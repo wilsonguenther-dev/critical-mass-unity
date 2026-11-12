@@ -1,7 +1,7 @@
 # Critical Mass (Unity): build-loop rules
 
-Written 2026-11-12T03:08:23Z (date -u). Rules only; no harness scripts exist yet. When they are written they live in
-this folder and are committed (U-011).
+Written 2026-11-12T03:08:23Z (date -u). The harness scripts that enforce these rules live in this folder and are
+committed (U-011); section 10 lists them (added 2026-11-12T04:15Z).
 
 Sources: decision **U-011** ([../DECISIONS.md](../DECISIONS.md)) and the launch rules section of the browser loop's
 harness post-mortem (`Obsidian/Wilson-Brain/Projects/Kaiju-Demo/unity-port/harness-postmortem-2026-11-11.md`, section 7).
@@ -125,3 +125,29 @@ Unity Hub is an Electron app and ships its own `chrome_crashpad_handler`, which 
 card flushers raced and sent a duplicate digest) and R14 (a dead integrator's compile lock blocked the next run).
 Recommended rules: slips go out as one digest per checkpoint and skip person-owned items; exactly one process flushes
 cards; the compile lock records its owner pid and a lock whose pid is dead is reclaimed at arm.
+
+## 10. The harness (scripts in this folder)
+
+Python 3 stdlib and bash only; nothing is "found on the machine" beyond Unity, git, `gh`, `xmllint` and node (for the
+workflow dry run). `loop/logs/` and `loop/state/` are git-ignored.
+
+| Path | Job |
+| --- | --- |
+| `items/<ID>.md` | One item per file. Front-matter: `id, title, phase, owner (loop/max), waits_on, files_allowed, files_forbidden, tests_required, pass_check, art_row`; optional `tightly_defined`, `architect_approved: U-###`. Files starting with `_` (conventions) are not items. Fixtures go in `items/_fixtures/` and are never queued. |
+| `bin/validate-items.py` | Rejects a missing field, "or" / "either" / "if installed" / "TBD" in the method (the `## Method` section, else every `##` section except `## Out of scope`), and any reach into `ProjectSettings/`, `Packages/` or `Controls.inputactions` without `architect_approved: U-###`. |
+| `bin/cmloop.py` | The one shared library: paths, compile lock (owner, pid, start; dead pid reclaimed), landed check (full-id `loop-landed: <ID>` line on origin/main, not reverted), lanes, returns and parking, the Obsidian live log, the single digest sender, PR open/merge (base must be `main`; no docs-only PR while a batch PR is open), halt check, preflight, plan, shutdown. |
+| `bin/integrate.py` | The integrator's mechanical part: merge the batch onto `loop/int-<tag>-<N>` cut from origin/main, scope-check, run the gates once per round, drop the red item with its failure text, re-run, then one PR to main, squash, prove landed, one card. |
+| `bin/spend.py` | Spend governor on the workflow's own `totalTokens` (U-014); live transcript estimate until that file exists. 90 % writes `STOP-DISPATCH`, 100 % writes `HALT`. |
+| `bin/launch.sh`, `bin/shutdown.sh` | Launch checklist and watcher start; teardown by pidfile, lanes pushed or bundled, resume note. Both take `--dry-run`. |
+| `bin/halt-check.sh` | First step of every seat: exit 3 halt/stall, 4 stop-dispatch, 5 launch ids not recorded. |
+| `gates/{compile,editmode,playmode-smoke,build-mac,parity,scope,budgets}` | One JSON line each, real exit codes; `skipped` exits 78, never 0. `budgets` only reports or flags. |
+| `watchers/watch.py {stall,memory,clock,disk,spend}` | Plain processes with pidfiles. Stall stays quiet while a live owner holds the compile lock. |
+| `workflow/critical-mass-unity.js` | The Workflow script. Scheduling is plain code: 5 builders + 1 integrator, stable item order, `agent()` null = halt, payloads under 40 KB. |
+| `tests/` | `python3 -m pytest -q loop/tests` and `node loop/tests/js/sim-workflow.mjs` (the workflow run against mock agents). |
+
+**Launch (orchestrator):** `loop/bin/launch.sh --cap <tokens>`; then `Workflow({scriptPath: loop/workflow/critical-mass-unity.js, args: <loop/logs/launch-args.json>})`, fresh, never resumed; then at once `python3 loop/bin/cmloop.py record-launch --task-id <w...> --run-id <wf_...>` (builders wait at most 120 s for it). **Stop:** `TaskStop(<task id>)`, then `loop/bin/shutdown.sh`.
+
+The defects in the OPEN note above are now handled: R4 (slips go to the live log once per checkpoint, person-owned
+items skipped, never texted), R6 (one flusher under a lock, one text per key ever), R14 (dead-pid locks reclaimed).
+The Unity process names in section 6's OPEN were measured during a compile and are listed in `watchers/watch.py`; the
+memory threshold (14 GB of loop RSS, report only) is still the architect's to set.
