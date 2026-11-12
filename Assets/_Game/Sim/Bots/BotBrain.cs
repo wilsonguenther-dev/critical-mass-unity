@@ -1,0 +1,65 @@
+using System;
+using System.Runtime.CompilerServices;
+using CriticalMass.Sim.Config;
+using CriticalMass.Sim.Core;
+
+namespace CriticalMass.Sim.Bots
+{
+    /// <summary>Bot brains (CM-09): FSM, team director, shared flow fields and steering into InputFrames. Port of src/bots/index.ts (09e0904), U-031.</summary>
+    public static class BotBrain
+    {
+        /// <summary>Bot think period in sim ticks (round(simHz / thinkHz)).</summary>
+        public static int BotThinkPeriod(GameConfig c) => Math.Max(1, (int)JsMath.Round((double)c.SimHz / c.Bots.ThinkHz));
+
+        private static readonly ConditionalWeakTable<World, BotsState> States = new ConditionalWeakTable<World, BotsState>();
+
+        /// <summary>The bot state for `world`, created on first use and reset when the world restarted or changed size.</summary>
+        public static BotsState GetBotsState(World w)
+        {
+            BotsState st;
+            if (!States.TryGetValue(w, out st))
+            {
+                st = BotsState.CreateBotsState(w);
+                States.Add(w, st);
+                BotsState.ResetBotsState(st, w);
+                return st;
+            }
+            if (st.Epoch != w.Epoch || st.ActorCount != w.ActorCount || w.Tick < st.LastTick) BotsState.ResetBotsState(st, w);
+            st.LastTick = w.Tick;
+            return st;
+        }
+
+        /// <summary>One bot tick (once per sim step, before Step): at most one stale field rebuilt, the director on its period, each bot's FSM think staggered by id.</summary>
+        public static void BotsThink(World w, double dt)
+        {
+            BotsState st = GetBotsState(w);
+            if (w.Match.Phase == MatchPhase.Ended) return;
+            BotFields.MaintainFields(st.Fields, w);
+            BotDirector.DirectorTick(w, st);
+            int period = st.ThinkPeriod;
+            int n = w.ActorCount;
+            int tick = w.Tick;
+            bool human = BotsState.HumanDriven(st, w);
+            for (int id = 0; id < n; id++)
+            {
+                Actor a = w.Actors[id];
+                // ITEM CM-35: added by its owner (Kaiju-role bots walk-pick meat)
+                if (id == 0 && !human) continue;
+                if (!a.Alive) continue;
+                if ((tick + id) % period == 0 || a.AiState == AiState.None) BotFsm.ThinkBot(w, st, id);
+            }
+        }
+
+        /// <summary>Write bot `id`'s InputFrame for this step into `output` (no allocation). Asking for id 0 puts the human on autopilot.</summary>
+        public static void FillBotInput(World w, int id, InputFrame output)
+        {
+            BotsState st = GetBotsState(w);
+            if (id == 0) st.HumanDrivenTick = w.Tick;
+            // fix-cm3-1: one scratch frame is shared by the human and every bot; a human jump / terraform press never reaches a bot.
+            output.Terraform = false;
+            output.Jump = false;
+            BotSteer.SteerBot(w, st, id, output);
+            // ITEM CM-38: added by its owner (takeBotTnt: Demolitions bot's F press)
+        }
+    }
+}
