@@ -1,16 +1,16 @@
 {
  "objects": {
   "Miner_Body": {
-   "triangles": 10300,
-   "vertices": 5520,
+   "triangles": 10756,
+   "vertices": 5792,
    "rest_bounds": {
     "min": [
-     -1.11,
+     -1.095,
      -0.473,
      0.0
     ],
     "max": [
-     1.11,
+     1.095,
      0.778,
      2.0
     ]
@@ -34,6 +34,7 @@
     "feat_helmet_lamp",
     "feat_knee_guard",
     "feat_shirt",
+    "feat_shoulder_pad",
     "feat_skin",
     "feat_sleeve",
     "feat_straps",
@@ -171,8 +172,8 @@
   "faces": 40
  },
  "bevels": {
-  "boxes": 145,
-  "at_min_or_more": 138,
+  "boxes": 147,
+  "at_min_or_more": 140,
   "groove_strips_exempt": 6,
   "hidden_cores_unbevelled": 1,
   "min_bevel": 0.02,
@@ -180,21 +181,23 @@
  },
  "triangles_by_feature": {
   "Miner_Body:beard": 1084,
-  "Miner_Body:team_cloth": 968,
+  "Miner_Body:team_glow": 896,
   "Miner_PickHammer:pick_hammer": 884,
-  "Miner_Body:team_glow": 784,
-  "Miner_Body:gloves": 760,
   "Miner_PickHammer_Hammer:pick_hammer": 756,
+  "Miner_Body:gloves": 712,
   "Miner_Body:helmet": 708,
   "Miner_Body:boots": 696,
-  "Miner_Body:shirt": 696,
+  "Miner_Body:skin": 696,
+  "Miner_Body:shoulder_pad": 664,
   "Miner_Body:crate": 584,
+  "Miner_Body:team_cloth": 536,
   "Miner_Body:trousers": 504,
-  "Miner_Body:skin": 496,
   "Miner_Body:belt": 464,
   "Miner_Body:straps": 440,
   "Miner_Body:chest_plate": 404,
+  "Miner_Body:shirt": 376,
   "Miner_Body:crate_detail": 356,
+  "Miner_Body:sleeve": 352,
   "Miner_Body:helmet_detail": 324,
   "Miner_Body:knee_guard": 304,
   "Miner_Body:face": 260,
@@ -202,11 +205,10 @@
   "Miner_Body:face_decal": 176,
   "Miner_PickHammer_Hammer:team_glow": 168,
   "Miner_PickHammer:team_glow": 112,
-  "Miner_Body:sleeve": 72,
   "Miner_PickHammer:team_cloth": 36,
   "Miner_PickHammer_Hammer:team_cloth": 36
  },
- "triangles_character": 12292,
+ "triangles_character": 12748,
  "triangles_barricade_per_state": {
   "folded": 1376,
   "deployed": 1424,

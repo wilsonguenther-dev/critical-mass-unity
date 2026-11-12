@@ -191,24 +191,44 @@ def build_torso():
 
 
 def build_arms():
+    """v3 (bible p08): cream rolled sleeves on the upper arm, tan bare forearms, big brass-and-stone shoulder pads with
+    a blue gem, dark-brown chunky gloves. No team rings on the arms (team colour only on scarf, gems and accents)."""
+    Z = 1.107
     for s, sd in ((1, "l"), (-1, "r")):
         ua, la, wr, hd = f"upperarm.{sd}", f"lowerarm.{sd}", f"wrist.{sd}", f"hand.{sd}"
-        add(BODY, B.sphere((0.155, 0.155, 0.155), 10, 6), "navy", ["chest", ua], "shirt", m=M((0.27 * s, 0, 1.11)))
-        add(BODY, B.cyl((0.24 * s, 0, 1.107), (0.47 * s, 0.012, 1.107), 0.145, 0.125, 12), "navy",
-            ["chest", ua, la], "shirt")
-        add(BODY, B.sphere((0.125, 0.125, 0.125), 8, 6), "navy", [ua, la], "shirt", m=M((0.465 * s, 0.012, 1.107)))
-        add(BODY, B.cyl((0.47 * s, 0.012, 1.107), (0.70 * s, 0, 1.107), 0.13, 0.145, 12), "leather_dark", [la, wr], "gloves")
-        # cream rolled sleeve on the upper arm (bible: light upper arms), brass stud band
-        add(BODY, B.cyl((0.30 * s, 0.004, 1.107), (0.43 * s, 0.01, 1.107), 0.16, 0.15, 10), "cream", [ua, "chest"],
-            "sleeve", m=None)
-        add(BODY, B.torus(0.155, 0.042, 12, 5), "kerchief", ua, "team_cloth", m=M((0.42 * s, 0.01, 1.107), (0, 90, 0)))
-        # huge dark-brown gloves: flared cuff, brass band, fist, knuckle ridge, thumb
-        add(BODY, B.cyl((0.62 * s, 0, 1.107), (0.80 * s, 0, 1.107), 0.15, 0.18, 12), "leather_dark", [la, wr, hd],
-            "gloves")
-        add(BODY, B.torus(0.158, 0.045, 12, 4), "kerchief", [la, wr], "team_cloth", m=M((0.61 * s, 0, 1.107), (0, 90, 0)))
-        add(BODY, B.sphere((0.20, 0.195, 0.205), 12, 8), "leather_dark", hd, "gloves", m=M((0.91 * s, -0.01, 1.09)))
+        add(BODY, B.sphere((0.15, 0.15, 0.15), 8, 5), "navy", ["chest", ua], "shirt", m=M((0.27 * s, 0, Z)))
+        # rolled cream sleeve: full upper arm, thick rolled cuff above the elbow
+        add(BODY, B.cyl((0.24 * s, 0.0, Z), (0.43 * s, 0.008, Z), 0.155, 0.145, 10), "cream", ["chest", ua, la],
+            "sleeve")
+        add(BODY, B.torus(0.142, 0.045, 10, 4), "cream", ua, "sleeve", m=M((0.43 * s, 0.008, Z), (0, 90, 0)))
+        add(BODY, B.torus(0.150, 0.014, 10, 3), "brass_dark", ua, "sleeve", m=M((0.405 * s, 0.008, Z), (0, 90, 0)))
+        # bare tan forearm, chunky (bible: thick forearms between sleeve and glove)
+        add(BODY, B.sphere((0.115, 0.115, 0.115), 8, 5), "skin", [ua, la], "skin", m=M((0.47 * s, 0.01, Z)))
+        add(BODY, B.cyl((0.47 * s, 0.01, Z), (0.645 * s, 0.0, Z), 0.118, 0.13, 10), "skin", [la, wr], "skin")
+        # huge dark-brown gloves: flared cuff with a stitched brass-studded band, fist, knuckle ridge, thumb
+        add(BODY, B.cyl((0.625 * s, 0, Z), (0.80 * s, 0, Z), 0.155, 0.185, 10), "leather_dark", [la, wr, hd], "gloves")
+        add(BODY, B.torus(0.158, 0.03, 10, 3), "leather", [la, wr], "gloves", m=M((0.635 * s, 0, Z), (0, 90, 0)))
+        for k in range(3):
+            a = math.radians(-60 + 60 * k)
+            add(BODY, rivet(0.016, 0.014), "brass", [la, wr], "gloves", smooth=False,
+                m=kit.frame((0.64 * s, 0.18 * math.sin(a) * 0 - 0.17 * math.cos(a), Z + 0.17 * math.sin(a)),
+                            (0, -math.cos(a), math.sin(a)), (1, 0, 0)))
+        add(BODY, B.sphere((0.20, 0.195, 0.205), 10, 7), "leather_dark", hd, "gloves", m=M((0.91 * s, -0.01, 1.09)))
         add(BODY, box((0.11, 0.23, 0.12), 0.04, 1), "leather_dark", hd, "gloves", m=M((1.01 * s, -0.03, 1.12)))
-        add(BODY, B.sphere((0.08, 0.075, 0.095), 8, 6), "leather_dark", hd, "gloves", m=M((0.84 * s, -0.18, 1.13)))
+        add(BODY, B.sphere((0.08, 0.075, 0.095), 6, 5), "leather_dark", hd, "gloves", m=M((0.84 * s, -0.18, 1.13)))
+        # big shoulder pad: stone pauldron cap, brass frame plate on its outer face, stone inset, blue gem, rivets
+        W = {ua: 0.65, "chest": 0.35}
+        PADM = kit.frame((0.31 * s, -0.10, 1.20), (0.50 * s, -0.55, 0.67), (0, 0, 1))
+        add(BODY, B.lathe([(0.235, -0.07), (0.245, 0.0), (0.22, 0.07), (0.14, 0.12), (0.02, 0.135)], 10),
+            "stone_light", W, "shoulder_pad", m=PADM)
+        add(BODY, B.torus(0.24, 0.032, 10, 3), "brass", W, "shoulder_pad", m=PADM @ M((0, 0, -0.005)))
+        PL = PADM @ M((0, 0, 0.115))
+        add(BODY, box((0.22, 0.22, 0.05), 0.025, 1), "brass", W, "shoulder_pad", smooth=False, m=PL)
+        add(BODY, B.prism([(-0.065, -0.07), (0.05, -0.07), (0.07, -0.05), (0.07, 0.065), (-0.07, 0.07), (-0.07, -0.05)],
+                          0.05, 0.012), "stone", W, "shoulder_pad", smooth=False, m=PL @ M((0, 0, 0.012)))
+        for x, y in ((0.075, 0.075), (-0.075, 0.075), (0.075, -0.075), (-0.075, -0.075)):
+            add(BODY, rivet(0.015, 0.012), "brass_dark", W, "shoulder_pad", smooth=False, m=PL @ M((x, y, 0.024)))
+        B.add_crystal(BODY, W, "team_glow", PL @ M((0, 0, 0.035), (0, 0, 30)), 0.05, 0.045, seg=6, waist=0.8, cap=0.55)
 
 
 def build_neck():
@@ -261,11 +281,11 @@ def beard_lobe_path():
     for i in range(n):
         t = -1.0 + 2.0 * i / (n - 1)               # -1 his right sideburn, 0 chin, +1 his left sideburn
         phi = math.radians(98 * t)
-        z = 1.175 + 0.33 * abs(t) ** 2.0            # chin 1.205, sideburn 1.505
+        z = 1.255 + 0.25 * abs(t) ** 2.0            # chin 1.205, sideburn 1.505
         R = 0.315 - 0.03 * (1 - abs(t))
         x = math.sin(phi) * R
         y = -math.cos(phi) * R * 0.92 - 0.02
-        size = 0.118 - 0.04 * abs(t)
+        size = 0.102 - 0.028 * abs(t)
         out.append(((x, y, z), (size, size * 0.80, size * 0.95), math.degrees(phi)))
     return out
 
@@ -291,7 +311,7 @@ def build_head():
     # big round red-pink nose, a step proud of the cheeks
     add(BODY, B.sphere((0.080, 0.075, 0.074), 10, 7), "nose", H, "face", m=M((0, -0.30, 1.412)))
     # beard: chin mass under the mouth plus scalloped jaw lobes, sideburns into the helmet
-    add(BODY, B.sphere((0.25, 0.17, 0.11), 10, 6), "beard", H, "beard", m=M((0, -0.18, 1.215)))
+    add(BODY, B.sphere((0.24, 0.17, 0.09), 10, 6), "beard", H, "beard", m=M((0, -0.18, 1.25)))
     lobes = beard_lobe_path()
     for c, r, rz in lobes:
         add(BODY, B.sphere(r, 7, 5), "beard", H, "beard", m=M(c, (0, 0, rz)))
