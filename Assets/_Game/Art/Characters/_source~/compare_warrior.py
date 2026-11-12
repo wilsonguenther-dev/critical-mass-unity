@@ -223,7 +223,7 @@ if MODE == "bible":
             print("   ", profile_diff(bm, rm))
         if "swatches" in res:
             print("    swatches", {k: v["dE2000"] for k, v in res["swatches"].items()})
-        sbs(b, r, f"bible p06: {ref}", f"ours v2: {name}  (silhouette IoU {res['iou']:.2f})",
+        sbs(b, r, f"bible p06: {ref}", f"ours v3: {name}  (silhouette IoU {res['iou']:.2f})",
             os.path.join(OUT, f"sbs-{name}.jpg"))
     with open(os.path.join(OUT, "iou.json"), "w") as f:
         json.dump(results, f, indent=1)
@@ -277,7 +277,7 @@ elif MODE == "facings":
         x += c.width + 8
     row.save(os.path.join(OUT, "facings-ours.png"))
     bible = Image.open(os.path.join(REF, "09-warrior-directions.png")).convert("RGB")
-    sbs(bible, row, "bible p09: 09-warrior-directions.png", "ours v2: 8 facings at the gameplay camera, 1080p pixels",
+    sbs(bible, row, "bible p09: 09-warrior-directions.png", "ours v3: 8 facings at the gameplay camera, 1080p pixels",
         os.path.join(OUT, "sbs-directions.jpg"), h=260)
     SH = max(s.height for s in sils)
     sheet = Image.new("RGB", (sum(s.width + 16 for s in sils) + 16, SH + 30), CREAM)

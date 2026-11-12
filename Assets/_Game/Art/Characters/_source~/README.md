@@ -82,8 +82,32 @@ repo; nothing in this folder should be committed from a render run.
 - Capture poses are per framing in `render_warrior.py` (`POSES`): a clip frame plus joint rotations. The bible
   profile draws no shield, so the profile pose holds the shield arm out to the side, shield edge-on behind the body.
 
+## Version 3 (2026-11-12)
+
+- Face: wider, softer head with modelled cheek volumes (blush painted on them), a low button nose between the cheeks
+  (the painted nose stroke is gone), big ears, and modelled dark brows (tapered clumps) that sit on the top of the eyes.
+  The decal (`cm_art/face.py`, same 256 x 256 planar layout as v2) now paints bigger lidded eyes with the iris toward the
+  nose and a white wedge outside (no ring), a wide smirk with a dimple, a nose shadow and a lip shadow.
+- Hair: separate tapered spikes over a small hidden cap: a six-lock fringe down over the forehead, side, nape and
+  back-crown spikes, and a tall topknot spray in a brass ring that leans to the character's left and sweeps back.
+- Armour: pauldrons are two chunky hewn stones per shoulder (`kit.Builder.chipped`: bisect-plane chips + lumpiness)
+  with a big domed brass plate on the front, brass rivets and cyan crack inlays; chipped knee guards and toe caps,
+  bigger boots, a domed belt buckle and hip plate, gloves with knuckles. `kit.add` bakes value steps from the surface
+  normal into vertex colour (+8 % on top faces, -12 % on undersides) on every non-glow part.
+- Scarf: a bunched roll of puffy folds; the front folds sit under the chin, the side folds bunch over the pauldrons'
+  inner edge (larger on the cleaver side) so team colour reads in the side facings; knot and hanging end on the
+  character's right; wide back tail.
+- Attitude: `build_warrior.py ATTITUDE` is baked into the KayKit `Idle` clip as a constant per-bone rotation layer
+  (`bake_attitude`): wide planted stance, chest out, head cocked toward the shield side. Rig, rest pose and the other
+  75 clips are untouched; clip names unchanged. The capture framings in `render_warrior.py` therefore add only what
+  each bible framing changes; cleave and shield-charge use a deep lunge with the cleaver arm flung back.
+- Tuning hook: `CM_POSES=<file.json>` adds framings to `render_warrior.py` (same tuple format as `POSES`), used to sweep
+  poses and camera angles by silhouette IoU before fixing them in `POSES`.
+
 ## Still not done
 
 - The Unity `CM/Toon` shader (it must also sample `Warrior_Face.png` through `UVMap`); nothing imported in Unity yet.
 - Cleave and shield-charge bible crops include swoosh and rock effects that are not modelled, so their IoU stays low.
+- v3: back (0.838) and profile (0.751) IoU are still under 0.85; the scarf is larger than the bible draws it to keep
+  team colour at 12 % in the side facings.
 - No LODs.
