@@ -209,6 +209,16 @@ def px_height(base, top, res_y):
 
 
 def posed_points(objs):
+    hulls = [m for ob in objs for m in ob.modifiers if m.name == "Outline" and m.show_viewport]
+    for m in hulls:            # fit to the model, not to its outline hull
+        m.show_viewport = False
+    pts = _posed_points(objs)
+    for m in hulls:
+        m.show_viewport = True
+    return pts
+
+
+def _posed_points(objs):
     dg = bpy.context.evaluated_depsgraph_get()
     pts = []
     for ob in objs:
@@ -248,52 +258,32 @@ def want(key):
 
 
 # ---------------------------------------------------------------- capture stances (render only; mesh, rig rest and FBX untouched)
-# The bible sheets draw the Miner with his fists up and the pick held upright; "bible" aims the arm bones at these
-# armature-space points (Idle frame 1 as the start), then turns the right hand so the pick shaft stands upright.
+# v2: per-framing stances and view angles fitted to the clean bible masks by fit_stance.py (stances.json).
+from miner_art.stance import Poser  # noqa: E402
+_SJ = os.path.join(HERE, "stances.json")
+FITTED = {k: v["stance"] for k, v in json.load(open(_SJ)).items()} if os.path.exists(_SJ) else {}
 STANCES = {
-    "bible": {"upperarm.r": (-0.50, 0.03, 0.90), "lowerarm.r": (-0.62, -0.14, 0.98),
+    "bible": {"az": 0, "el": 6, "upperarm.r": (-0.50, 0.03, 0.90), "lowerarm.r": (-0.62, -0.14, 0.98),
               "upperarm.l": (0.47, 0.05, 0.90), "lowerarm.l": (0.57, -0.08, 0.84), "pick_up": (-0.10, -0.04, 1.0)},
     "barricade": {"upperarm.r": (-0.40, -0.20, 0.96), "lowerarm.r": (-0.30, -0.50, 0.88),
                   "upperarm.l": (0.40, -0.20, 0.96), "lowerarm.l": (0.30, -0.50, 0.88), "pick_up": None},
 }
-IDLE_PICK_UP = Vector((-0.10, -0.06, 1.0)).normalized()     # build_miner.build_pick display-pose shaft direction
-_idle_bases = None
+STANCES.update(FITTED)
+_poser = None
 
 
 def freeze_idle():
-    global _idle_bases
-    arm.animation_data.action = bpy.data.actions["Idle"]
-    scene.frame_set(1)
-    _idle_bases = {pb.name: pb.matrix_basis.copy() for pb in arm.pose.bones}
-    arm.animation_data.action = None
-    for pb in arm.pose.bones:
-        pb.matrix_basis = _idle_bases[pb.name]
-    bpy.context.view_layer.update()
+    global _poser
+    _poser = Poser(arm, scene)
 
 
 def reset_idle():
-    for pb in arm.pose.bones:
-        pb.matrix_basis = _idle_bases[pb.name]
-    bpy.context.view_layer.update()
-
-
-def _rot_about(pb, q):
-    head = pb.head.copy()
-    pb.matrix = Matrix.Translation(head) @ q.to_matrix().to_4x4() @ Matrix.Translation(-head) @ pb.matrix
-    bpy.context.view_layer.update()
+    _poser.reset()
 
 
 def apply_stance(name):
-    reset_idle()
-    st = STANCES[name]
-    slot_idle = arm.pose.bones["handslot.r"].matrix.copy()
-    for bone in ("upperarm.r", "lowerarm.r", "upperarm.l", "lowerarm.l"):
-        pb = arm.pose.bones[bone]
-        _rot_about(pb, (pb.tail - pb.head).rotation_difference(Vector(st[bone]) - pb.head))
-    if st["pick_up"] is not None:
-        slot_now = arm.pose.bones["handslot.r"].matrix
-        cur = ((slot_now @ slot_idle.inverted()).to_3x3() @ IDLE_PICK_UP).normalized()
-        _rot_about(arm.pose.bones["hand.r"], cur.rotation_difference(Vector(st["pick_up"]).normalized()))
+    _poser.apply(STANCES.get(name, STANCES["bible"]))
+
 
 measure = {}
 char_objs = [body, pick]
@@ -396,7 +386,10 @@ if want("ortho"):
     freeze_idle()
     for name, (what, az, el, teams) in ORTHO.items():
         if what in ("char", "pickzoom"):
-            apply_stance("bible")
+            sname = {"accent": "front", "front-pick": "front"}.get(name, name)
+            apply_stance(sname if sname in STANCES else "bible")
+            if name in FITTED:
+                az, el = FITTED[name]["az"], FITTED[name]["el"]
         elif what == "posebar":
             apply_stance("barricade")
         else:
@@ -435,6 +428,9 @@ if want("ortho"):
         scene.render.resolution_y = hh
         scene.render.resolution_x = max(16, int(round(hh * w / h)))
         cam_data.ortho_scale = max(w, h)
+        measure.setdefault("ortho", {})[name] = {"az": az, "el": el, "ortho_scale": round(cam_data.ortho_scale, 3),
+                                                  "fit_min": [round(min(p[i] for p in pts), 3) for i in range(3)],
+                                                  "fit_max": [round(max(p[i] for p in pts), 3) for i in range(3)]}
         wpp = cam_data.ortho_scale / max(scene.render.resolution_x, scene.render.resolution_y)
         char = what in ("char", "pickzoom", "posebar")
         set_outline([o for o in objs if o in (body, pick, hammer)], ORTHO_PX * wpp)

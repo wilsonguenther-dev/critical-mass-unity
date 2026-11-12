@@ -160,7 +160,7 @@ def add_outline(ob, width, vgroup=None):
     sol.offset = 1.0
     sol.use_flip_normals = True
     sol.use_rim = False
-    sol.use_even_offset = True
+    sol.use_even_offset = False    # v2: even offset exploded into 20 u spikes where posed parts fold over each other
     sol.material_offset = len(ob.data.materials) - 1
     if vgroup and vgroup in ob.vertex_groups:
         sol.vertex_group = vgroup

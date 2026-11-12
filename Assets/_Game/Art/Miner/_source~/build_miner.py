@@ -47,6 +47,12 @@ BODY, PICK, HAMMER = "Miner_Body", "Miner_PickHammer", "Miner_PickHammer_Hammer"
 BAR = {"folded": "Miner_Barricade_Folded", "deployed": "Miner_Barricade_Deployed", "damaged": "Miner_Barricade_Damaged"}
 M = kit.mat_from
 BV = 0.03          # standard bevel (art direction 3.5: 0.02 to 0.04 u)
+LEG_X = 0.245      # v2: wider stance (bible p08 front, boots about 1.2 u across)
+HS = 1.35          # v2: helmet dome stretched up from the brim (bible: dome top about 8 % below the crystal tip)
+
+
+def hz(z):
+    return 1.545 + (z - 1.545) * HS
 
 
 HEAD_WIDEN = Matrix.Diagonal((1.18, 1.18, 1.0, 1.0))   # bible p08: helmet about half the body width
@@ -84,27 +90,27 @@ def ellipse_pos(theta_deg, rx, ry, z):
 # ===================================================================================================== body
 def build_legs():
     for s, sd in ((1, "l"), (-1, "r")):
-        lx = 0.19 * s
+        lx = LEG_X * s
         up, lo, ft, to = f"upperleg.{sd}", f"lowerleg.{sd}", f"foot.{sd}", f"toes.{sd}"
-        prof = [(0.12, 0.19), (0.165, 0.25), (0.19, 0.35), (0.195, 0.46), (0.175, 0.58), (0.12, 0.65)]
+        prof = [(0.14, 0.19), (0.19, 0.25), (0.215, 0.35), (0.22, 0.46), (0.205, 0.58), (0.15, 0.66)]
         add(BODY, B.lathe(prof, 12), "navy_dark", ["hips", up, lo], "trousers", m=M((lx, 0.0, 0)))
         # brass/brown knee guard: brass plate, leather inset, rivet
-        kg = M((lx, -0.165, 0.335), (-10, 0, 8 * s))
-        add(BODY, box((0.21, 0.09, 0.18), 0.03, 2), "brass", lo, "knee_guard", smooth=False, m=kg)
+        kg = M((lx, -0.19, 0.335), (-10, 0, 8 * s))
+        add(BODY, box((0.23, 0.09, 0.19), 0.03, 2), "brass", lo, "knee_guard", smooth=False, m=kg)
         add(BODY, box((0.13, 0.03, 0.10), 0.012, 1), "stone_light", lo, "knee_guard", smooth=False,
             m=kg @ M((0, -0.045, 0)))
         B.add_crystal(BODY, lo, "team_glow", kg @ M((0, -0.06, 0), (90, 0, 30)), 0.055, 0.045, seg=6, waist=0.8,
                       cap=0.55)
                 # heavy brown boots with brass toe caps
-        add(BODY, B.cyl((lx, 0.02, 0.06), (lx, 0.02, 0.25), 0.17, 0.165, 12), "leather", [lo, ft], "boots")
-        add(BODY, B.torus(0.172, 0.04, 12, 5), "kerchief", lo, "team_cloth", m=M((lx, 0.02, 0.25)))   # team trim
-        add(BODY, box((0.33, 0.44, 0.16), 0.05, 2), "leather", [ft, to], "boots", m=M((lx, -0.08, 0.085)))
-        add(BODY, box((0.335, 0.15, 0.135), 0.035, 2), "brass", to, "boots", smooth=False,
-            m=M((lx, -0.245, 0.078)))
-        add(BODY, box((0.34, 0.46, 0.045), 0.015, 1), "leather_dark", [ft, to], "boots", smooth=False,
-            m=M((lx, -0.085, 0.022)))
-        add(BODY, box((0.05, 0.03, 0.05), 0.012, 1), "brass", [lo, ft], "boots", smooth=False,
-            m=M((lx + 0.0, -0.155, 0.15)))
+        add(BODY, B.cyl((lx, 0.02, 0.06), (lx, 0.02, 0.27), 0.20, 0.19, 12), "leather", [lo, ft], "boots")
+        add(BODY, B.torus(0.198, 0.045, 12, 5), "kerchief", lo, "team_cloth", m=M((lx, 0.02, 0.27)))   # team trim
+        add(BODY, box((0.38, 0.48, 0.17), 0.05, 2), "leather", [ft, to], "boots", m=M((lx + 0.02 * s, -0.08, 0.09)))
+        add(BODY, box((0.385, 0.16, 0.145), 0.035, 2), "brass", to, "boots", smooth=False,
+            m=M((lx + 0.02 * s, -0.26, 0.082)))
+        add(BODY, box((0.39, 0.50, 0.05), 0.02, 1), "leather_dark", [ft, to], "boots", smooth=False,
+            m=M((lx + 0.02 * s, -0.085, 0.025)))
+        add(BODY, box((0.06, 0.04, 0.06), 0.02, 1), "brass", [lo, ft], "boots", smooth=False,
+            m=M((lx + 0.0, -0.18, 0.16)))
 
 
 def build_torso():
@@ -175,9 +181,9 @@ def build_arms():
         add(BODY, B.cyl((0.62 * s, 0, 1.107), (0.80 * s, 0, 1.107), 0.15, 0.18, 12), "leather_dark", [la, wr, hd],
             "gloves")
         add(BODY, B.torus(0.158, 0.045, 12, 4), "kerchief", [la, wr], "team_cloth", m=M((0.61 * s, 0, 1.107), (0, 90, 0)))
-        add(BODY, B.sphere((0.175, 0.17, 0.18), 12, 8), "leather_dark", hd, "gloves", m=M((0.90 * s, -0.01, 1.09)))
-        add(BODY, box((0.10, 0.20, 0.10), 0.04, 1), "leather_dark", hd, "gloves", m=M((0.99 * s, -0.03, 1.12)))
-        add(BODY, B.sphere((0.07, 0.065, 0.085), 8, 6), "leather_dark", hd, "gloves", m=M((0.84 * s, -0.16, 1.13)))
+        add(BODY, B.sphere((0.20, 0.195, 0.205), 12, 8), "leather_dark", hd, "gloves", m=M((0.91 * s, -0.01, 1.09)))
+        add(BODY, box((0.11, 0.23, 0.12), 0.04, 1), "leather_dark", hd, "gloves", m=M((1.01 * s, -0.03, 1.12)))
+        add(BODY, B.sphere((0.08, 0.075, 0.095), 8, 6), "leather_dark", hd, "gloves", m=M((0.84 * s, -0.18, 1.13)))
 
 
 def build_neck():
@@ -204,17 +210,17 @@ def build_head():
     # big round red nose
     add(BODY, B.sphere((0.085, 0.075, 0.075), 12, 8), "nose", H, "face", m=M((0, -0.30, 1.405)))
     # beard: base mass + 9 sculpted tapered clumps; mustache 2 clumps; grin
-    add(BODY, B.sphere((0.27, 0.20, 0.16), 12, 7), "beard", H, "beard", m=M((0, -0.03, 1.29)))
+    add(BODY, B.sphere((0.27, 0.20, 0.12), 12, 7), "beard", H, "beard", m=M((0, -0.03, 1.33)))
     clumps = [
-        ((0.25, -0.07, 1.40), (0.275, -0.13, 1.23), 0.085, (0.03, -0.02, 0.0)),
-        ((-0.25, -0.07, 1.40), (-0.275, -0.13, 1.23), 0.085, (-0.03, -0.02, 0.0)),
+        ((0.25, -0.07, 1.40), (0.27, -0.13, 1.27), 0.085, (0.03, -0.02, 0.0)),
+        ((-0.25, -0.07, 1.40), (-0.27, -0.13, 1.27), 0.085, (-0.03, -0.02, 0.0)),
         ((0.255, 0.0, 1.52), (0.27, -0.06, 1.37), 0.06, (0.02, 0, 0)),
         ((-0.255, 0.0, 1.52), (-0.27, -0.06, 1.37), 0.06, (-0.02, 0, 0)),
-        ((0.17, -0.18, 1.30), (0.19, -0.26, 1.14), 0.09, (0.02, -0.03, 0)),
-        ((-0.17, -0.18, 1.30), (-0.19, -0.26, 1.14), 0.09, (-0.02, -0.03, 0)),
-        ((0.065, -0.21, 1.27), (0.07, -0.30, 1.11), 0.09, (0.0, -0.03, 0)),
-        ((-0.065, -0.21, 1.27), (-0.07, -0.30, 1.11), 0.09, (0.0, -0.03, 0)),
-        ((0.0, -0.20, 1.25), (0.0, -0.28, 1.09), 0.085, (0, -0.03, 0)),
+        ((0.17, -0.18, 1.32), (0.19, -0.26, 1.22), 0.09, (0.02, -0.03, 0)),
+        ((-0.17, -0.18, 1.32), (-0.19, -0.26, 1.22), 0.09, (-0.02, -0.03, 0)),
+        ((0.065, -0.21, 1.30), (0.07, -0.30, 1.20), 0.09, (0.0, -0.03, 0)),
+        ((-0.065, -0.21, 1.30), (-0.07, -0.30, 1.20), 0.09, (0.0, -0.03, 0)),
+        ((0.0, -0.20, 1.29), (0.0, -0.29, 1.19), 0.085, (0, -0.03, 0)),
     ]
     for b, t, r, bend in clumps:
         add(BODY, B.spike(b, t, r, 8, bend), "beard", H, "beard", smooth=True)
@@ -231,20 +237,20 @@ def build_helmet():
     global _post
     _post = HEAD_WIDEN
     H = "head"
-    prof = [(0.30, 1.545), (0.335, 1.58), (0.325, 1.635), (0.29, 1.685), (0.22, 1.725), (0.115, 1.748),
-            (0.02, 1.755)]
+    prof = [(r, hz(z)) for r, z in ((0.30, 1.545), (0.338, 1.58), (0.33, 1.635), (0.30, 1.685), (0.235, 1.725),
+                                    (0.125, 1.748), (0.02, 1.755))]
     add(BODY, B.lathe(prof, 20), "helmet", H, "helmet", m=M((0, 0.005, 0)))
     # brim (rounded, a step lighter), groove line, brass trim band + rivets
     add(BODY, B.torus(0.335, 0.05, 20, 5), "stone_light", H, "helmet", m=M((0, -0.012, 1.55), (0, 0, 0),
                                                                             (1.0, 1.07, 0.62)))
     add(BODY, B.torus(0.333, 0.010, 20, 3), "helmet_seam", H, "helmet_detail", m=M((0, 0.004, 1.562)))
-    add(BODY, B.torus(0.336, 0.024, 20, 4), "brass", H, "helmet", m=M((0, 0.004, 1.59)))
+    add(BODY, B.torus(0.338, 0.026, 20, 4), "brass", H, "helmet", m=M((0, 0.004, hz(1.59))))
     for k in range(8):
         a = 2 * math.pi * (k + 0.5) / 8
         add(BODY, B.sphere((0.016, 0.016, 0.016), 5, 3), "brass_dark", H, "helmet_detail",
-            m=M((0.358 * math.cos(a), 0.004 + 0.358 * math.sin(a), 1.59)))
+            m=M((0.36 * math.cos(a), 0.004 + 0.36 * math.sin(a), hz(1.59))))
     # plate grooves (segmented stone hard hat): 4 meridians as thin strips riding the dome
-    pp = [(0.333, 1.60), (0.325, 1.64), (0.29, 1.69)]
+    pp = [(0.336, hz(1.60)), (0.328, hz(1.64)), (0.30, hz(1.69))]
     for ang in (30, 90, 150, 210, 270, 330):
         a = math.radians(ang)
         d = Vector((math.cos(a), math.sin(a), 0))
@@ -255,18 +261,18 @@ def build_helmet():
             bm, mm = strap(p0, p1, 0.014, 0.012, n, bevel=0.0)
             add(BODY, bm, "helmet_seam", H, "helmet_detail", smooth=False, m=mm, grad=False)
     # brass lamp bracket on the front of the dome
-    add(BODY, box((0.22, 0.09, 0.15), 0.03, 2), "brass", H, "helmet_lamp", smooth=False,
-        m=M((0, -0.255, 1.655), (-38, 0, 0)))
-    add(BODY, B.torus(0.10, 0.026, 12, 5), "brass", H, "helmet_lamp", m=M((0, -0.205, 1.705), (-12, 0, 0)))
-    # big glowing crystal lamp: tall spike (tip at z 2.0, 0.25 above the dome) + two side shards + a back shard
-    axis = Vector((0, -0.21, 0.978)).normalized()
-    base = Vector((0, -0.172, 1.66))
+    add(BODY, box((0.24, 0.10, 0.17), 0.03, 2), "brass", H, "helmet_lamp", smooth=False,
+        m=M((0, -0.25, 1.70), (-34, 0, 0)))
+    add(BODY, B.torus(0.13, 0.032, 12, 5), "brass", H, "helmet_lamp", m=M((0, -0.15, 1.785), (-14, 0, 0)))
+    # big glowing crystal lamp (v2: a chunky hex gem, not a thin spike): tip at z 2.0, 0.17 above the dome
+    axis = Vector((0, -0.16, 0.987)).normalized()
+    base = Vector((0, -0.14, 1.755))
     h_main = (2.0 - base.z) / axis.z
-    head_crystal(BODY, H, "team_glow", kit.frame(base, axis, (0, 1, 0)), 0.125, h_main, seg=6, waist=0.9,
-                 cap=0.3)
+    head_crystal(BODY, H, "team_glow", kit.frame(base, axis, (0, 1, 0)), 0.15, h_main, seg=6, waist=0.94,
+                 cap=0.42)
     for s in (1, -1):
-        ax = Vector((0.42 * s, -0.25, 0.87)).normalized()
-        head_crystal(BODY, H, "team_glow", kit.frame((0.08 * s, -0.20, 1.665), ax, (0, 1, 0)), 0.045, 0.13, seg=6,
+        ax = Vector((0.55 * s, -0.25, 0.80)).normalized()
+        head_crystal(BODY, H, "team_glow", kit.frame((0.11 * s, -0.17, 1.76), ax, (0, 1, 0)), 0.06, 0.15, seg=6,
                       waist=0.8, cap=0.38)
 
 
@@ -274,8 +280,8 @@ def build_crate():
     global _post
     _post = None
     W = "chest"
-    C = Vector((0.0, 0.56, 1.24))
-    SX, SY, SZ = 0.60, 0.52, 0.60
+    C = Vector((0.0, 0.53, 1.10))      # v2: lower on the back (bible profile: crate spans z 0.75 to 1.45)
+    SX, SY, SZ = 0.60, 0.60, 0.66      # v2: 0.6 x 0.6 top-down square (brief), a little taller
     F = "crate"
     FD = "crate_detail"      # boards, brace, lid, seams: 1.5 px inner line
 
@@ -318,7 +324,7 @@ def build_crate():
             for z in (-1, 1):
                 if y < 0 and z < 0:
                     continue      # hidden against the back
-        add(BODY, box((0.125, 0.125, 0.125), 0.03, 1), "brass", W, F, smooth=False,
+                add(BODY, box((0.125, 0.125, 0.125), 0.03, 1), "brass", W, F, smooth=False,
                     m=at(x * (SX / 2 - 0.045), y * (SY / 2 - 0.045), z * (SZ / 2 - 0.045)))
     # rope coil on the right side, team crystals growing out of the top-left corner
     for (x, y, z, ax, r, h) in ((0.19, 0.08, SZ / 2 - 0.02, (0.30, 0.15, 0.94), 0.08, 0.32),
@@ -337,15 +343,27 @@ def held_matrix(poses, slot, origin, z_axis, y_hint):
     return rest @ poses[slot].inverted() @ kit.frame(origin, z_axis, y_hint)
 
 
+GRIP = 0.62      # v2: grip height on the item (bible 08-front: fist a little below the middle of the pick)
+
+
 def shaft_parts(p):
-    """Shared banded shaft along +Z (pommel bottom -0.045, shaft top 0.98); build_pick shifts it 0.26 down so the grip
-    sits 31 % up the item. Item height pommel to crystal tip 1.243 u = 0.62 of body height (bible 0.633)."""
-    p(B.cyl((0, 0, 0.02), (0, 0, 0.98), 0.042, 0.04, 10), "wood", "pick_hammer", True)
-    p(B.cyl((0, 0, 0.19), (0, 0, 0.34), 0.047, 0.047, 10), "navy_dark", "pick_hammer", True)
-    p(B.cyl((0, 0, 0.55), (0, 0, 0.68), 0.05, 0.05, 10), "kerchief", "team_cloth", True)   # team trim wrap
-    for z in (0.08, 0.40, 0.50, 0.75, 0.88):
-        p(B.cyl((0, 0, z - 0.018), (0, 0, z + 0.018), 0.05, 0.05, 8), "brass", "pick_hammer", False)
-    p(box((0.10, 0.10, 0.08), 0.022, 1), "brass", "pick_hammer", False, M((0, 0, -0.005)))
+    """v2 shaft along +Z: brass pommel block at 0, thick banded shaft to 1.30, head socket above. Item length pommel to
+    the top of the head 1.50 u = 0.75 of body height (the p08 drawings, front and front-pick, show the pick from the
+    helmet brim to the boots; the 0.633 number in PARITY.md undersells what the drawing shows)."""
+    p(B.cyl((0, 0, 0.06), (0, 0, 1.30), 0.056, 0.052, 10), "wood", "pick_hammer", True)
+    for z0, z1 in ((0.20, 0.36), (0.80, 0.94)):
+        p(B.cyl((0, 0, z0), (0, 0, z1), 0.064, 0.064, 10), "navy_dark", "pick_hammer", True)
+    p(B.cyl((0, 0, 0.44), (0, 0, 0.56), 0.066, 0.066, 10), "kerchief", "team_cloth", True)   # team trim wrap
+    for z in (0.17, 0.39, 0.61, 0.77, 0.97, 1.16):
+        p(B.cyl((0, 0, z - 0.024), (0, 0, z + 0.024), 0.068, 0.068, 8), "brass", "pick_hammer", False)
+    p(box((0.15, 0.15, 0.12), 0.03, 2), "brass", "pick_hammer", False, M((0, 0, 0.05)))
+    p(box((0.10, 0.10, 0.04), 0.02, 1), "brass_dark", "pick_hammer", False, M((0, 0, -0.025)))
+
+
+def arc_arm(p, pts, color, seg=8):
+    """Curved tapering arm through [(x, z, r), ...] in the item XZ plane (r = half thickness)."""
+    for (x0, z0, r0), (x1, z1, r1) in zip(pts[:-1], pts[1:]):
+        p(B.cyl((x0, 0, z0), (x1, 0, z1), r0, r1, seg), color, "pick_hammer", False)
 
 
 def build_pick(poses, obj, state):
@@ -358,30 +376,32 @@ def build_pick(poses, obj, state):
     shaft_parts(p)
     crystals = []
     if state == "pick":
-        p(box((0.16, 0.15, 0.20), 0.03, 2), "brass", "pick_hammer", False, M((0, 0, 1.02)))
-        p(box((0.135, 0.125, 0.04), 0.012, 1), "brass_dark", "pick_hammer", False, M((0, 0, 0.955)))
-        # stone point (+X, toward the head), curving down, with a crystal edge strip: the second crystal point
-        arc = [(0.06, 1.03, 0.085), (0.15, 1.02, 0.068), (0.23, 0.96, 0.048), (0.28, 0.88, 0.026), (0.30, 0.80, 0.004)]
-        for (x0, z0, r0), (x1, z1, r1) in zip(arc[:-1], arc[1:]):
-            p(B.cyl((x0, 0, z0), (x1, 0, z1), r0, r1, 8), "stone_light", "pick_hammer", False)
-        crystals.append((kit.frame((0.07, 0, 1.06), (1.0, 0, -0.35), (0, 0, 1)), 0.03, 0.17))
-        # crystal blade (-X, outward): the big glowing pick point, angled up and out
-        crystals.append((kit.frame((-0.05, 0, 1.05), (-1.0, 0, 0.42), (0, 0, 1)), 0.15, 0.36))
-        p(B.cyl((-0.03, 0, 1.03), (-0.12, 0, 1.07), 0.065, 0.05, 8), "stone", "pick_hammer", False)
+        # head socket: brass collar, stone block, brass cap (heavy, about 0.26 x 0.22 x 0.30)
+        p(box((0.27, 0.22, 0.30), 0.035, 2), "brass", "pick_hammer", False, M((0, 0, 1.36)))
+        p(box((0.20, 0.235, 0.16), 0.03, 2), "stone", "pick_hammer", False, M((0, 0, 1.39)))
+        p(box((0.14, 0.24, 0.06), 0.02, 1), "brass_dark", "pick_hammer", False, M((0, 0, 1.25)))
+        # stone point (+X), a wide crescent arm drooping to a point (bible: the hooked grey arm on the right)
+        arc_arm(p, [(0.10, 1.40, 0.10), (0.24, 1.38, 0.085), (0.36, 1.31, 0.065), (0.45, 1.20, 0.042),
+                    (0.50, 1.07, 0.012)], "stone_light")
+        # crystal arm (-X): a broad stone blade carrying a long crystal edge, drooping down and out
+        arc_arm(p, [(-0.10, 1.40, 0.10), (-0.24, 1.37, 0.09), (-0.36, 1.29, 0.075), (-0.44, 1.18, 0.05)], "stone")
+        crystals.append((kit.frame((-0.13, 0, 1.36), (-1.0, 0, -0.78), (0, 0, 1)), 0.12, 0.44))
+        crystals.append((kit.frame((-0.22, 0, 1.43), (-1.0, 0, -0.30), (0, 0, 1)), 0.08, 0.28))
     else:
-        # hammer: stone block head with brass bands and crystals set into both faces and the top
-        p(box((0.42, 0.25, 0.27), 0.04, 2), "stone", "pick_hammer", False, M((0, 0, 1.02)))
-        for x in (-0.13, 0.13):
-            p(box((0.045, 0.265, 0.285), 0.012, 1), "brass", "pick_hammer", False, M((x * 1.15, 0, 1.02)))
+        # hammer: a massive stone block head with brass bands, crystals set into both faces and the top
+        p(box((0.56, 0.32, 0.36), 0.045, 2), "stone", "pick_hammer", False, M((0, 0, 1.40)))
+        for x in (-0.17, 0.17):
+            p(box((0.06, 0.34, 0.38), 0.02, 1), "brass", "pick_hammer", False, M((x, 0, 1.40)))
+        for x in (-0.27, 0.27):
+            p(box((0.05, 0.30, 0.30), 0.02, 1), "stone_light", "pick_hammer", False, M((x * 1.03, 0, 1.40)))
         for y in (-1, 1):
-            crystals.append((M((0, y * 0.12, 1.02), (-90 * y, 0, 30)), 0.085, 0.065))
-        crystals.append((kit.frame((0, 0, 1.14), (0, 0, 1), (0, 1, 0)), 0.05, 0.09))
-        p(box((0.13, 0.12, 0.05), 0.012, 1), "brass_dark", "pick_hammer", False, M((0, 0, 0.89)))
+            crystals.append((M((0, y * 0.15, 1.40), (-90 * y, 0, 30)), 0.11, 0.08))
+        crystals.append((kit.frame((0, 0, 1.57), (0, 0, 1), (0, 1, 0)), 0.07, 0.12))
+        p(box((0.16, 0.16, 0.06), 0.02, 1), "brass_dark", "pick_hammer", False, M((0, 0, 1.20)))
 
     origin = poses[W].translation.copy()
     up = Vector((-0.10, -0.06, 1.0)).normalized()
-    # grip sits about a third up the item (bible 08-front-pick: the fist holds the shaft below its middle)
-    T = held_matrix(poses, W, origin, up, (0, 1, 0)) @ M((0, 0, -0.26))
+    T = held_matrix(poses, W, origin, up, (0, 1, 0)) @ M((0, 0, -GRIP))
     for bm, color, feat, smooth, m in parts:
         B.add(obj, bm, color, W, feat=feat, smooth=smooth, m=m, post=T)
     for m4, r, h in crystals:
