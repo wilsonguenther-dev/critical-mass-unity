@@ -1,0 +1,175 @@
+using System;
+using System.Collections.Generic;
+using CriticalMass.Sim.Config;
+using CriticalMass.Sim.Core;
+using CriticalMass.Sim.Tests.Harness;
+using NUnit.Framework;
+
+namespace CriticalMass.Sim.Tests
+{
+    /// <summary>Port of src/bots/outcomes.slow.test.ts (09e0904): do bots produce a real match? Soak lane only (U-034: reported, never a gate).</summary>
+    [TestFixture, Category("Slow")]
+    public sealed class OutcomesSoakTests
+    {
+        /// <summary>D-030 floor on the 50-seed passive sweep (outcomes.slow.test.ts line 150); not PassiveHumanTeamWins.</summary>
+        private const int PassiveSweepTeamWinsMin = 11;
+
+        private static IReadOnlyList<MatchOutcome> A => SoakCache.Batch("A", HumanMode.Bot);
+        private static IReadOnlyList<MatchOutcome> B => SoakCache.Batch("B", HumanMode.Bot);
+        private static IReadOnlyList<MatchOutcome> C => SoakCache.Batch("C", HumanMode.Passive);
+        private static IReadOnlyList<MatchOutcome> AfkBot => SoakCache.Batch("AFK", HumanMode.Bot);
+        private static IReadOnlyList<MatchOutcome> AfkPassive => SoakCache.Batch("AFK", HumanMode.Passive);
+        private static IReadOnlyList<MatchOutcome> AfkWander => SoakCache.Batch("AFK", HumanMode.Wander);
+
+        private static double Mean(IReadOnlyList<MatchOutcome> list, Func<MatchOutcome, double> f)
+        {
+            if (list.Count == 0) return 0;
+            double s = 0;
+            for (int i = 0; i < list.Count; i++) s += f(list[i]);
+            return s / list.Count;
+        }
+
+        /// <summary>Matches of the first n entries of list won by team (n &lt; 0: all).</summary>
+        private static int Wins(IReadOnlyList<MatchOutcome> list, MatchResult team, int n = -1)
+        {
+            int end = n < 0 ? list.Count : Math.Min(n, list.Count);
+            int c = 0;
+            for (int i = 0; i < end; i++)
+                if (list[i].Winner == team) c++;
+            return c;
+        }
+
+        private static bool HatchedAllied(MatchOutcome o)
+        {
+            return o.Hatch == KaijuState.Azure || o.Hatch == KaijuState.Crimson;
+        }
+
+        private static List<MatchOutcome> AllAB()
+        {
+            var all = new List<MatchOutcome>(A);
+            all.AddRange(B);
+            return all;
+        }
+
+        [Test]
+        public void ADecisiveGe80PercentOfMatchesAreNotADraw()
+        {
+            IReadOnlyList<MatchOutcome> a = A;
+            Assert.AreEqual(OutcomeBatches.A.Count, a.Count);
+            int n = 0;
+            for (int i = 0; i < a.Count; i++)
+                if (a[i].Winner == MatchResult.Azure || a[i].Winner == MatchResult.Crimson) n++;
+            double decisive = (double)n / a.Count;
+            Assert.GreaterOrEqual(decisive, OutcomeThresholds.Decisive);
+        }
+
+        [Test]
+        public void AOwnedShareMeanShareOfSamplesOwnedByATeamContestedAndNeutralExcludedGe04()
+        {
+            Assert.GreaterOrEqual(Mean(A, o => o.OwnedShare), OutcomeThresholds.OwnedShare);
+        }
+
+        [Test]
+        public void AOwnedShareEverySingleMatchGe025()
+        {
+            foreach (MatchOutcome o in A)
+                Assert.GreaterOrEqual(o.OwnedShare, OutcomeThresholds.OwnedShareMin, "seed " + o.Seed);
+        }
+
+        [Test]
+        public void ASwingyMeanHillOwnerChangesPerMatchGe4()
+        {
+            Assert.GreaterOrEqual(Mean(A, o => o.OwnerChanges), OutcomeThresholds.OwnerChangesMean);
+        }
+
+        [Test]
+        public void ABalancedNeitherTeamWinsMoreThan14Of20()
+        {
+            int most = Math.Max(Wins(A, MatchResult.Azure), Wins(A, MatchResult.Crimson));
+            Assert.LessOrEqual(most, OutcomeThresholds.MaxTeamWins);
+        }
+
+        [Test]
+        public void AKaijuDutyMeanBotsPerTeamInGatherDeliverCorruptDuringT20240Ge15()
+        {
+            Assert.GreaterOrEqual(Mean(A, o => o.KaijuDuty), OutcomeThresholds.KaijuDutyMean);
+        }
+
+        [Test]
+        public void BOwnedShareEverySingleMatchGe025()
+        {
+            IReadOnlyList<MatchOutcome> b = B;
+            Assert.AreEqual(OutcomeBatches.B.Count, b.Count);
+            foreach (MatchOutcome o in b)
+                Assert.GreaterOrEqual(o.OwnedShare, OutcomeThresholds.OwnedShareMin, "seed " + o.Seed);
+        }
+
+        [Test]
+        public void APlusBDifferentGe2DistinctNaturalHatchOutcomes()
+        {
+            List<MatchOutcome> all = AllAB();
+            Assert.AreEqual(OutcomeBatches.A.Count + OutcomeBatches.B.Count, all.Count);
+            var distinct = new HashSet<KaijuState>();
+            foreach (MatchOutcome o in all)
+                if (o.Hatch != null) distinct.Add(o.Hatch.Value);
+            Assert.GreaterOrEqual(distinct.Count, OutcomeThresholds.DistinctHatchOutcomes);
+        }
+
+        [Test]
+        public void APlusBTheKaijuSwingsFightsButDoesNotDecideThemAnAlliedHatchSTeamWinsLe85PercentOfThoseMatches()
+        {
+            int allied = 0;
+            int alliedWins = 0;
+            foreach (MatchOutcome o in AllAB())
+            {
+                if (!HatchedAllied(o)) continue;
+                allied++;
+                if (SimEnumMap.TeamOf(o.Winner) == SimEnumMap.TeamOf(o.Hatch.Value)) alliedWins++;
+            }
+            double share = allied > 0 ? (double)alliedWins / allied : 0;
+            Assert.LessOrEqual(share, OutcomeThresholds.AlliedWinShareMax);
+        }
+
+        [Test]
+        public void CRunsIts10PassiveSeedsWinShareAssertedOnThe50SeedPassiveSweepD030()
+        {
+            Assert.AreEqual(OutcomeBatches.C.Count, C.Count);
+        }
+
+        [Test]
+        public void AFKThePassiveBatchReplaysBatchCExactlySameSeedsSameOutcomes()
+        {
+            IReadOnlyList<MatchOutcome> passive = AfkPassive;
+            IReadOnlyList<MatchOutcome> c = C;
+            Assert.AreEqual(OutcomeBatches.AFK.Count, passive.Count);
+            Assert.AreEqual(OutcomeBatches.C.Count, c.Count);
+            for (int i = 0; i < OutcomeBatches.C.Count; i++)
+                Assert.AreEqual(c[i].Winner, passive[i].Winner, "seed " + c[i].Seed);
+        }
+
+        [Test]
+        public void CD030APassiveHumanSTeamStillWinsGe11OfThe50PassiveSeeds201250()
+        {
+            IReadOnlyList<MatchOutcome> passive = AfkPassive;
+            Assert.AreEqual(OutcomeBatches.AFK.Count, passive.Count);
+            Assert.GreaterOrEqual(Wins(passive, MatchResult.Azure), PassiveSweepTeamWinsMin);
+        }
+
+        [Test]
+        public void AFKOnBatchCSSeedsANonContributingActor0PassiveOrWanderingNeverWinsMoreThanACompetentOne()
+        {
+            int n = OutcomeBatches.C.Count;
+            int played = Wins(AfkBot, MatchResult.Azure, n);
+            Assert.LessOrEqual(Wins(AfkPassive, MatchResult.Azure, n) - played, OutcomeThresholds.AfkWinsOverPlayingMax);
+            Assert.LessOrEqual(Wins(AfkWander, MatchResult.Azure, n) - played, OutcomeThresholds.AfkWinsOverPlayingMax);
+        }
+
+        [Test]
+        public void AFKOnAll50SeedsANonContributingActor0PassiveOrWanderingNeverWinsMoreThanACompetentOne()
+        {
+            int played = Wins(AfkBot, MatchResult.Azure);
+            Assert.LessOrEqual(Wins(AfkPassive, MatchResult.Azure) - played, OutcomeThresholds.AfkWinsOverPlayingMax);
+            Assert.LessOrEqual(Wins(AfkWander, MatchResult.Azure) - played, OutcomeThresholds.AfkWinsOverPlayingMax);
+        }
+    }
+}
