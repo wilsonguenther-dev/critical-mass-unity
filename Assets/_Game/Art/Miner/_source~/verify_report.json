@@ -1,5 +1,7 @@
 {
- "failed": [],
+ "failed": [
+  "Miner_Barricade_Damaged: sits on the ground (min z ~ 0)"
+ ],
  "results": [
   {
    "check": "fbx header axes (Y up, Z front, X coord)",
@@ -89,11 +91,11 @@
    "check": "Miner_Body loose/non-manifold",
    "ok": true,
    "detail": {
-    "triangles": 9916,
+    "triangles": 9860,
     "loose_verts": 0,
     "loose_edges": 0,
     "non_manifold_edges": 0,
-    "closed_shells": 175
+    "closed_shells": 173
    }
   },
   {
@@ -255,7 +257,7 @@
   {
    "check": "triangle budget <= 12000",
    "ok": true,
-   "detail": 11908
+   "detail": 11852
   },
   {
    "check": "body height in metres after round trip (Blender Z = Unity Y)",
@@ -381,8 +383,8 @@
   },
   {
    "check": "Miner_Barricade_Damaged: sits on the ground (min z ~ 0)",
-   "ok": true,
-   "detail": -0.031
+   "ok": false,
+   "detail": -0.075
   },
   {
    "check": "Miner_Barricade_Damaged: vertex colour + team mask present",

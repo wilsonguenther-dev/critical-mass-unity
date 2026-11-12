@@ -415,10 +415,11 @@ def build_crate():
                 add(BODY, box((0.125, 0.125, 0.125), 0.03, 1), "brass", W, F, smooth=False,
                     m=at(x * (SX / 2 - 0.045), y * (SY / 2 - 0.045), z * (SZ / 2 - 0.045)))
     # rope coil on the right side, team crystals growing out of the top-left corner
-    for (x, y, z, ax, r, h) in ((0.21, 0.08, SZ / 2 - 0.02, (0.30, 0.15, 0.94), 0.085, 0.24),
-                                 (0.07, -0.02, SZ / 2 - 0.02, (-0.1, -0.25, 0.95), 0.06, 0.16),
-                                 (0.25, -0.10, SZ / 2 - 0.02, (0.5, -0.35, 0.8), 0.05, 0.13),
-                                 (-0.22, 0.10, SZ / 2 - 0.02, (-0.35, 0.1, 0.93), 0.07, 0.19),
+    # v2: one cluster at the back-left top corner, short, so it no longer rings the helmet at gameplay size or pokes
+    # out beside the head in the front view (bible back view: a single cluster on the top-left corner)
+    for (x, y, z, ax, r, h) in ((-0.20, 0.14, SZ / 2 - 0.02, (-0.20, 0.25, 0.95), 0.08, 0.15),
+                                 (-0.10, 0.18, SZ / 2 - 0.02, (0.1, 0.35, 0.93), 0.055, 0.10),
+                                 (-0.27, 0.06, SZ / 2 - 0.02, (-0.5, 0.1, 0.86), 0.05, 0.08),
                                  (SX / 2 + 0.01, 0.05, 0.08, (0.95, 0.1, 0.3), 0.06, 0.20),
                                  (-SX / 2 - 0.01, -0.06, 0.16, (-0.9, -0.1, 0.45), 0.055, 0.17)):
         B.add_crystal(BODY, W, "team_glow", kit.frame(C + Vector((x, y, z)), ax, (0, 1, 0)), r, h, seg=6,
@@ -545,7 +546,7 @@ def build_barricade():
         bar_plank(o, -0.53, 0.53, z)
     bar_diamond(o, 0.46)
     folded_crate(BAR["folded"], damaged=False)
-    # damaged (bible p08 barricade-damaged): the FOLDED crate, battered: knocked over onto its long side and tilted,
+    # damaged (bible p08 barricade-damaged): the FOLDED crate, battered: upright but knocked askew,
     # one face board torn out, one brace snapped, a brass corner off, a stone panel cracked, the crystal chipped,
     # splinters and a stone chip on the ground. Authored geometry, no procedural destruction.
     folded_crate(BAR["damaged"], damaged=True)
@@ -555,8 +556,9 @@ def folded_crate(o, damaged):
     F = "barricade"
     SX, SY, SZ = 0.62, 0.44, 0.80
     if damaged:
-        # lying on its long side (crate z -> world x), rocked 9 degrees onto one edge, resting on the ground
-        base = M((0.0, 0.0, SX / 2 + 0.035), (0, 0, 0)) @ M((0, 0, 0), (0, 81, 0)) @ M((0, 0, -SZ / 2))
+        # upright like the bible drawing (vertical boards, stone panels at the sides), knocked askew: rocked 7 degrees
+        # onto one bottom edge and turned 8 degrees, one corner sunk 3 cm into the ground
+        base = M((0.0, 0.0, -0.03), (0, 7, 8))
     else:
         base = M((0, 0, 0))
 
