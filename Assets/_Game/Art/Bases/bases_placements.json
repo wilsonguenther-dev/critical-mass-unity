@@ -1049,56 +1049,20 @@
    {
     "piece": "cm_crystal_lamp_low",
     "unity_local_pos": [
-     3.9404,
+     3.9837,
      0.0,
-     -2.275
+     2.3
+    ],
+    "unity_yaw_deg": 30.0
+   },
+   {
+    "piece": "cm_crystal_lamp_low",
+    "unity_local_pos": [
+     3.9837,
+     0.0,
+     -2.3
     ],
     "unity_yaw_deg": -30.0
-   },
-   {
-    "piece": "cm_crystal_lamp_low",
-    "unity_local_pos": [
-     0.0,
-     0.0,
-     -4.55
-    ],
-    "unity_yaw_deg": -90.0
-   },
-   {
-    "piece": "cm_crystal_lamp_low",
-    "unity_local_pos": [
-     -3.9404,
-     0.0,
-     -2.275
-    ],
-    "unity_yaw_deg": -150.0
-   },
-   {
-    "piece": "cm_crystal_lamp_low",
-    "unity_local_pos": [
-     -3.9404,
-     0.0,
-     2.275
-    ],
-    "unity_yaw_deg": -210.0
-   },
-   {
-    "piece": "cm_crystal_lamp_low",
-    "unity_local_pos": [
-     -0.0,
-     0.0,
-     4.55
-    ],
-    "unity_yaw_deg": -270.0
-   },
-   {
-    "piece": "cm_crystal_lamp_low",
-    "unity_local_pos": [
-     3.9404,
-     0.0,
-     2.275
-    ],
-    "unity_yaw_deg": -330.0
    }
   ]
  },
@@ -2152,56 +2116,20 @@
    {
     "piece": "cm_crystal_lamp_low",
     "unity_local_pos": [
-     -3.9404,
+     -3.9837,
      0.0,
-     -2.275
+     2.3
+    ],
+    "unity_yaw_deg": -30.0
+   },
+   {
+    "piece": "cm_crystal_lamp_low",
+    "unity_local_pos": [
+     -3.9837,
+     0.0,
+     -2.3
     ],
     "unity_yaw_deg": 30.0
-   },
-   {
-    "piece": "cm_crystal_lamp_low",
-    "unity_local_pos": [
-     0.0,
-     0.0,
-     -4.55
-    ],
-    "unity_yaw_deg": 90.0
-   },
-   {
-    "piece": "cm_crystal_lamp_low",
-    "unity_local_pos": [
-     3.9404,
-     0.0,
-     -2.275
-    ],
-    "unity_yaw_deg": 150.0
-   },
-   {
-    "piece": "cm_crystal_lamp_low",
-    "unity_local_pos": [
-     3.9404,
-     0.0,
-     2.275
-    ],
-    "unity_yaw_deg": 210.0
-   },
-   {
-    "piece": "cm_crystal_lamp_low",
-    "unity_local_pos": [
-     0.0,
-     0.0,
-     4.55
-    ],
-    "unity_yaw_deg": 270.0
-   },
-   {
-    "piece": "cm_crystal_lamp_low",
-    "unity_local_pos": [
-     -3.9404,
-     0.0,
-     2.275
-    ],
-    "unity_yaw_deg": 330.0
    }
   ]
  },

@@ -749,14 +749,14 @@ def brazier_geo(piece, x, y, z, rng, scale=1.0):
     piece.pools.append((Vector((x, y, z)), 2.0))
 
 
-def crystal_cluster(piece, x, y, z, rng, height=0.9, n=4, spread=0.25, base=True, lamp=True):
+def crystal_cluster(piece, x, y, z, rng, height=0.9, n=4, spread=0.25, base=True, lamp=True, fat=0.0):
     if base:
         piece.lathe([(0.34, z), (0.38, z + 0.06), (0.3, z + 0.16), (0.0, z + 0.17)], 7,
                     topside(pal.vc("warm_b"), pal.vc("warm_c", pal.TOP_LIFT)), cx=x, cy=y, bev=0.0)
         z += 0.12
     for i in range(n):
         h = height * (1.0 if i == 0 else rng.uniform(0.45, 0.75))
-        r = h * 0.17
+        r = max(h * 0.17, fat * (1.0 if i == 0 else 0.75))
         ang = rng.uniform(0, 2 * math.pi)
         d = 0 if i == 0 else spread * rng.uniform(0.6, 1.0)
         cx, cy = x + d * math.cos(ang), y + d * math.sin(ang)

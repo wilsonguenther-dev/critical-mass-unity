@@ -70,7 +70,7 @@ def kit_builders():
         "pool": lambda: pieces.pool_decal(),
         "egg_pool": lambda: pieces.pool_decal("cm_egg_pool", radius=3.0, hexc="#4FDDC3", alpha=0.4),
         "crystal_lamp": lambda: pieces.crystal_lamp(),
-        "crystal_lamp_low": lambda: pieces.crystal_lamp("cm_crystal_lamp_low", height=0.26),
+        "crystal_lamp_low": lambda: pieces.crystal_lamp("cm_crystal_lamp_low", height=0.27),
         "stairs": lambda: pieces.stairs(),
         "roof_pitched": lambda: pieces.roof_pitched(),
         "pad": lambda: pieces.respawn_pad(),
@@ -222,6 +222,23 @@ def export_layouts(scn):
 
 
 # ============================================================================ checks
+def mirror_check():
+    """Crimson district = Azure mirrored across sim x = 56: every placement mirrored in position, yaw negated
+    (barrels, braziers, pools, lamps and the pad are rotation-symmetric)."""
+    a, c = PLACEMENTS["district_azure"]["items"], PLACEMENTS["district_crimson"]["items"]
+    sym = {"cm_dress_barrel", "cm_brazier", "cm_light_pool", "cm_crystal_lamp", "cm_respawn_pad"}
+    pos = yaw = 0
+    for ia, ic in zip(a, c):
+        (xa, ya, za), (xc, yc, zc) = ia["unity_local_pos"], ic["unity_local_pos"]
+        if ia["piece"].replace("azure", "T") == ic["piece"].replace("crimson", "T") and abs(xa + xc) < 0.01 and \
+                abs(ya - yc) < 0.01 and abs(za - zc) < 0.01:
+            pos += 1
+            if ia["piece"] in sym or abs(((-ia["unity_yaw_deg"]) - ic["unity_yaw_deg"] + 180) % 360 - 180) < 0.6:
+                yaw += 1
+    return {"placements": [len(a), len(c)], "position_mirrored": pos, "yaw_mirrored_or_symmetric": yaw,
+            "walls_footing_towers": "same seeds along mirrored paths"}
+
+
 def world_verts(ob):
     mw = ob.matrix_world
     return [mw @ v.co for v in ob.data.vertices]
@@ -655,28 +672,34 @@ def base_target(cam, layout, base_target_sim):
     lm = [o for o in objs if o.get("key") == "landmark"][0]
     pad = [o for o in objs if o.get("key") == "pad"][0]
     probes = [lm.matrix_world @ p for p in LANDMARK_LOCAL_PROBES] + [pad.matrix_world @ p for p in PAD_LOCAL_PROBES]
+    # candidates that frame landmark + pad; among them prefer the art-direction density band (45..60 props,
+    # 10..14 warm pools in frame), then the smallest move
+    from bpy_extras.object_utils import world_to_camera_view
+    props = [o.matrix_world.translation.copy() for o in objs if KIT.get(o.get("key"), {}).get("kind") == "prop"
+             or o.get("key") in ("gate_post",)]
+    pools = [o.matrix_world.translation.copy() for o in objs if o.get("key") == "pool"]
+    for o in objs:
+        for lp, lk in KIT.get(o.get("key"), {}).get("lights", []):
+            if lk == "brazier" and o.get("key") != "brazier":
+                pools.append(o.matrix_world @ lp)
     best = None
-    most = (0, None)
     steps = [i * 0.5 for i in range(-22, 23)]
     for dx in steps:
         for dz in steps:
-            d = math.hypot(dx, dz)
-            if best and d >= best[0]:
-                continue
             t = (base_target_sim[0] + dx, base_target_sim[1] + dz)
             frame_gameplay(cam, S2B(t[0], t[1], 0))
             bpy.context.view_layer.update()
-            h = _in_frame(scn, cam, probes, 0.01)
-            if h > most[0]:
-                most = (h, t)
-            if h == len(probes):
-                best = (d, t)
-    from bpy_extras.object_utils import world_to_camera_view
-    frame_gameplay(cam, S2B(most[1][0], most[1][1], 0))
-    bpy.context.view_layer.update()
-    bad = [(i, tuple(round(c, 2) for c in world_to_camera_view(scn, cam, p))) for i, p in enumerate(probes)
-           if not all(0.01 <= c <= 0.99 for c in tuple(world_to_camera_view(scn, cam, p))[:2])]
-    print("BASE_TARGET", layout, len(probes), most, best, bad)
+            if _in_frame(scn, cam, probes, 0.01) != len(probes):
+                continue
+            n_p = _in_frame(scn, cam, props, 0.0)
+            n_l = _in_frame(scn, cam, pools, 0.0)
+            miss = max(0, 45 - n_p, n_p - 60) + 2 * max(0, 10 - n_l, n_l - 14)
+            key = (miss, math.hypot(dx, dz))
+            if best is None or key < best[0]:
+                best = (key, t, n_p, n_l)
+    print("BASE_TARGET", layout, best)
+    if best:
+        best = (best[0][1], best[1])
     return (best[1], round(best[0], 2)) if best else (base_target_sim, None)
 
 
@@ -697,8 +720,11 @@ def define_shots(cam):
         # the landmark whole; the warrior stands where that camera's player would be
         t, shift = base_target(cam, f"district_{team}", (padx - 1.4, 34.6))
         BASE_TARGETS[team] = {"target_sim": [round(t[0], 2), round(t[1], 2)], "shift_from_pad_view_m": shift}
-        shot(f"gp_base_{team}", [f"district_{team}"], team, "gp", S2B(t[0], t[1], 0),
-             warrior=(t[0] + 1.4 + 0.6, t[1] + 1.4 + 0.9, 0.0))
+        # the reference warrior stands on walkable floor just outside the heal zone, on the camera side of the pad
+        dx, dz = t[0] - padx, t[1] - layouts.PAD[1]
+        dl = math.hypot(dx, dz) or 1.0
+        wx, wz = padx + dx / dl * 4.9, layouts.PAD[1] + dz / dl * 4.9
+        shot(f"gp_base_{team}", [f"district_{team}"], team, "gp", S2B(t[0], t[1], 0), warrior=(wx, wz, 0.0))
         # reference: the spawn camera (player on the pad), as v1 framed it
         shot(f"gp_base_{team}_pad", [f"district_{team}"], team, "gp", S2B(padx - 1.4, 34.6, 0),
              warrior=(padx + 0.6, 36.9, 0.1))
@@ -861,6 +887,7 @@ def main():
     checks["kit"] = rows
     checks["solid_cell_proposal"] = layouts.solid_cell_proposal()
     checks["chipped_blocks"] = dict(kit.CHIP_STATS)
+    checks["mirror_check"] = mirror_check()
     os.makedirs(OUT, exist_ok=True)
     blend = os.path.join(HERE, "bases_kit.blend")
     if RENDER:

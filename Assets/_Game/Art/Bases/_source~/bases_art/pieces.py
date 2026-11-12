@@ -318,10 +318,9 @@ def respawn_pad(name="cm_respawn_pad", seed=13):
         pc.box(0, 0, 0.1, 1.86, 0.62, 0.02, pal.vc("team_dark"), rot=rot, bev=0.0)
         pc.box(0, 0, 0.11, 1.7, 0.48, 0.035, pal.vc("team_glow"), rot=rot, bev=0.012)
     # low team crystal clusters (<= 0.3 u) nested in the outer ring, two big ones as the bible's
-    for k, (a, n, sp) in enumerate(((math.radians(120), 11, 0.4), (math.radians(300), 11, 0.4),
-                                    (math.radians(35), 6, 0.24), (math.radians(215), 6, 0.24))):
-        kit.crystal_cluster(pc, 4.12 * math.cos(a), 4.12 * math.sin(a), 0.0, rng, height=0.29, n=n, spread=sp,
-                            base=False, lamp=k < 2)
+    for k, (a, n, sp) in enumerate(((math.radians(120), 6, 0.3), (math.radians(300), 6, 0.3))):
+        kit.crystal_cluster(pc, 4.15 * math.cos(a), 4.15 * math.sin(a), 0.0, rng, height=0.29, n=n, spread=sp,
+                            base=False, lamp=True, fat=0.13)
     # boulders and grass outside the ring (<= 0.28 u)
     for k in range(5):
         a = rng.uniform(0, 2 * math.pi)
@@ -578,14 +577,18 @@ def _block_chain(pc, rng, pts, w0, w1, depth0=None, depth1=None, warm=True, moss
     depth0 = depth0 or w0
     depth1 = depth1 or w1
     ups = []
+    prev = None
     for i in range(n + 1):
         a = pts[max(0, i - 1)]
         b = pts[min(n, i + 1)]
         ax = (b - a).normalized()
         side = ax.cross(Vector((0, 0, 1)))
         if side.length < 1e-4:
-            side = Vector((1, 0, 0))
+            side = prev.copy() if prev is not None else Vector((1, 0, 0))
         side.normalize()
+        if prev is not None and side.dot(prev) < 0:     # the curve passed vertical: keep the frame from flipping
+            side = -side
+        prev = side
         ups.append((ax, side, side.cross(ax).normalized()))
     for i in range(n):
         a, b = pts[i], pts[i + 1]

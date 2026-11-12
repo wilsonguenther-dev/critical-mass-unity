@@ -262,12 +262,12 @@ def district(team="azure"):
             place.append(("banner", xb, zb, 0.0, yaw_front(Vector((-(xi - xb), zi - zb)).normalized()), {}))
     info["landmark"] = [isl_pt(deg, R + 0.1, mirror) for deg, half, kind, R in cuts if kind == "landmark"][0]
     # the pad: lanes around it stay clear (no ground scatter in v2); six low team crystal lamps (0.26 u, walkable)
-    # mark the heal-zone edge as the bible's pad crystals do
+    # (the pad piece carries its own two big low clusters)
     place.append(("pad", padx, PAD[1], 0.0, 0.0, {}))
-    for k in range(6):
-        a = math.radians(30 + 60 * k)
-        x = padx + 4.55 * math.cos(a) * (-1 if mirror else 1)
-        place.append(("crystal_lamp_low", x, PAD[1] + 4.55 * math.sin(a), 0.0, mj(a), {}))
+    for k in range(2):         # two more chunky low crystal lamps on the route side of the pad
+        a = math.radians(-30 + 60 * k)
+        x = padx + 4.6 * math.cos(a) * (-1 if mirror else 1)
+        place.append(("crystal_lamp_low", x, PAD[1] + 4.6 * math.sin(a), 0.0, mj(a), {}))
     return world, place, info
 
 
