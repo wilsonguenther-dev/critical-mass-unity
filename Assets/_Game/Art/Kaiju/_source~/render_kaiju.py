@@ -426,15 +426,15 @@ GAME = [
 BIBLE = [
     ("10-egg", "Egg", "Neutral", None, 0.0, 30, 10),
     ("10-hatchling", "Hatchling", "Neutral", "Idle", 0.0, 60, 12),
-    ("10-azure-adult", "Adult", "Azure", "Idle", 0.0, 60, 6),
-    ("10-crimson-adult", "Adult", "Crimson", "Idle", 0.0, 60, 6),
-    ("10-berserk-adult", "Adult", "Berserk", "Berserk", 0.25, 0, 6),
-    ("11-front", "Adult", "Azure", "Idle", 0.0, -15, 8),
+    ("10-azure-adult", "Adult", "Azure", "Idle", 0.0, 52, 6),
+    ("10-crimson-adult", "Adult", "Crimson", "Idle", 0.0, 52, 6),
+    ("10-berserk-adult", "Adult", "Berserk", "Berserk", 0.25, 60, 6),
+    ("11-front", "Adult", "Azure", "Idle", 0.0, 0, 8),
     ("11-three-quarter", "Adult", "Azure", "Idle", 0.0, 60, 8),
     ("11-profile", "Adult", "Azure", "Idle", 0.0, 75, 8),
-    ("11-rear", "Adult", "Azure", "Idle", 0.0, 195, 12),
-    ("11-roar", "Adult", "Azure", "Roar", 0.55, 0, 8),
-    ("11-slam-windup", "Adult", "Azure", "SlamWindup", 1.0, 45, 8),
+    ("11-rear", "Adult", "Azure", "Idle", 0.0, 180, 12),
+    ("11-roar", "Adult", "Azure", "Roar", 0.55, 60, 8),
+    ("11-slam-windup", "Adult", "Azure", "SlamWindup", 1.0, 52, 8),
 ]
 
 meta = {}

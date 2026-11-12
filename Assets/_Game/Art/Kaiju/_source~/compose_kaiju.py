@@ -142,13 +142,32 @@ for jid, m in sorted(meta.items()):
 
 
 # ------------------------------------------------------------------------------------------------ bible framings
+def main_component(m):
+    lab, n = ndimage.label(m)
+    if n == 0:
+        return m
+    sizes = ndimage.sum(np.ones_like(lab), lab, range(1, n + 1))
+    return ndimage.binary_fill_holes(lab == int(np.argmax(sizes)) + 1)
+
+
 def bible_mask(ref):
+    """The bible subject: pixels away from the page cream, minus the soft grey ground shadow under the feet (light,
+    unsaturated pixels in the lowest 15 % of the subject), largest connected piece, holes filled."""
     a = np.asarray(ref.convert("RGB")).astype(int)
     bg = np.median(np.concatenate([a[0], a[-1], a[:, 0], a[:, -1]]), axis=0)
     diff = np.abs(a - bg).max(2) > 28
-    lab, n = ndimage.label(ndimage.binary_closing(diff, iterations=2))
-    sizes = ndimage.sum(np.ones_like(lab), lab, range(1, n + 1))
-    return ndimage.binary_fill_holes(lab == int(np.argmax(sizes)) + 1)
+    _, sat, val = hsv(a.astype(np.uint8))
+    m0 = main_component(ndimage.binary_closing(diff, iterations=2))
+    ys = np.nonzero(m0.any(1))[0]
+    y_cut = ys.min() + 0.85 * (ys.max() - ys.min())
+    rows = np.arange(a.shape[0])[:, None] >= y_cut
+    shadow = rows & (sat < 0.16) & (val > 0.55)
+    return main_component(ndimage.binary_closing(diff & ~shadow, iterations=2))
+
+
+def our_mask(rgba):
+    """Our subject, treated like the bible's: largest connected piece (floating shards excluded), holes filled."""
+    return main_component(np.asarray(rgba)[..., 3] > 127)
 
 
 def bbox(m):
@@ -158,7 +177,7 @@ def bbox(m):
 
 def iou_only(ref_p, our_p):
     bm = bible_mask(Image.open(ref_p))
-    oa = np.asarray(Image.open(our_p).convert("RGBA"))[..., 3] > 127
+    oa = our_mask(Image.open(our_p).convert("RGBA"))
     bx0, by0, bx1, by1 = bbox(bm)
     ox0, oy0, ox1, oy1 = bbox(oa)
     sc = (by1 - by0) / (oy1 - oy0)
@@ -176,8 +195,8 @@ def iou_only(ref_p, our_p):
 
 # allowed azimuth ranges: the sweep may only fine-tune the view the bible page shows (front stays front)
 AZ_RANGE = {"11-front": (-15, 15), "11-three-quarter": (15, 60), "11-profile": (60, 100), "11-rear": (150, 210),
-            "10-azure-adult": (15, 60), "10-crimson-adult": (15, 60), "10-berserk-adult": (0, 75),
-            "10-hatchling": (30, 75), "10-egg": (-30, 30), "11-roar": (0, 75), "11-slam-windup": (0, 75)}
+            "10-azure-adult": (15, 60), "10-crimson-adult": (15, 60), "10-berserk-adult": (20, 60),
+            "10-hatchling": (30, 75), "10-egg": (-30, 30), "11-roar": (30, 75), "11-slam-windup": (0, 75)}
 if len(sys.argv) > 4 and sys.argv[4] == "--sweep":
     best = {}
     for f in sorted(glob.glob(os.path.join(REN, "sweep", "*__*.png"))):
@@ -205,8 +224,8 @@ for jid, m in sorted(meta.items()):
     ring = ndimage.binary_dilation(oa, structure=ndimage.generate_binary_structure(2, 1)) & ~oa
     arr = np.asarray(ours).copy()
     arr[ring] = (*NAVY, 255)
-    oa = oa | ring
     ours = Image.fromarray(arr)
+    oa = our_mask(ours)
     bm = bible_mask(ref)
     bx0, by0, bx1, by1 = bbox(bm)
     ox0, oy0, ox1, oy1 = bbox(oa)

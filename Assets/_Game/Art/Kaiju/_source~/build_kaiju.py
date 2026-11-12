@@ -683,8 +683,8 @@ def creature_clips():
     def roar(t):
         e = smooth(t / 0.3) * (1 - smooth((t - 0.8) / 0.2))
         sh = 2.5 * math.sin(math.tau * 9 * t) * e
-        return {"rot": {"Spine": [(X, -10 * e)], "Chest": [(X, -8 * e)], "Neck": [(X, -6 * e)],
-                        "Head": [(X, -12 * e + sh)], "Jaw": [(X, 38 * e)],
+        return {"rot": {"Spine": [(X, -10 * e)], "Chest": [(X, -10 * e)], "Neck": [(X, -12 * e)],
+                        "Head": [(X, -24 * e + sh)], "Jaw": [(X, 42 * e)],
                         "Arm_L": [(X, 16 * e), (Y, -8 * e)], "Arm_R": [(X, 16 * e), (Y, 8 * e)],
                         "Tail1": [(X, -8 * e)]},
                 "loc": {"Hips": (0, 0, 0.06 * e)}}
@@ -708,19 +708,20 @@ def creature_clips():
         return {"rot": rot, "loc": {"Hips": (0, 0, 0.06 - 0.14 * s)}}
 
     def berserk(t):
-        """Bible p10 berserk: a rearing roar. The whole body pitches up about the hind feet (Root turn plus the
-        matching lift, pivot = hind-foot contact at y = PIVOT_Y design units), forelimbs off the ground, jaw wide."""
+        """Bible p10 berserk: a hunched-up roar. The body rears a little about the hind feet (Root turn plus the
+        matching lift, pivot = hind-foot contact at y = PIVOT_Y design units), fists stay planted, head thrown up,
+        jaw wide, a shudder through the spine."""
         p = math.tau * t
         sh = math.sin(2 * p)
-        a = -24.0 + 2.0 * math.sin(p)
+        a = -13.0 + 1.5 * math.sin(p)
         ar = math.radians(a)
         lift = (0, PIVOT_Y[0] * (1 - math.cos(ar)), -PIVOT_Y[0] * math.sin(ar))
-        return {"rot": {"Root": [(X, a)], "Spine": [(X, -8), (Y, 3 * sh)], "Chest": [(X, -10)], "Neck": [(X, 6)],
-                        "Head": [(X, 4 + 4 * math.sin(4 * p))], "Jaw": [(X, 40 + 4 * math.sin(6 * p))],
-                        "Arm_L": [(X, -38 + 6 * math.sin(p)), (Y, -10)], "Arm_R": [(X, -38 - 6 * math.sin(p)), (Y, 10)],
-                        "Forearm_L": [(X, -30)], "Forearm_R": [(X, -30)], "Fist_L": [(X, -10)], "Fist_R": [(X, -10)],
-                        "Thigh_L": [(X, 20)], "Thigh_R": [(X, 20)], "Foot_L": [(X, 6)], "Foot_R": [(X, 6)],
-                        "Tail1": [(Z, 12 * sh), (X, 14)]},
+        return {"rot": {"Root": [(X, a)], "Spine": [(X, -6), (Y, 3 * sh)], "Chest": [(X, -8)], "Neck": [(X, -8)],
+                        "Head": [(X, -22 + 4 * math.sin(4 * p))], "Jaw": [(X, 40 + 4 * math.sin(6 * p))],
+                        "Arm_L": [(X, 24 + 3 * math.sin(p)), (Y, -6)], "Arm_R": [(X, 24 - 3 * math.sin(p)), (Y, 6)],
+                        "Forearm_L": [(X, 6)], "Forearm_R": [(X, 6)], "Fist_L": [(X, -16)], "Fist_R": [(X, -16)],
+                        "Thigh_L": [(X, 12)], "Thigh_R": [(X, 12)], "Foot_L": [(X, 2)], "Foot_R": [(X, 2)],
+                        "Tail1": [(Z, 12 * sh), (X, 8)]},
                 "loc": {"Root": lift}}
 
     def ko(t):
@@ -923,8 +924,8 @@ def adult_params():
     for sx in (1, -1):
         limbs += [((sx * 1.26, -0.48, 2.1), (sx * 1.32, -0.75, 1.55), 0.48, 0.5),
                   ((sx * 1.32, -0.75, 1.55), (sx * 1.34, -0.92, 0.75), 0.52, 0.6)]
-    limbs += [((0, 1.45, 1.15), (0, 1.85, 0.72), 0.4, 0.3), ((0, 1.85, 0.72), (T * 0.42, 2.05, 0.48), 0.3, 0.22),
-              ((T * 0.42, 2.05, 0.48), (T * 0.82, 1.9, 0.62), 0.22, 0.15)]
+    limbs += [((0, 1.45, 1.15), (0, 1.85, 0.72), 0.4, 0.3), ((0, 1.85, 0.72), (T * 0.3, 2.1, 0.5), 0.3, 0.22),
+              ((T * 0.3, 2.1, 0.5), (T * 0.52, 2.12, 0.78), 0.22, 0.15)]
     bones = [
         ("Root", (0, 0, 0), (0, 0.5, 0), None),
         ("Hips", (0, 1.0, 1.25), (0, 0.3, 1.6), "Root"),
@@ -934,8 +935,8 @@ def adult_params():
         ("Head", (0, -0.94, 3.2), (0, -1.47, 3.23), "Neck"),
         ("Jaw", (0, -1.02, 2.95), (0, -1.5, 2.91), "Head"),
         ("Tail1", (0, 1.4, 1.15), (0, 1.85, 0.72), "Hips"),
-        ("Tail2", (0, 1.85, 0.72), (T * 0.42, 2.05, 0.48), "Tail1"),
-        ("Tail3", (T * 0.42, 2.05, 0.48), (T * 0.82, 1.9, 0.62), "Tail2"),
+        ("Tail2", (0, 1.85, 0.72), (T * 0.3, 2.1, 0.5), "Tail1"),
+        ("Tail3", (T * 0.3, 2.1, 0.5), (T * 0.52, 2.12, 0.78), "Tail2"),
     ]
     for sx, sfx in ((1, "_L"), (-1, "_R")):
         bones += [("Arm" + sfx, (sx * 1.22, -0.42, 2.28), (sx * 1.32, -0.75, 1.55), "Chest"),
@@ -965,7 +966,7 @@ def adult_params():
         return 0.4 if (abs(p.x) > 0.72 and p.z < 1.7) else 0.18
 
     def moss(p, n):
-        return 0.85 if (p.z > 0.7 and n.z > 0.15) else 0.0
+        return 0.6 if (p.z > 0.7 and n.z > 0.2) else 0.0
 
     crest = []
     # midline: crown -> neck -> hump (tallest) -> back -> hips -> tail
@@ -996,7 +997,7 @@ def adult_params():
         "knuckles": (-0.33, -0.11, 0.11, 0.33), "knuckle_fwd": 0.42, "knuckle_r": 0.15,
         "foot": (0.64, 0.95, 0.38), "toes": (-0.2, 0.0, 0.2), "toe_fwd": 0.42, "toe_r": 0.12,
         "face": face, "crest": crest, "spikes": spikes,
-        "tail_tip": ((T * 0.82, 1.9, 0.62), (T * 0.6, -0.1, 0.8), 0.46),
+        "tail_tip": ((T * 0.52, 2.12, 0.78), (T * 0.35, 0.1, 0.9), 0.46),
     }
 
 
@@ -1017,7 +1018,7 @@ def hatch_params():
     limbs = []
     for sx in (1, -1):
         limbs += [((sx * 0.75, -0.55, 0.95), (sx * 0.82, -0.66, 0.35), 0.38, 0.4)]
-    limbs += [((0, 1.0, 0.75), (0, 1.45, 0.5), 0.34, 0.24), ((0, 1.45, 0.5), (0.15, 1.75, 0.32), 0.24, 0.14)]
+    limbs += [((0, 1.0, 0.75), (0, 1.55, 0.42), 0.34, 0.24), ((0, 1.55, 0.42), (0.15, 2.0, 0.28), 0.24, 0.14)]
     bones = [
         ("Root", (0, 0, 0), (0, 0.5, 0), None),
         ("Hips", (0, 0.65, 0.8), (0, 0.0, 1.0), "Root"),
@@ -1026,9 +1027,9 @@ def hatch_params():
         ("Neck", (0, -0.7, 1.3), (0, -1.0, 1.68), "Chest"),
         ("Head", (0, -1.0, 1.68), (0, -1.65, 1.73), "Neck"),
         ("Jaw", (0, -1.15, 1.42), (0, -1.65, 1.37), "Head"),
-        ("Tail1", (0, 0.95, 0.78), (0, 1.45, 0.5), "Hips"),
-        ("Tail2", (0, 1.45, 0.5), (0.15, 1.75, 0.32), "Tail1"),
-        ("Tail3", (0.15, 1.75, 0.32), (0.25, 1.95, 0.22), "Tail2"),
+        ("Tail1", (0, 0.95, 0.78), (0, 1.55, 0.42), "Hips"),
+        ("Tail2", (0, 1.55, 0.42), (0.15, 2.0, 0.28), "Tail1"),
+        ("Tail3", (0.15, 2.0, 0.28), (0.25, 2.2, 0.22), "Tail2"),
     ]
     for sx, sfx in ((1, "_L"), (-1, "_R")):
         bones += [("Arm" + sfx, (sx * 0.72, -0.52, 1.05), (sx * 0.78, -0.6, 0.7), "Chest"),
@@ -1054,8 +1055,8 @@ def hatch_params():
         return 0.7 if (p.z > 0.6 and n.z > 0.25) else 0.0
 
     crest = []
-    for cy, size, cnt in [(-1.12, 0.36, 3), (-0.6, 0.6, 3), (-0.3, 1.0, 4), (0.05, 1.12, 4), (0.4, 0.95, 4),
-                          (0.75, 0.62, 3), (1.15, 0.4, 3)]:
+    for cy, size, cnt in [(-1.12, 0.4, 3), (-0.6, 0.75, 3), (-0.3, 1.25, 4), (0.05, 1.4, 4), (0.4, 1.2, 4),
+                          (0.75, 0.8, 3), (1.15, 0.5, 3)]:
         crest.append((0.0, cy, size, cnt, 0.0))
     for sx in (1, -1):
         for cy, size, cnt, x, tilt in [(-0.2, 0.75, 3, 0.45, 0.6), (0.2, 0.8, 3, 0.5, 0.6), (0.55, 0.6, 3, 0.42, 0.6)]:
@@ -1074,7 +1075,7 @@ def hatch_params():
         "knuckles": (-0.18, 0.0, 0.18), "knuckle_fwd": 0.36, "knuckle_r": 0.11,
         "foot": (0.62, 0.62, 0.22), "toes": (-0.14, 0.0, 0.14), "toe_fwd": 0.34, "toe_r": 0.1,
         "face": face, "crest": crest, "spikes": [(0.1, 0.25, 0.3), (-0.1, -0.1, 0.3)],
-        "tail_tip": ((0.25, 1.95, 0.22), (0.3, 0.6, 0.5), 0.32),
+        "tail_tip": ((0.2, 2.1, 0.26), (0.3, 0.6, 0.6), 0.4),
     }
 
 
