@@ -25,7 +25,7 @@ def _rgba(h, a=1.0):
     return (r, g, b, a)
 
 
-def make_material(name="CM_Toon"):
+def make_material(name="CM_Toon", face_image=None):
     mat = bpy.data.materials.get(name) or bpy.data.materials.new(name)
     mat.use_nodes = True
     nt = mat.node_tree
@@ -74,6 +74,12 @@ def make_material(name="CM_Toon"):
     team = val("TEAM", 0.0)
     maskview = val("MASKVIEW", 0.0)
     a = col.outputs["Alpha"]
+    vcol = col.outputs["Color"]
+    if face_image is not None:          # painted face decal (UVMap) over the skin vertex colour
+        uvn = node("ShaderNodeUVMap", uv_map="UVMap")
+        tex = node("ShaderNodeTexImage", name="FACE", image=face_image, interpolation="Linear", extension="CLIP")
+        L.new(uvn.outputs[0], tex.inputs[0])
+        vcol = mix(tex.outputs["Alpha"], vcol, tex.outputs["Color"])
     is_cloth = math_("COMPARE", a, P.MASK_TEAM_CLOTH, 0.1)
     is_tglow = math_("COMPARE", a, P.MASK_TEAM_GLOW, 0.1)
     is_fglow = math_("COMPARE", a, FP.MASK_FIXED_GLOW, 0.1)
@@ -84,8 +90,8 @@ def make_material(name="CM_Toon"):
     az = P.lin(FP.FARMER["f_team_cloth"][0])
     cr = P.lin(FP.FARMER_SWAP["f_team_cloth"][0])
     ratio = tuple(c / max(z, 1e-4) for c, z in zip(cr, az)) + (1.0,)
-    swapped = mix(1.0, col.outputs["Color"], ratio, "MULTIPLY")
-    base = mix(math_("MULTIPLY", is_team, team), col.outputs["Color"], swapped)
+    swapped = mix(1.0, vcol, ratio, "MULTIPLY")
+    base = mix(math_("MULTIPLY", is_team, team), vcol, swapped)
 
     # N.L bands
     geo = node("ShaderNodeNewGeometry")

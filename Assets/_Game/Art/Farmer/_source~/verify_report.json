@@ -87,11 +87,11 @@
    "check": "Farmer_Body loose/non-manifold",
    "ok": true,
    "detail": {
-    "triangles": 10208,
+    "triangles": 10112,
     "loose_verts": 0,
     "loose_edges": 0,
     "non_manifold_edges": 0,
-    "closed_shells": 133
+    "closed_shells": 136
    }
   },
   {
@@ -105,7 +105,7 @@
    "check": "Farmer_Body weights",
    "ok": true,
    "detail": {
-    "bones_used": 20,
+    "bones_used": 21,
     "unweighted_verts": 0,
     "verts_over_4_influences": 0
    }
@@ -145,11 +145,11 @@
    "check": "Farmer_Staff loose/non-manifold",
    "ok": true,
    "detail": {
-    "triangles": 1612,
+    "triangles": 1672,
     "loose_verts": 0,
     "loose_edges": 0,
     "non_manifold_edges": 0,
-    "closed_shells": 20
+    "closed_shells": 21
    }
   },
   {
@@ -195,14 +195,14 @@
   {
    "check": "triangle budget <= 12000",
    "ok": true,
-   "detail": 11820
+   "detail": 11784
   },
   {
    "check": "body height in metres after round trip (Blender Z = Unity Y)",
    "ok": true,
    "detail": {
-    "min_z": -0.001,
-    "max_z": 1.998,
+    "min_z": -0.002,
+    "max_z": 1.994,
     "mesh_object_rot": [
      1.5708,
      -0.0,

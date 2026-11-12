@@ -18,7 +18,16 @@ TRI_LOG = {}     # (object, feature, colour) -> [triangles, primitives], for bud
 
 
 class FarmerBuilder(kit.Builder):
-    def add(self, obj, src, color, bones, feat=None, smooth=True, m=None, grad=True):
+    def _get(self, obj):
+        new = obj not in self.objs
+        d = super()._get(obj)
+        if new:
+            d["uv"] = d["bm"].loops.layers.uv.new("UVMap")
+        return d
+
+    def add(self, obj, src, color, bones, feat=None, smooth=True, m=None, grad=True, face_uv=None):
+        """face_uv = (cx, cy, cz, half_w, half_h): front planar projection for the painted face decal on faces whose
+        centre lies in front of cy (y < cy); every other face samples UV (0.002, 0.002), a transparent texel."""
         if m is not None:
             bmesh.ops.transform(src, matrix=m, verts=src.verts)
         d = self._get(obj)
@@ -47,9 +56,18 @@ class FarmerBuilder(kit.Builder):
             nv[d["ws"]] = wi
             nv[d["ft"]] = fi
             vmap[v] = nv
+        uvl = d["uv"]
         for f in src.faces:
             nf = bm.faces.new([vmap[v] for v in f.verts])
             nf.smooth = smooth
+            for lp in nf.loops:
+                lp[uvl].uv = (0.002, 0.002)
+            if face_uv is not None:
+                cx, cy, cz, hw, hh = face_uv
+                if nf.calc_center_median().y < cy:
+                    for lp in nf.loops:
+                        co = lp.vert.co
+                        lp[uvl].uv = ((co.x - cx) / (2 * hw) + 0.5, (co.z - cz) / (2 * hh) + 0.5)
         src.free()
 
     # ------------------------------------------------------------------ extra primitives

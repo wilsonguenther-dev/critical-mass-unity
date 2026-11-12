@@ -15,6 +15,10 @@ import sys
 
 from PIL import Image, ImageChops, ImageDraw, ImageFont
 
+sys.dont_write_bytecode = True
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from bible_masks import clean_mask  # noqa: E402
+
 RD, OUT = sys.argv[1], sys.argv[2]
 WSIL = sys.argv[3] if len(sys.argv) > 3 else None
 REF = sys.argv[4] if len(sys.argv) > 4 else os.path.expanduser("~/critical-mass/loop/parity/ref")
@@ -99,6 +103,12 @@ def alpha_mask(im):
     return im.split()[3].point(lambda a: 255 if a > 127 else 0)
 
 
+def bible_mask_file(fname):
+    """v2: fixed paper colour + character-only components (bible_masks.py). v1 used pixel (1, 1) as paper."""
+    import numpy as np
+    return Image.fromarray((clean_mask(os.path.join(REF, fname)) * 255).astype(np.uint8))
+
+
 def bible_mask(im):
     diff = ImageChops.difference(im.convert("RGB"), Image.new("RGB", im.size, im.getpixel((1, 1)))).convert("L")
     return diff.point(lambda v: 255 if v > 22 else 0)
@@ -179,11 +189,11 @@ for name, bfile, ofile in PAIRS:
     if not os.path.exists(os.path.join(RD, ofile)):
         continue
     b, o = ref(bfile), ours(ofile)
-    checks["iou"][name] = round(iou(bible_mask(b), alpha_mask(o)), 3)
+    checks["iou"][name] = round(iou(bible_mask_file(bfile), alpha_mask(o)), 3)
     checks["sbs_kb"][name] = sbs(name, b, o)
 if os.path.exists(os.path.join(RD, "staff-front_azure.png")):
     row = hrow([fit_h(ours(f"staff-{v}_azure.png"), 600) for v in ("front", "side", "back")], 30)
-    checks["iou"]["staff-views"] = round(iou(bible_mask(ref("07-staff-views.png")), alpha_mask(row)), 3)
+    checks["iou"]["staff-views"] = round(iou(bible_mask_file("07-staff-views.png"), alpha_mask(row)), 3)
     checks["sbs_kb"]["staff-views"] = sbs("staff-views", ref("07-staff-views.png"), row)
 if os.path.exists(os.path.join(RD, "front_crimson.png")):
     pair = hrow([fit_h(ours("front_azure.png"), 500), fit_h(ours("front_crimson.png"), 500)], 30)

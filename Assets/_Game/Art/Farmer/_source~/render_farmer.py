@@ -398,11 +398,284 @@ def show_only(objs):
             ob.hide_render = ob not in objs
 
 
+# --------------------------------------------------------------------------------------------- capture poses (fit)
+CAPTURE = os.path.join(HERE, "capture_poses.json")
+# world-axis rotations at bone heads, applied parent first (same mechanism as set_pose extra)
+FIT_PARAMS = [("spine", (1, 0, 0)), ("spine", (0, 1, 0)), ("spine", (0, 0, 1)),
+              ("head", (1, 0, 0)), ("head", (0, 1, 0)), ("head", (0, 0, 1)),
+              ("upperarm.r", (1, 0, 0)), ("upperarm.r", (0, 1, 0)), ("upperarm.r", (0, 0, 1)),
+              ("lowerarm.r", (1, 0, 0)), ("lowerarm.r", (0, 0, 1)), ("hand.r", (1, 0, 0)), ("hand.r", (0, 1, 0)),
+              ("upperarm.l", (1, 0, 0)), ("upperarm.l", (0, 1, 0)), ("upperarm.l", (0, 0, 1)),
+              ("lowerarm.l", (1, 0, 0)), ("lowerarm.l", (0, 0, 1)),
+              ("upperleg.l", (1, 0, 0)), ("upperleg.l", (0, 1, 0)), ("upperleg.r", (1, 0, 0)), ("upperleg.r", (0, 1, 0)),
+              ("lowerleg.l", (1, 0, 0)), ("lowerleg.r", (1, 0, 0))]
+FIT_SET = {
+    "front": dict(base=("Idle", 1), az=[0], el=4, rng=14),
+    "three-quarter": dict(base=("Idle", 1), az=[-35, 35], el=4, rng=25),
+    "profile": dict(base=("Idle", 1), az=[-90], el=2, rng=14),
+    "back": dict(base=("Idle", 1), az=[180], el=4, rng=14),
+    "pose-harvest": dict(base=("Dualwield_Melee_Attack_Slice", 19), az=[-62, -100], el=6, rng=40, props="harvest"),
+    "pose-root-seed": dict(base=("1H_Melee_Attack_Slice_Horizontal", 11), az=[-62, -95], el=6, rng=40, props="seed"),
+}
+BUSH = [((0, 0, 0.18), 0.17), ((0.16, 0.05, 0.12), 0.12), ((-0.15, -0.04, 0.12), 0.13), ((0.03, -0.14, 0.30), 0.11),
+        ((-0.04, 0.12, 0.30), 0.10)]
+
+
+def base_mats(action, frame):
+    set_pose(action, frame)
+    return {pb.name: pb.matrix_basis.copy() for pb in arm.pose.bones}
+
+
+def pose_from(bases, extra):
+    for pb in arm.pose.bones:
+        pb.matrix_basis = bases[pb.name]
+    bpy.context.view_layer.update()
+    for bone, axis, deg in extra:
+        pb = arm.pose.bones[bone]
+        head = pb.matrix.translation.copy()
+        r = Matrix.Translation(head) @ Matrix.Rotation(math.radians(deg), 4, Vector(axis)) @ Matrix.Translation(-head)
+        pb.matrix = r @ pb.matrix
+        bpy.context.view_layer.update()
+
+
+def prop_spheres(kind):
+    """Render-only props of the action poses, from the posed staff: (centre, radius) spheres + optional vine segment."""
+    sp = points(staff)
+    grip = (arm.matrix_world @ arm.pose.bones["handslot.r"].matrix).translation
+    tip = max(sp, key=lambda p: (p - grip).length)
+    if kind == "harvest":
+        hook = tip
+        return [(Vector((hook.x + x, hook.y + y, z)), r) for (x, y, z), r in BUSH], None
+    d = (tip - grip).normalized()
+    pod = tip + d * 0.30
+    return [(pod, 0.17)], (tip, pod)
+
+
+def view_basis(az, el):
+    a, e = math.radians(az), math.radians(el)
+    d = Vector((math.sin(a) * math.cos(e), -math.cos(a) * math.cos(e), math.sin(e)))
+    f = -d
+    right = f.cross(Vector((0, 0, 1))).normalized()
+    up = right.cross(f).normalized()
+    return d, right, up
+
+
+def tri_world(objs):
+    import numpy as np
+    dg = bpy.context.evaluated_depsgraph_get()
+    out = []
+    for ob in objs:
+        ev = ob.evaluated_get(dg)
+        me = ev.to_mesh()
+        me.calc_loop_triangles()
+        co = np.empty(len(me.vertices) * 3, np.float32)
+        me.vertices.foreach_get("co", co)
+        co = co.reshape(-1, 3)
+        mw = np.array(ev.matrix_world, dtype=np.float32)
+        co = co @ mw[:3, :3].T + mw[:3, 3]
+        t = np.empty(len(me.loop_triangles) * 3, np.int32)
+        me.loop_triangles.foreach_get("vertices", t)
+        out.append(co[t])
+        ev.to_mesh_clear()
+    return np.concatenate(out)
+
+
+class Raster:
+    W, H = 512, 256
+
+    def __init__(self):
+        import gpu
+        try:
+            gpu.init()
+        except Exception:
+            pass
+        self.gpu = gpu
+        self.off = gpu.types.GPUOffScreen(self.W, self.H)
+        self.sh = gpu.shader.from_builtin("UNIFORM_COLOR")
+
+    def mask(self, tris3d, extra2d, right, up):
+        """Silhouette normalised like compare_farmer.iou: bbox height -> H-2 rows, centred by bbox width."""
+        import numpy as np
+        from gpu_extras.batch import batch_for_shader
+        R = np.array(right, np.float32)
+        U = np.array(up, np.float32)
+        P = np.stack([tris3d @ R, tris3d @ U], 1)
+        if extra2d is not None and len(extra2d):
+            P = np.concatenate([P, extra2d])
+        u0, u1, v0, v1 = P[:, 0].min(), P[:, 0].max(), P[:, 1].min(), P[:, 1].max()
+        s = (self.H - 2) / (v1 - v0)
+        col = (P[:, 0] - (u0 + u1) / 2) * s + self.W / 2
+        row = (v1 - P[:, 1]) * s + 1
+        ndc = np.stack([2 * col / self.W - 1, 1 - 2 * row / self.H], 1).astype(np.float32)
+        gpu = self.gpu
+        with self.off.bind():
+            fb = gpu.state.active_framebuffer_get()
+            fb.clear(color=(0, 0, 0, 0))
+            with gpu.matrix.push_pop():
+                gpu.matrix.load_matrix(Matrix.Identity(4))
+                gpu.matrix.load_projection_matrix(Matrix.Identity(4))
+                b = batch_for_shader(self.sh, "TRIS", {"pos": ndc})
+                self.sh.uniform_float("color", (1, 1, 1, 1))
+                b.draw(self.sh)
+            buf = fb.read_color(0, 0, self.W, self.H, 1, 0, "UBYTE")
+        a = np.array(buf.to_list(), dtype=np.uint8).reshape(self.H, self.W)
+        return a[::-1] > 127
+
+
+def disk_tris(c2, r, n=20):
+    import numpy as np
+    out = []
+    for k in range(n):
+        a0, a1 = 2 * math.pi * k / n, 2 * math.pi * (k + 1) / n
+        out += [c2, (c2[0] + r * math.cos(a0), c2[1] + r * math.sin(a0)), (c2[0] + r * math.cos(a1), c2[1] + r * math.sin(a1))]
+    return np.array(out, np.float32)
+
+
+def norm_bible(m, W=512, H=256):
+    import numpy as np
+    ys, xs = np.nonzero(m)
+    m = m[ys.min():ys.max() + 1, xs.min():xs.max() + 1]
+    h, w = m.shape
+    s = (H - 2) / h
+    nw = max(1, int(round(w * s)))
+    yi = np.clip((np.arange(H - 2) / s).astype(int), 0, h - 1)
+    xi = np.clip((np.arange(nw) / s).astype(int), 0, w - 1)
+    r = m[yi][:, xi]
+    out = np.zeros((H, W), bool)
+    x0 = (W - nw) // 2
+    lo, hi = max(0, x0), min(W, x0 + nw)
+    out[1:H - 1, lo:hi] = r[:, lo - x0:hi - x0]
+    return out
+
+
+def do_fit():
+    import numpy as np
+    import time
+    rast = Raster()
+    show_only(meshes)
+    result = {}
+    only = os.environ.get("FIT_ONLY", "")
+    if os.path.exists(CAPTURE):
+        with open(CAPTURE) as fh:
+            result = json.load(fh)
+    for name, cfg in FIT_SET.items():
+        if only and name not in only.split(","):
+            continue
+        bib = norm_bible(np.load(os.path.join(OUT, f"mask-{name}.npy")))
+        bib_m = bib[:, ::-1]
+        bases = base_mats(*cfg["base"])
+        props = cfg.get("props")
+        t0 = time.time()
+        nev = [0]
+        lastm = [None]
+
+        def score(x, az, el, ref=bib):
+            nev[0] += 1
+            pose_from(bases, [(b, ax, d) for (b, ax), d in zip(FIT_PARAMS, x) if abs(d) > 1e-6])
+            _d, right, up = view_basis(az, el)
+            tris = tri_world(meshes)
+            extra = None
+            if props:
+                sph, vine = prop_spheres(props)
+                parts = []
+                for c, r in sph:
+                    parts.append(disk_tris((c.dot(right), c.dot(up)), r))
+                if vine:
+                    a, b = vine
+                    pa, pb_ = np.array((a.dot(right), a.dot(up))), np.array((b.dot(right), b.dot(up)))
+                    n = pb_ - pa
+                    n = np.array((-n[1], n[0])) / max(np.linalg.norm(n), 1e-6) * 0.05
+                    parts.append(np.array([pa + n, pa - n, pb_ + n, pa - n, pb_ - n, pb_ + n], np.float32))
+                extra = np.concatenate(parts)
+            m = rast.mask(tris, extra, right, up)
+            lastm[0] = m
+            return float((m & ref).sum()) / max(float((m | ref).sum()), 1.0)
+
+        def descend(x, az, el, az0, steps):
+            cur = score(x, az, el)
+            for step in steps:
+                for _sweep in range(2):
+                    improved = False
+                    for i in range(len(x) + 2):
+                        for sgn in (1, -1):
+                            if i < len(x):
+                                lim = 130 if "arm" in FIT_PARAMS[i][0] or "hand" in FIT_PARAMS[i][0] else 70
+                                nx = list(x)
+                                nx[i] = max(-lim, min(lim, nx[i] + sgn * step))
+                                if nx[i] == x[i]:
+                                    continue
+                                v = score(nx, az, el)
+                                if v > cur + 1e-4:
+                                    x, cur, improved = nx, v, True
+                            elif i == len(x):
+                                naz = max(az0 - cfg["rng"], min(az0 + cfg["rng"], az + sgn * step / 2))
+                                v = score(x, naz, el)
+                                if v > cur + 1e-4:
+                                    az, cur, improved = naz, v, True
+                            else:
+                                nel = max(0.0, min(30.0, el + sgn * step / 2))
+                                v = score(x, az, nel)
+                                if v > cur + 1e-4:
+                                    el, cur, improved = nel, v, True
+                    if not improved:
+                        break
+            return cur, x, az, el
+
+        import random
+        rng = random.Random(7)
+        starts = [([0.0] * len(FIT_PARAMS), float(a), float(cfg["el"]), float(a)) for a in cfg["az"]]
+        prev = result.get(name)
+        if prev:
+            px = [0.0] * len(FIT_PARAMS)
+            for b, ax, d in prev["extra"]:
+                k = FIT_PARAMS.index((b, tuple(ax)))
+                px[k] = d
+            near = min(cfg["az"], key=lambda a: abs(((prev["az"] - a + 180) % 360) - 180))
+            starts.append((px, float(prev["az"]), float(prev["el"]), float(near)))
+        best = None
+        for x0, az, el, az0 in starts:
+            r = descend(list(x0), az, el, az0, (32, 16, 8, 4, 2))
+            print(f"FIT {name} start az0={az0} iou={r[0]:.3f} az={r[2]:.1f} el={r[3]:.1f} evals={nev[0]} "
+                  f"t={time.time() - t0:.0f}s", flush=True)
+            if best is None or r[0] > best[0]:
+                best = r + (az0,)
+        for kick in range(int(os.environ.get("FIT_KICKS", "4"))):
+            cur, x, az, el, az0 = best
+            nx = list(x)
+            for i in rng.sample(range(len(x)), 6):
+                nx[i] += rng.choice((-1, 1)) * rng.choice((12, 24, 40))
+            r = descend(nx, az, el, az0, (8, 4, 2))
+            if r[0] > best[0]:
+                best = r + (az0,)
+            print(f"FIT {name} kick {kick} iou={r[0]:.3f} best={best[0]:.3f} t={time.time() - t0:.0f}s", flush=True)
+        best = best[:4]
+        cur, x, az, el = best
+        mir = score(x, az, el, bib_m)
+        np.save(os.path.join(OUT, f"fit-{name}.npy"), np.stack([lastm[0], bib]))
+        result[name] = {"base": list(cfg["base"]), "az": round(az, 2), "el": round(el, 2),
+                        "extra": [[b, list(ax), round(d, 2)] for (b, ax), d in zip(FIT_PARAMS, x) if abs(d) > 1e-6],
+                        "iou_fit_raster": round(cur, 3), "iou_vs_mirrored_bible": round(mir, 3)}
+        with open(CAPTURE, "w") as fh:
+            json.dump(result, fh, indent=1)
+            fh.write("\n")
+
+
+def capture(name, fallback):
+    if os.path.exists(CAPTURE):
+        with open(CAPTURE) as fh:
+            c = json.load(fh).get(name)
+        if c:
+            return c["base"][0], c["base"][1], [(b, tuple(ax), d) for b, ax, d in c["extra"]], c["az"], c["el"]
+    return fallback
+
+
 def do_bible():
-    set_pose("Idle", 1, BIBLE_STANCE)
     show_only(meshes)
     for name, az in (("front", 0), ("three-quarter", -32), ("profile", -90), ("back", 180)):
-        ortho_shot(name, az, 0, meshes, teams=("azure", "crimson") if name in ("front", "back") else ("azure",))
+        act, fr, extra, az, el = capture(name, ("Idle", 1, BIBLE_STANCE, az, 0))
+        set_pose(act, fr, extra)
+        ortho_shot(name, az, el, meshes, teams=("azure", "crimson") if name in ("front", "back") else ("azure",))
+    set_pose("Idle", 1, BIBLE_STANCE)
     tank = isolate_tank()
     show_only([tank])
     ortho_shot("backpack-tank", 180, 0, [tank], height=560)
@@ -417,58 +690,47 @@ def do_bible():
     show_only(meshes)
 
 
-def biomass_bush(at):
-    """Render-only lime bush (props are out of scope): self-lit lime blobs + dark leaves around them."""
+def prop_mesh(name, spheres, vine, hexcol):
     import bmesh
-    me = bpy.data.meshes.new("Bush")
+    me = bpy.data.meshes.new(name)
     bm = bmesh.new()
-    lime = bpy.data.materials.new("BushLime")
-    lime.use_nodes = True
-    blobs = [((0, 0, 0.18), 0.17), ((0.16, 0.05, 0.12), 0.12), ((-0.15, -0.04, 0.12), 0.13), ((0.03, -0.14, 0.30), 0.11),
-             ((-0.04, 0.12, 0.30), 0.10)]
-    for (x, y, z), r in blobs:
+    for c, r in spheres:
         g = bmesh.ops.create_uvsphere(bm, u_segments=14, v_segments=8, radius=r)
-        bmesh.ops.translate(bm, vec=Vector((at.x + x, at.y + y, z)), verts=g["verts"])
+        bmesh.ops.translate(bm, vec=c, verts=g["verts"])
+    if vine:
+        a, b = vine
+        g = bmesh.ops.create_cone(bm, cap_ends=True, segments=8, radius1=0.05, radius2=0.05, depth=(b - a).length)
+        q = (b - a).normalized().to_track_quat("Z", "Y")
+        bmesh.ops.transform(bm, matrix=Matrix.Translation((a + b) / 2) @ q.to_matrix().to_4x4(), verts=g["verts"])
     bm.to_mesh(me)
     bm.free()
-    ob = bpy.data.objects.new("Bush", me)
+    ob = bpy.data.objects.new(name, me)
     scene.collection.objects.link(ob)
-    ob.data.materials.append(flat_mat("BushLime", FP.FARMER["f_biomass"][0]))
-    sol = ob.modifiers.new("Outline", "SOLIDIFY")
-    sol.offset, sol.use_flip_normals, sol.use_rim = 1.0, True, False
+    ob.data.materials.append(flat_mat(name + "Mat", hexcol))
     ob.data.materials.append(bpy.data.materials["CM_Toon_Outline"])
-    sol.material_offset = 1
-    return ob, sol
+    sol = ob.modifiers.new("Outline", "SOLIDIFY")
+    sol.offset, sol.use_flip_normals, sol.use_rim, sol.material_offset = 1.0, True, False, 1
+    return ob
 
 
 def do_poses():
     show_only(meshes)
-    # harvest: dual-wield slice frame 19 puts the staff level in front; the elbow tips it down onto a bush
-    set_pose("Dualwield_Melee_Attack_Slice", 19, [("lowerarm.r", (1, 0, 0), 28), ("upperleg.l", (0, 1, 0), -8),
-                                                    ("upperleg.r", (0, 1, 0), 8)])
-    hook = max(points(staff), key=lambda p: -p.y)
-    bush, sol = biomass_bush(Vector((hook.x, hook.y + 0.05, 0)))
-    meshes.append(bush)
-    sol.thickness = 0.01
-    ortho_shot("pose-harvest", -62, 0, meshes, height=600)
-    meshes.remove(bush)
-    bpy.data.objects.remove(bush, do_unlink=True)
-    # root-seed: horizontal slice frame 11 holds the staff forward; the pod sits in front of the bulb
-    set_pose("1H_Melee_Attack_Slice_Horizontal", 11, [("upperleg.l", (0, 1, 0), -10), ("upperleg.r", (0, 1, 0), 10)])
-    tip = max(points(staff), key=lambda p: -p.y)
-    import bmesh
-    me = bpy.data.meshes.new("Pod")
-    bm = bmesh.new()
-    bmesh.ops.create_uvsphere(bm, u_segments=16, v_segments=10, radius=0.17)
-    bmesh.ops.translate(bm, vec=Vector((tip.x, tip.y - 0.45, tip.z + 0.05)), verts=bm.verts)
-    bm.to_mesh(me)
-    bm.free()
-    pod = bpy.data.objects.new("Pod", me)
-    scene.collection.objects.link(pod)
-    pod.data.materials.append(flat_mat("PodWood", FP.FARMER["f_wood"][0]))
-    meshes.append(pod)
-    ortho_shot("pose-root-seed", -62, 0, meshes, height=600)
-    meshes.remove(pod)
+    fall = {"pose-harvest": ("Dualwield_Melee_Attack_Slice", 19, [("lowerarm.r", (1, 0, 0), 28)], -62, 0),
+            "pose-root-seed": ("1H_Melee_Attack_Slice_Horizontal", 11, [], -62, 0)}
+    for name, kind, col in (("pose-harvest", "harvest", FP.FARMER["f_biomass"][0]),
+                            ("pose-root-seed", "seed", FP.FARMER["f_wood"][0])):
+        act, fr, extra, az, el = capture(name, fall[name])
+        set_pose(act, fr, extra)
+        sph, vine = prop_spheres(kind)
+        ob = prop_mesh("Prop", sph, vine, col)
+        meshes.append(ob)
+        ortho_shot(name, az, el, meshes, height=600)
+        meshes.remove(ob)
+        bpy.data.objects.remove(ob, do_unlink=True)
+
+
+if "fit" in MODES:
+    do_fit()
 
 
 if "game" in MODES:
