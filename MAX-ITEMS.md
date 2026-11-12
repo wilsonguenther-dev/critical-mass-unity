@@ -89,7 +89,7 @@ Browser keys that changed: jump was Q (D-062), the class ability was Space. The 
 
 **Shared files.** **Decided (U-023).** Several old files mix base rules with item code (for example `resources.ts`
 carries CM-35 meat and CM-85 biomass instability, `bots/fsm.ts` carries CM-38 and CM-37 bot rules). The loop ports
-those files in the foundation with the item code left out and marked with a `// CM-xx (Max)` comment; the item owner
+those files in the foundation with the item code left out and marked with a `// ITEM CM-xx: added by its owner (<what>)` comment line (one grep, `ITEM CM-`, finds every hole); the item owner
 (you) adds that part back in the item, with its tests.
 
 ---
@@ -102,8 +102,8 @@ those files in the foundation with the item code left out and marked with a `// 
 
 | # | Id | Item | Old state | Waits on |
 | --- | --- | --- | --- | --- |
-| 1 | CM-32 | Jumping (Travis must-have) | Landed | F-01 to F-08 |
-| 2 | CM-33 | Cross bridges at any angle (Travis must-have) | Built, not in main (pulled out twice) | F-01 to F-08 |
+| 1 | CM-32 | Jumping (Travis must-have) | Landed | F-01 to F-08c |
+| 2 | CM-33 | Cross bridges at any angle (Travis must-have) | Built, not in main (pulled out twice) | F-01 to F-08c |
 | 3 | CM-30 | Miners dig and place ground (Travis must-have) | Landed | F-01 to F-09 |
 | 4 | CM-31 | Knock-down structures (Travis must-have) | Landed | CM-30 |
 | 5 | CM-37 | Base healing fountain | Landed | F-01 to F-09 |
@@ -117,9 +117,9 @@ those files in the foundation with the item code left out and marked with a `// 
 | 13 | CM-84 | Base stations: swap class and upgrade | New | CM-39 |
 | 14 | CM-58 | Builder part 2: ladders and bridges | New | CM-39, CM-30 |
 | 15 | CM-59 | Any class carries built pieces | New | CM-58 |
-| 16 | CM-66 | Default 16v16 and 2x pace | Built, not in main (held) | F-08, F-09 |
-| 17 | CM-65 | Free camera | Landed (view only) | F-08 |
-| 18 | CM-68 | Maps B (Ember Orchard) and C (Tidal Crown) | Built, not in main (held) | F-03, F-06 |
+| 16 | CM-66 | Command-line size and pace (the 16v16 / 2x defaults are F-01's) | Built, not in main (held) | F-08a, F-08b, F-08c, F-09 |
+| 17 | CM-65 | Free camera | Landed (view only) | F-08a, F-08b, F-08c |
+| 18 | CM-68 | Maps B (Ember Orchard) and C (Tidal Crown) | Built, not in main (held) | F-03, F-04, F-06b |
 | 19 | CM-67 | The combat choice | Held (team has not picked) | the team's pick |
 | - | CM-55 | Engine port spike | Held | closed: this repo is the port |
 
@@ -127,8 +127,8 @@ Travis's must-haves: miners digging and placing ground is **CM-30**, knock-down 
 **CM-32**, diagonal bridge crossing is **CM-33**. Those four come first.
 
 Old ids that are not on your list: **CM-54** (class switch on the death screen) is superseded by CM-84, which ports its
-cooldown. **CM-56** (five-class roster) is part of F-01 and F-02. **CM-61** (the look of dug holes and placed blocks) is
-covered by the chunk meshes in F-08 and later by the loop's art.
+cooldown. **CM-56** (five-class roster) is part of F-01 and F-02b. **CM-61** (the look of dug holes and placed blocks) is
+covered by the chunk meshes in F-08b and later by the loop's art.
 
 ---
 
@@ -136,22 +136,28 @@ covered by the chunk meshes in F-08 and later by the loop's art.
 
 | Id | What the loop builds | Old source (lines) |
 | --- | --- | --- |
-| F-01 | `GameConfig` with every tunable 1:1, five class rows, plus its tests | `src/config/game.config.ts` (426), `game.config.test.ts` (91), `balance-table.test.ts` (120) |
-| F-02 | Core state and tick: seeded RNG, `World`, types, events, 30 Hz `Step`, match clock and winner, hill scoring | `rng.ts` (38), `world.ts` (667), `types.ts` (309), `step.ts` (46), `match.ts` (31), `hill.ts` (54), `debug.ts` (44) and their tests |
-| F-03 | Ground grid with Sim-owned heights and the Skybreak Basin map (with the CM-31 decoration data) | `map.ts` (364), `grid.ts` (85), `map.test.ts` (194), `grid.test.ts` (47), `boundary.test.ts` (70) |
-| F-04 | Flow field and spatial hash | `flowfield.ts` (191), `spatialHash.ts` (125) and tests |
-| F-05 | Base rules: input, movement, collision, combat, damage, abilities, barricades, plant biomass and corruption runs, Kaiju, respawn | `input.ts` (41), `movement.ts` (114), `collide.ts` (190), `combat.ts` (143), `damage.ts` (100), `abilities.ts` (161), `barricades.ts` (328), `resources.ts` (245), `kaiju.ts` (543), `respawn.ts` (194) and tests |
-| F-06 | Bots: director, state machine, steering, fields, outcomes | `src/bots/*.ts` (2,100 non-test), `bots.test.ts` (548), `outcomes.slow.test.ts` (215) |
-| F-07 | `Controls.inputactions` with the table above, and the input-to-command layer | `src/game/humanInput.ts` (292) for behaviour only |
-| F-08 | Placeholder view: `Assets/_Game/Scenes/Arena.unity`, the Sim driver (30 Hz accumulator, interpolation), team-coloured capsules, grid chunk meshes, the Cinemachine follow camera, a plain debug HUD (clock, hill seconds, Kaiju instability, team biomass) | `src/game/SimDriver.tsx`, `CameraRig.tsx`, `rig.ts` for behaviour |
-| F-09 | Headless match runner for soak tests (N seeds, team size, ticks, bot-driven actor 0) inside `Sim.Tests` | the `*.slow.test.ts` harness code |
+Foundation ids are split into sub-items; the item specs are `loop/items/F-*.md` and their order is
+`loop/items/_ORDER.md`. F-02 = F-02a, F-02b; F-05 = F-05a..F-05j; F-06 = F-06a..F-06f; F-08 = F-08a, F-08b, F-08c.
+"F-01 to F-08c" means every foundation item up to and including F-08c (F-09 excluded).
+
+| Id | What the loop builds | Old source (lines) |
+| --- | --- | --- |
+| F-01 | `GameConfig` with every tunable 1:1, five class rows, palette, plus its tests; `CreateDefault()` is 16v16 at 2x (U-004, `TeamSize` 16, `DefaultSpeed` 2), `CreateBrowser5v5()` the old main defaults for ported tests | `src/config/game.config.ts` (426), `game.config.test.ts` (91), `palette.ts` (121); `balance-table.test.ts` (120) is not ported |
+| F-02a, F-02b | Core types, seeded RNG, `JsMath`, the Sim boundary guard; `World` (create, reset, roster, events) and `MapGrid.SetCell` | `types.ts` (309), `rng.ts` (38), `boundary.test.ts` (70), `world.ts` (667), `setCell` of `grid.ts`, and their tests |
+| F-03 | Ground grid with Sim-owned heights and the Skybreak Basin map (with the CM-31 decoration data) | `map.ts` (364), `grid.ts` (85), `map.test.ts` (194), `grid.test.ts` (47) |
+| F-04 | Flow field and spatial hash, plus the map route tests | `flowfield.ts` (191), `spatialHash.ts` (125) and tests |
+| F-05a .. F-05j | Base rules: input, movement, collision, combat, damage, abilities, barricades, plant biomass and corruption runs, the debug feed, Kaiju, respawn, and the 30 Hz `SimStep`, hill scoring, match clock and winner | `input.ts` (41), `movement.ts` (114), `collide.ts` (190), `combat.ts` (143), `damage.ts` (100), `abilities.ts` (161), `barricades.ts` (328), `resources.ts` (245), `debug.ts` (44), `kaiju.ts` (543), `respawn.ts` (194), `step.ts` (46), `hill.ts` (54), `match.ts` (31) and tests |
+| F-06a .. F-06f | Bots: state, fields, steering, state machine, director, `MatchTick`, the bot match tests | `src/bots/*.ts` except outcomes (2,100 non-test), `bots.test.ts` (548) |
+| F-07 | `Controls.inputactions` with the table above, the human input state, and `ProjectSetup.Apply` assigning the project-wide actions | `src/game/humanInput.ts` (292) for behaviour |
+| F-08a, F-08b, F-08c | Placeholder view built in code when Boot loads (no new scene, U-027): the Sim driver (30 Hz accumulator, interpolation), `SimSpace` axis conversion, team-coloured capsules, grid chunk meshes, the Cinemachine follow camera, a plain debug HUD (clock, hill seconds, Kaiju instability, team biomass), the PlayMode smoke test | `src/game/SimDriver.tsx`, `CameraRig.tsx`, `rig.ts` for behaviour |
+| F-09 | Headless match runner for soak tests (N seeds, team size, bot / passive / wandering actor 0) inside `Sim.Tests`, and the 14 outcome bands (`[Category("Slow")]`, U-028) | `src/bots/outcomes.ts` (171), `outcomes.thresholds.ts` (48), `outcomes.slow.test.ts` (215) |
 
 **Foundation exit (U-012).** Phase 0 is done when a full 16v16 bot match plays in grey-box and every ported test
 passes. Phase 1 (your items, Travis's four must-haves first) and Phase 2 (the look) then run side by side. Phase 1 ends
 when Travis's four must-haves pass a play test; Phase 2 when every bible row passes; Phase 3 when Travis has a working
 build for his platform (U-024).
 
-Camera values for F-08 from the old config: yaw 45°, pitch 38°, orthographic, 20 world units tall
+Camera values for F-08b from the old config: yaw 45°, pitch 38°, orthographic, 20 world units tall
 (`viewHeightUnits`), distance 60, follow sharpness 8, target clamped to the map bounds inset by 6.
 
 Your items call the foundation by its class names (`GameConfig`, `World`, `SimStep`, `MapGrid`, `FlowField`,
@@ -163,12 +169,13 @@ Your items call the foundation by its class names (`GameConfig`, `World`, `SimSt
 
 Every item lists: what the player sees, the old files to port (with line counts), the C# files to create, the
 tunables with their values, how it is checked, and what is out of scope. New Sim files go in `Assets/_Game/Sim/Rules/`,
-tests in `Assets/_Game/Sim.Tests/`, view code in `Assets/_Game/Runtime/View/`, all in namespace `CriticalMass.Sim`
-(or `.Tests`, `.Runtime`).
+tests in `Assets/_Game/Sim.Tests/`, view code in `Assets/_Game/Runtime/View/`, namespaces `CriticalMass.Sim.<Area>` (the
+foundation uses `Config`, `Core`, `Grid`, `Maps`, `Bots`; new files in `Sim/Rules/` use `CriticalMass.Sim.Rules`), tests
+`CriticalMass.Sim.Tests`, view `CriticalMass.Runtime.<Area>`.
 
 ### CM-32 Jumping (Travis must-have)
 
-Old state: landed (D-062). Waits on F-01 to F-08.
+Old state: landed (D-062). Waits on F-01 to F-08c.
 
 **What the player sees.** Press Space (south button) and your capsule hops in a short arc, keeping the speed and
 direction it had at takeoff. You can hop a one-cell gap. A jump that would land you in a wall or a hole is shortened, or
@@ -184,7 +191,7 @@ Sim's jump height each frame).
 **Tunables.** `jump.airTicks` 18, `jump.apexUnits` 0.8, `jump.minAirTicks` 6; a shortened jump of k ticks lifts
 `apexUnits × (k / airTicks)²`.
 
-**Check.** `JumpTests` has the 6 ported cases with the browser's numbers and passes. Play check in `Arena`: run at a
+**Check.** `JumpTests` has the 6 ported cases with the browser's numbers and passes. Play check in the Boot scene (the arena is built in code, U-027): run at a
 one-cell void gap and jump, you land on the far side; jump at a wall, the jump is shortened or refused and you never end
 up in the void; hold Space, you jump once.
 
@@ -195,7 +202,7 @@ up in the void; hold Space, you jump once.
 
 Old state: built on branch `cm/CM-33` (commit `003c970`), landed in main twice on 2026-11-09 and pulled out both times
 during batch integration over a render check, not over the rule. D-060 was dropped from DECISIONS.md with it; read the
-branch's own DECISIONS.md entry and commit messages. Waits on F-01 to F-08.
+branch's own DECISIONS.md entry and commit messages. Waits on F-01 to F-08c.
 
 **What the player sees.** Walk onto any bridge, including the diagonal ones, from any angle up to 60° off its axis, and
 you slide along it to the far side without lining up first, without sticking on the rail and without dropping into the void.
@@ -234,7 +241,7 @@ it. The ground mesh changes at once and bots re-route around holes. You cannot d
 **Create.** `Assets/_Game/Sim/Rules/TerraformSystem.cs` (`TerraformSystem`, with the `TerraformRefused*` codes),
 `Assets/_Game/Sim.Tests/TerraformTests.cs` (`TerraformTests`), `Assets/_Game/Sim.Tests/TerraformSoakTests.cs`
 (`TerraformSoakTests`, `[Category("Slow")]`). Runtime: `Assets/_Game/Runtime/View/CarriedBlockView.cs`
-(`CarriedBlockView`, a small cube on the carrier). Chunk meshes already rebuild from the grid (F-08).
+(`CarriedBlockView`, a small cube on the carrier). Chunk meshes already rebuild from the grid (F-08b).
 
 **Tunables.** `abilities.minerTerraform`: `reach` 1.6, `teamCooldownTicks` 30, `minGapTicks` 15, `actorMargin` 0.05.
 Keep-outs as on main: pads 4, hill radius 6, shrine 3, nodes 1.
@@ -307,6 +314,13 @@ shrine.
 **Port.** The meat-orb parts of `src/sim/resources.ts` (245) and `spawnLooseOrb` in `world.ts`,
 `src/sim/biomass.test.ts` (436, 17 cases), `src/sim/biomass.slow.test.ts` (129, 2 cases: 5v5, seeds 1 to 100).
 
+**Reopens** (each at its `// ITEM CM-35` marker; the browser files with CM-35 code are types.ts, world.ts, combat.ts,
+resources.ts and bots/index.ts): `Assets/_Game/Sim/Core/SimEvent.cs` (`Bio`), `Core/Actor.cs` (`CarryMeat`,
+`MeatPickup`), `Core/ResourceNode.cs` (`LooseOrb`), `Core/MatchState.cs` (`DeliveredTally.Plant`, `Meat`),
+`Core/SimEnums.cs` (`BiomassType`), `Core/World.cs` (`Orbs`, `MeatDropped`, `OrbOverflows`, `SpawnLooseOrb`,
+`OrbCapacity`), `Assets/_Game/Sim/Combat.cs` (corpse meat drop), `Assets/_Game/Sim/Resources.cs` (`bio`, orb ageing,
+pickup, meat delivery), and `Assets/_Game/Sim/Bots/Bots.cs` (Kaiju-role meat pickup).
+
 **Create.** `Assets/_Game/Sim/Rules/MeatOrbs.cs` (`MeatOrbs`), `Assets/_Game/Sim.Tests/BiomassTests.cs`,
 `Assets/_Game/Sim.Tests/BiomassSoakTests.cs` (`[Category("Slow")]`). Runtime: `Assets/_Game/Runtime/View/OrbView.cs`.
 
@@ -342,8 +356,13 @@ Old state: landed (batch 2, old PR #18; D-068 CM-85 entry). Waits on CM-34.
 
 **What the player sees.** Every biomass delivery, plant or meat, also nudges Kaiju instability up a little.
 
-**Port.** The `biomassInstabilityPerUnit` path in `src/sim/resources.ts` and `src/sim/kaiju.ts`,
-`src/sim/corruption.test.ts` (149, 10 cases).
+**Port.** The `biomassInstabilityPerUnit` line of `applyDelivery` in `src/sim/resources.ts` (CM-85 commit `3807f98`
+touches game.config.ts, resources.ts, debug.test.ts, kaiju.test.ts and the corruption tests; no kaiju.ts code),
+`src/sim/corruption.test.ts` (149, 10 cases). The tunable is already in `GameConfig` (F-01).
+
+**Reopens** (each at its `// ITEM CM-85` marker): `Assets/_Game/Sim/Resources.cs` (`ApplyDelivery`),
+`Assets/_Game/Sim.Tests/DebugTests.cs` (`+ 7 * BiomassInstabilityPerUnit`), `Assets/_Game/Sim.Tests/KaijuResourceTests.cs`
+(`+ 2 * BiomassInstabilityPerUnit`).
 
 **Create.** `Assets/_Game/Sim.Tests/CorruptionRateTests.cs` (`CorruptionRateTests`); the rule goes into the
 foundation's `Resources.cs` delivery path.
@@ -532,16 +551,21 @@ pickup and drop. Play check: move a bridge from one gap to another.
 
 ### CM-66 Default 16v16 and 2x pace
 
-Old state: built on branch `cm/CM-66` (`8083906`), held. Waits on F-08 and F-09.
+Old state: built on branch `cm/CM-66` (`8083906`), held. Waits on F-08a, F-08b, F-08c and F-09.
 
 **What the player sees.** A match with no options is 16 against 16 and runs at double speed: the 8:00 match clock (sim
 time) plays in 4:00 of real time. The Sim still ticks at 30 Hz; the driver runs two ticks per frame slot.
 
-**Port** (from `cm/CM-66`). The `teamSize` and `defaultSpeed` changes in `game.config.ts` (+12), `game.config.test.ts`
-(+4), `balance-table.test.ts` (+1).
+**Already in the foundation (F-01).** `GameConfig.CreateDefault()` is 16v16 at 2x (`TeamSize` 16, `DefaultSpeed` 2,
+U-004) and `GameConfigTests.DefaultIs16v16At2xPace` pins it; the F-08a driver plays that default; ported tests use
+`GameConfig.CreateBrowser5v5()`. What is left for this item: the command-line arguments and the pause-menu size and
+speed options.
 
-**Create.** Edit `GameConfig` (`TeamSize` 16, new `DefaultSpeed` 2) and the foundation's Sim driver; update
-`GameConfigTests` and the balance-table tests. Ported tests that need 5v5 or speed 1 must set them explicitly.
+**Port** (from `cm/CM-66`). Behaviour only: the `?size=` / `?speed=` parsing in `src/game/params.ts` and
+`params.test.ts` becomes command-line parsing.
+
+**Create.** `Assets/_Game/Runtime/Game/CommandLine.cs` (reads `-teamSize` and `-speed` into the driver's `GameConfig`
+before `World.CreateWorld`), `Assets/_Game/Runtime.Tests/CommandLineTests.cs`.
 
 **Decided (U-004).** 16v16 (1 human + 31 bots) at 2x is the default. 5v5 and 1x remain as options in the pause menu and
 as command-line arguments. Match length 8 minutes. Frame budget: 60 fps at 16v16 in the Mac build on this Mac.
@@ -549,7 +573,8 @@ as command-line arguments. Match length 8 minutes. Frame budget: 60 fps at 16v16
 size change from the pause menu restarts the match.
 Land this item in its own PR: it touches many tests.
 
-**Check.** `GameConfigTests` pin 16 and 2; every test passes. Play check: a fresh match has 32 capsules and the clock runs
+**Check.** `CommandLineTests` pass and every test still passes. Play check: a build started with no arguments has 32
+capsules and the clock runs
 at twice real time.
 
 **Out of scope.** Performance work beyond reporting the frame time you measure.
@@ -557,7 +582,7 @@ at twice real time.
 ### CM-65 Free camera
 
 Old state: landed in the browser as a view-only change (D-067 CM-65 entry): mouse at a screen edge pans, middle drag
-grabs the ground, C or a respawn snaps back. Wilson could not find it. Waits on F-08.
+grabs the ground, C or a respawn snaps back. Wilson could not find it. Waits on F-08a, F-08b, F-08c.
 
 **Decided (U-005).** Free camera is out of the first playable. Do not build it. The camera is orthographic, yaw 45°,
 pitch 38°, 20 world units tall, never rotates, damped-spring follow with 0.25 s look-ahead capped at 2 units.
@@ -567,7 +592,7 @@ pitch 38°, 20 world units tall, never rotates, damped-spring follow with 0.25 s
 
 ### CM-68 Maps B (Ember Orchard) and C (Tidal Crown)
 
-Old state: built on branch `cm/CM-68` (`572927e`), held. Waits on F-03 and F-06.
+Old state: built on branch `cm/CM-68` (`572927e`), held. Waits on F-03, F-04 and F-06b.
 
 **What the player sees.** Two more maps from the bible's page 12. Skybreak stays the default.
 
