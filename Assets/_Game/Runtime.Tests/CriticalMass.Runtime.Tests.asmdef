@@ -5,7 +5,8 @@
         "CriticalMass.Sim",
         "CriticalMass.Runtime",
         "UnityEngine.TestRunner",
-        "UnityEditor.TestRunner"
+        "UnityEditor.TestRunner",
+        "UnityEngine.UI"
     ],
     "includePlatforms": [
         "Editor"
