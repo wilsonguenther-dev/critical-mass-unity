@@ -1,0 +1,593 @@
+# Max's work list: game mechanics, Unity rebuild
+
+Written 2026-11-12T02:16:06Z (Wednesday 2026-11-11, 8:16 pm Central). Replaces the browser-era list at
+`loop/MAX-ITEMS.md` in the old repo [wilsonguenther-dev/critical-mass](https://github.com/wilsonguenther-dev/critical-mass)
+(snapshot of 2026-11-09). Old-repo paths below are on its `main` at commit `09e0904` unless a branch is named.
+
+Critical Mass is now a Unity game. You own the game-mechanics items below. The build AI ("the loop") builds the
+foundation first (section 3) and the look (models, shader, art). Anything marked **DECISION PENDING** waits on the
+architect: build the parts of that item that do not depend on the pending answer, and do not pick the answer yourself.
+
+---
+
+## 1. Start here
+
+**Get the project.**
+
+```bash
+git lfs install                      # once per machine
+git clone https://github.com/wilsonguenther-dev/critical-mass-unity.git
+cd critical-mass-unity && git lfs pull
+```
+
+Open it with Unity **6000.3.28f1** (Unity 6.3) from Unity Hub. Other versions will rewrite project files; do not upgrade.
+
+**One-time merge setup (per clone).** Scenes, prefabs and assets are Unity YAML and merge through UnityYAMLMerge:
+
+```bash
+git config merge.unityyamlmerge.name "Unity SmartMerge"
+git config merge.unityyamlmerge.driver '"/Applications/Unity/Hub/Editor/6000.3.28f1/Unity.app/Contents/Helpers/UnityYAMLMerge" merge -p %O %B %A %A'
+git config merge.unityyamlmerge.recursive binary
+```
+
+If your editor is installed somewhere else, point the driver path (and `UNITY_PATH` for the scripts) at your install.
+
+**The three commands.** Each runs Unity headless and exits with Unity's real exit code.
+
+```bash
+tools/unity-compile.sh    # compile every assembly; fails on any compiler error
+tools/unity-test.sh       # EditMode tests; prints "unity-test: result=... total=... passed=... failed=..."
+tools/unity-build-mac.sh  # macOS player build -> Builds/macOS/CriticalMass.app
+```
+
+**How to work.**
+
+- Branch `max/<item-id>-short-name` off `main` (for example `max/cm-32-jumping`). One item per pull request into `main`.
+  Never push to `main` directly.
+- Before opening the PR run `tools/unity-compile.sh` and `tools/unity-test.sh` and paste both result lines into the PR.
+- Binary assets go through Git LFS (already set up in `.gitattributes` for .fbx, .blend, .png, .wav and the rest).
+- Scenes and prefabs conflict easily. An item touches only the scenes and prefabs it names. Most items below name none.
+- An item is not done without its tests (see rule 2 below).
+
+**The architecture (decided; items are written against it).**
+
+1. The game rules live in `Assets/_Game/Sim` (assembly `CriticalMass.Sim`). Plain C#, no UnityEngine (the assembly
+   enforces this). Fixed tick at **30 Hz**, the browser's `simHz`. Numbers are `double`. State is plain classes and
+   structs. Randomness only from the Sim's seeded RNG (the browser's mulberry32, ported). No MonoBehaviour, no Unity
+   physics, no `UnityEngine.Random` in rules. One `GameConfig` class holds every tunable, ported 1:1 from the old
+   `src/config/game.config.ts`.
+2. Every rule is a port of the matching old file in `src/sim` or `src/bots`, and its vitest file is ported to NUnit in
+   `Assets/_Game/Sim.Tests` as the oracle: same cases, same expected numbers. One `[Test]` per vitest `it(...)`, named
+   after it in PascalCase. Slow 100-seed soak files become their own fixture tagged `[Category("Slow")]`.
+3. `Assets/_Game/Runtime` (`CriticalMass.Runtime`) is the view. MonoBehaviours read Sim state every frame and
+   interpolate between ticks; player input becomes Sim commands. Runtime never changes game state itself.
+4. The ground is a grid of cells with heights, owned by the Sim. That is what makes digging, placing ground and
+   knock-down structures real. Runtime rebuilds chunk meshes from the grid. Bots path on the ported flow field. No NavMesh.
+5. Controls are one Input System asset, `Assets/_Game/Settings/Controls.inputactions` (table below). No item adds or
+   moves a binding.
+6. Camera: Cinemachine 3, fixed yaw (never rotates), follows your hero; angle and size come from the old config.
+7. Look: models from the asset bible under one shared toon shader with outlines. Mechanics items use plain
+   placeholder capsules and cubes coloured by team and never wait on art.
+
+**Controls.**
+
+| Action | Keyboard and mouse | Gamepad |
+| --- | --- | --- |
+| Move | W A S D | Left stick |
+| Jump | Space | South button |
+| Primary attack | Left mouse | West button |
+| Class ability | Right mouse | Right trigger |
+| Interact, carry, drop | E | North button |
+| Dig or place (Miner) | F | Left trigger |
+| Switch dig / place | Mouse wheel | Bumpers |
+| Scoreboard | Tab | (none) |
+| Pause | Esc | Start |
+
+Browser keys that changed: jump was Q (D-062), the class ability was Space. The rules behind them did not change.
+
+**Shared files.** **DECISION PENDING (architect):** several old files mix base rules with item code (for example
+`resources.ts` carries CM-35 meat and CM-85 biomass instability, `bots/fsm.ts` carries CM-38 and CM-37 bot rules). The
+working assumption here: the foundation ports those files with each item's code left out and marked with a
+`// CM-xx (Max)` comment, and your item adds its part back, with its tests. Do not start an item that edits a shared
+file until this is confirmed.
+
+---
+
+## 2. Your items at a glance (build order)
+
+"Old state" is where the item stood in the browser build. **Landed** = the rule is on the old `main`; you port it.
+**Built, not in main** = code exists on an old branch but was held or pulled out; you port it from that branch.
+**New** = no code exists; you build it from the rule text here.
+
+| # | Id | Item | Old state | Waits on |
+| --- | --- | --- | --- | --- |
+| 1 | CM-32 | Jumping (Travis must-have) | Landed | F-01 to F-08 |
+| 2 | CM-33 | Cross bridges at any angle (Travis must-have) | Built, not in main (pulled out twice) | F-01 to F-08 |
+| 3 | CM-30 | Miners dig and place ground (Travis must-have) | Landed | F-01 to F-09 |
+| 4 | CM-31 | Knock-down structures (Travis must-have) | Landed | CM-30 |
+| 5 | CM-37 | Base healing fountain | Landed | F-01 to F-09 |
+| 6 | CM-35 | Two kinds of biomass | Landed | F-01 to F-09 |
+| 7 | CM-34 | Slower corruption | Landed | CM-35 |
+| 8 | CM-85 | Corruption also builds from biomass | Landed | CM-34 |
+| 9 | CM-38 | Demolitions Expert | Landed | CM-30 |
+| 10 | CM-64 | Contestable deliveries | Built, not in main (reverted) | CM-85 |
+| 11 | CM-36 | Cleanse corruption at the shrine | Built, not in main (held) | CM-85 |
+| 12 | CM-39 | Builder part 1: biomass upgrade ladder | Built, not in main (held) | CM-35 |
+| 13 | CM-84 | Base stations: swap class and upgrade | New | CM-39 |
+| 14 | CM-58 | Builder part 2: ladders and bridges | New | CM-39, CM-30 |
+| 15 | CM-59 | Any class carries built pieces | New | CM-58 |
+| 16 | CM-66 | Default 16v16 and 2x pace | Built, not in main (held) | F-08, F-09 |
+| 17 | CM-65 | Free camera | Landed (view only) | F-08 |
+| 18 | CM-68 | Maps B (Ember Orchard) and C (Tidal Crown) | Built, not in main (held) | F-03, F-06 |
+| 19 | CM-67 | The combat choice | Held (team has not picked) | the team's pick |
+| - | CM-55 | Engine port spike | Held | closed: this repo is the port |
+
+Travis's must-haves: miners digging and placing ground is **CM-30**, knock-down structures is **CM-31**, jumping is
+**CM-32**, diagonal bridge crossing is **CM-33**. Those four come first.
+
+Old ids that are not on your list: **CM-54** (class switch on the death screen) is superseded by CM-84, which ports its
+cooldown. **CM-56** (five-class roster) is part of F-01 and F-02. **CM-61** (the look of dug holes and placed blocks) is
+covered by the chunk meshes in F-08 and later by the loop's art.
+
+---
+
+## 3. Foundation: built by the loop first, not yours
+
+| Id | What the loop builds | Old source (lines) |
+| --- | --- | --- |
+| F-01 | `GameConfig` with every tunable 1:1, five class rows, plus its tests | `src/config/game.config.ts` (426), `game.config.test.ts` (91), `balance-table.test.ts` (120) |
+| F-02 | Core state and tick: seeded RNG, `World`, types, events, 30 Hz `Step`, match clock and winner, hill scoring | `rng.ts` (38), `world.ts` (667), `types.ts` (309), `step.ts` (46), `match.ts` (31), `hill.ts` (54), `debug.ts` (44) and their tests |
+| F-03 | Ground grid with Sim-owned heights and the Skybreak Basin map (with the CM-31 decoration data) | `map.ts` (364), `grid.ts` (85), `map.test.ts` (194), `grid.test.ts` (47), `boundary.test.ts` (70) |
+| F-04 | Flow field and spatial hash | `flowfield.ts` (191), `spatialHash.ts` (125) and tests |
+| F-05 | Base rules: input, movement, collision, combat, damage, abilities, barricades, plant biomass and corruption runs, Kaiju, respawn | `input.ts` (41), `movement.ts` (114), `collide.ts` (190), `combat.ts` (143), `damage.ts` (100), `abilities.ts` (161), `barricades.ts` (328), `resources.ts` (245), `kaiju.ts` (543), `respawn.ts` (194) and tests |
+| F-06 | Bots: director, state machine, steering, fields, outcomes | `src/bots/*.ts` (2,100 non-test), `bots.test.ts` (548), `outcomes.slow.test.ts` (215) |
+| F-07 | `Controls.inputactions` with the table above, and the input-to-command layer | `src/game/humanInput.ts` (292) for behaviour only |
+| F-08 | Placeholder view: `Assets/_Game/Scenes/Arena.unity`, the Sim driver (30 Hz accumulator, interpolation), team-coloured capsules, grid chunk meshes, the Cinemachine follow camera, a plain debug HUD (clock, hill seconds, Kaiju instability, team biomass) | `src/game/SimDriver.tsx`, `CameraRig.tsx`, `rig.ts` for behaviour |
+| F-09 | Headless match runner for soak tests (N seeds, team size, ticks, bot-driven actor 0) inside `Sim.Tests` | the `*.slow.test.ts` harness code |
+
+Camera values for F-08 from the old config: yaw 45°, pitch 38°, orthographic, 20 world units tall
+(`viewHeightUnits`), distance 60, follow sharpness 8, target clamped to the map bounds inset by 6.
+
+Your items call the foundation by its class names (`GameConfig`, `World`, `SimStep`, `MapGrid`, `FlowField`,
+`BotFsm`). If a foundation PR lands with different names, follow the code.
+
+---
+
+## 4. The items
+
+Every item lists: what the player sees, the old files to port (with line counts), the C# files to create, the
+tunables with their values, how it is checked, and what is out of scope. New Sim files go in `Assets/_Game/Sim/Rules/`,
+tests in `Assets/_Game/Sim.Tests/`, view code in `Assets/_Game/Runtime/View/`, all in namespace `CriticalMass.Sim`
+(or `.Tests`, `.Runtime`).
+
+### CM-32 Jumping (Travis must-have)
+
+Old state: landed (D-062). Waits on F-01 to F-08.
+
+**What the player sees.** Press Space (south button) and your capsule hops in a short arc, keeping the speed and
+direction it had at takeoff. You can hop a one-cell gap. A jump that would land you in a wall or a hole is shortened, or
+refused if even the shortest jump would land badly, so you never fall to your death by accident.
+
+**Port.** `src/sim/jump.ts` (113 lines), `src/sim/jump.test.ts` (181 lines, 6 cases). Uses `collide.ts` and `world.ts`
+from the foundation.
+
+**Create.** `Assets/_Game/Sim/Rules/JumpSystem.cs` (static class `JumpSystem`), `Assets/_Game/Sim.Tests/JumpTests.cs`
+(class `JumpTests`). Runtime: `Assets/_Game/Runtime/View/ActorJumpLift.cs` (`ActorJumpLift`, lifts the capsule by the
+Sim's jump height each frame).
+
+**Tunables.** `jump.airTicks` 18, `jump.apexUnits` 0.8, `jump.minAirTicks` 6; a shortened jump of k ticks lifts
+`apexUnits × (k / airTicks)²`.
+
+**Check.** `JumpTests` has the 6 ported cases with the browser's numbers and passes. Play check in `Arena`: run at a
+one-cell void gap and jump, you land on the far side; jump at a wall, the jump is shortened or refused and you never end
+up in the void; hold Space, you jump once.
+
+**Out of scope.** Air control, double jump, jumping up onto higher cells (cell height is not a rule yet), any bot jumping
+(bots do not jump, as in the browser).
+
+### CM-33 Cross bridges at any angle (Travis must-have)
+
+Old state: built on branch `cm/CM-33` (commit `003c970`), landed in main twice on 2026-11-09 and pulled out both times
+during batch integration over a render check, not over the rule. D-060 was dropped from DECISIONS.md with it; read the
+branch's own DECISIONS.md entry and commit messages. Waits on F-01 to F-08.
+
+**What the player sees.** Walk onto any bridge, including the diagonal ones, from any angle up to 60° off its axis, and
+you slide along it to the far side without lining up first, without sticking on the rail and without dropping into the void.
+
+**Port** (from `cm/CM-33`). `src/sim/collide.ts` (391 lines on the branch; +212 over main), the bridge-span part of
+`src/sim/map.ts` (+77; `BRIDGE_SPANS` and the span axis), `src/sim/bridges.test.ts` (260 lines, 6 cases).
+
+**Create.** `Assets/_Game/Sim/Rules/BridgeSpans.cs` (`BridgeSpans`), the bridge rail inside the foundation's
+`Assets/_Game/Sim/Collide.cs`, `Assets/_Game/Sim.Tests/BridgeTravelTests.cs` (`BridgeTravelTests`).
+
+**Tunables.** None new. Uses class `radius` (Warrior 0.45, Farmer 0.4, Miner 0.45) and `moveSpeed` (3.8, 4.2, 4.0),
+`movement.accelSeconds` 0.12, `movement.brakeSeconds` 0.08, and the map's bridge half width 1.5.
+
+**Check.** `BridgeTravelTests` passes all 6: 16 spans with a chasm part; free lateral band at least 2.1 for radius 0.45
+over the middle 70 % of every span; the nearest 8-way key from 5 lateral offsets arrives with no stall tick and no void;
+constant input from −60° to +60° in 15° steps arrives; the same crossing twice lands on the same position and tick (see
+the open note on float precision); the deck height lies between the span's end heights. Play check: cross every
+diagonal bridge on Skybreak with keyboard and with the left stick at an angle.
+
+**Out of scope.** Bridge art, bot steering changes (bots already use the flow field), new bridges.
+
+**Standing note (Jeisil's fix-first 01).** While doing CM-32 and CM-33, play the movement and write down each movement
+bug with steps in your PR. Fix the ones inside these two items; list the rest for the architect.
+
+### CM-30 Miners dig and place ground (Travis must-have)
+
+Old state: landed (D-059). Waits on F-01 to F-09.
+
+**What the player sees.** As a Miner, press F (left trigger) at the ground in front of you: the cell drops away into a
+hole and your capsule carries a small block. Press again over a hole or water next to solid ground and the block fills
+it. The ground mesh changes at once and bots re-route around holes. You cannot dig the last route from a base to the hill.
+
+**Port.** `src/sim/terraform.ts` (361), `src/sim/terraform.test.ts` (350, 11 cases), `src/sim/terraform.slow.test.ts`
+(117, 1 case: 16v16, seed 101, 14,400 ticks). Rules: old DECISIONS.md D-059.
+
+**Create.** `Assets/_Game/Sim/Rules/TerraformSystem.cs` (`TerraformSystem`, with the `TerraformRefused*` codes),
+`Assets/_Game/Sim.Tests/TerraformTests.cs` (`TerraformTests`), `Assets/_Game/Sim.Tests/TerraformSoakTests.cs`
+(`TerraformSoakTests`, `[Category("Slow")]`). Runtime: `Assets/_Game/Runtime/View/CarriedBlockView.cs`
+(`CarriedBlockView`, a small cube on the carrier). Chunk meshes already rebuild from the grid (F-08).
+
+**Tunables.** `abilities.minerTerraform`: `reach` 1.6, `teamCooldownTicks` 30, `minGapTicks` 15, `actorMargin` 0.05.
+Keep-outs as on main: pads 4, hill radius 6, shrine 3, nodes 1.
+
+**Rules to keep.** Dig turns walkable floor or bridge into void and you carry one block; place turns void or water with a
+walkable side neighbour into floor (never bridge); refused under any living actor or the hatched Kaiju, inside keep-outs,
+and when it would cut a pad from the hill (or newly from the shrine); one change per team per 30 ticks and none within 15
+ticks of any wall change; a dead Miner loses the block. Every outcome is a `terraform` event.
+
+**DECISION PENDING (architect).** The new controls add "switch dig / place" on the wheel and bumpers. The browser had no
+mode: one key dug with empty hands and placed while carrying. Until decided, build the browser rule and leave the mode
+action unread.
+
+**Check.** `TerraformTests` (11 cases) and `TerraformSoakTests` (1 case) pass with the browser's numbers. Play check: as
+a Miner dig three cells in a row, watch the mesh drop and a bot path around; refill one; try to dig the last cell of the
+only route and see it refused.
+
+**Out of scope.** Bot digging beyond what the ported files already do, hole and block art (the loop's), changing the rate cap. If dig does not feel right in
+play (reach, rate), write it in the PR for the architect, do not change the numbers in this item.
+
+### CM-31 Knock-down structures (Travis must-have)
+
+Old state: landed (D-065, CM-31 entry). Waits on CM-30 (it reuses the dig route guard).
+
+**What the player sees.** Tall pillars stand at fixed spots on Skybreak. Hit one three times with any class and it falls
+away from you: one way it becomes a ramp onto an overlook ledge, the other way it walls off a path. Bots re-route.
+
+**Port.** `src/sim/topple.ts` (292), `src/sim/topple.test.ts` (225, 10 cases). The decoration positions come with the
+map in F-03.
+
+**Create.** `Assets/_Game/Sim/Rules/ToppleSystem.cs` (`ToppleSystem`), `Assets/_Game/Sim.Tests/ToppleTests.cs`
+(`ToppleTests`). Runtime: `Assets/_Game/Runtime/View/DecorationView.cs` (`DecorationView`, a tall cube that tips
+over across `fallTicks`).
+
+**Tunables.** `abilities.topple`: `hitsToTopple` 3, `lengthCells` 4, `widthCells` 3, `fallTicks` 18, `reach` 0.5.
+
+**Check.** `ToppleTests` (10 cases) pass. Play check: knock one pillar toward the ledge and walk up the ramp; knock its
+mirror the other way and see the path blocked and a bot go around.
+
+**Out of scope.** Pillar art, new decoration spots, rebuilding a fallen pillar.
+
+### CM-37 Base healing fountain
+
+Old state: landed (batch 2, old PR #18; D-061, D-068). Waits on F-01 to F-09.
+
+**What the player sees.** Stand hurt on your own base pad and your health climbs back to full; an enemy standing there
+does not heal. Bots below 30 % health with an enemy near run home and heal.
+
+**Port.** `src/sim/heal.ts` (41), `src/sim/heal.test.ts` (202, 9 cases), `src/sim/heal.slow.test.ts` (134, 1 case:
+5v5, seeds 1 to 100). The bot side reads `heal.seekHpShare` through the foundation's `BotFsm` (old `LOW_HP`).
+
+**Create.** `Assets/_Game/Sim/Rules/HealSystem.cs` (`HealSystem`, runs after respawn in the step order),
+`Assets/_Game/Sim.Tests/HealTests.cs`, `Assets/_Game/Sim.Tests/HealSoakTests.cs` (`[Category("Slow")]`).
+
+**Tunables.** `heal.hpPerTick` 1, `heal.zoneRadius` 3.75, `heal.seekHpShare` 0.3.
+
+**Check.** `HealTests` (9) and `HealSoakTests` (1) pass; the soak's recorded line in old BALANCE.md "Healing fountain"
+holds within the test's own tolerance. Play check: take damage, walk home, watch the HUD health rise 30 per second.
+
+**Out of scope.** Fountain art, a healer class, flasks.
+
+### CM-35 Two kinds of biomass
+
+Old state: landed (D-063). Waits on F-01 to F-09.
+
+**What the player sees.** Plants around the map still give biomass. A killed actor (while the Kaiju is an egg) drops a
+meat orb you grab by walking over it; it rots after 20 seconds. Meat rides separately from your cargo and pays at the
+shrine.
+
+**Port.** The meat-orb parts of `src/sim/resources.ts` (245) and `spawnLooseOrb` in `world.ts`,
+`src/sim/biomass.test.ts` (436, 17 cases), `src/sim/biomass.slow.test.ts` (129, 2 cases: 5v5, seeds 1 to 100).
+
+**Create.** `Assets/_Game/Sim/Rules/MeatOrbs.cs` (`MeatOrbs`), `Assets/_Game/Sim.Tests/BiomassTests.cs`,
+`Assets/_Game/Sim.Tests/BiomassSoakTests.cs` (`[Category("Slow")]`). Runtime: `Assets/_Game/Runtime/View/OrbView.cs`.
+
+**Tunables.** `kaijuFeed.biomassAllegiancePerUnit` 10, `kaijuFeed.meatAllegiancePerUnit` 6,
+`resources.meatUnitsPerKill` 2, `meatOrbLifetimeTicks` 600, `meatPickupRange` 1.2, `meatCarryCapacity` 2.
+
+**Check.** `BiomassTests` (17) and `BiomassSoakTests` (2) pass. Play check: kill an enemy, walk over the orb, deliver it.
+
+**Out of scope.** Meat and plant art (the loop's).
+
+### CM-34 Slower corruption
+
+Old state: landed (D-056). Waits on CM-35 (its soak plays full matches with both biomass kinds).
+
+**What the player sees.** The Kaiju turns berserk later: it now takes 12 corruption units instead of 10.
+
+**Port.** The rate is one config value. `src/sim/corruption.slow.test.ts` (314, 11 cases: 5v5, seeds 1 to 100, actor 0
+on a bot).
+
+**Create.** `Assets/_Game/Sim.Tests/CorruptionSoakTests.cs` (`[Category("Slow")]`).
+
+**Tunables.** `kaijuFeed.corruptionInstabilityPerUnit` 9, `kaijuFeed.berserkThreshold` 100,
+`kaijuFeed.corruptionAllegiancePerUnit` 4.
+
+**Check.** `CorruptionSoakTests` (11) pass, including the berserk share inside 10 to 50 %. Play check: the debug HUD
+instability rises 9 per corruption unit delivered.
+
+**Out of scope.** Corruption spread art on the map (the loop's).
+
+### CM-85 Corruption also builds from biomass (Travis must-have 2)
+
+Old state: landed (batch 2, old PR #18; D-068 CM-85 entry). Waits on CM-34.
+
+**What the player sees.** Every biomass delivery, plant or meat, also nudges Kaiju instability up a little.
+
+**Port.** The `biomassInstabilityPerUnit` path in `src/sim/resources.ts` and `src/sim/kaiju.ts`,
+`src/sim/corruption.test.ts` (149, 10 cases).
+
+**Create.** `Assets/_Game/Sim.Tests/CorruptionRateTests.cs` (`CorruptionRateTests`); the rule goes into the
+foundation's `Resources.cs` delivery path.
+
+**Tunables.** `kaijuFeed.biomassInstabilityPerUnit` 0.125 (exactly 1/8, so it adds without rounding in a double too).
+
+**Check.** `CorruptionRateTests` (10) pass and `CorruptionSoakTests` still pass. Play check: deliver 8 plant units,
+instability rises by exactly 1.
+
+**Out of scope.** Tuning the rate (record any change for the architect).
+
+### CM-38 Demolitions Expert
+
+Old state: landed (D-068 CM-38 entry). Waits on CM-30 (craters use the dig rules).
+
+**What the player sees.** The Demolitions Expert has no normal attack. The class ability drops a land mine at the aimed
+cell that blows up on the first enemy to step on it. The dig/place action throws TNT that explodes after 1.5 seconds,
+hurting enemies, breaking walls and cratering the ground (never the last route to the hill). Bots play the class in
+soak tests.
+
+**Port.** `src/sim/demolitions.ts` (525), `src/sim/demolitions.test.ts` (362, 7 cases), `src/sim/demolitions.slow.test.ts`
+(145, 1 case: 16v16, seeds 1 to 100), and `decideDemolitions` in `src/bots/fsm.ts` plus the TNT press in
+`src/bots/index.ts`.
+
+**Create.** `Assets/_Game/Sim/Rules/DemolitionsSystem.cs` (`DemolitionsSystem`), `Assets/_Game/Sim.Tests/DemolitionsTests.cs`,
+`Assets/_Game/Sim.Tests/DemolitionsSoakTests.cs` (`[Category("Slow")]`). Runtime: `MineView.cs`, `TntView.cs` in
+`Runtime/View/` (cubes).
+
+**Tunables.** `abilities.demolitionsMine`: `placeRange` 1.6, `maxActivePerOwner` 2, `armTicks` 15, `damage` 70,
+`blastRadius` 1.2, `lifetimeTicks` 1800. `abilities.demolitionsTnt`: `throwRange` 5, `fuseTicks` 45, `blastRadius` 2,
+`damage` 55, `carveRadius` 1, `cooldownTicks` 150. `classes.demolitions.abilityCooldown` 12 (the row is otherwise the
+Miner's copy). `bots.classMix.demolitions` stays 0.
+
+**DECISION PENDING (architect).** Throwing TNT on the "Dig or place (Miner)" action, as the browser did with F. Until
+decided, build the rule with a command (`ThrowTnt`) and leave its binding to the answer.
+
+**Check.** `DemolitionsTests` (7) and `DemolitionsSoakTests` (1) pass. Play check: lay a mine, lure a bot over it; throw
+TNT at a bridge and see one column carved while the last route survives.
+
+**Out of scope.** Class model and icons (the loop's). Making the class "feel distinct" from the Miner (Wilson's
+complaint) is a design follow-up: write your ideas in the PR, the rules here stay the browser's.
+
+### CM-64 Contestable deliveries
+
+Old state: built on branch `cm/CM-64` (`e056d8e`), landed in batch 1 and reverted, then held (D-067 CM-64 entry is on
+the branch). Waits on CM-85.
+
+**What the player sees.** Delivering at the shrine now takes a one-second wind-up while you hold E. An enemy hit during
+the wind-up stops it and it starts again; you keep your cargo unless you die. Defender bots near the shrine go after
+carriers.
+
+**Port** (from `cm/CM-64`). `src/sim/delivery.ts` (69), `src/sim/delivery.test.ts` (328, 11 cases),
+`src/sim/delivery.slow.test.ts` (188, 6 cases), the hit hook in `damage.ts` (+4), the delivery path in `resources.ts`
+(+12), `interceptTarget` in `src/bots/fsm.ts` (+61) and `src/bots/director.ts` (+22). The branch is 44 commits behind
+main: port the rule, do not merge the branch.
+
+**Create.** `Assets/_Game/Sim/Rules/DeliverySystem.cs` (`DeliverySystem`), `Assets/_Game/Sim.Tests/DeliveryTests.cs`,
+`Assets/_Game/Sim.Tests/DeliverySoakTests.cs` (`[Category("Slow")]`). Adds `Intercepted` per team to match state.
+
+**Tunables** (from the branch's config). `kaijuFeed.deliverWindupTicks` 30, `bots.interceptShrineRadius` 11.
+
+**Check.** `DeliveryTests` (11) and `DeliverySoakTests` (6) pass: an unhit carrier delivers after exactly 30 ticks; both
+teams have intercepted deliveries over seeds 1 to 100; hatch and berserk shares stay inside the old CM-19 thresholds
+(`src/bots/outcomes.thresholds.ts`). Play check: hit a carrying bot at the shrine and watch the delivery fail.
+
+**Out of scope.** A wind-up meter in the HUD.
+
+### CM-36 Cleanse corruption at the shrine (Travis must-have 2)
+
+Old state: built on branch `cm/CM-36` (`1c6ce00`), held. Waits on CM-85.
+
+**What the player sees.** At the shrine you can cleanse: Kaiju instability drops by a set amount over three seconds,
+then the cleanse is on a long cooldown. The debug HUD instability number visibly falls. Bots use it.
+
+**Port** (from `cm/CM-36`). `src/sim/cleanse.ts` (140), `src/sim/cleanse.test.ts` (337, 13 cases),
+`src/sim/cleanse.slow.test.ts` (119, 3 cases), the hooks in `kaiju.ts` (+4), `src/bots/fsm.ts` (+38),
+`src/bots/steer.ts` (+19). The branch is 44 commits behind main: port the rule only.
+
+**Create.** `Assets/_Game/Sim/Rules/CleanseSystem.cs` (`CleanseSystem`), `Assets/_Game/Sim.Tests/CleanseTests.cs`,
+`Assets/_Game/Sim.Tests/CleanseSoakTests.cs` (`[Category("Slow")]`).
+
+**Tunables** (the branch's `kaijuFeed.cleanse` block). `units` 2, `ticks` 90, `cooldownTicks` 2700, `holdTicks` 15,
+`botNetUnits` 10. These are on the branch only, not on old main; port them as they are.
+
+**Check.** `CleanseTests` (13) and `CleanseSoakTests` (3) pass; 5v5 over seeds 1 to 100 keeps the berserk share between
+10 and 50 %. Play check: cleanse at the shrine and watch instability fall.
+
+**Out of scope.** The cleanse effect art (keep any placeholder to a plain flash).
+
+### CM-39 Builder part 1: biomass upgrade ladder
+
+Old state: built on branch `cm/CM-39` (`b37bb1c`, up to date with old main), held. Waits on CM-35.
+
+**What the player sees.** The team banks delivered biomass. Spending it raises an ally's class level by one (two
+levels above the start), which raises their max health and heals the gain.
+
+**Port** (from `cm/CM-39`). `src/sim/upgrade.ts` (148), `src/sim/upgrade.test.ts` (268, 11 cases), the bank credit
+in `resources.ts` (+6), the level hook in `respawn.ts` (+6), `types.ts` (+17), `world.ts` (+5).
+
+**Create.** `Assets/_Game/Sim/Rules/UpgradeSystem.cs` (`UpgradeSystem`, `MaxClassLevel`), `Assets/_Game/Sim.Tests/UpgradeTests.cs`.
+Adds `BiomassBank` per team to match state.
+
+**Tunables** (from the branch). `abilities.builderUpgrade`: `range` 3, `costBiomass` [3, 5], `maxHpBonus` [0.15, 0.3],
+`refuseCooldownTicks` 15.
+
+**DECISION PENDING (architect).** On the branch the Builder spends by holding the class ability near an ally. CM-84 moves
+upgrades to the base station and CM-58 needs the Builder's ability for ladders and bridges. Until decided, build the
+ladder, the bank and the cost and health math behind an `UpgradeSystem.TryUpgrade(world, buyer, target)` call with no
+input wired.
+
+**Check.** `UpgradeTests` (11) pass (target choice and refusal cases follow the answer above; keep every case the
+answer does not touch).
+
+**Out of scope.** Badge art, an upgrade tree (D-067: the ladder is linear).
+
+### CM-84 Base stations: swap class and upgrade
+
+Old state: new (D-067 item 5, supersedes D-053). Waits on CM-39.
+
+**What the player sees.** Inside your own base station you can switch class and spend team biomass to go up one level.
+Outside it, or at the enemy's station, you cannot. Switching keeps your biomass, score and kills; it has a 5 second
+cooldown. The death screen no longer offers a class switch.
+
+**Port.** The class-switch cooldown from old main (CM-54): `src/sim/respawn.ts` (194) class-pick block and its cases in
+`src/sim/respawn.test.ts` (379), rule detail in the D-053 addendum. New files are yours; there is no old code for stations.
+
+**Create.** `Assets/_Game/Sim/Rules/StationSystem.cs` (`StationSystem`), `Assets/_Game/Sim.Tests/StationTests.cs`
+(`StationTests`). Runtime: `Assets/_Game/Runtime/View/StationPanel.cs` (plain uGUI or UI Toolkit placeholder).
+
+**Tunables.** `respawn.classSwitchCooldownTicks` 150 (switch at tick T refused through T+149, accepted at T+150).
+Upgrade costs from CM-39.
+
+**DECISION PENDING (architect).** The station's size and place, and how the player opens it (the browser had no station).
+Build the rules against a `StationZone` read from the map so the answer only changes data.
+
+**Check.** `StationTests`: switch accepted inside own station, refused outside and at the enemy station, refused within
+150 ticks, biomass, score and kills unchanged; upgrade refused outside, without biomass and at the top level; the ported
+CM-54 cooldown cases pass. Play check: walk into your station, switch to Farmer, try again at once and see it refused.
+
+**Out of scope.** Station art, bots switching class (they never did).
+
+### CM-58 Builder part 2: ladders and bridges
+
+Old state: new, no code. Waits on CM-39 (team bank) and CM-30 (route guard). The loop's Builder look item waits on this,
+so do it early.
+
+**What the player sees.** A Builder spends team biomass to turn a gap or wall cell into a walkable piece; players and bots
+re-route over it; the piece disappears after a time or when broken; a piece can never seal the only route to anything.
+
+**Port.** No old code. Reuse the dig route guard from CM-30 and the barricade lifetime and health pattern from
+`src/sim/barricades.ts` (328).
+
+**Create.** `Assets/_Game/Sim/Rules/BuildSystem.cs` (`BuildSystem`), `Assets/_Game/Sim.Tests/BuildTests.cs`,
+`Assets/_Game/Sim.Tests/BuildSoakTests.cs` (`[Category("Slow")]`).
+
+**DECISION PENDING (architect).** Which control places a piece; its biomass cost, lifetime, health, how many one Builder
+may have; and what a "ladder" means now that cells have heights. None of these exist in the old config.
+
+**Check.** `BuildTests`: a piece makes a cell walkable, the flow field routes over it, it expires and breaks on schedule,
+and a piece that would seal the only route is refused. `BuildSoakTests`: 16v16 over seeds 1 to 100 reports pieces built
+per match and every spawn pad keeps a route. Play check: bridge a gap as a Builder and watch a bot use it.
+
+**Out of scope.** Ladder and bridge meshes (the loop's).
+
+### CM-59 Any class carries built pieces
+
+Old state: new. Waits on CM-58.
+
+**What the player sees.** Any class presses E on a built piece to pick it up (the ground goes back to what it was),
+carries one at a time, and presses E at a valid gap or wall edge to put it down. The never-seal-the-only-route rule holds
+on pickup and on drop.
+
+**Port.** No old code.
+
+**Create.** `Assets/_Game/Sim/Rules/CarrySystem.cs` (`CarrySystem`), `Assets/_Game/Sim.Tests/CarryTests.cs`.
+
+**DECISION PENDING (architect).** Whether you can carry a piece while carrying biomass or a block, and what happens to a
+carried piece when you die.
+
+**Check.** `CarryTests`: pickup restores the cell, one piece at a time, drop only on a valid edge, route rule on both
+pickup and drop. Play check: move a bridge from one gap to another.
+
+**Out of scope.** Carry animation.
+
+### CM-66 Default 16v16 and 2x pace
+
+Old state: built on branch `cm/CM-66` (`8083906`), held. Waits on F-08 and F-09.
+
+**What the player sees.** A match with no options is 16 against 16 and runs at double speed: the 8:00 match clock (sim
+time) plays in 4:00 of real time. The Sim still ticks at 30 Hz; the driver runs two ticks per frame slot.
+
+**Port** (from `cm/CM-66`). The `teamSize` and `defaultSpeed` changes in `game.config.ts` (+12), `game.config.test.ts`
+(+4), `balance-table.test.ts` (+1).
+
+**Create.** Edit `GameConfig` (`TeamSize` 16, new `DefaultSpeed` 2) and the foundation's Sim driver; update
+`GameConfigTests` and the balance-table tests. Ported tests that need 5v5 or speed 1 must set them explicitly.
+
+**DECISION PENDING (architect).** How to pick 5v5 or speed 1 in Unity (the browser used `?size=5` and `?speed=1`), and
+the 16v16 frame budget (the browser's was the CM-17 render budget). Land this item in its own PR: it touches many tests.
+
+**Check.** `GameConfigTests` pin 16 and 2; every test passes. Play check: a fresh match has 32 capsules and the clock runs
+at twice real time.
+
+**Out of scope.** Performance work beyond reporting the frame time you measure.
+
+### CM-65 Free camera
+
+Old state: landed in the browser as a view-only change (D-067 CM-65 entry): mouse at a screen edge pans, middle drag
+grabs the ground, C or a respawn snaps back. Wilson could not find it. Waits on F-08.
+
+**DECISION PENDING (architect).** The Unity camera rule is "fixed yaw, follows your hero", the browser's C key and
+middle drag are not in the controls table, and the wheel now switches dig/place. Do not build until decided.
+
+**Port when decided.** Behaviour from old `src/game/CameraRig.tsx` (612) and `src/game/rig.ts` (160). Create
+`Assets/_Game/Runtime/View/CameraFreePan.cs`. Check: Wilson finds and uses it without being told.
+
+### CM-68 Maps B (Ember Orchard) and C (Tidal Crown)
+
+Old state: built on branch `cm/CM-68` (`572927e`), held. Waits on F-03 and F-06.
+
+**What the player sees.** Two more maps from the bible's page 12. Skybreak stays the default.
+
+**Port** (from `cm/CM-68`). The two layouts in `src/sim/map.ts` (560 lines on the branch, +233), `src/sim/map.test.ts`
+(362, 20 cases), `src/bots/maps.slow.test.ts` (111, 1 case).
+
+**Create.** `Assets/_Game/Sim/Maps/EmberOrchardMap.cs`, `Assets/_Game/Sim/Maps/TidalCrownMap.cs`, `MapId` in the Sim,
+`Assets/_Game/Sim.Tests/MapLayoutTests.cs`, `Assets/_Game/Sim.Tests/MapSoakTests.cs` (`[Category("Slow")]`).
+
+**DECISION PENDING (architect).** How a map is picked in Unity (the browser used `?map=ember|tidal`).
+
+**Check.** `MapLayoutTests` (20) and `MapSoakTests` (1) pass: both bases, the hill and the shrine reachable on the flow
+field; base-to-hill path lengths within 5 % for the two teams; a 10-seed headless match on each map plays to the clock
+with no stuck bot.
+
+**Out of scope.** Landmarks and materials (the loop's), new scenes.
+
+### CM-67 The combat choice
+
+Old state: held. The team has not picked parry, heavy versus light attacks, or both (D-067 item 6). Max and Jeisil pick,
+Wilson's pick goes into the decisions log, then Max builds it. Nothing to build until then. Whatever is picked must fit
+the controls table without a new binding.
+
+### CM-55 Engine port spike
+
+Old state: held until after the demo. Closed: moving to this Unity repo is the port.
+
+---
+
+## 5. Art
+
+No art item is assigned to you here. You have been modelling a hero character in Blender: please push the `.blend` and
+an FBX export to `Assets/_Game/Art/Characters/_source/` on a branch (for example `max/art-hero-source`) and open a PR,
+so it can be checked against the asset bible's Warrior page (page 6). Both file types already go through Git LFS.

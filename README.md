@@ -37,6 +37,14 @@ project settings and URP assets; `CriticalMass.Editor.ProjectSetup.LogPipeline` 
 | `Assets/_Game/Editor` | `CriticalMass.Editor`: editor-only build and setup scripts |
 | `Assets/_Game/Art`, `Audio`, `Scenes`, `Settings` | content, `Boot.unity`, URP assets |
 
+## For teammates
+
+Start with [MAX-ITEMS.md](MAX-ITEMS.md): setup, workflow, the architecture rules, the controls and the mechanics work list.
+Work on a branch named `max/<item-id>-short-name` (or your own prefix), one item per pull request into `main`.
+Run `tools/unity-compile.sh` and `tools/unity-test.sh` before every pull request and paste the result lines.
+Game rules go in `Assets/_Game/Sim` with NUnit tests in `Assets/_Game/Sim.Tests`; the view goes in `Assets/_Game/Runtime`.
+Never push to `main` directly.
+
 ## Git
 
 Binary assets go through Git LFS (`git lfs install` once per machine). Unity YAML files are merged with
