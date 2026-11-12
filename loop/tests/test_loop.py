@@ -53,7 +53,8 @@ def test_cards_must_carry_titles():
     assert not C.card_problems(C.batch_card(2, ['F-03'], {'F-03': {'title': 'Ground grid with heights'}}, '#4'))
 
 
-def test_one_text_per_key_and_one_flusher(tmp_path):
+def test_one_text_per_key_and_one_flusher(tmp_path, monkeypatch):
+    monkeypatch.setattr(C, 'quiet_hours', lambda now=None: False)  # the test is about keys and the lock, not the clock
     sent = []
     C.notify_enqueue('batch-landed', 'batch-T-1', 'Batch 1 landed: Ground grid (F-03).')
     C.notify_enqueue('batch-landed', 'batch-T-1', 'Batch 1 landed: Ground grid (F-03).')

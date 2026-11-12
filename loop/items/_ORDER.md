@@ -69,8 +69,8 @@ previous one; F-07 waits on F-05a; F-08a, F-08b, F-08c wait on F-06e and F-07; F
 
 Shared-file owners (one writer per batch, script-checked): `Assets/_Game/Runtime/CriticalMass.Runtime.asmdef`,
 `Assets/_Game/Runtime.Tests/CriticalMass.Runtime.Tests.asmdef` and `Assets/_Game/Editor/**` (ProjectSetup.cs and the
-Editor asmdef): F-07 only, in Phase 0. No item touches `ProjectSettings/`, `Packages/` or `tools/unity-test.sh`
-(F-09 uses the harness's existing `--category Slow`); F-08c creates `tools/unity-playtest.sh`. No item writes a
+Editor asmdef): F-07 only, in Phase 0. No item touches `ProjectSettings/`, `Packages/` or `tools/unity-test.sh`; F-08c creates
+`tools/unity-playtest.sh` and F-09 creates `tools/unity-soak.sh` (the two paths the harness gates run, U-028). No item writes a
 `.meta`, scene, prefab, material or asset file (U-027): Unity generates the metas on the integrator's import and
 ProjectSetup.Apply creates the one runtime asset (the placeholder material). ProjectSetup changes made in batch 3 must
 be applied (U-029) before batch 4's gates, which need the project-wide actions and the material.

@@ -389,9 +389,24 @@ director; `_OPEN.md` O-21, O-22), so their items cannot compile one by one.
 
 **Status.** Decided. Built: `loop/bin/integrate.py --coupled`, the workflow's fix seat, `cmloop.py batches`.
 
-## U-027 (reserved for the reviewer)
+## U-027 Hierarchy in code, no hand-authored Unity files
 
-Reserved: "the game hierarchy is built in code at Boot; builders never author scene files". Written by the reviewer.
+**Decision.** The game hierarchy is built in code when Boot loads (F-08a `GameBootstrap`, `RuntimeInitializeOnLoadMethod`
+plus `SceneManager.sceneLoaded`); `Assets/_Game/Scenes/Boot.unity` stays the only build scene and stays empty. Builders
+never author `.unity`, `.prefab`, `.asset`, `.mat` or `.meta` files by hand and never choose a GUID or fileID: Unity
+generates the `.meta` of every new file and folder on the integrator's import, and the assets Runtime needs (the
+project-wide input actions assignment, the placeholder material) are made by `CriticalMass.Editor.ProjectSetup.Apply`
+(F-07, run by U-029). The one hand-written Unity data file is `Assets/_Game/Settings/Controls.inputactions`, plain JSON
+in the shape F-07 gives. Sim-to-Unity axes go through `CriticalMass.Runtime.SimSpace` only (O-13).
+
+**Why.** Builders do not run Unity (loop/README.md) and cannot write scene or asset YAML, GUIDs or importer fileIDs that
+are known to be right; code and editor API calls are checked by the compile gate.
+
+**Replaces.** MAX-ITEMS' `Assets/_Game/Scenes/Arena.unity` and the drafted fixed-GUID `EditorBuildSettings` entry
+(`_OPEN.md` O-16, O-17).
+
+**Status.** Decided. Applied in `loop/items/` (conventions section 9, F-07, F-08a). The integrator must commit the
+`.meta` files Unity generates with the batch.
 
 ## U-028 Soak lane
 

@@ -88,3 +88,16 @@ def test_sectioned_item_without_method_heading_checks_all_but_out_of_scope(tmp_p
     assert V.validate(write(tmp_path, 'F-02', t), {'F-02'}) == []
     t2 = t.replace('Seed 1337 is the default.', 'Seed 1337 or 42.')
     assert any('"or"' in e for e in V.validate(write(tmp_path, 'F-02', t2), {'F-02'}))
+
+
+def test_quoted_titles_in_tests_section_are_data_not_method(tmp_path):
+    tests = '## Tests\n| `ATargetOffTheIslandIsOutOfRange` | `a target off the island or a non-finite aim` |\n'
+    t = GOOD.replace('## Out of scope', tests + '## Out of scope')
+    assert V.validate(write(tmp_path, 'F-02', t), {'F-02'}) == []
+    t2 = GOOD.replace('## Out of scope', '## Tests\n| `X` | "either this" |\n## Out of scope')
+    assert V.validate(write(tmp_path, 'F-02', t2), {'F-02'}) == []
+    # unquoted text in Tests still counts, and quotes elsewhere are not exempt
+    t3 = GOOD.replace('## Out of scope', '## Tests\nPick one or the other.\n## Out of scope')
+    assert any('"or"' in e for e in V.validate(write(tmp_path, 'F-02', t3), {'F-02'}))
+    t4 = GOOD.replace('Seed 1337 is the default.', 'Seed `1337 or 42`.')
+    assert any('"or"' in e for e in V.validate(write(tmp_path, 'F-02', t4), {'F-02'}))

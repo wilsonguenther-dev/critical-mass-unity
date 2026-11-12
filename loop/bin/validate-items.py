@@ -25,6 +25,24 @@ BANNED = [(re.compile(r'\bor\b', re.I), '"or"'), (re.compile(r'\beither\b', re.I
           (re.compile(r'\bif\s+installed\b', re.I), '"if installed"'), (re.compile(r'\bTBD\b', re.I), '"TBD"')]
 
 
+_TESTS_HEADING = re.compile(r'^##\s+Tests\b.*$', re.M | re.I)
+_QUOTED = re.compile(r'`[^`\n]*`|"[^"\n]*"')
+
+
+def _unquote_tests(body):
+    """Architect ruling 2026-11-12: quoted vitest titles in a `## Tests` section are data, not method. Blank out text
+    inside backticks or double quotes in `## Tests` sections only, before the forbidden-word check."""
+    parts = re.split(r'^(##\s+.*)$', body, flags=re.M)
+    out, in_tests = [], False
+    for chunk in parts:
+        if re.match(r'^##\s+', chunk):
+            in_tests = bool(_TESTS_HEADING.match(chunk))
+            out.append(chunk)
+        else:
+            out.append(_QUOTED.sub(lambda m: m.group(0)[0] * 2, chunk) if in_tests else chunk)
+    return ''.join(out)
+
+
 def validate(path, known_ids=None):
     fm, body, errors = C.parse_item(path)
     errs = list(errors)
@@ -70,7 +88,7 @@ def validate(path, known_ids=None):
         for w in (fm['waits_on'] if isinstance(fm.get('waits_on'), list) else []):
             if w not in known_ids:
                 errs.append(f'waits_on {w!r} is not an item in this folder')
-    method = C.method_text(body)
+    method = C.method_text(_unquote_tests(body))
     if method is None or not method.strip():
         errs.append('no method: the method is every "##" section except "## Out of scope", and there is none')
     else:
