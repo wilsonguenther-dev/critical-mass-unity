@@ -8,6 +8,7 @@ using CriticalMass.Runtime.Game;
 using CriticalMass.Sim.Config;
 using CriticalMass.Sim.Core;
 using CriticalMass.Sim.Grid;
+using Unity.Cinemachine;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -18,11 +19,22 @@ namespace CriticalMass.Editor
     /// <summary>
     /// Gameplay-camera capture (art direction 2026-11-12, section 8 checklist renders). Loads the Boot scene, enters Play
     /// Mode, runs the 16v16 bot match (actor 0 on autopilot, GameConfig.CreateDefault seed 1337) for a fixed number of
-    /// simulated seconds by StepTicks with the wall clock stopped, then frames three targets with the gameplay camera
+    /// simulated seconds by StepTicks with the wall clock stopped, then frames four targets with the gameplay camera
     /// (CameraFollowTarget.SetOverride) and writes 1920x1080 PNGs plus capture.json to the output folder. Needs graphics
     /// (no -nographics). Run (tools/unity-capture.sh wraps it):
-    /// Unity -batchmode -projectPath . -executeMethod CriticalMass.Editor.CaptureTool.Run -captureOut DIR [-captureSeconds 30]
+    /// Unity -batchmode -projectPath . -executeMethod CriticalMass.Editor.CaptureTool.Run -captureOut DIR [-captureSeconds 30] [-captureYaw DEG]
     /// Exit codes: 0 written, 1 exception, 2 timed out in frames, 64 bad arguments.
+    /// <para>Targets: the Azure base, the hill and the shrine at the gameplay distance, and "wide": the centre of the land
+    /// from the gameplay pitch and FOV, pulled back to <see cref="WideDistance"/>, the one distance that fits all the land
+    /// (every non-Void cell) at every heading, so captures at different yaws share a scale. Past the URP shadow distance
+    /// (60 u) the wide view has no cast shadows.</para>
+    /// <para>-captureYaw (capture only; the game's yaw stays RenderConfig.CameraYawDeg = 45): sets the yaw in this match's
+    /// GameConfig (the sim never reads RenderConfig, so the match is identical) and re-poses everything built from it: the
+    /// CM Camera's rotation and follow offset (CameraRig) and the sun (GameBootstrap.SunRotation, so it stays at the
+    /// screen's upper-left). Input is bypassed, not remapped: actor 0 is on autopilot (no human frame reaches the sim), the
+    /// follow is on an override (no aim term, no screen-up offset), so HumanInputState's fixed 45-degree move basis is
+    /// never used here; it would be wrong for a human playing at another yaw. The aim ray (Camera.ScreenPointToRay) would
+    /// follow the camera by itself.</para>
     /// </summary>
     [InitializeOnLoad]
     public static class CaptureTool
@@ -35,6 +47,10 @@ namespace CriticalMass.Editor
         private const string ActiveKey = "cm.capture.active";
         private const string OutKey = "cm.capture.out";
         private const string SecondsKey = "cm.capture.seconds";
+        private const string YawKey = "cm.capture.yaw";
+        private const string HasYawKey = "cm.capture.hasYaw";
+        /// <summary>Wide target: the map corners stay this far inside the frame edges (fraction of the half-extent).</summary>
+        private const double WideMargin = 0.04;
 
         private static int _frames;
         private static int _phase;
@@ -65,14 +81,26 @@ namespace CriticalMass.Editor
                 }
                 string secs = Arg("-captureSeconds");
                 double seconds = string.IsNullOrEmpty(secs) ? DefaultSeconds : double.Parse(secs, CultureInfo.InvariantCulture);
+                string yawArg = Arg("-captureYaw");
+                bool hasYaw = !string.IsNullOrEmpty(yawArg);
+                double yaw = 0;
+                if (hasYaw && (!double.TryParse(yawArg, NumberStyles.Float, CultureInfo.InvariantCulture, out yaw) ||
+                               double.IsNaN(yaw) || double.IsInfinity(yaw)))
+                {
+                    Debug.LogError($"[CaptureTool] -captureYaw '{yawArg}' is not a number of degrees");
+                    EditorApplication.Exit(64);
+                    return;
+                }
                 Directory.CreateDirectory(outDir);
+                SessionState.SetBool(HasYawKey, hasYaw);
+                SessionState.SetFloat(YawKey, (float)yaw);
                 SessionState.SetBool(ActiveKey, true);
                 SessionState.SetString(OutKey, Path.GetFullPath(outDir));
                 SessionState.SetFloat(SecondsKey, (float)seconds);
                 EditorSceneManager.OpenScene(GameBootstrap.BootScenePath, OpenSceneMode.Single);
                 Hook();
                 SimDriverBehaviour.CaptureMode = true;
-                Debug.Log($"[CaptureTool] start out={outDir} seconds={seconds}");
+                Debug.Log($"[CaptureTool] start out={outDir} seconds={seconds} yaw={(hasYaw ? yaw.ToString(CultureInfo.InvariantCulture) : "default")}");
                 EditorApplication.EnterPlaymode();
             }
             catch (Exception e)
@@ -121,6 +149,11 @@ namespace CriticalMass.Editor
             double seconds = SessionState.GetFloat(SecondsKey, (float)DefaultSeconds);
             _ticksWanted = (int)Math.Round(seconds * _driver.Config.SimHz);
             _ticksDone = 0;
+            if (SessionState.GetBool(HasYawKey, false))
+            {
+                if (!_driver.HumanAutopilot) throw new InvalidOperationException("yaw override needs actor 0 on autopilot (input is not remapped)");
+                _driver.Config.Render.CameraYawDeg = SessionState.GetFloat(YawKey, 45f);
+            }
             Debug.Log($"[CaptureTool] seed={_driver.Config.Seed} teamSize={_driver.Config.TeamSize} actors={_driver.World.ActorCount} ticks={_ticksWanted}");
             _phase = 1;
         }
@@ -139,15 +172,125 @@ namespace CriticalMass.Editor
             _settle = -1;
         }
 
-        private static (string Name, double X, double Z)[] Targets(MapDef map)
+        private static (string Name, double X, double Z, double Distance)[] Targets(MapDef map)
         {
             PadDef azure = map.Pads[(int)TeamId.Azure];
+            List<Vector2> land = LandOutline(map, out double cx, out double cz);
             return new[]
             {
-                ("base-azure", azure.X, azure.Z),
-                ("hill", map.Hill.X, map.Hill.Z),
-                ("shrine", map.Shrine.X, map.Shrine.Z),
+                ("base-azure", azure.X, azure.Z, GameplayCamera.Distance),
+                ("hill", map.Hill.X, map.Hill.Z, GameplayCamera.Distance),
+                ("shrine", map.Shrine.X, map.Shrine.Z, GameplayCamera.Distance),
+                ("wide", cx, cz, WideDistance(map, land, cx, cz)),
             };
+        }
+
+        /// <summary>
+        /// The outer corners of the land (every cell that is not Cell.Void): per row the first and last land cell, per
+        /// column the first and last, in sim (x, z). (cx, cz) = the centre of the land's bounding box. A map with no land
+        /// falls back to its bounds.
+        /// </summary>
+        public static List<Vector2> LandOutline(MapDef map, out double cx, out double cz)
+        {
+            var pts = new List<Vector2>();
+            int w = map.Width, h = map.Height;
+            int minX = int.MaxValue, maxX = -1, minZ = int.MaxValue, maxZ = -1;
+            for (int z = 0; z < h; z++)
+            {
+                int first = -1, last = -1;
+                for (int x = 0; x < w; x++)
+                {
+                    if (map.Cells[z * w + x] == Cell.Void) continue;
+                    if (first < 0) first = x;
+                    last = x;
+                    if (x < minX) minX = x;
+                    if (x > maxX) maxX = x;
+                    if (z < minZ) minZ = z;
+                    if (z > maxZ) maxZ = z;
+                }
+                if (first < 0) continue;
+                pts.Add(new Vector2(first, z)); pts.Add(new Vector2(first, z + 1));
+                pts.Add(new Vector2(last + 1, z)); pts.Add(new Vector2(last + 1, z + 1));
+            }
+            for (int x = 0; x < w; x++)
+            {
+                int first = -1, last = -1;
+                for (int z = 0; z < h; z++)
+                {
+                    if (map.Cells[z * w + x] == Cell.Void) continue;
+                    if (first < 0) first = z;
+                    last = z;
+                }
+                if (first < 0) continue;
+                pts.Add(new Vector2(x, first)); pts.Add(new Vector2(x + 1, first));
+                pts.Add(new Vector2(x, last + 1)); pts.Add(new Vector2(x + 1, last + 1));
+            }
+            BoundsDef b = map.Bounds;
+            if (pts.Count == 0)
+            {
+                pts.Add(new Vector2((float)b.MinX, (float)b.MinZ)); pts.Add(new Vector2((float)b.MaxX, (float)b.MinZ));
+                pts.Add(new Vector2((float)b.MinX, (float)b.MaxZ)); pts.Add(new Vector2((float)b.MaxX, (float)b.MaxZ));
+                cx = (b.MinX + b.MaxX) / 2;
+                cz = (b.MinZ + b.MaxZ) / 2;
+                return pts;
+            }
+            cx = (minX + maxX + 1) / 2.0;
+            cz = (minZ + maxZ + 1) / 2.0;
+            return pts;
+        }
+
+        /// <summary>
+        /// The smallest look distance (gameplay pitch and FOV, 16:9, look target = (cx, cz) at its ground height) that keeps
+        /// every land outline point inside the frame at every heading in 15-degree steps, so a wide capture at any yaw has
+        /// the same scale.
+        /// </summary>
+        public static double WideDistance(MapDef map, List<Vector2> land, double cx, double cz)
+        {
+            Vector3 target = SimSpace.ToWorld(cx, GroundHeight.At(map, cx, cz), cz);
+            var corners = new Vector3[land.Count];
+            for (int i = 0; i < land.Count; i++)
+                corners[i] = SimSpace.ToWorld(land[i].x, GroundHeight.At(map, land[i].x, land[i].y), land[i].y);
+            double tv = Math.Tan(GameplayCamera.FovDeg * Math.PI / 360) * (1 - WideMargin);
+            double th = tv * Width / Height;
+            double lo = GameplayCamera.Distance, hi = 1000;
+            for (int it = 0; it < 60; it++)
+            {
+                double d = (lo + hi) / 2;
+                bool fits = true;
+                for (int yaw = 0; yaw < 360 && fits; yaw += 15)
+                {
+                    Quaternion r = Quaternion.Euler((float)GameplayCamera.PitchDeg, 360f - yaw, 0f);
+                    Quaternion inv = Quaternion.Inverse(r);
+                    Vector3 cam = target - r * Vector3.forward * (float)d;
+                    foreach (Vector3 p in corners)
+                    {
+                        Vector3 l = inv * (p - cam);
+                        if (l.z <= 0 || Math.Abs(l.x / l.z) > th || Math.Abs(l.y / l.z) > tv) { fits = false; break; }
+                    }
+                }
+                if (fits) hi = d; else lo = d;
+            }
+            return Math.Ceiling(hi * 10) / 10;
+        }
+
+        /// <summary>
+        /// Pose the CM Camera (CameraRig) and the sun (GameBootstrap) for the config's yaw and the given look distance.
+        /// At the default yaw and the gameplay distance this re-applies exactly what CameraRig and GameBootstrap built.
+        /// </summary>
+        private static void ApplyPose(double distance)
+        {
+            GameConfig cfg = _driver.Config;
+            GameObject cmGo = GameObject.Find("CM Camera");
+            if (cmGo == null) throw new InvalidOperationException("no CM Camera in the scene");
+            var follow = cmGo.GetComponent<CinemachineFollow>();
+            var cm = cmGo.GetComponent<CinemachineCamera>();
+            if (follow == null || cm == null) throw new InvalidOperationException("CM Camera has no CinemachineFollow / CinemachineCamera");
+            Quaternion rotation = GameplayCamera.Rotation(cfg);
+            cmGo.transform.rotation = rotation;
+            follow.FollowOffset = -(rotation * Vector3.forward) * (float)distance;
+            cm.Lens.FarClipPlane = Math.Max(GameplayCamera.FarClip, (float)distance + 150f);
+            GameObject sun = GameObject.Find("Directional Light");
+            if (sun != null) sun.transform.rotation = GameBootstrap.SunRotation(cfg);
         }
 
         private static void Shoot()
@@ -163,6 +306,7 @@ namespace CriticalMass.Editor
             if (follow == null) throw new InvalidOperationException("no CameraFollowTarget in the scene");
             if (_settle < 0)
             {
+                ApplyPose(targets[_target].Distance);
                 follow.ClearOverride();
                 follow.SetOverride(targets[_target].X, targets[_target].Z);
                 _settle = SettleFrames;
@@ -174,7 +318,7 @@ namespace CriticalMass.Editor
             GameObject hillGo = GameObject.Find("Hill");
             Debug.Log($"[CaptureTool] {targets[_target].Name}: target={follow.transform.position} cam={main.transform.position} " +
                       $"euler={main.transform.eulerAngles} fov={main.fieldOfView} ortho={main.orthographic} " +
-                      $"expectedCam={GameplayCamera.PositionFor(_driver.Config, follow.transform.position)} " +
+                      $"distance={targets[_target].Distance} yaw={_driver.Config.Render.CameraYawDeg} " +
                       $"hill={(hillGo != null ? hillGo.transform.position + " scale " + hillGo.transform.lossyScale + " active " + hillGo.activeInHierarchy + " mat " + hillGo.GetComponent<Renderer>().sharedMaterial.shader.name : "none")}");
             if (_driver.World.Tick != _ticksWanted)
                 throw new InvalidOperationException($"world tick {_driver.World.Tick} != {_ticksWanted}: frame-time ticks leaked in, the capture is not deterministic");
@@ -223,18 +367,18 @@ namespace CriticalMass.Editor
             }
         }
 
-        private static void WriteManifest((string Name, double X, double Z)[] targets)
+        private static void WriteManifest((string Name, double X, double Z, double Distance)[] targets)
         {
             var sb = new System.Text.StringBuilder();
             sb.Append("{\n");
             sb.Append($"  \"seed\": {_driver.Config.Seed},\n  \"teamSize\": {_driver.Config.TeamSize},\n");
             sb.Append($"  \"ticks\": {_ticksDone},\n  \"simSeconds\": {(_ticksDone / _driver.Config.SimHz).ToString(CultureInfo.InvariantCulture)},\n");
             sb.Append($"  \"worldTick\": {_driver.World.Tick},\n  \"width\": {Width},\n  \"height\": {Height},\n");
-            sb.Append($"  \"camera\": {{\"projection\": \"perspective\", \"pitchDeg\": {GameplayCamera.PitchDeg.ToString(CultureInfo.InvariantCulture)}, \"fovDeg\": {GameplayCamera.FovDeg.ToString(CultureInfo.InvariantCulture)}, \"distance\": {GameplayCamera.Distance.ToString(CultureInfo.InvariantCulture)}, \"yawDeg\": {_driver.Config.Render.CameraYawDeg.ToString(CultureInfo.InvariantCulture)}}},\n");
+            sb.Append($"  \"camera\": {{\"projection\": \"perspective\", \"pitchDeg\": {GameplayCamera.PitchDeg.ToString(CultureInfo.InvariantCulture)}, \"fovDeg\": {GameplayCamera.FovDeg.ToString(CultureInfo.InvariantCulture)}, \"distance\": {GameplayCamera.Distance.ToString(CultureInfo.InvariantCulture)}, \"yawDeg\": {_driver.Config.Render.CameraYawDeg.ToString(CultureInfo.InvariantCulture)}, \"yawOverride\": {(SessionState.GetBool(HasYawKey, false) ? "true" : "false")}, \"input\": \"bypassed: actor 0 on autopilot, follow on override\"}},\n");
             sb.Append("  \"targets\": [\n");
             for (int i = 0; i < targets.Length; i++)
             {
-                sb.Append($"    {{\"name\": \"{targets[i].Name}\", \"simX\": {targets[i].X.ToString(CultureInfo.InvariantCulture)}, \"simZ\": {targets[i].Z.ToString(CultureInfo.InvariantCulture)}, \"file\": \"{Path.GetFileName(Written[i])}\"}}");
+                sb.Append($"    {{\"name\": \"{targets[i].Name}\", \"simX\": {targets[i].X.ToString(CultureInfo.InvariantCulture)}, \"simZ\": {targets[i].Z.ToString(CultureInfo.InvariantCulture)}, \"distance\": {targets[i].Distance.ToString(CultureInfo.InvariantCulture)}, \"file\": \"{Path.GetFileName(Written[i])}\"}}");
                 sb.Append(i + 1 < targets.Length ? ",\n" : "\n");
             }
             sb.Append("  ]\n}\n");
@@ -252,6 +396,7 @@ namespace CriticalMass.Editor
             EditorApplication.update -= Update;
             SimDriverBehaviour.CaptureMode = false;
             SessionState.EraseBool(ActiveKey);
+            SessionState.EraseBool(HasYawKey);
             Debug.Log($"[CaptureTool] exit {code}, {Written.Count} file(s)");
             EditorApplication.Exit(code);
         }
