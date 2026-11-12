@@ -42,7 +42,7 @@ TRI_CAP = {"Egg": 4000, "Hatchling": 10000, "Adult": 15000}
 # Silhouette tunables fitted against the bible crops with iou_map.py (KJ_TUNE='{"sh_x": 1.05}' overrides one run;
 # the committed defaults below are the fitted values, so a plain run rebuilds the committed asset).
 TUNE = {"sh_x": 1.12, "fist_x": 1.68, "fist_r": 0.64, "crown_k": 1.05, "fan_k": 1.2, "head_dy": -0.25, "head_dz": -0.2,
-        "hip_z": 1.38, "thigh_x": 0.68, "fist_y": -0.8, "tail_k": 0.6, "arm_k": 1.38, "cry_k": 1.12, "rock_k": 1.18, "facets": 11, "crack_k": 1.42, "rim_k": 2.2, "moss_k": 0.7, "rim_d": 0.09}
+        "hip_z": 1.38, "thigh_x": 0.68, "fist_y": -0.8, "tail_k": 0.6, "arm_k": 1.38, "cry_k": 1.12, "rock_k": 1.18, "facets": 11, "crack_k": 1.42, "rim_k": 2.2, "moss_k": 0.6, "rim_d": 0.09}
 TUNE.update(json.loads(os.environ.get("KJ_TUNE", "{}")))
 
 
@@ -479,14 +479,14 @@ def moss_cap(geo, pts, c, up, radii, cover, rng, bone):
     rz = radii[2]
     rr = 0.5 * (radii[0] + radii[1])
     tops = sorted(pts, key=lambda p: -(p - c).dot(up))
-    n = 2 + int(cover * 4.2)
+    n = 1 + int(cover * 3.2)
     chosen = [tops[0]]
     for p in tops[1:]:
         if len(chosen) >= n:
             break
         if (p - c).dot(up) < (0.62 - 0.5 * cover) * rz:
             break
-        if all((p - q).length > 0.26 * rr for q in chosen):
+        if all((p - q).length > 0.2 * rr for q in chosen):
             chosen.append(p)
     # one broad cushion over the crown ties the clumps into a single draped carpet
     chosen.insert(0, c + up * (0.72 * rz))
