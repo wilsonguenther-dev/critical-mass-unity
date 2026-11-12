@@ -1,0 +1,311 @@
+#!/usr/bin/env python3
+"""The loop's gates (decision 4). Each gate prints ONE JSON line, appends it to loop/logs/gates.jsonl and exits with
+the real exit code: 0 pass, the tool's own non-zero code on fail, 78 skipped. "skipped" is never exit 0, so nothing
+that reads exit codes can mistake a skip for a pass. `budgets` exits 0 with status "reported" or "flagged": it never
+fails an item; a flag goes to the architect.
+
+  gate.py compile        [--project DIR]                    tools/unity-compile.sh
+  gate.py editmode       [--project DIR]                    tools/unity-test.sh (fails on zero tests)
+  gate.py playmode-smoke [--project DIR]                    PlayMode tests in category Smoke on the game scene
+  gate.py build-mac      [--project DIR]                    tools/unity-build-mac.sh
+  gate.py parity  --item ID [--project DIR]                 tools/unity-capture.sh (art_row items only)
+  gate.py scope   --item ID --ref REF [--base REF]          git only: the diff touches only files_allowed
+  gate.py budgets        [--project DIR]                    frame time, draw calls, shader variants: report only
+
+Unity gates refuse to run inside a builder lane (builders never run Unity), refuse when a Unity editor already has the
+project open, refuse under the 15 GB disk floor, and run under the compile lock (one Unity process at a time).
+"""
+import argparse
+import json
+import os
+import re
+import subprocess
+import sys
+import xml.etree.ElementTree as ET
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'bin'))
+import cmloop as C  # noqa: E402
+
+SMOKE_SCENE = 'Assets/_Game/Scenes/Arena.unity'  # the game scene (ARCHITECTURE.md folder map, F-08)
+CAPTURE_TOOL = 'tools/unity-capture.sh'
+BUDGETS_FILE = C.LOOP / 'budgets.json'
+EXC_RE = re.compile(r'^\s*(?:[\w.]+\.)?\w*Exception\b[^\n]*', re.M)
+
+
+def emit(gate, status, code, detail, **kw):
+    rec = {'gate': gate, 'status': status, 'exit': code, 'ts': C.utc(), 'detail': detail, **kw}
+    line = json.dumps(rec, sort_keys=True)
+    print(line, flush=True)
+    C.append_jsonl(C.LOGS / 'gates.jsonl', rec)
+    return code
+
+
+def unity_binary(project):
+    ver = re.search(r'^m_EditorVersion:\s*(\S+)', (Path(project) / 'ProjectSettings/ProjectVersion.txt').read_text(),
+                    re.M).group(1)
+    return os.environ.get('UNITY_PATH') or f'/Applications/Unity/Hub/Editor/{ver}/Unity.app/Contents/MacOS/Unity'
+
+
+def refuse_unity(gate, project):
+    p = Path(project).resolve()
+    lanes = C.LANES.resolve()
+    if lanes in p.parents and p != C.INT.resolve() and C.INT.resolve() not in p.parents:
+        return emit(gate, 'fail', 2, f'refused: {p} is a builder lane; builders never run Unity', project=str(p))
+    hits = C.unity_open_on(p)
+    if hits:
+        return emit(gate, 'fail', 3, f'refused: a Unity editor already has {p} open (pid {hits[0]["pid"]})',
+                    project=str(p))
+    g = C.free_gb()
+    if g < C.DISK_FLOOR_GB:
+        return emit(gate, 'fail', 4, f'refused: {g:.1f} GB free, under the {C.DISK_FLOOR_GB} GB floor', project=str(p))
+    return None
+
+
+def run_locked(gate, cmd, cwd):
+    """Run cmd under the compile lock. Inside the integrator (CM_LOCK_TOKEN matches the lock) it runs directly."""
+    cur = C.read_json(C.lock_path()) or {}
+    if cur.get('token') and cur.get('token') == os.environ.get('CM_LOCK_TOKEN'):
+        p = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
+        return p.returncode, p.stdout, p.stderr, cur.get('owner')
+    rec = C.lock_acquire(f'gate-{gate}', purpose=' '.join(cmd)[:120])
+    if not rec:
+        st = C.lock_status()
+        return 75, '', f'compile lock held by {st.get("owner")} pid {st.get("pid")} since {st.get("started")}', None
+    try:
+        p = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True,
+                           env={**os.environ, 'CM_LOCK_TOKEN': rec['token']})
+        return p.returncode, p.stdout, p.stderr, rec['owner']
+    finally:
+        C.lock_release(rec['token'])
+
+
+def save_out(gate, out, err):
+    f = C.LOGS / f'gate-{gate}.out'
+    f.parent.mkdir(parents=True, exist_ok=True)
+    f.write_text(out + ('\n--- stderr ---\n' + err if err else ''))
+    return str(f)
+
+
+def cs_errors(log):
+    try:
+        txt = Path(log).read_text(errors='replace')
+    except FileNotFoundError:
+        return []
+    return sorted(set(l.strip() for l in txt.splitlines() if re.search(r'error CS\d+', l)))
+
+
+def g_compile(a):
+    proj = Path(a.project).resolve()
+    r = refuse_unity('compile', proj)
+    if r is not None:
+        return r
+    code, out, err, owner = run_locked('compile', [str(proj / 'tools/unity-compile.sh')], proj)
+    outf = save_out('compile', out, err)
+    log = proj / 'Logs/compile.log'
+    if code == 0:
+        return emit('compile', 'pass', 0, 'unity-compile: OK', project=str(proj), log=str(log), out=outf,
+                    lock_owner=owner)
+    errs = cs_errors(log)
+    ef = C.LOGS / 'gate-compile-errors.txt'
+    ef.write_text('\n'.join(errs) + '\n')
+    detail = errs[0] if errs else ((err or out).strip().splitlines() or ['no output'])[-1]
+    return emit('compile', 'fail', code, detail, errors=len(errs), errors_file=str(ef), project=str(proj), log=str(log), out=outf, lock_owner=owner)
+
+
+def failed_tests(xml_path):
+    try:
+        root = ET.parse(xml_path).getroot()
+    except Exception:
+        return []
+    out = []
+    for tc in root.iter('test-case'):
+        if tc.get('result') == 'Failed':
+            msg = tc.find('./failure/message')
+            st = tc.find('./failure/stack-trace')
+            out.append({'name': tc.get('name'), 'fullname': tc.get('fullname'), 'classname': tc.get('classname'),
+                        'message': (msg.text or '').strip()[:800] if msg is not None else '',
+                        'stack': (st.text or '').strip()[:1500] if st is not None else ''})
+    return out
+
+
+def g_editmode(a):
+    proj = Path(a.project).resolve()
+    r = refuse_unity('editmode', proj)
+    if r is not None:
+        return r
+    code, out, err, owner = run_locked('editmode', [str(proj / 'tools/unity-test.sh')], proj)
+    outf = save_out('editmode', out, err)
+    res = proj / 'Logs/editmode-results.xml'
+    m = re.search(r'total=(\d+) passed=(\d+) failed=(\d+)', out + err)
+    total, passed, failed = (int(x) for x in m.groups()) if m else (0, 0, 0)
+    ft = failed_tests(res)
+    ff = C.LOGS / 'gate-editmode-failed.json'
+    ff.write_text(json.dumps(ft, indent=1))
+    if code == 0 and total > 0:
+        return emit('editmode', 'pass', 0, f'{passed}/{total} EditMode tests passed', total=total, failed=0,
+                    results=str(res), out=outf, lock_owner=owner)
+    if total == 0:
+        detail = 'zero tests ran'
+    elif failed:
+        detail = f'{failed} of {total} EditMode tests failed'
+    else:
+        detail = ((err or out).strip().splitlines() or [f'Unity exit {code}'])[-1]
+    return emit('editmode', 'fail', code or 1, detail, total=total, failed=failed, failed_file=str(ff),
+                results=str(res), out=outf, lock_owner=owner)
+
+
+def g_playmode(a):
+    proj = Path(a.project).resolve()
+    if not (proj / SMOKE_SCENE).exists():
+        return emit('playmode-smoke', 'skipped', C.SKIP_EXIT, f'skipped: no game scene ({SMOKE_SCENE} does not exist)',
+                    project=str(proj))
+    r = refuse_unity('playmode-smoke', proj)
+    if r is not None:
+        return r
+    res, log = proj / 'Logs/playmode-results.xml', proj / 'Logs/playmode-smoke.log'
+    res.unlink(missing_ok=True)
+    cmd = [unity_binary(proj), '-batchmode', '-projectPath', str(proj), '-runTests', '-testPlatform', 'PlayMode',
+           '-testCategory', 'Smoke', '-testResults', str(res), '-logFile', str(log)]
+    code, out, err, owner = run_locked('playmode-smoke', cmd, proj)
+    try:
+        root = ET.parse(res).getroot()
+        total, failed = int(root.get('total', 0)), int(root.get('failed', 0))
+    except Exception:
+        total, failed = 0, 0
+    excs = sorted(set(m.group(0).strip()[:300] for m in EXC_RE.finditer(log.read_text(errors='replace'))))[:40] \
+        if log.exists() else []
+    ef = C.LOGS / 'gate-playmode-exceptions.txt'
+    ef.write_text('\n'.join(excs) + '\n')
+    if code == 0 and total > 0 and failed == 0 and not excs:
+        return emit('playmode-smoke', 'pass', 0, f'{total} Smoke PlayMode test(s) passed, zero exceptions',
+                    total=total, log=str(log), lock_owner=owner)
+    why = 'zero Smoke tests ran' if total == 0 else f'{failed} Smoke test(s) failed' if failed else \
+        f'{len(excs)} exception line(s) in the log' if excs else f'Unity exit {code}'
+    pf = C.LOGS / 'gate-playmode-failed.json'
+    pf.write_text(json.dumps(failed_tests(res), indent=1))
+    return emit('playmode-smoke', 'fail', code or 1, why, total=total, failed=failed, exceptions_file=str(ef),
+                failed_file=str(pf), log=str(log), lock_owner=owner)
+
+
+def g_build_mac(a):
+    proj = Path(a.project).resolve()
+    r = refuse_unity('build-mac', proj)
+    if r is not None:
+        return r
+    code, out, err, owner = run_locked('build-mac', [str(proj / 'tools/unity-build-mac.sh')], proj)
+    outf = save_out('build-mac', out, err)
+    log = proj / 'Logs/build-mac.log'
+    if code == 0:
+        return emit('build-mac', 'pass', 0, 'Builds/macOS/CriticalMass.app built', log=str(log), out=outf,
+                    lock_owner=owner)
+    errs = cs_errors(log)
+    ef = C.LOGS / 'gate-build-mac-errors.txt'
+    ef.write_text('\n'.join(errs) + '\n')
+    return emit('build-mac', 'fail', code, (errs[:1] or [((err or out).strip().splitlines() or ['?'])[-1]])[0],
+                errors_file=str(ef), log=str(log), out=outf, lock_owner=owner)
+
+
+def g_parity(a):
+    proj = Path(a.project).resolve()
+    it = C.load_item(Path(a.items_dir) / f'{a.item}.md')
+    row = it.get('art_row', 'none')
+    if row in (None, 'none'):
+        return emit('parity', 'skipped', C.SKIP_EXIT, f'skipped: {a.item} has no art_row', item=a.item)
+    if not (proj / CAPTURE_TOOL).exists():
+        return emit('parity', 'skipped', C.SKIP_EXIT, f'skipped: {CAPTURE_TOOL} does not exist yet (U-010, U-017)',
+                    item=a.item, art_row=row)
+    r = refuse_unity('parity', proj)
+    if r is not None:
+        return r
+    code, out, err, owner = run_locked('parity', [str(proj / CAPTURE_TOOL), '--row', row], proj)
+    short = C.git('rev-parse', '--short', 'HEAD', cwd=proj)[1].strip()
+    rj = proj / f'Logs/parity/{short}/{row}/results.json'  # U-017 output layout
+    res = C.read_json(rj)
+    if code != 0 or res is None:
+        return emit('parity', 'fail', code or 1, f'capture failed or wrote no {rj}', item=a.item, art_row=row,
+                    lock_owner=owner)
+    fails = [f for f in (res.get('framings') or []) if not f.get('measured_pass')]
+    if fails:
+        return emit('parity', 'fail', 1, f'{len(fails)} framing(s) fail the measured checks', item=a.item,
+                    art_row=row, results=str(rj))
+    return emit('parity', 'pass', 0, 'measured checks pass: the row is ready for the team (never a row PASS, U-010)',
+                item=a.item, art_row=row, results=str(rj))
+
+
+def scope_violations(item, files):
+    allowed = item.get('files_allowed') or []
+    forbidden = item.get('files_forbidden') or []
+    approved = item.get('architect_approved')
+    v = []
+    for f in files:
+        if any(C.glob_match(f, g) for g in forbidden):
+            v.append(f'{f}: matches files_forbidden')
+        elif not any(C.glob_match(f, g) for g in allowed):
+            v.append(f'{f}: not in files_allowed')
+        elif C.is_guarded(f) and not approved:
+            v.append(f'{f}: guarded path without architect_approved')
+        elif f.startswith('DECISIONS.md'):
+            v.append(f'{f}: builders never write DECISIONS.md (U-011)')
+    return v
+
+
+def g_scope(a):
+    it = C.load_item(Path(a.items_dir) / f'{a.item}.md')
+    try:
+        files = C.changed_files(a.base, a.ref, cwd=a.project)
+    except RuntimeError as e:
+        return emit('scope', 'fail', 2, str(e), item=a.item, ref=a.ref)
+    v = scope_violations(it, files)
+    if v:
+        return emit('scope', 'fail', 1, f'{len(v)} file(s) outside the item scope', item=a.item, ref=a.ref,
+                    base=a.base, violations=v[:30])
+    return emit('scope', 'pass', 0, f'{len(files)} file(s) changed, all inside files_allowed', item=a.item,
+                ref=a.ref, base=a.base, files=files[:30])
+
+
+def g_budgets(a):
+    proj = Path(a.project).resolve()
+    if not (proj / SMOKE_SCENE).exists():
+        return emit('budgets', 'skipped', C.SKIP_EXIT, f'skipped: no game scene ({SMOKE_SCENE} does not exist)')
+    limits = C.read_json(BUDGETS_FILE, {}) or {}
+    perf = C.read_json(proj / 'Logs/perf.json', {}) or {}  # written by the Smoke PlayMode test (an item's job)
+    log = proj / 'Logs/build-mac.log'
+    variants = None
+    if log.exists():
+        nums = [int(x) for x in re.findall(r'(\d+)\s+(?:shader\s+)?variants', log.read_text(errors='replace'))]
+        variants = sum(nums) if nums else None
+    meas = {'frame_ms': perf.get('frame_ms'), 'draw_calls': perf.get('draw_calls'), 'shader_variants': variants}
+    over = [k for k, v in meas.items() if v is not None and limits.get(k) is not None and v > limits[k]]
+    missing = [k for k, v in meas.items() if v is None]
+    st = 'flagged' if over else 'reported'
+    if over:
+        C.append_jsonl(C.STATE / 'architect-flags.jsonl', {'ts': C.utc(), 'kind': 'budget', 'over': over, **meas})
+    return emit('budgets', st, 0, (f'over budget: {", ".join(over)}; flagged for the architect' if over else
+                                   'measured and reported') + (f'; not measured: {", ".join(missing)}' if missing else ''),
+                measured=meas, limits=limits)
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument('gate', choices=['compile', 'editmode', 'playmode-smoke', 'build-mac', 'parity', 'scope', 'budgets'])
+    ap.add_argument('--project', default=str(C.MAIN))
+    ap.add_argument('--item')
+    ap.add_argument('--items-dir', default=str(C.ITEMS_DIR))
+    ap.add_argument('--ref')
+    ap.add_argument('--base', default='origin/main')
+    a = ap.parse_args(argv)
+    if a.gate in ('parity', 'scope') and not a.item:
+        ap.error(f'{a.gate} needs --item')
+    if a.gate == 'scope' and not a.ref:
+        ap.error('scope needs --ref')
+    fn = {'compile': g_compile, 'editmode': g_editmode, 'playmode-smoke': g_playmode, 'build-mac': g_build_mac,
+          'parity': g_parity, 'scope': g_scope, 'budgets': g_budgets}[a.gate]
+    try:
+        return fn(a)
+    except Exception as e:  # an internal error is a fail with its own code, never a pass
+        return emit(a.gate, 'fail', 70, f'gate internal error: {type(e).__name__}: {e}')
+
+
+if __name__ == '__main__':
+    sys.exit(main())

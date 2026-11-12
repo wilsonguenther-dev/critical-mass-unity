@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Every builder and integrator runs this first. Exit 0 = go on; 3 = HALT or STALL; 4 = STOP-DISPATCH (spend 90 %,
+# hard stop); 5 = no running loop recorded, or the launch ids were never recorded (waits up to 120 s for them).
+exec python3 "$(dirname "${BASH_SOURCE[0]}")/cmloop.py" halt-check "$@"
