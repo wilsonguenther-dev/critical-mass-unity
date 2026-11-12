@@ -129,3 +129,103 @@ def test_ledger_records_each_state_once_and_closes_every_item_in_exactly_one_ter
     assert C.ledger_audit() == []
     live = (C.LOGS / 'live.log').read_text()
     assert live.count('Two was dropped.') == 1 and live.count('was not reached this run (HALT: test)') == 1
+
+
+# ── U-050: a fresh launch reuses pushed lanes instead of rebuilding them ──
+def _lanes_repo(tmp):
+    def g(*a, cwd=tmp):
+        return subprocess.run(['git', '-C', str(cwd), *a], capture_output=True, text=True, check=True).stdout.strip()
+    g('init', '-q', '-b', 'main')
+    g('config', 'user.email', 't@t'); g('config', 'user.name', 't')
+    (tmp / 'a.txt').write_text('a\n'); g('add', '.'); g('commit', '-qm', 'base')
+    base = g('rev-parse', 'HEAD')
+    for name, f, text in (('X-1', 'x.txt', 'x\n'), ('X-2', 'a.txt', 'lane\n'), ('X-3', 'y.txt', 'y\n')):
+        g('checkout', '-q', '-b', f'loop/{name}', base)
+        (tmp / f).write_text(text); g('add', '.'); g('commit', '-qm', f'{name}: work')
+        g('update-ref', f'refs/remotes/origin/loop/{name}', 'HEAD')
+    g('checkout', '-q', 'main')
+    (tmp / 'a.txt').write_text('main moved\n'); (tmp / 'z.txt').write_text('z\n'); g('add', '.'); g('commit', '-qm', 'main')
+    g('update-ref', 'refs/remotes/origin/main', 'HEAD')
+    g('update-ref', 'refs/remotes/origin/loop/X-4', 'HEAD')  # a lane with nothing beyond main
+    return g
+
+
+def test_prebuilt_lane_reuses_a_clean_merging_pushed_lane_and_never_a_returned_conflicting_or_empty_one(tmp_path):
+    g = _lanes_repo(tmp_path)
+    x1 = C.prebuilt_lane('X-1', 0, cwd=tmp_path)
+    assert x1 == g('rev-parse', 'refs/remotes/origin/loop/X-1')       # behind main, merges cleanly: reused
+    assert C.prebuilt_lane('X-2', 0, cwd=tmp_path) == ''              # conflicts with main in a.txt: rebuilt
+    assert C.prebuilt_lane('X-3', 1, cwd=tmp_path) == ''              # returned once: its builder reads the failure
+    assert C.prebuilt_lane('X-4', 0, cwd=tmp_path) == ''              # nothing beyond main
+    assert C.prebuilt_lane('X-9', 0, cwd=tmp_path) == ''              # never pushed
+    g('checkout', '-q', 'loop/X-3'); g('merge', '-q', '--no-edit', 'main')
+    g('update-ref', 'refs/remotes/origin/loop/X-3', 'HEAD'); g('checkout', '-q', 'main')
+    assert C.prebuilt_lane('X-3', 0, cwd=tmp_path) == g('rev-parse', 'refs/remotes/origin/loop/X-3')  # descends from main
+    assert g('status', '--porcelain') == '' and g('rev-parse', 'main') == g('rev-parse', 'refs/remotes/origin/main')
+
+
+def test_plan_marks_prebuilt_lanes_and_rebuild_turns_it_off(monkeypatch):
+    monkeypatch.setattr(C, 'prebuilt_lane', lambda iid, returns=0, **k: 'f00d' if iid == 'F-05a' and not returns else '')
+    monkeypatch.setattr(C, 'returns_read', lambda: {'F-01b': 1})
+    rows = {r['id']: r for r in C.plan(1, '2026-11-12T18:00:00Z', max_builders=12)['items']}
+    assert rows['F-05a']['prebuilt'] == 'f00d' and rows['F-01b']['prebuilt'] == '' and rows['F-01b']['returns'] == 1
+    assert all(r['prebuilt'] == '' for r in C.plan(1, '2026-11-12T18:00:00Z', reuse=False)['items'])
+
+
+def test_record_launch_writes_one_reused_ledger_row_per_prebuilt_item_once():
+    C.write_json(C.STATE / 'run.json', {'run_id': 'wf_test-reuse', 'status': 'running'})
+    args = {'items': [{'id': 'R-1', 'owner': 'loop', 'title': 'One', 'prebuilt': 'a' * 40},
+                      {'id': 'R-2', 'owner': 'loop', 'title': 'Two', 'prebuilt': ''},
+                      {'id': 'R-3', 'owner': 'loop', 'title': 'Three', 'prebuilt': 'b' * 40},
+                      {'id': 'R-4', 'owner': 'loop', 'title': 'Four', 'prebuilt': 'c' * 40}],
+            'landed': ['R-3'], 'batches': [{'batch': 2, 'items': ['R-1', 'R-2', 'R-3']}]}
+    assert C.ledger_reused(args) == ['R-1']                       # R-3 landed, R-4 not in this run's batches
+    assert C.ledger_reused(args) == []                            # recorded once
+    rows = [r for r in C.ledger_rows('wf_test-reuse') if r['state'] == 'reused']
+    assert [r['id'] for r in rows] == ['R-1'] and 'aaaaaaaaaaaa' in rows[0]['detail'] and not rows[0]['final']
+    assert 'reuses 1 already pushed item branch(es) without rebuilding them: R-1.' in (C.LOGS / 'live.log').read_text()
+
+
+# ── U-051: build-windows, the shipping build, beside build-mac; due once batch 4's coupled set is on main ──
+GATES = Path(__file__).resolve().parents[1] / 'gates'
+
+
+def test_build_windows_gate_skips_with_78_without_the_module_and_never_reports_a_pass(tmp_path):
+    proj = tmp_path / 'proj'
+    (proj / 'ProjectSettings').mkdir(parents=True)
+    (proj / 'ProjectSettings/ProjectVersion.txt').write_text('m_EditorVersion: 6000.3.28f1\n')
+    fake = tmp_path / 'Editor/Unity.app/Contents/MacOS/Unity'  # an editor folder with no PlaybackEngines
+    p = subprocess.run([str(GATES / 'build-windows'), '--project', str(proj)], capture_output=True, text=True,
+                       env={**__import__('os').environ, 'UNITY_PATH': str(fake)})
+    rec = json.loads([l for l in p.stdout.splitlines() if l.startswith('{')][-1])
+    assert p.returncode == C.SKIP_EXIT == 78 and rec['status'] == 'skipped' and rec['exit'] == 78
+    assert 'WindowsStandaloneSupport' in rec['detail'] and rec['gate'] == 'build-windows'
+    assert (GATES / 'build-mac').read_text().replace('build-mac', 'X') == (GATES / 'build-windows').read_text().replace('build-windows', 'X')
+
+
+def test_windows_build_is_due_once_batch_4s_coupled_set_is_on_main_and_after_every_later_batch():
+    cset = {x['batch']: x for x in C.order_batches()}[I.WINDOWS_AFTER_BATCH]['coupled_set']
+    assert cset == ['F-08a', 'F-08b', 'F-08c']
+    assert I.windows_due(['F-05a'], landed=[]) is False
+    assert I.windows_due(['F-08a', 'F-08b'], landed=['F-07']) is False
+    assert I.windows_due(['F-08a', 'F-08b', 'F-08c'], landed=[]) is True       # the batch that lands the set
+    assert I.windows_due(['A-02'], landed=['F-08a', 'F-08b', 'F-08c']) is True  # every later batch
+
+
+def test_windows_build_red_is_a_blocking_entry_skipped_is_recorded_and_not_due_never_runs(tmp_path, monkeypatch):
+    class A:
+        batch, review_dir, items_dir = 4, str(tmp_path), None
+    calls = []
+    for status, code in (('fail', 1), ('skipped', 78), ('pass', 0)):
+        monkeypatch.setattr(I, 'run_gate', lambda name, *a, _s=status, _c=code, **k: calls.append(name) or
+                            {'gate': name, 'status': _s, 'exit': _c, 'detail': f'{_s} detail', 'out': '/tmp/o'})
+        res = {'flags': [], 'skipped_gates': []}
+        st = I.run_build_windows(A, 'T', tmp_path, {}, res, ['F-08a', 'F-08b', 'F-08c'], landed=[])
+        assert st['status'] == status and st['exit'] == code
+        if status == 'fail':
+            assert [b['key'] for b in C.review_blocking(tmp_path)] == ['WT-4'] and 'build-windows red' in res['flags'][0]
+        if status == 'skipped':
+            assert res['skipped_gates'] == ['build-windows: skipped detail'] and not res['flags']
+    assert calls == ['build-windows'] * 3
+    assert I.run_build_windows(A, 'T', tmp_path, {}, {'flags': [], 'skipped_gates': []}, ['F-05a'], landed=[]) is None
+    assert calls == ['build-windows'] * 3

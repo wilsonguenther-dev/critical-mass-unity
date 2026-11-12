@@ -186,6 +186,9 @@ const parked = new Set(A.parked || [])
 const setAside = new Map() // id -> reason (blocked by a question, or dropped uncounted too often)
 const uncounted = {}
 const reusable = new Set() // built and pushed, dropped only because an item it waits on was dropped
+// U-050: a pushed lane the launcher found reusable (plan's `prebuilt`: never returned, merges with origin/main) goes
+// straight to the integrator; a counted drop removes it from this set, so it rebuilds as a returned item.
+for (const i of Object.values(byId)) if (i.prebuilt && i.returns === 0 && !landed.has(i.id) && !parked.has(i.id)) reusable.add(i.id)
 const landedThisRun = []
 const batches = []
 let batchNo = 0
@@ -329,6 +332,7 @@ if (BAD.length) {
   return { halted: `bad args: ${BAD.join('; ')}`, landedThisRun: [] }
 }
 log(`run ${TAG}: ${ORDER.length} loop items, ${landed.size} already landed, ${parked.size} parked, ${BATCHES.length} batch(es) from _ORDER.md; cap ${A.capTokens} total tokens (watched by spend.py)`)
+if (reusable.size) log(`reusing ${reusable.size} pushed lane(s) without a builder (U-050): ${[...reusable].join(', ')}`)
 
 if (BATCHES.length) {
   for (const b of BATCHES) {

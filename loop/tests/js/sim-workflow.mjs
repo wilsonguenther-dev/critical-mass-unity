@@ -282,6 +282,44 @@ results.push(await scenario('builder limit: --builders 20 clamps to 12, default 
     return p
   }, { ...MARGS, maxBuilders: 20 }))
 
+// ── U-050: pushed lanes the launcher marked prebuilt go straight to the integrator; a returned item still rebuilds ──
+const RITEMS = MITEMS.map((i) => (i.id.startsWith('F-05') || i.id === 'V-01' ? { ...i, prebuilt: 'abc123' }
+  : i.id === 'F-01b' ? { ...i, prebuilt: '', returns: 1 } : i))
+results.push(await scenario('relaunch: prebuilt lanes are never rebuilt and go straight to integration; the returned F-01b rebuilds once on its own branch',
+  (label, prompt) => (label.startsWith('build') ? built(label) : label.startsWith('integrate') ? land(prompt) : review),
+  (out, { calls, logs }) => {
+    const p = []
+    const builds = calls.filter((c) => c.label.startsWith('build')).map((c) => c.label.slice(6))
+    const b2 = builds.filter((id) => id.startsWith('F-05') || id === 'V-01')
+    if (b2.length) p.push(`rebuilt prebuilt lanes: ${b2.join(' ')}`)
+    const f01b = calls.filter((c) => c.label === 'build F-01b')
+    if (f01b.length !== 1 || !/--base origin\/loop\/F-01b/.test(f01b[0].prompt)) p.push('F-01b not rebuilt once as a returned item')
+    const ci = calls.find((c) => c.label.startsWith('integrate') && isCoupled(c.prompt))
+    if (!ci || !ids(ci.prompt).includes('F-05j') || !ids(ci.prompt).includes('V-01') || !ids(ci.prompt).includes('F-01b')) p.push('the batch-2 integrator did not get every item')
+    if (!out.landedThisRun.includes('F-05a') || !out.landedThisRun.includes('F-06a')) p.push(`landed ${out.landedThisRun.join(' ')}`)
+    if (!logs.some((l) => /reusing 11 pushed lane\(s\) without a builder \(U-050\)/.test(l))) p.push('no reuse log line')
+    if (out.halted || out.stopDispatch) p.push(`stopped: ${out.halted || out.stopDispatch}`)
+    return p
+  }, { ...MARGS, items: RITEMS }))
+
+results.push(await scenario('a prebuilt lane that a counted drop sends back is rebuilt as a returned item (cut from its own branch)',
+  (label, prompt, calls) => {
+    if (label.startsWith('build')) return built(label)
+    if (label.startsWith('review')) return review
+    if (label.startsWith('integrate')) {
+      const first = calls.filter((c) => c.label.startsWith('integrate') && ids(c.prompt).includes('V-01')).length === 1
+      return first && ids(prompt).includes('V-01') ? land(prompt, ['V-01']) : land(prompt)
+    }
+    return { status: 'fixed', note: 'x' }
+  },
+  (out, { calls }) => {
+    const p = []
+    const v = calls.filter((c) => c.label === 'build V-01')
+    if (v.length !== 1 || !/--base origin\/loop\/V-01/.test(v[0].prompt)) p.push(`V-01 builds ${v.length}, want 1 returned build`)
+    if (!out.landedThisRun.includes('V-01')) p.push('V-01 never landed')
+    return p
+  }, { ...MARGS, items: RITEMS }))
+
 const ok = results.every(Boolean)
 console.log(`sim-workflow: ${results.filter(Boolean).length}/${results.length} scenarios passed`)
 process.exit(ok ? 0 : 1)

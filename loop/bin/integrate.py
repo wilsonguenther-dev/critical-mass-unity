@@ -6,7 +6,8 @@
                [--local] [--no-pr] [--items-dir DIR] [--gates setup,compile,editmode,...] [--deadline-min 40]
 Coupled batches (U-026): no drops; a red writes loop/logs/coupled-<tag>-<N>-round<K>.md for the fix seat and returns
 red-coupled; after 2 fix rounds (or a red no fix seat can repair) it writes HALT and returns halt-coupled. Gates start
-with `setup` (ProjectSetup.Apply, U-029); after a batch lands, the soak gate runs on the new main (U-028).
+with `setup` (ProjectSetup.Apply, U-029); after a batch lands, the soak gate runs on the new main (U-028), then, once
+_ORDER.md batch 4's coupled set is on main, the build-windows gate (U-051; a red is a BLOCKING review entry).
 
 Flow:
   1. Take the compile lock for the whole batch (owner integrator-batch-N, this pid, start time); the stall alarm reads it.
@@ -330,7 +331,7 @@ def main(argv=None):
     report = C.LOGS / f'batch-{tag}-{a.batch}.json'
     C.write_json(report, res)
     summary = {k: res.get(k) for k in ('batch', 'result', 'coupled', 'fix_round', 'red_items', 'evidence', 'landed', 'pr',
-                                       'error', 'flags', 'skipped_gates', 'soak', 'blocking_open')}
+                                       'error', 'flags', 'skipped_gates', 'soak', 'build_windows', 'blocking_open')}
     summary['dropped'] = [{k: d[k] for k in ('id', 'gate', 'returns', 'parked', 'failure_file', 'counted')}
                           for d in res.get('dropped', [])]
     summary['report'] = str(report)
@@ -579,8 +580,43 @@ def run(a, ids, items, tag, env, t0):
         C.git('fetch', '-q', 'origin', 'main')
         C.git('checkout', '-q', '--detach', C.branch_sha('origin/main'), cwd=int_dir)
         res['soak'] = run_soak(a, tag, int_dir, env, res)
+        res['build_windows'] = run_build_windows(a, tag, int_dir, env, res, res['landed'])
     res['blocking_open'] = len(C.review_blocking(a.review_dir))
     return res
+
+
+WINDOWS_AFTER_BATCH = 4  # U-051: the shipping Windows build starts once _ORDER.md batch 4's coupled set is on main
+
+
+def windows_due(landed_now, items_dir=None, landed=None):
+    """U-051: build-windows runs on the new main after a landed batch once every item of _ORDER.md batch 4's
+    coupled set (F-08a, F-08b, F-08c: the first playable build) is on main, and after every landed batch from then on."""
+    b = next((x for x in C.order_batches(items_dir) if x['batch'] == WINDOWS_AFTER_BATCH), None)
+    cset = set((b or {}).get('coupled_set') or [])
+    if not cset:
+        return False
+    on_main = set(C.landed_map('origin/main')) if landed is None else set(landed)
+    return cset <= (on_main | set(landed_now or []))
+
+
+def run_build_windows(a, tag, int_dir, env, res, landed_now, landed=None):
+    """U-051: after the soak lane, on the same new-main checkout. Skipped (78) is recorded as skipped; a red writes a
+    BLOCKING review entry (the batch has landed; the next batch waits until the architect resolves it)."""
+    if not windows_due(landed_now, a.items_dir, landed):
+        return None
+    r = run_gate('build-windows', int_dir, env=env)
+    st = {k: r.get(k) for k in ('status', 'exit', 'detail')}
+    if r['status'] == 'skipped' and r['exit'] == C.SKIP_EXIT:
+        res['skipped_gates'].append(f'build-windows: {r["detail"]}')
+    elif r['status'] != 'pass' or r['exit'] != 0:
+        f = C.review_add_blocking(f'{tag}-{a.batch}', f'W{tag}-{a.batch}', f'the Windows build (the shipping build, '
+                                  f'U-051) is red after batch {a.batch}: {r.get("detail")} (gate output {r.get("out")}, '
+                                  f'log {r.get("log")}).', a.review_dir)
+        res['flags'].append(f'build-windows red; BLOCKING entry in {f}')
+        C.livelog(f'The Windows build went red after batch {a.batch}; the next batch waits for the architect.')
+    else:
+        C.livelog(f'The Windows build is green after batch {a.batch}.')
+    return st
 
 
 def run_soak(a, tag, int_dir, env, res):

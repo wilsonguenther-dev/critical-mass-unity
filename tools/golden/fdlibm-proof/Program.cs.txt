@@ -1,0 +1,38 @@
+using System;
+using System.IO;
+using System.Reflection;
+using CriticalMass.Sim.Core;
+public static class Program
+{
+    public static int Main(string[] args)
+    {
+        int failed = 0;
+        foreach (var t in new[] { typeof(CriticalMass.Sim.Tests.BoundaryTests), typeof(CriticalMass.Sim.Tests.JsMathFdlibmTests) }) {
+        foreach (MethodInfo m in t.GetMethods())
+        {
+            if (m.GetCustomAttributes(typeof(NUnit.Framework.TestAttribute), false).Length == 0) continue;
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            try { m.Invoke(Activator.CreateInstance(t), null); Console.WriteLine("PASS " + m.Name + " (" + sw.ElapsedMilliseconds + " ms)"); }
+            catch (TargetInvocationException e) { failed++; Console.WriteLine("FAIL " + m.Name + ": " + e.InnerException.Message); }
+        }
+        }
+        if (args.Length > 0)
+        {
+            byte[] all = File.ReadAllBytes(args[0]);
+            int n = all.Length / 32, bad = 0;
+            Func<int, ulong> rd = off => { ulong v = 0; for (int k = 0; k < 8; k++) v = (v << 8) | all[off + k]; return v; };
+            Func<ulong, double> d = b => BitConverter.Int64BitsToDouble(unchecked((long)b));
+            for (int i = 0; i < n; i++)
+            {
+                double a = d(rd(32 * i)), b = d(rd(32 * i + 8)), c = d(rd(32 * i + 16)), e = d(rd(32 * i + 24));
+                double r = Fdlibm.Fma(a, b, c);
+                bool ok = double.IsNaN(e) ? double.IsNaN(r) : BitConverter.DoubleToInt64Bits(e) == BitConverter.DoubleToInt64Bits(r);
+                if (!ok && bad++ < 10) Console.WriteLine("fma mismatch " + rd(32*i).ToString("x16") + " " + rd(32*i+8).ToString("x16") + " " + rd(32*i+16).ToString("x16") + " -> " + rd(32*i+24).ToString("x16") + " got " + unchecked((ulong)BitConverter.DoubleToInt64Bits(r)).ToString("x16"));
+            }
+            Console.WriteLine("fma: " + n + " triples, " + bad + " mismatches");
+            if (bad != 0) failed++;
+        }
+        Console.WriteLine(failed == 0 ? "ALL PASS" : failed + " FAILED");
+        return failed == 0 ? 0 : 1;
+    }
+}

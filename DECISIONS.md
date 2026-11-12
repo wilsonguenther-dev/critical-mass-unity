@@ -781,3 +781,89 @@ recommendation.
 still prints its JSON line and runs the soak gate. The card accepts ids that are part of an item's own title
 (F-03's "with the CM-31 decoration data"). Found by batch 1's real run (2026-11-12T17:15:05Z).
 **Status.** Built and tested.
+
+## Architect rulings after batch 2's halt (2026-11-12)
+
+Batch 2's coupled set halted on F-02c (run wf_a1267a8f-56b, `loop/logs/coupled-20261112T1739-1-round1.md`): 24
+last-bit mismatches against `tools/golden/jsmath-fdlibm.json`. Nothing above this section is rewritten.
+
+## U-049 The fdlibm oracle is node v24.11.1 arm64, FMA-contracted
+
+**Decision.** The oracle for `JsMath.Sin`, `Cos`, `Atan2`, `Exp` is "node v24.11.1 arm64, FMA-contracted fdlibm":
+every ported browser expectation was produced by that binary on this machine, so the C# port reproduces it bit for
+bit. Node compiles V8's `ieee754.cc` with clang's default `-ffp-contract=on`, which turns every in-expression
+`a*b + c` into one `fmadd` / `fmsub` / `fnmsub`. F-02c's spec is amended: a fused multiply-add is REQUIRED at exactly
+the 49 sites node's binary fuses (tagged `FMA-1` .. `FMA-49` in `Fdlibm.cs`, `tools/golden/fdlibm_replay.py` and the
+table in `loop/items/F-02c.md`) and forbidden everywhere else in the Sim. `System.Math.FusedMultiplyAdd` does not
+exist at this project's API level (.NET Standard 2.1: Unity's `NetStandard/ref/2.1.0/netstandard.dll` and Mono's
+`unityjit` mscorlib have no such member; compiling a call gives CS0117), so the fused sites call `Fdlibm.Fma`, a
+correctly rounded software fma (musl's integer algorithm, `src/math/fma.c`, with a zero `z` returning `x * y` and the
+min-normal case returning `+-DBL_MIN` directly): only 64-bit integer arithmetic, the exact `long` to `double`
+conversion and `Scalbn`, so results are identical on every player CPU. The boundary ban on System.Math stays;
+`BoundaryTests` now also bans `FusedMultiplyAdd` in the Sim and `Fma(` outside `Core/Fdlibm.cs`. F-02c's pass check
+uses the bounded grep `(^|[^A-Za-z0-9_])Math\.(Sin|Cos|Atan2|Exp)\(` (its question 1: the unbounded one matches `JsMath.`).
+**Derivation.** `otool -arch arm64 -tV "$(which node)"` over `v8::base::ieee754::{sin, cos, atan, atan2, exp}` and
+`(anonymous)::__ieee754_rem_pio2` (which inlines `__kernel_rem_pio2`; `__kernel_sin` and `__kernel_cos` are inlined
+into sin and cos), each `fmadd` / `fmsub` / `fnmsub` read against the C source order. Fused instruction counts: sin 38,
+cos 40, rem_pio2 18 (kernel loops unrolled), atan 13, atan2 1, exp 7; every one maps to a site of the list, and the
+list predicts exactly those counts (clang's rule: within one expression the left product fuses first, so in
+`z*r - x*y` it is `z*r`; `half*y - v*r` fuses `half*y`). The vectorised `fmul.2d` path of `__kernel_rem_pio2`'s
+inner loop needs 8 or more terms and the loop has at most 3 (nx <= 3), so only its fused scalar path runs.
+**Fused sites.** RemPio2: FMA-1 `t*invpio2 + half`, FMA-2 `t - fn*pio2_1`, FMA-3 `fn*pio2_2t - ((t-r)-w)`, FMA-4
+`fn*pio2_3t - ((t-r)-w)`. KernelRemPio2: FMA-5 and FMA-8 `fw += x[j]*f[jx+i-j]`, FMA-6 and FMA-9 `z - two24*fw`, FMA-7
+`z -= 8.0*floor(z*0.125)`, FMA-10 `fw += PIo2[k]*q[i+k]`. KernelCos: FMA-11..15 the inner Horner adds of `r` (the outer
+`z * (...)` is a plain product), FMA-16 `0.5*z - (...)`, FMA-17 and FMA-19 `z*r - x*y` (product `z*r`), FMA-18
+`0.5*z - qx`. KernelSin: FMA-20..23 the Horner adds of `r`, FMA-24 `x + v*(...)`, FMA-25 `S1 + z*r`, FMA-26
+`(...) - v*S1`, FMA-27 `z*(...) - y`, FMA-28 `half*y - v*r` (product `half*y`). Atan: FMA-29 `2.0*x - one`, FMA-30
+`one + 1.5*x`, FMA-31..35 the Horner adds of `s1`, FMA-36..39 those of `s2`, FMA-40 `x - x*(s1+s2)`, FMA-41
+`x*(s1+s2) - atanlo[id]`. Atan2: FMA-42 `pi_o_2 + 0.5*pi_lo` (V8's `pi_lo` is volatile). Exp: FMA-43
+`invln2*x + halF[xsb]`, FMA-44 `x - t*ln2HI[0]`, FMA-45 `x - t*(...)`, FMA-46..49 the Horner adds of `P1..P5`.
+**Proof (2026-11-12).** (a) `python3 tools/golden/fdlibm_replay.py` (math.fma at exactly those sites, the C#
+expression order): fused 0 mismatches of 8,186 golden vectors for all four functions; plain order 12 sin, 8 cos, 2
+exp, 2 atan2, exactly the Unity run's 24. (b) `tools/golden/gen-jsmath-large.mjs` (seed 0x5eed2026; tiny and
+subnormal, the kernel range, near multiples of pi/2, every npio2_hw word, medium and big reduction paths, huge, NaN
+payloads and infinities, exp overflow, underflow and subnormal-result edges, every atan band, atan2 |y/x| near 2^60
+and 2^-60, x == 1): 271,649 sin and cos, 250,037 exp, 210,144 atan2 inputs, 1,003,479 vectors; `--full` (44 MB, not
+committed) replayed fused: 0 mismatches (plain: 1,922). Committed form: `tools/golden/jsmath-fdlibm-large.json`
+(seed, counts, SHA-256 of inputs and outputs). (c) `bash tools/golden/fdlibm-proof/run.sh <lane>`: the lane's
+`Fdlibm.cs`, `JsMath.cs`, `JsMathFdlibmTests.cs` and `BoundaryTests.cs` compile with the editor's own Roslyn against
+Unity's netstandard 2.1 reference (exit 0) and every test of both fixtures passes under Unity's Mono and Unity's
+CoreCLR 6.0.21, including the new `LargeSeededSetMatchesNodeHashes` (the C# generator reproduces node's input hashes,
+then the output hashes); the software fma equals Python's `math.fma` on 1,304,096 triples (random bits, exact and
+near cancellation, integer ties, 1 + 2^-53 ties, subnormal and min-normal results, overflow, signed-zero products,
+every special-value combination): 0 mismatches. A mutant with FMA-24 unfused fails both tests (3 sin vectors, the
+large hash). Not yet run: the Unity EditMode gate itself (the integrator runs it on relaunch).
+**Replaces.** F-02c's "never ... use `Math.FusedMultiplyAdd`" line and its unbounded grep. U-032 otherwise stands.
+**Status.** Decided; built on `loop/F-02c` (77bb50e); spec, golden set, replay and proof script on main. A different
+node, an x86_64 node (no contraction without `-mfma`) and IL2CPP contraction are out of scope (panel deferred list).
+
+## U-050 A relaunch reuses pushed lanes
+
+**Decision.** A fresh launch no longer rebuilds an item whose lane is already pushed. `cmloop.py plan` marks an item
+`prebuilt` (its head sha) when `origin/loop/<ID>` exists, carries commits beyond origin/main, the item was never
+returned (`returns.json` 0; a returned item's builder must read its failure file, U-038) and its head descends from
+origin/main or merges with it cleanly (`git merge-tree --write-tree`, nothing written). The workflow puts every
+prebuilt item in `reusable`, so `buildAll` gives it no builder and the integrator merges `origin/loop/<ID>` as
+before; a counted drop takes it out of `reusable` and it rebuilds as a returned item on its own branch.
+`record-launch` writes one `reused` ledger row per prebuilt item of the run (once each, U-042) and one live-log
+sentence; `launch.sh --rebuild` (`plan --rebuild`) turns reuse off. **Found by:** reading the workflow before this
+ruling: `reusable` started empty, so a fresh launch sent every batch-2 item to a builder, whose `lanes create`
+(`worktree add -B` from origin/main) restarted the branch from scratch and whose push could never fast-forward.
+**Effect on the batch-2 relaunch:** F-02c and F-05a .. F-05j are reused (11 lanes); F-01b (dropped once at setup:
+CS0104 `Match` ambiguous with F-05i's `CriticalMass.Sim.Core.Match`) gets one returned builder on `origin/loop/F-01b`
+that fixes exactly that, then joins the same integration.
+**Status.** Built and tested (`test_batch2_prep.py`: prebuilt_lane on a real throwaway repo, plan, ledger rows;
+`sim-workflow.mjs`: two relaunch scenarios).
+
+## U-051 The demo ships as a Windows build
+
+**Decision.** Travis plays on a Windows PC, so the demo ships as a Windows 64-bit build; the Mac build is for our own
+testing. Gate `build-windows` (`loop/gates/build-windows`, `tools/unity-build-windows.sh` ->
+`CriticalMass.Editor.Build.Windows` -> `Builds/Windows/CriticalMass.exe`) has build-mac's shape: one JSON line, the
+real exit code, under the compile lock, and skipped = 78 when the editor has no
+`PlaybackEngines/WindowsStandaloneSupport` (installed in 6000.3.28f1 on 2026-11-12). `integrate.py` runs it on the new
+main after a landed batch, after the soak lane, once every item of _ORDER.md batch 4's coupled set (F-08a, F-08b,
+F-08c) is on main, and after every landed batch from then on. A red writes a BLOCKING review entry (the batch has
+landed; the next batch waits for the architect); skipped is recorded as skipped, never as a pass.
+**Status.** Built and tested (`test_batch2_prep.py`: real 78 skip through the gate script, due rule against the real
+_ORDER.md, red = BLOCKING, skipped recorded, not due = not run). Not yet run against a real Unity build.

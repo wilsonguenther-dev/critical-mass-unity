@@ -2,7 +2,11 @@
 # Launcher for the Critical Mass (Unity) build loop (decision 8). It never launches the Workflow itself: the
 # orchestrator does that with the args file this script writes, then records the ids with record-launch.
 #
-#   loop/bin/launch.sh --cap <total tokens> [--batches 1] [--builders N] [--dry-run] [--schedule FILE.json] [--hard-stop 2026-11-14T23:00:00Z]
+#   loop/bin/launch.sh --cap <total tokens> [--batches 1] [--builders N] [--rebuild] [--dry-run] [--schedule FILE.json] [--hard-stop 2026-11-14T23:00:00Z]
+#
+# U-050: an item whose pushed origin/loop/<ID> lane has commits beyond origin/main, descends from it or merges with
+# it cleanly, and was never returned is REUSED: the workflow sends it to the integrator without a builder (plan
+# --show lists them; record-launch writes one 'reused' ledger row each). --rebuild turns that off for the launch.
 #
 # --builders N: the builder limit, 1..12 (U-037; default 5); the integrator, fix seat and reviewer run alone after
 # the builders, so N is also the peak agent count.
@@ -30,6 +34,7 @@ while [ $# -gt 0 ]; do
     --items-dir) ITEMS_DIR="${2:-}"; shift 2 ;;
     --batches) BATCHES="${2:-}"; shift 2 ;;
     --builders) BUILDERS="${2:-}"; shift 2 ;;
+    --rebuild) REBUILD=1; shift ;;
     --build-only) shift ;;
     --deploy) echo "launch: REFUSED: there is no deploy step for this repo (build-only, U-013)"; exit 2 ;;
     *) echo "launch: unknown argument $1"; exit 2 ;;
@@ -91,7 +96,7 @@ done
 if [ $FAILED -ne 0 ]; then echo "launch: a watcher failed; stopping the others"; python3 "$CM" watchers-stop; exit 1; fi
 
 ARGS="$LOGS/launch-args.json"
-python3 "$CM" plan --cap "$CAP" --now "$NOW" --out "$ARGS" ${ITEMS_DIR:+--items-dir "$ITEMS_DIR"} ${BATCHES:+--batches "$BATCHES"} --builders "$BUILDERS" --show || exit 1
+python3 "$CM" plan --cap "$CAP" --now "$NOW" --out "$ARGS" ${ITEMS_DIR:+--items-dir "$ITEMS_DIR"} ${BATCHES:+--batches "$BATCHES"} --builders "$BUILDERS" ${REBUILD:+--rebuild} --show || exit 1
 SENT="The loop launcher ran ($MODE) with a cap of $CAP tokens; watchers are running."
 if [ $DRY -eq 1 ]; then python3 "$CM" livelog --dry-run "$SENT"; else python3 "$CM" livelog "$SENT"; fi
 echo

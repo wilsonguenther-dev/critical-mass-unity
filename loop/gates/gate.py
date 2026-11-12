@@ -10,6 +10,7 @@ fails an item; a flag goes to the architect.
   gate.py playmode-smoke [--project DIR]                    tools/unity-playtest.sh (assembly Runtime.PlayTests, F-08c)
   gate.py soak           [--project DIR]                    tools/unity-soak.sh: the "Slow" tests, after a batch lands (U-028)
   gate.py build-mac      [--project DIR]                    tools/unity-build-mac.sh
+  gate.py build-windows  [--project DIR]                    tools/unity-build-windows.sh (skipped 78 without the module)
   gate.py parity  --item ID [--project DIR]                 tools/unity-capture.sh (art_row items only)
   gate.py scope   --item ID --ref REF [--base REF]          git only: the diff touches only files_allowed
   gate.py budgets        [--project DIR]                    frame time, draw calls, shader variants: report only
@@ -264,6 +265,35 @@ def g_build_mac(a):
                 errors_file=str(ef), log=str(log), out=outf, lock_owner=owner)
 
 
+def windows_module(project):
+    """U-051: the editor's Windows Build Support module, next to Unity.app (Hub layout <editor>/PlaybackEngines/)."""
+    return Path(unity_binary(project)).parents[3] / 'PlaybackEngines' / 'WindowsStandaloneSupport'
+
+
+def g_build_windows(a):
+    """U-051: the shipping build (the demo is a Windows build; build-mac is our own test build). Same shape as
+    build-mac; skipped (78) when the editor has no Windows Build Support module."""
+    proj = Path(a.project).resolve()
+    mod = windows_module(proj)
+    if not mod.is_dir():
+        return emit('build-windows', 'skipped', C.SKIP_EXIT, f'skipped: no Windows Build Support module at {mod}',
+                    project=str(proj))
+    r = refuse_unity('build-windows', proj)
+    if r is not None:
+        return r
+    code, out, err, owner = run_locked('build-windows', [str(proj / 'tools/unity-build-windows.sh')], proj)
+    outf = save_out('build-windows', out, err)
+    log = proj / 'Logs/build-windows.log'
+    if code == 0:
+        return emit('build-windows', 'pass', 0, 'Builds/Windows/CriticalMass.exe built', log=str(log), out=outf,
+                    lock_owner=owner)
+    errs = cs_errors(log)
+    ef = C.LOGS / 'gate-build-windows-errors.txt'
+    ef.write_text('\n'.join(errs) + '\n')
+    return emit('build-windows', 'fail', code, (errs[:1] or [((err or out).strip().splitlines() or ['?'])[-1]])[0],
+                errors_file=str(ef), log=str(log), out=outf, lock_owner=owner)
+
+
 def g_parity(a):
     proj = Path(a.project).resolve()
     it = C.load_item(Path(a.items_dir) / f'{a.item}.md')
@@ -348,8 +378,8 @@ def g_budgets(a):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument('gate', choices=['setup', 'clean-reimport', 'compile', 'editmode', 'playmode-smoke', 'build-mac', 'parity', 'scope',
-                                     'budgets', 'soak'])
+    ap.add_argument('gate', choices=['setup', 'clean-reimport', 'compile', 'editmode', 'playmode-smoke', 'build-mac', 'build-windows',
+                                     'parity', 'scope', 'budgets', 'soak'])
     ap.add_argument('--project', default=str(C.MAIN))
     ap.add_argument('--item')
     ap.add_argument('--items-dir', default=str(C.ITEMS_DIR))
@@ -361,7 +391,7 @@ def main(argv=None):
     if a.gate == 'scope' and not a.ref:
         ap.error('scope needs --ref')
     fn = {'setup': g_setup, 'clean-reimport': g_clean_reimport, 'soak': g_soak, 'compile': g_compile, 'editmode': g_editmode, 'playmode-smoke': g_playmode, 'build-mac': g_build_mac,
-          'parity': g_parity, 'scope': g_scope, 'budgets': g_budgets}[a.gate]
+          'build-windows': g_build_windows, 'parity': g_parity, 'scope': g_scope, 'budgets': g_budgets}[a.gate]
     try:
         return fn(a)
     except Exception as e:  # an internal error is a fail with its own code, never a pass
