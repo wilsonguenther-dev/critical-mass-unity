@@ -86,14 +86,21 @@ def cells_glow(seed, ncell=14):
         if c.length < 1e-6:
             return (BIOMASS, MASK_GLOW_LINED)
         n = face.normal
-        h = n.dot(HL_DIR)
-        if n.dot(dot_dir) > 0.965 or 0.5 < h < 0.72 and n.dot(Vector((0, -1, 0))) > 0.05:
+        if glassy(n):
             return ("#F6FCA0", MASK_GLOW_LINED)
         d = sorted((c.normalized() - p).length for p in pts)
         if d[1] - d[0] < 0.09:
             return ("#66D119", MASK_GLOW_LINED)
         return ("#D3F73C" if n.z > 0.3 else (BIOMASS if n.z > -0.45 else "#8CD12A"), MASK_GLOW_LINED)
     return f
+
+
+def glassy(n):
+    """Painted glassy highlight (v2): a crescent hugging the upper-left rim plus a round dot inside it, in face colour,
+    so it sits inside the toon bands and never moves with the light. Bible p14 loose orb / p03 orbs and crystals."""
+    dot_dir = Vector((-0.35, -0.75, 0.56)).normalized()
+    h = n.dot(HL_DIR)
+    return n.dot(dot_dir) > 0.965 or (0.5 < h < 0.72 and n.y < -0.05)
 
 
 def fib_dirs(n, zmin=-1.0):
@@ -245,7 +252,9 @@ def orb_corruption():
         h = "#B57BE6" if s > 0.55 else (CORRUPT_TIP if s > -0.3 else "#5E2391")
         if f.normal.z > 0.7:
             h = "#C99AF0"
-        return (h, MASK_GLOW)
+        if glassy(f.normal):
+            h = "#EAD6FA"
+        return (h, MASK_GLOW_LINED)
     P.add(uvs(0.225, 14, 9), col, smooth=True, mat=M((0, 0, 0.225)))
     return P.finish(fit_height=0.45)
 
@@ -347,12 +356,18 @@ def corruption(name, H, seed, spec=CORR_MAIN):
 # ---------------------------------------------------------------- team crystals
 def crystal(P, h, r, loc, lean=(0, 0), rot=0.0):
     bm = tube([(0, 0, -0.02), (0, 0, h * 0.68), (0, 0, h)], [r * 0.85, r, 0.0], 6, tip=True)
-    P.add(bm, facet_light(TEAM_GLOW, TEAM_DARK, MASK_TEAM_GLOW, MASK_TEAM_DARK), lined=False,
-          mat=M(loc, (lean[0], lean[1], rot)))
+    lit = facet_light(TEAM_GLOW, TEAM_DARK, MASK_TEAM_GLOW_LINED, MASK_TEAM_DARK)
+    top = loc[2] + h * 0.45
+
+    def col(f):                     # v2: a painted pale highlight on the upper half of the most lit facet
+        if f.normal.dot(HL_DIR) > 0.55 and f.calc_center_median().z > top:
+            return ("#E6FCFF", MASK_GLOW_LINED)
+        return lit(f)
+    P.add(bm, col, mat=M(loc, (lean[0], lean[1], rot)))
 
 
 def crystal_cluster(name, H, seed):
-    P = Prop(name, LARGE, "interactable", {"height": H}, seed, outline_px=0.0)
+    P = Prop(name, LARGE, "interactable", {"height": H}, seed)
     k = H / 0.9
     rock(P, 0.17 * k, (0, 0.02, 0.03), seed, squash=0.55)
     crystal(P, 0.9 * k, 0.11 * k, (0, 0, 0), (0, -6, 0))
@@ -364,38 +379,45 @@ def crystal_cluster(name, H, seed):
 
 
 # ---------------------------------------------------------------- barricade (Miner, one cell, three states)
+# v2 palette additions sampled from the bible p14 barricade crops: the pale cream the bible paints on every plank top
+# and bevel (#EACAA1 / #EDD6B6 / #E4BC8B) and the darker post brown (#724B2D after the mid band)
+PLANK_CREAM, POST_BROWN = "#EACAA1", "#946036"
+
+
+def wood_hl(base):
+    return lambda f: PLANK_CREAM if f.normal.z > 0.7 else base
 def _post(P, x, h=0.9, lean=0.0, broken=False):
     m = M((x, 0, 0), (0, lean, 0))
-    P.add(box(0.16, 0.16, h), WOOD_B, mat=m)
-    P.add(box(0.26, 0.26, 0.2), by_nz(STONE_CORE, STONE_CORE, STONE_CORE, 0.5), mat=M((x, 0, 0)))
+    P.add(box(0.16, 0.16, h), wood_hl(POST_BROWN), mat=m)
+    P.add(box(0.36, 0.17, 0.16), by_nz(STONE_CORE, STONE_CORE, STONE_CORE, 0.5), mat=M((x + 0.03 * (1 if x > 0 else -1), 0.03, 0)))
     P.add(box(0.19, 0.19, 0.06), STONE_CORE, mat=m @ M((0, 0, h * 0.62)))
     if broken:
-        P.add(box(0.16, 0.16, 0.1, bevel=0.02), WOOD_B, mat=m @ M((0.02, 0, h), (0, 25, 10)))
+        P.add(box(0.16, 0.16, 0.1, bevel=0.02), wood_hl(WOOD_B), mat=m @ M((0.02, 0, h), (0, 25, 10)))
     else:
         P.add(box(0.2, 0.2, 0.08), STONE_CORE, mat=m @ M((0, 0, h)))
 
 
 def barricade_deployed():
-    P = Prop("prop_barricade_deployed", BARRICADE, "barricade", {"height": 0.98, "width": 1.4}, 11)
-    X = 0.6
+    P = Prop("prop_barricade_deployed", BARRICADE, "barricade", {"height": 0.98, "width": 1.76}, 11)
+    X = 0.68
     _post(P, -X)
     _post(P, X)
-    P.add(box(1.06, 0.09, 0.09), WOOD, mat=M((0, 0, 0.68)))
-    P.add(box(1.06, 0.08, 0.09), WOOD_B, mat=M((0, 0.03, 0.06)))
+    P.add(box(1.22, 0.09, 0.09), wood_hl(WOOD), mat=M((0, 0, 0.66)))
+    P.add(box(1.22, 0.08, 0.09), wood_hl(WOOD_B), mat=M((0, 0.03, 0.06)))
     for s in (1, -1):
-        P.add(box(1.12, 0.06, 0.08), WOOD_D, mat=M((0, 0.05, 0.22), (0, s * 14, 0)))
-    P.add(cloth(1.0, 0.44, 10, 4, lambda u, v: -0.06 * math.sin(math.pi * u) * v, notch=0.2), TEAM_CLOTH,
-          mask=MASK_TEAM_CLOTH, smooth=True, mat=M((0, -0.06, 0.68)))
-    pts = [(-X + 2 * X * t, -0.09, 0.9 - 0.16 * math.sin(math.pi * t)) for t in [i / 11 for i in range(12)]]
+        P.add(box(1.28, 0.06, 0.08), WOOD_D, mat=M((0, 0.05, 0.22), (0, s * 13, 0)))
+    P.add(cloth(1.16, 0.44, 10, 4, lambda u, v: -0.06 * math.sin(math.pi * u) * v, notch=0.2), TEAM_CLOTH,
+          mask=MASK_TEAM_CLOTH, smooth=True, mat=M((0, -0.06, 0.66)))
+    pts = [(-X + 2 * X * t, -0.09, 0.84 - 0.18 * math.sin(math.pi * t)) for t in [i / 11 for i in range(12)]]
     P.add(tube(pts, [0.026] * 12, 4), ROPE, smooth=True)
     for x in (-X, X):
-        P.add(torus(0.1, 0.024, 10, 4), ROPE, mat=M((x, 0, 0.84)))
+        P.add(torus(0.1, 0.024, 10, 4), ROPE, mat=M((x, 0, 0.8)))
     return P.finish()
 
 
 def barricade_folded():
-    P = Prop("prop_barricade_folded", BARRICADE, "barricade", {"height": 0.6, "width": 0.8}, 12)
-    W, D, H = 0.8, 0.42, 0.56
+    P = Prop("prop_barricade_folded", BARRICADE, "barricade", {"height": 0.6, "width": 0.95}, 12)
+    W, D, H = 0.95, 0.34, 0.56          # v2: long low stack of folded panels (bible p14 proportions)
     P.add(box(W - 0.1, D - 0.1, 0.1), TEAM_CLOTH, mask=MASK_TEAM_CLOTH, mat=M((0, 0, H - 0.08)))
     for sx in (-1, 1):
         for sy in (-1, 1):
@@ -405,38 +427,42 @@ def barricade_folded():
                       mat=M((sx * (W / 2 - 0.045), sy * (D / 2 - 0.045), z)))
     for sy in (-1, 1):
         for j in range(3):
-            P.add(box(W - 0.16, 0.06, 0.15), WOOD if j % 2 else WOOD_B,
+            P.add(box(W - 0.16, 0.06, 0.15), wood_hl(WOOD if j % 2 else WOOD_B),
                   mat=M((0, sy * (D / 2 - 0.03), 0.04 + j * 0.165)))
         for s in (1, -1):
-            P.add(box(0.72, 0.05, 0.07), WOOD_D, mat=M((0, sy * (D / 2 + 0.01), 0.25), (0, s * 30, 0)))
+            P.add(box(W - 0.06, 0.05, 0.07), WOOD_D, mat=M((0, sy * (D / 2 + 0.01), 0.25), (0, s * 23, 0)))
     for sx in (-1, 1):
         for j in range(3):
-            P.add(box(0.06, D - 0.16, 0.15), WOOD_B, mat=M((sx * (W / 2 - 0.03), 0, 0.04 + j * 0.165)))
+            P.add(box(0.06, D - 0.16, 0.15), wood_hl(WOOD_B), mat=M((sx * (W / 2 - 0.03), 0, 0.04 + j * 0.165)))
     P.add(tube([(-0.2, -D / 2 - 0.02, H + 0.0), (-0.2, 0, H + 0.04), (-0.2, D / 2 + 0.02, H)], [0.02] * 3, 4), ROPE)
     P.add(tube([(0.2, -D / 2 - 0.02, H + 0.0), (0.2, 0, H + 0.04), (0.2, D / 2 + 0.02, H)], [0.02] * 3, 4), ROPE)
     return P.finish()
 
 
 def barricade_damaged():
+    """v2, matched to the bible p14 crop: both posts still stand (the right one snapped at the top), the top beam hangs
+    diagonally from the right post down to the left, a low beam sags across the middle, the cloth is torn and hangs
+    from the diagonal, and the broken planks lie in front of the right post."""
     P = Prop("prop_barricade_damaged", BARRICADE, "barricade", {"height": 0.95}, 13)
-    X = 0.6
-    _post(P, -X, 0.9)
-    _post(P, X, 0.74, lean=9, broken=True)
-    P.add(box(0.7, 0.09, 0.09), WOOD, mat=M((-0.28, 0, 0.6), (0, 14, 0)))
-    P.add(box(0.5, 0.09, 0.09), WOOD, mat=M((0.3, -0.1, 0.03), (0, 0, 12)))
-    P.add(box(1.1, 0.06, 0.08), WOOD_D, mat=M((0, 0.05, 0.22), (0, 14, 0)))
+    X = 0.64
+    _post(P, -X, 0.86)
+    _post(P, X, 0.84, broken=True)
+    P.add(box(1.12, 0.09, 0.09), wood_hl(WOOD), mat=M((0.1, 0, 0.6), (0, -22, 0)))          # diagonal top beam
+    P.add(box(0.78, 0.09, 0.09), wood_hl(WOOD_B), mat=M((-0.28, -0.02, 0.24), (0, -9, 0)))     # low sagging beam
+    P.add(box(0.5, 0.06, 0.08), WOOD_D, mat=M((-0.4, 0.05, 0.42), (0, -30, 0)))
     rng = P.rng
 
     def torn(u, v):
         n = noise.noise(Vector((u * 4.0, v * 3.0, 1.7)))
-        return n > 0.25 or (v > 0.7 and rng.random() < 0.4)
-    P.add(cloth(0.9, 0.42, 10, 5, lambda u, v: -0.05 * math.sin(math.pi * u) * v, notch=0.12, cut=torn), TEAM_CLOTH,
-          mask=MASK_TEAM_CLOTH, smooth=True, mat=M((-0.02, -0.06, 0.66), (0, 10, 0)))
-    for (x, y, rz, l) in ((-0.25, -0.38, 18, 0.5), (0.3, -0.34, -30, 0.44), (0.05, -0.55, 75, 0.36),
-                          (-0.6, -0.3, -12, 0.32), (0.65, -0.25, 40, 0.3)):
-        P.add(box(l, 0.1, 0.045, bevel=0.015), WOOD if l > 0.4 else WOOD_B, mat=M((x, y, 0), (0, 0, rz)))
-    P.add(tube([(X - 0.05, -0.1, 0.72), (X - 0.12, -0.13, 0.5), (X - 0.14, -0.14, 0.3)], [0.024] * 3, 4), ROPE)
-    rock(P, 0.06, (0.1, -0.2, 0.01), 31, col=STONE_CORE, squash=0.5)
+        return n > 0.3 or (v > 0.75 and rng.random() < 0.45)
+    P.add(cloth(0.95, 0.56, 10, 5, lambda u, v: -0.05 * math.sin(math.pi * u) * v, notch=0.12, cut=torn), TEAM_CLOTH,
+          mask=MASK_TEAM_CLOTH, smooth=True, mat=M((0.06, -0.07, 0.66), (0, -22, 0)))
+    for (x, y, rz, l) in ((0.45, -0.16, 18, 0.46), (0.62, -0.22, -24, 0.4), (0.78, -0.1, 40, 0.3)):
+        P.add(box(l, 0.1, 0.045, bevel=0.015), wood_hl(WOOD if l > 0.4 else WOOD_B), mat=M((x, y, 0), (0, 0, rz)))
+    for (x, ry, l) in ((-0.3, 38, 0.52), (-0.02, -42, 0.5), (0.24, 32, 0.46)):   # planks knocked against the low beam
+        P.add(box(l, 0.1, 0.045, bevel=0.015), wood_hl(WOOD_B), mat=M((x, -0.12, 0.17), (0, ry, 0)))
+    P.add(tube([(X - 0.05, -0.1, 0.8), (X - 0.12, -0.13, 0.56), (X - 0.14, -0.14, 0.36)], [0.024] * 3, 4), ROPE)
+    rock(P, 0.06, (0.1, -0.2, 0.01), 31, col=STONE_CORE, squash=0.5, sub=1)
     return P.finish()
 
 
@@ -452,28 +478,29 @@ def banner():
     """Bible p14 banner: the pole stands at the left third, the crossbar (1.12 m) and the cloth hang centred 0.22 m to
     its right; rope wraps and tassels at both bar ends; tattered tails; wide mossy rock pile (1.2 m) at the foot."""
     P = Prop("prop_banner", LARGE, "interactable", {"height": 1.9}, 14)
-    for i, (x, y, r) in enumerate(((-0.02, 0.08, 0.24), (0.32, -0.02, 0.2), (-0.34, -0.04, 0.17), (0.12, -0.24, 0.13),
-                                   (0.55, 0.04, 0.12), (-0.5, 0.06, 0.1))):
+    for i, (x, y, r) in enumerate(((-0.02, 0.08, 0.24), (0.32, -0.02, 0.2), (-0.3, -0.04, 0.21), (0.12, -0.24, 0.13),
+                                   (0.45, 0.04, 0.1), (-0.5, 0.06, 0.1))):
         rock(P, r, (x, y, r * 0.25), 40 + i, squash=0.62, moss=True, sub=1)
     for j, (x, y) in enumerate(((-0.42, -0.2), (0.45, -0.18), (0.2, -0.32))):
         tuft(P, (x, y, 0.02), h=0.1, seed=j, col=GRASS)
     P.add(box(0.13, 0.13, 1.8), by_nz(POLE_BROWN, POLE_BROWN, BAR_BROWN_D, 0.5), mat=M((0.0, 0.06, 0)))
-    bx, bz, L = 0.22, 1.76, 1.12
+    bx, bz, L = 0.22, 1.76, 1.08
+    cx = bx + 0.03                                        # cloth centre
     P.add(cyl(0.075, L, 8, bevel=0.025, base=False),
           lambda f: BAR_BROWN_D if abs(f.normal.x) > 0.9 else POLE_BROWN, mat=M((bx, 0.0, bz), (0, 90, 0)))
     for s in (-1, 1):
-        x = bx + s * (L / 2 - 0.1) - (0.08 if s > 0 else 0.0)
+        x = cx + s * 0.37
         for w in (-0.035, 0.035):
-            P.add(torus(0.08, 0.02, 10, 4), ROPE_CREAM, mat=M((x + w, 0, bz), (0, 90, 0)))
+            P.add(torus(0.074, 0.018, 10, 4), ROPE_CREAM, mat=M((x + w, 0, bz), (0, 90, 0)))
         P.add(tube([(x, -0.07, bz - 0.04), (x + 0.01 * s, -0.08, bz - 0.18), (x, -0.08, bz - 0.3)], [0.024, 0.022, 0.02], 4),
               ROPE_CREAM)
         P.add(cyl(0.035, 0.08, 6, r2=0.012, bevel=0.0), BAR_BROWN_D, mat=M((x, -0.08, bz - 0.38)))
     P.add(cyl(0.08, 0.07, 8, r2=0.04, bevel=0.015), BRASS, mat=M((0.0, 0.06, 1.8)))
-    rag = lambda u: 0.36 * (1 - math.exp(-((u - 0.55) / 0.16) ** 2)) + 0.06 * abs(math.sin(u * math.pi * 5))
-    cl = cloth(0.78, 1.22, 8, 10, lambda u, v: -0.035 * math.sin(u * math.pi * 3) * v - 0.03 * v, notch=0.0, bottom_fn=rag)
+    rag = lambda u: 0.3 * (1 - math.exp(-((u - 0.5) / 0.2) ** 2)) - 0.12 * max(0.0, u - 0.8) / 0.2 + 0.06 * abs(math.sin(u * math.pi * 5))
+    cl = cloth(0.78, 1.42, 8, 11, lambda u, v: -0.035 * math.sin(u * math.pi * 3) * v - 0.03 * v, notch=0.0, bottom_fn=rag)
     for v in cl.verts:                                    # taper: 0.78 m at the bar, about 0.6 m at the tails
-        v.co.x *= 1 + 0.2 * v.co.z / 1.22
-    P.add(cl, lambda f: TEAM_CLOTH, mask=MASK_TEAM_CLOTH, smooth=True, mat=M((bx, -0.1, bz - 0.04)))
+        v.co.x *= 1 + 0.22 * v.co.z / 1.42
+    P.add(cl, lambda f: TEAM_CLOTH, mask=MASK_TEAM_CLOTH, smooth=True, mat=M((cx, -0.1, bz - 0.04)))
     P.add(box(0.84, 0.05, 0.1, bevel=0.02), TEAM_CLOTH, mask=MASK_TEAM_CLOTH, mat=M((bx, -0.09, bz - 0.14)))  # sleeve hem
     ez, ey = 1.2, -0.15
     P.add(torus(0.15, 0.04, 16, 4), EMBLEM_CREAM, mat=M((bx, ey, ez), (90, 0, 0)))
