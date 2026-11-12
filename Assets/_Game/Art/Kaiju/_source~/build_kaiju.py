@@ -1203,8 +1203,8 @@ def creature_v3(name, P, target_h, geo, bm, bvh, rng, Hc, RH, face_zone, decal_z
     ncr = 0
     for (x, y, d, L, bone) in P["crystals"]:
         p, n = ray(bvh, (x, y, 20), (0, 0, -1))
-        if p is None:
-            continue
+        if p is None:           # beside the thin core (shoulder clusters): root on the nearest core point
+            p = bvh.find_nearest(Vector((x, y, 3.2)))[0]
         crystal3(geo, p, Vector(d), L, P["crystal_r"] * L, rng, bone=bone or auto(p))
         ncr += 1
     tp, td, tl = P["tail_tip"]
