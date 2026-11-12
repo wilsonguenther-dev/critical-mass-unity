@@ -1,0 +1,57 @@
+{
+ "gameplay": {},
+ "bible": {
+  "10-azure-adult": {
+   "iou": 0.824,
+   "bible_wh": 0.848,
+   "ours_wh": 0.916
+  },
+  "11-front": {
+   "iou": 0.861,
+   "bible_wh": 0.982,
+   "ours_wh": 1.008
+  },
+  "11-profile": {
+   "iou": 0.796,
+   "bible_wh": 0.884,
+   "ours_wh": 0.876
+  },
+  "11-rear": {
+   "iou": 0.799,
+   "bible_wh": 0.838,
+   "ours_wh": 1.036
+  },
+  "11-three-quarter": {
+   "iou": 0.784,
+   "bible_wh": 0.942,
+   "ours_wh": 0.923
+  }
+ },
+ "swatches": {
+  "slate": {
+   "bible": "#415066",
+   "ours": "#405066",
+   "dE2000": 0.49
+  },
+  "light stone": {
+   "bible": "#ADA59B",
+   "ours": "#9F988B",
+   "dE2000": 4.32
+  },
+  "moss": {
+   "bible": "#B7D139",
+   "ours": "#AFC835",
+   "dE2000": 2.05
+  },
+  "belly": {
+   "bible": "#C9BFAA",
+   "ours": "#C4BBA8",
+   "dE2000": 1.13
+  },
+  "azure glow": {
+   "bible": "#0FECF0",
+   "ours": "#12E5E7",
+   "dE2000": 1.57
+  }
+ }
+}
