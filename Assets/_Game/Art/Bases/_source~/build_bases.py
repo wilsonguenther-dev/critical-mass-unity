@@ -76,8 +76,8 @@ def kit_builders():
         "pad": lambda: pieces.respawn_pad(),
         "hill_dais": lambda: pieces.hill_dais(),
         "hill_rim_w": lambda: pieces.hill_rim_half(),
-        "hill_horn_l": lambda: pieces.horn("cm_hill_horn_l", 81, base_ang=238, tip_ang=257, width=0.8),
-        "hill_horn_r": lambda: pieces.horn("cm_hill_horn_r", 82, base_ang=302, tip_ang=283, width=0.8),
+        "hill_horn_l": lambda: pieces.hill_horn("cm_hill_horn_l", 81, base_ang=236, tip_ang=256),
+        "hill_horn_r": lambda: pieces.hill_horn("cm_hill_horn_r", 82, base_ang=304, tip_ang=284),
         "shrine_core": lambda: pieces.shrine_core(),
         "shrine_egg": lambda: pieces.shrine_egg(),
         "marker": marker,
@@ -653,11 +653,11 @@ def define_shots():
     tx, tz = layouts.isl_pt(116, 2.1)
     shot("crop2x_tower", ["district_azure"], "azure", "gp", S2B(tx, tz, 2.5), crop=2.0, warrior=(tx + 2.6, tz - 2.2, 0.0))
     # bible framings (orthographic, front view from the south, 30 deg elevation)
-    shot("bf_shrine", ["shrine"], "azure", "ortho", S2B(56, 8, 3.2), res=(1000, 1000), scale=8.5, elev=25,
+    shot("bf_shrine", ["shrine"], "azure", "ortho", S2B(56, 8, 4.0), res=(1000, 1000), scale=8.6, elev=25,
          hide=lambda o: ("yard" in o.name or "breakable" in o.name or "gate_post" in o.name or "brazier" in o.name
                          or "pool" in o.name or "marker" in o.name), ground=False, yaw=45.0)
     for v in ("neutral", "azure", "crimson"):
-        shot(f"bf_hill_{v}", ["hill"], v, "ortho", S2B(56, 40, 2.6), res=(1200, 900), scale=23, elev=28,
+        shot(f"bf_hill_{v}", ["hill"], v, "ortho", S2B(56, 40, 4.4), res=(1200, 900), scale=24, elev=28,
              hide=lambda o: ((o.matrix_world @ (sum((Vector(b) for b in o.bound_box), Vector()) / 8)).y > 41.5
                              and "dais" not in o.name and "rim" not in o.name) or "marker" in o.name, ground=False)
     for s in ("intact", "cracked", "destroyed"):
@@ -802,6 +802,8 @@ def main():
     checks["damage_state_fbx"] = {fam: sorted(f for f in os.listdir(ART) if f.startswith(fam) and f.endswith(".fbx"))
                                   for fam in ("cm_wall_segment_", "cm_hill_breakable_", "cm_shrine_breakable_")}
     checks["kit"] = rows
+    checks["solid_cell_proposal"] = layouts.solid_cell_proposal()
+    checks["chipped_blocks"] = dict(kit.CHIP_STATS)
     os.makedirs(OUT, exist_ok=True)
     blend = os.path.join(HERE, "bases_kit.blend")
     if RENDER:

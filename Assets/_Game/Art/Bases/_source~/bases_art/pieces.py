@@ -319,20 +319,38 @@ def respawn_pad(name="cm_respawn_pad", seed=13):
 
 # ------------------------------------------------------------------------------ hill
 def hill_dais(name="cm_hill_dais", seed=17):
-    """Flat (max 0.2 u) concentric stone dais inside the 6 u hill circle: kerb ring, paving ring, cream ring,
-    dark inner disc, cream medallion with the brass crown. The rim halves are separate (team mask)."""
+    """Bible p14 hill dais, flat enough for the 6 u circle (inside 6 u nothing above 0.13 u): chunky kerb ring of
+    varied blocks (0.3 u, just outside 6 u) with moss and grass, a grass band set with pavers, two rows of irregular
+    flagstones, a cream ring, the dark slate disc and a cream medallion with the brass crown. The team rim halves are
+    separate pieces (team mask)."""
     pc = Piece(name)
     rng = random.Random(seed)
-    for (ri, ro, n, h) in ((6.05, 6.7, 30, 0.2), (4.85, 5.45, 24, 0.12), (2.9, 4.85, 18, 0.1)):
-        for k in range(n):
-            t0, t1 = 2 * math.pi * k / n + 0.006, 2 * math.pi * (k + 1) / n - 0.006
-            cs = [Vector((ri * math.cos(t0), ri * math.sin(t0), 0)), Vector((ri * math.cos(t1), ri * math.sin(t1), 0)),
-                  Vector((ro * math.cos(t1), ro * math.sin(t1), 0)), Vector((ro * math.cos(t0), ro * math.sin(t0), 0))]
-            cs += [Vector((v.x, v.y, h + rng.uniform(-0.01, 0.01))) for v in cs]
-            pc.block(cs, *kit.stone_side(rng, warm=True), bev=0.04)
-    pc.lathe([(5.45, 0.0), (5.45, 0.06), (6.05, 0.06), (6.05, 0.0)], 48, solid(pal.vc("pave_d")), closed=True)
+    _ring_blocks(pc, rng, 6.06, 6.85, 0.25, 26, hj=0.04, moss_p=0.4, tuft_p=0.7)
+    # grass band r 4.85..5.45 with a few pavers in it
+    pc.lathe([(4.85, 0.0), (4.85, 0.07), (5.45, 0.07), (5.45, 0.0)], 56,
+             lambda f: pal.vc("grass_d") if f.normal.z > 0.5 else pal.vc("moss_d"), closed=True)
+    for k in range(11):
+        a0 = 2 * math.pi * k / 11 + rng.uniform(-0.1, 0.1)
+        sp = rng.uniform(0.12, 0.2)
+        ri, ro = 4.92 + rng.uniform(0, 0.06), 5.38 - rng.uniform(0, 0.06)
+        cs = [Vector((ri * math.cos(a0), ri * math.sin(a0), 0.0)), Vector((ri * math.cos(a0 + sp), ri * math.sin(a0 + sp), 0)),
+              Vector((ro * math.cos(a0 + sp), ro * math.sin(a0 + sp), 0)), Vector((ro * math.cos(a0), ro * math.sin(a0), 0))]
+        cs += [Vector((v.x, v.y, 0.1)) for v in cs]
+        pc.block(cs, *kit.stone_side(rng, warm=True), bev=0.03)
+    for k in range(16):
+        a0 = rng.uniform(0, 2 * math.pi)
+        kit.moss(pc, rng, 5.15 * math.cos(a0), 5.15 * math.sin(a0), 0.06, 0.16)
+    # two rows of flagstones of varied widths r 2.9..4.85
+    for (ri, ro, n) in ((3.92, 4.85, 22), (2.9, 3.88, 17)):
+        _ring_blocks(pc, rng, ri, ro, 0.11, n, hj=0.02, chips=False, moss_p=0.12, vary=0.45)
     pc.lathe([(2.45, 0.0), (2.45, 0.12), (2.9, 0.12), (2.9, 0.0)], 48, solid(pal.vc("cream")), closed=True)
     pc.lathe([(2.45, 0.0), (2.45, 0.1), (0.0, 0.1)], 40, topside(pal.vc("body_a"), pal.vc("body_c")))
+    # slate segments on the dark disc (radial joints as thin dark inlays)
+    for k in range(8):
+        a0 = 2 * math.pi * k / 8 + math.pi / 8
+        c = Vector((1.75 * math.cos(a0), 1.75 * math.sin(a0), 0.1))
+        pc.box(c.x, c.y, 0.1, 1.3, 0.05, 0.008, pal.vc("navy", 1.6), rot=a0, bev=0.0)
+    pc.lathe([(1.12, 0.1), (1.12, 0.125), (1.05, 0.125), (1.05, 0.1)], 40, solid(pal.vc("cap")), closed=True)
     pc.lathe([(1.05, 0.1), (1.05, 0.13), (0.0, 0.13)], 32, solid(pal.vc("cream")))
     # crown emblem (brass): band + three points, laid flat, facing up
     pts = [(-0.6, -0.35), (0.6, -0.35), (0.62, 0.15), (0.38, -0.02), (0.22, 0.42), (0.0, 0.05), (-0.22, 0.42),
@@ -405,50 +423,169 @@ def horn(name, seed, sign=1.0, base_ang=240.0, tip_ang=257.0, r=HILL_R, height=6
     return pc
 
 
+def hill_horn(name, seed, base_ang, tip_ang):
+    """Bible p14 hill horn at the scale the Sim allows: a plinth astride the ring wall top (on Wall cells), then five
+    huge chipped blocks (1.7 -> 0.9 u) that rise to 9 u and curl inward toward the ring centre. Below 2.25 u it is
+    the wall itself; everything over walkable cells is above 2.1 u (overhead), so no route is touched."""
+    pc = Piece(name)
+    rng = random.Random(seed)
+    rho = RHO.get("hill", lambda a: HILL_R)
+
+    def P(ad, dr, z):
+        a = math.radians(ad)
+        rr = rho(ad) + dr
+        return Vector((-rr * math.cos(a), rr * math.sin(a), z))
+    sgn = 1 if tip_ang > base_ang else -1
+    # plinth: two big blocks on the wall top, wrapping the merlons there
+    for k, (d0, d1) in enumerate(((-1.6, 0.1), (0.15, 1.7))):
+        a0, a1 = base_ang + sgn * math.degrees(d0 / HILL_R), base_ang + sgn * math.degrees(d1 / HILL_R)
+        p = outward_path(sim_arc(HILL_R, min(a0, a1), max(a0, a1), rho=rho))
+        side, top = kit.stone_side(rng, warm=True)
+        pc.block(kit.hexa_on_path(p, 0.0, p.L, -0.62, 0.62, 2.25, 3.2 - 0.12 * k), side, top, bev=0.08, segs=2,
+                 chips=kit.rand_chips(rng, 0.8, 0.4, 0.1, 0.2))
+    prof = [(0.0, 0.0, 3.15), (0.05, -0.1, 4.7), (0.15, -0.35, 6.2), (0.32, -0.85, 7.5), (0.55, -1.6, 8.5),
+            (0.8, -2.4, 9.1)]
+    pts = [P(base_ang + (tip_ang - base_ang) * f, dr, z) for f, dr, z in prof]
+    _block_chain(pc, rng, pts, 1.9, 1.2, depth0=1.4, depth1=1.0, warm=True, moss_p=0.6, gap=0.04)
+    pc.marks["horn_top"] = [((0, 0, 0), tuple(pts[-1]))]
+    return pc
+
+
 # ------------------------------------------------------------------------------ shrine
+SHRINE_DAIS_TOP = 1.5     # two courses on the 2 x 2 solid Sim cells (the only solid cells at the shrine)
+
+
+def _ring_blocks(pc, rng, ri, ro, h, n, warm=True, hj=0.0, a0=0.0, chips=True, moss_p=0.3, tuft_p=0.0, z0=0.0,
+                 vary=0.35):
+    """A ring of chunky blocks with varied angular widths (each its own bevelled, chipped shell)."""
+    ws = [rng.uniform(1 - vary, 1 + vary) for _ in range(n)]
+    tot = sum(ws)
+    t = a0
+    for k in range(n):
+        span = 2 * math.pi * ws[k] / tot
+        t0, t1 = t + 0.012, t + span - 0.012
+        t += span
+        rr = ro + rng.uniform(-0.06, 0.06)
+        hh = h + rng.uniform(-hj, 0.0)
+        cs = [Vector((ri * math.cos(t0), ri * math.sin(t0), z0)), Vector((ri * math.cos(t1), ri * math.sin(t1), z0)),
+              Vector((rr * math.cos(t1), rr * math.sin(t1), z0)), Vector((rr * math.cos(t0), rr * math.sin(t0), z0))]
+        cs += [Vector((v.x, v.y, z0 + hh)) for v in cs]
+        pc.block(cs, *kit.stone_side(rng, warm=warm), bev=0.06, segs=2,
+                 chips=kit.rand_chips(rng, 0.55, 0.2, 0.07, min(0.16, hh * 0.6)) if chips else None)
+        if rng.random() < moss_p:
+            m = (cs[4] + cs[6]) / 2
+            kit.moss(pc, rng, m.x, m.y, z0 + hh - 0.03, 0.2)
+        if rng.random() < tuft_p:
+            tm = (t0 + t1) / 2
+            kit.grass_tuft(pc, rng, (rr + 0.12) * math.cos(tm), (rr + 0.12) * math.sin(tm), z0, min(0.26, 0.3 - z0))
+
+
 def shrine_core(name="cm_shrine_core", seed=41):
-    """Upper dais on the 2 x 2 solid cells (0.6 u), lower walkable step ring (0.25 u) r 1.5..3.0, two horns rising in
-    the plane facing the gameplay camera, team crystals at the horn feet, waterfall on the camera side."""
+    """Bible p14 shrine on what the Sim gives it: a two-course dais (1.5 u) filling the 2 x 2 solid cells, a walkable
+    chunky step ring (0.25 u) r 1.4..3.0, two big crescent horns whose feet stand in the dais corners and which
+    swing outward only above 2.1 u (overhead), team crystals, mossy tops and a waterfall down the camera face."""
     pc = Piece(name, team=True)
     rng = random.Random(seed)
-    n = 16
-    for k in range(n):
-        t0, t1 = 2 * math.pi * k / n + 0.01, 2 * math.pi * (k + 1) / n - 0.01
-        ri, ro = 1.45, 3.0 + rng.uniform(-0.05, 0.05)
-        cs = [Vector((ri * math.cos(t0), ri * math.sin(t0), 0)), Vector((ri * math.cos(t1), ri * math.sin(t1), 0)),
-              Vector((ro * math.cos(t1), ro * math.sin(t1), 0)), Vector((ro * math.cos(t0), ro * math.sin(t0), 0))]
-        cs += [Vector((v.x, v.y, 0.25)) for v in cs]
-        pc.block(cs, *kit.stone_side(rng, warm=True))
-    for ix in (-0.5, 0.5):
-        for iy in (-0.5, 0.5):
+    _ring_blocks(pc, rng, 1.42, 3.0, 0.25, 13, hj=0.04, moss_p=0.35, tuft_p=0.45)
+    # dais: two courses of chunky blocks inside the 2 x 2 square (x, y in [-1, 1])
+    lay = [[(-1.0, -0.1, -1.0, 1.0), (-0.1, 1.0, -1.0, -0.05), (-0.1, 1.0, -0.05, 1.0)],
+           [(-1.0, 1.0, -1.0, -0.25), (-1.0, 0.15, -0.25, 1.0), (0.15, 1.0, -0.25, 1.0)]]
+    for c, row in enumerate(lay):
+        for (x0, x1, y0, y1) in row:
             side, top = kit.stone_side(rng, warm=True)
-            pc.box(ix, iy, 0.0, 0.97, 0.97, 0.6, side, top, rot=math.radians(rng.uniform(-2, 2)))
-    pc.lathe([(0.95, 0.6), (0.98, 0.66), (0.0, 0.66)], 8, topside(pal.vc("cap_side"), pal.vc("cap")),
-             rot=math.pi / 8)
-    # horns in the vertical plane of screen-right (sim NE-SW): blender direction (-1, -1)/sqrt2 = sim (1, -1)
+            g = GAP / 2
+            z0, z1 = c * COURSE + g, (c + 1) * COURSE - g - (0.0 if c else rng.uniform(0.0, 0.04))
+            cs = [Vector((x0 + g, y0 + g, z0)), Vector((x1 - g, y0 + g, z0)), Vector((x1 - g, y1 - g, z0)),
+                  Vector((x0 + g, y1 - g, z0))]
+            cs += [Vector((v.x, v.y, z1)) for v in cs]
+            pc.block(cs, side, top, bev=0.07, segs=2, chips=kit.rand_chips(rng, 0.7, 0.3, 0.1, 0.2))
+    # dark rock collar the egg sits in (bible: dark stones around the egg foot)
+    for k in range(7):
+        a = 2 * math.pi * k / 7 + rng.uniform(-0.2, 0.2)
+        r = rng.uniform(0.5, 0.66)
+        pc.box(r * math.cos(a), r * math.sin(a), SHRINE_DAIS_TOP - 0.02, rng.uniform(0.3, 0.42), rng.uniform(0.26, 0.36),
+               rng.uniform(0.16, 0.28), pal.vc("egg_d", 1.15), pal.vc("egg", 1.35), rot=a, bev=0.05,
+               chips=kit.rand_chips(rng, 0.6, 0.2, 0.05, 0.1))
+    # moss cushions and grass on the dais rim
+    for k in range(9):
+        a = 2 * math.pi * k / 9 + rng.uniform(-0.25, 0.25)
+        x, y = max(-0.82, min(0.82, 1.2 * math.cos(a))), max(-0.82, min(0.82, 1.2 * math.sin(a)))
+        kit.moss(pc, rng, x, y, SHRINE_DAIS_TOP - 0.03, rng.uniform(0.2, 0.3))
+    # horns in the vertical plane of screen-right (sim NE-SW): blender direction (-1, -1)/sqrt2
     pdir = Vector((-1, -1, 0)).normalized()
     for sgn in (-1, 1):
-        h = horn("tmp", seed + (3 if sgn > 0 else 7), plane_dir=pdir * sgn, base_off=0.6, bulge=0.36, height=4.1, z0=0.62,
-                 segs=7, width=0.6, warm=True)
-        _merge(pc, h)
-        foot = pdir * sgn * 0.62
-        kit.crystal_cluster(pc, foot.x - 0.25 * sgn, foot.y + 0.3 * sgn, 0.66, rng, height=0.75, n=4, spread=0.18,
-                            base=False)
-    # waterfall: from the upper tier down its sim-south face (+y blender) onto the step ring and into a pool
-    w = 0.7
-    cs = [Vector((-w / 2, 0.97, 0.62)), Vector((w / 2, 0.97, 0.62)), Vector((w / 2, 1.06, 0.62)),
-          Vector((-w / 2, 1.06, 0.62)), Vector((-w / 2 - 0.08, 1.24, 0.25)), Vector((w / 2 + 0.08, 1.24, 0.25)),
-          Vector((w / 2 + 0.08, 1.31, 0.27)), Vector((-w / 2 - 0.08, 1.31, 0.27))]
-    pc.block([cs[0], cs[1], cs[5], cs[4], cs[3], cs[2], cs[6], cs[7]], pal.vc("water"), pal.vc("water"), bev=0.02)
-    for k in range(3):
-        x = -w / 3 + k * w / 3
-        pc.box(x, 1.08 + 0.05 * k, 0.5 - 0.08 * k, 0.07, 0.12, 0.04, pal.vc("foam"), pal.vc("foam"), bev=0.0, rot=0.0)
-    pc.box(0, 0.98, 0.62, w + 0.12, 0.12, 0.05, pal.vc("foam"), pal.vc("foam"), bev=0.015)
-    pc.lathe([(0.62, 0.25), (0.62, 0.27), (0.0, 0.27)], 14, solid(pal.vc("water")), cy=1.75)
-    pc.lathe([(0.7, 0.25), (0.7, 0.28), (0.62, 0.28), (0.62, 0.25)], 14, solid(pal.vc("foam")), cy=1.75, closed=True)
+        _shrine_horn(pc, rng, pdir * sgn)
+    # team crystals on the two other dais corners and low ones (<= 0.3 u) on the step ring
+    qdir = Vector((-1, 1, 0)).normalized()
+    for sgn, hgt in ((1, 0.75), (-1, 1.05)):
+        c = qdir * sgn * 1.0
+        kit.crystal_cluster(pc, c.x, c.y, SHRINE_DAIS_TOP - 0.02, rng, height=hgt, n=5, spread=0.2, base=False)
+    for a in (0.5, 2.3, 3.6, 5.2):
+        kit.crystal_cluster(pc, 2.3 * math.cos(a), 2.3 * math.sin(a), 0.2, rng, height=0.1, n=5, spread=0.2, base=False,
+                            lamp=False)
+    # waterfall: from the dais top down its +y face (sim south, toward the camera) onto the step ring and a pool
+    w = 0.66
+    z1 = SHRINE_DAIS_TOP - 0.05
+    cs = [Vector((-w / 2, 0.93, z1)), Vector((w / 2, 0.93, z1)), Vector((w / 2, 1.0, z1)), Vector((-w / 2, 1.0, z1)),
+          Vector((-w / 2 - 0.05, 0.93, 0.27)), Vector((w / 2 + 0.05, 0.93, 0.27)), Vector((w / 2 + 0.05, 1.0, 0.27)),
+          Vector((-w / 2 - 0.05, 1.0, 0.27))]
+    pc.block([cs[4], cs[5], cs[6], cs[7], cs[0], cs[1], cs[2], cs[3]], pal.vc("water"), pal.vc("water"), bev=0.015)
+    for k in range(4):
+        x = -w / 2.6 + k * w / 3.9
+        pc.box(x, 1.0, 0.4 + 0.25 * k, 0.05, 0.03, 0.18, pal.vc("foam"), pal.vc("foam"), bev=0.0)
+    pc.box(0, 0.96, z1, w + 0.1, 0.12, 0.05, pal.vc("foam"), pal.vc("foam"), bev=0.015)
+    pc.lathe([(0.6, 0.25), (0.6, 0.27), (0.0, 0.27)], 14, solid(pal.vc("water")), cy=1.6)
+    pc.lathe([(0.68, 0.25), (0.68, 0.29), (0.6, 0.29), (0.6, 0.25)], 14, solid(pal.vc("foam")), cy=1.6, closed=True)
     pc.lathe([(0.9, 0.0), (0.9, 0.04), (0.0, 0.04)], 16, solid(pal.vc("water")), cy=3.3)
     pc.lathe([(0.95, 0.0), (0.95, 0.03), (0.88, 0.05), (0.88, 0.0)], 16, solid(pal.vc("foam")), cy=3.3, closed=True)
     return pc
+
+
+def _shrine_horn(pc, rng, d):
+    """Crescent horn in the vertical plane of direction d: the foot is a corner column of the dais (inside the solid
+    square up to 2.15 u), then chunky tapering blocks swing out to 2.0 u and curl back over the egg to 6.0 u."""
+    # corner column (square-aligned, the corner of the 2 x 2 cells)
+    sx, sy = (1 if d.x > 0 else -1), (1 if d.y > 0 else -1)
+    side, top = kit.stone_side(rng, warm=True)
+    pc.box(sx * 0.7, sy * 0.7, SHRINE_DAIS_TOP, 0.56, 0.56, 0.68, side, top, rot=0.0, bev=0.07, segs=2,
+           chips=[(4 + i, 0.1) for i in range(1)])
+    prof = [(1.0, 2.12), (1.36, 2.72), (1.7, 3.38), (1.9, 4.08), (1.93, 4.78), (1.8, 5.4), (1.52, 5.92), (1.18, 6.2)]
+    pts = [d * lat + Vector((0, 0, z)) for lat, z in prof]
+    _block_chain(pc, rng, pts, 0.98, 0.7, depth0=0.8, depth1=0.6, warm=True, moss_p=0.5)
+
+
+def _block_chain(pc, rng, pts, w0, w1, depth0=None, depth1=None, warm=True, moss_p=0.4, gap=0.035):
+    """Chunky tapering blocks along a polyline (each block its own chipped shell, joints follow the curve)."""
+    n = len(pts) - 1
+    depth0 = depth0 or w0
+    depth1 = depth1 or w1
+    ups = []
+    for i in range(n + 1):
+        a = pts[max(0, i - 1)]
+        b = pts[min(n, i + 1)]
+        ax = (b - a).normalized()
+        side = ax.cross(Vector((0, 0, 1)))
+        if side.length < 1e-4:
+            side = Vector((1, 0, 0))
+        side.normalize()
+        ups.append((ax, side, side.cross(ax).normalized()))
+    for i in range(n):
+        a, b = pts[i], pts[i + 1]
+        ta, tb = i / n, (i + 1) / n
+        wa, wb = w0 + (w1 - w0) * ta, w0 + (w1 - w0) * tb
+        da, db = depth0 + (depth1 - depth0) * ta, depth0 + (depth1 - depth0) * tb
+        axa, sa, ua = ups[i]
+        axb, sb, ub = ups[i + 1]
+        a2, b2 = a + axa * gap, b - axb * gap
+        cs = [a2 - sa * da / 2 - ua * wa / 2, a2 + sa * da / 2 - ua * wa / 2, a2 + sa * da / 2 + ua * wa / 2,
+              a2 - sa * da / 2 + ua * wa / 2,
+              b2 - sb * db / 2 - ub * wb / 2, b2 + sb * db / 2 - ub * wb / 2, b2 + sb * db / 2 + ub * wb / 2,
+              b2 - sb * db / 2 + ub * wb / 2]
+        sc, tc = kit.stone_side(rng, warm=warm)
+        pc.block(cs, sc, tc, bev=0.08, segs=2, top_thresh=0.35, chips=kit.rand_chips(rng, 0.7, 0.35, 0.1, 0.2, False))
+        if rng.random() < moss_p:
+            m = (a + b) / 2 + (ua + ub).normalized() * (wa + wb) / 4
+            kit.moss(pc, rng, m.x, m.y, m.z - 0.04, 0.16 + 0.08 * (wa + wb) / 2)
 
 
 def _merge(dst, src):
@@ -465,26 +602,38 @@ def _merge(dst, src):
 
 
 def shrine_egg(name="cm_shrine_egg", seed=43):
-    """Bible p14 faceted egg (1.5 x 2.3 u): dark panels with Void Navy lines over a self-lit #4FDDC3 core."""
+    """Bible p14 faceted egg (1.5 x 2.3 u): big dark stone plates (pentagons and hexagons, the dual of an icosphere)
+    with self-lit #4FDDC3 seams between them, the brightest thing in the district."""
     import bmesh
     pc = Piece(name, kind="glow")
-    rx, rz = 0.84, 1.3
-    pc.blob((0, 0, rz), rx * 0.91, rx * 0.91, rz * 0.91, pal.vc("egg_glow"), sub=2)
+    rx, rz = 0.75, 1.15
+    pc.blob((0, 0, rz), rx * 0.93, rx * 0.93, rz * 0.93, pal.vc("egg_glow"), sub=3)
     t = bmesh.new()
-    bmesh.ops.create_icosphere(t, subdivisions=1, radius=1.0)
+    bmesh.ops.create_icosphere(t, subdivisions=2, radius=1.0)
     rng = random.Random(seed)
-    for f in list(t.faces):
-        cen = f.calc_center_median()
-        pts = []
-        for v in f.verts:
-            p = cen + (v.co - cen) * 0.76
-            p = p.normalized() * 1.0 if False else p
-            pts.append(Vector((p.x * rx, p.y * rx, p.z * rz * (1.0 + 0.08 * max(0, p.z)) + rz)))
-        c = pal.vc("egg") if rng.random() < 0.6 else pal.vc("egg_d")
-        nrm = Vector((cen.x, cen.y, cen.z)).normalized()
+
+    def egg_pt(u):
+        u = u.normalized()
+        k = 1.0 + 0.1 * max(0.0, -u.z) - 0.06 * max(0.0, u.z)     # broader bottom, narrower top
+        return Vector((u.x * rx * k, u.y * rx * k, rz + u.z * rz))
+    for v in t.verts:
+        cents = [f.calc_center_median().normalized() for f in v.link_faces]
+        n = v.co.normalized()
+        ref = (cents[0] - n * cents[0].dot(n)).normalized()
+        oth = n.cross(ref)
+        cents.sort(key=lambda c: math.atan2((c - n).dot(oth), (c - n).dot(ref)))
+        shrink = rng.uniform(0.8, 0.87)
+        pts = [egg_pt(n + (c - n) * shrink) for c in cents]
+        cen = egg_pt(n)
+        nrm = (cen - Vector((0, 0, rz))).normalized()
+        push = rng.uniform(0.02, 0.06)
+        pts = [p + nrm * push for p in pts]
         if _facing(pts, nrm) < 0:
             pts = pts[::-1]
-        pc.poly([p + nrm * 0.015 for p in pts], c, thick=0.07)
+        c = pal.vc("egg") if rng.random() < 0.55 else pal.vc("egg_d")
+        top = pal.vc("egg", 1.45)
+        pc.poly(pts, lambda f, c=c, top=top, nrm=nrm: top if f.normal.dot(nrm) > 0.5 and nrm.z > 0.15 else c,
+                thick=0.11)
     t.free()
     pc.lights.append((Vector((0, 0, 1.2)), "egg"))
     return pc

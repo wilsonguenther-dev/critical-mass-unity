@@ -301,7 +301,7 @@ def hill(states=("intact",) * 4):
     place.append(("hill_dais", cx, cz, h, 0.0, {}))
     place.append(("hill_rim_w", cx, cz, h, 0.0, {}))
     place.append(("hill_rim_e", cx, cz, h, math.pi, {}))
-    place.append(("marker", cx, cz, h + 4.6, 0.0, {}))
+    place.append(("marker", cx, cz, h + 5.2, 0.0, {}))
     return place
 
 
@@ -313,7 +313,7 @@ def shrine(state="intact"):
     place = []
     cx, cz, h = SHRINE
     place.append(("shrine_core", cx, cz, h, 0.0, {}))
-    place.append(("shrine_egg", cx, cz, h + 0.66, 0.0, {}))
+    place.append(("shrine_egg", cx, cz, h + pieces.SHRINE_DAIS_TOP - 0.05, 0.0, {}))
     place.append(("shrine_yard", cx, cz, h, 0.0, {}))
     place.append((f"shrine_breakable_{state}", cx, cz, h, 0.0, {}))
     place.append((f"shrine_breakable_{state}", cx, cz, h, -math.pi / 2, {}))
@@ -326,7 +326,7 @@ def shrine(state="intact"):
         place.append(("brazier", cx + rho(a) * math.cos(r), cz + rho(a) * math.sin(r), h + 0.75, 0.0, {}))
         place.append(("pool", cx + 3.4 * math.cos(r), cz + 3.4 * math.sin(r), h, 0.0, {}))
     place.append(("egg_pool", cx, cz, h, 0.0, {}))
-    place.append(("marker", cx, cz, h + 6.2, 0.0, {}))
+    place.append(("marker", cx, cz, h + 7.4, 0.0, {}))
     return place
 
 
@@ -352,3 +352,48 @@ def route_cells():
             for cx in range(11, 14):
                 out.add((G.W - 1 - cx, cz) if mx else (cx, cz))
     return out
+
+
+# ------------------------------------------------------------------------------ proposal for the game code (not applied)
+def _cells_where(cx0, cz0, pred):
+    out = []
+    for cz in range(G.H):
+        for cx in range(G.W):
+            dx, dz = cx + 0.5 - cx0, cz + 0.5 - cz0
+            r = math.hypot(dx, dz)
+            a = math.degrees(math.atan2(dz, dx)) % 360
+            if pred(r, a) and cell(cx, cz) in (G.FLOOR,):
+                out.append([cx, cz])
+    return out
+
+
+def solid_cell_proposal():
+    """Which FLOOR cells would have to become Sim Wall (solid, non-walkable) so the shrine and the hill could be built
+    at full bible p14 size. A PROPOSAL for SkybreakBasinMap: nothing here changes the game."""
+    near = lambda a, c, h: min(abs(a - c) % 360, 360 - abs(a - c) % 360) <= h
+    sx, sz = 56, 8
+    shrine_dais = _cells_where(sx, sz, lambda r, a: r <= 1.6)
+    shrine_feet = [c for c in ([57, 6], [54, 9]) if cell(*c) == G.FLOOR]
+    hx, hz = 56, 40
+    horn_feet = _cells_where(hx, hz, lambda r, a: 6.2 <= r <= 7.6 and (near(a, 236, 7) or near(a, 304, 7)))
+    stones = []
+    for ang in (30, 60, 120, 150, 210, 330):
+        a = math.radians(ang)
+        stones.append([math.floor(hx + 7.4 * math.cos(a)), math.floor(hz + 7.4 * math.sin(a))])
+    kerb = _cells_where(hx, hz, lambda r, a: 6.0 <= r <= 6.9 and not any(near(a, c, 16) for c in (0, 90, 180, 270)))
+    return {
+        "note": "Sim cell coords (x, z) of SkybreakBasinMap; FLOOR -> WALL. Proposal only, game code untouched.",
+        "shrine_full_size": {
+            "why": "bible dais is about 3.6 u across (2.4 x the egg) with the horn feet at +-2.1 u; the Sim gives a 2 x 2 "
+                   "solid square, so today the dais is 2 x 2 x 1.5 u and the horns swing out only above 2.1 u",
+            "dais_cells_r_le_1_6": shrine_dais, "horn_foot_cells": shrine_feet,
+            "count": len(shrine_dais) + len(shrine_feet),
+            "lane_left_m": round(G.YARD_INNER - 2.1, 2)},
+        "hill_full_size": {
+            "why": "bible horns and standing stones stand on the dais edge (r 6 to 7.5) and the kerb is a raised step; "
+                   "today everything inside the ring is walkable, so the horns grow from the ring wall (r 10.5) and the "
+                   "kerb is held to 0.3 u",
+            "horn_foot_cells_236_304_deg": horn_feet, "standing_stone_cells": stones,
+            "raised_kerb_cells_optional": kerb, "kerb_openings_deg": "0, 90, 180, 270 +-16 (aligned with the ring gaps)",
+            "count_minimum": len(horn_feet) + len(stones), "count_with_kerb": len(horn_feet) + len(stones) + len(kerb)},
+    }

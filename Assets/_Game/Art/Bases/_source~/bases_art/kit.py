@@ -17,6 +17,7 @@ from . import pal
 GAP = 0.03
 CH = 0.05
 COURSE = 0.75
+CHIP_STATS = {"kept": 0, "rejected": 0}
 QUADS = [(0, 3, 2, 1), (4, 5, 6, 7), (0, 1, 5, 4), (1, 2, 6, 5), (2, 3, 7, 6), (3, 0, 4, 7)]
 
 
@@ -61,7 +62,14 @@ class Piece:
             t.faces.new([vs[i] for i in q])
         bmesh.ops.recalc_face_normals(t, faces=t.faces[:])
         if chips:
-            _chip(t, corners, chips)
+            t2 = t.copy()
+            if _chip(t2, corners, chips):
+                t.free()
+                t = t2
+                CHIP_STATS["kept"] += 1
+            else:
+                t2.free()
+                CHIP_STATS["rejected"] += 1
         if bev > 0:
             bmesh.ops.bevel(t, geom=t.edges[:], offset=bev, offset_type="OFFSET", segments=segs, profile=0.5,
                             affect="EDGES", clamp_overlap=True)
@@ -194,8 +202,15 @@ def _chip(t, corners, chips):
             if edges:
                 bmesh.ops.holes_fill(t, edges=edges, sides=0)
         except Exception:
-            pass
+            return False
     bmesh.ops.recalc_face_normals(t, faces=t.faces[:])
+    # keep the chip only if the shell is still closed, convex-oriented and has no slivers
+    if any(not e.is_manifold for e in t.edges):
+        return False
+    for f in t.faces:
+        if f.calc_area() < 1e-5 or (f.calc_center_median() - cen).dot(f.normal) <= 0.0:
+            return False
+    return True
 
 
 def rand_chips(rng, p1=0.5, p2=0.18, lo=0.09, hi=0.2, top_only=True):
@@ -328,7 +343,7 @@ def moss_drape(piece, rng, path, s, o_face, z, outward, size=0.26):
                    seed=rng.randint(0, 9999), jitter=0.12, M=Mq)
 
 
-def grass_tuft(piece, rng, x, y, z, h=0.24, n=6):
+def grass_tuft(piece, rng, x, y, z, h=0.24, n=4):
     """Spiky grass clump (blades = thin 3-sided spikes), at most h tall."""
     for i in range(n):
         a = rng.uniform(0, 2 * math.pi)
@@ -337,7 +352,7 @@ def grass_tuft(piece, rng, x, y, z, h=0.24, n=6):
         hh = h * rng.uniform(0.6, 1.0)
         M = Matrix.Translation((bx, by, z)) @ Matrix.Rotation(a, 4, "Z") @ Matrix.Rotation(rng.uniform(0.15, 0.45), 4, "Y")
         c = pal.vc("grass") if i % 2 else pal.vc("moss")
-        piece.lathe([(0.045, 0.0), (0.0, hh)], 3, lambda f, c=c: c, M=M)
+        piece.lathe([(0.085, 0.0), (0.0, hh)], 4, lambda f, c=c: c, M=M)
 
 
 def moss(piece, rng, x, y, z, size=0.25):

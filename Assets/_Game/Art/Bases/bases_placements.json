@@ -2185,7 +2185,7 @@
     "piece": "cm_marker_diamond",
     "unity_local_pos": [
      0.0,
-     4.6,
+     5.2,
      -0.0
     ],
     "unity_yaw_deg": -0.0
@@ -2595,7 +2595,7 @@
     "piece": "cm_marker_diamond",
     "unity_local_pos": [
      0.0,
-     4.6,
+     5.2,
      -0.0
     ],
     "unity_yaw_deg": -0.0
@@ -2627,7 +2627,7 @@
     "piece": "cm_shrine_egg",
     "unity_local_pos": [
      0.0,
-     0.66,
+     1.45,
      -0.0
     ],
     "unity_yaw_deg": -0.0
@@ -2798,7 +2798,7 @@
     "piece": "cm_marker_diamond",
     "unity_local_pos": [
      0.0,
-     6.2,
+     7.4,
      -0.0
     ],
     "unity_yaw_deg": -0.0
