@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using CriticalMass.Runtime.View.Art;
-using CriticalMass.Runtime.View.World;
+using CriticalMass.Runtime.View.Dressing;
 using UnityEditor;
 using UnityEngine;
 
@@ -107,6 +107,7 @@ namespace CriticalMass.Editor.Art
             bool env = WorldKit.IsEnvironment(assetPath);
             string piece = System.IO.Path.GetFileNameWithoutExtension(assetPath);
             foreach (WorldLook look in WorldKit.AllLooks) context.DependsOnSourceAsset(WorldKit.AssetPath(look));
+            bool warned = false;
             foreach (MeshFilter mf in root.GetComponentsInChildren<MeshFilter>(true))
             {
                 Mesh mesh = mf.sharedMesh;
@@ -118,7 +119,7 @@ namespace CriticalMass.Editor.Art
                 {
                     WorldLook look = env ? WorldKit.EnvLook(piece, i < src.Length && src[i] != null ? src[i].name : null) : WorldKit.BasesLook(mf.name);
                     mats[i] = AssetDatabase.LoadAssetAtPath<Material>(WorldKit.AssetPath(look));
-                    if (mats[i] == null) Debug.LogWarning($"[ArtImport] {WorldKit.AssetPath(look)} missing while importing {assetPath}: run ProjectSetup.Apply");
+                    if (mats[i] == null && !warned && (warned = true)) Debug.LogWarning($"[ArtImport] {WorldKit.AssetPath(look)} missing while importing {assetPath}: run ProjectSetup.Apply");
                 }
                 r.sharedMaterials = mats;
                 WorldMeshBake.SmoothOutlineDirections(mesh);

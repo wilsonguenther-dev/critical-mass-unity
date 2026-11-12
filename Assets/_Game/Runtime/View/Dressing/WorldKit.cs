@@ -1,6 +1,6 @@
 using System;
 
-namespace CriticalMass.Runtime.View.World
+namespace CriticalMass.Runtime.View.Dressing
 {
     /// <summary>
     /// The material "looks" of the world art (environment kit v3 and bases kit v1, 2026-11-12). Each look is one

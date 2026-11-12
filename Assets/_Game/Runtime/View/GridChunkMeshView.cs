@@ -54,8 +54,13 @@ namespace CriticalMass.Runtime.View
             new List<int>(), new List<int>(), new List<int>(), new List<int>(), new List<int>(), new List<int>(),
         };
 
+        private int _seenDressVersion;
+
         private void Start()
         {
+            // World art (2026-11-12): the dressed world draws ground, bridges and the walls the bases kit covers; this
+            // view keeps drawing every cell it does not cover, and any covered cell whose type changes (dig, breakables).
+            if (GetComponent<Dressing.WorldView>() == null) gameObject.AddComponent<Dressing.WorldView>();
             _driver = GetComponent<SimDriverBehaviour>();
             if (_driver == null) _driver = FindAnyObjectByType<SimDriverBehaviour>();
             if (_driver != null && _driver.World != null) BuildAll(_driver.World);
@@ -70,6 +75,11 @@ namespace CriticalMass.Runtime.View
             {
                 BuildAll(w);
                 return;
+            }
+            if (Dressing.WorldView.DressVersion != _seenDressVersion)
+            {
+                _seenDressVersion = Dressing.WorldView.DressVersion;
+                if (_dirty != null) for (int c = 0; c < _dirty.Length; c++) RebuildChunk(c);
             }
             if (w.GridVersion == _seenGridVersion) return;
             _seenGridVersion = w.GridVersion;
@@ -107,6 +117,7 @@ namespace CriticalMass.Runtime.View
             _map = w.Map;
             _cellsCopy = (byte[])_map.Cells.Clone();
             _seenGridVersion = w.GridVersion;
+            _seenDressVersion = Dressing.WorldView.DressVersion;
             _chunksX = (_map.Width + ChunkSize - 1) / ChunkSize;
             _chunksZ = (_map.Height + ChunkSize - 1) / ChunkSize;
 
@@ -180,6 +191,7 @@ namespace CriticalMass.Runtime.View
                 for (int cx = x0; cx < x1; cx++)
                 {
                     int i = cz * _map.Width + cx;
+                    if (Dressing.WorldView.Draws(i, _cellsCopy[i])) continue;
                     if (!CellBox(_cellsCopy[i], _map.Height01[i], out double top, out double bottom, out int look)) continue;
                     AddBox(cx, cx + 1, cz, cz + 1, bottom, top, _tris[look]);
                     if (_cellsCopy[i] == Cell.Water) AddFoam(cx, cz);

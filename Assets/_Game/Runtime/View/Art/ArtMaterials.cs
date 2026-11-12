@@ -33,6 +33,8 @@ namespace CriticalMass.Runtime.View.Art
             m.SetColor("_TeamCloth", Hex(target.Cloth));
             m.SetColor("_TeamGlow", Hex(target.Glow));
             m.SetColor("_TeamDark", Hex(target.Dark));
+            m.SetColor("_DefaultMarker", Hex(MarkerAzure));
+            m.SetColor("_DefaultMarkerDark", Hex(MarkerDarkAzure));
             m.SetColor("_TeamColor", Hex(rimHex));
             m.SetFloat("_RimStrength", spec.Rim);
             m.SetFloat("_OutlinePx", spec.OutlinePx);
@@ -44,8 +46,16 @@ namespace CriticalMass.Runtime.View.Art
         }
 
         /// <summary>A character or prop in its team's colours, rim in the team core colour (characters only).</summary>
-        public static Material ForTeam(ModelSpec spec, TeamId team) =>
-            For(spec, ArtMapping.Swatch(spec, team), team == TeamId.Azure ? Palette.Azure : Palette.Crimson);
+        public static Material ForTeam(ModelSpec spec, TeamId team)
+        {
+            Material m = For(spec, ArtMapping.Swatch(spec, team), team == TeamId.Azure ? Palette.Azure : Palette.Crimson);
+            // Props v2 marker codes 3 and 7 (authored Azure #27F8F8 / #43C2C5; Crimson #E6A595 / #D6594F).
+            m.SetColor("_TeamMarker", Hex(team == TeamId.Azure ? MarkerAzure : MarkerCrimson));
+            m.SetColor("_TeamMarkerDark", Hex(team == TeamId.Azure ? MarkerDarkAzure : MarkerDarkCrimson));
+            return m;
+        }
+
+        public const string MarkerAzure = "#27F8F8", MarkerDarkAzure = "#43C2C5", MarkerCrimson = "#E6A595", MarkerDarkCrimson = "#D6594F";
 
         /// <summary>A Kaiju stage in an allegiance glow.</summary>
         public static Material ForGlow(ModelSpec spec, string glowHex) => For(spec, new TeamSwatch(glowHex, glowHex, glowHex), glowHex);

@@ -99,7 +99,7 @@ namespace CriticalMass.Runtime.Tests
                 foreach (Color c in mesh.colors) codes.Add(Mathf.RoundToInt(c.a * 8f));
             }
             CollectionAssert.IsSubsetOf(spec.MaskCodes, codes.ToArray(), "mask codes present (eighths of alpha): " + string.Join(",", codes));
-            foreach (int code in codes) CollectionAssert.Contains(new[] { 0, 1, 2, 4, 5, 6, 8 }, code, "unknown mask code");
+            foreach (int code in codes) CollectionAssert.Contains(new[] { 0, 1, 2, 3, 4, 5, 6, 7, 8 }, code, "unknown mask code");
         }
 
         [TestCaseSource(nameof(Keys))]

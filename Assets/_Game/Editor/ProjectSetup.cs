@@ -3,7 +3,7 @@ using System.Linq;
 using UnityEditor;
 using UnityEditor.Build;
 using UnityEditor.SceneManagement;
-using CriticalMass.Runtime.View.World;
+using CriticalMass.Runtime.View.Dressing;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
