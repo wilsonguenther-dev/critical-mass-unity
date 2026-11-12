@@ -255,7 +255,7 @@ def voronoi_plates(geo, bvh, seeds, gap, thick_fn, slot_fn_for, rng, rmax_fn, si
         near = np.argsort(dist)[1:5]
         cosang = np.clip(NN[near] @ np.array(tuple(n)), -1, 1)
         theta = float(np.mean(np.arccos(cosang)))
-        flare = min(0.6 * th, 1.3 * th * math.tan(theta / 2))     # tops of neighbouring plates meet on convex parts
+        flare = min(0.75 * th, 1.8 * th * math.tan(theta / 2) + 0.15 * gap)     # tops of neighbouring plates meet on convex parts
         slab(geo, Vector(p), n, M, clean, th, base_slot, rng, mossy=mossy, bone=bone, sink=sink,
              surf=surf, flare=flare)
         count += 1
@@ -797,7 +797,7 @@ def creature(name, P, seed, target_h):
         return ("SlateLight" if light else "Slate"), rng.random() < P["moss"](p, n), auto(p)
 
     nplates = voronoi_plates(geo, bvh, seeds, P["gap"], lambda p, n, d: d * P["plate_thick"] * rng.uniform(0.85, 1.1),
-                             slot_for, rng, lambda p, n, d: d * 1.45, sink=0.5, min_edge=P["gap"] * 0.7)
+                             slot_for, rng, lambda p, n, d: d * 1.8, sink=0.5, min_edge=P["gap"] * 0.7)
     print("PLATES", name, nplates, "of", len(seeds), "seeds")
 
     # --- belly segments: a grid of tan tiles, ray-cast from the front
@@ -990,9 +990,9 @@ def adult_params():
                     brow=(1.3, 0.4, 0.98, 16), smile=(0.13, 0.31, -0.06, 0.05, 0.03), open_jaw=0, teeth=0)
     return {
         "unit": U, "balls": balls, "limbs": limbs, "voxel": 0.05, "body_tris": 2600, "bones": bones,
-        "gap": 0.036, "chamfer_m": 0.05, "design_h": 4.2,
+        "gap": 0.024, "chamfer_m": 0.05, "design_h": 4.2,
         "head": (0, -1.02, 3.25), "head_r": 0.43, "muzzle": (0, -1.36, 3.0), "head_clear": 1.12, "belly": belly, "dmin": dmin,
-        "samples": 9000, "plate_r": 1.0, "plate_thick": 0.4, "light_frac": light_frac, "moss": moss, "min_plate_z": 0.15,
+        "samples": 16000, "plate_r": 1.0, "plate_thick": 0.4, "light_frac": light_frac, "moss": moss, "min_plate_z": 0.15,
         "belly_tiles": belly_tiles, "fist": (1.34, -0.95, 0.52), "fist_plate_z": 0.85, "fist_plate_r": 0.44,
         "knuckles": (-0.33, -0.11, 0.11, 0.33), "knuckle_fwd": 0.42, "knuckle_r": 0.15,
         "foot": (0.64, 0.95, 0.38), "toes": (-0.2, 0.0, 0.2), "toe_fwd": 0.42, "toe_r": 0.12,
@@ -1068,9 +1068,9 @@ def hatch_params():
     belly_tiles = [(x, z, 0.16, 0.09) for z in (1.2, 1.0, 0.8, 0.6) for x in (-0.17, 0.17)]
     return {
         "unit": U, "balls": balls, "limbs": limbs, "voxel": 0.045, "body_tris": 2000, "bones": bones,
-        "gap": 0.032, "chamfer_m": 0.035, "design_h": 2.6,
+        "gap": 0.022, "chamfer_m": 0.035, "design_h": 2.6,
         "head": (0, -1.1, 1.75), "head_r": 0.56, "muzzle": (0, -1.5, 1.56), "head_clear": 1.1, "belly": belly, "dmin": dmin,
-        "samples": 6000, "plate_r": 1.0, "plate_thick": 0.4, "light_frac": light_frac, "moss": moss, "min_plate_z": 0.1,
+        "samples": 12000, "plate_r": 1.0, "plate_thick": 0.4, "light_frac": light_frac, "moss": moss, "min_plate_z": 0.1,
         "belly_tiles": belly_tiles, "fist": (0.82, -0.68, 0.32), "fist_plate_z": 0.45, "fist_plate_r": 0.26,
         "knuckles": (-0.18, 0.0, 0.18), "knuckle_fwd": 0.36, "knuckle_r": 0.11,
         "foot": (0.62, 0.62, 0.22), "toes": (-0.14, 0.0, 0.14), "toe_fwd": 0.34, "toe_r": 0.1,
