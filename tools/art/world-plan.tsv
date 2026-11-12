@@ -1,0 +1,82 @@
+# World dresser plan for Skybreak Basin (Editor/Dressing/WorldBake.cs; regenerate with -executeMethod CriticalMass.Editor.Dressing.WorldBake.Bake)
+hash	4d9f4e44f7a38337
+placements	5158
+rim_edges	570
+ledge_edges	0
+fills	134
+ledge_fills	0
+waterfalls	20
+spans	16
+breakables	6
+dressed_cells	3078
+piece	cm_brazier	34
+piece	cm_crystal_lamp	14
+piece	cm_crystal_lamp_low	10
+piece	cm_dress_barrel	12
+piece	cm_dress_blocks	3
+piece	cm_dress_flagstones	28
+piece	cm_dress_planks_low	25
+piece	cm_dress_rubble_low	33
+piece	cm_egg_pool	1
+piece	cm_hill_arc_a	4
+piece	cm_hill_arc_b	4
+piece	cm_hill_dais	1
+piece	cm_hill_horn_l	1
+piece	cm_hill_horn_r	1
+piece	cm_hill_rim_half	2
+piece	cm_layout_district_azure	1
+piece	cm_layout_district_crimson	1
+piece	cm_light_pool	40
+piece	cm_marker_diamond	1
+piece	cm_respawn_pad	2
+piece	cm_shrine_core	1
+piece	cm_shrine_egg	1
+piece	cm_shrine_yard_walls	1
+piece	cm_tower	4
+piece	cm_tower_landmark	2
+piece	env_boulder_l	15
+piece	env_boulder_m	18
+piece	env_bridge_cell	306
+piece	env_bridge_pier	54
+piece	env_bridge_post	10
+piece	env_bridge_span	97
+piece	env_bush	19
+piece	env_cliff_bend	144
+piece	env_cliff_corner	52
+piece	env_cliff_d1	92
+piece	env_cliff_d2	12
+piece	env_cliff_d3	6
+piece	env_cliff_s1	140
+piece	env_cliff_s2	20
+piece	env_cliff_s3	9
+piece	env_cliff_s4	20
+piece	env_cliff_s5	7
+piece	env_cliff_s6	19
+piece	env_cloud_floor	20
+piece	env_cloud_puff	130
+piece	env_crystal_biomass	15
+piece	env_crystal_cluster	15
+piece	env_crystal_cluster_small	30
+piece	env_crystal_corrupt	2
+piece	env_flowers	26
+piece	env_grass_tuft	58
+piece	env_ground_cell	2500
+piece	env_ground_fill_tri	134
+piece	env_lip_rim_corner45	144
+piece	env_lip_rim_corner90	52
+piece	env_lip_rim_diag_a	69
+piece	env_lip_rim_diag_b	65
+piece	env_lip_rim_straight_a	127
+piece	env_lip_rim_straight_b	156
+piece	env_lip_rim_straight_c	153
+piece	env_pebbles	20
+piece	env_rocks	22
+piece	env_sky_rock_l	21
+piece	env_sky_rock_m	20
+piece	env_sky_rock_s	29
+piece	env_stump	18
+piece	env_tree_round_l	10
+piece	env_tree_round_s	13
+piece	env_tree_tall_l	9
+piece	env_tree_tall_s	13
+piece	env_waterfall	20

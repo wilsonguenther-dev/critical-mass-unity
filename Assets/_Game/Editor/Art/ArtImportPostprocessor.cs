@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using CriticalMass.Runtime.View.Art;
+using CriticalMass.Runtime.View.Dressing;
 using UnityEditor;
 using UnityEngine;
 
@@ -15,6 +16,13 @@ namespace CriticalMass.Editor.Art
     /// material, Resources/Toon/CMToonArt.mat, vertex-colour mode), Generic rig with its own avatar for the rigged models
     /// in ArtMapping and no rig for the rest, clip names without the FBX take prefix ("Rig|Walk" becomes "Walk"), Loop
     /// Time on ArtMapping.LoopingClips, clips sorted by name.
+    /// World art (2026-11-12): the environment kit (Art/Environment) and the bases kit (Art/Bases) are static meshes the
+    /// world view combines per chunk, so they import readable; environment FBX keep their material slots by name
+    /// (CM_Toon, CM_Ground, CM_GlowDecal, CM_ShadowDecal, CM_Toon_Foliage, CM_Toon_Crystal) and each slot gets its
+    /// WorldLook material (Resources/Toon/World); bases renderers get WorldBase (or WorldBaseFlat for ground pools).
+    /// Every world mesh gets a smoothed outline direction in UV3 (averaged normals of coincident vertices), so the
+    /// constant-pixel hull does not tear at the hard edges, and the waterfall's pool foam band gets its constant-pixel
+    /// extrusion direction in UV2 (WorldFoam.Bake).
     /// </summary>
     public sealed class ArtImportPostprocessor : AssetPostprocessor
     {
@@ -22,7 +30,7 @@ namespace CriticalMass.Editor.Art
         public const string ArtMaterialPath = "Assets/_Game/Resources/Toon/CMToonArt.mat";
 
         /// <summary>Bump when the contract changes: Unity re-imports every model this postprocessor touches.</summary>
-        public override uint GetVersion() => 3;
+        public override uint GetVersion() => 5;
 
         public static bool IsArt(string path) =>
             path.StartsWith(ArtRoot, StringComparison.Ordinal) && path.EndsWith(".fbx", StringComparison.OrdinalIgnoreCase);
@@ -54,7 +62,16 @@ namespace CriticalMass.Editor.Art
             mi.generateSecondaryUV = false;
             mi.preserveHierarchy = true;
             mi.sortHierarchyByName = true;
-            mi.materialImportMode = ModelImporterMaterialImportMode.None;
+            mi.materialImportMode = WorldKit.IsEnvironment(assetPath)
+                ? ModelImporterMaterialImportMode.ImportViaMaterialDescription
+                : ModelImporterMaterialImportMode.None;
+            if (WorldKit.IsEnvironment(assetPath) || WorldKit.IsBases(assetPath))
+            {
+                mi.isReadable = true;
+                mi.materialLocation = ModelImporterMaterialLocation.InPrefab;
+                mi.materialName = ModelImporterMaterialName.BasedOnMaterialName;
+                mi.materialSearch = ModelImporterMaterialSearch.Local;
+            }
 
             mi.animationType = rigged ? ModelImporterAnimationType.Generic : ModelImporterAnimationType.None;
             mi.avatarSetup = rigged ? ModelImporterAvatarSetup.CreateFromThisModel : ModelImporterAvatarSetup.NoAvatar;
@@ -84,6 +101,32 @@ namespace CriticalMass.Editor.Art
             mi.clipAnimations = clips.OrderBy(c => c.name, StringComparer.Ordinal).ToArray();
         }
 
+        /// <summary>World art: per-slot look materials, smoothed outline directions (UV3), foam extrusion (UV2).</summary>
+        private void PostprocessWorld(GameObject root)
+        {
+            bool env = WorldKit.IsEnvironment(assetPath);
+            string piece = System.IO.Path.GetFileNameWithoutExtension(assetPath);
+            foreach (WorldLook look in WorldKit.AllLooks) context.DependsOnSourceAsset(WorldKit.AssetPath(look));
+            bool warned = false;
+            foreach (MeshFilter mf in root.GetComponentsInChildren<MeshFilter>(true))
+            {
+                Mesh mesh = mf.sharedMesh;
+                var r = mf.GetComponent<MeshRenderer>();
+                if (mesh == null || r == null) continue;
+                Material[] src = r.sharedMaterials;
+                var mats = new Material[Math.Max(1, mesh.subMeshCount)];
+                for (int i = 0; i < mats.Length; i++)
+                {
+                    WorldLook look = env ? WorldKit.EnvLook(piece, i < src.Length && src[i] != null ? src[i].name : null) : WorldKit.BasesLook(mf.name);
+                    mats[i] = AssetDatabase.LoadAssetAtPath<Material>(WorldKit.AssetPath(look));
+                    if (mats[i] == null && !warned && (warned = true)) Debug.LogWarning($"[ArtImport] {WorldKit.AssetPath(look)} missing while importing {assetPath}: run ProjectSetup.Apply");
+                }
+                r.sharedMaterials = mats;
+                WorldMeshBake.SmoothOutlineDirections(mesh);
+                if (piece == "env_waterfall") WorldMeshBake.FoamExtrusion(mesh);
+            }
+        }
+
         /// <summary>"Rig|Walk" (Blender all-actions take) -> "Walk"; a plain take name stays.</summary>
         public static string ClipName(string take)
         {
@@ -94,6 +137,11 @@ namespace CriticalMass.Editor.Art
         private void OnPostprocessModel(GameObject root)
         {
             if (!IsArt(assetPath)) return;
+            if (WorldKit.IsEnvironment(assetPath) || WorldKit.IsBases(assetPath))
+            {
+                PostprocessWorld(root);
+                return;
+            }
             context.DependsOnSourceAsset(ArtMaterialPath);
             var mat = AssetDatabase.LoadAssetAtPath<Material>(ArtMaterialPath);
             if (mat == null)

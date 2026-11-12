@@ -3,6 +3,7 @@ using System.Linq;
 using UnityEditor;
 using UnityEditor.Build;
 using UnityEditor.SceneManagement;
+using CriticalMass.Runtime.View.Dressing;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
@@ -36,6 +37,7 @@ namespace CriticalMass.Editor
                 ApplyInputActions();
                 ApplyPlaceholderMaterial();
                 ApplyToonMaterials();
+                ApplyWorldMaterials();
                 AssetDatabase.SaveAssets();
                 Art.ArtCatalogBuilder.Build();
                 MoveIntoSettings("Assets/UniversalRenderPipelineGlobalSettings.asset");
@@ -180,6 +182,89 @@ namespace CriticalMass.Editor
                 art.SetFloat("_ColorMode", 1f);
                 EditorUtility.SetDirty(art);
             }
+        }
+
+        // World art (2026-11-12): one material per WorldLook (Runtime/View/World/WorldKit), made here so the import
+        // postprocessor can assign them and a player build keeps the shaders. Idempotent: a value is written only when it
+        // differs, so a second Apply leaves git clean. Colours are sRGB hex (Unity converts Color properties to linear).
+        static void ApplyWorldMaterials()
+        {
+            string dir = WorldKit.MaterialAssetDir.TrimEnd('/');
+            if (!AssetDatabase.IsValidFolder(dir)) AssetDatabase.CreateFolder(ToonDir, "World");
+            foreach (WorldLook look in WorldKit.AllLooks)
+            {
+                string path = WorldKit.AssetPath(look);
+                bool decal = look == WorldLook.GlowDecal || look == WorldLook.ShadowDecal || look == WorldLook.Pool;
+                string shader = look == WorldLook.Ground ? "CM/WorldGround" : decal ? "CM/WorldDecal" : "CM/Toon";
+                EnsureMaterial(path, shader);
+                var m = AssetDatabase.LoadAssetAtPath<Material>(path);
+                bool dirty = false;
+                if (shader == "CM/Toon") dirty |= WorldToonValues(m, look);
+                else if (decal)
+                {
+                    bool glow = look == WorldLook.GlowDecal, pool = look == WorldLook.Pool;
+                    dirty |= SetF(m, "_Mode", glow ? 0f : pool ? 2f : 1f);
+                    dirty |= SetF(m, "_Strength", glow ? 0.6f : pool ? 0.35f : 1f);
+                    dirty |= SetF(m, "_SrcBlend", glow ? 1f : 5f);
+                    dirty |= SetF(m, "_DstBlend", glow ? 1f : 10f);
+                }
+                if (dirty) EditorUtility.SetDirty(m);
+            }
+        }
+
+        static bool WorldToonValues(Material m, WorldLook look)
+        {
+            bool d = false;
+            d |= SetF(m, "_ColorMode", 1f);
+            d |= SetF(m, "_OutlinePx", WorldKit.OutlinePx(look));
+            d |= SetF(m, "_OutlineSource", 2f);
+            d |= SetF(m, "_RimStrength", 0f);
+            d |= SetF(m, "_FogAmount", 1f);
+            d |= SetC(m, "_FogColor", "#B4DAEE");
+            d |= SetF(m, "_FogTop", -3.5f);
+            d |= SetF(m, "_FogBottom", -11f);
+            d |= SetF(m, "_ExtrudePx", look == WorldLook.Water ? 11f : 0f);
+            bool foliage = look == WorldLook.Foliage, crystal = look == WorldLook.Crystal;
+            // Foliage (kit README v3): bands exactly #86BD4E / #5E9A45 / #3F6E36 on the leaf colour, N.L only, cuts 0.30 / 0.02.
+            Color leaf = Hex("#86BD4E").linear, mid = Hex("#5E9A45").linear, low = Hex("#3F6E36").linear;
+            d |= SetCRaw(m, "_MidRatio", foliage ? new Color(mid.r / leaf.r, mid.g / leaf.g, mid.b / leaf.b, 1f) : Color.white);
+            d |= SetCRaw(m, "_ShadowRatio", foliage ? new Color(low.r / leaf.r, low.g / leaf.g, low.b / leaf.b, 1f) : Color.white);
+            d |= SetF(m, "_MidMultiplier", foliage || crystal ? 1f : 0.84f);
+            d |= SetF(m, "_ShadowMultiplier", foliage ? 1f : crystal ? 0.46f : 0.66f);
+            d |= SetF(m, "_ShadowTintAmount", foliage ? 0f : crystal ? 0.25f : 0.12f);
+            d |= SetF(m, "_LitMultiplier", crystal ? 1.9f : 1f);
+            d |= SetF(m, "_LitThreshold", foliage ? 0.30f : 0.35f);
+            d |= SetF(m, "_ShadowThreshold", foliage ? 0.02f : -0.05f);
+            d |= SetF(m, "_ReceiveShadows", foliage || crystal ? 0f : 1f);
+            d |= SetF(m, "_TopBandLift", foliage || crystal ? 0f : 1f);
+            bool bases = look == WorldLook.Base || look == WorldLook.BaseFlat;
+            string cloth = bases ? WorldKit.BaseAuthoredCloth : WorldKit.EnvAuthoredCloth;
+            string glow = bases ? WorldKit.BaseAuthoredGlow : WorldKit.EnvAuthoredGlow;
+            string dark = bases ? WorldKit.BaseAuthoredDark : WorldKit.EnvAuthoredDark;
+            d |= SetC(m, "_DefaultCloth", cloth); d |= SetC(m, "_TeamCloth", cloth);
+            d |= SetC(m, "_DefaultGlow", glow); d |= SetC(m, "_TeamGlow", glow);
+            d |= SetC(m, "_DefaultDark", dark); d |= SetC(m, "_TeamDark", dark);
+            return d;
+        }
+
+        static Color Hex(string hex) { ColorUtility.TryParseHtmlString(hex, out Color c); return c; }
+
+        static bool SetF(Material m, string n, float v)
+        {
+            if (!m.HasProperty(n) || Mathf.Abs(m.GetFloat(n) - v) < 1e-6f) return false;
+            m.SetFloat(n, v);
+            return true;
+        }
+
+        static bool SetC(Material m, string n, string hex) => SetCRaw(m, n, Hex(hex));
+
+        static bool SetCRaw(Material m, string n, Color c)
+        {
+            if (!m.HasProperty(n)) return false;
+            Color o = m.GetColor(n);
+            if (Mathf.Abs(o.r - c.r) < 1e-5f && Mathf.Abs(o.g - c.g) < 1e-5f && Mathf.Abs(o.b - c.b) < 1e-5f && Mathf.Abs(o.a - c.a) < 1e-5f) return false;
+            m.SetColor(n, c);
+            return true;
         }
 
         static void EnsureMaterial(string path, string shaderName)

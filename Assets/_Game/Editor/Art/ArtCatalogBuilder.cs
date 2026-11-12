@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using CriticalMass.Runtime.View.Art;
+using CriticalMass.Runtime.View.Dressing;
 using UnityEditor;
 using UnityEngine;
 
@@ -47,6 +48,41 @@ namespace CriticalMass.Editor.Art
                     ? $"[ArtCatalog] {spec.Key}: MISSING {spec.AssetPath} (view falls back to grey-box)"
                     : $"[ArtCatalog] {spec.Key}: {spec.AssetPath} clips=[{string.Join(",", e.Clips.Select(c => c.name))}]");
             }
+            BuildWorld();
+            return cat;
+        }
+
+        /// <summary>
+        /// Writes Resources/World/WorldKitCatalog.asset: every FBX under Art/Environment and Art/Bases by file name, sorted
+        /// (the world view's model lookup). Idempotent like the art catalog.
+        /// </summary>
+        public static WorldKitCatalog BuildWorld()
+        {
+            if (!AssetDatabase.IsValidFolder("Assets/_Game/Resources/World")) AssetDatabase.CreateFolder("Assets/_Game/Resources", "World");
+            var pairs = AssetDatabase.FindAssets("t:Model", new[] { "Assets/_Game/Art/Environment", "Assets/_Game/Art/Bases" })
+                .Select(AssetDatabase.GUIDToAssetPath)
+                .Where(p => WorldKit.IsEnvironment(p) || WorldKit.IsBases(p))
+                .Select(p => (name: System.IO.Path.GetFileNameWithoutExtension(p), model: AssetDatabase.LoadAssetAtPath<GameObject>(p)))
+                .Where(x => x.model != null)
+                .OrderBy(x => x.name, StringComparer.Ordinal).ToArray();
+            var cat = AssetDatabase.LoadAssetAtPath<WorldKitCatalog>(WorldKitCatalog.AssetPath);
+            bool created = cat == null;
+            if (created)
+            {
+                cat = ScriptableObject.CreateInstance<WorldKitCatalog>();
+                cat.name = "WorldKitCatalog";
+                AssetDatabase.CreateAsset(cat, WorldKitCatalog.AssetPath);
+            }
+            string[] names = pairs.Select(x => x.name).ToArray();
+            GameObject[] models = pairs.Select(x => x.model).ToArray();
+            if (created || !cat.Names.SequenceEqual(names) || !cat.Models.SequenceEqual(models))
+            {
+                cat.Names = names;
+                cat.Models = models;
+                EditorUtility.SetDirty(cat);
+                AssetDatabase.SaveAssetIfDirty(cat);
+            }
+            Debug.Log($"[ArtCatalog] world kit: {names.Length} models");
             return cat;
         }
 
