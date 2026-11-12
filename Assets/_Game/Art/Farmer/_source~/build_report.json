@@ -1,0 +1,303 @@
+{
+ "objects": {
+  "Farmer_Body": {
+   "triangles": 10348,
+   "vertices": 5404,
+   "materials": [
+    "CM_Toon"
+   ],
+   "feature_groups": [
+    "feat_belt",
+    "feat_boots",
+    "feat_bun",
+    "feat_face",
+    "feat_gloves",
+    "feat_goggles",
+    "feat_hair",
+    "feat_hose",
+    "feat_jacket",
+    "feat_leaves",
+    "feat_overalls",
+    "feat_seed_pod",
+    "feat_skin",
+    "feat_tank",
+    "feat_team_cloth"
+   ],
+   "bone_groups": 20
+  },
+  "Farmer_Staff": {
+   "triangles": 1552,
+   "vertices": 810,
+   "materials": [
+    "CM_Toon"
+   ],
+   "feature_groups": [
+    "feat_bulb",
+    "feat_hook",
+    "feat_hose",
+    "feat_staff",
+    "feat_team_cloth"
+   ],
+   "bone_groups": 1
+  }
+ },
+ "bones": 41,
+ "display_pose": [
+  "Idle",
+  1
+ ],
+ "body_height_rest": 2.0025,
+ "body_min_z": -0.0005,
+ "staff_length_local": 1.944,
+ "staff_bottom_local": -0.53,
+ "tank": {
+  "centre": [
+   -0.06,
+   0.41,
+   1.19
+  ],
+  "diameter": 0.45,
+  "top_z": 1.415
+ },
+ "feature_z_ranges_rest": {
+  "feat_overalls": [
+   0.2,
+   1.19
+  ],
+  "feat_boots": [
+   -0.001,
+   0.29
+  ],
+  "feat_team_cloth": [
+   0.183,
+   1.852
+  ],
+  "feat_jacket": [
+   0.765,
+   1.287
+  ],
+  "feat_skin": [
+   1.04,
+   1.8
+  ],
+  "feat_belt": [
+   0.6,
+   1.321
+  ],
+  "feat_seed_pod": [
+   0.522,
+   0.73
+  ],
+  "feat_gloves": [
+   0.965,
+   1.225
+  ],
+  "feat_face": [
+   1.382,
+   1.644
+  ],
+  "feat_hair": [
+   1.26,
+   2.002
+  ],
+  "feat_bun": [
+   1.745,
+   1.985
+  ],
+  "feat_goggles": [
+   1.653,
+   1.817
+  ],
+  "feat_tank": [
+   0.839,
+   1.445
+  ],
+  "feat_leaves": [
+   1.428,
+   1.59
+  ],
+  "feat_hose": [
+   0.707,
+   0.889
+  ]
+ },
+ "triangles_total": 11900,
+ "triangles_by_part": {
+  "Farmer_Body/hair/f_hair": [
+   1484,
+   16
+  ],
+  "Farmer_Body/team_cloth/f_team_cloth": [
+   1032,
+   13
+  ],
+  "Farmer_Body/tank/f_brass": [
+   916,
+   14
+  ],
+  "Farmer_Body/jacket/f_cream": [
+   832,
+   8
+  ],
+  "Farmer_Staff/staff/f_brass": [
+   740,
+   11
+  ],
+  "Farmer_Body/skin/f_skin": [
+   736,
+   5
+  ],
+  "Farmer_Body/overalls/f_navy": [
+   668,
+   5
+  ],
+  "Farmer_Body/gloves/f_glove": [
+   488,
+   6
+  ],
+  "Farmer_Body/belt/f_brown": [
+   412,
+   7
+  ],
+  "Farmer_Body/boots/f_boot": [
+   400,
+   4
+  ],
+  "Farmer_Body/tank/f_biomass": [
+   360,
+   1
+  ],
+  "Farmer_Body/goggles/f_brass": [
+   356,
+   4
+  ],
+  "Farmer_Body/tank/f_frame_dark": [
+   252,
+   2
+  ],
+  "Farmer_Staff/hook/f_brass": [
+   220,
+   1
+  ],
+  "Farmer_Body/boots/f_cream": [
+   184,
+   2
+  ],
+  "Farmer_Body/leaves/f_leaf": [
+   180,
+   5
+  ],
+  "Farmer_Body/bun/f_hair": [
+   168,
+   1
+  ],
+  "Farmer_Staff/bulb/f_biomass": [
+   168,
+   1
+  ],
+  "Farmer_Body/face/f_white": [
+   160,
+   4
+  ],
+  "Farmer_Body/overalls/f_brass": [
+   152,
+   2
+  ],
+  "Farmer_Body/belt/f_leather": [
+   132,
+   3
+  ],
+  "Farmer_Body/face/f_iris": [
+   128,
+   2
+  ],
+  "Farmer_Body/hose/f_hose": [
+   128,
+   1
+  ],
+  "Farmer_Body/seed_pod/f_wood": [
+   120,
+   1
+  ],
+  "Farmer_Body/seed_pod/f_wood_dark": [
+   120,
+   2
+  ],
+  "Farmer_Staff/team_cloth/f_team_cloth": [
+   120,
+   2
+  ],
+  "Farmer_Body/seed_pod/f_leaf": [
+   108,
+   3
+  ],
+  "Farmer_Staff/hose/f_hose": [
+   104,
+   1
+  ],
+  "Farmer_Body/overalls/f_patch": [
+   88,
+   2
+  ],
+  "Farmer_Body/boots/f_sole": [
+   88,
+   2
+  ],
+  "Farmer_Body/boots/f_brass": [
+   88,
+   2
+  ],
+  "Farmer_Body/face/f_brow": [
+   88,
+   2
+  ],
+  "Farmer_Staff/hook/f_blade": [
+   80,
+   1
+  ],
+  "Farmer_Body/hose/f_brass": [
+   76,
+   1
+  ],
+  "Farmer_Body/face/f_pupil": [
+   72,
+   2
+  ],
+  "Farmer_Body/face/f_cheek": [
+   72,
+   2
+  ],
+  "Farmer_Body/face/f_skin_dark": [
+   64,
+   1
+  ],
+  "Farmer_Staff/staff/f_shaft": [
+   60,
+   1
+  ],
+  "Farmer_Staff/staff/f_brown": [
+   60,
+   1
+  ],
+  "Farmer_Body/overalls/f_navy_dark": [
+   44,
+   1
+  ],
+  "Farmer_Body/belt/f_brass": [
+   44,
+   1
+  ],
+  "Farmer_Body/seed_pod/f_brown": [
+   44,
+   1
+  ],
+  "Farmer_Body/seed_pod/f_biomass": [
+   36,
+   1
+  ],
+  "Farmer_Body/face/f_mouth": [
+   28,
+   1
+  ]
+ }
+}
