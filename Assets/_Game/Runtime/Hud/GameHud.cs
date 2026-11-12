@@ -283,7 +283,7 @@ namespace CriticalMass.Runtime.Hud
             _portraitFrame = Shape(c, "Portrait", ShapeKind.Chamfer, 0f, 6f, 116f, 120f, Panel, 18f);
             _portraitFrame.RimPx = 3f;
             // v2: the illustrated class portrait (bible p15 player card), a class badge and the class name on a plate
-            _portrait = Icon(_portraitFrame.transform, "Portrait", UiIcons.Portrait[0, 0], 9f, 3f, 98f, 98f);
+            _portrait = Icon(_portraitFrame.transform, "Portrait", UiIcons.Portrait[0, 0], 5f, 1f, 106f, 106f);   // fills the card like p15
             Shape(_portraitFrame.transform, "Name Plate", ShapeKind.RoundRect, 6f, 92f, 104f, 24f, Navy, -1f).RimPx = 0f;
             _classBadge = Icon(_portraitFrame.transform, "Class Badge", UiIcons.ClassBadge[0, 0], -6f, -6f, 36f, 36f);
             _className = Label(_portraitFrame.transform, "Class Name", CMTokens.Ui, 15, Cream, TextAnchor.MiddleCenter, 6f, 92f, 104f, 24f,

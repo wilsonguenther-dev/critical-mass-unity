@@ -504,7 +504,7 @@ SKIN = {'warrior': ('#C98A5E', '#9A6340', '#E8B48A'), 'farmer': ('#F1C29B', '#C9
 
 
 def portrait(cls, team):
-    a = Art(f'portrait-{cls}-{team}', 104)
+    a = Art(f'portrait-{cls}-{team}', 106)
     tm = TEAM[team]
     tones = (tm['base'], tm['shade'], tm['light'])
     skin = SKIN[cls]
