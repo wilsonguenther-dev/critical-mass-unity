@@ -579,7 +579,7 @@ def pebbles(m, seed):
     rng = random.Random(seed)
     for i in range(rng.randint(4, 6)):
         a, r = rng.uniform(0, 2 * math.pi), rng.uniform(0.05, 0.32)
-        boulder(m, seed * 17 + i, rng.uniform(0.09, 0.19), (math.cos(a) * r, 0, math.sin(a) * r), flat=0.5)
+        boulder(m, seed * 17 + i, rng.uniform(0.15, 0.30), (math.cos(a) * r * 1.4, 0, math.sin(a) * r * 1.4), flat=0.42)
 
 
 # ----------------------------------------------------------------------------------------------------- crystals
@@ -605,7 +605,7 @@ def _spike(m, base, h, r, yaw, tilt, body, lit):
         F(m, [lo[i], lo[j], hi[j], hi[i]], lit if i == bi else body, tuple(out))
         if i == bi:     # painted highlight streak on the lit facet, 40-68% up, a third of the facet wide
             P = lambda s, t: lo[i] + (lo[j] - lo[i]) * s + ((hi[i] + (hi[j] - hi[i]) * s) - (lo[i] + (lo[j] - lo[i]) * s)) * t + out * 0.006
-            F(m, [P(0.18, 0.40), P(0.50, 0.44), P(0.44, 0.97), P(0.20, 0.92)], C("crystal_hi"), tuple(out))
+            F(m, [P(0.14, 0.22), P(0.56, 0.28), P(0.48, 0.98), P(0.16, 0.92)], C("crystal_hi"), tuple(out))
         F(m, [hi[i], hi[j], tip], lit if i in (bi, (bi + 1) % n, (bi - 1) % n) else body, tuple((out + R @ Vector((0, 0.8, 0))).normalized()))
 
 
@@ -632,10 +632,10 @@ def crystal_cluster(m, seed, hmax=1.8, k=6, kind="team"):
 # ------------------------------------------------------------------------------------------------- small props
 def tuft(m, seed, at=(0, 0, 0), flowers=False):
     rng = random.Random(seed)
-    for i in range(rng.randint(6, 9)):
-        a, r = rng.uniform(0, 2 * math.pi), rng.uniform(0.0, 0.1)
+    for i in range(rng.randint(9, 13)):
+        a, r = rng.uniform(0, 2 * math.pi), rng.uniform(0.0, 0.16)
         bx, bz = at[0] + math.cos(a) * r, at[2] + math.sin(a) * r
-        h, w, lean = rng.uniform(0.12, 0.24), 0.035, rng.uniform(0.02, 0.07)
+        h, w, lean = rng.uniform(0.14, 0.26), 0.05, rng.uniform(0.03, 0.09)
         ca = rng.uniform(0, math.pi)
         dx, dz = math.cos(ca) * w, math.sin(ca) * w
         tip = (bx + math.cos(a) * lean, h, bz + math.sin(a) * lean)
@@ -647,7 +647,7 @@ def tuft(m, seed, at=(0, 0, 0), flowers=False):
             a, r = rng.uniform(0, 2 * math.pi), rng.uniform(0.04, 0.2)
             x, z, y = at[0] + math.cos(a) * r, at[2] + math.sin(a) * r, rng.uniform(0.11, 0.17)
             col = C("flower") if i % 2 else C("flower_y")
-            s = 0.045
+            s = 0.07
             for (p, q) in (((s, 0), (0, s)), ((0, s), (-s, 0)), ((-s, 0), (0, -s)), ((0, -s), (s, 0))):
                 F(m, [(x, y + s * 0.6, z), (x + p[0], y, z + p[1]), (x + q[0], y, z + q[1])], col, UP)
 
@@ -655,7 +655,7 @@ def tuft(m, seed, at=(0, 0, 0), flowers=False):
 def grass_tuft(m, seed):
     rng = random.Random(seed)
     for k in range(3):
-        tuft(m, seed * 5 + k, (rng.uniform(-0.25, 0.25), 0, rng.uniform(-0.25, 0.25)))
+        tuft(m, seed * 5 + k, (rng.uniform(-0.35, 0.35), 0, rng.uniform(-0.35, 0.35)))
 
 
 def flowers(m, seed):
@@ -665,7 +665,7 @@ def flowers(m, seed):
 
 def stump(m, seed):
     rng = random.Random(seed)
-    m.prism(0, 0, 0.21, -0.05, 0.24, C("trunk"), n=8, top=C("wood"), rot=rng.uniform(0, 1), r_top=0.18, ch=0.03)
+    m.prism(0, 0, 0.29, -0.05, 0.24, C("trunk"), n=8, top=C("wood"), rot=rng.uniform(0, 1), r_top=0.25, ch=0.04)
     for k in range(3):
         a = 2 * math.pi * k / 3 + rng.uniform(-0.3, 0.3)
         m.prism(math.cos(a) * 0.2, math.sin(a) * 0.2, 0.06, -0.03, 0.07, C("trunk", 0.92), n=5, r_top=0.03)
@@ -675,9 +675,8 @@ def bush_low(m, seed):
     rng = random.Random(seed)
     for k in range(3):
         a = 2 * math.pi * k / 3 + rng.uniform(-0.4, 0.4)
-        r = rng.uniform(0.16, 0.24)
-        m.blob(math.cos(a) * 0.2, 0.0, math.sin(a) * 0.2, r, 0.28, r, C("leaf_light"), sub=2, smooth=True,
-               seed=seed + k, jitter=0.06, flat_bottom=0.0)
+        r = rng.uniform(0.24, 0.32)
+        lobe(m, (math.cos(a) * 0.28, 0.0, math.sin(a) * 0.28), (r, 0.28, r), seed + k, 0.95, flat_bottom=0.0)
 
 
 # ---------------------------------------------------------------------------------------------------------- sky
@@ -773,7 +772,7 @@ PIECES += [
     _p("env_grass_tuft", grass_tuft, "small", CELL, "grass tufts (under 0.25 u)", seed=602),
     _p("env_flowers", flowers, "small", CELL, "flower tuft (under 0.25 u)", seed=603),
     _p("env_stump", stump, "small", CELL, "tree stump (0.24 u)", outline_px=2.5, seed=604),
-    _p("env_bush", bush_low, "small", CELL, "low bush (0.28 u)", outline_px=2.5, seed=605),
+    _p("env_bush", bush_low, "small", CELL, "low bush (0.28 u tall, 1.1 u across)", outline_px=2.5, mats=("CM_Toon_Foliage",), seed=605),
     _p("env_sky_rock_s", lambda m, s: sky_rock(m, s, 0.7), "sky", "cap top centre", "p12 floating rock", outline_px=1.0, seed=191, far=True),
     _p("env_sky_rock_m", lambda m, s: sky_rock(m, s, 1.2), "sky", "cap top centre", "p12 floating rock spire", outline_px=1.0, seed=192, far=True),
     _p("env_sky_rock_l", lambda m, s: sky_rock(m, s, 2.0), "sky", "cap top centre", "p12 floating rock spire", outline_px=1.0, seed=193, far=True),

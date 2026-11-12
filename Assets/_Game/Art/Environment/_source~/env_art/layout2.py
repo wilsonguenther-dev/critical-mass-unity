@@ -315,7 +315,8 @@ def decor(g, rim, fl, paths, keep, team_of, sites=(), wf_cells=(), skip=()):
     for e in rim:
         if e["kind"] == "ax":
             rim_cells[e["cell"]].append(e)
-    wf_cells = set(wf_cells) | set(skip)
+    wf_only = set(wf_cells)
+    wf_cells = wf_only | set(skip)
     for cz in range(g.H):
         for cx in range(g.W):
             if not g.land(cx, cz) or g.t(cx, cz) not in (L1.FLOOR,):
@@ -335,7 +336,8 @@ def decor(g, rim, fl, paths, keep, team_of, sites=(), wf_cells=(), skip=()):
                 if r < 110 and pd > PATH_W + 0.6:
                     out.append(dict(piece=TREES[h32(cx, cz, 112) % 4], x=xc + n[0] * 0.28, y=h, z=zc + n[1] * 0.28,
                                     yaw=yaw, cat="tree", edge=True))
-                elif r < 310 and pd < PATH_W + 4.5:
+                elif r < 310 and pd < PATH_W + 4.5 and not any((cx + a_, cz + b_) in wf_only for a_ in (-2, -1, 0, 1, 2)
+                                                                 for b_ in (-2, -1, 0, 1, 2)):
                     # v3: a big prop on the rim beside a route; its centre sits just past the lip (over the void cell,
                     # on the rim rock band), so no walkable cell holds anything taller than 0.3 u at its centre
                     k = h32(cx, cz, 122) % 100

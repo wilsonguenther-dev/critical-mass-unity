@@ -1,8 +1,8 @@
-"""Kit v2 deliverable images (system python3 + Pillow; no Blender).
+"""Kit v3 deliverable images (system python3 + Pillow; no Blender).
 
-    python3 compose_v2.py <render_dir> <out_dir>
+    python3 compose_v3.py <render_dir> <out_dir>
 
-Gameplay renders come in at 3840x2160 (render_v2.py --scale 2): each becomes a 1920x1080 JPEG (the 1080p frame)
+Gameplay renders come in at 3840x2160 (render_v3.py --scale 2): each becomes a 1920x1080 JPEG (the 1080p frame)
 and, for the field shots, a centre crop at 2x (`-2x.jpg`). Side-by-sides put the bible crop LEFT and ours RIGHT,
 1400 px wide at most. Every JPEG is kept under 180 KB. Bible crops are read from ~/critical-mass/loop/parity/ref.
 """
@@ -58,7 +58,7 @@ def sbs(left, right, cap, name, W=1400):
     im.paste(l2, (0, 34))
     im.paste(r2, (l2.width + 12, 34))
     d = ImageDraw.Draw(im)
-    d.text((8, 8), "BIBLE  |  " + cap + "  |  OURS (kit v2)", fill=(247, 240, 229), font=font(17))
+    d.text((8, 8), "BIBLE  |  " + cap + "  |  OURS (kit v3)", fill=(247, 240, 229), font=font(17))
     save(im, os.path.join(out, "sbs-%s.jpg" % name))
 
 

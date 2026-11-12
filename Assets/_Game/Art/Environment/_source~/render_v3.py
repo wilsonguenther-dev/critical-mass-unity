@@ -1,7 +1,7 @@
-"""Kit v2: assemble Skybreak Basin + a field demo + lineups from the kit-v2 pieces, run the checks, render.
+"""Kit v3: assemble Skybreak Basin + a field demo + lineups from the kit-v2 pieces, run the checks, render.
 
     B=/Applications/Blender.app/Contents/MacOS/Blender
-    $B -b --factory-startup --python-exit-code 1 -P render_v2.py -- <out_dir> [--only a,b] [--no-render] [--scale 2]
+    $B -b --factory-startup --python-exit-code 1 -P render_v3.py -- <out_dir> [--only a,b] [--no-render] [--scale 2]
 
 Writes <out_dir>/renders/*.png (gameplay framings at 1920x1080 x scale) and <out_dir>/checks.json.
 The Blender materials here are a PREVIEW of the Unity shaders (CM/Toon 3-band + CM_Ground); see README.
@@ -231,10 +231,16 @@ def outline_mat(name, far=False):
     return mat
 
 
-def decal_mat(name, radial):
+def decal_mat(name, radial, fixed=None):
     mat, nt = _nt(name)
     vc = nt.nodes.new("ShaderNodeVertexColor")
     vc.layer_name = "Col"
+    if fixed is not None:       # crimson glow decal: the vertex colour carries the azure lit facet
+        vc = nt.nodes.new("ShaderNodeRGB")
+        vc.outputs[0].default_value = RGB(fixed)
+        col_out = vc.outputs[0]
+    else:
+        col_out = vc.outputs["Color"]
     uv = nt.nodes.new("ShaderNodeUVMap")
     sp = nt.nodes.new("ShaderNodeSeparateXYZ")
     nt.links.new(uv.outputs[0], sp.inputs[0])
@@ -244,7 +250,7 @@ def decal_mat(name, radial):
         alpha = M_(nt, "MULTIPLY", M_(nt, "SUBTRACT", 1.0, r, clamp=True), 0.5)
     else:
         alpha = M_(nt, "MULTIPLY", M_(nt, "SUBTRACT", 1.0, sp.outputs[1], clamp=True), 0.5)
-    _emit(nt, mat, vc.outputs["Color"], alpha)
+    _emit(nt, mat, col_out, alpha)
     return mat
 
 
@@ -471,6 +477,9 @@ def instance(p, coll, dx=0.0, dz=0.0):
     if p.get("team") == "crimson":
         ob.material_slots[0].link = "OBJECT"
         ob.material_slots[0].material = MATS[L["mat0"] + "_Crimson"]
+        if L["nmats"] > 1 and L["me"].materials[1].name == "CM_GlowDecal":
+            ob.material_slots[1].link = "OBJECT"
+            ob.material_slots[1].material = MATS["CM_GlowDecal_Crimson"]
     if L["olpx"] > 0:
         s = ob.modifiers.new("Outline", "SOLIDIFY")
         s.offset = 1.0
@@ -579,7 +588,8 @@ def main():
                  "CM_Toon_Crystal": toon_mat("CM_Toon_Crystal", bands="crystal"),
                  "CM_Toon_Crystal_Crimson": toon_mat("CM_Toon_Crystal_Crimson", True, bands="crystal"),
                  "Outline": outline_mat("Outline"), "Outline_Far": outline_mat("Outline_Far", True),
-                 "CM_GlowDecal": decal_mat("CM_GlowDecal", True), "CM_ShadowDecal": decal_mat("CM_ShadowDecal", False)})
+                 "CM_GlowDecal": decal_mat("CM_GlowDecal", True),
+                 "CM_GlowDecal_Crimson": decal_mat("CM_GlowDecal_Crimson", True, palette.TEAM_SWAP["team_glow"][0]), "CM_ShadowDecal": decal_mat("CM_ShadowDecal", False)})
 
     # ---- the real map
     lay = layout2.place_map()

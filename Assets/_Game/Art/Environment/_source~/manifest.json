@@ -1240,22 +1240,22 @@
    "fbx": "Environment/env_pebbles.fbx",
    "cat": "small",
    "pivot": "cell top centre (cx+0.5, h, -(cz+0.5))",
-   "tris": 311,
+   "tris": 303,
    "outline_px": 2.5,
    "materials": [
     "CM_Toon"
    ],
-   "verts": 181,
+   "verts": 180,
    "cull": "down",
    "bounds_unity_min": [
-    -0.1823,
+    -0.2675,
     -0.04,
-    -0.2474
+    -0.3577
    ],
    "bounds_unity_max": [
-    0.3425,
-    0.0503,
-    0.1477
+    0.491,
+    0.0679,
+    0.2198
    ],
    "covers": "pebbles (under 0.12 u)",
    "team_mask": false
@@ -1265,22 +1265,22 @@
    "fbx": "Environment/env_grass_tuft.fbx",
    "cat": "small",
    "pivot": "cell top centre (cx+0.5, h, -(cz+0.5))",
-   "tris": 23,
+   "tris": 34,
    "outline_px": 0.0,
    "materials": [
     "CM_Toon"
    ],
-   "verts": 69,
+   "verts": 102,
    "cull": "down",
    "bounds_unity_min": [
-    -0.1941,
+    -0.2519,
     0.0,
-    -0.1773
+    -0.266
    ],
    "bounds_unity_max": [
-    0.2279,
-    0.2348,
-    0.0475
+    0.3356,
+    0.2597,
+    0.0907
    ],
    "covers": "grass tufts (under 0.25 u)",
    "team_mask": false
@@ -1290,22 +1290,22 @@
    "fbx": "Environment/env_flowers.fbx",
    "cat": "small",
    "pivot": "cell top centre (cx+0.5, h, -(cz+0.5))",
-   "tris": 49,
+   "tris": 59,
    "outline_px": 0.0,
    "materials": [
     "CM_Toon"
    ],
-   "verts": 84,
+   "verts": 107,
    "cull": "down",
    "bounds_unity_min": [
-    -0.1477,
+    -0.1262,
     0.0,
-    -0.272
+    -0.3428
    ],
    "bounds_unity_max": [
-    0.3657,
-    0.2345,
-    0.108
+    0.4352,
+    0.2545,
+    0.2216
    ],
    "covers": "flower tuft (under 0.25 u)",
    "team_mask": false
@@ -1323,14 +1323,14 @@
    "verts": 54,
    "cull": "down",
    "bounds_unity_min": [
-    -0.2096,
+    -0.2894,
     -0.05,
-    -0.2217
+    -0.2894
    ],
    "bounds_unity_max": [
-    0.2539,
+    0.2894,
     0.24,
-    0.2119
+    0.2894
    ],
    "covers": "tree stump (0.24 u)",
    "team_mask": false
@@ -1343,21 +1343,21 @@
    "tris": 121,
    "outline_px": 2.5,
    "materials": [
-    "CM_Toon"
+    "CM_Toon_Foliage"
    ],
    "verts": 79,
    "cull": "down",
    "bounds_unity_min": [
-    -0.3251,
+    -0.463,
     0.0,
-    -0.3112
+    -0.4442
    ],
    "bounds_unity_max": [
-    0.3985,
+    0.5555,
     0.2784,
-    0.3745
+    0.5245
    ],
-   "covers": "low bush (0.28 u)",
+   "covers": "low bush (0.28 u tall, 1.1 u across)",
    "team_mask": false
   },
   {

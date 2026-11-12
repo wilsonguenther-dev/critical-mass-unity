@@ -76,8 +76,8 @@ ENV = {
     # v3 (owner 2026-11-12: bolder, sharper; rock one step darker for value contrast against grass and paving)
     "leaf_hi":      ("#B4DB6A", "v3 painted highlight shape on the sun side of each canopy lobe"),
     "crystal_hi":   ("#EAFCFF", "v3 painted highlight streak near crystal tips (self-lit, both teams)"),
-    "rim_rock":     ("#A39A82", "v3 rim rock band (chamfer under every island rim), lit stone"),
-    "rim_rock_b":   ("#8F8771", "v3 rim rock band, second stone tone"),
+    "rim_rock":     ("#968D76", "v3 rim rock band (chamfer under every island rim), lit stone"),
+    "rim_rock_b":   ("#847C67", "v3 rim rock band, second stone tone"),
     "sky_horizon":  ("#CDEFF8", "CORE world Sky Horizon (height fog)"),
     "biomass_c":    ("#B7F238", "CORE Biomass, crystal lit facet (self-lit)"),
     "biomass_cd":   ("#6E9A2A", "Biomass crystal body (Biomass x0.6)"),
