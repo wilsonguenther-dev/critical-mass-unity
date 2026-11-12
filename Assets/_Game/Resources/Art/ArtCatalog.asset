@@ -1,0 +1,100 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8258ff30ed2de4d4b8b9b501a2b77217, type: 3}
+  m_Name: ArtCatalog
+  m_EditorClassIdentifier: CriticalMass.Runtime::CriticalMass.Runtime.View.Art.ArtCatalog
+  Entries:
+  - Key: Warrior
+    Model: {fileID: 919132149155446097, guid: d601f8929a39e46b594861a9c5581264, type: 3}
+    Clips:
+    - {fileID: -3510217540682870009, guid: 698ef57cbc7aa4ec6bdc3113f0e0d820, type: 3}
+    - {fileID: 2606927044688373672, guid: 698ef57cbc7aa4ec6bdc3113f0e0d820, type: 3}
+    - {fileID: 5853113653780947187, guid: 698ef57cbc7aa4ec6bdc3113f0e0d820, type: 3}
+    - {fileID: -7030805144458276618, guid: 698ef57cbc7aa4ec6bdc3113f0e0d820, type: 3}
+    - {fileID: 3341008991451901215, guid: 698ef57cbc7aa4ec6bdc3113f0e0d820, type: 3}
+    - {fileID: -429512112410174799, guid: 698ef57cbc7aa4ec6bdc3113f0e0d820, type: 3}
+    - {fileID: -5181486892397411127, guid: 698ef57cbc7aa4ec6bdc3113f0e0d820, type: 3}
+    - {fileID: -7264356326966739861, guid: 698ef57cbc7aa4ec6bdc3113f0e0d820, type: 3}
+  - Key: Miner
+    Model: {fileID: 919132149155446097, guid: b5a3d79beed1446e1b64ea2c1239fcae, type: 3}
+    Clips:
+    - {fileID: -3510217540682870009, guid: 698ef57cbc7aa4ec6bdc3113f0e0d820, type: 3}
+    - {fileID: 2606927044688373672, guid: 698ef57cbc7aa4ec6bdc3113f0e0d820, type: 3}
+    - {fileID: 5853113653780947187, guid: 698ef57cbc7aa4ec6bdc3113f0e0d820, type: 3}
+    - {fileID: -7030805144458276618, guid: 698ef57cbc7aa4ec6bdc3113f0e0d820, type: 3}
+    - {fileID: 3341008991451901215, guid: 698ef57cbc7aa4ec6bdc3113f0e0d820, type: 3}
+    - {fileID: -429512112410174799, guid: 698ef57cbc7aa4ec6bdc3113f0e0d820, type: 3}
+    - {fileID: -5181486892397411127, guid: 698ef57cbc7aa4ec6bdc3113f0e0d820, type: 3}
+    - {fileID: -7264356326966739861, guid: 698ef57cbc7aa4ec6bdc3113f0e0d820, type: 3}
+  - Key: KayKit_Clips
+    Model: {fileID: 919132149155446097, guid: 698ef57cbc7aa4ec6bdc3113f0e0d820, type: 3}
+    Clips:
+    - {fileID: -3510217540682870009, guid: 698ef57cbc7aa4ec6bdc3113f0e0d820, type: 3}
+    - {fileID: 2606927044688373672, guid: 698ef57cbc7aa4ec6bdc3113f0e0d820, type: 3}
+    - {fileID: 5853113653780947187, guid: 698ef57cbc7aa4ec6bdc3113f0e0d820, type: 3}
+    - {fileID: -7030805144458276618, guid: 698ef57cbc7aa4ec6bdc3113f0e0d820, type: 3}
+    - {fileID: 3341008991451901215, guid: 698ef57cbc7aa4ec6bdc3113f0e0d820, type: 3}
+    - {fileID: -429512112410174799, guid: 698ef57cbc7aa4ec6bdc3113f0e0d820, type: 3}
+    - {fileID: -5181486892397411127, guid: 698ef57cbc7aa4ec6bdc3113f0e0d820, type: 3}
+    - {fileID: -7264356326966739861, guid: 698ef57cbc7aa4ec6bdc3113f0e0d820, type: 3}
+  - Key: MinerBarricade
+    Model: {fileID: 919132149155446097, guid: ab7be3e9e47d645ada45676944908420, type: 3}
+    Clips: []
+  - Key: Kaiju_Egg
+    Model: {fileID: 919132149155446097, guid: bde83cfc124644a08b6bfe307a5ff570, type: 3}
+    Clips:
+    - {fileID: -3100369314251171874, guid: bde83cfc124644a08b6bfe307a5ff570, type: 3}
+    - {fileID: -3671601596690056613, guid: bde83cfc124644a08b6bfe307a5ff570, type: 3}
+  - Key: Kaiju_Hatchling
+    Model: {fileID: 919132149155446097, guid: 781e47d62192f4e6fafd7e337f08577b, type: 3}
+    Clips:
+    - {fileID: -8058566529272770241, guid: 781e47d62192f4e6fafd7e337f08577b, type: 3}
+    - {fileID: -3100369314251171874, guid: 781e47d62192f4e6fafd7e337f08577b, type: 3}
+    - {fileID: 3066888772483816881, guid: 781e47d62192f4e6fafd7e337f08577b, type: 3}
+    - {fileID: 5874199474891123731, guid: 781e47d62192f4e6fafd7e337f08577b, type: 3}
+    - {fileID: -1515349500964892227, guid: 781e47d62192f4e6fafd7e337f08577b, type: 3}
+    - {fileID: -3858766435920583795, guid: 781e47d62192f4e6fafd7e337f08577b, type: 3}
+    - {fileID: 2667949614841947897, guid: 781e47d62192f4e6fafd7e337f08577b, type: 3}
+  - Key: Kaiju_Adult
+    Model: {fileID: 919132149155446097, guid: 8d976f89c643c4745926736967b24884, type: 3}
+    Clips:
+    - {fileID: -8058566529272770241, guid: 8d976f89c643c4745926736967b24884, type: 3}
+    - {fileID: -3100369314251171874, guid: 8d976f89c643c4745926736967b24884, type: 3}
+    - {fileID: 3066888772483816881, guid: 8d976f89c643c4745926736967b24884, type: 3}
+    - {fileID: 5874199474891123731, guid: 8d976f89c643c4745926736967b24884, type: 3}
+    - {fileID: -1515349500964892227, guid: 8d976f89c643c4745926736967b24884, type: 3}
+    - {fileID: -3858766435920583795, guid: 8d976f89c643c4745926736967b24884, type: 3}
+    - {fileID: 2667949614841947897, guid: 8d976f89c643c4745926736967b24884, type: 3}
+  - Key: Kaiju_BerserkShards
+    Model: {fileID: 919132149155446097, guid: eac700d3f7b2144d0a5a19b3e5e14424, type: 3}
+    Clips: []
+  - Key: Kaiju_TelegraphSpikes
+    Model: {fileID: 919132149155446097, guid: 355e37c14419f4df69f8efac40f0cf11, type: 3}
+    Clips: []
+  - Key: prop_biomass_plant_s
+    Model: {fileID: 919132149155446097, guid: a095b6760890342958c8391b84158574, type: 3}
+    Clips: []
+  - Key: prop_biomass_plant_m
+    Model: {fileID: 919132149155446097, guid: f6b65a9ec29994f81905d8ea8804478c, type: 3}
+    Clips: []
+  - Key: prop_biomass_plant_l
+    Model: {fileID: 919132149155446097, guid: ddd7511dc3be04ff18b0303ee1b5f9ab, type: 3}
+    Clips: []
+  - Key: prop_biomass_sprout
+    Model: {fileID: 919132149155446097, guid: c02963aea5aa74e05a99aafdc2e47e38, type: 3}
+    Clips: []
+  - Key: prop_corruption_growth_s
+    Model: {fileID: 919132149155446097, guid: 346b58e4520a94b2380122e895474e6b, type: 3}
+    Clips: []
+  - Key: prop_corruption_growth_l
+    Model: {fileID: 919132149155446097, guid: f43fec1921f5e42b0aa74579a0e988b6, type: 3}
+    Clips: []

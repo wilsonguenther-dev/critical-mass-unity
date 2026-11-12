@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using CriticalMass.Runtime.Game;
+using CriticalMass.Runtime.View.Art;
 using CriticalMass.Sim.Config;
 using CriticalMass.Sim.Core;
 using CriticalMass.Sim.Grid;
@@ -8,28 +10,59 @@ using UnityEngine;
 namespace CriticalMass.Runtime.View
 {
     /// <summary>
-    /// Phase 0 placeholder views: one capsule per actor slot, one kaiju cube, one cube per resource node, one flat hill
-    /// cube, all on CM/Toon (ToonMaterials) so the grey-box already shows the art direction's look: team-coloured
-    /// characters with a 3 px line and team rim, props with a 2.5 px line. Every Sim-to-Unity position goes through SimSpace (O-13). No Unity physics: primitives lose their colliders.
-    /// Reads the Sim only; never writes it. Barricades are grid cells (GridChunkMeshView, F-08b).
+    /// Actor, Kaiju, resource node, barricade and hill views. Since the art import (2026-11-12) every entity looks its model
+    /// up in ArtMapping (the one class-to-model table) and the ArtCatalog built from Assets/_Game/Art/**: Warrior and Miner
+    /// models in team colours, the Kaiju egg / hatchling / adult in the allegiance glow, biomass and corruption props for
+    /// the nodes, the Miner barricade for barricade entities. Anything without a model (Farmer, Demolitions, Builder, or a
+    /// project whose catalog was never built) keeps the grey-box primitive on CM/Toon (ToonMaterials).
+    /// Clips are driven from sim state only (velocity, cooldown timers, Kaiju timers) and sim time, so a capture after the
+    /// same ticks shows the same pose. Every Sim-to-Unity position goes through SimSpace (O-13). No Unity physics.
+    /// Reads the Sim only; never writes it. Model instances are pooled per model and never destroyed during play.
     /// </summary>
     public sealed class ActorViews : MonoBehaviour
     {
-        /// <summary>The human's capsule is this much wider in X and Z.</summary>
+        /// <summary>The human's capsule is this much wider in X and Z (grey-box only).</summary>
         private const float HumanScale = 1.15f;
-        /// <summary>Resource node cube footprint.</summary>
         private const float NodeSize = 0.6f;
-        /// <summary>Hill plate thickness.</summary>
         private const float HillThickness = 0.05f;
+        /// <summary>Ground speeds (units/s) at which the KayKit Walk and Run clips play at rate 1 (estimated, not measured on the clip).</summary>
+        public const double WalkClipSpeed = 1.6, RunClipSpeed = 4.0;
+        /// <summary>Seconds before the hatch the egg shakes.</summary>
+        private const double EggShakeSeconds = 6.0;
+
+        private sealed class CharSlot
+        {
+            public Transform Capsule;
+            public Renderer CapsuleRenderer;
+            public ModelView Model;
+            public double IdleT, WalkT, RunT, GatherT;
+        }
 
         private SimDriverBehaviour _driver;
-        private Transform[] _actors;
-        private Renderer[] _actorRenderers;
-        private Transform _kaiju;
-        private Renderer _kaijuRenderer;
+        private ArtCatalog _catalog;
+        private CharSlot[] _actors;
+        private readonly Dictionary<string, Stack<ModelView>> _pool = new Dictionary<string, Stack<ModelView>>();
+
+        private Transform _kaijuCube;
+        private Renderer _kaijuCubeRenderer;
+        private ModelView _egg, _hatchling, _adult, _shards, _spikes;
+        private double _hatchTime = double.NegativeInfinity;
+        private bool _sawEgg;
+        private KaijuState _lastKaijuState;
+        private double _berserkAt = double.NegativeInfinity, _slamAt = double.NegativeInfinity;
+        private bool _wasTelegraph;
+        private double _kaijuIdleT, _kaijuWalkT;
+
         private Transform[] _nodes;
         private Renderer[] _nodeRenderers;
+        private Dictionary<string, ModelView>[] _nodeModels;
+
+        private ModelView[] _barricades;
         private Transform _hill;
+        private double _lastSimTime = double.NaN;
+
+        /// <summary>Models in use (for tests and the capture's frame report).</summary>
+        public int ActiveModelCount { get; private set; }
 
         private void Start()
         {
@@ -42,35 +75,43 @@ namespace CriticalMass.Runtime.View
             }
             World w = _driver.World;
             GameConfig cfg = _driver.Config;
+            _catalog = ArtCatalog.Load();
 
             int capacity = World.ActorCapacity(cfg);
-            _actors = new Transform[capacity];
-            _actorRenderers = new Renderer[capacity];
-            for (int i = 0; i < capacity; i++)
-            {
-                GameObject go = CreatePrimitive(PrimitiveType.Capsule, "Actor " + i);
-                _actors[i] = go.transform;
-                _actorRenderers[i] = go.GetComponent<Renderer>();
-                go.SetActive(false);
-            }
+            _actors = new CharSlot[capacity];
+            for (int i = 0; i < capacity; i++) _actors[i] = new CharSlot();
 
             GameObject kaiju = CreatePrimitive(PrimitiveType.Cube, "Kaiju");
-            _kaiju = kaiju.transform;
-            _kaijuRenderer = kaiju.GetComponent<Renderer>();
+            _kaijuCube = kaiju.transform;
+            _kaijuCubeRenderer = kaiju.GetComponent<Renderer>();
+            _egg = Make(ArtMapping.KaijuEgg, "Kaiju Egg");
+            _hatchling = Make(ArtMapping.KaijuHatchling, "Kaiju Hatchling");
+            _adult = Make(ArtMapping.KaijuAdult, "Kaiju Adult");
+            if (_adult != null) _shards = Make(ArtMapping.KaijuShards, "Kaiju Berserk Shards", _adult.Transform);
+            _spikes = Make(ArtMapping.KaijuSpikes, "Kaiju Telegraph Spikes");
 
             int nodeCount = w.Nodes.Length;
             _nodes = new Transform[nodeCount];
             _nodeRenderers = new Renderer[nodeCount];
+            _nodeModels = new Dictionary<string, ModelView>[nodeCount];
             for (int i = 0; i < nodeCount; i++)
             {
                 GameObject go = CreatePrimitive(PrimitiveType.Cube, "Node " + i);
                 _nodes[i] = go.transform;
                 _nodeRenderers[i] = go.GetComponent<Renderer>();
+                _nodeModels[i] = new Dictionary<string, ModelView>();
             }
+
+            _barricades = new ModelView[w.Barricades != null ? w.Barricades.Length : 0];
 
             GameObject hill = CreatePrimitive(PrimitiveType.Cube, "Hill");
             _hill = hill.transform;
             hill.GetComponent<Renderer>().sharedMaterial = ToonMaterials.Prop(Palette.Brass);
+        }
+
+        private void OnDestroy()
+        {
+            foreach (Stack<ModelView> s in _pool.Values) foreach (ModelView m in s) m.Dispose();
         }
 
         private GameObject CreatePrimitive(PrimitiveType type, string objectName)
@@ -83,74 +124,311 @@ namespace CriticalMass.Runtime.View
             return go;
         }
 
-        private void LateUpdate()
+        /// <summary>A new model instance for a mapping key, or null when the catalog has no model for it.</summary>
+        private ModelView Make(string key, string objectName, Transform parent = null)
         {
+            ArtEntry e = _catalog != null ? _catalog.Find(key) : null;
+            if (e == null || ArtMapping.Spec(key) == null) return null;
+            var m = new ModelView(e, parent != null ? parent : transform, objectName);
+            m.SetActive(false);
+            return m;
+        }
+
+        private ModelView Take(string key, string objectName)
+        {
+            if (_pool.TryGetValue(key, out Stack<ModelView> s) && s.Count > 0)
+            {
+                ModelView m = s.Pop();
+                m.Root.name = objectName;
+                return m;
+            }
+            return Make(key, objectName);
+        }
+
+        private void Give(ModelView m)
+        {
+            m.SetActive(false);
+            if (!_pool.TryGetValue(m.Entry.Key, out Stack<ModelView> s)) _pool[m.Entry.Key] = s = new Stack<ModelView>();
+            s.Push(m);
+        }
+
+        private void LateUpdate() => Sync(Time.deltaTime);
+
+        /// <summary>
+        /// One view update (LateUpdate, and the capture tool's frame timing). Clip time advances with SIM time (tick plus
+        /// interpolation alpha), not with dt, so frames with the clock stopped hold the pose; dt is unused.
+        /// </summary>
+        public void Sync(float dt)
+        {
+            if (_driver == null || _actors == null) return;
             World w = _driver.World;
             GameConfig cfg = _driver.Config;
             MapDef map = w.Map;
             double a = _driver.Alpha;
-            double charHeight = cfg.Render.CharacterHeight;
+            double simTime = (w.Tick + a) / cfg.SimHz;
+            double dSim = double.IsNaN(_lastSimTime) ? 0 : Math.Max(0, simTime - _lastSimTime);
+            _lastSimTime = simTime;
+            int models = 0;
 
-            // Actors.
-            for (int i = 0; i < _actors.Length; i++)
+            for (int i = 0; i < _actors.Length; i++) models += SyncActor(i, w, cfg, map, a, dSim) ? 1 : 0;
+            models += SyncKaiju(w, cfg, map, a, simTime, dSim);
+            models += SyncNodes(w, map);
+            models += SyncBarricades(w, cfg, map);
+
+            HillDef hill = map.Hill;
+            double hh = GroundHeight(map, hill.X, hill.Z);
+            float d = (float)(2 * hill.R);
+            _hill.localPosition = SimSpace.ToWorld(hill.X, hh + HillThickness / 2.0, hill.Z);
+            _hill.localRotation = Quaternion.identity;
+            _hill.localScale = new Vector3(d, HillThickness, d);
+            ActiveModelCount = models;
+        }
+
+        private bool SyncActor(int i, World w, GameConfig cfg, MapDef map, double a, double dSim)
+        {
+            CharSlot slot = _actors[i];
+            bool alive = i < w.ActorCount && w.Actors[i].Alive;
+            Actor actor = alive ? w.Actors[i] : null;
+            string key = alive ? ArtMapping.ClassModel(actor.Cls) : null;
+            if (key != null && _catalog?.Find(key) == null) key = null;
+
+            if (slot.Model != null && (!alive || slot.Model.Entry.Key != key))
             {
-                Transform t = _actors[i];
-                bool active = i < w.ActorCount && w.Actors[i].Alive;
-                if (t.gameObject.activeSelf != active) t.gameObject.SetActive(active);
-                if (!active) continue;
+                Give(slot.Model);
+                slot.Model = null;
+            }
+            if (alive && key != null && slot.Model == null) slot.Model = Take(key, "Actor " + i + " " + key);
+            bool capsule = alive && slot.Model == null;
+            if (capsule && slot.Capsule == null)
+            {
+                GameObject go = CreatePrimitive(PrimitiveType.Capsule, "Actor " + i);
+                slot.Capsule = go.transform;
+                slot.CapsuleRenderer = go.GetComponent<Renderer>();
+            }
+            if (slot.Capsule != null && slot.Capsule.gameObject.activeSelf != capsule) slot.Capsule.gameObject.SetActive(capsule);
+            if (!alive) return false;
 
-                Actor actor = w.Actors[i];
-                double x = Lerp(w.PrevX[i], w.X[i], a);
-                double z = Lerp(w.PrevZ[i], w.Z[i], a);
-                double h = GroundHeight(map, x, z);
-                t.localPosition = SimSpace.ToWorld(x, h + charHeight / 2, z);
-                t.localRotation = Quaternion.Euler(0f, SimSpace.YawDeg(actor.Facing), 0f);
-
+            double x = Lerp(w.PrevX[i], w.X[i], a);
+            double z = Lerp(w.PrevZ[i], w.Z[i], a);
+            double h = GroundHeight(map, x, z);
+            Quaternion facing = Quaternion.Euler(0f, SimSpace.YawDeg(actor.Facing), 0f);
+            if (capsule)
+            {
+                double charHeight = cfg.Render.CharacterHeight;
+                slot.Capsule.localPosition = SimSpace.ToWorld(x, h + charHeight / 2, z);
+                slot.Capsule.localRotation = facing;
                 float d = (float)(2 * cfg.Class(actor.Cls).Radius);
                 if (i == 0) d *= HumanScale;
-                t.localScale = new Vector3(d, (float)(charHeight / 2), d);
-
-                SetMaterial(_actorRenderers[i], ToonMaterials.Character(actor.Team == TeamId.Azure ? Palette.Azure : Palette.Crimson));
+                slot.Capsule.localScale = new Vector3(d, (float)(charHeight / 2), d);
+                SetMaterial(slot.CapsuleRenderer, ToonMaterials.Character(actor.Team == TeamId.Azure ? Palette.Azure : Palette.Crimson));
+                return false;
             }
 
-            // Kaiju: shown in every state.
+            ModelView m = slot.Model;
+            m.SetActive(true);
+            m.Transform.localPosition = SimSpace.ToWorld(x, h, z);
+            m.Transform.localRotation = facing;
+            m.SetMaterial(ArtMaterials.ForTeam(m.Spec, actor.Team));
+
+            // Locomotion from the sim velocity: Idle below 0.15 u/s, Walk to 1.2 u/s, Run above 3.4 u/s (whatever exists).
+            double speed = Math.Sqrt(w.Vx[i] * w.Vx[i] + w.Vz[i] * w.Vz[i]);
+            float move = Smooth(0.15, 1.2, speed);
+            float run = m.HasClip(ArtMapping.Run) ? move * Smooth(2.2, 3.4, speed) : 0f;
+            float walk = m.HasClip(ArtMapping.Walk) ? move - run : 0f;
+            slot.IdleT += dSim;
+            slot.WalkT += dSim * Clamp(speed / WalkClipSpeed, 0.5, 2.0);
+            slot.RunT += dSim * Clamp(speed / RunClipSpeed, 0.6, 1.6);
+            m.BeginPose();
+            m.Pose(ArtMapping.Idle, slot.IdleT + i * 0.37, 1f - walk - run, true);
+            m.Pose(ArtMapping.Walk, slot.WalkT, walk, true);
+            m.Pose(ArtMapping.Run, slot.RunT, run, true);
+            // Attack: AnimAction is "seconds since the last attack / ability"; AttackCd > 0 means one happened.
+            float attackLen = m.ClipLength(ArtMapping.Attack);
+            if (actor.AttackCd > 0 && actor.AnimAction < attackLen) m.Pose(ArtMapping.Attack, actor.AnimAction, 3f, false);
+            if (actor.GatherProgress > 0 && speed < 0.3)
             {
-                Kaiju k = w.Kaiju;
-                double x = Lerp(k.PrevX, k.X, a);
-                double z = Lerp(k.PrevZ, k.Z, a);
-                double h = GroundHeight(map, x, z);
+                slot.GatherT += dSim;
+                m.Pose(ArtMapping.Gather, slot.GatherT, 3f, true);
+            }
+            m.Evaluate();
+            return true;
+        }
+
+        private int SyncKaiju(World w, GameConfig cfg, MapDef map, double a, double simTime, double dSim)
+        {
+            Kaiju k = w.Kaiju;
+            double x = Lerp(k.PrevX, k.X, a);
+            double z = Lerp(k.PrevZ, k.Z, a);
+            double h = GroundHeight(map, x, z);
+            Quaternion facing = Quaternion.Euler(0f, SimSpace.YawDeg(k.Facing), 0f);
+
+            if (k.State == KaijuState.Egg) _sawEgg = true;
+            else if (_sawEgg) { _sawEgg = false; _hatchTime = simTime; }
+            if (k.State == KaijuState.Berserk && _lastKaijuState != KaijuState.Berserk) _berserkAt = simTime;
+            _lastKaijuState = k.State;
+            bool telegraph = k.TelegraphIn > 0;
+            if (_wasTelegraph && !telegraph && k.KoIn <= 0) _slamAt = simTime;
+            _wasTelegraph = telegraph;
+
+            string key = ArtMapping.KaijuModel(k.State, simTime - _hatchTime);
+            ModelView m = key == ArtMapping.KaijuEgg ? _egg : key == ArtMapping.KaijuHatchling ? (_hatchling ?? _adult) : _adult;
+            if (m == null && key != ArtMapping.KaijuEgg) m = _hatchling;
+            SetActive(_egg, m == _egg && m != null);
+            SetActive(_hatchling, m == _hatchling && m != null);
+            SetActive(_adult, m == _adult && m != null);
+            _kaijuCube.gameObject.SetActive(m == null);
+
+            int count = 0;
+            if (m == null)
+            {
                 double kh = cfg.Render.KaijuHeight;
                 float d = (float)(2 * cfg.Kaiju.Radius);
-                _kaiju.localPosition = SimSpace.ToWorld(x, h + kh / 2, z);
-                _kaiju.localRotation = Quaternion.Euler(0f, SimSpace.YawDeg(k.Facing), 0f);
-                _kaiju.localScale = new Vector3(d, (float)kh, d);
-                SetMaterial(_kaijuRenderer, ToonMaterials.Character(KaijuHex(k.State), true));
+                _kaijuCube.localPosition = SimSpace.ToWorld(x, h + kh / 2, z);
+                _kaijuCube.localRotation = facing;
+                _kaijuCube.localScale = new Vector3(d, (float)kh, d);
+                SetMaterial(_kaijuCubeRenderer, ToonMaterials.Character(KaijuHex(k.State), true));
+            }
+            else
+            {
+                count++;
+                string glow = ArtMapping.KaijuGlow(k.State);
+                // The egg rests on the shrine's raised centre cell (a 1.5 u wall block in the grid view), not inside it.
+                double baseY = m == _egg ? h + RaisedTop(map, x, z) : h;
+                m.Transform.localPosition = SimSpace.ToWorld(x, baseY, z);
+                m.Transform.localRotation = facing;
+                m.SetMaterial(ArtMaterials.ForGlow(m.Spec, glow));
+                double speed = Math.Sqrt((k.X - k.PrevX) * (k.X - k.PrevX) + (k.Z - k.PrevZ) * (k.Z - k.PrevZ)) * cfg.SimHz;
+                _kaijuIdleT += dSim;
+                _kaijuWalkT += dSim * Clamp(speed / 1.5, 0.5, 2.0);
+                m.BeginPose();
+                if (m == _egg)
+                {
+                    bool shake = cfg.HatchSeconds - w.Match.Time < EggShakeSeconds && m.HasClip(ArtMapping.Shake);
+                    m.Pose(shake ? ArtMapping.Shake : ArtMapping.Idle, _kaijuIdleT, 1f, true);
+                }
+                else
+                {
+                    float slamLen = m.ClipLength(ArtMapping.Slam), berserkLen = m.ClipLength(ArtMapping.Berserk);
+                    if (k.KoIn > 0) m.Pose(ArtMapping.KO, cfg.Kaiju.KoSeconds - k.KoIn, 1f, false);
+                    else if (telegraph)
+                        m.Pose(ArtMapping.SlamWindup, (cfg.Kaiju.SlamTelegraphSeconds - k.TelegraphIn) / cfg.Kaiju.SlamTelegraphSeconds * m.ClipLength(ArtMapping.SlamWindup), 1f, false);
+                    else if (simTime - _slamAt < slamLen) m.Pose(ArtMapping.Slam, simTime - _slamAt, 1f, false);
+                    else if (k.MeleeWindupIn > 0)
+                        m.Pose(ArtMapping.Roar, (cfg.Kaiju.MeleeWindupTicks - k.MeleeWindupIn) / cfg.Kaiju.MeleeWindupTicks * m.ClipLength(ArtMapping.Roar), 1f, false);
+                    else if (simTime - _berserkAt < berserkLen) m.Pose(ArtMapping.Berserk, simTime - _berserkAt, 1f, false);
+                    else
+                    {
+                        float walk = Smooth(0.15, 1.0, speed);
+                        m.Pose(ArtMapping.Idle, _kaijuIdleT, 1f - walk, true);
+                        m.Pose(ArtMapping.Walk, _kaijuWalkT, walk, true);
+                    }
+                }
+                m.Evaluate();
             }
 
-            // Resource nodes.
+            bool shards = _shards != null && m == _adult && k.State == KaijuState.Berserk;
+            SetActive(_shards, shards);
+            if (shards) _shards.SetMaterial(ArtMaterials.ForGlow(_shards.Spec, ArtMapping.GlowBerserk));
+
+            bool spikes = _spikes != null && k.TelegraphIn > 0 && k.State != KaijuState.Egg;
+            SetActive(_spikes, spikes);
+            if (spikes)
+            {
+                _spikes.Transform.localPosition = SimSpace.ToWorld(k.TelegraphX, GroundHeight(map, k.TelegraphX, k.TelegraphZ), k.TelegraphZ);
+                _spikes.SetMaterial(ArtMaterials.ForGlow(_spikes.Spec, ArtMapping.KaijuGlow(k.State)));
+                count++;
+            }
+            return count;
+        }
+
+        private int SyncNodes(World w, MapDef map)
+        {
+            int count = 0;
             int nodeCount = Math.Min(_nodes.Length, w.Nodes.Length);
             for (int i = 0; i < nodeCount; i++)
             {
                 ResourceNode n = w.Nodes[i];
-                float sy = 0.3f + 0.1f * n.Charges;
+                string key = ArtMapping.NodeModel(n.Kind, n.Charges);
+                Dictionary<string, ModelView> variants = _nodeModels[i];
+                ModelView shown = null;
+                if (key != null && !variants.TryGetValue(key, out shown))
+                {
+                    shown = Make(key, "Node " + i + " " + key);
+                    variants[key] = shown;
+                }
+                foreach (KeyValuePair<string, ModelView> v in variants) SetActive(v.Value, v.Value != null && v.Value == shown);
                 double h = GroundHeight(map, n.X, n.Z);
+                bool cube = shown == null && (key != null || _catalog == null);
                 Transform t = _nodes[i];
-                t.localPosition = SimSpace.ToWorld(n.X, h + sy / 2.0, n.Z);
-                t.localRotation = Quaternion.identity;
-                t.localScale = new Vector3(NodeSize, sy, NodeSize);
-                SetMaterial(_nodeRenderers[i], ToonMaterials.Prop(n.Kind == NodeKind.Biomass ? Palette.Biomass : Palette.Corruption));
+                if (t.gameObject.activeSelf != cube) t.gameObject.SetActive(cube);
+                if (shown != null)
+                {
+                    count++;
+                    shown.Transform.localPosition = SimSpace.ToWorld(n.X, h, n.Z);
+                    shown.Transform.localRotation = Quaternion.Euler(0f, (i * 137.5f) % 360f, 0f);
+                    shown.SetMaterial(ArtMaterials.ForTeam(shown.Spec, TeamId.Azure));
+                }
+                else if (cube)
+                {
+                    float sy = 0.3f + 0.1f * n.Charges;
+                    t.localPosition = SimSpace.ToWorld(n.X, h + sy / 2.0, n.Z);
+                    t.localRotation = Quaternion.identity;
+                    t.localScale = new Vector3(NodeSize, sy, NodeSize);
+                    SetMaterial(_nodeRenderers[i], ToonMaterials.Prop(n.Kind == NodeKind.Biomass ? Palette.Biomass : Palette.Corruption));
+                }
             }
-
-            // Hill plate.
-            {
-                HillDef hill = map.Hill;
-                double h = GroundHeight(map, hill.X, hill.Z);
-                float d = (float)(2 * hill.R);
-                _hill.localPosition = SimSpace.ToWorld(hill.X, h + HillThickness / 2.0, hill.Z);
-                _hill.localRotation = Quaternion.identity;
-                _hill.localScale = new Vector3(d, HillThickness, d);
-            }
+            return count;
         }
+
+        private int SyncBarricades(World w, GameConfig cfg, MapDef map)
+        {
+            if (_barricades.Length == 0 || _catalog?.Find(ArtMapping.MinerBarricade) == null) return 0;
+            int count = 0;
+            for (int i = 0; i < _barricades.Length; i++)
+            {
+                Barricade b = w.Barricades[i];
+                bool on = b != null && b.Active;
+                if (on && _barricades[i] == null) _barricades[i] = Make(ArtMapping.MinerBarricade, "Barricade " + i);
+                ModelView m = _barricades[i];
+                if (m == null) continue;
+                m.SetActive(on);
+                if (!on) continue;
+                count++;
+                double x = b.Cx + 0.5, z = b.Cz + 0.5;
+                m.Transform.localPosition = SimSpace.ToWorld(x, GroundHeight(map, x, z), z);
+                m.Transform.localRotation = Quaternion.identity;
+                string state = ArtMapping.BarricadeState(b.Hp, cfg.Abilities.MinerBarricade.MaxHp);
+                foreach (Renderer r in m.Renderers)
+                {
+                    bool show = r.name == state;
+                    if (r.enabled != show) r.enabled = show;
+                }
+                m.SetMaterial(ArtMaterials.ForTeam(m.Spec, b.Team));
+            }
+            return count;
+        }
+
+        private static void SetActive(ModelView m, bool on)
+        {
+            if (m != null) m.SetActive(on);
+        }
+
+        /// <summary>Height of the grid view's block above the ground at a sim point (GridChunkMeshView.CellBox: walls and intact breakables 1.5 u).</summary>
+        private static double RaisedTop(MapDef map, double x, double z)
+        {
+            int cx = (int)Math.Floor(x), cz = (int)Math.Floor(z);
+            if (map.Cells == null || cx < 0 || cz < 0 || cx >= map.Width || cz >= map.Height) return 0;
+            byte c = map.Cells[cz * map.Width + cx];
+            return c == Cell.Wall || c == Cell.BreakableIntact ? 1.5 : 0;
+        }
+
+        private static float Smooth(double e0, double e1, double v)
+        {
+            double t = Math.Max(0, Math.Min(1, (v - e0) / (e1 - e0)));
+            return (float)(t * t * (3 - 2 * t));
+        }
+
+        private static double Clamp(double v, double lo, double hi) => Math.Max(lo, Math.Min(hi, v));
 
         private static double Lerp(double from, double to, double t) => from + (to - from) * t;
 
