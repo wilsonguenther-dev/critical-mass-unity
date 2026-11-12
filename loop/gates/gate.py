@@ -4,9 +4,11 @@ the real exit code: 0 pass, the tool's own non-zero code on fail, 78 skipped. "s
 that reads exit codes can mistake a skip for a pass. `budgets` exits 0 with status "reported" or "flagged": it never
 fails an item; a flag goes to the architect.
 
+  gate.py setup          [--project DIR]                    -executeMethod CriticalMass.Editor.ProjectSetup.Apply (U-029)
   gate.py compile        [--project DIR]                    tools/unity-compile.sh
-  gate.py editmode       [--project DIR]                    tools/unity-test.sh (fails on zero tests)
-  gate.py playmode-smoke [--project DIR]                    PlayMode tests in category Smoke on the game scene
+  gate.py editmode       [--project DIR]                    tools/unity-test.sh, category "!Slow" (fails on zero tests)
+  gate.py playmode-smoke [--project DIR]                    tools/unity-playtest.sh (assembly Runtime.PlayTests, F-08c)
+  gate.py soak           [--project DIR]                    tools/unity-soak.sh: the "Slow" tests, after a batch lands (U-028)
   gate.py build-mac      [--project DIR]                    tools/unity-build-mac.sh
   gate.py parity  --item ID [--project DIR]                 tools/unity-capture.sh (art_row items only)
   gate.py scope   --item ID --ref REF [--base REF]          git only: the diff touches only files_allowed
@@ -28,6 +30,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'bin'))
 import cmloop as C  # noqa: E402
 
 SMOKE_SCENE = 'Assets/_Game/Scenes/Arena.unity'  # the game scene (ARCHITECTURE.md folder map, F-08)
+PLAYTEST_TOOL = 'tools/unity-playtest.sh'  # runs Assets/_Game/Runtime.PlayTests (ruling 4; F-08c creates both)
+SOAK_TOOL = 'tools/unity-soak.sh'  # runs the NUnit "Slow" tests (U-028)
 CAPTURE_TOOL = 'tools/unity-capture.sh'
 BUDGETS_FILE = C.LOOP / 'budgets.json'
 EXC_RE = re.compile(r'^\s*(?:[\w.]+\.)?\w*Exception\b[^\n]*', re.M)
@@ -143,7 +147,8 @@ def g_editmode(a):
     ff = C.LOGS / 'gate-editmode-failed.json'
     ff.write_text(json.dumps(ft, indent=1))
     if code == 0 and total > 0:
-        return emit('editmode', 'pass', 0, f'{passed}/{total} EditMode tests passed', total=total, failed=0,
+        return emit('editmode', 'pass', 0, f'{passed}/{total} EditMode tests passed (category !Slow)', total=total,
+                    failed=0, category='!Slow',
                     results=str(res), out=outf, lock_owner=owner)
     if total == 0:
         detail = 'zero tests ran'
@@ -157,35 +162,62 @@ def g_editmode(a):
 
 def g_playmode(a):
     proj = Path(a.project).resolve()
-    if not (proj / SMOKE_SCENE).exists():
-        return emit('playmode-smoke', 'skipped', C.SKIP_EXIT, f'skipped: no game scene ({SMOKE_SCENE} does not exist)',
+    if not (proj / PLAYTEST_TOOL).exists():
+        return emit('playmode-smoke', 'skipped', C.SKIP_EXIT,
+                    f'skipped: {PLAYTEST_TOOL} does not exist yet (F-08c creates it with Runtime.PlayTests)',
                     project=str(proj))
     r = refuse_unity('playmode-smoke', proj)
     if r is not None:
         return r
-    res, log = proj / 'Logs/playmode-results.xml', proj / 'Logs/playmode-smoke.log'
-    res.unlink(missing_ok=True)
-    cmd = [unity_binary(proj), '-batchmode', '-projectPath', str(proj), '-runTests', '-testPlatform', 'PlayMode',
-           '-testCategory', 'Smoke', '-testResults', str(res), '-logFile', str(log)]
-    code, out, err, owner = run_locked('playmode-smoke', cmd, proj)
-    try:
-        root = ET.parse(res).getroot()
-        total, failed = int(root.get('total', 0)), int(root.get('failed', 0))
-    except Exception:
-        total, failed = 0, 0
+    code, out, err, owner = run_locked('playmode-smoke', [str(proj / PLAYTEST_TOOL)], proj)
+    outf = save_out('playmode-smoke', out, err)
+    res, log = proj / 'Logs/playmode-results.xml', proj / 'Logs/playmode-tests.log'
+    pf = C.LOGS / 'gate-playmode-failed.json'
+    pf.write_text(json.dumps(failed_tests(res), indent=1))
     excs = sorted(set(m.group(0).strip()[:300] for m in EXC_RE.finditer(log.read_text(errors='replace'))))[:40] \
         if log.exists() else []
     ef = C.LOGS / 'gate-playmode-exceptions.txt'
     ef.write_text('\n'.join(excs) + '\n')
-    if code == 0 and total > 0 and failed == 0 and not excs:
-        return emit('playmode-smoke', 'pass', 0, f'{total} Smoke PlayMode test(s) passed, zero exceptions',
-                    total=total, log=str(log), lock_owner=owner)
-    why = 'zero Smoke tests ran' if total == 0 else f'{failed} Smoke test(s) failed' if failed else \
-        f'{len(excs)} exception line(s) in the log' if excs else f'Unity exit {code}'
-    pf = C.LOGS / 'gate-playmode-failed.json'
-    pf.write_text(json.dumps(failed_tests(res), indent=1))
-    return emit('playmode-smoke', 'fail', code or 1, why, total=total, failed=failed, exceptions_file=str(ef),
-                failed_file=str(pf), log=str(log), lock_owner=owner)
+    if code == 0 and not excs:
+        return emit('playmode-smoke', 'pass', 0, ((out.strip().splitlines() or ['ok'])[-1])[:200], out=outf,
+                    lock_owner=owner)
+    why = f'{len(excs)} exception line(s) in {log.name}' if code == 0 else \
+        ((err or out).strip().splitlines() or [f'exit {code}'])[-1][:200]
+    return emit('playmode-smoke', 'fail', code or 1, why, failed_file=str(pf), exceptions_file=str(ef), log=str(log),
+                out=outf, lock_owner=owner)
+
+
+def g_soak(a):
+    proj = Path(a.project).resolve()
+    if not (proj / SOAK_TOOL).exists():
+        return emit('soak', 'skipped', C.SKIP_EXIT, f'skipped: {SOAK_TOOL} does not exist yet (U-028)', project=str(proj))
+    r = refuse_unity('soak', proj)
+    if r is not None:
+        return r
+    code, out, err, owner = run_locked('soak', [str(proj / SOAK_TOOL)], proj)
+    outf = save_out('soak', out, err)
+    last = ((err or out).strip().splitlines() or [f'exit {code}'])[-1][:200]
+    return emit('soak', 'pass' if code == 0 else 'fail', code, last, out=outf, lock_owner=owner)
+
+
+def g_setup(a):
+    proj = Path(a.project).resolve()
+    r = refuse_unity('setup', proj)
+    if r is not None:
+        return r
+    log = proj / 'Logs/setup-gate.log'
+    cmd = [unity_binary(proj), '-batchmode', '-nographics', '-projectPath', str(proj), '-executeMethod',
+           'CriticalMass.Editor.ProjectSetup.Apply', '-logFile', str(log), '-quit']
+    code, out, err, owner = run_locked('setup', cmd, proj)
+    dirty = [l[3:] for l in C.git('status', '--porcelain', cwd=proj)[1].splitlines() if l.strip()]
+    if code == 0:
+        return emit('setup', 'pass', 0, 'ProjectSetup.Apply exit 0', log=str(log), changed_files=dirty[:20],
+                    lock_owner=owner)
+    errs = cs_errors(log)
+    ef = C.LOGS / 'gate-setup-errors.txt'
+    ef.write_text('\n'.join(errs) + '\n')
+    return emit('setup', 'fail', code, (errs[:1] or [f'ProjectSetup.Apply: Unity exit {code}'])[0], log=str(log),
+                errors_file=str(ef), lock_owner=owner)
 
 
 def g_build_mac(a):
@@ -288,7 +320,8 @@ def g_budgets(a):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument('gate', choices=['compile', 'editmode', 'playmode-smoke', 'build-mac', 'parity', 'scope', 'budgets'])
+    ap.add_argument('gate', choices=['setup', 'compile', 'editmode', 'playmode-smoke', 'build-mac', 'parity', 'scope',
+                                     'budgets', 'soak'])
     ap.add_argument('--project', default=str(C.MAIN))
     ap.add_argument('--item')
     ap.add_argument('--items-dir', default=str(C.ITEMS_DIR))
@@ -299,7 +332,7 @@ def main(argv=None):
         ap.error(f'{a.gate} needs --item')
     if a.gate == 'scope' and not a.ref:
         ap.error('scope needs --ref')
-    fn = {'compile': g_compile, 'editmode': g_editmode, 'playmode-smoke': g_playmode, 'build-mac': g_build_mac,
+    fn = {'setup': g_setup, 'soak': g_soak, 'compile': g_compile, 'editmode': g_editmode, 'playmode-smoke': g_playmode, 'build-mac': g_build_mac,
           'parity': g_parity, 'scope': g_scope, 'budgets': g_budgets}[a.gate]
     try:
         return fn(a)

@@ -68,7 +68,8 @@ results.push(await scenario('happy path: everything loop-owned lands, waits_on r
     if (!calls.filter((c) => c.label.startsWith('build')).every((c) => /NEVER run Unity/.test(c.prompt))) p.push('a builder prompt lacks never-run-Unity')
     const f02 = calls.find((c) => c.label === 'build F-02'), f01 = calls.find((c) => c.label === 'build F-01')
     if (f02.model !== 'sonnet' || f01.model !== 'opus') p.push(`models: F-02 ${f02.model}, F-01 ${f01.model}`)
-    if (!out.review || calls.filter((c) => c.label === 'review').length !== 1) p.push('no single review seat')
+    const reviews = calls.filter((c) => c.label.startsWith('review batch')).length
+    if (reviews !== order.length) p.push(`${reviews} review seats for ${order.length} landed batches (ruling 6: one per batch)`)
     if (JSON.stringify(out).length > 40000) p.push('return over 40 KB')
     console.log('      batches: ' + order.map((b) => '[' + b.join(' ') + ']').join(' '), '| peak agents', peak)
     return p
@@ -130,6 +131,90 @@ results.push(await scenario('builder blocked by an open question: set aside, nev
 results.push(await scenario('refuses to start without capTokens', () => built('build X'),
   (out, { calls }) => (calls.length === 0 && /capTokens/.test(out.halted || '') ? [] : [`calls ${calls.length} halted ${out.halted}`]),
   { ...ARGS, capTokens: undefined }))
+
+// ── U-026 batches from _ORDER.md ──
+const OITEMS = [
+  ['F-01', []], ['F-02a', ['F-01']], ['F-03', ['F-02a']], ['F-04', ['F-03']], ['F-02b', ['F-04']],
+  ...['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'].map((x) => [`F-05${x}`, ['F-02b']]),
+].map(([id, w]) => ({ id, title: 'Item ' + id, owner: 'loop', waits_on: w, phase: '0' }))
+const OBATCHES = [
+  { batch: 1, items: ['F-01', 'F-02a', 'F-03', 'F-04', 'F-02b'], coupled: false },
+  { batch: 2, items: OITEMS.slice(5).map((i) => i.id), coupled: true },
+]
+const OARGS = { ...ARGS, items: OITEMS, batches: OBATCHES }
+const isCoupled = (prompt) => /This batch is COUPLED/.test(prompt)
+const fixSpent = (prompt) => Number((prompt.match(/fix rounds spent so far: (\d+)/) || [0, 0])[1])
+const review = { findings: 0, blocking: 0, file: '/tmp/r.md' }
+
+results.push(await scenario('uncoupled chain batch: F-03 red drops itself and its dependants; only F-03 is rebuilt; then the coupled batch lands whole',
+  (label, prompt, calls) => {
+    if (label.startsWith('build')) return built(label)
+    if (label.startsWith('review')) return review
+    if (label.startsWith('integrate')) {
+      const all = ids(prompt)
+      if (!isCoupled(prompt) && all.includes('F-03') && calls.filter((c) => c.label === 'build F-03').length === 1) {
+        return { result: 'all-dropped', landed: ['F-01', 'F-02a'].filter((i) => all.includes(i)), pr: 1, report: 'r', spend_action: 'ok', note: 'x',
+          dropped: [{ id: 'F-03', gate: 'compile', counted: true, parked: false }, { id: 'F-04', gate: 'dependency', counted: false, parked: false }, { id: 'F-02b', gate: 'dependency', counted: false, parked: false }] }
+      }
+      return land(prompt)
+    }
+    return { status: 'fixed', note: 'x' }
+  },
+  (out, { calls, peak }) => {
+    const p = []
+    const n = (id) => calls.filter((c) => c.label === `build ${id}`).length
+    if (n('F-03') !== 2 || n('F-04') !== 1 || n('F-02b') !== 1) p.push(`builds F-03 ${n('F-03')} F-04 ${n('F-04')} F-02b ${n('F-02b')}`)
+    if (out.landedThisRun.length !== 15) p.push(`landed ${out.landedThisRun.length} of 15`)
+    const coupledInts = calls.filter((c) => c.label.startsWith('integrate') && isCoupled(c.prompt))
+    if (coupledInts.length !== 1 || ids(coupledInts[0].prompt).length !== 10) p.push('coupled batch not integrated once with all 10')
+    if (peak > 6) p.push(`peak ${peak}`)
+    return p
+  }, OARGS))
+
+results.push(await scenario('coupled batch red: no drop, one fix seat with the evidence, re-integrated, lands whole',
+  (label, prompt) => {
+    if (label.startsWith('build')) return built(label)
+    if (label.startsWith('review')) return review
+    if (label.startsWith('fix')) return { status: 'fixed', items: ['F-05c'], note: 'fixed' }
+    if (isCoupled(prompt) && fixSpent(prompt) === 0) return { result: 'red-coupled', landed: [], dropped: [], red_items: ['F-05c'], evidence: '/tmp/ev.md', spend_action: 'ok', note: 'red' }
+    return land(prompt)
+  },
+  (out, { calls }) => {
+    const p = []
+    const fixes = calls.filter((c) => c.label.startsWith('fix'))
+    if (fixes.length !== 1 || !/\/tmp\/ev\.md/.test(fixes[0].prompt) || !/F-05c/.test(fixes[0].prompt) || !/ONLY files inside that item's files_allowed/.test(fixes[0].prompt)) p.push('fix seat prompt wrong or count != 1')
+    if (calls.filter((c) => c.label.startsWith('build F-05')).length !== 10) p.push('coupled items rebuilt')
+    if (!OITEMS.slice(5).every((i) => out.landedThisRun.includes(i.id))) p.push('coupled batch did not land whole')
+    if (out.halted) p.push(`halted ${out.halted}`)
+    return p
+  }, OARGS))
+
+results.push(await scenario('coupled batch still red after 2 fix rounds: HALT, nothing of it lands',
+  (label, prompt) => {
+    if (label.startsWith('build')) return built(label)
+    if (label.startsWith('review')) return review
+    if (label.startsWith('fix')) return { status: 'fixed', items: ['F-05c'], note: 'tried' }
+    if (isCoupled(prompt)) return { result: fixSpent(prompt) >= 2 ? 'halt-coupled' : 'red-coupled', landed: [], dropped: [], red_items: ['F-05c'], evidence: '/tmp/ev.md', spend_action: 'ok', note: 'red' }
+    return land(prompt)
+  },
+  (out, { calls }) => {
+    const p = []
+    if (calls.filter((c) => c.label.startsWith('fix')).length !== 2) p.push('fix seats != 2')
+    if (calls.filter((c) => c.label.startsWith('integrate') && isCoupled(c.prompt)).length !== 3) p.push('coupled integrations != 3')
+    if (!out.halted || !/coupled batch/.test(out.halted)) p.push(`halted=${out.halted}`)
+    if (out.landedThisRun.some((i) => i.startsWith('F-05'))) p.push('part of the coupled batch landed')
+    return p
+  }, OARGS))
+
+results.push(await scenario('BLOCKING review finding stops the next batch',
+  (label, prompt) => (label.startsWith('build') ? built(label) : label.startsWith('review') ? { findings: 1, blocking: 1, file: '/x/loop/review/T-1.md' } : land(prompt)),
+  (out, { calls }) => (/BLOCKING/.test(out.stopDispatch || '') && !calls.some((c) => c.label.startsWith('build F-05')) ? [] : [`stop=${out.stopDispatch}`]),
+  OARGS))
+
+results.push(await scenario('soak red (blocking_open from the integrator) stops the next batch',
+  (label, prompt) => (label.startsWith('build') ? built(label) : label.startsWith('review') ? review : { ...land(prompt), blocking_open: 1 }),
+  (out, { calls }) => (/BLOCKING/.test(out.stopDispatch || '') && !calls.some((c) => c.label.startsWith('build F-05')) ? [] : [`stop=${out.stopDispatch}`]),
+  OARGS))
 
 const ok = results.every(Boolean)
 console.log(`sim-workflow: ${results.filter(Boolean).length}/${results.length} scenarios passed`)

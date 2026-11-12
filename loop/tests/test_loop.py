@@ -148,3 +148,64 @@ def test_builders_cannot_take_the_lock():
     import pytest
     with pytest.raises(SystemExit):
         C.lock_acquire('builder-F-01')
+
+
+# ── U-026 batches, ruling 6 blockers, ruling 7 quiet hours ──
+ORDER_MD = """# Phase 0 order
+
+## 2. Dependency graph
+
+```
+F-01 -> F-02a -> F-03
+F-03 -> {F-05a, F-05b}   (coupled: one compile unit)
+```
+
+## 3. Batches (no two items in a batch share a path)
+
+| Batch | Items | Builders |
+| --- | --- | --- |
+| 1 | F-01, F-02a, F-03 | 3 |
+| 2 | F-05a, F-05b | 2 |
+
+## 4. Next
+"""
+
+
+def test_batches_from_order_md(tmp_path):
+    (tmp_path / '_ORDER.md').write_text(ORDER_MD)
+    assert C.order_batches(tmp_path) == [{'batch': 1, 'items': ['F-01', 'F-02a', 'F-03'], 'coupled': False},
+                                         {'batch': 2, 'items': ['F-05a', 'F-05b'], 'coupled': True}]
+
+
+def test_real_order_md_marks_batches_2_3_4_coupled():
+    b = C.order_batches()
+    if b:  # loop/items/_ORDER.md exists on this checkout
+        assert [x['coupled'] for x in b] == [False, True, True, True]
+
+
+def test_chain_dependants_drop_with_the_red_item():
+    items = {'F-01': {}, 'F-02a': {'waits_on': ['F-01']}, 'F-03': {'waits_on': ['F-02a']}, 'X-01': {}}
+    assert I.dependants('F-01', ['F-01', 'F-02a', 'F-03', 'X-01'], items) == ['F-02a', 'F-03']
+    assert I.dependants('F-03', ['F-01', 'F-02a', 'F-03'], items) == []
+
+
+def test_review_blocking_needs_item_or_waiver(tmp_path):
+    f = C.review_add_blocking('T-1', 'RT-1-1', 'Sim reads the wall clock in Rng.cs:12.', tmp_path)
+    C.review_add_blocking('T-1', 'RT-1-2', 'Runtime writes World.Tick.', tmp_path)
+    assert [b['key'] for b in C.review_blocking(tmp_path)] == ['RT-1-1', 'RT-1-2']
+    with open(f, 'a') as o:
+        o.write('- RESOLVED RT-1-1: item F-10\n- WAIVED RT-1-2: no reason\n')
+    assert [b['key'] for b in C.review_blocking(tmp_path)] == ['RT-1-2']  # a waiver must cite U-###
+    with open(f, 'a') as o:
+        o.write('- WAIVED RT-1-2: U-030\n')
+    assert C.review_blocking(tmp_path) == []
+
+
+def test_quiet_hours_hold_digests_but_halts_always_text(monkeypatch):
+    monkeypatch.setattr(C, 'quiet_hours', lambda now=None: True)
+    (C.STATE / 'notify-outbox.jsonl').write_text('')
+    sent = []
+    C.notify_enqueue('batch-landed', 'batch-Q-1', 'Batch 1 landed: Ground grid (F-03).')
+    C.notify_enqueue('halt', 'halt-Q-1', 'Critical Mass Unity loop stopped: disk is low.')
+    r = C.notify_flush(transport=lambda t: (sent.append(t), (0, 'ok', ''))[1])
+    assert sent == ['Critical Mass Unity loop stopped: disk is low.'] and r['held'] >= 1

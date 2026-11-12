@@ -1,11 +1,12 @@
 export const meta = {
   name: 'critical-mass-unity-loop',
-  description: 'Critical Mass (Unity) build loop: up to 5 code-only builders in worktrees (never run Unity), one Opus integrator per batch of up to 6 that runs loop/bin/integrate.py (one compile per round, first-red drop, one PR to main, squash), one Opus review pass at the end. Scheduling is plain code in this script; no idle, dispatch or heartbeat agents.',
+  description: 'Critical Mass (Unity) build loop: batches from loop/items/_ORDER.md; up to 5 code-only builders in worktrees (never run Unity); one Opus integrator per batch running loop/bin/integrate.py (project setup, one compile, first-red drop for uncoupled batches; for coupled batches one Opus fix seat, max 2 rounds, lands whole or halts); one PR to main per batch; one Opus reviewer per landed batch (BLOCKING stops the next batch). Scheduling is plain code; no idle, dispatch or heartbeat agents.',
   whenToUse: 'Launch FRESH only, with args = the JSON in loop/logs/launch-args.json written by loop/bin/launch.sh. Never resumeFromRunId (the resume cache is positional). Record the returned taskId and runId at once with: python3 loop/bin/cmloop.py record-launch --task-id <w...> --run-id <wf_...>; builders refuse to start until both are recorded.',
   phases: [
     { title: 'Build', detail: 'builders: halt-check, lane worktree on loop/<ID>, code + named NUnit tests + docs, scope gate (git only), push. Never Unity.' },
     { title: 'Integrate', detail: 'one Opus integrator per batch: loop/bin/integrate.py (merge, gates, drop the red item, PR to main, squash, prove landed), spend check' },
-    { title: 'Review', detail: 'one Opus reviewer with a different lens after everything lands; findings go to a file for the architect' },
+    { title: 'Fix', detail: 'coupled batches only (U-026): one Opus fix seat repairs the red item inside its files_allowed; at most 2 rounds' },
+    { title: 'Review', detail: 'one Opus reviewer per landed batch, a different lens; BLOCKING findings in loop/review/<batch>.md stop the next batch' },
   ],
 }
 
@@ -23,8 +24,9 @@ const CM = `python3 ${MAIN}/loop/bin/cmloop.py`
 const MAX_BUILDERS = Math.max(1, Math.min(5, Number(A.maxBuilders) || 5)) // U-015: 5 builders + 1 integrator = 6
 const BATCH_MAX = Math.max(1, Math.min(6, Number(A.batchMax) || 6))
 const MAX_RETURNS = Math.max(0, Number(A.maxReturns) || 2)
+const MAX_FIX_ROUNDS = 2 // U-026
 const PAYLOAD_CAP = 40000 // bytes; agents write details to files and return paths
-const CAPS = { builder: 60, integrator: 40, reviewer: 50 }
+const CAPS = { builder: 60, integrator: 40, reviewer: 50, fixer: 60 }
 
 // ───────────────────────────── guardrail block (verbatim in every seat) ─────────────────────────────
 const GUARD = (cap, role) => `
@@ -63,10 +65,13 @@ const BUILD_SCHEMA = {
 const INT_SCHEMA = {
   type: 'object',
   properties: {
-    result: { type: 'string', enum: ['landed', 'all-dropped', 'error', 'halted'] },
-    landed: { type: 'array', items: { type: 'string' }, maxItems: 6 },
+    result: { type: 'string', enum: ['landed', 'all-dropped', 'red-coupled', 'halt-coupled', 'error', 'halted'] },
+    red_items: { type: 'array', items: { type: 'string' }, maxItems: 10 },
+    evidence: { type: 'string' },
+    blocking_open: { type: 'integer' },
+    landed: { type: 'array', items: { type: 'string' }, maxItems: 10 },
     dropped: {
-      type: 'array', maxItems: 6,
+      type: 'array', maxItems: 10,
       items: { type: 'object', properties: { id: { type: 'string' }, gate: { type: 'string' }, counted: { type: 'boolean' }, parked: { type: 'boolean' } }, required: ['id', 'gate', 'counted', 'parked'] },
     },
     pr: { type: ['integer', 'null'] },
@@ -75,6 +80,11 @@ const INT_SCHEMA = {
     note: { type: 'string', maxLength: 600 },
   },
   required: ['result', 'landed', 'dropped', 'spend_action', 'note'],
+}
+const FIX_SCHEMA = {
+  type: 'object',
+  properties: { status: { type: 'string', enum: ['fixed', 'cannot'] }, items: { type: 'array', items: { type: 'string' }, maxItems: 10 }, note: { type: 'string', maxLength: 400 } },
+  required: ['status', 'note'],
 }
 const REVIEW_SCHEMA = {
   type: 'object',
@@ -96,21 +106,33 @@ STEPS (in order):
 7. If the item cannot be built without an answer it does not give, write the question with your recommendation to ${MAIN}/loop/logs/questions/${it.id}.md, push nothing unfinished as if finished, and return status "blocked".
 Return: status, branch, head (the pushed sha), files_changed, tests_written, questions_file (if any), note (one plain sentence).`
 
-const integratorPrompt = (n, ids) => `You are the INTEGRATOR for batch ${n} of the Critical Mass Unity build loop (run ${TAG}). Items, in this order: ${ids.join(', ')}.
+const integratorPrompt = (n, ids, coupled, fixRound, culprit) => `You are the INTEGRATOR for batch ${n} of the Critical Mass Unity build loop (run ${TAG}). Items, in this order: ${ids.join(', ')}. This batch is ${coupled ? `COUPLED (U-026): it lands whole or not at all; fix rounds spent so far: ${fixRound} of ${MAX_FIX_ROUNDS}` : 'uncoupled: a red item is dropped on the first red'}.
 ${GUARD(CAPS.integrator, 'integrator')}
 STEPS:
-1. Run \`bash ${MAIN}/loop/bin/halt-check.sh --wait 0\` bare. Exit 3 (HALT/STALL) = return result "halted". Exit 4 (STOP-DISPATCH) = still integrate (the batch is already built).
-2. Run, bare, from ${MAIN}: \`python3 ${MAIN}/loop/bin/integrate.py --batch ${n} --items ${ids.join(',')} --run-tag ${TAG}\`, then \`echo $?\`. It takes the compile lock, merges, runs the gates once per round, drops a red item at once (no fix attempts), opens ONE PR to main and squash-merges it, and prints one JSON line.
-3. Only if its JSON flags "red with no item attributed": open the report file it names and the gate logs it points to. If, and only if, an error line names a file:line that one item's diff created or changed, re-run step 2 ONCE adding \`--drop <ID>="<gate>: <the error line>"\`. Otherwise leave it: the batch stays dropped uncounted and the architect sees the flag.
+1. Run \`bash ${MAIN}/loop/bin/halt-check.sh --wait 0\` bare. Exit 3 (HALT/STALL) = return result "halted". Exit 4 or 6 = still integrate (the batch is already built).
+2. Run, bare, from ${MAIN}: \`python3 ${MAIN}/loop/bin/integrate.py --batch ${n} --items ${ids.join(',')} --run-tag ${TAG}${coupled ? ` --coupled --fix-round ${fixRound}` : ''}${culprit ? ` --culprit ${culprit}` : ''}\`, then \`echo $?\`. It takes the compile lock, runs CriticalMass.Editor.ProjectSetup.Apply (U-029), merges, runs the gates once, ${coupled ? 'and on a red writes the evidence file and stops (no drops)' : 'drops a red item at once (no fix attempts)'}, opens ONE PR to main and squash-merges a green batch, runs the soak gate on the new main, and prints one JSON line.
+3. Only if its JSON flags a red with no item named: open the evidence or report file it names. If, and only if, an error line names a file:line that one item's diff created or changed, re-run step 2 ONCE adding \`${coupled ? '--culprit' : '--drop'} <ID>="<gate>: <the error line>"\`. Otherwise leave it for the architect.
 4. Never edit code, never fix an item, never run gh pr create or gh pr merge yourself, never run Unity outside integrate.py.
 5. Run \`python3 ${MAIN}/loop/bin/spend.py check\` bare, then \`echo $?\` (0 ok, 10 stop-dispatch, 11 halt, 12 no-data).
-Return: result (landed | all-dropped | error | halted), landed ids, dropped [{id, gate, counted, parked}], pr, report (the path integrate.py printed), spend_action, note (one plain sentence).`
+Return: result (landed | all-dropped | red-coupled | halt-coupled | error | halted), landed ids, dropped [{id, gate, counted, parked}], red_items and evidence (coupled red), blocking_open, pr, report (the path integrate.py printed), spend_action, note (one plain sentence).`
 
-const reviewerPrompt = (landedIds) => `You are the REVIEWER for run ${TAG} of the Critical Mass Unity build loop. Items landed this run: ${landedIds.join(', ')}.
+const fixPrompt = (n, redIds, evidence, round) => `You are the FIX SEAT for coupled batch ${n} of the Critical Mass Unity build loop (run ${TAG}), fix round ${round} of ${MAX_FIX_ROUNDS} (U-026). Red item(s): ${redIds.join(', ')}.
+${GUARD(CAPS.fixer, 'builder')}
+STEPS:
+1. Read the exact compiler/test output in ${evidence}. Read each red item's spec: ${redIds.map((id) => `${MAIN}/loop/items/${id}.md`).join(', ')}.
+2. For each red item: \`${CM} lanes create <ID> --base origin/loop/<ID>\`, repair ONLY files inside that item's files_allowed so the output above goes away, without changing what the spec asks for. Never touch another item's files, even if the error appears there: report that in the note instead.
+3. Run \`${MAIN}/loop/gates/scope --item <ID> --ref HEAD --base origin/main --project ${LANES}/<ID>\` bare; fix any violation; commit "<ID>: fix round ${round}: <what>"; \`git push origin loop/<ID>\`; then \`${CM} lanes remove <ID>\`.
+4. If the repair needs a change outside those files, or a decision the spec does not give, return status "cannot" and say why in one sentence.
+Return: status (fixed | cannot), items (ids you pushed), note.`
+
+const reviewerPrompt = (n, landedIds) => `You are the REVIEWER for batch ${n} of run ${TAG} of the Critical Mass Unity build loop. Items that landed in this batch: ${landedIds.join(', ')}.
 ${GUARD(CAPS.reviewer, 'reviewer')}
-Your lens is NOT the builders' (they wrote to the item's method). Yours: (a) determinism of CriticalMass.Sim (no UnityEngine, no wall clock, no unseeded randomness, double math, fixed 30 Hz tick, U-002); (b) fidelity to the browser oracle (ported tests assert the same ticks, counts and outcomes; positions within 1e-4); (c) Runtime never writes game state; (d) anything that touched a file outside its item's files_allowed.
-Read only: \`git -C ${MAIN} fetch -q origin\`, \`git -C ${MAIN} log origin/main --grep '^loop-landed:' -n 40\`, the squash commits' diffs, and the item files in ${MAIN}/loop/items/. Do not run Unity, do not edit code, do not open PRs.
-Write findings to ${MAIN}/loop/logs/review-${TAG}.md, one per finding: BLOCKING or ADVISORY, file:line evidence, the item id, and a recommendation for the architect (who writes any fix item; builders never decide).
+Your lens is NOT the builders' (they wrote to the item's method). Yours: (a) determinism of CriticalMass.Sim (no UnityEngine, no wall clock, no unseeded randomness, double math, fixed 30 Hz tick, U-002); (b) fidelity to the browser oracle (ported tests assert the same ticks, counts and outcomes; positions within 1e-4); (c) Runtime never writes game state; (d) anything outside its item's files_allowed.
+Read only: \`git -C ${MAIN} fetch -q origin\`, the batch's squash commit on origin/main (\`git -C ${MAIN} log origin/main --grep '^loop-landed:' -n 5\`) and its diff, and the item files in ${MAIN}/loop/items/. Do not run Unity, do not edit code, do not open PRs.
+Write ${MAIN}/loop/review/${TAG}-${n}.md (ruling 6), one line per finding:
+  "- BLOCKING R${TAG}-${n}-<k>: <item id> <file:line> <what is wrong> <recommendation>"  for anything that must be fixed before the next batch
+  "- ADVISORY R${TAG}-${n}-<k>: ..."  for the rest
+Never write RESOLVED or WAIVED lines (the architect does). A BLOCKING line stops the next batch until the architect resolves it with an item or waives it with a U-### line.
 Return: findings (count), blocking (count), file (path), note.`
 
 // ───────────────────────────── scheduling: plain code ─────────────────────────────
@@ -144,26 +166,23 @@ function semaphore(n) {
     give: () => { const w = waiters.shift(); if (w) w(); else free++ },
   }
 }
-const builders = semaphore(MAX_BUILDERS)
+const slots = semaphore(MAX_BUILDERS) // builders, fix seats and reviewers share these 5; the integrator is the 6th
 
 const ITEMS = (A.items || []).filter((i) => i && i.owner === 'loop' && typeof i.id === 'string') // max-owned items are never dispatched
 const byId = Object.fromEntries(ITEMS.map((i) => [i.id, { ...i, returns: Number(i.returns) || 0 }]))
 const ORDER = ITEMS.map((i) => i.id) // stable order from the launcher (phase, then natural id): positional-cache safe
+const BATCHES = Array.isArray(A.batches) ? A.batches.filter((b) => b && Array.isArray(b.items)) : [] // from _ORDER.md (U-026)
 const landed = new Set(A.landed || [])
 const parked = new Set(A.parked || [])
 const setAside = new Map() // id -> reason (blocked by a question, or dropped uncounted too often)
 const uncounted = {}
-const inflight = new Set()
+const reusable = new Set() // built and pushed, dropped only because an item it waits on was dropped
 const landedThisRun = []
 const batches = []
-
-function readyIds() {
-  return ORDER.filter((id) => !landed.has(id) && !parked.has(id) && !setAside.has(id) && !inflight.has(id)
-    && (byId[id].waits_on || []).every((w) => landed.has(w))).slice(0, BATCH_MAX)
-}
+let batchNo = 0
 
 async function buildOne(id, n) {
-  await builders.take()
+  await slots.take()
   try {
     if (halted || stopDispatch) return null
     const it = byId[id]
@@ -176,70 +195,129 @@ async function buildOne(id, n) {
     if (r.status === 'blocked') { setAside.set(id, `open question: ${r.questions_file || r.note}`); log(`${id} blocked: ${r.note}`); return null }
     return { id, ...r }
   } finally {
-    builders.give()
+    slots.give()
   }
 }
 
-async function integrateBatch(n, ids) {
-  const r = await seat(integratorPrompt(n, ids), {
-    label: `integrate batch ${n}`, phase: 'Integrate', schema: INT_SCHEMA, model: 'opus', effort: 'high',
+// Builds the given ids (waves of at most 5 through the shared slots); returns the ids that are built, in stable order.
+async function buildAll(ids, n) {
+  const need = ids.filter((id) => !reusable.has(id))
+  const done = (await parallel(need.map((id) => () => buildOne(id, n)))).filter(Boolean).filter((b) => b.status === 'built')
+  return ids.filter((id) => reusable.has(id) || done.some((b) => b.id === id))
+}
+
+async function integrate(n, ids, coupled, fixRound, culprit) {
+  return seat(integratorPrompt(n, ids, coupled, fixRound, culprit), {
+    label: `integrate batch ${n}${fixRound ? ` (after fix ${fixRound})` : ''}`, phase: 'Integrate', schema: INT_SCHEMA, model: 'opus', effort: 'high',
   }, `integrator batch ${n}`)
-  const rec = { batch: n, items: ids, result: r ? r.result : 'null', landed: r ? r.landed : [], pr: r ? r.pr : null, report: r ? r.report : null }
-  batches.push(rec)
-  if (!r) { ids.forEach((id) => inflight.delete(id)); return }
-  for (const id of r.landed || []) { landed.add(id); landedThisRun.push(id) }
+}
+
+function applyIntegration(n, ids, r) {
+  batches.push({ batch: n, items: ids, result: r ? r.result : 'null', landed: r ? r.landed : [], pr: r ? r.pr : null, report: r ? r.report : null })
+  if (!r) return
+  for (const id of r.landed || []) { landed.add(id); landedThisRun.push(id); reusable.delete(id) }
   for (const d of r.dropped || []) {
     if (!byId[d.id]) continue
     if (d.parked) parked.add(d.id)
-    else if (d.counted) byId[d.id].returns += 1
+    else if (d.counted) { byId[d.id].returns += 1; reusable.delete(d.id) }
+    else if (d.gate === 'dependency') reusable.add(d.id)
     else {
       uncounted[d.id] = (uncounted[d.id] || 0) + 1
       if (uncounted[d.id] > MAX_RETURNS) setAside.set(d.id, `dropped uncounted ${uncounted[d.id]} times (unattributed red or time box)`)
     }
   }
-  ids.forEach((id) => inflight.delete(id))
   log(`batch ${n}: ${r.result}; landed ${(r.landed || []).join(', ') || 'none'}; dropped ${(r.dropped || []).map((d) => d.id).join(', ') || 'none'}; spend ${r.spend_action}`)
   if (r.result === 'halted') halt(`integrator batch ${n}: ${r.note}`)
   if (r.result === 'error') halt(`integrator batch ${n} error: ${r.note} (report ${r.report || 'none'})`)
+  if (r.result === 'halt-coupled') halt(`coupled batch ${n} halted for the architect: ${r.note} (evidence ${r.evidence || r.report})`)
   if (r.spend_action === 'halt') halt('spend cap reached (spend.py)')
   if (r.spend_action === 'stop-dispatch') stopDispatch = stopDispatch || 'spend at 90 % of the cap, or the hard stop (spend.py / clock)'
+  if (Number(r.blocking_open) > 0) stopDispatch = stopDispatch || `${r.blocking_open} unresolved BLOCKING review entr(y/ies) (soak red or review); the architect resolves or waives them`
 }
+
+// Ruling 6: one Opus reviewer per landed batch; BLOCKING findings stop the next batch until the architect acts.
+async function reviewBatch(n, ids) {
+  if (halted || !ids.length) return
+  await slots.take()
+  let r
+  try {
+    r = await seat(reviewerPrompt(n, ids), { label: `review batch ${n}`, phase: 'Review', schema: REVIEW_SCHEMA, model: 'opus', effort: 'high' }, `reviewer batch ${n}`)
+  } finally { slots.give() }
+  if (r && Number(r.blocking) > 0) stopDispatch = stopDispatch || `review of batch ${n}: ${r.blocking} BLOCKING finding(s) in ${r.file}; the architect resolves or waives them`
+}
+
+// U-026 coupled batch: all items built, one compile; a red goes to ONE fix seat (max 2 rounds); lands whole or halts.
+async function runCoupled(n, ids) {
+  const built = await buildAll(ids, n)
+  if (halted) return
+  if (built.length !== ids.length) {
+    stopDispatch = stopDispatch || `coupled batch ${n} cannot land whole: not built ${ids.filter((i) => !built.includes(i)).join(', ')}`
+    return
+  }
+  ids.forEach((id) => reusable.add(id))
+  for (let fixRound = 0; fixRound <= MAX_FIX_ROUNDS && !halted; fixRound++) {
+    const r = await integrate(n, ids, true, fixRound, '')
+    if (!r || r.result !== 'red-coupled') { applyIntegration(n, ids, r); if (r && r.result === 'landed') await reviewBatch(n, r.landed); return }
+    if (fixRound >= MAX_FIX_ROUNDS) { halt(`coupled batch ${n} still red after ${fixRound} fix rounds (evidence ${r.evidence})`); return }
+    await slots.take()
+    let f
+    try {
+      f = await seat(fixPrompt(n, r.red_items || [], r.evidence, fixRound + 1), { label: `fix batch ${n} round ${fixRound + 1}`, phase: 'Fix', schema: FIX_SCHEMA, model: 'opus', effort: 'high' }, `fix seat batch ${n}`)
+    } finally { slots.give() }
+    if (!f) return
+    if (f.status !== 'fixed') { halt(`fix seat for coupled batch ${n} could not repair it: ${f.note} (evidence ${r.evidence})`); return }
+  }
+}
+
+// Uncoupled batch: drop on first red (integrate.py), dropped items rebuild and retry until landed, parked or set aside.
+async function runUncoupled(n0, ids) {
+  let n = n0
+  for (;;) {
+    const todo = ids.filter((id) => !landed.has(id) && !parked.has(id) && !setAside.has(id))
+    if (!todo.length || halted || stopDispatch) return
+    const built = await buildAll(todo, n)
+    if (halted || !built.length) return
+    const r = await integrate(n, built, false, 0, '')
+    applyIntegration(n, built, r)
+    if (r && r.landed && r.landed.length) await reviewBatch(n, r.landed)
+    if (!r || halted) return
+    batchNo += 1
+    n = batchNo
+  }
+}
+
+const outsideWaitsLanded = (ids) => ids.every((id) => (byId[id].waits_on || []).every((w) => landed.has(w) || ids.includes(w)))
 
 if (BAD.length) {
   log(`refusing to start: ${BAD.join('; ')}`)
   return { halted: `bad args: ${BAD.join('; ')}`, landedThisRun: [] }
 }
-log(`run ${TAG}: ${ORDER.length} loop items, ${landed.size} already landed, ${parked.size} parked; cap ${A.capTokens} total tokens (watched by spend.py)`)
+log(`run ${TAG}: ${ORDER.length} loop items, ${landed.size} already landed, ${parked.size} parked, ${BATCHES.length} batch(es) from _ORDER.md; cap ${A.capTokens} total tokens (watched by spend.py)`)
 
-let n = 0
-let pending = null // the one integration in flight; builders of the next batch run beside it (5 + 1 = 6 agents)
-while (!halted && !stopDispatch) {
-  const take = readyIds()
-  if (!take.length) {
-    if (pending) { await pending; pending = null; continue }
-    break
+if (BATCHES.length) {
+  for (const b of BATCHES) {
+    if (halted || stopDispatch) break
+    const ids = b.items.filter((id) => byId[id] && !landed.has(id) && !parked.has(id) && !setAside.has(id))
+    if (!ids.length) continue
+    if (!outsideWaitsLanded(ids)) { stopDispatch = `batch ${b.batch} waits on items that have not landed`; break }
+    batchNo += 1
+    log(`batch ${batchNo} (_ORDER.md batch ${b.batch}, ${b.coupled ? 'coupled' : 'uncoupled'}): ${ids.join(', ')}`)
+    if (b.coupled) await runCoupled(batchNo, ids)
+    else await runUncoupled(batchNo, ids)
+    if (b.items.some((id) => byId[id] && !landed.has(id)) && !halted) { stopDispatch = stopDispatch || `batch ${b.batch} did not land every item`; break }
   }
-  n += 1
-  const bn = n
-  take.forEach((id) => inflight.add(id))
-  phase('Build')
-  log(`batch ${bn}: building ${take.join(', ')}`)
-  const built = (await parallel(take.map((id) => () => buildOne(id, bn)))).filter(Boolean).filter((b) => b.status === 'built')
-  const builtIds = take.filter((id) => built.some((b) => b.id === id)) // keep the stable order
-  take.filter((id) => !builtIds.includes(id)).forEach((id) => inflight.delete(id))
-  if (pending) { await pending; pending = null }
-  if (halted || !builtIds.length) continue
-  pending = integrateBatch(bn, builtIds)
-}
-if (pending) { await pending; pending = null }
-
-let review = null
-if (!halted && landedThisRun.length) {
-  phase('Review')
-  await builders.take() // the reviewer takes a builder slot (U-015)
-  try {
-    review = await seat(reviewerPrompt(landedThisRun), { label: 'review', phase: 'Review', schema: REVIEW_SCHEMA, model: 'opus', effort: 'high' }, 'reviewer')
-  } finally { builders.give() }
+} else {
+  // No _ORDER.md batches: form uncoupled batches of up to 6 from waits_on, in stable order.
+  for (;;) {
+    if (halted || stopDispatch) break
+    const take = ORDER.filter((id) => !landed.has(id) && !parked.has(id) && !setAside.has(id)
+      && (byId[id].waits_on || []).every((w) => landed.has(w))).slice(0, BATCH_MAX)
+    if (!take.length) break
+    batchNo += 1
+    const before = landed.size + parked.size + setAside.size
+    await runUncoupled(batchNo, take)
+    if (landed.size + parked.size + setAside.size === before) break
+  }
 }
 
 const notLanded = ORDER.filter((id) => !landed.has(id))
@@ -252,6 +330,5 @@ return {
   parked: [...parked],
   setAside: [...setAside.entries()].map(([id, why]) => ({ id, why })),
   notLanded: notLanded.slice(0, 100),
-  review,
   next: 'Run loop/bin/shutdown.sh (watchers by pid, lanes, resume note). Relaunch fresh with launch.sh; never resume.',
 }

@@ -187,11 +187,8 @@ def parse_item(path):
 
 
 def method_text(body):
-    """The item's method: its `## Method` section if it has one; otherwise every `##` section of the body except
-    `## Out of scope` (which lists what NOT to build and may name alternatives). Returns None when there is none."""
-    m = section(body, 'Method')
-    if m is not None:
-        return m
+    """The item's method (architect ruling 1, 2026-11-12): every `##` section of the body except `## Out of scope`,
+    which lists what NOT to build and may name alternatives. No `## Method` heading is required. None when empty."""
     parts = re.split(r'^(##\s+.*)$', body, flags=re.M)
     keep, cur = [], None
     for chunk in parts:
@@ -453,12 +450,13 @@ def notify_flush(dry=False, transport=None):
                 append_jsonl(LOGS / 'notify-dry.jsonl', {**m, 'dry': True, 'flushed': utc()})
                 keep.append(m)  # a dry run never consumes the real outbox
                 continue
-            if quiet_hours():
+            if m['kind'] != 'halt' and quiet_hours():  # ruling 7: quiet hours hold digests only; a halt always texts
                 keep.append(m)
                 continue
             last = read_json(STATE / 'notify-last.json', {}).get('epoch', 0)
-            if time.time() - last < 45:
-                time.sleep(45 - (time.time() - last))
+            gap = float(os.environ.get('CM_LOOP_SEND_GAP', 45))  # never two texts inside 45 s (iMessage->SMS fallback)
+            if time.time() - last < gap:
+                time.sleep(gap - (time.time() - last))
             code, out, err = (transport or (lambda t: sh([str(SEND_TEXT), t], timeout=90)))(m['text'])
             write_json(STATE / 'notify-last.json', {'epoch': time.time()})
             append_jsonl(sent_file, {**m, 'sent': code == 0, 'exit': code, 'detail': (out + err).strip()[:300],
@@ -605,6 +603,9 @@ def halt_check(wait_launch=120):
             return 3, f'{name}: {f.read_text().strip()[:300]}'
     if (STATE / 'STOP-DISPATCH').exists():
         return 4, 'STOP-DISPATCH: ' + (STATE / 'STOP-DISPATCH').read_text().strip()[:300]
+    blk = review_blocking()
+    if blk:
+        return 6, f'{len(blk)} unresolved BLOCKING review entr(y/ies), first {blk[0]["key"]} in {blk[0]["file"]}'
     deadline = time.time() + wait_launch
     while True:
         run = read_json(STATE / 'run.json') or {}
@@ -705,6 +706,14 @@ def preflight(cap, items_dir=None, fetch=True):
     add('main checked out and clean', br == 'main' and not dirty,
         f'branch {br}; ' + (('dirty: ' + ' '.join(l[3:] for l in dirty.splitlines()[:6])) if dirty else 'clean'))
     add('main equals origin/main', lm and lm == om, f'main {lm[:8]} origin/main {om[:8]}')
+    blk = review_blocking()
+    add('no unresolved BLOCKING review entry', not blk, ', '.join(b['key'] for b in blk[:5]) or 'none')
+    bat = order_batches(items_dir)
+    known = {p.stem for p in item_files(items_dir)}
+    missing = sorted({i for b in bat for i in b['items']} - known)
+    add('every _ORDER.md batch item has an item file', not missing,
+        (', '.join(missing[:8]) if missing else f'{len(bat)} batch(es), coupled: '
+         + (', '.join(str(b['batch']) for b in bat if b['coupled']) or 'none')))
     lic = [str(p) for p in LICENSE_FILES if p.is_file()]
     add('Unity license present', bool(lic), (lic[0] + ' exists (not read)') if lic else 'no Unity_lic.ulf found')
     hits = unity_open_on(MAIN)
@@ -731,8 +740,63 @@ def plan(cap, now, items_dir=None, run_tag=None):
     head = branch_sha('HEAD')
     return {'now': now, 'runTag': run_tag or now.replace('-', '').replace(':', '')[:13], 'mainRoot': str(MAIN),
             'lanesRoot': str(LANES), 'repo': SLUG, 'harnessCommit': head, 'capTokens': cap,
-            'items': rows, 'landed': sorted(landed), 'parked': sorted(parked),
+            'items': rows, 'landed': sorted(landed), 'parked': sorted(parked), 'batches': order_batches(items_dir),
             'maxBuilders': 5, 'batchMax': 6, 'maxReturns': MAX_RETURNS}
+
+
+
+# ───────────────────────────── review blockers (ruling 6) and batches (U-026) ─────────────────────────────
+REVIEW_DIR = LOOP / 'review'
+_BLOCK_RE = re.compile(r'^\s*-?\s*BLOCKING\s+(\S+?):', re.M)
+_RESOLVED_RE = re.compile(r'^\s*-?\s*RESOLVED\s+(\S+?):.*\b[A-Z][A-Z0-9]*-\d+[a-z]?\b', re.M)
+_WAIVED_RE = re.compile(r'^\s*-?\s*WAIVED\s+(\S+?):.*\bU-\d{3}\b', re.M)
+
+
+def review_blocking(review_dir=None):
+    """Unresolved BLOCKING entries in loop/review/*.md. An entry `- BLOCKING <key>: <text>` is resolved only by a line
+    `- RESOLVED <key>: item <ID>` (the architect turned it into an item) or `- WAIVED <key>: U-###`."""
+    d = Path(review_dir or REVIEW_DIR)
+    open_ = []
+    for f in sorted(d.glob('*.md')) if d.exists() else []:
+        t = f.read_text(errors='replace')
+        done = set(_RESOLVED_RE.findall(t)) | set(_WAIVED_RE.findall(t))
+        open_ += [{'key': k, 'file': str(f)} for k in _BLOCK_RE.findall(t) if k not in done]
+    return open_
+
+
+def review_add_blocking(batch_key, key, text, review_dir=None):
+    d = Path(review_dir or REVIEW_DIR)
+    d.mkdir(parents=True, exist_ok=True)
+    f = d / f'{batch_key}.md'
+    new = not f.exists()
+    with open(f, 'a') as o:
+        if new:
+            o.write(f'# Review: batch {batch_key}\n\nResolve each BLOCKING line with `- RESOLVED <key>: item <ID>` or '
+                    f'`- WAIVED <key>: U-###` (architect only). The next batch does not start while one is open.\n\n')
+        o.write(f'- BLOCKING {key}: {text.strip()}\n')
+    return str(f)
+
+
+def order_batches(items_dir=None):
+    """Batches from loop/items/_ORDER.md, the one source of truth: section 3's table gives each batch's items in order;
+    a batch is coupled when two or more of its items sit on one dependency-graph line marked "(coupled".
+    Returns [] when the file or table is absent (the workflow then forms batches from waits_on)."""
+    f = Path(items_dir or ITEMS_DIR) / '_ORDER.md'
+    if not f.exists():
+        return []
+    t = f.read_text()
+    tok = re.compile(r'(?<![A-Za-z0-9-])[A-Z][A-Z0-9]*-\d+[a-z]?(?![A-Za-z0-9-])')
+    coupled_sets = [set(tok.findall(l)) for l in t.splitlines() if '(coupled' in l]
+    m = re.search(r'^##\s+\d*\.?\s*Batches\b.*?$(.*?)(?=^##\s|\Z)', t, re.M | re.S)
+    sec = m.group(1) if m else ''
+    out = []
+    for l in sec.splitlines():
+        cells = [c.strip() for c in l.strip().strip('|').split('|')]
+        if len(cells) >= 2 and cells[0].isdigit():
+            ids = tok.findall(cells[1])
+            coupled = any(len(set(ids) & cs) >= 2 for cs in coupled_sets)
+            out.append({'batch': int(cells[0]), 'items': ids, 'coupled': coupled})
+    return out
 
 
 # ───────────────────────────── shutdown ─────────────────────────────
@@ -814,7 +878,10 @@ def main(argv=None):
     s.add_argument('--key')
     s.add_argument('--text')
     s.add_argument('--dry-run', action='store_true')
-    s = sub.add_parser('halt-check', help='exit 0 to proceed; 3 halt/stall, 4 stop-dispatch, 5 no recorded launch')
+    s = sub.add_parser('batches', help='batches from loop/items/_ORDER.md (coupled flag included)')
+    s.add_argument('--items-dir')
+    s = sub.add_parser('review-blocking', help='unresolved BLOCKING entries in loop/review/*.md (exit 6 if any)')
+    s = sub.add_parser('halt-check', help='exit 0 go; 3 halt/stall, 4 stop-dispatch, 5 no recorded launch, 6 BLOCKING')
     s.add_argument('--wait', type=int, default=120)
     s = sub.add_parser('record-launch', help='record the Workflow taskId (w...) and runId (wf_...)')
     s.add_argument('--task-id', required=True)
@@ -893,6 +960,13 @@ def main(argv=None):
             return 0
         print(json.dumps(notify_flush(a.dry_run)))
         return 0
+    if a.cmd == 'batches':
+        print(json.dumps(order_batches(a.items_dir), indent=1))
+        return 0
+    if a.cmd == 'review-blocking':
+        b = review_blocking()
+        print(json.dumps(b))
+        return 6 if b else 0
     if a.cmd == 'halt-check':
         code, msg = halt_check(a.wait)
         print(msg)

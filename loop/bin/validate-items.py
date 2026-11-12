@@ -4,9 +4,10 @@
 An item is rejected when (decision 1, U-011):
   - a front-matter field is missing: id, title, phase, owner, waits_on, files_allowed, files_forbidden,
     tests_required, pass_check, art_row (or a value is malformed: owner loop|max, art_row none|p03..p15, ...)
-  - its method is missing (its "## Method" section; for items written without one, every "##" section except
-    "## Out of scope"), or contains the words "or", "either", "TBD" or the phrase "if installed"
-    (an item carries one method; a builder never chooses between options)
+  - its method is missing. The METHOD is every "##" section of the item except "## Out of scope" (architect
+    ruling 1, 2026-11-12); no "## Method" heading is required. A "## Method" heading, if present, is just one
+    of those sections. Inside the method, the words "or", "either", "TBD" and the phrase "if installed" reject the
+    item (an item carries one method; a builder never chooses between options)
   - files_allowed reaches ProjectSettings/, Packages/ or Controls.inputactions without a front-matter line
     `architect_approved: U-###`
 Fixture items under loop/items/_fixtures/ are never part of the queue; validate them with --dir.
@@ -71,17 +72,18 @@ def validate(path, known_ids=None):
                 errs.append(f'waits_on {w!r} is not an item in this folder')
     method = C.method_text(body)
     if method is None or not method.strip():
-        errs.append('no method: a "## Method" section, or "##" sections other than "Out of scope"')
+        errs.append('no method: the method is every "##" section except "## Out of scope", and there is none')
     else:
         for n, ln in enumerate(method.splitlines(), 1):
             for rx, word in BANNED:
                 if rx.search(ln):
-                    errs.append(f'method line {n} contains {word}: {ln.strip()[:100]!r}')
+                    errs.append(f'method (every section except Out of scope) line {n} contains {word}: '
+                                f'{ln.strip()[:100]!r}')
     return errs
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--dir', default=str(C.ITEMS_DIR))
     ap.add_argument('--json', action='store_true')
     ap.add_argument('--quiet', action='store_true', help='print only rejected items and the summary line')

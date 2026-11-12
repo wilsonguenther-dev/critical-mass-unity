@@ -21,8 +21,8 @@ art_row: none
 ---
 ## Method
 Port sim/rng.ts line for line into Rng.cs. Seed 1337 is the default. This text is for the builder.
-## Notes
-Either way, notes may say or. Only the method section is checked.
+## Out of scope
+Either way, this section may say or. Only Out of scope is exempt.
 """
 
 
@@ -73,14 +73,18 @@ def test_filename_must_match_id(tmp_path):
     assert any('does not match the file name' in e for e in V.validate(write(tmp_path, 'F-03', GOOD), {'F-03'}))
 
 
+def test_any_section_but_out_of_scope_is_method(tmp_path):
+    t = GOOD.replace('## Out of scope', '## Notes')
+    assert any('"either"' in e for e in V.validate(write(tmp_path, 'F-02', t), {'F-02'}))
+
+
 def test_no_method_section(tmp_path):
     t = GOOD.split('## Method')[0]
     assert any('no method' in e for e in V.validate(write(tmp_path, 'F-02', t), {'F-02'}))
 
 
 def test_sectioned_item_without_method_heading_checks_all_but_out_of_scope(tmp_path):
-    t = GOOD.replace('## Method\n', '## Create\n').replace('## Notes\nEither way, notes may say or.',
-                                                           '## Out of scope\nCameras or menus.')
+    t = GOOD.replace('## Method\n', '## Create\n')
     assert V.validate(write(tmp_path, 'F-02', t), {'F-02'}) == []
     t2 = t.replace('Seed 1337 is the default.', 'Seed 1337 or 42.')
     assert any('"or"' in e for e in V.validate(write(tmp_path, 'F-02', t2), {'F-02'}))

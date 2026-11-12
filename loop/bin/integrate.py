@@ -2,7 +2,11 @@
 """Integrate one batch (decision 3). The mechanical part of the integrator seat; the Opus integrator runs this.
 
   integrate.py --batch N --items ID1,ID2,... [--run-tag T] [--drop ID=reason ...]
-               [--local] [--no-pr] [--items-dir DIR] [--gates compile,editmode,...] [--deadline-min 40]
+               [--coupled --fix-round K [--culprit ID=reason]]
+               [--local] [--no-pr] [--items-dir DIR] [--gates setup,compile,editmode,...] [--deadline-min 40]
+Coupled batches (U-026): no drops; a red writes loop/logs/coupled-<tag>-<N>-round<K>.md for the fix seat and returns
+red-coupled; after 2 fix rounds (or a red no fix seat can repair) it writes HALT and returns halt-coupled. Gates start
+with `setup` (ProjectSetup.Apply, U-029); after a batch lands, the soak gate runs on the new main (U-028).
 
 Flow:
   1. Take the compile lock for the whole batch (owner integrator-batch-N, this pid, start time); the stall alarm reads it.
@@ -34,7 +38,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import cmloop as C  # noqa: E402
 
 GATES_DIR = C.REPO / 'loop' / 'gates'
-DEFAULT_GATES = ['compile', 'editmode', 'playmode-smoke', 'build-mac', 'parity', 'budgets']
+DEFAULT_GATES = ['setup', 'compile', 'editmode', 'playmode-smoke', 'build-mac', 'parity', 'budgets']
 PATH_RE = re.compile(r'((?:Assets|Packages)/[^\s:(]+?\.(?:cs|asmdef|shader|hlsl|uss|uxml|unity|prefab|asset))')
 
 
@@ -120,6 +124,16 @@ def attribute(rec, items, files_by_item, project):
     return {}
 
 
+def dependants(iid, active, items):
+    """Items in the batch whose waits_on reaches iid, directly or through another batch item (batch 1 is a chain)."""
+    out, frontier = [], {iid}
+    while frontier:
+        nxt = {j for j in active if j not in out and j != iid and set(items[j].get('waits_on') or []) & frontier}
+        out += sorted(nxt - set(out))
+        frontier = nxt
+    return [j for j in active if j in out]
+
+
 def ensure_int(int_dir, base_sha, branch):
     int_dir = Path(int_dir)
     if not int_dir.exists():
@@ -150,11 +164,16 @@ def main(argv=None):
     ap.add_argument('--int-dir', default=str(C.INT))
     ap.add_argument('--drop', action='append', default=[], help='ID=reason: the integrator attributes a red by hand')
     ap.add_argument('--max-returns', type=int, default=C.MAX_RETURNS)
+    ap.add_argument('--coupled', action='store_true', help='U-026: no drops; a red goes to the fix seat; lands whole')
+    ap.add_argument('--fix-round', type=int, default=0, help='coupled: fix rounds already spent on this batch (0..2)')
+    ap.add_argument('--max-fix-rounds', type=int, default=2)
+    ap.add_argument('--culprit', default='', help='coupled: ID=reason, the integrator names the red item once')
+    ap.add_argument('--review-dir', default=str(C.REVIEW_DIR))
     a = ap.parse_args(argv)
     t0 = time.time()
     ids = [i.strip() for i in a.items.split(',') if i.strip()]
-    if len(ids) != len(set(ids)) or not ids or len(ids) > 6:
-        print(json.dumps({'error': 'items must be 1 to 6 distinct ids'}))
+    if len(ids) != len(set(ids)) or not ids or len(ids) > (10 if a.coupled else 6):
+        print(json.dumps({'error': 'items must be distinct: 1 to 6, or 1 to 10 for a coupled batch (O-22)'}))
         return 2
     tag = a.run_tag or C.utc().replace('-', '').replace(':', '')[:13]
     items = {i: C.load_item(Path(a.items_dir) / f'{i}.md') for i in ids}
@@ -171,7 +190,8 @@ def main(argv=None):
         C.lock_release(rec['token'])
     report = C.LOGS / f'batch-{tag}-{a.batch}.json'
     C.write_json(report, res)
-    summary = {k: res.get(k) for k in ('batch', 'result', 'landed', 'pr', 'error', 'flags', 'skipped_gates')}
+    summary = {k: res.get(k) for k in ('batch', 'result', 'coupled', 'fix_round', 'red_items', 'evidence', 'landed', 'pr',
+                                       'error', 'flags', 'skipped_gates', 'soak', 'blocking_open')}
     summary['dropped'] = [{k: d[k] for k in ('id', 'gate', 'returns', 'parked', 'failure_file', 'counted')}
                           for d in res.get('dropped', [])]
     summary['report'] = str(report)
@@ -190,6 +210,7 @@ def run(a, ids, items, tag, env, t0):
     int_dir = Path(a.int_dir)
     gates = [g for g in a.gates.split(',') if g]
     active, dropped, rounds, flags, skipped = list(ids), [], [], [], set()
+    coupled_reds = []
 
     def drop(iid, gate, text, counted=True):
         r = C.return_item(iid, items[iid].get('title', iid), f'{tag}-{a.batch}', gate, text, counted, a.max_returns)
@@ -198,6 +219,8 @@ def run(a, ids, items, tag, env, t0):
             active.remove(iid)
         if not a.local:  # the branch is pushed; the next builder gets a fresh lane on top of it
             C.lane_remove(iid)
+        for dep in dependants(iid, active, items):
+            drop(dep, 'dependency', f'waits on {iid} ("{items[iid].get("title")}"), dropped from this batch', False)
         title = items[iid].get('title', iid)
         if r['parked']:
             C.livelog(f'"{title}" failed the {gate} gate again and is parked for the architect.')
@@ -206,16 +229,22 @@ def run(a, ids, items, tag, env, t0):
                       + (f' and goes back to the queue (return {r["returns"]} of {a.max_returns}).' if counted else
                          ' without counting against it.'))
 
+    def fail(iid, gate, text, counted=True):
+        if a.coupled:  # U-026: no drop; the evidence goes to the fix seat
+            coupled_reds.append({'id': iid, 'gate': gate, 'text': text})
+        else:
+            drop(iid, gate, text, counted)
+
     for spec in a.drop:
         iid, _, why = spec.partition('=')
         if iid in active:
             drop(iid, 'integrator', why or 'dropped by the integrator')
     for iid in list(active):
         if not C.branch_sha(ref(iid)):
-            drop(iid, 'merge', f'branch {ref(iid)} does not exist (the builder never pushed it)', counted=False)
+            fail(iid, 'merge', f'branch {ref(iid)} does not exist (the builder never pushed it)', counted=False)
 
     green = False
-    while active:
+    while active and not coupled_reds:
         if (time.time() - t0) / 60 > a.deadline_min:
             for iid in list(active):
                 drop(iid, 'time-box', f'batch passed {a.deadline_min:.0f} minutes and was cut', counted=False)
@@ -229,13 +258,15 @@ def run(a, ids, items, tag, env, t0):
             if code != 0:
                 conf = C.git('diff', '--name-only', '--diff-filter=U', cwd=int_dir)[1].split()
                 C.git('merge', '--abort', cwd=int_dir)
-                drop(iid, 'merge', f'merge conflict with the batch in: {", ".join(conf) or (out + err).strip()[-300:]}')
+                fail(iid, 'merge', f'merge conflict with the batch in: {", ".join(conf) or (out + err).strip()[-300:]}')
         for iid in list(active):
             s = run_gate('scope', C.MAIN, ['--item', iid, '--ref', ref(iid), '--base', base_sha,
                                            '--items-dir', a.items_dir], env)
             rnd['gates'].append(s)
             if s['status'] != 'pass':
-                drop(iid, 'scope', json.dumps(s))
+                fail(iid, 'scope', json.dumps(s))
+        if coupled_reds:
+            break
         if not active:
             break
         if len(active) < len(rnd['items']):  # something left the batch before the compile: rebuild the tree
@@ -251,7 +282,7 @@ def run(a, ids, items, tag, env, t0):
                     if r['status'] == 'skipped':
                         skipped.add(f'parity: {r["detail"]}')
                     elif r['status'] != 'pass':
-                        drop(iid, 'parity', json.dumps(r))
+                        fail(iid, 'parity', json.dumps(r))
                         red = True
                 if red:
                     break
@@ -268,6 +299,16 @@ def run(a, ids, items, tag, env, t0):
             if r['status'] == 'pass' and r['exit'] == 0:
                 continue
             hits = attribute(r, items, files_by_item, int_dir)
+            if a.coupled:
+                cid, _, cwhy = a.culprit.partition('=')
+                if not hits and cid in active:  # ruling 3: the integrator may name the culprit once
+                    hits = {cid: [f'named by the integrator: {cwhy}']}
+                ev = '\n'.join(read_lines(r.get('errors_file')) + read_lines(r.get('failed_file')))[:20000]
+                for iid, lines in (hits or {None: []}).items():
+                    coupled_reds.append({'id': iid, 'gate': g, 'text': f'{g} gate red: {r.get("detail")}\n'
+                                         + '\n'.join(lines[:60]) + '\n--- full gate output ---\n' + ev})
+                red = True
+                break
             if not hits:
                 flags.append(f'{g} red with no item attributed: {r.get("detail")}')
                 for iid in list(active):
@@ -283,12 +324,37 @@ def run(a, ids, items, tag, env, t0):
             break
 
     res = {'batch': a.batch, 'tag': tag, 'branch': branch, 'base': base_sha, 'rounds': rounds, 'dropped': dropped,
-           'flags': flags, 'skipped_gates': sorted(skipped), 'landed': [], 'green_items': list(active) if green else []}
+           'flags': flags, 'skipped_gates': sorted(skipped), 'landed': [], 'green_items': list(active) if green else [],
+           'coupled': a.coupled, 'fix_round': a.fix_round}
+    if a.coupled and coupled_reds:
+        ev = C.LOGS / f'coupled-{tag}-{a.batch}-round{a.fix_round}.md'
+        ev.write_text(f'# Coupled batch {a.batch} ({tag}), fix round {a.fix_round}: red\n\n' + '\n\n'.join(
+            f'## {c["id"] or "no item named"} at {c["gate"]}\n\n```\n{c["text"]}\n```' for c in coupled_reds) + '\n')
+        res['evidence'] = str(ev)
+        res['red_items'] = sorted({c['id'] for c in coupled_reds if c['id']})
+        unfixable = any(c['id'] is None or c['gate'] == 'merge' for c in coupled_reds)
+        if unfixable or a.fix_round >= a.max_fix_rounds:
+            res['result'] = 'halt-coupled'
+            why = ('a red no fix seat can repair (no item named, or a merge conflict)' if unfixable else
+                   f'still red after {a.fix_round} fix rounds')
+            (C.STATE / 'HALT').write_text(f'coupled batch {a.batch} {why}; evidence {ev}\n')
+            C.livelog(f'Coupled batch {a.batch} is {why}; the loop halts for the architect.')
+            C.notify_enqueue('halt', f'halt-coupled-{tag}-{a.batch}', f'Critical Mass Unity loop stopped: coupled batch '
+                             f'{a.batch} is {why}. The architect has the evidence.')
+            res['notify'] = C.notify_flush()
+        else:
+            res['result'] = 'red-coupled'
+            C.livelog(f'Coupled batch {a.batch} is red at {coupled_reds[0]["gate"]}; a fix seat repairs '
+                      + ', '.join(f'"{items[i].get("title")}"' for i in res['red_items']) + f' (round {a.fix_round + 1}).')
+        res['blocking_open'] = len(C.review_blocking(a.review_dir))
+        return res
     if not green or not active:
         res['result'] = 'all-dropped'
         return res
     if a.local or a.no_pr:
         res['result'] = 'green-local' if a.local else 'green-no-pr'
+        res['soak'] = run_soak(a, tag, int_dir, env, res)
+        res['blocking_open'] = len(C.review_blocking(a.review_dir))
         return res
     # ── land: one PR to main, squash, prove ──
     titles = [f'- {items[i].get("title")} ({i})' for i in active]
@@ -328,7 +394,26 @@ def run(a, ids, items, tag, env, t0):
         C.notify_enqueue('batch-landed', f'batch-{tag}-{a.batch}', C.batch_card(a.batch, res['landed'], items,
                                                                                  f'#{pr["number"]}'))
         res['notify'] = C.notify_flush()
+    if res['result'] == 'landed':  # U-028: the soak lane runs once on the new main, before the next batch
+        C.git('fetch', '-q', 'origin', 'main')
+        C.git('checkout', '-q', '--detach', C.branch_sha('origin/main'), cwd=int_dir)
+        res['soak'] = run_soak(a, tag, int_dir, env, res)
+    res['blocking_open'] = len(C.review_blocking(a.review_dir))
     return res
+
+
+def run_soak(a, tag, int_dir, env, res):
+    r = run_gate('soak', int_dir, env=env)
+    st = {k: r.get(k) for k in ('status', 'exit', 'detail')}
+    if r['status'] == 'skipped' and r['exit'] == C.SKIP_EXIT:
+        res['skipped_gates'].append(f'soak: {r["detail"]}')
+    elif r['status'] != 'pass':
+        f = C.review_add_blocking(f'{tag}-{a.batch}', f'S{tag}-{a.batch}', f'soak red after batch {a.batch}: '
+                                  f'{r.get("detail")} (gate output {r.get("out")}). Top priority: the architect opens '
+                                  f'a fix item; no next batch until then.', a.review_dir)
+        res['flags'].append(f'soak red; BLOCKING entry in {f}')
+        C.livelog(f'The soak tests went red after batch {a.batch}; the next batch waits for a fix item.')
+    return st
 
 
 if __name__ == '__main__':
