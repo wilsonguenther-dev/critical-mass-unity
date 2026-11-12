@@ -53,7 +53,7 @@ namespace CriticalMass.Sim.Tests
         private static List<string[]> Vectors(string fn)
         {
             var list = new List<string[]>();
-            foreach (Match m in Vector.Matches(SliceOf(ReadGolden(), fn)))
+            foreach (System.Text.RegularExpressions.Match m in Vector.Matches(SliceOf(ReadGolden(), fn)))
             {
                 list.Add(m.Groups[3].Success
                     ? new[] { m.Groups[1].Value, m.Groups[2].Value, m.Groups[3].Value }
@@ -140,8 +140,8 @@ namespace CriticalMass.Sim.Tests
         public void GoldenFileIsTheCommittedNodeRunAndCoversEveryFunction()
         {
             string json = ReadGolden();
-            Match node = Regex.Match(json, @"""node"":""([^""]*)""");
-            Match v8 = Regex.Match(json, @"""v8"":""([^""]*)""");
+            System.Text.RegularExpressions.Match node = Regex.Match(json, @"""node"":""([^""]*)""");
+            System.Text.RegularExpressions.Match v8 = Regex.Match(json, @"""v8"":""([^""]*)""");
             Assert.IsTrue(node.Success, "node key missing");
             Assert.IsTrue(v8.Success, "v8 key missing");
             Assert.AreEqual("v24.11.1", node.Groups[1].Value);
