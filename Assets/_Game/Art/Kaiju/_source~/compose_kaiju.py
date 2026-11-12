@@ -25,7 +25,7 @@ import kaiju_palette as PAL  # noqa: E402
 
 REN, REF, OUT = sys.argv[1:4]
 os.makedirs(OUT, exist_ok=True)
-meta = json.load(open(os.path.join(REN, "meta.json")))
+meta = json.load(open(os.path.join(REN, "meta.json"))) if os.path.exists(os.path.join(REN, "meta.json")) else {}
 NAVY = tuple(int(PAL.VOID_NAVY[i:i + 2], 16) for i in (1, 3, 5))
 CREAM = tuple(int(PAL.BACKGROUND[i:i + 2], 16) for i in (1, 3, 5))
 metrics = {"gameplay": {}, "bible": {}, "swatches": {}}
@@ -108,7 +108,7 @@ def de2000(l1, l2):
 
 # ------------------------------------------------------------------------------------------------ gameplay
 for jid, m in sorted(meta.items()):
-    if m["kind"] != "gameplay":
+    if m["kind"] != "gameplay" or "--sweep" in sys.argv:
         continue
     im = np.asarray(Image.open(os.path.join(REN, jid + ".png")).convert("RGB")).copy()
     mask = np.asarray(Image.open(os.path.join(REN, jid + "_mask.png")).convert("RGBA"))[..., 3] > 127
@@ -155,6 +155,42 @@ def bbox(m):
     ys, xs = np.nonzero(m)
     return xs.min(), ys.min(), xs.max() + 1, ys.max() + 1
 
+
+def iou_only(ref_p, our_p):
+    bm = bible_mask(Image.open(ref_p))
+    oa = np.asarray(Image.open(our_p).convert("RGBA"))[..., 3] > 127
+    bx0, by0, bx1, by1 = bbox(bm)
+    ox0, oy0, ox1, oy1 = bbox(oa)
+    sc = (by1 - by0) / (oy1 - oy0)
+    sub = Image.fromarray(oa[oy0:oy1, ox0:ox1].astype(np.uint8) * 255).resize(
+        (max(1, round((ox1 - ox0) * sc)), by1 - by0), Image.NEAREST)
+    sub = np.asarray(sub) > 127
+    om = np.zeros(bm.shape, bool)
+    px = (bx0 + bx1) // 2 - sub.shape[1] // 2
+    ys, xs = np.nonzero(sub)
+    ys2, xs2 = ys + by0, xs + px
+    ok = (xs2 >= 0) & (xs2 < bm.shape[1]) & (ys2 >= 0) & (ys2 < bm.shape[0])
+    om[ys2[ok], xs2[ok]] = True
+    return float((om & bm).sum() / max(1, (om | bm).sum()))
+
+
+# allowed azimuth ranges: the sweep may only fine-tune the view the bible page shows (front stays front)
+AZ_RANGE = {"11-front": (-15, 15), "11-three-quarter": (15, 60), "11-profile": (60, 100), "11-rear": (150, 210),
+            "10-azure-adult": (15, 60), "10-crimson-adult": (15, 60), "10-berserk-adult": (0, 75),
+            "10-hatchling": (30, 75), "10-egg": (-30, 30), "11-roar": (0, 75), "11-slam-windup": (0, 75)}
+if len(sys.argv) > 4 and sys.argv[4] == "--sweep":
+    best = {}
+    for f in sorted(glob.glob(os.path.join(REN, "sweep", "*__*.png"))):
+        jid, az = os.path.basename(f)[:-4].split("__")
+        lo, hi = AZ_RANGE.get(jid, (-360, 360))
+        if not lo <= float(az) <= hi:
+            continue
+        v = iou_only(os.path.join(REF, jid + ".png"), f)
+        if jid not in best or v > best[jid][1]:
+            best[jid] = (float(az), v)
+    for jid, (az, v) in sorted(best.items()):
+        print("BEST %-18s az %5.0f IoU %.3f" % (jid, az, v))
+    sys.exit(0)
 
 for jid, m in sorted(meta.items()):
     if m["kind"] != "bible":

@@ -421,19 +421,20 @@ GAME = [
     ("gp-roar", [("Adult", "Azure", "Roar", 0.55, (0, 0, 0), A_YAW)], (2.9, -1.2, 0), None),
     ("gp-slam-windup", [("Adult", "Azure", "SlamWindup", 1.0, (0, 0, 0), A_YAW)], (3.6, -2.2, 0), "telegraph"),
 ]
-# bible framings (orthographic): (crop id, stage, allegiance, clip, phase, azimuth, elevation)
+# bible framings (orthographic): (crop id, stage, allegiance, clip, phase, azimuth, elevation). Azimuths were tuned
+# by the KJ_SWEEP silhouette search inside each page's view range (compose_kaiju.AZ_RANGE): front stays front.
 BIBLE = [
-    ("10-egg", "Egg", "Neutral", None, 0.0, 0, 10),
-    ("10-hatchling", "Hatchling", "Neutral", "Idle", 0.0, 50, 12),
-    ("10-azure-adult", "Adult", "Azure", "Idle", 0.0, 35, 6),
-    ("10-crimson-adult", "Adult", "Crimson", "Idle", 0.0, 35, 6),
-    ("10-berserk-adult", "Adult", "Berserk", "Berserk", 0.25, 40, 6),
-    ("11-front", "Adult", "Azure", "Idle", 0.0, 0, 8),
-    ("11-three-quarter", "Adult", "Azure", "Idle", 0.0, 40, 8),
-    ("11-profile", "Adult", "Azure", "Idle", 0.0, 62, 8),
-    ("11-rear", "Adult", "Azure", "Idle", 0.0, 168, 12),
-    ("11-roar", "Adult", "Azure", "Roar", 0.55, 35, 8),
-    ("11-slam-windup", "Adult", "Azure", "SlamWindup", 1.0, 20, 8),
+    ("10-egg", "Egg", "Neutral", None, 0.0, 30, 10),
+    ("10-hatchling", "Hatchling", "Neutral", "Idle", 0.0, 60, 12),
+    ("10-azure-adult", "Adult", "Azure", "Idle", 0.0, 60, 6),
+    ("10-crimson-adult", "Adult", "Crimson", "Idle", 0.0, 60, 6),
+    ("10-berserk-adult", "Adult", "Berserk", "Berserk", 0.25, 0, 6),
+    ("11-front", "Adult", "Azure", "Idle", 0.0, -15, 8),
+    ("11-three-quarter", "Adult", "Azure", "Idle", 0.0, 60, 8),
+    ("11-profile", "Adult", "Azure", "Idle", 0.0, 75, 8),
+    ("11-rear", "Adult", "Azure", "Idle", 0.0, 195, 12),
+    ("11-roar", "Adult", "Azure", "Roar", 0.55, 0, 8),
+    ("11-slam-windup", "Adult", "Azure", "SlamWindup", 1.0, 45, 8),
 ]
 
 meta = {}
@@ -489,6 +490,24 @@ for jid, members, wloc, extra in GAME:
     print("RENDERED", jid, "warrior px %.1f" % meta[jid]["warrior_px"])
 
 GROUND_OB.hide_render = True
+SWEEP = [float(x) for x in os.environ.get("KJ_SWEEP", "").split(",") if x]
+if SWEEP:   # angle search for the bible framings: KJ_SWEEP="0,10,..." writes sweep/<job>__<az>.png at 320 px
+    for jid, stage, alleg, clip, phase, az0, el in BIBLE:
+        if ONLY and jid not in ONLY:
+            continue
+        ob = STAGES[stage]
+        place(ob, (0, 0, 0), 0)
+        set_pose(ob, clip, phase)
+        set_team(PAL.STAGE_DEFAULT_GLOW[stage], alleg)
+        show([ob, HULLS[stage]])
+        bpy.context.view_layer.update()
+        for az in SWEEP:
+            ppm = ortho_camera([ob], az, el, res=320)
+            hull_width(2.0, ppm)
+            scene.render.film_transparent = True
+            scene.render.filepath = os.path.join(OUT, "sweep", "%s__%g.png" % (jid, az))
+            bpy.ops.render.render(write_still=True)
+    sys.exit(0)
 for jid, stage, alleg, clip, phase, az, el in BIBLE:
     if ONLY and jid not in ONLY:
         continue
