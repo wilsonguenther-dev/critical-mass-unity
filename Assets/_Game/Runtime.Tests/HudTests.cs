@@ -329,7 +329,9 @@ namespace CriticalMass.Runtime.Tests
         [Test]
         public void DeathGradeShaderShipsAndTargetsTheBrief()
         {
-            Assert.IsNotNull(Resources.Load<Shader>(DeathGrade.ShaderResource), "death grade shader missing from Resources");
+            Shader sh = Resources.Load<Shader>(DeathGrade.ShaderResource);
+            Assert.IsNotNull(sh, "death grade shader missing from Resources");
+            Assert.IsTrue(sh.isSupported, "death grade shader does not compile (a shader with errors draws nothing)");
             Material m = DeathGrade.GradeMaterial;
             Assert.IsNotNull(m);
             Assert.AreEqual(0.7f, m.GetFloat("_Brightness"), 1e-4f);

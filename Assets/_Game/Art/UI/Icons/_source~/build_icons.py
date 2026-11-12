@@ -667,8 +667,6 @@ def write_meta(png):
             ln = 'guid: ' + guid
         elif ln.strip().startswith('textureCompression:'):
             ln = ln.split(':')[0] + ': 0'
-        elif ln.strip().startswith('maxTextureSize:'):
-            ln = ln.split(':')[0] + ': 1024'
         out.append(ln)
     with open(meta, 'w') as f:
         f.write('\n'.join(out) + '\n')

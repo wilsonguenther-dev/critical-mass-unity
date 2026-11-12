@@ -834,8 +834,8 @@ namespace CriticalMass.Runtime.Hud
             {
                 _grade.gameObject.SetActive(dead);
                 UnityEngine.Camera gc = Canvas.worldCamera;
-                var data = gc != null ? gc.GetComponent<UnityEngine.Rendering.Universal.UniversalAdditionalCameraData>() : null;
-                if (data != null) data.requiresColorTexture = dead;   // the opaque copy only while dead
+                // the opaque copy only while dead (GetUniversalAdditionalCameraData adds the component if it is missing)
+                if (gc != null) UnityEngine.Rendering.Universal.CameraExtensions.GetUniversalAdditionalCameraData(gc).requiresColorTexture = dead;
             }
             if (_koRing.gameObject.activeSelf != dead) _koRing.gameObject.SetActive(dead);
             if (!dead) return;
