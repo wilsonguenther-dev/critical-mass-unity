@@ -151,7 +151,7 @@ def make_outline_material(name="CM_Toon_Outline"):
     return mat
 
 
-def add_outline(ob, width):
+def add_outline(ob, width, vgroup=None):
     om = make_outline_material()
     if om.name not in [m.name for m in ob.data.materials if m]:
         ob.data.materials.append(om)
@@ -162,6 +162,9 @@ def add_outline(ob, width):
     sol.use_rim = False
     sol.use_even_offset = True
     sol.material_offset = len(ob.data.materials) - 1
+    if vgroup and vgroup in ob.vertex_groups:
+        sol.vertex_group = vgroup
+        sol.thickness_vertex_group = 0.0
     return sol
 
 

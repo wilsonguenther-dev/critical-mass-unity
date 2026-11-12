@@ -1,17 +1,17 @@
 {
  "objects": {
   "Miner_Body": {
-   "triangles": 10884,
-   "vertices": 5796,
+   "triangles": 10300,
+   "vertices": 5488,
    "rest_bounds": {
     "min": [
      -1.075,
-     -0.456,
+     -0.5,
      -0.001
     ],
     "max": [
      1.075,
-     0.764,
+     0.845,
      2.0
     ]
    },
@@ -24,14 +24,16 @@
     "feat_boots",
     "feat_chest_plate",
     "feat_crate",
+    "feat_crate_detail",
     "feat_face",
     "feat_gloves",
     "feat_helmet",
+    "feat_helmet_detail",
     "feat_helmet_lamp",
     "feat_knee_guard",
     "feat_shirt",
-    "feat_shoulder_pad",
     "feat_skin",
+    "feat_sleeve",
     "feat_straps",
     "feat_team_cloth",
     "feat_team_glow",
@@ -43,14 +45,14 @@
    "vertices": 356,
    "rest_bounds": {
     "min": [
-     -1.25,
-     -0.168,
-     0.721
+     -1.429,
+     -0.193,
+     0.847
     ],
     "max": [
-     0.117,
-     0.079,
-     1.588
+     0.144,
+     0.092,
+     1.44
     ]
    },
    "materials": [
@@ -58,6 +60,7 @@
    ],
    "feature_groups": [
     "feat_pick_hammer",
+    "feat_team_cloth",
     "feat_team_glow"
    ]
   },
@@ -66,14 +69,14 @@
    "vertices": 388,
    "rest_bounds": {
     "min": [
-     -1.25,
-     -0.22,
-     0.934
+     -1.429,
+     -0.206,
+     0.918
     ],
     "max": [
-     0.269,
-     0.085,
-     1.325
+     0.09,
+     0.098,
+     1.309
     ]
    },
    "materials": [
@@ -81,6 +84,7 @@
    ],
    "feature_groups": [
     "feat_pick_hammer",
+    "feat_team_cloth",
     "feat_team_glow"
    ]
   },
@@ -159,7 +163,7 @@
   "Idle",
   1
  ],
- "triangles_character": 12216,
+ "triangles_character": 11632,
  "triangles_barricade_per_state": {
   "folded": 952,
   "deployed": 984,
