@@ -147,11 +147,11 @@ F-06 = F-06a..F-06f; F-08 = F-08a, F-08b, F-08c.
 | CM-30 dig/place | F-01 .. F-09 | F-02a, F-02b (World, SetCell), F-05f (Abilities.cs), F-06b, F-06e, F-07, F-08b |
 | CM-31 topple | CM-30 | F-02a, F-02b, F-03 (Decorations), F-05c (Combat.cs) |
 | CM-37 heal | F-01 .. F-09 | F-05i (SimStep.cs), F-06d, F-02a (SimEventType) |
-| CM-35 biomass types | F-01 .. F-09 | every file with an `ITEM CM-35` marker: Core/SimEvent.cs, Core/Actor.cs, Core/ResourceNode.cs, Core/MatchState.cs, Core/World.cs (F-02a, F-02b), Combat.cs (F-05c), Resources.cs (F-05g), Bots/Bots.cs (F-06e); the browser files with CM-35 code are exactly types.ts, world.ts, combat.ts, resources.ts, bots/index.ts |
+| CM-35 biomass types | F-01 .. F-09 | every file with an `ITEM CM-35` marker: Core/SimEvent.cs, Core/Actor.cs, Core/ResourceNode.cs, Core/MatchState.cs, Core/World.cs (F-02a, F-02b), Combat.cs (F-05c), SimResources.cs (F-05g), Bots/BotBrain.cs (F-06e); the browser files with CM-35 code are exactly types.ts, world.ts, combat.ts, resources.ts, bots/index.ts |
 | CM-34 | CM-35 | F-05g |
-| CM-85 | CM-34 | Resources.cs, DebugTests.cs, KaijuResourceTests.cs (F-05g); no kaiju.ts code (verified: CM-85 commit 3807f98 touches game.config.ts, resources.ts, debug.test.ts, kaiju.test.ts, corruption tests) |
+| CM-85 | CM-34 | SimResources.cs, DebugTests.cs, KaijuResourceTests.cs (F-05g); no kaiju.ts code (verified: CM-85 commit 3807f98 touches game.config.ts, resources.ts, debug.test.ts, kaiju.test.ts, corruption tests) |
 | CM-38 Demolitions | CM-30 | F-05c, F-05f, F-06d, F-06e |
-| CM-64 | CM-85 (kept) | branch `origin/cm/CM-64` read: built on CM-35 (e0ab1c7 is an ancestor), not on CM-85 (3807f98 is not); it edits resources.ts, damage.ts, types.ts, world.ts, fsm.ts, director.ts, debug.test.ts, kaiju.test.ts, so it shares Resources.cs and the two test files with CM-85: the CM-85 wait serialises those edits |
+| CM-64 | CM-85 (kept) | branch `origin/cm/CM-64` read: built on CM-35 (e0ab1c7 is an ancestor), not on CM-85 (3807f98 is not); it edits resources.ts, damage.ts, types.ts, world.ts, fsm.ts, director.ts, debug.test.ts, kaiju.test.ts, so it shares SimResources.cs and the two test files with CM-85: the CM-85 wait serialises those edits |
 | CM-36 | CM-85 (kept) | branch `origin/cm/CM-36` read: built on CM-35, not on CM-85; edits kaiju.ts (+4), fsm.ts, steer.ts, types.ts, world.ts; its berserk-share band is measured on instability, which CM-85 changes, so the wait stands |
 | CM-39 stations/upgrades | CM-35 | F-05d (Respawn.cs), F-08c |
 | CM-84 class switch | CM-39 | F-05d (CM-54 cut + 7 tests), F-02a (SimEventType, Actor) |

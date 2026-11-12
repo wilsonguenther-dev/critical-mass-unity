@@ -318,8 +318,8 @@ shrine.
 resources.ts and bots/index.ts): `Assets/_Game/Sim/Core/SimEvent.cs` (`Bio`), `Core/Actor.cs` (`CarryMeat`,
 `MeatPickup`), `Core/ResourceNode.cs` (`LooseOrb`), `Core/MatchState.cs` (`DeliveredTally.Plant`, `Meat`),
 `Core/SimEnums.cs` (`BiomassType`), `Core/World.cs` (`Orbs`, `MeatDropped`, `OrbOverflows`, `SpawnLooseOrb`,
-`OrbCapacity`), `Assets/_Game/Sim/Combat.cs` (corpse meat drop), `Assets/_Game/Sim/Resources.cs` (`bio`, orb ageing,
-pickup, meat delivery), and `Assets/_Game/Sim/Bots/Bots.cs` (Kaiju-role meat pickup).
+`OrbCapacity`), `Assets/_Game/Sim/Combat.cs` (corpse meat drop), `Assets/_Game/Sim/SimResources.cs` (`bio`, orb ageing,
+pickup, meat delivery), and `Assets/_Game/Sim/Bots/BotBrain.cs` (Kaiju-role meat pickup).
 
 **Create.** `Assets/_Game/Sim/Rules/MeatOrbs.cs` (`MeatOrbs`), `Assets/_Game/Sim.Tests/BiomassTests.cs`,
 `Assets/_Game/Sim.Tests/BiomassSoakTests.cs` (`[Category("Slow")]`). Runtime: `Assets/_Game/Runtime/View/OrbView.cs`.
@@ -360,12 +360,12 @@ Old state: landed (batch 2, old PR #18; D-068 CM-85 entry). Waits on CM-34.
 touches game.config.ts, resources.ts, debug.test.ts, kaiju.test.ts and the corruption tests; no kaiju.ts code),
 `src/sim/corruption.test.ts` (149, 10 cases). The tunable is already in `GameConfig` (F-01).
 
-**Reopens** (each at its `// ITEM CM-85` marker): `Assets/_Game/Sim/Resources.cs` (`ApplyDelivery`),
+**Reopens** (each at its `// ITEM CM-85` marker): `Assets/_Game/Sim/SimResources.cs` (`ApplyDelivery`),
 `Assets/_Game/Sim.Tests/DebugTests.cs` (`+ 7 * BiomassInstabilityPerUnit`), `Assets/_Game/Sim.Tests/KaijuResourceTests.cs`
 (`+ 2 * BiomassInstabilityPerUnit`).
 
 **Create.** `Assets/_Game/Sim.Tests/CorruptionRateTests.cs` (`CorruptionRateTests`); the rule goes into the
-foundation's `Resources.cs` delivery path.
+foundation's `SimResources.cs` delivery path.
 
 **Tunables.** `kaijuFeed.biomassInstabilityPerUnit` 0.125 (exactly 1/8, so it adds without rounding in a double too).
 
