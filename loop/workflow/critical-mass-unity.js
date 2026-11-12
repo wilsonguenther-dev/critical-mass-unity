@@ -68,12 +68,12 @@ const INT_SCHEMA = {
   type: 'object',
   properties: {
     result: { type: 'string', enum: ['landed', 'all-dropped', 'red-coupled', 'halt-coupled', 'error', 'halted'] },
-    red_items: { type: 'array', items: { type: 'string' }, maxItems: 10 },
+    red_items: { type: 'array', items: { type: 'string' }, maxItems: 12 },
     evidence: { type: 'string' },
     blocking_open: { type: 'integer' },
-    landed: { type: 'array', items: { type: 'string' }, maxItems: 10 },
+    landed: { type: 'array', items: { type: 'string' }, maxItems: 12 },
     dropped: {
-      type: 'array', maxItems: 10,
+      type: 'array', maxItems: 12,
       items: { type: 'object', properties: { id: { type: 'string' }, gate: { type: 'string' }, counted: { type: 'boolean' }, parked: { type: 'boolean' } }, required: ['id', 'gate', 'counted', 'parked'] },
     },
     pr: { type: ['integer', 'null'] },
@@ -85,7 +85,7 @@ const INT_SCHEMA = {
 }
 const FIX_SCHEMA = {
   type: 'object',
-  properties: { status: { type: 'string', enum: ['fixed', 'cannot'] }, items: { type: 'array', items: { type: 'string' }, maxItems: 10 }, note: { type: 'string', maxLength: 400 } },
+  properties: { status: { type: 'string', enum: ['fixed', 'cannot'] }, items: { type: 'array', items: { type: 'string' }, maxItems: 12 }, note: { type: 'string', maxLength: 400 } },
   required: ['status', 'note'],
 }
 const REVIEW_SCHEMA = {

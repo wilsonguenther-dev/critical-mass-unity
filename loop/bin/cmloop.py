@@ -565,8 +565,8 @@ def card_problems(text, titles=()):
         text = text.replace(ti, 'T' * len(ti))
     if not text.strip():
         probs.append('empty text')
-    if len(text) > 700:
-        probs.append(f'{len(text)} chars (cap 700)')
+    if len(text) > 1400:
+        probs.append(f'{len(text)} chars (cap 1400)')
     for m in TOKEN_RE.finditer(text):
         s, e = m.span()
         if not (s > 0 and text[s - 1] == '(' and e < len(text) and text[e] == ')'):
