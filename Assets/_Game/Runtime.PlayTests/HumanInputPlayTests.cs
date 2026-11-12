@@ -21,6 +21,9 @@ namespace CriticalMass.Runtime.PlayTests
 
         SimDriverBehaviour _driver;
         Keyboard _kb;
+        bool _settingsSaved;
+        InputSettings.BackgroundBehavior _savedBackground;
+        InputSettings.EditorInputBehaviorInPlayMode _savedEditorBehaviour;
 
         [UnitySetUp]
         public IEnumerator SetUp()
@@ -31,6 +34,19 @@ namespace CriticalMass.Runtime.PlayTests
             _driver = UnityEngine.Object.FindAnyObjectByType<SimDriverBehaviour>();
             Assert.IsNotNull(_driver, "Boot did not build a SimDriverBehaviour");
             _driver.HumanAutopilot = false;
+
+            // The batchmode test runner has no focused Game view, so under the default "pointers and keyboards respect
+            // Game view focus" the Input System routes keyboard events to editor updates and the player-side actions
+            // never see them. Route all device input to the game regardless of focus for these tests only (the
+            // settings object is modified in place, never replaced: replacing destroys the temporary default instance),
+            // and restore both values in TearDown.
+            InputSettings s = InputSystem.settings;
+            _savedBackground = s.backgroundBehavior;
+            _savedEditorBehaviour = s.editorInputBehaviorInPlayMode;
+            _settingsSaved = true;
+            s.backgroundBehavior = InputSettings.BackgroundBehavior.IgnoreFocus;
+            s.editorInputBehaviorInPlayMode = InputSettings.EditorInputBehaviorInPlayMode.AllDeviceInputAlwaysGoesToGameView;
+
             _kb = InputSystem.AddDevice<Keyboard>();
         }
 
@@ -41,6 +57,13 @@ namespace CriticalMass.Runtime.PlayTests
             {
                 InputSystem.RemoveDevice(_kb);
                 _kb = null;
+            }
+            if (_settingsSaved)
+            {
+                InputSettings s = InputSystem.settings;
+                s.backgroundBehavior = _savedBackground;
+                s.editorInputBehaviorInPlayMode = _savedEditorBehaviour;
+                _settingsSaved = false;
             }
             _driver = null;
         }
