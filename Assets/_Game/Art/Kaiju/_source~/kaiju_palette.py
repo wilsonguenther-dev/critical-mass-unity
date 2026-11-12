@@ -40,6 +40,7 @@ STAGE_BASE = {
 # Team-glow slots: facet value k applied to the default glow colour (unlit, so the facets are painted in).
 GLOW_K = {
     "Glow":        1.00,   # cracks between plates, egg seams, the egg's ground glow
+    "GlowHalo":    0.55,   # v2: the short crack walls of every plate, the dimmer halo either side of a bright crack
     "CrystalTip":  1.00,   # crystal tip facets (face the sky)
     "Crystal":     0.86,   # crystal side facets, lit side
     "CrystalDark": 0.64,   # crystal side facets, alternate (reads as the shaded facet)

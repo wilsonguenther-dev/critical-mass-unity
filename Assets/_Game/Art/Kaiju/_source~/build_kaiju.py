@@ -14,6 +14,7 @@ vertex colours, plate tiling, face, rig, clips, FBX) is new.
 
 Conventions: Blender Z up, the creature faces -Y, 1 unit = 1 m. Feet on z = 0, origin between the feet.
 """
+import json
 import math
 import os
 import random
@@ -38,6 +39,11 @@ HATCH_HEIGHT = 0.447 * ADULT_HEIGHT  # D-058, measured on the sheet
 EGG_HEIGHT = 0.34 * ADULT_HEIGHT     # sheet: egg ~2.9x the figure, adult ~8.6x the same figure
 OUTLINE_WIDTH = {"Egg": 0.018, "Hatchling": 0.022, "Adult": 0.035}  # metres, per asset (U-008); stored as a property
 TRI_CAP = {"Egg": 4000, "Hatchling": 10000, "Adult": 15000}
+# Silhouette tunables fitted against the bible crops with iou_map.py (KJ_TUNE='{"sh_x": 1.05}' overrides one run;
+# the committed defaults below are the fitted values, so a plain run rebuilds the committed asset).
+TUNE = {"sh_x": 1.04, "fist_x": 1.5, "fist_r": 0.64, "crown_k": 1.05, "fan_k": 1.2, "head_dy": -0.08, "head_dz": 0.04,
+        "hip_z": 1.38, "thigh_x": 0.68, "fist_y": -0.95, "tail_k": 1.0}
+TUNE.update(json.loads(os.environ.get("KJ_TUNE", "{}")))
 
 
 def lin(hexs):
@@ -134,61 +140,74 @@ def hull(pts):
 
 
 def slab(geo, p, n, M, outline, thick, base_slot, rng, mossy=False, bone=None, sink=0.3, moss_dot=0.45,
-         surf=None, slot_fn=None, flare=0.0):
-    """One plate: a separate bevelled slab (ART-DIRECTION 3.5; brief: 0.04-0.06 u chamfer at adult scale).
+         surf=None, slot_fn=None, flare=0.0, halo=True):
+    """One plate: a separate ROUNDED boulder (v2; bible plates are pillowed stones, not flat slabs).
     outline: convex 2-D polygon (counter-clockwise) in the tangent frame M at p (normal n). Rings, bottom to top:
-    footing (sunk into the body), shoulder (side top), chamfer ring (inset by CHAMFER, raised), and a domed apex, so
-    the top reads as 2-4 facets in the three-band ramp and every corner catches a light line. No bottom cap (hidden
-    in the body). surf(q) -> surface point for a tangent-plane point (conforms the footing to the body), or None.
-    flare: the side walls lean out by this much at the top, so on a curved body neighbouring plate tops still meet
-    (each plate is extruded along its own normal, which fans the tops apart on convex parts)."""
+    footing (sunk into the body), a short wall (the crack wall: team-glow HALO when halo=True, so every crack reads as a
+    bright core with a dimmer glow either side, ART-DIRECTION 2.3 "a bright rim instead"), then two shoulder rings
+    inset toward the centre and an apex: a domed, smooth-shaded top that takes the three bands as a rounded stone.
+    The first shoulder ring sits CHAMFER in from the wall, so every rim still catches a light line (3.5 bevels).
+    surf(q) -> surface point for a tangent-plane point (conforms the footing to the body), or None.
+    flare: the walls lean out by this much at the top, so on a curved body neighbouring plates still close up."""
     n = Vector(n).normalized()
     ch = CHAMFER[0]
     k = len(outline)
     cen2 = sum((Vector(q) for q in outline), Vector((0.0, 0.0))) / k
+    rad = sum((Vector(q) - cen2).length for q in outline) / k
+
+    def at(q2):
+        w = p + M @ Vector((q2.x, q2.y, 0.0))
+        return surf(w) if surf else w
+
     rows = []
     for q in outline:
         q = Vector(q)
-        w = p + M @ Vector((q.x, q.y, 0.0))
-        base = surf(w) if surf else w
         d = q - cen2
         dn = d.normalized() if d.length > 1e-6 else Vector((0.0, 0.0))
         out = M @ Vector((dn.x, dn.y, 0.0))
-        inset = (dn * max(0.0, d.length - ch) + cen2) if d.length > 1e-6 else q
-        wi = p + M @ Vector((inset.x, inset.y, 0.0))
-        basei = surf(wi) if surf else wi
-        rows.append((base - n * (sink * thick), base + n * (thick - 0.8 * ch) + out * flare, basei + n * thick + out * flare))
-    apex = (surf(p + M @ Vector((cen2.x, cen2.y, 0))) if surf else p + M @ Vector((cen2.x, cen2.y, 0))) \
-        + n * (thick * 1.18) + M @ Vector((rng.uniform(-0.12, 0.12) * thick, rng.uniform(-0.12, 0.12) * thick, 0))
+        base = at(q)
+        ia = cen2 + d * max(0.55, 1.0 - (ch * 1.2) / max(1e-6, d.length))      # first shoulder: a chamfer in
+        ib = cen2 + d * 0.5
+        rows.append((base - n * (sink * thick),
+                     base + n * (0.12 * thick) + out * (0.2 * flare),
+                     at(ia) + n * (0.8 * thick) + out * (0.75 * flare),
+                     at(ib) + n * (1.02 * thick) + out * (0.45 * flare)))
+    apex = at(cen2) + n * (thick * (1.1 + 0.08 * min(1.0, rad / max(1e-6, 4 * thick)))) \
+        + M @ Vector((rng.uniform(-0.1, 0.1) * thick, rng.uniform(-0.1, 0.1) * thick, 0))
     V, G = [], []
-    for b, s, c in rows:
-        V += [b, s, c]
-        G += [0.90, 1.0, 1.03]
+    for r4 in rows:
+        V += list(r4)
+        G += [0.90, 0.94, 1.0, 1.04]
     A = len(V)
     V.append(apex)
     G.append(1.06)
-    F, mats = [], []
+    F, kinds = [], []
     for i in range(k):
         j = (i + 1) % k
-        F.append([3 * i, 3 * j, 3 * j + 1, 3 * i + 1]); mats.append("side")
-        F.append([3 * i + 1, 3 * j + 1, 3 * j + 2, 3 * i + 2]); mats.append("chamfer")
-        F.append([3 * i + 2, 3 * j + 2, A]); mats.append("top")
+        F.append([4 * i, 4 * j, 4 * j + 1, 4 * i + 1]); kinds.append("side")
+        F.append([4 * i + 1, 4 * j + 1, 4 * j + 2, 4 * i + 2]); kinds.append("chamfer")
+        F.append([4 * i + 2, 4 * j + 2, 4 * j + 3, 4 * i + 3]); kinds.append("top")
+        F.append([4 * i + 3, 4 * j + 3, A]); kinds.append("cap")
     cen = sum(V, Vector()) / len(V)
     out = []
-    for f, kind in zip(F, mats):
+    for f, kind in zip(F, kinds):
         a, b, c = V[f[0]], V[f[1]], V[f[2]]
         nrm = (b - a).cross(c - a)
         if nrm.dot((a + b + c) / 3 - cen) < 0:
             f.reverse()
             nrm = -nrm
         nrm.normalize()
-        if slot_fn:
+        if kind == "side" and halo:
+            out.append(SLOT["GlowHalo"])
+        elif slot_fn:
             out.append(SLOT[slot_fn(kind, nrm)])
-        elif mossy and kind in ("top", "chamfer") and nrm.z > moss_dot * 0.5:
+        elif mossy and kind == "cap" and nrm.z > moss_dot * 0.4:
+            out.append(SLOT["Moss"])      # moss sits on the crown of an up-facing boulder (bible), not the whole plate
+        elif mossy and kind == "top" and nrm.z > 0.8:
             out.append(SLOT["Moss"])
         else:
             out.append(SLOT[base_slot])
-    geo.add(V, F, out, bone, shade=G)
+    geo.add(V, F, out, bone, smooth=True, shade=G)
 
 
 def rock(geo, p, n, r, thick, base_slot, rng, moss=0.0, bone=None, elong=(0.8, 1.2), sink=0.3, moss_dot=0.45):
@@ -202,7 +221,7 @@ def rock(geo, p, n, r, thick, base_slot, rng, moss=0.0, bone=None, elong=(0.8, 1
         rr = r * rng.uniform(0.85, 1.0)
         outline.append((math.cos(a) * rr * ex, math.sin(a) * rr * ey))
     slab(geo, Vector(p), n, M, outline, thick, base_slot, rng, mossy=rng.random() < moss, bone=bone, sink=sink,
-         moss_dot=moss_dot)
+         moss_dot=moss_dot, halo=False)
 
 
 def clip_poly(poly, nx, ny, c):
@@ -277,6 +296,32 @@ def voronoi_plates(geo, bvh, seeds, gap, thick_fn, slot_fn_for, rng, rmax_fn, si
     return count
 
 
+def confine_glow(geo, seeds, crack_w):
+    """v2: the body under the plates glows ONLY along the crack network (bible: glow in the cracks, never in wide
+    patches). A body face keeps the Glow slot when its centre lies within crack_w of the bisector between its two
+    nearest plate seeds (where two plates meet); every other Glow face (under a plate, or a hole the plates leave on a
+    tight curve) becomes dark Skin, so a gap shows as a shadowed crevice, not a lit patch."""
+    if not seeds:
+        return
+    P = np.array([tuple(sd[0]) for sd in seeds])
+    glow, dark = SLOT["Glow"], SLOT["Skin"]
+    kept = 0
+    for fi, (f, m) in enumerate(zip(geo.F, geo.M)):
+        if m != glow:
+            continue
+        c = sum((geo.V[i] for i in f), Vector()) / len(f)
+        d2 = ((P - np.array(tuple(c))) ** 2).sum(1)
+        i1, i2 = np.argsort(d2)[:2]
+        sep = math.sqrt(((P[i1] - P[i2]) ** 2).sum())
+        bis = (d2[i2] - d2[i1]) / (2 * max(1e-6, sep))          # distance to the bisector plane
+        reach = math.sqrt(d2[i1]) < 1.6 * seeds[i1][2]            # inside some plate's reach
+        if bis < crack_w and reach:
+            kept += 1
+        else:
+            geo.M[fi] = dark
+    print("GLOW body faces kept in cracks", kept)
+
+
 def tile(geo, p, n, w, h, thick, slot, rng, bone=None, spin=0.0):
     """A flat rounded-rectangle belly segment: an octagon slab (chamfered corners in plan and on the top edge)."""
     M = frame(n, spin)
@@ -286,10 +331,10 @@ def tile(geo, p, n, w, h, thick, slot, rng, bone=None, spin=0.0):
         outline += pts if sx * sy > 0 else pts[::-1]
     # order counter-clockwise by angle
     outline.sort(key=lambda q: math.atan2(q[1], q[0]))
-    slab(geo, Vector(p), n, M, outline, thick, slot, rng, sink=0.35)
+    slab(geo, Vector(p), n, M, outline, thick, slot, rng, sink=0.35, halo=False)
 
 
-def crystal(geo, base, d, length, radius, rng, bone=None, base_frac=0.3, sides=6):
+def crystal(geo, base, d, length, radius, rng, bone=None, base_frac=0.3, sides=6, cap=True):
     """Hexagonal crystal, self-lit team glow. Facets are painted (unlit): root ring CrystalBase, side facets
     alternating Crystal / CrystalDark, tip facets CrystalTip."""
     d = Vector(d).normalized()
@@ -305,7 +350,8 @@ def crystal(geo, base, d, length, radius, rng, bone=None, base_frac=0.3, sides=6
     tip = base + M @ Vector((rng.uniform(-0.2, 0.2) * radius, rng.uniform(-0.2, 0.2) * radius, length))
     V.append(tip)
     F, mats = [], []
-    F.append(list(range(sides))[::-1]); mats.append(SLOT["CrystalBase"])
+    if cap:
+        F.append(list(range(sides))[::-1]); mats.append(SLOT["CrystalBase"])
     for ring in (0, 1):
         for i in range(sides):
             a, b = ring * sides + i, ring * sides + (i + 1) % sides
@@ -597,6 +643,7 @@ def finish(name, geo, bones, target_h):
     ob["cm_outline_width"] = OUTLINE_WIDTH[name]
     ob["cm_stage"] = name
     rig["cm_stage"] = name
+    rig["cm_scale"] = s          # design units -> metres (pose_fit.py keys locations like key_clips)
     return ob, rig, s
 
 
@@ -847,6 +894,7 @@ def creature(name, P, seed, target_h):
         return P["dmin"](p, n)
 
     seeds = poisson(surface_samples(bm, P["samples"], rng), dmin, rng)
+    confine_glow(geo, seeds, P["crack_w"])
 
     def slot_for(p, n, d):
         light = rng.random() < P["light_frac"](p)
@@ -888,13 +936,26 @@ def creature(name, P, seed, target_h):
     # --- face
     P["face"](geo, rng, Hc, RH)
 
-    # --- crest: crystal clusters along the spine top, fanning out over the shoulders; dark spikes between
-    for (cx, cy, size, count, tilt_x) in P["crest"]:
-        p, n = ray(bvh, (cx, cy, 20), (0, 0, -1))
-        if p is None:
-            continue
-        d = (n * 0.45 + Vector((tilt_x, 0.05, 1.0))).normalized()
-        cluster(geo, p, d, size, count, rng, bone=auto(p))
+    # --- crown and spine ridge (bible p10/p11): single tall hexagonal crystals, a midline row whose length peaks over
+    # the shoulder hump, with side pairs that splay outward (the fan seen from the front), shrinking down the back to
+    # the tail; crystal roots sink into the plates (no hidden base caps)
+    ncr = 0
+    for (cy, L, nfan) in P["crown"]:
+        row = [(0.0, 0.0, 1.0)]
+        for (xo, tilt, lf) in P["fans"][:nfan]:
+            row += [(xo, tilt, lf), (-xo, -tilt, lf)]
+        for (xo, tilt, lf) in row:
+            p, n = ray(bvh, (xo, cy + rng.uniform(-0.03, 0.03), 20), (0, 0, -1))
+            if p is None:
+                continue
+            t = math.radians(tilt + rng.uniform(-4, 4))
+            lean = math.radians(P["crown_lean"] + rng.uniform(-4, 4))
+            d = Vector((math.sin(t), math.sin(lean), math.cos(t) * math.cos(lean))).normalized()
+            d = (d + n * 0.12).normalized()
+            ln = L * lf * rng.uniform(0.9, 1.05)
+            crystal(geo, p, d, ln, max(0.03, P["crystal_r"] * ln), rng, bone=auto(p), cap=False)
+            ncr += 1
+    print("CROWN", name, ncr, "crystals")
     for (cx, cy, ln) in P["spikes"]:
         p, n = ray(bvh, (cx, cy, 20), (0, 0, -1))
         if p is not None:
@@ -960,45 +1021,55 @@ def adult_params():
     eyes 0.73, head top 0.79, fist centres +-0.24, fist half-width 0.13, belly half-width 0.12. Design height 4.2."""
     U = 1.0
     T = -1  # tail curls to the creature's right (p11 rear: tail tip to screen right)
+    SX, FX, FR, HY, HZ = TUNE["sh_x"], TUNE["fist_x"], TUNE["fist_r"], TUNE["head_dy"], TUNE["head_dz"]
+    HIPZ, THX, FY, TK = TUNE["hip_z"], TUNE["thigh_x"], TUNE["fist_y"], TUNE["tail_k"]
+
+    def ty(y):          # tail length scale about its root
+        return 1.45 + (y - 1.45) * TK
+    FACE.RECT["Adult"] = (FACE.ADULT_RECT[0], FACE.ADULT_RECT[1] + HZ, FACE.ADULT_RECT[2], FACE.ADULT_RECT[3])
     balls = [
         ((0, -0.1, 2.6), 0.8, (1.12, 1.0, 0.78)),      # shoulder hump (crest base)
         ((0, 0.55, 2.05), 0.68, (1.0, 1.15, 0.8)),     # back sloping down to the hips (p11 profile)
         ((0, -0.5, 2.05), 0.76, (1.0, 0.82, 1.0)),     # chest
         ((0, 0.0, 1.5), 0.7, (1.0, 1.1, 0.9)),         # belly
-        ((0, 1.0, 1.25), 0.6, (1.1, 1.0, 0.85)),       # hips (small, low)
-        ((0, -0.72, 2.88), 0.46),                      # neck
-        ((0, -1.02, 3.25), 0.43, (1.08, 1.0, 0.9)),    # small head low between the shoulders
-        ((0, -1.36, 3.0), 0.27, (1.2, 1.3, 0.7)),      # blunt muzzle, below the eyes
+        ((0, 1.0, HIPZ), 0.6, (1.1, 1.0, 0.85)),       # hips (small, high enough to leave the arch between the legs)
+        ((0, -0.72 + HY / 2, 2.88 + HZ / 2), 0.46),                # neck
+        ((0, -1.02 + HY, 3.25 + HZ), 0.43, (1.08, 1.0, 0.9)),      # small head low between the shoulders
+        ((0, -1.36 + HY, 3.0 + HZ), 0.27, (1.2, 1.3, 0.7)),        # blunt muzzle, below the eyes
     ]
     for sx in (1, -1):
-        balls += [((sx * 1.22, -0.42, 2.24), 0.62),                   # shoulders: far wider than the hips
-                  ((sx * 1.34, -0.95, 0.52), 0.6, (1.0, 1.05, 0.92)),  # boulder fists on the ground
-                  ((sx * 0.6, 1.1, 1.0), 0.46),                        # thighs
-                  ((sx * 0.64, 0.95, 0.38), 0.4, (1.0, 1.25, 0.75))]   # short hind feet
+        balls += [((sx * SX, -0.42, 2.24), 0.62),                     # shoulders: far wider than the hips
+                  ((sx * FX, FY, 0.52), FR, (1.0, 1.05, 0.92)),     # boulder fists on the ground, spread (A-frame)
+                  ((sx * THX, 1.1, 1.0), 0.46),                        # thighs
+                  ((sx * (THX + 0.04), 0.95, 0.38), 0.4, (1.0, 1.25, 0.75))]   # short hind feet
     limbs = []
     for sx in (1, -1):
-        limbs += [((sx * 1.26, -0.48, 2.1), (sx * 1.32, -0.75, 1.55), 0.48, 0.5),
-                  ((sx * 1.32, -0.75, 1.55), (sx * 1.34, -0.92, 0.75), 0.52, 0.6)]
-    limbs += [((0, 1.45, 1.15), (0, 1.85, 0.72), 0.4, 0.3), ((0, 1.85, 0.72), (T * 0.3, 2.1, 0.5), 0.3, 0.22),
-              ((T * 0.3, 2.1, 0.5), (T * 0.52, 2.12, 0.78), 0.22, 0.15)]
+        MX = (SX + FX) / 2 + 0.05
+        MY = (FY - 0.55) / 2
+        limbs += [((sx * (SX + 0.04), -0.48, 2.1), (sx * MX, MY, 1.55), 0.48, 0.5),
+                  ((sx * MX, MY, 1.55), (sx * (FX - 0.02), FY + 0.03, 0.75), 0.52, 0.6 * FR / 0.6)]
+    # tail: back and up, curling to the side at hip height (kept out of the arch between the legs, p11 front/rear)
+    limbs += [((0, 1.45, 1.25), (0, ty(1.9), 1.02), 0.4, 0.3), ((0, ty(1.9), 1.02), (T * 0.32, ty(2.2), 0.92), 0.3, 0.22),
+              ((T * 0.32, ty(2.2), 0.92), (T * 0.6, ty(2.24), 1.16), 0.22, 0.15)]
     bones = [
         ("Root", (0, 0, 0), (0, 0.5, 0), None),
         ("Hips", (0, 1.0, 1.25), (0, 0.3, 1.6), "Root"),
         ("Spine", (0, 0.3, 1.6), (0, -0.45, 2.1), "Hips"),
         ("Chest", (0, -0.45, 2.1), (0, -0.68, 2.72), "Spine"),
-        ("Neck", (0, -0.68, 2.72), (0, -0.94, 3.2), "Chest"),
-        ("Head", (0, -0.94, 3.2), (0, -1.47, 3.23), "Neck"),
-        ("Jaw", (0, -1.02, 2.95), (0, -1.5, 2.91), "Head"),
-        ("Tail1", (0, 1.4, 1.15), (0, 1.85, 0.72), "Hips"),
-        ("Tail2", (0, 1.85, 0.72), (T * 0.3, 2.1, 0.5), "Tail1"),
-        ("Tail3", (T * 0.3, 2.1, 0.5), (T * 0.52, 2.12, 0.78), "Tail2"),
+        ("Neck", (0, -0.68, 2.72), (0, -0.94 + HY, 3.2 + HZ), "Chest"),
+        ("Head", (0, -0.94 + HY, 3.2 + HZ), (0, -1.47 + HY, 3.23 + HZ), "Neck"),
+        ("Jaw", (0, -1.02 + HY, 2.95 + HZ), (0, -1.5 + HY, 2.91 + HZ), "Head"),
+        ("Tail1", (0, 1.4, 1.25), (0, ty(1.9), 1.02), "Hips"),
+        ("Tail2", (0, ty(1.9), 1.02), (T * 0.32, ty(2.2), 0.92), "Tail1"),
+        ("Tail3", (T * 0.32, ty(2.2), 0.92), (T * 0.6, ty(2.24), 1.16), "Tail2"),
     ]
     for sx, sfx in ((1, "_L"), (-1, "_R")):
-        bones += [("Arm" + sfx, (sx * 1.22, -0.42, 2.28), (sx * 1.32, -0.75, 1.55), "Chest"),
-                  ("Forearm" + sfx, (sx * 1.32, -0.75, 1.55), (sx * 1.34, -0.92, 0.75), "Arm" + sfx),
-                  ("Fist" + sfx, (sx * 1.34, -0.92, 0.75), (sx * 1.34, -1.0, 0.1), "Forearm" + sfx),
-                  ("Thigh" + sfx, (sx * 0.58, 1.1, 1.2), (sx * 0.62, 1.0, 0.7), "Hips"),
-                  ("Foot" + sfx, (sx * 0.62, 1.0, 0.7), (sx * 0.64, 0.7, 0.12), "Thigh" + sfx)]
+        MX, MY = (SX + FX) / 2 + 0.05, (FY - 0.55) / 2
+        bones += [("Arm" + sfx, (sx * SX, -0.42, 2.28), (sx * MX, MY, 1.55), "Chest"),
+                  ("Forearm" + sfx, (sx * MX, MY, 1.55), (sx * (FX - 0.02), FY + 0.03, 0.75), "Arm" + sfx),
+                  ("Fist" + sfx, (sx * (FX - 0.02), FY + 0.03, 0.75), (sx * FX, FY - 0.05, 0.1), "Forearm" + sfx),
+                  ("Thigh" + sfx, (sx * (THX - 0.02), 1.1, 1.2), (sx * (THX + 0.02), 1.0, 0.7), "Hips"),
+                  ("Foot" + sfx, (sx * (THX + 0.02), 1.0, 0.7), (sx * (THX + 0.04), 0.7, 0.12), "Thigh" + sfx)]
 
     def belly(c, n):
         return c.y < -0.25 and abs(c.x) < 0.56 and 0.95 < c.z < 2.62 and n.y < -0.3
@@ -1009,7 +1080,7 @@ def adult_params():
             return 0.44         # forearms / fists: big boulders
         if ax > 0.68 and p.y < 0.1:
             return 0.44         # shoulders, upper arms
-        if (p - Vector((0, -1.02, 3.25))).length < 0.6:
+        if (p - Vector((0, -1.02 + HY, 3.25 + HZ))).length < 0.6:
             return 0.24         # head
         if p.y > 1.7:
             return 0.28         # tail
@@ -1023,19 +1094,13 @@ def adult_params():
     def moss(p, n):
         return 0.6 if (p.z > 0.7 and n.z > 0.2) else 0.0
 
-    crest = []
-    # midline: crown -> neck -> hump (tallest) -> back -> hips -> tail
-    for cy, size, cnt in [(-1.05, 0.34, 4), (-0.75, 0.62, 5), (-0.48, 0.9, 5), (-0.2, 1.05, 5), (0.1, 0.95, 5),
-                          (0.4, 0.88, 4), (0.7, 0.78, 4), (1.0, 0.66, 4), (1.3, 0.54, 3), (1.6, 0.44, 3),
-                          (1.85, 0.36, 3)]:
-        crest.append((0.0, cy, size, cnt, 0.0))
-    for sx in (1, -1):   # the crest fans across the shoulder tops (p11 front: crystals span the shoulders)
-        for cy, size, cnt, x, tilt in [(-0.55, 0.7, 4, 0.42, 0.35), (-0.25, 0.8, 4, 0.46, 0.4), (0.08, 0.72, 4, 0.44, 0.45),
-                                       (0.4, 0.6, 3, 0.38, 0.45), (-0.45, 0.62, 3, 0.85, 0.7), (-0.12, 0.58, 3, 0.9, 0.75),
-                                       (0.2, 0.5, 3, 0.8, 0.8), (0.7, 0.5, 3, 0.34, 0.5), (1.0, 0.42, 3, 0.3, 0.5),
-                                       (1.3, 0.34, 2, 0.26, 0.5)]:
-            crest.append((sx * x, cy, size, cnt, sx * tilt))
-    spikes = [(0.14, -0.35, 0.36), (-0.16, -0.05, 0.38), (0.18, 0.25, 0.34), (-0.14, 0.55, 0.32), (0.0, -0.62, 0.28), (0.16, 0.85, 0.3), (-0.12, 1.15, 0.26)]
+    # crown: (y, midline length, side pairs); fans: (x offset, outward tilt deg, length fraction)
+    CK, FK = TUNE["crown_k"], TUNE["fan_k"]
+    crown = [(-0.8, 0.7, 1), (-0.56, 1.12, 2), (-0.31, 1.42, 2), (-0.06, 1.52, 2), (0.19, 1.46, 2), (0.44, 1.32, 2),
+             (0.69, 1.08, 2), (0.94, 0.8, 1), (1.18, 0.58, 1), (1.42, 0.44, 0), (1.66, 0.36, 0), (1.9, 0.3, 0)]
+    crown = [(ty(y) if y > 1.45 else y, L * CK, f) for y, L, f in crown]
+    fans = [(0.19, 17 * FK, 0.8), (0.38, 34 * FK, 0.64)]
+    spikes = [(0.52, -0.2, 0.32), (-0.54, 0.05, 0.34), (0.5, 0.35, 0.3), (-0.48, -0.45, 0.28), (0.3, 0.8, 0.26), (-0.28, 1.05, 0.24)]
     belly_tiles = [(-0.2, 2.3, 0.2, 0.15), (0.2, 2.3, 0.2, 0.15)]                     # pecs
     for z, half in [(2.0, 0.27), (1.74, 0.26), (1.48, 0.24), (1.22, 0.2)]:              # abdominal segments
         belly_tiles += [(-half * 0.52, z, half * 0.47, 0.11), (half * 0.52, z, half * 0.47, 0.11)]
@@ -1045,14 +1110,14 @@ def adult_params():
                     brow=(1.3, 0.4, 0.98, 16), smile=(0.13, 0.31, -0.06, 0.05, 0.03), open_jaw=0, teeth=0)
     return {
         "unit": U, "balls": balls, "limbs": limbs, "voxel": 0.05, "body_tris": 2600, "bones": bones,
-        "gap": 0.024, "chamfer_m": 0.05, "design_h": 4.2,
-        "head": (0, -1.02, 3.25), "head_r": 0.43, "muzzle": (0, -1.36, 3.0), "head_clear": 1.12, "belly": belly, "dmin": dmin,
+        "gap": 0.024, "crack_w": 0.08, "chamfer_m": 0.05, "design_h": 4.2,
+        "head": (0, -1.02 + HY, 3.25 + HZ), "head_r": 0.43, "muzzle": (0, -1.36 + HY, 3.0 + HZ), "head_clear": 1.12, "belly": belly, "dmin": dmin,
         "samples": 16000, "plate_r": 1.0, "plate_thick": 0.4, "light_frac": light_frac, "moss": moss, "min_plate_z": 0.15,
-        "belly_tiles": belly_tiles, "fist": (1.34, -0.95, 0.52), "fist_plate_z": 0.85, "fist_plate_r": 0.44,
+        "belly_tiles": belly_tiles, "fist": (FX, FY, 0.52), "fist_plate_z": 0.85, "fist_plate_r": 0.44 * FR / 0.6,
         "knuckles": (-0.33, -0.11, 0.11, 0.33), "knuckle_fwd": 0.42, "knuckle_r": 0.15,
         "foot": (0.64, 0.95, 0.38), "toes": (-0.2, 0.0, 0.2), "toe_fwd": 0.42, "toe_r": 0.12,
-        "face": face, "crest": crest, "spikes": spikes,
-        "tail_tip": ((T * 0.52, 2.12, 0.78), (T * 0.35, 0.1, 0.9), 0.46),
+        "face": face, "crown": crown, "fans": fans, "crown_lean": 10.0, "crystal_r": 0.17, "spikes": spikes,
+        "tail_tip": ((T * 0.6, ty(2.24), 1.16), (T * 0.35, 0.1, 0.9), 0.46),
     }
 
 
@@ -1109,13 +1174,9 @@ def hatch_params():
     def moss(p, n):
         return 0.7 if (p.z > 0.6 and n.z > 0.25) else 0.0
 
-    crest = []
-    for cy, size, cnt in [(-1.12, 0.4, 3), (-0.6, 0.75, 3), (-0.3, 1.25, 4), (0.05, 1.4, 4), (0.4, 1.2, 4),
-                          (0.75, 0.8, 3), (1.15, 0.5, 3)]:
-        crest.append((0.0, cy, size, cnt, 0.0))
-    for sx in (1, -1):
-        for cy, size, cnt, x, tilt in [(-0.2, 0.75, 3, 0.45, 0.6), (0.2, 0.8, 3, 0.5, 0.6), (0.55, 0.6, 3, 0.42, 0.6)]:
-            crest.append((sx * x, cy, size, cnt, sx * tilt))
+    crown = [(-0.62, 0.55, 1), (-0.36, 0.95, 2), (-0.08, 1.2, 2), (0.2, 1.22, 2), (0.48, 1.05, 2), (0.76, 0.78, 1),
+             (1.05, 0.52, 1), (1.32, 0.38, 0), (1.58, 0.3, 0)]
+    fans = [(0.24, 18, 0.82), (0.48, 36, 0.64)]
     face = face_kit(eye_r=0.15, eye_off={"x": 0.24, "y": -0.43, "z": 0.1, "muzzle": (0, -0.4, -0.16),
                                          "nose_fwd": 0.3, "nose_up": 0.1, "jaw": (0, -0.04, -0.2),
                                          "jaw_size": (0.24, 0.2, 0.08)},
@@ -1123,13 +1184,14 @@ def hatch_params():
     belly_tiles = [(x, z, 0.16, 0.09) for z in (1.2, 1.0, 0.8, 0.6) for x in (-0.17, 0.17)]
     return {
         "unit": U, "balls": balls, "limbs": limbs, "voxel": 0.045, "body_tris": 2000, "bones": bones,
-        "gap": 0.022, "chamfer_m": 0.035, "design_h": 2.6,
+        "gap": 0.022, "crack_w": 0.07, "chamfer_m": 0.035, "design_h": 2.6,
         "head": (0, -1.1, 1.75), "head_r": 0.56, "muzzle": (0, -1.5, 1.56), "head_clear": 1.1, "belly": belly, "dmin": dmin,
         "samples": 12000, "plate_r": 1.0, "plate_thick": 0.4, "light_frac": light_frac, "moss": moss, "min_plate_z": 0.1,
         "belly_tiles": belly_tiles, "fist": (0.82, -0.68, 0.32), "fist_plate_z": 0.45, "fist_plate_r": 0.26,
         "knuckles": (-0.18, 0.0, 0.18), "knuckle_fwd": 0.36, "knuckle_r": 0.11,
         "foot": (0.62, 0.62, 0.22), "toes": (-0.14, 0.0, 0.14), "toe_fwd": 0.34, "toe_r": 0.1,
-        "face": face, "crest": crest, "spikes": [(0.1, 0.25, 0.3), (-0.1, -0.1, 0.3)],
+        "face": face, "crown": crown, "fans": fans, "crown_lean": 8.0, "crystal_r": 0.18,
+        "spikes": [(0.62, 0.25, 0.26), (-0.62, -0.1, 0.26)],
         "tail_tip": ((0.2, 2.1, 0.26), (0.3, 0.6, 0.6), 0.4),
     }
 
