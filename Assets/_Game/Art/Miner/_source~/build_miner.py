@@ -557,8 +557,8 @@ def folded_crate(o, damaged):
     SX, SY, SZ = 0.62, 0.44, 0.80
     if damaged:
         # upright like the bible drawing (vertical boards, stone panels at the sides), knocked askew: rocked 7 degrees
-        # onto one bottom edge and turned 8 degrees, one corner sunk 3 cm into the ground
-        base = M((0.0, 0.0, -0.03), (0, 7, 8))
+        # onto one bottom edge and turned 8 degrees, the low corner 3 cm into the ground
+        base = M((0.0, 0.0, 0.015), (0, 7, 8))
     else:
         base = M((0, 0, 0))
 

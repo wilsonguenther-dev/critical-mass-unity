@@ -1,7 +1,5 @@
 {
- "failed": [
-  "Miner_Barricade_Damaged: sits on the ground (min z ~ 0)"
- ],
+ "failed": [],
  "results": [
   {
    "check": "fbx header axes (Y up, Z front, X coord)",
@@ -383,8 +381,8 @@
   },
   {
    "check": "Miner_Barricade_Damaged: sits on the ground (min z ~ 0)",
-   "ok": false,
-   "detail": -0.075
+   "ok": true,
+   "detail": -0.03
   },
   {
    "check": "Miner_Barricade_Damaged: vertex colour + team mask present",
