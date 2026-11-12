@@ -57,36 +57,19 @@ scene.unit_settings.scale_length = 1.0
 COLL = scene.collection
 
 
-def make_materials():
-    cols = PAL.colours("Neutral")
-    mats = []
-    for s in PAL.SLOTS:
-        m = bpy.data.materials.new(PAL.material_name(s))
-        if m.node_tree is None:
-            m.use_nodes = True
-        nt = m.node_tree
-        bsdf = next(n for n in nt.nodes if n.type == "BSDF_PRINCIPLED")
-        lit = lin(cols[s][0])
-        bsdf.inputs["Base Color"].default_value = (*lit, 1.0)
-        bsdf.inputs["Roughness"].default_value = 1.0
-        bsdf.inputs["Metallic"].default_value = 0.0
-        for nm in ("Specular IOR Level", "Specular"):
-            if nm in bsdf.inputs:
-                bsdf.inputs[nm].default_value = 0.0
-        if s == "Glow":
-            bsdf.inputs["Emission Color"].default_value = (*lit, 1.0)
-            bsdf.inputs["Emission Strength"].default_value = 1.0
-        m.diffuse_color = (*lit, 1.0)
-        m.roughness = 1.0
-        m.metallic = 0.0
-        m["cm_slot"] = s
-        m["cm_unlit"] = s == "Glow"
-        m["cm_team_channel"] = s in ("Glow", "Crystal", "CrystalBase")
-        mats.append(m)
-    return mats
+def make_material():
+    """The one CM_Toon material every Kaiju mesh carries (ART-DIRECTION 3.4). Colour is in the vertex colour layer
+    "Col" (RGB lit colour, ALPHA mask code); the Unity CM/Toon shader reads it. render_kaiju.py swaps in a node tree
+    that previews the three-band ramp; the FBX only needs the name."""
+    m = bpy.data.materials.new(PAL.MATERIAL)
+    m.diffuse_color = (0.5, 0.5, 0.5, 1.0)
+    m.roughness = 1.0
+    m.metallic = 0.0
+    return m
 
 
-MATS = make_materials()
+MAT = make_material()
+CHAMFER = [0.04]          # current chamfer in DESIGN units; set per stage from metres / expected scale
 
 
 # ------------------------------------------------------------------------------------------------ geometry
@@ -94,12 +77,15 @@ class Geo:
     """Accumulates pieces: verts, faces, per-face slot, per-vertex rigid bone (None = skin by distance)."""
 
     def __init__(self):
-        self.V, self.F, self.M, self.SM, self.B = [], [], [], [], []
+        self.V, self.F, self.M, self.SM, self.B, self.G = [], [], [], [], [], []
 
-    def add(self, verts, faces, mats, bone=None, smooth=False):
+    def add(self, verts, faces, mats, bone=None, smooth=False, shade=None):
+        """shade: per-vertex value factor baked into the vertex colour (+6 % toward the top of a part, -10 % in
+        crevices, ART-DIRECTION 3.5). None = 1.0."""
         o = len(self.V)
         self.V += [Vector(v) for v in verts]
         self.B += [bone] * len(verts)
+        self.G += list(shade) if shade is not None else [1.0] * len(verts)
         for k, f in enumerate(faces):
             self.F.append(tuple(i + o for i in f))
             self.M.append(mats[k] if isinstance(mats, (list, tuple)) else mats)
@@ -132,65 +118,155 @@ def hull(pts):
     return V, F, N
 
 
-def rock(geo, p, n, r, thick, base_slot, rng, moss=0.0, bone=None, elong=(0.8, 1.2), sink=0.3, moss_dot=0.45):
-    """A faceted boulder plate sitting on the surface point p with normal n. Built face by face (bottom fan, a zipper
-    band between a jittered bottom ring and a smaller top ring, top fan) rather than by convex hull, because
-    bmesh's hull kept or dropped near-coplanar points differently from run to run and broke reproducibility."""
-    M = frame(n, rng.uniform(0, math.tau))
-    nn_ = Vector(n).normalized()
-    ex, ey = rng.uniform(*elong), rng.uniform(0.8, 1.1)
-    k, m = 9, 5
-    ab = [math.tau * i / k + rng.uniform(-0.22, 0.22) for i in range(k)]
-    at = [math.tau * j / m + 0.3 + rng.uniform(-0.3, 0.3) for j in range(m)]
-    loc = []
-    for a in ab:
-        rr = r * rng.uniform(0.82, 1.0)
-        loc.append(Vector((math.cos(a) * rr * ex, math.sin(a) * rr * ey, rng.uniform(-0.25, 0.05) * thick)))
-    for a in at:
-        rr = r * rng.uniform(0.35, 0.68)
-        loc.append(Vector((math.cos(a) * rr * ex, math.sin(a) * rr * ey, thick * rng.uniform(0.62, 0.95))))
-    loc.append(Vector((rng.uniform(-0.15, 0.15) * r, rng.uniform(-0.15, 0.15) * r, thick)))   # apex
-    loc.append(Vector((0, 0, -0.3 * thick)))                                                   # bottom centre
-    V = [Vector(p) + M @ q - nn_ * (sink * thick) for q in loc]
-    A, BC = k + m, k + m + 1
-    F = [[BC, (i + 1) % k, i] for i in range(k)]
-    i = j = 0
-    while i < k or j < m:
-        nb = ab[i + 1] if i + 1 < k else ab[0] + math.tau
-        nt = at[j + 1] if j + 1 < m else at[0] + math.tau
-        if j >= m or (i < k and nb < nt):
-            F.append([i % k, (i + 1) % k, k + j % m]); i += 1
-        else:
-            F.append([i % k, k + (j + 1) % m, k + j % m]); j += 1
-    F += [[k + j, k + (j + 1) % m, A] for j in range(m)]
+def slab(geo, p, n, M, outline, thick, base_slot, rng, mossy=False, bone=None, sink=0.3, moss_dot=0.45,
+         surf=None, slot_fn=None):
+    """One plate: a separate bevelled slab (ART-DIRECTION 3.5; brief: 0.04-0.06 u chamfer at adult scale).
+    outline: convex 2-D polygon (counter-clockwise) in the tangent frame M at p (normal n). Rings, bottom to top:
+    footing (sunk into the body), shoulder (side top), chamfer ring (inset by CHAMFER, raised), and a domed apex, so
+    the top reads as 2-4 facets in the three-band ramp and every corner catches a light line. No bottom cap (hidden
+    in the body). surf(q) -> surface point for a tangent-plane point (conforms the footing to the body), or None."""
+    n = Vector(n).normalized()
+    ch = CHAMFER[0]
+    k = len(outline)
+    cen2 = sum((Vector(q) for q in outline), Vector((0.0, 0.0))) / k
+    rows = []
+    for q in outline:
+        q = Vector(q)
+        w = p + M @ Vector((q.x, q.y, 0.0))
+        base = surf(w) if surf else w
+        d = q - cen2
+        inset = (d.normalized() * max(0.0, d.length - ch) + cen2) if d.length > 1e-6 else q
+        wi = p + M @ Vector((inset.x, inset.y, 0.0))
+        basei = surf(wi) if surf else wi
+        rows.append((base - n * (sink * thick), base + n * (thick - 0.8 * ch), basei + n * thick))
+    apex = (surf(p + M @ Vector((cen2.x, cen2.y, 0))) if surf else p + M @ Vector((cen2.x, cen2.y, 0))) \
+        + n * (thick * 1.18) + M @ Vector((rng.uniform(-0.12, 0.12) * thick, rng.uniform(-0.12, 0.12) * thick, 0))
+    V, G = [], []
+    for b, s, c in rows:
+        V += [b, s, c]
+        G += [0.90, 1.0, 1.03]
+    A = len(V)
+    V.append(apex)
+    G.append(1.06)
+    F, mats = [], []
+    for i in range(k):
+        j = (i + 1) % k
+        F.append([3 * i, 3 * j, 3 * j + 1, 3 * i + 1]); mats.append("side")
+        F.append([3 * i + 1, 3 * j + 1, 3 * j + 2, 3 * i + 2]); mats.append("chamfer")
+        F.append([3 * i + 2, 3 * j + 2, A]); mats.append("top")
     cen = sum(V, Vector()) / len(V)
-    mats = []
-    mossy = rng.random() < moss
-    for f in F:
+    out = []
+    for f, kind in zip(F, mats):
         a, b, c = V[f[0]], V[f[1]], V[f[2]]
         nrm = (b - a).cross(c - a)
         if nrm.dot((a + b + c) / 3 - cen) < 0:
             f.reverse()
             nrm = -nrm
         nrm.normalize()
-        mats.append(SLOT["Moss"] if (mossy and nrm.z > moss_dot) else SLOT[base_slot])
-    geo.add(V, F, mats, bone)
+        if slot_fn:
+            out.append(SLOT[slot_fn(kind, nrm)])
+        elif mossy and kind == "top" and nrm.z > moss_dot:
+            out.append(SLOT["Moss"])
+        else:
+            out.append(SLOT[base_slot])
+    geo.add(V, F, out, bone, shade=G)
+
+
+def rock(geo, p, n, r, thick, base_slot, rng, moss=0.0, bone=None, elong=(0.8, 1.2), sink=0.3, moss_dot=0.45):
+    """A free-standing boulder plate (knuckles, toes, fist fronts): a jittered k-gon slab."""
+    M = frame(n, rng.uniform(0, math.tau))
+    ex, ey = rng.uniform(*elong), rng.uniform(0.85, 1.05)
+    k = rng.choice((6, 7))
+    outline = []
+    for i in range(k):
+        a = math.tau * i / k + rng.uniform(-0.2, 0.2)
+        rr = r * rng.uniform(0.85, 1.0)
+        outline.append((math.cos(a) * rr * ex, math.sin(a) * rr * ey))
+    slab(geo, Vector(p), n, M, outline, thick, base_slot, rng, mossy=rng.random() < moss, bone=bone, sink=sink,
+         moss_dot=moss_dot)
+
+
+def clip_poly(poly, nx, ny, c):
+    """Keep the part of a 2-D polygon with nx*x + ny*y <= c (Sutherland-Hodgman)."""
+    out = []
+    for i in range(len(poly)):
+        a, b = poly[i], poly[(i + 1) % len(poly)]
+        da, db = nx * a[0] + ny * a[1] - c, nx * b[0] + ny * b[1] - c
+        if da <= 0:
+            out.append(a)
+        if (da < 0) != (db < 0) and abs(da - db) > 1e-12:
+            t = da / (da - db)
+            out.append((a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t))
+    return out
+
+
+def voronoi_plates(geo, bvh, seeds, gap, thick_fn, slot_fn_for, rng, rmax_fn, sink=0.45, min_edge=0.0):
+    """Tile the body with plates: each seed's Voronoi cell in its own tangent plane, shrunk by gap/2 on every side
+    so the glowing body shows as an even crack between plates (brief: crack inlays as channels in team glow).
+    seeds: [(p, n, d)]. thick_fn(p, n, d) -> plate height; slot_fn_for(p, n, d) -> (base_slot, mossy, bone)."""
+    P = np.array([tuple(s[0]) for s in seeds])
+    count = 0
+    for i, (p, n, d) in enumerate(seeds):
+        n = Vector(n).normalized()
+        M = frame(n, 0.0)
+        Mi = M.transposed()
+        rmax = rmax_fn(p, n, d)
+        poly = [(math.cos(math.tau * a / 10) * rmax, math.sin(math.tau * a / 10) * rmax) for a in range(10)]
+        dist = np.sqrt(((P - np.array(tuple(p))) ** 2).sum(1))
+        for j in np.argsort(dist)[1:18]:
+            if dist[j] > 2.6 * rmax + gap:
+                break
+            q = Mi @ (Vector(P[j]) - p)
+            L = math.hypot(q.x, q.y)
+            if L < 1e-6:
+                continue
+            poly = clip_poly(poly, q.x / L, q.y / L, L / 2 - gap / 2)
+            if len(poly) < 3:
+                break
+        if len(poly) < 3:
+            continue
+        # drop very short edges (fewer triangles, cleaner polygons)
+        clean = []
+        for q in poly:
+            if not clean or math.hypot(q[0] - clean[-1][0], q[1] - clean[-1][1]) > min_edge:
+                clean.append(q)
+        if len(clean) > 3 and math.hypot(clean[0][0] - clean[-1][0], clean[0][1] - clean[-1][1]) < min_edge:
+            clean.pop()
+        if len(clean) < 3:
+            continue
+        area = 0.5 * abs(sum(clean[a][0] * clean[(a + 1) % len(clean)][1] - clean[(a + 1) % len(clean)][0] * clean[a][1]
+                             for a in range(len(clean))))
+        if area < (0.6 * gap) ** 2:
+            continue
+
+        def surf(w, n=n):
+            hit, _, _, _ = bvh.ray_cast(w + n * 0.3, -n, 0.7)
+            if hit is None:
+                hit = bvh.find_nearest(w)[0]
+            return hit if hit is not None else w
+
+        base_slot, mossy, bone = slot_fn_for(p, n, d)
+        slab(geo, Vector(p), n, M, clean, thick_fn(p, n, d), base_slot, rng, mossy=mossy, bone=bone, sink=sink,
+             surf=surf)
+        count += 1
+    return count
 
 
 def tile(geo, p, n, w, h, thick, slot, rng, bone=None, spin=0.0):
-    """A flat rounded-rectangle plate (belly segments)."""
+    """A flat rounded-rectangle belly segment: an octagon slab (chamfered corners in plan and on the top edge)."""
     M = frame(n, spin)
-    pts = []
+    outline = []
     for sx, sy in ((1, 1), (-1, 1), (-1, -1), (1, -1)):
-        for cx, cy in ((1.0, 0.72), (0.72, 1.0)):
-            pts.append(Vector((sx * w * cx, sy * h * cy, 0.0)))
-            pts.append(Vector((sx * w * cx * 0.86, sy * h * cy * 0.86, thick)))
-    world = [Vector(p) + M @ q - Vector(n).normalized() * (0.35 * thick) for q in pts]
-    V, F, _ = hull(world)
-    geo.add(V, F, SLOT[slot], bone)
+        pts = [(sx * w, sy * h * 0.72), (sx * w * 0.72, sy * h)]
+        outline += pts if sx * sy > 0 else pts[::-1]
+    # order counter-clockwise by angle
+    outline.sort(key=lambda q: math.atan2(q[1], q[0]))
+    slab(geo, Vector(p), n, M, outline, thick, slot, rng, sink=0.35)
 
 
 def crystal(geo, base, d, length, radius, rng, bone=None, base_frac=0.3, sides=6):
+    """Hexagonal crystal, self-lit team glow. Facets are painted (unlit): root ring CrystalBase, side facets
+    alternating Crystal / CrystalDark, tip facets CrystalTip."""
     d = Vector(d).normalized()
     M = frame(d, rng.uniform(0, math.tau))
     base = Vector(base) - d * (0.18 * length)
@@ -209,10 +285,10 @@ def crystal(geo, base, d, length, radius, rng, bone=None, base_frac=0.3, sides=6
         for i in range(sides):
             a, b = ring * sides + i, ring * sides + (i + 1) % sides
             F.append([a, b, b + sides, a + sides])
-            mats.append(SLOT["CrystalBase"] if ring == 0 else SLOT["Crystal"])
+            mats.append(SLOT["CrystalBase"] if ring == 0 else SLOT["Crystal" if i % 2 == 0 else "CrystalDark"])
     t = len(V) - 1
     for i in range(sides):
-        F.append([2 * sides + i, 2 * sides + (i + 1) % sides, t]); mats.append(SLOT["Crystal"])
+        F.append([2 * sides + i, 2 * sides + (i + 1) % sides, t]); mats.append(SLOT["CrystalTip" if i % 2 == 0 else "Crystal"])
     geo.add(V, F, mats, bone)
 
 
@@ -261,7 +337,8 @@ def ellipsoid(geo, c, r, scale, slot, bone=None, seg=10, rings=7, smooth=True, r
         F.append([top, (i + 1) % seg, i])
         o = (rings - 2) * seg
         F.append([bot, o + i, o + (i + 1) % seg])
-    geo.add(V, F, SLOT[slot], bone, smooth)
+    zs = [(R.transposed() @ (v - Vector(c))).z / (r * scale[2]) for v in V]
+    geo.add(V, F, SLOT[slot], bone, smooth, shade=[1.0 + 0.06 * z if z > 0 else 1.0 + 0.08 * z for z in zs])
 
 
 def metaball_body(balls, limbs, voxel, tri_target):
@@ -321,6 +398,7 @@ def add_body(geo, bm, face_slot, smooth_fn=lambda c, n: False):
     o = len(geo.V)
     geo.V += V
     geo.B += [None] * len(V)
+    geo.G += [1.0] * len(V)
     for f in bm.faces:
         c, n = f.calc_center_median(), f.normal
         geo.F.append(tuple(v.index + o for v in f.verts))
@@ -432,6 +510,7 @@ def finish(name, geo, bones, target_h):
     zmin = min(v.z for v in geo.V)
     zmax = max(v.z for v in geo.V)
     s = target_h / (zmax - zmin)
+    print("SCALE %s design_h=%.3f s=%.4f chamfer=%.3f m" % (name, zmax - zmin, s, CHAMFER[0] * s))
     off = Vector((0, 0, zmin))
     geo.V = [(v - off) * s for v in geo.V]
     bones = [(bn, (Vector(h) - off) * s, (Vector(t) - off) * s, p) for bn, h, t, p in bones]
@@ -451,17 +530,33 @@ def finish(name, geo, bones, target_h):
             W[i] = {cache[key]: 1.0}
     me = bpy.data.meshes.new(name + "_Mesh")
     me.from_pydata([tuple(v) for v in geo.V], [], [list(f) for f in geo.F])
-    for m in MATS:
-        me.materials.append(m)
-    me.polygons.foreach_set("material_index", geo.M)
+    me.materials.append(MAT)
     me.polygons.foreach_set("use_smooth", geo.SM)
     me.validate(clean_customdata=False)
     me.update()
     bm = bmesh.new()
     bm.from_mesh(me)
-    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+    # re-orient closed pieces only; open pieces (plate slabs, the egg's ground splash) are built facing out and a
+    # whole-mesh recalc can flip them
+    seen = set()
+    for f0 in bm.faces:
+        if f0.index in seen:
+            continue
+        isl, stack = [], [f0]
+        seen.add(f0.index)
+        while stack:
+            f = stack.pop()
+            isl.append(f)
+            for e in f.edges:
+                for g in e.link_faces:
+                    if g.index not in seen:
+                        seen.add(g.index)
+                        stack.append(g)
+        if all(e.is_manifold for f in isl for e in f.edges):
+            bmesh.ops.recalc_face_normals(bm, faces=isl)
     bm.to_mesh(me)
     bm.free()
+    paint(me, name, geo)
     ob = bpy.data.objects.new(name + "_Mesh", me)
     COLL.objects.link(ob)
     rig = make_rig(name, bones)
@@ -476,6 +571,29 @@ def finish(name, geo, bones, target_h):
     ob["cm_stage"] = name
     rig["cm_stage"] = name
     return ob, rig, s
+
+
+def paint(me, stage, geo):
+    """Vertex colour layer "Col" (corner domain, sRGB bytes): RGB = slot lit colour x baked gradient, A = mask code.
+    Team-glow slots are self-lit, so they get no gradient. Also stores the slot per face as an int attribute
+    "cm_slot" (Blender-side only, for checks; FBX ignores it)."""
+    names = PAL.SLOTS
+    assert len(me.polygons) == len(geo.M), ("validate dropped faces", len(me.polygons), len(geo.M))
+    rgb = {s: PAL.slot_rgb(stage, s) for s in names}
+    col = me.color_attributes.new("Col", "BYTE_COLOR", "CORNER")
+    me.color_attributes.active_color = col
+    me.color_attributes.render_color_index = me.color_attributes.active_color_index
+    slot_attr = me.attributes.new("cm_slot", "INT", "FACE")
+    vals = []
+    for poly, mi in zip(me.polygons, geo.M):
+        sname = names[mi]
+        slot_attr.data[poly.index].value = mi
+        base, a = rgb[sname], PAL.slot_alpha(sname)
+        for li in poly.loop_indices:
+            g = 1.0 if sname in PAL.TEAM_SLOTS else geo.G[me.loops[li].vertex_index]
+            vals.append((min(1.0, base[0] * g), min(1.0, base[1] * g), min(1.0, base[2] * g), a))
+    for li, v in enumerate(vals):
+        col.data[li].color_srgb = v
 
 
 def auto(p):
@@ -526,6 +644,7 @@ def key_clips(rig, clips, scale):
 
 
 X, Y, Z = (1, 0, 0), (0, 1, 0), (0, 0, 1)
+PIVOT_Y = [0.95]   # hind-foot contact (design y) of the stage being keyed, for the rearing pivot
 
 
 def creature_clips():
@@ -579,15 +698,20 @@ def creature_clips():
         return {"rot": rot, "loc": {"Hips": (0, 0, 0.06 - 0.14 * s)}}
 
     def berserk(t):
+        """Bible p10 berserk: a rearing roar. The whole body pitches up about the hind feet (Root turn plus the
+        matching lift, pivot = hind-foot contact at y = PIVOT_Y design units), forelimbs off the ground, jaw wide."""
         p = math.tau * t
-        s = math.sin(p)
         sh = math.sin(2 * p)
-        return {"rot": {"Spine": [(X, -6), (Y, 3 * sh)], "Chest": [(X, -6)], "Neck": [(X, -4)],
-                        "Head": [(X, -14 + 4 * math.sin(4 * p))], "Jaw": [(X, 40 + 4 * math.sin(6 * p))],
-                        "Arm_L": [(X, 10 - 12 * max(0.0, s))], "Arm_R": [(X, 10 - 12 * max(0.0, -s))],
-                        "Forearm_L": [(X, -10 * max(0.0, s))], "Forearm_R": [(X, -10 * max(0.0, -s))],
-                        "Tail1": [(Z, 12 * sh), (X, -10)]},
-                "loc": {"Hips": (0, 0, 0.05)}}
+        a = -24.0 + 2.0 * math.sin(p)
+        ar = math.radians(a)
+        lift = (0, PIVOT_Y[0] * (1 - math.cos(ar)), -PIVOT_Y[0] * math.sin(ar))
+        return {"rot": {"Root": [(X, a)], "Spine": [(X, -8), (Y, 3 * sh)], "Chest": [(X, -10)], "Neck": [(X, 6)],
+                        "Head": [(X, 4 + 4 * math.sin(4 * p))], "Jaw": [(X, 40 + 4 * math.sin(6 * p))],
+                        "Arm_L": [(X, -38 + 6 * math.sin(p)), (Y, -10)], "Arm_R": [(X, -38 - 6 * math.sin(p)), (Y, 10)],
+                        "Forearm_L": [(X, -30)], "Forearm_R": [(X, -30)], "Fist_L": [(X, -10)], "Fist_R": [(X, -10)],
+                        "Thigh_L": [(X, 20)], "Thigh_R": [(X, 20)], "Foot_L": [(X, 6)], "Foot_R": [(X, 6)],
+                        "Tail1": [(Z, 12 * sh), (X, 14)]},
+                "loc": {"Root": lift}}
 
     def ko(t):
         e = smooth(t / 0.7)
@@ -618,6 +742,7 @@ def creature(name, P, seed, target_h):
     """Shared quadruped builder for the hatchling and the adult. P is a dict of design-space proportions."""
     rng = random.Random(seed)
     geo = Geo()
+    CHAMFER[0] = P["chamfer_m"] / (target_h / P["design_h"])
     bm = metaball_body(P["balls"], P["limbs"], P["voxel"], P["body_tris"])
     bvh = BVHTree.FromBMesh(bm)
     Hc = Vector(P["head"])
@@ -633,11 +758,11 @@ def creature(name, P, seed, target_h):
         if face_zone(c, n):
             if n.z < -0.35 and c.z < P["muzzle"][2]:
                 return "Mouth"   # under the muzzle: hidden by the jaw at rest, the open mouth when the jaw drops
-            return "Belly" if c.z < P["muzzle"][2] + 0.03 else "Slate"
+            return "Belly" if c.z < P["muzzle"][2] + 0.03 else "Skin"
         if (c - Hc).length < RH * 1.9 and n.y < -0.25 and c.z < Hc.z - 0.3 * RH and abs(c.x) < RH:
             return "Belly"       # chin and throat run into the tan chest plate (p11 front)
         if (c - Hc).length < RH * 1.25:
-            return "Slate"
+            return "Skin"
         if belly_zone(c, n):
             return "Belly"
         return "Glow"
@@ -654,17 +779,21 @@ def creature(name, P, seed, target_h):
             return None         # the head stays a smooth dark mass with a few authored plates (p11 face read)
         return P["dmin"](p, n)
 
-    for p, n, d in poisson(surface_samples(bm, P["samples"], rng), dmin, rng):
+    seeds = poisson(surface_samples(bm, P["samples"], rng), dmin, rng)
+
+    def slot_for(p, n, d):
         light = rng.random() < P["light_frac"](p)
-        moss = P["moss"](p, n)
-        r = d * P["plate_r"]
-        rock(geo, p, n, r, r * P["plate_thick"], "SlateLight" if light else "Slate", rng, moss=moss, bone=auto(p))
+        return ("SlateLight" if light else "Slate"), rng.random() < P["moss"](p, n), auto(p)
+
+    nplates = voronoi_plates(geo, bvh, seeds, P["gap"], lambda p, n, d: d * P["plate_thick"] * rng.uniform(0.85, 1.1),
+                             slot_for, rng, lambda p, n, d: d * 0.8, sink=0.5, min_edge=P["gap"] * 0.7)
+    print("PLATES", name, nplates, "of", len(seeds), "seeds")
 
     # --- belly segments: a grid of tan tiles, ray-cast from the front
     for (bx, bz, w, h) in P["belly_tiles"]:
         p, n = ray(bvh, (bx, -6, bz), (0, 1, 0))
         if p is not None:
-            tile(geo, p, n, w, h, 0.07 * P["unit"], "Belly", rng, bone=auto(p))
+            tile(geo, p, n, w, h, 0.09 * P["unit"], "Belly", rng, bone=auto(p))
 
     # --- fists / forefeet: big lighter front boulder and knuckles on the ground
     for sx in (1, -1):
@@ -709,6 +838,7 @@ def creature(name, P, seed, target_h):
 
     bm.free()
     ob, rig, s = finish(name, geo, P["bones"], target_h)
+    PIVOT_Y[0] = P["foot"][1]
     key_clips(rig, creature_clips(), s)
     return ob, rig
 
@@ -847,7 +977,8 @@ def adult_params():
                                          "jaw_size": (0.17, 0.17, 0.09), "mouth_back": 0.12},
                     brow=(1.3, 0.4, 0.98, 16), smile=(0.13, 0.31, -0.06, 0.05, 0.03), open_jaw=0, teeth=0)
     return {
-        "unit": U, "balls": balls, "limbs": limbs, "voxel": 0.05, "body_tris": 4600, "bones": bones,
+        "unit": U, "balls": balls, "limbs": limbs, "voxel": 0.05, "body_tris": 2600, "bones": bones,
+        "gap": 0.1, "chamfer_m": 0.05, "design_h": 4.2,
         "head": (0, -1.02, 3.25), "head_r": 0.43, "muzzle": (0, -1.36, 3.0), "head_clear": 1.12, "belly": belly, "dmin": dmin,
         "samples": 9000, "plate_r": 1.0, "plate_thick": 0.4, "light_frac": light_frac, "moss": moss, "min_plate_z": 0.15,
         "belly_tiles": belly_tiles, "fist": (1.1, -0.95, 0.52), "fist_plate_z": 0.85, "fist_plate_r": 0.44,
@@ -924,7 +1055,8 @@ def hatch_params():
                     brow=None, smile=(0.18, 0.31, -0.07, 0.07, 0.0), open_jaw=22, teeth=4)
     belly_tiles = [(x, z, 0.16, 0.09) for z in (1.2, 1.0, 0.8, 0.6) for x in (-0.17, 0.17)]
     return {
-        "unit": U, "balls": balls, "limbs": limbs, "voxel": 0.045, "body_tris": 3200, "bones": bones,
+        "unit": U, "balls": balls, "limbs": limbs, "voxel": 0.045, "body_tris": 2000, "bones": bones,
+        "gap": 0.085, "chamfer_m": 0.035, "design_h": 2.6,
         "head": (0, -1.1, 1.75), "head_r": 0.56, "muzzle": (0, -1.5, 1.56), "head_clear": 1.1, "belly": belly, "dmin": dmin,
         "samples": 6000, "plate_r": 1.0, "plate_thick": 0.4, "light_frac": light_frac, "moss": moss, "min_plate_z": 0.1,
         "belly_tiles": belly_tiles, "fist": (0.82, -0.68, 0.32), "fist_plate_z": 0.45, "fist_plate_r": 0.26,
@@ -964,23 +1096,102 @@ def build_egg(seed):
     bm.normal_update()
     add_body(geo, bm, lambda c, n: "Glow", lambda c, n: True)
     window = Vector((0.0, -R, 0.45))
+    CHAMFER[0] = 0.03 / (EGG_HEIGHT / H)
 
     def dmin(p, n):
-        if (p - window).length < 0.2:
-            return None
-        return 0.165
+        if (p - window).length < 0.17:
+            return None         # the glowing core window on the front (p10)
+        return 0.2
 
     samples = surface_samples(bm, 6000, rng)
     picks = poisson(samples, dmin, rng)
-    for p, n, d in picks:
-        r = d * 0.86
-        light = rng.random() < 0.3
-        rock(geo, p, n, r, r * 0.32, "SlateLight" if light else "Slate", rng, moss=0.0, bone="Shell", elong=(0.9, 1.1), sink=0.45)
+    bvh = BVHTree.FromBMesh(bm)
+    voronoi_plates(geo, bvh, picks, 0.035, lambda p, n, d: d * 0.36,
+                   lambda p, n, d: ("SlateLight" if rng.random() < 0.25 else "Slate", False, "Shell"), rng,
+                   lambda p, n, d: d * 0.8, sink=0.5, min_edge=0.025)
+    # lime ground glow: a flat ragged splash on the ground, part of the shell mesh (bible p10 egg)
+    ring, k = [], 28
+    for i in range(k):
+        a = math.tau * i / k
+        rr = R * (1.75 + 0.35 * math.sin(3 * a + 0.7) + rng.uniform(-0.15, 0.15))
+        ring.append(Vector((math.cos(a) * rr, math.sin(a) * rr * 0.8, 0.0)))
+    inner = [Vector((v.x * 0.55, v.y * 0.55, 0.004)) for v in ring]
+    V = ring + inner + [Vector((0, 0, 0.006))]
+    F = [[i, (i + 1) % k, k + (i + 1) % k, k + i] for i in range(k)] + [[k + i, k + (i + 1) % k, 2 * k] for i in range(k)]
+    geo.add(V, F, [SLOT["Crystal"]] * k + [SLOT["Glow"]] * k, "Root")
     bm.free()
     bones = [("Root", (0, 0, 0), (0, 0.3, 0), None), ("Shell", (0, 0, 0.02), (0, 0, H), "Root")]
     ob, rig, s = finish("Egg", geo, bones, EGG_HEIGHT)
     key_clips(rig, egg_clips(), s)
     return ob, rig
+
+
+# ------------------------------------------------------------------------------------------------ props (metres)
+def prop_mesh(name, stage, geo):
+    me = bpy.data.meshes.new(name)
+    me.from_pydata([tuple(v) for v in geo.V], [], [list(f) for f in geo.F])
+    me.materials.append(MAT)
+    me.validate(clean_customdata=False)
+    me.update()
+    paint(me, stage, geo)
+    ob = bpy.data.objects.new(name, me)
+    COLL.objects.link(ob)
+    ob["cm_stage"] = name
+    return ob
+
+
+def build_shards(seed):
+    """Berserk floating shards (bible p10): 12 broken crystal shards orbiting the adult, 1.4-4.6 m up, 1.9-2.7 m out.
+    Team glow (baked in the adult's Azure default, so the berserk magenta swap applies the same way). A separate
+    rigid prop: the game parents it to the Kaiju root and spins it only in the berserk state."""
+    rng = random.Random(seed)
+    geo = Geo()
+    CHAMFER[0] = 0.04
+    for i in range(12):
+        a = math.tau * i / 12 + rng.uniform(-0.2, 0.2)
+        r = rng.uniform(1.9, 2.7)
+        c = Vector((math.cos(a) * r, math.sin(a) * r * 0.9 + 0.3, rng.uniform(1.4, 4.6)))
+        d = Vector((rng.uniform(-1, 1), rng.uniform(-1, 1), rng.uniform(0.3, 1.2))).normalized()
+        ln = rng.uniform(0.35, 0.7)
+        crystal(geo, c - d * ln * 0.5, d, ln, ln * 0.24, rng, bone=None, sides=5)
+    return prop_mesh("Kaiju_BerserkShards", "Shards", geo)
+
+
+def build_telegraph(seed, radius=5.0):
+    """Slam telegraph spike ring (bible p10; brief: model the spike ring only, the red decal and its 2 Hz pulse are
+    game side). 28 red spikes on the slam radius (config Kaiju.SlamRadius 5.0), leaning outward. Fixed colour."""
+    rng = random.Random(seed)
+    geo = Geo()
+    n = 28
+    for i in range(n):
+        a = math.tau * i / n
+        p = Vector((math.cos(a) * radius, math.sin(a) * radius, 0.0))
+        out = Vector((math.cos(a), math.sin(a), 0.0))
+        ln = 0.42 if i % 2 == 0 else 0.28
+        d = (Vector((0, 0, 1)) + out * 0.45).normalized()
+        sides = 4
+        M = frame(d, a)
+        base = p
+        V = [base + M @ Vector((math.cos(math.tau * k / sides) * ln * 0.3, math.sin(math.tau * k / sides) * ln * 0.3, 0))
+             for k in range(sides)]
+        V.append(base + d * ln)
+        F = [list(range(sides))[::-1]] + [[k, (k + 1) % sides, sides] for k in range(sides)]
+        geo.add(V, F, SLOT["Telegraph"], shade=[0.92] * sides + [1.06])
+    return prop_mesh("Kaiju_TelegraphSpikes", "Adult", geo)
+
+
+def export_prop(ob):
+    for o in bpy.data.objects:
+        o.select_set(False)
+    ob.select_set(True)
+    bpy.context.view_layer.objects.active = ob
+    path = os.path.join(ART, ob.name + ".fbx")
+    bpy.ops.export_scene.fbx(
+        filepath=path, use_selection=True, object_types={"MESH"}, global_scale=1.0, apply_unit_scale=True,
+        apply_scale_options="FBX_SCALE_ALL", axis_forward="-Z", axis_up="Y", bake_space_transform=False,
+        use_mesh_modifiers=False, mesh_smooth_type="FACE", use_tspace=False, colors_type="SRGB",
+        prioritize_active_color=True, bake_anim=False, path_mode="STRIP", embed_textures=False)
+    print("EXPORTED", path, "tris", sum(len(p.vertices) - 2 for p in ob.data.polygons))
 
 
 # ------------------------------------------------------------------------------------------------ build + export
@@ -997,8 +1208,8 @@ def export(stage, ob, rig):
         filepath=path, use_selection=True, object_types={"ARMATURE", "MESH"},
         global_scale=1.0, apply_unit_scale=True, apply_scale_options="FBX_SCALE_ALL",
         axis_forward="-Z", axis_up="Y", bake_space_transform=False,
-        use_mesh_modifiers=False, mesh_smooth_type="FACE", use_tspace=False,
-        add_leaf_bones=False, primary_bone_axis="Y", secondary_bone_axis="X", use_armature_deform_only=False,
+        use_mesh_modifiers=False, mesh_smooth_type="FACE", use_tspace=False, colors_type="SRGB",
+        prioritize_active_color=True, add_leaf_bones=False, primary_bone_axis="Y", secondary_bone_axis="X", use_armature_deform_only=False,
         bake_anim=True, bake_anim_use_all_bones=True, bake_anim_use_nla_strips=True, bake_anim_use_all_actions=False,
         bake_anim_force_startend_keying=True, bake_anim_step=1.0, bake_anim_simplify_factor=1.0,
         path_mode="STRIP", embed_textures=False)
@@ -1015,9 +1226,11 @@ def main():
     for stage, ob, rig in stages:
         tris = sum(len(p.vertices) - 2 for p in ob.data.polygons)
         h = max((rig.matrix_world @ ob.matrix_world @ Vector(c)).z for c in ob.bound_box)
-        print("STAGE %s tris=%d bones=%d height=%.3f slots=%d" % (stage, tris, len(rig.data.bones), h, len(ob.data.materials)))
+        print("STAGE %s tris=%d bones=%d height=%.3f materials=%d" % (stage, tris, len(rig.data.bones), h, len(ob.data.materials)))
         assert tris <= TRI_CAP[stage], (stage, tris)
         export(stage, ob, rig)
+    for prop in (build_shards(4004), build_telegraph(5005)):
+        export_prop(prop)
     for stage, ob, rig in stages:      # spread out in the .blend for viewing; FBX roots stay at the origin
         rig.location.x = xoff[stage]
     blend = os.path.join(HERE, "Kaiju.blend")
