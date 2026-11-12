@@ -375,6 +375,7 @@ def shot_district():
     sun(sc, L_GAME)
     cam = gameplay_cam(sc, (0, 0, 0))
     paving = ["env_ground_path_a", "env_ground_path_b", "env_ground_path_c"]
+    ground_plane(shot, mats, 120, "#A3C150", -0.02)          # beyond the kit tiles (no black void)
     W = 9    # walls on x = -W and y = -W (the screen-top corner), pad at the origin
     for x in range(-W, 17):
         for y in range(-W, 17):
@@ -400,8 +401,8 @@ def shot_district():
     edge = ["prop_crate", "prop_barrel", "prop_crate", "prop_barrel", "prop_stone_stack", "prop_log", "prop_stump",
             "prop_stone_block", "prop_crate"]
     # clusters against the walls (non-walkable edge strip, 0.6 to 1.1 u from the wall face)
-    for k in range(26):
-        along = -7.5 + k * 0.92 + rng.uniform(-0.2, 0.2)
+    for k in range(28):
+        along = -7.6 + (k // 2) * 1.05 + rng.uniform(-0.15, 0.15)
         side = k % 2
         off = -W + 1.0 + 0.15 + rng.uniform(0, 0.45)
         loc = (off, along, 0) if side == 0 else (along, off, 0)
@@ -443,6 +444,7 @@ def shot_field():
     sun(sc, L_GAME)
     cam = gameplay_cam(sc, (0, 0, 0))
     grass = ["env_ground_grass_a", "env_ground_grass_b", "env_ground_grass_c"]
+    ground_plane(shot, mats, 120, "#A3C150", -0.02)
     path_cells = set()
     for t in range(-20, 21):                        # a path running up the screen
         for w in (-1, 0, 1):
