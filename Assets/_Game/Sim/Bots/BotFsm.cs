@@ -1,0 +1,483 @@
+using System;
+using CriticalMass.Sim.Config;
+using CriticalMass.Sim.Core;
+using CriticalMass.Sim.Grid;
+
+namespace CriticalMass.Sim.Bots
+{
+    /// <summary>
+    /// Per-bot FSM with utility-scored transitions (CM-09, browser src/bots/fsm.ts). The chosen state is written to
+    /// Actor.AiState. Each bot thinks at Bots.ThinkHz, staggered by id (BotBrain). Allocation-free.
+    /// </summary>
+    public static class BotFsm
+    {
+        public const double FightRange = 6, FightKeepRange = 8, UrgentRange = 3, KaijuEngageRange = 12, KaijuFightUtility = 1, CockyHillFactor = 0.3, HillUtility = 0.7, KaijuRoleHillUtility = 0.2, NearbyNodeDist = 20, UrgentFloorSeconds = 1, UnstickSeconds = 1, ProgressRadius = 1.0, ProgressSeconds = 2;
+
+        private const double StuckDist2 = 0.3 * 0.3;
+
+        /// <summary>CM-30 progress detector radius squared.</summary>
+        private const double ProgressDist2 = ProgressRadius * ProgressRadius;
+
+        /// <summary>CM-37: the CM-09 retreat threshold, kept in Heal.SeekHpShare (0.3).</summary>
+        public static double LowHp(GameConfig c) => c.Heal.SeekHpShare;
+
+        // ITEM CM-38: added by its owner (canPlaceMine, requestBotTnt, tntWaitTicks from sim/demolitions)
+
+        private static int[] Near = new int[0];
+
+        /// <summary>Perception scratch, filled by Perceive().</summary>
+        private sealed class Perception
+        {
+            public int Enemy = -1;
+            public double EnemyD2 = double.PositiveInfinity;
+            public int Within3;
+            public int Within6;
+            public int Within8;
+            /// <summary>Centroid of enemies within 8 (for barricades).</summary>
+            public double Cx;
+            public double Cz;
+            public bool KaijuHostile;
+            public double KaijuD2 = double.PositiveInfinity;
+        }
+
+        private static readonly Perception P = new Perception();
+
+        private static void EnsureNear(World w)
+        {
+            int cap = World.ActorCapacity(w.Config);
+            if (Near.Length < cap) Near = new int[cap];
+        }
+
+        private static void Perceive(World w, BotsState st, int id, double fightRange)
+        {
+            Actor a = w.Actors[id];
+            double x = w.X[id];
+            double z = w.Z[id];
+            P.Enemy = -1;
+            P.EnemyD2 = double.PositiveInfinity;
+            P.Within3 = 0;
+            P.Within6 = 0;
+            P.Within8 = 0;
+            P.Cx = 0;
+            P.Cz = 0;
+            EnsureNear(w);
+            int[] near = Near;
+            int cnt = SpatialHash.QueryCircle(w.Hash, x, z, FightKeepRange, near);
+            double fr2 = fightRange * fightRange;
+            for (int k = 0; k < cnt; k++)
+            {
+                int j = near[k];
+                if (j >= w.ActorCount) continue;
+                Actor t = w.Actors[j];
+                if (!t.Alive || t.Team == a.Team || t.SpawnProtect > 0) continue;
+                double dx = w.X[j] - x;
+                double dz = w.Z[j] - z;
+                double d2 = dx * dx + dz * dz;
+                if (d2 > FightKeepRange * FightKeepRange) continue;
+                P.Within8++;
+                P.Cx += w.X[j];
+                P.Cz += w.Z[j];
+                if (d2 <= FightRange * FightRange) P.Within6++;
+                if (d2 <= UrgentRange * UrgentRange) P.Within3++;
+                if (d2 <= fr2 && (d2 < P.EnemyD2 || (d2 == P.EnemyD2 && j < P.Enemy)))
+                {
+                    P.Enemy = j;
+                    P.EnemyD2 = d2;
+                }
+            }
+            if (P.Within8 > 0)
+            {
+                P.Cx /= P.Within8;
+                P.Cz /= P.Within8;
+            }
+            Kaiju kj = w.Kaiju;
+            bool hostile = kj.State == KaijuState.Berserk
+                || (kj.State != KaijuState.Neutral && kj.State != KaijuState.Egg && kj.State != SimEnumMap.ToKaijuState(a.Team));
+            P.KaijuHostile = hostile && kj.KoIn <= 0;
+            double kx = kj.X - x;
+            double kz = kj.Z - z;
+            P.KaijuD2 = kx * kx + kz * kz;
+        }
+
+        /// <summary>Argmax scratch (no closure per think).</summary>
+        private sealed class Selection
+        {
+            public AiState Cur = AiState.None;
+            public AiState Best = AiState.None;
+            public double U;
+        }
+
+        private static readonly Selection Sel = new Selection();
+
+        private static void Consider(World w, AiState s, double u)
+        {
+            if (u <= 0) return;
+            double v = u + (s == Sel.Cur ? w.Config.Bots.InertiaBonus : 0);
+            if (v > Sel.U)
+            {
+                Sel.U = v;
+                Sel.Best = s;
+            }
+        }
+
+        private static double Cap1(double v)
+        {
+            return v > 1 ? 1 : v;
+        }
+
+        /// <summary>Best node of kind with charges for bot id by field distance (greedy: nearest). Returns node id or -1.</summary>
+        private static int BestNode(World w, BotsState st, int id, NodeKind kind, double maxDist)
+        {
+            BotFields f = st.Fields;
+            double x = w.X[id];
+            double z = w.Z[id];
+            int best = -1;
+            double bestD = maxDist;
+            for (int i = 0; i < w.Nodes.Length; i++)
+            {
+                ResourceNode node = w.Nodes[i];
+                if (node.Kind != kind || node.Charges <= 0) continue;
+                int fi = f.FieldOfNode[i];
+                if (fi < 0) continue;
+                double d = BotFields.FieldDistAt(f, fi, x, z);
+                if (kind == NodeKind.Corruption)
+                {
+                    // The combined field gives the distance to the nearest corruption node; rank the others by straight line.
+                    double dx = node.X - x;
+                    double dz = node.Z - z;
+                    d = Math.Max(d, Math.Sqrt(dx * dx + dz * dz));
+                }
+                if (d < bestD)
+                {
+                    bestD = d;
+                    best = i;
+                }
+            }
+            return best;
+        }
+
+        private static void SetState(World w, BotsState st, int id, AiState s, double now)
+        {
+            Actor a = w.Actors[id];
+            if (a.AiState == s) return;
+            a.AiState = s;
+            st.StateSince[id] = now;
+            st.StateChanges++;
+        }
+
+        private static bool IsHillState(AiState s)
+        {
+            return s == AiState.ToHill || s == AiState.HoldHill;
+        }
+
+        private static void PickPost(World w, BotsState st, int id, double now)
+        {
+            HillDef hill = w.Map.Hill;
+            double ang = Rng.NextFloat(st.Rng) * Math.PI * 2;
+            double r = Math.Sqrt(Rng.NextFloat(st.Rng)) * BotFields.HoldRadius(w.Config);
+            st.PostX[id] = JsMath.F32(hill.X + JsMath.Cos(ang) * r);
+            st.PostZ[id] = JsMath.F32(hill.Z + JsMath.Sin(ang) * r);
+            st.PostUntil[id] = now + 2 + 2 * Rng.NextFloat(st.Rng);
+        }
+
+        private static void StartUnstick(World w, BotsState st, int id, double now)
+        {
+            double x = w.X[id];
+            double z = w.Z[id];
+            int ccx = JsMath.FloorToInt(x);
+            int ccz = JsMath.FloorToInt(z);
+            double tx = x;
+            double tz = z;
+            for (int tries = 0; tries < 12; tries++)
+            {
+                double ang = Rng.NextFloat(st.Rng) * Math.PI * 2;
+                double r = 2 + Rng.NextFloat(st.Rng);
+                int cx = JsMath.FloorToInt(x + JsMath.Cos(ang) * r);
+                int cz = JsMath.FloorToInt(z + JsMath.Sin(ang) * r);
+                if ((cx == ccx && cz == ccz) || !MapGrid.IsWalkable(w.Map, cx, cz)) continue;
+                tx = cx + 0.5;
+                tz = cz + 0.5;
+                break;
+            }
+            st.UnstickX[id] = JsMath.F32(tx);
+            st.UnstickZ[id] = JsMath.F32(tz);
+            st.UnstickUntil[id] = now + UnstickSeconds;
+            st.AnchorX[id] = JsMath.F32(x);
+            st.AnchorZ[id] = JsMath.F32(z);
+            st.AnchorTime[id] = now;
+            st.ProgressX[id] = JsMath.F32(x);
+            st.ProgressZ[id] = JsMath.F32(z);
+            st.ProgressTime[id] = now;
+            SetState(w, st, id, AiState.Unstick, now);
+        }
+
+        /// <summary>Ability decisions (sent by the next FillBotInput as one press).</summary>
+        private static void DecideAbility(World w, BotsState st, int id, AiState state)
+        {
+            Actor a = w.Actors[id];
+            st.AbilityReq[id] = 0;
+            // ITEM CM-38: added by its owner (Demolitions class branch: DecideDemolitions(w, st, id, state); return;)
+            if (a.AbilityCd > 0) return;
+            double x = w.X[id];
+            double z = w.Z[id];
+            if (a.Cls == ClassId.Warrior)
+            {
+                if (state == AiState.Fight && a.AbilityActive <= 0 && (P.Within3 >= 2 || a.Hp < 0.5 * a.MaxHp) && P.Enemy >= 0)
+                {
+                    st.AbilityReq[id] = 1;
+                    st.AbilityX[id] = JsMath.F32(w.X[P.Enemy]);
+                    st.AbilityZ[id] = JsMath.F32(w.Z[P.Enemy]);
+                }
+                return;
+            }
+            if (a.Cls == ClassId.Farmer)
+            {
+                if (P.Within6 < 2) return;
+                // Densest enemy cluster within cast range: the enemy with the most enemies inside the root radius around it.
+                FarmerRootsConfig R = w.Config.Abilities.FarmerRoots;
+                EnsureNear(w);
+                int[] near = Near;
+                int cnt = SpatialHash.QueryCircle(w.Hash, x, z, R.CastRange, near);
+                int best = -1;
+                int bestN = 1;
+                double rr = R.Radius * R.Radius;
+                for (int p = 0; p < cnt; p++)
+                {
+                    int i = near[p];
+                    if (i >= w.ActorCount) continue;
+                    Actor ti = w.Actors[i];
+                    if (!ti.Alive || ti.Team == a.Team) continue;
+                    int c = 0;
+                    for (int q = 0; q < cnt; q++)
+                    {
+                        int j = near[q];
+                        if (j >= w.ActorCount) continue;
+                        Actor tj = w.Actors[j];
+                        if (!tj.Alive || tj.Team == a.Team) continue;
+                        double ddx = w.X[j] - w.X[i];
+                        double ddz = w.Z[j] - w.Z[i];
+                        if (ddx * ddx + ddz * ddz <= rr) c++;
+                    }
+                    if (c > bestN)
+                    {
+                        bestN = c;
+                        best = i;
+                    }
+                }
+                if (best >= 0)
+                {
+                    st.AbilityReq[id] = 1;
+                    st.AbilityX[id] = JsMath.F32(w.X[best]);
+                    st.AbilityZ[id] = JsMath.F32(w.Z[best]);
+                }
+                return;
+            }
+            // Miner barricade: only while holding the hill with ge 2 enemies approaching within 8, on the cell 2 ahead of
+            // the miner toward them; the sim's own rule (CanPlaceBarricade) decides, so a press never produces a rejected cast.
+            if (state != AiState.HoldHill || P.Within8 < 2) return;
+            double dx = P.Cx - x;
+            double dz = P.Cz - z;
+            double len = Math.Sqrt(dx * dx + dz * dz);
+            if (len < 1e-6) return;
+            dx /= len;
+            dz /= len;
+            double tx = JsMath.FloorToInt(x + dx * 2) + 0.5;
+            double tz = JsMath.FloorToInt(z + dz * 2) + 0.5;
+            if (!Barricades.CanPlaceBarricade(w, id, tx, tz)) return;
+            st.AbilityReq[id] = 1;
+            st.AbilityX[id] = JsMath.F32(tx);
+            st.AbilityZ[id] = JsMath.F32(tz);
+        }
+
+        // ITEM CM-38: added by its owner (DecideDemolitions: TNT throw via requestBotTnt / tntWaitTicks, land mine via canPlaceMine)
+
+        /// <summary>One think for bot id: perception, stuck check, utility selection, targets, ability decision.</summary>
+        public static void ThinkBot(World w, BotsState st, int id)
+        {
+            Actor a = w.Actors[id];
+            if (!a.Alive) return;
+            BotsConfig B = w.Config.Bots;
+            double lowHp = LowHp(w.Config);
+            double now = w.Match.Time;
+            double x = w.X[id];
+            double z = w.Z[id];
+            AiState cur = a.AiState;
+            if (cur == AiState.None)
+            {
+                st.StateSince[id] = double.NegativeInfinity;
+                st.AnchorX[id] = JsMath.F32(x);
+                st.AnchorZ[id] = JsMath.F32(z);
+                st.AnchorTime[id] = now;
+                st.ProgressX[id] = JsMath.F32(x);
+                st.ProgressZ[id] = JsMath.F32(z);
+                st.ProgressTime[id] = now;
+            }
+
+            // Unstick runs its full second.
+            if (cur == AiState.Unstick && now < st.UnstickUntil[id]) return;
+
+            // Stuck detector.
+            double sdx = x - st.AnchorX[id];
+            double sdz = z - st.AnchorZ[id];
+            if (sdx * sdx + sdz * sdz >= StuckDist2 || st.WantMove[id] == 0)
+            {
+                st.AnchorX[id] = JsMath.F32(x);
+                st.AnchorZ[id] = JsMath.F32(z);
+                st.AnchorTime[id] = now;
+            }
+            else if (now - st.AnchorTime[id] >= B.StuckSeconds && now - st.StateSince[id] >= UrgentFloorSeconds)
+            {
+                StartUnstick(w, st, id, now);
+                return;
+            }
+
+            // Progress detector (CM-30): travelling but never leaving a ProgressRadius circle.
+            double progDx = x - st.ProgressX[id];
+            double progDz = z - st.ProgressZ[id];
+            bool travelling = cur == AiState.ToHill || cur == AiState.Deliver || cur == AiState.Retreat;
+            if (!travelling || st.WantMove[id] == 0 || progDx * progDx + progDz * progDz >= ProgressDist2)
+            {
+                st.ProgressX[id] = JsMath.F32(x);
+                st.ProgressZ[id] = JsMath.F32(z);
+                st.ProgressTime[id] = now;
+            }
+            else if (now - st.ProgressTime[id] >= ProgressSeconds && now - st.StateSince[id] >= UrgentFloorSeconds)
+            {
+                StartUnstick(w, st, id, now);
+                return;
+            }
+
+            bool fighting = cur == AiState.Fight;
+            bool cocky = BotDirector.IsCocky(w, a.Team);
+            Perceive(w, st, id, fighting || cocky ? FightKeepRange : FightRange);
+            int role = st.Role[id];
+            ClassConfig cc = w.Config.Class(a.Cls);
+            double hpFrac = a.MaxHp > 0 ? a.Hp / a.MaxHp : 0;
+            bool egg = w.Kaiju.State == KaijuState.Egg && !w.Match.Hatched;
+            HillDef hill = w.Map.Hill;
+            double hdx = x - hill.X;
+            double hdz = z - hill.Z;
+            double hillD = Math.Sqrt(hdx * hdx + hdz * hdz);
+
+            // --- utilities ---
+            double uFight = 0;
+            int fightTarget = -1;
+            if (role == BotsState.RoleFightKaiju && P.KaijuHostile && P.KaijuD2 <= KaijuEngageRange * KaijuEngageRange)
+            {
+                // CM-19: 1.0 above LowHp (0.95 x hp never beat holdHill 0.7 + 0.25 inertia under strict gt).
+                uFight = hpFrac >= lowHp ? KaijuFightUtility : 0;
+                fightTarget = BotsState.TargetKaiju;
+            }
+            else if (P.Enemy >= 0)
+            {
+                uFight = Cap1(hpFrac * (role == BotsState.RoleHill ? 1 : 0.6) * st.Aggression[id]);
+                fightTarget = P.Enemy;
+                if (cur == AiState.HoldHill && !cocky)
+                {
+                    double ex = w.X[P.Enemy] - hill.X;
+                    double ez = w.Z[P.Enemy] - hill.Z;
+                    if (ex * ex + ez * ez > (hill.R + 1) * (hill.R + 1)) uFight *= 0.5;
+                }
+            }
+
+            double uHill = role == BotsState.RoleKaiju ? KaijuRoleHillUtility : cocky ? HillUtility * CockyHillFactor : HillUtility;
+            bool holding = cur == AiState.HoldHill ? hillD < hill.R + 2 : hillD < hill.R - 1;
+            AiState hillState = holding ? AiState.HoldHill : AiState.ToHill;
+
+            double uGather = 0;
+            int gatherNode = -1;
+            if (role == BotsState.RoleKaiju && st.Corrupt[id] == 0 && egg && a.CarryAmount < cc.CarryCapacity && a.Carry != CarryKind.Corruption)
+            {
+                gatherNode = BestNode(w, st, id, NodeKind.Biomass, double.PositiveInfinity);
+                if (gatherNode >= 0) uGather = Cap1(0.8 * st.Greed[id]);
+            }
+
+            double uDeliver = 0;
+            if (a.CarryAmount > 0 && egg)
+            {
+                NodeKind kind = a.Carry == CarryKind.Corruption ? NodeKind.Corruption : NodeKind.Biomass;
+                if (a.CarryAmount >= cc.CarryCapacity || BestNode(w, st, id, kind, NearbyNodeDist) < 0) uDeliver = 0.9;
+            }
+
+            double uCorrupt = 0;
+            int corruptNode = -1;
+            if (st.Corrupt[id] != 0 && egg && a.Carry != CarryKind.Biomass && a.CarryAmount < cc.CarryCapacity)
+            {
+                corruptNode = BestNode(w, st, id, NodeKind.Corruption, double.PositiveInfinity);
+                if (corruptNode >= 0 && BotFields.FieldDistAt(st.Fields, BotFields.FieldCorruption, x, z) < double.PositiveInfinity)
+                    uCorrupt = Cap1(0.85 * st.Greed[id]);
+            }
+
+            double uRetreat = hpFrac < lowHp && P.Within6 > 0 ? 0.9 : 0;
+
+            // --- current state's own utility (0 = its task is over) ---
+            double curU;
+            switch (cur)
+            {
+                case AiState.Fight:
+                    curU = uFight;
+                    break;
+                case AiState.ToHill:
+                case AiState.HoldHill:
+                    curU = uHill;
+                    break;
+                case AiState.Gather:
+                    curU = uGather;
+                    break;
+                case AiState.Deliver:
+                    curU = uDeliver;
+                    break;
+                case AiState.Corrupt:
+                    curU = uCorrupt;
+                    break;
+                case AiState.Retreat:
+                    curU = uRetreat;
+                    break;
+                default:
+                    curU = 0;
+                    break;
+            }
+
+            // --- argmax with inertia ---
+            Sel.Cur = cur;
+            Sel.Best = hillState;
+            Sel.U = uHill + (IsHillState(cur) ? B.InertiaBonus : 0);
+            Consider(w, AiState.Fight, uFight);
+            Consider(w, AiState.Gather, uGather);
+            Consider(w, AiState.Deliver, uDeliver);
+            Consider(w, AiState.Corrupt, uCorrupt);
+            Consider(w, AiState.Retreat, uRetreat);
+            AiState best = Sel.Best;
+
+            // --- switch rule ---
+            AiState next = cur;
+            if (best != cur)
+            {
+                double elapsed = now - st.StateSince[id];
+                bool urgent = hpFrac < lowHp || P.Within3 > 0;
+                bool free = elapsed >= B.MinStateSeconds;
+                bool early = elapsed >= UrgentFloorSeconds && (urgent || curU <= 0 || (IsHillState(cur) && IsHillState(best)));
+                if (cur == AiState.None || cur == AiState.Unstick || free || early) next = best;
+            }
+            SetState(w, st, id, next, now);
+
+            // --- targets ---
+            st.Target[id] = next == AiState.Fight ? fightTarget : -1;
+            if (next == AiState.Gather) st.TargetNode[id] = gatherNode;
+            else if (next == AiState.Corrupt) st.TargetNode[id] = corruptNode;
+            else st.TargetNode[id] = -1;
+            if (next == AiState.HoldHill)
+            {
+                double pdx = st.PostX[id] - x;
+                double pdz = st.PostZ[id] - z;
+                if (now >= st.PostUntil[id] || (pdx * pdx + pdz * pdz < 0.36 && now + 0.5 >= st.PostUntil[id])) PickPost(w, st, id, now);
+            }
+            else if (next == AiState.ToHill)
+            {
+                st.PostUntil[id] = 0;
+            }
+
+            DecideAbility(w, st, id, next);
+        }
+    }
+}
