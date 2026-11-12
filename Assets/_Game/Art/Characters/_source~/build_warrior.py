@@ -87,7 +87,7 @@ def build_legs():
 def build_torso():
     add(BODY, B.sphere((0.34, 0.25, 0.21), 16, 10), "trouser", ["hips", "spine"], "clothes", m=M((0, 0.0, 0.62)))
     # navy padded doublet, a barrel that overhangs the belt (fixed navy: the accent-swap keeps it navy)
-    add(BODY, B.sphere((0.36, 0.27, 0.31), 18, 12), "navy", ["spine", "chest"], "clothes", m=M((0, 0.01, 0.99)))
+    add(BODY, B.sphere((0.36, 0.25, 0.31), 18, 12), "navy", ["spine", "chest"], "clothes", m=M((0, 0.01, 0.99)))
     # cream quilted undershirt: a broad panel down the chest, with two quilting grooves
     add(BODY, B.sphere((0.20, 0.13, 0.25), 14, 10), "cream", ["spine", "chest"], "clothes", m=M((0, -0.16, 0.99)))
     for z in (0.92, 1.04):
@@ -106,22 +106,22 @@ def build_torso():
     add(BODY, B.box((0.145, 0.115, 0.055), 0.02), "brass", {"hips": 0.6, "spine": 0.4}, "belt", smooth=False,
         m=M((0.25, -0.215, 0.79), (0, 0, -25)))
     # teal tabard strips, front and back, zigzag hem (team cloth), wide enough to read from above
-    hem = [(-0.13, 0.0), (0.13, 0.0), (0.14, -0.40), (0.095, -0.47), (0.047, -0.40), (0.0, -0.48),
-           (-0.047, -0.40), (-0.095, -0.47), (-0.14, -0.40)]
-    for y, ry in ((-0.29, 0), (0.29, 180)):
+    hem = [(-0.17, 0.0), (0.17, 0.0), (0.18, -0.45), (0.12, -0.53), (0.06, -0.45), (0.0, -0.54),
+           (-0.06, -0.45), (-0.12, -0.53), (-0.18, -0.45)]
+    for y, ry in ((-0.275, 0), (0.265, 180)):
         add(BODY, B.prism(hem, 0.03, bevel=0.012, seg=1), "team_cloth", "hips", "team_cloth", smooth=False,
             m=M((0, y, 0.82), (90, 0, ry)) @ M((0, 0, 0), (-8, 0, 0)))
     add(BODY, B.cyl((0, 0, 1.15), (0, 0, 1.31), 0.10, 0.095, 12), "skin", ["chest", "head"], "skin")
     # teal scarf: a high, wide neck roll that rings the neck from above, puffy front fold, wide back tail
-    add(BODY, B.torus(0.215, 0.115, 20, 9), "team_cloth", "chest", "team_cloth",
-        m=M((0, 0.0, 1.26), (0, 0, 0), (1.08, 1.0, 0.85)))
-    add(BODY, B.torus(0.285, 0.010, 20, 4), groove("team_cloth"), "chest", "team_cloth",
-        m=M((0, 0.0, 1.195), (0, 0, 0), (1.08, 1.0, 1.0)))
-    add(BODY, B.sphere((0.19, 0.10, 0.13), 12, 8), "team_cloth", "chest", "team_cloth",
-        m=M((0.03, -0.24, 1.15), (0, 16, 0)))
-    tail = [(-0.17, 0.0), (0.17, 0.0), (0.16, -0.36), (0.085, -0.43), (0.0, -0.35), (-0.085, -0.43), (-0.16, -0.36)]
+    add(BODY, B.torus(0.255, 0.148, 20, 9), "team_cloth", ["chest", "head"], "team_cloth",
+        m=M((0, 0.0, 1.29), (0, 0, 0), (1.08, 1.0, 0.95)))
+    add(BODY, B.torus(0.355, 0.010, 20, 4), groove("team_cloth"), "chest", "team_cloth",
+        m=M((0, 0.0, 1.20), (0, 0, 0), (1.08, 1.0, 1.0)))
+    add(BODY, B.sphere((0.24, 0.13, 0.16), 12, 8), "team_cloth", "chest", "team_cloth",
+        m=M((0.03, -0.29, 1.15), (0, 16, 0)))
+    tail = [(-0.20, 0.0), (0.20, 0.0), (0.19, -0.42), (0.10, -0.50), (0.0, -0.41), (-0.10, -0.50), (-0.19, -0.42)]
     add(BODY, B.prism(tail, 0.035, bevel=0.012, seg=1), "team_cloth", "chest", "team_cloth", smooth=False,
-        m=M((0, 0.33, 1.22), (90, 0, 180)) @ M((0, 0, 0), (-6, 0, 0)))
+        m=M((0, 0.32, 1.24), (90, 0, 180)) @ M((0, 0, 0), (-6, 0, 0)))
 
 
 def build_arms():
@@ -151,20 +151,24 @@ def crack(m, pts, w=0.045, feat="team_glow", wset=None):
 def build_pauldrons():
     for s, sd in ((1, "l"), (-1, "r")):
         w = {"chest": 0.55, f"upperarm.{sd}": 0.45}
-        top = M((0.35 * s, 0.0, 1.33), (0, -24 * s, 0))
-        add(BODY, B.slab((0.38, 0.46, 0.17), 0.45, 14, 9), "stone_armour", w, "stone_armour", m=top.copy())
-        mid = M((0.50 * s, 0.0, 1.19), (0, -52 * s, 0))
-        add(BODY, B.slab((0.30, 0.42, 0.15), 0.45, 12, 8), "stone_armour", w, "stone_armour", m=mid.copy())
-        low = M((0.57 * s, 0.0, 1.05), (0, -74 * s, 0))
+        top = M((0.33 * s, 0.0, 1.30), (0, -24 * s, 0))
+        add(BODY, B.slab((0.36, 0.44, 0.19), 0.6, 14, 9), "stone_armour", w, "stone_armour", m=top.copy())
+        mid = M((0.45 * s, 0.0, 1.19), (0, -52 * s, 0))
+        add(BODY, B.slab((0.29, 0.40, 0.16), 0.6, 12, 8), "stone_armour", w, "stone_armour", m=mid.copy())
+        low = M((0.51 * s, 0.0, 1.05), (0, -74 * s, 0))
         add(BODY, B.slab((0.20, 0.34, 0.12), 0.5, 10, 6), "stone_armour", {f"upperarm.{sd}": 1.0}, "stone_armour",
             m=low.copy())
         # cyan crack inlays across the top slab (seen from above) and the middle slab
-        crack(top @ M((0, 0, 0.083)), [(-0.12 * s, -0.12), (-0.04 * s, -0.06), (0.0, -0.10), (0.08 * s, 0.0),
-                                       (0.05 * s, 0.07), (0.12 * s, 0.13)], 0.045, wset=w)
-        crack(mid @ M((0, 0, 0.073)), [(-0.08 * s, -0.10), (0.0, -0.04), (0.03 * s, 0.05), (0.09 * s, 0.10)], 0.04,
+        crack(top @ M((0, 0, 0.092)), [(-0.13 * s, -0.15), (-0.04 * s, -0.07), (0.0, -0.12), (0.09 * s, 0.0),
+                                       (0.05 * s, 0.08), (0.13 * s, 0.16)], 0.065, wset=w)
+        crack(top @ M((0, 0, 0.090)), [(0.12 * s, -0.17), (0.07 * s, -0.10), (0.13 * s, -0.04)], 0.055, wset=w)
+        crack(mid @ M((0, 0, 0.078)), [(-0.09 * s, -0.12), (0.0, -0.04), (0.03 * s, 0.05), (0.10 * s, 0.12)], 0.055,
               wset=w)
+        crack(low @ M((0, 0, 0.062)), [(0.0, -0.15), (0.04 * s, -0.06), (-0.02 * s, 0.03), (0.03 * s, 0.14)], 0.06,
+              wset={f"upperarm.{sd}": 1.0})
+        crack(mid @ M((0, 0, 0.078)), [(-0.10 * s, 0.10), (-0.03 * s, 0.15)], 0.05, wset=w)
         # brass ring rivets: front face of the top slab and on the middle slab
-        for loc, rot in (((0.40 * s, -0.235, 1.20), (90, 0, 0)),):
+        for loc, rot in (((0.38 * s, -0.235, 1.20), (90, 0, 0)),):
             add(BODY, B.torus(0.062, 0.024, 14, 5), "brass", w, "stone_armour", m=M(loc, rot))
             add(BODY, B.cyl((loc[0], -0.22, loc[2]), (loc[0], -0.25, loc[2]), 0.036, 0.036, 10), "brass", w,
                 "stone_armour")
@@ -184,36 +188,38 @@ def build_hair():
     H = "head"
     add(BODY, B.sphere((0.26, 0.275, 0.20), 18, 10), "hair", H, "hair", m=M((0, 0.06, 1.66)))
     add(BODY, B.sphere((0.25, 0.20, 0.21), 14, 8), "hair", H, "hair", m=M((0, 0.11, 1.49)))
-    C = [  # (base, control, tip, width, thickness, up): 12 sculpted tapered clumps
-        # spiky bangs over the forehead
-        ((-0.16, -0.10, 1.79), (-0.22, -0.26, 1.74), (-0.22, -0.29, 1.59), 0.15, 0.07, (0, -1, 0.3)),
-        ((-0.05, -0.12, 1.82), (-0.07, -0.29, 1.76), (-0.09, -0.31, 1.60), 0.15, 0.07, (0, -1, 0.3)),
-        ((0.07, -0.12, 1.82), (0.10, -0.29, 1.76), (0.13, -0.31, 1.61), 0.15, 0.07, (0, -1, 0.3)),
-        ((0.17, -0.09, 1.79), (0.25, -0.24, 1.73), (0.25, -0.26, 1.58), 0.14, 0.07, (0, -1, 0.3)),
-        # sides, sweeping out and down over the ears
-        ((0.22, 0.02, 1.74), (0.29, -0.03, 1.66), (0.295, -0.06, 1.52), 0.15, 0.08, (1, 0, 0.2)),
-        ((-0.22, 0.02, 1.74), (-0.29, -0.03, 1.66), (-0.295, -0.06, 1.52), 0.15, 0.08, (-1, 0, 0.2)),
-        ((0.20, 0.16, 1.70), (0.28, 0.22, 1.60), (0.285, 0.25, 1.46), 0.15, 0.08, (1, 0.6, 0)),
-        ((-0.20, 0.16, 1.70), (-0.28, 0.22, 1.60), (-0.285, 0.25, 1.46), 0.15, 0.08, (-1, 0.6, 0)),
+    C = [  # (base, control, tip, width, thickness, up): 12 sculpted tapered clumps, spiky and voluminous
+        # spiky bangs over the forehead, tips just above the brows
+        ((-0.15, -0.08, 1.80), (-0.21, -0.25, 1.75), (-0.215, -0.27, 1.60), 0.17, 0.08, (0, -1, 0.3)),
+        ((-0.05, -0.10, 1.83), (-0.07, -0.29, 1.77), (-0.06, -0.31, 1.62), 0.17, 0.08, (0, -1, 0.3)),
+        ((0.06, -0.10, 1.83), (0.09, -0.29, 1.78), (0.11, -0.31, 1.61), 0.17, 0.08, (0, -1, 0.3)),
+        ((0.16, -0.07, 1.80), (0.23, -0.23, 1.74), (0.25, -0.24, 1.59), 0.16, 0.08, (0, -1, 0.3)),
+        # sides: two spikes per side flaring out over the temples and ears
+        ((0.20, 0.00, 1.76), (0.30, -0.04, 1.70), (0.31, -0.10, 1.55), 0.18, 0.10, (1, 0, 0.2)),
+        ((-0.20, 0.00, 1.76), (-0.30, -0.04, 1.70), (-0.31, -0.10, 1.55), 0.18, 0.10, (-1, 0, 0.2)),
+        ((0.19, 0.15, 1.74), (0.29, 0.22, 1.64), (0.30, 0.24, 1.47), 0.18, 0.10, (1, 0.6, 0)),
+        ((-0.19, 0.15, 1.74), (-0.29, 0.22, 1.64), (-0.30, 0.24, 1.47), 0.18, 0.10, (-1, 0.6, 0)),
         # back, hanging to the nape
-        ((0.0, 0.26, 1.62), (0.0, 0.36, 1.50), (0.0, 0.36, 1.34), 0.17, 0.08, (0, 1, 0)),
-        ((0.13, 0.24, 1.60), (0.19, 0.32, 1.48), (0.20, 0.32, 1.35), 0.15, 0.08, (0.5, 1, 0)),
-        ((-0.13, 0.24, 1.60), (-0.19, 0.32, 1.48), (-0.20, 0.32, 1.35), 0.15, 0.08, (-0.5, 1, 0)),
-        # crown spike forward-up
-        ((0.0, -0.04, 1.83), (0.02, -0.16, 1.90), (0.05, -0.22, 1.86), 0.14, 0.07, (0, 0, 1)),
+        ((0.07, 0.24, 1.66), (0.10, 0.36, 1.52), (0.10, 0.35, 1.35), 0.20, 0.10, (0.3, 1, 0)),
+        ((-0.09, 0.24, 1.66), (-0.12, 0.35, 1.52), (-0.13, 0.33, 1.36), 0.20, 0.10, (-0.3, 1, 0)),
+        # crown spikes, messy, up and out
+        ((-0.08, -0.02, 1.84), (-0.17, -0.06, 1.90), (-0.24, -0.08, 1.84), 0.17, 0.09, (0, 0, 1)),
+        ((0.10, -0.02, 1.84), (0.19, -0.05, 1.91), (0.27, -0.06, 1.83), 0.17, 0.09, (0, 0, 1)),
     ]
     for p0, p1, p2, w, t, up in C:
         add(BODY, B.clump(p0, p1, p2, w, t, 7, up=up), "hair", H, "hair")
-    # high topknot at the back-top: tuft, brass ring, spiky flare fanning up and back (bible p06 profile)
+    # high topknot at the back-top: tuft, brass ring, a fat spiky palm fanning up, to the character's left and back
+    # (bible p06: the spray leans to the viewer's right in front view and sweeps back in profile)
     T = "topknot"
-    add(BODY, B.sphere((0.105, 0.11, 0.10), 12, 8), "hair", H, T, m=M((0, 0.12, 1.83)))
-    add(BODY, B.torus(0.085, 0.032, 16, 6), "brass", H, T, m=M((0, 0.135, 1.885), (-30, 0, 0)))
-    # the spray leans to the character's left (+X, viewer's right in front view) and back (bible front, back, profile)
-    tuft = [((0.0, 0.13, 1.90), (0.02, 0.12, 1.97), (0.07, 0.09, 1.99), 0.13, 0.08, (0, -1, 0)),
-            ((0.0, 0.15, 1.90), (0.04, 0.28, 1.99), (0.10, 0.40, 1.92), 0.14, 0.08, (0, 0, 1)),
-            ((0.0, 0.16, 1.88), (0.03, 0.34, 1.90), (0.06, 0.50, 1.74), 0.13, 0.07, (0, 0, 1)),
-            ((0.03, 0.14, 1.90), (0.16, 0.18, 1.95), (0.31, 0.22, 1.85), 0.13, 0.07, (0, 0, 1)),
-            ((-0.03, 0.14, 1.90), (-0.09, 0.20, 1.95), (-0.13, 0.25, 1.89), 0.10, 0.06, (0, 0, 1))]
+    add(BODY, B.sphere((0.11, 0.11, 0.10), 12, 8), "hair", H, T, m=M((0, 0.11, 1.83)))
+    add(BODY, B.torus(0.088, 0.034, 16, 6), "brass", H, T, m=M((0, 0.12, 1.885), (-25, 0, 0)))
+    tuft = [((0.0, 0.12, 1.90), (0.01, 0.10, 1.97), (0.03, 0.06, 1.995), 0.17, 0.10, (0, -1, 0)),
+            ((0.02, 0.12, 1.90), (0.12, 0.12, 1.98), (0.20, 0.10, 1.95), 0.17, 0.10, (0, -1, 0)),
+            ((0.03, 0.13, 1.89), (0.18, 0.18, 1.93), (0.29, 0.20, 1.85), 0.16, 0.09, (0, 0, 1)),
+            ((-0.02, 0.13, 1.90), (-0.09, 0.15, 1.96), (-0.15, 0.15, 1.93), 0.15, 0.09, (0, 0, 1)),
+            ((0.0, 0.15, 1.89), (0.04, 0.32, 1.96), (0.07, 0.50, 1.86), 0.17, 0.10, (0, 0, 1)),
+            ((0.0, 0.16, 1.87), (0.03, 0.34, 1.87), (0.04, 0.48, 1.72), 0.15, 0.09, (0, 0, 1))]
+    tuft = [tuple((p[0], p[1], p[2] - 0.016) for p in t[:3]) + t[3:] for t in tuft]   # keep the tip at 2.0 u
     for p0, p1, p2, w, t, up in tuft:
         add(BODY, B.clump(p0, p1, p2, w, t, 7, up=up), "hair", H, T)
 
@@ -249,8 +255,8 @@ def build_shield(poses):
         tilt = rng.uniform(-6, 6)
         p(B.slab((sx, 0.18, sz), 0.4, 10, 6), "stone_armour", "shield", True,
           m=M((r * math.cos(a), r * math.sin(a), 0.0), (tilt, 0, math.degrees(a) + 90)))
-        if k in (1, 4, 7):  # cyan crack inlays on the rim (0.04 u wide)
-            p(B.box((sx * 0.5, 0.04, 0.016), 0.0, 1), "team_glow", "team_glow",
+        if k in (1, 3, 5, 7):  # cyan crack inlays on the rim (0.05 u wide)
+            p(B.box((sx * 0.6, 0.05, 0.016), 0.0, 1), "team_glow", "team_glow",
               m=M((r * math.cos(a), r * math.sin(a), sz / 2 - 0.004), (0, 0, math.degrees(a) + 90 + rng.uniform(-25, 25))))
     # core: navy ring, brass ring, glowing core (team glow), brass boss ring
     p(B.cyl((0, 0, 0.03), (0, 0, 0.075), 0.30, 0.29, 28), "navy", "shield", True)
@@ -261,7 +267,7 @@ def build_shield(poses):
         p(B.box((0.34, 0.06, 0.03), 0.01, 1), "leather_dark", "shield", m=M((0, y, -0.05)))
 
     # display pose (Idle): on the left arm, face turned ~55 deg from the front view toward the viewer's right
-    origin = (0.60, -0.17, 0.80)
+    origin = (0.53, -0.17, 0.80)
     normal = (0.76, -0.65, 0.0)
     T = held_matrix(poses, W, origin, normal, (0, 0, 1))
     for bm, color, feat, smooth, m in parts:
@@ -283,8 +289,8 @@ def build_cleaver(poses):
     BL = 0.76        # blade length scale: the bible's fist-to-tip run is ~0.6 u (front view)
     blade = [(x, y * BL) for x, y in blade]
     p(B.prism(blade, 0.10, bevel=0.025, seg=2), "stone_blade", "cleaver")
-    edge = [(0.18, -0.14), (0.25, -0.17), (0.24, -0.30), (0.265, -0.44), (0.25, -0.60), (0.26, -0.75),
-            (0.16, -0.90), (0.10, -0.86), (0.185, -0.75), (0.20, -0.42), (0.195, -0.18)]
+    edge = [(0.17, -0.14), (0.27, -0.17), (0.26, -0.30), (0.29, -0.44), (0.27, -0.60), (0.28, -0.75),
+            (0.17, -0.92), (0.08, -0.87), (0.18, -0.75), (0.19, -0.42), (0.185, -0.18)]
     edge = [(x, y * BL) for x, y in edge]
     p(B.prism(edge, 0.055, bevel=0.012, seg=1), "team_glow", "team_glow")
     for (x, y, ang) in ((0.05, -0.24, 30), (0.10, -0.43, -40), (0.0, -0.50, 70)):  # glowing chips in the faces
@@ -297,9 +303,9 @@ def build_cleaver(poses):
     p(B.box((0.19, 0.05, 0.11), 0.02), "brass", "cleaver", m=M((0.02, -0.095, 0)))
 
     origin = poses[W].translation.copy()
-    down = Vector((-0.62, -0.35, -0.62)).normalized()       # blade points low, out to the viewer's left, forward
+    down = Vector((-0.84, -0.30, -0.45)).normalized()       # blade points low, out to the viewer's left, forward
     y_axis = -down
-    x_hint = Vector((0, 0, -1))
+    x_hint = Vector((-0.6, -0.2, -0.75))     # glowing edge faces down and out (seen from the high camera)
     x_axis = (x_hint - y_axis * x_hint.dot(y_axis)).normalized()  # cutting edge faces down
     z_axis = x_axis.cross(y_axis)
     T = held_matrix(poses, W, origin, z_axis, y_axis)

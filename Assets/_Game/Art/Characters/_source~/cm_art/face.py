@@ -50,13 +50,15 @@ def paint(cx, cz, hw, hh):
     for s in (1, -1):
         over(ell(0.150 * s, 1.405, 0.050, 0.030, soft=0.03), blush)               # cheeks
     for s in (1, -1):
-        ex, ez = 0.092 * s, 1.488
-        over(ell(ex, ez, 0.058, 0.074), _hex(palette.CHAR["pupil"][0]))           # dark lash rim
-        over(ell(ex, ez - 0.004, 0.050, 0.064), _hex("#FFFFFF"))                  # eye white
-        over(ell(ex - 0.006 * s, ez - 0.008, 0.040, 0.054), _hex(palette.CHAR["iris"][0]))
-        over(ell(ex - 0.006 * s, ez - 0.012, 0.022, 0.030), _hex(palette.CHAR["pupil"][0]))
-        over(ell(ex - 0.020 * s, ez + 0.016, 0.014, 0.016), _hex("#FFFFFF"))      # highlights
-        over(ell(ex + 0.010 * s, ez - 0.030, 0.007, 0.007), _hex("#FFFFFF"))
+        ex, ez = 0.088 * s, 1.488
+        over(ell(ex, ez, 0.050, 0.062), _hex("#FFFFFF"))                          # eye white
+        over(ell(ex - 0.004 * s, ez - 0.006, 0.040, 0.054), _hex(palette.CHAR["iris"][0]))   # large brown iris
+        over(ell(ex - 0.004 * s, ez - 0.010, 0.022, 0.030), _hex(palette.CHAR["pupil"][0]))
+        over(ell(ex - 0.018 * s, ez + 0.016, 0.014, 0.016), _hex("#FFFFFF"))      # highlights
+        over(ell(ex + 0.010 * s, ez - 0.028, 0.007, 0.007), _hex("#FFFFFF"))
+        over(stroke([(ex - 0.052 * s, ez + 0.018), (ex - 0.01 * s, ez + 0.060), (ex + 0.04 * s, ez + 0.050),
+                     (ex + 0.060 * s, ez + 0.020)], [0.012, 0.020, 0.020, 0.010]),
+             _hex(palette.CHAR["pupil"][0]))                                      # heavy upper lid only
         over(stroke([(0.030 * s, 1.575), (0.095 * s, 1.598), (0.160 * s, 1.585)], [0.030, 0.040, 0.026]),
              _hex(palette.CHAR["brow"][0]))                                       # thick confident brows
     # nose hint

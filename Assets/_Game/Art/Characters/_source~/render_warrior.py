@@ -39,7 +39,7 @@ OUTLINE_GAME_PX = 3.0
 OUTLINE_BIBLE = 0.016        # metres on the 2.0 u figure: the bible crops draw ~0.8 % of figure height
 
 LEGS = [("upperleg.l", (0, 1, 0), -9), ("upperleg.r", (0, 1, 0), 9), ("foot.l", (0, 1, 0), 9), ("foot.r", (0, 1, 0), -9)]
-STANCE = LEGS + [("upperarm.l", (0, 1, 0), 8), ("upperarm.r", (0, 1, 0), -10)]
+STANCE = LEGS + [("upperarm.l", (0, 1, 0), 8), ("upperarm.r", (0, 1, 0), -14)]
 
 
 def shield_turn(deg):
@@ -48,19 +48,30 @@ def shield_turn(deg):
 
 
 # framing: (clip, frame, joint rotations, camera azimuth deg, camera elevation deg, team, fit)
+# Profile: the bible draws no shield in profile, so the capture pose holds the shield arm out to the side with the
+# shield face forward, edge-on to the camera and behind the body (a pose choice, not a hidden object).
 # azimuth 0 = camera in front (-Y); -90 = camera on the character's right (he faces screen right)
-CLEAVE = LEGS + [("upperleg.l", (1, 0, 0), 25), ("upperleg.r", (1, 0, 0), -25), ("spine", (0, 1, 0), 10),
-                 ("upperarm.r", (0, 1, 0), -95), ("upperarm.r", (1, 0, 0), 30), ("lowerarm.r", (0, 1, 0), -20)]
-CHARGE = LEGS + [("upperleg.l", (1, 0, 0), 30), ("upperleg.r", (1, 0, 0), -30), ("spine", (1, 0, 0), 12)]
+CLEAVE = LEGS + [("upperleg.l", (1, 0, 0), -25), ("upperleg.r", (1, 0, 0), 25), ("upperleg.l", (0, 1, 0), -10),
+                 ("upperleg.r", (0, 1, 0), 10), ("spine", (0, 1, 0), -8),
+                 ("upperarm.r", (0, 1, 0), 80), ("lowerarm.r", (0, 1, 0), 40)]
+CHARGE = LEGS + [("upperleg.l", (1, 0, 0), -30), ("upperleg.r", (1, 0, 0), 30), ("upperleg.l", (0, 1, 0), -8),
+                 ("upperleg.r", (0, 1, 0), 8), ("spine", (1, 0, 0), 12)]
+
+
+def cleaver_turn(deg):
+    """Swing the cleaver about the vertical through the right wrist (deg > 0 swings the blade from -X toward -Y)."""
+    return [("hand.r", (0, 0, 1), deg)]
 POSES = {
-    "front": ("Idle", 1, STANCE + shield_turn(19), 0, 6, "azure", "all"),
-    "three-quarter": ("Idle", 1, STANCE + shield_turn(-17), -25, 6, "azure", "all"),
-    "profile": ("Idle", 1, STANCE + shield_turn(-50), -90, 4, "azure", "all"),
+    "front": ("Idle", 1, STANCE + shield_turn(8) + [("hand.l", (0, 1, 0), -12), ("hand.r", (0, 1, 0), 25)], 0, 6,
+              "azure", "all"),
+    "three-quarter": ("Idle", 1, STANCE + shield_turn(-35) + [("hand.r", (0, 1, 0), 25)], -25, 6, "azure", "all"),
+    "profile": ("Idle", 1, STANCE + [("upperarm.l", (0, 1, 0), -30), ("upperarm.r", (1, 0, 0), -15)] + shield_turn(-50)
+                + cleaver_turn(100), -90, 4, "azure", "all"),
     "back": ("Idle", 1, STANCE, 180, 6, "azure", "all"),
     "cleave": ("Idle", 1, CLEAVE, -20, 6, "azure", "all"),
     "shield-charge": ("Block", 10, CHARGE, -30, 6, "azure", "all"),
     "front-shield": ("Idle", 1, STANCE, 0, 6, "azure", "shield"),
-    "crimson": ("Idle", 1, STANCE + shield_turn(19), -12, 6, "crimson", "all"),
+    "crimson": ("Idle", 1, STANCE + shield_turn(8) + [("hand.r", (0, 1, 0), 25)], -12, 6, "crimson", "all"),
 }
 
 bpy.ops.wm.open_mainfile(filepath=os.path.join(HERE, "warrior.blend"))
@@ -84,6 +95,7 @@ outline_mat = toon.make_outline_material()
 id_team = toon.make_flat_material("ID_Team", "#FFFFFF")
 id_rest = toon.make_flat_material("ID_Rest", "#808080")
 id_mat = toon.make_flat_material("ID_TeamMask", team_white=True)
+id_rest.use_backface_culling = True       # it is the hull material in ID renders: cull like the outline
 hulls = {ob.name: toon.add_outline(ob, OUTLINE_BIBLE, outline_mat) for ob in meshes}
 
 cam_data = bpy.data.cameras.new("Cam")
@@ -232,7 +244,8 @@ SUN_EL = math.radians(50)
 
 if MODE == "bible":
     cam_data.type = "ORTHO"
-    blob = flat_obj("ContactBlob", disc_mesh(0.55, 0.002), "#18233B", 0.40)   # drawn by the game; the bible draws one too
+    # ground shadow as the bible framings draw it (~1.5 u wide); the game's own blob (0.55 u) is in the game renders
+    blob = flat_obj("ContactBlob", disc_mesh(0.75, 0.002), "#18233B", 0.40)
     set_outline(OUTLINE_BIBLE)
     for name, (clip, frame, rots, az, el, team, fit) in POSES.items():
         if ONLY and name not in ONLY:
@@ -309,6 +322,14 @@ elif MODE in ("game", "facings"):
                 continue
             toon.set_team(mat, team == "crimson")
             render(os.path.join(OUT, f"game_{team}.png"))
+        # ART-DIRECTION 2.1 height: feet (ground under the unit) to the top of the hair, projected to the screen
+        from bpy_extras.object_utils import world_to_camera_view
+        body_pts = posed_points([bpy.data.objects["Warrior_Body"]])
+        top = max(body_pts, key=lambda p: p.z)
+        feet = Vector((top.x, top.y, 0.0))
+        yf = world_to_camera_view(scene, cam, feet).y * 1080
+        yt = world_to_camera_view(scene, cam, top).y * 1080
+        print("FEET_TO_TOP_PX %.1f (top of hair at z %.3f)" % (yt - yf, top.z))
         # unit alone (no ground, no ref) for the pixel-height measurement
         ground.hide_render = blob.hide_render = ref.hide_render = True
         scene.render.film_transparent = True
