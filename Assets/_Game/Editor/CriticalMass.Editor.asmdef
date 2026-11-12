@@ -1,0 +1,21 @@
+{
+    "name": "CriticalMass.Editor",
+    "rootNamespace": "CriticalMass.Editor",
+    "references": [
+        "CriticalMass.Sim",
+        "CriticalMass.Runtime",
+        "Unity.RenderPipelines.Core.Runtime",
+        "Unity.RenderPipelines.Universal.Runtime"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
