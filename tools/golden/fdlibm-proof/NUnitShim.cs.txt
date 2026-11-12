@@ -1,0 +1,22 @@
+using System;
+using System.Collections;
+namespace NUnit.Framework
+{
+    public class TestFixtureAttribute : Attribute { }
+    public class TestAttribute : Attribute { }
+    public class AssertionException : Exception { public AssertionException(string m) : base(m) { } }
+    public static class Assert
+    {
+        public static void IsTrue(bool c, string m = "") { if (!c) throw new AssertionException(m); }
+        public static void Fail(string m) { throw new AssertionException(m); }
+        public static void AreEqual(object e, object a, string m = "") { if (!Equals(e, a)) throw new AssertionException(m + " expected " + e + " got " + a); }
+        public static void Greater(int a, int b, string m = "") { if (!(a > b)) throw new AssertionException(m); }
+        public static void GreaterOrEqual(int a, int b, string m = "") { if (!(a >= b)) throw new AssertionException(m); }
+        public static void IsEmpty(ICollection c, string m = "") { if (c.Count != 0) throw new AssertionException(m); }
+    }
+}
+namespace NUnit.Framework
+{
+    public static class CollectionAssert { public static void IsEmpty(System.Collections.ICollection c, string m = "") { if (c.Count != 0) throw new AssertionException(m); } }
+    public static class StringAssert { public static void Contains(string e, string a, string m = "") { if (!a.Contains(e)) throw new AssertionException(m + " missing " + e); } }
+}

@@ -927,7 +927,46 @@ def preflight(cap, items_dir=None, fetch=True):
 
 
 # ───────────────────────────── plan (the workflow's args) ─────────────────────────────
-def plan(cap, now, items_dir=None, run_tag=None, only_batches=None, max_builders=DEFAULT_BUILDERS):
+def prebuilt_lane(item_id, returns=0, main='origin/main', cwd=None):
+    """U-050: the head of a pushed lane a fresh launch reuses instead of rebuilding, or ''. Reused when
+    origin/loop/<ID> exists (the remote-tracking ref; preflight fetched), carries commits beyond `main`, the item was
+    never returned (a returned item's builder must read its failure file, U-038), and the head descends from `main`
+    or merges with it cleanly (git merge-tree, nothing written to any branch)."""
+    if int(returns or 0) > 0:
+        return ''
+    head, mref = branch_sha(f'refs/remotes/origin/loop/{item_id}', cwd=cwd), branch_sha(main, cwd=cwd)
+    if not head or not mref:
+        return ''
+    code, out, _ = git('rev-list', '--count', f'{mref}..{head}', cwd=cwd)
+    if code != 0 or out.strip() in ('', '0'):
+        return ''
+    if git('merge-base', '--is-ancestor', mref, head, cwd=cwd)[0] == 0:
+        return head
+    return head if git('merge-tree', '--write-tree', mref, head, cwd=cwd)[0] == 0 else ''
+
+
+def ledger_reused(args=None):
+    """U-050, at record-launch (the run id is known): one 'reused' ledger row per item whose pushed lane the run
+    takes straight to integration, and one live-log sentence naming them. Returns the ids recorded."""
+    args = read_json(LOGS / 'launch-args.json') if args is None else args
+    args = args or {}
+    landed = set(args.get('landed') or [])
+    in_run = {i for b in args.get('batches') or [] for i in b.get('items', [])}
+    out = []
+    for r in args.get('items') or []:
+        iid = r.get('id')
+        if r.get('prebuilt') and r.get('owner') == 'loop' and iid not in landed and (not in_run or iid in in_run):
+            if item_state(iid, r.get('title') or iid, 'reused',
+                          f"pushed lane origin/loop/{iid} at {r['prebuilt'][:12]} goes to integration unbuilt (U-050)",
+                          batch='launch'):
+                out.append(iid)
+    if out:
+        livelog(f'This run reuses {len(out)} already pushed item branch(es) without rebuilding them: '
+                f'{", ".join(out)}.')
+    return out
+
+
+def plan(cap, now, items_dir=None, run_tag=None, only_batches=None, max_builders=DEFAULT_BUILDERS, reuse=True):
     items = load_items(items_dir)
     try:
         landed = landed_map()
@@ -940,7 +979,9 @@ def plan(cap, now, items_dir=None, run_tag=None, only_batches=None, max_builders
         rows.append({'id': iid, 'title': it.get('title'), 'phase': str(it.get('phase')), 'owner': it.get('owner'),
                      'waits_on': it.get('waits_on') or [], 'art_row': it.get('art_row'),
                      'tightly_defined': str(it.get('tightly_defined', 'false')).lower() == 'true',
-                     'returns': int(rets.get(iid, 0))})
+                     'returns': int(rets.get(iid, 0)),
+                     'prebuilt': (prebuilt_lane(iid, rets.get(iid, 0)) if reuse and it.get('owner') == 'loop'
+                                  and iid not in landed and iid not in parked else '')})
     head = branch_sha('HEAD')
     nb = clamp_builders(max_builders)
     bats = select_batches(order_batches(items_dir), only_batches)
@@ -1234,6 +1275,8 @@ def main(argv=None):
     s.add_argument('--batches', help="run only these _ORDER.md batch numbers, e.g. '1' (the workflow then stops)")
     s.add_argument('--builders', type=int, default=DEFAULT_BUILDERS, help='builder limit, 1..12 (U-037)')
     s.add_argument('--show', action='store_true', help='print the batch table: items, coupled set, waves, peak agents')
+    s.add_argument('--rebuild', action='store_true',
+                   help='U-050: rebuild every item; never reuse a pushed origin/loop/<ID> lane')
     s = sub.add_parser('pr-open')
     s.add_argument('--head', required=True)
     s.add_argument('--title', required=True)
@@ -1324,6 +1367,7 @@ def main(argv=None):
         (LOGS / 'launch-ids.txt').parent.mkdir(parents=True, exist_ok=True)
         with open(LOGS / 'launch-ids.txt', 'a') as f:
             f.write(f'{utc()} task_id={a.task_id} run_id={a.run_id}\n')
+        run['reused'] = ledger_reused()
         print(json.dumps(run))
         return 0
     if a.cmd == 'preflight':
@@ -1332,7 +1376,7 @@ def main(argv=None):
             print(f"{'PASS' if c['ok'] else 'FAIL'}  {c['check']}: {c['detail']}")
         return 0 if all(c['ok'] for c in checks) else 1
     if a.cmd == 'plan':
-        p = plan(a.cap, a.now, a.items_dir, only_batches=a.batches, max_builders=a.builders)
+        p = plan(a.cap, a.now, a.items_dir, only_batches=a.batches, max_builders=a.builders, reuse=not a.rebuild)
         if a.out:
             write_json(a.out, p)
         if a.show:
@@ -1342,6 +1386,8 @@ def main(argv=None):
                       + '; '.join(f'wave {k + 1}: {len(w)}' for k, w in enumerate(b['waves']))
                       + f" | peak agents {peak_agents(b['waves'])} of {MAX_BUILDERS_CEILING}")
             print(f"builder limit {p['maxBuilders']}")
+            reused = [r['id'] for r in p['items'] if r.get('prebuilt')]
+            print(f"reused pushed lanes (no rebuild, U-050): {', '.join(reused) or 'none'}")
         print(json.dumps({'items': len(p['items']), 'landed': len(p['landed']), 'parked': len(p['parked']),
                           'batches': [b['batch'] for b in p['batches']], 'out': a.out}))
         return 0

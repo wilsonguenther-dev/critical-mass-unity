@@ -66,9 +66,9 @@ with a lower limit `cmloop.py plan` re-chunks the batch in table order.
 | Batch | Items | Coupled set | Waves (builders <= 12) | Compiles | Gate after the batch |
 | --- | --- | --- | --- | --- | --- |
 | 1 | F-01, F-02a, F-03, F-04, F-02b | none (a chain: each item waits on the earlier ones) | wave 1: F-01, F-02a, F-03, F-04, F-02b | 1 | LANDED 2026-11-12 in PR 1 (579a53f): compile, EditMode 41 |
-| 2 | F-02c, F-01b, F-05a .. F-05j | F-02c, F-05a .. F-05j | wave 1: F-02c, F-01b, F-05a .. F-05j | 1 | compile, EditMode +129 (117 ported runtime cases in 113 methods; added: JsMathFdlibm 5, Boundary 4, SimEnumMap 1, GameConfigGolden 3, SharedScratch 2) |
+| 2 | F-02c, F-01b, F-05a .. F-05j | F-02c, F-05a .. F-05j | wave 1: F-02c, F-01b, F-05a .. F-05j | 1 | compile, EditMode +130 (117 ported runtime cases in 113 methods; added: JsMathFdlibm 6 (U-049), Boundary 4, SimEnumMap 1, GameConfigGolden 3, SharedScratch 2) |
 | 3 | F-06b, F-06a, F-06c, F-06d, F-06e, F-06f, F-07 | F-06a .. F-06f | wave 1: F-06b, F-06a, F-06c, F-06d, F-06e, F-06f, F-07 | 1 | compile, EditMode +31 (29 ported, 2 added; the perf case is Explicit) |
-| 4 | F-08a, F-08b, F-08c, F-09, V-01 | F-08a, F-08b, F-08c | wave 1: F-08a, F-08b, F-08c, F-09, V-01 | 1 | compile, EditMode +12 (4 ported, 3 SimSpace, 1 OutcomeRunner, 4 ToonShader), PlayMode 3 (smoke 1, human input 2), Mac build; soak lane `tools/unity-soak.sh` runs the 14 outcome bands and REPORTS (U-034, never a gate) |
+| 4 | F-08a, F-08b, F-08c, F-09, V-01 | F-08a, F-08b, F-08c | wave 1: F-08a, F-08b, F-08c, F-09, V-01 | 1 | compile, EditMode +12 (4 ported, 3 SimSpace, 1 OutcomeRunner, 4 ToonShader), PlayMode 3 (smoke 1, human input 2), Mac build; after the coupled set lands, the Windows build `build-windows` (the shipping build, U-051; red = BLOCKING) on the new main; soak lane `tools/unity-soak.sh` runs the 14 outcome bands and REPORTS (U-034, never a gate) |
 | 5 | A-02, A-03, A-04, A-05 | none | wave 1: A-02, A-03, A-04, A-05 | 1 | parity gate per art row; launch with `--batches 5` only after branch `art/warrior-blender` is on main (U-043) |
 
 Acyclic: every `waits_on` edge points to an earlier batch, or inside a batch to an earlier item (batch 1's chain;

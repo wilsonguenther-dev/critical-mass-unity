@@ -1,0 +1,25 @@
+{
+ "generator": "tools/golden/gen-jsmath-large.mjs",
+ "node": "v24.11.1",
+ "v8": "13.6.233.10-node.28",
+ "arch": "arm64",
+ "seed": 1592598566,
+ "note": "sha256 over 8-byte big-endian IEEE-754 bits, NaN as 7ff8000000000000; inputs of atan2 are y then x per pair",
+ "counts": {
+  "sin": 271649,
+  "cos": 271649,
+  "exp": 250037,
+  "atan2": 210144
+ },
+ "inputs": {
+  "sin": "0ed71200a32ebca436adccd2fb00ed6a55bf423feec3d970da8a7000ed428ce0",
+  "exp": "217bd680d38f8ddf5a5c9189c157390c11eff689087032d6cf0d82bb5c0e0419",
+  "atan2": "b3688ab47aa56f76aebe95f44e295bd7e78345eaf479fdef52950c0a86a5734f"
+ },
+ "outputs": {
+  "sin": "6f01c0dc92531193d900a93cac701aafb27735ce4714712b22bfe0c732679e81",
+  "cos": "ecafcad8dc2039e7b06c33fa50fb19a8c7680ddd3591f522ea28519dc291cfd1",
+  "exp": "c584bef460b4f8f3d2706279888ed48069a3a6d2a6ab728b72f4a16e779a3b6a",
+  "atan2": "05da19bec98d2e761e83d760e3d7fbaa391164ff9e00fbc0715d501b5046881f"
+ }
+}
