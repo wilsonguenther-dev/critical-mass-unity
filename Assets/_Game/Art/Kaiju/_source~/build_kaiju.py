@@ -1295,7 +1295,7 @@ def adult_params():
         ((0, 0.0, 1.5), 0.7, (1.0, 1.1, 0.9)),         # belly
         ((0, 1.0, HIPZ), 0.6, (1.1, 1.0, 0.85)),       # hips (small, high enough to leave the arch between the legs)
         ((0, -0.72 + HY / 2, 2.88 + HZ / 2), 0.46),                # neck
-        ((0, -1.02 + HY, 3.25 + HZ), 0.43, (1.08, 1.0, 0.9)),      # small head low between the shoulders
+        ((0, -1.02 + HY, 3.25 + HZ), 0.49, (1.08, 1.0, 0.9)),      # v3: bigger head, still low between the shoulders
         ((0, -1.29 + HY, 3.0 + HZ), 0.27, (1.25, 1.0, 0.74)),      # v3: short blunt muzzle, below the eyes
     ]
     for sx in (1, -1):
@@ -1388,7 +1388,7 @@ def adult_params():
         add((T * 0.18, ty(2.08), 0.98), (0.26, 0.27, 0.22), "Tail2", up=(T * 0.3, 0.3, 1))
         add((T * 0.42, ty(2.22), 1.02), (0.2, 0.2, 0.17), "Tail3", up=(T * 0.4, 0.2, 1), n=12)
         # heavy brow boulder over the painted eyes (stays above them), moss on its crown
-        add((0, -1.25 + HY, 3.49 + HZ), (0.5, 0.26, 0.15), "Head", moss=0.3, up=(0, -0.6, 1), n=18, spin=0.0)
+        add((0.04, -1.22 + HY, 3.6 + HZ), (0.5, 0.26, 0.13), "Head", moss=0.3, up=(-0.25, -0.6, 1), n=18, spin=0.0)
         # tan chest: two big pectoral plates, then three rows of belly segments (ray-cast onto the core)
         tiles = [(-0.29, 2.3, 0.33, 0.25), (0.29, 2.3, 0.33, 0.25)]
         tiles += [(sx * 0.17, z, 0.19, 0.13) for z in (1.92, 1.62, 1.34) for sx in (1, -1)]
@@ -1448,7 +1448,7 @@ def adult_params():
     return {
         "unit": U, "balls": balls, "limbs": limbs, "voxel": 0.05, "body_tris": 2600, "bones": bones,
         "gap": 0.024, "crack_w": 0.02, "chamfer_m": 0.05, "design_h": 4.2,
-        "head": (0, -1.02 + HY, 3.25 + HZ), "head_r": 0.43, "muzzle": (0, -1.29 + HY, 3.0 + HZ), "head_clear": 1.12, "belly": belly, "dmin": dmin,
+        "head": (0, -1.02 + HY, 3.25 + HZ), "head_r": 0.49, "muzzle": (0, -1.29 + HY, 3.0 + HZ), "head_clear": 1.12, "belly": belly, "dmin": dmin,
         "samples": 16000, "plate_r": 1.0, "plate_thick": 0.4, "light_frac": light_frac, "moss": moss, "min_plate_z": 0.15,
         "belly_tiles": belly_tiles, "fist": (FX, FY, 0.52), "fist_plate_z": 0.85, "fist_plate_r": 0.44 * FR / 0.6,
         "knuckles": (-0.33, -0.11, 0.11, 0.33), "knuckle_fwd": 0.42, "knuckle_r": 0.15,

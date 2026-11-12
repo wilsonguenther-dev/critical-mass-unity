@@ -31,6 +31,7 @@ TAN = _rgba("#C9BFAA")          # PAL Belly (muzzle and cheeks)
 TAN_DARK = _rgba("#A89D86")     # muzzle crease under the smile
 LID = _rgba("#2C3850")          # lid skin, a touch darker than PAL Skin #36425A
 EYE = _rgba("#E4F046")          # PAL Eye
+EYE_V3 = _rgba("#CFF240")       # v3: brighter lime-yellow, toward the bible's green eyes
 WHITE = _rgba("#FFFFFF")
 MOUTH = _rgba("#7A2E3A")        # PAL Mouth
 TONGUE = _rgba("#E0707C")
@@ -83,34 +84,39 @@ class Canvas:
 
 
 def paint_adult(cv):
-    """Smug adult (bible 11-details head crop). Eyes at x = +-0.21, z = 3.34 on the head front; muzzle below."""
-    # tan muzzle and cheeks with a wavy top edge under the eyes
-    m = np.maximum.reduce([cv.ell(0.0, 3.02, 0.40, 0.17), cv.ell(0.30, 3.10, 0.19, 0.12),
-                           cv.ell(-0.30, 3.09, 0.19, 0.12), cv.ell(0.0, 2.92, 0.44, 0.12)])
+    """v3 cheeky adult (Jeisil 2026-11-12: cartoony and expressive like the bible, not a stern wolf). Big bright
+    lime-yellow eyes with two highlights, only a light lid on the snout side, one brow cocked high, and a wide
+    confident smirk that curls up hard into the left cheek with a fang and a dimple. Eyes at x = +-0.22, z = 3.34."""
+    m = np.maximum.reduce([cv.ell(0.0, 3.0, 0.40, 0.16), cv.ell(0.30, 3.07, 0.19, 0.12),
+                           cv.ell(-0.30, 3.06, 0.19, 0.12), cv.ell(0.0, 2.90, 0.44, 0.12)])
     cv.over(m, TAN)
     for s in (1, -1):
-        ex, ez = 0.21 * s, 3.335
-        cv.over(cv.ell(ex, ez, 0.112, 0.098), NAVY)                               # thick dark rim
-        cv.over(cv.ell(ex, ez, 0.094, 0.080), EYE)                                # big yellow eye
-        cv.over(cv.ell(ex - 0.022 * s, ez - 0.012, 0.042, 0.054), NAVY)           # pupil, looking in and down
-        cv.over(cv.ell(ex - 0.040 * s, ez + 0.006, 0.016, 0.018), WHITE)          # highlight
-        # heavy half-closed upper lid: slants down toward the snout (smug, self-satisfied)
-        inner, outer = (ex - 0.11 * s, ez + 0.005), (ex + 0.11 * s, ez + 0.040)
-        lid = cv.ell(ex, ez, 0.112, 0.098) * (1 - cv.below_line(*inner, *outer))
+        ex, ez = 0.22 * s, 3.345
+        cv.over(cv.ell(ex, ez, 0.142, 0.138), NAVY)                               # thick ink rim
+        cv.over(cv.ell(ex, ez, 0.122, 0.118), EYE_V3)                             # big bright eye
+        cv.over(cv.ell(ex - 0.018 * s, ez - 0.006, 0.062, 0.074), NAVY)           # big pupil, looking in
+        cv.over(cv.ell(ex - 0.044 * s, ez + 0.032, 0.026, 0.028), WHITE)          # main highlight
+        cv.over(cv.ell(ex + 0.010 * s, ez - 0.040, 0.012, 0.012), WHITE)          # small second highlight
+        # light cocky lid on the snout side only (the raised-brow eye stays wide open)
+        drop = 0.06 if s < 0 else 0.0
+        inner, outer = (ex - 0.14 * s, ez + 0.07 - drop), (ex + 0.14 * s, ez + 0.13 - drop * 0.4)
+        lid = cv.ell(ex, ez, 0.142, 0.138) * (1 - cv.below_line(*inner, *outer))
         cv.over(lid, LID)
-        cv.over(cv.stroke([(ex - 0.115 * s, ez + 0.000), (ex, ez + 0.024), (ex + 0.118 * s, ez + 0.044)],
-                          [0.020, 0.026, 0.018]), NAVY)                           # lid line
-        # brow: one cocked higher (creature's left, +x), the other flat and low
-        hi = 0.03 if s > 0 else 0.0
-        cv.over(cv.stroke([(ex - 0.11 * s, ez + 0.11), (ex, ez + 0.13 + hi), (ex + 0.12 * s, ez + 0.12 + 1.5 * hi)],
-                          [0.030, 0.036, 0.024]), NAVY)
-    # long closed smirk: low on the creature's right, curling up into the left cheek, with a dimple
-    smile = [(-0.31, 3.035), (-0.18, 2.975), (0.0, 2.955), (0.16, 2.970), (0.28, 3.020), (0.345, 3.085)]
-    cv.over(cv.stroke(smile, [0.016, 0.022, 0.024, 0.024, 0.022, 0.016]), NAVY)
-    cv.over(cv.stroke([(0.335, 3.10), (0.375, 3.07)], [0.014, 0.010]), NAVY)       # dimple tick
-    cv.over(cv.stroke([(-0.10, 2.925), (0.05, 2.918), (0.16, 2.932)], [0.010, 0.012, 0.008]), TAN_DARK)  # lower lip
-    cv.over(cv.ell(0.06, 2.948, 0.018, 0.026), TEETH)                              # one fang peeking under the lip
-    cv.over(cv.stroke(smile[1:4], [0.016, 0.018, 0.016]), NAVY)
+        cv.over(cv.stroke([inner, (ex, 0.5 * (inner[1] + outer[1]) + 0.012), outer], [0.020, 0.026, 0.018]), NAVY)
+        # brows: the creature's left one arched high (raised, cheeky), the right one low and flat
+        if s > 0:
+            pts = [(ex - 0.12, ez + 0.16), (ex - 0.01, ez + 0.235), (ex + 0.13, ez + 0.20)]
+        else:
+            pts = [(ex + 0.12, ez + 0.15), (ex, ez + 0.165), (ex - 0.13, ez + 0.175)]
+        cv.over(cv.stroke(pts, [0.032, 0.040, 0.026]), NAVY)
+    # wide confident smirk: starts low on the right, sweeps across and curls up high into the left cheek
+    smile = [(-0.30, 3.015), (-0.17, 2.95), (0.0, 2.925), (0.15, 2.94), (0.27, 2.995), (0.34, 3.08), (0.35, 3.13)]
+    cv.over(cv.stroke(smile, [0.016, 0.024, 0.028, 0.028, 0.026, 0.022, 0.014]), NAVY)
+    cv.over(cv.stroke([(0.325, 3.15), (0.39, 3.11)], [0.016, 0.010]), NAVY)        # dimple tick
+    cv.over(cv.stroke([(-0.12, 2.895), (0.05, 2.885), (0.18, 2.90)], [0.010, 0.012, 0.008]), TAN_DARK)
+    for fx in (0.08, 0.20):                                                         # two fangs on the grinning side
+        cv.over(cv.ell(fx, 2.925 - 0.01 * (fx > 0.1), 0.02, 0.03), TEETH)
+    cv.over(cv.stroke(smile[1:5], [0.018, 0.022, 0.022, 0.018]), NAVY)
 
 
 def paint_hatchling(cv):
@@ -130,16 +136,16 @@ def paint_hatchling(cv):
                           [0.022, 0.028, 0.020]), NAVY)                            # small raised brows
     # open D grin: wide smiling top edge, round bottom
     top = cv.below_line(-0.3, 1.60, 0.3, 1.60)
-    bowl = cv.ell(0.0, 1.60, 0.24, 0.15) * top
-    up = np.maximum(cv.ell(-0.235, 1.625, 0.05, 0.045), cv.ell(0.235, 1.625, 0.05, 0.045))
+    bowl = cv.ell(0.0, 1.60, 0.31, 0.17) * top
+    up = np.maximum(cv.ell(-0.30, 1.64, 0.06, 0.055), cv.ell(0.30, 1.64, 0.06, 0.055))
     mouth = np.maximum(bowl, up * cv.below_line(-0.3, 1.66, 0.3, 1.66))
     cv.over(np.clip(mouth * 1.0, 0, 1), NAVY)
-    inner = cv.ell(0.0, 1.605, 0.215, 0.125) * cv.below_line(-0.3, 1.592, 0.3, 1.592)
+    inner = cv.ell(0.0, 1.605, 0.285, 0.145) * cv.below_line(-0.3, 1.592, 0.3, 1.592)
     cv.over(inner, MOUTH)
     cv.over(cv.ell(0.0, 1.47, 0.12, 0.06) * inner, TONGUE)
     for x in (-0.09, 0.09):
         cv.over(cv.ell(x, 1.585, 0.035, 0.024) * inner, TEETH)                     # two top teeth
-    cv.over(cv.stroke([(-0.27, 1.62), (-0.20, 1.60), (0.0, 1.597), (0.20, 1.60), (0.27, 1.62)],
+    cv.over(cv.stroke([(-0.34, 1.67), (-0.24, 1.605), (0.0, 1.597), (0.24, 1.605), (0.34, 1.67)],
                       [0.014, 0.020, 0.022, 0.020, 0.014]), NAVY)                  # smiling top lip line
 
 
