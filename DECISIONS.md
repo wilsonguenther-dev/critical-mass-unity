@@ -370,6 +370,72 @@ capture publish, not before).
 
 **Status.** Decided. Applied with the first Unity capture publish.
 
+## Rulings on the harness builder's open questions (2026-11-12)
+
+## U-026 Coupled batches
+
+**Decision.** Batches come from `loop/items/_ORDER.md` (section 3 gives each batch's items; a batch is coupled when two
+or more of its items sit on one dependency-graph line marked "(coupled"). Phase 0 batches 2, 3 and 4 are coupled. In a
+coupled batch every builder finishes (in waves of at most 5), then ONE compile. On a red the drop rule does not apply:
+one Opus fix seat gets the exact compiler/test output and the red item's spec and repairs only files inside that item's
+`files_allowed`; at most 2 fix rounds per batch, then the loop halts for the architect with the evidence. A coupled
+batch lands whole or not at all. Uncoupled batches keep the drop-on-first-red rule; a dropped item also drops the
+items in the same batch that wait on it (batch 1 is a chain), without counting against them.
+
+**Why.** The ported modules reference each other in cycles (combat and kaiju, step and every system, fsm and
+director; `_OPEN.md` O-21, O-22), so their items cannot compile one by one.
+
+**Replaces.** U-011's "a red item is dropped from the batch on the first red" for coupled batches only.
+
+**Status.** Decided. Built: `loop/bin/integrate.py --coupled`, the workflow's fix seat, `cmloop.py batches`.
+
+## U-027 (reserved for the reviewer)
+
+Reserved: "the game hierarchy is built in code at Boot; builders never author scene files". Written by the reviewer.
+
+## U-028 Soak lane
+
+**Decision.** NUnit tests in category "Slow" are excluded from the per-batch EditMode gate (`tools/unity-test.sh`
+passes `-testCategory "!Slow"`; Unity Test Framework 1.6 splits the value on `;` and turns a leading `!` into a NOT
+filter). A separate `soak` gate runs `tools/unity-soak.sh` once after each batch lands on main and before any handoff
+build. A soak red writes a BLOCKING entry (top-priority fix item needed) to `loop/review/<batch>.md`, which blocks the
+next batch. Until `tools/unity-soak.sh` exists the gate reports skipped.
+
+**Why.** The 14 slow outcome tests (F-09) would add their run time to every batch's gate.
+
+**Replaces.** Running every EditMode test in the per-batch gate.
+
+**Status.** Decided. Built: the filter in `tools/unity-test.sh`, `loop/gates/soak`. `tools/unity-soak.sh` not written.
+
+## U-029 Project setup step
+
+**Decision.** Before the compile gate the integrator runs `CriticalMass.Editor.ProjectSetup.Apply` with
+`-executeMethod` (it is idempotent), recorded as the `setup` gate's result line; a non-zero exit fails the batch. Item
+F-07 extends that method to assign the project-wide input actions through the Input System editor API instead of a
+hand-written file id.
+
+**Why.** Project settings applied by code are the same on every machine and every integration tree.
+
+**Replaces.** Nothing.
+
+**Status.** Decided. Built: `loop/gates/setup`, first gate in `loop/bin/integrate.py`.
+
+### Further harness rulings (2026-11-12, no new id)
+
+- **Review blockers (ruling 6).** Review findings marked BLOCKING are written to `loop/review/<batch>.md`. The next
+  batch does not start while an unresolved BLOCKING entry exists (`halt-check` exits 6, the launch checklist fails,
+  the workflow stops dispatching). The architect resolves each one with `- RESOLVED <key>: item <ID>` or waives it with
+  `- WAIVED <key>: U-###`.
+- **Quiet hours (ruling 7).** Quiet hours (23:00 to 07:30 Chicago) hold digests only; a HALT always texts.
+- **Method (ruling 1).** An item's method is every section except "Out of scope"; no `## Method` heading is required.
+- **Spend estimate (ruling 2).** The transcript-based estimate is kept until the workflow writes its own total.
+- **Unattributed red (ruling 3).** A red that names no item's file returns the whole uncoupled batch uncounted and
+  flags the architect; the integrator may name a culprit once.
+- **PlayMode smoke and budgets (ruling 4).** The smoke test lives in `Assets/_Game/Runtime.PlayTests`, run by
+  `tools/unity-playtest.sh` (F-08c creates both); the gate reports skipped until it exists. `perf.json`, draw calls and
+  shader variants are report-only with no limits until the architect sets them after the first real measurement.
+- **Memory (ruling 5).** The memory watchdog stays report-only.
+
 ## Still open (the architect specifies them in the shader and art item specs)
 
 `CM/Toon` property names and team-mask storage; FBX export settings; the Kaiju rig; the prop script location.

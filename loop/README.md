@@ -26,7 +26,11 @@ finished items the integrator compiles and gates together. A **gate** is a check
 | --- | --- |
 | Builders write code and tests only, commit and push a branch; they never compile, run Unity or build. | Several Unity instances fighting over one machine; the browser's ~29-minute verify per bounce (R3). |
 | One compile per batch of about 6 items, and never more than one Unity compile running at a time across the session. | Compile-lock contention and false "compile overdue" alarms (R7). |
-| On the first red, the red item is dropped from the batch back to a builder and the rest land. | One bounce per full re-verify round; 144 minutes for 2 items; revert and reapply churn (R3). |
+| On the first red, the red item is dropped from the batch back to a builder and the rest land; items in the batch that wait on it drop with it, uncounted. | One bounce per full re-verify round; 144 minutes for 2 items; revert and reapply churn (R3). |
+| Coupled batches (U-026, from `items/_ORDER.md`; Phase 0 batches 2 to 4): all builders finish in waves of at most 5, one compile; a red goes to one Opus fix seat that repairs only the red item's `files_allowed`; at most 2 fix rounds, then HALT with the evidence; the batch lands whole or not at all. | Cyclic ported modules that cannot compile item by item (O-21, O-22). |
+| Before the compile, `CriticalMass.Editor.ProjectSetup.Apply` runs via `-executeMethod` as the `setup` gate; non-zero fails the batch (U-029). | Project settings that differ between trees. |
+| Tests in category "Slow" are excluded from the per-batch EditMode gate (`-testCategory "!Slow"`) and run by the `soak` gate (`tools/unity-soak.sh`) once after each batch lands; a soak red writes a BLOCKING entry and blocks the next batch (U-028). | Slow outcome tests multiplying every batch's gate time. |
+| Review findings marked BLOCKING go to `loop/review/<batch>.md`; the next batch does not start while one is unresolved (`- RESOLVED <key>: item <ID>` or `- WAIVED <key>: U-###`, architect only). | Review findings nobody acts on. |
 | A batch that runs past 40 minutes is cut. | Batches that never finish (Decisions 2026-11-08, never carried into the browser loop, R3). |
 | Gates, all on this Mac: compile; EditMode tests (the sim oracle); PlayMode smoke test (boot, 16v16 bots, 60 simulated seconds, zero exceptions); Mac build; parity capture for art items. | Rules that broke in play but no builder could see it, such as the jump leaking to every bot (R19). |
 | Shared limits (frame time, draw calls, shader variants) are measured by the gate and reported per batch; no builder is asked to raise one. | Most browser bounces: crowd draw calls over 900, rim, terrain and shader-program budgets a builder could not measure (R16). |
@@ -104,7 +108,7 @@ Unity Hub is an Electron app and ships its own `chrome_crashpad_handler`, which 
 | Status texts to Wilson go by iMessage/SMS through the notify script, not email. | Status lost in an inbox. |
 | One card per landed batch, sent by the helper itself. | Batches landing without Wilson knowing where to play them. |
 | On a stop, one plain sentence. | Walls of text at the moment Wilson needs a decision. |
-| Quiet hours 23:00 to 07:30 Chicago. | Texts at night. |
+| Quiet hours 23:00 to 07:30 Chicago hold digests only; a HALT always texts (ruling 7). | Texts at night, and a halt nobody hears about. |
 | The team group chat gets signal only: build state, answers the team owes, direction, slips, final. | 8 group texts in 2 hours of schedule slips (R4). |
 | Times are plain Central clock times. | Wilson unable to read the times. |
 | Never text Jeisil without Wilson's yes. | Messages the team did not agree to. |
@@ -134,13 +138,14 @@ workflow dry run). `loop/logs/` and `loop/state/` are git-ignored.
 | Path | Job |
 | --- | --- |
 | `items/<ID>.md` | One item per file. Front-matter: `id, title, phase, owner (loop/max), waits_on, files_allowed, files_forbidden, tests_required, pass_check, art_row`; optional `tightly_defined`, `architect_approved: U-###`. Files starting with `_` (conventions) are not items. Fixtures go in `items/_fixtures/` and are never queued. |
-| `bin/validate-items.py` | Rejects a missing field, "or" / "either" / "if installed" / "TBD" in the method (the `## Method` section, else every `##` section except `## Out of scope`), and any reach into `ProjectSettings/`, `Packages/` or `Controls.inputactions` without `architect_approved: U-###`. |
+| `bin/validate-items.py` | Rejects a missing field, "or" / "either" / "if installed" / "TBD" in the method (every `##` section except `## Out of scope`, ruling 1; no `## Method` heading needed), and any reach into `ProjectSettings/`, `Packages/` or `Controls.inputactions` without `architect_approved: U-###`. |
 | `bin/cmloop.py` | The one shared library: paths, compile lock (owner, pid, start; dead pid reclaimed), landed check (full-id `loop-landed: <ID>` line on origin/main, not reverted), lanes, returns and parking, the Obsidian live log, the single digest sender, PR open/merge (base must be `main`; no docs-only PR while a batch PR is open), halt check, preflight, plan, shutdown. |
-| `bin/integrate.py` | The integrator's mechanical part: merge the batch onto `loop/int-<tag>-<N>` cut from origin/main, scope-check, run the gates once per round, drop the red item with its failure text, re-run, then one PR to main, squash, prove landed, one card. |
+| `bin/integrate.py` | The integrator's mechanical part: merge the batch onto `loop/int-<tag>-<N>` cut from origin/main, scope-check, run setup then the gates once per round; uncoupled: drop the red item (and its in-batch dependants) with its failure text and re-run; `--coupled`: no drop, write the evidence for the fix seat, halt after 2 fix rounds; green: one PR to main, squash, prove landed, one card, then the soak gate on the new main. |
 | `bin/spend.py` | Spend governor on the workflow's own `totalTokens` (U-014); live transcript estimate until that file exists. 90 % writes `STOP-DISPATCH`, 100 % writes `HALT`. |
 | `bin/launch.sh`, `bin/shutdown.sh` | Launch checklist and watcher start; teardown by pidfile, lanes pushed or bundled, resume note. Both take `--dry-run`. |
 | `bin/halt-check.sh` | First step of every seat: exit 3 halt/stall, 4 stop-dispatch, 5 launch ids not recorded. |
-| `gates/{compile,editmode,playmode-smoke,build-mac,parity,scope,budgets}` | One JSON line each, real exit codes; `skipped` exits 78, never 0. `budgets` only reports or flags. |
+| `gates/{setup,compile,editmode,playmode-smoke,build-mac,parity,scope,budgets,soak}` | One JSON line each, real exit codes; `skipped` exits 78, never 0. `budgets` only reports or flags (no limits yet, ruling 4). `playmode-smoke` calls `tools/unity-playtest.sh` (assembly `Assets/_Game/Runtime.PlayTests`, F-08c); `soak` calls `tools/unity-soak.sh`; both report skipped until those scripts exist. |
+| `review/<batch>.md` | Review and soak BLOCKING entries (ruling 6). |
 | `watchers/watch.py {stall,memory,clock,disk,spend}` | Plain processes with pidfiles. Stall stays quiet while a live owner holds the compile lock. |
 | `workflow/critical-mass-unity.js` | The Workflow script. Scheduling is plain code: 5 builders + 1 integrator, stable item order, `agent()` null = halt, payloads under 40 KB. |
 | `tests/` | `python3 -m pytest -q loop/tests` and `node loop/tests/js/sim-workflow.mjs` (the workflow run against mock agents). |
