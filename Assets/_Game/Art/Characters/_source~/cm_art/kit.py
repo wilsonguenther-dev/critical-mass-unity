@@ -17,7 +17,8 @@ from . import palette
 MAX_INFLUENCES = 4
 GRADIENT = 0.06        # +6 % value toward the top of each part (ART-DIRECTION 3.5)
 CREVICE = 0.10         # -10 % value in crevices (baked ray occlusion, finalize)
-SEG = 0.8              # global segment scale for round primitives (the 12,000-triangle budget knob)
+SEG = 0.76             # global segment scale for round primitives (the 12,000-triangle budget knob)
+STEP_TOP, STEP_UNDER = 0.08, 0.12   # v3 value steps from the surface normal: +8 % on top faces, -12 % on undersides
 
 
 def _s(n, lo=4):
@@ -72,11 +73,12 @@ class Builder:
             }
         return self.objs[obj]
 
-    def add(self, obj, src, color, bones, feat=None, smooth=True, m=None, face_uv=None, grad=GRADIENT):
+    def add(self, obj, src, color, bones, feat=None, smooth=True, m=None, face_uv=None, grad=GRADIENT, steps=True):
         """Merge temp bmesh `src` (transformed by m) into object `obj`.
 
         grad: value gradient across the part's height (bottom x(1-grad/2) .. top x(1+grad/2)), the "+6 % toward the
-        top" painted-light rule. face_uv = (cx, cy, cz, half_w, half_h): planar front projection for the painted face
+        top" painted-light rule. steps: v3 value steps from the world normal (lighter tops, darker undersides, the
+        bible's painted form shadow), stepped at n.z > 0.45 and n.z < -0.35. face_uv = (cx, cy, cz, half_w, half_h): planar front projection for the painted face
         decal on faces whose centre is in front of cy; every other face samples UV (0.002, 0.002), a transparent texel.
         """
         if m is not None:
@@ -96,10 +98,15 @@ class Builder:
         zs = [v.co.z for v in src.verts]
         z0, z1 = min(zs), max(zs)
         vmap = {}
+        src.normal_update()
         for v in src.verts:
             nv = bm.verts.new(v.co)
             t = (v.co.z - z0) / max(z1 - z0, 1e-6)
-            f = 1.0 if glow else (1.0 + grad * (t - 0.5)) ** 2.2      # value step in sRGB, applied in linear
+            k = 1.0 + grad * (t - 0.5)
+            if steps:
+                nz = v.normal.z
+                k *= (1.0 + STEP_TOP) if nz > 0.45 else ((1.0 - STEP_UNDER) if nz < -0.35 else 1.0)
+            f = 1.0 if glow else k ** 2.2      # value step in sRGB, applied in linear
             nv[d["col"]] = (rgba[0] * f, rgba[1] * f, rgba[2] * f, rgba[3])
             nv[d["ws"]] = wi
             nv[d["ft"]] = fi
@@ -250,6 +257,29 @@ class Builder:
         bmesh.ops.create_uvsphere(bm, u_segments=_s(u, 8), v_segments=_s(v, 5), radius=1.0)
         for vert in bm.verts:
             vert.co = Vector(tuple(math.copysign(abs(c) ** e, c) * s / 2 for c, s in zip(vert.co, size)))
+        return bm
+
+    @staticmethod
+    def chipped(bm, rng, chips=2, depth=0.20, lump=0.0):
+        """Hewn stone: cut `chips` corners off a centred primitive with flat facets (bisect + fill), then optional
+        lumpiness along the normal. Deterministic through `rng`. Returns the same bmesh."""
+        xs = [v.co for v in bm.verts]
+        ext = Vector(tuple(max(abs(c[i]) for c in xs) for i in range(3)))
+        corners = [(sx, sy, sz) for sx in (1, -1) for sy in (1, -1) for sz in (1, -1)]
+        rng.shuffle(corners)
+        for sx, sy, sz in corners[:chips]:
+            sz = abs(sz) if rng.random() < 0.7 else sz          # most chips on the upper edge, where the camera looks
+            n = Vector((sx / ext.x, sy / ext.y, sz / ext.z * 0.6)).normalized()
+            far = max(v.co.dot(n) for v in bm.verts)
+            co = n * far * (1.0 - depth * rng.uniform(0.7, 1.2))
+            bmesh.ops.bisect_plane(bm, geom=list(bm.verts) + list(bm.edges) + list(bm.faces), dist=1e-5,
+                                   plane_co=co, plane_no=n, clear_outer=True)
+            bmesh.ops.holes_fill(bm, edges=[e for e in bm.edges if e.is_boundary], sides=0)
+        if lump > 0:
+            bm.normal_update()
+            for v in bm.verts:
+                v.co += v.normal * lump * rng.uniform(-1.0, 1.0)
+        bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
         return bm
 
     @staticmethod

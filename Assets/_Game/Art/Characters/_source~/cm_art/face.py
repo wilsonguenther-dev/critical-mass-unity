@@ -1,4 +1,4 @@
-"""Painted face decal, 256 x 256 RGBA, drawn procedurally (deterministic, no hand edits): thick dark brows, large
+"""Painted face decal, 256 x 256 RGBA, drawn procedurally (deterministic, no hand edits): large
 brown eyes with white highlights, a confident closed-mouth smirk, cheek blush (bible p06 face callout).
 
 Texture space = the head's front planar projection (kit.Builder.add face_uv): u = (x - cx) / (2 hw) + 0.5,
@@ -45,37 +45,39 @@ def paint(cx, cz, hw, hh):
             m = np.maximum(m, np.clip(0.5 - d / soft, 0, 1))
         return m
 
-    skin = palette.CHAR["skin"][0]
     ink = _hex(palette.CHAR["pupil"][0])
-    blush = _hex("#F2867A", 0.6)
+    lash = _hex("#2A1810")
+    blush = _hex("#F2867A", 0.55)
     for s in (1, -1):
-        over(ell(0.150 * s, 1.400, 0.052, 0.032, soft=0.03), blush)               # warm cheeks
+        over(ell(0.140 * s, 1.384, 0.056, 0.030, soft=0.03), blush)                # warm cheeks, on the cheek volumes
     for s in (1, -1):
-        ex, ez = 0.100 * s, 1.462
-        # big readable eyes (bible p06): white sclera showing at the sides, a big brown iris against the lid,
-        # dark pupil, one big and one small highlight; no outer ring (it read as spectacles at 84 px)
-        over(ell(ex, ez, 0.058, 0.076), _hex("#FFFFFF"))
-        over(ell(ex - 0.004 * s, ez, 0.046, 0.076), _hex(palette.CHAR["iris"][0]))   # iris fills top to bottom
-        over(ell(ex - 0.004 * s, ez - 0.020, 0.036, 0.040), _hex("#9A5A32"))
-        over(ell(ex - 0.004 * s, ez + 0.004, 0.024, 0.036), ink)
-        over(ell(ex - 0.020 * s, ez + 0.030, 0.019, 0.022), _hex("#FFFFFF"))     # main highlight
-        over(ell(ex + 0.016 * s, ez - 0.032, 0.009, 0.009), _hex("#FFFFFF"))     # small lower highlight
-        ez += 0.012
-        # heavy upper lid with an outer lash flick, a confident half-lidded look
-        over(stroke([(ex - 0.054 * s, ez + 0.030), (ex - 0.010 * s, ez + 0.072), (ex + 0.040 * s, ez + 0.062),
-                     (ex + 0.072 * s, ez + 0.044)], [0.016, 0.026, 0.024, 0.010]), ink)
-        # thick dark brows, inner ends low and close, outer ends lifted: determined, cocky
-        over(stroke([(0.030 * s, 1.572), (0.100 * s, 1.606), (0.180 * s, 1.616)], [0.042, 0.052, 0.030]),
-             _hex(palette.CHAR["brow"][0]))
-    # nose: a small warm shadow hook
-    over(stroke([(-0.004, 1.438), (0.012, 1.420), (-0.006, 1.414)], [0.010, 0.012, 0.008]), _hex("#D7865F", 0.9))
-    # confident closed-mouth smirk: a wide curve that kicks up hard at the character's left, dimple at the top
+        # v3 eyes (bible p06 front): big, tall, set wide, cut flat across the top by a heavy upper lid; the brown
+        # iris sits toward the nose so the white shows as a wedge on the outer side only (no ring: v2 read as glasses)
+        ex, ez = 0.098 * s, 1.464
+        u = (X - ex) * s / 0.06                                                    # -1 inner .. +1 outer
+        lid = ez + 0.044 + 0.010 * u                                               # inner corner lower: determined
+        under = (Z < lid).astype(np.float32)
+        over(ell(ex, ez - 0.002, 0.055, 0.066) * under, _hex("#FFFFFF"))
+        ix = ex - 0.011 * s
+        over(ell(ix, ez - 0.004, 0.043, 0.060) * under, _hex(palette.CHAR["iris"][0]))
+        over(ell(ix, ez - 0.030, 0.032, 0.026) * under * ell(ix, ez - 0.004, 0.043, 0.060), _hex("#A0623A"))
+        over(ell(ix, ez + 0.002, 0.025, 0.035) * under, ink)
+        over(ell(ix - 0.015 * s, ez + 0.022, 0.016, 0.018), _hex("#FFFFFF"))      # main highlight
+        over(ell(ix + 0.015 * s, ez - 0.030, 0.008, 0.008), _hex("#FFFFFF"))      # small lower highlight
+        # heavy upper lid with an outer lash flick, plus a short lower lash at the outer corner
+        over(stroke([(ex - 0.058 * s, ez + 0.033), (ex - 0.02 * s, ez + 0.040),
+                     (ex + 0.03 * s, ez + 0.050), (ex + 0.058 * s, ez + 0.054), (ex + 0.080 * s, ez + 0.068)],
+                    [0.018, 0.028, 0.030, 0.022, 0.008]), lash)
+        over(stroke([(ex + 0.036 * s, ez - 0.058), (ex + 0.054 * s, ez - 0.044)], [0.008, 0.004]), lash)
+    # nose: the nose is modelled (v3); only a soft warm shadow under it
+    over(ell(0.004, 1.366, 0.026, 0.009, soft=0.012), _hex("#C9775A", 0.55))
+    # confident smirk (bible p06): a wide closed smile, the character's left corner kicks up into a dimple
     mouth = _hex(palette.CHAR["mouth"][0])
-    over(stroke([(-0.075, 1.366), (-0.030, 1.352), (0.020, 1.352), (0.065, 1.368), (0.092, 1.394)],
-                [0.010, 0.016, 0.016, 0.014, 0.010]), mouth)
-    over(stroke([(0.094, 1.380), (0.104, 1.400)], [0.008, 0.006]), _hex(palette.CHAR["mouth"][0], 0.85))
-    over(stroke([(-0.074, 1.362), (-0.082, 1.372)], [0.007, 0.005]), _hex(palette.CHAR["mouth"][0], 0.7))
-    del skin
+    over(stroke([(-0.070, 1.343), (-0.034, 1.331), (0.015, 1.330), (0.057, 1.342), (0.086, 1.366)],
+                [0.012, 0.020, 0.022, 0.018, 0.012]), mouth)
+    over(stroke([(0.084, 1.354), (0.098, 1.378)], [0.010, 0.006]), _hex(palette.CHAR["mouth"][0], 0.9))
+    over(stroke([(-0.070, 1.339), (-0.082, 1.349)], [0.008, 0.005]), _hex(palette.CHAR["mouth"][0], 0.7))
+    over(ell(0.000, 1.313, 0.034, 0.008, soft=0.010), _hex("#C9775A", 0.45))      # lower-lip shadow
     img[:3, :3, 3] = 0.0
     return img
 

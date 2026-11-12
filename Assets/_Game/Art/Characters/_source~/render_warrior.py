@@ -38,9 +38,8 @@ CAM_PITCH, CAM_FOV, CAM_DIST, CAM_YAW = 55.0, 35.0, 23.4, 45.0
 OUTLINE_GAME_PX = 3.0
 OUTLINE_BIBLE = 0.016        # metres on the 2.0 u figure: the bible crops draw ~0.8 % of figure height
 
-LEGS = [("upperleg.l", (0, 1, 0), -9), ("upperleg.r", (0, 1, 0), 9), ("foot.l", (0, 1, 0), 9), ("foot.r", (0, 1, 0), -9)]
-ATTITUDE = [("head", (1, 0, 0), -4), ("head", (0, 1, 0), -3)]     # chin up, head cocked: the bible's swagger
-STANCE = LEGS + [("upperarm.l", (0, 1, 0), 8), ("upperarm.r", (0, 1, 0), -14)] + ATTITUDE
+# v3: the stance (wide legs, chest out, head cocked) is baked into the Idle clip by build_warrior.py ATTITUDE, so
+# the framings below add only what each bible framing changes.
 
 
 def shield_turn(deg):
@@ -48,33 +47,46 @@ def shield_turn(deg):
     return [("hand.l", (0, 0, 1), deg)]
 
 
-# framing: (clip, frame, joint rotations, camera azimuth deg, camera elevation deg, team, fit)
-# Profile: the bible draws no shield in profile, so the capture pose holds the shield arm out to the side with the
-# shield face forward, edge-on to the camera and behind the body (a pose choice, not a hidden object).
-# azimuth 0 = camera in front (-Y); -90 = camera on the character's right (he faces screen right)
-CLEAVE = LEGS + [("upperleg.l", (1, 0, 0), -25), ("upperleg.r", (1, 0, 0), 25), ("upperleg.l", (0, 1, 0), -10),
-                 ("upperleg.r", (0, 1, 0), 10), ("spine", (0, 1, 0), -8),
-                 ("upperarm.r", (0, 1, 0), 80), ("lowerarm.r", (0, 1, 0), 40)]
-CHARGE = LEGS + [("upperleg.l", (1, 0, 0), -30), ("upperleg.r", (1, 0, 0), 30), ("upperleg.l", (0, 1, 0), -8),
-                 ("upperleg.r", (0, 1, 0), 8), ("spine", (1, 0, 0), 12)]
-
-
 def cleaver_turn(deg):
     """Swing the cleaver about the vertical through the right wrist (deg > 0 swings the blade from -X toward -Y)."""
     return [("hand.r", (0, 0, 1), deg)]
+
+
+# framing: (clip, frame, joint rotations, camera azimuth deg, camera elevation deg, team, fit)
+# azimuth 0 = camera in front (-Y); negative = camera toward the character's right, so he faces screen right.
+# Profile: the bible draws no shield in profile, so the capture pose holds the shield arm out to the side with the
+# shield face forward, edge-on to the camera and behind the body (a pose choice, not a hidden object).
+# Cleave (bible 06-pose-cleave): a deep lunge toward screen right, the cleaver arm flung back and up behind him at
+# shoulder height (blade trailing up and back), the shield thrust forward, torso leaning into the line of action.
+LUNGE = [("upperleg.l", (1, 0, 0), -42), ("lowerleg.l", (1, 0, 0), 38), ("foot.l", (1, 0, 0), 6),
+         ("upperleg.r", (1, 0, 0), 40), ("lowerleg.r", (1, 0, 0), 12), ("foot.r", (1, 0, 0), -30),
+         ("upperleg.l", (0, 1, 0), -6), ("upperleg.r", (0, 1, 0), 6)]
+CLEAVE = LUNGE + [("spine", (1, 0, 0), 16), ("spine", (0, 0, 1), 18),
+                  ("upperarm.r", (0, 1, 0), 35), ("upperarm.r", (1, 0, 0), 95), ("lowerarm.r", (1, 0, 0), 15),
+                  ("hand.r", (1, 0, 0), 55),
+                  ("upperarm.l", (1, 0, 0), -55), ("upperarm.l", (0, 1, 0), 10), ("head", (1, 0, 0), -10)]
+# Shield charge (bible 06-pose-shield-charge): running lunge, body pitched hard forward behind the shield, which
+# leads at chest height facing the run; the cleaver arm trails low behind.
+CHARGE = LUNGE + [("spine", (1, 0, 0), 26), ("spine", (0, 0, 1), -8),
+                  ("upperarm.l", (1, 0, 0), -70), ("upperarm.l", (0, 1, 0), 20), ("lowerarm.l", (1, 0, 0), -25),
+                  ("upperarm.r", (1, 0, 0), 55), ("upperarm.r", (0, 1, 0), 25), ("head", (1, 0, 0), -14)]
 POSES = {
-    "front": ("Idle", 1, STANCE + shield_turn(8) + [("hand.l", (0, 1, 0), -12), ("hand.r", (0, 1, 0), 25)], 0, 6,
+    "front": ("Idle", 1, shield_turn(8) + [("hand.l", (0, 1, 0), -12), ("hand.r", (0, 1, 0), -12)], 8, 6,
               "azure", "all"),
-    "three-quarter": ("Idle", 1, STANCE + shield_turn(-35) + [("hand.r", (0, 1, 0), 25)], -25, 6, "azure", "all"),
-    "profile": ("Idle", 1, STANCE + [("upperarm.l", (0, 1, 0), -30), ("upperarm.r", (1, 0, 0), -15)] + shield_turn(-50)
+    "three-quarter": ("Idle", 1, shield_turn(-60) + [("hand.r", (0, 1, 0), 25)], -35, 6, "azure", "all"),
+    "profile": ("Idle", 1, [("upperarm.l", (0, 1, 0), -30), ("upperarm.r", (1, 0, 0), -15)] + shield_turn(-50)
                 + cleaver_turn(100), -90, 4, "azure", "all"),
-    "back": ("Idle", 1, STANCE, 180, 6, "azure", "all"),
-    "cleave": ("Idle", 1, CLEAVE, -20, 6, "azure", "all"),
-    "shield-charge": ("Block", 10, CHARGE, -30, 6, "azure", "all"),
-    "front-shield": ("Idle", 1, STANCE, 0, 6, "azure", "shield"),
-    "face": ("Idle", 1, STANCE, -10, 4, "azure", "head"),
-    "crimson": ("Idle", 1, STANCE + shield_turn(8) + [("hand.r", (0, 1, 0), 25)], -12, 6, "crimson", "all"),
+    "back": ("Idle", 1, [], 180, 6, "azure", "all"),
+    "cleave": ("Idle", 1, CLEAVE + shield_turn(-70), -40, 6, "azure", "all"),
+    "shield-charge": ("Idle", 1, CHARGE + shield_turn(-75), -35, 6, "azure", "all"),
+    "front-shield": ("Idle", 1, [], 0, 6, "azure", "shield"),
+    "face": ("Idle", 1, [], -10, 4, "azure", "head"),
+    "crimson": ("Idle", 1, shield_turn(8) + [("hand.r", (0, 1, 0), 25)], -12, 6, "crimson", "all"),
 }
+if os.environ.get("CM_POSES"):     # tuning hook: extra framings, JSON {name: [clip, frame, rots, az, el, team, fit]}
+    import json
+    with open(os.environ["CM_POSES"]) as fh:
+        POSES.update({k: tuple(v) for k, v in json.load(fh).items()})
 
 bpy.ops.wm.open_mainfile(filepath=os.path.join(HERE, "warrior.blend"))
 scene = bpy.context.scene
@@ -284,6 +296,9 @@ if MODE == "bible":
             pp = posed_points([o])
             print("BBOX", name, o.name, " ".join("%.2f..%.2f" % (min(v[i] for v in pp), max(v[i] for v in pp))
                                                  for i in range(3)))
+        sp = posed_points([bpy.data.objects["Warrior_Shield"]])
+        shc = sum(sp, Vector()) / len(sp)
+        print("SHIELD", name, "centre", tuple(round(c, 2) for c in shc))
         for bn in ("hand.l", "hand.r", "head"):
             print("JOINT", name, bn, tuple(round(c, 2) for c in (arm.matrix_world @ arm.pose.bones[bn].head)))
         toon.set_light(mat, key_light_for(d))
