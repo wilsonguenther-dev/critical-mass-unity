@@ -44,15 +44,12 @@ namespace CriticalMass.Runtime.Hud
             _canvas.planeDistance = cam != null ? Mathf.Max(0.45f, cam.nearClipPlane * 1.4f) : 0.45f;
             var root = (RectTransform)go.transform;
 
-            var wash = new GameObject("Wash", typeof(RectTransform)).AddComponent<VectorShape>();
+            var wash = new GameObject("Wash", typeof(RectTransform)).AddComponent<ScreenVignette>();
             wash.gameObject.layer = 5;
             wash.transform.SetParent(root, false);
             Stretch(wash.rectTransform);
-            wash.Kind = ShapeKind.RoundRect;
-            wash.Radius = 0f;
-            wash.OutlinePx = 0f;
-            wash.RimPx = 0f;
-            wash.FillColor = CMTokens.WithAlpha(CMTokens.VoidNavy.Color, 0.62f);
+            wash.Wash = 0.6f;
+            wash.EdgeAlpha = 0.8f;
             wash.raycastTarget = false;
 
             _logo = new GameObject("Logo", typeof(RectTransform)).AddComponent<RawImage>();

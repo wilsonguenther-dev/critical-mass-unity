@@ -11,6 +11,7 @@ namespace CriticalMass.Runtime.Hud.Ui
     /// band lighter, water blue, plus dashed routes base to hill to shrine (bible p15 minimap). Oriented so the Azure base is
     /// on the left and the shrine is at the top. Rebuilt only when the map or the rect changes.
     /// </summary>
+    [RequireComponent(typeof(CanvasRenderer))]
     public sealed class MinimapLand : MaskableGraphic
     {
         static readonly Color Land = CMTokens.ParseHex("#34465C");
@@ -129,9 +130,10 @@ namespace CriticalMass.Runtime.Hud.Ui
     /// Death state (art direction 6.3): a Void Navy wash (world to about 70% brightness) plus a navy vignette that starts
     /// 40% in from each edge. Drawn under the HUD clusters, which stay at full brightness. No red, no flash.
     /// </summary>
+    [RequireComponent(typeof(CanvasRenderer))]
     public sealed class ScreenVignette : MaskableGraphic
     {
-        public float Wash = 0.3f;
+        public float Wash = 0.55f;   // linear blend: about 70% of the world's sRGB brightness
         public float EdgeAlpha = 0.75f;
         public float Band = 0.4f;
 

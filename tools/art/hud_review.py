@@ -269,6 +269,19 @@ def main():
     # outline profile down through the Azure panel's top edge (x = 746): expect navy 3, cream 2, then fill
     m['outline_profile_azure_panel'] = run_profile(hud, 746, 0, 16)
     m['outline_profile_hp_plate'] = run_profile(hud, 300, 942, 960)
+    # sharpness: pixels in the 10-90% transition down the Azure panel's top edge (world, navy 3, cream 2, fill); a vector
+    # render keeps this count about constant across resolutions, an upscaled bitmap grows it with the scale
+    def edge_px(path, k):
+        im = Image.open(path).convert('L')
+        x = int(746 * k)
+        col = [im.getpixel((x, y)) for y in range(0, int(12 * k))]
+        lo, hi = min(col), max(col)
+        if hi - lo < 20:
+            return None
+        return sum(1 for v in col if lo + 0.1 * (hi - lo) < v < lo + 0.9 * (hi - lo))
+    m['edge_transition_px'] = {n: edge_px(os.path.join(cap, n + '.png'), k)
+                               for n, k in (('hud-720', 2 / 3), ('hud-1080', 1), ('hud-2160', 2))
+                               if os.path.exists(os.path.join(cap, n + '.png'))}
     with open(os.path.join(out, 'measurements.json'), 'w') as f:
         json.dump(m, f, indent=1)
     print(json.dumps(m, indent=1))
