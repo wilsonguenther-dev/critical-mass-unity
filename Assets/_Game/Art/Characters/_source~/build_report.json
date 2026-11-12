@@ -1,8 +1,8 @@
 {
  "objects": {
   "Warrior_Body": {
-   "triangles": 8516,
-   "vertices": 4438,
+   "triangles": 8332,
+   "vertices": 4338,
    "materials": [
     "CM_Toon"
    ],
@@ -22,8 +22,8 @@
    "bone_groups": 20
   },
   "Warrior_Shield": {
-   "triangles": 1632,
-   "vertices": 860,
+   "triangles": 1692,
+   "vertices": 900,
    "materials": [
     "CM_Toon"
    ],
@@ -51,7 +51,7 @@
   "Idle",
   1
  ],
- "triangles_total": 11108,
- "rest_height_m": 1.9975,
+ "triangles_total": 10984,
+ "rest_height_m": 1.998,
  "rest_min_z": 0.0
 }

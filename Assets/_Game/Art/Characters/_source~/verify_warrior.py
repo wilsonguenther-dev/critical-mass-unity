@@ -188,6 +188,29 @@ offs = {bn: round(((fbx_arm.matrix_world @ fbx_arm.pose.bones[bn].head) - (src.m
 moved = (src.pose.bones["hand.l"].head - src.data.bones["hand.l"].head_local).length
 check("KayKit 'Idle' on the re-imported FBX rig matches the source rig (Blender, by bone name)",
       max(offs.values()) < 0.01 and moved > 0.1, {"offsets_m": offs, "hand.l moved from rest by": round(moved, 3)})
+# every one of the 76 KayKit clips, sampled at its middle frame, drives the re-imported rig like the source rig
+worst_clip, n_clips = (None, 0.0), 0
+for act in [a for a in bpy.data.actions if a.name in json.load(open(os.path.join(HERE, "rig_kaykit41.json")))["clips"]]:
+    for a in (src, fbx_arm):
+        a.animation_data.action = act
+        if getattr(act, "slots", None) and len(act.slots):
+            a.animation_data.action_slot = act.slots[0]
+    f0, f1 = act.frame_range
+    bpy.context.scene.frame_set(int((f0 + f1) / 2))
+    bpy.context.view_layer.update()
+    d = max(((fbx_arm.matrix_world @ fbx_arm.pose.bones[bn].head) - (src.matrix_world @ src.pose.bones[bn].head)).length
+            for bn in ("hand.l", "hand.r", "head", "foot.l", "foot.r", "handslot.l", "handslot.r"))
+    n_clips += 1
+    if d > worst_clip[1]:
+        worst_clip = (act.name, d)
+check("all KayKit clips drive the re-imported FBX rig (mid frame, joint offset < 1 cm)",
+      n_clips == 76 and worst_clip[1] < 0.01, {"clips": n_clips, "worst": [worst_clip[0], round(worst_clip[1], 5)]})
+fbx_body = [o for o in bpy.data.objects if o.parent is fbx_arm and o.name.startswith("Warrior_Body")]
+check("Warrior_Body UV map for the painted face decal survives the FBX",
+      bool(fbx_body) and len(fbx_body[0].data.uv_layers) >= 1, [u.name for u in fbx_body[0].data.uv_layers] if fbx_body else None)
+face_png = os.path.join(os.path.dirname(HERE), "Warrior_Face.png")
+check("face decal Warrior_Face.png next to the FBX, 256 x 256", os.path.isfile(face_png) and
+      tuple(bpy.data.images.load(face_png).size) == (256, 256), face_png)
 for ob in [o for o in bpy.data.objects if o.parent is fbx_arm]:
     bpy.data.objects.remove(ob, do_unlink=True)
 bpy.data.objects.remove(fbx_arm, do_unlink=True)

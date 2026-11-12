@@ -88,11 +88,11 @@
    "check": "Warrior_Body loose/non-manifold",
    "ok": true,
    "detail": {
-    "triangles": 9788,
+    "triangles": 8332,
     "loose_verts": 0,
     "loose_edges": 0,
     "non_manifold_edges": 0,
-    "closed_shells": 108
+    "closed_shells": 104
    }
   },
   {
@@ -146,7 +146,7 @@
    "check": "Warrior_Cleaver loose/non-manifold",
    "ok": true,
    "detail": {
-    "triangles": 708,
+    "triangles": 960,
     "loose_verts": 0,
     "loose_edges": 0,
     "non_manifold_edges": 0,
@@ -202,11 +202,11 @@
    "check": "Warrior_Shield loose/non-manifold",
    "ok": true,
    "detail": {
-    "triangles": 1404,
+    "triangles": 1692,
     "loose_verts": 0,
     "loose_edges": 0,
     "non_manifold_edges": 0,
-    "closed_shells": 23
+    "closed_shells": 30
    }
   },
   {
@@ -250,14 +250,14 @@
   {
    "check": "triangle budget <= 12000",
    "ok": true,
-   "detail": 11900
+   "detail": 10984
   },
   {
    "check": "body height in metres after round trip (Blender Z = Unity Y)",
    "ok": true,
    "detail": {
     "min_z": -0.0,
-    "max_z": 2.142,
+    "max_z": 1.998,
     "mesh_object_rot": [
      1.5708,
      -0.0,
@@ -293,6 +293,29 @@
     },
     "hand.l moved from rest by": 0.437
    }
+  },
+  {
+   "check": "all KayKit clips drive the re-imported FBX rig (mid frame, joint offset < 1 cm)",
+   "ok": true,
+   "detail": {
+    "clips": 76,
+    "worst": [
+     "Death_A",
+     0.0
+    ]
+   }
+  },
+  {
+   "check": "Warrior_Body UV map for the painted face decal survives the FBX",
+   "ok": true,
+   "detail": [
+    "UVMap"
+   ]
+  },
+  {
+   "check": "face decal Warrior_Face.png next to the FBX, 256 x 256",
+   "ok": true,
+   "detail": "/Users/wilsonguenther/critical-mass-unity-art/Assets/_Game/Art/Characters/Warrior_Face.png"
   },
   {
    "check": "bible point 1: shield (object Warrior_Shield, group feat_shield)",

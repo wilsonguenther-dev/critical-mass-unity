@@ -46,27 +46,35 @@ def paint(cx, cz, hw, hh):
         return m
 
     skin = palette.CHAR["skin"][0]
-    blush = _hex("#F2867A", 0.55)
+    ink = _hex(palette.CHAR["pupil"][0])
+    blush = _hex("#F2867A", 0.6)
     for s in (1, -1):
-        over(ell(0.150 * s, 1.405, 0.050, 0.030, soft=0.03), blush)               # cheeks
+        over(ell(0.150 * s, 1.400, 0.052, 0.032, soft=0.03), blush)               # warm cheeks
     for s in (1, -1):
-        ex, ez = 0.088 * s, 1.488
-        over(ell(ex, ez, 0.050, 0.062), _hex("#FFFFFF"))                          # eye white
-        over(ell(ex - 0.004 * s, ez - 0.006, 0.040, 0.054), _hex(palette.CHAR["iris"][0]))   # large brown iris
-        over(ell(ex - 0.004 * s, ez - 0.010, 0.022, 0.030), _hex(palette.CHAR["pupil"][0]))
-        over(ell(ex - 0.018 * s, ez + 0.016, 0.014, 0.016), _hex("#FFFFFF"))      # highlights
-        over(ell(ex + 0.010 * s, ez - 0.028, 0.007, 0.007), _hex("#FFFFFF"))
-        over(stroke([(ex - 0.052 * s, ez + 0.018), (ex - 0.01 * s, ez + 0.060), (ex + 0.04 * s, ez + 0.050),
-                     (ex + 0.060 * s, ez + 0.020)], [0.012, 0.020, 0.020, 0.010]),
-             _hex(palette.CHAR["pupil"][0]))                                      # heavy upper lid only
-        over(stroke([(0.030 * s, 1.575), (0.095 * s, 1.598), (0.160 * s, 1.585)], [0.030, 0.040, 0.026]),
-             _hex(palette.CHAR["brow"][0]))                                       # thick confident brows
-    # nose hint
-    over(stroke([(-0.012, 1.432), (0.0, 1.425), (0.014, 1.433)], [0.008, 0.009, 0.008]), _hex("#D7865F", 0.8))
-    # closed-mouth smirk, higher on the character's left (+x), dimple at the high end
-    over(stroke([(-0.062, 1.372), (-0.02, 1.360), (0.030, 1.362), (0.070, 1.384)], [0.010, 0.013, 0.013, 0.010]),
-         _hex(palette.CHAR["mouth"][0]))
-    over(stroke([(0.074, 1.378), (0.080, 1.392)], [0.007, 0.005]), _hex(palette.CHAR["mouth"][0], 0.8))
+        ex, ez = 0.100 * s, 1.462
+        # big readable eyes (bible p06): white sclera showing at the sides, a big brown iris against the lid,
+        # dark pupil, one big and one small highlight; no outer ring (it read as spectacles at 84 px)
+        over(ell(ex, ez, 0.058, 0.076), _hex("#FFFFFF"))
+        over(ell(ex - 0.004 * s, ez, 0.046, 0.076), _hex(palette.CHAR["iris"][0]))   # iris fills top to bottom
+        over(ell(ex - 0.004 * s, ez - 0.020, 0.036, 0.040), _hex("#9A5A32"))
+        over(ell(ex - 0.004 * s, ez + 0.004, 0.024, 0.036), ink)
+        over(ell(ex - 0.020 * s, ez + 0.030, 0.019, 0.022), _hex("#FFFFFF"))     # main highlight
+        over(ell(ex + 0.016 * s, ez - 0.032, 0.009, 0.009), _hex("#FFFFFF"))     # small lower highlight
+        ez += 0.012
+        # heavy upper lid with an outer lash flick, a confident half-lidded look
+        over(stroke([(ex - 0.054 * s, ez + 0.030), (ex - 0.010 * s, ez + 0.072), (ex + 0.040 * s, ez + 0.062),
+                     (ex + 0.072 * s, ez + 0.044)], [0.016, 0.026, 0.024, 0.010]), ink)
+        # thick dark brows, inner ends low and close, outer ends lifted: determined, cocky
+        over(stroke([(0.030 * s, 1.572), (0.100 * s, 1.606), (0.180 * s, 1.616)], [0.042, 0.052, 0.030]),
+             _hex(palette.CHAR["brow"][0]))
+    # nose: a small warm shadow hook
+    over(stroke([(-0.004, 1.438), (0.012, 1.420), (-0.006, 1.414)], [0.010, 0.012, 0.008]), _hex("#D7865F", 0.9))
+    # confident closed-mouth smirk: a wide curve that kicks up hard at the character's left, dimple at the top
+    mouth = _hex(palette.CHAR["mouth"][0])
+    over(stroke([(-0.075, 1.366), (-0.030, 1.352), (0.020, 1.352), (0.065, 1.368), (0.092, 1.394)],
+                [0.010, 0.016, 0.016, 0.014, 0.010]), mouth)
+    over(stroke([(0.094, 1.380), (0.104, 1.400)], [0.008, 0.006]), _hex(palette.CHAR["mouth"][0], 0.85))
+    over(stroke([(-0.074, 1.362), (-0.082, 1.372)], [0.007, 0.005]), _hex(palette.CHAR["mouth"][0], 0.7))
     del skin
     img[:3, :3, 3] = 0.0
     return img

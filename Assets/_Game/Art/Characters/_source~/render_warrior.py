@@ -39,7 +39,8 @@ OUTLINE_GAME_PX = 3.0
 OUTLINE_BIBLE = 0.016        # metres on the 2.0 u figure: the bible crops draw ~0.8 % of figure height
 
 LEGS = [("upperleg.l", (0, 1, 0), -9), ("upperleg.r", (0, 1, 0), 9), ("foot.l", (0, 1, 0), 9), ("foot.r", (0, 1, 0), -9)]
-STANCE = LEGS + [("upperarm.l", (0, 1, 0), 8), ("upperarm.r", (0, 1, 0), -14)]
+ATTITUDE = [("head", (1, 0, 0), -4), ("head", (0, 1, 0), -3)]     # chin up, head cocked: the bible's swagger
+STANCE = LEGS + [("upperarm.l", (0, 1, 0), 8), ("upperarm.r", (0, 1, 0), -14)] + ATTITUDE
 
 
 def shield_turn(deg):
@@ -71,6 +72,7 @@ POSES = {
     "cleave": ("Idle", 1, CLEAVE, -20, 6, "azure", "all"),
     "shield-charge": ("Block", 10, CHARGE, -30, 6, "azure", "all"),
     "front-shield": ("Idle", 1, STANCE, 0, 6, "azure", "shield"),
+    "face": ("Idle", 1, STANCE, -10, 4, "azure", "head"),
     "crimson": ("Idle", 1, STANCE + shield_turn(8) + [("hand.r", (0, 1, 0), 25)], -12, 6, "crimson", "all"),
 }
 
@@ -246,6 +248,7 @@ if MODE == "bible":
     cam_data.type = "ORTHO"
     # ground shadow as the bible framings draw it (~1.5 u wide); the game's own blob (0.55 u) is in the game renders
     blob = flat_obj("ContactBlob", disc_mesh(0.75, 0.002), "#18233B", 0.40)
+    blob.scale = (1.0, 0.55, 1.0)            # an ellipse under the feet, wide across the stance, as the bible draws
     set_outline(OUTLINE_BIBLE)
     for name, (clip, frame, rots, az, el, team, fit) in POSES.items():
         if ONLY and name not in ONLY:
@@ -254,7 +257,11 @@ if MODE == "bible":
         pose(clip, frame, rots)
         d = view_dir(az, el)
         fit_obs = [o for o in meshes if o.name == "Warrior_Shield"] if fit == "shield" else meshes
+        if fit == "head":
+            fit_obs = [bpy.data.objects["Warrior_Body"]]
         pts = posed_points(fit_obs)
+        if fit == "head":         # head close-up for the face check (bible 06-callouts face panel)
+            pts = [p for p in pts if p.z > 1.24]
         if fit == "shield":           # look straight at the shield face
             sh = bpy.data.objects["Warrior_Shield"]
             n = (sh.matrix_world.to_3x3() @ (arm.pose.bones["handslot.l"].matrix.to_3x3() @ Vector((0, 0, 1))))
@@ -281,7 +288,7 @@ if MODE == "bible":
             print("JOINT", name, bn, tuple(round(c, 2) for c in (arm.matrix_world @ arm.pose.bones[bn].head)))
         toon.set_light(mat, key_light_for(d))
         toon.set_team(mat, team == "crimson")
-        blob.hide_render = fit == "shield"
+        blob.hide_render = fit in ("shield", "head")
         set_materials("toon")
         render(os.path.join(OUT, f"{name}.png"))
         blob.hide_render = True
@@ -313,7 +320,7 @@ elif MODE in ("game", "facings"):
     if MODE == "game":
         ground = flat_obj("Ground", disc_mesh(30.0, 0.0, 64), "#A3C150")
         blob = flat_obj("ContactBlob", disc_mesh(0.55, 0.003), "#18233B", 0.40)
-        ref = flat_obj("RefFigure2u", ref_figure_mesh(1.6, 1.6), "#18233B")
+        ref = flat_obj("RefFigure2u", ref_figure_mesh(1.7, 0.0), "#18233B")    # beside the unit, same depth
         scene.render.film_transparent = False
         set_materials("toon")
         place_camera(0.0)       # the unit stands facing the camera (screen S); the world yaw 45 is the camera's

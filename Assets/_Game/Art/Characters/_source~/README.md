@@ -24,10 +24,14 @@ Unity skips this `_source~` folder (P-08). The only file Unity imports is the FB
 ```sh
 B=/Applications/Blender.app/Contents/MacOS/Blender
 cd "Assets/_Game/Art/Characters/_source~"
-$B -b --factory-startup --python-exit-code 1 -P build_warrior.py      # warrior.blend + ../Warrior.fbx
-$B -b --factory-startup --python-exit-code 1 -P verify_warrior.py     # FBX re-import checks
-$B -b --factory-startup --python-exit-code 1 -P render_warrior.py -- /tmp/warrior-renders 720
-python3 compare_warrior.py /tmp/warrior-renders /tmp/warrior-compare
+$B -b --factory-startup --python-exit-code 1 -P build_warrior.py        # warrior.blend, ../Warrior.fbx, ../Warrior_Face.png
+$B -b --factory-startup --python-exit-code 1 -P verify_warrior.py       # FBX re-import checks (40), all 76 clips
+$B -b --factory-startup --python-exit-code 1 -P render_warrior.py -- bible   /tmp/w 720   # orthographic bible framings
+$B -b --factory-startup --python-exit-code 1 -P render_warrior.py -- game    /tmp/w       # gameplay camera, both teams
+$B -b --factory-startup --python-exit-code 1 -P render_warrior.py -- facings /tmp/w       # 8 facings + team ID masks
+python3 compare_warrior.py bible   /tmp/w <out>     # IoU, swatch dE2000, sbs-<framing>.jpg
+python3 compare_warrior.py game    /tmp/w <out>     # gameplay crops, pixel size
+python3 compare_warrior.py facings /tmp/w <out>     # team-colour share per facing, directions sheet, 64 px silhouettes
 ```
 
 Always `-b` (no window). The build is deterministic (factory startup, fixed seed). Render output goes outside the
@@ -64,12 +68,22 @@ repo; nothing in this folder should be committed from a render run.
    crops (`07-*.png`, `08-*.png`); keep the triangle budget.
 5. Run build, verify, render, compare; look at the side-by-sides before committing.
 
-## Not done (v1)
+## Version 2 (2026-11-12)
 
-- `CM/Toon` itself (Unity shader) is not built; `cm_art/toon.py` is only a Blender preview of the contract.
-- Nothing has been imported into Unity. Axes, scale and Generic clip carry-over are verified in Blender only.
-- Faces, hair and armour are built from primitives; they read as the bible's character but not at its painted
-  finish. The profile view is the weakest. No hand-sculpted pass.
-- The bible "shield charge", "cleave" and "front shield" framings are not rendered; renders use a capture stance
-  (KayKit Idle frame 1 with the arms and legs opened, `BIBLE_STANCE` in `render_warrior.py`), not a new clip.
-- No LODs, no UVs or textures (none needed for flat vertex colour), no ID-mask render for the U-010 gate.
+- Shapes: pauldrons, knee guards, boot feet, toe caps and shield rim are rounded slabs (superellipsoids); hair is 12
+  sculpted tapered clumps plus a 6-clump palm topknot with a brass ring; every box and prism is bevelled 2 segments.
+- Colour: vertex colour carries a +6 % value gradient toward the top of each part and a baked -10 % crevice term
+  (ray occlusion); creases on the belt, scarf, shield rim, bracers and undershirt are modelled 25 % darker grooves.
+- Face: a 256 x 256 painted decal (`cm_art/face.py`, drawn by script) on the head's front UV region, written to
+  `../Warrior_Face.png`; the body mesh carries `UVMap` (non-face faces sample a transparent texel).
+- Team read: scarf cowl under the chin, wide tabards front and back, shield core 0.35 of the shield diameter, glowing
+  cracks on pauldrons and every rim slab, blade edge turned outward; at least 12 % team pixels in all 8 facings.
+- `cm_art/toon.py` previews the 3-band ramp (x1.00 / x0.84 / x0.66 + 12 % Void Navy) from N.L, team rim, Void Navy hull.
+- Capture poses are per framing in `render_warrior.py` (`POSES`): a clip frame plus joint rotations. The bible
+  profile draws no shield, so the profile pose holds the shield arm out to the side, shield edge-on behind the body.
+
+## Still not done
+
+- The Unity `CM/Toon` shader (it must also sample `Warrior_Face.png` through `UVMap`); nothing imported in Unity yet.
+- Cleave and shield-charge bible crops include swoosh and rock effects that are not modelled, so their IoU stays low.
+- No LODs.

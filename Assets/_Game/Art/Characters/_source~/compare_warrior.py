@@ -195,6 +195,17 @@ if MODE == "bible":
             ys, xs = np.nonzero(paper_mask(r))
             hh = ys.max() - ys.min() + 1
             r = r.crop((max(0, xs.max() + 1 - round(hh * 0.533)), ys.min(), xs.max() + 1, ys.max() + 1))
+        if name == "crimson":           # the bible accent-swap panel is cut by the page at the crown and both sides
+            ys, xs = np.nonzero(paper_mask(r))
+            fh = ys.max() - ys.min() + 1
+            top = ys.min() + round(0.125 * fh)                 # crown of the hair (topknot above the cut)
+            h = round((ys.max() + 1 - top) * 1.13)             # feet sit at 88 % of the panel height
+            w = round(h * 160 / 144)
+            head = np.nonzero(paper_mask(r)[top + 2])[0]
+            cx = (head.min() + head.max()) // 2 + round(0.03 * w)
+            big = Image.new("RGB", (r.width + 2 * w, r.height + 2 * h), tuple(PAPER))
+            big.paste(r, (w, h))
+            r = big.crop((w + cx - w // 2, h + top, w + cx - w // 2 + w, h + top + h))
         bm, rm = paper_mask(b), paper_mask(r)
         res = {"iou": round(iou(bm, rm), 3),
                "iou_v1": round(iou(paper_mask(b, False, True), paper_mask(r, False, True)), 3)}
