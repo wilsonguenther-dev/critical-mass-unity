@@ -281,6 +281,232 @@
    "team_mask": false
   },
   {
+   "piece": "env_ledge_band_diag",
+   "fbx": "Environment/env_ledge_band_diag.fbx",
+   "cat": "edge",
+   "pivot": "lip start point at ground height; local +X runs along the rim, outward -Z; yaw = atan2(dz, dx) in sim (1.414 u, along a ledge fill hypotenuse)",
+   "tris": 12,
+   "outline_px": 0.0,
+   "materials": [
+    "CM_Toon"
+   ],
+   "verts": 14,
+   "cull": "down",
+   "bounds_unity_min": [
+    0.0,
+    -0.8588,
+    0.0
+   ],
+   "bounds_unity_max": [
+    1.4142,
+    0.0,
+    0.0
+   ],
+   "covers": "multi-step diagonal ledge face",
+   "team_mask": false
+  },
+  {
+   "piece": "env_ledge_shadow_diag",
+   "fbx": "Environment/env_ledge_shadow_diag.fbx",
+   "cat": "edge",
+   "pivot": "lip start point at ground height; local +X runs along the rim, outward -Z; yaw = atan2(dz, dx) in sim (1.414 u, upper lip)",
+   "tris": 2,
+   "outline_px": 0.0,
+   "materials": [
+    "CM_Toon",
+    "CM_ShadowDecal"
+   ],
+   "verts": 4,
+   "cull": "down",
+   "bounds_unity_min": [
+    0.0,
+    -0.746,
+    -0.5
+   ],
+   "bounds_unity_max": [
+    1.4142,
+    -0.746,
+    0.0
+   ],
+   "covers": "diagonal ledge soft shadow",
+   "team_mask": false
+  },
+  {
+   "piece": "env_lip_rim_straight_a",
+   "fbx": "Environment/env_lip_rim_straight_a.fbx",
+   "cat": "edge",
+   "pivot": "lip start point at ground height; local +X runs along the rim, outward -Z; yaw = atan2(dz, dx) in sim",
+   "tris": 100,
+   "outline_px": 0.0,
+   "materials": [
+    "CM_Toon"
+   ],
+   "verts": 96,
+   "cull": "down",
+   "bounds_unity_min": [
+    -0.0563,
+    -0.8793,
+    -0.5379
+   ],
+   "bounds_unity_max": [
+    1.0432,
+    0.006,
+    0.1036
+   ],
+   "covers": "island rim: fringe + ink + rim rock band (30-degree chamfer) + face band",
+   "team_mask": false
+  },
+  {
+   "piece": "env_lip_rim_straight_b",
+   "fbx": "Environment/env_lip_rim_straight_b.fbx",
+   "cat": "edge",
+   "pivot": "lip start point at ground height; local +X runs along the rim, outward -Z; yaw = atan2(dz, dx) in sim",
+   "tris": 100,
+   "outline_px": 0.0,
+   "materials": [
+    "CM_Toon"
+   ],
+   "verts": 96,
+   "cull": "down",
+   "bounds_unity_min": [
+    -0.0576,
+    -0.8701,
+    -0.5134
+   ],
+   "bounds_unity_max": [
+    1.0464,
+    0.006,
+    0.1027
+   ],
+   "covers": "island rim variant",
+   "team_mask": false
+  },
+  {
+   "piece": "env_lip_rim_straight_c",
+   "fbx": "Environment/env_lip_rim_straight_c.fbx",
+   "cat": "edge",
+   "pivot": "lip start point at ground height; local +X runs along the rim, outward -Z; yaw = atan2(dz, dx) in sim",
+   "tris": 100,
+   "outline_px": 0.0,
+   "materials": [
+    "CM_Toon"
+   ],
+   "verts": 96,
+   "cull": "down",
+   "bounds_unity_min": [
+    -0.0461,
+    -0.8117,
+    -0.5426
+   ],
+   "bounds_unity_max": [
+    1.054,
+    0.006,
+    0.0948
+   ],
+   "covers": "island rim variant",
+   "team_mask": false
+  },
+  {
+   "piece": "env_lip_rim_diag_a",
+   "fbx": "Environment/env_lip_rim_diag_a.fbx",
+   "cat": "edge",
+   "pivot": "lip start point at ground height; local +X runs along the rim, outward -Z; yaw = atan2(dz, dx) in sim (1.414 u, along a fill hypotenuse)",
+   "tris": 139,
+   "outline_px": 0.0,
+   "materials": [
+    "CM_Toon"
+   ],
+   "verts": 130,
+   "cull": "down",
+   "bounds_unity_min": [
+    -0.0532,
+    -0.8602,
+    -0.5391
+   ],
+   "bounds_unity_max": [
+    1.4532,
+    0.006,
+    0.1136
+   ],
+   "covers": "diagonal island rim",
+   "team_mask": false
+  },
+  {
+   "piece": "env_lip_rim_diag_b",
+   "fbx": "Environment/env_lip_rim_diag_b.fbx",
+   "cat": "edge",
+   "pivot": "lip start point at ground height; local +X runs along the rim, outward -Z; yaw = atan2(dz, dx) in sim (1.414 u)",
+   "tris": 139,
+   "outline_px": 0.0,
+   "materials": [
+    "CM_Toon"
+   ],
+   "verts": 130,
+   "cull": "down",
+   "bounds_unity_min": [
+    -0.0546,
+    -0.8689,
+    -0.5286
+   ],
+   "bounds_unity_max": [
+    1.4641,
+    0.006,
+    0.1065
+   ],
+   "covers": "diagonal island rim variant",
+   "team_mask": false
+  },
+  {
+   "piece": "env_lip_rim_corner90",
+   "fbx": "Environment/env_lip_rim_corner90.fbx",
+   "cat": "edge",
+   "pivot": "convex 90-degree rim corner point; yaw of the incoming edge",
+   "tris": 48,
+   "outline_px": 0.0,
+   "materials": [
+    "CM_Toon"
+   ],
+   "verts": 42,
+   "cull": "down",
+   "bounds_unity_min": [
+    0.0,
+    -0.84,
+    -0.5
+   ],
+   "bounds_unity_max": [
+    0.5,
+    0.006,
+    -0.0
+   ],
+   "covers": "rim outer corner (fringe fan + rock fan)",
+   "team_mask": false
+  },
+  {
+   "piece": "env_lip_rim_corner45",
+   "fbx": "Environment/env_lip_rim_corner45.fbx",
+   "cat": "edge",
+   "pivot": "convex 45-degree rim bend point; yaw of the incoming edge",
+   "tris": 9,
+   "outline_px": 0.0,
+   "materials": [
+    "CM_Toon"
+   ],
+   "verts": 9,
+   "cull": "down",
+   "bounds_unity_min": [
+    0.0,
+    -0.84,
+    -0.5
+   ],
+   "bounds_unity_max": [
+    0.3536,
+    -0.004,
+    0.0
+   ],
+   "covers": "rim bend (rock fan)",
+   "team_mask": false
+  },
+  {
    "piece": "env_cliff_s1",
    "fbx": "Environment/env_cliff_s1.fbx",
    "cat": "cliff",
@@ -295,12 +521,12 @@
    "bounds_unity_min": [
     0.0,
     -5.0831,
-    -0.1201
+    -0.6201
    ],
    "bounds_unity_max": [
     1.0,
     -0.75,
-    1.0474
+    0.6
    ],
    "covers": "p12/p15 continuous island cliff skirt",
    "team_mask": false
@@ -320,12 +546,12 @@
    "bounds_unity_min": [
     0.0,
     -4.0919,
-    -0.0745
+    -0.5745
    ],
    "bounds_unity_max": [
     2.0,
     -0.75,
-    0.7326
+    0.6
    ],
    "covers": "p12/p15 continuous island cliff skirt",
    "team_mask": false
@@ -345,12 +571,12 @@
    "bounds_unity_min": [
     0.0,
     -6.7065,
-    -0.1292
+    -0.6292
    ],
    "bounds_unity_max": [
     3.0,
     -0.75,
-    1.1979
+    0.6979
    ],
    "covers": "p12/p15 continuous island cliff skirt",
    "team_mask": false
@@ -370,12 +596,12 @@
    "bounds_unity_min": [
     0.0,
     -5.7891,
-    -0.0938
+    -0.5938
    ],
    "bounds_unity_max": [
     4.0,
     -0.75,
-    1.0738
+    0.6
    ],
    "covers": "p12/p15 continuous island cliff skirt",
    "team_mask": false
@@ -395,12 +621,12 @@
    "bounds_unity_min": [
     0.0,
     -6.759,
-    -0.0851
+    -0.5851
    ],
    "bounds_unity_max": [
     5.0,
     -0.75,
-    1.2639
+    0.7639
    ],
    "covers": "p12/p15 continuous island cliff skirt",
    "team_mask": false
@@ -420,12 +646,12 @@
    "bounds_unity_min": [
     0.0,
     -5.9283,
-    -0.1371
+    -0.6371
    ],
    "bounds_unity_max": [
     6.0,
     -0.75,
-    1.1051
+    0.6051
    ],
    "covers": "p12/p15 continuous island cliff skirt",
    "team_mask": false
@@ -445,12 +671,12 @@
    "bounds_unity_min": [
     0.0,
     -5.6339,
-    -0.1192
+    -0.6192
    ],
    "bounds_unity_max": [
     1.4142,
     -0.75,
-    0.993
+    0.6
    ],
    "covers": "p12 cliff skirt on a 45-degree rim",
    "team_mask": false
@@ -470,12 +696,12 @@
    "bounds_unity_min": [
     0.0,
     -6.7151,
-    -0.1222
+    -0.6222
    ],
    "bounds_unity_max": [
     2.8284,
     -0.75,
-    1.2371
+    0.7371
    ],
    "covers": "p12 cliff skirt on a 45-degree rim",
    "team_mask": false
@@ -495,12 +721,12 @@
    "bounds_unity_min": [
     0.0,
     -6.561,
-    -0.0848
+    -0.5848
    ],
    "bounds_unity_max": [
     4.2426,
     -0.75,
-    1.345
+    0.845
    ],
    "covers": "p12 cliff skirt on a 45-degree rim",
    "team_mask": false
@@ -520,12 +746,12 @@
    "bounds_unity_min": [
     0.0,
     -6.0784,
-    -0.1063
+    -0.6063
    ],
    "bounds_unity_max": [
     5.6569,
     -0.75,
-    1.0975
+    0.6
    ],
    "covers": "p12 cliff skirt on a 45-degree rim",
    "team_mask": false
@@ -534,7 +760,7 @@
    "piece": "env_cliff_corner",
    "fbx": "Environment/env_cliff_corner.fbx",
    "cat": "cliff",
-   "pivot": "rim corner point, island height",
+   "pivot": "rim corner point, island height; yaw of the incoming edge",
    "tris": 142,
    "outline_px": 2.0,
    "materials": [
@@ -543,14 +769,14 @@
    "verts": 73,
    "cull": "down",
    "bounds_unity_min": [
-    -0.3673,
+    -0.1585,
     -5.3677,
-    -0.3614
+    -0.6916
    ],
    "bounds_unity_max": [
-    0.3618,
+    0.6922,
     -0.75,
-    0.3597
+    0.1497
    ],
    "covers": "cliff outer corner column",
    "team_mask": false
@@ -559,7 +785,7 @@
    "piece": "env_cliff_bend",
    "fbx": "Environment/env_cliff_bend.fbx",
    "cat": "cliff",
-   "pivot": "rim 45-degree bend point",
+   "pivot": "rim 45-degree bend point; yaw of the incoming edge",
    "tris": 96,
    "outline_px": 2.0,
    "materials": [
@@ -568,14 +794,14 @@
    "verts": 50,
    "cull": "down",
    "bounds_unity_min": [
-    -0.2394,
+    -0.2042,
     -4.2013,
-    -0.2293
+    -0.5827
    ],
    "bounds_unity_max": [
-    0.2314,
+    0.4236,
     -0.75,
-    0.2412
+    0.0447
    ],
    "covers": "cliff bend column",
    "team_mask": false
@@ -594,12 +820,12 @@
    "cull": "down",
    "bounds_unity_min": [
     -0.5333,
-    -6.8,
-    -1.4483
+    -7.07,
+    -1.8583
    ],
    "bounds_unity_max": [
     0.6653,
-    0.016,
+    0.02,
     0.74
    ],
    "covers": "p12/p15 waterfall + pool + foam",
@@ -710,22 +936,22 @@
    "fbx": "Environment/env_tree_round_l.fbx",
    "cat": "tree",
    "pivot": "cell top centre (cx+0.5, h, -(cz+0.5))",
-   "tris": 323,
+   "tris": 382,
    "outline_px": 2.5,
    "materials": [
-    "CM_Toon"
+    "CM_Toon_Foliage"
    ],
-   "verts": 204,
+   "verts": 240,
    "cull": "down",
    "bounds_unity_min": [
-    -1.861,
+    -1.86,
     -0.0909,
-    -1.8448
+    -1.9667
    ],
    "bounds_unity_max": [
-    2.1012,
-    3.486,
-    2.0963
+    2.1608,
+    3.5853,
+    2.0772
    ],
    "covers": "p12/p15 round tree, 3.0 u canopy",
    "team_mask": false
@@ -735,22 +961,22 @@
    "fbx": "Environment/env_tree_round_s.fbx",
    "cat": "tree",
    "pivot": "cell top centre (cx+0.5, h, -(cz+0.5))",
-   "tris": 323,
+   "tris": 383,
    "outline_px": 2.5,
    "materials": [
-    "CM_Toon"
+    "CM_Toon_Foliage"
    ],
-   "verts": 204,
+   "verts": 240,
    "cull": "down",
    "bounds_unity_min": [
-    -1.2233,
+    -1.2284,
     -0.0721,
-    -1.2213
+    -1.3084
    ],
    "bounds_unity_max": [
-    1.3205,
-    2.3269,
-    1.387
+    1.3965,
+    2.436,
+    1.3869
    ],
    "covers": "round tree, 2.0 u",
    "team_mask": false
@@ -760,22 +986,22 @@
    "fbx": "Environment/env_tree_tall_l.fbx",
    "cat": "tree",
    "pivot": "cell top centre (cx+0.5, h, -(cz+0.5))",
-   "tris": 204,
+   "tris": 203,
    "outline_px": 2.5,
    "materials": [
-    "CM_Toon"
+    "CM_Toon_Foliage"
    ],
    "verts": 132,
    "cull": "down",
    "bounds_unity_min": [
-    -1.0228,
+    -1.284,
     -0.0784,
-    -1.0893
+    -1.0926
    ],
    "bounds_unity_max": [
-    0.9448,
-    4.1178,
-    0.9958
+    1.1316,
+    4.1347,
+    0.9912
    ],
    "covers": "tall stacked tree, 2.6 u",
    "team_mask": false
@@ -788,19 +1014,19 @@
    "tris": 263,
    "outline_px": 2.5,
    "materials": [
-    "CM_Toon"
+    "CM_Toon_Foliage"
    ],
    "verts": 168,
    "cull": "down",
    "bounds_unity_min": [
-    -0.6855,
+    -0.8575,
     -0.0683,
-    -0.5414
+    -0.5445
    ],
    "bounds_unity_max": [
-    0.6592,
-    2.6946,
-    0.8285
+    0.8073,
+    2.7061,
+    0.8274
    ],
    "covers": "tall stacked tree, 1.7 u",
    "team_mask": false
@@ -818,16 +1044,16 @@
    "verts": 54,
    "cull": "down",
    "bounds_unity_min": [
-    -0.1767,
+    -0.2827,
     -0.04,
-    -0.1684
+    -0.2688
    ],
    "bounds_unity_max": [
-    0.2466,
-    0.1938,
-    0.2411
+    0.3946,
+    0.31,
+    0.3857
    ],
-   "covers": "boulder 0.5 u",
+   "covers": "boulder 0.8 u",
    "team_mask": false
   },
   {
@@ -843,16 +1069,16 @@
    "verts": 47,
    "cull": "down",
    "bounds_unity_min": [
-    -0.3288,
+    -0.5187,
     -0.04,
-    -0.4002
+    -0.6319
    ],
    "bounds_unity_max": [
-    0.4161,
-    0.4186,
-    0.4145
+    0.6564,
+    0.661,
+    0.6535
    ],
-   "covers": "boulder 0.95 u",
+   "covers": "boulder 1.5 u",
    "team_mask": false
   },
   {
@@ -868,16 +1094,16 @@
    "verts": 51,
    "cull": "down",
    "bounds_unity_min": [
-    -0.4882,
+    -0.7065,
     -0.04,
-    -0.5786
+    -0.8374
    ],
    "bounds_unity_max": [
-    0.6589,
-    0.6565,
-    0.4247
+    0.9542,
+    0.9509,
+    0.6145
    ],
-   "covers": "boulder 1.45 u",
+   "covers": "boulder 2.1 u",
    "team_mask": false
   },
   {
@@ -885,7 +1111,7 @@
    "fbx": "Environment/env_rocks.fbx",
    "cat": "rock_big",
    "pivot": "cell top centre (cx+0.5, h, -(cz+0.5))",
-   "tris": 808,
+   "tris": 803,
    "outline_px": 2.0,
    "materials": [
     "CM_Toon"
@@ -893,14 +1119,14 @@
    "verts": 480,
    "cull": "down",
    "bounds_unity_min": [
-    -1.1959,
-    -0.2575,
-    -0.6524
+    -1.7141,
+    -0.3651,
+    -0.94
    ],
    "bounds_unity_max": [
     0.7489,
-    0.3883,
-    0.6991
+    0.5825,
+    1.0103
    ],
    "covers": "rock cluster 3-5 + pebbles",
    "team_mask": false
@@ -910,23 +1136,23 @@
    "fbx": "Environment/env_crystal_cluster.fbx",
    "cat": "crystal",
    "pivot": "cell top centre (cx+0.5, h, -(cz+0.5))",
-   "tris": 128,
+   "tris": 160,
    "outline_px": 2.5,
    "materials": [
-    "CM_Toon",
+    "CM_Toon_Crystal",
     "CM_GlowDecal"
    ],
-   "verts": 99,
+   "verts": 140,
    "cull": "down",
    "bounds_unity_min": [
-    -1.0,
-    -0.1258,
-    -1.0
+    -1.54,
+    -0.1877,
+    -1.54
    ],
    "bounds_unity_max": [
-    1.0,
-    1.7934,
-    1.0
+    1.54,
+    2.3912,
+    1.54
    ],
    "covers": "p12/p14 team crystal cluster (game sets team)",
    "team_mask": true
@@ -936,23 +1162,23 @@
    "fbx": "Environment/env_crystal_cluster_small.fbx",
    "cat": "crystal",
    "pivot": "cell top centre (cx+0.5, h, -(cz+0.5))",
-   "tris": 92,
+   "tris": 120,
    "outline_px": 2.5,
    "materials": [
-    "CM_Toon",
+    "CM_Toon_Crystal",
     "CM_GlowDecal"
    ],
-   "verts": 73,
+   "verts": 106,
    "cull": "down",
    "bounds_unity_min": [
-    -1.0,
-    -0.0974,
-    -1.0
+    -1.2075,
+    -0.1409,
+    -1.2075
    ],
    "bounds_unity_max": [
-    1.0,
-    0.9464,
-    1.0
+    1.2075,
+    1.4445,
+    1.2075
    ],
    "covers": "small team crystal cluster",
    "team_mask": true
@@ -962,23 +1188,23 @@
    "fbx": "Environment/env_crystal_biomass.fbx",
    "cat": "crystal",
    "pivot": "cell top centre (cx+0.5, h, -(cz+0.5))",
-   "tris": 110,
+   "tris": 140,
    "outline_px": 2.5,
    "materials": [
-    "CM_Toon",
+    "CM_Toon_Crystal",
     "CM_GlowDecal"
    ],
-   "verts": 86,
+   "verts": 123,
    "cull": "down",
    "bounds_unity_min": [
-    -1.0,
-    -0.0846,
-    -1.0
+    -1.295,
+    -0.1167,
+    -1.295
    ],
    "bounds_unity_max": [
-    1.0,
-    1.1989,
-    1.0
+    1.295,
+    1.6985,
+    1.295
    ],
    "covers": "Biomass crystal cluster",
    "team_mask": false
@@ -988,23 +1214,23 @@
    "fbx": "Environment/env_crystal_corrupt.fbx",
    "cat": "crystal",
    "pivot": "cell top centre (cx+0.5, h, -(cz+0.5))",
-   "tris": 110,
+   "tris": 140,
    "outline_px": 2.5,
    "materials": [
-    "CM_Toon",
+    "CM_Toon_Crystal",
     "CM_GlowDecal"
    ],
-   "verts": 86,
+   "verts": 123,
    "cull": "down",
    "bounds_unity_min": [
-    -1.0,
-    -0.1092,
-    -1.0
+    -1.33,
+    -0.1587,
+    -1.33
    ],
    "bounds_unity_max": [
-    1.0,
-    1.2956,
-    1.0
+    1.33,
+    1.7938,
+    1.33
    ],
    "covers": "Corruption crystal cluster",
    "team_mask": false

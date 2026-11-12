@@ -36,6 +36,8 @@ OVERHANG = 0.08
 BAND = 0.75             # one Sim height step
 FOAM_W = 0.15           # AD 2.5: 0.15 u (11 px across, 9 px foreshortened at the look target)
 TILE = 2.04             # bridge tile: 6 x (0.30 plank + 0.04 gap)
+CH_OUT = 0.50           # v3 rim rock band: a chamfer from the lip 0.50 u out and 0.29 u down (30 degrees), so a rim
+CH_DROP = 0.29          # shows stone at the 55-degree camera whichever way it faces (a vertical face hides on far rims)
 UP = (0.0, 1.0, 0.0)
 OUT = (0.0, 0.0, -1.0)  # outward for edge pieces
 
@@ -162,17 +164,60 @@ def lip_corner(m, seed):
     _ink(m, outline, _miter_normals(outline, radial))
 
 
-def ledge_band(m, seed):
+def ledge_band(m, seed, L=1.0):
     """An extra 0.75 u face band for a multi-step ledge (stack at y - 0.75 per extra step)."""
-    face_band(m, 0.0, 1.0, random.Random(seed), extra=0.04)
+    face_band(m, 0.0, L, random.Random(seed), extra=0.04)
 
 
-def ledge_shadow(m, seed):
-    """Soft 0.5 u shadow band on the LOWER ground in front of a 1 u ledge lip (decal material, UV v = 0 at the
+def ledge_shadow(m, seed, L=1.0):
+    """Soft 0.5 u shadow band on the LOWER ground in front of a ledge lip (decal material, UV v = 0 at the
     ledge foot, 1 at 0.5 u out). Place with the lip (same pivot and yaw); local y = -0.75 + 0.004."""
     y = -BAND + 0.004
-    F(m, [(0.0, y, 0.0), (1.0, y, 0.0), (1.0, y, -0.5), (0.0, y, -0.5)], C("grass_dark"), UP, mat=1,
+    F(m, [(0.0, y, 0.0), (L, y, 0.0), (L, y, -0.5), (0.0, y, -0.5)], C("grass_dark"), UP, mat=1,
       uv=[(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)])
+
+
+def rim_band(m, a, b, rng):
+    """v3 rim rock band: stones (0.35-0.5 u) on a 30-degree chamfer from the lip (z = 0, y = 0) out to z = -CH_OUT,
+    y = -CH_DROP, then the dark face band down to one Sim step. Ends are exact so neighbours tile."""
+    n = max(1, round((b - a) / 0.42))
+    xs = [a + (b - a) * i / n + (rng.uniform(-0.07, 0.07) if 0 < i < n else 0.0) for i in range(n + 1)]
+    zo = [-CH_OUT - (rng.uniform(-0.03, 0.05) if 0 < i < n else 0.0) for i in range(n + 1)]
+    yo = [-CH_DROP - (rng.uniform(0.0, 0.04) if 0 < i < n else 0.0) for i in range(n + 1)]
+    yb = [-BAND - 0.06 - (rng.uniform(0.0, 0.07) if 0 < i < n else 0.0) for i in range(n + 1)]
+    for i in range(n):
+        col = C("rim_rock" if i % 2 == 0 else "rim_rock_b", rng.uniform(0.96, 1.04))
+        # each stone is two facets (a soft ridge 40% of the way down) so it catches the light like cut rock
+        ym0, ym1 = yo[i] * 0.42 + 0.012, yo[i + 1] * 0.42 + 0.012
+        zm0, zm1 = zo[i] * 0.40, zo[i + 1] * 0.40
+        F(m, [(xs[i], -0.004, 0.0), (xs[i + 1], -0.004, 0.0), (xs[i + 1], ym1, zm1), (xs[i], ym0, zm0)], col, (0, 0.95, -0.3))
+        F(m, [(xs[i], ym0, zm0), (xs[i + 1], ym1, zm1), (xs[i + 1], yo[i + 1], zo[i + 1]), (xs[i], yo[i], zo[i])],
+          C("rim_rock_b", 0.94) if i % 2 == 0 else C("rock_mid", 1.04), (0, 0.6, -0.8))
+        F(m, [(xs[i], yo[i], zo[i]), (xs[i + 1], yo[i + 1], zo[i + 1]), (xs[i + 1], yb[i + 1], zo[i + 1]), (xs[i], yb[i], zo[i])],
+          C("band"), OUT)
+
+
+def rim_lip(m, seed, L):
+    rng = random.Random(seed)
+    fringe(m, 0.0, L, rng)
+    rim_band(m, 0.0, L, rng)
+
+
+def rim_corner(m, seed, deg=90):
+    """Convex rim corner (90) or bend (45) at the origin: incoming rim along +X ends here (outward -Z). Fills the
+    outward wedge with the chamfer fan and its face band; the 90-degree piece also carries the fringe fan + ink."""
+    if deg == 90:
+        lip_corner(m, seed)
+    rng = random.Random(seed + 7)
+    k = max(2, deg // 15)
+    angs = [deg * i / k for i in range(k + 1)]
+    u = lambda a: (math.sin(math.radians(a)), -math.cos(math.radians(a)))
+    pts = [(u(a)[0] * CH_OUT, -CH_DROP, u(a)[1] * CH_OUT) for a in angs]
+    for i in range(k):
+        F(m, [(0.0, -0.004, 0.0), pts[i], pts[i + 1]], C("rim_rock" if i % 2 else "rim_rock_b"), (0, 0.85, -0.5))
+        yb0, yb1 = -BAND - 0.06 - (0.03 if 0 < i else 0.0), -BAND - 0.06 - (0.03 if i + 1 < k else 0.0)
+        F(m, [pts[i], pts[i + 1], (pts[i + 1][0], yb1, pts[i + 1][2]), (pts[i][0], yb0, pts[i][2])], C("band"),
+          (u((angs[i] + angs[i + 1]) / 2)[0], 0.0, u((angs[i] + angs[i + 1]) / 2)[1]))
 
 
 # ------------------------------------------------------------------------------------------------------ ground
@@ -203,7 +248,7 @@ def _facet(m, x0, x1, rng, y_top, back=0.6):
     rock = C("rock", rng.uniform(0.95, 1.04))
     moss, mossd = C("moss"), C("moss", 0.93)
     D = rng.uniform(3.8, 6.8)
-    o = rng.uniform(-0.03, 0.07)
+    o = CH_OUT + rng.uniform(-0.03, 0.07)
     y = y_top
     F(m, [(x0, y, back), (x1, y, back), (x1, y, -o), (x0, y, -o)], moss, UP)     # closed top (moss shelf outside)
     xf = x0 + (x1 - x0) * rng.uniform(0.35, 0.65)
@@ -244,12 +289,12 @@ def cliff_skirt(m, seed, L):
         _facet(m, xs[i], xs[i + 1], rng, -BAND)
 
 
-def _column(m, rng, r0, n=8, y_top=-BAND, depth=(3.6, 5.8)):
+def _column(m, rng, r0, n=8, y_top=-BAND, depth=(3.6, 5.8), c=(0.0, 0.0)):
     rock, moss = C("rock", rng.uniform(0.95, 1.03)), C("moss")
     D = rng.uniform(*depth)
     rot = rng.uniform(0, math.pi)
-    ring = lambda r, y: [(r * math.cos(rot + 2 * math.pi * i / n) * rng.uniform(0.92, 1.06), y,
-                          r * math.sin(rot + 2 * math.pi * i / n) * rng.uniform(0.92, 1.06)) for i in range(n)]
+    ring = lambda r, y: [(c[0] + r * math.cos(rot + 2 * math.pi * i / n) * rng.uniform(0.92, 1.06), y,
+                          c[1] + r * math.sin(rot + 2 * math.pi * i / n) * rng.uniform(0.92, 1.06)) for i in range(n)]
     y, r = y_top, r0
     top = ring(r, y)
     F(m, top, moss, UP)
@@ -257,27 +302,29 @@ def _column(m, rng, r0, n=8, y_top=-BAND, depth=(3.6, 5.8)):
         bot = ring(r * 0.97, y - BAND)
         for i in range(n):
             j = (i + 1) % n
-            c = ((top[i][0] + top[j][0]) / 2, 0, (top[i][2] + top[j][2]) / 2)
-            F(m, [top[i], top[j], bot[j], bot[i]], rock, c)
+            cc = ((top[i][0] + top[j][0]) / 2 - c[0], 0, (top[i][2] + top[j][2]) / 2 - c[1])
+            F(m, [top[i], top[j], bot[j], bot[i]], rock, cc)
         r = r * rng.uniform(0.78, 0.9)
         nxt = ring(r, y - BAND)
         for i in range(n):
             j = (i + 1) % n
             F(m, [bot[i], bot[j], nxt[j], nxt[i]], moss, UP)
         top, y = nxt, y - BAND
-    tip = (rng.uniform(-0.1, 0.1), -D, rng.uniform(-0.1, 0.1))
+    tip = (c[0] + rng.uniform(-0.1, 0.1), -D, c[1] + rng.uniform(-0.1, 0.1))
     for i in range(n):
         j = (i + 1) % n
-        c = ((top[i][0] + top[j][0]) / 2, -0.4, (top[i][2] + top[j][2]) / 2)
-        F(m, [top[i], top[j], tip], rock, c)
+        cc = ((top[i][0] + top[j][0]) / 2 - c[0], -0.4, (top[i][2] + top[j][2]) / 2 - c[1])
+        F(m, [top[i], top[j], tip], rock, cc)
 
 
 def cliff_corner(m, seed):
-    _column(m, random.Random(seed), 0.36)
+    """Convex 90-degree rim corner column; placed at the corner point with the incoming edge's yaw (like the lip
+    corner), centred on the outward bisector so it closes the two skirts under the rim band."""
+    _column(m, random.Random(seed), 0.42, c=(0.27, -0.27))
 
 
 def cliff_bend(m, seed):
-    _column(m, random.Random(seed), 0.24, n=7, depth=(3.4, 5.2))
+    _column(m, random.Random(seed), 0.32, n=7, depth=(3.4, 5.2), c=(0.115, -0.277))
 
 
 # -------------------------------------------------------------------------------------------------------- water
@@ -291,7 +338,7 @@ def _dense(poly, step):
     return out
 
 
-def waterfall(m, seed, fall=6.5):
+def waterfall(m, seed, fall=6.5, foam_w=FOAM_W):
     """Spring pool on the rim cell + ribbon off the lip. Pivot: lip midpoint at ground height; lip along local X
     from -0.5 to 0.5, outward -Z. Pool and foam lie 0.012-0.016 u above the ground (decal layer)."""
     rng = random.Random(seed)
@@ -310,7 +357,7 @@ def waterfall(m, seed, fall=6.5):
         if (cx - pts[k][0]) * nx + (cz - pts[k][1]) * nz < 0:
             nx, nz = -nx, -nz
         nin.append((nx, nz))
-    inner = [(p[0] + n[0] * FOAM_W * rng.uniform(0.85, 1.15), p[1] + n[1] * FOAM_W * rng.uniform(0.85, 1.15))
+    inner = [(p[0] + n[0] * foam_w * rng.uniform(0.93, 1.07), p[1] + n[1] * foam_w * rng.uniform(0.93, 1.07))
              for p, n in zip(pts, nin)]
     outer = [(p[0] - n[0] * 0.04, p[1] - n[1] * 0.04) for p, n in zip(pts, nin)]
     for k in range(len(pts) - 1):
@@ -330,8 +377,11 @@ def waterfall(m, seed, fall=6.5):
     nc = len(cols)
 
     def cpt(t):
-        s = t * fall
-        return -s, -0.08 - 0.62 * math.sqrt(t)
+        if t < 0.125:                        # two rows slide over the rim rock band (30-degree chamfer)
+            f = t / 0.125
+            return -f * (CH_DROP - 0.02) + 0.02 * (1 - f), -0.08 - f * (CH_OUT - 0.02)
+        t2 = (t - 0.125) / 0.875
+        return -(CH_DROP - 0.02) - t2 * fall, -0.08 - (CH_OUT - 0.02) - 0.55 * math.sqrt(t2)
 
     for r in range(rows):
         t0, t1 = r / rows, (r + 1) / rows
@@ -434,24 +484,51 @@ def tree(m, seed, species="round", size="l"):
     top = (math.sin(tilt) * th * math.cos(ta), th, math.sin(tilt) * th * math.sin(ta))
     _trunk(m, (0, -0.05, 0), top, 0.075 * Dc, 0.045 * Dc, C("trunk"))
     _trunk(m, (0, -0.05, 0), (top[0] * 0.3 + 0.05 * Dc, 0.25 * Dc, top[2] * 0.3), 0.06 * Dc, 0.03 * Dc, C("trunk", 0.95), n=5)
-    leaf = C("leaf_light")
     if species == "round":
-        lobes = [(0.0, 0.36 * Dc, 0.0, 0.34 * Dc)]
-        k = rng.choice((3, 4))
+        # v3: a crown lobe plus 4-5 rim lobes pushed well out, so the outline scallops read at gameplay size
+        lobes = [(0.0, 0.42 * Dc, 0.0, 0.33 * Dc)]
+        k = rng.choice((4, 5))
         for i in range(k):
-            a = 2 * math.pi * i / k + rng.uniform(-0.3, 0.3)
-            lobes.append((math.cos(a) * 0.36 * Dc, 0.12 * Dc + rng.uniform(-0.05, 0.08) * Dc, math.sin(a) * 0.36 * Dc,
-                          rng.uniform(0.27, 0.33) * Dc))
+            a = 2 * math.pi * i / k + rng.uniform(-0.25, 0.25)
+            lobes.append((math.cos(a) * 0.40 * Dc, 0.14 * Dc + rng.uniform(-0.04, 0.08) * Dc, math.sin(a) * 0.40 * Dc,
+                          rng.uniform(0.25, 0.31) * Dc))
     else:
         lobes = []
         k = rng.choice((3, 4))
         for i in range(k):
             f = i / (k - 1)
-            lobes.append((rng.uniform(-0.06, 0.06) * Dc, (0.05 + 0.62 * f) * Dc, rng.uniform(-0.06, 0.06) * Dc,
+            sx = (0.11 if i % 2 else -0.11) * Dc
+            lobes.append((sx + rng.uniform(-0.03, 0.03) * Dc, (0.05 + 0.62 * f) * Dc, rng.uniform(-0.06, 0.06) * Dc,
                           (0.40 - 0.16 * f) * Dc))
+    lobes.sort(key=lambda l: l[1])
     for i, (x, y, z, r) in enumerate(lobes):
-        m.blob(top[0] + x, top[1] + y, top[2] + z, r, r * 0.86, r, C("leaf_light", 0.93 + 0.035 * (i % 3)), sub=2, smooth=True, seed=seed * 7 + i,
-               jitter=0.05, flat_bottom=top[1] - 0.15 * Dc)
+        lobe(m, (top[0] + x, top[1] + y, top[2] + z), (r, r * 0.88, r), seed * 7 + i, 0.9 + 0.1 * (y / max(1e-6, lobes[-1][1])),
+             flat_bottom=top[1] - 0.15 * Dc)
+
+
+HI_DIR = Vector((-0.34, 0.92, -0.16)).normalized()  # sun side, turned toward the gameplay camera (painted highlight)
+
+
+def lobe(m, c, r, seed, mul=1.0, flat_bottom=None, sub=2):
+    """Canopy lobe: jittered icosphere ellipsoid, smooth-shaded for the 3-band ramp, with a painted highlight shape
+    (the faces turned most to the sun, in leaf_hi) so each lobe reads as a ball even where the ramp sees one band."""
+    tmp = bmesh.new()
+    bmesh.ops.create_icosphere(tmp, subdivisions=sub, radius=1.0)
+    rng = random.Random(seed)
+    for v in tmp.verts:
+        k = 1.0 + rng.uniform(-0.06, 0.06)
+        x, y, z = v.co.x * k, v.co.z * k, v.co.y * k
+        yy = c[1] + y * r[1]
+        if flat_bottom is not None and yy < flat_bottom:
+            yy = flat_bottom
+        v.co = Vector((c[0] + x * r[0], yy, c[2] + z * r[2]))
+    for f in tmp.faces:
+        pts = [tuple(v.co) for v in reversed(f.verts)]
+        ctr = sum((Vector(p) for p in pts), Vector()) / len(pts)
+        nrm = Vector(((ctr.x - c[0]) / r[0], (ctr.y - c[1]) / r[1], (ctr.z - c[2]) / r[2])).normalized()
+        col = C("leaf_hi") if nrm.dot(HI_DIR) > 0.74 else C("leaf_light", mul)
+        m.poly(pts, col, smooth=True)
+    tmp.free()
 
 
 # -------------------------------------------------------------------------------------------------------- rocks
@@ -491,7 +568,7 @@ def rock_cluster(m, seed):
     for i in range(k):
         a = 2 * math.pi * i / k + rng.uniform(-0.4, 0.4)
         r = 0.0 if i == 0 else rng.uniform(0.35, 0.6)
-        boulder(m, seed * 13 + i, (0.9 if i == 0 else rng.uniform(0.35, 0.6)), (math.cos(a) * r, 0, math.sin(a) * r))
+        boulder(m, seed * 13 + i, (1.35 if i == 0 else rng.uniform(0.5, 0.85)), (math.cos(a) * r * 1.45, 0, math.sin(a) * r * 1.45))
     for i in range(5):
         a = rng.uniform(0, 2 * math.pi)
         r = rng.uniform(0.5, 0.85)
@@ -526,6 +603,9 @@ def _spike(m, base, h, r, yaw, tilt, body, lit):
         j = (i + 1) % n
         out = ((lo[i] + lo[j]) / 2 - (b + R @ Vector((0, (h * 0.36), 0)))).normalized()
         F(m, [lo[i], lo[j], hi[j], hi[i]], lit if i == bi else body, tuple(out))
+        if i == bi:     # painted highlight streak on the lit facet, 40-68% up, a third of the facet wide
+            P = lambda s, t: lo[i] + (lo[j] - lo[i]) * s + ((hi[i] + (hi[j] - hi[i]) * s) - (lo[i] + (lo[j] - lo[i]) * s)) * t + out * 0.006
+            F(m, [P(0.18, 0.40), P(0.50, 0.44), P(0.44, 0.97), P(0.20, 0.92)], C("crystal_hi"), tuple(out))
         F(m, [hi[i], hi[j], tip], lit if i in (bi, (bi + 1) % n, (bi - 1) % n) else body, tuple((out + R @ Vector((0, 0.8, 0))).normalized()))
 
 
@@ -540,13 +620,13 @@ def crystal_cluster(m, seed, hmax=1.8, k=6, kind="team"):
     rng = random.Random(seed)
     body, lit = {"team": (C("team_dark"), C("team_glow")), "biomass": (C("biomass_cd"), C("biomass_c")),
                  "corrupt": (C("corrupt_cd"), C("corrupt_c"))}[kind]
-    _spike(m, (0, 0, 0), hmax, 0.09 * hmax + 0.08, rng.uniform(0, 6.28), math.radians(rng.uniform(2, 7)), body, lit)
+    _spike(m, (0, 0, 0), hmax, 0.12 * hmax + 0.10, rng.uniform(0, 6.28), math.radians(rng.uniform(2, 7)), body, lit)
     for i in range(k - 1):
         a = 2 * math.pi * i / (k - 1) + rng.uniform(-0.3, 0.3)
-        rr = rng.uniform(0.14, 0.32) * (hmax / 1.8 + 0.4)
+        rr = rng.uniform(0.22, 0.42) * (hmax / 1.8 + 0.4)
         h = hmax * rng.uniform(0.45, 0.8)
-        _spike(m, (math.cos(a) * rr, 0, math.sin(a) * rr), h, 0.07 * hmax + 0.06, -a, math.radians(rng.uniform(12, 28)), body, lit)
-    _decal(m, 1.0, lit)
+        _spike(m, (math.cos(a) * rr, 0, math.sin(a) * rr), h, 0.095 * hmax + 0.08, -a, math.radians(rng.uniform(14, 30)), body, lit)
+    _decal(m, 0.7 + 0.35 * hmax, lit)
 
 
 # ------------------------------------------------------------------------------------------------- small props
@@ -653,6 +733,15 @@ PIECES = [
     _p("env_lip_corner", lip_corner, "edge", "convex 90-degree corner point; yaw of the incoming edge", "lip outer corner", seed=321),
     _p("env_ledge_band", ledge_band, "edge", EDGE + "; stack at y-0.75 per extra step", "multi-step ledge face", seed=331),
     _p("env_ledge_shadow", ledge_shadow, "edge", EDGE + " (upper lip); decal on the lower ground", "ledge soft shadow 0.5 u", mats=("CM_Toon", "CM_ShadowDecal"), seed=332),
+    _p("env_ledge_band_diag", lambda m, s: ledge_band(m, s, SQ2), "edge", EDGE + " (1.414 u, along a ledge fill hypotenuse)", "multi-step diagonal ledge face", seed=333),
+    _p("env_ledge_shadow_diag", lambda m, s: ledge_shadow(m, s, SQ2), "edge", EDGE + " (1.414 u, upper lip)", "diagonal ledge soft shadow", mats=("CM_Toon", "CM_ShadowDecal"), seed=334),
+    _p("env_lip_rim_straight_a", lambda m, s: rim_lip(m, s, 1.0), "edge", EDGE, "island rim: fringe + ink + rim rock band (30-degree chamfer) + face band", seed=341),
+    _p("env_lip_rim_straight_b", lambda m, s: rim_lip(m, s, 1.0), "edge", EDGE, "island rim variant", seed=342),
+    _p("env_lip_rim_straight_c", lambda m, s: rim_lip(m, s, 1.0), "edge", EDGE, "island rim variant", seed=343),
+    _p("env_lip_rim_diag_a", lambda m, s: rim_lip(m, s, SQ2), "edge", EDGE + " (1.414 u, along a fill hypotenuse)", "diagonal island rim", seed=351),
+    _p("env_lip_rim_diag_b", lambda m, s: rim_lip(m, s, SQ2), "edge", EDGE + " (1.414 u)", "diagonal island rim variant", seed=352),
+    _p("env_lip_rim_corner90", lambda m, s: rim_corner(m, s, 90), "edge", "convex 90-degree rim corner point; yaw of the incoming edge", "rim outer corner (fringe fan + rock fan)", seed=361),
+    _p("env_lip_rim_corner45", lambda m, s: rim_corner(m, s, 45), "edge", "convex 45-degree rim bend point; yaw of the incoming edge", "rim bend (rock fan)", seed=362),
 ]
 for _n in range(1, 7):
     PIECES.append(_p(f"env_cliff_s{_n}", (lambda L: (lambda m, s: cliff_skirt(m, s, L)))(float(_n)), "cliff",
@@ -661,25 +750,25 @@ for _n in range(1, 5):
     PIECES.append(_p(f"env_cliff_d{_n}", (lambda L: (lambda m, s: cliff_skirt(m, s, L)))(_n * SQ2), "cliff",
                      EDGE + f"; {_n} diagonal step(s), {_n * SQ2:.3f} u", "p12 cliff skirt on a 45-degree rim", outline_px=2.0, seed=420 + _n))
 PIECES += [
-    _p("env_cliff_corner", cliff_corner, "cliff", "rim corner point, island height", "cliff outer corner column", outline_px=2.0, seed=441),
-    _p("env_cliff_bend", cliff_bend, "cliff", "rim 45-degree bend point", "cliff bend column", outline_px=2.0, seed=442),
+    _p("env_cliff_corner", cliff_corner, "cliff", "rim corner point, island height; yaw of the incoming edge", "cliff outer corner column", outline_px=2.0, seed=441),
+    _p("env_cliff_bend", cliff_bend, "cliff", "rim 45-degree bend point; yaw of the incoming edge", "cliff bend column", outline_px=2.0, seed=442),
     _p("env_waterfall", waterfall, "water", "rim edge midpoint (1 u axis edge); yaw = atan2(dz, dx) of the edge", "p12/p15 waterfall + pool + foam", seed=151),
     _p("env_bridge_span", bridge_span, "bridge", "deck centre of the near end; local +Z along the bridge, stretch to fit", "p14 rope bridge tile (6 planks, posts, ropes)", outline_px=2.0, seed=91),
     _p("env_bridge_post", bridge_post, "bridge", "post foot at deck height", "p14 bridge end post", outline_px=2.0, seed=93),
     _p("env_bridge_pier", bridge_pier, "bridge", "lip point beside a bridge mouth", "p14 mossy stone pier", outline_px=2.0, seed=94),
     _p("env_bridge_cell", v1.bridge_cell, "bridge", CELL, "BRIDGE cell outside a span (stair-step of diagonal bridges)", outline_px=0.0, seed=92),
-    _p("env_tree_round_l", lambda m, s: tree(m, s, "round", "l"), "tree", CELL, "p12/p15 round tree, 3.0 u canopy", outline_px=2.5, seed=181),
-    _p("env_tree_round_s", lambda m, s: tree(m, s, "round", "s"), "tree", CELL, "round tree, 2.0 u", outline_px=2.5, seed=182),
-    _p("env_tree_tall_l", lambda m, s: tree(m, s, "tall", "l"), "tree", CELL, "tall stacked tree, 2.6 u", outline_px=2.5, seed=183),
-    _p("env_tree_tall_s", lambda m, s: tree(m, s, "tall", "s"), "tree", CELL, "tall stacked tree, 1.7 u", outline_px=2.5, seed=184),
-    _p("env_boulder_s", lambda m, s: boulder(m, s, 0.5, log=FACET_LOG.setdefault("env_boulder_s", [])), "rock_big", CELL, "boulder 0.5 u", outline_px=2.0, seed=501),
-    _p("env_boulder_m", lambda m, s: boulder(m, s, 0.95, log=FACET_LOG.setdefault("env_boulder_m", [])), "rock_big", CELL, "boulder 0.95 u", outline_px=2.0, seed=502),
-    _p("env_boulder_l", lambda m, s: boulder(m, s, 1.45, log=FACET_LOG.setdefault("env_boulder_l", [])), "rock_big", CELL, "boulder 1.45 u", outline_px=2.0, seed=503),
+    _p("env_tree_round_l", lambda m, s: tree(m, s, "round", "l"), "tree", CELL, "p12/p15 round tree, 3.0 u canopy", outline_px=2.5, mats=("CM_Toon_Foliage",), seed=181),
+    _p("env_tree_round_s", lambda m, s: tree(m, s, "round", "s"), "tree", CELL, "round tree, 2.0 u", outline_px=2.5, mats=("CM_Toon_Foliage",), seed=182),
+    _p("env_tree_tall_l", lambda m, s: tree(m, s, "tall", "l"), "tree", CELL, "tall stacked tree, 2.6 u", outline_px=2.5, mats=("CM_Toon_Foliage",), seed=183),
+    _p("env_tree_tall_s", lambda m, s: tree(m, s, "tall", "s"), "tree", CELL, "tall stacked tree, 1.7 u", outline_px=2.5, mats=("CM_Toon_Foliage",), seed=184),
+    _p("env_boulder_s", lambda m, s: boulder(m, s, 0.8, log=FACET_LOG.setdefault("env_boulder_s", [])), "rock_big", CELL, "boulder 0.8 u", outline_px=2.0, seed=501),
+    _p("env_boulder_m", lambda m, s: boulder(m, s, 1.5, log=FACET_LOG.setdefault("env_boulder_m", [])), "rock_big", CELL, "boulder 1.5 u", outline_px=2.0, seed=502),
+    _p("env_boulder_l", lambda m, s: boulder(m, s, 2.1, log=FACET_LOG.setdefault("env_boulder_l", [])), "rock_big", CELL, "boulder 2.1 u", outline_px=2.0, seed=503),
     _p("env_rocks", rock_cluster, "rock_big", CELL, "rock cluster 3-5 + pebbles", outline_px=2.0, seed=184),
-    _p("env_crystal_cluster", lambda m, s: crystal_cluster(m, s, 1.8, 6), "crystal", CELL, "p12/p14 team crystal cluster (game sets team)", outline_px=2.5, mats=("CM_Toon", "CM_GlowDecal"), seed=121),
-    _p("env_crystal_cluster_small", lambda m, s: crystal_cluster(m, s, 0.95, 4), "crystal", CELL, "small team crystal cluster", outline_px=2.5, mats=("CM_Toon", "CM_GlowDecal"), seed=122),
-    _p("env_crystal_biomass", lambda m, s: crystal_cluster(m, s, 1.2, 5, "biomass"), "crystal", CELL, "Biomass crystal cluster", outline_px=2.5, mats=("CM_Toon", "CM_GlowDecal"), seed=123),
-    _p("env_crystal_corrupt", lambda m, s: crystal_cluster(m, s, 1.3, 5, "corrupt"), "crystal", CELL, "Corruption crystal cluster", outline_px=2.5, mats=("CM_Toon", "CM_GlowDecal"), seed=124),
+    _p("env_crystal_cluster", lambda m, s: crystal_cluster(m, s, 2.4, 7), "crystal", CELL, "p12/p14 team crystal cluster (game sets team)", outline_px=2.5, mats=("CM_Toon_Crystal", "CM_GlowDecal"), seed=121),
+    _p("env_crystal_cluster_small", lambda m, s: crystal_cluster(m, s, 1.45, 5), "crystal", CELL, "small team crystal cluster", outline_px=2.5, mats=("CM_Toon_Crystal", "CM_GlowDecal"), seed=122),
+    _p("env_crystal_biomass", lambda m, s: crystal_cluster(m, s, 1.7, 6, "biomass"), "crystal", CELL, "Biomass crystal cluster", outline_px=2.5, mats=("CM_Toon_Crystal", "CM_GlowDecal"), seed=123),
+    _p("env_crystal_corrupt", lambda m, s: crystal_cluster(m, s, 1.8, 6, "corrupt"), "crystal", CELL, "Corruption crystal cluster", outline_px=2.5, mats=("CM_Toon_Crystal", "CM_GlowDecal"), seed=124),
     _p("env_pebbles", pebbles, "small", CELL, "pebbles (under 0.12 u)", outline_px=2.5, seed=601),
     _p("env_grass_tuft", grass_tuft, "small", CELL, "grass tufts (under 0.25 u)", seed=602),
     _p("env_flowers", flowers, "small", CELL, "flower tuft (under 0.25 u)", seed=603),

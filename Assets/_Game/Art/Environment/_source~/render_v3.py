@@ -55,7 +55,7 @@ def pmat(p, dx=0.0, dz=0.0):
         f = b - a
         ln = f.length
         fz = f / ln
-        X = Vector((0, 1, 0)).cross(fz).normalized()
+        X = Vector((0, 1, 0)).cross(fz).normalized() * p.get("w", 1.0)
         Y = fz.cross(X)
         s = ln / kit2.TILE
         Mu = Matrix(((X.x, Y.x, fz.x * s, a.x), (X.y, Y.y, fz.y * s, a.y), (X.z, Y.z, fz.z * s, a.z), (0, 0, 0, 1)))
@@ -133,7 +133,7 @@ def _fog(nt, col):
     g = nt.nodes.new("ShaderNodeNewGeometry")
     sp = nt.nodes.new("ShaderNodeSeparateXYZ")
     nt.links.new(g.outputs["Position"], sp.inputs[0])
-    f = M_(nt, "MULTIPLY", M_(nt, "DIVIDE", M_(nt, "SUBTRACT", -2.0, sp.outputs[2]), 7.0, clamp=True), 0.85)
+    f = M_(nt, "MULTIPLY", M_(nt, "DIVIDE", M_(nt, "SUBTRACT", -3.5, sp.outputs[2]), 6.0, clamp=True), 0.85)
     return MIX(nt, f, col, RGB("#CDEFF8"))
 
 
@@ -153,20 +153,44 @@ def _emit(nt, mat, col, alpha=None):
         mat.surface_render_method = "BLENDED"
 
 
-def _shade3(nt, col):
+# v3 band sets: per-channel multipliers (linear) of the lit colour for the mid and shadow bands, and the N.L cuts.
+def _ratio(a, b):
+    la, lb = lin(a), lin(b)
+    return tuple(la[i] / lb[i] for i in range(3))
+
+
+BANDS = {
+    "default": dict(mid=(0.84,) * 3, dark=(0.66,) * 3, t_lit=0.35, t_mid=0.02),
+    # trees: exactly the art-direction canopy bands #86BD4E / #5E9A45 / #3F6E36
+    "foliage": dict(mid=_ratio("#5E9A45", "#86BD4E"), dark=_ratio("#3F6E36", "#86BD4E"), t_lit=0.30, t_mid=0.02, analytic=True),
+    # crystal bodies: team dark lit, 0.62 mid, a navy-leaning shadow (lit facets and the highlight streak are self-lit)
+    "crystal": dict(lit=(1.9,) * 3, mid=(1.0,) * 3, dark=(0.46, 0.48, 0.56), t_lit=0.18, t_mid=0.02, analytic=True),
+}
+
+
+def _shade3(nt, col, bands="default"):
+    B = BANDS[bands]
     ndl, vis = _light_ratio(nt)
-    lit = M_(nt, "GREATER_THAN", ndl, 0.35)
-    mid = M_(nt, "GREATER_THAN", ndl, 0.02)
-    mult = M_(nt, "ADD", 0.66, M_(nt, "ADD", M_(nt, "MULTIPLY", mid, 0.18), M_(nt, "MULTIPLY", lit, 0.16)))
-    sh = MIX(nt, 1.0, col, nt.nodes.new("ShaderNodeCombineColor").outputs[0], "MULTIPLY")
-    cc = sh.node.inputs[7].links[0].from_node
-    for i in range(3):
-        _set(nt, cc.inputs[i], mult)
-    navy = M_(nt, "MULTIPLY", M_(nt, "LESS_THAN", ndl, 0.02), 0.12)
+    if B.get("analytic"):
+        # canopies and crystals band on their own N.L only (no received cast shadow), so a crown lobe never
+        # blacks out the lobes under it; they still CAST shadows on the ground
+        geo = nt.nodes.new("ShaderNodeNewGeometry")
+        dp = nt.nodes.new("ShaderNodeVectorMath")
+        dp.operation = "DOT_PRODUCT"
+        nt.links.new(geo.outputs["Normal"], dp.inputs[0])
+        dp.inputs[1].default_value = (math.cos(math.radians(50)), 0.0, math.sin(math.radians(50)))
+        ndl = M_(nt, "MAXIMUM", dp.outputs["Value"], 0.0)
+    lit = M_(nt, "GREATER_THAN", ndl, B["t_lit"])
+    mid = M_(nt, "GREATER_THAN", ndl, B["t_mid"])
+    dark_c = MIX(nt, 1.0, col, tuple(B["dark"]) + (1.0,), "MULTIPLY")
+    mid_c = MIX(nt, 1.0, col, tuple(B["mid"]) + (1.0,), "MULTIPLY")
+    lit_c = MIX(nt, 1.0, col, tuple(B["lit"]) + (1.0,), "MULTIPLY") if "lit" in B else col
+    sh = MIX(nt, lit, MIX(nt, mid, dark_c, mid_c), lit_c)
+    navy = M_(nt, "MULTIPLY", M_(nt, "LESS_THAN", ndl, B["t_mid"]), 0.12)
     return MIX(nt, navy, sh, RGB("#18233B"))
 
 
-def toon_mat(name, crimson=False):
+def toon_mat(name, crimson=False, bands="default"):
     mat, nt = _nt(name)
     vc = nt.nodes.new("ShaderNodeVertexColor")
     vc.layer_name = "Col"
@@ -176,7 +200,7 @@ def toon_mat(name, crimson=False):
             c = M_(nt, "COMPARE", a, code)
             c.node.inputs[2].default_value = 0.05
             col = MIX(nt, c, col, RGB(palette.TEAM_SWAP[key][0]))
-    shaded = _shade3(nt, col)
+    shaded = _shade3(nt, col, bands)
     g1 = M_(nt, "COMPARE", a, 0.25)
     g1.node.inputs[2].default_value = 0.05
     g2 = M_(nt, "COMPARE", a, 0.75)
@@ -298,7 +322,7 @@ def ground_mat(name, img, x0, z0, wdt, hgt):
     vA, vAe = vor(0.4), vor(0.4, "DISTANCE_TO_EDGE")
     hA = nt.nodes.new("ShaderNodeSeparateColor")
     nt.links.new(vA.outputs["Color"], hA.inputs[0])
-    grass = MIX(nt, seam(vAe, 0.4), ramp3(hA.outputs[0], ("#ACCB56", "#A3C150", "#96B249")), RGB("#7E9A3F"))
+    grass = MIX(nt, seam(vAe, 0.4), ramp3(hA.outputs[0], ("#A0BE4E", "#98B64A", "#90AE46")), RGB("#7A9540"))
     n2 = nt.nodes.new("ShaderNodeTexNoise")
     n2.noise_dimensions = "2D"
     n2.inputs["Scale"].default_value = 0.07
@@ -334,15 +358,15 @@ def ground_mat(name, img, x0, z0, wdt, hgt):
                 M_(nt, "GREATER_THAN", R, M_(nt, "SUBTRACT", w, 0.8)))
     hF = nt.nodes.new("ShaderNodeSeparateColor")
     nt.links.new(vF.outputs["Color"], hF.inputs[0])
-    colF = MIX(nt, M_(nt, "LESS_THAN", hF.outputs[1], 0.05), ramp3(hF.outputs[0], ("#E6C597", "#D8B78C", "#EBD2A6")), RGB("#D39A5C"))
-    colF = MIX(nt, seam(vFe, 1.0), colF, RGB("#A08A68"))
+    colF = MIX(nt, M_(nt, "LESS_THAN", hF.outputs[1], 0.05), ramp3(hF.outputs[0], ("#EDD3A6", "#E0C195", "#F3DDB2")), RGB("#D39A5C"))
+    colF = MIX(nt, seam(vFe, 1.0), colF, RGB("#8C7556"))
     hK = nt.nodes.new("ShaderNodeSeparateColor")
     nt.links.new(vK.outputs["Color"], hK.inputs[0])
-    colK = MIX(nt, seam(vKe, 2.0), ramp3(hK.outputs[0], ("#D8B78C", "#CFAE84", "#E6C597")), RGB("#A08A68"))
+    colK = MIX(nt, seam(vKe, 2.0), ramp3(hK.outputs[0], ("#C9AD84", "#BDA078", "#D6BA90")), RGB("#8C7556"))
     out = MIX(nt, M_(nt, "MULTIPLY", stoneF, M_(nt, "SUBTRACT", 1.0, stoneK)), grass, colF)
     out = MIX(nt, stoneK, out, colK)
     ndl, vis = _light_ratio(nt)
-    shadow = MIX(nt, 0.12, MIX(nt, 1.0, out, (0.66, 0.66, 0.66, 1.0), "MULTIPLY"), RGB("#18233B"))
+    shadow = MIX(nt, 0.16, MIX(nt, 1.0, out, (0.60, 0.60, 0.60, 1.0), "MULTIPLY"), RGB("#18233B"))
     _emit(nt, mat, MIX(nt, M_(nt, "SUBTRACT", 1.0, vis), out, shadow))
     return mat
 
@@ -387,6 +411,34 @@ def reset():
 
 MATS = {}
 LIB = {}
+WF = []          # (object, placement) of every waterfall: foam is refitted to 11 px per shot (Unity: constant-pixel foam)
+WFM = {}
+
+
+def wf_mesh(w):
+    """env_waterfall with a foam band of w metres (preview of the constant-pixel foam the Unity shader must draw)."""
+    key = round(w * 1000)
+    if key not in WFM:
+        m = kit2.Mesh("env_waterfall_f%03d" % key, cull="down")
+        kit2.waterfall(m, kit2.BY_NAME["env_waterfall"]["seed"], foam_w=key / 1000.0)
+        ob = m.finish(bpy.data.collections.get("Lib"))
+        for mt in lib_piece("env_waterfall")["me"].materials:
+            ob.data.materials.append(mt)
+        WFM[key] = ob.data
+    return WFM[key]
+
+
+def fit_foam(cam):
+    for ob, p in WF:
+        P = ob.matrix_world.translation
+        c = proj(cam, P)
+        if not (-300 < c.x < 2220 and -300 < c.y < 1380 and c.z > 0):
+            continue
+        a = c.to_2d()
+        px = ((proj(cam, P + Vector((0.15, 0, 0))).to_2d() - a).length + (proj(cam, P + Vector((0, 0.15, 0))).to_2d() - a).length) / 2
+        w = max(0.08, min(0.24, 0.15 * 11.0 / max(px, 1e-6)))
+        ob.data = wf_mesh(w)
+        p["foam_w"] = round(w * 1000) / 1000.0
 
 
 def lib_piece(name):
@@ -407,7 +459,7 @@ def lib_piece(name):
     if olpx > 0:
         me.materials.append(MATS["Outline_Far" if far else "Outline"])
     zs = [v.co.z for v in me.vertices]
-    LIB[name] = dict(me=me, nmats=len(mats), olpx=olpx, cat=cat, top=max(zs) if zs else 0.0)
+    LIB[name] = dict(me=me, nmats=len(mats), olpx=olpx, cat=cat, top=max(zs) if zs else 0.0, mat0=mats[0])
     return LIB[name]
 
 
@@ -418,7 +470,7 @@ def instance(p, coll, dx=0.0, dz=0.0):
     ob.matrix_world = pmat(p, dx, dz)
     if p.get("team") == "crimson":
         ob.material_slots[0].link = "OBJECT"
-        ob.material_slots[0].material = MATS["CM_Toon_Crimson"]
+        ob.material_slots[0].material = MATS[L["mat0"] + "_Crimson"]
     if L["olpx"] > 0:
         s = ob.modifiers.new("Outline", "SOLIDIFY")
         s.offset = 1.0
@@ -523,6 +575,9 @@ def main():
     scn.collection.children.link(lib)
     bpy.context.view_layer.layer_collection.children["Lib"].exclude = True
     MATS.update({"CM_Toon": toon_mat("CM_Toon"), "CM_Toon_Crimson": toon_mat("CM_Toon_Crimson", True),
+                 "CM_Toon_Foliage": toon_mat("CM_Toon_Foliage", bands="foliage"),
+                 "CM_Toon_Crystal": toon_mat("CM_Toon_Crystal", bands="crystal"),
+                 "CM_Toon_Crystal_Crimson": toon_mat("CM_Toon_Crystal_Crimson", True, bands="crystal"),
                  "Outline": outline_mat("Outline"), "Outline_Far": outline_mat("Outline_Far", True),
                  "CM_GlowDecal": decal_mat("CM_GlowDecal", True), "CM_ShadowDecal": decal_mat("CM_ShadowDecal", False)})
 
@@ -538,9 +593,11 @@ def main():
     ground = ground_mesh("Ground_Map", pl, MATS["CM_Ground"], world)
     objs = []
     for p in pl:
-        if p["piece"] in ("env_ground_cell", "env_ground_fill_tri"):
+        if p["piece"] in ("env_ground_cell", "env_ground_fill_tri") or p.get("cat") == "struct":
             continue
         objs.append(instance(p, world))
+        if p["piece"] == "env_waterfall":
+            WF.append((objs[-1], p))
     print("MAP objects", len(objs), round(time.time() - T0), "s")
 
     # ---- demo terrain (field shot)
@@ -549,10 +606,12 @@ def main():
     MATS["CM_Ground_Demo"] = ground_mat("CM_Ground_Demo", dimg, -6.0 + DEMO_DX, -6.0, 58.0, 48.0)
     dcol = bpy.data.collections.new("Demo")
     scn.collection.children.link(dcol)
-    ground_mesh("Ground_Demo", demo["placements"], MATS["CM_Ground_Demo"], dcol, DEMO_DX)
+    gdemo = ground_mesh("Ground_Demo", demo["placements"], MATS["CM_Ground_Demo"], dcol, DEMO_DX)
     for p in demo["placements"]:
         if p["piece"] not in ("env_ground_cell", "env_ground_fill_tri"):
             objs.append(instance(p, dcol, DEMO_DX))
+            if p["piece"] == "env_waterfall":
+                WF.append((objs[-1], p))
 
     # ---- reference character (2.0 u) helper
     def ref_char(coll, x, y, z):
@@ -623,7 +682,7 @@ def main():
                 for s_ in range(int(round(L)) if "_s" in nm or nm == "env_waterfall" else 0):
                     # a strip of ground behind the lip (local +Z = inland)
                     pass
-                lp = dict(piece="env_lip_diag_a" if "_d" in nm else "env_lip_straight_a", x=x, y=y, z=z, yaw=yaw)
+                lp = dict(piece="env_lip_rim_diag_a" if "_d" in nm else "env_lip_rim_straight_a", x=x, y=y, z=z, yaw=yaw)
                 if nm == "env_waterfall":
                     lp["x"], lp["z"] = x - 0.5 * math.cos(math.radians(yaw)), z - 0.5 * math.sin(math.radians(yaw))
                     objs.append(instance(dict(piece="env_cliff_s1", x=lp["x"], y=y, z=lp["z"], yaw=yaw), lcol))
@@ -680,6 +739,7 @@ def main():
         return
     # ------------------------------------------------------------------------------------------------- checks
     checks(lay, pl, ground, objs, cam)
+    CHECKS["tiling_demo_terrace"] = tiling_rays(demo, gdemo, DEMO_DX)
 
     # ------------------------------------------------------------------------------------------------ renders
     shots = []
@@ -694,6 +754,7 @@ def main():
     for name, tgt in shots:
         cam_game(cam, tgt)
         set_outlines(cam, objs)
+        fit_foam(cam)
         measure(name, cam, pl if not name.startswith("field") else [dict(q, x=q.get("x", 0) + DEMO_DX) for q in demo["placements"]], tgt)
         render(cam, name, (1920, 1080))
     # overview, orthographic north-up (bible p12 framing)
@@ -712,7 +773,7 @@ def main():
     globals()["SCALE"] = sv
     with open(os.path.join(OUT, "checks.json"), "w") as f:
         json.dump(CHECKS, f, indent=1)
-    print("V2_DONE", round(time.time() - T0), "s")
+    print("V3_DONE", round(time.time() - T0), "s")
 
 
 # ------------------------------------------------------------------------------------------------------- checks
@@ -722,6 +783,16 @@ def checks(lay, pl, ground, objs, cam):
     dg = bpy.context.evaluated_depsgraph_get()
     bvh = BVHTree.FromObject(ground, dg)
     miss = mism = n = 0
+    ltris = [(layout2.fill_tri(f), f[4]) for f in lay.get("lfills", [])]
+
+    def expect(px, pz, h):
+        for (A, B_, C_), hh in ltris:
+            d1 = (px - B_[0]) * (A[1] - B_[1]) - (A[0] - B_[0]) * (pz - B_[1])
+            d2 = (px - C_[0]) * (B_[1] - C_[1]) - (B_[0] - C_[0]) * (pz - C_[1])
+            d3 = (px - A[0]) * (C_[1] - A[1]) - (C_[0] - A[0]) * (pz - A[1])
+            if not ((d1 < 0 or d2 < 0 or d3 < 0) and (d1 > 0 or d2 > 0 or d3 > 0)):
+                return hh
+        return h
     for cz in range(g.H):
         for cx in range(g.W):
             if not g.land(cx, cz):
@@ -732,7 +803,7 @@ def checks(lay, pl, ground, objs, cam):
                 hit = bvh.ray_cast(bl(px, h + 2.0, pz), Vector((0, 0, -1)), 10.0)
                 if hit[0] is None:
                     miss += 1
-                elif abs(hit[0].z - h) > 0.12:
+                elif abs(hit[0].z - expect(px, pz, h)) > 0.12:
                     mism += 1
     # bridges: rays onto span/bridge-cell decks
     verts, polys = [], []
@@ -745,6 +816,7 @@ def checks(lay, pl, ground, objs, cam):
             polys += [[base + i for i in p.vertices] for p in ob.data.polygons]
     bb = BVHTree.FromPolygons(verts, polys)
     bmiss = bn = 0
+    BMISS = []
     for cz in range(g.H):
         for cx in range(g.W):
             if g.t(cx, cz) != L1.BRIDGE:
@@ -754,6 +826,7 @@ def checks(lay, pl, ground, objs, cam):
             hit = bb.ray_cast(bl(cx + .5, h + 2.0, cz + .5), Vector((0, 0, -1)), 10.0)
             if hit[0] is None or abs(hit[0].z - h) > 0.2:
                 bmiss += 1
+                BMISS.append((cx, cz, round(h, 2), None if hit[0] is None else round(hit[0].z, 2)))
     # rim coverage: every rim unit edge has exactly one lip and one skirt over it
     lips = [(p["x"], p["z"], p["yaw"], 1.0 if "straight" in p["piece"] else math.sqrt(2)) for p in pl if p["piece"].startswith("env_lip_") and "corner" not in p["piece"]]
     lipkeys = {(round(x, 3), round(z, 3), round(y % 360, 1)) for (x, z, y, L) in lips}
@@ -773,7 +846,7 @@ def checks(lay, pl, ground, objs, cam):
     long_ = sum(L for (_, _, L, _) in sk if L >= 2.99) / max(1e-9, sum(L for (_, _, L, _) in sk))
     CHECKS["tiling"] = dict(rays=n, holes=miss, height_mismatch=mism, bridge_cells=bn, bridge_misses=bmiss,
                             rim_unit_edges=len(lay["rim"]), edges_without_lip=nolip, edges_not_covered_once_by_skirt=noskirt,
-                            fill_triangles=len(lay["fills"]), skirt_pieces=len(sk), share_of_rim_in_3to6u_pieces=round(long_, 3),
+                            fill_triangles=len(lay["fills"]), ledge_fill_triangles=len(lay.get("lfills", [])), bridge_miss_cells=BMISS[:8], skirt_pieces=len(sk), share_of_rim_in_3to6u_pieces=round(long_, 3),
                             ground_inside_map=all(0 <= p["x"] <= L1.W and 0 <= p["z"] <= L1.H for p in pl if p["cat"] == "ground"))
     # nothing over 0.3 u on walkable cells (except edge trees)
     viol = {}
@@ -827,6 +900,44 @@ def checks(lay, pl, ground, objs, cam):
     print("CHECKS", json.dumps(CHECKS)[:900])
 
 
+def tiling_rays(lay, ground, dx=0.0):
+    """Holes / height mismatches over every land cell (5 rays each), ledge-fill triangles expected one step up."""
+    g = lay["g"]
+    bvh = BVHTree.FromObject(ground, bpy.context.evaluated_depsgraph_get())
+    tris = [(layout2.fill_tri(f), f[4]) for f in lay.get("lfills", [])]
+
+    def inside(px, pz, A, B_, C_):
+        d1 = (px - B_[0]) * (A[1] - B_[1]) - (A[0] - B_[0]) * (pz - B_[1])
+        d2 = (px - C_[0]) * (B_[1] - C_[1]) - (B_[0] - C_[0]) * (pz - C_[1])
+        d3 = (px - A[0]) * (C_[1] - A[1]) - (C_[0] - A[0]) * (pz - A[1])
+        if (d1 < 0 or d2 < 0 or d3 < 0) and (d1 > 0 or d2 > 0 or d3 > 0):
+            return 0
+        return 1 if min(abs(d1), abs(d2), abs(d3)) > 1e-9 else 2     # 2 = on the hypotenuse: either height is right
+    n = miss = mism = raised = 0
+    for cz in range(g.H):
+        for cx in range(g.W):
+            if not g.land(cx, cz):
+                continue
+            for (px, pz) in ((cx + .02, cz + .02), (cx + .98, cz + .02), (cx + .02, cz + .98), (cx + .98, cz + .98), (cx + .5, cz + .5)):
+                n += 1
+                h = g.h(cx, cz)
+                ok = [h]
+                for (A, B_, C_), hh in tris:
+                    k = inside(px, pz, A, B_, C_)
+                    if k:
+                        ok = [hh] if k == 1 else [h, hh]
+                        h = hh
+                        raised += k == 1
+                        break
+                hit = bvh.ray_cast(bl(px + dx, h + 2.0, pz), Vector((0, 0, -1)), 10.0)
+                if hit[0] is None:
+                    miss += 1
+                elif min(abs(hit[0].z - o) for o in ok) > 0.12:
+                    mism += 1
+    return dict(rays=n, holes=miss, height_mismatch=mism, ledge_fill_triangles=len(tris), rays_on_raised_half_cells=raised,
+                ledge_edges=len(lay["ledge"]), diagonal_ledge_edges=sum(1 for e in lay["ledge"] if e["kind"] == "dg"))
+
+
 def measure(name, cam, pl, tgt):
     """Pixel measurements at 1080p for the current camera."""
     T = bl(*tgt)
@@ -835,7 +946,7 @@ def measure(name, cam, pl, tgt):
     inside = lambda q: 0 <= q.x <= 1920 and 0 <= q.y <= 1080 and q.z > 0
     cnt = {}
     for p in pl:
-        if "a" in p or p.get("cat") in ("ground", "edge", "cliff", None):
+        if "a" in p or p.get("cat") in ("ground", "edge", "cliff", "struct", None):
             continue
         if inside(proj(cam, bl(p["x"], p["y"], p["z"]))):
             cnt[p["cat"]] = cnt.get(p["cat"], 0) + 1
@@ -845,7 +956,7 @@ def measure(name, cam, pl, tgt):
     # ink width (px) of lips near the screen centre
     ink = []
     for p in pl:
-        if not p["piece"].startswith("env_lip_straight"):
+        if not (p["piece"].startswith("env_lip_") and "straight" in p["piece"]):
             continue
         yaw = math.radians(p["yaw"])
         d = (math.cos(yaw), math.sin(yaw))
@@ -876,7 +987,7 @@ def measure(name, cam, pl, tgt):
         for (u, v, du, dv) in ((0.44, -0.2, -1, 0), (-0.44, -0.2, 1, 0), (0.0, -0.70, 0, 1), (0.0, 0.015, 0, 1)):
             # (u along lip, v outward; foam goes inward by du/dv). The last row is the lip collar (0.17 u across).
             P0 = (p["x"] + d[0] * u + nrm[0] * v, p["z"] + d[1] * u + nrm[1] * v)
-            wdt = kit2.FOAM_W
+            wdt = p.get("foam_w", kit2.FOAM_W)
             P1 = (P0[0] + (d[0] * du + nrm[0] * dv) * wdt, P0[1] + (d[1] * du + nrm[1] * dv) * wdt)
             foam.append((proj(cam, bl(P0[0], p["y"], P0[1])).to_2d() - proj(cam, bl(P1[0], p["y"], P1[1])).to_2d()).length)
     if foam:

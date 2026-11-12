@@ -411,7 +411,7 @@ def _cell_under_span(cx, cz, spans):
         for (px, pz) in ((cx, cz), (cx + 1, cz), (cx, cz + 1), (cx + 1, cz + 1)):
             t = ((px - sp["x0"]) * ex + (pz - sp["z0"]) * ez) / (sp["L"] ** 2)
             perp = abs((px - sp["x0"]) * ez - (pz - sp["z0"]) * ex) / sp["L"]
-            if not (sp["ta"] <= t <= sp["tb"] and perp <= DECK_HALF):
+            if not (sp["ta"] <= t <= sp["tb"] and perp <= sp.get("hw", 1.5) - (1.5 - DECK_HALF)):
                 ok = False
                 break
         if ok:

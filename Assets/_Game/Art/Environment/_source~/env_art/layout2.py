@@ -57,6 +57,29 @@ def fills(g):
     return out
 
 
+def ledge_fills(g):
+    """v3: the same smoothing for ledges INSIDE islands. A walkable low cell with higher ground on two adjacent
+    sides + the diagonal (all one height, a real step > 0.3 u) gets a half-cell triangle at the HIGH height on that
+    corner, so a 45-degree terrace staircase reads as one straight diagonal ledge: (cx, cz, dx, dz, h_high).
+    Trade-off (README): half of that walkable cell draws one step up; the Sim height of the cell is unchanged."""
+    out = []
+    for cz in range(g.H):
+        for cx in range(g.W):
+            if not L1.walkable(g.t(cx, cz)) or not g.land(cx, cz):
+                continue
+            hl = g.h(cx, cz)
+            cand = []
+            for dx in (-1, 1):
+                for dz in (-1, 1):
+                    if g.land(cx + dx, cz) and g.land(cx, cz + dz) and g.land(cx + dx, cz + dz):
+                        hh = g.h(cx + dx, cz)
+                        if hh - hl > 0.3 and abs(g.h(cx, cz + dz) - hh) < 1e-6 and abs(g.h(cx + dx, cz + dz) - hh) < 1e-6:
+                            cand.append((dx, dz, hh))
+            if len(cand) == 1:
+                out.append((cx, cz) + cand[0])
+    return out
+
+
 def fill_tri(f):
     cx, cz, dx, dz, h = f
     Cx, Cz = cx + (1 if dx > 0 else 0), cz + (1 if dz > 0 else 0)
@@ -70,8 +93,9 @@ def _orient(p, q, n):
     return p, q
 
 
-def boundary(g, fl):
+def boundary(g, fl, lfl=()):
     fill_at = {(f[0], f[1]): f for f in fl}
+    lfill_at = {(f[0], f[1]): f for f in lfl}
     rim, ledge = [], []
     for cz in range(g.H):
         for cx in range(g.W):
@@ -91,6 +115,9 @@ def boundary(g, fl):
                 n = (float(sx), float(sz))
                 if g.land(nx, nz):
                     dh = h - g.h(nx, nz)
+                    lf = lfill_at.get((nx, nz))
+                    if dh > 0.3 and lf and ((nx + lf[2], nz) == (cx, cz) or (nx, nz + lf[3]) == (cx, cz)):
+                        continue        # replaced by the diagonal ledge of the fill triangle below
                     if dh > 0.3:
                         p2, q2 = _orient(p, q, n)
                         ledge.append(dict(p=p2, q=q2, n=n, h=h, low=g.h(nx, nz), kind="ax", cell=(cx, cz)))
@@ -105,6 +132,11 @@ def boundary(g, fl):
         n = (-f[2] / SQ2, -f[3] / SQ2)
         p2, q2 = _orient(P, Q, n)
         rim.append(dict(p=p2, q=q2, n=n, h=f[4], kind="dg", cell=(f[0], f[1]), bridge=False, fill=True))
+    for f in lfl:
+        _, P, Q = fill_tri(f)
+        n = (-f[2] / SQ2, -f[3] / SQ2)
+        p2, q2 = _orient(P, Q, n)
+        ledge.append(dict(p=p2, q=q2, n=n, h=f[4], low=g.h(f[0], f[1]), kind="dg", cell=(f[0], f[1]), fill=True))
     return rim, ledge
 
 
@@ -177,16 +209,18 @@ def edge_pieces(rim, ledge):
     for kind_set, is_rim in ((rim, True), (ledge, False)):
         for e in kind_set:
             d = _dir(e)
+            pre = "env_lip_rim_" if is_rim else "env_lip_"
             if e["kind"] == "ax":
-                nm = "env_lip_straight_" + "abc"[h32(int(e["p"][0] * 2), int(e["p"][1] * 2), 3) % 3]
+                nm = pre + "straight_" + "abc"[h32(int(e["p"][0] * 2), int(e["p"][1] * 2), 3) % 3]
             else:
-                nm = "env_lip_diag_" + "ab"[h32(int(e["p"][0] * 2), int(e["p"][1] * 2), 5) % 2]
+                nm = pre + "diag_" + "ab"[h32(int(e["p"][0] * 2), int(e["p"][1] * 2), 5) % 2]
             out.append(dict(piece=nm, x=e["p"][0], y=e["h"], z=e["p"][1], yaw=yaw_of(d), cat="edge"))
             if not is_rim:
                 steps = max(1, round((e["h"] - e["low"]) / STEP))
+                sfx = "_diag" if e["kind"] == "dg" else ""
                 for k in range(1, steps):
-                    out.append(dict(piece="env_ledge_band", x=e["p"][0], y=e["h"] - STEP * k, z=e["p"][1], yaw=yaw_of(d), cat="edge"))
-                out.append(dict(piece="env_ledge_shadow", x=e["p"][0], y=e["h"] - STEP * (steps - 1), z=e["p"][1],
+                    out.append(dict(piece="env_ledge_band" + sfx, x=e["p"][0], y=e["h"] - STEP * k, z=e["p"][1], yaw=yaw_of(d), cat="edge"))
+                out.append(dict(piece="env_ledge_shadow" + sfx, x=e["p"][0], y=e["h"] - STEP * (steps - 1), z=e["p"][1],
                                 yaw=yaw_of(d), cat="edge"))
         for lp in loops(kind_set):
             rs, closed = runs(lp)
@@ -212,11 +246,13 @@ def edge_pieces(rim, ledge):
                         continue
                     ang = math.degrees(math.acos(max(-1.0, min(1.0, d[0] * d2[0] + d[1] * d2[1]))))
                     V = run[-1]["q"]
-                    if ang > 60:
-                        out.append(dict(piece="env_lip_corner", x=V[0], y=run[-1]["h"], z=V[1], yaw=yaw_of(d), cat="edge"))
-                    if is_rim:
+                    if is_rim:      # v3: rock fan under the rim band + column on the corner bisector, both by incoming yaw
+                        out.append(dict(piece="env_lip_rim_corner90" if ang > 60 else "env_lip_rim_corner45", x=V[0],
+                                        y=run[-1]["h"], z=V[1], yaw=yaw_of(d), cat="edge"))
                         out.append(dict(piece="env_cliff_corner" if ang > 60 else "env_cliff_bend", x=V[0],
-                                        y=run[-1]["h"], z=V[1], yaw=0.0, cat="cliff"))
+                                        y=run[-1]["h"], z=V[1], yaw=yaw_of(d), cat="cliff"))
+                    elif ang > 60:
+                        out.append(dict(piece="env_lip_corner", x=V[0], y=run[-1]["h"], z=V[1], yaw=yaw_of(d), cat="edge"))
     return out, skirts
 
 
@@ -273,13 +309,13 @@ SMALL = ["env_pebbles", "env_grass_tuft", "env_flowers", "env_stump", "env_bush"
 TREES = ["env_tree_round_l", "env_tree_round_s", "env_tree_tall_l", "env_tree_tall_s"]
 
 
-def decor(g, rim, fl, paths, keep, team_of, sites=(), wf_cells=()):
+def decor(g, rim, fl, paths, keep, team_of, sites=(), wf_cells=(), skip=()):
     out = []
     rim_cells = defaultdict(list)
     for e in rim:
         if e["kind"] == "ax":
             rim_cells[e["cell"]].append(e)
-    wf_cells = set(wf_cells)
+    wf_cells = set(wf_cells) | set(skip)
     for cz in range(g.H):
         for cx in range(g.W):
             if not g.land(cx, cz) or g.t(cx, cz) not in (L1.FLOOR,):
@@ -295,17 +331,31 @@ def decor(g, rim, fl, paths, keep, team_of, sites=(), wf_cells=()):
             es = rim_cells.get((cx, cz))
             if es and not any(e["bridge"] for e in es):
                 r = h32(cx, cz, 111) % 1000
+                n = es[0]["n"]
                 if r < 110 and pd > PATH_W + 0.6:
-                    n = es[0]["n"]
                     out.append(dict(piece=TREES[h32(cx, cz, 112) % 4], x=xc + n[0] * 0.28, y=h, z=zc + n[1] * 0.28,
                                     yaw=yaw, cat="tree", edge=True))
-                elif r < 480 and pd > PATH_W - 0.2:
+                elif r < 310 and pd < PATH_W + 4.5:
+                    # v3: a big prop on the rim beside a route; its centre sits just past the lip (over the void cell,
+                    # on the rim rock band), so no walkable cell holds anything taller than 0.3 u at its centre
+                    k = h32(cx, cz, 122) % 100
+                    x, z = xc + n[0] * 0.58 - n[1] * jx * 0.6, zc + n[1] * 0.58 + n[0] * jx * 0.6
+                    site = next((s_ for s_ in sites if math.hypot(x - s_[0], z - s_[1]) < s_[2] + 2.0), None)
+                    if site and k < 70:
+                        out.append(dict(piece=site[3], x=x, y=h - 0.03, z=z, yaw=yaw, cat="crystal", edge=True))
+                    elif team_of(x) is not None and k < 72:
+                        out.append(dict(piece=("env_crystal_cluster", "env_crystal_cluster_small")[k % 2], x=x, y=h - 0.03, z=z,
+                                        yaw=yaw, cat="crystal", team=team_of(x), edge=True))
+                    else:
+                        out.append(dict(piece=("env_boulder_l", "env_boulder_m", "env_rocks", "env_boulder_m")[k % 4], x=x, y=h - 0.10,
+                                        z=z, yaw=yaw, cat="rock_big", edge=True))
+                elif 310 <= r < 410 and pd > PATH_W - 0.2:
                     out.append(dict(piece=SMALL[h32(cx, cz, 114) % 3], x=xc + jx * 0.5, y=h, z=zc + jz * 0.5, yaw=yaw, cat="small"))
                 continue
             if PATH_W + 0.1 < pd < PATH_W + 1.5:
-                if h32(cx, cz, 117) % 100 < 26:
+                if h32(cx, cz, 117) % 100 < 18:
                     out.append(dict(piece=SMALL[h32(cx, cz, 118) % 5], x=xc + jx * 0.6, y=h, z=zc + jz * 0.6, yaw=yaw, cat="small"))
-            elif pd >= PATH_W + 1.5 and h32(cx, cz, 119) % 100 < 9:
+            elif pd >= PATH_W + 1.5 and h32(cx, cz, 119) % 100 < 3:
                 out.append(dict(piece=SMALL[h32(cx, cz, 120) % 5], x=xc + jx * 0.6, y=h, z=zc + jz * 0.6, yaw=yaw, cat="small"))
     for f in fl:
         cx, cz, dx, dz, h = f
@@ -317,9 +367,16 @@ def decor(g, rim, fl, paths, keep, team_of, sites=(), wf_cells=()):
         pd = path_dist(paths, x, z)
         yaw = float(h32(cx, cz, 115) % 360)
         site = next((s for s in sites if math.hypot(x - s[0], z - s[1]) < s[2]), None)
-        if r < 32:
+        near = pd < 6.5
+        if r < (16 if near else 32):
             out.append(dict(piece=TREES[h32(cx, cz, 116) % 4], x=x, y=h, z=z, yaw=yaw, cat="tree", edge=True))
-        elif r < 60:
+        elif near and r >= 36 and r < 80 and (site or team_of(x) is not None):
+            if site:
+                out.append(dict(piece=site[3], x=x, y=h, z=z, yaw=yaw, cat="crystal", edge=True))
+            else:
+                out.append(dict(piece=("env_crystal_cluster", "env_crystal_cluster_small")[r % 2], x=x, y=h, z=z, yaw=yaw,
+                                cat="crystal", team=team_of(x), edge=True))
+        elif r < 60 or (near and r < 72):
             out.append(dict(piece=("env_boulder_l", "env_boulder_m", "env_rocks")[h32(cx, cz, 121) % 3], x=x, y=h, z=z,
                             yaw=yaw, cat="rock_big", edge=True))
         elif r < 80 and (site or (pd < 6.5 and team_of(x) is not None)):
@@ -333,24 +390,48 @@ def decor(g, rim, fl, paths, keep, team_of, sites=(), wf_cells=()):
     return out
 
 
+def span_half_width(sp, g):
+    """v3: half-width the deck must cover. Axis-aligned bridges on an integer axis paint FOUR cells (centres at
+    +-0.5 and +-1.5 from the axis), so their deck widens to +-2.0 u (tile scale w = hw / 1.5 across); every other
+    bridge keeps the 3.0 u deck."""
+    ex, ez = sp["x1"] - sp["x0"], sp["z1"] - sp["z0"]
+    if g is None or (abs(ex) > 1e-6 and abs(ez) > 1e-6):
+        return 1.5
+    best = 1.0
+    for cz in range(g.H):
+        for cx in range(g.W):
+            if g.t(cx, cz) != BRIDGE:
+                continue
+            px, pz = cx + 0.5, cz + 0.5
+            t = ((px - sp["x0"]) * ex + (pz - sp["z0"]) * ez) / (sp["L"] ** 2)
+            perp = abs((px - sp["x0"]) * ez - (pz - sp["z0"]) * ex) / sp["L"]
+            if sp["ta"] <= t <= sp["tb"] and perp <= 1.6:
+                best = max(best, perp + 0.5)
+    return best
+
+
 def bridge_tiles(spans, g=None):
     out = []
     for sp in spans:
+        w = sp.get("hw", 1.5) / 1.5
         x0, z0, x1, z1, ha, hb, ta, tb, L = (sp[k] for k in ("x0", "z0", "x1", "z1", "ha", "hb", "ta", "tb", "L"))
         n = max(1, round((tb - ta) * L / 2.04))
         pt = lambda t: (x0 + (x1 - x0) * t, ha + (hb - ha) * t, z0 + (z1 - z0) * t)
         for k in range(n):
-            out.append(dict(piece="env_bridge_span", a=pt(ta + (tb - ta) * k / n), b=pt(ta + (tb - ta) * (k + 1) / n), cat="bridge"))
+            out.append(dict(piece="env_bridge_span", a=pt(ta + (tb - ta) * k / n), b=pt(ta + (tb - ta) * (k + 1) / n), w=round(w, 4),
+                            cat="bridge"))
         ang = math.atan2(z1 - z0, x1 - x0)
         ox, oz = -math.sin(ang), math.cos(ang)
         for side in (-1, 1):
             e = pt(tb)
-            out.append(dict(piece="env_bridge_post", x=e[0] + ox * 1.58 * side, y=e[1], z=e[2] + oz * 1.58 * side, yaw=0.0, cat="bridge"))
+            px_, pz_ = e[0] + ox * 1.58 * w * side, e[2] + oz * 1.58 * w * side
+            if g is None or not L1.walkable(g.t(int(math.floor(px_)), int(math.floor(pz_)))):
+                out.append(dict(piece="env_bridge_post", x=px_, y=e[1], z=pz_, yaw=0.0, cat="bridge"))
             for t, sgn in ((ta, 1), (tb, -1)):
                 # mossy piers sit on the rim beside the mouth, on a NON-walkable cell (void beside the bridge)
                 for dt in (0.6, 0.35, 0.85, 0.1):
                     p = pt(t + sgn * dt / L)
-                    x, z = p[0] + ox * 2.0 * side, p[2] + oz * 2.0 * side
+                    x, z = p[0] + ox * (2.0 * w) * side, p[2] + oz * (2.0 * w) * side
                     if g is None or not L1.walkable(g.t(int(math.floor(x)), int(math.floor(z)))):
                         out.append(dict(piece="env_bridge_pier", x=x, y=p[1], z=z, yaw=math.degrees(ang), cat="bridge"))
                         break
@@ -389,11 +470,14 @@ def place_map():
     m = L1.build_map()
     g = Grid(m["cells"], m["hgt"], L1.W, L1.H)
     fl = fills(g)
-    rim, ledge = boundary(g, fl)
+    lfl = ledge_fills(g)
+    rim, ledge = boundary(g, fl, lfl)
     edges, skirts = edge_pieces(rim, ledge)
     paths = map_paths()
     wf = waterfalls(g, rim, map_keep, WATERFALL_ANCHORS)
     spans = L1.all_spans(m)
+    for sp in spans:
+        sp["hw"] = span_half_width(sp, g)
     out = []
     for cz in range(g.H):
         for cx in range(g.W):
@@ -404,14 +488,17 @@ def place_map():
                 out.append(dict(piece="env_bridge_cell", x=cx + 0.5, y=g.h(cx, cz) - 0.06, z=cz + 0.5, yaw=0.0, cat="bridge"))
     for f in fl:
         out.append(dict(piece="env_ground_fill_tri", x=f[0] + 0.5, y=f[4], z=f[1] + 0.5, yaw=yaw_of((f[2], f[3])) - 45.0, cat="ground"))
+    for f in lfl:
+        out.append(dict(piece="env_ground_fill_tri", x=f[0] + 0.5, y=f[4], z=f[1] + 0.5, yaw=yaw_of((f[2], f[3])) - 45.0, cat="ground",
+                        ledge_fill=True))
     out += edges + wf + bridge_tiles(spans, g)
-    out += decor(g, rim, fl, paths, map_keep, map_team, map_sites(), [w["cell"] for w in wf])
+    out += decor(g, rim, fl, paths, map_keep, map_team, map_sites(), [w["cell"] for w in wf], [(f[0], f[1]) for f in lfl])
     for (nm, x, y, z, yaw, extra) in L1.place(m):
         if nm in STRUCT_FROM_V1 or nm in KEEP_FROM_V1:
             team = extra if isinstance(extra, str) else None
             out.append(dict(piece=nm, x=x, y=y, z=z, yaw=float(yaw or 0.0), cat="struct" if nm in STRUCT_FROM_V1 else "deco",
                             team=team))
-    return dict(m=m, g=g, fills=fl, rim=rim, ledge=ledge, skirts=skirts, paths=paths, spans=spans, placements=out)
+    return dict(m=m, g=g, fills=fl, lfills=lfl, rim=rim, ledge=ledge, skirts=skirts, paths=paths, spans=spans, placements=out)
 
 
 # ------------------------------------------------------------------------------------------- field demo terrain
@@ -436,7 +523,8 @@ def place_demo():
                 cells[i] = BRIDGE
     g = Grid(cells, hgt, W, H)
     fl = fills(g)
-    rim, ledge = boundary(g, fl)
+    lfl = ledge_fills(g)
+    rim, ledge = boundary(g, fl, lfl)
     edges, skirts = edge_pieces(rim, ledge)
     paths = dict(segs=[(31.0, 17.5, 22.0, 20.0), (22.0, 20.0, 6.0, 21.0), (22.0, 20.0, 18.0, 29.0), (35.0, 17.5, 40.0, 17.0)],
                  discs=[(40.0, 17.0, 2.5)])
@@ -456,9 +544,12 @@ def place_demo():
                 out.append(dict(piece="env_ground_cell", x=cx + 0.5, y=g.h(cx, cz), z=cz + 0.5, yaw=0.0, cat="ground"))
     for f in fl:
         out.append(dict(piece="env_ground_fill_tri", x=f[0] + 0.5, y=f[4], z=f[1] + 0.5, yaw=yaw_of((f[2], f[3])) - 45.0, cat="ground"))
+    for f in lfl:
+        out.append(dict(piece="env_ground_fill_tri", x=f[0] + 0.5, y=f[4], z=f[1] + 0.5, yaw=yaw_of((f[2], f[3])) - 45.0, cat="ground",
+                        ledge_fill=True))
     out += edges + wf + bridge_tiles([sp], g)
-    out += decor(g, rim, fl, paths, keep, lambda x: "azure", [], [w["cell"] for w in wf])
-    return dict(g=g, fills=fl, rim=rim, ledge=ledge, skirts=skirts, paths=paths, spans=[sp], placements=out)
+    out += decor(g, rim, fl, paths, keep, lambda x: "azure", [], [w["cell"] for w in wf], [(f[0], f[1]) for f in lfl])
+    return dict(g=g, fills=fl, lfills=lfl, rim=rim, ledge=ledge, skirts=skirts, paths=paths, spans=[sp], placements=out)
 
 
 # ------------------------------------------------------------------------------------------- shader field bake
@@ -496,7 +587,7 @@ def fields(lay, x0, z0, wdt, hgt_, res=4, sites=()):
     for e in lay["ledge"]:
         px, pz = e["p"]
         dx, dz = e["q"][0] - px, e["q"][1] - pz
-        t = (XX - px) * dx + (ZZ - pz) * dz
+        t = ((XX - px) * dx + (ZZ - pz) * dz) / (dx * dx + dz * dz)
         s = (XX - px) * e["n"][0] + (ZZ - pz) * e["n"][1]
         A = np.maximum(A, np.where((t >= -0.05) & (t <= 1.05) & (s >= 0) & (s <= 0.5), 1 - s / 0.5, 0.0))
     return np.stack([R, G, B, A], axis=-1).astype(np.float32)

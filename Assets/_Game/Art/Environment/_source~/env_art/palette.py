@@ -32,9 +32,9 @@ ENV = {
     "corrupt_dark": ("#402547", "P14 corrupted tile #402547"),
     "corrupt_glow": ("#D23F8E", "P14 corrupted tile cracks #AD3872, lifted (self-lit)"),
     # rock and stone
-    "rock":         ("#9C9480", "P15 cliff faces #9E968D / P14 #908D6A"),
-    "rock_mid":     ("#87836F", "P14 hill/wall #959164 shade side"),
-    "rock_dark":    ("#5B5E58", "P14 bridge pier / hill #5B6059"),
+    "rock":         ("#958C77", "P15 cliff faces #9E968D / P14 #908D6A"),
+    "rock_mid":     ("#7C7764", "P14 hill/wall #959164 shade side"),
+    "rock_dark":    ("#53564F", "P14 bridge pier / hill #5B6059"),
     "crevice":      ("#444541", "P14 wall crop #444541"),
     "wall":         ("#B0A58C", "P14 wall intact #AB9274 / #938A64, mid"),
     "wall_b":       ("#9C9479", "P14 wall intact #938A64"),
@@ -68,11 +68,16 @@ ENV = {
     "grass_d":      ("#96B249", "AD 2.5 grass cell tone dark"),
     "seam":         ("#7E9A3F", "AD 2.5 grass cell seam"),
     "ink":          ("#18233B", "CORE Void Navy, ledge ink line (self-lit fixed so it never shades)"),
-    "band":         ("#5B5E58", "AD 5.1 ledge face band, rock dark (self-lit fixed)"),
+    "band":         ("#53564F", "AD 5.1 ledge face band, rock dark (self-lit fixed)"),
     "foam":         ("#F7F9F6", "AD 2.5 water foam band (self-lit fixed)"),
     "water_f":      ("#6FC0EC", "AD 2.5 water, fixed (self-lit)"),
     "water_df":     ("#57A1D1", "P15 waterfall dark streak, fixed"),
     "water_lf":     ("#C4E4F4", "P15 waterfall light streak, fixed"),
+    # v3 (owner 2026-11-12: bolder, sharper; rock one step darker for value contrast against grass and paving)
+    "leaf_hi":      ("#B4DB6A", "v3 painted highlight shape on the sun side of each canopy lobe"),
+    "crystal_hi":   ("#EAFCFF", "v3 painted highlight streak near crystal tips (self-lit, both teams)"),
+    "rim_rock":     ("#A39A82", "v3 rim rock band (chamfer under every island rim), lit stone"),
+    "rim_rock_b":   ("#8F8771", "v3 rim rock band, second stone tone"),
     "sky_horizon":  ("#CDEFF8", "CORE world Sky Horizon (height fog)"),
     "biomass_c":    ("#B7F238", "CORE Biomass, crystal lit facet (self-lit)"),
     "biomass_cd":   ("#6E9A2A", "Biomass crystal body (Biomass x0.6)"),
@@ -107,7 +112,7 @@ MASK_FOR = {"team_cloth": MASK_TEAM_CLOTH, "team_glow": MASK_TEAM_GLOW, "team_da
             "egg_glow": MASK_FIXED_GLOW, "corrupt_glow": MASK_FIXED_GLOW, "ink": MASK_FIXED_GLOW,
             "band": MASK_FIXED_GLOW, "foam": MASK_FIXED_GLOW, "water_f": MASK_FIXED_GLOW,
             "water_df": MASK_FIXED_GLOW, "water_lf": MASK_FIXED_GLOW, "biomass_c": MASK_FIXED_GLOW,
-            "corrupt_c": MASK_FIXED_GLOW}
+            "corrupt_c": MASK_FIXED_GLOW, "crystal_hi": MASK_FIXED_GLOW}
 
 
 def hex_rgb(h):
