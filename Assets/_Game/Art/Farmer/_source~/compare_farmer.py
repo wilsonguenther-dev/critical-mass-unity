@@ -21,10 +21,56 @@ REF = sys.argv[4] if len(sys.argv) > 4 else os.path.expanduser("~/critical-mass/
 os.makedirs(OUT, exist_ok=True)
 PAPER = (254, 248, 238)
 NAVY = (0x18, 0x23, 0x3B)
+SS, OUTER_PX, INNER_PX = 2, 3.0, 1.5      # must match render_farmer.py
+
+
+def dilate(a, r):
+    out = a.copy()
+    for dx in range(-r, r + 1):
+        for dy in range(-r, r + 1):
+            if (dx or dy) and dx * dx + dy * dy <= r * r + 0.5:
+                out = ImageChops.lighter(out, ImageChops.offset(a, dx, dy))
+    return out
+
+
+def finish(src):
+    """Raw 2x renders -> final 1x: add (OUTER - INNER) px of Void Navy outside the character silhouette, then halve.
+    game_* frames take the silhouette from the matching character-only pass gchar_<team>.png."""
+    dst = os.path.join(src, "final")
+    os.makedirs(dst, exist_ok=True)
+    r = round((OUTER_PX - INNER_PX) * SS)
+    for fn in sorted(os.listdir(src)):
+        if not fn.endswith(".png") or fn.startswith("gchar_"):
+            continue
+        im = Image.open(os.path.join(src, fn)).convert("RGBA")
+        if fn.startswith("game_"):
+            ch = Image.open(os.path.join(src, "gchar_" + fn.rsplit("_", 1)[1])).convert("RGBA")
+            ring = Image.new("RGBA", im.size, NAVY + (0,))
+            ring.putalpha(dilate(ch.split()[3], r))
+            im.alpha_composite(ring)
+            im.alpha_composite(ch)
+        else:
+            ring = Image.new("RGBA", im.size, NAVY + (0,))
+            ring.putalpha(dilate(im.split()[3], r))
+            ring.alpha_composite(im)
+            im = ring
+        size = (im.width // SS, im.height // SS)
+        im = im.resize(size, Image.NEAREST if fn.startswith("mask_") else Image.LANCZOS)
+        im.save(os.path.join(dst, fn))
+    for fn in ("measure.json",):
+        if os.path.exists(os.path.join(src, fn)):
+            with open(os.path.join(src, fn)) as a, open(os.path.join(dst, fn), "w") as b:
+                b.write(a.read())
+    return dst
+
+
+RD = finish(RD)
+if WSIL:
+    WSIL = finish(WSIL)
 CREAM = (0xF7, 0xF0, 0xE5)
 FACINGS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
-# bible 09 directions sheet order, left to right (checked against the sheet's labels by eye)
-BIBLE_DIR_ORDER = ["S", "SW", "W", "NW", "N", "NE", "E", "SE"]
+# bible 09 directions sheet order, left to right (back view first, front view fifth; read off the sheet by eye)
+BIBLE_DIR_ORDER = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
 
 
 def font(sz):
@@ -176,7 +222,9 @@ if os.path.exists(os.path.join(RD, "facing_S_azure.png")):
         for y in range(im.height):
             for x in range(im.width):
                 r, g, b_, a = ma[x, y]
-                if a > 200 and g > 200 and r < 50:
+                if a > 200 and g > 200 and r < 50 and 0 < x < im.width - 1 and 0 < y < im.height - 1 and all(
+                        ma[x + dx, y + dy][1] > 200 and ma[x + dx, y + dy][0] < 50
+                        for dx in (-1, 0, 1) for dy in (-1, 0, 1)):        # interior lime pixels (no AA blend)
                     if not (mc[x, y][1] > 200 and mc[x, y][0] < 50):
                         lime_same = False
                     lime_dc = max(lime_dc, max(abs(ca[x, y][i] - cc[x, y][i]) for i in range(3)))
@@ -229,15 +277,30 @@ if os.path.exists(os.path.join(RD, "facing_S_azure.png")):
         rows.append(sil_row([os.path.join(WSIL, f"sil_{f}.png") for f in BIBLE_DIR_ORDER], "Warrior (v1 branch)"))
 
     def bible_cells(fname):
+        """Figures of a p09 directions sheet: threshold, close small holes, split at empty columns."""
+        from PIL import ImageFilter
         b = ref(fname)
-        m = bible_mask(b)
-        w = b.width / 8.0
-        cells = []
-        for i in range(8):
-            c = m.crop((int(i * w), 0, int((i + 1) * w), int(b.height * 0.86)))
-            if c.getbbox():
-                cells.append(c)
-        return cells
+        m = ImageChops.difference(b, Image.new("RGB", b.size, b.getpixel((1, 1)))).convert("L")
+        m = m.point(lambda v: 255 if v > 40 else 0).filter(ImageFilter.MaxFilter(5)).filter(ImageFilter.MinFilter(5))
+        m = m.crop((0, 0, m.width, int(m.height * 0.88)))
+        px = m.load()
+        cols = [sum(1 for y in range(m.height) if px[x, y]) for x in range(m.width)]
+        runs, x = [], 0
+        while x < m.width:
+            if cols[x] > 2:
+                s0 = x
+                while x < m.width and cols[x] > 2:
+                    x += 1
+                runs.append([s0, x])
+            x += 1
+        merged = []
+        for r in runs:
+            if merged and r[0] - merged[-1][1] < 6:
+                merged[-1][1] = r[1]
+            else:
+                merged.append(r)
+        merged = sorted(sorted(merged, key=lambda r: r[0] - r[1])[:8])
+        return [m.crop((a, 0, b_, m.height)) for a, b_ in merged]
 
     rows.append(sil_row(bible_cells("09-miner-directions.png"), "Miner (bible p09*)"))
     rows.append(sil_row(bible_cells("09-farmer-directions.png"), "Farmer (bible p09*)"))
@@ -245,7 +308,7 @@ if os.path.exists(os.path.join(RD, "facing_S_azure.png")):
     sheet = Image.new("RGB", (W, 72 * len(rows) + 30), CREAM)
     for i, r in enumerate(rows):
         sheet.paste(r, (0, i * 72))
-    ImageDraw.Draw(sheet).text((6, 72 * len(rows) + 6), "64 px Void Navy fills, facings S SW W NW N NE E SE. "
+    ImageDraw.Draw(sheet).text((6, 72 * len(rows) + 6), "64 px Void Navy fills, facings N NE E SE S SW W NW. "
                                "*bible rows: threshold masks of the p09 sheets (no Miner build exists yet)",
                                fill=NAVY, font=font(13))
     checks["silhouette_sheet_kb"] = save_jpg(sheet, os.path.join(OUT, "silhouettes-64px.jpg"))
@@ -334,7 +397,7 @@ checks["swatch_de2000_biomass_core_vs_p07_lime"] = round(de2000(hx("#B7F238"), h
 # rendered: share of the front render's fill pixels within dE 10 of each swatch (lit band)
 if os.path.exists(os.path.join(RD, "front_azure.png")):
     im = ours("front_azure.png").resize((200, round(200 * 720 / 400)))
-    pix = [p[:3] for p in im.getdata() if p[3] > 200 and sum(abs(p[i] - NAVY[i]) for i in range(3)) > 60]
+    pix = [p[:3] for p in im.get_flattened_data() if p[3] > 200 and sum(abs(p[i] - NAVY[i]) for i in range(3)) > 60]
     rend = {}
     for k, h in SW.items():
         if k == "coral":
@@ -345,7 +408,7 @@ if os.path.exists(os.path.join(RD, "front_azure.png")):
     checks["swatch_render_pct_within_de10_front_azure"] = rend
     if os.path.exists(os.path.join(RD, "front_crimson.png")):
         imc = ours("front_crimson.png").resize(im.size)
-        pc = [p[:3] for p in imc.getdata() if p[3] > 200]
+        pc = [p[:3] for p in imc.get_flattened_data() if p[3] > 200]
         checks["swatch_render_pct_within_de10_front_crimson"] = {
             "coral": round(100 * sum(1 for p in pc[::3] if de2000(p, hx(SW["coral"])) < 10) / max(len(pc[::3]), 1), 1)}
 

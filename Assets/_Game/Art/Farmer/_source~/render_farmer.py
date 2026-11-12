@@ -10,7 +10,8 @@ modes (comma list):
   poses     harvest (staff hooking a lime biomass bush) and root-seed (seed pod in front of the bulb), transparent
   sil       8 facings at the gameplay camera, alpha only, for the 64 px silhouette sheet; [blend] may name another
             character's .blend (the Warrior's), which is opened read-only and never saved
-Outline width: 3.0 px at the render's own scale (metres = 3.0 / pixels-per-metre at the subject).
+Outline: the inverted hull is 1.5 px (inner creases); compare_farmer.py adds 1.5 px outside the silhouette, so the
+outer line is 3.0 px. Raw renders are 2x (SS) and are halved by compare_farmer.py.
 """
 import json
 import math
@@ -34,13 +35,16 @@ OUT = os.path.abspath(argv[0]) if argv else os.path.join(HERE, "renders")
 MODES = (argv[1] if len(argv) > 1 else "game,facings,bible,poses").split(",")
 BLEND = os.path.abspath(argv[2]) if len(argv) > 2 else os.path.join(HERE, "farmer.blend")
 FOREIGN = BLEND != os.path.join(HERE, "farmer.blend")
-OUTLINE_PX = 3.0
+OUTLINE_PX = 3.0      # outer silhouette at 1x (hull INNER_PX + a post dilation of OUTLINE_PX - INNER_PX)
+INNER_PX = 1.5        # inner creases: the inverted hull itself
+SS = 2                # supersampling: raw renders at 2x; compare_farmer.py dilates the silhouette and halves them
 PITCH, FOV, DIST, YAW = 55.0, 35.0, 23.4, 45.0
 F_H = Vector((math.sin(math.radians(YAW)), -math.cos(math.radians(YAW)), 0.0))   # camera forward on the ground
 R_H = F_H.cross(Vector((0, 0, 1)))                                                 # screen right on the ground
-# screen facings -> armature Z rotation (rig faces -Y at 0). S faces the camera.
+# screen facings -> armature Z rotation (rig faces -Y at 0).
 FACINGS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
-FACE_DEG = {"S": 0, "SE": 45, "E": 90, "NE": 135, "N": 180, "NW": 225, "W": 270, "SW": 315}
+# The camera sits at -F_H (screen-down), so facing the camera (S) is rig yaw -135 deg; E (screen right) is -45.
+FACE_DEG = {"S": 225, "SE": 270, "E": 315, "NE": 0, "N": 45, "NW": 90, "W": 135, "SW": 180}
 BIBLE_STANCE = [("upperleg.l", (0, 1, 0), -7), ("upperleg.r", (0, 1, 0), 7),
                 ("foot.l", (0, 1, 0), 7), ("foot.r", (0, 1, 0), -7), ("upperarm.l", (0, 1, 0), -8)]
 
@@ -152,7 +156,7 @@ def render(path):
 
 
 # --------------------------------------------------------------------------------------------- gameplay camera
-def game_cam(res=(1920, 1080)):
+def game_cam(res=(1920 * SS, 1080 * SS)):
     cam_data.type = "PERSP"
     cam_data.sensor_fit = "VERTICAL"
     cam_data.angle_y = math.radians(FOV)
@@ -162,7 +166,7 @@ def game_cam(res=(1920, 1080)):
     cam.rotation_euler = (-cam.location).to_track_quat("-Z", "Y").to_euler()
     scene.render.resolution_x, scene.render.resolution_y = res
     bpy.context.view_layer.update()
-    px_per_m = (res[1] / 2) / math.tan(math.radians(FOV) / 2) / DIST
+    px_per_m = (1080 / 2) / math.tan(math.radians(FOV) / 2) / DIST      # at 1x
     light_world((F_H - R_H).normalized() * math.cos(math.radians(50)) + Vector((0, 0, math.sin(math.radians(50)))))
     return px_per_m
 
@@ -241,7 +245,7 @@ def add_ground(hexcol):
 def do_game():
     set_pose("Idle", 1)
     ppm = game_cam()
-    outline(OUTLINE_PX / ppm)
+    outline(INNER_PX / ppm)
     arm.rotation_euler = (0, 0, math.radians(FACE_DEG["SE"]))
     bpy.context.view_layer.update()
     scene.render.film_transparent = False
@@ -254,6 +258,11 @@ def do_game():
             render(os.path.join(OUT, f"game_{gname}_{t}.png"))
         for e in extra:
             bpy.data.objects.remove(e, do_unlink=True)
+    scene.render.film_transparent = True          # character-only pass: its alpha drives the outer outline
+    for t in ("azure", "crimson"):
+        team(t == "crimson")
+        render(os.path.join(OUT, f"gchar_{t}.png"))
+    scene.render.film_transparent = False
     # proportions in the Idle pose (geometry, metres), facing front
     arm.rotation_euler = (0, 0, 0)
     bpy.context.view_layer.update()
@@ -281,12 +290,12 @@ def do_game():
         x0, y0, x1, y1 = px_box([body])
         sx0, sy0, sx1, sy1 = px_box(meshes)
         top = max(points([body]), key=lambda p: p.z)
-        res_y = scene.render.resolution_y
+        res_y = scene.render.resolution_y / SS
         feet_y = (1 - world_to_camera_view(scene, cam, Vector((0, 0, 0))).y) * res_y
         top_y = (1 - world_to_camera_view(scene, cam, top).y) * res_y
         measure[f] = {"feet_to_hair_top_px": round(feet_y - top_y, 1),
-                      "body_bbox_px_h": round(y1 - y0, 1), "body_px_w": round(x1 - x0, 1),
-                      "with_staff_px_h": round(sy1 - sy0, 1), "with_staff_px_w": round(sx1 - sx0, 1)}
+                      "body_bbox_px_h": round((y1 - y0) / SS, 1), "body_px_w": round((x1 - x0) / SS, 1),
+                      "with_staff_px_h": round((sy1 - sy0) / SS, 1), "with_staff_px_w": round((sx1 - sx0) / SS, 1)}
     with open(os.path.join(OUT, "measure.json"), "w") as fh:
         json.dump(measure, fh, indent=1)
     print("MEASURE", json.dumps({f: measure[f]["feet_to_hair_top_px"] for f in FACINGS}),
@@ -296,7 +305,7 @@ def do_game():
 def do_facings(alpha_only=False):
     set_pose("Idle", 1)
     ppm = game_cam()
-    outline(OUTLINE_PX / ppm)
+    outline(INNER_PX / ppm)
     scene.render.film_transparent = True
     scene.render.use_border = True
     scene.render.use_crop_to_border = True
@@ -305,7 +314,7 @@ def do_facings(alpha_only=False):
         arm.rotation_euler = (0, 0, math.radians(FACE_DEG[f]))
         bpy.context.view_layer.update()
         x0, y0, x1, y1 = px_box(meshes)
-        m = 10
+        m = 10 * SS
         rx, ry = scene.render.resolution_x, scene.render.resolution_y
         scene.render.border_min_x = max(0, (x0 - m) / rx)
         scene.render.border_max_x = min(1, (x1 + m) / rx)
@@ -340,15 +349,16 @@ def ortho_shot(name, az, el, objs, height=720, teams=("azure",), cam_dist=12.0):
     cp = [inv @ p for p in pts]
     xs, ys = [p.x for p in cp], [p.y for p in cp]
     w0, h0 = max(xs) - min(xs), max(ys) - min(ys)
+    height *= SS
     ppm = height / (h0 * 1.03)
-    pad = 2 * (OUTLINE_PX / ppm) + 0.02
+    pad = 2 * (OUTLINE_PX * SS / ppm) + 0.02
     w, h = w0 + pad, h0 + pad
     cam.location = cam.matrix_world @ Vector(((max(xs) + min(xs)) / 2, (max(ys) + min(ys)) / 2, 0))
     scene.render.resolution_y = height
     scene.render.resolution_x = max(16, int(round(height * w / h)))
     cam_data.ortho_scale = max(w, h)
-    ppm = height / h if h >= w else scene.render.resolution_x / w
-    outline(OUTLINE_PX / ppm)
+    ppm = (height / h if h >= w else scene.render.resolution_x / w) / SS     # pixels per metre at 1x
+    outline(INNER_PX / ppm)
     light_world(cam.matrix_world.to_3x3() @ Vector((-0.5, 0.6, 0.62)))
     scene.render.film_transparent = True
     for t in teams:

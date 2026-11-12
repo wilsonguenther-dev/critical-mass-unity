@@ -3,8 +3,9 @@
   * colour = vertex colour RGB; team swap scales team parts by (crimson / azure) per channel, so painted gradients survive
   * three bands on N.L against the LIGHT vector (world space, set per render): > 0.35 lit x1.00, -0.05..0.35 mid x0.84,
     below -0.05 shadow x0.66 mixed 12 % toward Void Navy. Hard edges. No gloss, no metal.
-  * team rim: where N.V < 0.25 (grazing), mix 0.6 toward the team core colour (Azure #16C7D9 / Crimson #FF5A5F),
-    lit and mid bands only, never on glows
+  * team rim: where N.V < 0.15 (grazing), mix 0.45 toward the team core colour (Azure #16C7D9 / Crimson #FF5A5F),
+    lit band only, never on glows. (The CMToon "width 0.25, strength 0.6" literally applied as N.V < 0.25 painted a
+    teal band round every part in v1; this is the visual equivalent of a thin rim.)
   * mask code 0.75 (team glow) and 0.25 (fixed biomass glow) are unlit; the biomass gets a lighter rim facet
   * MASKVIEW = 1 replaces everything with ID colours for pixel counts: team -> magenta, biomass -> green, other -> red
   * inverted-hull outline in Void Navy #18233B (render only; width set per render in pixels -> metres)
@@ -14,6 +15,9 @@ import bpy
 
 from cm_art import palette as P
 from . import fpalette as FP
+
+
+RIM_NDV, RIM_STRENGTH = 0.15, 0.45
 
 
 def _rgba(h, a=1.0):
@@ -102,10 +106,10 @@ def make_material(name="CM_Toon"):
     ndv = node("ShaderNodeVectorMath", operation="DOT_PRODUCT")
     L.new(geo.outputs["Normal"], ndv.inputs[0])
     L.new(geo.outputs["Incoming"], ndv.inputs[1])
-    rim = math_("LESS_THAN", ndv.outputs["Value"], 0.25)
-    rim = math_("MULTIPLY", rim, g_mid)
+    rim = math_("LESS_THAN", ndv.outputs["Value"], RIM_NDV)
+    rim = math_("MULTIPLY", rim, g_lit)
     rim = math_("MULTIPLY", rim, math_("SUBTRACT", 1.0, is_glow))
-    rim = math_("MULTIPLY", rim, 0.6)
+    rim = math_("MULTIPLY", rim, RIM_STRENGTH)
     rimcol = mix(team, _rgba(P.CORE["azure_team"]), _rgba(P.CORE["crimson_team"]))
     shaded = mix(rim, banded, rimcol)
 
@@ -152,8 +156,11 @@ def add_outline(ob, width):
     sol.offset = 1.0
     sol.use_flip_normals = True
     sol.use_rim = False
-    sol.use_even_offset = True
+    sol.use_even_offset = False      # even offset spikes at sharp leaf / blade tips
     sol.material_offset = len(ob.data.materials) - 1
+    if "outline_w" in ob.vertex_groups:          # no hull on face features (eyes, brows, mouth)
+        sol.vertex_group = "outline_w"
+        sol.thickness_vertex_group = 0.0
     return sol
 
 
