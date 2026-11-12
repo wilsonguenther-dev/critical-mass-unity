@@ -18,6 +18,8 @@ namespace CriticalMass.Runtime.PlayTests
     {
         const string BootScene = "Assets/_Game/Scenes/Boot.unity";
         const int HoldTicks = 30;
+        /// <summary>Sim seconds stepped with no input before a test starts, so the spawn crowd has left the pad.</summary>
+        const double SettleSeconds = 3;
 
         SimDriverBehaviour _driver;
         Keyboard _kb;
@@ -34,6 +36,16 @@ namespace CriticalMass.Runtime.PlayTests
             _driver = UnityEngine.Object.FindAnyObjectByType<SimDriverBehaviour>();
             Assert.IsNotNull(_driver, "Boot did not build a SimDriverBehaviour");
             _driver.HumanAutopilot = false;
+
+            // Wall-time independence (as SmokeTests): TimeScale 0 stops Update from adding accumulator ticks during the
+            // yields, so a test runs exactly the ticks it steps. Round 1 failed because batchmode frame times let Update
+            // run dozens of extra W ticks, which walked actor 0 into the base island's edge and slid it sideways
+            // (0.47 drift). Then settle with no input: 16 Azure bots spawn within 2.4 units of the pad and actor 0's
+            // up-screen path crosses slot 15's spawn point; after SettleSeconds they have left eastward (hill, bridges)
+            // and only the human's own input moves actor 0 during the measured window.
+            _driver.TimeScale = 0;
+            GameConfig c = _driver.World.Config;
+            _driver.StepTicks((int)Math.Ceiling(SettleSeconds * c.SimHz));
 
             // The batchmode test runner has no focused Game view, so under the default "pointers and keyboards respect
             // Game view focus" the Input System routes keyboard events to editor updates and the player-side actions
