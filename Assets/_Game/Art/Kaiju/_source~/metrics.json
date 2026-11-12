@@ -1,16 +1,5 @@
 {
- "gameplay": {
-  "gp-adult-azure": {
-   "kaiju_px": 70056,
-   "glow_share": 0.213,
-   "moss_share": 0.237,
-   "kaiju_box_px": [
-    358,
-    372
-   ],
-   "px_per_m": 73.2
-  }
- },
+ "gameplay": {},
  "bible": {
   "10-azure-adult": {
    "iou": 0.809,
@@ -21,38 +10,23 @@
    "iou": 0.862,
    "bible_wh": 0.982,
    "ours_wh": 1.003
-  },
-  "11-profile": {
-   "iou": 0.76,
-   "bible_wh": 0.884,
-   "ours_wh": 0.841
-  },
-  "11-rear": {
-   "iou": 0.798,
-   "bible_wh": 0.838,
-   "ours_wh": 1.031
-  },
-  "11-three-quarter": {
-   "iou": 0.768,
-   "bible_wh": 0.942,
-   "ours_wh": 0.926
   }
  },
  "swatches": {
   "slate": {
    "bible": "#415066",
-   "ours": "#3C4A5E",
+   "ours": "#3C4A5F",
    "dE2000": 1.9
   },
   "light stone": {
    "bible": "#ADA59B",
    "ours": "#9F988B",
-   "dE2000": 4.33
+   "dE2000": 4.34
   },
   "moss": {
    "bible": "#B7D139",
-   "ours": "#B3CE37",
-   "dE2000": 0.69
+   "ours": "#B1CC36",
+   "dE2000": 1.28
   },
   "belly": {
    "bible": "#C9BFAA",
@@ -61,8 +35,8 @@
   },
   "azure glow": {
    "bible": "#0FECF0",
-   "ours": "#0FC8CB",
-   "dE2000": 8.24
+   "ours": "#12E3E6",
+   "dE2000": 1.97
   }
  }
 }

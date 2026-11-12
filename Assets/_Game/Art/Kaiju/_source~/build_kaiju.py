@@ -42,7 +42,7 @@ TRI_CAP = {"Egg": 4000, "Hatchling": 10000, "Adult": 15000}
 # Silhouette tunables fitted against the bible crops with iou_map.py (KJ_TUNE='{"sh_x": 1.05}' overrides one run;
 # the committed defaults below are the fitted values, so a plain run rebuilds the committed asset).
 TUNE = {"sh_x": 1.12, "fist_x": 1.68, "fist_r": 0.64, "crown_k": 1.05, "fan_k": 1.2, "head_dy": -0.25, "head_dz": -0.2,
-        "hip_z": 1.38, "thigh_x": 0.68, "fist_y": -0.8, "tail_k": 0.6, "arm_k": 1.38, "cry_k": 1.12, "rock_k": 1.18, "facets": 11, "crack_k": 1.42, "rim_k": 2.2, "moss_k": 0.7, "rim_d": 0.05}
+        "hip_z": 1.38, "thigh_x": 0.68, "fist_y": -0.8, "tail_k": 0.6, "arm_k": 1.38, "cry_k": 1.12, "rock_k": 1.18, "facets": 11, "crack_k": 1.42, "rim_k": 2.2, "moss_k": 0.7, "rim_d": 0.09}
 TUNE.update(json.loads(os.environ.get("KJ_TUNE", "{}")))
 
 
@@ -1377,7 +1377,7 @@ def adult_params():
             add((sx * 0.48, 0.58, 2.28), (0.42, 0.44, 0.38), "Spine", moss=0.45, up=(sx * 0.45, 0.2, 1))
             add((sx * 0.44, 1.12, 1.7), (0.4, 0.4, 0.36), "Hips", up=(sx * 0.5, 0.4, 1))
             # cranium blocks on the head top
-            add((sx * 0.24, -0.86 + HY, 3.62 + HZ), (0.22, 0.22, 0.17), "Head", moss=0.0, n=14, up=(sx * 0.4, 0.3, 1))
+            add((sx * 0.24, -0.86 + HY, 3.58 + HZ), (0.19, 0.19, 0.14), "Head", moss=0.0, n=14, up=(sx * 0.4, 0.3, 1))
         # spine line: hump block behind the head, then down the back to the hips
         add((0, -0.22, 3.02), (0.5, 0.48, 0.38), "Chest", moss=0.5)
         add((0, 0.32, 2.8), (0.48, 0.46, 0.38), "Spine", moss=0.4, up=(0, 0.2, 1))
