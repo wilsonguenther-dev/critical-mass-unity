@@ -11,6 +11,7 @@ using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Rendering;
+using Object = UnityEngine.Object;
 
 namespace CriticalMass.Runtime.Tests
 {
@@ -172,6 +173,8 @@ namespace CriticalMass.Runtime.Tests
             foreach (WorldPlacement p in plan.Placements)
             {
                 if (p.Surface || p.Cat == "sky" || p.Cat == "base") continue; // bases: footprint rule below
+                // Knock-down pillars (CM-31) stand on their Sim cell by design: the Sim's decoration is the obstacle.
+                if (p.Cat == "decor") continue;
                 float h = Top(p.Piece) * p.Matrix.lossyScale.y;
                 if (h <= 0.3f) continue;
                 checkedPieces++;
@@ -240,5 +243,105 @@ namespace CriticalMass.Runtime.Tests
                 Assert.IsTrue(cat.Find("cm_layout_" + site).GetComponentsInChildren<MeshFilter>(true).Any(mf => mf.name.Contains("cm_district_")),
                     "cm_layout_" + site + " has its wall run (cm_district_*)");
         }
-    }
+    
+        /// <summary>Art refresh 2: the hill site's pieces belong to the hill and take the holding team's colours.</summary>
+        [Test]
+        public void HillTintFollowsTheSimHillState()
+        {
+            MapDef map = Map();
+            WorldPlan plan = WorldDresser.Plan(map, BasesFile.Load(), Cat.Centroid, Cat.Body);
+            WorldPlacement[] hill = plan.Placements.Where(p => p.Team == WorldTeam.Hill).ToArray();
+            Assert.Greater(hill.Length, 0, "hill site pieces are WorldTeam.Hill");
+            foreach (WorldPlacement p in hill)
+                Assert.Less(Math.Sqrt((p.SimX - map.Hill.X) * (p.SimX - map.Hill.X) + (p.SimZ - map.Hill.Z) * (p.SimZ - map.Hill.Z)), 16.0, p.Piece + " is a hill piece");
+            Assert.IsTrue(hill.Any(p => p.Piece.Contains("banner")) || hill.Any(p => p.Piece.Contains("rim")), "ring or banners on the hill");
+            Assert.IsTrue(plan.Breakables.Any(b => b.Team == WorldTeam.Hill), "hill breakables tint too");
+
+            var m = new Material(Shader.Find("CM/Toon"));
+            var go = new GameObject("WorldView test");
+            try
+            {
+                var view = go.AddComponent<WorldView>();
+                foreach (HillState s in new[] { HillState.Azure, HillState.Crimson, HillState.Contested, HillState.Neutral })
+                {
+                    WorldView.TintHill(m, s);
+                    var (cloth, glow, dark) = WorldView.HillSwatch(s);
+                    Near(Hex(cloth), m.GetColor("_TeamCloth"), s + " cloth");
+                    Near(Hex(glow), m.GetColor("_TeamGlow"), s + " glow");
+                    Near(Hex(dark), m.GetColor("_TeamDark"), s + " dark");
+                    view.ApplyHill(s);
+                    Assert.AreEqual(s, view.HillShown, "the view shows the sim's hill state");
+                }
+                Assert.AreEqual(WorldKit.BaseAuthoredCloth, WorldView.HillSwatch(HillState.Azure).cloth);
+                Assert.AreEqual(WorldKit.BaseCrimsonCloth, WorldView.HillSwatch(HillState.Crimson).cloth);
+                Assert.AreEqual(WorldKit.BaseNeutralCloth, WorldView.HillSwatch(HillState.Contested).cloth, "contested reads neutral");
+            }
+            finally
+            {
+                Object.DestroyImmediate(go);
+                Object.DestroyImmediate(m);
+            }
+        }
+
+        /// <summary>Art refresh 2: digging an island edge cell (or placing a cell in the void) re-plans its lips and cliffs,
+        /// and the view's changed-group set holds that cell's group, so the edge art follows the grid.</summary>
+        [Test]
+        public void DiggingOrPlacingACellUpdatesTheEdgesAroundIt()
+        {
+            MapDef map = Map();
+            WorldPlan before = WorldDresser.Plan(map, BasesFile.Load(), Cat.Centroid, Cat.Body);
+            // An island-edge floor cell (void to its north) away from the bases and the hill.
+            int pick = -1;
+            for (int cz = 2; cz < map.Height - 2 && pick < 0; cz++)
+            for (int cx = 24; cx < map.Width - 24 && pick < 0; cx++)
+            {
+                int i = cz * map.Width + cx;
+                if (map.Cells[i] == Cell.Floor && map.Cells[i - map.Width] == Cell.Void && map.Cells[i + map.Width] == Cell.Floor &&
+                    Math.Abs(cx - map.Hill.X) > 14) pick = i;
+            }
+            Assert.GreaterOrEqual(pick, 0, "an edge cell to dig");
+            int px = pick % map.Width, pz = pick / map.Width;
+            map.Cells[pick] = Cell.Void;
+            WorldPlan dug = WorldDresser.Plan(map, BasesFile.Load(), Cat.Centroid, Cat.Body);
+            CollectionAssert.Contains(WorldView.ChangedGroups(before, dug), WorldView.GroupOf(px + 0.5, pz + 0.5), "the dug cell's group rebuilds");
+            Assert.AreNotEqual(EdgesNear(before, px, pz), EdgesNear(dug, px, pz), "lips and cliffs moved with the dug edge");
+            Assert.IsTrue(dug.Placements.Any(p => (p.Cat == "edge" || p.Cat == "cliff") && Math.Abs(p.SimX - (px + 0.5)) < 1.5 && p.SimZ > pz + 0.4 && p.SimZ < pz + 1.6),
+                "a new edge runs along the south side of the dug cell");
+            map.Cells[pick] = Cell.Floor;
+            map.Cells[pick - map.Width] = Cell.Floor; // place a cell into the void north of it
+            WorldPlan placed = WorldDresser.Plan(map, BasesFile.Load(), Cat.Centroid, Cat.Body);
+            CollectionAssert.Contains(WorldView.ChangedGroups(before, placed), WorldView.GroupOf(px + 0.5, pz - 0.5), "the placed cell's group rebuilds");
+            Assert.AreNotEqual(EdgesNear(before, px, pz - 1), EdgesNear(placed, px, pz - 1), "lips and cliffs moved out with the placed cell");
+            Assert.IsEmpty(WorldView.ChangedGroups(before, WorldDresser.Plan(Map(), BasesFile.Load(), Cat.Centroid, Cat.Body)), "an unchanged map rebuilds nothing");
+        }
+
+        static string EdgesNear(WorldPlan plan, int cx, int cz) => string.Join(";", plan.Placements
+            .Where(p => (p.Cat == "edge" || p.Cat == "cliff") && Math.Abs(p.SimX - (cx + 0.5)) < 2.5 && Math.Abs(p.SimZ - (cz + 0.5)) < 2.5)
+            .Select(p => $"{p.Piece}@{p.SimX:0.00},{p.SimZ:0.00}").OrderBy(x => x));
+
+        /// <summary>Art refresh 2: every knock-down pillar stands as the kit's ruin column (fallen variants mapped for CM-31).</summary>
+        [Test]
+        public void KnockDownPillarsUseTheKitRuinColumn()
+        {
+            MapDef map = Map();
+            Assert.IsNotEmpty(map.Decorations, "the map has knock-down pillars");
+            WorldPlan plan = WorldDresser.Plan(map, BasesFile.Load(), Cat.Centroid, Cat.Body);
+            foreach (DecorationDef d in map.Decorations)
+                Assert.IsTrue(plan.Placements.Any(p => p.Cat == "decor" && p.Piece == "env_ruin_column_intact" &&
+                                                       Math.Abs(p.SimX - (d.Cx + 0.5)) < 0.01 && Math.Abs(p.SimZ - (d.Cz + 0.5)) < 0.01),
+                    $"pillar at {d.Cx},{d.Cz}");
+            foreach (string piece in new[] { WorldDresser.DecorationPiece(DecorationKind.Pillar, false, false),
+                         WorldDresser.DecorationPiece(DecorationKind.Pillar, true, true), WorldDresser.DecorationPiece(DecorationKind.Pillar, true, false) })
+                Assert.IsNotNull(Cat.Find(piece), piece + " is in the kit catalog");
+        }
+
+        static Color Hex(string hex) { ColorUtility.TryParseHtmlString(hex, out Color c); return c; }
+
+        static void Near(Color e, Color a, string what)
+        {
+            Assert.AreEqual(e.r, a.r, 1e-3f, what);
+            Assert.AreEqual(e.g, a.g, 1e-3f, what);
+            Assert.AreEqual(e.b, a.b, 1e-3f, what);
+        }
+}
 }

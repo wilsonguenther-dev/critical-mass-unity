@@ -1,13 +1,13 @@
 fileFormatVersion: 2
-guid: cf76689e0dc694f63894e26c1ae8f623
+guid: 3e289c4ee312b4dbdb5ddccf00aef8b2
 ModelImporter:
   serializedVersion: 24300
   internalIDToNameTable: []
   externalObjects: {}
   materials:
     materialImportMode: 0
-    materialName: 1
-    materialSearch: 0
+    materialName: 0
+    materialSearch: 1
     materialLocation: 1
     searchTexturesGlobally: 0
   animations:
@@ -31,7 +31,7 @@ ModelImporter:
     extraExposedTransformPaths: []
     extraUserProperties: []
     clipAnimations: []
-    isReadable: 1
+    isReadable: 0
   meshes:
     lODScreenPercentages: []
     globalScale: 1
@@ -80,7 +80,7 @@ ModelImporter:
     blendShapeNormalImportMode: 1
     normalSmoothingSource: 0
   referencedClips: []
-  importAnimation: 0
+  importAnimation: 1
   humanDescription:
     serializedVersion: 3
     human: []
@@ -99,9 +99,9 @@ ModelImporter:
     skeletonHasParents: 1
   lastHumanDescriptionAvatarSource: {instanceID: 0}
   autoGenerateAvatarMappingIfUnspecified: 1
-  animationType: 0
+  animationType: 2
   humanoidOversampling: 1
-  avatarSetup: 0
+  avatarSetup: 1
   addHumanoidExtraRootOnlyWhenUsingAvatar: 1
   importBlendShapeDeformPercent: 1
   remapMaterialsIfMaterialImportModeIsNone: 0

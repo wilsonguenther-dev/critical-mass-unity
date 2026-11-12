@@ -11,11 +11,11 @@ namespace CriticalMass.Runtime.Tests
     public sealed class ArtMappingTests
     {
         [Test]
-        public void WarriorAndMinerHaveModelsEveryOtherClassKeepsTheCapsule()
+        public void WarriorMinerAndFarmerHaveModelsEveryOtherClassKeepsTheCapsule()
         {
             Assert.AreEqual(ArtMapping.Warrior, ArtMapping.ClassModel(ClassId.Warrior));
             Assert.AreEqual(ArtMapping.Miner, ArtMapping.ClassModel(ClassId.Miner));
-            Assert.IsNull(ArtMapping.ClassModel(ClassId.Farmer), "Farmer is not built yet: capsule");
+            Assert.AreEqual(ArtMapping.Farmer, ArtMapping.ClassModel(ClassId.Farmer), "Farmer v1 replaces the capsule (art refresh 2)");
             Assert.IsNull(ArtMapping.ClassModel(ClassId.Demolitions));
             Assert.IsNull(ArtMapping.ClassModel(ClassId.Builder));
         }
@@ -88,10 +88,70 @@ namespace CriticalMass.Runtime.Tests
             Near(ArtMaterials.Hex("#FF7461"), crimson.GetColor("_TeamGlow"));
             Near(ArtMaterials.Hex("#E46753"), crimson.GetColor("_TeamCloth"));
             Near(ArtMaterials.Hex("#4FE3F0"), crimson.GetColor("_DefaultGlow"));
-            Assert.AreEqual(3f, crimson.GetFloat("_OutlinePx"));
+            Assert.AreEqual(ArtMapping.CharacterHullPx, crimson.GetFloat("_OutlinePx"));
+            Assert.AreEqual(3f, crimson.GetFloat("_OutlineSource"), "rigged models read the smoothed hull direction from TANGENT");
             Assert.IsTrue(crimson.GetShaderPassEnabled("SRPDefaultUnlit"), "characters keep their hull");
             Material shards = ArtMaterials.ForGlow(ArtMapping.Spec(ArtMapping.KaijuShards), ArtMapping.GlowBerserk);
             Assert.IsFalse(shards.GetShaderPassEnabled("SRPDefaultUnlit"), "all-glow pieces draw no hull");
+        }
+
+        /// <summary>Art refresh 2: decals, outline weights, the Farmer's team swap and the Kaiju berserk reach the materials.</summary>
+        [Test]
+        public void FaceDecalsOutlineWeightsFarmerSwapAndBerserkReachTheMaterials()
+        {
+            Material w = ArtMaterials.ForTeam(ArtMapping.Spec(ArtMapping.Warrior), TeamId.Azure);
+            Assert.AreEqual(1f, w.GetFloat("_DecalOn"), "Warrior face decal mixed over the body");
+            Assert.IsNotNull(w.GetTexture("_FaceTex"), "Warrior_Face.png from the catalog");
+            Assert.AreEqual(1f, w.GetFloat("_OutlineWeightUV4"), "Warrior reads its UV4 outline weights");
+
+            Material f = ArtMaterials.ForTeam(ArtMapping.Spec(ArtMapping.Farmer), TeamId.Crimson);
+            Near(ArtMaterials.Hex("#4999A5"), f.GetColor("_DefaultCloth"));
+            Near(ArtMaterials.Hex("#E9705F"), f.GetColor("_TeamCloth"));
+            Assert.AreEqual(0f, f.GetFloat("_DecalOn"), "the Farmer has no painted decal");
+            Assert.AreEqual(1f, f.GetFloat("_OutlineWeightUV4"), "Farmer face unlined through UV4 (outline_w sidecar)");
+
+            ModelSpec minerSpec = ArtMapping.Spec(ArtMapping.Miner);
+            Material miner = ArtMaterials.ForTeam(minerSpec, TeamId.Azure), face = ArtMaterials.Face(minerSpec, miner);
+            Assert.AreEqual(0f, miner.GetFloat("_DecalOn"), "the Miner body slot carries no decal");
+            Assert.IsNotNull(face, "the Miner's CM_FaceDecal slot has its own material");
+            Assert.AreEqual(1f, face.GetFloat("_DecalOn"));
+            Assert.IsFalse(face.GetShaderPassEnabled("SRPDefaultUnlit"), "per-material outline suppression on the Miner face");
+            Assert.AreSame(face, ArtMaterials.Face(minerSpec, miner), "one face material per body material");
+
+            ModelSpec adult = ArtMapping.Spec(ArtMapping.KaijuAdult);
+            Assert.AreEqual(1f, ArtMaterials.ForGlow(adult, ArtMapping.GlowBerserk).GetFloat("_Berserk"), "berserk darkens the plates");
+            Material calm = ArtMaterials.ForGlow(adult, ArtMapping.GlowAzure);
+            Assert.AreEqual(0f, calm.GetFloat("_Berserk"));
+            Assert.AreEqual(1f, calm.GetFloat("_DecalOn"), "Kaiju face atlas");
+            Assert.AreEqual(0f, ArtMaterials.ForGlow(ArtMapping.Spec(ArtMapping.KaijuShards), ArtMapping.GlowBerserk).GetFloat("_Berserk"),
+                "shards are all glow: nothing to darken, and only Kaiju creature stages are switched");
+        }
+
+        /// <summary>The Farmer's new alpha 0.25 code is code 2 in eighths: fixed colour, self-lit, no hull, never swapped.</summary>
+        [Test]
+        public void MaskCodeQuarterIsTheFixedSelfLitUnlinedGlow()
+        {
+            Assert.AreEqual(2, Mathf.RoundToInt(0.25f * 8f));
+            string hlsl = System.IO.File.ReadAllText("Assets/_Game/Art/Shaders/CMToonCommon.hlsl");
+            StringAssert.Contains("selfLit = (code == 1 || code == 2 ||", hlsl, "code 2 is self-lit");
+            StringAssert.Contains("return (code == 2 ||", hlsl, "code 2 draws no hull");
+            StringAssert.DoesNotContain("code == 2) rgb = CMToonSwap", hlsl, "code 2 is never team-swapped");
+        }
+
+        /// <summary>CPU replica of the berserk darkening (kaiju v3 report): fixed' = lerp(fixed * (0.82, 0.56, 0.78), #8E3FD1, 0.15).</summary>
+        [Test]
+        public void BerserkDarkeningMatchesTheArtFormula()
+        {
+            Color plate = ArtMaterials.Hex("#8C8C8C"), corruption = ArtMaterials.Hex("#8E3FD1");
+            Color dark = Color.Lerp(new Color(plate.r * 0.82f, plate.g * 0.56f, plate.b * 0.78f), corruption, 0.15f);
+            Assert.Less(dark.g, plate.g * 0.7f, "green drops most: the plates go purple-dark");
+            Assert.Less(dark.maxColorComponent, plate.maxColorComponent, "darker, never brighter");
+            Material m = ArtMaterials.ForGlow(ArtMapping.Spec(ArtMapping.KaijuAdult), ArtMapping.GlowBerserk);
+            Vector4 mul = m.GetVector("_BerserkMul");
+            Assert.AreEqual(0.82f, mul.x, 1e-4f);
+            Assert.AreEqual(0.56f, mul.y, 1e-4f);
+            Assert.AreEqual(0.78f, mul.z, 1e-4f);
+            Assert.AreEqual(0.15f, m.GetFloat("_BerserkTintAmount"), 1e-4f);
         }
 
         /// <summary>CPU replica of CMToonSwap (sRGB): an authored-colour pixel becomes exactly the target, darker facets keep their ratio.</summary>

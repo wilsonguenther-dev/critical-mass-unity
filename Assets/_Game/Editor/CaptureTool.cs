@@ -183,6 +183,7 @@ namespace CriticalMass.Editor
             return new[]
             {
                 ("base-azure", azure.X, azure.Z, GameplayCamera.Distance),
+                ("base-crimson", map.Pads[(int)TeamId.Crimson].X, map.Pads[(int)TeamId.Crimson].Z, GameplayCamera.Distance),
                 ("hill", map.Hill.X, map.Hill.Z, GameplayCamera.Distance),
                 ("shrine", map.Shrine.X, map.Shrine.Z, GameplayCamera.Distance),
                 ("wide", cx, cz, WideDistance(map, land, cx, cz)),
@@ -388,6 +389,12 @@ namespace CriticalMass.Editor
             RenderTexture prevActive = RenderTexture.active;
             cam.aspect = (float)Width / Height;
             var ms = new List<double>();
+            // Draw calls, batches and SetPass calls of the measured frames (Render profiler counters; 0 when the counter
+            // is not available in this editor build, reported as -1).
+            var drawRec = Unity.Profiling.ProfilerRecorder.StartNew(Unity.Profiling.ProfilerCategory.Render, "Draw Calls Count");
+            var batchRec = Unity.Profiling.ProfilerRecorder.StartNew(Unity.Profiling.ProfilerCategory.Render, "Batches Count");
+            var setPassRec = Unity.Profiling.ProfilerRecorder.StartNew(Unity.Profiling.ProfilerCategory.Render, "SetPass Calls Count");
+            long draws = -1, batches = -1, setPass = -1;
             try
             {
                 for (int i = 0; i < PerfFrames + 5; i++)
@@ -401,10 +408,19 @@ namespace CriticalMass.Editor
                     RenderTexture.active = prevActive;
                     sw.Stop();
                     if (i >= 5) ms.Add(sw.Elapsed.TotalMilliseconds);
+                    if (i >= 5 && drawRec.Valid && drawRec.CurrentValue > 0) draws = Math.Max(draws, drawRec.CurrentValue);
+                    if (i >= 5 && UnityStats.drawCalls > 0) draws = Math.Max(draws, UnityStats.drawCalls);
+                    if (i >= 5 && UnityStats.batches > 0) batches = Math.Max(batches, UnityStats.batches);
+                    if (i >= 5 && UnityStats.setPassCalls > 0) setPass = Math.Max(setPass, UnityStats.setPassCalls);
+                    if (i >= 5 && batchRec.Valid && batchRec.CurrentValue > 0) batches = Math.Max(batches, batchRec.CurrentValue);
+                    if (i >= 5 && setPassRec.Valid && setPassRec.CurrentValue > 0) setPass = Math.Max(setPass, setPassRec.CurrentValue);
                 }
             }
             finally
             {
+                drawRec.Dispose();
+                batchRec.Dispose();
+                setPassRec.Dispose();
                 RenderTexture.active = prevActive;
                 cam.ResetAspect();
                 rt.Release();
@@ -413,8 +429,12 @@ namespace CriticalMass.Editor
             }
             ms.Sort();
             double median = ms[ms.Count / 2], p95 = ms[(int)Math.Floor(ms.Count * 0.95)];
-            int renderers = 0, skinned = 0;
-            long tris = 0;
+            int renderers = 0, skinned = 0, visible = 0;
+            long tris = 0, visibleTris = 0, estDraws = 0;
+            // Batch mode reports no Render profiler counters, so the frame's draws are also estimated from the camera:
+            // each renderer whose bounds meet the frustum costs one forward draw per submesh, plus one hull draw per
+            // submesh when its material keeps the outline pass, plus one shadow-caster draw when it casts (no batching).
+            Plane[] frustum = GeometryUtility.CalculateFrustumPlanes(cam);
             foreach (Renderer r in UnityEngine.Object.FindObjectsByType<Renderer>(FindObjectsSortMode.None))
             {
                 if (!r.enabled || !r.gameObject.activeInHierarchy) continue;
@@ -422,10 +442,21 @@ namespace CriticalMass.Editor
                 Mesh m = r is SkinnedMeshRenderer smr ? smr.sharedMesh : (r.GetComponent<MeshFilter>() != null ? r.GetComponent<MeshFilter>().sharedMesh : null);
                 if (r is SkinnedMeshRenderer) skinned++;
                 if (m != null) for (int s = 0; s < m.subMeshCount; s++) tris += (long)m.GetIndexCount(s) / 3;
+                if (m == null || !GeometryUtility.TestPlanesAABB(frustum, r.bounds)) continue;
+                visible++;
+                Material[] mats = r.sharedMaterials;
+                for (int s = 0; s < m.subMeshCount; s++)
+                {
+                    visibleTris += (long)m.GetIndexCount(s) / 3;
+                    Material mat = s < mats.Length ? mats[s] : null;
+                    estDraws += 1;
+                    if (mat != null && mat.FindPass("Outline") >= 0 && mat.GetShaderPassEnabled("SRPDefaultUnlit")) estDraws++;
+                    if (r.shadowCastingMode != ShadowCastingMode.Off) estDraws++;
+                }
             }
             string line = string.Format(CultureInfo.InvariantCulture,
-                "{{\"name\": \"{0}\", \"frameMsMedian\": {1:0.00}, \"frameMsP95\": {2:0.00}, \"frames\": {3}, \"renderers\": {4}, \"skinned\": {5}, \"sceneTris\": {6}}}",
-                name, median, p95, ms.Count, renderers, skinned, tris);
+                "{{\"name\": \"{0}\", \"frameMsMedian\": {1:0.00}, \"frameMsP95\": {2:0.00}, \"frames\": {3}, \"renderers\": {4}, \"skinned\": {5}, \"sceneTris\": {6}, \"drawCalls\": {7}, \"batches\": {8}, \"setPass\": {9}, \"visibleRenderers\": {10}, \"visibleTris\": {11}, \"estDrawCalls\": {12}}}",
+                name, median, p95, ms.Count, renderers, skinned, tris, draws, batches, setPass, visible, visibleTris, estDraws);
             Debug.Log("[CaptureTool] perf " + line);
             return line;
         }

@@ -20,9 +20,9 @@ MonoBehaviour:
   - cm_dress_barrel
   - cm_dress_blocks
   - cm_dress_crate
-  - cm_dress_flagstones
-  - cm_dress_planks_low
-  - cm_dress_rubble_low
+  - cm_dress_crate_small
+  - cm_dress_stakes
+  - cm_dress_weapon_rack
   - cm_egg_pool
   - cm_gate_post
   - cm_gate_post_ring
@@ -139,9 +139,9 @@ MonoBehaviour:
   - {fileID: 919132149155446097, guid: d4b8c16daa2824829ab889ad577ba7e2, type: 3}
   - {fileID: 919132149155446097, guid: fc78ae0b7b4c94216bdf05a4cc3df2d8, type: 3}
   - {fileID: 919132149155446097, guid: 9c7b7f8f0f4a1457eaa4a7c195ac15fa, type: 3}
-  - {fileID: 919132149155446097, guid: 25f3a957660764ab299fdec7d43a7d2a, type: 3}
-  - {fileID: 919132149155446097, guid: cf76689e0dc694f63894e26c1ae8f623, type: 3}
-  - {fileID: 919132149155446097, guid: 14bb11a60bf2a4ddc8ea27f521150bf8, type: 3}
+  - {fileID: 919132149155446097, guid: 5ca9ddc99ba8a47098dcb58fce762750, type: 3}
+  - {fileID: 919132149155446097, guid: 67dec54d2b3504f998faf3c236f7df77, type: 3}
+  - {fileID: 919132149155446097, guid: 17c252514c1be45df8b8af3a515f3650, type: 3}
   - {fileID: 919132149155446097, guid: 7194fd42520434ae49fcec4fbef84931, type: 3}
   - {fileID: 919132149155446097, guid: ed6706658137c4da6abbaa8134b88665, type: 3}
   - {fileID: 919132149155446097, guid: 27099ccd105eb4b2b844e5d20e56a8e1, type: 3}

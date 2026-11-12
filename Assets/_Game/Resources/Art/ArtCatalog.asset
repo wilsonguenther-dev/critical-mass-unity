@@ -24,6 +24,7 @@ MonoBehaviour:
     - {fileID: -429512112410174799, guid: 698ef57cbc7aa4ec6bdc3113f0e0d820, type: 3}
     - {fileID: -5181486892397411127, guid: 698ef57cbc7aa4ec6bdc3113f0e0d820, type: 3}
     - {fileID: -7264356326966739861, guid: 698ef57cbc7aa4ec6bdc3113f0e0d820, type: 3}
+    Face: {fileID: 2800000, guid: 95cb4f610e27d42bfa25210def7aa609, type: 3}
   - Key: Miner
     Model: {fileID: 919132149155446097, guid: b5a3d79beed1446e1b64ea2c1239fcae, type: 3}
     Clips:
@@ -35,6 +36,19 @@ MonoBehaviour:
     - {fileID: -429512112410174799, guid: 698ef57cbc7aa4ec6bdc3113f0e0d820, type: 3}
     - {fileID: -5181486892397411127, guid: 698ef57cbc7aa4ec6bdc3113f0e0d820, type: 3}
     - {fileID: -7264356326966739861, guid: 698ef57cbc7aa4ec6bdc3113f0e0d820, type: 3}
+    Face: {fileID: 2800000, guid: 97265c750badb4ee4b236435fc7cc65b, type: 3}
+  - Key: Farmer
+    Model: {fileID: 919132149155446097, guid: 3e289c4ee312b4dbdb5ddccf00aef8b2, type: 3}
+    Clips:
+    - {fileID: -3510217540682870009, guid: 698ef57cbc7aa4ec6bdc3113f0e0d820, type: 3}
+    - {fileID: 2606927044688373672, guid: 698ef57cbc7aa4ec6bdc3113f0e0d820, type: 3}
+    - {fileID: 5853113653780947187, guid: 698ef57cbc7aa4ec6bdc3113f0e0d820, type: 3}
+    - {fileID: -7030805144458276618, guid: 698ef57cbc7aa4ec6bdc3113f0e0d820, type: 3}
+    - {fileID: 3341008991451901215, guid: 698ef57cbc7aa4ec6bdc3113f0e0d820, type: 3}
+    - {fileID: -429512112410174799, guid: 698ef57cbc7aa4ec6bdc3113f0e0d820, type: 3}
+    - {fileID: -5181486892397411127, guid: 698ef57cbc7aa4ec6bdc3113f0e0d820, type: 3}
+    - {fileID: -7264356326966739861, guid: 698ef57cbc7aa4ec6bdc3113f0e0d820, type: 3}
+    Face: {fileID: 0}
   - Key: KayKit_Clips
     Model: {fileID: 919132149155446097, guid: 698ef57cbc7aa4ec6bdc3113f0e0d820, type: 3}
     Clips:
@@ -46,14 +60,17 @@ MonoBehaviour:
     - {fileID: -429512112410174799, guid: 698ef57cbc7aa4ec6bdc3113f0e0d820, type: 3}
     - {fileID: -5181486892397411127, guid: 698ef57cbc7aa4ec6bdc3113f0e0d820, type: 3}
     - {fileID: -7264356326966739861, guid: 698ef57cbc7aa4ec6bdc3113f0e0d820, type: 3}
+    Face: {fileID: 0}
   - Key: MinerBarricade
     Model: {fileID: 919132149155446097, guid: ab7be3e9e47d645ada45676944908420, type: 3}
     Clips: []
+    Face: {fileID: 0}
   - Key: Kaiju_Egg
     Model: {fileID: 919132149155446097, guid: bde83cfc124644a08b6bfe307a5ff570, type: 3}
     Clips:
     - {fileID: -3100369314251171874, guid: bde83cfc124644a08b6bfe307a5ff570, type: 3}
     - {fileID: -3671601596690056613, guid: bde83cfc124644a08b6bfe307a5ff570, type: 3}
+    Face: {fileID: 0}
   - Key: Kaiju_Hatchling
     Model: {fileID: 919132149155446097, guid: 781e47d62192f4e6fafd7e337f08577b, type: 3}
     Clips:
@@ -64,6 +81,7 @@ MonoBehaviour:
     - {fileID: -1515349500964892227, guid: 781e47d62192f4e6fafd7e337f08577b, type: 3}
     - {fileID: -3858766435920583795, guid: 781e47d62192f4e6fafd7e337f08577b, type: 3}
     - {fileID: 2667949614841947897, guid: 781e47d62192f4e6fafd7e337f08577b, type: 3}
+    Face: {fileID: 2800000, guid: 62dbfe09afb394f2d847b9c117c035c2, type: 3}
   - Key: Kaiju_Adult
     Model: {fileID: 919132149155446097, guid: 8d976f89c643c4745926736967b24884, type: 3}
     Clips:
@@ -74,27 +92,36 @@ MonoBehaviour:
     - {fileID: -1515349500964892227, guid: 8d976f89c643c4745926736967b24884, type: 3}
     - {fileID: -3858766435920583795, guid: 8d976f89c643c4745926736967b24884, type: 3}
     - {fileID: 2667949614841947897, guid: 8d976f89c643c4745926736967b24884, type: 3}
+    Face: {fileID: 2800000, guid: 62dbfe09afb394f2d847b9c117c035c2, type: 3}
   - Key: Kaiju_BerserkShards
     Model: {fileID: 919132149155446097, guid: eac700d3f7b2144d0a5a19b3e5e14424, type: 3}
     Clips: []
+    Face: {fileID: 0}
   - Key: Kaiju_TelegraphSpikes
     Model: {fileID: 919132149155446097, guid: 355e37c14419f4df69f8efac40f0cf11, type: 3}
     Clips: []
+    Face: {fileID: 0}
   - Key: prop_biomass_plant_s
     Model: {fileID: 919132149155446097, guid: a095b6760890342958c8391b84158574, type: 3}
     Clips: []
+    Face: {fileID: 0}
   - Key: prop_biomass_plant_m
     Model: {fileID: 919132149155446097, guid: f6b65a9ec29994f81905d8ea8804478c, type: 3}
     Clips: []
+    Face: {fileID: 0}
   - Key: prop_biomass_plant_l
     Model: {fileID: 919132149155446097, guid: ddd7511dc3be04ff18b0303ee1b5f9ab, type: 3}
     Clips: []
+    Face: {fileID: 0}
   - Key: prop_biomass_sprout
     Model: {fileID: 919132149155446097, guid: c02963aea5aa74e05a99aafdc2e47e38, type: 3}
     Clips: []
+    Face: {fileID: 0}
   - Key: prop_corruption_growth_s
     Model: {fileID: 919132149155446097, guid: 346b58e4520a94b2380122e895474e6b, type: 3}
     Clips: []
+    Face: {fileID: 0}
   - Key: prop_corruption_growth_l
     Model: {fileID: 919132149155446097, guid: f43fec1921f5e42b0aa74579a0e988b6, type: 3}
     Clips: []
+    Face: {fileID: 0}

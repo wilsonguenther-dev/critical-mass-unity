@@ -45,6 +45,16 @@ namespace CriticalMass.Runtime.View.Art
         /// <summary>Body height in metres (bind-pose mesh bounds of Meshes[0]) the art reports, with tolerance HeightTolerance.</summary>
         public float Height;
         public const float HeightTolerance = 0.12f;
+        /// <summary>Painted face decal (PNG next to the FBX, UV0 of Meshes[0]), or null.</summary>
+        public string FaceTexture;
+        /// <summary>-1: the decal is mixed over the main material (every face that shows no face maps to a transparent
+        /// texel; Warrior, Kaiju). 0 or more: the decal is its own material slot (submesh) of Meshes[0], drawn by a face
+        /// material with no hull (Miner: CM_FaceDecal is slot 1).</summary>
+        public int FaceSlot = -1;
+        /// <summary>Sidecar of unlined vertices (tools/art/outline_weights.py from the .blend's outline_w group), or null.</summary>
+        public string OutlineWeights;
+        /// <summary>True when the importer bakes UV4.x outline weights (0 on the face) and the material reads them.</summary>
+        public bool BakesOutlineWeights => OutlineWeights != null || (FaceTexture != null && FaceSlot < 0);
     }
 
     /// <summary>
@@ -58,6 +68,7 @@ namespace CriticalMass.Runtime.View.Art
     {
         public const string Warrior = "Warrior";
         public const string Miner = "Miner";
+        public const string Farmer = "Farmer";
         public const string KaykitClips = "KayKit_Clips";
         public const string MinerBarricade = "MinerBarricade";
         public const string KaijuEgg = "Kaiju_Egg";
@@ -88,29 +99,50 @@ namespace CriticalMass.Runtime.View.Art
         /// <summary>Seconds after the hatch the view shows the hatchling before the adult (view only: the sim has no stage).</summary>
         public const double HatchlingSeconds = 8.0;
 
+        /// <summary>
+        /// Inverted-hull width (px at 1080p) of characters and Kaiju (art refresh 2): the art previews draw a thin hull for
+        /// inner creases (Farmer and Warrior 1.5 px, Kaiju 2.0 px) plus a silhouette-only dilation to 3 px outer. CM/Toon has
+        /// no silhouette pass, so a 3 px hull drew every inner crease at 3 px and the characters read busy at the gameplay
+        /// camera; 2 px matches the Kaiju's authored hull and keeps the silhouette readable.
+        /// </summary>
+        public const float CharacterHullPx = 2f;
+
         // Swatches (sRGB). Warrior: cm_art/palette.py team_cloth / team_glow / team_dark and TEAM_SWAP.
         static readonly TeamSwatch WarriorAzure = new TeamSwatch("#2A95AE", "#4FE3F0", "#2A374D");
         static readonly TeamSwatch WarriorCrimson = new TeamSwatch("#E46753", "#FF7461", "#652D2F");
         // Miner: miner_art/mpal.py kerchief / crystal (team dark unused: navy stays) and TEAM_SWAP.
         static readonly TeamSwatch MinerAzure = new TeamSwatch("#3E78C6", "#2E9BE6", "#23375F");
         static readonly TeamSwatch MinerCrimson = new TeamSwatch("#EF674E", "#FA743D", "#23375F");
+        // Farmer: farmer_art/fpalette.py team cloth teal #4999A5 -> coral #E9705F (README "Conventions"); no team glow or
+        // team dark on the Farmer (the 0.25 biomass glow is fixed, never swapped), so those channels keep the Warrior's.
+        static readonly TeamSwatch FarmerAzure = new TeamSwatch("#4999A5", "#4FE3F0", "#2A374D");
+        static readonly TeamSwatch FarmerCrimson = new TeamSwatch("#E9705F", "#FF7461", "#652D2F");
         // Props: props_art/core.py TEAM_CLOTH / TEAM_GLOW / TEAM_DARK and TEAM_SWAP (1.0 / 0.75 / 0.5).
         static readonly TeamSwatch PropAzure = new TeamSwatch("#127EC0", "#4FE3F0", "#1D6A8C");
         static readonly TeamSwatch PropCrimson = new TeamSwatch("#FC725A", "#FF7461", "#9B4132");
         // Kaiju: kaiju_palette.py GLOW (allegiance) and STAGE_DEFAULT_GLOW (egg and hatchling lime, adult and shards Azure).
         public const string GlowNeutral = "#B8E833", GlowAzure = "#13F1F4", GlowCrimson = "#F2563F", GlowBerserk = "#EE2CC0";
         static TeamSwatch KaijuDefault(string glow) => new TeamSwatch(glow, glow, glow);
+        /// <summary>One 256 px atlas for both creature stages (adult top half, hatchling bottom half) on UVMap.</summary>
+        public const string KaijuFace = "Assets/_Game/Art/Kaiju/Kaiju_Face.png";
 
         public static readonly ModelSpec[] Models =
         {
             new ModelSpec { Key = Warrior, AssetPath = "Assets/_Game/Art/Characters/Warrior.fbx", Kind = ArtKind.Character, Rigged = true,
                 Bones = 41, ClipSource = "Assets/_Game/Art/Characters/KayKit_Clips.fbx",
                 Meshes = new[] { "Warrior_Body", "Warrior_Cleaver", "Warrior_Shield" }, MaskCodes = new[] { 0, 6, 8 },
-                OutlinePx = 3f, Rim = 0.6f, Authored = WarriorAzure, Crimson = WarriorCrimson, Height = 2.0f },
+                OutlinePx = CharacterHullPx, Rim = 0.6f, Authored = WarriorAzure, Crimson = WarriorCrimson, Height = 2.0f,
+                FaceTexture = "Assets/_Game/Art/Characters/Warrior_Face.png" },
             new ModelSpec { Key = Miner, AssetPath = "Assets/_Game/Art/Miner/Miner.fbx", Kind = ArtKind.Character, Rigged = true,
                 Bones = 41, ClipSource = "Assets/_Game/Art/Characters/KayKit_Clips.fbx",
                 Meshes = new[] { "Miner_Body", "Miner_PickHammer", "Miner_PickHammer_Hammer" }, MaskCodes = new[] { 0, 6, 8 },
-                OutlinePx = 3f, Rim = 0.6f, Authored = MinerAzure, Crimson = MinerCrimson, Height = 2.0f },
+                OutlinePx = CharacterHullPx, Rim = 0.6f, Authored = MinerAzure, Crimson = MinerCrimson, Height = 2.0f,
+                FaceTexture = "Assets/_Game/Art/Miner/MinerFace.png", FaceSlot = 1 },
+            new ModelSpec { Key = Farmer, AssetPath = "Assets/_Game/Art/Farmer/Farmer.fbx", Kind = ArtKind.Character, Rigged = true,
+                Bones = 41, ClipSource = "Assets/_Game/Art/Characters/KayKit_Clips.fbx",
+                Meshes = new[] { "Farmer_Body", "Farmer_Staff" }, MaskCodes = new[] { 0, 2, 8 },
+                OutlinePx = CharacterHullPx, Rim = 0.6f, Authored = FarmerAzure, Crimson = FarmerCrimson, Height = 2.0f,
+                OutlineWeights = "Assets/_Game/Art/Farmer/Farmer_OutlineW.json" },
             new ModelSpec { Key = KaykitClips, AssetPath = "Assets/_Game/Art/Characters/KayKit_Clips.fbx", Kind = ArtKind.Character, Rigged = true,
                 Bones = 41, OwnClips = new[] { Idle, Walk, Run, Attack, Gather, Hit, Death, Cheer } },
             new ModelSpec { Key = MinerBarricade, AssetPath = "Assets/_Game/Art/Miner/MinerBarricade.fbx", Kind = ArtKind.Prop,
@@ -118,13 +150,13 @@ namespace CriticalMass.Runtime.View.Art
                 OutlinePx = 2.5f, Authored = MinerAzure, Crimson = MinerCrimson },
             new ModelSpec { Key = KaijuEgg, AssetPath = "Assets/_Game/Art/Kaiju/Kaiju_Egg.fbx", Kind = ArtKind.Kaiju, Rigged = true,
                 Bones = 2, OwnClips = new[] { Idle, Shake }, Meshes = new[] { "KaijuMesh" }, MaskCodes = new[] { 0, 6 },
-                OutlinePx = 3f, Authored = KaijuDefault(GlowNeutral), Height = 1.7f },
+                OutlinePx = CharacterHullPx, Authored = KaijuDefault(GlowNeutral), Height = 1.7f },
             new ModelSpec { Key = KaijuHatchling, AssetPath = "Assets/_Game/Art/Kaiju/Kaiju_Hatchling.fbx", Kind = ArtKind.Kaiju, Rigged = true,
                 Bones = 20, OwnClips = new[] { Idle, Walk, Roar, SlamWindup, Slam, Berserk, KO }, Meshes = new[] { "KaijuMesh" },
-                MaskCodes = new[] { 0, 6 }, OutlinePx = 3f, Authored = KaijuDefault(GlowNeutral), Height = 2.235f },
+                MaskCodes = new[] { 0, 6 }, OutlinePx = CharacterHullPx, Authored = KaijuDefault(GlowNeutral), Height = 2.235f, FaceTexture = KaijuFace },
             new ModelSpec { Key = KaijuAdult, AssetPath = "Assets/_Game/Art/Kaiju/Kaiju_Adult.fbx", Kind = ArtKind.Kaiju, Rigged = true,
                 Bones = 20, OwnClips = new[] { Idle, Walk, Roar, SlamWindup, Slam, Berserk, KO }, Meshes = new[] { "KaijuMesh" },
-                MaskCodes = new[] { 0, 6 }, OutlinePx = 3f, Authored = KaijuDefault(GlowAzure), Height = 5.0f },
+                MaskCodes = new[] { 0, 6 }, OutlinePx = CharacterHullPx, Authored = KaijuDefault(GlowAzure), Height = 5.0f, FaceTexture = KaijuFace },
             new ModelSpec { Key = KaijuShards, AssetPath = "Assets/_Game/Art/Kaiju/Kaiju_BerserkShards.fbx", Kind = ArtKind.Kaiju,
                 Meshes = new[] { "Kaiju_BerserkShards" }, MaskCodes = new[] { 6 }, OutlinePx = 0f, Authored = KaijuDefault(GlowAzure) },
             new ModelSpec { Key = KaijuSpikes, AssetPath = "Assets/_Game/Art/Kaiju/Kaiju_TelegraphSpikes.fbx", Kind = ArtKind.Kaiju,
@@ -152,13 +184,14 @@ namespace CriticalMass.Runtime.View.Art
             return key != null && _byKey.TryGetValue(key, out ModelSpec s) ? s : null;
         }
 
-        /// <summary>Character model per class; null keeps the grey-box capsule (Farmer, Demolitions, Builder: not built yet).</summary>
+        /// <summary>Character model per class; null keeps the grey-box capsule (Demolitions, Builder: not built yet).</summary>
         public static string ClassModel(ClassId cls)
         {
             switch (cls)
             {
                 case ClassId.Warrior: return Warrior;
                 case ClassId.Miner: return Miner;
+                case ClassId.Farmer: return Farmer;
                 default: return null;
             }
         }
