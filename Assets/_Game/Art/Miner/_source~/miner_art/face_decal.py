@@ -8,7 +8,7 @@ face plane built by build_miner.face_plane(): x -0.22..0.22 u, z 1.39..1.545 u o
 import numpy as np
 
 N = 256
-X0, X1, Z0, Z1 = -0.25, 0.25, 1.42, 1.59     # v3 face plane extent in metres (head space, before HEAD_WIDEN)
+X0, X1, Z0, Z1 = -0.25, 0.25, 1.395, 1.59     # v3 face plane extent in metres (head space, before HEAD_WIDEN)
 
 
 def _hex(h):
@@ -66,11 +66,11 @@ def paint():
         a = a + k * (1 - a)
 
     for s in (1, -1):
-        ex, ez = 0.150 * s, 1.494
+        ex, ez = 0.152 * s, 1.488
         over(_cov(_ellipse(X, Z, 0.185 * s, 1.437, 0.052, 0.026), pxm * 7), BLUSH, 0.55)
-        eye = _ellipse(X, Z, ex, ez, 0.068, 0.073)
+        eye = _ellipse(X, Z, ex, ez, 0.074, 0.080)
         # a gentle upper lid: the top 12 % of the eye is lid skin, sloping down to the outside (friendly)
-        lid_p, lid_q = (ex - 0.08 * s, ez + 0.050), (ex + 0.08 * s, ez + 0.042)
+        lid_p, lid_q = (ex - 0.09 * s, ez + 0.066), (ex + 0.09 * s, ez + 0.058)
         if s < 0:
             lid_p, lid_q = lid_q, lid_p
         open_eye = np.maximum(eye, -_halfplane(X, Z, lid_p, lid_q))
@@ -78,10 +78,10 @@ def paint():
         over(_cov(eye, pxm), LID)
         over(_cov(open_eye, pxm), SCLERA)
         ix, iz = ex - 0.012 * s, ez - 0.006
-        over(_cov(np.maximum(_ellipse(X, Z, ix, iz, 0.044, 0.050), open_eye), pxm), IRIS_DK)
-        over(_cov(np.maximum(_ellipse(X, Z, ix, iz - 0.004, 0.036, 0.040), open_eye), pxm), IRIS)
-        over(_cov(np.maximum(_ellipse(X, Z, ix, iz, 0.020, 0.024), open_eye), pxm), INK)
-        over(_cov(_ellipse(X, Z, ix + 0.014, iz + 0.019, 0.013, 0.014), pxm), WHITE)      # big catch light
+        over(_cov(np.maximum(_ellipse(X, Z, ix, iz, 0.049, 0.056), open_eye), pxm), IRIS_DK)
+        over(_cov(np.maximum(_ellipse(X, Z, ix, iz - 0.004, 0.041, 0.046), open_eye), pxm), IRIS)
+        over(_cov(np.maximum(_ellipse(X, Z, ix, iz, 0.023, 0.027), open_eye), pxm), INK)
+        over(_cov(_ellipse(X, Z, ix + 0.016, iz + 0.022, 0.015, 0.016), pxm), WHITE)      # big catch light
         over(_cov(_ellipse(X, Z, ix - 0.016, iz - 0.020, 0.006, 0.006), pxm), WHITE)      # small catch light
         lidline = np.abs(_halfplane(X, Z, lid_p, lid_q)) - 0.006
         over(_cov(np.maximum(lidline, eye), pxm), INK)

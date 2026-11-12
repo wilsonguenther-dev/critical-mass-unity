@@ -250,7 +250,7 @@ def build_arms():
 def build_neck():
     add(BODY, B.cyl((0, 0, 1.17), (0, 0, 1.32), 0.11, 0.105, 8), "skin", ["chest", "head"], "skin")
     # blue neckerchief (team cloth): thick roll, front knot, hanging point
-    add(BODY, B.torus(0.27, 0.13, 14, 6), "kerchief", "chest", "team_cloth",
+    add(BODY, B.torus(0.30, 0.13, 14, 6), "kerchief", "chest", "team_cloth",
         m=M((0, 0.0, 1.225), (8, 0, 0), (1.06, 0.82, 0.8)))
     add(BODY, B.sphere((0.13, 0.08, 0.09), 8, 5), "kerchief", "chest", "team_cloth", m=M((0.15, -0.27, 1.14)))
     add(BODY, B.spike((0.15, -0.30, 1.10), (0.20, -0.33, 0.98), 0.07, 6, (0.0, -0.02, 0.0)), "kerchief", "chest",
@@ -316,14 +316,14 @@ def build_head():
     for s in (1, -1):
         add(BODY, B.sphere((0.04, 0.055, 0.075), 6, 4), "skin_shadow", H, "skin", m=M((0.315 * s, 0.02, 1.47)))
         # round cheeks under the eyes (bible: full cheeks with a warm shade); the decal adds the blush on top
-        add(BODY, B.sphere((0.10, 0.06, 0.075), 7, 4), "skin", H, "skin", m=M((0.17 * s, -0.215, 1.405)))
+        add(BODY, B.sphere((0.10, 0.06, 0.065), 7, 4), "skin", H, "skin", m=M((0.19 * s, -0.20, 1.36)))   # below the eyes
         # thick dark angled brows as modelled wedges: low and heavy over the nose, rising to the temple
-        brow = [(0.03, -0.045), (0.215, 0.005), (0.245, 0.042), (0.15, 0.050), (0.04, 0.028)]
+        brow = [(0.035, -0.028), (0.215, 0.010), (0.245, 0.045), (0.15, 0.056), (0.045, 0.036)]
         brow = [(x * s, z) for x, z in brow]
         if s < 0:
             brow = list(reversed(brow))
         add(BODY, B.prism(brow, 0.055, 0.012), "brow", H, "face", smooth=False,
-            m=M((0.0, head_front_y(0.13 * s, 1.562, 0.0) + 0.008, 1.562), (90 - 14, 0, -16 * s)))
+            m=M((0.0, head_front_y(0.13 * s, 1.568, 0.0) + 0.008, 1.568), (90 - 14, 0, -16 * s)))
     # v3 face decal: large round brown eyes with highlights, cheek blush (painted, 256 px)
     add(BODY, face_plane(), "skin", H, "face_decal", smooth=True, grad=False)
     # big round red-pink nose, a step proud of the cheeks
