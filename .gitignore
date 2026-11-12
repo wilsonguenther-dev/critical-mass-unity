@@ -50,3 +50,6 @@ Thumbs.db
 # Blender backups (panel revision 2026-11-12)
 *.blend1
 *.blend2
+
+# python bytecode from the UI art build scripts
+__pycache__/

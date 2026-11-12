@@ -89,6 +89,27 @@ namespace CriticalMass.Runtime.Hud
             if (w < 1 || h < 1) return;
             float s = HudLayout.Scale(w, h);
             if (Mathf.Abs(Canvas.scaleFactor - s) > 1e-4f) Canvas.scaleFactor = s;
+            int tier = UiIcons.TierFor(s);
+            if (tier != _tier)
+            {
+                _tier = tier;
+                for (int i = 0; i < _icons.Count; i++) _icons[i].SetTier(tier);
+            }
+        }
+
+        // ---------------------------------------------------------------- illustrated icons (v2)
+
+        readonly System.Collections.Generic.List<HudIcon> _icons = new System.Collections.Generic.List<HudIcon>(64);
+        int _tier = 2;
+        public int IconTier => _tier;
+        public System.Collections.Generic.IReadOnlyList<HudIcon> Icons => _icons;
+
+        HudIcon Icon(Transform parent, string goName, string icon, float x, float y, float w, float h, bool leftPivot = false)
+        {
+            HudIcon i = HudIcon.Make(parent, goName, x, y, w, h, leftPivot);
+            i.Set(icon, _tier);
+            _icons.Add(i);
+            return i;
         }
 
         RectTransform Cluster(HudCluster c)
@@ -149,7 +170,7 @@ namespace CriticalMass.Runtime.Hud
 
         const int Pips = 5;
         Text _clock, _scoreA, _scoreC, _hillWord, _onHillA, _onHillC;
-        VectorShape _hillBar, _medallion, _medallionHalf, _crown;
+        VectorShape _hillBar, _medallion, _medallionHalf;
         readonly VectorShape[] _pipsA = new VectorShape[Pips], _pipsC = new VectorShape[Pips];
 
         void BuildMatch(RectTransform c)
@@ -167,9 +188,7 @@ namespace CriticalMass.Runtime.Hud
             _medallionHalf = Shape(_medallion.transform, "Contested Half", ShapeKind.Pie, 5f, 5f, 50f, 50f, CMTokens.Crimson.Color);
             _medallionHalf.Fill01 = 0.5f;
             _medallionHalf.gameObject.SetActive(false);
-            _crown = Shape(_medallion.transform, "Crown", ShapeKind.Crown, 14f, 17f, 32f, 24f, Cream);
-            _crown.OutlinePx = 2f;
-            _crown.RimPx = 0f;
+            Icon(_medallion.transform, "Crown", UiIcons.Crown, 13f, 11f, 34f, 34f);
             _hillWord = Label(c, "Hill Word", CMTokens.Ui, 19, Cream, TextAnchor.MiddleCenter, 250f, 106f, 300f, 24f, "NEUTRAL");
         }
 
@@ -179,8 +198,7 @@ namespace CriticalMass.Runtime.Hud
             Color tc = CMTokens.Team(team);
             Shape(c, team + " Panel", ShapeKind.Chamfer, x, 4f, 308f, 64f, Panel, 14f);
             float shieldX = azure ? x - 6f : x + 308f - 52f;
-            VectorShape shield = Shape(c, team + " Shield", ShapeKind.Shield, shieldX, 0f, 58f, 70f, tc);
-            Shape(shield.transform, "Emblem", ShapeKind.Diamond, 18f, 16f, 22f, 30f, Cream).RimPx = 0f;
+            Icon(c, team + " Crest", UiIcons.Crest[(int)team], shieldX - 6f, 0f, 70f, 70f);   // illustrated crest (v2)
             float pipX0 = azure ? x + 64f : x + 308f - 64f - Pips * 22f;
             for (int i = 0; i < Pips; i++)
             {
@@ -200,7 +218,8 @@ namespace CriticalMass.Runtime.Hud
 
         const int MeterSegments = 8;
         const int RagePips = 5;
-        VectorShape _egg;
+        HudIcon _kaijuHead;
+        VectorShape _eggFrame;
         Text _kaijuWord, _kaijuNumber;
         readonly VectorShape[] _segments = new VectorShape[MeterSegments];
         readonly VectorShape[] _rage = new VectorShape[RagePips];
@@ -208,8 +227,8 @@ namespace CriticalMass.Runtime.Hud
         void BuildKaiju(RectTransform c)
         {
             VectorShape frame = Shape(c, "Egg Frame", ShapeKind.Chamfer, 0f, 0f, 88f, 98f, Navy, 16f);
-            _egg = Shape(frame.transform, "Egg", ShapeKind.Egg, 16f, 10f, 56f, 76f, CMTokens.ParseHex("#3A4052"));
-            _egg.RimPx = 4f;
+            _eggFrame = frame;
+            _kaijuHead = Icon(frame.transform, "Kaiju", UiIcons.Egg, 6f, 11f, 76f, 76f);   // egg, hatchling or adult head
             Shape(c, "Meter Frame", ShapeKind.RoundRect, 80f, 12f, 216f, 42f, Navy, 10f);
             for (int i = 0; i < MeterSegments; i++)
             {
@@ -234,9 +253,16 @@ namespace CriticalMass.Runtime.Hud
         // ---------------------------------------------------------------- 03 PLAYER
 
         const int Hearts = 4;
-        VectorShape _portraitFrame, _classIcon, _hpBar, _hpGhost;
+        VectorShape _portraitFrame, _hpBar, _hpGhost;
+        HudIcon _portrait, _classBadge;
         Text _className, _hpNumber;
-        readonly VectorShape[] _hearts = new VectorShape[Hearts];
+        readonly HeartSlot[] _hearts = new HeartSlot[Hearts];
+
+        sealed class HeartSlot
+        {
+            public RectTransform Rt;
+            public HudIcon Empty, Full;
+        }
         readonly AbilityButton[] _buttons = new AbilityButton[3];
         float _hpShown = -1f, _hpGhostShown = -1f, _ghostHold;
         readonly float[] _heartPop = new float[Hearts];
@@ -245,7 +271,8 @@ namespace CriticalMass.Runtime.Hud
         sealed class AbilityButton
         {
             public RectTransform Rt;
-            public VectorShape Body, Icon, Sweep;
+            public VectorShape Body, Sweep;
+            public HudIcon Icon;
             public Text Seconds, Name, Count;
             public float Flash;
             public bool WasCooling;
@@ -255,17 +282,24 @@ namespace CriticalMass.Runtime.Hud
         {
             _portraitFrame = Shape(c, "Portrait", ShapeKind.Chamfer, 0f, 6f, 116f, 120f, Panel, 18f);
             _portraitFrame.RimPx = 3f;
-            _classIcon = Shape(_portraitFrame.transform, "Class Icon", ShapeKind.Shield, 28f, 14f, 60f, 66f, CMTokens.Azure.Color);
-            _className = Label(_portraitFrame.transform, "Class Name", CMTokens.Ui, 16, Cream, TextAnchor.MiddleCenter, 0f, 86f, 116f, 24f,
+            // v2: the illustrated class portrait (bible p15 player card), a class badge and the class name on a plate
+            _portrait = Icon(_portraitFrame.transform, "Portrait", UiIcons.Portrait[0, 0], 9f, 3f, 98f, 98f);
+            Shape(_portraitFrame.transform, "Name Plate", ShapeKind.RoundRect, 6f, 92f, 104f, 24f, Navy, -1f).RimPx = 0f;
+            _classBadge = Icon(_portraitFrame.transform, "Class Badge", UiIcons.ClassBadge[0, 0], -6f, -6f, 36f, 36f);
+            _className = Label(_portraitFrame.transform, "Class Name", CMTokens.Ui, 15, Cream, TextAnchor.MiddleCenter, 6f, 92f, 104f, 24f,
                 "WARRIOR", 2f);
 
             Shape(c, "Health Plate", ShapeKind.RoundRect, 124f, 22f, 252f, 90f, Panel, 14f);
             for (int i = 0; i < Hearts; i++)
             {
-                VectorShape h = Shape(c, "Heart " + i, ShapeKind.Heart, 138f + i * 36f, 32f, 32f, 30f, CMTokens.Azure.Color);
-                h.EmptyColor = Empty;
-                h.RimPx = 0f;
-                _hearts[i] = h;
+                RectTransform hr = Rt(c, "Heart " + i);
+                Place(hr, 136f + i * 36f, 30f, 34f, 34f);
+                _hearts[i] = new HeartSlot
+                {
+                    Rt = hr,
+                    Empty = Icon(hr, "Empty", UiIcons.HeartEmpty, 0f, 0f, 34f, 34f),
+                    Full = Icon(hr, "Full", UiIcons.Heart[0], 0f, 0f, 34f, 34f, true),
+                };
             }
             _hpNumber = Label(c, "HP Number", CMTokens.Mono, 24, Cream, TextAnchor.MiddleRight, 284f, 30f, 82f, 32f, "160", 2f);
             _hpGhost = Shape(c, "HP Ghost", ShapeKind.RoundRect, 136f, 72f, 228f, 28f, Cream, -1f);
@@ -279,9 +313,7 @@ namespace CriticalMass.Runtime.Hud
                 var b = new AbilityButton();
                 b.Body = Shape(c, "Ability " + i, ShapeKind.RoundRect, bx, 6f, HudLayout.AbilityButton, HudLayout.AbilityButton, Panel, 16f);
                 b.Rt = b.Body.rectTransform;
-                b.Icon = Shape(b.Body.transform, "Icon", i == 1 ? ShapeKind.Shield : i == 2 ? ShapeKind.Circle : ShapeKind.Diamond,
-                    20f, 14f, 36f, 46f, CMTokens.Azure.Color);
-                b.Icon.RimPx = 0f;
+                b.Icon = Icon(b.Body.transform, "Icon", i == 2 ? UiIcons.CarryEmpty : null, 10f, 7f, 56f, 56f);
                 b.Sweep = Shape(b.Body.transform, "Cooldown", ShapeKind.Pie, 5f, 5f, 66f, 66f, CMTokens.WithAlpha(Navy, 0.72f));
                 b.Sweep.Fill01 = 0f;
                 b.Seconds = Label(b.Body.transform, "Seconds", CMTokens.Mono, 30, Cream, TextAnchor.MiddleCenter, 0f, 0f, 76f, 76f, "", 3f);
@@ -297,7 +329,6 @@ namespace CriticalMass.Runtime.Hud
 
         static readonly string[] ClassNames = { "WARRIOR", "FARMER", "MINER", "DEMOLITIONS", "BUILDER" };
         static readonly string[] AbilityNames = { "SHIELD", "ROOTS", "WALL BREAK", "MINE", "BUILD" };
-        static readonly ShapeKind[] ClassIcons = { ShapeKind.Shield, ShapeKind.Circle, ShapeKind.RoundRect, ShapeKind.Hexagon, ShapeKind.Chamfer };
 
         // ---------------------------------------------------------------- minimap
 
@@ -305,7 +336,8 @@ namespace CriticalMass.Runtime.Hud
         MinimapLand _land;
         RectTransform _mapArea;
         readonly VectorShape[] _dots = new VectorShape[MaxDots];
-        VectorShape _mapEgg, _mapHill;
+        VectorShape _mapHill;
+        HudIcon _mapEgg, _mapYou;
         MapDef _mapFor;
 
         void BuildMinimap(RectTransform c)
@@ -324,19 +356,24 @@ namespace CriticalMass.Runtime.Hud
                 d.gameObject.SetActive(false);
                 _dots[i] = d;
             }
-            _mapEgg = Shape(_mapArea, "Map Egg", ShapeKind.Egg, 0f, 0f, 22f, 28f, CMTokens.ParseHex("#3A4052"));
-            _mapEgg.RimColor = CMTokens.EggSeam.Color;
+            // v2: illustrated markers, each with its word (the v1 report's missing minimap labels)
+            _mapEgg = Icon(_mapArea, "Map Egg", UiIcons.MapEgg, 0f, 0f, 26f, 26f);
+            Label(_mapEgg.Rt, "Label", CMTokens.Ui, 11, Cream, TextAnchor.MiddleCenter, -22f, 22f, 70f, 14f, "KAIJU", 2f);
             _mapHill = Shape(_mapArea, "Map Hill", ShapeKind.Circle, 0f, 0f, 30f, 30f, Navy);
-            Shape(_mapHill.transform, "Crown", ShapeKind.Crown, 7f, 9f, 16f, 12f, Cream).RimPx = 0f;
+            Icon(_mapHill.transform, "Crown", UiIcons.MapCrown, 5f, 5f, 20f, 20f);
+            Label(_mapHill.transform, "Label", CMTokens.Ui, 11, Cream, TextAnchor.MiddleCenter, -20f, 28f, 70f, 14f, "HILL", 2f);
             for (int t = 0; t < 2; t++)
             {
-                VectorShape b = Shape(_mapArea, (TeamId)t + " Base", ShapeKind.Banner, 0f, 0f, 26f, 34f, CMTokens.Team((TeamId)t));
-                Shape(b.transform, "Emblem", ShapeKind.Diamond, 8f, 8f, 10f, 16f, Cream).RimPx = 0f;
+                HudIcon b = Icon(_mapArea, (TeamId)t + " Base", UiIcons.Banner[t], 0f, 0f, 30f, 30f);
+                Label(b.Rt, "Label", CMTokens.Ui, 11, Cream, TextAnchor.MiddleCenter, -20f, 27f, 70f, 14f, t == 0 ? "AZURE" : "CRIMSON", 2f);
                 _mapBases[t] = b;
             }
+            _mapYou = Icon(_mapArea, "Map You", UiIcons.You, 0f, 0f, 18f, 18f);
+            Label(_mapYou.Rt, "Label", CMTokens.Ui, 11, CMTokens.ToolBrass.Color, TextAnchor.MiddleLeft, 18f, 2f, 40f, 14f, "YOU", 2f);
+            _mapYou.Rt.gameObject.SetActive(false);
         }
 
-        readonly VectorShape[] _mapBases = new VectorShape[2];
+        readonly HudIcon[] _mapBases = new HudIcon[2];
 
         void PlaceOnMap(RectTransform rt, double simX, double simZ)
         {
@@ -375,7 +412,7 @@ namespace CriticalMass.Runtime.Hud
             RectTransform marker = Rt(_world, "Hill Marker");
             Center(marker, 120f, 80f);
             _hillMarker = Shape(marker, "Medallion", ShapeKind.Circle, 38f, 0f, 44f, 44f, CMTokens.Stone.Color);
-            Shape(_hillMarker.transform, "Crown", ShapeKind.Crown, 10f, 12f, 24f, 18f, Cream).RimPx = 0f;
+            Icon(_hillMarker.transform, "Crown", UiIcons.Crown, 4f, 4f, 36f, 36f);
             _hillMarkerWord = Label(marker, "Word", CMTokens.Ui, 16, Cream, TextAnchor.MiddleCenter, 0f, 46f, 120f, 22f, "NEUTRAL", 2.5f);
 
             for (int r = 0; r < HeartRows; r++)
@@ -405,8 +442,8 @@ namespace CriticalMass.Runtime.Hud
                 RectTransform p = Rt(_world, "Pointer " + i);
                 Center(p, 60f, 70f);
                 Shape(p, "Icon", ShapeKind.Circle, 10f, 0f, 40f, 40f, Navy).RimColor = i == 0 ? Cream : CMTokens.EggSeam.Color;
-                if (i == 0) Shape(p.GetChild(0), "Crown", ShapeKind.Crown, 9f, 11f, 22f, 16f, Cream).RimPx = 0f;
-                else Shape(p.GetChild(0), "Egg", ShapeKind.Egg, 12f, 8f, 16f, 24f, CMTokens.ParseHex("#3A4052")).RimColor = CMTokens.EggSeam.Color;
+                if (i == 0) Icon(p.GetChild(0), "Crown", UiIcons.Crown, 4f, 4f, 32f, 32f);
+                else Icon(p.GetChild(0), "Egg", UiIcons.MapEgg, 5f, 5f, 30f, 30f);
                 RectTransform arrowPivot = Rt(p, "Arrow Pivot");
                 Place(arrowPivot, 30f, 20f, 0f, 0f);
                 VectorShape arrow = Shape(arrowPivot, "Arrow", ShapeKind.TriangleRight, 0f, 0f, 16f, 18f, Cream);
@@ -435,6 +472,8 @@ namespace CriticalMass.Runtime.Hud
         Vector3 _koWorld;
         bool _wasAlive = true;
 
+        DeathGrade _grade;
+
         void BuildDeath()
         {
             _death = Rt(Root, "Death");
@@ -442,7 +481,22 @@ namespace CriticalMass.Runtime.Hud
             _death.anchorMin = Vector2.zero;
             _death.anchorMax = Vector2.one;
             _death.sizeDelta = Vector2.zero;
-            _death.gameObject.AddComponent<ScreenVignette>().raycastTarget = false;
+            ScreenVignette vignette = _death.gameObject.AddComponent<ScreenVignette>();
+            vignette.raycastTarget = false;
+            // v2: the world grade (70% brightness, 60% saturation) is a shader pass on URP's opaque texture under the HUD;
+            // with it the vignette keeps only its edge band. Without the shader the v1 navy wash stays as the fallback.
+            if (DeathGrade.GradeMaterial != null)
+            {
+                RectTransform g = Rt(Root, "Death Grade");
+                g.SetSiblingIndex(0);
+                g.anchorMin = Vector2.zero;
+                g.anchorMax = Vector2.one;
+                g.sizeDelta = Vector2.zero;
+                _grade = g.gameObject.AddComponent<DeathGrade>();
+                _grade.raycastTarget = false;
+                vignette.Wash = 0f;
+                g.gameObject.SetActive(false);
+            }
             RectTransform mid = Rt(_death, "Centre");
             mid.anchorMin = mid.anchorMax = new Vector2(0.5f, 0.5f);
             mid.sizeDelta = new Vector2(400f, 160f);
@@ -532,7 +586,8 @@ namespace CriticalMass.Runtime.Hud
         {
             bool egg = !s.Hatched || s.Kaiju == KaijuState.Egg;
             Color state = KaijuColour(s.Kaiju);
-            _egg.SetRim(state);
+            _eggFrame.SetRim(egg ? CMTokens.EggSeam.Color : state);
+            _kaijuHead.Set(KaijuIcon(s, egg), _tier);
             int lit = Mathf.CeilToInt(s.KaijuMeter01 * MeterSegments - 1e-4f);
             Color litColour = s.Kaiju == KaijuState.Berserk ? CMTokens.Corruption.Color : CMTokens.MeterOrange.Color;
             for (int i = 0; i < MeterSegments; i++) _segments[i].SetFill(i < lit ? litColour : Empty);
@@ -546,6 +601,12 @@ namespace CriticalMass.Runtime.Hud
             _kaijuWord.color = egg || s.Kaiju == KaijuState.Neutral ? Cream : state;
         }
 
+        /// <summary>Egg before the hatch; the wild (neutral) Kaiju is the hatchling of bible p10; once a team turns it
+        /// (or it goes berserk) the adult head in that state's colours (p10 azure / crimson / berserk adult).</summary>
+        static string KaijuIcon(HudState s, bool egg) =>
+            egg ? UiIcons.Egg : s.Kaiju == KaijuState.Azure ? UiIcons.Adult[1] : s.Kaiju == KaijuState.Crimson ? UiIcons.Adult[2] :
+            s.Kaiju == KaijuState.Berserk ? UiIcons.Adult[3] : UiIcons.Hatchling;
+
         static Color KaijuColour(KaijuState k) =>
             k == KaijuState.Azure ? CMTokens.Azure.Color : k == KaijuState.Crimson ? CMTokens.Crimson.Color :
             k == KaijuState.Berserk ? CMTokens.Corruption.Color : k == KaijuState.Egg ? CMTokens.EggSeam.Color : CMTokens.Stone.Color;
@@ -555,8 +616,9 @@ namespace CriticalMass.Runtime.Hud
             if (!s.HasPlayer) return;
             Color tc = CMTokens.Team(s.Team);
             int cls = Mathf.Clamp((int)s.Cls, 0, ClassNames.Length - 1);
-            if (_classIcon.Kind != ClassIcons[cls]) { _classIcon.Kind = ClassIcons[cls]; _classIcon.SetVerticesDirty(); }
-            _classIcon.SetFill(tc);
+            int team = s.Team == TeamId.Crimson ? 1 : 0;
+            _portrait.Set(UiIcons.Portrait[cls, team], _tier);
+            _classBadge.Set(UiIcons.ClassBadge[cls, team], _tier);
             HudText.Set(_className, ClassNames[cls]);
 
             // health: shown value drains toward the target, the cream ghost holds 0.4 s then follows
@@ -576,29 +638,28 @@ namespace CriticalMass.Runtime.Hud
                 float q = Mathf.Clamp01(target * Hearts - i);
                 if (q < _heartLast[i] - 1e-3f) _heartPop[i] = 0.25f;
                 _heartLast[i] = q;
-                _hearts[i].SetFill(tc);
-                _hearts[i].Fill01 = q;
+                _hearts[i].Full.Set(UiIcons.Heart[team], _tier);
+                _hearts[i].Full.Fill01 = q;
                 _heartPop[i] = Mathf.Max(0, _heartPop[i] - dt);
                 float k = 1f + 0.3f * (_heartPop[i] / 0.25f);
-                _hearts[i].rectTransform.localScale = new Vector3(k, k, 1f);
+                _hearts[i].Rt.localScale = new Vector3(k, k, 1f);
             }
 
             // buttons: attack (LMB), class ability (RMB), carry (E)
-            ApplyButton(_buttons[0], s.AttackCd01, 0f, tc, "ATTACK", dt);
-            ApplyButton(_buttons[1], s.AbilityCd01, s.AbilityCdSeconds, tc, AbilityNames[cls], dt);
+            ApplyButton(_buttons[0], s.AttackCd01, 0f, UiIcons.Attack[cls, team], "ATTACK", dt);
+            ApplyButton(_buttons[1], s.AbilityCd01, s.AbilityCdSeconds, UiIcons.Ability[cls, team], AbilityNames[cls], dt);
             AbilityButton carry = _buttons[2];
-            Color carryColour = s.Carry == CarryKind.Corruption ? CMTokens.Corruption.Color :
-                s.Carry == CarryKind.Biomass ? CMTokens.Biomass.Color : Empty;
-            carry.Icon.SetFill(carryColour);
+            carry.Icon.Set(s.Carry == CarryKind.Corruption ? UiIcons.Corruption : s.Carry == CarryKind.Biomass ? UiIcons.Biomass :
+                UiIcons.CarryEmpty, _tier);
             HudText.Set(carry.Count, s.CarryAmount > 0 ? NumberCache.Int(s.CarryAmount) : "");
             HudText.Set(carry.Name, s.Carry == CarryKind.Corruption ? "CORRUPTION" : s.Carry == CarryKind.Biomass ? "BIOMASS" : "CARRY");
         }
 
-        void ApplyButton(AbilityButton b, float cd01, float seconds, Color tc, string name, float dt)
+        void ApplyButton(AbilityButton b, float cd01, float seconds, string icon, string name, float dt)
         {
             bool cooling = cd01 > 0.0005f;
             b.Sweep.Fill01 = cd01;
-            b.Icon.SetFill(tc);
+            b.Icon.Set(icon, _tier);
             HudText.Set(b.Seconds, cooling && seconds >= 1f ? NumberCache.Int(Mathf.CeilToInt(seconds)) : "");
             HudText.Set(b.Name, name);
             if (b.WasCooling && !cooling) b.Flash = 0.3f;
@@ -618,26 +679,31 @@ namespace CriticalMass.Runtime.Hud
             {
                 _mapFor = w.Map;
                 _land.SetMap(w.Map);
-                PlaceOnMap(_mapEgg.rectTransform, w.Map.Shrine.X, w.Map.Shrine.Z);
+                PlaceOnMap(_mapEgg.Rt, w.Map.Shrine.X, w.Map.Shrine.Z);
                 PlaceOnMap(_mapHill.rectTransform, w.Map.Hill.X, w.Map.Hill.Z);
-                for (int t = 0; t < 2 && t < w.Map.Pads.Length; t++) PlaceOnMap(_mapBases[t].rectTransform, w.Map.Pads[t].X, w.Map.Pads[t].Z);
+                for (int t = 0; t < 2 && t < w.Map.Pads.Length; t++) PlaceOnMap(_mapBases[t].Rt, w.Map.Pads[t].X, w.Map.Pads[t].Z);
             }
             _mapHill.SetFill(s.Hill == HillState.Neutral ? Navy : HillColour(s.Hill));
-            _mapEgg.SetRim(KaijuColour(s.Kaiju));
-            if (s.Hatched) PlaceOnMap(_mapEgg.rectTransform, w.Kaiju.X, w.Kaiju.Z);
+            bool eggOnMap = !s.Hatched || s.Kaiju == KaijuState.Egg;
+            _mapEgg.Set(eggOnMap ? UiIcons.MapEgg : KaijuIcon(s, false), _tier);
+            if (s.Hatched) PlaceOnMap(_mapEgg.Rt, w.Kaiju.X, w.Kaiju.Z);
             int n = Math.Min(w.ActorCount, MaxDots);
             for (int i = 0; i < MaxDots; i++)
             {
+                bool self = i == HudBinder.LocalActor;
                 bool on = i < n && w.Actors[i].Alive;
+                if (self)
+                {
+                    // own player: the brass arrow marker with its word, above every dot
+                    if (_mapYou.Rt.gameObject.activeSelf != on) _mapYou.Rt.gameObject.SetActive(on);
+                    if (on) { PlaceOnMap(_mapYou.Rt, w.X[i], w.Z[i]); _mapYou.Rt.SetAsLastSibling(); }
+                    on = false;
+                }
                 VectorShape d = _dots[i];
                 if (d.gameObject.activeSelf != on) d.gameObject.SetActive(on);
                 if (!on) continue;
                 PlaceOnMap(d.rectTransform, w.X[i], w.Z[i]);
-                bool self = i == HudBinder.LocalActor;
-                d.SetFill(self ? CMTokens.ToolBrass.Color : CMTokens.Team(w.Actors[i].Team));
-                float size = self ? 12f : 7f;
-                if (d.rectTransform.sizeDelta.x != size) d.rectTransform.sizeDelta = new Vector2(size, size);
-                if (self) d.transform.SetAsLastSibling();
+                d.SetFill(CMTokens.Team(w.Actors[i].Team));
             }
         }
 
@@ -764,6 +830,13 @@ namespace CriticalMass.Runtime.Hud
                 _koWorld = SimSpace.ToWorld(s.PlayerX, GroundHeight.At(w.Map, s.PlayerX, s.PlayerZ) + 0.05, s.PlayerZ);
             _wasAlive = !dead;
             if (_death.gameObject.activeSelf != dead) _death.gameObject.SetActive(dead);
+            if (_grade != null && _grade.gameObject.activeSelf != dead)
+            {
+                _grade.gameObject.SetActive(dead);
+                UnityEngine.Camera gc = Canvas.worldCamera;
+                var data = gc != null ? gc.GetComponent<UnityEngine.Rendering.Universal.UniversalAdditionalCameraData>() : null;
+                if (data != null) data.requiresColorTexture = dead;   // the opaque copy only while dead
+            }
             if (_koRing.gameObject.activeSelf != dead) _koRing.gameObject.SetActive(dead);
             if (!dead) return;
             HudText.Set(_respawn, NumberCache.Int(Mathf.CeilToInt((float)s.RespawnIn)));
