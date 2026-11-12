@@ -143,5 +143,15 @@ check(A["head_z"] < A["shoulder_z"] + 0.25 * A["height"] and A["head_y"] < A["ch
       % (A["head_z"], A["shoulder_z"], A["height"], A["head_y"], A["chest_y"]))
 hr = ANAT["Hatchling"]["height"] / A["height"]
 check(abs(hr - 0.447) < 0.005, "hatchling / adult height %.3f (brief 0.447)" % hr)
+# v2 painted face decal (ART-DIRECTION 3.4): one 256 x 256 atlas next to the FBX, a UVMap in each creature FBX
+_face = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "Kaiju_Face.png")
+_ok = os.path.isfile(_face)
+if _ok:
+    _im = bpy.data.images.load(_face)
+    _ok = tuple(_im.size) == (256, 256)
+check(_ok, "face decal Kaiju_Face.png next to the FBX, 256 x 256")
+for _st in ("Adult", "Hatchling"):
+    _fbx = os.path.join(os.path.dirname(_face), "Kaiju_%s.fbx" % _st)
+    check(os.path.isfile(_fbx) and b"UVMap" in open(_fbx, "rb").read(), "UVMap for the face decal in Kaiju_%s.fbx" % _st)
 print("RESULT", "PASS" if not fails else "FAIL (%d)" % len(fails))
 sys.exit(1 if fails else 0)
