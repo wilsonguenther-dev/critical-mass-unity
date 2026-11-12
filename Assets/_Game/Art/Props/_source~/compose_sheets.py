@@ -118,7 +118,7 @@ def lineup():
         label(d, (it["bx"], it["by"] + 14), nm, f)
     w = data["warrior"]
     label(d, (w["bx"], w["by"] + 14), "Warrior 2.0 u", f, fill=(255, 230, 160))
-    label(d, (16, 16), f"Critical Mass props v1: {len(data['items'])} props, gameplay camera (pitch 55, FOV 35, "
+    label(d, (16, 16), f"Critical Mass props v2: {len(data['items'])} props, gameplay camera (pitch 55, FOV 35, "
                        f"23.4 u, yaw 45). Centre character {data['centre_character_px']:.0f} px tall.",
           font(20), anchor="lt")
     size, q = save_jpg(im, os.path.join(OUT, "lineup.jpg"))

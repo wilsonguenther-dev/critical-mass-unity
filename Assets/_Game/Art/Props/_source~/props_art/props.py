@@ -87,11 +87,11 @@ def cells_glow(seed, ncell=14):
             return (BIOMASS, MASK_GLOW_LINED)
         n = face.normal
         if glassy(n):
-            return ("#F6FCA0", MASK_GLOW_LINED)
+            return ("#E4F29A", MASK_GLOW_LINED)
         d = sorted((c.normalized() - p).length for p in pts)
         if d[1] - d[0] < 0.09:
             return ("#66D119", MASK_GLOW_LINED)
-        return ("#D3F73C" if n.z > 0.3 else (BIOMASS if n.z > -0.45 else "#8CD12A"), MASK_GLOW_LINED)
+        return ("#D3F73C" if n.z > 0.3 else (BIOMASS if n.z > -0.45 else "#A2CB5E"), MASK_GLOW_LINED)
     return f
 
 
@@ -303,7 +303,7 @@ def corr_plates(seed, H):
         c = face.calc_center_median()
         n = face.normal
         d = sorted((c - p).length for p in pts)
-        if d[1] - d[0] < 0.024 * H / 1.2 and n.y < 0.3:
+        if d[1] - d[0] < 0.016 * H / 1.2 and n.y < 0.3:
             return (CORRUPT_GLOW, MASK_GLOW)
         if n.dot(HL_DIR) > 0.7:
             return (CORR_HL, MASK_FIXED)
@@ -319,7 +319,7 @@ def flame(P, spine, radii, colf, depth=0.62, sides=8, inner=True):
     if inner:
         n = len(pts)
         core = [(p[0], -radii[k] * depth * 0.55, p[2]) for k, p in enumerate(pts)][: n - 1]
-        P.add(tube(core, [r * 0.34 for r in radii[: n - 1]], 5, tip=True),
+        P.add(tube(core, [r * 0.3 for r in radii[: n - 1]], 5, tip=True),
               lambda f: (CORRUPT_TIP if f.calc_center_median().z > spine[-1][1] * 0.75 else CORRUPT_GLOW, MASK_GLOW),
               smooth=True)
 
