@@ -28,6 +28,7 @@ from mathutils.bvhtree import BVHTree
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import kaiju_palette as PAL  # noqa: E402
+import kaiju_face as FACE  # noqa: E402
 
 ART = os.path.dirname(HERE)
 FPS = 24
@@ -65,6 +66,19 @@ def make_material():
     m.diffuse_color = (0.5, 0.5, 0.5, 1.0)
     m.roughness = 1.0
     m.metallic = 0.0
+    # the painted face decal (kaiju_face.py) rides on the material as its base-colour texture, so the FBX carries the
+    # Kaiju_Face.png reference (as the Warrior's Warrior_Face.png); vertex colour stays the colour source
+    m.use_nodes = True
+    nt = m.node_tree
+    bsdf = next(n for n in nt.nodes if n.type == "BSDF_PRINCIPLED")
+    uv = nt.nodes.new("ShaderNodeUVMap")
+    uv.uv_map = "UVMap"
+    tex = nt.nodes.new("ShaderNodeTexImage")
+    tex.name = "FACE"
+    tex.image = FACE.make_image(bpy, "Kaiju_Face", os.path.join(ART, "Kaiju_Face.png"))
+    tex.extension = "CLIP"
+    nt.links.new(uv.outputs[0], tex.inputs[0])
+    nt.links.new(tex.outputs["Color"], bsdf.inputs["Base Color"])
     return m
 
 
@@ -77,7 +91,7 @@ class Geo:
     """Accumulates pieces: verts, faces, per-face slot, per-vertex rigid bone (None = skin by distance)."""
 
     def __init__(self):
-        self.V, self.F, self.M, self.SM, self.B, self.G = [], [], [], [], [], []
+        self.V, self.F, self.M, self.SM, self.B, self.G, self.D = [], [], [], [], [], [], []
 
     def add(self, verts, faces, mats, bone=None, smooth=False, shade=None):
         """shade: per-vertex value factor baked into the vertex colour (+6 % toward the top of a part, -10 % in
@@ -90,6 +104,7 @@ class Geo:
             self.F.append(tuple(i + o for i in f))
             self.M.append(mats[k] if isinstance(mats, (list, tuple)) else mats)
             self.SM.append(smooth)
+            self.D.append(False)
 
 
 def frame(n, spin=0.0):
@@ -401,7 +416,7 @@ def metaball_body(balls, limbs, voxel, tri_target):
     return bm
 
 
-def add_body(geo, bm, face_slot, smooth_fn=lambda c, n: False):
+def add_body(geo, bm, face_slot, smooth_fn=lambda c, n: False, decal_fn=lambda c, n: False):
     bm.verts.index_update()
     V = [v.co.copy() for v in bm.verts]
     F, mats, sm = [], [], []
@@ -414,6 +429,7 @@ def add_body(geo, bm, face_slot, smooth_fn=lambda c, n: False):
         geo.F.append(tuple(v.index + o for v in f.verts))
         geo.M.append(SLOT[face_slot(c, n)])
         geo.SM.append(smooth_fn(c, n))
+        geo.D.append(bool(decal_fn(c, n)))
 
 
 def surface_samples(bm, count, rng):
@@ -567,6 +583,7 @@ def finish(name, geo, bones, target_h):
     bm.to_mesh(me)
     bm.free()
     paint(me, name, geo)
+    face_uvs(me, name, geo, off, s)
     ob = bpy.data.objects.new(name + "_Mesh", me)
     COLL.objects.link(ob)
     rig = make_rig(name, bones)
@@ -604,6 +621,34 @@ def paint(me, stage, geo):
             vals.append((min(1.0, base[0] * g), min(1.0, base[1] * g), min(1.0, base[2] * g), a))
     for li, v in enumerate(vals):
         col.data[li].color_srgb = v
+
+
+def face_uvs(me, stage, geo, off=None, s=1.0):
+    """UV map "UVMap" for the painted face decal: faces flagged in geo.D take the front planar projection of their
+    stage's rect (kaiju_face.py, design units); a flagged face with any corner outside the rect, and every other face,
+    sits on the transparent corner texel, so only the head front shows paint."""
+    uvl = me.uv_layers.new(name="UVMap")
+    n_dec = 0
+    for poly in me.polygons:
+        uvs = None
+        if stage in FACE.RECT and geo.D[poly.index]:
+            uvs = []
+            for li in poly.loop_indices:
+                v = me.vertices[me.loops[li].vertex_index].co
+                d = v / s + off
+                uv = FACE.uv_for(stage, d.x, d.z)
+                if uv is None:
+                    uvs = None
+                    break
+                uvs.append(uv)
+        if uvs:
+            n_dec += 1
+            for li, uv in zip(poly.loop_indices, uvs):
+                uvl.data[li].uv = uv
+        else:
+            for li in poly.loop_indices:
+                uvl.data[li].uv = FACE.CORNER_UV
+    print("FACE_UV %s decal faces %d" % (stage, n_dec))
 
 
 def auto(p):
@@ -765,7 +810,16 @@ def creature(name, P, seed, target_h):
     def belly_zone(c, n):
         return P["belly"](c, n) and not (c - Hc).length < RH * 1.2
 
+    fr = FACE.RECT[name]
+
+    def decal_zone(c, n):
+        """head front that takes the painted face (eyes, lids, smirk / grin, tan muzzle)"""
+        return ((c - Hc).length < RH * 1.9 and c.y < Hc.y - 0.1 * RH and n.y < -0.2 and c.z > Hc.z - 0.75 * RH
+                and FACE.uv_for(name, c.x, c.z) is not None)
+
     def body_slot(c, n):
+        if decal_zone(c, n):
+            return "Skin" if c.z > fr[1] - 0.15 * fr[3] / 0.36 else "Belly"   # paint lays the tan muzzle on top
         if face_zone(c, n):
             if n.z < -0.35 and c.z < P["muzzle"][2]:
                 return "Mouth"   # under the muzzle: hidden by the jaw at rest, the open mouth when the jaw drops
@@ -778,12 +832,14 @@ def creature(name, P, seed, target_h):
             return "Belly"
         return "Glow"
 
-    add_body(geo, bm, body_slot, lambda c, n: face_zone(c, n) or (c - Hc).length < RH * 1.25)
+    add_body(geo, bm, body_slot, lambda c, n: face_zone(c, n) or (c - Hc).length < RH * 1.25, decal_zone)
 
     # --- boulder plates over everything but the face and belly
     def dmin(p, n):
-        if face_zone(p, n) or belly_zone(p, n):
+        if face_zone(p, n) or belly_zone(p, n) or decal_zone(p, n):
             return None
+        if (p - Vector(P["muzzle"])).length < RH * 0.95:
+            return None         # the snout stays clear so the painted smirk / grin reads
         if p.z < P["min_plate_z"]:
             return None
         if (p - Hc).length < RH * P.get("head_clear", 0.0):
@@ -859,17 +915,20 @@ def face_kit(eye_r, eye_off, brow, smile, open_jaw, teeth):
 
     def build(geo, rng, Hc, RH):
         mz = Hc + Vector(eye_off["muzzle"])
+        # eyes, lids, brows' ink and the mouth are PAINTED (kaiju_face.py decal); geometry keeps the brow plates,
+        # cheek spikes, nose, jaw and mouth interior
         for sx in (1, -1):
             e = Hc + Vector((sx * eye_off["x"], eye_off["y"], eye_off["z"]))
-            ellipsoid(geo, e, eye_r, (1.0, 0.75, 1.0), "Eye", bone="Head", seg=12, rings=8)
-            pu = e + Vector((sx * 0.12 * eye_r, -0.6 * eye_r, 0.0))
-            ellipsoid(geo, pu, eye_r * 0.5, (0.85, 0.6, 1.05), "Pupil", bone="Head", seg=10, rings=6)
             # brow plate: inner end low, outer end high (adult: smug / determined); the hatchling has none (cute read)
             if brow:
                 bw, bh = eye_r * brow[0], eye_r * brow[1]
                 c = e + Vector((sx * 0.1 * eye_r, -0.35 * eye_r, eye_r * brow[2]))
                 tilt = Matrix.Rotation(-sx * math.radians(brow[3]), 3, "Y")
-                pts = [c + tilt @ Vector((dx * bw, dy * eye_r * 0.9, dz * bh)) for dx in (-1, 1) for dy in (-1, 0.6) for dz in (-1, 1)]
+                # a heavy arched ridge, thin at the inner end, thick and raised mid-way (not a brick)
+                prof = [(-1.0, 0.45, 0.0), (-0.35, 0.95, 0.25), (0.35, 1.0, 0.3), (1.0, 0.7, 0.05)]
+                pts = [c + tilt @ Vector((sx * dx * bw, dy * eye_r * (0.9 if dy < 0 else 0.6) * (0.75 + 0.25 * hgt),
+                                          (dz * hgt + arch) * bh))
+                       for dx, hgt, arch in prof for dy in (-1, 1) for dz in (-1, 1)]
                 V, F, _ = hull(pts)
                 geo.add(V, F, SLOT["Slate"], "Head")
             # cheek spike
@@ -878,11 +937,6 @@ def face_kit(eye_r, eye_off, brow, smile, open_jaw, teeth):
         # nose: dark flat wedge at the snout tip
         nose = mz + Vector((0, -eye_off["nose_fwd"], eye_off["nose_up"]))
         ellipsoid(geo, nose, eye_r * 0.75, (1.5, 0.7, 0.7), "Pupil", bone="Head", seg=8, rings=5, smooth=False)
-        # mouth line: a smug curve of thin dark beads along the muzzle
-        for i in range(9):
-            u = (i - 4) / 4.0
-            p = mz + Vector((u * smile[0], -smile[1] * (1 - 0.35 * u * u), smile[2] + smile[3] * u * u + smile[4] * u))
-            ellipsoid(geo, p, eye_r * 0.16, (2.2, 1.0, 1.0), "Pupil", bone="Head", seg=6, rings=4, smooth=False)
         # jaw (own bone) with mouth interior behind it, teeth on the upper lip
         jc = mz + Vector(eye_off["jaw"])
         hinge = Hc + Vector((0, -0.1 * RH, -0.45 * RH))
@@ -890,7 +944,8 @@ def face_kit(eye_r, eye_off, brow, smile, open_jaw, teeth):
         js = eye_off["jaw_size"]
         ellipsoid(geo, hinge + R @ (jc - hinge), 1.0, (js[0], js[1] * 1.15, js[2] * 1.3), "Belly", bone="Jaw", seg=10, rings=6,
                   smooth=False, rot=R)
-        ellipsoid(geo, mz + Vector((0, eye_off.get("mouth_back", 0.05) * RH * 2, -0.24 * RH)), RH * 0.36, (1.0, 0.9, 0.5), "Mouth", bone="Head", seg=10, rings=6)
+        ellipsoid(geo, mz + Vector((0, eye_off.get("mouth_back", 0.05) * RH * 2 + 0.1 * RH, -0.13 * RH)), RH * 0.3,
+                  (1.0, 0.9, 0.5), "Mouth", bone="Head", seg=10, rings=6)   # hidden by the closed jaw
         for k in range(teeth):
             u = (k - (teeth - 1) / 2) / max(1, teeth - 1)
             tp = mz + Vector((u * smile[0] * 1.3, -smile[1] * 0.85, smile[2] - 0.02 * RH))
@@ -1064,7 +1119,7 @@ def hatch_params():
     face = face_kit(eye_r=0.15, eye_off={"x": 0.24, "y": -0.43, "z": 0.1, "muzzle": (0, -0.4, -0.16),
                                          "nose_fwd": 0.3, "nose_up": 0.1, "jaw": (0, -0.04, -0.2),
                                          "jaw_size": (0.24, 0.2, 0.08)},
-                    brow=None, smile=(0.18, 0.31, -0.07, 0.07, 0.0), open_jaw=22, teeth=4)
+                    brow=None, smile=(0.18, 0.31, -0.07, 0.07, 0.0), open_jaw=6, teeth=0)
     belly_tiles = [(x, z, 0.16, 0.09) for z in (1.2, 1.0, 0.8, 0.6) for x in (-0.17, 0.17)]
     return {
         "unit": U, "balls": balls, "limbs": limbs, "voxel": 0.045, "body_tris": 2000, "bones": bones,
@@ -1146,6 +1201,7 @@ def prop_mesh(name, stage, geo):
     me.validate(clean_customdata=False)
     me.update()
     paint(me, stage, geo)
+    face_uvs(me, stage, geo)
     ob = bpy.data.objects.new(name, me)
     COLL.objects.link(ob)
     ob["cm_stage"] = name

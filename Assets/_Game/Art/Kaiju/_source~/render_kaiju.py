@@ -93,8 +93,8 @@ def band_factor(nt, L_node):
     return f, is_sh
 
 
-def toon_material():
-    m = bpy.data.materials.get(PAL.MATERIAL)
+def toon_material(m=None, face=True):
+    m = m or bpy.data.materials.get(PAL.MATERIAL)
     m.use_nodes = True
     nt = m.node_tree
     nt.nodes.clear()
@@ -103,10 +103,22 @@ def toon_material():
     team = node(nt, "ShaderNodeRGB", name="TEAM")
     ref = node(nt, "ShaderNodeValue", name="REF")
     f, is_sh = band_factor(nt, L)
+    base = col.outputs["Color"]
+    img = bpy.data.images.get("Kaiju_Face")
+    if face and img is not None:
+        # painted face decal mixed over the vertex colour before the bands (CM/Toon: lit like the head)
+        uv = node(nt, "ShaderNodeUVMap", uv_map="UVMap")
+        tex = node(nt, "ShaderNodeTexImage", image=img, interpolation="Linear", extension="CLIP")
+        nt.links.new(uv.outputs[0], tex.inputs[0])
+        fm = node(nt, "ShaderNodeMix", data_type="RGBA", blend_type="MIX")
+        nt.links.new(tex.outputs["Alpha"], fm.inputs["Factor"])
+        nt.links.new(base, fm.inputs[6])
+        nt.links.new(tex.outputs["Color"], fm.inputs[7])
+        base = fm.outputs[2]
     # fixed colour: rgb * f, shadow band mixed 12 % toward navy
     mul = node(nt, "ShaderNodeMix", data_type="RGBA", blend_type="MULTIPLY")
     mul.inputs["Factor"].default_value = 1.0
-    nt.links.new(col.outputs["Color"], mul.inputs[6])
+    nt.links.new(base, mul.inputs[6])
     fc = node(nt, "ShaderNodeCombineColor")
     for i in range(3):
         nt.links.new(f, fc.inputs[i])
@@ -164,11 +176,12 @@ def flat_material(name, hexs, shaded=True):
 
 
 TOON = toon_material()
+TOON_W = toon_material(bpy.data.materials.new("CM_Toon_Warrior"), face=False)   # the Warrior has its own face UVs
 OUTLINE = flat_material("Outline", PAL.VOID_NAVY, shaded=False)
 OUTLINE.use_backface_culling = True
 GROUND = flat_material("Ground", PAL.GROUND_GREY)
 DECAL = flat_material("TelegraphDecal", PAL.TELEGRAPH_RED, shaded=False)
-LIGHT_NODES = [TOON.node_tree.nodes["LIGHT"], GROUND.node_tree.nodes["LIGHT"]]
+LIGHT_NODES = [TOON.node_tree.nodes["LIGHT"], TOON_W.node_tree.nodes["LIGHT"], GROUND.node_tree.nodes["LIGHT"]]
 
 # ------------------------------------------------------------------------------------------------ scene objects
 STAGES = {}
@@ -227,7 +240,7 @@ W_ROOT = next(o for o in W_OBJS if o.parent is None)
 W_MESHES = [o for o in W_OBJS if o.type == "MESH"]
 for o in W_MESHES:
     o.data.materials.clear()
-    o.data.materials.append(TOON)
+    o.data.materials.append(TOON_W)
 W_HULLS = []
 for o in W_MESHES:
     hm = o.data.copy()
@@ -296,8 +309,9 @@ def set_light(src):
 
 
 def set_team(stage_default, alleg):
-    TOON.node_tree.nodes["TEAM"].outputs[0].default_value = (*PAL.lin(PAL.GLOW[alleg]), 1.0)
-    TOON.node_tree.nodes["REF"].outputs[0].default_value = max(PAL.lin(PAL.GLOW[stage_default]))
+    for mt in (TOON, TOON_W):
+        mt.node_tree.nodes["TEAM"].outputs[0].default_value = (*PAL.lin(PAL.GLOW[alleg]), 1.0)
+        mt.node_tree.nodes["REF"].outputs[0].default_value = max(PAL.lin(PAL.GLOW[stage_default]))
 
 
 def set_pose(ob, clip, phase):
@@ -386,13 +400,13 @@ def gameplay_camera(target):
     return 1080 / (2 * 23.4 * math.tan(math.radians(17.5)))
 
 
-def ortho_camera(objs, az, el, res=640):
+def ortho_camera(objs, az, el, res=640, pts=None):
     az, el = math.radians(az), math.radians(el)
     d = Vector((-math.sin(az) * math.cos(el), -math.cos(az) * math.cos(el), math.sin(el)))   # toward the camera
     rot = (-d).to_track_quat("-Z", "Y")
     R = rot.to_matrix()
     right, up = R.col[0], R.col[1]
-    pts = [w for o in objs for w in world_pts(o)]
+    pts = pts or [w for o in objs for w in world_pts(o)]
     xs = [w.dot(right) for w in pts]
     ys = [w.dot(up) for w in pts]
     cx, cy = (min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2
@@ -528,6 +542,31 @@ for jid, stage, alleg, clip, phase, az, el in BIBLE:
     scene.render.filepath = os.path.join(OUT, jid + ".png")
     bpy.ops.render.render(write_still=True)
     meta[jid] = {"kind": "bible", "px_per_m": ppm}
+    print("RENDERED", jid)
+
+# head close-ups for the painted face (not bible framings): face-<stage>-<az>.png, 480 px
+FACES = [("Adult", "Idle", 0.0, 15, 6), ("Adult", "Idle", 0.0, 50, 10), ("Hatchling", "Idle", 0.0, 15, 6),
+         ("Hatchling", "Idle", 0.0, 50, 10)]
+for stage, clip, phase, az, el in FACES:
+    jid = "face-%s-%d" % (stage.lower(), az)
+    if ONLY and jid not in ONLY and "faces" not in ONLY:
+        continue
+    ob = STAGES[stage]
+    place(ob, (0, 0, 0), 0)
+    set_pose(ob, clip, phase)
+    set_team(PAL.STAGE_DEFAULT_GLOW[stage], "Azure" if stage == "Adult" else "Neutral")
+    show([ob, HULLS[stage]])
+    bpy.context.view_layer.update()
+    rig = ob.parent
+    hb = rig.pose.bones["Head"]
+    hc = rig.matrix_world @ ((hb.head + hb.tail) / 2)
+    hr = (hb.tail - hb.head).length * 1.25
+    pts = [w for w in world_pts(ob) if (w - hc).length < hr]
+    ppm = ortho_camera([ob], az, el, res=480, pts=pts)
+    hull_width(2.0, ppm)
+    scene.render.film_transparent = True
+    scene.render.filepath = os.path.join(OUT, jid + ".png")
+    bpy.ops.render.render(write_still=True)
     print("RENDERED", jid)
 
 json.dump(meta, open(meta_path, "w"), indent=1)
