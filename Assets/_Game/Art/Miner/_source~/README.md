@@ -57,3 +57,6 @@ are `feat_*` vertex groups kept in the .blend. `feat_*_detail` groups mark inner
 ## v2 (2026-11-12)
 
 See ~/Obsidian/Wilson-Brain/Projects/Kaiju-Demo/unity-port/miner-v2/REPORT.md. New: bible_masks.py + bible_masks/ (clean masks), iou_gate.py (registered IoU gate), fit_stance.py + stances.json + miner_art/stance.py (render-only bible stances fitted per crop), miner_art/face_decal.py (256 px painted face decal -> ../MinerFace.png, material CM_FaceDecal on Miner_Body slot 1). Unity: assign MinerFace.png to CM_FaceDecal (alpha, no outline pass).
+
+## v3 (2026-11-12)
+Face rebuilt for the bible likeness: decal holds only big round eyes; brows, nose, scalloped beard, moustache and smile are geometry; helmet raised, widened, eight stone plates over a dark core, upright crystal in a brass cup. Arms: cream sleeves, tan forearms, brass shoulder pads, dark gloves. Detail: chipped stone chest plate with brass brackets, pouch flaps with buckles, stone shin plates, segmented pick head, blue grip wraps. mkit adds a vertex-colour value step by facing (UP_GAIN / DOWN_LOSS). build_report.json lists triangles_by_feature. Report: Obsidian unity-port/miner-v3/REPORT.md.
