@@ -324,6 +324,9 @@ def measure_walls():
         "landmark_diameter_m": 4.5,
         "stair_step_rise_m": 0.25, "stair_tread_m": 0.35,
         "blocks_per_piece": {k: v["blocks"] for k, v in KIT.items() if v["blocks"]},
+        "walkable_piece_max_height_m (limit 0.3)": {k: round(max(v.co.z for v in KIT[k]["mesh"].vertices), 3) for k in
+                                                    ("wall_segment_destroyed", "hill_breakable_destroyed",
+                                                     "shrine_breakable_destroyed", "pad", "hill_dais")},
     }
 
 
@@ -589,7 +592,7 @@ def set_outline(ob, px, px_per_m_fn):
         sol.offset = 1.0
         sol.use_flip_normals = True
         sol.use_rim = False
-        sol.use_even_offset = True
+        sol.use_even_offset = False     # even offset throws spikes on chipped/bevelled corners
         sol.material_offset = 1
     c = ob.matrix_world @ (sum((Vector(b) for b in ob.bound_box), Vector()) / 8)
     sol.thickness = px / px_per_m_fn(c)

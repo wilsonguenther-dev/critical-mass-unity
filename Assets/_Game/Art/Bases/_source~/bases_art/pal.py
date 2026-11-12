@@ -21,6 +21,8 @@ HEX = {
     # v2 block tops: warm tan (bible p14 chunky stone tops #AB9274 .. #D8C9A0), cool-leaning variants for dark walls
     "top_a": "#C2AE86", "top_b": "#B49E78", "top_c": "#CDBB93", "top_cool_a": "#A9A28C", "top_cool_b": "#9E9A8A",
     "grass": "#A3C24F", "grass_d": "#7FA43F",
+    # bible p14 respawn pad: dark slate disc (#415151 / #53736C sampled)
+    "slate": "#4D5B5A", "slate_d": "#3F4A4A", "slate_l": "#5E6F6C",
     "dais": "#C9B58E", "dais_d": "#8E8A6A", "pave": "#B9B19C", "pave_d": "#A39B86",
     "moss": "#8FAE48", "moss_d": "#6F9A3E",
     "wood": "#C78B50", "wood_b": "#B27440", "wood_d": "#633F22", "rope": "#D9B98A",

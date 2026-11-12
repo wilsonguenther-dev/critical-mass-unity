@@ -289,31 +289,49 @@ def roof_pitched(name="cm_roof_pitched", span=3.0, length=4.0, pitch=50.0):
 
 
 def respawn_pad(name="cm_respawn_pad", seed=13):
-    """Bible p14 respawn pad, flat enough to walk (top 0.22 u, crystals 0.3 u): block ring r 2.7..3.75, inner disc,
-    team glow ring and cross glyph, four low team crystals."""
+    """Bible p14 respawn pad, walkable (nothing above 0.3 u): an outer ring of 12 chunky chipped blocks of varied width
+    (r 2.72..3.75), a light inner kerb, the team glow channel with a dark lip, a dark slate disc laid in tiles, the
+    glowing cross, low team crystal clusters in the ring, mossy tops, grass and boulders outside."""
     pc = Piece(name, team=True)
     rng = random.Random(seed)
-    n = 14
-    for k in range(n):
-        t0, t1 = 2 * math.pi * k / n + 0.01, 2 * math.pi * (k + 1) / n - 0.01
-        ri, ro = 2.72, 3.75 + rng.uniform(-0.06, 0.06)
-        h = rng.uniform(0.17, 0.26)
-        cs = [Vector((ri * math.cos(t0), ri * math.sin(t0), 0)), Vector((ri * math.cos(t1), ri * math.sin(t1), 0)),
-              Vector((ro * math.cos(t1), ro * math.sin(t1), 0)), Vector((ro * math.cos(t0), ro * math.sin(t0), 0))]
-        cs += [Vector((v.x, v.y, h)) for v in cs]
-        pc.block(cs, *kit.stone_side(rng, warm=True), bev=0.05)
-        if rng.random() < 0.3:
-            m = (cs[4] + cs[6]) / 2
-            kit.moss(pc, rng, m.x, m.y, h - 0.03, 0.18)
-    pc.lathe([(2.7, 0.0), (2.7, 0.09), (0.0, 0.09)], 32, topside(pal.vc("body_c"), pal.vc("pave_d")))
-    pc.lathe([(2.0, 0.09), (2.42, 0.09), (2.42, 0.12), (2.0, 0.12)], 40, solid(pal.vc("team_glow")), closed=True)
-    pc.lathe([(1.88, 0.09), (1.88, 0.1), (0.0, 0.1)], 32, solid(pal.vc("pave")))
+    _ring_blocks(pc, rng, 2.74, 3.75, 0.22, 12, hj=0.03, moss_p=0.6, tuft_p=0.9, vary=0.3, a0=0.2, moss_size=0.3)
+    _ring_blocks(pc, rng, 2.44, 2.72, 0.17, 18, hj=0.02, moss_p=0.0, chips=False, vary=0.2)
+    # glow channel: dark lip, team glow ring, bright inner line
+    pc.lathe([(2.36, 0.0), (2.36, 0.11), (2.44, 0.11), (2.44, 0.0)], 48, solid(pal.vc("team_dark")), closed=True)
+    pc.lathe([(1.98, 0.0), (1.98, 0.12), (2.36, 0.12), (2.36, 0.0)], 48, solid(pal.vc("team_glow")), closed=True)
+    pc.lathe([(1.9, 0.0), (1.9, 0.105), (1.98, 0.105), (1.98, 0.0)], 48, solid(pal.vc("team_dark")), closed=True)
+    # slate disc: centre slab + a ring of 10 tiles of varied width (seams are the gaps)
+    pc.lathe([(0.98, 0.0), (0.98, 0.1), (0.0, 0.1)], 32, topside(pal.vc("slate_d"), pal.vc("slate")))
+    ws = [rng.uniform(0.8, 1.2) for _ in range(10)]
+    t = 0.3
+    for w in ws:
+        span = 2 * math.pi * w / sum(ws)
+        t0, t1 = t + 0.015, t + span - 0.015
+        t += span
+        cs = [Vector((1.02 * math.cos(t0), 1.02 * math.sin(t0), 0)), Vector((1.02 * math.cos(t1), 1.02 * math.sin(t1), 0)),
+              Vector((1.88 * math.cos(t1), 1.88 * math.sin(t1), 0)), Vector((1.88 * math.cos(t0), 1.88 * math.sin(t0), 0))]
+        cs += [Vector((v.x, v.y, 0.1 + rng.uniform(-0.01, 0.005))) for v in cs]
+        k = rng.uniform(0.92, 1.1)
+        pc.block(cs, pal.vc("slate_d", k), pal.vc(rng.choice(("slate", "slate_l")), k), bev=0.025)
+    # glowing cross (raised, bevelled) with a dark rim
     for rot in (0.0, math.pi / 2):
-        pc.box(0, 0, 0.1, 1.7, 0.5, 0.025, pal.vc("team_glow"), rot=rot, bev=0.0)
-    for k in range(4):
-        a = math.pi / 4 + k * math.pi / 2
-        kit.crystal_cluster(pc, 3.2 * math.cos(a), 3.2 * math.sin(a), 0.0, rng, height=0.29, n=7, spread=0.34,
-                            base=False)
+        pc.box(0, 0, 0.1, 1.86, 0.62, 0.02, pal.vc("team_dark"), rot=rot, bev=0.0)
+        pc.box(0, 0, 0.11, 1.7, 0.48, 0.035, pal.vc("team_glow"), rot=rot, bev=0.012)
+    # low team crystal clusters (<= 0.3 u) nested in the outer ring, two big ones as the bible's
+    for k, (a, n, sp) in enumerate(((math.radians(120), 11, 0.4), (math.radians(300), 11, 0.4),
+                                    (math.radians(35), 6, 0.24), (math.radians(215), 6, 0.24))):
+        kit.crystal_cluster(pc, 4.12 * math.cos(a), 4.12 * math.sin(a), 0.0, rng, height=0.29, n=n, spread=sp,
+                            base=False, lamp=k < 2)
+    # boulders and grass outside the ring (<= 0.28 u)
+    for k in range(5):
+        a = rng.uniform(0, 2 * math.pi)
+        r = rng.uniform(3.95, 4.3)
+        pc.box(r * math.cos(a), r * math.sin(a), -0.04, rng.uniform(0.35, 0.55), rng.uniform(0.3, 0.45),
+               rng.uniform(0.24, 0.32), *kit.stone_side(rng, warm=True), rot=a + rng.uniform(-0.4, 0.4), bev=0.06,
+               segs=2, chips=kit.rand_chips(rng, 0.7, 0.3, 0.06, 0.12))
+    for k in range(10):
+        a = rng.uniform(0, 2 * math.pi)
+        kit.grass_tuft(pc, rng, 3.95 * math.cos(a), 3.95 * math.sin(a), 0.0, 0.24)
     return pc
 
 
@@ -456,7 +474,7 @@ SHRINE_DAIS_TOP = 1.5     # two courses on the 2 x 2 solid Sim cells (the only s
 
 
 def _ring_blocks(pc, rng, ri, ro, h, n, warm=True, hj=0.0, a0=0.0, chips=True, moss_p=0.3, tuft_p=0.0, z0=0.0,
-                 vary=0.35):
+                 vary=0.35, moss_size=0.2):
     """A ring of chunky blocks with varied angular widths (each its own bevelled, chipped shell)."""
     ws = [rng.uniform(1 - vary, 1 + vary) for _ in range(n)]
     tot = sum(ws)
@@ -474,7 +492,7 @@ def _ring_blocks(pc, rng, ri, ro, h, n, warm=True, hj=0.0, a0=0.0, chips=True, m
                  chips=kit.rand_chips(rng, 0.55, 0.2, 0.07, min(0.16, hh * 0.6)) if chips else None)
         if rng.random() < moss_p:
             m = (cs[4] + cs[6]) / 2
-            kit.moss(pc, rng, m.x, m.y, z0 + hh - 0.03, 0.2)
+            kit.moss(pc, rng, m.x, m.y, z0 + hh - 0.03, moss_size)
         if rng.random() < tuft_p:
             tm = (t0 + t1) / 2
             kit.grass_tuft(pc, rng, (rr + 0.12) * math.cos(tm), (rr + 0.12) * math.sin(tm), z0, min(0.26, 0.3 - z0))
@@ -547,9 +565,9 @@ def _shrine_horn(pc, rng, d):
     # corner column (square-aligned, the corner of the 2 x 2 cells)
     sx, sy = (1 if d.x > 0 else -1), (1 if d.y > 0 else -1)
     side, top = kit.stone_side(rng, warm=True)
-    pc.box(sx * 0.7, sy * 0.7, SHRINE_DAIS_TOP, 0.56, 0.56, 0.68, side, top, rot=0.0, bev=0.07, segs=2,
+    pc.box(sx * 0.7, sy * 0.7, SHRINE_DAIS_TOP, 0.56, 0.56, 0.92, side, top, rot=0.0, bev=0.07, segs=2,
            chips=[(4 + i, 0.1) for i in range(1)])
-    prof = [(1.0, 2.12), (1.36, 2.72), (1.7, 3.38), (1.9, 4.08), (1.93, 4.78), (1.8, 5.4), (1.52, 5.92), (1.18, 6.2)]
+    prof = [(1.0, 2.5), (1.38, 3.05), (1.7, 3.62), (1.9, 4.25), (1.93, 4.88), (1.8, 5.45), (1.52, 5.95), (1.18, 6.22)]
     pts = [d * lat + Vector((0, 0, z)) for lat, z in prof]
     _block_chain(pc, rng, pts, 0.98, 0.7, depth0=0.8, depth1=0.6, warm=True, moss_p=0.5)
 

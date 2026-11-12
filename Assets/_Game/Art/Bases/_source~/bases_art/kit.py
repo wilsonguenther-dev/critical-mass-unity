@@ -432,7 +432,7 @@ def wall_run(piece, path, rng, thick=1.0, courses=3, z0=0.0, merlons=True, walkw
                 hi_o -= 0.24
             side = pal.vc("body_a", 0.8)
             topc = pal.vc("body_a", 0.92)
-        elif 0.21 <= r < 0.36:
+        elif 0.21 <= r < 0.36 and courses > 1:
             # shifted stone: pushed out of line on one face and in on the other
             sh = rng.choice((-1, 1)) * rng.uniform(0.03, 0.045)
             lo_o += sh
@@ -445,7 +445,7 @@ def wall_run(piece, path, rng, thick=1.0, courses=3, z0=0.0, merlons=True, walkw
             sm = rng.uniform(a + 0.25, b - 0.25)
             face = rng.choice((-1, 1))
             moss_strip(piece, rng, path, sm, face * (h0 + 0.02), zt + GAP / 2, rng.uniform(0.35, 0.7), face)
-        if top_course and rng.random() < moss_p * 1.6:
+        if top_course and courses > 1 and rng.random() < moss_p * 1.6:
             sm = rng.uniform(a + 0.2, b - 0.2)
             moss_drape(piece, rng, path, sm, hi_o, zt, 1, rng.uniform(0.26, 0.4))
     if not merlons and walkway is False:
@@ -534,28 +534,54 @@ def wall_run(piece, path, rng, thick=1.0, courses=3, z0=0.0, merlons=True, walkw
 
 
 def _rubble_run(piece, path, rng, thick, z0, warm):
-    """Destroyed: low broken stubs of the bottom course plus scattered chunks, all at most 0.3 u above z0."""
-    xs = course_breaks(path.L, rng, False)
+    """Destroyed (bible p14 heap, flattened to the walkable limit): every top at most 0.3 u above z0. Big chipped
+    blocks sunk into the ground and tilted along the old wall line, broken stubs of the bottom course, smaller
+    chunks and fallen cap stones lying on and around them, moss and grass between."""
     h0 = thick / 2
-    for a, b in zip(xs, xs[1:]):
-        if rng.random() < 0.25:
+    L = path.L
+    xs = course_breaks(L, rng, False)
+    for a, b in zip(xs, xs[1:]):           # stubs of the bottom course (some missing)
+        if rng.random() < 0.3:
             continue
         side, topc = stone_side(rng, warm)
-        hgt = rng.uniform(0.12, 0.26)
-        piece.block(hexa_on_path(path, a + 0.05, b - 0.05, -h0 + 0.05, h0 - 0.05, z0, z0 + hgt, 0.03, rng), side, topc)
-    for _ in range(int(path.L * 3)):
-        s = rng.uniform(0, path.L)
-        p = path.at(s, rng.uniform(-h0 - 0.4, h0 + 0.5), z0)
+        hgt = rng.uniform(0.14, 0.22)
+        piece.block(hexa_on_path(path, a + 0.05, b - 0.05, -h0 + 0.05, h0 - 0.05, z0, z0 + hgt, 0.03, rng), side, topc,
+                    bev=0.06, segs=2, chips=rand_chips(rng, 0.8, 0.4, 0.07, 0.13))
+    s = rng.uniform(0.0, 0.4)
+    while s < L:                           # the heap: chunky tilted cubes (blue-grey sides, tan tops), tops 0.2..0.3
+        for _ in range(2):
+            p = path.at(s + rng.uniform(-0.15, 0.15), rng.uniform(-0.75, 0.85), z0)
+            ang = rng.uniform(0, math.pi)
+            side, topc = stone_side(rng, warm)
+            if rng.random() < 0.55:
+                side = pal.vc(rng.choice(("body_c", "body_d")), rng.uniform(0.95, 1.15))
+                topc = pal.vc(rng.choice(("top_a", "top_b", "top_c")), rng.uniform(0.95, 1.05))
+            top = rng.uniform(0.2, 0.3)
+            sink = rng.uniform(0.05, 0.18)
+            jit = [-rng.uniform(0.0, 0.1) for _ in range(4)]
+            jit[rng.randrange(4)] = 0.0
+            w = rng.uniform(0.38, 0.62)
+            piece.box(p.x, p.y, z0 - sink, w, w * rng.uniform(0.75, 1.0), top + sink, side, topc, rot=ang,
+                      bev=0.06, segs=2, jit=jit, chips=rand_chips(rng, 0.9, 0.5, 0.06, 0.12))
+        s += rng.uniform(0.35, 0.6)
+    for _ in range(int(L * 4)):            # chunks and cap stones scattered wider (lower, so nothing passes 0.3)
+        s = rng.uniform(0, L)
+        o = rng.uniform(-h0 - 0.9, h0 + 1.2)
+        p = path.at(s, o, z0)
         side, topc = stone_side(rng, warm)
-        if rng.random() < 0.3:
+        if rng.random() < 0.25:
             side, topc = pal.vc("cap_side"), pal.vc("cap")
-        hgt = rng.uniform(0.08, 0.22)
-        piece.box(p.x, p.y, z0 - 0.04, rng.uniform(0.2, 0.5), rng.uniform(0.2, 0.45), hgt + 0.04, side, topc,
-                  rot=rng.uniform(0, 3.1), bev=0.04, jit=[rng.uniform(-0.04, 0.04) for _ in range(4)])
-    for _ in range(int(path.L)):
-        s = rng.uniform(0, path.L)
-        p = path.at(s, rng.uniform(-0.3, 0.3), z0 + 0.15)
-        moss(piece, rng, p.x, p.y, z0 + 0.12, 0.2)
+        far = abs(o) > h0 + 0.3
+        hgt = rng.uniform(0.07, 0.14) if far else rng.uniform(0.1, 0.2)
+        piece.box(p.x, p.y, z0 - 0.04, rng.uniform(0.18, 0.42), rng.uniform(0.16, 0.36), hgt + 0.04, side, topc,
+                  rot=rng.uniform(0, 3.1), bev=0.04, jit=[rng.uniform(-0.04, 0.0) for _ in range(4)],
+                  chips=rand_chips(rng, 0.5, 0.1, 0.04, 0.07))
+    for _ in range(int(L * 1.6)):
+        s = rng.uniform(0, L)
+        p = path.at(s, rng.uniform(-0.9, 1.0), z0)
+        moss(piece, rng, p.x, p.y, z0 + 0.02, rng.uniform(0.2, 0.32))
+        if rng.random() < 0.7:
+            grass_tuft(piece, rng, p.x + rng.uniform(-0.2, 0.2), p.y + rng.uniform(-0.2, 0.2), z0, 0.22)
 
 
 # ---------------------------------------------------------------------- drum courses (towers)
