@@ -33,10 +33,13 @@ def facet_light(lit, dark, mask_lit, mask_dark, lvec=(-0.55, -0.35, 0.75)):
     return f
 
 
-def rock(P, r, loc, seed, col=STONE, sub=2, squash=0.7, rot=0.0):
+def rock(P, r, loc, seed, col=STONE, sub=2, squash=0.7, rot=0.0, moss=False):
     bm = jitter(ico(r, sub), r * 0.28, 2.2 / r, seed)
-    P.add(bm, by_nz(col, col, STONE_D, 0.5, -0.4) if col == STONE else col,
-          mat=M(loc, (0, 0, rot), (1.0, 0.9, squash)))
+    if col == STONE:
+        top = MOSS if moss else STONE
+        P.add(bm, lambda f: top if f.normal.z > 0.62 else STONE, mat=M(loc, (0, 0, rot), (1.0, 0.9, squash)))
+    else:
+        P.add(bm, col, mat=M(loc, (0, 0, rot), (1.0, 0.9, squash)))
 
 
 def tuft(P, loc, h=0.09, n=3, seed=0, col=GRASS_D):
@@ -51,47 +54,78 @@ def dirt_base(P, r, seed, h=0.05):
 
 
 # ---------------------------------------------------------------- p14 biomass plants
-def biomass_plant(name, H, nstalk, nhead, nmush, seed):
+def bio_glow(f):
+    n = f.normal
+    if n.dot(Vector((-0.45, -0.45, 0.77))) > 0.9:
+        return ("#F6FD58", MASK_GLOW)
+    return (BIO_HI if n.z > 0.35 else (BIOMASS if n.z > -0.35 else BIO_LO), MASK_GLOW)
+
+
+def cells_glow(seed, ncell=14):
+    """Biomass orb surface: lighter cells with darker borders (bible loose orb), plus a top-left highlight."""
+    import random as _r
+    rr = _r.Random(seed)
+    pts = []
+    for _ in range(ncell):
+        v = Vector((rr.gauss(0, 1), rr.gauss(0, 1), rr.gauss(0, 1))).normalized()
+        pts.append(v)
+
+    def f(face):
+        c = face.calc_center_median()
+        if c.length < 1e-6:
+            return (BIOMASS, MASK_GLOW)
+        d = sorted((c.normalized() - p).length for p in pts)
+        n = face.normal
+        if n.dot(Vector((-0.45, -0.5, 0.74))) > 0.92:
+            return ("#F4FB61", MASK_GLOW)
+        if d[1] - d[0] < 0.09:
+            return ("#66D119", MASK_GLOW)
+        return ("#D3F73C" if n.z > 0.3 else (BIOMASS if n.z > -0.45 else "#8CD12A"), MASK_GLOW)
+    return f
+
+
+def biomass_plant(name, H, nstalk, heads, nmush, seed):
+    """heads: list of (x, z, [blob radii]) clusters; the first is the crown."""
     P = Prop(name, LARGE, "interactable", {"height": H}, seed)
     rng = P.rng
-    base_r = 0.30 + 0.12 * nstalk / 3
-    dirt_base(P, base_r, seed)
-    for i in range(nstalk):                                       # curling fern-like stalks
-        a = 2 * math.pi * (i + rng.uniform(-0.2, 0.2)) / nstalk + 0.4
-        reach = rng.uniform(0.35, 0.55)
-        hs = rng.uniform(0.55, 0.8) if i else 0.62
+    base_r = 0.2 + 0.06 * nstalk / 3
+    dirt_base(P, base_r, seed, h=0.04)
+    for i in range(nstalk):                                       # thick curling stalks
+        a = 2 * math.pi * (i + rng.uniform(-0.15, 0.15)) / nstalk + 0.3
+        reach = rng.uniform(0.3, 0.45)
+        hs = rng.uniform(0.45, 0.7)
         pts, rad = [], []
-        for k in range(8):
-            t = k / 7
-            d = reach * math.sin(t * math.pi * 0.62) * 0.75
-            z = hs * t ** 0.85
-            if k >= 6:                                            # tip curls outward and down
-                d += 0.08 * (k - 5)
-                z -= 0.07 * (k - 5) ** 1.5
-            pts.append((d * math.cos(a), d * math.sin(a), z + 0.03))
-            rad.append(0.075 * (1 - 0.75 * t) + 0.012)
-        P.add(tube(pts, rad, 5, tip=True), by_nz(STALK_L, STALK, STALK, 0.35, -2), smooth=True)
-    P.add(tube([(0, 0, 0.02), (0.02, 0.0, 0.35), (-0.02, 0.02, 0.62)], [0.10, 0.08, 0.06], 6), STALK, smooth=True)
-    glow = by_nz(BIO_HI, BIOMASS, BIO_LO, 0.5, -0.3, MASK_GLOW)
-    cr = 0.36                                                     # head cluster
-    for i in range(nhead):
-        if i == 0:
-            c, r = Vector((0, 0, 0.78)), 0.27
-        else:
-            a = 2 * math.pi * i / max(1, nhead - 1) + rng.uniform(-0.3, 0.3)
-            c = Vector((cr * 0.62 * math.cos(a), cr * 0.62 * math.sin(a), 0.70 + rng.uniform(-0.06, 0.08)))
-            r = rng.uniform(0.15, 0.2)
-        P.add(uvs(r, 10, 7), glow, smooth=True, mat=M(c, (0, 0, rng.uniform(0, 90)), (1, 1, 0.86)))
+        for k in range(7):
+            t = k / 6
+            d = reach * math.sin(t * math.pi * 0.55) * 0.8
+            z = hs * t ** 0.8
+            if k >= 5:
+                d += 0.09 * (k - 4)
+                z -= 0.08 * (k - 4) ** 1.6
+            pts.append((d * math.cos(a), d * math.sin(a), z + 0.02))
+            rad.append(0.085 * (1 - 0.7 * t) + 0.012)
+        P.add(tube(pts, rad, 5, tip=True), by_nz(STALK_L, STALK, STALK, 0.3, -2), smooth=True)
+    for (x, z, radii) in heads:
+        P.add(tube([(0, 0, 0.02), (x * 0.4, 0.0, z * 0.5), (x, 0.0, z - 0.05)], [0.1, 0.075, 0.06], 5),
+              by_nz(STALK_L, STALK, STALK, 0.3, -2), smooth=True)
+        for j, r in enumerate(radii):
+            if j == 0:
+                c = Vector((x, 0, z))
+            else:
+                a = 2 * math.pi * j / (len(radii) - 1) + rng.uniform(-0.3, 0.3)
+                rr = radii[0] * 0.8
+                c = Vector((x + rr * math.cos(a), rr * 0.7 * math.sin(a), z - radii[0] * 0.35 + rng.uniform(-0.03, 0.05)))
+            P.add(uvs(r, 8, 6), bio_glow, smooth=True, mat=M(c, (0, 0, rng.uniform(0, 90))))
     for i in range(nmush):                                        # small biomass puffs at the base
-        a = 2 * math.pi * i / max(1, nmush) + 1.1
-        d = base_r * 0.78
-        h = rng.uniform(0.10, 0.2)
-        c = (d * math.cos(a), d * math.sin(a), 0.0)
-        P.add(cyl(0.025, h, 4, bevel=0), STALK, mat=M(c))
-        P.add(uvs(rng.uniform(0.07, 0.1), 8, 5), glow, smooth=True, mat=M((c[0], c[1], h), scale=(1, 1, 0.8)))
-    rock(P, 0.09, (base_r * 0.7, -base_r * 0.55, 0.03), seed + 1)
-    rock(P, 0.06, (-base_r * 0.75, -base_r * 0.4, 0.02), seed + 2, sub=1)
-    tuft(P, (-base_r * 0.2, -base_r * 0.85, 0.02), seed=seed)
+        a = 2 * math.pi * i / max(1, nmush) + 1.4
+        d = base_r * 0.95
+        h = rng.uniform(0.08, 0.16)
+        c = (d * math.cos(a), d * math.sin(a) - 0.05, 0.0)
+        P.add(cyl(0.022, h, 4, bevel=0), STALK, mat=M(c))
+        P.add(uvs(rng.uniform(0.06, 0.085), 6, 4), bio_glow, smooth=True, mat=M((c[0], c[1], h)))
+    rock(P, 0.08, (base_r * 0.6, -base_r * 0.7, 0.02), seed + 1)
+    rock(P, 0.05, (-base_r * 0.8, -base_r * 0.5, 0.02), seed + 2, sub=1)
+    tuft(P, (-base_r * 0.2, -base_r * 0.95, 0.02), seed=seed)
     return P.finish(fit_height=H)
 
 
@@ -112,14 +146,7 @@ def biomass_sprout():
 # ---------------------------------------------------------------- orbs (pickups) and carried bundle
 def orb_biomass():
     P = Prop("prop_orb_biomass", LARGE, "interactable", {"height": 0.45, "width": 0.45}, 3)
-    glow = by_nz(BIO_HI, BIOMASS, BIO_LO, 0.45, -0.35, MASK_GLOW)
-    P.add(uvs(0.2, 14, 9), glow, smooth=True, mat=M((0, 0, 0.22)))
-    rng = P.rng
-    for i in range(7):
-        a, el = 2 * math.pi * i / 7 + rng.uniform(-0.3, 0.3), rng.uniform(-0.2, 0.9)
-        d = Vector((math.cos(a) * math.cos(el), math.sin(a) * math.cos(el), math.sin(el)))
-        r = rng.uniform(0.06, 0.09)
-        P.add(uvs(r, 8, 6), glow, smooth=True, mat=M(Vector((0, 0, 0.22)) + d * (0.2 - r * 0.25)))
+    P.add(uvs(0.225, 16, 10), cells_glow(3), smooth=True, mat=M((0, 0, 0.225)))
     return P.finish(fit_height=0.45)
 
 
@@ -170,15 +197,18 @@ def orb_brass():
 
 def carried_bundle():
     P = Prop("prop_carried_bundle", LARGE, "interactable", {"height": 0.55, "width": 0.5}, 9)
-    c = (0, 0, 0.27)
-    P.add(uvs(0.175, 12, 8), by_nz(BIO_HI, BIOMASS, BIO_LO, 0.45, -0.35, MASK_GLOW), smooth=True, mat=M(c))
-    seg_col = lambda f: WOOD if f.normal.z > 0.2 or f.normal.y < -0.5 else WOOD_B
-    P.add(torus(0.215, 0.045, 14, 5), seg_col, mat=M(c, (90, 0, 0)))        # front ring (faces camera)
-    P.add(torus(0.215, 0.035, 14, 4), WOOD_D, mat=M(c, (90, 0, 90)))        # side ring
-    P.add(torus(0.225, 0.022, 16, 4), LEATHER, mat=M(c))                    # strap
-    for (x, z) in ((0, 0.27 + 0.215), (0, 0.27 - 0.215), (0.215, 0.27), (-0.215, 0.27)):
-        P.add(box(0.1, 0.11, 0.08, bevel=0.02, base=False), BRASS, mat=M((x, 0, z), (0, 90 if x else 0, 0)))
-    P.add(tube([(-0.12, -0.05, 0.47), (0, -0.07, 0.56), (0.12, -0.05, 0.47)], [0.02, 0.02, 0.02], 4), LEATHER)
+    c = (0, 0, 0.26)
+    P.add(uvs(0.215, 14, 9), cells_glow(9, 10), smooth=True, mat=M(c))
+
+    def planks_(f):
+        a = math.atan2(f.calc_center_median().z - 0.26, f.calc_center_median().x)
+        return WOOD if int((a + 4) * 2.2) % 2 else WOOD_B
+    P.add(torus(0.215, 0.034, 16, 5), planks_, mat=M(c, (90, 0, 0)))          # plank ring around the orb
+    P.add(torus(0.205, 0.026, 16, 4), WOOD_D, mat=M((0, 0, 0.19)))            # band round the lower middle
+    P.add(torus(0.22, 0.018, 16, 4), LEATHER, mat=M(c, (90, 0, 90)))          # strap over the top
+    for (x, z) in ((-0.205, 0.19), (0.205, 0.19)):
+        P.add(box(0.07, 0.09, 0.08, bevel=0.02, base=False), BRASS, mat=M((x, 0, z)))
+    P.add(box(0.09, 0.09, 0.06, bevel=0.02, base=False), BRASS, mat=M((0, 0, 0.485)))
     return P.finish(fit_height=0.55)
 
 
@@ -186,33 +216,34 @@ def carried_bundle():
 def corruption(name, H, nsp, seed):
     P = Prop(name, LARGE, "interactable", {"height": H}, seed)
     rng = P.rng
-    for i, (x, y, r) in enumerate(((0.0, 0.05, 0.16), (0.2, -0.12, 0.11), (-0.22, -0.1, 0.12), (0.05, -0.25, 0.08))):
-        rock(P, r, (x, y, r * 0.35), seed + i, col=STONE_D, squash=0.75)
+    for i, (x, y, r) in enumerate(((0.0, 0.08, 0.15), (0.2, -0.1, 0.1), (-0.22, -0.08, 0.11), (0.06, -0.24, 0.08))):
+        rock(P, r, (x, y, r * 0.3), seed + i, col=STONE_D, squash=0.7)
     gl = Vector((-0.4, -0.8, 0.45)).normalized()
 
     def col(f):
         c = f.calc_center_median()
         t = c.z / H
-        if t > 0.82:
+        if t > 0.86:
             return (CORRUPT_TIP, MASK_GLOW)
-        if f.normal.dot(gl) > 0.15 and abs(noise.noise(c * 6.5 + Vector((seed, 0, 0)))) < 0.2 and t > 0.12:
+        if f.normal.dot(gl) > 0.0 and abs(noise.noise(c * 5.0 + Vector((seed, 0, 0)))) < 0.3 and t > 0.08:
             return (CORRUPT_GLOW, MASK_GLOW)
         return CORRUPT if f.normal.z > -0.1 else CORRUPT_D
     for i in range(nsp):
         if i == 0:
-            x0, y0, h, r0, ph = 0.0, 0.0, 1.0, 0.16, 0.0
+            x0, y0, h, r0, ph, curl = 0.0, 0.0, 1.0, 0.2, 0.0, 0.22
         else:
             a = 2 * math.pi * i / (nsp - 1) + rng.uniform(-0.3, 0.3)
-            x0, y0 = 0.17 * math.cos(a), 0.12 * math.sin(a)
-            h, r0, ph = rng.uniform(0.45, 0.7), rng.uniform(0.07, 0.11), rng.uniform(0, 6)
+            x0, y0 = 0.2 * math.cos(a), 0.12 * math.sin(a)
+            h, r0, ph = rng.uniform(0.4, 0.68), rng.uniform(0.09, 0.13), rng.uniform(0, 6)
+            curl = 0.14 * (1 if x0 >= 0 else -1)
         pts, rad = [], []
-        for k in range(9):
-            t = k / 8
-            sway = 0.12 * math.sin(t * math.pi * 1.4 + ph) * t
-            out = 0.25 * t * t if i else 0.0
-            pts.append((x0 * (1 + out * 3) + sway, y0 * (1 + out * 3), 0.05 + h * t))
-            rad.append(r0 * (1.0 - t) ** 0.7 * (1 + 0.35 * math.sin(t * math.pi)))
-        P.add(tube(pts, rad, 6, tip=True, twist=i), col)
+        for k in range(10):
+            t = k / 9
+            sway = 0.07 * math.sin(t * math.pi * 1.6 + ph) * t + curl * t ** 3
+            spread = (1 + 0.6 * t) if i else 1.0
+            pts.append((x0 * spread + sway, y0 * spread, 0.04 + h * (t - 0.12 * t ** 4)))
+            rad.append(r0 * (1.0 - t) ** 0.85 * (1 + 0.55 * math.sin(t * math.pi * 0.9)))
+        P.add(tube(pts, rad, 6, tip=True, twist=i), col, smooth=True)
     return P.finish(fit_height=H)
 
 
@@ -236,31 +267,32 @@ def crystal_cluster(name, H, seed):
 
 
 # ---------------------------------------------------------------- barricade (Miner, one cell, three states)
-def _post(P, x, h=1.0, lean=0.0, broken=False):
+def _post(P, x, h=0.9, lean=0.0, broken=False):
     m = M((x, 0, 0), (0, lean, 0))
-    P.add(box(0.15, 0.15, h), WOOD_B, mat=m)
-    P.add(box(0.25, 0.25, 0.22), by_nz(STONE, STONE_CORE, STONE_CORE, 0.5), mat=M((x, 0, 0)))
-    P.add(box(0.18, 0.18, 0.06), STONE_CORE, mat=m @ M((0, 0, h * 0.78)))
+    P.add(box(0.16, 0.16, h), WOOD_B, mat=m)
+    P.add(box(0.26, 0.26, 0.2), by_nz(STONE_CORE, STONE_CORE, STONE_CORE, 0.5), mat=M((x, 0, 0)))
+    P.add(box(0.19, 0.19, 0.06), STONE_CORE, mat=m @ M((0, 0, h * 0.62)))
     if broken:
-        P.add(box(0.15, 0.15, 0.12, bevel=0.02), WOOD_B, mat=m @ M((0.02, 0, h), (0, 25, 10)))
+        P.add(box(0.16, 0.16, 0.1, bevel=0.02), WOOD_B, mat=m @ M((0.02, 0, h), (0, 25, 10)))
     else:
-        P.add(cyl(0.085, 0.07, 8, r2=0.03, bevel=0.015), WOOD_B, mat=m @ M((0, 0, h)))
+        P.add(box(0.2, 0.2, 0.08), STONE_CORE, mat=m @ M((0, 0, h)))
 
 
 def barricade_deployed():
-    P = Prop("prop_barricade_deployed", BARRICADE, "barricade", {"height": 1.05, "width": 1.0}, 11)
-    _post(P, -0.42)
-    _post(P, 0.42)
-    P.add(box(0.76, 0.09, 0.09), WOOD, mat=M((0, 0, 0.84)))
-    P.add(box(0.76, 0.08, 0.1), WOOD_B, mat=M((0, 0.02, 0.12)))
+    P = Prop("prop_barricade_deployed", BARRICADE, "barricade", {"height": 0.98, "width": 1.4}, 11)
+    X = 0.6
+    _post(P, -X)
+    _post(P, X)
+    P.add(box(1.06, 0.09, 0.09), WOOD, mat=M((0, 0, 0.68)))
+    P.add(box(1.06, 0.08, 0.09), WOOD_B, mat=M((0, 0.03, 0.06)))
     for s in (1, -1):
-        P.add(box(0.9, 0.06, 0.08), WOOD_D, mat=M((0, 0.05, 0.42), (0, s * 33, 0)))
-    P.add(cloth(0.74, 0.5, 8, 4, lambda u, v: -0.05 * math.sin(math.pi * u) * v, notch=0.16), TEAM_CLOTH,
-          mask=MASK_TEAM_CLOTH, smooth=True, mat=M((0, -0.06, 0.82)))
-    pts = [(-0.42 + 0.84 * t, -0.09, 0.96 - 0.16 * math.sin(math.pi * t)) for t in [i / 9 for i in range(10)]]
-    P.add(tube(pts, [0.025] * 10, 4), ROPE, smooth=True)
-    for x in (-0.42, 0.42):
-        P.add(torus(0.09, 0.022, 10, 4), ROPE, mat=M((x, 0, 0.93)))
+        P.add(box(1.12, 0.06, 0.08), WOOD_D, mat=M((0, 0.05, 0.22), (0, s * 14, 0)))
+    P.add(cloth(1.0, 0.44, 10, 4, lambda u, v: -0.06 * math.sin(math.pi * u) * v, notch=0.2), TEAM_CLOTH,
+          mask=MASK_TEAM_CLOTH, smooth=True, mat=M((0, -0.06, 0.68)))
+    pts = [(-X + 2 * X * t, -0.09, 0.9 - 0.16 * math.sin(math.pi * t)) for t in [i / 11 for i in range(12)]]
+    P.add(tube(pts, [0.026] * 12, 4), ROPE, smooth=True)
+    for x in (-X, X):
+        P.add(torus(0.1, 0.024, 10, 4), ROPE, mat=M((x, 0, 0.84)))
     return P.finish()
 
 
@@ -290,21 +322,23 @@ def barricade_folded():
 
 def barricade_damaged():
     P = Prop("prop_barricade_damaged", BARRICADE, "barricade", {"height": 0.95}, 13)
-    _post(P, -0.42, 0.92, broken=False)
-    _post(P, 0.42, 0.72, lean=10, broken=True)
-    P.add(box(0.5, 0.09, 0.09), WOOD, mat=M((-0.18, 0, 0.78), (0, 6, 0)))
-    P.add(box(0.42, 0.09, 0.09), WOOD, mat=M((0.18, -0.06, 0.03), (0, 0, 14)))
-    P.add(box(0.9, 0.06, 0.08), WOOD_D, mat=M((0, 0.05, 0.36), (0, 33, 0)))
+    X = 0.6
+    _post(P, -X, 0.9)
+    _post(P, X, 0.74, lean=9, broken=True)
+    P.add(box(0.7, 0.09, 0.09), WOOD, mat=M((-0.28, 0, 0.6), (0, 14, 0)))
+    P.add(box(0.5, 0.09, 0.09), WOOD, mat=M((0.3, -0.1, 0.03), (0, 0, 12)))
+    P.add(box(1.1, 0.06, 0.08), WOOD_D, mat=M((0, 0.05, 0.22), (0, 14, 0)))
     rng = P.rng
 
     def torn(u, v):
         n = noise.noise(Vector((u * 4.0, v * 3.0, 1.7)))
-        return n > 0.18 or (v > 0.75 and rng.random() < 0.45) or (u > 0.6 and v > 0.5)
-    P.add(cloth(0.56, 0.48, 8, 5, lambda u, v: -0.05 * math.sin(math.pi * u) * v, notch=0.08, cut=torn), TEAM_CLOTH,
-          mask=MASK_TEAM_CLOTH, smooth=True, mat=M((-0.12, -0.06, 0.76), (0, 6, 0)))
-    for (x, y, rz, l) in ((-0.15, -0.35, 20, 0.5), (0.3, -0.3, -35, 0.42), (0.05, -0.5, 70, 0.36), (-0.45, -0.3, -10, 0.3)):
+        return n > 0.25 or (v > 0.7 and rng.random() < 0.4)
+    P.add(cloth(0.9, 0.42, 10, 5, lambda u, v: -0.05 * math.sin(math.pi * u) * v, notch=0.12, cut=torn), TEAM_CLOTH,
+          mask=MASK_TEAM_CLOTH, smooth=True, mat=M((-0.02, -0.06, 0.66), (0, 10, 0)))
+    for (x, y, rz, l) in ((-0.25, -0.38, 18, 0.5), (0.3, -0.34, -30, 0.44), (0.05, -0.55, 75, 0.36),
+                          (-0.6, -0.3, -12, 0.32), (0.65, -0.25, 40, 0.3)):
         P.add(box(l, 0.1, 0.045, bevel=0.015), WOOD if l > 0.4 else WOOD_B, mat=M((x, y, 0), (0, 0, rz)))
-    P.add(tube([(-0.42, -0.09, 0.9), (-0.3, -0.12, 0.6), (-0.25, -0.14, 0.35)], [0.022] * 3, 4), ROPE)
+    P.add(tube([(X - 0.05, -0.1, 0.72), (X - 0.12, -0.13, 0.5), (X - 0.14, -0.14, 0.3)], [0.024] * 3, 4), ROPE)
     rock(P, 0.06, (0.1, -0.2, 0.01), 31, col=STONE_CORE, squash=0.5)
     return P.finish()
 
@@ -312,20 +346,27 @@ def barricade_damaged():
 # ---------------------------------------------------------------- banner (team cloth)
 def banner():
     P = Prop("prop_banner", LARGE, "interactable", {"height": 1.9}, 14)
-    for i, (x, y, r) in enumerate(((0.0, 0.08, 0.17), (0.17, -0.02, 0.11), (-0.16, 0.0, 0.12), (0.06, -0.14, 0.08))):
-        rock(P, r, (x, y, r * 0.3), 40 + i, squash=0.7)
-    tuft(P, (-0.2, -0.15, 0.03), seed=1)
-    tuft(P, (0.22, -0.12, 0.03), seed=2)
-    P.add(box(0.11, 0.11, 1.84), WOOD_B, mat=M((0, 0.06, 0)))
-    P.add(box(0.74, 0.09, 0.09), WOOD, mat=M((0, 0.0, 1.7)))
-    for x in (-0.37, 0.37):
-        P.add(box(0.08, 0.11, 0.11, bevel=0.02, base=False), BRASS, mat=M((x, 0, 1.745)))
-        P.add(torus(0.05, 0.018, 8, 4), ROPE, mat=M((x * 0.8, 0, 1.745), (0, 90, 0)))
-    P.add(cyl(0.07, 0.08, 8, r2=0.03, bevel=0.015), BRASS, mat=M((0, 0.06, 1.84)))
-    P.add(cloth(0.6, 1.12, 6, 8, lambda u, v: -0.03 * math.sin(u * math.pi * 3) * v - 0.02 * v, notch=0.24),
-          TEAM_CLOTH, mask=MASK_TEAM_CLOTH, smooth=True, mat=M((0, -0.06, 1.68)))
-    P.add(torus(0.1, 0.022, 14, 4), CREAM, mat=M((0, -0.1, 1.22), (90, 0, 0)))
-    P.add(tube([(0, -0.1, 1.04), (0, -0.1, 1.22), (0, -0.1, 1.4)], [0.0, 0.05, 0.0], 4), CREAM)
+    for i, (x, y, r) in enumerate(((0.0, 0.1, 0.22), (0.22, -0.04, 0.16), (-0.21, -0.02, 0.15), (0.08, -0.18, 0.1))):
+        rock(P, r, (x, y, r * 0.25), 40 + i, squash=0.65, moss=True)
+    for j, (x, y) in enumerate(((-0.3, -0.16), (0.32, -0.14), (0.0, -0.3), (-0.12, 0.2))):
+        tuft(P, (x, y, 0.02), h=0.12, seed=j)
+    P.add(box(0.11, 0.11, 1.84), WOOD_B, mat=M((-0.06, 0.07, 0)))
+    P.add(box(0.84, 0.1, 0.1), WOOD, mat=M((0, 0.0, 1.7)))
+    for x in (-0.42, 0.42):
+        P.add(box(0.08, 0.12, 0.12, bevel=0.02, base=False), BRASS, mat=M((x, 0, 1.75)))
+        P.add(tube([(x * 0.85, -0.06, 1.75), (x * 0.85, -0.07, 1.55), (x * 0.83, -0.07, 1.42)], [0.022, 0.02, 0.0], 4,
+                   tip=True), ROPE)
+    P.add(cyl(0.07, 0.08, 8, r2=0.03, bevel=0.015), BRASS, mat=M((-0.06, 0.07, 1.84)))
+    rag = lambda u: 0.1 * abs(math.sin(u * math.pi * 3.5)) + 0.05 * math.sin(u * 17)
+    P.add(cloth(0.72, 1.38, 6, 9, lambda u, v: -0.03 * math.sin(u * math.pi * 3) * v - 0.03 * v, notch=0.12,
+                bottom_fn=rag), TEAM_CLOTH, mask=MASK_TEAM_CLOTH, smooth=True, mat=M((0, -0.06, 1.66)))
+    ez, ey = 1.17, -0.115
+    P.add(torus(0.14, 0.035, 16, 4), CREAM, mat=M((0, ey, ez), (90, 0, 0)))
+    for k in range(8):
+        a = 360 * k / 8 + 22.5
+        P.add(cyl(0.035, 0.08, 3, r2=0.0, bevel=0), CREAM,
+              mat=M((0.17 * math.cos(math.radians(a)), ey, ez + 0.17 * math.sin(math.radians(a))), (0, 90 - a, 0)))
+    P.add(tube([(0, ey, ez - 0.13), (0, ey, ez), (0, ey, ez + 0.13)], [0.0, 0.055, 0.0], 4), CREAM)
     return P.finish(fit_height=1.9)
 
 
@@ -337,15 +378,15 @@ def _diamond(P, z0, h, r, colf):
 
 def marker(team=True):
     name = "prop_marker_team" if team else "prop_marker_neutral"
-    P = Prop(name, LARGE, "interactable", {"height": 1.0}, 15, outline_px=0.0)
+    P = Prop(name, LARGE, "interactable", {"height": 0.9}, 15, outline_px=0.0)
     if team:
         lit, dark, ml, md = TEAM_GLOW, TEAM_DARK, MASK_TEAM_GLOW, MASK_TEAM_DARK
     else:
         lit, dark, ml, md = NEUTRAL_HI, NEUTRAL_LO, MASK_GLOW, 0.0
-    P.add(torus(0.3, 0.04, 20, 4), (lit, ml), lined=False, mat=M((0, 0, 0.04), scale=(1, 1, 0.6)))
-    P.add(cyl(0.2, 0.01, 12, bevel=0), (dark, md), lined=False)
-    _diamond(P, 0.4, 0.6, 0.19, facet_light(lit, dark, ml, md, (-0.7, -0.4, 0.3)))
-    return P.finish(fit_height=1.0)
+    P.add(torus(0.25, 0.035, 20, 4), (lit, ml), lined=False, mat=M((0, 0, 0.035), scale=(1, 1, 0.6)))
+    P.add(cyl(0.17, 0.01, 12, bevel=0), (dark, md), lined=False)
+    _diamond(P, 0.2, 0.72, 0.24, facet_light(lit, dark, ml, md, (-0.7, -0.4, 0.3)))
+    return P.finish(fit_height=0.9)
 
 
 # ---------------------------------------------------------------- neutral dressing
@@ -503,9 +544,9 @@ def crystal_lamp():
 # ---------------------------------------------------------------- registry
 REGISTRY = [
     # name, builder, bible ref
-    ("prop_biomass_plant_s", lambda: biomass_plant("prop_biomass_plant_s", 0.5, 3, 2, 1, 31), "p14 biomass plants (small); p03"),
-    ("prop_biomass_plant_m", lambda: biomass_plant("prop_biomass_plant_m", 0.8, 4, 3, 2, 32), "p14 biomass plants (medium)"),
-    ("prop_biomass_plant_l", lambda: biomass_plant("prop_biomass_plant_l", 1.2, 6, 5, 3, 33), "p14 biomass plants (large); p03"),
+    ("prop_biomass_plant_s", lambda: biomass_plant("prop_biomass_plant_s", 0.5, 3, [(0, 0.62, [0.2, 0.13, 0.12, 0.12])], 1, 31), "p14 biomass plants (small); p03"),
+    ("prop_biomass_plant_m", lambda: biomass_plant("prop_biomass_plant_m", 0.8, 4, [(0, 0.8, [0.22, 0.15, 0.14, 0.14]), (0.32, 0.5, [0.13, 0.09])], 2, 32), "p14 biomass plants (medium)"),
+    ("prop_biomass_plant_l", lambda: biomass_plant("prop_biomass_plant_l", 1.2, 6, [(0, 0.95, [0.26, 0.17, 0.16, 0.16, 0.15]), (0.36, 0.62, [0.15, 0.1]), (-0.34, 0.55, [0.13, 0.09])], 3, 33), "p14 biomass plants (large); p03"),
     ("prop_biomass_sprout", biomass_sprout, "p03 small biomass sprouts"),
     ("prop_orb_biomass", orb_biomass, "p14 loose orb; p03 biomass orb"),
     ("prop_orb_stone", orb_stone, "p03 stone orb"),

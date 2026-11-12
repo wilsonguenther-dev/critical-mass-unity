@@ -11,11 +11,11 @@
    "fbx": "Props/prop_biomass_plant_s.fbx",
    "bible": "p14 biomass plants (small); p03",
    "size_class": "interactable",
-   "tris": 720,
+   "tris": 736,
    "budget": 1500,
    "dims_blender_xyz": [
-    0.393,
-    0.391,
+    0.455,
+    0.424,
     0.5
    ],
    "targets": {
@@ -34,11 +34,11 @@
    "fbx": "Props/prop_biomass_plant_m.fbx",
    "bible": "p14 biomass plants (medium)",
    "size_class": "interactable",
-   "tris": 984,
+   "tris": 1028,
    "budget": 1500,
    "dims_blender_xyz": [
-    0.679,
-    0.746,
+    0.748,
+    0.702,
     0.8
    ],
    "targets": {
@@ -57,11 +57,11 @@
    "fbx": "Props/prop_biomass_plant_l.fbx",
    "bible": "p14 biomass plants (large); p03",
    "size_class": "interactable",
-   "tris": 1436,
+   "tris": 1458,
    "budget": 1500,
    "dims_blender_xyz": [
-    1.183,
-    1.179,
+    1.0,
+    0.896,
     1.2
    ],
    "targets": {
@@ -83,8 +83,8 @@
    "tris": 236,
    "budget": 300,
    "dims_blender_xyz": [
-    0.239,
-    0.223,
+    0.236,
+    0.228,
     0.25
    ],
    "targets": {
@@ -104,19 +104,19 @@
    "fbx": "Props/prop_orb_biomass.fbx",
    "bible": "p14 loose orb; p03 biomass orb",
    "size_class": "interactable",
-   "tris": 784,
+   "tris": 288,
    "budget": 1500,
    "dims_blender_xyz": [
-    0.467,
-    0.447,
-    0.429
+    0.45,
+    0.45,
+    0.45
    ],
    "targets": {
     "height": 0.45,
     "width": 0.45
    },
    "walkable": false,
-   "outline_px": 2.5,
+   "outline_px": 0.0,
    "team_mask": false,
    "checks": {
     "tris": true,
@@ -132,9 +132,9 @@
    "tris": 320,
    "budget": 1500,
    "dims_blender_xyz": [
-    0.436,
-    0.447,
-    0.445
+    0.435,
+    0.446,
+    0.435
    ],
    "targets": {
     "height": 0.45,
@@ -157,9 +157,9 @@
    "tris": 320,
    "budget": 1500,
    "dims_blender_xyz": [
-    0.436,
-    0.441,
-    0.44
+    0.442,
+    0.443,
+    0.441
    ],
    "targets": {
     "height": 0.45,
@@ -191,7 +191,7 @@
     "width": 0.45
    },
    "walkable": false,
-   "outline_px": 2.5,
+   "outline_px": 0.0,
    "team_mask": false,
    "checks": {
     "tris": true,
@@ -229,12 +229,12 @@
    "fbx": "Props/prop_carried_bundle.fbx",
    "bible": "p14 carried bundle",
    "size_class": "interactable",
-   "tris": 744,
+   "tris": 772,
    "budget": 1500,
    "dims_blender_xyz": [
-    0.493,
-    0.474,
-    0.536
+    0.532,
+    0.508,
+    0.538
    ],
    "targets": {
     "height": 0.55,
@@ -254,11 +254,11 @@
    "fbx": "Props/prop_corruption_growth_l.fbx",
    "bible": "p14 corruption growth (large); p03",
    "size_class": "interactable",
-   "tris": 884,
+   "tris": 956,
    "budget": 1500,
    "dims_blender_xyz": [
-    0.803,
-    0.546,
+    1.045,
+    0.662,
     1.2
    ],
    "targets": {
@@ -277,11 +277,11 @@
    "fbx": "Props/prop_corruption_growth_s.fbx",
    "bible": "p14 corruption growth (small)",
    "size_class": "interactable",
-   "tris": 696,
+   "tris": 744,
    "budget": 1500,
    "dims_blender_xyz": [
-    0.402,
-    0.276,
+    0.526,
+    0.327,
     0.6
    ],
    "targets": {
@@ -303,8 +303,8 @@
    "tris": 190,
    "budget": 1500,
    "dims_blender_xyz": [
-    0.475,
-    0.411,
+    0.473,
+    0.409,
     0.9
    ],
    "targets": {
@@ -327,7 +327,7 @@
    "budget": 1500,
    "dims_blender_xyz": [
     0.236,
-    0.206,
+    0.204,
     0.45
    ],
    "targets": {
@@ -371,16 +371,16 @@
    "fbx": "Props/prop_barricade_deployed.fbx",
    "bible": "p14 barricade deployed",
    "size_class": "barricade",
-   "tris": 940,
+   "tris": 996,
    "budget": 2500,
    "dims_blender_xyz": [
-    1.09,
-    0.25,
-    1.07
+    1.46,
+    0.26,
+    0.98
    ],
    "targets": {
-    "height": 1.05,
-    "width": 1.0
+    "height": 0.98,
+    "width": 1.4
    },
    "walkable": false,
    "outline_px": 2.5,
@@ -396,12 +396,12 @@
    "fbx": "Props/prop_barricade_damaged.fbx",
    "bible": "p14 barricade damaged",
    "size_class": "barricade",
-   "tris": 932,
+   "tris": 1036,
    "budget": 2500,
    "dims_blender_xyz": [
-    1.295,
-    0.806,
-    1.012
+    1.619,
+    0.863,
+    1.003
    ],
    "targets": {
     "height": 0.95
@@ -422,8 +422,8 @@
    "tris": 1088,
    "budget": 1500,
    "dims_blender_xyz": [
-    0.784,
-    0.428,
+    0.872,
+    0.595,
     1.9
    ],
    "targets": {
@@ -445,12 +445,12 @@
    "tris": 218,
    "budget": 1500,
    "dims_blender_xyz": [
-    0.68,
-    0.68,
-    1.0
+    0.558,
+    0.558,
+    0.9
    ],
    "targets": {
-    "height": 1.0
+    "height": 0.9
    },
    "walkable": false,
    "outline_px": 0.0,
@@ -468,12 +468,12 @@
    "tris": 218,
    "budget": 1500,
    "dims_blender_xyz": [
-    0.68,
-    0.68,
-    1.0
+    0.558,
+    0.558,
+    0.9
    ],
    "targets": {
-    "height": 1.0
+    "height": 0.9
    },
    "walkable": false,
    "outline_px": 0.0,
@@ -541,8 +541,8 @@
    "tris": 148,
    "budget": 800,
    "dims_blender_xyz": [
-    0.6,
-    0.6,
+    0.593,
+    0.598,
     0.6
    ],
    "targets": {
@@ -567,7 +567,7 @@
    "budget": 800,
    "dims_blender_xyz": [
     1.006,
-    0.502,
+    0.503,
     0.85
    ],
    "targets": {
@@ -706,9 +706,9 @@
    "tris": 240,
    "budget": 300,
    "dims_blender_xyz": [
-    0.435,
-    0.273,
-    0.114
+    0.447,
+    0.246,
+    0.116
    ],
    "targets": {
     "height": 0.12

@@ -183,7 +183,7 @@ def torus(R, r, segs=16, sides=6, arc=360.0, start=0.0):
     return bm
 
 
-def cloth(w, h, nx, ny, offset_fn=None, notch=0.0, cut=None, thickness=0.025):
+def cloth(w, h, nx, ny, offset_fn=None, notch=0.0, cut=None, thickness=0.025, bottom_fn=None):
     """Hanging cloth in the XZ plane (faces -Y), top edge at z=0, hangs to -h; V notch of depth `notch` at the
     bottom (swallowtail); cut(u, v) -> True removes a quad (tears)."""
     bm = bmesh.new()
@@ -193,7 +193,7 @@ def cloth(w, h, nx, ny, offset_fn=None, notch=0.0, cut=None, thickness=0.025):
         v = j / ny
         for i in range(nx + 1):
             u = i / nx
-            bottom = -h + notch * (1 - abs(2 * u - 1))
+            bottom = -h + notch * (1 - abs(2 * u - 1)) + (bottom_fn(u) if bottom_fn else 0.0)
             z = v * bottom
             y = offset_fn(u, v) if offset_fn else 0.0
             row.append(bm.verts.new(((u - 0.5) * w, y, z)))
@@ -275,6 +275,8 @@ class Prop:
         idx = [i for i, w in enumerate(lined) if w > 0.5]
         if idx:
             vg.add(idx, 1.0, "REPLACE")
+        else:                       # all-glow prop: no hull at all (an empty group makes Solidify ignore it)
+            self.outline_px = 0.0
         attr = me.color_attributes.get("Col")
         if attr is not None:
             me.color_attributes.active_color = attr

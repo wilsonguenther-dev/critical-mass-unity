@@ -13,6 +13,9 @@ import sys
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from props_art.bible import fg_mask  # noqa: E402
+
 OUT = os.path.abspath(sys.argv[1])
 RD = os.path.join(OUT, "renders")
 BIBLE = os.path.expanduser("~/critical-mass/loop/parity/ref")
@@ -145,7 +148,7 @@ def density(name, title, band):
     lines = [title, f"small props in frame: {data['small_props']} (band {band[0]} to {band[1]})"]
     if "warm_light_pools" in data:
         lines.append(f"warm light pools: {data['warm_light_pools']} (band 10 to 14); crystal lamps: {data['crystal_lamps']}; "
-                     f"tall props on walkable cells: {data['tall_on_walkable']}")
+                     f"tall props on walkable cells: {len(data['tall_on_walkable'])}")
     if "trees_big_rocks" in data:
         lines.append(f"trees / big rocks: {data['trees_big_rocks']} (band 4 to 8); lights: {data['lights']} (band 0 to 2)")
     lines.append(", ".join(f"{k.replace('prop_', '')} {v}" for k, v in sorted(data["kinds"].items())))
@@ -163,7 +166,7 @@ def framing(key):
     W, H = bib.size
     barr = np.asarray(bib).astype(int)
     bg = barr[2, 2]
-    bmask = np.abs(barr - bg).sum(2) > 60
+    bmask = fg_mask(np.asarray(bib))
     ours = Image.open(os.path.join(RD, key + ".png")).convert("RGBA").resize((W, H), Image.LANCZOS)
     oarr = np.asarray(ours).astype(float)
     omask = oarr[..., 3] > 127
@@ -194,10 +197,11 @@ def framing(key):
     d.text((pad, 14), f"BIBLE {meta['crop']}", font=f, fill=(24, 35, 59))
     d.text((sb.width + 2 * pad, 14), f"OURS {key}   IoU {iou:.2f}", font=f, fill=(24, 35, 59))
     worst = max((p["de2000"] for p in pairs), default=0)
+    main3 = max((p["de2000"] for p in pairs[:3]), default=0)
     d.text((pad, th + 54), "swatch dE2000 (bible->ours): " + ", ".join(f"{p['bible']}->{p['ours']} {p['de2000']}" for p in pairs),
            font=font(11), fill=(24, 35, 59))
     size, q = save_jpg(sheet, os.path.join(OUT, f"sbs-{key}.jpg"), max_w=1400)
-    return dict(iou=round(iou, 3), swatches=pairs, worst_de2000=worst, jpg_bytes=size, sheet_w=min(1400, sheet.width))
+    return dict(iou=round(iou, 3), swatches=pairs, worst_de2000=worst, main3_de2000=main3, jpg_bytes=size, sheet_w=min(1400, sheet.width))
 
 
 def main():
@@ -214,7 +218,7 @@ def main():
             checks["framings"][fn[:-4]] = framing(fn[:-4])
     json.dump(checks, open(os.path.join(OUT, "checks.json"), "w"), indent=1)
     for k, v in checks["framings"].items():
-        print(f"{k:26s} IoU {v['iou']:.2f}  worst dE {v['worst_de2000']:5.1f}  {v['jpg_bytes'] // 1000} KB")
+        print(f"{k:26s} IoU {v['iou']:.2f}  main3 dE {v['main3_de2000']:5.1f}  worst dE {v['worst_de2000']:5.1f}  {v['jpg_bytes'] // 1000} KB")
     for k in ("lineup", "district", "field"):
         if k in checks:
             print(k, {a: b for a, b in checks[k].items() if a != "kinds"})

@@ -364,7 +364,7 @@ def env_place(shot, mats, name, loc, rotz=0.0, outline_px=0.0):
 
 
 def in_frame(sc, cam, ob):
-    x, y, z = proj(sc, cam, ob.matrix_world.translation)
+    x, y, z = proj(sc, cam, ob.location)
     return 0 <= x <= sc.render.resolution_x and 0 <= y <= sc.render.resolution_y and z > 0
 
 
@@ -425,8 +425,9 @@ def shot_district():
     vis_small = [o for o in small if in_frame(sc, cam, o)]
     data = dict(small_props=len(vis_small), warm_light_pools=len([b for b in lights if in_frame(sc, cam, b)]),
                 crystal_lamps=len([lp for lp in lamps if in_frame(sc, cam, lp)]),
-                tall_on_walkable=sum(1 for o in vis_small if o.dimensions.z >= 0.3 and
-                                     min(o.location.x, o.location.y) > -W + 2.2),
+                tall_on_walkable=[(o.name, round(o.location.x, 1), round(o.location.y, 1), round(o.dimensions.z, 2))
+                                  for o in vis_small if max(v.co.z for v in o.data.vertices) >= 0.3 and
+                                  min(o.location.x, o.location.y) > -W + 2.2],
                 kinds={})
     for o in vis_small:
         k = o.name.split(".")[0]
@@ -497,7 +498,7 @@ FRAMINGS = {
     "p14-carried-bundle": ("14-carried-bundle", [("prop_carried_bundle", (0, 0))]),
     "p14-corruption-growth": ("14-corruption-growth", [("prop_corruption_growth_l", (0, 0)),
                                                        ("prop_corruption_growth_s", (0.62, 0))]),
-    "p14-barricade-folded": ("14-barricade-folded", [("prop_barricade_folded", (0, 0))]),
+    "p14-barricade-folded": ("14-barricade-folded", [("prop_barricade_folded", (0, 0), False, -28)]),
     "p14-barricade-deployed": ("14-barricade-deployed", [("prop_barricade_deployed", (0, 0))]),
     "p14-barricade-damaged": ("14-barricade-damaged", [("prop_barricade_damaged", (0, 0))]),
     "p14-banner-azure": ("14-banner-azure", [("prop_banner", (0, 0))]),
@@ -515,13 +516,12 @@ FRAMINGS = {
 
 
 def bible_box(crop):
+    from props_art.bible import fg_box
     img = bpy.data.images.load(os.path.join(BIBLE, crop + ".png"))
     w, h = img.size
     a = np.array(img.pixels[:], dtype=np.float32).reshape(h, w, 4)[::-1, :, :3]
-    bg = a[2, 2]
-    fg = np.abs(a - bg).sum(2) > 60 / 255
-    ys, xs = np.nonzero(fg)
-    return w, h, xs.min(), xs.max() + 1, ys.min(), ys.max() + 1
+    x0, x1, y0, y1 = fg_box(np.round(a * 255).astype(np.uint8))
+    return w, h, x0, x1, y0, y1
 
 
 def shot_ortho(key, scale=3):
@@ -531,7 +531,7 @@ def shot_ortho(key, scale=3):
     obs = []
     for it in items:
         n, (x, z) = it[0], it[1]
-        obs.append(place(shot, mats, n, (x, 0, z), rotz=0.0, crimson=len(it) > 2 and it[2]))
+        obs.append(place(shot, mats, n, (x, 0, z), rotz=it[3] if len(it) > 3 else 0.0, crimson=len(it) > 2 and it[2]))
     bpy.context.view_layer.update()
     pitch = math.radians(20)
     d = Vector((0, math.cos(pitch), -math.sin(pitch)))
