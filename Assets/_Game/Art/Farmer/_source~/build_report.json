@@ -1,8 +1,8 @@
 {
  "objects": {
   "Farmer_Body": {
-   "triangles": 10240,
-   "vertices": 5368,
+   "triangles": 10208,
+   "vertices": 5356,
    "materials": [
     "CM_Toon"
    ],
@@ -71,7 +71,7 @@
   ],
   "feat_team_cloth": [
    0.17,
-   1.867
+   1.942
   ],
   "feat_jacket": [
    0.765,
@@ -94,8 +94,8 @@
    1.225
   ],
   "feat_face": [
-   1.39,
-   1.668
+   1.385,
+   1.663
   ],
   "feat_hair": [
    1.26,
@@ -106,8 +106,8 @@
    1.99
   ],
   "feat_goggles": [
-   1.586,
-   1.863
+   1.641,
+   1.938
   ],
   "feat_tank": [
    0.839,
@@ -126,7 +126,7 @@
    0.889
   ]
  },
- "triangles_total": 11852,
+ "triangles_total": 11820,
  "triangles_by_part": {
   "Farmer_Body/hair/f_hair": [
    1644,
@@ -180,6 +180,10 @@
    220,
    1
   ],
+  "Farmer_Body/face/f_white": [
+   192,
+   6
+  ],
   "Farmer_Body/boots/f_cream": [
    184,
    2
@@ -192,10 +196,6 @@
    180,
    3
   ],
-  "Farmer_Body/face/f_brow": [
-   176,
-   4
-  ],
   "Farmer_Body/bun/f_hair": [
    168,
    1
@@ -203,10 +203,6 @@
   "Farmer_Staff/bulb/f_biomass": [
    168,
    1
-  ],
-  "Farmer_Body/face/f_white": [
-   160,
-   4
   ],
   "Farmer_Body/overalls/f_brass": [
    152,
@@ -239,6 +235,10 @@
   "Farmer_Body/leaves/f_leaf_dark": [
    108,
    3
+  ],
+  "Farmer_Body/face/f_brow": [
+   104,
+   4
   ],
   "Farmer_Staff/hose/f_hose": [
    104,
@@ -304,12 +304,12 @@
    36,
    1
   ],
-  "Farmer_Body/tank_glint/f_biomass_hi": [
+  "Farmer_Body/face/f_mouth": [
    36,
    1
   ],
-  "Farmer_Body/face/f_mouth": [
-   28,
+  "Farmer_Body/tank_glint/f_biomass_hi": [
+   36,
    1
   ]
  }

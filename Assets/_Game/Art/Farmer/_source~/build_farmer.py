@@ -147,25 +147,37 @@ def build_head():
     H = "head"
     add(BODY, B.sphere((0.215, 0.21, 0.235), 16, 12), "f_skin", H, "skin", m=M((0, -0.01, 1.55)))
     add(BODY, B.sphere((0.17, 0.165, 0.13), 14, 8), "f_skin", H, "skin", m=M((0, -0.035, 1.43)))
+    # expressive face (bible p07: big readable eyes, confident arched brows with one raised, cheeky open grin)
     for s in (1, -1):
-        add(BODY, B.sphere((0.052, 0.012, 0.066), 8, 5), "f_white", H, "face", grad=False,
-            m=M((0.086 * s, -0.212, 1.53)))
-        add(BODY, B.sphere((0.045, 0.014, 0.058), 8, 5), "f_iris", H, "face", grad=False,
-            m=M((0.083 * s, -0.219, 1.524)))
-        add(BODY, B.sphere((0.024, 0.01, 0.03), 6, 4), "f_pupil", H, "face", grad=False,
-            m=M((0.081 * s, -0.229, 1.518)))
-        add(BODY, B.sphere((0.016, 0.006, 0.016), 4, 3), "f_white", H, "face", grad=False,
-            m=M((0.066 * s, -0.233, 1.548)))
-        add(BODY, B.box((0.11, 0.02, 0.022), 0.008, 1), "f_brow", H, "face", smooth=False,      # upper lash line
-            m=M((0.088 * s, -0.222, 1.588), (0, 0, 8 * s)) @ M((0, 0, 0), (0, -8 * s, 0)))
-        add(BODY, B.box((0.10, 0.022, 0.03), 0.01, 1), "f_brow", H, "face", smooth=False,       # brows
-            m=M((0.092 * s, -0.214, 1.645), (0, 0, 9 * s)) @ M((0, 0, 0), (0, -12 * s, 0)))
-        add(BODY, B.sphere((0.042, 0.012, 0.028), 6, 4), "f_cheek", H, "face", grad=False,
-            m=M((0.132 * s, -0.178, 1.455), (0, 0, 30 * s)))
-    add(BODY, B.sphere((0.026, 0.022, 0.022), 6, 4), "f_skin_dark", H, "face", m=M((0, -0.222, 1.47)))
-    smile = [(-0.07, 0.016), (-0.035, -0.008), (0.0, -0.015), (0.035, -0.008), (0.07, 0.016), (0.035, 0.004),
-             (0.0, -0.002), (-0.035, 0.004)]
-    add(BODY, B.prism(smile, 0.024), "f_mouth", H, "face", smooth=False, m=M((0, -0.195, 1.405), (90, 0, 0)))
+        yaw = 20 * s
+        R = M((0, 0, 0), (0, 0, yaw))
+        n = Vector((math.sin(math.radians(yaw)), -math.cos(math.radians(yaw)), 0))
+        c = Vector((0.088 * s, -0.200, 1.53))
+
+        def em(dx, dz, fwd, rot=(0, 0, yaw)):
+            return M(c + (R @ Vector((dx * s, 0, dz))) + n * fwd, rot)
+        add(BODY, B.sphere((0.06, 0.012, 0.074), 8, 5), "f_white", H, "face", grad=False, m=em(0, 0, 0))
+        add(BODY, B.sphere((0.052, 0.012, 0.07), 8, 5), "f_iris", H, "face", grad=False, m=em(-0.004, -0.004, 0.006))
+        add(BODY, B.sphere((0.03, 0.008, 0.04), 6, 4), "f_pupil", H, "face", grad=False, m=em(-0.006, -0.008, 0.012))
+        add(BODY, B.sphere((0.021, 0.006, 0.021), 4, 3), "f_white", H, "face", grad=False, m=em(-0.022, 0.024, 0.016))
+        add(BODY, B.sphere((0.01, 0.005, 0.01), 4, 3), "f_white", H, "face", grad=False, m=em(0.016, -0.03, 0.016))
+        lash = [(-0.064, -0.006), (-0.01, 0.016), (0.05, 0.012), (0.092, 0.034), (0.07, -0.006), (0.0, -0.004),
+                (-0.064, -0.022)]
+        brow = [(-0.064, -0.02), (-0.02, 0.014), (0.03, 0.022), (0.072, 0.002), (0.064, -0.016), (0.02, -0.004),
+                (-0.025, -0.012), (-0.064, -0.034)]
+        if s < 0:
+            lash = [(-x, z) for x, z in reversed(lash)]
+            brow = [(-x, z) for x, z in reversed(brow)]
+        add(BODY, B.prism(lash, 0.022), "f_brow", H, "face", smooth=False, m=em(0, 0.066, 0.004, (90, 0, yaw)))
+        lift = 0.012 if s > 0 else 0.0                  # the character's left brow cocked up: attitude
+        add(BODY, B.prism(brow, 0.024), "f_brow", H, "face", smooth=False,
+            m=M(c + R @ Vector((0.005 * s, 0, 0.102 + lift)) + n * 0.004, (90, 6 * s if s > 0 else -4, yaw)))
+        add(BODY, B.sphere((0.05, 0.012, 0.032), 6, 4), "f_cheek", H, "face", grad=False,
+            m=M((0.13 * s, -0.172, 1.45), (0, 0, 30 * s)))
+    add(BODY, B.sphere((0.024, 0.02, 0.02), 6, 4), "f_skin_dark", H, "face", m=M((0, -0.222, 1.468)))
+    smirk = [(-0.062, 0.012), (-0.03, -0.004), (0.01, -0.008), (0.05, 0.002), (0.078, 0.026), (0.07, 0.006),
+             (0.04, -0.012), (0.0, -0.02), (-0.034, -0.014), (-0.064, 0.004)]       # closed, left corner up
+    add(BODY, B.prism(smirk, 0.03), "f_mouth", H, "face", smooth=False, m=M((0, -0.19, 1.405), (90, 0, 0)))
 
 
 def clump(p0, p1, p2, p3, r, n=6, flat=0.62):
@@ -177,14 +189,14 @@ def clump(p0, p1, p2, p3, r, n=6, flat=0.62):
 
 def build_hair():
     H = "head"
-    add(BODY, B.sphere((0.262, 0.256, 0.205), 14, 8), "f_hair", H, "hair", m=M((0, 0.02, 1.66)))
+    add(BODY, B.sphere((0.262, 0.25, 0.19), 14, 8), "f_hair", H, "hair", m=M((0, 0.04, 1.70)))
     add(BODY, B.sphere((0.25, 0.21, 0.24), 12, 8), "f_hair", H, "hair", m=M((0, 0.085, 1.50)))
     for s in (1, -1):   # puffy wavy volume at the sides of the face (bible: big hair framing the cheeks)
         add(BODY, B.sphere((0.12, 0.15, 0.17), 10, 7), "f_hair", H, "hair", m=M((0.235 * s, 0.05, 1.55)))
     C = [  # 13 wavy clumps with tapered tips: swept bangs, side curls, back, messy bun flare
         ((-0.10, -0.12, 1.86), (0.0, -0.29, 1.81), (0.18, -0.28, 1.72), (0.245, -0.20, 1.60), 0.095),
         ((0.06, -0.14, 1.86), (-0.10, -0.29, 1.79), (-0.20, -0.26, 1.70), (-0.245, -0.18, 1.61), 0.085),
-        ((0.0, -0.17, 1.84), (0.04, -0.28, 1.76), (-0.03, -0.27, 1.69), (0.02, -0.235, 1.65), 0.055),
+        ((0.0, -0.17, 1.86), (0.04, -0.27, 1.80), (-0.03, -0.27, 1.75), (0.02, -0.24, 1.715), 0.05),
         ((0.27, -0.06, 1.62), (0.36, -0.08, 1.50), (0.30, -0.05, 1.40), (0.37, 0.0, 1.37), 0.085),
         ((0.28, 0.12, 1.60), (0.38, 0.14, 1.48), (0.32, 0.18, 1.38), (0.39, 0.23, 1.36), 0.085),
         ((-0.27, -0.06, 1.62), (-0.36, -0.08, 1.50), (-0.30, -0.05, 1.40), (-0.37, 0.0, 1.37), 0.085),
@@ -202,14 +214,14 @@ def build_hair():
     add(BODY, B.sphere((0.19, 0.18, 0.13), 12, 8), "f_hair", H, "bun", m=M((0, 0.04, 1.86)))
     add(BODY, B.torus(0.158, 0.054, 12, 4), "f_team_cloth", H, "team_cloth", m=M((0, 0.04, 1.785), (-8, 0, 0)))
     # brass goggles with teal lenses pushed up ON TOP of the hair at the front (visible from the front and above)
-    add(BODY, B.torus(0.25, 0.02, 20, 4), "f_brass", H, "goggles", m=M((0, 0.03, 1.71), (-25, 0, 0), (1.04, 1.0, 1)))
+    add(BODY, B.torus(0.25, 0.02, 20, 4), "f_brass", H, "goggles", m=M((0, 0.03, 1.765), (-25, 0, 0), (1.04, 1.0, 1)))
     for s in (1, -1):
         n = Vector((0.26 * s, -0.62, 0.74)).normalized()
-        c = Vector((0.105 * s, -0.20, 1.80))
+        c = Vector((0.11 * s, -0.20, 1.875))
         add(BODY, B.bcyl(c - n * 0.025, c + n * 0.03, 0.082, 0.076, 10, 0.012), "f_brass", H, "goggles")
         add(BODY, B.bcyl(c + n * 0.02, c + n * 0.042, 0.064, 0.062, 10, 0.008), "f_team_cloth", H, "team_cloth")
     add(BODY, B.box((0.07, 0.03, 0.035), 0.01, 1), "f_brass", H, "goggles", smooth=False,
-        m=M((0, -0.225, 1.81), (-40, 0, 0)))
+        m=M((0, -0.222, 1.885), (-40, 0, 0)))
 
 
 # ===================================================================================================== globe tank

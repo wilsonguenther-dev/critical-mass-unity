@@ -87,11 +87,11 @@
    "check": "Farmer_Body loose/non-manifold",
    "ok": true,
    "detail": {
-    "triangles": 10240,
+    "triangles": 10208,
     "loose_verts": 0,
     "loose_edges": 0,
     "non_manifold_edges": 0,
-    "closed_shells": 131
+    "closed_shells": 133
    }
   },
   {
@@ -195,7 +195,7 @@
   {
    "check": "triangle budget <= 12000",
    "ok": true,
-   "detail": 11852
+   "detail": 11820
   },
   {
    "check": "body height in metres after round trip (Blender Z = Unity Y)",

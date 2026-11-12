@@ -36,7 +36,7 @@ FARMER = {
     "f_cheek":      ("#F28C7E", "SAMPLED rosy cheeks"),
     "f_hair":       ("#4A2F25", "SAMPLED wavy dark-brown hair (lit ~#5A3A2C, shade ~#2E1C18)"),
     "f_brow":       ("#3A231B", "SAMPLED brows"),
-    "f_iris":       ("#6E3F24", "SAMPLED big brown eyes"),
+    "f_iris":       ("#7A4A2A", "SAMPLED big brown eyes"),
     "f_pupil":      ("#24161A", "pupil"),
     "f_white":      ("#FFFFFF", "eye whites, highlights"),
     "f_mouth":      ("#8A3A30", "SAMPLED smile"),

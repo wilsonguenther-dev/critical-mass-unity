@@ -46,7 +46,8 @@ FACINGS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
 # The camera sits at -F_H (screen-down), so facing the camera (S) is rig yaw -135 deg; E (screen right) is -45.
 FACE_DEG = {"S": 225, "SE": 270, "E": 315, "NE": 0, "N": 45, "NW": 90, "W": 135, "SW": 180}
 BIBLE_STANCE = [("upperleg.l", (0, 1, 0), -7), ("upperleg.r", (0, 1, 0), 7),
-                ("foot.l", (0, 1, 0), 7), ("foot.r", (0, 1, 0), -7), ("upperarm.l", (0, 1, 0), -8)]
+                ("foot.l", (0, 1, 0), 7), ("foot.r", (0, 1, 0), -7), ("upperarm.l", (0, 1, 0), -8),
+                ("head", (0, 1, 0), -6), ("head", (1, 0, 0), -5)]      # head tilt + chin up: attitude
 
 os.makedirs(OUT, exist_ok=True)
 bpy.ops.wm.open_mainfile(filepath=BLEND)
