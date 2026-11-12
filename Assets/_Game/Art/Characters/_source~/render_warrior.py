@@ -58,27 +58,30 @@ def cleaver_turn(deg):
 # shield face forward, edge-on to the camera and behind the body (a pose choice, not a hidden object).
 # Cleave (bible 06-pose-cleave): a deep lunge toward screen right, the cleaver arm flung back and up behind him at
 # shoulder height (blade trailing up and back), the shield thrust forward, torso leaning into the line of action.
-LUNGE = [("upperleg.l", (1, 0, 0), -42), ("lowerleg.l", (1, 0, 0), 38), ("foot.l", (1, 0, 0), 6),
-         ("upperleg.r", (1, 0, 0), 40), ("lowerleg.r", (1, 0, 0), 12), ("foot.r", (1, 0, 0), -30),
-         ("upperleg.l", (0, 1, 0), -6), ("upperleg.r", (0, 1, 0), 6)]
-CLEAVE = LUNGE + [("spine", (1, 0, 0), 16), ("spine", (0, 0, 1), 18),
-                  ("upperarm.r", (0, 1, 0), 35), ("upperarm.r", (1, 0, 0), 95), ("lowerarm.r", (1, 0, 0), 15),
-                  ("hand.r", (1, 0, 0), 55),
-                  ("upperarm.l", (1, 0, 0), -55), ("upperarm.l", (0, 1, 0), 10), ("head", (1, 0, 0), -10)]
-# Shield charge (bible 06-pose-shield-charge): running lunge, body pitched hard forward behind the shield, which
-# leads at chest height facing the run; the cleaver arm trails low behind.
-CHARGE = LUNGE + [("spine", (1, 0, 0), 26), ("spine", (0, 0, 1), -8),
-                  ("upperarm.l", (1, 0, 0), -70), ("upperarm.l", (0, 1, 0), 20), ("lowerarm.l", (1, 0, 0), -25),
-                  ("upperarm.r", (1, 0, 0), 55), ("upperarm.r", (0, 1, 0), 25), ("head", (1, 0, 0), -14)]
+def lunge(a):
+    """Deep lunge toward the facing (-Y): front (left) thigh forward, shin back to vertical; back leg extended."""
+    return [("upperleg.l", (1, 0, 0), -a), ("lowerleg.l", (1, 0, 0), a * 0.8), ("foot.l", (1, 0, 0), 5),
+            ("upperleg.r", (1, 0, 0), a), ("lowerleg.r", (1, 0, 0), a * 0.2), ("foot.r", (1, 0, 0), -a * 0.6),
+            ("upperleg.l", (0, 1, 0), -6), ("upperleg.r", (0, 1, 0), 6)]
+
+
+# Cleave and shield-charge chosen by silhouette sweeps (v3): the torso twists so the cleaver shoulder goes back,
+# the cleaver arm is flung back and up behind the head, the shield shoulder drives forward.
+CLEAVE = lunge(62) + [("spine", (1, 0, 0), 12), ("chest", (1, 0, 0), 8), ("spine", (0, 0, 1), -15),
+                      ("upperarm.r", (0, 1, 0), 20), ("upperarm.r", (1, 0, 0), 150), ("hand.r", (1, 0, 0), -40),
+                      ("upperarm.l", (1, 0, 0), -55), ("upperarm.l", (0, 1, 0), 10), ("head", (1, 0, 0), -10)]
+CHARGE = lunge(62) + [("spine", (1, 0, 0), 30), ("upperarm.l", (1, 0, 0), -75), ("upperarm.l", (0, 1, 0), 20),
+                      ("lowerarm.l", (1, 0, 0), -25), ("upperarm.r", (0, 1, 0), 30), ("upperarm.r", (1, 0, 0), 140),
+                      ("head", (1, 0, 0), -16)]
 POSES = {
     "front": ("Idle", 1, shield_turn(8) + [("hand.l", (0, 1, 0), -12), ("hand.r", (0, 1, 0), -12)], 8, 6,
               "azure", "all"),
     "three-quarter": ("Idle", 1, shield_turn(-60) + [("hand.r", (0, 1, 0), 25)], -35, 6, "azure", "all"),
-    "profile": ("Idle", 1, [("upperarm.l", (0, 1, 0), -30), ("upperarm.r", (1, 0, 0), -15)] + shield_turn(-50)
-                + cleaver_turn(100), -90, 4, "azure", "all"),
-    "back": ("Idle", 1, [], 180, 6, "azure", "all"),
-    "cleave": ("Idle", 1, CLEAVE + shield_turn(-70), -40, 6, "azure", "all"),
-    "shield-charge": ("Idle", 1, CHARGE + shield_turn(-75), -35, 6, "azure", "all"),
+    "profile": ("Idle", 1, [("upperarm.l", (1, 0, 0), -10), ("upperarm.r", (1, 0, 0), -15)] + shield_turn(-50)
+                + cleaver_turn(100) + [("hand.r", (1, 0, 0), 30)], -90, 4, "azure", "all"),
+    "back": ("Idle", 1, [("hand.r", (0, 1, 0), -20), ("hand.l", (1, 0, 0), -20)], 180, 6, "azure", "all"),
+    "cleave": ("Idle", 1, CLEAVE + shield_turn(-70), -50, 6, "azure", "all"),
+    "shield-charge": ("Idle", 1, CHARGE + shield_turn(-75), -45, 6, "azure", "all"),
     "front-shield": ("Idle", 1, [], 0, 6, "azure", "shield"),
     "face": ("Idle", 1, [], -10, 4, "azure", "head"),
     "crimson": ("Idle", 1, shield_turn(8) + [("hand.r", (0, 1, 0), 25)], -12, 6, "crimson", "all"),

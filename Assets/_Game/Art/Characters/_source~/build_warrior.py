@@ -76,13 +76,13 @@ def build_legs():
         add(BODY, B.torus(0.168, 0.02, 14, 5), "leather_dark", [lo, ft], "boots", m=M((lx * 1.10, 0.02, 0.14)))
         add(BODY, B.box((0.05, 0.035, 0.055), 0.012), "brass", [lo, ft], "boots", smooth=False,
             m=M((lx * 1.10 + 0.165 * s, 0.0, 0.14)))
-        add(BODY, B.slab((0.33, 0.44, 0.17), 0.55, 12, 8), "boot", [ft, to], "boots",
-            m=M((lx * 1.12, -0.09, 0.09)))
+        add(BODY, B.slab((0.34, 0.50, 0.18), 0.55, 12, 8), "boot", [ft, to], "boots",
+            m=M((lx * 1.12, -0.11, 0.09)))
         add(BODY, B.chipped(B.slab((0.345, 0.18, 0.15), 0.5, 12, 8), rng, chips=1, lump=0.005), "stone_armour", to,
             "stone_armour",
-            m=M((lx * 1.12, -0.25, 0.075)))
-        add(BODY, B.box((0.33, 0.46, 0.045), 0.02), "leather_dark", [ft, to], "boots", smooth=False,
-            m=M((lx * 1.12, -0.095, 0.0225)))
+            m=M((lx * 1.12, -0.29, 0.078)))
+        add(BODY, B.box((0.34, 0.52, 0.045), 0.02), "leather_dark", [ft, to], "boots", smooth=False,
+            m=M((lx * 1.12, -0.115, 0.0225)))
 
 
 def build_torso():
@@ -174,9 +174,9 @@ def build_pauldrons():
     a big domed brass plate on the front of the shoulder, brass rivets on the top block, cyan crack inlays."""
     for s, sd in ((1, "l"), (-1, "r")):
         w = {"chest": 0.55, f"upperarm.{sd}": 0.45}
-        top = M((0.34 * s, 0.0, 1.31), (0, -22 * s, 0))
+        top = M((0.31 * s, 0.0, 1.30), (0, -24 * s, 0))
         add(BODY, stone((0.40, 0.47, 0.235), chips=3), "stone_armour", w, "stone_armour", m=top.copy())
-        mid = M((0.47 * s, 0.01, 1.16), (0, -58 * s, 0))
+        mid = M((0.44 * s, 0.01, 1.15), (0, -60 * s, 0))
         add(BODY, stone((0.31, 0.42, 0.19), chips=2), "stone_armour", w, "stone_armour", m=mid.copy())
         crack(top @ M((0, 0, 0.113)), [(-0.14 * s, -0.16), (-0.05 * s, -0.08), (0.0, -0.13), (0.09 * s, 0.0),
                                        (0.05 * s, 0.08), (0.14 * s, 0.17)], 0.07, wset=w)
@@ -184,7 +184,7 @@ def build_pauldrons():
         crack(mid @ M((0, 0, 0.093)), [(-0.09 * s, -0.15), (0.0, -0.05), (0.03 * s, 0.05), (0.10 * s, 0.15)], 0.08,
               wset=w)
         # big domed brass plate on the front of the shoulder (bible: one per side, the brightest warm accent)
-        disc_m = kit.frame((0.36 * s, -0.215, 1.17), (0.42 * s, -0.90, 0.10), (0, 0, 1))
+        disc_m = kit.frame((0.34 * s, -0.215, 1.16), (0.42 * s, -0.90, 0.10), (0, 0, 1))
         add(BODY, brass_disc(0.092), "brass", w, "stone_armour", m=disc_m)
         add(BODY, B.torus(0.070, 0.008, 18, 4), groove("brass"), w, "stone_armour", m=disc_m @ M((0, 0, 0.034)))
         # rivets: brass domes along the top block's outer edge and one on the arm block
@@ -199,7 +199,7 @@ def build_head():
     on them), a small modelled button nose low between the cheeks, big ears, and modelled brows that sit low enough to
     overlap the top of the painted eyes. Eye and mouth detail stay in the face decal."""
     H = "head"
-    add(BODY, B.sphere((0.262, 0.238, 0.222), 24, 16), "skin", H, "skin", m=M((0, -0.01, 1.53)), face_uv=FACE_UV)
+    add(BODY, B.sphere((0.262, 0.238, 0.212), 24, 16), "skin", H, "skin", m=M((0, -0.01, 1.525)), face_uv=FACE_UV)
     add(BODY, B.sphere((0.245, 0.212, 0.150), 18, 10), "skin", H, "skin", m=M((0, -0.04, 1.415)), face_uv=FACE_UV)
     for s, k in ((1, 1.06), (-1, 1.0)):    # cheeks: the smirk side (character's left) is fuller and higher
         add(BODY, B.sphere((0.098 * k, 0.056, 0.076 * k), 12, 8), "skin", H, "skin",
@@ -217,17 +217,17 @@ def build_hair():
     a fringe of six locks curling down over the forehead, side spikes flaring over the ears, crown and nape spikes,
     and a tall topknot spray in a brass ring that leans to the character's left and sweeps back."""
     H = "head"
-    add(BODY, B.sphere((0.250, 0.245, 0.150), 13, 7), "hair", H, "hair", m=M((0, 0.035, 1.63)), grad=0.14)
+    add(BODY, B.sphere((0.250, 0.245, 0.150), 13, 7), "hair", H, "hair", m=M((0, 0.035, 1.605)), grad=0.14)
     add(BODY, B.sphere((0.240, 0.185, 0.200), 11, 7), "hair", H, "hair", m=M((0, 0.105, 1.49)), grad=0.14)
     SP = (0.92, 1.0, 0.68, 0.30)          # spike profile: full at the root, sharp tip
     C = [  # (base, control, tip, width, thickness, up)
         # fringe: six locks curling forward and down, tips staggered, two kicking sideways
-        ((-0.17, -0.05, 1.79), (-0.24, -0.25, 1.77), (-0.26, -0.24, 1.655), 0.15, 0.075, (0, -1, 0.3)),
-        ((-0.10, -0.08, 1.81), (-0.14, -0.28, 1.79), (-0.15, -0.26, 1.665), 0.15, 0.075, (0, -1, 0.3)),
-        ((-0.03, -0.09, 1.82), (-0.04, -0.29, 1.80), (-0.07, -0.27, 1.68), 0.15, 0.075, (0, -1, 0.3)),
-        ((0.04, -0.09, 1.82), (0.06, -0.29, 1.80), (0.05, -0.27, 1.66), 0.15, 0.075, (0, -1, 0.3)),
-        ((0.11, -0.08, 1.81), (0.16, -0.28, 1.79), (0.17, -0.26, 1.67), 0.15, 0.075, (0, -1, 0.3)),
-        ((0.17, -0.05, 1.79), (0.25, -0.24, 1.76), (0.27, -0.22, 1.65), 0.15, 0.075, (0, -1, 0.3)),
+        ((-0.17, -0.05, 1.715), (-0.24, -0.25, 1.695), (-0.26, -0.24, 1.655), 0.15, 0.075, (0, -1, 0.3)),
+        ((-0.10, -0.08, 1.735), (-0.14, -0.28, 1.715), (-0.15, -0.26, 1.665), 0.15, 0.075, (0, -1, 0.3)),
+        ((-0.03, -0.09, 1.745), (-0.04, -0.29, 1.725), (-0.07, -0.27, 1.68), 0.15, 0.075, (0, -1, 0.3)),
+        ((0.04, -0.09, 1.745), (0.06, -0.29, 1.725), (0.05, -0.27, 1.66), 0.15, 0.075, (0, -1, 0.3)),
+        ((0.11, -0.08, 1.735), (0.16, -0.28, 1.715), (0.17, -0.26, 1.67), 0.15, 0.075, (0, -1, 0.3)),
+        ((0.17, -0.05, 1.715), (0.25, -0.24, 1.685), (0.27, -0.22, 1.65), 0.15, 0.075, (0, -1, 0.3)),
         # sides: spikes flaring out over the temples and ears
         ((0.20, 0.00, 1.74), (0.31, -0.04, 1.70), (0.31, -0.08, 1.58), 0.15, 0.08, (1, 0, 0.2)),
         ((-0.20, 0.00, 1.74), (-0.31, -0.04, 1.70), (-0.31, -0.08, 1.58), 0.15, 0.08, (-1, 0, 0.2)),
@@ -237,18 +237,21 @@ def build_hair():
         ((0.10, 0.22, 1.62), (0.14, 0.34, 1.50), (0.15, 0.34, 1.35), 0.15, 0.08, (0.3, 1, 0)),
         ((-0.10, 0.22, 1.62), (-0.14, 0.34, 1.50), (-0.16, 0.33, 1.35), 0.15, 0.08, (-0.3, 1, 0)),
         ((0.0, 0.25, 1.64), (0.0, 0.37, 1.52), (0.01, 0.36, 1.33), 0.15, 0.08, (0, 1, 0)),
+        # back of the crown: two spikes sweeping back under the topknot (the bible's full round back of the head)
+        ((0.09, 0.18, 1.72), (0.13, 0.36, 1.71), (0.15, 0.44, 1.62), 0.15, 0.08, (0.2, 1, 0.3)),
+        ((-0.09, 0.18, 1.72), (-0.13, 0.36, 1.71), (-0.16, 0.43, 1.61), 0.15, 0.08, (-0.2, 1, 0.3)),
     ]
     for p0, p1, p2, w, t, up in C:
         add(BODY, B.clump(p0, p1, p2, w, t, 6, up=up, prof=SP), "hair", H, "hair", grad=0.18)
-    T = "topknot"
-    add(BODY, B.sphere((0.10, 0.10, 0.08), 12, 8), "hair", H, T, m=M((0, 0.07, 1.76)))
-    add(BODY, B.torus(0.080, 0.032, 16, 6), "brass", H, T, m=M((0, 0.075, 1.815), (-20, 0, 0)))
-    tuft = [((-0.02, 0.07, 1.83), (-0.05, 0.05, 1.91), (-0.09, 0.07, 1.935), 0.15, 0.085, (0, -1, 0)),
-            ((0.01, 0.07, 1.84), (0.04, 0.04, 1.95), (0.08, 0.03, 1.998), 0.16, 0.09, (0, -1, 0)),
-            ((0.02, 0.07, 1.84), (0.10, 0.05, 1.94), (0.17, 0.06, 1.975), 0.15, 0.085, (0, -1, 0)),
-            ((0.03, 0.07, 1.83), (0.14, 0.08, 1.91), (0.23, 0.10, 1.93), 0.14, 0.08, (0, -1, 0.2)),
-            ((0.0, 0.09, 1.82), (0.04, 0.22, 1.93), (0.07, 0.32, 1.92), 0.15, 0.085, (0, 0, 1)),
-            ((0.0, 0.10, 1.80), (0.0, 0.26, 1.85), (0.0, 0.36, 1.77), 0.14, 0.08, (0, 0, 1))]
+    T = "topknot"          # base set 0.08 back of the crown: the spray sweeps back in profile (bible p06)
+    add(BODY, B.sphere((0.10, 0.10, 0.08), 12, 8), "hair", H, T, m=M((0, 0.15, 1.74)))
+    add(BODY, B.torus(0.080, 0.032, 16, 6), "brass", H, T, m=M((0, 0.155, 1.795), (-20, 0, 0)))
+    tuft = [((-0.02, 0.15, 1.830), (-0.05, 0.13, 1.910), (-0.09, 0.15, 1.935), 0.15, 0.085, (0, -1, 0)),
+            ((0.01, 0.15, 1.840), (0.04, 0.12, 1.950), (0.08, 0.11, 1.998), 0.16, 0.09, (0, -1, 0)),
+            ((0.02, 0.15, 1.840), (0.10, 0.13, 1.940), (0.16, 0.14, 1.945), 0.15, 0.085, (0, -1, 0)),
+            ((0.03, 0.15, 1.830), (0.14, 0.16, 1.910), (0.21, 0.18, 1.880), 0.14, 0.08, (0, -1, 0.2)),
+            ((0.00, 0.17, 1.820), (0.04, 0.30, 1.930), (0.07, 0.40, 1.920), 0.15, 0.085, (0, 0, 1)),
+            ((0.00, 0.18, 1.800), (0.00, 0.34, 1.850), (0.00, 0.44, 1.770), 0.14, 0.08, (0, 0, 1))]
     for p0, p1, p2, w, t, up in tuft:
         add(BODY, B.clump(p0, p1, p2, w, t, 6, up=up, prof=SP), "hair", H, T, grad=0.18)
 
