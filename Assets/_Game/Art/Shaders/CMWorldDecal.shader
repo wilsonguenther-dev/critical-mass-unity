@@ -1,12 +1,13 @@
 // CM/WorldDecal (environment kit v3, 2026-11-12): the kit's ground decals, unlit, no outline, no depth write.
 // _Mode 0 = CM_GlowDecal (crystal ground glow: vertex colour, radial alpha from the disc's UV centre, additive), and a
 // team decal (vertex alpha code 6) takes _TeamGlowDecal instead of its authored Azure when _SwapTeam is 1 (Crimson).
+// _Mode 2 = bases light / egg pool: the vertex colour at _Strength alpha (props README: brazier pool decal at 35%).
 // _Mode 1 = CM_ShadowDecal (ledge soft shadow on the lower ground: alpha = 1 - UV.v, alpha-blended _ShadowColor).
 Shader "CM/WorldDecal"
 {
     Properties
     {
-        _Mode ("Mode (0 glow additive, 1 ledge shadow)", Range(0, 1)) = 0
+        _Mode ("Mode (0 glow additive, 1 ledge shadow, 2 pool)", Range(0, 2)) = 0
         _Strength ("Strength", Range(0, 2)) = 0.6
         _SwapTeam ("Swap team glow (Crimson)", Range(0, 1)) = 0
         _TeamGlowDecal ("Team glow (Crimson)", Color) = (1, 0.454902, 0.380392, 1)
@@ -44,6 +45,14 @@ Shader "CM/WorldDecal"
             V Vert(A i) { V o; o.positionCS = TransformObjectToHClip(i.positionOS.xyz); o.color = i.color; o.uv = i.uv; return o; }
             half4 Frag(V i) : SV_Target
             {
+                if (_Mode > 1.5)
+                {
+                    half3 c = i.color.rgb;
+                #if !defined(UNITY_COLORSPACE_GAMMA)
+                    c = SRGBToLinear(c);
+                #endif
+                    return half4(c, _Strength);
+                }
                 if (_Mode > 0.5) return half4(_ShadowColor.rgb, _ShadowColor.a * saturate(1.0 - i.uv.y) * _Strength);
                 half3 rgb = i.color.rgb;
                 if (_SwapTeam > 0.5 && (int)round(i.color.a * 8.0) == 6) rgb = LinearToSRGB(_TeamGlowDecal.rgb);

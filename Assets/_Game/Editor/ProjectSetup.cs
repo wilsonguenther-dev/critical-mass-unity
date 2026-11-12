@@ -194,7 +194,7 @@ namespace CriticalMass.Editor
             foreach (WorldLook look in WorldKit.AllLooks)
             {
                 string path = WorldKit.AssetPath(look);
-                bool decal = look == WorldLook.GlowDecal || look == WorldLook.ShadowDecal;
+                bool decal = look == WorldLook.GlowDecal || look == WorldLook.ShadowDecal || look == WorldLook.Pool;
                 string shader = look == WorldLook.Ground ? "CM/WorldGround" : decal ? "CM/WorldDecal" : "CM/Toon";
                 EnsureMaterial(path, shader);
                 var m = AssetDatabase.LoadAssetAtPath<Material>(path);
@@ -202,9 +202,9 @@ namespace CriticalMass.Editor
                 if (shader == "CM/Toon") dirty |= WorldToonValues(m, look);
                 else if (decal)
                 {
-                    bool glow = look == WorldLook.GlowDecal;
-                    dirty |= SetF(m, "_Mode", glow ? 0f : 1f);
-                    dirty |= SetF(m, "_Strength", glow ? 0.6f : 1f);
+                    bool glow = look == WorldLook.GlowDecal, pool = look == WorldLook.Pool;
+                    dirty |= SetF(m, "_Mode", glow ? 0f : pool ? 2f : 1f);
+                    dirty |= SetF(m, "_Strength", glow ? 0.6f : pool ? 0.35f : 1f);
                     dirty |= SetF(m, "_SrcBlend", glow ? 1f : 5f);
                     dirty |= SetF(m, "_DstBlend", glow ? 1f : 10f);
                 }

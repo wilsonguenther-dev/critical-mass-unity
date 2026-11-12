@@ -9,7 +9,7 @@ namespace CriticalMass.Runtime.View.Dressing
     /// </summary>
     public enum WorldLook
     {
-        Ground, Structure, Fringe, Prop, Flat, Sky, Water, Foliage, Crystal, GlowDecal, ShadowDecal, Base, BaseFlat,
+        Ground, Structure, Fringe, Prop, Flat, Sky, Water, Foliage, Crystal, GlowDecal, ShadowDecal, Base, BaseFlat, Pool,
     }
 
     /// <summary>Which look each kit piece and FBX material slot takes, and the outline width of each look.</summary>
@@ -93,7 +93,8 @@ namespace CriticalMass.Runtime.View.Dressing
         public static WorldLook BasesLook(string rendererName)
         {
             string n = rendererName ?? "";
-            return n.Contains("light_pool") || n.Contains("egg_pool") || n.Contains("flagstones") ? WorldLook.BaseFlat : WorldLook.Base;
+            if (n.Contains("light_pool") || n.Contains("egg_pool")) return WorldLook.Pool; // translucent ground light (35%)
+            return n.Contains("flagstones") ? WorldLook.BaseFlat : WorldLook.Base;
         }
 
         /// <summary>Bases kit authored team colours (Azure, sRGB hex; bases_art/pal.py TEAM_SETS) and the swap targets.</summary>

@@ -249,7 +249,7 @@ namespace CriticalMass.Runtime.View.Dressing
             if (src == null) return null;
             if (!Enum.TryParse(src.name.StartsWith("World", StringComparison.Ordinal) ? src.name.Substring(5) : "", out WorldLook look)) return src;
             if (look == WorldLook.Ground) return GroundMaterial();
-            bool swap = WorldKit.TeamSwapped(look) && (team == WorldTeam.Crimson || (team == WorldTeam.Neutral && (look == WorldLook.Base || look == WorldLook.BaseFlat)));
+            bool swap = look != WorldLook.Pool && WorldKit.TeamSwapped(look) && (team == WorldTeam.Crimson || (team == WorldTeam.Neutral && (look == WorldLook.Base || look == WorldLook.BaseFlat)));
             if (!swap) return src;
             string key = src.name + "|" + team;
             if (_mats.TryGetValue(key, out Material m) && m != null) return m;
