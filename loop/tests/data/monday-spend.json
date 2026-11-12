@@ -1,0 +1,14 @@
+{
+  "_source": "Recorded 2026-11-12T03:5xZ from the browser loop's Monday 2026-11-09 Workflow run files (~/.claude/projects/-Users-wilsonguenther/cf9c19a9-.../workflows/wf_*.json: totalTokens, agentCount, args.tokenCap, result.budget.spent) and their agent transcripts (subagents/workflows/wf_*/agent-*.jsonl, assistant usage deduplicated by message id per file). Numbers only; no transcript text.",
+  "runs": [
+    {"run_id": "wf_c73ef50d-d6c", "task_id": "wbb5vwxa2", "status": "completed", "agentCount": 81, "tokenCap": 4000000,
+     "governor_output_only": 919605, "totalTokens": 5526746, "landed": 2,
+     "transcripts": {"input": 2012, "output": 880050, "cache_creation": 5847854, "cache_read": 90061521}},
+    {"run_id": "wf_9e9819a9-2ca", "task_id": "wsovc32tn", "status": "completed", "agentCount": 365, "tokenCap": 4000000,
+     "governor_output_only": 3277033, "totalTokens": 21646318, "landed": 7,
+     "transcripts": {"input": 6366, "output": 2290696, "cache_creation": 23629876, "cache_read": 262959571}},
+    {"run_id": "wf_2f3407a6-e27", "task_id": "wbp77xb8z", "status": "killed", "agentCount": 207, "tokenCap": 2700000,
+     "governor_output_only": 1320000, "totalTokens": 12191590, "landed": 5,
+     "transcripts": {"input": 3550, "output": 1216481, "cache_creation": 13464073, "cache_read": 142698859}}
+  ]
+}
