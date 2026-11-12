@@ -41,8 +41,8 @@ OUTLINE_WIDTH = {"Egg": 0.018, "Hatchling": 0.022, "Adult": 0.035}  # metres, pe
 TRI_CAP = {"Egg": 4000, "Hatchling": 10000, "Adult": 15000}
 # Silhouette tunables fitted against the bible crops with iou_map.py (KJ_TUNE='{"sh_x": 1.05}' overrides one run;
 # the committed defaults below are the fitted values, so a plain run rebuilds the committed asset).
-TUNE = {"sh_x": 1.04, "fist_x": 1.5, "fist_r": 0.64, "crown_k": 1.05, "fan_k": 1.2, "head_dy": -0.08, "head_dz": 0.04,
-        "hip_z": 1.38, "thigh_x": 0.68, "fist_y": -0.95, "tail_k": 0.6}
+TUNE = {"sh_x": 1.04, "fist_x": 1.5, "fist_r": 0.64, "crown_k": 1.05, "fan_k": 1.2, "head_dy": -0.16, "head_dz": 0.0,
+        "hip_z": 1.38, "thigh_x": 0.68, "fist_y": -0.95, "tail_k": 0.6, "arm_k": 1.3, "cry_k": 1.2, "rock_k": 1.1, "facets": 11}
 TUNE.update(json.loads(os.environ.get("KJ_TUNE", "{}")))
 
 
@@ -98,8 +98,9 @@ class Geo:
 
     def __init__(self):
         self.V, self.F, self.M, self.SM, self.B, self.G, self.D = [], [], [], [], [], [], []
+        self.FS, self.GR = [], []      # v3: per-face value factor (three-step boulder read); graded team faces
 
-    def add(self, verts, faces, mats, bone=None, smooth=False, shade=None):
+    def add(self, verts, faces, mats, bone=None, smooth=False, shade=None, fshade=None, graded=False):
         """shade: per-vertex value factor baked into the vertex colour (+6 % toward the top of a part, -10 % in
         crevices, ART-DIRECTION 3.5). None = 1.0."""
         o = len(self.V)
@@ -111,6 +112,8 @@ class Geo:
             self.M.append(mats[k] if isinstance(mats, (list, tuple)) else mats)
             self.SM.append(smooth)
             self.D.append(False)
+            self.FS.append(fshade[k] if fshade is not None else 1.0)
+            self.GR.append(graded)
 
 
 def frame(n, spin=0.0):
@@ -378,6 +381,159 @@ def cluster(geo, p, n, size, count, rng, bone=None, spread=0.45):
         crystal(geo, Vector(p) + off, d, ln, max(0.035, 0.27 * ln), rng, bone)
 
 
+# ------------------------------------------------------------------------------------------------ v3 boulder kit
+# v3 (2026-11-12 review of sbs-10-azure-adult): the bible creature is a few LARGE faceted boulders per mass with deep
+# glowing gaps, not a mosaic of small plates. Every boulder is its own convex rock: a jittered, flat-topped point
+# cloud -> convex hull -> near-coplanar facets merged -> one chamfer. Value is baked per facet (three steps: light top
+# plane, mid side, dark underside) so it survives the flat toon shader; facets touching the glowing core take the
+# GlowHalo team slot (the soft cyan rim the glow spills onto boulder edges).
+STEP_TOP, STEP_MID, STEP_UNDER = 1.08, 0.90, 0.70
+
+
+def _hull_bm(pts):
+    bm = bmesh.new()
+    for p in pts:
+        bm.verts.new(p)
+    res = bmesh.ops.convex_hull(bm, input=bm.verts[:])
+    dead = list({g for g in res["geom_interior"] + res["geom_unused"] if isinstance(g, bmesh.types.BMVert)})
+    if dead:
+        bmesh.ops.delete(bm, geom=dead, context="VERTS")
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+    return bm
+
+
+def _bm_out(bm):
+    bm.verts.index_update()
+    bm.normal_update()
+    V = [v.co.copy() for v in bm.verts]
+    F = [[v.index for v in f.verts] for f in bm.faces]
+    C = [f.calc_center_median() for f in bm.faces]
+    N = [f.normal.copy() for f in bm.faces]
+    return V, F, C, N
+
+
+def boulder_pts(c, radii, up, rng, npts=16, flat_top=0.6, spin=None):
+    up = Vector(up).normalized()
+    M = frame(up, rng.uniform(0, math.tau) if spin is None else spin)
+    ga = math.pi * (3 - math.sqrt(5))
+    ph = rng.uniform(0, math.tau)
+    pts = []
+    for i in range(npts):
+        z = 1 - 2 * (i + 0.5) / npts
+        r = math.sqrt(max(0.0, 1 - z * z))
+        a = i * ga + ph
+        q = Vector((math.cos(a) * r, math.sin(a) * r, z)) * rng.uniform(0.9, 1.07)
+        if q.z > flat_top:                  # broad top plane (the lighter facet the bible paints on every rock)
+            q.z = flat_top + (q.z - flat_top) * 0.25
+        if q.z < -0.72:
+            q.z = -0.72 + (q.z + 0.72) * 0.4
+        pts.append(Vector(c) + M @ Vector((q.x * radii[0], q.y * radii[1], q.z * radii[2])))
+    return pts, M
+
+
+def boulder(geo, b, rng, core_bvh=None, rim_d=0.0):
+    """b: dict c, r (3 radii along the boulder frame, r[2] along 'up'), up, slot, bone, moss (0..1 cover), n, rim."""
+    c, radii = Vector(b["c"]), b["r"]
+    up = Vector(b.get("up", (0, 0, 1)))
+    pts, M = boulder_pts(c, radii, up, rng, b.get("n", 16), b.get("flat", 0.6), b.get("spin"))
+    bm = _hull_bm(pts)
+    bmesh.ops.dissolve_limit(bm, angle_limit=math.radians(9), verts=bm.verts[:], edges=bm.edges[:])
+    ch = min(CHAMFER[0], 0.12 * min(radii))
+    bmesh.ops.bevel(bm, geom=bm.edges[:] + bm.verts[:], offset=ch, offset_type="OFFSET", segments=1, profile=0.5,
+                    affect="EDGES", clamp_overlap=True)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+    V, F, C, N = _bm_out(bm)
+    bm.free()
+    mats, fs = [], []
+    for fc, n in zip(C, N):
+        nz = n.z
+        if b.get("rim", True) and core_bvh is not None and nz < 0.25:
+            hit = core_bvh.find_nearest(fc)
+            if hit[0] is not None and (hit[0] - fc).length < rim_d and (fc - hit[0]).dot(hit[1]) > 0:
+                mats.append(SLOT["GlowHalo"])
+                fs.append(1.0)
+                continue
+        mats.append(SLOT[b["slot"]])
+        fs.append(STEP_TOP if nz > 0.55 else (STEP_UNDER if nz < -0.2 else STEP_MID))
+    geo.add(V, F, mats, b["bone"], smooth=False, fshade=fs)
+    if b.get("moss", 0) > 0:
+        moss_cap(geo, pts, c, up, radii, b["moss"], rng, b["bone"])
+
+
+def moss_cap(geo, pts, c, up, radii, cover, rng, bone):
+    """Soft rounded moss clumps sitting on the boulder's top plane: 1 to 3 squashed, smooth-shaded ellipsoids (more
+    with more cover), light on top and a darker olive underside where they drape (bible: moss follows the rock tops)."""
+    up = Vector(up).normalized()
+    top = max((p - c).dot(up) for p in pts)
+    R = frame(up, rng.uniform(0, math.tau))
+    n = 2 + int(cover * 2.2 + rng.random() * 0.6)
+    rr = min(radii[0], radii[1])
+    for k in range(n):
+        a = math.tau * k / n + rng.uniform(-0.5, 0.5)
+        off = rng.uniform(0.0, 0.2) * rr if k == 0 else rng.uniform(0.3, 0.62) * rr
+        cr = rr * (0.3 + 0.16 * cover) * (1.0 if k == 0 else rng.uniform(0.6, 0.85))
+        q = c + R @ Vector((math.cos(a) * off, math.sin(a) * off, 0.0)) + up * (top - 0.16 * cr - 0.06 * off)
+        sq = (rng.uniform(1.0, 1.25), rng.uniform(0.85, 1.0), 0.42)
+        V, F = [], []
+        seg, rings = 8, 5
+        for j in range(1, rings):
+            th = math.pi * j / rings
+            for i in range(seg):
+                ph = math.tau * i / seg + 0.3 * j
+                V.append(q + R @ Vector((math.sin(th) * math.cos(ph) * sq[0], math.sin(th) * math.sin(ph) * sq[1],
+                                         math.cos(th) * sq[2])) * cr)
+        V.append(q + R @ Vector((0, 0, sq[2])) * cr)
+        V.append(q - R @ Vector((0, 0, sq[2])) * cr)
+        t, b_ = len(V) - 2, len(V) - 1
+        for j in range(rings - 2):
+            for i in range(seg):
+                a0, a1 = j * seg + i, j * seg + (i + 1) % seg
+                F.append([a0, a1, a1 + seg, a0 + seg])
+        for i in range(seg):
+            F.append([t, (i + 1) % seg, i])
+            o = (rings - 2) * seg
+            F.append([b_, o + i, o + (i + 1) % seg])
+        G = [max(0.56, min(1.04, 0.8 + 0.55 * (v - q).dot(up) / (sq[2] * cr))) for v in V]
+        geo.add(V, F, SLOT["Moss"], bone, smooth=True, shade=G)
+
+
+def crystal3(geo, base, d, length, radius, rng, bone=None, sides=6):
+    """v3 crystal: a tall separate hexagonal prism with a graded core (deep base -> bright tip, baked per vertex in the
+    team-glow value k, so the allegiance swap keeps it) and alternating facets one step darker (visible facet edge)."""
+    d = Vector(d).normalized()
+    M = frame(d, rng.uniform(0, math.tau))
+    base = Vector(base) - d * (0.22 * length)
+    rings = [(0.0, radius * 0.92, 0.5), (length * 0.4, radius, 0.74), (length * 0.72, radius * 0.94, 0.94)]
+    V, G = [], []
+    for z, r, k in rings:
+        for i in range(sides):
+            a = math.tau * i / sides
+            V.append(base + M @ Vector((math.cos(a) * r, math.sin(a) * r, z)))
+            G.append(k)
+    V.append(base + M @ Vector((rng.uniform(-0.15, 0.15) * radius, rng.uniform(-0.15, 0.15) * radius, length)))
+    G.append(1.0)
+    F, mats = [], []
+    for ring in (0, 1):
+        for i in range(sides):
+            a, b = ring * sides + i, ring * sides + (i + 1) % sides
+            F.append([a, b, b + sides, a + sides])
+            mats.append(SLOT["CrystalTip" if i % 2 == 0 else "Crystal"])
+    t = len(V) - 1
+    for i in range(sides):
+        F.append([2 * sides + i, 2 * sides + (i + 1) % sides, t])
+        mats.append(SLOT["CrystalTip" if i % 2 == 0 else "Crystal"])
+    geo.add(V, F, mats, bone, shade=G, graded=True)
+
+
+def ell_dist(p, b):
+    """normalized ellipsoid distance of point p from boulder b (1.0 = on its surface)"""
+    M = frame(Vector(b.get("up", (0, 0, 1))), 0.0)
+    q = M.transposed() @ (Vector(p) - Vector(b["c"]))
+    r = b["r"]
+    rr = max(r[0], r[1])
+    return math.sqrt((q.x / rr) ** 2 + (q.y / rr) ** 2 + (q.z / r[2]) ** 2)
+
+
 def spike(geo, p, d, length, radius, slot, bone=None, sides=4, rng=None):
     d = Vector(d).normalized()
     M = frame(d, rng.uniform(0, math.tau) if rng else 0.0)
@@ -476,6 +632,8 @@ def add_body(geo, bm, face_slot, smooth_fn=lambda c, n: False, decal_fn=lambda c
         geo.M.append(SLOT[face_slot(c, n)])
         geo.SM.append(smooth_fn(c, n))
         geo.D.append(bool(decal_fn(c, n)))
+        geo.FS.append(1.0)
+        geo.GR.append(False)
 
 
 def surface_samples(bm, count, rng):
@@ -664,7 +822,10 @@ def paint(me, stage, geo):
         slot_attr.data[poly.index].value = mi
         base, a = rgb[sname], PAL.slot_alpha(sname)
         for li in poly.loop_indices:
-            g = 1.0 if sname in PAL.TEAM_SLOTS else geo.G[me.loops[li].vertex_index]
+            g = geo.G[me.loops[li].vertex_index]
+            if sname in PAL.TEAM_SLOTS and not geo.GR[poly.index]:
+                g = 1.0
+            g *= geo.FS[poly.index]
             vals.append((min(1.0, base[0] * g), min(1.0, base[1] * g), min(1.0, base[2] * g), a))
     for li, v in enumerate(vals):
         col.data[li].color_srgb = v
@@ -906,6 +1067,8 @@ def creature(name, P, seed, target_h):
             return "Belly"
         return "Glow"
 
+    if P.get("boulders"):
+        return creature_v3(name, P, target_h, geo, bm, bvh, rng, Hc, RH, face_zone, decal_zone, body_slot)
     add_body(geo, bm, body_slot, lambda c, n: face_zone(c, n) or (c - Hc).length < RH * 1.25, decal_zone)
 
     # --- boulder plates over everything but the face and belly
@@ -991,6 +1154,53 @@ def creature(name, P, seed, target_h):
     tp, td = Vector(P["tail_tip"][0]), Vector(P["tail_tip"][1])
     cluster(geo, tp, td, P["tail_tip"][2], 4, rng, bone="Tail3", spread=0.5)
 
+    bm.free()
+    ob, rig, s = finish(name, geo, P["bones"], target_h)
+    PIVOT_Y[0] = P["foot"][1]
+    key_clips(rig, creature_clips(name), s)
+    return ob, rig
+
+
+def creature_v3(name, P, target_h, geo, bm, bvh, rng, Hc, RH, face_zone, decal_zone, body_slot):
+    """v3 surface: the metaball body is only the dark core; each anatomical mass is its own few large boulders
+    (P["boulders"]), the core glows only in the gaps between boulders of one mass and stays dark between masses."""
+    BL = P["boulders"](bvh)
+    rocks = []
+    for b in BL:
+        if b["slot"] == "Belly":
+            continue
+        M = frame(Vector(b.get("up", (0, 0, 1))), 0.0)
+        rocks.append((np.array(M.transposed()), np.array(b["c"]), max(b["r"][0], b["r"][1]), b["r"][2]))
+    RT = np.stack([r[0] for r in rocks])
+    RC = np.stack([r[1] for r in rocks])
+    RS = np.array([[r[2], r[2], r[3]] for r in rocks])
+
+    def slot3(c, n):
+        s = body_slot(c, n)
+        if s != "Glow":
+            return s
+        q = np.einsum("kij,kj->ki", RT, np.array(tuple(c)) - RC) / RS
+        d = np.sort(np.sqrt((q * q).sum(1)))
+        return "Glow" if d[1] < P["crack_k"] else "Skin"
+
+    add_body(geo, bm, slot3, lambda c, n: True, decal_zone)
+    for b in BL:
+        boulder(geo, b, rng, core_bvh=bvh, rim_d=P["rim_d"])
+    print("BOULDERS", name, len(BL))
+    P["face"](geo, rng, Hc, RH)
+    ncr = 0
+    for (x, y, d, L, bone) in P["crystals"]:
+        p, n = ray(bvh, (x, y, 20), (0, 0, -1))
+        if p is None:
+            continue
+        crystal3(geo, p, Vector(d), L, P["crystal_r"] * L, rng, bone=bone or auto(p))
+        ncr += 1
+    tp, td, tl = P["tail_tip"]
+    for k, (dx, dy, f) in enumerate(((0, 0, 1.0), (0.4, 0.3, 0.7))):
+        dd = (Vector(td) + Vector((dx, dy, 0))).normalized()
+        crystal3(geo, Vector(tp), dd, tl * f, P["crystal_r"] * tl * f, rng, bone="Tail3")
+        ncr += 1
+    print("CRYSTALS", name, ncr)
     bm.free()
     ob, rig, s = finish(name, geo, P["bones"], target_h)
     PIVOT_Y[0] = P["foot"][1]
@@ -1098,6 +1308,81 @@ def adult_params():
                   ("Thigh" + sfx, (sx * (THX - 0.02), 1.1, 1.2), (sx * (THX + 0.02), 1.0, 0.7), "Hips"),
                   ("Foot" + sfx, (sx * (THX + 0.02), 1.0, 0.7), (sx * (THX + 0.04), 0.7, 0.12), "Thigh" + sfx)]
 
+    # ---- v3: separate masses, few large boulders (2026-11-12 review). Positions follow the v2 fitted skeleton.
+    CORE = 0.62             # the metaball body shrinks to a dark core the boulders stand proud of
+    balls = [(c, r * (CORE if abs(c[0]) > 0.3 else 0.9)) + tuple(rest) for c, r, *rest in balls]
+    limbs = [(a, b, r0 * CORE, r1 * CORE) if abs(a[0]) > 0.3 or abs(b[0]) > 0.3 else (a, b, r0, r1)
+             for a, b, r0, r1 in limbs]
+    MX, MY = (SX + FX) / 2 + 0.05, (FY - 0.55) / 2
+
+    def boulders(bvh):
+        B = []
+
+        def add(c, r, bone, slot="Slate", moss=0.0, up=(0, 0, 1), n=16, rim=True, flat=0.6, spin=None):
+            if n > 12 and bone.startswith(("Arm", "Forearm", "Fist")):
+                r = tuple(x * TUNE["arm_k"] for x in r)       # forelimb boulders: the bible's forearms are huge
+            elif slot != "Belly" and bone not in ("Head",) and n > 12:
+                r = tuple(x * TUNE["rock_k"] for x in r)
+            n = min(n, TUNE["facets"]) if slot != "Belly" else n
+            B.append({"c": tuple(c), "r": r, "bone": bone, "slot": slot, "moss": moss, "up": up, "n": n, "rim": rim,
+                      "flat": flat, "spin": spin})
+        for sx, sf in ((1, "_L"), (-1, "_R")):
+            # shoulder: the big rounded mass, moss draped over its top; a second one behind it toward the hump
+            add((sx * (SX + 0.06), -0.42, 2.44), (0.6, 0.58, 0.5), "Arm" + sf, moss=0.8, up=(sx * 0.3, 0, 1))
+            add((sx * (SX - 0.3), 0.08, 2.62), (0.46, 0.46, 0.4), "Chest", moss=0.6, up=(sx * 0.3, 0.1, 1))
+            # upper arm, angled down and out to the elbow
+            add((sx * (SX + 0.2), -0.66, 1.92), (0.44, 0.42, 0.42), "Arm" + sf, up=(sx * 0.6, -0.3, 0.6))
+            # forearm column: elbow block (moss on top), a big mid block (pale on one arm), an inner block
+            add((sx * (MX + 0.02), MY - 0.04, 1.47), (0.5, 0.48, 0.4), "Forearm" + sf, moss=0.55, up=(sx * 0.2, -0.4, 1))
+            add((sx * (FX - 0.05), FY + 0.0, 1.02), (0.53, 0.5, 0.37), "Forearm" + sf,
+                slot="SlateLight" if sx < 0 else "Slate", up=(sx * 0.15, -0.7, 0.7))
+            add((sx * (MX - 0.24), MY + 0.22, 1.12), (0.38, 0.38, 0.36), "Forearm" + sf, up=(-sx * 0.6, 0.2, 0.6))
+            # fist: a big pale front boulder, an outer boulder, three knuckles on the ground
+            add((sx * FX, FY - 0.14, 0.56), (0.56, 0.46, 0.48), "Fist" + sf, slot="SlateLight" if sx > 0 else "Slate",
+                up=(0, -1, 0.35))
+            add((sx * (FX + 0.22), FY + 0.16, 0.5), (0.4, 0.4, 0.42), "Fist" + sf, up=(sx * 1, 0, 0.4))
+            for dx in (-0.3, 0.0, 0.3):
+                add((sx * (FX + dx), FY - 0.46, 0.17), (0.19, 0.17, 0.17), "Fist" + sf, n=12, rim=False, up=(0, -0.5, 1))
+            # hind leg: thigh, foot block, toes
+            add((sx * (THX + 0.06), 1.05, 1.12), (0.42, 0.44, 0.42), "Thigh" + sf, moss=0.5)
+            add((sx * (THX + 0.08), 0.9, 0.48), (0.4, 0.44, 0.34), "Foot" + sf, up=(0, -0.5, 1))
+            for dx in (-0.18, 0.0, 0.18):
+                add((sx * (THX + 0.08 + dx), 0.55, 0.14), (0.14, 0.13, 0.13), "Foot" + sf, n=12, rim=False)
+            # flank and hip blocks
+            add((sx * 0.48, 0.58, 2.28), (0.42, 0.44, 0.38), "Spine", moss=0.45, up=(sx * 0.45, 0.2, 1))
+            add((sx * 0.44, 1.12, 1.7), (0.4, 0.4, 0.36), "Hips", up=(sx * 0.5, 0.4, 1))
+            # cranium blocks on the head top
+            add((sx * 0.2, -0.9 + HY, 3.6 + HZ), (0.22, 0.22, 0.17), "Head", moss=0.75, n=14, up=(sx * 0.3, 0.2, 1))
+        # spine line: hump block behind the head, then down the back to the hips
+        add((0, -0.22, 3.02), (0.5, 0.48, 0.38), "Chest", moss=0.5)
+        add((0, 0.32, 2.8), (0.48, 0.46, 0.38), "Spine", moss=0.4, up=(0, 0.2, 1))
+        add((0, 0.86, 2.32), (0.44, 0.44, 0.36), "Spine", up=(0, 0.4, 1))
+        add((0, 1.36, 1.66), (0.36, 0.38, 0.32), "Hips", up=(0, 0.7, 0.7))
+        # tail: three shrinking blocks
+        add((0, ty(1.75), 1.16), (0.32, 0.34, 0.28), "Tail1", up=(0, 0.4, 1))
+        add((T * 0.18, ty(2.08), 0.98), (0.26, 0.27, 0.22), "Tail2", up=(T * 0.3, 0.3, 1))
+        add((T * 0.42, ty(2.22), 1.02), (0.2, 0.2, 0.17), "Tail3", up=(T * 0.4, 0.2, 1), n=12)
+        # heavy brow boulder over the painted eyes (stays above them), moss on its crown
+        add((0, -1.22 + HY, 3.56 + HZ), (0.42, 0.2, 0.13), "Head", moss=0.55, up=(0, -0.45, 1), n=18, spin=0.0)
+        # tan chest: two big pectoral plates, then three rows of belly segments (ray-cast onto the core)
+        tiles = [(-0.24, 2.3, 0.27, 0.21), (0.24, 2.3, 0.27, 0.21)]
+        tiles += [(sx * 0.15, z, 0.16, 0.12) for z in (1.94, 1.66, 1.38) for sx in (1, -1)]
+        for (x, z, w, h) in tiles:
+            p, n = ray(bvh, (x, -6, z), (0, 1, 0))
+            if p is not None:
+                add(p - n * 0.02, (w, h, 0.16), auto(p), slot="Belly", up=tuple(n), n=14, rim=False, flat=0.35,
+                    spin=0.0)
+        return B
+
+    CL = TUNE["cry_k"]
+    crystals = [(x, y, d, L * CL, b) for x, y, d, L, b in [
+        (0.0, -0.3, (0, 0.12, 1), 1.6, None), (0.24, -0.18, (0.38, 0.18, 1), 1.18, None),
+        (-0.24, -0.18, (-0.38, 0.18, 1), 1.18, None),
+        (0.74, 0.02, (0.6, 0.15, 1), 1.0, None), (0.92, 0.24, (0.95, 0.3, 0.8), 0.72, None),
+        (-0.74, 0.02, (-0.6, 0.15, 1), 1.0, None), (-0.92, 0.24, (-0.95, 0.3, 0.8), 0.72, None),
+        (0.12, 0.58, (0.15, 0.4, 1), 1.0, None), (-0.15, 0.9, (-0.2, 0.5, 1), 0.8, None),
+        (0.0, 1.22, (0, 0.7, 0.8), 0.62, None)]]
+
     def belly(c, n):
         return c.y < -0.25 and abs(c.x) < 0.56 and 0.95 < c.z < 2.62 and n.y < -0.3
 
@@ -1134,7 +1419,7 @@ def adult_params():
     face = face_kit(eye_r=0.1, eye_off={"x": 0.21, "y": -0.34, "z": 0.09, "muzzle": (0, -0.38, -0.25),
                                          "nose_fwd": 0.3, "nose_up": 0.07, "jaw": (0, -0.02, -0.15),
                                          "jaw_size": (0.17, 0.17, 0.09), "mouth_back": 0.12},
-                    brow=(1.3, 0.4, 0.98, 16), smile=(0.13, 0.31, -0.06, 0.05, 0.03), open_jaw=0, teeth=0)
+                    brow=None, smile=(0.13, 0.31, -0.06, 0.05, 0.03), open_jaw=0, teeth=0)
     return {
         "unit": U, "balls": balls, "limbs": limbs, "voxel": 0.05, "body_tris": 2600, "bones": bones,
         "gap": 0.024, "crack_w": 0.02, "chamfer_m": 0.05, "design_h": 4.2,
@@ -1143,8 +1428,9 @@ def adult_params():
         "belly_tiles": belly_tiles, "fist": (FX, FY, 0.52), "fist_plate_z": 0.85, "fist_plate_r": 0.44 * FR / 0.6,
         "knuckles": (-0.33, -0.11, 0.11, 0.33), "knuckle_fwd": 0.42, "knuckle_r": 0.15,
         "foot": (0.64, 0.95, 0.38), "toes": (-0.2, 0.0, 0.2), "toe_fwd": 0.42, "toe_r": 0.12,
-        "face": face, "crown": crown, "fans": fans, "crown_lean": 10.0, "crystal_r": 0.17, "spikes": spikes,
+        "face": face, "crown": crown, "fans": fans, "crown_lean": 10.0, "crystal_r": 0.2, "spikes": spikes,
         "tail_tip": ((T * 0.6, ty(2.24), 1.16), (T * 0.35, 0.1, 0.9), 0.46),
+        "boulders": boulders, "crystals": crystals, "crack_k": 1.38, "rim_d": 0.05,
     }
 
 
