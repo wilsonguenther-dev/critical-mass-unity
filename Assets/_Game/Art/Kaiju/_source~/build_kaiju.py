@@ -42,7 +42,7 @@ TRI_CAP = {"Egg": 4000, "Hatchling": 10000, "Adult": 15000}
 # Silhouette tunables fitted against the bible crops with iou_map.py (KJ_TUNE='{"sh_x": 1.05}' overrides one run;
 # the committed defaults below are the fitted values, so a plain run rebuilds the committed asset).
 TUNE = {"sh_x": 1.04, "fist_x": 1.5, "fist_r": 0.64, "crown_k": 1.05, "fan_k": 1.2, "head_dy": -0.08, "head_dz": 0.04,
-        "hip_z": 1.38, "thigh_x": 0.68, "fist_y": -0.95, "tail_k": 1.0}
+        "hip_z": 1.38, "thigh_x": 0.68, "fist_y": -0.95, "tail_k": 0.6}
 TUNE.update(json.loads(os.environ.get("KJ_TUNE", "{}")))
 
 
@@ -754,7 +754,7 @@ PIVOT_Y = [0.95]   # hind-foot contact (design y) of the stage being keyed, for 
 ROAR_FIT = {"hz": 0.06, "ay": 16.0, "ax": 8.0, "fy": -8.0, "fx": -8.0, "sp": -10, "ch": -10, "nk": -10.5, "hd": -34.0, "tx": -6.0, "ty": 12.0, "tl": -24.0}
 WINDUP_FIT = {"arx": 195.0, "ary": 2.0, "frx": -40.0, "fkx": -20.0, "hz": 0.06, "sp": 12.0, "chx": 5.0, "chy": -6, "hd": -32.0, "alx": 18.0, "aly": 0, "flx": 4.0}
 BERSERK_FIT = {"ra": -6.0, "ax": 12.0, "ay": 6, "sp": -1.0, "ch": -8, "nk": -2.0, "hd": -22, "fx": 6, "fk": -8.0, "tx": 18.0}
-HATCH_IDLE_FIT = {"nk": -30.0, "hd": 4.0, "hy": 7.5, "sp": -11.25, "ch": 5.0, "ax": 0, "ay": 6.0, "tx": 0, "ty": 0, "tl": -10.0}
+HATCH_IDLE_FIT = {"nk": -34.0, "hd": 18.0, "hy": 0.0, "sp": -11.25, "ch": 5.0, "ax": 12.0, "ay": -12.0, "tx": 30, "ty": -6.0, "tl": -14.0}
 
 
 def creature_clips(stage="Adult"):
@@ -1155,7 +1155,7 @@ def hatch_params():
         ((0, 0.15, 1.0), 0.95, (1.0, 1.25, 0.82)),     # domed turtle shell body
         ((0, -0.5, 1.0), 0.66, (1.05, 0.85, 1.0)),     # chest
         ((0.72, -0.55, 0.95), 0.42), ((-0.72, -0.55, 0.95), 0.42),   # shoulders
-        ((0.82, -0.68, 0.32), 0.42, (1.0, 1.0, 0.85)), ((-0.82, -0.68, 0.32), 0.42, (1.0, 1.0, 0.85)),  # front feet
+        ((0.84, -0.8, 0.34), 0.47, (1.0, 1.0, 0.85)), ((-0.84, -0.8, 0.34), 0.47, (1.0, 1.0, 0.85)),  # big front feet
         ((0.58, 0.72, 0.6), 0.4), ((-0.58, 0.72, 0.6), 0.4),
         ((0.62, 0.62, 0.22), 0.34, (1.0, 1.2, 0.7)), ((-0.62, 0.62, 0.22), 0.34, (1.0, 1.2, 0.7)),
         ((0, -1.1, 1.75), 0.56, (1.0, 0.95, 0.92)),    # big round head, raised
@@ -1164,8 +1164,9 @@ def hatch_params():
     ]
     limbs = []
     for sx in (1, -1):
-        limbs += [((sx * 0.75, -0.55, 0.95), (sx * 0.82, -0.66, 0.35), 0.38, 0.4)]
-    limbs += [((0, 1.0, 0.75), (0, 1.55, 0.42), 0.34, 0.24), ((0, 1.55, 0.42), (0.15, 2.0, 0.28), 0.24, 0.14)]
+        limbs += [((sx * 0.75, -0.55, 0.95), (sx * 0.84, -0.78, 0.36), 0.38, 0.42)]
+    # tail sticks out behind (bible p10 hatchling), crystal-tipped
+    limbs += [((0, 1.0, 0.75), (0, 1.6, 0.42), 0.34, 0.24), ((0, 1.6, 0.42), (0.15, 2.3, 0.26), 0.24, 0.14)]
     bones = [
         ("Root", (0, 0, 0), (0, 0.5, 0), None),
         ("Hips", (0, 0.65, 0.8), (0, 0.0, 1.0), "Root"),
@@ -1174,14 +1175,14 @@ def hatch_params():
         ("Neck", (0, -0.7, 1.3), (0, -1.0, 1.68), "Chest"),
         ("Head", (0, -1.0, 1.68), (0, -1.65, 1.73), "Neck"),
         ("Jaw", (0, -1.15, 1.42), (0, -1.65, 1.37), "Head"),
-        ("Tail1", (0, 0.95, 0.78), (0, 1.55, 0.42), "Hips"),
-        ("Tail2", (0, 1.55, 0.42), (0.15, 2.0, 0.28), "Tail1"),
-        ("Tail3", (0.15, 2.0, 0.28), (0.25, 2.2, 0.22), "Tail2"),
+        ("Tail1", (0, 0.95, 0.78), (0, 1.6, 0.42), "Hips"),
+        ("Tail2", (0, 1.6, 0.42), (0.15, 2.3, 0.26), "Tail1"),
+        ("Tail3", (0.15, 2.3, 0.26), (0.22, 2.5, 0.22), "Tail2"),
     ]
     for sx, sfx in ((1, "_L"), (-1, "_R")):
-        bones += [("Arm" + sfx, (sx * 0.72, -0.52, 1.05), (sx * 0.78, -0.6, 0.7), "Chest"),
-                  ("Forearm" + sfx, (sx * 0.78, -0.6, 0.7), (sx * 0.82, -0.66, 0.38), "Arm" + sfx),
-                  ("Fist" + sfx, (sx * 0.82, -0.66, 0.38), (sx * 0.82, -0.72, 0.05), "Forearm" + sfx),
+        bones += [("Arm" + sfx, (sx * 0.72, -0.52, 1.05), (sx * 0.79, -0.66, 0.7), "Chest"),
+                  ("Forearm" + sfx, (sx * 0.79, -0.66, 0.7), (sx * 0.84, -0.78, 0.38), "Arm" + sfx),
+                  ("Fist" + sfx, (sx * 0.84, -0.78, 0.38), (sx * 0.84, -0.84, 0.05), "Forearm" + sfx),
                   ("Thigh" + sfx, (sx * 0.56, 0.72, 0.75), (sx * 0.6, 0.65, 0.4), "Hips"),
                   ("Foot" + sfx, (sx * 0.6, 0.65, 0.4), (sx * 0.62, 0.4, 0.08), "Thigh" + sfx)]
 
@@ -1201,8 +1202,8 @@ def hatch_params():
     def moss(p, n):
         return 0.7 if (p.z > 0.6 and n.z > 0.25) else 0.0
 
-    crown = [(-0.62, 0.55, 1), (-0.36, 0.95, 2), (-0.08, 1.2, 2), (0.2, 1.22, 2), (0.48, 1.05, 2), (0.76, 0.78, 1),
-             (1.05, 0.52, 1), (1.32, 0.38, 0), (1.58, 0.3, 0)]
+    crown = [(-0.62, 0.55, 1), (-0.36, 0.95, 2), (-0.08, 1.2, 2), (0.2, 1.22, 2), (0.48, 1.0, 2), (0.76, 0.62, 1),
+             (1.05, 0.42, 1), (1.4, 0.32, 0), (1.75, 0.3, 0), (2.05, 0.28, 0)]
     fans = [(0.24, 18, 0.82), (0.48, 36, 0.64)]
     face = face_kit(eye_r=0.15, eye_off={"x": 0.24, "y": -0.43, "z": 0.1, "muzzle": (0, -0.4, -0.16),
                                          "nose_fwd": 0.3, "nose_up": 0.1, "jaw": (0, -0.04, -0.2),
@@ -1214,12 +1215,12 @@ def hatch_params():
         "gap": 0.022, "crack_w": 0.02, "chamfer_m": 0.035, "design_h": 2.6,
         "head": (0, -1.1, 1.75), "head_r": 0.56, "muzzle": (0, -1.5, 1.56), "head_clear": 1.1, "belly": belly, "dmin": dmin,
         "samples": 12000, "plate_r": 1.0, "plate_thick": 0.4, "light_frac": light_frac, "moss": moss, "min_plate_z": 0.1,
-        "belly_tiles": belly_tiles, "fist": (0.82, -0.68, 0.32), "fist_plate_z": 0.45, "fist_plate_r": 0.26,
+        "belly_tiles": belly_tiles, "fist": (0.84, -0.8, 0.34), "fist_plate_z": 0.45, "fist_plate_r": 0.26,
         "knuckles": (-0.18, 0.0, 0.18), "knuckle_fwd": 0.36, "knuckle_r": 0.11,
         "foot": (0.62, 0.62, 0.22), "toes": (-0.14, 0.0, 0.14), "toe_fwd": 0.34, "toe_r": 0.1,
         "face": face, "crown": crown, "fans": fans, "crown_lean": 8.0, "crystal_r": 0.18,
         "spikes": [(0.62, 0.25, 0.26), (-0.62, -0.1, 0.26)],
-        "tail_tip": ((0.2, 2.1, 0.26), (0.3, 0.6, 0.6), 0.4),
+        "tail_tip": ((0.2, 2.4, 0.25), (0.3, 0.6, 0.6), 0.4),
     }
 
 
