@@ -124,7 +124,9 @@ there. `Assets/_Game/Editor/` (`CriticalMass.Editor`): only F-07 edits it in Pha
 9. **Randomness.** Only the seeded `Rng` (F-02a). No `System.Random`, `UnityEngine.Random`, `DateTime`, `Stopwatch` in
    `Assets/_Game/Sim` (`BoundaryTests` enforces it). `Math.random` appears in no browser sim file and no bot file.
 10. **Module-scope scratch.** TS module-level scratch arrays and objects become `private static` fields, grown the
-    same way. Tests run single-threaded: never add `[Parallelizable]`.
+    same way. Tests run single-threaded: never add `[Parallelizable]`. The Sim is stepped from exactly one thread
+    (U-047): the Runtime driver (F-08a) steps it on the Unity main thread only and the soak harness (F-09) runs matches
+    one after another, never in parallel; F-01b proves sequential interleaving of two worlds is safe.
 11. **Logging.** `console.error` / `console.log` in sim code is dropped (the Sim has no logger).
 12. **Ceil and round of products.** `Math.ceil(a * b)` -> `Math.Ceiling(a * b)` with both operands `double`, and the
     same for `Math.round` -> `JsMath.Round`: the IEEE product is the same in both runtimes (10 * 0.3 = 3.0000000000000004
@@ -132,6 +134,9 @@ there. `Assets/_Game/Editor/` (`CriticalMass.Editor`): only F-07 edits it in Pha
 13. **Tick counts from config.** Every config number is `double` (F-01). A TS field that counts whole ticks
     (`Kaiju.meleeWindupIn`, `Barricade` slots, ...) is `int` in C# and is set with an explicit `(int)` cast of the config
     value; the cast is exact because those values are integers.
+14a. **Team enums (U-047).** `TeamId`, `MatchResult`, `HillState` and `KaijuState` have different integer values for
+    Azure and Crimson. A browser assignment of a team string (`winner = team`, `kaiju.state = team`, `hillState = team`)
+    goes through `SimEnumMap` (F-02c); a raw cast between them fails `BoundaryTests`.
 14. **Empty input is not "no aim".** `SimInput.EmptyInput()` has aim (0, 0), which is finite. Code that means "no aim"
     passes `double.NaN`; code that means "no input" does not call `ApplyInput` at all.
 15. **Math library (U-032, replaces the earlier "System.Math equivalents, 1e-4 covers it").** `Math.sin`, `Math.cos`,

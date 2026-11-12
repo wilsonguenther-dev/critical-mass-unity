@@ -102,10 +102,10 @@ those files in the foundation with the item code left out and marked with a `// 
 
 | # | Id | Item | Old state | Waits on |
 | --- | --- | --- | --- | --- |
-| 1 | CM-32 | Jumping (Travis must-have) | Landed | F-01 to F-08c |
-| 2 | CM-33 | Cross bridges at any angle (Travis must-have) | Built, not in main (pulled out twice) | F-01 to F-08c |
-| 3 | CM-30 | Miners dig and place ground (Travis must-have) | Landed | F-01 to F-09 |
-| 4 | CM-31 | Knock-down structures (Travis must-have) | Landed | CM-30 |
+| 1 | CM-32 | Jumping (Travis must-have) | Landed | rules part: batch 2 (the human-jump bots case: batch 3); view part: F-07, F-08a (U-035) |
+| 2 | CM-33 | Cross bridges at any angle (Travis must-have) | Built, not in main (pulled out twice) | rules part: batch 2; view part: F-08b (U-035) |
+| 3 | CM-30 | Miners dig and place ground (Travis must-have) | Landed | rules part: batch 2 (4 bot cases and the soak case: batch 3); view part: F-08a, F-08b, F-08c (U-034, U-035) |
+| 4 | CM-31 | Knock-down structures (Travis must-have) | Landed | rules part: batch 2 and CM-30's rules part; view part: F-08b (U-035) |
 | 5 | CM-37 | Base healing fountain | Landed | F-01 to F-09 |
 | 6 | CM-35 | Two kinds of biomass | Landed | F-01 to F-09 |
 | 7 | CM-34 | Slower corruption | Landed | CM-35 |
@@ -124,7 +124,13 @@ those files in the foundation with the item code left out and marked with a `// 
 | - | CM-55 | Engine port spike | Held | closed: this repo is the port |
 
 Travis's must-haves: miners digging and placing ground is **CM-30**, knock-down structures is **CM-31**, jumping is
-**CM-32**, diagonal bridge crossing is **CM-33**. Those four come first.
+**CM-32**, diagonal bridge crossing is **CM-33**. Those four come first. Each is split (U-035) into a **rules part**
+(Sim code and its NUnit tests, which can start once batch 2 is on main) and a **view part** (Runtime code and the play
+check, which waits on the placeholder views F-08a to F-08c). Both parts stay yours; the split changes when you can
+start, not who owns what.
+
+**Ownership (U-045).** You keep every item in this list. The loop never touches a Max-owned item unless you leave it
+undone and the owner (Wilson) says to take it; nothing here is reassigned.
 
 Old ids that are not on your list: **CM-54** (class switch on the death screen) is superseded by CM-84, which ports its
 cooldown. **CM-56** (five-class roster) is part of F-01 and F-02b. **CM-61** (the look of dug holes and placed blocks) is
@@ -175,7 +181,9 @@ foundation uses `Config`, `Core`, `Grid`, `Maps`, `Bots`; new files in `Sim/Rule
 
 ### CM-32 Jumping (Travis must-have)
 
-Old state: landed (D-062). Waits on F-01 to F-08c.
+Old state: landed (D-062). **Split (U-035).** Rules part (`JumpSystem`, `JumpTests` 6 cases) waits only on batch 2
+(F-01 to F-05j and F-02c: movement, collide, step); the moved human-jump bots case (`bots.test.ts` line 522) waits on
+batch 3. View part (`ActorJumpLift`, the Jump binding read, the play check) waits on F-07 and F-08a.
 
 **What the player sees.** Press Space (south button) and your capsule hops in a short arc, keeping the speed and
 direction it had at takeoff. You can hop a one-cell gap. A jump that would land you in a wall or a hole is shortened, or
@@ -202,7 +210,9 @@ up in the void; hold Space, you jump once.
 
 Old state: built on branch `cm/CM-33` (commit `003c970`), landed in main twice on 2026-11-09 and pulled out both times
 during batch integration over a render check, not over the rule. D-060 was dropped from DECISIONS.md with it; read the
-branch's own DECISIONS.md entry and commit messages. Waits on F-01 to F-08c.
+branch's own DECISIONS.md entry and commit messages. **Split (U-035).** Rules part (`BridgeSpans`, the rail in
+`Collide.cs`, `BridgeTravelTests` 6 cases; bridges.test.ts imports only collide, grid, map, movement, step, world)
+waits only on batch 2. View part (the play check on every diagonal bridge) waits on F-08b.
 
 **What the player sees.** Walk onto any bridge, including the diagonal ones, from any angle up to 60° off its axis, and
 you slide along it to the far side without lining up first, without sticking on the rail and without dropping into the void.
@@ -229,7 +239,11 @@ bug with steps in your PR. Fix the ones inside these two items; list the rest fo
 
 ### CM-30 Miners dig and place ground (Travis must-have)
 
-Old state: landed (D-059). Waits on F-01 to F-09.
+Old state: landed (D-059). **Split (U-035); no wait on F-09 (U-034).** Rules part (`TerraformSystem` and the 7
+bot-free `TerraformTests` cases: dig, place, water place, keep-outs, route guard, rate cap, rising edge) waits only on
+batch 2. The 4 cases that call the bots (`fillBotInput` clears terraform, fresh fields per 30 ticks, the two progress
+detector cases), `TerraformSoakTests` (16v16 bots, no F-09 runner: it drives `botsThink` itself) and the F-06b / F-06e
+reopens wait on batch 3. View part (`CarriedBlockView`, the play check) waits on F-08a, F-08b and F-08c.
 
 **What the player sees.** As a Miner, press F (left trigger) at the ground in front of you: the cell drops away into a
 hole and your capsule carries a small block. Press again over a hole or water next to solid ground and the block fills
@@ -264,7 +278,9 @@ play (reach, rate), write it in the PR for the architect, do not change the numb
 
 ### CM-31 Knock-down structures (Travis must-have)
 
-Old state: landed (D-065, CM-31 entry). Waits on CM-30 (it reuses the dig route guard).
+Old state: landed (D-065, CM-31 entry). **Split (U-035).** Rules part (`ToppleSystem`, `ToppleTests` 10 cases; no
+bots) waits on batch 2 and CM-30's rules part (it reuses the dig route guard `padsReachHill`). View part
+(`DecorationView`, the play check) waits on F-08b and CM-30's view part.
 
 **What the player sees.** Tall pillars stand at fixed spots on Skybreak. Hit one three times with any class and it falls
 away from you: one way it becomes a ramp onto an overlook ledge, the other way it walls off a path. Bots re-route.
@@ -629,3 +645,8 @@ No art item is assigned to you here. You have been modelling a hero character in
 `Assets/_Game/Art/Characters/_source~/` (the `~` keeps Unity from importing it) and its FBX export to
 `Assets/_Game/Art/Characters/` on a branch (for example `max/art-hero-source`) and open a PR,
 so it can be checked against the asset bible's Warrior page (page 6). Both file types already go through Git LFS.
+
+**Decided (U-043).** All art is made by the loop in Blender, by script: every character (Warrior, Farmer, Miner and the
+planned classes), the Kaiju, props and the environment. No art waits on you; a model you share is a reference, never a
+dependency. The Warrior is being built on branch `art/warrior-blender`; Farmer, Miner, Kaiju and environment are loop
+items A-02 to A-05.

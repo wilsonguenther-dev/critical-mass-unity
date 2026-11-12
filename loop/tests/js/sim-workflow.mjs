@@ -141,10 +141,10 @@ const OITEMS = [
 ].map(([id, w]) => ({ id, title: 'Item ' + id, owner: 'loop', waits_on: w, phase: '0' }))
 const OBATCHES = [
   { batch: 1, items: ['F-01', 'F-02a', 'F-03', 'F-04', 'F-02b'], coupled: false },
-  { batch: 2, items: OITEMS.slice(5).map((i) => i.id), coupled: true },
+  { batch: 2, items: OITEMS.slice(5).map((i) => i.id), coupled: true, coupled_set: OITEMS.slice(5).map((i) => i.id) },
 ]
 const OARGS = { ...ARGS, items: OITEMS, batches: OBATCHES }
-const isCoupled = (prompt) => /This batch is COUPLED/.test(prompt)
+const isCoupled = (prompt) => /Coupled set \(U-026, U-033\)/.test(prompt)
 const fixSpent = (prompt) => Number((prompt.match(/fix rounds spent so far: (\d+)/) || [0, 0])[1])
 const review = { findings: 0, blocking: 0, file: '/tmp/r.md' }
 
@@ -217,6 +217,70 @@ results.push(await scenario('soak red (blocking_open from the integrator) stops 
   (label, prompt) => (label.startsWith('build') ? built(label) : label.startsWith('review') ? review : { ...land(prompt), blocking_open: 1 }),
   (out, { calls }) => (/BLOCKING/.test(out.stopDispatch || '') && !calls.some((c) => c.label.startsWith('build F-05')) ? [] : [`stop=${out.stopDispatch}`]),
   OARGS))
+
+// ── U-033 per-item coupling, U-037 builder limit, U-046 Opus only, U-040 batch report, U-042 no stop on an uncoupled park ──
+const MITEMS = [...OITEMS, { id: 'F-01b', title: 'Golden follow-up', owner: 'loop', waits_on: ['F-01'], phase: '0' },
+  { id: 'V-01', title: 'Toon shader', owner: 'loop', waits_on: [], phase: '0' },
+  { id: 'F-06a', title: 'Bots state', owner: 'loop', waits_on: ['F-05a'], phase: '0' }]
+const MB = [
+  { batch: 1, items: ['F-01', 'F-02a', 'F-03', 'F-04', 'F-02b'], coupled: false, coupled_set: [], waves: [['F-01', 'F-02a', 'F-03', 'F-04', 'F-02b']] },
+  { batch: 2, items: ['F-01b', ...OITEMS.slice(5).map((i) => i.id), 'V-01'], coupled: true, coupled_set: OITEMS.slice(5).map((i) => i.id), waves: [['F-01b', ...OITEMS.slice(5).map((i) => i.id), 'V-01']] },
+  { batch: 3, items: ['F-06a'], coupled: false, coupled_set: [], waves: [['F-06a']] },
+]
+const MARGS = { ...ARGS, items: MITEMS, batches: MB, maxBuilders: 12 }
+
+results.push(await scenario('mixed batch: the uncoupled F-01b drops alone, the coupled set lands without it, F-01b is rebuilt and lands after; 12 builders in one wave',
+  (label, prompt, calls) => {
+    if (label.startsWith('build')) return built(label)
+    if (label.startsWith('review')) return review
+    if (label.startsWith('integrate')) {
+      const all = ids(prompt)
+      if (isCoupled(prompt) && all.includes('F-01b')) return land(prompt, ['F-01b'])
+      return land(prompt)
+    }
+    return { status: 'fixed', note: 'x' }
+  },
+  (out, { calls, peak }) => {
+    const p = []
+    const n = (id) => calls.filter((c) => c.label === `build ${id}`).length
+    if (n('F-01b') !== 2) p.push(`F-01b built ${n('F-01b')} times, want 2`)
+    if (!out.landedThisRun.includes('F-01b') || !out.landedThisRun.includes('F-05j') || !out.landedThisRun.includes('F-06a')) p.push(`landed ${out.landedThisRun.join(' ')}`)
+    const ci = calls.find((c) => c.label.startsWith('integrate') && isCoupled(c.prompt))
+    if (!ci || !/--coupled-set F-05a,F-05b,F-05c,F-05d,F-05e,F-05f,F-05g,F-05h,F-05i,F-05j /.test(ci.prompt) || !/drops alone/.test(ci.prompt)) p.push('integrator prompt lacks the coupled set or the drop-alone line')
+    if (peak !== 12) p.push(`peak ${peak}, want 12 (one wave of 12)`)
+    if (out.halted) p.push(`halted ${out.halted}`)
+    return p
+  }, MARGS))
+
+results.push(await scenario('an uncoupled item parked in batch 2 does not stop batch 3 (nothing waits on it); the reviewer writes the batch report',
+  (label, prompt) => {
+    if (label.startsWith('build')) return built(label)
+    if (label.startsWith('review')) return review
+    if (label.startsWith('integrate')) {
+      const r = land(prompt, ['V-01'])
+      r.dropped = r.dropped.map((d) => ({ ...d, parked: true }))
+      return r
+    }
+    return { status: 'fixed', note: 'x' }
+  },
+  (out, { calls }) => {
+    const p = []
+    if (!out.parked.includes('V-01')) p.push('V-01 not parked')
+    if (!out.landedThisRun.includes('F-06a')) p.push('batch 3 did not run after an uncoupled park')
+    if (!calls.filter((c) => c.label.startsWith('review')).every((c) => /spend\.py batch-report --batch \d+ --tag /.test(c.prompt))) p.push('a reviewer prompt lacks the batch report step')
+    return p
+  }, MARGS))
+
+results.push(await scenario('builder limit: --builders 20 clamps to 12, default is 5; no seat ever leaves Opus',
+  (label, prompt) => (label.startsWith('build') ? built(label) : label.startsWith('integrate') ? land(prompt) : review),
+  (out, { calls, peak }) => {
+    const p = []
+    if (peak > 12) p.push(`peak ${peak} > 12`)
+    if (!calls.every((c) => c.model === 'opus')) p.push('a seat is not Opus')
+    if (/model:\s*['"](?!opus)/.test(src) || /sonnet|haiku/i.test(src.replace(/\/\/.*$/gm, ''))) p.push('the workflow names a non-Opus model')
+    if (!/opts\.model !== OPUS/.test(src)) p.push('seat() lacks the Opus guard')
+    return p
+  }, { ...MARGS, maxBuilders: 20 }))
 
 const ok = results.every(Boolean)
 console.log(`sim-workflow: ${results.filter(Boolean).length}/${results.length} scenarios passed`)

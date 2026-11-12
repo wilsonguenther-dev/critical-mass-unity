@@ -2,8 +2,10 @@
 # Launcher for the Critical Mass (Unity) build loop (decision 8). It never launches the Workflow itself: the
 # orchestrator does that with the args file this script writes, then records the ids with record-launch.
 #
-#   loop/bin/launch.sh --cap <total tokens> [--batches 1] [--dry-run] [--schedule FILE.json] [--hard-stop 2026-11-14T23:00:00Z]
+#   loop/bin/launch.sh --cap <total tokens> [--batches 1] [--builders N] [--dry-run] [--schedule FILE.json] [--hard-stop 2026-11-14T23:00:00Z]
 #
+# --builders N: the builder limit, 1..12 (U-037; default 5); the integrator, fix seat and reviewer run alone after
+# the builders, so N is also the peak agent count.
 # --batches N[,M]: the args file carries only those _ORDER.md batches, so the workflow stops after them (panel
 # revision 2026-11-12: "batch 1 alone" is enforced in code, not by hoping the cap stops the run).
 #
@@ -18,7 +20,7 @@ set -u
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOOP="$(cd "$HERE/.." && pwd)"
 CM="$HERE/cmloop.py"
-CAP=""; DRY=0; SCHED=""; HARD=""; ITEMS_DIR=""; BATCHES=""
+CAP=""; DRY=0; SCHED=""; HARD=""; ITEMS_DIR=""; BATCHES=""; BUILDERS="5"
 while [ $# -gt 0 ]; do
   case "$1" in
     --cap) CAP="${2:-}"; shift 2 ;;
@@ -27,6 +29,7 @@ while [ $# -gt 0 ]; do
     --hard-stop) HARD="${2:-}"; shift 2 ;;
     --items-dir) ITEMS_DIR="${2:-}"; shift 2 ;;
     --batches) BATCHES="${2:-}"; shift 2 ;;
+    --builders) BUILDERS="${2:-}"; shift 2 ;;
     --build-only) shift ;;
     --deploy) echo "launch: REFUSED: there is no deploy step for this repo (build-only, U-013)"; exit 2 ;;
     *) echo "launch: unknown argument $1"; exit 2 ;;
@@ -36,6 +39,8 @@ if [ -z "$CAP" ]; then
   echo "launch: REFUSED: --cap <total tokens> is required (the U-014 measure; Wilson sets the number)"; exit 2
 fi
 case "$CAP" in *[!0-9]*|0) echo "launch: REFUSED: --cap must be a positive whole number of tokens, not '$CAP'"; exit 2 ;; esac
+case "$BUILDERS" in ''|*[!0-9]*|0) echo "launch: REFUSED: --builders must be 1..12, not '$BUILDERS'"; exit 2 ;; esac
+if [ "$BUILDERS" -gt 12 ]; then echo "launch: REFUSED: --builders $BUILDERS is over the ceiling of 12 (U-037)"; exit 2; fi
 
 NOW="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 MODE="real"; [ $DRY -eq 1 ] && MODE="dry-run"
@@ -86,7 +91,7 @@ done
 if [ $FAILED -ne 0 ]; then echo "launch: a watcher failed; stopping the others"; python3 "$CM" watchers-stop; exit 1; fi
 
 ARGS="$LOGS/launch-args.json"
-python3 "$CM" plan --cap "$CAP" --now "$NOW" --out "$ARGS" ${ITEMS_DIR:+--items-dir "$ITEMS_DIR"} ${BATCHES:+--batches "$BATCHES"} || exit 1
+python3 "$CM" plan --cap "$CAP" --now "$NOW" --out "$ARGS" ${ITEMS_DIR:+--items-dir "$ITEMS_DIR"} ${BATCHES:+--batches "$BATCHES"} --builders "$BUILDERS" --show || exit 1
 SENT="The loop launcher ran ($MODE) with a cap of $CAP tokens; watchers are running."
 if [ $DRY -eq 1 ]; then python3 "$CM" livelog --dry-run "$SENT"; else python3 "$CM" livelog "$SENT"; fi
 echo

@@ -1,6 +1,6 @@
 export const meta = {
   name: 'critical-mass-unity-loop',
-  description: 'Critical Mass (Unity) build loop: batches from loop/items/_ORDER.md; up to 5 code-only builders in worktrees (never run Unity); one Opus integrator per batch running loop/bin/integrate.py (project setup, one compile, first-red drop for uncoupled batches; for coupled batches one Opus fix seat, max 2 rounds, lands whole or halts); one PR to main per batch; one Opus reviewer per landed batch (BLOCKING stops the next batch). Scheduling is plain code; no idle, dispatch or heartbeat agents.',
+  description: 'Critical Mass (Unity) build loop: batches from loop/items/_ORDER.md; up to 12 code-only builders in worktrees (the launch builder limit, U-037; never run Unity); one Opus integrator per batch running loop/bin/integrate.py (project setup, one compile; coupling is per item, U-033: an uncoupled item drops alone on the first red, a red in the coupled set goes to one Opus fix seat, max 2 rounds, and the set lands whole or halts); one PR to main per batch; one Opus reviewer per landed batch (BLOCKING stops the next batch). Scheduling is plain code; no idle, dispatch or heartbeat agents.',
   whenToUse: 'Launch FRESH only, with args = the JSON in loop/logs/launch-args.json written by loop/bin/launch.sh. Never resumeFromRunId (the resume cache is positional). Record the returned taskId and runId at once with: python3 loop/bin/cmloop.py record-launch --task-id <w...> --run-id <wf_...>; builders refuse to start until both are recorded.',
   phases: [
     { title: 'Build', detail: 'builders: halt-check, lane worktree on loop/<ID>, code + named NUnit tests + docs, scope gate (git only), push. Never Unity.' },
@@ -21,7 +21,9 @@ const LANES = A.lanesRoot || '/Users/wilsonguenther/critical-mass-unity-lanes'
 const REPO = A.repo || 'wilsonguenther-dev/critical-mass-unity'
 const TAG = String(A.runTag || 'untagged')
 const CM = `python3 ${MAIN}/loop/bin/cmloop.py`
-const MAX_BUILDERS = Math.max(1, Math.min(5, Number(A.maxBuilders) || 5)) // U-015: 5 builders + 1 integrator = 6
+const BUILDER_CEILING = 12 // U-037: the owner's machine-wide agent limit for this loop
+const MAX_BUILDERS = Math.max(1, Math.min(BUILDER_CEILING, Number(A.maxBuilders) || 5)) // from launch.sh --builders N
+const OPUS = 'opus' // U-046: every seat that builds, fixes, integrates or reviews is Opus; tightly_defined never changes it
 const BATCH_MAX = Math.max(1, Math.min(6, Number(A.batchMax) || 6))
 const MAX_RETURNS = Math.max(0, Number(A.maxReturns) || 2)
 const MAX_FIX_ROUNDS = 2 // U-026
@@ -99,7 +101,7 @@ STEPS (in order):
 1. Run \`bash ${MAIN}/loop/bin/halt-check.sh\` bare. If it exits non-zero, stop: return status "halted" with its message as the note.
 2. Create your lane: \`${CM} lanes create ${it.id}${it.returns > 0 ? ` --base origin/loop/${it.id}` : ''}\`. Work only in ${LANES}/${it.id} on branch loop/${it.id}.
 3. Read the item: ${MAIN}/loop/items/${it.id}.md. It carries the method, files_allowed, files_forbidden, tests_required and pass_check. Follow the method exactly; it has no options to choose between.${it.returns > 0 ? `
-   This item was returned ${it.returns} time(s). FIRST read ${MAIN}/loop/state/failures/${it.id}.md (the gate output that dropped it) and fix exactly that. At most ${MAX_RETURNS} returns; the next red parks it for the architect.` : ''}
+   This item was returned ${it.returns} time(s). The lane is cut from origin/loop/${it.id} and lanes create has already merged origin/main into it (U-038), so upstream code that landed since is present. FIRST read ${MAIN}/loop/state/failures/${it.id}.md (the gate output that dropped it) and fix exactly that. At most ${MAX_RETURNS} returns; the next red parks it for the architect.` : ''}
 4. Write the code, the NUnit tests named in tests_required (exact names), and any docs the item names, all in this branch. Touch only files_allowed. Never write a .meta, .unity, .prefab, .asset or .mat file and never choose a GUID (U-027): Unity generates metas on the integrator's import and editor-made assets come from CriticalMass.Editor.ProjectSetup.Apply; the scope gate drops a branch that carries one. The one hand-written Unity data file is Controls.inputactions (plain JSON). The Sim assembly never references UnityEngine (U-002).
    Upstream contract (panel revision 2026-11-12): ${(it.waits_on || []).length ? `this item waits on ${(it.waits_on || []).join(', ')}. Any of those not yet on origin/main is being built right now in parallel and is NOT in your lane. For each, read ${MAIN}/loop/items/<ID>.md (its Create, API and signature tables) and ${MAIN}/loop/items/_CONVENTIONS.md section 11, and call exactly those signatures, verbatim. Never stub, redeclare or guess an upstream member. A missing upstream type is expected and is not an open question; a signature the upstream spec does not give is one (step 7).` : 'this item waits on nothing.'} Never read another item's lane under ${LANES}.
    Browser oracle: read it ONLY with \`git -C /Users/wilsonguenther/critical-mass show 09e0904:<path>\`. Never cat, ls or grep the /Users/wilsonguenther/critical-mass working tree: it is checked out at an older commit and differs from the oracle.
@@ -111,21 +113,21 @@ Return: status, branch, head (the pushed sha), files_changed, tests_written, que
 // U-030, the one sentence on order; identical to SETUP_ORDER in loop/bin/cmloop.py (a test compares them).
 const SETUP_ORDER = 'CriticalMass.Editor.ProjectSetup.Apply runs on the integration branch after every item branch of the batch is merged and before the compile gate, on every batch (it is idempotent); nothing runs Unity on that branch before it.'
 
-const integratorPrompt = (n, ids, coupled, fixRound, culprit) => `You are the INTEGRATOR for batch ${n} of the Critical Mass Unity build loop (run ${TAG}). Items, in this order: ${ids.join(', ')}. This batch is ${coupled ? `COUPLED (U-026): it lands whole or not at all; fix rounds spent so far: ${fixRound} of ${MAX_FIX_ROUNDS}` : 'uncoupled: a red item is dropped on the first red'}.
+const integratorPrompt = (n, ids, cset, fixRound, culprit) => { const coupled = cset.length > 0; return `You are the INTEGRATOR for batch ${n} of the Critical Mass Unity build loop (run ${TAG}). Items, in this order: ${ids.join(', ')}. ${coupled ? `Coupled set (U-026, U-033): ${cset.join(', ')}; those land whole or not at all; fix rounds spent so far: ${fixRound} of ${MAX_FIX_ROUNDS}.${cset.length < ids.length ? ` Every other item is uncoupled and drops alone on its first red.` : ''}` : 'Every item is uncoupled: a red item is dropped on the first red.'}
 ${GUARD(CAPS.integrator, 'integrator')}
 STEPS:
 1. Run \`bash ${MAIN}/loop/bin/halt-check.sh --wait 0\` bare. Exit 3 (HALT/STALL) = return result "halted". Exit 4 or 6 = still integrate (the batch is already built).
-2. Run, bare, from ${MAIN}: \`python3 ${MAIN}/loop/bin/integrate.py --batch ${n} --items ${ids.join(',')} --run-tag ${TAG}${coupled ? ` --coupled --fix-round ${fixRound}` : ''}${culprit ? ` --culprit ${culprit}` : ''}\`, then \`echo $?\`. It takes the compile lock, merges the item branches, then: ${SETUP_ORDER} After the compile it commits the files Unity generated (every new .meta, and what ProjectSetup.Apply wrote) as a harness commit, never an item's, and the clean-reimport gate proves a second import leaves git status clean (U-030). It runs the gates once, ${coupled ? 'and on a red writes the evidence file and stops (no drops)' : 'drops a red item at once (no fix attempts)'}, opens ONE PR to main and squash-merges a green batch, runs the soak gate on the new main, and prints one JSON line.
+2. Run, bare, from ${MAIN}: \`python3 ${MAIN}/loop/bin/integrate.py --batch ${n} --items ${ids.join(',')} --run-tag ${TAG}${coupled ? ` --coupled-set ${cset.join(',')} --fix-round ${fixRound}` : ''}${culprit ? ` --culprit ${culprit}` : ''}\`, then \`echo $?\`. It takes the compile lock, merges the item branches, then: ${SETUP_ORDER} After the compile it commits the files Unity generated (every new .meta, and what ProjectSetup.Apply wrote) as a harness commit, never an item's, and the clean-reimport gate proves a second import leaves git status clean (U-030). It runs the gates once, ${coupled ? 'and on a red writes the evidence file and stops (no drops)' : 'drops a red item at once (no fix attempts)'}, opens ONE PR to main and squash-merges a green batch, runs the soak gate on the new main, and prints one JSON line.
 3. Only if its JSON flags a red with no item named: open the evidence or report file it names. If, and only if, an error line names a file:line that one item's diff created or changed, re-run step 2 ONCE adding \`${coupled ? '--culprit' : '--drop'} <ID>="<gate>: <the error line>"\`. Otherwise leave it for the architect.
 4. Never edit code, never fix an item, never run gh pr create or gh pr merge yourself, never run Unity outside integrate.py.
 5. Run \`python3 ${MAIN}/loop/bin/spend.py check\` bare, then \`echo $?\` (0 ok, 10 stop-dispatch, 11 halt, 12 no-data).
-Return: result (landed | all-dropped | red-coupled | halt-coupled | error | halted), landed ids, dropped [{id, gate, counted, parked}], red_items and evidence (coupled red), blocking_open, pr, report (the path integrate.py printed), spend_action, note (one plain sentence).`
+Return: result (landed | all-dropped | red-coupled | halt-coupled | error | halted), landed ids, dropped [{id, gate, counted, parked}], red_items and evidence (coupled red), blocking_open, pr, report (the path integrate.py printed), spend_action, note (one plain sentence).` }
 
 const fixPrompt = (n, redIds, evidence, round) => `You are the FIX SEAT for coupled batch ${n} of the Critical Mass Unity build loop (run ${TAG}), fix round ${round} of ${MAX_FIX_ROUNDS} (U-026). Red item(s): ${redIds.join(', ')}.
 ${GUARD(CAPS.fixer, 'builder')}
 STEPS:
 1. Read the exact compiler/test output in ${evidence}. Read each red item's spec: ${redIds.map((id) => `${MAIN}/loop/items/${id}.md`).join(', ')}.
-2. For each red item: \`${CM} lanes create <ID> --base origin/loop/<ID>\`, repair ONLY files inside that item's files_allowed so the output above goes away, without changing what the spec asks for. Never write a .meta, .unity, .prefab, .asset or .mat file (U-027). Never touch another item's files, even if the error appears there: report that in the note instead.
+2. For each red item: \`${CM} lanes create <ID> --base origin/loop/<ID>\` (it merges origin/main into the lane first, U-038; if it reports a conflict, return "cannot" naming the files), repair ONLY files inside that item's files_allowed so the output above goes away, without changing what the spec asks for. Never write a .meta, .unity, .prefab, .asset or .mat file (U-027). Never touch another item's files, even if the error appears there: report that in the note instead.
 3. Run \`${MAIN}/loop/gates/scope --item <ID> --ref HEAD --base origin/main --project ${LANES}/<ID>\` bare; fix any violation; commit "<ID>: fix round ${round}: <what>"; \`git push origin loop/<ID>\`; then \`${CM} lanes remove <ID>\`.
 4. If the repair needs a change outside those files, or a decision the spec does not give, return status "cannot" and say why in one sentence.
 Return: status (fixed | cannot), items (ids you pushed), note.`
@@ -138,6 +140,7 @@ Write ${MAIN}/loop/review/${TAG}-${n}.md (ruling 6), one line per finding:
   "- BLOCKING R${TAG}-${n}-<k>: <item id> <file:line> <what is wrong> <recommendation>"  for anything that must be fixed before the next batch
   "- ADVISORY R${TAG}-${n}-<k>: ..."  for the rest
 Never write RESOLVED or WAIVED lines (the architect does). A BLOCKING line stops the next batch until the architect resolves it with an item or waives it with a U-### line.
+Last step (U-040): run \`python3 ${MAIN}/loop/bin/spend.py batch-report --batch ${n} --tag ${TAG}\` bare, then \`echo $?\` (the per-seat-kind token and rounds report for this batch; a non-zero exit goes in your note, it never blocks).
 Return: findings (count), blocking (count), file (path), note.`
 
 // ───────────────────────────── scheduling: plain code ─────────────────────────────
@@ -147,6 +150,7 @@ const halt = (why) => { if (!halted) { halted = why; log(`HALT: ${why}`) } }
 
 async function seat(prompt, opts, what) {
   if (halted) return null
+  if (opts.model !== OPUS) { halt(`${what}: refused a seat on model ${opts.model} (U-046: every seat is Opus)`); return null }
   let r
   try {
     r = await agent(prompt, opts)
@@ -171,7 +175,7 @@ function semaphore(n) {
     give: () => { const w = waiters.shift(); if (w) w(); else free++ },
   }
 }
-const slots = semaphore(MAX_BUILDERS) // builders, fix seats and reviewers share these 5; the integrator is the 6th
+const slots = semaphore(MAX_BUILDERS) // builders run together (up to the launch's limit, ceiling 12); fix seat, integrator and reviewer run alone after them
 
 const ITEMS = (A.items || []).filter((i) => i && i.owner === 'loop' && typeof i.id === 'string') // max-owned items are never dispatched
 const byId = Object.fromEntries(ITEMS.map((i) => [i.id, { ...i, returns: Number(i.returns) || 0 }]))
@@ -193,7 +197,7 @@ async function buildOne(id, n) {
     const it = byId[id]
     const r = await seat(builderPrompt(it, n), {
       label: `build ${id}`, phase: 'Build', schema: BUILD_SCHEMA,
-      model: 'opus', // binding ledger: Opus in every seat (panel revision 2026-11-12; the tightly_defined -> Sonnet switch is removed)
+      model: OPUS, // binding ledger: Opus in every seat (panel revision 2026-11-12; the tightly_defined -> Sonnet switch is removed)
     }, `builder ${id}`)
     if (!r) return null
     if (r.status === 'halted') { stopDispatch = stopDispatch || `builder ${id}: ${r.note}`; return null }
@@ -204,33 +208,46 @@ async function buildOne(id, n) {
   }
 }
 
-// Builds the given ids (waves of at most 5 through the shared slots); returns the ids that are built, in stable order.
-async function buildAll(ids, n) {
+// Builds the given ids wave by wave (the plan's waves for this batch, else one wave), every wave through the shared
+// slots (at most MAX_BUILDERS at once); returns the ids that are built, in stable order.
+async function buildAll(ids, n, waves) {
   const need = ids.filter((id) => !reusable.has(id))
-  const done = (await parallel(need.map((id) => () => buildOne(id, n)))).filter(Boolean).filter((b) => b.status === 'built')
+  const plan = (Array.isArray(waves) && waves.length ? waves.map((w) => w.filter((id) => need.includes(id))) : [need]).filter((w) => w.length)
+  const left = need.filter((id) => !plan.flat().includes(id))
+  if (left.length) plan.push(left)
+  const done = []
+  for (const w of plan) {
+    if (halted || stopDispatch) break
+    done.push(...(await parallel(w.map((id) => () => buildOne(id, n)))).filter(Boolean).filter((b) => b.status === 'built'))
+  }
   return ids.filter((id) => reusable.has(id) || done.some((b) => b.id === id))
 }
 
-async function integrate(n, ids, coupled, fixRound, culprit) {
-  return seat(integratorPrompt(n, ids, coupled, fixRound, culprit), {
-    label: `integrate batch ${n}${fixRound ? ` (after fix ${fixRound})` : ''}`, phase: 'Integrate', schema: INT_SCHEMA, model: 'opus', effort: 'high',
+async function integrate(n, ids, cset, fixRound, culprit) {
+  return seat(integratorPrompt(n, ids, cset, fixRound, culprit), {
+    label: `integrate batch ${n}${fixRound ? ` (after fix ${fixRound})` : ''}`, phase: 'Integrate', schema: INT_SCHEMA, model: OPUS, effort: 'high',
   }, `integrator batch ${n}`)
+}
+
+function applyDrops(r) {
+  for (const d of (r && r.dropped) || []) {
+    if (!byId[d.id] || d._applied) continue
+    d._applied = true
+    if (d.parked) parked.add(d.id)
+    else if (d.counted) { byId[d.id].returns += 1; reusable.delete(d.id) }
+    else if (d.gate === 'dependency') reusable.add(d.id)
+    else {
+      uncounted[d.id] = (uncounted[d.id] || 0) + 1
+      if (uncounted[d.id] > MAX_RETURNS) setAside.set(d.id, `dropped uncounted ${uncounted[d.id]} times (unattributed red, upstream type missing, or time box)`)
+    }
+  }
 }
 
 function applyIntegration(n, ids, r) {
   batches.push({ batch: n, items: ids, result: r ? r.result : 'null', landed: r ? r.landed : [], pr: r ? r.pr : null, report: r ? r.report : null })
   if (!r) return
   for (const id of r.landed || []) { landed.add(id); landedThisRun.push(id); reusable.delete(id) }
-  for (const d of r.dropped || []) {
-    if (!byId[d.id]) continue
-    if (d.parked) parked.add(d.id)
-    else if (d.counted) { byId[d.id].returns += 1; reusable.delete(d.id) }
-    else if (d.gate === 'dependency') reusable.add(d.id)
-    else {
-      uncounted[d.id] = (uncounted[d.id] || 0) + 1
-      if (uncounted[d.id] > MAX_RETURNS) setAside.set(d.id, `dropped uncounted ${uncounted[d.id]} times (unattributed red or time box)`)
-    }
-  }
+  applyDrops(r)
   log(`batch ${n}: ${r.result}; landed ${(r.landed || []).join(', ') || 'none'}; dropped ${(r.dropped || []).map((d) => d.id).join(', ') || 'none'}; spend ${r.spend_action}`)
   if (r.result === 'halted') halt(`integrator batch ${n}: ${r.note}`)
   if (r.result === 'error') halt(`integrator batch ${n} error: ${r.note} (report ${r.report || 'none'})`)
@@ -246,28 +263,42 @@ async function reviewBatch(n, ids) {
   await slots.take()
   let r
   try {
-    r = await seat(reviewerPrompt(n, ids), { label: `review batch ${n}`, phase: 'Review', schema: REVIEW_SCHEMA, model: 'opus', effort: 'high' }, `reviewer batch ${n}`)
+    r = await seat(reviewerPrompt(n, ids), { label: `review batch ${n}`, phase: 'Review', schema: REVIEW_SCHEMA, model: OPUS, effort: 'high' }, `reviewer batch ${n}`)
   } finally { slots.give() }
   if (r && Number(r.blocking) > 0) stopDispatch = stopDispatch || `review of batch ${n}: ${r.blocking} BLOCKING finding(s) in ${r.file}; the architect resolves or waives them`
 }
 
-// U-026 coupled batch: all items built, one compile; a red goes to ONE fix seat (max 2 rounds); lands whole or halts.
-async function runCoupled(n, ids) {
-  const built = await buildAll(ids, n)
+// U-026/U-033 batch with a coupled set: all items built (in the plan's waves), one compile; a red in the coupled set goes
+// to ONE fix seat (max 2 rounds) and the set lands whole or halts; an uncoupled item of the batch drops alone and is
+// retried afterwards like any uncoupled item.
+async function runCoupled(n, ids, cset, waves) {
+  const built = await buildAll(ids, n, waves)
   if (halted) return
-  if (built.length !== ids.length) {
-    stopDispatch = stopDispatch || `coupled batch ${n} cannot land whole: not built ${ids.filter((i) => !built.includes(i)).join(', ')}`
+  const missing = cset.filter((i) => !built.includes(i))
+  if (missing.length) {
+    stopDispatch = stopDispatch || `coupled set of batch ${n} cannot land whole: not built ${missing.join(', ')}`
     return
   }
-  ids.forEach((id) => reusable.add(id))
+  let active = built.slice()
+  active.forEach((id) => reusable.add(id))
   for (let fixRound = 0; fixRound <= MAX_FIX_ROUNDS && !halted; fixRound++) {
-    const r = await integrate(n, ids, true, fixRound, '')
-    if (!r || r.result !== 'red-coupled') { applyIntegration(n, ids, r); if (r && r.result === 'landed') await reviewBatch(n, r.landed); return }
+    const r = await integrate(n, active, cset, fixRound, '')
+    if (r && r.result === 'red-coupled') {
+      for (const d of r.dropped || []) active = active.filter((id) => id !== d.id) // uncoupled drops of this round
+      applyDrops(r)
+    }
+    if (!r || r.result !== 'red-coupled') {
+      applyIntegration(n, active, r)
+      if (r && r.result === 'landed') await reviewBatch(n, r.landed)
+      const rest = ids.filter((id) => !cset.includes(id) && !landed.has(id) && !parked.has(id) && !setAside.has(id))
+      if (rest.length && r && r.result === 'landed' && !halted && !stopDispatch) { batchNo += 1; await runUncoupled(batchNo, rest) }
+      return
+    }
     if (fixRound >= MAX_FIX_ROUNDS) { halt(`coupled batch ${n} still red after ${fixRound} fix rounds (evidence ${r.evidence})`); return }
     await slots.take()
     let f
     try {
-      f = await seat(fixPrompt(n, r.red_items || [], r.evidence, fixRound + 1), { label: `fix batch ${n} round ${fixRound + 1}`, phase: 'Fix', schema: FIX_SCHEMA, model: 'opus', effort: 'high' }, `fix seat batch ${n}`)
+      f = await seat(fixPrompt(n, r.red_items || [], r.evidence, fixRound + 1), { label: `fix batch ${n} round ${fixRound + 1}`, phase: 'Fix', schema: FIX_SCHEMA, model: OPUS, effort: 'high' }, `fix seat batch ${n}`)
     } finally { slots.give() }
     if (!f) return
     if (f.status !== 'fixed') { halt(`fix seat for coupled batch ${n} could not repair it: ${f.note} (evidence ${r.evidence})`); return }
@@ -275,14 +306,14 @@ async function runCoupled(n, ids) {
 }
 
 // Uncoupled batch: drop on first red (integrate.py), dropped items rebuild and retry until landed, parked or set aside.
-async function runUncoupled(n0, ids) {
+async function runUncoupled(n0, ids, waves) {
   let n = n0
   for (;;) {
     const todo = ids.filter((id) => !landed.has(id) && !parked.has(id) && !setAside.has(id))
     if (!todo.length || halted || stopDispatch) return
-    const built = await buildAll(todo, n)
+    const built = await buildAll(todo, n, waves)
     if (halted || !built.length) return
-    const r = await integrate(n, built, false, 0, '')
+    const r = await integrate(n, built, [], 0, '')
     applyIntegration(n, built, r)
     if (r && r.landed && r.landed.length) await reviewBatch(n, r.landed)
     if (!r || halted) return
@@ -306,10 +337,15 @@ if (BATCHES.length) {
     if (!ids.length) continue
     if (!outsideWaitsLanded(ids)) { stopDispatch = `batch ${b.batch} waits on items that have not landed`; break }
     batchNo += 1
-    log(`batch ${batchNo} (_ORDER.md batch ${b.batch}, ${b.coupled ? 'coupled' : 'uncoupled'}): ${ids.join(', ')}`)
-    if (b.coupled) await runCoupled(batchNo, ids)
-    else await runUncoupled(batchNo, ids)
-    if (b.items.some((id) => byId[id] && !landed.has(id)) && !halted) { stopDispatch = stopDispatch || `batch ${b.batch} did not land every item`; break }
+    const cset = (Array.isArray(b.coupled_set) ? b.coupled_set : (b.coupled ? b.items : [])).filter((id) => ids.includes(id))
+    log(`batch ${batchNo} (_ORDER.md batch ${b.batch}): ${ids.join(', ')}; coupled set ${cset.join(', ') || 'none'}; waves ${(b.waves || [ids]).map((w) => w.length).join('+')} under ${MAX_BUILDERS} builders`)
+    if (cset.length) await runCoupled(batchNo, ids, cset, b.waves)
+    else await runUncoupled(batchNo, ids, b.waves)
+    // U-033: an uncoupled item that did not land (parked, set aside) does not stop the run by itself; the next batch
+    // stops only if it waits on that item (outsideWaitsLanded above). A coupled set that did not land always stops.
+    const unl = b.items.filter((id) => byId[id] && !landed.has(id))
+    if (unl.length) log(`batch ${b.batch}: not landed ${unl.join(', ')} (recorded in the ledger at shutdown, U-042)`)
+    if (cset.some((id) => !landed.has(id)) && !halted) { stopDispatch = stopDispatch || `batch ${b.batch}: its coupled set did not land`; break }
   }
 } else {
   // No _ORDER.md batches: form uncoupled batches of up to 6 from waits_on, in stable order.

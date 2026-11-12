@@ -48,6 +48,9 @@ DATA_VOLUME = '/System/Volumes/Data' if os.path.isdir('/System/Volumes/Data') el
 DISK_FLOOR_GB = 15
 LAUNCH_DISK_GB = 25
 MAX_RETURNS = 2
+MAX_BUILDERS_CEILING = 12  # U-037: owner raised the machine-wide agent limit for this loop to 12
+DEFAULT_BUILDERS = 5
+MAX_BATCH_ITEMS = 12
 SKIP_EXIT = 78  # gates: "skipped" exits 78, never 0, so no caller can read a skip as a pass
 WATCHERS = ['stall', 'memory', 'clock', 'disk', 'spend']
 REQUIRED = ['id', 'title', 'phase', 'owner', 'waits_on', 'files_allowed', 'files_forbidden', 'tests_required',
@@ -430,14 +433,136 @@ def livelog(sentence, dry=False):
     return str(f)
 
 
+# ───────────────────────────── ledger: every item's state, once (U-042) ─────────────────────────────
+TERMINAL = ('landed', 'dropped', 'parked')
+
+
+def ledger_path():
+    return LOGS / 'ledger.jsonl'  # loop/logs is git-ignored and never wiped by launch or shutdown
+
+
+def run_key():
+    run = read_json(STATE / 'run.json') or {}
+    return run.get('run_id') or (f"started-{run['started']}" if run.get('started') else 'no-run')
+
+
+def ledger_rows(run=None):
+    f = ledger_path()
+    rows = []
+    if f.exists():
+        for ln in f.read_text().splitlines():
+            try:
+                r = json.loads(ln)
+            except ValueError:
+                continue
+            if run is None or r.get('run') == run:
+                rows.append(r)
+    return rows
+
+
+def item_state(iid, title, state, detail='', batch='', sentence=None, final=False):
+    """Record one state change of an item: a ledger row and, when given, one live-log sentence. The same (run, item,
+    state, batch, final) is recorded once only, so a retried call never logs twice. Returns True when written."""
+    run = run_key()
+    for r in ledger_rows(run):
+        if (r['id'], r['state'], str(r.get('batch', '')), bool(r.get('final'))) == (iid, state, str(batch), final):
+            return False
+    append_jsonl(ledger_path(), {'ts': utc(), 'run': run, 'id': iid, 'title': title, 'state': state,
+                                 'detail': str(detail)[:600], 'batch': str(batch), 'final': final})
+    if sentence:
+        livelog(sentence)
+    return True
+
+
+def ledger_close(stop_reason='', dry=False):
+    """Run end: every loop item this run was given ends in exactly one of landed (with its loop-landed commit),
+    dropped (with its failure file) or parked (with the reason). Items never reached are parked with the stop reason,
+    so no item is left without a record. Returns the final rows written."""
+    run = run_key()
+    args = read_json(LOGS / 'launch-args.json') or {}
+    in_run = {i for b in args.get('batches') or [] for i in b.get('items', [])}
+    ids = [r['id'] for r in args.get('items') or [] if r.get('owner') == 'loop' and (not in_run or r['id'] in in_run)
+           and r['id'] not in set(args.get('landed') or [])]
+    try:
+        lm = landed_map()
+    except RuntimeError:
+        lm = {}
+    rows = ledger_rows(run)
+    items = load_items()
+    out = []
+    for iid in ids:
+        if any(r['id'] == iid and r.get('final') for r in rows):
+            continue
+        title = title_of(iid, items)
+        parked = STATE / 'parked' / f'{iid}.json'
+        question = LOGS / 'questions' / f'{iid}.md'
+        failure = STATE / 'failures' / f'{iid}.md'
+        if iid in lm:
+            st, det, s = 'landed', f'loop-landed: {iid} in {lm[iid]}', f'"{title}" ended the run landed on main.'
+        elif parked.exists():
+            st, det, s = 'parked', f'parked for the architect: {parked}', f'"{title}" ended the run parked for the architect.'
+        elif question.exists():
+            st, det, s = 'parked', f'open question: {question}', f'"{title}" ended the run parked on an open question.'
+        elif any(r['id'] == iid and r['state'] == 'dropped' for r in rows) and failure.exists():
+            st, det, s = 'dropped', f'failure text: {failure}', f'"{title}" ended the run dropped; its failure text is kept.'
+        else:
+            why = stop_reason or 'the run stopped before it'
+            st, det, s = 'parked', f'not reached in run {run}: {why}', f'"{title}" was not reached this run ({why}).'
+        if dry:
+            print(f'[dry-run ledger] {iid}: {st} ({det})')
+        elif item_state(iid, title, st, det, 'final', s, final=True):
+            out.append({'id': iid, 'state': st, 'detail': det})
+    return out
+
+
+def ledger_audit(run=None):
+    """Problems with the run's record: an item without exactly one final row, a landed row whose commit is not the
+    item's loop-landed commit on origin/main, a dropped row without its failure file, a parked row without a reason,
+    and a non-final state recorded twice."""
+    run = run or run_key()
+    rows = ledger_rows(run)
+    probs = []
+    try:
+        lm = landed_map()
+    except RuntimeError:
+        lm = None
+    finals = {}
+    seen = {}
+    for r in rows:
+        key = (r['id'], r['state'], r.get('batch'), bool(r.get('final')))
+        seen[key] = seen.get(key, 0) + 1
+        if r.get('final'):
+            finals.setdefault(r['id'], []).append(r)
+    probs += [f'{k[0]} recorded {k[1]} {n} times' for k, n in seen.items() if n > 1]
+    ids = {r['id'] for r in rows}
+    for iid in sorted(ids, key=natural_key):
+        fs = finals.get(iid, [])
+        if len(fs) != 1:
+            probs.append(f'{iid} has {len(fs)} final rows (needs exactly 1)')
+            continue
+        f = fs[0]
+        if f['state'] not in TERMINAL:
+            probs.append(f'{iid} final state {f["state"]!r} is not landed, dropped or parked')
+        elif f['state'] == 'landed' and lm is not None and not (lm.get(iid) and lm[iid] in f['detail']):
+            probs.append(f'{iid} is recorded landed but origin/main has no loop-landed line for it at that commit')
+        elif f['state'] == 'dropped' and not (STATE / 'failures' / f'{iid}.md').exists():
+            probs.append(f'{iid} is recorded dropped but its failure file is missing')
+        elif f['state'] == 'parked' and not f.get('detail'):
+            probs.append(f'{iid} is recorded parked without a reason')
+    return probs
+
+
 # ───────────────────────────── texting: one digest sender ─────────────────────────────
 KINDS = {'batch-landed', 'halt'}
 TOKEN_RE = re.compile(r'(?<![A-Za-z0-9-])[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+[a-z]?(?![A-Za-z0-9-])')
 
 
-def card_problems(text):
-    """A card is plain English: every item id may appear only as '(ID)' right after its title."""
+def card_problems(text, titles=()):
+    """A card is plain English: every item id may appear only as '(ID)' right after its title. Ids that are part of an
+    item's own title (F-03's "with the CM-31 decoration data") are words of that title, not raw ids (U-048)."""
     probs = []
+    for ti in sorted({x for x in titles if x}, key=len, reverse=True):
+        text = text.replace(ti, 'T' * len(ti))
     if not text.strip():
         probs.append('empty text')
     if len(text) > 700:
@@ -453,10 +578,10 @@ def card_problems(text):
     return probs
 
 
-def notify_enqueue(kind, key, text):
+def notify_enqueue(kind, key, text, titles=()):
     if kind not in KINDS:
         raise SystemExit(f'notify: kind must be one of {sorted(KINDS)} (one text per batch landing, one per halt)')
-    probs = card_problems(text)
+    probs = card_problems(text, titles)
     if probs:
         raise SystemExit('notify: card refused: ' + '; '.join(probs))
     append_jsonl(STATE / 'notify-outbox.jsonl', {'ts': utc(), 'kind': kind, 'key': key, 'text': text})
@@ -522,6 +647,10 @@ def notify_flush(dry=False, transport=None):
         lf.close()
 
 
+def card_titles(ids, items):
+    return [title_of(i, items) for i in ids]
+
+
 def batch_card(batch, landed_ids, items, pr=None):
     names = ', '.join(f'{title_of(i, items)} ({i})' for i in landed_ids)
     where = f' in pull request {pr}' if pr else ''
@@ -548,7 +677,26 @@ def lane_create(item_id, base='origin/main'):
     if base.startswith('origin/'):
         git('fetch', '-q', 'origin', '--prune')
     code, out, err = git('worktree', 'add', '-B', f'loop/{item_id}', str(path), base)
-    return {'ok': code == 0, 'path': str(path), 'branch': f'loop/{item_id}', 'detail': (out + err).strip()[-400:]}
+    res = {'ok': code == 0, 'path': str(path), 'branch': f'loop/{item_id}', 'detail': (out + err).strip()[-400:]}
+    if code == 0 and base != main_ref(base):
+        res.update(merge_main_into_lane(path, main_ref(base)))
+    return res
+
+
+def main_ref(base):
+    """The main ref that matches a lane base: origin/main for origin/* bases, main for local ones."""
+    return 'origin/main' if base.startswith('origin/') else 'main'
+
+
+def merge_main_into_lane(path, ref='origin/main'):
+    """U-038: a returned item's lane (cut from its own branch) merges main first, so its fixer sees the upstream code
+    that landed since. A conflict aborts the merge and fails the lane with the conflicting files named."""
+    code, out, err = git('merge', '--no-edit', '-m', f'merge {ref} into the returned lane (U-038)', ref, cwd=path)
+    if code == 0:
+        return {'merged_main': branch_sha('HEAD', cwd=path)}
+    conf = git('diff', '--name-only', '--diff-filter=U', cwd=path)[1].split()
+    git('merge', '--abort', cwd=path)
+    return {'ok': False, 'error': f'merging {ref} into the lane conflicts in: {", ".join(conf) or (out + err).strip()[-300:]}'}
 
 
 def lane_remove(name, dry=False):
@@ -768,6 +916,8 @@ def preflight(cap, items_dir=None, fetch=True):
     cov = batch_coverage(bat, load_items(items_dir))
     add('every loop item sits in exactly one _ORDER.md batch', not cov, '; '.join(cov[:8]) or
         f'{sum(len(b["items"]) for b in bat)} ids in {len(bat)} batch(es)')
+    bp = batch_problems(bat, load_items(items_dir))
+    add('coupled sets and waves are well formed (U-033)', not bp, '; '.join(bp[:8]) or 'ok')
     lic = [str(p) for p in LICENSE_FILES if p.is_file()]
     add('Unity license present', bool(lic), (lic[0] + ' exists (not read)') if lic else 'no Unity_lic.ulf found')
     hits = unity_open_on(MAIN)
@@ -777,7 +927,7 @@ def preflight(cap, items_dir=None, fetch=True):
 
 
 # ───────────────────────────── plan (the workflow's args) ─────────────────────────────
-def plan(cap, now, items_dir=None, run_tag=None, only_batches=None):
+def plan(cap, now, items_dir=None, run_tag=None, only_batches=None, max_builders=DEFAULT_BUILDERS):
     items = load_items(items_dir)
     try:
         landed = landed_map()
@@ -792,11 +942,42 @@ def plan(cap, now, items_dir=None, run_tag=None, only_batches=None):
                      'tightly_defined': str(it.get('tightly_defined', 'false')).lower() == 'true',
                      'returns': int(rets.get(iid, 0))})
     head = branch_sha('HEAD')
+    nb = clamp_builders(max_builders)
+    bats = select_batches(order_batches(items_dir), only_batches)
+    for b in bats:
+        b['waves'] = plan_waves(b, nb)
     return {'now': now, 'runTag': run_tag or now.replace('-', '').replace(':', '')[:13], 'mainRoot': str(MAIN),
             'lanesRoot': str(LANES), 'repo': SLUG, 'harnessCommit': head, 'capTokens': cap,
             'items': rows, 'landed': sorted(landed), 'parked': sorted(parked),
-            'batches': select_batches(order_batches(items_dir), only_batches), 'onlyBatches': only_batches or None,
-            'maxBuilders': 5, 'batchMax': 6, 'maxReturns': MAX_RETURNS}
+            'batches': bats, 'onlyBatches': only_batches or None,
+            'maxBuilders': nb, 'batchMax': 6, 'maxReturns': MAX_RETURNS}
+
+
+def clamp_builders(n):
+    """U-037: the builder limit is a launch argument, 1..12."""
+    try:
+        n = int(n)
+    except (TypeError, ValueError):
+        n = DEFAULT_BUILDERS
+    return max(1, min(MAX_BUILDERS_CEILING, n))
+
+
+def plan_waves(batch, limit):
+    """Build waves for one batch under `limit` builders (U-037): the _ORDER.md waves when each fits, else the batch's
+    items chunked in table order. Every item sits in exactly one wave."""
+    limit = clamp_builders(limit)
+    items = list(batch['items'])
+    declared = [list(w) for w in batch.get('waves') or [] if w]
+    flat = [i for w in declared for i in w]
+    if declared and sorted(flat) == sorted(items) and len(flat) == len(set(flat)) and all(len(w) <= limit for w in declared):
+        return declared
+    return [items[k:k + limit] for k in range(0, len(items), limit)]
+
+
+def peak_agents(waves):
+    """Builders run together; the integrator, fix seat and reviewer each run alone after them, so the peak is the
+    largest wave (at least 1, the integrator)."""
+    return max([len(w) for w in waves] + [1])
 
 
 
@@ -817,6 +998,16 @@ def review_blocking(review_dir=None):
         done = set(_RESOLVED_RE.findall(t)) | set(_WAIVED_RE.findall(t))
         open_ += [{'key': k, 'file': str(f)} for k in _BLOCK_RE.findall(t) if k not in done]
     return open_
+
+
+def review_add_advisory(batch_key, key, text, review_dir=None):
+    """An ADVISORY line (U-034 soak reports): visible to the architect, never blocks a batch."""
+    d = Path(review_dir or REVIEW_DIR)
+    d.mkdir(parents=True, exist_ok=True)
+    f = d / f'{batch_key}.md'
+    with open(f, 'a') as o:
+        o.write(f'- ADVISORY {key}: {text.strip()}\n')
+    return str(f)
 
 
 def review_add_blocking(batch_key, key, text, review_dir=None):
@@ -871,25 +1062,64 @@ def select_batches(batches, only):
 
 
 def order_batches(items_dir=None):
-    """Batches from loop/items/_ORDER.md, the one source of truth: section 3's table gives each batch's items in order;
-    a batch is coupled when two or more of its items sit on one dependency-graph line marked "(coupled".
-    Returns [] when the file or table is absent (the workflow then forms batches from waits_on)."""
+    """Batches from loop/items/_ORDER.md, the one source of truth. Section 3's table gives each batch's items in order.
+    Coupling is per item (U-033): a `Coupled set` column names the items that must land together ("none" = empty);
+    without that column (older tables) the coupled set is the batch's items that sit, two or more, on one
+    dependency-graph line marked "(coupled". A `Waves` column ("wave 1: A, B; wave 2: C") gives the build plan.
+    Returns [{'batch', 'items', 'coupled' (any coupled item), 'coupled_set', 'waves'}]; [] when the table is absent."""
     f = Path(items_dir or ITEMS_DIR) / '_ORDER.md'
     if not f.exists():
         return []
     t = f.read_text()
     tok = re.compile(r'(?<![A-Za-z0-9-])[A-Z][A-Z0-9]*-\d+[a-z]?(?![A-Za-z0-9-])')
-    coupled_sets = [set(tok.findall(l)) for l in t.splitlines() if '(coupled' in l]
+    coupled_lines = [set(expand_ranges(l, tok)) for l in t.splitlines() if '(coupled' in l]
     m = re.search(r'^##\s+\d*\.?\s*Batches\b.*?$(.*?)(?=^##\s|\Z)', t, re.M | re.S)
     sec = m.group(1) if m else ''
-    out = []
+    out, header = [], []
     for l in sec.splitlines():
         cells = [c.strip() for c in l.strip().strip('|').split('|')]
+        if cells and cells[0].lower() == 'batch':
+            header = [c.lower() for c in cells]
+            continue
         if len(cells) >= 2 and cells[0].isdigit():
             ids = expand_ranges(cells[1], tok)
-            coupled = any(len(set(ids) & cs) >= 2 for cs in coupled_sets)
-            out.append({'batch': int(cells[0]), 'items': ids, 'coupled': coupled})
+            ci = next((k for k, h in enumerate(header) if h.startswith('coupled set')), None)
+            if ci is not None and ci < len(cells):
+                cset = [i for i in expand_ranges(cells[ci], tok)]
+            else:
+                cset = [i for i in ids if any(i in cs and len(set(ids) & cs) >= 2 for cs in coupled_lines)]
+            wi = next((k for k, h in enumerate(header) if h.startswith('waves')), None)
+            waves = parse_waves(cells[wi], tok) if wi is not None and wi < len(cells) else []
+            out.append({'batch': int(cells[0]), 'items': ids, 'coupled': bool(cset), 'coupled_set': cset,
+                        'waves': waves})
     return out
+
+
+def parse_waves(cell, tok):
+    """'wave 1: F-01, F-02; wave 2: F-03' -> [['F-01', 'F-02'], ['F-03']]; a cell without 'wave' gives []."""
+    if 'wave' not in cell.lower():
+        return []
+    return [expand_ranges(part.split(':', 1)[1], tok) for part in cell.split(';') if ':' in part]
+
+
+def batch_problems(batches, items):
+    """U-033 shape checks beyond coverage: the coupled set lies inside the batch, the waves (when given) hold every item
+    exactly once, no coupled item waits on an uncoupled item of its own batch, and no batch is over MAX_BATCH_ITEMS."""
+    probs = []
+    for b in batches:
+        n, ids, cset = b['batch'], b['items'], set(b.get('coupled_set') or [])
+        if len(ids) > MAX_BATCH_ITEMS:
+            probs.append(f'batch {n} has {len(ids)} items (at most {MAX_BATCH_ITEMS})')
+        for i in sorted(cset - set(ids)):
+            probs.append(f'batch {n}: coupled-set id {i} is not in the batch')
+        flat = [i for w in b.get('waves') or [] for i in w]
+        if flat and (sorted(flat) != sorted(ids) or len(flat) != len(set(flat))):
+            probs.append(f'batch {n}: the waves do not hold every item exactly once')
+        for c in sorted(cset):
+            for w in (items.get(c) or {}).get('waits_on') or []:
+                if w in ids and w not in cset:
+                    probs.append(f'batch {n}: coupled item {c} waits on uncoupled {w} of the same batch')
+    return probs
 
 
 # ───────────────────────────── shutdown ─────────────────────────────
@@ -911,6 +1141,17 @@ def shutdown(dry=False):
     if not lanes:
         print(f'lanes: none under {LANES}')
     run = read_json(STATE / 'run.json', {}) or {}
+    stop = ', '.join(f'{n}: {(STATE / n).read_text().strip()[:120]}' for n in ('HALT', 'STALL', 'STOP-DISPATCH')
+                     if (STATE / n).exists()) or 'the workflow ended'
+    finals = ledger_close(stop, dry)
+    audit = [] if dry else ledger_audit()
+    reports = []
+    if not dry and run.get('run_id'):
+        try:
+            import spend  # noqa: E402 (spend imports this module; imported late on purpose)
+            reports = spend.missing_batch_reports(run['run_id'])
+        except Exception as e:  # a report failure never blocks teardown; it is written into the resume note
+            reports = [f'batch reports failed: {type(e).__name__}: {e}']
     try:
         lm = landed_map()
     except RuntimeError:
@@ -928,7 +1169,9 @@ def shutdown(dry=False):
         f'Spend: {json.dumps(read_json(STATE / "spend.json"))}',
         f'Watchers stopped: {json.dumps(stopped)}; still alive: {left or "none"}',
         f'Lanes: {json.dumps(lanes)}',
-        f'Disk free after: {free_gb():.1f} GB', '',
+        f'Disk free after: {free_gb():.1f} GB',
+        f'Ledger (U-042, {ledger_path()}): {len(finals)} final row(s) written; audit: ' + ('; '.join(audit) or 'clean'),
+        f'Batch reports written at shutdown: {json.dumps(reports)}', '',
         'Next launch: fresh, never resumed (positional resume cache). Run loop/bin/launch.sh --cap N.', '']))
     print(f'resume note: {note}')
     if not dry:
@@ -989,6 +1232,8 @@ def main(argv=None):
     s.add_argument('--items-dir')
     s.add_argument('--out')
     s.add_argument('--batches', help="run only these _ORDER.md batch numbers, e.g. '1' (the workflow then stops)")
+    s.add_argument('--builders', type=int, default=DEFAULT_BUILDERS, help='builder limit, 1..12 (U-037)')
+    s.add_argument('--show', action='store_true', help='print the batch table: items, coupled set, waves, peak agents')
     s = sub.add_parser('pr-open')
     s.add_argument('--head', required=True)
     s.add_argument('--title', required=True)
@@ -998,6 +1243,10 @@ def main(argv=None):
     s.add_argument('--number', required=True, type=int)
     s.add_argument('--subject', required=True)
     s.add_argument('--body-file', required=True)
+    s = sub.add_parser('ledger', help='close | audit | show: the per-item record of this run (U-042)')
+    s.add_argument('action', choices=['close', 'audit', 'show'])
+    s.add_argument('--reason', default='')
+    s.add_argument('--dry-run', action='store_true')
     s = sub.add_parser('watchers-stop')
     s = sub.add_parser('shutdown', help='stop watchers by pidfile, remove lanes (pushed or bundled), resume note')
     s.add_argument('--dry-run', action='store_true')
@@ -1083,9 +1332,16 @@ def main(argv=None):
             print(f"{'PASS' if c['ok'] else 'FAIL'}  {c['check']}: {c['detail']}")
         return 0 if all(c['ok'] for c in checks) else 1
     if a.cmd == 'plan':
-        p = plan(a.cap, a.now, a.items_dir, only_batches=a.batches)
+        p = plan(a.cap, a.now, a.items_dir, only_batches=a.batches, max_builders=a.builders)
         if a.out:
             write_json(a.out, p)
+        if a.show:
+            for b in p['batches']:
+                print(f"batch {b['batch']}: items {', '.join(b['items'])} | coupled set "
+                      f"{', '.join(b['coupled_set']) or 'none'} | waves "
+                      + '; '.join(f'wave {k + 1}: {len(w)}' for k, w in enumerate(b['waves']))
+                      + f" | peak agents {peak_agents(b['waves'])} of {MAX_BUILDERS_CEILING}")
+            print(f"builder limit {p['maxBuilders']}")
         print(json.dumps({'items': len(p['items']), 'landed': len(p['landed']), 'parked': len(p['parked']),
                           'batches': [b['batch'] for b in p['batches']], 'out': a.out}))
         return 0
@@ -1097,6 +1353,16 @@ def main(argv=None):
         r = pr_merge(a.number, a.subject, a.body_file)
         print(json.dumps(r))
         return 0 if r['ok'] else 2
+    if a.cmd == 'ledger':
+        if a.action == 'close':
+            print(json.dumps(ledger_close(a.reason, a.dry_run)))
+            return 0
+        if a.action == 'audit':
+            pr = ledger_audit()
+            print(json.dumps(pr))
+            return 1 if pr else 0
+        print(json.dumps(ledger_rows(run_key()), indent=1))
+        return 0
     if a.cmd == 'watchers-stop':
         print(json.dumps(watchers_stop()))
         return 0

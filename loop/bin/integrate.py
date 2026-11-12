@@ -154,11 +154,17 @@ def _results_by_test(xml_path):
     return out
 
 
-def required_tests_missing(items, active, files_by_item, project, xml_path):
+def is_play_file(path):
+    return '.PlayTests/' in str(path) or str(path).startswith('Assets/_Game/Runtime.PlayTests')
+
+
+def required_tests_missing(items, active, files_by_item, project, xml_path, scope='edit'):
     """Panel revision 2026-11-12: a green EditMode run proves nothing about an item unless its tests_required ran.
     For each active item and each `Class.Method` it requires: the method must be declared in a .cs file the item's
     diff touched, and the results file must show it Passed. Not run at all is allowed only when the declaration
     carries Explicit or Category("Slow") (the perf case, the soak lane); [Ignore] never is.
+    scope 'edit' checks requirements declared outside a PlayTests folder against the EditMode results; scope 'play'
+    checks those declared in a PlayTests folder against the PlayMode results (a PlayMode test never runs in EditMode).
     Returns {item: [reason, ...]} for the items that fall short."""
     res = _results_by_test(xml_path)
     hits = {}
@@ -167,16 +173,19 @@ def required_tests_missing(items, active, files_by_item, project, xml_path):
         src = {f: (Path(project) / f).read_text(errors='replace') for f in cs}
         for req in items[iid].get('tests_required') or []:
             cls, _, meth = req.rpartition('.')
-            decl = None
+            decl, decl_file = None, None
             for f, body in src.items():
                 if cls and not re.search(rf'\bclass\s+{re.escape(cls)}\b', body):
                     continue
-                m = re.search(rf'\bvoid\s+{re.escape(meth)}\s*\(', body)
+                m = re.search(rf'\b(?:void|IEnumerator)\s+{re.escape(meth)}\s*\(', body)
                 if m:
-                    decl = body[max(0, m.start() - 400):m.start()]
+                    decl, decl_file = body[max(0, m.start() - 400):m.start()], f
                     break
             if decl is None:
-                hits.setdefault(iid, []).append(f'test {req} is not declared in any .cs file this item changed')
+                if scope == 'edit':
+                    hits.setdefault(iid, []).append(f'test {req} is not declared in any .cs file this item changed')
+                continue
+            if is_play_file(decl_file) != (scope == 'play'):
                 continue
             attr = re.split(r'[{};]', decl)[-1]  # only the attributes between the previous member and this one
             got = [r for name, rs in res.items() for r in rs
@@ -192,6 +201,31 @@ def required_tests_missing(items, active, files_by_item, project, xml_path):
             else:
                 hits.setdefault(iid, []).append(f'test {req} did not run in the EditMode gate')
     return hits
+
+
+MISSING_RE = [re.compile(r"error CS0246: The type or namespace name '([A-Za-z_]\w*)"),
+              re.compile(r"error CS0234: The type or namespace name '([A-Za-z_]\w*)' does not exist"),
+              re.compile(r"error CS0103: The name '([A-Za-z_]\w*)' does not exist"),
+              re.compile(r"error CS0117: '[\w.]+' does not contain a definition for '([A-Za-z_]\w*)'")]
+
+
+def upstream_missing(lines, iid, items, items_dir):
+    """U-038: True when every error line charged to `iid` is a missing-name error (CS0246, CS0234, CS0103, CS0117) and
+    every missing name is declared in the spec of an item `iid` waits on. Such a red is the upstream item's absence,
+    not the downstream item's fault, so it does not count against the downstream item's return limit."""
+    names = []
+    for ln in lines:
+        hit = next((m.group(1) for rx in MISSING_RE for m in [rx.search(ln)] if m), None)
+        if hit is None:
+            return False
+        names.append(hit)
+    if not names:
+        return False
+    specs = []
+    for w in (items.get(iid) or {}).get('waits_on') or []:
+        it = items.get(w) or C.load_item(Path(items_dir) / f'{w}.md') if (Path(items_dir) / f'{w}.md').exists() else {}
+        specs.append(it.get('_body') or '')
+    return all(any(re.search(rf'\b{re.escape(n)}\b', s) for s in specs) for n in names)
 
 
 def read_lines(path):
@@ -255,7 +289,9 @@ def main(argv=None):
     ap.add_argument('--int-dir', default=str(C.INT))
     ap.add_argument('--drop', action='append', default=[], help='ID=reason: the integrator attributes a red by hand')
     ap.add_argument('--max-returns', type=int, default=C.MAX_RETURNS)
-    ap.add_argument('--coupled', action='store_true', help='U-026: no drops; a red goes to the fix seat; lands whole')
+    ap.add_argument('--coupled', action='store_true', help='U-026: every item is coupled (same as --coupled-set <all ids>)')
+    ap.add_argument('--coupled-set', default='', help='U-033: comma list of the items that must land together; the rest '
+                    'of the batch is uncoupled and drops alone on a red')
     ap.add_argument('--fix-round', type=int, default=0, help='coupled: fix rounds already spent on this batch (0..2)')
     ap.add_argument('--max-fix-rounds', type=int, default=2)
     ap.add_argument('--culprit', default='', help='coupled: ID=reason, the integrator names the red item once')
@@ -263,9 +299,17 @@ def main(argv=None):
     a = ap.parse_args(argv)
     t0 = time.time()
     ids = [i.strip() for i in a.items.split(',') if i.strip()]
-    if len(ids) != len(set(ids)) or not ids or len(ids) > (10 if a.coupled else 6):
-        print(json.dumps({'error': 'items must be distinct: 1 to 6, or 1 to 10 for a coupled batch (O-22)'}))
+    if len(ids) != len(set(ids)) or not ids or len(ids) > C.MAX_BATCH_ITEMS:
+        print(json.dumps({'error': f'items must be distinct: 1 to {C.MAX_BATCH_ITEMS} (U-037)'}))
         return 2
+    cset = [i.strip() for i in a.coupled_set.split(',') if i.strip()]
+    if a.coupled and not cset:
+        cset = list(ids)
+    if set(cset) - set(ids):
+        print(json.dumps({'error': f'--coupled-set names ids outside --items: {sorted(set(cset) - set(ids))}'}))
+        return 2
+    a.coupled_set = set(cset)
+    a.coupled = bool(cset)
     oe = gate_order_error([g for g in a.gates.split(',') if g])
     if oe:
         print(json.dumps({'error': oe}))
@@ -291,6 +335,9 @@ def main(argv=None):
                           for d in res.get('dropped', [])]
     summary['report'] = str(report)
     summary['minutes'] = round((time.time() - t0) / 60, 1)
+    C.append_jsonl(C.LOGS / 'integrations.jsonl', {'ts': C.utc(), 'tag': tag, 'batch': a.batch, 'result': res.get('result'),
+                                                   'rounds': len(res.get('rounds') or []), 'fix_round': a.fix_round,
+                                                   'items': ids, 'minutes': summary['minutes']})
     print(json.dumps(summary))
     return 1 if res.get('result') == 'error' else 0
 
@@ -308,6 +355,11 @@ def run(a, ids, items, tag, env, t0):
     coupled_reds = []
 
     def drop(iid, gate, text, counted=True):
+        if iid in a.coupled_set and gate == 'dependency':  # U-033: a coupled item never drops alone; halt instead
+            coupled_reds.append({'id': None, 'gate': 'dependency', 'text': text})
+            if iid in active:
+                active.remove(iid)
+            return
         r = C.return_item(iid, items[iid].get('title', iid), f'{tag}-{a.batch}', gate, text, counted, a.max_returns)
         dropped.append({'id': iid, 'gate': gate, 'counted': counted, 'text': text[:2000], **r})
         if iid in active:
@@ -318,14 +370,16 @@ def run(a, ids, items, tag, env, t0):
             drop(dep, 'dependency', f'waits on {iid} ("{items[iid].get("title")}"), dropped from this batch', False)
         title = items[iid].get('title', iid)
         if r['parked']:
-            C.livelog(f'"{title}" failed the {gate} gate again and is parked for the architect.')
+            C.item_state(iid, title, 'parked', r['failure_file'], f'{tag}-{a.batch}',
+                         f'"{title}" failed the {gate} gate again and is parked for the architect.')
         else:
-            C.livelog(f'"{title}" was dropped from batch {a.batch} at the {gate} gate'
-                      + (f' and goes back to the queue (return {r["returns"]} of {a.max_returns}).' if counted else
-                         ' without counting against it.'))
+            C.item_state(iid, title, 'dropped', r['failure_file'], f'{tag}-{a.batch}',
+                         f'"{title}" was dropped from batch {a.batch} at the {gate} gate'
+                         + (f' and goes back to the queue (return {r["returns"]} of {a.max_returns}).' if counted else
+                            ' without counting against it.'))
 
     def fail(iid, gate, text, counted=True):
-        if a.coupled:  # U-026: no drop; the evidence goes to the fix seat
+        if iid in a.coupled_set:  # U-026/U-033: a coupled item never drops; the evidence goes to the fix seat
             coupled_reds.append({'id': iid, 'gate': gate, 'text': text})
         else:
             drop(iid, gate, text, counted)
@@ -403,9 +457,11 @@ def run(a, ids, items, tag, env, t0):
                 continue
             hits = None
             if r['status'] == 'pass' and r['exit'] == 0:
-                if g != 'editmode':
+                if g not in ('editmode', 'playmode-smoke'):
                     continue
-                hits = required_tests_missing(items, active, files_by_item, int_dir, r.get('results'))
+                xml = r.get('results') or (str(int_dir / 'Logs/playmode-results.xml') if g == 'playmode-smoke' else None)
+                hits = required_tests_missing(items, active, files_by_item, int_dir, xml,
+                                              'play' if g == 'playmode-smoke' else 'edit')
                 if not hits:
                     continue
                 g = 'tests'  # a counted red of the item that fell short, never an unattributed one
@@ -414,7 +470,16 @@ def run(a, ids, items, tag, env, t0):
                 rnd['gates'].append(r)
             if hits is None:
                 hits = attribute(r, items, files_by_item, int_dir)
-            if a.coupled:
+            if hits:
+                for iid in [i for i in list(hits) if i not in a.coupled_set]:  # U-033: an uncoupled item drops alone
+                    lines = hits.pop(iid)
+                    up = g in ('setup', 'compile', 'build-mac') and upstream_missing(lines, iid, items, a.items_dir)
+                    drop(iid, 'upstream' if up else g, f'{g} gate red: {r.get("detail")}\n' + '\n'.join(lines[:40]),
+                         counted=not up)
+                if not hits:
+                    red = True
+                    break
+            if a.coupled and (hits or set(active) & a.coupled_set):
                 cid, _, cwhy = a.culprit.partition('=')
                 if not hits and cid in active:  # ruling 3: the integrator may name the culprit once
                     hits = {cid: [f'named by the integrator: {cwhy}']}
@@ -454,9 +519,9 @@ def run(a, ids, items, tag, env, t0):
                    f'still red after {a.fix_round} fix rounds')
             (C.STATE / 'HALT').write_text(f'coupled batch {a.batch} {why}; evidence {ev}\n')
             C.livelog(f'Coupled batch {a.batch} is {why}; the loop halts for the architect.')
-            C.notify_enqueue('halt', f'halt-coupled-{tag}-{a.batch}-r{a.fix_round}', f'Critical Mass Unity loop stopped: coupled batch '
-                             f'{a.batch} is {why}. The architect has the evidence.')
-            res['notify'] = C.notify_flush()
+            res['notify'] = safe_notify('halt', f'halt-coupled-{tag}-{a.batch}-r{a.fix_round}',
+                                        f'Critical Mass Unity loop stopped: coupled batch {a.batch} is {why}. The '
+                                        f'architect has the evidence.', [], res)
         else:
             res['result'] = 'red-coupled'
             C.livelog(f'Coupled batch {a.batch} is red at {coupled_reds[0]["gate"]}; a fix seat repairs '
@@ -503,12 +568,13 @@ def run(a, ids, items, tag, env, t0):
     for i in res['landed']:
         C.lane_remove(i)
         C.git('push', '-q', 'origin', '--delete', f'loop/{i}')
+        C.item_state(i, items[i].get('title', i), 'landed', f'loop-landed: {i} in {mg["merge_commit"]}', f'{tag}-{a.batch}')
     C.livelog(f'Batch {a.batch} landed on main in PR #{pr["number"]}: '
               + ', '.join(f'"{items[i].get("title")}"' for i in res['landed']) + '.')
     if res['landed']:
-        C.notify_enqueue('batch-landed', f'batch-{tag}-{a.batch}', C.batch_card(a.batch, res['landed'], items,
-                                                                                 f'#{pr["number"]}'))
-        res['notify'] = C.notify_flush()
+        res['notify'] = safe_notify('batch-landed', f'batch-{tag}-{a.batch}',
+                                    C.batch_card(a.batch, res['landed'], items, f'#{pr["number"]}'),
+                                    C.card_titles(res['landed'], items), res)
     if res['result'] == 'landed':  # U-028: the soak lane runs once on the new main, before the next batch
         C.git('fetch', '-q', 'origin', 'main')
         C.git('checkout', '-q', '--detach', C.branch_sha('origin/main'), cwd=int_dir)
@@ -522,13 +588,27 @@ def run_soak(a, tag, int_dir, env, res):
     st = {k: r.get(k) for k in ('status', 'exit', 'detail')}
     if r['status'] == 'skipped' and r['exit'] == C.SKIP_EXIT:
         res['skipped_gates'].append(f'soak: {r["detail"]}')
-    elif r['status'] != 'pass':
-        f = C.review_add_blocking(f'{tag}-{a.batch}', f'S{tag}-{a.batch}', f'soak red after batch {a.batch}: '
-                                  f'{r.get("detail")} (gate output {r.get("out")}). Top priority: the architect opens '
-                                  f'a fix item; no next batch until then.', a.review_dir)
-        res['flags'].append(f'soak red; BLOCKING entry in {f}')
-        C.livelog(f'The soak tests went red after batch {a.batch}; the next batch waits for a fix item.')
+    elif r['status'] != 'pass':  # U-034: the soak lane REPORTS to the architect; it never halts or blocks a batch
+        f = C.review_add_advisory(f'{tag}-{a.batch}', f'S{tag}-{a.batch}', f'soak lane red after batch {a.batch} '
+                                  f'(report, not a gate, U-034): {r.get("detail")} (gate output {r.get("out")}). For '
+                                  f'the architect.', a.review_dir)
+        res['flags'].append(f'soak red (report only, U-034); ADVISORY entry in {f}')
+        C.livelog(f'The soak lane went red after batch {a.batch}; it is a report for the architect and the loop carries on.')
+    st['report_only'] = True
     return st
+
+
+def safe_notify(kind, key, text, titles, res):
+    """U-048: a refused or failed text after a merge is logged and flagged, never fatal; the JSON line and the
+    remaining post-merge steps still run."""
+    try:
+        C.notify_enqueue(kind, key, text, titles)
+        return C.notify_flush()
+    except (SystemExit, Exception) as e:  # SystemExit is how notify_enqueue refuses a card
+        msg = f'notify {kind} refused: {e}'
+        res.setdefault('flags', []).append(msg)
+        C.append_jsonl(C.LOGS / 'events.jsonl', {'ts': C.utc(), 'event': 'notify-refused', 'key': key, 'error': str(e)})
+        return {'flushed': 0, 'error': msg}
 
 
 if __name__ == '__main__':

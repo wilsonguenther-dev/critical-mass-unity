@@ -18,25 +18,25 @@ finished items the integrator compiles and gates together. A **gate** is a check
 | A builder that meets a missing answer reports it as an open question with a recommendation and does not decide it. | At least 30 builder-written decision entries in the browser log. |
 | Decision ids are `U-###`, allocated only by the orchestrator; builders never append to DECISIONS.md. | D-067 used five times, D-065 and D-066 three times each (R17). |
 | Only the item tools (merge mode, add-item) write the items file; it is never wiped. | Lost item state between runs. |
-| Mechanics belong to Max and the look to the loop, fixed before launch (U-012). | The ownership split decided mid-run after mechanics had been coded and re-landed (R22). |
+| Mechanics belong to Max and the look to the loop, fixed before launch (U-012). The loop never touches a Max-owned item unless Max leaves it undone and the owner says to take it (U-045). All art is the loop's, made in Blender by script; no art waits on Max (U-043). | The ownership split decided mid-run after mechanics had been coded and re-landed (R22). |
 
 ## 2. Builders, batches, gates
 
 | Rule | Prevents |
 | --- | --- |
 | Builders write code and tests only, commit and push a branch; they never compile, run Unity or build. | Several Unity instances fighting over one machine; the browser's ~29-minute verify per bounce (R3). |
-| One compile per batch of about 6 items, and never more than one Unity compile running at a time across the session. | Compile-lock contention and false "compile overdue" alarms (R7). |
+| One compile per batch (up to 12 items, U-037), and never more than one Unity compile running at a time across the session. | Compile-lock contention and false "compile overdue" alarms (R7). |
 | On the first red, the red item is dropped from the batch back to a builder and the rest land; items in the batch that wait on it drop with it, uncounted. | One bounce per full re-verify round; 144 minutes for 2 items; revert and reapply churn (R3). |
-| Coupled batches (U-026, from `items/_ORDER.md`; Phase 0 batches 2 to 4): all builders finish in waves of at most 5, one compile; a red goes to one Opus fix seat that repairs only the red item's `files_allowed`; at most 2 fix rounds, then HALT with the evidence; the batch lands whole or not at all. | Cyclic ported modules that cannot compile item by item (O-21, O-22). |
+| Coupling is per item (U-026, U-033): each `_ORDER.md` batch row names its **coupled set**. All builders finish (in the batch's waves under the launch's `--builders N`, ceiling 12, U-037), one compile; a red in the coupled set goes to one Opus fix seat that repairs only the red item's `files_allowed`, at most 2 fix rounds, then HALT; the coupled set lands whole or not at all. An uncoupled item of the same batch (F-01b, F-07, F-09, V-01) drops alone on its first red and is retried after the set lands. A coupled item never waits on an uncoupled sibling (preflight). | Cyclic ported modules that cannot compile item by item (O-21, O-22). |
 | Order (U-030): CriticalMass.Editor.ProjectSetup.Apply runs on the integration branch after every item branch of the batch is merged and before the compile gate, on every batch (it is idempotent); nothing runs Unity on that branch before it. Non-zero fails the batch (U-029). | Project settings that differ between trees. |
 | Builders never write `.meta`, `.unity`, `.prefab`, `.asset` or `.mat` files (U-027; `Controls.inputactions` and its meta excepted); the scope gate fails a branch that carries one. After the compile the harness commits what Unity generated (every `*.meta` under `Assets/`, and what ProjectSetup.Apply changed under `Assets/_Game/Settings/`, `Assets/_Game/Resources/`, `ProjectSettings/`), attributed to the harness, not an item; the `clean-reimport` gate then proves a second import leaves `git status` clean (U-030). | Metas that never reach main, GUIDs chosen by hand, a tree dirty after every import. |
-| Tests in category "Slow" are excluded from the per-batch EditMode gate (`-testCategory "!Slow"`) and run by the `soak` gate (`tools/unity-soak.sh`) once after each batch lands; a soak red writes a BLOCKING entry and blocks the next batch (U-028). | Slow outcome tests multiplying every batch's gate time. |
+| Tests in category "Slow" are excluded from the per-batch EditMode gate (`-testCategory "!Slow"`) and run by the `soak` gate (`tools/unity-soak.sh`) once after each batch lands; the soak lane REPORTS: a red writes an ADVISORY entry for the architect and flags the batch, it never halts or blocks a batch (U-034, replaces U-028's BLOCKING rule). | Slow outcome tests multiplying every batch's gate time. |
 | Review findings marked BLOCKING go to `loop/review/<batch>.md`; the next batch does not start while one is unresolved (`- RESOLVED <key>: item <ID>` or `- WAIVED <key>: U-###`, architect only). | Review findings nobody acts on. |
 | A batch that runs past 40 minutes is cut. | Batches that never finish (Decisions 2026-11-08, never carried into the browser loop, R3). |
 | Gates, all on this Mac: compile; EditMode tests (the sim oracle); PlayMode smoke test (boot, 16v16 bots, 60 simulated seconds, zero exceptions); Mac build; parity capture for art items. | Rules that broke in play but no builder could see it, such as the jump leaking to every bot (R19). |
 | Shared limits (frame time, draw calls, shader variants) are measured by the gate and reported per batch; no builder is asked to raise one. | Most browser bounces: crowd draw calls over 900, rim, terrain and shader-program budgets a builder could not measure (R16). |
 | Parity is measured only by the U-010 method in [../PARITY.md](../PARITY.md); a builder never designs the measure. | A parity measure that measured the background and reported false PASS lines (R18). |
-| No play-testing by agents; Wilson and Jeisil play every build. | Agents reporting a feel they cannot observe. |
+| No play-testing by agents; Wilson and Jeisil play every build; Wilson runs F-08a's human play check (U-041). Nothing is sent to Travis until the demo is completely done; internal grey-box builds for the team's own play checks are fine (U-044). | Agents reporting a feel they cannot observe. |
 
 ## 3. PRs and landing
 
@@ -82,7 +82,7 @@ for about 14 landed items, about 2.8M per item), not the old output-only counter
 | Arm a memory watchdog at launch that samples RSS every 60 s, with **Unity in its process list**: the Unity editor and its child processes (asset import workers, shader compiler, package manager, the build backend), alongside node and Chrome. | The browser watchdog's process list (node, cargo, rustc, wilson-voice, Chrome) never seeing Unity or its compilers. |
 | Write an expected-by schedule in plain Central times at launch and at every batch start, and arm a clock per checkpoint. | Slips nobody notices until the end. |
 | An end time Wilson gives is a hard stop; it never moves and is never re-estimated. | Runs that overrun the time he set. |
-| Build-only by default (no users): no multi-Opus review chain; one review pass (two Opus lenses) and one fix seat after everything lands. | Review seats spending more than the builders on a product nobody plays yet. |
+| Build-only by default (no users): one review per landed batch by a single Opus reviewer, and no second review stage (U-039). | Review seats spending more than the builders on a product nobody plays yet. |
 | Never block on a wait; after dispatching, end the turn and react to the notification. | An orchestrator burning tokens and context sitting on a running task. |
 | Agents use headless browsers only, and a browser-count monitor runs during agent work. | Windows opening on Wilson's screen. |
 | The Obsidian live log is written live, one plain sentence per event, stamped from `date -u`. | Logs reconstructed afterwards from memory. |
@@ -95,12 +95,12 @@ Unity Hub is an Electron app and ships its own `chrome_crashpad_handler`, which 
 
 | Rule | Prevents |
 | --- | --- |
-| At most 6 agents running at once: 5 builders + 1 integrator; reviewers and fixers take a builder slot (U-015). | Memory and rate exhaustion on this Mac. |
-| Builder lanes are Opus; the integrator is Opus at high effort; the lander and mechanical seats are Haiku; the sanity seat is Opus and read-only; the parity feature reviewer is Opus. Subagents are never Fable. | Weak models on judgement seats, and expensive models on mechanical ones. |
+| At most 12 agents running at once (U-037, replaces U-015's 6): the builders of a wave run together up to `--builders N` (1..12, default 5); the integrator, the fix seat and the reviewer each run alone after them, so the peak is the largest wave. | Memory and rate exhaustion on this Mac. |
+| Every seat is Opus (U-046): builders, fixer, integrator (high effort), reviewer, parity feature reviewer. No seat that builds, fixes or integrates code ever runs on Sonnet or Haiku; `tightly_defined` in an item no longer affects the model (information only); `seat()` in the workflow refuses any non-Opus model and halts. Subagents are never Fable. | Weak models on judgement seats, and expensive models on mechanical ones. |
 | No third-party model in any seat; a second opinion is a second Opus with a different lens. | Reviews from models the team does not use. |
 | A mechanical seat that returns nothing is retried once; a second empty return halts the run. | A usage limit read as a result. |
 
-**Decided (U-015).** At most 6 agents at once = 5 builders + 1 integrator; reviewers and fixers take a builder slot.
+**Decided (U-037, replaces U-015).** At most 12 agents at once; the builder limit is a launch argument (`--builders N`, ceiling 12).
 
 ## 8. Texting
 
@@ -146,12 +146,14 @@ workflow dry run). `loop/logs/` and `loop/state/` are git-ignored.
 | `bin/launch.sh`, `bin/shutdown.sh` | Launch checklist and watcher start; teardown by pidfile, lanes pushed or bundled, resume note. Both take `--dry-run`. |
 | `bin/halt-check.sh` | First step of every seat: exit 3 halt/stall, 4 stop-dispatch, 5 launch ids not recorded. |
 | `gates/{setup,clean-reimport,compile,editmode,playmode-smoke,build-mac,parity,scope,budgets,soak}` | One JSON line each, real exit codes; `skipped` exits 78, never 0. `budgets` only reports or flags (no limits yet, ruling 4). `playmode-smoke` calls `tools/unity-playtest.sh` (assembly `Assets/_Game/Runtime.PlayTests`, F-08c); `soak` calls `tools/unity-soak.sh`; both report skipped until those scripts exist. |
-| `review/<batch>.md` | Review and soak BLOCKING entries (ruling 6). |
+| `review/<batch>.md` | Review BLOCKING and ADVISORY entries (ruling 6); soak reports as ADVISORY (U-034). |
+| `logs/ledger.jsonl` | U-042: one row per item state change (dropped, parked, landed) and, at shutdown, exactly one final row per item of the run (landed with its `loop-landed:` commit, dropped with its failure file, parked with the reason, including "not reached"). Survives shutdown; `cmloop.py ledger audit` checks it. |
+| `logs/batch-report-<run>-<N>.{json,md}` | U-040: tokens per seat kind, integrator runs, compile and fix rounds for each batch (the reviewer writes it with `spend.py batch-report`; shutdown fills any missing). Baseline: batch 1 = 7 agents, 808,397 subagent tokens, 162 tool uses, 17.6 min, about 162k tokens per landed item. |
 | `watchers/watch.py {stall,memory,clock,disk,spend}` | Plain processes with pidfiles. Stall stays quiet while a live owner holds the compile lock. |
-| `workflow/critical-mass-unity.js` | The Workflow script. Scheduling is plain code: 5 builders + 1 integrator, stable item order, `agent()` null = halt, payloads under 40 KB. |
+| `workflow/critical-mass-unity.js` | The Workflow script. Scheduling is plain code: the batch's waves under the builder limit (1..12), then the integrator; stable item order, `agent()` null = halt, every seat Opus, payloads under 40 KB. |
 | `tests/` | `python3 -m pytest -q loop/tests` and `node loop/tests/js/sim-workflow.mjs` (the workflow run against mock agents). |
 
-**Launch (orchestrator):** `loop/bin/launch.sh --cap <tokens> [--batches 1]` (`--batches` writes only those `_ORDER.md` batches into the args file, so the run stops after them; the batch-1 cost run uses `--batches 1`); then `Workflow({scriptPath: loop/workflow/critical-mass-unity.js, args: <loop/logs/launch-args.json>})`, fresh, never resumed; then at once `python3 loop/bin/cmloop.py record-launch --task-id <w...> --run-id <wf_...>` (builders wait at most 120 s for it). **Stop:** `TaskStop(<task id>)`, then `loop/bin/shutdown.sh`.
+**Launch (orchestrator):** `loop/bin/launch.sh --cap <tokens> [--batches 2,3,4] [--builders 12]` (the batch table with coupled sets, waves and peak agents is printed by `cmloop.py plan --show`) (`--batches` writes only those `_ORDER.md` batches into the args file, so the run stops after them; the batch-1 cost run uses `--batches 1`); then `Workflow({scriptPath: loop/workflow/critical-mass-unity.js, args: <loop/logs/launch-args.json>})`, fresh, never resumed; then at once `python3 loop/bin/cmloop.py record-launch --task-id <w...> --run-id <wf_...>` (builders wait at most 120 s for it). **Stop:** `TaskStop(<task id>)`, then `loop/bin/shutdown.sh`.
 
 The defects in the OPEN note above are now handled: R4 (slips go to the live log once per checkpoint, person-owned
 items skipped, never texted), R6 (one flusher under a lock, one text per key ever), R14 (dead-pid locks reclaimed).

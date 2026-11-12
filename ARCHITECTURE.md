@@ -162,9 +162,11 @@ the colour of every pixel of a model.
 - No second shader for characters, Kaiju or props. Everything goes through `CM/Toon`.
 - Mechanics work never waits on art: it uses team-coloured capsules and cubes.
 
-**OPEN (the architect specifies it in the shader item spec):** the exact contract details: shader property names; how the team mask is stored (a vertex-colour channel, a
-mask texture, or a material slot); outline colour (the bible's line art is "dark-brown or navy" per the recon, not
-black); the ramp threshold; the rim width and strength; and whether `CM/Toon` is hand-written HLSL or Shader Graph.
+**Decided (U-041, item V-01).** Hand-written URP HLSL (`Assets/_Game/Art/Shaders/CMToon.shader`); properties
+`_BaseColor`, `_ShadeMultiplier` 0.62, `_RampThreshold` 0.0, `_TeamColor`, `_OutlineColor` Void Navy #18233B,
+`_OutlineWidth` 0.02, `_RimWidth` 0.25, `_RimStrength` 0.6; the team mask is the vertex colour red channel (layer
+`TeamMask` in Blender); passes ForwardLit, Outline (front-culled inverted hull), ShadowCaster. Starting values; tuning
+needs a U-### entry.
 
 ## 6. Art pipeline (U-009)
 
@@ -175,9 +177,9 @@ black); the ramp threshold; the rim width and strength; and whether `CM/Toon` is
 | Source folder | `Assets/_Game/Art/Characters/_source~/`: the `.blend` plus a build note, in Git LFS. The trailing `~` makes Unity skip the folder, so no machine needs Blender to import the project. The FBX export, the only file Unity imports, sits one level up in `Assets/_Game/Art/Characters/` (panel revision 2026-11-12, P-08). |
 | Rig | All three classes share the **KayKit 41-joint rig**. A **rig** is the skeleton of joints a mesh is bound to so it can be animated. |
 | Clips | All **76** CC0 KayKit clips work on every class (the browser kept 32; Unity keeps all 76). A **clip** is one recorded animation, such as `Running_A`. Source: the KayKit Adventurers 1.0 GLBs at `/Users/wilsonguenther/critical-mass-assets/work/kaykit-adventurers/KayKit-Character-Pack-Adventures-1.0-main/addons/kaykit_character_pack_adventures/Characters/gltf/` (`Knight.glb`, `Rogue.glb`, `Barbarian.glb`; 76 clips on a 41-joint skin each; licence CC0). |
-| Mesh | Sculpted by a person in Blender to the bible page. Never procedural stand-ins. |
-| Warrior | Max's Blender model is the starting mesh **if** his file passes audit (rig-compatible, clean topology). It is then corrected to bible p06: round shield (the class identifier, never removed), stone cleaver with glowing edge, dark-brown topknot with brass ring, grey stone slab armour with cyan cracks, flat toon shading. |
-| Farmer, Miner | Same route: sculpt in Blender to bible p07 and p08. |
+| Mesh | **U-043:** built in Blender by script (a committed build script per model, run headless) to the bible page, by the loop. No art waits on Max. |
+| Warrior | Built on branch `art/warrior-blender` (shared rig module, palette module, export settings); bible p06: round shield (the class identifier, never removed), stone cleaver with glowing edge, dark-brown topknot with brass ring, grey stone slab armour with cyan cracks, flat toon shading. |
+| Farmer, Miner | Items A-02 and A-03: the same scripted route on the Warrior branch's rig and palette, to bible p07 and p08. |
 | Look | `CM/Toon` only (section 5). |
 | Check | The parity gate ([PARITY.md](PARITY.md)). |
 
@@ -185,8 +187,8 @@ black); the ramp threshold; the rim width and strength; and whether `CM/Toon` is
 
 ### Kaiju
 
-Same route as the characters: sculpted in Blender to bible pp 10 and 11 (a heavy, gorilla-weight quadruped), never a
-procedural stand-in. The source goes beside the characters' in the Art tree.
+Same route as the characters (U-043, item A-04): built in Blender by script to bible pp 10 and 11 (a heavy,
+gorilla-weight quadruped). The source goes beside the characters' in the Art tree.
 
 **OPEN (the architect specifies it in the art item spec):** the Kaiju's rig and clip list (the KayKit rig is a humanoid; p10 and p11 need egg, hatchling, adult idle, walk,
 roar, slam wind-up, slam, berserk and KO), and its source folder (`Assets/_Game/Art/Kaiju/_source~/` would mirror the
@@ -194,8 +196,8 @@ characters).
 
 ### Props and environment kit pieces
 
-The headless-Blender script route (the browser loop's `scripts/sculpt/kaiju_adult.py`) is kept only for props and
-environment kit pieces. Bible p14: "Author each damage state as a discrete 2D sprite or cutout layer. Avoid procedural
+The headless-Blender script route is the route for every model (U-043); environment kit pieces are item A-05, props
+follow it. Bible p14: "Author each damage state as a discrete 2D sprite or cutout layer. Avoid procedural
 destruction", so walls, barricades and similar props get one authored model per state (intact, cracked, destroyed;
 folded, deployed, damaged).
 
@@ -252,7 +254,7 @@ test or build, never in the player; *developer machine* = must be installed on t
 | Unity player runtime (Mono scripting backend, .NET Standard API level, URP Forward+, linear colour) | as the editor | shipped in build | set by `ProjectSetup.Apply` |
 | Unity Hub | not pinned | developer machine | installs the editor and its build modules |
 | Mac build support (StandaloneOSX) | as the editor | developer machine | `tools/unity-build-mac.sh` works today |
-| Windows build support (StandaloneWindows64) | as the editor | developer machine | not installed; `Build.Windows` exits 3 until it is; install before the first handoff (U-013) |
+| Windows build support (StandaloneWindows64) | as the editor | developer machine | not installed; `Build.Windows` exits 3 until it is; install before the one handoff, the finished demo (U-013, U-044) |
 | UnityYAMLMerge | ships with the editor | developer machine | merge driver for `.unity`, `.prefab`, `.asset`, `.meta`; one-time `git config` per clone (README) |
 | Git | not pinned | developer machine | |
 | Git LFS | 3.7.1 observed on this Mac; not pinned | developer machine | `.gitattributes` routes .fbx, .blend, .glb, .png, .jpg, .psd, .tga, .exr, .hdr, .wav, .ogg, .mp3 through LFS |

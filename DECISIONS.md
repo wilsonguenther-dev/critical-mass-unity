@@ -608,3 +608,176 @@ section is rewritten. Where an entry conflicts with an earlier decision, this en
 | A CM/Toon shader item in parallel with Phase 0 (no Sim dependency). | Architect, slot into batch 4 |
 | Windows build module and a build-windows gate. | After Travis's platform is known; batch 4 |
 | Stale ownership parentheticals in `_ORDER.md` section 1 and MAX-ITEMS line 149. | Architect doc pass |
+| SpatialHash infinity clamp (batch-1 review R20261112T1705-1-2): `CellOf` / `QueryCircle` clamp `FloorToInt`'s `int.MinValue` to cell 0 where the browser clamps +Infinity to the last cell; no current caller passes such values. | Architect, an F-04 fix item before Phase 1 bot work (deferred by U-047) |
+| Mutable GameConfig held by World (review R20261112T1705-1-4): `CreateWorld` keeps the caller's instance; a Runtime write would change rules mid-match. Decide `opts.Config.Clone()` against a Runtime write ban. | Architect, before batch 4 (with the Runtime-never-writes check above) |
+| IL2CPP floating-point contraction can break the fdlibm port's bit-exactness in player builds. | Phase 1 per-tick state hash (above) |
+
+## Architect rulings for batches 2 to 5 (2026-11-12)
+
+Applied on branch `architect/batch2-prep` while batch 1 ran and after it landed (PR 1, 579a53f). Each entry was checked
+against the files or a command; nothing above this section is rewritten. Where an entry conflicts with an earlier
+decision, this entry wins.
+
+## U-031 Sim class names that never collide
+
+**Decision.** The Sim class of `bots/index.ts` is `BotBrain` (file `Assets/_Game/Sim/Bots/BotBrain.cs`) and the Sim class
+of `resources.ts` is `SimResources` (file `Assets/_Game/Sim/SimResources.cs`). The namespaces and the `GameConfig`
+sections `Bots` and `Resources` (config properties, F-01) keep their names.
+**Why.** `public static class Bots` inside namespace `CriticalMass.Sim.Bots` is shadowed by the namespace from other
+`CriticalMass.Sim.*` code (CS0234); `Resources` is ambiguous with `UnityEngine.Resources` in Runtime files (CS0104).
+**Replaces.** Conventions section 3's `index.ts -> Bots` and `Resources`. Applied in `_CONVENTIONS.md`, F-05g, F-05i,
+F-06c, F-06e, `_ORDER.md`, MAX-ITEMS (F-07 and F-08a now write `UnityEngine.Resources.Load`).
+**Status.** Decided. A grep for the old class names in `loop/items`, MAX-ITEMS, ARCHITECTURE and `loop/README.md` finds none.
+
+## U-032 Transcendentals are fdlibm, bit-exact with node
+
+**Decision.** Item F-02c (front of batch 2, coupled) ports V8's fdlibm `sin`, `cos`, `atan2`, `exp` into `JsMath`
+(V8 tag 13.6.233.10, the V8 of node v24.11.1), checked bit for bit against `tools/golden/jsmath-fdlibm.json` (8,186
+vectors, generator `tools/golden/gen-jsmath.mjs`), and `BoundaryTests` bans `System.Math`'s versions in the Sim. The four
+batch-1 call sites (SkybreakBasinMap.cs:175, World.cs:120, 121, 307 on 579a53f) are converted by F-02c; every F-05
+item waits on it.
+**Why.** node builds V8 without `V8_USE_LIBM_TRIG_FUNCTIONS` (checked in node's `tools/v8_gypfiles` on 2026-11-12), so
+the oracle's four functions are fdlibm; `System.Math` uses the platform libm. V8 main has since moved to LLVM libc, so
+the port is pinned to the oracle's node.
+**Replaces.** Conventions 6.15 ("System.Math equivalents; 1e-4 covers it").
+**Status.** Decided. Item written; golden file committed.
+
+## U-033 Coupling is per item
+
+**Decision.** Each `_ORDER.md` batch row carries a coupled set; `cmloop.py` parses it (`coupled_set`, waves),
+`integrate.py --coupled-set` drops an uncoupled item alone and sends a coupled red to the fix seat, and the workflow
+retries dropped uncoupled items after the set lands. A coupled item never waits on an uncoupled item of its batch
+(preflight). An uncoupled item that ends parked no longer stops the next batch unless that batch waits on it.
+**Why.** F-07 and F-09 (and now F-01b, V-01) would have halted with their coupled siblings although `_ORDER.md` said
+they drop alone (panel deferred list).
+**Replaces.** U-026's per-batch coupled flag.
+**Status.** Built and tested (`loop/tests/test_batch2_prep.py`, `sim-workflow.mjs` mixed-batch scenarios).
+
+## U-034 Balance bands are a report
+
+**Decision.** F-09's pass check is the headless match runner and `OutcomeRunnerTests.SameSeedTwiceGivesTheSameOutcomeInEveryField`.
+The 14 outcome bands run in the soak lane, which REPORTS: a red writes an ADVISORY entry for the architect and a flag,
+never a BLOCKING entry, never a halt. CM-30 no longer waits on F-09. The Phase 0 exit no longer includes the 14 bands.
+**Replaces.** U-028's "a soak red writes a BLOCKING entry"; the U-012 exit's soak clause; CM-30's wait on F-09.
+**Status.** Built (`run_soak`), tested; F-09 and MAX-ITEMS edited.
+
+## U-035 Travis's must-haves split into rules and view parts
+
+**Decision.** CM-30, CM-31, CM-32 and CM-33 each have a rules part that waits on batch 2 and a view part that waits on
+the placeholder views (MAX-ITEMS section 2 and each item; `_ORDER.md` section 6). Checked against the oracle's imports:
+jump.ts, topple.ts, bridges.test.ts and 7 of the 11 terraform cases need batch 2 only; 4 terraform cases, the terraform
+soak case and the moved human-jump case call the bots, so they wait on batch 3. CM-31's rules part also waits on CM-30's
+(route guard). All four stay Max's; the loop owns none of them, so no loop item specs were written.
+**Status.** Decided; applied in MAX-ITEMS and `_ORDER.md`.
+
+## U-036 Tunables against a golden file
+
+**Decision.** `tools/golden/game-config-09e0904.json` (171 leaves of `GAME_CONFIG` at 09e0904, generator
+`tools/golden/gen-game-config.mjs`) is the oracle for every tunable. Batch 1 had landed, so F-01 is not edited; the
+follow-up item F-01b (front of batch 2, uncoupled) compares `CreateBrowser5v5()` to it, and also carries the batch-1
+review's shared-scratch proof (U-047).
+**Status.** Item written; golden file and generator committed.
+
+## U-037 Builder limit is a launch argument, ceiling 12
+
+**Decision.** The owner raised the machine-wide agent limit for this loop to 12. `launch.sh --builders N` (1..12, default 5)
+passes through `cmloop.py plan --builders` into the workflow's `maxBuilders` (clamped to 12). Batches run their
+independent items in one wave when the limit allows: batch 2's 12 items run in one wave of 12. The integrator, fix
+seat and reviewer run alone after the builders, so the peak agent count equals the largest wave: batch 2 = 12, batch 3
+= 7, batch 4 = 5, batch 5 = 4. One compile per batch. Integrations take at most 12 items.
+**Replaces.** U-015's 6 agents (5 builders + 1 integrator); the hard clamp to 5.
+**Status.** Built and tested.
+
+## U-038 Returned items see landed upstream code
+
+**Decision.** `cmloop.py lanes create <ID> --base origin/loop/<ID>` merges origin/main into the lane before the fixer
+starts (a conflict fails the lane with the files named). In an uncoupled drop, a compile red whose every line is a
+missing-name error (CS0246, CS0234, CS0103, CS0117) naming a type declared in the spec of an item the red item waits on
+is recorded at gate `upstream` and does not count against its return limit.
+**Status.** Built and tested.
+
+## U-039 One review per landed batch
+
+**Decision.** One Opus reviewer per landed batch, as the workflow already does. Confirmed: the workflow has no second
+review stage; `loop/README.md`'s "one review pass (two Opus lenses)" line and the Haiku "lander and mechanical seats"
+line described seats the workflow never had and are rewritten.
+**Status.** Confirmed; docs corrected.
+
+## U-040 Cost report per batch
+
+**Decision.** At the end of each landed batch the reviewer runs `spend.py batch-report`, writing
+`loop/logs/batch-report-<run>-<N>.{json,md}` (tokens per seat kind from the agent transcripts, integrator runs, compile
+rounds from `loop/logs/integrations.jsonl`, fix rounds) and one live-log sentence; shutdown writes any missing report.
+**First measured data point (batch 1, run wf_403d1691-a59, the workflow runtime's report):** 7 agents, 808,397
+subagent tokens, 162 tool uses, 17.6 minutes wall clock, 5 items landed: about 162k tokens per landed item.
+**Status.** Built and tested; the baseline is in `spend.py` (`BASELINE_BATCH_1`) and every report.
+
+## U-041 CM/Toon shader item, human-input PlayMode test, the human play check
+
+**Decision.** Item V-01 (no Sim dependency) builds `CM/Toon` in batch 4's wave and lands with batch 4 as an uncoupled
+item; it fixes ARCHITECTURE section 5's OPEN contract (HLSL, vertex-colour red team mask, Void Navy outline, threshold
+0, shade 0.62, rim 0.25 / 0.6). F-08c adds `HumanInputPlayTests` (two PlayMode tests that drive F-08a's
+`HumanInputSource` through a virtual keyboard), and `integrate.py` now checks PlayMode `tests_required` against the
+PlayMode results (before, F-08c's smoke test would have been a counted red: it never runs in EditMode). Wilson runs the
+F-08a human play check.
+**Status.** Items written; scoped check built and tested.
+
+## U-042 Every piece of work leaves one checkable record
+
+**Decision.** `loop/logs/ledger.jsonl` (git-ignored, never wiped) gets one row per item state change (dropped, parked,
+landed) written once per run, item, state and batch, with one live-log sentence each; at shutdown every loop item the
+run was given gets exactly one final row: landed (with its `loop-landed:` commit), dropped (with its failure file) or
+parked (with the reason, including "not reached in run ...: <stop reason>"). `cmloop.py ledger audit` checks the
+record. Already covered before this ruling: `loop-landed:` lines proven on origin/main, failure files per drop, parked
+files, the resume note, the live log of drops, parks and batch landings, `launch-ids.txt`.
+**Status.** Built and tested.
+
+## U-043 All art is made by us in Blender, by script
+
+**Decision.** Every model (Warrior, Farmer, Miner and the planned classes, the Kaiju, props, environment) is built by
+the loop in Blender by a committed script; no art waits on Max. The loop owns every bible row's model. The Warrior is
+on branch `art/warrior-blender` (another agent); items A-02 Farmer, A-03 Miner, A-04 Kaiju and A-05 environment kit
+(batch 5) follow its rig, palette and layout and launch only after it is on main.
+**Replaces.** U-009's "sculpted by a person" and "Max's Blender model is the starting mesh"; MAX-ITEMS section 5's
+request is now a reference only.
+**Status.** Decided; items written; ARCHITECTURE and MAX-ITEMS edited.
+
+## U-044 Nothing goes to Travis until the demo is done
+
+**Decision.** No build is sent to Travis until the demo is completely done (Phase 3 exit). Internal grey-box builds for
+the team's own play checks are fine. U-013's "before the first handoff" and U-024's Phase 1 play test mean the
+team's own play, not a drop to Travis; any earlier grey-box drop to Travis is rejected.
+**Status.** Decided.
+
+## U-045 Max keeps his items
+
+**Decision.** Max keeps the items MAX-ITEMS.md gives him. The loop never touches a Max-owned item unless Max leaves it
+undone and the owner says to take it. Nothing is reassigned now.
+**Status.** Decided; MAX-ITEMS and `loop/README.md` state it.
+
+## U-046 All code building is Opus
+
+**Decision.** No builder, fixer or integrator seat ever runs on Sonnet or Haiku, whatever `tightly_defined` says (it is
+information only). The workflow routes every seat through `OPUS` and `seat()` halts on any other model; sim-workflow
+asserts every call is Opus and that the script names no other model.
+**Status.** Confirmed and tested.
+
+## U-047 Batch-1 review follow-up
+
+**Decision.** From `loop/review/20261112T1705-1.md` (six ADVISORY, no BLOCKING): the boundary guard learns unqualified
+`new Random(`, `Random.Shared`, `DateTimeOffset`, `DateTime.Today`, `GetHashCode(` and raw casts between team enums,
+and `SimEnumMap` maps `TeamId` to `MatchResult`, `HillState`, `KaijuState` (F-02c, because those guards must hold over
+the F-05 code). No ported test or serialised value depends on those enums' integers (the browser has strings there), so
+the values stay; `Cell` and `ClassId`, whose numbers do matter, already match. The process-wide static scratch stays and
+F-01b proves two worlds interleaved give the same results as each alone; the Sim is stepped from exactly one thread.
+The SpatialHash infinity clamp and the mutable GameConfig reference go on the deferred list. The golden-fixture
+suggestion (R-3) is covered for the transcendentals by F-02c and for tunables by F-01b; per-cell map checksums stay a
+recommendation.
+**Status.** Items written.
+
+## U-048 A refused text never kills a landed batch
+
+**Decision.** After a merge, a refused or failed notification is logged (`events.jsonl`) and flagged; `integrate.py`
+still prints its JSON line and runs the soak gate. The card accepts ids that are part of an item's own title
+(F-03's "with the CM-31 decoration data"). Found by batch 1's real run (2026-11-12T17:15:05Z).
+**Status.** Built and tested.
