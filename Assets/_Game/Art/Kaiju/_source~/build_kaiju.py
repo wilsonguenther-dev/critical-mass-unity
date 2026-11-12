@@ -1497,6 +1497,47 @@ def hatch_params():
                   ("Thigh" + sfx, (sx * 0.56, 0.72, 0.75), (sx * 0.6, 0.65, 0.4), "Hips"),
                   ("Foot" + sfx, (sx * 0.6, 0.65, 0.4), (sx * 0.62, 0.4, 0.08), "Thigh" + sfx)]
 
+    # ---- v3 (same kit as the adult): a thin dark core under few large boulders; the shell is 6 big plates
+    balls = [(c, r * (0.74 if abs(c[0]) > 0.3 else 0.86)) + tuple(rest) for c, r, *rest in balls]
+    limbs = [(a, b, r0 * 0.74, r1 * 0.74) if abs(a[0]) > 0.3 else (a, b, r0 * 0.86, r1 * 0.86) for a, b, r0, r1 in limbs]
+
+    def boulders(bvh):
+        B = []
+
+        def add(c, r, bone, slot="Slate", moss=0.0, up=(0, 0, 1), n=11, rim=True, flat=0.6, spin=None):
+            B.append({"c": tuple(c), "r": r, "bone": bone, "slot": slot, "moss": moss, "up": up, "n": n, "rim": rim,
+                      "flat": flat, "spin": spin})
+        add((0, 0.1, 1.62), (0.5, 0.55, 0.32), "Spine", moss=0.7)                     # shell crown plate
+        add((0, -0.45, 1.52), (0.42, 0.4, 0.3), "Chest", moss=0.6, up=(0, -0.3, 1))
+        add((0, 0.75, 1.36), (0.42, 0.42, 0.3), "Hips", moss=0.5, up=(0, 0.4, 1))
+        for sx, sf in ((1, "_L"), (-1, "_R")):
+            add((sx * 0.5, -0.08, 1.42), (0.42, 0.45, 0.32), "Spine", moss=0.6, up=(sx * 0.5, 0, 1))
+            add((sx * 0.48, 0.55, 1.3), (0.4, 0.42, 0.3), "Hips", moss=0.45, up=(sx * 0.5, 0.3, 1),
+                slot="SlateLight" if sx > 0 else "Slate")
+            add((sx * 0.78, 0.22, 0.98), (0.34, 0.4, 0.3), "Spine", up=(sx, 0, 0.4))   # shell rim
+            add((sx * 0.8, -0.6, 0.86), (0.34, 0.32, 0.32), "Arm" + sf, moss=0.45)    # front leg
+            add((sx * 0.88, -0.86, 0.32), (0.48, 0.42, 0.34), "Fist" + sf, slot="SlateLight", up=(0, -0.6, 1))
+            for dx in (-0.16, 0.16):
+                add((sx * (0.86 + dx), -1.2, 0.1), (0.12, 0.11, 0.1), "Fist" + sf, n=10, rim=False)
+            add((sx * 0.62, 0.78, 0.62), (0.34, 0.36, 0.32), "Thigh" + sf)
+            add((sx * 0.64, 0.62, 0.22), (0.32, 0.36, 0.24), "Foot" + sf, up=(0, -0.5, 1))
+            add((sx * 0.22, -0.92, 2.12), (0.15, 0.15, 0.1), "Head", moss=0.5, n=10, up=(sx * 0.5, 0.4, 1))
+        add((0, 1.5, 0.56), (0.32, 0.34, 0.27), "Tail1", up=(0, 0.5, 1))
+        add((0.1, 1.98, 0.38), (0.24, 0.26, 0.2), "Tail2", up=(0, 0.5, 1), n=10)
+        add((0.18, 2.36, 0.28), (0.17, 0.18, 0.14), "Tail3", up=(0, 0.6, 1), n=10)
+        for x in (-0.17, 0.17):
+            for z in (1.2, 0.98, 0.76):
+                p, n = ray(bvh, (x, -6, z), (0, 1, 0))
+                if p is not None:
+                    add(p - n * 0.02, (0.16, 0.1, 0.09), auto(p), slot="Belly", up=tuple(n), n=12, rim=False, flat=0.35,
+                        spin=0.0)
+        return B
+
+    crystals = [(0.0, 0.25, (0, 0.35, 1), 0.8, None), (0.25, 0.5, (0.4, 0.45, 1), 0.66, None),
+                (-0.25, 0.5, (-0.4, 0.45, 1), 0.66, None), (0.0, 0.8, (0, 0.6, 1), 0.66, None),
+                (0.2, 1.05, (0.3, 0.7, 1), 0.52, None), (-0.2, 1.05, (-0.3, 0.7, 1), 0.52, None),
+                (0.0, 1.3, (0, 0.9, 0.8), 0.45, None)]
+
     def belly(c, n):
         return (c.y < -0.35 and abs(c.x) < 0.5 and 0.4 < c.z < 1.35 and n.y < -0.3) or (n.z < -0.55 and abs(c.x) < 0.6)
 
@@ -1532,6 +1573,7 @@ def hatch_params():
         "face": face, "crown": crown, "fans": fans, "crown_lean": 8.0, "crystal_r": 0.18,
         "spikes": [(0.62, 0.25, 0.26), (-0.62, -0.1, 0.26)],
         "tail_tip": ((0.2, 2.4, 0.25), (0.3, 0.6, 0.6), 0.4),
+        "boulders": boulders, "crystals": crystals, "crack_k": TUNE["crack_k"], "rim_d": TUNE["rim_d"] * 0.6,
     }
 
 
