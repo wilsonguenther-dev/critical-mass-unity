@@ -262,11 +262,11 @@ def build_helmet():
     axis = Vector((0, -0.21, 0.978)).normalized()
     base = Vector((0, -0.172, 1.66))
     h_main = (2.0 - base.z) / axis.z
-    head_crystal(BODY, H, "team_glow", kit.frame(base, axis, (0, 1, 0)), 0.11, h_main, seg=6, waist=0.78,
-                  cap=0.36)
+    head_crystal(BODY, H, "team_glow", kit.frame(base, axis, (0, 1, 0)), 0.125, h_main, seg=6, waist=0.9,
+                 cap=0.3)
     for s in (1, -1):
         ax = Vector((0.42 * s, -0.25, 0.87)).normalized()
-        head_crystal(BODY, H, "team_glow", kit.frame((0.075 * s, -0.20, 1.67), ax, (0, 1, 0)), 0.05, 0.16, seg=6,
+        head_crystal(BODY, H, "team_glow", kit.frame((0.08 * s, -0.20, 1.665), ax, (0, 1, 0)), 0.045, 0.13, seg=6,
                       waist=0.8, cap=0.38)
 
 
@@ -338,13 +338,14 @@ def held_matrix(poses, slot, origin, z_axis, y_hint):
 
 
 def shaft_parts(p):
-    """Shared banded shaft along +Z (pommel -0.205, top 0.98); build_pick shifts it 0.30 down so the grip is 38 % up."""
-    p(B.cyl((0, 0, -0.18), (0, 0, 0.98), 0.042, 0.04, 10), "wood", "pick_hammer", True)
-    p(B.cyl((0, 0, -0.06), (0, 0, 0.09), 0.043, 0.043, 10), "navy_dark", "pick_hammer", True)
-    p(B.cyl((0, 0, 0.52), (0, 0, 0.67), 0.047, 0.047, 10), "kerchief", "team_cloth", True)   # team trim wrap
-    for z in (-0.12, 0.12, 0.42, 0.72, 0.86):
+    """Shared banded shaft along +Z (pommel bottom -0.045, shaft top 0.98); build_pick shifts it 0.26 down so the grip
+    sits 31 % up the item. Item height pommel to crystal tip 1.243 u = 0.62 of body height (bible 0.633)."""
+    p(B.cyl((0, 0, 0.02), (0, 0, 0.98), 0.042, 0.04, 10), "wood", "pick_hammer", True)
+    p(B.cyl((0, 0, 0.19), (0, 0, 0.34), 0.047, 0.047, 10), "navy_dark", "pick_hammer", True)
+    p(B.cyl((0, 0, 0.55), (0, 0, 0.68), 0.05, 0.05, 10), "kerchief", "team_cloth", True)   # team trim wrap
+    for z in (0.08, 0.40, 0.50, 0.75, 0.88):
         p(B.cyl((0, 0, z - 0.018), (0, 0, z + 0.018), 0.05, 0.05, 8), "brass", "pick_hammer", False)
-    p(box((0.10, 0.10, 0.08), 0.022, 1), "brass", "pick_hammer", False, M((0, 0, -0.205)))
+    p(box((0.10, 0.10, 0.08), 0.022, 1), "brass", "pick_hammer", False, M((0, 0, -0.005)))
 
 
 def build_pick(poses, obj, state):
@@ -357,30 +358,30 @@ def build_pick(poses, obj, state):
     shaft_parts(p)
     crystals = []
     if state == "pick":
-        p(box((0.13, 0.12, 0.17), 0.025, 1), "brass", "pick_hammer", False, M((0, 0, 1.02)))
+        p(box((0.16, 0.15, 0.20), 0.03, 2), "brass", "pick_hammer", False, M((0, 0, 1.02)))
         p(box((0.135, 0.125, 0.04), 0.012, 1), "brass_dark", "pick_hammer", False, M((0, 0, 0.955)))
         # stone point (+X, toward the head), curving down, with a crystal edge strip: the second crystal point
-        arc = [(0.06, 1.03, 0.06), (0.13, 1.02, 0.048), (0.19, 0.97, 0.034), (0.23, 0.90, 0.02), (0.25, 0.83, 0.004)]
+        arc = [(0.06, 1.03, 0.085), (0.15, 1.02, 0.068), (0.23, 0.96, 0.048), (0.28, 0.88, 0.026), (0.30, 0.80, 0.004)]
         for (x0, z0, r0), (x1, z1, r1) in zip(arc[:-1], arc[1:]):
             p(B.cyl((x0, 0, z0), (x1, 0, z1), r0, r1, 8), "stone_light", "pick_hammer", False)
         crystals.append((kit.frame((0.07, 0, 1.06), (1.0, 0, -0.35), (0, 0, 1)), 0.03, 0.17))
         # crystal blade (-X, outward): the big glowing pick point, angled up and out
-        crystals.append((kit.frame((-0.05, 0, 1.05), (-0.8, 0, 1.0), (0, 0, 1)), 0.125, 0.40))
-        p(B.cyl((-0.03, 0, 1.03), (-0.11, 0, 1.12), 0.065, 0.05, 8), "stone", "pick_hammer", False)
+        crystals.append((kit.frame((-0.05, 0, 1.05), (-1.0, 0, 0.42), (0, 0, 1)), 0.15, 0.36))
+        p(B.cyl((-0.03, 0, 1.03), (-0.12, 0, 1.07), 0.065, 0.05, 8), "stone", "pick_hammer", False)
     else:
         # hammer: stone block head with brass bands and crystals set into both faces and the top
-        p(box((0.36, 0.21, 0.23), 0.035, 2), "stone", "pick_hammer", False, M((0, 0, 1.02)))
+        p(box((0.42, 0.25, 0.27), 0.04, 2), "stone", "pick_hammer", False, M((0, 0, 1.02)))
         for x in (-0.13, 0.13):
-            p(box((0.04, 0.225, 0.245), 0.012, 1), "brass", "pick_hammer", False, M((x, 0, 1.02)))
+            p(box((0.045, 0.265, 0.285), 0.012, 1), "brass", "pick_hammer", False, M((x * 1.15, 0, 1.02)))
         for y in (-1, 1):
-            crystals.append((M((0, y * 0.10, 1.02), (-90 * y, 0, 30)), 0.07, 0.06))
-        crystals.append((kit.frame((0, 0, 1.12), (0, 0, 1), (0, 1, 0)), 0.05, 0.16))
+            crystals.append((M((0, y * 0.12, 1.02), (-90 * y, 0, 30)), 0.085, 0.065))
+        crystals.append((kit.frame((0, 0, 1.14), (0, 0, 1), (0, 1, 0)), 0.05, 0.09))
         p(box((0.13, 0.12, 0.05), 0.012, 1), "brass_dark", "pick_hammer", False, M((0, 0, 0.89)))
 
     origin = poses[W].translation.copy()
     up = Vector((-0.10, -0.06, 1.0)).normalized()
-    # grip sits 38 % up the shaft (bible 08-front-pick: the fist holds the shaft below its middle)
-    T = held_matrix(poses, W, origin, up, (0, 1, 0)) @ M((0, 0, -0.30))
+    # grip sits about a third up the item (bible 08-front-pick: the fist holds the shaft below its middle)
+    T = held_matrix(poses, W, origin, up, (0, 1, 0)) @ M((0, 0, -0.26))
     for bm, color, feat, smooth, m in parts:
         B.add(obj, bm, color, W, feat=feat, smooth=smooth, m=m, post=T)
     for m4, r, h in crystals:
@@ -390,93 +391,94 @@ def build_pick(poses, obj, state):
 
 # ===================================================================================================== barricade
 def bar_post(obj, x, chipped=False):
+    """Stone post: three stacked chunky blocks (alternating light / mid stone) with brass bands, crystal inset."""
     F = "barricade"
-    add(obj, box((0.32, 0.32, 0.92 if not chipped else 0.74), 0.04, 1), "stone", None, F, smooth=False,
-        m=M((x, 0, 0.46 if not chipped else 0.37)))
-    if not chipped:
-        add(obj, box((0.37, 0.37, 0.09), 0.035, 1), "stone_light", None, F, smooth=False, m=M((x, 0, 0.95)))
-    else:
-        add(obj, box((0.22, 0.20, 0.16), 0.035, 1), "stone_light", None, F, smooth=False,
-            m=M((x - 0.04, 0.03, 0.80), (14, -22, 9)))
-    for z in (0.18, 0.62):
-        add(obj, box((0.345, 0.345, 0.05), 0.015, 1), "brass", None, F, smooth=False, m=M((x, 0, z)))
-    # small crystal inset on the outer face of each post
     sgn = 1 if x > 0 else -1
-    B.add_crystal(obj, None, "team_glow", M((x + sgn * 0.16, 0, 0.42), (0, 90 * sgn, 0)), 0.05, 0.06, seg=6,
+    blocks = [(0.15, 0.40, 0.30, "stone"), (0.45, 0.37, 0.28, "stone_light"), (0.74, 0.39, 0.27, "stone")]
+    if chipped:
+        blocks = blocks[:2]
+    for k, (z, w, h, col) in enumerate(blocks):
+        add(obj, box((w, w * 0.92, h), 0.04, 2), col, None, F, smooth=False,
+            m=M((x + rng.uniform(-0.015, 0.015), rng.uniform(-0.015, 0.015), z), (0, 0, rng.uniform(-4, 4))))
+    for z in (0.30, 0.60) if not chipped else (0.30,):
+        add(obj, box((0.42, 0.39, 0.05), 0.015, 1), "brass", None, F, smooth=False, m=M((x, 0, z)))
+    if chipped:   # the top block knocked off, lying tilted at the foot of the post
+        add(obj, box((0.33, 0.30, 0.22), 0.04, 2), "stone", None, F, smooth=False,
+            m=M((x + 0.28 * sgn, -0.30, 0.175), (12, 25, 30)))
+    B.add_crystal(obj, None, "team_glow", M((x + sgn * 0.20, 0, 0.45), (0, 90 * sgn, 0)), 0.07, 0.07, seg=6,
                   waist=0.8, cap=0.55)
 
 
-def bar_plank(obj, x0, x1, z, tilt=0.0, h=0.19, y=0.0):
-    add(obj, box((x1 - x0, 0.075, h), 0.022, 1), "wood", None, "barricade", smooth=False,
+def bar_plank(obj, x0, x1, z, tilt=0.0, h=0.25, y=0.0):
+    add(obj, box((x1 - x0, 0.09, h), 0.025, 2), "wood", None, "barricade", smooth=False,
         m=M(((x0 + x1) / 2, y, z), (0, tilt, 0)))
-    for x in (x0 + 0.06, x1 - 0.06):
-        add(obj, box((0.03, 0.02, 0.03), 0.008, 1), "brass_dark", None, "barricade", smooth=False,
-            m=M((x, y - 0.045, z), (0, tilt, 0)))
+    for x in (x0 + 0.07, x1 - 0.07):      # brass end brackets
+        add(obj, box((0.09, 0.11, h + 0.03), 0.015, 1), "brass", None, "barricade", smooth=False,
+            m=M((x, y, z), (0, tilt, 0)))
+    add(obj, box(((x1 - x0) * 0.7, 0.02, 0.012), 0.0, 1), "wood_dark", None, "barricade", smooth=False, grad=False,
+        m=M(((x0 + x1) / 2, y - 0.046, z + 0.02), (0, tilt, 0)))      # grain groove (1 px line)
 
 
 def bar_diamond(obj, z, scale=1.0, tilt=0.0, x=0.0):
+    """Big diamond crystal facing front in a diamond-shaped brass frame."""
     F = "barricade"
-    mount = M((x, -0.05, z), (90, tilt, 45))
-    add(obj, B.box((0.30 * scale, 0.30 * scale, 0.04), 0.012, 1), "brass", None, F, smooth=False, m=mount)
-    lower = kit.frame((x, -0.085, z), (0, 0, -1), (0, -1, 0))
-    upper = kit.frame((x, -0.085, z), (0, 0, 1), (0, -1, 0))
-    # bipyramid diamond: two 4-sided crystals back to back, plus a lit facet each
-    B.add_crystal(obj, None, "team_glow", upper @ M((0, 0, 0), (0, 0, 45)), 0.15 * scale, 0.22 * scale, seg=4,
-                  waist=0.95, cap=0.85, light=(-0.5, -0.6, 0.6))
-    B.add_crystal(obj, None, "team_glow", lower @ M((0, 0, 0), (0, 0, 45)), 0.15 * scale, 0.18 * scale, seg=4,
-                  waist=0.95, cap=0.85, light=(-0.5, -0.6, 0.6))
+    face = kit.frame((x, -0.05, z), (0, -1, 0), (0, 0, 1)) @ M((0, 0, 0), (0, 0, 45 + tilt))
+    add(obj, B.torus(0.24 * scale, 0.035, 4, 4), "brass", None, F, smooth=False, m=face @ M((0, 0, 0.0)))
+    B.add_crystal(obj, None, "team_glow", face, 0.22 * scale, 0.14 * scale, seg=4, waist=0.92, cap=0.75,
+                  light=(-0.5, -0.6, 0.6))
 
 
 def build_barricade():
-    # deployed: wide fence, two stone posts, three planks, central diamond crystal
+    # deployed: wide fence, two stone posts, two thick planks, central diamond crystal
     o = BAR["deployed"]
     for x in (-0.72, 0.72):
         bar_post(o, x)
-    for z in (0.22, 0.47, 0.72):
-        bar_plank(o, -0.58, 0.58, z)
-    bar_diamond(o, 0.47)
-    # folded: compact upright crate (posts folded in as stone side panels)
+    for z in (0.30, 0.62):
+        bar_plank(o, -0.53, 0.53, z)
+    bar_diamond(o, 0.46)
+    # folded: compact upright crate (the posts folded in as stone side panels), X brace, brass corners, crystals
     o = BAR["folded"]
-    SX, SY, SZ = 0.62, 0.40, 0.80
+    SX, SY, SZ = 0.62, 0.44, 0.80
     add(o, B.box((SX - 0.14, SY - 0.05, SZ - 0.04), 0.0), "wood_dark", None, "barricade", smooth=False,
         m=M((0, 0, SZ / 2)))
     for x in (-1, 1):
-        add(o, box((0.12, SY, SZ), 0.04, 1), "stone", None, "barricade", smooth=False,
-            m=M((x * (SX / 2 - 0.06), 0, SZ / 2)))
-        for z in (0.12, SZ - 0.12):
-            add(o, box((0.13, SY + 0.012, 0.05), 0.015, 1), "brass", None, "barricade", smooth=False,
-                m=M((x * (SX / 2 - 0.06), 0, z)))
-        B.add_crystal(o, None, "team_glow", M((x * (SX / 2 + 0.0), 0, SZ / 2), (0, 90 * x, 0)), 0.06, 0.07,
+        add(o, box((0.13, SY, SZ - 0.06), 0.04, 2), "stone_light", None, "barricade", smooth=False,
+            m=M((x * (SX / 2 - 0.065), 0, SZ / 2)))
+        B.add_crystal(o, None, "team_glow", M((x * (SX / 2 + 0.0), 0, SZ / 2), (0, 90 * x, 0)), 0.08, 0.08,
                       seg=6, waist=0.8, cap=0.55)
+        for y in (-1, 1):
+            for z in (-1, 1):
+                add(o, box((0.12, 0.12, 0.12), 0.03, 1), "brass", None, "barricade", smooth=False,
+                    m=M((x * (SX / 2 - 0.05), y * (SY / 2 - 0.05), SZ / 2 + z * (SZ / 2 - 0.05))))
     for y in (-1, 1):
-        for z in (0.17, 0.40, 0.63):
-            add(o, box((SX - 0.25, 0.03, 0.205), 0.012, 1), "wood", None, "barricade", smooth=False,
-                m=M((0, y * (SY / 2 - 0.01), z)))
+        for xx in (-0.12, 0.0, 0.12):
+            add(o, box((0.115, 0.03, SZ - 0.16), 0.012, 1), "wood", None, "barricade", smooth=False,
+                m=M((xx, y * (SY / 2 - 0.005), SZ / 2)))
         for sg in (1, -1):
-            add(o, box((0.06, 0.03, 0.74), 0.012, 1), "wood", None, "barricade", smooth=False,
-                m=M((0, y * (SY / 2 + 0.012), SZ / 2), (0, 30 * sg, 0)))
-    add(o, box((SX - 0.02, SY + 0.02, 0.05), 0.018, 1), "wood", None, "barricade", smooth=False,
+            add(o, box((0.075, 0.035, 0.72), 0.014, 1), "wood", None, "barricade", smooth=False,
+                m=M((0, y * (SY / 2 + 0.014), SZ / 2), (0, 22 * sg, 0)))
+    add(o, box((SX - 0.02, SY + 0.02, 0.05), 0.018, 2), "wood", None, "barricade", smooth=False,
         m=M((0, 0, SZ + 0.02)))
-    add(o, B.torus(0.06, 0.015, 10, 4), "brass_dark", None, "barricade", m=M((0, 0, SZ + 0.06), (90, 0, 0)))
-    # damaged: chipped post, missing middle plank (splintered stubs), cracked top plank, chipped crystal, debris
+    B.add_crystal(o, None, "team_glow", kit.frame((0.14, 0.05, SZ + 0.04), (0.3, 0.1, 0.95), (0, 1, 0)), 0.06, 0.18,
+                  seg=6, waist=0.8, cap=0.4)
+    add(o, B.torus(0.06, 0.015, 10, 4), "brass_dark", None, "barricade", m=M((-0.10, 0, SZ + 0.06), (90, 0, 0)))
+    # damaged: one post lost its top block, top plank snapped in two, lower plank cracked, crystal chipped, debris
     o = BAR["damaged"]
     bar_post(o, -0.72)
     bar_post(o, 0.72, chipped=True)
-    bar_plank(o, -0.58, 0.58, 0.22)
-    bar_plank(o, -0.58, -0.05, 0.72, tilt=4)
-    bar_plank(o, 0.03, 0.58, 0.69, tilt=-9)
-    for x0, x1, tip in ((-0.58, -0.36, 1), (0.40, 0.58, -1)):
-        pts = [(x0, -0.095), (x1, -0.095), (x1 - 0.05 * tip, -0.02), (x1 + 0.0, 0.05), (x1 - 0.07 * tip, 0.095),
-               (x0, 0.095)] if tip > 0 else \
-              [(x0, -0.095), (x1, -0.095), (x1, 0.095), (x0 + 0.07, 0.095), (x0, 0.04), (x0 + 0.05, -0.02)]
-        add(o, B.prism(pts, 0.075, 0.012), "wood", None, "barricade", smooth=False, m=M((0, 0, 0.47), (90, 0, 0)))
-    bar_diamond(o, 0.46, scale=0.8, tilt=12, x=-0.04)
-    for (x, y, rz, l) in ((0.15, -0.35, 25, 0.34), (-0.25, -0.42, -40, 0.24)):
-        add(o, box((l, 0.07, 0.05), 0.012, 1), "wood", None, "barricade", smooth=False, m=M((x, y, 0.025), (0, 0, rz)))
-    for (x, y, s) in ((0.55, -0.35, 0.11), (0.85, -0.25, 0.08), (0.30, -0.25, 0.06)):
-        add(o, box((s, s * 0.9, s * 0.8), 0.02, 1), "stone_light", None, "barricade", smooth=False,
-            m=M((x, y, s * 0.4), (rng.uniform(-20, 20), rng.uniform(-20, 20), rng.uniform(0, 90))))
-    B.add_crystal(o, None, "team_glow", kit.frame((0.05, -0.30, 0.0), (0.4, -0.2, 0.3), (0, 0, 1)), 0.04, 0.09,
+    bar_plank(o, -0.53, -0.04, 0.30, tilt=-2)
+    bar_plank(o, 0.03, 0.53, 0.29, tilt=3)
+    bar_plank(o, -0.53, -0.08, 0.66, tilt=6)
+    jag = [(0.0, -0.125), (0.42, -0.125), (0.36, -0.04), (0.44, 0.03), (0.34, 0.125), (0.0, 0.125)]
+    add(o, B.prism(jag, 0.09, 0.012), "wood", None, "barricade", smooth=False,
+        m=M((0.08, 0.0, 0.58), (90, -14, 0)))
+    bar_diamond(o, 0.47, scale=0.8, tilt=14, x=-0.05)
+    for (x, y, rz, l) in ((0.15, -0.40, 25, 0.34), (-0.25, -0.45, -40, 0.24)):
+        add(o, box((l, 0.08, 0.06), 0.015, 1), "wood", None, "barricade", smooth=False, m=M((x, y, 0.03), (0, 0, rz)))
+    for (x, y, sz) in ((0.40, -0.45, 0.11), (0.95, -0.25, 0.08), (0.30, -0.25, 0.06)):
+        add(o, box((sz, sz * 0.9, sz * 0.8), 0.02, 1), "stone_light", None, "barricade", smooth=False,
+            m=M((x, y, sz * 0.4), (rng.uniform(-20, 20), rng.uniform(-20, 20), rng.uniform(0, 90))))
+    B.add_crystal(o, None, "team_glow", kit.frame((0.05, -0.32, 0.0), (0.4, -0.2, 0.3), (0, 0, 1)), 0.045, 0.10,
                   seg=4, waist=0.9, cap=0.6)
 
 

@@ -1,0 +1,463 @@
+{
+ "failed": [],
+ "results": [
+  {
+   "check": "fbx header axes (Y up, Z front, X coord)",
+   "ok": true,
+   "detail": {
+    "UpAxis": 1,
+    "UpAxisSign": 1,
+    "FrontAxis": 2,
+    "FrontAxisSign": 1,
+    "CoordAxis": 0,
+    "CoordAxisSign": 1,
+    "UnitScaleFactor": 100.0
+   }
+  },
+  {
+   "check": "fbx unit scale",
+   "ok": true,
+   "detail": "UnitScaleFactor=100.0; with FBX_SCALE_ALL the vertex data is already in metres x this factor's inverse, so Unity 'Convert Units' yields scale 1 (UNVERIFIED in Unity)"
+  },
+  {
+   "check": "fbx has no baked animation",
+   "ok": true,
+   "detail": "AnimationCurveNode records: 0"
+  },
+  {
+   "check": "objects",
+   "ok": true,
+   "detail": {
+    "armature": [
+     "Rig"
+    ],
+    "meshes": [
+     "Miner_Body",
+     "Miner_PickHammer",
+     "Miner_PickHammer_Hammer"
+    ]
+   }
+  },
+  {
+   "check": "bone count 41",
+   "ok": true,
+   "detail": 41
+  },
+  {
+   "check": "bone names = KayKit rig",
+   "ok": true,
+   "detail": {
+    "missing": [],
+    "extra": []
+   }
+  },
+  {
+   "check": "bone hierarchy = KayKit rig",
+   "ok": true,
+   "detail": "every joint has its KayKit parent"
+  },
+  {
+   "check": "joint rest positions = KayKit (metres, after the axis round trip)",
+   "ok": true,
+   "detail": "max error 0.000049 m"
+  },
+  {
+   "check": "armature root transform clean",
+   "ok": true,
+   "detail": {
+    "rot": [
+     -1.6292068494294654e-07,
+     0.0,
+     0.0
+    ],
+    "scale": [
+     1.0,
+     1.0,
+     1.0
+    ]
+   }
+  },
+  {
+   "check": "Miner_Body material slots",
+   "ok": true,
+   "detail": [
+    "CM_Toon"
+   ]
+  },
+  {
+   "check": "Miner_Body loose/non-manifold",
+   "ok": true,
+   "detail": {
+    "triangles": 10300,
+    "loose_verts": 0,
+    "loose_edges": 0,
+    "non_manifold_edges": 0,
+    "closed_shells": 180
+   }
+  },
+  {
+   "check": "Miner_Body skinned to the rig",
+   "ok": true,
+   "detail": [
+    "Rig"
+   ]
+  },
+  {
+   "check": "Miner_Body weights",
+   "ok": true,
+   "detail": {
+    "bones_used": 20,
+    "unweighted_verts": 0,
+    "verts_over_4_influences": 0
+   }
+  },
+  {
+   "check": "Miner_Body vertex colours + team mask",
+   "ok": true,
+   "detail": {
+    "layers": [
+     "Col.001",
+     "Col"
+    ],
+    "mask_codes": [
+     0.0,
+     0.75,
+     1.0
+    ]
+   }
+  },
+  {
+   "check": "team colour blocking (cloth + glow codes on body)",
+   "ok": true,
+   "detail": [
+    0.0,
+    0.75,
+    1.0
+   ]
+  },
+  {
+   "check": "Miner_PickHammer material slots",
+   "ok": true,
+   "detail": [
+    "CM_Toon"
+   ]
+  },
+  {
+   "check": "Miner_PickHammer loose/non-manifold",
+   "ok": true,
+   "detail": {
+    "triangles": 696,
+    "loose_verts": 0,
+    "loose_edges": 0,
+    "non_manifold_edges": 0,
+    "closed_shells": 20
+   }
+  },
+  {
+   "check": "Miner_PickHammer skinned to the rig",
+   "ok": true,
+   "detail": [
+    "Rig"
+   ]
+  },
+  {
+   "check": "Miner_PickHammer weights",
+   "ok": true,
+   "detail": {
+    "bones_used": 1,
+    "unweighted_verts": 0,
+    "verts_over_4_influences": 0
+   }
+  },
+  {
+   "check": "Miner_PickHammer vertex colours + team mask",
+   "ok": true,
+   "detail": {
+    "layers": [
+     "Col.001",
+     "Col"
+    ],
+    "mask_codes": [
+     0.0,
+     0.75,
+     1.0
+    ]
+   }
+  },
+  {
+   "check": "Miner_PickHammer team glow (shield core / blade edge)",
+   "ok": true,
+   "detail": [
+    0.0,
+    0.75,
+    1.0
+   ]
+  },
+  {
+   "check": "Miner_PickHammer_Hammer material slots",
+   "ok": true,
+   "detail": [
+    "CM_Toon"
+   ]
+  },
+  {
+   "check": "Miner_PickHammer_Hammer loose/non-manifold",
+   "ok": true,
+   "detail": {
+    "triangles": 700,
+    "loose_verts": 0,
+    "loose_edges": 0,
+    "non_manifold_edges": 0,
+    "closed_shells": 19
+   }
+  },
+  {
+   "check": "Miner_PickHammer_Hammer skinned to the rig",
+   "ok": true,
+   "detail": [
+    "Rig"
+   ]
+  },
+  {
+   "check": "Miner_PickHammer_Hammer weights",
+   "ok": true,
+   "detail": {
+    "bones_used": 1,
+    "unweighted_verts": 0,
+    "verts_over_4_influences": 0
+   }
+  },
+  {
+   "check": "Miner_PickHammer_Hammer vertex colours + team mask",
+   "ok": true,
+   "detail": {
+    "layers": [
+     "Col.001",
+     "Col"
+    ],
+    "mask_codes": [
+     0.0,
+     0.75,
+     1.0
+    ]
+   }
+  },
+  {
+   "check": "Miner_PickHammer_Hammer team glow (shield core / blade edge)",
+   "ok": true,
+   "detail": [
+    0.0,
+    0.75,
+    1.0
+   ]
+  },
+  {
+   "check": "triangle budget <= 12000",
+   "ok": true,
+   "detail": 11696
+  },
+  {
+   "check": "body height in metres after round trip (Blender Z = Unity Y)",
+   "ok": true,
+   "detail": {
+    "min_z": -0.001,
+    "max_z": 2.0,
+    "mesh_object_rot": [
+     1.5708,
+     -0.0,
+     0.0
+    ],
+    "mesh_object_scale": [
+     1.0,
+     1.0,
+     1.0
+    ]
+   }
+  },
+  {
+   "check": "bone rest orientations FBX re-import vs miner.blend (informational)",
+   "ok": true,
+   "detail": {
+    "max_deg": 0.0,
+    "bones_over_0.5_deg": []
+   }
+  },
+  {
+   "check": "KayKit 'Idle' on the re-imported FBX rig matches the source rig (Blender, by bone name)",
+   "ok": true,
+   "detail": {
+    "offsets_m": {
+     "hand.l": 0.0,
+     "hand.r": 0.0,
+     "head": 0.0,
+     "foot.l": 0.0,
+     "foot.r": 0.0,
+     "handslot.l": 0.0,
+     "handslot.r": 0.0
+    },
+    "hand.l moved from rest by": 0.437
+   }
+  },
+  {
+   "check": "p08 feature: hard-hat helmet + brass trim + crystal lamp",
+   "ok": true,
+   "detail": "present"
+  },
+  {
+   "check": "p08 feature: crate backpack: boards, X brace, brass corners, stone side panels",
+   "ok": true,
+   "detail": "present"
+  },
+  {
+   "check": "p08 feature: barrel torso, navy shirt, navy trousers",
+   "ok": true,
+   "detail": "present"
+  },
+  {
+   "check": "p08 feature: beard (9 clumps + mustache), face",
+   "ok": true,
+   "detail": "present"
+  },
+  {
+   "check": "p08 feature: neckerchief + trim (team cloth)",
+   "ok": true,
+   "detail": "present"
+  },
+  {
+   "check": "p08 feature: chest plate in brass frame + hex crystal",
+   "ok": true,
+   "detail": "present"
+  },
+  {
+   "check": "p08 feature: shoulder straps with gem studs",
+   "ok": true,
+   "detail": "present"
+  },
+  {
+   "check": "p08 feature: belt with pouches",
+   "ok": true,
+   "detail": "present"
+  },
+  {
+   "check": "p08 feature: knee guards, heavy boots with brass toe caps, huge gloves",
+   "ok": true,
+   "detail": "present"
+  },
+  {
+   "check": "p08 feature: pick-hammer, two states as objects",
+   "ok": true,
+   "detail": "Miner_PickHammer (pick) + Miner_PickHammer_Hammer (hammer)"
+  },
+  {
+   "check": "Miner_PickHammer length along its shaft within 5 % of bible 0.633 x 2.0 = 1.266 u",
+   "ok": true,
+   "detail": 1.262
+  },
+  {
+   "check": "Miner_PickHammer_Hammer length along its shaft within 5 % of bible 0.633 x 2.0 = 1.266 u",
+   "ok": true,
+   "detail": 1.275
+  },
+  {
+   "check": "barricade FBX: three authored state meshes, no armature",
+   "ok": true,
+   "detail": [
+    "Miner_Barricade_Damaged",
+    "Miner_Barricade_Deployed",
+    "Miner_Barricade_Folded"
+   ]
+  },
+  {
+   "check": "Miner_Barricade_Damaged: tris <= 2500, closed shells",
+   "ok": true,
+   "detail": {
+    "tris": 1916,
+    "loose_v": 0,
+    "loose_e": 0,
+    "nonmanifold_e": 0,
+    "shells": 36
+   }
+  },
+  {
+   "check": "Miner_Barricade_Damaged: sits on the ground (min z ~ 0)",
+   "ok": true,
+   "detail": -0.031
+  },
+  {
+   "check": "Miner_Barricade_Damaged: vertex colour + team mask present",
+   "ok": true,
+   "detail": [
+    "Col.001",
+    "Col"
+   ]
+  },
+  {
+   "check": "Miner_Barricade_Deployed: tris <= 2500, closed shells",
+   "ok": true,
+   "detail": {
+    "tris": 1424,
+    "loose_v": 0,
+    "loose_e": 0,
+    "nonmanifold_e": 0,
+    "shells": 25
+   }
+  },
+  {
+   "check": "Miner_Barricade_Deployed: sits on the ground (min z ~ 0)",
+   "ok": true,
+   "detail": -0.0
+  },
+  {
+   "check": "Miner_Barricade_Deployed: vertex colour + team mask present",
+   "ok": true,
+   "detail": [
+    "Col.001",
+    "Col"
+   ]
+  },
+  {
+   "check": "Miner_Barricade_Folded: tris <= 2500, closed shells",
+   "ok": true,
+   "detail": {
+    "tris": 1376,
+    "loose_v": 0,
+    "loose_e": 0,
+    "nonmanifold_e": 0,
+    "shells": 29
+   }
+  },
+  {
+   "check": "Miner_Barricade_Folded: sits on the ground (min z ~ 0)",
+   "ok": true,
+   "detail": -0.01
+  },
+  {
+   "check": "Miner_Barricade_Folded: vertex colour + team mask present",
+   "ok": true,
+   "detail": [
+    "Col.001",
+    "Col"
+   ]
+  },
+  {
+   "check": "widest class: Miner Idle body width > Warrior (bodies only, held items excluded)",
+   "ok": true,
+   "detail": {
+    "miner_w_d": [
+     1.438,
+     1.362
+    ],
+    "warrior_w_d": [
+     1.367,
+     0.809
+    ],
+    "farmer": "not on this branch; not measured"
+   }
+  },
+  {
+   "check": "flat shading: no glossy/metal nodes in CM_Toon",
+   "ok": true,
+   "detail": "Emission of ramped diffuse only"
+  }
+ ]
+}

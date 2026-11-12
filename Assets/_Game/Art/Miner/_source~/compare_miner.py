@@ -211,6 +211,8 @@ for name, rf, of in FR:
         continue
     im, m = on_paper(rp(of))
     res[name] = sbs(name, [(ref(rf), None)], [(im, m)], rf, of)
+    os.makedirs(os.path.join(OUT, "views"), exist_ok=True)
+    save_jpg(im, os.path.join(OUT, "views", f"{name}.jpg"), maxw=900)
 # pick-hammer: pick state -> hammer state
 pk, pm = on_paper(rp("ortho_pick_azure.png"))
 hm, hmm = on_paper(rp("ortho_hammer_azure.png"))

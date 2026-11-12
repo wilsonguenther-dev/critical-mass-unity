@@ -41,18 +41,18 @@
    ]
   },
   "Miner_PickHammer": {
-   "triangles": 632,
-   "vertices": 356,
+   "triangles": 696,
+   "vertices": 388,
    "rest_bounds": {
     "min": [
-     -1.429,
-     -0.193,
-     0.847
+     -1.191,
+     -0.221,
+     0.799
     ],
     "max": [
-     0.144,
-     0.092,
-     1.44
+     0.052,
+     0.075,
+     1.509
     ]
    },
    "materials": [
@@ -69,14 +69,14 @@
    "vertices": 388,
    "rest_bounds": {
     "min": [
-     -1.429,
-     -0.206,
-     0.918
+     -1.191,
+     -0.237,
+     0.889
     ],
     "max": [
-     0.09,
-     0.098,
-     1.309
+     0.081,
+     0.123,
+     1.345
     ]
    },
    "materials": [
@@ -89,18 +89,18 @@
    ]
   },
   "Miner_Barricade_Deployed": {
-   "triangles": 984,
-   "vertices": 544,
+   "triangles": 1424,
+   "vertices": 760,
    "rest_bounds": {
     "min": [
-     -0.94,
-     -0.195,
+     -0.99,
+     -0.202,
      0.0
     ],
     "max": [
-     0.94,
-     0.185,
-     0.995
+     0.99,
+     0.195,
+     0.875
     ]
    },
    "materials": [
@@ -112,18 +112,18 @@
    ]
   },
   "Miner_Barricade_Folded": {
-   "triangles": 952,
-   "vertices": 520,
+   "triangles": 1376,
+   "vertices": 744,
    "rest_bounds": {
     "min": [
-     -0.38,
-     -0.227,
-     0.0
+     -0.39,
+     -0.252,
+     -0.01
     ],
     "max": [
-     0.38,
-     0.227,
-     0.931
+     0.39,
+     0.252,
+     1.011
     ]
    },
    "materials": [
@@ -135,18 +135,18 @@
    ]
   },
   "Miner_Barricade_Damaged": {
-   "triangles": 1380,
-   "vertices": 760,
+   "triangles": 1916,
+   "vertices": 1028,
    "rest_bounds": {
     "min": [
-     -0.94,
-     -0.516,
-     -0.027
+     -0.99,
+     -0.548,
+     -0.031
     ],
     "max": [
-     0.94,
-     0.185,
-     0.995
+     1.214,
+     0.197,
+     0.875
     ]
    },
    "materials": [
@@ -163,10 +163,10 @@
   "Idle",
   1
  ],
- "triangles_character": 11632,
+ "triangles_character": 11696,
  "triangles_barricade_per_state": {
-  "folded": 952,
-  "deployed": 984,
-  "damaged": 1380
+  "folded": 1376,
+  "deployed": 1424,
+  "damaged": 1916
  }
 }
