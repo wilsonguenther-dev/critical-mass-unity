@@ -15,6 +15,10 @@ from cm_art import kit
 
 TOP_GAIN = 0.06
 BOTTOM_LOSS = 0.10
+# v3 value steps by facing (vertex colour, survives the flat toon shader): planes facing up a step lighter,
+# undersides a step darker (bible: lit top planes, dark crevices under every plate and pouch)
+UP_GAIN = 0.10
+DOWN_LOSS = 0.16
 
 
 class MinerBuilder(kit.Builder):
@@ -32,6 +36,11 @@ class MinerBuilder(kit.Builder):
             bmesh.ops.transform(src, matrix=m, verts=src.verts)
         d = self._get(obj)
         bm = d["bm"]
+        tf = getattr(self, "tri_feat", None)
+        if tf is None:
+            tf = self.tri_feat = {}
+        k_ = obj + ":" + (feat or "misc")
+        tf[k_] = tf.get(k_, 0) + sum(len(f.verts) - 2 for f in src.faces)
         key = repr(bones)
         if key not in [repr(w) for w in d["wsets"]]:
             d["wsets"].append(bones)
@@ -45,13 +54,16 @@ class MinerBuilder(kit.Builder):
         hs = [v.co.dot(upv) for v in src.verts]
         h0, h1 = (min(hs), max(hs)) if hs else (0, 1)
         span = max(h1 - h0, 1e-6)
-        use_grad = grad and rgba[3] == mpal.MASK_FIXED and span > 0.02
+        use_grad = grad and rgba[3] == mpal.MASK_FIXED and span > 0.004
         vmap = {}
+        src.normal_update()
         for v, h in zip(src.verts, hs):
             nv = bm.verts.new(v.co)
             if use_grad:
                 t = (h - h0) / span
                 k = (1.0 - BOTTOM_LOSS) + (BOTTOM_LOSS + TOP_GAIN) * (t ** 0.8)
+                nz = v.normal.dot(upv)
+                k *= 1.0 + UP_GAIN * max(nz, 0.0) ** 1.5 - DOWN_LOSS * max(-nz, 0.0)
                 nv[d["col"]] = (rgba[0] * k, rgba[1] * k, rgba[2] * k, rgba[3])
             else:
                 nv[d["col"]] = rgba

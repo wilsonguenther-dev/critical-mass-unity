@@ -1,4 +1,6 @@
-"""Miner palette (bible p08, CM-CHR-003). sRGB hex + provenance.
+"""Miner palette (v3: navy, skin, leather, beard and stone re-sampled from 08-front.png k-means at the illustration's
+lit value: lit navy #384F74, tan skin #E1B68F/#E79855, glove brown #573825, warm stone #A48774/#7A6762).
+Original: (bible p08, CM-CHR-003). sRGB hex + provenance.
 
   P08      bible p08 swatch strip (08-swatches.png), sampled pixel-exact by this build
   SAMPLED  k-means cluster of 08-front.png / 08-accent-swap.png (14 clusters), picked by role
@@ -24,25 +26,25 @@ C = {
     "crystal_lit":  ("#8BE6FF", "SAMPLED crystal highlight facet #31D7FA lifted; the one lighter facet on the lit side"),
     "kerchief":     ("#3E78C6", "SAMPLED neckerchief #5071A4 (lit) toward P08 blue #2A8ECB"),
     # ---- fixed
-    "navy":         ("#23375F", "P08 navy #1B2D52 lifted one step (front crop lit navy #364C70)"),
-    "navy_dark":    ("#1B2D52", "P08 navy #1B2D52 (trousers, wraps)"),
+    "navy":         ("#34496E", "P08 navy #1B2D52 lifted one step (front crop lit navy #364C70)"),
+    "navy_dark":    ("#2B3D60", "P08 navy #1B2D52 (trousers, wraps)"),
     "cream":        ("#E9DECF", "P08 cream #E9DECF (chest plate, shoulder pads)"),
-    "stone":        ("#807470", "P08 stone grey #807470 (crate side panels, barricade posts, hammer head)"),
-    "stone_light":  ("#A39790", "SAMPLED light stone #9F8576/#A68876 (pick point, post tops)"),
-    "helmet":       ("#B39C86", "SAMPLED tan/stone hard hat (front crop #9F8576 shade, #D0B49E lit)"),
+    "stone":        ("#857771", "P08 stone grey #807470 (crate side panels, barricade posts, hammer head)"),
+    "stone_light":  ("#B9A28C", "SAMPLED light stone #9F8576/#A68876 (pick point, post tops)"),
+    "helmet":       ("#A2866F", "SAMPLED tan/stone hard hat (front crop #9F8576 shade, #D0B49E lit)"),
     "helmet_seam":  ("#6E5E52", "helmet plate grooves, 25% darker than helmet tone (inner line)"),
     "brass":        ("#B8793F", "P08 brown/brass #AF723B, lit one step (trim, frames, corners)"),
     "brass_dark":   ("#7E4E28", "SAMPLED dark brass shade (bands, rivet rims)"),
     "leather":      ("#734A2F", "SAMPLED brown leather #734A2F (belt, straps, pouches, boots)"),
-    "leather_dark": ("#4D3324", "SAMPLED dark brown #4D3324 (huge gloves, soles)"),
+    "leather_dark": ("#5A3A27", "SAMPLED dark brown #4D3324 (huge gloves, soles)"),
     "wood":         ("#9A6640", "SAMPLED crate wood (front crop #AE6937 lit / #734A2F shade)"),
     "wood_dark":    ("#5A3A24", "crate board grooves and backing, 25%+ darker (1 px inner line)"),
-    "skin":         ("#F2AE78", "SAMPLED skin #EEA361"),
-    "skin_shadow":  ("#D98C5E", "ears, under-brow"),
-    "nose":         ("#E8735C", "big round red nose (bible); P08 red #EF674E toward skin"),
-    "beard":        ("#563826", "SAMPLED thick dark-brown beard (#4D3324 / #201817 shade), v2 lifted one step so the shade band is not black"),
-    "beard_light":  ("#7A5236", "v2 beard crown tone (clump tops, mustache): the bible's lit beard strands, toned form not a dark mass"),
-    "brow":         ("#3A2419", "heavy brows"),
+    "skin":         ("#EFB58A", "SAMPLED skin #EEA361"),
+    "skin_shadow":  ("#DC9772", "ears, under-brow"),
+    "nose":         ("#EE7F5E", "big round red nose (bible); P08 red #EF674E toward skin"),
+    "beard":        ("#5B3B27", "SAMPLED thick dark-brown beard (#4D3324 / #201817 shade), v2 lifted one step so the shade band is not black"),
+    "beard_light":  ("#6E4830", "v2 beard crown tone (clump tops, mustache): the bible's lit beard strands, toned form not a dark mass"),
+    "brow":         ("#3E271B", "heavy brows"),
     "eye_white":    ("#FFFFFF", "eye white, highlights"),
     "pupil":        ("#24161A", "pupil"),
     "mouth":        ("#6E2A22", "grin interior"),

@@ -215,27 +215,31 @@ def build_neck():
     add(BODY, B.cyl((0, 0, 1.17), (0, 0, 1.32), 0.11, 0.105, 12), "skin", ["chest", "head"], "skin")
     # blue neckerchief (team cloth): thick roll, front knot, hanging point
     add(BODY, B.torus(0.255, 0.11, 14, 7), "kerchief", "chest", "team_cloth",
-        m=M((0, -0.015, 1.245), (8, 0, 0), (1.06, 0.95, 0.8)))
+        m=M((0, 0.0, 1.225), (8, 0, 0), (1.06, 0.82, 0.8)))
     add(BODY, B.sphere((0.10, 0.07, 0.07), 10, 6), "kerchief", "chest", "team_cloth", m=M((0.14, -0.25, 1.15)))
 
 
+HEAD_C, HEAD_R = (0.0, -0.01, 1.46), (0.32, 0.27, 0.30)   # v3: big round face (bible p08: face about 0.61 u across)
+
+
+def head_front_y(x, z, proud=0.0):
+    cx, cy, cz = HEAD_C
+    rx, ry, rz = HEAD_R
+    k = 1.0 - ((x - cx) / rx) ** 2 - ((z - cz) / rz) ** 2
+    return cy - ry * math.sqrt(max(k, 0.02)) - proud
+
+
 def face_plane(rows=4, cols=8):
-    """UV-less grid hugging the front of the head sphere (head space, before HEAD_WIDEN), 8 mm proud of it, covering the
-    face_decal extent. UVs and the decal material are assigned after finalize (assign_face_decal)."""
+    """Thin closed slab hugging the front of the head ellipsoid (head space, before HEAD_WIDEN), 8 mm proud of it,
+    covering the face_decal extent. UVs and the decal material are assigned after finalize (assign_face_decal)."""
     import bmesh
-    cx, cy, cz, rx, ry, rz = 0.0, -0.01, 1.44, 0.28, 0.26, 0.27
     bm = bmesh.new()
     grid = []
     for j in range(rows + 1):
         z = face_decal.Z0 + (face_decal.Z1 - face_decal.Z0) * j / rows
-        row = []
-        for i in range(cols + 1):
-            x = face_decal.X0 + (face_decal.X1 - face_decal.X0) * i / cols
-            k = 1.0 - (x / rx) ** 2 - ((z - cz) / rz) ** 2
-            y = cy - ry * math.sqrt(max(k, 0.02)) - 0.008
-            row.append(bm.verts.new((x, y, z)))
-        grid.append(row)
-    back = [[bm.verts.new(v.co + Vector((0, 0.004, 0))) for v in row] for row in grid]   # closed thin slab
+        grid.append([bm.verts.new((x, head_front_y(x, z, 0.008), z)) for x in
+                     (face_decal.X0 + (face_decal.X1 - face_decal.X0) * i / cols for i in range(cols + 1))])
+    back = [[bm.verts.new(v.co + Vector((0, 0.004, 0))) for v in row] for row in grid]
     for j in range(rows):
         for i in range(cols):
             bm.faces.new((grid[j][i], grid[j][i + 1], grid[j + 1][i + 1], grid[j + 1][i]))
@@ -249,42 +253,59 @@ def face_plane(rows=4, cols=8):
     return bm
 
 
+def beard_lobe_path():
+    """v3 beard: scalloped lobes wrapping the jaw from sideburn to sideburn (bible p08 front: a full dark-brown beard
+    with a clear scalloped lower outline). Returns (centre, radii, rot_z_deg) per lobe."""
+    out = []
+    n = 11
+    for i in range(n):
+        t = -1.0 + 2.0 * i / (n - 1)               # -1 his right sideburn, 0 chin, +1 his left sideburn
+        phi = math.radians(98 * t)
+        z = 1.175 + 0.33 * abs(t) ** 2.0            # chin 1.205, sideburn 1.505
+        R = 0.315 - 0.03 * (1 - abs(t))
+        x = math.sin(phi) * R
+        y = -math.cos(phi) * R * 0.92 - 0.02
+        size = 0.118 - 0.04 * abs(t)
+        out.append(((x, y, z), (size, size * 0.80, size * 0.95), math.degrees(phi)))
+    return out
+
+
 def build_head():
     global _post
     _post = HEAD_POST @ HEAD_WIDEN
     H = "head"
-    add(BODY, B.sphere((0.28, 0.26, 0.27), 16, 11), "skin", H, "skin", m=M((0, -0.01, 1.44)))
+    add(BODY, B.sphere(HEAD_R, 14, 10), "skin", H, "skin", m=M(HEAD_C))
     for s in (1, -1):
-        add(BODY, B.sphere((0.035, 0.05, 0.065), 8, 6), "skin_shadow", H, "skin", m=M((0.262 * s, 0.03, 1.45)))
-        # v2: brow ridge in skin (form under the painted heavy brow) instead of v1's dark boxes
-        add(BODY, B.sphere((0.085, 0.035, 0.03), 8, 5), "skin", H, "skin", m=M((0.10 * s, -0.235, 1.515), (0, 8 * s, 0)))
-    # v2 face: painted 256 px decal (eyes, lids, heavy brows, blush) on a plane hugging the head front
+        add(BODY, B.sphere((0.04, 0.055, 0.075), 6, 4), "skin_shadow", H, "skin", m=M((0.315 * s, 0.02, 1.47)))
+        # round cheeks under the eyes (bible: full cheeks with a warm shade); the decal adds the blush on top
+        add(BODY, B.sphere((0.10, 0.06, 0.075), 8, 5), "skin", H, "skin", m=M((0.17 * s, -0.215, 1.405)))
+        # thick dark angled brows as modelled wedges: low and heavy over the nose, rising to the temple
+        brow = [(0.03, -0.045), (0.215, 0.005), (0.245, 0.042), (0.15, 0.050), (0.04, 0.028)]
+        brow = [(x * s, z) for x, z in brow]
+        if s < 0:
+            brow = list(reversed(brow))
+        add(BODY, B.prism(brow, 0.055, 0.012), "brow", H, "face", smooth=False,
+            m=M((0.0, head_front_y(0.13 * s, 1.548, 0.0) + 0.008, 1.548), (90 - 14, 0, -16 * s)))
+    # v3 face decal: large round brown eyes with highlights, cheek blush (painted, 256 px)
     add(BODY, face_plane(), "skin", H, "face_decal", smooth=True, grad=False)
-    # big round red nose
-    add(BODY, B.sphere((0.088, 0.078, 0.078), 12, 8), "nose", H, "face", m=M((0, -0.30, 1.405)))
-    # v2 beard: a shaped, two-tone form (mid-brown mass, lighter clump crowns and mustache), short (tip at z 1.19)
-    add(BODY, B.sphere((0.275, 0.205, 0.125), 14, 7), "beard", H, "beard", m=M((0, -0.035, 1.33)))
-    clumps = [   # base, tip, radius, bend, tone
-        ((0.23, -0.08, 1.42), (0.24, -0.14, 1.27), 0.09, (0.02, -0.02, 0.0), "beard"),
-        ((-0.23, -0.08, 1.42), (-0.24, -0.14, 1.27), 0.09, (-0.02, -0.02, 0.0), "beard"),
-        ((0.24, 0.0, 1.53), (0.25, -0.06, 1.38), 0.065, (0.015, 0, 0), "beard"),
-        ((-0.24, 0.0, 1.53), (-0.25, -0.06, 1.38), 0.065, (-0.015, 0, 0), "beard"),
-        ((0.18, -0.17, 1.33), (0.20, -0.25, 1.21), 0.10, (0.02, -0.03, 0), "beard_light"),
-        ((-0.18, -0.17, 1.33), (-0.20, -0.25, 1.21), 0.10, (-0.02, -0.03, 0), "beard_light"),
-        ((0.075, -0.21, 1.31), (0.08, -0.30, 1.19), 0.10, (0.0, -0.03, 0), "beard"),
-        ((-0.075, -0.21, 1.31), (-0.08, -0.30, 1.19), 0.10, (0.0, -0.03, 0), "beard"),
-        ((0.0, -0.21, 1.30), (0.0, -0.30, 1.18), 0.09, (0, -0.03, 0), "beard_light"),
-    ]
-    for b, t, r, bend, tone in clumps:
-        add(BODY, B.spike(b, t, r, 8, bend), tone, H, "beard", smooth=True)
-    for s in (1, -1):   # mustache: two thick lighter curls sweeping out from under the nose
-        add(BODY, B.spike((0.025 * s, -0.295, 1.36), (0.185 * s, -0.25, 1.325), 0.055, 8, (0.0, -0.025, 0.018)),
-            "beard_light", H, "beard", smooth=True)
-    # wide open grin under the mustache: dark mouth, cream teeth band
-    grin = [(-0.10, 0.016), (-0.05, -0.036), (0.05, -0.036), (0.10, 0.016), (0.0, 0.0)]
-    add(BODY, B.prism(grin, 0.03), "mouth", H, "face", smooth=False, m=M((0, -0.278, 1.285), (90 - 12, 0, 0)))
-    teeth = [(-0.088, 0.012), (0.088, 0.012), (0.07, -0.009), (-0.07, -0.009)]
-    add(BODY, B.prism(teeth, 0.03), "teeth", H, "face", smooth=False, m=M((0, -0.284, 1.285), (90 - 12, 0, 0)))
+    # big round red-pink nose, a step proud of the cheeks
+    add(BODY, B.sphere((0.080, 0.075, 0.074), 10, 7), "nose", H, "face", m=M((0, -0.30, 1.412)))
+    # beard: chin mass under the mouth plus scalloped jaw lobes, sideburns into the helmet
+    add(BODY, B.sphere((0.25, 0.17, 0.11), 10, 6), "beard", H, "beard", m=M((0, -0.18, 1.215)))
+    lobes = beard_lobe_path()
+    for c, r, rz in lobes:
+        add(BODY, B.sphere(r, 7, 5), "beard", H, "beard", m=M(c, (0, 0, rz)))
+    for (c0, r0, _), (c1, r1, _) in zip(lobes[:-1], lobes[1:]):   # continuous jaw band behind the scallops
+        add(BODY, B.cyl(c0, c1, r0[1] * 1.05, r1[1] * 1.05, 7), "beard", H, "beard")
+    # moustache: two plump lobes over the smile, outer ends dropping (bible: thick, over a small smile)
+    for s in (1, -1):
+        add(BODY, B.sphere((0.10, 0.058, 0.046), 8, 5), "beard", H, "beard",
+            m=M((0.078 * s, -0.31, 1.355), (0, 10 * s, 8 * s)))
+    # small smile: dark crescent with a teeth band, sitting between moustache and chin mass
+    smile = [(-0.085, 0.024), (-0.045, -0.018), (0.045, -0.018), (0.085, 0.024), (0.0, 0.004)]
+    add(BODY, B.prism(smile, 0.03), "mouth", H, "face", smooth=False, m=M((0, -0.305, 1.292), (90 - 14, 0, 0)))
+    teeth = [(-0.058, 0.008), (0.058, 0.008), (0.045, -0.006), (-0.045, -0.006)]
+    add(BODY, B.prism(teeth, 0.03), "teeth", H, "face", smooth=False, m=M((0, -0.311, 1.294), (90 - 14, 0, 0)))
 
 
 def assign_face_decal(ob, image):
@@ -301,7 +322,7 @@ def assign_face_decal(ob, image):
     me.materials.append(mat)
     slot = len(me.materials) - 1
     n = 0
-    head_c = Vector((0.0, -0.01, 1.44))
+    head_c = Vector(HEAD_C)
     for poly in me.polygons:
         # front sheet only: outward-facing (back sheet faces the head, rim walls are tangent)
         if all(i in vin for i in poly.vertices) and poly.normal.dot((poly.center - head_c).normalized()) > 0.5:
@@ -314,50 +335,83 @@ def assign_face_decal(ob, image):
     return n
 
 
-HELMET_SCALE = Matrix.Diagonal((0.92, 0.95, 1.0, 1.0))   # v2: bible p08 front helmet is narrower than v1's widened dome
+HELMET_TILT = (Matrix.Translation((0, 0.035, 1.62)) @ Matrix.Rotation(math.radians(-5), 4, "X") @
+               Matrix.Translation((0, 0, -1.62)))   # v3: helmet higher and tipped back so the whole face shows
+HZ0 = 1.605         # brim base (head space)
+
+
+def dome_sector(prof, a0, a1, seg=2):
+    """Orange-slice shell of the dome between angles a0..a1: outer surface plus two flat side walls to the axis."""
+    import bmesh
+    bm = bmesh.new()
+    rows = []
+    for r, z in prof:
+        rows.append([bm.verts.new((r * math.cos(a0 + (a1 - a0) * i / seg), r * math.sin(a0 + (a1 - a0) * i / seg), z))
+                     for i in range(seg + 1)])
+    for j in range(len(prof) - 1):
+        for i in range(seg):
+            bm.faces.new((rows[j][i], rows[j][i + 1], rows[j + 1][i + 1], rows[j + 1][i]))
+    axis = [bm.verts.new((0, 0, prof[0][1])), bm.verts.new((0, 0, prof[-1][1]))]
+    for side in (0, seg):
+        wall = [rows[j][side] for j in range(len(prof))] + [axis[1], axis[0]]
+        bm.faces.new(wall if side == 0 else list(reversed(wall)))
+    bm.faces.new([rows[0][i] for i in range(seg, -1, -1)] + [axis[0]])
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    ngons = [f for f in bm.faces if len(f.verts) > 4]
+    bmesh.ops.triangulate(bm, faces=ngons, quad_method="BEAUTY", ngon_method="EAR_CLIP")
+    return bm
+
+
+def rivet(r=0.016, h=0.012):
+    return B.cyl((0, 0, 0), (0, 0, h), r, r * 0.7, 5)
 
 
 def build_helmet():
     global _post
-    _post = HEAD_POST @ HELMET_SCALE
+    _post = HEAD_POST @ HELMET_TILT
     H = "head"
-    # v2 dome: taller than v1 but tapering to a narrower crown (bible front: 0.44 u across at z 1.8)
-    prof = [(0.29, 1.545), (0.325, 1.58), (0.318, 1.64), (0.29, 1.70), (0.235, 1.755), (0.15, 1.795), (0.03, 1.812)]
-    add(BODY, B.lathe(prof, 16), "helmet", H, "helmet", m=M((0, 0.005, 0)))
-    # brim (rounded, a step lighter), groove line, brass trim band + rivets
-    add(BODY, B.torus(0.322, 0.05, 16, 5), "stone_light", H, "helmet", m=M((0, -0.012, 1.55), (0, 0, 0),
-                                                                            (1.0, 1.07, 0.62)))
-    add(BODY, B.torus(0.32, 0.010, 16, 3), "helmet_seam", H, "helmet_detail", m=M((0, 0.004, 1.562)))
-    add(BODY, B.torus(0.325, 0.026, 16, 4), "brass", H, "helmet", m=M((0, 0.004, hz(1.59))))
-    for k in range(6):
-        a = 2 * math.pi * (k + 0.5) / 6
-        add(BODY, B.sphere((0.016, 0.016, 0.016), 5, 3), "brass_dark", H, "helmet_detail",
-            m=M((0.347 * math.cos(a), 0.004 + 0.347 * math.sin(a), hz(1.59))))
-    # plate grooves (segmented stone hard hat): 4 meridians as thin strips riding the dome
-    pp = [(0.324, 1.60), (0.318, 1.655), (0.282, 1.715)]
-    for ang in (30, 90, 150, 210, 270, 330):
-        a = math.radians(ang)
-        d = Vector((math.cos(a), math.sin(a), 0))
-        for (r0, z0), (r1, z1) in zip(pp[:-1], pp[1:]):
-            p0 = d * (r0 + 0.003) + Vector((0, 0.005, z0))
-            p1 = d * (r1 + 0.003) + Vector((0, 0.005, z1))
-            n = (d * (z1 - z0) - Vector((0, 0, 1)) * (r1 - r0)).normalized()
-            bm, mm = strap(p0, p1, 0.014, 0.012, n, bevel=0.0)
-            add(BODY, bm, "helmet_seam", H, "helmet_detail", smooth=False, m=mm, grad=False)
-    # brass lamp bracket on the front of the dome
-    add(BODY, box((0.24, 0.10, 0.17), 0.03, 2), "brass", H, "helmet_lamp", smooth=False,
-        m=M((0, -0.255, 1.68), (-34, 0, 0)))
-    add(BODY, B.torus(0.13, 0.032, 12, 5), "brass", H, "helmet_lamp", m=M((0, -0.185, 1.755), (-17, 0, 0)))
-    # big glowing crystal lamp (v2: a chunky hex gem, not a thin spike): tip at z 2.0, 0.17 above the dome
-    axis = Vector((0, -0.30, 0.954)).normalized()
-    base = Vector((0, -0.17, 1.74))
-    tip_z = HEAD_PIVOT + (2.0 - HEAD_PIVOT) / HEAD_K       # tip lands on z 2.0 after HEAD_POST
-    h_main = (tip_z - base.z) / axis.z
-    head_crystal(BODY, H, "team_glow", kit.frame(base, axis, (0, 1, 0)), 0.17, h_main, seg=6, waist=0.94,
-                 cap=0.28)
-    # v2: no side shards (the bible front shows one gem); a small back shard keeps the gem cluster readable from above
-    head_crystal(BODY, H, "team_glow", kit.frame((0.0, -0.08, 1.77), Vector((0, 0.35, 0.94)).normalized(), (0, 1, 0)),
-                 0.06, 0.12, seg=6, waist=0.8, cap=0.38)
+    z0 = HZ0
+    HK, VK = 1.07, 1.0        # v3: wide, tall dome (bible: helmet clearly wider than the face)
+    prof = [(r * HK, z0 + dz * VK) for r, dz in ((0.365, 0.03), (0.372, 0.08), (0.355, 0.15), (0.315, 0.215),
+                                                   (0.245, 0.265), (0.14, 0.296), (0.03, 0.305))]
+    # dark core under the plates: the gaps between plates read as the 1.5 px inner lines
+    add(BODY, B.lathe([(r * 0.975, z) for r, z in prof], 12), "helmet_seam", H, "helmet_detail", grad=False)
+    # segmented stone plates (bible: a stone dome built from plates), alternating light / mid stone
+    n = 8
+    for k in range(n):
+        a0 = 2 * math.pi * k / n + math.pi / n + 0.06
+        a1 = 2 * math.pi * (k + 1) / n + math.pi / n - 0.06
+        tone = "stone_light" if k % 2 == 0 else "helmet"
+        add(BODY, dome_sector([(r * 1.02, z) for r, z in prof[:-1]] + [(0.05, prof[-1][1] - 0.004)], a0, a1, 2), tone, H,
+            "helmet", smooth=True)
+    # wide brass rim band with rivets, stone lip under it
+    add(BODY, B.torus(0.378 * HK, 0.036, 16, 4), "stone", H, "helmet", m=M((0, 0, z0 + 0.012), (0, 0, 0), (1, 1, 0.75)))
+    add(BODY, B.torus(0.384 * HK, 0.034, 16, 4), "brass", H, "helmet", m=M((0, 0, z0 + 0.06), (0, 0, 0), (1, 1, 1.1)))
+    for k in range(10):
+        a = 2 * math.pi * (k + 0.5) / 10
+        add(BODY, rivet(), "brass_dark", H, "helmet_detail", smooth=False,
+            m=kit.frame((0.44 * math.cos(a), 0.44 * math.sin(a), z0 + 0.06), (math.cos(a), math.sin(a), 0), (0, 0, 1)))
+    # brass crown ridge front to back
+    ridge = [(-0.30, z0 + 0.20 * VK), (-0.16, z0 + 0.285 * VK), (0.0, z0 + 0.315 * VK), (0.16, z0 + 0.285 * VK),
+             (0.32, z0 + 0.20 * VK)]
+    for (y0, z_0), (y1, z_1) in zip(ridge[1:-1], ridge[2:]):
+        bm, mm = strap((0, y0, z_0), (0, y1, z_1), 0.06, 0.035, (0, (y0 + y1) * 0.8, 1.0))
+        add(BODY, bm, "brass", H, "helmet", smooth=False, m=mm)
+    # brass lamp setting at the front of the dome: cup and four prongs gripping one large upright crystal
+    add(BODY, B.lathe([(0.10, 0.0), (0.145, 0.045), (0.135, 0.08), (0.11, 0.085)], 6), "brass", H, "helmet_lamp",
+        smooth=False, m=M((0, -0.36, z0 + 0.10)))
+    for k in range(4):
+        a_ = math.radians(45 + 90 * k)
+        add(BODY, box((0.05, 0.05, 0.13), 0.02, 1), "brass_dark", H, "helmet_lamp", smooth=False,
+            m=M((0.125 * math.cos(a_), -0.36 + 0.10 * math.sin(a_), z0 + 0.20), (14 * math.sin(a_), -14 * math.cos(a_), 0)))
+    base = Vector((0, -0.36, z0 + 0.14))
+    axis = Vector((0, 0.04, 1.0)).normalized()
+    # tip lands on z 2.0 after HELMET_TILT then HEAD_POST
+    TT = HEAD_POST @ HELMET_TILT
+    zb = (TT @ base).z
+    za = (TT.to_3x3() @ axis).z
+    h_main = (2.0 - zb) / za
+    head_crystal(BODY, H, "team_glow", kit.frame(base, axis, (0, 1, 0)), 0.125, h_main, seg=6, waist=0.92, cap=0.30)
 
 
 def build_crate():
@@ -661,6 +715,7 @@ def main():
     objs[HAMMER].hide_render = True
     objs[HAMMER].hide_set(True)
 
+    TRI_FEAT = dict(sorted(B.tri_feat.items(), key=lambda kv: -kv[1]))
     B = mkit.MinerBuilder(None)
     build_barricade()
     bcoll = bpy.data.collections.new("MinerBarricade")
@@ -679,6 +734,7 @@ def main():
             "feature_groups": sorted(g.name for g in ob.vertex_groups if g.name.startswith("feat_")),
         }
     report["bevels"] = BEVELS
+    report["triangles_by_feature"] = TRI_FEAT
     report["triangles_character"] = tris(objs[BODY]) + tris(objs[PICK]) + tris(objs[HAMMER])
     report["triangles_barricade_per_state"] = {k: tris(bobjs[v]) for k, v in BAR.items()}
 
