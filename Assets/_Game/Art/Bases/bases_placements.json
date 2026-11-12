@@ -14,650 +14,956 @@
    {
     "piece": "cm_brazier",
     "unity_local_pos": [
-     10.3137,
+     11.1801,
      2.31,
-     -6.2467
+     -6.6334
     ],
     "unity_yaw_deg": -0.0
    },
    {
     "piece": "cm_light_pool",
     "unity_local_pos": [
-     8.9111,
+     9.4187,
      0.0,
-     -5.5192
-    ],
-    "unity_yaw_deg": -0.0
-   },
-   {
-    "piece": "cm_dress_rubble_low",
-    "unity_local_pos": [
-     9.6719,
-     0.0,
-     -4.8513
-    ],
-    "unity_yaw_deg": -326.85
-   },
-   {
-    "piece": "cm_dress_rubble_low",
-    "unity_local_pos": [
-     9.2652,
-     0.0,
-     -5.8873
-    ],
-    "unity_yaw_deg": -238.728
-   },
-   {
-    "piece": "cm_dress_planks_low",
-    "unity_local_pos": [
-     8.9752,
-     0.0,
-     -6.7887
-    ],
-    "unity_yaw_deg": -174.678
-   },
-   {
-    "piece": "cm_brazier",
-    "unity_local_pos": [
-     2.138,
-     2.31,
-     -11.5356
-    ],
-    "unity_yaw_deg": -0.0
-   },
-   {
-    "piece": "cm_light_pool",
-    "unity_local_pos": [
-     2.1537,
-     0.0,
-     -9.9557
-    ],
-    "unity_yaw_deg": -0.0
-   },
-   {
-    "piece": "cm_dress_barrel",
-    "unity_local_pos": [
-     0.7278,
-     2.31,
-     -11.6223
-    ],
-    "unity_yaw_deg": -22.237
-   },
-   {
-    "piece": "cm_dress_rubble_low",
-    "unity_local_pos": [
-     3.0272,
-     0.0,
-     -10.5993
-    ],
-    "unity_yaw_deg": -160.195
-   },
-   {
-    "piece": "cm_dress_planks_low",
-    "unity_local_pos": [
-     1.9675,
-     0.0,
-     -10.5397
-    ],
-    "unity_yaw_deg": -85.932
-   },
-   {
-    "piece": "cm_dress_rubble_low",
-    "unity_local_pos": [
-     0.7905,
-     0.0,
-     -10.4774
-    ],
-    "unity_yaw_deg": -154.777
-   },
-   {
-    "piece": "cm_dress_flagstones",
-    "unity_local_pos": [
-     0.0502,
-     0.0,
-     -10.7267
-    ],
-    "unity_yaw_deg": -244.729
-   },
-   {
-    "piece": "cm_brazier",
-    "unity_local_pos": [
-     -5.0713,
-     2.31,
-     -8.5444
-    ],
-    "unity_yaw_deg": -0.0
-   },
-   {
-    "piece": "cm_light_pool",
-    "unity_local_pos": [
-     -3.8875,
-     0.0,
-     -7.498
-    ],
-    "unity_yaw_deg": -0.0
-   },
-   {
-    "piece": "cm_dress_barrel",
-    "unity_local_pos": [
-     -5.8119,
-     2.31,
-     -7.4102
-    ],
-    "unity_yaw_deg": 70.049
-   },
-   {
-    "piece": "cm_dress_planks_low",
-    "unity_local_pos": [
-     -3.7351,
-     0.0,
-     -8.3014
-    ],
-    "unity_yaw_deg": -267.873
-   },
-   {
-    "piece": "cm_dress_rubble_low",
-    "unity_local_pos": [
-     -4.0611,
-     0.0,
-     -7.5667
-    ],
-    "unity_yaw_deg": -192.532
-   },
-   {
-    "piece": "cm_dress_flagstones",
-    "unity_local_pos": [
-     -4.8584,
-     0.0,
-     -7.3493
-    ],
-    "unity_yaw_deg": -129.395
-   },
-   {
-    "piece": "cm_dress_rubble_low",
-    "unity_local_pos": [
-     -4.7099,
-     0.0,
-     -6.4873
-    ],
-    "unity_yaw_deg": -155.365
-   },
-   {
-    "piece": "cm_brazier",
-    "unity_local_pos": [
-     -7.5188,
-     2.31,
-     0.3441
-    ],
-    "unity_yaw_deg": -0.0
-   },
-   {
-    "piece": "cm_light_pool",
-    "unity_local_pos": [
-     -5.9391,
-     0.0,
-     0.3729
+     -5.729
     ],
     "unity_yaw_deg": -0.0
    },
    {
     "piece": "cm_brazier",
     "unity_local_pos": [
-     -6.9497,
+     2.3035,
      2.31,
-     5.1314
+     -12.4892
     ],
     "unity_yaw_deg": -0.0
    },
    {
     "piece": "cm_light_pool",
     "unity_local_pos": [
-     -5.6009,
+     2.36,
      0.0,
-     4.3085
+     -10.51
+    ],
+    "unity_yaw_deg": -0.0
+   },
+   {
+    "piece": "cm_dress_crate",
+    "unity_local_pos": [
+     0.8938,
+     2.31,
+     -12.5422
+    ],
+    "unity_yaw_deg": 3.045
+   },
+   {
+    "piece": "cm_dress_barrel",
+    "unity_local_pos": [
+     0.1456,
+     2.31,
+     -12.5694
+    ],
+    "unity_yaw_deg": -0.0
+   },
+   {
+    "piece": "cm_dress_crate",
+    "unity_local_pos": [
+     1.9402,
+     0.0,
+     -11.6799
+    ],
+    "unity_yaw_deg": 5.861
+   },
+   {
+    "piece": "cm_dress_crate",
+    "unity_local_pos": [
+     1.1192,
+     0.0,
+     -11.7494
+    ],
+    "unity_yaw_deg": -0.428
+   },
+   {
+    "piece": "cm_dress_crate_small",
+    "unity_local_pos": [
+     1.836,
+     0.7,
+     -11.6803
+    ],
+    "unity_yaw_deg": -6.194
+   },
+   {
+    "piece": "cm_dress_crate_small",
+    "unity_local_pos": [
+     0.5172,
+     0.0,
+     -11.8343
+    ],
+    "unity_yaw_deg": -29.055
+   },
+   {
+    "piece": "cm_brazier",
+    "unity_local_pos": [
+     -5.6508,
+     2.31,
+     -9.3175
+    ],
+    "unity_yaw_deg": -0.0
+   },
+   {
+    "piece": "cm_light_pool",
+    "unity_local_pos": [
+     -4.194,
+     0.0,
+     -7.9767
+    ],
+    "unity_yaw_deg": -0.0
+   },
+   {
+    "piece": "cm_dress_crate",
+    "unity_local_pos": [
+     -6.4537,
+     2.31,
+     -8.2203
+    ],
+    "unity_yaw_deg": 57.733
+   },
+   {
+    "piece": "cm_dress_barrel",
+    "unity_local_pos": [
+     -6.7299,
+     2.31,
+     -7.5308
+    ],
+    "unity_yaw_deg": -0.0
+   },
+   {
+    "piece": "cm_dress_crate_small",
+    "unity_local_pos": [
+     -6.9962,
+     2.31,
+     -6.9824
+    ],
+    "unity_yaw_deg": 67.773
+   },
+   {
+    "piece": "cm_dress_barrel",
+    "unity_local_pos": [
+     -5.0954,
+     0.0,
+     -8.8651
+    ],
+    "unity_yaw_deg": -31.975
+   },
+   {
+    "piece": "cm_dress_barrel",
+    "unity_local_pos": [
+     -5.471,
+     0.0,
+     -8.4544
+    ],
+    "unity_yaw_deg": -277.021
+   },
+   {
+    "piece": "cm_dress_barrel",
+    "unity_local_pos": [
+     -5.0558,
+     0.0,
+     -8.4737
+    ],
+    "unity_yaw_deg": -131.879
+   },
+   {
+    "piece": "cm_dress_barrel",
+    "unity_local_pos": [
+     -5.4712,
+     0.0,
+     -8.0283
+    ],
+    "unity_yaw_deg": -169.72
+   },
+   {
+    "piece": "cm_brazier",
+    "unity_local_pos": [
+     -8.4661,
+     2.31,
+     0.2423
+    ],
+    "unity_yaw_deg": -0.0
+   },
+   {
+    "piece": "cm_light_pool",
+    "unity_local_pos": [
+     -6.4863,
+     0.0,
+     0.2675
+    ],
+    "unity_yaw_deg": -0.0
+   },
+   {
+    "piece": "cm_brazier",
+    "unity_local_pos": [
+     -8.0631,
+     2.31,
+     5.0947
+    ],
+    "unity_yaw_deg": -0.0
+   },
+   {
+    "piece": "cm_light_pool",
+    "unity_local_pos": [
+     -6.3295,
+     0.0,
+     4.1382
+    ],
+    "unity_yaw_deg": -0.0
+   },
+   {
+    "piece": "cm_dress_crate",
+    "unity_local_pos": [
+     -8.5297,
+     2.31,
+     1.6459
+    ],
+    "unity_yaw_deg": 83.644
+   },
+   {
+    "piece": "cm_dress_barrel",
+    "unity_local_pos": [
+     -8.5372,
+     2.31,
+     2.395
+    ],
+    "unity_yaw_deg": -0.0
+   },
+   {
+    "piece": "cm_dress_crate_small",
+    "unity_local_pos": [
+     -8.5842,
+     2.31,
+     2.9856
+    ],
+    "unity_yaw_deg": 103.509
+   },
+   {
+    "piece": "cm_dress_crate",
+    "unity_local_pos": [
+     -8.4305,
+     2.31,
+     4.0914
+    ],
+    "unity_yaw_deg": 107.298
+   },
+   {
+    "piece": "cm_dress_barrel",
+    "unity_local_pos": [
+     -8.1838,
+     2.31,
+     4.7899
+    ],
+    "unity_yaw_deg": -0.0
+   },
+   {
+    "piece": "cm_dress_crate_small",
+    "unity_local_pos": [
+     -7.9417,
+     2.31,
+     5.311
+    ],
+    "unity_yaw_deg": 127.997
+   },
+   {
+    "piece": "cm_dress_crate",
+    "unity_local_pos": [
+     -7.3427,
+     2.31,
+     6.3033
+    ],
+    "unity_yaw_deg": 107.507
+   },
+   {
+    "piece": "cm_dress_barrel",
+    "unity_local_pos": [
+     -6.9767,
+     2.31,
+     6.9538
+    ],
+    "unity_yaw_deg": -0.0
+   },
+   {
+    "piece": "cm_dress_weapon_rack",
+    "unity_local_pos": [
+     -7.7516,
+     0.0,
+     1.1812
+    ],
+    "unity_yaw_deg": 87.212
+   },
+   {
+    "piece": "cm_dress_barrel",
+    "unity_local_pos": [
+     -7.8014,
+     0.0,
+     2.1788
+    ],
+    "unity_yaw_deg": -141.999
+   },
+   {
+    "piece": "cm_dress_crate",
+    "unity_local_pos": [
+     -7.7495,
+     0.0,
+     3.3901
+    ],
+    "unity_yaw_deg": 102.683
+   },
+   {
+    "piece": "cm_dress_crate",
+    "unity_local_pos": [
+     -7.6523,
+     0.0,
+     3.9942
+    ],
+    "unity_yaw_deg": 91.261
+   },
+   {
+    "piece": "cm_dress_crate_small",
+    "unity_local_pos": [
+     -7.7393,
+     0.7,
+     3.4706
+    ],
+    "unity_yaw_deg": 101.538
+   },
+   {
+    "piece": "cm_dress_crate_small",
+    "unity_local_pos": [
+     -7.5242,
+     0.0,
+     4.5391
+    ],
+    "unity_yaw_deg": 71.299
+   },
+   {
+    "piece": "cm_dress_crate",
+    "unity_local_pos": [
+     -6.9716,
+     0.0,
+     5.363
+    ],
+    "unity_yaw_deg": 124.317
+   },
+   {
+    "piece": "cm_dress_crate",
+    "unity_local_pos": [
+     -6.5734,
+     0.0,
+     6.1155
+    ],
+    "unity_yaw_deg": 133.151
+   },
+   {
+    "piece": "cm_dress_crate_small",
+    "unity_local_pos": [
+     -6.9217,
+     0.7,
+     5.4418
+    ],
+    "unity_yaw_deg": 110.47
+   },
+   {
+    "piece": "cm_dress_crate_small",
+    "unity_local_pos": [
+     -6.3324,
+     0.0,
+     6.6666
+    ],
+    "unity_yaw_deg": 155.921
+   },
+   {
+    "piece": "cm_brazier",
+    "unity_local_pos": [
+     -2.384,
+     2.31,
+     11.8885
+    ],
+    "unity_yaw_deg": -0.0
+   },
+   {
+    "piece": "cm_light_pool",
+    "unity_local_pos": [
+     -1.6069,
+     0.0,
+     10.0673
+    ],
+    "unity_yaw_deg": -0.0
+   },
+   {
+    "piece": "cm_dress_crate",
+    "unity_local_pos": [
+     -1.1074,
+     2.31,
+     12.4386
+    ],
+    "unity_yaw_deg": 168.689
+   },
+   {
+    "piece": "cm_dress_barrel",
+    "unity_local_pos": [
+     -0.4028,
+     2.31,
+     12.5608
+    ],
+    "unity_yaw_deg": -0.0
+   },
+   {
+    "piece": "cm_dress_crate_small",
+    "unity_local_pos": [
+     0.1755,
+     2.31,
+     12.5976
+    ],
+    "unity_yaw_deg": 179.031
+   },
+   {
+    "piece": "cm_dress_barrel",
+    "unity_local_pos": [
+     -2.2385,
+     0.0,
+     11.1719
+    ],
+    "unity_yaw_deg": -145.609
+   },
+   {
+    "piece": "cm_dress_barrel",
+    "unity_local_pos": [
+     -1.6526,
+     0.0,
+     11.4494
+    ],
+    "unity_yaw_deg": -356.54
+   },
+   {
+    "piece": "cm_dress_barrel",
+    "unity_local_pos": [
+     -1.8587,
+     0.0,
+     11.0188
+    ],
+    "unity_yaw_deg": -297.974
+   },
+   {
+    "piece": "cm_dress_barrel",
+    "unity_local_pos": [
+     -1.2594,
+     0.0,
+     11.3589
+    ],
+    "unity_yaw_deg": -322.546
+   },
+   {
+    "piece": "cm_brazier",
+    "unity_local_pos": [
+     11.798,
+     2.31,
+     5.5559
+    ],
+    "unity_yaw_deg": -0.0
+   },
+   {
+    "piece": "cm_light_pool",
+    "unity_local_pos": [
+     10.1012,
+     0.0,
+     4.5354
+    ],
+    "unity_yaw_deg": -0.0
+   },
+   {
+    "piece": "cm_dress_crate",
+    "unity_local_pos": [
+     12.3653,
+     2.31,
+     4.3167
+    ],
+    "unity_yaw_deg": -98.956
+   },
+   {
+    "piece": "cm_dress_barrel",
+    "unity_local_pos": [
+     12.5034,
+     2.31,
+     3.5994
     ],
     "unity_yaw_deg": -0.0
    },
    {
     "piece": "cm_dress_barrel",
     "unity_local_pos": [
-     -7.603,
-     2.31,
-     1.7475
-    ],
-    "unity_yaw_deg": 89.372
-   },
-   {
-    "piece": "cm_dress_barrel",
-    "unity_local_pos": [
-     -7.5939,
-     2.31,
-     3.5064
-    ],
-    "unity_yaw_deg": 86.76
-   },
-   {
-    "piece": "cm_dress_barrel",
-    "unity_local_pos": [
-     -7.0835,
-     2.31,
-     4.9067
-    ],
-    "unity_yaw_deg": 120.219
-   },
-   {
-    "piece": "cm_dress_rubble_low",
-    "unity_local_pos": [
-     -6.457,
+     11.236,
      0.0,
-     -0.5123
+     5.1021
     ],
     "unity_yaw_deg": -248.663
    },
    {
-    "piece": "cm_dress_rubble_low",
+    "piece": "cm_dress_barrel",
     "unity_local_pos": [
-     -6.6456,
+     11.5422,
      0.0,
-     0.6178
+     4.6004
     ],
-    "unity_yaw_deg": -23.729
-   },
-   {
-    "piece": "cm_dress_flagstones",
-    "unity_local_pos": [
-     -6.392,
-     0.0,
-     1.6344
-    ],
-    "unity_yaw_deg": -315.095
-   },
-   {
-    "piece": "cm_dress_flagstones",
-    "unity_local_pos": [
-     -6.7068,
-     0.0,
-     2.6579
-    ],
-    "unity_yaw_deg": -219.442
-   },
-   {
-    "piece": "cm_dress_flagstones",
-    "unity_local_pos": [
-     -6.4459,
-     0.0,
-     3.3499
-    ],
-    "unity_yaw_deg": -50.488
-   },
-   {
-    "piece": "cm_dress_flagstones",
-    "unity_local_pos": [
-     -6.0672,
-     0.0,
-     3.9472
-    ],
-    "unity_yaw_deg": -335.681
-   },
-   {
-    "piece": "cm_dress_rubble_low",
-    "unity_local_pos": [
-     -5.6657,
-     0.0,
-     4.4226
-    ],
-    "unity_yaw_deg": -29.225
-   },
-   {
-    "piece": "cm_dress_planks_low",
-    "unity_local_pos": [
-     -5.5213,
-     0.0,
-     5.4441
-    ],
-    "unity_yaw_deg": -24.307
-   },
-   {
-    "piece": "cm_dress_planks_low",
-    "unity_local_pos": [
-     -4.854,
-     0.0,
-     6.329
-    ],
-    "unity_yaw_deg": -166.601
-   },
-   {
-    "piece": "cm_brazier",
-    "unity_local_pos": [
-     -1.8852,
-     2.31,
-     11.0674
-    ],
-    "unity_yaw_deg": -0.0
-   },
-   {
-    "piece": "cm_light_pool",
-    "unity_local_pos": [
-     -1.2855,
-     0.0,
-     9.6057
-    ],
-    "unity_yaw_deg": -0.0
+    "unity_yaw_deg": -245.92
    },
    {
     "piece": "cm_dress_barrel",
     "unity_local_pos": [
-     -0.6107,
-     2.31,
-     11.5963
-    ],
-    "unity_yaw_deg": 179.737
-   },
-   {
-    "piece": "cm_dress_rubble_low",
-    "unity_local_pos": [
-     -2.2287,
+     11.133,
      0.0,
-     9.7808
+     4.6995
     ],
-    "unity_yaw_deg": -152.916
-   },
-   {
-    "piece": "cm_dress_planks_low",
-    "unity_local_pos": [
-     -1.1715,
-     0.0,
-     9.8918
-    ],
-    "unity_yaw_deg": -87.921
-   },
-   {
-    "piece": "cm_dress_rubble_low",
-    "unity_local_pos": [
-     -0.4476,
-     0.0,
-     10.1094
-    ],
-    "unity_yaw_deg": -4.358
-   },
-   {
-    "piece": "cm_dress_planks_low",
-    "unity_local_pos": [
-     0.0073,
-     0.0,
-     10.2786
-    ],
-    "unity_yaw_deg": -236.019
-   },
-   {
-    "piece": "cm_brazier",
-    "unity_local_pos": [
-     11.0043,
-     2.31,
-     5.041
-    ],
-    "unity_yaw_deg": -0.0
-   },
-   {
-    "piece": "cm_light_pool",
-    "unity_local_pos": [
-     9.6484,
-     0.0,
-     4.23
-    ],
-    "unity_yaw_deg": -0.0
+    "unity_yaw_deg": -2.14
    },
    {
     "piece": "cm_dress_barrel",
     "unity_local_pos": [
-     11.5299,
-     2.31,
-     3.7881
-    ],
-    "unity_yaw_deg": -96.122
-   },
-   {
-    "piece": "cm_dress_flagstones",
-    "unity_local_pos": [
-     9.4597,
+     11.3696,
      0.0,
-     5.0882
+     4.3041
     ],
-    "unity_yaw_deg": -213.416
-   },
-   {
-    "piece": "cm_dress_rubble_low",
-    "unity_local_pos": [
-     10.2753,
-     0.0,
-     4.5234
-    ],
-    "unity_yaw_deg": -103.682
-   },
-   {
-    "piece": "cm_dress_planks_low",
-    "unity_local_pos": [
-     10.0905,
-     0.0,
-     3.6681
-    ],
-    "unity_yaw_deg": -229.694
+    "unity_yaw_deg": -30.247
    },
    {
     "piece": "cm_gate_post",
     "unity_local_pos": [
-     11.1138,
+     11.9676,
      0.0,
-     -5.3218
+     -5.7383
     ],
     "unity_yaw_deg": 116.0
    },
    {
     "piece": "cm_crystal_lamp",
     "unity_local_pos": [
-     10.39,
+     11.2,
      2.31,
-     -6.1864
+     -6.6828
     ],
     "unity_yaw_deg": -0.0
    },
    {
     "piece": "cm_brazier",
     "unity_local_pos": [
-     10.6138,
+     11.4478,
      2.31,
-     -5.6538
+     -6.1085
     ],
     "unity_yaw_deg": -0.0
    },
    {
     "piece": "cm_light_pool",
     "unity_local_pos": [
-     9.2266,
+     9.4021,
      0.0,
-     -4.8974
+     -4.9932
     ],
     "unity_yaw_deg": -0.0
    },
    {
+    "piece": "cm_dress_barrel",
+    "unity_local_pos": [
+     10.6956,
+     0.0,
+     -5.7897
+    ],
+    "unity_yaw_deg": 5.302
+   },
+   {
+    "piece": "cm_dress_barrel",
+    "unity_local_pos": [
+     10.5601,
+     0.0,
+     -6.0805
+    ],
+    "unity_yaw_deg": -15.336
+   },
+   {
+    "piece": "cm_dress_crate",
+    "unity_local_pos": [
+     10.3968,
+     0.0,
+     -6.4005
+    ],
+    "unity_yaw_deg": 9.942
+   },
+   {
+    "piece": "cm_dress_stakes",
+    "unity_local_pos": [
+     12.4529,
+     0.0,
+     -7.035
+    ],
+    "unity_yaw_deg": -60.0
+   },
+   {
     "piece": "cm_gate_post",
     "unity_local_pos": [
-     10.0287,
+     10.7773,
      0.0,
-     -7.504
+     -8.0889
     ],
     "unity_yaw_deg": 128.0
    },
    {
     "piece": "cm_crystal_lamp",
     "unity_local_pos": [
-     10.299,
+     11.1002,
      2.31,
-     -6.3616
+     -6.8721
     ],
     "unity_yaw_deg": -0.0
    },
    {
     "piece": "cm_brazier",
     "unity_local_pos": [
-     10.0367,
+     10.8111,
      2.31,
-     -6.8699
+     -7.4203
     ],
     "unity_yaw_deg": -0.0
    },
    {
     "piece": "cm_light_pool",
     "unity_local_pos": [
-     8.7488,
+     8.9118,
      0.0,
-     -5.9547
+     -6.0705
     ],
     "unity_yaw_deg": -0.0
    },
    {
+    "piece": "cm_dress_barrel",
+    "unity_local_pos": [
+     10.1839,
+     0.0,
+     -6.8776
+    ],
+    "unity_yaw_deg": -10.046
+   },
+   {
+    "piece": "cm_dress_barrel",
+    "unity_local_pos": [
+     10.3064,
+     0.0,
+     -6.578
+    ],
+    "unity_yaw_deg": 12.365
+   },
+   {
+    "piece": "cm_dress_crate",
+    "unity_local_pos": [
+     10.4704,
+     0.0,
+     -6.259
+    ],
+    "unity_yaw_deg": -69.439
+   },
+   {
+    "piece": "cm_dress_stakes",
+    "unity_local_pos": [
+     12.016,
+     0.0,
+     -7.8742
+    ],
+    "unity_yaw_deg": -56.0
+   },
+   {
     "piece": "cm_gate_post",
     "unity_local_pos": [
-     3.3901,
+     3.5224,
      0.0,
-     -11.8719
+     -12.8127
     ],
     "unity_yaw_deg": 172.0
    },
    {
     "piece": "cm_crystal_lamp",
     "unity_local_pos": [
-     2.4187,
+     2.4601,
      2.31,
-     -11.5875
+     -12.5366
     ],
     "unity_yaw_deg": -0.0
    },
    {
     "piece": "cm_brazier",
     "unity_local_pos": [
-     2.9074,
+     2.9968,
      2.31,
-     -11.5906
+     -12.5364
     ],
     "unity_yaw_deg": -0.0
    },
    {
     "piece": "cm_light_pool",
     "unity_local_pos": [
-     2.7587,
+     2.7775,
      0.0,
-     -10.0176
+     -10.2167
     ],
     "unity_yaw_deg": -0.0
    },
    {
+    "piece": "cm_dress_barrel",
+    "unity_local_pos": [
+     2.8518,
+     0.0,
+     -11.7288
+    ],
+    "unity_yaw_deg": -15.715
+   },
+   {
+    "piece": "cm_dress_barrel",
+    "unity_local_pos": [
+     2.5768,
+     0.0,
+     -11.7044
+    ],
+    "unity_yaw_deg": -13.217
+   },
+   {
+    "piece": "cm_dress_crate",
+    "unity_local_pos": [
+     2.2705,
+     0.0,
+     -11.6844
+    ],
+    "unity_yaw_deg": -36.443
+   },
+   {
+    "piece": "cm_dress_stakes",
+    "unity_local_pos": [
+     2.8278,
+     0.0,
+     -13.8334
+    ],
+    "unity_yaw_deg": -4.0
+   },
+   {
     "piece": "cm_gate_post",
     "unity_local_pos": [
-     0.2481,
+     0.0832,
      0.0,
-     11.9049
+     12.8405
     ],
     "unity_yaw_deg": -10.0
    },
    {
     "piece": "cm_crystal_lamp",
     "unity_local_pos": [
-     -0.6873,
+     -0.9411,
      2.31,
-     11.6173
+     12.5327
     ],
     "unity_yaw_deg": -0.0
    },
    {
     "piece": "cm_brazier",
     "unity_local_pos": [
-     -0.1716,
+     -0.3788,
      2.31,
-     11.6669
+     12.5941
     ],
     "unity_yaw_deg": -0.0
    },
    {
     "piece": "cm_light_pool",
     "unity_local_pos": [
-     0.1731,
+     0.1295,
      0.0,
-     10.125
+     10.3202
     ],
     "unity_yaw_deg": -0.0
    },
    {
+    "piece": "cm_dress_barrel",
+    "unity_local_pos": [
+     -0.2751,
+     0.0,
+     11.8031
+    ],
+    "unity_yaw_deg": 5.928
+   },
+   {
+    "piece": "cm_dress_barrel",
+    "unity_local_pos": [
+     -0.5584,
+     0.0,
+     11.7573
+    ],
+    "unity_yaw_deg": 7.559
+   },
+   {
+    "piece": "cm_dress_crate",
+    "unity_local_pos": [
+     -0.87,
+     0.0,
+     11.6701
+    ],
+    "unity_yaw_deg": 62.734
+   },
+   {
+    "piece": "cm_dress_stakes",
+    "unity_local_pos": [
+     -1.4905,
+     0.0,
+     13.7015
+    ],
+    "unity_yaw_deg": 163.5
+   },
+   {
     "piece": "cm_gate_post",
     "unity_local_pos": [
-     10.606,
+     11.4203,
      0.0,
-     6.2011
+     6.6903
     ],
     "unity_yaw_deg": 59.0
    },
    {
     "piece": "cm_crystal_lamp",
     "unity_local_pos": [
-     10.9872,
+     11.8446,
      2.31,
-     5.1477
+     5.5567
     ],
     "unity_yaw_deg": -0.0
    },
    {
     "piece": "cm_brazier",
     "unity_local_pos": [
-     10.6361,
+     11.4718,
      2.31,
-     5.6208
+     6.0726
     ],
     "unity_yaw_deg": -0.0
    },
    {
     "piece": "cm_light_pool",
     "unity_local_pos": [
-     9.2463,
+     9.4222,
      0.0,
-     4.8693
+     4.9644
     ],
     "unity_yaw_deg": -0.0
    },
    {
+    "piece": "cm_dress_barrel",
+    "unity_local_pos": [
+     10.8087,
+     0.0,
+     5.6226
+    ],
+    "unity_yaw_deg": 7.543
+   },
+   {
+    "piece": "cm_dress_barrel",
+    "unity_local_pos": [
+     10.9851,
+     0.0,
+     5.3495
+    ],
+    "unity_yaw_deg": -16.406
+   },
+   {
+    "piece": "cm_dress_crate",
+    "unity_local_pos": [
+     11.1769,
+     0.0,
+     5.0341
+    ],
+    "unity_yaw_deg": 92.778
+   },
+   {
+    "piece": "cm_dress_stakes",
+    "unity_local_pos": [
+     12.813,
+     0.0,
+     6.4175
+    ],
+    "unity_yaw_deg": -117.0
+   },
+   {
     "piece": "cm_gate_post",
     "unity_local_pos": [
-     11.88,
+     12.7977,
      0.0,
-     3.165
+     3.4109
     ],
     "unity_yaw_deg": 75.0
    },
    {
     "piece": "cm_crystal_lamp",
     "unity_local_pos": [
-     11.4417,
+     12.3315,
      2.31,
-     4.2305
+     4.5632
     ],
     "unity_yaw_deg": -0.0
    },
    {
     "piece": "cm_brazier",
     "unity_local_pos": [
-     11.5668,
+     12.4723,
      2.31,
-     3.6395
+     3.9267
     ],
     "unity_yaw_deg": -0.0
    },
    {
     "piece": "cm_light_pool",
     "unity_local_pos": [
-     10.0607,
+     10.2514,
      0.0,
-     3.1618
+     3.2222
     ],
     "unity_yaw_deg": -0.0
+   },
+   {
+    "piece": "cm_dress_barrel",
+    "unity_local_pos": [
+     11.6865,
+     0.0,
+     3.7654
+    ],
+    "unity_yaw_deg": 5.622
+   },
+   {
+    "piece": "cm_dress_barrel",
+    "unity_local_pos": [
+     11.5949,
+     0.0,
+     4.0875
+    ],
+    "unity_yaw_deg": -9.999
+   },
+   {
+    "piece": "cm_dress_crate",
+    "unity_local_pos": [
+     11.4828,
+     0.0,
+     4.446
+    ],
+    "unity_yaw_deg": -37.224
+   },
+   {
+    "piece": "cm_dress_stakes",
+    "unity_local_pos": [
+     13.6393,
+     0.0,
+     4.6589
+    ],
+    "unity_yaw_deg": -109.0
    },
    {
     "piece": "cm_tower",
@@ -694,195 +1000,6 @@
      -0.0
     ],
     "unity_yaw_deg": -0.0
-   },
-   {
-    "piece": "cm_dress_flagstones",
-    "unity_local_pos": [
-     5.0323,
-     0.0,
-     -0.0198
-    ],
-    "unity_yaw_deg": -239.252
-   },
-   {
-    "piece": "cm_dress_rubble_low",
-    "unity_local_pos": [
-     4.7322,
-     0.0,
-     -1.0294
-    ],
-    "unity_yaw_deg": -8.557
-   },
-   {
-    "piece": "cm_dress_planks_low",
-    "unity_local_pos": [
-     3.8763,
-     0.0,
-     -3.1658
-    ],
-    "unity_yaw_deg": -241.54
-   },
-   {
-    "piece": "cm_crystal_lamp_low",
-    "unity_local_pos": [
-     3.1565,
-     0.0,
-     -4.6575
-    ],
-    "unity_yaw_deg": -225.394
-   },
-   {
-    "piece": "cm_dress_flagstones",
-    "unity_local_pos": [
-     2.3691,
-     0.0,
-     -4.9822
-    ],
-    "unity_yaw_deg": -200.098
-   },
-   {
-    "piece": "cm_dress_rubble_low",
-    "unity_local_pos": [
-     0.637,
-     0.0,
-     -5.1631
-    ],
-    "unity_yaw_deg": -91.956
-   },
-   {
-    "piece": "cm_dress_planks_low",
-    "unity_local_pos": [
-     -1.5566,
-     0.0,
-     -4.759
-    ],
-    "unity_yaw_deg": -350.521
-   },
-   {
-    "piece": "cm_crystal_lamp_low",
-    "unity_local_pos": [
-     -2.8073,
-     0.0,
-     -4.2484
-    ],
-    "unity_yaw_deg": -208.035
-   },
-   {
-    "piece": "cm_dress_flagstones",
-    "unity_local_pos": [
-     -4.4939,
-     0.0,
-     -4.4973
-    ],
-    "unity_yaw_deg": -157.786
-   },
-   {
-    "piece": "cm_dress_rubble_low",
-    "unity_local_pos": [
-     -4.8449,
-     0.0,
-     -3.0133
-    ],
-    "unity_yaw_deg": -73.569
-   },
-   {
-    "piece": "cm_dress_planks_low",
-    "unity_local_pos": [
-     -6.1821,
-     0.0,
-     -1.6546
-    ],
-    "unity_yaw_deg": -350.739
-   },
-   {
-    "piece": "cm_crystal_lamp_low",
-    "unity_local_pos": [
-     -6.1807,
-     0.0,
-     1.1121
-    ],
-    "unity_yaw_deg": -4.765
-   },
-   {
-    "piece": "cm_dress_flagstones",
-    "unity_local_pos": [
-     -5.0551,
-     0.0,
-     3.1089
-    ],
-    "unity_yaw_deg": -277.075
-   },
-   {
-    "piece": "cm_dress_rubble_low",
-    "unity_local_pos": [
-     -3.6496,
-     0.0,
-     4.2141
-    ],
-    "unity_yaw_deg": -289.754
-   },
-   {
-    "piece": "cm_dress_planks_low",
-    "unity_local_pos": [
-     -2.2026,
-     0.0,
-     4.1193
-    ],
-    "unity_yaw_deg": -313.059
-   },
-   {
-    "piece": "cm_crystal_lamp_low",
-    "unity_local_pos": [
-     -0.9588,
-     0.0,
-     4.7465
-    ],
-    "unity_yaw_deg": -30.987
-   },
-   {
-    "piece": "cm_dress_flagstones",
-    "unity_local_pos": [
-     0.5749,
-     0.0,
-     5.4693
-    ],
-    "unity_yaw_deg": -187.264
-   },
-   {
-    "piece": "cm_dress_rubble_low",
-    "unity_local_pos": [
-     1.485,
-     0.0,
-     5.3363
-    ],
-    "unity_yaw_deg": -350.887
-   },
-   {
-    "piece": "cm_dress_planks_low",
-    "unity_local_pos": [
-     2.5251,
-     0.0,
-     3.8603
-    ],
-    "unity_yaw_deg": -128.456
-   },
-   {
-    "piece": "cm_crystal_lamp_low",
-    "unity_local_pos": [
-     4.7869,
-     0.0,
-     3.0264
-    ],
-    "unity_yaw_deg": -353.119
-   },
-   {
-    "piece": "cm_dress_flagstones",
-    "unity_local_pos": [
-     5.7289,
-     0.0,
-     1.4211
-    ],
-    "unity_yaw_deg": -61.894
    }
   ]
  },
@@ -901,659 +1018,956 @@
    {
     "piece": "cm_brazier",
     "unity_local_pos": [
-     -10.3137,
+     -11.1801,
      2.31,
-     -6.2467
+     -6.6334
     ],
     "unity_yaw_deg": -0.0
    },
    {
     "piece": "cm_light_pool",
     "unity_local_pos": [
-     -8.9111,
+     -9.4188,
      0.0,
-     -5.5192
+     -5.729
     ],
     "unity_yaw_deg": -0.0
-   },
-   {
-    "piece": "cm_dress_rubble_low",
-    "unity_local_pos": [
-     -9.6719,
-     0.0,
-     -4.8513
-    ],
-    "unity_yaw_deg": -326.85
-   },
-   {
-    "piece": "cm_dress_rubble_low",
-    "unity_local_pos": [
-     -9.2652,
-     0.0,
-     -5.8872
-    ],
-    "unity_yaw_deg": -238.728
-   },
-   {
-    "piece": "cm_dress_planks_low",
-    "unity_local_pos": [
-     -8.9752,
-     0.0,
-     -6.7888
-    ],
-    "unity_yaw_deg": -174.678
    },
    {
     "piece": "cm_brazier",
     "unity_local_pos": [
-     -2.138,
+     -2.3035,
      2.31,
-     -11.5356
+     -12.4892
     ],
     "unity_yaw_deg": -0.0
    },
    {
     "piece": "cm_light_pool",
     "unity_local_pos": [
-     -2.1537,
+     -2.36,
      0.0,
-     -9.9557
+     -10.51
+    ],
+    "unity_yaw_deg": -0.0
+   },
+   {
+    "piece": "cm_dress_crate",
+    "unity_local_pos": [
+     -0.8938,
+     2.31,
+     -12.5422
+    ],
+    "unity_yaw_deg": -183.043
+   },
+   {
+    "piece": "cm_dress_barrel",
+    "unity_local_pos": [
+     -0.1455,
+     2.31,
+     -12.5694
+    ],
+    "unity_yaw_deg": -0.0
+   },
+   {
+    "piece": "cm_dress_crate",
+    "unity_local_pos": [
+     -1.9401,
+     0.0,
+     -11.6799
+    ],
+    "unity_yaw_deg": -185.859
+   },
+   {
+    "piece": "cm_dress_crate",
+    "unity_local_pos": [
+     -1.1192,
+     0.0,
+     -11.7494
+    ],
+    "unity_yaw_deg": -179.57
+   },
+   {
+    "piece": "cm_dress_crate_small",
+    "unity_local_pos": [
+     -1.836,
+     0.7,
+     -11.6803
+    ],
+    "unity_yaw_deg": -173.804
+   },
+   {
+    "piece": "cm_dress_crate_small",
+    "unity_local_pos": [
+     -0.5172,
+     0.0,
+     -11.8343
+    ],
+    "unity_yaw_deg": -150.943
+   },
+   {
+    "piece": "cm_brazier",
+    "unity_local_pos": [
+     5.6508,
+     2.31,
+     -9.3175
+    ],
+    "unity_yaw_deg": -0.0
+   },
+   {
+    "piece": "cm_light_pool",
+    "unity_local_pos": [
+     4.1939,
+     0.0,
+     -7.9767
+    ],
+    "unity_yaw_deg": -0.0
+   },
+   {
+    "piece": "cm_dress_crate",
+    "unity_local_pos": [
+     6.4537,
+     2.31,
+     -8.2203
+    ],
+    "unity_yaw_deg": 122.268
+   },
+   {
+    "piece": "cm_dress_barrel",
+    "unity_local_pos": [
+     6.7299,
+     2.31,
+     -7.5308
+    ],
+    "unity_yaw_deg": -0.0
+   },
+   {
+    "piece": "cm_dress_crate_small",
+    "unity_local_pos": [
+     6.9962,
+     2.31,
+     -6.9823
+    ],
+    "unity_yaw_deg": 112.229
+   },
+   {
+    "piece": "cm_dress_barrel",
+    "unity_local_pos": [
+     5.0954,
+     0.0,
+     -8.8651
+    ],
+    "unity_yaw_deg": -31.975
+   },
+   {
+    "piece": "cm_dress_barrel",
+    "unity_local_pos": [
+     5.4709,
+     0.0,
+     -8.4545
+    ],
+    "unity_yaw_deg": -277.021
+   },
+   {
+    "piece": "cm_dress_barrel",
+    "unity_local_pos": [
+     5.0558,
+     0.0,
+     -8.4737
+    ],
+    "unity_yaw_deg": -131.879
+   },
+   {
+    "piece": "cm_dress_barrel",
+    "unity_local_pos": [
+     5.4712,
+     0.0,
+     -8.0283
+    ],
+    "unity_yaw_deg": -169.72
+   },
+   {
+    "piece": "cm_brazier",
+    "unity_local_pos": [
+     8.4661,
+     2.31,
+     0.2423
+    ],
+    "unity_yaw_deg": -0.0
+   },
+   {
+    "piece": "cm_light_pool",
+    "unity_local_pos": [
+     6.4863,
+     0.0,
+     0.2673
+    ],
+    "unity_yaw_deg": -0.0
+   },
+   {
+    "piece": "cm_brazier",
+    "unity_local_pos": [
+     8.0631,
+     2.31,
+     5.0947
+    ],
+    "unity_yaw_deg": -0.0
+   },
+   {
+    "piece": "cm_light_pool",
+    "unity_local_pos": [
+     6.3295,
+     0.0,
+     4.1381
+    ],
+    "unity_yaw_deg": -0.0
+   },
+   {
+    "piece": "cm_dress_crate",
+    "unity_local_pos": [
+     8.5297,
+     2.31,
+     1.6459
+    ],
+    "unity_yaw_deg": 96.355
+   },
+   {
+    "piece": "cm_dress_barrel",
+    "unity_local_pos": [
+     8.5372,
+     2.31,
+     2.395
+    ],
+    "unity_yaw_deg": -0.0
+   },
+   {
+    "piece": "cm_dress_crate_small",
+    "unity_local_pos": [
+     8.5842,
+     2.31,
+     2.9856
+    ],
+    "unity_yaw_deg": 76.491
+   },
+   {
+    "piece": "cm_dress_crate",
+    "unity_local_pos": [
+     8.4305,
+     2.31,
+     4.0914
+    ],
+    "unity_yaw_deg": 72.699
+   },
+   {
+    "piece": "cm_dress_barrel",
+    "unity_local_pos": [
+     8.1838,
+     2.31,
+     4.7899
+    ],
+    "unity_yaw_deg": -0.0
+   },
+   {
+    "piece": "cm_dress_crate_small",
+    "unity_local_pos": [
+     7.9417,
+     2.31,
+     5.311
+    ],
+    "unity_yaw_deg": 52.0
+   },
+   {
+    "piece": "cm_dress_crate",
+    "unity_local_pos": [
+     7.3427,
+     2.31,
+     6.3033
+    ],
+    "unity_yaw_deg": 72.49
+   },
+   {
+    "piece": "cm_dress_barrel",
+    "unity_local_pos": [
+     6.9767,
+     2.31,
+     6.9538
+    ],
+    "unity_yaw_deg": -0.0
+   },
+   {
+    "piece": "cm_dress_weapon_rack",
+    "unity_local_pos": [
+     7.7516,
+     0.0,
+     1.1811
+    ],
+    "unity_yaw_deg": -87.219
+   },
+   {
+    "piece": "cm_dress_barrel",
+    "unity_local_pos": [
+     7.8014,
+     0.0,
+     2.1787
+    ],
+    "unity_yaw_deg": -141.999
+   },
+   {
+    "piece": "cm_dress_crate",
+    "unity_local_pos": [
+     7.7495,
+     0.0,
+     3.39
+    ],
+    "unity_yaw_deg": 77.315
+   },
+   {
+    "piece": "cm_dress_crate",
+    "unity_local_pos": [
+     7.6523,
+     0.0,
+     3.9942
+    ],
+    "unity_yaw_deg": 88.736
+   },
+   {
+    "piece": "cm_dress_crate_small",
+    "unity_local_pos": [
+     7.7393,
+     0.7,
+     3.4706
+    ],
+    "unity_yaw_deg": 78.46
+   },
+   {
+    "piece": "cm_dress_crate_small",
+    "unity_local_pos": [
+     7.5242,
+     0.0,
+     4.5392
+    ],
+    "unity_yaw_deg": 108.699
+   },
+   {
+    "piece": "cm_dress_crate",
+    "unity_local_pos": [
+     6.9716,
+     0.0,
+     5.363
+    ],
+    "unity_yaw_deg": 55.681
+   },
+   {
+    "piece": "cm_dress_crate",
+    "unity_local_pos": [
+     6.5734,
+     0.0,
+     6.1154
+    ],
+    "unity_yaw_deg": 46.847
+   },
+   {
+    "piece": "cm_dress_crate_small",
+    "unity_local_pos": [
+     6.9217,
+     0.7,
+     5.4418
+    ],
+    "unity_yaw_deg": 69.527
+   },
+   {
+    "piece": "cm_dress_crate_small",
+    "unity_local_pos": [
+     6.3324,
+     0.0,
+     6.6665
+    ],
+    "unity_yaw_deg": 24.077
+   },
+   {
+    "piece": "cm_brazier",
+    "unity_local_pos": [
+     2.384,
+     2.31,
+     11.8885
+    ],
+    "unity_yaw_deg": -0.0
+   },
+   {
+    "piece": "cm_light_pool",
+    "unity_local_pos": [
+     1.607,
+     0.0,
+     10.0673
+    ],
+    "unity_yaw_deg": -0.0
+   },
+   {
+    "piece": "cm_dress_crate",
+    "unity_local_pos": [
+     1.1074,
+     2.31,
+     12.4386
+    ],
+    "unity_yaw_deg": 11.311
+   },
+   {
+    "piece": "cm_dress_barrel",
+    "unity_local_pos": [
+     0.4028,
+     2.31,
+     12.5608
+    ],
+    "unity_yaw_deg": -0.0
+   },
+   {
+    "piece": "cm_dress_crate_small",
+    "unity_local_pos": [
+     -0.1755,
+     2.31,
+     12.5976
+    ],
+    "unity_yaw_deg": 0.969
+   },
+   {
+    "piece": "cm_dress_barrel",
+    "unity_local_pos": [
+     2.2386,
+     0.0,
+     11.1719
+    ],
+    "unity_yaw_deg": -145.609
+   },
+   {
+    "piece": "cm_dress_barrel",
+    "unity_local_pos": [
+     1.6526,
+     0.0,
+     11.4494
+    ],
+    "unity_yaw_deg": -356.54
+   },
+   {
+    "piece": "cm_dress_barrel",
+    "unity_local_pos": [
+     1.8587,
+     0.0,
+     11.0188
+    ],
+    "unity_yaw_deg": -297.974
+   },
+   {
+    "piece": "cm_dress_barrel",
+    "unity_local_pos": [
+     1.2594,
+     0.0,
+     11.3589
+    ],
+    "unity_yaw_deg": -322.546
+   },
+   {
+    "piece": "cm_brazier",
+    "unity_local_pos": [
+     -11.798,
+     2.31,
+     5.5559
+    ],
+    "unity_yaw_deg": -0.0
+   },
+   {
+    "piece": "cm_light_pool",
+    "unity_local_pos": [
+     -10.1012,
+     0.0,
+     4.5353
+    ],
+    "unity_yaw_deg": -0.0
+   },
+   {
+    "piece": "cm_dress_crate",
+    "unity_local_pos": [
+     -12.3653,
+     2.31,
+     4.3167
+    ],
+    "unity_yaw_deg": -81.045
+   },
+   {
+    "piece": "cm_dress_barrel",
+    "unity_local_pos": [
+     -12.5034,
+     2.31,
+     3.5994
     ],
     "unity_yaw_deg": -0.0
    },
    {
     "piece": "cm_dress_barrel",
     "unity_local_pos": [
-     -0.7278,
-     2.31,
-     -11.6223
-    ],
-    "unity_yaw_deg": -190.152
-   },
-   {
-    "piece": "cm_dress_rubble_low",
-    "unity_local_pos": [
-     -3.0272,
+     -11.236,
      0.0,
-     -10.5993
+     5.1021
     ],
-    "unity_yaw_deg": -160.195
-   },
-   {
-    "piece": "cm_dress_planks_low",
-    "unity_local_pos": [
-     -1.9675,
-     0.0,
-     -10.5397
-    ],
-    "unity_yaw_deg": -85.932
-   },
-   {
-    "piece": "cm_dress_rubble_low",
-    "unity_local_pos": [
-     -0.7905,
-     0.0,
-     -10.4774
-    ],
-    "unity_yaw_deg": -154.777
-   },
-   {
-    "piece": "cm_dress_flagstones",
-    "unity_local_pos": [
-     -0.0501,
-     0.0,
-     -10.7267
-    ],
-    "unity_yaw_deg": -244.729
-   },
-   {
-    "piece": "cm_brazier",
-    "unity_local_pos": [
-     5.0713,
-     2.31,
-     -8.5447
-    ],
-    "unity_yaw_deg": -0.0
-   },
-   {
-    "piece": "cm_light_pool",
-    "unity_local_pos": [
-     3.8861,
-     0.0,
-     -7.4999
-    ],
-    "unity_yaw_deg": -0.0
+    "unity_yaw_deg": -248.663
    },
    {
     "piece": "cm_dress_barrel",
     "unity_local_pos": [
-     5.8119,
-     2.31,
-     -7.4102
-    ],
-    "unity_yaw_deg": 117.229
-   },
-   {
-    "piece": "cm_dress_planks_low",
-    "unity_local_pos": [
-     3.7353,
+     -11.5422,
      0.0,
-     -8.3012
+     4.6003
     ],
-    "unity_yaw_deg": -267.873
-   },
-   {
-    "piece": "cm_dress_rubble_low",
-    "unity_local_pos": [
-     4.062,
-     0.0,
-     -7.5656
-    ],
-    "unity_yaw_deg": -192.532
-   },
-   {
-    "piece": "cm_dress_flagstones",
-    "unity_local_pos": [
-     4.8577,
-     0.0,
-     -7.3491
-    ],
-    "unity_yaw_deg": -129.395
-   },
-   {
-    "piece": "cm_dress_rubble_low",
-    "unity_local_pos": [
-     4.7095,
-     0.0,
-     -6.4883
-    ],
-    "unity_yaw_deg": -155.365
-   },
-   {
-    "piece": "cm_dress_planks_low",
-    "unity_local_pos": [
-     5.1507,
-     0.0,
-     -5.5822
-    ],
-    "unity_yaw_deg": -246.427
-   },
-   {
-    "piece": "cm_brazier",
-    "unity_local_pos": [
-     7.515,
-     2.31,
-     0.0681
-    ],
-    "unity_yaw_deg": -0.0
-   },
-   {
-    "piece": "cm_light_pool",
-    "unity_local_pos": [
-     5.9351,
-     0.0,
-     0.0777
-    ],
-    "unity_yaw_deg": -0.0
+    "unity_yaw_deg": -245.92
    },
    {
     "piece": "cm_dress_barrel",
     "unity_local_pos": [
-     7.584,
-     2.31,
-     1.4735
-    ],
-    "unity_yaw_deg": 80.213
-   },
-   {
-    "piece": "cm_dress_flagstones",
-    "unity_local_pos": [
-     6.5622,
+     -11.1331,
      0.0,
-     -0.8129
+     4.6995
     ],
-    "unity_yaw_deg": -112.009
-   },
-   {
-    "piece": "cm_dress_flagstones",
-    "unity_local_pos": [
-     6.2251,
-     0.0,
-     0.4029
-    ],
-    "unity_yaw_deg": -314.133
-   },
-   {
-    "piece": "cm_dress_flagstones",
-    "unity_local_pos": [
-     6.6689,
-     0.0,
-     1.5686
-    ],
-    "unity_yaw_deg": -124.412
-   },
-   {
-    "piece": "cm_brazier",
-    "unity_local_pos": [
-     5.1109,
-     2.31,
-     8.4989
-    ],
-    "unity_yaw_deg": -0.0
-   },
-   {
-    "piece": "cm_light_pool",
-    "unity_local_pos": [
-     3.9049,
-     0.0,
-     7.4781
-    ],
-    "unity_yaw_deg": -0.0
-   },
-   {
-    "piece": "cm_brazier",
-    "unity_local_pos": [
-     1.1963,
-     2.31,
-     11.3918
-    ],
-    "unity_yaw_deg": -0.0
-   },
-   {
-    "piece": "cm_light_pool",
-    "unity_local_pos": [
-     0.6052,
-     0.0,
-     9.9265
-    ],
-    "unity_yaw_deg": -0.0
-   },
-   {
-    "piece": "cm_dress_blocks",
-    "unity_local_pos": [
-     4.1509,
-     2.31,
-     9.5105
-    ],
-    "unity_yaw_deg": 35.771
-   },
-   {
-    "piece": "cm_dress_blocks",
-    "unity_local_pos": [
-     3.2455,
-     2.31,
-     10.3642
-    ],
-    "unity_yaw_deg": 25.961
+    "unity_yaw_deg": -2.14
    },
    {
     "piece": "cm_dress_barrel",
     "unity_local_pos": [
-     2.1405,
-     2.31,
-     10.9583
-    ],
-    "unity_yaw_deg": 9.446
-   },
-   {
-    "piece": "cm_dress_blocks",
-    "unity_local_pos": [
-     0.9421,
-     2.31,
-     11.4899
-    ],
-    "unity_yaw_deg": 3.923
-   },
-   {
-    "piece": "cm_dress_rubble_low",
-    "unity_local_pos": [
-     4.787,
+     -11.3696,
      0.0,
-     7.4051
+     4.3041
     ],
-    "unity_yaw_deg": -318.25
-   },
-   {
-    "piece": "cm_dress_flagstones",
-    "unity_local_pos": [
-     4.3692,
-     0.0,
-     7.9489
-    ],
-    "unity_yaw_deg": -198.02
-   },
-   {
-    "piece": "cm_dress_rubble_low",
-    "unity_local_pos": [
-     3.4141,
-     0.0,
-     8.6026
-    ],
-    "unity_yaw_deg": -100.271
-   },
-   {
-    "piece": "cm_dress_rubble_low",
-    "unity_local_pos": [
-     2.8926,
-     0.0,
-     9.4618
-    ],
-    "unity_yaw_deg": -89.961
-   },
-   {
-    "piece": "cm_dress_planks_low",
-    "unity_local_pos": [
-     2.4135,
-     0.0,
-     9.7896
-    ],
-    "unity_yaw_deg": -87.921
-   },
-   {
-    "piece": "cm_dress_rubble_low",
-    "unity_local_pos": [
-     1.5036,
-     0.0,
-     9.6367
-    ],
-    "unity_yaw_deg": -4.358
-   },
-   {
-    "piece": "cm_dress_planks_low",
-    "unity_local_pos": [
-     0.6661,
-     0.0,
-     10.1025
-    ],
-    "unity_yaw_deg": -236.019
-   },
-   {
-    "piece": "cm_dress_planks_low",
-    "unity_local_pos": [
-     0.2623,
-     0.0,
-     10.5656
-    ],
-    "unity_yaw_deg": -169.566
-   },
-   {
-    "piece": "cm_brazier",
-    "unity_local_pos": [
-     -11.0043,
-     2.31,
-     5.041
-    ],
-    "unity_yaw_deg": -0.0
-   },
-   {
-    "piece": "cm_light_pool",
-    "unity_local_pos": [
-     -9.6484,
-     0.0,
-     4.23
-    ],
-    "unity_yaw_deg": -0.0
-   },
-   {
-    "piece": "cm_dress_barrel",
-    "unity_local_pos": [
-     -11.5299,
-     2.31,
-     3.7881
-    ],
-    "unity_yaw_deg": -69.189
-   },
-   {
-    "piece": "cm_dress_flagstones",
-    "unity_local_pos": [
-     -9.6541,
-     0.0,
-     5.1982
-    ],
-    "unity_yaw_deg": -131.096
-   },
-   {
-    "piece": "cm_dress_flagstones",
-    "unity_local_pos": [
-     -9.9713,
-     0.0,
-     4.3068
-    ],
-    "unity_yaw_deg": -79.303
-   },
-   {
-    "piece": "cm_dress_rubble_low",
-    "unity_local_pos": [
-     -10.4621,
-     0.0,
-     3.9819
-    ],
-    "unity_yaw_deg": -52.481
-   },
-   {
-    "piece": "cm_dress_flagstones",
-    "unity_local_pos": [
-     -10.7126,
-     0.0,
-     3.3556
-    ],
-    "unity_yaw_deg": -72.827
+    "unity_yaw_deg": -30.247
    },
    {
     "piece": "cm_gate_post",
     "unity_local_pos": [
-     -11.1138,
+     -11.9676,
      0.0,
-     -5.3218
+     -5.7383
     ],
     "unity_yaw_deg": -116.0
    },
    {
     "piece": "cm_crystal_lamp",
     "unity_local_pos": [
-     -10.39,
+     -11.2,
      2.31,
-     -6.1864
+     -6.6828
     ],
     "unity_yaw_deg": -0.0
    },
    {
     "piece": "cm_brazier",
     "unity_local_pos": [
-     -10.6138,
+     -11.4478,
      2.31,
-     -5.6538
+     -6.1085
     ],
     "unity_yaw_deg": -0.0
    },
    {
     "piece": "cm_light_pool",
     "unity_local_pos": [
-     -9.2266,
+     -9.4021,
      0.0,
-     -4.8974
+     -4.9932
     ],
     "unity_yaw_deg": -0.0
    },
    {
+    "piece": "cm_dress_barrel",
+    "unity_local_pos": [
+     -10.6956,
+     0.0,
+     -5.7897
+    ],
+    "unity_yaw_deg": -5.302
+   },
+   {
+    "piece": "cm_dress_barrel",
+    "unity_local_pos": [
+     -10.5601,
+     0.0,
+     -6.0805
+    ],
+    "unity_yaw_deg": 15.336
+   },
+   {
+    "piece": "cm_dress_crate",
+    "unity_local_pos": [
+     -10.3968,
+     0.0,
+     -6.4005
+    ],
+    "unity_yaw_deg": 170.058
+   },
+   {
+    "piece": "cm_dress_stakes",
+    "unity_local_pos": [
+     -12.4529,
+     0.0,
+     -7.035
+    ],
+    "unity_yaw_deg": 60.0
+   },
+   {
     "piece": "cm_gate_post",
     "unity_local_pos": [
-     -10.0287,
+     -10.7773,
      0.0,
-     -7.504
+     -8.0889
     ],
     "unity_yaw_deg": -128.0
    },
    {
     "piece": "cm_crystal_lamp",
     "unity_local_pos": [
-     -10.299,
+     -11.1002,
      2.31,
-     -6.3616
+     -6.8721
     ],
     "unity_yaw_deg": -0.0
    },
    {
     "piece": "cm_brazier",
     "unity_local_pos": [
-     -10.0367,
+     -10.8111,
      2.31,
-     -6.8699
+     -7.4203
     ],
     "unity_yaw_deg": -0.0
    },
    {
     "piece": "cm_light_pool",
     "unity_local_pos": [
-     -8.7488,
+     -8.9118,
      0.0,
-     -5.9547
+     -6.0705
     ],
     "unity_yaw_deg": -0.0
    },
    {
+    "piece": "cm_dress_barrel",
+    "unity_local_pos": [
+     -10.1839,
+     0.0,
+     -6.8776
+    ],
+    "unity_yaw_deg": 10.046
+   },
+   {
+    "piece": "cm_dress_barrel",
+    "unity_local_pos": [
+     -10.3064,
+     0.0,
+     -6.578
+    ],
+    "unity_yaw_deg": -12.365
+   },
+   {
+    "piece": "cm_dress_crate",
+    "unity_local_pos": [
+     -10.4704,
+     0.0,
+     -6.259
+    ],
+    "unity_yaw_deg": -110.561
+   },
+   {
+    "piece": "cm_dress_stakes",
+    "unity_local_pos": [
+     -12.016,
+     0.0,
+     -7.8742
+    ],
+    "unity_yaw_deg": 56.0
+   },
+   {
     "piece": "cm_gate_post",
     "unity_local_pos": [
-     -3.3901,
+     -3.5224,
      0.0,
-     -11.8719
+     -12.8127
     ],
     "unity_yaw_deg": -172.0
    },
    {
     "piece": "cm_crystal_lamp",
     "unity_local_pos": [
-     -2.4187,
+     -2.4601,
      2.31,
-     -11.5875
+     -12.5366
     ],
     "unity_yaw_deg": -0.0
    },
    {
     "piece": "cm_brazier",
     "unity_local_pos": [
-     -2.9074,
+     -2.9968,
      2.31,
-     -11.5906
+     -12.5364
     ],
     "unity_yaw_deg": -0.0
    },
    {
     "piece": "cm_light_pool",
     "unity_local_pos": [
-     -2.7587,
+     -2.7775,
      0.0,
-     -10.0176
+     -10.2167
     ],
     "unity_yaw_deg": -0.0
    },
    {
+    "piece": "cm_dress_barrel",
+    "unity_local_pos": [
+     -2.8518,
+     0.0,
+     -11.7288
+    ],
+    "unity_yaw_deg": 15.715
+   },
+   {
+    "piece": "cm_dress_barrel",
+    "unity_local_pos": [
+     -2.5768,
+     0.0,
+     -11.7044
+    ],
+    "unity_yaw_deg": 13.217
+   },
+   {
+    "piece": "cm_dress_crate",
+    "unity_local_pos": [
+     -2.2705,
+     0.0,
+     -11.6844
+    ],
+    "unity_yaw_deg": -143.557
+   },
+   {
+    "piece": "cm_dress_stakes",
+    "unity_local_pos": [
+     -2.8278,
+     0.0,
+     -13.8334
+    ],
+    "unity_yaw_deg": 4.0
+   },
+   {
     "piece": "cm_gate_post",
     "unity_local_pos": [
-     -0.2481,
+     -0.0832,
      0.0,
-     11.9049
+     12.8405
     ],
     "unity_yaw_deg": 10.0
    },
    {
     "piece": "cm_crystal_lamp",
     "unity_local_pos": [
-     0.6873,
+     0.9411,
      2.31,
-     11.6173
+     12.5327
     ],
     "unity_yaw_deg": -0.0
    },
    {
     "piece": "cm_brazier",
     "unity_local_pos": [
-     0.1716,
+     0.3788,
      2.31,
-     11.6669
+     12.5941
     ],
     "unity_yaw_deg": -0.0
    },
    {
     "piece": "cm_light_pool",
     "unity_local_pos": [
-     -0.1731,
+     -0.1295,
      0.0,
-     10.125
+     10.3202
     ],
     "unity_yaw_deg": -0.0
    },
    {
+    "piece": "cm_dress_barrel",
+    "unity_local_pos": [
+     0.2751,
+     0.0,
+     11.8031
+    ],
+    "unity_yaw_deg": -5.928
+   },
+   {
+    "piece": "cm_dress_barrel",
+    "unity_local_pos": [
+     0.5584,
+     0.0,
+     11.7573
+    ],
+    "unity_yaw_deg": -7.559
+   },
+   {
+    "piece": "cm_dress_crate",
+    "unity_local_pos": [
+     0.87,
+     0.0,
+     11.6701
+    ],
+    "unity_yaw_deg": 117.266
+   },
+   {
+    "piece": "cm_dress_stakes",
+    "unity_local_pos": [
+     1.4905,
+     0.0,
+     13.7015
+    ],
+    "unity_yaw_deg": -163.5
+   },
+   {
     "piece": "cm_gate_post",
     "unity_local_pos": [
-     -10.606,
+     -11.4203,
      0.0,
-     6.2011
+     6.6903
     ],
     "unity_yaw_deg": -59.0
    },
    {
     "piece": "cm_crystal_lamp",
     "unity_local_pos": [
-     -10.9872,
+     -11.8446,
      2.31,
-     5.1477
+     5.5567
     ],
     "unity_yaw_deg": -0.0
    },
    {
     "piece": "cm_brazier",
     "unity_local_pos": [
-     -10.6361,
+     -11.4718,
      2.31,
-     5.6208
+     6.0726
     ],
     "unity_yaw_deg": -0.0
    },
    {
     "piece": "cm_light_pool",
     "unity_local_pos": [
-     -9.2463,
+     -9.4222,
      0.0,
-     4.8693
+     4.9644
     ],
     "unity_yaw_deg": -0.0
    },
    {
+    "piece": "cm_dress_barrel",
+    "unity_local_pos": [
+     -10.8087,
+     0.0,
+     5.6226
+    ],
+    "unity_yaw_deg": -7.543
+   },
+   {
+    "piece": "cm_dress_barrel",
+    "unity_local_pos": [
+     -10.9851,
+     0.0,
+     5.3495
+    ],
+    "unity_yaw_deg": 16.406
+   },
+   {
+    "piece": "cm_dress_crate",
+    "unity_local_pos": [
+     -11.1769,
+     0.0,
+     5.0341
+    ],
+    "unity_yaw_deg": 87.222
+   },
+   {
+    "piece": "cm_dress_stakes",
+    "unity_local_pos": [
+     -12.813,
+     0.0,
+     6.4175
+    ],
+    "unity_yaw_deg": 117.0
+   },
+   {
     "piece": "cm_gate_post",
     "unity_local_pos": [
-     -11.88,
+     -12.7977,
      0.0,
-     3.165
+     3.4109
     ],
     "unity_yaw_deg": -75.0
    },
    {
     "piece": "cm_crystal_lamp",
     "unity_local_pos": [
-     -11.4417,
+     -12.3315,
      2.31,
-     4.2305
+     4.5632
     ],
     "unity_yaw_deg": -0.0
    },
    {
     "piece": "cm_brazier",
     "unity_local_pos": [
-     -11.5668,
+     -12.4723,
      2.31,
-     3.6395
+     3.9267
     ],
     "unity_yaw_deg": -0.0
    },
    {
     "piece": "cm_light_pool",
     "unity_local_pos": [
-     -10.0607,
+     -10.2514,
      0.0,
-     3.1618
+     3.2222
     ],
     "unity_yaw_deg": -0.0
+   },
+   {
+    "piece": "cm_dress_barrel",
+    "unity_local_pos": [
+     -11.6865,
+     0.0,
+     3.7654
+    ],
+    "unity_yaw_deg": -5.622
+   },
+   {
+    "piece": "cm_dress_barrel",
+    "unity_local_pos": [
+     -11.5949,
+     0.0,
+     4.0875
+    ],
+    "unity_yaw_deg": 9.999
+   },
+   {
+    "piece": "cm_dress_crate",
+    "unity_local_pos": [
+     -11.4828,
+     0.0,
+     4.446
+    ],
+    "unity_yaw_deg": -142.776
+   },
+   {
+    "piece": "cm_dress_stakes",
+    "unity_local_pos": [
+     -13.6393,
+     0.0,
+     4.6589
+    ],
+    "unity_yaw_deg": 109.0
    },
    {
     "piece": "cm_tower",
@@ -1565,22 +1979,22 @@
     "unity_yaw_deg": -14.325
    },
    {
-    "piece": "cm_tower",
-    "unity_local_pos": [
-     9.1844,
-     0.0,
-     -4.2521
-    ],
-    "unity_yaw_deg": -65.157
-   },
-   {
     "piece": "cm_tower_landmark",
     "unity_local_pos": [
-     8.7889,
+     9.4222,
      0.0,
-     5.8762
+     -4.3293
     ],
-    "unity_yaw_deg": -123.766
+    "unity_yaw_deg": -65.322
+   },
+   {
+    "piece": "cm_tower",
+    "unity_local_pos": [
+     5.8575,
+     0.0,
+     10.2129
+    ],
+    "unity_yaw_deg": -150.164
    },
    {
     "piece": "cm_respawn_pad",
@@ -1590,195 +2004,6 @@
      -0.0
     ],
     "unity_yaw_deg": -0.0
-   },
-   {
-    "piece": "cm_dress_flagstones",
-    "unity_local_pos": [
-     -5.6094,
-     0.0,
-     -0.436
-    ],
-    "unity_yaw_deg": -225.394
-   },
-   {
-    "piece": "cm_dress_rubble_low",
-    "unity_local_pos": [
-     -5.3723,
-     0.0,
-     -1.2542
-    ],
-    "unity_yaw_deg": -200.098
-   },
-   {
-    "piece": "cm_dress_planks_low",
-    "unity_local_pos": [
-     -4.4338,
-     0.0,
-     -2.7211
-    ],
-    "unity_yaw_deg": -91.956
-   },
-   {
-    "piece": "cm_crystal_lamp_low",
-    "unity_local_pos": [
-     -2.7503,
-     0.0,
-     -4.1842
-    ],
-    "unity_yaw_deg": -350.521
-   },
-   {
-    "piece": "cm_dress_flagstones",
-    "unity_local_pos": [
-     -1.5712,
-     0.0,
-     -4.8437
-    ],
-    "unity_yaw_deg": -208.035
-   },
-   {
-    "piece": "cm_dress_rubble_low",
-    "unity_local_pos": [
-     -0.7142,
-     0.0,
-     -6.3175
-    ],
-    "unity_yaw_deg": -157.786
-   },
-   {
-    "piece": "cm_dress_planks_low",
-    "unity_local_pos": [
-     0.6648,
-     0.0,
-     -5.6666
-    ],
-    "unity_yaw_deg": -73.569
-   },
-   {
-    "piece": "cm_crystal_lamp_low",
-    "unity_local_pos": [
-     2.5609,
-     0.0,
-     -5.865
-    ],
-    "unity_yaw_deg": -350.739
-   },
-   {
-    "piece": "cm_dress_flagstones",
-    "unity_local_pos": [
-     4.7231,
-     0.0,
-     -4.1388
-    ],
-    "unity_yaw_deg": -4.765
-   },
-   {
-    "piece": "cm_dress_rubble_low",
-    "unity_local_pos": [
-     5.5825,
-     0.0,
-     -2.0138
-    ],
-    "unity_yaw_deg": -277.075
-   },
-   {
-    "piece": "cm_dress_planks_low",
-    "unity_local_pos": [
-     5.5702,
-     0.0,
-     -0.2259
-    ],
-    "unity_yaw_deg": -289.754
-   },
-   {
-    "piece": "cm_crystal_lamp_low",
-    "unity_local_pos": [
-     4.5939,
-     0.0,
-     0.8463
-    ],
-    "unity_yaw_deg": -313.059
-   },
-   {
-    "piece": "cm_dress_flagstones",
-    "unity_local_pos": [
-     4.3088,
-     0.0,
-     2.2097
-    ],
-    "unity_yaw_deg": -30.987
-   },
-   {
-    "piece": "cm_dress_rubble_low",
-    "unity_local_pos": [
-     3.9176,
-     0.0,
-     3.8595
-    ],
-    "unity_yaw_deg": -187.264
-   },
-   {
-    "piece": "cm_dress_planks_low",
-    "unity_local_pos": [
-     3.2462,
-     0.0,
-     4.4882
-    ],
-    "unity_yaw_deg": -350.887
-   },
-   {
-    "piece": "cm_crystal_lamp_low",
-    "unity_local_pos": [
-     1.4437,
-     0.0,
-     4.3811
-    ],
-    "unity_yaw_deg": -128.456
-   },
-   {
-    "piece": "cm_dress_flagstones",
-    "unity_local_pos": [
-     -0.6184,
-     0.0,
-     5.6294
-    ],
-    "unity_yaw_deg": -353.119
-   },
-   {
-    "piece": "cm_dress_rubble_low",
-    "unity_local_pos": [
-     -2.4608,
-     0.0,
-     5.365
-    ],
-    "unity_yaw_deg": -61.894
-   },
-   {
-    "piece": "cm_dress_planks_low",
-    "unity_local_pos": [
-     -4.3049,
-     0.0,
-     4.4124
-    ],
-    "unity_yaw_deg": -266.004
-   },
-   {
-    "piece": "cm_crystal_lamp_low",
-    "unity_local_pos": [
-     -3.8132,
-     0.0,
-     3.0356
-    ],
-    "unity_yaw_deg": -354.649
-   },
-   {
-    "piece": "cm_dress_flagstones",
-    "unity_local_pos": [
-     -6.3492,
-     0.0,
-     1.3143
-    ],
-    "unity_yaw_deg": -285.853
    }
   ]
  },

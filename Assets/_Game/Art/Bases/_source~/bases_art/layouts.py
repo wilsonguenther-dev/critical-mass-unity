@@ -88,18 +88,36 @@ def isl_pt(deg, extra, mirror=False):
     return x, z
 
 
+SHELF = 0.95                 # v2: a dressing shelf (VOID edge cells) between the wall's inner face and the island
+WALL_OFF = 0.5 + SHELF       # wall centre line beyond the walkable clearance line
+
+
+def _clear(x, z, r):
+    """No walkable cell within r of sim point (x, z) (sampled on two rings and the centre)."""
+    for rr in (0.0, r * 0.5, r):
+        for k in range(16 if rr else 1):
+            a = 2 * math.pi * k / 16
+            if walk(math.floor(x + rr * math.cos(a)), math.floor(z + rr * math.sin(a))):
+                return False
+    return True
+
+
+def yaw_front(d):
+    """Blender yaw that turns a piece's local -Y toward the Blender XY direction d."""
+    return math.atan2(d.x, -d.y)
+
+
 def district(team="azure"):
-    """Returns (pieces_world: list of Piece built in world Blender coords, placements, info)."""
+    """Returns (pieces_world: list of Piece built in world Blender coords, placements, info).
+    Crimson is the true mirror of Azure across sim x = 56 (same angles, same seeds, mirrored yaw jitter)."""
     mirror = team == "crimson"
-    rng = random.Random(101 if not mirror else 101)
+    mj = (lambda j: -j) if mirror else (lambda j: j)
+    rng = random.Random(101)
     world = []
     place = []
     info = {"wall_paths": [], "gates": []}
-    # tower angular cut-outs in the big sector
     cuts = []
-    # Crimson: landmark on its east-north-east edge so it stands in the gameplay view (the camera yaw is not mirrored)
-    towers = TOWERS if not mirror else [(116, "tower"), (162, "tower"), (205, "landmark")]
-    for deg, kind in towers:
+    for deg, kind in TOWERS:
         R = 2.25 if kind == "landmark" else 2.0
         cuts.append((deg, math.degrees(R / 10.0) * 0.92, kind, R))
     runs = []
@@ -116,58 +134,104 @@ def district(team="azure"):
         runs += segs
     wall = Piece(f"cm_district_walls_{team}", team=True)
     found = Piece(f"cm_district_footing_{team}")
+    cxm = G.MIRROR_X - ISL[0] if mirror else ISL[0]
+
+    def put(key, q, h, yaw):
+        place.append((key, -q.x, q.y, h, yaw, {}))
     for i, (a0, a1) in enumerate(runs):
         n = max(8, int((a1 - a0) * 2.5))
         pts = []
         for j in range(n + 1):
             d = a0 + (a1 - a0) * j / n
-            x, z = isl_pt(d, 0.5, mirror)
+            x, z = isl_pt(d, WALL_OFF, mirror)
             pts.append((-x, z))
-        cxm = G.MIRROR_X - ISL[0] if mirror else ISL[0]
         p = pieces.outward_path(pts, (-cxm, ISL[1]))
         kit.wall_run(wall, p, random.Random(200 + i), team_caps=True, moss_p=0.3)
         _footing(found, p, random.Random(300 + i))
         info["wall_paths"].append(p)
-        # braziers on the walkway every ~4.4 u (pools fall on the ground inside the wall)
+        # braziers on the walkway every 5 u (pools fall on the ground inside the wall)
         s = 1.6
         while s < p.L - 1.2:
-            q = p.at(s, -0.12, 2.31)
-            place.append(("brazier", -q.x, q.y, 2.31, 0.0, {}))
-            g = p.at(s, -1.7, 0.0)
-            place.append(("pool", -g.x, g.y, 0.0, 0.0, {}))
+            put("brazier", p.at(s, -0.12, 2.31), 2.31, 0.0)
+            put("pool", p.at(s, -2.1, 0.0), 0.0, 0.0)
             s += 5.0
-        # dressing on the walkway
+        # walkway: a crate and a barrel between braziers (kept to the wall top)
         s = 3.0
         while s < p.L - 1.0:
-            q = p.at(s, -0.12, 2.31)
             t = p.tan(s)
-            key = rng.choice(["crate", "barrel", "barrel", "blocks"])
-            place.append((key, -q.x, q.y, 2.31, math.atan2(t.y, t.x) + rng.uniform(-0.3, 0.3), {}))
-            s += rng.uniform(1.2, 1.8)
-        # low dressing on the ground along the inner face (<= 0.3 u)
-        s = 0.8
-        while s < p.L - 0.5:
-            q = p.at(s, -1.0 - rng.uniform(0.0, 0.6), 0.0)
-            key = rng.choice(["rubble_low", "planks_low", "flagstones"])
-            place.append((key, -q.x, q.y, 0.0, rng.uniform(0, 6.28), {}))
-            s += rng.uniform(0.75, 1.15)
+            put("crate", p.at(s, -0.12, 2.31), 2.31, math.atan2(t.y, t.x) + mj(rng.uniform(-0.2, 0.2)))
+            put("barrel", p.at(s + 0.75, -0.15, 2.31), 2.31, 0.0)
+            if rng.random() < 0.5:
+                put("crate_small", p.at(s + 1.35, -0.12, 2.31), 2.31, math.atan2(t.y, t.x) + mj(rng.uniform(-0.5, 0.5)))
+            s += 2.5
+        # shelf vignettes against the inner face (on VOID edge cells): crate stacks, barrel groups, weapon racks
+        inward = lambda ss: -p.nrm(ss)
+        o = -(0.5 + SHELF / 2)
+        s = 1.4 + rng.uniform(0.0, 0.6)
+        while s < p.L - 2.0:
+            kind = rng.choice(("crates", "barrels", "rack", "crates", "mixed"))
+            t = p.tan(s)
+            along = math.atan2(t.y, t.x)
+            if kind == "crates":
+                put("crate", p.at(s, o + 0.05, 0.0), 0.0, along + mj(rng.uniform(-0.12, 0.12)))
+                put("crate", p.at(s + 0.76, o + 0.08, 0.0), 0.0, along + mj(rng.uniform(-0.2, 0.2)))
+                put("crate_small", p.at(s + 0.1, o + 0.05, 0.7), 0.7, along + mj(rng.uniform(-0.5, 0.5)))
+                put("crate_small", p.at(s + 1.36, o + 0.12, 0.0), 0.0, along + mj(rng.uniform(-0.6, 0.6)))
+                s += 1.7
+            elif kind == "barrels":
+                for ds, do in ((0.0, 0.14), (0.62, 0.16), (0.32, -0.15), (1.0, -0.1)):
+                    put("barrel", p.at(s + ds, o + do, 0.0), 0.0, rng.uniform(0, 6.28))
+                s += 1.4
+            elif kind == "rack":
+                put("weapon_rack", p.at(s + 0.7, o + 0.1, 0.0), 0.0, yaw_front(inward(s + 0.7)))
+                put("barrel", p.at(s + 1.7, o + 0.1, 0.0), 0.0, rng.uniform(0, 6.28))
+                s += 2.1
+            else:
+                put("crate", p.at(s, o + 0.05, 0.0), 0.0, along + mj(rng.uniform(-0.3, 0.3)))
+                put("barrel", p.at(s + 0.72, o + 0.12, 0.0), 0.0, 0.0)
+                put("barrel", p.at(s + 1.25, o + 0.12, 0.0), 0.0, 0.0)
+                s += 1.6
+            s += rng.uniform(0.7, 1.4)          # rest areas between vignettes
     world += [wall, found]
-    # gate posts at every route-side wall end (banners face the camera), crystal lamps on the walkway beside them
+    # gates at every route-side wall end: gate post with banner on the wall line, a supply cache on the shelf just
+    # inside it, stakes jammed into the cliff lip outside the wall pointing out, a crystal lamp and brazier on top
     for a0, a1 in WALL_SECTORS:
-        for deg, inward in ((a0, 1), (a1, -1)):
-            d = deg + inward * 2.0
-            x, z = isl_pt(d, 0.62, mirror)
-            x2, z2 = isl_pt(d + 1.0, 0.62, mirror)
-            xo, zo = isl_pt(d, 2.0, mirror)
+        for deg, inward_sgn in ((a0, 1), (a1, -1)):
+            d = deg + inward_sgn * 2.0
+            x, z = isl_pt(d, WALL_OFF + 0.12, mirror)
+            xo, zo = isl_pt(d, WALL_OFF + 2.0, mirror)
             out = Vector((-(xo - x), zo - z)).normalized()
             place.append(("gate_post", x, z, 0.0, math.atan2(out.x, -out.y), {}))
             info["gates"].append((x, z))
-            xl, zl = isl_pt(deg + inward * 7.5, 0.42, mirror)
+            xl, zl = isl_pt(deg + inward_sgn * 7.5, WALL_OFF - 0.08, mirror)
             place.append(("crystal_lamp", xl, zl, 2.31, 0.0, {}))
-            xb, zb = isl_pt(deg + inward * 4.6, 0.38, mirror)
+            xb, zb = isl_pt(deg + inward_sgn * 4.6, WALL_OFF - 0.12, mirror)
             place.append(("brazier", xb, zb, 2.31, 0.0, {}))
-            xp, zp = isl_pt(deg + inward * 4.6, -1.2, mirror)
+            xp, zp = isl_pt(deg + inward_sgn * 4.6, -1.0, mirror)
             place.append(("pool", xp, zp, 0.0, 0.0, {}))
+            # supply cache on the shelf beside the post
+            for k, (dd, key) in enumerate(((5.0, "barrel"), (6.6, "barrel"), (8.4, "crate"))):
+                xc, zc = isl_pt(deg + inward_sgn * dd, WALL_OFF - 0.5 - SHELF / 2 + 0.05, mirror)
+                place.append((key, xc, zc, 0.0, mj(rng.uniform(-0.3, 0.3)) + (0.0 if key == "barrel" else
+                              math.atan2(-(zc - z), -(xc - x))), {}))
+            # stakes outside the wall on a stone lip, pointing out of the base (only where no walkable cell is near:
+            # some wall ends sit beside a bridge head)
+            for dd in (6.0, 8.5, 11.0):
+                xs_, zs_ = isl_pt(deg + inward_sgn * dd, WALL_OFF + 1.2, mirror)
+                if _clear(xs_, zs_, 1.25):
+                    break
+            else:
+                continue
+            xs2, zs2 = isl_pt(deg + inward_sgn * dd, WALL_OFF + 3.0, mirror)
+            out2 = Vector((-(xs2 - xs_), zs2 - zs_)).normalized()
+            place.append(("stakes", xs_, zs_, 0.0, yaw_front(-out2), {}))
+            lip = Piece(f"tmp_lip_{team}_{deg}")
+            xs3, zs3 = isl_pt(deg + inward_sgn * dd, WALL_OFF + 1.1, mirror)
+            ang = math.atan2(out2.y, out2.x) + math.pi / 2
+            lip.box(0, 0, -0.75, 2.2, 1.0, 0.78, pal.vc("body_a", 0.9), pal.vc("pave_d"), rot=ang, bev=0.05,
+                    chips=kit.rand_chips(rng, 0.6, 0.2, 0.08, 0.15))
+            lip.name = f"cm_district_gate_lip_{team}_{deg}"
+            place.append(("__piece__", xs3, zs3, 0.0, 0.0, {"piece": lip}))
     # towers, doors to the pad
     padx = G.MIRROR_X - PAD[0] if mirror else PAD[0]
     for deg, half, kind, R in cuts:
@@ -175,43 +239,34 @@ def district(team="azure"):
         dvec = S2B(padx, PAD[1]) - S2B(x, z)
         yaw = math.atan2(dvec.y, dvec.x) + math.pi / 2
         place.append(("landmark" if kind == "landmark" else "tower", x, z, 0.0, yaw, {}))
-        # tower footing down the cliff
         tf = Piece(f"tmp_footing_{deg}")
         kit.drum(tf, random.Random(deg), R + 0.1, 3, z0=-3 * COURSE - 0.02, thick=0.6)
-        ob = tf
-        ob.name = f"cm_district_tower_footing_{team}_{deg}"
+        tf.name = f"cm_district_tower_footing_{team}_{deg}"
         place.append(("__piece__", x, z, 0.0, 0.0, {"piece": tf}))
-    # the pad, and a loose ring of low dressing outside the 3.75 u heal zone (all <= 0.3 u)
+    info["landmark"] = [isl_pt(deg, R + 0.1, mirror) for deg, half, kind, R in cuts if kind == "landmark"][0]
+    # the pad: lanes around it stay clear (no ground scatter in v2)
     place.append(("pad", padx, PAD[1], 0.0, 0.0, {}))
-    for i in range(21):
-        a = 2 * math.pi * i / 21 + rng.uniform(-0.12, 0.12)
-        r = rng.uniform(4.6, 6.6)
-        x, z = PAD[0] + r * math.cos(a), PAD[1] + r * math.sin(a)
-        if mirror:
-            x = G.MIRROR_X - x
-        if not walk(math.floor(x), math.floor(z)):
-            continue
-        key = ["flagstones", "rubble_low", "planks_low", "crystal_lamp_low"][i % 4]
-        place.append((key, x, z, 0.0, rng.uniform(0, 6.28), {}))
     return world, place, info
 
 
 def _footing(pc, p, rng):
-    """Foundation under a wall standing on VOID edge cells: rock-dark courses down the cliff and a flat flagstone
-    apron (0.05 u) covering the strip between the island cells and the wall's inner face."""
+    """Foundation under a wall standing on VOID edge cells: rock-dark courses down the cliff under the wall and the
+    shelf, and a flat flagstone apron (0.05 u) over the shelf and the strip up to the island cells."""
+    inner = 0.5 + SHELF
     for c in range(1, 4):
         z1 = -(c - 1) * COURSE
         xs = kit.course_breaks(p.L, rng, c % 2 == 1)
         for a, b in zip(xs, xs[1:]):
             side = pal.vc("body_a", rng.uniform(0.85, 0.95))
             inset = 0.06 * c
-            pc.block(kit.hexa_on_path(p, a + 0.015, b - 0.015, -0.5 + inset, 0.5 - inset * 0.5, z1 - COURSE + 0.015,
+            pc.block(kit.hexa_on_path(p, a + 0.015, b - 0.015, -inner + inset, 0.5 - inset * 0.5, z1 - COURSE + 0.015,
                                       z1 - 0.015), side, side)
     s = 0.0
     while s < p.L:
         w = rng.uniform(0.5, 0.9)
-        c = pal.vc(rng.choice(["pave", "pave_d", "cap_side"]))
-        pc.block(kit.hexa_on_path(p, s + 0.02, min(p.L, s + w) - 0.02, -1.25, -0.5, -0.05, 0.03), c, c, bev=0.02)
+        for o0, o1 in ((-inner - 0.75, -inner + 0.02), (-inner + 0.05, -0.5)):
+            c = pal.vc(rng.choice(["pave", "pave_d", "cap_side"]), rng.uniform(0.94, 1.04))
+            pc.block(kit.hexa_on_path(p, s + 0.02, min(p.L, s + w) - 0.02, o0, o1, -0.05, 0.03), c, c, bev=0.02)
         s += w
 
 

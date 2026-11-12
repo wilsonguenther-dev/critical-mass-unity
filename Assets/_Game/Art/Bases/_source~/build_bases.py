@@ -82,11 +82,11 @@ def kit_builders():
         "shrine_egg": lambda: pieces.shrine_egg(),
         "marker": marker,
         "crate": lambda: pieces.crate(),
+        "crate_small": lambda: pieces.crate("cm_dress_crate_small", s=0.5, seed=1),
+        "weapon_rack": lambda: pieces.weapon_rack(),
+        "stakes": lambda: pieces.stakes(),
         "barrel": lambda: pieces.barrel(),
         "blocks": lambda: pieces.block_stack(),
-        "rubble_low": lambda: pieces.rubble_low(),
-        "planks_low": lambda: pieces.planks_low(),
-        "flagstones": lambda: pieces.flag_stones(),
     })
     return b
 

@@ -658,20 +658,81 @@ def shrine_egg(name="cm_shrine_egg", seed=43):
 
 
 # ------------------------------------------------------------------------------ district dressing (stand-ins)
-def crate(name="cm_dress_crate", s=0.7):
+def crate(name="cm_dress_crate", s=0.7, seed=0):
+    """Plank crate: dark frame edges, board faces with grooves, a diagonal brace on two sides."""
     pc = Piece(name, kind="prop")
-    pc.box(0, 0, 0, s, s, s, pal.vc("wood_b"), pal.vc("wood"), bev=0.04)
-    for z in (0.02, s - 0.1):
-        pc.box(0, 0, z, s + 0.03, s + 0.03, 0.08, pal.vc("wood_d"), pal.vc("wood_d"), bev=0.015)
+    rng = random.Random(seed)
+    pc.box(0, 0, 0, s, s, s, pal.vc("wood_b"), pal.vc("wood"), bev=0.035)
+    e = 0.09
+    for z in (0.0, s - e):                                   # top and bottom frame rails
+        for (cx, cy, sx, sy) in ((0, -s / 2, s + 0.02, e), (0, s / 2, s + 0.02, e), (-s / 2, 0, e, s + 0.02),
+                                 (s / 2, 0, e, s + 0.02)):
+            pc.box(cx, cy, z, sx, sy, e, pal.vc("wood_d", 1.15), pal.vc("wood_b"), bev=0.015)
+    for cx, cy in ((-s / 2, -s / 2), (s / 2, -s / 2), (s / 2, s / 2), (-s / 2, s / 2)):   # corner posts
+        pc.box(cx, cy, 0, e + 0.01, e + 0.01, s, pal.vc("wood_d", 1.15), pal.vc("wood_b"), bev=0.015)
+    for sgn, axis in ((-1, "y"), (1, "x")):                  # diagonal braces on two faces
+        L = s * 1.2
+        if axis == "y":
+            M = Matrix.Translation((0, sgn * (s / 2 + 0.01), s / 2)) @ Matrix.Rotation(math.radians(45), 4, "Y")
+        else:
+            M = Matrix.Translation((sgn * (s / 2 + 0.01), 0, s / 2)) @ Matrix.Rotation(math.radians(45), 4, "X")
+        pc.box(0, 0, -0.04, L if axis == "y" else 0.04, 0.04 if axis == "y" else L, 0.08, pal.vc("wood_d", 1.2),
+               bev=0.01, M=M)
+    for k in (-1, 1):                                        # board grooves on the lid
+        pc.box(k * s / 6, 0, s - 0.004, 0.025, s - 0.18, 0.012, pal.vc("wood_d"), bev=0.0)
     return pc
 
 
 def barrel(name="cm_dress_barrel"):
     pc = Piece(name, kind="prop")
-    pc.lathe([(0.27, 0), (0.33, 0.25), (0.33, 0.55), (0.27, 0.8), (0.0, 0.8)], 10,
+    pc.lathe([(0.27, 0), (0.33, 0.25), (0.33, 0.55), (0.27, 0.8), (0.0, 0.8)], 12,
              topside(pal.vc("wood_b"), pal.vc("wood")), bev=0.0)
-    for z in (0.15, 0.62):
-        pc.lathe([(0.335, z), (0.335, z + 0.07)], 10, solid(pal.vc("brass_d")))
+    for z in (0.12, 0.62):
+        pc.lathe([(0.325, z), (0.34, z + 0.02), (0.34, z + 0.07), (0.325, z + 0.09)], 12,
+                 topside(pal.vc("brass_d"), pal.vc("brass")))
+    pc.lathe([(0.22, 0.8), (0.22, 0.81), (0.0, 0.81)], 10, solid(pal.vc("wood_d", 1.2)))
+    return pc
+
+
+def weapon_rack(name="cm_dress_weapon_rack"):
+    """Wooden rack (1.4 x 0.45 x 1.3 u) with four spears, two swords and a brass-bossed round shield leaning on it."""
+    pc = Piece(name, kind="prop")
+    for x in (-0.62, 0.62):
+        pc.box(x, 0, 0, 0.12, 0.42, 0.08, pal.vc("wood_d", 1.2), pal.vc("wood_b"), bev=0.015)
+        pc.box(x, 0.0, 0.0, 0.11, 0.11, 1.25, pal.vc("wood_b"), pal.vc("wood"), bev=0.02)
+    for z in (0.35, 1.05):
+        pc.box(0, 0.0, z, 1.36, 0.1, 0.09, pal.vc("wood_b"), pal.vc("wood"), bev=0.02)
+    for k, x in enumerate((-0.42, -0.14, 0.14, 0.42)):       # spears leaning on the top bar
+        M = Matrix.Translation((x, 0.12, 0.0)) @ Matrix.Rotation(math.radians(-12), 4, "X")
+        pc.box(0, 0, 0, 0.065, 0.065, 1.55, pal.vc("wood_b", 0.95), pal.vc("wood"), bev=0.01, M=M)
+        pc.lathe([(0.075, 1.55), (0.0, 1.85)], 4, solid(pal.vc("iron", 1.5)), M=M)
+    for x in (-0.3, 0.3):                                     # swords hanging point down from the low bar
+        pc.box(x, -0.09, 0.08, 0.07, 0.025, 0.62, pal.vc("iron", 1.7), pal.vc("cream"), bev=0.008)
+        pc.box(x, -0.09, 0.7, 0.24, 0.05, 0.05, pal.vc("brass_d"), pal.vc("brass"), bev=0.008)
+        pc.box(x, -0.09, 0.75, 0.05, 0.05, 0.18, pal.vc("wood_d", 1.2), bev=0.008)
+    M = Matrix.Translation((0.78, -0.18, 0.42)) @ Matrix.Rotation(math.radians(70), 4, "X") @ \
+        Matrix.Rotation(math.radians(-20), 4, "Z")
+    pc.lathe([(0.42, 0.0), (0.42, 0.06), (0.36, 0.09), (0.0, 0.09)], 12, topside(pal.vc("wood_b"), pal.vc("wood")), M=M)
+    pc.lathe([(0.11, 0.09), (0.09, 0.14), (0.0, 0.15)], 8, solid(pal.vc("brass")), M=M)
+    pc.lathe([(0.43, 0.0), (0.43, 0.065), (0.39, 0.07), (0.39, 0.0)], 12, solid(pal.vc("brass_d")), M=M, closed=True)
+    return pc
+
+
+def stakes(name="cm_dress_stakes"):
+    """Cheval-de-frise (1.8 u): a log on crossed feet with five sharpened stakes pointing out (local -Y) and up."""
+    pc = Piece(name, kind="prop")
+    M = Matrix.Translation((0, 0, 0.38)) @ Matrix.Rotation(math.pi / 2, 4, "Y")
+    pc.lathe([(0.13, -0.9), (0.13, 0.9)], 8, topside(pal.vc("wood_b"), pal.vc("wood")), M=M)
+    for x in (-0.75, 0.75):
+        for sgn in (-1, 1):
+            Mf = Matrix.Translation((x, 0, 0)) @ Matrix.Rotation(sgn * math.radians(35), 4, "X")
+            pc.box(0, 0, 0, 0.1, 0.1, 0.62, pal.vc("wood_b"), pal.vc("wood"), bev=0.015, M=Mf)
+    for k in range(5):
+        x = -0.72 + k * 0.36
+        Ms = Matrix.Translation((x, 0.25, 0.12)) @ Matrix.Rotation(math.radians(-38 if k % 2 else -50), 4, "X")
+        pc.lathe([(0.075, 0.0), (0.075, 0.95), (0.0, 1.25)], 6,
+                 lambda f: pal.vc("wood") if f.normal.z > 0.2 else pal.vc("wood_b"), M=Ms)
+        pc.lathe([(0.08, 0.6), (0.08, 0.66)], 6, solid(pal.vc("rope")), M=Ms)
     return pc
 
 
