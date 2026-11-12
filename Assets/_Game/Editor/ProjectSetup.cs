@@ -19,6 +19,9 @@ namespace CriticalMass.Editor
         const string UrpAssetPath = SettingsDir + "/CriticalMass_URP.asset";
         const string UrpRendererPath = SettingsDir + "/CriticalMass_URP_Renderer.asset";
         const string BootScenePath = "Assets/_Game/Scenes/Boot.unity";
+        const string ControlsPath = SettingsDir + "/Controls.inputactions";
+        const string PlaceholderDir = "Assets/_Game/Resources/Placeholder";
+        const string PlaceholderMaterialPath = PlaceholderDir + "/PlaceholderLit.mat";
         const string DefaultPostProcessDataPath =
             "Packages/com.unity.render-pipelines.universal/Runtime/Data/PostProcessData.asset";
 
@@ -30,6 +33,8 @@ namespace CriticalMass.Editor
                 ApplyEditorSettings();
                 ApplyRenderPipeline();
                 ApplyBootScene();
+                ApplyInputActions();
+                ApplyPlaceholderMaterial();
                 MoveIntoSettings("Assets/UniversalRenderPipelineGlobalSettings.asset");
                 MoveIntoSettings("Assets/DefaultVolumeProfile.asset");
                 AssetDatabase.SaveAssets();
@@ -123,6 +128,26 @@ namespace CriticalMass.Editor
                     throw new InvalidOperationException("could not save " + BootScenePath);
             }
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(BootScenePath, true) };
+        }
+
+        // F-07: the project-wide actions (InputSystem.actions). In the editor the setter's validation hook stores the asset
+        // in EditorBuildSettings under com.unity.input.settings.actions, which the player build includes.
+        static void ApplyInputActions()
+        {
+            var asset = AssetDatabase.LoadAssetAtPath<UnityEngine.InputSystem.InputActionAsset>(ControlsPath);
+            if (asset == null) throw new InvalidOperationException("Controls.inputactions not imported");
+            UnityEngine.InputSystem.InputSystem.actions = asset;
+        }
+
+        // F-07: the lit placeholder material F-08a loads with Resources.Load. URP's defaultMaterial is editor-only (null in
+        // a player), so it is copied into a Resources asset here.
+        static void ApplyPlaceholderMaterial()
+        {
+            if (AssetDatabase.LoadAssetAtPath<Material>(PlaceholderMaterialPath) != null) return;
+            if (!AssetDatabase.IsValidFolder("Assets/_Game/Resources")) AssetDatabase.CreateFolder("Assets/_Game", "Resources");
+            if (!AssetDatabase.IsValidFolder(PlaceholderDir)) AssetDatabase.CreateFolder("Assets/_Game/Resources", "Placeholder");
+            var material = new Material(GraphicsSettings.currentRenderPipeline.defaultMaterial) { name = "PlaceholderLit" };
+            AssetDatabase.CreateAsset(material, PlaceholderMaterialPath);
         }
 
         // NET_Standard and the deprecated NET_Standard_2_0 share one value, so ToString() can print the old name.

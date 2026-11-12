@@ -1,0 +1,18 @@
+{
+ "note": "CM-21 step A: per-actor count of non-overlapping 3-tick windows with a heading change > 30 deg over 300 ticks of a seed-1 5v5 match (all actors on bots), heading = atan2 of the sim velocity (main: displacement / DT), sampled where speed >= 0.5 * moveSpeed. Captured from main's code.",
+ "seed": 1,
+ "teamSize": 5,
+ "ticks": 300,
+ "perBot": [
+  1,
+  1,
+  0,
+  0,
+  1,
+  0,
+  0,
+  20,
+  0,
+  0
+ ]
+}

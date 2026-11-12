@@ -2,7 +2,11 @@
     "name": "CriticalMass.Runtime",
     "rootNamespace": "CriticalMass.Runtime",
     "references": [
-        "CriticalMass.Sim"
+        "CriticalMass.Sim",
+        "Unity.InputSystem",
+        "Unity.Cinemachine",
+        "Unity.RenderPipelines.Universal.Runtime",
+        "Unity.RenderPipelines.Core.Runtime"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
