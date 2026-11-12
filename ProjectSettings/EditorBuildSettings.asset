@@ -8,5 +8,6 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/_Game/Scenes/Boot.unity
     guid: cbbdc4cfd4e4641dc8557ced76e80dd8
-  m_configObjects: {}
+  m_configObjects:
+    com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 7d9c7ccf196bd47a19a3df6f020a4227, type: 3}
   m_UseUCBPForAssetBundles: 0
