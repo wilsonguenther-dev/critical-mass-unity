@@ -13,7 +13,10 @@ namespace CriticalMass.Runtime.Input
     /// Buttons: InputAction.started fires once per press (key repeat raises no new started) -> ButtonDown, canceled ->
     /// ButtonUp. Move and the pointer aim are sampled every frame; the aim ray hits the plane at the ground height of
     /// actor 0's cell (GroundHeight.TryAimPoint, browser pickHumanAim) and goes through SimSpace.ToSim (the only z
-    /// negation, O-13). With no SimDriverBehaviour World on this GameObject the plane is y = 0.
+    /// negation, O-13). With no SimDriverBehaviour World on this GameObject the plane is y = 0. The gameplay camera is
+    /// perspective (U-005 amendment 2026-11-12): ScreenPointToRay starts each ray at the camera and points it through the
+    /// pixel, so nothing here assumes parallel rays; at pitch 55 and FOV 35 even the top-edge ray points 37.5 degrees
+    /// down, so the plane is always hit. Move stays a screen-space intent mapped by yaw only (HumanInputState).
     /// </summary>
     public sealed class HumanInputSource : MonoBehaviour
     {

@@ -6,7 +6,10 @@ using UnityEngine;
 
 namespace CriticalMass.Runtime.Camera
 {
-    /// <summary>Builds the fixed-angle orthographic Cinemachine 3 follow rig (CameraRig.tsx follow; no rotation control).</summary>
+    /// <summary>
+    /// Builds the fixed-angle perspective Cinemachine 3 follow rig (U-005 amendment 2026-11-12: pitch 55, vertical FOV 35,
+    /// 23.4 u from the look target, yaw 45, no rotation control, no shake). The follow itself is CameraFollowTarget.
+    /// </summary>
     public static class CameraRig
     {
         /// <summary>Creates <c>CameraTarget</c> (with <see cref="CameraFollowTarget"/>) and <c>CM Camera</c>; returns <c>CM Camera</c>.</summary>
@@ -19,19 +22,21 @@ namespace CriticalMass.Runtime.Camera
             followTarget.Driver = driver;
 
             var camGo = new GameObject("CM Camera");
-            camGo.transform.rotation = SimSpace.CameraRotation(cfg);
+            Quaternion rotation = GameplayCamera.Rotation(cfg);
+            camGo.transform.rotation = rotation;
 
             var cam = camGo.AddComponent<CinemachineCamera>();
             cam.Follow = targetGo.transform;
-            cam.Lens.ModeOverride = LensSettings.OverrideModes.Orthographic;
-            cam.Lens.OrthographicSize = (float)(cfg.Render.ViewHeightUnits / 2);
-            cam.Lens.NearClipPlane = 0.1f;
-            cam.Lens.FarClipPlane = 200f;
+            cam.Lens.ModeOverride = LensSettings.OverrideModes.None; // the Unity camera is perspective (GameBootstrap)
+            cam.Lens.FieldOfView = (float)GameplayCamera.FovDeg;
+            cam.Lens.NearClipPlane = GameplayCamera.NearClip;
+            cam.Lens.FarClipPlane = GameplayCamera.FarClip;
+            cam.Lens.Dutch = 0f;
 
             var follow = camGo.AddComponent<CinemachineFollow>();
             follow.TrackerSettings.BindingMode = BindingMode.WorldSpace;
             follow.TrackerSettings.PositionDamping = Vector3.zero;
-            follow.FollowOffset = -(SimSpace.CameraRotation(cfg) * Vector3.forward) * (float)cfg.Render.CameraDistance;
+            follow.FollowOffset = -(rotation * Vector3.forward) * (float)GameplayCamera.Distance;
 
             return camGo;
         }

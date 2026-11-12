@@ -31,6 +31,12 @@ namespace CriticalMass.Runtime.Game
         /// <summary>true: actor 0 is bot-driven (MatchTick.Advance(w, null, scratch)).</summary>
         public bool HumanAutopilot;
 
+        /// <summary>
+        /// Capture tool (Editor CaptureTool): the next driver to wake starts with actor 0 on autopilot and the wall clock
+        /// stopped (TimeScale 0), so only StepTicks advances the match and a capture does not depend on frame times.
+        /// </summary>
+        public static bool CaptureMode;
+
         /// <summary>Interpolation fraction between the previous and the current tick, 0..1.</summary>
         public double Alpha { get; private set; }
 
@@ -57,6 +63,11 @@ namespace CriticalMass.Runtime.Game
                 Config = cfg,
             });
             TimeScale = cfg.DefaultSpeed;
+            if (CaptureMode)
+            {
+                HumanAutopilot = true;
+                TimeScale = 0;
+            }
             _dt = SimStep.Dt(cfg);
             _acc = 0;
             Alpha = 0;

@@ -137,6 +137,13 @@ namespace CriticalMass.Runtime.Input
             _aimZ = worldZ;
         }
 
+        /// <summary>True while the pointer has a ground aim point (SetAim since the last ClearAim).</summary>
+        public bool HasAim => _hasAim;
+        /// <summary>The last aim point (sim x), valid while HasAim.</summary>
+        public double AimX => _aimX;
+        /// <summary>The last aim point (sim z), valid while HasAim.</summary>
+        public double AimZ => _aimZ;
+
         /// <summary>No pointer over the game view, or the ray missed: "no aim" (non-finite, D-011).</summary>
         public void ClearAim()
         {

@@ -26,7 +26,10 @@ namespace CriticalMass.Runtime
         /// </summary>
         public static float YawDeg(double facing) => (float)(90.0 + facing * 180.0 / Math.PI);
 
-        /// <summary>The fixed isometric camera rotation: Euler(pitch, 360 - yaw, 0) = (38, 315, 0) by default.</summary>
-        public static Quaternion CameraRotation(GameConfig c) => Quaternion.Euler((float)c.Render.CameraPitchDeg, (float)(360 - c.Render.CameraYawDeg), 0f);
+        /// <summary>
+        /// The fixed gameplay camera rotation: Euler(pitch, 360 - yaw, 0) = (55, 315, 0) (U-005 amendment 2026-11-12; the
+        /// pitch is Camera.GameplayCamera.PitchDeg, no longer RenderConfig.CameraPitchDeg).
+        /// </summary>
+        public static Quaternion CameraRotation(GameConfig c) => Camera.GameplayCamera.Rotation(c);
     }
 }

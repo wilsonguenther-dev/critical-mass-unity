@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Gameplay-camera captures (CriticalMass.Editor.CaptureTool.Run): 16v16 bot match, fixed seed (GameConfig default 1337),
+# N simulated seconds, then 1920x1080 PNGs of the Azure base, the hill and the shrine plus capture.json in OUT_DIR.
+# Needs a GPU (no -nographics). Usage: tools/unity-capture.sh OUT_DIR [SIM_SECONDS]
+set -euo pipefail
+OUT="${1:?usage: unity-capture.sh OUT_DIR [SIM_SECONDS]}"
+SECONDS_ARG="${2:-30}"
+source "$(dirname "${BASH_SOURCE[0]}")/_unity-env.sh"
+LOG="$ROOT/Logs/capture.log"
+mkdir -p "$OUT"
+set +e
+"$UNITY" -batchmode -projectPath "$ROOT" -executeMethod CriticalMass.Editor.CaptureTool.Run \
+  -captureOut "$OUT" -captureSeconds "$SECONDS_ARG" -logFile "$LOG"
+code=$?
+set -e
+n="$(ls "$OUT"/capture-*.png 2>/dev/null | wc -l | tr -d ' ')"
+echo "unity-capture: exit=$code pngs=$n out=$OUT (log: $LOG)"
+if [[ $code -ne 0 ]]; then exit "$code"; fi
+[[ "$n" -ge 3 ]] || { echo "unity-capture: FAILED, fewer than 3 PNGs" >&2; exit 1; }
