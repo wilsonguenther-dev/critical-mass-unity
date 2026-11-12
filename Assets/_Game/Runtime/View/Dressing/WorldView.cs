@@ -16,10 +16,16 @@ namespace CriticalMass.Runtime.View.Dressing
     /// cell whose type changed since the plan; ground chunks re-mesh when cells dig or place; breakable wall pieces swap
     /// intact / cracked / destroyed from their cells. Without the kit catalog (art not imported) it draws nothing and the
     /// grey box stays whole.
+    /// Art refresh 2 (2026-11-12): kit pieces combine per 32 x 32 cell group (GroupSize) per material, which cut the
+    /// renderer count; a dig or place re-plans the world (WorldDresser.Plan is a pure function of the map) and rebuilds
+    /// only the groups whose placements changed (ChangedGroups), so lips, cliffs and ledges follow the new edge; the hill
+    /// site's team materials take the colours of the team holding the hill (MatchState.HillState, HillSwatch).
     /// </summary>
     public sealed class WorldView : MonoBehaviour
     {
         public const int ChunkSize = 16;
+        /// <summary>Cells per side of one combined kit group (ground chunks stay ChunkSize).</summary>
+        public const int GroupSize = 32;
 
         private static bool[] _dressed;
         private static byte[] _dressedTypes;
@@ -49,6 +55,12 @@ namespace CriticalMass.Runtime.View.Dressing
         private readonly List<(WorldBreakable b, MeshFilter mf, string state)> _breakables = new List<(WorldBreakable, MeshFilter, string)>();
         private Material _ground;
         private Texture2D _field;
+        private readonly Dictionary<int, List<GameObject>> _groups = new Dictionary<int, List<GameObject>>();
+        private readonly List<Material> _hillMats = new List<Material>();
+        private HillState _hillShown = (HillState)(-1);
+
+        /// <summary>The hill tint shown now (tests read it).</summary>
+        public HillState HillShown => _hillShown;
 
         private void Start()
         {
@@ -65,7 +77,9 @@ namespace CriticalMass.Runtime.View.Dressing
                 Build(w);
                 return;
             }
-            if (Plan == null || w.GridVersion == _seenGridVersion) return;
+            if (Plan == null) return;
+            if (w.Match != null) ApplyHill(w.Match.HillState);
+            if (w.GridVersion == _seenGridVersion) return;
             _seenGridVersion = w.GridVersion;
             var dirtyChunks = new HashSet<int>();
             bool breakables = false;
@@ -79,7 +93,153 @@ namespace CriticalMass.Runtime.View.Dressing
                 breakables = true;
             }
             foreach (int c in dirtyChunks) BuildGroundChunk(c);
+            if (dirtyChunks.Count > 0) Replan();
             if (breakables) SyncBreakables();
+        }
+
+        /// <summary>A dig or place changed land: plan again on the current grid and rebuild the groups that differ.</summary>
+        private void Replan()
+        {
+            WorldPlan next = WorldDresser.Plan(_map, BasesFile.Load(), _catalog.Centroid, _catalog.Body);
+            HashSet<int> changed = ChangedGroups(Plan, next);
+            Plan = next;
+            foreach (int g in changed) DestroyGroup(g);
+            BuildGroups(changed);
+            _dressed = Plan.Dressed;
+            _dressedTypes = Plan.CellsAtPlan;
+            DressVersion++;
+        }
+
+        /// <summary>The combined-group key of a sim position (sky placements: -1, one group for the whole sky).</summary>
+        public static int GroupOf(double simX, double simZ)
+        {
+            int gx = Mathf.Clamp((int)Math.Floor(simX) / GroupSize, -1, 62) + 1, gz = Mathf.Clamp((int)Math.Floor(simZ) / GroupSize, -1, 62) + 1;
+            return gz * 64 + gx;
+        }
+
+        static int GroupOf(WorldPlacement p) => p.Cat == "sky" ? -1 : GroupOf(p.SimX, p.SimZ);
+
+        /// <summary>Groups whose placements (piece, position, yaw, team) differ between two plans.</summary>
+        public static HashSet<int> ChangedGroups(WorldPlan a, WorldPlan b)
+        {
+            Dictionary<int, (long sum, int n)> Sig(WorldPlan p)
+            {
+                var d = new Dictionary<int, (long, int)>();
+                foreach (WorldPlacement q in p.Placements)
+                {
+                    if (q.Piece == "env_ground_cell") continue;
+                    Vector3 t = q.Matrix.GetColumn(3);
+                    Vector3 f = q.Matrix.GetColumn(2);
+                    long h = q.Piece.GetHashCode() * 31L + Mathf.RoundToInt(t.x * 100f) * 7919L + Mathf.RoundToInt(t.y * 100f) * 104729L +
+                             Mathf.RoundToInt(t.z * 100f) * 1299709L + Mathf.RoundToInt(f.x * 1000f) * 15485863L + Mathf.RoundToInt(f.z * 1000f) * 32452843L +
+                             (long)q.Team * 49979687L;
+                    int g = GroupOf(q);
+                    d.TryGetValue(g, out (long s, int n) cur);
+                    d[g] = (cur.s + h, cur.n + 1);
+                }
+                return d;
+            }
+            Dictionary<int, (long, int)> sa = Sig(a), sb = Sig(b);
+            var changed = new HashSet<int>();
+            foreach (var kv in sa) if (!sb.TryGetValue(kv.Key, out var o) || !o.Equals(kv.Value)) changed.Add(kv.Key);
+            foreach (var kv in sb) if (!sa.ContainsKey(kv.Key)) changed.Add(kv.Key);
+            return changed;
+        }
+
+        /// <summary>The hill site's team colours per hill state (bases kit swatches): neutral grey when nobody or both hold it.</summary>
+        public static (string cloth, string glow, string dark) HillSwatch(HillState s)
+        {
+            switch (s)
+            {
+                case HillState.Azure: return (WorldKit.BaseAuthoredCloth, WorldKit.BaseAuthoredGlow, WorldKit.BaseAuthoredDark);
+                case HillState.Crimson: return (WorldKit.BaseCrimsonCloth, WorldKit.BaseCrimsonGlow, WorldKit.BaseCrimsonDark);
+                default: return (WorldKit.BaseNeutralCloth, WorldKit.BaseNeutralGlow, WorldKit.BaseNeutralDark);
+            }
+        }
+
+        /// <summary>Tints every hill-site material (ring, rim, arcs, horns, banners, breakables) for the hill state.</summary>
+        public void ApplyHill(HillState s)
+        {
+            if (s == _hillShown) return;
+            _hillShown = s;
+            foreach (Material m in _hillMats) TintHill(m, s);
+        }
+
+        /// <summary>Sets one hill-site material's team channels to the hill state's swatch.</summary>
+        public static void TintHill(Material m, HillState s)
+        {
+            if (m == null) return;
+            var (cloth, glow, dark) = HillSwatch(s);
+            m.SetColor("_TeamCloth", Hex(cloth));
+            m.SetColor("_TeamGlow", Hex(glow));
+            m.SetColor("_TeamDark", Hex(dark));
+        }
+
+        /// <summary>The hill-site materials ApplyHill tints (tests read them).</summary>
+        public IReadOnlyList<Material> HillMaterials => _hillMats;
+
+        private void DestroyGroup(int g)
+        {
+            if (!_groups.TryGetValue(g, out List<GameObject> list)) return;
+            foreach (GameObject go in list)
+            {
+                if (go == null) continue;
+                Mesh mesh = go.GetComponent<MeshFilter>().sharedMesh;
+                Renderer r = go.GetComponent<Renderer>();
+                if (r != null) Renderers--;
+                if (mesh != null)
+                {
+                    Triangles -= (int)(mesh.GetIndexCount(0) / 3);
+                    Destroy(mesh);
+                }
+                Destroy(go);
+            }
+            _groups.Remove(g);
+        }
+
+        /// <summary>Combines the plan's kit pieces per group per material; only the groups in "only" when it is set.</summary>
+        private void BuildGroups(HashSet<int> only)
+        {
+            var groups = new Dictionary<(int chunk, Material mat), List<(MeshData d, int sub, Matrix4x4 m)>>();
+            foreach (WorldPlacement p in Plan.Placements)
+            {
+                if (p.Piece == "env_ground_cell") continue; // drawn per chunk by BuildGroundChunk
+                GameObject model = _catalog.Find(p.Piece);
+                if (model == null) continue;
+                int chunk = GroupOf(p);
+                bool layout = p.Piece.StartsWith("cm_layout_", StringComparison.Ordinal);
+                if (only != null && !layout && !only.Contains(chunk)) continue;
+                foreach (MeshFilter mf in model.GetComponentsInChildren<MeshFilter>(true))
+                {
+                    if (layout && !mf.name.Contains("cm_district_")) continue; // listed items are placed on their own
+                    MeshData d = Data(mf.sharedMesh);
+                    if (d == null) continue;
+                    var r = mf.GetComponent<MeshRenderer>();
+                    Material[] mats = r != null ? r.sharedMaterials : new Material[0];
+                    Matrix4x4 local = model.transform.worldToLocalMatrix * mf.transform.localToWorldMatrix;
+                    Matrix4x4 m = p.Matrix * local;
+                    int pieceChunk = chunk;
+                    if (layout)
+                    {
+                        Vector3 c = m.MultiplyPoint3x4(mf.sharedMesh.bounds.center);
+                        pieceChunk = GroupOf(c.x, -c.z);
+                        if (only != null && !only.Contains(pieceChunk)) continue;
+                    }
+                    for (int s = 0; s < d.Subs.Length; s++)
+                    {
+                        Material mat = Resolve(s < mats.Length ? mats[s] : null, p.Team);
+                        if (mat == null) continue;
+                        if (!groups.TryGetValue((pieceChunk, mat), out var list)) groups[(pieceChunk, mat)] = list = new List<(MeshData, int, Matrix4x4)>();
+                        list.Add((d, s, m));
+                    }
+                }
+            }
+            foreach (var kv in groups)
+            {
+                GameObject go = MakeGroup("Group " + kv.Key.chunk + " " + kv.Key.mat.name, kv.Key.mat, kv.Value);
+                if (!_groups.TryGetValue(kv.Key.chunk, out List<GameObject> l)) _groups[kv.Key.chunk] = l = new List<GameObject>();
+                l.Add(go);
+            }
         }
 
         private void OnDestroy()
@@ -94,6 +254,8 @@ namespace CriticalMass.Runtime.View.Dressing
             _root = null;
             _groundChunks.Clear();
             _breakables.Clear();
+            _groups.Clear();
+            _hillShown = (HillState)(-1);
             _dressed = null;
             _dressedTypes = null;
             DressVersion++;
@@ -122,39 +284,7 @@ namespace CriticalMass.Runtime.View.Dressing
             Triangles = 0;
             Renderers = 0;
 
-            var groups = new Dictionary<(int chunk, Material mat), List<(MeshData d, int sub, Matrix4x4 m)>>();
-            foreach (WorldPlacement p in Plan.Placements)
-            {
-                if (p.Piece == "env_ground_cell") continue; // drawn per chunk by BuildGroundChunk
-                GameObject model = _catalog.Find(p.Piece);
-                if (model == null) continue;
-                int chunk = p.Cat == "sky" ? -1 : ChunkOf(p.SimX, p.SimZ);
-                bool layout = p.Piece.StartsWith("cm_layout_", StringComparison.Ordinal);
-                foreach (MeshFilter mf in model.GetComponentsInChildren<MeshFilter>(true))
-                {
-                    if (layout && !mf.name.Contains("cm_district_")) continue; // listed items are placed on their own
-                    MeshData d = Data(mf.sharedMesh);
-                    if (d == null) continue;
-                    var r = mf.GetComponent<MeshRenderer>();
-                    Material[] mats = r != null ? r.sharedMaterials : new Material[0];
-                    Matrix4x4 local = model.transform.worldToLocalMatrix * mf.transform.localToWorldMatrix;
-                    Matrix4x4 m = p.Matrix * local;
-                    int pieceChunk = chunk;
-                    if (layout)
-                    {
-                        Vector3 c = m.MultiplyPoint3x4(mf.sharedMesh.bounds.center);
-                        pieceChunk = ChunkOf(c.x, -c.z);
-                    }
-                    for (int s = 0; s < d.Subs.Length; s++)
-                    {
-                        Material mat = Resolve(s < mats.Length ? mats[s] : null, p.Team);
-                        if (mat == null) continue;
-                        if (!groups.TryGetValue((pieceChunk, mat), out var list)) groups[(pieceChunk, mat)] = list = new List<(MeshData, int, Matrix4x4)>();
-                        list.Add((d, s, m));
-                    }
-                }
-            }
-            foreach (var kv in groups) MakeGroup("Chunk " + kv.Key.chunk + " " + kv.Key.mat.name, kv.Key.mat, kv.Value);
+            BuildGroups(null);
             int chunksX = (_map.Width + ChunkSize - 1) / ChunkSize, chunksZ = (_map.Height + ChunkSize - 1) / ChunkSize;
             for (int cz = 0; cz < chunksZ; cz++)
             for (int cx = 0; cx < chunksX; cx++)
@@ -248,11 +378,20 @@ namespace CriticalMass.Runtime.View.Dressing
             if (src == null) return null;
             if (!Enum.TryParse(src.name.StartsWith("World", StringComparison.Ordinal) ? src.name.Substring(5) : "", out WorldLook look)) return src;
             if (look == WorldLook.Ground) return GroundMaterial();
-            bool swap = look != WorldLook.Pool && WorldKit.TeamSwapped(look) && (team == WorldTeam.Crimson || (team == WorldTeam.Neutral && (look == WorldLook.Base || look == WorldLook.BaseFlat)));
+            bool hill = team == WorldTeam.Hill && (look == WorldLook.Base || look == WorldLook.BaseFlat);
+            bool swap = look != WorldLook.Pool && WorldKit.TeamSwapped(look) && (team == WorldTeam.Crimson || hill || (team == WorldTeam.Neutral && (look == WorldLook.Base || look == WorldLook.BaseFlat)));
             if (!swap) return src;
             string key = src.name + "|" + team;
             if (_mats.TryGetValue(key, out Material m) && m != null) return m;
             m = new Material(src) { name = src.name + " " + team };
+            if (hill)
+            {
+                // Hill: its own material per look, tinted by ApplyHill from the Sim's hill state (neutral until then).
+                TintHill(m, _hillShown);
+                _hillMats.Add(m);
+                _mats[key] = m;
+                return m;
+            }
             if (look == WorldLook.GlowDecal) m.SetFloat("_SwapTeam", 1f);
             else if (look == WorldLook.Crystal)
             {

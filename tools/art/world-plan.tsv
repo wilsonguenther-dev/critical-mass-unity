@@ -1,6 +1,6 @@
 # World dresser plan for Skybreak Basin (Editor/Dressing/WorldBake.cs; regenerate with -executeMethod CriticalMass.Editor.Dressing.WorldBake.Bake)
-hash	4d9f4e44f7a38337
-placements	5158
+hash	559d1770f0059aee
+placements	5359
 rim_edges	570
 ledge_edges	0
 fills	134
@@ -9,15 +9,17 @@ waterfalls	20
 spans	16
 breakables	6
 dressed_cells	3078
+piece	cm_banner	4
 piece	cm_brazier	34
 piece	cm_crystal_lamp	14
-piece	cm_crystal_lamp_low	10
-piece	cm_dress_barrel	12
-piece	cm_dress_blocks	3
-piece	cm_dress_flagstones	28
-piece	cm_dress_planks_low	25
-piece	cm_dress_rubble_low	33
+piece	cm_crystal_lamp_low	4
+piece	cm_dress_barrel	58
+piece	cm_dress_crate	44
+piece	cm_dress_crate_small	26
+piece	cm_dress_stakes	12
+piece	cm_dress_weapon_rack	2
 piece	cm_egg_pool	1
+piece	cm_gate_post	12
 piece	cm_hill_arc_a	4
 piece	cm_hill_arc_b	4
 piece	cm_hill_dais	1
@@ -52,7 +54,7 @@ piece	env_cliff_s3	9
 piece	env_cliff_s4	20
 piece	env_cliff_s5	7
 piece	env_cliff_s6	19
-piece	env_cloud_floor	20
+piece	env_cloud_floor	168
 piece	env_cloud_puff	130
 piece	env_crystal_biomass	15
 piece	env_crystal_cluster	15
@@ -71,6 +73,7 @@ piece	env_lip_rim_straight_b	156
 piece	env_lip_rim_straight_c	153
 piece	env_pebbles	20
 piece	env_rocks	22
+piece	env_ruin_column_intact	2
 piece	env_sky_rock_l	21
 piece	env_sky_rock_m	20
 piece	env_sky_rock_s	29

@@ -10,6 +10,8 @@ namespace CriticalMass.Runtime.View.Art
         public string Key;
         public GameObject Model;
         public AnimationClip[] Clips = new AnimationClip[0];
+        /// <summary>The painted face decal (ModelSpec.FaceTexture), or null.</summary>
+        public Texture2D Face;
 
         public AnimationClip Clip(string name)
         {

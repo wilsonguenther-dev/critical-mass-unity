@@ -7,7 +7,8 @@
 // lights, no ambient probe, no highlights, no probes, no fog. Defaults are the bible core palette (p05); they are
 // starting values, tuned only through a U-### entry. Art import (2026-11-12): _ColorMode 1 reads the Blender art's
 // vertex colour with its alpha mask codes and team-glow contract (CMToonCommon.hlsl), and the DepthOnly and DepthNormals
-// passes put CM/Toon objects into the depth and normals textures.
+// passes put CM/Toon objects into the depth and normals textures. Art refresh 2: face decal (_DecalOn, _FaceTex on
+// UV0), Kaiju _Berserk darkening of fixed colours, per-vertex outline weight (UV4.x) so faces carry no hull.
 Shader "CM/Toon"
 {
     Properties
@@ -24,7 +25,7 @@ Shader "CM/Toon"
         _TopBandLift ("Top Face Band Lift", Range(0, 1)) = 1
         _OutlineColor ("Outline Color (Void Navy)", Color) = (0.094118, 0.137255, 0.231373, 1)
         _OutlinePx ("Outline Width (px at 1080p)", Range(0, 8)) = 3
-        _OutlineSource ("Outline Direction (0 normal, 1 from pivot, 2 UV3)", Range(0, 2)) = 0
+        _OutlineSource ("Outline Direction (0 normal, 1 from pivot, 2 UV3, 3 tangent)", Range(0, 3)) = 0
         _RimWidth ("Rim Width", Range(0, 1)) = 0.25
         _RimStrength ("Rim Strength", Range(0, 1)) = 0.6
         _ColorMode ("Colour Source (0 team mask in vertex red, 1 vertex colour + alpha mask codes)", Range(0, 1)) = 0
@@ -47,6 +48,13 @@ Shader "CM/Toon"
         _FogBottom ("Height Fog Full (y)", Float) = -10
         _FogAmount ("Height Fog Amount", Range(0, 1)) = 0
         _ExtrudePx ("UV2 Extrusion (px at 1080p, foam)", Range(0, 32)) = 0
+        [Toggle] _DecalOn ("Face Decal (UV0, alpha mix)", Float) = 0
+        [NoScaleOffset] _FaceTex ("Face Decal", 2D) = "black" {}
+        _Berserk ("Berserk (fixed colours darken)", Range(0, 1)) = 0
+        _BerserkMul ("Berserk Multiplier (sRGB)", Vector) = (0.82, 0.56, 0.78, 1)
+        _BerserkTint ("Berserk Tint (Corruption)", Color) = (0.556863, 0.247059, 0.819608, 1)
+        _BerserkTintAmount ("Berserk Tint Amount", Range(0, 1)) = 0.15
+        [Toggle] _OutlineWeightUV4 ("Outline Weight From UV4.x", Float) = 0
     }
 
     SubShader
@@ -77,6 +85,7 @@ Shader "CM/Toon"
                 float4 positionCS : SV_POSITION;
                 float3 positionWS : TEXCOORD0;
                 float3 normalWS   : TEXCOORD1;
+                float2 uv0        : TEXCOORD2;
                 half4  color      : COLOR;
             };
 
@@ -87,6 +96,7 @@ Shader "CM/Toon"
                 output.positionWS = TransformObjectToWorld(input.positionOS.xyz);
                 output.normalWS = TransformObjectToWorldNormal(input.normalOS);
                 output.color = input.color;
+                output.uv0 = _DecalOn > 0.5 ? input.uv0 : float2(0, 0);
                 return output;
             }
 
@@ -103,6 +113,7 @@ Shader "CM/Toon"
                 half selfLit = 0.0h;
                 if (_ColorMode > 0.5) CMToonVertexColour(input.color, albedo, selfLit);
                 else albedo = lerp(_BaseColor.rgb, _TeamColor.rgb, input.color.r);
+                albedo = CMToonDecal(albedo, input.uv0);
 
                 // Three bands from N.L; a cast shadow drops the pixel to the shadow band; a top-facing surface is one
                 // band lighter (2.2 bevel rule: tops exactly one band lighter than their sides).
