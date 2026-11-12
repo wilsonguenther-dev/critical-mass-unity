@@ -367,7 +367,7 @@ def ortho_shot(name, az, el, objs, height=720, teams=("azure",), cam_dist=12.0):
 
 
 def isolate_tank():
-    """Temporary copy of the body keeping only the globe tank (rest-space test around the tank centre)."""
+    """Temporary copy of the body keeping only the globe tank (its feature groups; the hose above the hip)."""
     import bmesh
     me = body.data.copy()
     ob = body.copy()
@@ -375,8 +375,16 @@ def isolate_tank():
     scene.collection.objects.link(ob)
     bm = bmesh.new()
     bm.from_mesh(me)
-    c = Vector((-0.06, 0.41, 1.19))
-    kill = [v for v in bm.verts if (v.co - c).length > 0.42 or v.co.y < 0.16]
+    keep_g = {body.vertex_groups[n].index for n in ("feat_tank", "feat_leaves", "feat_tank_glint", "feat_hose")
+              if n in body.vertex_groups}
+    team_g = body.vertex_groups["feat_team_cloth"].index
+    dl = bm.verts.layers.deform.active
+    keep = set()
+    for v in bm.verts:
+        gs = v[dl].keys()
+        if any(g in keep_g for g in gs) and v.co.z > 0.86 or (team_g in gs and v.co.y > 0.25):
+            keep.add(v)
+    kill = [v for v in bm.verts if v not in keep]
     bmesh.ops.delete(bm, geom=kill, context="VERTS")
     bm.to_mesh(me)
     bm.free()

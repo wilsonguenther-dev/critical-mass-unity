@@ -412,6 +412,13 @@ if os.path.exists(os.path.join(RD, "front_azure.png")):
         checks["swatch_render_pct_within_de10_front_crimson"] = {
             "coral": round(100 * sum(1 for p in pc[::3] if de2000(p, hx(SW["coral"])) < 10) / max(len(pc[::3]), 1), 1)}
 
+# our individual framings as JPEG on bible paper (render set)
+os.makedirs(os.path.join(OUT, "renders"), exist_ok=True)
+for fn in sorted(os.listdir(RD)):
+    if fn.endswith(".png") and not fn.startswith(("mask_", "game_")):
+        save_jpg(on_paper(Image.open(os.path.join(RD, fn)).convert("RGBA")),
+                 os.path.join(OUT, "renders", fn[:-4] + ".jpg"), max_w=1400)
+
 with open(os.path.join(OUT, "checks.json"), "w") as f:
     json.dump(checks, f, indent=1)
 print(json.dumps({k: v for k, v in checks.items() if k not in ("team_colour", "vs_warrior_bbox_px")}))

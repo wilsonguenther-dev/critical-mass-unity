@@ -218,8 +218,14 @@ def build_tank():
     G = TANK_C
     add(BODY, B.sphere((TANK_R, TANK_R, TANK_R), 18, 11), "f_biomass", W, "tank", m=M(G))
     add(BODY, B.torus(TANK_R + 0.008, 0.026, 18, 4), "f_brass", W, T, m=M(G, (90, 0, 0)))          # ring seen from behind
-    add(BODY, B.torus(TANK_R + 0.01, 0.028, 20, 4), "f_frame_dark", W, T, m=M(G + Vector((0, 0, -0.04)), (0, 0, 0),
-                                                                              (1, 1, 1)))
+    # leaves "inside" the glass (pressed on the back of the globe, outlined) and a lighter self-lit highlight facet
+    for d, ln, rot in (((0.05, 1.0, 0.05), 0.17, 0), ((-0.55, 0.8, -0.25), 0.14, 35), ((0.5, 0.8, -0.3), 0.14, -35)):
+        n = Vector(d).normalized()
+        add(BODY, B.leaf(ln, ln * 0.5, 0.012), "f_leaf_dark", W, "leaves", smooth=False,
+            m=kit.frame(G + n * (TANK_R - 0.003), n, (0, 0, 1)) @ M((0, -ln * 0.45, 0), (0, 0, rot)))
+    hn = Vector((-0.45, 0.72, 0.53)).normalized()
+    add(BODY, B.sphere((0.075, 0.05, 0.02), 6, 4), "f_biomass_hi", W, "tank_glint",
+        m=kit.frame(G + hn * (TANK_R - 0.004), hn, (0, 0, 1)))
     for k in range(2):
         a = math.radians(0 + 180 * k)
         p = G + Vector((math.cos(a) * (TANK_R + 0.01), 0.0, math.sin(a) * (TANK_R + 0.01)))
@@ -236,14 +242,14 @@ def build_tank():
     add(BODY, B.torus(0.056, 0.016, 10, 4), "f_brass", W, T, m=kit.frame(n1, n1 - n0, (1, 0, 0)))
     # teal side canisters with brass caps and brackets
     for s in (1, -1):
-        cx = G + Vector((0.285 * s, -0.02, 0.0))
+        cx = G + Vector((0.262 * s, -0.06, 0.0))
         a, b = cx + Vector((0, 0, -0.16)), cx + Vector((0, 0, 0.15))
-        add(BODY, B.bcyl(a, b, 0.078, 0.078, 8, 0.015), "f_team_cloth", W, "team_cloth")
+        add(BODY, B.bcyl(a, b, 0.07, 0.07, 8, 0.015), "f_team_cloth", W, "team_cloth")
         for e in (a, b):
-            add(BODY, B.bcyl(e - Vector((0, 0, 0.022)), e + Vector((0, 0, 0.022)), 0.084, 0.084, 8, 0.01), "f_brass",
+            add(BODY, B.bcyl(e - Vector((0, 0, 0.022)), e + Vector((0, 0, 0.022)), 0.076, 0.076, 8, 0.01), "f_brass",
                 W, T)
         add(BODY, B.box((0.06, 0.04, 0.035), 0.01, 1), "f_brass", W, T, smooth=False,
-            m=M(G + Vector((0.225 * s, -0.02, 0.0))))
+            m=M(G + Vector((0.215 * s, -0.05, 0.0))))
     # dark hose from the nozzle down to a brass coupler on the right of the belt
     pts = bezier(n1, n1 + Vector((-0.04, 0.03, -0.14)), Vector((-0.30, 0.22, 0.70)), Vector((-0.262, -0.02, 0.76)), 10)
     add(BODY, B.tube(pts, 0.026, 6), "f_hose", ["chest", "spine", "hips"], "hose")
@@ -346,10 +352,9 @@ def main():
     body = objs[BODY]
     for ob in objs.values():
         g = ob.vertex_groups.new(name="outline_w")
-        face = ob.vertex_groups.get("feat_face")
-        fi = face.index if face else -1
+        no_line = {ob.vertex_groups[n].index for n in ("feat_face", "feat_tank_glint") if n in ob.vertex_groups}
         for v in ob.data.vertices:
-            g.add([v.index], 0.0 if any(gg.group == fi for gg in v.groups) else 1.0, "REPLACE")
+            g.add([v.index], 0.0 if any(gg.group in no_line for gg in v.groups) else 1.0, "REPLACE")
     zs = [v.co.z for v in body.data.vertices]
     feats = {}
     for g in body.vertex_groups:
