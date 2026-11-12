@@ -24,10 +24,12 @@ Shared and read-only (not edited from here): `../../Characters/_source~/cm_art/`
 ```sh
 B=/Applications/Blender.app/Contents/MacOS/Blender
 cd "Assets/_Game/Art/Miner/_source~"
-$B -b --factory-startup --python-exit-code 1 -P build_miner.py                  # miner.blend + both FBX
+python3 bible_masks.py                                                          # v2: clean bible masks -> bible_masks/
+$B -b --factory-startup --python-exit-code 1 -P build_miner.py                  # miner.blend + both FBX + ../MinerFace.png
+$B -b --factory-startup --python-exit-code 1 -P fit_stance.py -- front,three-quarter,profile,back 450   # optional: refit stances.json
 $B -b --factory-startup --python-exit-code 1 -P verify_miner.py                 # FBX re-import checks
 $B -b --factory-startup --python-exit-code 1 -P render_miner.py -- /tmp/miner-r 600
-python3 compare_miner.py /tmp/miner-r ~/Obsidian/Wilson-Brain/Projects/Kaiju-Demo/unity-port/miner-v1
+python3 compare_miner.py /tmp/miner-r ~/Obsidian/Wilson-Brain/Projects/Kaiju-Demo/unity-port/miner-v2
 ```
 
 ## Contents of the FBX files
@@ -51,3 +53,7 @@ are `feat_*` vertex groups kept in the .blend. `feat_*_detail` groups mark inner
 - The bible framings use a render-only capture stance (`STANCES` in `render_miner.py`); the in-game Idle keeps the arms
   low. Silhouette IoU against the bible crops is 0.50 to 0.72, below the 0.85 gate.
 - The pick-to-hammer fold is two state meshes, not an animated transformation. Nothing imported into Unity yet.
+
+## v2 (2026-11-12)
+
+See ~/Obsidian/Wilson-Brain/Projects/Kaiju-Demo/unity-port/miner-v2/REPORT.md. New: bible_masks.py + bible_masks/ (clean masks), iou_gate.py (registered IoU gate), fit_stance.py + stances.json + miner_art/stance.py (render-only bible stances fitted per crop), miner_art/face_decal.py (256 px painted face decal -> ../MinerFace.png, material CM_FaceDecal on Miner_Body slot 1). Unity: assign MinerFace.png to CM_FaceDecal (alpha, no outline pass).
