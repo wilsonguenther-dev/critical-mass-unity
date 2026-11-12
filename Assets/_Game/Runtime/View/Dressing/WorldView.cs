@@ -173,7 +173,6 @@ namespace CriticalMass.Runtime.View.Dressing
             _dressed = Plan.Dressed;
             _dressedTypes = Plan.CellsAtPlan;
             DressVersion++;
-            Debug.Log($"[WorldView] dressed: {Plan.Placements.Count} placements, {Renderers} renderers, {Triangles} triangles, hash {Plan.Hash()}");
         }
 
         private void SyncBreakables()
