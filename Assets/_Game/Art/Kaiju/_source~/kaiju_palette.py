@@ -58,6 +58,25 @@ GLOW = {
 }
 STAGE_DEFAULT_GLOW = {"Egg": "Neutral", "Hatchling": "Neutral", "Adult": "Azure", "Shards": "Azure"}
 
+# Berserk state (bible p10 berserk adult, decided 2026-11-12: follow the bible, the plates DARKEN). Sampled with 10-colour
+# k-means over 10-berserk-adult.png: plates #442E5A (azure adult #3E4F60), lit faces #6A4A85 (azure #A29990), belly
+# #9A6660 / #CF8C9E (azure #C9BFAA). CM/Toon contract: a material float _Berserk (0 or 1, the game sets it with the
+# Berserk state, same mesh) applied to FIXED colours (alpha 0) before the bands, in sRGB:
+#     fixed' = lerp(fixed, lerp(fixed * BERSERK_MUL, CORRUPTION, BERSERK_TINT), _Berserk)
+# Team-glow faces only take the Berserk allegiance glow (magenta) as before.
+BERSERK_MUL = (0.82, 0.56, 0.78)
+BERSERK_TINT = 0.15
+CORRUPTION = "#8E3FD1"     # p05 Corruption
+
+
+def berserk_fixed(h):
+    """sRGB hex of a fixed colour as it renders in the Berserk state (for checks and swatches)."""
+    c = srgb(h)
+    t = srgb(CORRUPTION)
+    out = [(x * m) * (1 - BERSERK_TINT) + tt * BERSERK_TINT for x, m, tt in zip(c, BERSERK_MUL, t)]
+    return "#%02X%02X%02X" % tuple(round(255 * v) for v in out)
+
+
 TELEGRAPH_RED = "#E63E52"  # 10-telegraph spikes (k-means 14 %); fixed colour, never a team colour
 TELEGRAPH_RED_LIGHT = "#F6716B"
 

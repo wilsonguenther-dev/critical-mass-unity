@@ -115,6 +115,29 @@ def toon_material(m=None, face=True):
         nt.links.new(base, fm.inputs[6])
         nt.links.new(tex.outputs["Color"], fm.inputs[7])
         base = fm.outputs[2]
+    # Berserk state (kaiju_palette BERSERK_*): fixed colours darken toward violet before the bands. Done in sRGB as
+    # the contract says: linear -> sRGB (approx. pow 1/2.2), multiply + tint, back to linear.
+    bz = node(nt, "ShaderNodeValue", name="BERSERK")
+    bz.outputs[0].default_value = 0.0
+    g1 = node(nt, "ShaderNodeGamma")
+    nt.links.new(base, g1.inputs[0])
+    g1.inputs[1].default_value = 1 / 2.2
+    bm = node(nt, "ShaderNodeMix", data_type="RGBA", blend_type="MULTIPLY")
+    bm.inputs["Factor"].default_value = 1.0
+    nt.links.new(g1.outputs[0], bm.inputs[6])
+    bm.inputs[7].default_value = (*PAL.BERSERK_MUL, 1.0)
+    bt = node(nt, "ShaderNodeMix", data_type="RGBA", blend_type="MIX")
+    bt.inputs["Factor"].default_value = PAL.BERSERK_TINT
+    nt.links.new(bm.outputs[2], bt.inputs[6])
+    bt.inputs[7].default_value = (*PAL.srgb(PAL.CORRUPTION), 1.0)
+    g2 = node(nt, "ShaderNodeGamma")
+    nt.links.new(bt.outputs[2], g2.inputs[0])
+    g2.inputs[1].default_value = 2.2
+    bsel = node(nt, "ShaderNodeMix", data_type="RGBA", blend_type="MIX")
+    nt.links.new(bz.outputs[0], bsel.inputs["Factor"])
+    nt.links.new(base, bsel.inputs[6])
+    nt.links.new(g2.outputs[0], bsel.inputs[7])
+    base = bsel.outputs[2]
     # fixed colour: rgb * f, shadow band mixed 12 % toward navy
     mul = node(nt, "ShaderNodeMix", data_type="RGBA", blend_type="MULTIPLY")
     mul.inputs["Factor"].default_value = 1.0
@@ -312,6 +335,8 @@ def set_team(stage_default, alleg):
     for mt in (TOON, TOON_W):
         mt.node_tree.nodes["TEAM"].outputs[0].default_value = (*PAL.lin(PAL.GLOW[alleg]), 1.0)
         mt.node_tree.nodes["REF"].outputs[0].default_value = max(PAL.lin(PAL.GLOW[stage_default]))
+    # the Berserk state darkens the Kaiju's plates only (the Warrior keeps its colours)
+    TOON.node_tree.nodes["BERSERK"].outputs[0].default_value = 1.0 if alleg == "Berserk" else 0.0
 
 
 def set_pose(ob, clip, phase):
