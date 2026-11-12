@@ -27,7 +27,7 @@ item spec overrides this file where the two differ. Anything here that was a fre
 | --- | --- | --- |
 | `src/config/game.config.ts`, `palette.ts` (PALETTE only) | `Assets/_Game/Sim/Config/` | `CriticalMass.Sim.Config` |
 | `src/sim/types.ts`, `rng.ts`, `world.ts`, `step.ts`, `input.ts`, `hill.ts`, `match.ts`, `debug.ts` | `Assets/_Game/Sim/Core/` | `CriticalMass.Sim.Core` |
-| `src/sim/movement.ts`, `collide.ts`, `combat.ts`, `damage.ts`, `abilities.ts`, `barricades.ts`, `resources.ts`, `kaiju.ts`, `respawn.ts` | `Assets/_Game/Sim/` (root: MAX-ITEMS names `Assets/_Game/Sim/Collide.cs` and `Resources.cs`) | `CriticalMass.Sim.Core` |
+| `src/sim/movement.ts`, `collide.ts`, `combat.ts`, `damage.ts`, `abilities.ts`, `barricades.ts`, `resources.ts`, `kaiju.ts`, `respawn.ts` | `Assets/_Game/Sim/` (root: MAX-ITEMS names `Assets/_Game/Sim/Collide.cs` and `SimResources.cs`, U-031) | `CriticalMass.Sim.Core` |
 | `src/sim/grid.ts`, `flowfield.ts`, `spatialHash.ts`, the `MapDef` type of `map.ts` | `Assets/_Game/Sim/Grid/` | `CriticalMass.Sim.Grid` |
 | `src/sim/map.ts` (Skybreak Basin layout) | `Assets/_Game/Sim/Maps/` | `CriticalMass.Sim.Maps` |
 | `src/bots/*.ts` (non-test) | `Assets/_Game/Sim/Bots/` | `CriticalMass.Sim.Bots` |
@@ -49,10 +49,13 @@ there. `Assets/_Game/Editor/` (`CriticalMass.Editor`): only F-07 edits it in Pha
     item spec says so (`Kaiju`, `MapGrid`);
   - names fixed by MAX-ITEMS: `step.ts` -> `SimStep`, `grid.ts` -> `MapGrid`, `bots/fsm.ts` -> `BotFsm`,
     `game.config.ts` -> `GameConfig`;
-  - names that would hide a UnityEngine type in Runtime code: `input.ts` -> `SimInput`, `debug.ts` -> `SimDebug`;
-  - `src/bots/*`: `Bot` prefix (`BotSteer`, `BotDirector`, `BotFields`), `index.ts` -> `Bots`;
+  - names that would hide a UnityEngine type in Runtime code: `input.ts` -> `SimInput`, `debug.ts` -> `SimDebug`,
+    `resources.ts` -> `SimResources` (U-031: `Resources` is ambiguous with `UnityEngine.Resources` in any Runtime file
+    that also imports the Sim namespace, CS0104);
+  - `src/bots/*`: `Bot` prefix (`BotSteer`, `BotDirector`, `BotFields`), `index.ts` -> `BotBrain` (U-031: a class `Bots` inside
+    namespace `CriticalMass.Sim.Bots` is shadowed by the namespace from other `CriticalMass.Sim.*` code, CS0234);
   - every other file: PascalCase of the file name (`Movement`, `Collide`, `Combat`, `Damage`, `Abilities`,
-    `Barricades`, `Resources`, `Respawn`, `Hill`, `Match`, `HeadingMetric`).
+    `Barricades`, `Respawn`, `Hill`, `Match`, `HeadingMetric`).
 - `SCREAMING_CASE` constants -> PascalCase `public const`; `public static readonly` when not a compile-time
   constant: `ACTOR_CAPACITY` -> `ActorCapacity`, `KAIJU_SOURCE` -> `KaijuSource`.
 - Object fields -> PascalCase public fields (`world.prevX` -> `world.PrevX`, `actor.spawnProtect` -> `SpawnProtect`).
@@ -102,7 +105,8 @@ there. `Assets/_Game/Editor/` (`CriticalMass.Editor`): only F-07 edits it in Pha
    Why: with plain double storage, ties that collapse in f32 survive as one-ulp differences and change discrete
    choices; a port of computeFlowField + sampleFlowDir on 20 random 112x72 grids picked a different direction in
    539 of 144,221 cells (0.374%). Oracle tolerance (U-002): ticks, counts, booleans, event types and outcomes exact;
-   positions, velocities and distances within 1e-4 only for the last-bit transcendental case of rule 15.
+   positions, velocities and distances within 1e-4 only for the last-bit transcendental case of rule 15 (after F-02c the
+   four transcendentals are bit-exact, so the tolerance is a safety margin, not an expected difference).
 2. **Rounding.** `Math.round(v)` -> `JsMath.Round(v)` (floor, then +1 when the remainder is at least 0.5, F-02a; not
    `Math.Floor(v + 0.5)`, which is wrong at 0.49999999999999994; C# `Math.Round` rounds half to even).
 3. **Floor to a cell.** `Math.floor(v)` used as an integer (cell coordinate, index, count) -> `JsMath.FloorToInt(v)`
@@ -120,7 +124,9 @@ there. `Assets/_Game/Editor/` (`CriticalMass.Editor`): only F-07 edits it in Pha
 9. **Randomness.** Only the seeded `Rng` (F-02a). No `System.Random`, `UnityEngine.Random`, `DateTime`, `Stopwatch` in
    `Assets/_Game/Sim` (`BoundaryTests` enforces it). `Math.random` appears in no browser sim file and no bot file.
 10. **Module-scope scratch.** TS module-level scratch arrays and objects become `private static` fields, grown the
-    same way. Tests run single-threaded: never add `[Parallelizable]`.
+    same way. Tests run single-threaded: never add `[Parallelizable]`. The Sim is stepped from exactly one thread
+    (U-047): the Runtime driver (F-08a) steps it on the Unity main thread only and the soak harness (F-09) runs matches
+    one after another, never in parallel; F-01b proves sequential interleaving of two worlds is safe.
 11. **Logging.** `console.error` / `console.log` in sim code is dropped (the Sim has no logger).
 12. **Ceil and round of products.** `Math.ceil(a * b)` -> `Math.Ceiling(a * b)` with both operands `double`, and the
     same for `Math.round` -> `JsMath.Round`: the IEEE product is the same in both runtimes (10 * 0.3 = 3.0000000000000004
@@ -128,10 +134,17 @@ there. `Assets/_Game/Editor/` (`CriticalMass.Editor`): only F-07 edits it in Pha
 13. **Tick counts from config.** Every config number is `double` (F-01). A TS field that counts whole ticks
     (`Kaiju.meleeWindupIn`, `Barricade` slots, ...) is `int` in C# and is set with an explicit `(int)` cast of the config
     value; the cast is exact because those values are integers.
+14a. **Team enums (U-047).** `TeamId`, `MatchResult`, `HillState` and `KaijuState` have different integer values for
+    Azure and Crimson. A browser assignment of a team string (`winner = team`, `kaiju.state = team`, `hillState = team`)
+    goes through `SimEnumMap` (F-02c); a raw cast between them fails `BoundaryTests`.
 14. **Empty input is not "no aim".** `SimInput.EmptyInput()` has aim (0, 0), which is finite. Code that means "no aim"
     passes `double.NaN`; code that means "no input" does not call `ApplyInput` at all.
-15. **Math library.** `Math.sin/cos/atan2/sqrt/exp/abs/min/max/ceil` -> `System.Math` equivalents. `atan2`, `sin`, `cos`,
-    `exp` may differ from V8 in the last bit; the 1e-4 position tolerance covers it.
+15. **Math library (U-032, replaces the earlier "System.Math equivalents, 1e-4 covers it").** `Math.sin`, `Math.cos`,
+    `Math.atan2`, `Math.exp` -> `JsMath.Sin`, `JsMath.Cos`, `JsMath.Atan2`, `JsMath.Exp` (F-02c: ports of V8's fdlibm,
+    bit-exact with node on the golden file `tools/golden/jsmath-fdlibm.json`). `BoundaryTests` fails any
+    `Math.Sin/Cos/Atan2/Exp`, `MathF.*` of those four, and `using static System.Math` under `Assets/_Game/Sim/`.
+    `Math.sqrt/abs/min/max/floor/ceil` -> `System.Math` (exact in IEEE-754 on every platform). Sim.Tests code that
+    feeds the Sim (F-09's wandering actor) uses `JsMath` too.
 
 ## 7. Mechanics item code left out of shared files (U-023)
 

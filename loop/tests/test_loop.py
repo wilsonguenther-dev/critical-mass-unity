@@ -174,14 +174,15 @@ F-03 -> {F-05a, F-05b}   (coupled: one compile unit)
 
 def test_batches_from_order_md(tmp_path):
     (tmp_path / '_ORDER.md').write_text(ORDER_MD)
-    assert C.order_batches(tmp_path) == [{'batch': 1, 'items': ['F-01', 'F-02a', 'F-03'], 'coupled': False},
-                                         {'batch': 2, 'items': ['F-05a', 'F-05b'], 'coupled': True}]
+    assert C.order_batches(tmp_path) == [
+        {'batch': 1, 'items': ['F-01', 'F-02a', 'F-03'], 'coupled': False, 'coupled_set': [], 'waves': []},
+        {'batch': 2, 'items': ['F-05a', 'F-05b'], 'coupled': True, 'coupled_set': ['F-05a', 'F-05b'], 'waves': []}]
 
 
 def test_real_order_md_marks_batches_2_3_4_coupled():
     b = C.order_batches()
     if b:  # loop/items/_ORDER.md exists on this checkout
-        assert [x['coupled'] for x in b] == [False, True, True, True]
+        assert [x['coupled'] for x in b] == [False, True, True, True, False]
 
 
 def test_real_order_md_batch_membership_covers_every_loop_item():
@@ -189,8 +190,9 @@ def test_real_order_md_batch_membership_covers_every_loop_item():
     b = C.order_batches()
     if not b:
         return
-    assert b[1]['items'] == ['F-05a', 'F-05b', 'F-05c', 'F-05d', 'F-05e', 'F-05f', 'F-05g', 'F-05h', 'F-05i', 'F-05j']
-    assert [len(x['items']) for x in b] == [5, 10, 7, 4]
+    assert b[1]['items'] == ['F-02c', 'F-01b', 'F-05a', 'F-05b', 'F-05c', 'F-05d', 'F-05e', 'F-05f', 'F-05g', 'F-05h',
+                             'F-05i', 'F-05j']
+    assert [len(x['items']) for x in b] == [5, 12, 7, 5, 4]
     assert C.batch_coverage(b, C.load_items()) == []
 
 

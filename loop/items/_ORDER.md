@@ -40,11 +40,15 @@ open choices: `_OPEN.md`. Nothing here is launched.
 
 ```
 F-01 -> F-02a -> F-03 -> F-04 -> F-02b
-F-02b -> {F-05a, F-05b, F-05c, F-05d, F-05e, F-05f, F-05g, F-05h, F-05i, F-05j}   (coupled: one compile unit)
+F-02b -> F-02c                                                                       (batch 2, U-032)
+F-01 -> F-01b                                                                        (batch 2, U-036; nothing waits on it)
+F-02c -> {F-05a, F-05b, F-05c, F-05d, F-05e, F-05f, F-05g, F-05h, F-05i, F-05j}      (coupled: one compile unit, F-02c included)
 all F-05* -> F-06b -> F-06a -> F-06c -> F-06d -> F-06e -> F-06f                      (coupled: one compile unit)
 F-05a -> F-07
 F-06e, F-07 -> {F-08a, F-08b, F-08c}                                                 (coupled: one compile unit)
 F-06e -> F-09
+V-01 (waits on nothing; built in batch 4's wave, lands with batch 4, U-041)
+V-01 -> {A-02, A-03, A-04, A-05}                                                     (batch 5, after art/warrior-blender is on main, U-043)
 ```
 
 Coupling (O-21): batch-2 tests call `SimStep.Step`, which calls every batch-2 system, and combat/kaiju/barricades/
@@ -53,19 +57,31 @@ components. A coupled set lands together; a red in it is repaired by the fix sea
 
 ## 3. Batches (no two items in a batch share a `files_allowed` path: checked by script)
 
-| Batch | Items | coupled | Waves (builders) | Compiles | Gate after the batch |
-| --- | --- | --- | --- | --- | --- |
-| 1 | F-01, F-02a, F-03, F-04, F-02b | false (a chain: each item waits on the earlier ones) | 1 wave of 5 | 1 | compile, EditMode 41 (37 ported + 3 added + SimVersionTests 1; panel 2026-11-12 added the JsMath case) |
-| 2 | F-05a, F-05b, F-05c, F-05d, F-05e, F-05f, F-05g, F-05h, F-05i, F-05j | true (U-026) | wave 1: F-05a, F-05b, F-05c, F-05d, F-05e; wave 2: F-05f, F-05g, F-05h, F-05i, F-05j | 1 after both waves | compile, EditMode +117 runtime cases (113 methods) |
-| 3 | F-06b, F-06a, F-06c, F-06d, F-06e, F-06f, F-07 | true for the six F-06 items (U-026); F-07 is not coupled to them and drops alone | wave 1: F-06b, F-06a, F-06c, F-06d, F-06e; wave 2: F-06f, F-07 | 1 after both waves | compile, EditMode +31 (29 ported, 2 added; the perf case is Explicit; corrected by the panel 2026-11-12) |
-| 4 | F-08a, F-08b, F-08c, F-09 | true for F-08a, F-08b, F-08c (bootstrap creates the other two; SimSpace is F-08a's); F-09 is not coupled and drops alone | 1 wave of 4 | 1 | compile, EditMode +7 (4 ported, 3 added), PlayMode smoke 1, Mac build; soak lane `tools/unity-test.sh --category Slow` 14 (U-028) |
+Coupling is per item, not per batch (U-033): the **Coupled set** column names the items of a batch that must land
+together; every other item of the batch is uncoupled and drops alone on a red (its in-batch dependants drop with it,
+uncounted). A coupled item never waits on an uncoupled item of its own batch (preflight checks the closure). The
+**Waves** column is the build plan under the launch's builder limit (`launch.sh --builders N`, ceiling 12, U-037);
+with a lower limit `cmloop.py plan` re-chunks the batch in table order.
 
-Acyclic: every `waits_on` edge points to an earlier batch, or inside batch 1 to an earlier item of the chain
-(F-01 -> F-02a -> F-03 -> F-04 -> F-02b). The only cycles are the code-level ones inside the coupled sets (combat <->
+| Batch | Items | Coupled set | Waves (builders <= 12) | Compiles | Gate after the batch |
+| --- | --- | --- | --- | --- | --- |
+| 1 | F-01, F-02a, F-03, F-04, F-02b | none (a chain: each item waits on the earlier ones) | wave 1: F-01, F-02a, F-03, F-04, F-02b | 1 | LANDED 2026-11-12 in PR 1 (579a53f): compile, EditMode 41 |
+| 2 | F-02c, F-01b, F-05a .. F-05j | F-02c, F-05a .. F-05j | wave 1: F-02c, F-01b, F-05a .. F-05j | 1 | compile, EditMode +129 (117 ported runtime cases in 113 methods; added: JsMathFdlibm 5, Boundary 4, SimEnumMap 1, GameConfigGolden 3, SharedScratch 2) |
+| 3 | F-06b, F-06a, F-06c, F-06d, F-06e, F-06f, F-07 | F-06a .. F-06f | wave 1: F-06b, F-06a, F-06c, F-06d, F-06e, F-06f, F-07 | 1 | compile, EditMode +31 (29 ported, 2 added; the perf case is Explicit) |
+| 4 | F-08a, F-08b, F-08c, F-09, V-01 | F-08a, F-08b, F-08c | wave 1: F-08a, F-08b, F-08c, F-09, V-01 | 1 | compile, EditMode +12 (4 ported, 3 SimSpace, 1 OutcomeRunner, 4 ToonShader), PlayMode 3 (smoke 1, human input 2), Mac build; soak lane `tools/unity-soak.sh` runs the 14 outcome bands and REPORTS (U-034, never a gate) |
+| 5 | A-02, A-03, A-04, A-05 | none | wave 1: A-02, A-03, A-04, A-05 | 1 | parity gate per art row; launch with `--batches 5` only after branch `art/warrior-blender` is on main (U-043) |
+
+Acyclic: every `waits_on` edge points to an earlier batch, or inside a batch to an earlier item (batch 1's chain;
+batch 2: every F-05 item waits on F-02c). The only cycles are the code-level ones inside the coupled sets (combat <->
 kaiju <-> barricades through `SimStep`, fsm <-> director, bootstrap <-> camera/HUD), which compile as one unit: on a red
-one fix seat repairs the red item, at most 2 rounds, then halt (U-026). Batch membership equals `waits_on`: each F-05
-item waits on F-02b only; F-06b waits on all ten F-05 items; F-06a, F-06c, F-06d, F-06e, F-06f each wait on the
-previous one; F-07 waits on F-05a; F-08a, F-08b, F-08c wait on F-06e and F-07; F-09 waits on F-06e.
+one fix seat repairs the red item, at most 2 rounds, then halt (U-026). Batch membership equals `waits_on`: F-02c waits
+on batch 1; F-01b on F-01; each F-05 item waits on F-02b and F-02c; F-06b waits on all ten F-05 items; F-06a, F-06c,
+F-06d, F-06e, F-06f each wait on the previous one; F-07 waits on F-05a; F-08a, F-08b, F-08c wait on F-06e and F-07;
+F-09 waits on F-06e; V-01 waits on nothing; A-02..A-05 wait on V-01.
+
+Peak agents (U-037, machine limit 12): a batch's builders run together, then the integrator, the fix seat (coupled
+red only) and the reviewer each run alone after the builders finish, so the peak is the largest wave: batch 2 = 12,
+batch 3 = 7, batch 4 = 5, batch 5 = 4 (plus the orchestrator session, which is not a loop agent).
 
 Shared-file owners (one writer per batch, script-checked): `Assets/_Game/Runtime/CriticalMass.Runtime.asmdef`,
 `Assets/_Game/Runtime.Tests/CriticalMass.Runtime.Tests.asmdef` and `Assets/_Game/Editor/**` (ProjectSetup.cs and the
@@ -73,10 +89,12 @@ Editor asmdef): F-07 only, in Phase 0. No item touches `ProjectSettings/`, `Pack
 `tools/unity-playtest.sh` and F-09 creates `tools/unity-soak.sh` (the two paths the harness gates run, U-028). No item writes a
 `.meta`, scene, prefab, material or asset file (U-027): Unity generates the metas on the integrator's import and
 ProjectSetup.Apply creates the one runtime asset (the placeholder material). ProjectSetup changes made in batch 3 must
-be applied (U-029) before batch 4's gates, which need the project-wide actions and the material.
+be applied (U-029) before batch 4's gates, which need the project-wide actions and the material. `tools/golden/**` is
+written by the architect only (F-01b and F-02c read it).
 
-Phase 0 exit (U-012): after batch 4, EditMode default 195 cases green (187 ported + 8 added; plus SimVersionTests), soak 14 green, PlayMode
-smoke green, Mac build green.
+Phase 0 exit (U-012, as amended by U-034): after batch 4, EditMode default 210 cases green (187 ported + 23 added;
+plus SimVersionTests), PlayMode 3 green, Mac build green. The soak lane's 14 outcome bands are a report to the
+architect, not part of the exit.
 
 ## 4. Ported test count
 
@@ -142,16 +160,16 @@ F-06 = F-06a..F-06f; F-08 = F-08a, F-08b, F-08c.
 
 | Max item | waits on (final) | Reopens (F-item files) |
 | --- | --- | --- |
-| CM-32 jump | F-01 .. F-08c | F-02a (Actor), F-05a (Movement.cs), F-05b (Collide.cs), F-07 + F-08a (Jump binding read) |
-| CM-33 bridge spans | F-01 .. F-08c | F-03, F-04, F-05b, F-08b |
-| CM-30 dig/place | F-01 .. F-09 | F-02a, F-02b (World, SetCell), F-05f (Abilities.cs), F-06b, F-06e, F-07, F-08b |
-| CM-31 topple | CM-30 | F-02a, F-02b, F-03 (Decorations), F-05c (Combat.cs) |
+| CM-32 jump | rules part: batch 2 (the human-jump bots case after batch 3); view part: F-07, F-08a (U-035) | F-02a (Actor), F-05a (Movement.cs), F-05b (Collide.cs), F-07 + F-08a (Jump binding read) |
+| CM-33 bridge spans | rules part: batch 2; view part: F-08b (U-035) | F-03, F-04, F-05b, F-08b |
+| CM-30 dig/place | rules part: F-01 .. F-05j and F-02c (batch 2), the 4 bot cases + soak case after batch 3; view part: F-08a, F-08b, F-08c (U-034, U-035) | F-02a, F-02b (World, SetCell), F-05f (Abilities.cs), F-06b, F-06e, F-07, F-08b |
+| CM-31 topple | rules part: batch 2 and CM-30's rules part (route guard); view part: F-08b and CM-30's view part (U-035) | F-02a, F-02b, F-03 (Decorations), F-05c (Combat.cs) |
 | CM-37 heal | F-01 .. F-09 | F-05i (SimStep.cs), F-06d, F-02a (SimEventType) |
-| CM-35 biomass types | F-01 .. F-09 | every file with an `ITEM CM-35` marker: Core/SimEvent.cs, Core/Actor.cs, Core/ResourceNode.cs, Core/MatchState.cs, Core/World.cs (F-02a, F-02b), Combat.cs (F-05c), Resources.cs (F-05g), Bots/Bots.cs (F-06e); the browser files with CM-35 code are exactly types.ts, world.ts, combat.ts, resources.ts, bots/index.ts |
+| CM-35 biomass types | F-01 .. F-09 | every file with an `ITEM CM-35` marker: Core/SimEvent.cs, Core/Actor.cs, Core/ResourceNode.cs, Core/MatchState.cs, Core/World.cs (F-02a, F-02b), Combat.cs (F-05c), SimResources.cs (F-05g), Bots/BotBrain.cs (F-06e); the browser files with CM-35 code are exactly types.ts, world.ts, combat.ts, resources.ts, bots/index.ts |
 | CM-34 | CM-35 | F-05g |
-| CM-85 | CM-34 | Resources.cs, DebugTests.cs, KaijuResourceTests.cs (F-05g); no kaiju.ts code (verified: CM-85 commit 3807f98 touches game.config.ts, resources.ts, debug.test.ts, kaiju.test.ts, corruption tests) |
+| CM-85 | CM-34 | SimResources.cs, DebugTests.cs, KaijuResourceTests.cs (F-05g); no kaiju.ts code (verified: CM-85 commit 3807f98 touches game.config.ts, resources.ts, debug.test.ts, kaiju.test.ts, corruption tests) |
 | CM-38 Demolitions | CM-30 | F-05c, F-05f, F-06d, F-06e |
-| CM-64 | CM-85 (kept) | branch `origin/cm/CM-64` read: built on CM-35 (e0ab1c7 is an ancestor), not on CM-85 (3807f98 is not); it edits resources.ts, damage.ts, types.ts, world.ts, fsm.ts, director.ts, debug.test.ts, kaiju.test.ts, so it shares Resources.cs and the two test files with CM-85: the CM-85 wait serialises those edits |
+| CM-64 | CM-85 (kept) | branch `origin/cm/CM-64` read: built on CM-35 (e0ab1c7 is an ancestor), not on CM-85 (3807f98 is not); it edits resources.ts, damage.ts, types.ts, world.ts, fsm.ts, director.ts, debug.test.ts, kaiju.test.ts, so it shares SimResources.cs and the two test files with CM-85: the CM-85 wait serialises those edits |
 | CM-36 | CM-85 (kept) | branch `origin/cm/CM-36` read: built on CM-35, not on CM-85; edits kaiju.ts (+4), fsm.ts, steer.ts, types.ts, world.ts; its berserk-share band is measured on instability, which CM-85 changes, so the wait stands |
 | CM-39 stations/upgrades | CM-35 | F-05d (Respawn.cs), F-08c |
 | CM-84 class switch | CM-39 | F-05d (CM-54 cut + 7 tests), F-02a (SimEventType, Actor) |

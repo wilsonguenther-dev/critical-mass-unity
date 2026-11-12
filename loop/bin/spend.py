@@ -21,6 +21,7 @@ loop/state/HALT. Exit codes: 0 ok, 10 stop-dispatch, 11 halt, 12 no data for the
 """
 import argparse
 import glob
+import re
 import json
 import os
 import sys
@@ -120,9 +121,100 @@ def check(run_id, cap, projects=PROJECTS, dry=False):
     return rec
 
 
+# ───────────────────────────── per-batch cost report (U-040) ─────────────────────────────
+SEAT_RES = [('builder', re.compile(r'You are BUILDER for item (\S+) \("[^"]*"\) in batch (\d+)')),
+            ('integrator', re.compile(r'You are the INTEGRATOR for batch (\d+)')),
+            ('fixer', re.compile(r'You are the FIX SEAT for coupled batch (\d+)')),
+            ('reviewer', re.compile(r'You are the REVIEWER for batch (\d+)'))]
+BASELINE_BATCH_1 = {'run_id': 'wf_403d1691-a59', 'agents': 7, 'subagent_tokens': 808397, 'tool_uses': 162,
+                    'wall_minutes': 17.6, 'landed_items': 5, 'tokens_per_landed_item': 161679,
+                    'source': 'the workflow runtime report for batch 1 (PR 1, 579a53f), 2026-11-12'}
+
+
+def seat_of(transcript):
+    """(kind, batch) of one agent transcript, read from its first user message (the seat prompt)."""
+    with open(transcript, errors='replace') as fh:
+        for line in fh:
+            try:
+                o = json.loads(line)
+            except ValueError:
+                continue
+            if o.get('type') != 'user':
+                continue
+            c = (o.get('message') or {}).get('content')
+            text = c if isinstance(c, str) else ' '.join(x.get('text', '') for x in c or [] if isinstance(x, dict))
+            for kind, rx in SEAT_RES:
+                m = rx.search(text)
+                if m:
+                    return kind, int(m.groups()[-1])
+            return 'other', None
+    return 'other', None
+
+
+def batch_report(run_id, batch, tag='', projects=PROJECTS, write=True):
+    """Tokens per seat kind and rounds for one batch of a run, so the cost of the next batch can be extrapolated.
+    Writes loop/logs/batch-report-<run>-<batch>.json and .md and one live-log sentence."""
+    kinds = {}
+    for f in find_transcripts(run_id, projects):
+        kind, b = seat_of(f)
+        if b != batch:
+            continue
+        t = transcript_tokens([f])
+        k = kinds.setdefault(kind, {'seats': 0, 'counted': 0, 'output': 0, 'cache_read': 0})
+        k['seats'] += 1
+        k['counted'] += t['counted']
+        k['output'] += t['output']
+        k['cache_read'] += t['cache_read']
+    ints = [r for r in (json.loads(l) for l in (C.LOGS / 'integrations.jsonl').read_text().splitlines() if l.strip())
+            if r.get('batch') == batch and (not tag or r.get('tag') == tag)] if (C.LOGS / 'integrations.jsonl').exists() else []
+    total = sum(k['counted'] for k in kinds.values())
+    rep = {'ts': C.utc(), 'run_id': run_id, 'batch': batch, 'tag': tag, 'by_seat_kind': kinds,
+           'counted_tokens': total, 'integrator_runs': len(ints), 'compile_rounds': sum(r.get('rounds', 0) for r in ints),
+           'fix_rounds': kinds.get('fixer', {}).get('seats', 0), 'results': [r.get('result') for r in ints],
+           'per_builder_seat': (kinds['builder']['counted'] // kinds['builder']['seats']) if kinds.get('builder') else None,
+           'baseline': BASELINE_BATCH_1}
+    if write:
+        base = C.LOGS / f'batch-report-{run_id}-{batch}'
+        C.write_json(base.with_suffix('.json'), rep)
+        lines = [f'# Batch {batch} cost report ({run_id})', '', f'Written {rep["ts"]} (date -u). Counted = input + output + '
+                 'cache creation (U-014 measure; cache reads listed apart).', '', '| Seat kind | Seats | Counted tokens | Output | Cache read |',
+                 '| --- | --- | --- | --- | --- |']
+        lines += [f'| {k} | {v["seats"]} | {v["counted"]} | {v["output"]} | {v["cache_read"]} |' for k, v in sorted(kinds.items())]
+        lines += ['', f'Integrator runs {rep["integrator_runs"]}, compile rounds {rep["compile_rounds"]}, fix rounds '
+                  f'{rep["fix_rounds"]}; results {rep["results"]}.', '',
+                  f'Baseline (batch 1, measured): {BASELINE_BATCH_1["agents"]} agents, {BASELINE_BATCH_1["subagent_tokens"]} '
+                  f'subagent tokens, {BASELINE_BATCH_1["tool_uses"]} tool uses, {BASELINE_BATCH_1["wall_minutes"]} min, about '
+                  f'{BASELINE_BATCH_1["tokens_per_landed_item"]} tokens per landed item.', '']
+        base.with_suffix('.md').write_text('\n'.join(lines))
+        C.livelog(f'Batch {batch} cost: {total} counted tokens over {sum(v["seats"] for v in kinds.values())} seats '
+                  f'({", ".join(f"{k} {v['seats']}" for k, v in sorted(kinds.items()))}); {rep["compile_rounds"]} compile '
+                  f'round(s), {rep["fix_rounds"]} fix round(s).')
+    return rep
+
+
+def missing_batch_reports(run_id, projects=PROJECTS):
+    """Shutdown: write the report of every batch that ran an integrator in this run and has none yet."""
+    seen = set()
+    if (C.LOGS / 'integrations.jsonl').exists():
+        for l in (C.LOGS / 'integrations.jsonl').read_text().splitlines():
+            try:
+                r = json.loads(l)
+            except ValueError:
+                continue
+            seen.add(int(r['batch']))
+    out = []
+    for b in sorted(seen):
+        if not (C.LOGS / f'batch-report-{run_id}-{b}.json').exists():
+            batch_report(run_id, b, projects=projects)
+            out.append(b)
+    return out
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument('action', choices=['check', 'watch'])
+    ap.add_argument('action', choices=['check', 'watch', 'batch-report'])
+    ap.add_argument('--batch', type=int)
+    ap.add_argument('--tag', default='')
     ap.add_argument('--run-id')
     ap.add_argument('--cap', type=int)
     ap.add_argument('--projects-dir', default=str(PROJECTS))
@@ -131,6 +223,14 @@ def main(argv=None):
     a = ap.parse_args(argv)
     run = C.read_json(C.STATE / 'run.json', {}) or {}
     cap = a.cap or run.get('cap')
+    if a.action == 'batch-report':
+        rid = a.run_id or run.get('run_id')
+        if not rid or a.batch is None:
+            print(json.dumps({'error': 'batch-report needs --batch and a run id'}))
+            return 2
+        rep = batch_report(rid, a.batch, a.tag, a.projects_dir, not a.dry_run)
+        print(json.dumps({k: rep[k] for k in ('batch', 'counted_tokens', 'compile_rounds', 'fix_rounds')}))
+        return 0
     if a.action == 'check':
         rid = a.run_id or run.get('run_id')
         if not rid:
