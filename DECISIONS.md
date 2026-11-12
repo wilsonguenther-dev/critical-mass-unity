@@ -435,6 +435,29 @@ hand-written file id.
 
 **Status.** Decided. Built: `loop/gates/setup`, first gate in `loop/bin/integrate.py`.
 
+## U-030 Generated Unity files and the setup order
+
+**Decision.** Order: CriticalMass.Editor.ProjectSetup.Apply runs on the integration branch after every item branch of
+the batch is merged and before the compile gate, on every batch (it is idempotent); nothing runs Unity on that branch
+before it. After the compile, the harness (not an item) commits the files Unity generated for the batch: every `*.meta`
+under `Assets/` (added or removed by the import), and the files ProjectSetup.Apply changed under
+`Assets/_Game/Settings/`, `Assets/_Game/Resources/` and `ProjectSettings/`. Any other file left dirty fails the batch
+(gate `generated`, no item named). Then the `clean-reimport` gate runs a second import with ProjectSetup.Apply and
+fails unless `git status` is clean, which proves nothing generated was missed. The `scope` gate fails an item whose
+own branch carries a hand-written `.meta`, `.unity`, `.prefab`, `.asset` or `.mat` (U-027), even when a
+`files_allowed` glob such as `Foo.cs*` would admit it; `Controls.inputactions` and its meta are the exception.
+ProjectSettings changes not produced by ProjectSetup.Apply still need `architect_approved: U-###`. Item-supplied gate
+tools (`tools/unity-playtest.sh` from F-08c, `tools/unity-soak.sh` from F-09) are run through `bash`, so the
+`playmode-smoke` and `soak` gates switch from skipped to real as soon as the file is in the tree under test.
+
+**Why.** U-027 leaves the metas to Unity; without a harness commit they would never reach main, and every later
+import would leave the tree dirty.
+
+**Replaces.** Nothing; it implements U-027's "the integrator must commit the `.meta` files Unity generates".
+
+**Status.** Decided. Built: `loop/gates/clean-reimport`, `commit_generated` and the gate-order check in
+`loop/bin/integrate.py`, the U-027 rule in the scope gate, `SETUP_ORDER` in `loop/bin/cmloop.py` and the workflow.
+
 ### Further harness rulings (2026-11-12, no new id)
 
 - **Review blockers (ruling 6).** Review findings marked BLOCKING are written to `loop/review/<batch>.md`. The next
