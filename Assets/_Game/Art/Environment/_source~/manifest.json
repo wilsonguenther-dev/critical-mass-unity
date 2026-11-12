@@ -295,12 +295,12 @@
    "bounds_unity_min": [
     0.0,
     -5.0831,
-    -0.0976
+    -0.1201
    ],
    "bounds_unity_max": [
     1.0,
     -0.75,
-    0.7924
+    1.0474
    ],
    "covers": "p12/p15 continuous island cliff skirt",
    "team_mask": false
@@ -310,7 +310,7 @@
    "fbx": "Environment/env_cliff_s2.fbx",
    "cat": "cliff",
    "pivot": "lip start point at ground height; local +X runs along the rim, outward -Z; yaw = atan2(dz, dx) in sim; 2 cell(s) long",
-   "tris": 32,
+   "tris": 31,
    "outline_px": 2.0,
    "materials": [
     "CM_Toon"
@@ -320,12 +320,12 @@
    "bounds_unity_min": [
     0.0,
     -4.0919,
-    -0.0747
+    -0.0745
    ],
    "bounds_unity_max": [
     2.0,
     -0.75,
-    0.6041
+    0.7326
    ],
    "covers": "p12/p15 continuous island cliff skirt",
    "team_mask": false
@@ -335,22 +335,22 @@
    "fbx": "Environment/env_cliff_s3.fbx",
    "cat": "cliff",
    "pivot": "lip start point at ground height; local +X runs along the rim, outward -Z; yaw = atan2(dz, dx) in sim; 3 cell(s) long",
-   "tris": 141,
+   "tris": 154,
    "outline_px": 2.0,
    "materials": [
     "CM_Toon"
    ],
-   "verts": 84,
+   "verts": 92,
    "cull": "down",
    "bounds_unity_min": [
     0.0,
-    -6.1532,
-    -0.1207
+    -6.7065,
+    -0.1292
    ],
    "bounds_unity_max": [
     3.0,
     -0.75,
-    0.9117
+    1.1979
    ],
    "covers": "p12/p15 continuous island cliff skirt",
    "team_mask": false
@@ -360,22 +360,22 @@
    "fbx": "Environment/env_cliff_s4.fbx",
    "cat": "cliff",
    "pivot": "lip start point at ground height; local +X runs along the rim, outward -Z; yaw = atan2(dz, dx) in sim; 4 cell(s) long",
-   "tris": 134,
+   "tris": 148,
    "outline_px": 2.0,
    "materials": [
     "CM_Toon"
    ],
-   "verts": 81,
+   "verts": 87,
    "cull": "down",
    "bounds_unity_min": [
     0.0,
-    -6.0861,
-    -0.0653
+    -5.7891,
+    -0.0938
    ],
    "bounds_unity_max": [
     4.0,
     -0.75,
-    1.0264
+    1.0738
    ],
    "covers": "p12/p15 continuous island cliff skirt",
    "team_mask": false
@@ -385,22 +385,22 @@
    "fbx": "Environment/env_cliff_s5.fbx",
    "cat": "cliff",
    "pivot": "lip start point at ground height; local +X runs along the rim, outward -Z; yaw = atan2(dz, dx) in sim; 5 cell(s) long",
-   "tris": 218,
+   "tris": 296,
    "outline_px": 2.0,
    "materials": [
     "CM_Toon"
    ],
-   "verts": 127,
+   "verts": 171,
    "cull": "down",
    "bounds_unity_min": [
     0.0,
-    -6.3223,
-    -0.0932
+    -6.759,
+    -0.0851
    ],
    "bounds_unity_max": [
     5.0,
     -0.75,
-    0.9888
+    1.2639
    ],
    "covers": "p12/p15 continuous island cliff skirt",
    "team_mask": false
@@ -410,22 +410,22 @@
    "fbx": "Environment/env_cliff_s6.fbx",
    "cat": "cliff",
    "pivot": "lip start point at ground height; local +X runs along the rim, outward -Z; yaw = atan2(dz, dx) in sim; 6 cell(s) long",
-   "tris": 251,
+   "tris": 277,
    "outline_px": 2.0,
    "materials": [
     "CM_Toon"
    ],
-   "verts": 146,
+   "verts": 159,
    "cull": "down",
    "bounds_unity_min": [
     0.0,
-    -6.2805,
-    -0.0991
+    -5.9283,
+    -0.1371
    ],
    "bounds_unity_max": [
     6.0,
     -0.75,
-    0.8818
+    1.1051
    ],
    "covers": "p12/p15 continuous island cliff skirt",
    "team_mask": false
@@ -445,12 +445,12 @@
    "bounds_unity_min": [
     0.0,
     -5.6339,
-    -0.0928
+    -0.1192
    ],
    "bounds_unity_max": [
     1.4142,
     -0.75,
-    0.8114
+    0.993
    ],
    "covers": "p12 cliff skirt on a 45-degree rim",
    "team_mask": false
@@ -460,22 +460,22 @@
    "fbx": "Environment/env_cliff_d2.fbx",
    "cat": "cliff",
    "pivot": "lip start point at ground height; local +X runs along the rim, outward -Z; yaw = atan2(dz, dx) in sim; 2 diagonal step(s), 2.828 u",
-   "tris": 141,
+   "tris": 155,
    "outline_px": 2.0,
    "materials": [
     "CM_Toon"
    ],
-   "verts": 85,
+   "verts": 92,
    "cull": "down",
    "bounds_unity_min": [
     0.0,
     -6.7151,
-    -0.0859
+    -0.1222
    ],
    "bounds_unity_max": [
     2.8284,
     -0.75,
-    1.1004
+    1.2371
    ],
    "covers": "p12 cliff skirt on a 45-degree rim",
    "team_mask": false
@@ -485,22 +485,22 @@
    "fbx": "Environment/env_cliff_d3.fbx",
    "cat": "cliff",
    "pivot": "lip start point at ground height; local +X runs along the rim, outward -Z; yaw = atan2(dz, dx) in sim; 3 diagonal step(s), 4.243 u",
-   "tris": 212,
+   "tris": 198,
    "outline_px": 2.0,
    "materials": [
     "CM_Toon"
    ],
-   "verts": 125,
+   "verts": 117,
    "cull": "down",
    "bounds_unity_min": [
     0.0,
     -6.561,
-    -0.0793
+    -0.0848
    ],
    "bounds_unity_max": [
     4.2426,
     -0.75,
-    0.9464
+    1.345
    ],
    "covers": "p12 cliff skirt on a 45-degree rim",
    "team_mask": false
@@ -510,22 +510,22 @@
    "fbx": "Environment/env_cliff_d4.fbx",
    "cat": "cliff",
    "pivot": "lip start point at ground height; local +X runs along the rim, outward -Z; yaw = atan2(dz, dx) in sim; 4 diagonal step(s), 5.657 u",
-   "tris": 245,
+   "tris": 231,
    "outline_px": 2.0,
    "materials": [
     "CM_Toon"
    ],
-   "verts": 141,
+   "verts": 137,
    "cull": "down",
    "bounds_unity_min": [
     0.0,
-    -5.8701,
-    -0.0738
+    -6.0784,
+    -0.1063
    ],
    "bounds_unity_max": [
     5.6569,
     -0.75,
-    1.0215
+    1.0975
    ],
    "covers": "p12 cliff skirt on a 45-degree rim",
    "team_mask": false
@@ -585,22 +585,22 @@
    "fbx": "Environment/env_waterfall.fbx",
    "cat": "water",
    "pivot": "rim edge midpoint (1 u axis edge); yaw = atan2(dz, dx) of the edge",
-   "tris": 760,
+   "tris": 800,
    "outline_px": 0.0,
    "materials": [
     "CM_Toon"
    ],
-   "verts": 603,
+   "verts": 643,
    "cull": "down",
    "bounds_unity_min": [
-    -0.5108,
+    -0.5333,
     -6.8,
-    -1.4232
+    -1.4483
    ],
    "bounds_unity_max": [
-    0.6654,
+    0.6653,
     0.016,
-    0.52
+    0.74
    ],
    "covers": "p12/p15 waterfall + pool + foam",
    "team_mask": false
@@ -718,14 +718,14 @@
    "verts": 204,
    "cull": "down",
    "bounds_unity_min": [
-    -1.6846,
+    -1.861,
     -0.0909,
-    -1.6711
+    -1.8448
    ],
    "bounds_unity_max": [
-    1.9272,
-    3.5192,
-    1.9184
+    2.1012,
+    3.486,
+    2.0963
    ],
    "covers": "p12/p15 round tree, 3.0 u canopy",
    "team_mask": false
@@ -743,14 +743,14 @@
    "verts": 204,
    "cull": "down",
    "bounds_unity_min": [
-    -1.1074,
+    -1.2233,
     -0.0721,
-    -1.1027
+    -1.2213
    ],
    "bounds_unity_max": [
-    1.201,
-    2.3496,
-    1.2681
+    1.3205,
+    2.3269,
+    1.387
    ],
    "covers": "round tree, 2.0 u",
    "team_mask": false
@@ -920,7 +920,7 @@
    "cull": "down",
    "bounds_unity_min": [
     -1.0,
-    -0.1157,
+    -0.1258,
     -1.0
    ],
    "bounds_unity_max": [
@@ -946,7 +946,7 @@
    "cull": "down",
    "bounds_unity_min": [
     -1.0,
-    -0.0917,
+    -0.0974,
     -1.0
    ],
    "bounds_unity_max": [
@@ -972,7 +972,7 @@
    "cull": "down",
    "bounds_unity_min": [
     -1.0,
-    -0.0829,
+    -0.0846,
     -1.0
    ],
    "bounds_unity_max": [
@@ -998,7 +998,7 @@
    "cull": "down",
    "bounds_unity_min": [
     -1.0,
-    -0.1017,
+    -0.1092,
     -1.0
    ],
    "bounds_unity_max": [

@@ -698,6 +698,7 @@ def main():
         render(cam, name, (1920, 1080))
     # overview, orthographic north-up (bible p12 framing)
     cam.data.type = "ORTHO"
+    cam.data.sensor_fit = "AUTO"
     cam.data.ortho_scale = 124.0
     cam.location = bl(56.0, 60.0, 36.0)
     cam.rotation_euler = (0.0, 0.0, math.pi)
@@ -872,7 +873,7 @@ def measure(name, cam, pl, tgt):
         c = proj(cam, bl(p["x"], p["y"], p["z"]))
         if not inside(c):
             continue
-        for (u, v, du, dv) in ((0.36, -0.15, -1, 0), (-0.36, -0.15, 1, 0), (0.0, -0.48, 0, 1), (0.0, 0.015, 0, 1)):
+        for (u, v, du, dv) in ((0.44, -0.2, -1, 0), (-0.44, -0.2, 1, 0), (0.0, -0.70, 0, 1), (0.0, 0.015, 0, 1)):
             # (u along lip, v outward; foam goes inward by du/dv). The last row is the lip collar (0.17 u across).
             P0 = (p["x"] + d[0] * u + nrm[0] * v, p["z"] + d[1] * u + nrm[1] * v)
             wdt = kit2.FOAM_W

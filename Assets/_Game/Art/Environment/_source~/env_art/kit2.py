@@ -207,7 +207,11 @@ def _facet(m, x0, x1, rng, y_top, back=0.6):
     y = y_top
     F(m, [(x0, y, back), (x1, y, back), (x1, y, -o), (x0, y, -o)], moss, UP)     # closed top (moss shelf outside)
     xf = x0 + (x1 - x0) * rng.uniform(0.35, 0.65)
+    rock_a, rock_b = rock, C("rock_mid", rng.uniform(1.02, 1.08))
+    k = 0
     while y - BAND > -(D - 1.3):
+        rock = rock_a if k % 2 == 0 else rock_b      # strata read as alternating courses every 0.75 u
+        k += 1
         yb = y - BAND
         ob = o + rng.uniform(-0.05, 0.02)
         fold = rng.uniform(0.02, 0.07)
@@ -217,7 +221,7 @@ def _facet(m, x0, x1, rng, y_top, back=0.6):
         F(m, [(x0, y, -o), (x0, yb, -ob), (x0, yb, back), (x0, y, back)], rock, (-1, 0, 0))
         F(m, [(x1, y, -o), (x1, y, back), (x1, yb, back), (x1, yb, -ob)], rock, (1, 0, 0))
         F(m, [(x0, y, back), (x1, y, back), (x1, yb, back), (x0, yb, back)], rock, (0, 0, 1))
-        on = ob - rng.uniform(0.04, 0.13)
+        on = ob - rng.uniform(0.07, 0.16)
         F(m, [(x0, yb, -ob), (xf, yb, -ob - fold), (x1, yb, -ob), (x1, yb, -on), (x0, yb, -on)],
           moss if rng.random() < 0.8 else mossd, UP)
         y, o = yb, on
@@ -293,7 +297,7 @@ def waterfall(m, seed, fall=6.5):
     rng = random.Random(seed)
     water, foam, ink = C("water_f"), C("foam"), C("ink")
     # pool (z > 0 is inland)
-    edge = [(0.36, -0.06), (0.36, 0.30), (0.2, 0.48), (-0.2, 0.48), (-0.36, 0.30), (-0.36, -0.06)]
+    edge = [(0.44, -0.06), (0.44, 0.42), (0.26, 0.70), (-0.26, 0.70), (-0.44, 0.42), (-0.44, -0.06)]
     F(m, [(x, 0.012, z) for (x, z) in edge], water, UP)
     pts = _dense(edge, 0.05)
     nin = []
@@ -302,7 +306,7 @@ def waterfall(m, seed, fall=6.5):
         tx, tz = b[0] - a[0], b[1] - a[1]
         ln = math.hypot(tx, tz) or 1.0
         nx, nz = -tz / ln, tx / ln          # left normal of a clockwise-in-(x,z) walk = towards the pool centre
-        cx, cz = 0.0, 0.2
+        cx, cz = 0.0, 0.3
         if (cx - pts[k][0]) * nx + (cz - pts[k][1]) * nz < 0:
             nx, nz = -nx, -nz
         nin.append((nx, nz))
@@ -315,7 +319,7 @@ def waterfall(m, seed, fall=6.5):
         F(m, [(outer[k][0], 0.013, outer[k][1]), (outer[k + 1][0], 0.013, outer[k + 1][1]),
               (pts[k + 1][0], 0.013, pts[k + 1][1]), (pts[k][0], 0.013, pts[k][1])], ink, UP)
     # foam collar on the lip (jagged both sides), z from +0.07 to -0.10
-    xs = [-0.36 + 0.72 * i / 12 for i in range(13)]
+    xs = [-0.44 + 0.88 * i / 12 for i in range(13)]
     za = [0.07 + rng.uniform(-0.02, 0.02) for _ in xs]
     zb = [-0.10 + rng.uniform(-0.025, 0.02) for _ in xs]
     for i in range(12):
@@ -432,11 +436,11 @@ def tree(m, seed, species="round", size="l"):
     _trunk(m, (0, -0.05, 0), (top[0] * 0.3 + 0.05 * Dc, 0.25 * Dc, top[2] * 0.3), 0.06 * Dc, 0.03 * Dc, C("trunk", 0.95), n=5)
     leaf = C("leaf_light")
     if species == "round":
-        lobes = [(0.0, 0.3 * Dc, 0.0, 0.42 * Dc)]
+        lobes = [(0.0, 0.36 * Dc, 0.0, 0.34 * Dc)]
         k = rng.choice((3, 4))
         for i in range(k):
             a = 2 * math.pi * i / k + rng.uniform(-0.3, 0.3)
-            lobes.append((math.cos(a) * 0.3 * Dc, 0.12 * Dc + rng.uniform(-0.05, 0.08) * Dc, math.sin(a) * 0.3 * Dc,
+            lobes.append((math.cos(a) * 0.36 * Dc, 0.12 * Dc + rng.uniform(-0.05, 0.08) * Dc, math.sin(a) * 0.36 * Dc,
                           rng.uniform(0.27, 0.33) * Dc))
     else:
         lobes = []
@@ -446,7 +450,7 @@ def tree(m, seed, species="round", size="l"):
             lobes.append((rng.uniform(-0.06, 0.06) * Dc, (0.05 + 0.62 * f) * Dc, rng.uniform(-0.06, 0.06) * Dc,
                           (0.40 - 0.16 * f) * Dc))
     for i, (x, y, z, r) in enumerate(lobes):
-        m.blob(top[0] + x, top[1] + y, top[2] + z, r, r * 0.86, r, leaf, sub=2, smooth=True, seed=seed * 7 + i,
+        m.blob(top[0] + x, top[1] + y, top[2] + z, r, r * 0.86, r, C("leaf_light", 0.93 + 0.035 * (i % 3)), sub=2, smooth=True, seed=seed * 7 + i,
                jitter=0.05, flat_bottom=top[1] - 0.15 * Dc)
 
 
@@ -536,12 +540,12 @@ def crystal_cluster(m, seed, hmax=1.8, k=6, kind="team"):
     rng = random.Random(seed)
     body, lit = {"team": (C("team_dark"), C("team_glow")), "biomass": (C("biomass_cd"), C("biomass_c")),
                  "corrupt": (C("corrupt_cd"), C("corrupt_c"))}[kind]
-    _spike(m, (0, 0, 0), hmax, 0.07 * hmax + 0.06, rng.uniform(0, 6.28), math.radians(rng.uniform(2, 7)), body, lit)
+    _spike(m, (0, 0, 0), hmax, 0.09 * hmax + 0.08, rng.uniform(0, 6.28), math.radians(rng.uniform(2, 7)), body, lit)
     for i in range(k - 1):
         a = 2 * math.pi * i / (k - 1) + rng.uniform(-0.3, 0.3)
         rr = rng.uniform(0.14, 0.32) * (hmax / 1.8 + 0.4)
-        h = hmax * rng.uniform(0.33, 0.7)
-        _spike(m, (math.cos(a) * rr, 0, math.sin(a) * rr), h, 0.05 * hmax + 0.05, -a, math.radians(rng.uniform(16, 34)), body, lit)
+        h = hmax * rng.uniform(0.45, 0.8)
+        _spike(m, (math.cos(a) * rr, 0, math.sin(a) * rr), h, 0.07 * hmax + 0.06, -a, math.radians(rng.uniform(12, 28)), body, lit)
     _decal(m, 1.0, lit)
 
 

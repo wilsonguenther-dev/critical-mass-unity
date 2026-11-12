@@ -295,7 +295,7 @@ def decor(g, rim, fl, paths, keep, team_of, sites=(), wf_cells=()):
             es = rim_cells.get((cx, cz))
             if es and not any(e["bridge"] for e in es):
                 r = h32(cx, cz, 111) % 1000
-                if r < 75 and pd > PATH_W + 0.6:
+                if r < 110 and pd > PATH_W + 0.6:
                     n = es[0]["n"]
                     out.append(dict(piece=TREES[h32(cx, cz, 112) % 4], x=xc + n[0] * 0.28, y=h, z=zc + n[1] * 0.28,
                                     yaw=yaw, cat="tree", edge=True))
@@ -317,9 +317,9 @@ def decor(g, rim, fl, paths, keep, team_of, sites=(), wf_cells=()):
         pd = path_dist(paths, x, z)
         yaw = float(h32(cx, cz, 115) % 360)
         site = next((s for s in sites if math.hypot(x - s[0], z - s[1]) < s[2]), None)
-        if r < 26:
+        if r < 32:
             out.append(dict(piece=TREES[h32(cx, cz, 116) % 4], x=x, y=h, z=z, yaw=yaw, cat="tree", edge=True))
-        elif r < 56:
+        elif r < 60:
             out.append(dict(piece=("env_boulder_l", "env_boulder_m", "env_rocks")[h32(cx, cz, 121) % 3], x=x, y=h, z=z,
                             yaw=yaw, cat="rock_big", edge=True))
         elif r < 80 and (site or (pd < 6.5 and team_of(x) is not None)):
