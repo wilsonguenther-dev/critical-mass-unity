@@ -141,6 +141,59 @@ def attribute_tests(failed, items, files_by_item, project):
     return hits
 
 
+def _results_by_test(xml_path):
+    """{fullname: [result, ...]} for every test-case in an NUnit results file ({} if unreadable)."""
+    import xml.etree.ElementTree as ET
+    try:
+        root = ET.parse(xml_path).getroot()
+    except Exception:
+        return {}
+    out = {}
+    for tc in root.iter('test-case'):
+        out.setdefault(tc.get('fullname') or tc.get('name') or '', []).append(tc.get('result') or '')
+    return out
+
+
+def required_tests_missing(items, active, files_by_item, project, xml_path):
+    """Panel revision 2026-11-12: a green EditMode run proves nothing about an item unless its tests_required ran.
+    For each active item and each `Class.Method` it requires: the method must be declared in a .cs file the item's
+    diff touched, and the results file must show it Passed. Not run at all is allowed only when the declaration
+    carries Explicit or Category("Slow") (the perf case, the soak lane); [Ignore] never is.
+    Returns {item: [reason, ...]} for the items that fall short."""
+    res = _results_by_test(xml_path)
+    hits = {}
+    for iid in active:
+        cs = [f for f in files_by_item.get(iid, []) if f.endswith('.cs') and (Path(project) / f).is_file()]
+        src = {f: (Path(project) / f).read_text(errors='replace') for f in cs}
+        for req in items[iid].get('tests_required') or []:
+            cls, _, meth = req.rpartition('.')
+            decl = None
+            for f, body in src.items():
+                if cls and not re.search(rf'\bclass\s+{re.escape(cls)}\b', body):
+                    continue
+                m = re.search(rf'\bvoid\s+{re.escape(meth)}\s*\(', body)
+                if m:
+                    decl = body[max(0, m.start() - 400):m.start()]
+                    break
+            if decl is None:
+                hits.setdefault(iid, []).append(f'test {req} is not declared in any .cs file this item changed')
+                continue
+            attr = re.split(r'[{};]', decl)[-1]  # only the attributes between the previous member and this one
+            got = [r for name, rs in res.items() for r in rs
+                   if name == req or name.endswith('.' + req) or ('.' + req + '(') in name or name.startswith(req + '(')]
+            if any(r == 'Passed' for r in got):
+                continue
+            if re.search(r'\bIgnore\b', attr):
+                hits.setdefault(iid, []).append(f'test {req} carries [Ignore]')
+            elif re.search(r'\bExplicit\b|Category\(\s*"Slow"\s*\)', attr) and all(r in ('', 'Skipped') for r in got):
+                continue
+            elif got:
+                hits.setdefault(iid, []).append(f'test {req} did not pass (results: {", ".join(sorted(set(got)))})')
+            else:
+                hits.setdefault(iid, []).append(f'test {req} did not run in the EditMode gate')
+    return hits
+
+
 def read_lines(path):
     try:
         return Path(path).read_text(errors='replace').splitlines()
@@ -322,7 +375,7 @@ def run(a, ids, items, tag, env, t0):
                 for iid in [i for i in active if items[i].get('art_row') not in (None, 'none')]:
                     r = run_gate('parity', int_dir, ['--item', iid, '--items-dir', a.items_dir], env)
                     rnd['gates'].append(r)
-                    if r['status'] == 'skipped':
+                    if r['status'] == 'skipped' and r['exit'] == C.SKIP_EXIT:
                         skipped.add(f'parity: {r["detail"]}')
                     elif r['status'] != 'pass':
                         fail(iid, 'parity', json.dumps(r))
@@ -348,9 +401,19 @@ def run(a, ids, items, tag, env, t0):
                 if r['status'] == 'flagged':
                     flags.append(r['detail'])
                 continue
+            hits = None
             if r['status'] == 'pass' and r['exit'] == 0:
-                continue
-            hits = attribute(r, items, files_by_item, int_dir)
+                if g != 'editmode':
+                    continue
+                hits = required_tests_missing(items, active, files_by_item, int_dir, r.get('results'))
+                if not hits:
+                    continue
+                g = 'tests'  # a counted red of the item that fell short, never an unattributed one
+                r = {'gate': 'tests', 'status': 'fail', 'exit': 1, 'detail': 'tests_required not all Passed: '
+                     + '; '.join(f'{i}: {len(v)}' for i, v in hits.items())}
+                rnd['gates'].append(r)
+            if hits is None:
+                hits = attribute(r, items, files_by_item, int_dir)
             if a.coupled:
                 cid, _, cwhy = a.culprit.partition('=')
                 if not hits and cid in active:  # ruling 3: the integrator may name the culprit once

@@ -184,6 +184,50 @@ def test_real_order_md_marks_batches_2_3_4_coupled():
         assert [x['coupled'] for x in b] == [False, True, True, True]
 
 
+def test_real_order_md_batch_membership_covers_every_loop_item():
+    # panel revision 2026-11-12: 'F-05a .. F-05j' used to parse as its two endpoints only
+    b = C.order_batches()
+    if not b:
+        return
+    assert b[1]['items'] == ['F-05a', 'F-05b', 'F-05c', 'F-05d', 'F-05e', 'F-05f', 'F-05g', 'F-05h', 'F-05i', 'F-05j']
+    assert [len(x['items']) for x in b] == [5, 10, 7, 4]
+    assert C.batch_coverage(b, C.load_items()) == []
+
+
+def test_letter_range_expands_and_coverage_catches_orphans_and_duplicates():
+    tok = __import__('re').compile(r'(?<![A-Za-z0-9-])[A-Z][A-Z0-9]*-\d+[a-z]?(?![A-Za-z0-9-])')
+    assert C.expand_ranges('F-05a .. F-05d', tok) == ['F-05a', 'F-05b', 'F-05c', 'F-05d']
+    assert C.expand_ranges('F-01, F-05a..F-05b, F-07', tok) == ['F-01', 'F-05a', 'F-05b', 'F-07']
+    items = {'F-01': {'owner': 'loop'}, 'F-02': {'owner': 'loop'}, 'CM-30': {'owner': 'max'}}
+    bat = [{'batch': 1, 'items': ['F-01']}, {'batch': 2, 'items': ['F-01']}]
+    assert C.batch_coverage(bat, items) == ['F-02 is in no batch', 'F-01 in batches 1 and 2']
+
+
+def test_select_batches_keeps_only_the_named_batches():
+    bat = [{'batch': 1, 'items': ['F-01']}, {'batch': 2, 'items': ['F-05a']}]
+    assert C.select_batches(bat, '1') == [bat[0]]
+    assert C.select_batches(bat, None) == bat
+    try:
+        C.select_batches(bat, '9')
+        raise AssertionError('an unknown batch must refuse')
+    except ValueError:
+        pass
+
+
+def test_required_tests_must_be_declared_and_passed(tmp_path):
+    (tmp_path / 'A.cs').write_text('class ATests {\n [Test]\n public void Good() {}\n [Test, Ignore("x")]\n public void Ign() {}\n'
+                                   ' [Test, Explicit("perf")]\n public void Perf() {}\n [Test]\n public void NotRun() {}\n}\n')
+    xml = tmp_path / 'r.xml'
+    xml.write_text('<test-run><test-case fullname="CriticalMass.Sim.Tests.ATests.Good" result="Passed"/>'
+                   '<test-case fullname="CriticalMass.Sim.Tests.ATests.Ign" result="Skipped"/></test-run>')
+    items = {'X-01': {'tests_required': ['ATests.Good', 'ATests.Perf']},
+             'X-02': {'tests_required': ['ATests.Ign', 'ATests.NotRun', 'ATests.Missing']}}
+    fbi = {'X-01': {'A.cs'}, 'X-02': {'A.cs'}}
+    hits = I.required_tests_missing(items, ['X-01', 'X-02'], fbi, tmp_path, str(xml))
+    assert 'X-01' not in hits
+    assert [h.split(' ')[1] for h in hits['X-02']] == ['ATests.Ign', 'ATests.NotRun', 'ATests.Missing']
+
+
 def test_chain_dependants_drop_with_the_red_item():
     items = {'F-01': {}, 'F-02a': {'waits_on': ['F-01']}, 'F-03': {'waits_on': ['F-02a']}, 'X-01': {}}
     assert I.dependants('F-01', ['F-01', 'F-02a', 'F-03', 'X-01'], items) == ['F-02a', 'F-03']

@@ -765,6 +765,9 @@ def preflight(cap, items_dir=None, fetch=True):
     add('every _ORDER.md batch item has an item file', not missing,
         (', '.join(missing[:8]) if missing else f'{len(bat)} batch(es), coupled: '
          + (', '.join(str(b['batch']) for b in bat if b['coupled']) or 'none')))
+    cov = batch_coverage(bat, load_items(items_dir))
+    add('every loop item sits in exactly one _ORDER.md batch', not cov, '; '.join(cov[:8]) or
+        f'{sum(len(b["items"]) for b in bat)} ids in {len(bat)} batch(es)')
     lic = [str(p) for p in LICENSE_FILES if p.is_file()]
     add('Unity license present', bool(lic), (lic[0] + ' exists (not read)') if lic else 'no Unity_lic.ulf found')
     hits = unity_open_on(MAIN)
@@ -774,7 +777,7 @@ def preflight(cap, items_dir=None, fetch=True):
 
 
 # ───────────────────────────── plan (the workflow's args) ─────────────────────────────
-def plan(cap, now, items_dir=None, run_tag=None):
+def plan(cap, now, items_dir=None, run_tag=None, only_batches=None):
     items = load_items(items_dir)
     try:
         landed = landed_map()
@@ -791,7 +794,8 @@ def plan(cap, now, items_dir=None, run_tag=None):
     head = branch_sha('HEAD')
     return {'now': now, 'runTag': run_tag or now.replace('-', '').replace(':', '')[:13], 'mainRoot': str(MAIN),
             'lanesRoot': str(LANES), 'repo': SLUG, 'harnessCommit': head, 'capTokens': cap,
-            'items': rows, 'landed': sorted(landed), 'parked': sorted(parked), 'batches': order_batches(items_dir),
+            'items': rows, 'landed': sorted(landed), 'parked': sorted(parked),
+            'batches': select_batches(order_batches(items_dir), only_batches), 'onlyBatches': only_batches or None,
             'maxBuilders': 5, 'batchMax': 6, 'maxReturns': MAX_RETURNS}
 
 
@@ -828,6 +832,44 @@ def review_add_blocking(batch_key, key, text, review_dir=None):
     return str(f)
 
 
+_RANGE_RE = re.compile(r'(?<![A-Za-z0-9-])([A-Z][A-Z0-9]*-\d+)([a-z])\s*\.\.\s*\1([a-z])(?![A-Za-z0-9-])')
+
+
+def expand_ranges(cell, tok):
+    """Ids in a batch cell, with a letter range `F-05a .. F-05j` written out as F-05a, F-05b, ..., F-05j (panel
+    revision 2026-11-12: the parser used to keep only the two endpoints). A range must share its base id."""
+    def rep(m):
+        base, lo, hi = m.group(1), m.group(2), m.group(3)
+        if hi < lo:
+            raise ValueError(f'_ORDER.md batch range runs backwards: {m.group(0)!r}')
+        return ', '.join(base + chr(c) for c in range(ord(lo), ord(hi) + 1))
+    return tok.findall(_RANGE_RE.sub(rep, cell))
+
+
+def batch_coverage(batches, items):
+    """Problems with batch membership: a loop-owned item in no batch, or an id in more than one batch."""
+    seen, dup = {}, []
+    for b in batches:
+        for i in b['items']:
+            if i in seen:
+                dup.append(f'{i} in batches {seen[i]} and {b["batch"]}')
+            seen.setdefault(i, b['batch'])
+    loop_ids = {i for i, it in items.items() if str(it.get('owner', '')).lower() == 'loop'}
+    orphan = sorted(loop_ids - set(seen), key=natural_key)
+    return ([f'{i} is in no batch' for i in orphan] + dup) if batches else []
+
+
+def select_batches(batches, only):
+    """Keep only the batch numbers in `only` (comma list such as '1' or '1,2'); None keeps every batch."""
+    if not only:
+        return batches
+    want = {int(x) for x in str(only).split(',') if x.strip()}
+    out = [b for b in batches if b['batch'] in want]
+    if len(out) != len(want):
+        raise ValueError(f'--batches {only}: _ORDER.md has batches {[b["batch"] for b in batches]}')
+    return out
+
+
 def order_batches(items_dir=None):
     """Batches from loop/items/_ORDER.md, the one source of truth: section 3's table gives each batch's items in order;
     a batch is coupled when two or more of its items sit on one dependency-graph line marked "(coupled".
@@ -844,7 +886,7 @@ def order_batches(items_dir=None):
     for l in sec.splitlines():
         cells = [c.strip() for c in l.strip().strip('|').split('|')]
         if len(cells) >= 2 and cells[0].isdigit():
-            ids = tok.findall(cells[1])
+            ids = expand_ranges(cells[1], tok)
             coupled = any(len(set(ids) & cs) >= 2 for cs in coupled_sets)
             out.append({'batch': int(cells[0]), 'items': ids, 'coupled': coupled})
     return out
@@ -946,6 +988,7 @@ def main(argv=None):
     s.add_argument('--now', required=True)
     s.add_argument('--items-dir')
     s.add_argument('--out')
+    s.add_argument('--batches', help="run only these _ORDER.md batch numbers, e.g. '1' (the workflow then stops)")
     s = sub.add_parser('pr-open')
     s.add_argument('--head', required=True)
     s.add_argument('--title', required=True)
@@ -1040,11 +1083,11 @@ def main(argv=None):
             print(f"{'PASS' if c['ok'] else 'FAIL'}  {c['check']}: {c['detail']}")
         return 0 if all(c['ok'] for c in checks) else 1
     if a.cmd == 'plan':
-        p = plan(a.cap, a.now, a.items_dir)
+        p = plan(a.cap, a.now, a.items_dir, only_batches=a.batches)
         if a.out:
             write_json(a.out, p)
         print(json.dumps({'items': len(p['items']), 'landed': len(p['landed']), 'parked': len(p['parked']),
-                          'out': a.out}))
+                          'batches': [b['batch'] for b in p['batches']], 'out': a.out}))
         return 0
     if a.cmd == 'pr-open':
         r = pr_open(a.head, a.title, a.body_file, a.base)

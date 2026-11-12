@@ -151,7 +151,7 @@ workflow dry run). `loop/logs/` and `loop/state/` are git-ignored.
 | `workflow/critical-mass-unity.js` | The Workflow script. Scheduling is plain code: 5 builders + 1 integrator, stable item order, `agent()` null = halt, payloads under 40 KB. |
 | `tests/` | `python3 -m pytest -q loop/tests` and `node loop/tests/js/sim-workflow.mjs` (the workflow run against mock agents). |
 
-**Launch (orchestrator):** `loop/bin/launch.sh --cap <tokens>`; then `Workflow({scriptPath: loop/workflow/critical-mass-unity.js, args: <loop/logs/launch-args.json>})`, fresh, never resumed; then at once `python3 loop/bin/cmloop.py record-launch --task-id <w...> --run-id <wf_...>` (builders wait at most 120 s for it). **Stop:** `TaskStop(<task id>)`, then `loop/bin/shutdown.sh`.
+**Launch (orchestrator):** `loop/bin/launch.sh --cap <tokens> [--batches 1]` (`--batches` writes only those `_ORDER.md` batches into the args file, so the run stops after them; the batch-1 cost run uses `--batches 1`); then `Workflow({scriptPath: loop/workflow/critical-mass-unity.js, args: <loop/logs/launch-args.json>})`, fresh, never resumed; then at once `python3 loop/bin/cmloop.py record-launch --task-id <w...> --run-id <wf_...>` (builders wait at most 120 s for it). **Stop:** `TaskStop(<task id>)`, then `loop/bin/shutdown.sh`.
 
 The defects in the OPEN note above are now handled: R4 (slips go to the live log once per checkpoint, person-owned
 items skipped, never texted), R6 (one flusher under a lock, one text per key ever), R14 (dead-pid locks reclaimed).

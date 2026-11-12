@@ -100,7 +100,9 @@ STEPS (in order):
 2. Create your lane: \`${CM} lanes create ${it.id}${it.returns > 0 ? ` --base origin/loop/${it.id}` : ''}\`. Work only in ${LANES}/${it.id} on branch loop/${it.id}.
 3. Read the item: ${MAIN}/loop/items/${it.id}.md. It carries the method, files_allowed, files_forbidden, tests_required and pass_check. Follow the method exactly; it has no options to choose between.${it.returns > 0 ? `
    This item was returned ${it.returns} time(s). FIRST read ${MAIN}/loop/state/failures/${it.id}.md (the gate output that dropped it) and fix exactly that. At most ${MAX_RETURNS} returns; the next red parks it for the architect.` : ''}
-4. Write the code, the NUnit tests named in tests_required (exact names), and any docs the item names, all in this branch. Touch only files_allowed. Never write a .meta, .unity, .prefab, .asset or .mat file and never choose a GUID (U-027): Unity generates metas on the integrator's import and editor-made assets come from CriticalMass.Editor.ProjectSetup.Apply; the scope gate drops a branch that carries one. The one hand-written Unity data file is Controls.inputactions (plain JSON). The Sim assembly never references UnityEngine (U-002). Read real signatures before calling them.
+4. Write the code, the NUnit tests named in tests_required (exact names), and any docs the item names, all in this branch. Touch only files_allowed. Never write a .meta, .unity, .prefab, .asset or .mat file and never choose a GUID (U-027): Unity generates metas on the integrator's import and editor-made assets come from CriticalMass.Editor.ProjectSetup.Apply; the scope gate drops a branch that carries one. The one hand-written Unity data file is Controls.inputactions (plain JSON). The Sim assembly never references UnityEngine (U-002).
+   Upstream contract (panel revision 2026-11-12): ${(it.waits_on || []).length ? `this item waits on ${(it.waits_on || []).join(', ')}. Any of those not yet on origin/main is being built right now in parallel and is NOT in your lane. For each, read ${MAIN}/loop/items/<ID>.md (its Create, API and signature tables) and ${MAIN}/loop/items/_CONVENTIONS.md section 11, and call exactly those signatures, verbatim. Never stub, redeclare or guess an upstream member. A missing upstream type is expected and is not an open question; a signature the upstream spec does not give is one (step 7).` : 'this item waits on nothing.'} Never read another item's lane under ${LANES}.
+   Browser oracle: read it ONLY with \`git -C /Users/wilsonguenther/critical-mass show 09e0904:<path>\`. Never cat, ls or grep the /Users/wilsonguenther/critical-mass working tree: it is checked out at an older commit and differs from the oracle.
 5. Run \`${MAIN}/loop/gates/scope --item ${it.id} --ref HEAD --base origin/main --project ${LANES}/${it.id}\` bare (git only, no Unity). Fix any violation it lists.
 6. Commit with subject "${it.id}: <what changed>" (never a line starting "loop-landed:"), then \`git push -u origin loop/${it.id}\`.
 7. If the item cannot be built without an answer it does not give, write the question with your recommendation to ${MAIN}/loop/logs/questions/${it.id}.md, push nothing unfinished as if finished, and return status "blocked".
@@ -191,7 +193,7 @@ async function buildOne(id, n) {
     const it = byId[id]
     const r = await seat(builderPrompt(it, n), {
       label: `build ${id}`, phase: 'Build', schema: BUILD_SCHEMA,
-      model: it.tightly_defined === true ? 'sonnet' : 'opus', // decision 2: Sonnet only for tightly_defined items
+      model: 'opus', // binding ledger: Opus in every seat (panel revision 2026-11-12; the tightly_defined -> Sonnet switch is removed)
     }, `builder ${id}`)
     if (!r) return null
     if (r.status === 'halted') { stopDispatch = stopDispatch || `builder ${id}: ${r.note}`; return null }

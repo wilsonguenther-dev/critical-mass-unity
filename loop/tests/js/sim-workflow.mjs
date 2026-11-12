@@ -67,7 +67,9 @@ results.push(await scenario('happy path: everything loop-owned lands, waits_on r
     if (!calls.every((c) => /Never use the Agent, Task or Workflow tools/.test(c.prompt) && /Cap yourself at \d+ tool calls/.test(c.prompt) && /NEVER pkill/.test(c.prompt))) p.push('a prompt lacks the guardrail block')
     if (!calls.filter((c) => c.label.startsWith('build')).every((c) => /NEVER run Unity/.test(c.prompt))) p.push('a builder prompt lacks never-run-Unity')
     const f02 = calls.find((c) => c.label === 'build F-02'), f01 = calls.find((c) => c.label === 'build F-01')
-    if (f02.model !== 'sonnet' || f01.model !== 'opus') p.push(`models: F-02 ${f02.model}, F-01 ${f01.model}`)
+    if (f02.model !== 'opus' || f01.model !== 'opus') p.push(`models: F-02 ${f02.model}, F-01 ${f01.model}`)
+    if (!calls.every((c) => c.model === 'opus')) p.push('a seat is not Opus (binding ledger: Opus in every seat)')
+    if (!calls.filter((c) => c.label.startsWith('build')).every((c) => /show 09e0904:/.test(c.prompt) && /Never read another item's lane/.test(c.prompt))) p.push('a builder prompt lacks the pinned oracle or the no-sibling-lane rule')
     const reviews = calls.filter((c) => c.label.startsWith('review batch')).length
     if (reviews !== order.length) p.push(`${reviews} review seats for ${order.length} landed batches (ruling 6: one per batch)`)
     if (JSON.stringify(out).length > 40000) p.push('return over 40 KB')

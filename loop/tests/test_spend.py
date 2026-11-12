@@ -55,7 +55,8 @@ def test_transcript_fallback_dedupes_message_ids(tmp_path):
              {'type': 'user', 'message': {'id': 'u'}}]
     p = fake_projects(tmp_path, 'wf_bbbb-2', transcript_lines=lines)
     m = S.measure('wf_bbbb-2', p)
-    assert m['source'] == 'transcript-estimate' and m['spent'] == 10 + 100 + 1000 + 1 + 2 + 3
+    assert m['source'] == 'transcript-estimate' and m['raw'] == 10 + 100 + 1000 + 1 + 2 + 3
+    assert m['spent'] == -(-m['raw'] // S.ESTIMATE_FLOOR_RATIO) and m['spent'] > m['raw']  # errs high (panel 2026-11-12)
 
 
 def test_no_data(tmp_path):

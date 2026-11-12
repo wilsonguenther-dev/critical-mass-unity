@@ -7,7 +7,9 @@ Sources, in order:
   2. While that file does not exist yet: a live estimate from the run's agent transcripts
      (<session>/subagents/workflows/<runId>/agent-*.jsonl): input + output + cache-creation tokens per assistant
      message, deduplicated by message id. On Monday's three runs this estimate read 1.198 to 1.218 times the reported
-     total, so it errs high (stops early), never low. source = "transcript-estimate".
+     total, but on the aborted 2026-11-12 run wf_a743c82d-56d it read 0.886 (282,970 against 319,516), so it can err
+     LOW. The raw count is therefore divided by ESTIMATE_FLOOR_RATIO (0.85) before the thresholds (panel revision
+     2026-11-12); `raw` keeps the undivided count. source = "transcript-estimate".
 Cache READS are not counted by either source; that matches the U-014 measure (Monday's all-in 543 M includes them).
 
 Thresholds: ratio >= 0.90 writes loop/state/STOP-DISPATCH (no new builders or batches); >= 1.00 writes
@@ -30,6 +32,7 @@ import cmloop as C  # noqa: E402
 
 PROJECTS = Path(os.environ.get('CM_LOOP_PROJECTS_DIR') or Path.home() / '.claude/projects')
 STOP_AT, HALT_AT = 0.90, 1.00
+ESTIMATE_FLOOR_RATIO = 0.85  # lowest estimate/reported ratio seen (0.886 on 2026-11-12), rounded down
 
 
 def find_run_json(run_id, projects=PROJECTS):
@@ -78,7 +81,8 @@ def measure(run_id, projects=PROJECTS):
     files = find_transcripts(run_id, projects)
     if files:
         t = transcript_tokens(files)
-        return {'spent': t['counted'], 'source': 'transcript-estimate', 'agents': len(files), 'detail': t}
+        return {'spent': int(-(-t['counted'] // ESTIMATE_FLOOR_RATIO)), 'raw': t['counted'],
+                'source': 'transcript-estimate', 'agents': len(files), 'detail': t}
     return {'spent': None, 'source': 'none'}
 
 
