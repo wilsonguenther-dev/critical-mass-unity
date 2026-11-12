@@ -35,6 +35,7 @@ namespace CriticalMass.Editor
                 ApplyBootScene();
                 ApplyInputActions();
                 ApplyPlaceholderMaterial();
+                ApplyToonMaterials();
                 MoveIntoSettings("Assets/UniversalRenderPipelineGlobalSettings.asset");
                 MoveIntoSettings("Assets/DefaultVolumeProfile.asset");
                 AssetDatabase.SaveAssets();
@@ -100,6 +101,13 @@ namespace CriticalMass.Editor
                 AssetDatabase.CreateAsset(asset, UrpAssetPath);
             }
 
+            // Art direction 2.2: hard-edged sun shadows, map 2048, one cascade over the view (the perspective view reaches
+            // about 40 u from the camera at the top edge).
+            asset.mainLightShadowmapResolution = 2048;
+            asset.shadowCascadeCount = 1;
+            asset.shadowDistance = 60f;
+            EditorUtility.SetDirty(asset);
+
             GraphicsSettings.defaultRenderPipeline = asset;
 
             int current = QualitySettings.GetQualityLevel();
@@ -148,6 +156,34 @@ namespace CriticalMass.Editor
             if (!AssetDatabase.IsValidFolder(PlaceholderDir)) AssetDatabase.CreateFolder("Assets/_Game/Resources", "Placeholder");
             var material = new Material(GraphicsSettings.currentRenderPipeline.defaultMaterial) { name = "PlaceholderLit" };
             AssetDatabase.CreateAsset(material, PlaceholderMaterialPath);
+        }
+
+        // Art direction 2026-11-12: the CM/Toon and CM/ToonGround base materials the views clone (ToonMaterials). Living in
+        // Resources keeps both shaders in a player build (the views never Shader.Find at runtime). Idempotent: an existing
+        // material keeps its asset (and GUID) and only gets its shader set back.
+        const string ToonDir = "Assets/_Game/Resources/Toon";
+
+        static void ApplyToonMaterials()
+        {
+            if (!AssetDatabase.IsValidFolder("Assets/_Game/Resources")) AssetDatabase.CreateFolder("Assets/_Game", "Resources");
+            if (!AssetDatabase.IsValidFolder(ToonDir)) AssetDatabase.CreateFolder("Assets/_Game/Resources", "Toon");
+            EnsureMaterial(ToonDir + "/CMToon.mat", "CM/Toon");
+            EnsureMaterial(ToonDir + "/CMToonGround.mat", "CM/ToonGround");
+        }
+
+        static void EnsureMaterial(string path, string shaderName)
+        {
+            Shader shader = Shader.Find(shaderName);
+            if (shader == null) throw new InvalidOperationException("shader " + shaderName + " not found");
+            var existing = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (existing != null)
+            {
+                if (existing.shader == shader) return;
+                existing.shader = shader;
+                EditorUtility.SetDirty(existing);
+                return;
+            }
+            AssetDatabase.CreateAsset(new Material(shader) { name = System.IO.Path.GetFileNameWithoutExtension(path) }, path);
         }
 
         // NET_Standard and the deprecated NET_Standard_2_0 share one value, so ToString() can print the old name.

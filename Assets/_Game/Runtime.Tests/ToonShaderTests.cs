@@ -16,6 +16,8 @@ namespace CriticalMass.Runtime.Tests
         private const string ShaderName = "CM/Toon";
         private const string ShaderPath = "_Game/Art/Shaders/CMToon.shader";
         private const string CommonPath = "_Game/Art/Shaders/CMToonCommon.hlsl";
+        private const string GroundName = "CM/ToonGround";
+        private const string GroundPath = "_Game/Art/Shaders/CMToonGround.shader";
         private const float ColorTolerance = 1e-4f;
         private const float FloatTolerance = 1e-5f;
 
@@ -24,13 +26,22 @@ namespace CriticalMass.Runtime.Tests
             ("_BaseColor", ShaderPropertyType.Color, new Vector4(0.968627f, 0.941176f, 0.898039f, 1f)),
             ("_TeamColor", ShaderPropertyType.Color, new Vector4(0.086275f, 0.780392f, 0.850980f, 1f)),
             ("_OutlineColor", ShaderPropertyType.Color, new Vector4(0.094118f, 0.137255f, 0.231373f, 1f)),
+            ("_ShadowTint", ShaderPropertyType.Color, new Vector4(0.094118f, 0.137255f, 0.231373f, 1f)),
         };
 
+        // Art direction 2026-11-12, 2.2 and 2.3: three bands (1.00 / 0.84 / 0.66 mixed 12 % to Void Navy), thresholds
+        // 0.35 and -0.05 in N.L with a 0.02 hard edge, top faces one band lighter, 3 px constant-screen outline default.
         private static readonly (string Name, ShaderPropertyType Type, float Default)[] RangeProperties =
         {
-            ("_ShadeMultiplier", ShaderPropertyType.Range, 0.62f),
-            ("_RampThreshold", ShaderPropertyType.Range, 0.0f),
-            ("_OutlineWidth", ShaderPropertyType.Range, 0.02f),
+            ("_MidMultiplier", ShaderPropertyType.Range, 0.84f),
+            ("_ShadowMultiplier", ShaderPropertyType.Range, 0.66f),
+            ("_ShadowTintAmount", ShaderPropertyType.Range, 0.12f),
+            ("_LitThreshold", ShaderPropertyType.Range, 0.35f),
+            ("_ShadowThreshold", ShaderPropertyType.Range, -0.05f),
+            ("_BandSoftness", ShaderPropertyType.Range, 0.02f),
+            ("_TopBandLift", ShaderPropertyType.Range, 1f),
+            ("_OutlinePx", ShaderPropertyType.Range, 3f),
+            ("_OutlineSource", ShaderPropertyType.Range, 0f),
             ("_RimWidth", ShaderPropertyType.Range, 0.25f),
             ("_RimStrength", ShaderPropertyType.Range, 0.6f),
         };
@@ -118,7 +129,7 @@ namespace CriticalMass.Runtime.Tests
                 }
             }
 
-            foreach (string relative in new[] { ShaderPath, CommonPath })
+            foreach (string relative in new[] { ShaderPath, CommonPath, GroundPath })
             {
                 string path = Path.Combine(Application.dataPath, relative);
                 Assert.IsTrue(File.Exists(path), path + " is missing");
@@ -128,6 +139,53 @@ namespace CriticalMass.Runtime.Tests
                     Assert.IsFalse(source.Contains(token), relative + " contains " + token);
                 }
             }
+        }
+
+        [Test]
+        public void TheShadowBandIsNeverBlackAndTheBandsStepDown()
+        {
+            // The shader's own band maths on Warm Cream: lit > mid > shadow, and the shadow band stays well above the ink.
+            Vector3 cream = new Vector3(0.968627f, 0.941176f, 0.898039f);
+            Vector3 navy = new Vector3(0.094118f, 0.137255f, 0.231373f);
+            Vector3 mid = cream * 0.84f;
+            Vector3 shadow = Vector3.Lerp(cream * 0.66f, navy, 0.12f);
+            Assert.Greater(Luma(cream), Luma(mid));
+            Assert.Greater(Luma(mid), Luma(shadow));
+            Assert.Greater(Luma(shadow), Luma(navy) + 0.3f, "the shadow band is far from black and from the ink");
+        }
+
+        private static float Luma(Vector3 c) => 0.2126f * c.x + 0.7152f * c.y + 0.0722f * c.z;
+
+        [Test]
+        public void TheGroundVariantCompilesHasNoOutlinePassAndPaintsTheGrassCells()
+        {
+            Shader shader = Shader.Find(GroundName);
+            Assert.IsNotNull(shader, GroundName + " not found");
+            Assert.IsFalse(ShaderUtil.ShaderHasError(shader), GroundName + " has compile errors");
+            Assert.AreEqual(2, shader.passCount, "ForwardLit and ShadowCaster only: no hull on ground cells");
+            var lightMode = new ShaderTagId("LightMode");
+            AssertLightMode(shader, 0, lightMode, "UniversalForward");
+            AssertLightMode(shader, 1, lightMode, "ShadowCaster");
+
+            AssertColor(shader, "_GrassLight", "#ACCB56");
+            AssertColor(shader, "_GrassMid", "#A3C150");
+            AssertColor(shader, "_GrassDark", "#96B249");
+            AssertColor(shader, "_SeamColor", "#7E9A3F");
+            AssertColor(shader, "_CliffColor", "#5B5E58");
+            int cell = shader.FindPropertyIndex("_CellSize");
+            Assert.GreaterOrEqual(cell, 0, "_CellSize missing");
+            Assert.AreEqual(2.5f, shader.GetPropertyDefaultFloatValue(cell), FloatTolerance, "mean cell size 2.5 u");
+        }
+
+        private static void AssertColor(Shader shader, string name, string hex)
+        {
+            int i = shader.FindPropertyIndex(name);
+            Assert.GreaterOrEqual(i, 0, name + " missing");
+            Assert.IsTrue(ColorUtility.TryParseHtmlString(hex, out Color c));
+            Vector4 v = shader.GetPropertyDefaultVectorValue(i);
+            Assert.AreEqual(c.r, v.x, 2e-3f, name + " r");
+            Assert.AreEqual(c.g, v.y, 2e-3f, name + " g");
+            Assert.AreEqual(c.b, v.z, 2e-3f, name + " b");
         }
     }
 }

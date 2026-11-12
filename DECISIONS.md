@@ -85,6 +85,31 @@ not discoverable: Wilson could not find it.
 
 **Status.** Decided. Not built (F-08).
 
+**Amendment 2026-11-12 (owner direction).** The gameplay camera becomes a perspective camera: pitch 55° down, vertical
+field of view 35°, 23.4 units from the look target along the view ray (19.2 u above it), yaw 45° (unchanged), never
+rotates, no shake. The look target sits 2 units toward screen-up from the player (the player at about 58% of screen
+height) with up to 3 units of aim look-ahead toward the cursor (was 2 units of velocity look-ahead). This replaces the
+orthographic projection, the 38° pitch and the 20-unit view height above; the spring follow, the bounds inset and
+"never rotates" stand.
+*Why:* the owner's direction of 2026-11-12 after the reference audit (Obsidian `unity-port/ART-DIRECTION-2026-11-12.md`
+section 2.1): every gameplay audit puts the reference at 50 to 65° perspective, and at 38° orthographic you see walls
+and cliff faces while roofs, wall tops and the ground pattern, which carry the style, go thin.
+*Consequences:* at the same character size about 42% less ground is visible up the screen (19 u instead of 32.5 u) and
+26% less across (26 u instead of 35.6 u); the screen-up offset and the 3 u look-ahead buy most of the forward view
+back. A 2 u character at screen centre measures 90 px feet to head at 1080p (the art direction's 84 px is the
+orthographic estimate; the head is 1.6 u nearer the lens). The numbers live in the view (`Runtime/Camera/GameplayCamera.cs`)
+because the Sim assembly is frozen: `RenderConfig.CameraPitchDeg`, `CameraDistance` and `ViewHeightUnits` keep their
+browser values in GameConfig (golden test) but the gameplay camera no longer reads them. Cinemachine's lens is
+perspective and the P-09 orthographic brain override is removed. Mouse aim already casts each pointer ray from the
+camera onto the plane at the player's ground height, so it needs no change; its tests move from 38° to 55° (0.53 u
+miss instead of 0.96 u). Input directions are unaffected (yaw only). The parity capture camera stays orthographic for
+the bible framings (U-017). The outline must be constant screen-pixel width (done in CM/Toon), since an object-space
+width varies with distance under perspective.
+*Follow, parity with the browser (review advisory R20261112T1918-2-2):* render-velocity look-ahead, the teleport rule
+(a jump only zeroes the look-ahead velocity; the camera snaps only on a new match), the clamp after the spring step and
+the height spring now match `CameraRig.tsx` at 09e0904; the 2 u screen-up offset, the 3 u cap and the aim term are this
+amendment's.
+
 ## U-006 Controls
 
 **Decision.** Fixed table in `MAX-ITEMS.md` (WASD, Space jump, left mouse attack, right mouse ability, E carry/interact,

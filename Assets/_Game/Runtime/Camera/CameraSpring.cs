@@ -14,7 +14,8 @@ namespace CriticalMass.Runtime.Camera
     {
         /// <summary>CM-27 (1) follow spring natural frequency (rad/s), critically damped.</summary>
         public const double FollowOmega = 9;
-        /// <summary>Look-ahead = render velocity x this (s), capped at LookAheadMax (u).</summary>
+        /// <summary>Look-ahead = render velocity x this (s). The browser caps it at LookAheadMax (2 u); the gameplay camera
+        /// uses GameplayCamera.LookAheadMax (3 u, U-005 amendment 2026-11-12) instead.</summary>
         public const double LookAheadSeconds = 0.25;
         public const double LookAheadMax = 2.0;
         /// <summary>Look-ahead easing time constant (s).</summary>

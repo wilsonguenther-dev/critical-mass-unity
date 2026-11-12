@@ -9,7 +9,8 @@ namespace CriticalMass.Runtime.View
 {
     /// <summary>
     /// Phase 0 placeholder views: one capsule per actor slot, one kaiju cube, one cube per resource node, one flat hill
-    /// cube. Every Sim-to-Unity position goes through SimSpace (O-13). No Unity physics: primitives lose their colliders.
+    /// cube, all on CM/Toon (ToonMaterials) so the grey-box already shows the art direction's look: team-coloured
+    /// characters with a 3 px line and team rim, props with a 2.5 px line. Every Sim-to-Unity position goes through SimSpace (O-13). No Unity physics: primitives lose their colliders.
     /// Reads the Sim only; never writes it. Barricades are grid cells (GridChunkMeshView, F-08b).
     /// </summary>
     public sealed class ActorViews : MonoBehaviour
@@ -69,7 +70,7 @@ namespace CriticalMass.Runtime.View
 
             GameObject hill = CreatePrimitive(PrimitiveType.Cube, "Hill");
             _hill = hill.transform;
-            hill.GetComponent<Renderer>().sharedMaterial = PlaceholderMaterials.Get(Palette.Brass);
+            hill.GetComponent<Renderer>().sharedMaterial = ToonMaterials.Prop(Palette.Brass);
         }
 
         private GameObject CreatePrimitive(PrimitiveType type, string objectName)
@@ -109,7 +110,7 @@ namespace CriticalMass.Runtime.View
                 if (i == 0) d *= HumanScale;
                 t.localScale = new Vector3(d, (float)(charHeight / 2), d);
 
-                SetMaterial(_actorRenderers[i], actor.Team == TeamId.Azure ? Palette.Azure : Palette.Crimson);
+                SetMaterial(_actorRenderers[i], ToonMaterials.Character(actor.Team == TeamId.Azure ? Palette.Azure : Palette.Crimson));
             }
 
             // Kaiju: shown in every state.
@@ -123,7 +124,7 @@ namespace CriticalMass.Runtime.View
                 _kaiju.localPosition = SimSpace.ToWorld(x, h + kh / 2, z);
                 _kaiju.localRotation = Quaternion.Euler(0f, SimSpace.YawDeg(k.Facing), 0f);
                 _kaiju.localScale = new Vector3(d, (float)kh, d);
-                SetMaterial(_kaijuRenderer, KaijuHex(k.State));
+                SetMaterial(_kaijuRenderer, ToonMaterials.Character(KaijuHex(k.State), true));
             }
 
             // Resource nodes.
@@ -137,7 +138,7 @@ namespace CriticalMass.Runtime.View
                 t.localPosition = SimSpace.ToWorld(n.X, h + sy / 2.0, n.Z);
                 t.localRotation = Quaternion.identity;
                 t.localScale = new Vector3(NodeSize, sy, NodeSize);
-                SetMaterial(_nodeRenderers[i], n.Kind == NodeKind.Biomass ? Palette.Biomass : Palette.Corruption);
+                SetMaterial(_nodeRenderers[i], ToonMaterials.Prop(n.Kind == NodeKind.Biomass ? Palette.Biomass : Palette.Corruption));
             }
 
             // Hill plate.
@@ -169,9 +170,8 @@ namespace CriticalMass.Runtime.View
             }
         }
 
-        private static void SetMaterial(Renderer r, string hex)
+        private static void SetMaterial(Renderer r, Material m)
         {
-            Material m = PlaceholderMaterials.Get(hex);
             if (r.sharedMaterial != m) r.sharedMaterial = m;
         }
     }

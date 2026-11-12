@@ -54,38 +54,47 @@ namespace CriticalMass.Runtime.Game
             DebugHud hud = game.AddComponent<DebugHud>();
             hud.Driver = game.GetComponent<SimDriverBehaviour>();
 
-            // Main camera. Cinemachine 3.1.7 copies Lens.ModeOverride to the Unity camera only when the brain's override
-            // is enabled (CinemachineBrain.cs lines 755-773); it defaults to disabled Perspective (P-09).
+            // Main camera: perspective (U-005 amendment 2026-11-12). The P-09 orthographic brain override is gone: the
+            // brain's LensModeOverride stays at its default (disabled), so the Unity camera keeps its own perspective mode
+            // and the CinemachineCamera lens (ModeOverride None, FOV 35) drives it.
             var camGo = new GameObject("Main Camera");
             PlaceInScene(camGo, scene);
             camGo.tag = "MainCamera";
             UnityEngine.Camera cam = camGo.AddComponent<UnityEngine.Camera>();
             cam.clearFlags = CameraClearFlags.SolidColor;
-            cam.backgroundColor = Hex(Palette.VoidNavy);
-            cam.orthographic = true;
-            CinemachineBrain brain = camGo.AddComponent<CinemachineBrain>();
-            brain.LensModeOverride = new CinemachineBrain.LensModeOverrideSettings
-            {
-                Enabled = true,
-                DefaultMode = LensSettings.OverrideModes.Orthographic,
-            };
+            cam.backgroundColor = Hex(Palette.SkyTop);
+            cam.orthographic = false;
+            cam.fieldOfView = (float)GameplayCamera.FovDeg;
+            cam.nearClipPlane = GameplayCamera.NearClip;
+            cam.farClipPlane = GameplayCamera.FarClip;
+            camGo.AddComponent<CinemachineBrain>();
 
             // Camera rig (F-08b).
             GameObject rig = CameraRig.Create(driver);
             if (rig != null && rig.transform.parent == null) PlaceInScene(rig, scene);
 
-            // One directional light.
+            // One directional sun (art direction 2.2): from the screen's upper-left corner, elevation 50 degrees, so it
+            // travels 135 degrees clockwise from screen-up (Unity yaw 315 + 135 = 90) and shadows fall to the lower right.
+            // Hard shadows (CM/Toon puts a shadowed pixel on the receiving surface's shadow band, never black).
             var lightGo = new GameObject("Directional Light");
             PlaceInScene(lightGo, scene);
-            lightGo.transform.rotation = Quaternion.Euler(50f, 330f, 0f);
+            lightGo.transform.rotation = SunRotation(driver.Config);
             Light light = lightGo.AddComponent<Light>();
             light.type = LightType.Directional;
             light.intensity = 1f;
             light.color = Color.white;
-            light.shadows = LightShadows.Soft;
+            light.shadows = LightShadows.Hard;
 
             return game;
         }
+
+        /// <summary>Sun elevation (degrees) and its travel direction clockwise from screen-up (art direction 2.2).</summary>
+        public const float SunElevationDeg = 50f;
+        public const float SunAzimuthFromScreenUpDeg = 135f;
+
+        /// <summary>The sun's rotation: Euler(50, 360 - yaw + 135, 0) = (50, 90, 0) at yaw 45.</summary>
+        public static Quaternion SunRotation(GameConfig cfg) =>
+            Quaternion.Euler(SunElevationDeg, (float)(360 - cfg.Render.CameraYawDeg) + SunAzimuthFromScreenUpDeg, 0f);
 
         static void PlaceInScene(GameObject go, Scene scene)
         {

@@ -1,5 +1,5 @@
-using System;
 using CriticalMass.Runtime.Game;
+using CriticalMass.Runtime.Input;
 using CriticalMass.Sim.Core;
 using CriticalMass.Sim.Grid;
 using UnityEngine;
@@ -7,20 +7,33 @@ using UnityEngine;
 namespace CriticalMass.Runtime.Camera
 {
     /// <summary>
-    /// The Cinemachine follow target (CameraRig.tsx follow, CM-27 (1)): actor 0's interpolated position plus an eased
-    /// look-ahead, clamped to the inset map bounds, smoothed by a critically damped spring per axis; teleports snap.
+    /// The Cinemachine follow target: each LateUpdate feeds actor 0's interpolated position, its ground height and the
+    /// pointer aim into <see cref="CameraFollow"/> (CameraRig.tsx follow plus the U-005 amendment of 2026-11-12) and
+    /// places itself at the resulting look target. <see cref="SetOverride"/> frames a fixed point instead (capture tool).
     /// </summary>
     public sealed class CameraFollowTarget : MonoBehaviour
     {
         public SimDriverBehaviour Driver;
 
-        private readonly Spring1 _sx = CameraSpring.CreateSpring(0);
-        private readonly Spring1 _sz = CameraSpring.CreateSpring(0);
-        private double _easeX;
-        private double _easeZ;
-        private double _lastGoalX;
-        private double _lastGoalZ;
-        private bool _hasLast;
+        private readonly CameraFollow _follow = new CameraFollow(HumanInputState.ScreenUpX, HumanInputState.ScreenUpZ);
+        private HumanInputSource _input;
+        private bool _override;
+        private double _ox, _oz;
+
+        /// <summary>The follow state (tests and the debug HUD read it).</summary>
+        public CameraFollow Follow => _follow;
+
+        /// <summary>Frame the sim point (x, z) instead of the human until <see cref="ClearOverride"/> (snaps on).</summary>
+        public void SetOverride(double simX, double simZ)
+        {
+            _override = true;
+            _follow.SnapToNextOverride();
+            _ox = simX;
+            _oz = simZ;
+        }
+
+        /// <summary>Back to following the human; the spring flies home.</summary>
+        public void ClearOverride() => _override = false;
 
         private void LateUpdate()
         {
@@ -28,58 +41,40 @@ namespace CriticalMass.Runtime.Camera
             World w = Driver.World;
             if (w == null || w.ActorCount <= 0) return;
 
-            double dt = Driver.FrameDt;
             double a = Driver.Alpha;
-            double px = w.PrevX[0] + (w.X[0] - w.PrevX[0]) * a;
-            double pz = w.PrevZ[0] + (w.Z[0] - w.PrevZ[0]) * a;
-
-            double lax = w.Vx[0] * CameraSpring.LookAheadSeconds;
-            double laz = w.Vz[0] * CameraSpring.LookAheadSeconds;
-            double ll = Math.Sqrt(lax * lax + laz * laz);
-            if (ll > CameraSpring.LookAheadMax)
-            {
-                lax *= CameraSpring.LookAheadMax / ll;
-                laz *= CameraSpring.LookAheadMax / ll;
-            }
-            double k = 1 - Math.Exp(-dt / CameraSpring.LookAheadTau);
-            _easeX += (lax - _easeX) * k;
-            _easeZ += (laz - _easeZ) * k;
-
-            BoundsDef b = w.Map.Bounds;
+            MapDef map = w.Map;
+            BoundsDef b = map.Bounds;
             double inset = Driver.Config.Render.CameraBoundsInset;
-            double goalX = Clamp(px + _easeX, b.MinX + inset, b.MaxX - inset);
-            double goalZ = Clamp(pz + _easeZ, b.MinZ + inset, b.MaxZ - inset);
+            if (_input == null) _input = Driver.GetComponent<HumanInputSource>();
 
-            bool teleport = !_hasLast;
-            if (!teleport)
+            var f = new CameraFollowInput
             {
-                double dx = goalX - _lastGoalX;
-                double dz = goalZ - _lastGoalZ;
-                double speed = Math.Sqrt(dx * dx + dz * dz) / dt;
-                teleport = speed > CameraSpring.TeleportSpeed;
-            }
-            if (teleport)
+                Dt = Driver.FrameDt,
+                HumanX = w.PrevX[0] + (w.X[0] - w.PrevX[0]) * a,
+                HumanZ = w.PrevZ[0] + (w.Z[0] - w.PrevZ[0]) * a,
+                MinX = b.MinX + inset,
+                MaxX = b.MaxX - inset,
+                MinZ = b.MinZ + inset,
+                MaxZ = b.MaxZ - inset,
+                Epoch = w.Epoch,
+                Override = _override,
+            };
+            f.HumanY = GroundHeight.At(map, f.HumanX, f.HumanZ);
+            if (_input != null && !Driver.HumanAutopilot && _input.State.HasAim)
             {
-                _sx.X = goalX;
-                _sx.V = 0;
-                _sz.X = goalZ;
-                _sz.V = 0;
+                f.HasAim = true;
+                f.AimX = _input.State.AimX;
+                f.AimZ = _input.State.AimZ;
             }
-            else
+            if (_override)
             {
-                CameraSpring.SpringStep(_sx, goalX, CameraSpring.FollowOmega, dt);
-                CameraSpring.SpringStep(_sz, goalZ, CameraSpring.FollowOmega, dt);
+                f.OverrideX = _ox;
+                f.OverrideZ = _oz;
+                f.OverrideY = GroundHeight.At(map, _ox, _oz);
             }
-            _lastGoalX = goalX;
-            _lastGoalZ = goalZ;
-            _hasLast = true;
+            _follow.Step(f);
 
-            transform.position = SimSpace.ToWorld(_sx.X, 0, _sz.X);
-        }
-
-        private static double Clamp(double v, double lo, double hi)
-        {
-            return v < lo ? lo : v > hi ? hi : v;
+            transform.position = SimSpace.ToWorld(_follow.SX.X, _follow.SY.X, _follow.SZ.X);
         }
     }
 }

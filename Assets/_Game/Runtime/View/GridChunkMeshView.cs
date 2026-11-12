@@ -10,6 +10,11 @@ namespace CriticalMass.Runtime.View
     /// <summary>
     /// The grey-box ground: one mesh per 16 x 16 cell chunk built from the Sim cell types and heights, one submesh per
     /// cell look; chunks whose cells changed are rebuilt when <c>World.GridVersion</c> moves.
+    /// Art direction 2026-11-12: floor cells use CM/ToonGround (world-space cell pattern, continuous across chunks, no
+    /// outline; cliff faces in rock dark), walls, bridges, breakables and barricades use CM/Toon with the 2 px structure
+    /// line (UV3 carries each box corner's outward direction so the hull has no gaps at the corners), water cells use
+    /// the flat ground variant, and every water cell side that touches land gets a 0.15 u white foam band (FoamWidth)
+    /// on the water surface. The current Skybreak Basin map has no Water cells, so no foam is drawn on it yet.
     /// </summary>
     public sealed class GridChunkMeshView : MonoBehaviour
     {
@@ -19,8 +24,15 @@ namespace CriticalMass.Runtime.View
         private const int LookBrass = 1;
         private const int LookStone = 2;
         private const int LookMeat = 3;
-        private const int LookSkyTop = 4;
-        private static readonly string[] LookHex = { Palette.Cream, Palette.Brass, Palette.Stone, Palette.Meat, Palette.SkyTop };
+        private const int LookWater = 4;
+        private const int LookFoam = 5;
+        private const int LookCount = 6;
+
+        /// <summary>Foam band width on the water side of every land/water contact (art direction 2.5), u.</summary>
+        public const double FoamWidth = 0.15;
+        /// <summary>Water surface height (u) and the foam's lift above it (no z-fighting).</summary>
+        private const double WaterTop = -0.2;
+        private const double FoamLift = 0.01;
 
         private SimDriverBehaviour _driver;
         private World _world;
@@ -36,9 +48,10 @@ namespace CriticalMass.Runtime.View
 
         private readonly List<Vector3> _verts = new List<Vector3>();
         private readonly List<Vector3> _normals = new List<Vector3>();
+        private readonly List<Vector3> _outline = new List<Vector3>();
         private readonly List<int>[] _tris =
         {
-            new List<int>(), new List<int>(), new List<int>(), new List<int>(), new List<int>(),
+            new List<int>(), new List<int>(), new List<int>(), new List<int>(), new List<int>(), new List<int>(),
         };
 
         private void Start()
@@ -99,8 +112,13 @@ namespace CriticalMass.Runtime.View
 
             if (_materials == null)
             {
-                _materials = new Material[LookHex.Length];
-                for (int k = 0; k < LookHex.Length; k++) _materials[k] = PlaceholderMaterials.Get(LookHex[k]);
+                _materials = new Material[LookCount];
+                _materials[LookCream] = ToonMaterials.Ground(ToonMaterials.GroundKind.Grass);
+                _materials[LookBrass] = ToonMaterials.Structure(Palette.Brass);
+                _materials[LookStone] = ToonMaterials.Structure(Palette.Stone);
+                _materials[LookMeat] = ToonMaterials.Structure(Palette.Meat);
+                _materials[LookWater] = ToonMaterials.Ground(ToonMaterials.GroundKind.Water);
+                _materials[LookFoam] = ToonMaterials.Ground(ToonMaterials.GroundKind.Foam);
             }
 
             int count = _chunksX * _chunksZ;
@@ -154,6 +172,7 @@ namespace CriticalMass.Runtime.View
 
             _verts.Clear();
             _normals.Clear();
+            _outline.Clear();
             for (int k = 0; k < _tris.Length; k++) _tris[k].Clear();
 
             for (int cz = z0; cz < z1; cz++)
@@ -163,6 +182,7 @@ namespace CriticalMass.Runtime.View
                     int i = cz * _map.Width + cx;
                     if (!CellBox(_cellsCopy[i], _map.Height01[i], out double top, out double bottom, out int look)) continue;
                     AddBox(cx, cx + 1, cz, cz + 1, bottom, top, _tris[look]);
+                    if (_cellsCopy[i] == Cell.Water) AddFoam(cx, cz);
                 }
             }
 
@@ -171,6 +191,7 @@ namespace CriticalMass.Runtime.View
             mesh.subMeshCount = _tris.Length;
             mesh.SetVertices(_verts);
             mesh.SetNormals(_normals);
+            mesh.SetUVs(3, _outline);
             for (int k = 0; k < _tris.Length; k++) mesh.SetTriangles(_tris[k], k, false);
             mesh.RecalculateBounds();
         }
@@ -194,7 +215,7 @@ namespace CriticalMass.Runtime.View
                 case Cell.Barricade:
                     top = h + 1.0; bottom = h - 0.5; look = LookMeat; return true;
                 case Cell.Water:
-                    top = -0.2; bottom = -0.4; look = LookSkyTop; return true;
+                    top = WaterTop; bottom = WaterTop - 0.2; look = LookWater; return true;
                 default:
                     top = 0; bottom = 0; look = 0; return false;
             }
@@ -203,12 +224,37 @@ namespace CriticalMass.Runtime.View
         /// <summary>Six faces of the sim box [x0, x1] x [y0, y1] x [z0, z1], each with an outward sim normal.</summary>
         private void AddBox(double x0, double x1, double z0, double z1, double y0, double y1, List<int> tris)
         {
+            _cx = (x0 + x1) / 2; _cy = (y0 + y1) / 2; _cz = (z0 + z1) / 2;
             AddQuad(x0, y1, z0, x1, y1, z0, x1, y1, z1, x0, y1, z1, 0, 1, 0, tris);   // top
             AddQuad(x0, y0, z0, x0, y0, z1, x1, y0, z1, x1, y0, z0, 0, -1, 0, tris);  // bottom
             AddQuad(x1, y0, z0, x1, y0, z1, x1, y1, z1, x1, y1, z0, 1, 0, 0, tris);   // +x
             AddQuad(x0, y0, z0, x0, y1, z0, x0, y1, z1, x0, y0, z1, -1, 0, 0, tris);  // -x
             AddQuad(x0, y0, z1, x0, y1, z1, x1, y1, z1, x1, y0, z1, 0, 0, 1, tris);   // +z (sim)
             AddQuad(x0, y0, z0, x1, y0, z0, x1, y1, z0, x0, y1, z0, 0, 0, -1, tris);  // -z (sim)
+        }
+
+        /// <summary>The centre of the box being added: each corner's outline direction (UV3) points away from it.</summary>
+        private double _cx, _cy, _cz;
+
+        /// <summary>Land/water contact (the water-edge hook): a FoamWidth band inside water cell (cx, cz) along each side whose neighbour is land.</summary>
+        private void AddFoam(int cx, int cz)
+        {
+            double y = WaterTop + FoamLift;
+            double w = FoamWidth;
+            List<int> t = _tris[LookFoam];
+            _cx = cx + 0.5; _cy = y - 1; _cz = cz + 0.5;
+            if (IsLand(cx - 1, cz)) AddQuad(cx, y, cz, cx + w, y, cz, cx + w, y, cz + 1, cx, y, cz + 1, 0, 1, 0, t);
+            if (IsLand(cx + 1, cz)) AddQuad(cx + 1 - w, y, cz, cx + 1, y, cz, cx + 1, y, cz + 1, cx + 1 - w, y, cz + 1, 0, 1, 0, t);
+            if (IsLand(cx, cz - 1)) AddQuad(cx, y, cz, cx + 1, y, cz, cx + 1, y, cz + w, cx, y, cz + w, 0, 1, 0, t);
+            if (IsLand(cx, cz + 1)) AddQuad(cx, y, cz + 1 - w, cx + 1, y, cz + 1 - w, cx + 1, y, cz + 1, cx, y, cz + 1, 0, 1, 0, t);
+        }
+
+        /// <summary>True for a drawn, non-water cell inside the map.</summary>
+        private bool IsLand(int cx, int cz)
+        {
+            if (cx < 0 || cz < 0 || cx >= _map.Width || cz >= _map.Height) return false;
+            byte c = _cellsCopy[cz * _map.Width + cx];
+            return c != Cell.Water && c != Cell.Void;
         }
 
         /// <summary>
@@ -235,6 +281,10 @@ namespace CriticalMass.Runtime.View
             _normals.Add(n);
             _normals.Add(n);
             _normals.Add(n);
+            _outline.Add(SimSpace.ToWorld(ax - _cx, ay - _cy, az - _cz).normalized);
+            _outline.Add(SimSpace.ToWorld(bx - _cx, by - _cy, bz - _cz).normalized);
+            _outline.Add(SimSpace.ToWorld(cx - _cx, cy - _cy, cz - _cz).normalized);
+            _outline.Add(SimSpace.ToWorld(dx - _cx, dy - _cy, dz - _cz).normalized);
 
             if (Vector3.Dot(Vector3.Cross(b - a, c - a), n) > 0)
             {

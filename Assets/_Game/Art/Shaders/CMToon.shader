@@ -1,17 +1,28 @@
-// CM/Toon (V-01): the one shared flat shader for characters, Kaiju and props (U-008).
-// Two-step light ramp on the main light, vertex-colour team mask (red channel), hard rim in the team colour,
-// inverted-hull outline. Main light only: no additional lights, no ambient probe, no highlights, no probes, no fog.
-// Defaults are the bible core palette (p05); they are starting values, tuned only through a U-### entry.
+// CM/Toon (V-01): the one shared flat shader for characters, Kaiju, props and structures (U-008), to the art
+// direction of 2026-11-12 (sections 2.2 and 2.3): three tone bands with hard edges on the main light (lit x 1.00, mid
+// x 0.84, shadow x 0.66 mixed 12% toward Void Navy, so never black), cast shadows put a pixel on its shadow band,
+// top-facing surfaces sit one band lighter, vertex-colour team mask (red channel), hard rim in the team colour
+// (characters only: props and structures set _RimStrength 0), and a Void Navy inverted-hull outline of CONSTANT SCREEN
+// WIDTH set per material (_OutlinePx at 1080p: 3 characters, 2.5 props, 2 structures). Main light only: no additional
+// lights, no ambient probe, no highlights, no probes, no fog. Defaults are the bible core palette (p05); they are
+// starting values, tuned only through a U-### entry.
 Shader "CM/Toon"
 {
     Properties
     {
         _BaseColor ("Base Color (Warm Cream)", Color) = (0.968627, 0.941176, 0.898039, 1)
-        _ShadeMultiplier ("Shade Multiplier", Range(0, 1)) = 0.62
-        _RampThreshold ("Ramp Threshold", Range(-1, 1)) = 0.0
         _TeamColor ("Team Color (Azure Team)", Color) = (0.086275, 0.780392, 0.850980, 1)
+        _MidMultiplier ("Mid Band Multiplier", Range(0, 1)) = 0.84
+        _ShadowMultiplier ("Shadow Band Multiplier", Range(0, 1)) = 0.66
+        _ShadowTint ("Shadow Tint (Void Navy)", Color) = (0.094118, 0.137255, 0.231373, 1)
+        _ShadowTintAmount ("Shadow Tint Amount", Range(0, 1)) = 0.12
+        _LitThreshold ("Lit Threshold (N.L)", Range(-1, 1)) = 0.35
+        _ShadowThreshold ("Shadow Threshold (N.L)", Range(-1, 1)) = -0.05
+        _BandSoftness ("Band Edge Width (N.L)", Range(0, 0.2)) = 0.02
+        _TopBandLift ("Top Face Band Lift", Range(0, 1)) = 1
         _OutlineColor ("Outline Color (Void Navy)", Color) = (0.094118, 0.137255, 0.231373, 1)
-        _OutlineWidth ("Outline Width (object space)", Range(0, 0.1)) = 0.02
+        _OutlinePx ("Outline Width (px at 1080p)", Range(0, 8)) = 3
+        _OutlineSource ("Outline Direction (0 normal, 1 from pivot, 2 UV3)", Range(0, 2)) = 0
         _RimWidth ("Rim Width", Range(0, 1)) = 0.25
         _RimStrength ("Rim Strength", Range(0, 1)) = 0.6
     }
@@ -35,7 +46,6 @@ Shader "CM/Toon"
 
             // Main light shadow attenuation feeds the ramp test.
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
-            #pragma multi_compile_fragment _ _SHADOWS_SOFT _SHADOWS_SOFT_LOW _SHADOWS_SOFT_MEDIUM _SHADOWS_SOFT_HIGH
 
             #include "CMToonCommon.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
@@ -70,10 +80,12 @@ Shader "CM/Toon"
 
                 half3 albedo = lerp(_BaseColor.rgb, _TeamColor.rgb, input.color.r);
 
-                // Two flat bands; the main light's shadow attenuation multiplies ndl before the test.
+                // Three bands from N.L; a cast shadow drops the pixel to the shadow band; a top-facing surface is one
+                // band lighter (2.2 bevel rule: tops exactly one band lighter than their sides).
                 float ndl = dot(normalWS, mainLight.direction);
-                ndl *= mainLight.shadowAttenuation;
-                half3 lit = ndl > _RampThreshold ? albedo * mainLight.color : albedo * _ShadeMultiplier;
+                half band = CMToonBand(ndl) * step(0.5, mainLight.shadowAttenuation);
+                band = min(2.0h, band + _TopBandLift * smoothstep(0.65, 0.75, normalWS.y));
+                half3 lit = CMToonBandColor(albedo, band);
 
                 // Hard rim in the team colour.
                 float rim = 1.0 - saturate(dot(normalWS, normalize(viewDirWS)));
@@ -85,7 +97,7 @@ Shader "CM/Toon"
             ENDHLSL
         }
 
-        // Pass 1: the inverted hull outline.
+        // Pass 1: the inverted hull outline, constant screen width (CMToonOutlinePositionCS).
         Pass
         {
             Name "Outline"
@@ -108,8 +120,7 @@ Shader "CM/Toon"
             CMToonOutlineVaryings CMToonOutlineVertex(CMToonAttributes input)
             {
                 CMToonOutlineVaryings output;
-                float3 positionOS = input.positionOS.xyz + input.normalOS * _OutlineWidth;
-                output.positionCS = TransformObjectToHClip(positionOS);
+                output.positionCS = CMToonOutlinePositionCS(input);
                 return output;
             }
 
