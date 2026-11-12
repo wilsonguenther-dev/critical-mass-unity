@@ -492,8 +492,8 @@ def shot_field():
 
 # ---------------------------------------------------------------- orthographic bible framings
 FRAMINGS = {
-    "p14-biomass-plants": ("14-biomass-plants", [("prop_biomass_plant_s", (-1.0, 0)), ("prop_biomass_plant_m", (-0.15, 0)),
-                                                 ("prop_biomass_plant_l", (1.05, 0))]),
+    "p14-biomass-plants": ("14-biomass-plants", [("prop_biomass_plant_s", (-1.0, 0)), ("prop_biomass_plant_m", (-0.1, 0)),
+                                                 ("prop_biomass_plant_l", (0.9, 0))]),
     "p14-loose-orb": ("14-loose-orb", [("prop_orb_biomass", (0, 0))]),
     "p14-carried-bundle": ("14-carried-bundle", [("prop_carried_bundle", (0, 0))]),
     "p14-corruption-growth": ("14-corruption-growth", [("prop_corruption_growth_l", (0, 0)),

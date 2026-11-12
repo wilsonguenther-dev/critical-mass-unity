@@ -113,8 +113,8 @@ def biomass_plant(name, H, nstalk, heads, nmush, seed):
                 c = Vector((x, 0, z))
             else:
                 a = 2 * math.pi * j / (len(radii) - 1) + rng.uniform(-0.3, 0.3)
-                rr = radii[0] * 0.8
-                c = Vector((x + rr * math.cos(a), rr * 0.7 * math.sin(a), z - radii[0] * 0.35 + rng.uniform(-0.03, 0.05)))
+                rr = radii[0] * 0.95
+                c = Vector((x + rr * math.cos(a), rr * 0.6 * math.sin(a), z - radii[0] * 0.2 + rng.uniform(-0.03, 0.05)))
             P.add(uvs(r, 8, 6), bio_glow, smooth=True, mat=M(c, (0, 0, rng.uniform(0, 90))))
     for i in range(nmush):                                        # small biomass puffs at the base
         a = 2 * math.pi * i / max(1, nmush) + 1.4
@@ -218,32 +218,26 @@ def corruption(name, H, nsp, seed):
     rng = P.rng
     for i, (x, y, r) in enumerate(((0.0, 0.08, 0.15), (0.2, -0.1, 0.1), (-0.22, -0.08, 0.11), (0.06, -0.24, 0.08))):
         rock(P, r, (x, y, r * 0.3), seed + i, col=STONE_D, squash=0.7)
-    gl = Vector((-0.4, -0.8, 0.45)).normalized()
-
-    def col(f):
-        c = f.calc_center_median()
-        t = c.z / H
-        if t > 0.86:
-            return (CORRUPT_TIP, MASK_GLOW)
-        if f.normal.dot(gl) > 0.0 and abs(noise.noise(c * 5.0 + Vector((seed, 0, 0)))) < 0.3 and t > 0.08:
-            return (CORRUPT_GLOW, MASK_GLOW)
-        return CORRUPT if f.normal.z > -0.1 else CORRUPT_D
+    outer = lambda f: CORRUPT if f.normal.z > -0.15 and f.normal.x < 0.4 else CORRUPT_D
+    tipc = lambda f: (CORRUPT_TIP, MASK_GLOW) if f.calc_center_median().z > H * 0.8 else (CORRUPT_GLOW, MASK_GLOW)
     for i in range(nsp):
         if i == 0:
-            x0, y0, h, r0, ph, curl = 0.0, 0.0, 1.0, 0.2, 0.0, 0.22
+            x0, y0, h, r0, ph, curl = 0.0, 0.0, 1.0, 0.17, 0.0, -0.12
         else:
             a = 2 * math.pi * i / (nsp - 1) + rng.uniform(-0.3, 0.3)
-            x0, y0 = 0.2 * math.cos(a), 0.12 * math.sin(a)
-            h, r0, ph = rng.uniform(0.4, 0.68), rng.uniform(0.09, 0.13), rng.uniform(0, 6)
-            curl = 0.14 * (1 if x0 >= 0 else -1)
+            x0, y0 = 0.19 * math.cos(a), 0.1 * math.sin(a)
+            h, r0, ph = rng.uniform(0.45, 0.78), rng.uniform(0.08, 0.11), rng.uniform(0, 6)
+            curl = 0.2 * (1 if x0 >= 0 else -1)
         pts, rad = [], []
         for k in range(10):
             t = k / 9
-            sway = 0.07 * math.sin(t * math.pi * 1.6 + ph) * t + curl * t ** 3
-            spread = (1 + 0.6 * t) if i else 1.0
-            pts.append((x0 * spread + sway, y0 * spread, 0.04 + h * (t - 0.12 * t ** 4)))
-            rad.append(r0 * (1.0 - t) ** 0.85 * (1 + 0.55 * math.sin(t * math.pi * 0.9)))
-        P.add(tube(pts, rad, 6, tip=True, twist=i), col, smooth=True)
+            sway = 0.06 * math.sin(t * math.pi * 1.6 + ph) * t + curl * t ** 2.5
+            spread = (1 + 0.5 * t) if i else 1.0
+            pts.append((x0 * spread + sway, y0 * spread, 0.04 + h * (t - 0.18 * t ** 4)))
+            rad.append(r0 * (1.0 - t) ** 0.8 * (1 + 0.6 * math.sin(t * math.pi * 0.9)))
+        P.add(tube(pts, rad, 6, tip=True, twist=i), outer, smooth=True)
+        inner = [(p[0], p[1] - rad[k] * 0.62, p[2]) for k, p in enumerate(pts)]
+        P.add(tube(inner[1:], [r * 0.55 for r in rad[1:]], 5, tip=True), tipc, smooth=True)
     return P.finish(fit_height=H)
 
 
@@ -346,10 +340,10 @@ def barricade_damaged():
 # ---------------------------------------------------------------- banner (team cloth)
 def banner():
     P = Prop("prop_banner", LARGE, "interactable", {"height": 1.9}, 14)
-    for i, (x, y, r) in enumerate(((0.0, 0.1, 0.22), (0.22, -0.04, 0.16), (-0.21, -0.02, 0.15), (0.08, -0.18, 0.1))):
+    for i, (x, y, r) in enumerate(((0.0, 0.1, 0.22), (0.27, -0.04, 0.17), (-0.27, -0.02, 0.16), (0.1, -0.2, 0.11))):
         rock(P, r, (x, y, r * 0.25), 40 + i, squash=0.65, moss=True)
-    for j, (x, y) in enumerate(((-0.3, -0.16), (0.32, -0.14), (0.0, -0.3), (-0.12, 0.2))):
-        tuft(P, (x, y, 0.02), h=0.12, seed=j)
+    for j, (x, y) in enumerate(((-0.38, -0.16), (0.4, -0.12))):
+        tuft(P, (x, y, 0.02), h=0.1, seed=j, col=GRASS)
     P.add(box(0.11, 0.11, 1.84), WOOD_B, mat=M((-0.06, 0.07, 0)))
     P.add(box(0.84, 0.1, 0.1), WOOD, mat=M((0, 0.0, 1.7)))
     for x in (-0.42, 0.42):
@@ -372,7 +366,7 @@ def banner():
 
 # ---------------------------------------------------------------- markers (diamond over ring)
 def _diamond(P, z0, h, r, colf):
-    bm = tube([(0, 0, z0), (0, 0, z0 + h * 0.42), (0, 0, z0 + h)], [0.0001, r, 0.0], 4, tip=True, twist=math.pi / 4)
+    bm = tube([(0, 0, z0), (0, 0, z0 + h * 0.42), (0, 0, z0 + h)], [0.0001, r, 0.0], 4, tip=True, twist=0.0)
     P.add(bm, colf, lined=False)
 
 
@@ -383,9 +377,9 @@ def marker(team=True):
         lit, dark, ml, md = TEAM_GLOW, TEAM_DARK, MASK_TEAM_GLOW, MASK_TEAM_DARK
     else:
         lit, dark, ml, md = NEUTRAL_HI, NEUTRAL_LO, MASK_GLOW, 0.0
-    P.add(torus(0.25, 0.035, 20, 4), (lit, ml), lined=False, mat=M((0, 0, 0.035), scale=(1, 1, 0.6)))
+    P.add(torus(0.26, 0.04, 20, 4), (lit, ml), lined=False, mat=M((0, 0, 0.04), scale=(1, 1, 0.6)))
     P.add(cyl(0.17, 0.01, 12, bevel=0), (dark, md), lined=False)
-    _diamond(P, 0.2, 0.72, 0.24, facet_light(lit, dark, ml, md, (-0.7, -0.4, 0.3)))
+    _diamond(P, 0.12, 0.8, 0.25, facet_light(lit, dark, ml, md, (-0.7, -0.4, 0.3)))
     return P.finish(fit_height=0.9)
 
 
@@ -544,9 +538,9 @@ def crystal_lamp():
 # ---------------------------------------------------------------- registry
 REGISTRY = [
     # name, builder, bible ref
-    ("prop_biomass_plant_s", lambda: biomass_plant("prop_biomass_plant_s", 0.5, 3, [(0, 0.62, [0.2, 0.13, 0.12, 0.12])], 1, 31), "p14 biomass plants (small); p03"),
-    ("prop_biomass_plant_m", lambda: biomass_plant("prop_biomass_plant_m", 0.8, 4, [(0, 0.8, [0.22, 0.15, 0.14, 0.14]), (0.32, 0.5, [0.13, 0.09])], 2, 32), "p14 biomass plants (medium)"),
-    ("prop_biomass_plant_l", lambda: biomass_plant("prop_biomass_plant_l", 1.2, 6, [(0, 0.95, [0.26, 0.17, 0.16, 0.16, 0.15]), (0.36, 0.62, [0.15, 0.1]), (-0.34, 0.55, [0.13, 0.09])], 3, 33), "p14 biomass plants (large); p03"),
+    ("prop_biomass_plant_s", lambda: biomass_plant("prop_biomass_plant_s", 0.5, 3, [(0, 0.6, [0.26, 0.19, 0.19, 0.18])], 2, 31), "p14 biomass plants (small); p03"),
+    ("prop_biomass_plant_m", lambda: biomass_plant("prop_biomass_plant_m", 0.8, 3, [(0, 0.82, [0.3, 0.21, 0.21, 0.2, 0.19]), (0.42, 0.56, [0.18, 0.13])], 2, 32), "p14 biomass plants (medium)"),
+    ("prop_biomass_plant_l", lambda: biomass_plant("prop_biomass_plant_l", 1.2, 4, [(0, 0.9, [0.34, 0.24, 0.24, 0.22, 0.22, 0.2]), (0.46, 0.68, [0.22, 0.15]), (-0.46, 0.62, [0.2, 0.14])], 3, 33), "p14 biomass plants (large); p03"),
     ("prop_biomass_sprout", biomass_sprout, "p03 small biomass sprouts"),
     ("prop_orb_biomass", orb_biomass, "p14 loose orb; p03 biomass orb"),
     ("prop_orb_stone", orb_stone, "p03 stone orb"),

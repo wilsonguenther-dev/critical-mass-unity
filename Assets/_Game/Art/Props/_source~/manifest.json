@@ -11,11 +11,11 @@
    "fbx": "Props/prop_biomass_plant_s.fbx",
    "bible": "p14 biomass plants (small); p03",
    "size_class": "interactable",
-   "tris": 736,
+   "tris": 784,
    "budget": 1500,
    "dims_blender_xyz": [
-    0.455,
-    0.424,
+    0.434,
+    0.434,
     0.5
    ],
    "targets": {
@@ -34,11 +34,11 @@
    "fbx": "Props/prop_biomass_plant_m.fbx",
    "bible": "p14 biomass plants (medium)",
    "size_class": "interactable",
-   "tris": 1028,
+   "tris": 1050,
    "budget": 1500,
    "dims_blender_xyz": [
-    0.748,
-    0.702,
+    0.825,
+    0.55,
     0.8
    ],
    "targets": {
@@ -57,11 +57,11 @@
    "fbx": "Props/prop_biomass_plant_l.fbx",
    "bible": "p14 biomass plants (large); p03",
    "size_class": "interactable",
-   "tris": 1458,
+   "tris": 1422,
    "budget": 1500,
    "dims_blender_xyz": [
-    1.0,
-    0.896,
+    1.368,
+    0.873,
     1.2
    ],
    "targets": {
@@ -83,8 +83,8 @@
    "tris": 236,
    "budget": 300,
    "dims_blender_xyz": [
-    0.236,
-    0.228,
+    0.235,
+    0.226,
     0.25
    ],
    "targets": {
@@ -132,9 +132,9 @@
    "tris": 320,
    "budget": 1500,
    "dims_blender_xyz": [
-    0.435,
-    0.446,
-    0.435
+    0.437,
+    0.437,
+    0.44
    ],
    "targets": {
     "height": 0.45,
@@ -157,9 +157,9 @@
    "tris": 320,
    "budget": 1500,
    "dims_blender_xyz": [
-    0.442,
-    0.443,
-    0.441
+    0.432,
+    0.44,
+    0.445
    ],
    "targets": {
     "height": 0.45,
@@ -254,11 +254,11 @@
    "fbx": "Props/prop_corruption_growth_l.fbx",
    "bible": "p14 corruption growth (large); p03",
    "size_class": "interactable",
-   "tris": 956,
+   "tris": 1424,
    "budget": 1500,
    "dims_blender_xyz": [
-    1.045,
-    0.662,
+    1.195,
+    0.697,
     1.2
    ],
    "targets": {
@@ -277,11 +277,11 @@
    "fbx": "Props/prop_corruption_growth_s.fbx",
    "bible": "p14 corruption growth (small)",
    "size_class": "interactable",
-   "tris": 744,
+   "tris": 1056,
    "budget": 1500,
    "dims_blender_xyz": [
-    0.526,
-    0.327,
+    0.584,
+    0.354,
     0.6
    ],
    "targets": {
@@ -303,8 +303,8 @@
    "tris": 190,
    "budget": 1500,
    "dims_blender_xyz": [
-    0.473,
-    0.409,
+    0.476,
+    0.412,
     0.9
    ],
    "targets": {
@@ -401,7 +401,7 @@
    "dims_blender_xyz": [
     1.619,
     0.863,
-    1.003
+    0.999
    ],
    "targets": {
     "height": 0.95
@@ -419,11 +419,11 @@
    "fbx": "Props/prop_banner.fbx",
    "bible": "p14 banners azure / crimson (team mask)",
    "size_class": "interactable",
-   "tris": 1088,
+   "tris": 1064,
    "budget": 1500,
    "dims_blender_xyz": [
-    0.872,
-    0.595,
+    0.866,
+    0.59,
     1.9
    ],
    "targets": {
@@ -445,8 +445,8 @@
    "tris": 218,
    "budget": 1500,
    "dims_blender_xyz": [
-    0.558,
-    0.558,
+    0.587,
+    0.587,
     0.9
    ],
    "targets": {
@@ -468,8 +468,8 @@
    "tris": 218,
    "budget": 1500,
    "dims_blender_xyz": [
-    0.558,
-    0.558,
+    0.587,
+    0.587,
     0.9
    ],
    "targets": {
@@ -541,8 +541,8 @@
    "tris": 148,
    "budget": 800,
    "dims_blender_xyz": [
-    0.593,
-    0.598,
+    0.609,
+    0.605,
     0.6
    ],
    "targets": {
@@ -567,7 +567,7 @@
    "budget": 800,
    "dims_blender_xyz": [
     1.006,
-    0.503,
+    0.502,
     0.85
    ],
    "targets": {
@@ -706,9 +706,9 @@
    "tris": 240,
    "budget": 300,
    "dims_blender_xyz": [
-    0.447,
-    0.246,
-    0.116
+    0.435,
+    0.244,
+    0.118
    ],
    "targets": {
     "height": 0.12
