@@ -196,6 +196,10 @@ namespace CriticalMass.Runtime.View
             mesh.RecalculateBounds();
         }
 
+        /// <summary>True when the art catalog carries the Miner barricade model (art import 2026-11-12).</summary>
+        private static bool BarricadeModelShown =>
+            CriticalMass.Runtime.View.Art.ArtCatalog.Load()?.Find(CriticalMass.Runtime.View.Art.ArtMapping.MinerBarricade) != null;
+
         /// <summary>The box a cell is drawn as (top, bottom, look); false for Void (not drawn).</summary>
         private static bool CellBox(byte cell, double h, out double top, out double bottom, out int look)
         {
@@ -213,6 +217,8 @@ namespace CriticalMass.Runtime.View
                 case Cell.BreakableCracked:
                     top = h + 0.75; bottom = h - 0.5; look = LookBrass; return true;
                 case Cell.Barricade:
+                    // With the Miner barricade model imported (ActorViews draws it), the cell is plain floor under it.
+                    if (BarricadeModelShown) { top = h; bottom = h - 0.5; look = LookCream; return true; }
                     top = h + 1.0; bottom = h - 0.5; look = LookMeat; return true;
                 case Cell.Water:
                     top = WaterTop; bottom = WaterTop - 0.2; look = LookWater; return true;

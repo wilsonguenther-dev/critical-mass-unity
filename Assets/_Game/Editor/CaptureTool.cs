@@ -172,17 +172,50 @@ namespace CriticalMass.Editor
             _settle = -1;
         }
 
-        private static (string Name, double X, double Z, double Distance)[] Targets(MapDef map)
+        private static (string Name, double X, double Z, double Distance)[] Targets(World w)
         {
+            MapDef map = w.Map;
             PadDef azure = map.Pads[(int)TeamId.Azure];
             List<Vector2> land = LandOutline(map, out double cx, out double cz);
+            CloseTarget(w, out double closeX, out double closeZ);
             return new[]
             {
                 ("base-azure", azure.X, azure.Z, GameplayCamera.Distance),
                 ("hill", map.Hill.X, map.Hill.Z, GameplayCamera.Distance),
                 ("shrine", map.Shrine.X, map.Shrine.Z, GameplayCamera.Distance),
                 ("wide", cx, cz, WideDistance(map, land, cx, cz)),
+                ("close", closeX, closeZ, GameplayCamera.Distance),
             };
+        }
+
+        /// <summary>
+        /// Art review frame (2026-11-12 art import): the centroid of the Kaiju, the living Warrior nearest it and the living
+        /// Miner nearest it, at the gameplay camera distance. Read-only on the world.
+        /// </summary>
+        public static void CloseTarget(World w, out double x, out double z)
+        {
+            double kx = w.Kaiju.X, kz = w.Kaiju.Z;
+            int warrior = Nearest(w, ClassId.Warrior, kx, kz), miner = Nearest(w, ClassId.Miner, kx, kz);
+            double sx = kx, sz = kz;
+            int n = 1;
+            if (warrior >= 0) { sx += w.X[warrior]; sz += w.Z[warrior]; n++; }
+            if (miner >= 0) { sx += w.X[miner]; sz += w.Z[miner]; n++; }
+            x = sx / n;
+            z = sz / n;
+        }
+
+        private static int Nearest(World w, ClassId cls, double x, double z)
+        {
+            int best = -1;
+            double bestD = double.MaxValue;
+            for (int i = 0; i < w.ActorCount; i++)
+            {
+                Actor a = w.Actors[i];
+                if (!a.Alive || a.Cls != cls) continue;
+                double d = (w.X[i] - x) * (w.X[i] - x) + (w.Z[i] - z) * (w.Z[i] - z);
+                if (d < bestD) { bestD = d; best = i; }
+            }
+            return best;
         }
 
         /// <summary>
@@ -295,7 +328,7 @@ namespace CriticalMass.Editor
 
         private static void Shoot()
         {
-            var targets = Targets(_driver.World.Map);
+            var targets = Targets(_driver.World);
             if (_target >= targets.Length)
             {
                 WriteManifest(targets);
@@ -326,8 +359,71 @@ namespace CriticalMass.Editor
             RenderTo(path);
             Written.Add(path);
             Debug.Log("[CaptureTool] wrote " + path);
+            Perf.Add(MeasureFrame(targets[_target].Name));
             _target++;
             _settle = -1;
+        }
+
+        /// <summary>Frames timed per target by MeasureFrame.</summary>
+        private const int PerfFrames = 40;
+        private static readonly List<string> Perf = new List<string>();
+
+        /// <summary>
+        /// View frame time at the current pose, 1920x1080 MSAA 4, clock stopped: per frame the views' Sync (positions,
+        /// materials, animation evaluation) and one render of the gameplay camera, then a 1-pixel read-back so the GPU work
+        /// of that frame is finished inside the timing. Median and p95 over PerfFrames after 5 warm-up frames. This is the
+        /// editor in batch mode, not a player build: compare before and after, do not read it as a budget.
+        /// </summary>
+        private static string MeasureFrame(string name)
+        {
+            UnityEngine.Camera cam = UnityEngine.Camera.main;
+            var views = _driver.GetComponent<CriticalMass.Runtime.View.ActorViews>();
+            var rt = new RenderTexture(Width, Height, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB) { antiAliasing = 4 };
+            rt.Create();
+            var px = new Texture2D(1, 1, TextureFormat.RGB24, false);
+            RenderTexture prevActive = RenderTexture.active;
+            cam.aspect = (float)Width / Height;
+            var ms = new List<double>();
+            try
+            {
+                for (int i = 0; i < PerfFrames + 5; i++)
+                {
+                    var sw = System.Diagnostics.Stopwatch.StartNew();
+                    if (views != null) views.Sync(1f / 60f);
+                    var req = new RenderPipeline.StandardRequest { destination = rt };
+                    RenderPipeline.SubmitRenderRequest(cam, req);
+                    RenderTexture.active = rt;
+                    px.ReadPixels(new Rect(0, 0, 1, 1), 0, 0);
+                    RenderTexture.active = prevActive;
+                    sw.Stop();
+                    if (i >= 5) ms.Add(sw.Elapsed.TotalMilliseconds);
+                }
+            }
+            finally
+            {
+                RenderTexture.active = prevActive;
+                cam.ResetAspect();
+                rt.Release();
+                UnityEngine.Object.DestroyImmediate(rt);
+                UnityEngine.Object.DestroyImmediate(px);
+            }
+            ms.Sort();
+            double median = ms[ms.Count / 2], p95 = ms[(int)Math.Floor(ms.Count * 0.95)];
+            int renderers = 0, skinned = 0;
+            long tris = 0;
+            foreach (Renderer r in UnityEngine.Object.FindObjectsByType<Renderer>(FindObjectsSortMode.None))
+            {
+                if (!r.enabled || !r.gameObject.activeInHierarchy) continue;
+                renderers++;
+                Mesh m = r is SkinnedMeshRenderer smr ? smr.sharedMesh : (r.GetComponent<MeshFilter>() != null ? r.GetComponent<MeshFilter>().sharedMesh : null);
+                if (r is SkinnedMeshRenderer) skinned++;
+                if (m != null) for (int s = 0; s < m.subMeshCount; s++) tris += (long)m.GetIndexCount(s) / 3;
+            }
+            string line = string.Format(CultureInfo.InvariantCulture,
+                "{{\"name\": \"{0}\", \"frameMsMedian\": {1:0.00}, \"frameMsP95\": {2:0.00}, \"frames\": {3}, \"renderers\": {4}, \"skinned\": {5}, \"sceneTris\": {6}}}",
+                name, median, p95, ms.Count, renderers, skinned, tris);
+            Debug.Log("[CaptureTool] perf " + line);
+            return line;
         }
 
         private static void RenderTo(string path)
@@ -381,7 +477,7 @@ namespace CriticalMass.Editor
                 sb.Append($"    {{\"name\": \"{targets[i].Name}\", \"simX\": {targets[i].X.ToString(CultureInfo.InvariantCulture)}, \"simZ\": {targets[i].Z.ToString(CultureInfo.InvariantCulture)}, \"distance\": {targets[i].Distance.ToString(CultureInfo.InvariantCulture)}, \"file\": \"{Path.GetFileName(Written[i])}\"}}");
                 sb.Append(i + 1 < targets.Length ? ",\n" : "\n");
             }
-            sb.Append("  ]\n}\n");
+            sb.Append("  ],\n  \"perf\": [\n    " + string.Join(",\n    ", Perf) + "\n  ]\n}\n");
             File.WriteAllText(Path.Combine(SessionState.GetString(OutKey, "."), "capture.json"), sb.ToString());
         }
 

@@ -60,7 +60,8 @@ namespace CriticalMass.Runtime.Tests
         public void CMToonIsFoundAndCompilesWithoutErrors()
         {
             Shader shader = FindToon();
-            Assert.IsFalse(ShaderUtil.ShaderHasError(shader), "CM/Toon has compile errors");
+            Assert.IsFalse(ShaderUtil.ShaderHasError(shader), "CM/Toon has compile errors: " +
+                string.Join(" | ", System.Linq.Enumerable.Select(ShaderUtil.GetShaderMessages(shader), m => m.message + " (" + m.file + ":" + m.line + ")")));
             Assert.IsTrue(shader.isSupported, "CM/Toon is not supported");
         }
 
@@ -91,10 +92,10 @@ namespace CriticalMass.Runtime.Tests
         }
 
         [Test]
-        public void HasAForwardPassAnOutlinePassAndAShadowCasterPass()
+        public void HasForwardOutlineShadowCasterDepthOnlyAndDepthNormalsPasses()
         {
             Shader shader = FindToon();
-            Assert.AreEqual(3, shader.passCount, "pass count");
+            Assert.AreEqual(5, shader.passCount, "pass count (art import 2026-11-12 added DepthOnly and DepthNormals)");
 
             // ShaderTagId values are interned case-insensitively: .name returns the spelling first registered in the
             // editor session (the gate saw "SRPDEFAULTUNLIT" for pass 1), so compare tag ids, the way URP's
@@ -103,6 +104,8 @@ namespace CriticalMass.Runtime.Tests
             AssertLightMode(shader, 0, lightMode, "UniversalForward");
             AssertLightMode(shader, 1, lightMode, "SRPDefaultUnlit");
             AssertLightMode(shader, 2, lightMode, "ShadowCaster");
+            AssertLightMode(shader, 3, lightMode, "DepthOnly");
+            AssertLightMode(shader, 4, lightMode, "DepthNormals");
         }
 
         private static void AssertLightMode(Shader shader, int pass, ShaderTagId lightMode, string expected)

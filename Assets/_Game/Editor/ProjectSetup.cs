@@ -36,6 +36,8 @@ namespace CriticalMass.Editor
                 ApplyInputActions();
                 ApplyPlaceholderMaterial();
                 ApplyToonMaterials();
+                AssetDatabase.SaveAssets();
+                Art.ArtCatalogBuilder.Build();
                 MoveIntoSettings("Assets/UniversalRenderPipelineGlobalSettings.asset");
                 MoveIntoSettings("Assets/DefaultVolumeProfile.asset");
                 AssetDatabase.SaveAssets();
@@ -169,6 +171,15 @@ namespace CriticalMass.Editor
             if (!AssetDatabase.IsValidFolder(ToonDir)) AssetDatabase.CreateFolder("Assets/_Game/Resources", "Toon");
             EnsureMaterial(ToonDir + "/CMToon.mat", "CM/Toon");
             EnsureMaterial(ToonDir + "/CMToonGround.mat", "CM/ToonGround");
+            // Art import (2026-11-12): the shared material every Blender FBX under Assets/_Game/Art imports with
+            // (ArtImportPostprocessor), CM/Toon in vertex-colour mode; the views clone it per team (ArtMaterials).
+            EnsureMaterial(ToonDir + "/CMToonArt.mat", "CM/Toon");
+            var art = AssetDatabase.LoadAssetAtPath<Material>(ToonDir + "/CMToonArt.mat");
+            if (art.GetFloat("_ColorMode") != 1f)
+            {
+                art.SetFloat("_ColorMode", 1f);
+                EditorUtility.SetDirty(art);
+            }
         }
 
         static void EnsureMaterial(string path, string shaderName)

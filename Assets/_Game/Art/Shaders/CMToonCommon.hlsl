@@ -5,6 +5,8 @@
 #define CM_TOON_COMMON_INCLUDED
 
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+// SRGBToLinear / LinearToSRGB for the vertex-colour mode.
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
 
 CBUFFER_START(UnityPerMaterial)
     half4 _BaseColor;
@@ -22,6 +24,13 @@ CBUFFER_START(UnityPerMaterial)
     float _OutlineSource;
     half _RimWidth;
     half _RimStrength;
+    float _ColorMode;
+    half4 _TeamCloth;
+    half4 _TeamGlow;
+    half4 _TeamDark;
+    half4 _DefaultCloth;
+    half4 _DefaultGlow;
+    half4 _DefaultDark;
 CBUFFER_END
 
 // Shared vertex input. color.r is the team mask (vertex colour layer "TeamMask", U-043):
@@ -36,6 +45,50 @@ struct CMToonAttributes
     half4  color      : COLOR;
     float3 outlineOS  : TEXCOORD3;
 };
+
+// Vertex-colour mode (_ColorMode 1; Blender art import 2026-11-12). The art's colour set "Col" carries the lit colour
+// in RGB (sRGB hex from the bible) and a mask code in A, read here in eighths:
+//   0 fixed (banded)        1 fixed glow, lined (self-lit)   2 fixed glow (self-lit, no hull)
+//   4 team dark (banded)    5 team glow, lined (self-lit)    6 team glow (self-lit, no hull)    8 team cloth (banded)
+// Team channels are authored in one allegiance (the _Default* colours) and swapped by the team-glow contract of the
+// Kaiju v1 art: out = target * max(rgb) / max(default), in sRGB as the art authored it, so the baked facet brightness
+// survives the hue change and an authored-colour pixel becomes exactly the target colour.
+int CMToonMaskCode(half a)
+{
+    return (int)round(a * 8.0h);
+}
+
+half3 CMToonSwap(half3 rgbSrgb, half3 targetLinear, half3 authoredLinear)
+{
+    half3 target = LinearToSRGB(targetLinear);
+    half3 authored = LinearToSRGB(authoredLinear);
+    half k = max(rgbSrgb.r, max(rgbSrgb.g, rgbSrgb.b)) / max(1e-4h, max(authored.r, max(authored.g, authored.b)));
+    return saturate(target * k);
+}
+
+// Albedo (linear) and self-lit flag of one vertex colour.
+void CMToonVertexColour(half4 col, out half3 albedo, out half selfLit)
+{
+    int code = CMToonMaskCode(col.a);
+    half3 rgb = col.rgb;
+    if (code == 4) rgb = CMToonSwap(rgb, _TeamDark.rgb, _DefaultDark.rgb);
+    else if (code == 5 || code == 6) rgb = CMToonSwap(rgb, _TeamGlow.rgb, _DefaultGlow.rgb);
+    else if (code == 8) rgb = CMToonSwap(rgb, _TeamCloth.rgb, _DefaultCloth.rgb);
+    selfLit = (code == 1 || code == 2 || code == 5 || code == 6) ? 1.0h : 0.0h;
+#if defined(UNITY_COLORSPACE_GAMMA)
+    albedo = rgb;
+#else
+    albedo = SRGBToLinear(rgb);
+#endif
+}
+
+// 0 where the vertex colour mode marks an unlined glow (codes 2 and 6), else 1: the hull collapses there.
+half CMToonOutlineMask(half4 col)
+{
+    if (_ColorMode < 0.5) return 1.0h;
+    int code = CMToonMaskCode(col.a);
+    return (code == 2 || code == 6) ? 0.0h : 1.0h;
+}
 
 // Three tone bands (2.2): lit = base x 1.00, mid = base x _MidMultiplier, shadow = base x _ShadowMultiplier mixed
 // _ShadowTintAmount toward _ShadowTint (Void Navy). band is 0 (shadow) .. 2 (lit); between whole numbers it is the
@@ -69,7 +122,7 @@ float4 CMToonOutlinePositionCS(CMToonAttributes input)
     float len = length(dirCS);
     if (len > 1e-6)
     {
-        float2 offset = dirCS / len * (_OutlinePx * 2.0 / 1080.0);
+        float2 offset = dirCS / len * (_OutlinePx * CMToonOutlineMask(input.color) * 2.0 / 1080.0);
         offset.x *= _ScreenParams.y / _ScreenParams.x;
         positionCS.xy += offset * positionCS.w;
     }
