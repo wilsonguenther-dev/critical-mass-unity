@@ -207,6 +207,10 @@ class Art:
         if sil is not None and not sil.is_empty:
             out.append(f'<path d="{path_d(sil.buffer(self.OUT, join_style="round", quad_segs=10))}" fill="{NAVY}"/>')
         body = ''.join(out + self.layers)
+        zoom = getattr(self, 'zoom', None)
+        if zoom:
+            k, zx, zy = zoom
+            body = f'<g transform="translate({zx} {zy}) scale({k}) translate({-zx} {-zy})">{body}</g>'
         if self.clip is not None:
             self.defs.append(f'<clipPath id="clip_{self.name}"><path d="{path_d(self.clip)}"/></clipPath>')
             body = f'<g clip-path="url(#clip_{self.name})">{body}</g>'

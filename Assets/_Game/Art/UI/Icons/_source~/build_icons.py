@@ -510,9 +510,12 @@ def portrait(cls, team):
     skin = SKIN[cls]
     tile = rrect(4, 4, 120, 120, 16)
     a.clip = tile
-    a.fill(tile, tm['tint'], sil=False)
-    a.fill(tile.intersection(P([(4, 92), (92, 4), (124, 4), (124, 20), (20, 124), (4, 124)])), mix(tm['tint'], WHITE, 0.5), sil=False)
-    a.fill(tile.intersection(P([(4, 124), (124, 60), (124, 124)])), mix(tm['tint'], tm['base'], 0.35), sil=False)
+    a.under = []
+    a.zoom = (1.2, 64, 62)   # head-dominant bust like the p15 card portrait; the tile stays put (drawn unzoomed below)
+    a.under.append(f'<path d="{path_d(tile)}" fill="{tm["tint"]}"/>')
+    a.under.append(f'<path d="{path_d(tile.intersection(P([(4, 92), (92, 4), (124, 4), (124, 20), (20, 124), (4, 124)])))}" fill="{mix(tm["tint"], WHITE, 0.5)}"/>')
+    a.fill(tile, tm['tint'], sil=False, opacity=0)
+
     cx, cy = 64, 72
     # shoulders and neck
     a.toon(rrect(16, 106, 96, 44, 22), tones, k=0.1, hl=0.05)

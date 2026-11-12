@@ -218,7 +218,12 @@ def primary():
     parts = [stone.egg(cx, 300, 185, 225)]
     parts += [rock(300, 300, 120, 150), rock(905, 285, 130, 160), rock(150, 560, 150, 150), rock(1050, 590, 150, 140)]
     parts += [chip(250, 140, 22, 10), chip(960, 110, 24, 40), chip(430, 70, 18, 70), chip(800, 60, 20, 5, STONE_LIGHT),
-              chip(80, 430, 18, 30), chip(1130, 450, 20, 60), chip(200, 840, 22, 15), chip(1000, 850, 20, 50)]
+              chip(80, 430, 18, 30), chip(1130, 450, 20, 60), chip(200, 840, 22, 15), chip(1000, 850, 20, 50),
+              # v2: denser debris field like p04
+              chip(330, 120, 26, 25), chip(870, 150, 28, 65), chip(380, 210, 16, 50, STONE_LIGHT), chip(820, 230, 18, 10),
+              chip(60, 300, 22, 80), chip(1150, 300, 24, 20), chip(260, 420, 14, 35, STONE_LIGHT), chip(950, 420, 16, 75),
+              chip(120, 760, 20, 40), chip(1080, 740, 22, 5), chip(330, 900, 18, 60), chip(880, 905, 20, 30),
+              chip(520, 40, 14, 15, STONE_LIGHT), chip(690, 30, 16, 55), chip(1170, 620, 16, 45), chip(30, 640, 18, 20)]
     parts.append(crystals(150, 520, 230))
     parts.append(plume(1040, 575, 300))
     parts.append(waterfall(100, 610, 80, 250))

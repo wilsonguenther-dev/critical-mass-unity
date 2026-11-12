@@ -102,7 +102,7 @@ def word_geoms(glyphs, cmap, cap, text, x0, base, size, tilts, lifts, tracking, 
     x, out = x0, []
     for i, ch in enumerate(text):
         g, adv = glyph_geom(glyphs, cmap, cap, ch, x, base - lifts[i % len(lifts)], size, tilts[i % len(tilts)])
-        out.append(chisel(g, size, rng))
+        out.append(chisel(g.buffer(size * 0.035, join_style='mitre', mitre_limit=2.5), size, rng))   # bolder block letters
         x += adv + tracking
     return out
 
