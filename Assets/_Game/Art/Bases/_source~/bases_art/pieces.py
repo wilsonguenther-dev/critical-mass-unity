@@ -70,16 +70,16 @@ def banner_cloth(pc, top_c, width=1.0, length=1.8, tilt=15.0, seed=0):
     """Cloth hanging from top_c (Vector), facing local -Y, tilted `tilt` deg toward -Y, swallow-tail hem,
     white shield with a team sword."""
     rng = random.Random(seed)
-    nu, nv = 6, 10
+    nu, nv = 7, 10
     ct, st = math.cos(math.radians(tilt)), math.sin(math.radians(tilt))
     grid = []
     for j in range(nv):
         row = []
         for i in range(nu):
             u = i / (nu - 1)
-            vb = 1.0 - 0.21 * (1.0 - abs(2 * u - 1))      # swallow-tail: centre is shorter
+            vb = 1.0 - 0.14 * (1.0 - abs(2 * u - 1))      # swallow-tail: centre is shorter
             v = j / (nv - 1) * vb
-            wave = 0.045 * math.sin(2 * math.pi * u * 1.3 + v * 4.0 + seed) * v
+            wave = 0.028 * math.sin(2 * math.pi * u * 1.3 + v * 4.0 + seed) * v
             x = (u - 0.5) * width * (1.0 + 0.04 * v)
             y = -v * length * st + wave
             z = -v * length * ct
@@ -90,7 +90,7 @@ def banner_cloth(pc, top_c, width=1.0, length=1.8, tilt=15.0, seed=0):
     n = Vector((0, -ct, st))
     d = Vector((0, -st, -ct))
     xax = Vector((1, 0, 0))
-    o = top_c + d * (length * 0.42) + n * 0.03
+    o = top_c + d * (length * 0.42) + n * 0.065
 
     def P(x, yv, lift=0.0):
         return o + xax * x + d * yv + n * lift
@@ -297,19 +297,22 @@ def respawn_pad(name="cm_respawn_pad", seed=13):
     for k in range(n):
         t0, t1 = 2 * math.pi * k / n + 0.01, 2 * math.pi * (k + 1) / n - 0.01
         ri, ro = 2.72, 3.75 + rng.uniform(-0.06, 0.06)
-        h = 0.15 + rng.uniform(0.0, 0.02)
+        h = rng.uniform(0.17, 0.26)
         cs = [Vector((ri * math.cos(t0), ri * math.sin(t0), 0)), Vector((ri * math.cos(t1), ri * math.sin(t1), 0)),
               Vector((ro * math.cos(t1), ro * math.sin(t1), 0)), Vector((ro * math.cos(t0), ro * math.sin(t0), 0))]
         cs += [Vector((v.x, v.y, h)) for v in cs]
         pc.block(cs, *kit.stone_side(rng, warm=True), bev=0.05)
+        if rng.random() < 0.3:
+            m = (cs[4] + cs[6]) / 2
+            kit.moss(pc, rng, m.x, m.y, h - 0.03, 0.18)
     pc.lathe([(2.7, 0.0), (2.7, 0.09), (0.0, 0.09)], 32, topside(pal.vc("body_c"), pal.vc("pave_d")))
-    pc.lathe([(2.0, 0.09), (2.42, 0.09), (2.42, 0.12), (2.0, 0.12)], 40, solid(pal.vc("team_glow")))
+    pc.lathe([(2.0, 0.09), (2.42, 0.09), (2.42, 0.12), (2.0, 0.12)], 40, solid(pal.vc("team_glow")), closed=True)
     pc.lathe([(1.88, 0.09), (1.88, 0.1), (0.0, 0.1)], 32, solid(pal.vc("pave")))
     for rot in (0.0, math.pi / 2):
         pc.box(0, 0, 0.1, 1.7, 0.5, 0.025, pal.vc("team_glow"), rot=rot, bev=0.0)
     for k in range(4):
         a = math.pi / 4 + k * math.pi / 2
-        kit.crystal_cluster(pc, 3.2 * math.cos(a), 3.2 * math.sin(a), 0.03, rng, height=0.26, n=4, spread=0.22,
+        kit.crystal_cluster(pc, 3.2 * math.cos(a), 3.2 * math.sin(a), 0.0, rng, height=0.29, n=7, spread=0.34,
                             base=False)
     return pc
 
@@ -327,8 +330,8 @@ def hill_dais(name="cm_hill_dais", seed=17):
                   Vector((ro * math.cos(t1), ro * math.sin(t1), 0)), Vector((ro * math.cos(t0), ro * math.sin(t0), 0))]
             cs += [Vector((v.x, v.y, h + rng.uniform(-0.01, 0.01))) for v in cs]
             pc.block(cs, *kit.stone_side(rng, warm=True), bev=0.04)
-    pc.lathe([(5.45, 0.0), (5.45, 0.06), (6.05, 0.06), (6.05, 0.0)], 48, solid(pal.vc("pave_d")))
-    pc.lathe([(2.45, 0.0), (2.45, 0.12), (2.9, 0.12), (2.9, 0.0)], 48, solid(pal.vc("cream")))
+    pc.lathe([(5.45, 0.0), (5.45, 0.06), (6.05, 0.06), (6.05, 0.0)], 48, solid(pal.vc("pave_d")), closed=True)
+    pc.lathe([(2.45, 0.0), (2.45, 0.12), (2.9, 0.12), (2.9, 0.0)], 48, solid(pal.vc("cream")), closed=True)
     pc.lathe([(2.45, 0.0), (2.45, 0.1), (0.0, 0.1)], 40, topside(pal.vc("body_a"), pal.vc("body_c")))
     pc.lathe([(1.05, 0.1), (1.05, 0.13), (0.0, 0.13)], 32, solid(pal.vc("cream")))
     # crown emblem (brass): band + three points, laid flat, facing up
@@ -358,7 +361,7 @@ def hill_rim_half(name="cm_hill_rim_half"):
 
 
 def horn(name, seed, sign=1.0, base_ang=240.0, tip_ang=257.0, r=HILL_R, height=6.0, z0=0.0, warm=True,
-         plane_dir=None, base_off=0.0, segs=8, width=0.95):
+         plane_dir=None, base_off=0.0, segs=8, width=0.95, bulge=0.55):
     """Curved stone horn of stacked tapering blocks. Hill: rises from the ring wall cells along the ring (sim
     angles base_ang -> tip_ang). Shrine: plane_dir given, rises in that vertical plane."""
     pc = Piece(name)
@@ -374,7 +377,7 @@ def horn(name, seed, sign=1.0, base_ang=240.0, tip_ang=257.0, r=HILL_R, height=6
             pts.append(Vector((-rr * math.cos(a), rr * math.sin(a), z)))
         else:
             # lateral profile: out then in (bible shrine horns)
-            lat = base_off + 0.55 * math.sin(math.pi * t * 0.8) - 0.75 * t ** 2
+            lat = base_off + bulge * math.sin(math.pi * t * 0.8) - 0.45 * t ** 2
             z = z0 + height * t
             pts.append(plane_dir * lat + Vector((0, 0, z)))
     for i in range(segs):
@@ -425,7 +428,7 @@ def shrine_core(name="cm_shrine_core", seed=41):
     # horns in the vertical plane of screen-right (sim NE-SW): blender direction (-1, -1)/sqrt2 = sim (1, -1)
     pdir = Vector((-1, -1, 0)).normalized()
     for sgn in (-1, 1):
-        h = horn("tmp", seed + (3 if sgn > 0 else 7), plane_dir=pdir * sgn, base_off=0.78, height=4.1, z0=0.62,
+        h = horn("tmp", seed + (3 if sgn > 0 else 7), plane_dir=pdir * sgn, base_off=0.6, bulge=0.36, height=4.1, z0=0.62,
                  segs=7, width=0.6, warm=True)
         _merge(pc, h)
         foot = pdir * sgn * 0.62
@@ -433,12 +436,18 @@ def shrine_core(name="cm_shrine_core", seed=41):
                             base=False)
     # waterfall: from the upper tier down its sim-south face (+y blender) onto the step ring and into a pool
     w = 0.7
-    pc.box(0, 0.98, 0.25, w, 0.08, 0.38, pal.vc("water"), pal.vc("foam"), bev=0.02)
-    pc.box(0, 1.5, 0.25, w + 0.15, 1.0, 0.03, pal.vc("water"), pal.vc("water"), bev=0.0)
-    pc.box(0, 1.0, 0.6, w + 0.1, 0.1, 0.05, pal.vc("foam"), pal.vc("foam"), bev=0.01)
-    pc.box(0, 2.05, 0.0, w + 0.4, 0.5, 0.27, pal.vc("water"), pal.vc("foam"), bev=0.02)
+    cs = [Vector((-w / 2, 0.97, 0.62)), Vector((w / 2, 0.97, 0.62)), Vector((w / 2, 1.06, 0.62)),
+          Vector((-w / 2, 1.06, 0.62)), Vector((-w / 2 - 0.08, 1.24, 0.25)), Vector((w / 2 + 0.08, 1.24, 0.25)),
+          Vector((w / 2 + 0.08, 1.31, 0.27)), Vector((-w / 2 - 0.08, 1.31, 0.27))]
+    pc.block([cs[0], cs[1], cs[5], cs[4], cs[3], cs[2], cs[6], cs[7]], pal.vc("water"), pal.vc("water"), bev=0.02)
+    for k in range(3):
+        x = -w / 3 + k * w / 3
+        pc.box(x, 1.08 + 0.05 * k, 0.5 - 0.08 * k, 0.07, 0.12, 0.04, pal.vc("foam"), pal.vc("foam"), bev=0.0, rot=0.0)
+    pc.box(0, 0.98, 0.62, w + 0.12, 0.12, 0.05, pal.vc("foam"), pal.vc("foam"), bev=0.015)
+    pc.lathe([(0.62, 0.25), (0.62, 0.27), (0.0, 0.27)], 14, solid(pal.vc("water")), cy=1.75)
+    pc.lathe([(0.7, 0.25), (0.7, 0.28), (0.62, 0.28), (0.62, 0.25)], 14, solid(pal.vc("foam")), cy=1.75, closed=True)
     pc.lathe([(0.9, 0.0), (0.9, 0.04), (0.0, 0.04)], 16, solid(pal.vc("water")), cy=3.3)
-    pc.lathe([(0.95, 0.0), (0.95, 0.03), (0.88, 0.05), (0.88, 0.0)], 16, solid(pal.vc("foam")), cy=3.3)
+    pc.lathe([(0.95, 0.0), (0.95, 0.03), (0.88, 0.05), (0.88, 0.0)], 16, solid(pal.vc("foam")), cy=3.3, closed=True)
     return pc
 
 
@@ -459,8 +468,8 @@ def shrine_egg(name="cm_shrine_egg", seed=43):
     """Bible p14 faceted egg (1.5 x 2.3 u): dark panels with Void Navy lines over a self-lit #4FDDC3 core."""
     import bmesh
     pc = Piece(name, kind="glow")
-    rx, rz = 0.74, 1.15
-    pc.blob((0, 0, rz), rx * 0.97, rx * 0.97, rz * 0.97, pal.vc("egg_glow"), sub=2)
+    rx, rz = 0.84, 1.3
+    pc.blob((0, 0, rz), rx * 0.91, rx * 0.91, rz * 0.91, pal.vc("egg_glow"), sub=2)
     t = bmesh.new()
     bmesh.ops.create_icosphere(t, subdivisions=1, radius=1.0)
     rng = random.Random(seed)
@@ -468,7 +477,7 @@ def shrine_egg(name="cm_shrine_egg", seed=43):
         cen = f.calc_center_median()
         pts = []
         for v in f.verts:
-            p = cen + (v.co - cen) * 0.84
+            p = cen + (v.co - cen) * 0.76
             p = p.normalized() * 1.0 if False else p
             pts.append(Vector((p.x * rx, p.y * rx, p.z * rz * (1.0 + 0.08 * max(0, p.z)) + rz)))
         c = pal.vc("egg") if rng.random() < 0.6 else pal.vc("egg_d")

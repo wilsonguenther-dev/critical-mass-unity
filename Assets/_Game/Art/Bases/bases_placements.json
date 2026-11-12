@@ -39,9 +39,27 @@
     "unity_yaw_deg": -326.85
    },
    {
+    "piece": "cm_dress_rubble_low",
+    "unity_local_pos": [
+     9.2652,
+     0.0,
+     -5.8873
+    ],
+    "unity_yaw_deg": -238.728
+   },
+   {
+    "piece": "cm_dress_planks_low",
+    "unity_local_pos": [
+     8.9752,
+     0.0,
+     -6.7887
+    ],
+    "unity_yaw_deg": -174.678
+   },
+   {
     "piece": "cm_brazier",
     "unity_local_pos": [
-     2.1382,
+     2.138,
      2.31,
      -11.5356
     ],
@@ -50,7 +68,7 @@
    {
     "piece": "cm_light_pool",
     "unity_local_pos": [
-     2.1562,
+     2.1537,
      0.0,
      -9.9557
     ],
@@ -59,173 +77,317 @@
    {
     "piece": "cm_dress_barrel",
     "unity_local_pos": [
-     0.728,
+     0.7278,
      2.31,
      -11.6223
     ],
-    "unity_yaw_deg": -4.839
+    "unity_yaw_deg": -22.237
    },
    {
     "piece": "cm_dress_rubble_low",
     "unity_local_pos": [
-     3.0282,
+     3.0272,
      0.0,
-     -10.5866
-    ],
-    "unity_yaw_deg": -330.144
-   },
-   {
-    "piece": "cm_dress_planks_low",
-    "unity_local_pos": [
-     0.7183,
-     0.0,
-     -10.2667
-    ],
-    "unity_yaw_deg": -349.421
-   },
-   {
-    "piece": "cm_dress_rubble_low",
-    "unity_local_pos": [
-     -0.459,
-     0.0,
-     -10.6046
+     -10.5993
     ],
     "unity_yaw_deg": -160.195
    },
    {
+    "piece": "cm_dress_planks_low",
+    "unity_local_pos": [
+     1.9675,
+     0.0,
+     -10.5397
+    ],
+    "unity_yaw_deg": -85.932
+   },
+   {
+    "piece": "cm_dress_rubble_low",
+    "unity_local_pos": [
+     0.7905,
+     0.0,
+     -10.4774
+    ],
+    "unity_yaw_deg": -154.777
+   },
+   {
+    "piece": "cm_dress_flagstones",
+    "unity_local_pos": [
+     0.0502,
+     0.0,
+     -10.7267
+    ],
+    "unity_yaw_deg": -244.729
+   },
+   {
     "piece": "cm_brazier",
     "unity_local_pos": [
-     -6.1621,
+     -5.0713,
      2.31,
-     -6.544
+     -8.5444
     ],
     "unity_yaw_deg": -0.0
    },
    {
     "piece": "cm_light_pool",
     "unity_local_pos": [
-     -4.7339,
+     -3.8875,
      0.0,
-     -5.8682
+     -7.498
     ],
     "unity_yaw_deg": -0.0
    },
    {
     "piece": "cm_dress_barrel",
     "unity_local_pos": [
-     -6.8413,
+     -5.8119,
      2.31,
-     -5.306
+     -7.4102
     ],
-    "unity_yaw_deg": 58.68
+    "unity_yaw_deg": 70.049
    },
    {
     "piece": "cm_dress_planks_low",
     "unity_local_pos": [
-     -4.7008,
+     -3.7351,
      0.0,
-     -6.7985
+     -8.3014
     ],
-    "unity_yaw_deg": -151.952
+    "unity_yaw_deg": -267.873
    },
    {
     "piece": "cm_dress_rubble_low",
     "unity_local_pos": [
-     -5.5023,
+     -4.0611,
      0.0,
-     -5.2628
+     -7.5667
     ],
-    "unity_yaw_deg": -39.867
+    "unity_yaw_deg": -192.532
    },
    {
     "piece": "cm_dress_flagstones",
     "unity_local_pos": [
-     -6.3111,
+     -4.8584,
      0.0,
-     -3.3496
+     -7.3493
     ],
-    "unity_yaw_deg": -309.037
-   },
-   {
-    "piece": "cm_brazier",
-    "unity_local_pos": [
-     -7.467,
-     2.31,
-     4.0085
-    ],
-    "unity_yaw_deg": -0.0
-   },
-   {
-    "piece": "cm_light_pool",
-    "unity_local_pos": [
-     -5.9515,
-     0.0,
-     3.5616
-    ],
-    "unity_yaw_deg": -0.0
-   },
-   {
-    "piece": "cm_dress_blocks",
-    "unity_local_pos": [
-     -6.8846,
-     2.31,
-     5.2369
-    ],
-    "unity_yaw_deg": 131.232
-   },
-   {
-    "piece": "cm_dress_planks_low",
-    "unity_local_pos": [
-     -6.3125,
-     0.0,
-     3.1066
-    ],
-    "unity_yaw_deg": -2.346
-   },
-   {
-    "piece": "cm_dress_planks_low",
-    "unity_local_pos": [
-     -5.9295,
-     0.0,
-     4.4975
-    ],
-    "unity_yaw_deg": -286.273
-   },
-   {
-    "piece": "cm_dress_planks_low",
-    "unity_local_pos": [
-     -5.005,
-     0.0,
-     6.4893
-    ],
-    "unity_yaw_deg": -203.085
-   },
-   {
-    "piece": "cm_brazier",
-    "unity_local_pos": [
-     -1.208,
-     2.31,
-     11.387
-    ],
-    "unity_yaw_deg": -0.0
-   },
-   {
-    "piece": "cm_light_pool",
-    "unity_local_pos": [
-     -0.6147,
-     0.0,
-     9.9226
-    ],
-    "unity_yaw_deg": -0.0
+    "unity_yaw_deg": -129.395
    },
    {
     "piece": "cm_dress_rubble_low",
     "unity_local_pos": [
-     -1.5853,
+     -4.7099,
      0.0,
-     10.2168
+     -6.4873
     ],
-    "unity_yaw_deg": -99.937
+    "unity_yaw_deg": -155.365
+   },
+   {
+    "piece": "cm_brazier",
+    "unity_local_pos": [
+     -7.5188,
+     2.31,
+     0.3441
+    ],
+    "unity_yaw_deg": -0.0
+   },
+   {
+    "piece": "cm_light_pool",
+    "unity_local_pos": [
+     -5.9391,
+     0.0,
+     0.3729
+    ],
+    "unity_yaw_deg": -0.0
+   },
+   {
+    "piece": "cm_brazier",
+    "unity_local_pos": [
+     -6.9497,
+     2.31,
+     5.1314
+    ],
+    "unity_yaw_deg": -0.0
+   },
+   {
+    "piece": "cm_light_pool",
+    "unity_local_pos": [
+     -5.6009,
+     0.0,
+     4.3085
+    ],
+    "unity_yaw_deg": -0.0
+   },
+   {
+    "piece": "cm_dress_barrel",
+    "unity_local_pos": [
+     -7.603,
+     2.31,
+     1.7475
+    ],
+    "unity_yaw_deg": 89.372
+   },
+   {
+    "piece": "cm_dress_barrel",
+    "unity_local_pos": [
+     -7.5939,
+     2.31,
+     3.5064
+    ],
+    "unity_yaw_deg": 86.76
+   },
+   {
+    "piece": "cm_dress_barrel",
+    "unity_local_pos": [
+     -7.0835,
+     2.31,
+     4.9067
+    ],
+    "unity_yaw_deg": 120.219
+   },
+   {
+    "piece": "cm_dress_rubble_low",
+    "unity_local_pos": [
+     -6.457,
+     0.0,
+     -0.5123
+    ],
+    "unity_yaw_deg": -248.663
+   },
+   {
+    "piece": "cm_dress_rubble_low",
+    "unity_local_pos": [
+     -6.6456,
+     0.0,
+     0.6178
+    ],
+    "unity_yaw_deg": -23.729
+   },
+   {
+    "piece": "cm_dress_flagstones",
+    "unity_local_pos": [
+     -6.392,
+     0.0,
+     1.6344
+    ],
+    "unity_yaw_deg": -315.095
+   },
+   {
+    "piece": "cm_dress_flagstones",
+    "unity_local_pos": [
+     -6.7068,
+     0.0,
+     2.6579
+    ],
+    "unity_yaw_deg": -219.442
+   },
+   {
+    "piece": "cm_dress_flagstones",
+    "unity_local_pos": [
+     -6.4459,
+     0.0,
+     3.3499
+    ],
+    "unity_yaw_deg": -50.488
+   },
+   {
+    "piece": "cm_dress_flagstones",
+    "unity_local_pos": [
+     -6.0672,
+     0.0,
+     3.9472
+    ],
+    "unity_yaw_deg": -335.681
+   },
+   {
+    "piece": "cm_dress_rubble_low",
+    "unity_local_pos": [
+     -5.6657,
+     0.0,
+     4.4226
+    ],
+    "unity_yaw_deg": -29.225
+   },
+   {
+    "piece": "cm_dress_planks_low",
+    "unity_local_pos": [
+     -5.5213,
+     0.0,
+     5.4441
+    ],
+    "unity_yaw_deg": -24.307
+   },
+   {
+    "piece": "cm_dress_planks_low",
+    "unity_local_pos": [
+     -4.854,
+     0.0,
+     6.329
+    ],
+    "unity_yaw_deg": -166.601
+   },
+   {
+    "piece": "cm_brazier",
+    "unity_local_pos": [
+     -1.8852,
+     2.31,
+     11.0674
+    ],
+    "unity_yaw_deg": -0.0
+   },
+   {
+    "piece": "cm_light_pool",
+    "unity_local_pos": [
+     -1.2855,
+     0.0,
+     9.6057
+    ],
+    "unity_yaw_deg": -0.0
+   },
+   {
+    "piece": "cm_dress_barrel",
+    "unity_local_pos": [
+     -0.6107,
+     2.31,
+     11.5963
+    ],
+    "unity_yaw_deg": 179.737
+   },
+   {
+    "piece": "cm_dress_rubble_low",
+    "unity_local_pos": [
+     -2.2287,
+     0.0,
+     9.7808
+    ],
+    "unity_yaw_deg": -152.916
+   },
+   {
+    "piece": "cm_dress_planks_low",
+    "unity_local_pos": [
+     -1.1715,
+     0.0,
+     9.8918
+    ],
+    "unity_yaw_deg": -87.921
+   },
+   {
+    "piece": "cm_dress_rubble_low",
+    "unity_local_pos": [
+     -0.4476,
+     0.0,
+     10.1094
+    ],
+    "unity_yaw_deg": -4.358
+   },
+   {
+    "piece": "cm_dress_planks_low",
+    "unity_local_pos": [
+     0.0073,
+     0.0,
+     10.2786
+    ],
+    "unity_yaw_deg": -236.019
    },
    {
     "piece": "cm_brazier",
@@ -246,31 +408,40 @@
     "unity_yaw_deg": -0.0
    },
    {
-    "piece": "cm_dress_blocks",
+    "piece": "cm_dress_barrel",
     "unity_local_pos": [
      11.5299,
      2.31,
      3.7881
     ],
-    "unity_yaw_deg": -111.466
+    "unity_yaw_deg": -96.122
    },
    {
     "piece": "cm_dress_flagstones",
     "unity_local_pos": [
-     9.6152,
+     9.4597,
      0.0,
-     5.1762
+     5.0882
     ],
-    "unity_yaw_deg": -204.761
+    "unity_yaw_deg": -213.416
    },
    {
-    "piece": "cm_dress_flagstones",
+    "piece": "cm_dress_rubble_low",
     "unity_local_pos": [
-     10.0851,
+     10.2753,
      0.0,
-     3.7891
+     4.5234
     ],
-    "unity_yaw_deg": -112.009
+    "unity_yaw_deg": -103.682
+   },
+   {
+    "piece": "cm_dress_planks_low",
+    "unity_local_pos": [
+     10.0905,
+     0.0,
+     3.6681
+    ],
+    "unity_yaw_deg": -229.694
    },
    {
     "piece": "cm_gate_post",
@@ -291,11 +462,20 @@
     "unity_yaw_deg": -0.0
    },
    {
+    "piece": "cm_brazier",
+    "unity_local_pos": [
+     10.6138,
+     2.31,
+     -5.6538
+    ],
+    "unity_yaw_deg": -0.0
+   },
+   {
     "piece": "cm_light_pool",
     "unity_local_pos": [
-     8.8049,
+     9.2266,
      0.0,
-     -4.8349
+     -4.8974
     ],
     "unity_yaw_deg": -0.0
    },
@@ -318,11 +498,20 @@
     "unity_yaw_deg": -0.0
    },
    {
+    "piece": "cm_brazier",
+    "unity_local_pos": [
+     10.0367,
+     2.31,
+     -6.8699
+    ],
+    "unity_yaw_deg": -0.0
+   },
+   {
     "piece": "cm_light_pool",
     "unity_local_pos": [
-     8.4682,
+     8.7488,
      0.0,
-     -5.5783
+     -5.9547
     ],
     "unity_yaw_deg": -0.0
    },
@@ -345,11 +534,20 @@
     "unity_yaw_deg": -0.0
    },
    {
+    "piece": "cm_brazier",
+    "unity_local_pos": [
+     2.9074,
+     2.31,
+     -11.5906
+    ],
+    "unity_yaw_deg": -0.0
+   },
+   {
     "piece": "cm_light_pool",
     "unity_local_pos": [
-     2.5989,
+     2.7587,
      0.0,
-     -9.6032
+     -10.0176
     ],
     "unity_yaw_deg": -0.0
    },
@@ -372,11 +570,20 @@
     "unity_yaw_deg": -0.0
    },
    {
+    "piece": "cm_brazier",
+    "unity_local_pos": [
+     -0.1716,
+     2.31,
+     11.6669
+    ],
+    "unity_yaw_deg": -0.0
+   },
+   {
     "piece": "cm_light_pool",
     "unity_local_pos": [
-     0.1321,
+     0.1731,
      0.0,
-     9.7251
+     10.125
     ],
     "unity_yaw_deg": -0.0
    },
@@ -399,11 +606,20 @@
     "unity_yaw_deg": -0.0
    },
    {
+    "piece": "cm_brazier",
+    "unity_local_pos": [
+     10.6361,
+     2.31,
+     5.6208
+    ],
+    "unity_yaw_deg": -0.0
+   },
+   {
     "piece": "cm_light_pool",
     "unity_local_pos": [
-     8.9795,
+     9.2463,
      0.0,
-     4.5568
+     4.8693
     ],
     "unity_yaw_deg": -0.0
    },
@@ -426,67 +642,49 @@
     "unity_yaw_deg": -0.0
    },
    {
+    "piece": "cm_brazier",
+    "unity_local_pos": [
+     11.5668,
+     2.31,
+     3.6395
+    ],
+    "unity_yaw_deg": -0.0
+   },
+   {
     "piece": "cm_light_pool",
     "unity_local_pos": [
-     9.6435,
+     10.0607,
      0.0,
-     3.1921
+     3.1618
     ],
     "unity_yaw_deg": -0.0
    },
    {
     "piece": "cm_tower",
     "unity_local_pos": [
-     -5.2367,
+     -3.1615,
      0.0,
-     -10.8385
+     -12.3802
     ],
-    "unity_yaw_deg": 25.788
-   },
-   {
-    "piece": "cm_light_pool",
-    "unity_local_pos": [
-     -3.8445,
-     0.0,
-     -7.9572
-    ],
-    "unity_yaw_deg": -0.0
+    "unity_yaw_deg": 14.325
    },
    {
     "piece": "cm_tower_landmark",
     "unity_local_pos": [
-     -9.4843,
+     -9.4222,
      0.0,
-     -0.0
+     -4.3293
     ],
-    "unity_yaw_deg": -270.0
-   },
-   {
-    "piece": "cm_light_pool",
-    "unity_local_pos": [
-     -6.0343,
-     0.0,
-     -0.0
-    ],
-    "unity_yaw_deg": -0.0
+    "unity_yaw_deg": 65.322
    },
    {
     "piece": "cm_tower",
     "unity_local_pos": [
-     -5.2367,
+     -5.8575,
      0.0,
-     10.8385
+     10.2129
     ],
-    "unity_yaw_deg": -205.788
-   },
-   {
-    "piece": "cm_light_pool",
-    "unity_local_pos": [
-     -3.8445,
-     0.0,
-     7.9572
-    ],
-    "unity_yaw_deg": -0.0
+    "unity_yaw_deg": -209.836
    },
    {
     "piece": "cm_respawn_pad",
@@ -496,6 +694,195 @@
      -0.0
     ],
     "unity_yaw_deg": -0.0
+   },
+   {
+    "piece": "cm_dress_flagstones",
+    "unity_local_pos": [
+     5.0323,
+     0.0,
+     -0.0198
+    ],
+    "unity_yaw_deg": -239.252
+   },
+   {
+    "piece": "cm_dress_rubble_low",
+    "unity_local_pos": [
+     4.7322,
+     0.0,
+     -1.0294
+    ],
+    "unity_yaw_deg": -8.557
+   },
+   {
+    "piece": "cm_dress_planks_low",
+    "unity_local_pos": [
+     3.8763,
+     0.0,
+     -3.1658
+    ],
+    "unity_yaw_deg": -241.54
+   },
+   {
+    "piece": "cm_crystal_lamp_low",
+    "unity_local_pos": [
+     3.1565,
+     0.0,
+     -4.6575
+    ],
+    "unity_yaw_deg": -225.394
+   },
+   {
+    "piece": "cm_dress_flagstones",
+    "unity_local_pos": [
+     2.3691,
+     0.0,
+     -4.9822
+    ],
+    "unity_yaw_deg": -200.098
+   },
+   {
+    "piece": "cm_dress_rubble_low",
+    "unity_local_pos": [
+     0.637,
+     0.0,
+     -5.1631
+    ],
+    "unity_yaw_deg": -91.956
+   },
+   {
+    "piece": "cm_dress_planks_low",
+    "unity_local_pos": [
+     -1.5566,
+     0.0,
+     -4.759
+    ],
+    "unity_yaw_deg": -350.521
+   },
+   {
+    "piece": "cm_crystal_lamp_low",
+    "unity_local_pos": [
+     -2.8073,
+     0.0,
+     -4.2484
+    ],
+    "unity_yaw_deg": -208.035
+   },
+   {
+    "piece": "cm_dress_flagstones",
+    "unity_local_pos": [
+     -4.4939,
+     0.0,
+     -4.4973
+    ],
+    "unity_yaw_deg": -157.786
+   },
+   {
+    "piece": "cm_dress_rubble_low",
+    "unity_local_pos": [
+     -4.8449,
+     0.0,
+     -3.0133
+    ],
+    "unity_yaw_deg": -73.569
+   },
+   {
+    "piece": "cm_dress_planks_low",
+    "unity_local_pos": [
+     -6.1821,
+     0.0,
+     -1.6546
+    ],
+    "unity_yaw_deg": -350.739
+   },
+   {
+    "piece": "cm_crystal_lamp_low",
+    "unity_local_pos": [
+     -6.1807,
+     0.0,
+     1.1121
+    ],
+    "unity_yaw_deg": -4.765
+   },
+   {
+    "piece": "cm_dress_flagstones",
+    "unity_local_pos": [
+     -5.0551,
+     0.0,
+     3.1089
+    ],
+    "unity_yaw_deg": -277.075
+   },
+   {
+    "piece": "cm_dress_rubble_low",
+    "unity_local_pos": [
+     -3.6496,
+     0.0,
+     4.2141
+    ],
+    "unity_yaw_deg": -289.754
+   },
+   {
+    "piece": "cm_dress_planks_low",
+    "unity_local_pos": [
+     -2.2026,
+     0.0,
+     4.1193
+    ],
+    "unity_yaw_deg": -313.059
+   },
+   {
+    "piece": "cm_crystal_lamp_low",
+    "unity_local_pos": [
+     -0.9588,
+     0.0,
+     4.7465
+    ],
+    "unity_yaw_deg": -30.987
+   },
+   {
+    "piece": "cm_dress_flagstones",
+    "unity_local_pos": [
+     0.5749,
+     0.0,
+     5.4693
+    ],
+    "unity_yaw_deg": -187.264
+   },
+   {
+    "piece": "cm_dress_rubble_low",
+    "unity_local_pos": [
+     1.485,
+     0.0,
+     5.3363
+    ],
+    "unity_yaw_deg": -350.887
+   },
+   {
+    "piece": "cm_dress_planks_low",
+    "unity_local_pos": [
+     2.5251,
+     0.0,
+     3.8603
+    ],
+    "unity_yaw_deg": -128.456
+   },
+   {
+    "piece": "cm_crystal_lamp_low",
+    "unity_local_pos": [
+     4.7869,
+     0.0,
+     3.0264
+    ],
+    "unity_yaw_deg": -353.119
+   },
+   {
+    "piece": "cm_dress_flagstones",
+    "unity_local_pos": [
+     5.7289,
+     0.0,
+     1.4211
+    ],
+    "unity_yaw_deg": -61.894
    }
   ]
  },
@@ -539,9 +926,27 @@
     "unity_yaw_deg": -326.85
    },
    {
+    "piece": "cm_dress_rubble_low",
+    "unity_local_pos": [
+     -9.2652,
+     0.0,
+     -5.8872
+    ],
+    "unity_yaw_deg": -238.728
+   },
+   {
+    "piece": "cm_dress_planks_low",
+    "unity_local_pos": [
+     -8.9752,
+     0.0,
+     -6.7888
+    ],
+    "unity_yaw_deg": -174.678
+   },
+   {
     "piece": "cm_brazier",
     "unity_local_pos": [
-     -2.1382,
+     -2.138,
      2.31,
      -11.5356
     ],
@@ -550,7 +955,7 @@
    {
     "piece": "cm_light_pool",
     "unity_local_pos": [
-     -2.1562,
+     -2.1537,
      0.0,
      -9.9557
     ],
@@ -559,173 +964,317 @@
    {
     "piece": "cm_dress_barrel",
     "unity_local_pos": [
-     -0.728,
+     -0.7278,
      2.31,
      -11.6223
     ],
-    "unity_yaw_deg": -172.904
+    "unity_yaw_deg": -190.152
    },
    {
     "piece": "cm_dress_rubble_low",
     "unity_local_pos": [
-     -3.0282,
+     -3.0272,
      0.0,
-     -10.5866
-    ],
-    "unity_yaw_deg": -330.144
-   },
-   {
-    "piece": "cm_dress_planks_low",
-    "unity_local_pos": [
-     -0.7183,
-     0.0,
-     -10.2667
-    ],
-    "unity_yaw_deg": -349.421
-   },
-   {
-    "piece": "cm_dress_rubble_low",
-    "unity_local_pos": [
-     0.459,
-     0.0,
-     -10.6046
+     -10.5993
     ],
     "unity_yaw_deg": -160.195
    },
    {
+    "piece": "cm_dress_planks_low",
+    "unity_local_pos": [
+     -1.9675,
+     0.0,
+     -10.5397
+    ],
+    "unity_yaw_deg": -85.932
+   },
+   {
+    "piece": "cm_dress_rubble_low",
+    "unity_local_pos": [
+     -0.7905,
+     0.0,
+     -10.4774
+    ],
+    "unity_yaw_deg": -154.777
+   },
+   {
+    "piece": "cm_dress_flagstones",
+    "unity_local_pos": [
+     -0.0501,
+     0.0,
+     -10.7267
+    ],
+    "unity_yaw_deg": -244.729
+   },
+   {
     "piece": "cm_brazier",
     "unity_local_pos": [
-     6.1621,
+     5.0713,
      2.31,
-     -6.544
+     -8.5447
     ],
     "unity_yaw_deg": -0.0
    },
    {
     "piece": "cm_light_pool",
     "unity_local_pos": [
-     4.7339,
+     3.8861,
      0.0,
-     -5.8682
+     -7.4999
     ],
     "unity_yaw_deg": -0.0
    },
    {
     "piece": "cm_dress_barrel",
     "unity_local_pos": [
-     6.8413,
+     5.8119,
      2.31,
-     -5.306
+     -7.4102
     ],
-    "unity_yaw_deg": 123.272
+    "unity_yaw_deg": 117.229
    },
    {
     "piece": "cm_dress_planks_low",
     "unity_local_pos": [
-     4.7007,
+     3.7353,
      0.0,
-     -6.7986
+     -8.3012
     ],
-    "unity_yaw_deg": -151.952
+    "unity_yaw_deg": -267.873
    },
    {
     "piece": "cm_dress_rubble_low",
     "unity_local_pos": [
-     5.5023,
+     4.062,
      0.0,
-     -5.2628
+     -7.5656
     ],
-    "unity_yaw_deg": -39.867
+    "unity_yaw_deg": -192.532
    },
    {
     "piece": "cm_dress_flagstones",
     "unity_local_pos": [
-     6.3111,
+     4.8577,
      0.0,
-     -3.3497
+     -7.3491
     ],
-    "unity_yaw_deg": -309.037
+    "unity_yaw_deg": -129.395
+   },
+   {
+    "piece": "cm_dress_rubble_low",
+    "unity_local_pos": [
+     4.7095,
+     0.0,
+     -6.4883
+    ],
+    "unity_yaw_deg": -155.365
+   },
+   {
+    "piece": "cm_dress_planks_low",
+    "unity_local_pos": [
+     5.1507,
+     0.0,
+     -5.5822
+    ],
+    "unity_yaw_deg": -246.427
    },
    {
     "piece": "cm_brazier",
     "unity_local_pos": [
-     7.467,
+     7.515,
      2.31,
-     4.0085
+     0.0681
     ],
     "unity_yaw_deg": -0.0
    },
    {
     "piece": "cm_light_pool",
     "unity_local_pos": [
-     5.9515,
+     5.9351,
      0.0,
-     3.5617
+     0.0777
+    ],
+    "unity_yaw_deg": -0.0
+   },
+   {
+    "piece": "cm_dress_barrel",
+    "unity_local_pos": [
+     7.584,
+     2.31,
+     1.4735
+    ],
+    "unity_yaw_deg": 80.213
+   },
+   {
+    "piece": "cm_dress_flagstones",
+    "unity_local_pos": [
+     6.5622,
+     0.0,
+     -0.8129
+    ],
+    "unity_yaw_deg": -112.009
+   },
+   {
+    "piece": "cm_dress_flagstones",
+    "unity_local_pos": [
+     6.2251,
+     0.0,
+     0.4029
+    ],
+    "unity_yaw_deg": -314.133
+   },
+   {
+    "piece": "cm_dress_flagstones",
+    "unity_local_pos": [
+     6.6689,
+     0.0,
+     1.5686
+    ],
+    "unity_yaw_deg": -124.412
+   },
+   {
+    "piece": "cm_brazier",
+    "unity_local_pos": [
+     5.1109,
+     2.31,
+     8.4989
+    ],
+    "unity_yaw_deg": -0.0
+   },
+   {
+    "piece": "cm_light_pool",
+    "unity_local_pos": [
+     3.9049,
+     0.0,
+     7.4781
+    ],
+    "unity_yaw_deg": -0.0
+   },
+   {
+    "piece": "cm_brazier",
+    "unity_local_pos": [
+     1.1963,
+     2.31,
+     11.3918
+    ],
+    "unity_yaw_deg": -0.0
+   },
+   {
+    "piece": "cm_light_pool",
+    "unity_local_pos": [
+     0.6052,
+     0.0,
+     9.9265
     ],
     "unity_yaw_deg": -0.0
    },
    {
     "piece": "cm_dress_blocks",
     "unity_local_pos": [
-     6.8846,
+     4.1509,
      2.31,
-     5.2369
+     9.5105
     ],
-    "unity_yaw_deg": 67.393
+    "unity_yaw_deg": 35.771
    },
    {
-    "piece": "cm_dress_planks_low",
+    "piece": "cm_dress_blocks",
     "unity_local_pos": [
-     6.3125,
-     0.0,
-     3.1067
-    ],
-    "unity_yaw_deg": -2.346
-   },
-   {
-    "piece": "cm_dress_planks_low",
-    "unity_local_pos": [
-     5.9295,
-     0.0,
-     4.4975
-    ],
-    "unity_yaw_deg": -286.273
-   },
-   {
-    "piece": "cm_dress_planks_low",
-    "unity_local_pos": [
-     5.005,
-     0.0,
-     6.4893
-    ],
-    "unity_yaw_deg": -203.085
-   },
-   {
-    "piece": "cm_brazier",
-    "unity_local_pos": [
-     1.208,
+     3.2455,
      2.31,
-     11.387
+     10.3642
     ],
-    "unity_yaw_deg": -0.0
+    "unity_yaw_deg": 25.961
    },
    {
-    "piece": "cm_light_pool",
+    "piece": "cm_dress_barrel",
     "unity_local_pos": [
-     0.6147,
-     0.0,
-     9.9226
+     2.1405,
+     2.31,
+     10.9583
     ],
-    "unity_yaw_deg": -0.0
+    "unity_yaw_deg": 9.446
+   },
+   {
+    "piece": "cm_dress_blocks",
+    "unity_local_pos": [
+     0.9421,
+     2.31,
+     11.4899
+    ],
+    "unity_yaw_deg": 3.923
    },
    {
     "piece": "cm_dress_rubble_low",
     "unity_local_pos": [
-     1.5853,
+     4.787,
      0.0,
-     10.2168
+     7.4051
     ],
-    "unity_yaw_deg": -99.937
+    "unity_yaw_deg": -318.25
+   },
+   {
+    "piece": "cm_dress_flagstones",
+    "unity_local_pos": [
+     4.3692,
+     0.0,
+     7.9489
+    ],
+    "unity_yaw_deg": -198.02
+   },
+   {
+    "piece": "cm_dress_rubble_low",
+    "unity_local_pos": [
+     3.4141,
+     0.0,
+     8.6026
+    ],
+    "unity_yaw_deg": -100.271
+   },
+   {
+    "piece": "cm_dress_rubble_low",
+    "unity_local_pos": [
+     2.8926,
+     0.0,
+     9.4618
+    ],
+    "unity_yaw_deg": -89.961
+   },
+   {
+    "piece": "cm_dress_planks_low",
+    "unity_local_pos": [
+     2.4135,
+     0.0,
+     9.7896
+    ],
+    "unity_yaw_deg": -87.921
+   },
+   {
+    "piece": "cm_dress_rubble_low",
+    "unity_local_pos": [
+     1.5036,
+     0.0,
+     9.6367
+    ],
+    "unity_yaw_deg": -4.358
+   },
+   {
+    "piece": "cm_dress_planks_low",
+    "unity_local_pos": [
+     0.6661,
+     0.0,
+     10.1025
+    ],
+    "unity_yaw_deg": -236.019
+   },
+   {
+    "piece": "cm_dress_planks_low",
+    "unity_local_pos": [
+     0.2623,
+     0.0,
+     10.5656
+    ],
+    "unity_yaw_deg": -169.566
    },
    {
     "piece": "cm_brazier",
@@ -746,31 +1295,49 @@
     "unity_yaw_deg": -0.0
    },
    {
-    "piece": "cm_dress_blocks",
+    "piece": "cm_dress_barrel",
     "unity_local_pos": [
      -11.5299,
      2.31,
      3.7881
     ],
-    "unity_yaw_deg": -81.239
+    "unity_yaw_deg": -69.189
    },
    {
     "piece": "cm_dress_flagstones",
     "unity_local_pos": [
-     -9.6151,
+     -9.6541,
      0.0,
-     5.1762
+     5.1982
     ],
-    "unity_yaw_deg": -204.761
+    "unity_yaw_deg": -131.096
    },
    {
     "piece": "cm_dress_flagstones",
     "unity_local_pos": [
-     -10.0851,
+     -9.9713,
      0.0,
-     3.7891
+     4.3068
     ],
-    "unity_yaw_deg": -112.009
+    "unity_yaw_deg": -79.303
+   },
+   {
+    "piece": "cm_dress_rubble_low",
+    "unity_local_pos": [
+     -10.4621,
+     0.0,
+     3.9819
+    ],
+    "unity_yaw_deg": -52.481
+   },
+   {
+    "piece": "cm_dress_flagstones",
+    "unity_local_pos": [
+     -10.7126,
+     0.0,
+     3.3556
+    ],
+    "unity_yaw_deg": -72.827
    },
    {
     "piece": "cm_gate_post",
@@ -791,11 +1358,20 @@
     "unity_yaw_deg": -0.0
    },
    {
+    "piece": "cm_brazier",
+    "unity_local_pos": [
+     -10.6138,
+     2.31,
+     -5.6538
+    ],
+    "unity_yaw_deg": -0.0
+   },
+   {
     "piece": "cm_light_pool",
     "unity_local_pos": [
-     -8.8049,
+     -9.2266,
      0.0,
-     -4.8349
+     -4.8974
     ],
     "unity_yaw_deg": -0.0
    },
@@ -818,11 +1394,20 @@
     "unity_yaw_deg": -0.0
    },
    {
+    "piece": "cm_brazier",
+    "unity_local_pos": [
+     -10.0367,
+     2.31,
+     -6.8699
+    ],
+    "unity_yaw_deg": -0.0
+   },
+   {
     "piece": "cm_light_pool",
     "unity_local_pos": [
-     -8.4682,
+     -8.7488,
      0.0,
-     -5.5783
+     -5.9547
     ],
     "unity_yaw_deg": -0.0
    },
@@ -845,11 +1430,20 @@
     "unity_yaw_deg": -0.0
    },
    {
+    "piece": "cm_brazier",
+    "unity_local_pos": [
+     -2.9074,
+     2.31,
+     -11.5906
+    ],
+    "unity_yaw_deg": -0.0
+   },
+   {
     "piece": "cm_light_pool",
     "unity_local_pos": [
-     -2.5989,
+     -2.7587,
      0.0,
-     -9.6032
+     -10.0176
     ],
     "unity_yaw_deg": -0.0
    },
@@ -872,11 +1466,20 @@
     "unity_yaw_deg": -0.0
    },
    {
+    "piece": "cm_brazier",
+    "unity_local_pos": [
+     0.1716,
+     2.31,
+     11.6669
+    ],
+    "unity_yaw_deg": -0.0
+   },
+   {
     "piece": "cm_light_pool",
     "unity_local_pos": [
-     -0.1321,
+     -0.1731,
      0.0,
-     9.7251
+     10.125
     ],
     "unity_yaw_deg": -0.0
    },
@@ -899,11 +1502,20 @@
     "unity_yaw_deg": -0.0
    },
    {
+    "piece": "cm_brazier",
+    "unity_local_pos": [
+     -10.6361,
+     2.31,
+     5.6208
+    ],
+    "unity_yaw_deg": -0.0
+   },
+   {
     "piece": "cm_light_pool",
     "unity_local_pos": [
-     -8.9795,
+     -9.2463,
      0.0,
-     4.5568
+     4.8693
     ],
     "unity_yaw_deg": -0.0
    },
@@ -926,67 +1538,49 @@
     "unity_yaw_deg": -0.0
    },
    {
+    "piece": "cm_brazier",
+    "unity_local_pos": [
+     -11.5668,
+     2.31,
+     3.6395
+    ],
+    "unity_yaw_deg": -0.0
+   },
+   {
     "piece": "cm_light_pool",
     "unity_local_pos": [
-     -9.6435,
+     -10.0607,
      0.0,
-     3.1921
+     3.1618
     ],
     "unity_yaw_deg": -0.0
    },
    {
     "piece": "cm_tower",
     "unity_local_pos": [
-     5.2367,
+     3.1615,
      0.0,
-     -10.8385
+     -12.3802
     ],
-    "unity_yaw_deg": -25.788
+    "unity_yaw_deg": -14.325
    },
    {
-    "piece": "cm_light_pool",
+    "piece": "cm_tower",
     "unity_local_pos": [
-     3.8445,
+     9.1844,
      0.0,
-     -7.9572
+     -4.2521
     ],
-    "unity_yaw_deg": -0.0
+    "unity_yaw_deg": -65.157
    },
    {
     "piece": "cm_tower_landmark",
     "unity_local_pos": [
-     9.4843,
+     8.7889,
      0.0,
-     -0.0
+     5.8762
     ],
-    "unity_yaw_deg": -90.0
-   },
-   {
-    "piece": "cm_light_pool",
-    "unity_local_pos": [
-     6.0343,
-     0.0,
-     -0.0
-    ],
-    "unity_yaw_deg": -0.0
-   },
-   {
-    "piece": "cm_tower",
-    "unity_local_pos": [
-     5.2367,
-     0.0,
-     10.8385
-    ],
-    "unity_yaw_deg": -154.212
-   },
-   {
-    "piece": "cm_light_pool",
-    "unity_local_pos": [
-     3.8445,
-     0.0,
-     7.9572
-    ],
-    "unity_yaw_deg": -0.0
+    "unity_yaw_deg": -123.766
    },
    {
     "piece": "cm_respawn_pad",
@@ -996,6 +1590,195 @@
      -0.0
     ],
     "unity_yaw_deg": -0.0
+   },
+   {
+    "piece": "cm_dress_flagstones",
+    "unity_local_pos": [
+     -5.6094,
+     0.0,
+     -0.436
+    ],
+    "unity_yaw_deg": -225.394
+   },
+   {
+    "piece": "cm_dress_rubble_low",
+    "unity_local_pos": [
+     -5.3723,
+     0.0,
+     -1.2542
+    ],
+    "unity_yaw_deg": -200.098
+   },
+   {
+    "piece": "cm_dress_planks_low",
+    "unity_local_pos": [
+     -4.4338,
+     0.0,
+     -2.7211
+    ],
+    "unity_yaw_deg": -91.956
+   },
+   {
+    "piece": "cm_crystal_lamp_low",
+    "unity_local_pos": [
+     -2.7503,
+     0.0,
+     -4.1842
+    ],
+    "unity_yaw_deg": -350.521
+   },
+   {
+    "piece": "cm_dress_flagstones",
+    "unity_local_pos": [
+     -1.5712,
+     0.0,
+     -4.8437
+    ],
+    "unity_yaw_deg": -208.035
+   },
+   {
+    "piece": "cm_dress_rubble_low",
+    "unity_local_pos": [
+     -0.7142,
+     0.0,
+     -6.3175
+    ],
+    "unity_yaw_deg": -157.786
+   },
+   {
+    "piece": "cm_dress_planks_low",
+    "unity_local_pos": [
+     0.6648,
+     0.0,
+     -5.6666
+    ],
+    "unity_yaw_deg": -73.569
+   },
+   {
+    "piece": "cm_crystal_lamp_low",
+    "unity_local_pos": [
+     2.5609,
+     0.0,
+     -5.865
+    ],
+    "unity_yaw_deg": -350.739
+   },
+   {
+    "piece": "cm_dress_flagstones",
+    "unity_local_pos": [
+     4.7231,
+     0.0,
+     -4.1388
+    ],
+    "unity_yaw_deg": -4.765
+   },
+   {
+    "piece": "cm_dress_rubble_low",
+    "unity_local_pos": [
+     5.5825,
+     0.0,
+     -2.0138
+    ],
+    "unity_yaw_deg": -277.075
+   },
+   {
+    "piece": "cm_dress_planks_low",
+    "unity_local_pos": [
+     5.5702,
+     0.0,
+     -0.2259
+    ],
+    "unity_yaw_deg": -289.754
+   },
+   {
+    "piece": "cm_crystal_lamp_low",
+    "unity_local_pos": [
+     4.5939,
+     0.0,
+     0.8463
+    ],
+    "unity_yaw_deg": -313.059
+   },
+   {
+    "piece": "cm_dress_flagstones",
+    "unity_local_pos": [
+     4.3088,
+     0.0,
+     2.2097
+    ],
+    "unity_yaw_deg": -30.987
+   },
+   {
+    "piece": "cm_dress_rubble_low",
+    "unity_local_pos": [
+     3.9176,
+     0.0,
+     3.8595
+    ],
+    "unity_yaw_deg": -187.264
+   },
+   {
+    "piece": "cm_dress_planks_low",
+    "unity_local_pos": [
+     3.2462,
+     0.0,
+     4.4882
+    ],
+    "unity_yaw_deg": -350.887
+   },
+   {
+    "piece": "cm_crystal_lamp_low",
+    "unity_local_pos": [
+     1.4437,
+     0.0,
+     4.3811
+    ],
+    "unity_yaw_deg": -128.456
+   },
+   {
+    "piece": "cm_dress_flagstones",
+    "unity_local_pos": [
+     -0.6184,
+     0.0,
+     5.6294
+    ],
+    "unity_yaw_deg": -353.119
+   },
+   {
+    "piece": "cm_dress_rubble_low",
+    "unity_local_pos": [
+     -2.4608,
+     0.0,
+     5.365
+    ],
+    "unity_yaw_deg": -61.894
+   },
+   {
+    "piece": "cm_dress_planks_low",
+    "unity_local_pos": [
+     -4.3049,
+     0.0,
+     4.4124
+    ],
+    "unity_yaw_deg": -266.004
+   },
+   {
+    "piece": "cm_crystal_lamp_low",
+    "unity_local_pos": [
+     -3.8132,
+     0.0,
+     3.0356
+    ],
+    "unity_yaw_deg": -354.649
+   },
+   {
+    "piece": "cm_dress_flagstones",
+    "unity_local_pos": [
+     -6.3492,
+     0.0,
+     1.3143
+    ],
+    "unity_yaw_deg": -285.853
    }
   ]
  },

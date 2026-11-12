@@ -47,7 +47,7 @@ def marker():
     pc = kit.Piece("cm_marker_diamond", team=True, kind="prop")
     pc.lathe([(0.0, 0.0), (0.42, 0.62), (0.0, 1.5)], 4, lambda f: pal.vc("team") if f.normal.x + f.normal.y > -0.2
              else pal.vc("team_dark"))
-    pc.lathe([(0.5, -0.35), (0.62, -0.35), (0.62, -0.3), (0.5, -0.3)], 20, kit.solid(pal.vc("cream")))
+    pc.lathe([(0.5, -0.35), (0.62, -0.35), (0.62, -0.3), (0.5, -0.3)], 20, kit.solid(pal.vc("cream")), closed=True)
     return pc
 
 
@@ -70,7 +70,7 @@ def kit_builders():
         "pool": lambda: pieces.pool_decal(),
         "egg_pool": lambda: pieces.pool_decal("cm_egg_pool", radius=3.0, hexc="#4FDDC3", alpha=0.4),
         "crystal_lamp": lambda: pieces.crystal_lamp(),
-        "crystal_lamp_low": lambda: pieces.crystal_lamp("cm_crystal_lamp_low", height=0.3),
+        "crystal_lamp_low": lambda: pieces.crystal_lamp("cm_crystal_lamp_low", height=0.26),
         "stairs": lambda: pieces.stairs(),
         "roof_pitched": lambda: pieces.roof_pitched(),
         "pad": lambda: pieces.respawn_pad(),
@@ -200,6 +200,8 @@ def build_layouts(scn):
         scn.collection.children.link(coll)
         ob = link(bpy.data.objects.new(f"single:{key}", KIT[key]["mesh"]), coll)
         ob.location = Vector((200 + dx, -200, 0))
+        if key == "banner":
+            ob.rotation_euler = (0, 0, math.pi)      # cloth front toward the south-facing bible camera
         ob["key"] = key
         LAYOUT_OBJS[f"single_{key}"] = [ob]
 
@@ -609,6 +611,7 @@ def frame_gameplay(cam, target, crop=1.0):
 
 
 def frame_ortho(cam, centre, scale, elev=30.0, yaw_from_south=0.0):
+    yaw_from_south = SHOT_YAW[0]
     cam.data.type = "ORTHO"
     cam.data.ortho_scale = scale
     cam.data.clip_start, cam.data.clip_end = 0.1, 400
@@ -623,21 +626,22 @@ def frame_ortho(cam, centre, scale, elev=30.0, yaw_from_south=0.0):
 
 
 SHOTS = []
+SHOT_YAW = [0.0]
 
 
 def shot(name, layouts_on, variant, mode, target, res=(1920, 1080), crop=1.0, scale=20.0, elev=30.0, px=2.0,
-         warrior=None, hide=None, rim_variant=None, ground=True):
-    SHOTS.append(dict(name=name, layouts=layouts_on, variant=variant, mode=mode, target=target, res=res, crop=crop,
+         warrior=None, hide=None, rim_variant=None, ground=True, yaw=0.0):
+    SHOTS.append(dict(yaw=yaw, name=name, layouts=layouts_on, variant=variant, mode=mode, target=target, res=res, crop=crop,
                       scale=scale, elev=elev, px=px, warrior=warrior, hide=hide, rim_variant=rim_variant, ground=ground))
 
 
 def define_shots():
-    pa = S2B(7.2, 35.4, 0)
-    pc_ = S2B(G.MIRROR_X - 7.2, 35.4, 0)
+    pa = S2B(6.6, 34.6, 0)            # player on the pad + the 2.0 u screen-up look offset (art direction 2.1)
+    pc_ = S2B(G.MIRROR_X - 8.0 - 1.4, 34.6, 0)   # the look offset is screen-up (NW) for both teams
     hc = S2B(56, 40.6, 0.75)
     sc = S2B(56, 9.6, 1.5)
-    shot("gp_base_azure", ["district_azure"], "azure", "gp", pa, warrior=(9.0, 38.6, 0.22))
-    shot("gp_base_crimson", ["district_crimson"], "crimson", "gp", pc_, warrior=(G.MIRROR_X - 9.0, 38.6, 0.22))
+    shot("gp_base_azure", ["district_azure"], "azure", "gp", pa, warrior=(8.6, 36.9, 0.1))
+    shot("gp_base_crimson", ["district_crimson"], "crimson", "gp", pc_, warrior=(G.MIRROR_X - 8.0 + 0.6, 36.9, 0.1))
     shot("gp_hill_neutral", ["hill"], "neutral", "gp", hc, warrior=(57.5, 43.5, 0.95))
     shot("gp_hill_azure", ["hill_damaged"], "azure", "gp", hc, warrior=(57.5, 43.5, 0.95))
     shot("gp_hill_contested", ["hill"], "neutral", "gp", hc, warrior=(57.5, 43.5, 0.95), rim_variant="contested")
@@ -646,12 +650,12 @@ def define_shots():
     shot("crop2x_wall", ["hill"], "azure", "gp", S2B(56 + 10.5 * math.cos(a), 40 + 10.5 * math.sin(a), 1.5), crop=2.0,
          warrior=(56 + 8.6 * math.cos(a), 40 + 8.6 * math.sin(a), 0.75))
     shot("crop2x_gate", ["hill"], "azure", "gp", S2B(56, 50.2, 1.5), crop=2.0, warrior=(56.2, 49.0, 0.75))
-    tx, tz = layouts.isl_pt(128, 2.0)
+    tx, tz = layouts.isl_pt(116, 2.1)
     shot("crop2x_tower", ["district_azure"], "azure", "gp", S2B(tx, tz, 2.5), crop=2.0, warrior=(tx + 2.6, tz - 2.2, 0.0))
     # bible framings (orthographic, front view from the south, 30 deg elevation)
     shot("bf_shrine", ["shrine"], "azure", "ortho", S2B(56, 8, 3.2), res=(1000, 1000), scale=8.5, elev=25,
          hide=lambda o: ("yard" in o.name or "breakable" in o.name or "gate_post" in o.name or "brazier" in o.name
-                         or "pool" in o.name or "marker" in o.name), ground=False)
+                         or "pool" in o.name or "marker" in o.name), ground=False, yaw=45.0)
     for v in ("neutral", "azure", "crimson"):
         shot(f"bf_hill_{v}", ["hill"], v, "ortho", S2B(56, 40, 2.6), res=(1200, 900), scale=23, elev=28,
              hide=lambda o: ((o.matrix_world @ (sum((Vector(b) for b in o.bound_box), Vector()) / 8)).y > 41.5
@@ -699,6 +703,7 @@ def render_all(scn, cam, ground):
             cam.rotation_euler = (0, 0, math.pi)       # sim north (-y blender) up, sim east (-x blender) right
             ppm = (lambda p: max(sh["res"]) / sh["scale"])
         else:
+            SHOT_YAW[0] = sh["yaw"]
             ppm = frame_ortho(cam, sh["target"], sh["scale"], sh["elev"])
         if sh["warrior"]:
             wob.hide_render = False
@@ -750,9 +755,14 @@ def render_all(scn, cam, ground):
                                 c["pools"] += 1    # tower-door braziers carry their own pool
                             if lk in ("door", "crystal"):
                                 c["lamps"] += 1
-                    if k == "landmark":
-                        q = world_to_camera_view(scn, cam, o.matrix_world @ Vector((0, 0, 8.5)))
-                        c["landmark_visible"] = c["landmark_visible"] or (0 <= q.x <= 1 and 0 <= q.y <= 1)
+                    if k == "landmark":       # visible = at least half of 9 probe points (body, eave, apex) in frame
+                        probes = [Vector((dx, dy, z)) for z in (3.0, 7.0, 9.5) for dx, dy in ((0, 0), (1.8, 0), (-1.8, 0))]
+                        hits = 0
+                        for pr in probes:
+                            q = world_to_camera_view(scn, cam, o.matrix_world @ pr)
+                            hits += (0 <= q.x <= 1 and 0 <= q.y <= 1)
+                        c["landmark_probe_hits_of_9"] = hits
+                        c["landmark_visible"] = c["landmark_visible"] or hits >= 5
                     sol = o.modifiers.get("Outline")
                     if sol and m.get("kind") == "structure":
                         cen = o.matrix_world @ (sum((Vector(b) for b in o.bound_box), Vector()) / 8)

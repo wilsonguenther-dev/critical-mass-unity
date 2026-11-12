@@ -70,7 +70,7 @@ class Piece:
     def box(self, cx, cy, z0, sx, sy, h, side, top=None, rot=0.0, bev=CH, segs=1, mark=None, M=None, jit=None):
         self.block(box_corners(cx, cy, z0, sx, sy, h, rot, jit), side, top, bev, segs, mark=mark, M=M)
 
-    def lathe(self, prof, n, colfn, cx=0.0, cy=0.0, rot=0.0, M=None, mark=None, bev=0.0):
+    def lathe(self, prof, n, colfn, cx=0.0, cy=0.0, rot=0.0, M=None, mark=None, bev=0.0, closed=False):
         """prof: [(r, z)] bottom to top; r == 0 at an end makes an apex. Flat-shaded closed solid."""
         t = bmesh.new()
         rings = []
@@ -80,7 +80,8 @@ class Piece:
             else:
                 rings.append([t.verts.new((cx + r * math.cos(rot + 2 * math.pi * i / n),
                                            cy + r * math.sin(rot + 2 * math.pi * i / n), z)) for i in range(n)])
-        for a, b in zip(rings, rings[1:]):
+        pairs = list(zip(rings, rings[1:])) + ([(rings[-1], rings[0])] if closed else [])
+        for a, b in pairs:
             for i in range(n):
                 j = (i + 1) % n
                 if len(a) == 1 and len(b) == 1:
@@ -91,9 +92,9 @@ class Piece:
                     t.faces.new([a[i], a[j], b[0]])
                 else:
                     t.faces.new([a[i], a[j], b[j], b[i]])
-        if len(rings[0]) > 1:
+        if len(rings[0]) > 1 and not closed:
             t.faces.new(list(reversed(rings[0])))
-        if len(rings[-1]) > 1:
+        if len(rings[-1]) > 1 and not closed:
             t.faces.new(rings[-1])
         bmesh.ops.recalc_face_normals(t, faces=t.faces[:])
         if bev > 0:
@@ -287,7 +288,7 @@ def wall_run(piece, path, rng, thick=1.0, courses=3, z0=0.0, merlons=True, walkw
     for i, (c, a, b) in enumerate(blocks):
         side, topc = stone_side(rng, warm)
         zb, zt = z0 + c * COURSE + GAP / 2, z0 + (c + 1) * COURSE - GAP / 2
-        io = rng.uniform(-0.02, 0.02)
+        io = rng.uniform(-0.035, 0.035)
         if i in split:
             m = (a + b) / 2 + rng.uniform(-0.15, 0.15)
             d = 0.08
@@ -300,12 +301,19 @@ def wall_run(piece, path, rng, thick=1.0, courses=3, z0=0.0, merlons=True, walkw
                     cs[5] = path.at(sb - d, -h0 + io, zt + dz); cs[6] = path.at(sb - d, h0 + io + 0.04, zt + dz)
                 piece.block(cs, side, topc)
             continue
-        piece.block(hexa_on_path(path, a + GAP / 2, b - GAP / 2, -h0 + io, h0 + io, zb, zt, 0.015, rng), side, topc,
+        piece.block(hexa_on_path(path, a + GAP / 2, b - GAP / 2, -h0 + io, h0 + io, zb, zt, 0.035, rng), side, topc,
                     mark="course" if c == 0 and i < 3 else None)
         if c == courses - 1 and rng.random() < moss_p:
             s = rng.uniform(a + 0.2, b - 0.2)
             p = path.at(s, rng.uniform(-0.3, 0.3), zt)
             moss(piece, rng, p.x, p.y, p.z, 0.22)
+    s = rng.uniform(0.2, 0.9)
+    while s < L - 0.2:
+        for o in (-h0 - 0.08, h0 + 0.08):
+            if rng.random() < moss_p * 2.2:
+                p = path.at(s, o, z0)
+                moss(piece, rng, p.x, p.y, z0 + 0.02, 0.24)
+        s += rng.uniform(0.6, 1.3)
     # walkway (inner side of the wall top): planks 0.25 u across the wall, beams every 2 u (flush beam ends)
     if walkway:
         s = 0.06

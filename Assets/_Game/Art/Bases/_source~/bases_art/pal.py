@@ -34,7 +34,7 @@ HEX = {
 
 TEAM_SETS = {
     "azure":   {"team": "#16C7D9", "team_dark": "#0E8E9E", "team_glow": "#7FF0FA"},
-    "crimson": {"team": "#FF5A5F", "team_dark": "#B83A44", "team_glow": "#FF9C9A"},
+    "crimson": {"team": "#FF5A5F", "team_dark": "#B83A44", "team_glow": "#FF7C7C"},
     # neutral: Stone caps, Brass trim (rule 4.3); glow regions go Brass
     "neutral": {"team": "#6F7282", "team_dark": "#55586A", "team_glow": "#C79245"},
 }

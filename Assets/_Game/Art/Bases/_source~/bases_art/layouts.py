@@ -48,7 +48,7 @@ def face_cam_yaw(tangent_angle):
 ISL = (10.0, 36.0, 9.0, 11.0)
 PAD = (8.0, 36.0)
 WALL_SECTORS = [(24, 40), (80, 262), (327, 347)]     # sim degrees around the base island (0 east, 90 south)
-TOWERS = [(128, "tower"), (180, "landmark"), (232, "tower")]
+TOWERS = [(116, "tower"), (162, "landmark"), (228, "tower")]
 
 
 def _edge_offset():
@@ -97,7 +97,9 @@ def district(team="azure"):
     info = {"wall_paths": [], "gates": []}
     # tower angular cut-outs in the big sector
     cuts = []
-    for deg, kind in TOWERS:
+    # Crimson: landmark on its east-north-east edge so it stands in the gameplay view (the camera yaw is not mirrored)
+    towers = TOWERS if not mirror else [(116, "tower"), (162, "tower"), (205, "landmark")]
+    for deg, kind in towers:
         R = 2.25 if kind == "landmark" else 2.0
         cuts.append((deg, math.degrees(R / 10.0) * 0.92, kind, R))
     runs = []
@@ -133,7 +135,7 @@ def district(team="azure"):
             place.append(("brazier", -q.x, q.y, 2.31, 0.0, {}))
             g = p.at(s, -1.7, 0.0)
             place.append(("pool", -g.x, g.y, 0.0, 0.0, {}))
-            s += 4.4
+            s += 5.0
         # dressing on the walkway
         s = 3.0
         while s < p.L - 1.0:
@@ -141,14 +143,14 @@ def district(team="azure"):
             t = p.tan(s)
             key = rng.choice(["crate", "barrel", "barrel", "blocks"])
             place.append((key, -q.x, q.y, 2.31, math.atan2(t.y, t.x) + rng.uniform(-0.3, 0.3), {}))
-            s += rng.uniform(2.6, 3.8)
+            s += rng.uniform(1.2, 1.8)
         # low dressing on the ground along the inner face (<= 0.3 u)
         s = 0.8
         while s < p.L - 0.5:
             q = p.at(s, -1.0 - rng.uniform(0.0, 0.6), 0.0)
             key = rng.choice(["rubble_low", "planks_low", "flagstones"])
             place.append((key, -q.x, q.y, 0.0, rng.uniform(0, 6.28), {}))
-            s += rng.uniform(1.6, 2.6)
+            s += rng.uniform(0.75, 1.15)
     world += [wall, found]
     # gate posts at every route-side wall end (banners face the camera), crystal lamps on the walkway beside them
     for a0, a1 in WALL_SECTORS:
@@ -162,8 +164,10 @@ def district(team="azure"):
             info["gates"].append((x, z))
             xl, zl = isl_pt(deg + inward * 7.5, 0.42, mirror)
             place.append(("crystal_lamp", xl, zl, 2.31, 0.0, {}))
-            gp = isl_pt(deg + inward * 5.5, -1.6, mirror)
-            place.append(("pool", gp[0], gp[1], 0.0, 0.0, {}))
+            xb, zb = isl_pt(deg + inward * 4.6, 0.38, mirror)
+            place.append(("brazier", xb, zb, 2.31, 0.0, {}))
+            xp, zp = isl_pt(deg + inward * 4.6, -1.2, mirror)
+            place.append(("pool", xp, zp, 0.0, 0.0, {}))
     # towers, doors to the pad
     padx = G.MIRROR_X - PAD[0] if mirror else PAD[0]
     for deg, half, kind, R in cuts:
@@ -177,10 +181,18 @@ def district(team="azure"):
         ob = tf
         ob.name = f"cm_district_tower_footing_{team}_{deg}"
         place.append(("__piece__", x, z, 0.0, 0.0, {"piece": tf}))
-        dpos = S2B(x, z) + dvec.normalized() * (R + 1.2)
-        place.append(("pool", -dpos.x, dpos.y, 0.0, 0.0, {}))
-    # the pad and its crystals
+    # the pad, and a loose ring of low dressing outside the 3.75 u heal zone (all <= 0.3 u)
     place.append(("pad", padx, PAD[1], 0.0, 0.0, {}))
+    for i in range(21):
+        a = 2 * math.pi * i / 21 + rng.uniform(-0.12, 0.12)
+        r = rng.uniform(4.6, 6.6)
+        x, z = PAD[0] + r * math.cos(a), PAD[1] + r * math.sin(a)
+        if mirror:
+            x = G.MIRROR_X - x
+        if not walk(math.floor(x), math.floor(z)):
+            continue
+        key = ["flagstones", "rubble_low", "planks_low", "crystal_lamp_low"][i % 4]
+        place.append((key, x, z, 0.0, rng.uniform(0, 6.28), {}))
     return world, place, info
 
 
