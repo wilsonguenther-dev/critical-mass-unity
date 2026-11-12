@@ -153,12 +153,8 @@ namespace CriticalMass.Runtime.View
 
         private static double Lerp(double from, double to, double t) => from + (to - from) * t;
 
-        /// <summary>Map.Height01 of the cell under a sim point; 0 outside the map.</summary>
-        private static double GroundHeight(MapDef map, double x, double z)
-        {
-            int idx = MapGrid.CellIndex(map, JsMath.FloorToInt(x), JsMath.FloorToInt(z));
-            return idx < 0 ? 0 : map.Height01[idx];
-        }
+        /// <summary>Ground height under a sim point, the cell clamped to the map (GroundHeight.At, picking.ts groundHeightAt).</summary>
+        private static double GroundHeight(MapDef map, double x, double z) => CriticalMass.Runtime.GroundHeight.At(map, x, z);
 
         private static string KaijuHex(KaijuState s)
         {

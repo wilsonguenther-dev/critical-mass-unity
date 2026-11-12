@@ -1,4 +1,7 @@
 using System;
+using CriticalMass.Runtime.Game;
+using CriticalMass.Sim.Core;
+using CriticalMass.Sim.Grid;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using B = CriticalMass.Runtime.Input.HumanInputState.HumanButton;
@@ -8,8 +11,9 @@ namespace CriticalMass.Runtime.Input
     /// <summary>
     /// Reads the project-wide InputSystem.actions "Player" map into a HumanInputState (browser humanInput.ts listeners).
     /// Buttons: InputAction.started fires once per press (key repeat raises no new started) -> ButtonDown, canceled ->
-    /// ButtonUp. Move and the pointer aim are sampled every frame; the aim ray hits the y = 0 ground plane and goes
-    /// through SimSpace.ToSim (the only z negation, O-13).
+    /// ButtonUp. Move and the pointer aim are sampled every frame; the aim ray hits the plane at the ground height of
+    /// actor 0's cell (GroundHeight.TryAimPoint, browser pickHumanAim) and goes through SimSpace.ToSim (the only z
+    /// negation, O-13). With no SimDriverBehaviour World on this GameObject the plane is y = 0.
     /// </summary>
     public sealed class HumanInputSource : MonoBehaviour
     {
@@ -21,6 +25,7 @@ namespace CriticalMass.Runtime.Input
         public HumanInputState State { get; } = new HumanInputState();
 
         private InputActionMap _map;
+        private SimDriverBehaviour _driver;
         private InputAction _move;
         private InputAction _point;
         private readonly InputAction[] _actions = new InputAction[ButtonActions.Length];
@@ -77,12 +82,12 @@ namespace CriticalMass.Runtime.Input
                 return;
             }
             Ray ray = cam.ScreenPointToRay(_point.ReadValue<Vector2>());
-            var ground = new Plane(Vector3.up, 0f);
-            if (ground.Raycast(ray, out float d))
-            {
-                SimSpace.ToSim(ray.GetPoint(d), out double sx, out double sz);
-                State.SetAim(sx, sz);
-            }
+            // pickHumanAim (humanInput.ts:166): the plane at the ground height of actor 0's cell, not y = 0.
+            if (_driver == null) _driver = GetComponent<SimDriverBehaviour>();
+            World w = _driver != null ? _driver.World : null;
+            MapDef map = w != null && w.ActorCount > 0 ? w.Map : null;
+            double hx = map != null ? w.X[0] : 0, hz = map != null ? w.Z[0] : 0;
+            if (GroundHeight.TryAimPoint(ray, map, hx, hz, out double sx, out double sz)) State.SetAim(sx, sz);
             else State.ClearAim();
         }
 
