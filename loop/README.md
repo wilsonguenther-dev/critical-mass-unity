@@ -46,16 +46,13 @@ finished items the integrator compiles and gates together. A **gate** is a check
 
 | Rule | Prevents |
 | --- | --- |
-| The spend cap counts all tokens: input, output and cache. | A governor counting output only, 6 to 17 times under real use (R11). |
+| The spend cap counts the workflow's own reported total tokens (U-014), never the output-only counter. | A governor counting output only, 6 to 17 times under real use (R11). |
 | Wilson sets the cap; it is never raised without his word. | Silent overspend. |
 | No idle or dispatch agents; the loop reacts to events without per-lane wait seats. | 489 idle and dispatch agents burning 59 M tokens in one day (R12); a COST stop during a productive hour (R10). |
 | Wilson's weekly usage percentage is logged at every launch and the delta at every close. | Not knowing what a run cost. |
 
-**OPEN:** the decision file says to size the budget at "roughly 2.8M total tokens per landed item (Monday's real
-figure)". That figure is the workflow's `totalTokens` per landed item, which the post-mortem says is close to cache
-writes plus output. All-in usage counting cache reads was about 543 M for 14 items, about 39 M per landed item. A cap
-that counts cache (the rule above) sized at 2.8 M per item would stop the loop almost at once. The architect needs to
-say which number the cap counts.
+**Decided (U-014).** The cap counts the workflow's own reported total tokens (the measure that read 39.4M on Monday
+for about 14 landed items, about 2.8M per item), not the old output-only counter. Wilson sets the budget number.
 
 ## 5. Pre-launch checklist (every launch)
 
@@ -93,13 +90,12 @@ Unity Hub is an Electron app and ships its own `chrome_crashpad_handler`, which 
 
 | Rule | Prevents |
 | --- | --- |
-| At most 6 agents running at once, counting every seat. | Memory and rate exhaustion on this Mac. |
+| At most 6 agents running at once: 5 builders + 1 integrator; reviewers and fixers take a builder slot (U-015). | Memory and rate exhaustion on this Mac. |
 | Builder lanes are Opus; the integrator is Opus at high effort; the lander and mechanical seats are Haiku; the sanity seat is Opus and read-only; the parity feature reviewer is Opus. Subagents are never Fable. | Weak models on judgement seats, and expensive models on mechanical ones. |
 | No third-party model in any seat; a second opinion is a second Opus with a different lens. | Reviews from models the team does not use. |
 | A mechanical seat that returns nothing is retried once; a second empty return halts the run. | A usage limit read as a result. |
 
-**OPEN:** "6 agents at once, every seat counted" leaves room for 5 builders beside an integrator, while U-011's batch is
-"about 6" and the browser START text allowed 6 builders plus 1-2 review/land seats. The architect says which holds.
+**Decided (U-015).** At most 6 agents at once = 5 builders + 1 integrator; reviewers and fixers take a builder slot.
 
 ## 8. Texting
 

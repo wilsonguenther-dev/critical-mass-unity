@@ -37,19 +37,22 @@ Sources:
   a row stale when `main` has moved past that commit.
 - It is a gate for art items (U-011): it runs on this Mac.
 
-**OPEN: the script's exact interface.** Not decided: its arguments, output folder and file names, and the capture
-resolution. Recommended for the architect:
+**Decided (U-017): output.**
 
 ```
-tools/unity-capture.sh [--row p06] [--framing 06-front] [--out <dir>]
-  default --out: Logs/parity/<short-commit>/   (Logs/ is git-ignored)
-  per framing:   <row>/<framing>.png         colour capture on Void Navy
-                 <row>/<framing>.mask.png    ID mask, 1-bit, no anti-aliasing
-                 <row>/<framing>.json        commit, capture time (UTC), camera, swatch ΔE values, IoU, pass/fail per check
-  per run:       capture.json                every row and framing with its result; exit 0 = ran, non-zero = could not render
+Logs/parity/<commit>/<row>/<framing>.png         colour capture on Void Navy
+Logs/parity/<commit>/<row>/<framing>.mask.png    ID mask of the same framing
+Logs/parity/<commit>/results.json                every row and framing with its check results
 ```
 
-Note for whoever closes this: the existing `tools/*.sh` scripts run Unity with `-nographics`, which gives no GPU device;
+`Logs/` is git-ignored. **OPEN:** the script's command-line arguments (for example selecting one row or framing) and
+the capture resolution are not ruled.
+
+**Decided (U-017): camera and light.** The capture camera is orthographic and framed to match the bible crop for that
+framing. One fixed key light, defined in a dedicated capture scene `Assets/_Game/Scenes/ParityCapture.unity`, is the
+same for every row.
+
+Note for the builder: the existing `tools/*.sh` scripts run Unity with `-nographics`, which gives no GPU device;
 a capture script that renders cameras cannot use that flag.
 
 ## 3. The ID-mask method
@@ -62,9 +65,9 @@ background-plate mask (D-066); the corner-mean mask measured the background, not
 matters for IoU), and how team-swap framings are rendered (one capture per team, or Azure only plus the bible's
 accent-swap crop for Crimson).
 
-**OPEN:** the subject mask of each *bible crop*. IoU needs a silhouette on both sides; the bible crops are painted
-images with a background, and a guessed mask is exactly the defect R18. Recommended: a one-time silhouette mask per
-crop, made and checked by a person, committed beside a copy of the crop, never computed at gate time.
+**Decided (U-016): bible-side silhouettes.** One mask per bible crop, made once, stored in the repo under
+`loop/parity-board/ref-masks/`, reviewed by eye before first use, never computed at gate time. (IoU needs a silhouette
+on both sides, and a guessed mask is exactly the defect R18.)
 
 **OPEN:** how the capture and crop silhouettes are aligned before IoU (crop and capture differ in size). Recommended:
 scale both masks to the same bounding-box height and centre them on their bounding boxes.
@@ -83,17 +86,17 @@ checks never make a row pass (Wilson's rule, 2026-11-09).
 ## 5. The pass rule and the board
 
 - A row **PASSES** only when **every framing** of the row is scored **9 or 10** by the team. No measured number
-  replaces this.
+  replaces this. **Decided (U-018):** that means every rater who scored every framing gave 9 or 10, with at least two
+  raters, one of them Wilson.
 - The board shows, per framing, the bible crop and the Unity capture side by side, with the commit and the capture
   time, and marks the row **stale** when `main` has moved since its capture.
 - Team raters on the browser board were Wilson, Jeisil, Aidan and Max, each scoring 1-10 plus Redo plus a one-line
-  note. No team score was ever recorded there.
+  note. The board holds 4 team ratings, all on the browser demo: Max p04 = 1; Jeisil p04 = 4, p05 = 3, p10 = 3.
+- **Decided (U-025):** board scoring is switched off per row until that row has a Unity capture (applied with the first
+  Unity capture publish, not before).
 
-**OPEN:** does "scored 9 or 10 by the team" mean every rater who scores gives 9 or 10, or the team average is at
-least 9? Recommended: every rater who scored gives 9 or 10, with at least two raters, one of them Wilson.
-
-**OPEN:** where the board lives (a new version of the browser board artifact, slug
-`4a9623fa-4228-4552-abaa-6317bf0f8545`, or a new artifact) and who publishes it after each capture run.
+The board was republished as v4 (version `1794453554-f2c8`, Unity plan on top, rows marked not started in Unity;
+source in `loop/parity-board/`). **OPEN:** who publishes it after each capture run.
 
 ## 6. The rows
 
@@ -102,15 +105,15 @@ every reference crop that shows the asset in a pose or from an angle is a framin
 and `*-swatches.png` crops are reference only (detail sheets and colour sources). The architect confirms or edits this
 list, including whether the p09 direction sheets are one framing per facing.
 
-**OPEN: the capture camera per framing.** Character-sheet views (front, three-quarter, profile, back) are not the game
-camera, while p03, p09, p12 and p15 are gameplay views. Not decided: camera type and angle per framing kind, the
-capture light, and how p04 (title screen), p12 (whole map) and p15 (HUD overlay) use the Void Navy ground.
+**Capture camera (U-017):** orthographic, framed to match each framing's bible crop, one fixed key light in
+`ParityCapture.unity`. **OPEN:** how p04 (title screen), p12 (whole map) and p15 (HUD overlay) use the Void Navy
+ground.
 
 **Swatches.** The core palette (p05) is exact: D-064 confirmed the swatch pixels equal the printed hex. The per-sheet
 swatches on pp 06-08 are **ESTIMATE**: the recon sampled them with a 12-colour quantise; the bible prints no hex on those
 pages. Rows that have no swatch sheet of their own list the core palette colours their description names; that
-mapping is the doc writer's reading. **OPEN:** confirm each row's swatch list, and supply hexes for colours the bible
-names but no swatch gives (Kaiju slate body, moss, tan belly; HUD orange meter; skin and hair tones).
+mapping is the doc writer's reading. **Decided (U-021):** the missing swatches (Kaiju slate, moss, belly; HUD meter)
+are re-sampled from the bible pages and marked "sampled, pending Jeisil's confirmation". **OPEN:** confirmation of each row's swatch list, and skin and hair tones.
 
 Core palette: Void Navy **#18233B** · Azure Team **#16C7D9** · Crimson Team **#FF5A5F** · Warm Cream **#F7F0E5** ·
 Biomass **#B7F238** · Corruption **#8E3FD1** · Stone **#6F7282** · Tool Brass **#C79245**.
@@ -258,8 +261,8 @@ Biomass **#B7F238** · Corruption **#8E3FD1** · Stone **#6F7282** · Tool Brass
   - [ ] telegraph: red circular ground marker with concentric rings, red crystal spikes around the rim, cracked red tiles
   - [ ] adult roughly 8-9x the character figures on the sheet (**ESTIMATE**; the browser used 2.5x, kaijuHeight 5.0 vs characterHeight 2.0)
 - **Swatches:** Biomass #B7F238 (egg seams, hatchling spikes), Azure #16C7D9 (Azure cracks and crown), Crimson #FF5A5F
-  (Crimson crystals), Corruption #8E3FD1 (berserk). Slate body, moss and tan belly: **OPEN** (no hex in the recon; the
-  browser's slate check failed at ΔE 16.9-18.8 against a value the recon does not give).
+  (Crimson crystals), Corruption #8E3FD1 (berserk). Slate body, moss and tan belly: to be re-sampled from the bible
+  page, "sampled, pending Jeisil's confirmation" (U-021; the browser's slate check failed at ΔE 16.9-18.8).
 
 ### p11 Adult Kaiju turnaround, CM-KAI-002 (CM-49)
 
@@ -274,7 +277,7 @@ Biomass **#B7F238** · Corruption **#8E3FD1** · Stone **#6F7282** · Tool Brass
   - [ ] rear: cyan crystal ridge down the spine onto a short tail with a crystal tip
   - [ ] small face: yellow eyes with black pupils, flat snout, smug mouth; powerful, readable, slightly comedic, never horrific
   - [ ] rock shell plates with moss and cyan seams; a cyan-to-lime crystal cluster
-- **Swatches:** Azure #16C7D9, Biomass #B7F238; slate, moss: **OPEN** (as p10).
+- **Swatches:** Azure #16C7D9, Biomass #B7F238; slate, moss: re-sampled as p10 (U-021).
 
 ### p12 Skybreak Basin map (CM-50)
 
@@ -292,9 +295,9 @@ Biomass **#B7F238** · Corruption **#8E3FD1** · Stone **#6F7282** · Tool Brass
 
 ### p13 Spatial grammar (CM-50)
 
-- **Framings:** `ref/13-spatial-grammar.png` is text only; there is no picture to overlap. **OPEN:** how this row is
-  measured. Recommended: colour and IoU do not apply; the timing items are Sim tests on the headless match runner (F-09);
-  a top-down capture of Skybreak goes to the Opus reviewer and the team for the rest.
+- **Framings:** `ref/13-spatial-grammar.png` is text only; there is no picture to overlap. **Decided (U-019):** this row
+  is measured by Sim timing tests (base to hill 12–18 s, shrine detour 8–12 s at default pace) plus team review. Colour
+  and IoU do not apply.
 - **Required features (bible p13, verbatim list and blockout targets):**
   - [ ] opposing protected bases at clear ends
   - [ ] one central circular hill with at least 3 approach routes
@@ -348,11 +351,10 @@ Biomass **#B7F238** · Corruption **#8E3FD1** · Stone **#6F7282** · Tool Brass
   - [ ] 04 WORLD: objective arrows, contested state, class VFX, a crown marker over the hill, team banners
   - [ ] minimap bottom-right in a navy frame: egg at top, blue shield left, red shield right, crown at centre, dashed blue/red routes
   - [ ] fonts per p05 (JetBrains Mono for the clock, scores and counts)
-- **OPEN:** the bible's player panel labels its buttons "LB", "RB" and "Y"; the Unity controls table (U-006) puts the
-  class ability on the right trigger, dig/place on the left trigger and interact on the north button. Recommended: the
-  HUD shows the real bindings, and the Opus check is "labels match the controls table".
+- **Decided (U-020):** the HUD shows the game's real bindings (the U-006 controls table), not the bible's placeholder
+  "LB", "RB" and "Y" labels. The feature check is "button labels match the controls table".
 - **Swatches:** Void Navy #18233B, Warm Cream #F7F0E5, Azure #16C7D9, Crimson #FF5A5F (also the contested-hill stripe),
-  Tool Brass #C79245. The orange meter: **OPEN** (no hex).
+  Tool Brass #C79245. The orange meter: re-sampled from the bible page, "sampled, pending Jeisil's confirmation" (U-021).
 
 ## 7. Order
 

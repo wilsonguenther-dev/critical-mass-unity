@@ -162,7 +162,7 @@ the colour of every pixel of a model.
 - No second shader for characters, Kaiju or props. Everything goes through `CM/Toon`.
 - Mechanics work never waits on art: it uses team-coloured capsules and cubes.
 
-**OPEN:** the exact contract details: shader property names; how the team mask is stored (a vertex-colour channel, a
+**OPEN (the architect specifies it in the shader item spec):** the exact contract details: shader property names; how the team mask is stored (a vertex-colour channel, a
 mask texture, or a material slot); outline colour (the bible's line art is "dark-brown or navy" per the recon, not
 black); the ramp threshold; the rim width and strength; and whether `CM/Toon` is hand-written HLSL or Shader Graph.
 
@@ -188,7 +188,7 @@ black); the ramp threshold; the rim width and strength; and whether `CM/Toon` is
 Same route as the characters: sculpted in Blender to bible pp 10 and 11 (a heavy, gorilla-weight quadruped), never a
 procedural stand-in. The source goes beside the characters' in the Art tree.
 
-**OPEN:** the Kaiju's rig and clip list (the KayKit rig is a humanoid; p10 and p11 need egg, hatchling, adult idle, walk,
+**OPEN (the architect specifies it in the art item spec):** the Kaiju's rig and clip list (the KayKit rig is a humanoid; p10 and p11 need egg, hatchling, adult idle, walk,
 roar, slam wind-up, slam, berserk and KO), and its source folder (`Assets/_Game/Art/Kaiju/_source/` would mirror the
 characters).
 
@@ -199,19 +199,19 @@ environment kit pieces. Bible p14: "Author each damage state as a discrete 2D sp
 destruction", so walls, barricades and similar props get one authored model per state (intact, cracked, destroyed;
 folded, deployed, damaged).
 
-**OPEN:** where the prop scripts and their sources live in this repo (`tools/sculpt/` and
+**OPEN (the architect specifies it in the art item spec):** where the prop scripts and their sources live in this repo (`tools/sculpt/` and
 `Assets/_Game/Art/Props/_source/` would mirror the character layout), and whether the browser's script budgets
 (12,000 triangles, a builder's guess) carry over.
 
 ### Export and import settings
 
-**OPEN:** FBX export settings (scale, forward and up axes, apply transforms, clip naming, embedded textures or not) and
+**OPEN (the architect specifies it in the art item spec):** FBX export settings (scale, forward and up axes, apply transforms, clip naming, embedded textures or not) and
 Unity import settings (Generic or Humanoid animation type, avatar per class or shared, compression). None are decided.
 
-**OPEN:** how the 76 KayKit clips enter Unity: through glTFast from the source GLBs, or re-exported to FBX through
-Blender like the meshes. This also decides whether `com.unity.cloud.gltfast` has any job (section 8).
+**Decided (U-022).** glTFast (`com.unity.cloud.gltfast`) is build-time and import only: it brings the CC0 KayKit GLB
+sources and their clips into the editor. Nothing loads glTF at runtime.
 
-**OPEN:** the Blender version that art sources are authored in (see section 8).
+**Decided (U-022).** All art source is authored in **Blender 5.2.3**.
 
 ## 7. Folder map
 
@@ -256,7 +256,7 @@ test or build, never in the player; *developer machine* = must be installed on t
 | UnityYAMLMerge | ships with the editor | developer machine | merge driver for `.unity`, `.prefab`, `.asset`, `.meta`; one-time `git config` per clone (README) |
 | Git | not pinned | developer machine | |
 | Git LFS | 3.7.1 observed on this Mac; not pinned | developer machine | `.gitattributes` routes .fbx, .blend, .glb, .png, .jpg, .psd, .tga, .exr, .hdr, .wav, .ogg, .mp3 through LFS |
-| Blender | **OPEN** (5.2.3 LTS observed at `/Applications/Blender.app` on this Mac) | developer machine | art source for characters, Kaiju, props (U-009); headless prop scripts |
+| Blender | 5.2.3 (pinned, U-022; 5.2.3 LTS installed at `/Applications/Blender.app` on this Mac) | developer machine | art source for characters, Kaiju, props (U-009); headless prop scripts |
 | bash, `xmllint` | macOS system | developer machine | `tools/*.sh`; `unity-test.sh` reads results with `xmllint` |
 
 ### Unity packages (direct, `Packages/manifest.json`)
@@ -266,7 +266,7 @@ test or build, never in the player; *developer machine* = must be installed on t
 | com.unity.render-pipelines.universal | 17.3.0 | shipped in build | URP, Forward+ renderer; hosts `CM/Toon` |
 | com.unity.inputsystem | 1.20.1 | shipped in build | `Controls.inputactions` (U-006) |
 | com.unity.cinemachine | 3.1.7 | shipped in build | follow camera (U-005) |
-| com.unity.cloud.gltfast | 6.14.1 | **OPEN** | glTF/GLB import; no decided job (section 6) |
+| com.unity.cloud.gltfast | 6.14.1 | build-time only | imports the KayKit GLB sources and clips in the editor; nothing loads glTF at runtime (U-022) |
 | com.unity.test-framework | 1.6.0 | build-time only | EditMode and PlayMode tests (U-011 gates) |
 | com.unity.ugui | 2.0.0 | shipped in build | uGUI for HUD and panels (CM-84 `StationPanel` placeholder) |
 | com.unity.timeline | 1.8.13 | shipped in build | in the manifest; no decided job yet |

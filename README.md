@@ -12,7 +12,7 @@ browser demo lives in a separate repo, [wilsonguenther-dev/critical-mass](https:
 | Document | What it is |
 | --- | --- |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | How the game is put together: Sim / Runtime / Editor, data flow, ground grid, camera, the `CM/Toon` shader contract, the art pipeline, the folder map and the Runtime Dependencies table |
-| [DECISIONS.md](DECISIONS.md) | The architect's decisions, U-001 to U-013, and which browser-era decisions still apply |
+| [DECISIONS.md](DECISIONS.md) | The architect's decisions, U-001 to U-025, and which browser-era decisions still apply |
 | [PARITY.md](PARITY.md) | The parity gate against the asset bible (U-010): capture, checks, rows p03 to p15, pass rule |
 | [loop/README.md](loop/README.md) | The build-loop rules (U-011) and the launch checklist |
 | [MAX-ITEMS.md](MAX-ITEMS.md) | Max's mechanics work list and the foundation items |

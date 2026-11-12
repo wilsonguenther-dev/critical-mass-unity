@@ -231,13 +231,158 @@ multiplayer".
 
 ---
 
+## Rulings on the doc writer's open questions (2026-11-11 Central)
+
+## U-014 Spend cap measure
+
+**Decision.** The cap counts the workflow's own reported total tokens (the measure that read 39.4M on Monday for about
+14 landed items, i.e. about 2.8M per item), NOT the old output-only counter. Wilson sets the budget number.
+
+**Why.** U-011 said "all tokens" while the decision file sized the budget at 2.8M per item; only the workflow total
+fits both. The output-only counter read 6 to 17 times low (R11).
+
+**Replaces.** The browser governor's `budget.spent()` (output tokens only).
+
+**Status.** Decided. Budget number waiting on Wilson.
+
+## U-015 Seats
+
+**Decision.** At most 6 agents at once = 5 builders + 1 integrator; reviewers and fixers take a builder slot.
+
+**Why.** The 6-agent limit and "6 builders plus 1-2 review/land seats" in the browser START text could not both hold.
+
+**Replaces.** The browser START text's six coder lanes plus review and land seats.
+
+**Status.** Decided.
+
+## U-016 Bible reference silhouettes
+
+**Decision.** One mask per bible crop, made once, stored in the repo under `loop/parity-board/ref-masks/`, reviewed by
+eye before first use, never computed at gate time.
+
+**Why.** IoU needs a silhouette on both sides, and a guessed mask is the defect that made the browser measure the
+background (R18).
+
+**Replaces.** D-054 and D-066 computed masks for the bible side.
+
+**Status.** Decided. Masks not made yet.
+
+## U-017 Parity capture
+
+**Decision.** Output to `Logs/parity/<commit>/<row>/<framing>.png` plus `<framing>.mask.png` and a `results.json`;
+capture camera is orthographic and framed to match the bible crop for that framing; one fixed key light defined in a
+dedicated capture scene (`Assets/_Game/Scenes/ParityCapture.unity`), same for every row.
+
+**Why.** The capture script's interface, camera and light were not decided in U-010, and colour checks need the same
+light every time.
+
+**Replaces.** The browser's Playwright framings.
+
+**Status.** Decided. Not built.
+
+## U-018 Team pass
+
+**Decision.** A row passes when every rater who scored every framing gave 9 or 10, with at least two raters, one of
+them Wilson.
+
+**Why.** U-010's "scored 9 or 10 by the team" could be read as every rater or as the average.
+
+**Replaces.** The browser board's "Team avg" column as a pass measure.
+
+**Status.** Decided.
+
+## U-019 p13 spatial grammar
+
+**Decision.** Measured by Sim timing tests (base to hill 12–18 s, shrine detour 8–12 s at default pace) plus team
+review.
+
+**Why.** Bible p13 is text only; there is no picture for colour or IoU checks.
+
+**Replaces.** The browser's unbuilt grammar tests.
+
+**Status.** Decided. Not built.
+
+## U-020 HUD bindings
+
+**Decision.** The HUD shows the game's real bindings, not the bible's placeholder LB/RB/Y labels.
+
+**Why.** The bible's labels do not match the U-006 controls table.
+
+**Replaces.** Nothing built.
+
+**Status.** Decided.
+
+## U-021 Missing swatches
+
+**Decision.** Missing swatches (Kaiju slate, moss, belly; HUD meter): re-sample from the bible pages, mark as "sampled,
+pending Jeisil's confirmation".
+
+**Why.** The bible names these colours but prints no hex, and the recon gave none.
+
+**Replaces.** Nothing.
+
+**Status.** Decided. Not sampled yet.
+
+## U-022 Blender and glTFast
+
+**Decision.** Blender pinned at 5.2.3 for all art source. glTFast is build-time/import only, for bringing in the CC0
+KayKit GLB sources and their clips; nothing loads glTF at runtime.
+
+**Why.** The Runtime Dependencies table had no pinned Blender and no job for `com.unity.cloud.gltfast`.
+
+**Replaces.** The browser's GLB staging (`stage.mjs`, meshopt) and runtime GLB loading.
+
+**Status.** Decided. Blender 5.2.3 LTS is installed on this Mac.
+
+## U-023 Rule details
+
+**Decision.** A ladder is a one-step piece joining two cell heights; a carried piece drops on death if the cell is
+valid, else it is destroyed; every class buys its own upgrades at the station; command-line arguments are
+`-teamSize`, `-speed`, `-map`; map choice uses the same arguments-plus-pause-menu pattern; the unused "switch
+dig/place" binding row stays bound but unread; shared browser files that mix base rules with item code are ported by
+the loop with the item code left out and marked, and the item owner adds it back.
+
+**Why.** These were the open questions left in `MAX-ITEMS.md` after U-004 to U-007.
+
+**Replaces.** The browser's `?size=`, `?speed=` and `?map=` URL options; the CM-39 branch's ally-targeted upgrade.
+
+**Status.** Decided. Applied in `MAX-ITEMS.md`.
+
+## U-024 Phase exits
+
+**Decision.** Phase 1 ends when Travis's four must-haves pass a play test; Phase 2 when every bible row passes; Phase 3
+when Travis has a working build for his platform.
+
+**Why.** U-012 gave an exit only for Phase 0.
+
+**Replaces.** Nothing.
+
+**Status.** Decided.
+
+## U-025 Board scoring per row
+
+**Decision.** Board scoring is switched off per row until that row has a Unity capture (applied with the first Unity
+capture publish, not before).
+
+**Why.** The board still shows browser-demo captures; scores given now would rate the browser build, not Unity.
+
+**Replaces.** Open scoring on every row of the browser board.
+
+**Status.** Decided. Applied with the first Unity capture publish.
+
+## Still open (the architect specifies them in the shader and art item specs)
+
+`CM/Toon` property names and team-mask storage; FBX export settings; the Kaiju rig; the prop script location.
+
+---
+
 ## Open, waiting on people (from the decision file)
 
 - Max's Unity project and Blender file: audit, then decide whether his project or this scaffold is the base. The
   decisions above hold either way.
 - Travis's platform: ask before the first handoff.
 - Token budget for the loop: Wilson sets it; size it at roughly 2.8M total tokens per landed item (Monday's real
-  figure) until the new loop proves cheaper.
+  figure) until the new loop proves cheaper. The measure is fixed by U-014.
 
 ---
 

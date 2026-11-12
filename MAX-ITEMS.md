@@ -5,7 +5,7 @@ Written 2026-11-12T02:16:06Z (Wednesday 2026-11-11, 8:16 pm Central). Replaces t
 (snapshot of 2026-11-09). Old-repo paths below are on its `main` at commit `09e0904` unless a branch is named.
 
 Critical Mass is now a Unity game. You own the game-mechanics items below. The build AI ("the loop") builds the
-foundation first (section 3) and the look (models, shader, art). The architect's answers (U-004 to U-007, see
+foundation first (section 3) and the look (models, shader, art). The architect's answers (U-004 to U-007 and U-023, see
 [DECISIONS.md](DECISIONS.md)) are written into the items below as **Decided (U-###)**. Anything still marked **OPEN**
 waits on the architect: build the parts of that item that do not depend on the open answer, and do not pick the answer
 yourself.
@@ -87,11 +87,10 @@ tools/unity-build-mac.sh  # macOS player build -> Builds/macOS/CriticalMass.app
 
 Browser keys that changed: jump was Q (D-062), the class ability was Space. The rules behind them did not change.
 
-**Shared files.** **OPEN (architect; not covered by U-004 to U-007):** several old files mix base rules with item code (for example
-`resources.ts` carries CM-35 meat and CM-85 biomass instability, `bots/fsm.ts` carries CM-38 and CM-37 bot rules). The
-working assumption here: the foundation ports those files with each item's code left out and marked with a
-`// CM-xx (Max)` comment, and your item adds its part back, with its tests. Do not start an item that edits a shared
-file until this is confirmed.
+**Shared files.** **Decided (U-023).** Several old files mix base rules with item code (for example `resources.ts`
+carries CM-35 meat and CM-85 biomass instability, `bots/fsm.ts` carries CM-38 and CM-37 bot rules). The loop ports
+those files in the foundation with the item code left out and marked with a `// CM-xx (Max)` comment; the item owner
+(you) adds that part back in the item, with its tests.
 
 ---
 
@@ -148,7 +147,9 @@ covered by the chunk meshes in F-08 and later by the loop's art.
 | F-09 | Headless match runner for soak tests (N seeds, team size, ticks, bot-driven actor 0) inside `Sim.Tests` | the `*.slow.test.ts` harness code |
 
 **Foundation exit (U-012).** Phase 0 is done when a full 16v16 bot match plays in grey-box and every ported test
-passes. Phase 1 (your items, Travis's four must-haves first) and Phase 2 (the look) then run side by side.
+passes. Phase 1 (your items, Travis's four must-haves first) and Phase 2 (the look) then run side by side. Phase 1 ends
+when Travis's four must-haves pass a play test; Phase 2 when every bible row passes; Phase 3 when Travis has a working
+build for his platform (U-024).
 
 Camera values for F-08 from the old config: yaw 45°, pitch 38°, orthographic, 20 world units tall
 (`viewHeightUnits`), distance 60, follow sharpness 8, target clamped to the map bounds inset by 6.
@@ -245,7 +246,7 @@ ticks of any wall change; a dead Miner loses the block. Every outcome is a `terr
 
 **Decided (U-007).** Dig/place keeps the browser's one-key carry rule: F (left trigger) digs with empty hands and places
 while carrying. There is no dig/place mode; the "Switch dig / place" action in the controls table is not read by this
-item. **OPEN:** whether that table row is kept for a later use or removed (U-006 forbids an item moving a binding).
+item. **Decided (U-023):** that row stays bound but unread.
 
 **Check.** `TerraformTests` (11 cases) and `TerraformSoakTests` (1 case) pass with the browser's numbers. Play check: as
 a Miner dig three cells in a row, watch the mesh drop and a bot path around; refill one; try to dig the last cell of the
@@ -451,8 +452,8 @@ Adds `BiomassBank` per team to match state.
 **Decided (U-007).** Upgrades happen at base stations (CM-84), not through the Builder's class ability, which builds
 ladders and bridges (CM-58). The branch's "hold the ability near an ally" spending is not ported. Build the ladder, the
 bank and the cost and health math behind an `UpgradeSystem.TryUpgrade(world, buyer, target)` call; CM-84's station
-panel calls it. **OPEN:** whether only a Builder may buy at the station or every class buys for itself (CM-84's text
-says "you ... go up one level"); until answered, keep `target` a parameter.
+panel calls it. **Decided (U-023):** every class buys its own upgrades at the station, so `buyer` and `target` are the
+same actor.
 
 **Check.** `UpgradeTests` (11) pass (target choice and refusal cases follow the answer above; keep every case the
 answer does not touch).
@@ -501,7 +502,7 @@ re-route over it; the piece disappears after a time or when broken; a piece can 
 
 **Decided (U-007).** The Builder's class ability (right mouse / right trigger) places a piece. Cost 2 biomass, lifetime
 600 ticks, 120 HP, at most 2 per Builder. These numbers are **provisional** and are marked provisional in `GameConfig`.
-**OPEN:** what a "ladder" means now that cells have heights (no decision covers it).
+**Decided (U-023):** a ladder is a one-step piece joining two cell heights.
 
 **Check.** `BuildTests`: a piece makes a cell walkable, the flow field routes over it, it expires and breaks on schedule,
 and a piece that would seal the only route is refused. `BuildSoakTests`: 16v16 over seeds 1 to 100 reports pieces built
@@ -522,7 +523,7 @@ on pickup and on drop.
 **Create.** `Assets/_Game/Sim/Rules/CarrySystem.cs` (`CarrySystem`), `Assets/_Game/Sim.Tests/CarryTests.cs`.
 
 **Decided (U-007).** Picking up a piece needs empty hands (no biomass, meat or block). A carried piece drops when you
-die. **OPEN:** where it drops when the death cell is not a valid edge.
+die if the cell is valid; otherwise it is destroyed (U-023).
 
 **Check.** `CarryTests`: pickup restores the cell, one piece at a time, drop only on a valid edge, route rule on both
 pickup and drop. Play check: move a bridge from one gap to another.
@@ -544,7 +545,8 @@ time) plays in 4:00 of real time. The Sim still ticks at 30 Hz; the driver runs 
 
 **Decided (U-004).** 16v16 (1 human + 31 bots) at 2x is the default. 5v5 and 1x remain as options in the pause menu and
 as command-line arguments. Match length 8 minutes. Frame budget: 60 fps at 16v16 in the Mac build on this Mac.
-**OPEN:** the exact command-line argument names, and whether a size change from the pause menu restarts the match.
+**Decided (U-023):** the command-line arguments are `-teamSize` and `-speed` (and `-map`, CM-68). **OPEN:** whether a
+size change from the pause menu restarts the match.
 Land this item in its own PR: it touches many tests.
 
 **Check.** `GameConfigTests` pin 16 and 2; every test passes. Play check: a fresh match has 32 capsules and the clock runs
@@ -575,7 +577,8 @@ Old state: built on branch `cm/CM-68` (`572927e`), held. Waits on F-03 and F-06.
 **Create.** `Assets/_Game/Sim/Maps/EmberOrchardMap.cs`, `Assets/_Game/Sim/Maps/TidalCrownMap.cs`, `MapId` in the Sim,
 `Assets/_Game/Sim.Tests/MapLayoutTests.cs`, `Assets/_Game/Sim.Tests/MapSoakTests.cs` (`[Category("Slow")]`).
 
-**OPEN (architect; not covered by U-004 to U-007).** How a map is picked in Unity (the browser used `?map=ember|tidal`).
+**Decided (U-023).** A map is picked with the `-map` command-line argument and in the pause menu, the same pattern as
+team size and pace (the browser used `?map=ember|tidal`). Skybreak stays the default.
 
 **Check.** `MapLayoutTests` (20) and `MapSoakTests` (1) pass: both bases, the hill and the shrine reachable on the flow
 field; base-to-hill path lengths within 5 % for the two teams; a 10-seed headless match on each map plays to the clock
