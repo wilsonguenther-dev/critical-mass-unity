@@ -16,6 +16,8 @@
 // C# port of V8 src/base/ieee754.cc at tag 13.6.233.10 (the V8 of node v24.11.1), item F-02c (U-032): sin, cos,
 // atan2 and exp bit-exact with node. Ported line by line: same constant literals, same branch order, same operation
 // order in every expression. The C int32_t / uint32_t locals keep their signedness as int / uint.
+// U-049: the oracle is node v24.11.1 arm64, whose clang fused every in-expression a*b + c (fmadd / fmsub / fnmsub);
+// those 49 sites (tagged FMA-1..FMA-49) call Fma below, a correctly rounded software fma, and no other line does.
 
 using System;
 
@@ -88,6 +90,235 @@ namespace CriticalMass.Sim.Core
                 }
             }
             return y * BitConverter.Int64BitsToDouble((long)(0x3ff + n) << 52);
+        }
+
+        // ---- fused multiply-add (U-049) ----
+        //
+        // node v24.11.1 arm64 compiled ieee754.cc with clang's default -ffp-contract=on, so every `a*b + c` inside
+        // one C expression is a single fmadd / fmsub / fnmsub in node's binary (one rounding instead of two). The
+        // oracle is that binary, so the port uses Fma at exactly those sites, each tagged `FMA-n` (the list, with the
+        // disassembly it was read from, is in DECISIONS.md U-049; tools/golden/fdlibm_replay.py carries the same tags).
+        //
+        // System.Math.FusedMultiplyAdd does not exist at this project's API level (.NET Standard 2.1; Unity's
+        // netstandard.dll and Mono's mscorlib have no such member), so this is a software fma, correctly rounded
+        // (round to nearest, ties to even) for every input: musl's integer algorithm (src/math/fma.c, 2017), which
+        // only uses 64-bit integer arithmetic, the exact long -> double conversion and Scalbn above, so it gives the
+        // same bits on every CPU. Two changes from musl, both for IEEE-754 exactness rather than flags: a zero z
+        // returns round(x*y) (musl's x*y + z turns a product that underflows to -0 into +0), and the min-normal
+        // rounding case returns +-DBL_MIN directly (musl reaches the same value through a float conversion only
+        // to raise the underflow flag). Proven against Python's math.fma (the C library's, hardware fma on arm64)
+        // on 1,250,000+ triples including exact cancellation, ties, subnormal and overflowing results (U-049).
+        internal static double Fma(double x, double y, double z)
+        {
+            unchecked
+            {
+                const int ZeroInfNan = 0x7ff - 0x3ff - 52 - 1;
+                ulong mx, my, mz;
+                int ex, ey, ez, sx, sy, sz;
+                Normalize(x, out mx, out ex, out sx);
+                Normalize(y, out my, out ey, out sy);
+                Normalize(z, out mz, out ez, out sz);
+
+                if (ex >= ZeroInfNan || ey >= ZeroInfNan) return x * y + z; // x or y is 0, inf or nan: x*y is exact
+                if (ez >= ZeroInfNan)
+                {
+                    if (ez > ZeroInfNan) return x * y; // z == 0, x and y finite non-zero: fma = round(x*y)
+                    return z; // z is inf or nan, x*y finite
+                }
+
+                /* mul: r = x*y */
+                ulong rhi, rlo, zhi, zlo;
+                Mul64(mx, my, out rhi, out rlo);
+                /* either top 20 or 21 bits of rhi and last 2 bits of rlo are 0 */
+
+                /* align exponents */
+                int e = ex + ey;
+                int d = ez - e;
+                /* shift bits z<<=kz, r>>=kr, so kz+kr == d, set e = e+kr (== ez-kz) */
+                if (d > 0)
+                {
+                    if (d < 64)
+                    {
+                        zlo = mz << d;
+                        zhi = mz >> (64 - d);
+                    }
+                    else
+                    {
+                        zlo = 0;
+                        zhi = mz;
+                        e = ez - 64;
+                        d -= 64;
+                        if (d == 0)
+                        {
+                        }
+                        else if (d < 64)
+                        {
+                            rlo = (rhi << (64 - d)) | (rlo >> d) | ((rlo << (64 - d)) != 0 ? 1UL : 0UL);
+                            rhi = rhi >> d;
+                        }
+                        else
+                        {
+                            rlo = 1;
+                            rhi = 0;
+                        }
+                    }
+                }
+                else
+                {
+                    zhi = 0;
+                    d = -d;
+                    if (d == 0)
+                    {
+                        zlo = mz;
+                    }
+                    else if (d < 64)
+                    {
+                        zlo = (mz >> d) | ((mz << (64 - d)) != 0 ? 1UL : 0UL);
+                    }
+                    else
+                    {
+                        zlo = 1;
+                    }
+                }
+
+                /* add */
+                int sign = sx ^ sy;
+                bool samesign = (sign ^ sz) == 0;
+                bool nonzero = true;
+                if (samesign)
+                {
+                    /* r += z */
+                    rlo += zlo;
+                    rhi += zhi + (rlo < zlo ? 1UL : 0UL);
+                }
+                else
+                {
+                    /* r -= z */
+                    ulong t = rlo;
+                    rlo -= zlo;
+                    rhi = rhi - zhi - (t < rlo ? 1UL : 0UL);
+                    if ((rhi >> 63) != 0)
+                    {
+                        rlo = 0UL - rlo;
+                        rhi = 0UL - rhi - (rlo != 0 ? 1UL : 0UL);
+                        sign = sign == 0 ? 1 : 0;
+                    }
+                    nonzero = rhi != 0;
+                }
+
+                /* set rhi to top 63bit of the result (last bit is sticky) */
+                if (nonzero)
+                {
+                    e += 64;
+                    d = Clz64(rhi) - 1;
+                    /* note: d > 0 */
+                    rhi = (rhi << d) | (rlo >> (64 - d)) | ((rlo << d) != 0 ? 1UL : 0UL);
+                }
+                else if (rlo != 0)
+                {
+                    d = Clz64(rlo) - 1;
+                    if (d < 0)
+                        rhi = (rlo >> 1) | (rlo & 1);
+                    else
+                        rhi = rlo << d;
+                }
+                else
+                {
+                    /* exact +-0: x*y is exactly -z, both representable, so this is +0 as IEEE-754 asks */
+                    return x * y + z;
+                }
+                e -= d;
+
+                /* convert to double */
+                long i = (long)rhi; /* i is in [1<<62,(1<<63)-1] */
+                if (sign != 0) i = -i;
+                double r = i; /* |r| is in [0x1p62,0x1p63] */
+
+                if (e < -1022 - 62)
+                {
+                    /* result is subnormal before rounding */
+                    if (e == -1022 - 63)
+                    {
+                        double c = 9223372036854775808.0; /* 0x1p63 */
+                        if (sign != 0) c = -c;
+                        if (r == c)
+                        {
+                            /* min normal after rounding */
+                            const double dblMin = 2.2250738585072014e-308; /* 0x1p-1022 */
+                            return sign != 0 ? -dblMin : dblMin;
+                        }
+                        /* one bit is lost when scaled, add another top bit to
+                           only round once at conversion if it is inexact */
+                        if ((rhi << 53) != 0)
+                        {
+                            i = (long)((rhi >> 1) | (rhi & 1) | (1UL << 62));
+                            if (sign != 0) i = -i;
+                            r = i;
+                            r = 2 * r - c; /* remove top bit */
+                        }
+                    }
+                    else
+                    {
+                        /* only round once when scaled */
+                        d = 10;
+                        i = (long)(((rhi >> d) | ((rhi << (64 - d)) != 0 ? 1UL : 0UL)) << d);
+                        if (sign != 0) i = -i;
+                        r = i;
+                    }
+                }
+                return Scalbn(r, e);
+            }
+        }
+
+        // musl fma.c normalize(): top 10 bits and the last bit of m are 0; e >= ZeroInfNan for 0, inf and nan.
+        private static void Normalize(double x, out ulong m, out int e, out int sign)
+        {
+            unchecked
+            {
+                ulong ix = (ulong)BitConverter.DoubleToInt64Bits(x);
+                e = (int)(ix >> 52);
+                sign = (e & 0x800) != 0 ? 1 : 0;
+                e &= 0x7ff;
+                if (e == 0)
+                {
+                    ix = (ulong)BitConverter.DoubleToInt64Bits(x * 9223372036854775808.0 /* 0x1p63 */);
+                    e = (int)(ix >> 52) & 0x7ff;
+                    e = e != 0 ? e - 63 : 0x800;
+                }
+                ix &= (1UL << 52) - 1;
+                ix |= 1UL << 52;
+                ix <<= 1;
+                e -= 0x3ff + 52 + 1;
+                m = ix;
+            }
+        }
+
+        // musl fma.c mul(): the exact 128-bit product of two 64-bit integers.
+        private static void Mul64(ulong x, ulong y, out ulong hi, out ulong lo)
+        {
+            unchecked
+            {
+                ulong xlo = (uint)x, xhi = x >> 32;
+                ulong ylo = (uint)y, yhi = y >> 32;
+                ulong t1 = xlo * ylo;
+                ulong t2 = xlo * yhi + xhi * ylo;
+                ulong t3 = xhi * yhi;
+                lo = t1 + (t2 << 32);
+                hi = t3 + (t2 >> 32) + (t1 > lo ? 1UL : 0UL);
+            }
+        }
+
+        private static int Clz64(ulong x)
+        {
+            if (x == 0) return 64;
+            int n = 0;
+            if ((x & 0xFFFFFFFF00000000UL) == 0) { n += 32; x <<= 32; }
+            if ((x & 0xFFFF000000000000UL) == 0) { n += 16; x <<= 16; }
+            if ((x & 0xFF00000000000000UL) == 0) { n += 8; x <<= 8; }
+            if ((x & 0xF000000000000000UL) == 0) { n += 4; x <<= 4; }
+            if ((x & 0xC000000000000000UL) == 0) { n += 2; x <<= 2; }
+            if ((x & 0x8000000000000000UL) == 0) { n += 1; }
+            return n;
         }
 
         // ---- tables ----
@@ -260,9 +491,9 @@ namespace CriticalMass.Sim.Core
                 if (ix <= 0x413921FB)
                 { /* |x| ~<= 2^19*(pi/2), medium size */
                     t = Math.Abs(x);
-                    n = (int)(t * invpio2 + half);
+                    n = (int)Fma(t, invpio2, half); // FMA-1: t * invpio2 + half
                     fn = (double)n;
-                    r = t - fn * pio2_1;
+                    r = Fma(-fn, pio2_1, t); // FMA-2: t - fn * pio2_1
                     w = fn * pio2_1t; /* 1st round good to 85 bit */
                     if (n < 32 && ix != npio2_hw[n - 1])
                     {
@@ -280,7 +511,7 @@ namespace CriticalMass.Sim.Core
                             t = r;
                             w = fn * pio2_2;
                             r = t - w;
-                            w = fn * pio2_2t - ((t - r) - w);
+                            w = Fma(fn, pio2_2t, -((t - r) - w)); // FMA-3: fn * pio2_2t - ((t - r) - w)
                             y[0] = r - w;
                             high = GetHighWordU(y[0]);
                             i = j - (int)((high >> 20) & 0x7FF);
@@ -289,7 +520,7 @@ namespace CriticalMass.Sim.Core
                                 t = r; /* will cover all possible cases */
                                 w = fn * pio2_3;
                                 r = t - w;
-                                w = fn * pio2_3t - ((t - r) - w);
+                                w = Fma(fn, pio2_3t, -((t - r) - w)); // FMA-4: fn * pio2_3t - ((t - r) - w)
                                 y[0] = r - w;
                             }
                         }
@@ -366,10 +597,11 @@ namespace CriticalMass.Sim.Core
                     if ((int)x == 0) return one; /* generate inexact */
                 }
                 z = x * x;
-                r = z * (C1 + z * (C2 + z * (C3 + z * (C4 + z * (C5 + z * C6)))));
+                // FMA-11..15: r = z * (C1 + z * (C2 + z * (C3 + z * (C4 + z * (C5 + z * C6))))), every inner a*b + c fused
+                r = z * Fma(z, Fma(z, Fma(z, Fma(z, Fma(z, C6, C5), C4), C3), C2), C1);
                 if (ix < 0x3FD33333)
                 { /* if |x| < 0.3 */
-                    return one - (0.5 * z - (z * r - x * y));
+                    return one - Fma(0.5, z, -Fma(z, r, -(x * y))); // FMA-16: 0.5 * z - (...), FMA-17: z * r - x * y
                 }
                 else
                 {
@@ -381,9 +613,9 @@ namespace CriticalMass.Sim.Core
                     {
                         qx = InsertWords(ix - 0x00200000, 0); /* x/4 */
                     }
-                    iz = 0.5 * z - qx;
+                    iz = Fma(0.5, z, -qx); // FMA-18: 0.5 * z - qx
                     a = one - qx;
-                    return a - (iz - (z * r - x * y));
+                    return a - (iz - Fma(z, r, -(x * y))); // FMA-19: z * r - x * y
                 }
             }
         }
@@ -442,7 +674,7 @@ namespace CriticalMass.Sim.Core
                 /* compute q[0],q[1],...q[jk] */
                 for (i = 0; i <= jk; i++)
                 {
-                    for (j = 0, fw = 0.0; j <= jx; j++) fw += x[j] * f[jx + i - j];
+                    for (j = 0, fw = 0.0; j <= jx; j++) fw = Fma(x[j], f[jx + i - j], fw); // FMA-5: fw += x[j] * f[jx + i - j]
                     q[i] = fw;
                 }
 
@@ -452,13 +684,13 @@ namespace CriticalMass.Sim.Core
                 for (i = 0, j = jz, z = q[jz]; j > 0; i++, j--)
                 {
                     fw = (double)(int)(twon24 * z);
-                    iq[i] = (int)(z - two24 * fw);
+                    iq[i] = (int)Fma(-two24, fw, z); // FMA-6: z - two24 * fw
                     z = q[j - 1] + fw;
                 }
 
                 /* compute n */
                 z = Scalbn(z, q0);                /* actual value of z */
-                z -= 8.0 * Math.Floor(z * 0.125); /* trim off integer >= 8 */
+                z = Fma(-8.0, Math.Floor(z * 0.125), z); /* trim off integer >= 8 */ // FMA-7: z -= 8.0 * floor(z * 0.125)
                 n = (int)z;
                 z -= (double)n;
                 ih = 0;
@@ -532,7 +764,7 @@ namespace CriticalMass.Sim.Core
                         for (i = jz + 1; i <= jz + k; i++)
                         { /* add q[jz+1] to q[jz+k] */
                             f[jx + i] = ipio2[jv + i];
-                            for (j = 0, fw = 0.0; j <= jx; j++) fw += x[j] * f[jx + i - j];
+                            for (j = 0, fw = 0.0; j <= jx; j++) fw = Fma(x[j], f[jx + i - j], fw); // FMA-8: fw += x[j] * f[jx + i - j]
                             q[i] = fw;
                         }
                         jz += k;
@@ -557,7 +789,7 @@ namespace CriticalMass.Sim.Core
                     if (z >= two24)
                     {
                         fw = (double)(int)(twon24 * z);
-                        iq[jz] = (int)(z - two24 * fw);
+                        iq[jz] = (int)Fma(-two24, fw, z); // FMA-9: z - two24 * fw
                         jz += 1;
                         q0 += 24;
                         iq[jz] = (int)fw;
@@ -579,7 +811,7 @@ namespace CriticalMass.Sim.Core
                 /* compute PIo2[0,...,jp]*q[jz,...,0] */
                 for (i = jz; i >= 0; i--)
                 {
-                    for (fw = 0.0, k = 0; k <= jp && k <= jz - i; k++) fw += PIo2[k] * q[i + k];
+                    for (fw = 0.0, k = 0; k <= jp && k <= jz - i; k++) fw = Fma(PIo2[k], q[i + k], fw); // FMA-10: fw += PIo2[k] * q[i + k]
                     fq[jz - i] = fw;
                 }
 
@@ -662,14 +894,15 @@ namespace CriticalMass.Sim.Core
                 } /* generate inexact */
                 z = x * x;
                 v = z * x;
-                r = S2 + z * (S3 + z * (S4 + z * (S5 + z * S6)));
+                r = Fma(z, Fma(z, Fma(z, Fma(z, S6, S5), S4), S3), S2); // FMA-20..23: S2 + z * (S3 + z * (S4 + z * (S5 + z * S6)))
                 if (iy == 0)
                 {
-                    return x + v * (S1 + z * r);
+                    return Fma(v, Fma(z, r, S1), x); // FMA-24: x + v * (...), FMA-25: S1 + z * r
                 }
                 else
                 {
-                    return x - ((z * (half * y - v * r) - y) - v * S1);
+                    // FMA-26: (...) - v * S1, FMA-27: z * (...) - y, FMA-28: half * y - v * r (the left product of the two)
+                    return x - Fma(-v, S1, Fma(z, Fma(half, y, -(v * r)), -y));
                 }
             }
         }
@@ -714,7 +947,7 @@ namespace CriticalMass.Sim.Core
                         if (ix < 0x3FE60000)
                         { /* 7/16 <=|x|<11/16 */
                             id = 0;
-                            x = (2.0 * x - one) / (2.0 + x);
+                            x = Fma(2.0, x, -one) / (2.0 + x); // FMA-29: 2.0 * x - one
                         }
                         else
                         { /* 11/16<=|x|< 19/16 */
@@ -727,7 +960,7 @@ namespace CriticalMass.Sim.Core
                         if (ix < 0x40038000)
                         { /* |x| < 2.4375 */
                             id = 2;
-                            x = (x - 1.5) / (one + 1.5 * x);
+                            x = (x - 1.5) / Fma(1.5, x, one); // FMA-30: one + 1.5 * x
                         }
                         else
                         { /* 2.4375 <= |x| < 2^66 */
@@ -740,16 +973,17 @@ namespace CriticalMass.Sim.Core
                 z = x * x;
                 w = z * z;
                 /* break sum from i=0 to 10 aT[i]z**(i+1) into odd and even poly */
-                s1 = z * (aT[0] +
-                          w * (aT[2] + w * (aT[4] + w * (aT[6] + w * (aT[8] + w * aT[10])))));
-                s2 = w * (aT[1] + w * (aT[3] + w * (aT[5] + w * (aT[7] + w * aT[9]))));
+                // FMA-31..35: s1 = z * (aT[0] + w * (aT[2] + w * (aT[4] + w * (aT[6] + w * (aT[8] + w * aT[10])))))
+                s1 = z * Fma(w, Fma(w, Fma(w, Fma(w, Fma(w, aT[10], aT[8]), aT[6]), aT[4]), aT[2]), aT[0]);
+                // FMA-36..39: s2 = w * (aT[1] + w * (aT[3] + w * (aT[5] + w * (aT[7] + w * aT[9]))))
+                s2 = w * Fma(w, Fma(w, Fma(w, Fma(w, aT[9], aT[7]), aT[5]), aT[3]), aT[1]);
                 if (id < 0)
                 {
-                    return x - x * (s1 + s2);
+                    return Fma(-x, s1 + s2, x); // FMA-40: x - x * (s1 + s2)
                 }
                 else
                 {
-                    z = atanhi[id] - ((x * (s1 + s2) - atanlo[id]) - x);
+                    z = atanhi[id] - (Fma(x, s1 + s2, -atanlo[id]) - x); // FMA-41: x * (s1 + s2) - atanlo[id]
                     return (hx < 0) ? -z : z;
                 }
             }
@@ -853,7 +1087,7 @@ namespace CriticalMass.Sim.Core
                 k = (iy - ix) >> 20;
                 if (k > 60)
                 { /* |y/x| >  2**60 */
-                    z = pi_o_2 + 0.5 * pi_lo;
+                    z = Fma(0.5, pi_lo, pi_o_2); // FMA-42: pi_o_2 + 0.5 * pi_lo (V8's pi_lo is volatile, so not folded)
                     m &= 1;
                 }
                 else if (hx < 0 && k < -60)
@@ -984,9 +1218,9 @@ namespace CriticalMass.Sim.Core
                     }
                     else
                     {
-                        k = (int)(invln2 * x + halF[xsb]);
+                        k = (int)Fma(invln2, x, halF[xsb]); // FMA-43: invln2 * x + halF[xsb]
                         t = k;
-                        hi = x - t * ln2HI[0]; /* t*ln2HI is exact here */
+                        hi = Fma(-t, ln2HI[0], x); /* t*ln2HI is exact here */ // FMA-44: x - t * ln2HI[0]
                         lo = t * ln2LO[0];
                     }
                     x = hi - lo;
@@ -1010,7 +1244,8 @@ namespace CriticalMass.Sim.Core
                 {
                     twopk = InsertWords((int)(0x3FF00000 + ((uint)(k + 1000) << 20)), 0);
                 }
-                c = x - t * (P1 + t * (P2 + t * (P3 + t * (P4 + t * P5))));
+                // FMA-45: x - t * (...), FMA-46..49: P1 + t * (P2 + t * (P3 + t * (P4 + t * P5)))
+                c = Fma(-t, Fma(t, Fma(t, Fma(t, Fma(t, P5, P4), P3), P2), P1), x);
                 if (k == 0)
                 {
                     return one - ((x * c) / (c - 2.0) - x);

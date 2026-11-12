@@ -37,7 +37,14 @@ namespace CriticalMass.Sim.Tests
             new KeyValuePair<string, Regex>("Math.Sin/Cos/Atan2/Exp", new Regex(@"\bMath\.(Sin|Cos|Atan2|Exp)\s*\(")),
             new KeyValuePair<string, Regex>("MathF.Sin/Cos/Atan2/Exp", new Regex(@"\bMathF\.(Sin|Cos|Atan2|Exp)\s*\(")),
             new KeyValuePair<string, Regex>("using static System.Math", new Regex(@"using\s+static\s+System\.Math\b")),
+            // U-049: fused multiply-add only at node's fused sites, inside Fdlibm.cs (its software Fma); never
+            // System.Math's (absent at this API level) and never anywhere else in the Sim.
+            new KeyValuePair<string, Regex>("FusedMultiplyAdd", new Regex(@"\bFusedMultiplyAdd\b")),
+            new KeyValuePair<string, Regex>(FmaRule, new Regex(@"\bFma\s*\(")),
         };
+
+        private const string FmaRule = "Fma( outside Fdlibm.cs";
+        private const string FdlibmFile = "Assets/_Game/Sim/Core/Fdlibm.cs";
 
         // F-02c (review R20261112T1705-1-1): unqualified randomness, the clock, per-process hash codes.
         private static readonly KeyValuePair<string, Regex>[] Unqualified =
@@ -90,7 +97,10 @@ namespace CriticalMass.Sim.Tests
             if (rules == TeamEnumCasts && rel == SimEnumMapFile) return violations;
             string code = StripComments(source);
             foreach (KeyValuePair<string, Regex> b in rules)
+            {
+                if (b.Key == FmaRule && rel == FdlibmFile) continue;
                 if (b.Value.IsMatch(code)) violations.Add(rel + ": uses " + b.Key);
+            }
             return violations;
         }
 
@@ -144,10 +154,13 @@ namespace CriticalMass.Sim.Tests
                 "var d = DateTime.Today;",
                 "int h = o.GetHashCode();",
                 "w.Match.Winner = (MatchResult)(int)team;",
+                "var f = Math.FusedMultiplyAdd(a, b, c);",
+                "var f = Fdlibm.Fma(a, b, c);",
             };
             foreach (string s in bad)
                 Assert.AreEqual(1, CheckExtended("inline", s).Count, s);
             Assert.AreEqual(0, CheckExtended("inline", "var a = JsMath.Atan2(z, x);").Count);
+            Assert.AreEqual(0, CheckExtended(FdlibmFile, "r = Fma(-fn, pio2_1, t);").Count, "Fdlibm.cs may call Fma");
         }
 
         [Test]
