@@ -1,0 +1,659 @@
+{
+ "source": "KayKit Adventurers 1.0, Characters/gltf/Knight.glb (CC0), armature 'Rig'",
+ "space": "Blender armature space: Z up, faces -Y, character left = +X, metres",
+ "count": 41,
+ "joints": [
+  {
+   "name": "root",
+   "parent": null,
+   "head": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "tail": [
+    0.0,
+    0.0,
+    0.3005
+   ]
+  },
+  {
+   "name": "hips",
+   "parent": "root",
+   "head": [
+    0.0,
+    0.0,
+    0.4057
+   ],
+   "tail": [
+    0.0,
+    0.0,
+    0.5976
+   ]
+  },
+  {
+   "name": "spine",
+   "parent": "hips",
+   "head": [
+    0.0,
+    0.0,
+    0.5976
+   ],
+   "tail": [
+    0.0,
+    0.0,
+    0.9726
+   ]
+  },
+  {
+   "name": "chest",
+   "parent": "spine",
+   "head": [
+    0.0,
+    0.0,
+    0.9726
+   ],
+   "tail": [
+    0.0,
+    0.0,
+    1.2235
+   ]
+  },
+  {
+   "name": "upperarm.l",
+   "parent": "chest",
+   "head": [
+    0.212,
+    -0.0,
+    1.1068
+   ],
+   "tail": [
+    0.4535,
+    0.0139,
+    1.1068
+   ]
+  },
+  {
+   "name": "lowerarm.l",
+   "parent": "upperarm.l",
+   "head": [
+    0.4535,
+    0.0139,
+    1.1068
+   ],
+   "tail": [
+    0.7132,
+    -0.0,
+    1.1068
+   ]
+  },
+  {
+   "name": "wrist.l",
+   "parent": "lowerarm.l",
+   "head": [
+    0.7132,
+    -0.0,
+    1.1068
+   ],
+   "tail": [
+    0.787,
+    -0.0,
+    1.1068
+   ]
+  },
+  {
+   "name": "hand.l",
+   "parent": "wrist.l",
+   "head": [
+    0.787,
+    -0.0,
+    1.1068
+   ],
+   "tail": [
+    0.899,
+    -0.0,
+    1.1068
+   ]
+  },
+  {
+   "name": "handslot.l",
+   "parent": "hand.l",
+   "head": [
+    0.8831,
+    -0.0,
+    1.0493
+   ],
+   "tail": [
+    0.8831,
+    -0.112,
+    1.0493
+   ]
+  },
+  {
+   "name": "upperarm.r",
+   "parent": "chest",
+   "head": [
+    -0.212,
+    -0.0,
+    1.1068
+   ],
+   "tail": [
+    -0.4535,
+    0.0139,
+    1.1068
+   ]
+  },
+  {
+   "name": "lowerarm.r",
+   "parent": "upperarm.r",
+   "head": [
+    -0.4535,
+    0.0139,
+    1.1068
+   ],
+   "tail": [
+    -0.7132,
+    -0.0,
+    1.1068
+   ]
+  },
+  {
+   "name": "wrist.r",
+   "parent": "lowerarm.r",
+   "head": [
+    -0.7132,
+    -0.0,
+    1.1068
+   ],
+   "tail": [
+    -0.787,
+    -0.0,
+    1.1068
+   ]
+  },
+  {
+   "name": "hand.r",
+   "parent": "wrist.r",
+   "head": [
+    -0.787,
+    -0.0,
+    1.1068
+   ],
+   "tail": [
+    -0.899,
+    -0.0,
+    1.1068
+   ]
+  },
+  {
+   "name": "handslot.r",
+   "parent": "hand.r",
+   "head": [
+    -0.8831,
+    -0.0,
+    1.0493
+   ],
+   "tail": [
+    -0.8831,
+    -0.112,
+    1.0493
+   ]
+  },
+  {
+   "name": "head",
+   "parent": "chest",
+   "head": [
+    0.0,
+    0.0,
+    1.2414
+   ],
+   "tail": [
+    0.0,
+    0.0,
+    1.4923
+   ]
+  },
+  {
+   "name": "upperleg.l",
+   "parent": "hips",
+   "head": [
+    0.1709,
+    0.0,
+    0.5193
+   ],
+   "tail": [
+    0.1709,
+    -0.0079,
+    0.2923
+   ]
+  },
+  {
+   "name": "lowerleg.l",
+   "parent": "upperleg.l",
+   "head": [
+    0.1709,
+    -0.0079,
+    0.2923
+   ],
+   "tail": [
+    0.1709,
+    0.0186,
+    0.1452
+   ]
+  },
+  {
+   "name": "foot.l",
+   "parent": "lowerleg.l",
+   "head": [
+    0.1709,
+    0.0186,
+    0.1452
+   ],
+   "tail": [
+    0.1709,
+    -0.0964,
+    0.026
+   ]
+  },
+  {
+   "name": "toes.l",
+   "parent": "foot.l",
+   "head": [
+    0.1709,
+    -0.0964,
+    0.026
+   ],
+   "tail": [
+    0.1709,
+    -0.262,
+    0.026
+   ]
+  },
+  {
+   "name": "upperleg.r",
+   "parent": "hips",
+   "head": [
+    -0.1709,
+    0.0,
+    0.5193
+   ],
+   "tail": [
+    -0.1709,
+    -0.0079,
+    0.2923
+   ]
+  },
+  {
+   "name": "lowerleg.r",
+   "parent": "upperleg.r",
+   "head": [
+    -0.1709,
+    -0.0079,
+    0.2923
+   ],
+   "tail": [
+    -0.1709,
+    0.0186,
+    0.1452
+   ]
+  },
+  {
+   "name": "foot.r",
+   "parent": "lowerleg.r",
+   "head": [
+    -0.1709,
+    0.0186,
+    0.1452
+   ],
+   "tail": [
+    -0.1709,
+    -0.0964,
+    0.026
+   ]
+  },
+  {
+   "name": "toes.r",
+   "parent": "foot.r",
+   "head": [
+    -0.1709,
+    -0.0964,
+    0.026
+   ],
+   "tail": [
+    -0.1709,
+    -0.262,
+    0.026
+   ]
+  },
+  {
+   "name": "kneeIK.l",
+   "parent": "root",
+   "head": [
+    0.1709,
+    -0.5758,
+    0.2923
+   ],
+   "tail": [
+    0.1709,
+    -0.8763,
+    0.2923
+   ]
+  },
+  {
+   "name": "control-toe-roll.l",
+   "parent": "root",
+   "head": [
+    0.1709,
+    -0.2458,
+    0.026
+   ],
+   "tail": [
+    0.1709,
+    0.117,
+    0.026
+   ]
+  },
+  {
+   "name": "control-heel-roll.l",
+   "parent": "control-toe-roll.l",
+   "head": [
+    0.1709,
+    0.117,
+    0.026
+   ],
+   "tail": [
+    0.1709,
+    -0.0964,
+    0.026
+   ]
+  },
+  {
+   "name": "control-foot-roll.l",
+   "parent": "control-heel-roll.l",
+   "head": [
+    0.1709,
+    -0.0964,
+    0.026
+   ],
+   "tail": [
+    0.1709,
+    0.0186,
+    0.1452
+   ]
+  },
+  {
+   "name": "heelIK.l",
+   "parent": "control-foot-roll.l",
+   "head": [
+    0.1709,
+    0.0186,
+    0.1452
+   ],
+   "tail": [
+    0.1709,
+    0.1842,
+    0.1452
+   ]
+  },
+  {
+   "name": "IK-foot.l",
+   "parent": "control-foot-roll.l",
+   "head": [
+    0.1709,
+    0.0186,
+    0.1452
+   ],
+   "tail": [
+    0.1709,
+    -0.0964,
+    0.026
+   ]
+  },
+  {
+   "name": "IK-toe.l",
+   "parent": "control-heel-roll.l",
+   "head": [
+    0.1709,
+    0.117,
+    0.026
+   ],
+   "tail": [
+    0.1709,
+    -0.0964,
+    0.026
+   ]
+  },
+  {
+   "name": "kneeIK.r",
+   "parent": "root",
+   "head": [
+    -0.1709,
+    -0.5758,
+    0.2923
+   ],
+   "tail": [
+    -0.1709,
+    -0.8763,
+    0.2923
+   ]
+  },
+  {
+   "name": "control-toe-roll.r",
+   "parent": "root",
+   "head": [
+    -0.1709,
+    -0.2458,
+    0.026
+   ],
+   "tail": [
+    -0.1709,
+    0.117,
+    0.026
+   ]
+  },
+  {
+   "name": "control-heel-roll.r",
+   "parent": "control-toe-roll.r",
+   "head": [
+    -0.1709,
+    0.117,
+    0.026
+   ],
+   "tail": [
+    -0.1709,
+    -0.0964,
+    0.026
+   ]
+  },
+  {
+   "name": "control-foot-roll.r",
+   "parent": "control-heel-roll.r",
+   "head": [
+    -0.1709,
+    -0.0964,
+    0.026
+   ],
+   "tail": [
+    -0.1709,
+    0.0186,
+    0.1452
+   ]
+  },
+  {
+   "name": "heelIK.r",
+   "parent": "control-foot-roll.r",
+   "head": [
+    -0.1709,
+    0.0186,
+    0.1452
+   ],
+   "tail": [
+    -0.1709,
+    0.1842,
+    0.1452
+   ]
+  },
+  {
+   "name": "IK-foot.r",
+   "parent": "control-foot-roll.r",
+   "head": [
+    -0.1709,
+    0.0186,
+    0.1452
+   ],
+   "tail": [
+    -0.1709,
+    -0.0964,
+    0.026
+   ]
+  },
+  {
+   "name": "IK-toe.r",
+   "parent": "control-heel-roll.r",
+   "head": [
+    -0.1709,
+    0.117,
+    0.026
+   ],
+   "tail": [
+    -0.1709,
+    -0.0964,
+    0.026
+   ]
+  },
+  {
+   "name": "elbowIK.l",
+   "parent": "root",
+   "head": [
+    0.4535,
+    0.5889,
+    1.1068
+   ],
+   "tail": [
+    0.4535,
+    0.8894,
+    1.1068
+   ]
+  },
+  {
+   "name": "handIK.l",
+   "parent": "root",
+   "head": [
+    0.7132,
+    -0.0,
+    1.1068
+   ],
+   "tail": [
+    1.0137,
+    -0.0,
+    1.1068
+   ]
+  },
+  {
+   "name": "elbowIK.r",
+   "parent": "root",
+   "head": [
+    -0.4535,
+    0.5889,
+    1.1068
+   ],
+   "tail": [
+    -0.4535,
+    0.8894,
+    1.1068
+   ]
+  },
+  {
+   "name": "handIK.r",
+   "parent": "root",
+   "head": [
+    -0.7132,
+    -0.0,
+    1.1068
+   ],
+   "tail": [
+    -1.0137,
+    -0.0,
+    1.1068
+   ]
+  }
+ ],
+ "clips": [
+  "1H_Melee_Attack_Chop",
+  "1H_Melee_Attack_Slice_Diagonal",
+  "1H_Melee_Attack_Slice_Horizontal",
+  "1H_Melee_Attack_Stab",
+  "1H_Ranged_Aiming",
+  "1H_Ranged_Reload",
+  "1H_Ranged_Shoot",
+  "1H_Ranged_Shooting",
+  "2H_Melee_Attack_Chop",
+  "2H_Melee_Attack_Slice",
+  "2H_Melee_Attack_Spin",
+  "2H_Melee_Attack_Spinning",
+  "2H_Melee_Attack_Stab",
+  "2H_Melee_Idle",
+  "2H_Ranged_Aiming",
+  "2H_Ranged_Reload",
+  "2H_Ranged_Shoot",
+  "2H_Ranged_Shooting",
+  "Block",
+  "Block_Attack",
+  "Block_Hit",
+  "Blocking",
+  "Cheer",
+  "Death_A",
+  "Death_A_Pose",
+  "Death_B",
+  "Death_B_Pose",
+  "Dodge_Backward",
+  "Dodge_Forward",
+  "Dodge_Left",
+  "Dodge_Right",
+  "Dualwield_Melee_Attack_Chop",
+  "Dualwield_Melee_Attack_Slice",
+  "Dualwield_Melee_Attack_Stab",
+  "Hit_A",
+  "Hit_B",
+  "Idle",
+  "Interact",
+  "Jump_Full_Long",
+  "Jump_Full_Short",
+  "Jump_Idle",
+  "Jump_Land",
+  "Jump_Start",
+  "Lie_Down",
+  "Lie_Idle",
+  "Lie_Pose",
+  "Lie_StandUp",
+  "PickUp",
+  "Running_A",
+  "Running_B",
+  "Running_Strafe_Left",
+  "Running_Strafe_Right",
+  "Sit_Chair_Down",
+  "Sit_Chair_Idle",
+  "Sit_Chair_Pose",
+  "Sit_Chair_StandUp",
+  "Sit_Floor_Down",
+  "Sit_Floor_Idle",
+  "Sit_Floor_Pose",
+  "Sit_Floor_StandUp",
+  "Spellcast_Long",
+  "Spellcast_Raise",
+  "Spellcast_Shoot",
+  "Spellcasting",
+  "T-Pose",
+  "Throw",
+  "Unarmed_Idle",
+  "Unarmed_Melee_Attack_Kick",
+  "Unarmed_Melee_Attack_Punch_A",
+  "Unarmed_Melee_Attack_Punch_B",
+  "Unarmed_Pose",
+  "Use_Item",
+  "Walking_A",
+  "Walking_B",
+  "Walking_Backwards",
+  "Walking_C"
+ ]
+}

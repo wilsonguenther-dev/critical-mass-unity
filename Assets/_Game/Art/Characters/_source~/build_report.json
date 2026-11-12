@@ -1,0 +1,56 @@
+{
+ "objects": {
+  "Warrior_Body": {
+   "triangles": 9788,
+   "vertices": 5084,
+   "materials": [
+    "CM_Toon"
+   ],
+   "feature_groups": [
+    "feat_belt",
+    "feat_boots",
+    "feat_bracers",
+    "feat_clothes",
+    "feat_face",
+    "feat_gloves",
+    "feat_hair",
+    "feat_skin",
+    "feat_stone_armour",
+    "feat_team_cloth",
+    "feat_team_glow",
+    "feat_topknot"
+   ],
+   "bone_groups": 20
+  },
+  "Warrior_Shield": {
+   "triangles": 1404,
+   "vertices": 744,
+   "materials": [
+    "CM_Toon"
+   ],
+   "feature_groups": [
+    "feat_shield",
+    "feat_team_glow"
+   ],
+   "bone_groups": 1
+  },
+  "Warrior_Cleaver": {
+   "triangles": 708,
+   "vertices": 376,
+   "materials": [
+    "CM_Toon"
+   ],
+   "feature_groups": [
+    "feat_cleaver",
+    "feat_team_glow"
+   ],
+   "bone_groups": 1
+  }
+ },
+ "bones": 41,
+ "display_pose": [
+  "Idle",
+  1
+ ],
+ "triangles_total": 11900
+}
