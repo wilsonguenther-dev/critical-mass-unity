@@ -207,7 +207,7 @@ def build_torso():
             add(BODY, bm, "leather", w, "straps", smooth=False, m=mm)
         add(BODY, box((0.13, 0.17, 0.035), 0.012, 1), "brass", w, "straps", smooth=False,
             m=M((0.22 * s, -0.10, 1.295), (-8, 0, 0)))
-        for (y, z, tilt) in ((-0.285, 1.195, -55),):
+        for (y, z, tilt) in ((-0.12, 1.32, -20), (-0.285, 1.195, -55)):
             B.add_crystal(BODY, w, "team_glow", M((0.215 * s, y, z), (tilt, 0, 30)), 0.058, 0.05, seg=6,
                           waist=0.8, cap=0.55)
 
@@ -228,7 +228,7 @@ def build_arms():
         add(BODY, B.cyl((0.47 * s, 0.01, Z), (0.645 * s, 0.0, Z), 0.118, 0.13, 10), "skin", [la, wr], "skin")
         # huge dark-brown gloves: flared cuff with a stitched brass-studded band, fist, knuckle ridge, thumb
         add(BODY, B.cyl((0.625 * s, 0, Z), (0.80 * s, 0, Z), 0.15, 0.17, 10), "leather_dark", [la, wr, hd], "gloves")
-        add(BODY, B.torus(0.158, 0.03, 10, 3), "leather", [la, wr], "gloves", m=M((0.635 * s, 0, Z), (0, 90, 0)))
+        add(BODY, B.torus(0.155, 0.036, 10, 3), "kerchief", [la, wr], "team_cloth", m=M((0.635 * s, 0, Z), (0, 90, 0)))
         add(BODY, B.sphere((0.18, 0.175, 0.185), 9, 6), "leather_dark", hd, "gloves", m=M((0.91 * s, -0.01, 1.09)))
         add(BODY, box((0.11, 0.23, 0.12), 0.04, 1), "leather_dark", hd, "gloves", m=M((1.01 * s, -0.03, 1.12)))
         add(BODY, B.sphere((0.08, 0.075, 0.095), 6, 5), "leather_dark", hd, "gloves", m=M((0.84 * s, -0.18, 1.13)))
@@ -250,9 +250,11 @@ def build_arms():
 def build_neck():
     add(BODY, B.cyl((0, 0, 1.17), (0, 0, 1.32), 0.11, 0.105, 8), "skin", ["chest", "head"], "skin")
     # blue neckerchief (team cloth): thick roll, front knot, hanging point
-    add(BODY, B.torus(0.255, 0.11, 14, 7), "kerchief", "chest", "team_cloth",
+    add(BODY, B.torus(0.27, 0.13, 14, 6), "kerchief", "chest", "team_cloth",
         m=M((0, 0.0, 1.225), (8, 0, 0), (1.06, 0.82, 0.8)))
-    add(BODY, B.sphere((0.10, 0.07, 0.07), 10, 6), "kerchief", "chest", "team_cloth", m=M((0.14, -0.25, 1.15)))
+    add(BODY, B.sphere((0.13, 0.08, 0.09), 8, 5), "kerchief", "chest", "team_cloth", m=M((0.15, -0.27, 1.14)))
+    add(BODY, B.spike((0.15, -0.30, 1.10), (0.20, -0.33, 0.98), 0.07, 6, (0.0, -0.02, 0.0)), "kerchief", "chest",
+        "team_cloth")   # hanging scarf tail
 
 
 HEAD_C, HEAD_R = (0.0, -0.01, 1.46), (0.32, 0.27, 0.30)   # v3: big round face (bible p08: face about 0.61 u across)
@@ -275,10 +277,16 @@ def face_plane(rows=4, cols=8):
         z = face_decal.Z0 + (face_decal.Z1 - face_decal.Z0) * j / rows
         grid.append([bm.verts.new((x, head_front_y(x, z, 0.008), z)) for x in
                      (face_decal.X0 + (face_decal.X1 - face_decal.X0) * i / cols for i in range(cols + 1))])
-    # v3: one front sheet (the decal has no outline hull and is never seen from behind); saves the back and rim
+    back = [[bm.verts.new(v.co + Vector((0, 0.004, 0))) for v in row] for row in grid]   # closed thin slab
     for j in range(rows):
         for i in range(cols):
             bm.faces.new((grid[j][i], grid[j][i + 1], grid[j + 1][i + 1], grid[j + 1][i]))
+            bm.faces.new((back[j][i], back[j + 1][i], back[j + 1][i + 1], back[j][i + 1]))
+    ring = ([(0, i) for i in range(cols)] + [(j, cols) for j in range(rows)] +
+            [(rows, i) for i in range(cols, 0, -1)] + [(j, 0) for j in range(rows, 0, -1)])
+    for k, (j, i) in enumerate(ring):
+        j2, i2 = ring[(k + 1) % len(ring)]
+        bm.faces.new((grid[j][i], back[j][i], back[j2][i2], grid[j2][i2]))
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     return bm
 
@@ -386,6 +394,7 @@ def dome_sector(prof, a0, a1, seg=2):
         wall = [rows[j][side] for j in range(len(prof))] + [axis[1], axis[0]]
         bm.faces.new(wall if side == 0 else list(reversed(wall)))
     bm.faces.new([rows[0][i] for i in range(seg, -1, -1)] + [axis[0]])
+    bm.faces.new([rows[-1][i] for i in range(seg + 1)] + [axis[1]])
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     ngons = [f for f in bm.faces if len(f.verts) > 4]
     bmesh.ops.triangulate(bm, faces=ngons, quad_method="BEAUTY", ngon_method="EAR_CLIP")
@@ -441,7 +450,7 @@ def build_helmet():
     zb = (TT @ base).z
     za = (TT.to_3x3() @ axis).z
     h_main = (2.0 - zb) / za
-    head_crystal(BODY, H, "team_glow", kit.frame(base, axis, (0, 1, 0)), 0.125, h_main, seg=6, waist=0.92, cap=0.30)
+    head_crystal(BODY, H, "team_glow", kit.frame(base, axis, (0, 1, 0)), 0.15, h_main, seg=6, waist=0.92, cap=0.30)
 
 
 def build_crate():
@@ -501,9 +510,11 @@ def build_crate():
     # rope coil on the right side, team crystals growing out of the top-left corner
     # v2: one cluster at the back-left top corner, short, so it no longer rings the helmet at gameplay size or pokes
     # out beside the head in the front view (bible back view: a single cluster on the top-left corner)
-    for (x, y, z, ax, r, h) in ((-0.20, 0.14, SZ / 2 - 0.02, (-0.20, 0.25, 0.95), 0.08, 0.15),
-                                 (-0.10, 0.18, SZ / 2 - 0.02, (0.1, 0.35, 0.93), 0.055, 0.10),
-                                 (-0.27, 0.06, SZ / 2 - 0.02, (-0.5, 0.1, 0.86), 0.05, 0.08),
+    for (x, y, z, ax, r, h) in ((-0.20, 0.14, SZ / 2 - 0.02, (-0.20, 0.25, 0.95), 0.13, 0.26),
+                                 (-0.04, 0.18, SZ / 2 - 0.02, (0.1, 0.35, 0.93), 0.095, 0.18),
+                                 (-0.27, 0.0, SZ / 2 - 0.02, (-0.5, 0.1, 0.86), 0.08, 0.14),
+                                 (0.16, 0.20, SZ / 2 - 0.02, (0.4, 0.3, 0.87), 0.07, 0.12),
+                                 (0.20, 0.06, SZ / 2 - 0.02, (0.5, 0.1, 0.86), 0.075, 0.13),
                                  ):
         B.add_crystal(BODY, W, "team_glow", kit.frame(C + Vector((x, y, z)), ax, (0, 1, 0)), r, h, seg=6,
                       waist=0.8, cap=0.36)

@@ -26,7 +26,7 @@ C = {
     "crystal_lit":  ("#8BE6FF", "SAMPLED crystal highlight facet #31D7FA lifted; the one lighter facet on the lit side"),
     "kerchief":     ("#3E78C6", "SAMPLED neckerchief #5071A4 (lit) toward P08 blue #2A8ECB"),
     # ---- fixed
-    "navy":         ("#3A5078", "P08 navy #1B2D52 lifted one step (front crop lit navy #364C70)"),
+    "navy":         ("#364B72", "P08 navy #1B2D52 lifted one step (front crop lit navy #364C70)"),
     "navy_dark":    ("#32466B", "P08 navy #1B2D52 (trousers, wraps)"),
     "cream":        ("#E9DECF", "P08 cream #E9DECF (chest plate, shoulder pads)"),
     "stone":        ("#8A8481", "P08 stone grey #807470 (crate side panels, barricade posts, hammer head)"),
