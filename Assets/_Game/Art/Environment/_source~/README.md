@@ -1,4 +1,4 @@
-# Skybreak Basin environment kit, v2
+# Skybreak Basin environment kit, v3 (v2 structure + the owner's 2026-11-12 polish pass)
 
 A modular kit that tiles on the game's 1 m cell grid (F-03), built by script in headless Blender 5.2.3 for the
 perspective gameplay camera (pitch 55, vertical FOV 35, 23.4 u, yaw 45; ART-DIRECTION-2026-11-12 sections 2 and 5,
@@ -6,17 +6,51 @@ brief A-05). Scope: ground, ledges, cliffs, water, paths, bridges, trees, rocks,
 rocks and clouds, ruins. NOT bases, walls, towers, hill or shrine structures (bases-and-structures agent): their v1
 FBX files are left untouched and only stand in for those structures in the renders.
 
+## What v3 changed (read this before porting placement or shaders)
+
+- **Rim rock band.** Island rims use `env_lip_rim_straight_[abc]` / `env_lip_rim_diag_[ab]`: the same fringe + ink, then a
+  stone chamfer 0.50 u out and 0.29 u down (30 degrees) and the dark face band under it. A vertical face is invisible on
+  rims facing away from the 55-degree camera; the chamfer shows on every facing (about 0.24 u = 18 px on a far rim).
+  Convex rim corners get `env_lip_rim_corner90` (fringe fan + rock fan), 45-degree bends `env_lip_rim_corner45`.
+  Cliff skirts sit 0.50 u further out (under the band); `env_cliff_corner` / `env_cliff_bend` are now placed with the
+  INCOMING edge's yaw (like the lip corner), centred on the corner bisector. Inner ledges keep `env_lip_*` (no chamfer).
+- **Diagonal ledges inside islands** (`layout2.ledge_fills`): a walkable low cell with higher ground on two adjacent
+  sides + the diagonal gets an `env_ground_fill_tri` at the HIGH height and one diagonal lip (`env_lip_diag_*`,
+  `env_ledge_band_diag`, `env_ledge_shadow_diag`). Trade-off: half of that cell DRAWS one step up while the Sim keeps
+  its height; units standing on that corner will look sunk by 0.75 u. Accept it or skip ledge fills on hot cells.
+- **Bridges.** Axis-aligned bridges on an integer axis paint four cells; their tiles carry `w` (= half-width / 1.5) and
+  must be scaled by `w` on local X so the deck covers every walkable bridge cell; posts and piers move out by `w`.
+  End posts are never placed on walkable cells.
+- **Decor.** Rim cells beside a route (path distance < 6.4 u) take a big prop 20% of the time: a team crystal on team
+  sides, a Biomass/Corruption crystal near those sites, else a boulder or rock cluster. Its centre sits 0.08 u past
+  the lip (over the void cell, on the rim band) so no walkable cell holds anything over 0.3 u at its centre; never
+  within 2 cells of a waterfall. Fill triangles near routes prefer crystals and rocks over trees. Small props: rim
+  cells 10%, path sides 18%, open field 3% (the field shot lands at 27 per screen). Crystals 1.45-2.4 u tall with
+  fatter spikes, boulders 0.8 / 1.5 / 2.1 u, small props wider (still under 0.3 u tall).
+- **Materials.** New slots: `CM_Toon_Foliage` (trees, bush) bands exactly #86BD4E / #5E9A45 / #3F6E36 by N.L only, no
+  received cast shadow (cuts 0.30 / 0.02); `CM_Toon_Crystal` (lit band x1.9, mid x1.0, navy-leaning shadow x0.46, N.L
+  only). Painted highlight shapes are vertex colour, so they survive export: `leaf_hi` #B4DB6A on the canopy faces
+  turned to the sun and camera, `crystal_hi` #EAFCFF (mask 0.25, self-lit) as a streak on each lit facet. Crimson
+  crystals swap the glow decal too (`CM_GlowDecal_Crimson`, #FF7461).
+- **Foam must be constant-pixel in Unity.** The FBX ships a 0.15 u band; perspective makes that 8 to 13.5 px across the
+  frame, so the Unity foam (like the ink) must hold 11 px. The Blender preview refits each waterfall's band per shot
+  (`render_v3.fit_foam`).
+- **Value steps.** Ground preview: grass #A0BE4E / #98B64A / #90AE46 (seams #7A9540, softer than v2 so grass reads as
+  one mass), flagstones #EDD3A6 / #E0C195 / #F3DDB2, grout #8C7556, kerb #C9AD84 / #BDA078 / #D6BA90, cast shadow x0.60
+  + 16% navy. Rock #8A826D, rock mid #74705D, band #53564F, rim stone #8B826C / #7A7261. Height fog starts at y -3.5.
+- Structure stand-ins (walls, hill plaza, pads, banners, shrine) are left out of every v3 render; art/bases-blender owns them.
+
 ## Rebuild (from the repo root; exit 0, about 20 s in total)
 
 ```
 B=/Applications/Blender.app/Contents/MacOS/Blender
 D="Assets/_Game/Art/Environment/_source~"
 $B -b --factory-startup --python-exit-code 1 -P "$D/build_env_kit.py"                  # ../env_*.fbx, env_kit.blend, manifest
-$B -b --factory-startup --python-exit-code 1 -P "$D/render_v2.py" -- <out> [--scale 2]  # assembly, checks.json, renders/*.png
-python3 "$D/compose_v2.py" <out>/renders <report_dir>                                   # 1080p + 2x-crop JPEGs, sbs-*.jpg
+$B -b --factory-startup --python-exit-code 1 -P "$D/render_v3.py" -- <out> [--scale 2]  # assembly, checks.json, renders/*.png
+python3 "$D/compose_v3.py" <out>/renders <report_dir>                                   # 1080p + 2x-crop JPEGs, sbs-*.jpg
 ```
 
-`render_v2.py ... --no-render` runs the assembly and checks only; `--only name1,name2` renders a subset.
+`render_v3.py ... --no-render` runs the assembly and checks only; `--only name1,name2` renders a subset.
 
 | File | What |
 | --- | --- |
@@ -25,7 +59,7 @@ python3 "$D/compose_v2.py" <out>/renders <report_dir>                           
 | `env_art/geo.py` | Unity-space mesh builder. v2: only downward faces (normal y < -0.5) are dropped, so every piece may be yawed; material index and UV per face |
 | `env_art/pieces.py`, `env_art/layout.py` | v1 (structures, ruins, clouds reused; `layout.py` is still the 1:1 port of `src/sim/map.ts`) |
 | `env_art/palette.py` | environment palette (v2 entries added: grass tones, seam, ink, band, foam, water, crystal colours); outline is now Void Navy #18233B |
-| `render_v2.py`, `compose_v2.py` | Blender preview materials (3-band CM/Toon, CM_Ground), checks, renders, side-by-sides |
+| `render_v3.py`, `compose_v3.py` | Blender preview materials (3-band CM/Toon, CM_Ground), checks, renders, side-by-sides |
 
 Export recipe unchanged (FBX, `axis_forward=-Z`, `axis_up=Y`, `bake_space_transform`, sRGB vertex colours in `Col`,
 alpha = mask code; 0.25 = fixed-colour self-lit: ink, face band, foam, water, Biomass/Corruption crystal facets).
@@ -70,7 +104,7 @@ the CELL'S feature point < w - 0.5 (and a 0.33-scale noise < 0.6, so grass break
 #EBD2A6, 5% of cells dirt, grout #A08A68; kerb Voronoi scale 2.0 where w - 0.5 < R(feature) < w. Lighting: flat, cast
 shadows only (shadow = colour x 0.66 mixed 12% toward Void Navy).
 
-## Checks (`render_v2.py`, results in `checks.json`)
+## Checks (`render_v3.py`, results in `checks.json`)
 
 Tiling: 5 down-rays per land cell into the ground (holes, height mismatch > 0.12), bridge cells onto decks, every rim
 unit edge has a lip and exactly one skirt over it. Pixel measures at 1080p for each gameplay framing: character height,

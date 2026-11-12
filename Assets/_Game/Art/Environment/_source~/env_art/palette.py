@@ -32,8 +32,8 @@ ENV = {
     "corrupt_dark": ("#402547", "P14 corrupted tile #402547"),
     "corrupt_glow": ("#D23F8E", "P14 corrupted tile cracks #AD3872, lifted (self-lit)"),
     # rock and stone
-    "rock":         ("#958C77", "P15 cliff faces #9E968D / P14 #908D6A"),
-    "rock_mid":     ("#7C7764", "P14 hill/wall #959164 shade side"),
+    "rock":         ("#8A826D", "P15 cliff faces #9E968D / P14 #908D6A"),
+    "rock_mid":     ("#74705D", "P14 hill/wall #959164 shade side"),
     "rock_dark":    ("#53564F", "P14 bridge pier / hill #5B6059"),
     "crevice":      ("#444541", "P14 wall crop #444541"),
     "wall":         ("#B0A58C", "P14 wall intact #AB9274 / #938A64, mid"),
@@ -76,8 +76,8 @@ ENV = {
     # v3 (owner 2026-11-12: bolder, sharper; rock one step darker for value contrast against grass and paving)
     "leaf_hi":      ("#B4DB6A", "v3 painted highlight shape on the sun side of each canopy lobe"),
     "crystal_hi":   ("#EAFCFF", "v3 painted highlight streak near crystal tips (self-lit, both teams)"),
-    "rim_rock":     ("#968D76", "v3 rim rock band (chamfer under every island rim), lit stone"),
-    "rim_rock_b":   ("#847C67", "v3 rim rock band, second stone tone"),
+    "rim_rock":     ("#8B826C", "v3 rim rock band (chamfer under every island rim), lit stone"),
+    "rim_rock_b":   ("#7A7261", "v3 rim rock band, second stone tone"),
     "sky_horizon":  ("#CDEFF8", "CORE world Sky Horizon (height fog)"),
     "biomass_c":    ("#B7F238", "CORE Biomass, crystal lit facet (self-lit)"),
     "biomass_cd":   ("#6E9A2A", "Biomass crystal body (Biomass x0.6)"),
