@@ -461,6 +461,23 @@ namespace CriticalMass.Editor
             if (title != null) title.UpdateScale();
             Canvas.ForceUpdateCanvases();
             Canvas.ForceUpdateCanvases();   // the first pass re-sizes the canvas to the texture, the second lays out at that size
+            if (hud != null || title != null)
+            {
+                // HUD v2 fix: a Screen Space - Camera canvas takes its size from the camera's target only when that camera
+                // renders, so the first shot of a run laid the HUD out at the editor's Game view size (1920x1440). One
+                // throw-away render at the target size, then a fresh layout and HUD refresh, before the real render.
+                var warm = new RenderPipeline.StandardRequest { destination = rt };
+                if (RenderPipeline.SupportsRenderRequest(cam, warm)) RenderPipeline.SubmitRenderRequest(cam, warm);
+                else cam.Render();
+                if (hud != null)
+                {
+                    hud.UpdateScale();
+                    if (_driver != null && _driver.World != null) hud.Refresh(_driver.World, 0f);
+                }
+                if (title != null) title.UpdateScale();
+                Canvas.ForceUpdateCanvases();
+                Canvas.ForceUpdateCanvases();
+            }
             if (hud != null)
             {
                 var land = UnityEngine.Object.FindAnyObjectByType<CriticalMass.Runtime.Hud.Ui.MinimapLand>();
