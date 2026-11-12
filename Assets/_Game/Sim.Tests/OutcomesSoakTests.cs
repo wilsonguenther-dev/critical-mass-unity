@@ -51,7 +51,7 @@ namespace CriticalMass.Sim.Tests
             return all;
         }
 
-        [Test]
+        [Test, Category("Slow")]
         public void ADecisiveGe80PercentOfMatchesAreNotADraw()
         {
             IReadOnlyList<MatchOutcome> a = A;
@@ -63,39 +63,39 @@ namespace CriticalMass.Sim.Tests
             Assert.GreaterOrEqual(decisive, OutcomeThresholds.Decisive);
         }
 
-        [Test]
+        [Test, Category("Slow")]
         public void AOwnedShareMeanShareOfSamplesOwnedByATeamContestedAndNeutralExcludedGe04()
         {
             Assert.GreaterOrEqual(Mean(A, o => o.OwnedShare), OutcomeThresholds.OwnedShare);
         }
 
-        [Test]
+        [Test, Category("Slow")]
         public void AOwnedShareEverySingleMatchGe025()
         {
             foreach (MatchOutcome o in A)
                 Assert.GreaterOrEqual(o.OwnedShare, OutcomeThresholds.OwnedShareMin, "seed " + o.Seed);
         }
 
-        [Test]
+        [Test, Category("Slow")]
         public void ASwingyMeanHillOwnerChangesPerMatchGe4()
         {
             Assert.GreaterOrEqual(Mean(A, o => o.OwnerChanges), OutcomeThresholds.OwnerChangesMean);
         }
 
-        [Test]
+        [Test, Category("Slow")]
         public void ABalancedNeitherTeamWinsMoreThan14Of20()
         {
             int most = Math.Max(Wins(A, MatchResult.Azure), Wins(A, MatchResult.Crimson));
             Assert.LessOrEqual(most, OutcomeThresholds.MaxTeamWins);
         }
 
-        [Test]
+        [Test, Category("Slow")]
         public void AKaijuDutyMeanBotsPerTeamInGatherDeliverCorruptDuringT20240Ge15()
         {
             Assert.GreaterOrEqual(Mean(A, o => o.KaijuDuty), OutcomeThresholds.KaijuDutyMean);
         }
 
-        [Test]
+        [Test, Category("Slow")]
         public void BOwnedShareEverySingleMatchGe025()
         {
             IReadOnlyList<MatchOutcome> b = B;
@@ -104,7 +104,7 @@ namespace CriticalMass.Sim.Tests
                 Assert.GreaterOrEqual(o.OwnedShare, OutcomeThresholds.OwnedShareMin, "seed " + o.Seed);
         }
 
-        [Test]
+        [Test, Category("Slow")]
         public void APlusBDifferentGe2DistinctNaturalHatchOutcomes()
         {
             List<MatchOutcome> all = AllAB();
@@ -115,7 +115,7 @@ namespace CriticalMass.Sim.Tests
             Assert.GreaterOrEqual(distinct.Count, OutcomeThresholds.DistinctHatchOutcomes);
         }
 
-        [Test]
+        [Test, Category("Slow")]
         public void APlusBTheKaijuSwingsFightsButDoesNotDecideThemAnAlliedHatchSTeamWinsLe85PercentOfThoseMatches()
         {
             int allied = 0;
@@ -130,13 +130,13 @@ namespace CriticalMass.Sim.Tests
             Assert.LessOrEqual(share, OutcomeThresholds.AlliedWinShareMax);
         }
 
-        [Test]
+        [Test, Category("Slow")]
         public void CRunsIts10PassiveSeedsWinShareAssertedOnThe50SeedPassiveSweepD030()
         {
             Assert.AreEqual(OutcomeBatches.C.Count, C.Count);
         }
 
-        [Test]
+        [Test, Category("Slow")]
         public void AFKThePassiveBatchReplaysBatchCExactlySameSeedsSameOutcomes()
         {
             IReadOnlyList<MatchOutcome> passive = AfkPassive;
@@ -147,7 +147,7 @@ namespace CriticalMass.Sim.Tests
                 Assert.AreEqual(c[i].Winner, passive[i].Winner, "seed " + c[i].Seed);
         }
 
-        [Test]
+        [Test, Category("Slow")]
         public void CD030APassiveHumanSTeamStillWinsGe11OfThe50PassiveSeeds201250()
         {
             IReadOnlyList<MatchOutcome> passive = AfkPassive;
@@ -155,7 +155,7 @@ namespace CriticalMass.Sim.Tests
             Assert.GreaterOrEqual(Wins(passive, MatchResult.Azure), PassiveSweepTeamWinsMin);
         }
 
-        [Test]
+        [Test, Category("Slow")]
         public void AFKOnBatchCSSeedsANonContributingActor0PassiveOrWanderingNeverWinsMoreThanACompetentOne()
         {
             int n = OutcomeBatches.C.Count;
@@ -164,7 +164,7 @@ namespace CriticalMass.Sim.Tests
             Assert.LessOrEqual(Wins(AfkWander, MatchResult.Azure, n) - played, OutcomeThresholds.AfkWinsOverPlayingMax);
         }
 
-        [Test]
+        [Test, Category("Slow")]
         public void AFKOnAll50SeedsANonContributingActor0PassiveOrWanderingNeverWinsMoreThanACompetentOne()
         {
             int played = Wins(AfkBot, MatchResult.Azure);

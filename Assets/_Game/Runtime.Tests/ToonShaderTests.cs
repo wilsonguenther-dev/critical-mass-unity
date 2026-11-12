@@ -85,10 +85,20 @@ namespace CriticalMass.Runtime.Tests
             Shader shader = FindToon();
             Assert.AreEqual(3, shader.passCount, "pass count");
 
+            // ShaderTagId values are interned case-insensitively: .name returns the spelling first registered in the
+            // editor session (the gate saw "SRPDEFAULTUNLIT" for pass 1), so compare tag ids, the way URP's
+            // DrawRenderers matches LightMode, not the string spelling.
             var lightMode = new ShaderTagId("LightMode");
-            Assert.AreEqual("UniversalForward", shader.FindPassTagValue(0, lightMode).name, "pass 0 LightMode");
-            Assert.AreEqual("SRPDefaultUnlit", shader.FindPassTagValue(1, lightMode).name, "pass 1 LightMode");
-            Assert.AreEqual("ShadowCaster", shader.FindPassTagValue(2, lightMode).name, "pass 2 LightMode");
+            AssertLightMode(shader, 0, lightMode, "UniversalForward");
+            AssertLightMode(shader, 1, lightMode, "SRPDefaultUnlit");
+            AssertLightMode(shader, 2, lightMode, "ShadowCaster");
+        }
+
+        private static void AssertLightMode(Shader shader, int pass, ShaderTagId lightMode, string expected)
+        {
+            ShaderTagId actual = shader.FindPassTagValue(pass, lightMode);
+            Assert.IsTrue(actual == new ShaderTagId(expected),
+                "pass " + pass + " LightMode: expected " + expected + ", was " + actual.name);
         }
 
         [Test]
