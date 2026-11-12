@@ -630,6 +630,54 @@ def frame_ortho(cam, centre, scale, elev=30.0, yaw_from_south=0.0):
 
 SHOTS = []
 SHOT_YAW = [0.0]
+LANDMARK_LOCAL_PROBES = [Vector((r * math.cos(2 * math.pi * k / 8), r * math.sin(2 * math.pi * k / 8), z))
+                         for r, z in ((2.3, 0.0), (2.3, 3.0), (2.8, 6.6), (2.8, 7.4)) for k in range(8)] + \
+    [Vector((0, 0, 10.3)), Vector((0, 0, 11.6)), Vector((1.15, 0, 11.62)), Vector((1.15, 0, 11.2))]
+PAD_LOCAL_PROBES = [Vector((3.5 * math.cos(2 * math.pi * k / 8), 3.5 * math.sin(2 * math.pi * k / 8), 0.0))
+                    for k in range(8)]
+
+
+def _in_frame(scn, cam, pts, m=0.02):
+    from bpy_extras.object_utils import world_to_camera_view
+    hits = 0
+    for p in pts:
+        q = world_to_camera_view(scn, cam, p)
+        hits += (m <= q.x <= 1 - m and m <= q.y <= 1 - m and q.z > 0)
+    return hits
+
+
+def base_target(cam, layout, base_target_sim):
+    """Smallest move of the camera target (the player stands 2.0 u screen-down of it, still in the district) that
+    frames the whole landmark (drum, roof, finial, pennant) and the whole pad. Returns (target_sim, shift_m)."""
+    scn = bpy.context.scene
+    scn.render.resolution_x, scn.render.resolution_y = 1920, 1080
+    objs = LAYOUT_OBJS[layout]
+    lm = [o for o in objs if o.get("key") == "landmark"][0]
+    pad = [o for o in objs if o.get("key") == "pad"][0]
+    probes = [lm.matrix_world @ p for p in LANDMARK_LOCAL_PROBES] + [pad.matrix_world @ p for p in PAD_LOCAL_PROBES]
+    best = None
+    most = (0, None)
+    steps = [i * 0.5 for i in range(-22, 23)]
+    for dx in steps:
+        for dz in steps:
+            d = math.hypot(dx, dz)
+            if best and d >= best[0]:
+                continue
+            t = (base_target_sim[0] + dx, base_target_sim[1] + dz)
+            frame_gameplay(cam, S2B(t[0], t[1], 0))
+            bpy.context.view_layer.update()
+            h = _in_frame(scn, cam, probes, 0.01)
+            if h > most[0]:
+                most = (h, t)
+            if h == len(probes):
+                best = (d, t)
+    from bpy_extras.object_utils import world_to_camera_view
+    frame_gameplay(cam, S2B(most[1][0], most[1][1], 0))
+    bpy.context.view_layer.update()
+    bad = [(i, tuple(round(c, 2) for c in world_to_camera_view(scn, cam, p))) for i, p in enumerate(probes)
+           if not all(0.01 <= c <= 0.99 for c in tuple(world_to_camera_view(scn, cam, p))[:2])]
+    print("BASE_TARGET", layout, len(probes), most, best, bad)
+    return (best[1], round(best[0], 2)) if best else (base_target_sim, None)
 
 
 def shot(name, layouts_on, variant, mode, target, res=(1920, 1080), crop=1.0, scale=20.0, elev=30.0, px=2.0,
@@ -638,13 +686,22 @@ def shot(name, layouts_on, variant, mode, target, res=(1920, 1080), crop=1.0, sc
                       scale=scale, elev=elev, px=px, warrior=warrior, hide=hide, rim_variant=rim_variant, ground=ground))
 
 
-def define_shots():
-    pa = S2B(6.6, 34.6, 0)            # player on the pad + the 2.0 u screen-up look offset (art direction 2.1)
-    pc_ = S2B(G.MIRROR_X - 8.0 - 1.4, 34.6, 0)   # the look offset is screen-up (NW) for both teams
+BASE_TARGETS = {}
+
+
+def define_shots(cam):
     hc = S2B(56, 40.6, 0.75)
     sc = S2B(56, 9.6, 1.5)
-    shot("gp_base_azure", ["district_azure"], "azure", "gp", pa, warrior=(8.6, 36.9, 0.1))
-    shot("gp_base_crimson", ["district_crimson"], "crimson", "gp", pc_, warrior=(G.MIRROR_X - 8.0 + 0.6, 36.9, 0.1))
+    for team, padx in (("azure", 8.0), ("crimson", G.MIRROR_X - 8.0)):
+        # player on the pad + the 2.0 u screen-up look offset (art direction 2.1), then the smallest shift that frames
+        # the landmark whole; the warrior stands where that camera's player would be
+        t, shift = base_target(cam, f"district_{team}", (padx - 1.4, 34.6))
+        BASE_TARGETS[team] = {"target_sim": [round(t[0], 2), round(t[1], 2)], "shift_from_pad_view_m": shift}
+        shot(f"gp_base_{team}", [f"district_{team}"], team, "gp", S2B(t[0], t[1], 0),
+             warrior=(t[0] + 1.4 + 0.6, t[1] + 1.4 + 0.9, 0.0))
+        # reference: the spawn camera (player on the pad), as v1 framed it
+        shot(f"gp_base_{team}_pad", [f"district_{team}"], team, "gp", S2B(padx - 1.4, 34.6, 0),
+             warrior=(padx + 0.6, 36.9, 0.1))
     shot("gp_hill_neutral", ["hill"], "neutral", "gp", hc, warrior=(57.5, 43.5, 0.95))
     shot("gp_hill_azure", ["hill_damaged"], "azure", "gp", hc, warrior=(57.5, 43.5, 0.95))
     shot("gp_hill_contested", ["hill"], "neutral", "gp", hc, warrior=(57.5, 43.5, 0.95), rim_variant="contested")
@@ -653,7 +710,7 @@ def define_shots():
     shot("crop2x_wall", ["hill"], "azure", "gp", S2B(56 + 10.5 * math.cos(a), 40 + 10.5 * math.sin(a), 1.5), crop=2.0,
          warrior=(56 + 8.6 * math.cos(a), 40 + 8.6 * math.sin(a), 0.75))
     shot("crop2x_gate", ["hill"], "azure", "gp", S2B(56, 50.2, 1.5), crop=2.0, warrior=(56.2, 49.0, 0.75))
-    tx, tz = layouts.isl_pt(116, 2.1)
+    tx, tz = layouts.isl_pt(180, 2.1)
     shot("crop2x_tower", ["district_azure"], "azure", "gp", S2B(tx, tz, 2.5), crop=2.0, warrior=(tx + 2.6, tz - 2.2, 0.0))
     # bible framings (orthographic, front view from the south, 30 deg elevation)
     shot("bf_shrine", ["shrine"], "azure", "ortho", S2B(56, 8, 4.0), res=(1000, 1000), scale=8.6, elev=25,
@@ -744,7 +801,7 @@ def render_all(scn, cam, ground):
                     m = KIT.get(k, {})
                     if inside and m.get("kind") == "prop":
                         c["props"] += 1
-                    if inside and k in ("gate_post", "gate_post_ring"):
+                    if inside and k in ("gate_post", "gate_post_ring", "banner") and m.get("kind") != "prop":
                         c["props"] += 1          # its banner
                     if k in ("pool",) and inside:
                         c["pools"] += 1
@@ -758,14 +815,11 @@ def render_all(scn, cam, ground):
                                 c["pools"] += 1    # tower-door braziers carry their own pool
                             if lk in ("door", "crystal"):
                                 c["lamps"] += 1
-                    if k == "landmark":       # visible = at least half of 9 probe points (body, eave, apex) in frame
-                        probes = [Vector((dx, dy, z)) for z in (3.0, 7.0, 9.5) for dx, dy in ((0, 0), (1.8, 0), (-1.8, 0))]
-                        hits = 0
-                        for pr in probes:
-                            q = world_to_camera_view(scn, cam, o.matrix_world @ pr)
-                            hits += (0 <= q.x <= 1 and 0 <= q.y <= 1)
-                        c["landmark_probe_hits_of_9"] = hits
+                    if k == "landmark":       # v2: fully framed = every probe (drum foot to pennant tip) in frame
+                        hits = _in_frame(scn, cam, [o.matrix_world @ p for p in LANDMARK_LOCAL_PROBES], 0.0)
+                        c["landmark_probe_hits"] = f"{hits}/{len(LANDMARK_LOCAL_PROBES)}"
                         c["landmark_visible"] = c["landmark_visible"] or hits >= 5
+                        c["landmark_fully_framed"] = hits == len(LANDMARK_LOCAL_PROBES)
                     sol = o.modifiers.get("Outline")
                     if sol and m.get("kind") == "structure":
                         cen = o.matrix_world @ (sum((Vector(b) for b in o.bound_box), Vector()) / 8)
@@ -812,8 +866,9 @@ def main():
     if RENDER:
         ground = ground_object(scn)
         cam = setup_render(scn)
-        define_shots()
+        define_shots(cam)
         checks["shots"] = render_all(scn, cam, ground)
+        checks["base_shot_targets"] = BASE_TARGETS
     with open(os.path.join(OUT, "checks.json"), "w") as f:
         json.dump(checks, f, indent=1)
     bpy.ops.wm.save_as_mainfile(filepath=blend)

@@ -48,7 +48,12 @@ def face_cam_yaw(tangent_angle):
 ISL = (10.0, 36.0, 9.0, 11.0)
 PAD = (8.0, 36.0)
 WALL_SECTORS = [(24, 40), (80, 262), (327, 347)]     # sim degrees around the base island (0 east, 90 south)
-TOWERS = [(116, "tower"), (162, "landmark"), (228, "tower")]
+# v2: the landmark stands on the south-west island edge (130 deg) so the gameplay camera frames it whole from the
+# pad; Crimson uses the same angles mirrored (true mirror), which puts its landmark on the south-east edge
+import os as _os
+_LM = float(_os.environ.get("CM_LANDMARK_DEG", "130"))
+_T2 = float(_os.environ.get("CM_TOWER2_DEG", "180"))
+TOWERS = [(_LM, "landmark"), (_T2, "tower"), (228, "tower")]
 
 
 def _edge_offset():
@@ -138,6 +143,10 @@ def district(team="azure"):
 
     def put(key, q, h, yaw):
         place.append((key, -q.x, q.y, h, yaw, {}))
+
+    def al(t):
+        """Yaw along a wall tangent; the mirrored path's tangent is the mirror image, so add pi to get -yaw."""
+        return math.atan2(t.y, t.x) + (math.pi if mirror else 0.0)
     for i, (a0, a1) in enumerate(runs):
         n = max(8, int((a1 - a0) * 2.5))
         pts = []
@@ -154,16 +163,16 @@ def district(team="azure"):
         while s < p.L - 1.2:
             put("brazier", p.at(s, -0.12, 2.31), 2.31, 0.0)
             put("pool", p.at(s, -2.1, 0.0), 0.0, 0.0)
-            s += 5.0
+            s += 4.0
         # walkway: a crate and a barrel between braziers (kept to the wall top)
-        s = 3.0
-        while s < p.L - 1.0:
+        s = 2.6
+        while s < p.L - 1.0:              # walkway stores between the braziers (every 4 u at 1.6, 5.6, ...)
             t = p.tan(s)
-            put("crate", p.at(s, -0.12, 2.31), 2.31, math.atan2(t.y, t.x) + mj(rng.uniform(-0.2, 0.2)))
+            put("crate", p.at(s, -0.12, 2.31), 2.31, al(t) + mj(rng.uniform(-0.2, 0.2)))
             put("barrel", p.at(s + 0.75, -0.15, 2.31), 2.31, 0.0)
-            if rng.random() < 0.5:
-                put("crate_small", p.at(s + 1.35, -0.12, 2.31), 2.31, math.atan2(t.y, t.x) + mj(rng.uniform(-0.5, 0.5)))
-            s += 2.5
+            if rng.random() < 0.4:
+                put("crate_small", p.at(s + 1.4, -0.12, 2.31), 2.31, al(t) + mj(rng.uniform(-0.5, 0.5)))
+            s += 2.2
         # shelf vignettes against the inner face (on VOID edge cells): crate stacks, barrel groups, weapon racks
         inward = lambda ss: -p.nrm(ss)
         o = -(0.5 + SHELF / 2)
@@ -171,7 +180,7 @@ def district(team="azure"):
         while s < p.L - 2.0:
             kind = rng.choice(("crates", "barrels", "rack", "crates", "mixed"))
             t = p.tan(s)
-            along = math.atan2(t.y, t.x)
+            along = al(t)
             if kind == "crates":
                 put("crate", p.at(s, o + 0.05, 0.0), 0.0, along + mj(rng.uniform(-0.12, 0.12)))
                 put("crate", p.at(s + 0.76, o + 0.08, 0.0), 0.0, along + mj(rng.uniform(-0.2, 0.2)))
@@ -191,7 +200,7 @@ def district(team="azure"):
                 put("barrel", p.at(s + 0.72, o + 0.12, 0.0), 0.0, 0.0)
                 put("barrel", p.at(s + 1.25, o + 0.12, 0.0), 0.0, 0.0)
                 s += 1.6
-            s += rng.uniform(0.7, 1.4)          # rest areas between vignettes
+            s += rng.uniform(0.5, 1.1)          # rest areas between vignettes
     world += [wall, found]
     # gates at every route-side wall end: gate post with banner on the wall line, a supply cache on the shelf just
     # inside it, stakes jammed into the cliff lip outside the wall pointing out, a crystal lamp and brazier on top
@@ -213,7 +222,7 @@ def district(team="azure"):
             for k, (dd, key) in enumerate(((5.0, "barrel"), (6.6, "barrel"), (8.4, "crate"))):
                 xc, zc = isl_pt(deg + inward_sgn * dd, WALL_OFF - 0.5 - SHELF / 2 + 0.05, mirror)
                 place.append((key, xc, zc, 0.0, mj(rng.uniform(-0.3, 0.3)) + (0.0 if key == "barrel" else
-                              math.atan2(-(zc - z), -(xc - x))), {}))
+                              math.atan2(-(zc - z), -(xc - x)) + (math.pi if mirror else 0.0)), {}))
             # stakes outside the wall on a stone lip, pointing out of the base (only where no walkable cell is near:
             # some wall ends sit beside a bridge head)
             for dd in (6.0, 8.5, 11.0):
@@ -243,9 +252,22 @@ def district(team="azure"):
         kit.drum(tf, random.Random(deg), R + 0.1, 3, z0=-3 * COURSE - 0.02, thick=0.6)
         tf.name = f"cm_district_tower_footing_{team}_{deg}"
         place.append(("__piece__", x, z, 0.0, 0.0, {"piece": tf}))
+    # two team banners on the shelf flanking the landmark where the wall meets it
+    for deg, half, kind, R in cuts:
+        if kind != "landmark":
+            continue
+        for sg in (-1, 1):
+            xb, zb = isl_pt(deg + sg * (half + 3.2), WALL_OFF - 0.5 - SHELF / 2, mirror)
+            xi, zi = isl_pt(deg + sg * (half + 3.2), -3.0, mirror)
+            place.append(("banner", xb, zb, 0.0, yaw_front(Vector((-(xi - xb), zi - zb)).normalized()), {}))
     info["landmark"] = [isl_pt(deg, R + 0.1, mirror) for deg, half, kind, R in cuts if kind == "landmark"][0]
-    # the pad: lanes around it stay clear (no ground scatter in v2)
+    # the pad: lanes around it stay clear (no ground scatter in v2); six low team crystal lamps (0.26 u, walkable)
+    # mark the heal-zone edge as the bible's pad crystals do
     place.append(("pad", padx, PAD[1], 0.0, 0.0, {}))
+    for k in range(6):
+        a = math.radians(30 + 60 * k)
+        x = padx + 4.55 * math.cos(a) * (-1 if mirror else 1)
+        place.append(("crystal_lamp_low", x, PAD[1] + 4.55 * math.sin(a), 0.0, mj(a), {}))
     return world, place, info
 
 
