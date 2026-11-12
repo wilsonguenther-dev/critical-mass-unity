@@ -1,0 +1,23 @@
+{
+    "name": "CriticalMass.Runtime.PlayTests",
+    "rootNamespace": "CriticalMass.Runtime.PlayTests",
+    "references": [
+        "CriticalMass.Sim",
+        "CriticalMass.Runtime",
+        "Unity.InputSystem",
+        "UnityEngine.TestRunner"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
