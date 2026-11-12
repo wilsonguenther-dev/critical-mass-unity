@@ -32,13 +32,14 @@ sys.path.insert(0, HERE)
 sys.path.insert(0, SHARED)
 
 from cm_art import export, kit, rig  # noqa: E402  (shared, read-only)
-from miner_art import mkit, mpal, toon3  # noqa: E402
+from miner_art import face_decal, mkit, mpal, toon3  # noqa: E402
 
 SEED = 803
 OUT_BLEND = os.path.join(HERE, "miner.blend")
 OUT_FBX = os.path.join(os.path.dirname(HERE), "Miner.fbx")
 OUT_BARR_FBX = os.path.join(os.path.dirname(HERE), "MinerBarricade.fbx")
 OUT_REPORT = os.path.join(HERE, "build_report.json")
+OUT_FACE = os.path.join(os.path.dirname(HERE), "MinerFace.png")
 DISPLAY_ACTION, DISPLAY_FRAME = "Idle", 1
 
 rng = random.Random(SEED)
@@ -47,15 +48,18 @@ BODY, PICK, HAMMER = "Miner_Body", "Miner_PickHammer", "Miner_PickHammer_Hammer"
 BAR = {"folded": "Miner_Barricade_Folded", "deployed": "Miner_Barricade_Deployed", "damaged": "Miner_Barricade_Damaged"}
 M = kit.mat_from
 BV = 0.03          # standard bevel (art direction 3.5: 0.02 to 0.04 u)
-LEG_X = 0.245      # v2: wider stance (bible p08 front, boots about 1.2 u across)
-HS = 1.35          # v2: helmet dome stretched up from the brim (bible: dome top about 8 % below the crystal tip)
+LEG_X = 0.255      # v2: wider stance (bible p08 front, boots about 1.2 u across)
+HS = 1.28          # v2: helmet dome stretched up from the brim (bible: dome top about 8 % below the crystal tip)
 
 
 def hz(z):
     return 1.545 + (z - 1.545) * HS
 
 
-HEAD_WIDEN = Matrix.Diagonal((1.18, 1.18, 1.0, 1.0))   # bible p08: helmet about half the body width
+HEAD_K, HEAD_PIVOT = 0.93, 1.30   # v2: head + helmet scaled about the neck (bible legs read longer; brief head share 33-38 %)
+HEAD_POST = (Matrix.Translation((0, 0, HEAD_PIVOT)) @ Matrix.Diagonal((HEAD_K, HEAD_K, HEAD_K, 1.0)) @
+             Matrix.Translation((0, 0, -HEAD_PIVOT)))
+HEAD_WIDEN = Matrix.Diagonal((1.02, 1.02, 1.0, 1.0))   # v2: bible p08 front measures the helmet 0.76 u, face 0.70 u
 _post = None
 
 
@@ -70,15 +74,32 @@ def head_crystal(*a, **kw):
     B.add_crystal(*a, **kw)
 
 
+BV_MIN = 0.02      # art direction 3.5 minimum bevel
+BEVELS = {"boxes": 0, "at_min_or_more": 0, "groove_strips_exempt": 0, "hidden_cores_unbevelled": 0, "min_bevel": 9.0}
+
+
 def box(size, bevel=BV, seg=1):
-    return B.box(size, bevel, seg)
+    """v2: every bevelled box gets at least BV_MIN; pieces too thin to carry it (1 px groove strips, < 0.04 u) are
+    counted as exempt; bevel 0 marks a hidden core. Tallied into build_report.json."""
+    BEVELS["boxes"] += 1
+    thin = min(size)
+    if bevel <= 0:
+        BEVELS["hidden_cores_unbevelled" if thin > 0.04 else "groove_strips_exempt"] += 1
+        return B.box(size, 0.0, seg)
+    if thin < 2 * BV_MIN:
+        BEVELS["groove_strips_exempt"] += 1
+        return B.box(size, min(bevel, thin * 0.45), seg)
+    bevel = max(bevel, BV_MIN)
+    BEVELS["at_min_or_more"] += 1
+    BEVELS["min_bevel"] = min(BEVELS["min_bevel"], bevel)
+    return B.box(size, bevel, max(seg, 1))
 
 
 def strap(a, b, width, thick, normal_hint, bevel=None):
     """Box from point a to point b (length axis), `thick` along normal_hint, `width` across."""
     a, b = Vector(a), Vector(b)
     L = (b - a).length
-    bm = B.box((width, thick, L), min(0.012, thick * 0.4) if bevel is None else bevel, 1)
+    bm = box((width, thick, L), BV_MIN if bevel is None else bevel, 1)
     return bm, kit.frame((a + b) / 2, b - a, normal_hint)
 
 
@@ -92,23 +113,23 @@ def build_legs():
     for s, sd in ((1, "l"), (-1, "r")):
         lx = LEG_X * s
         up, lo, ft, to = f"upperleg.{sd}", f"lowerleg.{sd}", f"foot.{sd}", f"toes.{sd}"
-        prof = [(0.14, 0.19), (0.19, 0.25), (0.215, 0.35), (0.22, 0.46), (0.205, 0.58), (0.15, 0.66)]
+        prof = [(0.13, 0.19), (0.165, 0.25), (0.185, 0.35), (0.19, 0.46), (0.185, 0.58), (0.15, 0.66)]
         add(BODY, B.lathe(prof, 12), "navy_dark", ["hips", up, lo], "trousers", m=M((lx, 0.0, 0)))
         # brass/brown knee guard: brass plate, leather inset, rivet
-        kg = M((lx, -0.19, 0.335), (-10, 0, 8 * s))
-        add(BODY, box((0.23, 0.09, 0.19), 0.03, 2), "brass", lo, "knee_guard", smooth=False, m=kg)
+        kg = M((lx, -0.165, 0.335), (-10, 0, 8 * s))
+        add(BODY, box((0.23, 0.07, 0.19), 0.03, 2), "brass", lo, "knee_guard", smooth=False, m=kg)
         add(BODY, box((0.13, 0.03, 0.10), 0.012, 1), "stone_light", lo, "knee_guard", smooth=False,
             m=kg @ M((0, -0.045, 0)))
-        B.add_crystal(BODY, lo, "team_glow", kg @ M((0, -0.06, 0), (90, 0, 30)), 0.055, 0.045, seg=6, waist=0.8,
+        B.add_crystal(BODY, lo, "team_glow", kg @ M((0, -0.045, 0), (90, 0, 30)), 0.05, 0.035, seg=6, waist=0.8,
                       cap=0.55)
                 # heavy brown boots with brass toe caps
-        add(BODY, B.cyl((lx, 0.02, 0.06), (lx, 0.02, 0.27), 0.20, 0.19, 12), "leather", [lo, ft], "boots")
-        add(BODY, B.torus(0.198, 0.045, 12, 5), "kerchief", lo, "team_cloth", m=M((lx, 0.02, 0.27)))   # team trim
-        add(BODY, box((0.38, 0.48, 0.17), 0.05, 2), "leather", [ft, to], "boots", m=M((lx + 0.02 * s, -0.08, 0.09)))
+        add(BODY, B.cyl((lx, 0.02, 0.06), (lx, 0.02, 0.27), 0.185, 0.175, 12), "leather", [lo, ft], "boots")
+        add(BODY, B.torus(0.18, 0.045, 12, 5), "kerchief", lo, "team_cloth", m=M((lx, 0.02, 0.27)))   # team trim
+        add(BODY, box((0.37, 0.42, 0.17), 0.05, 2), "leather", [ft, to], "boots", m=M((lx + 0.02 * s, -0.065, 0.09)))
         add(BODY, box((0.385, 0.16, 0.145), 0.035, 2), "brass", to, "boots", smooth=False,
-            m=M((lx + 0.02 * s, -0.26, 0.082)))
-        add(BODY, box((0.39, 0.50, 0.05), 0.02, 1), "leather_dark", [ft, to], "boots", smooth=False,
-            m=M((lx + 0.02 * s, -0.085, 0.025)))
+            m=M((lx + 0.02 * s, -0.23, 0.082)))
+        add(BODY, box((0.38, 0.44, 0.05), 0.02, 1), "leather_dark", [ft, to], "boots", smooth=False,
+            m=M((lx + 0.02 * s, -0.07, 0.025)))
         add(BODY, box((0.06, 0.04, 0.06), 0.02, 1), "brass", [lo, ft], "boots", smooth=False,
             m=M((lx + 0.0, -0.18, 0.16)))
 
@@ -156,7 +177,7 @@ def build_torso():
             n = Vector((0, -(b[2] - a[2]), b[1] - a[1])).normalized()
             if n.z < 0:
                 n = -n
-            bm, mm = strap(a, b, 0.10, 0.035, n)
+            bm, mm = strap(a, b, 0.11, 0.045, n)
             add(BODY, bm, "leather", w, "straps", smooth=False, m=mm)
         add(BODY, box((0.13, 0.17, 0.035), 0.012, 1), "brass", w, "straps", smooth=False,
             m=M((0.22 * s, -0.10, 1.295), (-8, 0, 0)))
@@ -194,63 +215,122 @@ def build_neck():
     add(BODY, B.sphere((0.10, 0.07, 0.07), 10, 6), "kerchief", "chest", "team_cloth", m=M((0.14, -0.25, 1.15)))
 
 
+def face_plane(rows=6, cols=12):
+    """UV-less grid hugging the front of the head sphere (head space, before HEAD_WIDEN), 8 mm proud of it, covering the
+    face_decal extent. UVs and the decal material are assigned after finalize (assign_face_decal)."""
+    import bmesh
+    cx, cy, cz, rx, ry, rz = 0.0, -0.01, 1.44, 0.28, 0.26, 0.27
+    bm = bmesh.new()
+    grid = []
+    for j in range(rows + 1):
+        z = face_decal.Z0 + (face_decal.Z1 - face_decal.Z0) * j / rows
+        row = []
+        for i in range(cols + 1):
+            x = face_decal.X0 + (face_decal.X1 - face_decal.X0) * i / cols
+            k = 1.0 - (x / rx) ** 2 - ((z - cz) / rz) ** 2
+            y = cy - ry * math.sqrt(max(k, 0.02)) - 0.008
+            row.append(bm.verts.new((x, y, z)))
+        grid.append(row)
+    back = [[bm.verts.new(v.co + Vector((0, 0.004, 0))) for v in row] for row in grid]   # closed thin slab
+    for j in range(rows):
+        for i in range(cols):
+            bm.faces.new((grid[j][i], grid[j][i + 1], grid[j + 1][i + 1], grid[j + 1][i]))
+            bm.faces.new((back[j][i], back[j + 1][i], back[j + 1][i + 1], back[j][i + 1]))
+    ring = ([(0, i) for i in range(cols)] + [(j, cols) for j in range(rows)] +
+            [(rows, i) for i in range(cols, 0, -1)] + [(j, 0) for j in range(rows, 0, -1)])
+    for k, (j, i) in enumerate(ring):
+        j2, i2 = ring[(k + 1) % len(ring)]
+        bm.faces.new((grid[j][i], back[j][i], back[j2][i2], grid[j2][i2]))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    return bm
+
+
 def build_head():
     global _post
-    _post = HEAD_WIDEN
+    _post = HEAD_POST @ HEAD_WIDEN
     H = "head"
     add(BODY, B.sphere((0.28, 0.26, 0.27), 18, 12), "skin", H, "skin", m=M((0, -0.01, 1.44)))
     for s in (1, -1):
         add(BODY, B.sphere((0.035, 0.05, 0.065), 8, 6), "skin_shadow", H, "skin", m=M((0.262 * s, 0.03, 1.45)))
-        # determined eyes under heavy brows
-        add(BODY, B.sphere((0.062, 0.025, 0.066), 10, 6), "eye_white", H, "face", m=M((0.102 * s, -0.245, 1.468)))
-        add(BODY, B.sphere((0.04, 0.018, 0.048), 8, 6), "pupil", H, "face", m=M((0.095 * s, -0.262, 1.462)))
-        add(BODY, B.sphere((0.015, 0.007, 0.015), 6, 4), "eye_white", H, "face", m=M((0.082 * s, -0.279, 1.48)))
-        add(BODY, box((0.15, 0.06, 0.06), 0.02, 1), "brow", H, "face", smooth=False,
-            m=M((0.11 * s, -0.25, 1.53), (0, -16 * s, 0)))
+        # v2: brow ridge in skin (form under the painted heavy brow) instead of v1's dark boxes
+        add(BODY, B.sphere((0.085, 0.035, 0.03), 8, 5), "skin", H, "skin", m=M((0.10 * s, -0.235, 1.515), (0, 8 * s, 0)))
+    # v2 face: painted 256 px decal (eyes, lids, heavy brows, blush) on a plane hugging the head front
+    add(BODY, face_plane(), "skin", H, "face_decal", smooth=True, grad=False)
     # big round red nose
-    add(BODY, B.sphere((0.085, 0.075, 0.075), 12, 8), "nose", H, "face", m=M((0, -0.30, 1.405)))
-    # beard: base mass + 9 sculpted tapered clumps; mustache 2 clumps; grin
-    add(BODY, B.sphere((0.27, 0.20, 0.12), 12, 7), "beard", H, "beard", m=M((0, -0.03, 1.33)))
-    clumps = [
-        ((0.25, -0.07, 1.40), (0.27, -0.13, 1.27), 0.085, (0.03, -0.02, 0.0)),
-        ((-0.25, -0.07, 1.40), (-0.27, -0.13, 1.27), 0.085, (-0.03, -0.02, 0.0)),
-        ((0.255, 0.0, 1.52), (0.27, -0.06, 1.37), 0.06, (0.02, 0, 0)),
-        ((-0.255, 0.0, 1.52), (-0.27, -0.06, 1.37), 0.06, (-0.02, 0, 0)),
-        ((0.17, -0.18, 1.32), (0.19, -0.26, 1.22), 0.09, (0.02, -0.03, 0)),
-        ((-0.17, -0.18, 1.32), (-0.19, -0.26, 1.22), 0.09, (-0.02, -0.03, 0)),
-        ((0.065, -0.21, 1.30), (0.07, -0.30, 1.20), 0.09, (0.0, -0.03, 0)),
-        ((-0.065, -0.21, 1.30), (-0.07, -0.30, 1.20), 0.09, (0.0, -0.03, 0)),
-        ((0.0, -0.20, 1.29), (0.0, -0.29, 1.19), 0.085, (0, -0.03, 0)),
+    add(BODY, B.sphere((0.088, 0.078, 0.078), 12, 8), "nose", H, "face", m=M((0, -0.30, 1.405)))
+    # v2 beard: a shaped, two-tone form (mid-brown mass, lighter clump crowns and mustache), short (tip at z 1.19)
+    add(BODY, B.sphere((0.275, 0.205, 0.125), 14, 7), "beard", H, "beard", m=M((0, -0.035, 1.33)))
+    clumps = [   # base, tip, radius, bend, tone
+        ((0.23, -0.08, 1.42), (0.24, -0.14, 1.27), 0.09, (0.02, -0.02, 0.0), "beard"),
+        ((-0.23, -0.08, 1.42), (-0.24, -0.14, 1.27), 0.09, (-0.02, -0.02, 0.0), "beard"),
+        ((0.24, 0.0, 1.53), (0.25, -0.06, 1.38), 0.065, (0.015, 0, 0), "beard"),
+        ((-0.24, 0.0, 1.53), (-0.25, -0.06, 1.38), 0.065, (-0.015, 0, 0), "beard"),
+        ((0.18, -0.17, 1.33), (0.20, -0.25, 1.21), 0.10, (0.02, -0.03, 0), "beard_light"),
+        ((-0.18, -0.17, 1.33), (-0.20, -0.25, 1.21), 0.10, (-0.02, -0.03, 0), "beard_light"),
+        ((0.075, -0.21, 1.31), (0.08, -0.30, 1.19), 0.10, (0.0, -0.03, 0), "beard"),
+        ((-0.075, -0.21, 1.31), (-0.08, -0.30, 1.19), 0.10, (0.0, -0.03, 0), "beard"),
+        ((0.0, -0.21, 1.30), (0.0, -0.30, 1.18), 0.09, (0, -0.03, 0), "beard_light"),
     ]
-    for b, t, r, bend in clumps:
-        add(BODY, B.spike(b, t, r, 8, bend), "beard", H, "beard", smooth=True)
-    for s in (1, -1):
-        add(BODY, B.spike((0.03 * s, -0.29, 1.355), (0.165 * s, -0.25, 1.315), 0.045, 7, (0.0, -0.02, 0.012)), "beard",
-            H, "beard", smooth=True)
-    grin = [(-0.085, 0.012), (-0.04, -0.03), (0.04, -0.03), (0.085, 0.012), (0.0, -0.002)]
-    add(BODY, B.prism(grin, 0.03), "mouth", H, "face", smooth=False, m=M((0, -0.272, 1.29), (90 - 12, 0, 0)))
-    teeth = [(-0.075, 0.010), (0.075, 0.010), (0.06, -0.008), (-0.06, -0.008)]
-    add(BODY, B.prism(teeth, 0.03), "teeth", H, "face", smooth=False, m=M((0, -0.278, 1.29), (90 - 12, 0, 0)))
+    for b, t, r, bend, tone in clumps:
+        add(BODY, B.spike(b, t, r, 8, bend), tone, H, "beard", smooth=True)
+    for s in (1, -1):   # mustache: two thick lighter curls sweeping out from under the nose
+        add(BODY, B.spike((0.025 * s, -0.295, 1.36), (0.185 * s, -0.25, 1.325), 0.055, 8, (0.0, -0.025, 0.018)),
+            "beard_light", H, "beard", smooth=True)
+    # wide open grin under the mustache: dark mouth, cream teeth band
+    grin = [(-0.10, 0.016), (-0.05, -0.036), (0.05, -0.036), (0.10, 0.016), (0.0, 0.0)]
+    add(BODY, B.prism(grin, 0.03), "mouth", H, "face", smooth=False, m=M((0, -0.278, 1.285), (90 - 12, 0, 0)))
+    teeth = [(-0.088, 0.012), (0.088, 0.012), (0.07, -0.009), (-0.07, -0.009)]
+    add(BODY, B.prism(teeth, 0.03), "teeth", H, "face", smooth=False, m=M((0, -0.284, 1.285), (90 - 12, 0, 0)))
+
+
+def assign_face_decal(ob, image):
+    """UVs (planar, from the rest position, exactly the decal's x/z extent) and the CM_FaceDecal material on the faces
+    of the face plane; everything else keeps CM_Toon (slot 0)."""
+    me = ob.data
+    gi = ob.vertex_groups["feat_face_decal"].index
+    vin = {v.index for v in me.vertices if any(g.group == gi for g in v.groups)}
+    uv = me.uv_layers.new(name="UVMap")
+    xs = [me.vertices[i].co.x for i in vin]
+    zs = [me.vertices[i].co.z for i in vin]
+    x0, x1, z0, z1 = min(xs), max(xs), min(zs), max(zs)
+    mat = toon3.make_decal_material("CM_FaceDecal", image)
+    me.materials.append(mat)
+    slot = len(me.materials) - 1
+    n = 0
+    head_c = Vector((0.0, -0.01, 1.44))
+    for poly in me.polygons:
+        # front sheet only: outward-facing (back sheet faces the head, rim walls are tangent)
+        if all(i in vin for i in poly.vertices) and poly.normal.dot((poly.center - head_c).normalized()) > 0.5:
+            poly.material_index = slot
+            n += 1
+        for li in poly.loop_indices:
+            co = me.vertices[me.loops[li].vertex_index].co
+            uv.data[li].uv = ((co.x - x0) / (x1 - x0), (co.z - z0) / (z1 - z0)) if poly.material_index == slot \
+                else (0.0, 0.0)
+    return n
+
+
+HELMET_SCALE = Matrix.Diagonal((0.92, 0.95, 1.0, 1.0))   # v2: bible p08 front helmet is narrower than v1's widened dome
 
 
 def build_helmet():
     global _post
-    _post = HEAD_WIDEN
+    _post = HEAD_POST @ HELMET_SCALE
     H = "head"
-    prof = [(r, hz(z)) for r, z in ((0.30, 1.545), (0.338, 1.58), (0.33, 1.635), (0.30, 1.685), (0.235, 1.725),
-                                    (0.125, 1.748), (0.02, 1.755))]
+    # v2 dome: taller than v1 but tapering to a narrower crown (bible front: 0.44 u across at z 1.8)
+    prof = [(0.29, 1.545), (0.325, 1.58), (0.318, 1.64), (0.29, 1.70), (0.235, 1.755), (0.15, 1.795), (0.03, 1.812)]
     add(BODY, B.lathe(prof, 20), "helmet", H, "helmet", m=M((0, 0.005, 0)))
     # brim (rounded, a step lighter), groove line, brass trim band + rivets
-    add(BODY, B.torus(0.335, 0.05, 20, 5), "stone_light", H, "helmet", m=M((0, -0.012, 1.55), (0, 0, 0),
+    add(BODY, B.torus(0.322, 0.05, 20, 5), "stone_light", H, "helmet", m=M((0, -0.012, 1.55), (0, 0, 0),
                                                                             (1.0, 1.07, 0.62)))
-    add(BODY, B.torus(0.333, 0.010, 20, 3), "helmet_seam", H, "helmet_detail", m=M((0, 0.004, 1.562)))
-    add(BODY, B.torus(0.338, 0.026, 20, 4), "brass", H, "helmet", m=M((0, 0.004, hz(1.59))))
+    add(BODY, B.torus(0.32, 0.010, 20, 3), "helmet_seam", H, "helmet_detail", m=M((0, 0.004, 1.562)))
+    add(BODY, B.torus(0.325, 0.026, 20, 4), "brass", H, "helmet", m=M((0, 0.004, hz(1.59))))
     for k in range(8):
         a = 2 * math.pi * (k + 0.5) / 8
         add(BODY, B.sphere((0.016, 0.016, 0.016), 5, 3), "brass_dark", H, "helmet_detail",
-            m=M((0.36 * math.cos(a), 0.004 + 0.36 * math.sin(a), hz(1.59))))
+            m=M((0.347 * math.cos(a), 0.004 + 0.347 * math.sin(a), hz(1.59))))
     # plate grooves (segmented stone hard hat): 4 meridians as thin strips riding the dome
-    pp = [(0.336, hz(1.60)), (0.328, hz(1.64)), (0.30, hz(1.69))]
+    pp = [(0.324, 1.60), (0.318, 1.655), (0.282, 1.715)]
     for ang in (30, 90, 150, 210, 270, 330):
         a = math.radians(ang)
         d = Vector((math.cos(a), math.sin(a), 0))
@@ -262,26 +342,26 @@ def build_helmet():
             add(BODY, bm, "helmet_seam", H, "helmet_detail", smooth=False, m=mm, grad=False)
     # brass lamp bracket on the front of the dome
     add(BODY, box((0.24, 0.10, 0.17), 0.03, 2), "brass", H, "helmet_lamp", smooth=False,
-        m=M((0, -0.25, 1.70), (-34, 0, 0)))
-    add(BODY, B.torus(0.13, 0.032, 12, 5), "brass", H, "helmet_lamp", m=M((0, -0.15, 1.785), (-14, 0, 0)))
+        m=M((0, -0.255, 1.68), (-34, 0, 0)))
+    add(BODY, B.torus(0.13, 0.032, 12, 5), "brass", H, "helmet_lamp", m=M((0, -0.185, 1.755), (-17, 0, 0)))
     # big glowing crystal lamp (v2: a chunky hex gem, not a thin spike): tip at z 2.0, 0.17 above the dome
-    axis = Vector((0, -0.16, 0.987)).normalized()
-    base = Vector((0, -0.14, 1.755))
-    h_main = (2.0 - base.z) / axis.z
-    head_crystal(BODY, H, "team_glow", kit.frame(base, axis, (0, 1, 0)), 0.15, h_main, seg=6, waist=0.94,
-                 cap=0.42)
-    for s in (1, -1):
-        ax = Vector((0.55 * s, -0.25, 0.80)).normalized()
-        head_crystal(BODY, H, "team_glow", kit.frame((0.11 * s, -0.17, 1.76), ax, (0, 1, 0)), 0.06, 0.15, seg=6,
-                      waist=0.8, cap=0.38)
+    axis = Vector((0, -0.30, 0.954)).normalized()
+    base = Vector((0, -0.17, 1.74))
+    tip_z = HEAD_PIVOT + (2.0 - HEAD_PIVOT) / HEAD_K       # tip lands on z 2.0 after HEAD_POST
+    h_main = (tip_z - base.z) / axis.z
+    head_crystal(BODY, H, "team_glow", kit.frame(base, axis, (0, 1, 0)), 0.17, h_main, seg=6, waist=0.94,
+                 cap=0.28)
+    # v2: no side shards (the bible front shows one gem); a small back shard keeps the gem cluster readable from above
+    head_crystal(BODY, H, "team_glow", kit.frame((0.0, -0.08, 1.77), Vector((0, 0.35, 0.94)).normalized(), (0, 1, 0)),
+                 0.06, 0.12, seg=6, waist=0.8, cap=0.38)
 
 
 def build_crate():
     global _post
     _post = None
     W = "chest"
-    C = Vector((0.0, 0.53, 1.10))      # v2: lower on the back (bible profile: crate spans z 0.75 to 1.45)
-    SX, SY, SZ = 0.60, 0.60, 0.66      # v2: 0.6 x 0.6 top-down square (brief), a little taller
+    C = Vector((0.0, 0.45, 1.14))      # v2: bible profile crate spans z 0.77 to 1.51, close on the back
+    SX, SY, SZ = 0.70, 0.60, 0.74      # v2: bible back view draws it shoulder-wide and tall; top-down 0.70 x 0.60
     F = "crate"
     FD = "crate_detail"      # boards, brace, lid, seams: 1.5 px inner line
 
@@ -290,14 +370,18 @@ def build_crate():
 
     add(BODY, B.box((SX - 0.05, SY - 0.05, SZ - 0.05), 0.0), "wood_dark", W, F, smooth=False, m=at(0, 0, 0))
     # back face: three vertical boards with 1 px grooves between, X brace proud of them
-    for x in (-0.193, 0.0, 0.193):
-        add(BODY, box((0.183, 0.03, 0.50), 0.012, 1), "wood", W, FD, smooth=False, m=at(x, SY / 2 - 0.02, 0))
+    bw = (SX - 0.10) / 3
+    for x in (-bw, 0.0, bw):
+        add(BODY, box((bw - 0.012, 0.03, SZ - 0.14), 0.02, 1), "wood", W, FD, smooth=False, m=at(x, SY / 2 - 0.02, 0))
+    diag = math.hypot(SX - 0.12, SZ - 0.12)
+    ang = math.degrees(math.atan2(SX - 0.12, SZ - 0.12))
     for sgn in (1, -1):
-        add(BODY, box((0.095, 0.034, 0.66), 0.014, 1), "wood", W, FD, smooth=False,
-            m=at(0, SY / 2 + 0.008, 0, (0, 42 * sgn, 0)))
+        add(BODY, box((0.10, 0.036, diag), 0.02, 1), "wood", W, FD, smooth=False,
+            m=at(0, SY / 2 + 0.008, 0, (0, ang * sgn, 0)))
     # front-facing top lid boards and bottom
-    for y in (-0.105, 0.105):
-        add(BODY, box((0.50, 0.195, 0.03), 0.012, 1), "wood", W, FD, smooth=False, m=at(0, y, SZ / 2 - 0.02))
+    for y in (-(SY - 0.10) / 4, (SY - 0.10) / 4):
+        add(BODY, box((SX - 0.10, (SY - 0.10) / 2 - 0.012, 0.03), 0.012, 1), "wood", W, FD, smooth=False,
+            m=at(0, y, SZ / 2 - 0.02))
     # wooden frame posts along the vertical edges, rails along the horizontal edges
     for x in (-1, 1):
         for y in (-1, 1):
@@ -327,10 +411,10 @@ def build_crate():
                 add(BODY, box((0.125, 0.125, 0.125), 0.03, 1), "brass", W, F, smooth=False,
                     m=at(x * (SX / 2 - 0.045), y * (SY / 2 - 0.045), z * (SZ / 2 - 0.045)))
     # rope coil on the right side, team crystals growing out of the top-left corner
-    for (x, y, z, ax, r, h) in ((0.19, 0.08, SZ / 2 - 0.02, (0.30, 0.15, 0.94), 0.08, 0.32),
-                                 (0.06, -0.02, SZ / 2 - 0.02, (-0.1, -0.25, 0.95), 0.06, 0.22),
-                                 (0.21, -0.10, SZ / 2 - 0.02, (0.5, -0.35, 0.8), 0.05, 0.17),
-                                 (-0.19, 0.10, SZ / 2 - 0.02, (-0.35, 0.1, 0.93), 0.07, 0.27),
+    for (x, y, z, ax, r, h) in ((0.21, 0.08, SZ / 2 - 0.02, (0.30, 0.15, 0.94), 0.085, 0.24),
+                                 (0.07, -0.02, SZ / 2 - 0.02, (-0.1, -0.25, 0.95), 0.06, 0.16),
+                                 (0.25, -0.10, SZ / 2 - 0.02, (0.5, -0.35, 0.8), 0.05, 0.13),
+                                 (-0.22, 0.10, SZ / 2 - 0.02, (-0.35, 0.1, 0.93), 0.07, 0.19),
                                  (SX / 2 + 0.01, 0.05, 0.08, (0.95, 0.1, 0.3), 0.06, 0.20),
                                  (-SX / 2 - 0.01, -0.06, 0.16, (-0.9, -0.1, 0.45), 0.055, 0.17)):
         B.add_crystal(BODY, W, "team_glow", kit.frame(C + Vector((x, y, z)), ax, (0, 1, 0)), r, h, seg=6,
@@ -385,7 +469,7 @@ def build_pick(poses, obj, state):
                     (0.50, 1.07, 0.012)], "stone_light")
         # crystal arm (-X): a broad stone blade carrying a long crystal edge, drooping down and out
         arc_arm(p, [(-0.10, 1.40, 0.10), (-0.24, 1.37, 0.09), (-0.36, 1.29, 0.075), (-0.44, 1.18, 0.05)], "stone")
-        crystals.append((kit.frame((-0.13, 0, 1.36), (-1.0, 0, -0.78), (0, 0, 1)), 0.12, 0.44))
+        crystals.append((kit.frame((-0.14, 0, 1.38), (-0.62, 0, -1.0), (0, 0, 1)), 0.12, 0.58))
         crystals.append((kit.frame((-0.22, 0, 1.43), (-1.0, 0, -0.30), (0, 0, 1)), 0.08, 0.28))
     else:
         # hammer: a massive stone block head with brass bands, crystals set into both faces and the top
@@ -456,50 +540,75 @@ def build_barricade():
     for z in (0.30, 0.62):
         bar_plank(o, -0.53, 0.53, z)
     bar_diamond(o, 0.46)
-    # folded: compact upright crate (the posts folded in as stone side panels), X brace, brass corners, crystals
-    o = BAR["folded"]
+    folded_crate(BAR["folded"], damaged=False)
+    # damaged (bible p08 barricade-damaged): the FOLDED crate, battered: knocked over onto its long side and tilted,
+    # one face board torn out, one brace snapped, a brass corner off, a stone panel cracked, the crystal chipped,
+    # splinters and a stone chip on the ground. Authored geometry, no procedural destruction.
+    folded_crate(BAR["damaged"], damaged=True)
+
+
+def folded_crate(o, damaged):
+    F = "barricade"
     SX, SY, SZ = 0.62, 0.44, 0.80
-    add(o, B.box((SX - 0.14, SY - 0.05, SZ - 0.04), 0.0), "wood_dark", None, "barricade", smooth=False,
-        m=M((0, 0, SZ / 2)))
+    if damaged:
+        # lying on its long side (crate z -> world x), rocked 9 degrees onto one edge, resting on the ground
+        base = M((0.0, 0.0, SX / 2 + 0.035), (0, 0, 0)) @ M((0, 0, 0), (0, 81, 0)) @ M((0, 0, -SZ / 2))
+    else:
+        base = M((0, 0, 0))
+
+    def put(bm, col, m, smooth=False, grad=True):
+        add(o, bm, col, None, F, smooth=smooth, m=base @ m, grad=grad)
+
+    def gem(m4, r, h, **kw):
+        B.add_crystal(o, None, "team_glow", base @ m4, r, h, seg=6, waist=0.8, **kw)
+
+    put(B.box((SX - 0.14, SY - 0.05, SZ - 0.04), 0.0), "wood_dark", M((0, 0, SZ / 2)))
     for x in (-1, 1):
-        add(o, box((0.13, SY, SZ - 0.06), 0.04, 2), "stone_light", None, "barricade", smooth=False,
-            m=M((x * (SX / 2 - 0.065), 0, SZ / 2)))
-        B.add_crystal(o, None, "team_glow", M((x * (SX / 2 + 0.0), 0, SZ / 2), (0, 90 * x, 0)), 0.08, 0.08,
-                      seg=6, waist=0.8, cap=0.55)
+        if damaged and x > 0:      # cracked stone side panel: two pieces, the upper one slipped and turned
+            put(box((0.13, SY, SZ * 0.55), 0.04, 2), "stone_light", M((x * (SX / 2 - 0.065), 0, SZ * 0.29)))
+            put(box((0.13, SY * 0.9, SZ * 0.36), 0.04, 2), "stone", M((x * (SX / 2 - 0.05), -0.03, SZ * 0.79), (6, 0, 9)))
+        else:
+            put(box((0.13, SY, SZ - 0.06), 0.04, 2), "stone_light", M((x * (SX / 2 - 0.065), 0, SZ / 2)))
+        if damaged and x > 0:      # chipped crystal, smaller and knocked askew
+            gem(M((x * (SX / 2 + 0.0), 0.02, SZ * 0.45), (0, 90 * x, 25)), 0.065, 0.06, cap=0.6)
+        else:
+            gem(M((x * (SX / 2 + 0.0), 0, SZ / 2), (0, 90 * x, 0)), 0.08, 0.08, cap=0.55)
         for y in (-1, 1):
             for z in (-1, 1):
-                add(o, box((0.12, 0.12, 0.12), 0.03, 1), "brass", None, "barricade", smooth=False,
-                    m=M((x * (SX / 2 - 0.05), y * (SY / 2 - 0.05), SZ / 2 + z * (SZ / 2 - 0.05))))
+                if damaged and (x, y, z) == (1, -1, 1):
+                    continue       # this brass corner is off (lies on the ground below)
+                put(box((0.12, 0.12, 0.12), 0.03, 1), "brass",
+                    M((x * (SX / 2 - 0.05), y * (SY / 2 - 0.05), SZ / 2 + z * (SZ / 2 - 0.05))))
     for y in (-1, 1):
-        for xx in (-0.12, 0.0, 0.12):
-            add(o, box((0.115, 0.03, SZ - 0.16), 0.012, 1), "wood", None, "barricade", smooth=False,
-                m=M((xx, y * (SY / 2 - 0.005), SZ / 2)))
+        for k, xx in enumerate((-0.12, 0.0, 0.12)):
+            if damaged and y < 0 and k == 1:
+                continue           # the middle front board is torn out: the dark backing shows through
+            tilt = (0, 4 if damaged and k == 2 and y < 0 else 0, 0)
+            put(box((0.115, 0.03, SZ - 0.16), 0.02, 1), "wood", M((xx, y * (SY / 2 - 0.005), SZ / 2), tilt))
         for sg in (1, -1):
-            add(o, box((0.075, 0.035, 0.72), 0.014, 1), "wood", None, "barricade", smooth=False,
-                m=M((0, y * (SY / 2 + 0.014), SZ / 2), (0, 22 * sg, 0)))
-    add(o, box((SX - 0.02, SY + 0.02, 0.05), 0.018, 2), "wood", None, "barricade", smooth=False,
-        m=M((0, 0, SZ + 0.02)))
-    B.add_crystal(o, None, "team_glow", kit.frame((0.14, 0.05, SZ + 0.04), (0.3, 0.1, 0.95), (0, 1, 0)), 0.06, 0.18,
-                  seg=6, waist=0.8, cap=0.4)
-    add(o, B.torus(0.06, 0.015, 10, 4), "brass_dark", None, "barricade", m=M((-0.10, 0, SZ + 0.06), (90, 0, 0)))
-    # damaged: one post lost its top block, top plank snapped in two, lower plank cracked, crystal chipped, debris
-    o = BAR["damaged"]
-    bar_post(o, -0.72)
-    bar_post(o, 0.72, chipped=True)
-    bar_plank(o, -0.53, -0.04, 0.30, tilt=-2)
-    bar_plank(o, 0.03, 0.53, 0.29, tilt=3)
-    bar_plank(o, -0.53, -0.08, 0.66, tilt=6)
-    jag = [(0.0, -0.125), (0.42, -0.125), (0.36, -0.04), (0.44, 0.03), (0.34, 0.125), (0.0, 0.125)]
-    add(o, B.prism(jag, 0.09, 0.012), "wood", None, "barricade", smooth=False,
-        m=M((0.08, 0.0, 0.58), (90, -14, 0)))
-    bar_diamond(o, 0.47, scale=0.8, tilt=14, x=-0.05)
-    for (x, y, rz, l) in ((0.15, -0.40, 25, 0.34), (-0.25, -0.45, -40, 0.24)):
-        add(o, box((l, 0.08, 0.06), 0.015, 1), "wood", None, "barricade", smooth=False, m=M((x, y, 0.03), (0, 0, rz)))
-    for (x, y, sz) in ((0.40, -0.45, 0.11), (0.95, -0.25, 0.08), (0.30, -0.25, 0.06)):
-        add(o, box((sz, sz * 0.9, sz * 0.8), 0.02, 1), "stone_light", None, "barricade", smooth=False,
-            m=M((x, y, sz * 0.4), (rng.uniform(-20, 20), rng.uniform(-20, 20), rng.uniform(0, 90))))
-    B.add_crystal(o, None, "team_glow", kit.frame((0.05, -0.32, 0.0), (0.4, -0.2, 0.3), (0, 0, 1)), 0.045, 0.10,
-                  seg=4, waist=0.9, cap=0.6)
+            if damaged and y < 0 and sg < 0:
+                # snapped brace: two short pieces at broken angles with a jagged end
+                put(box((0.075, 0.035, 0.36), 0.02, 1), "wood", M((-0.07, y * (SY / 2 + 0.014), SZ * 0.30), (0, -22, 0)))
+                put(box((0.075, 0.035, 0.30), 0.02, 1), "wood", M((0.10, y * (SY / 2 + 0.03), SZ * 0.72), (0, -40, 0)))
+                jag = [(0.0, -0.04), (0.05, -0.04), (0.03, 0.0), (0.06, 0.04), (0.0, 0.04)]
+                put(B.prism(jag, 0.035, 0.0), "wood_dark", M((0.0, y * (SY / 2 + 0.02), SZ * 0.5), (90, 0, 0)),
+                    grad=False)
+            else:
+                put(box((0.075, 0.035, 0.72), 0.02, 1), "wood", M((0, y * (SY / 2 + 0.014), SZ / 2), (0, 22 * sg, 0)))
+    if damaged:   # lid knocked loose, sitting crooked
+        put(box((SX - 0.02, SY + 0.02, 0.05), 0.02, 2), "wood", M((0.03, 0.01, SZ + 0.03), (0, 7, 4)))
+    else:
+        put(box((SX - 0.02, SY + 0.02, 0.05), 0.02, 2), "wood", M((0, 0, SZ + 0.02)))
+        gem(kit.frame((0.14, 0.05, SZ + 0.04), (0.3, 0.1, 0.95), (0, 1, 0)), 0.06, 0.18, cap=0.4)
+        put(B.torus(0.06, 0.02, 10, 4), "brass_dark", M((-0.10, 0, SZ + 0.06), (90, 0, 0)), smooth=True)
+    if damaged:   # ground debris in world space: the lost brass corner, splinters, a stone chip, a crystal shard
+        add(o, box((0.12, 0.12, 0.12), 0.03, 1), "brass", None, F, smooth=False, m=M((0.52, -0.36, 0.06), (10, 0, 35)))
+        for (x, y, rz, L) in ((0.15, -0.42, 25, 0.30), (-0.30, -0.40, -40, 0.22), (0.45, 0.30, 70, 0.18)):
+            add(o, box((L, 0.06, 0.045), 0.02, 1), "wood", None, F, smooth=False, m=M((x, y, 0.025), (0, 0, rz)))
+        add(o, box((0.11, 0.10, 0.08), 0.025, 1), "stone_light", None, F, smooth=False,
+            m=M((-0.52, -0.25, 0.04), (12, 8, 30)))
+        B.add_crystal(o, None, "team_glow", kit.frame((0.30, -0.30, 0.0), (0.4, -0.2, 0.3), (0, 0, 1)), 0.04, 0.09,
+                      seg=4, waist=0.9, cap=0.6)
 
 
 # ===================================================================================================== main
@@ -541,6 +650,8 @@ def main():
         c.objects.unlink(arm)
     coll.objects.link(arm)
     objs = B.finalize(coll, mat)
+    face_img = face_decal.save_png_blender(OUT_FACE)
+    n_face = assign_face_decal(objs[BODY], face_img)
     objs[HAMMER].hide_render = True
     objs[HAMMER].hide_set(True)
 
@@ -553,13 +664,15 @@ def main():
         ob.hide_render = True
         ob.hide_set(True)
 
-    report = {"objects": {}, "bones": len(arm.data.bones), "display_pose": [DISPLAY_ACTION, DISPLAY_FRAME]}
+    report = {"objects": {}, "bones": len(arm.data.bones), "display_pose": [DISPLAY_ACTION, DISPLAY_FRAME],
+              "face_decal": {"png": os.path.basename(OUT_FACE), "size": face_decal.N, "faces": n_face}}
     for name, ob in list(objs.items()) + list(bobjs.items()):
         report["objects"][name] = {
             "triangles": tris(ob), "vertices": len(ob.data.vertices), "rest_bounds": dims(ob),
             "materials": [m.name for m in ob.data.materials],
             "feature_groups": sorted(g.name for g in ob.vertex_groups if g.name.startswith("feat_")),
         }
+    report["bevels"] = BEVELS
     report["triangles_character"] = tris(objs[BODY]) + tris(objs[PICK]) + tris(objs[HAMMER])
     report["triangles_barricade_per_state"] = {k: tris(bobjs[v]) for k, v in BAR.items()}
 

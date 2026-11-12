@@ -27,6 +27,11 @@ NAVY = (0x18, 0x23, 0x3B)
 CREAM = (0xF7, 0xF0, 0xE5)
 BIBLE_ORDER = ["N", "NW", "W", "SW", "S", "SE", "E", "NE"]   # 09-miner-directions left to right (fig 3 faces left)
 checks = {}
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import iou_gate  # noqa: E402  (v2: registered IoU against the clean bible masks)
+GATE = iou_gate.run(R, os.path.join(OUT, "iou.json"), os.path.join(OUT, "iou-overlay.jpg"))
+checks["iou"] = GATE
+checks["iou_turnaround_min"] = min(GATE[k]["iou"] for k in iou_gate.TURNAROUND if k in GATE)
 
 
 def font(sz):
@@ -99,9 +104,9 @@ def sbs(name, ref_imgs, ours, label_l, label_r, H=560, do_iou=True):
     d.text((gap, 6), "bible: " + label_l, fill=(40, 40, 50), font=f)
     d.text((gap * 2 + L.size[0], 6), "ours: " + label_r, fill=(40, 40, 50), font=f)
     score = None
-    if do_iou and len(ref_imgs) == 1 and len(ours) == 1 and ours[0][1] is not None:
-        score = round(iou(bible_mask(ref_imgs[0][0]), ours[0][1]), 3)
-        d.text((W - 190, 6), f"IoU (indicative) {score:.2f}", fill=(40, 40, 50), font=f)
+    if do_iou and name in GATE:
+        score = GATE[name]["iou"]
+        d.text((W - 220, 6), f"IoU (clean mask) {score:.2f}", fill=(40, 40, 50), font=f)
     path = os.path.join(OUT, f"sbs-{name}.jpg")
     size = save_jpg(canvas, path, maxw=1400)
     return {"file": os.path.basename(path), "bytes": size, "iou_indicative": score}

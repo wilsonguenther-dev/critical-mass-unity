@@ -11,6 +11,7 @@ Only the pose and the camera angle move; proportions are the model's. Writes sta
 import json
 import math
 import os
+import random
 import sys
 
 sys.dont_write_bytecode = True
@@ -161,7 +162,7 @@ def reg_iou(bm, om, n_scales=13):
 
 def vec_params(st):
     keys = []
-    for k in ("az", "el", "pick_roll", "leg_spread"):
+    for k in ("az", "el", "pick_roll", "leg_spread", "lean", "twist", "head_yaw", "head_tilt"):
         keys.append((k, None))
     for b in ARM_BONES:
         for i in range(3):
@@ -171,11 +172,14 @@ def vec_params(st):
     return keys
 
 
-STEP = {"az": 6.0, "el": 4.0, "pick_roll": 20.0, "leg_spread": 4.0, "pick_up": 0.25}
-LIMIT = {"el": (-5, 20), "leg_spread": (0, 14)}
+STEP = {"az": 6.0, "el": 4.0, "pick_roll": 20.0, "leg_spread": 4.0, "pick_up": 0.25, "lean": 4.0, "twist": 6.0,
+        "head_yaw": 8.0, "head_tilt": 5.0}
+LIMIT = {"el": (-5, 20), "leg_spread": (0, 14), "lean": (-12, 12), "twist": (-25, 25), "head_yaw": (-30, 30),
+         "head_tilt": (-15, 15)}
 
 
 def fit(view, st, evals):
+    rng = random.Random(803)
     bm = load_bible(MASK[view])
     cache = {}
 
@@ -209,6 +213,22 @@ def fit(view, st, evals):
                     break
             if n >= evals:
                 break
+        if not improved:   # before shrinking the steps, try a few joint random moves (escapes ridge-shaped optima)
+            for _ in range(8):
+                cand = json.loads(json.dumps(st))
+                for (k, i), sz in steps.items():
+                    if i is None:
+                        v = cand.get(k, 0.0) + rng.uniform(-1, 1) * sz
+                        if k in LIMIT:
+                            v = min(max(v, LIMIT[k][0]), LIMIT[k][1])
+                        cand[k] = round(v, 3)
+                    else:
+                        cand[k][i] = round(cand[k][i] + rng.uniform(-1, 1) * sz, 4)
+                sc = score(cand)
+                n += 1
+                if sc > best + 1e-4:
+                    best, st, improved = sc, cand, True
+                    break
         if not improved:
             steps = {k: v * 0.5 for k, v in steps.items()}
             if max(steps.values()) < 0.01:

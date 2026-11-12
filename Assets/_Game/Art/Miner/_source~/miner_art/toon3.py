@@ -176,3 +176,36 @@ def set_light(mat, vec):
     n = mat.node_tree.nodes["LIGHT"]
     for i in range(3):
         n.inputs[i].default_value = vec[i]
+
+
+def make_decal_material(name, image):
+    """Preview of the painted face decal (Unity: an unlit-in-band alpha decal on the face plane, no outline pass).
+    Flat image colour, alpha blended; DEBUG (1) paints it black so team-mask renders do not count eye whites."""
+    mat = bpy.data.materials.get(name) or bpy.data.materials.new(name)
+    mat.use_nodes = True
+    nt = mat.node_tree
+    nt.nodes.clear()
+    tex = nt.nodes.new("ShaderNodeTexImage")
+    tex.image = image
+    tex.interpolation = "Linear"
+    tex.extension = "CLIP"
+    dbg = nt.nodes.new("ShaderNodeValue")
+    dbg.name = dbg.label = "DEBUG"
+    dbg.outputs[0].default_value = 0.0
+    mix = nt.nodes.new("ShaderNodeMix")
+    mix.data_type = "RGBA"
+    nt.links.new(dbg.outputs[0], mix.inputs[0])
+    nt.links.new(tex.outputs["Color"], mix.inputs[6])
+    mix.inputs[7].default_value = (0, 0, 0, 1)
+    em = nt.nodes.new("ShaderNodeEmission")
+    nt.links.new(mix.outputs[2], em.inputs["Color"])
+    tr = nt.nodes.new("ShaderNodeBsdfTransparent")
+    ms = nt.nodes.new("ShaderNodeMixShader")
+    nt.links.new(tex.outputs["Alpha"], ms.inputs[0])
+    nt.links.new(tr.outputs[0], ms.inputs[1])
+    nt.links.new(em.outputs[0], ms.inputs[2])
+    out = nt.nodes.new("ShaderNodeOutputMaterial")
+    nt.links.new(ms.outputs[0], out.inputs["Surface"])
+    mat.surface_render_method = "BLENDED"
+    mat.use_backface_culling = True
+    return mat

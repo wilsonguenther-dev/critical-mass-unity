@@ -142,12 +142,16 @@ def outline_weights(ob):
         return
     g = ob.vertex_groups.new(name="outline_w")
     inner_idx = {vg.index for vg in ob.vertex_groups if vg.name in INNER}
-    full, half = [], []
+    none_idx = {vg.index for vg in ob.vertex_groups if vg.name == "feat_face_decal"}   # the decal gets no hull
+    full, half, zero = [], [], []
     for v in ob.data.vertices:
-        (half if any(e.group in inner_idx for e in v.groups) else full).append(v.index)
+        gs = {e.group for e in v.groups}
+        (zero if gs & none_idx else half if gs & inner_idx else full).append(v.index)
     g.add(full, 1.0, "REPLACE")
     if half:
         g.add(half, 0.5, "REPLACE")
+    if zero:
+        g.add(zero, 0.0, "REPLACE")
 
 
 def set_outline(objs, width):
@@ -171,6 +175,8 @@ def set_team(crimson):
 def set_debug(on):
     for m in (mat, prop_mat):
         toon3.set_param(m, "DEBUG", 1.0 if on else 0.0)
+    if "CM_FaceDecal" in bpy.data.materials:
+        bpy.data.materials["CM_FaceDecal"].node_tree.nodes["DEBUG"].outputs[0].default_value = 1.0 if on else 0.0
     ink = bpy.data.materials["CM_Toon_Outline"].node_tree.nodes["INK"]
     c = (1, 0, 0, 1) if on else tuple(list(mpal.lin(mpal.VOID_NAVY)) + [1])   # debug: ink red, team white, rest black
     ink.inputs["Color"].default_value = c
@@ -310,6 +316,25 @@ if want("gameplay"):
     pts = posed_points(char_objs)
     ys = [world_to_camera_view(scene, cam, p).y for p in pts]
     measure["gameplay_px_height_silhouette"] = round((max(ys) - min(ys)) * 1080, 2)
+    # v2 step 4: helmet vs crate read at gameplay size (projected bbox in 1080p px, facing the camera and away)
+    def feat_px(groups):
+        dg = bpy.context.evaluated_depsgraph_get()
+        gi = {body.vertex_groups[g].index for g in groups if g in body.vertex_groups}
+        idx = [v.index for v in body.data.vertices if any(e.group in gi for e in v.groups)]
+        ev = body.evaluated_get(dg)
+        me = ev.to_mesh()
+        cs = [world_to_camera_view(scene, cam, ev.matrix_world @ me.vertices[i].co) for i in idx]
+        ev.to_mesh_clear()
+        return [round((max(c.x for c in cs) - min(c.x for c in cs)) * 1920, 1),
+                round((max(c.y for c in cs) - min(c.y for c in cs)) * 1080, 1)]
+    for fname in ("S", "N", "SE"):
+        arm.rotation_euler = (0, 0, math.radians(FACINGS[fname]))
+        bpy.context.view_layer.update()
+        measure[f"gameplay_px_wh_{fname}"] = {
+            "helmet_with_lamp": feat_px(["feat_helmet", "feat_helmet_lamp", "feat_helmet_detail"]),
+            "crate": feat_px(["feat_crate", "feat_crate_detail"])}
+    arm.rotation_euler = (0, 0, math.radians(FACINGS["S"]))
+    bpy.context.view_layer.update()
     for team in ("azure", "crimson"):
         set_team(team == "crimson")
         no_border()

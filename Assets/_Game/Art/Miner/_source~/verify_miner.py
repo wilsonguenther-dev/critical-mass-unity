@@ -126,7 +126,8 @@ for name, ob in sorted(meshes.items()):
     tris, lv, le, nm, shells = geo_stats(ob)
     total += tris
     mats = [m.name for m in ob.data.materials if m]
-    check(f"{name} material slots", mats == ["CM_Toon"], mats)
+    want = ["CM_Toon", "CM_FaceDecal"] if name == "Miner_Body" else ["CM_Toon"]   # v2: painted face decal slot
+    check(f"{name} material slots", mats == want, mats)
     check(f"{name} loose/non-manifold", lv == 0 and le == 0 and nm == 0,
           {"triangles": tris, "loose_verts": lv, "loose_edges": le, "non_manifold_edges": nm, "closed_shells": shells})
     mod = [m for m in ob.modifiers if m.type == "ARMATURE"]

@@ -5,7 +5,7 @@
 v1 used a raw "differs from paper" threshold, which kept the ground shadow, neighbouring art clipped into the crop,
 next-row fragments and pin-holes from white highlights. Here, per crop:
   1. foreground = colour distance from the paper (median of the crop border) > 40;
-  2. the ground shadow and paper-grey haze are dropped: low-chroma light pixels (max-min < 20, mean > 150) are paper;
+  2. the ground shadow is dropped: low-chroma light pixels (max-min < 20, mean > 150) in the bottom 18 % of the figure;
   3. parts are grouped by a 2 px dilation; only the main figure group is kept (multi-object crops keep every group at
      least KEEP x the largest, so the three pick states / folded stages survive);
   4. holes are filled unless they are large AND paper-coloured (real gaps such as between the pick shaft and the arm);
@@ -41,7 +41,14 @@ def clean(path, keep, cut_b, cut_r):
     paper = np.median(border, axis=0)
     dist = np.abs(a - paper).sum(2)
     chroma = a.max(2) - a.min(2)
-    fg = (dist > 40) & ~((chroma < 20) & (a.mean(2) > 150))
+    fg0 = dist > 40
+    # the ground shadow is a low-chroma light ellipse under the feet: drop such pixels only in the bottom 18 % of the
+    # figure (v2 first pass dropped them everywhere and ate light silhouette edges: helmet highlights, cream sleeves)
+    shadowish = (chroma < 20) & (a.mean(2) > 150)
+    ys = np.nonzero(fg0.any(1))[0]
+    band = np.zeros_like(fg0)
+    band[int(ys.min() + 0.82 * (ys.max() - ys.min())):] = True
+    fg = fg0 & ~(shadowish & band)
     if cut_b:
         fg[-cut_b:] = False
     if cut_r:

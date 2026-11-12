@@ -6,6 +6,8 @@ A stance is a dict (stances.json, written by fit_stance.py):
   pick_up                   armature-space direction the pick shaft is turned to (None: leave the hand alone)
   pick_roll                 degrees the hand turns about the shaft after that (faces the pick head to the camera)
   leg_spread                degrees each upper leg swings outward about the armature Y axis
+  lean, twist               degrees the spine bends sideways (about Y) / turns (about Z); arms, head and crate follow
+  head_yaw, head_tilt       degrees the head turns (about Z) / tilts sideways (about Y)
 """
 import bpy
 from mathutils import Matrix, Quaternion, Vector
@@ -41,6 +43,11 @@ class Poser:
         if sp:
             for nm, sgn in (("upperleg.l", 1), ("upperleg.r", -1)):
                 self._rot_about(pbs[nm], Quaternion((0, 1, 0), -sgn * sp * 3.14159265 / 180.0))
+        D = 3.14159265 / 180.0
+        for bone, key, axis in (("spine", "lean", (0, 1, 0)), ("spine", "twist", (0, 0, 1)),
+                                ("head", "head_yaw", (0, 0, 1)), ("head", "head_tilt", (0, 1, 0))):
+            if st.get(key):
+                self._rot_about(pbs[bone], Quaternion(axis, st[key] * D))
         slot_idle = pbs["handslot.r"].matrix.copy()
         for bone in ARM_BONES:
             if bone in st and st[bone] is not None:
