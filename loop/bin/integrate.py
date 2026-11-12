@@ -12,8 +12,15 @@ Flow:
   1. Take the compile lock for the whole batch (owner integrator-batch-N, this pid, start time); the stall alarm reads it.
   2. Cut loop/int-<tag>-<N> from current origin/main in the integration worktree (~/critical-mass-unity-lanes/_int).
   3. Merge each item branch loop/<ID> in the given (stable) order. A merge conflict drops that item.
-  4. Scope-check each item (git only). A scope violation drops that item.
-  5. Run the gates in order, ONE compile per round. On a red gate, attribute it to an item from the compiler/test
+  4. Scope-check each item (git only). A scope violation drops that item. A hand-written .meta, .unity, .prefab,
+     .asset or .mat on an item branch is a scope violation (U-027; Controls.inputactions and its meta excepted).
+  5. Order (U-030): CriticalMass.Editor.ProjectSetup.Apply runs on the integration branch after every item branch of the
+     batch is merged and before the compile gate, on every batch (it is idempotent); nothing runs Unity on that branch
+     before it.
+     Then compile; then the harness commits the files Unity generated (U-030: every *.meta under Assets/, and what
+     ProjectSetup.Apply changed under Assets/_Game/Settings/, Assets/_Game/Resources/, ProjectSettings/), attributed
+     to the harness, not to an item; then `clean-reimport` (a second import leaves git status clean); then the rest.
+     Run the gates in order, ONE compile per round. On a red gate, attribute it to an item from the compiler/test
      output (file paths in errors, failed test names vs tests_required, stack traces), DROP that item immediately
      (no fix attempts), and re-run the round with the rest. A red that names no item's file returns the whole batch
      uncounted and flags the architect. skipped gates (exit 78) are recorded as SKIPPED, never as passes.
@@ -38,7 +45,38 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import cmloop as C  # noqa: E402
 
 GATES_DIR = C.REPO / 'loop' / 'gates'
-DEFAULT_GATES = ['setup', 'compile', 'editmode', 'playmode-smoke', 'build-mac', 'parity', 'budgets']
+DEFAULT_GATES = ['setup', 'compile', 'clean-reimport', 'editmode', 'playmode-smoke', 'build-mac', 'parity', 'budgets']
+UNITY_GATES = {'setup', 'compile', 'clean-reimport', 'editmode', 'playmode-smoke', 'build-mac', 'parity'}
+
+
+def gate_order_error(gates):
+    """U-030: setup must be the first Unity gate, and clean-reimport must come after compile."""
+    uni = [g for g in gates if g in UNITY_GATES]
+    if uni and uni[0] != 'setup':
+        return f'setup (ProjectSetup.Apply) must be the first Unity gate: {C.SETUP_ORDER}'
+    if 'clean-reimport' in gates and ('compile' not in gates or gates.index('compile') > gates.index('clean-reimport')):
+        return 'clean-reimport needs compile before it (the generated files are committed after the compile)'
+    return None
+
+
+def commit_generated(int_dir, after_setup, batch, tag):
+    """U-030: commit the files Unity generated for this batch on the integration branch; a gate-shaped record."""
+    accept, reject = C.classify_generated(after_setup, C.dirty_files(int_dir))
+    if reject:
+        return {'gate': 'generated', 'status': 'fail', 'exit': 1, 'detail': f'Unity or a gate changed {len(reject)} '
+                f'file(s) outside the generated set (U-030): ' + ', '.join(reject[:5]), 'rejected': reject[:30]}
+    if not accept:
+        return {'gate': 'generated', 'status': 'pass', 'exit': 0, 'detail': 'no generated files', 'files': []}
+    C.git('add', '-A', '--', *accept, cwd=int_dir)
+    code, out, err = C.git('commit', '-q', '-m', f'harness: Unity-generated files for batch {tag}-{batch} (U-030)\n\n'
+                           'Metas from the integrator\'s import and the assets ProjectSetup.Apply wrote; no item wrote '
+                           'these.', cwd=int_dir)
+    if code != 0:
+        return {'gate': 'generated', 'status': 'fail', 'exit': code, 'detail': f'commit: {err.strip()[-200:]}'}
+    return {'gate': 'generated', 'status': 'pass', 'exit': 0, 'detail': f'{len(accept)} generated file(s) committed '
+            f'by the harness', 'files': accept[:60], 'commit': C.git('rev-parse', 'HEAD', cwd=int_dir)[1].strip()}
+
+
 PATH_RE = re.compile(r'((?:Assets|Packages)/[^\s:(]+?\.(?:cs|asmdef|shader|hlsl|uss|uxml|unity|prefab|asset))')
 
 
@@ -175,6 +213,10 @@ def main(argv=None):
     if len(ids) != len(set(ids)) or not ids or len(ids) > (10 if a.coupled else 6):
         print(json.dumps({'error': 'items must be distinct: 1 to 6, or 1 to 10 for a coupled batch (O-22)'}))
         return 2
+    oe = gate_order_error([g for g in a.gates.split(',') if g])
+    if oe:
+        print(json.dumps({'error': oe}))
+        return 2
     tag = a.run_tag or C.utc().replace('-', '').replace(':', '')[:13]
     items = {i: C.load_item(Path(a.items_dir) / f'{i}.md') for i in ids}
     rec = C.lock_acquire(f'integrator-batch-{a.batch}', purpose=f'batch {a.batch}: {",".join(ids)}')
@@ -274,6 +316,7 @@ def run(a, ids, items, tag, env, t0):
             continue
         files_by_item = item_files_map(active, ref, base_sha, C.MAIN)
         red = False
+        after_setup = []
         for g in gates:
             if g == 'parity':
                 for iid in [i for i in active if items[i].get('art_row') not in (None, 'none')]:
@@ -287,8 +330,17 @@ def run(a, ids, items, tag, env, t0):
                 if red:
                     break
                 continue
-            r = run_gate(g, int_dir, env=env)
-            rnd['gates'].append(r)
+            r = None
+            if g == 'clean-reimport':  # U-030: the harness commits the generated files first
+                r = commit_generated(int_dir, after_setup, a.batch, tag)
+                rnd['gates'].append(r)
+                if r['status'] == 'pass':
+                    r = None
+            if r is None:
+                r = run_gate(g, int_dir, env=env)
+                rnd['gates'].append(r)
+            if g == 'setup':
+                after_setup = C.dirty_files(int_dir)
             if r['status'] == 'skipped' and r['exit'] == C.SKIP_EXIT:
                 skipped.add(f'{g}: {r["detail"]}')
                 continue

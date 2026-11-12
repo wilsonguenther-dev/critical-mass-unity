@@ -129,6 +129,57 @@ def is_guarded(path):
     return path.startswith('ProjectSettings/') or path.startswith('Packages/') or path.endswith('Controls.inputactions')
 
 
+# ── U-027 / U-030: Unity data files are generated, never hand-written ──
+UNITY_DATA_EXT = ('.meta', '.unity', '.prefab', '.asset', '.mat')
+GENERATED_DIRS = ('Assets/_Game/Settings/', 'Assets/_Game/Resources/', 'ProjectSettings/')
+# The one sentence on order (U-030). integrate.py and the workflow's integrator prompt both print exactly this.
+SETUP_ORDER = ('CriticalMass.Editor.ProjectSetup.Apply runs on the integration branch after every item branch of the '
+               'batch is merged and before the compile gate, on every batch (it is idempotent); nothing runs Unity on '
+               'that branch before it.')
+
+
+def hand_written_unity_data(path, approved=None):
+    """Why a builder's branch may not carry this file (U-027), or None. Controls.inputactions (plain JSON) and its
+    meta are the exception; a ProjectSettings/*.asset change needs architect_approved (the guarded-path rule)."""
+    if path.endswith('Controls.inputactions') or path.endswith('Controls.inputactions.meta'):
+        return None
+    if path.startswith('ProjectSettings/'):
+        return None  # the guarded-path rule already requires architect_approved for every ProjectSettings/ change
+    if path.endswith(UNITY_DATA_EXT):
+        ext = path.rsplit('.', 1)[-1]
+        return (f'hand-written .{ext} (U-027): builders never author .meta, .unity, .prefab, .asset or .mat files and '
+                f'never choose GUIDs; Unity generates metas on the integrator\'s import and editor-made assets come '
+                f'from CriticalMass.Editor.ProjectSetup.Apply. Delete it from the branch')
+    return None
+
+
+def dirty_files(cwd):
+    """[(xy, path)] from git status, every untracked file listed (no collapsed directories)."""
+    out = git('status', '--porcelain', '--untracked-files=all', cwd=cwd)[1]
+    rows = []
+    for ln in out.splitlines():
+        if len(ln) > 3:
+            path = ln[3:].split(' -> ')[-1].strip('"')
+            rows.append((ln[:2], path))
+    return rows
+
+
+def classify_generated(after_setup, after_compile):
+    """U-030: which dirty files the harness commits. Accepted: every *.meta under Assets/ (any status: Unity adds and
+    removes them on import), and the files ProjectSetup.Apply changed under GENERATED_DIRS (seen dirty right after
+    the setup gate). Everything else dirty is rejected (Unity or a gate wrote something outside the generated set)."""
+    setup_paths = {p for _, p in after_setup}
+    accept, reject = [], []
+    for xy, p in after_compile:
+        if p.startswith('Assets/') and p.endswith('.meta'):
+            accept.append(p)
+        elif p in setup_paths and p.startswith(GENERATED_DIRS):
+            accept.append(p)
+        else:
+            reject.append(f'{xy.strip() or "?"} {p}')
+    return sorted(accept), sorted(reject)
+
+
 def glob_match(path, pattern):
     p = PurePosixPath(path)
     try:

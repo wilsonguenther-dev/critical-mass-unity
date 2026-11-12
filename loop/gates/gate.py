@@ -169,7 +169,7 @@ def g_playmode(a):
     r = refuse_unity('playmode-smoke', proj)
     if r is not None:
         return r
-    code, out, err, owner = run_locked('playmode-smoke', [str(proj / PLAYTEST_TOOL)], proj)
+    code, out, err, owner = run_locked('playmode-smoke', ['bash', str(proj / PLAYTEST_TOOL)], proj)
     outf = save_out('playmode-smoke', out, err)
     res, log = proj / 'Logs/playmode-results.xml', proj / 'Logs/playmode-tests.log'
     pf = C.LOGS / 'gate-playmode-failed.json'
@@ -194,7 +194,7 @@ def g_soak(a):
     r = refuse_unity('soak', proj)
     if r is not None:
         return r
-    code, out, err, owner = run_locked('soak', [str(proj / SOAK_TOOL)], proj)
+    code, out, err, owner = run_locked('soak', ['bash', str(proj / SOAK_TOOL)], proj)
     outf = save_out('soak', out, err)
     last = ((err or out).strip().splitlines() or [f'exit {code}'])[-1][:200]
     return emit('soak', 'pass' if code == 0 else 'fail', code, last, out=outf, lock_owner=owner)
@@ -209,7 +209,7 @@ def g_setup(a):
     cmd = [unity_binary(proj), '-batchmode', '-nographics', '-projectPath', str(proj), '-executeMethod',
            'CriticalMass.Editor.ProjectSetup.Apply', '-logFile', str(log), '-quit']
     code, out, err, owner = run_locked('setup', cmd, proj)
-    dirty = [l[3:] for l in C.git('status', '--porcelain', cwd=proj)[1].splitlines() if l.strip()]
+    dirty = [p for _, p in C.dirty_files(proj)]
     if code == 0:
         return emit('setup', 'pass', 0, 'ProjectSetup.Apply exit 0', log=str(log), changed_files=dirty[:20],
                     lock_owner=owner)
@@ -218,6 +218,32 @@ def g_setup(a):
     ef.write_text('\n'.join(errs) + '\n')
     return emit('setup', 'fail', code, (errs[:1] or [f'ProjectSetup.Apply: Unity exit {code}'])[0], log=str(log),
                 errors_file=str(ef), lock_owner=owner)
+
+
+def g_clean_reimport(a):
+    """U-030: after the harness committed the generated files, a second import (with ProjectSetup.Apply, which runs on
+    every batch) must leave git status clean; anything dirty is a generated file the commit missed."""
+    proj = Path(a.project).resolve()
+    r = refuse_unity('clean-reimport', proj)
+    if r is not None:
+        return r
+    before = C.dirty_files(proj)
+    if before:
+        return emit('clean-reimport', 'fail', 1, f'tree not clean before the re-import: {len(before)} file(s)',
+                    dirty=[f'{x.strip()} {p}' for x, p in before][:30])
+    log = proj / 'Logs/reimport-gate.log'
+    cmd = [unity_binary(proj), '-batchmode', '-nographics', '-projectPath', str(proj), '-executeMethod',
+           'CriticalMass.Editor.ProjectSetup.Apply', '-logFile', str(log), '-quit']
+    code, out, err, owner = run_locked('clean-reimport', cmd, proj)
+    after = C.dirty_files(proj)
+    if code != 0:
+        return emit('clean-reimport', 'fail', code, f'Unity exit {code} on the re-import', log=str(log), lock_owner=owner)
+    if after:
+        return emit('clean-reimport', 'fail', 1, f'the re-import changed {len(after)} file(s) the batch commit missed: '
+                    + ', '.join(p for _, p in after[:5]), dirty=[f'{x.strip()} {p}' for x, p in after][:30],
+                    log=str(log), lock_owner=owner)
+    return emit('clean-reimport', 'pass', 0, 'second import + ProjectSetup.Apply left git status clean', log=str(log),
+                head=C.git('rev-parse', 'HEAD', cwd=proj)[1].strip(), lock_owner=owner)
 
 
 def g_build_mac(a):
@@ -271,7 +297,9 @@ def scope_violations(item, files):
     approved = item.get('architect_approved')
     v = []
     for f in files:
-        if any(C.glob_match(f, g) for g in forbidden):
+        if C.hand_written_unity_data(f, approved):  # U-027 first: a files_allowed glob like Foo.cs* never admits a meta
+            v.append(f'{f}: {C.hand_written_unity_data(f, approved)}')
+        elif any(C.glob_match(f, g) for g in forbidden):
             v.append(f'{f}: matches files_forbidden')
         elif not any(C.glob_match(f, g) for g in allowed):
             v.append(f'{f}: not in files_allowed')
@@ -320,7 +348,7 @@ def g_budgets(a):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument('gate', choices=['setup', 'compile', 'editmode', 'playmode-smoke', 'build-mac', 'parity', 'scope',
+    ap.add_argument('gate', choices=['setup', 'clean-reimport', 'compile', 'editmode', 'playmode-smoke', 'build-mac', 'parity', 'scope',
                                      'budgets', 'soak'])
     ap.add_argument('--project', default=str(C.MAIN))
     ap.add_argument('--item')
@@ -332,7 +360,7 @@ def main(argv=None):
         ap.error(f'{a.gate} needs --item')
     if a.gate == 'scope' and not a.ref:
         ap.error('scope needs --ref')
-    fn = {'setup': g_setup, 'soak': g_soak, 'compile': g_compile, 'editmode': g_editmode, 'playmode-smoke': g_playmode, 'build-mac': g_build_mac,
+    fn = {'setup': g_setup, 'clean-reimport': g_clean_reimport, 'soak': g_soak, 'compile': g_compile, 'editmode': g_editmode, 'playmode-smoke': g_playmode, 'build-mac': g_build_mac,
           'parity': g_parity, 'scope': g_scope, 'budgets': g_budgets}[a.gate]
     try:
         return fn(a)

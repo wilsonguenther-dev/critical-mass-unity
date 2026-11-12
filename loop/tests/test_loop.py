@@ -217,3 +217,75 @@ def test_setup_red_from_compile_errors_names_the_item(tmp_path):
     ef.write_text('Assets/_Game/Sim/FixtureCb.cs(5,37): error CS1002: ; expected\n')
     hits = I.attribute({'gate': 'setup', 'errors_file': str(ef)}, {}, {'FX-CB': {'Assets/_Game/Sim/FixtureCb.cs'}}, '/p')
     assert list(hits) == ['FX-CB']
+
+
+# ── U-027 / U-030: generated Unity files ──
+def _gate_module():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location('gate', str(C.REPO / 'loop' / 'gates' / 'gate.py'))
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m
+
+
+def test_scope_rejects_hand_written_unity_data_even_inside_files_allowed():
+    G = _gate_module()
+    it = {'files_allowed': ['Assets/_Game/Runtime/**', 'Assets/_Game/Settings/Controls.inputactions*'],
+          'files_forbidden': [], 'architect_approved': 'U-006'}
+    v = G.scope_violations(it, ['Assets/_Game/Runtime/Foo.cs', 'Assets/_Game/Runtime/Foo.cs.meta',
+                                'Assets/_Game/Runtime/Arena.unity', 'Assets/_Game/Runtime/Bot.prefab',
+                                'Assets/_Game/Runtime/Floor.mat', 'Assets/_Game/Runtime/Data.asset',
+                                'Assets/_Game/Settings/Controls.inputactions',
+                                'Assets/_Game/Settings/Controls.inputactions.meta'])
+    bad = sorted(x.split(':')[0] for x in v)
+    assert bad == ['Assets/_Game/Runtime/Arena.unity', 'Assets/_Game/Runtime/Bot.prefab', 'Assets/_Game/Runtime/Data.asset',
+                   'Assets/_Game/Runtime/Floor.mat', 'Assets/_Game/Runtime/Foo.cs.meta']
+    assert all('U-027' in x and 'Unity generates metas' in x for x in v)
+
+
+def test_project_settings_asset_still_needs_architect_approved():
+    G = _gate_module()
+    it = {'files_allowed': ['ProjectSettings/EditorBuildSettings.asset'], 'files_forbidden': []}
+    assert 'architect_approved' in G.scope_violations(it, ['ProjectSettings/EditorBuildSettings.asset'])[0]
+    assert G.scope_violations({**it, 'architect_approved': 'U-006'}, ['ProjectSettings/EditorBuildSettings.asset']) == []
+
+
+def test_generated_set_is_metas_plus_what_setup_wrote_in_its_dirs():
+    after_setup = [('??', 'Assets/_Game/Sim/New.cs.meta'), (' M', 'ProjectSettings/QualitySettings.asset'),
+                   ('??', 'Assets/_Game/Settings/Urp.asset'), (' M', 'Packages/packages-lock.json')]
+    after_compile = after_setup + [('??', 'Assets/_Game/Sim/Dir.meta'), (' D', 'Assets/_Game/Sim/Old.cs.meta'),
+                                   (' M', 'ProjectSettings/ProjectSettings.asset'), ('??', 'Assets/_Game/Sim/Stray.txt')]
+    accept, reject = C.classify_generated(after_setup, after_compile)
+    assert accept == ['Assets/_Game/Settings/Urp.asset', 'Assets/_Game/Sim/Dir.meta', 'Assets/_Game/Sim/New.cs.meta',
+                      'Assets/_Game/Sim/Old.cs.meta', 'ProjectSettings/QualitySettings.asset']
+    # not written by ProjectSetup.Apply (or outside its dirs): never committed by the harness
+    assert reject == ['?? Assets/_Game/Sim/Stray.txt', 'M Packages/packages-lock.json', 'M ProjectSettings/ProjectSettings.asset']
+
+
+def test_setup_is_the_first_unity_gate_and_clean_reimport_follows_compile():
+    assert I.gate_order_error(I.DEFAULT_GATES) is None
+    assert I.DEFAULT_GATES[:3] == ['setup', 'compile', 'clean-reimport']
+    assert 'first Unity gate' in I.gate_order_error(['compile', 'setup'])
+    assert I.gate_order_error(['setup', 'clean-reimport', 'compile'])
+    assert I.gate_order_error(['budgets']) is None  # no Unity gate, nothing to order
+
+
+def test_order_sentence_is_the_same_in_integrate_and_the_workflow():
+    norm = lambda t: ' '.join(t.split())
+    assert norm(C.SETUP_ORDER) in norm(I.__doc__)
+    js = (C.REPO / 'loop' / 'workflow' / 'critical-mass-unity.js').read_text()
+    assert f"const SETUP_ORDER = '{C.SETUP_ORDER}'" in js
+
+
+def test_item_supplied_tools_switch_gates_from_skipped_to_real(tmp_path, monkeypatch):
+    """F-08c / F-09 commit tools/unity-playtest.sh and tools/unity-soak.sh (maybe without the exec bit): the gates
+    run them through bash as soon as they exist in the tree under test."""
+    G = _gate_module()
+    a = type('A', (), {'project': str(tmp_path)})()
+    assert G.g_soak(a) == C.SKIP_EXIT and G.g_playmode(a) == C.SKIP_EXIT
+    calls = []
+    monkeypatch.setattr(G, 'refuse_unity', lambda g, p: None)
+    monkeypatch.setattr(G, 'run_locked', lambda g, cmd, p: (calls.append(cmd), (0, 'soak: OK', '', 'gate-soak'))[1])
+    (tmp_path / 'tools').mkdir()
+    (tmp_path / G.SOAK_TOOL).write_text('echo soak: OK\n')  # no chmod +x
+    assert G.g_soak(a) == 0 and calls[-1] == ['bash', str(tmp_path / G.SOAK_TOOL)]
