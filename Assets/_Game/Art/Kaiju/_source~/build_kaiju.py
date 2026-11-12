@@ -41,8 +41,8 @@ OUTLINE_WIDTH = {"Egg": 0.018, "Hatchling": 0.022, "Adult": 0.035}  # metres, pe
 TRI_CAP = {"Egg": 4000, "Hatchling": 10000, "Adult": 15000}
 # Silhouette tunables fitted against the bible crops with iou_map.py (KJ_TUNE='{"sh_x": 1.05}' overrides one run;
 # the committed defaults below are the fitted values, so a plain run rebuilds the committed asset).
-TUNE = {"sh_x": 1.12, "fist_x": 1.68, "fist_r": 0.64, "crown_k": 1.05, "fan_k": 1.2, "head_dy": -0.25, "head_dz": 0.0,
-        "hip_z": 1.38, "thigh_x": 0.68, "fist_y": -0.8, "tail_k": 0.6, "arm_k": 1.38, "cry_k": 1.12, "rock_k": 1.18, "facets": 11, "crack_k": 1.2, "rim_k": 1.5, "rim_d": 0.05}
+TUNE = {"sh_x": 1.12, "fist_x": 1.68, "fist_r": 0.64, "crown_k": 1.05, "fan_k": 1.2, "head_dy": -0.25, "head_dz": -0.2,
+        "hip_z": 1.38, "thigh_x": 0.68, "fist_y": -0.8, "tail_k": 0.6, "arm_k": 1.38, "cry_k": 1.12, "rock_k": 1.18, "facets": 11, "crack_k": 1.42, "rim_k": 2.2, "moss_k": 0.7, "rim_d": 0.05}
 TUNE.update(json.loads(os.environ.get("KJ_TUNE", "{}")))
 
 
@@ -452,7 +452,7 @@ def boulder(geo, b, rng, core_bvh=None, rim_d=0.0, near=()):
     mats, fs = [], []
     for fc, n, bev in zip(C, N, bevel_f):
         nz = n.z
-        if b.get("rim", True) and bev and nz < 0.5:
+        if b.get("rim", True) and (bev or nz < -0.15) and nz < 0.5:
             rim = False
             if core_bvh is not None:
                 hit = core_bvh.find_nearest(fc)
@@ -468,43 +468,55 @@ def boulder(geo, b, rng, core_bvh=None, rim_d=0.0, near=()):
         fs.append(STEP_TOP if nz > 0.55 else (STEP_UNDER if nz < -0.2 else STEP_MID))
     geo.add(V, F, mats, b["bone"], smooth=False, fshade=fs)
     if b.get("moss", 0) > 0:
-        moss_cap(geo, pts, c, up, radii, b["moss"], rng, b["bone"])
+        moss_cap(geo, pts, c, up, radii, b["moss"] * TUNE["moss_k"], rng, b["bone"])
 
 
 def moss_cap(geo, pts, c, up, radii, cover, rng, bone):
-    """Moss draped over the boulder's top: the rock's own top points pushed out a little (so it follows the rock),
-    an irregular drape edge with a tucked-under skirt, smooth-shaded; value runs from the lit crown down to a dark
-    olive at the drape (bible: soft caps on the tops of shoulders, head and forearms, darker underneath)."""
+    """Moss as a lumpy carpet of soft clumps draped over the boulder's top: squashed, smooth-shaded little domes
+    centred on the rock's upper points (so they follow the top and spill over its upper edges), each lit on its
+    crown and dark olive underneath (bible: soft rounded caps over shoulders, head and forearms)."""
     up = Vector(up).normalized()
     rz = radii[2]
-    mt = 0.05 * min(radii) + 0.015
-    cap = []
-    for p in pts:
-        h = (p - c).dot(up) / rz
-        if h > 0.6 - 0.62 * cover + rng.uniform(-0.15, 0.15):
-            d = (p - c).normalized()
-            cap.append(p + d * mt * rng.uniform(0.8, 1.5))
-    if len(cap) < 4:
-        return
-    hs = [(p - c).dot(up) for p in cap]
-    lo, hi = min(hs), max(hs)
-    for p, h in list(zip(cap, hs)):
-        if h < lo + 0.3 * (hi - lo):
-            d = p - c - up * h
-            cap.append(c + d * 0.9 + up * (h - 1.2 * mt))
-    # two soft clumps on the crown
-    R = frame(up, rng.uniform(0, math.tau))
-    for k in range(5):                     # domed crown: moss is a soft rounded clump, not a flat sheet
-        a = math.tau * k / 5 + rng.uniform(-0.4, 0.4)
-        q = R @ Vector((math.cos(a), math.sin(a), 0)) * rng.uniform(0.15, 0.42) * min(radii[0], radii[1])
-        cap.append(c + q + up * (hi + rng.uniform(1.2, 2.0) * mt))
-    bm = _hull_bm(cap)
-    V, F, C, N = _bm_out(bm)
-    bm.free()
-    hs = [(v - c).dot(up) for v in V]
-    lo, hi = min(hs), max(hs)
-    G = [0.56 + 0.48 * max(0.0, min(1.0, (h - lo) / max(1e-6, hi - lo))) ** 0.7 for h in hs]
-    geo.add(V, F, SLOT["Moss"], bone, smooth=True, shade=G)
+    rr = 0.5 * (radii[0] + radii[1])
+    tops = sorted(pts, key=lambda p: -(p - c).dot(up))
+    n = 2 + int(cover * 4.2)
+    chosen = [tops[0]]
+    for p in tops[1:]:
+        if len(chosen) >= n:
+            break
+        if (p - c).dot(up) < (0.62 - 0.5 * cover) * rz:
+            break
+        if all((p - q).length > 0.26 * rr for q in chosen):
+            chosen.append(p)
+    # one broad cushion over the crown ties the clumps into a single draped carpet
+    chosen.insert(0, c + up * (0.72 * rz))
+    seg, rings = 7, 4
+    for k, p in enumerate(chosen):
+        nrm = up if k == 0 else ((p - c).normalized() + up * 1.2).normalized()
+        R = frame(nrm, rng.uniform(0, math.tau))
+        cr = max(0.085, rr * (0.62 if k == 0 else rng.uniform(0.3, 0.4)) * (0.7 + 0.3 * cover))
+        q0 = p + nrm * (0.05 * cr) - (p - c).normalized() * (0.25 * cr)
+        sq = (rng.uniform(1.0, 1.3), rng.uniform(0.85, 1.05), 0.5)
+        V, F = [], []
+        for j in range(1, rings):
+            th = math.pi * j / rings
+            for i in range(seg):
+                ph = math.tau * i / seg + 0.4 * j
+                V.append(q0 + R @ Vector((math.sin(th) * math.cos(ph) * sq[0], math.sin(th) * math.sin(ph) * sq[1],
+                                          math.cos(th) * sq[2])) * cr)
+        V.append(q0 + R @ Vector((0, 0, sq[2])) * cr)
+        V.append(q0 - R @ Vector((0, 0, sq[2])) * cr)
+        t, b_ = len(V) - 2, len(V) - 1
+        for j in range(rings - 2):
+            for i in range(seg):
+                a0, a1 = j * seg + i, j * seg + (i + 1) % seg
+                F.append([a0, a1, a1 + seg, a0 + seg])
+        for i in range(seg):
+            F.append([t, (i + 1) % seg, i])
+            o = (rings - 2) * seg
+            F.append([b_, o + i, o + (i + 1) % seg])
+        G = [max(0.55, min(1.04, 0.78 + 0.6 * (v - q0).dot(up) / (sq[2] * cr))) for v in V]
+        geo.add(V, F, SLOT["Moss"], bone, smooth=True, shade=G)
 
 
 def crystal3(geo, base, d, length, radius, rng, bone=None, sides=6):
@@ -1284,7 +1296,7 @@ def adult_params():
         ((0, 1.0, HIPZ), 0.6, (1.1, 1.0, 0.85)),       # hips (small, high enough to leave the arch between the legs)
         ((0, -0.72 + HY / 2, 2.88 + HZ / 2), 0.46),                # neck
         ((0, -1.02 + HY, 3.25 + HZ), 0.43, (1.08, 1.0, 0.9)),      # small head low between the shoulders
-        ((0, -1.36 + HY, 3.0 + HZ), 0.27, (1.2, 1.3, 0.7)),        # blunt muzzle, below the eyes
+        ((0, -1.29 + HY, 3.0 + HZ), 0.27, (1.25, 1.0, 0.74)),      # v3: short blunt muzzle, below the eyes
     ]
     for sx in (1, -1):
         balls += [((sx * SX, -0.42, 2.24), 0.62),                     # shoulders: far wider than the hips
@@ -1365,7 +1377,7 @@ def adult_params():
             add((sx * 0.48, 0.58, 2.28), (0.42, 0.44, 0.38), "Spine", moss=0.45, up=(sx * 0.45, 0.2, 1))
             add((sx * 0.44, 1.12, 1.7), (0.4, 0.4, 0.36), "Hips", up=(sx * 0.5, 0.4, 1))
             # cranium blocks on the head top
-            add((sx * 0.2, -0.9 + HY, 3.6 + HZ), (0.22, 0.22, 0.17), "Head", moss=0.75, n=14, up=(sx * 0.3, 0.2, 1))
+            add((sx * 0.24, -0.86 + HY, 3.62 + HZ), (0.22, 0.22, 0.17), "Head", moss=0.0, n=14, up=(sx * 0.4, 0.3, 1))
         # spine line: hump block behind the head, then down the back to the hips
         add((0, -0.22, 3.02), (0.5, 0.48, 0.38), "Chest", moss=0.5)
         add((0, 0.32, 2.8), (0.48, 0.46, 0.38), "Spine", moss=0.4, up=(0, 0.2, 1))
@@ -1376,7 +1388,7 @@ def adult_params():
         add((T * 0.18, ty(2.08), 0.98), (0.26, 0.27, 0.22), "Tail2", up=(T * 0.3, 0.3, 1))
         add((T * 0.42, ty(2.22), 1.02), (0.2, 0.2, 0.17), "Tail3", up=(T * 0.4, 0.2, 1), n=12)
         # heavy brow boulder over the painted eyes (stays above them), moss on its crown
-        add((0, -1.22 + HY, 3.56 + HZ), (0.42, 0.2, 0.13), "Head", moss=0.55, up=(0, -0.45, 1), n=18, spin=0.0)
+        add((0, -1.25 + HY, 3.49 + HZ), (0.5, 0.26, 0.15), "Head", moss=0.3, up=(0, -0.6, 1), n=18, spin=0.0)
         # tan chest: two big pectoral plates, then three rows of belly segments (ray-cast onto the core)
         tiles = [(-0.29, 2.3, 0.33, 0.25), (0.29, 2.3, 0.33, 0.25)]
         tiles += [(sx * 0.17, z, 0.19, 0.13) for z in (1.92, 1.62, 1.34) for sx in (1, -1)]
@@ -1436,12 +1448,12 @@ def adult_params():
     return {
         "unit": U, "balls": balls, "limbs": limbs, "voxel": 0.05, "body_tris": 2600, "bones": bones,
         "gap": 0.024, "crack_w": 0.02, "chamfer_m": 0.05, "design_h": 4.2,
-        "head": (0, -1.02 + HY, 3.25 + HZ), "head_r": 0.43, "muzzle": (0, -1.36 + HY, 3.0 + HZ), "head_clear": 1.12, "belly": belly, "dmin": dmin,
+        "head": (0, -1.02 + HY, 3.25 + HZ), "head_r": 0.43, "muzzle": (0, -1.29 + HY, 3.0 + HZ), "head_clear": 1.12, "belly": belly, "dmin": dmin,
         "samples": 16000, "plate_r": 1.0, "plate_thick": 0.4, "light_frac": light_frac, "moss": moss, "min_plate_z": 0.15,
         "belly_tiles": belly_tiles, "fist": (FX, FY, 0.52), "fist_plate_z": 0.85, "fist_plate_r": 0.44 * FR / 0.6,
         "knuckles": (-0.33, -0.11, 0.11, 0.33), "knuckle_fwd": 0.42, "knuckle_r": 0.15,
         "foot": (0.64, 0.95, 0.38), "toes": (-0.2, 0.0, 0.2), "toe_fwd": 0.42, "toe_r": 0.12,
-        "face": face, "crown": crown, "fans": fans, "crown_lean": 10.0, "crystal_r": 0.2, "spikes": spikes,
+        "face": face, "crown": crown, "fans": fans, "crown_lean": 10.0, "crystal_r": 0.18, "spikes": spikes,
         "tail_tip": ((T * 0.6, ty(2.24), 1.16), (T * 0.35, 0.1, 0.9), 0.46),
         "boulders": boulders, "crystals": crystals, "crack_k": TUNE["crack_k"], "rim_d": TUNE["rim_d"],
     }
