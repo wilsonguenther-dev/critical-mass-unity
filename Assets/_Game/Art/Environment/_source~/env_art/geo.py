@@ -5,7 +5,8 @@ The FBX export (axis_forward=-Z, axis_up=Y, bake_space_transform) maps Blender -
     unity = (-bx, bz, -by)      so      blender = (-ux, -uz, uy).
 Every helper here takes Unity coordinates, so the pieces can be reasoned about in the game's own frame.
 
-Camera culling (the follow camera is fixed: pitch 38, yaw 45, orthographic, never rotates):
+Camera culling. v2: the gameplay camera is perspective (pitch 55, FOV 35, 23.4 u, yaw 45), so every piece drops only
+downward-facing faces (normal y < -0.5) and may be yawed freely. The v1 note below is history:
     TO_CAM (Unity) = (0.557, 0.616, -0.557)
 A face whose outward normal has dot(TO_CAM) <= CULL_EPS can never be seen and is not emitted ("cam" mode). That drops
 bottoms and the faces pointing -X (west) and +Z (north). Pieces the game rotates (bridge spans, fallen columns,
@@ -60,14 +61,14 @@ class Mesh:
         if n.length < 1e-9:
             return False
         n = n.normalized()
-        if self.cull == "cam":
-            return n.dot(TO_CAM) > CULL_EPS
-        if self.cull == "down":
-            return n.y > -0.6
+        if self.cull in ("cam", "down"):
+            # v2 (perspective camera, pitch 55, FOV 35): outward faces at the screen edges are visible, so only
+            # faces pointing down are dropped. "cam" is kept as an alias so v1 callers still build.
+            return n.y > -0.5
         return True
 
     # ----------------------------------------------------------------- faces
-    def poly(self, pts, color, smooth=False, force=False):
+    def poly(self, pts, color, smooth=False, force=False, mat=0, uv=None):
         """pts: Unity-space points, counter-clockwise seen from OUTSIDE in a right-handed sense is not required:
         the outward normal is taken from the Newell normal of pts (Unity space) and the winding is fixed after the
         axis change so Blender's normal points the same way."""
@@ -89,8 +90,14 @@ class Mesh:
         if f.normal.dot(want) < 0:
             f.normal_flip()
         f.smooth = smooth
+        f.material_index = mat
         for lp in f.loops:
             lp[self.col] = color
+        if uv is not None:
+            lay = self.bm.loops.layers.uv.get("UVMap") or self.bm.loops.layers.uv.new("UVMap")
+            by_vert = dict(zip(vs, uv))
+            for lp in f.loops:
+                lp[lay].uv = by_vert[lp.vert]
         return f
 
     def quad(self, a, b, c, d, color, **kw):

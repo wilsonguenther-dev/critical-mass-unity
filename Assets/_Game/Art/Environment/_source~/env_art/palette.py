@@ -63,6 +63,23 @@ ENV = {
     "egg_glow":     ("#4FDDC3", "P14 shrine seam glow #4FDDC3 (self-lit, fixed teal: the neutral egg)"),
     "cream":        ("#F7F0E5", "CORE Warm Cream (hill medallion, banner emblem)"),
     "brass":        ("#C79245", "CORE Tool Brass (crown, post caps)"),
+    # v2 (ART-DIRECTION 2026-11-12 sections 2.4, 2.5, 5.1)
+    "grass_l":      ("#ACCB56", "AD 2.5 grass cell tone light"),
+    "grass_d":      ("#96B249", "AD 2.5 grass cell tone dark"),
+    "seam":         ("#7E9A3F", "AD 2.5 grass cell seam"),
+    "ink":          ("#18233B", "CORE Void Navy, ledge ink line (self-lit fixed so it never shades)"),
+    "band":         ("#5B5E58", "AD 5.1 ledge face band, rock dark (self-lit fixed)"),
+    "foam":         ("#F7F9F6", "AD 2.5 water foam band (self-lit fixed)"),
+    "water_f":      ("#6FC0EC", "AD 2.5 water, fixed (self-lit)"),
+    "water_df":     ("#57A1D1", "P15 waterfall dark streak, fixed"),
+    "water_lf":     ("#C4E4F4", "P15 waterfall light streak, fixed"),
+    "sky_horizon":  ("#CDEFF8", "CORE world Sky Horizon (height fog)"),
+    "biomass_c":    ("#B7F238", "CORE Biomass, crystal lit facet (self-lit)"),
+    "biomass_cd":   ("#6E9A2A", "Biomass crystal body (Biomass x0.6)"),
+    "corrupt_c":    ("#B67AE8", "CORE Corruption lifted, crystal lit facet (self-lit)"),
+    "corrupt_cd":   ("#5E2C8C", "Corruption crystal body"),
+    "flower":       ("#F7F0E5", "CORE Warm Cream, flower heads"),
+    "flower_y":     ("#F2C94C", "flower heads, warm yellow"),
     # team channels (AZURE value here; crimson value in TEAM_SWAP)
     "team_glow":    ("#4FE3F0", "same as cm_art team_glow: glow rim, glyphs, crystal lit facets"),
     "team_cloth":   ("#127EC0", "P14 azure banner cloth #127EC0"),
@@ -75,7 +92,7 @@ TEAM_SWAP = {
     "team_dark":  ("#9B4132", "P14 crimson banner shade #9B4132 / hill #843B41"),
 }
 
-OUTLINE = "#2A1E24"   # same as cm_art OUTLINE (dark brown, not black)
+OUTLINE = "#18233B"   # v2: Void Navy (ART-DIRECTION 2.3); v1 used cm_art's #2A1E24
 SHADE = 0.66
 RAMP_STEP = 0.42
 
@@ -87,7 +104,10 @@ MASK_TEAM_DARK = 0.5
 MASK_TEAM_GLOW = 0.75
 MASK_TEAM_CLOTH = 1.0
 MASK_FOR = {"team_cloth": MASK_TEAM_CLOTH, "team_glow": MASK_TEAM_GLOW, "team_dark": MASK_TEAM_DARK,
-            "egg_glow": MASK_FIXED_GLOW, "corrupt_glow": MASK_FIXED_GLOW}
+            "egg_glow": MASK_FIXED_GLOW, "corrupt_glow": MASK_FIXED_GLOW, "ink": MASK_FIXED_GLOW,
+            "band": MASK_FIXED_GLOW, "foam": MASK_FIXED_GLOW, "water_f": MASK_FIXED_GLOW,
+            "water_df": MASK_FIXED_GLOW, "water_lf": MASK_FIXED_GLOW, "biomass_c": MASK_FIXED_GLOW,
+            "corrupt_c": MASK_FIXED_GLOW}
 
 
 def hex_rgb(h):
