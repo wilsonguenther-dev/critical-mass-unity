@@ -125,7 +125,7 @@ def district(team="azure"):
             pts.append((-x, z))
         cxm = G.MIRROR_X - ISL[0] if mirror else ISL[0]
         p = pieces.outward_path(pts, (-cxm, ISL[1]))
-        kit.wall_run(wall, p, random.Random(200 + i), team_caps=True, moss_p=0.15)
+        kit.wall_run(wall, p, random.Random(200 + i), team_caps=True, moss_p=0.3)
         _footing(found, p, random.Random(300 + i))
         info["wall_paths"].append(p)
         # braziers on the walkway every ~4.4 u (pools fall on the ground inside the wall)

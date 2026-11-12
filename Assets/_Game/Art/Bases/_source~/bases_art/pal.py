@@ -17,7 +17,10 @@ HEX = {
     "body_a": "#5B5E58", "body_b": "#63665F", "body_c": "#6F7282",
     "cap": "#C9BFA6", "cap_side": "#B0A58C",
     # warm bible stone (p14 wall crops) for breakable sections, horns, pads and daises
-    "warm_a": "#9C9479", "warm_b": "#8E876E", "warm_c": "#A59D84",
+    "warm_a": "#9C9479", "warm_b": "#8E876E", "warm_c": "#A59D84", "warm_d": "#7E775F", "body_d": "#575A63",
+    # v2 block tops: warm tan (bible p14 chunky stone tops #AB9274 .. #D8C9A0), cool-leaning variants for dark walls
+    "top_a": "#C2AE86", "top_b": "#B49E78", "top_c": "#CDBB93", "top_cool_a": "#A9A28C", "top_cool_b": "#9E9A8A",
+    "grass": "#A3C24F", "grass_d": "#7FA43F",
     "dais": "#C9B58E", "dais_d": "#8E8A6A", "pave": "#B9B19C", "pave_d": "#A39B86",
     "moss": "#8FAE48", "moss_d": "#6F9A3E",
     "wood": "#C78B50", "wood_b": "#B27440", "wood_d": "#633F22", "rope": "#D9B98A",

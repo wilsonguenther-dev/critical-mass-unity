@@ -50,8 +50,8 @@ def wall_segment(state, seed=11, team_caps=True):
 def hill_arc(name, a0, a1, seed, warm=False, state="intact", team_caps=True):
     pc = Piece(name, team=team_caps)
     p = outward_path(sim_arc(HILL_R, a0, a1, rho=RHO.get("hill")))
-    kit.wall_run(pc, p, random.Random(seed), thick=0.9, team_caps=team_caps, damage=state, warm=warm,
-                 moss_p=0.3 if warm else 0.12)
+    kit.wall_run(pc, p, random.Random(seed), thick=0.86, team_caps=team_caps, damage=state, warm=warm,
+                 moss_p=0.35 if warm else 0.25)
     return pc
 
 

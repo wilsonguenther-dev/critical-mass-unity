@@ -54,12 +54,14 @@ class Piece:
                 lp[self.col] = c
         t.free()
 
-    def block(self, corners, side, top=None, bev=CH, segs=1, top_thresh=0.55, mark=None, M=None):
+    def block(self, corners, side, top=None, bev=CH, segs=1, top_thresh=0.55, mark=None, M=None, chips=None):
         t = bmesh.new()
         vs = [t.verts.new(c) for c in corners]
         for q in QUADS:
             t.faces.new([vs[i] for i in q])
         bmesh.ops.recalc_face_normals(t, faces=t.faces[:])
+        if chips:
+            _chip(t, corners, chips)
         if bev > 0:
             bmesh.ops.bevel(t, geom=t.edges[:], offset=bev, offset_type="OFFSET", segments=segs, profile=0.5,
                             affect="EDGES", clamp_overlap=True)
@@ -67,8 +69,9 @@ class Piece:
         self.add(t, lambda f: top if f.normal.z > top_thresh else side, M=M, mark=mark)
         self.blocks += 1
 
-    def box(self, cx, cy, z0, sx, sy, h, side, top=None, rot=0.0, bev=CH, segs=1, mark=None, M=None, jit=None):
-        self.block(box_corners(cx, cy, z0, sx, sy, h, rot, jit), side, top, bev, segs, mark=mark, M=M)
+    def box(self, cx, cy, z0, sx, sy, h, side, top=None, rot=0.0, bev=CH, segs=1, mark=None, M=None, jit=None,
+            chips=None):
+        self.block(box_corners(cx, cy, z0, sx, sy, h, rot, jit), side, top, bev, segs, mark=mark, M=M, chips=chips)
 
     def lathe(self, prof, n, colfn, cx=0.0, cy=0.0, rot=0.0, M=None, mark=None, bev=0.0, closed=False):
         """prof: [(r, z)] bottom to top; r == 0 at an end makes an apex. Flat-shaded closed solid."""
@@ -173,6 +176,37 @@ def box_corners(cx, cy, z0, sx, sy, h, rot=0.0, jit=None):
     return [Vector((x, y, z0)) for x, y in base] + [Vector((x, y, z0 + tz)) for (x, y), tz in zip(base, tops)]
 
 
+def _chip(t, corners, chips):
+    """Knock corners off a block: each chip = (corner index, size). A plane through the corner region, normal pointing
+    out of that corner (diagonal, tilted up for top corners), cuts the corner away and the hole is capped flat."""
+    cen = sum((Vector(c) for c in corners), Vector()) / len(corners)
+    for idx, size in chips:
+        c = Vector(corners[idx])
+        d = c - cen
+        if d.length < 1e-6:
+            continue
+        n = Vector((d.x, d.y, d.z * 1.6)).normalized()
+        co = c - n * size
+        geom = t.verts[:] + t.edges[:] + t.faces[:]
+        try:
+            bmesh.ops.bisect_plane(t, geom=geom, dist=1e-5, plane_co=co, plane_no=n, clear_outer=True)
+            edges = [e for e in t.edges if e.is_boundary]
+            if edges:
+                bmesh.ops.holes_fill(t, edges=edges, sides=0)
+        except Exception:
+            pass
+    bmesh.ops.recalc_face_normals(t, faces=t.faces[:])
+
+
+def rand_chips(rng, p1=0.5, p2=0.18, lo=0.09, hi=0.2, top_only=True):
+    """0, 1 or 2 chipped corners (indices into the 8 hexahedron corners; 4..7 = top)."""
+    r = rng.random()
+    k = 2 if r < p2 else (1 if r < p1 else 0)
+    pool = [4, 5, 6, 7] if top_only else list(range(8))
+    rng.shuffle(pool)
+    return [(i, rng.uniform(lo, hi)) for i in pool[:k]]
+
+
 def solid(c):
     return lambda f: c
 
@@ -182,10 +216,16 @@ def topside(side, top, thresh=0.55):
 
 
 def stone_side(rng, warm=False):
-    keys = ("warm_a", "warm_b", "warm_c") if warm else ("body_a", "body_b", "body_c")
+    """(side, top) colours for one block. v2: sides vary in value (a dark block now and then, as the bible's chunky
+    stone), tops are a distinctly lighter warm tan so every block reads lit top / mid side / dark shadow side."""
+    keys = ("warm_a", "warm_b", "warm_c", "warm_d") if warm else ("body_a", "body_b", "body_c", "body_d")
     k = rng.choice(keys)
-    m = rng.uniform(0.96, 1.04)
-    return pal.vc(k, m), pal.vc(k, m * pal.TOP_LIFT * 1.06)
+    r = rng.random()
+    m = rng.uniform(0.78, 0.86) if r < 0.14 else rng.uniform(0.93, 1.07)
+    tk = rng.choice(("top_a", "top_b", "top_c")) if warm else rng.choice(("top_cool_a", "top_cool_b", "top_a"))
+    side = pal.vc(k, m)
+    top = pal.lerp_vc(pal.vc(k, m * pal.TOP_LIFT * 1.08), pal.vc(tk, rng.uniform(0.95, 1.04)), 0.6)
+    return side, top
 
 
 class Path:
@@ -257,6 +297,49 @@ def hexa_on_path(path, s0, s1, o0, o1, z0, z1, jit=0.0, rng=None):
             path.at(s0, o1, z1 + js[3])]
 
 
+def moss_strip(piece, rng, path, s, o_face, z, length, outward):
+    """Moss growing in a horizontal joint: a thin flat lens along the course line, proud of the face by 0.04 u."""
+    n = path.nrm(s) * outward
+    p = path.at(s, o_face, z)
+    t = path.tan(s)
+    ang = math.atan2(t.y, t.x)
+    M = Matrix.Translation(Vector((p.x - n.x * 0.03, p.y - n.y * 0.03, z))) @ Matrix.Rotation(ang, 4, "Z")
+    piece.blob((0, 0, 0), length / 2, 0.05, 0.06, lambda f: pal.vc("moss") if f.normal.z > 0.2 else pal.vc("moss_d"),
+               sub=1, seed=rng.randint(0, 9999), jitter=0.15, M=M)
+
+
+def moss_drape(piece, rng, path, s, o_face, z, outward, size=0.26):
+    """Moss cushion on a top edge with short strands hanging down the face (the bible's mossy block tops). Kept
+    within 0.05 u of the face so it never reaches further into a walkable cell than the stone does."""
+    t = path.tan(s)
+    ang = math.atan2(t.y, t.x)
+    p = path.at(s, o_face - 0.16 * outward, z)
+    M = Matrix.Translation(Vector((p.x, p.y, z))) @ Matrix.Rotation(ang, 4, "Z")
+    piece.blob((0, 0, 0.0), size * rng.uniform(0.9, 1.3), 0.2, size * 0.42,
+               lambda f: pal.vc("grass") if f.normal.z > 0.45 else pal.vc("moss_d"), sub=1,
+               seed=rng.randint(0, 9999), jitter=0.2, M=M)
+    for k in range(rng.randint(1, 3)):
+        sk = s + rng.uniform(-size, size) * 0.6
+        q = path.at(sk, o_face + 0.01 * outward, z)
+        hz = size * rng.uniform(0.5, 0.9)
+        Mq = Matrix.Translation(Vector((q.x, q.y, z - hz * 0.8))) @ Matrix.Rotation(ang, 4, "Z")
+        piece.blob((0, 0, 0), size * rng.uniform(0.3, 0.5), 0.045, hz,
+                   lambda f: pal.vc("moss") if f.normal.z > 0.3 else pal.vc("moss_d"), sub=1,
+                   seed=rng.randint(0, 9999), jitter=0.12, M=Mq)
+
+
+def grass_tuft(piece, rng, x, y, z, h=0.24, n=6):
+    """Spiky grass clump (blades = thin 3-sided spikes), at most h tall."""
+    for i in range(n):
+        a = rng.uniform(0, 2 * math.pi)
+        d = rng.uniform(0.0, 0.12)
+        bx, by = x + d * math.cos(a), y + d * math.sin(a)
+        hh = h * rng.uniform(0.6, 1.0)
+        M = Matrix.Translation((bx, by, z)) @ Matrix.Rotation(a, 4, "Z") @ Matrix.Rotation(rng.uniform(0.15, 0.45), 4, "Y")
+        c = pal.vc("grass") if i % 2 else pal.vc("moss")
+        piece.lathe([(0.045, 0.0), (0.0, hh)], 3, lambda f, c=c: c, M=M)
+
+
 def moss(piece, rng, x, y, z, size=0.25):
     piece.blob((x, y, z), size * rng.uniform(0.8, 1.3), size * rng.uniform(0.6, 1.0), size * 0.32,
                lambda f: pal.vc("moss") if f.normal.z > 0.3 else pal.vc("moss_d"), sub=1,
@@ -285,10 +368,12 @@ def wall_run(piece, path, rng, thick=1.0, courses=3, z0=0.0, merlons=True, walkw
         cand = [i for i, bl in enumerate(blocks) if bl[0] >= 1 and bl[2] - bl[1] > 0.8]
         rng.shuffle(cand)
         split = set(cand[:4])
+    # v2 character: per block a variant (normal / split into two stacked stones / shifted in or out / missing face
+    # stone), chipped corners, shorter tops; moss in joints and draped over top edges
     for i, (c, a, b) in enumerate(blocks):
         side, topc = stone_side(rng, warm)
         zb, zt = z0 + c * COURSE + GAP / 2, z0 + (c + 1) * COURSE - GAP / 2
-        io = rng.uniform(-0.035, 0.035)
+        io = rng.uniform(-0.025, 0.025)
         if i in split:
             m = (a + b) / 2 + rng.uniform(-0.15, 0.15)
             d = 0.08
@@ -296,23 +381,75 @@ def wall_run(piece, path, rng, thick=1.0, courses=3, z0=0.0, merlons=True, walkw
                 cs = hexa_on_path(path, sa, sb, -h0 + io, h0 + io + 0.04, zb + dz, zt + dz)
                 # slant the crack: shift the top corners at the cut side
                 if sa > a + 0.1:
-                    cs[4] += Vector((0, 0, 0)); cs[0] = path.at(sa + d, -h0 + io, zb + dz); cs[3] = path.at(sa + d, h0 + io + 0.04, zb + dz)
+                    cs[0] = path.at(sa + d, -h0 + io, zb + dz); cs[3] = path.at(sa + d, h0 + io + 0.04, zb + dz)
                 else:
                     cs[5] = path.at(sb - d, -h0 + io, zt + dz); cs[6] = path.at(sb - d, h0 + io + 0.04, zt + dz)
-                piece.block(cs, side, topc)
+                piece.block(cs, side, topc, chips=rand_chips(rng, 0.6, 0.3, 0.1, 0.2))
             continue
-        piece.block(hexa_on_path(path, a + GAP / 2, b - GAP / 2, -h0 + io, h0 + io, zb, zt, 0.035, rng), side, topc,
-                    mark="course" if c == 0 and i < 3 else None)
-        if c == courses - 1 and rng.random() < moss_p:
-            s = rng.uniform(a + 0.2, b - 0.2)
-            p = path.at(s, rng.uniform(-0.3, 0.3), zt)
-            moss(piece, rng, p.x, p.y, p.z, 0.22)
+        top_course = c == courses - 1
+        r = rng.random()
+        lo_o, hi_o = -h0 + io, h0 + io
+        drop = 0.0 if (top_course or c == 0) else rng.choice((0.0, 0.0, 0.0, -0.04, -0.07))
+        if r < 0.13 and b - a > 1.0 and not top_course:
+            # two stacked stones in one course slot (0.36 u each), the upper one shorter and set back
+            zm = (zb + zt) / 2
+            cut = rng.uniform(0.25, 0.45) * (b - a)
+            piece.block(hexa_on_path(path, a + GAP / 2, b - GAP / 2, lo_o, hi_o, zb, zm - GAP / 2, 0.02, rng), side,
+                        topc, chips=rand_chips(rng, 0.4, 0.1, 0.07, 0.14))
+            s2, t2 = stone_side(rng, warm)
+            if rng.random() < 0.5:
+                sa, sb = a + GAP / 2, b - cut - GAP / 2
+            else:
+                sa, sb = a + cut + GAP / 2, b - GAP / 2
+            piece.block(hexa_on_path(path, sa, sb, lo_o + 0.03, hi_o - 0.03, zm + GAP / 2, zt + drop, 0.02, rng), s2,
+                        t2, chips=rand_chips(rng, 0.5, 0.15, 0.08, 0.16))
+            s3, t3 = stone_side(rng, warm)
+            oa, ob = (b - cut + GAP / 2, b - GAP / 2) if sa == a + GAP / 2 else (a + GAP / 2, a + cut - GAP / 2)
+            if ob - oa > 0.25:
+                piece.block(hexa_on_path(path, oa, ob, lo_o + 0.05, hi_o - 0.05, zm + GAP / 2, zt - 0.05, 0.02, rng),
+                            s3, t3, chips=rand_chips(rng, 0.5, 0.2, 0.06, 0.12))
+            continue
+        if 0.13 <= r < 0.21 and not top_course and c >= 0:
+            # missing face stone: the block is set deep into the wall on one face (dark socket) -- a gap in the face
+            if rng.random() < 0.5:
+                lo_o += 0.24
+            else:
+                hi_o -= 0.24
+            side = pal.vc("body_a", 0.8)
+            topc = pal.vc("body_a", 0.92)
+        elif 0.21 <= r < 0.36:
+            # shifted stone: pushed out of line on one face and in on the other
+            sh = rng.choice((-1, 1)) * rng.uniform(0.03, 0.045)
+            lo_o += sh
+            hi_o += sh
+        piece.block(hexa_on_path(path, a + GAP / 2, b - GAP / 2, lo_o, hi_o, zb, zt + drop, 0.035, rng), side, topc,
+                    mark="course" if c == 0 and i < 3 else None, chips=rand_chips(rng, 0.55, 0.22, 0.12, 0.26),
+                    bev=0.075, segs=2)
+        # moss: in the joint above this block (outer or inner face), draped on top-course edges
+        if c < courses - 1 and rng.random() < moss_p * 0.9:
+            sm = rng.uniform(a + 0.25, b - 0.25)
+            face = rng.choice((-1, 1))
+            moss_strip(piece, rng, path, sm, face * (h0 + 0.02), zt + GAP / 2, rng.uniform(0.35, 0.7), face)
+        if top_course and rng.random() < moss_p * 1.6:
+            sm = rng.uniform(a + 0.2, b - 0.2)
+            moss_drape(piece, rng, path, sm, hi_o, zt, 1, rng.uniform(0.26, 0.4))
+    if not merlons and walkway is False:
+        # low walls (shrine yard): mossy tops
+        s = rng.uniform(0.3, 0.8)
+        while s < L - 0.3:
+            if rng.random() < moss_p:
+                p = path.at(s, rng.uniform(-0.2, 0.2), top)
+                moss(piece, rng, p.x, p.y, top - 0.02, 0.22)
+            s += rng.uniform(0.8, 1.4)
     s = rng.uniform(0.2, 0.9)
     while s < L - 0.2:
         for o in (-h0 - 0.08, h0 + 0.08):
             if rng.random() < moss_p * 2.2:
                 p = path.at(s, o, z0)
                 moss(piece, rng, p.x, p.y, z0 + 0.02, 0.24)
+                if rng.random() < 0.6:
+                    q = path.at(s + rng.uniform(-0.3, 0.3), o * 1.08, z0)
+                    grass_tuft(piece, rng, q.x, q.y, z0, rng.uniform(0.18, 0.28))
         s += rng.uniform(0.6, 1.3)
     # walkway (inner side of the wall top): planks 0.25 u across the wall, beams every 2 u (flush beam ends)
     if walkway:
@@ -347,14 +484,19 @@ def wall_run(piece, path, rng, thick=1.0, courses=3, z0=0.0, merlons=True, walkw
             body_top = mz0 + merlon_h - (0.14 if capped else 0.0)
             cs = hexa_on_path(path, s - 0.45, s + 0.45, h0 - 0.6, h0, mz0, body_top)
             sc = rng.uniform(0.97, 1.03)
+            if not capped and rng.random() < 0.18:      # a merlon knocked slightly out of line
+                M2 = Matrix.Translation(path.at(s, h0 - 0.3, 0)) @ Matrix.Rotation(rng.uniform(-0.12, 0.12), 4, "Z") \
+                    @ Matrix.Translation(-path.at(s, h0 - 0.3, 0))
+                cs = [M2 @ v for v in cs]
             piece.block(cs, pal.vc("cap_side", sc), pal.vc("cap", sc), bev=0.1 if not capped else 0.06, segs=2,
-                        mark="merlon" if not capped else "merlon_body")
+                        mark="merlon" if not capped else "merlon_body",
+                        chips=None if capped else rand_chips(rng, 0.45, 0.1, 0.08, 0.15))
             if capped:
                 cs = hexa_on_path(path, s - 0.48, s + 0.48, h0 - 0.63, h0 + 0.03, body_top + 0.01, mz0 + merlon_h)
                 piece.block(cs, pal.vc("team"), pal.vc("team"), bev=0.04, segs=2, mark="merlon_cap")
-            if rng.random() < moss_p * 0.8:
-                p = path.at(s, h0 - 0.3, mz0 + merlon_h)
-                moss(piece, rng, p.x, p.y, p.z, 0.18)
+            if not capped and rng.random() < moss_p * 1.3:
+                p = path.at(s + rng.uniform(-0.2, 0.2), h0 - 0.3, mz0 + merlon_h)
+                moss(piece, rng, p.x, p.y, p.z - 0.03, 0.2)
     for j, s in enumerate(fallen):
         if j == 0:   # tipped over onto the walkway
             c = path.at(s, -h0 + 0.35, top + 0.06)
@@ -421,12 +563,25 @@ def drum(piece, rng, r, courses, z0=0.0, thick=0.85, door=None, warm=False, merl
             ri, ro = r - thick, r + rng.uniform(-0.015, 0.015)
             cs = [Vector((ri * math.cos(t0), ri * math.sin(t0), zb)), Vector((ri * math.cos(t1), ri * math.sin(t1), zb)),
                   Vector((ro * math.cos(t1), ro * math.sin(t1), zb)), Vector((ro * math.cos(t0), ro * math.sin(t0), zb))]
-            cs += [Vector((v.x, v.y, zt)) for v in cs]
-            piece.block(cs, *stone_side(rng, warm))
+            dz = rng.choice((0.0, 0.0, 0.0, -0.05)) if c < courses - 1 else 0.0
+            cs += [Vector((v.x, v.y, zt + dz)) for v in cs]
+            if rng.random() < 0.2:
+                k = rng.uniform(1.012, 1.03)
+                cs = [Vector((v.x * k, v.y * k, v.z)) if j in (2, 3, 6, 7) else v for j, v in enumerate(cs)]
+            piece.block(cs, *stone_side(rng, warm), chips=rand_chips(rng, 0.45, 0.15, 0.08, 0.18))
+            if c < courses - 1 and rng.random() < 0.12:
+                tm = (t0 + t1) / 2
+                kit_moss_ring(piece, rng, r, tm, zt + GAP / 2)
     top = z0 + courses * COURSE
     if door:
         _arch_door(piece, rng, r, door, z0)
     return top
+
+
+def kit_moss_ring(piece, rng, r, ang, z):
+    M = Matrix.Translation(Vector((r * math.cos(ang), r * math.sin(ang), z))) @ Matrix.Rotation(ang + math.pi / 2, 4, "Z")
+    piece.blob((0, 0, 0), rng.uniform(0.25, 0.4), 0.07, 0.06, lambda f: pal.vc("moss") if f.normal.z > 0.2 else
+               pal.vc("moss_d"), sub=1, seed=rng.randint(0, 9999), jitter=0.2, M=M)
 
 
 def _even_breaks(L, rng):

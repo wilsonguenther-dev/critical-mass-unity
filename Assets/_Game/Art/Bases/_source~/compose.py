@@ -53,7 +53,7 @@ def sbs(left, right, path):
     out.paste(r, (l.width + 12, 30))
     d = ImageDraw.Draw(out)
     d.text((8, 8), "BIBLE", fill=(255, 255, 255))
-    d.text((l.width + 20, 8), "OURS (Blender, v1)", fill=(255, 255, 255))
+    d.text((l.width + 20, 8), "OURS (Blender, v2)", fill=(255, 255, 255))
     save_small(out, path, 178, 1400)
 
 
