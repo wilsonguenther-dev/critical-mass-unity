@@ -112,7 +112,7 @@ def read_lines(path):
 
 def attribute(rec, items, files_by_item, project):
     g = rec['gate']
-    if g in ('compile', 'build-mac'):
+    if g in ('setup', 'compile', 'build-mac'):  # setup goes red on compile errors too (Unity cannot run the method)
         return attribute_paths(read_lines(rec.get('errors_file')), files_by_item, project)
     if g in ('editmode', 'playmode-smoke'):
         failed = C.read_json(rec.get('failed_file'), []) or []
@@ -339,7 +339,7 @@ def run(a, ids, items, tag, env, t0):
                    f'still red after {a.fix_round} fix rounds')
             (C.STATE / 'HALT').write_text(f'coupled batch {a.batch} {why}; evidence {ev}\n')
             C.livelog(f'Coupled batch {a.batch} is {why}; the loop halts for the architect.')
-            C.notify_enqueue('halt', f'halt-coupled-{tag}-{a.batch}', f'Critical Mass Unity loop stopped: coupled batch '
+            C.notify_enqueue('halt', f'halt-coupled-{tag}-{a.batch}-r{a.fix_round}', f'Critical Mass Unity loop stopped: coupled batch '
                              f'{a.batch} is {why}. The architect has the evidence.')
             res['notify'] = C.notify_flush()
         else:

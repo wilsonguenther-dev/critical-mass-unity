@@ -209,3 +209,10 @@ def test_quiet_hours_hold_digests_but_halts_always_text(monkeypatch):
     C.notify_enqueue('halt', 'halt-Q-1', 'Critical Mass Unity loop stopped: disk is low.')
     r = C.notify_flush(transport=lambda t: (sent.append(t), (0, 'ok', ''))[1])
     assert sent == ['Critical Mass Unity loop stopped: disk is low.'] and r['held'] >= 1
+
+
+def test_setup_red_from_compile_errors_names_the_item(tmp_path):
+    ef = tmp_path / 'e.txt'
+    ef.write_text('Assets/_Game/Sim/FixtureCb.cs(5,37): error CS1002: ; expected\n')
+    hits = I.attribute({'gate': 'setup', 'errors_file': str(ef)}, {}, {'FX-CB': {'Assets/_Game/Sim/FixtureCb.cs'}}, '/p')
+    assert list(hits) == ['FX-CB']
