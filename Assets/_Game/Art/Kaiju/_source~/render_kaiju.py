@@ -435,20 +435,20 @@ GAME = [
     ("gp-roar", [("Adult", "Azure", "Roar", 0.55, (0, 0, 0), A_YAW)], (2.9, -1.2, 0), None),
     ("gp-slam-windup", [("Adult", "Azure", "SlamWindup", 1.0, (0, 0, 0), A_YAW)], (3.6, -2.2, 0), "telegraph"),
 ]
-# bible framings (orthographic): (crop id, stage, allegiance, clip, phase, azimuth, elevation). Azimuths were tuned
-# by the KJ_SWEEP silhouette search inside each page's view range (compose_kaiju.AZ_RANGE): front stays front.
+# bible framings (orthographic): (crop id, stage, allegiance, clip, phase, azimuth, elevation). v2: azimuth and
+# elevation fitted by pose_fit.py inside each page's view range (compose_kaiju.AZ_RANGE, elevation 2-18): front stays front.
 BIBLE = [
     ("10-egg", "Egg", "Neutral", None, 0.0, 30, 10),
-    ("10-hatchling", "Hatchling", "Neutral", "Idle", 0.0, 60, 12),
-    ("10-azure-adult", "Adult", "Azure", "Idle", 0.0, 52, 6),
-    ("10-crimson-adult", "Adult", "Crimson", "Idle", 0.0, 52, 6),
+    ("10-hatchling", "Hatchling", "Neutral", "Idle", 0.0, 57.5, 12),
+    ("10-azure-adult", "Adult", "Azure", "Idle", 0.0, 57, 6),
+    ("10-crimson-adult", "Adult", "Crimson", "Idle", 0.0, 57, 3),
     ("10-berserk-adult", "Adult", "Berserk", "Berserk", 0.25, 60, 6),
     ("11-front", "Adult", "Azure", "Idle", 0.0, 0, 8),
-    ("11-three-quarter", "Adult", "Azure", "Idle", 0.0, 60, 8),
-    ("11-profile", "Adult", "Azure", "Idle", 0.0, 75, 8),
-    ("11-rear", "Adult", "Azure", "Idle", 0.0, 180, 12),
+    ("11-three-quarter", "Adult", "Azure", "Idle", 0.0, 60, 2.7),
+    ("11-profile", "Adult", "Azure", "Idle", 0.0, 77.5, 5),
+    ("11-rear", "Adult", "Azure", "Idle", 0.0, 181.7, 8.3),
     ("11-roar", "Adult", "Azure", "Roar", 0.55, 60, 8),
-    ("11-slam-windup", "Adult", "Azure", "SlamWindup", 1.0, 52, 8),
+    ("11-slam-windup", "Adult", "Azure", "SlamWindup", 1.0, 47, 8),
 ]
 
 meta = {}

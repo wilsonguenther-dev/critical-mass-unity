@@ -130,6 +130,7 @@ def iou(az, el):
 POSE = eval("lambda P: " + SPEC["pose"])
 params = {k: v[0] for k, v in SPEC["params"].items()}
 az = SPEC["az"]
+el = SPEC["el"]
 
 
 def score(p, az_):
@@ -159,5 +160,15 @@ for rnd in range(SPEC.get("rounds", 3)):
             v = score(params, a2)
             if v > best + 1e-4:
                 best, az = v, a2
-    print("FIT round %d IoU %.3f az %g %s" % (rnd, best, az, json.dumps({k: round(v, 2) for k, v in params.items()})))
-json.dump({"iou": best, "az": az, "params": {k: round(v, 2) for k, v in params.items()}}, open(OUTP, "w"), indent=1)
+    if "el_range" in SPEC:
+        for de in (2, -2, 4, -4):
+            e2 = min(SPEC["el_range"][1], max(SPEC["el_range"][0], el + de / (rnd + 1)))
+            SPEC["el"], keep = e2, SPEC["el"]
+            v = score(params, az)
+            if v > best + 1e-4:
+                best, el = v, e2
+            else:
+                SPEC["el"] = keep
+    SPEC["el"] = el
+    print("FIT round %d IoU %.3f az %g el %g %s" % (rnd, best, az, el, json.dumps({k: round(v, 2) for k, v in params.items()})))
+json.dump({"iou": best, "az": az, "el": el, "params": {k: round(v, 2) for k, v in params.items()}}, open(OUTP, "w"), indent=1)

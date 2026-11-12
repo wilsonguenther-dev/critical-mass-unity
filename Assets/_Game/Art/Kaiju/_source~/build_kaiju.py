@@ -749,15 +749,31 @@ X, Y, Z = (1, 0, 0), (0, 1, 0), (0, 0, 1)
 PIVOT_Y = [0.95]   # hind-foot contact (design y) of the stage being keyed, for the rearing pivot
 
 
-def creature_clips():
+# Poses fitted to the bible crops with pose_fit.py (silhouette IoU; specs in the v2 REPORT). Degrees about armature
+# axes as in key_clips; hz = hips lift in design units. Clips reach these values at full weight.
+ROAR_FIT = {"hz": 0.06, "ay": 16.0, "ax": 8.0, "fy": -8.0, "fx": -8.0, "sp": -10, "ch": -10, "nk": -10.5, "hd": -34.0, "tx": -6.0, "ty": 12.0, "tl": -24.0}
+WINDUP_FIT = {"arx": 195.0, "ary": 2.0, "frx": -40.0, "fkx": -20.0, "hz": 0.06, "sp": 12.0, "chx": 5.0, "chy": -6, "hd": -32.0, "alx": 18.0, "aly": 0, "flx": 4.0}
+BERSERK_FIT = {"ra": -6.0, "ax": 12.0, "ay": 6, "sp": -1.0, "ch": -8, "nk": -2.0, "hd": -22, "fx": 6, "fk": -8.0, "tx": 18.0}
+HATCH_IDLE_FIT = {"nk": -30.0, "hd": 4.0, "hy": 7.5, "sp": -11.25, "ch": 5.0, "ax": 0, "ay": 6.0, "tx": 0, "ty": 0, "tl": -10.0}
+
+
+def creature_clips(stage="Adult"):
     """Clips the docs name (ARCHITECTURE.md section 6, PARITY p10/p11): idle, walk, roar, slam wind-up, slam, berserk,
     KO. Loops are in place (no root motion). Locations are design units (multiplied by the stage scale)."""
 
     def idle(t):
         s = math.sin(math.tau * t)
-        return {"rot": {"Spine": [(X, -1.5 * s)], "Chest": [(X, -1.0 * s)], "Head": [(X, 2.5 * math.sin(math.tau * t + 1))],
-                        "Arm_L": [(X, 2.0 * s)], "Arm_R": [(X, 2.0 * s)], "Tail1": [(Z, 5 * s)], "Tail2": [(Z, 6 * s)]},
-                "loc": {"Hips": (0, 0, 0.015 * s)}}
+        rot = {"Spine": [(X, -1.5 * s)], "Chest": [(X, -1.0 * s)], "Head": [(X, 2.5 * math.sin(math.tau * t + 1))],
+               "Arm_L": [(X, 2.0 * s)], "Arm_R": [(X, 2.0 * s)], "Tail1": [(Z, 5 * s)], "Tail2": [(Z, 6 * s)]}
+        if stage == "Hatchling":        # bible p10 hatchling: head up and turned to the viewer, chest lifted
+            H = HATCH_IDLE_FIT
+            base = {"Spine": [(X, H["sp"])], "Chest": [(X, H["ch"])], "Neck": [(X, H["nk"])],
+                    "Head": [(X, H["hd"]), (Z, H["hy"])], "Arm_L": [(X, H["ax"]), (Y, -H["ay"])],
+                    "Arm_R": [(X, H["ax"]), (Y, H["ay"])], "Thigh_L": [(X, H["tx"]), (Y, -H["ty"])],
+                    "Thigh_R": [(X, H["tx"]), (Y, H["ty"])], "Tail1": [(Z, H["tl"])]}
+            for k, v in base.items():
+                rot[k] = v + rot.get(k, [])
+        return {"rot": rot, "loc": {"Hips": (0, 0, 0.015 * s)}}
 
     def walk(t):
         p = math.tau * t
@@ -773,31 +789,39 @@ def creature_clips():
                 "loc": {"Hips": (0.04 * s, 0, 0.05 * abs(math.sin(2 * p)))}}
 
     def roar(t):
+        """Bible p11 roar: wide planted stance, arms splayed, head thrown up, jaw wide (ROAR_FIT)."""
         e = smooth(t / 0.3) * (1 - smooth((t - 0.8) / 0.2))
         sh = 2.5 * math.sin(math.tau * 9 * t) * e
-        return {"rot": {"Spine": [(X, -10 * e)], "Chest": [(X, -10 * e)], "Neck": [(X, -12 * e)],
-                        "Head": [(X, -24 * e + sh)], "Jaw": [(X, 42 * e)],
-                        "Arm_L": [(X, 16 * e), (Y, -8 * e)], "Arm_R": [(X, 16 * e), (Y, 8 * e)],
-                        "Tail1": [(X, -8 * e)]},
-                "loc": {"Hips": (0, 0, 0.06 * e)}}
+        R = ROAR_FIT
+        rot = {"Spine": [(X, R["sp"] * e)], "Chest": [(X, R["ch"] * e)], "Neck": [(X, R["nk"] * e)],
+               "Head": [(X, R["hd"] * e + sh)], "Jaw": [(X, 42 * e)],
+               "Arm_L": [(X, R["ax"] * e), (Y, -R["ay"] * e)], "Arm_R": [(X, R["ax"] * e), (Y, R["ay"] * e)],
+               "Forearm_L": [(X, R["fx"] * e), (Y, -R["fy"] * e)], "Forearm_R": [(X, R["fx"] * e), (Y, R["fy"] * e)],
+               "Thigh_L": [(X, R["tx"] * e), (Y, -R["ty"] * e)], "Thigh_R": [(X, R["tx"] * e), (Y, R["ty"] * e)],
+               "Tail1": [(X, R["tl"] * e)]}
+        return {"rot": rot, "loc": {"Hips": (0, 0, R["hz"] * e)}}
 
-    def windup_pose(e):
-        return {"Spine": [(X, 6 * e)], "Chest": [(X, 2 * e), (Y, -6 * e)], "Head": [(X, -12 * e)],
-                "Arm_R": [(X, -150 * e), (Y, 12 * e)], "Forearm_R": [(X, -35 * e)], "Fist_R": [(X, -20 * e)],
-                "Arm_L": [(X, -8 * e)], "Jaw": [(X, 12 * e)]}
+    def windup_pose(e, arc_back=True):
+        """Bible p11 slam wind-up (WINDUP_FIT): the right fist swung back over the shoulder, body pitched down."""
+        W = WINDUP_FIT
+        arx = W["arx"] if arc_back else (W["arx"] - 360 if W["arx"] > 180 else W["arx"])
+        return {"Spine": [(X, W["sp"] * e)], "Chest": [(X, W["chx"] * e), (Y, W["chy"] * e)], "Head": [(X, W["hd"] * e)],
+                "Arm_R": [(X, arx * e), (Y, W["ary"] * e)], "Forearm_R": [(X, W["frx"] * e)],
+                "Fist_R": [(X, W["fkx"] * e)], "Arm_L": [(X, W["alx"] * e), (Y, -W["aly"] * e)],
+                "Forearm_L": [(X, W["flx"] * e)], "Jaw": [(X, 12 * e)]}
 
     def windup(t):
         e = smooth(t)
-        return {"rot": windup_pose(e), "loc": {"Hips": (0, 0, 0.06 * e)}}
+        return {"rot": windup_pose(e), "loc": {"Hips": (0, 0, WINDUP_FIT["hz"] * e)}}
 
     def slam(t):
+        """From the wind-up pose the fist comes down IN FRONT (forward arc) onto the telegraph centre."""
         s = smooth(t / 0.55) ** 2
-        k = 1 - smooth((t - 0.75) / 0.25) * 0.3
-        rot = {"Spine": [(X, 6 + 6 * s)], "Chest": [(X, (2 + 10 * s) * k), (Y, -6 + 6 * s)],
-               "Head": [(X, -12 + 14 * s)], "Arm_R": [(X, -150 + 150 * s), (Y, 12 - 12 * s)],
-               "Forearm_R": [(X, -35 + 35 * s)], "Fist_R": [(X, -20 + 20 * s)], "Arm_L": [(X, -8 - 2 * s)],
-               "Jaw": [(X, 12 + 10 * s)]}
-        return {"rot": rot, "loc": {"Hips": (0, 0, 0.06 - 0.14 * s)}}
+        rot = windup_pose(1 - s, arc_back=False)
+        for b, add in (("Spine", 10 * s), ("Chest", 10 * s), ("Head", 4 * s)):
+            rot[b] = rot.get(b, []) + [(X, add)]
+        rot["Jaw"] = [(X, 12 + 10 * s)]
+        return {"rot": rot, "loc": {"Hips": (0, 0, WINDUP_FIT["hz"] * (1 - s) - 0.08 * s)}}
 
     def berserk(t):
         """Bible p10 berserk: a hunched-up roar. The body rears a little about the hind feet (Root turn plus the
@@ -805,15 +829,18 @@ def creature_clips():
         jaw wide, a shudder through the spine."""
         p = math.tau * t
         sh = math.sin(2 * p)
-        a = -13.0 + 1.5 * math.sin(p)
+        Bf = BERSERK_FIT
+        a = Bf["ra"] - 1.5 + 1.5 * math.sin(p)
         ar = math.radians(a)
         lift = (0, PIVOT_Y[0] * (1 - math.cos(ar)), -PIVOT_Y[0] * math.sin(ar))
-        return {"rot": {"Root": [(X, a)], "Spine": [(X, -6), (Y, 3 * sh)], "Chest": [(X, -8)], "Neck": [(X, -8)],
-                        "Head": [(X, -22 + 4 * math.sin(4 * p))], "Jaw": [(X, 40 + 4 * math.sin(6 * p))],
-                        "Arm_L": [(X, 24 + 3 * math.sin(p)), (Y, -6)], "Arm_R": [(X, 24 - 3 * math.sin(p)), (Y, 6)],
-                        "Forearm_L": [(X, 6)], "Forearm_R": [(X, 6)], "Fist_L": [(X, -16)], "Fist_R": [(X, -16)],
-                        "Thigh_L": [(X, 12)], "Thigh_R": [(X, 12)], "Foot_L": [(X, 2)], "Foot_R": [(X, 2)],
-                        "Tail1": [(Z, 12 * sh), (X, 8)]},
+        osc = 3 * (math.sin(p) - 1)
+        return {"rot": {"Root": [(X, a)], "Spine": [(X, Bf["sp"]), (Y, 3 * sh)], "Chest": [(X, Bf["ch"])],
+                        "Neck": [(X, Bf["nk"])], "Head": [(X, Bf["hd"] + 4 * math.sin(4 * p))],
+                        "Jaw": [(X, 38 + 4 * math.sin(6 * p + math.pi))],
+                        "Arm_L": [(X, Bf["ax"] + osc), (Y, -Bf["ay"])], "Arm_R": [(X, Bf["ax"] - osc), (Y, Bf["ay"])],
+                        "Forearm_L": [(X, Bf["fx"])], "Forearm_R": [(X, Bf["fx"])], "Fist_L": [(X, Bf["fk"])],
+                        "Fist_R": [(X, Bf["fk"])], "Thigh_L": [(X, Bf["tx"])], "Thigh_R": [(X, Bf["tx"])],
+                        "Foot_L": [(X, 2)], "Foot_R": [(X, 2)], "Tail1": [(Z, 12 * sh), (X, 8)]},
                 "loc": {"Root": lift}}
 
     def ko(t):
@@ -869,7 +896,7 @@ def creature(name, P, seed, target_h):
             return "Skin" if c.z > fr[1] - 0.15 * fr[3] / 0.36 else "Belly"   # paint lays the tan muzzle on top
         if face_zone(c, n):
             if n.z < -0.35 and c.z < P["muzzle"][2]:
-                return "Mouth"   # under the muzzle: hidden by the jaw at rest, the open mouth when the jaw drops
+                return "Belly"   # under the muzzle (v2: tan; the open mouth shows the interior piece behind the jaw)
             return "Belly" if c.z < P["muzzle"][2] + 0.03 else "Skin"
         if (c - Hc).length < RH * 1.9 and n.y < -0.25 and c.z < Hc.z - 0.3 * RH and abs(c.x) < RH:
             return "Belly"       # chin and throat run into the tan chest plate (p11 front)
@@ -967,7 +994,7 @@ def creature(name, P, seed, target_h):
     bm.free()
     ob, rig, s = finish(name, geo, P["bones"], target_h)
     PIVOT_Y[0] = P["foot"][1]
-    key_clips(rig, creature_clips(), s)
+    key_clips(rig, creature_clips(name), s)
     return ob, rig
 
 
@@ -1005,7 +1032,7 @@ def face_kit(eye_r, eye_off, brow, smile, open_jaw, teeth):
         js = eye_off["jaw_size"]
         ellipsoid(geo, hinge + R @ (jc - hinge), 1.0, (js[0], js[1] * 1.15, js[2] * 1.3), "Belly", bone="Jaw", seg=10, rings=6,
                   smooth=False, rot=R)
-        ellipsoid(geo, mz + Vector((0, eye_off.get("mouth_back", 0.05) * RH * 2 + 0.1 * RH, -0.13 * RH)), RH * 0.3,
+        ellipsoid(geo, mz + Vector((0, eye_off.get("mouth_back", 0.05) * RH * 2 + 0.3 * RH, -0.02 * RH)), RH * 0.26,
                   (1.0, 0.9, 0.5), "Mouth", bone="Head", seg=10, rings=6)   # hidden by the closed jaw
         for k in range(teeth):
             u = (k - (teeth - 1) / 2) / max(1, teeth - 1)
@@ -1110,7 +1137,7 @@ def adult_params():
                     brow=(1.3, 0.4, 0.98, 16), smile=(0.13, 0.31, -0.06, 0.05, 0.03), open_jaw=0, teeth=0)
     return {
         "unit": U, "balls": balls, "limbs": limbs, "voxel": 0.05, "body_tris": 2600, "bones": bones,
-        "gap": 0.024, "crack_w": 0.08, "chamfer_m": 0.05, "design_h": 4.2,
+        "gap": 0.024, "crack_w": 0.02, "chamfer_m": 0.05, "design_h": 4.2,
         "head": (0, -1.02 + HY, 3.25 + HZ), "head_r": 0.43, "muzzle": (0, -1.36 + HY, 3.0 + HZ), "head_clear": 1.12, "belly": belly, "dmin": dmin,
         "samples": 16000, "plate_r": 1.0, "plate_thick": 0.4, "light_frac": light_frac, "moss": moss, "min_plate_z": 0.15,
         "belly_tiles": belly_tiles, "fist": (FX, FY, 0.52), "fist_plate_z": 0.85, "fist_plate_r": 0.44 * FR / 0.6,
@@ -1184,7 +1211,7 @@ def hatch_params():
     belly_tiles = [(x, z, 0.16, 0.09) for z in (1.2, 1.0, 0.8, 0.6) for x in (-0.17, 0.17)]
     return {
         "unit": U, "balls": balls, "limbs": limbs, "voxel": 0.045, "body_tris": 2000, "bones": bones,
-        "gap": 0.022, "crack_w": 0.07, "chamfer_m": 0.035, "design_h": 2.6,
+        "gap": 0.022, "crack_w": 0.02, "chamfer_m": 0.035, "design_h": 2.6,
         "head": (0, -1.1, 1.75), "head_r": 0.56, "muzzle": (0, -1.5, 1.56), "head_clear": 1.1, "belly": belly, "dmin": dmin,
         "samples": 12000, "plate_r": 1.0, "plate_thick": 0.4, "light_frac": light_frac, "moss": moss, "min_plate_z": 0.1,
         "belly_tiles": belly_tiles, "fist": (0.82, -0.68, 0.32), "fist_plate_z": 0.45, "fist_plate_r": 0.26,
