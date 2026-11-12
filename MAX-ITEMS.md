@@ -625,6 +625,7 @@ Old state: held until after the demo. Closed: moving to this Unity repo is the p
 
 ## 5. Art
 
-No art item is assigned to you here. You have been modelling a hero character in Blender: please push the `.blend` and
-an FBX export to `Assets/_Game/Art/Characters/_source/` on a branch (for example `max/art-hero-source`) and open a PR,
+No art item is assigned to you here. You have been modelling a hero character in Blender: please push the `.blend` to
+`Assets/_Game/Art/Characters/_source~/` (the `~` keeps Unity from importing it) and its FBX export to
+`Assets/_Game/Art/Characters/` on a branch (for example `max/art-hero-source`) and open a PR,
 so it can be checked against the asset bible's Warrior page (page 6). Both file types already go through Git LFS.

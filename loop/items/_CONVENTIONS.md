@@ -6,9 +6,17 @@ item spec overrides this file where the two differ. Anything here that was a fre
 
 ## 1. Source of truth
 
-- Browser repo: `/Users/wilsonguenther/critical-mass`, branch `origin/main`, commit `09e0904` (2026-11-09, "cm batch 2").
-  Read a file with `git -C /Users/wilsonguenther/critical-mass show origin/main:<path>`. Read only: never check out,
-  pull, edit, commit there.
+- Browser repo: `/Users/wilsonguenther/critical-mass`, commit `09e0904` (2026-11-09, "cm batch 2").
+  Read a file ONLY with `git -C /Users/wilsonguenther/critical-mass show 09e0904:<path>` (pinned sha, not a moving
+  branch). Never `cat`, `ls` or `grep` the `~/critical-mass` working tree: it is checked out at an older commit
+  (9a29d71, 149 commits behind, with local edits on 2026-11-12) and its `src/` differs from the oracle in game.config.ts,
+  types.ts, map.ts and world.ts (panel revision 2026-11-12, P-05). Read only: never check out, pull, edit, commit there.
+- Never read another item's lane under `~/critical-mass-unity-lanes/`. Items of the same batch are built at the same
+  time from origin/main; their code is not in your lane and may be half-written in theirs. The contract between items
+  is the upstream item file: for every `waits_on` id that has not landed, read `loop/items/<ID>.md` (its Create, API and
+  signature tables) and section 11 below, and call exactly those signatures, verbatim. Never stub, redeclare or guess an
+  upstream member. An upstream type missing from your lane is expected and is NOT an open question; a signature the
+  upstream spec does not give IS one (P-06).
 - Port rule for rule, line for line. Private helpers and private constants of a TS file become `private static`
   members of the C# class that ports the file, same name in PascalCase. Doc comments are carried as one-line `///`
   summaries; the long reasoning comments are not copied (they stay in the browser repo).
@@ -86,11 +94,17 @@ there. `Assets/_Game/Editor/` (`CriticalMass.Editor`): only F-07 edits it in Pha
 
 ## 6. Behaviour rules that never translate mechanically
 
-1. **Float32 storage.** The browser stores positions, velocities and flow distances in `Float32Array` and calls
-   `Math.fround` before collision tests (D-012). The C# Sim stores `double` and every `Math.fround(v)` becomes `v`.
-   Oracle tolerance (U-002): ticks, counts, booleans, event types and outcomes exact; positions, velocities and
-   distances within 1e-4.
-2. **Rounding.** `Math.round(v)` -> `JsMath.Round(v)` (= `Math.Floor(v + 0.5)`; C# `Math.Round` rounds half to even).
+1. **Float32 storage (panel revision 2026-11-12, P-03; replaces "every fround becomes v").** The browser stores
+   positions, velocities, flow distances and several bot fields in `Float32Array` and calls `Math.fround` before
+   collision tests (D-012). The C# Sim keeps `double[]` storage but rounds exactly where the browser rounds: every
+   store into a field the browser holds in a `Float32Array`, and every `Math.fround(v)`, is written `JsMath.F32(v)`
+   (`(double)(float)v`, F-02a). Reads and arithmetic stay `double`, as in V8. `Float64Array` stays plain `double`.
+   Why: with plain double storage, ties that collapse in f32 survive as one-ulp differences and change discrete
+   choices; a port of computeFlowField + sampleFlowDir on 20 random 112x72 grids picked a different direction in
+   539 of 144,221 cells (0.374%). Oracle tolerance (U-002): ticks, counts, booleans, event types and outcomes exact;
+   positions, velocities and distances within 1e-4 only for the last-bit transcendental case of rule 15.
+2. **Rounding.** `Math.round(v)` -> `JsMath.Round(v)` (floor, then +1 when the remainder is at least 0.5, F-02a; not
+   `Math.Floor(v + 0.5)`, which is wrong at 0.49999999999999994; C# `Math.Round` rounds half to even).
 3. **Floor to a cell.** `Math.floor(v)` used as an integer (cell coordinate, index, count) -> `JsMath.FloorToInt(v)`
    (F-02a): `int.MinValue` for NaN, infinities and values outside int range, else `(int)Math.Floor(v)`. A raw
    `(int)Math.Floor(NaN)` is platform-dependent (0 on Apple Silicon), which would let a NaN aim read cell (0, 0).

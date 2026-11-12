@@ -536,3 +536,75 @@ Superseded inside the browser log: D-002 (5v5 default) by D-067(6); D-053 (class
 | D-051 | WebGL failure card |
 | D-052 (2026-10-28) | Immutable content-addressed model URLs |
 | D-044 (history only) | The "no audio files" history is web-specific; the Kenney SFX bank itself is CC0 and portable |
+
+## Panel revisions 2026-11-12
+
+Senior Panel plan-audit before the first batch (seats: CTO, senior Unity/C# engineer, QA and harness, pre-mortem, demo
+PM; synthesis seat applied these). Every entry below was checked against the files or a command; nothing above this
+section is rewritten. Where an entry conflicts with an earlier decision, this entry wins.
+
+- **P-01 Builders run on Opus.** The workflow sent every `tightly_defined` item (all 26) to Sonnet; the aborted run
+  wf_a743c82d-56d's builder transcripts show `claude-sonnet-5-5`. That broke the binding "Opus in every seat" and would
+  have measured the wrong cost. Now `model: 'opus'` for every seat; sim-workflow asserts it. `tightly_defined` stays in
+  the front-matter as information only.
+- **P-02 Batch membership is checked and a run can be limited to named batches.** `_ORDER.md` row 2 read
+  `F-05a .. F-05j` and the parser kept only the two endpoints, leaving F-05b..F-05i in no batch. Now the row lists all ten
+  ids, the parser expands letter ranges anyway, preflight FAILs when a loop item sits in no batch or in two, and
+  `launch.sh --batches 1` (`cmloop.py plan --batches 1`) writes only batch 1 into the args file, so the cost run cannot
+  roll into batch 2. A test pins the real membership (5, 10, 7, 4).
+- **P-03 Float32 storage is emulated, not dropped** (replaces conventions 6.1's "every `Math.fround(v)` becomes `v`" and
+  O-01's "keep all 53 bits"). Storage stays `double[]`; every store into a field the browser holds in a `Float32Array`,
+  and every `Math.fround`, goes through `JsMath.F32(v) = (double)(float)v`. Measured reason: a port of
+  computeFlowField + sampleFlowDir on 20 random 112x72 grids picked a different direction in 539 of 144,221 cells
+  (0.374%) with f64 storage, because ties that collapse in f32 survive as one-ulp differences. U-002's "outcomes exact,
+  positions within 1e-4" now has a mechanism; the 1e-4 tolerance is left for the last-bit transcendental case only.
+  Edited: _CONVENTIONS 6.1, F-02a (adds `F32`), F-02b, F-04, F-05a, F-05b, F-05d, F-05j, F-06a.
+- **P-04 `JsMath.Round` is JS `Math.round`.** `Math.Floor(v + 0.5)` gives 1 for 0.49999999999999994 (JS gives 0) and is
+  wrong for odd integers from 2^52 up. F-02a now specifies floor-then-compare and adds one test,
+  `JsMathTests.RoundMatchesJsMathRoundAtTheEdgesAndF32MatchesMathFround` (values taken from node on this Mac). Batch 1's
+  EditMode count becomes 41 (37 ported + 3 added + SimVersionTests); Phase 0 exit default count becomes 195.
+- **P-05 The oracle is the pinned commit, never the working tree.** `~/critical-mass` is checked out at 9a29d71, 149
+  commits behind 09e0904, with local edits, and its src/ differs in game.config.ts, types.ts, map.ts and world.ts; a
+  builder in the aborted run `cat`-ed world.ts from it. Conventions section 1 and the builder prompt now say
+  `git -C ~/critical-mass show 09e0904:<path>` only.
+- **P-06 Same-batch upstream contract.** Batch 1 is a chain built in parallel from origin/main, so downstream builders
+  cannot see upstream code. The builder prompt and conventions section 1 now say: read each not-yet-landed `waits_on`
+  item's spec and conventions section 11, call those signatures verbatim, never stub or guess, never read another lane;
+  a missing upstream type is expected and is not an open question.
+- **P-07 `tests_required` is enforced.** After a green EditMode gate, integrate.py checks that every `tests_required`
+  name of each item is declared in a .cs file the item changed and shows `Passed` in the results file (not run is
+  allowed only for `Explicit` or `Category("Slow")`; `[Ignore]` never). A shortfall is a counted red of that item at gate
+  `tests`. `pass_check` stays as prose for humans; this check is what enforces it.
+- **P-08 Art sources live where Unity does not import them.** `.blend` files go in `Assets/_Game/Art/*/_source~/`
+  (Unity skips `~` folders, so no machine needs Blender to import the project and nothing imports twice); the FBX
+  export sits one level up. `*.blend1`/`*.blend2` are ignored; `.mat`, `.anim`, `.controller` and the other Unity YAML
+  types get `merge=unityyamlmerge`. Supersedes the path in U-009 (the rest of U-009 stands).
+- **P-09 The follow camera is really orthographic.** Cinemachine 3.1.7 copies `Lens.ModeOverride` to the Unity camera
+  only when `CinemachineBrain.LensModeOverride.Enabled` (CinemachineBrain.cs 755-773; default disabled, Perspective).
+  F-08a now sets `camera.orthographic = true` and enables the brain override; F-08b casts the double view height to float.
+- **P-10 The spend fallback errs high.** The transcript estimate read 0.886 of the reported total on the aborted run (it
+  was documented as 1.2x). spend.py now divides the raw estimate by 0.85 before the thresholds and keeps `raw`.
+- **P-11 Small corrections.** Batch 3's count is +31 (29 ported, 2 added), not +30. The parity gate's skip now needs exit
+  78 like every other gate.
+
+### Deferred by the panel
+
+| What | Destination |
+| --- | --- |
+| The coupled flag is per batch, so F-07 (batch 3) and F-09 (batch 4) halt with their coupled siblings although `_ORDER.md` says they drop alone. Split the rows or carry per-item coupled sets. | Architect, before batch 3 |
+| `public static class Bots` in namespace `CriticalMass.Sim.Bots` resolves to the namespace from `CriticalMass.Sim.*` code (CS0234), and Sim `Resources` collides with `UnityEngine.Resources` in Runtime files (CS0104). Rename to `BotBrain` and `SimResources` across conventions section 3, F-05g, F-05i, F-06a, F-06c, F-06d, F-06e, F-07, F-08a and MAX-ITEMS. | Architect, before batch 2 |
+| Port V8's fdlibm `sin/cos/atan2/exp` into JsMath and ban the System.Math versions in the Sim (BoundaryTests); map.ts compares atan2 angles with `<=`. | Architect item before batch 2; sooner if a batch-1 map test goes red on an angle |
+| A Unity-free `dotnet test` job for the Sim on ubuntu and windows (no licence needed; doubles as the cross-platform determinism check). | Phase 1, architect |
+| A check that Runtime code never assigns to Sim state (scope rule or read-only facade). | Before batch 4 |
+| Player-build (IL2CPP) determinism: per-tick state hash against EditMode. | Phase 1 |
+| Steamworks wrapper, save and settings storage, Mac signing and notarisation stubs. | Decision stubs when Phase 1 starts; build in Phase 3 |
+| F-01's "every tunable matches" test compares the spec to itself; commit a golden file generated from game.config.ts at 09e0904. | Architect, before batch 2 (F-01 lands as specified) |
+| Per-seat-kind token totals and rounds/compiles per batch in the batch report, so batch 1's cost can be extrapolated per seat. | Harness, right after the batch-1 run |
+| build-mac runs on every batch although `_ORDER.md` lists it only after batch 4. Accepted for batch 1 (it is part of the real cost); revisit after. | After batch 1 |
+| A returned item's lane is cut from `origin/loop/<ID>`, which lacks upstream code that landed since; merge origin/main in. A consumer red naming an upstream type should not count against the consumer. | Architect, harness, before batch 2 |
+| F-09's 14 outcome bands as a Phase 0 exit gate, CM-30 waiting on all of F-09, and the must-haves waiting on all 26 items (split into Sim and view parts). | Owner and architect, before batch 4 |
+| Max's prototype against this scaffold (which base the view layer builds on). | Owner, before batch 3 |
+| A named owner (Wilson) for the F-08a human play check, and one PlayMode test that drives human input. | Architect, before batch 4 |
+| A CM/Toon shader item in parallel with Phase 0 (no Sim dependency). | Architect, slot into batch 4 |
+| Windows build module and a build-windows gate. | After Travis's platform is known; batch 4 |
+| Stale ownership parentheticals in `_ORDER.md` section 1 and MAX-ITEMS line 149. | Architect doc pass |

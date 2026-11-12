@@ -55,9 +55,9 @@ components. A coupled set lands together; a red in it is repaired by the fix sea
 
 | Batch | Items | coupled | Waves (builders) | Compiles | Gate after the batch |
 | --- | --- | --- | --- | --- | --- |
-| 1 | F-01, F-02a, F-03, F-04, F-02b | false (a chain: each item waits on the earlier ones) | 1 wave of 5 | 1 | compile, EditMode 39 (37 ported + 2 added) |
-| 2 | F-05a .. F-05j | true (U-026) | wave 1: F-05a, F-05b, F-05c, F-05d, F-05e; wave 2: F-05f, F-05g, F-05h, F-05i, F-05j | 1 after both waves | compile, EditMode +117 runtime cases (113 methods) |
-| 3 | F-06b, F-06a, F-06c, F-06d, F-06e, F-06f, F-07 | true for the six F-06 items (U-026); F-07 is not coupled to them and drops alone | wave 1: F-06b, F-06a, F-06c, F-06d, F-06e; wave 2: F-06f, F-07 | 1 after both waves | compile, EditMode +30 (28 ported, 2 added; the perf case is Explicit) |
+| 1 | F-01, F-02a, F-03, F-04, F-02b | false (a chain: each item waits on the earlier ones) | 1 wave of 5 | 1 | compile, EditMode 41 (37 ported + 3 added + SimVersionTests 1; panel 2026-11-12 added the JsMath case) |
+| 2 | F-05a, F-05b, F-05c, F-05d, F-05e, F-05f, F-05g, F-05h, F-05i, F-05j | true (U-026) | wave 1: F-05a, F-05b, F-05c, F-05d, F-05e; wave 2: F-05f, F-05g, F-05h, F-05i, F-05j | 1 after both waves | compile, EditMode +117 runtime cases (113 methods) |
+| 3 | F-06b, F-06a, F-06c, F-06d, F-06e, F-06f, F-07 | true for the six F-06 items (U-026); F-07 is not coupled to them and drops alone | wave 1: F-06b, F-06a, F-06c, F-06d, F-06e; wave 2: F-06f, F-07 | 1 after both waves | compile, EditMode +31 (29 ported, 2 added; the perf case is Explicit; corrected by the panel 2026-11-12) |
 | 4 | F-08a, F-08b, F-08c, F-09 | true for F-08a, F-08b, F-08c (bootstrap creates the other two; SimSpace is F-08a's); F-09 is not coupled and drops alone | 1 wave of 4 | 1 | compile, EditMode +7 (4 ported, 3 added), PlayMode smoke 1, Mac build; soak lane `tools/unity-test.sh --category Slow` 14 (U-028) |
 
 Acyclic: every `waits_on` edge points to an earlier batch, or inside batch 1 to an earlier item of the chain
@@ -75,7 +75,7 @@ Editor asmdef): F-07 only, in Phase 0. No item touches `ProjectSettings/`, `Pack
 ProjectSetup.Apply creates the one runtime asset (the placeholder material). ProjectSetup changes made in batch 3 must
 be applied (U-029) before batch 4's gates, which need the project-wide actions and the material.
 
-Phase 0 exit (U-012): after batch 4, EditMode default 194 cases green (187 ported + 7 added), soak 14 green, PlayMode
+Phase 0 exit (U-012): after batch 4, EditMode default 195 cases green (187 ported + 8 added; plus SimVersionTests), soak 14 green, PlayMode
 smoke green, Mac build green.
 
 ## 4. Ported test count
@@ -84,7 +84,7 @@ smoke green, Mac build green.
 187 in the default EditMode gate, 14 `[Category("Slow")]` (F-09), 1 `[Explicit]` perf (F-06f). Counted with
 `grep -cE '^\s*(it|test)(\.skipIf\([^)]*\))?\('` per file on 09e0904 (no `.each` in any ported file; the one
 `it` inside a `for` loop, clarity.test.ts line 223, runs 5 times) and matched name by name: every ported vitest title
-maps to exactly one `tests_required` entry. Added (no vitest twin): 2 config (F-01), 1 steer (F-06c), 1 fsm (F-06d),
+maps to exactly one `tests_required` entry. Added (no vitest twin): 2 config (F-01), 1 JsMath (F-02a, panel 2026-11-12), 1 steer (F-06c), 1 fsm (F-06d),
 3 SimSpace (F-08a), 1 PlayMode smoke (F-08c). Not ported: balance-table (3 sites, 11 runtime, O-02), humanInput (2,
 O-26), bots CM21 capture (1), palette.test (13, browser CSS), buildTag.test (3, browser build tag). Moved to mechanics
 items: respawn CM-54 (7, CM-84), bots human-jump (1, CM-32). The mechanics test files on main (jump, terraform, topple,

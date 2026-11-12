@@ -46,3 +46,7 @@ crashlytics-build.properties
 # OS
 .DS_Store
 Thumbs.db
+
+# Blender backups (panel revision 2026-11-12)
+*.blend1
+*.blend2

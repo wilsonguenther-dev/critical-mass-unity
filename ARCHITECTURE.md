@@ -172,7 +172,7 @@ black); the ramp threshold; the rim width and strength; and whether `CM/Toon` is
 
 | Step | Rule |
 | --- | --- |
-| Source folder | `Assets/_Game/Art/Characters/_source/`: the `.blend` plus its FBX export, with a build note. In Git LFS. |
+| Source folder | `Assets/_Game/Art/Characters/_source~/`: the `.blend` plus a build note, in Git LFS. The trailing `~` makes Unity skip the folder, so no machine needs Blender to import the project. The FBX export, the only file Unity imports, sits one level up in `Assets/_Game/Art/Characters/` (panel revision 2026-11-12, P-08). |
 | Rig | All three classes share the **KayKit 41-joint rig**. A **rig** is the skeleton of joints a mesh is bound to so it can be animated. |
 | Clips | All **76** CC0 KayKit clips work on every class (the browser kept 32; Unity keeps all 76). A **clip** is one recorded animation, such as `Running_A`. Source: the KayKit Adventurers 1.0 GLBs at `/Users/wilsonguenther/critical-mass-assets/work/kaykit-adventurers/KayKit-Character-Pack-Adventures-1.0-main/addons/kaykit_character_pack_adventures/Characters/gltf/` (`Knight.glb`, `Rogue.glb`, `Barbarian.glb`; 76 clips on a 41-joint skin each; licence CC0). |
 | Mesh | Sculpted by a person in Blender to the bible page. Never procedural stand-ins. |
@@ -189,7 +189,7 @@ Same route as the characters: sculpted in Blender to bible pp 10 and 11 (a heavy
 procedural stand-in. The source goes beside the characters' in the Art tree.
 
 **OPEN (the architect specifies it in the art item spec):** the Kaiju's rig and clip list (the KayKit rig is a humanoid; p10 and p11 need egg, hatchling, adult idle, walk,
-roar, slam wind-up, slam, berserk and KO), and its source folder (`Assets/_Game/Art/Kaiju/_source/` would mirror the
+roar, slam wind-up, slam, berserk and KO), and its source folder (`Assets/_Game/Art/Kaiju/_source~/` would mirror the
 characters).
 
 ### Props and environment kit pieces
@@ -200,7 +200,7 @@ destruction", so walls, barricades and similar props get one authored model per 
 folded, deployed, damaged).
 
 **OPEN (the architect specifies it in the art item spec):** where the prop scripts and their sources live in this repo (`tools/sculpt/` and
-`Assets/_Game/Art/Props/_source/` would mirror the character layout), and whether the browser's script budgets
+`Assets/_Game/Art/Props/_source~/` would mirror the character layout), and whether the browser's script budgets
 (12,000 triangles, a builder's guess) carry over.
 
 ### Export and import settings
@@ -224,7 +224,7 @@ sources and their clips into the editor. Nothing loads glTF at runtime.
 | `Assets/_Game/Runtime/` | `CriticalMass.Runtime`: Sim driver, input layer, views | exists (`AssemblyInfo.cs` only) |
 | `Assets/_Game/Runtime/View/` | per-item views (`ActorJumpLift.cs`, `CarriedBlockView.cs`, ...) | named in MAX-ITEMS |
 | `Assets/_Game/Editor/` | `CriticalMass.Editor`: `Build.cs`, `ProjectSetup.cs`, parity capture | exists |
-| `Assets/_Game/Art/Characters/_source/` | character `.blend` + FBX + build note | decided (U-009) |
+| `Assets/_Game/Art/Characters/_source~/` | character `.blend` + build note (Unity skips `~` folders); the FBX goes in `Assets/_Game/Art/Characters/` | decided (U-009, path revised by the panel 2026-11-12) |
 | `Assets/_Game/Art/{Characters,Kaiju,Props,Environment,Materials,Shaders,UI,VFX}/` | imported art; `CM/Toon` in `Shaders/` | folders exist |
 | `Assets/_Game/Audio/` | the 42 CC0 sounds (Phase 3) | folder exists |
 | `Assets/_Game/Scenes/` | `Boot.unity` (exists), `Arena.unity` (F-08) | |
