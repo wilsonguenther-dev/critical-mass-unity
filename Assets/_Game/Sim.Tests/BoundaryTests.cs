@@ -31,6 +31,32 @@ namespace CriticalMass.Sim.Tests
             new KeyValuePair<string, Regex>("System.Threading", new Regex(@"\bSystem\s*\.\s*Threading\b")),
         };
 
+        // F-02c (U-032): transcendentals go through JsMath (fdlibm), never System.Math / MathF.
+        private static readonly KeyValuePair<string, Regex>[] Transcendental =
+        {
+            new KeyValuePair<string, Regex>("Math.Sin/Cos/Atan2/Exp", new Regex(@"\bMath\.(Sin|Cos|Atan2|Exp)\s*\(")),
+            new KeyValuePair<string, Regex>("MathF.Sin/Cos/Atan2/Exp", new Regex(@"\bMathF\.(Sin|Cos|Atan2|Exp)\s*\(")),
+            new KeyValuePair<string, Regex>("using static System.Math", new Regex(@"using\s+static\s+System\.Math\b")),
+        };
+
+        // F-02c (review R20261112T1705-1-1): unqualified randomness, the clock, per-process hash codes.
+        private static readonly KeyValuePair<string, Regex>[] Unqualified =
+        {
+            new KeyValuePair<string, Regex>("new Random(", new Regex(@"\bnew\s+Random\s*\(")),
+            new KeyValuePair<string, Regex>("Random.Shared", new Regex(@"\bRandom\s*\.\s*Shared\b")),
+            new KeyValuePair<string, Regex>("DateTimeOffset", new Regex(@"\bDateTimeOffset\b")),
+            new KeyValuePair<string, Regex>("DateTime.Today", new Regex(@"\bDateTime\s*\.\s*Today\b")),
+            new KeyValuePair<string, Regex>("GetHashCode(", new Regex(@"\bGetHashCode\s*\(")),
+        };
+
+        // F-02c (review R20261112T1705-1-6): raw team-enum casts; SimEnumMap is the one place that maps them.
+        private const string SimEnumMapFile = "Assets/_Game/Sim/Core/SimEnumMap.cs";
+
+        private static readonly KeyValuePair<string, Regex>[] TeamEnumCasts =
+        {
+            new KeyValuePair<string, Regex>("cast to a team enum", new Regex(@"\(\s*(MatchResult|HillState|KaijuState)\s*\)")),
+        };
+
         private static readonly Regex BlockComment = new Regex(@"/\*[\s\S]*?\*/");
         private static readonly Regex LineComment = new Regex(@"(^|[^:""'`])//.*$", RegexOptions.Multiline);
 
@@ -56,6 +82,72 @@ namespace CriticalMass.Sim.Tests
             foreach (KeyValuePair<string, Regex> b in Banned)
                 if (b.Value.IsMatch(code)) violations.Add(rel + ": uses " + b.Key);
             return violations;
+        }
+
+        private static List<string> CheckRules(string rel, string source, KeyValuePair<string, Regex>[] rules)
+        {
+            var violations = new List<string>();
+            if (rules == TeamEnumCasts && rel == SimEnumMapFile) return violations;
+            string code = StripComments(source);
+            foreach (KeyValuePair<string, Regex> b in rules)
+                if (b.Value.IsMatch(code)) violations.Add(rel + ": uses " + b.Key);
+            return violations;
+        }
+
+        /// <summary>The F-02c guard: the three extended rule sets on one source.</summary>
+        private static List<string> CheckExtended(string rel, string source)
+        {
+            var violations = new List<string>();
+            violations.AddRange(CheckRules(rel, source, Transcendental));
+            violations.AddRange(CheckRules(rel, source, Unqualified));
+            violations.AddRange(CheckRules(rel, source, TeamEnumCasts));
+            return violations;
+        }
+
+        private static void AssertNoSimFileBreaks(KeyValuePair<string, Regex>[] rules)
+        {
+            List<string> files = ListCs();
+            Assert.GreaterOrEqual(files.Count, 12);
+            var violations = new List<string>();
+            foreach (string f in files) violations.AddRange(CheckRules(f, File.ReadAllText(f), rules));
+            CollectionAssert.IsEmpty(violations, string.Join("\n", violations));
+        }
+
+        [Test]
+        public void NoSimFileCallsSystemMathSinCosAtan2Exp()
+        {
+            AssertNoSimFileBreaks(Transcendental);
+        }
+
+        [Test]
+        public void NoSimFileUsesUnqualifiedRandomTheClockOrGetHashCode()
+        {
+            AssertNoSimFileBreaks(Unqualified);
+        }
+
+        [Test]
+        public void NoSimFileCastsBetweenTeamEnums()
+        {
+            AssertNoSimFileBreaks(TeamEnumCasts);
+        }
+
+        [Test]
+        public void TheExtendedGuardCatchesEachNewViolation()
+        {
+            string[] bad =
+            {
+                "var a = Math.Atan2(z, x);",
+                "using static System.Math;",
+                "var r = new Random(1);",
+                "var r = Random.Shared;",
+                "var t = DateTimeOffset.Now;",
+                "var d = DateTime.Today;",
+                "int h = o.GetHashCode();",
+                "w.Match.Winner = (MatchResult)(int)team;",
+            };
+            foreach (string s in bad)
+                Assert.AreEqual(1, CheckExtended("inline", s).Count, s);
+            Assert.AreEqual(0, CheckExtended("inline", "var a = JsMath.Atan2(z, x);").Count);
         }
 
         [Test]

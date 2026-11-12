@@ -117,8 +117,8 @@ namespace CriticalMass.Sim.Core
             PadDef pad = map.Pads[(int)team];
             double a = slot * SpawnAngleStep;
             double r = SpawnRadiusBase + (slot % 3) * SpawnRadiusStep;
-            x = pad.X + Math.Cos(a) * r;
-            z = pad.Z + Math.Sin(a) * r;
+            x = pad.X + JsMath.Cos(a) * r;
+            z = pad.Z + JsMath.Sin(a) * r;
         }
 
         /// <summary>Team-local slot of an actor id (ids 0..N-1 are the human's team, N..2N-1 the other team).</summary>
@@ -304,7 +304,7 @@ namespace CriticalMass.Sim.Core
                     world.PrevZ[id] = JsMath.F32(sz);
                     world.Vx[id] = JsMath.F32(0);
                     world.Vz[id] = JsMath.F32(0);
-                    a.Facing = Math.Atan2(map.Hill.Z - sz, map.Hill.X - sx);
+                    a.Facing = JsMath.Atan2(map.Hill.Z - sz, map.Hill.X - sx);
                     InputFrame inp = world.Inputs[id];
                     ResetInput(inp);
                     inp.AimX = sx;

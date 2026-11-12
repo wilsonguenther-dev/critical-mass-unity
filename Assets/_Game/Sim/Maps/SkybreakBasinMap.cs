@@ -172,7 +172,7 @@ namespace CriticalMass.Sim.Maps
         /// <summary>Angle in degrees [0, 360) of (dx, dz); 0 = east, 90 = south.</summary>
         private static double AngleDeg(double dx, double dz)
         {
-            double a = (Math.Atan2(dz, dx) * 180) / Math.PI;
+            double a = (JsMath.Atan2(dz, dx) * 180) / Math.PI;
             return a < 0 ? a + 360 : a;
         }
 
