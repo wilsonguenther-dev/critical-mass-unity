@@ -25,5 +25,17 @@ namespace CriticalMass.Sim.Core
         {
             return (double)(float)v;
         }
+
+        /// <summary>JS sine, bit-exact with node v24.11.1 (V8's fdlibm port, U-032).</summary>
+        public static double Sin(double x) => Fdlibm.Sin(x);
+
+        /// <summary>JS cosine, bit-exact with node v24.11.1 (V8's fdlibm port, U-032).</summary>
+        public static double Cos(double x) => Fdlibm.Cos(x);
+
+        /// <summary>JS two-argument arctangent, bit-exact with node v24.11.1 (V8's fdlibm port, U-032).</summary>
+        public static double Atan2(double y, double x) => Fdlibm.Atan2(y, x);
+
+        /// <summary>JS exponential, bit-exact with node v24.11.1 (V8's fdlibm port, U-032).</summary>
+        public static double Exp(double x) => Fdlibm.Exp(x);
     }
 }
