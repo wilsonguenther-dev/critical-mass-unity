@@ -1,0 +1,168 @@
+{
+ "objects": {
+  "Miner_Body": {
+   "triangles": 10884,
+   "vertices": 5796,
+   "rest_bounds": {
+    "min": [
+     -1.075,
+     -0.456,
+     -0.001
+    ],
+    "max": [
+     1.075,
+     0.764,
+     2.0
+    ]
+   },
+   "materials": [
+    "CM_Toon"
+   ],
+   "feature_groups": [
+    "feat_beard",
+    "feat_belt",
+    "feat_boots",
+    "feat_chest_plate",
+    "feat_crate",
+    "feat_face",
+    "feat_gloves",
+    "feat_helmet",
+    "feat_helmet_lamp",
+    "feat_knee_guard",
+    "feat_shirt",
+    "feat_shoulder_pad",
+    "feat_skin",
+    "feat_straps",
+    "feat_team_cloth",
+    "feat_team_glow",
+    "feat_trousers"
+   ]
+  },
+  "Miner_PickHammer": {
+   "triangles": 632,
+   "vertices": 356,
+   "rest_bounds": {
+    "min": [
+     -1.25,
+     -0.168,
+     0.721
+    ],
+    "max": [
+     0.117,
+     0.079,
+     1.588
+    ]
+   },
+   "materials": [
+    "CM_Toon"
+   ],
+   "feature_groups": [
+    "feat_pick_hammer",
+    "feat_team_glow"
+   ]
+  },
+  "Miner_PickHammer_Hammer": {
+   "triangles": 700,
+   "vertices": 388,
+   "rest_bounds": {
+    "min": [
+     -1.25,
+     -0.22,
+     0.934
+    ],
+    "max": [
+     0.269,
+     0.085,
+     1.325
+    ]
+   },
+   "materials": [
+    "CM_Toon"
+   ],
+   "feature_groups": [
+    "feat_pick_hammer",
+    "feat_team_glow"
+   ]
+  },
+  "Miner_Barricade_Deployed": {
+   "triangles": 984,
+   "vertices": 544,
+   "rest_bounds": {
+    "min": [
+     -0.94,
+     -0.195,
+     0.0
+    ],
+    "max": [
+     0.94,
+     0.185,
+     0.995
+    ]
+   },
+   "materials": [
+    "CM_Toon"
+   ],
+   "feature_groups": [
+    "feat_barricade",
+    "feat_team_glow"
+   ]
+  },
+  "Miner_Barricade_Folded": {
+   "triangles": 952,
+   "vertices": 520,
+   "rest_bounds": {
+    "min": [
+     -0.38,
+     -0.227,
+     0.0
+    ],
+    "max": [
+     0.38,
+     0.227,
+     0.931
+    ]
+   },
+   "materials": [
+    "CM_Toon"
+   ],
+   "feature_groups": [
+    "feat_barricade",
+    "feat_team_glow"
+   ]
+  },
+  "Miner_Barricade_Damaged": {
+   "triangles": 1380,
+   "vertices": 760,
+   "rest_bounds": {
+    "min": [
+     -0.94,
+     -0.516,
+     -0.027
+    ],
+    "max": [
+     0.94,
+     0.185,
+     0.995
+    ]
+   },
+   "materials": [
+    "CM_Toon"
+   ],
+   "feature_groups": [
+    "feat_barricade",
+    "feat_team_glow"
+   ]
+  }
+ },
+ "bones": 41,
+ "display_pose": [
+  "Idle",
+  1
+ ],
+ "triangles_character": 12216,
+ "triangles_barricade_per_state": {
+  "folded": 952,
+  "deployed": 984,
+  "damaged": 1380
+ }
+}
