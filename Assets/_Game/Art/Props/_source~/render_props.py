@@ -499,7 +499,7 @@ FRAMINGS = {
     "p14-loose-orb": ("14-loose-orb", [("prop_orb_biomass", (0, 0))]),
     "p14-carried-bundle": ("14-carried-bundle", [("prop_carried_bundle", (0, 0))]),
     "p14-corruption-growth": ("14-corruption-growth", [("prop_corruption_growth_l", (0, 0)),
-                                                       ("prop_corruption_growth_s", (0.62, 0))]),
+                                                       ("prop_corruption_growth_s", (0.5, 0.02))]),
     "p14-barricade-folded": ("14-barricade-folded", [("prop_barricade_folded", (0, 0), False, -28)]),
     "p14-barricade-deployed": ("14-barricade-deployed", [("prop_barricade_deployed", (0, 0))]),
     "p14-barricade-damaged": ("14-barricade-damaged", [("prop_barricade_damaged", (0, 0))]),

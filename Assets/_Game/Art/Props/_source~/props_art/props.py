@@ -9,7 +9,7 @@ import math
 from mathutils import Vector, noise
 
 from .core import (BIO_HI, BIO_LO, BIOMASS, BRASS, CORRUPT, CORRUPT_D, CORRUPT_GLOW, CORRUPT_TIP, CREAM, DIRT,
-                   DIRT_D, FLAME, FLAME_CORE, GRASS, GRASS_D, LAVA_GLOW, LAVA_ROCK, LEATHER, MASK_GLOW, MASK_GLOW_LINED, MASK_TEAM_GLOW_LINED,
+                   DIRT_D, FLAME, FLAME_CORE, GRASS, GRASS_D, LAVA_GLOW, LAVA_ROCK, LEATHER, MASK_FIXED, MASK_GLOW, MASK_GLOW_LINED, MASK_TEAM_GLOW_LINED,
                    MASK_TEAM_CLOTH, MASK_TEAM_DARK, MASK_TEAM_GLOW, MOSS, NEUTRAL_HI, NEUTRAL_LO, ROPE, STALK,
                    STALK_L, STONE, STONE_CORE, STONE_D, TEAM_CLOTH, TEAM_DARK, TEAM_GLOW, WOOD, WOOD_B, WOOD_D, M,
                    Prop, box, cloth, cyl, ico, jitter, torus, tube, uvs)
@@ -55,6 +55,7 @@ def dirt_base(P, r, seed, h=0.05):
 
 # ---------------------------------------------------------------- p14 biomass plants
 STALK_F = by_nz(STALK_L, STALK_L, STALK, 0.2, -0.35)   # v2: more lit mid-green (bible #419335)
+VIEW_DIR = Vector((0.0, -0.8, 0.6)).normalized()
 HL_DIR = Vector((-0.45, -0.5, 0.74)).normalized()     # painted glassy highlight sits upper left, facing the camera
 
 
@@ -63,7 +64,10 @@ def bio_glow(f):
     n = f.normal
     if n.dot(HL_DIR) > 0.88:
         return ("#F6FD58", MASK_GLOW_LINED)
-    return (BIO_HI if n.z > 0.45 else (BIOMASS if n.z > -0.3 else BIO_LO), MASK_GLOW_LINED)
+    v = n.dot(VIEW_DIR)                     # per-blob rim so every lump reads inside the crown (bible cells)
+    if v < 0.28:
+        return ("#7DBF26" if n.z < 0.2 else "#93D82A", MASK_GLOW_LINED)
+    return (BIO_HI if v > 0.8 and n.z > 0.2 else (BIOMASS if n.z > -0.3 else BIO_LO), MASK_GLOW_LINED)
 
 
 def cells_glow(seed, ncell=14):
@@ -276,31 +280,67 @@ def carried_bundle():
 
 
 # ---------------------------------------------------------------- corruption growth
-def corruption(name, H, nsp, seed):
+CORR_HL = "#CDA8C4"          # v2: pale lilac glassy highlight on the plates (sampled from the bible crop, #CAA9B9)
+
+
+def corr_plates(seed, H):
+    """Dark plates (lit magenta-purple / shadow indigo) with glowing magenta cracks between them, plus a painted
+    lilac highlight on the upper-left of the plates. Bible p14: scaled flame of crystal plates, glow in the seams."""
+    import random as _r
+    rr = _r.Random(seed)
+    pts = [Vector((rr.uniform(-0.4, 0.4), rr.uniform(-0.25, 0.25), rr.uniform(0, 1.25))) * (H / 1.2) for _ in range(46)]
+
+    def f(face):
+        c = face.calc_center_median()
+        n = face.normal
+        d = sorted((c - p).length for p in pts)
+        if d[1] - d[0] < 0.024 * H / 1.2 and n.y < 0.3:
+            return (CORRUPT_GLOW, MASK_GLOW)
+        if n.dot(HL_DIR) > 0.62:
+            return (CORR_HL, MASK_FIXED)
+        return ("#4E3D85" if n.x > 0.15 or n.z < -0.3 else "#6B1761", MASK_FIXED)   # shadow side indigo, lit side plum
+    return f
+
+
+def flame(P, spine, radii, colf, depth=0.62, sides=8, inner=True):
+    """One flowing flame tongue: a tapered tube along an S-curved spine, flattened front to back, with a glowing core
+    pushed out of its front face (the magenta seam the bible shows up the middle of each tongue)."""
+    pts = [(x, 0.0, z) for (x, z) in spine]
+    P.add(tube(pts, radii, sides, tip=True), colf, smooth=True, mat=M(scale=(1, depth, 1)))
+    if inner:
+        n = len(pts)
+        core = [(p[0], -radii[k] * depth * 0.55, p[2]) for k, p in enumerate(pts)][: n - 1]
+        P.add(tube(core, [r * 0.34 for r in radii[: n - 1]], 5, tip=True),
+              lambda f: (CORRUPT_TIP if f.calc_center_median().z > spine[-1][1] * 0.75 else CORRUPT_GLOW, MASK_GLOW),
+              smooth=True)
+
+
+# measured off the bible crop at H = 1.2 (1 col = 0.019 m): body half-width 0.30 to z 0.6, right edge upright to
+# z 0.88, a thin tendril to z 1.2 whose tip hooks over to the right
+CORR_MAIN = dict(
+    spine=[(0.0, 0.03), (0.0, 0.3), (0.01, 0.55), (0.07, 0.74), (0.1, 0.88), (0.08, 0.97), (0.02, 1.05), (0.01, 1.13),
+           (0.05, 1.19), (0.09, 1.18), (0.11, 1.13)],
+    radii=[0.24, 0.27, 0.25, 0.17, 0.12, 0.08, 0.06, 0.05, 0.04, 0.03, 0.0],
+    licks=[  # (spine, radii): side tongues that rise, lean out, and curl their tips back in
+        ([(-0.1, 0.05), (-0.17, 0.3), (-0.2, 0.55), (-0.17, 0.74), (-0.12, 0.86), (-0.07, 0.9)], [0.11, 0.11, 0.09, 0.06, 0.035, 0.0]),
+        ([(0.14, 0.05), (0.22, 0.35), (0.25, 0.62), (0.26, 0.82), (0.22, 0.93), (0.17, 0.95)], [0.1, 0.1, 0.085, 0.06, 0.035, 0.0]),
+        ([(-0.18, 0.03), (-0.23, 0.14), (-0.24, 0.25), (-0.21, 0.32)], [0.06, 0.055, 0.035, 0.0]),
+    ],
+    rocks=[(-0.3, -0.04, 0.1), (-0.11, -0.2, 0.13), (0.1, -0.2, 0.1), (0.28, -0.06, 0.09), (0.02, 0.13, 0.12),
+           (-0.22, 0.1, 0.08), (0.36, 0.05, 0.07)],
+)
+
+
+def corruption(name, H, seed, spec=CORR_MAIN):
     P = Prop(name, LARGE, "interactable", {"height": H}, seed)
-    rng = P.rng
-    for i, (x, y, r) in enumerate(((0.0, 0.08, 0.15), (0.2, -0.1, 0.1), (-0.22, -0.08, 0.11), (0.06, -0.24, 0.08))):
-        rock(P, r, (x, y, r * 0.3), seed + i, col=STONE_D, squash=0.7)
-    outer = lambda f: CORRUPT if f.normal.z > -0.15 and f.normal.x < 0.4 else CORRUPT_D
-    tipc = lambda f: (CORRUPT_TIP, MASK_GLOW) if f.calc_center_median().z > H * 0.8 else (CORRUPT_GLOW, MASK_GLOW)
-    for i in range(nsp):
-        if i == 0:
-            x0, y0, h, r0, ph, curl = 0.0, 0.0, 1.0, 0.17, 0.0, -0.12
-        else:
-            a = 2 * math.pi * i / (nsp - 1) + rng.uniform(-0.3, 0.3)
-            x0, y0 = 0.19 * math.cos(a), 0.1 * math.sin(a)
-            h, r0, ph = rng.uniform(0.45, 0.78), rng.uniform(0.08, 0.11), rng.uniform(0, 6)
-            curl = 0.2 * (1 if x0 >= 0 else -1)
-        pts, rad = [], []
-        for k in range(10):
-            t = k / 9
-            sway = 0.06 * math.sin(t * math.pi * 1.6 + ph) * t + curl * t ** 2.5
-            spread = (1 + 0.5 * t) if i else 1.0
-            pts.append((x0 * spread + sway, y0 * spread, 0.04 + h * (t - 0.18 * t ** 4)))
-            rad.append(r0 * (1.0 - t) ** 0.8 * (1 + 0.6 * math.sin(t * math.pi * 0.9)))
-        P.add(tube(pts, rad, 6, tip=True, twist=i), outer, smooth=True)
-        inner = [(p[0], p[1] - rad[k] * 0.62, p[2]) for k, p in enumerate(pts)]
-        P.add(tube(inner[1:], [r * 0.55 for r in rad[1:]], 5, tip=True), tipc, smooth=True)
+    k = H / 1.2
+    for i, (x, y, r) in enumerate(spec["rocks"]):
+        rock(P, r * k, (x * k, y * k, r * k * 0.3), seed + i, col=STONE_D, sub=1, squash=0.7)
+    colf = corr_plates(seed, H)
+    sc = lambda pts: [(x * k, z * k) for (x, z) in pts]
+    flame(P, sc(spec["spine"]), [r * k for r in spec["radii"]], colf)
+    for (sp, rad) in spec["licks"]:
+        flame(P, sc(sp), [r * k for r in rad], colf, sides=6, inner=len(sp) > 4)
     return P.finish(fit_height=H)
 
 
@@ -611,8 +651,8 @@ REGISTRY = [
     ("prop_orb_corruption", orb_corruption, "p03 corruption orb"),
     ("prop_orb_brass", orb_brass, "p03 brass orb"),
     ("prop_carried_bundle", carried_bundle, "p14 carried bundle"),
-    ("prop_corruption_growth_l", lambda: corruption("prop_corruption_growth_l", 1.2, 6, 41), "p14 corruption growth (large); p03"),
-    ("prop_corruption_growth_s", lambda: corruption("prop_corruption_growth_s", 0.6, 4, 42), "p14 corruption growth (small)"),
+    ("prop_corruption_growth_l", lambda: corruption("prop_corruption_growth_l", 1.2, 41), "p14 corruption growth (large); p03"),
+    ("prop_corruption_growth_s", lambda: corruption("prop_corruption_growth_s", 0.6, 42), "p14 corruption growth (small)"),
     ("prop_crystal_cluster_l", lambda: crystal_cluster("prop_crystal_cluster_l", 0.9, 51), "p03 blue crystals (large), team"),
     ("prop_crystal_cluster_s", lambda: crystal_cluster("prop_crystal_cluster_s", 0.45, 52), "p03 blue crystals (small), team"),
     ("prop_barricade_folded", barricade_folded, "p14 barricade folded"),

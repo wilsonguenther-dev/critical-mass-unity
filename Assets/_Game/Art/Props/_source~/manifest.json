@@ -14,8 +14,8 @@
    "tris": 1020,
    "budget": 1500,
    "dims_blender_xyz": [
-    0.463,
-    0.32,
+    0.455,
+    0.323,
     0.5
    ],
    "targets": {
@@ -37,8 +37,8 @@
    "tris": 1268,
    "budget": 1500,
    "dims_blender_xyz": [
-    0.727,
-    0.406,
+    0.733,
+    0.408,
     0.8
    ],
    "targets": {
@@ -60,8 +60,8 @@
    "tris": 1490,
    "budget": 1500,
    "dims_blender_xyz": [
-    0.862,
-    0.534,
+    0.88,
+    0.538,
     1.2
    ],
    "targets": {
@@ -83,8 +83,8 @@
    "tris": 236,
    "budget": 300,
    "dims_blender_xyz": [
-    0.231,
-    0.223,
+    0.236,
+    0.225,
     0.25
    ],
    "targets": {
@@ -132,8 +132,8 @@
    "tris": 320,
    "budget": 1500,
    "dims_blender_xyz": [
-    0.436,
-    0.44,
+    0.445,
+    0.452,
     0.44
    ],
    "targets": {
@@ -157,9 +157,9 @@
    "tris": 320,
    "budget": 1500,
    "dims_blender_xyz": [
-    0.443,
-    0.446,
-    0.434
+    0.43,
+    0.43,
+    0.436
    ],
    "targets": {
     "height": 0.45,
@@ -254,11 +254,11 @@
    "fbx": "Props/prop_corruption_growth_l.fbx",
    "bible": "p14 corruption growth (large); p03",
    "size_class": "interactable",
-   "tris": 1424,
+   "tris": 612,
    "budget": 1500,
    "dims_blender_xyz": [
-    1.188,
-    0.729,
+    0.757,
+    0.496,
     1.2
    ],
    "targets": {
@@ -277,11 +277,11 @@
    "fbx": "Props/prop_corruption_growth_s.fbx",
    "bible": "p14 corruption growth (small)",
    "size_class": "interactable",
-   "tris": 1056,
+   "tris": 612,
    "budget": 1500,
    "dims_blender_xyz": [
-    0.585,
-    0.347,
+    0.376,
+    0.246,
     0.6
    ],
    "targets": {
@@ -303,8 +303,8 @@
    "tris": 190,
    "budget": 1500,
    "dims_blender_xyz": [
-    0.472,
-    0.408,
+    0.474,
+    0.41,
     0.9
    ],
    "targets": {
@@ -327,7 +327,7 @@
    "budget": 1500,
    "dims_blender_xyz": [
     0.236,
-    0.204,
+    0.207,
     0.45
    ],
    "targets": {
@@ -401,7 +401,7 @@
    "dims_blender_xyz": [
     1.619,
     0.863,
-    1.0
+    0.999
    ],
    "targets": {
     "height": 0.95
@@ -422,8 +422,8 @@
    "tris": 1064,
    "budget": 1500,
    "dims_blender_xyz": [
-    0.873,
-    0.554,
+    0.876,
+    0.575,
     1.9
    ],
    "targets": {
@@ -541,8 +541,8 @@
    "tris": 148,
    "budget": 800,
    "dims_blender_xyz": [
-    0.601,
-    0.607,
+    0.61,
+    0.603,
     0.6
    ],
    "targets": {
@@ -706,9 +706,9 @@
    "tris": 240,
    "budget": 300,
    "dims_blender_xyz": [
-    0.434,
-    0.265,
-    0.119
+    0.439,
+    0.253,
+    0.118
    ],
    "targets": {
     "height": 0.12
