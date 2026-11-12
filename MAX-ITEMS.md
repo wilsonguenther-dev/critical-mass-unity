@@ -5,8 +5,10 @@ Written 2026-11-12T02:16:06Z (Wednesday 2026-11-11, 8:16 pm Central). Replaces t
 (snapshot of 2026-11-09). Old-repo paths below are on its `main` at commit `09e0904` unless a branch is named.
 
 Critical Mass is now a Unity game. You own the game-mechanics items below. The build AI ("the loop") builds the
-foundation first (section 3) and the look (models, shader, art). Anything marked **DECISION PENDING** waits on the
-architect: build the parts of that item that do not depend on the pending answer, and do not pick the answer yourself.
+foundation first (section 3) and the look (models, shader, art). The architect's answers (U-004 to U-007, see
+[DECISIONS.md](DECISIONS.md)) are written into the items below as **Decided (U-###)**. Anything still marked **OPEN**
+waits on the architect: build the parts of that item that do not depend on the open answer, and do not pick the answer
+yourself.
 
 ---
 
@@ -85,7 +87,7 @@ tools/unity-build-mac.sh  # macOS player build -> Builds/macOS/CriticalMass.app
 
 Browser keys that changed: jump was Q (D-062), the class ability was Space. The rules behind them did not change.
 
-**Shared files.** **DECISION PENDING (architect):** several old files mix base rules with item code (for example
+**Shared files.** **OPEN (architect; not covered by U-004 to U-007):** several old files mix base rules with item code (for example
 `resources.ts` carries CM-35 meat and CM-85 biomass instability, `bots/fsm.ts` carries CM-38 and CM-37 bot rules). The
 working assumption here: the foundation ports those files with each item's code left out and marked with a
 `// CM-xx (Max)` comment, and your item adds its part back, with its tests. Do not start an item that edits a shared
@@ -144,6 +146,9 @@ covered by the chunk meshes in F-08 and later by the loop's art.
 | F-07 | `Controls.inputactions` with the table above, and the input-to-command layer | `src/game/humanInput.ts` (292) for behaviour only |
 | F-08 | Placeholder view: `Assets/_Game/Scenes/Arena.unity`, the Sim driver (30 Hz accumulator, interpolation), team-coloured capsules, grid chunk meshes, the Cinemachine follow camera, a plain debug HUD (clock, hill seconds, Kaiju instability, team biomass) | `src/game/SimDriver.tsx`, `CameraRig.tsx`, `rig.ts` for behaviour |
 | F-09 | Headless match runner for soak tests (N seeds, team size, ticks, bot-driven actor 0) inside `Sim.Tests` | the `*.slow.test.ts` harness code |
+
+**Foundation exit (U-012).** Phase 0 is done when a full 16v16 bot match plays in grey-box and every ported test
+passes. Phase 1 (your items, Travis's four must-haves first) and Phase 2 (the look) then run side by side.
 
 Camera values for F-08 from the old config: yaw 45°, pitch 38°, orthographic, 20 world units tall
 (`viewHeightUnits`), distance 60, follow sharpness 8, target clamped to the map bounds inset by 6.
@@ -238,9 +243,9 @@ walkable side neighbour into floor (never bridge); refused under any living acto
 and when it would cut a pad from the hill (or newly from the shrine); one change per team per 30 ticks and none within 15
 ticks of any wall change; a dead Miner loses the block. Every outcome is a `terraform` event.
 
-**DECISION PENDING (architect).** The new controls add "switch dig / place" on the wheel and bumpers. The browser had no
-mode: one key dug with empty hands and placed while carrying. Until decided, build the browser rule and leave the mode
-action unread.
+**Decided (U-007).** Dig/place keeps the browser's one-key carry rule: F (left trigger) digs with empty hands and places
+while carrying. There is no dig/place mode; the "Switch dig / place" action in the controls table is not read by this
+item. **OPEN:** whether that table row is kept for a later use or removed (U-006 forbids an item moving a binding).
 
 **Check.** `TerraformTests` (11 cases) and `TerraformSoakTests` (1 case) pass with the browser's numbers. Play check: as
 a Miner dig three cells in a row, watch the mesh drop and a bot path around; refill one; try to dig the last cell of the
@@ -371,8 +376,8 @@ soak tests.
 `damage` 55, `carveRadius` 1, `cooldownTicks` 150. `classes.demolitions.abilityCooldown` 12 (the row is otherwise the
 Miner's copy). `bots.classMix.demolitions` stays 0.
 
-**DECISION PENDING (architect).** Throwing TNT on the "Dig or place (Miner)" action, as the browser did with F. Until
-decided, build the rule with a command (`ThrowTnt`) and leave its binding to the answer.
+**Decided (U-007).** TNT is thrown on F / left trigger (the "Dig or place (Miner)" action), as the browser did with F.
+Build the rule with a `ThrowTnt` command and bind it to that action for the Demolitions Expert.
 
 **Check.** `DemolitionsTests` (7) and `DemolitionsSoakTests` (1) pass. Play check: lay a mine, lure a bot over it; throw
 TNT at a bridge and see one column carved while the last route survives.
@@ -443,10 +448,11 @@ Adds `BiomassBank` per team to match state.
 **Tunables** (from the branch). `abilities.builderUpgrade`: `range` 3, `costBiomass` [3, 5], `maxHpBonus` [0.15, 0.3],
 `refuseCooldownTicks` 15.
 
-**DECISION PENDING (architect).** On the branch the Builder spends by holding the class ability near an ally. CM-84 moves
-upgrades to the base station and CM-58 needs the Builder's ability for ladders and bridges. Until decided, build the
-ladder, the bank and the cost and health math behind an `UpgradeSystem.TryUpgrade(world, buyer, target)` call with no
-input wired.
+**Decided (U-007).** Upgrades happen at base stations (CM-84), not through the Builder's class ability, which builds
+ladders and bridges (CM-58). The branch's "hold the ability near an ally" spending is not ported. Build the ladder, the
+bank and the cost and health math behind an `UpgradeSystem.TryUpgrade(world, buyer, target)` call; CM-84's station
+panel calls it. **OPEN:** whether only a Builder may buy at the station or every class buys for itself (CM-84's text
+says "you ... go up one level"); until answered, keep `target` a parameter.
 
 **Check.** `UpgradeTests` (11) pass (target choice and refusal cases follow the answer above; keep every case the
 answer does not touch).
@@ -470,8 +476,8 @@ cooldown. The death screen no longer offers a class switch.
 **Tunables.** `respawn.classSwitchCooldownTicks` 150 (switch at tick T refused through T+149, accepted at T+150).
 Upgrade costs from CM-39.
 
-**DECISION PENDING (architect).** The station's size and place, and how the player opens it (the browser had no station).
-Build the rules against a `StationZone` read from the map so the answer only changes data.
+**Decided (U-007).** The station is your own base pad, radius 3.75; pressing E inside it opens the station panel. Build
+the rules against a `StationZone` read from the map (centre = own base pad, radius 3.75).
 
 **Check.** `StationTests`: switch accepted inside own station, refused outside and at the enemy station, refused within
 150 ticks, biomass, score and kills unchanged; upgrade refused outside, without biomass and at the top level; the ported
@@ -493,8 +499,9 @@ re-route over it; the piece disappears after a time or when broken; a piece can 
 **Create.** `Assets/_Game/Sim/Rules/BuildSystem.cs` (`BuildSystem`), `Assets/_Game/Sim.Tests/BuildTests.cs`,
 `Assets/_Game/Sim.Tests/BuildSoakTests.cs` (`[Category("Slow")]`).
 
-**DECISION PENDING (architect).** Which control places a piece; its biomass cost, lifetime, health, how many one Builder
-may have; and what a "ladder" means now that cells have heights. None of these exist in the old config.
+**Decided (U-007).** The Builder's class ability (right mouse / right trigger) places a piece. Cost 2 biomass, lifetime
+600 ticks, 120 HP, at most 2 per Builder. These numbers are **provisional** and are marked provisional in `GameConfig`.
+**OPEN:** what a "ladder" means now that cells have heights (no decision covers it).
 
 **Check.** `BuildTests`: a piece makes a cell walkable, the flow field routes over it, it expires and breaks on schedule,
 and a piece that would seal the only route is refused. `BuildSoakTests`: 16v16 over seeds 1 to 100 reports pieces built
@@ -514,8 +521,8 @@ on pickup and on drop.
 
 **Create.** `Assets/_Game/Sim/Rules/CarrySystem.cs` (`CarrySystem`), `Assets/_Game/Sim.Tests/CarryTests.cs`.
 
-**DECISION PENDING (architect).** Whether you can carry a piece while carrying biomass or a block, and what happens to a
-carried piece when you die.
+**Decided (U-007).** Picking up a piece needs empty hands (no biomass, meat or block). A carried piece drops when you
+die. **OPEN:** where it drops when the death cell is not a valid edge.
 
 **Check.** `CarryTests`: pickup restores the cell, one piece at a time, drop only on a valid edge, route rule on both
 pickup and drop. Play check: move a bridge from one gap to another.
@@ -535,8 +542,10 @@ time) plays in 4:00 of real time. The Sim still ticks at 30 Hz; the driver runs 
 **Create.** Edit `GameConfig` (`TeamSize` 16, new `DefaultSpeed` 2) and the foundation's Sim driver; update
 `GameConfigTests` and the balance-table tests. Ported tests that need 5v5 or speed 1 must set them explicitly.
 
-**DECISION PENDING (architect).** How to pick 5v5 or speed 1 in Unity (the browser used `?size=5` and `?speed=1`), and
-the 16v16 frame budget (the browser's was the CM-17 render budget). Land this item in its own PR: it touches many tests.
+**Decided (U-004).** 16v16 (1 human + 31 bots) at 2x is the default. 5v5 and 1x remain as options in the pause menu and
+as command-line arguments. Match length 8 minutes. Frame budget: 60 fps at 16v16 in the Mac build on this Mac.
+**OPEN:** the exact command-line argument names, and whether a size change from the pause menu restarts the match.
+Land this item in its own PR: it touches many tests.
 
 **Check.** `GameConfigTests` pin 16 and 2; every test passes. Play check: a fresh match has 32 capsules and the clock runs
 at twice real time.
@@ -548,10 +557,10 @@ at twice real time.
 Old state: landed in the browser as a view-only change (D-067 CM-65 entry): mouse at a screen edge pans, middle drag
 grabs the ground, C or a respawn snaps back. Wilson could not find it. Waits on F-08.
 
-**DECISION PENDING (architect).** The Unity camera rule is "fixed yaw, follows your hero", the browser's C key and
-middle drag are not in the controls table, and the wheel now switches dig/place. Do not build until decided.
+**Decided (U-005).** Free camera is out of the first playable. Do not build it. The camera is orthographic, yaw 45°,
+pitch 38°, 20 world units tall, never rotates, damped-spring follow with 0.25 s look-ahead capped at 2 units.
 
-**Port when decided.** Behaviour from old `src/game/CameraRig.tsx` (612) and `src/game/rig.ts` (160). Create
+**Port if it is brought back later.** Behaviour from old `src/game/CameraRig.tsx` (612) and `src/game/rig.ts` (160). Create
 `Assets/_Game/Runtime/View/CameraFreePan.cs`. Check: Wilson finds and uses it without being told.
 
 ### CM-68 Maps B (Ember Orchard) and C (Tidal Crown)
@@ -566,7 +575,7 @@ Old state: built on branch `cm/CM-68` (`572927e`), held. Waits on F-03 and F-06.
 **Create.** `Assets/_Game/Sim/Maps/EmberOrchardMap.cs`, `Assets/_Game/Sim/Maps/TidalCrownMap.cs`, `MapId` in the Sim,
 `Assets/_Game/Sim.Tests/MapLayoutTests.cs`, `Assets/_Game/Sim.Tests/MapSoakTests.cs` (`[Category("Slow")]`).
 
-**DECISION PENDING (architect).** How a map is picked in Unity (the browser used `?map=ember|tidal`).
+**OPEN (architect; not covered by U-004 to U-007).** How a map is picked in Unity (the browser used `?map=ember|tidal`).
 
 **Check.** `MapLayoutTests` (20) and `MapSoakTests` (1) pass: both bases, the hill and the shrine reachable on the flow
 field; base-to-hill path lengths within 5 % for the two teams; a 10-seed headless match on each map plays to the clock
@@ -576,7 +585,7 @@ with no stuck bot.
 
 ### CM-67 The combat choice
 
-Old state: held. The team has not picked parry, heavy versus light attacks, or both (D-067 item 6). Max and Jeisil pick,
+**Decided (U-007): this stays a team pick.** Old state: held. The team has not picked parry, heavy versus light attacks, or both (D-067 item 6). Max and Jeisil pick,
 Wilson's pick goes into the decisions log, then Max builds it. Nothing to build until then. Whatever is picked must fit
 the controls table without a new binding.
 
