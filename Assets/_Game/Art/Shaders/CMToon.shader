@@ -34,6 +34,19 @@ Shader "CM/Toon"
         _DefaultCloth ("Authored Cloth (code 8)", Color) = (0.164706, 0.584314, 0.682353, 1)
         _DefaultGlow ("Authored Glow (codes 5 6)", Color) = (0.309804, 0.890196, 0.941176, 1)
         _DefaultDark ("Authored Dark (code 4)", Color) = (0.164706, 0.215686, 0.301961, 1)
+        _TeamMarker ("Team Marker Light (target, code 3)", Color) = (0.152941, 0.972549, 0.972549, 1)
+        _TeamMarkerDark ("Team Marker Dark (target, code 7)", Color) = (0.262745, 0.760784, 0.772549, 1)
+        _DefaultMarker ("Authored Marker Light (code 3)", Color) = (0.152941, 0.972549, 0.972549, 1)
+        _DefaultMarkerDark ("Authored Marker Dark (code 7)", Color) = (0.262745, 0.760784, 0.772549, 1)
+        _LitMultiplier ("Lit Band Multiplier", Range(0, 3)) = 1
+        _MidRatio ("Mid Band Ratio (per channel)", Color) = (1, 1, 1, 1)
+        _ShadowRatio ("Shadow Band Ratio (per channel)", Color) = (1, 1, 1, 1)
+        _ReceiveShadows ("Cast Shadows Drop The Band", Range(0, 1)) = 1
+        _FogColor ("Height Fog Colour", Color) = (0.705882, 0.854902, 0.933333, 1)
+        _FogTop ("Height Fog Top (y)", Float) = -3.5
+        _FogBottom ("Height Fog Full (y)", Float) = -10
+        _FogAmount ("Height Fog Amount", Range(0, 1)) = 0
+        _ExtrudePx ("UV2 Extrusion (px at 1080p, foam)", Range(0, 32)) = 0
     }
 
     SubShader
@@ -70,9 +83,8 @@ Shader "CM/Toon"
             CMToonForwardVaryings CMToonForwardVertex(CMToonAttributes input)
             {
                 CMToonForwardVaryings output;
-                VertexPositionInputs positionInputs = GetVertexPositionInputs(input.positionOS.xyz);
-                output.positionCS = positionInputs.positionCS;
-                output.positionWS = positionInputs.positionWS;
+                output.positionCS = CMToonPositionCS(input);
+                output.positionWS = TransformObjectToWorld(input.positionOS.xyz);
                 output.normalWS = TransformObjectToWorldNormal(input.normalOS);
                 output.color = input.color;
                 return output;
@@ -95,7 +107,7 @@ Shader "CM/Toon"
                 // Three bands from N.L; a cast shadow drops the pixel to the shadow band; a top-facing surface is one
                 // band lighter (2.2 bevel rule: tops exactly one band lighter than their sides).
                 float ndl = dot(normalWS, mainLight.direction);
-                half band = CMToonBand(ndl) * step(0.5, mainLight.shadowAttenuation);
+                half band = CMToonBand(ndl) * lerp(1.0h, step(0.5, mainLight.shadowAttenuation), _ReceiveShadows);
                 band = min(2.0h, band + _TopBandLift * smoothstep(0.65, 0.75, normalWS.y));
                 half3 lit = CMToonBandColor(albedo, band);
 
@@ -106,7 +118,7 @@ Shader "CM/Toon"
 
                 // Glows are self-lit: unshaded, no rim.
                 color = selfLit > 0.5h ? albedo : color;
-                return half4(color, 1.0);
+                return half4(CMToonFog(color, input.positionWS), 1.0);
             }
             ENDHLSL
         }
@@ -193,7 +205,7 @@ Shader "CM/Toon"
             CMToonDepthVaryings CMToonDepthVertex(CMToonAttributes input)
             {
                 CMToonDepthVaryings output;
-                output.positionCS = TransformObjectToHClip(input.positionOS.xyz);
+                output.positionCS = CMToonPositionCS(input);
                 return output;
             }
 
@@ -228,7 +240,7 @@ Shader "CM/Toon"
             CMToonDepthNormalsVaryings CMToonDepthNormalsVertex(CMToonAttributes input)
             {
                 CMToonDepthNormalsVaryings output;
-                output.positionCS = TransformObjectToHClip(input.positionOS.xyz);
+                output.positionCS = CMToonPositionCS(input);
                 output.normalWS = TransformObjectToWorldNormal(input.normalOS);
                 return output;
             }
