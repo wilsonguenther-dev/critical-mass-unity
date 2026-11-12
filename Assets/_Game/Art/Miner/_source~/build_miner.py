@@ -227,21 +227,21 @@ def build_arms():
         add(BODY, B.sphere((0.115, 0.115, 0.115), 8, 5), "skin", [ua, la], "skin", m=M((0.47 * s, 0.01, Z)))
         add(BODY, B.cyl((0.47 * s, 0.01, Z), (0.645 * s, 0.0, Z), 0.118, 0.13, 10), "skin", [la, wr], "skin")
         # huge dark-brown gloves: flared cuff with a stitched brass-studded band, fist, knuckle ridge, thumb
-        add(BODY, B.cyl((0.625 * s, 0, Z), (0.80 * s, 0, Z), 0.155, 0.185, 10), "leather_dark", [la, wr, hd], "gloves")
+        add(BODY, B.cyl((0.625 * s, 0, Z), (0.80 * s, 0, Z), 0.15, 0.17, 10), "leather_dark", [la, wr, hd], "gloves")
         add(BODY, B.torus(0.158, 0.03, 10, 3), "leather", [la, wr], "gloves", m=M((0.635 * s, 0, Z), (0, 90, 0)))
-        add(BODY, B.sphere((0.20, 0.195, 0.205), 9, 6), "leather_dark", hd, "gloves", m=M((0.91 * s, -0.01, 1.09)))
+        add(BODY, B.sphere((0.18, 0.175, 0.185), 9, 6), "leather_dark", hd, "gloves", m=M((0.91 * s, -0.01, 1.09)))
         add(BODY, box((0.11, 0.23, 0.12), 0.04, 1), "leather_dark", hd, "gloves", m=M((1.01 * s, -0.03, 1.12)))
         add(BODY, B.sphere((0.08, 0.075, 0.095), 6, 5), "leather_dark", hd, "gloves", m=M((0.84 * s, -0.18, 1.13)))
         # big shoulder pad: stone pauldron cap, brass frame plate on its outer face, stone inset, blue gem, rivets
         W = {ua: 0.65, "chest": 0.35}
-        PADM = kit.frame((0.385 * s, -0.08, 1.19), (0.62 * s, -0.48, 0.62), (0, 0, 1))
-        add(BODY, B.lathe([(0.19, -0.07), (0.20, 0.0), (0.18, 0.07), (0.115, 0.12), (0.02, 0.135)], 8),
-            "stone_light", W, "shoulder_pad", m=PADM)
-        add(BODY, B.torus(0.195, 0.032, 8, 3), "brass", W, "shoulder_pad", m=PADM @ M((0, 0, -0.005)))
-        PL = PADM @ M((0, 0, 0.115))
-        add(BODY, box((0.20, 0.21, 0.05), 0.025, 1), "brass", W, "shoulder_pad", smooth=False, m=PL)
+        PADM = kit.frame((0.39 * s, -0.04, 1.20), (0.78 * s, -0.30, 0.55), (0, 0, 1))
+        add(BODY, B.lathe([(0.16, -0.07), (0.17, 0.0), (0.15, 0.07), (0.10, 0.11), (0.02, 0.125)], 8),
+            "brass", W, "shoulder_pad", m=PADM)
+        add(BODY, B.torus(0.165, 0.03, 8, 3), "brass_dark", W, "shoulder_pad", m=PADM @ M((0, 0, -0.005)))
+        PL = PADM @ M((0, 0, 0.105))
+        add(BODY, box((0.18, 0.19, 0.05), 0.025, 1), "brass", W, "shoulder_pad", smooth=False, m=PL)
         add(BODY, B.prism([(-0.065, -0.07), (0.05, -0.07), (0.07, -0.05), (0.07, 0.065), (-0.07, 0.07), (-0.07, -0.05)],
-                          0.05, 0.012), "stone", W, "shoulder_pad", smooth=False, m=PL @ M((0, 0, 0.012)))
+                          0.05, 0.012), "helmet_light", W, "shoulder_pad", smooth=False, m=PL @ M((0, 0, 0.012)))
         for x, y in ((0.075, 0.075), (-0.075, -0.075)):
             add(BODY, rivet(0.015, 0.012), "brass_dark", W, "shoulder_pad", smooth=False, m=PL @ M((x, y, 0.024)))
         B.add_crystal(BODY, W, "team_glow", PL @ M((0, 0, 0.035), (0, 0, 30)), 0.05, 0.045, seg=6, waist=0.8, cap=0.55)
@@ -291,7 +291,7 @@ def beard_lobe_path():
     for i in range(n):
         t = -1.0 + 2.0 * i / (n - 1)               # -1 his right sideburn, 0 chin, +1 his left sideburn
         phi = math.radians(98 * t)
-        z = 1.255 + 0.25 * abs(t) ** 2.0            # chin 1.205, sideburn 1.505
+        z = 1.195 + 0.31 * abs(t) ** 1.5            # chin 1.205, sideburn 1.505
         R = 0.315 - 0.03 * (1 - abs(t))
         x = math.sin(phi) * R
         y = -math.cos(phi) * R * 0.92 - 0.02
@@ -315,13 +315,13 @@ def build_head():
         if s < 0:
             brow = list(reversed(brow))
         add(BODY, B.prism(brow, 0.055, 0.012), "brow", H, "face", smooth=False,
-            m=M((0.0, head_front_y(0.13 * s, 1.548, 0.0) + 0.008, 1.548), (90 - 14, 0, -16 * s)))
+            m=M((0.0, head_front_y(0.13 * s, 1.562, 0.0) + 0.008, 1.562), (90 - 14, 0, -16 * s)))
     # v3 face decal: large round brown eyes with highlights, cheek blush (painted, 256 px)
     add(BODY, face_plane(), "skin", H, "face_decal", smooth=True, grad=False)
     # big round red-pink nose, a step proud of the cheeks
     add(BODY, B.sphere((0.080, 0.075, 0.074), 10, 7), "nose", H, "face", m=M((0, -0.30, 1.412)))
     # beard: chin mass under the mouth plus scalloped jaw lobes, sideburns into the helmet
-    add(BODY, B.sphere((0.24, 0.17, 0.09), 8, 5), "beard", H, "beard", m=M((0, -0.18, 1.25)))
+    add(BODY, B.sphere((0.24, 0.17, 0.09), 8, 5), "beard", H, "beard", m=M((0, -0.17, 1.215)))
     lobes = beard_lobe_path()
     for c, r, rz in lobes:
         add(BODY, B.sphere(r, 6, 4), "beard", H, "beard", m=M(c, (0, 0, rz)))
@@ -329,13 +329,13 @@ def build_head():
         add(BODY, B.cyl(c0, c1, r0[1] * 1.1, r1[1] * 1.1, 6), "beard", H, "beard")
     # moustache: two plump lobes over the smile, outer ends dropping (bible: thick, over a small smile)
     for s in (1, -1):
-        add(BODY, B.sphere((0.10, 0.058, 0.046), 7, 4), "beard", H, "beard",
-            m=M((0.078 * s, -0.31, 1.355), (0, 10 * s, 8 * s)))
+        add(BODY, B.sphere((0.092, 0.055, 0.04), 7, 4), "beard", H, "beard",
+            m=M((0.072 * s, -0.315, 1.362), (0, 12 * s, 8 * s)))
     # small smile: dark crescent with a teeth band, sitting between moustache and chin mass
-    smile = [(-0.085, 0.024), (-0.045, -0.018), (0.045, -0.018), (0.085, 0.024), (0.0, 0.004)]
-    add(BODY, B.prism(smile, 0.03), "mouth", H, "face", smooth=False, m=M((0, -0.305, 1.292), (90 - 14, 0, 0)))
-    teeth = [(-0.058, 0.008), (0.058, 0.008), (0.045, -0.006), (-0.045, -0.006)]
-    add(BODY, B.prism(teeth, 0.03), "teeth", H, "face", smooth=False, m=M((0, -0.311, 1.294), (90 - 14, 0, 0)))
+    smile = [(-0.10, 0.03), (-0.05, -0.02), (0.05, -0.02), (0.10, 0.03), (0.0, 0.006)]
+    add(BODY, B.prism(smile, 0.03), "mouth", H, "face", smooth=False, m=M((0, -0.335, 1.30), (90 - 18, 0, 0)))
+    teeth = [(-0.07, 0.012), (0.07, 0.012), (0.05, -0.004), (-0.05, -0.004)]
+    add(BODY, B.prism(teeth, 0.03), "teeth", H, "face", smooth=False, m=M((0, -0.341, 1.304), (90 - 18, 0, 0)))
 
 
 def assign_face_decal(ob, image):
@@ -411,7 +411,7 @@ def build_helmet():
     for k in range(n):
         a0 = 2 * math.pi * k / n + math.pi / n + 0.06
         a1 = 2 * math.pi * (k + 1) / n + math.pi / n - 0.06
-        tone = "stone_light" if k % 2 == 0 else "helmet"
+        tone = "helmet_light" if k % 2 == 0 else "helmet"
         add(BODY, dome_sector([(r * 1.02, z) for r, z in prof[:-1]] + [(0.05, prof[-1][1] - 0.004)], a0, a1, 2), tone, H,
             "helmet", smooth=True)
     # wide brass rim band with rivets, stone lip under it

@@ -17,7 +17,7 @@ TOP_GAIN = 0.06
 BOTTOM_LOSS = 0.10
 # v3 value steps by facing (vertex colour, survives the flat toon shader): planes facing up a step lighter,
 # undersides a step darker (bible: lit top planes, dark crevices under every plate and pouch)
-UP_GAIN = 0.10
+UP_GAIN = 0.18
 DOWN_LOSS = 0.16
 
 
