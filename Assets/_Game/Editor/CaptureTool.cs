@@ -5,6 +5,7 @@ using System.IO;
 using CriticalMass.Runtime;
 using CriticalMass.Runtime.Camera;
 using CriticalMass.Runtime.Game;
+using CriticalMass.Runtime.Hud;
 using CriticalMass.Sim.Config;
 using CriticalMass.Sim.Core;
 using CriticalMass.Sim.Grid;
@@ -131,6 +132,7 @@ namespace CriticalMass.Editor
                     case 0: Begin(); break;
                     case 1: Simulate(); break;
                     case 2: Shoot(); break;
+                    case 3: ShootHud(); break;
                 }
             }
             catch (Exception e)
@@ -332,7 +334,9 @@ namespace CriticalMass.Editor
             if (_target >= targets.Length)
             {
                 WriteManifest(targets);
-                Finish(0);
+                _phase = 3;
+                _extra = 0;
+                _settle = -1;
                 return;
             }
             CameraFollowTarget follow = UnityEngine.Object.FindAnyObjectByType<CameraFollowTarget>();
@@ -426,17 +430,49 @@ namespace CriticalMass.Editor
             return line;
         }
 
-        private static void RenderTo(string path)
+        private static void RenderTo(string path) => RenderTo(path, Width, Height, false, null);
+
+        /// <summary>
+        /// Renders the gameplay camera to a PNG of width x height. The HUD (GameHud) and the title screen are Screen Space -
+        /// Camera canvases, so they are drawn in the same render: the camera targets the texture first and the canvases are
+        /// re-scaled to its size. uiOnly: only the UI layer over a pure magenta clear (HUD area mask).
+        /// </summary>
+        private static void RenderTo(string path, int width, int height, bool uiOnly, TitleScreen title)
         {
             UnityEngine.Camera cam = UnityEngine.Camera.main;
             if (cam == null) throw new InvalidOperationException("no main camera");
-            var rt = new RenderTexture(Width, Height, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB)
+            var rt = new RenderTexture(width, height, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB)
             {
                 antiAliasing = 4,
             };
             rt.Create();
             RenderTexture prevActive = RenderTexture.active;
-            cam.aspect = (float)Width / Height;
+            int prevMask = cam.cullingMask;
+            CameraClearFlags prevFlags = cam.clearFlags;
+            Color prevBg = cam.backgroundColor;
+            cam.targetTexture = rt;
+            cam.aspect = (float)width / height;
+            GameHud hud = UnityEngine.Object.FindAnyObjectByType<GameHud>();
+            if (hud != null && _driver != null && _driver.World != null)
+            {
+                hud.UpdateScale();
+                hud.Refresh(_driver.World, 0f);
+            }
+            if (title != null) title.UpdateScale();
+            Canvas.ForceUpdateCanvases();
+            Canvas.ForceUpdateCanvases();   // the first pass re-sizes the canvas to the texture, the second lays out at that size
+            if (hud != null)
+            {
+                var land = UnityEngine.Object.FindAnyObjectByType<CriticalMass.Runtime.Hud.Ui.MinimapLand>();
+                Debug.Log($"[CaptureTool] hud canvas {hud.Root.rect.size} scale {hud.Canvas.scaleFactor} for {width}x{height}; " +
+                          $"minimap quads {(land != null ? land.Quads : -1)} rect {(land != null ? land.rectTransform.rect.ToString() : "-")}");
+            }
+            if (uiOnly)
+            {
+                cam.cullingMask = 1 << 5;
+                cam.clearFlags = CameraClearFlags.SolidColor;
+                cam.backgroundColor = new Color(1f, 0f, 1f, 1f);
+            }
             try
             {
                 var req = new RenderPipeline.StandardRequest { destination = rt };
@@ -448,8 +484,8 @@ namespace CriticalMass.Editor
                     cam.targetTexture = null;
                 }
                 RenderTexture.active = rt;
-                var tex = new Texture2D(Width, Height, TextureFormat.RGB24, false);
-                tex.ReadPixels(new Rect(0, 0, Width, Height), 0, 0);
+                var tex = new Texture2D(width, height, TextureFormat.RGB24, false);
+                tex.ReadPixels(new Rect(0, 0, width, height), 0, 0);
                 tex.Apply();
                 File.WriteAllBytes(path, tex.EncodeToPNG());
                 UnityEngine.Object.DestroyImmediate(tex);
@@ -457,10 +493,79 @@ namespace CriticalMass.Editor
             finally
             {
                 RenderTexture.active = prevActive;
+                cam.targetTexture = null;
+                cam.cullingMask = prevMask;
+                cam.clearFlags = prevFlags;
+                cam.backgroundColor = prevBg;
                 cam.ResetAspect();
                 rt.Release();
                 UnityEngine.Object.DestroyImmediate(rt);
             }
+        }
+
+        // ---------------------------------------------------------------- HUD and title shots (2026-11-12, hud-and-logo)
+
+        private static int _extra;
+
+        /// <summary>HUD shots at the hill pose: three resolutions, the area mask, the state sheet frames, the title screen.</summary>
+        private static readonly (string Name, int W, int H)[] HudShots =
+        {
+            ("hud-1080", 1920, 1080), ("hud-720", 1280, 720), ("hud-2160", 3840, 2160), ("hud-mask", 1920, 1080),
+            ("state-hill-neutral", 1920, 1080), ("state-hill-azure", 1920, 1080), ("state-hill-contested", 1920, 1080),
+            ("state-kaiju-neutral", 1920, 1080), ("state-kaiju-azure", 1920, 1080), ("state-kaiju-crimson", 1920, 1080),
+            ("state-kaiju-berserk", 1920, 1080), ("state-death", 1920, 1080), ("title", 1920, 1080),
+        };
+
+        /// <summary>View-only HudState edits for the state sheet (GameHud.PreviewOverride; the Sim is untouched).</summary>
+        private static Action<HudState> OverrideFor(string name)
+        {
+            switch (name)
+            {
+                case "state-hill-neutral": return s => { s.Hill = HillState.Neutral; s.OnHillAzure = 0; s.OnHillCrimson = 0; };
+                case "state-hill-azure": return s => { s.Hill = HillState.Azure; s.OnHillAzure = 3; s.OnHillCrimson = 0; };
+                case "state-hill-contested": return s => { s.Hill = HillState.Contested; s.OnHillAzure = 2; s.OnHillCrimson = 2; };
+                case "state-kaiju-neutral": return s => { s.Hatched = true; s.Kaiju = KaijuState.Neutral; s.KaijuMeter01 = 0.85f; s.Instability01 = 0.2f; };
+                case "state-kaiju-azure": return s => { s.Hatched = true; s.Kaiju = KaijuState.Azure; s.KaijuMeter01 = 0.6f; s.Instability01 = 0.4f; };
+                case "state-kaiju-crimson": return s => { s.Hatched = true; s.Kaiju = KaijuState.Crimson; s.KaijuMeter01 = 0.45f; s.Instability01 = 0.6f; };
+                case "state-kaiju-berserk": return s => { s.Hatched = true; s.Kaiju = KaijuState.Berserk; s.KaijuMeter01 = 0.9f; s.Instability01 = 1f; };
+                case "state-death": return s => { s.Alive = false; s.Hp = 0f; s.RespawnIn = 4.2; };
+                default: return null;
+            }
+        }
+
+        private static void ShootHud()
+        {
+            if (_extra >= HudShots.Length)
+            {
+                GameHud.PreviewOverride = null;
+                Finish(0);
+                return;
+            }
+            CameraFollowTarget follow = UnityEngine.Object.FindAnyObjectByType<CameraFollowTarget>();
+            if (follow == null) throw new InvalidOperationException("no CameraFollowTarget in the scene");
+            if (_settle < 0)
+            {
+                ApplyPose(GameplayCamera.Distance);
+                follow.ClearOverride();
+                follow.SetOverride(_driver.World.Map.Hill.X, _driver.World.Map.Hill.Z);
+                _settle = SettleFrames;
+                return;
+            }
+            if (--_settle > 0) return;
+            var shot = HudShots[_extra];
+            GameHud hud = UnityEngine.Object.FindAnyObjectByType<GameHud>();
+            if (hud == null) throw new InvalidOperationException("no GameHud in the scene");
+            hud.SnapAnimations = true;
+            GameHud.PreviewOverride = OverrideFor(shot.Name);
+            TitleScreen title = shot.Name == "title" ? TitleScreen.Show(hud.gameObject, hud) : null;
+            string path = Path.Combine(SessionState.GetString(OutKey, "."), shot.Name + ".png");
+            RenderTo(path, shot.W, shot.H, shot.Name == "hud-mask", title);
+            if (title != null) title.Hide();
+            GameHud.PreviewOverride = null;
+            Written.Add(path);
+            Debug.Log("[CaptureTool] wrote " + path);
+            _extra++;
+            _settle = -1;
         }
 
         private static void WriteManifest((string Name, double X, double Z, double Distance)[] targets)

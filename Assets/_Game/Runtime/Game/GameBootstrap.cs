@@ -53,6 +53,9 @@ namespace CriticalMass.Runtime.Game
             game.AddComponent<GridChunkMeshView>();
             DebugHud hud = game.AddComponent<DebugHud>();
             hud.Driver = game.GetComponent<SimDriverBehaviour>();
+            // The debug box stays for the loop's tools but is hidden from players (F1 toggles it); the bible p15 HUD is
+            // GameHud, built after the camera below so its Screen Space - Camera canvas finds Camera.main.
+            hud.Visible = false;
 
             // Main camera: perspective (U-005 amendment 2026-11-12). The P-09 orthographic brain override is gone: the
             // brain's LensModeOverride stays at its default (disabled), so the Unity camera keeps its own perspective mode
@@ -72,6 +75,11 @@ namespace CriticalMass.Runtime.Game
             // Camera rig (F-08b).
             GameObject rig = CameraRig.Create(driver);
             if (rig != null && rig.transform.parent == null) PlaceInScene(rig, scene);
+
+            // Bible p15 HUD (2026-11-12) and, in player builds, the p04 title screen over the live match.
+            GameHud gameHud = game.AddComponent<GameHud>();
+            gameHud.Driver = driver;
+            if (TitleScreen.ShowOnBoot) TitleScreen.Show(game, gameHud);
 
             // One directional sun (art direction 2.2): from the screen's upper-left corner, elevation 50 degrees, so it
             // travels 135 degrees clockwise from screen-up (Unity yaw 315 + 135 = 90) and shadows fall to the lower right.

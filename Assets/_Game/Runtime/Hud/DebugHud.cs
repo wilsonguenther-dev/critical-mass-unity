@@ -34,6 +34,9 @@ namespace CriticalMass.Runtime.Hud
         GUIStyle _style;
         float _nextRefresh;
 
+        /// <summary>Draw the box (the text is still rebuilt for tools and tests). F1 toggles it in play.</summary>
+        public bool Visible = true;
+
         /// <summary>The text the box currently shows (rebuilt at RefreshHz).</summary>
         public string Text => _content.text;
 
@@ -47,7 +50,8 @@ namespace CriticalMass.Runtime.Hud
 
         void OnGUI()
         {
-            if (_content.text.Length == 0) return;
+            if (Event.current != null && Event.current.type == EventType.KeyDown && Event.current.keyCode == KeyCode.F1) Visible = !Visible;
+            if (!Visible || _content.text.Length == 0) return;
             if (_style == null)
             {
                 _style = new GUIStyle(GUI.skin.box)
