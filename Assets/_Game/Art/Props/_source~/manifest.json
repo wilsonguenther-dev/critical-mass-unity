@@ -1,0 +1,772 @@
+{
+ "generated_by": "build_props.py",
+ "blender": "5.2.3 LTS",
+ "unit": "1 unit = 1 m = 1 cell",
+ "pivot": "footprint centre on the ground (z = 0); front faces Blender -Y = Unity +Z",
+ "colour": "vertex colour set `Col`: RGB = bible hex (sRGB), A = mask code (0 fixed, 0.25 fixed glow, 0.5 team dark, 0.75 team glow, 1.0 team cloth)",
+ "outline": "2.5 px Void Navy #18233B constant screen width; hull width 0 where A is 0.25 or 0.75; props with outline_px 0 draw no hull at all",
+ "props": [
+  {
+   "prop": "prop_biomass_plant_s",
+   "fbx": "Props/prop_biomass_plant_s.fbx",
+   "bible": "p14 biomass plants (small); p03",
+   "size_class": "interactable",
+   "tris": 720,
+   "budget": 1500,
+   "dims_blender_xyz": [
+    0.393,
+    0.391,
+    0.5
+   ],
+   "targets": {
+    "height": 0.5
+   },
+   "walkable": false,
+   "outline_px": 2.5,
+   "team_mask": false,
+   "checks": {
+    "tris": true,
+    "height": true
+   }
+  },
+  {
+   "prop": "prop_biomass_plant_m",
+   "fbx": "Props/prop_biomass_plant_m.fbx",
+   "bible": "p14 biomass plants (medium)",
+   "size_class": "interactable",
+   "tris": 984,
+   "budget": 1500,
+   "dims_blender_xyz": [
+    0.679,
+    0.746,
+    0.8
+   ],
+   "targets": {
+    "height": 0.8
+   },
+   "walkable": false,
+   "outline_px": 2.5,
+   "team_mask": false,
+   "checks": {
+    "tris": true,
+    "height": true
+   }
+  },
+  {
+   "prop": "prop_biomass_plant_l",
+   "fbx": "Props/prop_biomass_plant_l.fbx",
+   "bible": "p14 biomass plants (large); p03",
+   "size_class": "interactable",
+   "tris": 1436,
+   "budget": 1500,
+   "dims_blender_xyz": [
+    1.183,
+    1.179,
+    1.2
+   ],
+   "targets": {
+    "height": 1.2
+   },
+   "walkable": false,
+   "outline_px": 2.5,
+   "team_mask": false,
+   "checks": {
+    "tris": true,
+    "height": true
+   }
+  },
+  {
+   "prop": "prop_biomass_sprout",
+   "fbx": "Props/prop_biomass_sprout.fbx",
+   "bible": "p03 small biomass sprouts",
+   "size_class": "small",
+   "tris": 236,
+   "budget": 300,
+   "dims_blender_xyz": [
+    0.239,
+    0.223,
+    0.25
+   ],
+   "targets": {
+    "height": 0.25
+   },
+   "walkable": true,
+   "outline_px": 2.5,
+   "team_mask": false,
+   "checks": {
+    "tris": true,
+    "height": true,
+    "walkable_under_0.3": true
+   }
+  },
+  {
+   "prop": "prop_orb_biomass",
+   "fbx": "Props/prop_orb_biomass.fbx",
+   "bible": "p14 loose orb; p03 biomass orb",
+   "size_class": "interactable",
+   "tris": 784,
+   "budget": 1500,
+   "dims_blender_xyz": [
+    0.467,
+    0.447,
+    0.429
+   ],
+   "targets": {
+    "height": 0.45,
+    "width": 0.45
+   },
+   "walkable": false,
+   "outline_px": 2.5,
+   "team_mask": false,
+   "checks": {
+    "tris": true,
+    "height": true,
+    "width": true
+   }
+  },
+  {
+   "prop": "prop_orb_stone",
+   "fbx": "Props/prop_orb_stone.fbx",
+   "bible": "p03 stone orb",
+   "size_class": "interactable",
+   "tris": 320,
+   "budget": 1500,
+   "dims_blender_xyz": [
+    0.436,
+    0.447,
+    0.445
+   ],
+   "targets": {
+    "height": 0.45,
+    "width": 0.45
+   },
+   "walkable": false,
+   "outline_px": 2.5,
+   "team_mask": false,
+   "checks": {
+    "tris": true,
+    "height": true,
+    "width": true
+   }
+  },
+  {
+   "prop": "prop_orb_lava",
+   "fbx": "Props/prop_orb_lava.fbx",
+   "bible": "p03 lava orb",
+   "size_class": "interactable",
+   "tris": 320,
+   "budget": 1500,
+   "dims_blender_xyz": [
+    0.436,
+    0.441,
+    0.44
+   ],
+   "targets": {
+    "height": 0.45,
+    "width": 0.45
+   },
+   "walkable": false,
+   "outline_px": 2.5,
+   "team_mask": false,
+   "checks": {
+    "tris": true,
+    "height": true,
+    "width": true
+   }
+  },
+  {
+   "prop": "prop_orb_corruption",
+   "fbx": "Props/prop_orb_corruption.fbx",
+   "bible": "p03 corruption orb",
+   "size_class": "interactable",
+   "tris": 224,
+   "budget": 1500,
+   "dims_blender_xyz": [
+    0.432,
+    0.443,
+    0.45
+   ],
+   "targets": {
+    "height": 0.45,
+    "width": 0.45
+   },
+   "walkable": false,
+   "outline_px": 2.5,
+   "team_mask": false,
+   "checks": {
+    "tris": true,
+    "height": true,
+    "width": true
+   }
+  },
+  {
+   "prop": "prop_orb_brass",
+   "fbx": "Props/prop_orb_brass.fbx",
+   "bible": "p03 brass orb",
+   "size_class": "interactable",
+   "tris": 568,
+   "budget": 1500,
+   "dims_blender_xyz": [
+    0.45,
+    0.45,
+    0.45
+   ],
+   "targets": {
+    "height": 0.45,
+    "width": 0.45
+   },
+   "walkable": false,
+   "outline_px": 2.5,
+   "team_mask": false,
+   "checks": {
+    "tris": true,
+    "height": true,
+    "width": true
+   }
+  },
+  {
+   "prop": "prop_carried_bundle",
+   "fbx": "Props/prop_carried_bundle.fbx",
+   "bible": "p14 carried bundle",
+   "size_class": "interactable",
+   "tris": 744,
+   "budget": 1500,
+   "dims_blender_xyz": [
+    0.493,
+    0.474,
+    0.536
+   ],
+   "targets": {
+    "height": 0.55,
+    "width": 0.5
+   },
+   "walkable": false,
+   "outline_px": 2.5,
+   "team_mask": false,
+   "checks": {
+    "tris": true,
+    "height": true,
+    "width": true
+   }
+  },
+  {
+   "prop": "prop_corruption_growth_l",
+   "fbx": "Props/prop_corruption_growth_l.fbx",
+   "bible": "p14 corruption growth (large); p03",
+   "size_class": "interactable",
+   "tris": 884,
+   "budget": 1500,
+   "dims_blender_xyz": [
+    0.803,
+    0.546,
+    1.2
+   ],
+   "targets": {
+    "height": 1.2
+   },
+   "walkable": false,
+   "outline_px": 2.5,
+   "team_mask": false,
+   "checks": {
+    "tris": true,
+    "height": true
+   }
+  },
+  {
+   "prop": "prop_corruption_growth_s",
+   "fbx": "Props/prop_corruption_growth_s.fbx",
+   "bible": "p14 corruption growth (small)",
+   "size_class": "interactable",
+   "tris": 696,
+   "budget": 1500,
+   "dims_blender_xyz": [
+    0.402,
+    0.276,
+    0.6
+   ],
+   "targets": {
+    "height": 0.6
+   },
+   "walkable": false,
+   "outline_px": 2.5,
+   "team_mask": false,
+   "checks": {
+    "tris": true,
+    "height": true
+   }
+  },
+  {
+   "prop": "prop_crystal_cluster_l",
+   "fbx": "Props/prop_crystal_cluster_l.fbx",
+   "bible": "p03 blue crystals (large), team",
+   "size_class": "interactable",
+   "tris": 190,
+   "budget": 1500,
+   "dims_blender_xyz": [
+    0.475,
+    0.411,
+    0.9
+   ],
+   "targets": {
+    "height": 0.9
+   },
+   "walkable": false,
+   "outline_px": 0.0,
+   "team_mask": true,
+   "checks": {
+    "tris": true,
+    "height": true
+   }
+  },
+  {
+   "prop": "prop_crystal_cluster_s",
+   "fbx": "Props/prop_crystal_cluster_s.fbx",
+   "bible": "p03 blue crystals (small), team",
+   "size_class": "interactable",
+   "tris": 190,
+   "budget": 1500,
+   "dims_blender_xyz": [
+    0.236,
+    0.206,
+    0.45
+   ],
+   "targets": {
+    "height": 0.45
+   },
+   "walkable": false,
+   "outline_px": 0.0,
+   "team_mask": true,
+   "checks": {
+    "tris": true,
+    "height": true
+   }
+  },
+  {
+   "prop": "prop_barricade_folded",
+   "fbx": "Props/prop_barricade_folded.fbx",
+   "bible": "p14 barricade folded",
+   "size_class": "barricade",
+   "tris": 1316,
+   "budget": 2500,
+   "dims_blender_xyz": [
+    0.83,
+    0.49,
+    0.62
+   ],
+   "targets": {
+    "height": 0.6,
+    "width": 0.8
+   },
+   "walkable": false,
+   "outline_px": 2.5,
+   "team_mask": true,
+   "checks": {
+    "tris": true,
+    "height": true,
+    "width": true
+   }
+  },
+  {
+   "prop": "prop_barricade_deployed",
+   "fbx": "Props/prop_barricade_deployed.fbx",
+   "bible": "p14 barricade deployed",
+   "size_class": "barricade",
+   "tris": 940,
+   "budget": 2500,
+   "dims_blender_xyz": [
+    1.09,
+    0.25,
+    1.07
+   ],
+   "targets": {
+    "height": 1.05,
+    "width": 1.0
+   },
+   "walkable": false,
+   "outline_px": 2.5,
+   "team_mask": true,
+   "checks": {
+    "tris": true,
+    "height": true,
+    "width": true
+   }
+  },
+  {
+   "prop": "prop_barricade_damaged",
+   "fbx": "Props/prop_barricade_damaged.fbx",
+   "bible": "p14 barricade damaged",
+   "size_class": "barricade",
+   "tris": 932,
+   "budget": 2500,
+   "dims_blender_xyz": [
+    1.295,
+    0.806,
+    1.012
+   ],
+   "targets": {
+    "height": 0.95
+   },
+   "walkable": false,
+   "outline_px": 2.5,
+   "team_mask": true,
+   "checks": {
+    "tris": true,
+    "height": true
+   }
+  },
+  {
+   "prop": "prop_banner",
+   "fbx": "Props/prop_banner.fbx",
+   "bible": "p14 banners azure / crimson (team mask)",
+   "size_class": "interactable",
+   "tris": 1088,
+   "budget": 1500,
+   "dims_blender_xyz": [
+    0.784,
+    0.428,
+    1.9
+   ],
+   "targets": {
+    "height": 1.9
+   },
+   "walkable": false,
+   "outline_px": 2.5,
+   "team_mask": true,
+   "checks": {
+    "tris": true,
+    "height": true
+   }
+  },
+  {
+   "prop": "prop_marker_team",
+   "fbx": "Props/prop_marker_team.fbx",
+   "bible": "p14 markers azure / crimson (team mask)",
+   "size_class": "interactable",
+   "tris": 218,
+   "budget": 1500,
+   "dims_blender_xyz": [
+    0.68,
+    0.68,
+    1.0
+   ],
+   "targets": {
+    "height": 1.0
+   },
+   "walkable": false,
+   "outline_px": 0.0,
+   "team_mask": true,
+   "checks": {
+    "tris": true,
+    "height": true
+   }
+  },
+  {
+   "prop": "prop_marker_neutral",
+   "fbx": "Props/prop_marker_neutral.fbx",
+   "bible": "p14 marker neutral (grey)",
+   "size_class": "interactable",
+   "tris": 218,
+   "budget": 1500,
+   "dims_blender_xyz": [
+    0.68,
+    0.68,
+    1.0
+   ],
+   "targets": {
+    "height": 1.0
+   },
+   "walkable": false,
+   "outline_px": 0.0,
+   "team_mask": false,
+   "checks": {
+    "tris": true,
+    "height": true
+   }
+  },
+  {
+   "prop": "prop_crate",
+   "fbx": "Props/prop_crate.fbx",
+   "bible": "p03 crate; dressing",
+   "size_class": "medium",
+   "tris": 672,
+   "budget": 800,
+   "dims_blender_xyz": [
+    0.6,
+    0.6,
+    0.6
+   ],
+   "targets": {
+    "height": 0.6,
+    "width": 0.6
+   },
+   "walkable": false,
+   "outline_px": 2.5,
+   "team_mask": false,
+   "checks": {
+    "tris": true,
+    "height": true,
+    "width": true
+   }
+  },
+  {
+   "prop": "prop_barrel",
+   "fbx": "Props/prop_barrel.fbx",
+   "bible": "dressing",
+   "size_class": "medium",
+   "tris": 596,
+   "budget": 800,
+   "dims_blender_xyz": [
+    0.539,
+    0.539,
+    0.7
+   ],
+   "targets": {
+    "height": 0.7,
+    "width": 0.5
+   },
+   "walkable": false,
+   "outline_px": 2.5,
+   "team_mask": false,
+   "checks": {
+    "tris": true,
+    "height": true,
+    "width": true
+   }
+  },
+  {
+   "prop": "prop_stone_block",
+   "fbx": "Props/prop_stone_block.fbx",
+   "bible": "p03 stone block; dressing",
+   "size_class": "medium",
+   "tris": 148,
+   "budget": 800,
+   "dims_blender_xyz": [
+    0.6,
+    0.6,
+    0.6
+   ],
+   "targets": {
+    "height": 0.6,
+    "width": 0.6
+   },
+   "walkable": false,
+   "outline_px": 2.5,
+   "team_mask": false,
+   "checks": {
+    "tris": true,
+    "height": true,
+    "width": true
+   }
+  },
+  {
+   "prop": "prop_stone_stack",
+   "fbx": "Props/prop_stone_stack.fbx",
+   "bible": "dressing (stacked stone blocks)",
+   "size_class": "medium",
+   "tris": 184,
+   "budget": 800,
+   "dims_blender_xyz": [
+    1.006,
+    0.502,
+    0.85
+   ],
+   "targets": {
+    "height": 0.85
+   },
+   "walkable": false,
+   "outline_px": 2.5,
+   "team_mask": false,
+   "checks": {
+    "tris": true,
+    "height": true
+   }
+  },
+  {
+   "prop": "prop_log_section",
+   "fbx": "Props/prop_log_section.fbx",
+   "bible": "p03 log",
+   "size_class": "medium",
+   "tris": 228,
+   "budget": 800,
+   "dims_blender_xyz": [
+    0.487,
+    0.508,
+    0.5
+   ],
+   "targets": {
+    "height": 0.5,
+    "width": 0.5
+   },
+   "walkable": false,
+   "outline_px": 2.5,
+   "team_mask": false,
+   "checks": {
+    "tris": true,
+    "height": true,
+    "width": true
+   }
+  },
+  {
+   "prop": "prop_log",
+   "fbx": "Props/prop_log.fbx",
+   "bible": "dressing",
+   "size_class": "medium",
+   "tris": 102,
+   "budget": 800,
+   "dims_blender_xyz": [
+    1.1,
+    0.3,
+    0.305
+   ],
+   "targets": {
+    "height": 0.3,
+    "length": 1.1
+   },
+   "walkable": false,
+   "outline_px": 2.5,
+   "team_mask": false,
+   "checks": {
+    "tris": true,
+    "height": true
+   }
+  },
+  {
+   "prop": "prop_stump",
+   "fbx": "Props/prop_stump.fbx",
+   "bible": "dressing",
+   "size_class": "small",
+   "tris": 102,
+   "budget": 300,
+   "dims_blender_xyz": [
+    0.529,
+    0.506,
+    0.3
+   ],
+   "targets": {
+    "height": 0.3
+   },
+   "walkable": false,
+   "outline_px": 2.5,
+   "team_mask": false,
+   "checks": {
+    "tris": true,
+    "height": true
+   }
+  },
+  {
+   "prop": "prop_planks",
+   "fbx": "Props/prop_planks.fbx",
+   "bible": "dressing (walkable)",
+   "size_class": "small",
+   "tris": 132,
+   "budget": 300,
+   "dims_blender_xyz": [
+    0.907,
+    0.451,
+    0.07
+   ],
+   "targets": {},
+   "walkable": true,
+   "outline_px": 2.5,
+   "team_mask": false,
+   "checks": {
+    "tris": true,
+    "walkable_under_0.3": true
+   }
+  },
+  {
+   "prop": "prop_rope_coil",
+   "fbx": "Props/prop_rope_coil.fbx",
+   "bible": "dressing (walkable)",
+   "size_class": "small",
+   "tris": 220,
+   "budget": 300,
+   "dims_blender_xyz": [
+    0.391,
+    0.379,
+    0.118
+   ],
+   "targets": {
+    "height": 0.12
+   },
+   "walkable": true,
+   "outline_px": 2.5,
+   "team_mask": false,
+   "checks": {
+    "tris": true,
+    "height": true,
+    "walkable_under_0.3": true
+   }
+  },
+  {
+   "prop": "prop_pebbles",
+   "fbx": "Props/prop_pebbles.fbx",
+   "bible": "dressing (walkable)",
+   "size_class": "small",
+   "tris": 240,
+   "budget": 300,
+   "dims_blender_xyz": [
+    0.435,
+    0.273,
+    0.114
+   ],
+   "targets": {
+    "height": 0.12
+   },
+   "walkable": true,
+   "outline_px": 2.5,
+   "team_mask": false,
+   "checks": {
+    "tris": true,
+    "height": true,
+    "walkable_under_0.3": true
+   }
+  },
+  {
+   "prop": "prop_brazier",
+   "fbx": "Props/prop_brazier.fbx",
+   "bible": "dressing light: brazier (pool #FFC27A r 2.0 u)",
+   "size_class": "medium",
+   "tris": 384,
+   "budget": 800,
+   "dims_blender_xyz": [
+    0.52,
+    0.52,
+    1.0
+   ],
+   "targets": {
+    "height": 1.0
+   },
+   "walkable": false,
+   "outline_px": 2.5,
+   "team_mask": false,
+   "checks": {
+    "tris": true,
+    "height": true
+   }
+  },
+  {
+   "prop": "prop_crystal_lamp",
+   "fbx": "Props/prop_crystal_lamp.fbx",
+   "bible": "dressing light: team crystal lamp (r 1.5 u)",
+   "size_class": "medium",
+   "tris": 214,
+   "budget": 800,
+   "dims_blender_xyz": [
+    0.344,
+    0.344,
+    0.95
+   ],
+   "targets": {
+    "height": 0.95
+   },
+   "walkable": false,
+   "outline_px": 2.5,
+   "team_mask": true,
+   "checks": {
+    "tris": true,
+    "height": true
+   }
+  }
+ ]
+}
