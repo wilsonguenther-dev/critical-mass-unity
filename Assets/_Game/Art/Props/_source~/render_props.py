@@ -505,8 +505,8 @@ FRAMINGS = {
     "p14-barricade-damaged": ("14-barricade-damaged", [("prop_barricade_damaged", (0, 0))]),
     "p14-banner-azure": ("14-banner-azure", [("prop_banner", (0, 0))]),
     "p14-banner-crimson": ("14-banner-crimson", [("prop_banner", (0, 0), True)]),
-    "p14-markers": ("14-markers", [("prop_marker_team", (-0.8, 0)), ("prop_marker_neutral", (0, 0)),
-                                   ("prop_marker_team", (0.8, 0), True)]),
+    "p14-markers": ("14-markers", [("prop_marker_team", (-0.55, 0)), ("prop_marker_neutral", (0.07, 0)),
+                                   ("prop_marker_team", (0.71, 0), True)]),
     "p03-props-strip": ("03-props-strip", [
         ("prop_biomass_plant_l", (-2.9, 0)), ("prop_biomass_sprout", (-2.05, 0.55)), ("prop_biomass_sprout", (-2.05, 0)),
         ("prop_crystal_cluster_l", (-1.45, 0.45)), ("prop_crystal_cluster_s", (-1.5, 0)),

@@ -9,7 +9,7 @@ import math
 from mathutils import Vector, noise
 
 from .core import (BIO_HI, BIO_LO, BIOMASS, BRASS, CORRUPT, CORRUPT_D, CORRUPT_GLOW, CORRUPT_TIP, CREAM, DIRT,
-                   DIRT_D, FLAME, FLAME_CORE, GRASS, GRASS_D, LAVA_GLOW, LAVA_ROCK, LEATHER, MASK_FIXED, MASK_GLOW, MASK_GLOW_LINED, MASK_TEAM_GLOW_LINED,
+                   DIRT_D, FLAME, FLAME_CORE, GRASS, GRASS_D, LAVA_GLOW, LAVA_ROCK, LEATHER, MASK_FIXED, MASK_GLOW, MASK_GLOW_LINED, MASK_TEAM_GLOW_LINED, MASK_MARK_LIGHT, MASK_MARK_DARK, MARK_LIGHT, MARK_DARK,
                    MASK_TEAM_CLOTH, MASK_TEAM_DARK, MASK_TEAM_GLOW, MOSS, NEUTRAL_HI, NEUTRAL_LO, ROPE, STALK,
                    STALK_L, STONE, STONE_CORE, STONE_D, TEAM_CLOTH, TEAM_DARK, TEAM_GLOW, WOOD, WOOD_B, WOOD_D, M,
                    Prop, box, cloth, cyl, ico, jitter, torus, tube, uvs)
@@ -296,7 +296,7 @@ def corr_plates(seed, H):
         d = sorted((c - p).length for p in pts)
         if d[1] - d[0] < 0.024 * H / 1.2 and n.y < 0.3:
             return (CORRUPT_GLOW, MASK_GLOW)
-        if n.dot(HL_DIR) > 0.62:
+        if n.dot(HL_DIR) > 0.7:
             return (CORR_HL, MASK_FIXED)
         return ("#4E3D85" if n.x > 0.15 or n.z < -0.3 else "#6B1761", MASK_FIXED)   # shadow side indigo, lit side plum
     return f
@@ -441,48 +441,77 @@ def barricade_damaged():
 
 
 # ---------------------------------------------------------------- banner (team cloth)
+# v2 palette additions sampled from the bible p14 banner crops (median-cut swatches of the crop foreground):
+POLE_BROWN = "#6B4B2E"      # pole and crossbar body; lands on the bible's dark brown #5C513F after the mid band
+BAR_BROWN_D = "#4F3A26"     # dark brown end grain, rope shadow (bible #694533 on the crimson crop)
+ROPE_CREAM = "#E2D08E"      # rope wraps and tassels, bible highlight cream #D9C985 / #DDCE7C
+EMBLEM_CREAM = "#F3EBCF"    # emblem, bible warm cream highlight
+
+
 def banner():
+    """Bible p14 banner: the pole stands at the left third, the crossbar (1.12 m) and the cloth hang centred 0.22 m to
+    its right; rope wraps and tassels at both bar ends; tattered tails; wide mossy rock pile (1.2 m) at the foot."""
     P = Prop("prop_banner", LARGE, "interactable", {"height": 1.9}, 14)
-    for i, (x, y, r) in enumerate(((0.0, 0.1, 0.22), (0.27, -0.04, 0.17), (-0.27, -0.02, 0.16), (0.1, -0.2, 0.11))):
-        rock(P, r, (x, y, r * 0.25), 40 + i, squash=0.65, moss=True)
-    for j, (x, y) in enumerate(((-0.38, -0.16), (0.4, -0.12))):
+    for i, (x, y, r) in enumerate(((-0.02, 0.08, 0.24), (0.32, -0.02, 0.2), (-0.34, -0.04, 0.17), (0.12, -0.24, 0.13),
+                                   (0.55, 0.04, 0.12), (-0.5, 0.06, 0.1))):
+        rock(P, r, (x, y, r * 0.25), 40 + i, squash=0.62, moss=True, sub=1)
+    for j, (x, y) in enumerate(((-0.42, -0.2), (0.45, -0.18), (0.2, -0.32))):
         tuft(P, (x, y, 0.02), h=0.1, seed=j, col=GRASS)
-    P.add(box(0.11, 0.11, 1.84), WOOD_B, mat=M((-0.06, 0.07, 0)))
-    P.add(box(0.84, 0.1, 0.1), WOOD, mat=M((0, 0.0, 1.7)))
-    for x in (-0.42, 0.42):
-        P.add(box(0.08, 0.12, 0.12, bevel=0.02, base=False), BRASS, mat=M((x, 0, 1.75)))
-        P.add(tube([(x * 0.85, -0.06, 1.75), (x * 0.85, -0.07, 1.55), (x * 0.83, -0.07, 1.42)], [0.022, 0.02, 0.0], 4,
-                   tip=True), ROPE)
-    P.add(cyl(0.07, 0.08, 8, r2=0.03, bevel=0.015), BRASS, mat=M((-0.06, 0.07, 1.84)))
-    rag = lambda u: 0.1 * abs(math.sin(u * math.pi * 3.5)) + 0.05 * math.sin(u * 17)
-    P.add(cloth(0.72, 1.38, 6, 9, lambda u, v: -0.03 * math.sin(u * math.pi * 3) * v - 0.03 * v, notch=0.12,
-                bottom_fn=rag), TEAM_CLOTH, mask=MASK_TEAM_CLOTH, smooth=True, mat=M((0, -0.06, 1.66)))
-    ez, ey = 1.17, -0.115
-    P.add(torus(0.14, 0.035, 16, 4), CREAM, mat=M((0, ey, ez), (90, 0, 0)))
-    for k in range(8):
-        a = 360 * k / 8 + 22.5
-        P.add(cyl(0.035, 0.08, 3, r2=0.0, bevel=0), CREAM,
-              mat=M((0.17 * math.cos(math.radians(a)), ey, ez + 0.17 * math.sin(math.radians(a))), (0, 90 - a, 0)))
-    P.add(tube([(0, ey, ez - 0.13), (0, ey, ez), (0, ey, ez + 0.13)], [0.0, 0.055, 0.0], 4), CREAM)
+    P.add(box(0.13, 0.13, 1.8), by_nz(POLE_BROWN, POLE_BROWN, BAR_BROWN_D, 0.5), mat=M((0.0, 0.06, 0)))
+    bx, bz, L = 0.22, 1.76, 1.12
+    P.add(cyl(0.075, L, 8, bevel=0.025, base=False),
+          lambda f: BAR_BROWN_D if abs(f.normal.x) > 0.9 else POLE_BROWN, mat=M((bx, 0.0, bz), (0, 90, 0)))
+    for s in (-1, 1):
+        x = bx + s * (L / 2 - 0.1) - (0.08 if s > 0 else 0.0)
+        for w in (-0.035, 0.035):
+            P.add(torus(0.08, 0.02, 10, 4), ROPE_CREAM, mat=M((x + w, 0, bz), (0, 90, 0)))
+        P.add(tube([(x, -0.07, bz - 0.04), (x + 0.01 * s, -0.08, bz - 0.18), (x, -0.08, bz - 0.3)], [0.024, 0.022, 0.02], 4),
+              ROPE_CREAM)
+        P.add(cyl(0.035, 0.08, 6, r2=0.012, bevel=0.0), BAR_BROWN_D, mat=M((x, -0.08, bz - 0.38)))
+    P.add(cyl(0.08, 0.07, 8, r2=0.04, bevel=0.015), BRASS, mat=M((0.0, 0.06, 1.8)))
+    rag = lambda u: 0.36 * (1 - math.exp(-((u - 0.55) / 0.16) ** 2)) + 0.06 * abs(math.sin(u * math.pi * 5))
+    cl = cloth(0.78, 1.22, 8, 10, lambda u, v: -0.035 * math.sin(u * math.pi * 3) * v - 0.03 * v, notch=0.0, bottom_fn=rag)
+    for v in cl.verts:                                    # taper: 0.78 m at the bar, about 0.6 m at the tails
+        v.co.x *= 1 + 0.2 * v.co.z / 1.22
+    P.add(cl, lambda f: TEAM_CLOTH, mask=MASK_TEAM_CLOTH, smooth=True, mat=M((bx, -0.1, bz - 0.04)))
+    P.add(box(0.84, 0.05, 0.1, bevel=0.02), TEAM_CLOTH, mask=MASK_TEAM_CLOTH, mat=M((bx, -0.09, bz - 0.14)))  # sleeve hem
+    ez, ey = 1.2, -0.15
+    P.add(torus(0.15, 0.04, 16, 4), EMBLEM_CREAM, mat=M((bx, ey, ez), (90, 0, 0)))
+    for k in range(6):
+        a = 360 * k / 6 + 30
+        P.add(cyl(0.04, 0.09, 3, r2=0.0, bevel=0), EMBLEM_CREAM,
+              mat=M((bx + 0.18 * math.cos(math.radians(a)), ey, ez + 0.18 * math.sin(math.radians(a))), (0, 90 - a, 0)))
+    for dx in (-0.035, 0.035):
+        P.add(tube([(bx + dx, ey, ez - 0.09), (bx + dx * 1.6, ey, ez), (bx + dx, ey, ez + 0.09)], [0.0, 0.03, 0.0], 4),
+              EMBLEM_CREAM)
     return P.finish(fit_height=1.9)
 
 
 # ---------------------------------------------------------------- markers (diamond over ring)
-def _diamond(P, z0, h, r, colf):
-    bm = tube([(0, 0, z0), (0, 0, z0 + h * 0.42), (0, 0, z0 + h)], [0.0001, r, 0.0], 4, tip=True, twist=0.0)
-    P.add(bm, colf, lined=False)
-
-
 def marker(team=True):
+    """Bible p14 marker, measured off the crop (1 col = 0.028 m): a four-facet diamond 0.37 m wide with a ridge to the
+    camera, tip 0.19 m above the ground, widest at 0.5, top 0.87; a broken flat ring (r 0.24) with a centre dot on the
+    ground below it. Left facets light, right facets dark, a pale star highlight at the widest point."""
     name = "prop_marker_team" if team else "prop_marker_neutral"
     P = Prop(name, LARGE, "interactable", {"height": 0.9}, 15, outline_px=0.0)
     if team:
-        lit, dark, ml, md = TEAM_GLOW, TEAM_DARK, MASK_TEAM_GLOW, MASK_TEAM_DARK
+        lit, dark, ml, md = MARK_LIGHT, MARK_DARK, MASK_MARK_LIGHT, MASK_MARK_DARK
     else:
-        lit, dark, ml, md = NEUTRAL_HI, NEUTRAL_LO, MASK_GLOW, 0.0
-    P.add(torus(0.26, 0.04, 20, 4), (lit, ml), lined=False, mat=M((0, 0, 0.04), scale=(1, 1, 0.6)))
-    P.add(cyl(0.17, 0.01, 12, bevel=0), (dark, md), lined=False)
-    _diamond(P, 0.12, 0.8, 0.25, facet_light(lit, dark, ml, md, (-0.7, -0.4, 0.3)))
+        lit, dark, ml, md = NEUTRAL_HI, NEUTRAL_LO, MASK_GLOW, MASK_GLOW
+    for k in range(4):                                    # broken ring: four arcs with gaps
+        P.add(torus(0.15, 0.05, 6, 4, arc=76, start=90 * k + 7), (dark, md), lined=False,
+              mat=M((0, -0.28, 0.025), scale=(1, 1, 0.45)))
+    P.add(cyl(0.055, 0.012, 10, bevel=0), (lit, ml), lined=False, mat=M((0, -0.28, 0)))
+    z0, zw, z1, r = 0.1, 0.47, 0.9, 0.19
+    bm = tube([(0, 0, z0), (0, 0, zw), (0, 0, z1)], [0.0001, r, 0.0], 4, tip=True, twist=0.0)
+
+    def facet(f):
+        n, c = f.normal, f.calc_center_median()
+        return (lit, ml) if n.x < -0.05 else (dark, md)
+    P.add(bm, facet, lined=False, mat=M((0, 0, 0), (0, 0, 0), (1.0, 0.75, 1)))
+    hl = "#FFFFFF" if team else "#F4F1EC"
+    for (sx, sz) in ((0.06, 0.012), (0.012, 0.09)):      # four-point star highlight on the front ridge
+        P.add(box(sx, 0.01, sz, bevel=0, base=False), (hl, MASK_GLOW), lined=False, mat=M((-0.012, -r * 0.75 * 0.72 - 0.004, zw)))
     return P.finish(fit_height=0.9)
 
 

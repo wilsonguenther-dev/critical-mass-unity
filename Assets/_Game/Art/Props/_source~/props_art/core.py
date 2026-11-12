@@ -33,14 +33,17 @@ CORRUPT, CORRUPT_D, CORRUPT_GLOW, CORRUPT_TIP = "#652968", "#450E46", "#D23F8E",
 LAVA_ROCK, LAVA_GLOW = "#5E4A48", "#FF8A3D"
 FLAME, FLAME_CORE = "#FFC27A", "#F7F0E5"
 TEAM_GLOW, TEAM_DARK, TEAM_CLOTH = "#4FE3F0", "#1D6A8C", "#127EC0"       # azure values
-TEAM_SWAP = {0.5: "#9B4132", 0.625: "#FF7461", 0.75: "#FF7461", 1.0: "#FC725A"}            # crimson values per mask code
-NEUTRAL_HI, NEUTRAL_LO = "#D9DAC9", "#9A9CA6"
+TEAM_SWAP = {0.375: "#E6A595", 0.5: "#9B4132", 0.625: "#FF7461", 0.75: "#FF7461", 0.875: "#D6594F", 1.0: "#FC725A"}            # crimson values per mask code
+NEUTRAL_HI, NEUTRAL_LO = "#DAD1CC", "#86928F"      # v2: sampled from the bible grey marker
+MARK_LIGHT, MARK_DARK = "#27F8F8", "#43C2C5"         # v2: bible azure marker
 
 MASK_FIXED, MASK_GLOW, MASK_TEAM_DARK, MASK_TEAM_GLOW, MASK_TEAM_CLOTH = 0.0, 0.25, 0.5, 0.75, 1.0
 # v2: glows the bible draws with an ink line (orbs, biomass, crystals) keep the hull: self-lit but outlined
 MASK_GLOW_LINED, MASK_TEAM_GLOW_LINED = 0.125, 0.625
-GLOW_CODES = (MASK_GLOW, MASK_TEAM_GLOW)                       # unlined glows (hull collapsed)
-SELF_LIT = (MASK_GLOW_LINED, MASK_GLOW, MASK_TEAM_GLOW_LINED, MASK_TEAM_GLOW)   # emitted unshaded, no gradient
+# v2: marker diamonds and rings (bible p14): self-lit, unlined, own team values (azure #27F8F8 / #43C2C5)
+MASK_MARK_LIGHT, MASK_MARK_DARK = 0.375, 0.875
+GLOW_CODES = (MASK_GLOW, MASK_TEAM_GLOW, MASK_MARK_LIGHT, MASK_MARK_DARK)                       # unlined glows (hull collapsed)
+SELF_LIT = (MASK_GLOW_LINED, MASK_GLOW, MASK_TEAM_GLOW_LINED, MASK_TEAM_GLOW, MASK_MARK_LIGHT, MASK_MARK_DARK)   # emitted unshaded, no gradient
 
 # three-band ramp (ART-DIRECTION 2.2)
 BAND_MID, BAND_SHADOW, SHADOW_NAVY_MIX = 0.84, 0.66, 0.12
@@ -353,8 +356,9 @@ def make_toon(name="CM_Toon", crimson=False, ldir=(0.0, -0.643, 0.766), flat=Fal
     if crimson:
         for code, h in TEAM_SWAP.items():
             base = mix(is_code(code), base, _rgba(h))
-    glow = math_("MAXIMUM", math_("MAXIMUM", is_code(MASK_GLOW), is_code(MASK_TEAM_GLOW)),
-                 math_("MAXIMUM", is_code(MASK_GLOW_LINED), is_code(MASK_TEAM_GLOW_LINED)))
+    glow = is_code(SELF_LIT[0])
+    for code in SELF_LIT[1:]:
+        glow = math_("MAXIMUM", glow, is_code(code))
 
     geo = node("ShaderNodeNewGeometry")
     dot = node("ShaderNodeVectorMath", operation="DOT_PRODUCT")

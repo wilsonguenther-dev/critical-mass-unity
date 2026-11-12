@@ -14,8 +14,8 @@
    "tris": 1020,
    "budget": 1500,
    "dims_blender_xyz": [
-    0.455,
-    0.323,
+    0.458,
+    0.325,
     0.5
    ],
    "targets": {
@@ -37,8 +37,8 @@
    "tris": 1268,
    "budget": 1500,
    "dims_blender_xyz": [
-    0.733,
-    0.408,
+    0.728,
+    0.407,
     0.8
    ],
    "targets": {
@@ -60,8 +60,8 @@
    "tris": 1490,
    "budget": 1500,
    "dims_blender_xyz": [
-    0.88,
-    0.538,
+    0.876,
+    0.533,
     1.2
    ],
    "targets": {
@@ -83,8 +83,8 @@
    "tris": 236,
    "budget": 300,
    "dims_blender_xyz": [
-    0.236,
-    0.225,
+    0.238,
+    0.224,
     0.25
    ],
    "targets": {
@@ -132,8 +132,8 @@
    "tris": 320,
    "budget": 1500,
    "dims_blender_xyz": [
-    0.445,
-    0.452,
+    0.437,
+    0.442,
     0.44
    ],
    "targets": {
@@ -157,9 +157,9 @@
    "tris": 320,
    "budget": 1500,
    "dims_blender_xyz": [
-    0.43,
-    0.43,
-    0.436
+    0.446,
+    0.441,
+    0.431
    ],
    "targets": {
     "height": 0.45,
@@ -257,8 +257,8 @@
    "tris": 612,
    "budget": 1500,
    "dims_blender_xyz": [
-    0.757,
-    0.496,
+    0.782,
+    0.49,
     1.2
    ],
    "targets": {
@@ -280,8 +280,8 @@
    "tris": 612,
    "budget": 1500,
    "dims_blender_xyz": [
-    0.376,
-    0.246,
+    0.384,
+    0.249,
     0.6
    ],
    "targets": {
@@ -327,7 +327,7 @@
    "budget": 1500,
    "dims_blender_xyz": [
     0.236,
-    0.207,
+    0.204,
     0.45
    ],
    "targets": {
@@ -401,7 +401,7 @@
    "dims_blender_xyz": [
     1.619,
     0.863,
-    0.999
+    0.998
    ],
    "targets": {
     "height": 0.95
@@ -419,11 +419,11 @@
    "fbx": "Props/prop_banner.fbx",
    "bible": "p14 banners azure / crimson (team mask)",
    "size_class": "interactable",
-   "tris": 1064,
+   "tris": 1348,
    "budget": 1500,
    "dims_blender_xyz": [
-    0.876,
-    0.575,
+    1.326,
+    0.594,
     1.9
    ],
    "targets": {
@@ -442,11 +442,11 @@
    "fbx": "Props/prop_marker_team.fbx",
    "bible": "p14 markers azure / crimson (team mask)",
    "size_class": "interactable",
-   "tris": 218,
+   "tris": 282,
    "budget": 1500,
    "dims_blender_xyz": [
-    0.587,
-    0.587,
+    0.397,
+    0.621,
     0.9
    ],
    "targets": {
@@ -454,7 +454,7 @@
    },
    "walkable": false,
    "outline_px": 0.0,
-   "team_mask": true,
+   "team_mask": false,
    "checks": {
     "tris": true,
     "height": true
@@ -465,11 +465,11 @@
    "fbx": "Props/prop_marker_neutral.fbx",
    "bible": "p14 marker neutral (grey)",
    "size_class": "interactable",
-   "tris": 218,
+   "tris": 282,
    "budget": 1500,
    "dims_blender_xyz": [
-    0.587,
-    0.587,
+    0.397,
+    0.621,
     0.9
    ],
    "targets": {
@@ -541,8 +541,8 @@
    "tris": 148,
    "budget": 800,
    "dims_blender_xyz": [
-    0.61,
-    0.603,
+    0.602,
+    0.595,
     0.6
    ],
    "targets": {
@@ -566,8 +566,8 @@
    "tris": 184,
    "budget": 800,
    "dims_blender_xyz": [
-    1.006,
-    0.502,
+    1.007,
+    0.503,
     0.85
    ],
    "targets": {
@@ -706,9 +706,9 @@
    "tris": 240,
    "budget": 300,
    "dims_blender_xyz": [
-    0.439,
-    0.253,
-    0.118
+    0.434,
+    0.257,
+    0.129
    ],
    "targets": {
     "height": 0.12
