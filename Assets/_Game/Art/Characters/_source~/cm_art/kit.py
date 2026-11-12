@@ -15,6 +15,13 @@ from mathutils import Matrix, Vector
 from . import palette
 
 MAX_INFLUENCES = 4
+GRADIENT = 0.06        # +6 % value toward the top of each part (ART-DIRECTION 3.5)
+CREVICE = 0.10         # -10 % value in crevices (baked ray occlusion, finalize)
+SEG = 0.8              # global segment scale for round primitives (the 12,000-triangle budget knob)
+
+
+def _s(n, lo=4):
+    return max(lo, int(round(n * SEG)))
 
 
 def mat_from(loc=(0, 0, 0), rot=(0, 0, 0), scale=(1, 1, 1)):
@@ -58,13 +65,20 @@ class Builder:
                 "col": bm.verts.layers.float_color.new("Col"),
                 "ws": bm.verts.layers.int.new("wset"),
                 "ft": bm.verts.layers.int.new("feat"),
+                "uv": bm.loops.layers.uv.new("UVMap"),
+                "nogo": bm.verts.layers.int.new("noao"),
                 "wsets": [],
                 "feats": [],
             }
         return self.objs[obj]
 
-    def add(self, obj, src, color, bones, feat=None, smooth=True, m=None):
-        """Merge temp bmesh `src` (transformed by m) into object `obj`."""
+    def add(self, obj, src, color, bones, feat=None, smooth=True, m=None, face_uv=None, grad=GRADIENT):
+        """Merge temp bmesh `src` (transformed by m) into object `obj`.
+
+        grad: value gradient across the part's height (bottom x(1-grad/2) .. top x(1+grad/2)), the "+6 % toward the
+        top" painted-light rule. face_uv = (cx, cy, cz, half_w, half_h): planar front projection for the painted face
+        decal on faces whose centre is in front of cy; every other face samples UV (0.002, 0.002), a transparent texel.
+        """
         if m is not None:
             bmesh.ops.transform(src, matrix=m, verts=src.verts)
         d = self._get(obj)
@@ -78,28 +92,43 @@ class Builder:
             d["feats"].append(feat)
         fi = d["feats"].index(feat)
         rgba = palette.vcol(color) if isinstance(color, str) else color
+        glow = abs(rgba[3] - palette.MASK_TEAM_GLOW) < 0.01
+        zs = [v.co.z for v in src.verts]
+        z0, z1 = min(zs), max(zs)
         vmap = {}
         for v in src.verts:
             nv = bm.verts.new(v.co)
-            nv[d["col"]] = rgba
+            t = (v.co.z - z0) / max(z1 - z0, 1e-6)
+            f = 1.0 if glow else (1.0 + grad * (t - 0.5)) ** 2.2      # value step in sRGB, applied in linear
+            nv[d["col"]] = (rgba[0] * f, rgba[1] * f, rgba[2] * f, rgba[3])
             nv[d["ws"]] = wi
             nv[d["ft"]] = fi
+            nv[d["nogo"]] = 1 if glow else 0
             vmap[v] = nv
+        uvl = d["uv"]
         for f in src.faces:
             nf = bm.faces.new([vmap[v] for v in f.verts])
             nf.smooth = smooth
+            for lp in nf.loops:
+                lp[uvl].uv = (0.002, 0.002)
+            if face_uv is not None:
+                cx, cy, cz, hw, hh = face_uv
+                if nf.calc_center_median().y < cy:
+                    for lp in nf.loops:
+                        co = lp.vert.co
+                        lp[uvl].uv = ((co.x - cx) / (2 * hw) + 0.5, (co.z - cz) / (2 * hh) + 0.5)
         src.free()
 
     # ------------------------------------------------------------------ primitives (return temp bmesh)
     @staticmethod
     def sphere(radii=(1, 1, 1), u=16, v=10):
         bm = bmesh.new()
-        bmesh.ops.create_uvsphere(bm, u_segments=u, v_segments=v, radius=1.0)
+        bmesh.ops.create_uvsphere(bm, u_segments=_s(u, 6), v_segments=_s(v, 4), radius=1.0)
         bmesh.ops.scale(bm, vec=Vector(radii), verts=bm.verts)
         return bm
 
     @staticmethod
-    def box(size=(1, 1, 1), bevel=0.0, seg=1):
+    def box(size=(1, 1, 1), bevel=0.0, seg=2):
         bm = bmesh.new()
         bmesh.ops.create_cube(bm, size=1.0)
         bmesh.ops.scale(bm, vec=Vector(size), verts=bm.verts)
@@ -113,7 +142,7 @@ class Builder:
         """Closed truncated cone from point a (radius r1) to point b (radius r2)."""
         a, b = Vector(a), Vector(b)
         bm = bmesh.new()
-        bmesh.ops.create_cone(bm, cap_ends=True, cap_tris=False, segments=seg, radius1=r1, radius2=r2,
+        bmesh.ops.create_cone(bm, cap_ends=True, cap_tris=False, segments=_s(seg, 6), radius1=r1, radius2=r2,
                               depth=(b - a).length)
         d = (b - a).normalized()
         q = d.to_track_quat("Z", "Y")
@@ -126,6 +155,7 @@ class Builder:
         """Closed surface of revolution about local Z. profile = [(r, z), ...] from bottom to top; r>0 inside."""
         bm = bmesh.new()
         rings = []
+        seg = _s(seg, 8)
         for r, z in profile:
             ring = [bm.verts.new((r * math.cos(2 * math.pi * i / seg), r * math.sin(2 * math.pi * i / seg), z))
                     for i in range(seg)]
@@ -142,6 +172,7 @@ class Builder:
     @staticmethod
     def torus(R, r, seg=16, ring=6):
         """Torus in local XY plane around Z."""
+        seg, ring = _s(seg, 8), max(3, int(round(ring * SEG)))
         bm = bmesh.new()
         grid = []
         for i in range(seg):
@@ -160,7 +191,7 @@ class Builder:
         return bm
 
     @staticmethod
-    def prism(points, thickness, bevel=0.0):
+    def prism(points, thickness, bevel=0.0, seg=2):
         """Closed prism: polygon `points` [(x, y), ...] in local XY, extruded +-thickness/2 along Z."""
         bm = bmesh.new()
         h = thickness / 2
@@ -174,7 +205,7 @@ class Builder:
         bm.faces.new(top)
         bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
         if bevel > 0:
-            bmesh.ops.bevel(bm, geom=list(bm.edges), offset=bevel, offset_type="OFFSET", segments=1,
+            bmesh.ops.bevel(bm, geom=list(bm.edges), offset=bevel, offset_type="OFFSET", segments=seg,
                             profile=0.5, affect="EDGES", clamp_overlap=True)
         ngons = [f for f in bm.faces if len(f.verts) > 4]
         if ngons:
@@ -211,12 +242,80 @@ class Builder:
         bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
         return bm
 
+    @staticmethod
+    def slab(size, e=0.5, u=14, v=9):
+        """Rounded slab: a superellipsoid (exponent e < 1 squares it off) with full extents `size`. No hard corner
+        anywhere, so it needs no bevel and catches all three tone bands (pauldrons, knee guards, toe caps)."""
+        bm = bmesh.new()
+        bmesh.ops.create_uvsphere(bm, u_segments=_s(u, 8), v_segments=_s(v, 5), radius=1.0)
+        for vert in bm.verts:
+            vert.co = Vector(tuple(math.copysign(abs(c) ** e, c) * s / 2 for c, s in zip(vert.co, size)))
+        return bm
+
+    @staticmethod
+    def clump(p0, p1, p2, w, t, seg=7, rings=5, up=(0, 0, 1), prof=(1.0, 1.0, 0.82, 0.5)):
+        """Sculpted hair clump: an elliptical section (width w, thickness t) swept along the quadratic curve
+        p0 -> p1 -> p2, swelling then tapering to a point at p2. `up` orients the flat side."""
+        P0, P1, P2 = Vector(p0), Vector(p1), Vector(p2)
+        bm = bmesh.new()
+        rr = []
+        n = len(prof)
+        for k in range(n):
+            s = k / n
+            c = (1 - s) ** 2 * P0 + 2 * (1 - s) * s * P1 + s * s * P2
+            d = (2 * (1 - s) * (P1 - P0) + 2 * s * (P2 - P1)).normalized()
+            side = d.cross(Vector(up))
+            if side.length < 1e-4:
+                side = d.orthogonal()
+            side.normalize()
+            nrm = side.cross(d).normalized()
+            f = prof[k]
+            rr.append([bm.verts.new(c + side * (w / 2 * f * math.cos(2 * math.pi * i / seg))
+                                    + nrm * (t / 2 * f * math.sin(2 * math.pi * i / seg))) for i in range(seg)])
+        tip = bm.verts.new(P2)
+        for k in range(n - 1):
+            for i in range(seg):
+                j = (i + 1) % seg
+                bm.faces.new((rr[k][i], rr[k][j], rr[k + 1][j], rr[k + 1][i]))
+        for i in range(seg):
+            bm.faces.new((rr[-1][i], rr[-1][(i + 1) % seg], tip))
+        bm.faces.new(list(reversed(rr[0])))
+        bmesh.ops.triangulate(bm, faces=[f for f in bm.faces if len(f.verts) > 4])
+        bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+        return bm
+
+    @staticmethod
+    def bake_crevices(bm, col, skip, dist=0.09, strength=CREVICE):
+        """-strength value where a vertex is enclosed by other geometry (ray occlusion over the hemisphere)."""
+        from mathutils.bvhtree import BVHTree
+        bm.normal_update()
+        tree = BVHTree.FromBMesh(bm)
+        dirs = []
+        for i in range(12):                       # fixed, deterministic hemisphere set (z = up along the normal)
+            a = 2 * math.pi * i / 12 + (0.4 if i % 2 else 0.0)
+            el = math.radians(28 if i % 2 else 55)
+            dirs.append(Vector((math.cos(a) * math.cos(el), math.sin(a) * math.cos(el), math.sin(el))))
+        dirs.append(Vector((0, 0, 1)))
+        for v in bm.verts:
+            if v[skip]:
+                continue
+            n = v.normal
+            if n.length < 0.5:
+                continue
+            q = n.to_track_quat("Z", "Y")
+            o = v.co + n * 0.004
+            hit = sum(1 for d in dirs if tree.ray_cast(o, q @ d, dist)[0] is not None)
+            k = (1.0 - strength * hit / len(dirs)) ** 2.2
+            c = v[col]
+            v[col] = (c[0] * k, c[1] * k, c[2] * k, c[3])
+
     # ------------------------------------------------------------------ finalise
     def finalize(self, coll, material):
         out = {}
         for name, d in self.objs.items():
             bm = d["bm"]
             bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+            self.bake_crevices(bm, d["col"], d["nogo"])
             me = bpy.data.meshes.new(name)
             bm.to_mesh(me)
             ob = bpy.data.objects.new(name, me)
@@ -231,7 +330,7 @@ class Builder:
                 ca.data[i].color = v[cl]
             me.color_attributes.active_color = ca
             me.color_attributes.render_color_index = me.color_attributes.find("Col")
-            for a in ("wset", "feat"):
+            for a in ("wset", "feat", "noao"):
                 if a in me.attributes:
                     me.attributes.remove(me.attributes[a])
             # feature tags as non-deform vertex groups (FBX ignores them; the .blend keeps them)

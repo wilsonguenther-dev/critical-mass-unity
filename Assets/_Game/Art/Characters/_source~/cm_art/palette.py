@@ -59,8 +59,8 @@ TEAM_SWAP = {
     "team_dark":  ("#652D2F", "P06 maroon"),
 }
 
-# Outline (inverted hull) colour. The bible's line art is "dark-brown or navy"; this sits between the two.
-OUTLINE = "#2A1E24"
+# Outline (inverted hull) colour.
+OUTLINE = "#18233B"      # Void Navy, ART-DIRECTION 2.3 (v1 used #2A1E24)
 
 # Team-mask codes stored in the vertex-colour ALPHA channel (one colour set survives Unity's FBX import).
 MASK_FIXED = 0.0
@@ -88,3 +88,9 @@ def vcol(name):
     """Vertex colour RGBA (linear RGB, alpha = team mask code) for a palette entry."""
     r, g, b = lin(CHAR[name][0])
     return (r, g, b, MASK_FOR.get(name, MASK_FIXED))
+
+
+def vcol_scaled(name, k):
+    """Vertex colour of `name` with its sRGB value scaled by k (k = 0.75: the 25 % darker modelled crease groove)."""
+    r, g, b = hex_rgb(CHAR[name][0])
+    return (to_lin(r * k), to_lin(g * k), to_lin(b * k), MASK_FOR.get(name, MASK_FIXED))
