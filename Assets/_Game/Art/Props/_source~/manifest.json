@@ -11,11 +11,11 @@
    "fbx": "Props/prop_biomass_plant_s.fbx",
    "bible": "p14 biomass plants (small); p03",
    "size_class": "interactable",
-   "tris": 784,
+   "tris": 1020,
    "budget": 1500,
    "dims_blender_xyz": [
-    0.434,
-    0.434,
+    0.463,
+    0.32,
     0.5
    ],
    "targets": {
@@ -34,11 +34,11 @@
    "fbx": "Props/prop_biomass_plant_m.fbx",
    "bible": "p14 biomass plants (medium)",
    "size_class": "interactable",
-   "tris": 1050,
+   "tris": 1268,
    "budget": 1500,
    "dims_blender_xyz": [
-    0.825,
-    0.55,
+    0.727,
+    0.406,
     0.8
    ],
    "targets": {
@@ -57,11 +57,11 @@
    "fbx": "Props/prop_biomass_plant_l.fbx",
    "bible": "p14 biomass plants (large); p03",
    "size_class": "interactable",
-   "tris": 1422,
+   "tris": 1490,
    "budget": 1500,
    "dims_blender_xyz": [
-    1.368,
-    0.873,
+    0.862,
+    0.534,
     1.2
    ],
    "targets": {
@@ -83,8 +83,8 @@
    "tris": 236,
    "budget": 300,
    "dims_blender_xyz": [
-    0.235,
-    0.226,
+    0.231,
+    0.223,
     0.25
    ],
    "targets": {
@@ -116,7 +116,7 @@
     "width": 0.45
    },
    "walkable": false,
-   "outline_px": 0.0,
+   "outline_px": 2.5,
    "team_mask": false,
    "checks": {
     "tris": true,
@@ -132,8 +132,8 @@
    "tris": 320,
    "budget": 1500,
    "dims_blender_xyz": [
-    0.437,
-    0.437,
+    0.436,
+    0.44,
     0.44
    ],
    "targets": {
@@ -157,9 +157,9 @@
    "tris": 320,
    "budget": 1500,
    "dims_blender_xyz": [
-    0.432,
-    0.44,
-    0.445
+    0.443,
+    0.446,
+    0.434
    ],
    "targets": {
     "height": 0.45,
@@ -257,8 +257,8 @@
    "tris": 1424,
    "budget": 1500,
    "dims_blender_xyz": [
-    1.195,
-    0.697,
+    1.188,
+    0.729,
     1.2
    ],
    "targets": {
@@ -280,8 +280,8 @@
    "tris": 1056,
    "budget": 1500,
    "dims_blender_xyz": [
-    0.584,
-    0.354,
+    0.585,
+    0.347,
     0.6
    ],
    "targets": {
@@ -303,8 +303,8 @@
    "tris": 190,
    "budget": 1500,
    "dims_blender_xyz": [
-    0.476,
-    0.412,
+    0.472,
+    0.408,
     0.9
    ],
    "targets": {
@@ -401,7 +401,7 @@
    "dims_blender_xyz": [
     1.619,
     0.863,
-    0.999
+    1.0
    ],
    "targets": {
     "height": 0.95
@@ -422,8 +422,8 @@
    "tris": 1064,
    "budget": 1500,
    "dims_blender_xyz": [
-    0.866,
-    0.59,
+    0.873,
+    0.554,
     1.9
    ],
    "targets": {
@@ -541,8 +541,8 @@
    "tris": 148,
    "budget": 800,
    "dims_blender_xyz": [
-    0.609,
-    0.605,
+    0.601,
+    0.607,
     0.6
    ],
    "targets": {
@@ -706,9 +706,9 @@
    "tris": 240,
    "budget": 300,
    "dims_blender_xyz": [
-    0.435,
-    0.244,
-    0.118
+    0.434,
+    0.265,
+    0.119
    ],
    "targets": {
     "height": 0.12

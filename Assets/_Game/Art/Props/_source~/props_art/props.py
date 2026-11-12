@@ -9,7 +9,7 @@ import math
 from mathutils import Vector, noise
 
 from .core import (BIO_HI, BIO_LO, BIOMASS, BRASS, CORRUPT, CORRUPT_D, CORRUPT_GLOW, CORRUPT_TIP, CREAM, DIRT,
-                   DIRT_D, FLAME, FLAME_CORE, GRASS, GRASS_D, LAVA_GLOW, LAVA_ROCK, LEATHER, MASK_GLOW,
+                   DIRT_D, FLAME, FLAME_CORE, GRASS, GRASS_D, LAVA_GLOW, LAVA_ROCK, LEATHER, MASK_GLOW, MASK_GLOW_LINED, MASK_TEAM_GLOW_LINED,
                    MASK_TEAM_CLOTH, MASK_TEAM_DARK, MASK_TEAM_GLOW, MOSS, NEUTRAL_HI, NEUTRAL_LO, ROPE, STALK,
                    STALK_L, STONE, STONE_CORE, STONE_D, TEAM_CLOTH, TEAM_DARK, TEAM_GLOW, WOOD, WOOD_B, WOOD_D, M,
                    Prop, box, cloth, cyl, ico, jitter, torus, tube, uvs)
@@ -54,79 +54,142 @@ def dirt_base(P, r, seed, h=0.05):
 
 
 # ---------------------------------------------------------------- p14 biomass plants
+STALK_F = by_nz(STALK_L, STALK_L, STALK, 0.2, -0.35)   # v2: more lit mid-green (bible #419335)
+HL_DIR = Vector((-0.45, -0.5, 0.74)).normalized()     # painted glassy highlight sits upper left, facing the camera
+
+
 def bio_glow(f):
+    """Biomass blob: lime body, yellow top, deeper lime underside, and a painted highlight patch (v2: outlined)."""
     n = f.normal
-    if n.dot(Vector((-0.45, -0.45, 0.77))) > 0.9:
-        return ("#F6FD58", MASK_GLOW)
-    return (BIO_HI if n.z > 0.35 else (BIOMASS if n.z > -0.35 else BIO_LO), MASK_GLOW)
+    if n.dot(HL_DIR) > 0.88:
+        return ("#F6FD58", MASK_GLOW_LINED)
+    return (BIO_HI if n.z > 0.45 else (BIOMASS if n.z > -0.3 else BIO_LO), MASK_GLOW_LINED)
 
 
 def cells_glow(seed, ncell=14):
-    """Biomass orb surface: lighter cells with darker borders (bible loose orb), plus a top-left highlight."""
+    """Biomass orb surface: lighter cells with darker borders (bible loose orb), plus a painted glassy highlight:
+    a crescent along the upper-left rim and a round dot inside it (v2, sits inside the toon bands, never lit)."""
     import random as _r
     rr = _r.Random(seed)
     pts = []
     for _ in range(ncell):
         v = Vector((rr.gauss(0, 1), rr.gauss(0, 1), rr.gauss(0, 1))).normalized()
         pts.append(v)
+    dot_dir = Vector((-0.35, -0.75, 0.56)).normalized()
 
     def f(face):
         c = face.calc_center_median()
         if c.length < 1e-6:
-            return (BIOMASS, MASK_GLOW)
-        d = sorted((c.normalized() - p).length for p in pts)
+            return (BIOMASS, MASK_GLOW_LINED)
         n = face.normal
-        if n.dot(Vector((-0.45, -0.5, 0.74))) > 0.92:
-            return ("#F4FB61", MASK_GLOW)
+        h = n.dot(HL_DIR)
+        if n.dot(dot_dir) > 0.965 or 0.5 < h < 0.72 and n.dot(Vector((0, -1, 0))) > 0.05:
+            return ("#F6FCA0", MASK_GLOW_LINED)
+        d = sorted((c.normalized() - p).length for p in pts)
         if d[1] - d[0] < 0.09:
-            return ("#66D119", MASK_GLOW)
-        return ("#D3F73C" if n.z > 0.3 else (BIOMASS if n.z > -0.45 else "#8CD12A"), MASK_GLOW)
+            return ("#66D119", MASK_GLOW_LINED)
+        return ("#D3F73C" if n.z > 0.3 else (BIOMASS if n.z > -0.45 else "#8CD12A"), MASK_GLOW_LINED)
     return f
 
 
-def biomass_plant(name, H, nstalk, heads, nmush, seed):
-    """heads: list of (x, z, [blob radii]) clusters; the first is the crown."""
+def fib_dirs(n, zmin=-1.0):
+    out = []
+    for i in range(n * 3):
+        z = 1 - 2 * (i + 0.5) / (n * 3)
+        if z < zmin:
+            break
+        a = i * 2.39996
+        r = math.sqrt(max(0.0, 1 - z * z))
+        out.append(Vector((r * math.cos(a), r * math.sin(a), z)))
+        if len(out) == n:
+            break
+    return out
+
+
+def bio_crown(P, c, rx, ry, rz, br, n, rng, seg=(7, 5), extra=()):
+    """Cauliflower crown: n round blobs on an ellipsoid shell plus a filling core; the envelope is (rx, ry, rz)."""
+    c = Vector(c)
+    ix, iy, iz = max(rx - br, 0.3 * rx), max(ry - br, 0.3 * ry), max(rz - br, 0.35 * rz)
+    P.add(uvs(1.0, *seg), bio_glow, smooth=True, mat=M(c, scale=(ix + br * 0.55, iy + br * 0.55, iz + br * 0.55)))
+    for d in fib_dirs(n, zmin=-0.45):
+        r = br * rng.uniform(0.86, 1.08)
+        p = c + Vector((d.x * ix, d.y * iy, d.z * iz))
+        P.add(uvs(r, *seg), bio_glow, smooth=True, mat=M(p, (0, 0, rng.uniform(0, 90))))
+    for (dx, dz, r) in extra:                          # drooping side lobes (bible: crown hangs low on one side)
+        P.add(uvs(r, *seg), bio_glow, smooth=True, mat=M(c + Vector((dx, -0.02, dz)), (0, 0, rng.uniform(0, 90))))
+
+
+def bio_hook(P, root, ang, reach, z1, r0, rng, curl=1.0):
+    """Fern-hook stalk: rises and leans out, then curls over and down at the tip (bible fiddleheads)."""
+    pts, rad = [], []
+    ca, sa = math.cos(ang), math.sin(ang)
+    for k in range(8):
+        t = k / 7
+        d = reach * math.sin(t * math.pi * 0.5)
+        z = root[2] + z1 * math.sin(t * math.pi * 0.62)
+        if k >= 5:                                   # curl over: forward then back down and in
+            q = (k - 4) / 3
+            d += reach * 0.25 * q * curl
+            z -= z1 * 0.22 * q * q * curl
+        pts.append((root[0] + d * ca, root[1] + d * sa, z))
+        rad.append(r0 * (1 - 0.6 * t) + 0.008)
+    P.add(tube(pts, rad, 4, tip=True), STALK_F, smooth=True)
+
+
+def bio_pod(P, root, top, r, rng):
+    """Small round biomass pod on its own curved stalk (bible side globes)."""
+    mid = ((root[0] + top[0]) / 2 * 1.1, (root[1] + top[1]) / 2, (root[2] + top[2]) / 2)
+    P.add(tube([root, mid, (top[0], top[1], top[2] - r * 0.6)], [0.045, 0.034, 0.026], 5),
+          STALK_F, smooth=True)
+    P.add(uvs(r, 7, 5), bio_glow, smooth=True, mat=M(top, (0, 0, rng.uniform(0, 90)), (1, 1, 0.9)))
+
+
+def biomass_plant(name, H, spec, seed):
+    """spec: base (rx, ry), crown (cx, cz, rx, ry, rz, blob_r, n), trunk (n stalks, radius), hooks [(angle deg, reach,
+    rise)], pods [(x, y, z, r)]. Proportions measured from the bible p14 crop (crown 0.6 x H wide on the large one)."""
     P = Prop(name, LARGE, "interactable", {"height": H}, seed)
     rng = P.rng
-    base_r = 0.2 + 0.06 * nstalk / 3
-    dirt_base(P, base_r, seed, h=0.04)
-    for i in range(nstalk):                                       # thick curling stalks
-        a = 2 * math.pi * (i + rng.uniform(-0.15, 0.15)) / nstalk + 0.3
-        reach = rng.uniform(0.3, 0.45)
-        hs = rng.uniform(0.45, 0.7)
-        pts, rad = [], []
-        for k in range(7):
-            t = k / 6
-            d = reach * math.sin(t * math.pi * 0.55) * 0.8
-            z = hs * t ** 0.8
-            if k >= 5:
-                d += 0.09 * (k - 4)
-                z -= 0.08 * (k - 4) ** 1.6
-            pts.append((d * math.cos(a), d * math.sin(a), z + 0.02))
-            rad.append(0.085 * (1 - 0.7 * t) + 0.012)
-        P.add(tube(pts, rad, 5, tip=True), by_nz(STALK_L, STALK, STALK, 0.3, -2), smooth=True)
-    for (x, z, radii) in heads:
-        P.add(tube([(0, 0, 0.02), (x * 0.4, 0.0, z * 0.5), (x, 0.0, z - 0.05)], [0.1, 0.075, 0.06], 5),
-              by_nz(STALK_L, STALK, STALK, 0.3, -2), smooth=True)
-        for j, r in enumerate(radii):
-            if j == 0:
-                c = Vector((x, 0, z))
-            else:
-                a = 2 * math.pi * j / (len(radii) - 1) + rng.uniform(-0.3, 0.3)
-                rr = radii[0] * 0.95
-                c = Vector((x + rr * math.cos(a), rr * 0.6 * math.sin(a), z - radii[0] * 0.2 + rng.uniform(-0.03, 0.05)))
-            P.add(uvs(r, 8, 6), bio_glow, smooth=True, mat=M(c, (0, 0, rng.uniform(0, 90))))
-    for i in range(nmush):                                        # small biomass puffs at the base
-        a = 2 * math.pi * i / max(1, nmush) + 1.4
-        d = base_r * 0.95
-        h = rng.uniform(0.08, 0.16)
-        c = (d * math.cos(a), d * math.sin(a) - 0.05, 0.0)
-        P.add(cyl(0.022, h, 4, bevel=0), STALK, mat=M(c))
-        P.add(uvs(rng.uniform(0.06, 0.085), 6, 4), bio_glow, smooth=True, mat=M((c[0], c[1], h)))
-    rock(P, 0.08, (base_r * 0.6, -base_r * 0.7, 0.02), seed + 1)
-    rock(P, 0.05, (-base_r * 0.8, -base_r * 0.5, 0.02), seed + 2, sub=1)
-    tuft(P, (-base_r * 0.2, -base_r * 0.95, 0.02), seed=seed)
+    bx, by = spec["base"]
+    bm = jitter(cyl(1.0, 0.05, 12, r2=0.86, bevel=0.0), 0.04, 3.0, seed, zscale=0.2)
+    P.add(bm, by_nz(DIRT, DIRT_D, DIRT_D, 0.6, -2), mat=M(scale=(bx, by, 1.0)))
+    cx, cz, crx, cry, crz, br, nb = spec["crown"]
+    ns, sr = spec["trunk"]
+    for i in range(ns):                                   # thick trunk stalks, flaring into the crown
+        a = 2 * math.pi * (i + 0.5) / ns + rng.uniform(-0.2, 0.2)
+        r0, r1 = bx * 0.32, crx * 0.45
+        top = cz - crz * 0.55
+        pts = []
+        for k in range(6):
+            t = k / 5
+            rr = r0 + (r1 - r0) * t ** 2.2 - 0.04 * math.sin(t * math.pi)
+            pts.append((cx * t ** 1.5 + rr * math.cos(a), rr * math.sin(a) * 0.8, 0.02 + top * t))
+        rad = [sr * (1.15 - 0.45 * k / 5) for k in range(6)]
+        P.add(tube(pts, rad, 5), STALK_F, smooth=True)
+    for (adeg, reach, rise) in spec["hooks"]:
+        a = math.radians(adeg)
+        bio_hook(P, (bx * 0.25 * math.cos(a), bx * 0.2 * math.sin(a), 0.02), a, reach, rise, sr * 0.75, rng)
+    bio_crown(P, (cx, 0.0, cz), crx, cry, crz, br, nb, rng, extra=spec.get("lobes", ()))
+    for (x, y, z, r) in spec["pods"]:
+        bio_pod(P, (x * 0.35, y * 0.3, 0.02), (x, y, z), r, rng)
+    rock(P, bx * 0.2, (bx * 0.35, -by * 0.75, 0.02), seed + 1, sub=1)
+    rock(P, bx * 0.12, (-bx * 0.55, -by * 0.6, 0.02), seed + 2, sub=1)
+    for j in range(4):
+        a = 1.6 * j + 0.7
+        tuft(P, (bx * 0.8 * math.cos(a), by * 0.85 * math.sin(a), 0.03), h=0.1, seed=j + seed, col="#47963A")
     return P.finish(fit_height=H)
+
+
+BIO_SPECS = {   # measured off the bible crop: 1 col = 0.024 m (see props-v2/REPORT.md)
+    "s": dict(base=(0.24, 0.17), crown=(0.03, 0.40, 0.15, 0.12, 0.11, 0.075, 7), trunk=(3, 0.04),
+              hooks=[(200, 0.1, 0.15), (330, 0.11, 0.14)], pods=[(0.16, -0.04, 0.3, 0.07), (-0.13, -0.06, 0.2, 0.06)]),
+    "m": dict(base=(0.31, 0.21), crown=(0.16, 0.63, 0.25, 0.2, 0.16, 0.12, 8), trunk=(4, 0.055),
+              hooks=[(190, 0.13, 0.26), (330, 0.18, 0.26), (10, 0.3, 0.45)],
+              pods=[(-0.15, 0.0, 0.48, 0.085), (0.3, -0.06, 0.3, 0.075), (-0.08, -0.1, 0.15, 0.065)]),
+    "l": dict(base=(0.40, 0.27), crown=(0.08, 0.89, 0.40, 0.3, 0.29, 0.17, 8), trunk=(4, 0.075),
+              lobes=[(-0.29, -0.14, 0.12), (0.3, -0.3, 0.11), (-0.2, -0.32, 0.1)],
+              hooks=[(185, 0.13, 0.3), (340, 0.2, 0.36), (15, 0.2, 0.42), (160, 0.18, 0.32)],
+              pods=[(0.17, -0.06, 0.42, 0.11), (-0.22, -0.1, 0.16, 0.08), (0.27, -0.05, 0.14, 0.06)]),
+}
 
 
 def biomass_sprout():
@@ -538,9 +601,9 @@ def crystal_lamp():
 # ---------------------------------------------------------------- registry
 REGISTRY = [
     # name, builder, bible ref
-    ("prop_biomass_plant_s", lambda: biomass_plant("prop_biomass_plant_s", 0.5, 3, [(0, 0.6, [0.26, 0.19, 0.19, 0.18])], 2, 31), "p14 biomass plants (small); p03"),
-    ("prop_biomass_plant_m", lambda: biomass_plant("prop_biomass_plant_m", 0.8, 3, [(0, 0.82, [0.3, 0.21, 0.21, 0.2, 0.19]), (0.42, 0.56, [0.18, 0.13])], 2, 32), "p14 biomass plants (medium)"),
-    ("prop_biomass_plant_l", lambda: biomass_plant("prop_biomass_plant_l", 1.2, 4, [(0, 0.9, [0.34, 0.24, 0.24, 0.22, 0.22, 0.2]), (0.46, 0.68, [0.22, 0.15]), (-0.46, 0.62, [0.2, 0.14])], 3, 33), "p14 biomass plants (large); p03"),
+    ("prop_biomass_plant_s", lambda: biomass_plant("prop_biomass_plant_s", 0.5, BIO_SPECS["s"], 31), "p14 biomass plants (small); p03"),
+    ("prop_biomass_plant_m", lambda: biomass_plant("prop_biomass_plant_m", 0.8, BIO_SPECS["m"], 32), "p14 biomass plants (medium)"),
+    ("prop_biomass_plant_l", lambda: biomass_plant("prop_biomass_plant_l", 1.2, BIO_SPECS["l"], 33), "p14 biomass plants (large); p03"),
     ("prop_biomass_sprout", biomass_sprout, "p03 small biomass sprouts"),
     ("prop_orb_biomass", orb_biomass, "p14 loose orb; p03 biomass orb"),
     ("prop_orb_stone", orb_stone, "p03 stone orb"),

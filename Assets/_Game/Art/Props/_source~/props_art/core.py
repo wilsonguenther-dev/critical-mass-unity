@@ -33,11 +33,14 @@ CORRUPT, CORRUPT_D, CORRUPT_GLOW, CORRUPT_TIP = "#652968", "#450E46", "#D23F8E",
 LAVA_ROCK, LAVA_GLOW = "#5E4A48", "#FF8A3D"
 FLAME, FLAME_CORE = "#FFC27A", "#F7F0E5"
 TEAM_GLOW, TEAM_DARK, TEAM_CLOTH = "#4FE3F0", "#1D6A8C", "#127EC0"       # azure values
-TEAM_SWAP = {0.5: "#9B4132", 0.75: "#FF7461", 1.0: "#FC725A"}            # crimson values per mask code
+TEAM_SWAP = {0.5: "#9B4132", 0.625: "#FF7461", 0.75: "#FF7461", 1.0: "#FC725A"}            # crimson values per mask code
 NEUTRAL_HI, NEUTRAL_LO = "#D9DAC9", "#9A9CA6"
 
 MASK_FIXED, MASK_GLOW, MASK_TEAM_DARK, MASK_TEAM_GLOW, MASK_TEAM_CLOTH = 0.0, 0.25, 0.5, 0.75, 1.0
-GLOW_CODES = (MASK_GLOW, MASK_TEAM_GLOW)
+# v2: glows the bible draws with an ink line (orbs, biomass, crystals) keep the hull: self-lit but outlined
+MASK_GLOW_LINED, MASK_TEAM_GLOW_LINED = 0.125, 0.625
+GLOW_CODES = (MASK_GLOW, MASK_TEAM_GLOW)                       # unlined glows (hull collapsed)
+SELF_LIT = (MASK_GLOW_LINED, MASK_GLOW, MASK_TEAM_GLOW_LINED, MASK_TEAM_GLOW)   # emitted unshaded, no gradient
 
 # three-band ramp (ART-DIRECTION 2.2)
 BAND_MID, BAND_SHADOW, SHADOW_NAVY_MIX = 0.84, 0.66, 0.12
@@ -262,7 +265,7 @@ class Prop:
         for f in bm.faces:
             for loop in f.loops:
                 r, g, b, m = loop[self.c]
-                k = 1.0 if m in GLOW_CODES else 0.90 + 0.16 * (loop.vert.co.z - z0) / span
+                k = 1.0 if m in SELF_LIT else 0.90 + 0.16 * (loop.vert.co.z - z0) / span
                 loop[self.c] = (to_lin(min(1.0, r * k)), to_lin(min(1.0, g * k)), to_lin(min(1.0, b * k)), m)
         me = bpy.data.meshes.new(self.name)
         bm.normal_update()
@@ -342,7 +345,7 @@ def make_toon(name="CM_Toon", crimson=False, ldir=(0.0, -0.643, 0.766), flat=Fal
     def is_code(code):
         c = node("ShaderNodeMath", operation="COMPARE")
         c.inputs[1].default_value = code
-        c.inputs[2].default_value = 0.1
+        c.inputs[2].default_value = 0.05
         L.new(alpha, c.inputs[0])
         return c.outputs[0]
 
@@ -350,7 +353,8 @@ def make_toon(name="CM_Toon", crimson=False, ldir=(0.0, -0.643, 0.766), flat=Fal
     if crimson:
         for code, h in TEAM_SWAP.items():
             base = mix(is_code(code), base, _rgba(h))
-    glow = math_("MAXIMUM", is_code(MASK_GLOW), is_code(MASK_TEAM_GLOW))
+    glow = math_("MAXIMUM", math_("MAXIMUM", is_code(MASK_GLOW), is_code(MASK_TEAM_GLOW)),
+                 math_("MAXIMUM", is_code(MASK_GLOW_LINED), is_code(MASK_TEAM_GLOW_LINED)))
 
     geo = node("ShaderNodeNewGeometry")
     dot = node("ShaderNodeVectorMath", operation="DOT_PRODUCT")
