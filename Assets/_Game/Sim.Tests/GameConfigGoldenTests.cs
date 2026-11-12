@@ -5,10 +5,14 @@ using System.Globalization;
 using System.IO;
 using System.Reflection;
 using System.Text;
-using System.Text.RegularExpressions;
 using CriticalMass.Sim.Config;
 using CriticalMass.Sim.Core;
 using NUnit.Framework;
+// Aliased, not namespace-imported: CriticalMass.Sim.Core.Match (F-05i) would make a bare Match ambiguous (CS0104).
+using MatchCollection = System.Text.RegularExpressions.MatchCollection;
+using Regex = System.Text.RegularExpressions.Regex;
+using RegexOptions = System.Text.RegularExpressions.RegexOptions;
+using RxMatch = System.Text.RegularExpressions.Match;
 
 namespace CriticalMass.Sim.Tests
 {
@@ -59,7 +63,7 @@ namespace CriticalMass.Sim.Tests
             Assert.GreaterOrEqual(at, 0, "golden file has no \"leaves\" object");
             string after = text.Substring(at + "\"leaves\":".Length);
             var leaves = new List<KeyValuePair<string, object>>();
-            foreach (Match m in LeafRx.Matches(after))
+            foreach (RxMatch m in LeafRx.Matches(after))
             {
                 leaves.Add(new KeyValuePair<string, object>(m.Groups[1].Value, ParseValue(m.Groups[2].Value)));
             }
@@ -114,7 +118,7 @@ namespace CriticalMass.Sim.Tests
                 why = "empty path";
                 return false;
             }
-            foreach (Match seg in segs)
+            foreach (RxMatch seg in segs)
             {
                 if (cur == null)
                 {
@@ -276,15 +280,15 @@ namespace CriticalMass.Sim.Tests
             Assert.GreaterOrEqual(at, 0, "golden file has no \"leaves\" object");
             string head = text.Substring(0, at);
 
-            Match commit = Regex.Match(head, @"""commit"":\s*""([^""]*)""");
+            RxMatch commit = Regex.Match(head, @"""commit"":\s*""([^""]*)""");
             Assert.IsTrue(commit.Success, "no \"commit\" member");
             Assert.AreEqual("09e0904", commit.Groups[1].Value);
 
-            Match source = Regex.Match(head, @"""source"":\s*""([^""]*)""");
+            RxMatch source = Regex.Match(head, @"""source"":\s*""([^""]*)""");
             Assert.IsTrue(source.Success, "no \"source\" member");
             Assert.AreEqual("src/config/game.config.ts", source.Groups[1].Value);
 
-            Match count = Regex.Match(head, @"""leafCount"":\s*([0-9]+)");
+            RxMatch count = Regex.Match(head, @"""leafCount"":\s*([0-9]+)");
             Assert.IsTrue(count.Success, "no \"leafCount\" member");
             Assert.AreEqual(171, int.Parse(count.Groups[1].Value, NumberStyles.None, CultureInfo.InvariantCulture));
 
