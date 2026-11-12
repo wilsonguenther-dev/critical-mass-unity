@@ -1,8 +1,8 @@
 {
  "objects": {
   "Miner_Body": {
-   "triangles": 10424,
-   "vertices": 5544,
+   "triangles": 9916,
+   "vertices": 5286,
    "rest_bounds": {
     "min": [
      -1.11,
@@ -11,7 +11,7 @@
     ],
     "max": [
      1.11,
-     0.776,
+     0.778,
      2.0
     ]
    },
@@ -119,12 +119,12 @@
    "rest_bounds": {
     "min": [
      -0.39,
-     -0.252,
+     -0.254,
      -0.01
     ],
     "max": [
      0.39,
-     0.252,
+     0.254,
      1.011
     ]
    },
@@ -168,16 +168,17 @@
  "face_decal": {
   "png": "MinerFace.png",
   "size": 256,
-  "faces": 84
+  "faces": 40
  },
  "bevels": {
   "boxes": 151,
-  "at_min_or_more": 99,
-  "groove_strips_exempt": 51,
+  "at_min_or_more": 132,
+  "groove_strips_exempt": 18,
   "hidden_cores_unbevelled": 1,
-  "min_bevel": 0.02
+  "min_bevel": 0.02,
+  "thickened_to_carry_bevel": 33
  },
- "triangles_character": 12416,
+ "triangles_character": 11908,
  "triangles_barricade_per_state": {
   "folded": 1376,
   "deployed": 1424,

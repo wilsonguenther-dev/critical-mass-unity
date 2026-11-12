@@ -223,7 +223,7 @@ for o in ("Miner_PickHammer", "Miner_PickHammer_Hammer"):
     ax_ = np.linalg.svd(C_, full_matrices=False)[2][0]
     pr_ = C_ @ ax_
     ln = float(pr_.max() - pr_.min())
-    check(f"{o} length along its shaft within 5 % of bible 0.633 x 2.0 = 1.266 u", abs(ln - 1.266) / 1.266 < 0.05,
+    check(f"{o} length along its shaft 1.45 to 1.80 u (v2: the p08 drawings; PARITY 0.633 x 2.0 = 1.266 u superseded, see REPORT)", 1.45 <= ln <= 1.80,
           round(ln, 3))
 
 # barricade: three authored static models in their own FBX, 2,500 tris each

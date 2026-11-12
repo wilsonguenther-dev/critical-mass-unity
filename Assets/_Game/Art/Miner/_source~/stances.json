@@ -31,11 +31,11 @@
    "pick_roll": 20.0,
    "leg_spread": 0,
    "lean": 4.0,
-   "head_yaw": 6.0,
+   "head_yaw": 8.0,
    "head_tilt": 6.797,
    "twist": -4.312
   },
-  "fit_iou_150px": 0.842
+  "fit_iou_150px": 0.843
  },
  "three-quarter": {
   "stance": {
@@ -73,7 +73,7 @@
    "twist": -1.5,
    "lean": 1.0
   },
-  "fit_iou_150px": 0.873
+  "fit_iou_150px": 0.875
  },
  "back": {
   "stance": {
@@ -107,11 +107,11 @@
    "pick_roll": -15.0,
    "leg_spread": 4.0,
    "twist": -25,
-   "head_yaw": 18.0,
+   "head_yaw": 22.0,
    "head_tilt": 5.312,
    "lean": -2.0
   },
-  "fit_iou_150px": 0.871
+  "fit_iou_150px": 0.872
  },
  "profile": {
   "stance": {
@@ -125,7 +125,7 @@
    "lowerarm.r": [
     -0.8588,
     0.1026,
-    0.4393
+    0.3793
    ],
    "upperarm.l": [
     1.0092,
@@ -146,9 +146,9 @@
    "leg_spread": 0.056,
    "lean": 11.91,
    "head_yaw": -21.846,
-   "head_tilt": 2.423,
+   "head_tilt": -2.577,
    "twist": 5.866
   },
-  "fit_iou_150px": 0.828
+  "fit_iou_150px": 0.829
  }
 }

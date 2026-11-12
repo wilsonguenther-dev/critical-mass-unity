@@ -86,6 +86,10 @@ def box(size, bevel=BV, seg=1):
     if bevel <= 0:
         BEVELS["hidden_cores_unbevelled" if thin > 0.04 else "groove_strips_exempt"] += 1
         return B.box(size, 0.0, seg)
+    if 0.025 <= thin < 2 * BV_MIN:      # boards, braces, plates: thicken to 0.04 so they carry the full bevel
+        size = tuple(2 * BV_MIN if d == thin else d for d in size)
+        BEVELS["thickened_to_carry_bevel"] = BEVELS.get("thickened_to_carry_bevel", 0) + 1
+        thin = 2 * BV_MIN
     if thin < 2 * BV_MIN:
         BEVELS["groove_strips_exempt"] += 1
         return B.box(size, min(bevel, thin * 0.45), seg)
@@ -210,12 +214,12 @@ def build_arms():
 def build_neck():
     add(BODY, B.cyl((0, 0, 1.17), (0, 0, 1.32), 0.11, 0.105, 12), "skin", ["chest", "head"], "skin")
     # blue neckerchief (team cloth): thick roll, front knot, hanging point
-    add(BODY, B.torus(0.255, 0.11, 18, 7), "kerchief", "chest", "team_cloth",
+    add(BODY, B.torus(0.255, 0.11, 14, 7), "kerchief", "chest", "team_cloth",
         m=M((0, -0.015, 1.245), (8, 0, 0), (1.06, 0.95, 0.8)))
     add(BODY, B.sphere((0.10, 0.07, 0.07), 10, 6), "kerchief", "chest", "team_cloth", m=M((0.14, -0.25, 1.15)))
 
 
-def face_plane(rows=6, cols=12):
+def face_plane(rows=4, cols=8):
     """UV-less grid hugging the front of the head sphere (head space, before HEAD_WIDEN), 8 mm proud of it, covering the
     face_decal extent. UVs and the decal material are assigned after finalize (assign_face_decal)."""
     import bmesh
@@ -249,7 +253,7 @@ def build_head():
     global _post
     _post = HEAD_POST @ HEAD_WIDEN
     H = "head"
-    add(BODY, B.sphere((0.28, 0.26, 0.27), 18, 12), "skin", H, "skin", m=M((0, -0.01, 1.44)))
+    add(BODY, B.sphere((0.28, 0.26, 0.27), 16, 11), "skin", H, "skin", m=M((0, -0.01, 1.44)))
     for s in (1, -1):
         add(BODY, B.sphere((0.035, 0.05, 0.065), 8, 6), "skin_shadow", H, "skin", m=M((0.262 * s, 0.03, 1.45)))
         # v2: brow ridge in skin (form under the painted heavy brow) instead of v1's dark boxes
@@ -319,14 +323,14 @@ def build_helmet():
     H = "head"
     # v2 dome: taller than v1 but tapering to a narrower crown (bible front: 0.44 u across at z 1.8)
     prof = [(0.29, 1.545), (0.325, 1.58), (0.318, 1.64), (0.29, 1.70), (0.235, 1.755), (0.15, 1.795), (0.03, 1.812)]
-    add(BODY, B.lathe(prof, 20), "helmet", H, "helmet", m=M((0, 0.005, 0)))
+    add(BODY, B.lathe(prof, 16), "helmet", H, "helmet", m=M((0, 0.005, 0)))
     # brim (rounded, a step lighter), groove line, brass trim band + rivets
-    add(BODY, B.torus(0.322, 0.05, 20, 5), "stone_light", H, "helmet", m=M((0, -0.012, 1.55), (0, 0, 0),
+    add(BODY, B.torus(0.322, 0.05, 16, 5), "stone_light", H, "helmet", m=M((0, -0.012, 1.55), (0, 0, 0),
                                                                             (1.0, 1.07, 0.62)))
-    add(BODY, B.torus(0.32, 0.010, 20, 3), "helmet_seam", H, "helmet_detail", m=M((0, 0.004, 1.562)))
-    add(BODY, B.torus(0.325, 0.026, 20, 4), "brass", H, "helmet", m=M((0, 0.004, hz(1.59))))
-    for k in range(8):
-        a = 2 * math.pi * (k + 0.5) / 8
+    add(BODY, B.torus(0.32, 0.010, 16, 3), "helmet_seam", H, "helmet_detail", m=M((0, 0.004, 1.562)))
+    add(BODY, B.torus(0.325, 0.026, 16, 4), "brass", H, "helmet", m=M((0, 0.004, hz(1.59))))
+    for k in range(6):
+        a = 2 * math.pi * (k + 0.5) / 6
         add(BODY, B.sphere((0.016, 0.016, 0.016), 5, 3), "brass_dark", H, "helmet_detail",
             m=M((0.347 * math.cos(a), 0.004 + 0.347 * math.sin(a), hz(1.59))))
     # plate grooves (segmented stone hard hat): 4 meridians as thin strips riding the dome

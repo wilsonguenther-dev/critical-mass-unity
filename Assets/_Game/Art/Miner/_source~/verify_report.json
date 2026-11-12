@@ -81,18 +81,19 @@
    "check": "Miner_Body material slots",
    "ok": true,
    "detail": [
-    "CM_Toon"
+    "CM_Toon",
+    "CM_FaceDecal"
    ]
   },
   {
    "check": "Miner_Body loose/non-manifold",
    "ok": true,
    "detail": {
-    "triangles": 10300,
+    "triangles": 9916,
     "loose_verts": 0,
     "loose_edges": 0,
     "non_manifold_edges": 0,
-    "closed_shells": 180
+    "closed_shells": 175
    }
   },
   {
@@ -146,11 +147,11 @@
    "check": "Miner_PickHammer loose/non-manifold",
    "ok": true,
    "detail": {
-    "triangles": 696,
+    "triangles": 1032,
     "loose_verts": 0,
     "loose_edges": 0,
     "non_manifold_edges": 0,
-    "closed_shells": 20
+    "closed_shells": 26
    }
   },
   {
@@ -204,11 +205,11 @@
    "check": "Miner_PickHammer_Hammer loose/non-manifold",
    "ok": true,
    "detail": {
-    "triangles": 700,
+    "triangles": 960,
     "loose_verts": 0,
     "loose_edges": 0,
     "non_manifold_edges": 0,
-    "closed_shells": 19
+    "closed_shells": 24
    }
   },
   {
@@ -254,13 +255,13 @@
   {
    "check": "triangle budget <= 12000",
    "ok": true,
-   "detail": 11696
+   "detail": 11908
   },
   {
    "check": "body height in metres after round trip (Blender Z = Unity Y)",
    "ok": true,
    "detail": {
-    "min_z": -0.001,
+    "min_z": -0.0,
     "max_z": 2.0,
     "mesh_object_rot": [
      1.5708,
@@ -349,14 +350,14 @@
    "detail": "Miner_PickHammer (pick) + Miner_PickHammer_Hammer (hammer)"
   },
   {
-   "check": "Miner_PickHammer length along its shaft within 5 % of bible 0.633 x 2.0 = 1.266 u",
+   "check": "Miner_PickHammer length along its shaft 1.45 to 1.80 u (v2: the p08 drawings; PARITY 0.633 x 2.0 = 1.266 u superseded, see REPORT)",
    "ok": true,
-   "detail": 1.262
+   "detail": 1.559
   },
   {
-   "check": "Miner_PickHammer_Hammer length along its shaft within 5 % of bible 0.633 x 2.0 = 1.266 u",
+   "check": "Miner_PickHammer_Hammer length along its shaft 1.45 to 1.80 u (v2: the p08 drawings; PARITY 0.633 x 2.0 = 1.266 u superseded, see REPORT)",
    "ok": true,
-   "detail": 1.275
+   "detail": 1.735
   },
   {
    "check": "barricade FBX: three authored state meshes, no armature",
@@ -371,11 +372,11 @@
    "check": "Miner_Barricade_Damaged: tris <= 2500, closed shells",
    "ok": true,
    "detail": {
-    "tris": 1916,
+    "tris": 1580,
     "loose_v": 0,
     "loose_e": 0,
     "nonmanifold_e": 0,
-    "shells": 36
+    "shells": 34
    }
   },
   {
@@ -444,8 +445,8 @@
    "ok": true,
    "detail": {
     "miner_w_d": [
-     1.438,
-     1.362
+     1.488,
+     1.279
     ],
     "warrior_w_d": [
      1.367,
