@@ -292,7 +292,9 @@ namespace CriticalMass.Runtime.View
             {
                 count++;
                 string glow = ArtMapping.KaijuGlow(k.State);
-                m.Transform.localPosition = SimSpace.ToWorld(x, h, z);
+                // The egg rests on the shrine's raised centre cell (a 1.5 u wall block in the grid view), not inside it.
+                double baseY = m == _egg ? h + RaisedTop(map, x, z) : h;
+                m.Transform.localPosition = SimSpace.ToWorld(x, baseY, z);
                 m.Transform.localRotation = facing;
                 m.SetMaterial(ArtMaterials.ForGlow(m.Spec, glow));
                 double speed = Math.Sqrt((k.X - k.PrevX) * (k.X - k.PrevX) + (k.Z - k.PrevZ) * (k.Z - k.PrevZ)) * cfg.SimHz;
@@ -409,6 +411,15 @@ namespace CriticalMass.Runtime.View
         private static void SetActive(ModelView m, bool on)
         {
             if (m != null) m.SetActive(on);
+        }
+
+        /// <summary>Height of the grid view's block above the ground at a sim point (GridChunkMeshView.CellBox: walls and intact breakables 1.5 u).</summary>
+        private static double RaisedTop(MapDef map, double x, double z)
+        {
+            int cx = (int)Math.Floor(x), cz = (int)Math.Floor(z);
+            if (map.Cells == null || cx < 0 || cz < 0 || cx >= map.Width || cz >= map.Height) return 0;
+            byte c = map.Cells[cz * map.Width + cx];
+            return c == Cell.Wall || c == Cell.BreakableIntact ? 1.5 : 0;
         }
 
         private static float Smooth(double e0, double e1, double v)
