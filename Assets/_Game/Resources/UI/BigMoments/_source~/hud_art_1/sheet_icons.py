@@ -28,7 +28,7 @@ label("Attack + ability buttons @1x. BEFORE:"); row(aa, OLD, 1, gap=6)
 label("AFTER:"); row(aa, NEW, 1, gap=6)
 kj = ["kaiju-egg", "kaiju-egg-cracking", "kaiju-hatchling", "kaiju-adult-neutral", "kaiju-adult-azure", "kaiju-adult-crimson", "kaiju-adult-berserk"]
 label("Egg and Kaiju state badges @1x (rage panel). BEFORE / AFTER:"); yy = y; row(kj, OLD, 1); y = yy; row(kj, NEW, 1, x0=760)
-label("Resources @2x (coin, wood, water, food; BEFORE they were flat vector shapes) and @2x close-ups of the new set:")
-row(["res-coin", "res-wood", "res-water", "res-food", "portrait-warrior-azure", "portrait-healer-crimson", "ability-farmer-azure", "attack-miner-crimson",
-     "kaiju-egg-cracking", "kaiju-adult-berserk"], NEW, 2, gap=14)
+label("Resources + power-up items @2x (coin, wood, water, food, haste, might, ward; BEFORE flat vector shapes) and @2x close-ups:")
+row(["res-coin", "res-wood", "res-water", "res-food", "item-haste", "item-might", "item-ward", "portrait-warrior-azure", "portrait-healer-crimson", "ability-farmer-azure", "attack-miner-crimson",
+     "kaiju-adult-berserk"], NEW, 2, gap=14)
 sheet = sheet.crop((0, 0, W, y + 4)); sheet.save(OUT, quality=80, optimize=True); print(OUT, sheet.size, os.path.getsize(OUT))
