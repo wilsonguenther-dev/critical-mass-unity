@@ -25,6 +25,27 @@ namespace CriticalMass.Sim.Core
             int teamIdx = team == TeamId.Azure ? 0 : 1;
             if (kind == CarryKind.Biomass)
             {
+                if (bio == BiomassType.Wood || bio == BiomassType.Water)
+                {
+                    // U-064: wood feeds a little less than plant; water feeds least but cools the egg (never under 0, never after the lock).
+                    SourcesConfig S = w.Config.Depth.Sources;
+                    bool water = bio == BiomassType.Water;
+                    m.Allegiance[team] += units * (water ? S.WaterAllegiancePerUnit : S.WoodAllegiancePerUnit);
+                    m.Delivered[(int)team].Biomass += units;
+                    if (water)
+                    {
+                        m.Delivered[(int)team].Water += units;
+                        if (!m.BerserkLocked) m.Instability = Math.Max(0, m.Instability - units * S.WaterCoolPerUnit);
+                    }
+                    else
+                    {
+                        m.Delivered[(int)team].Wood += units;
+                        m.Instability += units * feed.BiomassInstabilityPerUnit;
+                    }
+                    World.PushEvent(w, SimEventType.DeliverBiomass, actorId, teamIdx, sh.X, sh.Z, units, bio, DamageCause.None);
+                    if (m.Instability >= BerserkLine(w)) LockBerserk(w);
+                    return;
+                }
                 bool meat = bio == BiomassType.Meat;
                 m.Allegiance[team] += units * (meat ? feed.MeatAllegiancePerUnit : feed.BiomassAllegiancePerUnit);
                 m.Delivered[(int)team].Biomass += units;
@@ -255,7 +276,7 @@ namespace CriticalMass.Sim.Core
                         if (cargoOk)
                         {
                             if (a.Carry == CarryKind.Corruption) ApplyDelivery(w, a.Team, CarryKind.Corruption, a.CarryAmount, id);
-                            else ApplyDelivery(w, a.Team, CarryKind.Biomass, a.CarryAmount, id, BiomassType.Plant);
+                            else ApplyDelivery(w, a.Team, CarryKind.Biomass, a.CarryAmount, id, Roles.BioOf(a.Carry));
                         }
                         if (cargoOk || a.CarryAmount <= 0)
                         {

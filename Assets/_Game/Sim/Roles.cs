@@ -6,7 +6,7 @@ namespace CriticalMass.Sim.Core
     /// U-063 class roles (our rule; not in the browser). The owner after playing: "the warriors are feeding the eggs, it's
     /// not even proper". With the rule on:
     /// <para>FEED. Only a class with Roles.MayFeed (the Farmer) hands biomass of any type to the egg. Any class may gather and
-    /// carry biomass; a carrier that may not feed holds interact beside an allied feeder to HAND IT OFF (Handoff event), or
+    /// carry biomass; a carrier that may not feed presses interact beside an allied feeder to HAND IT OFF (Handoff event), or
     /// banks it at its base (U-064). At the shrine it gets one DeliverRefused event (per RefuseLockTicks) and keeps its load.</para>
     /// <para>CORRUPT. Only a class with Roles.MayCorrupt (Warrior, Miner, Demolitions: the raiders) gathers, carries and
     /// delivers corruption. The Farmer, Builder and Healer cannot take it from a node.</para>
@@ -102,7 +102,7 @@ namespace CriticalMass.Sim.Core
         }
 
         /// <summary>
-        /// Hand-offs, once per step after ResourcesSystem: every living, standing actor that holds interact, may NOT feed and
+        /// Hand-offs, once per step after ResourcesSystem: every living, standing actor that PRESSES interact (rising edge), may NOT feed and
         /// carries biomass (class cargo that is not corruption, or meat) gives as much as fits to HandoffTarget. One Handoff
         /// event per type moved: A = giver, B = receiver, (X, Z) = the receiver, Value = units, Bio = the type.
         /// </summary>
@@ -115,7 +115,7 @@ namespace CriticalMass.Sim.Core
             for (int id = 0; id < n; id++)
             {
                 Actor a = w.Actors[id];
-                if (!a.Alive || a.StandUp > 0 || !w.Inputs[id].Interact || MayFeed(w, a.Cls)) continue;
+                if (!a.Alive || a.StandUp > 0 || !w.Inputs[id].Interact || w.Depth.PrevInteract[id] != 0 || MayFeed(w, a.Cls)) continue;
                 int j = HandoffTarget(w, id);
                 if (j < 0) continue;
                 Actor r = w.Actors[j];
@@ -154,9 +154,11 @@ namespace CriticalMass.Sim.Core
             w.Depth.HandoffUnits += units;
         }
 
-        /// <summary>The biomass type a cargo kind is counted as (Biomass cargo is plant).</summary>
+        /// <summary>The biomass type a cargo kind is counted as (Biomass cargo is plant; U-064 wood and water are their own).</summary>
         public static BiomassType BioOf(CarryKind kind)
         {
+            if (kind == CarryKind.Wood) return BiomassType.Wood;
+            if (kind == CarryKind.Water) return BiomassType.Water;
             return BiomassType.Plant;
         }
     }
@@ -176,7 +178,7 @@ namespace CriticalMass.Sim.Core
             "ENGINEER. Ladders, bridges, repairs and class upgrades at the base.",
             "MEDIC. Heals allies and purifies the egg, no weapon.",
         };
-        public const string RefusedNotFeeder = "Only Farmers feed the egg. Hold interact beside a Farmer to hand it over, or bank it at your base.";
+        public const string RefusedNotFeeder = "Only Farmers feed the egg. Press interact beside a Farmer to hand it over, or bank it at your base.";
         public const string RefusedNotRaider = "This class will not touch corruption.";
         public const string Escort = "ESCORT";
     }

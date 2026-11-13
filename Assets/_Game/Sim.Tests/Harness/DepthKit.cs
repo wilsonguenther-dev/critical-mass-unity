@@ -32,6 +32,7 @@ namespace CriticalMass.Sim.Tests.Harness
             {
                 w.Actors[j].Alive = false;
                 w.Actors[j].RespawnIn = 1e9;
+                w.MeatDropped[j] = 1; // no meat orbs from the bodies the kit removed
             }
             Put(w, 0, x, z);
             w.Tick = 100;

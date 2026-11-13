@@ -14,11 +14,66 @@ namespace CriticalMass.Sim.Config
         public bool Classic = false;
         /// <summary>U-063: who may feed, corrupt and hand off; the six-class bot lineup.</summary>
         public RolesConfig Roles = new RolesConfig();
+        /// <summary>U-064: wood and water on the map, the team stock at the base, supply bots.</summary>
+        public SourcesConfig Sources = new SourcesConfig();
 
         public DepthConfig Clone()
         {
             var c = (DepthConfig)MemberwiseClone();
             c.Roles = Roles.Clone();
+            c.Sources = Sources.Clone();
+            return c;
+        }
+    }
+
+    /// <summary>
+    /// U-064 biomass sources (DG-42; our rule from Travis's list "Meat / Wood / Water / Corruption"). Timing in sim ticks.
+    /// Per-class arrays are indexed by (int)ClassId: Warrior, Farmer, Miner, Demolitions, Builder, Healer.
+    /// </summary>
+    public sealed class SourcesConfig
+    {
+        public bool Enabled = true;
+        /// <summary>Wood groves: (x, z) anchors on the west half, each mirrored to the east; placed on the nearest open floor.</summary>
+        public double[] WoodAnchors = { 8, 29, 27, 14, 27, 59 };
+        /// <summary>Water springs: west-half anchors, mirrored; an anchor on the centre line (x = 56) is a single spring.</summary>
+        public double[] WaterAnchors = { 43, 45, 50, 6, 56, 64 };
+        public double WoodCharges = 4;
+        public double WaterCharges = 3;
+        /// <summary>Ticks for one charge to grow back (wood 20 s, water 15 s).</summary>
+        public double WoodRegrowTicks = 600;
+        public double WaterRegrowTicks = 450;
+        /// <summary>Gather time = class GatherSeconds x this. Builders and Miners chop fastest.</summary>
+        public double[] WoodGatherScale = { 1, 1.5, 0.5, 0.75, 0.5, 1 };
+        /// <summary>Healers and Farmers draw water fastest.</summary>
+        public double[] WaterGatherScale = { 1, 1, 1, 1, 1, 0.67 };
+        /// <summary>Allegiance per unit fed to the egg (plant is 10, meat 6).</summary>
+        public double WoodAllegiancePerUnit = 7;
+        public double WaterAllegiancePerUnit = 4;
+        /// <summary>Instability one unit of water removes when fed to the egg (a corruption unit adds 9).</summary>
+        public double WaterCoolPerUnit = 3;
+        /// <summary>The base zone: a press of interact within this distance of the own pad centre banks the load.</summary>
+        public double BankRange = 4.5;
+        /// <summary>Placement: rings searched around an anchor, and keep-outs from other landmarks.</summary>
+        public double PlaceSearchRings = 8;
+        public double NodeKeepOut = 4;
+        public double ShrineKeepOut = 5.5;
+        public double HillKeepOut = 3;
+        public double PadKeepOut = 2;
+        /// <summary>Bots: floor(living bots x this) per team run supply before the hatch (16: 2, 5: 0).</summary>
+        public double SupplyFraction = 0.125;
+        /// <summary>Bots: which classes run supply, lowest first; 9 = never.</summary>
+        public double[] SupplyClassRank = { 9, 9, 1, 2, 0, 9 };
+        /// <summary>Bots: utility of the supply run (under a hill bot's fight at full health, over the hill's 0.7).</summary>
+        public double SupplyUtility = 0.8;
+
+        public SourcesConfig Clone()
+        {
+            var c = (SourcesConfig)MemberwiseClone();
+            c.WoodAnchors = (double[])WoodAnchors.Clone();
+            c.WaterAnchors = (double[])WaterAnchors.Clone();
+            c.WoodGatherScale = (double[])WoodGatherScale.Clone();
+            c.WaterGatherScale = (double[])WaterGatherScale.Clone();
+            c.SupplyClassRank = (double[])SupplyClassRank.Clone();
             return c;
         }
     }

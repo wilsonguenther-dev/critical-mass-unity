@@ -302,6 +302,7 @@ namespace CriticalMass.Sim.Bots
                 int mine = team == TeamId.Azure ? activeA : activeC;
                 int theirs = team == TeamId.Azure ? activeC : activeA;
                 AssignTeam(w, st, team, now, mine < theirs, mine > theirs);
+                BotDepth.AssignSupply(w, st, team); // U-064
             }
             byte[] f = mem.Cocky;
             MatchState m = w.Match;

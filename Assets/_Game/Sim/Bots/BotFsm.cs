@@ -616,7 +616,7 @@ namespace CriticalMass.Sim.Bots
             // Progress detector (CM-30): travelling but never leaving a ProgressRadius circle.
             double progDx = x - st.ProgressX[id];
             double progDz = z - st.ProgressZ[id];
-            bool travelling = cur == AiState.ToHill || cur == AiState.Deliver || cur == AiState.Retreat;
+            bool travelling = cur == AiState.ToHill || cur == AiState.Deliver || cur == AiState.Retreat || cur == AiState.Supply;
             if (!travelling || st.WantMove[id] == 0 || progDx * progDx + progDz * progDz >= ProgressDist2)
             {
                 st.ProgressX[id] = JsMath.F32(x);
@@ -711,6 +711,17 @@ namespace CriticalMass.Sim.Bots
                 if (escortOf >= 0) uEscort = w.Config.Depth.Roles.EscortUtility;
             }
 
+            // U-064 supply duty: fill up at the nearest grove or spring, then bank it at the base. A bot left holding wood or
+            // water (the duty moved on) still walks it home.
+            double uSupply = 0;
+            int supplySource = -1;
+            bool holdsSupply = a.CarryAmount > 0 && (a.Carry == CarryKind.Wood || a.Carry == CarryKind.Water);
+            if (Sources.On(w) && ((st.Supply[id] != 0 && egg && a.CarryAmount == 0) || holdsSupply))
+            {
+                if (st.Supply[id] != 0 && egg && a.CarryAmount < cc.CarryCapacity) supplySource = Sources.BestSource(w, id);
+                if (supplySource >= 0 || holdsSupply) uSupply = w.Config.Depth.Sources.SupplyUtility;
+            }
+
             // CM-36: the shrine cleanse is the player's tool. Only the human slot on autopilot (IsHuman) uses it, and only for the
             // team that leads delivered biomass, once BotNetUnits net corruption units sit in the egg. Pure bots never cleanse
             // (D-060 retune). Reads delivery counts and cleanse timers only, never instability.
@@ -752,6 +763,9 @@ namespace CriticalMass.Sim.Bots
                 case AiState.Escort:
                     curU = uEscort;
                     break;
+                case AiState.Supply:
+                    curU = uSupply;
+                    break;
                 case AiState.Retreat:
                     curU = uRetreat;
                     break;
@@ -770,6 +784,7 @@ namespace CriticalMass.Sim.Bots
             Consider(w, AiState.Corrupt, uCorrupt);
             Consider(w, AiState.Cleanse, uCleanse);
             Consider(w, AiState.Escort, uEscort);
+            Consider(w, AiState.Supply, uSupply);
             Consider(w, AiState.Retreat, uRetreat);
             AiState best = Sel.Best;
 
@@ -788,6 +803,7 @@ namespace CriticalMass.Sim.Bots
             // --- targets ---
             st.Target[id] = next == AiState.Fight ? fightTarget : -1;
             st.EscortOf[id] = next == AiState.Escort ? escortOf : -1;
+            st.SupplySource[id] = next == AiState.Supply ? supplySource : -1;
             if (next == AiState.Gather) st.TargetNode[id] = gatherNode;
             else if (next == AiState.Corrupt) st.TargetNode[id] = corruptNode;
             else st.TargetNode[id] = -1;

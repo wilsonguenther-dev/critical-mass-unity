@@ -48,6 +48,25 @@ namespace CriticalMass.Sim.Core
         public int Refusals;
         public int Handoffs;
         public int HandoffUnits;
+        /// <summary>Per actor: was interact held (alive, standing) at the end of last step? Depth rules act on the rising edge.</summary>
+        public byte[] PrevInteract;
+
+        /// <summary>U-064: the wood groves and water springs of this map (Sources.Place), fixed for the world.</summary>
+        public SourceNode[] Sources;
+        /// <summary>U-064: per actor, seconds gathered at its current source and that source (-1 none).</summary>
+        public double[] SourceProgress;
+        public int[] SourceOf;
+        /// <summary>U-064: per actor, HP at the end of its last sources pass (a drop = it was hit: gathering restarts).</summary>
+        public double[] PrevHp;
+        /// <summary>U-064: the team stocks, [team * Sources.StockKinds + slot] (wood, water, food).</summary>
+        public int[] Stock;
+        /// <summary>U-064 counters: units gathered (wood, water), banked, taken back out, spent from the stock.</summary>
+        public int[] Gathered;
+        public int Banked;
+        public int Withdrawn;
+        public int StockSpent;
+        /// <summary>U-064: the World.Tick of the last source route rebuild (one per tick).</summary>
+        public int FieldBuildTick;
 
         public static DepthState Create(GameConfig cfg, Grid.MapDef map)
         {
@@ -55,6 +74,13 @@ namespace CriticalMass.Sim.Core
             var s = new DepthState
             {
                 RefuseReadyTick = new int[cap],
+                PrevInteract = new byte[cap],
+                Sources = Core.Sources.Place(cfg, map),
+                SourceProgress = new double[cap],
+                SourceOf = new int[cap],
+                PrevHp = new double[cap],
+                Stock = new int[2 * Core.Sources.StockKinds],
+                Gathered = new int[2],
             };
             return s;
         }
@@ -66,6 +92,39 @@ namespace CriticalMass.Sim.Core
             Refusals = 0;
             Handoffs = 0;
             HandoffUnits = 0;
+            Array.Clear(PrevInteract, 0, PrevInteract.Length);
+            foreach (SourceNode s in Sources)
+            {
+                s.Charges = s.MaxCharges;
+                s.RegrowIn = 0;
+                s.FieldWallVersion = -1;
+            }
+            Array.Clear(SourceProgress, 0, SourceProgress.Length);
+            Array.Fill(SourceOf, -1);
+            Array.Clear(PrevHp, 0, PrevHp.Length);
+            Array.Clear(Stock, 0, Stock.Length);
+            Array.Clear(Gathered, 0, Gathered.Length);
+            Banked = 0;
+            Withdrawn = 0;
+            StockSpent = 0;
+            FieldBuildTick = -1;
+            for (int t = 0; t < 2; t++)
+            {
+                w.Match.Delivered[t].Wood = 0;
+                w.Match.Delivered[t].Water = 0;
+            }
+        }
+
+        /// <summary>The last thing a sim step does when the lane is on: remember each actor's interact for next step's rising edge.</summary>
+        public static void EndStep(World w)
+        {
+            if (w.Config.Depth.Classic) return;
+            byte[] prev = w.Depth.PrevInteract;
+            for (int id = 0; id < w.ActorCount; id++)
+            {
+                Actor a = w.Actors[id];
+                prev[id] = (byte)(w.Inputs[id].Interact && a.Alive && a.StandUp <= 0 ? 1 : 0);
+            }
         }
     }
 }

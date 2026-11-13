@@ -65,6 +65,9 @@ namespace CriticalMass.Sim.Bots
         public int StateChanges;
         /// <summary>U-063: the allied carrier an AiState.Escort bot walks with (-1 = none).</summary>
         public int[] EscortOf;
+        /// <summary>U-064: 1 = this hill bot runs supply before the hatch (BotDepth.AssignSupply); its source (-1 = walk home and bank).</summary>
+        public byte[] Supply;
+        public int[] SupplySource;
 
         /// <summary>Browser createBotsState: allocate every per-actor array at ActorCapacity (no reset).</summary>
         public static BotsState CreateBotsState(World w)
@@ -106,6 +109,8 @@ namespace CriticalMass.Sim.Bots
                 AbilityZ = new double[cap],
                 StateChanges = 0,
                 EscortOf = new int[cap],
+                Supply = new byte[cap],
+                SupplySource = new int[cap],
             };
         }
 
@@ -146,6 +151,8 @@ namespace CriticalMass.Sim.Bots
                 st.PostUntil[id] = 0;
                 st.AbilityReq[id] = 0;
                 st.EscortOf[id] = -1;
+                st.Supply[id] = 0;
+                st.SupplySource[id] = -1;
                 st.AbilityX[id] = JsMath.F32(0);
                 st.AbilityZ[id] = JsMath.F32(0);
             }

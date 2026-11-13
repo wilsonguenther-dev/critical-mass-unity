@@ -361,6 +361,42 @@ namespace CriticalMass.Sim.Bots
                 case AiState.Retreat:
                     Follow(w, st, id, TeamPadField(w, id));
                     break;
+                case AiState.Supply:
+                {
+                    // U-064: to the source and gather; with no source (full, or none left) home to the base and bank.
+                    int si = st.SupplySource[id];
+                    SourceNode[] srcs = w.Depth.Sources;
+                    if (si >= 0 && si < srcs.Length)
+                    {
+                        SourceNode src = srcs[si];
+                        aimX = src.X;
+                        aimZ = src.Z;
+                        double reach = cfg.Resources.NodeInteractRange + cc.Radius - InteractMargin;
+                        double dx = src.X - x;
+                        double dz = src.Z - z;
+                        if (dx * dx + dz * dz <= reach * reach)
+                        {
+                            output.Interact = true;
+                            separate = false;
+                        }
+                        else if (FlowField.SampleFlowDir(Sources.EnsureField(w, si), map, x, z, out double fdx, out double fdz))
+                        {
+                            Mv.X = fdx;
+                            Mv.Z = fdz;
+                        }
+                        else Toward(w, id, src.X, src.Z, 0);
+                    }
+                    else
+                    {
+                        PadDef pad = map.Pads[(int)a.Team];
+                        double r = cfg.Depth.Sources.BankRange - 1;
+                        double dx = pad.X - x;
+                        double dz = pad.Z - z;
+                        if (dx * dx + dz * dz <= r * r) output.Interact = true;
+                        else if (!Follow(w, st, id, TeamPadField(w, id))) Toward(w, id, pad.X, pad.Z, 0);
+                    }
+                    break;
+                }
                 case AiState.Escort:
                 {
                     // U-063: walk with the carrier (straight at it when the line is clear, else the shrine route it is on).

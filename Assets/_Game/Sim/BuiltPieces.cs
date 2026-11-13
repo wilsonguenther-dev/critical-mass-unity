@@ -208,7 +208,8 @@ namespace CriticalMass.Sim.Core
         /// <summary>Spendable biomass of team (StartBiomass + delivered biomass - spent).</summary>
         public static double Bank(World w, TeamId team)
         {
-            return w.Config.Abilities.BuilderPieces.StartBiomass + w.Match.Delivered[(int)team].Biomass - w.Builder.Spent[(int)team];
+            // U-064: banked wood is building material too (0 without the sources rule).
+            return w.Config.Abilities.BuilderPieces.StartBiomass + w.Match.Delivered[(int)team].Biomass - w.Builder.Spent[(int)team] + Sources.Stock(w, team, Sources.StockWood);
         }
 
         /// <summary>Biomass a piece of kind costs.</summary>
@@ -418,7 +419,7 @@ namespace CriticalMass.Sim.Core
             BuilderState s = w.Builder;
             BuiltPiece p = s.Pieces[slot];
             double cost = Cost(w.Config, PlanKind);
-            s.Spent[(int)a.Team] += cost;
+            s.Spent[(int)a.Team] += cost - Sources.SpendUpTo(w, a.Team, Sources.StockWood, cost); // U-064: banked wood pays first
             s.Stats.BiomassSpent += cost;
             if (PlanKind == Ladder) s.Stats.Ladders++;
             else s.Stats.Bridges++;

@@ -1,13 +1,13 @@
 namespace CriticalMass.Sim.Core
 {
     /// <summary>What an actor carries in its class cargo (browser CarryKind).</summary>
-    public enum CarryKind { None, Biomass, Corruption }
+    public enum CarryKind { None, Biomass, Corruption, /* U-064, appended: */ Wood, Water }
 
     /// <summary>
     /// CM-35: the two biomass types (browser BiomassType). Plant comes from the map's biomass nodes (gathered with E) and
     /// rides in the class cargo; meat drops from killed actors as a loose orb and rides in its own load (Actor.CarryMeat).
     /// </summary>
-    public enum BiomassType { Plant, Meat }
+    public enum BiomassType { Plant, Meat, /* U-064 (DG-42), appended: gathered at groves and springs, ride in the class cargo */ Wood, Water }
 
     /// <summary>
     /// DG-16: what dealt a hit (SimEvent.Cause on Hit and Death events, Actor.LastCause). Not in the browser. Never stored or
@@ -35,6 +35,8 @@ namespace CriticalMass.Sim.Core
         Cleanse,
         /// <summary>U-063 class roles: an egg-duty bot that may not feed walks with the nearest allied carrier (appended).</summary>
         Escort,
+        /// <summary>U-064: a supply bot walks to a grove or spring, fills up and banks it at the base (appended).</summary>
+        Supply,
     }
 
     /// <summary>Match phase (browser MatchState.phase).</summary>
@@ -140,6 +142,12 @@ namespace CriticalMass.Sim.Core
         DeliverRefused,
         /// <summary>U-063: a carrier handed biomass to an allied feeder: A = giver, B = receiver, (X, Z) = the receiver, Value = units, Bio = the type.</summary>
         Handoff,
+        /// <summary>U-064: an actor took one unit from a grove or spring: A = actor, B = source index (World.Depth.Sources), (X, Z) = the source, Value = units it now carries, Bio = Wood / Water.</summary>
+        SourceGather,
+        /// <summary>U-064: a load went into the team stock at the base: A = actor, B = team index, (X, Z) = the pad, Value = units, Bio = the type.</summary>
+        BankDeposit,
+        /// <summary>U-064: a feeder took food out of the team stock: A = actor, B = team index, (X, Z) = the pad, Value = units, Bio = Plant.</summary>
+        BankWithdraw,
         // ITEM CM-84: added by its owner (ClassSwitch, ports CM-54)
         /// <summary>CM-37: one tick of fountain healing (Heal.HealSystem): A = the healed actor, B = -1, (X, Z) = the actor, Value = HP restored this tick (&gt; 0).</summary>
         Heal,
