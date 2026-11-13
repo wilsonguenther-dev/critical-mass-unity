@@ -81,8 +81,12 @@ namespace CriticalMass.Runtime.View.Affordance
             _driver.TimeScale = scale;
             float f0 = Time.realtimeSinceStartup;
             while (_driver.World.Match.Time < 40 && Time.realtimeSinceStartup - f0 < 60f) yield return new WaitForSecondsRealtime(0.5f);
+            // Round 1: actor 0 was knocked out by the time of the shot. Wait for him alive, move him in, shoot quickly.
+            float a0 = Time.realtimeSinceStartup;
+            while (Time.realtimeSinceStartup - a0 < 30f && !_driver.World.Actors[0].Alive) yield return new WaitForSecondsRealtime(0.25f);
             MoveToFight(_driver.World);
-            yield return Shot("fight", 1.4f);
+            _driver.World.Actors[0].SpawnProtect = 3;
+            yield return Shot("fight", 0.5f);
             TerrainAffordanceView.CaptureForce = false;
             Log("done");
             yield return new WaitForSecondsRealtime(0.5f);

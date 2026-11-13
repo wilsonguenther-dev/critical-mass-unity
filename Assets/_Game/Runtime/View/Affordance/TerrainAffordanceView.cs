@@ -48,7 +48,7 @@ namespace CriticalMass.Runtime.View.Affordance
         public const string ShowAction = "ShowTerrain";
         public const int LocalActor = HudBinder.LocalActor;
         /// <summary>Marker opacity at rest (out of reach) and in reach.</summary>
-        public const float QuietAlpha = 0.34f, ReachAlpha = 0.8f;
+        public const float QuietAlpha = 0.26f, ReachAlpha = 0.78f;
         /// <summary>Ground lift of markers (under the unit rings at 0.075 u, over the floor).</summary>
         public const float GroundLift = 0.045f;
         /// <summary>Hint lifetime: the first minute of match time.</summary>
@@ -207,8 +207,9 @@ namespace CriticalMass.Runtime.View.Affordance
 
             _chip = Chip(_root, "Target Prompt", 560f, 40f, out _label, UiScale.TypeBody);
             _hintChip = Chip(_root, "Class Hint", 980f, 44f, out _hintLabel, UiScale.TypeSmall);
-            _hintChip.anchorMin = _hintChip.anchorMax = new Vector2(0.5f, 0f);
-            _hintChip.anchoredPosition = new Vector2(0f, 300f);
+            _hintChip.anchorMin = _hintChip.anchorMax = new Vector2(0.5f, 1f);
+            _hintChip.pivot = new Vector2(0.5f, 1f);
+            _hintChip.anchoredPosition = new Vector2(0f, -196f);
 
             _bar = MenuUi.Rt(_root, "Progress Bar");
             _bar.anchorMin = _bar.anchorMax = Vector2.zero;
@@ -249,9 +250,15 @@ namespace CriticalMass.Runtime.View.Affordance
             chip.pivot = new Vector2(0.5f, 0f);
             chip.sizeDelta = new Vector2(w, h);
             VectorShape body = MenuUi.Shape(chip, "Body", ShapeKind.RoundRect, 0f, 0f, w, h, CMTokens.PanelNavy.Color, -1f);
+            MenuUi.Stretch(body.rectTransform);
             body.OutlinePx = 3f;
             body.RimPx = 2f;
             label = MenuUi.Fit(MenuUi.Label(chip, "Line", CMTokens.Display, size, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 10f, 0f, w - 20f, h, "", 3f), 14);
+            RectTransform lr = label.rectTransform;
+            lr.anchorMin = Vector2.zero;
+            lr.anchorMax = Vector2.one;
+            lr.offsetMin = new Vector2(14f, 4f);
+            lr.offsetMax = new Vector2(-14f, -4f);
             return chip;
         }
 
@@ -500,7 +507,9 @@ namespace CriticalMass.Runtime.View.Affordance
                 else if (t.Ghost == 0 || t.Ghost == 5)
                 {
                     float y = CellY(m, t.X, t.Z) + (IsWall(m, t.Cx, t.Cz) ? WallTop(m, t.Cx, t.Cz) : 0f) + 0.01f;
-                    GroundQuad(t.Cx + 0.5, t.Cz + 0.5, y, 0.56f, CellOutline, A(tint, primary ? 1f : 0.7f));
+                    float pulse = primary ? 0.82f + 0.18f * Mathf.Sin((float)(Time.unscaledTimeAsDouble * 6.0)) : 0.7f;
+                    GroundQuad(t.Cx + 0.5, t.Cz + 0.5, y, 0.5f, CellDisc, A(tint, primary ? 0.32f : 0.18f));
+                    GroundQuad(t.Cx + 0.5, t.Cz + 0.5, y + 0.004f, 0.64f, CellOutline, A(tint, pulse));
                 }
                 if (primary) OutlineDrawn = true;
             }
@@ -735,8 +744,9 @@ namespace CriticalMass.Runtime.View.Affordance
                 string a = Line(Scan.Primary, ControlBindings.ActiveDevice), b = Line(Scan.Secondary, ControlBindings.ActiveDevice);
                 _prompt = b.Length > 0 ? a + "\n" + b : a;
                 HudText.Set(_label, _prompt);
-                _chip.sizeDelta = new Vector2(_chip.sizeDelta.x, b.Length > 0 ? 66f : 40f);
-                _label.rectTransform.sizeDelta = new Vector2(_label.rectTransform.sizeDelta.x, b.Length > 0 ? 66f : 40f);
+                // Fit the chip to the longer line (preferredWidth is the unwrapped width at the label's size).
+                float pw = _label.preferredWidth;
+                _chip.sizeDelta = new Vector2(Mathf.Clamp(pw + 40f, 180f, 720f), b.Length > 0 ? 70f : 42f);
             }
             AffTarget t = Scan.Primary;
             MapDef m = w.Map;
@@ -896,6 +906,7 @@ namespace CriticalMass.Runtime.View.Affordance
                         Shade(cell, fx, fy, out float fill, out float line);
                         float a = Mathf.Clamp01(Mathf.Max(fill, line));
                         float red = a > 1e-3f ? Mathf.Clamp01(fill / a) : 0f;
+                        if (cell >= CellCrack1 && cell <= CellCrack3) { a = fill * 0.95f; red = 1f - line; }
                         px[(oy + y) * W + ox + x] = new Color32((byte)(red * 255f), 0, 0, (byte)(a * 255f));
                     }
                 }
@@ -945,7 +956,8 @@ namespace CriticalMass.Runtime.View.Affordance
                     return;
                 }
                 case CellPick:
-                    d = Mathf.Min(Seg(x, y, 32, 8, 32, 46) - 3.5f, Mathf.Min(Seg(x, y, 10, 40, 32, 52) - 4.5f, Seg(x, y, 32, 52, 54, 40) - 4.5f));
+                    // A shovel: rounded blade, shaft, cross grip.
+                    d = Mathf.Min(RBox(x, y, 32, 20, 12, 13, 9), Mathf.Min(Seg(x, y, 32, 30, 32, 52) - 3.5f, Seg(x, y, 21, 54, 43, 54) - 4f));
                     break;
                 case CellSprout:
                 {
@@ -1003,8 +1015,9 @@ namespace CriticalMass.Runtime.View.Affordance
                         best = Mathf.Min(best, Seg(x, y, pxs, pys, nx, ny) - (stage >= 3 ? 1.6f : 1.1f));
                         if (k % 3 == 2) { pxs = 32f; pys = 32f; } else { pxs = nx; pys = ny; }
                     }
-                    fill = 0f;
-                    line = Cov(best);
+                    // Thick enough to read at gameplay distance: a Void Navy core inside a light halo (CrackShade below).
+                    fill = Cov(best - 2.2f);
+                    line = Cov(best + 0.6f);
                     return;
                 }
             }
