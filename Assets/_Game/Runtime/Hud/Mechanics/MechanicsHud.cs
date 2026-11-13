@@ -607,6 +607,8 @@ namespace CriticalMass.Runtime.Hud.Mechanics
 
         /// <summary>Panel-local top of the extra legend rows: under the full map's own legend and ping row.</summary>
         public const float LegendX = FullMapView.SideX - FullMapView.PanelX, LegendY = 790f;
+        /// <summary>Step between these legend rows (30: the four rows and DepthHud's two end inside the panel).</summary>
+        public const float LegendStep = 30f;
 
         void BuildLegend(FullMapView fm)
         {
@@ -615,9 +617,9 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             Transform p = fm.Panel;
             Color cream = CMTokens.WarmCream.Color;
             float y = LegendY;
-            Row(p, y, ShapeKind.RoundRect, CMTokens.Azure.Color, "Ladder or rope bridge, team colour", cream, false); y += 32f;
-            Row(p, y, ShapeKind.Diamond, CMTokens.Azure.Color, "Your team's mine (enemies see the mound)", cream, false); y += 32f;
-            Row(p, y, ShapeKind.Circle, CMTokens.Biomass.Color, "Drop to pick up: biomass or meat", cream, false); y += 32f;
+            Row(p, y, ShapeKind.RoundRect, CMTokens.Azure.Color, "Ladder or rope bridge, team colour", cream, false); y += LegendStep;
+            Row(p, y, ShapeKind.Diamond, CMTokens.Azure.Color, "Your team's mine (enemies see the mound)", cream, false); y += LegendStep;
+            Row(p, y, ShapeKind.Circle, CMTokens.Biomass.Color, "Drop to pick up: biomass or meat", cream, false); y += LegendStep;
             Row(p, y, ShapeKind.Circle, CMTokens.MeterOrange.Color, "TNT about to land", cream, true);
         }
 

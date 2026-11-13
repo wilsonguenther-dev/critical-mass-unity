@@ -45,6 +45,9 @@ namespace CriticalMass.Runtime.View.Moments
         public static event Action<ActiveMoment> Started;
         public static event Action<MomentId> Ended;
 
+        /// <summary>The most one frame advances the director's clock (seconds).</summary>
+        public const float MaxFrameSeconds = 0.1f;
+
         /// <summary>A takeover is on screen or a banner-preempting one is about to start.</summary>
         public static bool IsPlaying => Instance != null && Instance._queue.Playing;
 
@@ -212,7 +215,9 @@ namespace CriticalMass.Runtime.View.Moments
         private void LateUpdate()
         {
             bool paused = _input != null && _input.State.Paused;
-            if (!paused) _clock += Time.unscaledDeltaTime;
+            // Integration batch 4: one hitch frame (the match-start load, a shader warm-up) advances the director at most
+            // MaxFrameSeconds, so a takeover that just started never ends behind a single slow frame unseen.
+            if (!paused) _clock += Mathf.Min(Time.unscaledDeltaTime, MaxFrameSeconds);
             double now = _clock;
 
             DebugKeys();

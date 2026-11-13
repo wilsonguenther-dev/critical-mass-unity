@@ -505,7 +505,7 @@ namespace CriticalMass.Runtime.View.Anim
                 double windup = 0;
                 if (_kind == 1)
                 {
-                    windup = AttackTiming.WindupTicks(cfg, actor.Cls) / hz;
+                    windup = AttackTiming.SwingWindupSeconds(actor, hz);   // the sim's own swing: contact on SwingTick + SwingWindup
                     double age = AttackTiming.SwingAge(actor, w.Tick, alpha, hz);
                     if (combat != null && hasFx) age = combat.AttackTime(i, age, fx); // the attacker freezes on contact during the hold
                     t = AttackTiming.ClipTime(age, ClipFacts.Contact(_actClip, (float)(len * 0.5)), len, windup);

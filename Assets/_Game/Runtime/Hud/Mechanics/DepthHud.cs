@@ -817,7 +817,9 @@ namespace CriticalMass.Runtime.Hud.Mechanics
         }
 
         /// <summary>Panel-local top of these legend rows: under the class-mechanics rows (MechanicsHud.LegendY + 4 rows).</summary>
-        public const float LegendY = MechanicsHud.LegendY + 4f * 32f, LegendColW = FullMapView.SideW / 3f;
+        public const float LegendY = MechanicsHud.LegendY + 4f * MechanicsHud.LegendStep, LegendColW = FullMapView.SideW / 3f;
+        /// <summary>Step between the two rows of three (16 px type, the minimum, in a 24 px row).</summary>
+        public const float LegendRowStep = 26f;
 
         void BuildLegend(FullMapView fm)
         {
@@ -834,14 +836,12 @@ namespace CriticalMass.Runtime.Hud.Mechanics
 
         static void Row(Transform p, int i, ShapeKind kind, Color c, string word)
         {
-            float x = MechanicsHud.LegendX + (i % 3) * LegendColW, y = LegendY + (i / 3) * 24f;
+            float x = MechanicsHud.LegendX + (i % 3) * LegendColW, y = LegendY + (i / 3) * LegendRowStep;
             VectorShape s = MenuUi.Shape(p, "Depth Legend " + i, kind, x + 2f, y + 3f, 16f, 16f, c, 3f);
             s.OutlinePx = 2f;
             s.RimPx = 0f;
-            Text t = MenuUi.Label(p, "Depth Legend Word " + i, CMTokens.Ui, 15, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft, x + 24f, y, LegendColW - 28f, 22f, word, 2f);
-            t.resizeTextForBestFit = true;
-            t.resizeTextMinSize = 10;
-            t.resizeTextMaxSize = 15;
+            // 16 px, the type minimum (was 15 with best-fit down to 10).
+            MenuUi.Label(p, "Depth Legend Word " + i, CMTokens.Ui, UiScale.TypeMin, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft, x + 24f, y, LegendColW - 28f, 24f, word, 2f);
         }
     }
 }

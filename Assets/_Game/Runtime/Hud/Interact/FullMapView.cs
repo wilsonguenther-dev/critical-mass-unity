@@ -35,6 +35,8 @@ namespace CriticalMass.Runtime.Hud.Interact
         public const float PanelX = 150f, PanelY = 54f, PanelW = 1620f, PanelH = 972f;
         public const float ViewX = 186f, ViewY = 132f, ViewW = 1000f, ViewH = 860f;
         public const float SideX = 1222f, SideW = 512f;
+        /// <summary>Top of the one-line key hints: under the map frame (ViewY + ViewH + 6), above the panel's bottom edge.</summary>
+        public const float HintsY = ViewY + ViewH + 8f;
         public const float MinZoom = 1f, MaxZoom = 4f;
         public const float RefreshInterval = 0.1f;
         public const int MaxActors = 64, MaxNodes = 48, MaxPings = PingBook.Capacity;
@@ -348,7 +350,9 @@ namespace CriticalMass.Runtime.Hud.Interact
             ping.RimPx = 0f;
             MenuUi.Label(_space, "Legend Ping Word", CMTokens.Ui, UiScale.TypeMin, Cream, TextAnchor.MiddleLeft, x + 38f, ly, w - 38f, 26f, "Ping: attack, on my way, defend, help", 2f);
 
-            _hints = MenuUi.Label(_space, "Hints", CMTokens.Ui, UiScale.TypeMin, CMTokens.WithAlpha(Cream, 0.85f), TextAnchor.UpperLeft, x, PanelY + PanelH - 98f, w, 70f, "", 2f);
+            // Integration batch 4: the key hints are one line in the strip under the map frame, so the side column's
+            // mechanics and depth legend rows (MechanicsHud, DepthHud) never run into them.
+            _hints = MenuUi.Label(_space, "Hints", CMTokens.Ui, UiScale.TypeMin, CMTokens.WithAlpha(Cream, 0.85f), TextAnchor.MiddleCenter, ViewX, HintsY, ViewW, 24f, "", 2f);
         }
 
         void LegendIcon(float x, float y, string icon, string word)
@@ -854,8 +858,8 @@ namespace CriticalMass.Runtime.Hud.Interact
             if (_hints == null) return;
             bool pad = d == ControlDevice.Gamepad;
             HudText.Set(_hints, pad
-                ? "LT / RT  ZOOM      R STICK  PAN\n" + pingKey + "  HOLD TO PING      " + mapKey + " / B  CLOSE"
-                : "WHEEL  ZOOM      DRAG  PAN\n" + pingKey + "  HOLD TO PING      " + mapKey + " / ESC  CLOSE");
+                ? "LT / RT  ZOOM      R STICK  PAN      " + pingKey + "  HOLD TO PING      " + mapKey + " / B  CLOSE"
+                : "WHEEL  ZOOM      DRAG  PAN      " + pingKey + "  HOLD TO PING      " + mapKey + " / ESC  CLOSE");
             HudText.Set(_closeKey, (pad ? "B" : mapKey) + "  CLOSE");
         }
 

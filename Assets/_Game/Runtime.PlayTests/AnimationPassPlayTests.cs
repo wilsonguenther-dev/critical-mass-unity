@@ -57,6 +57,8 @@ namespace CriticalMass.Runtime.PlayTests
             if (classes.Count == 0) Assert.Ignore("no class has a model");
             foreach (ClassId cls in classes)
             {
+                // No regular swing by design: the Demolitions attack press does nothing (DG-22), the Healer's mends (DG-40).
+                if (cls == ClassId.Demolitions || cls == ClassId.Healer) continue;
                 _w = new SanityWorld();
                 yield return _w.Load(cls);
                 Transform model = _w.ActorModel(0);
@@ -74,6 +76,7 @@ namespace CriticalMass.Runtime.PlayTests
                 var pos = new List<Vector3>();
                 var ticks = new List<int>();
                 double lastAction = w.Actors[0].AnimAction;
+                int windupSim = 0;
                 for (int t = 0; t < 45; t++)
                 {
                     _w.Tick(1);
@@ -82,6 +85,7 @@ namespace CriticalMass.Runtime.PlayTests
                     {
                         pressTick = w.Tick;
                         clip = anim != null ? anim.ActionClip : null;
+                        windupSim = w.Actors[0].SwingWindup;   // the sim's own swing: AttackContact on SwingTick + SwingWindup
                     }
                     lastAction = w.Actors[0].AnimAction;
                     pos.Add(model.InverseTransformPoint(hand.position));
@@ -89,7 +93,7 @@ namespace CriticalMass.Runtime.PlayTests
                 }
                 if (pressTick < 0) { _bad.Add(cls + ": the attack press did not start a swing"); continue; }
                 if (clip == null) clip = ArtMapping.Attack;
-                int windup = AttackTiming.WindupTicks(_w.Cfg, cls);
+                int windup = windupSim;
                 double contact = ClipFacts.Contact(clip, 0.5f);
                 double contactAge = AttackTiming.ContactAge(contact, windup / _w.Cfg.SimHz);
                 int expected = pressTick + (int)Math.Round(contactAge * _w.Cfg.SimHz);

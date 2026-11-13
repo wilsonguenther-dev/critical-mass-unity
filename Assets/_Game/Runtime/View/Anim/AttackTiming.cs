@@ -22,6 +22,8 @@ namespace CriticalMass.Runtime.View.Anim
     {
         /// <summary>Frames of the clip shown before contact in parity mode (W = 0), at 30 fps clip time.</summary>
         public const double ParityLeadFrames = 2;
+        /// <summary>Clip seconds of the strike played during a sim wind-up (ends exactly on the contact frame).</summary>
+        public const double StrikeLead = 0.25;
         /// <summary>Envelope (sim seconds): fade in, fade out at the end of the follow-through, cross-fade on a re-trigger.</summary>
         public const double FadeIn = 0.05, FadeOut = 0.12, Retrigger = 0.06;
 
@@ -116,6 +118,14 @@ namespace CriticalMass.Runtime.View.Anim
         }
 
         /// <summary>
+        /// The wind-up of the actor's current swing in sim seconds, read from the sim's own swing (Actor.SwingWindup: the
+        /// hit resolves and AttackContact fires on SwingTick + SwingWindup), so the view never guesses it from the config at
+        /// a different pace.
+        /// </summary>
+        public static double SwingWindupSeconds(Actor a, double simHz) =>
+            a != null && simHz > 0 ? Math.Max(0, a.SwingWindup) / simHz : 0;
+
+        /// <summary>
         /// Clip time of an attack clip `age` sim seconds after the press: contact c, length L, wind-up W seconds.
         /// W > 0: 0..c over the wind-up, then c..L at rate 1. W = 0: starts ParityLeadFrames before c at rate 1, so the
         /// contact frame is shown within 2 frames of the damage tick (the hit cannot land before the swing).
@@ -124,7 +134,15 @@ namespace CriticalMass.Runtime.View.Anim
         {
             if (age < 0) age = 0;
             if (windupSeconds > 1e-9)
-                return age < windupSeconds ? contact * age / windupSeconds : Math.Min(length, contact + (age - windupSeconds));
+            {
+                if (age >= windupSeconds) return Math.Min(length, contact + (age - windupSeconds));
+                // Integration batch 4: the wind-up shows the strike (the last StrikeLead clip seconds before contact), eased
+                // in (cubic), so the weapon hand is fastest on the tick the sim resolves the hit (AttackContact), not mid
+                // wind-up. Squeezing the whole 0..contact anticipation into 3 or 4 ticks peaked the hand 2 ticks early.
+                double from = Math.Max(0, contact - StrikeLead);
+                double s = age / windupSeconds;
+                return from + (contact - from) * s * s * s;
+            }
             double start = Math.Max(0, contact - ParityLeadFrames / 30.0);
             return Math.Min(length, start + age);
         }

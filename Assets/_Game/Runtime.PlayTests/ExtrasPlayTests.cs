@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using CriticalMass.Runtime.Audio;
 using CriticalMass.Runtime.Codex;
 using CriticalMass.Runtime.Game;
 using CriticalMass.Runtime.Hud;
@@ -238,6 +239,9 @@ namespace CriticalMass.Runtime.PlayTests
             string spoken = null;
             Action<string> onLine = id => spoken = id;
             SecretsBoard.AnnouncerLine += onLine;
+            bool heard = false;
+            Action<AnnouncerLine> onSaid = l => { if (l != null && l.Trigger == AnnouncerTrigger.SecretHillAlone) heard = true; };
+            Announcer.LineStarted += onSaid;
             try
             {
                 World w = _driver.World;
@@ -253,12 +257,30 @@ namespace CriticalMass.Runtime.PlayTests
                     yield return null;
                 }
                 Assert.AreEqual(SecretWatcher.HillAloneLine, spoken);
-                Assert.IsTrue(CaptionBar.IsShowing, "subtitles on: the caption shows");
-                Assert.AreEqual(LoreText.Announcer("an-22"), CaptionBar.Current);
+                // One caption only (batch 4, UI rough spots): the announcer subtitles its own line when it is installed with
+                // subtitles on; the secret's caption bar shows only when nobody else will.
+                bool own = SecretWatcher.ShouldShowOwnCaption(SettingsExtras.Subtitles, Announcer.Instance != null, Announcer.SubtitlesEnabled);
+                if (own)
+                {
+                    Assert.IsTrue(CaptionBar.IsShowing, "subtitles on: the caption shows");
+                    Assert.AreEqual(LoreText.Announcer("an-22"), CaptionBar.Current);
+                }
+                else
+                {
+                    Assert.IsFalse(CaptionBar.IsShowing, "the announcer subtitles the line: no second caption");
+                    if (Announcer.Instance != null && Announcer.SubtitlesEnabled)
+                    {
+                        // The announcer may finish another line first: wait by wall clock (batch-mode frames are about 1 ms).
+                        float until = Time.realtimeSinceStartup + 10f;
+                        while (!heard && Time.realtimeSinceStartup < until) yield return null;
+                        Assert.IsTrue(heard, "the announcer speaks and subtitles the hill line");
+                    }
+                }
             }
             finally
             {
                 SecretsBoard.AnnouncerLine -= onLine;
+                Announcer.LineStarted -= onSaid;
             }
         }
 
