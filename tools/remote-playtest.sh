@@ -10,7 +10,7 @@
 # -autoplayTimeout -quality -dataDir -logFile -perfLog), waits, copies Player.log, perf*.json, samples.tsv, run.env and
 # data/ (shots) back into OUT, deletes the run on the box, and judges it here with tools/demo-smoke.sh --summarise-only
 # (same budgets, tools/budgets.json; summary.json in OUT). Old builds on the box beyond the newest two are deleted.
-# --mode captures adds -shots: the player writes shot-title.png (title, 2 s in) and shot-mid.png (60 s of match time),
+# --mode captures adds -shots: the player writes shot-title.png (title, 2 s in), shot-start.png (3 s of match time) and shot-mid.png (60 s),
 # copied to OUT/shots/. (Screen grabs from outside the game are not possible over ssh: macOS refuses screen recording.)
 # Defaults: host wilsons-macbook-air.local (or CM_REMOTE_HOST), app Builds/current or Builds/macOS of this checkout,
 # smoke, Medium, 1 match, 1920x1080 window, 12 s on the title, OUT Logs/remote/<utc>-<mode>-<quality>.

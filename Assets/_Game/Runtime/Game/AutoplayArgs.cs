@@ -34,7 +34,7 @@ namespace CriticalMass.Runtime.Game
     ///   -quality NAME|N          this quality level for the run (FrameGovernor; the perf report has quality_requested)
     ///   -debugHangSeconds N      TEST ONLY: the main thread sleeps N s once, 3 s after the title (proves the hang watchdog)
     ///   -seed N -simHashOut PATH sim-only run (no view): one 16v16 bot match on seed N, its end-state hash to PATH, quit (DG-66)
-    ///   -shots                   screenshots shot-title.png and shot-mid.png into the data folder (Windows graphics run)
+    ///   -shots                   screenshots shot-title.png, shot-start.png (3 s of match time) and shot-mid.png into the data folder (Windows graphics run)
     ///   -traceStates             record shader states for warm-up (ShaderWarmup); -exportReport, -diag: SupportReport
     /// DG-63: the crash log is written by CrashLog (bounded queue, one background writer, 20 lines per second, repeat keys
     /// with digits and hex as "#"); Exceptions and Errors both count. A stack in the sim or the match driver ends the match
@@ -171,7 +171,7 @@ namespace CriticalMass.Runtime.Game
         // ── autoplay state ──
         SimDriverBehaviour _driver;
         TitleScreen _title;
-        bool _titleSeen, _recording, _ended, _quitting, _timedOut, _hangDone, _shotTitle, _shotMid;
+        bool _titleSeen, _recording, _ended, _quitting, _timedOut, _hangDone, _shotTitle, _shotStart, _shotMid;
         double _titleAt = -1, _matchStart, _endAt, _firstTitleAt = -1;
         bool _costReset;
         int _exceptionsAtStart, _match = 1, _reloadFrame = -1;
@@ -442,6 +442,12 @@ namespace CriticalMass.Runtime.Game
                 ScreenCapture.CaptureScreenshot(Path.Combine(GamePaths.DataDir, "shot-title.png"));
             }
             if (!o.Autoplay && !o.QuitAfterMatch) return;
+            if (o.Shots && !_shotStart && _recording && _driver != null && _driver.World != null && _driver.World.Match.Time > 3)
+            {
+                // Match start: the moment the owner saw rings without bodies (2026-11-13); proves fighters draw from the first seconds.
+                _shotStart = true;
+                ScreenCapture.CaptureScreenshot(Path.Combine(GamePaths.DataDir, "shot-start.png"));
+            }
             if (o.Shots && !_shotMid && _recording && _driver != null && _driver.World != null && _driver.World.Match.Time > 60)
             {
                 _shotMid = true;
