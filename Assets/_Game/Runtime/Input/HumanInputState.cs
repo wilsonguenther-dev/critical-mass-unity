@@ -400,8 +400,12 @@ namespace CriticalMass.Runtime.Input
         /// basis for keys with KeysFollowMap), else pointer walking while its button is held; then, with MovementAssist
         /// and a bound world, lane assist for a single key and corner sliding (MoveAssist).
         /// </summary>
-        /// <summary>True within a bridge's deck band plus one unit, from one unit before its start to one after its end.</summary>
-        static bool NearBridge(double x, double z)
+        /// <summary>
+        /// True within a bridge's deck band plus one unit, from 1.5 u before its start to 1.5 u after its end: where corner
+        /// slide stays off (EasyMovementTests.CornerSlideIsOffNearBridges...: with it on there, 148 of 3504 Sim crossings
+        /// stall; with it off, none).
+        /// </summary>
+        public static bool NearBridge(double x, double z)
         {
             var all = CriticalMass.Sim.Maps.BridgeSpans.All;
             double reach = CriticalMass.Sim.Maps.SkybreakBasinMap.BridgeHalfWidth + 1.0;

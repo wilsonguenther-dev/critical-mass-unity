@@ -417,5 +417,104 @@ namespace CriticalMass.Runtime.Tests
             }
             Assert.IsTrue(bad.Count == 0, bad.Count + " failure(s):\n" + string.Join("\n", bad));
         }
+
+        /// <summary>
+        /// Creator acceptance (bridge travel), 2026-11-13: corner slide must stay off near bridges (HumanInputState.NearBridge)
+        /// for the stick AND the keys. On a deck, or on the landing at a mouth, the straight move 45 to 60 degrees off the
+        /// axis is "blocked" by the VOID beside the deck, and corner slide turns it toward the most progress along the input
+        /// direction, which is along the island edge or into a riser corner, away from the span; the sim's own rail
+        /// (Collide.RailFirst) carries the unturned move across. Every span, both ways, the stick at -60..+60 in 15 degree
+        /// steps and every 8-way key within 60 degrees (one key with lane assist and two keys, for both key bases), three
+        /// offsets, from the landing and from the deck, Warrior (widest): the game's assist (slide off near bridges) crosses
+        /// everything the bare sim crosses, and the control (slide everywhere) shows the stalls the gate removes.
+        /// </summary>
+        [Test]
+        public void CornerSlideIsOffNearBridgesSoTheStickAndTheKeysCrossEveryBridgeAsTheSimAloneDoes()
+        {
+            int gated = BridgeSweepWithAssist(true, out string example, out int runs);
+            Assert.AreEqual(0, gated, gated + " of " + runs + " crossings stalled or did not arrive with the game's assist, e.g. " + example);
+            int ungated = BridgeSweepWithAssist(false, out string ungatedExample, out _);
+            Assert.Greater(ungated, 0, "control: corner slide everywhere should stall some bridge crossings (else the gate is moot)");
+        }
+
+        private static int BridgeSweepWithAssist(bool gate, out string example, out int runs)
+        {
+            example = "";
+            runs = 0;
+            int fails = 0;
+            World w = Lone();
+            double r = Cfg.Class(ClassId.Warrior).Radius, speed = Cfg.Class(ClassId.Warrior).MoveSpeed;
+            double band = SkybreakBasinMap.BridgeHalfWidth - r;
+            for (int s = 0; s < BridgeSpans.All.Count; s++)
+            {
+                BridgeSpan sp = BridgeSpans.All[s];
+                double enter = -1, exit = -1;
+                for (int k = 0; k * 0.05 <= sp.Len; k++)
+                {
+                    int c = CriticalMass.Sim.Grid.MapGrid.CellAt(w.Map, sp.X0 + sp.Ux * k * 0.05, sp.Z0 + sp.Uz * k * 0.05);
+                    if (c != Cell.Bridge && c != Cell.Void) continue;
+                    if (enter < 0) enter = k * 0.05;
+                    exit = k * 0.05;
+                }
+                for (int dir = 1; dir >= -1; dir -= 2)
+                {
+                    double ux = sp.Ux * dir, uz = sp.Uz * dir, ox = dir > 0 ? sp.X0 : sp.X1, oz = dir > 0 ? sp.Z0 : sp.Z1;
+                    double en = dir > 0 ? enter : sp.Len - exit, ex = dir > 0 ? exit : sp.Len - enter;
+                    double goal = Math.Min(sp.Len, ex + 1), axis = Math.Atan2(uz, ux);
+                    var inputs = new List<(double off, int keys)>(); // keys: 0 stick, 1 one key, 2 two keys
+                    for (int deg = -60; deg <= 60; deg += 15) inputs.Add((deg, 0));
+                    for (int q = 0; q < 8; q++)
+                    {
+                        double off = Math.IEEERemainder(q * Math.PI / 4 - axis, 2 * Math.PI) * 180 / Math.PI;
+                        if (Math.Abs(off) > 60.0001) continue;
+                        inputs.Add((off, 1)); // one key in one key basis
+                        inputs.Add((off, 2)); // two keys in the other
+                    }
+                    foreach (double f in new[] { -0.8, 0, 0.8 })
+                    {
+                        for (int fam = 0; fam < 2; fam++)
+                        {
+                            double l = f * band, sa = -1, sx = 0, sz = 0, from = fam == 0 ? Math.Max(0, en - 1) : en + 1.5;
+                            for (double a = from; a <= from + 2; a += 0.25)
+                            {
+                                double px = ox + ux * a - uz * l, pz = oz + uz * a + ux * l;
+                                if (Collide.ActorFits(w, px, pz, r)) { sa = a; sx = px; sz = pz; break; }
+                            }
+                            Assert.GreaterOrEqual(sa, 0, BridgeSpans.Name(s) + ": a fitting start");
+                            foreach (var inp in inputs)
+                            {
+                                // Input that leaves the band before the chasm truly points off the deck: not a crossing.
+                                if (fam == 0 && en > sa && Math.Abs(l + (en - sa) * Math.Tan(inp.off * Math.PI / 180)) > band + Collide.DeckPad) continue;
+                                double th = axis + inp.off * Math.PI / 180, kx = Math.Cos(th), kz = Math.Sin(th);
+                                int budget = (int)Math.Ceiling(1.25 * (goal - sa) / (speed * Math.Cos(inp.off * Math.PI / 180)) * Cfg.SimHz) + (int)Cfg.SimHz;
+                                Place(w, sx, sz);
+                                var along = new List<double> { sa };
+                                bool arrived = false;
+                                int stall = -1;
+                                for (int t = 1; t <= budget && !arrived; t++)
+                                {
+                                    double mx = kx, mz = kz; // HumanInputState.WorldMove's order: lane assist (one key), then corner slide
+                                    if (inp.keys == 1 && MoveAssist.LaneSteer(w.X[0], w.Z[0], mx, mz, out double lx, out double lz)) { mx = lx; mz = lz; }
+                                    if (!(gate && HumanInputState.NearBridge(w.X[0], w.Z[0])) && MoveAssist.CornerSlide(w, 0, mx, mz, out double qx, out double qz)) { mx = qx; mz = qz; }
+                                    w.Inputs[0].MoveX = mx;
+                                    w.Inputs[0].MoveZ = mz;
+                                    Movement.MovementSystem(w, Dt);
+                                    double a = (w.X[0] - ox) * ux + (w.Z[0] - oz) * uz;
+                                    along.Add(a);
+                                    if (t >= 6 && a - along[t - 3] < 0.01 && stall < 0) stall = t;
+                                    arrived = a >= goal;
+                                }
+                                runs++;
+                                if (arrived && stall < 0) continue;
+                                fails++;
+                                if (example.Length == 0)
+                                    example = $"{BridgeSpans.Name(s)} {(dir > 0 ? "fwd" : "back")} offset {f} {(fam == 0 ? "landing" : "deck")} {inp.off:0} deg ({(inp.keys == 0 ? "stick" : inp.keys + " key(s)")}): arrived {arrived}, stall tick {stall}";
+                            }
+                        }
+                    }
+                }
+            }
+            return fails;
+        }
     }
 }
