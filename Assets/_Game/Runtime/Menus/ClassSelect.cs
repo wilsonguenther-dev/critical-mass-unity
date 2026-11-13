@@ -239,11 +239,15 @@ namespace CriticalMass.Runtime.Menus
             _setupPage = MenuUi.Rt(_space, "Setup Page");
             MenuUi.Stretch(_setupPage);
             _setupTitle = MenuUi.Fit(MenuUi.Label(_setupPage, "Title", CMTokens.Display, UiScale.TypeTitle, Cream, TextAnchor.MiddleCenter, 360f, 34f, 1200f, 84f, "CHOOSE YOUR CLASS", 4f), 60);
-            float x0 = (HudLayout.RefW - (5 * TileW + 4 * TileGap)) * 0.5f;
+            // Finisher, batch 4: six classes (Healer joined in batch 3) in one row that fits the screen; the row was laid
+            // out for five, so the sixth tile ran off the right edge.
+            int nTiles = ClassIds.All.Count;
+            float tileW = Mathf.Min(TileW, (HudLayout.RefW - 2f * 80f - (nTiles - 1) * TileGap) / nTiles);
+            float x0 = (HudLayout.RefW - (nTiles * tileW + (nTiles - 1) * TileGap)) * 0.5f;
             for (int i = 0; i < ClassIds.All.Count; i++)
             {
                 ClassId cls = ClassIds.All[i];
-                ClassCard t = ClassCard.Build(_setupPage, ClassCard.Layout.Tile, x0 + i * (TileW + TileGap), TileY, TileW, TileH, "Tile " + cls);
+                ClassCard t = ClassCard.Build(_setupPage, ClassCard.Layout.Tile, x0 + i * (tileW + TileGap), TileY, tileW, TileH, "Tile " + cls);
                 t.Tile.Focused = () => FocusSetup(cls);
                 t.Tile.Submitted = () => ConfirmSetup(cls);
                 _setupTiles.Add(t);
@@ -263,8 +267,9 @@ namespace CriticalMass.Runtime.Menus
             // ---- respawn page
             _respawnPage = MenuUi.Rt(_space, "Respawn Page");
             MenuUi.Stretch(_respawnPage);
-            float rx0 = (HudLayout.RefW - (5 * RTileW + 4 * RTileGap)) * 0.5f;
-            _respawnLine = MenuUi.Label(_respawnPage, "Next Life", CMTokens.Ui, UiScale.TypeBody, Cream, TextAnchor.MiddleCenter, rx0, RTileY - 46f, 5 * RTileW + 4 * RTileGap, 36f, "", 3f);
+            int nR = ClassIds.All.Count;
+            float rx0 = (HudLayout.RefW - (nR * RTileW + (nR - 1) * RTileGap)) * 0.5f;
+            _respawnLine = MenuUi.Label(_respawnPage, "Next Life", CMTokens.Ui, UiScale.TypeBody, Cream, TextAnchor.MiddleCenter, rx0, RTileY - 46f, nR * RTileW + (nR - 1) * RTileGap, 36f, "", 3f);
             for (int i = 0; i < ClassIds.All.Count; i++)
             {
                 ClassId cls = ClassIds.All[i];

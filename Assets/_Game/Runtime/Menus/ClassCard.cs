@@ -589,7 +589,7 @@ namespace CriticalMass.Runtime.Menus
             disc.OutlinePx = 3f;
             _portrait = HudIcon.Make(Root, "Portrait", (_w - p) * 0.5f, 14f, p, p);
             float y = 18f + p + 4f;
-            _name = MenuUi.Label(Root, "Name", CMTokens.Display, _w > 260f ? 26 : 22, Cream, TextAnchor.MiddleCenter, 6f, y, _w - 12f, 32f, "", 3f);
+            _name = MenuUi.Label(Root, "Name", CMTokens.Display, _w > 290f ? 26 : 22, Cream, TextAnchor.MiddleCenter, 6f, y, _w - 12f, 32f, "", 3f);
             y += 32f;
             _role = MenuUi.Label(Root, "Role", CMTokens.Ui, UiScale.TypeSmall, Brass, TextAnchor.MiddleCenter, 6f, y, _w - 12f, 24f, "", 2f);
             y += 28f;
@@ -637,6 +637,7 @@ namespace CriticalMass.Runtime.Menus
             _name = MenuUi.Label(Root, "Name", CMTokens.Display, UiScale.TypeDisplay, Cream, TextAnchor.MiddleLeft, tx, 28f, tw, 70f, "", 4f);
             _role = MenuUi.Label(Root, "Role", CMTokens.Ui, UiScale.TypeButton, Brass, TextAnchor.MiddleLeft, tx, 98f, tw, 38f, "", 3f);
             Fit(_name, 30);
+            Fit(_role, UiScale.TypeMin);   // finisher: the two-line role ran past the panel and over DIFFICULTY
             _diffLabel = MenuUi.Label(Root, "Difficulty", CMTokens.Ui, UiScale.TypeSmall, CMTokens.WithAlpha(Cream, 0.85f), TextAnchor.MiddleLeft, tx, 140f, 130f, 26f, "DIFFICULTY", 2f);
             BuildPips(Root, tx + 132f, 145f, 16f, 8f);
             _bio = MenuUi.Fit(MenuUi.Label(Root, "Bio", CMTokens.Ui, UiScale.TypeBody, Cream, TextAnchor.UpperLeft, tx, 176f, tw, 70f, "", 2f), 21);
