@@ -450,6 +450,8 @@ namespace CriticalMass.Sim.Config
         public double Damage = 55;
         public double CarveRadius = 1;
         public double CooldownTicks = 150;
+        /// <summary>DG-22 (not in the browser, U-059): ticks from the throw until the bundle touches down (the TntLanded event; the fuse still counts from the throw) [guess: 0.4 s].</summary>
+        public double FlightTicks = 12;
 
         public DemolitionsTntConfig Clone() => (DemolitionsTntConfig)MemberwiseClone();
     }
@@ -482,13 +484,62 @@ namespace CriticalMass.Sim.Config
         /// human slot (actor 0). 0 = off (the default; every bot decision is the browser's).
         /// </summary>
         public double PassiveSeconds = 0;
+        /// <summary>DG-21: the Easy profile (WorldOptions.BotDifficulty). Normal has no profile: it is the browser code path.</summary>
+        public BotSkillConfig Easy = BotSkillConfig.EasyDefaults();
+        /// <summary>DG-21: the Hard profile.</summary>
+        public BotSkillConfig Hard = BotSkillConfig.HardDefaults();
 
         public BotsConfig Clone()
         {
             var c = (BotsConfig)MemberwiseClone();
             c.ClassMix = (double[])ClassMix.Clone();
+            c.Easy = Easy.Clone();
+            c.Hard = Hard.Clone();
             return c;
         }
+    }
+
+    /// <summary>
+    /// DG-21 bot skill profile (not in the browser; U-058). Every field changes one thing against the Normal bots; Normal itself
+    /// has no profile, so its decisions are the browser's bit for bit. All rolls are a stateless hash of seed, actor and tick
+    /// (BotSkill.Roll): no shared bot RNG draw moves, so the profile of one team never changes the other team's choices.
+    /// </summary>
+    public sealed class BotSkillConfig
+    {
+        /// <summary>Reaction delay: the think period is round(Normal period x this) ticks (Normal 8 at 30 Hz: Easy 12, Hard 4).</summary>
+        public double ThinkPeriodScale = 1;
+        /// <summary>Aim error: thrown or cast ability points (roots, mines, TNT) land up to this many units off, uniform over a disc.</summary>
+        public double AimErrorUnits = 0;
+        /// <summary>Aim: TNT aimed at a moving enemy leads it by velocity x fuse time x this (0 = aim where it stands, as Normal).</summary>
+        public double TntLeadFraction = 0;
+        /// <summary>Hesitation: share of 1/3-second windows in which the bot holds its melee swing.</summary>
+        public double SwingHesitation = 0;
+        /// <summary>Ability use: chance per think that a decided ability press (or TNT throw) is sent; else it waits for the next think.</summary>
+        public double AbilityChance = 1;
+        /// <summary>Ability use: a Warrior raises its shield with this many enemies within 3 (Normal 2).</summary>
+        public int ShieldCrowd = 2;
+        /// <summary>Target choice: weight enemies by carried cargo or meat (x CarrierWeight on distance squared) and by missing HP.</summary>
+        public bool FocusCarriers = false;
+        /// <summary>Target choice: distance-squared multiplier for a carrier when FocusCarriers is on.</summary>
+        public double CarrierWeight = 0.25;
+        /// <summary>Objective discipline: a hill holder's fight utility vs an enemy off the hill is multiplied by this (Normal 0.5).</summary>
+        public double OffHillChaseFactor = 0.5;
+        /// <summary>Objective discipline: a hurt bot retreats when an enemy is within this range (Normal 6).</summary>
+        public double RetreatRange = 6;
+
+        public static BotSkillConfig EasyDefaults() => new BotSkillConfig
+        {
+            ThinkPeriodScale = 1.5, AimErrorUnits = 1.5, TntLeadFraction = 0, SwingHesitation = 0.4, AbilityChance = 0.5,
+            ShieldCrowd = 3, FocusCarriers = false, OffHillChaseFactor = 1, RetreatRange = 6,
+        };
+
+        public static BotSkillConfig HardDefaults() => new BotSkillConfig
+        {
+            ThinkPeriodScale = 0.5, AimErrorUnits = 0, TntLeadFraction = 0.6, SwingHesitation = 0, AbilityChance = 1,
+            ShieldCrowd = 1, FocusCarriers = true, CarrierWeight = 0.25, OffHillChaseFactor = 0.25, RetreatRange = 3,
+        };
+
+        public BotSkillConfig Clone() => (BotSkillConfig)MemberwiseClone();
     }
 
     /// <summary>Camera and render tunables.</summary>

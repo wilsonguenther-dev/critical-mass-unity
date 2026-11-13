@@ -1032,3 +1032,59 @@ ceiling that the cleanse can reach. **Measured** (CM-36 driver, 5v5 seeds 1..100
 
 Berserk stays inside the CM-34 band [10, 50]. Pure bots still never cleanse; only the autopilot slot does.
 
+
+## U-058 Bot difficulty as built in DG-21: Easy, Normal, Hard (not in the browser) (2026-11-13T02:15:17Z)
+
+**Why.** The browser has no bot difficulty (git grep on 09e0904 and every cm/* branch finds none), so the rule is ours: the
+smallest one that meets row DG-21 (reaction delay, aim error, ability use, target choice, objective discipline).
+**Rule.** `WorldOptions.BotDifficulty` sets the bots of the team the human does not play (what match setup's "Bot
+difficulty" sets); `WorldOptions.AllyBotDifficulty` sets the human's own team (default Normal; the menu leaves it).
+Normal has no profile: every call site keeps the browser code path, so a Normal match is the browser match bit for bit
+(four golden state hashes taken on 798fa11 before any DG-21 code, test `DG21NormalIsTodaysBotsBitForBitOnTheGoldenSeeds`).
+Easy and Hard read `Bots.Easy` / `Bots.Hard` (`BotSkillConfig`). Every roll is a stateless hash of seed, actor, a salt and a
+tick bucket (`BotSkill.Roll`): no shared bot RNG draw moves.
+
+| Lever | Easy | Normal | Hard |
+| --- | --- | --- | --- |
+| Reaction: think period (ticks at 30 Hz) | 12 | 8 | 4 |
+| Aim error on roots and TNT (units, disc) | 1.5 | 0 | 0 |
+| TNT lead on a moving enemy (x velocity x fuse) | 0 | 0 | 0.6 |
+| Swing held in this share of 1/3 s windows | 0.4 | 0 | 0 |
+| Chance a decided ability press is sent per think | 0.5 | 1 | 1 |
+| Warrior shield: enemies within 3 | 3 | 2 | 1 |
+| Target choice | nearest | nearest | carriers x0.25 on d2, hurt enemies first |
+| Off-hill chase factor while holding | 1 | 0.5 | 0.25 |
+| Retreat when hurt and an enemy is within | 6 | 6 | 3 |
+
+**Measured** (5v5, CreateBrowser5v5, whole matches, actor 0 on autopilot). Hard vs Easy: Hard wins 20 of 20 as Azure and
+20 of 20 as Crimson (floor 14 of 20). The human proxy (Normal allies) wins 20/20 against Easy, 11/20 against Normal, 5/20
+against Hard. Hard was tuned on 30 seeds: the first cut (think 6, chase 0.35, retreat 8) won only as often as Normal (18 vs
+19 of 30); the faster think, the tighter hill discipline and the shield at one enemy each mattered (10 of 30 with all three).
+
+## U-059 The Demolitions Expert as built in DG-22: TNT and mines, ported from CM-38 with view events (2026-11-13T02:24:16Z)
+
+**Source.** The browser's Demolitions sim is on 09e0904 itself (cm/CM-38 is an ancestor: `src/sim/demolitions.ts`, D-068),
+so the rules are a port: mine on Space (place range 1.6, arms after 15 ticks, lives 1800, first grounded unprotected enemy
+in its cell triggers it, 70 damage within 1.2, two per owner and the oldest recycles, pad keep-outs), TNT on the DigPlace
+binding (F; Y on a controller) on the rising edge (range 5, 45-tick fuse, 55 damage within 2, own 150-tick cooldown), no
+regular attack, enemy barricades hit, breakable walls in the radius destroyed, and a crater of Floor / Bridge cells within 1
+(placed ground is Floor) decided cell by cell by the CM-30 dig rules (keep-outs, actors on the cell, the route guard) and
+refused inside the CM-30 world gap. Bots: the CM-38 `decideDemolitions` rule (TNT at the enemy or the centroid in range,
+else a mine on its own cell while holding the hill or fighting near it). The browser's six CM-38 unit cases are ported.
+**Departures (ours, flagged in the PR).**
+1. State is a World field (`World.Demolitions`, fixed pools, reset in `InitWorld`), the Unity pattern, not a side table.
+2. View events (appended before the CM-84 marker, `SimEvent.Radius` appended, nothing reordered): MinePlaced, MineArmed,
+   MineTriggered, MineRemoved (expired, ground gone, recycled), TntThrown, TntLanded, Explosion (B = mine or TNT, Value =
+   actors hurt). The browser's Ability events (cast, refusal codes, blasts with A = -1) are kept as they were.
+3. TNT touches down `DemolitionsTnt.FlightTicks` = 12 ticks after the throw (TntLanded) [guess: 0.4 s]; the fuse still
+   counts from the throw, so the blast tick is the browser's.
+4. Blast damage goes through `Damage.ApplyDamage(..., DamageCause.Explosion)`; a bot's blast respects the DG-16 passive
+   window like its swing; an exhausted bomb pool is counted (`Stats.PoolRefusals`), not logged.
+5. Difficulty (U-058) in the bot rule: Hard leads a moving target by 0.6 x velocity x fuse; Easy throws up to 1.5 units off
+   and only on half its thinks. Normal is the browser rule.
+6. The default bot ClassMix keeps Demolitions at 0, so default matches (and every existing outcome band, including the
+   passive-team sweep that has no margin) are unchanged. Bots play the class whenever a config gives it a share; the soak
+   uses 3 of 16 per team (the browser soak's count). Turning it on by default is the owner's call after the integrator's
+   soak: in the 16v16 soak (seed 101, 3 per team) the six Demolitions bots score 144 blast knock-outs to 109 deaths at
+   Normal, the most lethal class per head, so a damage or cooldown pass may be wanted first.
+7. On-screen names live in one place, `DemolitionsNames` (MINE, TNT, DEMOLITIONS); GameHud's AbilityNames should read them.

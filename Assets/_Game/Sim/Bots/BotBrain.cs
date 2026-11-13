@@ -57,7 +57,9 @@ namespace CriticalMass.Sim.Bots
                 a.MeatPickup = (id == 0 && !human) || st.Role[id] == BotsState.RoleKaiju;
                 if (id == 0 && !human) continue;
                 if (!a.Alive) continue;
-                if ((tick + id) % period == 0 || a.AiState == AiState.None) BotFsm.ThinkBot(w, st, id);
+                // DG-21 reaction delay: Easy / Hard scale the think period (Normal keeps ThinkPeriod).
+                int p = BotSkill.ThinkPeriod(w, id, period);
+                if ((tick + id) % p == 0 || a.AiState == AiState.None) BotFsm.ThinkBot(w, st, id);
             }
         }
 
@@ -71,7 +73,8 @@ namespace CriticalMass.Sim.Bots
             output.Jump = false;
             output.TerraformSwitch = false; // DG-09: bots never switch the dig / place mode (they never dig: oracle CM-30)
             BotSteer.SteerBot(w, st, id, output);
-            // ITEM CM-38: added by its owner (takeBotTnt: Demolitions bot's F press)
+            // DG-22 (CM-38): a Demolitions bot's queued TNT throw (BotFsm.DecideDemolitions) is its one press, aimed at the throw point.
+            Demolitions.TakeBotTnt(w, id, output);
         }
     }
 }
