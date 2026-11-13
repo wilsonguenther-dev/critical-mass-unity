@@ -4,7 +4,7 @@ Unity skips this `_source~` folder and imports `../Healer.fbx` (Rig + `Healer_Bo
 `handslot.l`), `../HealerProps.fbx` (static `Healer_BloomGauntlet_Prop`, `Healer_Lantern_Prop`) and `../HealerFace.png`
 (assign to `CM_FaceDecal`: alpha decal, no outline pass).
 
-Design (v2, artist direction): armoured front-line battle healer, no sword. Heal = bloom gauntlet (right hand, part of
+Design (version 2, artist direction): armoured winged battle healer, no sword. Living-leaf wings rigid on `chest`. Heal = bloom gauntlet (right hand, part of
 the body mesh, lime biomass orb). Remove corruption = cleansing lantern (left hand, warm cream-gold light).
 
 | File | What |
@@ -19,7 +19,13 @@ the body mesh, lime biomass orb). Remove corruption = cleansing lantern (left ha
 Reused unchanged from this branch: `../../Characters/_source~/cm_art` (rig, kit, FBX recipe) and
 `../../Miner/_source~/miner_art` (mkit, toon3; their palette module is swapped for hpal at import).
 
-## Rebuild
+## Rebuild (one Blender launch: `run_all.py` = build + export + verify + renders)
+```sh
+~/bin/cm-heavy blender perl -e 'alarm 2400; exec @ARGV' /Applications/Blender.app/Contents/MacOS/Blender -b --factory-startup --python-exit-code 1 -P run_all.py -- /tmp/healer-r 600
+python3 compare_healer.py /tmp/healer-r ~/Obsidian/Wilson-Brain/Projects/Kaiju-Demo/unity-port/healer-v2
+```
+
+## Rebuild step by step (older)
 ```sh
 B=/Applications/Blender.app/Contents/MacOS/Blender; H="perl -e 'alarm 1500; exec @ARGV'"
 cd "Assets/_Game/Art/Healer/_source~"

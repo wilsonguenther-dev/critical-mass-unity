@@ -130,7 +130,7 @@ gameplay_extras = [ground, blob, ref_blob] + refsil
 for ob in gameplay_extras:
     ob.hide_render = True
 
-INNER = {"feat_face", "feat_team_cloth", "feat_tabard_detail", "feat_tasset_detail", "feat_greave_detail", "feat_pauldron_detail", "feat_breastplate_detail", "feat_gauntlet_detail", "feat_belt_detail", "feat_satchel_detail",
+INNER = {"feat_wing_detail", "feat_bodice_trim", "feat_tabard_trim", "feat_face", "feat_team_cloth", "feat_tabard_detail", "feat_tasset_detail", "feat_greave_detail", "feat_pauldron_detail", "feat_breastplate_detail", "feat_gauntlet_detail", "feat_belt_detail", "feat_satchel_detail",
          "feat_bandage", "feat_mantle_detail", "feat_lantern_detail", "feat_brooch", "feat_biomass"}
 
 

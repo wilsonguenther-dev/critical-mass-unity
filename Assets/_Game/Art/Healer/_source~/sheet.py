@@ -55,7 +55,7 @@ def row(paths, labels, H=520, title=None):
 if WHAT in ("turnaround", "all"):
     views = ["front", "three-quarter", "profile", "back"]
     save_jpg(row([f"{R}/ortho_{v}_azure.png" for v in views], views, 560,
-                 "Healer v2 battle-healer turnaround (proposed class, Azure, KayKit Idle frame 1)"), f"{OUT}/turnaround.jpg")
+                 "Healer version 2: winged battle healer turnaround (proposed class, Azure, KayKit Idle frame 1)"), f"{OUT}/turnaround.jpg")
 if WHAT in ("face", "all"):
     save_jpg(on_paper(f"{R}/face_closeup.png"), f"{OUT}/face-closeup.jpg", maxw=1000)
 if WHAT in ("props", "all"):

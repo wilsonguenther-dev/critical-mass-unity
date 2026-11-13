@@ -12,7 +12,7 @@ biomass heart-gem, stone tassets over a knee-length navy skirt, stone greaves, a
 v1 notes (kept where still true): Silver-white double buns with team ribbons and a
 lime sprout, a cream shoulder mantle open at the front, a team stole with a gem brooch, a navy coat with a BELL SKIRT
 (the only skirt of the six classes: an A-line silhouette against five pairs of trouser legs), a linen medic apron with
-a lime leaf, bandage-wrapped forearms, a leather satchel of glowing lime sprouts on the right hip.
+a lime leaf, bandage-wrapped forearms (v2.1: satchel replaced by belt vials and pouches).
   Heal prop      Healer_BloomCan  (right hand): oversized brass watering can full of glowing lime biomass, sprouts
                                                 growing out of it, rose on the spout
   Cleanse prop   Healer_Lantern   (left hand):  brass hand lantern on a short grip, warm cream-gold light (the opposite
@@ -137,14 +137,14 @@ def shell_sector(prof, a0, a1, seg, thick, sy=1.0, off=0.0, cx=0.0):
     return bm
 
 
-def leaf_shape(L, W):
-    """Pointed leaf outline in local XY, tip at +Y."""
+def leaf_shape(L, W, n=8):
+    """Pointed leaf outline in local XY, tip at +Y; n = segments per side (2n points)."""
     pts = []
-    for k in range(9):
-        t = k / 8
+    for k in range(n + 1):
+        t = k / n
         pts.append((W * math.sin(math.pi * t) * (1 - 0.35 * t), L * t - L * 0.1))
-    for k in range(7, 0, -1):
-        t = k / 8
+    for k in range(n - 1, 0, -1):
+        t = k / n
         pts.append((-W * math.sin(math.pi * t) * (1 - 0.35 * t), L * t - L * 0.1))
     return pts
 
@@ -174,15 +174,15 @@ def build_legs():
             ["hips", up, lo], "leggings", m=M((lx, 0.0, 0)))
         # short leather boots, rounded toe, fold-down cuff with a linen bandage wrap
         add(BODY, B.cyl((lx, 0.01, 0.05), (lx, 0.01, 0.27), 0.145, 0.135, 12), "leather", [lo, ft], "boots")
-        add(BODY, B.torus(0.14, 0.035, 12, 4), "leather_dark", lo, "boots", m=M((lx, 0.01, 0.275)))
+        add(BODY, B.torus(0.14, 0.032, 12, 4), "brass", lo, "boots", m=M((lx, 0.01, 0.275)))
         GR = M((lx, -0.14, 0.22), (90 - 8, 0, 0))     # v2 stone greave on the shin, two brass rivets
         add(BODY, B.prism(chipped(0.19, 0.20, (0.03, 0.015, 0.035, 0.01)), 0.045, 0.012), "stone_light", [lo, ft],
             "greave", smooth=False, m=GR)
         for x in (-0.06, 0.06):
             add(BODY, B.cyl((0, 0, 0), (0, 0, 0.014), 0.016, 0.011, 5), "brass_dark", [lo, ft], "greave_detail",
                 smooth=False, m=GR @ M((x, 0.06, 0.022)))
-        add(BODY, box((0.28, 0.32, 0.14), 0.05, 2), "leather", [ft, to], "boots", m=M((lx + 0.01 * s, -0.06, 0.075)))
-        add(BODY, B.sphere((0.14, 0.11, 0.08), 10, 6), "leather", to, "boots", m=M((lx + 0.01 * s, -0.20, 0.078)))
+        add(BODY, box((0.28, 0.32, 0.14), 0.05, 1), "leather", [ft, to], "boots", m=M((lx + 0.01 * s, -0.06, 0.075)))
+        add(BODY, B.sphere((0.14, 0.11, 0.08), 10, 6), "stone_light", to, "boots", m=M((lx + 0.01 * s, -0.20, 0.078)))
         add(BODY, box((0.26, 0.40, 0.04), 0.018, 1), "leather_dark", [ft, to], "boots", smooth=False,
             m=M((lx + 0.01 * s, -0.09, 0.02)))
         add(BODY, box((0.07, 0.03, 0.05), 0.012, 1), "brass", lo, "boots", smooth=False,
@@ -200,7 +200,7 @@ def build_torso():
     add(BODY, B.lathe(list(reversed(SKIRT)), 20), "navy", SK, "skirt", m=M((0, 0, 0), (0, 0, 0), (1, SKIRT_SY, 1)))
     # cream hem band: the bell outline gets a light rim from every angle
     add(BODY, B.torus(0.50, 0.03, 20, 4), "cream", SK, "skirt_hem", m=M((0, 0, 0.315), (0, 0, 0), (1, SKIRT_SY, 1)))
-    add(BODY, B.lathe(TORSO, 16), "navy", ["hips", "spine", "chest"], "bodice",
+    add(BODY, B.lathe(TORSO, 16), "stone_light", ["hips", "spine", "chest"], "bodice",
         m=M((0, 0, 0), (0, 0, 0), (1, TORSO_SY, 1)))
     # belt and buckle
     add(BODY, B.cyl((0, 0, 0.785), (0, 0, 0.865), 0.262, 0.262, 18), "leather", {"hips": 0.5, "spine": 0.5}, "belt",
@@ -209,53 +209,68 @@ def build_torso():
         m=M((0, -0.225, 0.825)))
     add(BODY, box((0.05, 0.03, 0.04), 0.0), "leather_dark", {"hips": 0.5, "spine": 0.5}, "belt_detail", smooth=False,
         m=M((0, -0.243, 0.825)))
-    # v2: cream tabard panel down the front with the lime leaf
-    ap_rows = [(interp(SKIRT, z), z) for z in (0.80, 0.70, 0.60, 0.50, 0.40)]
-    add(BODY, shell_sector(ap_rows, -90 - 24, -90 + 24, 6, 0.02, SKIRT_SY, 0.008), "cream", SK, "tabard", smooth=True)
-    z = 0.62
-    lf = M((0, -(interp(SKIRT, z) + 0.028) * SKIRT_SY - 0.012, z), (90 - 30, 0, 0))
-    add(BODY, B.prism(leaf_shape(0.17, 0.068), 0.024), "lime", SK, "biomass", smooth=False, m=lf, grad=False)
-    add(BODY, B.prism(leaf_shape(0.12, 0.010), 0.034), "leaf", SK, "tabard_detail", smooth=False, m=lf)
-    # stone tassets hanging from the belt over the skirt, each in a brass backing plate with a rivet
-    for ang in (-90 - 52, -90 + 52, -90 - 100, -90 + 100, 90 - 30, 90 + 30):
+    # v2.1 fitted armoured bodice: brass trim at the waist and neckline, brass centre ridge, lime heart-gem in a
+    # brass sunburst bezel (healing radiates from here)
+    W3 = ["spine", "chest"]
+    for z, sc in ((0.875, 1.0), (1.175, 1.0)):
+        r = interp(TORSO, z) + 0.01
+        add(BODY, B.torus(r, 0.024, 16, 3), "brass", W3, "bodice_trim", m=M((0, 0, z), (0, 0, 0), (1, TORSO_SY, 1)))
+    for z0, z1 in ((0.89, 0.97), (1.06, 1.16)):
+        za, zb = (z0, z1)
+        bm, mm = strap((0, -interp(TORSO, za) * TORSO_SY - 0.012, za), (0, -interp(TORSO, zb) * TORSO_SY - 0.012, zb),
+                       0.05, 0.03, (0, -1, 0))
+        add(BODY, bm, "brass", W3, "bodice_trim", smooth=False, m=mm)
+    P = M((0, -interp(TORSO, 1.015) * TORSO_SY - 0.006, 1.015), (90 - 8, 0, 0))
+    add(BODY, B.lathe([(0.115, 0.0), (0.125, 0.02), (0.10, 0.04)], 12), "brass", W3, "breastplate", smooth=False, m=P)
+    for k in range(8):           # sunburst rays
+        a_ = math.radians(22.5 + 45 * k)
+        add(BODY, B.prism([(-0.022, 0.0), (0.022, 0.0), (0.0, 0.075)], 0.03), "brass_dark", W3, "breastplate_detail",
+            smooth=False, m=P @ M((0.10 * math.cos(a_), 0.10 * math.sin(a_), 0.018), (0, 0, math.degrees(a_) - 90)))
+    add(BODY, mkit.MinerBuilder.crystal(0.085, 0.07, 6, 0.8, 0.55), "lime_light", W3, "biomass", smooth=False,
+        m=P @ M((0, 0, 0.035), (0, 0, 30)), grad=False)
+    # linen tabard front and back, brass-trimmed edges, embroidered biomass emblem (ring, leaf, two side leaves)
+    rows = [(interp(SKIRT, z) + (0.03 if z < 0.37 else 0.0), z) for z in (0.81, 0.70, 0.58, 0.46, 0.36, 0.30)] + [(0.527, 0.24)]
+    for c, ang0 in (("front", -90), ("back", 90)):
+        add(BODY, shell_sector(rows, ang0 - 22, ang0 + 22, 6, 0.02, SKIRT_SY, 0.008), "linen", SK, "tabard")
+        for sgn in (-1, 1):
+            add(BODY, shell_sector(rows, ang0 + sgn * 22 - (2.5 if sgn > 0 else 0), ang0 + sgn * 22 + (0 if sgn > 0 else 2.5),
+                                   1, 0.028, SKIRT_SY, 0.008), "brass", SK, "tabard_trim")
+        add(BODY, shell_sector([(0.527, 0.27), (0.527, 0.24)], ang0 - 22, ang0 + 22, 6, 0.028, SKIRT_SY, 0.008),
+            "brass", SK, "tabard_trim")
+    z = 0.58
+    EM = M((0, -(interp(SKIRT, z) + 0.028) * SKIRT_SY - 0.012, z), (90 - 30, 0, 0))
+    add(BODY, B.torus(0.10, 0.013, 16, 3), "leaf", SK, "tabard_detail", m=EM)
+    add(BODY, B.prism(leaf_shape(0.16, 0.06), 0.024), "lime", SK, "biomass", smooth=False, m=EM @ M((0, -0.07, 0)), grad=False)
+    add(BODY, B.prism(leaf_shape(0.11, 0.009), 0.034), "leaf", SK, "tabard_detail", smooth=False, m=EM @ M((0, -0.07, 0)))
+    for sgn in (-1, 1):
+        add(BODY, B.prism(leaf_shape(0.08, 0.03), 0.024), "lime", SK, "biomass", smooth=False,
+            m=EM @ M((0.03 * sgn, -0.05, 0), (0, 0, -50 * sgn)), grad=False)
+    # stone tassets on the hips only (sides), brass backing, rivet
+    for ang in (-90 - 72, -90 + 72, 90 - 72 + 180 - 180 + 18, 90 + 72 - 18):
         ar = math.radians(ang)
         z = 0.68
         r = interp(SKIRT, z) + 0.03
         o = (r * math.cos(ar), r * math.sin(ar) * SKIRT_SY, z)
         nrm = Vector((math.cos(ar), math.sin(ar) * SKIRT_SY, 0.42)).normalized()
         TM = kit.frame(o, nrm, (0, 0, 1))
-        add(BODY, B.prism(chipped(0.23, 0.25, (0.03, 0.02, 0.04, 0.015)), 0.035, 0.01), "brass", SK, "tasset",
+        add(BODY, B.prism(chipped(0.22, 0.24, (0.03, 0.02, 0.04, 0.015)), 0.035, 0.0), "brass", SK, "tasset",
             smooth=False, m=TM)
-        add(BODY, B.prism(chipped(0.19, 0.21, (0.035, 0.015, 0.03, 0.02)), 0.04, 0.012), "stone_light", SK, "tasset",
+        add(BODY, B.prism(chipped(0.18, 0.20, (0.035, 0.015, 0.03, 0.02)), 0.04, 0.0), "stone_light", SK, "tasset",
             smooth=False, m=TM @ M((0, -0.005, 0.02)))
-        add(BODY, B.cyl((0, 0, 0), (0, 0, 0.014), 0.016, 0.011, 5), "brass_dark", SK, "tasset_detail", smooth=False,
-            m=TM @ M((0, 0.07, 0.04)))
-    # stone breastplate in a brass frame with the lime biomass heart-gem (healing radiates from here)
-    P = M((0, -0.228, 1.00), (90 - 12, 0, 0))
-    W3 = ["spine", "chest"]
-    add(BODY, B.prism(chipped(0.36, 0.32, (0.05, 0.05, 0.05, 0.05)), 0.05, 0.012), "brass", W3, "breastplate",
-        smooth=False, m=P)
-    add(BODY, B.prism(chipped(0.30, 0.26, (0.045, 0.02, 0.05, 0.015)), 0.05, 0.012), "stone_light", W3, "breastplate",
-        smooth=False, m=P @ M((0, 0, 0.018)))
-    add(BODY, B.lathe([(0.075, 0.0), (0.082, 0.02), (0.07, 0.035)], 6), "brass", W3, "breastplate_detail",
-        smooth=False, m=P @ M((0, 0, 0.035), (0, 0, 30)))
-    add(BODY, mkit.MinerBuilder.crystal(0.068, 0.06, 6, 0.8, 0.55), "lime", W3, "biomass", smooth=False,
-        m=P @ M((0, 0, 0.05), (0, 0, 30)), grad=False)
-    # satchel of glowing sprouts on her right hip, hung from the belt
-    SW = {"hips": 0.7, "spine": 0.3}
-    SM = M((-0.33, -0.02, 0.69), (0, 0, 20))
-    add(BODY, box((0.22, 0.13, 0.19), 0.035, 2), "leather", SW, "satchel", m=SM)
-    add(BODY, box((0.235, 0.145, 0.07), 0.025, 1), "leather_dark", SW, "satchel", m=SM @ M((0, -0.004, 0.075)))
-    add(BODY, box((0.045, 0.02, 0.05), 0.0), "brass", SW, "satchel_detail", smooth=False, m=SM @ M((0, -0.08, 0.05)))
-    add(BODY, box((0.04, 0.03, 0.10), 0.0), "leather_dark", SW, "satchel_detail", smooth=False,
-        m=SM @ M((0.07, 0.0, 0.14)))
-
-    def sp(bm, color, smooth, m, grad):
-        add(BODY, bm, color, SW, "biomass", smooth=smooth, m=m, grad=grad)
-    for (dx, dy, h, lx, ly) in ((-0.06, 0.02, 0.17, -0.04, 0.0), (0.0, -0.02, 0.22, 0.0, -0.02),
-                                (0.06, 0.03, 0.15, 0.04, 0.01)):
-        b0 = SM @ Vector((dx, dy, 0.09))
-        sprout(sp, tuple(b0), h, (lx, ly, 0), 1.0)
+    # belt: three lime healing vials on her left front, two pouches with flaps on her right
+    BW = {"hips": 0.6, "spine": 0.4}
+    for k, th in enumerate((-60, -40, -20)):
+        x, y = -0.262 * math.sin(math.radians(th)), -0.262 * 0.84 * math.cos(math.radians(th)) + 0.008
+        add(BODY, B.cyl((x, y - 0.02, 0.72), (x, y - 0.02, 0.86), 0.028, 0.028, 6), "lime_light", BW, "biomass",
+            smooth=True, grad=False)
+        add(BODY, B.cyl((x, y - 0.02, 0.86), (x, y - 0.02, 0.89), 0.02, 0.02, 6), "wood", BW, "belt_detail")
+        add(BODY, B.cyl((x, y - 0.02, 0.79), (x, y - 0.02, 0.81), 0.033, 0.033, 6), "brass", BW, "belt_detail")
+    for th in (35, 62):
+        a_ = math.radians(-90 - th)
+        pm = M((0.30 * math.cos(a_), 0.30 * math.sin(a_) * 0.86, 0.765), (0, 0, -th))
+        add(BODY, box((0.12, 0.08, 0.13), 0.025, 1), "leather", BW, "belt", m=pm)
+        add(BODY, box((0.13, 0.09, 0.05), 0.02, 1), "leather_dark", BW, "belt", smooth=False, m=pm @ M((0, -0.003, 0.05)))
+        add(BODY, box((0.03, 0.02, 0.03), 0.0), "brass", BW, "belt_detail", smooth=False, m=pm @ M((0, -0.05, 0.03)))
 
 
 def build_arms():
@@ -298,14 +313,18 @@ def build_gauntlet(obj, bones, post=None):
     for k in range(3):
         g(B.cyl((0, 0, 0), (0, 0, 0.014), 0.015, 0.011, 5), "brass_dark", bh, "gauntlet_detail", smooth=False,
           m=M((-1.0, -0.10 + 0.09 * k, 1.17)))
-    g(B.lathe([(0.10, 0.0), (0.112, 0.03), (0.088, 0.05)], 8), "brass_dark", bh, "gauntlet_detail", smooth=False,
-      m=M((-0.89, 0, 1.235)))
-    g(B.sphere((0.085, 0.085, 0.075), 10, 7), "lime_light", bh, "biomass", m=M((-0.89, 0, 1.285)), grad=False)
+    g(B.lathe([(0.115, 0.0), (0.13, 0.03), (0.10, 0.055)], 8), "brass_dark", bh, "gauntlet_detail", smooth=False,
+      m=M((-0.89, 0, 1.23)))
+    g(B.sphere((0.12, 0.12, 0.11), 12, 8), "lime_light", bh, "biomass", m=M((-0.89, 0, 1.31)), grad=False)
+    for k in range(4):              # brass claws gripping the orb
+        a_ = math.radians(45 + 90 * k)
+        cx, cy = -0.89 + 0.105 * math.cos(a_), 0.105 * math.sin(a_)
+        g(B.spike((cx, cy, 1.25), (-0.89 + 0.06 * math.cos(a_), 0.06 * math.sin(a_), 1.40), 0.024, 5,
+                  (0.035 * math.cos(a_), 0.035 * math.sin(a_), 0)), "brass", bh, "gauntlet_detail", smooth=True)
 
     def sp(bm, color, smooth, m, grad):
         g(bm, color, bh, "biomass", smooth, m, grad)
-    sprout(sp, (-0.86, 0.035, 1.32), 0.10, (0.0, 0.03, 0), 0.8)
-    sprout(sp, (-0.93, -0.03, 1.32), 0.08, (-0.02, -0.02, 0), 0.7, bud=False)
+    sprout(sp, (-0.86, 0.04, 1.40), 0.09, (0.0, 0.03, 0), 0.8)
 
 
 MANTLE = [(0.19, 1.285), (0.29, 1.25), (0.37, 1.18), (0.415, 1.09), (0.435, 0.985)]
@@ -329,24 +348,52 @@ def build_pauldrons():
     team gem on top."""
     for s, sd in ((1, "l"), (-1, "r")):
         W = {f"upperarm.{sd}": 0.6, "chest": 0.4}
-        PADM = kit.frame((0.34 * s, -0.01, 1.215), (0.72 * s, -0.12, 0.68), (0, 0, 1))
-        add(BODY, B.lathe([(0.205, -0.08), (0.215, 0.0), (0.19, 0.08), (0.125, 0.135), (0.03, 0.152)], 10),
+        PADM = kit.frame((0.315 * s, -0.01, 1.205), (0.62 * s, -0.10, 0.78), (0, 0, 1))   # v2.1 smaller, rounder
+        add(BODY, B.lathe([(0.16, -0.07), (0.168, 0.0), (0.152, 0.07), (0.105, 0.125), (0.045, 0.15), (0.0, 0.155)], 10),
             "stone_light", W, "pauldron", m=PADM)
-        add(BODY, B.torus(0.212, 0.032, 12, 4), "brass", W, "pauldron", m=PADM @ M((0, 0, -0.01)))
-        add(BODY, B.lathe([(0.20, -0.135), (0.225, -0.10), (0.215, -0.065), (0.17, -0.07)], 10), "brass_dark", W,
+        add(BODY, B.torus(0.166, 0.028, 12, 4), "brass", W, "pauldron", m=PADM @ M((0, 0, -0.01)))
+        add(BODY, B.lathe([(0.155, -0.125), (0.178, -0.095), (0.17, -0.06), (0.13, -0.065)], 10), "brass_dark", W,
             "pauldron_detail", m=PADM)
         for k in range(3):
             a = math.radians(-60 + 60 * k)
             add(BODY, B.cyl((0, 0, 0), (0, 0, 0.014), 0.016, 0.011, 5), "brass_dark", W, "pauldron_detail",
-                smooth=False, m=PADM @ kit.frame((0.16 * math.cos(a), 0.16 * math.sin(a), 0.075),
+                smooth=False, m=PADM @ kit.frame((0.125 * math.cos(a), 0.125 * math.sin(a), 0.08),
                                                  (math.cos(a), math.sin(a), 1.0), (0, 0, 1)))
-        B.add_crystal(BODY, W, "team_glow", PADM @ M((0, 0, 0.14), (0, 0, 30)), 0.045, 0.045, seg=6, waist=0.8, cap=0.55)
+        B.add_crystal(BODY, W, "team_glow", PADM @ M((0, 0, 0.145), (0, 0, 30)), 0.04, 0.04, seg=6, waist=0.8, cap=0.55)
+
+
+def build_wings():
+    """v2.1 LIVING-LEAF WINGS (ours: this world's biomass, not feathers): three broad deep-green leaf blades per side
+    fan up and out from a brass hinge boss between the shoulder blades, each with a glowing lime central vein and two
+    side veins. Rigid on `chest` (no new joints); they sit behind the cape and pauldrons, clear of the Idle arms."""
+    W = "chest"
+    zc = 1.13
+    yb = (interp(MANTLE, zc) + 0.035) * MANTLE_SY
+    add(BODY, B.lathe([(0.10, 0.0), (0.11, 0.035), (0.075, 0.06)], 8), "brass", W, "wing_mount", smooth=False,
+        m=M((0, yb - 0.005, zc), (-90, 0, 0)))
+    add(BODY, mkit.MinerBuilder.crystal(0.05, 0.045, 6, 0.8, 0.55), "lime_light", W, "biomass", smooth=False,
+        grad=False, m=kit.frame((0, yb + 0.05, zc), (0, 1, 0), (0, 0, 1)))
+    blades = (((0.56, 0.24, 0.80), 0.94, 0.23), ((0.95, 0.24, 0.26), 0.80, 0.20), ((0.84, 0.26, -0.40), 0.48, 0.15))
+    for s in (1, -1):
+        b0 = Vector((0.06 * s, yb + 0.03, zc + 0.01))
+        add(BODY, B.sphere((0.06, 0.05, 0.06), 8, 5), "brass_dark", W, "wing_mount", m=M(tuple(b0)))
+        for d, L, Wd in blades:
+            dv = Vector((d[0] * s, d[1], d[2])).normalized()
+            nrm = Vector((0, 1, 0))
+            nrm = (nrm - dv * nrm.dot(dv)).normalized()
+            F = kit.frame(tuple(b0 + dv * 0.1 * L), nrm, dv)
+            add(BODY, B.prism(leaf_shape(L, Wd, 6), 0.045), "leaf_dark", W, "wing", smooth=False, m=F)
+            vbm, vmm = strap((0, -0.02 * L, 0), (0, 0.78 * L, 0), 0.03, 0.06, (0, 0, 1), bevel=0.0)
+            add(BODY, vbm, "lime", W, "wing_detail", smooth=False, m=F @ vmm, grad=False)
+            for sg in (1, -1):
+                sbm, smm = strap((0, 0.3 * L, 0), (sg * Wd * 0.55, 0.55 * L, 0), 0.02, 0.055, (0, 0, 1), bevel=0.0)
+                add(BODY, sbm, "lime", W, "wing_detail", smooth=False, m=F @ smm, grad=False)
 
 
 def build_neck():
     add(BODY, B.cyl((0, 0, 1.17), (0, 0, 1.33), 0.088, 0.085, 8), "skin", ["chest", "head"], "skin")
     # team stole: collar roll over the mantle, two tails down the apron bib, gem brooch
-    add(BODY, B.torus(0.215, 0.085, 16, 6), "kerchief", "chest", "team_cloth",
+    add(BODY, B.torus(0.215, 0.085, 14, 5), "kerchief", "chest", "team_cloth",
         m=M((0, 0.0, 1.285), (6, 0, 0), (1.0, 0.86, 0.75)))
     for s in (1, -1):    # v2: short stole tails beside the breastplate (bible scarf amount, clear of the plate)
         pts = [(0.15 * s, -0.20, 1.24), (0.20 * s, -0.215, 1.14), (0.215 * s, -0.215, 1.04)]
@@ -391,7 +438,7 @@ def face_plane(rows=4, cols=8):
 
 def build_head():
     H = "head"
-    add(BODY, B.sphere(HEAD_R, 24, 16), "skin", H, "skin", m=M(HEAD_C))
+    add(BODY, B.sphere(HEAD_R, 20, 14), "skin", H, "skin", m=M(HEAD_C))
     for s in (1, -1):
         add(BODY, B.sphere((0.035, 0.05, 0.065), 6, 4), "skin_shadow", H, "skin", m=M((0.295 * s, 0.02, 1.48)))
         # simple soft brows: thin arcs, silver like the hair (light on brown skin reads)
@@ -447,7 +494,7 @@ def lock(pts, widths, thick_k=0.62, seg=8, center=(0.0, 0.02, 1.52)):
 
 def build_hair():
     H = "head"
-    add(BODY, B.sphere((0.322, 0.292, 0.282), 20, 12), "hair", H, "hair", m=M((0, 0.062, 1.56)))
+    add(BODY, B.sphere((0.322, 0.292, 0.282), 16, 10), "hair", H, "hair", m=M((0, 0.062, 1.56)))
     # v1.2 fringe: three smooth swept locks from a side part on her left, sweeping to her right, rounded ends. Lock
     # centre lines sit on the forehead surface (v1.1 floated 8 cm proud and hid the face from the gameplay camera)
     def fp(x, z, proud=0.022):
@@ -463,7 +510,7 @@ def build_hair():
                         (0.315 * s, -0.10, 1.32)], [0.072, 0.066, 0.056, 0.042]), "hair", H, "hair")
     # short braid down the back with a team ribbon tie (back read)
     for k, (z, r) in enumerate(((1.47, 0.085), (1.39, 0.078), (1.315, 0.07), (1.245, 0.06))):
-        add(BODY, B.sphere((r * 1.05, r * 0.85, r), 10, 6), "hair", H, "hair",
+        add(BODY, B.sphere((r * 1.05, r * 0.85, r), 8, 5), "hair", H, "hair",
             m=M((0.012 * (1 if k % 2 else -1), 0.31 + 0.02 * k, z), (0, 18 * (1 if k % 2 else -1), 0)))
     add(BODY, B.torus(0.045, 0.02, 10, 4), "kerchief", H, "team_cloth", m=M((0, 0.37, 1.205), (12, 0, 0)))
     add(BODY, lock([(0, 0.37, 1.20), (0, 0.39, 1.13), (0.0, 0.395, 1.08)], [0.05, 0.045, 0.03], center=(0, 0, 1.2)),
@@ -472,12 +519,17 @@ def build_hair():
     for s in (1, -1):
         c = Vector((0.205 * s, 0.05, 1.795))
         d = (c - Vector((0, 0.02, 1.52))).normalized()
-        add(BODY, B.sphere((0.135, 0.135, 0.135), 14, 9), "hair", H, "hair", m=M(tuple(c)))
+        add(BODY, B.sphere((0.135, 0.135, 0.135), 12, 8), "hair", H, "hair", m=M(tuple(c)))
         add(BODY, B.torus(0.105, 0.03, 12, 4), "kerchief", H, "team_cloth",
             m=kit.frame(tuple(c - d * 0.075), d, (0, 1, 0)))
         add(BODY, B.spike(tuple(c - d * 0.08 + Vector((0.03 * s, 0.09, -0.02))),
                           tuple(c - d * 0.08 + Vector((0.07 * s, 0.17, -0.16))), 0.035, 5, (0.02 * s, 0.01, 0)),
             "kerchief", H, "team_cloth")   # ribbon tail
+    # v2.1 brass circlet at the hairline (front low over the fringe, back high), lime gem at the brow, two brass
+    # leaves rising beside the buns
+    add(BODY, B.torus(0.255, 0.019, 20, 3), "brass", H, "circlet", m=M((0, -0.005, 1.752), (11, 0, 0), (1.03, 1.0, 1.0)))
+    add(BODY, mkit.MinerBuilder.crystal(0.034, 0.032, 6, 0.8, 0.55), "lime_light", H, "biomass", smooth=False,
+        grad=False, m=kit.frame((0, -0.258, 1.703), (0, -0.96, 0.28), (0, 0, 1)))
     # lime sprout tucked into her left bun; tip lands exactly on TOP_Z
 
     def sp(bm, color, smooth, m, grad):
@@ -553,10 +605,20 @@ def build_lantern(obj, bones, T):
         a = math.radians(30 + 60 * k + 30)
         r0, r1 = 0.125, 0.11
         bm, mm = strap((r0 * math.cos(a), r0 * math.sin(a), 0.175), (r1 * math.cos(a), r1 * math.sin(a), 0.405), 0.03,
-                       0.03, (math.cos(a), math.sin(a), 0), bevel=0.008)
+                       0.03, (math.cos(a), math.sin(a), 0), bevel=0.0)
         q(bm, "brass_dark", feat="lantern_detail", m=mm)
     q(B.lathe([(0.135, 0.395), (0.13, 0.43), (0.085, 0.48), (0.035, 0.51)], 6), "brass", m=M((0, 0, 0), (0, 0, 30)))
-    q(B.torus(0.055, 0.016, 10, 4), "brass_dark", m=M((0, 0, 0.55), (90, 0, 0)))
+    q(B.torus(0.055, 0.016, 10, 4), "brass_dark", m=M((0, 0, 0.62), (90, 0, 0)))
+    # v2.1 ornate: brass spire, a crown of six brass leaves round the cap, three claw feet under the base
+    q(B.lathe([(0.04, 0.50), (0.03, 0.56), (0.0, 0.60)], 6), "brass_dark", m=M((0, 0, 0), (0, 0, 30)))
+    for k in range(6):
+        a_ = math.radians(60 * k)
+        q(B.prism(leaf_shape(0.09, 0.03, 4), 0.016), "brass", feat="lantern_detail",
+          m=kit.frame((0.125 * math.cos(a_), 0.125 * math.sin(a_), 0.43), (math.cos(a_), math.sin(a_), 0.6), (0, 0, 1)))
+    for k in range(3):
+        a_ = math.radians(120 * k + 30)
+        q(B.spike((0.10 * math.cos(a_), 0.10 * math.sin(a_), 0.13), (0.15 * math.cos(a_), 0.15 * math.sin(a_), 0.05),
+                  0.022, 5), "brass_dark", feat="lantern_detail")
     B.add_crystal(obj, bones, "team_glow", U @ M((0, 0, 0.49), (0, 0, 30)), 0.05, 0.075, seg=6, waist=0.85, cap=0.45,
                   post=T)
 
@@ -619,6 +681,7 @@ def main():
     build_arms()
     build_mantle()
     build_pauldrons()
+    build_wings()
     build_neck()
     build_head()
     build_hair()

@@ -183,7 +183,7 @@ row = []
 for code, name in (("06", "Warrior (bible p06)"), ("07", "Farmer (bible p07)"), ("08", "Miner (bible p08)")):
     nm = name.split()[0]
     row.append((fig(os.path.join(REF, f"{code}-front.png"), masks[nm]), name))
-row.append((fig(os.path.join(R, "ortho_front_azure.png"), masks["Healer"]), "Healer v2 (ours)"))
+row.append((fig(os.path.join(R, "ortho_front_azure.png"), masks["Healer"]), "Healer version 2 (ours)"))
 ims = []
 for (im, fh), lb in row:
     k = H / fh
@@ -211,7 +211,7 @@ for view in ("front", "three-quarter", "profile", "back"):
     s.paste(Rr, (L.width + 40, 40))
     d = ImageDraw.Draw(s)
     d.text((20, 10), f"bible 07-{view}.png (Farmer, style anchor)", fill=(50, 50, 60), font=font(18))
-    d.text((L.width + 40, 10), f"ours: Healer v2 {view}", fill=(50, 50, 60), font=font(18))
+    d.text((L.width + 40, 10), f"ours: Healer version 2 {view}", fill=(50, 50, 60), font=font(18))
     checks[f"sbs_{view}_bytes"] = save_jpg(s, os.path.join(OUT, f"sbs-{view}.jpg"))
 
 # gameplay

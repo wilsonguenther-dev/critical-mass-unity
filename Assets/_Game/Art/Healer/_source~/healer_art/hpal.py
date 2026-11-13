@@ -38,6 +38,7 @@ C = {
     "lime":         ("#9BE23A", "bible biomass lime (Farmer orb / tank glow, 07-front)"),
     "lime_light":   ("#D8FF7A", "lime highlight (sprout tips, liquid surface)"),
     "leaf":         ("#5FB82E", "lime one step darker (leaf bodies)"),
+    "leaf_dark":    ("#3F8A2C", "deep living-leaf green (wing blades); lime veins glow against it"),
     # ---- new to the Healer
     "hair":         ("#ECE8F0", "NEW silver-white hair (the only white head of the six classes)"),
     "hair_shade":   ("#B7B0C4", "NEW cool grey-lilac hair shade / brows (kept far from corruption violet)"),

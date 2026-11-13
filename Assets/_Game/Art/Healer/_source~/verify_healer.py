@@ -205,7 +205,9 @@ FEATURES = [
     ("heal tool: bloom gauntlet with lime biomass orb", {"feat_gauntlet", "feat_biomass"}),
     ("silver hair, double buns, braid; painted face decal", {"feat_hair", "feat_face", "feat_face_decal"}),
     ("team stole + ribbons (team cloth), team gems (glow)", {"feat_team_cloth", "feat_team_glow"}),
-    ("navy skirt, cream tabard, back half-cape, bandage wraps, sprout satchel", {"feat_skirt", "feat_tabard", "feat_cape", "feat_bandage", "feat_satchel"}),
+    ("navy skirt, brass-trimmed tabard with emblem, back half-cape, bandage wraps, belt vials and pouches", {"feat_skirt", "feat_tabard", "feat_tabard_trim", "feat_cape", "feat_bandage", "feat_belt"}),
+    ("living-leaf wings on a brass hinge boss", {"feat_wing", "feat_wing_detail", "feat_wing_mount"}),
+    ("brass circlet, armoured bodice with brass trim", {"feat_circlet", "feat_bodice_trim"}),
 ]
 for label, need in FEATURES:
     check("feature: " + label, need <= body_g, sorted(need - body_g) or "present")

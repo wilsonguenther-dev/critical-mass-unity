@@ -88,11 +88,11 @@
    "check": "Healer_Body loose/non-manifold (open face-decal card exempt)",
    "ok": true,
    "detail": {
-    "triangles": 11278,
+    "triangles": 11174,
     "loose_verts": 0,
     "loose_edges": 0,
     "non_manifold_edges": 24,
-    "closed_shells": 161
+    "closed_shells": 201
    }
   },
   {
@@ -155,11 +155,11 @@
    "check": "Healer_Lantern loose/non-manifold (open face-decal card exempt)",
    "ok": true,
    "detail": {
-    "triangles": 652,
+    "triangles": 708,
     "loose_verts": 0,
     "loose_edges": 0,
     "non_manifold_edges": 0,
-    "closed_shells": 15
+    "closed_shells": 25
    }
   },
   {
@@ -211,7 +211,7 @@
   {
    "check": "triangle budget <= 12000",
    "ok": true,
-   "detail": 11930
+   "detail": 11882
   },
   {
    "check": "body height in metres after round trip (Blender Z = Unity Y)",
@@ -276,7 +276,17 @@
    "detail": "present"
   },
   {
-   "check": "feature: navy skirt, cream tabard, back half-cape, bandage wraps, sprout satchel",
+   "check": "feature: navy skirt, brass-trimmed tabard with emblem, back half-cape, bandage wraps, belt vials and pouches",
+   "ok": true,
+   "detail": "present"
+  },
+  {
+   "check": "feature: living-leaf wings on a brass hinge boss",
+   "ok": true,
+   "detail": "present"
+  },
+  {
+   "check": "feature: brass circlet, armoured bodice with brass trim",
    "ok": true,
    "detail": "present"
   },
@@ -304,20 +314,20 @@
    "check": "Healer_BloomGauntlet_Prop: tris <= 2500, closed, on the ground, vertex colour",
    "ok": true,
    "detail": {
-    "tris": 1020,
+    "tris": 1072,
     "nonmanifold_e": 0,
     "min_z": 0.004,
-    "shells": 20
+    "shells": 21
    }
   },
   {
    "check": "Healer_Lantern_Prop: tris <= 2500, closed, on the ground, vertex colour",
    "ok": true,
    "detail": {
-    "tris": 652,
+    "tris": 708,
     "nonmanifold_e": 0,
     "min_z": 0.001,
-    "shells": 15
+    "shells": 25
    }
   },
   {
