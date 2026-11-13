@@ -274,11 +274,22 @@ namespace CriticalMass.Runtime.PlayTests
             SanityWorld.ToScreenIntent(dx, dz, out double right, out double up);
             _w.HumanInput.SetMove(right, up);
             _w.Tick(10);
-            long before = Footfalls.Emitted;
-            _w.Tick(45);
+            var mine = new ActorSteps { Actor = 0 };
+            Footfalls.Register(mine);
+            long before = Footfalls.Emitted, dropped = Footfalls.Dropped;
+            try { _w.Tick(45); }
+            finally { Footfalls.Unregister(mine); }
             long steps = Footfalls.Emitted - before;
-            Debug.Log($"[AnimationPass] {steps} footfalls in 1.5 sim s of running");
+            Debug.Log($"[AnimationPass] {steps} footfalls in 1.5 sim s of running ({mine.Steps} by actor 0, {Footfalls.Dropped - dropped} over the cap)");
             Assert.GreaterOrEqual(steps, 2, "no footfalls while running");
+            // fix/animation-reds: the runner itself steps (about 2.5 a second at a run), whatever the crowd does.
+            Assert.GreaterOrEqual(mine.Steps, 2, "actor 0 ran 1.5 s without a footfall of its own");
+        }
+
+        sealed class ActorSteps : IFootfallSink
+        {
+            public int Actor, Steps;
+            public void OnFootfall(in Footfall f) { if (f.Actor == Actor && f.Kind == FootfallKind.Step) Steps++; }
         }
     }
 }

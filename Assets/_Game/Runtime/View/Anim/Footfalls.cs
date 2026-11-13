@@ -36,8 +36,13 @@ namespace CriticalMass.Runtime.View.Anim
     }
 
     /// <summary>
-    /// The footfall dispatcher: a fixed list of sinks (no allocation), a per-frame cap so a crowd never floods listeners
-    /// (the Kaiju and landings always pass; fighter steps stop at StepCapPerFrame).
+    /// The footfall dispatcher: a fixed list of sinks (no allocation), a per-view-update cap so a crowd never floods
+    /// listeners (the Kaiju and landings always pass; fighter steps stop at StepCapPerFrame).
+    /// <para>fix/animation-reds: the cap window is one rendered frame AND one sim tick. Keyed on Time.frameCount alone, a
+    /// caller that steps several ticks and view updates inside one Unity frame (the PlayMode sanity worlds with the clock
+    /// stopped, a catch-up after a hitch) shared ONE window of 12 across all of them: the crowd used it up in the first
+    /// ticks and every later step was dropped (RunningRaisesFootfalls saw 0). In a normal frame (one view update, one
+    /// tick) nothing changes.</para>
     /// </summary>
     public static class Footfalls
     {
@@ -47,7 +52,7 @@ namespace CriticalMass.Runtime.View.Anim
             StepStrength = 0.12f, StepRadius = 0.5f;
 
         static readonly IFootfallSink[] _sinks = new IFootfallSink[MaxSinks];
-        static int _count, _frame = -1, _stepsThisFrame;
+        static int _count, _frame = -1, _tick = int.MinValue, _stepsThisFrame;
 
         /// <summary>Footfalls raised since start (tests and the capture report).</summary>
         public static long Emitted { get; private set; }
@@ -79,7 +84,7 @@ namespace CriticalMass.Runtime.View.Anim
         public static bool Emit(in Footfall f)
         {
             int frame = Time.frameCount;
-            if (frame != _frame) { _frame = frame; _stepsThisFrame = 0; }
+            if (frame != _frame || f.Tick != _tick) { _frame = frame; _tick = f.Tick; _stepsThisFrame = 0; }
             if (f.Kind == FootfallKind.Step && ++_stepsThisFrame > StepCapPerFrame)
             {
                 Dropped++;
@@ -99,6 +104,7 @@ namespace CriticalMass.Runtime.View.Anim
             _count = 0;
             Emitted = Dropped = 0;
             _frame = -1;
+            _tick = int.MinValue;
         }
     }
 }
