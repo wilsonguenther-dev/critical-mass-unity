@@ -55,10 +55,13 @@ def paint(cx, cz, hw, hh, head_scale=None):
         over(ell(0.152 * s, 1.388, 0.040, 0.020, soft=0.026), _hex("#FF9A86", 0.42))
     for s in (1, -1):
         ex, ez = 0.106 * s, 1.446                  # big eyes, set wide and low on the face
-        over(ell(ex + 0.007 * s, ez, 0.050, 0.061), _hex("#FFFFFF"))           # white shows only as an outer sliver
-        over(ell(ex - 0.002 * s, ez, 0.043, 0.060), dark)                     # big simple dark-brown eye
-        over(ell(ex - 0.002 * s, ez - 0.020, 0.029, 0.030) * ell(ex - 0.002 * s, ez, 0.043, 0.060), iris)
-        over(ell(ex + 0.012 * s, ez + 0.022, 0.015, 0.017), _hex("#FFFFFF"))  # one white highlight
+        # the top of the eye is cut a little flat, lower toward the nose: the bible's confident look (a shape, not a line)
+        u = (X - ex) * s / 0.05
+        top = np.clip((ez + 0.044 + 0.008 * u - Z) / 0.003 + 0.5, 0, 1)
+        over(ell(ex + 0.007 * s, ez, 0.050, 0.061) * top, _hex("#FFFFFF"))     # white shows only as an outer sliver
+        over(ell(ex - 0.002 * s, ez, 0.043, 0.060) * top, dark)               # big simple dark-brown eye
+        over(ell(ex - 0.002 * s, ez - 0.020, 0.029, 0.030) * ell(ex - 0.002 * s, ez, 0.043, 0.060) * top, iris)
+        over(ell(ex + 0.012 * s, ez + 0.018, 0.015, 0.017), _hex("#FFFFFF"))  # one white highlight
         # thick dark brow: a simple angled wedge well above the eye, the inner end lower (confident)
         over(stroke([(0.048 * s, 1.530), (0.105 * s, 1.552), (0.168 * s, 1.552)], [0.036, 0.031, 0.014],
                     soft=0.005), dark)

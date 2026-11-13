@@ -111,3 +111,17 @@ repo; nothing in this folder should be committed from a render run.
 - v3: back (0.838) and profile (0.751) IoU are still under 0.85; the scarf is larger than the bible draws it to keep
   team colour at 12 % in the side facings.
 - No LODs.
+
+## v4 (2026-11-12): the bible's face, hair, team-colour amount and armour
+- **Face.** One smooth round head mesh (`head_mesh`, 36 x 24, smooth shaded), no glued cheeks, nose or brows, so the
+  outline never draws inside the face; skin is excluded from crevice darkening; the face front carries custom shading
+  normals (`soften_face_normals`, written to the FBX: keep Unity's Normals on Import). The decal paints only simple
+  shapes: big dark-brown eyes with one highlight and a slightly flat top, wedge brows, a tiny nose hint, a small
+  one-sided smile and soft blush, stored with straight alpha (v3 stored premultiplied colour, which gave dark fringes).
+- **Head scale.** Head and hair are modelled at design size and scaled x0.90 about the chin (`HEAD_SCALE`); the
+  topknot is lifted 0.07 after the scale (`TOPKNOT_LIFT`) so the figure stays 2.0 u. `face.paint` uses the same map,
+  so `Warrior_Face.png` keeps the v2/v3 planar layout (`FACE_UV` unchanged).
+- **Hair** warm dark brown #4F353E, big swept clumps, temple locks, a tall spiky topknot fan from a brass tie.
+- **Team colour** where the bible draws it only: compact neck scarf with one tail, narrow tabard, small chips on the
+  pauldrons and three rim stones, a teal ring and centre on an iron shield boss, the glowing cleaver edge.
+- **Stone** warm #C9B0A0 with stronger baked value steps (`STONE_STEPS`: +12 % tops, -30 % undersides).
