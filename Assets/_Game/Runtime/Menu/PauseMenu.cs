@@ -1243,6 +1243,7 @@ namespace CriticalMass.Runtime.Menu
                 Stepper(tab, 1, "BLOOD", () => GameSettings.Blood ? "ON" : "OFF", d => GameSettings.Blood = !GameSettings.Blood),
                 // Owner, 2026-11-13: the story intro plays at every launch; this turns that off, WATCH INTRO plays it now.
                 Stepper(tab, 2, "PLAY INTRO AT LAUNCH", () => GameSettings.IntroAtLaunch ? "ON" : "OFF", d => GameSettings.IntroAtLaunch = !GameSettings.IntroAtLaunch),
+                Stepper(tab, 3, "INTRO SUBTITLES", () => GameSettings.IntroSubtitles ? "ON" : "OFF", d => GameSettings.IntroSubtitles = !GameSettings.IntroSubtitles),
             };
             MenuItem watch = MenuUi.Item(tab, "Watch Intro", ContentX, ContentY + GameTabLines * (LineH + LineGap) + 20f, 420f, 56f,
                 "WATCH INTRO", MenuItem.Kind.Button, UiScale.TypeBody, true, CMTokens.Display);
@@ -1278,7 +1279,7 @@ namespace CriticalMass.Runtime.Menu
         }
 
         /// <summary>Stepper lines on the Game tab (the three buttons sit under them).</summary>
-        const int GameTabLines = 3;
+        const int GameTabLines = 4;
 
         /// <summary>Settings > WATCH INTRO: closes the menu and plays the story intro (on the title, Home or setup; never over a
         /// live match, where the menu says so instead).</summary>

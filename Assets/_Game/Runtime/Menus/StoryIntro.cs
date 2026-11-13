@@ -7,6 +7,7 @@ using CriticalMass.Runtime.Hud.Style;
 using CriticalMass.Runtime.Hud.Ui;
 using CriticalMass.Runtime.Input;
 using CriticalMass.Runtime.Menu;
+using CriticalMass.Runtime.Menus.Story;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
@@ -353,6 +354,12 @@ namespace CriticalMass.Runtime.Menus
         /// <summary>Mix while the film plays: music bed, the music under narration, the backdrop match's world sounds.</summary>
         public const float FilmMusicBed = 0.8f, FilmMusicUnderVoice = 0.5f, FilmWorldSounds = 0.1f;
         SkipGate _gate;
+        // Story intro 3: the intro is a pre-rendered film (IntroFilm); the motion comic stays for the attract loop, the
+        // Codex vignettes and as the intro's fallback when the film is missing or cannot be decoded.
+        IntroFilmPlayer _film;
+        bool _filmMode, _quietStart;
+        float _worldRamp = 99f;
+        public bool FilmMode => _filmMode;
         double _filmT;
         float _loadWait;
         /// <summary>Seconds the film has been on screen (the skip lock counts these).</summary>
@@ -454,6 +461,7 @@ namespace CriticalMass.Runtime.Menus
             Credits.Hide();
             _kind = kind;
             _outro = false;
+            if (kind == PlayKind.Intro && BeginFilm()) return true;
             if (BeginComic(sequence)) return true;
             if (kind != PlayKind.Intro) return false;
             Build();
@@ -531,8 +539,83 @@ namespace CriticalMass.Runtime.Menus
             _comic.SetSkipAlpha(0f);
             UpdateComicHint();
             if (_comic.Pump() || _comic.ShotReady(0)) _comic.Render(0, 0f, 0.0, false);
-            if (_kind == PlayKind.Intro) Started?.Invoke();
+            if (_kind == PlayKind.Intro && !_quietStart) Started?.Invoke();
             return true;
+        }
+
+        /// <summary>Starts the pre-rendered intro film; false (nothing changed) when the film or its table is missing.</summary>
+        bool BeginFilm()
+        {
+            _filmMode = false;
+            if (!IntroFilm.Available || IntroFilm.LoadTable() == null) return false;
+            if (_film == null)
+            {
+                var host = new GameObject("Intro Film", typeof(RectTransform));
+                host.transform.SetParent(transform, false);
+                _film = host.AddComponent<IntroFilmPlayer>();
+            }
+            _film.Subtitles = GameSettings.IntroSubtitles;
+            _film.TitleLogoY = () => OverlayGuard.TitleLogoY(TitleScreen.LogoY);
+            _film.Begin(IntroFilm.Url);
+            Timeline = new StoryTimeline(new[] { IntroFilm.Seconds });
+            _filmMode = true;
+            _comicMode = false;
+            _playing = true;
+            _hintDevice = (ControlDevice)(-1);
+            _gate = new SkipGate(SkipGate.LockSeconds);
+            _filmT = 0;
+            _loadWait = 0f;
+            _worldRamp = 99f;
+            OverlayGuard.Begin(gameObject, ConsumePause, true);
+            // The film carries its own finished soundtrack: the menu music and the world sounds go quiet under it.
+            Audio.MusicDirector.FilmBed = 0f;
+            Audio.Sound.SoundDirector.FilmWorldGain = 0f;
+            Started?.Invoke();
+            return true;
+        }
+
+        void UpdateFilm()
+        {
+            float dt = Mathf.Min((float)MaxFrameDt, Time.unscaledDeltaTime);
+            _film.Tick(dt);
+            if (_film.State == IntroFilmPlayer.FilmState.Failed)
+            {
+                // The platform could not decode the film: the motion comic plays the intro instead (no second Started).
+                _film.Stop();
+                _filmMode = false;
+                _quietStart = true;
+                bool ok = BeginComic(MotionComic.IntroSequence);
+                _quietStart = false;
+                if (!ok) EndPlay(false, true);
+                return;
+            }
+            bool skipKey = SkipKeyDown();
+            if (_film.State != IntroFilmPlayer.FilmState.Playing)
+            {
+                _gate.Update(0.0, skipKey);   // preparing: black, the clock and the skip lock wait for the first frame
+                return;
+            }
+            double t = _film.Time;
+            _filmT = t;
+            Timeline.Advance(Math.Max(0.0, t - Timeline.Time));
+            ControlBindings.Sample();
+            ControlDevice d = ControlBindings.ActiveDevice;
+            _film.SetSkip(d == ControlDevice.Gamepad ? SkipComicPad : SkipComicKeyboard,
+                _outro ? 0f : MotionComic.SkipPromptAlpha(_filmT, _gate.Lock));
+            bool press = _gate.Update(_filmT, skipKey);
+            if (!_outro && t >= IntroFilm.HandoffStart)
+            {
+                // The last 25 frames: the film dissolves into the title underneath; the engine's logo stays on the title's.
+                _outro = true;
+                OverlayGuard.RevealUnder();
+            }
+            if (_film.Ended || t >= IntroFilm.Seconds - 1.0 / 30.0 || (_outro && press))
+            {
+                Audio.MusicDirector.ResumeTitleAt(IntroFilm.TitleMusicOffsetAtEnd - (float)Math.Max(0.0, IntroFilm.Seconds - t));
+                EndPlay(false, true);
+                return;
+            }
+            if (press) SkipNow();
         }
 
         void UpdateComicHint()
@@ -644,6 +727,7 @@ namespace CriticalMass.Runtime.Menus
         /// the pause menu over the film). The attract loop ends on it.</summary>
         bool ConsumePause()
         {
+            if (_playing && _filmMode) return true;   // Esc is a skip key: the skip gate decides (never inside the lock)
             if (_playing && _comicMode && _kind == PlayKind.Attract) EndPlay(false, false);
             else if (_playing && !_comicMode) SkipNow();
             return true;
@@ -652,6 +736,7 @@ namespace CriticalMass.Runtime.Menus
         void SkipNow()
         {
             if (!_playing) return;
+            if (_filmMode && _film != null) _film.FadeOut(null);   // 0.3 s picture dissolve, 0.4 s audio fade, then stop
             Timeline.Skip();
             EndPlay(true, true);
         }
@@ -673,6 +758,14 @@ namespace CriticalMass.Runtime.Menus
             Audio.MusicDirector.FilmBed = 1f;
             Audio.MusicDirector.FilmDuck = Audio.MusicDirector.DuckGain;
             Audio.Sound.SoundDirector.FilmWorldGain = 1f;
+            if (_filmMode)
+            {
+                // World sounds come back over 1.5 s after the film (no wall of sound on the cut to the title).
+                Audio.Sound.SoundDirector.FilmWorldGain = 0f;
+                _worldRamp = 0f;
+                if (_film != null && !_film.Fading) _film.Stop();
+            }
+            _filmMode = false;
             if (_comicMode && _comic != null)
             {
                 _comic.Hide();
@@ -700,7 +793,18 @@ namespace CriticalMass.Runtime.Menus
         void Update()
         {
             OverlayGuard.Tick();
+            if (_film != null && _film.Fading) _film.Tick(Mathf.Min((float)MaxFrameDt, Time.unscaledDeltaTime));
+            if (_worldRamp < IntroFilm.WorldGainRampSeconds && !_playing)
+            {
+                _worldRamp += Time.unscaledDeltaTime;
+                Audio.Sound.SoundDirector.FilmWorldGain = IntroFilm.WorldGainAfter(_worldRamp);
+            }
             if (!_playing) return;
+            if (_filmMode)
+            {
+                UpdateFilm();
+                return;
+            }
             if (_comicMode)
             {
                 UpdateComic();

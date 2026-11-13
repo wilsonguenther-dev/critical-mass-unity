@@ -1,0 +1,273 @@
+{
+ "schema": "cm.story.introfilm/1",
+ "fps": 30,
+ "frames": 1420,
+ "seconds": 47.3333,
+ "width": 2560,
+ "height": 1440,
+ "picture": {
+  "width": 2560,
+  "height": 1280,
+  "bar": 80,
+  "aspect": 2.0
+ },
+ "bpm": 80,
+ "beat": 0.75,
+ "bar_seconds": 3.0,
+ "downbeats": [
+  1.5,
+  4.5,
+  7.5,
+  10.5,
+  13.5,
+  16.5,
+  19.5,
+  22.5,
+  25.5,
+  28.5,
+  31.5,
+  34.5,
+  37.5,
+  40.5,
+  43.5,
+  46.5
+ ],
+ "hero_hits": {
+  "crack": 4.5,
+  "horizon": 10.5,
+  "clash": 22.5,
+  "hatch": 31.5,
+  "roar": 34.5,
+  "berserk": 37.5,
+  "hero_cut": 40.5,
+  "logo": 43.5
+ },
+ "shots": [
+  {
+   "id": "calm",
+   "t0": 0.0,
+   "t1": 3.75,
+   "out": "cut"
+  },
+  {
+   "id": "crack_rise",
+   "t0": 3.75,
+   "t1": 9.75,
+   "out": "cut"
+  },
+  {
+   "id": "fall",
+   "t0": 9.75,
+   "t1": 12.0,
+   "out": "match-dissolve",
+   "dur": 0.8
+  },
+  {
+   "id": "shrine",
+   "t0": 12.0,
+   "t1": 17.25,
+   "out": "glow-bloom"
+  },
+  {
+   "id": "peoples",
+   "t0": 17.25,
+   "t1": 19.5,
+   "out": "cut"
+  },
+  {
+   "id": "hill",
+   "t0": 19.5,
+   "t1": 23.25,
+   "out": "cut"
+  },
+  {
+   "id": "choice",
+   "t0": 23.25,
+   "t1": 28.5,
+   "out": "match-cut"
+  },
+  {
+   "id": "hatch",
+   "t0": 28.5,
+   "t1": 32.25,
+   "out": "glow-match-cut"
+  },
+  {
+   "id": "kaiju",
+   "t0": 32.25,
+   "t1": 40.5,
+   "out": "cut"
+  },
+  {
+   "id": "hero",
+   "t0": 40.5,
+   "t1": 47.333333333333336,
+   "out": "engine-dissolve",
+   "dur": 0.8333333333333357
+  }
+ ],
+ "cuts": [
+  3.75,
+  9.75,
+  17.25,
+  19.5,
+  23.25,
+  28.5,
+  32.25,
+  40.5
+ ],
+ "hard_cuts": [
+  3.75,
+  9.75,
+  19.5,
+  23.25,
+  28.5,
+  32.25,
+  40.5
+ ],
+ "light_events": [
+  {
+   "t": 4.5,
+   "src": "crack",
+   "peak": 0.45,
+   "up": 3,
+   "down": 8
+  },
+  {
+   "t": 31.5,
+   "src": "egg",
+   "peak": 0.6,
+   "up": 3,
+   "down": 10
+  }
+ ],
+ "shakes": [
+  {
+   "t": 4.5,
+   "px": 8,
+   "dur": 0.4
+  },
+  {
+   "t": 22.5,
+   "px": 6,
+   "dur": 0.35
+  },
+  {
+   "t": 31.5,
+   "px": 10,
+   "dur": 0.45
+  },
+  {
+   "t": 34.5,
+   "px": 8,
+   "dur": 1.5
+  }
+ ],
+ "titles": [
+  {
+   "text": "LONG AGO",
+   "t_in": 1.0,
+   "t_out": 3.3,
+   "size": 64,
+   "x": -560,
+   "y": -250,
+   "style": "fade-track"
+  },
+  {
+   "text": "SKYBREAK BASIN",
+   "t_in": 7.4,
+   "t_out": 9.7,
+   "size": 84,
+   "x": 0,
+   "y": 330,
+   "style": "fade-track"
+  },
+  {
+   "text": "SOMETHING FELL THROUGH.",
+   "t_in": 10.05,
+   "t_out": 12.35,
+   "size": 64,
+   "x": 0,
+   "y": 320,
+   "style": "fade-track"
+  },
+  {
+   "text": "FEED IT",
+   "t_in": 23.7,
+   "t_out": 26.0,
+   "size": 84,
+   "x": -430,
+   "y": 300,
+   "style": "fade-track"
+  },
+  {
+   "text": "OR CORRUPT IT",
+   "t_in": 26.05,
+   "t_out": 28.35,
+   "size": 84,
+   "x": 380,
+   "y": 300,
+   "style": "fade-track"
+  },
+  {
+   "text": "IT PICKS A SIDE.",
+   "t_in": 35.4,
+   "t_out": 37.7,
+   "size": 76,
+   "x": 0,
+   "y": 330,
+   "style": "fade-track"
+  },
+  {
+   "text": "OR NO SIDE AT ALL.",
+   "t_in": 37.8,
+   "t_out": 40.1,
+   "size": 76,
+   "x": 0,
+   "y": 330,
+   "style": "fade-track"
+  }
+ ],
+ "subtitles": [
+  {
+   "text": "The sky cracked. And the land rose to meet it.",
+   "t_in": 5.05,
+   "t_out": 8.39,
+   "clip": "story-card-1"
+  },
+  {
+   "text": "Far away, a Kaiju egg sleeps. It remembers every meal.",
+   "t_in": 12.55,
+   "t_out": 16.85,
+   "clip": "story-card-3"
+  },
+  {
+   "text": "Two banners. One hill. Neither has learned to share.",
+   "t_in": 18.28,
+   "t_out": 22.03,
+   "clip": "story-card-2"
+  },
+  {
+   "text": "Feed it, and it fights for you. Corrupt it, and it fights everyone.",
+   "t_in": 23.67,
+   "t_out": 28.17,
+   "clip": "story-card-4"
+  },
+  {
+   "text": "Hold the hill. Raise the Kaiju.",
+   "t_in": 40.8,
+   "t_out": 43.37,
+   "clip": "story-card-5"
+  }
+ ],
+ "logo": {
+  "t_in": 43.17,
+  "land": 43.5,
+  "settle": 44.0,
+  "s_from": 1.6,
+  "s_land": 1.04,
+  "s_end": 1.0
+ },
+ "skip_lock_seconds": 1.5,
+ "handoff_dissolve": 0.8333
+}
