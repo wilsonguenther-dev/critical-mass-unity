@@ -209,8 +209,8 @@ namespace CriticalMass.Runtime.Tests
             {
                 asset.RemoveAllBindingOverrides();
                 List<string> kb = ControlsCard.Describe(ControlDevice.KeyboardMouse);
-                CollectionAssert.Contains(kb, "Attack: LMB");
-                CollectionAssert.Contains(kb, "Class ability: RMB");
+                CollectionAssert.Contains(kb, "Attack: LEFT CLICK"); // integration batch 2: the card reads InputGlyphs words (#35)
+                CollectionAssert.Contains(kb, "Class ability: RIGHT CLICK");
                 CollectionAssert.Contains(kb, "Move: W A S D / ARROWS");
                 CollectionAssert.Contains(kb, "Pause menu: ESC");
                 List<string> pad = ControlsCard.Describe(ControlDevice.Gamepad);

@@ -93,6 +93,7 @@ namespace CriticalMass.Runtime.Progression
                 if (!TryRead(MainPath, out _))
                 {
                     KeepCorrupt();
+                    File.Delete(MainPath); // integration batch 2: File.Move never overwrites, so the save failed here
                     File.Move(TempPath, MainPath);
                     return true;
                 }

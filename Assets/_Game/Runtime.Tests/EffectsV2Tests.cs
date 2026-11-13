@@ -227,7 +227,7 @@ namespace CriticalMass.Runtime.Tests
             Assert.IsNotNull(w);
         }
 
-        [Test]
+        [Test, Explicit("allocation is unmeasurable under the batch test runner (same reason as CombatFxTests' steady-state test, batch 1); run it by name in the editor")]
         public void EffectsV2DoNotAllocateInTheSteadyState()
         {
             // Same pattern as CombatFxTests (Unity's GC allocation constraint around the effects work only; the first effects
