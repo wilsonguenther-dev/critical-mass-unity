@@ -111,3 +111,12 @@ voice of the engine; it imitates no real person. The words are the game's own (w
 lists every line's id, text, voice, speed and length. The owner picks the final narrator voice by ear from the
 audition in `Obsidian/Wilson-Brain/Projects/Kaiju-Demo/unity-port/voice-tests/` (am_onyx, am_fenrir, bm_george);
 changing `VOICE` in tools/audio/bake_voice.py and running it again re-bakes every line.
+
+## Procedural sounds (sound coverage, 2026-11-12)
+
+No files and no third-party code or service: every cue in `Runtime/Audio/Sound/SoundTable.cs` that the 42 Kenney clips
+above do not cover (explosions, fuses, mines, the Kaiju's roar, hatch, wind-up, slam and steps, berserk loop, heals,
+builder pieces, pillar topple, pickups, level up, hill stings, pings, big-moment stingers, the low-frequency layer, wind,
+water and birds) is rendered at load by the game's own deterministic synthesiser (`Runtime/Audio/Sound/SoundSynth.cs`:
+oscillators, xorshift noise, filters and envelopes, recipe ids seed the noise). Nothing imitates a person or an animal.
+`SoundTable.SynthOnly()` lists the cues to replace with recorded CC0 sounds later.

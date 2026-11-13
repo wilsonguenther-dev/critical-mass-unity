@@ -46,6 +46,8 @@ namespace CriticalMass.Runtime.Audio
         public static void Play(string cue)
         {
             if (string.IsNullOrEmpty(cue)) return;
+            // Sound coverage: names the sound table knows (each ping kind, map open / close) get their own cue.
+            if (CriticalMass.Runtime.Audio.Sound.SoundDirector.PlayNamed(cue)) return;
             UiCue c = UiCue.Confirm;
             if (cue.IndexOf("refus", StringComparison.OrdinalIgnoreCase) >= 0 || cue.IndexOf("error", StringComparison.OrdinalIgnoreCase) >= 0) c = UiCue.Error;
             else if (cue.IndexOf("close", StringComparison.OrdinalIgnoreCase) >= 0 || cue.IndexOf("back", StringComparison.OrdinalIgnoreCase) >= 0) c = UiCue.Back;
