@@ -9,7 +9,7 @@ namespace CriticalMass.Runtime.Onboarding
 {
     /// <summary>
     /// QUICK DEMO (title and home): the 80 second guided skirmish for first-time visitors and for showing the game to
-    /// others. The match itself is an ordinary 5 v 5 request in MatchMode.Demo (PlayModes.Rules: an 80 s clock, the egg
+    /// others (creator acceptance: it now also names terrain manipulation and corruption). The match itself is an ordinary 5 v 5 request in MatchMode.Demo (PlayModes.Rules: an 80 s clock, the egg
     /// hatching at 0:36, bots leaving the player alone for the first 14 s, easy enemy bots) with the human in control from
     /// the first frame. This overlay only talks: the mascot says one line per beat (move, hit, the hill, the egg, the
     /// Kaiju), timed on the sim's own match clock so it never drifts from what is on screen, and when the sim ends the match
@@ -30,10 +30,13 @@ namespace CriticalMass.Runtime.Onboarding
         public static readonly Beat[] Beats =
         {
             new Beat { At = 0.5, Id = "demo.move", Reaction = MascotReaction.Point },
+            // Creator acceptance: his two pitch points, terrain manipulation and corruption, each get a line.
+            new Beat { At = 6.5, Id = "demo.terrain", Reaction = MascotReaction.Point },
             new Beat { At = 13, Id = "demo.hit", Reaction = MascotReaction.Surprised },
             new Beat { At = 20, Id = "demo.hill", Reaction = MascotReaction.Point },
             new Beat { At = 29, Id = "demo.egg", Reaction = MascotReaction.Neutral },
             new Beat { At = 39, Id = "demo.kaiju", Reaction = MascotReaction.Wince },
+            new Beat { At = 52, Id = "demo.corrupt", Reaction = MascotReaction.Surprised },
             new Beat { At = 66, Id = "demo.end", Reaction = MascotReaction.Cheer },
         };
 
@@ -56,7 +59,9 @@ namespace CriticalMass.Runtime.Onboarding
             MascotLines.Register("demo.move", "Quick demo, one minute. Move with {Move}. The bots give you a few seconds to find your feet.");
             MascotLines.Register("demo.hit", "Here they come. Hit back with {Attack}.");
             MascotLines.Register("demo.hill", "See the hill in the middle? Your team scores while more of you stand on it than them.");
-            MascotLines.Register("demo.egg", "That egg in the shrine hatches in a few seconds. Whoever fed it most, it fights for.");
+            MascotLines.Register("demo.terrain", "The ground is yours to change. Miners dig it up and drop it anywhere; hit a stone pillar and it falls into a ramp or a wall.");
+            MascotLines.Register("demo.egg", "That egg in the shrine hatches in a few seconds. Biomass wins it over. Violet corruption makes it angry.");
+            MascotLines.Register("demo.corrupt", "Feed the egg enough corruption and it hatches berserk: it hunts both teams. That's the gamble.");
             MascotLines.Register("demo.kaiju", "There it is. A Kaiju. Stay out from under its slam and point it at them.");
             MascotLines.Register("demo.end", "That's Critical Mass. The full battle is sixteen a side. Ready for a real one?");
             MascotLines.Register(HintId, "QUICK DEMO   ·   PAUSE TO LEAVE");

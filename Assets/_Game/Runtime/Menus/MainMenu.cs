@@ -95,10 +95,12 @@ namespace CriticalMass.Runtime.Menus
             List<MenuEntry> all = OverlayRegistry.MenuEntries();
             for (int i = 0; i < all.Count; i++)
                 if (all[i].Available && !PlayFlowIds.Contains(all[i].Id)) _entries.Add(all[i]);
+            // Creator acceptance: an eighth line (CREATOR'S TOUR) tightens the step so the rail still ends above REMATCH.
+            float railStep = Mathf.Min(RailStep, (RematchY - 12f - RailY - RailH) / Mathf.Max(1, _entries.Count - 1));
             for (int i = 0; i < _entries.Count; i++)
             {
                 MenuEntry entry = _entries[i];
-                MenuItem it = MenuUi.Item(space, "Entry " + entry.Id, ColX, RailY + i * RailStep, ColW * 0.78f, RailH, entry.Label,
+                MenuItem it = MenuUi.Item(space, "Entry " + entry.Id, ColX, RailY + i * railStep, ColW * 0.78f, RailH, entry.Label,
                     MenuItem.Kind.Button, UiScale.TypeBody, false, CMTokens.Display);
                 it.Body.Radius = 14f;
                 it.Body.RimPx = 2f;
