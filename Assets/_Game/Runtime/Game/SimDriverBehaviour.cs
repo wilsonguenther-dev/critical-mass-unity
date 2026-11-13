@@ -37,6 +37,9 @@ namespace CriticalMass.Runtime.Game
         /// </summary>
         public static bool CaptureMode;
 
+        /// <summary>This driver woke in capture mode (actor 0 on autopilot by design; HumanControlGuard leaves it alone).</summary>
+        public bool CreatedInCaptureMode { get; private set; }
+
         /// <summary>Interpolation fraction between the previous and the current tick, 0..1.</summary>
         public double Alpha { get; private set; }
 
@@ -89,6 +92,7 @@ namespace CriticalMass.Runtime.Game
             if (req != null && req.Backdrop) HumanAutopilot = true;
             if (CaptureMode)
             {
+                CreatedInCaptureMode = true;
                 HumanAutopilot = true;
                 TimeScale = 0;
             }
