@@ -18,7 +18,7 @@ finished items the integrator compiles and gates together. A **gate** is a check
 | A builder that meets a missing answer reports it as an open question with a recommendation and does not decide it. | At least 30 builder-written decision entries in the browser log. |
 | Decision ids are `U-###`, allocated only by the orchestrator; builders never append to DECISIONS.md. | D-067 used five times, D-065 and D-066 three times each (R17). |
 | Only the item tools (merge mode, add-item) write the items file; it is never wiped. | Lost item state between runs. |
-| Mechanics belong to Max and the look to the loop, fixed before launch (U-012). The loop never touches a Max-owned item unless Max leaves it undone and the owner says to take it (U-045). All art is the loop's, made in Blender by script; no art waits on Max (U-043). | The ownership split decided mid-run after mechanics had been coded and re-landed (R22). |
+| Mechanics belong to Max and the look to the loop, fixed before launch (U-012). The owner took every Max item for the loop on 2026-11-12 (U-052, replaces U-045); Max reviews each PR afterwards. All art is the loop's, made in Blender by script; no art waits on Max (U-043). | The ownership split decided mid-run after mechanics had been coded and re-landed (R22). |
 
 ## 2. Builders, batches, gates
 

@@ -102,8 +102,8 @@ those files in the foundation with the item code left out and marked with a `// 
 
 | # | Id | Item | Old state | Waits on |
 | --- | --- | --- | --- | --- |
-| 1 | CM-32 | Jumping (Travis must-have) | Landed | rules part: batch 2 (the human-jump bots case: batch 3); view part: F-07, F-08a (U-035) |
-| 2 | CM-33 | Cross bridges at any angle (Travis must-have) | Built, not in main (pulled out twice) | rules part: batch 2; view part: F-08b (U-035) |
+| 1 | CM-32 | Jumping (Travis must-have) | Landed (browser); Unity: built by the loop as DG-02, Max reviews (U-052) | rules part: batch 2 (the human-jump bots case: batch 3); view part: F-07, F-08a (U-035) |
+| 2 | CM-33 | Cross bridges at any angle (Travis must-have) | Built, not in main (pulled out twice); Unity: built by the loop as DG-02, Max reviews (U-052) | rules part: batch 2; view part: F-08b (U-035) |
 | 3 | CM-30 | Miners dig and place ground (Travis must-have) | Landed | rules part: batch 2 (4 bot cases and the soak case: batch 3); view part: F-08a, F-08b, F-08c (U-034, U-035) |
 | 4 | CM-31 | Knock-down structures (Travis must-have) | Landed | rules part: batch 2 and CM-30's rules part; view part: F-08b (U-035) |
 | 5 | CM-37 | Base healing fountain | Landed | F-01 to F-09 |
@@ -129,8 +129,11 @@ Travis's must-haves: miners digging and placing ground is **CM-30**, knock-down 
 check, which waits on the placeholder views F-08a to F-08c). Both parts stay yours; the split changes when you can
 start, not who owns what.
 
-**Ownership (U-045).** You keep every item in this list. The loop never touches a Max-owned item unless you leave it
-undone and the owner (Wilson) says to take it; nothing here is reassigned.
+**Ownership (U-052, replaces U-045's rule).** On 2026-11-12 the owner (Wilson) said, by voice message, "take over all
+Max items ... all of it". The loop now builds every item in this list, in the rules lane order of the demo gap list
+(`Obsidian/Wilson-Brain/Projects/Kaiju-Demo/unity-port/DEMO-GAP-LIST-2026-11-12.md`, section 5.2). Max reviews each
+pull request afterwards and may take any item back. CM-32 and CM-33 are built first, together, as DG-02 (branch
+`feat/dg-02-jump-bridges`).
 
 Old ids that are not on your list: **CM-54** (class switch on the death screen) is superseded by CM-84, which ports its
 cooldown. **CM-56** (five-class roster) is part of F-01 and F-02b. **CM-61** (the look of dug holes and placed blocks) is

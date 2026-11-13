@@ -12,7 +12,7 @@ namespace CriticalMass.Sim.Maps
         public const int MapWidth = 112;
         public const int MapHeight = 72;
         /// <summary>x' = MirrorX - x (mirror line x = 56).</summary>
-        private const double MirrorX = 112;
+        internal const double MirrorX = 112;
 
         private struct Island
         {
@@ -136,7 +136,7 @@ namespace CriticalMass.Sim.Maps
         }
 
         /// <summary>Height of the island an endpoint sits on (smallest normalised ellipse distance).</summary>
-        private static double EndpointHeight(double x, double z)
+        internal static double EndpointHeight(double x, double z)
         {
             double best = double.PositiveInfinity;
             double h = 0;

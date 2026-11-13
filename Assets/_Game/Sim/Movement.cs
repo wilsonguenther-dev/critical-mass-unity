@@ -2,7 +2,12 @@ using CriticalMass.Sim.Config;
 
 namespace CriticalMass.Sim.Core
 {
-    /// <summary>Movement system (browser movement.ts): input to velocity to grid collision, then soft separation. Dead actors do not move.</summary>
+    /// <summary>
+    /// Movement system (browser movement.ts): input to velocity to grid collision, then soft separation. Dead actors do not move.
+    /// <para>CM-32: InputFrame.Jump (cleared here when read) starts a jump (Jump.cs). Airborne actors keep their takeoff
+    /// velocity (no air control), move with the airborne collision rules (in-map VOID passes) and land at the end of tick
+    /// AirLen. DG-02: the press is buffered for Jump.BufferTicks ticks and coyote time counts unsupported ticks.</para>
+    /// </summary>
     public static class Movement
     {
         private const double AimDeadzone = 0.05;
@@ -12,20 +17,35 @@ namespace CriticalMass.Sim.Core
         public static void MovementSystem(World w, double dt)
         {
             GameConfig cfg = w.Config;
+            int bufferTicks = Jump.BufferTicks(cfg);
             for (int i = 0; i < w.ActorCount; i++)
             {
                 Actor a = w.Actors[i];
                 InputFrame inp = w.Inputs[i];
-                // ITEM CM-32: added by its owner (jump read/clear)
+                // CM-32: the jump flag is one-shot: read (and cleared) every step, so a stored true never repeats a jump.
+                // DG-02 buffer: a press stays wanted for this tick and the next bufferTicks ticks.
+                if (inp.Jump) a.JumpBuffer = bufferTicks + 1;
+                inp.Jump = false;
+                bool wantJump = a.JumpBuffer > 0;
+                if (wantJump) a.JumpBuffer--;
                 if (!a.Alive || a.StandUp > 0)
                 {
                     a.Moving = false;
                     w.Vx[i] = JsMath.F32(0);
                     w.Vz[i] = JsMath.F32(0);
-                    // ITEM CM-32: added by its owner (clearJump on a dead or getting-up actor)
+                    Jump.ClearJump(a);
+                    a.UnsupportedTicks = 0;
+                    if (!a.Alive) a.JumpBuffer = 0;
                     continue;
                 }
-                // ITEM CM-32: added by its owner (FlyTick airborne step)
+                if (a.AirLen > 0)
+                {
+                    FlyTick(w, i, dt);
+                    continue;
+                }
+                // DG-02 coyote time: count the ticks this grounded actor has stood where its footprint no longer fits.
+                if (Collide.FootprintClear(w, i, w.X[i], w.Z[i])) a.UnsupportedTicks = 0;
+                else a.UnsupportedTicks++;
                 double mx = inp.MoveX;
                 double mz = inp.MoveZ;
                 double len2 = mx * mx + mz * mz;
@@ -67,7 +87,13 @@ namespace CriticalMass.Sim.Core
                 }
                 w.Vx[i] = JsMath.F32(vx);
                 w.Vz[i] = JsMath.F32(vz);
-                // ITEM CM-32: added by its owner (jump takeoff)
+                // CM-32: a jump takes off with this step's velocity; tick 1 of the flight is this step's move.
+                if (wantJump && Jump.StartJump(w, i, dt))
+                {
+                    a.JumpBuffer = 0;
+                    FlyTick(w, i, dt);
+                    continue;
+                }
                 if (vx != 0 || vz != 0) Collide.MoveActor(w, i, vx * dt, vz * dt, false);
                 a.Moving = moving;
                 // Facing: toward a real aim point (from the post-move position), else toward the move direction.
@@ -86,6 +112,26 @@ namespace CriticalMass.Sim.Core
             Collide.SeparateActors(w);
         }
 
-        // ITEM CM-32: added by its owner (FlyTick airborne step)
+        /// <summary>
+        /// CM-32: one airborne tick of actor i: the locked takeoff velocity moves it under the airborne collision rules,
+        /// facing follows a real aim point only (move input is ignored mid-air), and the last tick lands it (LandJump).
+        /// </summary>
+        private static void FlyTick(World w, int i, double dt)
+        {
+            Actor a = w.Actors[i];
+            double vx = w.Vx[i];
+            double vz = w.Vz[i];
+            a.AirTick++;
+            if (vx != 0 || vz != 0) Collide.MoveActor(w, i, vx * dt, vz * dt, true);
+            a.Moving = vx != 0 || vz != 0;
+            if (w.HasAim[i] == 1)
+            {
+                InputFrame inp = w.Inputs[i];
+                double ax = inp.AimX - w.X[i];
+                double az = inp.AimZ - w.Z[i];
+                if (ax * ax + az * az > AimDeadzone * AimDeadzone) a.Facing = JsMath.Atan2(az, ax);
+            }
+            if (a.AirTick >= a.AirLen) Jump.LandJump(w, i);
+        }
     }
 }
