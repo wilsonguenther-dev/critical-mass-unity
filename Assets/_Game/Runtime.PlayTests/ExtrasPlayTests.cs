@@ -118,7 +118,7 @@ namespace CriticalMass.Runtime.PlayTests
         {
             _menu.Pause();
             yield return null;
-            Assert.AreEqual(5, _menu.TabCount, "the ACCESS tab follows the four built-in tabs");
+            Assert.AreEqual(6, _menu.TabCount, "ACCESS follows the four built-in tabs, then WORLD (feat/terrain-affordances)");
             _menu.ShowSettings((PauseMenu.Tab)4);
             yield return null;
             Item("HIDE NAMES").Stepped(1);

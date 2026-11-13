@@ -29,6 +29,7 @@ Settings, Controls, with a conflict warning and RESET ALL.
 | Dig / place | U | F | F | Y / triangle |
 | Switch dig / place | I | R | Mouse wheel | LB or RB / L1 or R1 |
 | Ping wheel | G | G | G or middle click | D-pad left |
+| Show usable terrain (hold; terrain classes) | O | Q | Q | R3 (outside the base ring; inside it R3 opens the station) |
 | Scoreboard (hold) | TAB | TAB | TAB | View / Create |
 | Full map | M | M | M | D-pad up |
 | Base station | B | B | B | Press the right stick (R3) |
