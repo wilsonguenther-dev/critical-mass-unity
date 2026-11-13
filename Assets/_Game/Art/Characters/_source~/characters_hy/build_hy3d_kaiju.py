@@ -63,10 +63,42 @@ scene.render.fps = 30
 before_a = set(bpy.data.actions)
 bpy.ops.import_scene.fbx(filepath=SRC_FBX, use_anim=True, use_custom_normals=True, colors_type="SRGB",
                          ignore_leaf_bones=False, automatic_bone_orientation=False, primary_bone_axis="Y", secondary_bone_axis="X")
-ACTS = [a for a in bpy.data.actions if a not in before_a]
-for a in ACTS:
-    a.use_fake_user = True
-arm = next(o for o in bpy.data.objects if o.type == "ARMATURE")
+FBX_ACTS = [a for a in bpy.data.actions if a not in before_a]
+fbx_arm = next(o for o in bpy.data.objects if o.type == "ARMATURE")
+# The FBX-imported clips pose the bones but do not deform the mesh in Blender (measured: 0.0 movement
+# for all 8 clips, while Kaiju.blend's native actions move it 1.3-2.5 m). Use the source rig and its
+# native actions from Kaiju.blend (the exact rig build_kaiju.py exports), so the pose test, the
+# renders and the baked export clips are real.
+KBLEND = os.path.expanduser(os.environ.get("HY_KAIJU_BLEND",
+    "~/critical-mass-unity-art-kaiju/Assets/_Game/Art/Kaiju/_source~/Kaiju.blend"))
+with bpy.data.libraries.load(KBLEND, link=False) as (_src, _dst):
+    _dst.objects = ["Adult_Rig"]
+arm = _dst.objects[0]
+scene.collection.objects.link(arm)
+_strips = [s for t in (arm.animation_data.nla_tracks if arm.animation_data else []) for s in t.strips]
+if _strips:
+    ACTS = []
+    for s in _strips:
+        a = s.action
+        ACTS.append((s.name.split("|")[-1], a))
+    for t in list(arm.animation_data.nla_tracks):
+        arm.animation_data.nla_tracks.remove(t)
+    arm.animation_data.action = None
+    for a in FBX_ACTS:
+        bpy.data.actions.remove(a)
+    for clip, a in ACTS:
+        a.name = "KaijuRig|" + clip
+        a.use_fake_user = True
+    ACTS = [a for _, a in ACTS]
+    fbx_arm.name = "OLD_KaijuRig"
+    arm.name = "KaijuRig"
+    print("KAIJU_SRC native", [a.name for a in ACTS], flush=True)
+else:
+    print("KAIJU_SRC fbx (no NLA strips in Kaiju.blend)", flush=True)
+    bpy.data.objects.remove(arm)
+    arm, ACTS = fbx_arm, FBX_ACTS
+    for a in ACTS:
+        a.use_fake_user = True
 assert (arm.matrix_world - Matrix.Identity(4)).to_3x3().determinant() < 1e-6 or True
 BONES = [b.name for b in arm.data.bones]
 OLD = {o.name: o for o in bpy.data.objects if o.type == "MESH"}
