@@ -15,7 +15,7 @@ F = np.float32
 # game-mesh triangle budgets and per-material weights (more where the eye goes: face, hair, shield, brass)
 BUDGET = {"body": 15500, "shield": 4200, "cleaver": 1500}
 WEIGHT = {"skin": 3.2, "hair": 1.25, "brass": 1.0, "wrap": 0.6, "trouser": 0.8, "navy": 0.75, "wood_seam": 0.3, "leather_dark": 0.6, "wood": 1.3,
-          "glow": 1.2, "stone": 1.5}
+          "glow": 1.2, "stone": 1.25}
 TEXEL = {"skin_head": 2.6, "shield": 0.85, "cleaver": 1.0}
 HARD = {"stone", "stone_blade", "wood", "iron", "glow", "brass", "wood_seam"}     # flat planes keep flat shading normals
 
@@ -45,7 +45,7 @@ def hidden(o, vol, v):
 
 def run(work):
     from skimage import measure
-    import fast_simplification
+    import pymeshlab
     import xatlas
     stats = {"objects": {}}
     atlas = xatlas.Atlas()
@@ -85,18 +85,16 @@ def run(work):
             want = max(60, int(BUDGET[name] * a * WEIGHT.get(W.GROUPS[gid], 1.0) / wsum))
             # decimate the CLOSED shell (open borders collapse into spikes), then drop the buried faces
             target = int(want * min(1.6, atot / a))
-            for agg in (5, 7, 9, 10, 10):
-                if len(f) <= target * 1.08:
-                    break
-                v, f = fast_simplification.simplify(v.astype(F), f.astype(np.int32), target_count=target, agg=agg)
-                v, f = clean(np.asarray(v, F), np.asarray(f, np.int64))
-            if len(f) > target * 1.25:             # the first decimator stalls on thin slabs: second engine, same algorithm
-                import pyfqmr
-                ms = pyfqmr.Simplify()
-                ms.setMesh(v.astype(np.float64), f.astype(np.int32))
-                ms.simplify_mesh(target_count=target, aggressiveness=8, preserve_border=False, verbose=False, max_iterations=200)
-                v2, f2, _ = ms.getMesh()
-                v, f = clean(np.asarray(v2, F), np.asarray(f2, np.int64))
+            if len(f) > target * 1.05:
+                # MeshLab quadric edge collapse. (Fast-Quadric-Mesh-Simplification stalls on flat faces and tears
+                # them when forced: the v1 shield rim came out as shards. Measured: 0.3 mm mean error here.)
+                ms = pymeshlab.MeshSet()
+                ms.add_mesh(pymeshlab.Mesh(v.astype(np.float64), f.astype(np.int32)))
+                ms.meshing_decimation_quadric_edge_collapse(targetfacenum=int(target), qualitythr=0.5, preserveboundary=True,
+                                                            preservenormal=True, preservetopology=True, optimalplacement=True,
+                                                            planarquadric=True, planarweight=0.001, autoclean=True)
+                mm = ms.current_mesh()
+                v, f = clean(mm.vertex_matrix().astype(F), mm.face_matrix().astype(np.int64))
             vol = o.fld[gid]
             for _ in range(2):                     # pull the decimated vertices back onto the true surface
                 v = v - o.grad(vol, v) * o.s(vol, v)[:, None]
@@ -170,6 +168,27 @@ def run(work):
         arr = {k: np.concatenate(d[k]) for k in ("v", "f", "uv", "gid", "n", "comp", "cn")}
         np.savez(os.path.join(work, f"low_{name}.npz"), **arr)
         stats["objects"][name]["game_verts"] = int(len(arr["v"]))
+    # GATE: the game mesh must keep the sculpt's silhouette (three axis views, points splatted on the lattice)
+    rng = np.random.default_rng(0)
+    for name in out:
+        o = Obj(work, name)
+        z = np.load(os.path.join(work, f"low_{name}.npz"))
+        v, f = z["v"], z["f"]
+        b = rng.random((len(f), 300, 2))
+        fl = b.sum(2) > 1
+        b[fl] = 1 - b[fl]
+        p = (v[f[:, 0]][:, None] + (v[f[:, 1]] - v[f[:, 0]])[:, None] * b[..., :1] + (v[f[:, 2]] - v[f[:, 0]])[:, None] * b[..., 1:]).reshape(-1, 3)
+        ious = []
+        for ax in range(3):
+            keep = [i for i in range(3) if i != ax]
+            ms = (o.d1 < 0).any(ax)
+            ij = np.round((p[:, keep] - o.lo[keep]) / o.h).astype(int)
+            m = np.zeros_like(ms)
+            m[np.clip(ij[:, 0], 0, ms.shape[0] - 1), np.clip(ij[:, 1], 0, ms.shape[1] - 1)] = True
+            ious.append(round(float((m & ms).sum() / (m | ms).sum()), 3))
+        stats["objects"][name]["silhouette_iou_vs_sculpt_xyz"] = ious
+        if min(ious) < 0.95:
+            print(f"GATE FAIL {name} silhouette vs sculpt {ious}", flush=True)
     stats["atlas"] = {"charts": int(atlas.chart_count), "utilization": float(np.mean(atlas.utilization))}
     stats["game_tris_total"] = sum(s["game_tris"] for s in stats["objects"].values())
     stats["game_verts_total"] = sum(s["game_verts"] for s in stats["objects"].values())
