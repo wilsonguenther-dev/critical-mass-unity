@@ -42,6 +42,14 @@ namespace CriticalMass.Sim.Config
     public sealed class MapEventsConfig
     {
         public bool Enabled = true;
+        /// <summary>
+        /// Bridge collapse in the event rotation (2026-11-13, off by default). Nothing in the creator's spec asks for bridges
+        /// that break (the brief: "bridges are walkable", no fall deaths); the co-founder saw the collapse as "random holes".
+        /// Off: the rotation's bridge turn is a quiet minute with no event (a supply drop there instead broke the CM-64
+        /// interception band, 77 of 100; the quiet minute keeps every band: 83 of 100). The rule, its warning, repair and
+        /// tests are kept: true restores U-068 exactly; MapEvents.Start(KindBridge) ignores this switch.
+        /// </summary>
+        public bool BridgeCollapse = false;
         /// <summary>First event at 50 s, then one every 60 s; the three kinds rotate from a seed-fixed start.</summary>
         public double FirstEventTicks = 1500;
         public double PeriodTicks = 1800;

@@ -342,7 +342,9 @@ namespace CriticalMass.Runtime.Hud.Mechanics
 
         // ------------------------------------------------------------------ per frame
 
-        void LateUpdate()
+        void LateUpdate() { var cost = CriticalMass.Runtime.Game.FrameCost.Enter(); LateUpdateCost(); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.NameTags, cost); }
+
+        void LateUpdateCost()
         {
             if (_driver == null) _driver = GetComponent<SimDriverBehaviour>();
             if (_log == null && --_logSearch <= 0) { _logSearch = 30; _log = FindAnyObjectByType<CombatLog>(); }

@@ -611,7 +611,9 @@ namespace CriticalMass.Runtime.Hud
 
         // ---------------------------------------------------------------- update
 
-        void LateUpdate()
+        void LateUpdate() { var cost = CriticalMass.Runtime.Game.FrameCost.Enter(); LateUpdateCost(); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.Hud, cost); }
+
+        void LateUpdateCost()
         {
             if (Driver == null) Driver = GetComponent<SimDriverBehaviour>();
             if (Driver == null || Driver.World == null || Root == null) return;

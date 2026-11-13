@@ -131,6 +131,19 @@ card flushers raced and sent a duplicate digest) and R14 (a dead integrator's co
 Recommended rules: slips go out as one digest per checkpoint and skip person-owned items; exactly one process flushes
 cards; the compile lock records its owner pid and a lock whose pid is dead is reclaimed at arm.
 
+## 9b. Automated runs never show a window (HARD)
+
+Any player started with an automation flag (`-autoplay`, `-quitAfterMatch`, `-autoplayMatches`, `-autoplayQualities`,
+`-perfLog`, `-shots`, `-simHashOut`, `-capture`, `-soak`, `-traceStates`, `-debugHangSeconds`, `-automation`) hides
+itself: no Dock icon, no Dock bounce, windows transparent and click-through, app hidden, audio muted, fullscreen requests
+turned into a hidden window, and re-hidden on the same frame whenever Unity re-shows or activates it (it does so at boot
+and at every match load: that is why `open -g -j` alone failed on 2026-11-13). This lives in the game
+(`Assets/_Game/Runtime/Game/AutomationWindow.cs`, tests `Runtime.Tests/AutomationWindowTests.cs`), so no script can
+forget it. A person who wants to watch passes `-showWindow` (demo-smoke: `CM_SMOKE_VISIBLE=1`). The player log says
+`[CM.Window] automated run: window hidden`; if a test window is ever on the owner's screen, the build predates this or
+`-showWindow` was passed: find the launcher, never the owner's problem. Builds older than this change still pop a window:
+do not launch them for automation.
+
 ## 10. The harness (scripts in this folder)
 
 Python 3 stdlib and bash only; nothing is "found on the machine" beyond Unity, git, `gh`, `xmllint` and node (for the
@@ -149,6 +162,7 @@ workflow dry run). `loop/logs/` and `loop/state/` are git-ignored.
 | `gates/precompile` | ci/offload (2026-11-13), the FIRST gate: all six assemblies type-checked by Unity's bundled compiler with the arguments Unity last wrote to `Library/Bee/artifacts/*/<Assembly>.rsp`, the worktree's current sources, no editor, no cm-heavy slot, ~3 s. A pass means Unity's compiler accepts the sources; a new asmdef or package still needs the Unity compile gate. |
 | `../tools/ci/sim-tests-mac.sh`, `../tools/ci/sim-tests.sh` | The no-Unity Sim gate: Sim + Sim.Tests compiled (C# 9; CI: .NET Standard 2.1) and run without the editor. Mac: Unity's bundled csc + Mono (~30 s). CI and any machine with a .NET SDK: NUnitLite (`.github/workflows/sim-tests.yml`). |
 | `gates/remote` | Run a gate on GitHub instead of the Mac: push, start the workflow, poll every 30 s, download results to `logs/remote/<run>/`, one JSON line. `sim` needs nothing; `editmode`, `playmode`, `tests`, `build-windows`, `build-mac` need the Unity licence secrets (`.github/workflows/unity-ci.yml`, GameCI) and exit 78 (skipped) until they exist. |
+| `RequiresGpu` (NUnit category) | ci/playmode-triage, 2026-11-13: a PlayMode test that needs a real GPU (a rendered frame, a read-back) carries `[Category("RequiresGpu")]`. `unity-ci.yml` always adds `;!RequiresGpu` to the category filter (GitHub's runners have no GPU), while the Mac integrator (`tools/unity-playtest.sh`, `gates/gate.py playmode-smoke`) passes no such exclusion and still runs them. GitHub runs PlayMode `-nographics` like the Mac gate, in 3 parallel shards by fixture, with `-cmTestTimeScale 4` (wall-clock wait budgets in tests go through `TestClock.Budget`, scale 1 on the Mac; product promises are never scaled). `gates/remote playmode --graphics software` runs it under llvmpipe instead (diagnosis: the batch-mode Editor never runs WaitForEndOfFrame, so still captures cannot complete there). |
 | `../tools/library-seed.sh` | Seeds a new worktree's `Library/` from the most recent one with APFS clones (`cp -c`): 3.4 GB in ~4 s for ~15 MB of disk; Bee, BuildPlayerData and ScriptAssemblies dropped (old absolute paths). Integrators call it right after `git worktree add`, instead of moving a Library by hand. |
 | `review/<batch>.md` | Review BLOCKING and ADVISORY entries (ruling 6); soak reports as ADVISORY (U-034). |
 | `logs/ledger.jsonl` | U-042: one row per item state change (dropped, parked, landed) and, at shutdown, exactly one final row per item of the run (landed with its `loop-landed:` commit, dropped with its failure file, parked with the reason, including "not reached"). Survives shutdown; `cmloop.py ledger audit` checks it. |

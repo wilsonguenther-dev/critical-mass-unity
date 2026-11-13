@@ -78,6 +78,9 @@ namespace CriticalMass.Runtime.Game
         public static float CpuFrameMs { get; private set; }
         public static float GpuFrameMs { get; private set; }
         public static float CpuMainMs { get; private set; }
+        /// <summary>perf-smooth-1: the main thread's wait for present and the render thread's time (ms; 0 when none).</summary>
+        public static float CpuPresentWaitMs { get; private set; }
+        public static float CpuRenderMs { get; private set; }
 
         /// <summary>Boot work (idempotent, main thread). Safe to call in the editor: it does nothing there.</summary>
         public static void EnsureStarted()
@@ -324,6 +327,8 @@ namespace CriticalMass.Runtime.Game
                 CpuFrameMs = (float)Timings[0].cpuFrameTime;
                 GpuFrameMs = (float)Timings[0].gpuFrameTime;
                 CpuMainMs = (float)Timings[0].cpuMainThreadFrameTime;
+                CpuPresentWaitMs = (float)Timings[0].cpuMainThreadPresentWaitTime;
+                CpuRenderMs = (float)Timings[0].cpuRenderThreadFrameTime;
             }
 
             if (_dir == null || ToolRun || SecondInstance) return;

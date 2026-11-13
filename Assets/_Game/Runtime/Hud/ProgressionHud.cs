@@ -150,9 +150,9 @@ namespace CriticalMass.Runtime.Hud
             Keyboard kb = Keyboard.current;
             Gamepad pad = Gamepad.current;
             bool paused = _input != null && _input.State.Paused;
-            bool key = kb != null && kb.cKey.wasPressedThisFrame;
+            bool key = kb != null && kb.pKey.wasPressedThisFrame;   // controls-1: P (C is the arrow hand's jump)
             // D-pad up navigates the pause menu while paused; it opens the panel only in play.
-            // Integration batch 2: D-pad up is the Map action (full map) and a spectator objective; the panel opens with C
+            // Integration batch 2: D-pad up is the Map action (full map) and a spectator objective; the panel opens with P (controls-1; was C)
             // or a click on the HUD portrait, and closes with B.
             bool padKey = false, padClose = false;
             if (key || padKey || padClose) CharacterPanel.Toggle();

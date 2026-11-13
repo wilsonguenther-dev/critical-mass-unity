@@ -276,6 +276,14 @@ namespace CriticalMass.Runtime.Audio.Sound
             return cue >= 0 && Instance != null && Instance.PlayCue(cue, simX, simZ, own, false, 1f, 1f, 0);
         }
 
+        /// <summary>fix/kaiju-alive-1: a cue at a sim position with a gain and pitch scale (the hatchling's higher, quieter
+        /// roar, the berserk's lower one). Same distance rules as every world cue. False when refused or unknown.</summary>
+        public static bool PlayCueAt(string id, double simX, double simZ, float gain, float pitch)
+        {
+            int cue = SoundTable.IndexOf(id);
+            return cue >= 0 && Instance != null && Instance.PlayCue(cue, simX, simZ, false, false, gain, pitch, 0);
+        }
+
         // ---- big moments (IBigMomentsAudio)
         public void OnTakeover(MomentId id, float seconds, bool playerOwned)
         {
@@ -536,7 +544,7 @@ namespace CriticalMass.Runtime.Audio.Sound
 
         // ------------------------------------------------------------------ per frame (mixing only: no allocation)
 
-        private void LateUpdate() { long c = CriticalMass.Runtime.Game.FrameCost.Begin(); LateUpdateBody(); CriticalMass.Runtime.Game.FrameCost.End(CriticalMass.Runtime.Game.FrameCost.Slot.Sound, c); }
+        private void LateUpdate() { var c = CriticalMass.Runtime.Game.FrameCost.Enter(); LateUpdateBody(); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.Sound, c); }
 
         private void LateUpdateBody()
         {

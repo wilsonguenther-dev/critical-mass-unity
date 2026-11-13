@@ -63,7 +63,9 @@ namespace CriticalMass.Runtime.Camera
         /// <summary>Back to following the human; the spring flies home.</summary>
         public void ClearOverride() => _override = false;
 
-        private void LateUpdate()
+        private void LateUpdate() { var cost = CriticalMass.Runtime.Game.FrameCost.Enter(); LateUpdateCost(); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.Camera, cost); }
+
+        void LateUpdateCost()
         {
             if (Driver == null) return;
             World w = Driver.World;
@@ -74,6 +76,9 @@ namespace CriticalMass.Runtime.Camera
             BoundsDef b = map.Bounds;
             double inset = Driver.Config.Render.CameraBoundsInset;
             if (_input == null) _input = Driver.GetComponent<HumanInputSource>();
+            // perf-60hz-32p stress scene (-stressHill with -autoplay): the camera stays on the hill, where ActorViews draws everyone.
+            if (CriticalMass.Runtime.Game.AutoplayArgs.Current.Autoplay && CriticalMass.Runtime.Game.AutoplayArgs.Current.StressHill && !_override)
+                SetOverride(map.Hill.X, map.Hill.Z);
 
             var f = new CameraFollowInput
             {

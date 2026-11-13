@@ -35,6 +35,8 @@ namespace CriticalMass.Runtime.Menus
         public const float QuickMinSeconds = 0.35f;
         public const float FadeOutSeconds = 0.2f;
         public const int WarmUpFrames = 4;
+        /// <summary>perf-smooth-1: the longest the WarmUp step waits for ShaderWarmup.Done.</summary>
+        public const float WarmUpWaitSeconds = 4f;
         /// <summary>A watched boot step that never reports is completed after this (the screen never hangs).</summary>
         public const float StepTimeoutSeconds = 6f;
 
@@ -42,6 +44,28 @@ namespace CriticalMass.Runtime.Menus
         public static readonly float[] Weights = { 0.35f, 0.3f, 0.2f, 0.15f };
         /// <summary>The line under the bar per step (no technology names).</summary>
         public static readonly string[] StepLabels = { "RAISING THE BASIN", "DRESSING THE WORLD", "WAKING THE BANNERS", "WARMING UP" };
+
+        /// <summary>perf-smooth-1: each step label with 0 to 3 trailing dots, cached (the animated dots never allocate).</summary>
+        static readonly string[][] StepDots = BuildDots();
+
+        static string[][] BuildDots()
+        {
+            var a = new string[StepLabels.Length][];
+            for (int i = 0; i < StepLabels.Length; i++)
+                a[i] = new[] { StepLabels[i], StepLabels[i] + " .", StepLabels[i] + " . .", StepLabels[i] + " . . ." };
+            return a;
+        }
+
+        /// <summary>The step line for a step and time: the label with dots that cycle three times a second (pure; tests).</summary>
+        public static string StepLine(LoadStep step, float seconds)
+        {
+            int s = Mathf.Clamp((int)step, 0, StepDots.Length - 1);
+            int d = ((int)Mathf.Floor(Mathf.Max(0f, seconds) * 3f)) % 4;
+            return StepDots[s][d];
+        }
+
+        /// <summary>The tip's fade-in alpha after the screen opened (0.6 s ease; pure; tests).</summary>
+        public static float TipAlpha(float openSeconds) => Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(openSeconds / 0.6f));
 
         /// <summary>Player builds show it on boot until the game flow takes over (set false there).</summary>
         public static bool ShowOnBoot
@@ -394,6 +418,15 @@ namespace CriticalMass.Runtime.Menus
                 return;
             }
 
+            // perf-smooth-1: the screen moves every frame (dots on the step line, the tip fades in), so a frozen frame shows.
+            HudText.Set(_step, StepLine(CurrentStep, OpenSeconds));
+            if (_tip != null)
+            {
+                Color tc = _tip.color;
+                float ta = TipAlpha(OpenSeconds);
+                if (Mathf.Abs(tc.a - ta) > 0.004f) { tc.a = ta; _tip.color = tc; }
+            }
+
             // Ease toward the target, never back: fast enough that a finished load fills in about 0.3 s.
             float next = Mathf.MoveTowards(Shown, Target, Time.unscaledDeltaTime * 3.2f);
             if (next > Shown)
@@ -445,7 +478,9 @@ namespace CriticalMass.Runtime.Menus
                     break;
                 }
                 case LoadStep.Dressing:
-                    if ((FindAnyObjectByType<WorldView>() != null && WorldView.DressVersion > 0) || timedOut) Complete(LoadStep.Dressing);
+                    // perf-smooth-1: the world builds over frames now; the bar follows its real progress.
+                    if (WorldView.Building) { Report(LoadStep.Dressing, WorldView.BuildProgress); _stepStart = Time.unscaledTime; }
+                    else if ((FindAnyObjectByType<WorldView>() != null && WorldView.DressVersion > 0) || timedOut) Complete(LoadStep.Dressing);
                     break;
                 case LoadStep.Views:
                     if (FindAnyObjectByType<ActorViews>() != null || timedOut) Complete(LoadStep.Views);
@@ -453,8 +488,9 @@ namespace CriticalMass.Runtime.Menus
                 default:
                     if (_finish) break;
                     _warmFrames++;
-                    Report(LoadStep.WarmUp, (float)_warmFrames / WarmUpFrames);
-                    if (_warmFrames >= WarmUpFrames) Finish();
+                    Report(LoadStep.WarmUp, Mathf.Min((float)_warmFrames / WarmUpFrames, ShaderWarmup.Done ? 1f : 0.95f));
+                    // perf-smooth-1: also wait for the shipped shader/PSO warm-up (bounded: never more than WarmUpWaitSeconds).
+                    if (_warmFrames >= WarmUpFrames && (ShaderWarmup.Done || Time.unscaledTime - _stepStart > WarmUpWaitSeconds)) Finish();
                     break;
             }
         }

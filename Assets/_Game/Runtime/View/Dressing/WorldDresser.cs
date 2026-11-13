@@ -509,19 +509,17 @@ namespace CriticalMass.Runtime.View.Dressing
                 o.Add(a0);
                 o.Add(a1);
             }
-            // Deck tiles: 14 % of the inner tiles of each span become the damaged tile; a hanging lantern on every third.
+            // Deck tiles: a hanging lantern on every third (no damaged tiles since 2026-11-13, see below).
             for (int i = 0; i < before; i++)
             {
                 WorldPlacement t = pl[i];
                 if (t.Piece != "env_bridge_span" || t.SpanB <= t.SpanA) continue;
                 int n = Mathf.Max(1, Mathf.RoundToInt(1f / (t.SpanB - t.SpanA)));
                 int k = Mathf.RoundToInt(t.SpanA * n);
-                if (k > 0 && k < n - 1 && H32((long)Math.Floor(t.SimX * 4), (long)Math.Floor(t.SimZ * 4), 241) % 100 < 14)
-                {
-                    t.Piece = "env_bridge_span_damaged";
-                    pl[i] = t;
-                    plan.DamagedSpans++;
-                }
+                // 2026-11-13 ("the bridges have random holes"): no deck tile is swapped for env_bridge_span_damaged any more.
+                // That tile has a missing and a snapped plank, so 14 % of the inner tiles of every span showed a hole the
+                // player walks straight over: decoration that reads as a broken, unwalkable deck. An intact deck now looks
+                // intact (the damaged piece stays in the kit, unused). DamagedSpans stays 0.
                 if (k % 3 == 1)
                 {
                     Vector3 X = t.Matrix.GetColumn(0), F = (Vector3)t.Matrix.GetColumn(2) * (float)TILE;
@@ -1084,6 +1082,11 @@ namespace CriticalMass.Runtime.View.Dressing
                 for (int k = 0; k < n; k++)
                 {
                     double[] a = pt(ta + (tb - ta) * k / n), b = pt(ta + (tb - ta) * (k + 1) / n);
+                    // A deck tile over an in-map VOID axis cell is not drawn: the sim removed that deck (a collapse, a blast),
+                    // so the gap shows instead of planks the body would drop through. On an intact span every axis cell is
+                    // BRIDGE or land (the raster paints every cell within 1.5 of the axis), so the intact plan is unchanged.
+                    double mx = (a[0] + b[0]) / 2, mz = (a[2] + b[2]) / 2;
+                    if (g.T((int)Math.Floor(mx), (int)Math.Floor(mz)) == Cell.Void) continue;
                     WorldPlacement tile = SpanTile(a, b, w);
                     tile.SpanA = (float)k / n;
                     tile.SpanB = (float)(k + 1) / n;

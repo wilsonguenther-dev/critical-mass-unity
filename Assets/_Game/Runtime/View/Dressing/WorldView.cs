@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using CriticalMass.Runtime.Game;
 using CriticalMass.Sim.Core;
@@ -158,6 +159,14 @@ namespace CriticalMass.Runtime.View.Dressing
         /// shared project assets in the editor).</summary>
         private void ApplyTier()
         {
+            if (_building != null) return;   // the running build re-checks the tier when it finishes
+            if (_replanning != null)
+            {
+                _makeParent = _staging;
+                while (_replanning.MoveNext()) { }   // finish a running re-plan first (rare: a quality change mid-dig)
+                _makeParent = null;
+                _replanning = null;
+            }
             // Environment v4 clutter follows the quality level: re-plan (only the groups that differ are rebuilt).
             if (Plan != null && QualityTable.ExtraClutter(RenderTier.Level) != _clutterOn) _replanPending = true;
             // Scenery LODs: another quality level needs other levels of detail or another clutter density: rebuild once.
@@ -249,23 +258,73 @@ namespace CriticalMass.Runtime.View.Dressing
             if (_driver == null) _driver = FindAnyObjectByType<SimDriverBehaviour>();
         }
 
-        private void LateUpdate()
+        private void LateUpdate() { var cost = CriticalMass.Runtime.Game.FrameCost.Enter(); LateUpdateCost(); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.World, cost); }
+
+        void LateUpdateCost()
         {
             if (_driver == null || _driver.World == null) return;
             Sim.Core.World w = _driver.World;
-            if (w != _world || w.Map != _map)
+            CriticalMass.Runtime.Game.FrameRecorder.Loading = false;
+            if (_building == null && (w != _world || w.Map != _map))
             {
+                _replanning = null;   // a new world: a running re-plan of the old one is dropped (Clear destroys its objects)
+                _replanPending = false;
+                _building = BuildSteps(w);
+                _buildWallStart = Time.realtimeSinceStartupAsDouble;
+                LastBuildMs = 0;
+                LastBuildFrames = 0;
+                LastBuildWorstSliceMs = 0;
+                Building = true;
+                BuildProgress = 0f;
+            }
+            if (_building != null)
+            {
+                CriticalMass.Runtime.Game.FrameRecorder.Loading = true;
+                double budget = Application.isEditor && !SliceInEditor ? double.PositiveInfinity : BuildBudgetMs;
                 var sw = System.Diagnostics.Stopwatch.StartNew();
-                Build(w);
-                LastBuildMs = sw.Elapsed.TotalMilliseconds;
+                bool done = CriticalMass.Runtime.Game.FrameBudget.Run(_building, budget, StepClock());
+                double slice = sw.Elapsed.TotalMilliseconds;
+                LastBuildMs += slice;
+                LastBuildFrames++;
+                if (slice > LastBuildWorstSliceMs)
+                {
+                    LastBuildWorstSliceMs = slice;
+                    LastBuildWorstStage = _stage;
+                }
+                BuildProgress = done ? 1f : Mathf.Clamp01((float)_buildDone / Math.Max(1, _buildTotal));
+                if (!done) return;
+                _building = null;
+                Building = false;
+                if (NeedsRebuild(_builtQuality, RenderTier.Level) || QualityTable.ExtraClutter(RenderTier.Level) != _clutterOn) ApplyTier();
                 if (!Application.isEditor)
-                    Debug.Log($"[CM.Load] world art built in {LastBuildMs:0} ms: {Renderers} renderers, {Triangles} triangles, quality {_builtQuality}");
+                    Debug.Log($"[CM.Load] world art built in {LastBuildMs:0} ms of work over {LastBuildFrames} frames " +
+                              $"({(Time.realtimeSinceStartupAsDouble - _buildWallStart) * 1000.0:0} ms wall, slowest frame's slice " +
+                              $"{LastBuildWorstSliceMs:0.0} ms, in {LastBuildWorstStage}): {Renderers} renderers, {Triangles} triangles, quality {_builtQuality}; stages {LastStages}");
                 return;
             }
             if (Plan == null) return;
             UpdateLods();
             if (w.Match != null) ApplyHill(w.Match.HillState);
-            if (_replanPending && Time.frameCount - _lastReplanFrame >= ReplanEveryFrames) Replan();
+            if (_replanning != null)
+            {
+                // the new groups are made under a hidden staging parent, so the old ones draw alone until the swap
+                if (_staging == null)
+                {
+                    _staging = new GameObject("Replan Staging").transform;
+                    _staging.SetParent(_root, false);
+                    _staging.gameObject.SetActive(false);
+                }
+                _makeParent = _staging;
+                try
+                {
+                    if (FrameBudget.Run(_replanning, ReplanBudgetMs, StepClock())) _replanning = null;
+                }
+                finally
+                {
+                    _makeParent = null;
+                }
+            }
+            if (_replanPending && Time.frameCount - _lastReplanFrame >= ReplanEveryFrames) RequestReplan();
             if (w.GridVersion == _seenGridVersion) return;
             _seenGridVersion = w.GridVersion;
             HashSet<int> dirtyChunks = _dirtyChunks;
@@ -283,10 +342,86 @@ namespace CriticalMass.Runtime.View.Dressing
             foreach (int c in dirtyChunks) BuildGroundChunk(c);
             if (dirtyChunks.Count > 0)
             {
-                if (Time.frameCount - _lastReplanFrame >= ReplanEveryFrames) Replan();
+                if (Time.frameCount - _lastReplanFrame >= ReplanEveryFrames) RequestReplan();
                 else _replanPending = true;   // merged with the next digs into one re-plan
             }
             if (breakables) SyncBreakables();
+        }
+
+        // perf-smooth-1: in a match a dig re-plans on a worker thread (on a copy of the grid) and rebuilds the changed groups a
+        // few milliseconds a frame, then swaps them in at once; it was 55 to 105 ms in one frame (the in-match hitches the
+        // frame recorder attributed to WorldView). The editor and tests keep the one-frame Replan.
+        private IEnumerator _replanning;
+        private Transform _staging, _makeParent;
+        public const double ReplanBudgetMs = 3.0;
+        private static readonly System.Diagnostics.Stopwatch StepWatch = new System.Diagnostics.Stopwatch();
+        private static readonly Func<double> StepClockFn = () => StepWatch.Elapsed.TotalMilliseconds;
+
+        private static Func<double> StepClock()
+        {
+            StepWatch.Restart();
+            return StepClockFn;
+        }
+
+        /// <summary>A re-plan is running over frames (tests).</summary>
+        public bool Replanning => _replanning != null;
+
+        private void RequestReplan()
+        {
+            if (Application.isEditor && !SliceInEditor)
+            {
+                Replan();
+                return;
+            }
+            if (_replanning != null)
+            {
+                _replanPending = true;
+                return;
+            }
+            _replanPending = false;
+            _lastReplanFrame = Time.frameCount;
+            Replans++;
+            _replanning = ReplanSteps();
+        }
+
+        private IEnumerator ReplanSteps()
+        {
+            _clutterOn = QualityTable.ExtraClutter(RenderTier.Level);
+            MapDef snap = _map.WithCells((byte[])_map.Cells.Clone());
+            WorldPlan old = Plan;
+            bool clutter = _clutterOn;
+            BasesFile bases = _bases;
+            WorldKitCatalog cat = _catalog;
+            var task = System.Threading.Tasks.Task.Run(() =>
+            {
+                WorldPlan p = WorldDresser.Plan(snap, bases, cat.Centroid, cat.Body, clutter);
+                return (p, ChangedGroups(old, p));
+            });
+            while (!task.IsCompleted) yield return null;
+            WorldPlan next;
+            HashSet<int> changed;
+            if (task.IsFaulted)
+            {
+                Debug.LogWarning("[CM.World] re-plan on a worker failed, planning on the main thread: " + task.Exception?.GetBaseException().Message);
+                next = WorldDresser.Plan(snap, bases, cat.Centroid, cat.Body, clutter);
+                changed = ChangedGroups(old, next);
+            }
+            else (next, changed) = task.Result;
+            Plan = next;
+            var fresh = new Dictionary<int, Chunk>();
+            IEnumerator steps = BuildGroupsSteps(changed, fresh);
+            while (steps.MoveNext()) yield return null;
+            foreach (int g in changed) DestroyGroup(g);
+            foreach (var kv in fresh)
+            {
+                foreach (GameObject go in kv.Value.Objects)
+                    if (go != null) go.transform.SetParent(_root, false);
+                _groups[kv.Key] = kv.Value;
+            }
+            _dressed = Plan.Dressed;
+            _dressedTypes = Plan.CellsAtPlan;
+            DressVersion++;
+            UpdateLods();
         }
 
         /// <summary>A dig or place changed land: plan again on the current grid and rebuild the groups that differ.</summary>
@@ -417,12 +552,22 @@ namespace CriticalMass.Runtime.View.Dressing
         /// </summary>
         private void BuildGroups(HashSet<int> only)
         {
+            IEnumerator e = BuildGroupsSteps(only);
+            while (e.MoveNext()) { }
+        }
+
+        /// <summary>perf-smooth-1: the group build as steps (one placement, one combined group or one shadow group each), so
+        /// the match-start build can run a few milliseconds a frame behind the loading screen.</summary>
+        private IEnumerator BuildGroupsSteps(HashSet<int> only, Dictionary<int, Chunk> into = null)
+        {
+            var bgw = System.Diagnostics.Stopwatch.StartNew();
             int q = RenderTier.Level;
             _builtQuality = q;
             var groups = new Dictionary<(int chunk, int level, Material mat), List<(MeshData d, int sub, Matrix4x4 m, SwayInfo sw)>>();
             var shadows = new Dictionary<int, List<(MeshData d, int sub, Matrix4x4 m, SwayInfo sw)>>();
             Func<string, bool> hasFile = n => _catalog.Find(n) != null;
             List<(int chunk, Material mat, MeshData d, int sub, Matrix4x4 m)> parts = _parts;
+            _stage = "collect";
             foreach (WorldPlacement p in Plan.Placements)
             {
                 if (p.Piece == "env_ground_cell") continue; // drawn per chunk by BuildGroundChunk
@@ -456,12 +601,42 @@ namespace CriticalMass.Runtime.View.Dressing
                     if (!shadows.TryGetValue(pc, out var list)) shadows[pc] = list = new List<(MeshData, int, Matrix4x4, SwayInfo)>();
                     list.Add((d, sub, m, default(SwayInfo)));
                 }
+                _buildDone++;
+                yield return null;
             }
+            _collectMs = bgw.Elapsed.TotalMilliseconds;
+            _buildTotal += groups.Count + shadows.Count;
+            // perf-smooth-1: every group's vertex streams are computed on worker threads; the main thread only makes the
+            // meshes, in the same order as before (one group per step).
+            var jobs = new List<GroupJob>(groups.Count + shadows.Count);
+            var groupKeys = new List<(int chunk, int level, Material mat)>(groups.Count);
             foreach (var kv in groups)
             {
                 (int chunk, int level, Material mat) = kv.Key;
-                GameObject go = MakeGroup("Group " + chunk + " L" + level + " " + mat.name, mat, kv.Value, ShadowCastingMode.Off);
-                Chunk ch = ChunkFor(chunk, go);
+                groupKeys.Add(kv.Key);
+                jobs.Add(PrepareGroup("Group " + chunk + " L" + level + " " + mat.name, mat, kv.Value, ShadowCastingMode.Off));
+                _stage = "prepare";
+                yield return null;   // perf-smooth-1: the per-part matrices of one group per step (was all groups in one step)
+            }
+            Material caster = ShadowMaterial();
+            bool shadowsOn = RenderTier.Policy(q).sceneryShadows;
+            var shadowKeys = new List<int>(shadows.Count);
+            if (caster != null)
+                foreach (var kv in shadows)
+                {
+                    shadowKeys.Add(kv.Key);
+                    jobs.Add(PrepareGroup("Shadow " + kv.Key, caster, kv.Value, ShadowCastingMode.ShadowsOnly));
+                    yield return null;
+                }
+            ComputeOnWorkers(jobs);
+            _stage = "finish groups";
+            for (int k = 0; k < groupKeys.Count; k++)
+            {
+                while (!jobs[k].Done) yield return null;
+                (int chunk, int level, Material mat) = groupKeys[k];
+                GameObject go = FinishGroup(jobs[k]);
+                jobs[k] = null;
+                Chunk ch = ChunkFor(chunk, go, into);
                 var r = go.GetComponent<MeshRenderer>();
                 ch.ByLevel[level].Add(r);
                 int tris = (int)(go.GetComponent<MeshFilter>().sharedMesh.GetIndexCount(0) / 3);
@@ -475,27 +650,33 @@ namespace CriticalMass.Runtime.View.Dressing
                 }
                 r.enabled = false; // UpdateLods shows one level
                 ch.Shown = -1;
+                _buildDone++;
+                yield return null;
             }
-            Material caster = ShadowMaterial();
-            bool shadowsOn = RenderTier.Policy(q).sceneryShadows;
-            if (caster != null)
-                foreach (var kv in shadows)
-                {
-                    GameObject go = MakeGroup("Shadow " + kv.Key, caster, kv.Value, ShadowCastingMode.ShadowsOnly);
-                    Chunk ch = ChunkFor(kv.Key, go);
-                    ch.Shadow = go.GetComponent<MeshRenderer>();
-                    ch.ShadowTris = (int)(go.GetComponent<MeshFilter>().sharedMesh.GetIndexCount(0) / 3);
-                    ch.Shadow.enabled = shadowsOn;
-                }
+            for (int k = 0; k < shadowKeys.Count; k++)
+            {
+                int jk = groupKeys.Count + k;
+                while (!jobs[jk].Done) yield return null;
+                GameObject go = FinishGroup(jobs[jk]);
+                jobs[jk] = null;
+                Chunk ch = ChunkFor(shadowKeys[k], go, into);
+                ch.Shadow = go.GetComponent<MeshRenderer>();
+                ch.ShadowTris = (int)(go.GetComponent<MeshFilter>().sharedMesh.GetIndexCount(0) / 3);
+                ch.Shadow.enabled = shadowsOn;
+                _buildDone++;
+                yield return null;
+            }
+            _combineMs = bgw.Elapsed.TotalMilliseconds - _collectMs;
             UpdateLods();
         }
 
         private readonly List<(int chunk, Material mat, MeshData d, int sub, Matrix4x4 m)> _parts =
             new List<(int, Material, MeshData, int, Matrix4x4)>();
 
-        private Chunk ChunkFor(int key, GameObject go)
+        private Chunk ChunkFor(int key, GameObject go, Dictionary<int, Chunk> into = null)
         {
-            if (!_groups.TryGetValue(key, out Chunk ch)) _groups[key] = ch = new Chunk();
+            into = into ?? _groups;
+            if (!into.TryGetValue(key, out Chunk ch)) into[key] = ch = new Chunk();
             ch.Objects.Add(go);
             return ch;
         }
@@ -538,6 +719,13 @@ namespace CriticalMass.Runtime.View.Dressing
 
         private void OnDestroy()
         {
+            _replanning = null;
+            if (_building != null)
+            {
+                _building = null;
+                Building = false;
+                BuildProgress = 1f;
+            }
             Clear();
             if (_field != null) Destroy(_field);
             _field = null;
@@ -587,31 +775,129 @@ namespace CriticalMass.Runtime.View.Dressing
             return cz * 64 + cx;
         }
 
+        /// <summary>perf-smooth-1: the last build's stage times ([CM.Load]).</summary>
+        public static string LastStages = "";
+        private double _collectMs, _combineMs;
+
         private void Build(Sim.Core.World w)
         {
+            IEnumerator e = BuildSteps(w);
+            while (e.MoveNext()) { }
+        }
+
+        // perf-smooth-1: the match-start build in steps behind the loading screen (players); progress for the loading bar.
+        private int _buildDone, _buildTotal = 1;
+        private IEnumerator _building;
+        private double _buildWallStart;
+
+        /// <summary>Main-thread milliseconds the world build may use per frame in a player (the loading screen stays smooth).
+        /// The editor and tests build in one frame (PlayMode tests read the world a few frames after load).</summary>
+        public static double BuildBudgetMs = 6.0;
+
+        /// <summary>A world build is running (the sim waits: SimDriverBehaviour, the loading screen bar: BuildProgress).</summary>
+        public static bool Building { get; private set; }
+
+        /// <summary>The running build's progress 0..1 (1 when none runs).</summary>
+        public static float BuildProgress { get; private set; } = 1f;
+
+        /// <summary>Frames the last build took and its slowest frame's build work, ms (the loading budget's proof).</summary>
+        public int LastBuildFrames { get; private set; }
+        public double LastBuildWorstSliceMs { get; private set; }
+
+        /// <summary>The build stage the slowest frame's slice ended in ([CM.Load]).</summary>
+        public string LastBuildWorstStage { get; private set; } = "";
+
+        private string _stage = "";
+
+        private IEnumerator BuildSteps(Sim.Core.World w)
+        {
+            _buildDone = 0;
+            _buildTotal = 1;
+            _stage = "clear";
+            if (_groups.Count > 0)
+            {
+                var oldKeys = new List<int>(_groups.Keys);   // the previous world's groups go a few per frame
+                for (int i = 0; i < oldKeys.Count; i++)
+                {
+                    DestroyGroup(oldKeys[i]);
+                    if ((i & 7) == 7) yield return null;
+                }
+            }
             Clear();
+            _stage = "catalog";
             _world = w;
             _map = w.Map;
             _seenGridVersion = w.GridVersion;
             _cells = (byte[])_map.Cells.Clone();
             _catalog = WorldKitCatalog.Load();
-            if (_catalog == null || _catalog.Names.Length == 0) return;
+            if (_catalog == null || _catalog.Names.Length == 0) yield break;
+            var st = System.Diagnostics.Stopwatch.StartNew();
             _bases = BasesFile.Load();
             BasesParses++;
             _clutterOn = QualityTable.ExtraClutter(RenderTier.Level);
+            // perf-smooth-1: the planner reads every piece's centroid and body from the kit meshes (cached on the catalog
+            // after the first build: 0.5 s cold); warm them one piece a step first, so the plan itself is one short step.
+            _buildTotal = 2 + _catalog.Names.Length;
+            _stage = "kit warm";
+            foreach (string piece in _catalog.Names)
+            {
+                if (string.IsNullOrEmpty(piece)) continue;
+                _catalog.Centroid(piece);
+                _catalog.Body(piece);
+                _buildDone++;
+                yield return null;
+            }
+            double tLoad = st.Elapsed.TotalMilliseconds;
+            yield return null;
+            _stage = "plan";
             Plan = WorldDresser.Plan(_map, _bases, _catalog.Centroid, _catalog.Body, _clutterOn);
+            double tPlan = st.Elapsed.TotalMilliseconds;
+            _stage = "field start";
+            int chunksX0 = (_map.Width + ChunkSize - 1) / ChunkSize, chunksZ0 = (_map.Height + ChunkSize - 1) / ChunkSize;
+            _buildTotal = _buildDone + 2 + Plan.Placements.Count + chunksX0 * chunksZ0 + Plan.Breakables.Count / 16 + 1;
+            _buildDone++;
+            yield return null;
             _root = new GameObject("World Art").transform;
             _root.SetParent(transform, false);
             if (_field != null) Destroy(_field);
-            _field = WorldField.Bake(Plan);
+            _field = null;
+            // perf-smooth-1: the field texture's pixels (about 0.5 s of pure math) are computed on a worker thread while
+            // the groups build; the texture is made on the main thread before the ground needs it.
+            WorldPlan fieldPlan = Plan;
+            var fieldTask = System.Threading.Tasks.Task.Run(() =>
+            {
+                Color[] fpx = WorldField.Compute(fieldPlan, out int fc, out int fr);
+                return (fpx, fc, fr);
+            });
+            double tField = st.Elapsed.TotalMilliseconds;
             Triangles = 0;
             Renderers = 0;
+            _buildDone++;
+            yield return null;
 
-            BuildGroups(null);
+            IEnumerator groupSteps = BuildGroupsSteps(null);
+            while (groupSteps.MoveNext()) yield return null;
+            double tGroups = st.Elapsed.TotalMilliseconds;
+            _stage = "field wait";
+            while (!fieldTask.IsCompleted) yield return null;
+            _stage = "field apply";
+            {
+                var (fpx, fc, fr) = fieldTask.Result;   // rethrows a worker exception here, on the main thread
+                _field = WorldField.FromPixels(fpx, fc, fr);
+            }
+            double tFieldWait = st.Elapsed.TotalMilliseconds - tGroups;
+            yield return null;
+            tGroups += tFieldWait;
             int chunksX = (_map.Width + ChunkSize - 1) / ChunkSize, chunksZ = (_map.Height + ChunkSize - 1) / ChunkSize;
             for (int cz = 0; cz < chunksZ; cz++)
             for (int cx = 0; cx < chunksX; cx++)
+            {
                 BuildGroundChunk(cz * 64 + cx);
+                _buildDone++;
+                yield return null;
+            }
+            double tGround = st.Elapsed.TotalMilliseconds;
+            LastStages = $"catalog+bases+kit warm {tLoad:0}, plan {tPlan - tLoad:0}, field start {tField - tPlan:0} (then waited {tFieldWait:0}), groups {tGroups - tField:0} (collect {_collectMs:0}, combine {_combineMs:0}), ground {tGround - tGroups:0} ms";
             foreach (WorldBreakable b in Plan.Breakables)
             {
                 var go = new GameObject("Breakable " + b.Family);
@@ -621,12 +907,30 @@ namespace CriticalMass.Runtime.View.Dressing
                 var mf = go.AddComponent<MeshFilter>();
                 go.AddComponent<MeshRenderer>();
                 _breakables.Add((b, mf, null));
+                if (_breakables.Count % 16 == 0)
+                {
+                    _buildDone++;
+                    yield return null;
+                }
             }
             SyncBreakables();
             _dressed = Plan.Dressed;
             _dressedTypes = Plan.CellsAtPlan;
+            // perf-smooth-1: the build leaves tens of MB of garbage (combine buffers, mesh copies). Collect it now, in
+            // incremental slices behind the loading screen, so no stop-the-world collection lands in the match.
+            if (!Application.isEditor && UnityEngine.Scripting.GarbageCollector.isIncremental)
+                _stage = "gc settle";
+                for (int k = 0; k < GcSettleMaxSteps && UnityEngine.Scripting.GarbageCollector.CollectIncremental(GcSettleSliceNs); k++)
+                    yield return null;
+            _buildDone = _buildTotal;
             DressVersion++;
         }
+
+        /// <summary>perf-smooth-1: the post-build incremental collection: 3 ms slices, at most 240 of them.</summary>
+        public const ulong GcSettleSliceNs = 3_000_000;
+        public const int GcSettleMaxSteps = 240;
+        /// <summary>Tests: slice the build in the editor too (the editor and PlayMode tests build in one frame otherwise).</summary>
+        public static bool SliceInEditor;
 
         private void SyncBreakables()
         {
@@ -811,52 +1115,128 @@ namespace CriticalMass.Runtime.View.Dressing
             return d;
         }
 
+        /// <summary>perf-smooth-1: one combined mesh's inputs and outputs. Prepare (main thread) fills the inputs, Compute
+        /// (pure arithmetic, any thread) the vertex streams, Finish (main thread) makes the mesh and the GameObject.</summary>
+        private sealed class GroupJob
+        {
+            public string Name;
+            public Material Mat;
+            public ShadowCastingMode? Casting;
+            public bool SwayMat, Sways;
+            public (MeshData d, int sub, Matrix4x4 m, Matrix4x4 nm, SwayInfo sw)[] Parts;
+            public List<Vector3> V, N, UV2, UV3;
+            public List<Color32> C;
+            public List<Vector2> UV;
+            public List<Vector4> UV5;
+            public List<int> Tri;
+            public volatile bool Done;
+            public Exception Error;
+        }
+
+        private static GroupJob PrepareGroup(string name, Material mat, List<(MeshData d, int sub, Matrix4x4 m, SwayInfo sw)> parts,
+            ShadowCastingMode? casting)
+        {
+            var job = new GroupJob
+            {
+                Name = name, Mat = mat, Casting = casting,
+                // UV5 only on groups whose material reads it (the sway clones): still groups carry no extra channel.
+                SwayMat = mat != null && mat.HasProperty("_SwayOn") && mat.GetFloat("_SwayOn") > 0.5f,
+                Parts = new (MeshData, int, Matrix4x4, Matrix4x4, SwayInfo)[parts.Count],
+            };
+            for (int k = 0; k < parts.Count; k++)
+            {
+                var (d, sub, m, sw) = parts[k];
+                job.Parts[k] = (d, sub, m, m.inverse.transpose, sw);   // Matrix4x4.inverse is an engine call: main thread
+            }
+            return job;
+        }
+
+        /// <summary>The vertex streams of a group: plain arithmetic on cached arrays, no engine call (safe off the main thread).</summary>
+        private static void ComputeGroup(GroupJob job)
+        {
+            try
+            {
+                // Closer (batch 4): sized up front (the lists regrew a dozen times per group: part of the match-start hitch).
+                int indices = 0;
+                foreach (var part in job.Parts) indices += part.d.Subs[part.sub].Length;
+                int verts = indices / 2 + 16;
+                var uv5 = job.SwayMat ? new List<Vector4>(verts) : null;
+                bool sways = false;
+                var v = new List<Vector3>(verts);
+                var n = new List<Vector3>(verts);
+                var c = new List<Color32>(verts);
+                var uv = new List<Vector2>(verts);
+                var uv2 = new List<Vector3>(verts);
+                var uv3 = new List<Vector3>(verts);
+                var tri = new List<int>(indices);
+                var map = new Dictionary<int, int>(1024);
+                foreach (var (d, sub, m, nm, sw) in job.Parts)
+                {
+                    map.Clear();
+                    foreach (int i in d.Subs[sub])
+                    {
+                        if (!map.TryGetValue(i, out int j))
+                        {
+                            j = v.Count;
+                            map[i] = j;
+                            v.Add(m.MultiplyPoint3x4(d.V[i]));
+                            n.Add(d.N.Length > i ? nm.MultiplyVector(d.N[i]).normalized : Vector3.up);
+                            c.Add(d.C.Length > i ? d.C[i] : new Color32(255, 255, 255, 255));
+                            uv.Add(d.UV.Length > i ? d.UV[i] : Vector2.zero);
+                            uv2.Add(d.UV2.Count > i && d.UV2[i].sqrMagnitude > 0.25f ? nm.MultiplyVector(d.UV2[i]).normalized : Vector3.zero);
+                            uv3.Add(d.UV3.Count > i ? nm.MultiplyVector(d.UV3[i]).normalized : n[j]);
+                            if (uv5 != null)
+                            {
+                                float wgt = SwayWeight(d, d.V[i], in sw);
+                                if (wgt > 0f) sways = true;
+                                uv5.Add(new Vector4(sw.PivotX, sw.PivotZ, wgt, sw.Kind));
+                            }
+                        }
+                        tri.Add(j);
+                    }
+                }
+                job.V = v; job.N = n; job.C = c; job.UV = uv; job.UV2 = uv2; job.UV3 = uv3; job.UV5 = uv5; job.Tri = tri;
+                job.Sways = sways;
+            }
+            catch (Exception e) { job.Error = e; }
+            finally { job.Done = true; }
+        }
+
+        /// <summary>Runs the jobs' Compute on up to (cores - 2) worker threads, in list order per worker (never the main thread).</summary>
+        private static void ComputeOnWorkers(List<GroupJob> jobs)
+        {
+            int next = -1;
+            int workers = Math.Max(1, Math.Min(jobs.Count, Environment.ProcessorCount - 2));
+            for (int w = 0; w < workers; w++)
+                System.Threading.Tasks.Task.Run(() =>
+                {
+                    for (int k = System.Threading.Interlocked.Increment(ref next); k < jobs.Count; k = System.Threading.Interlocked.Increment(ref next))
+                        ComputeGroup(jobs[k]);
+                });
+        }
+
         /// <summary>One combined mesh: positions, normals, UV2 (foam extrusion) and UV3 (outline direction) transformed.</summary>
         private GameObject MakeGroup(string name, Material mat, List<(MeshData d, int sub, Matrix4x4 m, SwayInfo sw)> parts,
             ShadowCastingMode? casting = null)
         {
-            // UV5 only on groups whose material reads it (the sway clones): still groups carry no extra channel.
-            bool swayMat = mat != null && mat.HasProperty("_SwayOn") && mat.GetFloat("_SwayOn") > 0.5f;
-            // Closer (batch 4): sized up front (the lists regrew a dozen times per group: part of the match-start hitch).
-            int indices = 0;
-            foreach (var part in parts) indices += part.d.Subs[part.sub].Length;
-            int verts = indices / 2 + 16;
-            var uv5 = swayMat ? new List<Vector4>(verts) : null;
-            bool sways = false;
-            var v = new List<Vector3>(verts);
-            var n = new List<Vector3>(verts);
-            var c = new List<Color32>(verts);
-            var uv = new List<Vector2>(verts);
-            var uv2 = new List<Vector3>(verts);
-            var uv3 = new List<Vector3>(verts);
-            var tri = new List<int>(indices);
-            var map = new Dictionary<int, int>(1024);
-            foreach (var (d, sub, m, sw) in parts)
-            {
-                Matrix4x4 nm = m.inverse.transpose;
-                map.Clear();
-                foreach (int i in d.Subs[sub])
-                {
-                    if (!map.TryGetValue(i, out int j))
-                    {
-                        j = v.Count;
-                        map[i] = j;
-                        v.Add(m.MultiplyPoint3x4(d.V[i]));
-                        n.Add(d.N.Length > i ? nm.MultiplyVector(d.N[i]).normalized : Vector3.up);
-                        c.Add(d.C.Length > i ? d.C[i] : (Color32)Color.white);
-                        uv.Add(d.UV.Length > i ? d.UV[i] : Vector2.zero);
-                        uv2.Add(d.UV2.Count > i && d.UV2[i].sqrMagnitude > 0.25f ? nm.MultiplyVector(d.UV2[i]).normalized : Vector3.zero);
-                        uv3.Add(d.UV3.Count > i ? nm.MultiplyVector(d.UV3[i]).normalized : n[j]);
-                        if (uv5 != null)
-                        {
-                            float wgt = SwayWeight(d, d.V[i], in sw);
-                            if (wgt > 0f) sways = true;
-                            uv5.Add(new Vector4(sw.PivotX, sw.PivotZ, wgt, sw.Kind));
-                        }
-                    }
-                    tri.Add(j);
-                }
-            }
+            GroupJob job = PrepareGroup(name, mat, parts, casting);
+            ComputeGroup(job);
+            return FinishGroup(job);
+        }
+
+        /// <summary>The mesh and GameObject of a computed group (main thread).</summary>
+        private GameObject FinishGroup(GroupJob job)
+        {
+            if (job.Error != null) throw new InvalidOperationException("world group " + job.Name + " failed", job.Error);
+            string name = job.Name;
+            Material mat = job.Mat;
+            ShadowCastingMode? casting = job.Casting;
+            List<Vector3> v = job.V, n = job.N, uv2 = job.UV2, uv3 = job.UV3;
+            List<Color32> c = job.C;
+            List<Vector2> uv = job.UV;
+            List<Vector4> uv5 = job.UV5;
+            List<int> tri = job.Tri;
+            bool sways = job.Sways;
             var mesh = new Mesh { name = name, indexFormat = v.Count > 65000 ? IndexFormat.UInt32 : IndexFormat.UInt16 };
             mesh.SetVertices(v);
             mesh.SetNormals(n);
@@ -874,7 +1254,7 @@ namespace CriticalMass.Runtime.View.Dressing
             }
             mesh.UploadMeshData(true);
             var go = new GameObject(name);
-            go.transform.SetParent(_root, false);
+            go.transform.SetParent(_makeParent != null ? _makeParent : _root, false);
             go.AddComponent<MeshFilter>().sharedMesh = mesh;
             var r = go.AddComponent<MeshRenderer>();
             r.sharedMaterial = mat;

@@ -1,0 +1,90 @@
+{
+ "A1": {
+  "ok": true,
+  "I": -16.1,
+  "TP": -1.4,
+  "LRA": 8.8,
+  "samples_over": 0
+ },
+ "A2": {
+  "ok": true,
+  "max_fx_starts_1s": 3,
+  "max_fx_starts_200ms": 2,
+  "max_flux_onsets_per_s": 2
+ },
+ "A3": {
+  "ok": true,
+  "failures": []
+ },
+ "A4": {
+  "ok": true,
+  "banned": [],
+  "correlated_pairs": []
+ },
+ "A5": {
+  "ok": true,
+  "music_I": -19.1,
+  "fx_I": -17.2
+ },
+ "A6": {
+  "ok": true,
+  "lines": [
+   {
+    "id": "DX1-card-1",
+    "voice_minus_bed_db": 10.9
+   },
+   {
+    "id": "DX3-card-3",
+    "voice_minus_bed_db": 13.8
+   },
+   {
+    "id": "DX2-card-2",
+    "voice_minus_bed_db": 12.4
+   },
+   {
+    "id": "DX4-card-4",
+    "voice_minus_bed_db": 13.4
+   },
+   {
+    "id": "DX5-card-5",
+    "voice_minus_bed_db": 10.5
+   },
+   {
+    "id": "DX6-story-title",
+    "voice_minus_bed_db": 11.3
+   }
+  ],
+  "transients_before_title": []
+ },
+ "A7": {
+  "ok": true,
+  "silence_peak_db": -51.6,
+  "hit_minus_preceding_db": {
+   "crack": 19.8,
+   "clash": 34.8,
+   "roar": 21.6,
+   "logo": 23.9
+  }
+ },
+ "A8": {
+  "ok": true,
+  "hit_minus_2s_before_LU": {
+   "crack": 16.3,
+   "clash": 6.1,
+   "roar": 7.7,
+   "logo": 6.1,
+   "hatch": 14.3
+  },
+  "integrated_drop_db": 2.0
+ },
+ "A9": {
+  "ok": true,
+  "loudest_t": 43.7,
+  "logo_M": -9.6,
+  "roar_M": -12.2
+ },
+ "A10": {
+  "ok": true,
+  "failures": []
+ }
+}

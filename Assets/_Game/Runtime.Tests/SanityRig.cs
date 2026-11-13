@@ -34,14 +34,21 @@ namespace CriticalMass.Runtime.Tests
             Transform tl = Find(root, "toes.l"), tr = Find(root, "toes.r"), fl = Find(root, "foot.l"), fr = Find(root, "foot.r");
             if (tl != null && tr != null && fl != null && fr != null)
             {
-                // The planted (lower) foot only: in a run cycle the trailing foot kicks up behind with its sole to the
-                // sky, and its toes then point backwards; summed with an airborne front foot that read a correct model as
-                // turned around in about one sampled frame in nine (integration batch 1).
-                Vector3 d = Flat(tl.position.y <= tr.position.y ? tl.position - fl.position : tr.position - fr.position);
+                // The planted foot only: in a run cycle the trailing foot kicks up behind with its sole to the sky, and its
+                // toes then point backwards; summed with an airborne front foot that read a correct model as turned around
+                // in about one sampled frame in nine (integration batch 1).
+                // fix/facing-frame-timing: the planted foot is the one with the lower ANKLE, not the lower toe. Just after
+                // toe-off the trailing foot's heel is up but its toes still hang lowest (5 mm below the landing foot's in the
+                // GitHub reads), so the lower-toe rule read that foot, toes backwards: the Farmer "144 degrees, turned
+                // around" at run phase 0.27 with its root, its hip line and its other foot on the facing. Forward kinematics
+                // on the KayKit rig (tools/art/locomotion_blend_fk.py clips, 200 phases each): the lower-toe rule misreads
+                // 1 to 6 % of Run reversed, the strafes reversed, Walk and Walking_Backwards, all as turned around; the
+                // lower-ankle rule none. A model drawn turned around still reads turned around (its planted toes point back).
+                Vector3 d = Flat(fl.position.y <= fr.position.y ? tl.position - fl.position : tr.position - fr.position);
                 if (d.sqrMagnitude > 1e-6f)
                 {
                     front = d.normalized;
-                    cue = "toes ahead of the planted ankle";
+                    cue = "toes ahead of the planted (lower) ankle";
                     return true;
                 }
             }

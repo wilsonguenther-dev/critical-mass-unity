@@ -70,6 +70,16 @@ namespace CriticalMass.Sim.Core
             return ApplyHit(w, targetId, amount, sourceId, srcX, srcZ, CauseOf(w, sourceId), dx, dz, amount * w.Config.Physics.MeleeKnockPerDamage, stun);
         }
 
+        /// <summary>fix/kaiju-alive-1: true when a hit of this cause knocks and staggers: Knockback on, or a Kaiju hit with
+        /// PhysicsConfig.KaijuKnockback on.</summary>
+        /// <summary>fix/kaiju-alive-1: the share of the Kaiju's designed throw it applies (PhysicsConfig.KaijuKnockScale while
+        /// the fighters' Knockback is off).</summary>
+        public static double KaijuThrow(World w) => Phys.On(w, w.Config.Physics.Knockback) ? 1 : w.Config.Physics.KaijuKnockScale;
+
+        public static bool Knocks(World w, DamageCause cause) =>
+            Phys.On(w, w.Config.Physics.Knockback) ||
+            (cause == DamageCause.KaijuMelee || cause == DamageCause.KaijuSlam) && Phys.On(w, w.Config.Physics.KaijuKnockback);
+
         /// <summary>
         /// DG-70: the one entry point (ApplyDamage(..., cause) calls it with no knock): damage, then, when the victim lives and
         /// Knockback is on, a knock of knock u (mass 1) along (dirX, dirZ) and stunTicks of stagger (Knock.Push). The Hit event
@@ -113,7 +123,7 @@ namespace CriticalMass.Sim.Core
             t.LastCause = cause;
             double tx = w.X[targetId];
             double tz = w.Z[targetId];
-            bool physics = Phys.On(w, w.Config.Physics.Knockback);
+            bool physics = Knocks(w, cause);
             double eff = physics && (knock > 0) ? Knock.Effective(w, targetId, knock, srcX, srcZ) : 0;
             int tier = Knock.Tier(w.Config, dmg, t.Hp <= 0);
             if (physics) World.PushEvent(w, SimEventType.Hit, targetId, credit, tx, tz, dmg, null, cause, 0, dirX, dirZ, eff, tier, 0, 0);

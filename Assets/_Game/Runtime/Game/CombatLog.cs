@@ -318,7 +318,9 @@ namespace CriticalMass.Runtime.Game
             if (Instance == this) Instance = null;
         }
 
-        void LateUpdate()
+        void LateUpdate() { var cost = CriticalMass.Runtime.Game.FrameCost.Enter(); LateUpdateCost(); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.CombatLog, cost); }
+
+        void LateUpdateCost()
         {
             if (Instance == null) Instance = this;
             if (Driver == null)
