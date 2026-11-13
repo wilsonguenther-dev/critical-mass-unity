@@ -39,6 +39,17 @@ def save(name, rgba):
     print('wrote', name, a.shape[1], 'x', a.shape[0])
 
 
+def border_ramp(shape, frac=0.045):
+    """Soft fade of alpha toward the generator image's own edges, so content the generator cropped at its border
+    never shows a straight cut (applied before the sprite is cropped to its alpha bounds)."""
+    H, W = shape[:2]
+    r = max(8.0, frac * min(H, W))
+    yy = np.minimum(np.arange(H), np.arange(H)[::-1])[:, None].astype(np.float32)
+    xx = np.minimum(np.arange(W), np.arange(W)[::-1])[None, :].astype(np.float32)
+    u = np.clip(np.minimum(yy, xx) / r, 0, 1)
+    return u * u * (3 - 2 * u)
+
+
 def key(rgb, kind='magenta', lo=0.12, hi=0.42, min_area=400):
     r, g, b = rgb[..., 0], rgb[..., 1], rgb[..., 2]
     if kind == 'magenta':
@@ -66,7 +77,7 @@ def key(rgb, kind='magenta', lo=0.12, hi=0.42, min_area=400):
         sp = np.clip(g - np.maximum(r, b), 0, None)
         out[..., 1] -= sp * 0.9
     out = np.clip(out, 0, 1)
-    return np.dstack([out, a])
+    return np.dstack([out, a * border_ramp(a.shape)])
 
 
 def key_flat(rgb, lo=0.10, hi=0.22, min_area=400):
@@ -81,7 +92,7 @@ def key_flat(rgb, lo=0.10, hi=0.22, min_area=400):
     keep = np.zeros(n, bool)
     keep[1:] = st[1:, cv2.CC_STAT_AREA] >= min_area
     a = a * cv2.dilate(keep[lab].astype(np.uint8), np.ones((5, 5), np.uint8))
-    return np.dstack([rgb, a])
+    return np.dstack([rgb, a * border_ramp(a.shape)])
 
 
 def crop_alpha(rgba, pad=8):
@@ -168,7 +179,7 @@ JOBS = {
     'p-hill': ('plate', 'hill.jpg'),
     'p-choice': ('plate', 'choice.jpg'),
     'p-islands-far2': ('key', 'islands_far.png', 'magenta'),
-    'p-arena-calm': ('key', 'arena_calm.png', 'magenta'),
+    'p-arena-calm3': ('keybig', 'arena_calm.png', 'magenta'),
     'p-rocks-rise': ('sheet', 'rock', 'magenta'),
     'p-debris': ('sheet', 'debris', 'magenta'),
     'p-shrine': ('key', 'shrine.png', 'magenta'),
@@ -179,13 +190,15 @@ JOBS = {
     'biomass': ('key', 'biomass.png', 'magenta'),
     'corruption2': ('keyflat', 'corruption.png'),
     'clouds-storm': ('key', 'clouds_storm.png', 'green'),
-    'clouds-day2': ('key', 'clouds_day.png', 'magenta'),
+    'clouds-day2': ('keybig', 'clouds_day.png', 'magenta'),
     'egg': ('key', 'egg.png', 'magenta'),
     'hatchling-burst': ('key', 'hatchling.png', 'magenta'),
     'kaiju2-roar-a': ('kaiju', 'kaiju'),
     'kaiju2-roar-b': ('kaiju', 'kaiju_b'),
     'kaiju2-stand-c': ('kaiju', 'kaiju_hero'),
     'ch-warrior-charge': ('char', 'warrior_charge'),
+    'ch-warrior-charge2': ('char', 'warrior_charge2'),
+    'ch-warrior-stand2': ('char', 'warrior_stand2'),
     'ch-warrior-stand': ('char', 'warrior_stand'),
     'ch-farmer-stand': ('char', 'farmer_stand'),
     'ch-farmer-feed': ('char', 'farmer_feed'),
@@ -210,6 +223,12 @@ def run(raw_dir, only):
             save(job[1], rgb)
         elif op == 'key':
             save(job[1], crop_alpha(key(rgb, job[2])))
+        elif op == 'keybig':                      # keep only the largest shape (drops stray generated specks)
+            k = key(rgb, job[2])
+            n, lab, st, _ = cv2.connectedComponentsWithStats((k[..., 3] > 0.08).astype(np.uint8), 8)
+            big = 1 + int(np.argmax(st[1:, cv2.CC_STAT_AREA]))
+            k[..., 3] *= cv2.dilate((lab == big).astype(np.uint8), np.ones((5, 5), np.uint8))
+            save(job[1], crop_alpha(k))
         elif op == 'keyflat':
             save(job[1], crop_alpha(key_flat(rgb)))
         elif op == 'sheet':

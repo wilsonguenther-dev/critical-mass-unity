@@ -419,6 +419,17 @@ def tex_proc(name, width_px):
 
 
 DOT = proc('__dot', _soft_dot)
+
+
+def _contact():
+    w, h = 512, 96
+    yy, xx = np.mgrid[0:h, 0:w].astype(np.float32)
+    r = np.hypot((xx - w / 2) / (w / 2), (yy - h / 2) / (h / 2))
+    a = np.clip(1 - r, 0, 1) ** 1.4 * 0.85
+    return np.dstack([np.full((h, w, 3), (0.06, 0.07, 0.1), np.float32), a])
+
+
+CONTACT = proc('__contact', _contact)
 RAYS = proc('__rays', _rays)
 PUFF = proc('__puff', _puff)
 STAR = proc('__star', _star)
@@ -427,6 +438,9 @@ STAR = proc('__star', _star)
 def lh(cv, cam, cn, name, x, feet, h, d, **kw):
     """Place a cut-out by height with its feet at y=feet."""
     w = h / tex_aspect(name)
+    sh = kw.pop('shadow', 0.0)
+    if sh > 0:                                    # contact shadow / occlusion where the figure meets the ground
+        layer(cv, cam, None, CONTACT, x, feet + h * 0.015, min(w, h * 0.55) * 1.15, d, alpha=sh)
     nx = kw.pop('next_feet', None)
     if nx is not None:
         kw['next_xy'] = (nx[0], nx[1] + h / 2)
@@ -777,9 +791,9 @@ def shot_peoples(cv, t, cam, cn):
         layer(cv, cam, cn, name, x, cy, w, 0.55, rot=sway, alpha=a)
     # (cut-out, x, feet, height, depth, entry order, mirrored): every figure faces the centre of the frame
     rows = [(L('miner_stand.png'), -470, -250, 300, 0.62, 2, -1), (L('demolitions_stand_cr.png'), 470, -250, 285, 0.62, 3, -1),
-            (L('healer_stand.png'), -820, -235, 290, 0.58, 6, 1), (L('healer_stand_cr.png'), 820, -235, 290, 0.58, 7, -1),
+            (L('healer_stand.png'), -760, -225, 265, 0.56, 6, 1), (L('healer_stand_cr.png'), 760, -225, 265, 0.56, 7, -1),
             (L('farmer_stand.png'), -640, -300, 340, 0.72, 0, 1), (L('builder_stand_cr.png'), 640, -300, 345, 0.72, 1, -1),
-            (L('warrior_stand.png'), -300, -370, 420, 0.82, 4, 1), (L('warrior_stand_cr.png'), 300, -370, 420, 0.82, 5, -1)]
+            (L('warrior_stand.png'), -300, -370, 420, 0.82, 4, 1), (L('warrior_stand2_cr.png'), 300, -370, 430, 0.82, 5, -1)]
     for name, x, feet, h, d, i, face in rows:
         if not os.path.exists(name):
             continue
@@ -791,7 +805,7 @@ def shot_peoples(cv, t, cam, cn):
         br = 0.012 * math.sin(2 * math.pi * 0.35 * t + i)
         if t >= t0 - 0.05:
             lh(cv, cam, cn, name, xpos(t), feet, h * (1 + br), d, flipx=(face < 0),
-               next_feet=(xpos(t + 1 / FPS), feet))
+               next_feet=(xpos(t + 1 / FPS), feet), shadow=0.55)
 
 
 def cam_hill(t):
@@ -814,8 +828,8 @@ def shot_hill(cv, t, cam, cn):
         v = (f(tt + 1 / FPS) - f(tt))
         return f(tt) + max(-18, min(18, v))      # limited smear: at most an 18-unit blur per frame
     feet = -300
-    for name, f, flip in ((L('warrior_charge_cr.png'), rx, True), (L('warrior_charge.png'), lx, False)):
-        lh(cv, cam, cn, name, f(t), feet, 470, 0.85, flipx=flip, next_feet=(capped(t, f), feet),
+    for name, f, flip in ((L('warrior_charge2_cr.png'), rx, True), (L('warrior_charge.png'), lx, False)):
+        lh(cv, cam, cn, name, f(t), feet, 470, 0.85, flipx=flip, next_feet=(capped(t, f), feet), shadow=0.5,
            gain=1.25 if imp else 1.0)
     if 22.50 <= t < 22.50 + 3 / FPS:
         px, py, _ = cam.place(0, feet + 290, 1, 0.85)
@@ -1054,8 +1068,8 @@ def shot_kaiju(cv, t, cam, cn):
 
 
 def cam_hero(t):
-    y = K(t, [(40.50, -40), (42.45, -20), (43.25, 40, 'inOutCubic'), (DUR, 52)])
-    z = K(t, [(40.50, 1.00), (42.45, 1.05), (43.25, 1.10, 'inOutCubic'), (DUR, 1.15)])
+    y = K(t, [(40.50, 40), (42.45, 60), (43.25, 95, 'inOutCubic'), (DUR, 105)])
+    z = K(t, [(40.50, 1.00), (42.45, 1.03), (43.25, 1.04, 'inOutCubic'), (DUR, 1.05)])
     return Cam(K(t, [(40.5, -40), (DUR, 40)]), y, z, (0.0, 0.0))
 
 
@@ -1071,7 +1085,7 @@ def shot_hero(cv, t, cam, cn):
           add=True, tint=(1.0, 0.9, 0.55))
     layer(cv, cam, cn, name, x, feet + rise + h / 2, w, 0.3, tint=haze)
     layer(cv, cam, cn, name, x, feet + rise + h / 2, w, 0.3, alpha=0.18, add=True, tint=(0.55, 0.4, 0.25))   # air between
-    layer(cv, cam, cn, L('clouds_day.png'), 900 - 14 * t, -520, 2100, 0.34, tint=(1.0, 0.8, 0.58), alpha=0.9)
+    layer(cv, cam, cn, L('clouds_day.png'), 420 - 14 * t, -520, 3300, 0.34, tint=(1.0, 0.8, 0.58), alpha=0.9)
     layer(cv, cam, cn, RAYS, -500, 200, 2200, 0.2, alpha=0.18 + 0.05 * math.sin(t * 0.9), add=True,
           tint=(1.0, 0.85, 0.55), rot=-18)
     motes(cv, cam, t, 91, 22, (-1100, 1100, -480, 450), 12, 0.6, col=(1.0, 0.82, 0.5), alpha=0.4, drift=(-5, 8))
