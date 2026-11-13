@@ -120,7 +120,12 @@ Shader "CM/WorldGround"
                 float seamW = max(0.008, fwidth(gedgeU));
                 col = gedgeU < seamW ? Hex(0x7E, 0x9A, 0x3F) : col;
                 col *= 1.0 + 0.04 * sin(6.2831853 * F.g / 8.0 + 6.0 * VNoise(q * 0.07));
-                col = lerp(col, Hex(0xD3, 0x9A, 0x5C), saturate(F.b));
+                // Dirt edge (map quality pass, arena-night-life-1): the dirt mask follows the 1 u sim tiles, which read as a
+                // staircase at the gameplay camera. Warp the lookup about half a tile and cut it crisp (toon edge, about
+                // 0.1 u wide). Visual only; one extra field sample and three value-noise taps per ground pixel.
+                float2 dq = sim + (float2(VNoise(sim * 0.9 + 11.3), VNoise(sim * 0.9 + 57.1)) - 0.5) * 1.1;
+                float dirt = smoothstep(0.38, 0.62, Field(dq).b + (VNoise(sim * 2.3) - 0.5) * 0.35);
+                col = lerp(col, Hex(0xD3, 0x9A, 0x5C), dirt);
                 col = lerp(col, Hex(0x6F, 0x9A, 0x3E), 0.55 * saturate(F.a));
 
                 // Flagstones (scale 1.0): paved by the path distance at the cell's feature point.
