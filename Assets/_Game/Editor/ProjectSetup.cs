@@ -84,6 +84,12 @@ namespace CriticalMass.Editor
             PlayerSettings.visibleInBackground = true;
             // DG-54: FrameTimingManager CPU and GPU frame times in release players too.
             PlayerSettings.enableFrameTimingStats = true;
+            // polish-audit-1: no engine splash. It put the engine vendor's logo on the first screen a player sees (the
+            // project rule: no vendor or stack names on player-facing screens) and held the cold launch for its animation
+            // (boot to title measured 6.9 s process / 2.5 s engine at a14ce59 against a 5 s budget). Optional on Unity
+            // Personal since Unity 6. The game's own intro and title follow at once.
+            PlayerSettings.SplashScreen.show = false;
+            PlayerSettings.SplashScreen.showUnityLogo = false;
             // DG-80 (R-M1): skinning on the GPU through compute shaders, batched (6000.3 docs: PlayerSettings.meshDeformation,
             // MeshDeformation.GPUBatched, needs a graphics API with compute shaders: Metal and Direct3D 11 both have them).
             if (PlayerSettings.meshDeformation != MeshDeformation.GPUBatched) PlayerSettings.meshDeformation = MeshDeformation.GPUBatched;

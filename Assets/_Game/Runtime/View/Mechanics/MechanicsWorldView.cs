@@ -122,7 +122,7 @@ namespace CriticalMass.Runtime.View.Mechanics
             Feed.Read(w);
         }
 
-        void LateUpdate() { long c = CriticalMass.Runtime.Game.FrameCost.Begin(); LateUpdateBody(); CriticalMass.Runtime.Game.FrameCost.End(CriticalMass.Runtime.Game.FrameCost.Slot.MechanicsView, c); }
+        void LateUpdate() { var c = CriticalMass.Runtime.Game.FrameCost.Enter(); LateUpdateBody(); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.MechanicsView, c); }
 
         void LateUpdateBody()
         {

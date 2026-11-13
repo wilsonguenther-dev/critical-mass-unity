@@ -83,6 +83,23 @@ namespace CriticalMass.Runtime.Game
         /// <summary>The settings page saved a frame setting: re-read them on the next frame.</summary>
         public static void Reapply() => _reapply = true;
 
+        static int _forceLevel = -1;
+
+        /// <summary>perf-smooth-1 measurement only (autoplay -autoplayPacing): null or "rule" = the frame cap rule; "display" =
+        /// vsync every refresh, no cap; "timed60" = vsync off, a timed 60.</summary>
+        public static string PacingOverride;
+
+        /// <summary>perf-smooth-1 (autoplay -autoplayQualities): run the next match at this level, as -quality NAME would.</summary>
+        public static void ForceRunQuality(string name)
+        {
+            int l = QualityArg(new[] { "-quality", name }, QualitySettings.names);
+            if (l < 0) return;
+            _forceLevel = l;
+            _reapply = true;
+            if (l != QualitySettings.GetQualityLevel()) QualitySettings.SetQualityLevel(l, true);
+            RenderTier.Set(l);   // now, so the next scene's world builds at this tier
+        }
+
         /// <summary>A short line at the top of the screen for a few seconds ("Settings could not be saved").</summary>
         public static void ShowNotice(string text, float seconds = 6f)
         {
@@ -281,6 +298,30 @@ namespace CriticalMass.Runtime.Game
             if (w != Screen.width || h != Screen.height || mode != Screen.fullScreenMode) RequestWindow(w, h, mode);
         }
 
+        FullScreenMode? _seenMode;
+        FullScreenMode _requestedMode = FullScreenMode.FullScreenWindow;
+        double _requestedAt = double.NegativeInfinity;
+
+        /// <summary>
+        /// polish-audit-1: Alt+Enter (allowFullscreenSwitch) or the OS changed the window mode behind the settings page:
+        /// store the new mode as the player's "Display" choice, and give a new window a sensible size instead of the full
+        /// display size (title bar under the taskbar). Player builds only (this component is off in the editor).
+        /// </summary>
+        void WatchExternalModeChange()
+        {
+            FullScreenMode now = Screen.fullScreenMode;
+            if (_seenMode == null) { _seenMode = now; return; }
+            bool changed = now != _seenMode.Value;
+            _seenMode = now;
+            if (!FramePolicy.IsExternalModeChange(changed, now == _requestedMode, Time.realtimeSinceStartupAsDouble - _requestedAt)) return;
+            bool full = now != FullScreenMode.Windowed;
+            if (!GamePaths.Isolated) CriticalMass.Runtime.Menu.GameSettings.RememberFullScreen(full);   // never the owner's prefs from a -dataDir run
+            Debug.Log($"[CM.Governor] window mode changed outside the game ({now}): Display setting stored as {(full ? "full screen" : "windowed")}");
+            if (full) return;
+            (int w, int h) = FramePolicy.WindowAfterExternalToggle(Screen.width, Screen.height, Display.main.systemWidth, Display.main.systemHeight);
+            if (w > 0 && h > 0) RequestWindow(w, h, FullScreenMode.Windowed);
+        }
+
         void ReadDisplay()
         {
             _seenW = Screen.width;
@@ -374,7 +415,15 @@ namespace CriticalMass.Runtime.Game
                 _inputPaused = _input != null && _input.State != null && _input.State.Paused;
                 _onBattery = SystemInfo.batteryStatus == BatteryStatus.Discharging;
                 SessionKeeper.Phase = _title ? "title" : _inputPaused ? "paused" : MenuOpen ? "menu" : "match";
-                if (reapplied)
+                if (reapplied && _forceLevel >= 0)
+                {
+                    _baseLevel = _forceLevel;
+                    _chosenScale = _forceLevel <= FramePolicy.LevelLow ? LowRenderScale : 1f;
+                    RequestedQuality = QualitySettings.names[_forceLevel];
+                    SetLevel(_forceLevel);
+                    _forceLevel = -1;
+                }
+                else if (reapplied)
                 {
                     int q = QualitySettings.GetQualityLevel();
                     if (q != _baseLevel && !_thermalDropped)
@@ -395,13 +444,19 @@ namespace CriticalMass.Runtime.Game
                     _guard.Reset();
                 }
                 UpdateThermal();
+                WatchExternalModeChange();
             }
 
             if (_pendingWindow.HasValue && WindowDebounce.TryFire(Time.realtimeSinceStartupAsDouble))
             {
                 (int w, int h, FullScreenMode mode) = _pendingWindow.Value;
                 _pendingWindow = null;
-                if (w != Screen.width || h != Screen.height || mode != Screen.fullScreenMode) Screen.SetResolution(w, h, mode);
+                if (w != Screen.width || h != Screen.height || mode != Screen.fullScreenMode)
+                {
+                    Screen.SetResolution(w, h, mode);
+                    _requestedMode = mode;
+                    _requestedAt = Time.realtimeSinceStartupAsDouble;
+                }
             }
 
             AutoplayArgs.Options o = AutoplayArgs.Current;
@@ -421,13 +476,20 @@ namespace CriticalMass.Runtime.Game
                 cap = background ? FramePolicy.BackgroundCap(fg, _prefBg != 0) : fg;
                 double hz = Screen.currentResolution.refreshRateRatio.value;
                 (vsync, target) = _guard.Settings(cap, hz);
-                if (_prefVSync == 0 || (background && _prefBg != 0))
+                if (cap == FramePolicy.Unlimited)
+                {
+                    vsync = 0;   // perf-smooth-1: the player chose UNLIMITED: vsync off, no target
+                    target = -1;
+                }
+                else if (_prefVSync == 0 || (background && _prefBg != 0))
                 {
                     vsync = 0;   // vsync off by choice (or the save-power cap): still capped, never unbounded
                     target = cap > 0 ? cap : (double.IsNaN(hz) || hz < 20 ? 60 : (int)Math.Round(hz));
                 }
                 _guard.Feed(dt, cap, vsync > 0);
             }
+            if (o.Autoplay && PacingOverride == "display") { vsync = 1; target = -1; }
+            else if (o.Autoplay && PacingOverride == "timed60") { vsync = 0; target = 60; }
             if (QualitySettings.vSyncCount != vsync) QualitySettings.vSyncCount = vsync;
             if (Application.targetFrameRate != target) Application.targetFrameRate = target;
             AppliedVSync = vsync;

@@ -383,7 +383,9 @@ namespace CriticalMass.Runtime.View
 
         // ---------------------------------------------------------------- frame
 
-        private void LateUpdate()
+        private void LateUpdate() { var cost = CriticalMass.Runtime.Game.FrameCost.Enter(); LateUpdateCost(); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.BigMoments, cost); }
+
+        void LateUpdateCost()
         {
             World w = Driver != null ? Driver.World : null;
             if (w == null) return;

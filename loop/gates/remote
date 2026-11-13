@@ -2,7 +2,7 @@
 # Gate "remote" (ci/offload, 2026-11-13): run a gate on GitHub's runners instead of the Mac's one Unity slot.
 # One command: push the branch, start the workflow, wait (polling every 30 s, no agent tokens), fetch the results.
 #   loop/gates/remote sim            [--suite fast|slow|all]     no-Unity Sim compile + tests (sim-tests.yml, ~1-3 min)
-#   loop/gates/remote editmode|playmode|tests [--category '!Slow'|Slow]                      (unity-ci.yml, needs the licence)
+#   loop/gates/remote editmode|playmode|tests [--category '!Slow'|Slow] [--graphics nographics|software]                      (unity-ci.yml, needs the licence)
 #   loop/gates/remote build-windows|build-mac|builds|all                                      (unity-ci.yml, needs the licence)
 #   common: [--ref BRANCH] (default: current branch) [--no-push] [--max-wait MIN] (default 150)
 # Prints ONE JSON line (also appended to loop/logs/gates.jsonl); results land in loop/logs/remote/<run id>/.
@@ -12,7 +12,7 @@ set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; ROOT="$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || (cd "$HERE/../.." && pwd))"
 LOGS="$HERE/../logs"; mkdir -p "$LOGS/remote"
 what="${1:-}"; shift || true
-REF=''; PUSH=1; MAXW=150; SUITE=fast; CATEGORY='!Slow'
+REF=''; PUSH=1; MAXW=150; SUITE=fast; CATEGORY='!Slow'; GRAPHICS=nographics
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --ref) REF="${2:?}"; shift 2 ;;
@@ -20,12 +20,13 @@ while [[ $# -gt 0 ]]; do
     --max-wait) MAXW="${2:?}"; shift 2 ;;
     --suite) SUITE="${2:?}"; shift 2 ;;
     --category) CATEGORY="${2:?}"; shift 2 ;;
+    --graphics) GRAPHICS="${2:?}"; shift 2 ;;   # nographics (default, as the Mac gate) | software (llvmpipe)
     *) echo "remote: unknown option $1" >&2; exit 64 ;;
   esac
 done
 case "$what" in
   sim) WF=sim-tests.yml; INPUTS=(-f "suite=$SUITE") ;;
-  editmode|playmode|tests|build-windows|build-mac|builds|all) WF=unity-ci.yml; INPUTS=(-f "jobs=$what" -f "category=$CATEGORY") ;;
+  editmode|playmode|tests|build-windows|build-mac|builds|all) WF=unity-ci.yml; INPUTS=(-f "jobs=$what" -f "category=$CATEGORY" -f "graphics=$GRAPHICS") ;;
   *) sed -n '2,12p' "$0" >&2; exit 64 ;;
 esac
 REF="${REF:-$(git -C "$ROOT" rev-parse --abbrev-ref HEAD)}"

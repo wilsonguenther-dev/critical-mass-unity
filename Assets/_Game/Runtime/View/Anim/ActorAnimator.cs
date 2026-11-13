@@ -642,14 +642,23 @@ namespace CriticalMass.Runtime.View.Anim
         void StepYaw(double target, double dt)
         {
             if (!_hasYaw) { _yaw = target; _yawVel = 0; _hasYaw = true; return; }
+            StepFacing(ref _yaw, ref _yawVel, target, dt);
+        }
+
+        /// <summary>
+        /// The facing spring (DG-89) over dt sim seconds: the exact critically damped step toward target (degrees), its
+        /// travel capped at MaxYawRate. Pure, so EditMode tests can run it on any clock.
+        /// </summary>
+        public static void StepFacing(ref double yaw, ref double yawVel, double target, double dt)
+        {
             if (dt <= 0) return;
-            double x = Wrap(_yaw - target), v = _yawVel, e = Math.Exp(-YawOmega * dt);
+            double x = Wrap(yaw - target), v = yawVel, e = Math.Exp(-YawOmega * dt);
             double nx = (x + (v + YawOmega * x) * dt) * e;
             double nv = (v - YawOmega * (v + YawOmega * x) * dt) * e;
             double maxStep = MaxYawRate * dt;
             if (Math.Abs(nx - x) > maxStep) { nx = x + Math.Sign(nx - x) * maxStep; nv = (nx - x) / dt; }
-            _yaw = Wrap(target + nx);
-            _yawVel = nv;
+            yaw = Wrap(target + nx);
+            yawVel = nv;
         }
 
         /// <summary>Footsteps on the measured touchdown phases of the dominant locomotion clip (DG-93), near the camera only.</summary>

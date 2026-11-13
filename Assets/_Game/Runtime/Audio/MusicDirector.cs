@@ -183,7 +183,9 @@ namespace CriticalMass.Runtime.Audio
             _lookupFrames = 0;
         }
 
-        void Update()
+        void Update() { var cost = CriticalMass.Runtime.Game.FrameCost.Enter(); UpdateCost(); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.Sound, cost); }
+
+        void UpdateCost()
         {
             float now = Time.unscaledTime;
             float dt = Mathf.Min(Time.unscaledDeltaTime, 0.1f);
