@@ -234,7 +234,7 @@ namespace CriticalMass.Sim.Config
         /// <summary>Ticks of held interact that start it (0.5 s).</summary>
         public double HoldTicks = 15;
         /// <summary>The human slot on autopilot cleanses once this many net corruption units sit in the egg; pure bots never cleanse.</summary>
-        public double BotNetUnits = 10;
+        public double BotNetUnits = 8; // U-057 (browser 10): with CM-85 biomass instability, net corruption never reached 10 before the lock
 
         public CleanseConfig Clone() => (CleanseConfig)MemberwiseClone();
     }

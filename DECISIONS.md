@@ -1013,3 +1013,22 @@ any later rule touching corruption delivery will move it. The structural cause (
 which the short-handed team relies on) is not fixed here; a corruption hand-off without a wind-up is the candidate if it
 bounces.
 
+## U-057 Autopilot cleanse gate: 8 net corruption units, not 10 (departs from the browser) (2026-11-13)
+
+**Finding.** After U-056 the CM-36 soak still read 0 cleanses. The port of the CM-36 autopilot rule is faithful (actor 0,
+biomass lead, kaijuFeed.cleanse.botNetUnits net corruption units in the egg, cleanse ready). Instrumented over 30 seeds:
+net corruption units never exceeded 9 before the berserk lock or the hatch, so the browser's 10 can never be met here. The
+cause is CM-85 (DG-16a): delivered biomass also feeds instability, so berserk locks a few corruption units earlier than on
+the CM-36 branch, which predates that rule. **Rule.** botNetUnits 10 -> 8, the largest whole value below the measured
+ceiling that the cleanse can reach. **Measured** (CM-36 driver, 5v5 seeds 1..100, all bots, stop at lock or hatch):
+
+| botNetUnits | berserk /100 | cleanses | matches with one |
+| --- | --- | --- | --- |
+| 10 (browser) | 27 | 0 | 0 |
+| **8 (chosen)** | **19** | **17** | **17** |
+| 7 | 19 | 17 | 17 |
+| 6 | 17 | 36 | 35 |
+| 5 | 17 | 36 | 35 |
+
+Berserk stays inside the CM-34 band [10, 50]. Pure bots still never cleanse; only the autopilot slot does.
+
