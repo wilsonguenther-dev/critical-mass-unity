@@ -111,11 +111,23 @@ pix = p1.get('render_pixels')
 pix_cap = budget('render_pixels_max_high') if q_real in ('High', 'Very High', 'Ultra') and budget('render_pixels_max_high') else budget('render_pixels_max')
 boot_s = round((int(m.group(3)) - launch_ms) / 1000, 2) if m else None
 gfx = (p1.get('memory_mb') or {}).get('graphics_driver')
+# Physics audit m1 / DG-111: triangles, batches and shadow casters are gated on the MATCH phase's p95 (perf.json
+# "phases"), not on the run maximum that included title and loading frames. A player without phases falls back to the max.
+phases = p1.get('phases') or {}
+pm = phases.get('match') or {}
+def p95(d, k):
+    v = d.get(k)
+    return v.get('p95') if isinstance(v, dict) else None
+tri = p95(pm, 'triangles') if pm else mk.get('Triangles Count', {}).get('max')
+bat = p95(pm, 'batches') if pm else mk.get('Batches Count', {}).get('max')
 meas = {'peak_rss_mb': peak, 'growth_mb': growth if matches >= 3 else 0.0, 'p95_ms': fm.get('p95'), 'worst_hitch_ms': fm.get('worst'),
-        'idle_cpu_pct': idle, 'batches': mk.get('Batches Count', {}).get('max'), 'triangles': mk.get('Triangles Count', {}).get('max'),
+        'idle_cpu_pct': idle, 'batches': bat, 'triangles': tri,
         'render_pixels_max': pix, 'boot_to_title_s': boot_s}
+# B2: GPU frame time must be measured on every profile (frame timing stats on); a null or 0 fails as not measured.
+meas['gpu_p95_ms'] = gpu if gpu else None
+if pm:
+    meas['shadow_casters'] = p95(pm, 'shadow_casters')
 if profile == 'floor':
-    meas['gpu_p95_ms'] = gpu
     meas['cpu_main_p95_ms'] = cpu
 if gfx:  # 0 in release players (Unity reports graphics-driver memory in development builds only): reported, not gated
     meas['gfx_mb'] = gfx
@@ -145,6 +157,7 @@ s = {'pass': code == 0 and ends == matches and not exc and not over and not not_
      'top_time_markers': [(x['name'], round(x['mean'], 3)) for x in p1.get('markers', []) if x.get('unit') == 'ms'][:8],
      'rss_mb_at_match_end': rss_at_end, 'objects_per_match': [p.get('objects') for p in perfs],
      'sim_dropped_seconds': [p.get('sim_dropped_seconds') for p in perfs], 'hud_events_dropped': [p.get('hud_events_dropped') for p in perfs],
+     'phases': phases, 'triangles_run_max': mk.get('Triangles Count', {}).get('max'),
      'assets': p1.get('assets'), 'screen': p1.get('screen'), 'frame_cap': p1.get('frame_cap'), 'vsync': p1.get('vsync'),
      'winner': [p.get('winner') for p in perfs], 'version': p1.get('version'), 'commit': p1.get('commit'),
      'other_unity_pids': others.split(), 'out': out}

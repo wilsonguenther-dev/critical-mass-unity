@@ -204,6 +204,9 @@ namespace CriticalMass.Runtime.Camera
             for (int i = 0; i < _scratch.Count && _rendererCount < MaxRenderers; i++)
             {
                 Renderer r = _scratch[i];
+                // Contract C4: the player is always LOD0; the Hero, LOD1 and shadow-proxy meshes are never drawn as the silhouette.
+                var role = CriticalMass.Runtime.View.Art.FighterLod.RoleOf(r.name);
+                if (role != CriticalMass.Runtime.View.Art.FighterLod.Role.Lod0 && role != CriticalMass.Runtime.View.Art.FighterLod.Role.Shared) continue;
                 Mesh mesh = null;
                 if (r is SkinnedMeshRenderer smr) mesh = smr.sharedMesh;
                 else if (r is MeshRenderer)

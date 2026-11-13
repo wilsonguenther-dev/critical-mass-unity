@@ -102,8 +102,12 @@ namespace CriticalMass.Runtime.View.Dressing
                 }
         }
 
+        // Physics audit DG-80 (R-M8): small props (WorldLook.Prop: barrels, crates, braziers, light pools, pebbles) never cast
+        // at any level (QualityTable.PropShadows); structures, bases, crystals, trees and cliff fringes keep casting where
+        // RenderTier allows scenery shadows.
         private static bool CastsShadows(Material mat) =>
-            mat != null && Enum.TryParse(mat.name.StartsWith("World", StringComparison.Ordinal) ? mat.name.Substring(5).Split(' ')[0] : "", out WorldLook look) && WorldKit.CastsShadows(look);
+            mat != null && Enum.TryParse(mat.name.StartsWith("World", StringComparison.Ordinal) ? mat.name.Substring(5).Split(' ')[0] : "", out WorldLook look) &&
+            WorldKit.CastsShadows(look) && (look != WorldLook.Prop || QualityTable.Current.PropShadows);
 
         private void Start()
         {

@@ -1175,11 +1175,11 @@ namespace CriticalMass.Runtime.Menu
             MenuUi.Stretch(tab);
             var items = new List<MenuItem>
             {
-                // Camera shake moved to the ACCESS tab as an amount, 0 to 100 (DG-30, SettingsExtras).
+                // Camera shake, reduce flashing and reduce motion live on the ACCESS tab (one source of truth, SettingsExtras).
                 Stepper(tab, 0, "DAMAGE NUMBERS", () => GameSettings.DamageNumbers ? "ON" : "OFF", d => GameSettings.DamageNumbers = !GameSettings.DamageNumbers),
                 Stepper(tab, 1, "BLOOD", () => GameSettings.Blood ? "ON" : "OFF", d => GameSettings.Blood = !GameSettings.Blood),
             };
-            MenuItem reset = MenuUi.Item(tab, "Reset Settings", ContentX, ContentY + 2 * (LineH + LineGap) + 20f, 420f, 56f,
+            MenuItem reset = MenuUi.Item(tab, "Reset Settings", ContentX, ContentY + GameTabLines * (LineH + LineGap) + 20f, 420f, 56f,
                 "RESET ALL SETTINGS", MenuItem.Kind.Button, 24, true, CMTokens.Display);
             reset.Submitted = () =>
             {
@@ -1190,7 +1190,7 @@ namespace CriticalMass.Runtime.Menu
             };
             items.Add(reset);
             // DG-64: a zip of the logs a tester can send us (no upload; the decision ledger rules out crash services).
-            MenuItem report = MenuUi.Item(tab, "Problem Report", ContentX, ContentY + 3 * (LineH + LineGap) + 96f, 420f, 56f,
+            MenuItem report = MenuUi.Item(tab, "Problem Report", ContentX, ContentY + GameTabLines * (LineH + LineGap) + 96f, 420f, 56f,
                 "SAVE A PROBLEM REPORT", MenuItem.Kind.Button, 24, true, CMTokens.Display);
             report.Submitted = () =>
             {
@@ -1206,6 +1206,26 @@ namespace CriticalMass.Runtime.Menu
             items.Add(report);
             ChainInTab(items);
             return tab.gameObject;
+        }
+
+        /// <summary>Stepper lines on the Game tab (the two buttons sit under them).</summary>
+        const int GameTabLines = 2;
+
+        static string ShakeText()
+        {
+            if (GameSettings.ReduceMotion) return "OFF (REDUCE MOTION)";
+            float v = GameSettings.ShakeScale;
+            return v <= 0f ? "OFF" : v < 0.75f ? "LIGHT" : "FULL";
+        }
+
+        static void StepShake(int d)
+        {
+            float[] steps = GameSettings.ShakeSteps;
+            float v = GameSettings.ShakeScale;
+            int at = 0;
+            for (int i = 0; i < steps.Length; i++) if (Mathf.Abs(steps[i] - v) < Mathf.Abs(steps[at] - v)) at = i;
+            int n = steps.Length;
+            GameSettings.ShakeScale = steps[((at + (d < 0 ? -1 : 1)) % n + n) % n];
         }
 
         void ChainInTab(List<MenuItem> items)

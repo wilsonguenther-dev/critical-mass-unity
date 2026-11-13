@@ -25,9 +25,11 @@ namespace CriticalMass.Runtime.Menu
         public const string SubtitlesKey = "cm.access.subtitles";
         public const string UiScaleKey = "cm.access.uiScale";
         public const string ReduceFlashingKey = "cm.access.reduceFlashing";
-        public const string ShakeAmountKey = "cm.access.shake";
+        public const string ShakeAmountKey = GameSettings.ShakeScaleKey;
+        /// <summary>Reduce motion: one key for every reader (StoryIntro, AttractMode, FeelGate, big moments, world reactions).</summary>
+        public const string ReduceMotionKey = GameSettings.ReduceMotionKey;
 
-        public static readonly string[] AllKeys = { HideNamesKey, CleanHudKey, SubtitlesKey, UiScaleKey, ReduceFlashingKey, ShakeAmountKey };
+        public static readonly string[] AllKeys = { HideNamesKey, CleanHudKey, SubtitlesKey, UiScaleKey, ReduceFlashingKey, ShakeAmountKey, ReduceMotionKey };
 
         /// <summary>UI scale choices in percent, screen order.</summary>
         public static readonly int[] UiScaleOptions = { 80, 90, 100, 110, 120, 130 };
@@ -35,6 +37,9 @@ namespace CriticalMass.Runtime.Menu
         /// <summary>The flash ceiling while Reduce flashing is on.</summary>
         public const int ReducedFlashesPerSecond = 3;
         public const string TabName = "ACCESS";
+
+        /// <summary>Other screens' rows on the ACCESS tab (big moments): appended after the built-in lines, before Reset.</summary>
+        public static Action<PauseMenu, RectTransform, List<MenuItem>> AddExtraRows;
 
         /// <summary>Raised after any of these options changes.</summary>
         public static event Action Changed;
@@ -47,6 +52,8 @@ namespace CriticalMass.Runtime.Menu
         public static bool Subtitles { get => GetB(SubtitlesKey, true); set => SetB(SubtitlesKey, value); }
         /// <summary>Limit full-screen and HUD flashes to ReducedFlashesPerSecond (default off).</summary>
         public static bool ReduceFlashing { get => GetB(ReduceFlashingKey, false); set => SetB(ReduceFlashingKey, value); }
+        /// <summary>Reduce motion (default off): fades instead of slides, a quarter of the world sway, no shake.</summary>
+        public static bool ReduceMotion { get => GetB(ReduceMotionKey, false); set => SetB(ReduceMotionKey, value); }
 
         /// <summary>Flashes allowed per second: 3 with Reduce flashing on, otherwise no limit.</summary>
         public static int MaxFlashesPerSecond => ReduceFlashing ? ReducedFlashesPerSecond : int.MaxValue;
@@ -76,13 +83,7 @@ namespace CriticalMass.Runtime.Menu
         public static int ShakeAmount
         {
             get => Mathf.Clamp(PlayerPrefs.GetInt(ShakeAmountKey, 0), 0, 100);
-            set
-            {
-                int v = Mathf.Clamp(value, 0, 100);
-                PlayerPrefs.SetInt(ShakeAmountKey, v);
-                GameSettings.CameraShake = v > 0;
-                Save();
-            }
+            set { GameSettings.ShakeScale = Mathf.Clamp(value, 0, 100) / 100f; Changed?.Invoke(); }   // one writer: GameSettings keeps cm.shake in step
         }
 
         /// <summary>Camera shake as a 0..1 multiplier for the camera effects.</summary>
@@ -123,9 +124,11 @@ namespace CriticalMass.Runtime.Menu
                 menu.Stepper(tab, 2, "SUBTITLES", () => OnOff(Subtitles), d => Subtitles = !Subtitles),
                 menu.Stepper(tab, 3, "UI SCALE", UiScaleText, StepUiScale),
                 menu.Stepper(tab, 4, "REDUCE FLASHING", () => OnOff(ReduceFlashing), d => ReduceFlashing = !ReduceFlashing),
-                menu.Slider(tab, 5, "CAMERA SHAKE", () => Shake01, v => ShakeAmount = Mathf.RoundToInt(v * 100f)),
+                menu.Stepper(tab, 5, "REDUCE MOTION", () => OnOff(ReduceMotion), d => ReduceMotion = !ReduceMotion),
+                menu.Slider(tab, 6, "CAMERA SHAKE", () => Shake01, v => ShakeAmount = Mathf.RoundToInt(v * 100f)),
             };
-            float y = PauseMenu.ContentY + 6 * (PauseMenu.LineH + PauseMenu.LineGap) + 10f;
+            AddExtraRows?.Invoke(menu, tab, items);
+            float y = PauseMenu.ContentY + items.Count * (PauseMenu.LineH + PauseMenu.LineGap) + 10f;
             MenuItem reset = MenuUi.Item(tab, "Reset Access", PauseMenu.ContentX, y, 460f, 56f, "RESET THESE OPTIONS",
                 MenuItem.Kind.Button, 24, true, CMTokens.Display);
             reset.Submitted = () =>
@@ -135,7 +138,7 @@ namespace CriticalMass.Runtime.Menu
                 menu.SetStatus("Streamer and accessibility options are back to their defaults.", false);
             };
             items.Add(reset);
-            menu.Note(tab, 7, "Press H in a match to hide or show the HUD. Blood is on the Game tab.");
+            menu.Note(tab, items.Count, "Press H in a match to hide or show the HUD. Blood is on the Game tab.");
             return items;
         }
 

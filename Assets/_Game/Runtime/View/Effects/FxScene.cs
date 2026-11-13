@@ -88,6 +88,19 @@ namespace CriticalMass.Runtime.View.Effects
         /// <summary>Blood on (the cm.blood setting): droplets, splats, pools, drips, gibs; off: neutral white-yellow sparks only.</summary>
         public bool Blood = true;
 
+        /// <summary>The driver's interpolation alpha for this build (CombatFx sets it): blob shadows follow the drawn bodies.</summary>
+        public double Alpha;
+        /// <summary>The match pace in force (sim seconds per wall second; CombatFx sets it from the driver): pulses are in wall Hz.</summary>
+        public double Pace;
+        /// <summary>Physics audit B1/M8: flat ground blobs under fighters and the Kaiju where the quality level has no shadow map.</summary>
+        public bool BlobShadows;
+
+        /// <summary>Blob shadow radius as a multiple of the body radius, and its opacity.</summary>
+        public const float BlobScale = 1.35f, BlobAlpha = 0.34f;
+        /// <summary>Slam telegraph rim pulse in wall Hz (was 18 rad per sim second: 5.7 Hz on screen at pace 2).</summary>
+        public const float SlamPulseHz = 2f;
+        public const float BerserkPulseHz = 1.5f, ShieldPulseHz = 2f, MeleePulseHz = 2f;
+
         public FxScene(GameConfig cfg, MapDef map)
         {
             _cfg = cfg;
@@ -558,6 +571,7 @@ namespace CriticalMass.Runtime.View.Effects
             solid.Clear();
             Vector3 gr = Vector3.right, gu = Vector3.forward; // ground plane basis (world)
             const float lift = 0.03f;
+            if (BlobShadows) DrawBlobShadows(w, ground);
 
             BuildMarks(now, ground);
             BuildDecals(now, ground);
@@ -876,7 +890,7 @@ namespace CriticalMass.Runtime.View.Effects
                 float p = 1f - (float)(k.TelegraphIn / _cfg.Kaiju.SlamTelegraphSeconds);
                 double h = Ground(k.TelegraphX, k.TelegraphZ);
                 Vector3 c = W(k.TelegraphX, h + 0.04, k.TelegraphZ);
-                float pulse = 0.75f + 0.25f * Mathf.Sin((float)now * 18f);
+                float pulse = 0.75f + 0.25f * (FeelGate.Pulse(now, PaceNow, SlamPulseHz) * 2f - 1f) * (FeelGate.ReduceFlashing ? 0.4f : 1f);
                 ground.Blob(c, gr, gu, R, null, 48, 0, A(WarnHot, 0.14f));
                 ground.Blob(c, gr, gu, Mathf.Max(0.05f, R * p), null, 48, 0, A(Warn, 0.32f + 0.2f * p));
                 ground.Ring(c, gr, gu, R - 0.2f, R + 0.08f, 0, Mathf.PI * 2f, 64, A(Navy, 0.9f));
@@ -887,12 +901,15 @@ namespace CriticalMass.Runtime.View.Effects
                     ground.Ring(c, gr, gu, R * p - 0.12f, R * p + 0.02f, a, a + 0.42f, 6, A(Navy, 0.6f));
                 }
             }
+            if (k.MeleeWindupIn > 0) DrawMeleeTelegraph(w, ground, now);
+            else DrawPreWarnings(w, ground);
             if (k.State == KaijuState.Berserk)
             {
                 double h = Ground(k.X, k.Z);
                 Vector3 c = W(k.X, h + 0.05, k.Z);
                 float R = (float)_cfg.Kaiju.Radius * 1.7f;
-                float pulse = 0.5f + 0.5f * Mathf.Sin((float)now * 6f);
+                float pulse = FeelGate.Pulse(now, PaceNow, BerserkPulseHz);
+                if (FeelGate.ReduceFlashing) pulse = 0.5f + 0.2f * (pulse - 0.5f);
                 ground.Star(c, gr, gu, R * (1.05f + 0.1f * pulse) + 0.1f, 0.62f, 10, (float)now * 0.8f, A(Navy, 0.75f));
                 ground.Star(c, gr, gu, R * (1.05f + 0.1f * pulse), 0.62f, 10, (float)now * 0.8f, A(Berserk, 0.55f + 0.3f * pulse));
                 ground.Ring(c, gr, gu, R * 0.55f, R * 0.62f, 0, Mathf.PI * 2f, 40, A(SparkWhite, 0.5f * pulse));
@@ -908,6 +925,93 @@ namespace CriticalMass.Runtime.View.Effects
             }
         }
 
+        /// <summary>The pace pulses use: the driver's pace when CombatFx set it, else the default match speed.</summary>
+        private double PaceNow => Pace > 0 ? Pace : _speed;
+
+        /// <summary>
+        /// Physics audit M6 (view half): the Kaiju melee wind-up gets a ground telegraph for its whole length. The swing
+        /// hits its locked target if that target is still within MeleeRange + MeleeLeash of the Kaiju when the wind-up runs
+        /// out (Kaiju.ResolveMelee), so the shape drawn is that reach circle, a wedge toward the target and a disc under the
+        /// target that fills as the wind-up runs out. The wind-up length itself is a sim number (GameConfig
+        /// Kaiju.MeleeWindupTicks); lengthening it is the sim lane's change.
+        /// </summary>
+        private void DrawMeleeTelegraph(World w, FxMeshBuilder ground, double now)
+        {
+            Kaiju k = w.Kaiju;
+            Vector3 gr = Vector3.right, gu = Vector3.forward;
+            float reach = (float)(_cfg.Kaiju.MeleeRange + Kaiju.MeleeLeash);
+            float p = Telegraphs.MeleeProgress(k.MeleeWindupIn, _cfg.Kaiju.MeleeWindupTicks, Alpha);
+            float pulse = 0.7f + 0.3f * FeelGate.Pulse(now, PaceNow, MeleePulseHz) * (FeelGate.ReduceFlashing ? 0.4f : 1f);
+            double kx = k.PrevX + (k.X - k.PrevX) * Alpha, kz = k.PrevZ + (k.Z - k.PrevZ) * Alpha;
+            Vector3 c = W(kx, Ground(kx, kz) + 0.05, kz);
+            ground.Ring(c, gr, gu, reach - 0.12f, reach + 0.06f, 0, Mathf.PI * 2f, 48, A(Navy, 0.75f));
+            ground.Ring(c, gr, gu, reach - 0.08f, reach + 0.02f, 0, Mathf.PI * 2f, 48, A(WarnHot, 0.55f * pulse));
+            int t = k.MeleeTargetId;
+            if (t < 0 || t >= w.ActorCount || !w.Actors[t].Alive) return;
+            double tx = w.PrevX[t] + (w.X[t] - w.PrevX[t]) * Alpha, tz = w.PrevZ[t] + (w.Z[t] - w.PrevZ[t]) * Alpha;
+            Vector3 tc = W(tx, Ground(tx, tz) + 0.06, tz);
+            Vector3 d = tc - c;
+            float ang = Mathf.Atan2(d.z, d.x);
+            const float half = 0.42f;   // about 24 degrees each side: reads as "this one is coming at you"
+            ground.Ring(c, gr, gu, 0.4f, reach, ang - half, ang + half, 10, A(WarnHot, 0.12f + 0.2f * p), A(Warn, 0.3f + 0.3f * p));
+            ground.Ring(c, gr, gu, reach * p - 0.1f, reach * p + 0.04f, ang - half, ang + half, 8, A(Navy, 0.8f));
+            float tr = (float)_cfg.Class(w.Actors[t].Cls).Radius * 1.6f + 0.2f;
+            ground.Blob(tc, gr, gu, tr + 0.08f, null, 24, 0, A(Navy, 0.6f));
+            ground.Blob(tc, gr, gu, tr, null, 24, 0, A(WarnHot, 0.18f));
+            ground.Blob(tc, gr, gu, Mathf.Max(0.04f, tr * p), null, 24, 0, A(Warn, 0.35f + 0.35f * p * pulse));
+        }
+
+        /// <summary>
+        /// Telegraphs.cs pre-warning stage: a faint reach ring and a thin wedge toward the target before the claw wind-up,
+        /// a faint dashed slam ring before the slam telegraph, so the total warning meets the owner's minimums on screen.
+        /// </summary>
+        private void DrawPreWarnings(World w, FxMeshBuilder ground)
+        {
+            Kaiju k = w.Kaiju;
+            Vector3 gr = Vector3.right, gu = Vector3.forward;
+            double kx = k.PrevX + (k.X - k.PrevX) * Alpha, kz = k.PrevZ + (k.Z - k.PrevZ) * Alpha;
+            Vector3 c = W(kx, Ground(kx, kz) + 0.045, kz);
+            int t = Telegraphs.ClawPreWarning(w, PaceNow);
+            if (t >= 0)
+            {
+                float reach = (float)(_cfg.Kaiju.MeleeRange + Kaiju.MeleeLeash);
+                ground.Ring(c, gr, gu, reach - 0.06f, reach + 0.02f, 0, Mathf.PI * 2f, 48, A(WarnHot, 0.28f));
+                double tx = w.PrevX[t] + (w.X[t] - w.PrevX[t]) * Alpha, tz = w.PrevZ[t] + (w.Z[t] - w.PrevZ[t]) * Alpha;
+                Vector3 d = W(tx, 0, tz) - W(kx, 0, kz);
+                float ang = Mathf.Atan2(d.z, d.x);
+                ground.Ring(c, gr, gu, 0.4f, reach, ang - 0.42f, ang + 0.42f, 10, A(Warn, 0.06f), A(Warn, 0.14f));
+            }
+            if (Telegraphs.SlamPreWarning(w, PaceNow))
+            {
+                float R = (float)_cfg.Kaiju.SlamRadius;
+                for (int s = 0; s < 16; s++)
+                {
+                    float a = s * Mathf.PI / 8f;
+                    ground.Ring(c, gr, gu, R - 0.1f, R + 0.02f, a, a + 0.26f, 4, A(WarnHot, 0.32f));
+                }
+            }
+        }
+
+        /// <summary>Flat dark blobs under every living fighter and the hatched Kaiju (Low: no shadow map), interpolated.</summary>
+        private void DrawBlobShadows(World w, FxMeshBuilder ground)
+        {
+            Vector3 gr = Vector3.right, gu = Vector3.forward;
+            Color32 col = A(Navy, BlobAlpha);
+            for (int i = 0; i < w.ActorCount; i++)
+            {
+                if (!w.Actors[i].Alive) continue;
+                double x = w.PrevX[i] + (w.X[i] - w.PrevX[i]) * Alpha, z = w.PrevZ[i] + (w.Z[i] - w.PrevZ[i]) * Alpha;
+                float r = (float)_cfg.Class(w.Actors[i].Cls).Radius * BlobScale;
+                ground.Blob(W(x, Ground(x, z) + 0.02, z), gr, gu, r, null, 12, 0, col);
+            }
+            Kaiju k = w.Kaiju;
+            if (k.State != KaijuState.Egg)
+            {
+                double x = k.PrevX + (k.X - k.PrevX) * Alpha, z = k.PrevZ + (k.Z - k.PrevZ) * Alpha;
+                ground.Blob(W(x, Ground(x, z) + 0.02, z), gr, gu, (float)_cfg.Kaiju.Radius * 1.1f, null, 20, 0, col);
+            }
+        }
+
         private void DrawShields(World w, FxMeshBuilder air, double now)
         {
             double half = Damage.ShieldHalfArcDeg * Math.PI / 180;
@@ -919,7 +1023,7 @@ namespace CriticalMass.Runtime.View.Effects
                 Vector3 c = W(w.X[i], h + 0.9, w.Z[i]);
                 float centre = (float)-a.Facing;
                 Color32 team = a.Team == TeamId.Azure ? AzureC : CrimsonC;
-                float pulse = 0.75f + 0.25f * Mathf.Sin((float)now * 9f + i);
+                float pulse = 0.75f + 0.25f * (FeelGate.Pulse(now + i * 0.11, PaceNow, ShieldPulseHz) * 2f - 1f) * (FeelGate.ReduceFlashing ? 0.4f : 1f);
                 air.Ring(c, Vector3.right, Vector3.forward, 0.66f, 0.86f, centre - (float)half, centre + (float)half, 10, A(Navy, 0.85f));
                 air.Ring(c, Vector3.right, Vector3.forward, 0.69f, 0.83f, centre - (float)half + 0.03f, centre + (float)half - 0.03f, 10, A(team, 0.75f * pulse));
                 air.Ring(c + Vector3.up * 0.01f, Vector3.right, Vector3.forward, 0.79f, 0.83f, centre - (float)half + 0.05f, centre + (float)half - 0.05f, 10, A(SparkWhite, 0.8f * pulse));

@@ -65,6 +65,8 @@ namespace CriticalMass.Runtime.View.Effects
             ("hill_enter", new[] { "toggle_001" }, 0.35f, 0.02f, 1f, 1, 0.5, true),
             ("hill_capture", new[] { "confirmation_003" }, 0.5f, 0f, 1f, 1, 0.5, true),
             ("ui_click", new[] { "click_001", "click3" }, 0.35f, 0.04f, 1f, 2, 0.03, true),
+            // Physics audit M7 / DG-101: a soft, low "not ready" click when an ability press is refused on cooldown.
+            ("ability_denied", new[] { "click_001" }, 0.22f, 0.02f, 0.72f, 1, 0.12, true),
             ("berserk_lock", new[] { "impactPunch_heavy_002", "impactPlate_heavy_001" }, 0.8f, 0.04f, 0.6f, 1, 1.0, true),
         };
 
