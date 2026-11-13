@@ -34,7 +34,7 @@ namespace CriticalMass.Editor.Art
         public const string ArtMaterialPath = "Assets/_Game/Resources/Toon/CMToonArt.mat";
 
         /// <summary>Bump when the contract changes: Unity re-imports every model this postprocessor touches.</summary>
-        public override uint GetVersion() => 11;   // 11: KayKit deform-bone constant translations always dropped
+        public override uint GetVersion() => 12;   // 12: KayKit deform-bone translations within 1% always dropped
 
         public static bool IsArt(string path) =>
             path.StartsWith(ArtRoot, StringComparison.Ordinal) && path.EndsWith(".fbx", StringComparison.OrdinalIgnoreCase);
@@ -284,15 +284,22 @@ namespace CriticalMass.Editor.Art
                 Transform t = root != null ? root.transform.Find(kv.Key) : null;
                 if (t == null) continue;
                 bool same = true;
-                // A KayKit deform bone never moves in translation; some takes (Attack2HChop, ...) still carry a constant
-                // translation a hair off the rest value (export round-off), which the strict rest test kept and which then
-                // pinned the HY classes' own joints. For deform bones any constant translation is dropped.
+                // A KayKit deform bone never moves in translation; some takes (Attack2HChop, ...) still carry a translation a
+                // hair off the rest value or jittering by round-off, which the strict test kept: a partly stripped clip then
+                // mixes KayKit and per-class joints (the HY Farmer's feet floated 0.35 u). For deform bones any translation
+                // that stays within 1% of its value is dropped.
                 bool deform = KaykitDeformBones.Contains(kv.Key.Substring(kv.Key.LastIndexOf('/') + 1));
+                float mag = 0f;   // the bone offset's size (largest axis), the scale of "1%"
+                foreach (EditorCurveBinding b in kv.Value)
+                {
+                    AnimationCurve c0 = AnimationUtility.GetEditorCurve(clip, b);
+                    if (c0 != null && c0.length > 0) mag = Math.Max(mag, Math.Abs(c0.keys[0].value));
+                }
                 foreach (EditorCurveBinding b in kv.Value)
                 {
                     AnimationCurve c = AnimationUtility.GetEditorCurve(clip, b);
                     if (c == null || c.length == 0) { same = false; break; }
-                    float tol = deform ? 1e-4f * Math.Max(1f, Math.Abs(c.keys[0].value)) : 1e-5f;
+                    float tol = deform ? Math.Max(1e-4f, 0.01f * mag) : 1e-5f;   // deform: sub-1% jitter is round-off, not motion
                     if (!IsConstant(c, tol)) { same = false; break; }
                     if (deform) continue;
                     char axis = b.propertyName[b.propertyName.Length - 1];
