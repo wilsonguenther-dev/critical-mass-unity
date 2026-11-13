@@ -34,9 +34,14 @@ try:
 except AttributeError:
     pass
 arm = bpy.data.objects["Rig"]
+V7BODY = bpy.data.objects["Warrior_Body"]
 for ob in list(bpy.data.objects):
-    if ob.type == "MESH":
+    if ob.type == "MESH" and ob is not V7BODY:
         bpy.data.objects.remove(ob, do_unlink=True)
+for m in list(V7BODY.modifiers):
+    if m.type != "ARMATURE":
+        V7BODY.modifiers.remove(m)
+V7BODY.hide_render = True
 LOG = {"clips": {}, "deform": {}}
 
 
@@ -158,7 +163,7 @@ def build(variant):
                                       os.path.join(IN, variant + "_mask.png")))
     me.materials.append(OUTLINE_MAT)
     sol = ob.modifiers.new("Outline", "SOLIDIFY")
-    sol.offset, sol.use_flip_normals, sol.use_rim, sol.use_even_offset = 1.0, True, False, True
+    sol.offset, sol.use_flip_normals, sol.use_rim, sol.use_even_offset = 1.0, True, False, False  # even offset spikes at thin creases
     sol.material_offset = 1
     sol.thickness = 0.0
     return ob, d
@@ -211,6 +216,13 @@ def pose(clip, frame):
 
 def posed(ob):
     dg = bpy.context.evaluated_depsgraph_get()
+    if "Outline" not in ob.modifiers:
+        ev = ob.evaluated_get(dg)
+        me = ev.to_mesh()
+        P = np.empty(len(me.vertices) * 3, np.float32)
+        me.vertices.foreach_get("co", P)
+        ev.to_mesh_clear()
+        return (np.c_[P.reshape(-1, 3), np.ones(len(P) // 3)] @ np.array(ob.matrix_world).T)[:, :3]
     mods = ob.modifiers["Outline"].show_viewport
     ob.modifiers["Outline"].show_viewport = False
     dg.update()
@@ -298,12 +310,13 @@ def deform_numbers(variant):
     pose(CLIPS["Idle"], 1)
     P0 = posed(ob)
     L0 = np.linalg.norm(P0[edges[:, 0]] - P0[edges[:, 1]], axis=1) + 1e-9
-    res = {}
+    res = {"edges": int(len(edges))}
     for clip in ("Idle", "Walk", "Attack"):
         act = bpy.data.actions[CLIPS[clip]]
         f0, f1 = [int(x) for x in act.frame_range]
-        worst = {"shield_dev_cm_max": 0, "cleaver_dev_cm_max": 0, "arm_stretch_p95": 0, "shield_dev_cm_median": 0,
-                 "cleaver_dev_cm_median": 0}
+        worst = {"shield_dev_cm_max": 0, "cleaver_dev_cm_max": 0, "arm_stretch_p95": 0, "shield_dev_cm_p95": 0,
+                 "cleaver_dev_cm_p95": 0, "shield_share_over_2cm": 0, "cleaver_share_over_2cm": 0,
+                 "all_stretch_p999": 0, "edges_over_2x": 0}
         for fr in np.linspace(f0, f1, 9).round().astype(int):
             pose(CLIPS[clip], int(fr))
             P = posed(ob)
@@ -317,8 +330,12 @@ def deform_numbers(variant):
                 # rigid-body error relative to the best rigid fit is what matters visually; use the hand-slot as the
                 # reference the game uses (a held item IS rigid in the hand)
                 worst[key + "_dev_cm_max"] = max(worst[key + "_dev_cm_max"], round(float(dev.max()), 2))
-                worst[key + "_dev_cm_median"] = max(worst[key + "_dev_cm_median"], round(float(np.median(dev)), 2))
+                worst[key + "_dev_cm_p95"] = max(worst[key + "_dev_cm_p95"], round(float(np.percentile(dev, 95)), 2))
+                worst[key + "_share_over_2cm"] = max(worst[key + "_share_over_2cm"], round(float((dev > 2).mean()), 3))
             Lt = np.linalg.norm(P[edges[:, 0]] - P[edges[:, 1]], axis=1)
+            r = Lt / L0
+            worst["all_stretch_p999"] = max(worst["all_stretch_p999"], round(float(np.percentile(np.abs(r - 1), 99.9)), 3))
+            worst["edges_over_2x"] = max(worst["edges_over_2x"], int(((r > 2) | (r < 0.5)).sum()))
             if arm_e.any():
                 worst["arm_stretch_p95"] = max(worst["arm_stretch_p95"],
                                                round(float(np.percentile(np.abs(Lt[arm_e] / L0[arm_e] - 1), 95)), 3))
@@ -327,6 +344,39 @@ def deform_numbers(variant):
     print("DEFORM", variant, json.dumps(res), flush=True)
 
 
+def v7_baseline():
+    """Same stretch numbers on the scripted v7 body (segmented, rigid per part) as the yardstick."""
+    me = V7BODY.data
+    F = np.array([p.vertices[:] for p in me.polygons if len(p.vertices) == 3] +
+                 [p.vertices[:3] for p in me.polygons if len(p.vertices) > 3])
+    edges = np.array([e.vertices[:] for e in me.edges])
+    gname = {g.index: g.name for g in V7BODY.vertex_groups}
+    armv = np.zeros(len(me.vertices), bool)
+    for v in me.vertices:
+        armv[v.index] = sum(g.weight for g in v.groups
+                            if gname.get(g.group, "").startswith(("upperarm", "lowerarm", "wrist", "hand"))) > 0.5
+    arm_e = armv[edges[:, 0]] & armv[edges[:, 1]]
+    pose(CLIPS["Idle"], 1)
+    P0 = posed(V7BODY)
+    L0 = np.linalg.norm(P0[edges[:, 0]] - P0[edges[:, 1]], axis=1) + 1e-9
+    res = {}
+    for clip in ("Idle", "Walk", "Attack"):
+        act = bpy.data.actions[CLIPS[clip]]
+        f0, f1 = [int(x) for x in act.frame_range]
+        w = {"arm_stretch_p95": 0, "all_stretch_p999": 0, "edges_over_2x": 0, "edges": int(len(edges))}
+        for fr in np.linspace(f0, f1, 9).round().astype(int):
+            pose(CLIPS[clip], int(fr))
+            P = posed(V7BODY)
+            r = np.linalg.norm(P[edges[:, 0]] - P[edges[:, 1]], axis=1) / L0
+            w["arm_stretch_p95"] = max(w["arm_stretch_p95"], round(float(np.percentile(np.abs(r[arm_e] - 1), 95)), 3))
+            w["all_stretch_p999"] = max(w["all_stretch_p999"], round(float(np.percentile(np.abs(r - 1), 99.9)), 3))
+            w["edges_over_2x"] = max(w["edges_over_2x"], int(((r > 2) | (r < 0.5)).sum()))
+        res[clip] = w
+    LOG["deform"]["v7_body_baseline"] = res
+    print("DEFORM v7_body_baseline", json.dumps(res), flush=True)
+
+
+v7_baseline()
 for v in VARIANTS:
     deform_numbers(v)
 

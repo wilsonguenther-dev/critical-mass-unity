@@ -269,7 +269,7 @@ REPORT["colour"]["dE_to_palette_raw_median"] = round(float(np.median(dE_raw)), 1
 REPORT["colour"]["dE_to_palette_after_transfer_median"] = round(float(np.median(dE_tr)), 1)
 
 # ---------------------------------------------------------------- 6. voxel remesh helpers
-VOX = H7 / 230.0
+VOX = H7 / 300.0     # finer than v1 (230): keeps edges a little crisper
 
 
 def occupancy(points, pad=6):
@@ -284,7 +284,7 @@ def occupancy(points, pad=6):
     return occ, lo_
 
 
-def remesh(points, target_tris, smooth_sigma=0.8):
+def remesh(points, target_tris, smooth_sigma=0.6):
     from skimage.measure import marching_cubes
     import fast_simplification
     occ, lo_ = occupancy(points)
@@ -293,7 +293,7 @@ def remesh(points, target_tris, smooth_sigma=0.8):
     v = v * VOX + lo_
     m = trimesh.Trimesh(v, fcs, process=True)
     m.fix_normals()
-    trimesh.smoothing.filter_taubin(m, lamb=0.5, nu=-0.53, iterations=6)
+    trimesh.smoothing.filter_taubin(m, lamb=0.5, nu=-0.53, iterations=3)
     pts, fcs2 = fast_simplification.simplify(m.vertices, m.faces, target_reduction=1 - target_tris / len(m.faces))
     m2 = trimesh.Trimesh(pts, fcs2, process=True)
     m2.fix_normals()
@@ -419,20 +419,39 @@ AW = d7["arm_world"]
 AWi = np.linalg.inv(AW)
 
 
-def weights_from(Vn, sources):
+def weights_from(Vn, sources, Fn=None, smooth_iters=6):
+    """v2: dominant bone of the NEAREST v7 vertex (no Euclidean blending across gaps: a hand resting on a hip must
+    not pull the hip), then blended only along the new mesh's own surface (uniform Laplacian over its edges), limit 4,
+    normalise. A vertex whose blended skinning matrix collapses (det < 0.6) falls back to its dominant bone, so
+    un-posing cannot fling it out."""
     Psrc = np.vstack([P7[n] for n in sources])
     Wsrc = np.vstack([W7[n] for n in sources])
     t = cKDTree(Psrc)
-    dd, ii = t.query(Vn, k=8)
-    w = 1.0 / (dd + 1e-3) ** 2
-    W = (Wsrc[ii] * w[..., None]).sum(1) / w.sum(1, keepdims=True)
-    # limit to 4 influences, normalise
+    _, ii = t.query(Vn, k=1)
+    dom = Wsrc[ii].argmax(1)
+    W = np.zeros((len(Vn), Wsrc.shape[1]))
+    W[np.arange(len(Vn)), dom] = 1.0
+    if Fn is not None and smooth_iters:
+        E = np.vstack([Fn[:, [0, 1]], Fn[:, [1, 2]], Fn[:, [2, 0]]])
+        E = np.vstack([E, E[:, ::-1]])
+        deg = np.bincount(E[:, 0], minlength=len(Vn)).astype(float)
+        for _ in range(smooth_iters):
+            acc = np.zeros_like(W)
+            np.add.at(acc, E[:, 0], W[E[:, 1]])
+            W = 0.5 * W + 0.5 * acc / np.maximum(deg, 1)[:, None]
     order = np.argsort(-W, 1)
     W2 = np.zeros_like(W)
     rows = np.arange(len(W))[:, None]
     W2[rows, order[:, :4]] = W[rows, order[:, :4]]
     W2 /= W2.sum(1, keepdims=True) + 1e-12
-    return W2
+    M = np.einsum("vb,bij->vij", W2, S)[:, :3, :3]
+    det = np.linalg.det(M)
+    bad = det < 0.6
+    W2[bad] = 0
+    W2[np.nonzero(bad)[0], dom[bad]] = 1.0
+    REPORT.setdefault("weights", []).append({"vertices": int(len(Vn)), "collapsed_fallback": int(bad.sum()),
+                                             "blended_vertices": int(((W2 > 0).sum(1) > 1).sum())})
+    return W2.astype(np.float32)
 
 
 def unpose(Vn, W):
@@ -458,25 +477,30 @@ def save_variant(name, Vn, Fn, UV, Pn, W, info):
 
 
 # fused: one remesh of the whole generated figure, proximity weights from every v7 object
-m_f, occ_f, lo_f = remesh(Sp[::2], 22000)
+m_f, occ_f, lo_f = remesh(Sp, 24000)
 vp_f = Spart[cKDTree(Sp).query(m_f.vertices)[1]]     # nearest raw part: for the emission mask and reporting
 Vn, Fn, UV, Pn, info = bake_variant("fused", [m_f], vp_f, occ_f, lo_f)
-W = weights_from(Vn, part_names)
+W = weights_from(Vn, part_names, Fn)
 info["watertight"] = bool(m_f.is_watertight)
 info["pieces"] = int(len(m_f.split(only_watertight=False)))
 save_variant("fused", Vn, Fn, UV, Pn, W, info)
 
 # parts: body / shield / cleaver remeshed separately; held items rigid on the hand slots
-targets = [16000, 4000, 2000]
+targets = [17500, 4500, 2500]
 ms = []
 for i in range(3):
     sel = Spart == i
-    m, _, _ = remesh(Sp[sel], targets[i], smooth_sigma=0.7)
+    m, _, _ = remesh(Sp[sel], targets[i])
     ms.append(m)
 Vn, Fn, UV, Pn, info = bake_variant("parts", ms, np.concatenate([np.full(len(m.vertices), i) for i, m in enumerate(ms)]), occ_f, lo_f)
 W = np.zeros((len(Vn), len(bones)), np.float32)
 body = Pn == 0
-W[body] = weights_from(Vn[body], ["Warrior_Body"])
+# body-only sub-mesh for surface smoothing
+bidx = np.nonzero(body)[0]
+remap = -np.ones(len(Vn), int)
+remap[bidx] = np.arange(len(bidx))
+Fb = remap[Fn[np.all(body[Fn], 1)]]
+W[body] = weights_from(Vn[body], ["Warrior_Body"], Fb)
 W[Pn == 1, bones.index("handslot.l")] = 1.0
 W[Pn == 2, bones.index("handslot.r")] = 1.0
 info["watertight_by_part"] = [bool(m.is_watertight) for m in ms]

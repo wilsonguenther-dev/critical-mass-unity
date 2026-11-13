@@ -162,7 +162,19 @@ g7 = Image.open(os.path.join(V7, "game-azure-crop.jpg")).convert("RGB")
 gb = Image.open(os.path.join(R, "game_b.png")).convert("RGB")
 ga = Image.open(os.path.join(R, "game_a.png")).convert("RGB")
 cw = 300
-v7c = g7.crop((0, 0, min(g7.width, g7.height), g7.height))
+ga7 = np.asarray(g7).astype(int)
+unit = (np.abs(ga7 - np.array([163, 193, 80])).sum(2) > 90) & (np.abs(ga7 - np.array(PAPER)).sum(2) > 40)
+unit[:30] = False                                    # skip the caption strip
+cols = np.nonzero(unit.sum(0) > 3)[0]
+first = cols[0]
+run_end = first
+for c in cols[1:]:                                   # first contiguous unit (the Azure one)
+    if c - run_end > 12:
+        break
+    run_end = c
+cx = (first + run_end) // 2
+h7 = g7.height
+v7c = g7.crop((max(0, cx - h7 // 2), 0, max(0, cx - h7 // 2) + h7, h7))
 sheet = Image.new("RGB", (3 * cw + 40 + 3 * cw + 40, 340), PAPER)
 dr = ImageDraw.Draw(sheet)
 xx = 10
