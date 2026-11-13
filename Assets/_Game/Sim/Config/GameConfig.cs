@@ -76,6 +76,8 @@ namespace CriticalMass.Sim.Config
         public BotsConfig Bots = new BotsConfig();
         public RenderConfig Render = new RenderConfig();
         public DebugConfig Debug = new DebugConfig();
+        /// <summary>The sim-physics lane (DG-67..DG-100): every rule and number in one block (PhysicsConfig.Classic = browser parity).</summary>
+        public PhysicsConfig Physics = new PhysicsConfig();
 
         /// <summary>The game's config: 16v16 at 2x pace (U-004), every other value the browser main value.</summary>
         public static GameConfig CreateDefault()
@@ -114,6 +116,7 @@ namespace CriticalMass.Sim.Config
             c.Bots = Bots.Clone();
             c.Render = Render.Clone();
             c.Debug = Debug.Clone();
+            c.Physics = Physics.Clone();
             return c;
         }
 

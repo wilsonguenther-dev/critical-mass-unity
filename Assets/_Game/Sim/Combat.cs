@@ -52,6 +52,10 @@ namespace CriticalMass.Sim.Core
                 a.AnimAction += dt;
             }
 
+            // DG-67 (S4): with FairTrades every swing of this tick is decided first (hits queued in w.Hits, no actor written),
+            // then all are applied in queue order, so a lower id never cancels a higher id's swing by killing it first.
+            bool fair = Phys.On(w, cfg.Physics.FairTrades);
+            w.Hits.Count = 0;
             for (int i = 0; i < n; i++)
             {
                 Actor a = w.Actors[i];
@@ -93,7 +97,8 @@ namespace CriticalMass.Sim.Core
                         double dot = (dx * fx + dz * fz) / Math.Sqrt(d2);
                         if (dot < cosHalf - 1e-9) continue;
                     }
-                    Damage.ApplyDamage(w, j, cc.AttackDamage, i, ax, az);
+                    if (fair) w.Hits.Add(j, i, cc.AttackDamage, ax, az);
+                    else Damage.ApplyDamage(w, j, cc.AttackDamage, i, ax, az);
                 }
                 // Structures (CM-05): the same swing chips enemy barricades in its arc; a Miner's pick also breaks breakables.
                 Barricades.DamageBarricadesInArc(w, i, ax, az, fx, fz, cc.AttackRange, cosHalf, cc.AttackDamage);
@@ -115,10 +120,19 @@ namespace CriticalMass.Sim.Core
                     }
                 }
             }
+            if (fair) ApplyPendingHits(w);
             // DG-22 (CM-38): mines trigger and due TNT blows on this step's positions, before the meat drop so a blast kill leaves meat.
             Demolitions.DemolitionsBlastSystem(w);
             // CM-35: the last thing combat does: every body killed this step (or since last step's combat) drops its meat once.
             DropCorpseMeat(w);
+        }
+
+        /// <summary>DG-67: phase 2, every queued melee hit of the tick in queue order (attacker id, then candidate order).</summary>
+        public static void ApplyPendingHits(World w)
+        {
+            PendingHits h = w.Hits;
+            for (int k = 0; k < h.Count; k++) Damage.ApplyDamage(w, h.Target[k], h.Amount[k], h.Source[k], h.SrcX[k], h.SrcZ[k]);
+            h.Count = 0;
         }
 
         /// <summary>

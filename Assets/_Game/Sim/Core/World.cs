@@ -349,6 +349,7 @@ namespace CriticalMass.Sim.Core
             world.Opts.HumanClass = opts.HumanClass;
             world.Opts.BotDifficulty = opts.BotDifficulty; // DG-21
             world.Opts.AllyBotDifficulty = opts.AllyBotDifficulty;
+            world.Opts.Pace = opts.Pace; // sim-physics lane (OD-1)
             Rng.SeedRng(world.Rng, unchecked((uint)opts.Seed));
             world.Tick = 0;
             world.ActorCount = 2 * n;
@@ -645,6 +646,7 @@ namespace CriticalMass.Sim.Core
                     Config = cfg,
                     BotDifficulty = opts.BotDifficulty,
                     AllyBotDifficulty = opts.AllyBotDifficulty,
+                    Pace = opts.Pace,
                 },
                 Config = cfg,
                 Rng = Rng.CreateRng(unchecked((uint)opts.Seed)),
@@ -737,6 +739,7 @@ namespace CriticalMass.Sim.Core
                 Hash = SpatialHash.CreateSpatialHash(map.Width, map.Height, cap),
                 Builder = BuilderState.Create(cfg),
                 Healer = HealerState.Create(cfg),
+                Hits = PendingHits.Create(cap),
             };
             InitWorld(world, opts);
             return world;
@@ -831,5 +834,7 @@ namespace CriticalMass.Sim.Core
         public BuilderState Builder;
         /// <summary>DG-40: the Healer's purify cooldowns and counters (Healer.cs).</summary>
         public HealerState Healer;
+        /// <summary>DG-67: this tick's melee hits, applied together after every swing is decided (Combat).</summary>
+        public PendingHits Hits;
     }
 }
