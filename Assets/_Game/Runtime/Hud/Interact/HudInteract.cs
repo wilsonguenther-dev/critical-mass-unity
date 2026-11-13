@@ -244,7 +244,9 @@ namespace CriticalMass.Runtime.Hud.Interact
             Map.Tick(w, Me, now);
         }
 
-        void LateUpdate()
+        void LateUpdate() { var cost = CriticalMass.Runtime.Game.FrameCost.Enter(); LateUpdateCost(); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.HudInteract, cost); }
+
+        void LateUpdateCost()
         {
             if (_built && Driver != null && Driver.World != null) Minimap.LateTick(Driver.World, Me);
         }

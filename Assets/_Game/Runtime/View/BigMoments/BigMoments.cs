@@ -212,7 +212,9 @@ namespace CriticalMass.Runtime.View.Moments
             _queue.Force(req, scale, _clock);
         }
 
-        private void LateUpdate()
+        private void LateUpdate() { var cost = CriticalMass.Runtime.Game.FrameCost.Enter(); LateUpdateCost(); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.BigMoments, cost); }
+
+        void LateUpdateCost()
         {
             bool paused = _input != null && _input.State.Paused;
             // Integration batch 4: one hitch frame (the match-start load, a shader warm-up) advances the director at most

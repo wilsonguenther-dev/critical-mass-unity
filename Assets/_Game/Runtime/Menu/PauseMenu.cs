@@ -1499,11 +1499,11 @@ namespace CriticalMass.Runtime.Menu
             GameSettings.Resolution = opts[i];
         }
 
-        /// <summary>"60 FPS" or "DISPLAY RATE" for 0.</summary>
+        /// <summary>"60 FPS", "OFF" (0: the display's rate) or "UNLIMITED" (-1: vsync off).</summary>
         public static string FpsCapText()
         {
             int v = GameSettings.FpsCap;
-            return v == 0 ? "DISPLAY RATE" : v + " FPS";
+            return v == 0 ? "OFF" : v == CriticalMass.Runtime.Game.FramePolicy.Unlimited ? "UNLIMITED" : v + " FPS";
         }
 
         static void StepFpsCap(int d)

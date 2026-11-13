@@ -4,6 +4,11 @@
 # exceeded OR NOT MEASURED (fail closed), when the run started in safe mode, or when the quality is not the one asked for.
 #   tools/demo-smoke.sh [--app PATH.app] [--out DIR] [--matches N] [--speed X] [--novsync] [--width W --height H]
 #                       [--fullscreen] [--quality NAME] [--title-seconds S] [--timeout S] [--summarise-only DIR]
+#                       [--qualities High,Medium,Low] [--trace-states] [--pacing rule,display,timed60]
+# perf-smooth-1: --qualities runs match n at the n-th level (one hidden run measures three levels with the same match
+# settings; perf-mN.json names each level); --trace-states records the shader variants and graphics states the run met
+# (OUT/data/traces/<api>.graphicsstate, the source of Assets/StreamingAssets/ShaderWarmup). Each match also writes
+# frames.csv / frames-mN.csv (the frame-cost recorder, FrameRecorder) and a "frame_recorder" summary in its perf json.
 # Profiles: CM_PROFILE=default (High, 1920x1080 window) or CM_PROFILE=floor (Low, 1920x1080, 30 fps cap, the floor
 # budgets). --fullscreen runs at the panel's native size in borderless fullscreen (proves the pixel cap).
 # Budgets: tools/budgets.json (profile section); env CM_BUDGET_<KEY> overrides one (for example CM_BUDGET_P95_MS=20).
@@ -19,7 +24,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP="$ROOT/Builds/current/CriticalMass.app"
 [[ -d "$APP" ]] || APP="$ROOT/Builds/macOS/CriticalMass.app"
 ORIG_ARGS=("$@")   # kept for the cm-heavy re-exec below (the option loop shifts "$@" empty: --out and --quality were lost)
-OUT=""; SPEED=""; NOVSYNC=(); W=1920; H=1080; TIMEOUT=900; MATCHES=3; TITLE_S=12; FULL=0; QUALITY=""; SUMMARISE=""
+QUALITIES=(); TRACE=(); OUT=""; SPEED=""; NOVSYNC=(); W=1920; H=1080; TIMEOUT=900; MATCHES=3; TITLE_S=12; FULL=0; QUALITY=""; SUMMARISE=""
 PROFILE="${CM_PROFILE:-default}"
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -35,6 +40,9 @@ while [[ $# -gt 0 ]]; do
     --title-seconds) TITLE_S="${2:?}"; shift 2 ;;
     --timeout) TIMEOUT="${2:?}"; shift 2 ;;
     --summarise-only) SUMMARISE="${2:?}"; shift 2 ;;
+    --qualities) QUALITIES=(-autoplayQualities "${2:?}"); shift 2 ;;
+    --trace-states) TRACE=(-traceStates); shift ;;
+    --pacing) TRACE+=(-autoplayPacing "${2:?}"); shift 2 ;;
     *) echo "usage: demo-smoke.sh [--app PATH.app] [--out DIR] [--matches N] [--speed X] [--novsync] [--width W --height H] [--fullscreen] [--quality NAME] [--title-seconds S] [--timeout S] [--summarise-only DIR]" >&2; exit 64 ;;
   esac
 done
@@ -202,7 +210,7 @@ LIMIT=$((MATCHES * (TIMEOUT + 60) + 120))
 set +e
 ARGS=(-autoplay -quitAfterMatch -autoplayMatches "$MATCHES" -autoplayTitleSeconds "$TITLE_S" \
   -autoplayTimeout "$TIMEOUT" ${SPEED:+-autoplaySpeed "$SPEED"} ${NOVSYNC[@]+"${NOVSYNC[@]}"} ${CAP_ARGS[@]+"${CAP_ARGS[@]}"} \
-  -quality "$QUALITY" -dataDir "$OUT/data" "${WIN[@]}" -logFile "$LOG" -perfLog "$PERF")
+  ${QUALITIES[@]+"${QUALITIES[@]}"} ${TRACE[@]+"${TRACE[@]}"} -quality "$QUALITY" -dataDir "$OUT/data" "${WIN[@]}" -logFile "$LOG" -perfLog "$PERF")
 # Integration batch 3 (owner report 2026-11-12): automated runs never take the owner's screen. By default the player is
 # launched through LaunchServices hidden and in the background (open -g -j: no activation, no focus steal, no visible
 # window); CM_SMOKE_VISIBLE=1 restores the old direct launch. The watchdog replaces perl's alarm for the hidden path.

@@ -166,12 +166,13 @@ namespace CriticalMass.Runtime.Menu
         public static bool KeysFollowMap { get => GetB(KeysFollowMapKey, false); set => SetB(KeysFollowMapKey, value); }
 
         // ---- video ----
-        /// <summary>The frame-rate limit choices in screen order; 0 = the display's refresh rate.</summary>
-        public static readonly int[] FpsCapOptions = { 30, 60, 120, 0 };
-        public const int DefaultFpsCap = 60;
+        /// <summary>The frame-rate limit choices in screen order (FramePolicy.CapChoices): 30, 60, 120, 144, 0 = OFF (locked to
+        /// the display), -1 = UNLIMITED (vsync off).</summary>
+        public static readonly int[] FpsCapOptions = CriticalMass.Runtime.Game.FramePolicy.CapChoices;
+        public const int DefaultFpsCap = CriticalMass.Runtime.Game.FramePolicy.DefaultCap;   // perf-smooth-1: OFF (vsync, one frame per refresh)
 
         /// <summary>
-        /// Frame-rate limit (cm.fpsCap): 30, 60, 120, or 0 for the display's refresh rate; default 60. Stored here; FrameGovernor
+        /// Frame-rate limit (cm.fpsCap): 30, 60, 120, 144, 0 (off: the display's refresh rate) or -1 (unlimited); default 60. Stored here; FrameGovernor
         /// applies it (Reapply on save).
         /// </summary>
         public static int FpsCap
