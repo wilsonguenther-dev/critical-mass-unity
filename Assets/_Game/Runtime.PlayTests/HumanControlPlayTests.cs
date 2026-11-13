@@ -153,10 +153,20 @@ namespace CriticalMass.Runtime.PlayTests
             yield return null;
             FlowDirector d = FlowDirector.Current;
             Assert.AreEqual(FlowState.Menu, GameFlow.State);
-            yield return Press(d.MainMenu.Item(spectate ? OverlayRegistry.Spectate : OverlayRegistry.Play));
-            Assert.AreEqual(FlowState.Setup, GameFlow.State);
-            Assert.AreEqual(spectate, d.Setup.Spectate, spectate ? "SPECTATE opens setup on SPECTATE" : "PLAY opens setup on a team");
-            if (!spectate) d.Setup.SetTeam(TeamId.Azure);
+            // Integration batch 4: the home lobby (#60) opens the mode cards from PLAY; CUSTOM is the old setup screen and
+            // SPECTATE goes through READY.
+            yield return Press(d.MainMenu.PlayItem);
+            yield return Until(() => d.Modes.IsVisible, 5f, "PLAY opens the mode cards");
+            if (spectate)
+            {
+                yield return Press(d.Modes.Card(MatchMode.Spectate));
+                yield return StartFromReady();
+                yield break;
+            }
+            yield return Press(d.Modes.Card(MatchMode.Custom));
+            yield return Until(() => GameFlow.State == FlowState.Setup && d.Setup.IsVisible, 5f, "CUSTOM opens the match setup");
+            Assert.IsFalse(d.Setup.Spectate, "CUSTOM opens setup on a team");
+            d.Setup.SetTeam(TeamId.Azure);
             d.Setup.SetSize(16);
             d.Setup.SetPace(2);
             SimDriverBehaviour backdrop = Driver();
@@ -402,7 +412,11 @@ namespace CriticalMass.Runtime.PlayTests
         public IEnumerator HomeFullBattleGivesControl() { yield return ModeCardPath(MatchMode.FullBattle); }
 
         [UnityTest, Timeout(120000)]
-        public IEnumerator HomeTrainingGivesControl() { yield return ModeCardPath(MatchMode.Training); }
+        public IEnumerator HomeTrainingGivesControl()
+        {
+            LogAssert.Expect(LogType.Log, new System.Text.RegularExpressions.Regex(@"^\[Trial\] passive bots"));
+            yield return ModeCardPath(MatchMode.Training);
+        }
 
         [UnityTest, Timeout(120000)]
         public IEnumerator HomePracticeGivesControl() { yield return ModeCardPath(MatchMode.Practice); }
