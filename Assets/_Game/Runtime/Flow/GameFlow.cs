@@ -98,6 +98,13 @@ namespace CriticalMass.Runtime.Flow
         /// <summary>Backdrop matches play at 1x behind the menus.</summary>
         public const double BackdropPace = 1;
 
+        /// <summary>
+        /// Backdrop matches behind the title and menus are 8v8 (technical hardening 2026-11-12): the 16v16 backdrop cost 36.7%
+        /// of a core on an idle title (smoke budget 35%, plan target 10%); half the actors halves the sim and the character
+        /// drawing behind a screen nobody plays.
+        /// </summary>
+        public const int BackdropTeamSize = 8;
+
         public static bool Enabled => ForceEnabled || TitleScreen.ShowOnBoot;
 
         public static FlowState State { get; private set; } = FlowState.Off;
@@ -207,7 +214,7 @@ namespace CriticalMass.Runtime.Flow
                 Seed = NewSeed(),
                 Team = TeamId.Azure,
                 Class = ClassId.Warrior,
-                TeamSize = 16,
+                TeamSize = BackdropTeamSize,
                 Pace = BackdropPace,
                 Backdrop = true,
             };

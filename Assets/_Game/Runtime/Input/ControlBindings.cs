@@ -296,7 +296,21 @@ namespace CriticalMass.Runtime.Input
         }
 
         /// <summary>Applies the overrides saved by Persist (none saved = defaults).</summary>
-        public static void Restore(InputActionAsset asset) => LoadJson(asset, PlayerPrefs.GetString(PrefsKey, string.Empty));
+        public static void Restore(InputActionAsset asset)
+        {
+            try
+            {
+                LoadJson(asset, PlayerPrefs.GetString(PrefsKey, string.Empty));
+            }
+            catch (Exception e)
+            {
+                // DG-53: a corrupt or foreign cm.bindings must never stop the game: drop it once and keep the defaults.
+                if (asset != null) asset.RemoveAllBindingOverrides();
+                PlayerPrefs.DeleteKey(PrefsKey);
+                Debug.LogWarning($"[CM.Controls] saved bindings could not be read ({e.GetType().Name}); using the defaults");
+                BindingsChanged?.Invoke();
+            }
+        }
 
         /// <summary>Every binding back to Controls.inputactions and the saved overrides deleted.</summary>
         public static void ResetAll(InputActionAsset asset)

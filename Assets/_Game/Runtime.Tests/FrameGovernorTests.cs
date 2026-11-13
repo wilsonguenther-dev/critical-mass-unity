@@ -44,8 +44,10 @@ namespace CriticalMass.Runtime.Tests
                 FrameGovernor.PickQuality("Intel(R) UHD Graphics 620", 1536, 16384, 6, 3));
             Assert.AreEqual((1, FrameGovernor.LowRenderScale, "integrated graphics"),
                 FrameGovernor.PickQuality("AMD Radeon(TM) Graphics", 512, 16384, 6, 3));
-            Assert.AreEqual((1, FrameGovernor.LowRenderScale, "under 8 GB memory"),
-                FrameGovernor.PickQuality("NVIDIA GeForce GTX 1650", 4096, 6144, 6, 3));
+            Assert.AreEqual((2, FramePolicy.MidRenderScale, "8 GB memory"),
+                FrameGovernor.PickQuality("NVIDIA GeForce GTX 1650", 4096, 6144, 6, 3), "DG-50: 8 GB or less is mid tier");
+            Assert.AreEqual((1, FrameGovernor.LowRenderScale, "under 6 GB memory"),
+                FrameGovernor.PickQuality("NVIDIA GeForce GTX 1650", 4096, 4096, 6, 3));
             Assert.AreEqual((3, 1f, "capable machine"), FrameGovernor.PickQuality("Apple M4 Pro", 18432, 24576, 6, 3));
             Assert.AreEqual((3, 1f, "capable machine"), FrameGovernor.PickQuality("NVIDIA GeForce RTX 3060", 12288, 16384, 6, 3));
             Assert.IsFalse(FrameGovernor.IsIntegrated("AMD Radeon RX Vega 64", 8192));

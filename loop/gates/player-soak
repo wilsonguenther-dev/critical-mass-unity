@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Gate "player-soak" (DG-55): 20 matches, 2 hours, the shipped player. See gate.py.
+exec python3 "$(dirname "${BASH_SOURCE[0]}")/gate.py" player-soak "$@"

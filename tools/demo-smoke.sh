@@ -1,34 +1,25 @@
 #!/usr/bin/env bash
-# DG-05 demo smoke + budgets: run a BUILT Mac player with -autoplay -quitAfterMatch through back-to-back 16v16 matches,
-# sample its memory and CPU from outside, and fail when a budget is exceeded.
+# DG-05 demo smoke, made a real perf gate by DG-54 (2026-11-12 panel): run a BUILT Mac player with -autoplay
+# -quitAfterMatch through back-to-back 16v16 matches, sample memory and CPU from outside, and FAIL when a budget is
+# exceeded OR NOT MEASURED (fail closed), when the run started in safe mode, or when the quality is not the one asked for.
 #   tools/demo-smoke.sh [--app PATH.app] [--out DIR] [--matches N] [--speed X] [--novsync] [--width W --height H]
-#                       [--title-seconds S] [--timeout S]
+#                       [--fullscreen] [--quality NAME] [--title-seconds S] [--timeout S] [--summarise-only DIR]
+# Profiles: CM_PROFILE=default (High, 1920x1080 window) or CM_PROFILE=floor (Low, 1920x1080, 30 fps cap, the floor
+# budgets). --fullscreen runs at the panel's native size in borderless fullscreen (proves the pixel cap).
+# Budgets: tools/budgets.json (profile section); env CM_BUDGET_<KEY> overrides one (for example CM_BUDGET_P95_MS=20).
+# Isolation: the player's files go to OUT/data (-dataDir), and the player's saved settings (macOS defaults domain
+# com.drivia.criticalmass) are exported before the run and restored after it, so a smoke never changes the owner's
+# settings or window size. The run deletes no session marker of the owner's.
 # It runs itself inside the machine-wide limiter (~/bin/cm-heavy unity) when that exists.
-# Defaults: this checkout's build-mac app, out Logs/demo-smoke/<utc>, 3 matches (480 s each at the game's 2x speed, about
-# 4 minutes each), 1920x1080 windowed, 12 s idle on the title first, timeout 900 s per match (the player quits itself;
-# this script's hard limit is matches x (timeout + 60) + 120 s).
-# PASS needs all of: player exit 0, every match logs "[CM.Autoplay] MATCH END", zero exception lines in Player.log, and
-# every budget below (override with env vars). A budget whose counter the run did not produce FAILS the run (fail closed,
-# DG-54): it is listed under not_measured.
-#   CM_BUDGET_PEAK_RSS_MB=1536   peak resident memory of the player over the run
-#   CM_BUDGET_GROWTH_MB=50       resident memory at the end of the last match minus the end of match 1 (3+ matches)
-#   CM_BUDGET_P95_MS=17.5        match 1 p95 frame time with the 60 fps cap (a vsync miss is 33 ms); 16.7 with --novsync
-#   CM_BUDGET_IDLE_CPU_PCT=35    CPU on the title screen, percent of one core, from 2 s after the title to 1 s before it goes
-#   CM_BUDGET_BATCHES=1500       worst Batches Count in match 1 (the gameplay camera is the wide view; no zoom exists)
-#   CM_BUDGET_TRIANGLES=1000000  worst Triangles Count in match 1
-# Reported only: worst hitch, boot to title, SetPass calls, Unity and graphics memory, the largest textures and meshes,
-# textures flagged (over 2048 px or uncompressed). Writes Player.log, perf.json (+ perf-m2.json ...), samples.tsv and
-# summary.json into DIR; prints one summary line.
-# Windows (one line, PowerShell, in the folder holding CriticalMass.exe):
-#   .\CriticalMass.exe -batchmode -nographics -autoplay -quitAfterMatch -autoplaySpeed 8 -logFile Player.log -perfLog perf.json; "exit $LASTEXITCODE"; Select-String -Path Player.log -Pattern 'Exception','MATCH END'
+# Writes Player.log, perf.json (+ perf-m2.json ...), samples.tsv and summary.json into OUT; prints one summary line.
+# Exit: 0 pass, 1 fail (budget over or not measured), 66 no app, 64 usage.
+# Windows: see tools/windows-run.ps1 (one command for the owner) and .github/workflows/windows-player.yml.
 set -euo pipefail
-# One graphics-heavy job machine-wide (2026-11-12 watchdog restart): re-run this script inside ~/bin/cm-heavy's Unity slot.
-if [[ -z "${CM_HEAVY_HELD:-}" && -x "$HOME/bin/cm-heavy" ]]; then
-  CM_HEAVY_HELD=1 exec "$HOME/bin/cm-heavy" unity env CM_HEAVY_HELD=1 bash "${BASH_SOURCE[0]}" "$@"
-fi
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-APP="$ROOT/Builds/macOS/CriticalMass.app"
-OUT=""; SPEED=""; NOVSYNC=(); W=1920; H=1080; TIMEOUT=900; MATCHES=3; TITLE_S=12
+APP="$ROOT/Builds/current/CriticalMass.app"
+[[ -d "$APP" ]] || APP="$ROOT/Builds/macOS/CriticalMass.app"
+OUT=""; SPEED=""; NOVSYNC=(); W=1920; H=1080; TIMEOUT=900; MATCHES=3; TITLE_S=12; FULL=0; QUALITY=""; SUMMARISE=""
+PROFILE="${CM_PROFILE:-default}"
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --app) APP="${2:?}"; shift 2 ;;
@@ -38,54 +29,34 @@ while [[ $# -gt 0 ]]; do
     --novsync) NOVSYNC=(-novsync); shift ;;
     --width) W="${2:?}"; shift 2 ;;
     --height) H="${2:?}"; shift 2 ;;
+    --fullscreen) FULL=1; shift ;;
+    --quality) QUALITY="${2:?}"; shift 2 ;;
     --title-seconds) TITLE_S="${2:?}"; shift 2 ;;
     --timeout) TIMEOUT="${2:?}"; shift 2 ;;
-    *) echo "usage: demo-smoke.sh [--app PATH.app] [--out DIR] [--matches N] [--speed X] [--novsync] [--width W --height H] [--title-seconds S] [--timeout S]" >&2; exit 64 ;;
+    --summarise-only) SUMMARISE="${2:?}"; shift 2 ;;
+    *) echo "usage: demo-smoke.sh [--app PATH.app] [--out DIR] [--matches N] [--speed X] [--novsync] [--width W --height H] [--fullscreen] [--quality NAME] [--title-seconds S] [--timeout S] [--summarise-only DIR]" >&2; exit 64 ;;
   esac
 done
-[[ -d "$APP" ]] || { echo "demo-smoke: FAILED, no app at $APP (run tools/unity-build-mac.sh first)" >&2; exit 66; }
-EXE_NAME="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP/Contents/Info.plist")"
-EXE="$APP/Contents/MacOS/$EXE_NAME"
-[[ -x "$EXE" ]] || { echo "demo-smoke: FAILED, no executable at $EXE" >&2; exit 66; }
-OUT="${OUT:-$ROOT/Logs/demo-smoke/$(date -u +%Y%m%dT%H%M%SZ)}"
-mkdir -p "$OUT"
-LOG="$OUT/Player.log"; PERF="$OUT/perf.json"; SUM="$OUT/summary.json"; SAMPLES="$OUT/samples.tsv"
-rm -f "$LOG" "$OUT"/perf*.json "$SUM" "$SAMPLES"
+case "$PROFILE" in
+  floor) QUALITY="${QUALITY:-Low}"; W=1920; H=1080; FULL=0; CAP_ARGS=(-fpsCap 30) ;;
+  default) QUALITY="${QUALITY:-High}"; CAP_ARGS=() ;;
+  *) echo "demo-smoke: unknown CM_PROFILE=$PROFILE (default or floor)" >&2; exit 64 ;;
+esac
 
-others="$(pgrep -f 'Unity.app/Contents/MacOS/Unity' | tr '\n' ' ' || true)"
-launch_ms="$(python3 -c 'import time; print(int(time.time()*1000))')"
-LIMIT=$((MATCHES * (TIMEOUT + 60) + 120))
-set +e
-perl -e 'alarm shift; exec @ARGV' "$LIMIT" \
-  "$EXE" -autoplay -quitAfterMatch -autoplayMatches "$MATCHES" -autoplayTitleSeconds "$TITLE_S" \
-  -autoplayTimeout "$TIMEOUT" ${SPEED:+-autoplaySpeed "$SPEED"} ${NOVSYNC[@]+"${NOVSYNC[@]}"} \
-  -screen-fullscreen 0 -screen-width "$W" -screen-height "$H" -logFile "$LOG" -perfLog "$PERF" &
-pid=$!
-# Outside view, once a second: wall ms, resident KB, cumulative CPU time (ps cputime), and the log markers seen so far.
-printf 'ms\trss_kb\tcputime\ttitle\tmatch_ends\n' > "$SAMPLES"
-while kill -0 "$pid" 2>/dev/null; do
-  line="$(ps -o rss=,cputime= -p "$pid" 2>/dev/null || true)"
-  if [[ -n "$line" ]]; then
-    t=0; e=0
-    if [[ -f "$LOG" ]]; then
-      grep -q '\[CM.Boot\] title on screen' "$LOG" && t=1
-      e="$(grep -c '\[CM.Autoplay\] MATCH END' "$LOG" || true)"
-    fi
-    printf '%s\t%s\t%s\t%s\t%s\n' "$(python3 -c 'import time; print(int(time.time()*1000))')" \
-      "$(awk '{print $1}' <<<"$line")" "$(awk '{print $2}' <<<"$line")" "$t" "$e" >> "$SAMPLES"
-  fi
-  sleep 1
-done
-wait "$pid"; code=$?
-set -e
-
-python3 - "$OUT" "$code" "$launch_ms" "$others" "$MATCHES" "$TITLE_S" "${NOVSYNC[*]:-}" <<'PY'
+summarise() {  # $1 out dir, $2 exit code, $3 launch ms, $4 other unity pids
+python3 - "$1" "$2" "$3" "$4" "$MATCHES" "$TITLE_S" "${NOVSYNC[*]:-}" "$PROFILE" "$QUALITY" "$ROOT/tools/budgets.json" <<'PY'
 import json, os, re, sys
-out, code, launch_ms, others, matches, title_s, novsync = sys.argv[1], int(sys.argv[2]), int(sys.argv[3]), sys.argv[4], int(sys.argv[5]), float(sys.argv[6]), sys.argv[7]
-env = lambda k, d: float(os.environ.get(k, d))
-B = {'peak_rss_mb': env('CM_BUDGET_PEAK_RSS_MB', 1536), 'growth_mb': env('CM_BUDGET_GROWTH_MB', 50),
-     'p95_ms': env('CM_BUDGET_P95_MS', 16.7 if novsync else 17.5), 'idle_cpu_pct': env('CM_BUDGET_IDLE_CPU_PCT', 35),
-     'batches': env('CM_BUDGET_BATCHES', 1500), 'triangles': env('CM_BUDGET_TRIANGLES', 1000000)}
+out, code, launch_ms, others, matches, title_s, novsync, profile, quality, bfile = sys.argv[1:11]
+code, launch_ms, matches, title_s = int(code), int(launch_ms), int(matches), float(title_s)
+cfg = json.load(open(bfile))[profile]
+def budget(k):
+    v = os.environ.get('CM_BUDGET_' + k.upper())
+    if v is not None:
+        return float(v)
+    b = cfg.get(k)
+    if isinstance(b, dict):  # per quality level: the level the player really ran (perf.json), else the one asked for
+        return b.get(q_real or quality)
+    return b
 log = os.path.join(out, 'Player.log')
 txt = open(log, errors='replace').read() if os.path.exists(log) else ''
 exc = sorted(set(m.group(0).strip()[:200] for m in re.finditer(r'^\s*(?:[\w.]+\.)?\w*Exception\b[^\n]*', txt, re.M)))
@@ -102,7 +73,8 @@ def cpu_s(s):  # ps cputime: [[dd-]hh:]mm:ss[.cc]
     return int(d) * 86400 + parts[0] * 3600 + parts[1] * 60 + parts[2]
 
 rows = []
-for i, l in enumerate(open(os.path.join(out, 'samples.tsv'))):
+sp = os.path.join(out, 'samples.tsv')
+for i, l in enumerate(open(sp) if os.path.exists(sp) else []):
     if i == 0:
         continue
     f = l.rstrip('\n').split('\t')
@@ -112,7 +84,7 @@ for i, l in enumerate(open(os.path.join(out, 'samples.tsv'))):
         pass
 peak = max((r['rss_mb'] for r in rows), default=None)
 rss_at_end = {}
-for r in rows:  # first sample after each MATCH END appeared
+for r in rows:
     if r['ends'] and r['ends'] not in rss_at_end:
         rss_at_end[r['ends']] = r['rss_mb']
 growth = (rss_at_end[max(rss_at_end)] - rss_at_end[1]) if len(rss_at_end) >= 3 and 1 in rss_at_end else None
@@ -125,33 +97,115 @@ if t0 is not None:
 perfs = []
 for k in range(1, matches + 1):
     p = os.path.join(out, 'perf.json' if k == 1 else f'perf-m{k}.json')
-    perfs.append(json.load(open(p)) if os.path.exists(p) else {})
+    try:
+        perfs.append(json.load(open(p)))
+    except (OSError, ValueError):
+        perfs.append({})
 p1 = perfs[0] if perfs else {}
 mk = {x['name']: x for x in p1.get('markers', [])}
-batches = mk.get('Batches Count', {}).get('max')
-tris = mk.get('Triangles Count', {}).get('max')
-p95 = (p1.get('frame_ms') or {}).get('p95')
-meas = {'peak_rss_mb': peak, 'growth_mb': growth, 'p95_ms': p95, 'idle_cpu_pct': idle, 'batches': batches, 'triangles': tris}
-over = [k for k, v in meas.items() if v is not None and v > B[k]]
-not_measured = [k for k, v in meas.items() if v is None]
+fm = p1.get('frame_ms') or {}
+gpu = (p1.get('gpu_ms') or {}).get('p95')
+cpu = (p1.get('cpu_main_ms') or {}).get('p95')
+q_real, q_req = p1.get('quality'), p1.get('quality_requested')
+pix = p1.get('render_pixels')
+pix_cap = budget('render_pixels_max_high') if q_real in ('High', 'Very High', 'Ultra') and budget('render_pixels_max_high') else budget('render_pixels_max')
 boot_s = round((int(m.group(3)) - launch_ms) / 1000, 2) if m else None
-if boot_s is None:
-    not_measured.append('boot_to_title_s')
-# Fail closed (DG-54): a number the run did not produce is a failure, never a silent pass.
-s = {'pass': code == 0 and ends == matches and not exc and not over and not not_measured, 'exit': code, 'matches': matches,
-     'match_end_logged': ends, 'exception_lines': len(exc), 'exceptions': exc[:20],
-     'errors_logged': p1.get('errors'), 'over_budget': over, 'not_measured': not_measured, 'measured': meas, 'budgets': B,
-     'boot_to_title_from_launch_s': boot_s,
+gfx = (p1.get('memory_mb') or {}).get('graphics_driver')
+meas = {'peak_rss_mb': peak, 'growth_mb': growth if matches >= 3 else 0.0, 'p95_ms': fm.get('p95'), 'worst_hitch_ms': fm.get('worst'),
+        'idle_cpu_pct': idle, 'batches': mk.get('Batches Count', {}).get('max'), 'triangles': mk.get('Triangles Count', {}).get('max'),
+        'render_pixels_max': pix, 'boot_to_title_s': boot_s}
+if profile == 'floor':
+    meas['gpu_p95_ms'] = gpu
+    meas['cpu_main_p95_ms'] = cpu
+if gfx:  # 0 in release players (Unity reports graphics-driver memory in development builds only): reported, not gated
+    meas['gfx_mb'] = gfx
+limits = {k: (pix_cap if k == 'render_pixels_max' else budget(k)) for k in meas}
+not_measured = sorted(k for k, v in meas.items() if v is None)
+no_budget = sorted(k for k, v in limits.items() if v is None)
+over = sorted(k for k, v in meas.items() if v is not None and limits[k] is not None and v > limits[k])
+problems = []
+if not p1:
+    problems.append('perf.json missing')
+if p1.get('safe_mode') is True:
+    problems.append('started in safe mode')
+if q_req and q_real != q_req:
+    problems.append(f'quality {q_real} is not the requested {q_req}')
+if quality and q_real and q_real.replace(' ', '').lower() != quality.replace(' ', '').lower():
+    problems.append(f'quality {q_real} is not --quality {quality}')
+if p1 and p1.get('data_isolated') is not True:
+    problems.append('the run did not use its own data folder (-dataDir)')
+s = {'pass': code == 0 and ends == matches and not exc and not over and not not_measured and not no_budget and not problems,
+     'profile': profile, 'exit': code, 'matches': matches, 'match_end_logged': ends, 'exception_lines': len(exc), 'exceptions': exc[:20],
+     'errors_logged': p1.get('errors'), 'over_budget': over, 'not_measured': not_measured, 'no_budget': no_budget, 'problems': problems,
+     'measured': meas, 'budgets': limits, 'quality': q_real, 'quality_requested': q_req, 'safe_mode': p1.get('safe_mode'),
+     'render_scale': p1.get('render_scale'), 'world_triangles': p1.get('world_triangles'), 'render_tier': p1.get('render_tier'),
      'boot_to_title_engine_s': float(m.group(1)) if m else None,
-     'frame_ms': p1.get('frame_ms'), 'frames_over_ms': p1.get('frames_over_ms'),
+     'frame_ms': fm, 'gpu_ms': p1.get('gpu_ms'), 'cpu_main_ms': p1.get('cpu_main_ms'), 'frames_over_ms': p1.get('frames_over_ms'),
      'setpass_max': mk.get('SetPass Calls Count', {}).get('max'), 'draw_calls_max': mk.get('Draw Calls Count', {}).get('max'),
      'top_time_markers': [(x['name'], round(x['mean'], 3)) for x in p1.get('markers', []) if x.get('unit') == 'ms'][:8],
-     'rss_mb_at_match_end': rss_at_end, 'unity_mb_per_match': [(p.get('memory_mb') or {}).get('unity_allocated') for p in perfs],
+     'rss_mb_at_match_end': rss_at_end, 'objects_per_match': [p.get('objects') for p in perfs],
+     'sim_dropped_seconds': [p.get('sim_dropped_seconds') for p in perfs], 'hud_events_dropped': [p.get('hud_events_dropped') for p in perfs],
      'assets': p1.get('assets'), 'screen': p1.get('screen'), 'frame_cap': p1.get('frame_cap'), 'vsync': p1.get('vsync'),
-     'quality': p1.get('quality'), 'winner': [p.get('winner') for p in perfs], 'version': p1.get('version'),
-     'commit': p1.get('commit'), 'other_unity_pids': others.split(), 'out': out}
+     'winner': [p.get('winner') for p in perfs], 'version': p1.get('version'), 'commit': p1.get('commit'),
+     'other_unity_pids': others.split(), 'out': out}
 open(os.path.join(out, 'summary.json'), 'w').write(json.dumps(s, indent=1) + '\n')
-print(json.dumps({k: s[k] for k in ('pass', 'exit', 'match_end_logged', 'exception_lines', 'over_budget', 'not_measured', 'measured',
-                                     'boot_to_title_from_launch_s', 'frame_ms', 'other_unity_pids')}))
+print(json.dumps({k: s[k] for k in ('pass', 'profile', 'exit', 'match_end_logged', 'exception_lines', 'over_budget', 'not_measured', 'problems', 'measured')}))
 sys.exit(0 if s['pass'] else 1)
 PY
+}
+
+if [[ -n "$SUMMARISE" ]]; then  # re-score an existing run folder (tests and re-analysis); no player starts
+  set +e; summarise "$SUMMARISE" "${CM_SMOKE_EXIT:-0}" "${CM_SMOKE_LAUNCH_MS:-0}" ""; exit $?
+fi
+
+# One graphics-heavy job machine-wide: re-run this script inside ~/bin/cm-heavy's Unity slot.
+if [[ -z "${CM_HEAVY_HELD:-}" && -x "$HOME/bin/cm-heavy" ]]; then
+  CM_HEAVY_HELD=1 exec "$HOME/bin/cm-heavy" unity env CM_HEAVY_HELD=1 bash "${BASH_SOURCE[0]}" "$@"
+fi
+[[ -d "$APP" ]] || { echo "demo-smoke: FAILED, no app at $APP (run tools/unity-build-mac.sh first)" >&2; exit 66; }
+EXE_NAME="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP/Contents/Info.plist")"
+EXE="$APP/Contents/MacOS/$EXE_NAME"
+[[ -x "$EXE" ]] || { echo "demo-smoke: FAILED, no executable at $EXE" >&2; exit 66; }
+OUT="${OUT:-$ROOT/Logs/demo-smoke/$(date -u +%Y%m%dT%H%M%SZ)-$PROFILE}"
+mkdir -p "$OUT/data"
+LOG="$OUT/Player.log"; PERF="$OUT/perf.json"; SAMPLES="$OUT/samples.tsv"
+rm -f "$LOG" "$OUT"/perf*.json "$OUT/summary.json" "$SAMPLES"
+
+# Isolation of the owner's saved settings (PlayerPrefs live in this defaults domain on macOS).
+DOMAIN="${CM_PREFS_DOMAIN:-com.drivia.criticalmass}"
+HAD_PREFS=0
+if defaults export "$DOMAIN" "$OUT/prefs-before.plist" 2>/dev/null; then HAD_PREFS=1; fi
+restore_prefs() {
+  if (( HAD_PREFS )); then defaults import "$DOMAIN" "$OUT/prefs-before.plist" 2>/dev/null || true
+  else defaults delete "$DOMAIN" 2>/dev/null || true; fi
+}
+trap restore_prefs EXIT
+
+if (( FULL )); then WIN=(-screen-fullscreen 1 -window-mode borderless); else WIN=(-screen-fullscreen 0 -screen-width "$W" -screen-height "$H"); fi
+others="$(pgrep -f 'Unity.app/Contents/MacOS/Unity' | tr '\n' ' ' || true)"
+launch_ms="$(python3 -c 'import time; print(int(time.time()*1000))')"
+LIMIT=$((MATCHES * (TIMEOUT + 60) + 120))
+set +e
+perl -e 'alarm shift; exec @ARGV' "$LIMIT" \
+  "$EXE" -autoplay -quitAfterMatch -autoplayMatches "$MATCHES" -autoplayTitleSeconds "$TITLE_S" \
+  -autoplayTimeout "$TIMEOUT" ${SPEED:+-autoplaySpeed "$SPEED"} ${NOVSYNC[@]+"${NOVSYNC[@]}"} ${CAP_ARGS[@]+"${CAP_ARGS[@]}"} \
+  -quality "$QUALITY" -dataDir "$OUT/data" "${WIN[@]}" -logFile "$LOG" -perfLog "$PERF" &
+pid=$!
+# Outside view, once a second (one ps per second, no tight loop): wall ms, resident KB, CPU time, log markers.
+printf 'ms\trss_kb\tcputime\ttitle\tmatch_ends\n' > "$SAMPLES"
+while kill -0 "$pid" 2>/dev/null; do
+  line="$(ps -o rss=,cputime= -p "$pid" 2>/dev/null || true)"
+  if [[ -n "$line" ]]; then
+    t=0; e=0
+    if [[ -f "$LOG" ]]; then
+      grep -q '\[CM.Boot\] title on screen' "$LOG" && t=1
+      e="$(grep -c '\[CM.Autoplay\] MATCH END' "$LOG" || true)"
+    fi
+    printf '%s\t%s\t%s\t%s\t%s\n' "$(date +%s)000" "$(awk '{print $1}' <<<"$line")" "$(awk '{print $2}' <<<"$line")" "$t" "$e" >> "$SAMPLES"
+  fi
+  sleep 1
+done
+wait "$pid"; code=$?
+set -e
+set +e; summarise "$OUT" "$code" "$launch_ms" "$others"; rc=$?; set -e
+exit "$rc"

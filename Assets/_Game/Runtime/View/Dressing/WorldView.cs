@@ -58,9 +58,52 @@ namespace CriticalMass.Runtime.View.Dressing
         private readonly Dictionary<int, List<GameObject>> _groups = new Dictionary<int, List<GameObject>>();
         private readonly List<Material> _hillMats = new List<Material>();
         private HillState _hillShown = (HillState)(-1);
+        // DG-58: the bases file is parsed once per world build (it was re-read and re-parsed on every dig), the dirty-chunk
+        // set is reused, and digs are merged into at most one re-plan every ReplanEveryFrames frames.
+        public const int ReplanEveryFrames = 6;
+        private BasesFile _bases;
+        private readonly HashSet<int> _dirtyChunks = new HashSet<int>();
+        private bool _replanPending;
+        private int _lastReplanFrame = -1000;
+
+        /// <summary>How many times this view parsed the bases file (DG-58 test: once per world build).</summary>
+        public int BasesParses { get; private set; }
+
+        /// <summary>World re-plans run since the view was created (tests).</summary>
+        public int Replans { get; private set; }
 
         /// <summary>The hill tint shown now (tests read it).</summary>
         public HillState HillShown => _hillShown;
+
+        // Render tier (2026-11-12 triangle budget): the materials and renderers the scenery uses, so a quality change can
+        // drop the scenery outline pass and scenery shadow casting without touching the characters.
+        private readonly HashSet<Material> _sceneryMats = new HashSet<Material>();
+
+        /// <summary>Scenery triangles drawn once (the perf report's world_triangles; outline and shadow passes multiply it).</summary>
+        public static int LastTriangles { get; private set; }
+
+        private void OnEnable() => RenderTier.Changed += ApplyTier;
+        private void OnDisable() => RenderTier.Changed -= ApplyTier;
+
+        /// <summary>Applies RenderTier.Policy to every scenery renderer and material (players only for materials: they are
+        /// shared project assets in the editor).</summary>
+        private void ApplyTier()
+        {
+            (bool outline, bool shadows) = RenderTier.Policy(RenderTier.Level);
+            if (!Application.isEditor)
+                foreach (Material m in _sceneryMats)
+                    if (m != null && m.GetShaderPassEnabled("SRPDefaultUnlit") != outline) m.SetShaderPassEnabled("SRPDefaultUnlit", outline);
+            foreach (List<GameObject> list in _groups.Values)
+                foreach (GameObject go in list)
+                {
+                    if (go == null) continue;
+                    var r = go.GetComponent<MeshRenderer>();
+                    if (r != null) r.shadowCastingMode = shadows && CastsShadows(r.sharedMaterial) ? ShadowCastingMode.On : ShadowCastingMode.Off;
+                }
+        }
+
+        private static bool CastsShadows(Material mat) =>
+            mat != null && Enum.TryParse(mat.name.StartsWith("World", StringComparison.Ordinal) ? mat.name.Substring(5).Split(' ')[0] : "", out WorldLook look) && WorldKit.CastsShadows(look);
 
         private void Start()
         {
@@ -79,9 +122,11 @@ namespace CriticalMass.Runtime.View.Dressing
             }
             if (Plan == null) return;
             if (w.Match != null) ApplyHill(w.Match.HillState);
+            if (_replanPending && Time.frameCount - _lastReplanFrame >= ReplanEveryFrames) Replan();
             if (w.GridVersion == _seenGridVersion) return;
             _seenGridVersion = w.GridVersion;
-            var dirtyChunks = new HashSet<int>();
+            HashSet<int> dirtyChunks = _dirtyChunks;
+            dirtyChunks.Clear();
             bool breakables = false;
             byte[] cells = w.Map.Cells;
             for (int i = 0; i < cells.Length; i++)
@@ -93,14 +138,21 @@ namespace CriticalMass.Runtime.View.Dressing
                 breakables = true;
             }
             foreach (int c in dirtyChunks) BuildGroundChunk(c);
-            if (dirtyChunks.Count > 0) Replan();
+            if (dirtyChunks.Count > 0)
+            {
+                if (Time.frameCount - _lastReplanFrame >= ReplanEveryFrames) Replan();
+                else _replanPending = true;   // merged with the next digs into one re-plan
+            }
             if (breakables) SyncBreakables();
         }
 
         /// <summary>A dig or place changed land: plan again on the current grid and rebuild the groups that differ.</summary>
         private void Replan()
         {
-            WorldPlan next = WorldDresser.Plan(_map, BasesFile.Load(), _catalog.Centroid, _catalog.Body);
+            _replanPending = false;
+            _lastReplanFrame = Time.frameCount;
+            Replans++;
+            WorldPlan next = WorldDresser.Plan(_map, _bases, _catalog.Centroid, _catalog.Body);
             HashSet<int> changed = ChangedGroups(Plan, next);
             Plan = next;
             foreach (int g in changed) DestroyGroup(g);
@@ -246,10 +298,32 @@ namespace CriticalMass.Runtime.View.Dressing
         {
             Clear();
             if (_field != null) Destroy(_field);
+            _field = null;
         }
 
+        /// <summary>
+        /// DG-58: destroys everything this view created, not only the root object: every combined group and ground-chunk
+        /// mesh, every cloned material (team and hill clones) and the ground material (which pointed at the old field
+        /// texture), so play-again and world rebuilds never leak.
+        /// </summary>
         private void Clear()
         {
+            var groupKeys = new List<int>(_groups.Keys);
+            foreach (int g in groupKeys) DestroyGroup(g);
+            foreach (GameObject chunk in _groundChunks.Values)
+            {
+                if (chunk == null) continue;
+                MeshFilter mf = chunk.GetComponent<MeshFilter>();
+                if (mf != null && mf.sharedMesh != null) Destroy(mf.sharedMesh);
+            }
+            foreach (Material m in _mats.Values)
+                if (m != null) Destroy(m);
+            _mats.Clear();
+            _hillMats.Clear();
+            _sceneryMats.Clear();
+            if (_ground != null) Destroy(_ground);
+            _ground = null;
+            _replanPending = false;
             if (_root != null) Destroy(_root.gameObject);
             _root = null;
             _groundChunks.Clear();
@@ -276,7 +350,9 @@ namespace CriticalMass.Runtime.View.Dressing
             _cells = (byte[])_map.Cells.Clone();
             _catalog = WorldKitCatalog.Load();
             if (_catalog == null || _catalog.Names.Length == 0) return;
-            Plan = WorldDresser.Plan(_map, BasesFile.Load(), _catalog.Centroid, _catalog.Body);
+            _bases = BasesFile.Load();
+            BasesParses++;
+            Plan = WorldDresser.Plan(_map, _bases, _catalog.Centroid, _catalog.Body);
             _root = new GameObject("World Art").transform;
             _root.SetParent(transform, false);
             if (_field != null) Destroy(_field);
@@ -488,8 +564,11 @@ namespace CriticalMass.Runtime.View.Dressing
             go.AddComponent<MeshFilter>().sharedMesh = mesh;
             var r = go.AddComponent<MeshRenderer>();
             r.sharedMaterial = mat;
-            bool casts = Enum.TryParse(mat.name.StartsWith("World", StringComparison.Ordinal) ? mat.name.Substring(5).Split(' ')[0] : "", out WorldLook look) && WorldKit.CastsShadows(look);
+            bool casts = CastsShadows(mat) && RenderTier.Policy(RenderTier.Level).sceneryShadows;
             r.shadowCastingMode = casts ? ShadowCastingMode.On : ShadowCastingMode.Off;
+            if (mat != _ground && _sceneryMats.Add(mat) && !Application.isEditor)
+                mat.SetShaderPassEnabled("SRPDefaultUnlit", RenderTier.Policy(RenderTier.Level).sceneryOutline);
+            LastTriangles = Triangles + tri.Count / 3;
             Triangles += tri.Count / 3;
             Renderers++;
             return go;

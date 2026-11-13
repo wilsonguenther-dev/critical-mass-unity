@@ -1,0 +1,62 @@
+# DG-56: prove the Windows build runs and DRAWS. The player is built on the Mac (tools/unity-build-windows.sh, then
+# tools/package.sh --windows Builds/Windows) and uploaded as a release asset CriticalMass-windows.zip on a tag; this
+# job downloads it and runs:
+#   Pass A (logic): -batchmode -nographics autoplay match; the job's exit code is the player's (Start-Process -Wait).
+#   Pass B (graphics): a 1280x720 Direct3D 11 window on the runner's software renderer (WARP), 60 s+, screenshots at
+#   the title and mid-match; both must have mean brightness > 0.08 and > 1% of pixels off the most common colour.
+# Never builds Unity here (no licence on runners). Manual trigger only.
+name: windows-player
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Release tag holding CriticalMass-windows.zip"
+        required: true
+permissions:
+  contents: read
+jobs:
+  windows-player:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download the player
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "${{ inputs.release_tag }}" --pattern "CriticalMass-windows.zip" --dir player
+          Expand-Archive player\CriticalMass-windows.zip -DestinationPath player
+          Get-ChildItem -Recurse player -Filter CriticalMass.exe | Select-Object -First 1 | ForEach-Object { "PLAYER_DIR=$($_.DirectoryName)" | Out-File -Append $env:GITHUB_ENV }
+      - name: Pass A (logic, no graphics device)
+        shell: pwsh
+        run: |
+          cd $env:PLAYER_DIR
+          $p = Start-Process .\CriticalMass.exe -ArgumentList '-batchmode','-nographics','-autoplay','-quitAfterMatch','-autoplaySpeed','8','-dataDir',"$PWD\dataA",'-logFile',"$PWD\Player.log" -Wait -PassThru
+          Get-Content Player.log -Tail 40
+          $t = Get-Content Player.log -Raw
+          if ($t -notmatch '\[CM\.Autoplay\] MATCH END') { Write-Host 'no MATCH END'; exit 1 }
+          if (([regex]::Matches($t, '(?m)^\s*(?:[\w.]+\.)?\w*Exception\b')).Count -gt 0) { Write-Host 'exceptions in Player.log'; exit 1 }
+          exit $p.ExitCode
+      - name: Pass B (Direct3D 11 window, screenshots)
+        shell: pwsh
+        run: |
+          cd $env:PLAYER_DIR
+          $p = Start-Process .\CriticalMass.exe -ArgumentList '-force-d3d11','-screen-fullscreen','0','-screen-width','1280','-screen-height','720','-autoplay','-quitAfterMatch','-autoplaySpeed','4','-autoplayTimeout','1500','-shots','-dataDir',"$PWD\dataB",'-logFile',"$PWD\PlayerB.log" -Wait -PassThru
+          $t = Get-Content PlayerB.log -Raw
+          if ($t -notmatch 'Direct3D 11') { Write-Host 'no Direct3D 11 line'; exit 1 }
+          if ($t -match '(?i)shader.*error') { Write-Host 'shader errors'; exit 1 }
+          if ($t -notmatch '\[CM\.Autoplay\] MATCH END') { Write-Host 'no MATCH END'; exit 1 }
+          exit $p.ExitCode
+      - name: Screenshots draw something
+        shell: pwsh
+        run: |
+          pip install pillow --quiet
+          python tools/tests/check_screenshot.py "$env:PLAYER_DIR\dataB\shot-title.png" "$env:PLAYER_DIR\dataB\shot-mid.png"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-player-logs
+          path: |
+            ${{ env.PLAYER_DIR }}/*.log
+            ${{ env.PLAYER_DIR }}/dataB/*.png
+            ${{ env.PLAYER_DIR }}/dataB/perf*.json

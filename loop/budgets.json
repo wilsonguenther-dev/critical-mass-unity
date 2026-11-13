@@ -1,6 +1,0 @@
-{
-  "_note": "Shared limits the budgets gate REPORTS against. It never fails an item; a value over its limit flags the batch for the architect. frame_ms is the U-004 bar (60 fps at 16v16 in the Mac build). draw_calls and shader_variants have no decided number yet, so null means report only.",
-  "frame_ms": 16.7,
-  "draw_calls": null,
-  "shader_variants": null
-}

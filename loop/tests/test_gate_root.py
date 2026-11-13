@@ -54,8 +54,8 @@ def test_cli_default_is_the_invoking_worktree_not_the_main_checkout(tmp_path, mo
     main, wt = _repo_with_worktree(tmp_path)
     seen = {}
     monkeypatch.setattr(G, 'default_project', lambda: wt)
-    monkeypatch.setattr(G, 'g_budgets', lambda a: seen.setdefault('project', a.project) and 0)
-    G.main(['budgets'])
+    monkeypatch.setattr(G, 'g_perf', lambda a: seen.setdefault('project', a.project) and 0)
+    G.main(['perf'])
     assert seen['project'] == str(wt)
     assert seen['project'] != str(main)
 

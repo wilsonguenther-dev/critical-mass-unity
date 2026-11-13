@@ -576,6 +576,7 @@ namespace CriticalMass.Runtime.Hud
             {
                 _countedMatch = true;
                 PlayerPrefs.SetInt(MatchesPlayedKey, PlayerPrefs.GetInt(MatchesPlayedKey, 0) + 1);
+                if (!CriticalMass.Runtime.Game.GamePaths.IsolatedRun) PlayerPrefs.Save();   // DG-53: once per match; never in a -dataDir run
             }
         }
 
@@ -793,7 +794,11 @@ namespace CriticalMass.Runtime.Hud
             // events: damage numbers (local player's hits only) and the last-hit time for overhead hearts
             if (_lastHit.Length < w.ActorCount) _lastHit = new double[w.ActorCount];
             if (_eventCursor < 0 || _eventCursor > w.EventHead) _eventCursor = w.EventHead;
-            if (w.EventHead - _eventCursor > World.EventCapacity) _eventCursor = w.EventHead - World.EventCapacity;
+            if (w.EventHead - _eventCursor > World.EventCapacity)
+            {
+                CriticalMass.Runtime.Game.RuntimeCounters.HudEventsDropped += w.EventHead - World.EventCapacity - _eventCursor;   // DG-60
+                _eventCursor = w.EventHead - World.EventCapacity;
+            }
             for (; _eventCursor < w.EventHead; _eventCursor++)
             {
                 SimEvent e = w.Events[_eventCursor % World.EventCapacity];
