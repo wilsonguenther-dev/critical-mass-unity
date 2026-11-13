@@ -521,5 +521,57 @@ namespace CriticalMass.Sim.Tests
         {
             Assert.AreEqual(MatchHash.Run(5, 16, 1800, ClassId.Farmer), MatchHash.Run(5, 16, 1800, ClassId.Farmer));
         }
+        // ------------------------------------------------------------------ DG-83 walls block hits
+
+        private static int SwingsAcrossCell(byte cellType)
+        {
+            World w = Make(c => c.Physics.Knockback = false);
+            Assert.IsTrue(FindWallFace(w, out int cx, out int cz));
+            MapDef m = w.Map;
+            // A one-cell wall at (cx - 2, cz) with walkable ground both sides (the face's west cells are walkable).
+            int wx = cx - 2;
+            MapGrid.SetCell(w, wx, cz, cellType);
+            ParkOthers(w, 0, 5);
+            Place(w, 0, wx - 0.475, cz + 0.5);
+            Place(w, 5, wx + 1.475, cz + 0.5);
+            Assert.AreEqual(1.95, w.X[5] - w.X[0], 1e-4);
+            double hp0 = w.Actors[5].Hp;
+            for (int k = 0; k < 300; k++)
+            {
+                Idle(w);
+                Place(w, 0, wx - 0.475, cz + 0.5);
+                Place(w, 5, wx + 1.475, cz + 0.5);
+                Input(w, 0, w.X[5], w.Z[5], true);
+                SimStep.Step(w);
+                if (!w.Actors[5].Alive) break;
+            }
+            return (int)Math.Round(hp0 - w.Actors[5].Hp);
+        }
+
+        [Test]
+        public void DG83TwoEnemies195ApartAcrossAOneCellWall300TicksOfSwingsNoDamage()
+        {
+            Assert.AreEqual(0, SwingsAcrossCell(Cell.Wall));
+            Assert.AreEqual(0, SwingsAcrossCell(Cell.BreakableIntact));
+        }
+
+        [Test]
+        public void DG83TheSamePairWithFloorBetweenTakesDamage()
+        {
+            Assert.Greater(SwingsAcrossCell(Cell.Floor), 0);
+        }
+
+        [Test]
+        public void DG83SegmentClearBlocksOnWallsAndPassesVoidAndWater()
+        {
+            World w = Make();
+            Assert.IsTrue(FindWallFace(w, out int cx, out int cz));
+            Assert.IsFalse(SegmentClear.Clear(w.Map, cx - 1.5, cz + 0.5, cx + 0.5, cz + 0.5));
+            Assert.IsTrue(SegmentClear.Clear(w.Map, cx - 1.5, cz + 0.5, cx + 0.5, cz + 0.5, cx, cz), "the target cell is skipped");
+            MapGrid.SetCell(w, cx - 2, cz, Cell.Water);
+            Assert.IsTrue(SegmentClear.Clear(w.Map, cx - 2.5, cz + 0.5, cx - 1.5, cz + 0.5));
+            Assert.IsTrue(SegmentClear.Blocks(Cell.Barricade));
+            Assert.IsFalse(SegmentClear.Blocks(Cell.Void));
+        }
     }
 }

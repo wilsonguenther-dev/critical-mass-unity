@@ -162,6 +162,8 @@ namespace CriticalMass.Sim.Core
                     double d2 = dx * dx + dz * dz;
                     if (d2 > r2) continue;
                     if (d2 > 1e-12 && (dx * fx + dz * fz) / Math.Sqrt(d2) < WallBreakCos - AngleEps) continue;
+                    // DG-83: a pick cannot break a wall behind another wall.
+                    if (Phys.On(w, w.Config.Physics.WallsBlockHits) && !SegmentClear.Clear(map, ax, az, cx + 0.5, cz + 0.5, cx, cz)) continue;
                     // A breakable painted without hit points (e.g. by a test or a gate helper) gets the ones its state implies.
                     double hp = map.WallHp[i];
                     if (hp == 0) hp = t == Cell.BreakableIntact ? 2 * hps : hps;

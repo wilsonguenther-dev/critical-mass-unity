@@ -138,6 +138,7 @@ namespace CriticalMass.Sim.Core
             double fz = JsMath.Sin(facing);
             double cosHalf = JsMath.Cos(cc.AttackArcDeg / 2 * Math.PI / 180);
             int hits = 0;
+            bool walls = Phys.On(w, cfg.Physics.WallsBlockHits); // DG-83: no hits through walls or barricades
             int count = SpatialHash.QueryCircle(w.Hash, ax, az, cc.AttackRange + maxTargetRadius, candidates);
             for (int k = 0; k < count; k++)
             {
@@ -157,6 +158,7 @@ namespace CriticalMass.Sim.Core
                     double dot = (dx * fx + dz * fz) / Math.Sqrt(d2);
                     if (dot < cosHalf - 1e-9) continue;
                 }
+                if (walls && !SegmentClear.Clear(w.Map, ax, az, w.X[j], w.Z[j])) continue;
                 hits++;
                 if (fair) w.Hits.Add(j, i, cc.AttackDamage, ax, az);
                 else Damage.ApplyMelee(w, j, cc.AttackDamage, i, ax, az);
@@ -175,7 +177,8 @@ namespace CriticalMass.Sim.Core
                 double dz = kj.Z - az;
                 double reach = cc.AttackRange + cfg.Kaiju.Radius;
                 double d2 = dx * dx + dz * dz;
-                if (d2 <= reach * reach && (d2 <= 1e-12 || (dx * fx + dz * fz) / Math.Sqrt(d2) >= cosHalf - 1e-9))
+                if (d2 <= reach * reach && (d2 <= 1e-12 || (dx * fx + dz * fz) / Math.Sqrt(d2) >= cosHalf - 1e-9)
+                    && (!walls || SegmentClear.Clear(w.Map, ax, az, kj.X, kj.Z)))
                 {
                     Kaiju.DamageKaiju(w, i, cc.AttackDamage);
                 }
