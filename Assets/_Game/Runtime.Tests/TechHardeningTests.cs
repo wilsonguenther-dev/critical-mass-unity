@@ -133,7 +133,7 @@ namespace CriticalMass.Runtime.Tests
         public void ThreeDifferentPipelineAssetsAcrossTheLevelsAndLowIsCheap()
         {
             string q = File.ReadAllText(Path.Combine(ProjectRoot, "ProjectSettings", "QualitySettings.asset"));
-            var guids = Regex.Matches(q, @"customRenderPipeline: \{fileID: \d+, guid: (\w+)").Cast<Match>().Select(m => m.Groups[1].Value).Distinct().ToArray();
+            var guids = Regex.Matches(q, @"customRenderPipeline: \{fileID: \d+, guid: (\w+)").Cast<System.Text.RegularExpressions.Match>().Select(m => m.Groups[1].Value).Distinct().ToArray();
             Assert.GreaterOrEqual(guids.Length, 3, "run ProjectSetup.Apply: Low, Medium and High assets");
             string low = File.ReadAllText(Path.Combine(Application.dataPath, "_Game", "Settings", "CriticalMass_URP_Low.asset"));
             StringAssert.Contains("m_SupportsHDR: 0", low);

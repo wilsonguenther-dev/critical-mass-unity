@@ -172,7 +172,7 @@ namespace CriticalMass.Runtime.Tests
             {
                 ArtMapping.ClassClipSet s = ArtMapping.ClassClips(c);
                 Assert.AreNotEqual(s.Attack, s.Ability, c + ": the ability must not replay the attack");
-                Assert.AreNotEqual(ArtMapping.Attack, s.Ability, c);
+                Assert.AreNotEqual(ArtMapping.Attack, s.Ability, c.ToString());
             }
         }
 

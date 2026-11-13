@@ -25,7 +25,7 @@ namespace CriticalMass.Runtime.View.Anim
         public static void BeginFrame()
         {
             _frame = Time.frameCount;
-            Camera cam = Camera.main;
+            UnityEngine.Camera cam = UnityEngine.Camera.main;
             _hasFocus = false;
             if (cam == null) return;
             Transform t = cam.transform;
