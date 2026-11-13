@@ -196,5 +196,39 @@ namespace CriticalMass.Runtime.Tests
             StringAssert.Contains("CMTodRim(", s);
             StringAssert.DoesNotContain("ShadowCaster", s, "the void never shadows the play island");
         }
+
+        [Test]
+        public void TheGroundCameraNeverLooksAtAnEmptyHorizon()
+        {
+            // The ground camera (PR #92: 1.3 u pivot, 3 u behind, FOV 55 vertical = about 85 degrees across at 16:9, any yaw,
+            // far clip 600) must find land on the horizon in every direction, inside its far clip, at every tier.
+            var mid = new Vector3(MapW * 0.5f, 0f, -MapH * 0.5f);
+            foreach (int q in Levels)
+            {
+                Build(q, out List<BeyondFeature> f);
+                var angles = new List<float>();
+                foreach (BeyondFeature x in f)
+                {
+                    if (x.Name != "horizon islet") continue;
+                    Vector3 d = x.Centre - mid;
+                    Assert.Less(new Vector2(d.x, d.z).magnitude + x.Radius, 450f, "inside the ground camera's far clip from anywhere on the map");
+                    Assert.Less(x.Centre.y, -7f, "sits on the cloud sea, below every island top");
+                    angles.Add(Mathf.Atan2(d.z, d.x) * Mathf.Rad2Deg);
+                }
+                Assert.GreaterOrEqual(angles.Count, 6, $"horizon ring on level {q}");
+                angles.Sort();
+                float gap = 360f - (angles[angles.Count - 1] - angles[0]);
+                for (int k = 1; k < angles.Count; k++) gap = Mathf.Max(gap, angles[k] - angles[k - 1]);
+                Assert.Less(gap, 85f, $"the widest empty arc of horizon on level {q} is narrower than the ground camera's view");
+            }
+        }
+
+        [Test]
+        public void DistanceHazeLeavesTheTopDownCameraAlone()
+        {
+            string s = File.ReadAllText(Path.Combine(Application.dataPath, "_Game/Runtime/View/Atmosphere/Resources/CMWorldBeyond.shader"));
+            StringAssert.Contains("_DistStart (\"Distance Haze Start (u)\", Float) = 45", s, "gameplay-camera distances (under about 40 u) get no distance haze");
+            StringAssert.Contains("distance(positionWS, _WorldSpaceCameraPos)", s);
+        }
     }
 }

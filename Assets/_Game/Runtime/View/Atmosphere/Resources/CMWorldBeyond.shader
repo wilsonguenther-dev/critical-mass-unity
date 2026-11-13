@@ -20,6 +20,9 @@ Shader "CM/WorldBeyond"
         _FogAmount ("Height Fog Amount", Range(0, 1)) = 0.78
         _BandFade ("Band Fade (at band 1)", Range(0, 1)) = 0.62
         _NearFade ("Haze on the near band", Range(0, 1)) = 0.14
+        _DistStart ("Distance Haze Start (u)", Float) = 45
+        _DistRange ("Distance Haze Range (u)", Float) = 170
+        _DistFade ("Distance Haze Amount", Range(0, 1)) = 0.72
         _TeamTint ("Team Light Strength", Range(0, 1)) = 0.22
         _OutlinePx ("Outline Width (px at 1080p)", Range(0, 4)) = 1.0
         _OutlineColor ("Outline Colour (Void Navy)", Color) = (0.094118, 0.137255, 0.231373, 1)
@@ -44,6 +47,9 @@ Shader "CM/WorldBeyond"
             half _FogAmount;
             half _BandFade;
             half _NearFade;
+            float _DistStart;
+            float _DistRange;
+            half _DistFade;
             half _TeamTint;
             float _OutlinePx;
             half4 _OutlineColor;
@@ -83,12 +89,17 @@ Shader "CM/WorldBeyond"
         }
 
         // How much of the void colour replaces the surface: height fog plus the depth band.
-        half BeyondFog(float y, half band, half glow)
+        half BeyondFog(float3 positionWS, half band, half glow)
         {
+            float y = positionWS.y;
             half bandFade = _BandFade * (_CMBeyondTune.x > 0.0 ? (half)_CMBeyondTune.x : 1.0h);
             half f = _FogAmount * saturate((_FogTop - y) / max(1e-3, _FogTop - _FogBottom));
             f = 1.0h - (1.0h - f) * (1.0h - saturate(band * bandFade + _NearFade));   // pass 2: even the near band sits in a little air
             // Glows pierce the haze at night (they are lights).
+            // Distance haze for the low ground camera (it looks along the horizon, where height fog alone is thin). Zero at
+            // gameplay-camera distances (under 45 u), so the top-down look is unchanged; the far rings melt into the sky.
+            half dist = (half)saturate((distance(positionWS, _WorldSpaceCameraPos) - _DistStart) / max(1.0, _DistRange));
+            f = 1.0h - (1.0h - f) * (1.0h - dist * _DistFade);
             f *= 1.0h - glow * saturate((half)_CMAmbient.w) * 0.65h;
             return min(f, 0.94h);
         }
@@ -168,7 +179,7 @@ Shader "CM/WorldBeyond"
                     // Glows: self-lit, unshaded (bible), at full strength from dusk on.
                     col = lerp(col, albedo * (1.0h + 0.25h * saturate((half)_CMAmbient.w)), glow);
                 }
-                half f = BeyondFog(i.positionWS.y, band, glow);
+                half f = BeyondFog(i.positionWS, band, glow);
                 if (f > 0.0h) col = lerp(col, CMTodFogColor(_FogColor.rgb, i.positionWS, min(f, 0.9h)), f);
                 return half4(col, 1.0);
             }
@@ -221,7 +232,7 @@ Shader "CM/WorldBeyond"
 
             half4 Frag(V i) : SV_Target
             {
-                half f = BeyondFog(i.positionWS.y, (half)i.band, 0.0h);
+                half f = BeyondFog(i.positionWS, (half)i.band, 0.0h);
                 half3 fog = CMTodFogColor(_FogColor.rgb, i.positionWS, 0.0h);
                 return half4(lerp(_OutlineColor.rgb, fog, saturate(0.6h + f * 0.4h)), 1.0);   // pass 2: softer ink, the arena keeps the strongest line
             }

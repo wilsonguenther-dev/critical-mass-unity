@@ -20,18 +20,22 @@ namespace CriticalMass.Runtime.View.Atmosphere
         public readonly int RootsPerIslet, RimRootPercent;
         /// <summary>The far homeland massifs (only wide cameras see them), trees and underside crystals on the islets, the ink pass.</summary>
         public readonly bool Massifs, Trees, UnderCrystals, Ink;
+        /// <summary>Horizon silhouettes all the way round, 70 to 150 u out on the cloud sea, so the low ground camera never
+        /// looks at an empty horizon (the gameplay camera never sees them).</summary>
+        public readonly int Horizon;
 
-        public WorldBeyondBudget(int segments, int nearIslets, int farIslets, int rootsPerIslet, int rimRootPercent, bool massifs, bool trees, bool underCrystals, bool ink)
+        public WorldBeyondBudget(int segments, int nearIslets, int farIslets, int rootsPerIslet, int rimRootPercent, bool massifs, bool trees, bool underCrystals, bool ink, int horizon = 0)
         {
+            Horizon = horizon;
             Segments = segments; NearIslets = nearIslets; FarIslets = farIslets; RootsPerIslet = rootsPerIslet; RimRootPercent = rimRootPercent;
             Massifs = massifs; Trees = trees; UnderCrystals = underCrystals; Ink = ink;
         }
 
         public static WorldBeyondBudget For(int level)
         {
-            if (level <= FramePolicy.LevelLow) return new WorldBeyondBudget(6, 0, 0, 0, 0, false, false, false, false);
-            if (level == FramePolicy.LevelMedium) return new WorldBeyondBudget(8, 6, 8, 2, 18, false, true, false, true);
-            return new WorldBeyondBudget(10, 10, 18, 4, 40, true, true, true, true);
+            if (level <= FramePolicy.LevelLow) return new WorldBeyondBudget(6, 0, 0, 0, 0, false, false, false, false, 6);
+            if (level == FramePolicy.LevelMedium) return new WorldBeyondBudget(8, 6, 8, 2, 18, false, true, false, true, 10);
+            return new WorldBeyondBudget(10, 10, 18, 4, 40, true, true, true, true, 16);
         }
 
         /// <summary>Draw calls: the fill, plus the ink line when on.</summary>
@@ -617,6 +621,26 @@ namespace CriticalMass.Runtime.View.Atmosphere
                     f.Add(new BeyondFeature { Name = "crimson massif", Centre = c, Radius = r, Band = 2 });
                 }
                 m.Team = 0f;
+            }
+
+            // ---------------- the horizon ring (band 1): low flat silhouettes on the cloud sea all the way round ----------------
+            // For the ground camera (1.3 u pivot, 3 u behind a fighter, any yaw, 600 u far clip): wherever it looks, the horizon
+            // has land on it, deep in the haze (the shader's distance fade) so nothing reads sharp or pops. Own seed, so the
+            // rest of the layout is unchanged.
+            if (b.Horizon > 0)
+            {
+                m.Band = 1.0f;
+                uint hs = Seed ^ 0x5EA5u;
+                var mid = new Vector3(W * 0.5f, 0f, -H * 0.5f);
+                for (int k = 0; k < b.Horizon; k++)
+                {
+                    float a = (k + 0.35f + 0.3f * R(ref hs)) / b.Horizon * Mathf.PI * 2f;
+                    float d = 70f + 80f * R(ref hs);
+                    float r = 7f + 9f * R(ref hs);
+                    var c = mid + new Vector3(Mathf.Cos(a) * d * 1.15f, -8.2f - 1.6f * R(ref hs), Mathf.Sin(a) * d);
+                    m.Islet(c, r, r * 0.7f, 6, 500u + (uint)k, 0, false, null, 0.55f + 0.3f * R(ref hs));
+                    f.Add(new BeyondFeature { Name = "horizon islet", Centre = c, Radius = r, Band = 2 });
+                }
             }
 
             // ---------------- the play island's own underside: roots hanging off the rim (band 3) ----------------
