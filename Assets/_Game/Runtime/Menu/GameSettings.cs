@@ -30,12 +30,16 @@ namespace CriticalMass.Runtime.Menu
         public const string FpsCapKey = "cm.fpsCap";
         /// <summary>Lower the frame rate while the game is not the front window: 1 on (default), 0 off.</summary>
         public const string BgThrottleKey = "cm.bgThrottle";
+        /// <summary>Easy movement: lane assist and corner sliding, 1 on (default), 0 off.</summary>
+        public const string MoveAssistKey = "cm.moveAssist";
+        /// <summary>Easy movement: direction keys follow the map's grid instead of the screen, 1 on, 0 off (default).</summary>
+        public const string KeysFollowMapKey = "cm.keysFollowMap";
 
         /// <summary>Every key this class writes (tests back these up and restore them).</summary>
         public static readonly string[] AllKeys =
         {
             MasterKey, MusicKey, EffectsKey, WidthKey, HeightKey, FullScreenKey, VSyncKey, QualityKey, ShakeKey,
-            DamageNumbersKey, BloodKey, FpsCapKey, BgThrottleKey,
+            DamageNumbersKey, BloodKey, FpsCapKey, BgThrottleKey, MoveAssistKey, KeysFollowMapKey,
         };
 
         public const string MixerResource = "Audio/CMMixer";
@@ -60,6 +64,16 @@ namespace CriticalMass.Runtime.Menu
         public static bool DamageNumbers { get => GetB(DamageNumbersKey, true); set => SetB(DamageNumbersKey, value); }
         /// <summary>Blood effects on (PlayerPrefs cm.blood, default on).</summary>
         public static bool Blood { get => GetB(BloodKey, true); set => SetB(BloodKey, value); }
+        /// <summary>
+        /// "Movement assist" (cm.moveAssist, default on): one direction key follows a bridge it points along (within 50
+        /// degrees) and a blocked move slides along corners and rails (Input.MoveAssist).
+        /// </summary>
+        public static bool MovementAssist { get => GetB(MoveAssistKey, true); set => SetB(MoveAssistKey, value); }
+        /// <summary>
+        /// "Keys follow the map" (cm.keysFollowMap, default off): W, A, S and D move along the map's grid axes instead
+        /// of screen up, left, down and right. The controller stick stays screen-relative.
+        /// </summary>
+        public static bool KeysFollowMap { get => GetB(KeysFollowMapKey, false); set => SetB(KeysFollowMapKey, value); }
 
         // ---- video ----
         /// <summary>The frame-rate limit choices in screen order; 0 = the display's refresh rate.</summary>

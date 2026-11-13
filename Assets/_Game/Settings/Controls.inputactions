@@ -88,6 +88,15 @@
                     "initialStateCheck": false
                 },
                 {
+                    "name": "MoveToPointer",
+                    "type": "Button",
+                    "id": "6b1e6f0a-3c52-4d8e-9a57-2f4c8e1d7b90",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
                     "name": "Pause",
                     "type": "Button",
                     "id": "fae31022-4c41-48ac-bfc2-e27957d38a21",
@@ -327,6 +336,28 @@
                     "processors": "",
                     "groups": "KeyboardMouse",
                     "action": "Ability",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "0d93c4a7-8e21-4f6b-b5d2-71a9e3c64f18",
+                    "path": "<Mouse>/backButton",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "KeyboardMouse",
+                    "action": "MoveToPointer",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "5b7e2c19-3a4d-4c8e-9f61-2d0b8a7c41e6",
+                    "path": "<Keyboard>/leftShift",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "KeyboardMouse",
+                    "action": "MoveToPointer",
                     "isComposite": false,
                     "isPartOfComposite": false
                 },

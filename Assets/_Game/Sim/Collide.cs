@@ -276,6 +276,31 @@ namespace CriticalMass.Sim.Core
             return true;
         }
 
+        /// <summary>
+        /// Easy movement (2026-11-12): the last answer to a blocked sub-step (sx, sz) heading along span s (RailFirst's along
+        /// test) from (x, z): the centre moves toward the axis by at most RailPullShare of the step's length and keeps as
+        /// much of the along part as the rest of the length allows. False for a step across the axis or a centre on the
+        /// axis. Reached only where every earlier rule left the person-steered actor standing still (human-only path, so
+        /// bot-only matches stay bit-identical).
+        /// </summary>
+        private static bool InwardTarget(BridgeSpan s, double x, double z, double sx, double sz, out double ox, out double oz)
+        {
+            ox = x;
+            oz = z;
+            double len = BridgeSpans.Hypot(sx, sz);
+            double aStep = sx * s.Ux + sz * s.Uz;
+            if (len == 0 || Math.Abs(aStep) < RailAlongFraction * len) return false;
+            double l0 = BridgeSpans.Lateral(s, x, z);
+            if (l0 == 0) return false;
+            double pull = Math.Min(Math.Abs(l0), RailPullShare * len);
+            double dl = l0 > 0 ? -pull : pull;
+            double room = Math.Sqrt(Math.Max(0, len * len - pull * pull));
+            double da = aStep > room ? room : aStep < -room ? -room : aStep;
+            ox = JsMath.F32(x + s.Ux * da - s.Uz * dl);
+            oz = JsMath.F32(z + s.Uz * da + s.Ux * dl);
+            return true;
+        }
+
         /// <summary>Move actor id by (dx, dz) against the grid, sliding along walls. Does not touch other actors.</summary>
         public static void MoveActor(World w, int id, double dx, double dz, bool air = false)
         {
@@ -386,6 +411,15 @@ namespace CriticalMass.Sim.Core
                     continue;
                 }
                 if (RailTarget(rs, px, pz, sx, sz, r, false, out rx, out rz) && ActorFits(w, rx, rz, r))
+                {
+                    px = rx;
+                    pz = rz;
+                    continue;
+                }
+                // Easy movement (2026-11-12, the owner's "diagonal bridge corner"): at a mouth the deck's round end meets the
+                // island's staircase, so a body on the band edge whose step heads along the span fits neither the band-clamped
+                // rail target nor the box. Pull it toward the axis while keeping the along part; it walks off the corner.
+                if (InwardTarget(rs, px, pz, sx, sz, out rx, out rz) && ActorFits(w, rx, rz, r))
                 {
                     px = rx;
                     pz = rz;

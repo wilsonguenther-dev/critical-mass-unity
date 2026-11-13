@@ -867,9 +867,11 @@ namespace CriticalMass.Runtime.Menu
 
         // ---- Controls tab ----
 
-        const float RowH = 40f, RowGap = 4f, LabelW = 330f, CellW = 210f, CellGap = 14f;
+        // Easy movement: rows 36 + 3 (were 40 + 4) so the Walk to pointer row and the two movement toggles fit above Reset.
+        // Integration batch 2: the two toggles sit on Reset's line (420 px each, left of it), which leaves the list its height.
+        const float RowH = 36f, RowGap = 3f, LabelW = 330f, CellW = 210f, CellGap = 14f, ToggleH = 46f, ToggleW = 420f;
 
-        // Integration batch 2: 18 rows (Map, Ping, HUD cursor and Minimap zoom joined) at 30 + 3 px take the room 14 rows
+        // Integration batch 2: 19 rows (Walk to pointer, Map, Ping, HUD cursor and Minimap zoom joined) at 30 + 3 px take the room 14 rows
         // took at 40 + 4 px, so the list still ends above the status line.
         const float CtlRowH = 30f, CtlRowGap = 3f;
 
@@ -924,6 +926,18 @@ namespace CriticalMass.Runtime.Menu
                 ControlBindings.ResetAll(InputSystem.actions);
                 SetStatus("Every control is back to its default.", false);
             };
+
+            // Easy movement toggles (GameSettings, kept between launches; HumanInputSource applies them at once).
+            y = PanelY + PanelH - 78f + 5f;
+            MenuItem assist = MoveToggle(tab, "Movement Assist", ContentX, y, () => GameSettings.MovementAssist,
+                v => GameSettings.MovementAssist = v, "MOVEMENT ASSIST",
+                "Movement assist on: one key follows a bridge it points along, and you slide past corners.",
+                "Movement assist off: you move exactly where the keys point.");
+            MenuItem keys = MoveToggle(tab, "Keys Follow Map", ContentX + ToggleW + 20f, y, () => GameSettings.KeysFollowMap,
+                v => GameSettings.KeysFollowMap = v, "KEYS FOLLOW THE MAP",
+                "Keys follow the map: W, A, S and D move along the map's grid instead of the screen.",
+                "Keys follow the screen: W moves up the screen.");
+
             WireGrid(grid, reset);
             MenuItem firstCell = grid.Count > 0 ? (grid[0][0] ?? grid[0][2]) : reset;
             view.navigation = new Navigation { mode = Navigation.Mode.Explicit, selectOnUp = _tabButtons[0], selectOnDown = firstCell };
@@ -934,8 +948,55 @@ namespace CriticalMass.Runtime.Menu
                 n.selectOnUp = view;
                 grid[0][c].navigation = n;
             }
+            // The grid's bottom edge now leads to the toggles, the toggles to Reset.
+            MenuItem lastLeft = null, lastRight = null;
+            for (int r = grid.Count - 1; r >= 0 && (lastLeft == null || lastRight == null); r--)
+            {
+                if (lastLeft == null) lastLeft = grid[r][0] ?? grid[r][1];
+                if (lastRight == null) lastRight = grid[r][2] ?? grid[r][3];
+            }
+            for (int r = 0; r < grid.Count; r++)
+            {
+                for (int c = 0; c < 4; c++)
+                {
+                    MenuItem it = grid[r][c];
+                    if (it == null || it.navigation.selectOnDown != reset) continue;
+                    Navigation n = it.navigation;
+                    n.selectOnDown = c < 2 ? assist : keys;
+                    it.navigation = n;
+                }
+            }
+            assist.navigation = new Navigation
+            {
+                mode = Navigation.Mode.Explicit, selectOnUp = lastLeft ?? (Selectable)_tabButtons[0], selectOnDown = reset, selectOnRight = keys,
+            };
+            keys.navigation = new Navigation
+            {
+                mode = Navigation.Mode.Explicit, selectOnUp = lastRight ?? lastLeft ?? (Selectable)_tabButtons[0], selectOnDown = reset,
+                selectOnLeft = assist,
+            };
+            Navigation rn = reset.navigation;
+            rn.selectOnUp = keys;
+            reset.navigation = rn;
             _refreshers.Add(RefreshCells);
             return tab.gameObject;
+        }
+
+        /// <summary>An ON/OFF button for a movement setting: submit flips it, the label shows the state.</summary>
+        MenuItem MoveToggle(RectTransform tab, string name, float x, float y, Func<bool> get, Action<bool> set, string label,
+            string onStatus, string offStatus)
+        {
+            MenuItem it = MenuUi.Item(tab, name, x, y, ToggleW, ToggleH, label, MenuItem.Kind.Button, 19, true, CMTokens.Display);
+            Action refresh = () => HudText.Set(it.Label, label + (get() ? "   ON" : "   OFF"));
+            it.Submitted = () =>
+            {
+                set(!get());
+                refresh();
+                SetStatus(get() ? onStatus : offStatus, false);
+            };
+            _refreshers.Add(refresh);
+            refresh();
+            return it;
         }
 
         /// <summary>Explicit grid navigation: up/down within a column (skipping gaps), left/right within a row.</summary>
