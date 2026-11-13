@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -8,13 +9,24 @@ namespace CriticalMass.Runtime.View.Effects
     /// Every effect of a layer lands in one mesh, so a layer is one draw call. Shapes are flat toon shapes in vertex
     /// colour: a navy outline copy first, then the fill and its tone steps on top (draw order = index order).
     /// When the vertex budget is full further shapes are dropped (the pools cap first; this is the last guard).
+    /// GPU side: the vertex and index buffers are sized ONCE to the budget in the constructor and only their contents and
+    /// the sub-mesh index count change per frame (SetVertexBufferData / SetIndexBufferData / SetSubMesh), so a hit or a
+    /// frame never creates, grows or frees a GPU buffer.
     /// </summary>
     public sealed class FxMeshBuilder
     {
         public readonly int MaxVerts;
         public readonly int MaxIndices;
-        private readonly Vector3[] _pos;
-        private readonly Color32[] _col;
+        [StructLayout(LayoutKind.Sequential)]
+        private struct Vert
+        {
+            public Vector3 Pos;
+            public Color32 Col;
+        }
+
+        private const MeshUpdateFlags Quiet = MeshUpdateFlags.DontValidateIndices | MeshUpdateFlags.DontRecalculateBounds |
+                                              MeshUpdateFlags.DontResetBoneBounds | MeshUpdateFlags.DontNotifyMeshUsers;
+        private readonly Vert[] _v;
         private readonly int[] _idx;
         public int VertCount { get; private set; }
         public int IndexCount { get; private set; }
@@ -26,11 +38,19 @@ namespace CriticalMass.Runtime.View.Effects
         {
             MaxVerts = maxVerts;
             MaxIndices = maxIndices;
-            _pos = new Vector3[maxVerts];
-            _col = new Color32[maxVerts];
+            _v = new Vert[maxVerts];
             _idx = new int[maxIndices];
-            Mesh = new Mesh { name = name, indexFormat = maxVerts > 65000 ? IndexFormat.UInt32 : IndexFormat.UInt16 };
+            Mesh = new Mesh { name = name };
             Mesh.MarkDynamic();
+            Mesh.SetVertexBufferParams(maxVerts,
+                new VertexAttributeDescriptor(VertexAttribute.Position, VertexAttributeFormat.Float32, 3),
+                new VertexAttributeDescriptor(VertexAttribute.Color, VertexAttributeFormat.UNorm8, 4));
+            Mesh.SetIndexBufferParams(maxIndices, IndexFormat.UInt32);
+            Mesh.SetVertexBufferData(_v, 0, 0, maxVerts, 0, Quiet);
+            Mesh.SetIndexBufferData(_idx, 0, 0, maxIndices, Quiet);
+            Mesh.subMeshCount = 1;
+            Mesh.SetSubMesh(0, new SubMeshDescriptor(0, 0, MeshTopology.Triangles), Quiet);
+            Mesh.bounds = new Bounds(Vector3.zero, new Vector3(10000f, 10000f, 10000f));
         }
 
         public void Clear()
@@ -49,8 +69,8 @@ namespace CriticalMass.Runtime.View.Effects
 
         public int V(Vector3 p, Color32 c)
         {
-            _pos[VertCount] = p;
-            _col[VertCount] = c;
+            _v[VertCount].Pos = p;
+            _v[VertCount].Col = c;
             return VertCount++;
         }
 
@@ -61,14 +81,15 @@ namespace CriticalMass.Runtime.View.Effects
             _idx[IndexCount++] = c;
         }
 
-        /// <summary>Writes the arrays into the mesh (non-allocating overloads) with huge bounds (effects are never culled per shape).</summary>
+        /// <summary>
+        /// Copies this frame's vertices and indices into the fixed GPU buffers and draws only IndexCount indices
+        /// (huge bounds: effects are never culled per shape). No buffer is (re)allocated.
+        /// </summary>
         public void Upload()
         {
-            Mesh.Clear(true);
-            Mesh.SetVertices(_pos, 0, VertCount);
-            Mesh.SetColors(_col, 0, VertCount);
-            Mesh.SetIndices(_idx, 0, IndexCount, MeshTopology.Triangles, 0, false);
-            Mesh.bounds = new Bounds(Vector3.zero, new Vector3(10000f, 10000f, 10000f));
+            if (VertCount > 0) Mesh.SetVertexBufferData(_v, 0, 0, VertCount, 0, Quiet);
+            if (IndexCount > 0) Mesh.SetIndexBufferData(_idx, 0, 0, IndexCount, Quiet);
+            Mesh.SetSubMesh(0, new SubMeshDescriptor(0, IndexCount, MeshTopology.Triangles), Quiet);
         }
 
         // ---- shapes (all flat; "right" and "up" span the shape's plane) ----

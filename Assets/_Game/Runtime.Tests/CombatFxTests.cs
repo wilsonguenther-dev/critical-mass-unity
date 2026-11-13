@@ -6,6 +6,9 @@ using CriticalMass.Sim.Core;
 using CriticalMass.Sim.Grid;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.TestTools.Constraints;
+using Is = NUnit.Framework.Is;
+using UIs = UnityEngine.TestTools.Constraints.Is;
 
 namespace CriticalMass.Runtime.Tests
 {
@@ -126,7 +129,7 @@ namespace CriticalMass.Runtime.Tests
                 for (int t = 0; t < 900; t++)
                 {
                     MatchTick.Advance(w, null, f);
-                    Assert.That(frame, UnityEngine.TestTools.Constraints.Is.Not.AllocatingGCMemory(), $"effects allocated at tick {w.Tick}");
+                    Assert.That(frame, UIs.Not.AllocatingGCMemory(), $"effects allocated at tick {w.Tick}");
                 }
                 Assert.Greater(rig.Feed.Decoded - decoded, 100, "events flowed during the measured window");
             }
@@ -152,16 +155,28 @@ namespace CriticalMass.Runtime.Tests
                     if (e.Kind == FxKind.KaijuSlam) e.Value = cfg.Kaiju.SlamRadius;
                     rig.Scene.OnFx(ref e, w);
                 }
+                int[] ids = { rig.G.Mesh.GetInstanceID(), rig.A.Mesh.GetInstanceID(), rig.S.Mesh.GetInstanceID() };
+                int worstVerts = 0, worstActive = 0;
                 for (int step = 0; step <= 60; step++)
                 {
                     double now = 10 / cfg.SimHz + step * 0.05;
                     rig.Scene.Advance(now);
                     rig.Scene.Build(now, w, Vector3.right, Vector3.up, rig.G, rig.A, rig.S);
+                    rig.G.Upload(); rig.A.Upload(); rig.S.Upload();
+                    // GPU buffers are fixed: same meshes, same buffer sizes, only the drawn index count changes.
+                    Assert.AreEqual(ids[0], rig.G.Mesh.GetInstanceID());
+                    Assert.AreEqual(ids[2], rig.S.Mesh.GetInstanceID());
+                    Assert.AreEqual(CombatFx.GroundVerts, rig.G.Mesh.vertexCount);
+                    Assert.AreEqual(CombatFx.AirVerts, rig.A.Mesh.vertexCount);
+                    Assert.AreEqual((uint)rig.A.IndexCount, rig.A.Mesh.GetIndexCount(0));
+                    worstVerts = Math.Max(worstVerts, rig.G.VertCount + rig.A.VertCount + rig.S.VertCount);
+                    worstActive = Math.Max(worstActive, rig.Scene.ActiveCount(now));
                     Assert.LessOrEqual(rig.Scene.ActiveCount(now), FxScene.Capacity);
                     Assert.LessOrEqual(rig.Scene.DecalCount(now), FxScene.MaxDecals);
                     Assert.AreEqual(0, rig.G.Dropped + rig.A.Dropped + rig.S.Dropped, $"mesh budget overflow at step {step}");
                 }
                 Assert.Greater(rig.Scene.DecalCount(10 / cfg.SimHz + 3.0), 0, "blood landed as decals");
+                TestContext.Progress.WriteLine($"[CombatFx worst case] active effects {worstActive} of {FxScene.Capacity}, verts {worstVerts} of {CombatFx.GroundVerts + CombatFx.AirVerts + CombatFx.SolidVerts}");
             }
         }
 

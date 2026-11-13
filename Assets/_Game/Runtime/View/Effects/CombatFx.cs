@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using CriticalMass.Runtime.Game;
+using CriticalMass.Runtime.View.Art;
 using CriticalMass.Sim.Config;
 using CriticalMass.Sim.Core;
 using UnityEngine;
@@ -98,6 +99,7 @@ namespace CriticalMass.Runtime.View.Effects
             _airGo = Layer("Fx Air", _air, _airMat);
             _solidGo = Layer("Fx Solid", _solid, _solidMat);
             BuildVignette();
+            PrewarmFlash();
             _driver.Ticked -= OnTicked;
             _driver.Ticked += OnTicked;
             RenderPipelineManager.beginCameraRendering -= OnBeginCamera;
@@ -283,6 +285,32 @@ namespace CriticalMass.Runtime.View.Effects
             _flash[source] = m;
             return m;
         }
+
+        /// <summary>
+        /// Create every character flash material up front (one per class model and team), so a hit never creates a
+        /// material or any other GPU resource. A missing art material (setup not run) only skips the prewarm.
+        /// </summary>
+        private void PrewarmFlash()
+        {
+            foreach (ClassId cls in new[] { ClassId.Warrior, ClassId.Miner, ClassId.Farmer })
+            {
+                string key = ArtMapping.ClassModel(cls);
+                ModelSpec spec = key != null ? ArtMapping.Spec(key) : null;
+                if (spec == null) continue;
+                try
+                {
+                    FlashMaterial(ArtMaterials.ForTeam(spec, TeamId.Azure));
+                    FlashMaterial(ArtMaterials.ForTeam(spec, TeamId.Crimson));
+                }
+                catch (System.InvalidOperationException)
+                {
+                    return;
+                }
+            }
+        }
+
+        /// <summary>Flash materials created (bounded: class models x 2 teams; all made in Start).</summary>
+        public int FlashMaterialCount => _flash.Count;
 
         private static readonly string[] FlashColours =
         {
