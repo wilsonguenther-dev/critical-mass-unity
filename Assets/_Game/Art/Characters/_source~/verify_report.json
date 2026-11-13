@@ -88,11 +88,11 @@
    "check": "Warrior_Body loose/non-manifold",
    "ok": true,
    "detail": {
-    "triangles": 9322,
+    "triangles": 9380,
     "loose_verts": 0,
     "loose_edges": 0,
     "non_manifold_edges": 0,
-    "closed_shells": 134
+    "closed_shells": 120
    }
   },
   {
@@ -146,11 +146,11 @@
    "check": "Warrior_Cleaver loose/non-manifold",
    "ok": true,
    "detail": {
-    "triangles": 960,
+    "triangles": 862,
     "loose_verts": 0,
     "loose_edges": 0,
     "non_manifold_edges": 0,
-    "closed_shells": 14
+    "closed_shells": 8
    }
   },
   {
@@ -202,11 +202,11 @@
    "check": "Warrior_Shield loose/non-manifold",
    "ok": true,
    "detail": {
-    "triangles": 1652,
+    "triangles": 1602,
     "loose_verts": 0,
     "loose_edges": 0,
     "non_manifold_edges": 0,
-    "closed_shells": 30
+    "closed_shells": 24
    }
   },
   {
@@ -250,14 +250,14 @@
   {
    "check": "triangle budget <= 12000",
    "ok": true,
-   "detail": 11934
+   "detail": 11844
   },
   {
    "check": "body height in metres after round trip (Blender Z = Unity Y)",
    "ok": true,
    "detail": {
-    "min_z": -0.0,
-    "max_z": 1.998,
+    "min_z": -0.002,
+    "max_z": 1.997,
     "mesh_object_rot": [
      1.5708,
      -0.0,

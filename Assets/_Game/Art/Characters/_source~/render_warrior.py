@@ -74,8 +74,9 @@ CHARGE = lunge(62) + [("spine", (1, 0, 0), 30), ("upperarm.l", (1, 0, 0), -75), 
                       ("lowerarm.l", (1, 0, 0), -25), ("upperarm.r", (0, 1, 0), 30), ("upperarm.r", (1, 0, 0), 140),
                       ("head", (1, 0, 0), -16)]
 POSES = {
-    "front": ("Idle", 1, shield_turn(8) + [("hand.l", (0, 1, 0), -12), ("hand.r", (0, 1, 0), -12)], 8, 6,
-              "azure", "all"),
+    # v4 front: chosen by a silhouette sweep (shield turn 8/20/30, shield arm in 0/8, cleaver arm in 0/-6/-8)
+    "front": ("Idle", 1, [("upperarm.l", (0, 1, 0), 8)] + shield_turn(20)
+              + [("hand.l", (0, 1, 0), -12), ("hand.r", (0, 1, 0), -12)], 8, 6, "azure", "all"),
     "three-quarter": ("Idle", 1, shield_turn(-60) + [("hand.r", (0, 1, 0), 25)], -35, 6, "azure", "all"),
     "profile": ("Idle", 1, [("upperarm.l", (1, 0, 0), -10), ("upperarm.r", (1, 0, 0), -15)] + shield_turn(-50)
                 + cleaver_turn(100) + [("hand.r", (1, 0, 0), 30)], -90, 4, "azure", "all"),
@@ -84,7 +85,8 @@ POSES = {
     "shield-charge": ("Idle", 1, CHARGE + shield_turn(-75), -45, 6, "azure", "all"),
     "front-shield": ("Idle", 1, [], 0, 6, "azure", "shield"),
     "face": ("Idle", 1, [], -10, 4, "azure", "head"),
-    "crimson": ("Idle", 1, shield_turn(8) + [("hand.r", (0, 1, 0), 25)], -12, 6, "crimson", "all"),
+    "crimson": ("Idle", 1, [("upperarm.l", (0, 1, 0), 8)] + shield_turn(20) + [("hand.r", (0, 1, 0), 25)], -12, 6,
+                "crimson", "all"),
 }
 if os.environ.get("CM_POSES"):     # tuning hook: extra framings, JSON {name: [clip, frame, rots, az, el, team, fit]}
     import json

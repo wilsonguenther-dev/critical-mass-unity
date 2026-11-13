@@ -17,7 +17,7 @@ from . import palette
 MAX_INFLUENCES = 4
 GRADIENT = 0.06        # +6 % value toward the top of each part (ART-DIRECTION 3.5)
 CREVICE = 0.10         # -10 % value in crevices (baked ray occlusion, finalize)
-SEG = 0.76             # global segment scale for round primitives (the 12,000-triangle budget knob)
+SEG = 0.70             # global segment scale for round primitives (the 12,000-triangle budget knob)
 STEP_TOP, STEP_UNDER = 0.08, 0.12   # v3 value steps from the surface normal: +8 % on top faces, -12 % on undersides
 
 

@@ -17,12 +17,15 @@ def _hex(h, a=1.0):
     return np.array([r, g, b, a], dtype=np.float32)
 
 
-def paint(cx, cz, hw, hh):
+def paint(cx, cz, hw, hh, head_scale=None):
     n = SIZE
     img = np.zeros((n, n, 4), dtype=np.float32)
     ys, xs = np.mgrid[0:n, 0:n].astype(np.float32) + 0.5
     X = (xs / n - 0.5) * 2 * hw + cx           # metres, character space (x = character left)
     Z = (ys / n - 0.5) * 2 * hh + cz           # row 0 = bottom (Blender image order)
+    if head_scale is not None:                 # features are drawn in design space, before the head scale
+        kxy, kz, (px, _py, pz) = head_scale
+        X, Z = px + (X - px) / kxy, pz + (Z - pz) / kz
 
     def over(mask, rgba):
         a = np.clip(mask, 0, 1)[..., None] * rgba[3]
@@ -69,8 +72,8 @@ def paint(cx, cz, hw, hh):
     return img
 
 
-def make_image(bpy, name, path, cx, cz, hw, hh):
-    px = paint(cx, cz, hw, hh)
+def make_image(bpy, name, path, cx, cz, hw, hh, head_scale=None):
+    px = paint(cx, cz, hw, hh, head_scale)
     im = bpy.data.images.get(name) or bpy.data.images.new(name, SIZE, SIZE, alpha=True)
     im.colorspace_settings.name = "sRGB"
     im.pixels.foreach_set(px.ravel())
