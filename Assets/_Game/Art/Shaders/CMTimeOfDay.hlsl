@@ -69,15 +69,15 @@ half3 CMTodSkyGlints(float3 vd)
     float pa = CMTodPixelAngle();
     if (_CMTodSky.x > 0.0)
     {
-        float2 p = vd.xz / max(0.2, -vd.y) * 46.0;
+        float2 p = vd.xz / max(0.2, -vd.y) * 40.0;
         float2 cell = floor(p);
         float h = CMTodHash12(cell);
-        if (h > 0.955)
+        if (h > 0.92)
         {
             float2 c = float2(CMTodHash12(cell + 17.3), CMTodHash12(cell + 41.9)) * 0.7 + 0.15;
-            float px = max(1e-4, 46.0 * pa / max(0.04, vd.y * vd.y)) * 0.75;
+            float px = max(1e-4, 40.0 * pa / max(0.04, vd.y * vd.y)) * 0.9;
             float d = length(frac(p) - c) / px;
-            float big = step(0.992, h);
+            float big = step(0.988, h);
             float tw = 0.65 + 0.35 * sin(_CMTodSky.w * (1.3 + 2.0 * frac(h * 91.0)) + h * 60.0);
             float s = saturate((1.0 + big * 0.9) - d) * tw * (0.55 + 0.45 * big);
             add += half3(0.86, 0.90, 1.0) * (half)(s * _CMTodSky.x);

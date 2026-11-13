@@ -275,7 +275,7 @@ namespace CriticalMass.Runtime.View.Atmosphere
     {
         public const float BlendSeconds = 0.8f;
         /// <summary>Where the moon sits on screen (viewport) and its angular radius (degrees).</summary>
-        public static readonly Vector2 MoonViewport = new Vector2(0.80f, 0.80f);
+        public static readonly Vector2 MoonViewport = new Vector2(0.22f, 0.70f);
         public const float MoonRadiusDeg = 3.0f;
 
         /// <summary>Captures and tests force a time here (null = the player's choice).</summary>

@@ -486,7 +486,8 @@ namespace CriticalMass.Runtime.View.Atmosphere
             r.lightProbeUsage = LightProbeUsage.Off;
             r.reflectionProbeUsage = ReflectionProbeUsage.Off;
             r.allowOcclusionWhenDynamic = false;
-            Triangles += mesh.triangles.Length / 3 * (mat == _creatureMat ? 2 : 1);
+            // Index count from the submesh descriptor: the mesh is no longer readable after UploadMeshData(true).
+            Triangles += (int)mesh.GetIndexCount(0) / 3 * (mat == _creatureMat ? 2 : 1);
             Draws += mat == _creatureMat ? 2 : 1;
         }
 

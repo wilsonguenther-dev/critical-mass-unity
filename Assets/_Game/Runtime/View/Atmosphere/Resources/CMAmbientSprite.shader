@@ -54,7 +54,6 @@ Shader "CM/AmbientSprite"
 
             float4 _CMAmbient;
             float _CMAmbientTime;
-        float _CMAmbientTime;
 
             struct A
             {
