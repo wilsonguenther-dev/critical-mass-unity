@@ -45,7 +45,7 @@ def outline(im, px):
 def zzz(im):
     d = ImageDraw.Draw(im)
     W = im.size[0]
-    for cx, cy, s in ((0.80, 0.17, 0.085), (0.925, 0.07, 0.055)):
+    for cx, cy, s in ((0.76, 0.20, 0.07), (0.87, 0.09, 0.045)):
         x0, y0, x1, y1 = (cx - s) * W, (cy - s) * W, (cx + s) * W, (cy + s) * W
         w = max(3, int(s * W * 0.42))
         d.line([(x0, y0), (x1, y0), (x0, y1), (x1, y1)], fill=CREAM + (255,), width=w, joint="curve")

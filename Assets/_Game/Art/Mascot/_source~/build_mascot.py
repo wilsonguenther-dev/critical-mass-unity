@@ -57,13 +57,13 @@ def lin(h):
 # ------------------------------------------------------------------------------------------------ palette
 VOID_NAVY = "#18233B"
 FIXED = {
-    "Skin": "#36425A",        # PAL Skin: smooth hide (head, body, limbs)
+    "Skin": "#5B6B86",        # baby hide: PAL Slate #415066 lit x1.3 (adult PAL Skin #36425A vanished on the Void Navy HUD panel)
     "Slate": "#415066",       # PAL Slate: boulder plates (shoulders, back, tail ridge)
     "SlateLight": "#ADA59B",  # PAL SlateLight: pale stone fists and horn buds (the hatchling's pale fists)
     "Moss": "#B4CF37",        # PAL Moss on up-facing plate facets
     "Belly": "#C9BFAA",       # PAL Belly: tan belly plates, chin
-    "ShellOut": "#83868C",    # Egg stage light plate: the eggshell hat, outside
-    "ShellIn": "#F7F0E5",     # Warm Cream: inside of the shell
+    "ShellOut": "#EFE7DA",    # eggshell outside: Warm Cream a step down (the top silhouette at 64 px)
+    "ShellIn": "#83868C",     # inside of the shell: the Egg stage light plate
     "Seam": "#4FDDC3",        # CMTokens.EggSeam: the shell's cracked rim, the sweat drop
     "Claw": "#F7F0E5",        # Warm Cream claws and toes
 }
@@ -283,7 +283,7 @@ def build_head(geo):
     slots, decal = [], []
     for f in F:
         d = sum((U[i] for i in f), Vector()).normalized()
-        slots.append("Belly" if (d.z < -0.62 and d.y < 0.45) else "Skin")
+        slots.append("Skin")
         decal.append(d.y < -0.25 and d.z > -0.80)
     geo.add(V, F, slots, "Head", smooth=True, decal=decal)
 
@@ -359,8 +359,8 @@ def shell(geo):
 
 
 def body_slot(n, w):
-    if n.y < -0.30 and -0.70 < n.z < 0.78:
-        return "Belly", (0.82 if (w.z % 0.24) < 0.05 else (1.04 if n.z > 0.2 else 1.0))
+    if n.y < -0.40 and -0.75 < n.z < 0.35:
+        return "Belly", (0.84 if (w.z % 0.30) < 0.045 else (1.04 if n.z > 0.2 else 1.0))
     return "Skin", (1.05 if n.z > 0.6 else 1.0)
 
 
@@ -370,12 +370,12 @@ def tail_slot(c, n):
 
 def build():
     geo = Geo()
-    ellipsoid(geo, (0, 0.05, 0.92), (0.82, 0.74, 0.88), "Skin", "Body", 26, 16, slot_fn=body_slot)
+    ellipsoid(geo, (0, 0.05, 0.84), (0.76, 0.68, 0.80), "Skin", "Body", 26, 16, slot_fn=body_slot)
     build_head(geo)
     shell(geo)
     for s in SIDE:
         hb, hd = HORN[s]
-        cone(geo, hb - hd * 0.08, hd, 0.34, 0.13, "SlateLight", "Horn.%s" % ("L" if s > 0 else "R"), sides=8)
+        cone(geo, hb - hd * 0.08, hd, 0.40, 0.11, "SlateLight", "Horn.%s" % ("L" if s > 0 else "R"), sides=8)
         along(geo, SH[s], EL[s], 0.17, "Skin", "UpperArm.%s" % ("L" if s > 0 else "R"))
         hand(geo, EL[s], TP[s], s, "Hand.%s" % ("L" if s > 0 else "R"))
         lb = "Leg.%s" % ("L" if s > 0 else "R")
@@ -389,6 +389,10 @@ def build():
         crystal(geo, (0.52 * s, 0.42, 1.24), (0.80 * s, 0.28, 0.56), 0.88, 0.13, "Body", spin=0.3)
         crystal(geo, (0.34 * s, 0.56, 1.30), (0.35 * s, 0.35, 0.88), 0.62, 0.11, "Body", spin=0.1)
     boulder(geo, (0.0, 0.68, 1.15), (0.30, 0.20, 0.24), "Body", up=(0, 0.9, 0.45))
+    # crest of three lime crystals behind the head: the adult's crown, baby-sized (family read in the HUD bust)
+    crystal(geo, H + Vector((0.0, 0.60, 0.42)), (0.0, 0.50, 0.87), 0.92, 0.12, "Head", spin=0.2)
+    for s in SIDE:
+        crystal(geo, H + Vector((0.34 * s, 0.56, 0.30)), (0.45 * s, 0.50, 0.74), 0.70, 0.10, "Head", spin=0.4)
     crystal(geo, (0.0, 0.70, 1.00), (0.0, 0.75, 0.66), 0.50, 0.11, "Body")
     loft(geo, TAIL, TAIL_R, tail_slot, "Tail")
     boulder(geo, (0.03, 1.00, 0.52), (0.16, 0.18, 0.10), "Tail", up=(0, 0.2, 1))
@@ -777,7 +781,7 @@ def world_pts(ob, every=1, bones=None):
         names = {g.index: g.name for g in ob.vertex_groups}
         pts = [ob.matrix_world @ v.co for v in m.vertices if v.groups and names[v.groups[0].group] in bones]
     else:
-        pts = [ob.matrix_world @ v.co for v in m.vertices[::every]]
+        pts = [ob.matrix_world @ v.co for v in list(m.vertices)[::every]]
     ev.to_mesh_clear()
     return pts
 
@@ -846,7 +850,7 @@ def arms(l_up, l_hand, r_up=None, r_hand=None):
 
 
 REST_ARMS = arms((0.40, -0.25, -0.88), (0.15, -0.65, -0.70))
-POINT = dict(arms((0.80, -0.45, 0.40), (0.72, -0.48, 0.50), (-0.40, -0.25, -0.88), (-0.15, -0.65, -0.70)))
+POINT = dict(arms((0.55, -0.75, 0.38), (0.62, -0.60, 0.50), (-0.40, -0.25, -0.88), (-0.15, -0.65, -0.70)))
 POINT.update({"Head": {"rot": (-3, 6, 20)}, "Body": {"rot": (0, 0, 8)}})
 POSES = {
     "neutral": dict(REST_ARMS, Head={"rot": (0, 5, 4)}),
@@ -855,8 +859,8 @@ POSES = {
                   Shell={"rot": (0, -8, 0)}, **{"Horn.L": {"rot": (0, 25, 0)}, "Horn.R": {"rot": (0, -25, 0)}}),
     "point": POINT,
     "point-left": mirror(POINT),
-    "surprised": dict(arms((0.88, -0.25, -0.05), (0.60, -0.35, 0.70)), Head={"rot": (-8, 0, 0), "loc": (0, 0, 0.06)},
-                      Shell={"loc": (0.05, 0.0, 0.26), "rot": (0, 10, 0)},
+    "surprised": dict(arms((0.75, -0.45, -0.10), (0.45, -0.55, 0.70)), Head={"rot": (-8, 0, 0), "loc": (0, 0, 0.03)},
+                      Shell={"loc": (0.04, 0.0, 0.17), "rot": (0, 8, 0)},
                       **{"Horn.L": {"dir": (0.25, -0.1, 1.0)}, "Horn.R": {"dir": (-0.25, -0.1, 1.0)}}),
     "thinking": dict(arms((0.15, -0.45, -0.88), (-0.65, -0.62, -0.20), (0.05, -0.55, -0.40), (0.38, -0.40, 0.85)),
                      Head={"rot": (-5, -9, -8)}),
@@ -889,9 +893,9 @@ headonly = world_pts(MESH, bones={"Head"})
 xs = [p.dot(right) for p in headonly]
 tops = [p.dot(up) for p in hp]
 head_w = max(xs) - min(xs)
-SPAN = head_w / 0.70
-CX = (max(xs) + min(xs)) / 2
-CY = max(tops) + SPAN * 0.035 - SPAN / 2
+SPAN = head_w / 0.76
+CX = (max(xs) + min(xs)) / 2 - 0.025 * head_w / 0.76
+CY = max(tops) + SPAN * 0.045 - SPAN / 2
 meta = {"portrait": {"span_m": SPAN, "head_w_m": head_w, "head_fill": head_w / SPAN, "yaw": P_YAW, "el": P_EL}}
 for stem in EXPR:
     RIG.location = (0, 0, 0)

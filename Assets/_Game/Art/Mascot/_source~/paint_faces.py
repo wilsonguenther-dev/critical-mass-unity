@@ -146,7 +146,7 @@ def face_plate(f):
     """Tan heart-shaped face plate: two eye lobes merging into the muzzle (reads at 64 px on the slate head)."""
     m = f.ell(-EYE_X, EYE_Z + 0.02, 0.40, 0.39)
     m = f.OR(m, f.ell(EYE_X, EYE_Z + 0.02, 0.40, 0.39))
-    m = f.OR(m, f.ell(0.0, -0.40, 0.66, 0.46))
+    m = f.OR(m, f.ell(0.0, -0.36, 0.66, 0.40))
     m = f.OR(m, f.poly([(-0.55, -0.15), (0.55, -0.15), (0.40, 0.10), (-0.40, 0.10)]))
     f.fill(m, TAN)
 
