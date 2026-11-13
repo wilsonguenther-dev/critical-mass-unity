@@ -53,7 +53,7 @@ namespace CriticalMass.Runtime.Onboarding
             _has = has;
         }
 
-        static void DefaultLog(string line) => UnityEngine.Debug.Log(line);
+        static void DefaultLog(string line) => (Trial.InfoLog ?? UnityEngine.Debug.Log)(line);
 
         /// <summary>Probes every step's mechanic, switches off the missing ones, and starts the first runnable step.</summary>
         public void Begin(World w)

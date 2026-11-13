@@ -42,6 +42,14 @@ namespace CriticalMass.Runtime.Onboarding
         public static Action AfterTrial;
 
         /// <summary>
+        /// Where the trial's information lines go ("[Trial] dig is off: ...", the passive-bots note): Debug.Log by default.
+        /// Tests collect them instead, so LogAssert.NoUnexpectedReceived still catches everything else.
+        /// </summary>
+        public static Action<string> InfoLog = DefaultInfoLog;
+
+        static void DefaultInfoLog(string line) => UnityEngine.Debug.Log(line);
+
+        /// <summary>
         /// Starts the guided match now: 5v5 at 1x on the running game (TrialMatch), then the steps. Replayable at any time
         /// ("How to play"). team/cls: null = Azure Warrior (or the class the current world's human plays).
         /// </summary>

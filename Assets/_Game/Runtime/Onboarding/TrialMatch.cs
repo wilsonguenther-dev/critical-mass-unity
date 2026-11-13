@@ -74,7 +74,7 @@ namespace CriticalMass.Runtime.Onboarding
         public static void Start(SimDriverBehaviour driver, TrialMatchRequest req, Action<string> log = null)
         {
             if (driver == null || req == null || driver.World == null) return;
-            if (log == null) log = s => UnityEngine.Debug.Log(s);
+            if (log == null) log = s => (Trial.InfoLog ?? UnityEngine.Debug.Log)(s);
             ApplyPassiveBots(driver.Config, req.PassiveBotSeconds, log);
             if (Starter != null && Starter(driver, req)) return;
             Restart(driver.World, req);

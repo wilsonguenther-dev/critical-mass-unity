@@ -327,8 +327,10 @@ namespace CriticalMass.Runtime.PlayTests
             d = FlowDirector.Current;
             World w = Driver().World;
             Driver().TimeScale = 0;
+            Driver().StepTicks(30);   // past the start (as TimerExpiry...): a tick-0 clock change does not end the match
             w.Match.Time = w.Config.MatchSeconds - 2.0 / w.Config.SimHz;
             Driver().StepTicks(4);
+            Assert.AreEqual(MatchPhase.Ended, w.Match.Phase, "the clock ran out");
             yield return Until(() => d.Results.IsVisible, 1.0f, "results");
             yield return Press(d.Results.ChangeClassItem);
             Assert.IsTrue(d.Setup.IsVisible);

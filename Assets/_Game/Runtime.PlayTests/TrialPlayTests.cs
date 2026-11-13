@@ -30,6 +30,8 @@ namespace CriticalMass.Runtime.PlayTests
         [UnitySetUp]
         public IEnumerator SetUp()
         {
+            _info.Clear();
+            Trial.InfoLog = line => _info.Add(line);   // the trial's "[Trial] ..." information lines, checked below
             _hadDone = PlayerPrefs.HasKey(TrialProgress.DoneKey);
             _wasDone = PlayerPrefs.GetInt(TrialProgress.DoneKey, 0);
             SceneManager.LoadScene(BootScene);
@@ -49,9 +51,13 @@ namespace CriticalMass.Runtime.PlayTests
             _kb = InputSystem.AddDevice<Keyboard>();
         }
 
+        readonly System.Collections.Generic.List<string> _info = new System.Collections.Generic.List<string>();
+
         [TearDown]
         public void TearDown()
         {
+            foreach (string line in _info) StringAssert.StartsWith("[Trial] ", line, "only [Trial] information lines");
+            Trial.InfoLog = s => UnityEngine.Debug.Log(s);
             Trial.Stop();
             if (_kb != null)
             {
