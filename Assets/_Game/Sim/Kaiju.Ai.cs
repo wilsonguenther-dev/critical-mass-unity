@@ -26,6 +26,11 @@ namespace CriticalMass.Sim.Core
 
         private static void ResolveSlam(World w)
         {
+            if (Phys.On(w, w.Config.Physics.SlamShockwave))
+            {
+                ResolveShockwave(w);
+                return;
+            }
             KaijuConfig kc = w.Config.Kaiju;
             Kaiju k = w.Kaiju;
             int n = w.ActorCount;
@@ -42,6 +47,43 @@ namespace CriticalMass.Sim.Core
             }
             k.SlamCd = kc.SlamCooldown;
             World.PushEvent(w, SimEventType.KaijuSlam, -1, hits, k.TelegraphX, k.TelegraphZ, kc.SlamRadius);
+        }
+
+        /// <summary>
+        /// DG-85 (S6, OD-8): the slam as a shockwave from the telegraph point: full SlamDamage inside SlamFullRadiusShare x R,
+        /// falling linearly to SlamEdgeDamageShare at R; stopped by walls (SegmentClear); an actor in the air on the resolve
+        /// tick is untouched (AirDodgesSlam); everyone hit is thrown outward (SlamKnockCentre to SlamKnockEdge) and knocked
+        /// down (SlamStunSeconds).
+        /// </summary>
+        private static void ResolveShockwave(World w)
+        {
+            KaijuConfig kc = w.Config.Kaiju;
+            PhysicsConfig p = w.Config.Physics;
+            Kaiju k = w.Kaiju;
+            double R = kc.SlamRadius;
+            double full = p.SlamFullRadiusShare * R;
+            bool walls = Phys.On(w, p.WallsBlockHits);
+            bool knock = Phys.On(w, p.Knockback);
+            int hits = 0;
+            for (int id = 0; id < w.ActorCount; id++)
+            {
+                Actor a = w.Actors[id];
+                if (!a.Alive || !KaijuHostileTo(w, id)) continue;
+                double dx = w.X[id] - k.TelegraphX;
+                double dz = w.Z[id] - k.TelegraphZ;
+                double d = Math.Sqrt(dx * dx + dz * dz);
+                if (d > R) continue;
+                if (p.AirDodgesSlam && a.AirLen > 0) continue;
+                if (walls && !SegmentClear.Clear(w.Map, k.TelegraphX, k.TelegraphZ, w.X[id], w.Z[id])) continue;
+                double share = d <= full ? 1 : 1 - (1 - p.SlamEdgeDamageShare) * (d - full) / (R - full);
+                double ux = d > 1e-6 ? dx / d : JsMath.Cos(id * 2.39996);
+                double uz = d > 1e-6 ? dz / d : JsMath.Sin(id * 2.39996);
+                double kd = p.SlamKnockCentre + (p.SlamKnockEdge - p.SlamKnockCentre) * (d / R);
+                if (Damage.ApplyHit(w, id, kc.SlamDamage * share, Damage.KaijuSlamSource, k.TelegraphX, k.TelegraphZ, DamageCause.KaijuSlam,
+                    ux, uz, knock ? kd : 0, knock ? w.Dur.SlamStun : 0) > 0) hits++;
+            }
+            k.SlamCd = kc.SlamCooldown;
+            World.PushEvent(w, SimEventType.KaijuSlam, -1, hits, k.TelegraphX, k.TelegraphZ, R, null, DamageCause.None, R, 0, 0, knock ? p.SlamKnockCentre : 0, 2, 0, 0);
         }
 
         /// <summary>
@@ -332,10 +374,19 @@ namespace CriticalMass.Sim.Core
 
             if (k.SlamCd <= 0 && CountHostilesWithin(w, k.X, k.Z, kc.SlamRadius) >= 2)
             {
-                k.TelegraphIn = kc.SlamTelegraphSeconds;
                 k.TelegraphX = k.X;
                 k.TelegraphZ = k.Z;
-                World.PushEvent(w, SimEventType.KaijuTelegraph, -1, -1, k.X, k.Z, kc.SlamRadius);
+                if (Phys.On(w, true))
+                {
+                    // DG-85 / OD-7: at least KaijuSlamMinRealSeconds on screen at the match pace (48 ticks at pace 2).
+                    k.TelegraphIn = w.Dur.SlamTelegraph / cfg.SimHz;
+                    World.PushEvent(w, SimEventType.KaijuTelegraph, -1, -1, k.X, k.Z, kc.SlamRadius, null, DamageCause.None, kc.SlamRadius, 0, 0, 0, 0, w.Dur.SlamTelegraph, 0);
+                }
+                else
+                {
+                    k.TelegraphIn = kc.SlamTelegraphSeconds;
+                    World.PushEvent(w, SimEventType.KaijuTelegraph, -1, -1, k.X, k.Z, kc.SlamRadius);
+                }
                 return;
             }
 

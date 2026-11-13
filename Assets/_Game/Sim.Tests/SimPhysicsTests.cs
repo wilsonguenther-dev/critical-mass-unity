@@ -229,7 +229,7 @@ namespace CriticalMass.Sim.Tests
 
         // The checked-in on-screen seconds (pace 2) of the windows later items change.
         private const double TableClaw = 0.45;
-        private const double TableSlam = 0.6;
+        private const double TableSlam = 0.8;
         private const double TableWarriorWindup = 0.12;
         private const double TableFarmerWindup = 0.10;
 
@@ -659,6 +659,70 @@ namespace CriticalMass.Sim.Tests
             Assert.AreEqual(w.Config.Kaiju.MeleeRange + Kaiju.MeleeLeash, e.Radius, 1e-9);
             Assert.AreEqual(1, e.DirX, 1e-6);
             Assert.AreEqual(k.X, k.ClawX);
+        }
+        // ------------------------------------------------------------------ DG-85 Kaiju slam shockwave
+
+        private static void SlamNow(World w, double x, double z)
+        {
+            Kaiju k = w.Kaiju;
+            k.TelegraphX = x;
+            k.TelegraphZ = z;
+            k.TelegraphIn = 0.5 / w.Config.SimHz;
+            Idle(w);
+            SimStep.Step(w);
+            Assert.AreEqual(0, k.TelegraphIn);
+        }
+
+        [Test]
+        public void DG85FullDamageAtTheCentreLessAtTheEdgeAndMorePushAtTheCentre()
+        {
+            World w = Make();
+            HatchedKaiju(w);
+            ParkOthers(w, 5, 6);
+            Place(w, 5, HillX + 1, HillZ);
+            Place(w, 6, HillX - 4.5, HillZ);
+            double h5 = w.Actors[5].Hp, h6 = w.Actors[6].Hp;
+            SlamNow(w, HillX, HillZ);
+            Assert.AreEqual(45, h5 - w.Actors[5].Hp, 1e-9, "d = 1");
+            Assert.LessOrEqual(h6 - w.Actors[6].Hp, 22, "d = 4.5");
+            Assert.Greater(h6 - w.Actors[6].Hp, 0);
+            for (int t = 0; t < 30; t++) { Idle(w); SimStep.Step(w); }
+            double push5 = w.X[5] - (HillX + 1);
+            double push6 = (HillX - 4.5) - w.X[6];
+            Assert.Greater(push5, push6, "outward push at d = 1 beats d = 4.5");
+            Assert.Greater(push6, 0);
+        }
+
+        [Test]
+        public void DG85BehindAWallAndInTheAirTakeNothing()
+        {
+            World w = Make();
+            HatchedKaiju(w);
+            Assert.IsTrue(FindWallFace(w, out int cx, out int cz));
+            MapGrid.SetCell(w, cx - 2, cz, Cell.Wall);
+            ParkOthers(w, 5, 6);
+            Place(w, 5, cx - 0.5, cz + 0.5); // behind the wall cell from the slam point
+            Place(w, 6, cx - 2.5, cz - 1.5);
+            Actor air = w.Actors[6];
+            air.AirLen = 12;
+            air.AirTick = 2;
+            air.AirFromX = air.AirToX = w.X[6];
+            air.AirFromZ = air.AirToZ = w.Z[6];
+            w.Kaiju.X = cx - 2.5;
+            w.Kaiju.Z = cz + 0.5;
+            double h5 = w.Actors[5].Hp, h6 = air.Hp;
+            SlamNow(w, cx - 2.5, cz + 0.5);
+            Assert.AreEqual(h5, w.Actors[5].Hp, "behind a wall");
+            Assert.AreEqual(h6, air.Hp, "airborne");
+        }
+
+        [Test]
+        public void DG85TelegraphIsAtLeast08SecondsOnScreen()
+        {
+            GameConfig c = GameConfig.CreateDefault();
+            World w = World.CreateWorld(new WorldOptions { Seed = 1, TeamSize = 16, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = c });
+            Assert.GreaterOrEqual(Durations.OnScreen(c, w.Dur.SlamTelegraph, 2), 0.8 - 1e-9);
+            Assert.AreEqual(36, Make().Dur.SlamTelegraph, "pace 1: the 1.2 s sim telegraph is already longer");
         }
     }
 }
