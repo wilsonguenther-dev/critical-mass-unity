@@ -1,8 +1,8 @@
 {
  "objects": {
   "Farmer_Body": {
-   "triangles": 9920,
-   "vertices": 5206,
+   "triangles": 10304,
+   "vertices": 5418,
    "materials": [
     "CM_Toon"
    ],
@@ -126,11 +126,15 @@
    1.076
   ]
  },
- "triangles_total": 11592,
+ "triangles_total": 11976,
  "triangles_by_part": {
   "Farmer_Body/hair/f_hair": [
    1244,
    13
+  ],
+  "Farmer_Body/tank/f_brass": [
+   1160,
+   22
   ],
   "Farmer_Body/team_cloth/f_team_cloth": [
    1040,
@@ -139,10 +143,6 @@
   "Farmer_Body/jacket/f_cream": [
    832,
    8
-  ],
-  "Farmer_Body/tank/f_brass": [
-   776,
-   10
   ],
   "Farmer_Body/skin/f_skin": [
    768,

@@ -93,6 +93,16 @@ def set_pose(action="Idle", frame=1, extra=()):
         pb.matrix_basis = bases[pb.name]
     bpy.context.view_layer.update()
     for bone, axis, deg in extra:
+        if bone == "@aim":                 # v3: turn hand.r so the staff (grip -> hook) points along `axis`
+            sp = points(staff)
+            pb = arm.pose.bones["hand.r"]
+            grip = (arm.matrix_world @ arm.pose.bones["handslot.r"].matrix).translation
+            tip = max(sp, key=lambda p: (p - grip).length)
+            q = (tip - grip).normalized().rotation_difference(Vector(axis).normalized())
+            head = pb.matrix.translation.copy()
+            pb.matrix = Matrix.Translation(head) @ q.to_matrix().to_4x4() @ Matrix.Translation(-head) @ pb.matrix
+            bpy.context.view_layer.update()
+            continue
         pb = arm.pose.bones[bone]
         head = pb.matrix.translation.copy()
         r = Matrix.Translation(head) @ Matrix.Rotation(math.radians(deg), 4, Vector(axis)) @ Matrix.Translation(-head)
@@ -726,10 +736,33 @@ def prop_mesh(name, spheres, vine, hexcol):
     ob = bpy.data.objects.new(name, me)
     scene.collection.objects.link(ob)
     ob.data.materials.append(flat_mat(name + "Mat", hexcol))
-    ob.data.materials.append(bpy.data.materials["CM_Toon_Outline"])
+    ob.data.materials.append(toon3.make_outline_material())
     sol = ob.modifiers.new("Outline", "SOLIDIFY")
     sol.offset, sol.use_flip_normals, sol.use_rim, sol.material_offset = 1.0, True, False, 1
     return ob
+
+
+# v3: hand-made action poses (confident, readable, head up toward the camera), NOT overlap-fitted.
+# (bone, world axis, degrees) applied in order at bone heads on top of Idle frame 1. Rig faces -Y; camera az -62 sees the
+# character's right/front, facing screen right as p07 draws both actions.
+HAND_POSES = {
+    "pose-harvest": ("Idle", 1, [
+        ("upperleg.r", (1, 0, 0), -55), ("lowerleg.r", (1, 0, 0), 60), ("upperleg.l", (1, 0, 0), 40),
+        ("lowerleg.l", (1, 0, 0), 20), ("upperleg.l", (0, 1, 0), -8), ("upperleg.r", (0, 1, 0), 8),
+        ("spine", (1, 0, 0), 22), ("spine", (0, 0, 1), -15),
+        ("upperarm.r", (1, 0, 0), -50), ("lowerarm.r", (1, 0, 0), -20),
+        ("upperarm.l", (1, 0, 0), -55), ("upperarm.l", (0, 0, 1), -35), ("lowerarm.l", (1, 0, 0), -35),
+        ("@aim", (-0.15, -0.75, -0.65), 0),
+        ("head", (1, 0, 0), -30), ("head", (0, 0, 1), -28), ("head", (0, 1, 0), 10)], -62, 6),
+    "pose-root-seed": ("Idle", 1, [
+        ("upperleg.r", (1, 0, 0), -55), ("lowerleg.r", (1, 0, 0), 55), ("upperleg.l", (1, 0, 0), 42),
+        ("lowerleg.l", (1, 0, 0), 15), ("upperleg.l", (0, 1, 0), -8), ("upperleg.r", (0, 1, 0), 8),
+        ("spine", (1, 0, 0), 12), ("spine", (0, 0, 1), -20),
+        ("upperarm.r", (1, 0, 0), -82), ("lowerarm.r", (1, 0, 0), -5),
+        ("upperarm.l", (1, 0, 0), 40), ("lowerarm.l", (1, 0, 0), -35),
+        ("@aim", (-0.05, -1.0, 0.08), 0),
+        ("head", (1, 0, 0), -22), ("head", (0, 0, 1), -30), ("head", (0, 1, 0), -8)], -62, 6),
+}
 
 
 def do_poses():
@@ -738,7 +771,7 @@ def do_poses():
             "pose-root-seed": ("1H_Melee_Attack_Slice_Horizontal", 11, [], -62, 0)}
     for name, kind, col in (("pose-harvest", "harvest", FP.FARMER["f_biomass"][0]),
                             ("pose-root-seed", "seed", FP.FARMER["f_wood"][0])):
-        act, fr, extra, az, el = capture(name, fall[name])
+        act, fr, extra, az, el = HAND_POSES[name]
         set_pose(act, fr, extra)
         sph, vine = prop_spheres(kind)
         ob = prop_mesh("Prop", sph, vine, col)

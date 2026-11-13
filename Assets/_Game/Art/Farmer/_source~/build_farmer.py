@@ -259,17 +259,24 @@ def build_tank():
     n0, n1 = G + Vector((0, 0.04, -0.20)), G + Vector((0, 0.10, -0.31))
     add(BODY, B.bcyl(n0, n1, 0.068, 0.054, 12, 0.015), "f_frame_dark", W, T)
     add(BODY, B.torus(0.058, 0.016, 10, 4), "f_brass", W, T, m=kit.frame(n1, n1 - n0, (1, 0, 0)))
-    # teal side canisters (team, bible size), tucked low and forward against the globe so they never stick out like wings
-    # from behind; brass caps and a bracket each
+    # bolted brass cage (bible p07 tank crop): two diagonal meridian straps besides the ring and band, bolts at the joins
+    for rz in (45, -45):
+        add(BODY, B.torus(TANK_R + 0.006, 0.016, 14, 3), "f_brass", W, T, m=M(G, (0, 90, rz)))
+    for k in range(8):
+        a = math.radians(22.5 + 45 * k)
+        p = G + Vector((math.cos(a) * (TANK_R + 0.03), 0.0, math.sin(a) * (TANK_R + 0.03)))
+        add(BODY, B.sphere((0.022, 0.022, 0.022), 4, 3), "f_brass", W, T, m=M(p))
+    # teal side canisters (team, bible size) standing on both sides at mid height, brass caps and brackets
     for s in (1, -1):
-        cx = G + Vector((0.205 * s, -0.085, -0.05))
-        a, b = cx + Vector((0.012 * s, 0, -0.17)), cx + Vector((-0.012 * s, 0, 0.17))
-        add(BODY, B.bcyl(a, b, 0.075, 0.075, 10, 0.016), "f_team_cloth", W, "team_cloth")
+        cx = G + Vector((s * (TANK_R + 0.035), -0.02, -0.03))
+        a, b = cx + Vector((0, 0, -0.15)), cx + Vector((0, 0, 0.15))
+        add(BODY, B.bcyl(a, b, 0.072, 0.072, 10, 0.014), "f_team_cloth", W, "team_cloth")
         for e in (a, b):
-            add(BODY, B.bcyl(e - (b - a).normalized() * 0.022, e + (b - a).normalized() * 0.022, 0.081, 0.081, 10,
-                             0.01), "f_brass", W, T)
-        add(BODY, B.box((0.05, 0.04, 0.035), 0.01, 1), "f_brass", W, T, smooth=False,
-            m=M(G + Vector((0.16 * s, -0.07, -0.05))))
+            add(BODY, B.bcyl(e - Vector((0, 0, 0.02)), e + Vector((0, 0, 0.02)), 0.078, 0.078, 10, 0.01), "f_brass", W, T)
+        add(BODY, B.box((0.06, 0.04, 0.035), 0.01, 1), "f_brass", W, T, smooth=False,
+            m=M(G + Vector((s * (TANK_R + 0.0), -0.02, 0.06))))
+        add(BODY, B.box((0.06, 0.04, 0.035), 0.01, 1), "f_brass", W, T, smooth=False,
+            m=M(G + Vector((s * (TANK_R + 0.0), -0.02, -0.12))))
     return n1
 
 
