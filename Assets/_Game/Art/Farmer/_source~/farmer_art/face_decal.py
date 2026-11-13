@@ -19,12 +19,18 @@ def _hex(h, a=1.0):
     return np.array([int(h[i:i + 2], 16) / 255.0 for i in (0, 2, 4)] + [a], dtype=np.float32)
 
 
+FEATURE_MAP = (0.84, 1.29, 1.345, 0.84)   # v4: x scale, v3 chin z, v4 chin z, z scale (build_farmer.HEAD_*)
+
+
 def paint(cx, cz, hw, hh):
     n = SIZE
     img = np.zeros((n, n, 4), dtype=np.float32)
     ys, xs = np.mgrid[0:n, 0:n].astype(np.float32) + 0.5
     X = (xs / n - 0.5) * 2 * hw + cx           # metres, character space (x = character left = screen right in front)
     Z = (ys / n - 0.5) * 2 * hh + cz           # row 0 = bottom (Blender image order)
+    # v4: features are authored in the v3 head space; map the v4 (smaller, higher) head back into it
+    sx, z_old, z_new, sz = FEATURE_MAP
+    X, Z = X / sx, z_old + (Z - z_new) / sz
 
     def over(mask, rgba):
         a = np.clip(mask, 0, 1)[..., None] * rgba[3]

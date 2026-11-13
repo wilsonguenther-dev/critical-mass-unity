@@ -280,14 +280,14 @@ def do_game():
     if not FOREIGN:
         bp = points([body])
         top = max(p.z for p in bp)
-        head = [p for p in bp if p.z > 1.30 and p.y < 0.17]
+        head = [p for p in bp if p.z > 1.345 and p.y < 0.17]
         sh = [p for p in bp if 1.08 < p.z < 1.25 and p.y < 0.20]
         tank = [p for p in bp if p.y > 0.20 and 0.95 < p.z < 1.62 and abs(p.x + 0.06) < 0.24]
         sp = points(staff)
         hw = max(p.x for p in head) - min(p.x for p in head)
         sw = max(p.x for p in sh) - min(p.x for p in sh)
         measure["proportions_idle_m"] = {
-            "height": round(top, 3), "chin_z": 1.29, "head_plus_hair_fraction": round((top - 1.29) / top, 3),
+            "height": round(top, 3), "chin_z": 1.345, "head_plus_hair_fraction": round((top - 1.345) / top, 3),
             "head_with_hair_width": round(hw, 3), "shoulder_line_width": round(sw, 3),
             "shoulder_over_head": round(sw / hw, 3),
             "tank_top_z": round(max(p.z for p in tank), 3), "shoulder_top_z": round(max(p.z for p in sh), 3),
@@ -747,16 +747,16 @@ def prop_mesh(name, spheres, vine, hexcol):
 # character's right/front, facing screen right as p07 draws both actions.
 HAND_POSES = {
     "pose-harvest": ("Idle", 1, [
-        ("upperleg.r", (1, 0, 0), -55), ("lowerleg.r", (1, 0, 0), 60), ("upperleg.l", (1, 0, 0), 40),
-        ("lowerleg.l", (1, 0, 0), 20), ("upperleg.l", (0, 1, 0), -8), ("upperleg.r", (0, 1, 0), 8),
+        ("upperleg.r", (1, 0, 0), -78), ("lowerleg.r", (1, 0, 0), 88), ("upperleg.l", (1, 0, 0), 52),
+        ("lowerleg.l", (1, 0, 0), 12), ("upperleg.l", (0, 1, 0), -8), ("upperleg.r", (0, 1, 0), 8),
         ("spine", (1, 0, 0), 22), ("spine", (0, 0, 1), -15),
         ("upperarm.r", (1, 0, 0), -50), ("lowerarm.r", (1, 0, 0), -20),
         ("upperarm.l", (1, 0, 0), -55), ("upperarm.l", (0, 0, 1), -35), ("lowerarm.l", (1, 0, 0), -35),
         ("@aim", (-0.15, -0.75, -0.65), 0),
         ("head", (1, 0, 0), -30), ("head", (0, 0, 1), -28), ("head", (0, 1, 0), 10)], -62, 6),
     "pose-root-seed": ("Idle", 1, [
-        ("upperleg.r", (1, 0, 0), -55), ("lowerleg.r", (1, 0, 0), 55), ("upperleg.l", (1, 0, 0), 42),
-        ("lowerleg.l", (1, 0, 0), 15), ("upperleg.l", (0, 1, 0), -8), ("upperleg.r", (0, 1, 0), 8),
+        ("upperleg.r", (1, 0, 0), -75), ("lowerleg.r", (1, 0, 0), 84), ("upperleg.l", (1, 0, 0), 54),
+        ("lowerleg.l", (1, 0, 0), 8), ("upperleg.l", (0, 1, 0), -8), ("upperleg.r", (0, 1, 0), 8),
         ("spine", (1, 0, 0), 12), ("spine", (0, 0, 1), -20),
         ("upperarm.r", (1, 0, 0), -82), ("lowerarm.r", (1, 0, 0), -5),
         ("upperarm.l", (1, 0, 0), 40), ("lowerarm.l", (1, 0, 0), -35),

@@ -11,7 +11,19 @@ import bmesh
 from mathutils import Matrix, Vector
 
 from cm_art import kit
+from . import finish
 from . import fpalette as FP
+
+# v4: painted finish (copied from the Warrior branch's cm_art/finish.py, unmodified) - Farmer colour -> finish kind
+F_KIND = {"f_navy": "cloth", "f_navy_dark": "cloth", "f_cream": "cloth", "f_cream_dark": "cloth",
+          "f_team_cloth": "cloth", "f_patch": "cloth", "f_brown": "leather", "f_glove": "leather",
+          "f_leather": "leather", "f_boot": "leather", "f_sole": "leather", "f_hose": "leather",
+          "f_brass": "metal", "f_frame_dark": "metal", "f_shaft": "wood", "f_wood": "wood", "f_wood_dark": "wood",
+          "f_skin": "skin", "f_hair": "hair"}
+# the Farmer already bakes a +6/-10 % part gradient (and the hair its top light), so the finish's own top gradient is
+# kept small; the rest are the shared defaults
+FINISH_PARAMS = {"cloth": {"top": 0.03}, "leather": {"top": 0.03}, "metal": {"top": 0.03}, "wood": {"top": 0.03},
+                 "hair": {"ao": 0.16}}
 
 GRAD_TOP, GRAD_BOT = 1.06, 0.90
 TRI_LOG = {}     # (object, feature, colour) -> [triangles, primitives], for budget work
@@ -22,12 +34,17 @@ class FarmerBuilder(kit.Builder):
         new = obj not in self.objs
         d = super()._get(obj)
         if new:
-            d["uv"] = d["bm"].loops.layers.uv.new("UVMap")
+            bm = d["bm"]
+            d["uv"] = bm.loops.layers.uv.new("UVMap")
+            d["kind"] = bm.verts.layers.int.new("kind")
+            d["lco"] = bm.verts.layers.float_vector.new("lco")
+            d["skip"] = bm.verts.layers.int.new("fskip")
         return d
 
     def add(self, obj, src, color, bones, feat=None, smooth=True, m=None, grad=True, face_uv=None, top_light=None):
         """face_uv = (cx, cy, cz, half_w, half_h): front planar projection for the painted face decal on faces whose
         centre lies in front of cy (y < cy); every other face samples UV (0.002, 0.002), a transparent texel."""
+        local = {v: v.co.copy() for v in src.verts}
         if m is not None:
             bmesh.ops.transform(src, matrix=m, verts=src.verts)
         d = self._get(obj)
@@ -60,6 +77,9 @@ class FarmerBuilder(kit.Builder):
             nv[d["col"]] = FP.vcol(color, k)
             nv[d["ws"]] = wi
             nv[d["ft"]] = fi
+            nv[d["kind"]] = finish.KIND[F_KIND.get(color, "other")]
+            nv[d["lco"]] = local[v]
+            nv[d["skip"]] = 1 if (glow or face_uv is not None or feat == "face") else 0
             vmap[v] = nv
         uvl = d["uv"]
         for f in src.faces:
@@ -74,6 +94,24 @@ class FarmerBuilder(kit.Builder):
                         co = lp.vert.co
                         lp[uvl].uv = ((co.x - cx) / (2 * hw) + 0.5, (co.z - cz) / (2 * hh) + 0.5)
         src.free()
+
+    def finalize(self, coll, material, painted=False):
+        """v4: painted=True bakes cm_art finish.painted_finish (top light, crease AO, edge highlights, brass hot spots,
+        grain, folds) into the vertex RGB before the meshes are written; alpha (team mask) is never touched."""
+        self.finish_stats = {}
+        for name, d in self.objs.items():
+            if painted:
+                bm = d["bm"]
+                alpha = [v[d["col"]][3] for v in bm.verts]
+                self.finish_stats[name] = finish.painted_finish(bm, d["col"], d["kind"], lco=d["lco"], skip=d["skip"],
+                                                                seed=707, params=FINISH_PARAMS)
+                assert all(abs(v[d["col"]][3] - a) < 1e-6 for v, a in zip(bm.verts, alpha)), "finish touched alpha"
+        out = super().finalize(coll, material)
+        for ob in out.values():
+            for a in ("kind", "lco", "fskip"):
+                if a in ob.data.attributes:
+                    ob.data.attributes.remove(ob.data.attributes[a])
+        return out
 
     # ------------------------------------------------------------------ extra primitives
     @staticmethod
