@@ -161,6 +161,8 @@ namespace CriticalMass.Runtime.Menus.Story
 
         public FilmState State { get; private set; } = FilmState.Idle;
         public double Time => _vp != null && State == FilmState.Playing ? _vp.time : 0.0;
+        /// <summary>The video frame on screen (build verification); -1 when nothing plays.</summary>
+        public long Frame => _vp != null && State == FilmState.Playing ? _vp.frame : -1;
         public bool Subtitles = true;
         /// <summary>The video reached its last frame.</summary>
         public bool Ended { get; private set; }

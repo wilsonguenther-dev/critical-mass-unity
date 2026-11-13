@@ -360,6 +360,15 @@ namespace CriticalMass.Runtime.Menus
         bool _filmMode, _quietStart;
         float _worldRamp = 99f;
         public bool FilmMode => _filmMode;
+        /// <summary>Build verification (IntroFilmCapture): what the intro is drawing now: "film" (the video is playing),
+        /// "comic" (the fallback), "preparing", or "none".</summary>
+        public static string PlaybackMode => Instance == null || !Instance._playing ? "none"
+            : Instance._comicMode ? "comic"
+            : Instance._filmMode && Instance._film != null && Instance._film.State == IntroFilmPlayer.FilmState.Playing ? "film"
+            : "preparing";
+        /// <summary>The video clock and the video frame on screen (build verification); -1 when no film plays.</summary>
+        public static double FilmClock => Instance != null && Instance._film != null ? Instance._film.Time : -1.0;
+        public static long FilmFrame => Instance != null && Instance._film != null ? Instance._film.Frame : -1;
         double _filmT;
         float _loadWait;
         /// <summary>Seconds the film has been on screen (the skip lock counts these).</summary>
@@ -398,7 +407,10 @@ namespace CriticalMass.Runtime.Menus
             // Once per launch: going back to the title later (a scene reload in the Title state) does not replay it.
             if (_launchPlayed) return;
             bool titleOnBoot = TitleScreen.ShowOnBoot || (LaunchRuleInEditorForTests && GameFlow.Enabled);
-            if (ShouldPlayAtLaunch(PlayOnFirstLaunch, titleOnBoot, GameFlow.State, GameFlow.Autoplay, GameSettings.IntroAtLaunch))
+            // intro-film-2: a build-verification run (-introCapture DIR) always plays the intro, whatever the saved setting.
+            bool capture = IntroFilmCapture.Requested;
+            if (ShouldPlayAtLaunch(PlayOnFirstLaunch || capture, titleOnBoot, GameFlow.State, GameFlow.Autoplay && !capture,
+                    GameSettings.IntroAtLaunch || capture))
             {
                 _launchPlayed = true;
                 Play();
@@ -554,7 +566,7 @@ namespace CriticalMass.Runtime.Menus
                 host.transform.SetParent(transform, false);
                 _film = host.AddComponent<IntroFilmPlayer>();
             }
-            _film.Subtitles = GameSettings.IntroSubtitles;
+            _film.Subtitles = GameSettings.IntroSubtitles || IntroFilmCapture.Requested;
             _film.TitleLogoY = () => OverlayGuard.TitleLogoY(TitleScreen.LogoY);
             _film.Begin(IntroFilm.Url);
             Timeline = new StoryTimeline(new[] { IntroFilm.Seconds });

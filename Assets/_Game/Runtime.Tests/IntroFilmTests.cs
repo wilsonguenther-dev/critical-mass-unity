@@ -24,6 +24,14 @@ namespace CriticalMass.Runtime.Tests
             Mathf.Abs((t - offset) / step - Mathf.Round((t - offset) / step)) * step <= 2f * Frame + 1e-4f;
 
         [Test]
+        public void BuildCaptureHarnessIsNeverOnInTheEditorOrANormalLaunch()
+        {
+            // intro-film-2: the video path is verified in a real player with -introCapture (tools/film/README-video-check.md);
+            // the harness must never switch itself on without that flag.
+            Assert.IsFalse(IntroFilmCapture.Requested);
+        }
+
+        [Test]
         public void TableLoadsAndMatchesTheFilm()
         {
             Assert.IsNotNull(T, "Resources/Story/intro-film.json");
