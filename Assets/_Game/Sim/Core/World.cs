@@ -97,6 +97,8 @@ namespace CriticalMass.Sim.Core
         public ToppleState Topple;
         /// <summary>CM-36: the shrine cleanse (Cleanse.cs).</summary>
         public CleanseState Cleanse;
+        /// <summary>DG-22: land mines, thrown TNT and their counters (Demolitions.cs).</summary>
+        public DemolitionsState Demolitions;
         /// <summary>Bumps on every ResetWorld. Views must drop cached per-match state when it changes.</summary>
         public int Epoch;
         public int Tick;
@@ -208,7 +210,7 @@ namespace CriticalMass.Sim.Core
             int used = 0;
             for (int k = 0; k < classCount; k++)
             {
-                double q = n * c.ClassMix(ClassIds.All[k]);
+                double q = n * c.ClassMix(ClassIds.All[k], n);
                 counts[k] = JsMath.FloorToInt(q + 1e-9);
                 frac[k] = q - counts[k];
                 used += counts[k];
@@ -270,7 +272,8 @@ namespace CriticalMass.Sim.Core
                 AnimAction = 0,
                 Moving = false,
                 PendingClass = null,
-                // ITEM CM-84: added by its owner (ClassSwitchCd = 0, ClassSwitches = 0)
+                ClassSwitchCd = 0, // CM-84 / U-065
+                ClassSwitches = 0,
                 StandUp = 0,
                 AirLen = 0,
                 AirTick = 0,
@@ -299,6 +302,8 @@ namespace CriticalMass.Sim.Core
                 ClassPick = -1,
                 Terraform = false,
                 Jump = false,
+                StationBuy = 0,
+                PingKind = 0,
             };
         }
 
@@ -345,6 +350,10 @@ namespace CriticalMass.Sim.Core
             world.Opts.TeamSize = n;
             world.Opts.HumanTeam = opts.HumanTeam;
             world.Opts.HumanClass = opts.HumanClass;
+            world.Opts.BotDifficulty = opts.BotDifficulty; // DG-21
+            world.Opts.AllyBotDifficulty = opts.AllyBotDifficulty;
+            world.Opts.Pace = opts.Pace; // sim-physics lane (OD-1)
+            world.Dur.Derive(world.Config, Durations.PaceOf(opts, world.Config)); // DG-68
             Rng.SeedRng(world.Rng, unchecked((uint)opts.Seed));
             world.Tick = 0;
             world.ActorCount = 2 * n;
@@ -530,6 +539,13 @@ namespace CriticalMass.Sim.Core
             cl.Count = 0;
             cl.Removed = 0;
 
+            // DG-22: mines, bombs and counters, reset in place.
+            world.Demolitions.Reset();
+            // DG-24: every piece gone (the repaint restored its cells), banks full again.
+            world.Builder.Reset();
+            world.Healer.Reset(); // DG-40
+            world.Depth.Reset(world); // U-063 onward
+
             SpatialHash.Rebuild(world.Hash, world.X, world.Z, world.Actors, world.ActorCount);
         }
 
@@ -564,7 +580,8 @@ namespace CriticalMass.Sim.Core
             a.AnimAction = 0;
             a.Moving = false;
             a.PendingClass = null;
-            // ITEM CM-84: added by its owner (ClassSwitchCd = 0, ClassSwitches = 0)
+            a.ClassSwitchCd = 0; // CM-84 / U-065
+            a.ClassSwitches = 0;
             a.StandUp = 0;
             a.AirLen = 0;
             a.AirTick = 0;
@@ -576,6 +593,19 @@ namespace CriticalMass.Sim.Core
             a.UnsupportedTicks = 0;
             a.LastCause = DamageCause.None;
             a.DeliverTicks = 0;
+            a.CoinsPicked = 0;
+            ClearSwing(a);
+        }
+
+        /// <summary>DG-69: no swing in flight (reset, respawn, death).</summary>
+        public static void ClearSwing(Actor a)
+        {
+            a.SwingTick = NeverTick;
+            a.SwingWindup = 0;
+            a.SwingRecovery = 0;
+            a.SwingFacing = 0;
+            a.SwingPending = false;
+            Knock.Clear(a);
         }
 
         private static void ResetInput(InputFrame f)
@@ -591,6 +621,8 @@ namespace CriticalMass.Sim.Core
             f.Terraform = false;
             f.Jump = false;
             f.TerraformSwitch = false;
+            f.StationBuy = 0;
+            f.PingKind = 0;
         }
 
         /// <summary>Build a world for opts: a fresh Skybreak Basin map and every buffer allocated at capacity.</summary>
@@ -633,6 +665,9 @@ namespace CriticalMass.Sim.Core
                     HumanTeam = opts.HumanTeam,
                     HumanClass = opts.HumanClass,
                     Config = cfg,
+                    BotDifficulty = opts.BotDifficulty,
+                    AllyBotDifficulty = opts.AllyBotDifficulty,
+                    Pace = opts.Pace,
                 },
                 Config = cfg,
                 Rng = Rng.CreateRng(unchecked((uint)opts.Seed)),
@@ -666,6 +701,7 @@ namespace CriticalMass.Sim.Core
                     Count = 0,
                     Removed = 0,
                 },
+                Demolitions = DemolitionsState.Create(cfg),
                 Epoch = 0,
                 Tick = 0,
                 ActorCount = 0,
@@ -722,6 +758,11 @@ namespace CriticalMass.Sim.Core
                 Events = events,
                 EventHead = 0,
                 Hash = SpatialHash.CreateSpatialHash(map.Width, map.Height, cap),
+                Builder = BuilderState.Create(cfg),
+                Healer = HealerState.Create(cfg),
+                Hits = PendingHits.Create(cap),
+                Dur = Durations.Create(cfg),
+                Depth = DepthState.Create(cfg, map),
             };
             InitWorld(world, opts);
             return world;
@@ -750,6 +791,35 @@ namespace CriticalMass.Sim.Core
         /// </summary>
         public static void PushEvent(World w, SimEventType type, int a, int b, double x, double z, double value, BiomassType? bio, DamageCause cause)
         {
+            PushEvent(w, type, a, b, x, z, value, bio, cause, 0);
+        }
+
+        /// <summary>DG-22: PushEvent with the effect radius (SimEvent.Radius) of a Demolitions event; every push writes it.</summary>
+        public static void PushEvent(World w, SimEventType type, int a, int b, double x, double z, double value, BiomassType? bio, DamageCause cause, double radius)
+        {
+            PushEvent(w, type, a, b, x, z, value, bio, cause, radius, 0, 0, 0, 0, 0, 0);
+        }
+
+        /// <summary>
+        /// Sim-physics lane: PushEvent with the world-force fields (C1): push direction (0, 0 = radial), Impulse (the sim's
+        /// knock distance in u), Tier (0 light, 1 heavy, 2 critical), and the Windup / Recovery ticks of a timed action.
+        /// Every push writes every field, so a reused slot never keeps a stale value.
+        /// </summary>
+        public static void PushEvent(World w, SimEventType type, int a, int b, double x, double z, double value, BiomassType? bio, DamageCause cause, double radius,
+            double dirX, double dirZ, double impulse, int tier, int windup, int recovery)
+        {
+            SimEvent ev = w.Events[w.EventHead % EventCapacity];
+            ev.DirX = dirX;
+            ev.DirZ = dirZ;
+            ev.Impulse = impulse;
+            ev.Tier = tier;
+            ev.Windup = windup;
+            ev.Recovery = recovery;
+            PushCore(w, type, a, b, x, z, value, bio, cause, radius);
+        }
+
+        private static void PushCore(World w, SimEventType type, int a, int b, double x, double z, double value, BiomassType? bio, DamageCause cause, double radius)
+        {
             SimEvent e = w.Events[w.EventHead % EventCapacity];
             e.Type = type;
             e.A = a;
@@ -759,6 +829,8 @@ namespace CriticalMass.Sim.Core
             e.Value = value;
             e.Bio = bio;
             e.Cause = cause;
+            e.Radius = radius;
+            e.Slot = -1; // U-066: Pickups writes it after the push
             w.EventHead++;
         }
 
@@ -804,5 +876,16 @@ namespace CriticalMass.Sim.Core
         }
 
         // DG-16b additions follow (appended).
+
+        /// <summary>DG-24: ladders and rope bridges, each team's spent biomass and the carry state (BuiltPieces.cs).</summary>
+        public BuilderState Builder;
+        /// <summary>DG-40: the Healer's purify cooldowns and counters (Healer.cs).</summary>
+        public HealerState Healer;
+        /// <summary>DG-67: this tick's melee hits, applied together after every swing is decided (Combat).</summary>
+        public PendingHits Hits;
+        /// <summary>DG-68: every duration of this world in ticks, derived once per CreateWorld / ResetWorld for the match pace.</summary>
+        public Durations Dur;
+        /// <summary>Mechanics depth (U-063 onward): roles, sources, stations, pickups, pings and map events (DepthState.cs).</summary>
+        public DepthState Depth;
     }
 }

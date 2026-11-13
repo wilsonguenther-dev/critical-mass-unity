@@ -15,7 +15,7 @@ namespace CriticalMass.Sim.Tests
     [TestFixture]
     public sealed class CombatTests
     {
-        private static GameConfig Cfg => GameConfig.CreateBrowser5v5();
+        private static GameConfig Cfg => SimPhysicsTests.ClassicBrowser();
 
         private static ClassConfig W => Cfg.Class(ClassId.Warrior);
 
@@ -27,7 +27,7 @@ namespace CriticalMass.Sim.Tests
                 TeamSize = 5,
                 HumanTeam = TeamId.Azure,
                 HumanClass = ClassId.Warrior,
-                Config = GameConfig.CreateBrowser5v5(),
+                Config = SimPhysicsTests.ClassicBrowser(),
             });
         }
 
@@ -348,7 +348,7 @@ namespace CriticalMass.Sim.Tests
                     TeamSize = 16,
                     HumanTeam = TeamId.Crimson,
                     HumanClass = ClassId.Farmer,
-                    Config = GameConfig.CreateBrowser5v5(),
+                    Config = SimPhysicsTests.ClassicBrowser(),
                 });
                 InputFrame f = SimInput.EmptyInput();
                 var deadBefore = new byte[w.ActorCount];

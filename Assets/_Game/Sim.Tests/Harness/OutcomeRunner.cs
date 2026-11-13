@@ -92,10 +92,11 @@ namespace CriticalMass.Sim.Tests.Harness
         }
 
         /// <summary>Play one full match (MatchSeconds) and measure it.</summary>
-        public static MatchOutcome RunOutcomeMatch(int seed, int teamSize, HumanMode human)
+        public static MatchOutcome RunOutcomeMatch(int seed, int teamSize, HumanMode human, System.Action<GameConfig> cfgTweak = null)
         {
             bool driveHuman = human == HumanMode.Bot;
             GameConfig cfg = GameConfig.CreateBrowser5v5();
+            cfgTweak?.Invoke(cfg); // U-063..U-068: the depth soak turns the mechanics-depth rules on
             World w = World.CreateWorld(new WorldOptions
             {
                 Seed = seed,

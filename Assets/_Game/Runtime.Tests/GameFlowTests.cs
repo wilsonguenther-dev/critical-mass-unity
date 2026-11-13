@@ -65,7 +65,7 @@ namespace CriticalMass.Runtime.Tests
             MatchRequest r = GameFlow.RequestForBuild();
             Assert.AreEqual(FlowState.Title, GameFlow.State);
             Assert.IsTrue(r.Backdrop);
-            Assert.AreEqual(16, r.TeamSize);
+            Assert.AreEqual(GameFlow.BackdropTeamSize, r.TeamSize, "8v8 behind the menus (idle CPU budget)");
             Assert.AreNotEqual(new GameConfig().Seed, r.Seed, "the backdrop must not be the fixed 1337 match");
         }
 
@@ -149,7 +149,10 @@ namespace CriticalMass.Runtime.Tests
         {
             List<MenuEntry> e = OverlayRegistry.MenuEntries(Array.Empty<Type>());
             string[] ids = e.ConvertAll(x => x.Id).ToArray();
-            CollectionAssert.AreEqual(new[] { "play", "spectate", "howto", "barracks", "controls", "settings", "codex", "credits", "quit" }, ids);
+            CollectionAssert.AreEqual(new[] { "playnow", "play", "spectate", "howto", "barracks", "controls", "settings", "codex", "credits", "quit" }, ids);
+            Assert.IsTrue(e.Find(x => x.Id == "playnow").Available, "PLAY NOW is the first line");
+            Assert.AreEqual("PLAY NOW", e[0].Label);
+            Assert.AreEqual("CUSTOM MATCH", e.Find(x => x.Id == "play").Label, "the setup flow keeps its line as Custom match");
             Assert.IsTrue(e.Find(x => x.Id == "play").Available);
             Assert.IsTrue(e.Find(x => x.Id == "controls").Available);
             Assert.IsTrue(e.Find(x => x.Id == "settings").Available);
@@ -222,11 +225,14 @@ namespace CriticalMass.Runtime.Tests
                 m.EnsureBuilt();
                 Assert.AreEqual(m.Entries.Count, m.Items.Count);
                 for (int i = 0; i < m.Entries.Count; i++) Assert.AreEqual(m.Entries[i].Available, m.Items[i].interactable, m.Entries[i].Id);
-                // Integration batch 2: every line leads somewhere (Barracks, Codex, Credits, Spectate are wired).
+                // Integration batch 2: every line leads somewhere (Barracks, Codex, Credits are wired).
                 Assert.IsTrue(m.Item("barracks").interactable);
                 Assert.IsTrue(m.Item("codex").interactable);
-                Assert.IsTrue(m.Item("spectate").interactable);
-                Assert.IsTrue(m.Item("play").interactable);
+                // Home lobby: Play now, Custom match and Spectate live on the mode cards; "play" / "playnow" are the PLAY button.
+                Assert.IsNull(m.Item("spectate"), "spectate is a mode card, not a home tile");
+                Assert.AreSame(m.PlayItem, m.Item("play"));
+                Assert.AreSame(m.PlayItem, m.Item("playnow"));
+                Assert.IsTrue(m.PlayItem.interactable);
                 AssertChainSkipsDisabled(m.Items);
                 for (int i = 0; i < m.Entries.Count; i++)
                     if (!m.Entries[i].Available) Assert.IsNotNull(m.Items[i].transform.Find("Soon"), "coming soon lines carry the tag");
@@ -246,7 +252,7 @@ namespace CriticalMass.Runtime.Tests
                 MatchSetup s = go.AddComponent<MatchSetup>();
                 s.EnsureBuilt();
                 var all = new List<MenuItem> { s.TeamItem, s.SizeItem, s.PaceItem, s.StartItem, s.BackItem };
-                for (int c = 0; c < 5; c++)
+                for (int c = 0; c < MatchSetup.CardCount; c++)
                 {
                     MenuItem card = s.Card((ClassId)c);
                     Assert.IsNotNull(card);
@@ -256,8 +262,10 @@ namespace CriticalMass.Runtime.Tests
                     all.Add(card);
                 }
                 AssertChainSkipsDisabled(all);
-                s.SetClass(ClassId.Builder);
-                Assert.AreNotEqual(ClassId.Builder, s.Choice.Class, "a coming-soon class can't be picked");
+                // integration batch 3: every class is playable now (Demolitions, Builder and Healer landed)
+                CollectionAssert.AreEquivalent(ClassIds.All, MatchSetup.Playable);
+                s.SetClass(ClassId.Healer);
+                Assert.AreEqual(ClassId.Healer, s.Choice.Class, "the Healer can be picked");
                 s.SetTeam(TeamId.Crimson);
                 s.SetClass(ClassId.Miner);
                 s.SetSize(5);

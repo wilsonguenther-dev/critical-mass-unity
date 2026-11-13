@@ -19,6 +19,15 @@ namespace CriticalMass.Editor
         const string SettingsDir = "Assets/_Game/Settings";
         const string UrpAssetPath = SettingsDir + "/CriticalMass_URP.asset";
         const string UrpRendererPath = SettingsDir + "/CriticalMass_URP_Renderer.asset";
+        // DG-50 quality ladder: Very Low and Low use Low, Medium uses Medium, High and above use the original asset.
+        const string UrpLowPath = SettingsDir + "/CriticalMass_URP_Low.asset";
+        const string UrpMediumPath = SettingsDir + "/CriticalMass_URP_Medium.asset";
+        // Physics audit DG-80 (R-m7): Low and Medium draw with plain Forward (one directional light; CMToon has no Forward+
+        // variants, so Forward+ only paid for light binning). High keeps the original Forward+ renderer.
+        const string UrpForwardRendererPath = SettingsDir + "/CriticalMass_URP_Renderer_Forward.asset";
+        /// <summary>DG-80 (R-m3): the audio DSP buffer, "Good latency" (was 1024, about 45 to 90 ms behind the hit flash).</summary>
+        public const int DspBufferSize = 512;
+        const int DefaultStandaloneQuality = 3;   // High; never Ultra
         const string BootScenePath = "Assets/_Game/Scenes/Boot.unity";
         const string ControlsPath = SettingsDir + "/Controls.inputactions";
         const string PlaceholderDir = "Assets/_Game/Resources/Placeholder";
@@ -52,6 +61,9 @@ namespace CriticalMass.Editor
             }
         }
 
+        /// <summary>The view's compile switches for the merged sim lanes (PR #50 / #59: physics fields, mechanics depth).</summary>
+        public static readonly string[] SimDefines = { "CM_SIM_PHYSICS", "CM_SIM_MECHANICS" };
+
         static void ApplyPlayerSettings()
         {
             var standalone = NamedBuildTarget.Standalone;
@@ -60,10 +72,34 @@ namespace CriticalMass.Editor
             PlayerSettings.SetApplicationIdentifier(standalone, "com.drivia.criticalmass");
             PlayerSettings.defaultScreenWidth = 1920;
             PlayerSettings.defaultScreenHeight = 1080;
-            PlayerSettings.fullScreenMode = FullScreenMode.Windowed;
+            // DG-52: borderless fullscreen-window by default (a windowed option is in Settings); never exclusive
+            // fullscreen and never a display-mode change.
+            PlayerSettings.fullScreenMode = FullScreenMode.FullScreenWindow;
+            PlayerSettings.defaultIsNativeResolution = true;
+            PlayerSettings.resizableWindow = true;
+            PlayerSettings.allowFullscreenSwitch = true;
+            PlayerSettings.forceSingleInstance = true;      // Windows: a second launch focuses the first (macOS: instance.lock)
+            // DG-51: keep running when unfocused (FrameGovernor keeps the normal cap; sound stays on).
+            PlayerSettings.runInBackground = true;
+            PlayerSettings.visibleInBackground = true;
+            // DG-54: FrameTimingManager CPU and GPU frame times in release players too.
+            PlayerSettings.enableFrameTimingStats = true;
+            // DG-80 (R-M1): skinning on the GPU through compute shaders, batched (6000.3 docs: PlayerSettings.meshDeformation,
+            // MeshDeformation.GPUBatched, needs a graphics API with compute shaders: Metal and Direct3D 11 both have them).
+            if (PlayerSettings.meshDeformation != MeshDeformation.GPUBatched) PlayerSettings.meshDeformation = MeshDeformation.GPUBatched;
+            // DG-56: Windows pinned to Direct3D 11 first, 12 as the fallback.
+            var win = new[] { GraphicsDeviceType.Direct3D11, GraphicsDeviceType.Direct3D12 };
+            if (PlayerSettings.GetUseDefaultGraphicsAPIs(BuildTarget.StandaloneWindows64)) PlayerSettings.SetUseDefaultGraphicsAPIs(BuildTarget.StandaloneWindows64, false);
+            if (!PlayerSettings.GetGraphicsAPIs(BuildTarget.StandaloneWindows64).SequenceEqual(win)) PlayerSettings.SetGraphicsAPIs(BuildTarget.StandaloneWindows64, win);
             PlayerSettings.SetApiCompatibilityLevel(standalone, ApiCompatibilityLevel.NET_Standard);
             PlayerSettings.SetScriptingBackend(standalone, ScriptingImplementation.Mono2x);
             PlayerSettings.colorSpace = ColorSpace.Linear;
+            // Integration batch 4: the merged sim (#61) carries the physics and mechanics-depth fields; the view reads them
+            // only behind these two defines (MechPhysics, DepthRead). Kept in order, added once, other symbols untouched.
+            var defines = PlayerSettings.GetScriptingDefineSymbols(standalone).Split(';').Where(d => d.Length > 0).ToList();
+            foreach (string d in SimDefines) if (!defines.Contains(d)) defines.Add(d);
+            string joined = string.Join(";", defines);
+            if (joined != PlayerSettings.GetScriptingDefineSymbols(standalone)) PlayerSettings.SetScriptingDefineSymbols(standalone, joined);
 
             // Active Input Handling: 0 = Input Manager (old), 1 = Input System (new), 2 = both.
             var playerSettings = AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/ProjectSettings.asset")
@@ -109,18 +145,192 @@ namespace CriticalMass.Editor
             // about 40 u from the camera at the top edge).
             asset.mainLightShadowmapResolution = 2048;
             asset.shadowCascadeCount = 1;
-            asset.shadowDistance = 60f;
+            // DG-80 (R-M8): 35 m at High covers the farthest ground the gameplay camera sees (about 31.5 m); it was 60 m on a
+            // 112 x 72 map, so the shadow pass drew almost every caster on the map at half the texel density.
+            asset.shadowDistance = CriticalMass.Runtime.Game.QualityTable.HighShadowMetres;
             EditorUtility.SetDirty(asset);
 
             GraphicsSettings.defaultRenderPipeline = asset;
 
+            // DG-50: three real pipeline assets. Low and Medium start as copies of the High asset (same renderer, new
+            // GUIDs) and only the listed fields differ; every write is skipped when the value is already right, so a
+            // second Apply leaves git clean.
+            var low = EnsureTier(UrpLowPath, so =>
+            {
+                bool d = false;
+                d |= SetInt(so, "m_SupportsHDR", 0);
+                d |= SetInt(so, "m_MSAA", 1);                        // 1 = anti-aliasing off
+                d |= SetFloat(so, "m_RenderScale", 0.75f);
+                // DG-80: no shadow map at Low (blob shadows under fighters instead, FxScene.BlobShadows).
+                d |= SetInt(so, "m_MainLightShadowsSupported", 0);
+                d |= SetInt(so, "m_MainLightShadowmapResolution", 1024);
+                d |= SetInt(so, "m_AdditionalLightShadowsSupported", 0);
+                d |= SetInt(so, "m_AdditionalLightsPerObjectLimit", 2);
+                d |= SetFloat(so, "m_ShadowDistance", 0f);
+                return d;
+            });
+            var medium = EnsureTier(UrpMediumPath, so =>
+            {
+                bool d = false;
+                d |= SetInt(so, "m_SupportsHDR", 0);
+                d |= SetInt(so, "m_MainLightShadowmapResolution", 1024);
+                d |= SetInt(so, "m_AdditionalLightShadowsSupported", 0);
+                d |= SetFloat(so, "m_ShadowDistance", CriticalMass.Runtime.Game.QualityTable.MediumShadowMetres);   // DG-80: 30 m
+                return d;
+            });
+            UniversalRendererData forward = EnsureForwardRenderer();
+            if (forward != null)
+            {
+                SetFirstRenderer(low, forward);
+                SetFirstRenderer(medium, forward);
+            }
+            ApplyAudioAndPhysics();
+
+            var tiers = new RenderPipelineAsset[] { low, medium, asset };
             int current = QualitySettings.GetQualityLevel();
             for (int i = 0; i < QualitySettings.names.Length; i++)
             {
                 QualitySettings.SetQualityLevel(i, false);
-                QualitySettings.renderPipeline = asset;
+                RenderPipelineAsset want = tiers[i <= 1 ? 0 : i == 2 ? 1 : 2];
+                if (QualitySettings.renderPipeline != want) QualitySettings.renderPipeline = want;
+                if (QualitySettings.vSyncCount != 1) QualitySettings.vSyncCount = 1;   // DG-49: never uncapped, editor and tests too
             }
-            QualitySettings.SetQualityLevel(current, false);
+            QualitySettings.SetQualityLevel(current == 5 || current == 4 ? DefaultStandaloneQuality : current, false);
+            SetStandaloneDefaultQuality(DefaultStandaloneQuality);
+        }
+
+        /// <summary>DG-80: a copy of the renderer in plain Forward mode for Low and Medium (created once, then only checked).</summary>
+        static UniversalRendererData EnsureForwardRenderer()
+        {
+            var r = AssetDatabase.LoadAssetAtPath<UniversalRendererData>(UrpForwardRendererPath);
+            if (r == null)
+            {
+                if (!AssetDatabase.CopyAsset(UrpRendererPath, UrpForwardRendererPath))
+                {
+                    Debug.LogWarning("[CriticalMass.Setup] could not copy the renderer for Forward; Low and Medium keep Forward+");
+                    return null;
+                }
+                r = AssetDatabase.LoadAssetAtPath<UniversalRendererData>(UrpForwardRendererPath);
+                if (r == null) return null;
+            }
+            if (r.renderingMode != RenderingMode.Forward)
+            {
+                r.renderingMode = RenderingMode.Forward;
+                EditorUtility.SetDirty(r);
+            }
+            return r;
+        }
+
+        /// <summary>Points a pipeline asset's first renderer at rendererData (skipped when it already does).</summary>
+        static void SetFirstRenderer(UniversalRenderPipelineAsset a, ScriptableRendererData rendererData)
+        {
+            if (a == null || rendererData == null) return;
+            var so = new SerializedObject(a);
+            SerializedProperty list = so.FindProperty("m_RendererDataList");
+            if (list == null || !list.isArray || list.arraySize == 0)
+            {
+                Debug.LogWarning("[CriticalMass.Setup] m_RendererDataList not found on " + a.name);
+                return;
+            }
+            SerializedProperty first = list.GetArrayElementAtIndex(0);
+            if (first.objectReferenceValue == rendererData) return;
+            first.objectReferenceValue = rendererData;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(a);
+        }
+
+        /// <summary>
+        /// DG-80: DSP buffer 512 (R-m3) and physics stepped only by script (R-m11: nothing in the game uses Unity physics;
+        /// view physics, if added, steps its own local scene). Both through SerializedObject on the project settings files;
+        /// each write is skipped when the value is already right, so a second Apply leaves git clean.
+        /// </summary>
+        static void ApplyAudioAndPhysics()
+        {
+            WriteSetting("ProjectSettings/AudioManager.asset", "m_DSPBufferSize", DspBufferSize);
+            WriteSetting("ProjectSettings/DynamicsManager.asset", "m_SimulationMode", 2);   // SimulationMode.Script
+        }
+
+        static void WriteSetting(string path, string property, int value)
+        {
+            UnityEngine.Object o = AssetDatabase.LoadAllAssetsAtPath(path).FirstOrDefault();
+            if (o == null) { Debug.LogWarning("[CriticalMass.Setup] " + path + " not found"); return; }
+            var so = new SerializedObject(o);
+            SerializedProperty p = so.FindProperty(property);
+            if (p == null) { Debug.LogWarning("[CriticalMass.Setup] " + property + " not found in " + path); return; }
+            if (p.intValue == value) return;
+            p.intValue = value;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(o);   // integration batch 3: AudioManager kept 1024 without this (project settings save only when dirty)
+        }
+
+        static UniversalRenderPipelineAsset EnsureTier(string path, Func<SerializedObject, bool> configure)
+        {
+            var a = AssetDatabase.LoadAssetAtPath<UniversalRenderPipelineAsset>(path);
+            if (a == null)
+            {
+                if (!AssetDatabase.CopyAsset(UrpAssetPath, path)) throw new InvalidOperationException("could not copy " + UrpAssetPath + " to " + path);
+                a = AssetDatabase.LoadAssetAtPath<UniversalRenderPipelineAsset>(path);
+                if (a == null) throw new InvalidOperationException(path + " did not import as a URP asset");
+            }
+            var so = new SerializedObject(a);
+            if (configure(so))
+            {
+                so.ApplyModifiedPropertiesWithoutUndo();
+                EditorUtility.SetDirty(a);
+            }
+            return a;
+        }
+
+        static bool SetInt(SerializedObject so, string name, int v)
+        {
+            SerializedProperty p = so.FindProperty(name);
+            if (p == null) { Debug.LogWarning("[CriticalMass.Setup] URP field " + name + " not found"); return false; }
+            if (p.propertyType == SerializedPropertyType.Boolean)
+            {
+                if (p.boolValue == (v != 0)) return false;
+                p.boolValue = v != 0;
+                return true;
+            }
+            if (p.propertyType == SerializedPropertyType.Enum)
+            {
+                if (p.intValue == v) return false;
+                p.intValue = v;
+                return true;
+            }
+            if (p.intValue == v) return false;
+            p.intValue = v;
+            return true;
+        }
+
+        static bool SetFloat(SerializedObject so, string name, float v)
+        {
+            SerializedProperty p = so.FindProperty(name);
+            if (p == null) { Debug.LogWarning("[CriticalMass.Setup] URP field " + name + " not found"); return false; }
+            if (Mathf.Abs(p.floatValue - v) < 1e-5f) return false;
+            p.floatValue = v;
+            return true;
+        }
+
+        // DG-50: first launch defaults to High (the per-platform default lives only in QualitySettings.asset's
+        // m_PerPlatformDefaultQuality map; there is no public setter, so it is written through SerializedObject).
+        static void SetStandaloneDefaultQuality(int level)
+        {
+            var qs = AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/QualitySettings.asset").FirstOrDefault();
+            if (qs == null) { Debug.LogWarning("[CriticalMass.Setup] QualitySettings asset not found"); return; }
+            var so = new SerializedObject(qs);
+            SerializedProperty map = so.FindProperty("m_PerPlatformDefaultQuality");
+            if (map == null || !map.isArray) { Debug.LogWarning("[CriticalMass.Setup] m_PerPlatformDefaultQuality not found; set Standalone to High by hand"); return; }
+            for (int i = 0; i < map.arraySize; i++)
+            {
+                SerializedProperty e = map.GetArrayElementAtIndex(i);
+                SerializedProperty k = e.FindPropertyRelative("first"), v = e.FindPropertyRelative("second");
+                if (k == null || v == null || k.stringValue != "Standalone") continue;
+                if (v.intValue == level) return;
+                v.intValue = level;
+                so.ApplyModifiedPropertiesWithoutUndo();
+                return;
+            }
+            Debug.LogWarning("[CriticalMass.Setup] no Standalone entry in m_PerPlatformDefaultQuality");
         }
 
         // URP auto-creates its global settings and default volume profile at the Assets root; keep them in _Game/Settings.

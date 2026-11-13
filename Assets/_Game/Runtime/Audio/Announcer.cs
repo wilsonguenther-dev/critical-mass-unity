@@ -185,7 +185,9 @@ namespace CriticalMass.Runtime.Audio
         public void Expire(double now)
         {
             for (int i = _count - 1; i >= 0; i--)
-                if (now - _at[i] > MaxAgeSeconds)
+                // Finisher (batch 3, sim-long FullMatchKeepsTheRule): the result never goes stale. A line that started under
+                // 6 s before the end held the result past MaxAgeSeconds and it was dropped, so the match ended uncalled.
+                if (now - _at[i] > MaxAgeSeconds && !IsResult(_trig[i]))
                 {
                     RemoveAt(i);
                     Dropped++;
@@ -193,6 +195,9 @@ namespace CriticalMass.Runtime.Audio
         }
 
         /// <summary>The line to start now, if the cooldown allows one; it is recorded in the history.</summary>
+        static bool IsResult(AnnouncerTrigger t) =>
+            t == AnnouncerTrigger.Victory || t == AnnouncerTrigger.Defeat || t == AnnouncerTrigger.Draw;
+
         public bool TryNext(double now, out AnnouncerLine line)
         {
             line = null;
@@ -301,6 +306,9 @@ namespace CriticalMass.Runtime.Audio
             for (; _cursor < head; _cursor++)
             {
                 SimEvent e = w.Events[_cursor % World.EventCapacity];
+                // Integration batch 3 (sim-long FullMatchKeepsTheRule): once the result is called nothing else is queued.
+                // Events written in the same tick after MatchEnd (a hill-contested flip) used to play after "Victory".
+                if (_endCalled && e.Type != SimEventType.MatchEnd) continue;
                 switch (e.Type)
                 {
                     case SimEventType.HillOwnerChange: OnHill(e.A, me, q, now); break;
@@ -413,6 +421,12 @@ namespace CriticalMass.Runtime.Audio
                 PlayerPrefs.Save();
             }
         }
+
+        /// <summary>
+        /// Free to speak a low-priority line now (nothing playing, nothing queued). A queued line ages out after
+        /// AnnouncerQueue.MaxAgeSeconds, so a rare line (the hill secret) is only handed over when it will really be said.
+        /// </summary>
+        public static bool Free => Instance != null && !IsSpeaking && Instance._queue.Pending == 0;
 
         public static bool IsSpeaking => Instance != null && Instance._lineEnds > Time.unscaledTime;
         /// <summary>The subtitle on screen ("" when none).</summary>
@@ -597,7 +611,7 @@ namespace CriticalMass.Runtime.Audio
             _panel = MenuUi.Panel(_space, "Subtitle", (HudLayout.RefW - 600f) * 0.5f, SubtitleY, 600f, SubtitleH);
             _panel.OutlinePx = 3f;
             _panel.RimPx = 2f;
-            _text = MenuUi.Label(_panel.transform, "Line", CMTokens.Ui, 28, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter,
+            _text = MenuUi.Label(_panel.transform, "Line", CMTokens.Ui, UiScale.TypeButton, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter,
                 0f, 0f, 600f, SubtitleH, string.Empty, 2f);
             _canvas.enabled = false;
         }

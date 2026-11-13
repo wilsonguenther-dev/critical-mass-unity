@@ -179,7 +179,7 @@ namespace CriticalMass.Runtime.Menu
                 _stills[k].texture = still;
                 _stills[k].enabled = still != null;
                 HudText.Set(_labels[k], Label(kind, has, m));
-                HudText.Set(_times[k], has ? "AT " + NumberCache.Mmss(m.MatchTime) : string.Empty);
+                HudText.Set(_times[k], has ? "AT " + NumberCache.Mmss(global::CriticalMass.Runtime.Flow.MatchSpeed.ToReal(m.MatchTime)) : string.Empty);
                 HudText.Set(_empty[k], still != null ? string.Empty : has ? "NO PICTURE" : Missing(kind));
             }
         }
@@ -223,7 +223,7 @@ namespace CriticalMass.Runtime.Menu
             MenuUi.Stretch(wash.rectTransform);
             wash.transform.SetAsFirstSibling();
             MenuUi.Panel(space, "Panel", PanelX, PanelY, PanelW, PanelH);
-            MenuUi.Label(space, "Title", CMTokens.Display, 56, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, PanelX, PanelY + 24f, PanelW, 80f,
+            MenuUi.Label(space, "Title", CMTokens.Display, UiScale.TypeDisplay, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, PanelX, PanelY + 24f, PanelW, 80f,
                 "HIGHLIGHTS", 4f);
             float x0 = PanelX + (PanelW - (3 * TileW + 2 * TileGap)) * 0.5f;
             for (int k = 0; k < 3; k++)
@@ -232,28 +232,28 @@ namespace CriticalMass.Runtime.Menu
                 VectorShape frame = MenuUi.Shape(space, "Frame " + k, ShapeKind.RoundRect, x - 6f, TileY - 6f, TileW + 12f, TileH + 12f,
                     CMTokens.VoidNavy.Color, 12f);
                 frame.RimPx = 2f;
-                _empty[k] = MenuUi.Label(space, "Empty " + k, CMTokens.Display, 22, CMTokens.Stone.Color, TextAnchor.MiddleCenter, x, TileY, TileW, TileH, "", 2f);
+                _empty[k] = MenuUi.Label(space, "Empty " + k, CMTokens.Display, UiScale.TypeBody, CMTokens.StoneInk.Color, TextAnchor.MiddleCenter, x, TileY, TileW, TileH, "", 2f);
                 RawImage img = MenuUi.Rt(space, "Still " + k).gameObject.AddComponent<RawImage>();
                 MenuUi.Place(img.rectTransform, x, TileY, TileW, TileH);
                 img.raycastTarget = false;
                 img.enabled = false;
                 _stills[k] = img;
-                _labels[k] = MenuUi.Label(space, "Label " + k, CMTokens.Display, 24, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft, x, TileY + TileH + 16f,
+                _labels[k] = MenuUi.Label(space, "Label " + k, CMTokens.Display, UiScale.TypeBody, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft, x, TileY + TileH + 16f,
                     TileW, 36f, "", 3f);
-                _times[k] = MenuUi.Label(space, "Time " + k, CMTokens.Mono, 20, CMTokens.ToolBrass.Color, TextAnchor.MiddleLeft, x, TileY + TileH + 52f,
+                _times[k] = MenuUi.Label(space, "Time " + k, CMTokens.Mono, UiScale.TypeSmall, CMTokens.ToolBrass.Color, TextAnchor.MiddleLeft, x, TileY + TileH + 52f,
                     TileW, 30f, "", 2f);
             }
             const float bw = 460f, cw = 300f, gap = 24f, by = PanelY + PanelH - 132f;
             float bx = PanelX + (PanelW - (bw + gap + cw)) * 0.5f;
-            _share = MenuUi.Item(space, "Share", bx, by, bw, 72f, "SAVE PHOTO   F12", MenuItem.Kind.Button, 30, true, CMTokens.Display);
+            _share = MenuUi.Item(space, "Share", bx, by, bw, 72f, "SAVE PHOTO   " + CriticalMass.Runtime.Input.InputGlyphs.ForPath("<Keyboard>/f12").Words.ToUpperInvariant(), MenuItem.Kind.Button, UiScale.TypeHeading, true, CMTokens.Display);
             _share.Body.Radius = 16f;
             _share.Submitted = Share;
-            _close = MenuUi.Item(space, "Close", bx + bw + gap, by, cw, 72f, "CLOSE", MenuItem.Kind.Button, 30, true, CMTokens.Display);
+            _close = MenuUi.Item(space, "Close", bx + bw + gap, by, cw, 72f, "CLOSE", MenuItem.Kind.Button, UiScale.TypeHeading, true, CMTokens.Display);
             _close.Body.Radius = 16f;
             _close.Submitted = Close;
             _share.navigation = new Navigation { mode = Navigation.Mode.Explicit, selectOnLeft = _close, selectOnRight = _close };
             _close.navigation = new Navigation { mode = Navigation.Mode.Explicit, selectOnLeft = _share, selectOnRight = _share };
-            _status = MenuUi.Label(space, "Status", CMTokens.Ui, 20, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, PanelX, by + 82f, PanelW, 30f, "", 2f);
+            _status = MenuUi.Label(space, "Status", CMTokens.Ui, UiScale.TypeSmall, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, PanelX, by + 82f, PanelW, 30f, "", 2f);
             _canvas.enabled = false;
         }
     }

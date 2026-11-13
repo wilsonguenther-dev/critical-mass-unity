@@ -26,16 +26,15 @@ namespace CriticalMass.Runtime.View.Effects
     /// </summary>
     public static class Effects
     {
-        /// <summary>Camera shake setting (PlayerPrefs int). The art direction is no shake in normal play, so an unset key
-        /// means OFF here; the settings page on main stores 1 or 0 when the player changes it.</summary>
-        public const string ShakeKey = "cm.shake";
+        /// <summary>Camera shake setting (PlayerPrefs int, the same key GameSettings writes). Default OFF (OD-6).</summary>
+        public const string ShakeKey = CriticalMass.Runtime.Menu.GameSettings.ShakeKey;
         public const string BloodKey = BloodSetting.Key;
 
         /// <summary>The running CombatFx (set in its Start, cleared in OnDestroy).</summary>
         public static CombatFx Active { get; internal set; }
 
-        /// <summary>Camera shake allowed (cm.shake == 1). Default off.</summary>
-        public static bool ShakeEnabled => PlayerPrefs.GetInt(ShakeKey, 0) != 0;
+        /// <summary>Camera shake allowed: GameSettings.CameraShake, the one source of truth (default off).</summary>
+        public static bool ShakeEnabled => CriticalMass.Runtime.Menu.GameSettings.CameraShake;
 
         /// <summary>The world offset applied to the gameplay camera for the frame being drawn (zero when shake is off).</summary>
         public static Vector3 ShakeOffset { get; internal set; }

@@ -117,6 +117,8 @@ namespace CriticalMass.Runtime.Hud.Interact
         /// <summary>Builds every widget once (hidden). Safe to call again.</summary>
         public void Build()
         {
+            // The guided match's map step asks this layer whether the full map is open (TrialFeatures.MapOpenProbe).
+            CriticalMass.Runtime.Onboarding.TrialFeatures.MapOpenProbe = () => FullMap.IsOpen;
             if (_built) return;
             _built = true;
             if (Driver == null) Driver = GetComponent<SimDriverBehaviour>();
@@ -204,9 +206,12 @@ namespace CriticalMass.Runtime.Hud.Interact
             else
             {
                 // in controller HUD focus the d-pad navigates, so its map, zoom and ping buttons wait until focus ends (B)
-                if (MapKey.WasPressed && !Wheel.IsOpen && !_padHudFocus) { if (Map.IsOpen) CloseMap(); else OpenMap(); }
-                if (ZoomKey.WasPressed && !Map.IsOpen && !_padHudFocus) Minimap.ToggleZoom();
-                if (CursorKey.WasPressedOnGamepad && !_padHudFocus && !Map.IsOpen && !Card.IsOpen && !Wheel.IsOpen)
+                // 2026-11-12: shared d-pad resolved by context (InputContext): spectating, it belongs to the objective jumps.
+                InputContextKind ctx = InputContext.Current;
+                _ctx = ctx;
+                if (MapKey.WasPressedIn(ctx) && !Wheel.IsOpen && !_padHudFocus) { if (Map.IsOpen) CloseMap(); else OpenMap(); }
+                if (ZoomKey.WasPressedIn(ctx) && !Map.IsOpen && !_padHudFocus) Minimap.ToggleZoom();
+                if (CursorKey.WasPressedOnGamepad && InputContext.HudOwnsDpad(ctx) && !_padHudFocus && !Map.IsOpen && !Card.IsOpen && !Wheel.IsOpen)
                 {
                     SetPadFocus(true);
                     _navRepeatAt = now + 0.35f;   // the press that entered focus does not also move it
@@ -248,9 +253,30 @@ namespace CriticalMass.Runtime.Hud.Interact
 
         // ---------------------------------------------------------------- pings
 
+        /// <summary>
+        /// Capture and test hook (2026-11-12): while true an open ping wheel stays open without the ping key held, so a
+        /// capture script can photograph it. Never set in play; the capture walk clears it after its shot.
+        /// </summary>
+        public static bool DebugHoldWheel;
+
+        /// <summary>The input context this frame (InputContext.Current, read once in Update).</summary>
+        InputContextKind _ctx;
+
+        /// <summary>Capture and test hook: opens the ping wheel at the player as a ping-key press would. True when it opened.</summary>
+        public bool DebugOpenWheel()
+        {
+            World w = Driver != null ? Driver.World : null;
+            if (!_built || w == null || _root == null) return false;
+            Actor me = w.Actors[Me];
+            double x = w.X[Me] + Math.Cos(me.Facing) * 6.0, z = w.Z[Me] + Math.Sin(me.Facing) * 6.0;
+            Wheel.Open(x, z, Vector2.zero, _root.rect, Time.unscaledTime, false);
+            _wheelStart = Vector2.zero;
+            return Wheel.IsOpen;
+        }
+
         bool TickPing(World w, float now, UnityEngine.Camera cam, Vector2 rootLocal, bool padActive, Gamepad pad, Mouse mouse, ref GateReason reasons)
         {
-            if (!Wheel.IsOpen && PingKey.WasPressed && !Card.IsOpen && !_padHudFocus)
+            if (!Wheel.IsOpen && PingKey.WasPressedIn(_ctx) && !Card.IsOpen && !_padHudFocus)
             {
                 double x, z;
                 Vector2 at;
@@ -293,7 +319,7 @@ namespace CriticalMass.Runtime.Hud.Interact
             bool confirm = mouse != null && mouse.leftButton.wasPressedThisFrame && Wheel.Selected >= 0;
             bool cancel = (mouse != null && mouse.rightButton.wasPressedThisFrame) || (pad != null && pad.buttonEast.wasPressedThisFrame);
             if (cancel) Wheel.Cancel();
-            else if (confirm || PingKey.WasReleased || !PingKey.IsPressed)
+            else if (!DebugHoldWheel && (confirm || PingKey.WasReleased || !PingKey.IsPressed))
             {
                 if (Wheel.Release(now, out PingKind kind)) Pings.Place(w, kind, Wheel.X, Wheel.Z, Me);
             }
@@ -528,7 +554,7 @@ namespace CriticalMass.Runtime.Hud.Interact
             GameConfig c = Cfg;
             MatchState m = w.Match;
             bool egg = !m.Hatched || w.Kaiju.State == KaijuState.Egg;
-            string sub = egg ? "EGG · HATCHES IN " + Clock(c.HatchSeconds - m.Time)
+            string sub = egg ? "EGG · HATCHES IN " + Clock(global::CriticalMass.Runtime.Flow.MatchSpeed.ToReal(c.HatchSeconds - m.Time))
                 : w.Kaiju.State == KaijuState.Azure ? "AZURE · FIGHTS FOR AZURE"
                 : w.Kaiju.State == KaijuState.Crimson ? "CRIMSON · FIGHTS FOR CRIMSON"
                 : w.Kaiju.State == KaijuState.Berserk ? "BERSERK · FIGHTS EVERYONE" : "WILD · FIGHTS WHOEVER HITS IT";
@@ -597,7 +623,7 @@ namespace CriticalMass.Runtime.Hud.Interact
             int cls = Mathf.Clamp((int)a.Cls, 0, ClassUpper.Length - 1);
             Card.Open("health", "HEALTH", ClassUpper[cls], new[]
             {
-                a.Alive ? "Health " + N(Math.Ceiling(Math.Max(0, a.Hp))) + " of " + N(a.MaxHp) + ". Each heart is a quarter." : "Knocked out. Back in " + N(Math.Ceiling(Math.Max(0, a.RespawnIn))) + " s.",
+                a.Alive ? "Health " + N(Math.Ceiling(Math.Max(0, a.Hp))) + " of " + N(a.MaxHp) + ". Each heart is a quarter." : "Knocked out. Back in " + N(Math.Ceiling(Math.Max(0, global::CriticalMass.Runtime.Flow.MatchSpeed.ToReal(a.RespawnIn)))) + " s.",
                 LoreText.Tip("tip-14", c) ?? "Knocked out? You are back in " + N(c.Respawn.DelaySeconds) + " s, and nothing can hurt you for " + N(c.Respawn.ProtectionSeconds) + " s after.",
                 "Knockouts " + a.Kills + ", knocked out " + a.Deaths + ".",
             }, CardHint);
@@ -641,7 +667,7 @@ namespace CriticalMass.Runtime.Hud.Interact
             Card.Open("score", "SCORE", "HILL SECONDS DECIDE THE MATCH", new[]
             {
                 "Azure " + N(Math.Floor(m.HillSeconds.Azure)) + " s of hill, Crimson " + N(Math.Floor(m.HillSeconds.Crimson)) + " s.",
-                "Time left " + Clock(w.Config.MatchSeconds - m.Time) + ".",
+                "Time left " + Clock(global::CriticalMass.Runtime.Flow.MatchSpeed.ToReal(w.Config.MatchSeconds - m.Time)) + ".",
                 "You: " + a.Kills + " knockouts, knocked out " + a.Deaths + ", " + N(Math.Floor(a.HillSeconds)) + " s on the hill.",
             }, CardHint);
         }

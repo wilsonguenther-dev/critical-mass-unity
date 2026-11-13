@@ -87,7 +87,13 @@ namespace CriticalMass.Runtime.Input
                 new[] { new RebindSlot("SwitchDigPlace", G, 0, "Shoulders", "negative"), new RebindSlot("SwitchDigPlace", G, 0, "Shoulders", "positive") }),
             new ControlRow("Scoreboard", new[] { new RebindSlot("Scoreboard", K) }, new[] { new RebindSlot("Scoreboard", G) }),
             new ControlRow("Full map", new[] { new RebindSlot("Map", K) }, new[] { new RebindSlot("Map", G) }),
-            new ControlRow("Ping wheel", new[] { new RebindSlot("Ping", K) }, new[] { new RebindSlot("Ping", G) }),
+            new ControlRow("Ping wheel", new[] { new RebindSlot("Ping", K), new RebindSlot("Ping", K, 1) }, new[] { new RebindSlot("Ping", G) }),
+            // feat/mechanics-depth-view: the base station panel (B, or press the right stick, inside your base ring) and its
+            // confirm (ENTER; on a controller the panel takes A like every menu, and holds it so the player never jumps).
+            new ControlRow("Base station", new[] { new RebindSlot("OpenStation", K) }, new[] { new RebindSlot("OpenStation", G) }),
+            new ControlRow("Station: confirm", new[] { new RebindSlot("StationBuy", K) }, None),
+            // feat/new-mechanics-view: the emote wheel (T, or press the left stick), view only (EmoteWheel).
+            new ControlRow("Emote wheel", new[] { new RebindSlot("Emote", K) }, new[] { new RebindSlot("Emote", G) }),
             new ControlRow("HUD cursor", new[] { new RebindSlot("HudCursor", K) }, new[] { new RebindSlot("HudCursor", G) }),
             new ControlRow("Minimap zoom", new[] { new RebindSlot("MinimapZoom", K) }, new[] { new RebindSlot("MinimapZoom", G) }),
             new ControlRow("Pause menu", new[] { new RebindSlot("Pause", K) }, new[] { new RebindSlot("Pause", G) }),
@@ -296,7 +302,21 @@ namespace CriticalMass.Runtime.Input
         }
 
         /// <summary>Applies the overrides saved by Persist (none saved = defaults).</summary>
-        public static void Restore(InputActionAsset asset) => LoadJson(asset, PlayerPrefs.GetString(PrefsKey, string.Empty));
+        public static void Restore(InputActionAsset asset)
+        {
+            try
+            {
+                LoadJson(asset, PlayerPrefs.GetString(PrefsKey, string.Empty));
+            }
+            catch (Exception e)
+            {
+                // DG-53: a corrupt or foreign cm.bindings must never stop the game: drop it once and keep the defaults.
+                if (asset != null) asset.RemoveAllBindingOverrides();
+                PlayerPrefs.DeleteKey(PrefsKey);
+                Debug.LogWarning($"[CM.Controls] saved bindings could not be read ({e.GetType().Name}); using the defaults");
+                BindingsChanged?.Invoke();
+            }
+        }
 
         /// <summary>Every binding back to Controls.inputactions and the saved overrides deleted.</summary>
         public static void ResetAll(InputActionAsset asset)

@@ -46,7 +46,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import cmloop as C  # noqa: E402
 
 GATES_DIR = C.REPO / 'loop' / 'gates'
-DEFAULT_GATES = ['setup', 'compile', 'clean-reimport', 'editmode', 'playmode-smoke', 'build-mac', 'parity', 'budgets']
+DEFAULT_GATES = ['setup', 'compile', 'clean-reimport', 'editmode', 'playmode-smoke', 'build-mac', 'parity', 'perf']
 UNITY_GATES = {'setup', 'compile', 'clean-reimport', 'editmode', 'playmode-smoke', 'build-mac', 'parity'}
 
 

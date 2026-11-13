@@ -1,0 +1,77 @@
+name	width	height	source	note
+banner_azure	424	624	p14 Azure banner	
+banner_crimson	448	624	p14 Crimson banner	
+orb	312	328	p14 loose biomass orb	
+orb_glow	312	328	p14 loose biomass orb	seam / crystal rim glow
+sky_night	1280	720	procedural	Void Navy night, cream stars, teal ground glow
+sky_warm	1280	720	procedural	late-afternoon hero sky
+cloudsea	1600	540	procedural	cloud sea, lower frame
+cloudsea_warm	1600	540	procedural	
+cloudsea_storm	1600	540	procedural	
+shafts_warm	960	540	procedural	
+speed_radial	1280	720	procedural	radial speed lines
+speed_down	1280	720	procedural	falling speed lines
+mote	48	48	procedural	soft dot (dust motes, sparks)
+ember	48	48	procedural	ember / shard
+sweep	512	16	procedural	light sweep band
+vignette	960	540	procedural	Void Navy vignette
+ring	256	256	procedural	impact shock ring
+sky_day	2560	1428	painted plate: calm day sky over a cloud sea	
+sky_storm	2560	1428	painted plate: storm sky spiralling round the break point	
+shrine	2560	1428	painted plate: the shrine at night, the egg in its arch	
+shrine_blur	1280	712	painted plate	depth-of-field copy, half size
+shrine_glow	2560	1432	painted plate	egg seam glow, aligned to shrine
+sky_split	2560	1428	painted plate	two camps under a teal and coral sky, the hill between
+hill	2560	1428	painted plate	the hill battle, closer and lower than the cover
+hill_blur	1280	712	painted plate	depth-of-field copy, half size
+hero	2560	1428	painted plate	sunset hero plate, the Kaiju looming behind the hill
+hero_blur	1280	712	painted plate	depth-of-field copy, half size
+sky_choice	2560	1428	painted plate	biomass garden | corrupted island split
+crack_1	1600	896	painted crack of light	revealed from the burst point, stage 1 of 6
+crack_2	1600	896	painted crack of light	revealed from the burst point, stage 2 of 6
+crack_3	1600	896	painted crack of light	revealed from the burst point, stage 3 of 6
+crack_4	1600	896	painted crack of light	revealed from the burst point, stage 4 of 6
+crack_5	1600	896	painted crack of light	revealed from the burst point, stage 5 of 6
+crack_6	1600	896	painted crack of light	revealed from the burst point, stage 6 of 6
+crack_glow	960	536	painted crack of light	soft glow, aligned to the crack
+shafts	960	540	procedural	light shafts from the painted crack's burst point
+basin	2400	1108	painted cut-out: Skybreak Basin before the banners	
+debris	1920	664	painted cut-out: rising rock debris (parallax overlay)	
+rocks_l	1184	1536	painted cut-out: foreground cliff, left	
+rocks_r	796	1360	painted cut-out: foreground pillar, right	
+egg	1024	1212	painted cut-out: the Kaiju egg	shared hatch canvas
+egg_glow	1024	1212	painted egg	seam glow
+egg_crack_1	1024	1212	painted hatch frames	hatch stage 1 of 4 (full egg, shared canvas)
+egg_crack_2	1024	1212	painted hatch frames	hatch stage 2 of 4 (full egg, shared canvas)
+egg_crack_3	1024	1212	painted hatch frames	hatch stage 3 of 4 (full egg, shared canvas)
+egg_crack_4	1024	1212	painted hatch frames	hatch stage 4 of 4 (full egg, shared canvas)
+hatchling	1100	1084	painted cut-out: the hatchling in its shell	
+hatchling_glow	1100	1084	painted hatchling	seam glow
+kaiju_neutral	1216	1536	painted cut-out: adult Kaiju rising, low angle	
+kaiju_neutral_glow	1216	1536	painted Kaiju	crystal glow
+kaiju_crimson	1280	1448	painted cut-out: adult Kaiju rising, low angle	
+kaiju_crimson_glow	1280	1448	painted Kaiju	crystal glow
+kaiju_berserk	1280	1336	painted cut-out: adult Kaiju rising, low angle	
+kaiju_berserk_glow	1280	1336	painted Kaiju	crystal glow
+warrior	844	1100	painted cut-out: native warrior pose	
+farmer	824	1100	painted cut-out: native farmer pose	
+miner	876	1100	painted cut-out: native miner pose	
+warrior_crimson	868	1100	painted cut-out: native warrior crimson pose	
+farmer_crimson	872	1100	painted cut-out: native farmer crimson pose	
+miner_crimson	788	1100	painted cut-out: native miner crimson pose	
+warrior_charge	1100	700	painted cut-out: native warrior charge pose	
+warrior_cleave_crimson	1012	1100	painted cut-out: native warrior cleave crimson pose	
+farmer_harvest	1200	1180	painted cut-out: farmer harvest	
+farmer_harvest_glow	1200	1180	painted farmer_harvest	glow
+biomass_plants	1480	876	painted cut-out: biomass plants	
+biomass_plants_glow	1480	876	painted biomass_plants	glow
+corruption_growth	1480	864	painted cut-out: corruption growth	
+corruption_growth_glow	1480	864	painted corruption_growth	glow
+farmer_glow	824	1100	painted farmer	tank glow
+cutin_farmer_azure	1920	1072	painted cut-in portrait (16:9, takeover system)	
+cutin_farmer_crimson	1920	1072	painted cut-in portrait (16:9, takeover system)	
+cutin_kaiju	1920	1072	painted cut-in portrait (16:9, takeover system)	
+cutin_miner_azure	1920	1072	painted cut-in portrait (16:9, takeover system)	
+cutin_miner_crimson	1920	1072	painted cut-in portrait (16:9, takeover system)	
+cutin_warrior_azure	1920	1072	painted cut-in portrait (16:9, takeover system)	
+cutin_warrior_crimson	1920	1072	painted cut-in portrait (16:9, takeover system)	

@@ -86,7 +86,7 @@ namespace CriticalMass.Runtime.Secrets
             hr.anchorMin = hr.anchorMax = _egg.anchorMin;
             _start = p + new Vector2(0f, -_egg.rect.height * 0.35f);
             hr.anchoredPosition = _start;
-            _say = HudText.Make(hr, "Say", CMTokens.Ui, 24, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 2f);
+            _say = HudText.Make(hr, "Say", CMTokens.Ui, UiScale.TypeBody, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 2f);
             _say.rectTransform.anchoredPosition = new Vector2(0f, 96f);
             _say.rectTransform.sizeDelta = new Vector2(360f, 36f);
             _say.text = LoreText.EggLine(SecretsBoard.TitleEgg);
@@ -140,7 +140,7 @@ namespace CriticalMass.Runtime.Secrets
         {
             RectTransform root = MenuUi.Rt(parent, "Credits Gag");
             MenuUi.Place(root, x, y, w, 200f);
-            MenuUi.Label(root, "Line", CMTokens.Ui, 24, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 0f, 0f, w, 40f, Line, 2f);
+            MenuUi.Label(root, "Line", CMTokens.Ui, UiScale.TypeBody, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 0f, 0f, w, 40f, Line, 2f);
             Hatchling.Make(root, (w - 120f) * 0.5f, 60f, 120f, Hatchling.Pose.Look);
             SecretsBoard.CreditsGagPlaced = true;
             SecretsBoard.Fire(SecretsBoard.CreditsGag);

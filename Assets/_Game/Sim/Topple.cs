@@ -132,7 +132,7 @@ namespace CriticalMass.Sim.Core
                 World.PushEvent(w, SimEventType.Topple, attacker, k, x, z, RefusedFallen);
                 return RefusedFallen;
             }
-            if (w.Tick < w.WallChangeTick + (int)w.Config.Abilities.MinerTerraform.MinGapTicks)
+            if (w.Tick < w.WallChangeTick + Durations.T30(w.Config, w.Config.Abilities.MinerTerraform.MinGapTicks))
             {
                 World.PushEvent(w, SimEventType.Topple, attacker, k, x, z, RefusedRate);
                 return RefusedRate;
@@ -146,7 +146,8 @@ namespace CriticalMass.Sim.Core
                 FootNew[j] = ToppledType(old, mode);
                 if (FootNew[j] != old) changes++;
             }
-            if (mode == Block)
+            bool onLanding = Phys.On(w, w.Config.Physics.PillarFallsOnLanding);
+            if (mode == Block && !onLanding)
             {
                 for (int j = 0; j < n; j++)
                 {
@@ -166,6 +167,27 @@ namespace CriticalMass.Sim.Core
                 World.PushEvent(w, SimEventType.Topple, attacker, k, x, z, RefusedRoute);
                 return RefusedRoute;
             }
+            if (onLanding)
+            {
+                // DG-99: the ground changes when the pillar lands (ToppleSystem, FallTicks later); only the route guard refused.
+                t.Fallen[k] = (byte)mode;
+                t.Hp[k] = 0;
+                t.FallTick[k] = w.Tick;
+                World.PushEvent(w, SimEventType.Topple, attacker, k, x, z, mode);
+                return mode;
+            }
+            ApplyFootprint(w, d, mode, n);
+            t.Fallen[k] = (byte)mode;
+            t.Hp[k] = 0;
+            t.FallTick[k] = w.Tick;
+            World.PushEvent(w, SimEventType.Topple, attacker, k, x, z, mode);
+            return mode;
+        }
+
+        /// <summary>Write the first n FootCells / FootNew changes through MapGrid.SetCell (ramps take the base rim's height).</summary>
+        private static void ApplyFootprint(World w, DecorationDef d, int mode, int n)
+        {
+            MapDef map = w.Map;
             double baseH = map.Height01[d.Cz * map.Width + d.Cx];
             for (int j = 0; j < n; j++)
             {
@@ -176,11 +198,106 @@ namespace CriticalMass.Sim.Core
                 if (mode == Ramp) map.Height01[i] = baseH; // visual only: the ramp sits at the rim it fell from
                 MapGrid.SetCell(w, cx, cz, FootNew[j]);
             }
-            t.Fallen[k] = (byte)mode;
-            t.Hp[k] = 0;
-            t.FallTick[k] = w.Tick;
-            World.PushEvent(w, SimEventType.Topple, attacker, k, x, z, mode);
-            return mode;
+        }
+
+        private static int[] CrushVictims = new int[0];
+
+        /// <summary>
+        /// DG-99 (S12): the pillar lands. The footprint is recomputed on today's cells and re-checked by the route guard (a
+        /// route cut since the hit leaves the ground as it is). For a Block, every living grounded actor whose body touches a
+        /// cell turning to Wall takes PillarCrushDamage, is moved just outside the strip on its own side (else the other side,
+        /// else the nearest free spot within 4 cells), pushed further out (CrushKnock) and stunned. Then the cells change.
+        /// </summary>
+        private static void Land(World w, int k, int mode)
+        {
+            MapDef map = w.Map;
+            DecorationDef d = map.Decorations[k];
+            PhysicsConfig p = w.Config.Physics;
+            EnsureScratch(w.Config);
+            CellDir dir = Dir(d, mode);
+            int n = Footprint(w.Config, map, d, dir, FootCells);
+            int changes = 0;
+            for (int j = 0; j < n; j++)
+            {
+                byte old = map.Cells[FootCells[j]];
+                FootNew[j] = ToppledType(old, mode);
+                if (FootNew[j] != old) changes++;
+            }
+            if (changes == 0) return;
+            if (!Terraform.CellsKeepRoutes(w, FootCells, FootNew, n))
+            {
+                World.PushEvent(w, SimEventType.Topple, -1, k, d.Cx + 0.5, d.Cz + 0.5, RefusedRoute);
+                return;
+            }
+            if (CrushVictims.Length < w.ActorCount) CrushVictims = new int[w.ActorCount];
+            int victims = 0;
+            if (mode == Block)
+            {
+                for (int a = 0; a < w.ActorCount; a++)
+                {
+                    if (!w.Actors[a].Alive || w.Actors[a].AirLen > 0) continue;
+                    double r = Collide.ActorRadius(w, a);
+                    for (int j = 0; j < n; j++)
+                    {
+                        if (FootNew[j] != Cell.Wall || map.Cells[FootCells[j]] == Cell.Wall) continue;
+                        int cx = FootCells[j] % map.Width;
+                        int cz = (FootCells[j] - cx) / map.Width;
+                        if (!Terraform.CircleHitsCell(w.X[a], w.Z[a], r, cx, cz)) continue;
+                        CrushVictims[victims++] = a;
+                        break;
+                    }
+                }
+            }
+            ApplyFootprint(w, d, mode, n);
+            double ox = d.Cx + 0.5;
+            double oz = d.Cz + 0.5;
+            double px = -dir.Dz;
+            double pz = dir.Dx;
+            double half = w.Config.Abilities.Topple.WidthCells / 2;
+            bool knock = Phys.On(w, p.Knockback);
+            for (int v = 0; v < victims; v++)
+            {
+                int a = CrushVictims[v];
+                double r = Collide.ActorRadius(w, a);
+                double lat = (w.X[a] - ox) * px + (w.Z[a] - oz) * pz;
+                double side = lat > 0 || (lat == 0 && (a & 1) == 0) ? 1 : -1;
+                double along = (w.X[a] - ox) * dir.Dx + (w.Z[a] - oz) * dir.Dz;
+                bool placed = false;
+                for (int tries = 0; tries < 2 && !placed; tries++)
+                {
+                    double sd = tries == 0 ? side : -side;
+                    double off = sd * (half + r + 0.01);
+                    double nx = JsMath.F32(ox + dir.Dx * along + px * off);
+                    double nz = JsMath.F32(oz + dir.Dz * along + pz * off);
+                    if (!Collide.FootprintClear(w, a, nx, nz)) continue;
+                    w.X[a] = nx;
+                    w.Z[a] = nz;
+                    side = sd;
+                    placed = true;
+                }
+                for (int ring = 1; ring <= 4 && !placed; ring++)
+                {
+                    int bx = JsMath.FloorToInt(w.X[a]);
+                    int bz = JsMath.FloorToInt(w.Z[a]);
+                    for (int dz = -ring; dz <= ring && !placed; dz++)
+                        for (int dx = -ring; dx <= ring && !placed; dx++)
+                        {
+                            if (Math.Max(Math.Abs(dx), Math.Abs(dz)) != ring) continue;
+                            double nx = bx + dx + 0.5;
+                            double nz = bz + dz + 0.5;
+                            if (!Collide.FootprintClear(w, a, nx, nz)) continue;
+                            w.X[a] = nx;
+                            w.Z[a] = nz;
+                            placed = true;
+                        }
+                }
+                w.PrevX[a] = w.X[a];
+                w.PrevZ[a] = w.Z[a];
+                double dealt = Damage.ApplyHit(w, a, p.PillarCrushDamage, -1, ox, oz, DamageCause.Crush, px * side, pz * side,
+                    knock ? p.CrushKnock : 0, knock ? w.Dur.CrushStun : 0);
+                World.PushEvent(w, SimEventType.PillarCrush, a, k, w.X[a], w.Z[a], dealt, null, DamageCause.Crush, 0, px * side, pz * side,
+                    knock ? Knock.Effective(w, a, p.CrushKnock, ox, oz) : 0, 1, 0, 0);
+            }
         }
 
         /// <summary>
@@ -221,7 +338,7 @@ namespace CriticalMass.Sim.Core
         {
             ToppleState t = w.Topple;
             if (k < 0 || k >= t.Fallen.Length || t.Fallen[k] == Standing) return -1;
-            double ticks = w.Config.Abilities.Topple.FallTicks;
+            double ticks = Durations.T30(w.Config, w.Config.Abilities.Topple.FallTicks);
             if (!(ticks > 0)) return 1;
             double u = (w.Tick - t.FallTick[k] - 1 + alpha) / ticks;
             return u < 0 ? 0 : u > 1 ? 1 : u;
@@ -236,7 +353,7 @@ namespace CriticalMass.Sim.Core
             DecorationDef[] decs = w.Map.Decorations;
             if (decs == null) return;
             ToppleState t = w.Topple;
-            int fall = (int)w.Config.Abilities.Topple.FallTicks;
+            int fall = Durations.T30(w.Config, w.Config.Abilities.Topple.FallTicks);
             int length = (int)w.Config.Abilities.Topple.LengthCells;
             for (int k = 0; k < decs.Length; k++)
             {
@@ -244,6 +361,7 @@ namespace CriticalMass.Sim.Core
                 if (mode == Standing || w.Tick != t.FallTick[k] + fall) continue;
                 DecorationDef d = decs[k];
                 CellDir dir = Dir(d, mode);
+                if (Phys.On(w, w.Config.Physics.PillarFallsOnLanding)) Land(w, k, mode); // DG-99
                 World.PushEvent(w, SimEventType.ToppleDown, -1, k, d.Cx + 0.5 + dir.Dx * length, d.Cz + 0.5 + dir.Dz * length, mode);
             }
         }

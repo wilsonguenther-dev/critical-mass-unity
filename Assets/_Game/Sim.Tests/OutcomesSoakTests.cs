@@ -11,8 +11,10 @@ namespace CriticalMass.Sim.Tests
     [TestFixture, Category("Slow")]
     public sealed class OutcomesSoakTests
     {
-        /// <summary>D-030 floor on the 50-seed passive sweep (outcomes.slow.test.ts line 150); not PassiveHumanTeamWins.</summary>
-        private const int PassiveSweepTeamWinsMin = 11;
+        /// <summary>D-030 passive sweep, sturdier form: 200 passive 5v5 seeds from 201, share floor 0.15 (was 11 of 50, outcomes.slow.test.ts line 150).</summary>
+        private const int PassiveSweepFirstSeed = 201;
+        private const int PassiveSweepSeeds = 200;
+        private const double PassiveSweepShareMin = 0.15;
 
         private static IReadOnlyList<MatchOutcome> A => SoakCache.Batch("A", HumanMode.Bot);
         private static IReadOnlyList<MatchOutcome> B => SoakCache.Batch("B", HumanMode.Bot);
@@ -147,12 +149,22 @@ namespace CriticalMass.Sim.Tests
                 Assert.AreEqual(c[i].Winner, passive[i].Winner, "seed " + c[i].Seed);
         }
 
+        /// <summary>
+        /// D-030, sturdier form (DG-24/40 PR, proposed in the DG-21/22 PR): the 50-seed sweep's floor of 11 wins had no margin
+        /// (p = 0.22 over 50 seeds: one standard deviation is 2.9 wins, so a rule change flipping one seed turned it red). Now
+        /// 200 passive 5v5 seeds (201..400) pooled, and the passive human's team must win at least PassiveSweepShareMin of
+        /// them: about 2.4 standard deviations under the measured share. Prints the count.
+        /// </summary>
         [Test, Category("Slow")]
-        public void CD030APassiveHumanSTeamStillWinsGe11OfThe50PassiveSeeds201250()
+        public void CD030APassiveHumanSTeamStillWinsAtLeast15PercentOf200PassiveSeeds201400()
         {
-            IReadOnlyList<MatchOutcome> passive = AfkPassive;
-            Assert.AreEqual(OutcomeBatches.AFK.Count, passive.Count);
-            Assert.GreaterOrEqual(Wins(passive, MatchResult.Azure), PassiveSweepTeamWinsMin);
+            int wins = 0;
+            for (int seed = PassiveSweepFirstSeed; seed < PassiveSweepFirstSeed + PassiveSweepSeeds; seed++)
+            {
+                if (OutcomeRunner.RunOutcomeMatch(seed, 5, HumanMode.Passive).Winner == MatchResult.Azure) wins++;
+            }
+            Console.WriteLine("{\"item\":\"D-030\",\"passiveTeamWins\":" + wins + ",\"of\":" + PassiveSweepSeeds + "}");
+            Assert.GreaterOrEqual((double)wins / PassiveSweepSeeds, PassiveSweepShareMin);
         }
 
         [Test, Category("Slow")]

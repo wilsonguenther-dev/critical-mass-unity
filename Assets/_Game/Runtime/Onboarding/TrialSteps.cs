@@ -25,6 +25,8 @@ namespace CriticalMass.Runtime.Onboarding
         Dig,
         /// <summary>A gap cell within Param of actor 0 became walkable since the step's start (needs dig and place).</summary>
         Place,
+        /// <summary>The full map is open (asked through TrialFeatures.MapOpenProbe; needs the HUD's interact layer).</summary>
+        OpenMap,
     }
 
     /// <summary>Where a step's world arrow points.</summary>
@@ -56,6 +58,8 @@ namespace CriticalMass.Runtime.Onboarding
         Jump,
         /// <summary>CM-30 dig and place (DG-09, not yet built).</summary>
         Terraform,
+        /// <summary>The full map (the HUD's interact layer sets TrialFeatures.MapOpenProbe).</summary>
+        Map,
     }
 
     /// <summary>One step of the guided match. Plain data: the runner and the checks interpret it.</summary>
@@ -107,21 +111,6 @@ namespace CriticalMass.Runtime.Onboarding
             },
             new TrialStep
             {
-                Id = "gather", Prompt = "Hold {Interact} on the biomass. Snack time.", Goal = TrialGoal.GatherBiomass,
-                Target = TrialTarget.BiomassNode,
-            },
-            new TrialStep
-            {
-                Id = "deliver", Prompt = "Take it to the egg and hold {Interact}. It remembers who feeds it.", Goal = TrialGoal.DeliverBiomass,
-                Target = TrialTarget.Shrine,
-            },
-            new TrialStep
-            {
-                Id = "hill", Prompt = "Stand on the hill. Outnumber them and the clock is yours.", Goal = TrialGoal.HoldHill,
-                Target = TrialTarget.Hill, Param = 3,
-            },
-            new TrialStep
-            {
                 Id = "ability", Prompt = "Now your trick: {Ability}. Show off a little.", Goal = TrialGoal.UseAbility,
                 Target = TrialTarget.NearestEnemy,
             },
@@ -139,6 +128,27 @@ namespace CriticalMass.Runtime.Onboarding
             {
                 Id = "place", Prompt = "Now fill the gap. {DigPlace} again.", Goal = TrialGoal.Place, Target = TrialTarget.Gap,
                 Param = 2.5, OnlyClass = ClassId.Miner, Needs = TrialFeature.Terraform,
+            },
+            // 2026-11-12: the first match teaches move, attack, ability, jump, map and the objective, in that order.
+            new TrialStep
+            {
+                Id = "map", Prompt = "Lost? {Map} opens the full map. The hill, the egg and both bases are on it.", Goal = TrialGoal.OpenMap,
+                Target = TrialTarget.Self, Needs = TrialFeature.Map,
+            },
+            new TrialStep
+            {
+                Id = "hill", Prompt = "The objective: stand on the hill. Outnumber them there and the clock is yours.", Goal = TrialGoal.HoldHill,
+                Target = TrialTarget.Hill, Param = 3,
+            },
+            new TrialStep
+            {
+                Id = "gather", Prompt = "Hold {Interact} on the biomass. Snack time.", Goal = TrialGoal.GatherBiomass,
+                Target = TrialTarget.BiomassNode,
+            },
+            new TrialStep
+            {
+                Id = "deliver", Prompt = "Take it to the egg and hold {Interact}. It remembers who feeds it.", Goal = TrialGoal.DeliverBiomass,
+                Target = TrialTarget.Shrine,
             },
         };
     }

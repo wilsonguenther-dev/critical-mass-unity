@@ -1,0 +1,646 @@
+{
+ "source": "KayKit Adventurers 1.0 Knight.glb (CC0), tools/art/measure_clips.py",
+ "fps": 120,
+ "clips": [
+  {
+   "clip": "Idle",
+   "source": "Idle",
+   "length": 1.0667,
+   "loop": true,
+   "groundSpeed": 0.0,
+   "moveDeg": 0.0,
+   "leftPlant": -1.0,
+   "touchdown": [
+    -1.0,
+    -1.0
+   ],
+   "contact": 0.925,
+   "contactSpeed": 0.112,
+   "lowest": 0.7667,
+   "swingPlane": "vertical",
+   "hipsDrift": 0.0,
+   "headStart": 1.228,
+   "headEnd": 1.228
+  },
+  {
+   "clip": "Walk",
+   "source": "Walking_A",
+   "length": 1.0667,
+   "loop": true,
+   "groundSpeed": 0.8613,
+   "moveDeg": 0.0,
+   "leftPlant": 0.2812,
+   "touchdown": [
+    0.0938,
+    0.5938
+   ],
+   "contact": 0.2667,
+   "contactSpeed": 1.598,
+   "lowest": 0.5333,
+   "swingPlane": "horizontal",
+   "hipsDrift": 0.0,
+   "headStart": 1.195,
+   "headEnd": 1.195
+  },
+  {
+   "clip": "Run",
+   "source": "Running_A",
+   "length": 0.8,
+   "loop": true,
+   "groundSpeed": 4.5669,
+   "moveDeg": 0.0,
+   "leftPlant": 0.2031,
+   "touchdown": [
+    0.1667,
+    0.6667
+   ],
+   "contact": 0.0667,
+   "contactSpeed": 1.032,
+   "lowest": 0.2,
+   "swingPlane": "vertical",
+   "hipsDrift": 0.0,
+   "headStart": 1.254,
+   "headEnd": 1.254
+  },
+  {
+   "clip": "Attack",
+   "source": "1H_Melee_Attack_Chop",
+   "length": 1.0667,
+   "loop": false,
+   "groundSpeed": 0.0,
+   "moveDeg": 0.0,
+   "leftPlant": -1.0,
+   "touchdown": [
+    -1.0,
+    -1.0
+   ],
+   "contact": 0.5667,
+   "contactSpeed": 7.078,
+   "lowest": 0.8667,
+   "swingPlane": "vertical",
+   "hipsDrift": 0.0,
+   "headStart": 1.228,
+   "headEnd": 1.228
+  },
+  {
+   "clip": "Gather",
+   "source": "Interact",
+   "length": 1.3,
+   "loop": false,
+   "groundSpeed": 0.0,
+   "moveDeg": 0.0,
+   "leftPlant": -1.0,
+   "touchdown": [
+    -1.0,
+    -1.0
+   ],
+   "contact": 0.1333,
+   "contactSpeed": 2.775,
+   "lowest": 0.0,
+   "swingPlane": "horizontal",
+   "hipsDrift": 0.0,
+   "headStart": 1.228,
+   "headEnd": 1.228
+  },
+  {
+   "clip": "Hit",
+   "source": "Hit_A",
+   "length": 0.6667,
+   "loop": false,
+   "groundSpeed": 0.0,
+   "moveDeg": 0.0,
+   "leftPlant": -1.0,
+   "touchdown": [
+    -1.0,
+    -1.0
+   ],
+   "contact": 0.05,
+   "contactSpeed": 3.031,
+   "lowest": 0.05,
+   "swingPlane": "horizontal",
+   "hipsDrift": 0.0,
+   "headStart": 1.228,
+   "headEnd": 1.228
+  },
+  {
+   "clip": "Death",
+   "source": "Death_A",
+   "length": 0.8,
+   "loop": false,
+   "groundSpeed": 0.5259,
+   "moveDeg": 110.2,
+   "leftPlant": 0.0885,
+   "touchdown": [
+    -1.0,
+    -1.0
+   ],
+   "contact": 0.3917,
+   "contactSpeed": 5.263,
+   "lowest": 0.8,
+   "swingPlane": "horizontal",
+   "hipsDrift": 0.4496,
+   "headStart": 1.228,
+   "headEnd": 0.338
+  },
+  {
+   "clip": "Cheer",
+   "source": "Cheer",
+   "length": 1.6667,
+   "loop": false,
+   "groundSpeed": 0.0,
+   "moveDeg": 0.0,
+   "leftPlant": -1.0,
+   "touchdown": [
+    -1.0,
+    -1.0
+   ],
+   "contact": 0.075,
+   "contactSpeed": 7.968,
+   "lowest": 0.0,
+   "swingPlane": "vertical",
+   "hipsDrift": 0.0,
+   "headStart": 1.228,
+   "headEnd": 1.228
+  },
+  {
+   "clip": "StrafeL",
+   "source": "Running_Strafe_Left",
+   "length": 0.8,
+   "loop": true,
+   "groundSpeed": 4.5438,
+   "moveDeg": 60.1,
+   "leftPlant": 0.2031,
+   "touchdown": [
+    0.1667,
+    0.6667
+   ],
+   "contact": 0.1583,
+   "contactSpeed": 0.636,
+   "lowest": 0.2,
+   "swingPlane": "vertical",
+   "hipsDrift": 0.0,
+   "headStart": 1.192,
+   "headEnd": 1.192
+  },
+  {
+   "clip": "StrafeR",
+   "source": "Running_Strafe_Right",
+   "length": 0.8,
+   "loop": true,
+   "groundSpeed": 4.5045,
+   "moveDeg": -60.1,
+   "leftPlant": 0.2031,
+   "touchdown": [
+    0.1667,
+    0.6562
+   ],
+   "contact": 0.2917,
+   "contactSpeed": 0.635,
+   "lowest": 0.2,
+   "swingPlane": "vertical",
+   "hipsDrift": 0.0,
+   "headStart": 1.192,
+   "headEnd": 1.192
+  },
+  {
+   "clip": "WalkBack",
+   "source": "Walking_Backwards",
+   "length": 1.0667,
+   "loop": true,
+   "groundSpeed": 0.8611,
+   "moveDeg": -180.0,
+   "leftPlant": 0.7188,
+   "touchdown": [
+    0.5312,
+    0.0547
+   ],
+   "contact": 0.8333,
+   "contactSpeed": 0.576,
+   "lowest": 0.5333,
+   "swingPlane": "horizontal",
+   "hipsDrift": 0.0,
+   "headStart": 1.194,
+   "headEnd": 1.194
+  },
+  {
+   "clip": "JumpStart",
+   "source": "Jump_Start",
+   "length": 0.6,
+   "loop": false,
+   "groundSpeed": 0.0,
+   "moveDeg": 0.0,
+   "leftPlant": -1.0,
+   "touchdown": [
+    -1.0,
+    -1.0
+   ],
+   "contact": 0.425,
+   "contactSpeed": 3.362,
+   "lowest": 0.0,
+   "swingPlane": "vertical",
+   "hipsDrift": 0.0,
+   "headStart": 1.228,
+   "headEnd": 1.341
+  },
+  {
+   "clip": "JumpAir",
+   "source": "Jump_Idle",
+   "length": 1.0667,
+   "loop": true,
+   "groundSpeed": 0.0,
+   "moveDeg": 0.0,
+   "leftPlant": -1.0,
+   "touchdown": [
+    -1.0,
+    -1.0
+   ],
+   "contact": 0.2667,
+   "contactSpeed": 0.092,
+   "lowest": 0.5333,
+   "swingPlane": "vertical",
+   "hipsDrift": 0.0,
+   "headStart": 1.341,
+   "headEnd": 1.341
+  },
+  {
+   "clip": "JumpLand",
+   "source": "Jump_Land",
+   "length": 0.6667,
+   "loop": false,
+   "groundSpeed": 0.0,
+   "moveDeg": 0.0,
+   "leftPlant": -1.0,
+   "touchdown": [
+    -1.0,
+    -1.0
+   ],
+   "contact": 0.2583,
+   "contactSpeed": 2.562,
+   "lowest": 0.3333,
+   "swingPlane": "vertical",
+   "hipsDrift": 0.0,
+   "headStart": 1.341,
+   "headEnd": 1.228
+  },
+  {
+   "clip": "KnockDown",
+   "source": "Lie_Down",
+   "length": 3.0,
+   "loop": false,
+   "groundSpeed": 0.0,
+   "moveDeg": 0.0,
+   "leftPlant": -1.0,
+   "touchdown": [
+    -1.0,
+    -1.0
+   ],
+   "contact": 1.125,
+   "contactSpeed": 2.115,
+   "lowest": 3.0,
+   "swingPlane": "horizontal",
+   "hipsDrift": 0.1199,
+   "headStart": 1.228,
+   "headEnd": 0.311
+  },
+  {
+   "clip": "GetUp",
+   "source": "Lie_StandUp",
+   "length": 2.3333,
+   "loop": false,
+   "groundSpeed": 0.0,
+   "moveDeg": 0.0,
+   "leftPlant": -1.0,
+   "touchdown": [
+    -1.0,
+    -1.0
+   ],
+   "contact": 0.4583,
+   "contactSpeed": 1.777,
+   "lowest": 0.0,
+   "swingPlane": "horizontal",
+   "hipsDrift": 0.1199,
+   "headStart": 0.311,
+   "headEnd": 1.228
+  },
+  {
+   "clip": "HitHeavy",
+   "source": "Hit_B",
+   "length": 0.8667,
+   "loop": false,
+   "groundSpeed": 0.0,
+   "moveDeg": 0.0,
+   "leftPlant": -1.0,
+   "touchdown": [
+    -1.0,
+    -1.0
+   ],
+   "contact": 0.0583,
+   "contactSpeed": 4.627,
+   "lowest": 0.0,
+   "swingPlane": "vertical",
+   "hipsDrift": 0.0,
+   "headStart": 1.228,
+   "headEnd": 1.228
+  },
+  {
+   "clip": "Block",
+   "source": "Block",
+   "length": 1.0667,
+   "loop": false,
+   "groundSpeed": 0.0,
+   "moveDeg": 0.0,
+   "leftPlant": -1.0,
+   "touchdown": [
+    -1.0,
+    -1.0
+   ],
+   "contact": 0.1667,
+   "contactSpeed": 0.759,
+   "lowest": 0.0,
+   "swingPlane": "horizontal",
+   "hipsDrift": 0.0973,
+   "headStart": 1.228,
+   "headEnd": 1.186
+  },
+  {
+   "clip": "Blocking",
+   "source": "Blocking",
+   "length": 1.0667,
+   "loop": true,
+   "groundSpeed": 0.0,
+   "moveDeg": 0.0,
+   "leftPlant": -1.0,
+   "touchdown": [
+    -1.0,
+    -1.0
+   ],
+   "contact": 0.7917,
+   "contactSpeed": 0.01,
+   "lowest": 0.0,
+   "swingPlane": "horizontal",
+   "hipsDrift": 0.0,
+   "headStart": 1.186,
+   "headEnd": 1.186
+  },
+  {
+   "clip": "BlockHit",
+   "source": "Block_Hit",
+   "length": 1.0667,
+   "loop": false,
+   "groundSpeed": 0.0,
+   "moveDeg": 0.0,
+   "leftPlant": -1.0,
+   "touchdown": [
+    -1.0,
+    -1.0
+   ],
+   "contact": 0.2,
+   "contactSpeed": 0.717,
+   "lowest": 0.6583,
+   "swingPlane": "horizontal",
+   "hipsDrift": 0.0,
+   "headStart": 1.186,
+   "headEnd": 1.186
+  },
+  {
+   "clip": "DeathB",
+   "source": "Death_B",
+   "length": 2.6333,
+   "loop": false,
+   "groundSpeed": 0.8547,
+   "moveDeg": 16.1,
+   "leftPlant": 0.1661,
+   "touchdown": [
+    0.1076,
+    0.5285
+   ],
+   "contact": 0.0583,
+   "contactSpeed": 4.502,
+   "lowest": 1.7,
+   "swingPlane": "vertical",
+   "hipsDrift": 0.2338,
+   "headStart": 1.228,
+   "headEnd": 0.468
+  },
+  {
+   "clip": "AttackSlice",
+   "source": "1H_Melee_Attack_Slice_Horizontal",
+   "length": 1.0667,
+   "loop": false,
+   "groundSpeed": 0.0,
+   "moveDeg": 0.0,
+   "leftPlant": -1.0,
+   "touchdown": [
+    -1.0,
+    -1.0
+   ],
+   "contact": 0.2417,
+   "contactSpeed": 12.441,
+   "lowest": 0.05,
+   "swingPlane": "horizontal",
+   "hipsDrift": 0.0,
+   "headStart": 1.228,
+   "headEnd": 1.228
+  },
+  {
+   "clip": "Attack2HChop",
+   "source": "2H_Melee_Attack_Chop",
+   "length": 1.6333,
+   "loop": false,
+   "groundSpeed": 0.0,
+   "moveDeg": 0.0,
+   "leftPlant": -1.0,
+   "touchdown": [
+    -1.0,
+    -1.0
+   ],
+   "contact": 0.7,
+   "contactSpeed": 5.229,
+   "lowest": 0.8583,
+   "swingPlane": "horizontal",
+   "hipsDrift": 0.0,
+   "headStart": 1.209,
+   "headEnd": 1.209
+  },
+  {
+   "clip": "Attack2HSlice",
+   "source": "2H_Melee_Attack_Slice",
+   "length": 1.1,
+   "loop": false,
+   "groundSpeed": 0.0,
+   "moveDeg": 0.0,
+   "leftPlant": -1.0,
+   "touchdown": [
+    -1.0,
+    -1.0
+   ],
+   "contact": 0.3667,
+   "contactSpeed": 6.567,
+   "lowest": 0.7,
+   "swingPlane": "horizontal",
+   "hipsDrift": 0.0,
+   "headStart": 1.209,
+   "headEnd": 1.209
+  },
+  {
+   "clip": "Cast",
+   "source": "Spellcast_Shoot",
+   "length": 0.9333,
+   "loop": false,
+   "groundSpeed": 0.0,
+   "moveDeg": 0.0,
+   "leftPlant": -1.0,
+   "touchdown": [
+    -1.0,
+    -1.0
+   ],
+   "contact": 0.0667,
+   "contactSpeed": 3.961,
+   "lowest": 0.0,
+   "swingPlane": "horizontal",
+   "hipsDrift": 0.0,
+   "headStart": 1.228,
+   "headEnd": 1.228
+  },
+  {
+   "clip": "UseItem",
+   "source": "Use_Item",
+   "length": 1.6,
+   "loop": false,
+   "groundSpeed": 0.0,
+   "moveDeg": 0.0,
+   "leftPlant": -1.0,
+   "touchdown": [
+    -1.0,
+    -1.0
+   ],
+   "contact": 0.1667,
+   "contactSpeed": 1.393,
+   "lowest": 0.0,
+   "swingPlane": "horizontal",
+   "hipsDrift": 0.0,
+   "headStart": 1.228,
+   "headEnd": 1.228
+  },
+  {
+   "clip": "Throw",
+   "source": "Throw",
+   "length": 1.3667,
+   "loop": false,
+   "groundSpeed": 0.0,
+   "moveDeg": 0.0,
+   "leftPlant": -1.0,
+   "touchdown": [
+    -1.0,
+    -1.0
+   ],
+   "contact": 0.7,
+   "contactSpeed": 11.155,
+   "lowest": 0.1083,
+   "swingPlane": "horizontal",
+   "hipsDrift": 0.0,
+   "headStart": 1.228,
+   "headEnd": 1.228
+  },
+  {
+   "clip": "PickUp",
+   "source": "PickUp",
+   "length": 1.3,
+   "loop": false,
+   "groundSpeed": 0.0,
+   "moveDeg": 0.0,
+   "leftPlant": -1.0,
+   "touchdown": [
+    -1.0,
+    -1.0
+   ],
+   "contact": 0.1333,
+   "contactSpeed": 2.193,
+   "lowest": 0.5667,
+   "swingPlane": "horizontal",
+   "hipsDrift": 0.0,
+   "headStart": 1.228,
+   "headEnd": 1.228
+  },
+  {
+   "clip": "Carry",
+   "source": "2H_Melee_Idle",
+   "length": 1.0667,
+   "loop": true,
+   "groundSpeed": 0.0,
+   "moveDeg": 0.0,
+   "leftPlant": -1.0,
+   "touchdown": [
+    -1.0,
+    -1.0
+   ],
+   "contact": 0.7917,
+   "contactSpeed": 0.147,
+   "lowest": 0.5333,
+   "swingPlane": "horizontal",
+   "hipsDrift": 0.0,
+   "headStart": 1.209,
+   "headEnd": 1.209
+  },
+  {
+   "clip": "IdleLook",
+   "source": "Unarmed_Idle",
+   "length": 1.0667,
+   "loop": true,
+   "groundSpeed": 0.0,
+   "moveDeg": 0.0,
+   "leftPlant": -1.0,
+   "touchdown": [
+    -1.0,
+    -1.0
+   ],
+   "contact": 0.8333,
+   "contactSpeed": 0.107,
+   "lowest": 0.6333,
+   "swingPlane": "vertical",
+   "hipsDrift": 0.0,
+   "headStart": 1.217,
+   "headEnd": 1.217
+  },
+  {
+   "clip": "SitDown",
+   "source": "Sit_Floor_Down",
+   "length": 1.0,
+   "loop": false,
+   "groundSpeed": 0.0,
+   "moveDeg": 0.0,
+   "leftPlant": -1.0,
+   "touchdown": [
+    -1.0,
+    -1.0
+   ],
+   "contact": 0.2,
+   "contactSpeed": 2.643,
+   "lowest": 0.35,
+   "swingPlane": "vertical",
+   "hipsDrift": 0.1195,
+   "headStart": 1.228,
+   "headEnd": 0.879
+  },
+  {
+   "clip": "SitIdle",
+   "source": "Sit_Floor_Idle",
+   "length": 4.0,
+   "loop": true,
+   "groundSpeed": 0.0,
+   "moveDeg": 0.0,
+   "leftPlant": -1.0,
+   "touchdown": [
+    -1.0,
+    -1.0
+   ],
+   "contact": 2.825,
+   "contactSpeed": 0.012,
+   "lowest": 3.5,
+   "swingPlane": "horizontal",
+   "hipsDrift": 0.0,
+   "headStart": 0.879,
+   "headEnd": 0.879
+  }
+ ]
+}

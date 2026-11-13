@@ -155,7 +155,7 @@ namespace CriticalMass.Runtime.Menus
         int _nextLook;
         string[] _respawnLines;
 
-        static readonly string[] Hotkeys = { "1", "2", "3", "4", "5" };
+        static readonly string[] Hotkeys = { "1", "2", "3", "4", "5", "6" };
 
         // ---------------------------------------------------------------- static API
 
@@ -238,12 +238,16 @@ namespace CriticalMass.Runtime.Menus
             // ---- setup page
             _setupPage = MenuUi.Rt(_space, "Setup Page");
             MenuUi.Stretch(_setupPage);
-            _setupTitle = MenuUi.Label(_setupPage, "Title", CMTokens.Display, 60, Cream, TextAnchor.MiddleCenter, 360f, 34f, 1200f, 84f, "CHOOSE YOUR CLASS", 4f);
-            float x0 = (HudLayout.RefW - (5 * TileW + 4 * TileGap)) * 0.5f;
+            _setupTitle = MenuUi.Fit(MenuUi.Label(_setupPage, "Title", CMTokens.Display, UiScale.TypeTitle, Cream, TextAnchor.MiddleCenter, 360f, 34f, 1200f, 84f, "CHOOSE YOUR CLASS", 4f), 60);
+            // Finisher, batch 4: six classes (Healer joined in batch 3) in one row that fits the screen; the row was laid
+            // out for five, so the sixth tile ran off the right edge.
+            int nTiles = ClassIds.All.Count;
+            float tileW = Mathf.Min(TileW, (HudLayout.RefW - 2f * 80f - (nTiles - 1) * TileGap) / nTiles);
+            float x0 = (HudLayout.RefW - (nTiles * tileW + (nTiles - 1) * TileGap)) * 0.5f;
             for (int i = 0; i < ClassIds.All.Count; i++)
             {
                 ClassId cls = ClassIds.All[i];
-                ClassCard t = ClassCard.Build(_setupPage, ClassCard.Layout.Tile, x0 + i * (TileW + TileGap), TileY, TileW, TileH, "Tile " + cls);
+                ClassCard t = ClassCard.Build(_setupPage, ClassCard.Layout.Tile, x0 + i * (tileW + TileGap), TileY, tileW, TileH, "Tile " + cls);
                 t.Tile.Focused = () => FocusSetup(cls);
                 t.Tile.Submitted = () => ConfirmSetup(cls);
                 _setupTiles.Add(t);
@@ -254,7 +258,7 @@ namespace CriticalMass.Runtime.Menus
             MenuUi.Place(_previewImage.rectTransform, 12f, 12f, PrevW - 24f, PrevH - 24f);
             _previewImage.raycastTarget = true;
             _previewImage.gameObject.AddComponent<ClassPreviewDrag>().Owner = this;
-            _confirm = MenuUi.Item(_setupPage, "Confirm", PrevX, PrevY + PrevH + 20f, PrevW, 70f, "PLAY AS WARRIOR", MenuItem.Kind.Button, 30, true, CMTokens.Display);
+            _confirm = MenuUi.Item(_setupPage, "Confirm", PrevX, PrevY + PrevH + 20f, PrevW, 70f, "PLAY AS WARRIOR", MenuItem.Kind.Button, UiScale.TypeHeading, true, CMTokens.Display);
             _confirm.Body.Radius = 16f;
             ClassCard.Fit(_confirm.Label, 18);
             _confirm.Submitted = () => ConfirmSetup(Focused);
@@ -263,8 +267,9 @@ namespace CriticalMass.Runtime.Menus
             // ---- respawn page
             _respawnPage = MenuUi.Rt(_space, "Respawn Page");
             MenuUi.Stretch(_respawnPage);
-            float rx0 = (HudLayout.RefW - (5 * RTileW + 4 * RTileGap)) * 0.5f;
-            _respawnLine = MenuUi.Label(_respawnPage, "Next Life", CMTokens.Ui, 24, Cream, TextAnchor.MiddleCenter, rx0, RTileY - 46f, 5 * RTileW + 4 * RTileGap, 36f, "", 3f);
+            int nR = ClassIds.All.Count;
+            float rx0 = (HudLayout.RefW - (nR * RTileW + (nR - 1) * RTileGap)) * 0.5f;
+            _respawnLine = MenuUi.Label(_respawnPage, "Next Life", CMTokens.Ui, UiScale.TypeBody, Cream, TextAnchor.MiddleCenter, rx0, RTileY - 46f, nR * RTileW + (nR - 1) * RTileGap, 36f, "", 3f);
             for (int i = 0; i < ClassIds.All.Count; i++)
             {
                 ClassId cls = ClassIds.All[i];
@@ -276,9 +281,9 @@ namespace CriticalMass.Runtime.Menus
             WireRow(_respawnTiles, null);
             _respawnLines = new string[ClassIds.All.Count];
             for (int i = 0; i < _respawnLines.Length; i++)
-                _respawnLines[i] = "NEXT LIFE: " + LoreWords.Class(ClassIds.All[i]).Name.ToUpperInvariant() + "     1-5 TO SWITCH";
+                _respawnLines[i] = "NEXT LIFE: " + LoreWords.Class(ClassIds.All[i]).Name.ToUpperInvariant() + "     1-" + ClassIds.All.Count + " TO SWITCH";
 
-            _hint = MenuUi.Label(_space, "Hint", CMTokens.Ui, 20, Cream, TextAnchor.MiddleCenter, 260f, 1028f, 1400f, 36f, "", 2f);
+            _hint = MenuUi.Label(_space, "Hint", CMTokens.Ui, UiScale.TypeSmall, Cream, TextAnchor.MiddleCenter, 260f, 1028f, 1400f, 36f, "", 2f);
             Canvas.enabled = false;
             _setupPage.gameObject.SetActive(false);
             _respawnPage.gameObject.SetActive(false);
@@ -520,6 +525,7 @@ namespace CriticalMass.Runtime.Menus
                 else if (kb.digit3Key.wasPressedThisFrame) PickRespawn(ClassId.Miner);
                 else if (kb.digit4Key.wasPressedThisFrame) PickRespawn(ClassId.Demolitions);
                 else if (kb.digit5Key.wasPressedThisFrame) PickRespawn(ClassId.Builder);
+                else if (kb.digit6Key.wasPressedThisFrame) PickRespawn(ClassId.Healer);
             }
             EventSystem es = EventSystem.current;
             if (es != null && es.currentSelectedGameObject == null && Gamepad.current != null && ControlBindings.ActiveDevice == ControlDevice.Gamepad)
@@ -645,7 +651,7 @@ namespace CriticalMass.Runtime.Menus
             ArtEntry e = key != null && cat != null ? cat.Find(key) : null;
             if (e != null && ArtMapping.Spec(key) != null)
             {
-                if (!_models.TryGetValue(key, out ModelView m) && _models.Count < 5)
+                if (!_models.TryGetValue(key, out ModelView m) && _models.Count < ClassIds.All.Count)
                 {
                     m = new ModelView(e, _pivot, "Preview " + key);
                     foreach (Renderer r in m.Renderers) r.gameObject.layer = Layer;

@@ -86,10 +86,10 @@ namespace CriticalMass.Runtime.Codex
             MenuUi.Shape(_card, "Badge Disc", ShapeKind.Circle, 28f, 40f, 96f, 96f, CMTokens.VoidNavy.Color, -1f).RimPx = 0f;
             _badge = MenuUi.Shape(_card, "Badge", ShapeKind.Diamond, 46f, 54f, 60f, 68f, CMTokens.ToolBrass.Color, -1f);
             const float tx = 148f, tw = CardW - tx - 32f;
-            _title = MenuUi.Label(_card, "Title", CMTokens.Display, 30, CMTokens.ToolBrass.Color, TextAnchor.MiddleLeft, tx, 18f, tw, 44f, "", 3f);
-            _line1 = MenuUi.Label(_card, "Line 1", CMTokens.Ui, 23, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft, tx, 66f, tw, 34f, "", 2f);
-            _line2 = MenuUi.Label(_card, "Line 2", CMTokens.Ui, 23, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft, tx, 100f, tw, 34f, "", 2f);
-            _footer = MenuUi.Label(_card, "Footer", CMTokens.Mono, 16, CMTokens.WithAlpha(CMTokens.WarmCream.Color, 0.8f), TextAnchor.MiddleRight,
+            _title = MenuUi.Label(_card, "Title", CMTokens.Display, UiScale.TypeHeading, CMTokens.ToolBrass.Color, TextAnchor.MiddleLeft, tx, 18f, tw, 44f, "", 3f);
+            _line1 = MenuUi.Label(_card, "Line 1", CMTokens.Ui, UiScale.TypeBody, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft, tx, 66f, tw, 34f, "", 2f);
+            _line2 = MenuUi.Label(_card, "Line 2", CMTokens.Ui, UiScale.TypeBody, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft, tx, 100f, tw, 34f, "", 2f);
+            _footer = MenuUi.Label(_card, "Footer", CMTokens.Mono, UiScale.TypeMin, CMTokens.WithAlpha(CMTokens.WarmCream.Color, 0.8f), TextAnchor.MiddleRight,
                 tx, 138f, tw, 26f, "", 2f);
             _canvas.enabled = false;
         }

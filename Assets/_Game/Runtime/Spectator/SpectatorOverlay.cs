@@ -77,12 +77,13 @@ namespace CriticalMass.Runtime.Spectator
         {
             if (_names == null)
             {
-                _names = new string[2, 5];
+                int nc = ClassIds.All.Count;
+                _names = new string[2, nc];
                 for (int ti = 0; ti < 2; ti++)
-                    for (int ci = 0; ci < 5; ci++)
+                    for (int ci = 0; ci < nc; ci++)
                         _names[ti, ci] = (KillWords.Team[ti] + " " + KillWords.ClassName((ClassId)ci)).ToUpperInvariant();
             }
-            return _names[Mathf.Clamp((int)t, 0, 1), Mathf.Clamp((int)c, 0, 4)];
+            return _names[Mathf.Clamp((int)t, 0, 1), Mathf.Clamp((int)c, 0, _names.GetLength(1) - 1)];
         }
 
         void OnDisable()
@@ -113,16 +114,16 @@ namespace CriticalMass.Runtime.Spectator
             bp.RimPx = 2f;
             VectorShape tag = MenuUi.Shape(badge, "Tag", ShapeKind.RoundRect, 14f, 12f, 200f, 36f, brass, -1f);
             tag.RimPx = 0f;
-            MenuUi.Label(badge, "Spectating", CMTokens.Display, 22, navy, TextAnchor.MiddleCenter, 14f, 12f, 200f, 36f, "SPECTATING", 0f);
-            _azureScore = MenuUi.Label(badge, "Azure Score", CMTokens.Mono, 26, CMTokens.Azure.Color, TextAnchor.MiddleRight, 222f, 12f, 80f, 36f, "0", 2f);
-            MenuUi.Label(badge, "Dash", CMTokens.Mono, 22, cream, TextAnchor.MiddleCenter, 302f, 12f, 28f, 36f, "-", 2f);
-            _crimsonScore = MenuUi.Label(badge, "Crimson Score", CMTokens.Mono, 26, CMTokens.Crimson.Color, TextAnchor.MiddleLeft, 330f, 12f, 80f, 36f, "0", 2f);
-            _badgeSub = MenuUi.Label(badge, "Sub", CMTokens.Ui, 17, cream, TextAnchor.MiddleLeft, 18f, 54f, 390f, 30f, "", 2f);
+            MenuUi.Label(badge, "Spectating", CMTokens.Display, UiScale.TypeBody, navy, TextAnchor.MiddleCenter, 14f, 12f, 200f, 36f, "SPECTATING", 0f);
+            _azureScore = MenuUi.Fit(MenuUi.Label(badge, "Azure Score", CMTokens.Mono, UiScale.TypeButton, CMTokens.Azure.Color, TextAnchor.MiddleRight, 222f, 12f, 80f, 36f, "0", 2f), 26);
+            MenuUi.Label(badge, "Dash", CMTokens.Mono, UiScale.TypeBody, cream, TextAnchor.MiddleCenter, 302f, 12f, 28f, 36f, "-", 2f);
+            _crimsonScore = MenuUi.Fit(MenuUi.Label(badge, "Crimson Score", CMTokens.Mono, UiScale.TypeButton, CMTokens.CrimsonInk.Color, TextAnchor.MiddleLeft, 330f, 12f, 80f, 36f, "0", 2f), 26);
+            _badgeSub = MenuUi.Label(badge, "Sub", CMTokens.Ui, UiScale.TypeMin, cream, TextAnchor.MiddleLeft, 18f, 54f, 390f, 30f, "", 2f);
 
             RectTransform ticker = FeedUi.Anchored(watch, "Ticker", new Vector2(0f, 1f), HudLayout.Margin + 6f, -HudLayout.Margin - 108f, 520f, TickerLines * 30f);
             for (int i = 0; i < TickerLines; i++)
             {
-                _ticker[i] = MenuUi.Label(ticker, "Line " + i, CMTokens.Ui, 18, cream, TextAnchor.MiddleLeft, 0f, i * 30f, 520f, 28f, "", 2f);
+                _ticker[i] = MenuUi.Label(ticker, "Line " + i, CMTokens.Ui, UiScale.TypeSmall, cream, TextAnchor.MiddleLeft, 0f, i * 30f, 520f, 28f, "", 2f);
                 _tickerAt[i] = -100f;
             }
 
@@ -134,15 +135,15 @@ namespace CriticalMass.Runtime.Spectator
             VectorShape frame = MenuUi.Shape(card, "Portrait Frame", ShapeKind.RoundRect, 12f, 12f, 108f, 108f, navy, 14f);
             frame.RimPx = 2f;
             _portrait = HudIcon.Make(frame.transform, "Portrait", 2f, 2f, 104f, 104f);
-            _name = MenuUi.Label(card, "Name", CMTokens.Display, 28, cream, TextAnchor.MiddleLeft, 136f, 10f, 490f, 40f, "", 3f);
-            _sub = MenuUi.Label(card, "Sub", CMTokens.Ui, 18, cream, TextAnchor.MiddleLeft, 138f, 48f, 490f, 26f, "", 2f);
+            _name = MenuUi.Label(card, "Name", CMTokens.Display, UiScale.TypeButton, cream, TextAnchor.MiddleLeft, 136f, 10f, 490f, 40f, "", 3f);
+            _sub = MenuUi.Label(card, "Sub", CMTokens.Ui, UiScale.TypeSmall, cream, TextAnchor.MiddleLeft, 138f, 48f, 490f, 26f, "", 2f);
             VectorShape hpBack = MenuUi.Shape(card, "HP Back", ShapeKind.RoundRect, 138f, 78f, 300f, 18f, CMTokens.MeterEmpty.Color, -1f);
             hpBack.RimPx = 0f;
             _hpBar = MenuUi.Shape(card, "HP Bar", ShapeKind.RoundRect, 138f, 78f, 300f, 18f, CMTokens.Azure.Color, -1f);
             _hpBar.RimPx = 0f;
             _hpBar.EmptyColor = new Color(0, 0, 0, 0);
             _hpRt = _hpBar.rectTransform;
-            _stats = MenuUi.Label(card, "Stats", CMTokens.Ui, 17, cream, TextAnchor.MiddleLeft, 138f, 100f, 490f, 26f, "", 2f);
+            _stats = MenuUi.Label(card, "Stats", CMTokens.Ui, UiScale.TypeMin, cream, TextAnchor.MiddleLeft, 138f, 100f, 490f, 26f, "", 2f);
 
             RectTransform help = FeedUi.Anchored(watch, "Help", new Vector2(0.5f, 0f), 0f, HudLayout.Margin, 1500f, 76f);
             _help1 = PromptStrip.Make(help, "Help 1", 28f, 18, cream);
@@ -153,7 +154,7 @@ namespace CriticalMass.Runtime.Spectator
             // ---- the offer while knocked out ----
             RectTransform offer = FeedUi.Anchored(_canvas.transform, "Spectate Offer", new Vector2(0.5f, 0f), 0f, 176f, 460f, 56f);
             _offer = offer.gameObject;
-            _offerItem = MenuUi.Item(offer, "Offer", 0f, 0f, 460f, 56f, "", MenuItem.Kind.Button, 20, true);
+            _offerItem = MenuUi.Item(offer, "Offer", 0f, 0f, 460f, 56f, "", MenuItem.Kind.Button, UiScale.TypeSmall, true);
             _offerItem.Body.Radius = -1f;
             _offerItem.Submitted = () => SpectatorMode.Enter();
             _offerStrip = PromptStrip.Make(_offerItem.transform, "Offer Prompt", 30f, 20, cream);
@@ -370,7 +371,7 @@ namespace CriticalMass.Runtime.Spectator
                     _portrait.Image.enabled = true;
                     _portrait.Set(UiIcons.Portrait[(int)a.Cls, t], _tier);
                     HudText.Set(_name, ActorName(a.Team, a.Cls));
-                    _name.color = CMTokens.Team(a.Team);
+                    _name.color = CMTokens.TeamInk(a.Team);
                     HudText.Set(_sub, id == 0 ? "YOUR FIGHTER, ON AUTOPILOT" : a.Team == TeamId.Azure ? "AZURE TEAM" : "CRIMSON TEAM");
                     _hpBar.SetFill(CMTokens.Team(a.Team));
                     _hpBar.gameObject.SetActive(true);

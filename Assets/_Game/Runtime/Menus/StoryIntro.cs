@@ -278,6 +278,11 @@ namespace CriticalMass.Runtime.Menus
     /// Start too), subtitles, and a slow three-layer parallax per card that stands still when reduced motion is on
     /// (PlayerPrefs "cm.reducedMotion" = 1). Plays once on first launch in player builds (PlayerPrefs "cm.story.seen"), and
     /// whenever the game-flow menu calls <see cref="Play"/> ("Watch the story"). View only: it never touches the sim.
+    /// <para>Since the motion-comic rebuild (2026-11-12) the intro plays the shot table Resources "Story/motion-comic" through
+    /// <see cref="MotionComicPlayer"/> (12 shots, about 58 s, the bible's own art; skippable with any key, "skip" prompt
+    /// after 1 s, a short fade into the title at the end). The five-card path below stays as the fallback when the table
+    /// or its layers are missing. The same player runs the title's attract loop (<see cref="PlayAttract"/>, narration off,
+    /// any input returns to the title) and Codex lore vignettes (<see cref="PlayLore"/>).</para>
     /// <para>Public API for the game-flow item (DG-01): <see cref="Play"/>, <see cref="Skip"/>, <see cref="IsPlaying"/>,
     /// <see cref="Started"/>, <see cref="Finished"/> (argument: skipped), <see cref="PlayOnFirstLaunch"/> (set false if the
     /// flow plays it itself), <see cref="SeenKey"/>, <see cref="ReducedMotionKey"/>.</para>
@@ -296,6 +301,11 @@ namespace CriticalMass.Runtime.Menus
 
         public static StoryIntro Instance { get; private set; }
         public static bool IsPlaying => Instance != null && Instance._playing;
+        /// <summary>True while the motion comic runs as the title's attract loop.</summary>
+        public static bool IsAttract => IsPlaying && Instance._kind == PlayKind.Attract;
+        /// <summary>The motion comic is playing (false while the five-card fallback plays).</summary>
+        public bool ComicActive => _playing && _comicMode;
+        public MotionComicPlayer Comic => _comic;
         public static event Action Started;
         /// <summary>Raised when the intro ends; true when it was skipped.</summary>
         public static event Action<bool> Finished;
@@ -314,7 +324,16 @@ namespace CriticalMass.Runtime.Menus
         static readonly string SkipKeyboard = "SPACE   SKIP";
         static readonly string SkipPad = "A   SKIP";
 
+        enum PlayKind { Intro, Attract, Lore }
+
         bool _built, _playing;
+        PlayKind _kind;
+        bool _comicMode, _outro;
+        float _outroT;
+        MotionComicPlayer _comic;
+        McTable _table;
+        static readonly string SkipAnyKeyboard = "ANY KEY   SKIP";
+        static readonly string SkipAnyPad = "ANY BUTTON   SKIP";
         CanvasGroup _group;
         readonly RectTransform[] _cardRoots = new RectTransform[StoryContent.CardCount];
         readonly CanvasGroup[] _cardGroups = new CanvasGroup[StoryContent.CardCount];
@@ -353,8 +372,25 @@ namespace CriticalMass.Runtime.Menus
         {
             StoryIntro s = Instance != null ? Instance : StoryAttractCreditsInstaller.AttachStory();
             if (s == null) return false;
-            s.Begin();
+            s.Begin(PlayKind.Intro, MotionComic.IntroSequence);
             return true;
+        }
+
+        /// <summary>The motion comic as the title's attract loop: loops with narration off until any input. False when no
+        /// game is loaded or the shot table is missing (the caller then runs its camera tour).</summary>
+        public static bool PlayAttract()
+        {
+            StoryIntro s = Instance != null ? Instance : StoryAttractCreditsInstaller.AttachStory();
+            if (s == null) return false;
+            return s.Begin(PlayKind.Attract, MotionComic.AttractSequence);
+        }
+
+        /// <summary>The Codex vignette of a lore entry (shot table "codex" ids, for example "relic-02"); false if it has none.</summary>
+        public static bool PlayLore(string entryId)
+        {
+            StoryIntro s = Instance != null ? Instance : StoryAttractCreditsInstaller.AttachStory();
+            if (s == null) return false;
+            return s.Begin(PlayKind.Lore, entryId);
         }
 
         /// <summary>Ends the intro now, as the skip keys do.</summary>
@@ -365,11 +401,15 @@ namespace CriticalMass.Runtime.Menus
 
         // ---- play ----
 
-        void Begin()
+        bool Begin(PlayKind kind, string sequence)
         {
             if (_playing) EndPlay(false, false);
-            AttractMode.End();
+            if (kind != PlayKind.Attract) AttractMode.End();
             Credits.Hide();
+            _kind = kind;
+            _outro = false;
+            if (BeginComic(sequence)) return true;
+            if (kind != PlayKind.Intro) return false;
             Build();
             Cards = StoryContent.Load();
             var secs = new float[Cards.Length];
@@ -397,6 +437,116 @@ namespace CriticalMass.Runtime.Menus
             ShowCard(0);
             Apply();
             Started?.Invoke();
+            return true;
+        }
+
+        /// <summary>Starts the motion comic for a sequence or Codex id; false (nothing changed) when the table, the id or
+        /// its layers are missing.</summary>
+        bool BeginComic(string sequence)
+        {
+            _comicMode = false;
+            if (_table == null) _table = MotionComic.LoadTable();
+            McShot[] shots = MotionComic.Shots(_table, sequence);
+            if (shots == null) return false;
+            if (_comic == null)
+            {
+                var host = new GameObject("Motion Comic", typeof(RectTransform));
+                host.transform.SetParent(transform, false);
+                _comic = host.AddComponent<MotionComicPlayer>();
+            }
+            _comic.Reduced = ReducedMotion;
+            _comic.ReduceFlashing = GameSettings.ReduceFlashing;
+            _comic.ShakeScale = PlayerPrefs.HasKey(GameSettings.ShakeScaleKey) ? GameSettings.ShakeScale : 1f;
+            _comic.VoiceOn = _kind != PlayKind.Attract;
+            if (!_comic.Prepare(_table, shots))
+            {
+                _comic.Release();
+                return false;
+            }
+            var secs = new float[shots.Length];
+            for (int i = 0; i < shots.Length; i++) secs[i] = Mathf.Max(0.05f, shots[i].seconds);
+            Timeline = new StoryTimeline(secs);
+            _comicMode = true;
+            _playing = true;
+            _hintDevice = (ControlDevice)(-1);
+            OverlayGuard.Begin(gameObject, ConsumePause);
+            _comic.Show();
+            UpdateComicHint();
+            _comic.Render(0, 0f, 0.0, true);
+            if (_kind == PlayKind.Intro) Started?.Invoke();
+            return true;
+        }
+
+        void UpdateComicHint()
+        {
+            ControlBindings.Sample();
+            ControlDevice d = ControlBindings.ActiveDevice;
+            if (d == _hintDevice) return;
+            _hintDevice = d;
+            _comic.SetSkipText(d == ControlDevice.Gamepad ? SkipAnyPad : SkipAnyKeyboard);
+        }
+
+        void UpdateComic()
+        {
+            float dt = Mathf.Min((float)MaxFrameDt, Time.unscaledDeltaTime);
+            if (_outro)
+            {
+                // The film has finished: a key here only shortens the fade (the title reads keys from now on as well).
+                _outroT += dt;
+                float len = Mathf.Max(0.05f, _table.outroSeconds);
+                _comic.SetFade(1f - MotionComic.Ease(McEase.InOutSine, _outroT / len));
+                if (_outroT >= len || AnyKeyPressed()) EndPlay(false, true);
+                return;
+            }
+            bool input = _kind == PlayKind.Attract ? AttractMode.AnyInput() : AnyKeyPressed();
+            if (input)
+            {
+                if (_kind == PlayKind.Attract) EndPlay(false, false);
+                else SkipNow();
+                return;
+            }
+            UpdateComicHint();
+            Timeline.Advance(dt);
+            if (Timeline.Done)
+            {
+                if (_kind == PlayKind.Attract)
+                {
+                    var secs = new float[Timeline.CardCount];
+                    for (int i = 0; i < secs.Length; i++) secs[i] = (float)Timeline.LengthOf(i);
+                    Timeline = new StoryTimeline(secs);   // loop (one small allocation per 58 s loop, on the title only)
+                    _comic.Render(0, 0f, 0.0, false);
+                    return;
+                }
+                int last = Timeline.CardCount - 1;
+                _comic.Render(last, (float)Timeline.LengthOf(last), Timeline.Total, false);
+                if (_kind == PlayKind.Intro)
+                {
+                    // The hero frame lands on the logo, then fades into the title screen, which is shown again now.
+                    _outro = true;
+                    _outroT = 0f;
+                    _comic.StopVoice();
+                    OverlayGuard.End();
+                    return;
+                }
+                EndPlay(false, true);
+                return;
+            }
+            int idx = Timeline.Index;
+            _comic.Render(idx, (float)(Timeline.Time - Timeline.StartOf(idx)), Timeline.Time, true);
+        }
+
+        /// <summary>Any keyboard key, mouse button or controller button pressed this frame (mouse movement does not skip).</summary>
+        public static bool AnyKeyPressed()
+        {
+            Keyboard kb = Keyboard.current;
+            if (kb != null && kb.anyKey.wasPressedThisFrame) return true;
+            Mouse m = Mouse.current;
+            if (m != null && (m.leftButton.wasPressedThisFrame || m.rightButton.wasPressedThisFrame)) return true;
+            Gamepad p = Gamepad.current;
+            if (p == null) return false;
+            return p.buttonSouth.wasPressedThisFrame || p.buttonEast.wasPressedThisFrame || p.buttonWest.wasPressedThisFrame ||
+                   p.buttonNorth.wasPressedThisFrame || p.startButton.wasPressedThisFrame || p.selectButton.wasPressedThisFrame ||
+                   p.leftShoulder.wasPressedThisFrame || p.rightShoulder.wasPressedThisFrame;
         }
 
         bool ConsumePause()
@@ -415,13 +565,24 @@ namespace CriticalMass.Runtime.Menus
         void EndPlay(bool skipped, bool raise)
         {
             _playing = false;
+            _outro = false;
             if (_voice != null) _voice.Stop();
             if (Canvas != null) Canvas.enabled = false;
             OverlayGuard.End();
-            PlayerPrefs.SetInt(SeenKey, 1);
-            PlayerPrefs.Save();
+            bool intro = _kind == PlayKind.Intro;
+            if (intro)
+            {
+                PlayerPrefs.SetInt(SeenKey, 1);
+                PlayerPrefs.Save();
+            }
             ReleaseAssets();
-            if (raise) Finished?.Invoke(skipped);
+            if (_comicMode && _comic != null)
+            {
+                _comic.Hide();
+                _comic.Release();
+            }
+            _comicMode = false;
+            if (raise && intro) Finished?.Invoke(skipped);
         }
 
         void ReleaseAssets()
@@ -443,6 +604,11 @@ namespace CriticalMass.Runtime.Menus
         {
             OverlayGuard.Tick();
             if (!_playing) return;
+            if (_comicMode)
+            {
+                UpdateComic();
+                return;
+            }
             if (SkipPressed())
             {
                 SkipNow();
@@ -603,12 +769,12 @@ namespace CriticalMass.Runtime.Menus
             MakeBar(space, "Top Bar", 0f, topBar);
             MakeBar(space, "Bottom Bar", HudLayout.RefH - bottomBar, bottomBar);
 
-            _caption = MenuUi.Label(space, "Subtitle", CMTokens.Ui, 40, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter,
+            _caption = MenuUi.Label(space, "Subtitle", CMTokens.Ui, UiScale.TypeLead, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter,
                 260f, HudLayout.RefH - bottomBar + 14f, HudLayout.RefW - 520f, bottomBar - 28f, "", CMTokens.OutlinePx);
             _caption.horizontalOverflow = HorizontalWrapMode.Wrap;
             _caption.lineSpacing = 1.05f;
 
-            _skip = MenuUi.Label(space, "Skip", CMTokens.Display, 22, CMTokens.ToolBrass.Color, TextAnchor.MiddleRight,
+            _skip = MenuUi.Label(space, "Skip", CMTokens.Display, UiScale.TypeBody, CMTokens.ToolBrass.Color, TextAnchor.MiddleRight,
                 HudLayout.RefW - 560f, 18f, 500f, 40f, SkipKeyboard, 2f);
 
             float pipsW = StoryContent.CardCount * 34f;

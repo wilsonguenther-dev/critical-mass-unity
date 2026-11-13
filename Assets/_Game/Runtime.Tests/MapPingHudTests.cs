@@ -280,10 +280,19 @@ namespace CriticalMass.Runtime.Tests
             Pings.Refused += onRefused;
             try
             {
-                Assert.IsTrue(Pings.Place(w, PingKind.Attack, w.Map.Hill.X, w.Map.Hill.Z, 0));
-                Assert.IsTrue(Pings.Place(w, PingKind.Defend, w.Map.Hill.X, w.Map.Hill.Z, 0));
-                Assert.IsTrue(Pings.Place(w, PingKind.Help, w.Map.Hill.X, w.Map.Hill.Z, 0));
-                Assert.IsFalse(Pings.Place(w, PingKind.Help, w.Map.Hill.X, w.Map.Hill.Z, 0));
+                // Integration batch 4: with the depth rules on (#59/#61) the local player's ping is a sim input (the sim
+                // rate-limits it); the book's own limit still applies to any other owner, and to every ping with the rules off.
+                if (CriticalMass.Runtime.View.Mechanics.DepthRead.PingsOn(w))
+                {
+                    Assert.IsTrue(Pings.Place(w, PingKind.Attack, w.Map.Hill.X, w.Map.Hill.Z, 0));
+                    Assert.IsTrue(CriticalMass.Runtime.View.Mechanics.DepthInputLatch.PingPending, "the local ping goes to the sim");
+                    CriticalMass.Runtime.View.Mechanics.DepthInputLatch.Take(out _, out _, out _, out _);
+                }
+                const int owner = 3;
+                Assert.IsTrue(Pings.Place(w, PingKind.Attack, w.Map.Hill.X, w.Map.Hill.Z, owner));
+                Assert.IsTrue(Pings.Place(w, PingKind.Defend, w.Map.Hill.X, w.Map.Hill.Z, owner));
+                Assert.IsTrue(Pings.Place(w, PingKind.Help, w.Map.Hill.X, w.Map.Hill.Z, owner));
+                Assert.IsFalse(Pings.Place(w, PingKind.Help, w.Map.Hill.X, w.Map.Hill.Z, owner));
                 Assert.Greater(refused, 0.0, "the refusal reports the wait");
             }
             finally

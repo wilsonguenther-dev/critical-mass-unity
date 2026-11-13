@@ -1,141 +1,157 @@
 using System;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
-using System.Text;
+using System.Threading;
 using CriticalMass.Runtime.Hud;
 using CriticalMass.Runtime.Input;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
+using Debug = UnityEngine.Debug;
 
 namespace CriticalMass.Runtime.Game
 {
     /// <summary>
-    /// DG-05 "do not blow up the player's machine" (after the 2026-11-12 watchdog restart: the player had no frame limit).
-    /// Installs itself (DontDestroyOnLoad) and only touches engine settings, never game or Sim state.
-    ///
-    /// Frame limit: PlayerPrefs cm.fpsCap (30, 60, 120, 0 = display rate; default 60) through vertical sync at every
-    /// quality level: vSyncCount = refresh / cap when that divides the display rate, else vSync off and
-    /// targetFrameRate = cap; measured every 2 s and switched to targetFrameRate if the display runs faster than the cap.
-    /// Title, pause and menus (MenuOpen) cap at 60 whatever the setting. cm.bgThrottle (default 1): an unfocused or
-    /// minimised window drops to 15 fps and pauses audio. Autoplay runs are exempt from the background throttle, and
-    /// -novsync (measurement only) lifts every cap.
-    ///
-    /// Safe start: the first launch picks the quality from the machine (integrated graphics or under 8 GB memory: the low
-    /// level at render scale 0.75) and stores it in machine-profile.json; the window never exceeds the display's native
-    /// resolution; -safe forces the lowest settings; a session marker left by a run that did not exit cleanly starts the
-    /// next run in safe settings and says so on the title screen.
-    ///
-    /// Files the game writes (all in Application.persistentDataPath unless noted): machine-profile.json (+ .bak, atomic,
-    /// versioned), session.running (marker, deleted on a clean quit), crash-log.txt (+ crash-log.1.txt, capped),
-    /// perf-last.json (autoplay only); Unity's Player.log (Application.consoleLogPath); PlayerPrefs cm.fpsCap and
-    /// cm.bgThrottle (read here; written only by a settings menu).
+    /// DG-05, hardened by DG-49 to DG-52, DG-56 and DG-62 (2026-11-12 panel). Installs itself (DontDestroyOnLoad) and only
+    /// touches engine settings, never game or Sim state. The pure rules live in FramePolicy (tests).
+    /// <para>One owner: this is the ONLY code that writes QualitySettings.vSyncCount, Application.targetFrameRate and
+    /// QualitySettings.maxQueuedFrames. GameSettings stores the player's choices and calls Reapply.</para>
+    /// <para>Frame cap: cm.fpsCap (30, 60, 120, 0 = display rate; default 60) through vsync when it divides the display,
+    /// else a timed cap; menus at 60; on battery menus at 30 and matches at 60 or below; -novsync = vsync off with a 240
+    /// target, never unlimited; if the measured rate stays over 1.5x the cap for 2 s, a timed cap takes over.</para>
+    /// <para>Background (DG-51): an unfocused window keeps drawing at the normal cap (never below 30) with sound on, so a
+    /// streamer who clicks chat never shows a frozen or silent game; "save power in background" (cm.bgThrottle, default
+    /// off) brings back 15 fps.</para>
+    /// <para>Pixels (DG-50): render scale = min(chosen, sqrt(budget / screen pixels)), budget 2.1 MP (3.7 MP at High and
+    /// above), applied to the level's pipeline asset in the player only (the editor never runs this, so project files
+    /// never change). Heat: a serious thermal state (macOS pmset, checked every 2 min off the main thread) drops one level.</para>
+    /// <para>Displays (DG-52): a change of window size, display count or refresh rate re-reads the display, re-applies the
+    /// cap and the pixel budget. Window mode and size changes go through RequestWindow: at least 1 s apart, never
+    /// exclusive fullscreen, never larger than the display.</para>
+    /// <para>Safe mode (DG-62): SessionKeeper decides (a crash at startup, or two unclean sessions in a row, or -safe);
+    /// safe mode selects the Low asset at 0.7 scale; the notice lives in Settings (SafeNotice), not on the title.</para>
+    /// Files (DATA = GamePaths.DataDir): machine-profile.json (+ .bak, atomic, versioned); see SessionKeeper for the rest.
     /// </summary>
     public sealed class FrameGovernor : MonoBehaviour
     {
         public const string PrefFpsCap = "cm.fpsCap";
         public const string PrefBgThrottle = "cm.bgThrottle";
-        /// <summary>The settings page's keys (GameSettings, controls lane): a vsync choice and a quality choice win over the pick.</summary>
         public const string PrefVSync = "cm.video.vsync";
         public const string PrefQuality = "cm.video.quality";
-        public const int DefaultCap = 60;
-        public const int MenuCap = 60;
-        public const int BackgroundFps = 15;
+        public const int DefaultCap = FramePolicy.DefaultCap;
+        public const int MenuCap = FramePolicy.MenuCap;
+        public const int BackgroundFps = FramePolicy.SavePowerBackgroundFps;
         public const int SafeCap = 30;
-        public const float LowRenderScale = 0.75f;
-        public const float SafeRenderScale = 0.7f;
+        public const float LowRenderScale = FramePolicy.LowRenderScale;
+        public const float SafeRenderScale = FramePolicy.SafeRenderScale;
         public const int ProfileVersion = 1;
         public const string ProfileFile = "machine-profile.json";
-        public const string MarkerFile = "session.running";
+        public const string MarkerFile = SessionKeeper.MarkerFile;
+        public const int NoVsyncTarget = FramePolicy.NoVsyncTarget;
 
         /// <summary>Set by any menu while it is open: the frame cap drops to 60 (MenuCap).</summary>
         public static bool MenuOpen;
 
-        /// <summary>true when this run started in safe settings; SafeReason says why ("-safe", "last run did not exit cleanly").</summary>
-        public static bool SafeMode { get; private set; }
-        public static string SafeReason { get; private set; } = "";
+        public static bool SafeMode => SessionKeeper.SafeMode;
+        public static string SafeReason => SessionKeeper.SafeReason;
 
-        /// <summary>The frame settings now applied: vSyncCount, targetFrameRate and the cap they aim at (0 = uncapped).</summary>
+        /// <summary>The neutral line the settings page shows when this session started in lighter settings (null otherwise).</summary>
+        public static string SafeNotice => SessionKeeper.SafeMode
+            ? (SessionKeeper.SafeReason == "-safe" ? "Started with light video settings (-safe)."
+                : "This session started with lighter video settings after an unexpected exit. Choose a quality level to change it.")
+            : null;
+
         public static int AppliedVSync { get; private set; }
         public static int AppliedTarget { get; private set; }
         public static int AppliedCap { get; private set; }
+        public static float AppliedRenderScale { get; private set; } = 1f;
+        public static int AppliedQueuedFrames { get; private set; }
+        /// <summary>true while the title screen is up (read by SimDriverBehaviour's backdrop throttle).</summary>
+        public static bool TitleUp { get; private set; }
+
+        /// <summary>The quality the run asked for (-quality or the stored choice); the perf gate compares it with the real one.</summary>
+        public static string RequestedQuality { get; private set; } = "";
 
         static GameObject _host;
         static bool _reapply;
+        static readonly ToggleDebouncer WindowDebounce = new ToggleDebouncer();
+        static (int w, int h, FullScreenMode mode)? _pendingWindow;
+        static string _notice;
+        static float _noticeUntil;
+
+        /// <summary>The settings page saved a frame setting: re-read them on the next frame.</summary>
+        public static void Reapply() => _reapply = true;
+
+        /// <summary>A short line at the top of the screen for a few seconds ("Settings could not be saved").</summary>
+        public static void ShowNotice(string text, float seconds = 6f)
+        {
+            _notice = text;
+            _noticeUntil = Time.realtimeSinceStartup + seconds;
+        }
 
         /// <summary>
-        /// The settings page saved cm.fpsCap, cm.bgThrottle, cm.video.vsync or cm.video.quality: re-read them on the next
-        /// frame. FrameGovernor is the only code that writes QualitySettings.vSyncCount and Application.targetFrameRate.
+        /// DG-52: change the window. Exclusive fullscreen becomes borderless; the size is clamped to the display; changes
+        /// closer than 1 s apart are held and the newest runs when the gap has passed. Player builds only.
         /// </summary>
-        public static void Reapply() => _reapply = true;
+        public static void RequestWindow(int w, int h, FullScreenMode mode)
+        {
+            if (Application.isEditor || Application.isBatchMode) return;
+            if (mode == FullScreenMode.ExclusiveFullScreen || mode == FullScreenMode.MaximizedWindow) mode = FullScreenMode.FullScreenWindow;
+            (w, h) = FramePolicy.ClampToNative(w, h, Display.main.systemWidth, Display.main.systemHeight);
+            _pendingWindow = (w, h, mode);
+        }
+
         string _dataDir;
-        bool _focused = true, _pausedAudio, _forceTarget, _title, _inputPaused;
-        float _checkAge = 10f, _measureAge, _noticeUntil;
-        int _measureFrames, _prefCap = DefaultCap, _prefBg = 1, _prefVSync = 1;
+        bool _focused = true, _title, _inputPaused, _onBattery;
+        float _checkAge = 10f;
+        int _prefCap = DefaultCap, _prefBg, _prefVSync = 1, _baseLevel = -1, _seenW, _seenH, _seenDisplays;
+        double _seenHz;
+        float _chosenScale = 1f;
+        int _argCap = -1;   // -fpsCap N (measurement runs: the floor profile uses 30); -1 = none
+        readonly TimedCapGuard _guard = new TimedCapGuard();
         HumanInputSource _input;
         FrameGovernorGui _gui;
-
-        /// <summary>The frame target under -novsync.</summary>
-        public const int NoVsyncTarget = 240;
+        Thread _thermalThread;
+        volatile int _thermal;
+        volatile bool _stopThermal;
+        bool _thermalDropped;
+        float _coolSince;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         static void Install()
         {
-            // Keep running (at the background rate below) when the window loses focus: a streamer clicking away must not
-            // freeze the game. ProjectSettings sets the same; this covers builds made before it.
-            Application.runInBackground = true;
+            Application.runInBackground = true;   // DG-51; ProjectSetup sets the same
             if (_host != null) return;
             _host = new GameObject("CriticalMass FrameGovernor");
             DontDestroyOnLoad(_host);
             _host.AddComponent<FrameGovernor>();
         }
 
-        // ── pure parts (tests) ──
+        // ── pure parts kept for DG-05 callers and tests (FramePolicy holds the rules) ──
 
-        /// <summary>vSyncCount and targetFrameRate for a cap (0 = display rate) on a display of refreshHz.</summary>
-        public static (int vSync, int target) FrameSettings(int cap, double refreshHz)
+        public static (int vSync, int target) FrameSettings(int cap, double refreshHz) => FramePolicy.FrameSettings(cap, refreshHz);
+        public static int SanitiseCap(int v) => FramePolicy.SanitiseCap(v);
+        public static int EffectiveCap(int prefCap, bool menuLike) => FramePolicy.EffectiveCap(prefCap, menuLike);
+        public static bool IsIntegrated(string gpuName, int gpuMemoryMb) => FramePolicy.IsIntegrated(gpuName, gpuMemoryMb);
+        public static (int level, float scale, string reason) PickQuality(string gpuName, int gpuMemoryMb, int systemMemoryMb, int levelCount, int defaultLevel) =>
+            FramePolicy.PickQuality(gpuName, gpuMemoryMb, systemMemoryMb, levelCount, defaultLevel);
+        public static (int w, int h) ClampToNative(int w, int h, int nativeW, int nativeH) => FramePolicy.ClampToNative(w, h, nativeW, nativeH);
+
+        /// <summary>The level asked for by -quality NAME|INDEX, or -1 (pure; tests).</summary>
+        public static int QualityArg(string[] args, string[] names)
         {
-            if (cap <= 0) return (1, -1);
-            if (double.IsNaN(refreshHz) || refreshHz < 20) refreshHz = 60;
-            int n = (int)Math.Round(refreshHz / cap);
-            if (n >= 1 && n <= 4 && Math.Abs(refreshHz / n - cap) <= cap * 0.1) return (n, -1);
-            return (0, cap);
-        }
-
-        /// <summary>A cap read from PlayerPrefs: one of 30, 60, 120, 0; anything else is 60.</summary>
-        public static int SanitiseCap(int v) => v == 30 || v == 60 || v == 120 || v == 0 ? v : DefaultCap;
-
-        /// <summary>The cap in force: title, pause and menus never above 60 (0 counts as above).</summary>
-        public static int EffectiveCap(int prefCap, bool menuLike) =>
-            menuLike && (prefCap == 0 || prefCap > MenuCap) ? MenuCap : prefCap;
-
-        /// <summary>true for integrated GPUs (Intel, AMD APUs); Apple silicon counts as a capable GPU (U-004 targets it).</summary>
-        public static bool IsIntegrated(string gpuName, int gpuMemoryMb)
-        {
-            string g = (gpuName ?? "").ToLowerInvariant();
-            if (g.Contains("apple")) return false;
-            if (g.Contains("intel")) return true;
-            if (g.Contains("radeon(tm) graphics") || g.Contains("radeon graphics") || g.Contains("vega") && !g.Contains("rx vega")) return true;
-            if (g.Contains("microsoft basic render") || g.Contains("llvmpipe") || g.Contains("swiftshader")) return true;
-            return gpuMemoryMb > 0 && gpuMemoryMb < 1024;
-        }
-
-        /// <summary>First-launch pick: (quality level, render scale, reason).</summary>
-        public static (int level, float scale, string reason) PickQuality(string gpuName, int gpuMemoryMb, int systemMemoryMb,
-            int levelCount, int defaultLevel)
-        {
-            int low = Math.Min(1, Math.Max(0, levelCount - 1));
-            if (IsIntegrated(gpuName, gpuMemoryMb)) return (low, LowRenderScale, "integrated graphics");
-            if (systemMemoryMb > 0 && systemMemoryMb < 8 * 1024) return (low, LowRenderScale, "under 8 GB memory");
-            return (Math.Max(0, Math.Min(defaultLevel, levelCount - 1)), 1f, "capable machine");
-        }
-
-        /// <summary>A window size never above the display's native size, aspect kept.</summary>
-        public static (int w, int h) ClampToNative(int w, int h, int nativeW, int nativeH)
-        {
-            if (nativeW <= 0 || nativeH <= 0 || (w <= nativeW && h <= nativeH)) return (w, h);
-            double s = Math.Min((double)nativeW / w, (double)nativeH / h);
-            return (Math.Max(640, (int)(w * s + 1e-6)), Math.Max(360, (int)(h * s + 1e-6)));
+            if (args == null || names == null) return -1;
+            for (int i = 0; i + 1 < args.Length; i++)
+            {
+                if (!string.Equals(args[i], "-quality", StringComparison.OrdinalIgnoreCase)) continue;
+                string v = args[i + 1];
+                if (int.TryParse(v, out int n)) return n >= 0 && n < names.Length ? n : -1;
+                for (int k = 0; k < names.Length; k++)
+                    if (string.Equals(names[k], v, StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(names[k].Replace(" ", ""), v, StringComparison.OrdinalIgnoreCase)) return k;
+            }
+            return -1;
         }
 
         // ── lifecycle ──
@@ -149,95 +165,128 @@ namespace CriticalMass.Runtime.Game
                 enabled = false;   // frame caps, settings and files belong to players; the editor and its tests keep their own
                 return;
             }
-            _dataDir = Application.persistentDataPath;
-            string marker = Path.Combine(_dataDir, MarkerFile);
-            bool unclean = File.Exists(marker);
-            bool safeFlag = Array.Exists(Environment.GetCommandLineArgs(), a => string.Equals(a, "-safe", StringComparison.OrdinalIgnoreCase));
-            try
+            SessionKeeper.EnsureStarted();
+            if (SessionKeeper.SecondInstance)
             {
-                Directory.CreateDirectory(_dataDir);
-                SafeFile.WriteAtomic(marker, "started_utc=" + DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture) + "\n" +
-                                             "version=" + BuildInfo.Label + "\n", false);
+                enabled = false;
+                Application.Quit(0);
+                return;
             }
-            catch (Exception) { /* a read-only disk must not stop the game */ }
-            Application.quitting += OnQuitting;
-
-            SafeMode = safeFlag || unclean;
-            SafeReason = safeFlag ? "-safe" : unclean ? "last run did not exit cleanly" : "";
+            _dataDir = GamePaths.DataDir;
+            if (SessionKeeper.ToolRun) return;
+            string[] args = Environment.GetCommandLineArgs();
+            for (int i = 0; i + 1 < args.Length; i++)
+                if (string.Equals(args[i], "-fpsCap", StringComparison.OrdinalIgnoreCase) && int.TryParse(args[i + 1], out int c))
+                    _argCap = SanitiseCap(c);
             ApplyQuality();
             ClampWindow();
-            if (unclean) _noticeUntil = Time.realtimeSinceStartup + 12f;
-            Debug.Log($"[CM.Governor] quality={QualitySettings.names[QualitySettings.GetQualityLevel()]} " +
-                      $"renderScale={CurrentRenderScale():0.##} safe={SafeMode}{(SafeMode ? " (" + SafeReason + ")" : "")} " +
-                      $"gpu=\"{SystemInfo.graphicsDeviceName}\" vram={SystemInfo.graphicsMemorySize}MB ram={SystemInfo.systemMemorySize}MB " +
-                      $"refresh={Screen.currentResolution.refreshRateRatio.value:0.#}Hz data={_dataDir}");
+            ReadDisplay();
+            StartThermal();
+            Debug.Log($"[CM.Governor] quality={QualitySettings.names[QualitySettings.GetQualityLevel()]} requested={RequestedQuality} " +
+                      $"renderScale={AppliedRenderScale:0.##} safe={SafeMode}{(SafeMode ? " (" + SafeReason + ")" : "")} " +
+                      $"gpu=\"{SystemInfo.graphicsDeviceName}\" api={SystemInfo.graphicsDeviceType} vram={SystemInfo.graphicsMemorySize}MB " +
+                      $"ram={SystemInfo.systemMemorySize}MB refresh={Screen.currentResolution.refreshRateRatio.value:0.#}Hz " +
+                      $"screen={Screen.width}x{Screen.height} mode={Screen.fullScreenMode} displays={Display.displays.Length} data={_dataDir}");
         }
 
-        void OnQuitting()
+        void OnDestroy()
         {
-            try
-            {
-                if (_dataDir != null) File.Delete(Path.Combine(_dataDir, MarkerFile));
-            }
-            catch (Exception) { }
+            _stopThermal = true;
         }
 
-        static float CurrentRenderScale() =>
-            QualitySettings.renderPipeline is UniversalRenderPipelineAsset a ? a.renderScale
-            : GraphicsSettings.defaultRenderPipeline is UniversalRenderPipelineAsset d ? d.renderScale : 1f;
-
-        static void SetRenderScale(float s)
-        {
-            if (QualitySettings.renderPipeline is UniversalRenderPipelineAsset a) a.renderScale = s;
-            else if (GraphicsSettings.defaultRenderPipeline is UniversalRenderPipelineAsset d) d.renderScale = s;
-        }
+        static UniversalRenderPipelineAsset CurrentAsset() =>
+            QualitySettings.renderPipeline as UniversalRenderPipelineAsset ?? GraphicsSettings.defaultRenderPipeline as UniversalRenderPipelineAsset;
 
         void ApplyQuality()
         {
-            if (SafeMode)
-            {
-                QualitySettings.SetQualityLevel(0, true);
-                SetRenderScale(SafeRenderScale);
-                if (QualitySettings.renderPipeline is UniversalRenderPipelineAsset a) a.shadowDistance = Mathf.Min(a.shadowDistance, 40f);
-                return;
-            }
-            string path = Path.Combine(_dataDir, ProfileFile);
+            string[] names = QualitySettings.names;
             int level;
             float scale;
-            string reason;
-            string text = SafeFile.ReadVersioned(path, ProfileVersion, out string why);
-            var f = BuildInfo.Parse(text);
-            if (text != null && f.TryGetValue("level", out string ls) && int.TryParse(ls, out level) &&
-                f.TryGetValue("render_scale", out string ss) && float.TryParse(ss, NumberStyles.Float, CultureInfo.InvariantCulture, out scale))
+            if (SafeMode)
             {
-                reason = f.TryGetValue("reason", out string r) ? r : "stored";
+                level = Math.Min(FramePolicy.LevelLow, names.Length - 1);
+                scale = SafeRenderScale;
+                RequestedQuality = names[level];
             }
             else
             {
-                (level, scale, reason) = PickQuality(SystemInfo.graphicsDeviceName, SystemInfo.graphicsMemorySize,
-                    SystemInfo.systemMemorySize, QualitySettings.names.Length, QualitySettings.GetQualityLevel());
-                if (why != null) Debug.LogWarning($"[CM.Governor] {ProfileFile}: {why}; picked defaults again");
-                try
+                string path = Path.Combine(_dataDir, ProfileFile);
+                string text = SafeFile.ReadVersioned(path, ProfileVersion, out string why);
+                var f = BuildInfo.Parse(text);
+                if (text != null && f.TryGetValue("level", out string ls) && int.TryParse(ls, out level) &&
+                    f.TryGetValue("render_scale", out string ss) && float.TryParse(ss, NumberStyles.Float, CultureInfo.InvariantCulture, out scale))
                 {
-                    SafeFile.WriteAtomic(path, SafeFile.Versioned(ProfileVersion,
-                        "level=" + level + "\nrender_scale=" + scale.ToString("0.##", CultureInfo.InvariantCulture) +
-                        "\nreason=" + reason + "\ngpu=" + SystemInfo.graphicsDeviceName + "\nram_mb=" + SystemInfo.systemMemorySize + "\n"), true);
                 }
-                catch (Exception) { }
+                else
+                {
+                    string reason;
+                    (level, scale, reason) = FramePolicy.PickQuality(SystemInfo.graphicsDeviceName, SystemInfo.graphicsMemorySize,
+                        SystemInfo.systemMemorySize, names.Length, FramePolicy.LevelHigh);
+                    if (why != null && why != "missing") Debug.LogWarning($"[CM.Governor] {ProfileFile}: {why}; picked defaults again");
+                    SafeFile.TryWriteAtomic(path, SafeFile.Versioned(ProfileVersion,
+                        "level=" + level + "\nrender_scale=" + scale.ToString("0.##", CultureInfo.InvariantCulture) +
+                        "\nreason=" + reason + "\ngpu=" + SystemInfo.graphicsDeviceName + "\nram_mb=" + SystemInfo.systemMemorySize + "\n"), true, out _);
+                }
+                // The player's own choice wins, except in an isolated measurement run (-dataDir): the owner's choice must not leak in.
+                int chosen = GamePaths.Isolated ? -1 : PlayerPrefs.GetInt(PrefQuality, -1);
+                if (chosen >= 0 && chosen < names.Length)
+                {
+                    level = chosen;
+                    if (level >= FramePolicy.LevelHigh) scale = 1f;
+                }
+                int arg = QualityArg(Environment.GetCommandLineArgs(), names);
+                if (arg >= 0)
+                {
+                    level = arg;
+                    scale = level <= FramePolicy.LevelLow ? LowRenderScale : 1f;
+                }
+                level = Mathf.Clamp(level, 0, names.Length - 1);
+                RequestedQuality = names[level];
             }
-            int chosen = PlayerPrefs.GetInt(PrefQuality, -1);   // the player's own choice on the settings page wins
-            if (chosen >= 0 && chosen < QualitySettings.names.Length) level = chosen;
+            _baseLevel = level;
+            _chosenScale = Mathf.Clamp(scale, FramePolicy.MinRenderScale, 1f);
+            SetLevel(level);
+        }
+
+        void SetLevel(int level)
+        {
             level = Mathf.Clamp(level, 0, QualitySettings.names.Length - 1);
             if (level != QualitySettings.GetQualityLevel()) QualitySettings.SetQualityLevel(level, true);
-            SetRenderScale(Mathf.Clamp(scale, 0.5f, 1f));
+            RenderTier.Set(level);
+            ApplyPixels();
+            int queued = FramePolicy.MaxQueuedFrames(level, SafeMode);
+            if (QualitySettings.maxQueuedFrames != queued) QualitySettings.maxQueuedFrames = queued;
+            AppliedQueuedFrames = queued;
+            if (SafeMode && CurrentAsset() is UniversalRenderPipelineAsset a) a.shadowDistance = Mathf.Min(a.shadowDistance, 40f);
+            _guard.Reset();
+        }
+
+        void ApplyPixels()
+        {
+            int level = QualitySettings.GetQualityLevel();
+            float s = FramePolicy.RenderScaleFor(_chosenScale, FramePolicy.PixelBudget(level), Screen.width, Screen.height);
+            UniversalRenderPipelineAsset a = CurrentAsset();
+            // Player only (Awake disables this component in the editor): the asset in a player is an in-memory object,
+            // so the project's .asset file can never change.
+            if (a != null && Mathf.Abs(a.renderScale - s) > 0.001f) a.renderScale = s;
+            AppliedRenderScale = s;
         }
 
         static void ClampWindow()
         {
             int nw = Display.main.systemWidth, nh = Display.main.systemHeight;
-            (int w, int h) = ClampToNative(Screen.width, Screen.height, nw, nh);
-            if (SafeMode && Screen.fullScreenMode == FullScreenMode.Windowed) (w, h) = ClampToNative(w, h, 1280, 720);
-            if (w != Screen.width || h != Screen.height) Screen.SetResolution(w, h, Screen.fullScreenMode);
+            (int w, int h) = FramePolicy.ClampToNative(Screen.width, Screen.height, nw, nh);
+            FullScreenMode mode = Screen.fullScreenMode == FullScreenMode.ExclusiveFullScreen ? FullScreenMode.FullScreenWindow : Screen.fullScreenMode;
+            if (SafeMode && mode == FullScreenMode.Windowed) (w, h) = FramePolicy.ClampToNative(w, h, 1280, 720);
+            if (w != Screen.width || h != Screen.height || mode != Screen.fullScreenMode) RequestWindow(w, h, mode);
+        }
+
+        void ReadDisplay()
+        {
+            _seenW = Screen.width;
+            _seenH = Screen.height;
+            _seenDisplays = Display.displays.Length;
+            _seenHz = Screen.currentResolution.refreshRateRatio.value;
         }
 
         void OnApplicationFocus(bool focus) => _focused = focus;
@@ -247,24 +296,118 @@ namespace CriticalMass.Runtime.Game
             if (pause) _focused = false;
         }
 
+        // ── heat (macOS: pmset off the main thread, every 2 minutes; other platforms: none, UNVERIFIED API) ──
+
+        void StartThermal()
+        {
+            if (Application.platform != RuntimePlatform.OSXPlayer || GamePaths.HasFlag("-noThermal")) return;
+            _thermalThread = new Thread(() =>
+            {
+                while (!_stopThermal)
+                {
+                    try
+                    {
+                        var psi = new ProcessStartInfo("/usr/bin/pmset", "-g therm")
+                        {
+                            UseShellExecute = false, RedirectStandardOutput = true, CreateNoWindow = true,
+                        };
+                        using (Process p = Process.Start(psi))
+                        {
+                            string text = p.StandardOutput.ReadToEnd();
+                            if (!p.WaitForExit(2000)) p.Kill();
+                            _thermal = FramePolicy.ParsePmsetTherm(text);
+                        }
+                    }
+                    catch (Exception)
+                    {
+                        return;   // no pmset: no heat signal, never an error
+                    }
+                    for (int i = 0; i < 120 && !_stopThermal; i++) Thread.Sleep(1000);
+                }
+            }) { IsBackground = true, Name = "CM thermal" };
+            _thermalThread.Start();
+        }
+
+        void UpdateThermal()
+        {
+            bool hot = _thermal >= 2;
+            if (hot && !_thermalDropped && _baseLevel > 0)
+            {
+                _thermalDropped = true;
+                RuntimeCounters.ThermalDrops++;
+                Debug.LogWarning("[CM.Governor] the machine reports a serious thermal state; one quality step lower until it cools");
+                SetLevel(QualitySettings.GetQualityLevel() - 1);
+                _coolSince = -1f;
+            }
+            else if (!hot && _thermalDropped)
+            {
+                if (_coolSince < 0) _coolSince = Time.realtimeSinceStartup;
+                else if (Time.realtimeSinceStartup - _coolSince > 300f)
+                {
+                    _thermalDropped = false;
+                    SetLevel(QualitySettings.GetQualityLevel() + 1);
+                }
+            }
+        }
+
+        // ── per frame ──
+
         void Update()
         {
             float dt = Time.unscaledDeltaTime;
+            SessionKeeper.Tick(dt);
+            if (SessionKeeper.ToolRun) return;
             _checkAge += dt;
             if (_checkAge >= 0.5f || _reapply)
             {
+                bool reapplied = _reapply;
                 _checkAge = 0f;
                 _reapply = false;
-                _prefCap = SanitiseCap(PlayerPrefs.GetInt(PrefFpsCap, DefaultCap));
-                _prefBg = PlayerPrefs.GetInt(PrefBgThrottle, 1);
-                _prefVSync = PlayerPrefs.GetInt(PrefVSync, 1);
+                // An isolated measurement run (-dataDir) never reads the owner's choices: defaults plus its own flags.
+                bool own = !GamePaths.Isolated;
+                _prefCap = _argCap >= 0 ? _argCap : own ? SanitiseCap(PlayerPrefs.GetInt(PrefFpsCap, DefaultCap)) : DefaultCap;
+                _prefBg = own ? PlayerPrefs.GetInt(PrefBgThrottle, 0) : 0;
+                _prefVSync = own ? PlayerPrefs.GetInt(PrefVSync, 1) : 1;
                 _title = FindAnyObjectByType<TitleScreen>() != null;
+                TitleUp = _title;
                 if (_input == null) _input = FindAnyObjectByType<HumanInputSource>();
                 _inputPaused = _input != null && _input.State != null && _input.State.Paused;
+                _onBattery = SystemInfo.batteryStatus == BatteryStatus.Discharging;
+                SessionKeeper.Phase = _title ? "title" : _inputPaused ? "paused" : MenuOpen ? "menu" : "match";
+                if (reapplied)
+                {
+                    int q = QualitySettings.GetQualityLevel();
+                    if (q != _baseLevel && !_thermalDropped)
+                    {
+                        _baseLevel = q;
+                        _chosenScale = q >= FramePolicy.LevelHigh ? 1f : Math.Min(_chosenScale, 1f);
+                    }
+                    SetLevel(q);
+                }
+                if (Screen.width != _seenW || Screen.height != _seenH || Display.displays.Length != _seenDisplays ||
+                    Math.Abs(Screen.currentResolution.refreshRateRatio.value - _seenHz) > 0.5)
+                {
+                    RuntimeCounters.DisplayChanges++;
+                    Debug.Log($"[CM.Governor] display changed: {_seenW}x{_seenH}@{_seenHz:0.#} -> {Screen.width}x{Screen.height}@" +
+                              $"{Screen.currentResolution.refreshRateRatio.value:0.#} displays {_seenDisplays} -> {Display.displays.Length}");
+                    ReadDisplay();
+                    ApplyPixels();
+                    _guard.Reset();
+                }
+                UpdateThermal();
+            }
+
+            if (_pendingWindow.HasValue && WindowDebounce.TryFire(Time.realtimeSinceStartupAsDouble))
+            {
+                (int w, int h, FullScreenMode mode) = _pendingWindow.Value;
+                _pendingWindow = null;
+                if (w != Screen.width || h != Screen.height || mode != Screen.fullScreenMode) Screen.SetResolution(w, h, mode);
             }
 
             AutoplayArgs.Options o = AutoplayArgs.Current;
-            bool background = !_focused && _prefBg != 0 && !o.Autoplay;
+            bool menuLike = _title || _inputPaused || MenuOpen;
+            int fg = EffectiveCapFor(menuLike);
+            bool background = !_focused && !o.Autoplay;
             int cap;
             int vsync, target;
             if (o.Autoplay && o.NoVsync)
@@ -273,66 +416,42 @@ namespace CriticalMass.Runtime.Game
                 vsync = 0;
                 target = NoVsyncTarget;   // -novsync: vsync off with a high target, never unbounded (DG-49)
             }
-            else if (background)
-            {
-                cap = BackgroundFps;
-                vsync = 0;
-                target = BackgroundFps;
-            }
             else
             {
-                cap = EffectiveCap(SafeMode ? Math.Min(_prefCap == 0 ? SafeCap : _prefCap, SafeCap) : _prefCap, _title || _inputPaused || MenuOpen);
-                (vsync, target) = FrameSettings(cap, Screen.currentResolution.refreshRateRatio.value);
-                if ((_forceTarget || _prefVSync == 0) && cap > 0)
+                cap = background ? FramePolicy.BackgroundCap(fg, _prefBg != 0) : fg;
+                double hz = Screen.currentResolution.refreshRateRatio.value;
+                (vsync, target) = _guard.Settings(cap, hz);
+                if (_prefVSync == 0 || (background && _prefBg != 0))
                 {
-                    vsync = 0;   // vsync off by choice, or the display ignores vSyncCount > 1: still capped
-                    target = cap;
+                    vsync = 0;   // vsync off by choice (or the save-power cap): still capped, never unbounded
+                    target = cap > 0 ? cap : (double.IsNaN(hz) || hz < 20 ? 60 : (int)Math.Round(hz));
                 }
-                else if (_prefVSync == 0)
-                {
-                    vsync = 0;   // "display rate" with vsync off: cap at the refresh rate, never unbounded
-                    double hz = Screen.currentResolution.refreshRateRatio.value;
-                    target = double.IsNaN(hz) || hz < 20 ? 60 : (int)Math.Round(hz);
-                }
+                _guard.Feed(dt, cap, vsync > 0);
             }
-            if (cap != AppliedCap) { _measureAge = 0f; _measureFrames = 0; }
             if (QualitySettings.vSyncCount != vsync) QualitySettings.vSyncCount = vsync;
             if (Application.targetFrameRate != target) Application.targetFrameRate = target;
             AppliedVSync = vsync;
             AppliedTarget = target;
             AppliedCap = cap;
 
-            if (background != _pausedAudio)
-            {
-                AudioListener.pause = background;
-                _pausedAudio = background;
-            }
-
-            // The display may not honour vSyncCount > 1 (a 120 Hz panel at cap 60): measure, and fall back to the target.
-            if (cap > 0 && vsync > 0 && !_forceTarget)
-            {
-                _measureAge += dt;
-                _measureFrames++;
-                if (_measureAge >= 2f)
-                {
-                    double fps = _measureFrames / _measureAge;
-                    if (fps > cap * 1.25) _forceTarget = true;
-                    _measureAge = 0f;
-                    _measureFrames = 0;
-                }
-            }
-
             string notice = null;
-            if (SafeMode && (_title || Time.realtimeSinceStartup < _noticeUntil))
-                notice = SafeReason == "-safe" ? "Safe settings (-safe)." : "The last session ended unexpectedly. Started in safe settings.";
+            if (_notice != null && Time.realtimeSinceStartup < _noticeUntil) notice = _notice;
             if (AutoplayArgs.StoppedNotice != null && Time.realtimeSinceStartup < AutoplayArgs.StoppedNoticeUntil)
                 notice = (notice != null ? notice + "\n" : "") + AutoplayArgs.StoppedNotice;
+            if (SystemEvents.Notice != null) notice = (notice != null ? notice + "\n" : "") + SystemEvents.Notice;
             _gui.Notice = notice;
             _gui.enabled = notice != null;
         }
+
+        int EffectiveCapFor(bool menuLike)
+        {
+            int pref = SafeMode ? Math.Min(_prefCap == 0 ? SafeCap : _prefCap, SafeCap) : _prefCap;
+            int cap = FramePolicy.EffectiveCap(pref, menuLike, _onBattery);
+            return _title ? FramePolicy.TitleCapFor(cap) : cap;
+        }
     }
 
-    /// <summary>The small notice line at the top of the screen (safe start, a stopped system); OnGUI only while shown.</summary>
+    /// <summary>The small notice line at the top of the screen (a stopped system, a failed save); OnGUI only while shown.</summary>
     public sealed class FrameGovernorGui : MonoBehaviour
     {
         public string Notice;
@@ -346,73 +465,6 @@ namespace CriticalMass.Runtime.Game
             _style.fontSize = Mathf.RoundToInt(18 * s);
             float w = 760 * s;
             GUI.Box(new Rect((Screen.width - w) / 2f, 18 * s, w, (Notice.Contains("\n") ? 64 : 38) * s), Notice, _style);
-        }
-    }
-
-    /// <summary>
-    /// Atomic, versioned, corruption-tolerant small files: write to PATH.tmp then rename over PATH (the old file kept as
-    /// PATH.bak when asked); a file starts with "cm_format_version=N"; a missing, unreadable or wrong-version file reads
-    /// as null (the caller falls back to defaults), trying PATH.bak before giving up.
-    /// </summary>
-    public static class SafeFile
-    {
-        public const string VersionKey = "cm_format_version";
-
-        public static string Versioned(int version, string body) => VersionKey + "=" + version + "\n" + body;
-
-        public static void WriteAtomic(string path, string text, bool keepBak)
-        {
-            string tmp = path + ".tmp";
-            File.WriteAllText(tmp, text, new UTF8Encoding(false));
-            if (File.Exists(path))
-            {
-                if (keepBak) File.Copy(path, path + ".bak", true);
-                File.Delete(path);
-            }
-            File.Move(tmp, path);
-        }
-
-        /// <summary>The body of a versioned file, or null with the reason in why ("missing", "corrupt", "version 2").</summary>
-        public static string ReadVersioned(string path, int version, out string why)
-        {
-            string body = TryRead(path, version, out why);
-            if (body != null) return body;
-            // A crash between delete and rename in WriteAtomic leaves only the .bak: read it whenever the file is not good.
-            string bak = TryRead(path + ".bak", version, out _);
-            if (bak != null) why = null;
-            return bak;
-        }
-
-        static string TryRead(string path, int version, out string why)
-        {
-            why = null;
-            if (!File.Exists(path))
-            {
-                why = "missing";
-                return null;
-            }
-            try
-            {
-                string t = File.ReadAllText(path);
-                int nl = t.IndexOf('\n');
-                string first = (nl >= 0 ? t.Substring(0, nl) : t).Trim();
-                if (!first.StartsWith(VersionKey + "=", StringComparison.Ordinal))
-                {
-                    why = "corrupt (no version line)";
-                    return null;
-                }
-                if (!int.TryParse(first.Substring(VersionKey.Length + 1), out int v) || v != version)
-                {
-                    why = "format version " + first.Substring(VersionKey.Length + 1) + ", expected " + version;
-                    return null;
-                }
-                return nl >= 0 ? t.Substring(nl + 1) : "";
-            }
-            catch (Exception e)
-            {
-                why = "unreadable: " + e.GetType().Name;
-                return null;
-            }
         }
     }
 }

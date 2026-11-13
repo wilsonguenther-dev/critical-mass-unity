@@ -8,6 +8,9 @@ namespace CriticalMass.Sim.Core
         /// <summary>CM-35: Biomass = Plant + Meat; these split it by type.</summary>
         public double Plant;
         public double Meat;
+        /// <summary>U-064: wood and water fed to the egg (also inside Biomass).</summary>
+        public double Wood;
+        public double Water;
     }
 
     /// <summary>Match-level state (browser MatchState).</summary>

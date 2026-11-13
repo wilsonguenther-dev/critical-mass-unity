@@ -54,10 +54,12 @@ namespace CriticalMass.Sim.Bots
                 Actor a = w.Actors[id];
                 // CM-35: only Kaiju-role bots walk-pick meat (hill and Kaiju-fight bots leave the bodies to the feeders); actor 0
                 // always can while a person drives it. Set every step, before ResourcesSystem. Meat rides in its own load.
-                a.MeatPickup = (id == 0 && !human) || st.Role[id] == BotsState.RoleKaiju;
+                a.MeatPickup = (id == 0 && !human) || (st.Role[id] == BotsState.RoleKaiju && Roles.MayFeed(w, a.Cls)); // U-063: bot escorts leave meat to feeders
                 if (id == 0 && !human) continue;
                 if (!a.Alive) continue;
-                if ((tick + id) % period == 0 || a.AiState == AiState.None) BotFsm.ThinkBot(w, st, id);
+                // DG-21 reaction delay: Easy / Hard scale the think period (Normal keeps ThinkPeriod).
+                int p = BotSkill.ThinkPeriod(w, id, period);
+                if ((tick + id) % p == 0 || a.AiState == AiState.None) BotFsm.ThinkBot(w, st, id);
             }
         }
 
@@ -71,7 +73,12 @@ namespace CriticalMass.Sim.Bots
             output.Jump = false;
             output.TerraformSwitch = false; // DG-09: bots never switch the dig / place mode (they never dig: oracle CM-30)
             BotSteer.SteerBot(w, st, id, output);
-            // ITEM CM-38: added by its owner (takeBotTnt: Demolitions bot's F press)
+            // DG-22 (CM-38): a Demolitions bot's queued TNT throw (BotFsm.DecideDemolitions) is its one press, aimed at the throw point.
+            Demolitions.TakeBotTnt(w, id, output);
+            // DG-40: a Healer bot's queued purify (BotFsm.DecideHealer) is its one DigPlace press.
+            Healer.TakeBotPurify(w, id, output);
+            // U-065: a Builder bot in its station buys a class upgrade the team stock can pay.
+            Stations.TakeBotBuy(w, id, output);
         }
     }
 }

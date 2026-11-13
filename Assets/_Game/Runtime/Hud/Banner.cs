@@ -80,6 +80,18 @@ namespace CriticalMass.Runtime.Hud
             _waiting[_count++] = s;
         }
 
+        /// <summary>
+        /// Holds the banner on screen back while a full-screen takeover plays (Banner.Hold): its entrance restarts at now, so
+        /// it enters fresh, with its full hold, once the takeover is over. Waiting banners stay queued.
+        /// </summary>
+        public void Postpone(double now)
+        {
+            Rewind(now);
+            if (!HasCurrent) return;
+            _shownAt = now;
+            if (!double.IsPositiveInfinity(_hideAt)) _hideAt = now;
+        }
+
         /// <summary>Starts the exit of the banner on screen now (waiting banners follow).</summary>
         public void Hide(double now)
         {
@@ -172,13 +184,19 @@ namespace CriticalMass.Runtime.Hud
     public sealed class Banner : MonoBehaviour
     {
         /// <summary>Reference layout (1920 x 1080 units): centre of the banner below the match cluster.</summary>
-        public const float Width = 1080f, Height = 168f, CentreFromTop = 284f;
+        // Polish pass 1: inside the centre lane (HudZones.Callout, 148..336 with the 18 px lift), clear of the kill feed column.
+        public const float Width = 1032f, Height = 168f, CentreFromTop = 250f;
         public const int SortingOrder = 15;
 
         private static readonly BannerQueue Queue = new BannerQueue();
 
         /// <summary>Overrides the banner clock (seconds) when set.</summary>
         public static Func<double> Clock;
+        /// <summary>
+        /// Big moments (feat/big-moments): while this returns true the banner is hidden and postponed, so a full-screen
+        /// takeover and a banner never stack (one queue for full-screen moments). Null = never held.
+        /// </summary>
+        public static Func<bool> Hold;
         public static event Action<BannerSpec> Shown;
         public static event Action Hidden;
 
@@ -215,6 +233,11 @@ namespace CriticalMass.Runtime.Hud
         private readonly VectorShape[] _shards = new VectorShape[8];
         private int _seenVersion = -1;
         private bool _wasOpen;
+        private int _wallVersion = -1;
+        private double _wallShownAt;
+        private bool _wallHidden;
+        /// <summary>Wall seconds an event banner may stay on screen (auto-dismiss, batch 4).</summary>
+        public const double MaxWallSeconds = 4.0;
         private int _tier = 2;
 
         private static readonly Vector2[] ShardAt =
@@ -268,10 +291,13 @@ namespace CriticalMass.Runtime.Hud
             _badgeDisc.RimPx = 3f;
             _badge = HudIcon.Make(_badgeDisc.transform, "Badge", 12f, 12f, 80f, 80f);
 
-            _headline = HudText.Make(_root, "Headline", CMTokens.Display, 50, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 4f);
+            _headline = HudText.Make(_root, "Headline", CMTokens.Display, UiScale.TypeDisplay, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 4f);
             Centre(_headline.rectTransform, new Vector2(20f, 22f), new Vector2(Width - 300f, 64f));
+            // Closer (batch 4): "THE KAIJU SIDES WITH CRIMSON" is wider than the plate at 48 px; best-fit shrinks it onto
+            // one line (down to 30 px) instead of spilling past the plate.
+            CriticalMass.Runtime.Menu.MenuUi.Fit(_headline, 20);   // long event headlines wrap to two lines
             _headlineOutline = _headline.GetComponent<TextOutline>();
-            _reason = HudText.Make(_root, "Reason", CMTokens.Ui, 28, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 2.5f);
+            _reason = HudText.Make(_root, "Reason", CMTokens.Ui, UiScale.TypeButton, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 2.5f);
             Centre(_reason.rectTransform, new Vector2(20f, -36f), new Vector2(Width - 300f, 36f));
             go.SetActive(false);
         }
@@ -279,6 +305,13 @@ namespace CriticalMass.Runtime.Hud
         private void LateUpdate()
         {
             double now = Now();
+            if (Hold != null && Hold())
+            {
+                Queue.Postpone(now);
+                _wallVersion = -1;   // the wall clock restarts when the banner enters fresh after the takeover
+                if (_canvas != null && _canvas.gameObject.activeSelf) _canvas.gameObject.SetActive(false);
+                return;
+            }
             Queue.Update(now);
             bool open = Queue.HasCurrent;
             if (open && _canvas == null) Build();
@@ -312,7 +345,17 @@ namespace CriticalMass.Runtime.Hud
                     _badge.SetTier(tier);
                 }
             }
-            _group.alpha = Queue.Alpha(now);
+            // HUD zones: the autopilot banner and the lockout warning outrank event banners in the centre lane.
+            // Batch 4: an event banner never sits on screen longer than MaxWallSeconds of wall time, and it hides while the
+            // scoreboard or the full map is open (it covered the board and the pickup, timer and ping areas).
+            if (_seenVersion != _wallVersion) { _wallVersion = _seenVersion; _wallShownAt = Time.unscaledTimeAsDouble; _wallHidden = false; }
+            else if (!_wallHidden && Time.unscaledTimeAsDouble - _wallShownAt >= MaxWallSeconds) { _wallHidden = true; Queue.Hide(now); }
+            bool blocked = HudZones.Blocked(HudZone.Callout, HudPriority.Banner) || Scoreboard.AnyOpen ||
+                           CriticalMass.Runtime.Hud.Interact.FullMap.IsOpen ||
+                           CriticalMass.Runtime.Flow.GameFlow.State == CriticalMass.Runtime.Flow.FlowState.Results;
+            float alpha = blocked ? 0f : Queue.Alpha(now);
+            if (alpha > 0f) HudZones.Hold(HudZone.Callout, HudPriority.Banner);
+            _group.alpha = alpha;
             Queue.Motion(now, out float scale, out float lift);
             _root.localScale = new Vector3(scale, scale, 1f);
             _root.anchoredPosition = new Vector2(0f, -CentreFromTop + 18f * lift);

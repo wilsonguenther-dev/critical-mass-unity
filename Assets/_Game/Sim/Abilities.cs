@@ -108,16 +108,32 @@ namespace CriticalMass.Sim.Core
             {
                 Actor a = w.Actors[i];
                 if (!a.Alive || a.StandUp > 0 || !w.Inputs[i].Ability || a.AbilityCd > 0) continue;
+                if (a.HitStunTicks > 0 && Phys.On(w, true)) continue; // DG-70: no cast while staggered
                 if (a.Cls == ClassId.Warrior) CastWarriorShield(w, i);
                 else if (a.Cls == ClassId.Farmer) CastFarmerRoots(w, i);
                 else if (a.Cls == ClassId.Miner) CastMinerBarricade(w, i);
-                // ITEM CM-38: added by its owner (land mine cast)
-                // CM-56: builder has no Space cast yet (CM-39 upgrade); an explicit miner check keeps it from casting a
-                // barricade that Barricades would refuse for a non-miner.
+                else if (a.Cls == ClassId.Demolitions) Demolitions.CastMine(w, i); // DG-22 (CM-38): land mine on Space
+                else if (a.Cls == ClassId.Builder) BuiltPieces.CastBuild(w, i); // DG-24 (U-060): a ladder or a rope bridge on Space
+                else if (a.Cls == ClassId.Healer) Healer.CastPulse(w, i); // DG-40 (U-061): the healing pulse on Space
+                // DG-69: an accepted cast starts its action on this tick (the view's per-kind clip); casts have no wind-up.
+                if (a.AbilityCd > 0 && Phys.On(w, true))
+                {
+                    int kind = a.Cls == ClassId.Warrior ? Combat.KindShield : a.Cls == ClassId.Farmer ? Combat.KindRoots
+                        : a.Cls == ClassId.Miner ? Combat.KindBarricade : a.Cls == ClassId.Demolitions ? Combat.KindMine
+                        : a.Cls == ClassId.Builder ? Combat.KindBuild : Combat.KindPulse;
+                    double fx = JsMath.Cos(a.Facing);
+                    double fz = JsMath.Sin(a.Facing);
+                    World.PushEvent(w, SimEventType.AttackStart, i, kind, w.X[i], w.Z[i], a.Facing, null, DamageCause.None, 0, fx, fz, 0, 0, 0, 0);
+                }
             }
             // CM-30: miner dig / place (InputFrame.Terraform, its own key, so Space stays the barricade). DG-09: and the mode switch.
             Terraform.TerraformSystem(w);
-            // ITEM CM-38: added by its owner (TNT throw on F)
+            // DG-22 (CM-38): a Demolitions Expert's TNT throw on the same key (DigPlace: F, Y on a controller), its own cooldown.
+            Demolitions.DemolitionsInputSystem(w);
+            // DG-24: any class lifts / puts down a piece of its team on the Interact edge (E: "Interact / carry").
+            BuiltPieces.CarryInputSystem(w);
+            // DG-40: a Healer's purify at the egg on the DigPlace key (F, Y on a controller), its own cooldown.
+            Healer.HealerInputSystem(w);
         }
 
         /// <summary>
@@ -146,6 +162,8 @@ namespace CriticalMass.Sim.Core
                     double d2 = dx * dx + dz * dz;
                     if (d2 > r2) continue;
                     if (d2 > 1e-12 && (dx * fx + dz * fz) / Math.Sqrt(d2) < WallBreakCos - AngleEps) continue;
+                    // DG-83: a pick cannot break a wall behind another wall.
+                    if (Phys.On(w, w.Config.Physics.WallsBlockHits) && !SegmentClear.Clear(map, ax, az, cx + 0.5, cz + 0.5, cx, cz)) continue;
                     // A breakable painted without hit points (e.g. by a test or a gate helper) gets the ones its state implies.
                     double hp = map.WallHp[i];
                     if (hp == 0) hp = t == Cell.BreakableIntact ? 2 * hps : hps;

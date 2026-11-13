@@ -34,16 +34,24 @@ namespace CriticalMass.Sim.Core
             Movement.MovementSystem(w, dt);
             SpatialHash.Rebuild(w.Hash, w.X, w.Z, w.Actors, n);
             Combat.CombatSystem(w, dt);
+            Pickups.PickupsSystem(w); // U-066: coins, power-ups, drops from this step's knock-outs
+            MapEvents.EventsSystem(w); // U-068: supply drop, egg exposed, bridge collapse
             Topple.ToppleSystem(w); // DG-09: ToppleDown events when a fall animation time has passed
+            BuiltPieces.PiecesSystem(w); // DG-24: broken / expired ladders and bridges, after this step's digs and craters
             Barricades.BarricadesSystem(w, dt);
             SimResources.ResourcesSystem(w, dt);
+            Roles.HandoffSystem(w); // U-063: a carrier that may not feed hands its biomass to a feeder beside it
+            Sources.SourcesSystem(w, dt); // U-064: groves and springs, the bank at the base
             Kaiju.KaijuSystem(w, dt);
+            Stations.StationSystem(w); // U-065: upgrade purchases at the base station
+            PingRules.PingSystem(w); // U-067: pings in, orders out, the bots' own calls
             Respawn.RespawnSystem(w, dt);
             // CM-37: after respawn (a fresh respawn is already at full HP), before the hill / match bookkeeping.
             Heal.HealSystem(w);
             Hill.HillSystem(w, dt);
             Match.MatchSystem(w, dt);
 
+            DepthState.EndStep(w); // U-063 onward: interact edges for next step
             w.Match.Time += dt;
         }
     }

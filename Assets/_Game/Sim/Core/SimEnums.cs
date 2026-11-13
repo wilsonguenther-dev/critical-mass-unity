@@ -1,19 +1,28 @@
 namespace CriticalMass.Sim.Core
 {
     /// <summary>What an actor carries in its class cargo (browser CarryKind).</summary>
-    public enum CarryKind { None, Biomass, Corruption }
+    public enum CarryKind { None, Biomass, Corruption, /* U-064, appended: */ Wood, Water }
 
     /// <summary>
     /// CM-35: the two biomass types (browser BiomassType). Plant comes from the map's biomass nodes (gathered with E) and
     /// rides in the class cargo; meat drops from killed actors as a loose orb and rides in its own load (Actor.CarryMeat).
     /// </summary>
-    public enum BiomassType { Plant, Meat }
+    public enum BiomassType { Plant, Meat, /* U-064 (DG-42), appended: gathered at groves and springs, ride in the class cargo */ Wood, Water }
 
     /// <summary>
     /// DG-16: what dealt a hit (SimEvent.Cause on Hit and Death events, Actor.LastCause). Not in the browser. Never stored or
     /// compared by integer value: later items append members (Explosion is reserved for DG-22).
     /// </summary>
-    public enum DamageCause { None, Melee, KaijuMelee, KaijuSlam, Fall, Explosion }
+    public enum DamageCause { None, Melee, KaijuMelee, KaijuSlam, Fall, Explosion, Crush }
+
+    /// <summary>
+    /// DG-21 bot skill level (WorldOptions.BotDifficulty / AllyBotDifficulty). Normal is first so a WorldOptions that never
+    /// sets it plays exactly the browser bots. Never compared by integer value.
+    /// </summary>
+    public enum BotDifficulty { Normal, Easy, Hard }
+
+    /// <summary>U-066: what a pickup is. Coin first so a power-up kind is never 0 (DepthState.PowerKind: 0 = none). Never reordered: later items append.</summary>
+    public enum PickupKind { Coin, Haste, Might, Ward }
 
     /// <summary>Kaiju state (browser KaijuState).</summary>
     public enum KaijuState { Egg, Neutral, Azure, Crimson, Berserk }
@@ -27,6 +36,14 @@ namespace CriticalMass.Sim.Core
         None, ToHill, HoldHill, Fight, Gather, Deliver, Corrupt, Retreat, Unstick,
         /// <summary>CM-36: walk to the shrine empty-handed and hold interact for the shrine cleanse (appended: the browser lists it before Retreat).</summary>
         Cleanse,
+        /// <summary>U-063 class roles: an egg-duty bot that may not feed walks with the nearest allied carrier (appended).</summary>
+        Escort,
+        /// <summary>U-064: a supply bot walks to a grove or spring, fills up and banks it at the base (appended).</summary>
+        Supply,
+        /// <summary>U-066: a bot walks straight to a power-up it can see (appended).</summary>
+        Grab,
+        /// <summary>U-067: a bot walks to the spot (or the caller) of the ping it answered (appended).</summary>
+        Order,
     }
 
     /// <summary>Match phase (browser MatchState.phase).</summary>
@@ -81,7 +98,11 @@ namespace CriticalMass.Sim.Core
         ToppleDown,
         /// <summary>DG-09 fall rule: a grounded actor lost the ground under its centre: A = actor, B = cell fallen into, (X, Z) = where it climbs out, Value = get-up seconds.</summary>
         Fall,
-        /// <summary>DG-16 (view request): an actor started a melee swing: A = attacker, B = -1, (X, Z) = the swing's reach point (attacker + facing x AttackRange), Value = facing (radians).</summary>
+        /// <summary>
+        /// DG-16 (view request), moved by DG-69 to the PRESS tick: an attack or ability press was accepted: A = attacker, B = kind
+        /// (Combat.KindAttack = -1 for a melee swing, else an ability Combat.Kind*), (X, Z) = the reach point (attacker + facing x
+        /// AttackRange), Value = locked facing (radians), Windup / Recovery = ticks (0 = the hit is this tick), DirX / DirZ = facing.
+        /// </summary>
         AttackStart,
         /// <summary>DG-16 (view request): a swing hurt the hatched Kaiju: A = attacker, B = -1, (X, Z) = the contact point on the Kaiju's hit radius toward the attacker, Value = damage dealt.</summary>
         KaijuDamaged,
@@ -94,6 +115,113 @@ namespace CriticalMass.Sim.Core
         Cleanse,
         /// <summary>CM-36: the cleanse in flight finished: A = cleanser (-1 scripted), B = team index, (X, Z) = the shrine, Value = instability drained.</summary>
         CleanseEnd,
+        /// <summary>DG-22: a land mine went down: A = owner, B = mine slot, (X, Z) = its cell centre, Value = the tick it arms, Radius = blast radius.</summary>
+        MinePlaced,
+        /// <summary>DG-22: a mine armed (the ring warning): A = owner, B = mine slot, (X, Z) = cell centre, Value = the tick it expires, Radius = blast radius.</summary>
+        MineArmed,
+        /// <summary>DG-22: an enemy stepped on an armed mine: A = that actor, B = the owner, (X, Z) = cell centre, Value = mine slot, Radius = blast radius (an Explosion follows).</summary>
+        MineTriggered,
+        /// <summary>DG-22: a mine left without a blast: A = owner, B = mine slot, (X, Z) = cell centre, Value = Demolitions.MineExpired / MineGroundGone / MineRecycled, Radius = blast radius.</summary>
+        MineRemoved,
+        /// <summary>DG-22: TNT left the thrower's hand: A = thrower, B = bomb slot, (X, Z) = where it will land, Value = the tick it lands, Radius = blast radius.</summary>
+        TntThrown,
+        /// <summary>DG-22: thrown TNT touched down (fuse burning): A = thrower, B = bomb slot, (X, Z) = where it lies, Value = the tick it blows, Radius = blast radius.</summary>
+        TntLanded,
+        /// <summary>DG-22: an explosion (Effects.Explode): A = owner, B = Demolitions.ExplosionMine / ExplosionTnt, (X, Z) = centre, Value = actors hurt, Radius = blast radius, Cause = Explosion.</summary>
+        Explosion,
+        /// <summary>
+        /// DG-24: a ladder or rope bridge went down (built by a Builder or put down by a carrier): A = that actor, B = piece slot
+        /// (World.Builder.Pieces: Kind, cells, direction), (X, Z) = the span's centre, Value = the tick it crumbles, Radius = half
+        /// its length in units.
+        /// </summary>
+        PiecePlaced,
+        /// <summary>DG-24: a piece starts to crumble (the warning, BuilderPieces.WarnTicks before the end): A = owner, B = slot, (X, Z) = centre, Value = ticks left, Radius = half length.</summary>
+        PieceCrumbling,
+        /// <summary>DG-24: a piece left the map: A = owner, B = slot, (X, Z) = centre, Value = BuiltPieces.EndExpired / EndDropped / EndBroken, Radius = half length.</summary>
+        PieceExpired,
+        /// <summary>DG-24: a piece's cell was dug or blown out (it breaks; the rest follows as PieceExpired EndBroken): A = owner, B = slot, (X, Z) = the broken cell, Value = cells it had, Radius = half length.</summary>
+        PieceDestroyed,
+        /// <summary>DG-24: an actor (any class) picked a piece up to carry it: A = carrier, B = slot, (X, Z) = the span's centre, Value = ticks it has left, Radius = half length.</summary>
+        PiecePickedUp,
+        /// <summary>DG-40: a Healer cast: A = the Healer, B = Healer.KindMend / KindPulse, (X, Z) = the mended ally or the pulse centre, Value = HP it restored in all, Radius = the pulse radius (0 for a mend).</summary>
+        HealCast,
+        /// <summary>DG-40: Healer healing landed on one actor: A = that actor, B = the Healer, (X, Z) = the actor, Value = HP restored (&gt; 0).</summary>
+        HealLanded,
+        /// <summary>DG-40: a Healer purified the egg: A = the Healer, B = team index (0 azure, 1 crimson), (X, Z) = the shrine, Value = instability removed, Radius = Healer.PurifyRange.</summary>
+        Purify,
+        /// <summary>
+        /// DG-69: a swing reached its hit tick (press tick + Windup), even on a whiff (whoosh, trail, hit-stop key off it):
+        /// A = attacker, B = -1, (X, Z) = the reach point along the locked facing, Value = actors hit, DirX / DirZ = locked facing.
+        /// </summary>
+        AttackContact,
+        /// <summary>DG-70: a hit-stun during the wind-up cancelled a swing (no damage): A = actor, B = who stunned it (-2 Kaiju), (X, Z) = the actor.</summary>
+        AttackCancel,
+        /// <summary>DG-70: a victim was staggered: A = victim, B = source, (X, Z) = victim, Value = stun ticks, Tier = hit tier, Cause.</summary>
+        HitStun,
+        /// <summary>
+        /// DG-70: a body was pushed (melee knock, claw, slam, blast, crush): A = victim, B = source, (X, Z) = victim, DirX / DirZ =
+        /// push direction, Impulse = knock distance in u after mass and shield, Value = 0, Cause = what pushed it.
+        /// </summary>
+        Knock,
+        /// <summary>DG-86: the Kaiju's body shoved fighters this tick: A = -2, B = -1, (X, Z) = the Kaiju, Value = bodies shoved, Radius = body radius, DirX / DirZ = its heading, Impulse = largest shove (u).</summary>
+        BodyShove,
+        /// <summary>DG-99: a landing pillar crushed an actor: A = victim, B = decoration, (X, Z) = where it ends, DirX / DirZ = push out of the strip, Impulse = shove (u), Value = damage.</summary>
+        PillarCrush,
+        /// <summary>DG-100: a meat orb popped from a corpse: A = corpse actor, B = orb slot, (X, Z) = where it lands, DirX / DirZ = hop direction, Radius = hop length.</summary>
+        MeatPop,
+        /// <summary>U-063: the shrine refused a load (class roles): A = the carrier, B = Roles.RefusedNotFeeder / RefusedNotRaider, (X, Z) = the shrine, Value = units it holds.</summary>
+        DeliverRefused,
+        /// <summary>U-063: a carrier handed biomass to an allied feeder: A = giver, B = receiver, (X, Z) = the receiver, Value = units, Bio = the type.</summary>
+        Handoff,
+        /// <summary>U-064: an actor took one unit from a grove or spring: A = actor, B = source index (World.Depth.Sources), (X, Z) = the source, Value = units it now carries, Bio = Wood / Water.</summary>
+        SourceGather,
+        /// <summary>U-064: a load went into the team stock at the base: A = actor, B = team index, (X, Z) = the pad, Value = units, Bio = the type.</summary>
+        BankDeposit,
+        /// <summary>U-064: a feeder took food out of the team stock: A = actor, B = team index, (X, Z) = the pad, Value = units, Bio = Plant.</summary>
+        BankWithdraw,
+        /// <summary>
+        /// CM-84 / U-065 (ports CM-54 'classSwitch'): a class pick was answered: A = actor, B = Respawn.ClassSwitchAccepted /
+        /// ClassSwitchCooldown / ClassSwitchAlive, (X, Z) = the actor, Value = class index. Accepted while alive = switched now.
+        /// </summary>
+        ClassSwitch,
+        /// <summary>U-065 (ports CM-39 'upgrade'): a class upgrade purchase: A = the buyer, B = class index, (X, Z) = the pad, Value = the team's new level of that class (>= 2) or a Stations.Refused* code.</summary>
+        Upgrade,
+        /// <summary>U-066: a pickup appeared: A = the actor it dropped from (-1 = the map spawner), B = (int)PickupKind, (X, Z), Value = coins, or for a power-up the tick it can be taken, Radius = pickup range, Slot = World.Depth.Pickups slot.</summary>
+        PickupSpawned,
+        /// <summary>U-066: an actor walked over a pickup: A = actor, B = (int)PickupKind, (X, Z) = the pickup, Value = coins, or ticks the power-up will last, Slot = pool slot.</summary>
+        PickupTaken,
+        /// <summary>U-066: a pickup vanished untaken: A = -1, B = (int)PickupKind, (X, Z), Slot = pool slot.</summary>
+        PickupExpired,
+        /// <summary>U-066: an actor's power-up ended: A = actor, B = (int)PickupKind, (X, Z) = the actor, Value = Pickups.EndExpired / EndBroken / EndDropped / EndStripped / EndReplaced.</summary>
+        PowerUpEnded,
+        /// <summary>U-066: a Ward soaked damage: A = the warded actor, B = attacker id (-1 none, -2 the Kaiju), (X, Z) = the actor, Value = damage soaked.</summary>
+        WardAbsorb,
+        /// <summary>U-067: a ping was placed: A = the pinger (a player or a bot), B = (int)PingCall, (X, Z) = the spot, Value = ticks the marker lives.</summary>
+        Ping,
+        /// <summary>U-067: a ping was refused by the rate limit: A = the pinger, B = (int)PingCall, (X, Z), Value = ticks until the next is allowed.</summary>
+        PingRefused,
+        /// <summary>U-067: a bot took a ping: A = the bot, B = the pinger, (X, Z) = the bot, Value = (int)PingCall.</summary>
+        PingAnswered,
+        /// <summary>U-068: a supply drop is on its way: A = -1, B = event number, (X, Z) = where, Value = the tick it lands, Radius = claim range.</summary>
+        SupplyDropIncoming,
+        /// <summary>U-068: the supply drop landed: (X, Z), Value = the tick it is gone if unclaimed, Radius = claim range.</summary>
+        SupplyDropLanded,
+        /// <summary>U-068: who stands on the drop changed: A = an actor on it (-1 none), (X, Z), Value = MapEvents.ContestNobody / ContestAzure / ContestCrimson / ContestBoth.</summary>
+        SupplyDropContest,
+        /// <summary>U-068: the drop was claimed: A = the claimer, B = team index, (X, Z), Value = wood added to that team's stock.</summary>
+        SupplyDropClaimed,
+        /// <summary>U-068: the drop vanished unclaimed: (X, Z).</summary>
+        SupplyDropExpired,
+        /// <summary>U-068: the egg is exposed (deliveries count more): A = -1, B = event number, (X, Z) = the shrine, Value = the tick the window closes.</summary>
+        EggExposed,
+        /// <summary>U-068: the window closed: B = 1 when the hatch ended it, (X, Z) = the shrine.</summary>
+        EggExposedEnded,
+        /// <summary>U-068: a bridge will collapse: A = -1, B = BridgeSpans.All index, (X, Z) = the middle of the part that falls, Value = the tick it falls, Radius = half its length.</summary>
+        BridgeWarning,
+        /// <summary>U-068: the bridge part fell: B = span index, (X, Z), Value = the tick it rebuilds itself, Radius = cells removed.</summary>
+        BridgeCollapsed,
+        /// <summary>U-068: the bridge is back: A = the Builder (-1 = by itself), B = span index, (X, Z), Value = wood spent; -1 = the collapse was called off; -2 = a Builder's repair was refused for lack of wood (then (X, Z) = that Builder).</summary>
+        BridgeRepaired,
         // ITEM CM-84: added by its owner (ClassSwitch, ports CM-54)
         /// <summary>CM-37: one tick of fountain healing (Heal.HealSystem): A = the healed actor, B = -1, (X, Z) = the actor, Value = HP restored this tick (&gt; 0).</summary>
         Heal,

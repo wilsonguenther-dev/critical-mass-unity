@@ -46,6 +46,7 @@ namespace CriticalMass.Runtime.Hud
             "RenderPipelineManager.DoRenderLoop_Internal()", "Inl_UniversalRenderPipeline.RenderSingleCameraInternal",
             "Batches Count", "SetPass Calls Count", "Draw Calls Count", "Triangles Count", "Vertices Count",
             "Shadow Casters Count", "GC Allocated In Frame", "System Used Memory", "GC Reserved Memory",
+            "Visible Skinned Meshes Count", "Canvas.SendWillRenderCanvases", "Canvas.BuildBatch",
         };
 
         sealed class Rec
@@ -61,6 +62,10 @@ namespace CriticalMass.Runtime.Hud
         static readonly HashSet<string> RecNames = new HashSet<string>();
         static bool _recordersStarted, _recording;
         static readonly List<float> MatchFrames = new List<float>(65536);
+        // DG-54: real CPU and GPU frame times from FrameTimingManager (SessionKeeper captures them once per frame).
+        static readonly List<float> MatchGpu = new List<float>(65536);
+        static readonly List<float> MatchCpuMain = new List<float>(65536);
+        const int MaxRecordedFrames = 1 << 17;   // a hard cap: a 2-hour soak never grows these lists without bound
         static double _recordStart;
 
         void Awake()
@@ -86,9 +91,12 @@ namespace CriticalMass.Runtime.Hud
                 _ringHead = (_ringHead + 1) % RingFrames;
                 if (_ringCount < RingFrames) _ringCount++;
             }
-            if (_recording)
+            if (_phase != null && Time.frameCount > 1) SamplePhase(ms);
+            if (_recording && MatchFrames.Count < MaxRecordedFrames)
             {
                 MatchFrames.Add(ms);
+                if (SessionKeeper.GpuFrameMs > 0f) MatchGpu.Add(SessionKeeper.GpuFrameMs);
+                if (SessionKeeper.CpuMainMs > 0f) MatchCpuMain.Add(SessionKeeper.CpuMainMs);
                 Sample();
             }
 
@@ -137,6 +145,9 @@ namespace CriticalMass.Runtime.Hud
                 Last("Main Thread"), Last("PostLateUpdate.FinishFrameRendering"), Last("Update.ScriptRunBehaviourUpdate"));
             sb.AppendFormat(CultureInfo.InvariantCulture, "batches {0:F0}  setpass {1:F0}  tris {2:F0}k  gc {3:F1} KB/frame\n",
                 Last("Batches Count"), Last("SetPass Calls Count"), Last("Triangles Count") / 1000.0, Last("GC Allocated In Frame") / 1024.0);
+            sb.AppendFormat(CultureInfo.InvariantCulture, "cpu {0:F1} ms  gpu {1:F1} ms  scale {2:0.00}  cap {3}  dropped sim {4:F2} s  hud events {5}\n",
+                SessionKeeper.CpuMainMs, SessionKeeper.GpuFrameMs, FrameGovernor.AppliedRenderScale, FrameGovernor.AppliedCap,
+                RuntimeCounters.SimDroppedSeconds, RuntimeCounters.HudEventsDropped);
             sb.AppendFormat(CultureInfo.InvariantCulture, "{0}x{1}  vsync {2}  {3}", Screen.width, Screen.height, QualitySettings.vSyncCount, BuildInfo.Label);
             return sb.ToString();
         }
@@ -215,6 +226,132 @@ namespace CriticalMass.Runtime.Hud
             }
         }
 
+        // ── per-phase numbers (physics audit m1 / DG-111): the smoke reported run maxima (title and loading frames
+        // included) as "the" triangle and batch counts. Each phase (title, match, results) keeps its own frame times, GPU
+        // times and counter samples; perf.json gets p50 and p95 per phase and the gate reads the match phase. ──
+
+        /// <summary>One phase's samples, each list capped at MaxPhaseFrames (10 minutes at 60 fps).</summary>
+        public sealed class PhaseStats
+        {
+            public const int MaxPhaseFrames = 36000;
+            public readonly string Name;
+            public readonly List<float> Frame = new List<float>(4096), Gpu = new List<float>(4096), Triangles = new List<float>(4096),
+                Batches = new List<float>(4096), SetPass = new List<float>(4096), Casters = new List<float>(4096), Skinned = new List<float>(4096),
+                CanvasMs = new List<float>(4096);
+            public PhaseStats(string name) => Name = name;
+
+            public void Clear()
+            {
+                Frame.Clear(); Gpu.Clear(); Triangles.Clear(); Batches.Clear(); SetPass.Clear(); Casters.Clear(); Skinned.Clear(); CanvasMs.Clear();
+            }
+
+            public static void Add(List<float> l, double v)
+            {
+                if (l.Count < MaxPhaseFrames && !double.IsNaN(v)) l.Add((float)v);
+            }
+        }
+
+        public const string PhaseTitle = "title", PhaseMatch = "match", PhaseResults = "results";
+        static readonly Dictionary<string, PhaseStats> Phases = new Dictionary<string, PhaseStats>();
+        static readonly List<string> PhaseOrder = new List<string>();
+        static string _phase;
+        static PhaseStats _phaseStats;
+        static Rec _rTris, _rBatches, _rSetPass, _rCasters, _rSkinned, _rCanvasSend, _rCanvasBatch;
+
+        /// <summary>The phase being sampled now (null = none).</summary>
+        public static string Phase => _phase;
+
+        /// <summary>Starts sampling a phase (title, match, results; null stops). Returning to a phase appends to it.</summary>
+        public static void SetPhase(string name)
+        {
+            if (name == _phase) return;
+            _phase = name;
+            if (name == null) { _phaseStats = null; return; }
+            StartRecorders(false);
+            FindPhaseRecorders();
+            if (!Phases.TryGetValue(name, out _phaseStats))
+            {
+                _phaseStats = new PhaseStats(name);
+                Phases[name] = _phaseStats;
+                PhaseOrder.Add(name);
+            }
+        }
+
+        /// <summary>Forgets a phase's samples (a new match clears "match" and "results"; the title stays from boot).</summary>
+        public static void ClearPhase(string name)
+        {
+            if (Phases.TryGetValue(name, out PhaseStats p)) p.Clear();
+        }
+
+        static int _phaseRecCount = -1;
+
+        /// <summary>Caches the counters a phase samples; again whenever the recorder list was rebuilt (StopRecorders).</summary>
+        static void FindPhaseRecorders()
+        {
+            _phaseRecCount = Recs.Count;
+            _rTris = Find("Triangles Count"); _rBatches = Find("Batches Count"); _rSetPass = Find("SetPass Calls Count");
+            _rCasters = Find("Shadow Casters Count"); _rSkinned = Find("Visible Skinned Meshes Count");
+            _rCanvasSend = Find("Canvas.SendWillRenderCanvases"); _rCanvasBatch = Find("Canvas.BuildBatch");
+        }
+
+        static Rec Find(string name)
+        {
+            foreach (Rec r in Recs) if (r.Name == name) return r;
+            return null;
+        }
+
+        static double LastOf(Rec r) => r != null && r.R.Valid ? Scale(r.R.LastValue, r.Unit) : double.NaN;
+
+        static void SamplePhase(float ms)
+        {
+            PhaseStats p = _phaseStats;
+            if (p == null) return;
+            if (Recs.Count == 0) StartRecorders(false);
+            if (Recs.Count != _phaseRecCount) FindPhaseRecorders();
+            PhaseStats.Add(p.Frame, ms);
+            if (SessionKeeper.GpuFrameMs > 0f) PhaseStats.Add(p.Gpu, SessionKeeper.GpuFrameMs);
+            PhaseStats.Add(p.Triangles, LastOf(_rTris));
+            PhaseStats.Add(p.Batches, LastOf(_rBatches));
+            PhaseStats.Add(p.SetPass, LastOf(_rSetPass));
+            PhaseStats.Add(p.Casters, LastOf(_rCasters));
+            PhaseStats.Add(p.Skinned, LastOf(_rSkinned));
+            double canvas = LastOf(_rCanvasSend) + LastOf(_rCanvasBatch);
+            PhaseStats.Add(p.CanvasMs, canvas);
+        }
+
+        /// <summary>{"p50": a, "p95": b} of a sample list, or null when empty (the gate fails closed on null).</summary>
+        public static string P50P95(List<float> l)
+        {
+            if (l == null || l.Count == 0) return "null";
+            var a = l.ToArray();
+            Array.Sort(a);
+            return string.Format(CultureInfo.InvariantCulture, "{{\"p50\": {0:0.###}, \"p95\": {1:0.###}}}", PercentileSorted(a, 50), PercentileSorted(a, 95));
+        }
+
+        /// <summary>Every phase sampled so far as one JSON object (frames, frame_ms, gpu_ms, triangles, batches, setpass,
+        /// shadow_casters, visible_skinned_meshes, canvas_ms: p50 and p95 each).</summary>
+        public static string PhasesJson()
+        {
+            var sb = new StringBuilder(1024);
+            sb.Append('{');
+            for (int i = 0; i < PhaseOrder.Count; i++)
+            {
+                PhaseStats p = Phases[PhaseOrder[i]];
+                if (i > 0) sb.Append(", ");
+                sb.Append('"').Append(p.Name).Append("\": {\"frames\": ").Append(p.Frame.Count.ToString(CultureInfo.InvariantCulture))
+                  .Append(", \"frame_ms\": ").Append(P50P95(p.Frame))
+                  .Append(", \"gpu_ms\": ").Append(P50P95(p.Gpu))
+                  .Append(", \"triangles\": ").Append(P50P95(p.Triangles))
+                  .Append(", \"batches\": ").Append(P50P95(p.Batches))
+                  .Append(", \"setpass\": ").Append(P50P95(p.SetPass))
+                  .Append(", \"shadow_casters\": ").Append(P50P95(p.Casters))
+                  .Append(", \"visible_skinned_meshes\": ").Append(P50P95(p.Skinned))
+                  .Append(", \"canvas_ms\": ").Append(P50P95(p.CanvasMs)).Append('}');
+            }
+            sb.Append('}');
+            return sb.ToString();
+        }
+
         /// <summary>Starts recording every frame (autoplay); clears the previous recording.</summary>
         public static void BeginRecording()
         {
@@ -226,6 +363,8 @@ namespace CriticalMass.Runtime.Hud
                 r.Samples = 0;
             }
             MatchFrames.Clear();
+            MatchGpu.Clear();
+            MatchCpuMain.Clear();
             _recordStart = Time.realtimeSinceStartupAsDouble;
             _recording = true;
         }
@@ -236,6 +375,8 @@ namespace CriticalMass.Runtime.Hud
             public int Frames;
             public double Seconds, P50, P95, P99, Mean, Worst, WorstAtSecond;
             public int Over50, Over33, Over20;
+            /// <summary>FrameTimingManager GPU and main-thread CPU frame times (ms); NaN when the platform reported none.</summary>
+            public double GpuP50 = double.NaN, GpuP95 = double.NaN, CpuMainP50 = double.NaN, CpuMainP95 = double.NaN;
             public List<(string name, string unit, double mean, double max)> MarkerMeans = new List<(string, string, double, double)>();
 
             public string Summary() => string.Format(CultureInfo.InvariantCulture,
@@ -249,6 +390,18 @@ namespace CriticalMass.Runtime.Hud
             _recording = false;
             Report rep = Analyse(MatchFrames);
             rep.Seconds = Time.realtimeSinceStartupAsDouble - _recordStart;
+            if (MatchGpu.Count > 0)
+            {
+                Report g = Analyse(MatchGpu);
+                rep.GpuP50 = g.P50;
+                rep.GpuP95 = g.P95;
+            }
+            if (MatchCpuMain.Count > 0)
+            {
+                Report c = Analyse(MatchCpuMain);
+                rep.CpuMainP50 = c.P50;
+                rep.CpuMainP95 = c.P95;
+            }
             foreach (Rec r in Recs)
             {
                 if (r.Samples == 0) continue;
@@ -419,6 +572,9 @@ namespace CriticalMass.Runtime.Hud
             sb.AppendFormat(c, "  \"frame_ms\": {{\"p50\": {0:0.###}, \"p95\": {1:0.###}, \"p99\": {2:0.###}, \"mean\": {3:0.###}, \"worst\": {4:0.###}, \"worst_at_s\": {5:0.##}}},\n",
                 r.P50, r.P95, r.P99, r.Mean, r.Worst, r.WorstAtSecond);
             sb.AppendFormat(c, "  \"frames_over_ms\": {{\"20\": {0}, \"33.3\": {1}, \"50\": {2}}},\n", r.Over20, r.Over33, r.Over50);
+            // null (never 0) when the platform reported no timing: the perf gate fails closed on a missing number.
+            sb.Append("  \"gpu_ms\": ").Append(double.IsNaN(r.GpuP95) ? "null" : string.Format(c, "{{\"p50\": {0:0.###}, \"p95\": {1:0.###}}}", r.GpuP50, r.GpuP95)).Append(",\n");
+            sb.Append("  \"cpu_main_ms\": ").Append(double.IsNaN(r.CpuMainP95) ? "null" : string.Format(c, "{{\"p50\": {0:0.###}, \"p95\": {1:0.###}}}", r.CpuMainP50, r.CpuMainP95)).Append(",\n");
             sb.Append("  \"markers\": [\n");
             for (int i = 0; i < r.MarkerMeans.Count; i++)
             {

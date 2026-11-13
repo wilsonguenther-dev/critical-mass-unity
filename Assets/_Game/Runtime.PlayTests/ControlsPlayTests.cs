@@ -301,16 +301,22 @@ namespace CriticalMass.Runtime.PlayTests
             // Wall clock running while paused, and buttons pressed: nothing reaches the sim.
             _driver.TimeScale = 2;
             for (int i = 0; i < 20; i++) yield return null;
+            Assert.AreEqual(tick, _driver.World.Tick, "no tick while paused, before any press");
             yield return Send(_pad, new GamepadState { rightTrigger = 1f });
-            yield return Send(_pad, new GamepadState().WithButton(GamepadButton.South));
+            Assert.AreEqual(tick, _driver.World.Tick, $"no tick while paused, after the trigger (paused {_input.State.Paused}, menu {_menu.IsOpen})");
+            // Finisher, batch 4: South is the pause menu's confirm and RESUME has the focus, so a South press here resumes
+            // the match by design (measured: menu closed, then the sim ran on). The gameplay buttons the menu does not
+            // take are pressed instead: Ability (left trigger) and Interact (West).
+            yield return Send(_pad, new GamepadState { leftTrigger = 1f }.WithButton(GamepadButton.West));
             yield return Send(_pad, new GamepadState());
             for (int i = 0; i < 10; i++) yield return null;
-            Assert.AreEqual(tick, _driver.World.Tick, "no tick while paused");
+            Assert.IsTrue(_input.State.Paused, "still paused: the gameplay presses did not close the menu");
+            Assert.AreEqual(tick, _driver.World.Tick, $"no tick while paused (paused {_input.State.Paused}, menu {_menu.IsOpen}, page {_menu.CurrentPage})");
             Assert.AreEqual(x5, _driver.World.X[5]);
             Assert.AreEqual(t, _driver.World.Match.Time);
             InputFrame f = SimInput.EmptyInput();
             _input.State.Fill(f);
-            Assert.IsFalse(f.Attack || f.Jump, "presses while paused are dropped");
+            Assert.IsFalse(f.Attack || f.Jump || f.Ability || f.Interact, "presses while paused are dropped");
 
             _driver.TimeScale = 0;
             yield return new WaitForSecondsRealtime(0.32f);

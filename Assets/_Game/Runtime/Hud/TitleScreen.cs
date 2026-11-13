@@ -1,6 +1,8 @@
 using CriticalMass.Runtime.Hud.Style;
 using CriticalMass.Runtime.Hud.Ui;
+using CriticalMass.Runtime.Menu;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
@@ -10,9 +12,11 @@ namespace CriticalMass.Runtime.Hud
     /// Simple title screen: the bible's own primary logo (Visual Asset Bible p04, cut from its cream page by
     /// Art/UI/Logo/_source~/cut_bible_logo.py; 766 x 597 native, drawn 1:1 at 1080p from @1x, from @2x up to 4K, @4x above)
     /// with a slow bob and a pulsing glow on the egg's seams, over the live bot match under a Void Navy wash, and
-    /// "PRESS ANY KEY" in the HUD display face. The redrawn vector logo (critical-mass-logo@Nx) stays in the repo, unused. Any key, click or gamepad
-    /// button hides it and shows the HUD. Shown on boot in player builds only (ShowOnBoot), never in the editor, batch
-    /// mode or tests; the capture tool shows it explicitly.
+    /// three stickers under it: PLAY NOW (first and focused; Enter, Space, controller A or a click drops straight into a match
+    /// with the last class and settings, Flow.PlayNow), QUICK DEMO (a guided minute: move, hit, the hill and the Kaiju, then
+    /// home; Flow.PlayFlow.StartDemo) and HOME (Escape, B, Start, or the sticker: the home lobby). Left / right moves the focus. The redrawn vector logo (critical-mass-logo@Nx) stays in the repo, unused. Hide() is the main-menu
+    /// path (tools and tests call it); with the flow off both paths just show the HUD. Shown on boot in player builds
+    /// only (ShowOnBoot), never in the editor, batch mode or tests; the capture tool shows it explicitly.
     /// </summary>
     public sealed class TitleScreen : MonoBehaviour
     {
@@ -21,11 +25,20 @@ namespace CriticalMass.Runtime.Hud
         public GameHud Hud;
         Canvas _canvas;
         RawImage _logo, _glow;
+        RectTransform _eggHit;
         Text _prompt;
         /// <summary>Logo size in canvas units (1080p px): the @1x export's pixel size, so 1080p draws it 1:1.</summary>
         public static readonly Vector2 LogoSize = new Vector2(766f, 597f);
         public const float LogoY = 70f, BobPx = 6f, BobPeriod = 4f, GlowPeriod = 2.6f;
+        /// <summary>The two stickers, in 1920 x 1080 space from the top-left: y, width, height, gap.</summary>
+        public const float ButtonsY = 838f, ButtonW = 380f, ButtonH = 84f, ButtonGap = 24f;
         public RawImage Logo => _logo;
+        /// <summary>PLAY NOW, the first and focused sticker.</summary>
+        public MenuItem PlayNowItem => _playNow;
+        public MenuItem MainMenuItem => _toMenu;
+        /// <summary>QUICK DEMO, the middle sticker.</summary>
+        public MenuItem DemoItem => _demo;
+        MenuItem _playNow, _toMenu, _demo;
         float _t;
 
         public static TitleScreen Show(GameObject host, GameHud hud)
@@ -70,21 +83,96 @@ namespace CriticalMass.Runtime.Hud
             _glow.transform.SetParent(lr, false);
             _glow.raycastTarget = false;
             Stretch(_glow.rectTransform);
+            // Integration batch 3: egg-01, the title egg. A clear hit area over the egg in the middle of the logo; clicks on it
+            // count toward the secret instead of dismissing the title (keys and the pad still dismiss).
+            if (go.GetComponent<GraphicRaycaster>() == null) go.AddComponent<GraphicRaycaster>();
+            var eggHit = new GameObject("Egg Hit", typeof(RectTransform));
+            eggHit.layer = 5;
+            RectTransform er = (RectTransform)eggHit.transform;
+            er.SetParent(lr, false);
+            er.anchorMin = er.anchorMax = new Vector2(0.5f, 0.55f);
+            er.sizeDelta = new Vector2(230f, 250f);
+            er.anchoredPosition = Vector2.zero;
+            _eggHit = er;
+            _eggHitStatic = er;
+            _eggCam = cam;
+            CriticalMass.Runtime.Secrets.TitleEgg.Attach(er);
 
-            _prompt = HudText.Make(root, "Prompt", CMTokens.Display, 34, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter);
+            // PLAY NOW (focused, brass rim like START MATCH) and MAIN MENU, side by side under the tagline.
+            var space = new GameObject("Space", typeof(RectTransform));
+            space.layer = 5;
+            var sp = (RectTransform)space.transform;
+            sp.SetParent(root, false);
+            sp.anchorMin = sp.anchorMax = new Vector2(0.5f, 0.5f);
+            sp.pivot = new Vector2(0.5f, 0.5f);
+            sp.sizeDelta = new Vector2(HudLayout.RefW, HudLayout.RefH);
+            float bx = 960f - ButtonW * 1.5f - ButtonGap;
+            _playNow = MenuUi.Item(sp, "Play Now", bx, ButtonsY, ButtonW, ButtonH, Flow.PlayNow.Label, MenuItem.Kind.Button, UiScale.TypeLead, true,
+                CMTokens.Display);
+            _playNow.Body.Radius = 18f;
+            _playNow.Body.RimPx = 4f;
+            _playNow.Body.SetRim(CMTokens.ToolBrass.Color);
+            _playNow.Submitted = PressPlayNow;
+            _demo = MenuUi.Item(sp, "Quick Demo", 960f - ButtonW * 0.5f, ButtonsY, ButtonW, ButtonH, "QUICK DEMO", MenuItem.Kind.Button, UiScale.TypeHeading,
+                true, CMTokens.Display);
+            _demo.Body.Radius = 18f;
+            _demo.Body.RimPx = 3f;
+            _demo.Submitted = PressDemo;
+            _toMenu = MenuUi.Item(sp, "Main Menu", 960f + ButtonW * 0.5f + ButtonGap, ButtonsY, ButtonW, ButtonH, "HOME", MenuItem.Kind.Button, UiScale.TypeHeading,
+                true, CMTokens.Display);
+            _toMenu.Body.Radius = 18f;
+            _toMenu.Body.RimPx = 3f;
+            _toMenu.Submitted = Hide;
+            _playNow.navigation = new Navigation { mode = Navigation.Mode.Explicit, selectOnRight = _demo, selectOnLeft = _toMenu };
+            _demo.navigation = new Navigation { mode = Navigation.Mode.Explicit, selectOnLeft = _playNow, selectOnRight = _toMenu };
+            _toMenu.navigation = new Navigation { mode = Navigation.Mode.Explicit, selectOnLeft = _demo, selectOnRight = _playNow };
+            PauseMenu.EnsureEventSystem(transform);
+            if (EventSystem.current != null) EventSystem.current.SetSelectedGameObject(_playNow.gameObject);
+
+            _prompt = HudText.Make(root, "Prompt", CMTokens.Ui, UiScale.TypeBody, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 2f);
             RectTransform pr = _prompt.rectTransform;
             pr.anchorMin = pr.anchorMax = new Vector2(0.5f, 0.5f);
-            pr.sizeDelta = new Vector2(900f, 60f);
-            pr.anchoredPosition = new Vector2(0f, -400f);
-            _prompt.text = "PRESS ANY KEY";
-            Text sub = HudText.Make(root, "Tagline", CMTokens.Ui, 22, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 2f);
+            pr.sizeDelta = new Vector2(1100f, 40f);
+            pr.anchoredPosition = new Vector2(0f, -432f);
+            _prompt.text = "ENTER, SPACE OR A   PLAY NOW      ·      ESC OR B   HOME";
+            Text sub = HudText.Make(root, "Tagline", CMTokens.Ui, UiScale.TypeBody, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 2f);
             RectTransform sr = sub.rectTransform;
             sr.anchorMin = sr.anchorMax = new Vector2(0.5f, 0.5f);
             sr.sizeDelta = new Vector2(900f, 40f);
-            sr.anchoredPosition = new Vector2(0f, -350f);
+            sr.anchoredPosition = new Vector2(0f, -258f);
             sub.text = "16 v 16. Hold the hill. Turn the Kaiju.";
+            // 2026-11-12 (UI rough spots): the match behind the title is a live bot match; say so, quietly, in the
+            // bottom-left safe corner, so nobody takes it for their own game running itself.
+            BuildLiveTag(root);
             if (Hud != null && Hud.Canvas != null) Hud.Canvas.enabled = false;
             UpdateScale();
+        }
+
+        public const string LiveTagText = "LIVE BOT MATCH  ·  16 V 16, PLAYING BEHIND THE TITLE";
+        public Text LiveTag { get; private set; }
+
+        void BuildLiveTag(RectTransform root)
+        {
+            var dot = new GameObject("Live Dot", typeof(RectTransform)).AddComponent<VectorShape>();
+            dot.gameObject.layer = 5;
+            dot.transform.SetParent(root, false);
+            dot.Kind = ShapeKind.Circle;
+            dot.FillColor = CMTokens.Crimson.Color;
+            dot.OutlinePx = 2f;
+            dot.RimPx = 0f;
+            dot.raycastTarget = false;
+            RectTransform dr = dot.rectTransform;
+            dr.anchorMin = dr.anchorMax = new Vector2(0f, 0f);
+            dr.pivot = new Vector2(0f, 0.5f);
+            dr.sizeDelta = new Vector2(14f, 14f);
+            dr.anchoredPosition = new Vector2(UiScale.SafeMargin, UiScale.SafeMargin + 15f);
+            LiveTag = HudText.Make(root, "Live Tag", CMTokens.Ui, UiScale.TypeSmall, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft, 2f);
+            RectTransform lt = LiveTag.rectTransform;
+            lt.anchorMin = lt.anchorMax = new Vector2(0f, 0f);
+            lt.pivot = new Vector2(0f, 0.5f);
+            lt.sizeDelta = new Vector2(820f, 30f);
+            lt.anchoredPosition = new Vector2(UiScale.SafeMargin + 24f, UiScale.SafeMargin + 15f);
+            LiveTag.text = LiveTagText;
         }
 
         static void Stretch(RectTransform rt)
@@ -118,7 +206,75 @@ namespace CriticalMass.Runtime.Hud
             c.a = 0.75f + 0.25f * Mathf.Cos(_t * Mathf.PI);   // slow 0.5 Hz breathe, no flashing
             _prompt.color = c;
             Animate(_t);
-            if (AnyInput()) Hide();
+            if (_hidden) return;
+            // Keep a focus for the keyboard and controller if the mouse cleared it.
+            EventSystem es = EventSystem.current;
+            GameObject sel = es != null ? es.currentSelectedGameObject : null;
+            if (es != null && sel != _playNow.gameObject && sel != _toMenu.gameObject && sel != _demo.gameObject)
+                es.SetSelectedGameObject(_playNow.gameObject);
+            if (Confirm())
+            {
+                if (sel == _toMenu.gameObject) Hide();
+                else if (sel == _demo.gameObject) PressDemo();
+                else PressPlayNow();
+            }
+            else if (BackPressed()) Hide();
+        }
+
+        /// <summary>Enter, Space or controller A: the focused sticker (PLAY NOW unless the focus moved to MAIN MENU).</summary>
+        static bool Confirm()
+        {
+            Keyboard k = Keyboard.current;
+            if (k != null && (k.enterKey.wasPressedThisFrame || k.numpadEnterKey.wasPressedThisFrame || k.spaceKey.wasPressedThisFrame))
+                return true;
+            return Gamepad.current != null && Gamepad.current.buttonSouth.wasPressedThisFrame;
+        }
+
+        /// <summary>Escape, Backspace, controller B or Start: the main menu.</summary>
+        static bool BackPressed()
+        {
+            Keyboard k = Keyboard.current;
+            if (k != null && (k.escapeKey.wasPressedThisFrame || k.backspaceKey.wasPressedThisFrame)) return true;
+            Gamepad g = Gamepad.current;
+            return g != null && (g.buttonEast.wasPressedThisFrame || g.startButton.wasPressedThisFrame);
+        }
+
+        /// <summary>
+        /// PLAY NOW: straight into a match with the last class and settings (first launch: the guided-match offer first, its
+        /// Skip drops into the match). With the flow off (editor) or in autoplay it is the same as Hide().
+        /// </summary>
+        public void PressPlayNow()
+        {
+            if (_hidden) return;
+            if (!Flow.GameFlow.Enabled || Flow.FlowDirector.Current == null || Flow.GameFlow.State == Flow.FlowState.Off ||
+                Flow.GameFlow.Autoplay)
+            {
+                Hide();
+                return;
+            }
+            _hidden = true;
+            if (_canvas != null) Destroy(_canvas.gameObject);
+            Destroy(this);
+            Flow.PlayNow.FromTitle();
+        }
+
+        /// <summary>
+        /// QUICK DEMO: a guided minute against easy bots (move, hit, the hill, the Kaiju), then the home screen. With the flow
+        /// off (editor) or in autoplay it is the same as Hide().
+        /// </summary>
+        public void PressDemo()
+        {
+            if (_hidden) return;
+            if (!Flow.GameFlow.Enabled || Flow.FlowDirector.Current == null || Flow.GameFlow.State == Flow.FlowState.Off ||
+                Flow.GameFlow.Autoplay)
+            {
+                Hide();
+                return;
+            }
+            _hidden = true;
+            if (_canvas != null) Destroy(_canvas.gameObject);
+            Destroy(this);
+            Flow.PlayFlow.StartDemo();
         }
 
         /// <summary>View-only idle motion: a slow bob and the egg's seam glow breathing (no flashing, below 0.5 Hz).</summary>
@@ -130,12 +286,17 @@ namespace CriticalMass.Runtime.Hud
             _glow.color = g;
         }
 
-        static bool AnyInput()
+        /// <summary>The pointer is over the title egg's hit area (egg-01). Clicks no longer dismiss the title (only the two
+        /// stickers act on a click), so the egg's clicks never leave it; kept for the egg's own checks.</summary>
+        static RectTransform _eggHitStatic;
+        static UnityEngine.Camera _eggCam;
+
+        static bool PointerOnEgg()
         {
-            if (Keyboard.current != null && Keyboard.current.anyKey.wasPressedThisFrame) return true;
-            if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame) return true;
-            if (Gamepad.current != null && (Gamepad.current.startButton.wasPressedThisFrame || Gamepad.current.buttonSouth.wasPressedThisFrame)) return true;
-            return false;
+            RectTransform _eggHit = _eggHitStatic;
+            if (_eggHit == null || Mouse.current == null || !_eggHit.gameObject.activeInHierarchy) return false;
+            UnityEngine.Camera cam = _eggCam;
+            return RectTransformUtility.RectangleContainsScreenPoint(_eggHit, Mouse.current.position.ReadValue(), cam);
         }
 
         /// <summary>

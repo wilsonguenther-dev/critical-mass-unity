@@ -79,6 +79,7 @@ namespace CriticalMass.Runtime.Onboarding
             if (Starter != null && Starter(driver, req)) return;
             Restart(driver.World, req);
             driver.TimeScale = req.TimeScale;
+            global::CriticalMass.Runtime.Flow.MatchSpeed.DisplayPace = req.TimeScale;   // timers in real seconds at this pace
             HumanInputSource input = driver.GetComponent<HumanInputSource>();
             // Clicks and keys pressed on the offer panel must not reach the first tick of the new match.
             if (input != null && !input.State.Paused) input.State.Reset();

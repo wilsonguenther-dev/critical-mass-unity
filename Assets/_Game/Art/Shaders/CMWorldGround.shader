@@ -8,6 +8,7 @@
 // Lighting: flat, cast shadows only (shadow = colour x 0.66 mixed 12% toward Void Navy). No outline, no fog (y >= 0).
 // The field texture (_FieldTex, 4 texels per unit, RGBA half: R path distance, G feature distance, B dirt, A ledge
 // shadow) is baked from the Sim grid by WorldField.Bake; _FieldRect = (x0, z0, width, height) in sim units.
+// World reactions (2026-11-12): the ground paint texture (_CMPaintTex, global) is mixed over the colour.
 Shader "CM/WorldGround"
 {
     Properties
@@ -42,6 +43,13 @@ Shader "CM/WorldGround"
             #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
             TEXTURE2D(_FieldTex);
             SAMPLER(sampler_FieldTex);
+            // Ground paint (world reactions, GroundPaint.cs): blood, scorch, cracks and footprints stamped once into a
+            // linear RGBA8 texture over the map. RGB colour, A remaining life (1 at the stamp, falling linearly to 0);
+            // the mark is fully shown until 30% of its life is left, then fades. _CMPaintRect = (sim x0, z0, 1/w, 1/h),
+            // all 0 (never set) = no paint.
+            TEXTURE2D(_CMPaintTex);
+            SAMPLER(sampler_CMPaintTex);
+            float4 _CMPaintRect;
 
             struct A { float4 positionOS : POSITION; };
             struct V { float4 positionCS : SV_POSITION; float3 positionWS : TEXCOORD0; };
@@ -138,6 +146,17 @@ Shader "CM/WorldGround"
                         half3 kerb = Pick3(Hash21(kid + 3.0), Hex(0xC9, 0xAD, 0x84), Hex(0xBD, 0xA0, 0x78), Hex(0xD6, 0xBA, 0x90));
                         col = kedge / 2.0 < max(0.03, fwidth(kedge / 2.0)) ? Hex(0x8C, 0x75, 0x56) : kerb;
                     }
+                }
+
+                // Ground paint over the ground colour (before the shadow, so marks in shade darken with the ground).
+                if (_CMPaintRect.z > 0.0)
+                {
+                    float2 puv = (sim - _CMPaintRect.xy) * _CMPaintRect.zw;
+                #if UNITY_UV_STARTS_AT_TOP
+                    puv.y = 1.0 - puv.y;
+                #endif
+                    half4 paint = SAMPLE_TEXTURE2D_LOD(_CMPaintTex, sampler_CMPaintTex, puv, 0);
+                    col = lerp(col, paint.rgb, saturate(paint.a / 0.3h));
                 }
 
                 // Flat; cast shadows only.

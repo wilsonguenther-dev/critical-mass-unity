@@ -23,8 +23,8 @@ namespace CriticalMass.Sim.Core
         /// <summary>The validated wind-up length in sim ticks: KaijuFeed.DeliverWindupTicks when it is a whole number &gt;= 1, else 1.</summary>
         public static int WindupTicks(GameConfig c)
         {
-            double v = c.KaijuFeed.DeliverWindupTicks;
-            if (v >= 1 && v == System.Math.Floor(v) && v < int.MaxValue) return (int)v;
+            double v = c.KaijuFeed.DeliverWindupTicks; // validated raw, then converted by Durations.T30
+            if (v >= 1 && v == System.Math.Floor(v) && v < int.MaxValue) return System.Math.Max(1, Durations.T30(c, v)); // DG-68
             return 1;
         }
 

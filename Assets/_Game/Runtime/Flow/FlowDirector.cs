@@ -62,6 +62,10 @@ namespace CriticalMass.Runtime.Flow
         public MainMenu MainMenu => GetScreen<MainMenu>();
         public MatchSetup Setup => GetScreen<MatchSetup>();
         public ResultsScreen Results => GetScreen<ResultsScreen>();
+        /// <summary>Home lobby: the mode cards (Setup state).</summary>
+        public ModeSelect Modes => GetScreen<ModeSelect>();
+        /// <summary>Home lobby: the "match ready" rosters and countdown (Setup state).</summary>
+        public ReadyScreen Ready => GetScreen<ReadyScreen>();
 
         T GetScreen<T>() where T : FlowScreen
         {
@@ -119,7 +123,9 @@ namespace CriticalMass.Runtime.Flow
                     break;
                 case FlowState.Setup:
                     SetHud(false);
-                    Setup.Show();
+                    // A backdrop renewal while in the play flow comes back to the mode cards, not the custom setup.
+                    if (PlayFlow.InModeFlow) Modes.Show();
+                    else Setup.Show();
                     break;
                 case FlowState.Match:
                 case FlowState.Off:
@@ -171,6 +177,9 @@ namespace CriticalMass.Runtime.Flow
             }
         }
 
+        /// <summary>Hides every flow screen (the play flow before it opens the class screen).</summary>
+        public void HideFlowScreens() => HideScreens();
+
         void HideScreens()
         {
             FlowScreen[] all = GetComponents<FlowScreen>();
@@ -209,11 +218,35 @@ namespace CriticalMass.Runtime.Flow
 
         public void ShowMenu(string focusId = null)
         {
+            PlayFlow.InModeFlow = false;
             HideScreens();
             GameFlow.Enter(FlowState.Menu);
             SetHud(false);
             MainMenu.Show();
             if (focusId != null) MainMenu.FocusEntry(focusId);
+        }
+
+        /// <summary>Home lobby: the mode select, focused on focus.</summary>
+        public void ShowModes(MatchMode focus)
+        {
+            HideScreens();
+            GameFlow.Enter(FlowState.Setup);
+            SetHud(false);
+            PlayFlow.InModeFlow = true;
+            Modes.Show();
+            Modes.FocusMode(focus);
+        }
+
+        /// <summary>Home lobby: the ready screen for a launch (rosters, map, objective, a skippable 3 s countdown).</summary>
+        public void ShowReady(PlayLaunch launch)
+        {
+            if (launch == null) return;
+            HideScreens();
+            GameFlow.Enter(FlowState.Setup);
+            SetHud(false);
+            PlayFlow.InModeFlow = true;
+            Ready.Bind(launch);
+            Ready.Show();
         }
 
         /// <summary>Match setup; fromResults: its Back returns to the results (Change class).</summary>
@@ -292,7 +325,8 @@ namespace CriticalMass.Runtime.Flow
             });
         }
 
-        public void PlayAgain() => GameFlow.BeginMatch(GameFlow.LastSetup);
+        /// <summary>Results' PLAY AGAIN (focused, one press): the same setup on a new seed, with the short loading screen.</summary>
+        public void PlayAgain() => GameFlow.BeginMatch(GameFlow.LastSetup, true);
 
         public void ToMainMenu() => GameFlow.ReturnTo(FlowState.Menu);
 

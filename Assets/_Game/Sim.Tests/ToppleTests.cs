@@ -25,11 +25,11 @@ namespace CriticalMass.Sim.Tests
         private static readonly PointXZ Overlook = new PointXZ(11.5, 18.5);
         private static readonly PointXZ NwCourtyard = new PointXZ(28.5, 18.5);
 
-        private static ToppleConfig TC => GameConfig.CreateBrowser5v5().Abilities.Topple;
+        private static ToppleConfig TC => SimPhysicsTests.ClassicBrowser().Abilities.Topple;
 
         private static World MakeWorld()
         {
-            World w = World.CreateWorld(new WorldOptions { Seed = 31, TeamSize = 5, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = GameConfig.CreateBrowser5v5() });
+            World w = World.CreateWorld(new WorldOptions { Seed = 31, TeamSize = 5, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = SimPhysicsTests.ClassicBrowser() });
             w.Tick = 100;
             return w;
         }
@@ -253,7 +253,7 @@ namespace CriticalMass.Sim.Tests
         [Test]
         public void DG09AnyClassSwingingInTheRealStepEmitsHitHitHitFallingThenDownWithPositions()
         {
-            World w = World.CreateWorld(new WorldOptions { Seed = 31, TeamSize = 5, HumanTeam = TeamId.Azure, HumanClass = ClassId.Farmer, Config = GameConfig.CreateBrowser5v5() });
+            World w = World.CreateWorld(new WorldOptions { Seed = 31, TeamSize = 5, HumanTeam = TeamId.Azure, HumanClass = ClassId.Farmer, Config = SimPhysicsTests.ClassicBrowser() });
             for (int i = 1; i < w.ActorCount; i++)
             {
                 w.Actors[i].Alive = false;

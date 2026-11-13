@@ -107,7 +107,7 @@ namespace CriticalMass.Runtime.Tests
 
                 KillFeed.Entry row = feed.Row(0);
                 Assert.IsTrue(row.Active);
-                Assert.AreEqual("WARRIOR", row.Killer);
+                Assert.AreEqual(CriticalMass.Runtime.View.Mechanics.DepthNames.OrFallback(killer, "WARRIOR"), row.Killer, "the in-match name when the depth rules name fighters (#59), else the class");
                 Assert.AreEqual("YOU", row.Victim);
                 Assert.IsTrue(row.Own, "the local player's line is on brass");
             }
@@ -249,7 +249,7 @@ namespace CriticalMass.Runtime.Tests
                         seen[id] = true;
                         ActorTally t = tally.Tally(id);
                         Assert.AreEqual(team, t.Team);
-                        Assert.AreEqual(id == 0 ? "YOU" : KillWords.ClassUpper[(int)t.Cls], sb.Cell(team, r, 0));
+                        Assert.AreEqual(CriticalMass.Runtime.View.Mechanics.DepthNames.RowLabel(id, id == 0, "YOU", KillWords.ClassUpper[(int)t.Cls]), sb.Cell(team, r, 0));
                         Assert.AreEqual(t.Knockouts.ToString(), sb.Cell(team, r, 1));
                         Assert.AreEqual(t.Deaths.ToString(), sb.Cell(team, r, 2));
                         Assert.AreEqual(((int)Math.Floor(t.HillSeconds)).ToString(), sb.Cell(team, r, 3));

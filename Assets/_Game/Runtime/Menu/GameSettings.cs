@@ -8,7 +8,7 @@ namespace CriticalMass.Runtime.Menu
     /// <summary>
     /// The player's settings, stored in PlayerPrefs (kept between launches), read by the settings page and by any system
     /// that honours them. View side only: nothing here reaches the sim.
-    /// <para>Keys other code may read directly: cm.blood (int, 1 = blood on, default 1), cm.shake (camera shake, default 0: off unless the player turns it up),
+    /// <para>Keys other code may read directly: cm.blood (int, 1 = blood on, default 1), cm.shake (camera shake on/off, mirrors cm.access.shake, default off),
     /// cm.damagenumbers (default 1). Volumes are linear 0..1; the AudioMixer (Resources/Audio/CMMixer) gets them as dB on
     /// the exposed parameters MasterVolume, MusicVolume and EffectsVolume. Without the mixer, master volume falls back to
     /// AudioListener.volume.</para>
@@ -24,22 +24,36 @@ namespace CriticalMass.Runtime.Menu
         public const string VSyncKey = "cm.video.vsync";
         public const string QualityKey = "cm.video.quality";
         public const string ShakeKey = "cm.shake";
+        // Physics audit M11 / DG-94 / DG-106. The keys are PR #28's (SettingsExtras, DG-30) so both branches read and write
+        // the same stored values: shake is an int amount 0..100, default 0 (off, owner decision OD-6), reduce flashing an int.
+        /// <summary>Camera shake amount 0..100 (int, default 0 = off); same key as PR #28's SettingsExtras.ShakeAmountKey.</summary>
+        public const string ShakeScaleKey = "cm.access.shake";
+        /// <summary>Reduce flashing (1 on, default 0): hit flash as a light tint, a steady damage edge, pulses at 2 Hz or less.</summary>
+        public const string ReduceFlashingKey = "cm.access.reduceFlashing";
+        /// <summary>Reduce motion (1 on, default 0): no camera shake, no combat zoom, no Kaiju spotlight.</summary>
+        public const string ReduceMotionKey = "cm.reducedMotion";   // one key: StoryIntro, AttractMode, big moments and world reactions read it too
         public const string DamageNumbersKey = "cm.damagenumbers";
         public const string BloodKey = "cm.blood";
         /// <summary>Frame-rate limit: 30, 60 or 120 frames per second, or 0 = the display's refresh rate (default 60).</summary>
         public const string FpsCapKey = "cm.fpsCap";
-        /// <summary>Lower the frame rate while the game is not the front window: 1 on (default), 0 off.</summary>
+        /// <summary>"Save power in background": 15 fps while the game is not the front window: 1 on, 0 off (default, DG-51).</summary>
         public const string BgThrottleKey = "cm.bgThrottle";
         /// <summary>Easy movement: lane assist and corner sliding, 1 on (default), 0 off.</summary>
         public const string MoveAssistKey = "cm.moveAssist";
         /// <summary>Easy movement: direction keys follow the map's grid instead of the screen, 1 on, 0 off (default).</summary>
         public const string KeysFollowMapKey = "cm.keysFollowMap";
+        /// <summary>DG-53: the settings format version, so a later build can migrate or reset stored keys safely.</summary>
+        public const string PrefsVersionKey = "cm.prefsVersion";
+        public const int PrefsVersion = 1;
+        /// <summary>World reactions' name for the one reduce-motion key (same key as ReduceMotionKey).</summary>
+        public const string ReducedMotionKey = ReduceMotionKey;
 
         /// <summary>Every key this class writes (tests back these up and restore them).</summary>
         public static readonly string[] AllKeys =
         {
             MasterKey, MusicKey, EffectsKey, WidthKey, HeightKey, FullScreenKey, VSyncKey, QualityKey, ShakeKey,
-            DamageNumbersKey, BloodKey, FpsCapKey, BgThrottleKey, MoveAssistKey, KeysFollowMapKey,
+            DamageNumbersKey, BloodKey, FpsCapKey, BgThrottleKey, MoveAssistKey, KeysFollowMapKey, PrefsVersionKey,
+            ShakeScaleKey, ReduceFlashingKey, ReduceMotionKey,
         };
 
         public const string MixerResource = "Audio/CMMixer";
@@ -56,10 +70,37 @@ namespace CriticalMass.Runtime.Menu
         public static float EffectsVolume { get => GetF(EffectsKey, 1f); set { SetF(EffectsKey, Mathf.Clamp01(value)); ApplyAudio(); } }
 
         // ---- game ----
-        /// <summary>Camera shake allowed (no shake exists yet; the flag is stored for the effects work).</summary>
-        /// <summary>Camera shake allowed. Default OFF everywhere (art direction: no shake in normal play); the ACCESS tab's
-        /// CAMERA SHAKE amount turns it on, and the effects read the same key with the same default.</summary>
-        public static bool CameraShake { get => GetB(ShakeKey, false); set => SetB(ShakeKey, value); }
+        /// <summary>Camera shake allowed: ShakeScale above 0 (cm.shake is kept in step for older readers).</summary>
+        public static bool CameraShake
+        {
+            // The ACCESS amount decides once it exists; before that the older on/off key does (default off on a fresh install).
+            get => PlayerPrefs.HasKey(ShakeScaleKey) ? ShakeScale > 0f : GetB(ShakeKey, false);
+            set => ShakeScale = value ? 1f : 0f;
+        }
+
+        /// <summary>The shake steps the settings page cycles through, in screen order (off is the default).</summary>
+        public static readonly float[] ShakeSteps = { 0f, 0.5f, 1f };
+
+        /// <summary>
+        /// Camera shake strength 0..1, stored as the int amount 0..100 (default 0: off). CameraShake reads it; ReduceMotion
+        /// overrides it to 0 in FeelGate. Writing it keeps the older on/off flag cm.shake in step.
+        /// </summary>
+        public static float ShakeScale
+        {
+            get => Mathf.Clamp(PlayerPrefs.GetInt(ShakeScaleKey, 0), 0, 100) / 100f;
+            set
+            {
+                int v = Mathf.Clamp(Mathf.RoundToInt(value * 100f), 0, 100);
+                PlayerPrefs.SetInt(ShakeKey, v > 0 ? 1 : 0);
+                PlayerPrefs.SetInt(ShakeScaleKey, v);
+                Save();
+            }
+        }
+
+        public static bool ReduceFlashing { get => GetB(ReduceFlashingKey, false); set => SetB(ReduceFlashingKey, value); }
+        public static bool ReduceMotion { get => GetB(ReduceMotionKey, false); set => SetB(ReduceMotionKey, value); }
+        /// <summary>Same setting as ReduceMotion (world reactions' name): sway, springs, launches and the edge flash at 25%.</summary>
+        public static bool ReducedMotion { get => ReduceMotion; set => ReduceMotion = value; }
         /// <summary>Floating damage numbers shown.</summary>
         public static bool DamageNumbers { get => GetB(DamageNumbersKey, true); set => SetB(DamageNumbersKey, value); }
         /// <summary>Blood effects on (PlayerPrefs cm.blood, default on).</summary>
@@ -95,12 +136,12 @@ namespace CriticalMass.Runtime.Menu
             {
                 PlayerPrefs.SetInt(FpsCapKey, Array.IndexOf(FpsCapOptions, value) >= 0 ? value : DefaultFpsCap);
                 Save();
-                CriticalMass.Runtime.Game.FrameGovernor.Reapply();
+                CriticalMass.Runtime.Game.FrameGovernor.Reapply();   // FrameGovernor applies it on the next frame
             }
         }
 
-        /// <summary>Reduce the frame rate when the game is not the front window (cm.bgThrottle, default on). Stored only.</summary>
-        public static bool BackgroundThrottle { get => GetB(BgThrottleKey, true); set { SetB(BgThrottleKey, value); CriticalMass.Runtime.Game.FrameGovernor.Reapply(); } }
+        /// <summary>Save power in background: 15 fps when the game is not the front window (cm.bgThrottle, default off, DG-51).</summary>
+        public static bool BackgroundThrottle { get => GetB(BgThrottleKey, false); set { SetB(BgThrottleKey, value); CriticalMass.Runtime.Game.FrameGovernor.Reapply(); } }
 
         public static bool FullScreen { get => GetB(FullScreenKey, true); set { SetB(FullScreenKey, value); ApplyVideo(); } }
         public static bool VSync { get => GetB(VSyncKey, true); set { SetB(VSyncKey, value); ApplyVideo(); } }
@@ -205,10 +246,20 @@ namespace CriticalMass.Runtime.Menu
             if (q >= 0 && q < QualitySettings.names.Length && QualitySettings.GetQualityLevel() != q) QualitySettings.SetQualityLevel(q, true);
             // Vertical sync and the frame limit are FrameGovernor's alone (it re-applies them after a level change).
             CriticalMass.Runtime.Game.FrameGovernor.Reapply();
-            Vector2Int r = Resolution;
+            Vector2Int r = ClampedResolution(Resolution, Display.main.systemWidth, Display.main.systemHeight);
             int w = r.x > 0 ? r.x : Screen.width, h = r.y > 0 ? r.y : Screen.height;
+            // DG-52: borderless fullscreen-window or a window, never exclusive fullscreen or a display-mode change; the
+            // governor spaces changes at least 1 s apart.
             FullScreenMode mode = FullScreen ? FullScreenMode.FullScreenWindow : FullScreenMode.Windowed;
-            if (w != Screen.width || h != Screen.height || Screen.fullScreenMode != mode) Screen.SetResolution(w, h, mode);
+            if (w != Screen.width || h != Screen.height || Screen.fullScreenMode != mode) CriticalMass.Runtime.Game.FrameGovernor.RequestWindow(w, h, mode);
+        }
+
+        /// <summary>DG-52: a saved size larger than the display shrinks to fit it (aspect kept); (0, 0) stays "current".</summary>
+        public static Vector2Int ClampedResolution(Vector2Int saved, int displayW, int displayH)
+        {
+            if (saved.x <= 0 || saved.y <= 0) return saved;
+            (int w, int h) = CriticalMass.Runtime.Game.FramePolicy.ClampToNative(saved.x, saved.y, displayW, displayH);
+            return new Vector2Int(w, h);
         }
 
         /// <summary>Applies every stored setting (boot).</summary>
@@ -223,6 +274,7 @@ namespace CriticalMass.Runtime.Menu
         {
             for (int i = 0; i < AllKeys.Length; i++) PlayerPrefs.DeleteKey(AllKeys[i]);
             Save();
+            Flush();
             ApplyAll();
         }
 
@@ -231,8 +283,28 @@ namespace CriticalMass.Runtime.Menu
         {
             _mixerLooked = false;
             _mixer = null;
+            Application.quitting -= OnQuit;
+            Application.quitting += OnQuit;
+            CheckPrefsVersion();
             if (Application.isBatchMode) return;   // gates and tests keep the project's settings
+            if (CriticalMass.Runtime.Game.GamePaths.IsolatedRun) return;   // a -dataDir measurement run keeps its own window and quality
             ApplyAll();
+        }
+
+        static void OnQuit() => Flush();
+
+        /// <summary>DG-53: stamps cm.prefsVersion; a newer format (a later build ran) is kept and logged, never misread.</summary>
+        static void CheckPrefsVersion()
+        {
+            int v = PlayerPrefs.GetInt(PrefsVersionKey, 0);
+            if (v == PrefsVersion) return;
+            if (v > PrefsVersion)
+            {
+                Debug.LogWarning($"[CM.Settings] settings were saved by a newer build (format {v}); reading what this build knows");
+                return;
+            }
+            PlayerPrefs.SetInt(PrefsVersionKey, PrefsVersion);
+            _dirty = true;
         }
 
         static float GetF(string k, float d) => PlayerPrefs.GetFloat(k, d);
@@ -250,10 +322,52 @@ namespace CriticalMass.Runtime.Menu
             Save();
         }
 
+        static bool _dirty;
+
+        /// <summary>Disk writes of the settings since boot (DG-53 test: 100 volume changes, 0 saves until the page closes).</summary>
+        public static int SaveCount { get; private set; }
+
+        /// <summary>true while a change waits for Flush.</summary>
+        public static bool Dirty => _dirty;
+
+        /// <summary>The last save failure, or null.</summary>
+        public static string LastSaveError { get; private set; }
+
+        /// <summary>DG-53: a change is kept in memory and marked; it reaches the disk when the page closes (Flush), not per tick.</summary>
         static void Save()
         {
-            PlayerPrefs.Save();
+            _dirty = true;
             Changed?.Invoke();
+        }
+
+        /// <summary>
+        /// Writes pending changes to disk: the settings page and pause menu call it when they close, and the game at quit.
+        /// Returns false (and shows "Settings could not be saved") when the write failed.
+        /// </summary>
+        public static bool Flush()
+        {
+            if (!_dirty) return true;
+            if (CriticalMass.Runtime.Game.GamePaths.IsolatedRun)
+            {
+                _dirty = false;   // a -dataDir measurement run never writes the player's saved settings
+                return true;
+            }
+            try
+            {
+                PlayerPrefs.SetInt(PrefsVersionKey, PrefsVersion);
+                PlayerPrefs.Save();
+                _dirty = false;
+                SaveCount++;
+                LastSaveError = null;
+                return true;
+            }
+            catch (Exception e)
+            {
+                LastSaveError = e.Message;
+                Debug.LogError($"[CM.Settings] settings could not be saved: {e.Message}");
+                CriticalMass.Runtime.Game.FrameGovernor.ShowNotice("Settings could not be saved.");
+                return false;
+            }
         }
     }
 }

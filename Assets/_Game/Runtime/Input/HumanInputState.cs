@@ -302,6 +302,7 @@ namespace CriticalMass.Runtime.Input
                 _classPick = -1;
                 _attackBuffer.Clear();
                 _abilityBuffer.Clear();
+                View.Mechanics.DepthInputLatch.Clear(); // mechanics depth: a ping or purchase never fires on unpause
                 return;
             }
 
@@ -337,6 +338,8 @@ namespace CriticalMass.Runtime.Input
             _jumpLatch = false;
             output.ClassPick = _classPick;
             _classPick = -1;
+            // Mechanics depth (U-065 / U-067): the station purchase and the ping, each for exactly one tick.
+            View.Mechanics.DepthInputLatch.WriteInto(output);
         }
 
         /// <summary>

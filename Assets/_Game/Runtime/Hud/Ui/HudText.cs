@@ -70,6 +70,29 @@ namespace CriticalMass.Runtime.Hud.Ui
             return t;
         }
 
+        /// <summary>
+        /// One line, shrunk from max to at most min until it fits the label's width (batch 4: scoreboard names ran into the
+        /// next column and "LADDER AND BRIDGE" wrapped and was cut). Work only when the text changes.
+        /// </summary>
+        public static void SetOneLine(Text t, string s, int max, int min)
+        {
+            if (t == null) return;
+            if (s == null) s = string.Empty;
+            if (!t.resizeTextForBestFit && t.horizontalOverflow == HorizontalWrapMode.Overflow && t.text == s) return;
+            t.resizeTextForBestFit = false;
+            t.horizontalOverflow = HorizontalWrapMode.Overflow;
+            t.text = s;
+            float w = t.rectTransform.rect.width;
+            var key = (s, max, min, Mathf.RoundToInt(w), t.font != null ? t.font.GetInstanceID() : 0);
+            if (OneLineSizes.TryGetValue(key, out int known)) { t.fontSize = known; return; }   // no layout pass, no allocation
+            int size = max;
+            t.fontSize = size;
+            if (w > 1f) while (size > min && t.preferredWidth > w) t.fontSize = --size;
+            OneLineSizes[key] = size;
+        }
+
+        static readonly Dictionary<(string, int, int, int, int), int> OneLineSizes = new Dictionary<(string, int, int, int, int), int>();
+
         /// <summary>Sets text only when it changed (no mesh rebuild, no allocation on equal strings).</summary>
         public static void Set(Text t, string s)
         {

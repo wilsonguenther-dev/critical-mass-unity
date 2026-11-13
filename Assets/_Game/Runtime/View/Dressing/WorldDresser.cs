@@ -24,6 +24,9 @@ namespace CriticalMass.Runtime.View.Dressing
         public double SimX, SimZ, Y;
         /// <summary>True for pieces the kit lets stand over a walkable cell (the walkable surface itself: ground, bridge decks).</summary>
         public bool Surface;
+        /// <summary>World reactions: a bridge deck tile's start and end along its deck (0..1, piers at 0 and 1), else 0.
+        /// WorldView bakes the sag weight sin(pi t) from them.</summary>
+        public float SpanA, SpanB;
     }
 
     /// <summary>A unit edge of the island outline (rim) or of a step down inside an island (ledge), sim coordinates.</summary>
@@ -67,6 +70,9 @@ namespace CriticalMass.Runtime.View.Dressing
         /// <summary>Cell types when the plan was made.</summary>
         public byte[] CellsAtPlan;
         public int FillCount, LedgeFillCount, WaterfallCount, SpanCount;
+        /// <summary>Environment v4 placements added by WorldDresser.Clutter (0 unless the plan was made with extraClutter), and
+        /// how many bridge deck tiles it swapped to the damaged tile.</summary>
+        public int ClutterCount, DamagedSpans;
 
         /// <summary>Order-sensitive FNV-1a 64 of every placement (piece, team, matrix to 1e-4): the determinism fingerprint.</summary>
         public string Hash()
@@ -203,7 +209,14 @@ namespace CriticalMass.Runtime.View.Dressing
         /// with one of them more than 0.4 u inside walkable space is left out (WorldPlan.DroppedBases).</param>
         /// <param name="centroidOf">Vertex centroid of a bases piece in its own frame (WorldKitCatalog.Centroid): the hill and shrine
         /// breakables pivot on the site centre, so their cells are found from where the mesh is. Null: the pivot.</param>
-        public static WorldPlan Plan(MapDef map, BasesFile bases, Func<string, Vector3> centroidOf = null, Func<string, Vector3[]> bodyOf = null)
+        /// <param name="extraClutter">Environment v4 (art landing, 2026-11-12): also run the kit's layout4 rules (Clutter): about
+        /// 525 extra pieces on Skybreak Basin (ground patches, grass and flower clumps, ruts, edge stones, fences, torches,
+        /// reeds, trees, bones, signpost, bridge anchors, hanging lanterns, floating chunks) and 12 inner bridge tiles swapped
+        /// to the damaged tile. Off by default, so the committed plan (tools/art/world-plan.tsv, WorldBake) is unchanged; the
+        /// world view turns it on only where QualityTable.ExtraClutter allows it (High and up: the scene was at 4.36 M
+        /// triangles against a budget near 2 M).</param>
+        public static WorldPlan Plan(MapDef map, BasesFile bases, Func<string, Vector3> centroidOf = null, Func<string, Vector3[]> bodyOf = null,
+            bool extraClutter = false)
         {
             var g = new G { M = map, W = map.Width, H = map.Height };
             var plan = new WorldPlan { Width = g.W, Height = g.H, Dressed = new bool[g.W * g.H], CellsAtPlan = (byte[])map.Cells.Clone() };
@@ -260,7 +273,268 @@ namespace CriticalMass.Runtime.View.Dressing
             Sky(plan.Placements);
             // Bases kit: districts, hill, shrine; their breakables; the Sim wall cells they cover.
             if (bases != null) Bases(g, map, bases, plan, centroidOf, bodyOf);
+            if (extraClutter) Clutter(g, map, plan, fl, flH, spans);
             return plan;
+        }
+
+        // ------------------------------------------------------------------------------------------- environment v4 clutter
+        const double PAD_R = 3.0;   // env_art/layout.py PAD_R (layout4.PAD_RING)
+        static readonly HashSet<string> OccupyingCats = new HashSet<string> { "tree", "rock_big", "crystal", "small", "water", "struct", "deco" };
+        static readonly string[] V4Trees = { "env_tree_oak", "env_tree_pine", "env_tree_gnarl" };
+        static readonly string[] V4Bones = { "env_kaiju_skull", "env_bone_ribs", "env_kaiju_statue" };
+
+        static double J4(int cx, int cz, long salt, double amp) => ((H32(cx, cz, salt) % 1000) / 1000.0 - 0.5) * 2 * amp;
+
+        static double YawDir(double ux, double uz) => Math.Atan2(uz, ux) * 180.0 / Math.PI;
+
+        static void Grad(WorldPlan plan, double x, double z, out double gx, out double gz)
+        {
+            const double e = 0.25;
+            gx = PathDist(plan, x + e, z) - PathDist(plan, x - e, z);
+            gz = PathDist(plan, x, z + e) - PathDist(plan, x, z - e);
+            double ln = Math.Sqrt(gx * gx + gz * gz);
+            if (ln == 0) ln = 1.0;
+            gx /= ln;
+            gz /= ln;
+        }
+
+        /// <summary>
+        /// Environment kit v4 placement rules: a C# port of env_art/layout4.py dress() at art/environment-blender 47e37ac (the
+        /// rows of environment-v4/proposed-world-plan-rows.tsv), on this dresser's own plan. Deterministic hashes per cell or
+        /// edge; pieces over the 0.3 u step-over height only ever stand on void cells (fill triangles, or past a rim lip), so
+        /// nothing new blocks a walkable cell. Appends to plan.Placements and swaps inner span tiles to the damaged tile
+        /// (same box and pivot, so the deck sag and the walkable surface are unchanged).
+        /// </summary>
+        static void Clutter(G g, MapDef map, WorldPlan plan, List<int[]> fl, Dictionary<long, double> flH, List<double[]> spans)
+        {
+            List<WorldPlacement> pl = plan.Placements;
+            int before = pl.Count;
+            var occ = new HashSet<long>();
+            var trees = new List<double[]>();
+            var wfs = new List<double[]>();
+            foreach (WorldPlacement p in pl)
+            {
+                if (p.Piece == "env_waterfall") wfs.Add(new[] { p.SimX, p.SimZ });
+                if (p.Cat == null || !OccupyingCats.Contains(p.Cat)) continue;
+                occ.Add(Key((int)Math.Floor(p.SimX), (int)Math.Floor(p.SimZ)));
+                if (p.Cat == "tree") trees.Add(new[] { p.SimX, p.SimZ });
+            }
+            var pads = new List<double[]>();
+            if (map.Pads != null) foreach (PadDef pd in map.Pads) pads.Add(new[] { pd.X, pd.Z });
+            var o = new List<WorldPlacement>();
+            Func<int, int, bool> voidN = (cx, cz) => !g.Land(cx + 1, cz) || !g.Land(cx - 1, cz) || !g.Land(cx, cz + 1) || !g.Land(cx, cz - 1);
+            Func<double, double, double> padDist = (x, z) =>
+            {
+                double d = 99;
+                foreach (double[] a in pads) d = Math.Min(d, Math.Sqrt((x - a[0]) * (x - a[0]) + (z - a[1]) * (z - a[1])));
+                return d;
+            };
+
+            // Land cells.
+            for (int cz = 0; cz < g.H; cz++)
+            for (int cx = 0; cx < g.W; cx++)
+            {
+                if (!g.Land(cx, cz)) continue;
+                double xc = cx + 0.5, zc = cz + 0.5;
+                if (Keep(map, xc, zc)) continue;
+                double h = g.Hh(cx, cz);
+                double x = xc + J4(cx, cz, 301, 0.3), z = zc + J4(cx, cz, 302, 0.3);
+                double yaw = H32(cx, cz, 303) % 360;
+                double pd = PathDist(plan, xc, zc);
+                double dpad = padDist(xc, zc);
+                bool taken = occ.Contains(Key(cx, cz));
+                if (pd < PATH_W - 0.2)
+                {
+                    if (H32(cx, cz, 202) % 1000 < 4) o.Add(At("env_puddle", x, h, z, yaw, "ground_decal"));
+                    continue;
+                }
+                if (pd < PATH_W + 1.2)
+                {
+                    uint r = H32(cx, cz, 204) % 1000;
+                    Grad(plan, xc, zc, out double gx, out double gz);
+                    double tyaw = YawDir(-gz, gx);
+                    if (r < 70) o.Add(At("env_path_ruts", xc, h, zc, Math.Atan2(-gz, -gx) * 180.0 / Math.PI, "ground_decal"));
+                    else if (r < 150 && !taken)
+                    {
+                        double sh = pd - (PATH_W + 0.1);
+                        o.Add(At("env_edge_stones", xc - gx * sh + gz * 0.6, h, zc - gz * sh - gx * 0.6, tyaw, "small"));
+                    }
+                    else if (r < 190) o.Add(At("env_dirt_patch", x, h, z, yaw, "ground_decal"));
+                    continue;
+                }
+                if (PAD_R + 1.5 < dpad && dpad < PAD_R + 6.0)
+                {
+                    uint r = H32(cx, cz, 231) % 100;
+                    if (r < 4 && !taken) { o.Add(At("env_campfire", xc, h, zc, yaw, "small")); occ.Add(Key(cx, cz)); }
+                    else if (r < 10 && !taken) { o.Add(At("env_camp_sacks", xc, h, zc, yaw, "small")); occ.Add(Key(cx, cz)); }
+                    else if (r < 14) o.Add(At("env_ruin_rubble", x, h, z, yaw, "small"));
+                    continue;
+                }
+                uint q = H32(cx, cz, 201) % 1000;
+                bool nearTree = false;
+                foreach (double[] t in trees) if (Math.Abs(t[0] - xc) < 2.5 && Math.Abs(t[1] - zc) < 2.5) { nearTree = true; break; }
+                if (q < 55) o.Add(At("env_ground_patch_light", x, h, z, yaw, "ground_decal"));
+                else if (q < 110) o.Add(At("env_ground_patch_dark", x, h, z, yaw, "ground_decal"));
+                else if (q < 130) o.Add(At("env_moss_patch", x, h, z, yaw, "ground_decal"));
+                else if (q < 135) o.Add(At("env_puddle", x, h, z, yaw, "ground_decal"));
+                else if (taken) continue;
+                else if (q < 235) o.Add(At("env_grass_clump", x, h, z, yaw, "small"));
+                else if (q < 257) o.Add(At("env_flower_clump_a", x, h, z, yaw, "small"));
+                else if (q < 280) o.Add(At("env_flower_clump_b", x, h, z, yaw, "small"));
+                else if (q < 295) o.Add(At("env_moss_rocks", x, h, z, yaw, "small"));
+                else if (q < 305 || (nearTree && q < 365)) o.Add(At("env_mushrooms", x, h, z, yaw, "small"));
+                else if (q < 371) o.Add(At("env_ruin_rubble", x, h, z, yaw, "small"));
+                else if (voidN(cx, cz) && H32(cx, cz, 203) % 100 < 10) o.Add(At("env_grass_clump", x, h, z, yaw, "small"));
+            }
+
+            var placed = new Dictionary<string, List<double[]>>
+            {
+                { "env_signpost", new List<double[]>() }, { "env_kaiju_skull", new List<double[]>() },
+                { "env_bone_ribs", new List<double[]>() }, { "env_kaiju_statue", new List<double[]>() },
+            };
+            var spacing = new Dictionary<string, double> { { "env_signpost", 12.0 }, { "env_kaiju_skull", 20.0 }, { "env_bone_ribs", 10.0 }, { "env_kaiju_statue", 25.0 } };
+            Func<string, double, double, bool> far = (nm, x, z) =>
+            {
+                foreach (double[] a in placed[nm]) if (Math.Sqrt((x - a[0]) * (x - a[0]) + (z - a[1]) * (z - a[1])) < spacing[nm]) return false;
+                return true;
+            };
+
+            // Rim edges (axis-aligned, not bridge ends).
+            foreach (WorldEdge e in plan.Rim)
+            {
+                if (e.Bridge || e.Diag) continue;
+                double mx = (e.Px + e.Qx) / 2, mz = (e.Pz + e.Qz) / 2, nx = e.Nx, nz = e.Nz, h = e.H;
+                if (Keep(map, mx - nx * 0.5, mz - nz * 0.5)) continue;
+                int cx = e.Cx, cz = e.Cz;
+                double eyaw = YawDir(e.Qx - e.Px, e.Qz - e.Pz);
+                double pd = PathDist(plan, mx - nx * 0.5, mz - nz * 0.5);
+                double wfd = 99;
+                foreach (double[] w in wfs) wfd = Math.Min(wfd, Math.Sqrt((w[0] - mx) * (w[0] - mx) + (w[1] - mz) * (w[1] - mz)));
+                if (wfd < 0.3) continue;
+                if (wfd < 2.6 && H32(cx, cz, 215) % 100 < 70)
+                {
+                    o.Add(At("env_reeds", mx + nx * 0.15, h - 0.06, mz + nz * 0.15, eyaw, "small_tall"));
+                    continue;
+                }
+                if (pd < PATH_W + 2.5 && H32(cx, cz, 211) % 100 < 7) o.Add(At("env_torch", mx + nx * 0.18, h - 0.1, mz + nz * 0.18, eyaw, "light"));
+                else if (pd < PATH_W + 3.0 && H32(cx / 3, cz / 3, 212) % 100 < 22) o.Add(At("env_fence", e.Px, h, e.Pz, eyaw, "dress_tall"));
+                else if (H32(cx, cz, 213) % 100 < 4) o.Add(At("env_bush_berry", mx + nx * 0.12, h - 0.04, mz + nz * 0.12, eyaw, "small_tall"));
+                else if (pd > PATH_W + 3.0 && H32(cx, cz, 219) % 100 < 6)
+                {
+                    string nm = V4Bones[H32(cx, cz, 224) % 3];
+                    double lx = mx + nx * 0.35, lz = mz + nz * 0.35;
+                    if (far(nm, lx, lz))
+                    {
+                        placed[nm].Add(new[] { lx, lz });
+                        o.Add(At(nm, lx, h - 0.12, lz, nm == "env_kaiju_statue" ? YawDir(nz, -nx) : H32(cx, cz, 225) % 360, "landmark"));
+                    }
+                }
+                else if (pd > PATH_W + 1.5 && !occ.Contains(Key(cx, cz)) && H32(cx, cz, 220) % 100 < 7)
+                {
+                    o.Add(At(V4Trees[H32(cx, cz, 223) % 3], mx - nx * 0.3, h, mz - nz * 0.3, H32(cx, cz, 226) % 360, "tree"));
+                    occ.Add(Key(cx, cz));
+                }
+                if (nx + nz > 0.1)
+                {
+                    uint r = H32(cx, cz, 214) % 100;
+                    if (r < 6)
+                    {
+                        double d = 1.8 + (H32(cx, cz, 216) % 100) / 100.0 * 1.4;
+                        double dy = 2.5 + (H32(cx, cz, 217) % 100) / 100.0 * 2.5;
+                        o.Add(At(r < 2 ? "env_float_chunk_m" : "env_float_chunk_s", mx + nx * d, h - dy, mz + nz * d, H32(cx, cz, 218) % 360, "sky"));
+                    }
+                }
+            }
+
+            // Fill triangles (void cells beside the rim).
+            foreach (int[] f in fl)
+            {
+                int cx = f[0], cz = f[1];
+                double xc = cx + 0.5, zc = cz + 0.5;
+                if (Keep(map, xc, zc) || occ.Contains(Key(cx, cz))) continue;
+                double h = flH[Key(cx, cz)];
+                double x = xc + f[2] * 0.12, z = zc + f[3] * 0.12;
+                double yaw = H32(cx, cz, 222) % 360;
+                double pd = PathDist(plan, xc, zc);
+                double dpad = padDist(xc, zc);
+                uint r = H32(cx, cz, 221) % 100;
+                if (pd < PATH_W + 3.0)
+                {
+                    if (r < 10) o.Add(At("env_lantern_post", x, h, z, yaw, "light"));
+                    else if (r < 16 && far("env_signpost", x, z))
+                    {
+                        placed["env_signpost"].Add(new[] { x, z });
+                        o.Add(At("env_signpost", x, h, z, 0.0, "dress_tall"));
+                        double[] tb = new[] { 56.0, 40.0 };
+                        double best = double.PositiveInfinity;
+                        foreach (double[] a in pads)
+                        {
+                            double d = Math.Sqrt((a[0] - x) * (a[0] - x) + (a[1] - z) * (a[1] - z));
+                            if (d < best) { best = d; tb = a; }
+                        }
+                        o.Add(At("env_sign_board_hill", x, h + 1.25, z, YawDir(56.0 - x, 40.0 - z), "dress_tall"));
+                        o.Add(At("env_sign_board_shrine", x, h + 1.02, z, YawDir(56.0 - x, 8.0 - z), "dress_tall"));
+                        o.Add(At("env_sign_board_base", x, h + 0.79, z, YawDir(tb[0] - x, tb[1] - z), "dress_tall"));
+                    }
+                    else if (r < 24) o.Add(At("env_banner_worship", x, h, z, yaw, "dress_tall"));
+                    else if (r < 28) o.Add(At("env_ruin_altar", x, h, z, yaw, "dress_tall"));
+                    else if (r < 34 && dpad < 16) o.Add(At("env_woodpile", x, h, z, yaw, "dress_tall"));
+                }
+                else
+                {
+                    if (r < 14) o.Add(At(V4Trees[H32(cx, cz, 223) % 3], x, h, z, yaw, "tree"));
+                    else if (r < 20) o.Add(At("env_bush_berry", x, h, z, yaw, "small_tall"));
+                    else if (r < 24 && far("env_kaiju_skull", x, z)) { placed["env_kaiju_skull"].Add(new[] { x, z }); o.Add(At("env_kaiju_skull", x, h, z, yaw, "landmark")); }
+                    else if (r < 29 && far("env_bone_ribs", x, z)) { placed["env_bone_ribs"].Add(new[] { x, z }); o.Add(At("env_bone_ribs", x, h, z, yaw, "dress_tall")); }
+                    else if (r < 31 && far("env_kaiju_statue", x, z))
+                    {
+                        placed["env_kaiju_statue"].Add(new[] { x, z });
+                        Grad(plan, xc, zc, out double gx, out double gz);
+                        o.Add(At("env_kaiju_statue", x, h, z, Math.Atan2(gx, -gz) * 180.0 / Math.PI, "landmark"));
+                    }
+                    else if (r < 36) o.Add(At("env_woodpile", x, h, z, yaw, "dress_tall"));
+                }
+                occ.Add(Key(cx, cz));
+            }
+
+            // Bridges: an anchor at both deck ends of every span (a deck tile's frame, one tile long, scaled w across).
+            foreach (double[] sp in spans)
+            {
+                double w = Math.Round(sp[9] / 1.5, 4);
+                double x0 = sp[0], z0 = sp[1], x1 = sp[2], z1 = sp[3], ha = sp[4], hb = sp[5], L = sp[6], ta = sp[7], tb = sp[8];
+                Func<double, double[]> pt = t => new[] { x0 + (x1 - x0) * t, ha + (hb - ha) * t, z0 + (z1 - z0) * t };
+                double dt = TILE / L;
+                WorldPlacement a0 = SpanTile(pt(ta), pt(ta + dt), w), a1 = SpanTile(pt(tb), pt(tb - dt), w);
+                a0.Piece = a1.Piece = "env_bridge_anchor";
+                o.Add(a0);
+                o.Add(a1);
+            }
+            // Deck tiles: 14 % of the inner tiles of each span become the damaged tile; a hanging lantern on every third.
+            for (int i = 0; i < before; i++)
+            {
+                WorldPlacement t = pl[i];
+                if (t.Piece != "env_bridge_span" || t.SpanB <= t.SpanA) continue;
+                int n = Mathf.Max(1, Mathf.RoundToInt(1f / (t.SpanB - t.SpanA)));
+                int k = Mathf.RoundToInt(t.SpanA * n);
+                if (k > 0 && k < n - 1 && H32((long)Math.Floor(t.SimX * 4), (long)Math.Floor(t.SimZ * 4), 241) % 100 < 14)
+                {
+                    t.Piece = "env_bridge_span_damaged";
+                    pl[i] = t;
+                    plan.DamagedSpans++;
+                }
+                if (k % 3 == 1)
+                {
+                    Vector3 X = t.Matrix.GetColumn(0), F = (Vector3)t.Matrix.GetColumn(2) * (float)TILE;
+                    double w = X.magnitude;
+                    double fx = F.x, fz = -F.z, ln = Math.Sqrt(fx * fx + fz * fz);
+                    if (ln == 0) ln = 1.0;
+                    fx /= ln;
+                    fz /= ln;
+                    o.Add(At("env_lantern_hang", t.SimX - fz * 1.31 * w + fx * 0.02, t.Y + 0.69, t.SimZ + fx * 1.31 * w + fz * 0.02, YawDir(fx, fz), "light"));
+                }
+            }
+            pl.AddRange(o);
+            plan.ClutterCount = o.Count;
         }
 
         static long Key(int x, int z) => ((long)x << 32) ^ (uint)z;
@@ -810,7 +1084,10 @@ namespace CriticalMass.Runtime.View.Dressing
                 for (int k = 0; k < n; k++)
                 {
                     double[] a = pt(ta + (tb - ta) * k / n), b = pt(ta + (tb - ta) * (k + 1) / n);
-                    o.Add(SpanTile(a, b, w));
+                    WorldPlacement tile = SpanTile(a, b, w);
+                    tile.SpanA = (float)k / n;
+                    tile.SpanB = (float)(k + 1) / n;
+                    o.Add(tile);
                 }
                 double ang = Math.Atan2(z1 - z0, x1 - x0), ox = -Math.Sin(ang), oz = Math.Cos(ang);
                 for (int side = -1; side <= 1; side += 2)

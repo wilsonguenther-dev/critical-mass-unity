@@ -26,6 +26,14 @@ namespace CriticalMass.Runtime.Onboarding
         public static bool? JumpOverride;
         public static bool? TerraformOverride;
 
+        /// <summary>
+        /// True while the full map is open; registered by the HUD's interact layer when it builds (null in headless runs,
+        /// which switches the map step off). 2026-11-12.
+        /// </summary>
+        public static Func<bool> MapOpenProbe;
+
+        public static bool HasMap() => MapOpenProbe != null;
+
         public static bool HasJump()
         {
             if (JumpOverride.HasValue) return JumpOverride.Value;
@@ -49,6 +57,7 @@ namespace CriticalMass.Runtime.Onboarding
             {
                 case TrialFeature.Jump: return HasJump();
                 case TrialFeature.Terraform: return HasTerraform();
+                case TrialFeature.Map: return HasMap();
                 default: return true;
             }
         }
@@ -64,6 +73,8 @@ namespace CriticalMass.Runtime.Onboarding
                 case TrialFeature.Terraform:
                     return "the sim does not expose dig and place yet (no World." + TerraformWorldField + " or SimEventType." +
                         TerraformEvent + "; DG-09 is not built)";
+                case TrialFeature.Map:
+                    return "no full map in this run (the HUD's interact layer is not installed)";
                 default: return "";
             }
         }

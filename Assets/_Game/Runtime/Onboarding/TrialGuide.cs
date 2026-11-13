@@ -43,6 +43,10 @@ namespace CriticalMass.Runtime.Onboarding
         bool _skipHoldFired;
         float _bob;
         int _lastDevice = -1;
+        float _stepSaidAt = -1f;
+        int _idleFace;   // 0 none yet, 1 thinking shown, 2 sleepy shown (per step line)
+        /// <summary>Seconds on one step line before the mascot looks thoughtful, then dozes (art landing, Hatch v1 extras).</summary>
+        public const float ThinkingAfterSeconds = 20f, SleepyAfterSeconds = 45f;
 
         static readonly string[] Metres = BuildMetres();
 
@@ -104,7 +108,8 @@ namespace CriticalMass.Runtime.Onboarding
         {
             Trial.RaiseStepEnded(Runner.Steps[i], how);
             if (how != TrialStepState.Done || _mascot == null) return;
-            _mascot.React(MascotReaction.Cheer);
+            // Alternate the two happy faces so a run of cheers does not repeat one portrait.
+            _mascot.React(_cheers % 2 == 0 ? MascotReaction.Cheer : MascotReaction.Laughing);
             _mascot.Say(MascotLines.CheerId(_cheers++));
             _cheerUntil = Time.unscaledTime + CheerSeconds;
         }
@@ -128,14 +133,17 @@ namespace CriticalMass.Runtime.Onboarding
             _mascot.SayText(TrialText.StepLine(s, dev));
             _mascot.SetHint(TrialText.Fill("{Skip}  SKIP STEP (HOLD: LEAVE)    {Toggle}  HIDE ME", dev));
             _mascot.React(MascotReaction.Point);
+            _stepSaidAt = Time.unscaledTime;
+            _idleFace = 0;
         }
 
         void SayDone()
         {
             if (_mascot == null) return;
             ControlDevice dev = ControlBindings.ActiveDevice;
-            _mascot.React(MascotReaction.Cheer);
             bool left = Runner.Count(TrialStepState.Done) == 0;
+            // Proud when the steps were done; thoughtful when the player left without doing any.
+            _mascot.React(left ? MascotReaction.Thinking : MascotReaction.Proud);
             _mascot.Say(left ? TrialText.Left : TrialText.Done);
             _mascot.SetHint(Trial.AfterTrial != null ? string.Empty : TrialText.Fill(MascotLines.Resolve(TrialText.DoneHint), dev));
         }
@@ -184,10 +192,30 @@ namespace CriticalMass.Runtime.Onboarding
                     SayStep();
                 }
                 else if (_lastDevice != (int)ControlBindings.ActiveDevice && _cheerUntil < 0f && me.Alive) SayStep();
+                else if (!paused && me.Alive && _cheerUntil < 0f && _stepSaidAt >= 0f) IdleFaces();
             }
             _wasAlive = me.Alive;
 
             UpdateArrow(w, me.Alive);
+        }
+
+        /// <summary>A long wait on one step: thinking (with a nudge) after ThinkingAfterSeconds, sleepy after SleepyAfterSeconds.
+        /// The next step line (or a respawn, or a device change) brings the pointing face back.</summary>
+        void IdleFaces()
+        {
+            float on = Time.unscaledTime - _stepSaidAt;
+            if (_idleFace < 1 && on >= ThinkingAfterSeconds)
+            {
+                _idleFace = 1;
+                _mascot.React(MascotReaction.Thinking);
+                _mascot.Say("mascot.thinking");
+            }
+            else if (_idleFace < 2 && on >= SleepyAfterSeconds)
+            {
+                _idleFace = 2;
+                _mascot.React(MascotReaction.Sleepy);
+                _mascot.Say("mascot.sleepy");
+            }
         }
 
         void ReadSkip(World w)
@@ -266,7 +294,7 @@ namespace CriticalMass.Runtime.Onboarding
             VectorShape arrow = MakeShape(_edgeArrow, "Arrow", ShapeKind.TriangleRight, 22f, 26f, CMTokens.Biomass.Color);
             arrow.RimPx = 0f;
             arrow.rectTransform.anchoredPosition = new Vector2(38f, 0f);
-            _edgeDist = HudText.Make(_edge, "Distance", CMTokens.Mono, 22, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 2.5f);
+            _edgeDist = HudText.Make(_edge, "Distance", CMTokens.Mono, UiScale.TypeBody, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 2.5f);
             RectTransform dr = _edgeDist.rectTransform;
             dr.anchorMin = dr.anchorMax = new Vector2(0.5f, 0.5f);
             dr.pivot = new Vector2(0.5f, 0.5f);

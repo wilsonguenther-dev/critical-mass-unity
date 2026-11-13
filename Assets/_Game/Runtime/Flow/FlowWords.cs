@@ -67,7 +67,7 @@ namespace CriticalMass.Runtime.Flow
 
         static readonly string[] FallbackRole =
         {
-            "Holds the hill.", "Feeds the egg.", "Opens the roads.", "Rewrites the map.", "Builds the way across.",
+            "Holds the hill.", "Feeds the egg.", "Opens the roads.", "Rewrites the map.", "Builds the way across.", "Keeps the line standing.",
         };
 
         static readonly string[,] FallbackAbility =
@@ -77,9 +77,10 @@ namespace CriticalMass.Runtime.Flow
             { "Pick Swing", "Barricade" },
             { "Blast", "Mine" },
             { "Hammer", "Ladder" },
+            { "Mend", "Healing Wings" },
         };
 
-        static readonly int[] FallbackDifficulty = { 1, 2, 2, 3, 3 };
+        static readonly int[] FallbackDifficulty = { 1, 2, 2, 3, 3, 2 };
 
         static ClassWords[] _classes;
         static ResultsFile _results;
@@ -189,7 +190,7 @@ namespace CriticalMass.Runtime.Flow
                     else if (a.input == "ability") ability = a.name;
                 }
             }
-            return (attack + "  ·  " + ability).ToUpperInvariant();
+            return attack + " · " + ability;   // integration batch 4: title case, one space each side: "PICK-HAMMER · BARRICADE" did not fit a 230 px card at 16 px
         }
 
         /// <summary>Difficulty 1..3.</summary>

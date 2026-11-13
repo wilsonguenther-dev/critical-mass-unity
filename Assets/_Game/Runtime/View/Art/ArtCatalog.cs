@@ -12,6 +12,12 @@ namespace CriticalMass.Runtime.View.Art
         public AnimationClip[] Clips = new AnimationClip[0];
         /// <summary>The painted face decal (ModelSpec.FaceTexture), or null.</summary>
         public Texture2D Face;
+        /// <summary>Expression atlases indexed by KaijuExpression (ModelSpec.Expressions), or empty.</summary>
+        public Texture2D[] Expressions = new Texture2D[0];
+
+        /// <summary>The atlas of an expression, or null when the model has none (callers fall back to Face).</summary>
+        public Texture2D Expression(int index) =>
+            Expressions != null && index >= 0 && index < Expressions.Length ? Expressions[index] : null;
 
         public AnimationClip Clip(string name)
         {

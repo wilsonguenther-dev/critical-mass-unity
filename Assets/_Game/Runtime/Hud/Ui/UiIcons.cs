@@ -44,6 +44,8 @@ namespace CriticalMass.Runtime.Hud.Ui
 
         public static readonly string[] Teams = { "azure", "crimson" };
         public static readonly string[] Classes = { "warrior", "farmer", "miner", "demolitions", "builder" };
+        /// <summary>Icon rows by ClassId: the Healer (DG-40) borrows the Farmer's support icons until its own art lands.</summary>
+        static readonly string[] GridClasses = { "warrior", "farmer", "miner", "demolitions", "builder", "farmer" };
         public static readonly string[] Crest = { "crest-azure", "crest-crimson" };
         public static readonly string[] Banner = { "map-banner-azure", "map-banner-crimson" };
         public static readonly string[] Heart = { "heart-azure", "heart-crimson" };
@@ -59,10 +61,10 @@ namespace CriticalMass.Runtime.Hud.Ui
 
         static string[,] Grid(string prefix)
         {
-            var a = new string[Classes.Length, Teams.Length];
-            for (int c = 0; c < Classes.Length; c++)
+            var a = new string[GridClasses.Length, Teams.Length];
+            for (int c = 0; c < GridClasses.Length; c++)
             for (int t = 0; t < Teams.Length; t++)
-                a[c, t] = prefix + Classes[c] + "-" + Teams[t];
+                a[c, t] = prefix + GridClasses[c] + "-" + Teams[t];
             return a;
         }
 

@@ -25,8 +25,29 @@ namespace CriticalMass.Sim.Core
             int teamIdx = team == TeamId.Azure ? 0 : 1;
             if (kind == CarryKind.Biomass)
             {
+                if (bio == BiomassType.Wood || bio == BiomassType.Water)
+                {
+                    // U-064: wood feeds a little less than plant; water feeds least but cools the egg (never under 0, never after the lock).
+                    SourcesConfig S = w.Config.Depth.Sources;
+                    bool water = bio == BiomassType.Water;
+                    m.Allegiance[team] += units * (water ? S.WaterAllegiancePerUnit : S.WoodAllegiancePerUnit) * MapEvents.FeedScale(w) * Roles.AllegianceScale(w, actorId, units); // U-070
+                    m.Delivered[(int)team].Biomass += units;
+                    if (water)
+                    {
+                        m.Delivered[(int)team].Water += units;
+                        if (!m.BerserkLocked) m.Instability = Math.Max(0, m.Instability - units * S.WaterCoolPerUnit);
+                    }
+                    else
+                    {
+                        m.Delivered[(int)team].Wood += units;
+                        m.Instability += units * feed.BiomassInstabilityPerUnit;
+                    }
+                    World.PushEvent(w, SimEventType.DeliverBiomass, actorId, teamIdx, sh.X, sh.Z, units, bio, DamageCause.None);
+                    if (m.Instability >= BerserkLine(w)) LockBerserk(w);
+                    return;
+                }
                 bool meat = bio == BiomassType.Meat;
-                m.Allegiance[team] += units * (meat ? feed.MeatAllegiancePerUnit : feed.BiomassAllegiancePerUnit);
+                m.Allegiance[team] += units * (meat ? feed.MeatAllegiancePerUnit : feed.BiomassAllegiancePerUnit) * MapEvents.FeedScale(w) * Roles.AllegianceScale(w, actorId, units); // U-068 egg exposed, U-070 Farmer / pass bonus (x 1 otherwise)
                 m.Delivered[(int)team].Biomass += units;
                 if (meat) m.Delivered[(int)team].Meat += units;
                 else m.Delivered[(int)team].Plant += units;
@@ -35,12 +56,40 @@ namespace CriticalMass.Sim.Core
             }
             else
             {
-                m.Allegiance[team] += units * feed.CorruptionAllegiancePerUnit;
+                m.Allegiance[team] += units * feed.CorruptionAllegiancePerUnit * MapEvents.FeedScale(w);
                 m.Instability += units * feed.CorruptionInstabilityPerUnit;
                 m.Delivered[(int)team].Corruption += units;
                 World.PushEvent(w, SimEventType.DeliverCorruption, actorId, teamIdx, sh.X, sh.Z, units);
             }
-            if (m.Instability >= feed.BerserkThreshold) LockBerserk(w);
+            if (m.Instability >= BerserkLine(w)) LockBerserk(w);
+        }
+
+        /// <summary>
+        /// DG-41: the instability that locks berserk this match. KaijuFeed.BerserkThreshold unless KaijuFeed.RandomBerserk; then
+        /// u^2 x BerserkCurveMax with u = SeedUniform(seed) in [0, 1), fixed for the whole match and never drawn from the shared
+        /// RNG (P(line &lt;= I) = sqrt(I / BerserkCurveMax)). Pure function of the seed and config.
+        /// </summary>
+        public static double BerserkLine(World w)
+        {
+            KaijuFeedConfig feed = w.Config.KaijuFeed;
+            if (!feed.RandomBerserk) return feed.BerserkThreshold;
+            double u = SeedUniform(w.Opts.Seed);
+            return u * u * feed.BerserkCurveMax;
+        }
+
+        /// <summary>DG-41: a uniform value in [0, 1) from a match seed (a stateless integer hash; the same seed always gives the same value).</summary>
+        public static double SeedUniform(int seed)
+        {
+            unchecked
+            {
+                uint h = (uint)seed * 0x9E3779B1u + 0x7F4A7C15u;
+                h ^= h >> 16;
+                h *= 0x85EBCA6Bu;
+                h ^= h >> 13;
+                h *= 0xC2B2AE35u;
+                h ^= h >> 16;
+                return (h >> 8) / 16777216.0;
+            }
         }
 
         /// <summary>CM-28: set the berserk lock and raise the one BerserkLocked event of the match; false (and nothing pushed) when the lock was already set.</summary>
@@ -102,6 +151,7 @@ namespace CriticalMass.Sim.Core
                 ResourceNode n = nodes[i];
                 if (n.Charges <= 0) continue;
                 if (a.Carry != CarryKind.None && a.Carry != CarryOf(n.Kind)) continue;
+                if (n.Kind == NodeKind.Corruption && !Roles.MayCorrupt(w, a.Cls)) continue; // U-063: only raiders take corruption
                 double dx = n.X - x;
                 double dz = n.Z - z;
                 double d2 = dx * dx + dz * dz;
@@ -192,6 +242,7 @@ namespace CriticalMass.Sim.Core
                 Actor a = w.Actors[id];
                 // CM-35: Damage empties the cargo at death and the meat load goes with it; after the hatch meat feeds nothing.
                 if (!a.Alive || !egg) a.CarryMeat = 0;
+                if (a.CarryAmount <= 0 && a.CarryMeat <= 0) w.Depth.PassUnits[id] = 0; // U-070: a pass bonus never outlives its load
                 if (liveOrbs > 0 && egg && a.Alive && a.MeatPickup && a.StandUp <= 0) PickUpMeat(w, id);
                 if (!a.Alive || a.StandUp > 0 || !w.Inputs[id].Interact)
                 {
@@ -210,18 +261,34 @@ namespace CriticalMass.Sim.Core
                     {
                         a.GatherProgress = 0;
                         a.GatherNodeId = -1;
+                        // U-063 class roles: only a feeder hands in biomass, only a raider corruption. A load the shrine will
+                        // not take stays with the carrier: no wind-up, one DeliverRefused event. (Rule off: both always true.)
+                        bool cargoOk = a.CarryAmount > 0 && Roles.MayDeliver(w, a, a.Carry);
+                        bool meatOk = a.CarryMeat > 0 && Roles.MayFeed(w, a.Cls);
+                        if (!cargoOk && !meatOk)
+                        {
+                            Delivery.CancelDelivery(a);
+                            Roles.Refuse(w, id, a.CarryAmount > 0 && a.Carry == CarryKind.Corruption ? Roles.RefusedNotRaider : Roles.RefusedNotFeeder, a.CarryAmount + a.CarryMeat);
+                            continue;
+                        }
                         // CM-64: the wind-up; the load goes in only on the pass it completes.
                         if (!Delivery.StepDeliveryWindup(w, a)) continue;
                         Delivery.CancelDelivery(a);
-                        if (a.CarryAmount > 0)
+                        if (cargoOk)
                         {
                             if (a.Carry == CarryKind.Corruption) ApplyDelivery(w, a.Team, CarryKind.Corruption, a.CarryAmount, id);
-                            else ApplyDelivery(w, a.Team, CarryKind.Biomass, a.CarryAmount, id, BiomassType.Plant);
+                            else ApplyDelivery(w, a.Team, CarryKind.Biomass, a.CarryAmount, id, Roles.BioOf(a.Carry));
                         }
-                        if (a.CarryMeat > 0) ApplyDelivery(w, a.Team, CarryKind.Biomass, a.CarryMeat, id, BiomassType.Meat);
-                        a.Carry = CarryKind.None;
-                        a.CarryAmount = 0;
-                        a.CarryMeat = 0;
+                        if (cargoOk || a.CarryAmount <= 0)
+                        {
+                            a.Carry = CarryKind.None;
+                            a.CarryAmount = 0;
+                        }
+                        if (meatOk)
+                        {
+                            ApplyDelivery(w, a.Team, CarryKind.Biomass, a.CarryMeat, id, BiomassType.Meat);
+                            a.CarryMeat = 0;
+                        }
                         continue;
                     }
                 }

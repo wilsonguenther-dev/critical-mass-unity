@@ -1032,3 +1032,362 @@ ceiling that the cleanse can reach. **Measured** (CM-36 driver, 5v5 seeds 1..100
 
 Berserk stays inside the CM-34 band [10, 50]. Pure bots still never cleanse; only the autopilot slot does.
 
+
+## U-058 Bot difficulty as built in DG-21: Easy, Normal, Hard (not in the browser) (2026-11-13T02:15:17Z)
+
+**Why.** The browser has no bot difficulty (git grep on 09e0904 and every cm/* branch finds none), so the rule is ours: the
+smallest one that meets row DG-21 (reaction delay, aim error, ability use, target choice, objective discipline).
+**Rule.** `WorldOptions.BotDifficulty` sets the bots of the team the human does not play (what match setup's "Bot
+difficulty" sets); `WorldOptions.AllyBotDifficulty` sets the human's own team (default Normal; the menu leaves it).
+Normal has no profile: every call site keeps the browser code path, so a Normal match is the browser match bit for bit
+(four golden state hashes taken on 798fa11 before any DG-21 code, test `DG21NormalIsTodaysBotsBitForBitOnTheGoldenSeeds`).
+Easy and Hard read `Bots.Easy` / `Bots.Hard` (`BotSkillConfig`). Every roll is a stateless hash of seed, actor, a salt and a
+tick bucket (`BotSkill.Roll`): no shared bot RNG draw moves.
+
+| Lever | Easy | Normal | Hard |
+| --- | --- | --- | --- |
+| Reaction: think period (ticks at 30 Hz) | 12 | 8 | 4 |
+| Aim error on roots and TNT (units, disc) | 1.5 | 0 | 0 |
+| TNT lead on a moving enemy (x velocity x fuse) | 0 | 0 | 0.6 |
+| Swing held in this share of 1/3 s windows | 0.4 | 0 | 0 |
+| Chance a decided ability press is sent per think | 0.5 | 1 | 1 |
+| Warrior shield: enemies within 3 | 3 | 2 | 1 |
+| Target choice | nearest | nearest | carriers x0.25 on d2, hurt enemies first |
+| Off-hill chase factor while holding | 1 | 0.5 | 0.25 |
+| Retreat when hurt and an enemy is within | 6 | 6 | 3 |
+
+**Measured** (5v5, CreateBrowser5v5, whole matches, actor 0 on autopilot). Hard vs Easy: Hard wins 20 of 20 as Azure and
+20 of 20 as Crimson (floor 14 of 20). The human proxy (Normal allies) wins 20/20 against Easy, 11/20 against Normal, 5/20
+against Hard. Hard was tuned on 30 seeds: the first cut (think 6, chase 0.35, retreat 8) won only as often as Normal (18 vs
+19 of 30); the faster think, the tighter hill discipline and the shield at one enemy each mattered (10 of 30 with all three).
+
+## U-059 The Demolitions Expert as built in DG-22: TNT and mines, ported from CM-38 with view events (2026-11-13T02:24:16Z)
+
+**Source.** The browser's Demolitions sim is on 09e0904 itself (cm/CM-38 is an ancestor: `src/sim/demolitions.ts`, D-068),
+so the rules are a port: mine on Space (place range 1.6, arms after 15 ticks, lives 1800, first grounded unprotected enemy
+in its cell triggers it, 70 damage within 1.2, two per owner and the oldest recycles, pad keep-outs), TNT on the DigPlace
+binding (F; Y on a controller) on the rising edge (range 5, 45-tick fuse, 55 damage within 2, own 150-tick cooldown), no
+regular attack, enemy barricades hit, breakable walls in the radius destroyed, and a crater of Floor / Bridge cells within 1
+(placed ground is Floor) decided cell by cell by the CM-30 dig rules (keep-outs, actors on the cell, the route guard) and
+refused inside the CM-30 world gap. Bots: the CM-38 `decideDemolitions` rule (TNT at the enemy or the centroid in range,
+else a mine on its own cell while holding the hill or fighting near it). The browser's six CM-38 unit cases are ported.
+**Departures (ours, flagged in the PR).**
+1. State is a World field (`World.Demolitions`, fixed pools, reset in `InitWorld`), the Unity pattern, not a side table.
+2. View events (appended before the CM-84 marker, `SimEvent.Radius` appended, nothing reordered): MinePlaced, MineArmed,
+   MineTriggered, MineRemoved (expired, ground gone, recycled), TntThrown, TntLanded, Explosion (B = mine or TNT, Value =
+   actors hurt). The browser's Ability events (cast, refusal codes, blasts with A = -1) are kept as they were.
+3. TNT touches down `DemolitionsTnt.FlightTicks` = 12 ticks after the throw (TntLanded) [guess: 0.4 s]; the fuse still
+   counts from the throw, so the blast tick is the browser's.
+4. Blast damage goes through `Damage.ApplyDamage(..., DamageCause.Explosion)`; a bot's blast respects the DG-16 passive
+   window like its swing; an exhausted bomb pool is counted (`Stats.PoolRefusals`), not logged.
+5. Difficulty (U-058) in the bot rule: Hard leads a moving target by 0.6 x velocity x fuse; Easy throws up to 1.5 units off
+   and only on half its thinks. Normal is the browser rule.
+6. The default bot ClassMix keeps Demolitions at 0, so default matches (and every existing outcome band, including the
+   passive-team sweep that has no margin) are unchanged. Bots play the class whenever a config gives it a share; the soak
+   uses 3 of 16 per team (the browser soak's count). Turning it on by default is the owner's call after the integrator's
+   soak: in the 16v16 soak (seed 101, 3 per team) the six Demolitions bots score 144 blast knock-outs to 109 deaths at
+   Normal, the most lethal class per head, so a damage or cooldown pass may be wanted first.
+7. On-screen names live in one place, `DemolitionsNames` (MINE, TNT, DEMOLITIONS); GameHud's AbilityNames should read them.
+
+## U-060 Builder ladders and rope bridges as built in DG-24: temporary, paid from a team bank, carried by any class (not in the browser) (2026-11-13T02:43:02Z)
+
+**Source.** The oracle (09e0904 and every branch) has no ladder or bridge piece: its only Builder code is cm/CM-39
+`upgrade.ts` (spend team biomass to raise an ally's class level), which this item does not port (the station / upgrade half
+of row DG-24 is still open). So the rule is ours, the smallest one that satisfies Travis 2026-11-06 ("Build temporary
+ladders/bridges with biomass / Ladders/bridges movable by all classes") and the Nov 4 call ("ladders to get from different
+elevation levels ... rope bridges"). On this grid a cliff is a Wall cell and a gap is Void or Water, so:
+1. **BUILD (Space, Builder).** Along the cardinal axis nearest the aim (no aim: facing), the first blocked cell within 2 of
+   the Builder's cell decides: a Wall run up to 2 long makes a LADDER (1 biomass), a Void / Water run up to 6 long a ROPE
+   BRIDGE (2 biomass); the next cell must be walkable (the landing). 3 lanes wide (Topple.WidthCells), centred on that line;
+   every cell of the kind's type in that rectangle becomes Cell.Bridge through `MapGrid.SetCell`. Refused (Ability event with
+   a code, Space locked 0.5 s): nothing to span, too long, breakable / barricade in the way, shrine keep-out, map edge, the
+   Builder's 2 pieces already out, bank short, the CM-30 world gap. Class row unchanged (the CM-56 miner copy: mallet swing).
+2. **BANK.** StartBiomass 2 + the team's delivered biomass - what it spent. Spending never changes allegiance, instability or
+   the hatch (the CM-39 bank idea, read from Delivered instead of a new MatchState field).
+3. **TEMPORARY.** 60 s from the build, carried time included; PieceCrumbling 3 s before. A cell that stops being Bridge (dug,
+   cratered) breaks the piece (PieceDestroyed). Taking a piece away (expiry, break, lift) only reverts cells still Bridge, and
+   only when nobody (or the hatched Kaiju, or a barricade) is on them, the world gap has run out and the ROUTE GUARD passes
+   (`Terraform.CellsKeepRoutes`); otherwise it retries every tick. So a piece never leaves anyone in a wall or over the void,
+   and never seals a base from the hill: a piece that became the only route stays until another route exists.
+4. **CARRY (Interact, any class of the team).** Empty-handed and outside a node's / the shrine's interact range (where E
+   gathers and delivers), within 1.0 + radius of a piece cell: lift it (same safety checks). The next press puts it down in
+   front by the build rule of its kind (no cost, no cooldown). A carrier that dies drops it: gone. Bots never carry.
+5. **Bots.** A Builder bot on its way to the hill (ToHill, Unstick) or the shrine (Deliver, Corrupt) builds the accepted
+   piece whose landing is at least 2 cells closer by its team flow field. Skybreak Basin is well connected, so this is rare:
+   1 ladder per Builder-heavy 16v16 match at Normal and at Hard (seed 101); Builders stay out of the default ClassMix.
+6. View events (appended before the CM-84 marker): PiecePlaced, PieceCrumbling, PieceExpired (expired / dropped / broken),
+   PieceDestroyed, PiecePickedUp, each with a position and Radius = half the length; live state in `World.Builder.Pieces`.
+7. Names in one place: `BuilderNames` (BUILDER, BUILD, LADDER, ROPE BRIDGE, CARRY).
+
+## U-061 The Healer class as built in DG-40: mend, healing pulse, purify; no weapon (not in the browser) (2026-11-13T02:50:20Z)
+
+**Source.** The oracle has no Healer on any branch (its only heal is the CM-37 fountain, its only corruption removal the
+CM-36 shrine cleanse; cm/CM-36 `cleanse.ts` names "healer special" as the idea it chose not to build). Travis 2026-11-06:
+"Healer / Heal / Remove corruption"; "A way to remove corruption (healer special or something else)". Art direction: an
+armoured battle healer with wings and NO sword; she heals and supports. So the rules are ours, the smallest set that gives
+both of Travis's words a button on the bindings already on main:
+1. **ClassId.Healer = 5, appended** (every ClassPick index stays valid), class row MaxHp 110, speed 4.1, radius 0.42,
+   AttackDamage 0, AttackRange 4.5 (where bots stop from the fight), AttackCooldown 0.8, AbilityCooldown 9. Default
+   ClassMix 0: not in the default bot lineup.
+2. **MEND (attack).** No damage ever: the press heals the hurt ally (not herself) within 5.5 nearest the aim, 6 HP. No
+   target, no cooldown. Not an attack, so spawn protection stays.
+3. **HEALING WINGS (Space).** 30 HP to every ally within 3.5 of the aim (pulled back to 6), herself included.
+4. **PURIFY (DigPlace, F / Y).** Within 4 of the shrine, while `Cleanse.CleanseOpen` and corruption is in the egg: one
+   corruption unit removed at once (9 instability, the CM-36 units-to-instability rule), counted as cleansed
+   (`Cleanse.NetCorruptionUnits` subtracts `World.Healer.PurifiedUnits`, 0 without Healers, so CM-36 is unchanged); own
+   30 s cooldown, the team cleanse cooldown untouched. Refusals push an Ability event with a code.
+5. **Bots.** Attack presses come from the usual steering (she mends the hurt ally nearest the enemy she faces). Purify when
+   possible and her team is not behind in allegiance (or instability is at half the threshold). Pulse on the hurt ally
+   whose radius holds the most missing HP, when that is a full pulse or someone there is under a third of max HP. DG-21
+   Easy acts on half its thinks.
+6. Events (appended before the CM-84 marker): HealCast (mend / pulse, with position and pulse radius), HealLanded (per
+   actor), Purify (shrine, radius). Names in one place: `HealerNames` (HEALER, MEND, HEALING WINGS, PURIFY).
+7. **Tuning, measured.** First cut (mend 9, pulse 40): a team with three Healers in place of three Warriors beat the default
+   lineup 13 of 16; at mend 6, pulse 30: 10 of 16 (control, no swap: 8 of 16; three Miners: 3 of 16; three Builders: 0 of 16).
+   Shields and revives were not added. The CM-54 class switch (CM-84 markers) is still unported.
+
+## U-062 Random berserk line on a square-root curve as built in DG-41, off by default (not in the browser) (2026-11-13T02:58:16Z)
+
+**Source.** No branch of the oracle has it (its lock is `instability >= berserkThreshold`, 100). Travis 2026-11-06:
+"Corruption berserk threshold should be random, but affected by deposited corruption on a parabolic curve (y=√x)".
+1. **Rule.** With `KaijuFeed.RandomBerserk` the line that locks berserk is u² x `BerserkCurveMax`, u uniform in [0, 1) from
+   a stateless hash of the match seed (`SimResources.SeedUniform`, never the shared RNG), fixed for the match. So the chance
+   that instability I has locked berserk is √(I / BerserkCurveMax): y = √x, x being the corruption deposited (instability).
+   Every lock check (delivery, the Kaiju step, the debug feed) reads `SimResources.BerserkLine`.
+2. **Off by default.** It changes match outcomes, so on it would move the golden Normal hashes (U-058) and every berserk band;
+   the owner turns it on. Measured on 100 whole 5v5 matches (seeds 1..100, shipped config): fixed threshold 0.19 berserk
+   share; random line with curve top 160: 0.68, 250: 0.51, **800 (shipped): 0.30**, 1200: 0.23 (CM-34 band 0.10 to 0.50).
+3. The HUD's instability bar (Runtime/Hud/HudState.cs line 95) still draws against BerserkThreshold; with the rule on, the
+   view should hide the line (it is a secret roll) or show the √ chance instead. Not changed here (rules lane only).
+
+## U-063 Class roles made real: only Farmers feed the egg, only raiders carry corruption, everyone else hands off or escorts (our rule) (2026-11-13T04:22:24Z)
+
+**Source.** Our rule. No branch of the oracle restricts who feeds. The owner after playing: "the warriors are feeding the
+eggs, it's not even proper". Travis names the classes and their jobs, not who may feed.
+0. **The classic switch.** Every rule of U-063..U-068 sits behind `GameConfig.Depth.Classic`. `CreateBrowser5v5()` sets it
+   true (the game as it was: the DG-21 golden hashes and every older test are unchanged); `CreateDefault()`, which the game
+   runs, leaves the rules on. Each rule also has its own `Enabled`. Numbers: `Sim/Config/DepthConfig.cs`, one block per rule.
+1. **Feed.** Only a class in `Roles.MayFeed` (the Farmer) hands plant, meat, wood or water to the egg. Any class may gather
+   and carry it; a carrier that may not feed presses interact beside an allied Farmer to hand it over (`Handoff` event) or
+   banks it at its base (U-064). At the shrine it keeps its load and gets one `DeliverRefused` event per 45 ticks.
+2. **Corrupt.** Only Warrior, Miner and Demolitions (`Roles.MayCorrupt`) gather, carry and deliver corruption.
+3. **Bots obey.** Lineup with the rules on (`Roles.ClassMix`), at 16: 5 Warriors, 4 Farmers, 2 Miners, 2 Demolitions,
+   1 Builder, 2 Healers. Only Farmers gather and deliver; only raiders run corruption; an egg-duty bot that may do neither
+   escorts the nearest allied carrier (`AiState.Escort`) and still intercepts enemy carriers.
+4. **Small teams.** A team of 8 or fewer uses `Roles.SmallTeamClassMix` (at 5: 2 Warriors, Farmer, Miner, Healer); one
+   of each class left a five with a single Warrior and two classes with no weapon.
+5. **Measured** (seed 7, 16v16, first 3 minutes, all rules on): 37 feed events, all by Farmers; 46 and 52 units delivered;
+   1 unit of corruption (bots rarely raid with the rule on: see the owner question in the PR).
+6. **The idle-player check, measured.** Classic rules (D-030, unchanged by this lane): the idle player's team wins 37 of
+   200 5v5 seeds, before and after. With U-063..U-068 on: **20 of 200 (0.10), under the 0.15 floor.** Class roles are the
+   cause (roles alone 9 of 100, each other rule alone 14 to 23 of 100, classic 17 of 100 on the same seeds): with roles an
+   idle seat is a missing specialist. Tried and measured worse: one of each class (16), two Farmers and no Healer (0),
+   escorts off (1), egg duty capped to Farmers (0), non-feeders carrying food to Farmers (11). `DepthSoakTests` reports
+   the number with a 0.06 collapse floor. Whether 0.10 is acceptable at 5v5 is the owner's call.
+
+## U-064 Biomass sources as built for DG-42: wood groves and water springs, a team stock at the base, supply bots (our rule) (2026-11-13T04:22:24Z)
+
+**Source.** Our rule from Travis 2026-11-06, "Biomass sources / Meat / Wood / Water / Corruption". The browser has plant,
+meat and corruption only.
+1. **On the map.** 6 wood groves and 5 water springs, mirrored, on open floor both pads can walk to (`Sources.Place`).
+   Hold interact beside one to gather: class gather time x the class scale (Builder and Miner chop in half the time, the
+   Healer draws water in two thirds). A hit restarts the gather. Wood: 4 charges, one back per 20 s. Water: 3, one per 15 s.
+2. **Carry.** `CarryKind.Wood` / `Water` (appended) ride in the class cargo, one kind at a time.
+3. **Spend, two ways.** Feed: wood 7 allegiance a unit, water 4 and each unit cools the egg by 3 instability (never below
+   0, never after the berserk lock). Bank: a press of interact within 4.5 of the own pad puts the load in the team stock
+   (wood, water, food). Banked wood pays Builder pieces first (U-060) and pays upgrades (U-065) and bridge repairs (U-068);
+   a Farmer with empty hands takes food back out.
+4. **Bots.** Before the hatch floor(team x 0.125) bots of Builder, Miner, Demolitions run supply (16: 2 a team, 5: none).
+5. **Measured** (seed 7, 16v16, 3 minutes): 30 wood and 8 water gathered, 38 units banked, at most 2 supply bots a team.
+
+## U-065 Base stations: live class switching at the base (CM-54 ported into the CM-84 markers) and Builder-bought class upgrades (CM-39 ladder ported, paid our way) (2026-11-13T04:22:24Z)
+
+**Source.** Ported: cm/CM-54 (switch cooldown 150 ticks, `classSwitches` counter, 'classSwitch' event codes Accepted 0 /
+Cooldown 1 / Alive 2) and cm/CM-39 `upgrade.ts` (linear ladder, cost 3 then 5, +15% then +30% max HP, refusal codes -2
+max level and -3 cannot pay). Ours: switching while alive, team-wide class levels, paying in wood and water at the base.
+Travis: "Builder / Build class upgrades with biomass".
+1. **Station.** Each team's station is its base zone (4.5 of the pad). Names in `StationNames`.
+2. **Live switch.** A class pick by a living, grounded actor in its station changes its class at once: load banked (or
+   dropped), health share kept, ability locked 3 s, 150 ticks before the next switch. Away from the station the pick is
+   refused (`ClassSwitch` code Alive), as in CM-54. A dead actor's pick queues for the respawn, now with the cooldown.
+3. **Upgrades.** A living Builder in its station sends `InputFrame.StationBuy` = class index + 1: that class's level rises
+   for the whole team for the match. Level 2: 3 wood + 1 water, +15% max HP. Level 3: 5 wood + 2 water, +30%. Living
+   members gain the HP at once; later respawns start with it. One `Upgrade` event per attempt (new level or a refusal code).
+4. **Bots.** A Builder bot in its station buys the affordable level for the class with most living teammates. Bots do not switch.
+5. **Measured** (seed 7, 16v16, about 4 minutes): 10 upgrades bought by bots across both teams from 33 wood and 13 water.
+
+## U-066 Pickups and drops: coins from knock-outs and map piles, Haste / Might / Ward with counters, a seed-fixed spawner (our rule) (2026-11-13T04:22:24Z)
+
+**Source.** Our rule for DG-39 (the owner: "the skill points, the coins collected, drop item, everything"). Not in the browser.
+1. **Coins.** A knocked-out actor leaves 3 coins where it fell for 20 s, for anyone. 10 map piles of 5 (mirrored spots),
+   back 30 s after being taken. Walking over adds to `Actor.CoinsPicked` (Runtime's MatchRewardTracker marker reads it).
+2. **Power-ups**, one at a time per actor. HASTE: move x 1.3 for 10 s; a Farmer's roots strip it. MIGHT: melee x 1.5 for
+   10 s; shields still cut it. WARD: soaks the next 60 damage for 15 s; any explosion goes through and breaks it. A
+   knocked-out carrier drops its power-up with the time left (2 s or more) for 15 s.
+3. **Spawner.** From 20 s, every 45 s, one power-up on one of 4 centre-line spots, chosen by a stateless hash of the seed
+   (never the shared RNG), announced 5 s before it can be taken, gone 30 s later. Fixed pool of 96; the oldest drop is recycled.
+4. **Bots** take what they walk over and go for a power-up within 9 units in line of sight.
+5. **Measured** (seed 7, 16v16, 3 minutes): 445 coins picked up, 4 power-ups spawned, 3 taken, 0 pool recycles.
+
+## U-067 Pings the bots answer, bots that call their own, named bots with play styles (our rule, to the HUD lane's spec) (2026-11-13T04:22:24Z)
+
+**Source.** Our rule: the unbuilt half of DG-21, written to the spec in `Runtime/Hud/Interact/Pings.cs`. Not in the browser.
+1. **Input.** `InputFrame.PingKind` = call + 1 (Attack 0, On my way 1, Defend 2, Help 3: the HUD's wheel order) with
+   `PingX` / `PingZ`, for one tick. The sim accepts 3 per actor per 150 ticks (`Ping` event) and refuses the rest (`PingRefused`).
+2. **Who answers.** Living bots of the caller's team within 40 units, nearest first, at most 3 for Attack and Defend, 2
+   for Help, none for On my way. Never a bot that carries something, already has an order, or holds the hill with fewer
+   than 2 teammates on it; a class with no weapon never answers Attack or Help. Each answer pushes `PingAnswered`.
+3. **What they do.** Attack: fight the nearest enemy within 8 of the ping, else walk there; over when the spot is clear or
+   after 12 s. Defend: hold within 5 of the ping for 12 s. Help: go to the caller and fight its last attacker for 8 s.
+   A bot below the retreat line drops the order. Obeyed on the ping's own tick (`AiState.Order`).
+4. **Bots call too.** Under 35% health with an enemy on it: Help. Fighting an enemy carrier before the hatch: Attack.
+   One call per bot per 20 s, one per team per 8 s, one answerer per bot call.
+5. **Names and styles.** `BotNames.NameOf(world, id)`: 37 names, unique in a match, fixed by seed and slot.
+   `BotNames.StyleOf`: Brawler, Guard, Harvester, Sapper, from the class (40% of Warriors are Guards). A style scales how
+   readily the bot fights (1.15 / 0.95 / 0.8 / 1) and which calls it answers first.
+6. **Measured** (seed 7, 16v16, 3 minutes): bots made 36 Help and 3 Attack calls, 39 answers; a player's Attack ping drew
+   3 answers on its tick; same seed and same ping ticks give the same world hash.
+
+## U-068 Map events: contested supply drop, egg exposed, bridge collapse and Builder repair (our rule) (2026-11-13T04:22:24Z)
+
+**Source.** Our rule. Not in the browser.
+1. **Schedule.** First event at 50 s, one every 60 s. The three kinds rotate from a start fixed by the seed (stateless
+   hash). A kind that cannot run (egg hatched, a bridge already down, no safe span) becomes a supply drop.
+2. **Supply drop.** Announced 8 s ahead on a centre-line spot, then lands. A team claims it by standing within 2.5 for 3 s
+   with no enemy there (contested: nobody's clock runs). Reward: 4 wood and 2 water to the team stock, 10 coins to the
+   claimer, a power-up on the spot. Gone after 30 s unclaimed.
+3. **Egg exposed.** For 20 s every delivery, food or corruption, counts double toward allegiance. Ends at the hatch.
+4. **Bridge collapse.** One span is announced 8 s ahead, then its middle third falls; anyone on it falls and climbs out
+   unhurt (the DG-09 fall rule). Never a span whose loss cuts a base from the hill or the shrine (the CM-30 route guard,
+   re-checked at the collapse). A Builder holding interact within 3 of a broken end for 3 s rebuilds it for 2 wood from
+   the team stock; otherwise it rebuilds itself after 45 s. Bots do not repair (the timer does).
+5. **Events.** SupplyDropIncoming / Landed / Contest / Claimed / Expired, EggExposed / EggExposedEnded, BridgeWarning /
+   BridgeCollapsed / BridgeRepaired, each with a position. Announcer lines in `MapEventNames`.
+6. **Measured** (seed 7, 16v16, 4 minutes): 4 events, 1 drop claimed by bots, 1 egg window, 2 bridges down, 1 back; both
+   pads still reach the hill at the end. All 16 event numbers find a span that passes the route guard.
+
+## U-069 Rules combined: sim physics plus mechanics depth on one branch, one rules switch (our rule) (2026-11-13T05:57:05Z)
+
+**Source.** Integrator decision. Supersedes the separate drafts #49 (feat/sim-physics) and #58 (feat/mechanics-depth).
+1. **Merge order.** Physics events first, exactly as pinned by #49, then the mechanics events, all before the CM-84
+   marker; new `SimEvent` and `Actor` fields at the end in the same order; enum members appended only.
+2. **One switch.** `GameConfig.ApplyRules(RulesProfile)`: `Classic` = browser parity (every physics rule off, instant hits,
+   every depth rule off, pace 2x), `PhysicsOnly` = physics on, depth off (the test config, `CreateBrowser5v5`), `Full` =
+   everything on (`CreateDefault`, the game). `GameConfig.CreateClassic()` and `GameConfig.Rules` read it back.
+   `PhysicsConfig.Classic` and `DepthConfig.Classic` stay as the two lane switches underneath.
+3. **Composition.** Might scales the physics wind-up swing (fair hits included); Haste multiplies with the swing
+   multiplier; every mechanics `*Ticks` read goes through `Durations.T30` (the DG-68 one-time-unit scan).
+4. **Goldens per profile** (`GoldenHashesOfTheNewDefaultAreStable`): Classic equals the DG-21 goldens bit for bit at pace 2x.
+
+## U-071 Allies walking into each other pass instead of jamming (fixes the DG-22 Demolitions soak stall) (our rule) (2026-11-13T05:57:05Z)
+
+**Source.** Our rule (physics lane). Trace of the #49 red: a Crimson bot in Retreat at (64.1, 41.5) walking east along a
+one-cell corridor while three Crimson allies in Fight walked west through it. Teammates pushed each other at half
+strength, so the retreating bot was shoved back every tick and stood 96 ticks (limit 90). Not a Kaiju or wall-corner case.
+1. **Rule.** In the relaxed separation, a bot in Retreat and a teammate whose input direction points into it (dot product
+   under `PhysicsConfig.AllyPassDot` = -0.3) do not push at all (`AllyPassOpposing`, on). Everyone else pushes as before.
+   The 90-tick limit is unchanged. Rejected: every opposing ally pair passing (fixed the stall but cost the D-030 passive
+   check 39 -> 21 of 200 and the berserk share 0.14 -> 0.10).
+2. **Measured.** DG-22 worst still: Easy 58, Normal 58, Hard 61 ticks (was 96 on Normal in #49).
+
+## U-070 Every class feeds the egg; the Farmer is the best at it (owner decision, supersedes U-063's Farmers-only feeding) (2026-11-13T06:12:27Z)
+
+**Source.** Owner decision 2026-11-12: the game's creator never restricted feeding and the browser lets anyone feed.
+Supersedes U-063 item "only Farmers feed" and the small-team relaxation variants the integrator was asked to test first
+(dropped: no longer needed).
+1. **Rule.** `RolesConfig.MayFeed` is true for all six classes at every team size: no `DeliverRefused` with the defaults.
+2. **The Farmer is the best feeder** (`RolesConfig.BestFeeder`): its browser stats already carry 3 a trip (others 1, Healer
+   2) and gather in 1 s (others 1.5 to 2 s); on top, its deliveries count `BestFeederBonus` = 0.25 extra allegiance.
+   Measured on 200 + 200 idle-player seeds and 100 CM-64 seeds: bonus 0, 0.25 and 0.5 gave the same bands within one
+   seed (5v5 idle 2 / 2 / 3 of 200 before U-072), so the mildest value that still makes the Farmer's unit worth more was taken.
+   Farmers deliver 0.73 of all food with the rules on (every class delivers the rest).
+3. **Optional plays.** A non-Farmer pressing interact beside an allied Farmer hands its food over (`Handoff`); food taken
+   out of the team stock is the same. Those units pay `PassBonus` = 0.1 extra once, on the delivery (`DepthState.PassUnits`);
+   a deposit pays nothing, so a bank-and-withdraw loop earns nothing.
+4. **Bots.** Every class delivers food it holds when full, when no node is near, or within `DeliverNearShrine` = 10 of the
+   shrine; a Farmer bot's gather utility is scaled by `BestFeederGatherBias` = 1.25. Escorts only exist when a config turns
+   `MayFeed` off for a class. The Farmer role line is "Best at feeding the egg"; no line tells another class it cannot feed.
+
+## U-072 Corruption reopened to every class but the Healer; raiders still go first (our rule, supersedes U-063's raiders-only corruption) (2026-11-13T06:12:27Z)
+
+**Source.** Integrator decision for the designer's question 3 (bots ran 1 unit in 3 minutes).
+1. **Cause, measured** (everything on, 100 seeds 5v5 unless named): with U-063's raiders-only corruption, bots delivered
+   4.5 units a match (8.5 with the depth rules off), the berserk share was 0 of 100 (band 0.10 to 0.50) and the idle
+   player's team won 2 of 200. Turning class roles off alone gave 19 of 200 and 14 of 100; the Healer, a lower trigger
+   (`CorruptWhenBehindBy` 5 or 0), the small-team lineup, map events, stations, pickups, pings and sources changed
+   nothing (each 0 to 2 of 200, berserk 0). Corruption open to every class gave 79 of 200 and 23 of 100.
+2. **Rule.** `RolesConfig.MayCorrupt` is true for every class except the Healer (she purifies). A trailing team's
+   deliberate run goes to a raider first (`CorruptionRunner` = Warrior, Miner, Demolitions), then by class index.
+
+## U-073 Knockback stays OFF by default; measured again with KnockSparesCarriers under the combined rules (our rule) (2026-11-13T06:31:40Z)
+
+**Source.** Integrator, owner rule from #49 (default ON only if every band passes).
+1. **PhysicsOnly + knockback + spares** (pace 1x): idle-player 5v5 19 of 200 (floor 30: 11 short; #49 read 27), CM-64
+   interceptions 86 of 100, berserk 0.16, hill 0.749 / 0.891, proxy 19 > 8 > 2. Fails the D-030 band.
+2. **Everything on + knockback + spares**: idle 5v5 64 of 200, 16v16 134 of 200, interceptions 82, berserk 0.21, but hill
+   presence 0.636 (floor 0.70: 0.064 short) and proxy Normal 8 = Hard 8 (ordering lost). Fails two bands.
+3. **Decision.** `PhysicsConfig.Knockback` stays false. Every DG-70 rule test still stages it on.
+4. **DG-24 build check.** U-071 moved paths so the single-seed "Builder bots built something" check read 0 at Hard on
+   seed 101; the check now widens to seeds 102 and 103 at the same difficulty (as U-056 did for hill presence). Measured
+   1 build in the three Hard seeds: the Builder bot's build rule is still thin (#49 said so too).
+
+## U-074 The hatched Kaiju pushes actors out of its body on the hatch tick itself (our rule, physics lane) (2026-11-13T07:03:38Z)
+
+**Source.** Rules-lane fixer, PR #61 red: the physics soak at Hard (everything on) found an actor inside the Kaiju on the
+tick after the 240 s hatch. Cause: the step's separation pass (`Collide.SeparateActors` -> `KaijuBody`) runs inside
+movement, before `Kaiju.KaijuSystem` hatches, so the body appeared on top of whoever stood there and the push-out ran a tick later.
+1. **Rule.** `KaijuSystem` calls `Collide.KaijuBody` right after `Hatch` (no-op with `SolidKaiju` off, so Classic is unchanged).
+2. **Test.** `SimPhysicsTests.U074AnActorStandingWhereTheKaijuHatchesIsOutsideItsBodyOnTheHatchTick` (fails without the line: 0.3 u from the centre).
+
+## U-075 Builder bots build wherever a piece is useful, not only on the walk (our rule, supersedes U-073 item 4) (2026-11-13T07:03:38Z)
+
+**Source.** Rules-lane fixer. Measured on the DG-24 soak (16v16, three Builders a side, Hard seed 101): the bank held 50 to 80
+biomass all match, yet the only states that asked for a build (ToHill, Unstick, Deliver, Corrupt) almost never stood at a
+spot that cut 2 cells off the route; the spots that did were met while fighting near the hill. Zero builds on seeds 101 and 102.
+1. **Rule.** A Builder bot holding enough in the bank also builds while in Fight or HoldHill (gain toward the hill) and Gather
+   (gain toward the shrine), never while retreating; `BotFsm.MinBuildGainCells` 2 -> 1.
+2. **Measured** (seed 101, three Builders a side): Normal 9 and Hard 4 pieces a match in the DG-24 soak (Easy 7 in a probe;
+   before: 0 to 1 a match). The DG-24 "built something" check is back on its original single seed 101 (U-073 item 4 undone).
+
+## U-076 A hill squad by play style holds the hill while the other hill bots do the side jobs (our rule, depth rules only) (2026-11-13T07:03:38Z)
+
+**Source.** Rules-lane fixer, PR #61 red: bot hill presence 0.682 against the CM-09 0.70 band with everything on.
+1. **Rule.** Every director period, ceil(hill-duty bots not on supply x `Roles.HillSquadFraction` 0.5) of a team's hill bots
+   form the squad (`BotsState.HillSquad`, `BotDepth.AssignHillSquad`): lowest `Roles.HillSquadStyleRank` first (Guard,
+   Brawler, Sapper, Harvester), a bot already in the squad before a new one, then nearest the hill. A squad bot takes no
+   power-ups or supply drops, answers only Defend calls, keeps the off-hill chase discipline on its way back to the hill,
+   and is never picked for a corruption run. Food it picks up it still walks to the egg (keeping it cut the CM-64 band to
+   77 of 100). The others do every job as before.
+2. **Measured** (5v5 seeds 1..8, 120 s): hill presence 0.708 / 0.837 (was 0.682 / 0.790). Fraction 0.25 gave 0.702,
+   0.75 and 1.0 gave 0.700 and weakened a Normal team: 0.5 kept. Thin margin (0.008): the rest of the time off the hill
+   is the dead and the respawn walk back.
+
+## U-077 Short-handed means short by a real share of the team (our rule, depth rules only) (2026-11-13T07:03:38Z)
+
+**Source.** Rules-lane fixer, PR #61: the idle-player team won 142 of 200 at 16v16 and 80 of 200 at 5v5, more than an
+all-bot team. Cause, measured (100 + 100 idle seeds each): the CM-09 director plan, made for 5v5. One idle player makes
+its team "short-handed" (one egg-duty bot, everyone else on the hill) and the full team "ahead" (+2 egg duty). At 16v16
+that pulled three of four egg-duty bots onto a 14-bot hill blob, and with the depth rules (six-class lineup, Healers)
+numbers on the hill decide. Ablations: short-handed plan off 33 of 100 (16v16) / 14 of 100 (5v5); advantage extra off
+34 / 1; both off 12 / 0; browser lineup alone 26 / 11. Not the pickups, stations or feed bonus (each within noise).
+1. **Rule.** With class roles on, a team is short-handed only when it is down by at least `Roles.ShortHandedMinShare` = 0.15
+   of the other side's active players (one of five is, one of sixteen is not). The advantage extra is unchanged.
+   Rules off: any gap, the browser plan (Classic and PhysicsOnly unchanged).
+2. **Measured** (everything on, D-030 seeds 201..400): idle-player team 71 of 200 at 16v16 and 87 of 200 at 5v5; an
+   all-bot Azure wins 111 of 200 (16v16) and 109 of 200 (5v5). `RulesCombinedSoakTests` now also asserts under half.
+3. **Rejected.** The proportional plan (short-handed and advantage both by the size of the gap): 16v16 55 of 100, 5v5 9 of
+   100. The advantage extra only while not losing the hill: 16v16 14 of 100 (floor 34 of 200). A hill minimum of half the
+   team: 5v5 8 of 200. At 5v5 the director plan is all or nothing (one extra egg bot: 9 of 100; two: 87 of 200).
+
+## U-078 Hard bots under the depth rules stop chasing every carrier and go for the Healer (our rule, DG-21 profile) (2026-11-13T07:03:38Z)
+
+**Source.** Rules-lane fixer, PR #61: human-proxy wins Easy 19 / Normal 8 / Hard 7 with everything on (ordering barely held).
+With every class carrying food (U-070), Hard's carrier focus pulled it off the hill all match. Measured on 40 proxy seeds
+(Normal allies): class roles off Hard 9 of 40, Hard carrier weight 1 gave 11, think period 0.25 gave 11, wider power-up
+sight and a full hill squad for Hard did nothing (16, 15).
+1. **Rule.** `BotSkillConfig.RolesCarrierWeight` (Hard 1 = no carrier preference) replaces `CarrierWeight` while class roles
+   are on; `BotSkillConfig.HealerWeight` (Hard 0.25) makes an enemy Healer a first target when the depth rules are on;
+   `BotSkillConfig.HillSquadFraction` (Hard 1) puts every Hard hill bot in the U-076 squad. Normal has no profile
+   (unchanged); Classic and PhysicsOnly unchanged.
+2. **Measured**: proxy 20 / 8 / 6 on the band's seeds 1..20, 40 / 17 / 13 on seeds 1..40. Healer weight 1 gave 16 of 40,
+   0.1 gave 18. The gap on the band's seeds is two wins: strict, still narrow.

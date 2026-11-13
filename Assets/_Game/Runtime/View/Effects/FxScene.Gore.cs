@@ -315,7 +315,12 @@ namespace CriticalMass.Runtime.View.Effects
                 float grow = d.Grow > 0 ? Mathf.Clamp01((float)(age / d.Grow)) : 1f;
                 grow = 1f - (1f - grow) * (1f - grow);
                 float fade = (float)Math.Min(1.0, (d.Life - age) / (d.Life * 0.3));
+                bool still = age >= d.Grow && fade >= 1f;
+                int before = _decalStamp[i];
+                if (PaintedAway(ref _decalStamp[i], d.P, still)) continue;
+                if (before == -1 && _decalStamp[i] >= 0) DrawSplat(Paint.Builder, d.P, d.Size, d, 1f); // stamped once
                 DrawSplat(ground, d.P + Vector3.up * lift, d.Size * grow, d, fade);
+                LastGroundMarks++;
             }
         }
 
