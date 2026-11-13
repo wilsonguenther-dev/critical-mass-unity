@@ -1,8 +1,8 @@
 {
  "objects": {
   "Farmer_Body": {
-   "triangles": 10080,
-   "vertices": 5296,
+   "triangles": 9920,
+   "vertices": 5206,
    "materials": [
     "CM_Toon"
    ],
@@ -71,7 +71,7 @@
   ],
   "feat_team_cloth": [
    0.175,
-   1.848
+   1.888
   ],
   "feat_jacket": [
    0.76,
@@ -98,16 +98,16 @@
    1.474
   ],
   "feat_hair": [
-   1.35,
-   1.991
+   1.36,
+   1.962
   ],
   "feat_bun": [
-   1.72,
+   1.715,
    2.0
   ],
   "feat_goggles": [
-   1.603,
-   1.867
+   1.515,
+   1.885
   ],
   "feat_tank": [
    0.778,
@@ -126,11 +126,11 @@
    1.076
   ]
  },
- "triangles_total": 11752,
+ "triangles_total": 11592,
  "triangles_by_part": {
   "Farmer_Body/hair/f_hair": [
-   1448,
-   18
+   1244,
+   13
   ],
   "Farmer_Body/team_cloth/f_team_cloth": [
    1040,
@@ -164,13 +164,13 @@
    412,
    7
   ],
+  "Farmer_Body/bun/f_hair": [
+   412,
+   5
+  ],
   "Farmer_Body/boots/f_boot": [
    400,
    4
-  ],
-  "Farmer_Body/bun/f_hair": [
-   368,
-   5
   ],
   "Farmer_Body/tank/f_biomass": [
    360,

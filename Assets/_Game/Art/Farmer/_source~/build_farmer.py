@@ -43,8 +43,8 @@ TANK_C = Vector((0.08, 0.43, 1.13))   # globe centre: on the upper back, offset 
 TANK_R = 0.26                         # bible p07 back view: the globe spans most of the back (0.52 u; brief said 0.45)
 
 
-def add(obj, bm, color, bones, feat, smooth=True, m=None, grad=True, face_uv=None):
-    B.add(obj, bm, color, bones, feat=feat, smooth=smooth, m=m, grad=grad, face_uv=face_uv)
+def add(obj, bm, color, bones, feat, smooth=True, m=None, grad=True, face_uv=None, top_light=None):
+    B.add(obj, bm, color, bones, feat=feat, smooth=smooth, m=m, grad=grad, face_uv=face_uv, top_light=top_light)
 
 
 def rot_cols(x, y, z, t=(0, 0, 0)):
@@ -187,55 +187,52 @@ def lock(p0, p3, bend, wave, r, n=6, flat=0.55, side_hint=(0, 0, 1)):
         t = i / n
         radii.append(r * (0.85 + 0.6 * t / 0.25) if t < 0.25 else r * 1.0 * (1.0 - 0.88 * ((t - 0.25) / 0.75) ** 1.4))
     radii = [min(x, r * 1.0) for x in radii]
-    return B.tube(pts, radii, 5, flat)
+    return B.tube(pts, radii, 6, flat)
+
+
+HAIR_LIGHT = (1.32, 0.70)      # v3: top planes lit, undersides dark, so the hair reads as shapes, not one dark mass
+
+
+def hair(bm, feat="hair", m=None):
+    add(BODY, bm, "f_hair", "head", feat, m=m, grad=False, top_light=HAIR_LIGHT)
 
 
 def build_hair():
     H = "head"
-    # big volume: cap over the crown, a full back mass, puffs at the sides (kept behind the face line, y > -0.08)
-    add(BODY, B.sphere((0.28, 0.265, 0.15), 14, 8), "f_hair", H, "hair", m=M((0, 0.04, 1.68)))
-    add(BODY, B.sphere((0.265, 0.23, 0.21), 12, 8), "f_hair", H, "hair", m=M((0, 0.10, 1.56)))
+    # volume under the locks: crown cap, back mass, side puffs (behind the face line, y > -0.08)
+    hair(B.sphere((0.29, 0.27, 0.15), 14, 8), m=M((0, 0.04, 1.665)))
+    hair(B.sphere((0.27, 0.235, 0.20), 12, 8), m=M((0, 0.10, 1.56)))
     for s in (1, -1):
-        add(BODY, B.sphere((0.12, 0.14, 0.16), 8, 6), "f_hair", H, "hair", m=M((0.25 * s, 0.08, 1.56)))
-    L = [  # 14 wavy locks: p0, p3, bend, wave, radius
-        # swept bangs, parted at the character's right, falling over the forehead to the temples
-        ((-0.06, -0.15, 1.81), (0.26, -0.15, 1.66), (0.06, -0.12, 0.03), 0.03, 0.085),
-        ((-0.02, -0.16, 1.81), (-0.26, -0.14, 1.67), (-0.06, -0.11, 0.03), 0.03, 0.08),
-        ((0.03, -0.18, 1.81), (0.12, -0.24, 1.73), (0.03, -0.07, 0.0), 0.02, 0.05),
-        # temple curls framing the cheeks (behind the cheek line so the face stays clear in profile)
-        ((0.25, -0.10, 1.66), (0.28, -0.08, 1.40), (0.05, -0.02, 0.0), 0.05, 0.07),
-        ((-0.25, -0.10, 1.66), (-0.28, -0.08, 1.40), (-0.05, -0.02, 0.0), 0.05, 0.07),
-        # side volume down to the shoulders, curling outwards
-        ((0.27, 0.10, 1.66), (0.33, 0.17, 1.42), (0.08, 0.0, 0.0), 0.05, 0.085),
-        ((-0.27, 0.10, 1.66), (-0.33, 0.17, 1.42), (-0.08, 0.0, 0.0), 0.05, 0.085),
-        # back of the head to the nape
-        ((0.0, 0.25, 1.68), (0.03, 0.30, 1.40), (0.0, 0.08, 0.0), 0.05, 0.09),
-        ((0.16, 0.22, 1.68), (0.21, 0.26, 1.42), (0.04, 0.07, 0.0), 0.05, 0.08),
-        ((-0.16, 0.22, 1.68), (-0.21, 0.26, 1.42), (-0.04, 0.07, 0.0), 0.05, 0.08),
-        # messy strands escaping the bun
-        ((0.10, 0.0, 1.93), (0.30, 0.04, 1.86), (0.0, 0.0, 0.08), 0.03, 0.06),
-        ((-0.10, 0.06, 1.93), (-0.30, 0.10, 1.88), (0.0, 0.0, 0.08), 0.03, 0.06),
-        ((0.0, 0.14, 1.92), (0.04, 0.36, 1.84), (0.0, 0.0, 0.08), 0.03, 0.06),
-        ((0.0, -0.06, 1.925), (-0.05, -0.20, 1.95), (0.0, 0.0, 0.04), 0.02, 0.05),
+        hair(B.sphere((0.12, 0.14, 0.15), 8, 6), m=M((0.26 * s, 0.08, 1.56)))
+    L = [  # 9 fat, rounded locks: p0, p3, bend, wave, radius
+        ((-0.04, -0.15, 1.80), (0.27, -0.14, 1.64), (0.05, -0.12, 0.04), 0.025, 0.11),      # big swept bang (left)
+        ((-0.02, -0.16, 1.80), (-0.27, -0.13, 1.66), (-0.05, -0.10, 0.04), 0.025, 0.10),    # bang (right)
+        ((0.26, -0.10, 1.66), (0.29, -0.07, 1.44), (0.05, -0.02, 0.0), 0.04, 0.085),        # temple curl
+        ((-0.26, -0.10, 1.66), (-0.29, -0.07, 1.44), (-0.05, -0.02, 0.0), 0.04, 0.085),
+        ((0.27, 0.12, 1.66), (0.33, 0.18, 1.44), (0.07, 0.0, 0.0), 0.04, 0.10),             # side volume
+        ((-0.27, 0.12, 1.66), (-0.33, 0.18, 1.44), (-0.07, 0.0, 0.0), 0.04, 0.10),
+        ((0.09, 0.24, 1.68), (0.14, 0.30, 1.42), (0.03, 0.07, 0.0), 0.04, 0.11),            # back
+        ((-0.09, 0.24, 1.68), (-0.14, 0.30, 1.42), (-0.03, 0.07, 0.0), 0.04, 0.11),
+        ((0.10, 0.02, 1.90), (0.29, 0.07, 1.84), (0.0, 0.0, 0.06), 0.02, 0.07),             # strand escaping the bun
     ]
     for p0, p3, bend, wave, r in L:
-        add(BODY, lock(p0, p3, bend, wave, r), "f_hair", H, "hair")
-    # big high messy bun: a main ball and four lobes, tied with a wide teal band
-    add(BODY, B.sphere((0.22, 0.21, 0.14), 12, 7), "f_hair", H, "bun", m=M((0, 0.05, 1.86)))
-    for k, (az, r, dz) in enumerate(((30, 0.10, 0.03), (130, 0.095, 0.035), (220, 0.105, 0.025), (310, 0.09, 0.04))):
+        hair(lock(p0, p3, bend, wave, r, n=6, flat=0.78))
+    # tall messy bun: a main ball, a top lobe and three side lobes, tied with the teal band
+    hair(B.sphere((0.20, 0.19, 0.12), 12, 7), "bun", m=M((0, 0.05, 1.835)))
+    hair(B.sphere((0.14, 0.13, 0.095), 10, 6), "bun", m=M((0.02, 0.06, 1.905)))
+    for k, (az, r, dz) in enumerate(((40, 0.09, 0.02), (160, 0.095, 0.03), (280, 0.09, 0.025))):
         a = math.radians(az)
-        add(BODY, B.sphere((r, r, r * 0.85), 7, 5), "f_hair", H, "bun",
-            m=M((0.11 * math.cos(a), 0.04 + 0.11 * math.sin(a), 1.86 + dz)))
-    add(BODY, B.torus(0.168, 0.056, 12, 4), "f_team_cloth", H, "team_cloth", m=M((0, 0.05, 1.765), (-8, 0, 0)))
-    # brass goggles with teal lenses pushed up on top of the hair at the front
-    add(BODY, B.torus(0.27, 0.02, 16, 4), "f_brass", H, "goggles", m=M((0, 0.03, 1.735), (-25, 0, 0), (1.04, 1.0, 1)))
+        hair(B.sphere((r, r, r * 0.85), 7, 5), "bun", m=M((0.12 * math.cos(a), 0.05 + 0.12 * math.sin(a), 1.84 + dz)))
+    add(BODY, B.torus(0.165, 0.056, 12, 4), "f_team_cloth", H, "team_cloth", m=M((0, 0.05, 1.75), (-8, 0, 0)))
+    # brass goggles with big teal lenses resting ON TOP of the head (bible p07), strap behind the bangs
+    add(BODY, B.torus(0.275, 0.02, 16, 4), "f_brass", H, "goggles", m=M((0, 0.05, 1.70), (-38, 0, 0), (1.04, 1.0, 1)))
     for s in (1, -1):
-        n = Vector((0.26 * s, -0.62, 0.74)).normalized()
-        c = Vector((0.12 * s, -0.205, 1.78))
-        add(BODY, B.bcyl(c - n * 0.025, c + n * 0.03, 0.084, 0.078, 10, 0.012), "f_brass", H, "goggles")
-        add(BODY, B.bcyl(c + n * 0.02, c + n * 0.042, 0.066, 0.064, 10, 0.008), "f_team_cloth", H, "team_cloth")
-    add(BODY, B.box((0.07, 0.03, 0.035), 0.01, 1), "f_brass", H, "goggles", smooth=False,
-        m=M((0, -0.228, 1.79), (-40, 0, 0)))
+        n = Vector((0.30 * s, -0.42, 0.86)).normalized()
+        c = Vector((0.125 * s, -0.15, 1.815))
+        add(BODY, B.bcyl(c - n * 0.03, c + n * 0.03, 0.098, 0.092, 10, 0.014), "f_brass", H, "goggles")
+        add(BODY, B.bcyl(c + n * 0.022, c + n * 0.044, 0.080, 0.078, 10, 0.008), "f_team_cloth", H, "team_cloth")
+    add(BODY, B.box((0.08, 0.035, 0.04), 0.01, 1), "f_brass", H, "goggles", smooth=False,
+        m=M((0, -0.185, 1.835), (-55, 0, 0)))
 
 
 # ===================================================================================================== globe tank
@@ -395,8 +392,15 @@ def main():
     for ob in objs.values():
         g = ob.vertex_groups.new(name="outline_w")
         no_line = {ob.vertex_groups[n].index for n in ("feat_face", "feat_tank_glint") if n in ob.vertex_groups}
+        soft_line = {ob.vertex_groups[n].index for n in ("feat_hair", "feat_bun") if n in ob.vertex_groups}
         for v in ob.data.vertices:
-            g.add([v.index], 0.0 if any(gg.group in no_line for gg in v.groups) else 1.0, "REPLACE")
+            if any(gg.group in no_line for gg in v.groups):
+                w = 0.0
+            elif any(gg.group in soft_line for gg in v.groups):
+                w = 0.45                      # v3: thinner inner line on hair so it is not a dark mass
+            else:
+                w = 1.0
+            g.add([v.index], w, "REPLACE")
     zs = [v.co.z for v in body.data.vertices]
     feats = {}
     for g in body.vertex_groups:

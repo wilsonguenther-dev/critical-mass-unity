@@ -87,11 +87,11 @@
    "check": "Farmer_Body loose/non-manifold",
    "ok": true,
    "detail": {
-    "triangles": 10080,
+    "triangles": 9920,
     "loose_verts": 0,
     "loose_edges": 0,
     "non_manifold_edges": 0,
-    "closed_shells": 136
+    "closed_shells": 131
    }
   },
   {
@@ -195,7 +195,7 @@
   {
    "check": "triangle budget <= 12000",
    "ok": true,
-   "detail": 11752
+   "detail": 11592
   },
   {
    "check": "painted face decal: Farmer_Face.png 256x256 + body UV map with a face projection",
@@ -205,7 +205,7 @@
     "uv_layers": [
      "UVMap"
     ],
-    "face_loops": 288
+    "face_loops": 282
    }
   },
   {

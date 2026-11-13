@@ -25,7 +25,7 @@ class FarmerBuilder(kit.Builder):
             d["uv"] = d["bm"].loops.layers.uv.new("UVMap")
         return d
 
-    def add(self, obj, src, color, bones, feat=None, smooth=True, m=None, grad=True, face_uv=None):
+    def add(self, obj, src, color, bones, feat=None, smooth=True, m=None, grad=True, face_uv=None, top_light=None):
         """face_uv = (cx, cy, cz, half_w, half_h): front planar projection for the painted face decal on faces whose
         centre lies in front of cy (y < cy); every other face samples UV (0.002, 0.002), a transparent texel."""
         if m is not None:
@@ -49,8 +49,13 @@ class FarmerBuilder(kit.Builder):
         span = max(z1 - z0, 1e-6)
         use_grad = grad and not glow and span > 0.05
         vmap = {}
+        if top_light:                       # v3 hair: light top planes, dark undersides (painted by vertex normal)
+            src.normal_update()
         for v in src.verts:
             k = GRAD_BOT + (GRAD_TOP - GRAD_BOT) * ((v.co.z - z0) / span) if use_grad else 1.0
+            if top_light:
+                t = max(0.0, min(1.0, (v.normal.z + 0.35) / 1.0))
+                k = top_light[1] + (top_light[0] - top_light[1]) * t
             nv = bm.verts.new(v.co)
             nv[d["col"]] = FP.vcol(color, k)
             nv[d["ws"]] = wi
