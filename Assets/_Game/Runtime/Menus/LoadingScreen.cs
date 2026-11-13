@@ -35,6 +35,8 @@ namespace CriticalMass.Runtime.Menus
         public const float QuickMinSeconds = 0.35f;
         public const float FadeOutSeconds = 0.2f;
         public const int WarmUpFrames = 4;
+        /// <summary>perf-smooth-1: the longest the WarmUp step waits for ShaderWarmup.Done.</summary>
+        public const float WarmUpWaitSeconds = 4f;
         /// <summary>A watched boot step that never reports is completed after this (the screen never hangs).</summary>
         public const float StepTimeoutSeconds = 6f;
 
@@ -486,8 +488,9 @@ namespace CriticalMass.Runtime.Menus
                 default:
                     if (_finish) break;
                     _warmFrames++;
-                    Report(LoadStep.WarmUp, (float)_warmFrames / WarmUpFrames);
-                    if (_warmFrames >= WarmUpFrames) Finish();
+                    Report(LoadStep.WarmUp, Mathf.Min((float)_warmFrames / WarmUpFrames, ShaderWarmup.Done ? 1f : 0.95f));
+                    // perf-smooth-1: also wait for the shipped shader/PSO warm-up (bounded: never more than WarmUpWaitSeconds).
+                    if (_warmFrames >= WarmUpFrames && (ShaderWarmup.Done || Time.unscaledTime - _stepStart > WarmUpWaitSeconds)) Finish();
                     break;
             }
         }

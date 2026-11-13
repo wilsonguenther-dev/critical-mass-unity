@@ -271,7 +271,7 @@ namespace CriticalMass.Runtime.View.Dressing
             if (_building != null)
             {
                 CriticalMass.Runtime.Game.FrameRecorder.Loading = true;
-                double budget = Application.isEditor ? double.PositiveInfinity : BuildBudgetMs;
+                double budget = Application.isEditor && !SliceInEditor ? double.PositiveInfinity : BuildBudgetMs;
                 var sw = System.Diagnostics.Stopwatch.StartNew();
                 bool done = CriticalMass.Runtime.Game.FrameBudget.Run(_building, budget, () => sw.Elapsed.TotalMilliseconds);
                 double slice = sw.Elapsed.TotalMilliseconds;
@@ -330,7 +330,6 @@ namespace CriticalMass.Runtime.View.Dressing
             BuildGroups(changed);
             _dressed = Plan.Dressed;
             _dressedTypes = Plan.CellsAtPlan;
-            _buildDone = _buildTotal;
             DressVersion++;
         }
 
@@ -498,10 +497,32 @@ namespace CriticalMass.Runtime.View.Dressing
             }
             _collectMs = bgw.Elapsed.TotalMilliseconds;
             _buildTotal += groups.Count + shadows.Count;
+            // perf-smooth-1: every group's vertex streams are computed on worker threads; the main thread only makes the
+            // meshes, in the same order as before (one group per step).
+            var jobs = new List<GroupJob>(groups.Count + shadows.Count);
+            var groupKeys = new List<(int chunk, int level, Material mat)>(groups.Count);
             foreach (var kv in groups)
             {
                 (int chunk, int level, Material mat) = kv.Key;
-                GameObject go = MakeGroup("Group " + chunk + " L" + level + " " + mat.name, mat, kv.Value, ShadowCastingMode.Off);
+                groupKeys.Add(kv.Key);
+                jobs.Add(PrepareGroup("Group " + chunk + " L" + level + " " + mat.name, mat, kv.Value, ShadowCastingMode.Off));
+            }
+            Material caster = ShadowMaterial();
+            bool shadowsOn = RenderTier.Policy(q).sceneryShadows;
+            var shadowKeys = new List<int>(shadows.Count);
+            if (caster != null)
+                foreach (var kv in shadows)
+                {
+                    shadowKeys.Add(kv.Key);
+                    jobs.Add(PrepareGroup("Shadow " + kv.Key, caster, kv.Value, ShadowCastingMode.ShadowsOnly));
+                }
+            ComputeOnWorkers(jobs);
+            for (int k = 0; k < groupKeys.Count; k++)
+            {
+                while (!jobs[k].Done) yield return null;
+                (int chunk, int level, Material mat) = groupKeys[k];
+                GameObject go = FinishGroup(jobs[k]);
+                jobs[k] = null;
                 Chunk ch = ChunkFor(chunk, go);
                 var r = go.GetComponent<MeshRenderer>();
                 ch.ByLevel[level].Add(r);
@@ -519,19 +540,19 @@ namespace CriticalMass.Runtime.View.Dressing
                 _buildDone++;
                 yield return null;
             }
-            Material caster = ShadowMaterial();
-            bool shadowsOn = RenderTier.Policy(q).sceneryShadows;
-            if (caster != null)
-                foreach (var kv in shadows)
-                {
-                    GameObject go = MakeGroup("Shadow " + kv.Key, caster, kv.Value, ShadowCastingMode.ShadowsOnly);
-                    Chunk ch = ChunkFor(kv.Key, go);
-                    ch.Shadow = go.GetComponent<MeshRenderer>();
-                    ch.ShadowTris = (int)(go.GetComponent<MeshFilter>().sharedMesh.GetIndexCount(0) / 3);
-                    ch.Shadow.enabled = shadowsOn;
-                    _buildDone++;
-                    yield return null;
-                }
+            for (int k = 0; k < shadowKeys.Count; k++)
+            {
+                int jk = groupKeys.Count + k;
+                while (!jobs[jk].Done) yield return null;
+                GameObject go = FinishGroup(jobs[jk]);
+                jobs[jk] = null;
+                Chunk ch = ChunkFor(shadowKeys[k], go);
+                ch.Shadow = go.GetComponent<MeshRenderer>();
+                ch.ShadowTris = (int)(go.GetComponent<MeshFilter>().sharedMesh.GetIndexCount(0) / 3);
+                ch.Shadow.enabled = shadowsOn;
+                _buildDone++;
+                yield return null;
+            }
             _combineMs = bgw.Elapsed.TotalMilliseconds - _collectMs;
             UpdateLods();
         }
@@ -683,18 +704,37 @@ namespace CriticalMass.Runtime.View.Dressing
             _bases = BasesFile.Load();
             BasesParses++;
             _clutterOn = QualityTable.ExtraClutter(RenderTier.Level);
+            // perf-smooth-1: the planner reads every piece's centroid and body from the kit meshes (cached on the catalog
+            // after the first build: 0.5 s cold); warm them one piece a step first, so the plan itself is one short step.
+            _buildTotal = 2 + _catalog.Names.Length;
+            foreach (string piece in _catalog.Names)
+            {
+                if (string.IsNullOrEmpty(piece)) continue;
+                _catalog.Centroid(piece);
+                _catalog.Body(piece);
+                _buildDone++;
+                yield return null;
+            }
             double tLoad = st.Elapsed.TotalMilliseconds;
             yield return null;
             Plan = WorldDresser.Plan(_map, _bases, _catalog.Centroid, _catalog.Body, _clutterOn);
             double tPlan = st.Elapsed.TotalMilliseconds;
             int chunksX0 = (_map.Width + ChunkSize - 1) / ChunkSize, chunksZ0 = (_map.Height + ChunkSize - 1) / ChunkSize;
-            _buildTotal = 2 + Plan.Placements.Count + chunksX0 * chunksZ0 + Plan.Breakables.Count / 16 + 1;
-            _buildDone = 1;
+            _buildTotal = _buildDone + 2 + Plan.Placements.Count + chunksX0 * chunksZ0 + Plan.Breakables.Count / 16 + 1;
+            _buildDone++;
             yield return null;
             _root = new GameObject("World Art").transform;
             _root.SetParent(transform, false);
             if (_field != null) Destroy(_field);
-            _field = WorldField.Bake(Plan);
+            _field = null;
+            // perf-smooth-1: the field texture's pixels (about 0.5 s of pure math) are computed on a worker thread while
+            // the groups build; the texture is made on the main thread before the ground needs it.
+            WorldPlan fieldPlan = Plan;
+            var fieldTask = System.Threading.Tasks.Task.Run(() =>
+            {
+                Color[] fpx = WorldField.Compute(fieldPlan, out int fc, out int fr);
+                return (fpx, fc, fr);
+            });
             double tField = st.Elapsed.TotalMilliseconds;
             Triangles = 0;
             Renderers = 0;
@@ -704,6 +744,14 @@ namespace CriticalMass.Runtime.View.Dressing
             IEnumerator groupSteps = BuildGroupsSteps(null);
             while (groupSteps.MoveNext()) yield return null;
             double tGroups = st.Elapsed.TotalMilliseconds;
+            while (!fieldTask.IsCompleted) yield return null;
+            {
+                var (fpx, fc, fr) = fieldTask.Result;   // rethrows a worker exception here, on the main thread
+                _field = WorldField.FromPixels(fpx, fc, fr);
+            }
+            double tFieldWait = st.Elapsed.TotalMilliseconds - tGroups;
+            yield return null;
+            tGroups += tFieldWait;
             int chunksX = (_map.Width + ChunkSize - 1) / ChunkSize, chunksZ = (_map.Height + ChunkSize - 1) / ChunkSize;
             for (int cz = 0; cz < chunksZ; cz++)
             for (int cx = 0; cx < chunksX; cx++)
@@ -713,7 +761,7 @@ namespace CriticalMass.Runtime.View.Dressing
                 yield return null;
             }
             double tGround = st.Elapsed.TotalMilliseconds;
-            LastStages = $"catalog+bases {tLoad:0}, plan {tPlan - tLoad:0}, field {tField - tPlan:0}, groups {tGroups - tField:0} (collect {_collectMs:0}, combine {_combineMs:0}), ground {tGround - tGroups:0} ms";
+            LastStages = $"catalog+bases+kit warm {tLoad:0}, plan {tPlan - tLoad:0}, field start {tField - tPlan:0} (then waited {tFieldWait:0}), groups {tGroups - tField:0} (collect {_collectMs:0}, combine {_combineMs:0}), ground {tGround - tGroups:0} ms";
             foreach (WorldBreakable b in Plan.Breakables)
             {
                 var go = new GameObject("Breakable " + b.Family);
@@ -732,9 +780,20 @@ namespace CriticalMass.Runtime.View.Dressing
             SyncBreakables();
             _dressed = Plan.Dressed;
             _dressedTypes = Plan.CellsAtPlan;
+            // perf-smooth-1: the build leaves tens of MB of garbage (combine buffers, mesh copies). Collect it now, in
+            // incremental slices behind the loading screen, so no stop-the-world collection lands in the match.
+            if (!Application.isEditor && UnityEngine.Scripting.GarbageCollector.isIncremental)
+                for (int k = 0; k < GcSettleMaxSteps && UnityEngine.Scripting.GarbageCollector.CollectIncremental(GcSettleSliceNs); k++)
+                    yield return null;
             _buildDone = _buildTotal;
             DressVersion++;
         }
+
+        /// <summary>perf-smooth-1: the post-build incremental collection: 3 ms slices, at most 240 of them.</summary>
+        public const ulong GcSettleSliceNs = 3_000_000;
+        public const int GcSettleMaxSteps = 240;
+        /// <summary>Tests: slice the build in the editor too (the editor and PlayMode tests build in one frame otherwise).</summary>
+        public static bool SliceInEditor;
 
         private void SyncBreakables()
         {
@@ -919,52 +978,128 @@ namespace CriticalMass.Runtime.View.Dressing
             return d;
         }
 
+        /// <summary>perf-smooth-1: one combined mesh's inputs and outputs. Prepare (main thread) fills the inputs, Compute
+        /// (pure arithmetic, any thread) the vertex streams, Finish (main thread) makes the mesh and the GameObject.</summary>
+        private sealed class GroupJob
+        {
+            public string Name;
+            public Material Mat;
+            public ShadowCastingMode? Casting;
+            public bool SwayMat, Sways;
+            public (MeshData d, int sub, Matrix4x4 m, Matrix4x4 nm, SwayInfo sw)[] Parts;
+            public List<Vector3> V, N, UV2, UV3;
+            public List<Color32> C;
+            public List<Vector2> UV;
+            public List<Vector4> UV5;
+            public List<int> Tri;
+            public volatile bool Done;
+            public Exception Error;
+        }
+
+        private static GroupJob PrepareGroup(string name, Material mat, List<(MeshData d, int sub, Matrix4x4 m, SwayInfo sw)> parts,
+            ShadowCastingMode? casting)
+        {
+            var job = new GroupJob
+            {
+                Name = name, Mat = mat, Casting = casting,
+                // UV5 only on groups whose material reads it (the sway clones): still groups carry no extra channel.
+                SwayMat = mat != null && mat.HasProperty("_SwayOn") && mat.GetFloat("_SwayOn") > 0.5f,
+                Parts = new (MeshData, int, Matrix4x4, Matrix4x4, SwayInfo)[parts.Count],
+            };
+            for (int k = 0; k < parts.Count; k++)
+            {
+                var (d, sub, m, sw) = parts[k];
+                job.Parts[k] = (d, sub, m, m.inverse.transpose, sw);   // Matrix4x4.inverse is an engine call: main thread
+            }
+            return job;
+        }
+
+        /// <summary>The vertex streams of a group: plain arithmetic on cached arrays, no engine call (safe off the main thread).</summary>
+        private static void ComputeGroup(GroupJob job)
+        {
+            try
+            {
+                // Closer (batch 4): sized up front (the lists regrew a dozen times per group: part of the match-start hitch).
+                int indices = 0;
+                foreach (var part in job.Parts) indices += part.d.Subs[part.sub].Length;
+                int verts = indices / 2 + 16;
+                var uv5 = job.SwayMat ? new List<Vector4>(verts) : null;
+                bool sways = false;
+                var v = new List<Vector3>(verts);
+                var n = new List<Vector3>(verts);
+                var c = new List<Color32>(verts);
+                var uv = new List<Vector2>(verts);
+                var uv2 = new List<Vector3>(verts);
+                var uv3 = new List<Vector3>(verts);
+                var tri = new List<int>(indices);
+                var map = new Dictionary<int, int>(1024);
+                foreach (var (d, sub, m, nm, sw) in job.Parts)
+                {
+                    map.Clear();
+                    foreach (int i in d.Subs[sub])
+                    {
+                        if (!map.TryGetValue(i, out int j))
+                        {
+                            j = v.Count;
+                            map[i] = j;
+                            v.Add(m.MultiplyPoint3x4(d.V[i]));
+                            n.Add(d.N.Length > i ? nm.MultiplyVector(d.N[i]).normalized : Vector3.up);
+                            c.Add(d.C.Length > i ? d.C[i] : new Color32(255, 255, 255, 255));
+                            uv.Add(d.UV.Length > i ? d.UV[i] : Vector2.zero);
+                            uv2.Add(d.UV2.Count > i && d.UV2[i].sqrMagnitude > 0.25f ? nm.MultiplyVector(d.UV2[i]).normalized : Vector3.zero);
+                            uv3.Add(d.UV3.Count > i ? nm.MultiplyVector(d.UV3[i]).normalized : n[j]);
+                            if (uv5 != null)
+                            {
+                                float wgt = SwayWeight(d, d.V[i], in sw);
+                                if (wgt > 0f) sways = true;
+                                uv5.Add(new Vector4(sw.PivotX, sw.PivotZ, wgt, sw.Kind));
+                            }
+                        }
+                        tri.Add(j);
+                    }
+                }
+                job.V = v; job.N = n; job.C = c; job.UV = uv; job.UV2 = uv2; job.UV3 = uv3; job.UV5 = uv5; job.Tri = tri;
+                job.Sways = sways;
+            }
+            catch (Exception e) { job.Error = e; }
+            finally { job.Done = true; }
+        }
+
+        /// <summary>Runs the jobs' Compute on up to (cores - 2) worker threads, in list order per worker (never the main thread).</summary>
+        private static void ComputeOnWorkers(List<GroupJob> jobs)
+        {
+            int next = -1;
+            int workers = Math.Max(1, Math.Min(jobs.Count, Environment.ProcessorCount - 2));
+            for (int w = 0; w < workers; w++)
+                System.Threading.Tasks.Task.Run(() =>
+                {
+                    for (int k = System.Threading.Interlocked.Increment(ref next); k < jobs.Count; k = System.Threading.Interlocked.Increment(ref next))
+                        ComputeGroup(jobs[k]);
+                });
+        }
+
         /// <summary>One combined mesh: positions, normals, UV2 (foam extrusion) and UV3 (outline direction) transformed.</summary>
         private GameObject MakeGroup(string name, Material mat, List<(MeshData d, int sub, Matrix4x4 m, SwayInfo sw)> parts,
             ShadowCastingMode? casting = null)
         {
-            // UV5 only on groups whose material reads it (the sway clones): still groups carry no extra channel.
-            bool swayMat = mat != null && mat.HasProperty("_SwayOn") && mat.GetFloat("_SwayOn") > 0.5f;
-            // Closer (batch 4): sized up front (the lists regrew a dozen times per group: part of the match-start hitch).
-            int indices = 0;
-            foreach (var part in parts) indices += part.d.Subs[part.sub].Length;
-            int verts = indices / 2 + 16;
-            var uv5 = swayMat ? new List<Vector4>(verts) : null;
-            bool sways = false;
-            var v = new List<Vector3>(verts);
-            var n = new List<Vector3>(verts);
-            var c = new List<Color32>(verts);
-            var uv = new List<Vector2>(verts);
-            var uv2 = new List<Vector3>(verts);
-            var uv3 = new List<Vector3>(verts);
-            var tri = new List<int>(indices);
-            var map = new Dictionary<int, int>(1024);
-            foreach (var (d, sub, m, sw) in parts)
-            {
-                Matrix4x4 nm = m.inverse.transpose;
-                map.Clear();
-                foreach (int i in d.Subs[sub])
-                {
-                    if (!map.TryGetValue(i, out int j))
-                    {
-                        j = v.Count;
-                        map[i] = j;
-                        v.Add(m.MultiplyPoint3x4(d.V[i]));
-                        n.Add(d.N.Length > i ? nm.MultiplyVector(d.N[i]).normalized : Vector3.up);
-                        c.Add(d.C.Length > i ? d.C[i] : (Color32)Color.white);
-                        uv.Add(d.UV.Length > i ? d.UV[i] : Vector2.zero);
-                        uv2.Add(d.UV2.Count > i && d.UV2[i].sqrMagnitude > 0.25f ? nm.MultiplyVector(d.UV2[i]).normalized : Vector3.zero);
-                        uv3.Add(d.UV3.Count > i ? nm.MultiplyVector(d.UV3[i]).normalized : n[j]);
-                        if (uv5 != null)
-                        {
-                            float wgt = SwayWeight(d, d.V[i], in sw);
-                            if (wgt > 0f) sways = true;
-                            uv5.Add(new Vector4(sw.PivotX, sw.PivotZ, wgt, sw.Kind));
-                        }
-                    }
-                    tri.Add(j);
-                }
-            }
+            GroupJob job = PrepareGroup(name, mat, parts, casting);
+            ComputeGroup(job);
+            return FinishGroup(job);
+        }
+
+        /// <summary>The mesh and GameObject of a computed group (main thread).</summary>
+        private GameObject FinishGroup(GroupJob job)
+        {
+            if (job.Error != null) throw new InvalidOperationException("world group " + job.Name + " failed", job.Error);
+            string name = job.Name;
+            Material mat = job.Mat;
+            ShadowCastingMode? casting = job.Casting;
+            List<Vector3> v = job.V, n = job.N, uv2 = job.UV2, uv3 = job.UV3;
+            List<Color32> c = job.C;
+            List<Vector2> uv = job.UV;
+            List<Vector4> uv5 = job.UV5;
+            List<int> tri = job.Tri;
+            bool sways = job.Sways;
             var mesh = new Mesh { name = name, indexFormat = v.Count > 65000 ? IndexFormat.UInt32 : IndexFormat.UInt16 };
             mesh.SetVertices(v);
             mesh.SetNormals(n);

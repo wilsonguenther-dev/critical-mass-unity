@@ -442,7 +442,12 @@ namespace CriticalMass.Runtime.Game
                 cap = background ? FramePolicy.BackgroundCap(fg, _prefBg != 0) : fg;
                 double hz = Screen.currentResolution.refreshRateRatio.value;
                 (vsync, target) = _guard.Settings(cap, hz);
-                if (_prefVSync == 0 || (background && _prefBg != 0))
+                if (cap == FramePolicy.Unlimited)
+                {
+                    vsync = 0;   // perf-smooth-1: the player chose UNLIMITED: vsync off, no target
+                    target = -1;
+                }
+                else if (_prefVSync == 0 || (background && _prefBg != 0))
                 {
                     vsync = 0;   // vsync off by choice (or the save-power cap): still capped, never unbounded
                     target = cap > 0 ? cap : (double.IsNaN(hz) || hz < 20 ? 60 : (int)Math.Round(hz));
