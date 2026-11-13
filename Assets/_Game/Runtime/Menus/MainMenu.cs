@@ -50,7 +50,11 @@ namespace CriticalMass.Runtime.Menus
             band.RimPx = 0f;
             MenuUi.Label(space, "Heading", CMTokens.Display, 44, Cream, TextAnchor.MiddleLeft, ColX, ColY - 90f, ItemW, 60f, "MAIN MENU", 4f);
 
-            _entries = OverlayRegistry.MenuEntries();
+            // 2026-11-12 (UI rough spots): a line with no screen behind it is left out instead of shown as COMING SOON
+            // (Play always stays). The list closes up, so no dead row sits in the menu; Entries lists the lines shown.
+            _entries = new List<MenuEntry>();
+            foreach (MenuEntry e in OverlayRegistry.MenuEntries())
+                if (e.Available || e.Id == OverlayRegistry.Play) _entries.Add(e);
             for (int i = 0; i < _entries.Count; i++)
             {
                 MenuEntry e = _entries[i];

@@ -42,6 +42,7 @@ namespace CriticalMass.Runtime.Spectator
             set => HumanControlGuard.IdleAutopilotSeconds = value;
         }
         public const float DefaultIdleAutopilotSeconds = HumanControlGuard.DefaultIdleAutopilotSeconds;
+        public const float BannerW = 1040f, BannerH = 96f, BannerTop = 178f, FrameEdgePx = 10f;
         public const int SortingOrder = 13;
         /// <summary>Height of the YOU tag's point above the ground under actor 0, world units.</summary>
         public const float MarkerHeight = 2.6f;
@@ -74,9 +75,12 @@ namespace CriticalMass.Runtime.Spectator
         Canvas _canvas;
         RectTransform _marker;
         CanvasGroup _markerGroup;
-        GameObject _intro, _banner, _notice;
+        GameObject _intro, _banner, _notice, _frame;
+        CanvasGroup _frameGroup;
+        /// <summary>The brass screen frame shown with the autopilot banner (tests).</summary>
+        public bool FrameVisible => _frame != null && _frame.activeSelf;
         CanvasGroup _introGroup;
-        Text _introTitle, _noticeText;
+        Text _introTitle, _noticeText, _bannerWhat;
         PromptStrip _introStrip, _bannerStrip;
         float _markerUntil = -1f, _introUntil = -1f, _noticeUntil = -1f;
         int _tookBackSeen = -1;
@@ -183,7 +187,12 @@ namespace CriticalMass.Runtime.Spectator
             FeedUi.Refresh(_canvas);
 
             if (_banner.activeSelf != banner) _banner.SetActive(banner);
-            if (banner) UpdateBanner();
+            if (_frame.activeSelf != banner) _frame.SetActive(banner);
+            if (banner)
+            {
+                UpdateBanner();
+                _frameGroup.alpha = 0.6f + 0.35f * (0.5f + 0.5f * Mathf.Sin(now * Mathf.PI * 2f));
+            }
             if (_notice.activeSelf != notice) _notice.SetActive(notice);
 
             if (_intro.activeSelf != intro)
@@ -250,27 +259,53 @@ namespace CriticalMass.Runtime.Spectator
             sr.anchoredPosition = new Vector2(0f, 10f);
             _intro.SetActive(false);
 
-            // Autopilot banner, under the match panel.
-            RectTransform banner = FeedUi.Anchored(_canvas.transform, "Autopilot Banner", new Vector2(0.5f, 1f), 0f, -150f, BannerWidth, 64f);
+            // Autopilot banner, under the match panel. 2026-11-12 (owner: "the game's just running itself"): it must be
+            // impossible to miss, so it is big (Display 30 on a 1040 x 96 plate), says what is happening in two lines, and
+            // a brass frame runs round the whole screen while the fighter is not yours (a slow 1 Hz breathe: a live state).
+            RectTransform frame = MenuUi.Rt(_canvas.transform, "Autopilot Frame");
+            MenuUi.Stretch(frame);
+            _frame = frame.gameObject;
+            _frameGroup = _frame.AddComponent<CanvasGroup>();
+            _frameGroup.blocksRaycasts = false;
+            _frameGroup.interactable = false;
+            for (int e = 0; e < 4; e++)
+            {
+                Image edge = MenuUi.Rt(frame, "Edge " + e).gameObject.AddComponent<Image>();
+                edge.raycastTarget = false;
+                edge.color = brass;
+                RectTransform er = edge.rectTransform;
+                bool vertical = e >= 2;
+                er.anchorMin = new Vector2(e == 3 ? 1f : 0f, e == 1 ? 1f : 0f);
+                er.anchorMax = new Vector2(e == 2 ? 0f : 1f, e == 0 ? 0f : 1f);
+                er.pivot = new Vector2(e == 3 ? 1f : 0f, e == 1 ? 1f : 0f);
+                er.sizeDelta = vertical ? new Vector2(FrameEdgePx, 0f) : new Vector2(0f, FrameEdgePx);
+                er.anchoredPosition = Vector2.zero;
+            }
+            _frame.SetActive(false);
+
+            RectTransform banner = FeedUi.Anchored(_canvas.transform, "Autopilot Banner", new Vector2(0.5f, 1f), 0f, -BannerTop, BannerW, BannerH);
             _banner = banner.gameObject;
-            VectorShape bp = MenuUi.Shape(banner, "Plate", ShapeKind.RoundRect, 0f, 0f, BannerWidth, 64f, navy, 16f);
+            VectorShape bp = MenuUi.Shape(banner, "Plate", ShapeKind.RoundRect, 0f, 0f, BannerW, BannerH, navy, 18f);
             bp.OutlinePx = 4f;
-            bp.RimPx = 3f;
+            bp.RimPx = 4f;
             bp.RimColor = brass;
-            VectorShape tag = MenuUi.Shape(banner, "Tag", ShapeKind.RoundRect, 14f, 12f, 190f, 40f, brass, -1f);
+            VectorShape tag = MenuUi.Shape(banner, "Tag", ShapeKind.RoundRect, 16f, 16f, 220f, BannerH - 32f, brass, 14f);
             tag.RimPx = 0f;
-            MenuUi.Label(banner, "Autopilot", CMTokens.Display, 22, navy, TextAnchor.MiddleCenter, 14f, 12f, 190f, 40f, "AUTOPILOT", 0f);
-            _bannerStrip = PromptStrip.Make(banner, "Prompt", 32f, 22, cream);
+            MenuUi.Label(banner, "Autopilot", CMTokens.Display, 26, navy, TextAnchor.MiddleCenter, 16f, 16f, 220f, BannerH - 32f, "AUTOPILOT", 0f);
+            _bannerWhat = MenuUi.Label(banner, "What", CMTokens.Ui, 20, cream, TextAnchor.MiddleLeft, 256f, 10f, BannerW - 276f, 30f,
+                BannerWhat(false), 2f);
+            MenuUi.Fit(_bannerWhat, 16);
+            _bannerStrip = PromptStrip.Make(banner, "Prompt", 36f, 30, cream);
             RectTransform br = _bannerStrip.Rect;
-            br.anchorMin = br.anchorMax = new Vector2(0f, 0.5f);
-            br.pivot = new Vector2(0f, 0.5f);
-            br.sizeDelta = new Vector2(BannerWidth - 230f, 64f);
-            br.anchoredPosition = new Vector2(218f, 0f);
+            br.anchorMin = br.anchorMax = new Vector2(0f, 0f);
+            br.pivot = new Vector2(0f, 0f);
+            br.sizeDelta = new Vector2(BannerW - 276f, 52f);
+            br.anchoredPosition = new Vector2(256f, 8f);
             _bannerStrip.Align = TextAnchor.MiddleLeft;
             _banner.SetActive(false);
 
             // Notice line.
-            RectTransform notice = FeedUi.Anchored(_canvas.transform, "Notice", new Vector2(0.5f, 1f), 0f, -226f, 760f, 44f);
+            RectTransform notice = FeedUi.Anchored(_canvas.transform, "Notice", new Vector2(0.5f, 1f), 0f, -(BannerTop + BannerH * 0.5f + 40f), 760f, 44f);
             _notice = notice.gameObject;
             VectorShape np = MenuUi.Shape(notice, "Plate", ShapeKind.RoundRect, 0f, 0f, 760f, 44f, CMTokens.PanelNavy.Color, -1f);
             np.OutlinePx = 3f;
@@ -286,20 +321,31 @@ namespace CriticalMass.Runtime.Spectator
             _bannerBuilt = true;
             _bannerDevice = d;
             _bannerIdle = idle;
+            // Two lines (merge of fix/ui-rough-spots and fix/human-control): what is happening on top, the one thing
+            // that ends it below, big.
+            if (_bannerWhat != null) HudText.Set(_bannerWhat, BannerWhat(idle));
             _bannerStrip.Begin();
-            _bannerStrip.AddText(BannerText(d, idle));
+            _bannerStrip.AddText(BannerPress(d));
             _bannerStrip.End();
         }
 
         /// <summary>The banner's line: what is happening and the one thing that ends it.</summary>
-        public static string BannerText(ControlDevice d, bool idle) =>
-            (idle ? "YOU WERE IDLE, SO THE COMPUTER IS PLAYING YOUR FIGHTER. " : "THE COMPUTER IS PLAYING YOUR FIGHTER. ") +
-            (d == ControlDevice.Gamepad ? "PRESS ANY BUTTON TO PLAY." : "PRESS ANY KEY TO PLAY.");
+        public static string BannerText(ControlDevice d, bool idle) => BannerWhat(idle) + ". " + BannerPress(d);
 
-        /// <summary>The banner's line as drawn (tests).</summary>
-        public string BannerPrompt => _bannerStrip != null ? _bannerStrip.PlainText : string.Empty;
+        /// <summary>The banner's top line.</summary>
+        public static string BannerWhat(bool idle) =>
+            idle ? "YOU WERE IDLE, SO THE COMPUTER IS PLAYING YOUR FIGHTER" : "THE COMPUTER IS PLAYING YOUR FIGHTER";
 
-        public const float BannerWidth = 1180f;
+        /// <summary>The banner's big bottom line.</summary>
+        public static string BannerPress(ControlDevice d) =>
+            d == ControlDevice.Gamepad ? "PRESS ANY BUTTON TO PLAY." : "PRESS ANY KEY TO PLAY.";
+
+        /// <summary>The banner's two lines as drawn (tests).</summary>
+        public string BannerPrompt => (_bannerWhat != null ? _bannerWhat.text + ". " : string.Empty) +
+                                      (_bannerStrip != null ? _bannerStrip.PlainText : string.Empty);
+
+        /// <summary>Kept for callers of the batch-3 name.</summary>
+        public const float BannerWidth = BannerW;
 
         void BuildIntro(World w)
         {

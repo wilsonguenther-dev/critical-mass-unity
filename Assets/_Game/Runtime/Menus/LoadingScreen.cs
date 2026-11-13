@@ -81,6 +81,10 @@ namespace CriticalMass.Runtime.Menus
         /// <summary>Key art for the slot; null = Resources "UI/KeyArt/loading", then the gradient and logo.</summary>
         public static Texture KeyArt;
 
+        /// <summary>Lore line rect (1000 x 150, Ui 34) and tip rect (950 x 80, Ui 26) and the sizes they may shrink to.</summary>
+        public const float LoreW = 1000f, LoreH = 150f, TipW = 950f, TipH = 80f;
+        public const int LoreSize = 34, LoreMinSize = 22, TipSize = 26, TipMinSize = 18;
+
         static LoadingScreen _instance;
         public static LoadingScreen Instance => _instance;
         public static bool IsOpen => _instance != null && _instance._open;
@@ -309,11 +313,11 @@ namespace CriticalMass.Runtime.Menus
             _logo.raycastTarget = false;
 
             _lore = MenuUi.Label(space, "Lore", CMTokens.Ui, 34, cream, TextAnchor.LowerLeft, 120f, 560f, 1000f, 150f, "", 3f);
-            _lore.horizontalOverflow = HorizontalWrapMode.Wrap;
+            MenuUi.Fit(_lore, LoreMinSize);   // 2026-11-12: a long words-pack line shrinks before it spills (LayoutTextFitTests)
             VectorShape tipPanel = MenuUi.Panel(space, "Tip Panel", 110f, 740f, 1010f, 150f);
             MenuUi.Label(tipPanel.transform, "Tip Head", CMTokens.Display, 26, brass, TextAnchor.MiddleLeft, 30f, 18f, 300f, 36f, "TIP", 3f);
             _tip = MenuUi.Label(tipPanel.transform, "Tip", CMTokens.Ui, 26, cream, TextAnchor.UpperLeft, 30f, 58f, 950f, 80f, "", 2f);
-            _tip.horizontalOverflow = HorizontalWrapMode.Wrap;
+            MenuUi.Fit(_tip, TipMinSize);
 
             Controls = ControlsCard.Build(space, 1220f, 110f, 590f, 780f, "Loading Controls");
 

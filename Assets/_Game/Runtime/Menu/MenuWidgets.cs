@@ -120,6 +120,10 @@ namespace CriticalMass.Runtime.Menu
                 if (off) f = CMTokens.WithAlpha(f, 0.5f);
                 Body.SetFill(f);
             }
+            // States: idle (navy), focus = hover (brass; hovering moves the shared focus), pressed (darker brass and a
+            // 3 % shrink, view only), disabled (half alpha, stone text, skipped by navigation).
+            float sc = state == SelectionState.Pressed ? UiScale.PressedScale : 1f;
+            if (transform.localScale.x != sc) transform.localScale = new Vector3(sc, sc, 1f);
             Color t = focus ? FocusText : IdleText;
             if (off) t = CMTokens.WithAlpha(CMTokens.Stone.Color, 0.9f);
             if (Label != null) Label.color = t;
@@ -159,6 +163,22 @@ namespace CriticalMass.Runtime.Menu
             rt.pivot = new Vector2(0.5f, 0.5f);
             rt.sizeDelta = new Vector2(w, h);
             rt.anchoredPosition = new Vector2(x + w * 0.5f, -(y + h * 0.5f));
+        }
+
+        /// <summary>
+        /// Never clip: the text wraps inside its rect and best-fit shrinks it from its size down to min (uGUI best-fit
+        /// only shrinks when the overflow modes are bounded, which HudText.Make leaves unbounded; that is why the match
+        /// setup's DEMOLITIONS EXPERT spilled past its card even with best-fit on).
+        /// </summary>
+        public static Text Fit(Text t, int min = UiScale.TypeMin)
+        {
+            if (t == null) return null;
+            t.horizontalOverflow = HorizontalWrapMode.Wrap;
+            t.verticalOverflow = VerticalWrapMode.Truncate;
+            t.resizeTextMaxSize = Mathf.Max(t.fontSize, min);
+            t.resizeTextMinSize = Mathf.Min(min, t.fontSize);
+            t.resizeTextForBestFit = true;
+            return t;
         }
 
         public static void Stretch(RectTransform rt)
@@ -214,6 +234,8 @@ namespace CriticalMass.Runtime.Menu
             float pad = centre ? 0f : 18f;
             item.Label = Label(body.transform, "Label", face ?? CMTokens.Ui, fontSize, MenuItem.IdleText,
                 centre ? TextAnchor.MiddleCenter : TextAnchor.MiddleLeft, pad, 0f, w - pad * 2f, h, text, 2f);
+            // One line that shrinks before it clips (largest UI scale, long words-pack labels).
+            Fit(item.Label, Mathf.Min(fontSize, Mathf.Max(UiScale.TypeMin, Mathf.RoundToInt(fontSize * 0.7f))));
             return item;
         }
     }

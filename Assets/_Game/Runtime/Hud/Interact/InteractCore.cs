@@ -101,6 +101,13 @@ namespace CriticalMass.Runtime.Hud.Interact
             }
         }
 
+        /// <summary>
+        /// Pressed this frame by a device that owns this key in context k (2026-11-12): while spectating the controller
+        /// d-pad belongs to the spectator's objective jumps, so only the keyboard press counts (InputContext).
+        /// </summary>
+        public bool WasPressedIn(CriticalMass.Runtime.Input.InputContextKind k) =>
+            WasPressed && (CriticalMass.Runtime.Input.InputContext.HudOwnsDpad(k) || !WasPressedOnGamepad);
+
         /// <summary>Pressed this frame on a controller (the HUD focus is a toggle on controller).</summary>
         public bool WasPressedOnGamepad
         {

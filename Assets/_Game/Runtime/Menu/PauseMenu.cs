@@ -589,8 +589,9 @@ namespace CriticalMass.Runtime.Menu
                 _classItems[i] = it;
                 if (!Menus.MatchSetup.Playable.Contains(cls))
                 {
+                    // Not playable in this build: hidden, not a dead COMING SOON row (all six are playable since batch 3).
                     it.interactable = false;
-                    MenuUi.Label(it.transform, "Soon", CMTokens.Ui, 16, Brass, TextAnchor.MiddleRight, 330f, 0f, 170f, 70f, "COMING SOON", 2f);
+                    it.gameObject.SetActive(false);
                     continue;
                 }
                 items.Add(it);
@@ -657,7 +658,18 @@ namespace CriticalMass.Runtime.Menu
             space.pivot = new Vector2(0.5f, 0.5f);
             space.sizeDelta = new Vector2(HudLayout.RefW, HudLayout.RefH);
 
-            _title = MenuUi.Label(space, "Title", CMTokens.Display, 64, Cream, TextAnchor.MiddleCenter, 460f, 40f, 1000f, 90f, "PAUSED", 4f);
+            // 2026-11-12 (UI rough spots): the title used to sit on the HUD's score and clock (top 128 px). A solid title
+            // band now covers that strip while the menu is open, so the title reads on calm space and never on the clock.
+            Image band = MenuUi.Rt(space, "Title Band").gameObject.AddComponent<Image>();
+            band.rectTransform.anchorMin = new Vector2(0f, 1f);
+            band.rectTransform.anchorMax = new Vector2(1f, 1f);
+            band.rectTransform.pivot = new Vector2(0.5f, 1f);
+            band.rectTransform.sizeDelta = new Vector2(4000f, UiScale.TitleBandH);   // wider than any aspect's margin
+            band.rectTransform.anchoredPosition = Vector2.zero;
+            band.color = CMTokens.WithAlpha(Navy, 0.94f);
+            band.raycastTarget = false;
+            _title = MenuUi.Label(space, "Title", CMTokens.Display, UiScale.TypeTitle, Cream, TextAnchor.MiddleCenter, 460f, 20f, 1000f, 96f, "PAUSED", 4f);
+            MenuUi.Fit(_title, UiScale.TypeHeading);
             _hint = MenuUi.Label(space, "Hint", CMTokens.Ui, 20, Cream, TextAnchor.MiddleCenter, 260f, 1020f, 1400f, 36f, "", 2f);
             _hint.gameObject.SetActive(false);   // drawn by _hintStrip; kept as the plain line
             _hintStrip = PromptStrip.Make(space, "Hint Prompts", 30f, 20, Cream);
@@ -719,6 +731,12 @@ namespace CriticalMass.Runtime.Menu
                 () => { if (Flow.OverlayRegistry.StartTutorial()) Resume(); }, ShowControls, // DG-14: the one-screen controls card
                 () => ShowSettings(Tab.Audio),
             };
+            if (!howTo)
+            {
+                // 2026-11-12: no guided match registered: the line is left out rather than shown as COMING SOON.
+                labels.RemoveAt(4);
+                acts.RemoveAt(4);
+            }
             for (int e = 0; e < _extraDefs.Count; e++)
             {
                 int k = e;
@@ -731,7 +749,8 @@ namespace CriticalMass.Runtime.Menu
             int n = labels.Count;
             float stride = n <= 10 ? 72f : 66f, itemH = n <= 10 ? 62f : 58f;
             float total = (n - 1) * stride + itemH;
-            float y0 = Mathf.Max(150f, 540f - total * 0.5f);
+            // The panel starts under the title band (UiScale.TitleBandH) with one 16 px step of air.
+            float y0 = Mathf.Max(UiScale.TitleBandH + UiScale.S4 + 28f, 540f - total * 0.5f);
             MenuUi.Panel(page, "Panel", 640f, y0 - 28f, 640f, total + 56f);
             var items = new List<MenuItem>();
             for (int i = 0; i < n; i++)
@@ -743,16 +762,11 @@ namespace CriticalMass.Runtime.Menu
                 if (i == 1) _spectate = it;
                 if (i == 2) _changeClass = it;
                 if (i == 3) _switchTeam = it;
-                if (i == 4 && !howTo)
-                {
-                    // Present but not ready: dimmed, tagged and skipped by navigation.
-                    it.interactable = false;
-                    MenuUi.Label(it.transform, "Soon", CMTokens.Ui, 16, Brass, TextAnchor.MiddleRight, 330f, 0f, 170f, itemH, "COMING SOON", 2f);
-                    continue;
-                }
                 items.Add(it);
             }
-            _rootNote = MenuUi.Label(page, "Note", CMTokens.Ui, 22, Brass, TextAnchor.MiddleCenter, 640f, 918f, 640f, 36f, "", 2f);
+            // Under the panel, never inside its last line.
+            _rootNote = MenuUi.Fit(MenuUi.Label(page, "Note", CMTokens.Ui, UiScale.TypeBody, Brass, TextAnchor.MiddleCenter, 520f,
+                Mathf.Min(y0 + total + 28f + UiScale.S3, 1016f - 40f), 880f, 36f, "", 2f), UiScale.TypeMin);
             Chain(items);
             _resume = items[0];
         }

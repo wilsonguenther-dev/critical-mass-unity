@@ -45,11 +45,22 @@ namespace CriticalMass.Runtime.Secrets
             {
                 SecretsBoard.Fire(SecretsBoard.HillAlone);
                 SecretsBoard.Announce(HillAloneLine);
-                if (SettingsExtras.Subtitles) CaptionBar.Show(LoreText.Announcer(HillAloneLine), 4f);
+                // One caption only: the announcer subtitles its own line, so the secret's bar shows only when nobody
+                // else will (no announcer installed, or its subtitles are off while the access subtitles are on).
+                if (ShouldShowOwnCaption(SettingsExtras.Subtitles, CriticalMass.Runtime.Audio.Announcer.Instance != null,
+                        CriticalMass.Runtime.Audio.Announcer.SubtitlesEnabled))
+                    CaptionBar.Show(LoreText.Announcer(HillAloneLine), 4f);
             }
             ReadEvents(w);
             UpdateCrown(w);
         }
+
+        /// <summary>
+        /// The hill-alone line is captioned exactly once: by the announcer's subtitle when it is installed with subtitles on,
+        /// else by the secret's own caption bar when subtitles are on (EditMode test SecretCaptionTests).
+        /// </summary>
+        public static bool ShouldShowOwnCaption(bool subtitlesOn, bool announcerInstalled, bool announcerSubtitles) =>
+            subtitlesOn && !(announcerInstalled && announcerSubtitles);
 
         void NewMatch(World w)
         {
