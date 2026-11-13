@@ -3,9 +3,13 @@
 # ubuntu-6000.3.28f1-{base,windows-mono,mac-mono}-3 (published 2026-11-03). The project is Mono (scriptingBackend
 # Standalone 0), so the Windows and macOS players cross-build from Linux; the macOS app is unsigned.
 #
-# Licence: needs the repository secrets UNITY_LICENSE (the .ulf file's contents), UNITY_EMAIL and UNITY_PASSWORD
-# (Unity Personal, https://game.ci/docs/github/activation). Without them the `plan` job reports "skipped: no Unity
-# licence secret" and every Unity job is skipped cleanly (the run is green, nothing is spent past ~10 s).
+# Licence: needs EITHER the repository secret UNITY_LICENSE (the .ulf file's contents) OR both UNITY_EMAIL and
+# UNITY_PASSWORD (Unity Personal, https://game.ci/docs/github/activation). The game-ci CLI that unity-test-runner@v4 and
+# unity-builder@v4 shell out to resolves file mode whenever a .ulf is present and no serial is set
+# (game-ci/cli dist/platforms/ubuntu/steps/licensing_method.sh) and activates with `-manualLicenseFile` alone; email and
+# password are only a fallback there, used when the .ulf fails with "Machine bindings don't match". The owner signs in to
+# Unity with Google and has no Unity password, so the .ulf alone must be enough to run. Without any of these the `plan`
+# job reports "skipped: no Unity licence secret" and every Unity job is skipped cleanly (green, ~10 s).
 #
 # Safety: `pull_request` only (never pull_request_target), so a fork's PR gets no secrets; Unity jobs also refuse
 # fork PRs explicitly. Permissions are read-only except check runs for the test report.
@@ -48,7 +52,7 @@ jobs:
       - id: p
         shell: bash
         env:
-          HAS_LICENCE: ${{ secrets.UNITY_LICENSE != '' && secrets.UNITY_EMAIL != '' && secrets.UNITY_PASSWORD != '' }}
+          HAS_LICENCE: ${{ secrets.UNITY_LICENSE != '' || (secrets.UNITY_EMAIL != '' && secrets.UNITY_PASSWORD != '') }}
           EVENT: ${{ github.event_name }}
           WANT: ${{ inputs.jobs || 'tests' }}
           CATEGORY: ${{ inputs.category || '!Slow' }}
@@ -59,7 +63,7 @@ jobs:
         run: |
           set -euo pipefail
           run=true; why=''
-          if [ "$HAS_LICENCE" != true ]; then run=false; why='skipped: no Unity licence secret (UNITY_LICENSE, UNITY_EMAIL, UNITY_PASSWORD)'; fi
+          if [ "$HAS_LICENCE" != true ]; then run=false; why='skipped: no Unity licence secret (UNITY_LICENSE, or UNITY_EMAIL and UNITY_PASSWORD)'; fi
           if [ "$EVENT" = pull_request ]; then
             if [ "$FORK" = true ]; then run=false; why='skipped: fork PR (no secrets for forks)'; fi
             if [ "$LABELLED" != true ] && { [ "$ON_PR" != true ] || [ "$DRAFT" = true ]; }; then run=false; why="${why:-skipped: PR without the ci:unity label (or UNITY_CI_ON_PR unset / draft)}"; fi
@@ -122,7 +126,9 @@ jobs:
         with:
           testMode: ${{ matrix.mode }}
           customParameters: -testCategory ${{ needs.plan.outputs.category }}
-          coverageEnabled: false
+          # No `coverageEnabled: false`: unity-test-runner@v4.4.0 turns it into `--no-coverageEnabled`, and game-ci CLI
+          # v0.1.74 parses with "negation-prefix": false under strict mode, so the run dies in 1 s with
+          # "Unknown argument: noCoverageEnabled" (run 43450423341). The default (true) passes no such flag.
           artifactsPath: artifacts/${{ matrix.mode }}
           githubToken: ${{ secrets.GITHUB_TOKEN }}
           checkName: ${{ matrix.mode }} results
