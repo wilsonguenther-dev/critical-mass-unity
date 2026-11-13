@@ -312,7 +312,7 @@ namespace CriticalMass.Runtime.Hud
             _hpGhost.EmptyColor = Empty;
             _hpBar = Shape(c, "HP Bar", ShapeKind.RoundRect, 136f, 72f, 228f, 28f, CMTokens.Azure.Color, -1f);
 
-            string[] keys = { "LMB", "RMB", "E" };   // U-006 / U-020: attack, class ability, carry/interact
+            string[] keys = { "", "", "" };   // drawn by HudPrompts through InputGlyphs (never a literal key name);   // U-006 / U-020: attack, class ability, carry/interact
             for (int i = 0; i < 3; i++)
             {
                 float bx = 392f + i * 84f;

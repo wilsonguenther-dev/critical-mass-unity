@@ -310,7 +310,9 @@ namespace CriticalMass.Runtime.View.Effects
             double now = SimNow();
             float tr = _scene.Trauma(now, w.X[0], w.Z[0]);
             if (tr <= 0.001f) return;
-            float s = tr * tr * ShakeMax;
+            // The ACCESS tab's CAMERA SHAKE amount (0..100) scales it; the bare on flag with no amount set is full strength.
+            float amount = CriticalMass.Runtime.Menus.SettingsExtras.Shake01;
+            float s = tr * tr * ShakeMax * (amount > 0f ? amount : 1f);
             float tt = (float)now;
             float ox = Mathf.Sin(tt * 47.3f) * 0.6f + Mathf.Sin(tt * 91.7f + 1.3f) * 0.4f;
             float oy = Mathf.Sin(tt * 53.9f + 0.7f) * 0.6f + Mathf.Sin(tt * 83.1f + 2.1f) * 0.4f;

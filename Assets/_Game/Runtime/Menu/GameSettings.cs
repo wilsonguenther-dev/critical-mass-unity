@@ -8,7 +8,7 @@ namespace CriticalMass.Runtime.Menu
     /// <summary>
     /// The player's settings, stored in PlayerPrefs (kept between launches), read by the settings page and by any system
     /// that honours them. View side only: nothing here reaches the sim.
-    /// <para>Keys other code may read directly: cm.blood (int, 1 = blood on, default 1), cm.shake (camera shake, default 1),
+    /// <para>Keys other code may read directly: cm.blood (int, 1 = blood on, default 1), cm.shake (camera shake, default 0: off unless the player turns it up),
     /// cm.damagenumbers (default 1). Volumes are linear 0..1; the AudioMixer (Resources/Audio/CMMixer) gets them as dB on
     /// the exposed parameters MasterVolume, MusicVolume and EffectsVolume. Without the mixer, master volume falls back to
     /// AudioListener.volume.</para>
@@ -53,7 +53,9 @@ namespace CriticalMass.Runtime.Menu
 
         // ---- game ----
         /// <summary>Camera shake allowed (no shake exists yet; the flag is stored for the effects work).</summary>
-        public static bool CameraShake { get => GetB(ShakeKey, true); set => SetB(ShakeKey, value); }
+        /// <summary>Camera shake allowed. Default OFF everywhere (art direction: no shake in normal play); the ACCESS tab's
+        /// CAMERA SHAKE amount turns it on, and the effects read the same key with the same default.</summary>
+        public static bool CameraShake { get => GetB(ShakeKey, false); set => SetB(ShakeKey, value); }
         /// <summary>Floating damage numbers shown.</summary>
         public static bool DamageNumbers { get => GetB(DamageNumbersKey, true); set => SetB(DamageNumbersKey, value); }
         /// <summary>Blood effects on (PlayerPrefs cm.blood, default on).</summary>

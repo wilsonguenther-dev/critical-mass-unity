@@ -48,8 +48,11 @@ namespace CriticalMass.Runtime.Hud.Interact
         /// <summary>Re-reads the prompt text (after a rebind or a device change; allocates, never per frame).</summary>
         public void RefreshGlyphs()
         {
-            _glyphKb = _a != null ? ControlBindings.PromptLabel(_a, ControlDevice.KeyboardMouse) : _kbFallback;
-            _glyphPad = _a != null ? ControlBindings.PromptLabel(_a, ControlDevice.Gamepad) : _padFallback;
+            // Through InputGlyphs: the plain words of the current binding on each device.
+            _glyphKb = InputGlyphs.Words(Action, ControlDevice.KeyboardMouse);
+            _glyphPad = InputGlyphs.Words(Action, ControlDevice.Gamepad);
+            _glyphKb = string.IsNullOrEmpty(_glyphKb) ? null : _glyphKb.ToUpperInvariant();
+            _glyphPad = string.IsNullOrEmpty(_glyphPad) ? null : _glyphPad.ToUpperInvariant();
             if (string.IsNullOrEmpty(_glyphKb) || _glyphKb == "-") _glyphKb = _kbFallback;
             if (string.IsNullOrEmpty(_glyphPad) || _glyphPad == "-") _glyphPad = _padFallback;
         }
@@ -310,12 +313,16 @@ namespace CriticalMass.Runtime.Hud.Interact
     /// </summary>
     public static class LoreText
     {
-        public static string Folder => Path.Combine(Application.dataPath, "_Game", "Content", "Lore");
+        public static string Folder => Path.Combine(Application.dataPath, "_Game", "Resources", "Lore");
 
         public static T Load<T>(string file) where T : class
         {
             try
             {
+                // The words pack ships in Resources/Lore (the batch 1 rule), so player builds read it too.
+                TextAsset ta = Resources.Load<TextAsset>("Lore/" + Path.GetFileNameWithoutExtension(file));
+                if (ta != null && !string.IsNullOrEmpty(ta.text)) return JsonUtility.FromJson<T>(ta.text);
+                if (!Application.isEditor) return null;
                 string p = Path.Combine(Folder, file);
                 if (!File.Exists(p)) return null;
                 return JsonUtility.FromJson<T>(File.ReadAllText(p));

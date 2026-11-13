@@ -77,7 +77,10 @@ namespace CriticalMass.Runtime.Input
     {
         /// <summary>Every action of the Player map a prompt can name (tests check each maps to a glyph and words).</summary>
         public static readonly string[] PlayerActions =
-            { "Move", "Aim", "Point", "Attack", "Ability", "Jump", "Interact", "DigPlace", "SwitchDigPlace", "Scoreboard", "Pause" };
+        {
+            "Move", "Aim", "Point", "Attack", "Ability", "Jump", "Interact", "DigPlace", "SwitchDigPlace", "Scoreboard", "Pause",
+            "Map", "Ping", "HudCursor", "MinimapZoom",
+        };
 
         /// <summary>Abbreviations the owner could not read; no user-facing string may contain them as a word.</summary>
         public static readonly string[] Banned = { "LMB", "RMB", "MMB" };
@@ -213,6 +216,10 @@ namespace CriticalMass.Runtime.Input
                 case "SwitchDigPlace": return pad ? "<Gamepad>/leftShoulder" : "<Mouse>/scroll/y";
                 case "Scoreboard": return pad ? "<Gamepad>/select" : "<Keyboard>/tab";
                 case "Pause": return pad ? "<Gamepad>/start" : "<Keyboard>/escape";
+                case "Map": return pad ? "<Gamepad>/dpad/up" : "<Keyboard>/m";
+                case "Ping": return pad ? "<Gamepad>/dpad/left" : "<Keyboard>/g";
+                case "HudCursor": return pad ? "<Gamepad>/dpad/down" : "<Keyboard>/leftAlt";
+                case "MinimapZoom": return pad ? "<Gamepad>/dpad/right" : "<Keyboard>/n";
             }
             return null;
         }

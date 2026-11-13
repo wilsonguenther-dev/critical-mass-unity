@@ -489,7 +489,7 @@ namespace CriticalMass.Runtime.Audio
             TextAsset ta = Resources.Load<TextAsset>("Lore/announcer");
             if (ta != null && AnnouncerLines.ApplyWordsPack(ta.text) > 0) return;
 #if UNITY_EDITOR
-            string path = System.IO.Path.Combine(Application.dataPath, "_Game", "Content", "Lore", "announcer.json");
+            string path = System.IO.Path.Combine(Application.dataPath, "_Game", "Resources", "Lore", "announcer.json");
             if (System.IO.File.Exists(path)) AnnouncerLines.ApplyWordsPack(System.IO.File.ReadAllText(path));
 #endif
         }

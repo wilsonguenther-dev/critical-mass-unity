@@ -313,7 +313,9 @@ namespace CriticalMass.Runtime.Hud.Interact
                 string a = _spots[i].Def.KeyAction;
                 if (a == null) { _spots[i].Key = null; continue; }
                 UnityEngine.InputSystem.InputAction act = map != null ? map.FindAction(a, false) : null;
-                string k = act != null ? ControlBindings.PromptLabel(act, d) : null;
+                // Every key prompt goes through InputGlyphs (plain words from the current binding, never LMB / RMB).
+                string k = InputGlyphs.Words(a, d);
+                k = string.IsNullOrEmpty(k) || k == "-" ? (act != null ? ControlBindings.PromptLabel(act, d) : null) : k.ToUpperInvariant();
                 if (string.IsNullOrEmpty(k) || k == "-") k = Fallback(a, d);
                 _spots[i].Key = k;
             }
@@ -327,8 +329,8 @@ namespace CriticalMass.Runtime.Hud.Interact
                 case "Map": return pad ? "D-PAD UP" : "M";
                 case "Ping": return pad ? "D-PAD LEFT" : "G";
                 case "Scoreboard": return pad ? "VIEW" : "TAB";
-                case "Attack": return pad ? "RT" : "LMB";
-                case "Ability": return pad ? "LT" : "RMB";
+                case "Attack": return pad ? "RT" : "LEFT CLICK";
+                case "Ability": return pad ? "LT" : "RIGHT CLICK";
                 case "Interact": return pad ? "X" : "E";
                 default: return null;
             }

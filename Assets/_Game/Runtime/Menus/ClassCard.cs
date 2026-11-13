@@ -96,7 +96,7 @@ namespace CriticalMass.Runtime.Menus
             if (!Application.isEditor) return null;
             try
             {
-                string p = Path.Combine(Application.dataPath, "_Game", "Content", "Lore", name + ".json");
+                string p = Path.Combine(Application.dataPath, "_Game", "Resources", "Lore", name + ".json");
                 return File.Exists(p) ? File.ReadAllText(p) : null;
             }
             catch (Exception)

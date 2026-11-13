@@ -71,7 +71,7 @@ namespace CriticalMass.Runtime.Codex
                 string p = Path.Combine(Application.streamingAssetsPath, "Lore", file);
                 if (File.Exists(p)) return File.ReadAllText(p);
 #if UNITY_EDITOR
-                p = Path.Combine(Application.dataPath, "_Game", "Content", "Lore", file);
+                p = Path.Combine(Application.dataPath, "_Game", "Resources", "Lore", file);
                 if (File.Exists(p)) return File.ReadAllText(p);
 #endif
             }

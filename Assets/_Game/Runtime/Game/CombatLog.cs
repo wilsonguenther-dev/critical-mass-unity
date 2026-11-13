@@ -27,13 +27,16 @@ namespace CriticalMass.Runtime.Game
         MatchEnd,
     }
 
-    /// <summary>Killer ids beyond actor ids. KaijuSlam is inferred view-side: the sim credits a slam with -1.</summary>
+    /// <summary>
+    /// Killer ids beyond actor ids. The Kaiju slam is read from the event's death cause (DG-16: DamageCause.KaijuSlam; its
+    /// event B still reads -1); an event with no cause (an older stream) falls back to the slam-follows inference.
+    /// </summary>
     public static class KillSource
     {
         public const int Unknown = -1;
         /// <summary>Same value as Damage.KaijuSource (the Kaiju's melee swing).</summary>
         public const int KaijuMelee = Damage.KaijuSource;
-        public const int KaijuSlam = -3;
+        public const int KaijuSlam = Damage.KaijuSlamSource;
 
         public static bool IsKaiju(int killer) => killer == KaijuMelee || killer == KaijuSlam;
     }
@@ -151,9 +154,10 @@ namespace CriticalMass.Runtime.Game
                 {
                     case SimEventType.Hit:
                         // A slam hit (-1) keeps the slam's blow going (its deaths are re-credited to KaijuSlam below).
-                        if (e.B != _blowKiller && !(e.B == KillSource.Unknown && _blowKiller == KillSource.KaijuSlam))
+                        int src = e.Cause == DamageCause.KaijuSlam ? KillSource.KaijuSlam : e.B;
+                        if (src != _blowKiller && !(src == KillSource.Unknown && _blowKiller == KillSource.KaijuSlam))
                         {
-                            _blowKiller = e.B;
+                            _blowKiller = src;
                             _blowCount = 0;
                         }
                         break;
@@ -203,7 +207,9 @@ namespace CriticalMass.Runtime.Game
         {
             int victim = e.A;
             int killer = e.B;
-            if (killer == KillSource.Unknown && SlamFollows(w, _cursor)) killer = KillSource.KaijuSlam;
+            // DG-16: the sim says what killed (no guesswork); only a cause-less event uses the old inference.
+            if (e.Cause == DamageCause.KaijuSlam) killer = KillSource.KaijuSlam;
+            else if (e.Cause == DamageCause.None && killer == KillSource.Unknown && SlamFollows(w, _cursor)) killer = KillSource.KaijuSlam;
             if (killer != _blowKiller) { _blowKiller = killer; _blowCount = 0; }
             _blowCount++;
             if (Valid(victim))

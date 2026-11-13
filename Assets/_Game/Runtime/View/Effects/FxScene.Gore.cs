@@ -112,7 +112,9 @@ namespace CriticalMass.Runtime.View.Effects
         /// or a blast that went off within two ticks and reaches the body.</summary>
         private bool GibWorthy(ref FxEvent e, World w)
         {
-            if (e.B == -1 && w.Kaiju.State != KaijuState.Egg)
+            // DG-16: the sim names the cause. A slam or an explosion knock-out is gibbed; a melee or a fall never is.
+            if (e.Cause == DamageCause.KaijuSlam || e.Cause == DamageCause.Explosion) return true;
+            if (e.Cause == DamageCause.None && e.B == -1 && w.Kaiju.State != KaijuState.Egg)
             {
                 double dx = e.X - w.Kaiju.TelegraphX, dz = e.Z - w.Kaiju.TelegraphZ, r = _cfg.Kaiju.SlamRadius + 1.0;
                 if (dx * dx + dz * dz <= r * r) return true;

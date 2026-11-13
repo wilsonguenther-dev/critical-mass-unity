@@ -869,6 +869,10 @@ namespace CriticalMass.Runtime.Menu
 
         const float RowH = 40f, RowGap = 4f, LabelW = 330f, CellW = 210f, CellGap = 14f;
 
+        // Integration batch 2: 18 rows (Map, Ping, HUD cursor and Minimap zoom joined) at 30 + 3 px take the room 14 rows
+        // took at 40 + 4 px, so the list still ends above the status line.
+        const float CtlRowH = 30f, CtlRowGap = 3f;
+
         GameObject BuildControls(RectTransform parent)
         {
             RectTransform tab = MenuUi.Rt(parent, "Controls Tab");
@@ -890,7 +894,7 @@ namespace CriticalMass.Runtime.Menu
             for (int r = 0; r < ControlBindings.Rows.Length; r++)
             {
                 ControlRow row = ControlBindings.Rows[r];
-                MenuUi.Label(tab, "Row " + row.Label, CMTokens.Ui, 22, Cream, TextAnchor.MiddleLeft, ContentX + 8f, y, LabelW - 8f, RowH,
+                MenuUi.Label(tab, "Row " + row.Label, CMTokens.Ui, 19, Cream, TextAnchor.MiddleLeft, ContentX + 8f, y, LabelW - 8f, CtlRowH,
                     row.Label.ToUpperInvariant(), 2f);
                 var line = new MenuItem[4];
                 for (int c = 0; c < 4; c++)
@@ -899,11 +903,11 @@ namespace CriticalMass.Runtime.Menu
                     int k = c % 2;
                     if (k >= set.Length) continue;
                     RebindSlot slot = set[k];
-                    MenuItem cell = MenuUi.Item(tab, $"Cell {row.Label} {c}", ContentX + LabelW + c * (CellW + CellGap), y, CellW, RowH, "-",
-                        MenuItem.Kind.Button, 20, true, CMTokens.Mono);
+                    MenuItem cell = MenuUi.Item(tab, $"Cell {row.Label} {c}", ContentX + LabelW + c * (CellW + CellGap), y, CellW, CtlRowH, "-",
+                        MenuItem.Kind.Button, 17, true, CMTokens.Mono);
                     var cref = new CellRef { Item = cell, Slot = slot, Row = row };
                     // The binding's glyph beside its name (a mouse with the button lit, a keycap, a controller button).
-                    cref.Glyph = InputGlyphView.Make(cell.transform, "Glyph", 26f);
+                    cref.Glyph = InputGlyphView.Make(cell.transform, "Glyph", 22f);
                     cref.Glyph.Rect.anchoredPosition = new Vector2(8f, 0f);
                     cell.Submitted = () => StartRebind(cref);
                     if (!slot.Rebindable) cell.interactable = false;
@@ -911,7 +915,7 @@ namespace CriticalMass.Runtime.Menu
                     line[c] = cell;
                 }
                 grid.Add(line);
-                y += RowH + RowGap;
+                y += CtlRowH + CtlRowGap;
             }
             MenuItem reset = MenuUi.Item(tab, "Reset Controls", PanelX + PanelW - 40f - 340f, PanelY + PanelH - 78f, 340f, 56f,
                 "RESET TO DEFAULTS", MenuItem.Kind.Button, 24, true, CMTokens.Display);

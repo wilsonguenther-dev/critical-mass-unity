@@ -138,6 +138,8 @@ namespace CriticalMass.Runtime.Menus
         {
             string id = "card-" + n.ToString(CultureInfo.InvariantCulture);
             AudioClip c = Resources.Load<AudioClip>(NarrationResourceRoot + "/" + id);
+            // Integration batch 2: the narrator lines baked with the announcer (DG-18) live in Resources "CMVoice".
+            if (c == null) c = Resources.Load<AudioClip>("CMVoice/story-" + id);
 #if UNITY_EDITOR
             if (c == null) c = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>(string.Format(CultureInfo.InvariantCulture, NarrationAssetPathFormat, n));
 #endif

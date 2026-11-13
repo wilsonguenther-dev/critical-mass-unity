@@ -43,6 +43,8 @@ namespace CriticalMass.Runtime.View.Effects
         public double AttFacing;
         /// <summary>The local player (actor 0) is A or B.</summary>
         public bool Local;
+        /// <summary>DG-16: what did the damage, from the sim event (None on events that carry no cause).</summary>
+        public DamageCause Cause;
     }
 
     /// <summary>Receives decoded effect events (FxScene, CombatAudio, the vignette).</summary>
@@ -99,15 +101,11 @@ namespace CriticalMass.Runtime.View.Effects
             DeathZ = new double[actorCapacity];
             HoldTier = new byte[actorCapacity];
             LastDealtTick = Filled(actorCapacity, int.MinValue / 2);
-#if CM_HAS_JUMP
             _airLen = new int[actorCapacity];
-#endif
         }
-#if CM_HAS_JUMP
         // Jump landings (branch feat/dg-02-jump-bridges adds Actor.AirLen): the tick AirLen goes from > 0 to 0 is a landing.
-        // Define CM_HAS_JUMP (Player Settings > Scripting Define Symbols) once that branch is on main.
+        // Integration batch 2: DG-02 is in, so the landing decode is always compiled.
         private readonly int[] _airLen;
-#endif
 
         private static int[] Filled(int n, int v)
         {
@@ -133,19 +131,9 @@ namespace CriticalMass.Runtime.View.Effects
             }
             _head = w.EventHead;
 
-            GameConfig cfg = w.Config;
-            for (int i = 0; i < w.ActorCount; i++)
-            {
-                Actor ac = w.Actors[i];
-                if (!ac.Alive || ac.AnimAction != 0 || !(ac.AttackCd > 0)) continue;
-                if (Math.Abs(ac.AttackCd - cfg.Class(ac.Cls).AttackCooldown) > 1e-9) continue;
-                Begin(FxKind.Swing, w, i, -1, w.X[i], w.Z[i], cfg.Class(ac.Cls).AttackArcDeg);
-                _e.DirX = JsMath.Cos(ac.Facing);
-                _e.DirZ = JsMath.Sin(ac.Facing);
-                Send(w, a, b, c);
-            }
+            // Integration batch 2 (DG-16): swings come from the sim's AttackStart event and Kaiju hits from KaijuDamaged
+            // (decoded below with the contact position); nothing is inferred from cooldowns or the Kaiju's health any more.
 
-#if CM_HAS_JUMP
             for (int i = 0; i < w.ActorCount && i < _capacity; i++)
             {
                 Actor ac = w.Actors[i];
@@ -157,14 +145,7 @@ namespace CriticalMass.Runtime.View.Effects
                 }
                 _airLen[i] = air;
             }
-#endif
-            Kaiju k = w.Kaiju;
-            if (k.State != KaijuState.Egg && !double.IsNaN(_kaijuHp) && k.Hp < _kaijuHp - 1e-9)
-            {
-                Begin(FxKind.KaijuHit, w, -1, -1, k.X, k.Z, _kaijuHp - k.Hp);
-                Send(w, a, b, c);
-            }
-            _kaijuHp = k.Hp;
+            _kaijuHp = w.Kaiju.Hp;
         }
 
         private void Send(World w, IFxSink a, IFxSink b, IFxSink c)
@@ -195,6 +176,7 @@ namespace CriticalMass.Runtime.View.Effects
             _e.Team = valid ? w.Actors[a].Team : TeamId.Azure;
             _e.Cls = valid ? w.Actors[a].Cls : ClassId.Warrior;
             _e.Local = a == 0 || b == 0;
+            _e.Cause = DamageCause.None;
         }
 
         private bool Decode(SimEvent ev, World w)
@@ -215,6 +197,7 @@ namespace CriticalMass.Runtime.View.Effects
                     bool blocked = !death && w.Actors[t].Cls == ClassId.Warrior && w.Actors[t].AbilityActive > 0 &&
                                    Damage.IsFrontal(w, t, sx, sz);
                     Begin(death ? FxKind.Death : blocked ? FxKind.Block : FxKind.Hit, w, t, ev.B, ev.X, ev.Z, ev.Value);
+                    _e.Cause = ev.Cause;
                     _e.DirX = dx;
                     _e.DirZ = dz;
                     _e.Heavy = death || ev.Value >= HeavyDamage;
@@ -249,6 +232,21 @@ namespace CriticalMass.Runtime.View.Effects
                     }
                     return true;
                 }
+                case SimEventType.AttackStart:
+                {
+                    // A = attacker, Value = facing (radians). The swing effect starts at the attacker, along the real swing.
+                    int s = ev.A;
+                    if (s < 0 || s >= w.ActorCount) return false;
+                    Begin(FxKind.Swing, w, s, -1, w.X[s], w.Z[s], w.Config.Class(w.Actors[s].Cls).AttackArcDeg);
+                    _e.DirX = JsMath.Cos(ev.Value);
+                    _e.DirZ = JsMath.Sin(ev.Value);
+                    return true;
+                }
+                case SimEventType.KaijuDamaged:
+                    // (X, Z) = the contact point on the Kaiju toward the attacker (A), Value = damage dealt.
+                    Begin(FxKind.KaijuHit, w, -1, -1, ev.X, ev.Z, ev.Value);
+                    _e.Local = ev.A == 0;
+                    return true;
                 case SimEventType.Respawn:
                     if (ev.A >= 0 && ev.A < _capacity) DeathTick[ev.A] = int.MinValue / 2;
                     Begin(FxKind.Respawn, w, ev.A, -1, ev.X, ev.Z, ev.Value);

@@ -84,6 +84,10 @@ namespace CriticalMass.Runtime.Input
             new ControlRow("Switch dig / place", new[] { new RebindSlot("SwitchDigPlace", K, 0, rebindable: false) },
                 new[] { new RebindSlot("SwitchDigPlace", G, 0, "Shoulders", "negative"), new RebindSlot("SwitchDigPlace", G, 0, "Shoulders", "positive") }),
             new ControlRow("Scoreboard", new[] { new RebindSlot("Scoreboard", K) }, new[] { new RebindSlot("Scoreboard", G) }),
+            new ControlRow("Full map", new[] { new RebindSlot("Map", K) }, new[] { new RebindSlot("Map", G) }),
+            new ControlRow("Ping wheel", new[] { new RebindSlot("Ping", K) }, new[] { new RebindSlot("Ping", G) }),
+            new ControlRow("HUD cursor", new[] { new RebindSlot("HudCursor", K) }, new[] { new RebindSlot("HudCursor", G) }),
+            new ControlRow("Minimap zoom", new[] { new RebindSlot("MinimapZoom", K) }, new[] { new RebindSlot("MinimapZoom", G) }),
             new ControlRow("Pause menu", new[] { new RebindSlot("Pause", K) }, new[] { new RebindSlot("Pause", G) }),
         };
 

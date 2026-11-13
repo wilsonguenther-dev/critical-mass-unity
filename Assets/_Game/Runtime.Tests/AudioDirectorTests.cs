@@ -59,7 +59,7 @@ namespace CriticalMass.Runtime.Tests
         [Test]
         public void BuiltInLinesMatchTheWordsPack()
         {
-            string path = Path.Combine(Application.dataPath, "_Game", "Content", "Lore", "announcer.json");
+            string path = Path.Combine(Application.dataPath, "_Game", "Resources", "Lore", "announcer.json");
             if (!File.Exists(path)) Assert.Ignore("words pack (DG-04) not merged yet");
             var before = new string[AnnouncerLines.Table.Length];
             for (int i = 0; i < before.Length; i++) before[i] = AnnouncerLines.Table[i].Id + "|" + AnnouncerLines.Table[i].Text;
