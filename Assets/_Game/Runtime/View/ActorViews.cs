@@ -236,7 +236,7 @@ namespace CriticalMass.Runtime.View
             ModelView m = slot.Model;
             m.SetActive(true);
             m.Transform.localPosition = SimSpace.ToWorld(x, h, z) + (hasFx ? fx.Nudge : Vector3.zero);
-            m.Transform.localRotation = facing;
+            m.SetFacing(facing);
             m.Transform.localScale = Vector3.one * (hasFx ? fx.Scale : 1f);
             Material teamMat = ArtMaterials.ForTeam(m.Spec, actor.Team);
             m.SetMaterial(hasFx && fx.Flash ? _fx.FlashMaterial(teamMat) : teamMat);
@@ -319,7 +319,7 @@ namespace CriticalMass.Runtime.View
                 // The egg rests on the shrine's raised centre cell (a 1.5 u wall block in the grid view), not inside it.
                 double baseY = m == _egg ? h + RaisedTop(map, x, z) : h;
                 m.Transform.localPosition = SimSpace.ToWorld(x, baseY, z);
-                m.Transform.localRotation = facing;
+                m.SetFacing(facing);
                 m.SetMaterial(ArtMaterials.ForGlow(m.Spec, glow));
                 double speed = Math.Sqrt((k.X - k.PrevX) * (k.X - k.PrevX) + (k.Z - k.PrevZ) * (k.Z - k.PrevZ)) * cfg.SimHz;
                 _kaijuIdleT += dSim;
