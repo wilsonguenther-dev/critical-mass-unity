@@ -23,7 +23,8 @@ rm -f "$RESULTS"
 
 # No -quit: the Test Framework quits the editor itself when the run ends.
 set +e
-"$UNITY" -batchmode -nographics -projectPath "$ROOT" -runTests -testPlatform PlayMode \
+# Through the machine lock (cm-heavy unity, DG-44); never call "$UNITY" bare.
+"$CM_HEAVY" unity "$UNITY" -batchmode -nographics -projectPath "$ROOT" -runTests -testPlatform PlayMode \
   -testResults "$RESULTS" -logFile "$LOG" ${CATEGORY:+-testCategory "$CATEGORY"}
 code=$?
 set -e

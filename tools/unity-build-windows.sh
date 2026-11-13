@@ -7,7 +7,8 @@ source "$(dirname "${BASH_SOURCE[0]}")/_unity-env.sh"
 LOG="$ROOT/Logs/build-windows.log"
 
 set +e
-"$UNITY" -batchmode -nographics -projectPath "$ROOT" -buildTarget win64 \
+# Through the machine lock (cm-heavy unity, DG-44); never call "$UNITY" bare.
+"$CM_HEAVY" unity "$UNITY" -batchmode -nographics -projectPath "$ROOT" -buildTarget win64 \
   -executeMethod CriticalMass.Editor.Build.Windows -logFile "$LOG" -quit
 code=$?
 set -e

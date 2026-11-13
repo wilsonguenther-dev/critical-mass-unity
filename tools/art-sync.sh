@@ -14,7 +14,10 @@
 # Every clone is pinned (art refresh 2): tools/art/art-sources.tsv starts with "#pin<TAB>name<TAB>commit" lines (kaiju,
 # miner, warrior, farmer, props, environment, bases); each is read at that commit with `git archive`, never its working folder.
 #   ART_SYNC_TIMEOUT seconds for the Unity re-import (default 900); BLENDER (default: blender on PATH)
+#   Every Blender and Unity call goes through the machine lock, cm-heavy (DG-44): CM_HEAVY (default ~/bin/cm-heavy).
 set -euo pipefail
+CM_HEAVY="${CM_HEAVY:-$HOME/bin/cm-heavy}"
+[[ -x "$CM_HEAVY" ]] || { echo "art-sync: cm-heavy not found at $CM_HEAVY (DG-44)" >&2; exit 127; }
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RUN_UNITY=1; RUN_BLENDER=1
 for a in "$@"; do
@@ -116,7 +119,7 @@ printf '%s\t%s\t%s\t%s\n' "bases_placements.json" "$(shasum -a 256 "$B_DIR/bases
 FARMER_BLEND="$PIN_TMP/farmer/Assets/_Game/Art/Farmer/_source~/farmer.blend"
 if [[ $RUN_BLENDER -eq 1 && -f "$FARMER_BLEND" ]]; then
   BL="${BLENDER:-$(command -v blender || echo /Applications/Blender.app/Contents/MacOS/Blender)}"
-  perl -e 'alarm 300; exec @ARGV' "$BL" -b "$FARMER_BLEND" --factory-startup --python-exit-code 1 \
+  CM_HEAVY_TIMEOUT=300 "$CM_HEAVY" blender "$BL" -b "$FARMER_BLEND" --factory-startup --python-exit-code 1 \
     --python "$ROOT/tools/art/outline_weights.py" -- "$ART/Farmer/Farmer_OutlineW.json" > "$PIN_TMP/ow.log" 2>&1 \
     || { echo "art-sync: outline weight export failed:"; tail -20 "$PIN_TMP/ow.log"; exit 1; } >&2
   grep OUTLINE_W_OK "$PIN_TMP/ow.log"
@@ -130,7 +133,7 @@ if [[ $RUN_BLENDER -eq 1 ]]; then
   BL="${BLENDER:-$(command -v blender || true)}"
   if [[ -n "$BL" && -f "$KNIGHT" ]]; then
     tmp="$(mktemp -d)"
-    perl -e 'alarm 300; exec @ARGV' "$BL" -b --factory-startup --python "$ROOT/tools/art/build_kaykit_clips.py" -- "$KNIGHT" "$tmp/KayKit_Clips.fbx" > "$tmp/blender.log" 2>&1 \
+    CM_HEAVY_TIMEOUT=300 "$CM_HEAVY" blender "$BL" -b --factory-startup --python "$ROOT/tools/art/build_kaykit_clips.py" -- "$KNIGHT" "$tmp/KayKit_Clips.fbx" > "$tmp/blender.log" 2>&1 \
       || { echo "art-sync: Blender clip build failed (log $tmp/blender.log)" >&2; exit 1; }
     grep -q KAYKIT_CLIPS_OK "$tmp/blender.log" || { echo "art-sync: clip build printed no OK line ($tmp/blender.log)" >&2; exit 1; }
     # The FBX header carries a timestamp, so compare the clip list only: keep the committed file unless clips changed.
@@ -150,7 +153,7 @@ fi
 source "$ROOT/tools/_unity-env.sh"
 LOG="$ROOT/Logs/art-sync.log"
 set +e
-perl -e 'alarm shift; exec @ARGV' "${ART_SYNC_TIMEOUT:-900}" "$UNITY" -batchmode -nographics -projectPath "$ROOT" \
+CM_HEAVY_TIMEOUT="${ART_SYNC_TIMEOUT:-900}" "$CM_HEAVY" unity "$UNITY" -batchmode -nographics -projectPath "$ROOT" \
   -executeMethod CriticalMass.Editor.Art.ArtSync.Reimport -logFile "$LOG"
 code=$?
 set -e

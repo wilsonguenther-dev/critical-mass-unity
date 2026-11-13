@@ -5,7 +5,8 @@ source "$(dirname "${BASH_SOURCE[0]}")/_unity-env.sh"
 LOG="$ROOT/Logs/build-mac.log"
 
 set +e
-"$UNITY" -batchmode -nographics -projectPath "$ROOT" -buildTarget osxuniversal \
+# Through the machine lock (cm-heavy unity, DG-44); never call "$UNITY" bare.
+"$CM_HEAVY" unity "$UNITY" -batchmode -nographics -projectPath "$ROOT" -buildTarget osxuniversal \
   -executeMethod CriticalMass.Editor.Build.MacOS -logFile "$LOG" -quit
 code=$?
 set -e
