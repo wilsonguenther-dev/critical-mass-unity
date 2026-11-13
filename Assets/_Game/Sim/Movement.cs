@@ -6,7 +6,8 @@ namespace CriticalMass.Sim.Core
     /// Movement system (browser movement.ts): input to velocity to grid collision, then soft separation. Dead actors do not move.
     /// <para>CM-32: InputFrame.Jump (cleared here when read) starts a jump (Jump.cs). Airborne actors keep their takeoff
     /// velocity (no air control), move with the airborne collision rules (in-map VOID passes) and land at the end of tick
-    /// AirLen. DG-02: the press is buffered for Jump.BufferTicks ticks and coyote time counts unsupported ticks.</para>
+    /// AirLen. DG-02: the press is buffered for Jump.BufferTicks ticks and coyote time counts unsupported ticks. DG-09: past the
+    /// coyote window with no ground under its centre, the actor falls and climbs out (Terraform.FallIfUnsupported).</para>
     /// </summary>
     public static class Movement
     {
@@ -46,6 +47,8 @@ namespace CriticalMass.Sim.Core
                 // DG-02 coyote time: count the ticks this grounded actor has stood where its footprint no longer fits.
                 if (Collide.FootprintClear(w, i, w.X[i], w.Z[i])) a.UnsupportedTicks = 0;
                 else a.UnsupportedTicks++;
+                // DG-09 fall rule (U-053): ground gone under the centre for longer than the coyote window = fall in, climb out.
+                if (Terraform.FallIfUnsupported(w, i)) continue;
                 double mx = inp.MoveX;
                 double mz = inp.MoveZ;
                 double len2 = mx * mx + mz * mz;

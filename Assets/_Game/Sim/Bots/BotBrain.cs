@@ -67,6 +67,7 @@ namespace CriticalMass.Sim.Bots
             // fix-cm3-1: one scratch frame is shared by the human and every bot; a human jump / terraform press never reaches a bot.
             output.Terraform = false;
             output.Jump = false;
+            output.TerraformSwitch = false; // DG-09: bots never switch the dig / place mode (they never dig: oracle CM-30)
             BotSteer.SteerBot(w, st, id, output);
             // ITEM CM-38: added by its owner (takeBotTnt: Demolitions bot's F press)
         }

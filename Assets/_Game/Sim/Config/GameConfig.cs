@@ -371,6 +371,17 @@ namespace CriticalMass.Sim.Config
         public double TeamCooldownTicks = 30;
         public double MinGapTicks = 15;
         public double ActorMargin = 0.05;
+        /// <summary>
+        /// DG-09 (U-053, not in the browser): blocks a miner can carry. The browser carries exactly one (CarryMax 1 replays it
+        /// exactly: dig, place, dig...). [guess: 3, so the dig / place mode switch (wheel, LB / RB) has something to choose:
+        /// dig a short trench, then fill a gap three cells long.]
+        /// </summary>
+        public double CarryMax = 3;
+        /// <summary>
+        /// DG-09 fall rule (U-053, not in the browser): square cell rings searched around a fallen actor for ground to climb
+        /// out onto [guess: 6, wider than any hole the rate cap lets one team dig in a few seconds]; none = back to its pad.
+        /// </summary>
+        public double FallSearchRings = 6;
 
         public MinerTerraformConfig Clone() => (MinerTerraformConfig)MemberwiseClone();
     }

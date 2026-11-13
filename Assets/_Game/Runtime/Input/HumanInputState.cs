@@ -39,6 +39,7 @@ namespace CriticalMass.Runtime.Input
         bool _attackLatch;
         bool _abilityLatch;
         bool _terraformLatch;
+        bool _switchLatch;
         bool _jumpLatch;
         int _classPick = -1;
         double _moveRight;
@@ -63,6 +64,7 @@ namespace CriticalMass.Runtime.Input
             _attackLatch = false;
             _abilityLatch = false;
             _terraformLatch = false;
+            _switchLatch = false;
             _jumpLatch = false;
             _classPick = -1;
             _moveRight = 0;
@@ -103,6 +105,15 @@ namespace CriticalMass.Runtime.Input
                     _scoreboardHeld = true;
                     break;
             }
+        }
+
+        /// <summary>
+        /// DG-09 (U-053): the dig / place mode switch was pressed (mouse wheel notch, LB or RB; HumanInputSource edge-detects
+        /// the SwitchDigPlace axis). Latched like a button: one InputFrame.TerraformSwitch per press, dropped while paused.
+        /// </summary>
+        public void SwitchDigPlace()
+        {
+            if (!_paused) _switchLatch = true;
         }
 
         /// <summary>A button went up. Latches stay set until Fill consumes them.</summary>
@@ -161,6 +172,7 @@ namespace CriticalMass.Runtime.Input
             _attackLatch = false;
             _abilityLatch = false;
             _terraformLatch = false;
+            _switchLatch = false;
             _jumpLatch = false;
             _moveRight = 0;
             _moveUp = 0;
@@ -190,6 +202,7 @@ namespace CriticalMass.Runtime.Input
                 _attackLatch = false;
                 _abilityLatch = false;
                 _terraformLatch = false;
+                _switchLatch = false;
                 _jumpLatch = false;
                 _classPick = -1;
                 return;
@@ -233,6 +246,8 @@ namespace CriticalMass.Runtime.Input
             output.Interact = _interactHeld;
             output.Terraform = _terraformLatch;
             _terraformLatch = false;
+            output.TerraformSwitch = _switchLatch;
+            _switchLatch = false;
             output.Jump = _jumpLatch;
             _jumpLatch = false;
             output.ClassPick = _classPick;

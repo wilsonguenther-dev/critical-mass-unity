@@ -89,7 +89,8 @@ namespace CriticalMass.Sim.Core
                 // Structures (CM-05): the same swing chips enemy barricades in its arc; a Miner's pick also breaks breakables.
                 Barricades.DamageBarricadesInArc(w, i, ax, az, fx, fz, cc.AttackRange, cosHalf, cc.AttackDamage);
                 if (a.Cls == ClassId.Miner) Abilities.MinerWallBreak(w, i, ax, az, fx, fz);
-                // ITEM CM-31: added by its owner (swing chips decorations)
+                // CM-31: the same swing chips knock-down decorations in its arc (any class, bots included).
+                Topple.ToppleInArc(w, i, ax, az, fx, fz, cc.AttackRange, cosHalf);
 
                 // CM-08: the same cleave hits the hatched Kaiju within attackRange + kaiju.radius, inside the arc.
                 Kaiju kj = w.Kaiju;
