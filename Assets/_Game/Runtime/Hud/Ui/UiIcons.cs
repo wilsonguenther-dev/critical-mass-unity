@@ -62,6 +62,8 @@ namespace CriticalMass.Runtime.Hud.Ui
         /// <summary>hud-art-1: resource icons (coin chip, team stock).</summary>
         public const string Coin = "res-coin", Wood = "res-wood", Water = "res-water", Food = "res-food";
         public static readonly string[] Stock = { Wood, Water, Food };
+        /// <summary>hud-art-1: power-up icons by PickupKind - 1 (Haste, Might, Ward).</summary>
+        public static readonly string[] Items = { "item-haste", "item-might", "item-ward" };
         public static readonly string[] Adult = { "kaiju-adult-neutral", "kaiju-adult-azure", "kaiju-adult-crimson", "kaiju-adult-berserk" };
 
         static string[,] Grid(string prefix)
@@ -86,6 +88,7 @@ namespace CriticalMass.Runtime.Hud.Ui
             yield return Crown; yield return MapCrown; yield return Egg; yield return MapEgg; yield return You; yield return Hatchling;
             yield return EggCracking; yield return Coin;
             foreach (string s in Stock) yield return s;
+            foreach (string s in Items) yield return s;
             foreach (string s in Adult) yield return s;
         }
     }

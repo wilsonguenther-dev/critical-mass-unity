@@ -23,6 +23,8 @@ def slice_sheet(path, count):
     objs = ndi.find_objects(lab)
     sizes = [(int((lab[o] == i + 1).sum()), o) for i, o in enumerate(objs)]
     sizes.sort(key=lambda t: -t[0]); keep = [o for _, o in sizes[:count]]
+    if count == 3:
+        keep.sort(key=lambda o: (o[1].start + o[1].stop) / 2); return keep
     cys = sorted((o[0].start + o[0].stop) / 2 for o in keep); mid = (cys[len(cys) // 2 - 1] + cys[len(cys) // 2]) / 2
     keep.sort(key=lambda o: (0 if (o[0].start + o[0].stop) / 2 < mid else 1, (o[1].start + o[1].stop) / 2))
     return keep
@@ -109,6 +111,8 @@ if __name__ == "__main__":
             write(disc_icon(att, team), f"attack-{c}-{team}", outdir, 54)
             write(disc_icon(abb, team), f"ability-{c}-{team}", outdir, 54)
     for n, img in zip(["res-coin", "res-wood", "res-water", "res-food"], res): write(plain(img, 128), n, outdir, 32)
+    if os.path.exists(os.path.join(sheets, "sheet-items.png")):
+        for n, img in zip(["item-haste", "item-might", "item-ward"], cuts("items", 3)): write(plain(img, 128), n, outdir, 32)
     egg, crack, hatch, adult = kj
     write(plain(egg, 288), "kaiju-egg", outdir, 72); write(plain(crack, 288), "kaiju-egg-cracking", outdir, 72)
     write(plain(hatch, 288), "kaiju-hatchling", outdir, 72); write(plain(adult, 288), "kaiju-adult-neutral", outdir, 72)

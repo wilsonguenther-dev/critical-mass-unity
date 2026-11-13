@@ -122,6 +122,7 @@ namespace CriticalMass.Runtime.Tests
             var cutOuts = new HashSet<string> { UiIcons.Egg, UiIcons.EggCracking, UiIcons.Hatchling, UiIcons.Coin };
             foreach (string s in UiIcons.Adult) cutOuts.Add(s);
             foreach (string s in UiIcons.Stock) cutOuts.Add(s);
+            foreach (string s in UiIcons.Items) cutOuts.Add(s);
             var fresh = new List<string>(cutOuts);
             foreach (string[,] g in new[] { UiIcons.Portrait, UiIcons.Attack, UiIcons.Ability, UiIcons.ClassBadge })
                 foreach (string s in g) fresh.Add(s);

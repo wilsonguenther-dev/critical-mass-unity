@@ -76,6 +76,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
         RectTransform _coins, _power;
         Text _coinNum, _powerName, _powerTime, _powerHint;
         VectorShape _powerIcon, _powerPie;
+        RawImage _powerArt;
         readonly RectTransform[] _coinFly = new RectTransform[Coins];
         int _powerKindShown = -1;
 
@@ -288,6 +289,11 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             _powerPie.EmptyColor = CMTokens.MeterEmpty.Color;
             _powerIcon = Chip(_power, "Icon", ShapeKind.Shield, 20f, 20f, 28f, 28f, CMTokens.VoidNavy.Color, 4f);
             _powerIcon.OutlinePx = 0f;
+            // hud-art-1: the painted power-up icon over the timer pie (the vector glyph stays as the fallback)
+            _powerArt = MenuUi.Rt(_power, "Art").gameObject.AddComponent<RawImage>();
+            _powerArt.raycastTarget = false;
+            MenuUi.Place(_powerArt.rectTransform, 12f, 12f, 44f, 44f);
+            _powerArt.gameObject.SetActive(false);
             _powerName = MenuUi.Label(_power, "Name", CMTokens.Display, 22, cream, TextAnchor.MiddleLeft, 68f, 4f, 170f, 32f, "", 2.5f);
             _powerTime = MenuUi.Label(_power, "Time", CMTokens.Mono, 22, cream, TextAnchor.MiddleRight, 240f, 4f, 76f, 32f, "", 2f);
             _powerHint = MenuUi.Label(_power, "Counter", CMTokens.Ui, 13, CMTokens.WithAlpha(cream, 0.8f), TextAnchor.MiddleLeft, 68f, 36f, 250f, 26f, "", 1.5f);
@@ -553,6 +559,10 @@ namespace CriticalMass.Runtime.Hud.Mechanics
                 _powerPie.SetFill(c);
                 _powerIcon.Kind = PowerTimers.Icon[kind];
                 _powerIcon.SetVerticesDirty();
+                Texture2D art = kind >= 1 && kind <= UiIcons.Items.Length ? UiIcons.Get(UiIcons.Items[kind - 1], 2) : null;
+                _powerArt.texture = art;
+                _powerArt.gameObject.SetActive(art != null);
+                _powerIcon.gameObject.SetActive(art == null);
                 HudText.Set(_powerName, DepthWords.Pickup(kind));
                 _powerName.color = c;
                 HudText.Set(_powerHint, DepthWords.Counter(kind));

@@ -29,6 +29,10 @@ jobs = [
   "prompt": "Four resource icons for a game HUD in a 2-by-2 grid: top left a thick gold coin with an embossed crystal mark; top right a bundle "
             "of three chopped wooden logs tied with rope; bottom left a wooden bucket full of bright blue water with a splash; bottom right a "
             "harvest basket with bread, carrots and an apple. " + STY},
+ {"name": "sheet-items", "refs": [],
+  "prompt": "Three power-up icons for a game HUD in one row, left to right: HASTE, a winged leather boot with a small lightning bolt; MIGHT, "
+            "a clenched armoured fist with a few orange sparks; WARD, a round translucent-looking teal bubble shield with a bright rim around a "
+            "small stone rune. " + STY},
  {"name": "sheet-kaiju", "refs": [H + "/refs/kaiju-base.png", T + "/turnarounds_v1/turnaround/kaiju_hatchling/kaiju_hatchling-front-2k.jpg",
                                    os.path.expanduser("~/cm-wt-hud-art-1/Assets/_Game/Resources/Story/egg.png")],
   "prompt": "Four badge icons for a game HUD in a 2-by-2 grid, from our own designs in the references (first: the adult Kaiju, second: the "
@@ -37,5 +41,5 @@ jobs = [
             "front view, curious; bottom right the adult Kaiju's head and shoulders, front three-quarter view, jaws slightly open, its crystal "
             "crest glowing lime (#B8E833). Keep each design exactly like its reference. " + STY},
 ]
-for j in jobs: j.update({"model": "gemini-3-pro-image", "aspect": "1:1" if "2-by-2" in j["prompt"] else "3:2", "size": "2K"})
+for j in jobs: j.update({"model": "gemini-3-pro-image", "aspect": "1:1" if "2-by-2" in j["prompt"] else "16:9" if "in one row" in j["prompt"] else "3:2", "size": "2K"})
 json.dump(jobs, open(os.path.join(H, "icon_jobs.json"), "w"), indent=1); print(len(jobs))

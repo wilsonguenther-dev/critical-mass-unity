@@ -41,6 +41,14 @@
   "size": "2K"
  },
  {
+  "name": "sheet-items",
+  "refs": [],
+  "prompt": "Three power-up icons for a game HUD in one row, left to right: HASTE, a winged leather boot with a small lightning bolt; MIGHT, a clenched armoured fist with a few orange sparks; WARD, a round translucent-looking teal bubble shield with a bright rim around a small stone rune. Style: our stylised 3D game look (hand-painted 3D render, soft toon shading in three value steps, light from the upper left, a bold dark navy (#18233B) outline of even width around every object), chunky readable shapes that stay clear when shown at 40 pixels. Background perfectly flat pure white (#FFFFFF), no shadows, no glow halos, no text, no labels, no numbers, no frames, no circles or tiles behind the objects. Each item sits centred in its own cell of an invisible grid with wide white space between items; items never touch.",
+  "model": "gemini-3-pro-image",
+  "aspect": "16:9",
+  "size": "2K"
+ },
+ {
   "name": "sheet-kaiju",
   "refs": [
    "/Users/wilsonguenther/cm-wt-hud-art-1/Assets/_Game/Resources/UI/BigMoments/_source~/hud_art_1/refs/kaiju-base.png",
