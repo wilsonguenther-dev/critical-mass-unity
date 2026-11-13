@@ -453,9 +453,28 @@ namespace CriticalMass.Runtime.Menus
             src.Play();
         }
 
+        /// <summary>Capture and tests: draw through this camera into a w x h pixel target instead of the screen overlay (the
+        /// canvas stays 1080 units tall, as on screen).</summary>
+        public void UseCamera(UnityEngine.Camera cam, int pixelW, int pixelH)
+        {
+            Build();
+            Canvas.renderMode = RenderMode.ScreenSpaceCamera;
+            Canvas.worldCamera = cam;
+            Canvas.planeDistance = 1f;
+            CanvasScaler cs = Canvas.GetComponent<CanvasScaler>();
+            if (cs != null) cs.enabled = false;
+            Canvas.scaleFactor = pixelH / 1080f;
+            _viewOverride = new Vector2(1080f * pixelW / Mathf.Max(1f, pixelH), 1080f);
+        }
+
+        Vector2 _viewOverride;
+
+        /// <summary>The canvas size in canvas units (1080 tall).</summary>
+        public Vector2 ViewSize => _viewOverride.x > 0f ? _viewOverride : (_root != null ? _root.rect.size : new Vector2(1920f, 1080f));
+
         void UpdateStageScale()
         {
-            Rect r = _root.rect;
+            Rect r = new Rect(Vector2.zero, ViewSize);
             if (r.width < 1f || r.height < 1f) return;
             float s = Mathf.Max(r.width / _table.stageW, r.height / _table.stageH);
             if (Mathf.Abs(_stage.localScale.x - s) > 1e-4f) _stage.localScale = new Vector3(s, s, 1f);
