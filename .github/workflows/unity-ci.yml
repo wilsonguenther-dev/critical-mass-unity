@@ -1,0 +1,194 @@
+# ci/offload (2026-11-13): Unity EditMode, PlayMode and player builds on GitHub's Linux runners with GameCI
+# (https://game.ci), so agents stop queueing on the one Unity slot of the owner's Mac. Images: unityci/editor
+# ubuntu-6000.3.28f1-{base,windows-mono,mac-mono}-3 (published 2026-11-03). The project is Mono (scriptingBackend
+# Standalone 0), so the Windows and macOS players cross-build from Linux; the macOS app is unsigned.
+#
+# Licence: needs the repository secrets UNITY_LICENSE (the .ulf file's contents), UNITY_EMAIL and UNITY_PASSWORD
+# (Unity Personal, https://game.ci/docs/github/activation). Without them the `plan` job reports "skipped: no Unity
+# licence secret" and every Unity job is skipped cleanly (the run is green, nothing is spent past ~10 s).
+#
+# Safety: `pull_request` only (never pull_request_target), so a fork's PR gets no secrets; Unity jobs also refuse
+# fork PRs explicitly. Permissions are read-only except check runs for the test report.
+#
+# Triggers: manual (loop/gates/remote editmode|playmode|tests|build-windows|build-mac|builds|all), and PRs to main only
+# when the PR carries the label `ci:unity` or the repository variable UNITY_CI_ON_PR is 'true' (private-repo minutes
+# are limited: about 60 to 100 Linux minutes for tests plus one build).
+name: unity-ci
+on:
+  workflow_dispatch:
+    inputs:
+      jobs:
+        description: "Which Unity jobs"
+        type: choice
+        options: [tests, editmode, playmode, build-windows, build-mac, builds, all]
+        default: tests
+      category:
+        description: "NUnit category filter for EditMode and PlayMode (Unity syntax; '!Slow' = the per-batch set, 'Slow' = the slow suite)"
+        default: '!Slow'
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review, labeled]
+permissions:
+  contents: read
+  checks: write
+concurrency:
+  group: unity-ci-${{ github.ref }}-${{ inputs.jobs || 'pr' }}
+  cancel-in-progress: true
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      editmode: ${{ steps.p.outputs.editmode }}
+      playmode: ${{ steps.p.outputs.playmode }}
+      build-windows: ${{ steps.p.outputs.build-windows }}
+      build-mac: ${{ steps.p.outputs.build-mac }}
+      category: ${{ steps.p.outputs.category }}
+    steps:
+      - id: p
+        shell: bash
+        env:
+          HAS_LICENCE: ${{ secrets.UNITY_LICENSE != '' && secrets.UNITY_EMAIL != '' && secrets.UNITY_PASSWORD != '' }}
+          EVENT: ${{ github.event_name }}
+          WANT: ${{ inputs.jobs || 'tests' }}
+          CATEGORY: ${{ inputs.category || '!Slow' }}
+          FORK: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+          DRAFT: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft }}
+          LABELLED: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'ci:unity') }}
+          ON_PR: ${{ vars.UNITY_CI_ON_PR == 'true' }}
+        run: |
+          set -euo pipefail
+          run=true; why=''
+          if [ "$HAS_LICENCE" != true ]; then run=false; why='skipped: no Unity licence secret (UNITY_LICENSE, UNITY_EMAIL, UNITY_PASSWORD)'; fi
+          if [ "$EVENT" = pull_request ]; then
+            if [ "$FORK" = true ]; then run=false; why='skipped: fork PR (no secrets for forks)'; fi
+            if [ "$LABELLED" != true ] && { [ "$ON_PR" != true ] || [ "$DRAFT" = true ]; }; then run=false; why="${why:-skipped: PR without the ci:unity label (or UNITY_CI_ON_PR unset / draft)}"; fi
+          fi
+          e=false; p=false; w=false; m=false
+          if [ "$run" = true ]; then
+            case "$WANT" in
+              tests) e=true; p=true ;;
+              editmode) e=true ;;
+              playmode) p=true ;;
+              build-windows) w=true ;;
+              build-mac) m=true ;;
+              builds) w=true; m=true ;;
+              all) e=true; p=true; w=true; m=true ;;
+            esac
+          fi
+          { echo "editmode=$e"; echo "playmode=$p"; echo "build-windows=$w"; echo "build-mac=$m"; echo "category=$CATEGORY"; } >> "$GITHUB_OUTPUT"
+          echo "### unity-ci plan" >> "$GITHUB_STEP_SUMMARY"
+          echo "editmode=$e playmode=$p build-windows=$w build-mac=$m category='$CATEGORY' ${why}" | tee -a "$GITHUB_STEP_SUMMARY"
+
+  tests:
+    needs: plan
+    if: needs.plan.outputs.editmode == 'true' || needs.plan.outputs.playmode == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [EditMode, PlayMode]
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Skip the mode that was not asked for
+        id: want
+        shell: bash
+        run: |
+          w=false
+          [ "${{ matrix.mode }}" = EditMode ] && [ "${{ needs.plan.outputs.editmode }}" = true ] && w=true
+          [ "${{ matrix.mode }}" = PlayMode ] && [ "${{ needs.plan.outputs.playmode }}" = true ] && w=true
+          echo "run=$w" >> "$GITHUB_OUTPUT"
+      - name: Free disk (the editor image is ~5.3 GB, Library ~3.6 GB)
+        if: steps.want.outputs.run == 'true'
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL && df -h /
+      - uses: actions/checkout@v4
+        if: steps.want.outputs.run == 'true'
+        with:
+          lfs: true
+      - uses: actions/cache@v4
+        if: steps.want.outputs.run == 'true'
+        with:
+          path: Library
+          key: Library-editor-${{ hashFiles('Packages/packages-lock.json', 'ProjectSettings/ProjectVersion.txt') }}-${{ github.sha }}
+          restore-keys: |
+            Library-editor-${{ hashFiles('Packages/packages-lock.json', 'ProjectSettings/ProjectVersion.txt') }}-
+            Library-editor-
+      - uses: game-ci/unity-test-runner@v4
+        if: steps.want.outputs.run == 'true'
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          testMode: ${{ matrix.mode }}
+          customParameters: -testCategory ${{ needs.plan.outputs.category }}
+          coverageEnabled: false
+          artifactsPath: artifacts/${{ matrix.mode }}
+          githubToken: ${{ secrets.GITHUB_TOKEN }}
+          checkName: ${{ matrix.mode }} results
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.want.outputs.run == 'true'
+        with:
+          name: unity-${{ matrix.mode }}-results
+          path: artifacts/${{ matrix.mode }}
+          if-no-files-found: warn
+          retention-days: 7
+
+  build:
+    needs: plan
+    if: needs.plan.outputs.build-windows == 'true' || needs.plan.outputs.build-mac == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: StandaloneWindows64
+            method: CriticalMass.Editor.Build.Windows
+            out: Builds/Windows
+            want: build-windows
+          - target: StandaloneOSX
+            method: CriticalMass.Editor.Build.MacOS
+            out: Builds/macOS
+            want: build-mac
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Skip the target that was not asked for
+        id: want
+        shell: bash
+        run: echo "run=${{ matrix.want == 'build-windows' && needs.plan.outputs.build-windows || needs.plan.outputs.build-mac }}" >> "$GITHUB_OUTPUT"
+      - name: Free disk
+        if: steps.want.outputs.run == 'true'
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL && df -h /
+      - uses: actions/checkout@v4
+        if: steps.want.outputs.run == 'true'
+        with:
+          lfs: true
+      - uses: actions/cache@v4
+        if: steps.want.outputs.run == 'true'
+        with:
+          path: Library
+          key: Library-${{ matrix.target }}-${{ hashFiles('Packages/packages-lock.json', 'ProjectSettings/ProjectVersion.txt') }}-${{ github.sha }}
+          restore-keys: |
+            Library-${{ matrix.target }}-${{ hashFiles('Packages/packages-lock.json', 'ProjectSettings/ProjectVersion.txt') }}-
+            Library-${{ matrix.target }}-
+            Library-editor-
+      - uses: game-ci/unity-builder@v4
+        if: steps.want.outputs.run == 'true'
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          targetPlatform: ${{ matrix.target }}
+          buildMethod: ${{ matrix.method }}
+          versioning: None
+          allowDirtyBuild: true
+      - name: Pack the player (tar keeps the macOS app's permissions)
+        if: steps.want.outputs.run == 'true'
+        run: sudo tar -C "${{ matrix.out }}" -czf "player-${{ matrix.target }}.tgz" .
+      - uses: actions/upload-artifact@v4
+        if: steps.want.outputs.run == 'true'
+        with:
+          name: player-${{ matrix.target }}
+          path: player-${{ matrix.target }}.tgz
+          retention-days: 7
