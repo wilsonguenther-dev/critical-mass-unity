@@ -61,8 +61,8 @@ namespace CriticalMass.Runtime.Tests
         static readonly Regex NeedsRuleRe = new Regex(@"^DG-\d{2}[ab]?$");
         /// <summary>Rules the sim does not run yet (gap list section 3): any line naming one must say what it waits for.</summary>
         static readonly Regex UnbuiltRuleRe = new Regex(
-            // integration batch 2: jump (DG-02), dig (DG-09) and cleanse (DG-16a) are in the sim now and left this list
-            @"\b(heal(?:s|ing|ed)?|fountain|meat|mines?|tnt|ladders?|rope bridges?|upgrades?|stations?|heavy)\b",
+            // integration batch 2: jump (DG-02), dig (DG-09), and the fountain heal and cleanse (DG-16a, Sim/Heal.cs) are in the sim now and left this list
+            @"\b(meat|mines?|tnt|ladders?|rope bridges?|upgrades?|stations?|heavy)\b",
             RegexOptions.IgnoreCase);
         /// <summary>Technology, vendor and other games' names never appear in the words.</summary>
         static readonly string[] Forbidden =
