@@ -223,11 +223,16 @@ namespace CriticalMass.Runtime.PlayTests
             x0 = w.X[0];
             z0 = w.Z[0];
             InputSystem.QueueStateEvent(_pad, new GamepadState { leftStick = new Vector2(0f, 1f) });
-            yield return Real(HoldSeconds);
+            yield return Real(HoldSeconds * 0.5f);
+            Vector2 heldMove = map["Move"].ReadValue<Vector2>();
+            string heldDevice = map["Move"].activeControl != null ? map["Move"].activeControl.path : "none";
+            yield return Real(HoldSeconds * 0.5f);
             InputSystem.QueueStateEvent(_pad, new GamepadState());
             yield return null;
             Assert.IsFalse(d.HumanAutopilot, where + ": autopilot while the stick was pushed");
-            Assert.Greater(TravelUp(w, x0, z0), MinTravel, where + ": the left stick did not move the fighter up the screen");
+            Assert.Greater(TravelUp(w, x0, z0), MinTravel, where + ": the left stick did not move the fighter up the screen" +
+                $" (Move read {heldMove} from {heldDevice}; pads {Gamepad.all.Count}, current {(Gamepad.current == _pad ? "test pad" : "other")};" +
+                $" stand-up {w.Actors[0].StandUp}, stun {w.Actors[0].HitStunTicks}, alive {w.Actors[0].Alive})");
             Assert.AreEqual(0, guard.LockoutsReported, where + ": the lockout watchdog fired");
         }
 
