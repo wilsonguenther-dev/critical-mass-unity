@@ -194,6 +194,9 @@ namespace CriticalMass.Runtime.Tests
             {
                 "View/Effects/CombatFeed.cs", "View/KaijuMoments.cs", "Game/CombatLog.cs", "Game/MatchStats.cs", "Hud/GameHud.cs",
                 "Hud/DebugHud.cs",
+                // integration batch 3: readers that landed in batch 2 or beside this PR (each decodes only its own events)
+                "Audio/Announcer.cs", "Game/MomentRecorder.cs", "Progression/MatchRewardTracker.cs", "Secrets/SecretWatcher.cs",
+                "Spectator/SpectatorOverlay.cs", "View/BigMoments/MomentTriggers.cs",
             };
             var readers = Directory.GetFiles(root, "*.cs", SearchOption.AllDirectories)
                 .Where(f => Regex.IsMatch(File.ReadAllText(f), @"\.EventHead\b"))

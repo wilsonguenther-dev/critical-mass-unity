@@ -43,6 +43,7 @@ namespace CriticalMass.Runtime.Progression
             new[] { "LampCap", "DrillHelm", "CrystalCrown" },        // Miner
             new[] { "Goggles", "FuseBandana", "BlastHelm" },         // Demolitions
             new[] { "HardHat", "PencilCap", "ForemanHelm" },         // Builder
+            new[] { "Circlet", "WingedHelm", "HaloCrown" },          // Healer (DG-40; art to come, resolves to nothing until then)
         };
 
         static readonly string[] EmblemIds = { "Crest", "Sunburst", "HillCrown", "EggSeam", "KaijuEye", "BasinStar" };

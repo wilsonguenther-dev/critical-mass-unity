@@ -71,7 +71,12 @@ namespace CriticalMass.Runtime.Menu
 
         // ---- game ----
         /// <summary>Camera shake allowed: ShakeScale above 0 (cm.shake is kept in step for older readers).</summary>
-        public static bool CameraShake { get => ShakeScale > 0f; set => ShakeScale = value ? 1f : 0f; }
+        public static bool CameraShake
+        {
+            // The ACCESS amount decides once it exists; before that the older on/off key does (default off on a fresh install).
+            get => PlayerPrefs.HasKey(ShakeScaleKey) ? ShakeScale > 0f : GetB(ShakeKey, false);
+            set => ShakeScale = value ? 1f : 0f;
+        }
 
         /// <summary>The shake steps the settings page cycles through, in screen order (off is the default).</summary>
         public static readonly float[] ShakeSteps = { 0f, 0.5f, 1f };

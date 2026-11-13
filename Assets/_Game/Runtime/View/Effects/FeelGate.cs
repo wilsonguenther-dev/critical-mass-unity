@@ -126,6 +126,9 @@ namespace CriticalMass.Runtime.View.Effects
             { FxKind.WallCrack, FeelGating.None },
             { FxKind.WallBreak, FeelGating.Shake },
             { FxKind.HillChange, FeelGating.None },
+            { FxKind.Explosion, FeelGating.Flashing | FeelGating.Shake },   // effects v2 / DG-22 blasts
+            { FxKind.Splash, FeelGating.None },
+            { FxKind.Land, FeelGating.None },
         };
 
         static readonly Dictionary<FeelEffect, FeelGating> EffectTable = new Dictionary<FeelEffect, FeelGating>

@@ -108,15 +108,15 @@
         {
           "input": "ability",
           "name": "Land Mine",
-          "text": "Lay a mine on your spot. It arms in half a second and blows on the first enemy who steps on it, for 70 damage. Two at a time; a third recycles the oldest.",
+          "text": "Lay a mine on your spot. It arms after {cfg:mineArm} s and blows on the first enemy who steps on it for {cfg:mineDamage} damage. Up to {cfg:mineMax} at a time; another recycles the oldest.",
           "cooldown": "",
           "needsRule": ""
         },
         {
           "input": "throw",
           "name": "TNT",
-          "text": "Throw TNT up to 5 m. It blows 1.5 s after it lands for 55 damage, breaks walls and craters the ground.",
-          "cooldown": "5",
+          "text": "Throw TNT up to {cfg:tntRange} m. It blows {cfg:tntFuse} s after it lands for {cfg:tntDamage} damage, breaks walls and craters the ground.",
+          "cooldown": "{cfg:tntCooldown}",
           "needsRule": ""
         }
       ]
@@ -131,7 +131,7 @@
         {
           "input": "ability",
           "name": "Ladder",
-          "text": "Spend 1 biomass on a ladder up a wall, or 2 on a rope bridge across a gap or water, toward where you aim. Pieces last 60 s.",
+          "text": "Spend {cfg:ladderCost} biomass on a ladder up a wall of up to {cfg:ladderCells} cells, or {cfg:bridgeCost} on a rope bridge across up to {cfg:bridgeCells} cells of gap or water, toward your aim. Pieces last {cfg:pieceLife} s.",
           "cooldown": "",
           "needsRule": ""
         },
@@ -144,8 +144,8 @@
         },
         {
           "input": "passive",
-          "name": "Two at a Time",
-          "text": "Two pieces out at once. Your team's delivered biomass pays for them.",
+          "name": "Team Bank",
+          "text": "Your team's delivered biomass pays for every piece.",
           "cooldown": "",
           "needsRule": ""
         }
@@ -161,22 +161,22 @@
         {
           "input": "attack",
           "name": "Mend",
-          "text": "Heal the hurt ally nearest your aim within 5.5 m for 6 health. No damage, ever.",
+          "text": "Heal the hurt ally nearest your aim within {cfg:mendRange} m for {cfg:mendHeal} health. No damage, ever.",
           "cooldown": "",
           "needsRule": ""
         },
         {
           "input": "ability",
           "name": "Healing Wings",
-          "text": "Heal every ally within 3.5 m of your aim, you included, for 30.",
-          "cooldown": "9",
+          "text": "Heal every ally within {cfg:pulseRadius} m of your aim, you included, for {cfg:pulseHeal}.",
+          "cooldown": "{cfg:healerCooldown}",
           "needsRule": ""
         },
         {
           "input": "throw",
           "name": "Purify",
           "text": "Near the shrine, burn away one unit of corruption.",
-          "cooldown": "30",
+          "cooldown": "{cfg:purifyCooldown}",
           "needsRule": ""
         }
       ]
