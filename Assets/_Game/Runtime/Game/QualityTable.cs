@@ -37,10 +37,14 @@ namespace CriticalMass.Runtime.Game
         /// <summary>Fighters beyond this many metres from the camera evaluate their pose every AnimFarInterval frames.</summary>
         public readonly float AnimFarMetres;
         public readonly int AnimFarInterval;
+        /// <summary>perf-60hz-32p crowd budget: at most this many fighters besides your own draw LOD0 (the nearest to the
+        /// camera target within Lod0Metres); the rest draw LOD1. -1 = no budget (distance only).</summary>
+        public readonly int Lod0Budget;
 
         public QualityRow(float shadowDistance, bool propShadows, FighterShadow fighterShadows, bool blobShadows, float lod0Metres,
-            bool lod1Outline, float animFarMetres, int animFarInterval)
+            bool lod1Outline, float animFarMetres, int animFarInterval, int lod0Budget = -1)
         {
+            Lod0Budget = lod0Budget;
             ShadowDistance = shadowDistance;
             PropShadows = propShadows;
             FighterShadows = fighterShadows;
@@ -65,6 +69,9 @@ namespace CriticalMass.Runtime.Game
         public const float Lod0Metres = 25f;
         /// <summary>DG-108: half-rate poses beyond 15 u (Low: every third frame beyond 12 u).</summary>
         public const float AnimFarMetres = 15f;
+        /// <summary>perf-60hz-32p crowd budgets (fighters besides your own at LOD0): with all 32 on screen at the hill, Medium
+        /// skins 1 + 10 LOD0 bodies (at most 4,500 triangles each) and 21 LOD1 bodies (1,500) instead of 32 LOD0 ones.</summary>
+        public const int MediumLod0Budget = 10, HighLod0Budget = 16;
 
         /// <summary>The row for a quality level (0 Very Low, 1 Low, 2 Medium, 3 High, 4 Very High, 5 Ultra).</summary>
         public static QualityRow For(int level)
@@ -72,8 +79,8 @@ namespace CriticalMass.Runtime.Game
             if (level <= FramePolicy.LevelLow)
                 return new QualityRow(0f, false, FighterShadow.Blob, true, 0f, false, 12f, 3);
             if (level == FramePolicy.LevelMedium)
-                return new QualityRow(MediumShadowMetres, false, FighterShadow.Proxy, false, Lod0Metres, false, AnimFarMetres, 2);
-            return new QualityRow(HighShadowMetres, false, FighterShadow.Proxy, false, Lod0Metres, true, AnimFarMetres, 2);
+                return new QualityRow(MediumShadowMetres, false, FighterShadow.Proxy, false, Lod0Metres, false, AnimFarMetres, 2, MediumLod0Budget);
+            return new QualityRow(HighShadowMetres, false, FighterShadow.Proxy, false, Lod0Metres, true, AnimFarMetres, 2, HighLod0Budget);
         }
 
         /// <summary>
@@ -84,7 +91,19 @@ namespace CriticalMass.Runtime.Game
         public static bool ExtraClutter(int level) => level >= FramePolicy.LevelHigh;
 
         /// <summary>The row in force now (RenderTier.Level; the editor and tests stay at High unless they set it).</summary>
-        public static QualityRow Current => For(RenderTier.Level);
+        public static QualityRow Current => FrameGovernor.TitleUp ? ForTitle(RenderTier.Level) : For(RenderTier.Level);
+
+        /// <summary>
+        /// perf-60hz-32p: the title screen's backdrop match (nobody plays it, the logo and menu sit over it): every fighter but
+        /// the followed one at LOD1 and posed every other frame (every third at Low), so the title stays inside its idle CPU
+        /// budget (35% of a core; 59 to 61% measured on the 8 GB Air at batch 6). Pure; tests.
+        /// </summary>
+        public static QualityRow ForTitle(int level)
+        {
+            QualityRow r = For(level);
+            return new QualityRow(r.ShadowDistance, r.PropShadows, r.FighterShadows, r.BlobShadows, r.Lod0Metres, r.Lod1Outline,
+                0f, Math.Max(2, r.AnimFarInterval), 0);
+        }
     }
 
     /// <summary>
@@ -101,6 +120,24 @@ namespace CriticalMass.Runtime.Game
             if (self) return 0;
             if (row.Lod0Metres <= 0f) return 1;
             return distanceToTarget <= row.Lod0Metres ? 0 : 1;
+        }
+
+        /// <summary>perf-60hz-32p: PickLod with the crowd budget. budgetCut = the distance of the Lod0Budget-th nearest other
+        /// fighter (CrowdCut); farther ones draw LOD1 even inside Lod0Metres (pure; tests).</summary>
+        public static int PickLod(bool self, float distanceToTarget, float budgetCut, in QualityRow row)
+        {
+            int lod = PickLod(self, distanceToTarget, row);
+            return lod == 0 && !self && distanceToTarget > budgetCut ? 1 : lod;
+        }
+
+        /// <summary>The crowd budget's cut distance: the budget-th smallest of the first n distances (others than your own),
+        /// or +infinity when the budget covers them all or is off. Sorts scratch in place (no allocation; pure; tests).</summary>
+        public static float CrowdCut(float[] scratch, int n, int budget)
+        {
+            if (budget < 0 || n <= budget || scratch == null) return float.PositiveInfinity;
+            if (budget == 0) return float.NegativeInfinity;
+            Array.Sort(scratch, 0, n);
+            return scratch[budget - 1];
         }
 
         public static bool ShouldEvaluate(bool self, bool forced, bool visible, float distance, int frame, int index, in QualityRow row)

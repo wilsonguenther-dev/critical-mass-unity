@@ -89,6 +89,9 @@ namespace CriticalMass.Runtime.Game
         /// vsync every refresh, no cap; "timed60" = vsync off, a timed 60.</summary>
         public static string PacingOverride;
 
+        /// <summary>perf-60hz-32p: why the frame pacing in force was chosen (perf report "pacing_reason", Player.log).</summary>
+        public static string PacingReason { get; private set; }
+
         /// <summary>perf-smooth-1 (autoplay -autoplayQualities): run the next match at this level, as -quality NAME would.</summary>
         public static void ForceRunQuality(string name)
         {
@@ -465,6 +468,7 @@ namespace CriticalMass.Runtime.Game
             bool background = !_focused && !o.Autoplay;
             int cap;
             int vsync, target;
+            string reasonGuard = null;
             if (o.Autoplay && o.NoVsync)
             {
                 cap = 0;
@@ -486,15 +490,30 @@ namespace CriticalMass.Runtime.Game
                     vsync = 0;   // vsync off by choice (or the save-power cap): still capped, never unbounded
                     target = cap > 0 ? cap : (double.IsNaN(hz) || hz < 20 ? 60 : (int)Math.Round(hz));
                 }
-                _guard.Feed(dt, cap, vsync > 0);
+                _guard.Feed(dt, cap, vsync > 0, hz);
+                if (_guard.ForceTimed && cap >= 0 && vsync == 0 && target > 0 && _prefVSync != 0) reasonGuard = _guard.Why;
             }
-            if (o.Autoplay && PacingOverride == "display") { vsync = 1; target = -1; }
-            else if (o.Autoplay && PacingOverride == "timed60") { vsync = 0; target = 60; }
+            string reason = vsync > 0 ? "vsync " + vsync : target > 0 ? "timed " + target : "unlimited";
+            if (reasonGuard != null) reason += " (" + reasonGuard + ")";
+            if (o.Autoplay && PacingOverride == "display") { vsync = 1; target = -1; reason = "override display"; }
+            else if (o.Autoplay && PacingOverride == "timed60") { vsync = 0; target = 60; reason = "override timed60"; }
+            // perf-60hz-32p: a hidden automation window (AutomationWindow) is never composited, so macOS does not pace its
+            // drawables by the display: vsync frames came back at 16.7 or 33 to 37 ms at random (7.8% of frames at 33 ms or
+            // more on the Air, against 0.4% visible). A hidden run paces itself with a timer at the vsync rate instead, so the
+            // smoke measures the game, not the occluded window.
+            (vsync, target, reason) = FramePolicy.HiddenWindowPacing(AutomationWindow.Active, vsync, target,
+                Screen.currentResolution.refreshRateRatio.value, reason);
             if (QualitySettings.vSyncCount != vsync) QualitySettings.vSyncCount = vsync;
             if (Application.targetFrameRate != target) Application.targetFrameRate = target;
             AppliedVSync = vsync;
             AppliedTarget = target;
             AppliedCap = cap;
+            if (reason != PacingReason)
+            {
+                PacingReason = reason;
+                Debug.Log($"[CM.Governor] pacing: {reason} (cap {cap}, vSyncCount {vsync}, targetFrameRate {target}, " +
+                          $"{Screen.currentResolution.refreshRateRatio.value:0.#} Hz{(AutomationWindow.Active ? ", hidden window" : "")})");
+            }
 
             string notice = null;
             if (_notice != null && Time.realtimeSinceStartup < _noticeUntil) notice = _notice;

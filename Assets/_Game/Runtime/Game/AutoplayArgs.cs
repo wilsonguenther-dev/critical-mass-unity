@@ -34,6 +34,7 @@ namespace CriticalMass.Runtime.Game
     ///   -quality NAME|N          this quality level for the run (FrameGovernor; the perf report has quality_requested)
     ///   -debugHangSeconds N      TEST ONLY: the main thread sleeps N s once, 3 s after the title (proves the hang watchdog)
     ///   -seed N -simHashOut PATH sim-only run (no view): one 16v16 bot match on seed N, its end-state hash to PATH, quit (DG-66)
+    ///   -stressHill              perf-60hz-32p: camera pinned on the hill, every living fighter drawn within 9 m of it (view only)
     ///   -shots                   screenshots shot-title.png, shot-start.png (3 s of match time) and shot-mid.png into the data folder (Windows graphics run)
     ///   -traceStates             record shader states for warm-up (ShaderWarmup); -exportReport, -diag: SupportReport
     /// DG-63: the crash log is written by CrashLog (bounded queue, one background writer, 20 lines per second, repeat keys
@@ -74,6 +75,10 @@ namespace CriticalMass.Runtime.Game
             public string SimHashOut;
             public int Seed;
             public bool Shots;
+            /// <summary>perf-60hz-32p: -stressHill: the worst case for frame cost, all 32 fighters drawn on screen at once. The
+            /// camera is pinned on the hill and every living fighter is DRAWN within 9 m of it (ActorViews moves only the
+            /// models; the sim, its bots and its hash are untouched). Automation runs only.</summary>
+            public bool StressHill;
         }
 
         /// <summary>Pure parser (tests). Unknown flags are ignored, so Unity's own (-screen-width, -logFile) pass through.</summary>
@@ -112,6 +117,7 @@ namespace CriticalMass.Runtime.Game
                         if (!string.IsNullOrEmpty(next) && !next.StartsWith("-", StringComparison.Ordinal)) { o.SimHashOut = next; i++; }
                         break;
                     case "-shots": o.Shots = true; break;
+                    case "-stresshill": o.StressHill = true; break;
                     case "-autoplaypacing":
                         if (!string.IsNullOrEmpty(next) && !next.StartsWith("-", StringComparison.Ordinal)) { o.Pacing = next.Split(','); i++; }
                         break;
@@ -507,10 +513,21 @@ namespace CriticalMass.Runtime.Game
                 _driver.HumanAutopilot = true;
                 if (o.Speed > 0) _driver.TimeScale = o.Speed;
                 double hold = _match == 1 ? o.TitleSeconds : 1.0;
-                if (_title != null && !_costReset && now - _titleAt >= 2.0) { _costReset = true; FrameCost.Reset(); }
+                if (_title != null && !_costReset && now - _titleAt >= 2.0)
+                {
+                    _costReset = true;
+                    FrameCost.Reset();
+                    if (_match == 1) FrameRecorder.Begin();   // perf-60hz-32p: the title's own frames (frames-title.csv)
+                }
                 if (_title != null && now - _titleAt >= hold)
                 {
                     Debug.Log("[CM.Cost] title " + FrameCost.Report());
+                    if (FrameRecorder.Active)
+                    {
+                        string perfBase = string.IsNullOrEmpty(Current.PerfLog) ? Path.Combine(Application.persistentDataPath, "perf-last.json") : Current.PerfLog;
+                        string titleCsv = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(perfBase)) ?? "", "frames-title.csv");
+                        Debug.Log("[CM.Frames] title " + FrameRecorder.End(titleCsv));
+                    }
                     _title.Hide();
                     _title = null;
                 }
@@ -607,6 +624,9 @@ namespace CriticalMass.Runtime.Game
                 ("quality", Q(QualitySettings.names[QualitySettings.GetQualityLevel()])),
                 ("quality_requested", Q(FrameGovernor.RequestedQuality)),
                 ("pacing", Q(FrameGovernor.PacingOverride ?? "rule")),
+                ("pacing_reason", Q(FrameGovernor.PacingReason ?? "")),
+                ("window_hidden", AutomationWindow.Active ? "true" : "false"),
+                ("stress_hill", Current.StressHill ? "true" : "false"),
                 ("render_scale", Num(FrameGovernor.AppliedRenderScale)),
                 ("render_pixels", ((long)(Screen.width * FrameGovernor.AppliedRenderScale) * (long)(Screen.height * FrameGovernor.AppliedRenderScale)).ToString(CultureInfo.InvariantCulture)),
                 ("max_queued_frames", QualitySettings.maxQueuedFrames.ToString(CultureInfo.InvariantCulture)),
