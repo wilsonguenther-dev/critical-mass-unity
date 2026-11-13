@@ -64,7 +64,7 @@ namespace CriticalMass.Runtime.Audio.Sound
         /// them, a blast or mine beside them), +20 x how loud it will be after distance.
         /// </summary>
         public static float Priority(int basePriority, float audibleGain, bool own, bool threat) =>
-            basePriority + (own ? 40f : 0f) + (threat ? 25f : 0f) + 20f * Clamp(audibleGain, 0f, 1f);
+            basePriority + (own ? 60f : 0f) + (threat ? 30f : 0f) + 20f * Clamp(audibleGain, 0f, 1f);   // integration batch 4: +60 / +30 so a quiet own footstep and a near wind-up both beat a full-volume crowd hit (45 + 20), as SoundCoverageTests asks
 
         /// <summary>
         /// Crowd gain: with more than CrowdFree other voices playing, everything that is not the player's own sound is

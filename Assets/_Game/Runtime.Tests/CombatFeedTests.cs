@@ -107,7 +107,7 @@ namespace CriticalMass.Runtime.Tests
 
                 KillFeed.Entry row = feed.Row(0);
                 Assert.IsTrue(row.Active);
-                Assert.AreEqual("WARRIOR", row.Killer);
+                Assert.AreEqual(CriticalMass.Runtime.View.Mechanics.DepthNames.OrFallback(killer, "WARRIOR"), row.Killer, "the in-match name when the depth rules name fighters (#59), else the class");
                 Assert.AreEqual("YOU", row.Victim);
                 Assert.IsTrue(row.Own, "the local player's line is on brass");
             }
