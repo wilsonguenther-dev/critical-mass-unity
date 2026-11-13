@@ -188,7 +188,11 @@ namespace CriticalMass.Runtime.Tests
         [Test]
         public void FilmFileShipsAndFitsTheBudget()
         {
-            Assert.IsTrue(IntroFilm.Available, IntroFilm.Url);
+            Assert.IsTrue(File.Exists(IntroFilm.Url), IntroFilm.Url);
+            Assert.AreEqual(IntroFilm.PlatformDecodes(Application.platform), IntroFilm.Available);
+            Assert.IsTrue(IntroFilm.PlatformDecodes(RuntimePlatform.OSXPlayer));
+            Assert.IsTrue(IntroFilm.PlatformDecodes(RuntimePlatform.WindowsPlayer));
+            Assert.IsFalse(IntroFilm.PlatformDecodes(RuntimePlatform.LinuxPlayer), "Linux has no H.264: the comic plays");
             long bytes = new FileInfo(IntroFilm.Url).Length;
             Assert.LessOrEqual(bytes, 60L * 1024 * 1024, "film is " + bytes / 1048576 + " MB");
             Assert.Greater(bytes, 5L * 1024 * 1024);

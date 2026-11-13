@@ -38,11 +38,20 @@ namespace CriticalMass.Runtime.Menus.Story
 
         public static string Url => Path.Combine(Application.streamingAssetsPath, FileName);
 
-        /// <summary>True when the film file is present (desktop builds and the editor read StreamingAssets directly).</summary>
+        /// <summary>H.264 in an .mp4 decodes through the OS on macOS (AVFoundation) and Windows (Media Foundation). The
+        /// Linux editor and player have no H.264 decoder (Unity: VP8/WebM only), so there the motion comic plays the intro
+        /// without ever asking VideoPlayer (which would log an error per attempt).</summary>
+        public static bool PlatformDecodes(RuntimePlatform p) =>
+            p == RuntimePlatform.OSXEditor || p == RuntimePlatform.OSXPlayer ||
+            p == RuntimePlatform.WindowsEditor || p == RuntimePlatform.WindowsPlayer;
+
+        /// <summary>True when the film file is present and this platform can decode it (desktop builds and the editor
+        /// read StreamingAssets directly).</summary>
         public static bool Available
         {
             get
             {
+                if (!PlatformDecodes(Application.platform)) return false;
                 try { return File.Exists(Url); }
                 catch (Exception) { return false; }
             }
