@@ -29,6 +29,9 @@ namespace CriticalMass.Runtime.View.Moments
         public const double TightFightSeconds = 2.5;
         public const double AllegianceWindow = 30, AllegianceMargin = 2, HillLeadEpsilon = 0.5;
         public const int MaxOut = 16, MaxSlamDeaths = 32;
+        /// <summary>Batch 3: a blast hurting this many is BLAST RADIUS; a heal reaching this many allies in one tick is LIFELINE.</summary>
+        public const int BlastRadiusHurt = 3, LifelineAllies = 3;
+        private int _healTick = int.MinValue, _healCount;
 
         public static readonly int AttackStartCode = Code("AttackStart");
         public static readonly int KaijuDamagedCode = Code("KaijuDamaged");
@@ -207,6 +210,16 @@ namespace CriticalMass.Runtime.View.Moments
                     return;
                 case SimEventType.MatchEnd:
                     ReadEnd(w, now);
+                    return;
+                case SimEventType.Explosion:
+                    // DG-22: Value = actors hurt; A = the Demolitions owner.
+                    if (Valid(w, e.A) && e.Value >= BlastRadiusHurt) Raise(w, MomentId.BlastRadius, e.A, -1, (int)e.Value, e.X, e.Z);
+                    return;
+                case SimEventType.HealLanded:
+                    // DG-40: one event per healed ally (A = healed, B = the Healer); count the local Healer's pulse per tick.
+                    if (e.B != LocalActor || !Valid(w, e.B)) return;
+                    if (_healTick != w.Tick) { _healTick = w.Tick; _healCount = 0; }
+                    if (++_healCount == LifelineAllies) Raise(w, MomentId.Lifeline, e.B, -1, LifelineAllies, e.X, e.Z);
                     return;
             }
 

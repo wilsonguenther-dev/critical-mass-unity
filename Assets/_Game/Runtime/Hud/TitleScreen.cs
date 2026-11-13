@@ -21,6 +21,7 @@ namespace CriticalMass.Runtime.Hud
         public GameHud Hud;
         Canvas _canvas;
         RawImage _logo, _glow;
+        RectTransform _eggHit;
         Text _prompt;
         /// <summary>Logo size in canvas units (1080p px): the @1x export's pixel size, so 1080p draws it 1:1.</summary>
         public static readonly Vector2 LogoSize = new Vector2(766f, 597f);
@@ -70,6 +71,18 @@ namespace CriticalMass.Runtime.Hud
             _glow.transform.SetParent(lr, false);
             _glow.raycastTarget = false;
             Stretch(_glow.rectTransform);
+            // Integration batch 3: egg-01, the title egg. A clear hit area over the egg in the middle of the logo; clicks on it
+            // count toward the secret instead of dismissing the title (keys and the pad still dismiss).
+            if (go.GetComponent<GraphicRaycaster>() == null) go.AddComponent<GraphicRaycaster>();
+            var eggHit = new GameObject("Egg Hit", typeof(RectTransform));
+            eggHit.layer = 5;
+            RectTransform er = (RectTransform)eggHit.transform;
+            er.SetParent(lr, false);
+            er.anchorMin = er.anchorMax = new Vector2(0.5f, 0.55f);
+            er.sizeDelta = new Vector2(230f, 250f);
+            er.anchoredPosition = Vector2.zero;
+            _eggHit = er;
+            CriticalMass.Runtime.Secrets.TitleEgg.Attach(er);
 
             _prompt = HudText.Make(root, "Prompt", CMTokens.Display, 34, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter);
             RectTransform pr = _prompt.rectTransform;
@@ -133,9 +146,17 @@ namespace CriticalMass.Runtime.Hud
         static bool AnyInput()
         {
             if (Keyboard.current != null && Keyboard.current.anyKey.wasPressedThisFrame) return true;
-            if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame) return true;
+            if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame && !PointerOnEgg()) return true;
             if (Gamepad.current != null && (Gamepad.current.startButton.wasPressedThisFrame || Gamepad.current.buttonSouth.wasPressedThisFrame)) return true;
             return false;
+        }
+
+        /// <summary>The pointer is over the title egg's hit area (egg-01): that click is the secret's, not "any key".</summary>
+        bool PointerOnEgg()
+        {
+            if (_eggHit == null || Mouse.current == null || !_eggHit.gameObject.activeInHierarchy) return false;
+            UnityEngine.Camera cam = _canvas != null ? _canvas.worldCamera : null;
+            return RectTransformUtility.RectangleContainsScreenPoint(_eggHit, Mouse.current.position.ReadValue(), cam);
         }
 
         /// <summary>

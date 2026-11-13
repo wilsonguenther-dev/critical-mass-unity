@@ -388,6 +388,9 @@ namespace CriticalMass.Runtime.Menus
                     CreditsContent.Tools[i], 2f);
                 t.horizontalOverflow = HorizontalWrapMode.Wrap;
             }
+            // Integration batch 3: egg-05, the credits gag, under the tools when the column has room for it.
+            float gagY = 104f + CreditsContent.Tools.Length * 116f + 8f;
+            if (gagY + 200f <= ColH) CriticalMass.Runtime.Secrets.CreditsGag.Build(tools, 36f, gagY, ColW - 72f);
 
             Text intro = MenuUi.Label(_soundCol, "Sound Intro", CMTokens.Ui, 20, CMTokens.WithAlpha(Cream, 0.85f), TextAnchor.UpperLeft,
                 36f, 96f, ColW - 72f, 60f, CreditsContent.SoundIntro, 2f);

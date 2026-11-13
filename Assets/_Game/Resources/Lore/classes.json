@@ -101,23 +101,23 @@
         {
           "input": "passive",
           "name": "No Sword",
-          "text": "No regular attack. Everything you hit, you planned.",
+          "text": "No regular attack. The mine and the TNT are your weapons.",
           "cooldown": "",
-          "needsRule": "DG-22"
+          "needsRule": ""
         },
         {
           "input": "ability",
           "name": "Land Mine",
-          "text": "A loose-dirt mound everyone can see. It arms in {cfg:mineArm} s and hits for {cfg:mineDamage}. Up to {cfg:mineMax} at once.",
+          "text": "Lay a mine on your spot. It arms in half a second and blows on the first enemy who steps on it, for 70 damage. Two at a time; a third recycles the oldest.",
           "cooldown": "",
-          "needsRule": "DG-22"
+          "needsRule": ""
         },
         {
           "input": "throw",
           "name": "TNT",
-          "text": "Thrown up to {cfg:tntRange} m. After a {cfg:tntFuse} s fuse it deals {cfg:tntDamage} and blows a hole in the ground.",
-          "cooldown": "{cfg:tntCooldown}",
-          "needsRule": "DG-22"
+          "text": "Throw TNT up to 5 m. It blows 1.5 s after it lands for 55 damage, breaks walls and craters the ground.",
+          "cooldown": "5",
+          "needsRule": ""
         }
       ]
     },
@@ -131,23 +131,53 @@
         {
           "input": "ability",
           "name": "Ladder",
-          "text": "Spend biomass on a ladder up one level. Anyone can pick it up and move it.",
+          "text": "Spend 1 biomass on a ladder up a wall, or 2 on a rope bridge across a gap or water, toward where you aim. Pieces last 60 s.",
           "cooldown": "",
-          "needsRule": "DG-24"
+          "needsRule": ""
         },
         {
           "input": "interact",
-          "name": "Rope Bridge",
-          "text": "Spend biomass to span a gap. Anyone can carry it off, so guard it.",
+          "name": "Carry",
+          "text": "Anyone can pick a piece up with Interact and set it down somewhere else. A piece never seals a base off the hill.",
           "cooldown": "",
-          "needsRule": "DG-24"
+          "needsRule": ""
         },
         {
           "input": "passive",
-          "name": "Station Upgrades",
-          "text": "At your base station, turn biomass into upgrades for the whole team.",
+          "name": "Two at a Time",
+          "text": "Two pieces out at once. Your team's delivered biomass pays for them.",
           "cooldown": "",
-          "needsRule": "DG-24"
+          "needsRule": ""
+        }
+      ]
+    },
+    {
+      "id": "Healer",
+      "name": "Healer",
+      "role": "Keeps the line standing.",
+      "bio": "Armour, wings and no sword. She never lands a blow, and the hill stays yours a little longer wherever she stands.",
+      "difficulty": 2,
+      "abilities": [
+        {
+          "input": "attack",
+          "name": "Mend",
+          "text": "Heal the hurt ally nearest your aim within 5.5 m for 6 health. No damage, ever.",
+          "cooldown": "",
+          "needsRule": ""
+        },
+        {
+          "input": "ability",
+          "name": "Healing Wings",
+          "text": "Heal every ally within 3.5 m of your aim, you included, for 30.",
+          "cooldown": "9",
+          "needsRule": ""
+        },
+        {
+          "input": "throw",
+          "name": "Purify",
+          "text": "Near the shrine, burn away one unit of corruption.",
+          "cooldown": "30",
+          "needsRule": ""
         }
       ]
     }

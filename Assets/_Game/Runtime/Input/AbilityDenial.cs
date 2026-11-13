@@ -39,7 +39,9 @@ namespace CriticalMass.Runtime.Input
             if (w == null || w.Match == null || w.Match.Phase == MatchPhase.Ended || actor < 0 || actor >= w.ActorCount) return false;
             Actor a = w.Actors[actor];
             if (!a.Alive) return false;
-            double grace = GraceTicks * stepSeconds;
+            // Integration batch 3: the same gate and window as PR #25's buffer, so a cue and a buffered press never disagree.
+            if (InputReadiness.Ability(w, actor)) return false;
+            double grace = InputBuffer.MaxEarlyTicks(w.Config.SimHz) * stepSeconds;
             if (a.StandUp > grace) return true;
             return a.AbilityCd > grace;
         }

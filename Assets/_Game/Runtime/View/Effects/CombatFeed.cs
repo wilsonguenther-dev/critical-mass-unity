@@ -290,6 +290,28 @@ namespace CriticalMass.Runtime.View.Effects
                 case SimEventType.HillOwnerChange:
                     Begin(FxKind.HillChange, w, -1, -1, ev.X, ev.Z, ev.A);
                     return true;
+                // ---- batch 3: Demolitions, Builder and Healer events reach the same effects, force bus and audio paths
+                case SimEventType.Explosion:
+                    // DG-22: the same FxKind.Explosion Effects.Explode injects (fireball, scorch, crater dust, force ring).
+                    Begin(FxKind.Explosion, w, ev.A, (int)(ev.B == Demolitions.ExplosionMine ? ExplosionKind.Mine : ExplosionKind.Tnt),
+                        ev.X, ev.Z, Math.Max(0.5, ev.Radius));
+                    return true;
+                case SimEventType.MinePlaced:
+                case SimEventType.TntLanded:
+                    Begin(FxKind.BarricadePlaced, w, ev.A, -1, ev.X, ev.Z, ev.Radius);   // a dust puff where it lands
+                    return true;
+                case SimEventType.PiecePlaced:
+                    Begin(FxKind.BarricadePlaced, w, ev.A, -1, ev.X, ev.Z, ev.Radius);   // DG-24: dust where the ladder or bridge goes up
+                    return true;
+                case SimEventType.PieceExpired:
+                case SimEventType.PieceDestroyed:
+                    Begin(FxKind.BarricadeBroken, w, ev.A, -1, ev.X, ev.Z, ev.Value);    // wood debris when a piece goes
+                    return true;
+                case SimEventType.HealCast:
+                    // DG-40: Healing Wings (B = 2) rings out like a respawn beam on the Healer's team colour.
+                    if (ev.B != 2) return false;
+                    Begin(FxKind.Respawn, w, ev.A, -1, ev.X, ev.Z, ev.Radius);
+                    return true;
                 default:
                     return false;
             }

@@ -55,7 +55,7 @@ namespace CriticalMass.Runtime.Tests
                 Assert.That(sp, Is.InRange(0.6f, 1.4f), id + " shortened length");
                 Assert.LessOrEqual(sp, s);
             }
-            Assert.AreEqual(16, MomentRecipes.Gallery().Length);
+            Assert.AreEqual(18, MomentRecipes.Gallery().Length);   // batch 3: BLAST RADIUS and LIFELINE
             Assert.AreEqual(MomentScale.Stinger, MomentRecipes.Get(MomentId.TwoDown).Scale, "streaks are corner stingers");
             Assert.AreEqual(MomentScale.Stinger, MomentRecipes.Get(MomentId.ThreeDown).Scale);
             Assert.AreEqual(MomentScale.Stinger, MomentRecipes.Get(MomentId.Wildfire).Scale);

@@ -245,7 +245,7 @@ namespace CriticalMass.Runtime.Menu
             }
             const float bw = 460f, cw = 300f, gap = 24f, by = PanelY + PanelH - 132f;
             float bx = PanelX + (PanelW - (bw + gap + cw)) * 0.5f;
-            _share = MenuUi.Item(space, "Share", bx, by, bw, 72f, "SAVE PHOTO   F12", MenuItem.Kind.Button, 30, true, CMTokens.Display);
+            _share = MenuUi.Item(space, "Share", bx, by, bw, 72f, "SAVE PHOTO   " + CriticalMass.Runtime.Input.InputGlyphs.ForPath("<Keyboard>/f12").Words.ToUpperInvariant(), MenuItem.Kind.Button, 30, true, CMTokens.Display);
             _share.Body.Radius = 16f;
             _share.Submitted = Share;
             _close = MenuUi.Item(space, "Close", bx + bw + gap, by, cw, 72f, "CLOSE", MenuItem.Kind.Button, 30, true, CMTokens.Display);

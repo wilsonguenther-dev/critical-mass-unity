@@ -336,8 +336,24 @@ namespace CriticalMass.Runtime.Hud
             for (int i = 0; i < 3; i++) _buttons[i].Name.gameObject.SetActive(showNames);
         }
 
-        static readonly string[] ClassNames = { "WARRIOR", "FARMER", "MINER", "DEMOLITIONS", "BUILDER" };
-        static readonly string[] AbilityNames = { "SHIELD", "ROOTS", "WALL BREAK", "MINE", "BUILD" };
+        // Six classes (batch 3): names of the new ones come from the sim's name tables (DemolitionsNames, BuilderNames, HealerNames).
+        static readonly string[] ClassNames =
+        {
+            "WARRIOR", "FARMER", "MINER", CriticalMass.Sim.Core.DemolitionsNames.ClassName, CriticalMass.Sim.Core.BuilderNames.ClassName,
+            CriticalMass.Sim.Core.HealerNames.ClassName,
+        };
+        static readonly string[] AbilityNames =
+        {
+            "SHIELD", "ROOTS", "WALL BREAK", CriticalMass.Sim.Core.DemolitionsNames.Mine, CriticalMass.Sim.Core.BuilderNames.Build,
+            CriticalMass.Sim.Core.HealerNames.Pulse,
+        };
+        static readonly string[] AttackNames =
+        {
+            "ATTACK", "ATTACK", "ATTACK", "NO SWORD", "ATTACK", CriticalMass.Sim.Core.HealerNames.Mend,   // Demolitions: TNT is on Dig / place
+        };
+
+        /// <summary>The icon row for a class: the Healer has no icon art yet and borrows the Farmer's (support) row.</summary>
+        static int IconRow(int cls) => cls >= UiIcons.Classes.Length ? 1 : cls;
 
         // ---------------------------------------------------------------- minimap
 
@@ -691,8 +707,9 @@ namespace CriticalMass.Runtime.Hud
             Color tc = CMTokens.Team(s.Team);
             int cls = Mathf.Clamp((int)s.Cls, 0, ClassNames.Length - 1);
             int team = s.Team == TeamId.Crimson ? 1 : 0;
-            _portrait.Set(UiIcons.Portrait[cls, team], _tier);
-            _classBadge.Set(UiIcons.ClassBadge[cls, team], _tier);
+            int iconRow = IconRow(cls);
+            _portrait.Set(UiIcons.Portrait[iconRow, team], _tier);
+            _classBadge.Set(UiIcons.ClassBadge[iconRow, team], _tier);
             HudText.Set(_className, ClassNames[cls]);
 
             // health: shown value drains toward the target, the cream ghost holds 0.4 s then follows
@@ -720,8 +737,8 @@ namespace CriticalMass.Runtime.Hud
             }
 
             // buttons: attack (LMB), class ability (RMB), carry (E)
-            ApplyButton(_buttons[0], s.AttackCd01, 0f, UiIcons.Attack[cls, team], "ATTACK", dt);
-            ApplyButton(_buttons[1], s.AbilityCd01, s.AbilityCdSeconds, UiIcons.Ability[cls, team], AbilityNames[cls], dt);
+            ApplyButton(_buttons[0], s.AttackCd01, 0f, UiIcons.Attack[iconRow, team], AttackNames[cls], dt);
+            ApplyButton(_buttons[1], s.AbilityCd01, s.AbilityCdSeconds, UiIcons.Ability[iconRow, team], AbilityNames[cls], dt);
             ApplyDenied(_buttons[1], dt);
             AbilityButton carry = _buttons[2];
             carry.Icon.Set(s.Carry == CarryKind.Corruption ? UiIcons.Corruption : s.Carry == CarryKind.Biomass ? UiIcons.Biomass :

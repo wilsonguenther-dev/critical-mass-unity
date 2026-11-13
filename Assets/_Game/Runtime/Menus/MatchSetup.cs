@@ -23,12 +23,18 @@ namespace CriticalMass.Runtime.Menus
     public sealed class MatchSetup : FlowScreen
     {
         /// <summary>Classes the sim can play in this build; later items (DG-22, DG-24) add theirs.</summary>
-        public static readonly HashSet<ClassId> Playable = new HashSet<ClassId> { ClassId.Warrior, ClassId.Farmer, ClassId.Miner };
+        public static readonly HashSet<ClassId> Playable = new HashSet<ClassId>
+        {
+            ClassId.Warrior, ClassId.Farmer, ClassId.Miner, ClassId.Demolitions, ClassId.Builder, ClassId.Healer,   // batch 3: DG-22, DG-24, DG-40
+        };
+
+        /// <summary>Cards on the class row: every class the sim has (six since DG-40).</summary>
+        public static int CardCount => ClassIds.All.Count;
 
         const string PrefTeam = "cm.flow.setup.team", PrefClass = "cm.flow.setup.class", PrefSize = "cm.flow.setup.size",
-            PrefPace = "cm.flow.setup.pace";
+            PrefPace = "cm.flow.setup.pace", PrefBots = "cm.flow.setup.bots";
 
-        public const float CardW = 296f, CardH = 350f, CardGap = 22f, CardsY = 470f;
+        public const float CardW = 250f, CardH = 350f, CardGap = 16f, CardsY = 470f;
 
         /// <summary>Back goes to the results (Change class) instead of the main menu.</summary>
         public bool FromResults;
@@ -39,9 +45,9 @@ namespace CriticalMass.Runtime.Menus
         public bool Spectate { get; private set; }
 
         MenuItem _team, _size, _pace, _bots, _start, _back;
-        readonly MenuItem[] _cards = new MenuItem[5];
-        readonly HudIcon[] _portraits = new HudIcon[5];
-        readonly Text[][] _cardTexts = new Text[5][];
+        readonly MenuItem[] _cards = new MenuItem[CardCount];
+        readonly HudIcon[] _portraits = new HudIcon[CardCount];
+        readonly Text[][] _cardTexts = new Text[CardCount][];
         HudIcon _crest;
         readonly List<System.Action> _refresh = new List<System.Action>();
         static bool _prefsLoaded;
@@ -73,12 +79,13 @@ namespace CriticalMass.Runtime.Menus
                 d => Choice.TeamSize = Choice.TeamSize <= 5 ? 16 : 5, _refresh);
             _pace = Stepper(space, "Pace", sx, sy + 2 * step, sw, sh, "PACE", PaceText,
                 d => Choice.Pace = Choice.Pace >= 2 ? 1 : 2, _refresh);
-            _bots = Stepper(space, "Bots", sx, sy + 3 * step, sw, sh, "BOTS", () => "NORMAL", d => { }, _refresh);
-            MarkComingSoon(_bots, sw, sh);
+            // DG-21: the enemy bots' difficulty (Easy, Normal, Hard); allies and the backdrop stay Normal.
+            _bots = Stepper(space, "Bots", sx, sy + 3 * step, sw, sh, "ENEMY BOTS", BotText, StepBots, _refresh);
 
-            float total = 5 * CardW + 4 * CardGap;
+            int n = CardCount;
+            float total = n * CardW + (n - 1) * CardGap;
             float x0 = 960f - total * 0.5f;
-            for (int i = 0; i < 5; i++) BuildCard(space, (ClassId)i, x0 + i * (CardW + CardGap));
+            for (int i = 0; i < n; i++) BuildCard(space, ClassIds.All[i], x0 + i * (CardW + CardGap));
 
             _back = Button(space, "Back", 200f, 880f, 380f, 80f, "BACK", Back);
             _start = Button(space, "Start", 1340f, 880f, 380f, 80f, "START MATCH", StartMatch, 36);
@@ -102,6 +109,9 @@ namespace CriticalMass.Runtime.Menus
             _portraits[i] = HudIcon.Make(card.transform, "Portrait", (CardW - 150f) * 0.5f, 20f, 150f, 150f);
             Text name = MenuUi.Label(card.transform, "Name", CMTokens.Display, 30, Cream, TextAnchor.MiddleCenter, 0f, 180f, CardW, 44f,
                 FlowWords.ClassName(c), 3f);
+            name.resizeTextForBestFit = true;   // "DEMOLITIONS EXPERT" fits its card
+            name.resizeTextMinSize = 18;
+            name.resizeTextMaxSize = 30;
             Text role = MenuUi.Label(card.transform, "Role", CMTokens.Ui, 22, Cream, TextAnchor.MiddleCenter, 10f, 226f, CardW - 20f, 32f,
                 FlowWords.ClassRole(c), 2f);
             Text abil = MenuUi.Label(card.transform, "Abilities", CMTokens.Ui, 17, Cream, TextAnchor.MiddleCenter, 10f, 262f, CardW - 20f, 28f,
@@ -127,6 +137,38 @@ namespace CriticalMass.Runtime.Menus
             }
         }
 
+        static readonly CriticalMass.Sim.Core.BotDifficulty[] BotSteps =
+        {
+            CriticalMass.Sim.Core.BotDifficulty.Easy, CriticalMass.Sim.Core.BotDifficulty.Normal, CriticalMass.Sim.Core.BotDifficulty.Hard,
+        };
+
+        string BotText()
+        {
+            switch (Choice.BotDifficulty)
+            {
+                case CriticalMass.Sim.Core.BotDifficulty.Easy: return "EASY   ·   SLOW TO REACT, MISS THEIR THROWS";
+                case CriticalMass.Sim.Core.BotDifficulty.Hard: return "HARD   ·   QUICK, FOCUS CARRIERS AND THE HURT";
+                default: return "NORMAL";
+            }
+        }
+
+        void StepBots(int d)
+        {
+            int at = System.Array.IndexOf(BotSteps, Choice.BotDifficulty);
+            if (at < 0) at = 1;
+            int k = BotSteps.Length;
+            Choice.BotDifficulty = BotSteps[((at + (d < 0 ? -1 : 1)) % k + k) % k];
+        }
+
+        /// <summary>Tests and the capture walk: pick the enemy bots' difficulty.</summary>
+        public void SetBotDifficulty(CriticalMass.Sim.Core.BotDifficulty d)
+        {
+            Choice.BotDifficulty = d;
+            RefreshAll();
+        }
+
+        public MenuItem BotsItem => _bots;
+
         string PaceText()
         {
             double clock = GameConfig.CreateDefault().MatchSeconds;
@@ -139,16 +181,16 @@ namespace CriticalMass.Runtime.Menus
         void Wire()
         {
             var cards = new List<MenuItem>();
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < CardCount; i++)
                 if (_cards[i].interactable) cards.Add(_cards[i]);
             MenuItem firstCard = cards.Count > 0 ? cards[0] : _start;
             Nav(_team, _start, _size, null, null);
             Nav(_size, _team, _pace, null, null);
-            Nav(_pace, _size, firstCard, null, null);
-            _bots.navigation = new Navigation { mode = Navigation.Mode.None };
+            Nav(_pace, _size, _bots, null, null);
+            Nav(_bots, _pace, firstCard, null, null);
             for (int i = 0; i < cards.Count; i++)
-                Nav(cards[i], _pace, _start, cards[(i + cards.Count - 1) % cards.Count], cards[(i + 1) % cards.Count]);
-            for (int i = 0; i < 5; i++)
+                Nav(cards[i], _bots, _start, cards[(i + cards.Count - 1) % cards.Count], cards[(i + 1) % cards.Count]);
+            for (int i = 0; i < CardCount; i++)
                 if (!_cards[i].interactable) _cards[i].navigation = new Navigation { mode = Navigation.Mode.None };
             Nav(_back, firstCard, _team, _start, _start);
             Nav(_start, firstCard, _team, _back, _back);
@@ -173,9 +215,9 @@ namespace CriticalMass.Runtime.Menus
             if (chosen == null || !chosen.interactable) return;
             SetUp(_start, chosen);
             SetUp(_back, chosen);
-            Navigation n = _pace.navigation;
+            Navigation n = _bots.navigation;
             n.selectOnDown = chosen;
-            _pace.navigation = n;
+            _bots.navigation = n;
         }
 
         static void SetUp(MenuItem it, Selectable up)
@@ -194,7 +236,8 @@ namespace CriticalMass.Runtime.Menus
                 GameFlow.LastSetup = new MatchSetupChoice
                 {
                     Team = PlayerPrefs.GetInt(PrefTeam, (int)d.Team) == 1 ? TeamId.Crimson : TeamId.Azure,
-                    Class = (ClassId)Mathf.Clamp(PlayerPrefs.GetInt(PrefClass, (int)d.Class), 0, 4),
+                    Class = (ClassId)Mathf.Clamp(PlayerPrefs.GetInt(PrefClass, (int)d.Class), 0, CardCount - 1),
+                    BotDifficulty = (CriticalMass.Sim.Core.BotDifficulty)Mathf.Clamp(PlayerPrefs.GetInt(PrefBots, (int)d.BotDifficulty), 0, 2),
                     TeamSize = PlayerPrefs.GetInt(PrefSize, d.TeamSize) <= 5 ? 5 : 16,
                     Pace = PlayerPrefs.GetInt(PrefPace, 2) <= 1 ? 1 : 2,
                 };
@@ -258,7 +301,7 @@ namespace CriticalMass.Runtime.Menus
             _crest.Set(UiIcons.Crest[t], _tier);
             _crest.Image.enabled = !Spectate;
             if (_start != null) HudText.Set(_start.Label, Spectate ? "WATCH MATCH" : "START MATCH");
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < CardCount; i++)
             {
                 _portraits[i].Set(UiIcons.Portrait[i, t], _tier);
                 bool chosen = i == (int)Choice.Class;
@@ -283,7 +326,7 @@ namespace CriticalMass.Runtime.Menus
         {
             // Focus on a playable card picks it; focused cards draw navy text on the brass fill.
             MenuItem f = Focused;
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < CardCount; i++)
             {
                 if (!_cards[i].interactable) continue;
                 bool focus = f == _cards[i];
@@ -338,6 +381,7 @@ namespace CriticalMass.Runtime.Menus
             PlayerPrefs.SetInt(PrefClass, (int)Choice.Class);
             PlayerPrefs.SetInt(PrefSize, Choice.TeamSize);
             PlayerPrefs.SetInt(PrefPace, Choice.Pace >= 2 ? 2 : 1);
+            PlayerPrefs.SetInt(PrefBots, (int)Choice.BotDifficulty);
             SpectatorMode.SpectateNextMatch = Spectate;
             GameFlow.BeginMatch(Choice);
         }

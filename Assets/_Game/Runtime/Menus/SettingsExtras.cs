@@ -111,13 +111,16 @@ namespace CriticalMass.Runtime.Menu
 
         static string OnOff(bool b) => b ? "ON" : "OFF";
 
+        /// <summary>The clean-HUD key's name through InputGlyphs (the H key is read directly by AccessibilityApplier).</summary>
+        public static string CleanHudKeyWords => InputGlyphs.ForPath("<Keyboard>/h").Words.ToUpperInvariant();
+
         /// <summary>The ACCESS tab (PauseMenu.ExtraTab.Build): six lines, a reset button and a note.</summary>
         public static List<MenuItem> BuildTab(PauseMenu menu, RectTransform tab)
         {
             var items = new List<MenuItem>
             {
                 menu.Stepper(tab, 0, "HIDE NAMES", () => OnOff(HideNames), d => HideNames = !HideNames),
-                menu.Stepper(tab, 1, "CLEAN HUD   (H)", () => OnOff(CleanHud), d => CleanHud = !CleanHud),
+                menu.Stepper(tab, 1, "CLEAN HUD   (" + CleanHudKeyWords + ")", () => OnOff(CleanHud), d => CleanHud = !CleanHud),
                 menu.Stepper(tab, 2, "SUBTITLES", () => OnOff(Subtitles), d => Subtitles = !Subtitles),
                 menu.Stepper(tab, 3, "UI SCALE", UiScaleText, StepUiScale),
                 menu.Stepper(tab, 4, "REDUCE FLASHING", () => OnOff(ReduceFlashing), d => ReduceFlashing = !ReduceFlashing),
@@ -137,7 +140,7 @@ namespace CriticalMass.Runtime.Menu
                 menu.SetStatus("Streamer and accessibility options are back to their defaults.", false);
             };
             items.Add(reset);
-            menu.Note(tab, items.Count, "Press H in a match to hide or show the HUD. Blood is on the Game tab.");
+            menu.Note(tab, items.Count, "Press " + CleanHudKeyWords + " in a match to hide or show the HUD. Blood is on the Game tab.");
             return items;
         }
 

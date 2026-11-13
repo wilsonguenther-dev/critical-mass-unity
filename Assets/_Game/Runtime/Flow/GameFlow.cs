@@ -31,6 +31,8 @@ namespace CriticalMass.Runtime.Flow
         public int TeamSize;
         /// <summary>Sim seconds per wall second: 2 or 1.</summary>
         public double Pace;
+        /// <summary>DG-21 (U-058): the enemy team's bots. Normal is today's bots bit for bit.</summary>
+        public CriticalMass.Sim.Core.BotDifficulty BotDifficulty;
 
         public static MatchSetupChoice Default => new MatchSetupChoice
         {
@@ -38,6 +40,7 @@ namespace CriticalMass.Runtime.Flow
             Class = ClassId.Warrior,
             TeamSize = 16,
             Pace = 2,
+            BotDifficulty = CriticalMass.Sim.Core.BotDifficulty.Normal,
         };
     }
 
@@ -52,6 +55,8 @@ namespace CriticalMass.Runtime.Flow
         public ClassId Class;
         public int TeamSize;
         public double Pace;
+        /// <summary>DG-21: the bots on the team the human does not play (allies stay Normal; backdrops stay Normal).</summary>
+        public CriticalMass.Sim.Core.BotDifficulty BotDifficulty;
         /// <summary>true: the bot match behind the title and the menus (actor 0 on autopilot, never recorded).</summary>
         public bool Backdrop;
 
@@ -62,6 +67,7 @@ namespace CriticalMass.Runtime.Flow
             HumanTeam = Team,
             HumanClass = Class,
             Config = cfg,
+            BotDifficulty = Backdrop ? CriticalMass.Sim.Core.BotDifficulty.Normal : BotDifficulty,
         };
 
         public static MatchRequest From(MatchSetupChoice s, int seed) => new MatchRequest
@@ -71,6 +77,7 @@ namespace CriticalMass.Runtime.Flow
             Class = s.Class,
             TeamSize = s.TeamSize,
             Pace = s.Pace > 0 ? s.Pace : 2,
+            BotDifficulty = s.BotDifficulty,
             Backdrop = false,
         };
     }

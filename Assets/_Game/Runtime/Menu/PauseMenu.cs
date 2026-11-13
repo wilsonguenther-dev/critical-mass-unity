@@ -122,7 +122,7 @@ namespace CriticalMass.Runtime.Menu
         }
         GameObject _classPage, _confirmPage;
         MenuItem _spectate, _changeClass, _switchTeam, _confirmYes;
-        readonly MenuItem[] _classItems = new MenuItem[5];
+        readonly MenuItem[] _classItems = new MenuItem[ClassIds.All.Count];
         MenuItem _classBack;
         Text _rootNote, _confirmTitle;
         PromptStrip _hintStrip;

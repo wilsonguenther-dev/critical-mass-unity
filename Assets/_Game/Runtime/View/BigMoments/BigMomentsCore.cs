@@ -10,7 +10,12 @@ namespace CriticalMass.Runtime.View.Moments
     public enum MomentId
     {
         None, OpeningStrike, TwoDown, ThreeDown, Wildfire, HillCleared, BatteringRam, Overcharged, Hatch, AllegianceTurns,
-        Berserk, Quake, KaijuDown, Turnaround, AtTheWire, MatchPoint, Finisher,
+        Berserk, Quake, KaijuDown, Turnaround, AtTheWire, MatchPoint,
+        /// <summary>Batch 3: a TNT or mine blast that hurts three or more (DG-22).</summary>
+        BlastRadius,
+        /// <summary>Batch 3: the local Healer's Healing Wings landing on three or more allies at once (DG-40).</summary>
+        Lifeline,
+        Finisher,
     }
 
     /// <summary>A full-screen takeover, or a small corner stinger that never covers the play space.</summary>
@@ -123,6 +128,8 @@ namespace CriticalMass.Runtime.View.Moments
             Add(MomentId.Turnaround, "TURNAROUND", MomentScale.Takeover, 98, 1.4f, 9999f, Hero | MomentLayers.EndFrame | MomentLayers.EdgeGlow, BandStyle.Horizontal, PlateKind.Finisher, MomentArtKind.Team, 0f, true, true, true);
             Add(MomentId.AtTheWire, "AT THE WIRE", MomentScale.Takeover, 99, 1.4f, 9999f, Hero | MomentLayers.EndFrame | MomentLayers.EdgeGlow | MomentLayers.Invert, BandStyle.Horizontal, PlateKind.Finisher, MomentArtKind.Team, 0f, true, true, true);
             Add(MomentId.MatchPoint, "MATCH POINT", MomentScale.Takeover, 70, 1.2f, 9999f, MomentLayers.Band | MomentLayers.Title | MomentLayers.SpeedLines | MomentLayers.EdgeGlow, BandStyle.Horizontal, PlateKind.Finisher, MomentArtKind.Team, 0f, true, false);
+            Add(MomentId.BlastRadius, "BLAST RADIUS", MomentScale.Takeover, 50, 1.0f, 30f, Impact, BandStyle.Diagonal, PlateKind.Takeover, MomentArtKind.Actor, 0.12f);
+            Add(MomentId.Lifeline, "LIFELINE", MomentScale.Stinger, 21, 1.2f, 15f, Corner, BandStyle.Horizontal, PlateKind.Stinger, MomentArtKind.Actor);
             Add(MomentId.Finisher, "HILL TAKEN", MomentScale.Takeover, 97, 1.4f, 9999f, Hero | MomentLayers.EndFrame | MomentLayers.EdgeGlow, BandStyle.Horizontal, PlateKind.Finisher, MomentArtKind.Team, 0f, true, true, true);
             return a;
         }
