@@ -62,7 +62,8 @@ namespace CriticalMass.Runtime.Tests
         /// <summary>Rules the sim does not run yet (gap list section 3): any line naming one must say what it waits for.</summary>
         static readonly Regex UnbuiltRuleRe = new Regex(
             // integration batch 2: jump (DG-02), dig (DG-09), the fountain heal, cleanse and meat drops (DG-16a) are in the sim now and left this list
-            @"\b(mines?|tnt|ladders?|rope bridges?|upgrades?|stations?|heavy)\b",
+            // integration batch 3: mines and TNT (DG-22), ladders and rope bridges (DG-24) are in the sim now too
+            @"\b(upgrades?|stations?|heavy)\b",
             RegexOptions.IgnoreCase);
         /// <summary>Technology, vendor and other games' names never appear in the words.</summary>
         static readonly string[] Forbidden =

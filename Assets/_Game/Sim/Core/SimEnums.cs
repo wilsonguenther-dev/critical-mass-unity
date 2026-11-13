@@ -15,6 +15,12 @@ namespace CriticalMass.Sim.Core
     /// </summary>
     public enum DamageCause { None, Melee, KaijuMelee, KaijuSlam, Fall, Explosion }
 
+    /// <summary>
+    /// DG-21 bot skill level (WorldOptions.BotDifficulty / AllyBotDifficulty). Normal is first so a WorldOptions that never
+    /// sets it plays exactly the browser bots. Never compared by integer value.
+    /// </summary>
+    public enum BotDifficulty { Normal, Easy, Hard }
+
     /// <summary>Kaiju state (browser KaijuState).</summary>
     public enum KaijuState { Egg, Neutral, Azure, Crimson, Berserk }
 
@@ -94,6 +100,40 @@ namespace CriticalMass.Sim.Core
         Cleanse,
         /// <summary>CM-36: the cleanse in flight finished: A = cleanser (-1 scripted), B = team index, (X, Z) = the shrine, Value = instability drained.</summary>
         CleanseEnd,
+        /// <summary>DG-22: a land mine went down: A = owner, B = mine slot, (X, Z) = its cell centre, Value = the tick it arms, Radius = blast radius.</summary>
+        MinePlaced,
+        /// <summary>DG-22: a mine armed (the ring warning): A = owner, B = mine slot, (X, Z) = cell centre, Value = the tick it expires, Radius = blast radius.</summary>
+        MineArmed,
+        /// <summary>DG-22: an enemy stepped on an armed mine: A = that actor, B = the owner, (X, Z) = cell centre, Value = mine slot, Radius = blast radius (an Explosion follows).</summary>
+        MineTriggered,
+        /// <summary>DG-22: a mine left without a blast: A = owner, B = mine slot, (X, Z) = cell centre, Value = Demolitions.MineExpired / MineGroundGone / MineRecycled, Radius = blast radius.</summary>
+        MineRemoved,
+        /// <summary>DG-22: TNT left the thrower's hand: A = thrower, B = bomb slot, (X, Z) = where it will land, Value = the tick it lands, Radius = blast radius.</summary>
+        TntThrown,
+        /// <summary>DG-22: thrown TNT touched down (fuse burning): A = thrower, B = bomb slot, (X, Z) = where it lies, Value = the tick it blows, Radius = blast radius.</summary>
+        TntLanded,
+        /// <summary>DG-22: an explosion (Effects.Explode): A = owner, B = Demolitions.ExplosionMine / ExplosionTnt, (X, Z) = centre, Value = actors hurt, Radius = blast radius, Cause = Explosion.</summary>
+        Explosion,
+        /// <summary>
+        /// DG-24: a ladder or rope bridge went down (built by a Builder or put down by a carrier): A = that actor, B = piece slot
+        /// (World.Builder.Pieces: Kind, cells, direction), (X, Z) = the span's centre, Value = the tick it crumbles, Radius = half
+        /// its length in units.
+        /// </summary>
+        PiecePlaced,
+        /// <summary>DG-24: a piece starts to crumble (the warning, BuilderPieces.WarnTicks before the end): A = owner, B = slot, (X, Z) = centre, Value = ticks left, Radius = half length.</summary>
+        PieceCrumbling,
+        /// <summary>DG-24: a piece left the map: A = owner, B = slot, (X, Z) = centre, Value = BuiltPieces.EndExpired / EndDropped / EndBroken, Radius = half length.</summary>
+        PieceExpired,
+        /// <summary>DG-24: a piece's cell was dug or blown out (it breaks; the rest follows as PieceExpired EndBroken): A = owner, B = slot, (X, Z) = the broken cell, Value = cells it had, Radius = half length.</summary>
+        PieceDestroyed,
+        /// <summary>DG-24: an actor (any class) picked a piece up to carry it: A = carrier, B = slot, (X, Z) = the span's centre, Value = ticks it has left, Radius = half length.</summary>
+        PiecePickedUp,
+        /// <summary>DG-40: a Healer cast: A = the Healer, B = Healer.KindMend / KindPulse, (X, Z) = the mended ally or the pulse centre, Value = HP it restored in all, Radius = the pulse radius (0 for a mend).</summary>
+        HealCast,
+        /// <summary>DG-40: Healer healing landed on one actor: A = that actor, B = the Healer, (X, Z) = the actor, Value = HP restored (&gt; 0).</summary>
+        HealLanded,
+        /// <summary>DG-40: a Healer purified the egg: A = the Healer, B = team index (0 azure, 1 crimson), (X, Z) = the shrine, Value = instability removed, Radius = Healer.PurifyRange.</summary>
+        Purify,
         // ITEM CM-84: added by its owner (ClassSwitch, ports CM-54)
         /// <summary>CM-37: one tick of fountain healing (Heal.HealSystem): A = the healed actor, B = -1, (X, Z) = the actor, Value = HP restored this tick (&gt; 0).</summary>
         Heal,

@@ -66,6 +66,25 @@ namespace CriticalMass.Runtime.View
             if (_driver != null && _driver.World != null) BuildAll(_driver.World);
         }
 
+        // Integration batch 3 (perf: 206 shadow casters at High against 150): the cell chunks are scenery, so they cast only
+        // where RenderTier allows scenery shadows (High and above), like WorldView's groups; they used to cast at every level.
+        private static UnityEngine.Rendering.ShadowCastingMode ChunkShadows() =>
+            RenderTier.Policy(RenderTier.Level).sceneryShadows ? UnityEngine.Rendering.ShadowCastingMode.On : UnityEngine.Rendering.ShadowCastingMode.Off;
+
+        private void OnEnable() => RenderTier.Changed += ApplyTier;
+        private void OnDisable() => RenderTier.Changed -= ApplyTier;
+
+        private void ApplyTier()
+        {
+            if (_chunkObjects == null) return;
+            var mode = ChunkShadows();
+            foreach (GameObject go in _chunkObjects)
+            {
+                var r = go != null ? go.GetComponent<MeshRenderer>() : null;
+                if (r != null && r.shadowCastingMode != mode) r.shadowCastingMode = mode;
+            }
+        }
+
         private void LateUpdate()
         {
             if (_driver == null) return;
@@ -145,7 +164,9 @@ namespace CriticalMass.Runtime.View
                 var mesh = new Mesh { name = "GridChunk " + chx + "," + chz };
                 mesh.MarkDynamic();
                 go.AddComponent<MeshFilter>().sharedMesh = mesh;
-                go.AddComponent<MeshRenderer>().sharedMaterials = _materials;
+                var mr = go.AddComponent<MeshRenderer>();
+                mr.sharedMaterials = _materials;
+                mr.shadowCastingMode = ChunkShadows();
                 _chunkObjects[c] = go;
                 _meshes[c] = mesh;
                 RebuildChunk(c);

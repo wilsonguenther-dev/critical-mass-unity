@@ -185,7 +185,9 @@ namespace CriticalMass.Runtime.Audio
         public void Expire(double now)
         {
             for (int i = _count - 1; i >= 0; i--)
-                if (now - _at[i] > MaxAgeSeconds)
+                // Finisher (batch 3, sim-long FullMatchKeepsTheRule): the result never goes stale. A line that started under
+                // 6 s before the end held the result past MaxAgeSeconds and it was dropped, so the match ended uncalled.
+                if (now - _at[i] > MaxAgeSeconds && !IsResult(_trig[i]))
                 {
                     RemoveAt(i);
                     Dropped++;
@@ -193,6 +195,9 @@ namespace CriticalMass.Runtime.Audio
         }
 
         /// <summary>The line to start now, if the cooldown allows one; it is recorded in the history.</summary>
+        static bool IsResult(AnnouncerTrigger t) =>
+            t == AnnouncerTrigger.Victory || t == AnnouncerTrigger.Defeat || t == AnnouncerTrigger.Draw;
+
         public bool TryNext(double now, out AnnouncerLine line)
         {
             line = null;
@@ -301,6 +306,9 @@ namespace CriticalMass.Runtime.Audio
             for (; _cursor < head; _cursor++)
             {
                 SimEvent e = w.Events[_cursor % World.EventCapacity];
+                // Integration batch 3 (sim-long FullMatchKeepsTheRule): once the result is called nothing else is queued.
+                // Events written in the same tick after MatchEnd (a hill-contested flip) used to play after "Victory".
+                if (_endCalled && e.Type != SimEventType.MatchEnd) continue;
                 switch (e.Type)
                 {
                     case SimEventType.HillOwnerChange: OnHill(e.A, me, q, now); break;

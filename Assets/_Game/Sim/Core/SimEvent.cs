@@ -13,5 +13,7 @@ namespace CriticalMass.Sim.Core
         public BiomassType? Bio;
         /// <summary>DG-16: what dealt the blow on Hit and Death events (None on every other event).</summary>
         public DamageCause Cause;
+        /// <summary>DG-22: the effect radius (world units) of a MinePlaced / MineArmed / MineTriggered / MineRemoved / TntThrown / TntLanded / Explosion event; 0 on every other event.</summary>
+        public double Radius;
     }
 }

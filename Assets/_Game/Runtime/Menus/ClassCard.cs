@@ -351,6 +351,16 @@ namespace CriticalMass.Runtime.Menus
             "tntFuse", "Abilities.DemolitionsTnt.FuseTicks", "ticksAsSeconds",
             "tntDamage", "Abilities.DemolitionsTnt.Damage", "number",
             "tntCooldown", "Abilities.DemolitionsTnt.CooldownTicks", "ticksAsSeconds",
+            // integration batch 3: Builder (DG-24) and Healer (DG-40)
+            "ladderCost", "Abilities.BuilderPieces.LadderCost", "number",
+            "bridgeCost", "Abilities.BuilderPieces.BridgeCost", "number",
+            "pieceLife", "Abilities.BuilderPieces.LifetimeTicks", "ticksAsSeconds",
+            "mendHeal", "Abilities.Healer.MendHeal", "number",
+            "mendRange", "Abilities.Healer.MendRange", "number",
+            "pulseHeal", "Abilities.Healer.PulseHeal", "number",
+            "pulseRadius", "Abilities.Healer.PulseRadius", "number",
+            "healerCooldown", "Classes[Healer].AbilityCooldown", "number",
+            "purifyCooldown", "Abilities.Healer.PurifyCooldownTicks", "ticksAsSeconds",
         };
 
         /// <summary>The token ids of the built-in table (tests check each resolves).</summary>

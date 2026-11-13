@@ -15,8 +15,9 @@ namespace CriticalMass.Runtime.View
     /// models in team colours, the Kaiju egg / hatchling / adult in the allegiance glow, biomass and corruption props for
     /// the nodes, the Miner barricade for barricade entities. Anything without a model (Farmer, Demolitions, Builder, or a
     /// project whose catalog was never built) keeps the grey-box primitive on CM/Toon (ToonMaterials).
-    /// Clips are driven from sim state only (velocity, cooldown timers, Kaiju timers) and sim time, so a capture after the
-    /// same ticks shows the same pose. Every Sim-to-Unity position goes through SimSpace (O-13). No Unity physics.
+    /// Clips are driven from sim state only (drawn displacement, cooldown timers, Kaiju timers) and sim time, so a capture
+    /// after the same ticks shows the same pose. Since the animation pass (2026-11-12) the clip logic lives in
+    /// Runtime/View/Anim (ActorAnimator, KaijuAnimator); this class places models and calls them, then PostPose (contract C3). Every Sim-to-Unity position goes through SimSpace (O-13). No Unity physics.
     /// Reads the Sim only; never writes it. Model instances are pooled per model and never destroyed during play.
     /// </summary>
     public sealed class ActorViews : MonoBehaviour
@@ -25,8 +26,6 @@ namespace CriticalMass.Runtime.View
         private const float HumanScale = 1.15f;
         private const float NodeSize = 0.6f;
         private const float HillThickness = 0.05f;
-        /// <summary>Ground speeds (units/s) at which the KayKit Walk and Run clips play at rate 1 (estimated, not measured on the clip).</summary>
-        public const double WalkClipSpeed = 1.6, RunClipSpeed = 4.0;
         /// <summary>Seconds before the hatch the egg shakes.</summary>
         private const double EggShakeSeconds = 6.0;
 
@@ -35,8 +34,16 @@ namespace CriticalMass.Runtime.View
             public Transform Capsule;
             public Renderer CapsuleRenderer;
             public ModelView Model;
-            public double IdleT, WalkT, RunT, GatherT;
+            /// <summary>Animation pass (2026-11-12): all clip choice, timing, facing spring and squash for this actor (Runtime/View/Anim).</summary>
+            public Anim.ActorAnimator Anim;
         }
+
+        /// <summary>M9: spare pooled models per class model made at load, so a class change on respawn never instantiates.</summary>
+        public const int PrewarmPerClass = 2;
+
+        private readonly Dictionary<(int, string), string> _names = new Dictionary<(int, string), string>();
+        private UnityEngine.Camera _cam;
+        private Vector3 _camPos, _targetPos;
 
         private SimDriverBehaviour _driver;
         private ArtCatalog _catalog;
@@ -51,7 +58,10 @@ namespace CriticalMass.Runtime.View
         private KaijuState _lastKaijuState;
         private double _berserkAt = double.NegativeInfinity, _slamAt = double.NegativeInfinity;
         private bool _wasTelegraph;
-        private double _kaijuIdleT, _kaijuWalkT;
+        private double _eggIdleT;
+        private readonly Anim.KaijuAnimator _kaijuAnim = new Anim.KaijuAnimator();
+        private Anim.CarryProp _carryProp;
+        private Anim.ActorPoseState _poseState;
 
         private Transform[] _nodes;
         private Renderer[] _nodeRenderers;
@@ -81,7 +91,17 @@ namespace CriticalMass.Runtime.View
 
             int capacity = World.ActorCapacity(cfg);
             _actors = new CharSlot[capacity];
-            for (int i = 0; i < capacity; i++) _actors[i] = new CharSlot();
+            for (int i = 0; i < capacity; i++) _actors[i] = new CharSlot { Anim = new Anim.ActorAnimator(i) };
+            _carryProp = new Anim.CarryProp(_catalog);
+            Anim.PostPoseHooks.Register(_carryProp);
+            // DG-108: one model per class built before the first tick, so the match never instantiates mid-fight.
+            foreach (ClassId c in ClassIds.All)
+            {
+                string key = ArtMapping.ClassModel(c);
+                if (key == null || _catalog?.Find(key) == null) continue;
+                ModelView pre = Make(key, "Actor pool " + key);
+                if (pre != null) Give(pre);
+            }
 
             GameObject kaiju = CreatePrimitive(PrimitiveType.Cube, "Kaiju");
             _kaijuCube = kaiju.transform;
@@ -109,10 +129,24 @@ namespace CriticalMass.Runtime.View
             GameObject hill = CreatePrimitive(PrimitiveType.Cube, "Hill");
             _hill = hill.transform;
             hill.GetComponent<Renderer>().sharedMaterial = ToonMaterials.Prop(Palette.Brass);
+
+            // M9 (physics audit): prewarm spare models per class so a respawn as another class takes one from the pool.
+            if (_catalog != null)
+                foreach (ClassId cls in ClassIds.All)
+                {
+                    string key = ArtMapping.ClassModel(cls);
+                    if (key == null || _catalog.Find(key) == null) continue;
+                    for (int k = 0; k < PrewarmPerClass; k++)
+                    {
+                        ModelView m = Make(key, "Pool " + key);
+                        if (m != null) Give(m);
+                    }
+                }
         }
 
         private void OnDestroy()
         {
+            if (_carryProp != null) Anim.PostPoseHooks.Unregister(_carryProp);
             foreach (Stack<ModelView> s in _pool.Values) foreach (ModelView m in s) m.Dispose();
         }
 
@@ -141,7 +175,12 @@ namespace CriticalMass.Runtime.View
             if (_pool.TryGetValue(key, out Stack<ModelView> s) && s.Count > 0)
             {
                 ModelView m = s.Pop();
-                m.Root.name = objectName;
+                if (!ReferenceEquals(m.AssignedName, objectName))
+                {
+                    m.Root.name = objectName;
+                    m.AssignedName = objectName;
+                }
+                m.ResetScale();   // fix/model-scale: a reused model starts at its imported size (respawn, class switch)
                 return m;
             }
             return Make(key, objectName);
@@ -150,11 +189,25 @@ namespace CriticalMass.Runtime.View
         private void Give(ModelView m)
         {
             m.SetActive(false);
+            m.ResetScale();   // fix/model-scale: never park a model mid-effect (death pop, hit punch, squash)
             if (!_pool.TryGetValue(m.Entry.Key, out Stack<ModelView> s)) _pool[m.Entry.Key] = s = new Stack<ModelView>();
             s.Push(m);
         }
 
         private void LateUpdate() => Sync(Time.deltaTime);
+
+        /// <summary>
+        /// Contract C3 (DG-71): called once per drawn actor (and the Kaiju, actor -2) after its pose is evaluated and before
+        /// render. Spring bones, carried cargo, death launch and weapon trails register an Anim.IPostPoseListener with
+        /// Anim.PostPoseHooks and ride the bones from their own files.
+        /// </summary>
+        public static void PostPose(int actor, ModelView mv, in Anim.ActorPoseState s) => Anim.PostPoseHooks.Dispatch(actor, mv, in s);
+
+        /// <summary>The animator of actor i (tests and the capture report), or null.</summary>
+        public Anim.ActorAnimator AnimatorOf(int i) => _actors != null && i >= 0 && i < _actors.Length ? _actors[i].Anim : null;
+
+        /// <summary>The Kaiju's animator (tests).</summary>
+        public Anim.KaijuAnimator KaijuAnimator => _kaijuAnim;
 
         /// <summary>
         /// One view update (LateUpdate, and the capture tool's frame timing). Clip time advances with SIM time (tick plus
@@ -170,9 +223,14 @@ namespace CriticalMass.Runtime.View
             double simTime = (w.Tick + a) / cfg.SimHz;
             double dSim = double.IsNaN(_lastSimTime) ? 0 : Math.Max(0, simTime - _lastSimTime);
             _lastSimTime = simTime;
+            if (_cam == null || !_cam.isActiveAndEnabled) _cam = UnityEngine.Camera.main;
+            _camPos = _cam != null ? _cam.transform.position : Vector3.zero;
+            // Contract C4: LOD by distance to the camera target (the local player, whom the camera follows).
+            if (w.ActorCount > 0 && w.Actors[0].Alive) _targetPos = SimSpace.ToWorld(Lerp(w.PrevX[0], w.X[0], a), 0, Lerp(w.PrevZ[0], w.Z[0], a));
             int models = 0;
+            Anim.AnimLod.BeginFrame();
 
-            for (int i = 0; i < _actors.Length; i++) models += SyncActor(i, w, cfg, map, a, dSim) ? 1 : 0;
+            for (int i = 0; i < _actors.Length; i++) models += SyncActor(i, w, cfg, map, a, simTime, dSim) ? 1 : 0;
             models += SyncKaiju(w, cfg, map, a, simTime, dSim);
             models += SyncNodes(w, map);
             models += SyncBarricades(w, cfg, map);
@@ -186,7 +244,7 @@ namespace CriticalMass.Runtime.View
             ActiveModelCount = models;
         }
 
-        private bool SyncActor(int i, World w, GameConfig cfg, MapDef map, double a, double dSim)
+        private bool SyncActor(int i, World w, GameConfig cfg, MapDef map, double a, double simTime, double dSim)
         {
             CharSlot slot = _actors[i];
             if (_fx == null) _fx = GetComponent<Effects.CombatFx>();
@@ -203,7 +261,11 @@ namespace CriticalMass.Runtime.View
                 Give(slot.Model);
                 slot.Model = null;
             }
-            if (alive && key != null && slot.Model == null) slot.Model = Take(key, "Actor " + i + " " + key);
+            if (alive && key != null && slot.Model == null)
+            {
+                slot.Model = Take(key, ActorName(i, key));
+                slot.Anim.Reset();
+            }
             bool capsule = alive && slot.Model == null;
             if (capsule && slot.Capsule == null)
             {
@@ -235,46 +297,16 @@ namespace CriticalMass.Runtime.View
 
             ModelView m = slot.Model;
             m.SetActive(true);
-            m.Transform.localPosition = SimSpace.ToWorld(x, h, z) + (hasFx ? fx.Nudge : Vector3.zero);
-            m.SetFacing(facing);
-            m.Transform.localScale = Vector3.one * (hasFx ? fx.Scale : 1f);
+            m.ApplyTier();
+            QualityRow row = QualityTable.Current;
+            m.SetLod(AnimLod.PickLod(i == 0, Vector3.Distance(SimSpace.ToWorld(x, 0, z), _targetPos), row));
+            Vector3 basePos = SimSpace.ToWorld(x, h, z);
+            m.Transform.localPosition = basePos + (hasFx ? fx.Nudge : Vector3.zero) + JumpLift.Offset(w, map, i, a, x, z); // DG-02 jump arc
             Material teamMat = ArtMaterials.ForTeam(m.Spec, actor.Team);
             m.SetMaterial(hasFx && fx.Flash ? _fx.FlashMaterial(teamMat) : teamMat);
-            if (hasFx && fx.Corpse)
-            {
-                // Death clip when the model has one; else the Hit clip held on its last frame.
-                m.BeginPose();
-                if (!m.Pose(ArtMapping.Death, fx.DeathT, 1f, false)) m.Pose(ArtMapping.Hit, fx.DeathT, 1f, false);
-                m.Evaluate();
-                return true;
-            }
-
-            // Locomotion from the sim velocity: Idle below 0.15 u/s, Walk to 1.2 u/s, Run above 3.4 u/s (whatever exists).
-            double speed = Math.Sqrt(w.Vx[i] * w.Vx[i] + w.Vz[i] * w.Vz[i]);
-            float move = Smooth(0.15, 1.2, speed);
-            float run = m.HasClip(ArtMapping.Run) ? move * Smooth(2.2, 3.4, speed) : 0f;
-            float walk = m.HasClip(ArtMapping.Walk) ? move - run : 0f;
-            m.Transform.localPosition += JumpLift.Offset(w, map, i, a, x, z); // DG-02 jump arc (after the position is set)
-            slot.IdleT += dSim;
-            slot.WalkT += dSim * Clamp(speed / WalkClipSpeed, 0.5, 2.0);
-            slot.RunT += dSim * Clamp(speed / RunClipSpeed, 0.6, 1.6);
-            m.BeginPose();
-            m.Pose(ArtMapping.Idle, slot.IdleT + i * 0.37, 1f - walk - run, true);
-            m.Pose(ArtMapping.Walk, slot.WalkT, walk, true);
-            m.Pose(ArtMapping.Run, slot.RunT, run, true);
-            // Attack: AnimAction is "seconds since the last attack / ability"; AttackCd > 0 means one happened.
-            float attackLen = m.ClipLength(ArtMapping.Attack);
-            double attackT = hasFx ? _fx.AttackTime(i, actor.AnimAction, fx) : actor.AnimAction;
-            if (actor.AttackCd > 0 && attackT < attackLen) m.Pose(ArtMapping.Attack, attackT, 3f, false);
-            // Hit reaction (CombatFx): the Hit clip over locomotion, under an attack in progress.
-            float hitLen = m.ClipLength(ArtMapping.Hit);
-            if (hasFx && fx.HitT < hitLen * 0.8f) m.Pose(ArtMapping.Hit, fx.HitT - (fx.Holding ? fx.HoldOffset : 0), 2f * (1f - (float)(fx.HitT / hitLen)), false);
-            if (actor.GatherProgress > 0 && speed < 0.3)
-            {
-                slot.GatherT += dSim;
-                m.Pose(ArtMapping.Gather, slot.GatherT, 3f, true);
-            }
-            m.Evaluate();
+            // Animation pass: clips, timing, facing spring, squash and the level of detail live in Anim.ActorAnimator.
+            slot.Anim.Pose(m, w, cfg, i, a, simTime, dSim, basePos, _fx, hasFx, in fx, ref _poseState);
+            PostPose(i, m, in _poseState);
             return true;
         }
 
@@ -322,32 +354,31 @@ namespace CriticalMass.Runtime.View
                 m.SetFacing(facing);
                 m.SetMaterial(ArtMaterials.ForGlow(m.Spec, glow));
                 double speed = Math.Sqrt((k.X - k.PrevX) * (k.X - k.PrevX) + (k.Z - k.PrevZ) * (k.Z - k.PrevZ)) * cfg.SimHz;
-                _kaijuIdleT += dSim;
-                _kaijuWalkT += dSim * Clamp(speed / 1.5, 0.5, 2.0);
-                m.BeginPose();
                 if (m == _egg)
                 {
+                    m.Transform.localScale = m.BaseScale;
+                    _eggIdleT += dSim;
+                    m.BeginPose();
                     bool shake = cfg.HatchSeconds - w.Match.Time < EggShakeSeconds && m.HasClip(ArtMapping.Shake);
-                    m.Pose(shake ? ArtMapping.Shake : ArtMapping.Idle, _kaijuIdleT, 1f, true);
+                    m.Pose(shake ? ArtMapping.Shake : ArtMapping.Idle, _eggIdleT, 1f, true);
+                    m.Evaluate();
                 }
                 else
                 {
-                    float slamLen = m.ClipLength(ArtMapping.Slam), berserkLen = m.ClipLength(ArtMapping.Berserk);
-                    if (k.KoIn > 0) m.Pose(ArtMapping.KO, cfg.Kaiju.KoSeconds - k.KoIn, 1f, false);
-                    else if (telegraph)
-                        m.Pose(ArtMapping.SlamWindup, (cfg.Kaiju.SlamTelegraphSeconds - k.TelegraphIn) / cfg.Kaiju.SlamTelegraphSeconds * m.ClipLength(ArtMapping.SlamWindup), 1f, false);
-                    else if (simTime - _slamAt < slamLen) m.Pose(ArtMapping.Slam, simTime - _slamAt, 1f, false);
-                    else if (k.MeleeWindupIn > 0)
-                        m.Pose(ArtMapping.Roar, (cfg.Kaiju.MeleeWindupTicks - k.MeleeWindupIn) / cfg.Kaiju.MeleeWindupTicks * m.ClipLength(ArtMapping.Roar), 1f, false);
-                    else if (simTime - _berserkAt < berserkLen) m.Pose(ArtMapping.Berserk, simTime - _berserkAt, 1f, false);
-                    else
-                    {
-                        float walk = Smooth(0.15, 1.0, speed);
-                        m.Pose(ArtMapping.Idle, _kaijuIdleT, 1f - walk, true);
-                        m.Pose(ArtMapping.Walk, _kaijuWalkT, walk, true);
-                    }
+                    // Animation pass (DG-92, DG-93): strike, flinch, growth tween, measured stride, footfalls.
+                    _kaijuAnim.Pose(m, _hatchling, _adult, w, cfg, facing, simTime, dSim, speed, telegraph, _slamAt, _berserkAt);
+                    _poseState = default;
+                    _poseState.Actor = -2;
+                    _poseState.IsKaiju = true;
+                    _poseState.Tick = w.Tick;
+                    _poseState.Alpha = a;
+                    _poseState.SimTime = simTime;
+                    _poseState.DeltaSim = dSim;
+                    _poseState.Evaluated = true;
+                    _poseState.Speed = (float)speed;
+                    _poseState.Yaw = SimSpace.YawDeg(k.Facing);
+                    PostPose(-2, m, in _poseState);
                 }
-                m.Evaluate();
             }
 
             bool shards = _shards != null && m == _adult && k.State == KaijuState.Berserk;
@@ -432,6 +463,13 @@ namespace CriticalMass.Runtime.View
             return count;
         }
 
+        /// <summary>"Actor i key", built once per (slot, model) pair so a respawn never formats a string.</summary>
+        private string ActorName(int i, string key)
+        {
+            if (!_names.TryGetValue((i, key), out string n)) _names[(i, key)] = n = "Actor " + i + " " + key;
+            return n;
+        }
+
         private static void SetActive(ModelView m, bool on)
         {
             if (m != null) m.SetActive(on);
@@ -445,14 +483,6 @@ namespace CriticalMass.Runtime.View
             byte c = map.Cells[cz * map.Width + cx];
             return c == Cell.Wall || c == Cell.BreakableIntact ? 1.5 : 0;
         }
-
-        private static float Smooth(double e0, double e1, double v)
-        {
-            double t = Math.Max(0, Math.Min(1, (v - e0) / (e1 - e0)));
-            return (float)(t * t * (3 - 2 * t));
-        }
-
-        private static double Clamp(double v, double lo, double hi) => Math.Max(lo, Math.Min(hi, v));
 
         private static double Lerp(double from, double to, double t) => from + (to - from) * t;
 

@@ -56,7 +56,12 @@ namespace CriticalMass.Sim.Core
             {
                 Actor a = w.Actors[i];
                 if (!a.Alive || a.StandUp > 0 || !w.Inputs[i].Attack || a.AttackCd > 0) continue;
-                // ITEM CM-38: added by its owner (Demolitions has no regular attack)
+                if (a.Cls == ClassId.Demolitions) continue; // DG-22 (CM-38): no regular attack (Travis 2026-11-06)
+                if (a.Cls == ClassId.Healer)
+                {
+                    Healer.TryMend(w, i); // DG-40 (U-061): no weapon; the attack press mends a hurt ally
+                    continue;
+                }
                 ClassConfig cc = cfg.Class(a.Cls);
                 a.AttackCd = cc.AttackCooldown;
                 a.AnimAction = 0;
@@ -110,7 +115,8 @@ namespace CriticalMass.Sim.Core
                     }
                 }
             }
-            // ITEM CM-38: added by its owner (Demolitions mines and TNT blasts: demolitionsBlastSystem)
+            // DG-22 (CM-38): mines trigger and due TNT blows on this step's positions, before the meat drop so a blast kill leaves meat.
+            Demolitions.DemolitionsBlastSystem(w);
             // CM-35: the last thing combat does: every body killed this step (or since last step's combat) drops its meat once.
             DropCorpseMeat(w);
         }

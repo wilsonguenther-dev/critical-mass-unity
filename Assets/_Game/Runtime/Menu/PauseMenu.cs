@@ -122,7 +122,7 @@ namespace CriticalMass.Runtime.Menu
         }
         GameObject _classPage, _confirmPage;
         MenuItem _spectate, _changeClass, _switchTeam, _confirmYes;
-        readonly MenuItem[] _classItems = new MenuItem[5];
+        readonly MenuItem[] _classItems = new MenuItem[ClassIds.All.Count];
         MenuItem _classBack;
         Text _rootNote, _confirmTitle;
         PromptStrip _hintStrip;
@@ -238,9 +238,15 @@ namespace CriticalMass.Runtime.Menu
                 ClassSwitch.CloseExternalPicker();
                 _external = false;
             }
+            FlushSettings();   // DG-53: saved once when the menu closes, not on every slider tick
             IsOpen = false;
             if (Canvas != null) Canvas.enabled = false;
             if (EventSystem.current != null) EventSystem.current.SetSelectedGameObject(null);
+        }
+
+        void FlushSettings()
+        {
+            if (!GameSettings.Flush() && _settingsPage != null) SetStatus("Settings could not be saved.", true);
         }
 
         void Update()
@@ -315,6 +321,7 @@ namespace CriticalMass.Runtime.Menu
         {
             Build();
             CancelRebind();
+            if (CurrentPage == Page.Settings) FlushSettings();   // DG-53: the settings page closed: one save
             CurrentPage = Page.Root;
             SetExtraPage(-1);
             _rootPage.SetActive(true);
@@ -1151,11 +1158,13 @@ namespace CriticalMass.Runtime.Menu
                 Stepper(tab, 2, "VERTICAL SYNC", () => GameSettings.VSync ? "ON" : "OFF", d => GameSettings.VSync = !GameSettings.VSync),
                 Stepper(tab, 3, "QUALITY", QualityText, StepQuality),
                 Stepper(tab, 4, "FRAME RATE LIMIT", FpsCapText, StepFpsCap),
-                Stepper(tab, 5, "SLOW DOWN IN BACKGROUND", () => GameSettings.BackgroundThrottle ? "ON" : "OFF",
+                Stepper(tab, 5, "SAVE POWER IN BACKGROUND", () => GameSettings.BackgroundThrottle ? "ON" : "OFF",
                     d => GameSettings.BackgroundThrottle = !GameSettings.BackgroundThrottle),
             };
-            Note(tab, 6, GameSettings.CanChangeWindow ? "Changes apply at once and are kept for the next launch." :
-                "Video settings are saved here and apply in the built game.");
+            // DG-62: the safe-start notice lives here, neutral, never on the title screen.
+            string safe = CriticalMass.Runtime.Game.FrameGovernor.SafeNotice;
+            Note(tab, 6, safe ?? (GameSettings.CanChangeWindow ? "Changes apply at once and are kept for the next launch." :
+                "Video settings are saved here and apply in the built game."));
             ChainInTab(items);
             return tab.gameObject;
         }
@@ -1166,21 +1175,57 @@ namespace CriticalMass.Runtime.Menu
             MenuUi.Stretch(tab);
             var items = new List<MenuItem>
             {
-                // Camera shake moved to the ACCESS tab as an amount, 0 to 100 (DG-30, SettingsExtras).
+                // Camera shake, reduce flashing and reduce motion live on the ACCESS tab (one source of truth, SettingsExtras).
                 Stepper(tab, 0, "DAMAGE NUMBERS", () => GameSettings.DamageNumbers ? "ON" : "OFF", d => GameSettings.DamageNumbers = !GameSettings.DamageNumbers),
                 Stepper(tab, 1, "BLOOD", () => GameSettings.Blood ? "ON" : "OFF", d => GameSettings.Blood = !GameSettings.Blood),
             };
-            MenuItem reset = MenuUi.Item(tab, "Reset Settings", ContentX, ContentY + 2 * (LineH + LineGap) + 20f, 420f, 56f,
+            MenuItem reset = MenuUi.Item(tab, "Reset Settings", ContentX, ContentY + GameTabLines * (LineH + LineGap) + 20f, 420f, 56f,
                 "RESET ALL SETTINGS", MenuItem.Kind.Button, 24, true, CMTokens.Display);
             reset.Submitted = () =>
             {
                 GameSettings.ResetAll();
+                CriticalMass.Runtime.Game.SupportReport.ResetDataFiles();   // DG-64: the data files and the keys together
                 RefreshAll();
                 SetStatus("Audio, video and game settings are back to their defaults.", false);
             };
             items.Add(reset);
+            // DG-64: a zip of the logs a tester can send us (no upload; the decision ledger rules out crash services).
+            MenuItem report = MenuUi.Item(tab, "Problem Report", ContentX, ContentY + GameTabLines * (LineH + LineGap) + 96f, 420f, 56f,
+                "SAVE A PROBLEM REPORT", MenuItem.Kind.Button, 24, true, CMTokens.Display);
+            report.Submitted = () =>
+            {
+                string zip = CriticalMass.Runtime.Game.SupportReport.Export(null, out string error);
+                if (zip == null)
+                {
+                    SetStatus("The problem report could not be saved: " + error + ".", true);
+                    return;
+                }
+                SetStatus("Problem report saved: " + System.IO.Path.GetFileName(zip) + " (shown in its folder).", false);
+                CriticalMass.Runtime.Game.SupportReport.Reveal(zip);
+            };
+            items.Add(report);
             ChainInTab(items);
             return tab.gameObject;
+        }
+
+        /// <summary>Stepper lines on the Game tab (the two buttons sit under them).</summary>
+        const int GameTabLines = 2;
+
+        static string ShakeText()
+        {
+            if (GameSettings.ReduceMotion) return "OFF (REDUCE MOTION)";
+            float v = GameSettings.ShakeScale;
+            return v <= 0f ? "OFF" : v < 0.75f ? "LIGHT" : "FULL";
+        }
+
+        static void StepShake(int d)
+        {
+            float[] steps = GameSettings.ShakeSteps;
+            float v = GameSettings.ShakeScale;
+            int at = 0;
+            for (int i = 0; i < steps.Length; i++) if (Mathf.Abs(steps[i] - v) < Mathf.Abs(steps[at] - v)) at = i;
+            int n = steps.Length;
+            GameSettings.ShakeScale = steps[((at + (d < 0 ? -1 : 1)) % n + n) % n];
         }
 
         void ChainInTab(List<MenuItem> items)

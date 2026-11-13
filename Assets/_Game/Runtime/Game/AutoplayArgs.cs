@@ -5,6 +5,8 @@ using System.IO;
 using System.Text;
 using System.Threading;
 using CriticalMass.Runtime.Hud;
+using CriticalMass.Sim.Bots;
+using CriticalMass.Sim.Config;
 using CriticalMass.Sim.Core;
 using UnityEngine;
 using UnityEngine.Profiling;
@@ -28,6 +30,15 @@ namespace CriticalMass.Runtime.Game
     ///                            (default persistentDataPath/perf-last.json)
     ///   -novsync                 no frame cap at all (FrameGovernor steps aside): measures the real frame cost
     ///   -safe                    lowest settings (read by FrameGovernor)
+    ///   -dataDir PATH            the game's files go to PATH, not the player's folder (GamePaths; smoke and soak isolation)
+    ///   -quality NAME|N          this quality level for the run (FrameGovernor; the perf report has quality_requested)
+    ///   -debugHangSeconds N      TEST ONLY: the main thread sleeps N s once, 3 s after the title (proves the hang watchdog)
+    ///   -seed N -simHashOut PATH sim-only run (no view): one 16v16 bot match on seed N, its end-state hash to PATH, quit (DG-66)
+    ///   -shots                   screenshots shot-title.png and shot-mid.png into the data folder (Windows graphics run)
+    ///   -traceStates             record shader states for warm-up (ShaderWarmup); -exportReport, -diag: SupportReport
+    /// DG-63: the crash log is written by CrashLog (bounded queue, one background writer, 20 lines per second, repeat keys
+    /// with digits and hex as "#"); Exceptions and Errors both count. A stack in the sim or the match driver ends the match
+    /// to the menu with a notice instead of freezing it.
     /// Player builds append every exception and error to persistentDataPath/crash-log.txt with the build stamp (capped
     /// at 1 MB, the previous file kept as crash-log.1.txt). The same exception repeated RepeatLimit times stops the
     /// CriticalMass behaviour at the top of its stack (all instances disabled) and shows a small notice, so a per-frame
@@ -54,6 +65,10 @@ namespace CriticalMass.Runtime.Game
             public bool NoVsync;
             public int Matches;
             public double TitleSeconds;
+            public double DebugHangSeconds;
+            public string SimHashOut;
+            public int Seed;
+            public bool Shots;
         }
 
         /// <summary>Pure parser (tests). Unknown flags are ignored, so Unity's own (-screen-width, -logFile) pass through.</summary>
@@ -82,6 +97,16 @@ namespace CriticalMass.Runtime.Game
                     case "-autoplaytitleseconds":
                         if (TryNum(next, out double ts) && ts >= 0) { o.TitleSeconds = ts; i++; }
                         break;
+                    case "-debughangseconds":
+                        if (TryNum(next, out double hs) && hs > 0) { o.DebugHangSeconds = Math.Min(hs, 120); i++; }
+                        break;
+                    case "-seed":
+                        if (TryNum(next, out double sd)) { o.Seed = (int)sd; i++; }
+                        break;
+                    case "-simhashout":
+                        if (!string.IsNullOrEmpty(next) && !next.StartsWith("-", StringComparison.Ordinal)) { o.SimHashOut = next; i++; }
+                        break;
+                    case "-shots": o.Shots = true; break;
                     case "-perflog":
                         if (!string.IsNullOrEmpty(next) && !next.StartsWith("-", StringComparison.Ordinal)) { o.PerfLog = next; i++; }
                         break;
@@ -117,8 +142,8 @@ namespace CriticalMass.Runtime.Game
         static int _exceptions, _errors;
         static GameObject _host;
         static string _crashLogPath;
+        static CrashLog _crash;
         static readonly object CrashLock = new object();
-        static readonly Dictionary<string, int> Repeats = new Dictionary<string, int>();
         static readonly Queue<string> ToStop = new Queue<string>();
         static double _processStartOffset = -1;   // seconds between process start and engine start, when the OS says
 
@@ -135,7 +160,7 @@ namespace CriticalMass.Runtime.Game
         // ── autoplay state ──
         SimDriverBehaviour _driver;
         TitleScreen _title;
-        bool _titleSeen, _recording, _ended, _quitting, _timedOut;
+        bool _titleSeen, _recording, _ended, _quitting, _timedOut, _hangDone, _shotTitle, _shotMid;
         double _titleAt = -1, _matchStart, _endAt, _firstTitleAt = -1;
         int _exceptionsAtStart, _match = 1, _reloadFrame = -1;
 
@@ -143,7 +168,10 @@ namespace CriticalMass.Runtime.Game
         {
             if (!Application.isEditor)
             {
-                _crashLogPath = Path.Combine(Application.persistentDataPath, "crash-log.txt");
+                _crashLogPath = Path.Combine(GamePaths.DataDir, "crash-log.txt");
+                if (_crash == null) _crash = new CrashLog(_crashLogPath, true, BuildInfo.Label);
+                Application.quitting -= OnQuitFlush;
+                Application.quitting += OnQuitFlush;
                 Application.logMessageReceivedThreaded -= OnLog;
                 Application.logMessageReceivedThreaded += OnLog;
                 AppDomain.CurrentDomain.UnhandledException -= OnUnhandled;
@@ -158,9 +186,16 @@ namespace CriticalMass.Runtime.Game
                     _processStartOffset = -1;
                 }
                 Debug.Log($"[CriticalMass] {BuildInfo.Label} built {BuildInfo.BuiltUtc}; Player.log {Application.consoleLogPath}; " +
-                          $"crash log {_crashLogPath}");
+                          $"crash log {_crashLogPath}; {SystemInfo.operatingSystem}; {SystemInfo.processorType} x{SystemInfo.processorCount}; " +
+                          $"{SystemInfo.systemMemorySize} MB; {SystemInfo.graphicsDeviceName} ({SystemInfo.graphicsDeviceType}, {SystemInfo.graphicsDeviceVersion})");
+                if (SupportReport.HandleBootFlags()) { _quitting = true; return; }
             }
             Options o = Current;
+            if (!string.IsNullOrEmpty(o.SimHashOut))
+            {
+                RunSimHash(o);
+                return;
+            }
             if (o.Autoplay)
             {
                 Application.runInBackground = true;   // a background window must not pause the recorded match
@@ -177,59 +212,29 @@ namespace CriticalMass.Runtime.Game
             if (type == LogType.Exception) Interlocked.Increment(ref _exceptions);
             else if (type == LogType.Error || type == LogType.Assert) Interlocked.Increment(ref _errors);
             else return;
-            string key = type + "|" + condition + "|" + FirstLine(stack);
-            int n;
-            lock (CrashLock)
-            {
-                if (Repeats.Count > 2000) Repeats.Clear();   // messages with numbers in them must not grow this forever
-                Repeats.TryGetValue(key, out n);
-                Repeats[key] = ++n;
-                if (n == RepeatLimit && type == LogType.Exception) ToStop.Enqueue(stack ?? "");
-            }
-            if (n < RepeatLimit) AppendCrash(type.ToString(), condition, stack);
-            else if (n == RepeatLimit) AppendCrash(type.ToString(), condition + $" (repeated {RepeatLimit} times; further repeats are counted, not written)", stack);
+            // DG-56: a lost graphics device (Windows TDR, a GPU reset) counts the session as unclean.
+            if (condition != null && (condition.IndexOf("DEVICE_REMOVED", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                      condition.IndexOf("device removed", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                      condition.IndexOf("device lost", StringComparison.OrdinalIgnoreCase) >= 0))
+                SessionKeeper.Flag("graphics-device-lost");
+            CrashLog log = _crash;
+            if (log == null) return;
+            int n = log.Submit(type.ToString(), condition, stack);
+            if (n == RepeatLimit && !string.IsNullOrEmpty(stack))
+                lock (CrashLock) ToStop.Enqueue(stack);
         }
 
         static void OnUnhandled(object sender, UnhandledExceptionEventArgs e)
         {
             Interlocked.Increment(ref _exceptions);
-            AppendCrash("Unhandled", e.ExceptionObject?.ToString() ?? "unknown", "");
+            _crash?.Submit("Unhandled", e.ExceptionObject?.ToString() ?? "unknown", "");
+            _crash?.FlushNow();
         }
 
-        static string FirstLine(string s)
+        static void OnQuitFlush()
         {
-            if (string.IsNullOrEmpty(s)) return "";
-            int nl = s.IndexOf('\n');
-            return nl >= 0 ? s.Substring(0, nl) : s;
-        }
-
-        static void AppendCrash(string kind, string condition, string stack)
-        {
-            if (_crashLogPath == null) return;
-            try
-            {
-                lock (CrashLock)
-                {
-                    var fi = new FileInfo(_crashLogPath);
-                    if (fi.Exists && fi.Length > CrashLogMaxBytes)
-                    {
-                        string old = Path.Combine(fi.DirectoryName ?? "", "crash-log.1.txt");
-                        File.Copy(_crashLogPath, old, true);
-                        File.Delete(_crashLogPath);
-                    }
-                    bool fresh = !File.Exists(_crashLogPath);
-                    var sb = new StringBuilder();
-                    if (fresh) sb.Append("# Critical Mass crash log (DG-05). Newest last; capped at 1 MB (older: crash-log.1.txt).\n");
-                    sb.Append(DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ", CultureInfo.InvariantCulture))
-                      .Append(' ').Append(BuildInfo.Label).Append(' ').Append(kind).Append(": ").Append(condition).Append('\n');
-                    if (!string.IsNullOrEmpty(stack)) sb.Append(stack.TrimEnd()).Append('\n');
-                    File.AppendAllText(_crashLogPath, sb.ToString());
-                }
-            }
-            catch (Exception)
-            {
-                // never throw from a log handler
-            }
+            SupportReport.OnQuitDiag();
+            _crash?.Dispose();
         }
 
         /// <summary>
@@ -261,9 +266,23 @@ namespace CriticalMass.Runtime.Game
             return names;
         }
 
+        /// <summary>true when a stack runs through the sim or the match driver (stopping it would freeze the match; pure; tests).</summary>
+        public static bool IsMatchCritical(List<string> stackTypes)
+        {
+            foreach (string n in stackTypes)
+                if (n.StartsWith("CriticalMass.Sim.", StringComparison.Ordinal) || n == typeof(SimDriverBehaviour).FullName) return true;
+            return false;
+        }
+
         static void StopOffender(string stack)
         {
-            foreach (string name in StackTypeNames(stack))
+            List<string> types = StackTypeNames(stack);
+            if (IsMatchCritical(types))
+            {
+                EndMatchAfterError();
+                return;
+            }
+            foreach (string name in types)
             {
                 if (!name.StartsWith("CriticalMass.", StringComparison.Ordinal)) continue;
                 Type t = null;
@@ -282,6 +301,89 @@ namespace CriticalMass.Runtime.Game
                 Debug.LogWarning($"[CM.Guard] disabled {found.Length} {t.FullName} after {RepeatLimit} repeats of one exception");
                 return;
             }
+        }
+
+        /// <summary>DG-63: the sim or driver keeps failing: leave the match for the menu with a notice, never a frozen match.</summary>
+        static void EndMatchAfterError()
+        {
+            StoppedNotice = "The match stopped because of an error. Details are in the crash log.";
+            StoppedNoticeUntil = Time.realtimeSinceStartup + 15f;
+            Debug.LogWarning($"[CM.Guard] the match driver failed {RepeatLimit} times; ending the match");
+            if (Current.Autoplay && Current.QuitAfterMatch)
+            {
+                Application.Quit(ExitExceptions);
+                return;
+            }
+            SimDriverBehaviour d = FindAnyObjectByType<SimDriverBehaviour>();
+            if (d != null) d.enabled = false;
+            try
+            {
+                Flow.GameFlow.ReturnTo(Flow.FlowState.Menu);
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[CM.Guard] could not return to the menu: {e.Message}");
+            }
+        }
+
+        // ── DG-66 sim-only hash run ──
+
+        /// <summary>FNV-1a over the end state of a world (pure; the same on every machine for the same seed).</summary>
+        public static ulong WorldHash(World w)
+        {
+            ulong h = 14695981039346656037UL;
+            void Mix(long v)
+            {
+                h ^= (ulong)v;
+                h *= 1099511628211UL;
+            }
+            Mix(w.Tick);
+            Mix(BitConverter.DoubleToInt64Bits(w.Match.Time));
+            Mix((long)w.Match.Winner);
+            Mix(BitConverter.DoubleToInt64Bits(w.Match.HillSeconds.Azure));
+            Mix(BitConverter.DoubleToInt64Bits(w.Match.HillSeconds.Crimson));
+            for (int i = 0; i < w.ActorCount; i++)
+            {
+                Mix(BitConverter.DoubleToInt64Bits(w.X[i]));
+                Mix(BitConverter.DoubleToInt64Bits(w.Z[i]));
+                Mix(BitConverter.DoubleToInt64Bits(w.Vx[i]));
+                Mix(BitConverter.DoubleToInt64Bits(w.Vz[i]));
+                Mix(w.Actors[i].Alive ? 1 : 0);
+            }
+            Mix(w.GridVersion);
+            return h;
+        }
+
+        /// <summary>One bot match on a seed, stepped to its end (or maxTicks); returns the world (pure sim; tests).</summary>
+        public static World RunSimMatch(int seed, int maxTicks)
+        {
+            GameConfig cfg = GameConfig.CreateDefault();
+            World w = World.CreateWorld(new WorldOptions
+            {
+                Seed = seed, TeamSize = cfg.TeamSize, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = cfg,
+            });
+            InputFrame scratch = SimInput.EmptyInput();
+            for (int t = 0; t < maxTicks && w.Match.Phase != MatchPhase.Ended; t++) MatchTick.Advance(w, null, scratch);
+            return w;
+        }
+
+        void RunSimHash(Options o)
+        {
+            int code = ExitClean;
+            try
+            {
+                World w = RunSimMatch(o.Seed != 0 ? o.Seed : 1337, 60000);
+                string line = $"seed={(o.Seed != 0 ? o.Seed : 1337)} ticks={w.Tick} winner={w.Match.Winner} hash={WorldHash(w):x16}\n";
+                File.WriteAllText(o.SimHashOut, line);
+                Debug.Log($"{LogTag} SIMHASH {line.Trim()} arch={System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture}");
+            }
+            catch (Exception e)
+            {
+                code = ExitExceptions;
+                Debug.LogError($"{LogTag} SIMHASH failed: {e}");
+            }
+            _quitting = true;
+            Application.Quit(code);
         }
 
         // ── per frame ──
@@ -303,6 +405,7 @@ namespace CriticalMass.Runtime.Game
                 {
                     _titleSeen = true;
                     _titleAt = now;
+                    if (Current.Autoplay || Current.QuitAfterMatch) PerfOverlay.SetPhase(PerfOverlay.PhaseTitle);   // DG-111
                     if (!Application.isEditor && _firstTitleAt < 0)
                     {
                         _firstTitleAt = now;
@@ -315,7 +418,23 @@ namespace CriticalMass.Runtime.Game
             }
 
             Options o = Current;
+            if (o.DebugHangSeconds > 0 && !_hangDone && _firstTitleAt >= 0 && now - _firstTitleAt > 3.0)
+            {
+                _hangDone = true;
+                Debug.LogWarning($"{LogTag} -debugHangSeconds: the main thread sleeps {o.DebugHangSeconds} s (test only)");
+                Thread.Sleep((int)(o.DebugHangSeconds * 1000));
+            }
+            if (o.Shots && !_shotTitle && _titleSeen && now - _titleAt > 2.0)
+            {
+                _shotTitle = true;
+                ScreenCapture.CaptureScreenshot(Path.Combine(GamePaths.DataDir, "shot-title.png"));
+            }
             if (!o.Autoplay && !o.QuitAfterMatch) return;
+            if (o.Shots && !_shotMid && _recording && _driver != null && _driver.World != null && _driver.World.Match.Time > 60)
+            {
+                _shotMid = true;
+                ScreenCapture.CaptureScreenshot(Path.Combine(GamePaths.DataDir, "shot-mid.png"));
+            }
             if (_driver == null)
             {
                 _driver = FindAnyObjectByType<SimDriverBehaviour>();
@@ -332,6 +451,7 @@ namespace CriticalMass.Runtime.Game
                 }
             }
             if (_driver == null || _driver.World == null || _quitting) return;
+            SessionKeeper.MatchTick = _driver.World.Tick;
 
             if (o.Autoplay)
             {
@@ -347,6 +467,9 @@ namespace CriticalMass.Runtime.Game
                 {
                     _recording = true;
                     _exceptionsAtStart = _exceptions;
+                    PerfOverlay.ClearPhase(PerfOverlay.PhaseMatch);
+                    PerfOverlay.ClearPhase(PerfOverlay.PhaseResults);
+                    PerfOverlay.SetPhase(PerfOverlay.PhaseMatch);
                     PerfOverlay.BeginRecording();
                 }
             }
@@ -365,6 +488,7 @@ namespace CriticalMass.Runtime.Game
                 Finish("TIMEOUT");
             }
             if (!_ended || now - _endAt < 1.5) return;
+            if (_pendingExtra != null) RewriteWithPhases();   // DG-111: the results phase is complete now
 
             if (!_timedOut && o.Autoplay && _match < o.Matches)
             {
@@ -393,6 +517,7 @@ namespace CriticalMass.Runtime.Game
             World w = _driver.World;
             PerfOverlay.Report r = _recording ? PerfOverlay.EndRecording() : null;
             _recording = false;
+            PerfOverlay.SetPhase(PerfOverlay.PhaseResults);
             double wall = Time.realtimeSinceStartupAsDouble - _matchStart;
             const double Mb = 1024.0 * 1024.0;
             double allocated = Profiler.GetTotalAllocatedMemoryLong() / Mb;
@@ -400,7 +525,7 @@ namespace CriticalMass.Runtime.Game
             double mono = Profiler.GetMonoUsedSizeLong() / Mb;
             double gfx = Profiler.GetAllocatedMemoryForGraphicsDriver() / Mb;
             string assets = _match == 1 ? PerfOverlay.AssetReportJson() : "null";
-            string json = PerfOverlay.ToJson(r, new[]
+            var extra = new[]
             {
                 ("result", Q(why)),
                 ("match", _match.ToString(CultureInfo.InvariantCulture)),
@@ -424,13 +549,32 @@ namespace CriticalMass.Runtime.Game
                 ("target_frame_rate", Application.targetFrameRate.ToString(CultureInfo.InvariantCulture)),
                 ("frame_cap", FrameGovernor.AppliedCap.ToString(CultureInfo.InvariantCulture)),
                 ("quality", Q(QualitySettings.names[QualitySettings.GetQualityLevel()])),
+                ("quality_requested", Q(FrameGovernor.RequestedQuality)),
+                ("render_scale", Num(FrameGovernor.AppliedRenderScale)),
+                ("render_pixels", ((long)(Screen.width * FrameGovernor.AppliedRenderScale) * (long)(Screen.height * FrameGovernor.AppliedRenderScale)).ToString(CultureInfo.InvariantCulture)),
+                ("max_queued_frames", QualitySettings.maxQueuedFrames.ToString(CultureInfo.InvariantCulture)),
+                ("window_mode", Q(Screen.fullScreenMode.ToString())),
+                ("displays", Display.displays.Length.ToString(CultureInfo.InvariantCulture)),
+                ("data_isolated", GamePaths.Isolated ? "true" : "false"),
                 ("safe_mode", FrameGovernor.SafeMode ? "true" : "false"),
+                ("previous_unclean", SessionKeeper.PreviousUnclean ? "true" : "false"),
+                ("sim_dropped_seconds", Num(RuntimeCounters.SimDroppedSeconds)),
+                ("sim_dropped_ticks", RuntimeCounters.SimDroppedTicks.ToString(CultureInfo.InvariantCulture)),
+                ("hud_events_dropped", RuntimeCounters.HudEventsDropped.ToString(CultureInfo.InvariantCulture)),
+                ("objects", ObjectCountsJson()),
+                ("world_triangles", CriticalMass.Runtime.View.Dressing.WorldView.LastTriangles.ToString(CultureInfo.InvariantCulture)),
+                ("render_tier", Q(RenderTier.Policy(RenderTier.Level).ToString())),
                 ("screen", Q($"{Screen.width}x{Screen.height}")),
                 ("assets", assets),
-            });
+                ("phases", PerfOverlay.PhasesJson()),
+            };
+            string json = PerfOverlay.ToJson(r, extra);
+            _pendingExtra = extra;
+            _pendingReport = r;
             string basePath = Current.PerfLog;
             if (string.IsNullOrEmpty(basePath)) basePath = Path.Combine(Application.persistentDataPath, "perf-last.json");
             string path = PerfPathFor(basePath, _match);
+            _pendingPath = path;
             try
             {
                 string dir = Path.GetDirectoryName(Path.GetFullPath(path));
@@ -444,6 +588,43 @@ namespace CriticalMass.Runtime.Game
             string frames = r == null ? "frames=0" : r.Summary();
             Debug.Log($"{LogTag} {why} match={_match}/{Current.Matches} winner={w.Match.Winner} sim={Num(w.Match.Time)}s ticks={w.Tick} " +
                       $"wall={Num(wall)}s {frames} unity_mb={Num(allocated)} mono_mb={Num(mono)} exceptions={_exceptions} errors={_errors} perf={path}");
+        }
+
+        (string key, string jsonValue)[] _pendingExtra;
+        PerfOverlay.Report _pendingReport;
+        string _pendingPath;
+
+        /// <summary>
+        /// DG-111: perf.json is written at the match end (so a crash during results loses nothing) and written again when
+        /// the results phase ends, with every phase's p50 and p95 (title, match, results).
+        /// </summary>
+        void RewriteWithPhases()
+        {
+            var extra = _pendingExtra;
+            _pendingExtra = null;
+            PerfOverlay.SetPhase(null);
+            for (int i = 0; i < extra.Length; i++)
+                if (extra[i].key == "phases") extra[i].jsonValue = PerfOverlay.PhasesJson();
+            try
+            {
+                SafeFile.WriteAtomic(_pendingPath, PerfOverlay.ToJson(_pendingReport, extra), false);
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"{LogTag} could not rewrite {_pendingPath}: {e.Message}");
+            }
+        }
+
+        /// <summary>DG-55/58: live object counts at a match end (the soak compares match 2 and match 3).</summary>
+        static string ObjectCountsJson()
+        {
+            var c = CultureInfo.InvariantCulture;
+            return string.Format(c, "{{\"meshes\": {0}, \"materials\": {1}, \"textures\": {2}, \"game_objects\": {3}, \"audio_sources\": {4}, \"render_textures\": {5}}}",
+                Resources.FindObjectsOfTypeAll<Mesh>().Length, Resources.FindObjectsOfTypeAll<Material>().Length,
+                Resources.FindObjectsOfTypeAll<Texture>().Length,
+                FindObjectsByType<GameObject>(FindObjectsInactive.Include, FindObjectsSortMode.None).Length,
+                FindObjectsByType<AudioSource>(FindObjectsInactive.Include, FindObjectsSortMode.None).Length,
+                Resources.FindObjectsOfTypeAll<RenderTexture>().Length);
         }
 
         static string Q(string s) => "\"" + (s ?? "").Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"";

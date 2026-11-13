@@ -65,7 +65,7 @@ namespace CriticalMass.Runtime.Tests
             MatchRequest r = GameFlow.RequestForBuild();
             Assert.AreEqual(FlowState.Title, GameFlow.State);
             Assert.IsTrue(r.Backdrop);
-            Assert.AreEqual(16, r.TeamSize);
+            Assert.AreEqual(GameFlow.BackdropTeamSize, r.TeamSize, "8v8 behind the menus (idle CPU budget)");
             Assert.AreNotEqual(new GameConfig().Seed, r.Seed, "the backdrop must not be the fixed 1337 match");
         }
 
@@ -246,7 +246,7 @@ namespace CriticalMass.Runtime.Tests
                 MatchSetup s = go.AddComponent<MatchSetup>();
                 s.EnsureBuilt();
                 var all = new List<MenuItem> { s.TeamItem, s.SizeItem, s.PaceItem, s.StartItem, s.BackItem };
-                for (int c = 0; c < 5; c++)
+                for (int c = 0; c < MatchSetup.CardCount; c++)
                 {
                     MenuItem card = s.Card((ClassId)c);
                     Assert.IsNotNull(card);
@@ -256,8 +256,10 @@ namespace CriticalMass.Runtime.Tests
                     all.Add(card);
                 }
                 AssertChainSkipsDisabled(all);
-                s.SetClass(ClassId.Builder);
-                Assert.AreNotEqual(ClassId.Builder, s.Choice.Class, "a coming-soon class can't be picked");
+                // integration batch 3: every class is playable now (Demolitions, Builder and Healer landed)
+                CollectionAssert.AreEquivalent(ClassIds.All, MatchSetup.Playable);
+                s.SetClass(ClassId.Healer);
+                Assert.AreEqual(ClassId.Healer, s.Choice.Class, "the Healer can be picked");
                 s.SetTeam(TeamId.Crimson);
                 s.SetClass(ClassId.Miner);
                 s.SetSize(5);

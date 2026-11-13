@@ -53,18 +53,19 @@ namespace CriticalMass.Runtime.Progression
             return l.Source == RewardSource.HillTime ? n + " S" : "x" + n;
         }
 
-        public static readonly string[] ClassNames = { "WARRIOR", "FARMER", "MINER", "DEMOLITIONS", "BUILDER" };
+        public static readonly string[] ClassNames = { "WARRIOR", "FARMER", "MINER", "DEMOLITIONS", "BUILDER", "HEALER" };
 
         public static readonly string[] RoleLines =
         {
             "Front line. Holds the hill and turns blows aside with a shield.",
             "Harvester. Carries the most biomass and roots anyone who chases.",
             "Sapper. Breaks walls open and throws up barricades.",
-            "Blast expert. Mines and TNT, no regular swing. Arrives in a later build.",
-            "Bridges and ladders for the whole team. Arrives in a later build.",
+            "Blast expert. Mines and TNT, no regular swing.",
+            "Ladders and rope bridges for the whole team; anyone can carry them.",
+            "Battle healer. Mends allies, heals in a burst and purifies the shrine. Never deals damage.",
         };
 
-        public static readonly string[] AbilityNames = { "SHIELD", "ROOTS", "WALL BREAK", "MINE", "BUILD" };
+        public static readonly string[] AbilityNames = { "SHIELD", "ROOTS", "WALL BREAK", "MINE", "BUILD", "HEALING WINGS" };
 
         public static string ClassName(ClassId c) => ClassNames[(int)c];
 

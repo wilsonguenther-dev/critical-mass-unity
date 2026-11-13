@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using CriticalMass.Runtime.Game;
+using CriticalMass.Runtime.View.Anim;
 using CriticalMass.Runtime.View.Art;
 using CriticalMass.Runtime.View.Dressing;
 using CriticalMass.Sim.Config;
@@ -47,16 +48,18 @@ namespace CriticalMass.Runtime.View.Effects
     /// Three dynamic meshes (ground, air, solid) = three draw calls for every effect together.
     /// <para>v2: per-tier pose holds, a per-tick world pass (FxScene.OnTickState), explosions and splashes injected through
     /// the static Effects API, screen shake (only with cm.shake on: the camera is offset for its own render and restored
-    /// right after, so no camera script ever sees it), the foliage mask from the dressed world, the _CMFxImpulses shader
-    /// hook, weapon blood tints, and the F6 effects gallery in development builds.</para>
+    /// right after, so no camera script ever sees it), the foliage mask from the dressed world, weapon blood tints, and
+    /// the F6 effects gallery in development builds.</para>
+    /// <para>World reactions (2026-11-12): owns the WorldForceBus (contract C1) and forwards every decoded and injected
+    /// event to it (PR #30's _CMFxImpulses hook is retired: Reactions.ForceField publishes the bus slots); plans a death
+    /// launch per knock-out (Anim.DeathLaunch: the corpse flies along the hit, tumbles, bounces and slides, and its landing
+    /// is a scheduled force); rebuilds the effect meshes once per frame instead of once per camera.</para>
     /// </summary>
     [DefaultExecutionOrder(-40)]
     public sealed class CombatFx : MonoBehaviour, IFxSink
     {
         // v1: 40000 / 30000 / 6400. v2 sizes cover FxScene.WorstCaseVerts per layer (a test holds them).
         public const int GroundVerts = 58000, AirVerts = 56000, SolidVerts = 10800;
-        /// <summary>Shader global: up to 8 world impulses (xyz, strength 0..1) for foliage sway; count in _CMFxImpulseCount.</summary>
-        public static readonly int ImpulsesId = Shader.PropertyToID("_CMFxImpulses"), ImpulseCountId = Shader.PropertyToID("_CMFxImpulseCount");
         /// <summary>Largest camera shake offset in world units, at trauma 1 (the offset is trauma squared times this).</summary>
         public const float ShakeMax = 0.32f;
 
@@ -68,12 +71,16 @@ namespace CriticalMass.Runtime.View.Effects
         private GameObject _groundGo, _airGo, _solidGo;
         private Material _groundMat, _airMat, _solidMat;
         private readonly Dictionary<Material, Material> _flash = new Dictionary<Material, Material>();
+        /// <summary>Reduce flashing (M11, DG-106): the hit flash is a 30% tint toward white, cached per source like the flash.</summary>
+        private readonly Dictionary<Material, Material> _tint = new Dictionary<Material, Material>();
         private int _frame;
         private double _vignetteAt = double.NegativeInfinity, _vignetteAmount;
         private RawImage _vignette;
         private Canvas _vignetteCanvas;
         private double _builtAt = double.NaN;
-        private readonly Vector4[] _impulses = new Vector4[8];
+        private WorldForceBus _bus;
+        private LaunchPlan[] _launch;
+        private int _rebuiltFrame = -1;
         private bool _shakeOn;
         private Transform _shaken;
         private Vector3 _shakeRestore;
@@ -88,6 +95,8 @@ namespace CriticalMass.Runtime.View.Effects
         public CombatFeed Feed => _feed;
         public FxScene Scene => _scene;
         public CombatAudio Audio => _audio;
+        /// <summary>The world-force bus this CombatFx feeds (also WorldForceBus.Active while it runs).</summary>
+        public WorldForceBus Bus => _bus;
 
         /// <summary>Animation hold for heavy hits, sim seconds (about 65 ms wall at the default speed).</summary>
         public double HoldSeconds => HoldFor(1);
@@ -117,6 +126,12 @@ namespace CriticalMass.Runtime.View.Effects
             _feed = new CombatFeed(World.ActorCapacity(cfg));
             _scene = new FxScene(cfg, w.Map) { Blood = BloodSetting.Enabled };
             _audio = new CombatAudio(transform, cfg);
+            _bus = new WorldForceBus(cfg.SimHz) { SimPerWall = _scene.S(1.0) };
+            WorldForceBus.Active = _bus;
+            _bus.FootfallWorld = _driver != null ? _driver.World : null;
+            CriticalMass.Runtime.View.Anim.Footfalls.Register(_bus);   // DG-93: measured footfalls feed the one force bus
+            _launch = new LaunchPlan[World.ActorCapacity(cfg)];
+            _scene.KaijuFootfall = OnKaijuFootfall;
             _ground = new FxMeshBuilder("Fx Ground", GroundVerts, GroundVerts * 3);
             _air = new FxMeshBuilder("Fx Air", AirVerts, AirVerts * 3);
             _solid = new FxMeshBuilder("Fx Solid", SolidVerts, SolidVerts * 2);
@@ -130,11 +145,14 @@ namespace CriticalMass.Runtime.View.Effects
             _solidGo = Layer("Fx Solid", _solid, _solidMat);
             BuildVignette();
             PrewarmFlash();
-            _shakeOn = Effects.ShakeEnabled;
+            _shakeOn = false;   // integration batch 3: Camera.CameraShake (M11, FeelGate-scaled) is the one camera shake
             Effects.Active = this;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             _gallery = new FxGallery(_scene, _audio);
 #endif
+            // M11: the camera shake (scaled by the setting, off with reduce motion) and its start-of-frame reset.
+            if (GetComponent<CriticalMass.Runtime.Camera.CameraShake>() == null) gameObject.AddComponent<CriticalMass.Runtime.Camera.CameraShake>();
+            if (GetComponent<CriticalMass.Runtime.Camera.CameraShakeReset>() == null) gameObject.AddComponent<CriticalMass.Runtime.Camera.CameraShakeReset>();
             _driver.Ticked -= OnTicked;
             _driver.Ticked += OnTicked;
             RenderPipelineManager.beginCameraRendering -= OnBeginCamera;
@@ -150,7 +168,10 @@ namespace CriticalMass.Runtime.View.Effects
             RenderPipelineManager.endCameraRendering -= OnEndCamera;
             RestoreShake();
             if (Effects.Active == this) Effects.Active = null;
+            if (WorldForceBus.Active == _bus) WorldForceBus.Active = null;
+            if (_bus != null) CriticalMass.Runtime.View.Anim.Footfalls.Unregister(_bus);
             foreach (Material m in _flash.Values) if (m != null) Destroy(m);
+            foreach (Material m in _tint.Values) if (m != null) Destroy(m);
             _audio?.Dispose();
         }
 
@@ -195,6 +216,13 @@ namespace CriticalMass.Runtime.View.Effects
             if (!enabled) return;
             _feed.OnTick(w, _scene, _audio, this);
             _scene.OnTickState(w);
+            _bus.FootfallWorld = w;
+            _bus.OnTick(w);
+        }
+
+        private void OnKaijuFootfall(double x, double z)
+        {
+            if (_bus != null && _driver != null && _driver.World != null) _bus.PushKaijuStep(_driver.World, x, z);
         }
 
         /// <summary>Spawn an effect outside the sim's events (Effects.Explode / Splash), stamped with the current tick.</summary>
@@ -206,6 +234,7 @@ namespace CriticalMass.Runtime.View.Effects
             if (a >= 0 && a < w.ActorCount) { e.Team = w.Actors[a].Team; e.Cls = w.Actors[a].Cls; e.Local = a == 0; }
             _scene.OnFx(ref e, w);
             _audio?.OnFx(ref e, w);
+            _bus?.OnFx(ref e, w);
             return true;
         }
 
@@ -249,12 +278,67 @@ namespace CriticalMass.Runtime.View.Effects
 
         public void OnFx(ref FxEvent e, World w)
         {
+            _bus?.OnFx(ref e, w);
+            if (e.Kind == FxKind.Death && _launch != null && e.A >= 0 && e.A < _launch.Length) PlanLaunch(ref e, w);
             if ((e.Kind == FxKind.Hit || e.Kind == FxKind.Death || e.Kind == FxKind.Block) && e.A == 0)
             {
                 _vignetteAt = e.Tick / w.Config.SimHz;
                 _vignetteAmount = e.Kind == FxKind.Block ? 0.25 : Mathf.Clamp((float)(e.Value / 40.0), 0.3f, 0.95f);
             }
+            ShakeFor(ref e, w);
         }
+
+        /// <summary>
+        /// Camera shake impulses (M11, gated by FeelGate: amount x the shake setting, nothing with reduce motion or shake
+        /// off, which is the default). Only what lands on or near the local player shakes the view.
+        /// </summary>
+        private static void ShakeFor(ref FxEvent e, World w)
+        {
+            if (w.ActorCount == 0 || FeelGate.ShakeScale <= 0f) return;
+            float amount = ShakeAmount(e.Kind, e.A == 0, e.Value, DistanceToLocal(w, e.X, e.Z), w.Config.Kaiju.SlamRadius);
+            if (amount > 0f) CriticalMass.Runtime.Camera.CameraShake.Impulse(amount);
+        }
+
+        static double DistanceToLocal(World w, double x, double z)
+        {
+            double dx = w.X[0] - x, dz = w.Z[0] - z;
+            return System.Math.Sqrt(dx * dx + dz * dz);
+        }
+
+        /// <summary>Shake trauma 0..1 an effect adds (pure; tests). 0 for anything that is not big or not near you.</summary>
+        public static float ShakeAmount(FxKind kind, bool local, double value, double distance, double slamRadius)
+        {
+            switch (kind)
+            {
+                case FxKind.KaijuSlam: return distance <= slamRadius * 1.6 ? 0.6f : 0f;
+                case FxKind.Hit: return local && value >= 25 ? 0.25f : 0f;
+                case FxKind.Death: return local ? 0.4f : 0f;
+                case FxKind.Hatch: return distance <= 20 ? 0.45f : 0f;
+                case FxKind.BerserkLock: return 0.35f;
+                case FxKind.KaijuKO: return distance <= 12 ? 0.3f : 0f;
+                case FxKind.WallBreak: return distance <= 6 ? 0.2f : 0f;
+                default: return 0f;
+            }
+        }
+
+        /// <summary>The knock-out's flight (Anim.DeathLaunch) and its landing force, scheduled for the tick it lands.</summary>
+        private void PlanLaunch(ref FxEvent e, World w)
+        {
+            float motion = Reactions.ReactionBudget.MotionScale;
+            LaunchPlan p = DeathLaunch.Plan(w.Map, e.X, e.Z, e.DirX, e.DirZ, CombatFeed.TierOf(e.Value, false), e.B, motion);
+            _launch[e.A] = p;
+            if (p.Distance <= 0f || _bus == null || p.Falls) return;
+            double lx = e.X + p.DirX * p.Distance, lz = e.Z + p.DirZ * p.Distance;
+            WorldForce land = _bus.Make(w, ForceSource.Land, ForceShape.Landing, lx, lz, 0, 0, 0f, ExplosionKind.Tnt);
+            land.Actor = e.A;
+            land.Other = e.B;
+            land.Team = e.Team;
+            int ticks = (int)System.Math.Ceiling(p.Flight * _scene.S(1.0) * w.Config.SimHz);
+            _bus.Schedule(land, e.Tick + System.Math.Max(1, ticks));
+        }
+
+        /// <summary>Actor i's planned death launch (tests, captures).</summary>
+        public LaunchPlan Launch(int i) => _launch != null && i >= 0 && i < _launch.Length ? _launch[i] : default;
 
         private double SimNow()
         {
@@ -275,20 +359,23 @@ namespace CriticalMass.Runtime.View.Effects
             if (++_frame % 60 == 0)
             {
                 if (!galleryRunning) _scene.Blood = BloodSetting.Enabled;
-                _shakeOn = Effects.ShakeEnabled;
+                _shakeOn = false;   // integration batch 3: Camera.CameraShake (M11, FeelGate-scaled) is the one camera shake
                 if (!_scene.HasFoliage && _foliageTries < 20) FindFoliage();
             }
             _audio.Update(now, _driver.World);
             UpdateVignette(now);
-            int n = _scene.Impulses(now, _impulses);
-            Shader.SetGlobalVectorArray(ImpulsesId, _impulses);
-            Shader.SetGlobalFloat(ImpulseCountId, n);
         }
 
         private void OnBeginCamera(ScriptableRenderContext ctx, UnityEngine.Camera cam)
         {
             if (_scene == null || cam.cameraType == CameraType.Preview || cam.cameraType == CameraType.Reflection) return;
-            Rebuild(cam.transform.right, cam.transform.up);
+            // Once per frame (audit finding 6): the gameplay camera always rebuilds (billboards face it); any other
+            // camera only when nothing has built this frame yet.
+            if (cam == UnityEngine.Camera.main || _rebuiltFrame != Time.frameCount)
+            {
+                Rebuild(cam.transform.right, cam.transform.up);
+                _rebuiltFrame = Time.frameCount;
+            }
             ApplyShake(cam);
         }
 
@@ -346,6 +433,9 @@ namespace CriticalMass.Runtime.View.Effects
         public void Rebuild(Vector3 camRight, Vector3 camUp)
         {
             double now = SimNow();
+            _scene.Alpha = _driver.Alpha;
+            _scene.Pace = _driver.TimeScale > 0 ? _driver.TimeScale : 0;
+            _scene.BlobShadows = CriticalMass.Runtime.Game.QualityTable.Current.BlobShadows;
             _scene.Advance(now);
             _scene.Build(now, _driver.World, camRight, camUp, _ground, _air, _solid);
             _ground.Upload();
@@ -381,6 +471,18 @@ namespace CriticalMass.Runtime.View.Effects
                 fx.DeathT = dt;
                 fx.CorpseX = _feed.DeathX[i];
                 fx.CorpseZ = _feed.DeathZ[i];
+                if (_launch != null && i < _launch.Length && _launch[i].Distance > 0f)
+                {
+                    // Death launch: along the hit, a tumble about cross(up, dir), one bounce and a slide (wall seconds).
+                    LaunchPlan lp = _launch[i];
+                    DeathLaunch.Evaluate(lp, (float)(dt / _scene.S(1.0)), out float along, out float lift, out float tumble);
+                    fx.CorpseX += lp.DirX * along;
+                    fx.CorpseZ += lp.DirZ * along;
+                    fx.Nudge = Vector3.up * lift;
+                    Vector3 d = SimSpace.ToWorld(lp.DirX, 0, lp.DirZ);
+                    Vector3 axis = Vector3.Cross(Vector3.up, d);
+                    if (tumble != 0f && axis.sqrMagnitude > 1e-6f) fx.Lean = Quaternion.AngleAxis(tumble, axis.normalized);
+                }
                 fx.Flash = dt < FlashSeconds;
                 if (dt > _scene.CorpseSeconds)
                 {
@@ -430,6 +532,7 @@ namespace CriticalMass.Runtime.View.Effects
         public Material FlashMaterial(Material source)
         {
             if (source == null) return null;
+            if (FeelGate.ReduceFlashing) return TintMaterial(source);
             if (_flash.TryGetValue(source, out Material m)) return m;
             m = new Material(source) { name = source.name + " (Flash)" };
             Color white = new Color(1f, 0.98f, 0.94f, 1f);
@@ -440,6 +543,19 @@ namespace CriticalMass.Runtime.View.Effects
             if (m.HasProperty("_ShadowTintAmount")) m.SetFloat("_ShadowTintAmount", 0);
             if (m.HasProperty("_RimStrength")) m.SetFloat("_RimStrength", 0);
             _flash[source] = m;
+            return m;
+        }
+
+        /// <summary>Reduce flashing: a copy of a CM/Toon material with its colours 30% toward white (no white frame).</summary>
+        public Material TintMaterial(Material source)
+        {
+            if (source == null) return null;
+            if (_tint.TryGetValue(source, out Material m)) return m;
+            m = new Material(source) { name = source.name + " (Tint)" };
+            Color white = new Color(1f, 0.98f, 0.94f, 1f);
+            foreach (string p in FlashColours)
+                if (m.HasProperty(p)) m.SetColor(p, Color.Lerp(m.GetColor(p), white, FeelGate.ReducedFlashTint));
+            _tint[source] = m;
             return m;
         }
 
@@ -458,6 +574,8 @@ namespace CriticalMass.Runtime.View.Effects
                 {
                     FlashMaterial(ArtMaterials.ForTeam(spec, TeamId.Azure));
                     FlashMaterial(ArtMaterials.ForTeam(spec, TeamId.Crimson));
+                    TintMaterial(ArtMaterials.ForTeam(spec, TeamId.Azure));
+                    TintMaterial(ArtMaterials.ForTeam(spec, TeamId.Crimson));
                 }
                 catch (System.InvalidOperationException)
                 {
@@ -467,7 +585,7 @@ namespace CriticalMass.Runtime.View.Effects
         }
 
         /// <summary>Flash materials created (bounded: class models x 2 teams; all made in Start).</summary>
-        public int FlashMaterialCount => _flash.Count;
+        public int FlashMaterialCount => _flash.Count + _tint.Count;
 
         private static readonly string[] FlashColours =
         {
@@ -521,8 +639,18 @@ namespace CriticalMass.Runtime.View.Effects
             if (_vignette == null) return;
             if (_vignetteCanvas.worldCamera == null) _vignetteCanvas.worldCamera = UnityEngine.Camera.main;
             double t = now - _vignetteAt;
-            double life = _scene.S(0.32);
-            float a = t >= 0 && t < life ? (float)(_vignetteAmount * (1 - t / life) * (1 - t / life)) : 0f;
+            float a;
+            if (FeelGate.ReduceFlashing)
+            {
+                // M11: a steady low edge while you are being hit (no bright pulse on every hit), easing out at the end.
+                double hold = _scene.S(0.8);
+                a = t >= 0 && t < hold ? (float)(System.Math.Min(0.3, _vignetteAmount * 0.4) * System.Math.Min(1.0, (hold - t) / _scene.S(0.3))) : 0f;
+            }
+            else
+            {
+                double life = _scene.S(0.32);
+                a = t >= 0 && t < life ? (float)(_vignetteAmount * (1 - t / life) * (1 - t / life)) : 0f;
+            }
             bool on = a > 0.01f;
             if (_vignette.enabled != on) _vignette.enabled = on;
             if (on) _vignette.color = new Color(1, 1, 1, a);

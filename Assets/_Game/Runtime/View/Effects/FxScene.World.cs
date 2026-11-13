@@ -10,8 +10,8 @@ namespace CriticalMass.Runtime.View.Effects
     /// <summary>
     /// World reactions (v2), all decoded per sim tick from positions the sim already has (OnTickState), so a replay draws
     /// the same frame: footstep puffs on speed bursts and landings, plank dust under heavy actors (Warrior, Kaiju) on
-    /// bridges, Kaiju stomps, grass and bush rustle near impacts and passing actors (leaf flecks + the _CMFxImpulses
-    /// shader hook for real sway), water splashes when debris or gibs fall into water or over the rim, biomass sparkles
+    /// bridges, Kaiju stomps, grass and bush rustle near impacts and passing actors (leaf flecks; the real sway is the
+    /// world-force field, Reactions.ForceField), water splashes when debris or gibs fall into water or over the rim, biomass sparkles
     /// that home into the carrier, and corruption's own oily look (hollow bubbles, concentric puddles, teal sheen) that
     /// never uses blood's lobes or biomass's stars.
     /// </summary>
@@ -245,7 +245,7 @@ namespace CriticalMass.Runtime.View.Effects
             for (int n = 0; n < 4; n++) AddPuff(t, c + Vector3.up * 0.15f, ks, (uint)n, 0.45f, DustMid, 1);
             if (CellAt(fx, fz) == Cell.Bridge) PlankDust(t, fx, fz, fh, ks, 1.8f);
             RustleArea(fx, fz, 2.5, t, ks);
-            AddImpulse(t, fx, fh, fz, 0.5f);
+            KaijuFootfall?.Invoke(fx, fz);
         }
 
         private void FootPuff(double t, double x, double z, double h, uint seed, double dirX, double dirZ)

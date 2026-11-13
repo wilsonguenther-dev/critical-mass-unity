@@ -90,6 +90,8 @@ namespace CriticalMass.Runtime.View.Art
         public const string BiomassSprout = "prop_biomass_sprout";
         public const string CorruptionS = "prop_corruption_growth_s";
         public const string CorruptionL = "prop_corruption_growth_l";
+        /// <summary>The carried cargo prop (DG-71, CarryProp): props_art p14, 0.55 u tall.</summary>
+        public const string CarriedBundle = "prop_carried_bundle";
 
         /// <summary>Barricade states: child mesh names of MinerBarricade.fbx.</summary>
         public const string BarricadeFolded = "Miner_Barricade_Folded";
@@ -101,8 +103,68 @@ namespace CriticalMass.Runtime.View.Art
             Death = "Death", Cheer = "Cheer", Shake = "Shake", Roar = "Roar", SlamWindup = "SlamWindup", Slam = "Slam",
             Berserk = "Berserk", KO = "KO";
 
+        /// <summary>
+        /// Character clips added by the animation pass (2026-11-12, DG-72): tools/art/kaykit_clip_map.tsv maps each KayKit
+        /// clip to these names, build_kaykit_clips.py exports them into KayKit_Clips.fbx, measure_clips.py writes their facts
+        /// (Resources/Anim/clip_facts.json). Every view falls back to the original 8 clips when one is missing.
+        /// </summary>
+        public const string StrafeL = "StrafeL", StrafeR = "StrafeR", WalkBack = "WalkBack", JumpStart = "JumpStart",
+            JumpAir = "JumpAir", JumpLand = "JumpLand", KnockDown = "KnockDown", GetUp = "GetUp", HitHeavy = "HitHeavy",
+            Block = "Block", Blocking = "Blocking", BlockHit = "BlockHit", DeathB = "DeathB", AttackSlice = "AttackSlice",
+            Attack2HChop = "Attack2HChop", Attack2HSlice = "Attack2HSlice", Cast = "Cast", UseItem = "UseItem", Throw = "Throw",
+            PickUp = "PickUp", Carry = "Carry", IdleLook = "IdleLook", SitDown = "SitDown", SitIdle = "SitIdle";
+
+        /// <summary>Kaiju clips the Kaiju art branch adds (art/kaiju-blender, DG-91); used when present, else the old poses.</summary>
+        public const string Swipe = "Swipe", SwipeWindup = "SwipeWindup", Flinch = "Flinch";
+
+        /// <summary>The 24 clips beyond the original 8 that KayKit_Clips.fbx carries once build_kaykit_clips.py is re-run.</summary>
+        public static readonly string[] KaykitExtraClips =
+        {
+            StrafeL, StrafeR, WalkBack, JumpStart, JumpAir, JumpLand, KnockDown, GetUp, HitHeavy, Block, Blocking, BlockHit, DeathB,
+            AttackSlice, Attack2HChop, Attack2HSlice, Cast, UseItem, Throw, PickUp, Carry, IdleLook, SitDown, SitIdle,
+        };
+
         /// <summary>Clips that loop (Loop Time on import).</summary>
-        public static readonly string[] LoopingClips = { Idle, Walk, Run, Gather, Shake, Berserk };
+        public static readonly string[] LoopingClips =
+        {
+            Idle, Walk, Run, Gather, Shake, Berserk, StrafeL, StrafeR, WalkBack, JumpAir, Blocking, Carry, IdleLook, SitIdle,
+        };
+
+        /// <summary>
+        /// Clips that may play on the upper-body layer (ModelView, AvatarMask from "spine" up): attacks, abilities, light and
+        /// blocked hits, the carry pose and the cheer. Each gets two playables there so a re-trigger can cross-fade.
+        /// </summary>
+        public static readonly string[] UpperBodyClips =
+        {
+            Attack, AttackSlice, Attack2HChop, Attack2HSlice, Block, Blocking, BlockHit, Cast, UseItem, Throw, Hit, Carry, Cheer,
+        };
+
+        /// <summary>Per-class clip choice (DG-74): attack, ability (and its hold loop), gather and its rate. Missing clips fall back.</summary>
+        public readonly struct ClassClipSet
+        {
+            public readonly string Attack, Ability, AbilityHold, Gather;
+            public readonly float GatherRate;
+            public ClassClipSet(string attack, string ability, string abilityHold, string gather, float gatherRate)
+            {
+                Attack = attack; Ability = ability; AbilityHold = abilityHold; Gather = gather; GatherRate = gatherRate;
+            }
+        }
+
+        /// <summary>
+        /// Warrior: horizontal cleave (matches the 120 degree crescent), shield = Block then Blocking. Miner: two-hand chop,
+        /// barricade = Use_Item, gather = the chop at 0.7 rate on rock. Farmer: two-hand staff sweep, roots = Spellcast_Shoot,
+        /// gather = PickUp on plants. Others: the one-hand chop and the reach.
+        /// </summary>
+        public static ClassClipSet ClassClips(ClassId cls)
+        {
+            switch (cls)
+            {
+                case ClassId.Warrior: return new ClassClipSet(AttackSlice, Block, Blocking, Gather, 1f);
+                case ClassId.Miner: return new ClassClipSet(Attack2HChop, UseItem, null, Attack2HChop, 0.7f);
+                case ClassId.Farmer: return new ClassClipSet(Attack2HSlice, Cast, null, PickUp, 1f);
+                default: return new ClassClipSet(Attack, null, null, Gather, 1f);
+            }
+        }
 
         /// <summary>Seconds after the hatch the view shows the hatchling before the adult (view only: the sim has no stage).</summary>
         public const double HatchlingSeconds = 8.0;
@@ -170,7 +232,7 @@ namespace CriticalMass.Runtime.View.Art
             new ModelSpec { Key = KaijuSpikes, AssetPath = "Assets/_Game/Art/Kaiju/Kaiju_TelegraphSpikes.fbx", Kind = ArtKind.Kaiju,
                 Meshes = new[] { "Kaiju_TelegraphSpikes" }, OutlinePx = 0f, Authored = KaijuDefault(GlowAzure) },
             Prop(BiomassS, 0.5f), Prop(BiomassM, 0.8f), Prop(BiomassL, 1.2f), Prop(BiomassSprout, 0.25f),
-            Prop(CorruptionS, 0.6f), Prop(CorruptionL, 1.2f),
+            Prop(CorruptionS, 0.6f), Prop(CorruptionL, 1.2f), Prop(CarriedBundle, 0.55f),
         };
 
         static ModelSpec Prop(string key, float height) => new ModelSpec

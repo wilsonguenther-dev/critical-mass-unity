@@ -140,7 +140,9 @@ namespace CriticalMass.Runtime.Camera
             _follow.Step(f);
 
             transform.position = SimSpace.ToWorld(_follow.SX.X, _follow.SY.X, _follow.SZ.X);
-            if (Rig != null) Rig.FollowOffset = BaseOffset * (float)_director.Zoom;
+            // M11: reduce motion keeps the distance fixed (no combat or hatch zoom pumping).
+            float zoom = CriticalMass.Runtime.View.Effects.FeelGate.Allowed(CriticalMass.Runtime.View.Effects.FeelEffect.CombatZoom) ? (float)_director.Zoom : 1f;
+            if (Rig != null) Rig.FollowOffset = BaseOffset * zoom;
         }
 
         /// <summary>Living actors of the other team within CameraDirector.CombatRadius of the human (actor 0).</summary>

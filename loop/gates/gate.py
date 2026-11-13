@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """The loop's gates (decision 4). Each gate prints ONE JSON line, appends it to loop/logs/gates.jsonl and exits with
 the real exit code: 0 pass, the tool's own non-zero code on fail, 78 skipped. "skipped" is never exit 0, so nothing
-that reads exit codes can mistake a skip for a pass. `budgets` exits 0 with status "reported" or "flagged": it never
-fails an item; a flag goes to the architect.
+that reads exit codes can mistake a skip for a pass. DG-54 (2026-11-12 panel): the old `budgets` gate (it pointed at a
+scene that does not exist, was skipped every time and by design could never fail) is gone; `perf` runs the built player
+and FAILS on any budget over OR not measured.
 
   --project defaults to the worktree the gate is invoked from (cwd's checkout of this repo, else this script's
   checkout), never the main checkout (DG-05).
@@ -11,12 +12,14 @@ fails an item; a flag goes to the architect.
   gate.py compile        [--project DIR]                    tools/unity-compile.sh
   gate.py editmode       [--project DIR]                    tools/unity-test.sh, category "!Slow" (fails on zero tests)
   gate.py playmode-smoke [--project DIR]                    tools/unity-playtest.sh (assembly Runtime.PlayTests, F-08c)
-  gate.py soak           [--project DIR]                    tools/unity-soak.sh: the "Slow" tests, after a batch lands (U-028)
+  gate.py sim-long       [--project DIR]                    tools/unity-soak.sh: the "Slow" NUnit tests (was "soak"; "soak" still works)
+  gate.py perf           [--project DIR]                    tools/demo-smoke.sh on the built player: 1080p window, native
+                                                            fullscreen, CM_PROFILE=floor (CM_PERF_PASSES=window,fullscreen,floor)
+  gate.py player-soak    [--project DIR]                    tools/player-soak.sh: 20 matches, 2 hours, the shipped player (DG-55)
   gate.py build-mac      [--project DIR]                    tools/unity-build-mac.sh
   gate.py build-windows  [--project DIR]                    tools/unity-build-windows.sh (skipped 78 without the module)
   gate.py parity  --item ID [--project DIR]                 tools/unity-capture.sh (art_row items only)
   gate.py scope   --item ID --ref REF [--base REF]          git only: the diff touches only files_allowed
-  gate.py budgets        [--project DIR]                    frame time, draw calls, shader variants: report only
 
 Unity gates refuse to run inside a builder lane (builders never run Unity), refuse when a Unity editor already has the
 project open, refuse under the 15 GB disk floor, and run under the compile lock (one Unity process at a time).
@@ -47,7 +50,9 @@ SMOKE_SCENE = 'Assets/_Game/Scenes/Arena.unity'  # the game scene (ARCHITECTURE.
 PLAYTEST_TOOL = 'tools/unity-playtest.sh'  # runs Assets/_Game/Runtime.PlayTests (ruling 4; F-08c creates both)
 SOAK_TOOL = 'tools/unity-soak.sh'  # runs the NUnit "Slow" tests (U-028)
 CAPTURE_TOOL = 'tools/unity-capture.sh'
-BUDGETS_FILE = C.LOOP / 'budgets.json'
+PERF_TOOL = 'tools/demo-smoke.sh'  # DG-54
+PLAYER_SOAK_TOOL = 'tools/player-soak.sh'  # DG-55
+PERF_PASSES = {'window': ([], {}), 'fullscreen': (['--fullscreen'], {}), 'floor': ([], {'CM_PROFILE': 'floor'})}
 EXC_RE = re.compile(r'^\s*(?:[\w.]+\.)?\w*Exception\b[^\n]*', re.M)
 
 
@@ -152,6 +157,30 @@ def failed_tests(xml_path):
     return out
 
 
+def result_counts(xml_path):
+    """DG-54: total, passed, failed, skipped and inconclusive test cases (with names) from an NUnit 3 results file."""
+    try:
+        root = ET.parse(xml_path).getroot()
+    except Exception:
+        return None
+    c = {'total': 0, 'passed': 0, 'failed': 0, 'skipped': 0, 'inconclusive': 0, 'skipped_names': [], 'inconclusive_names': []}
+    for tc in root.iter('test-case'):
+        c['total'] += 1
+        r = tc.get('result') or ''
+        name = tc.get('fullname') or tc.get('name') or '?'
+        if r == 'Passed':
+            c['passed'] += 1
+        elif r == 'Failed':
+            c['failed'] += 1
+        elif r == 'Skipped':
+            c['skipped'] += 1
+            c['skipped_names'].append(name)
+        else:
+            c['inconclusive'] += 1
+            c['inconclusive_names'].append(name)
+    return c
+
+
 def g_editmode(a):
     proj = Path(a.project).resolve()
     r = refuse_unity('editmode', proj)
@@ -165,10 +194,19 @@ def g_editmode(a):
     ft = failed_tests(res)
     ff = C.LOGS / 'gate-editmode-failed.json'
     ff.write_text(json.dumps(ft, indent=1))
-    if code == 0 and total > 0:
-        return emit('editmode', 'pass', 0, f'{passed}/{total} EditMode tests passed (category !Slow)', total=total,
-                    failed=0, category='!Slow',
-                    results=str(res), out=outf, lock_owner=owner)
+    counts = result_counts(res)  # DG-54: the real numbers from the results file, never a hard-coded failed=0
+    if counts:
+        total, passed, failed = counts['total'], counts['passed'], counts['failed']
+    honest = bool(counts) and counts['total'] == counts['passed'] + counts['failed'] + counts['skipped'] + counts['inconclusive']
+    if code == 0 and total > 0 and failed == 0 and honest:
+        return emit('editmode', 'pass', 0, f'{passed}/{total} EditMode tests passed (category !Slow); '
+                    f'{counts["skipped"]} skipped, {counts["inconclusive"]} inconclusive', total=total, passed=passed,
+                    failed=failed, skipped=counts['skipped'], inconclusive=counts['inconclusive'],
+                    skipped_names=counts['skipped_names'][:40], inconclusive_names=counts['inconclusive_names'][:40],
+                    category='!Slow', results=str(res), out=outf, lock_owner=owner)
+    if code == 0 and total > 0 and failed == 0 and not honest:
+        return emit('editmode', 'fail', 1, 'results do not add up: total != passed + failed + skipped + inconclusive',
+                    counts=counts, results=str(res), out=outf, lock_owner=owner)
     if total == 0:
         detail = 'zero tests ran'
     elif failed:
@@ -374,26 +412,60 @@ def g_scope(a):
                 ref=a.ref, base=a.base, files=files[:30])
 
 
-def g_budgets(a):
+def _summary_line(out):
+    for line in reversed((out or '').strip().splitlines()):
+        line = line.strip()
+        if line.startswith('{'):
+            try:
+                return json.loads(line)
+            except ValueError:
+                return None
+    return None
+
+
+def g_perf(a):
+    """DG-54: the built player against tools/budgets.json; pass only when every pass ran and every number is measured
+    and within budget. A missing app, a missing perf.json or a missing number is a fail, never a skip."""
     proj = Path(a.project).resolve()
-    if not (proj / SMOKE_SCENE).exists():
-        return emit('budgets', 'skipped', C.SKIP_EXIT, f'skipped: no game scene ({SMOKE_SCENE} does not exist)')
-    limits = C.read_json(BUDGETS_FILE, {}) or {}
-    perf = C.read_json(proj / 'Logs/perf.json', {}) or {}  # written by the Smoke PlayMode test (an item's job)
-    log = proj / 'Logs/build-mac.log'
-    variants = None
-    if log.exists():
-        nums = [int(x) for x in re.findall(r'(\d+)\s+(?:shader\s+)?variants', log.read_text(errors='replace'))]
-        variants = sum(nums) if nums else None
-    meas = {'frame_ms': perf.get('frame_ms'), 'draw_calls': perf.get('draw_calls'), 'shader_variants': variants}
-    over = [k for k, v in meas.items() if v is not None and limits.get(k) is not None and v > limits[k]]
-    missing = [k for k, v in meas.items() if v is None]
-    st = 'flagged' if over else 'reported'
-    if over:
-        C.append_jsonl(C.STATE / 'architect-flags.jsonl', {'ts': C.utc(), 'kind': 'budget', 'over': over, **meas})
-    return emit('budgets', st, 0, (f'over budget: {", ".join(over)}; flagged for the architect' if over else
-                                   'measured and reported') + (f'; not measured: {", ".join(missing)}' if missing else ''),
-                measured=meas, limits=limits)
+    tool = proj / PERF_TOOL
+    if not tool.exists():
+        return emit('perf', 'fail', 66, f'{PERF_TOOL} missing', project=str(proj))
+    passes = [p.strip() for p in os.environ.get('CM_PERF_PASSES', 'window,fullscreen,floor').split(',') if p.strip()]
+    results, worst = {}, 0
+    for name in passes:
+        if name not in PERF_PASSES:
+            return emit('perf', 'fail', 64, f'unknown perf pass {name}', passes=passes)
+        extra, env = PERF_PASSES[name]
+        out_dir = proj / 'Logs' / 'perf-gate' / f'{C.utc().replace(":", "")}-{name}'
+        p = subprocess.run(['bash', str(tool), '--out', str(out_dir), *extra], cwd=proj, capture_output=True, text=True,
+                           env={**os.environ, **env})
+        summ = _summary_line(p.stdout)
+        ok = p.returncode == 0 and bool(summ) and summ.get('pass') is True
+        results[name] = {'exit': p.returncode, 'pass': ok, 'summary': summ, 'out': str(out_dir),
+                         'stderr': (p.stderr or '').strip().splitlines()[-3:]}
+        if not ok:
+            worst = worst or (p.returncode or 1)
+    failed = [n for n, r in results.items() if not r['pass']]
+    if failed:
+        nm = sorted({k for n in failed for k in ((results[n]['summary'] or {}).get('not_measured') or [])})
+        over = sorted({k for n in failed for k in ((results[n]['summary'] or {}).get('over_budget') or [])})
+        return emit('perf', 'fail', worst, f'failed: {", ".join(failed)}' + (f'; not measured: {", ".join(nm)}' if nm else '') +
+                    (f'; over budget: {", ".join(over)}' if over else ''), passes=results)
+    return emit('perf', 'pass', 0, f'{len(passes)} pass(es) measured and within budget', passes=results)
+
+
+def g_player_soak(a):
+    """DG-55: tools/player-soak.sh (2 hours); pass only on soak.json pass=true."""
+    proj = Path(a.project).resolve()
+    tool = proj / PLAYER_SOAK_TOOL
+    if not tool.exists():
+        return emit('player-soak', 'fail', 66, f'{PLAYER_SOAK_TOOL} missing', project=str(proj))
+    p = subprocess.run(['bash', str(tool)], cwd=proj, capture_output=True, text=True)
+    summ = _summary_line(p.stdout)
+    ok = p.returncode == 0 and bool(summ) and summ.get('pass') is True
+    return emit('player-soak', 'pass' if ok else 'fail', 0 if ok else (p.returncode or 1),
+                json.dumps(summ)[:300] if summ else ((p.stderr or 'no summary').strip().splitlines() or ['no summary'])[-1][:200],
+                summary=summ)
 
 
 def _common_dir(path):
@@ -427,7 +499,7 @@ def default_project(cwd=None, repo=None):
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument('gate', choices=['setup', 'clean-reimport', 'compile', 'editmode', 'playmode-smoke', 'build-mac', 'build-windows',
-                                     'parity', 'scope', 'budgets', 'soak'])
+                                     'parity', 'scope', 'perf', 'player-soak', 'sim-long', 'soak'])
     ap.add_argument('--project', default=None, help='default: the worktree invoked from (default_project)')
     ap.add_argument('--item')
     ap.add_argument('--items-dir', default=str(C.ITEMS_DIR))
@@ -441,7 +513,8 @@ def main(argv=None):
     if a.gate == 'scope' and not a.ref:
         ap.error('scope needs --ref')
     fn = {'setup': g_setup, 'clean-reimport': g_clean_reimport, 'soak': g_soak, 'compile': g_compile, 'editmode': g_editmode, 'playmode-smoke': g_playmode, 'build-mac': g_build_mac,
-          'build-windows': g_build_windows, 'parity': g_parity, 'scope': g_scope, 'budgets': g_budgets}[a.gate]
+          'build-windows': g_build_windows, 'parity': g_parity, 'scope': g_scope, 'perf': g_perf,
+          'player-soak': g_player_soak, 'sim-long': g_soak}[a.gate]
     try:
         return fn(a)
     except Exception as e:  # an internal error is a fail with its own code, never a pass

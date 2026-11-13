@@ -82,7 +82,7 @@ namespace CriticalMass.Runtime.PlayTests
             });
             yield return null;
             Assert.AreEqual(ClassSelect.SelectMode.Setup, s.Mode);
-            Assert.AreEqual(5, s.SetupTiles.Count, "a card for every class");
+            Assert.AreEqual(ClassIds.All.Count, s.SetupTiles.Count, "a card for every class");
             s.FocusClass(ClassId.Farmer);
             yield return null;
             Assert.AreEqual(ClassId.Farmer, s.Focused, "focus moves the detail card");
@@ -127,7 +127,7 @@ namespace CriticalMass.Runtime.PlayTests
             ClassSelect s = ClassSelect.Instance;
             Assert.IsNotNull(s, "ClassSelectInstaller attached the screen");
             Assert.AreEqual(ClassSelect.SelectMode.Respawn, s.Mode, "the respawn screen opens while knocked out");
-            Assert.AreEqual(5, s.RespawnTiles.Count);
+            Assert.AreEqual(ClassIds.All.Count, s.RespawnTiles.Count);
             s.PickRespawn(ClassId.Miner);
             _driver.StepTicks(1);
             Assert.AreEqual(ClassId.Miner, a.PendingClass, "the sim holds the pick");

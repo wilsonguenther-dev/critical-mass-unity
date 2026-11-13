@@ -155,7 +155,7 @@ namespace CriticalMass.Runtime.Menus
         int _nextLook;
         string[] _respawnLines;
 
-        static readonly string[] Hotkeys = { "1", "2", "3", "4", "5" };
+        static readonly string[] Hotkeys = { "1", "2", "3", "4", "5", "6" };
 
         // ---------------------------------------------------------------- static API
 
@@ -276,7 +276,7 @@ namespace CriticalMass.Runtime.Menus
             WireRow(_respawnTiles, null);
             _respawnLines = new string[ClassIds.All.Count];
             for (int i = 0; i < _respawnLines.Length; i++)
-                _respawnLines[i] = "NEXT LIFE: " + LoreWords.Class(ClassIds.All[i]).Name.ToUpperInvariant() + "     1-5 TO SWITCH";
+                _respawnLines[i] = "NEXT LIFE: " + LoreWords.Class(ClassIds.All[i]).Name.ToUpperInvariant() + "     1-" + ClassIds.All.Count + " TO SWITCH";
 
             _hint = MenuUi.Label(_space, "Hint", CMTokens.Ui, 20, Cream, TextAnchor.MiddleCenter, 260f, 1028f, 1400f, 36f, "", 2f);
             Canvas.enabled = false;
@@ -520,6 +520,7 @@ namespace CriticalMass.Runtime.Menus
                 else if (kb.digit3Key.wasPressedThisFrame) PickRespawn(ClassId.Miner);
                 else if (kb.digit4Key.wasPressedThisFrame) PickRespawn(ClassId.Demolitions);
                 else if (kb.digit5Key.wasPressedThisFrame) PickRespawn(ClassId.Builder);
+                else if (kb.digit6Key.wasPressedThisFrame) PickRespawn(ClassId.Healer);
             }
             EventSystem es = EventSystem.current;
             if (es != null && es.currentSelectedGameObject == null && Gamepad.current != null && ControlBindings.ActiveDevice == ControlDevice.Gamepad)
@@ -645,7 +646,7 @@ namespace CriticalMass.Runtime.Menus
             ArtEntry e = key != null && cat != null ? cat.Find(key) : null;
             if (e != null && ArtMapping.Spec(key) != null)
             {
-                if (!_models.TryGetValue(key, out ModelView m) && _models.Count < 5)
+                if (!_models.TryGetValue(key, out ModelView m) && _models.Count < ClassIds.All.Count)
                 {
                     m = new ModelView(e, _pivot, "Preview " + key);
                     foreach (Renderer r in m.Renderers) r.gameObject.layer = Layer;

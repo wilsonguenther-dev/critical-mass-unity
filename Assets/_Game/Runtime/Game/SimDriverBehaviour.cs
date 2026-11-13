@@ -14,8 +14,8 @@ namespace CriticalMass.Runtime.Game
     /// </summary>
     public sealed class SimDriverBehaviour : MonoBehaviour
     {
-        /// <summary>Spiral-of-death guard on the accumulator input, seconds.</summary>
-        private const double MaxDelta = 0.25;
+        /// <summary>Spiral-of-death guard on the accumulator input, seconds (SimClock.MaxDelta).</summary>
+        private const double MaxDelta = SimClock.MaxDelta;
         /// <summary>Clamp for FrameDt (P8), seconds.</summary>
         private const double MaxFrameDt = 0.1;
 
@@ -37,6 +37,9 @@ namespace CriticalMass.Runtime.Game
         /// </summary>
         public static bool CaptureMode;
 
+        /// <summary>This driver woke in capture mode (actor 0 on autopilot by design; HumanControlGuard leaves it alone).</summary>
+        public bool CreatedInCaptureMode { get; private set; }
+
         /// <summary>Interpolation fraction between the previous and the current tick, 0..1.</summary>
         public double Alpha { get; private set; }
 
@@ -50,7 +53,12 @@ namespace CriticalMass.Runtime.Game
         public event Action<World> Ticked;
 
         private double _dt;
-        private double _acc;
+        /// <summary>DG-60: the accumulator with its catch-up cap (at most 4 ticks per frame at the game's pace).</summary>
+        private readonly SimClock _clock = new SimClock();
+
+        /// <summary>Sim time and ticks dropped by the catch-up cap since this match began (F3 overlay, perf report).</summary>
+        public double DroppedSimSeconds => _clock.DroppedSimSeconds;
+        public long DroppedTicks => _clock.DroppedTicks;
         private HumanInputSource _input;
         private readonly InputFrame _humanFrame = SimInput.EmptyInput();
         private readonly InputFrame _scratch = SimInput.EmptyInput();
@@ -84,12 +92,13 @@ namespace CriticalMass.Runtime.Game
             if (req != null && req.Backdrop) HumanAutopilot = true;
             if (CaptureMode)
             {
+                CreatedInCaptureMode = true;
                 HumanAutopilot = true;
                 TimeScale = 0;
             }
             _dt = SimStep.Dt(cfg);
-            _acc = 0;
             Alpha = 0;
+            RuntimeCounters.Reset();
         }
 
         /// <summary>The HumanInputSource on this GameObject (added after this component by GameBootstrap, so resolved lazily).</summary>
@@ -108,13 +117,13 @@ namespace CriticalMass.Runtime.Game
             FrameDt = Math.Min(unscaled, MaxFrameDt);
             HumanInputSource input = InputSource;
             bool paused = input != null && input.State.Paused;
-            if (!paused) _acc += Math.Min(unscaled, MaxDelta) * TimeScale;
-            while (_acc >= _dt)
-            {
-                Tick(input);
-                _acc -= _dt;
-            }
-            Alpha = _acc / _dt;
+            // DG-60: after a hitch at most SimClock.TickCap ticks run this frame and the rest of the backlog is dropped
+            // (counted), so one slow frame never makes the next one slow too. Same inputs per tick: determinism holds.
+            int ticks = _clock.Advance(unscaled, TimeScale, _dt, paused);
+            for (int i = 0; i < ticks; i++) Tick(input);
+            RuntimeCounters.SimDroppedSeconds = _clock.DroppedSimSeconds;
+            RuntimeCounters.SimDroppedTicks = _clock.DroppedTicks;
+            Alpha = _clock.Alpha(_dt);
         }
 
         /// <summary>Runs n ticks immediately (smoke test); the accumulator and Alpha are left as they are.</summary>
@@ -134,6 +143,8 @@ namespace CriticalMass.Runtime.Game
                 _humanFrame.AimX = double.NaN;
                 _humanFrame.AimZ = double.NaN;
             }
+            // Physics audit M7 / DG-101: count ability presses the sim will refuse (read-only on the World) for the HUD's cue.
+            if (input != null && !HumanAutopilot) AbilityDenial.Observe(_humanFrame.Ability, World, 0, _dt);
             MatchTick.Advance(World, HumanAutopilot ? null : _humanFrame, _scratch);
             Ticked?.Invoke(World);
         }

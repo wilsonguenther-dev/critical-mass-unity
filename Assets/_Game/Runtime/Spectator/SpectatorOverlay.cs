@@ -77,12 +77,13 @@ namespace CriticalMass.Runtime.Spectator
         {
             if (_names == null)
             {
-                _names = new string[2, 5];
+                int nc = ClassIds.All.Count;
+                _names = new string[2, nc];
                 for (int ti = 0; ti < 2; ti++)
-                    for (int ci = 0; ci < 5; ci++)
+                    for (int ci = 0; ci < nc; ci++)
                         _names[ti, ci] = (KillWords.Team[ti] + " " + KillWords.ClassName((ClassId)ci)).ToUpperInvariant();
             }
-            return _names[Mathf.Clamp((int)t, 0, 1), Mathf.Clamp((int)c, 0, 4)];
+            return _names[Mathf.Clamp((int)t, 0, 1), Mathf.Clamp((int)c, 0, _names.GetLength(1) - 1)];
         }
 
         void OnDisable()

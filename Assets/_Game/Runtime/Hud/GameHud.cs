@@ -22,6 +22,9 @@ namespace CriticalMass.Runtime.Hud
     /// Read-only on the Sim: each LateUpdate copies the World into a HudState (HudBinder.Read, allocation-free) and applies
     /// it with change checks; animation (health drain, heart pop, cooldown sweep, ready flash) is view-side only.
     /// </summary>
+    // Physics audit M3: LateUpdate after CinemachineBrain (order 100) and the camera shake (150), so damage numbers,
+    // hearts, the hill marker and edge pointers are projected with the camera this frame is rendered from.
+    [DefaultExecutionOrder(200)]
     public sealed class GameHud : MonoBehaviour
     {
         public SimDriverBehaviour Driver;
@@ -333,8 +336,24 @@ namespace CriticalMass.Runtime.Hud
             for (int i = 0; i < 3; i++) _buttons[i].Name.gameObject.SetActive(showNames);
         }
 
-        static readonly string[] ClassNames = { "WARRIOR", "FARMER", "MINER", "DEMOLITIONS", "BUILDER" };
-        static readonly string[] AbilityNames = { "SHIELD", "ROOTS", "WALL BREAK", "MINE", "BUILD" };
+        // Six classes (batch 3): names of the new ones come from the sim's name tables (DemolitionsNames, BuilderNames, HealerNames).
+        static readonly string[] ClassNames =
+        {
+            "WARRIOR", "FARMER", "MINER", CriticalMass.Sim.Core.DemolitionsNames.ClassName, CriticalMass.Sim.Core.BuilderNames.ClassName,
+            CriticalMass.Sim.Core.HealerNames.ClassName,
+        };
+        static readonly string[] AbilityNames =
+        {
+            "SHIELD", "ROOTS", "WALL BREAK", CriticalMass.Sim.Core.DemolitionsNames.Mine, CriticalMass.Sim.Core.BuilderNames.Build,
+            CriticalMass.Sim.Core.HealerNames.Pulse,
+        };
+        static readonly string[] AttackNames =
+        {
+            "ATTACK", "ATTACK", "ATTACK", "NO SWORD", "ATTACK", CriticalMass.Sim.Core.HealerNames.Mend,   // Demolitions: TNT is on Dig / place
+        };
+
+        /// <summary>The icon row for a class: the Healer has no icon art yet and borrows the Farmer's (support) row.</summary>
+        static int IconRow(int cls) => cls >= UiIcons.Classes.Length ? 1 : cls;
 
         // ---------------------------------------------------------------- minimap
 
@@ -368,6 +387,7 @@ namespace CriticalMass.Runtime.Hud
             Shape(c, "Map Frame", ShapeKind.Chamfer, 0f, 0f, w + 2f * f, h + 2f * f, Navy, 20f);
             _mapArea = Rt(c, "Map Area");
             Place(_mapArea, f, f, w, h);
+            MinimapCanvas = NestedCanvas(_mapArea);   // M5: 40 moving dots and markers re-batch only the map
             _mapImage = _mapArea.gameObject.AddComponent<RawImage>();
             _mapImage.raycastTarget = false;
             _mapImage.texture = MapTexture(_mapTier);
@@ -447,6 +467,9 @@ namespace CriticalMass.Runtime.Hud
             _world.anchorMin = Vector2.zero;
             _world.anchorMax = Vector2.one;
             _world.sizeDelta = Vector2.zero;
+            // Physics audit M5 / DG-110: the world-anchored marks move every fight frame; their own nested canvas re-batches
+            // alone instead of the whole HUD (the static frame stays on the root canvas, the minimap on its own).
+            WorldCanvas = NestedCanvas(_world);
 
             RectTransform marker = Rt(_world, "Hill Marker");
             Center(marker, 120f, 80f);
@@ -475,6 +498,10 @@ namespace CriticalMass.Runtime.Hud
                 Center(t.rectTransform, 80f, 32f);
                 t.gameObject.SetActive(false);
                 _dmg[i] = t;
+                // M5: fade through the group alpha (no text mesh or 12-direction outline rebuild per frame).
+                _dmgFade[i] = t.gameObject.AddComponent<CanvasGroup>();
+                _dmgFade[i].interactable = false;
+                _dmgFade[i].blocksRaycasts = false;
             }
             for (int i = 0; i < Pointers; i++)
             {
@@ -494,6 +521,29 @@ namespace CriticalMass.Runtime.Hud
                 p.gameObject.SetActive(false);
                 _ptr[i] = p;
             }
+        }
+
+        /// <summary>The nested canvases of the M5 split (tests read them).</summary>
+        public Canvas WorldCanvas { get; private set; }
+        public Canvas MinimapCanvas { get; private set; }
+        readonly CanvasGroup[] _dmgFade = new CanvasGroup[DamageNumbers];
+
+        /// <summary>A nested canvas on rt: inherits the root's camera, sorting and scale; no raycaster (nothing to click).</summary>
+        static Canvas NestedCanvas(RectTransform rt)
+        {
+            Canvas c = rt.gameObject.AddComponent<Canvas>();
+            c.overrideSorting = false;
+            c.pixelPerfect = false;
+            return c;
+        }
+
+        /// <summary>Sets a group's alpha only when it changed by a visible step (pure helper; HUD dirty test).</summary>
+        public static bool SetAlpha(CanvasGroup g, float a)
+        {
+            a = Mathf.Clamp01(a);
+            if (Mathf.Abs(g.alpha - a) < 1f / 255f) return false;
+            g.alpha = a;
+            return true;
         }
 
         static void Center(RectTransform rt, float w, float h)
@@ -576,6 +626,7 @@ namespace CriticalMass.Runtime.Hud
             {
                 _countedMatch = true;
                 PlayerPrefs.SetInt(MatchesPlayedKey, PlayerPrefs.GetInt(MatchesPlayedKey, 0) + 1);
+                if (!CriticalMass.Runtime.Game.GamePaths.IsolatedRun) PlayerPrefs.Save();   // DG-53: once per match; never in a -dataDir run
             }
         }
 
@@ -656,8 +707,9 @@ namespace CriticalMass.Runtime.Hud
             Color tc = CMTokens.Team(s.Team);
             int cls = Mathf.Clamp((int)s.Cls, 0, ClassNames.Length - 1);
             int team = s.Team == TeamId.Crimson ? 1 : 0;
-            _portrait.Set(UiIcons.Portrait[cls, team], _tier);
-            _classBadge.Set(UiIcons.ClassBadge[cls, team], _tier);
+            int iconRow = IconRow(cls);
+            _portrait.Set(UiIcons.Portrait[iconRow, team], _tier);
+            _classBadge.Set(UiIcons.ClassBadge[iconRow, team], _tier);
             HudText.Set(_className, ClassNames[cls]);
 
             // health: shown value drains toward the target, the cream ghost holds 0.4 s then follows
@@ -685,8 +737,9 @@ namespace CriticalMass.Runtime.Hud
             }
 
             // buttons: attack (LMB), class ability (RMB), carry (E)
-            ApplyButton(_buttons[0], s.AttackCd01, 0f, UiIcons.Attack[cls, team], "ATTACK", dt);
-            ApplyButton(_buttons[1], s.AbilityCd01, s.AbilityCdSeconds, UiIcons.Ability[cls, team], AbilityNames[cls], dt);
+            ApplyButton(_buttons[0], s.AttackCd01, 0f, UiIcons.Attack[iconRow, team], AttackNames[cls], dt);
+            ApplyButton(_buttons[1], s.AbilityCd01, s.AbilityCdSeconds, UiIcons.Ability[iconRow, team], AbilityNames[cls], dt);
+            ApplyDenied(_buttons[1], dt);
             AbilityButton carry = _buttons[2];
             carry.Icon.Set(s.Carry == CarryKind.Corruption ? UiIcons.Corruption : s.Carry == CarryKind.Biomass ? UiIcons.Biomass :
                 UiIcons.CarryEmpty, _tier);
@@ -708,6 +761,49 @@ namespace CriticalMass.Runtime.Hud
             b.Body.SetRim(rim);
             float k = 1f + 0.1f * (b.Flash / 0.3f);
             b.Rt.localScale = new Vector3(k, k, 1f);
+        }
+
+        // ---- "not ready" cue (physics audit M7 view half, DG-101): an ability press the sim refuses shakes the icon 4 px
+        // and plays a soft click, once per press (CriticalMass.Runtime.Input.AbilityDenial counts refused presses).
+        public const float DeniedShakePx = 4f, DeniedSeconds = 0.24f;
+        int _deniedSeen = -1;
+        float _denied = DeniedSeconds;
+        Vector2 _deniedBase;
+        bool _deniedBaseSet;
+
+        /// <summary>The ability icon's horizontal shake for the time since a refused press (pure; tests): 0 at the end.</summary>
+        public static float DeniedOffset(float sinceSeconds)
+        {
+            if (sinceSeconds < 0f || sinceSeconds >= DeniedSeconds) return 0f;
+            float k = 1f - sinceSeconds / DeniedSeconds;
+            return DeniedShakePx * k * Mathf.Sin(sinceSeconds / DeniedSeconds * Mathf.PI * 6f);
+        }
+
+        /// <summary>Times the denied cue fired (tests).</summary>
+        public int DeniedCues { get; private set; }
+
+        void ApplyDenied(AbilityButton b, float dt)
+        {
+            int count = CriticalMass.Runtime.Input.AbilityDenial.Count;
+            if (_deniedSeen < 0) _deniedSeen = count;
+            if (count != _deniedSeen)
+            {
+                _deniedSeen = count;
+                _denied = 0f;
+                DeniedCues++;
+                CriticalMass.Runtime.View.Effects.CombatAudio.PlayUi("ability_denied");
+            }
+            else if (_denied < DeniedSeconds) _denied += dt;
+            if (b.Icon == null) return;
+            RectTransform rt = b.Icon.Rt;
+            if (!_deniedBaseSet)
+            {
+                _deniedBase = rt.anchoredPosition;
+                _deniedBaseSet = true;
+            }
+            float x = SnapAnimations ? 0f : DeniedOffset(_denied >= DeniedSeconds ? DeniedSeconds : _denied);
+            Vector2 want = _deniedBase + new Vector2(x, 0f);
+            if (rt.anchoredPosition != want) rt.anchoredPosition = want;
         }
 
         static float Approach(float v, float t, float step) => v < t ? Mathf.Min(t, v + step) : Mathf.Max(t, v - step);
@@ -793,7 +889,11 @@ namespace CriticalMass.Runtime.Hud
             // events: damage numbers (local player's hits only) and the last-hit time for overhead hearts
             if (_lastHit.Length < w.ActorCount) _lastHit = new double[w.ActorCount];
             if (_eventCursor < 0 || _eventCursor > w.EventHead) _eventCursor = w.EventHead;
-            if (w.EventHead - _eventCursor > World.EventCapacity) _eventCursor = w.EventHead - World.EventCapacity;
+            if (w.EventHead - _eventCursor > World.EventCapacity)
+            {
+                CriticalMass.Runtime.Game.RuntimeCounters.HudEventsDropped += w.EventHead - World.EventCapacity - _eventCursor;   // DG-60
+                _eventCursor = w.EventHead - World.EventCapacity;
+            }
             for (; _eventCursor < w.EventHead; _eventCursor++)
             {
                 SimEvent e = w.Events[_eventCursor % World.EventCapacity];
@@ -806,6 +906,7 @@ namespace CriticalMass.Runtime.Hud
                     _dmgAge[k] = 0f;
                     _dmgPos[k] = SimSpace.ToWorld(e.X, GroundHeight.At(w.Map, e.X, e.Z) + 2.2, e.Z);
                     HudText.Set(_dmg[k], NumberCache.Int(Mathf.RoundToInt((float)e.Value)));
+                    SetAlpha(_dmgFade[k], 1f);
                     _dmg[k].gameObject.SetActive(true);
                 }
             }
@@ -817,9 +918,7 @@ namespace CriticalMass.Runtime.Hud
                 float t = SnapAnimations ? 0.25f : _dmgAge[k] / 0.7f;
                 if (!Project(cam, _dmgPos[k] + Vector3.up * (0.6f * t), out Vector2 dp)) { _dmg[k].gameObject.SetActive(false); continue; }
                 _dmg[k].rectTransform.anchoredPosition = dp / scale;
-                Color c = _dmg[k].color;
-                c.a = 1f - t * t;
-                _dmg[k].color = c;
+                SetAlpha(_dmgFade[k], 1f - t * t);
             }
 
             // overhead hearts: other units, 3 s after damage, never at full health

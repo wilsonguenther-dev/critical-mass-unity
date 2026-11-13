@@ -1,73 +1,75 @@
 #!/usr/bin/env bash
-# DG-05: refresh the owner's playable Mac copy without touching a running one. Builds this checkout's HEAD into
-# Builds/macOS/<short-commit>/CriticalMass.app (suffix -dirty when tracked files have local changes), keeps the newest
-# two versioned folders (never deleting one whose app is running), and prints the app path as the last line.
-#   tools/play-latest.sh [--force] [--keep N] [--prune-only]
-#   --force       rebuild even when this commit's folder already exists (refused while that copy is running)
-#   --keep N      versioned folders to keep, default 2
-#   --prune-only  no build; only prune and print the newest app
-# The legacy Builds/macOS/CriticalMass.app (the build-mac gate's output) is never touched.
+# DG-57: build the owner's playable Mac copy without ever touching the one he is playing.
+#   tools/play-latest.sh [--keep N] [--prune-only] [--no-build]
+# Builds HEAD into Builds/staging/<stamp>/CriticalMass.app (stamp = UTC time + short commit, -dirty when tracked files
+# changed), verifies it (executable present, codesign --verify --strict, Gatekeeper assessment recorded), then moves the
+# whole folder with ONE atomic rename to Builds/releases/<stamp>/ and repoints the Builds/current link (atomic replace).
+# Keeps the newest N releases (default 5) and never deletes or rewrites a release whose app is running. Prints the app
+# path as the last line. Builds/macOS/CriticalMass.app (the build-mac gate's output) is never touched.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-FORCE=0; KEEP=2; PRUNE_ONLY=0
+KEEP=5; PRUNE_ONLY=0; NO_BUILD=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --force) FORCE=1; shift ;;
     --keep) KEEP="${2:?}"; shift 2 ;;
     --prune-only) PRUNE_ONLY=1; shift ;;
-    *) echo "usage: play-latest.sh [--force] [--keep N] [--prune-only]" >&2; exit 64 ;;
+    --no-build) NO_BUILD=1; shift ;;
+    --force) shift ;;   # kept for old callers: every build is a new release folder now
+    *) echo "usage: play-latest.sh [--keep N] [--prune-only] [--no-build]" >&2; exit 64 ;;
   esac
 done
-BASE="$ROOT/Builds/macOS"
-mkdir -p "$BASE"
+B="$ROOT/Builds"; REL="$B/releases"; STG="$B/staging"
+mkdir -p "$REL" "$STG"
 
-running() {  # $1 = a versioned folder; true when a process runs the app inside it (read only, never kills)
-  pgrep -f "$1/CriticalMass.app/Contents/MacOS/" >/dev/null 2>&1
-}
+running() { pgrep -f "$1/CriticalMass.app/Contents/MacOS/" >/dev/null 2>&1; }   # read only, never kills
 
 prune() {
   local n=0 d
-  # newest first by folder modification time; only folders named like a short commit
   while IFS= read -r d; do
-    [[ -d "$d/CriticalMass.app" ]] || continue
+    [[ -d "$d" ]] || continue
     n=$((n + 1))
     if (( n > KEEP )); then
-      if running "$d"; then echo "play-latest: keeping $d (running)" >&2; else rm -rf "$d"; echo "play-latest: removed $d" >&2; fi
+      if running "$d"; then echo "play-latest: keeping $d (running)" >&2
+      elif [[ "$(readlink "$B/current" 2>/dev/null)" == "$d" ]]; then echo "play-latest: keeping $d (current)" >&2
+      else rm -rf "$d"; echo "play-latest: removed $d" >&2; fi
     fi
-  done < <(ls -1dt "$BASE"/*/ 2>/dev/null | sed 's:/$::' | grep -E '/[0-9a-f]{7,12}(-dirty)?$' || true)
+  done < <(ls -1d "$REL"/*/ 2>/dev/null | sed 's:/$::' | sort -r)
+  # staging leftovers of interrupted builds (never a running one)
+  for d in "$STG"/*/; do [[ -d "$d" ]] && ! running "${d%/}" && rm -rf "${d%/}"; done 2>/dev/null || true
+}
+
+point_current() {  # atomic: a new link renamed over the old one
+  python3 -c 'import os,sys; t=sys.argv[2]+".new"; (os.path.lexists(t) and os.remove(t)); os.symlink(sys.argv[1], t); os.replace(t, sys.argv[2])' "$1" "$B/current"
 }
 
 if (( PRUNE_ONLY )); then
   prune
-  newest="$(ls -1dt "$BASE"/*/ 2>/dev/null | sed 's:/$::' | grep -E '/[0-9a-f]{7,12}(-dirty)?$' | head -1 || true)"
-  [[ -n "$newest" ]] || { echo "play-latest: no versioned build yet" >&2; exit 1; }
-  echo "$newest/CriticalMass.app"
-  exit 0
+  [[ -e "$B/current/CriticalMass.app" ]] || { echo "play-latest: no release yet" >&2; exit 1; }
+  echo "$B/current/CriticalMass.app"; exit 0
 fi
-
-short="$(git -C "$ROOT" rev-parse --short=7 HEAD)"
-[[ -z "$(git -C "$ROOT" status --porcelain --untracked-files=no)" ]] || short="$short-dirty"
-DEST="$BASE/$short"
-if [[ -d "$DEST/CriticalMass.app" && $FORCE -eq 0 ]]; then
-  echo "play-latest: $short already built" >&2
-  touch "$DEST"; prune
-  echo "$DEST/CriticalMass.app"; exit 0
-fi
-if [[ -d "$DEST" ]] && running "$DEST"; then
-  echo "play-latest: refused, $DEST/CriticalMass.app is running; quit it or build another commit" >&2; exit 75
-fi
+(( NO_BUILD )) && { echo "$B/current/CriticalMass.app"; exit 0; }
 if pgrep -f "Unity.app/Contents/MacOS/Unity.*-projectPath $ROOT( |$)" >/dev/null 2>&1; then
   echo "play-latest: refused, a Unity editor already has $ROOT open" >&2; exit 3
 fi
-
-STAGE="$BASE/.staging-$short-$$"
+short="$(git -C "$ROOT" rev-parse --short=7 HEAD)"
+[[ -z "$(git -C "$ROOT" status --porcelain --untracked-files=no)" ]] || short="$short-dirty"
+STAMP="$(date -u +%Y%m%dT%H%M%SZ)-$short"
+STAGE="$STG/$STAMP"
+mkdir -p "$STAGE"
 trap 'rm -rf "$STAGE"' EXIT
-# One graphics-heavy job machine-wide (2026-11-12 watchdog restart): the build waits for ~/bin/cm-heavy's Unity slot.
-HEAVY=()
-[[ -x "$HOME/bin/cm-heavy" ]] && HEAVY=("$HOME/bin/cm-heavy" unity)
+HEAVY=(); [[ -x "$HOME/bin/cm-heavy" ]] && HEAVY=("$HOME/bin/cm-heavy" unity)
 CM_BUILD_LOG="$ROOT/Logs/play-latest-build.log" ${HEAVY[@]+"${HEAVY[@]}"} "$ROOT/tools/unity-build-mac.sh" --output "$STAGE/CriticalMass.app" >&2
-rm -rf "$DEST"
-mv "$STAGE" "$DEST"
+APP="$STAGE/CriticalMass.app"
+EXE="$APP/Contents/MacOS/$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP/Contents/Info.plist")"
+[[ -x "$EXE" ]] || { echo "play-latest: FAILED, no executable in the staged app" >&2; exit 1; }
+{
+  echo "codesign: $(codesign --verify --strict "$APP" 2>&1 && echo ok)"
+  echo "spctl: $(spctl -a -vv "$APP" 2>&1 | tr '\n' ' ')"
+  echo "size_mb: $(du -sm "$APP" | awk '{print $1}')"
+} > "$STAGE/verify.txt" 2>&1 || true
+[[ -e "$REL/$STAMP" ]] && { echo "play-latest: refused, $REL/$STAMP exists" >&2; exit 75; }
+mv "$STAGE" "$REL/$STAMP"     # one rename; a running release is never rewritten (every build is a new folder)
 trap - EXIT
+point_current "$REL/$STAMP"
 prune
-echo "$DEST/CriticalMass.app"
+echo "$B/current/CriticalMass.app"

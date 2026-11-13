@@ -36,12 +36,12 @@ namespace CriticalMass.Sim.Tests
         }
 
         [Test]
-        public void HasExactlyFiveClassesWithAFarmerThatGathersFasterAndCarriesMore()
+        public void HasExactlySixClassesWithAFarmerThatGathersFasterAndCarriesMore()
         {
             var c = GameConfig.CreateBrowser5v5();
-            Assert.AreEqual(5, c.Classes.Length);
+            Assert.AreEqual(6, c.Classes.Length); // DG-40 appended the Healer
             CollectionAssert.AreEqual(
-                new[] { ClassId.Warrior, ClassId.Farmer, ClassId.Miner, ClassId.Demolitions, ClassId.Builder },
+                new[] { ClassId.Warrior, ClassId.Farmer, ClassId.Miner, ClassId.Demolitions, ClassId.Builder, ClassId.Healer },
                 ClassIds.All);
             Assert.Less(c.Class(ClassId.Farmer).GatherSeconds, c.Class(ClassId.Warrior).GatherSeconds);
             Assert.Greater(c.Class(ClassId.Farmer).CarryCapacity, c.Class(ClassId.Miner).CarryCapacity);
@@ -58,11 +58,11 @@ namespace CriticalMass.Sim.Tests
         }
 
         [Test]
-        public void CM56CLASSIDSListsAllFiveClassesInCanonicalOrderOneConfigRowEach()
+        public void CM56CLASSIDSListsAllSixClassesInCanonicalOrderOneConfigRowEach()
         {
             var c = GameConfig.CreateBrowser5v5();
             CollectionAssert.AreEqual(
-                new[] { ClassId.Warrior, ClassId.Farmer, ClassId.Miner, ClassId.Demolitions, ClassId.Builder },
+                new[] { ClassId.Warrior, ClassId.Farmer, ClassId.Miner, ClassId.Demolitions, ClassId.Builder, ClassId.Healer },
                 ClassIds.All);
             Assert.AreEqual(ClassIds.All.Count, c.Classes.Length);
             Assert.AreEqual(ClassIds.All.Count, c.Bots.ClassMix.Length);
@@ -75,6 +75,7 @@ namespace CriticalMass.Sim.Tests
             var c = GameConfig.CreateBrowser5v5();
             Assert.AreEqual(0d, c.ClassMix(ClassId.Demolitions));
             Assert.AreEqual(0d, c.ClassMix(ClassId.Builder));
+            Assert.AreEqual(0d, c.ClassMix(ClassId.Healer)); // DG-40: not in the default bot lineup
             Assert.AreEqual(1d, c.ClassMix(ClassId.Warrior) + c.ClassMix(ClassId.Farmer) + c.ClassMix(ClassId.Miner), 0.5e-6);
             Assert.IsTrue(c.Class(ClassId.Demolitions).SameStats(c.Class(ClassId.Miner)));
             Assert.IsTrue(c.Class(ClassId.Builder).SameStats(c.Class(ClassId.Miner)));
@@ -233,7 +234,7 @@ namespace CriticalMass.Sim.Tests
             Assert.AreEqual(0.3, c.Bots.HillMinFraction);
             Assert.AreEqual(0.25, c.Bots.KaijuGroupFraction);
             Assert.AreEqual(10d, c.Bots.CorruptWhenBehindBy);
-            CollectionAssert.AreEqual(new[] { 0.4, 0.3, 0.3, 0d, 0d }, c.Bots.ClassMix);
+            CollectionAssert.AreEqual(new[] { 0.4, 0.3, 0.3, 0d, 0d, 0d }, c.Bots.ClassMix);
             Assert.AreEqual(1.5, c.Bots.StuckSeconds);
             Assert.AreEqual(300d, c.Bots.TurnRateDegPerSec);
 

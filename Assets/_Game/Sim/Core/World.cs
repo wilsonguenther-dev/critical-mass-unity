@@ -97,6 +97,8 @@ namespace CriticalMass.Sim.Core
         public ToppleState Topple;
         /// <summary>CM-36: the shrine cleanse (Cleanse.cs).</summary>
         public CleanseState Cleanse;
+        /// <summary>DG-22: land mines, thrown TNT and their counters (Demolitions.cs).</summary>
+        public DemolitionsState Demolitions;
         /// <summary>Bumps on every ResetWorld. Views must drop cached per-match state when it changes.</summary>
         public int Epoch;
         public int Tick;
@@ -345,6 +347,8 @@ namespace CriticalMass.Sim.Core
             world.Opts.TeamSize = n;
             world.Opts.HumanTeam = opts.HumanTeam;
             world.Opts.HumanClass = opts.HumanClass;
+            world.Opts.BotDifficulty = opts.BotDifficulty; // DG-21
+            world.Opts.AllyBotDifficulty = opts.AllyBotDifficulty;
             Rng.SeedRng(world.Rng, unchecked((uint)opts.Seed));
             world.Tick = 0;
             world.ActorCount = 2 * n;
@@ -530,6 +534,12 @@ namespace CriticalMass.Sim.Core
             cl.Count = 0;
             cl.Removed = 0;
 
+            // DG-22: mines, bombs and counters, reset in place.
+            world.Demolitions.Reset();
+            // DG-24: every piece gone (the repaint restored its cells), banks full again.
+            world.Builder.Reset();
+            world.Healer.Reset(); // DG-40
+
             SpatialHash.Rebuild(world.Hash, world.X, world.Z, world.Actors, world.ActorCount);
         }
 
@@ -633,6 +643,8 @@ namespace CriticalMass.Sim.Core
                     HumanTeam = opts.HumanTeam,
                     HumanClass = opts.HumanClass,
                     Config = cfg,
+                    BotDifficulty = opts.BotDifficulty,
+                    AllyBotDifficulty = opts.AllyBotDifficulty,
                 },
                 Config = cfg,
                 Rng = Rng.CreateRng(unchecked((uint)opts.Seed)),
@@ -666,6 +678,7 @@ namespace CriticalMass.Sim.Core
                     Count = 0,
                     Removed = 0,
                 },
+                Demolitions = DemolitionsState.Create(cfg),
                 Epoch = 0,
                 Tick = 0,
                 ActorCount = 0,
@@ -722,6 +735,8 @@ namespace CriticalMass.Sim.Core
                 Events = events,
                 EventHead = 0,
                 Hash = SpatialHash.CreateSpatialHash(map.Width, map.Height, cap),
+                Builder = BuilderState.Create(cfg),
+                Healer = HealerState.Create(cfg),
             };
             InitWorld(world, opts);
             return world;
@@ -750,6 +765,12 @@ namespace CriticalMass.Sim.Core
         /// </summary>
         public static void PushEvent(World w, SimEventType type, int a, int b, double x, double z, double value, BiomassType? bio, DamageCause cause)
         {
+            PushEvent(w, type, a, b, x, z, value, bio, cause, 0);
+        }
+
+        /// <summary>DG-22: PushEvent with the effect radius (SimEvent.Radius) of a Demolitions event; every push writes it.</summary>
+        public static void PushEvent(World w, SimEventType type, int a, int b, double x, double z, double value, BiomassType? bio, DamageCause cause, double radius)
+        {
             SimEvent e = w.Events[w.EventHead % EventCapacity];
             e.Type = type;
             e.A = a;
@@ -759,6 +780,7 @@ namespace CriticalMass.Sim.Core
             e.Value = value;
             e.Bio = bio;
             e.Cause = cause;
+            e.Radius = radius;
             w.EventHead++;
         }
 
@@ -804,5 +826,10 @@ namespace CriticalMass.Sim.Core
         }
 
         // DG-16b additions follow (appended).
+
+        /// <summary>DG-24: ladders and rope bridges, each team's spent biomass and the carry state (BuiltPieces.cs).</summary>
+        public BuilderState Builder;
+        /// <summary>DG-40: the Healer's purify cooldowns and counters (Healer.cs).</summary>
+        public HealerState Healer;
     }
 }

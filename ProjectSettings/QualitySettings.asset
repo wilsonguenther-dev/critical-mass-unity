@@ -4,7 +4,7 @@
 QualitySettings:
   m_ObjectHideFlags: 0
   serializedVersion: 5
-  m_CurrentQuality: 5
+  m_CurrentQuality: 3
   m_QualitySettings:
   - serializedVersion: 5
     name: Very Low
@@ -48,7 +48,7 @@ QualitySettings:
     asyncUploadBufferSize: 16
     asyncUploadPersistentBuffer: 1
     resolutionScalingFixedDPIFactor: 1
-    customRenderPipeline: {fileID: 11400000, guid: c826564cc665a4fec9e6616158e4a942, type: 2}
+    customRenderPipeline: {fileID: 11400000, guid: f8e90ffea64684b239b9022695e3d483, type: 2}
     terrainQualityOverrides: 0
     terrainPixelError: 1
     terrainDetailDensityScale: 1
@@ -101,7 +101,7 @@ QualitySettings:
     asyncUploadBufferSize: 16
     asyncUploadPersistentBuffer: 1
     resolutionScalingFixedDPIFactor: 1
-    customRenderPipeline: {fileID: 11400000, guid: c826564cc665a4fec9e6616158e4a942, type: 2}
+    customRenderPipeline: {fileID: 11400000, guid: f8e90ffea64684b239b9022695e3d483, type: 2}
     terrainQualityOverrides: 0
     terrainPixelError: 1
     terrainDetailDensityScale: 1
@@ -154,7 +154,7 @@ QualitySettings:
     asyncUploadBufferSize: 16
     asyncUploadPersistentBuffer: 1
     resolutionScalingFixedDPIFactor: 1
-    customRenderPipeline: {fileID: 11400000, guid: c826564cc665a4fec9e6616158e4a942, type: 2}
+    customRenderPipeline: {fileID: 11400000, guid: a7182b1d35a014c60837818317be8abc, type: 2}
     terrainQualityOverrides: 0
     terrainPixelError: 1
     terrainDetailDensityScale: 1
@@ -338,7 +338,7 @@ QualitySettings:
     PS5: 5
     QNX: 5
     Server: 5
-    Standalone: 5
+    Standalone: 3
     VisionOS: 5
     WebGL: 3
     Windows Store Apps: 5

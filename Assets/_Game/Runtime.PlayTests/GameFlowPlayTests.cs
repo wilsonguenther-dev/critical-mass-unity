@@ -265,6 +265,51 @@ namespace CriticalMass.Runtime.PlayTests
             yield return null;
         }
 
+        /// <summary>
+        /// Integration batch 3 (owner's blocking report on the batch 2 build: "it runs by itself", W never takes control).
+        /// A match started the way a player does (title, main menu PLAY, setup START), then a real key event through the
+        /// Input System (a keyboard device and a queued state event, not the input source): within one second the human
+        /// fighter must move screen-up, the driver's autopilot must be off and the AUTOPILOT banner gone.
+        /// </summary>
+        [UnityTest, Timeout(120000)]
+        public IEnumerator RealKeyboardTakesControlOfTheFighterWithinOneSecond()
+        {
+            yield return BootToTitle();
+            UnityEngine.Object.FindAnyObjectByType<TitleScreen>().Hide();
+            yield return null;
+            FlowDirector d = FlowDirector.Current;
+            yield return Press(d.MainMenu.Item("play"));
+            Assert.AreEqual(FlowState.Setup, GameFlow.State);
+            SimDriverBehaviour previous = Driver();
+            yield return Press(d.Setup.StartItem);
+            yield return WaitForNewDriver(previous);
+            SimDriverBehaviour driver = Driver();
+            World w = driver.World;
+            yield return Until(() => w.Match.Phase == MatchPhase.Playing && w.Actors[0].Alive, 30f, "the match reached Playing with the fighter alive");
+            yield return PrepareKeyboard();
+            var presence = UnityEngine.Object.FindAnyObjectByType<CriticalMass.Runtime.Spectator.PlayerPresence>();
+            bool autoBefore = driver.HumanAutopilot;
+            bool bannerBefore = presence != null && presence.BannerVisible;
+            double x0 = w.X[0], z0 = w.Z[0];
+            InputSystem.QueueStateEvent(_kb, new KeyboardState(Key.W));
+            float t0 = Time.realtimeSinceStartup;
+            double along = 0;
+            while (Time.realtimeSinceStartup - t0 < 1f)
+            {
+                yield return null;
+                along = (w.X[0] - x0) * HumanInputState.ScreenUpX + (w.Z[0] - z0) * HumanInputState.ScreenUpZ;
+                if (!driver.HumanAutopilot && along > 0.3 && (presence == null || !presence.BannerVisible)) break;
+            }
+            InputSystem.QueueStateEvent(_kb, new KeyboardState());
+            yield return null;
+            string report = $"autopilot before {autoBefore}, banner before {bannerBefore}; after {Time.realtimeSinceStartup - t0:0.00} s: autopilot {driver.HumanAutopilot}, " +
+                            $"banner {(presence != null && presence.BannerVisible)}, moved {along:0.00} u screen-up, keyboard current {Keyboard.current == _kb}";
+            Debug.Log("[RealInput] " + report);
+            Assert.IsFalse(driver.HumanAutopilot, "the autopilot still drives the fighter after a real W press: " + report);
+            Assert.IsFalse(presence != null && presence.BannerVisible, "the AUTOPILOT banner is still up: " + report);
+            Assert.Greater(along, 0.3, "the fighter did not move screen-up within one second of a real W press: " + report);
+        }
+
         [UnityTest, Timeout(120000)]
         public IEnumerator KeyboardSkipsComingSoonOpensSettingsAndBackReturnsToTheMenu()
         {

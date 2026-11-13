@@ -31,6 +31,8 @@ namespace CriticalMass.Runtime.Flow
         public int TeamSize;
         /// <summary>Sim seconds per wall second: 2 or 1.</summary>
         public double Pace;
+        /// <summary>DG-21 (U-058): the enemy team's bots. Normal is today's bots bit for bit.</summary>
+        public CriticalMass.Sim.Core.BotDifficulty BotDifficulty;
 
         public static MatchSetupChoice Default => new MatchSetupChoice
         {
@@ -38,6 +40,7 @@ namespace CriticalMass.Runtime.Flow
             Class = ClassId.Warrior,
             TeamSize = 16,
             Pace = 2,
+            BotDifficulty = CriticalMass.Sim.Core.BotDifficulty.Normal,
         };
     }
 
@@ -52,6 +55,8 @@ namespace CriticalMass.Runtime.Flow
         public ClassId Class;
         public int TeamSize;
         public double Pace;
+        /// <summary>DG-21: the bots on the team the human does not play (allies stay Normal; backdrops stay Normal).</summary>
+        public CriticalMass.Sim.Core.BotDifficulty BotDifficulty;
         /// <summary>true: the bot match behind the title and the menus (actor 0 on autopilot, never recorded).</summary>
         public bool Backdrop;
 
@@ -62,6 +67,7 @@ namespace CriticalMass.Runtime.Flow
             HumanTeam = Team,
             HumanClass = Class,
             Config = cfg,
+            BotDifficulty = Backdrop ? CriticalMass.Sim.Core.BotDifficulty.Normal : BotDifficulty,
         };
 
         public static MatchRequest From(MatchSetupChoice s, int seed) => new MatchRequest
@@ -71,6 +77,7 @@ namespace CriticalMass.Runtime.Flow
             Class = s.Class,
             TeamSize = s.TeamSize,
             Pace = s.Pace > 0 ? s.Pace : 2,
+            BotDifficulty = s.BotDifficulty,
             Backdrop = false,
         };
     }
@@ -95,8 +102,18 @@ namespace CriticalMass.Runtime.Flow
         public static bool Autoplay;
 
         public const double AutoplayResultsSeconds = 5;
-        /// <summary>Backdrop matches play at 1x behind the menus.</summary>
-        public const double BackdropPace = 1;
+        /// <summary>
+        /// Backdrop matches play at 0.5x behind the menus (physics audit DG-111, R-M10: half the sim ticks per second on an
+        /// idle title; nobody plays the backdrop). The match pace default (2x) is not this: see MatchSetupChoice.Default.
+        /// </summary>
+        public const double BackdropPace = 0.5;
+
+        /// <summary>
+        /// Backdrop matches behind the title and menus are 8v8 (technical hardening 2026-11-12): the 16v16 backdrop cost 36.7%
+        /// of a core on an idle title (smoke budget 35%, plan target 10%); half the actors halves the sim and the character
+        /// drawing behind a screen nobody plays.
+        /// </summary>
+        public const int BackdropTeamSize = 8;
 
         public static bool Enabled => ForceEnabled || TitleScreen.ShowOnBoot;
 
@@ -207,7 +224,7 @@ namespace CriticalMass.Runtime.Flow
                 Seed = NewSeed(),
                 Team = TeamId.Azure,
                 Class = ClassId.Warrior,
-                TeamSize = 16,
+                TeamSize = BackdropTeamSize,
                 Pace = BackdropPace,
                 Backdrop = true,
             };

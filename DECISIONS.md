@@ -1032,3 +1032,130 @@ ceiling that the cleanse can reach. **Measured** (CM-36 driver, 5v5 seeds 1..100
 
 Berserk stays inside the CM-34 band [10, 50]. Pure bots still never cleanse; only the autopilot slot does.
 
+
+## U-058 Bot difficulty as built in DG-21: Easy, Normal, Hard (not in the browser) (2026-11-13T02:15:17Z)
+
+**Why.** The browser has no bot difficulty (git grep on 09e0904 and every cm/* branch finds none), so the rule is ours: the
+smallest one that meets row DG-21 (reaction delay, aim error, ability use, target choice, objective discipline).
+**Rule.** `WorldOptions.BotDifficulty` sets the bots of the team the human does not play (what match setup's "Bot
+difficulty" sets); `WorldOptions.AllyBotDifficulty` sets the human's own team (default Normal; the menu leaves it).
+Normal has no profile: every call site keeps the browser code path, so a Normal match is the browser match bit for bit
+(four golden state hashes taken on 798fa11 before any DG-21 code, test `DG21NormalIsTodaysBotsBitForBitOnTheGoldenSeeds`).
+Easy and Hard read `Bots.Easy` / `Bots.Hard` (`BotSkillConfig`). Every roll is a stateless hash of seed, actor, a salt and a
+tick bucket (`BotSkill.Roll`): no shared bot RNG draw moves.
+
+| Lever | Easy | Normal | Hard |
+| --- | --- | --- | --- |
+| Reaction: think period (ticks at 30 Hz) | 12 | 8 | 4 |
+| Aim error on roots and TNT (units, disc) | 1.5 | 0 | 0 |
+| TNT lead on a moving enemy (x velocity x fuse) | 0 | 0 | 0.6 |
+| Swing held in this share of 1/3 s windows | 0.4 | 0 | 0 |
+| Chance a decided ability press is sent per think | 0.5 | 1 | 1 |
+| Warrior shield: enemies within 3 | 3 | 2 | 1 |
+| Target choice | nearest | nearest | carriers x0.25 on d2, hurt enemies first |
+| Off-hill chase factor while holding | 1 | 0.5 | 0.25 |
+| Retreat when hurt and an enemy is within | 6 | 6 | 3 |
+
+**Measured** (5v5, CreateBrowser5v5, whole matches, actor 0 on autopilot). Hard vs Easy: Hard wins 20 of 20 as Azure and
+20 of 20 as Crimson (floor 14 of 20). The human proxy (Normal allies) wins 20/20 against Easy, 11/20 against Normal, 5/20
+against Hard. Hard was tuned on 30 seeds: the first cut (think 6, chase 0.35, retreat 8) won only as often as Normal (18 vs
+19 of 30); the faster think, the tighter hill discipline and the shield at one enemy each mattered (10 of 30 with all three).
+
+## U-059 The Demolitions Expert as built in DG-22: TNT and mines, ported from CM-38 with view events (2026-11-13T02:24:16Z)
+
+**Source.** The browser's Demolitions sim is on 09e0904 itself (cm/CM-38 is an ancestor: `src/sim/demolitions.ts`, D-068),
+so the rules are a port: mine on Space (place range 1.6, arms after 15 ticks, lives 1800, first grounded unprotected enemy
+in its cell triggers it, 70 damage within 1.2, two per owner and the oldest recycles, pad keep-outs), TNT on the DigPlace
+binding (F; Y on a controller) on the rising edge (range 5, 45-tick fuse, 55 damage within 2, own 150-tick cooldown), no
+regular attack, enemy barricades hit, breakable walls in the radius destroyed, and a crater of Floor / Bridge cells within 1
+(placed ground is Floor) decided cell by cell by the CM-30 dig rules (keep-outs, actors on the cell, the route guard) and
+refused inside the CM-30 world gap. Bots: the CM-38 `decideDemolitions` rule (TNT at the enemy or the centroid in range,
+else a mine on its own cell while holding the hill or fighting near it). The browser's six CM-38 unit cases are ported.
+**Departures (ours, flagged in the PR).**
+1. State is a World field (`World.Demolitions`, fixed pools, reset in `InitWorld`), the Unity pattern, not a side table.
+2. View events (appended before the CM-84 marker, `SimEvent.Radius` appended, nothing reordered): MinePlaced, MineArmed,
+   MineTriggered, MineRemoved (expired, ground gone, recycled), TntThrown, TntLanded, Explosion (B = mine or TNT, Value =
+   actors hurt). The browser's Ability events (cast, refusal codes, blasts with A = -1) are kept as they were.
+3. TNT touches down `DemolitionsTnt.FlightTicks` = 12 ticks after the throw (TntLanded) [guess: 0.4 s]; the fuse still
+   counts from the throw, so the blast tick is the browser's.
+4. Blast damage goes through `Damage.ApplyDamage(..., DamageCause.Explosion)`; a bot's blast respects the DG-16 passive
+   window like its swing; an exhausted bomb pool is counted (`Stats.PoolRefusals`), not logged.
+5. Difficulty (U-058) in the bot rule: Hard leads a moving target by 0.6 x velocity x fuse; Easy throws up to 1.5 units off
+   and only on half its thinks. Normal is the browser rule.
+6. The default bot ClassMix keeps Demolitions at 0, so default matches (and every existing outcome band, including the
+   passive-team sweep that has no margin) are unchanged. Bots play the class whenever a config gives it a share; the soak
+   uses 3 of 16 per team (the browser soak's count). Turning it on by default is the owner's call after the integrator's
+   soak: in the 16v16 soak (seed 101, 3 per team) the six Demolitions bots score 144 blast knock-outs to 109 deaths at
+   Normal, the most lethal class per head, so a damage or cooldown pass may be wanted first.
+7. On-screen names live in one place, `DemolitionsNames` (MINE, TNT, DEMOLITIONS); GameHud's AbilityNames should read them.
+
+## U-060 Builder ladders and rope bridges as built in DG-24: temporary, paid from a team bank, carried by any class (not in the browser) (2026-11-13T02:43:02Z)
+
+**Source.** The oracle (09e0904 and every branch) has no ladder or bridge piece: its only Builder code is cm/CM-39
+`upgrade.ts` (spend team biomass to raise an ally's class level), which this item does not port (the station / upgrade half
+of row DG-24 is still open). So the rule is ours, the smallest one that satisfies Travis 2026-11-06 ("Build temporary
+ladders/bridges with biomass / Ladders/bridges movable by all classes") and the Nov 4 call ("ladders to get from different
+elevation levels ... rope bridges"). On this grid a cliff is a Wall cell and a gap is Void or Water, so:
+1. **BUILD (Space, Builder).** Along the cardinal axis nearest the aim (no aim: facing), the first blocked cell within 2 of
+   the Builder's cell decides: a Wall run up to 2 long makes a LADDER (1 biomass), a Void / Water run up to 6 long a ROPE
+   BRIDGE (2 biomass); the next cell must be walkable (the landing). 3 lanes wide (Topple.WidthCells), centred on that line;
+   every cell of the kind's type in that rectangle becomes Cell.Bridge through `MapGrid.SetCell`. Refused (Ability event with
+   a code, Space locked 0.5 s): nothing to span, too long, breakable / barricade in the way, shrine keep-out, map edge, the
+   Builder's 2 pieces already out, bank short, the CM-30 world gap. Class row unchanged (the CM-56 miner copy: mallet swing).
+2. **BANK.** StartBiomass 2 + the team's delivered biomass - what it spent. Spending never changes allegiance, instability or
+   the hatch (the CM-39 bank idea, read from Delivered instead of a new MatchState field).
+3. **TEMPORARY.** 60 s from the build, carried time included; PieceCrumbling 3 s before. A cell that stops being Bridge (dug,
+   cratered) breaks the piece (PieceDestroyed). Taking a piece away (expiry, break, lift) only reverts cells still Bridge, and
+   only when nobody (or the hatched Kaiju, or a barricade) is on them, the world gap has run out and the ROUTE GUARD passes
+   (`Terraform.CellsKeepRoutes`); otherwise it retries every tick. So a piece never leaves anyone in a wall or over the void,
+   and never seals a base from the hill: a piece that became the only route stays until another route exists.
+4. **CARRY (Interact, any class of the team).** Empty-handed and outside a node's / the shrine's interact range (where E
+   gathers and delivers), within 1.0 + radius of a piece cell: lift it (same safety checks). The next press puts it down in
+   front by the build rule of its kind (no cost, no cooldown). A carrier that dies drops it: gone. Bots never carry.
+5. **Bots.** A Builder bot on its way to the hill (ToHill, Unstick) or the shrine (Deliver, Corrupt) builds the accepted
+   piece whose landing is at least 2 cells closer by its team flow field. Skybreak Basin is well connected, so this is rare:
+   1 ladder per Builder-heavy 16v16 match at Normal and at Hard (seed 101); Builders stay out of the default ClassMix.
+6. View events (appended before the CM-84 marker): PiecePlaced, PieceCrumbling, PieceExpired (expired / dropped / broken),
+   PieceDestroyed, PiecePickedUp, each with a position and Radius = half the length; live state in `World.Builder.Pieces`.
+7. Names in one place: `BuilderNames` (BUILDER, BUILD, LADDER, ROPE BRIDGE, CARRY).
+
+## U-061 The Healer class as built in DG-40: mend, healing pulse, purify; no weapon (not in the browser) (2026-11-13T02:50:20Z)
+
+**Source.** The oracle has no Healer on any branch (its only heal is the CM-37 fountain, its only corruption removal the
+CM-36 shrine cleanse; cm/CM-36 `cleanse.ts` names "healer special" as the idea it chose not to build). Travis 2026-11-06:
+"Healer / Heal / Remove corruption"; "A way to remove corruption (healer special or something else)". Art direction: an
+armoured battle healer with wings and NO sword; she heals and supports. So the rules are ours, the smallest set that gives
+both of Travis's words a button on the bindings already on main:
+1. **ClassId.Healer = 5, appended** (every ClassPick index stays valid), class row MaxHp 110, speed 4.1, radius 0.42,
+   AttackDamage 0, AttackRange 4.5 (where bots stop from the fight), AttackCooldown 0.8, AbilityCooldown 9. Default
+   ClassMix 0: not in the default bot lineup.
+2. **MEND (attack).** No damage ever: the press heals the hurt ally (not herself) within 5.5 nearest the aim, 6 HP. No
+   target, no cooldown. Not an attack, so spawn protection stays.
+3. **HEALING WINGS (Space).** 30 HP to every ally within 3.5 of the aim (pulled back to 6), herself included.
+4. **PURIFY (DigPlace, F / Y).** Within 4 of the shrine, while `Cleanse.CleanseOpen` and corruption is in the egg: one
+   corruption unit removed at once (9 instability, the CM-36 units-to-instability rule), counted as cleansed
+   (`Cleanse.NetCorruptionUnits` subtracts `World.Healer.PurifiedUnits`, 0 without Healers, so CM-36 is unchanged); own
+   30 s cooldown, the team cleanse cooldown untouched. Refusals push an Ability event with a code.
+5. **Bots.** Attack presses come from the usual steering (she mends the hurt ally nearest the enemy she faces). Purify when
+   possible and her team is not behind in allegiance (or instability is at half the threshold). Pulse on the hurt ally
+   whose radius holds the most missing HP, when that is a full pulse or someone there is under a third of max HP. DG-21
+   Easy acts on half its thinks.
+6. Events (appended before the CM-84 marker): HealCast (mend / pulse, with position and pulse radius), HealLanded (per
+   actor), Purify (shrine, radius). Names in one place: `HealerNames` (HEALER, MEND, HEALING WINGS, PURIFY).
+7. **Tuning, measured.** First cut (mend 9, pulse 40): a team with three Healers in place of three Warriors beat the default
+   lineup 13 of 16; at mend 6, pulse 30: 10 of 16 (control, no swap: 8 of 16; three Miners: 3 of 16; three Builders: 0 of 16).
+   Shields and revives were not added. The CM-54 class switch (CM-84 markers) is still unported.
+
+## U-062 Random berserk line on a square-root curve as built in DG-41, off by default (not in the browser) (2026-11-13T02:58:16Z)
+
+**Source.** No branch of the oracle has it (its lock is `instability >= berserkThreshold`, 100). Travis 2026-11-06:
+"Corruption berserk threshold should be random, but affected by deposited corruption on a parabolic curve (y=√x)".
+1. **Rule.** With `KaijuFeed.RandomBerserk` the line that locks berserk is u² x `BerserkCurveMax`, u uniform in [0, 1) from
+   a stateless hash of the match seed (`SimResources.SeedUniform`, never the shared RNG), fixed for the match. So the chance
+   that instability I has locked berserk is √(I / BerserkCurveMax): y = √x, x being the corruption deposited (instability).
+   Every lock check (delivery, the Kaiju step, the debug feed) reads `SimResources.BerserkLine`.
+2. **Off by default.** It changes match outcomes, so on it would move the golden Normal hashes (U-058) and every berserk band;
+   the owner turns it on. Measured on 100 whole 5v5 matches (seeds 1..100, shipped config): fixed threshold 0.19 berserk
+   share; random line with curve top 160: 0.68, 250: 0.51, **800 (shipped): 0.30**, 1200: 0.23 (CM-34 band 0.10 to 0.50).
+3. The HUD's instability bar (Runtime/Hud/HudState.cs line 95) still draws against BerserkThreshold; with the rule on, the
+   view should hide the line (it is a secret roll) or show the √ chance instead. Not changed here (rules lane only).

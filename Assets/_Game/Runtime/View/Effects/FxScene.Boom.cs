@@ -21,13 +21,10 @@ namespace CriticalMass.Runtime.View.Effects
     {
         private struct Explosion { public double Born; public Vector3 P; public float R; public ExplosionKind Kind; public uint Seed; public bool Flash; }
         private struct Mark { public double Born, Life, Grow; public Vector3 P; public float Size, Rot; public uint Seed; public byte Kind; }
-        private struct Impulse { public double Born; public Vector3 P; public float Strength; }
 
         private readonly Explosion[] _booms = new Explosion[MaxExplosions];
         private readonly Mark[] _marks = new Mark[MaxMarks];
-        private const int MaxImpulses = 8;
-        private readonly Impulse[] _impulses = new Impulse[MaxImpulses];
-        private int _nx, _nm, _ni;
+        private int _nx, _nm;
         private double _lastFlash = double.NegativeInfinity;
 
         private double BoomLife => S(2.8);
@@ -37,7 +34,6 @@ namespace CriticalMass.Runtime.View.Effects
         {
             for (int i = 0; i < MaxExplosions; i++) _booms[i].Born = double.NegativeInfinity;
             for (int i = 0; i < MaxMarks; i++) { _marks[i].Born = double.NegativeInfinity; _marks[i].Life = 0; }
-            for (int i = 0; i < MaxImpulses; i++) _impulses[i].Born = double.NegativeInfinity;
         }
 
         private int ActiveBoom(double now)
@@ -72,33 +68,10 @@ namespace CriticalMass.Runtime.View.Effects
 
         private void AddMark(double t, Vector3 p, float size, byte kind, uint seed, double grow, double life)
         {
+            _markStamp[_nm % MaxMarks] = -1;
             ref Mark m = ref _marks[_nm++ % MaxMarks];
             m.Born = t; m.P = p; m.Size = size; m.Kind = kind; m.Seed = seed; m.Grow = grow; m.Life = life;
             m.Rot = R01(seed, 11) * Mathf.PI * 2f;
-        }
-
-        /// <summary>A world impulse for foliage sway and the shader hook (_CMFxImpulses), the most recent eight.</summary>
-        private void AddImpulse(double t, double x, double h, double z, float strength)
-        {
-            ref Impulse im = ref _impulses[_ni++ % MaxImpulses];
-            im.Born = t; im.P = W(x, h, z); im.Strength = strength;
-        }
-
-        /// <summary>Writes the live impulses as (world x, y, z, strength 0..1 decaying over 0.6 s) into dst; returns the count.</summary>
-        public int Impulses(double now, Vector4[] dst)
-        {
-            int n = 0;
-            double life = S(0.6);
-            for (int i = 0; i < MaxImpulses && n < dst.Length; i++)
-            {
-                ref Impulse im = ref _impulses[i];
-                double age = now - im.Born;
-                if (age < 0 || age >= life) continue;
-                float k = 1f - (float)(age / life);
-                dst[n++] = new Vector4(im.P.x, im.P.y, im.P.z, im.Strength * k * k);
-            }
-            for (int i = n; i < dst.Length; i++) dst[i] = Vector4.zero;
-            return n;
         }
 
         /// <summary>
@@ -192,7 +165,6 @@ namespace CriticalMass.Runtime.View.Effects
             }
             GibRecentDeaths(t, x, z, R * 1.3);
             RustleArea(x, z, 1.6 * R, t, seed);
-            AddImpulse(t, x, h, z, Mathf.Clamp01(0.4f + 0.2f * R));
         }
 
         // ---- drawing ----
@@ -210,6 +182,16 @@ namespace CriticalMass.Runtime.View.Effects
                 float fade = (float)Math.Min(1.0, (m.Life - age) / (m.Life * 0.3));
                 Vector3 c = m.P + Vector3.up * lift;
                 float s = m.Size * grow;
+                // Cracks and scorch go to the ground paint once still; corruption puddles animate, so they stay here.
+                bool still = m.Kind <= 1 && age >= m.Grow && fade >= 1f;
+                int before = _markStamp[i];
+                if (PaintedAway(ref _markStamp[i], m.P, still)) continue;
+                if (before == -1 && _markStamp[i] >= 0)
+                {
+                    if (m.Kind == 0) DrawCrack(Paint.Builder, m.P, m.Size, m.Rot, m.Seed, 1f);
+                    else DrawScorch(Paint.Builder, m.P, m.Size, m.Rot, m.Seed, 1f);
+                }
+                LastGroundMarks++;
                 if (m.Kind == 0) DrawCrack(ground, c, s, m.Rot, m.Seed, fade);
                 else if (m.Kind == 1) DrawScorch(ground, c, s, m.Rot, m.Seed, fade);
                 else DrawPuddle(ground, c, s, m.Rot, m.Seed, fade, now);
