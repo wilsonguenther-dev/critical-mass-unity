@@ -28,8 +28,11 @@ namespace CriticalMass.Sim.Config
         // ---- DG-69 / OD-2 attack wind-up (per-class length: ClassConfig.AttackWindupSeconds, real seconds)
         /// <summary>Melee swings wind up before they land (false = damage on the press tick, the browser).</summary>
         public bool AttackWindup = true;
-        /// <summary>Move speed multiplier while winding up and recovering (no skating swings).</summary>
-        public double SwingMoveMultiplier = 0.4;
+        /// <summary>Move speed multiplier while winding up and recovering. DG-69 asks 0.4 (no skating swings); shipped 1.0 because
+        /// 0.4 cost bot hill presence 0.81 -> 0.68 and CM-64 intercepts 81 -> 77 of 100 (PR tuning table).</summary>
+        public double SwingMoveMultiplier = 1.0;
+        /// <summary>The slowdown also covers the recovery after contact (false: the wind-up only).</summary>
+        public bool SwingSlowsRecovery = true;
 
         // ---- DG-70 / OD-3 knockback, hit-stun, weight (per-class: ClassConfig.Mass, ClassConfig.Poise)
         /// <summary>Hits shove, heavy hits stagger. Default OFF: with it on, the D-030 passive check fell to 11 of 200 and the
@@ -53,6 +56,8 @@ namespace CriticalMass.Sim.Config
         public double CrushKnock = 1.0;
         /// <summary>A Warrior's raised shield takes the push from the front: only this share of the knock reaches him.</summary>
         public double ShieldFrontKnockShare = 0.3;
+        /// <summary>A fighter carrying biomass or corruption is neither shoved nor staggered (keeps deliveries landing).</summary>
+        public bool KnockSparesCarriers = false;
         /// <summary>Hit tiers (PR #30's table): light under HeavyHitDamage, heavy, critical at CriticalHitDamage or a finishing blow.</summary>
         public double HeavyHitDamage = 20;
         public double CriticalHitDamage = 40;
@@ -101,7 +106,7 @@ namespace CriticalMass.Sim.Config
         /// <summary>Bodies slide round convex wall corners instead of snagging (S10, every actor).</summary>
         public bool CornerRounding = true;
         /// <summary>Largest overlap with a corner cell that is slid round (u); deeper overlaps still stop.</summary>
-        public double CornerNudgeMax = 0.25;
+        public double CornerNudgeMax = 0.1;
 
         // ---- DG-98 / OD-8 blasts
         /// <summary>Blast damage falls from full at the centre to BlastEdgeDamageShare at the edge; push outward; air = push only.</summary>

@@ -293,7 +293,7 @@ namespace CriticalMass.Sim.Core
             if (loB && !hiB) shift = (lo + 1) - (other - r) + Skin;
             else if (hiB && !loB) shift = -((other + r) - hi + Skin);
             else return false;
-            if (Math.Abs(shift) > max + Skin || Math.Abs(shift) > stepLen + Skin) return false;
+            if (Math.Abs(shift) > max + Skin + 1e-6 || Math.Abs(shift) > stepLen + Skin) return false; // 1e-6: Float32 positions
             double moved = JsMath.F32(other + shift);
             if (!(alongX ? BoxFits(w, along, moved, r) : BoxFits(w, moved, along, r))) return false;
             other = moved;

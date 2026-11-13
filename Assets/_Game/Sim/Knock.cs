@@ -56,6 +56,7 @@ namespace CriticalMass.Sim.Core
         {
             Actor t = w.Actors[target];
             if (!t.Alive || t.StandUp > 0) return;
+            if (w.Config.Physics.KnockSparesCarriers && t.Carry != CarryKind.None && t.CarryAmount > 0) return;
             double dt = 1.0 / w.Config.SimHz;
             if (eff > 0)
             {

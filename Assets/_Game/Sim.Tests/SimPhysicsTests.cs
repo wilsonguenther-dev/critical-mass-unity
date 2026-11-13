@@ -333,7 +333,8 @@ namespace CriticalMass.Sim.Tests
         [Test]
         public void DG69AttackersSlowTo40PercentWhileSwinging()
         {
-            World w = Duel(out int windup);
+            // The rule, staged: the shipped default is 1.0 (no slowdown) because 0.4 broke the hill-presence and CM-64 bands.
+            World w = Duel(out int windup, tweak: c => c.Physics.SwingMoveMultiplier = 0.4);
             Place(w, 5, HillX + 8, HillZ);
             for (int k = 0; k < 20; k++) { Input(w, 0, HillX + 8, HillZ, false, 0, 1); SimStep.Step(w); }
             double free = w.Z[0] - w.PrevZ[0];

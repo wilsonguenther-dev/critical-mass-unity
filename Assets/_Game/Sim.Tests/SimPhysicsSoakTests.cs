@@ -205,7 +205,7 @@ namespace CriticalMass.Sim.Tests
             Assert.AreEqual(Golden5v5Seed42, b, "5v5 seed 42, whole match, physics default");
         }
 
-        private const ulong Golden16v16Seed1 = 0x7942F399F045C46CUL;
-        private const ulong Golden5v5Seed42 = 0xEA5A111B7730467BUL;
+        private const ulong Golden16v16Seed1 = 0xC650A26531E8C885UL;
+        private const ulong Golden5v5Seed42 = 0x66F27919805F6F75UL;
     }
 }
