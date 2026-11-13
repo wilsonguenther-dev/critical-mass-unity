@@ -10,13 +10,14 @@
 # -autoplayTimeout -quality -dataDir -logFile -perfLog), waits, copies Player.log, perf*.json, samples.tsv, run.env and
 # data/ (shots) back into OUT, deletes the run on the box, and judges it here with tools/demo-smoke.sh --summarise-only
 # (same budgets, tools/budgets.json; summary.json in OUT). Old builds on the box beyond the newest two are deleted.
-# --mode captures adds -shots: the player writes shot-title.png (title, 2 s in) and shot-mid.png (60 s of match time),
+# --mode captures adds -shots: the player writes shot-title.png (title, 2 s in), shot-start.png (3 s of match time) and shot-mid.png (60 s),
 # copied to OUT/shots/. (Screen grabs from outside the game are not possible over ssh: macOS refuses screen recording.)
 # Defaults: host wilsons-macbook-air.local (or CM_REMOTE_HOST), app Builds/current or Builds/macOS of this checkout,
 # smoke, Medium, 1 match, 1920x1080 window, 12 s on the title, OUT Logs/remote/<utc>-<mode>-<quality>.
 # Exit: 0 pass, 1 fail (exceptions, budget over or not measured), 4 match timeout, 124 overall timeout, 75 queue wait
 # ran out, 66 no app, 67 box refused (battery or disk), 69 box unreachable, 64 usage.
 set -euo pipefail
+CAMYAW=""   # --camera-yaw D: the player's -cameraYaw (builds from a81efe4+1 on; 0 = true north, 45 = default)
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$ROOT/tools/remote/_remote-lib.sh"
 APP="$ROOT/Builds/current/CriticalMass.app"; [[ -d "$APP" ]] || APP="$ROOT/Builds/macOS/CriticalMass.app"
@@ -33,6 +34,7 @@ while [[ $# -gt 0 ]]; do
     --out) OUT="${2:?}"; shift 2 ;;
     --speed) SPEED="${2:?}"; shift 2 ;;
     --novsync) NOVSYNC=1; shift ;;
+    --camera-yaw) CAMYAW="$2"; shift 2 ;;
     --profile) PROFILE="${2:?}"; shift 2 ;;
     --width) W="${2:?}"; shift 2 ;;
     --height) H="${2:?}"; shift 2 ;;
@@ -68,7 +70,7 @@ rsync_to --delete "$APP" "$REMOTE_USER@$REMOTE_HOST:cm-remote/builds/$COMMIT/" \
 FPS=(); [[ "$PROFILE" == floor ]] && FPS=(--fps-cap 30)
 ARGS=(--build "builds/$COMMIT" --matches "$MATCHES" --title-seconds "$TITLE_S" --timeout "$TIMEOUT"
       --quality "$QUALITY" --width "$W" --height "$H" --keep "$KEEP" --lock-wait "$LOCK_WAIT"
-      ${SPEED:+--speed "$SPEED"} ${NOVSYNC:+--novsync} ${FPS[@]+"${FPS[@]}"})
+      ${SPEED:+--speed "$SPEED"} ${NOVSYNC:+--novsync} ${CAMYAW:+--camera-yaw "$CAMYAW"} ${FPS[@]+"${FPS[@]}"})
 [[ "$MODE" == captures ]] && ARGS+=(--shots)
 MAX=$((LOCK_WAIT + MATCHES * (TIMEOUT + 60) + 300))
 echo "remote-playtest: $MODE, $MATCHES match(es) at $QUALITY on $REMOTE_HOST, job $ID (limit ${MAX}s incl. queue)"

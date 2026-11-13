@@ -298,6 +298,30 @@ namespace CriticalMass.Runtime.Game
             if (w != Screen.width || h != Screen.height || mode != Screen.fullScreenMode) RequestWindow(w, h, mode);
         }
 
+        FullScreenMode? _seenMode;
+        FullScreenMode _requestedMode = FullScreenMode.FullScreenWindow;
+        double _requestedAt = double.NegativeInfinity;
+
+        /// <summary>
+        /// polish-audit-1: Alt+Enter (allowFullscreenSwitch) or the OS changed the window mode behind the settings page:
+        /// store the new mode as the player's "Display" choice, and give a new window a sensible size instead of the full
+        /// display size (title bar under the taskbar). Player builds only (this component is off in the editor).
+        /// </summary>
+        void WatchExternalModeChange()
+        {
+            FullScreenMode now = Screen.fullScreenMode;
+            if (_seenMode == null) { _seenMode = now; return; }
+            bool changed = now != _seenMode.Value;
+            _seenMode = now;
+            if (!FramePolicy.IsExternalModeChange(changed, now == _requestedMode, Time.realtimeSinceStartupAsDouble - _requestedAt)) return;
+            bool full = now != FullScreenMode.Windowed;
+            if (!GamePaths.Isolated) CriticalMass.Runtime.Menu.GameSettings.RememberFullScreen(full);   // never the owner's prefs from a -dataDir run
+            Debug.Log($"[CM.Governor] window mode changed outside the game ({now}): Display setting stored as {(full ? "full screen" : "windowed")}");
+            if (full) return;
+            (int w, int h) = FramePolicy.WindowAfterExternalToggle(Screen.width, Screen.height, Display.main.systemWidth, Display.main.systemHeight);
+            if (w > 0 && h > 0) RequestWindow(w, h, FullScreenMode.Windowed);
+        }
+
         void ReadDisplay()
         {
             _seenW = Screen.width;
@@ -420,13 +444,19 @@ namespace CriticalMass.Runtime.Game
                     _guard.Reset();
                 }
                 UpdateThermal();
+                WatchExternalModeChange();
             }
 
             if (_pendingWindow.HasValue && WindowDebounce.TryFire(Time.realtimeSinceStartupAsDouble))
             {
                 (int w, int h, FullScreenMode mode) = _pendingWindow.Value;
                 _pendingWindow = null;
-                if (w != Screen.width || h != Screen.height || mode != Screen.fullScreenMode) Screen.SetResolution(w, h, mode);
+                if (w != Screen.width || h != Screen.height || mode != Screen.fullScreenMode)
+                {
+                    Screen.SetResolution(w, h, mode);
+                    _requestedMode = mode;
+                    _requestedAt = Time.realtimeSinceStartupAsDouble;
+                }
             }
 
             AutoplayArgs.Options o = AutoplayArgs.Current;

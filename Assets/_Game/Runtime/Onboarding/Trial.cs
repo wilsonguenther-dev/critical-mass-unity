@@ -53,7 +53,13 @@ namespace CriticalMass.Runtime.Onboarding
         /// Starts the guided match now: 5v5 at 1x on the running game (TrialMatch), then the steps. Replayable at any time
         /// ("How to play"). team/cls: null = Azure Warrior (or the class the current world's human plays).
         /// </summary>
-        public static bool Start(TeamId? team = null, ClassId? cls = null)
+        public static bool Start(TeamId? team = null, ClassId? cls = null) => Start(team, cls, Steps, null);
+
+        /// <summary>
+        /// Creator acceptance: starts a guided match with its own step list (the CREATOR'S TOUR) and an optional hook that
+        /// edits the new match's request and config before the restart (passive bots, the tour's egg rules).
+        /// </summary>
+        public static bool Start(TeamId? team, ClassId? cls, TrialStep[] steps, Action<GameConfig, TrialMatchRequest> tune)
         {
             SimDriverBehaviour driver = UnityEngine.Object.FindAnyObjectByType<SimDriverBehaviour>();
             if (driver == null || driver.World == null) return false;
@@ -66,12 +72,14 @@ namespace CriticalMass.Runtime.Onboarding
 
             TeamId t = team ?? driver.World.Opts.HumanTeam;
             ClassId c = cls ?? driver.World.Opts.HumanClass;
-            TrialMatch.Start(driver, TrialMatchRequest.Trial(driver.Config, t, c));
+            TrialMatchRequest req = TrialMatchRequest.Trial(driver.Config, t, c);
+            tune?.Invoke(driver.Config, req);
+            TrialMatch.Start(driver, req);
 
             TrialGuide g = host.AddComponent<TrialGuide>();
             g.Driver = driver;
             Guide = g;
-            g.Begin(Steps);
+            g.Begin(steps ?? Steps);
             Started?.Invoke();
             return true;
         }
@@ -88,6 +96,8 @@ namespace CriticalMass.Runtime.Onboarding
         /// <summary>Shows the first-launch question now (the menu can call it; the installer calls it once).</summary>
         /// <summary>A guided match asked for from the menus; the next Boot build's match starts it (TrialBoot).</summary>
         internal static bool PendingStart;
+        /// <summary>Creator acceptance: the pending start is the CREATOR'S TOUR (CreatorsTour.Begin), not the first match.</summary>
+        internal static bool PendingTour;
 
         /// <summary>
         /// "How to play" in the main menu and the pause menu (DG-01's [TutorialStart]). In a match it starts in place; from the
@@ -156,7 +166,12 @@ namespace CriticalMass.Runtime.Onboarding
                 SimDriverBehaviour d = GetComponent<SimDriverBehaviour>();
                 if (d == null || d.World == null) return;
                 Trial.PendingStart = false;
-                Trial.Start();
+                if (Trial.PendingTour)
+                {
+                    Trial.PendingTour = false;
+                    CreatorsTour.Begin();
+                }
+                else Trial.Start();
                 enabled = false;
                 return;
             }
@@ -198,6 +213,7 @@ namespace CriticalMass.Runtime.Onboarding
         {
             // Installed by the DG-01 overlay registry ([GameOverlay] on TrialBoot); PendingStart never survives a play session.
             Trial.PendingStart = false;
+            Trial.PendingTour = false;
             SceneManager.sceneLoaded -= OnSceneLoaded;
         }
 

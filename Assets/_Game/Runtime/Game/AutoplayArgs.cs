@@ -34,7 +34,7 @@ namespace CriticalMass.Runtime.Game
     ///   -quality NAME|N          this quality level for the run (FrameGovernor; the perf report has quality_requested)
     ///   -debugHangSeconds N      TEST ONLY: the main thread sleeps N s once, 3 s after the title (proves the hang watchdog)
     ///   -seed N -simHashOut PATH sim-only run (no view): one 16v16 bot match on seed N, its end-state hash to PATH, quit (DG-66)
-    ///   -shots                   screenshots shot-title.png and shot-mid.png into the data folder (Windows graphics run)
+    ///   -shots                   screenshots shot-title.png, shot-start.png (3 s of match time) and shot-mid.png into the data folder (Windows graphics run)
     ///   -traceStates             record shader states for warm-up (ShaderWarmup); -exportReport, -diag: SupportReport
     /// DG-63: the crash log is written by CrashLog (bounded queue, one background writer, 20 lines per second, repeat keys
     /// with digits and hex as "#"); Exceptions and Errors both count. A stack in the sim or the match driver ends the match
@@ -126,6 +126,37 @@ namespace CriticalMass.Runtime.Game
             return o;
         }
 
+        /// <summary>-cameraYaw DEGREES (camera-orientation grabs, 2026-11-13): the gameplay camera's yaw for this run, in place of
+        /// RenderConfig.CameraYawDeg (45 = the map reads as a diamond, 0 = true north, bases left and right). Honoured only
+        /// together with an automation flag (AutomationWindow.AutomationFlags), so a person's launch never changes the
+        /// camera; normalised to [0, 360). Pure (EditMode tests: CameraYawFlagTests). The minimap stays baked at 45.</summary>
+        public static bool TryCameraYaw(string[] args, out double yawDeg)
+        {
+            yawDeg = 0;
+            if (args == null) return false;
+            bool automation = false, found = false;
+            for (int i = 0; i < args.Length; i++)
+            {
+                string a = (args[i] ?? "").Trim().ToLowerInvariant();
+                if (Array.IndexOf(AutomationWindow.AutomationFlags, a) >= 0) automation = true;
+                if (a == "-camerayaw" && i + 1 < args.Length && TryNum(args[i + 1], out double y))
+                {
+                    yawDeg = ((y % 360) + 360) % 360;
+                    found = true;
+                    i++;
+                }
+            }
+            return found && automation;
+        }
+
+        /// <summary>Applies -cameraYaw from this process's command line to a match config (player and editor alike).</summary>
+        public static void ApplyCameraYaw(GameConfig cfg)
+        {
+            if (cfg == null || !TryCameraYaw(Environment.GetCommandLineArgs(), out double y)) return;
+            cfg.Render.CameraYawDeg = y;
+            Debug.Log($"{LogTag} -cameraYaw: gameplay camera yaw {y.ToString("F1", CultureInfo.InvariantCulture)} deg (default 45)");
+        }
+
         static bool TryNum(string s, out double v) =>
             double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out v) && !double.IsNaN(v) && !double.IsInfinity(v);
 
@@ -171,7 +202,7 @@ namespace CriticalMass.Runtime.Game
         // ── autoplay state ──
         SimDriverBehaviour _driver;
         TitleScreen _title;
-        bool _titleSeen, _recording, _ended, _quitting, _timedOut, _hangDone, _shotTitle, _shotMid;
+        bool _titleSeen, _recording, _ended, _quitting, _timedOut, _hangDone, _shotTitle, _shotStart, _shotMid;
         double _titleAt = -1, _matchStart, _endAt, _firstTitleAt = -1;
         bool _costReset;
         int _exceptionsAtStart, _match = 1, _reloadFrame = -1;
@@ -442,6 +473,12 @@ namespace CriticalMass.Runtime.Game
                 ScreenCapture.CaptureScreenshot(Path.Combine(GamePaths.DataDir, "shot-title.png"));
             }
             if (!o.Autoplay && !o.QuitAfterMatch) return;
+            if (o.Shots && !_shotStart && _recording && _driver != null && _driver.World != null && _driver.World.Match.Time > 3)
+            {
+                // Match start: the moment the owner saw rings without bodies (2026-11-13); proves fighters draw from the first seconds.
+                _shotStart = true;
+                ScreenCapture.CaptureScreenshot(Path.Combine(GamePaths.DataDir, "shot-start.png"));
+            }
             if (o.Shots && !_shotMid && _recording && _driver != null && _driver.World != null && _driver.World.Match.Time > 60)
             {
                 _shotMid = true;
