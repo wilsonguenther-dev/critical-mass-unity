@@ -139,6 +139,7 @@ jobs:
           # The GL renderer Blender gets in this mode (a 1x1 offscreen draw forces the context).
           "${pre[@]}" ~/blender/blender -b --factory-startup --python-expr 'import gpu
           try:
+              if hasattr(gpu, "init"): gpu.init()
               o = gpu.types.GPUOffScreen(1, 1); o.free()
               print("CI_GL", gpu.platform.backend_type_get(), "|", gpu.platform.renderer_get(), "|", gpu.platform.version_get())
           except Exception as e:

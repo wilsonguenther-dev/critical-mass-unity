@@ -31,7 +31,7 @@ running=0
 pgrep -fl "$CI_MAC_PROCESS" 2>/dev/null | grep -F "$DEST/" >/dev/null && running=1
 if [[ $running -eq 1 ]]; then
   rm -rf "$DEST/$NAME.new"; ditto "$SRC" "$DEST/$NAME.new" || out "$DEST/$NAME.new" fail ',"reason":"copy failed"' 1
-  out "$DEST/$NAME.new" installed-as-new ",\"reason\":\"$CI_MAC_PROCESS is running from $DEST; quit it, then: mv $NAME $NAME.prev && mv $NAME.new $NAME\"" 2
+  out "$DEST/$NAME.new" installed-as-new ",\"reason\":\"$CI_MAC_PROCESS is running from $DEST; quit it, then in $DEST: rm -rf $NAME.prev && mv $NAME $NAME.prev && mv $NAME.new $NAME\"" 2
 fi
 if [[ -d "$DEST/$NAME" ]]; then rm -rf "$DEST/$NAME.prev"; mv "$DEST/$NAME" "$DEST/$NAME.prev"; fi
 ditto "$SRC" "$DEST/$NAME" || { [[ -d "$DEST/$NAME.prev" ]] && mv "$DEST/$NAME.prev" "$DEST/$NAME"; out "$DEST/$NAME" fail ',"reason":"copy failed; previous build restored"' 1; }

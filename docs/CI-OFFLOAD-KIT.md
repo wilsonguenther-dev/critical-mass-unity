@@ -111,6 +111,11 @@ and budget the minutes above.
 8. **Workflow files only dispatchable from the default branch.** A new `workflow_dispatch` file on a branch cannot be
    started by hand until it is merged.
 
+9. **The 10 GB cache cap versus a 1.4 GB Library.** A Unity Library cache is about 1.4 GB, so the repository holds about
+   seven. Workflows that save one cache per commit and per branch evict everyone's caches within the hour (on 2026-11-13 a
+   main-scope cache saved at 19:47 UTC was gone before 20:10). The kit saves one Library per target, package set and UTC
+   day, in the default branch's scope only (it is dispatched from there), so it saves at most once a day per target.
+
 ## Extracting the kit into its own repository later
 
 Move the two `reusable-*.yml` files into a repo such as `<owner>/ci-offload-kit` under `.github/workflows/`, tag it
