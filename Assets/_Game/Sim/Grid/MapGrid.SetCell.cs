@@ -4,7 +4,7 @@ namespace CriticalMass.Sim.Grid
 {
     public static partial class MapGrid
     {
-        /// <summary>Change one cell: GridVersion bumps on every change, WallVersion unless the change is a barricade swap.</summary>
+        /// <summary>Change one cell: GridVersion bumps on every change, WallVersion (and WallChangeTick, CM-30) unless the change is a barricade swap.</summary>
         public static void SetCell(World w, int cx, int cz, byte type)
         {
             MapDef map = w.Map;
@@ -17,7 +17,7 @@ namespace CriticalMass.Sim.Grid
             if (old != Cell.Barricade && type != Cell.Barricade)
             {
                 w.WallVersion++;
-                // ITEM CM-30: added by its owner (w.WallChangeTick = w.Tick: terraform's rate cap keys on the last field-invalidating change)
+                w.WallChangeTick = w.Tick; // CM-30: terraform's rate cap keys on the last field-invalidating change
             }
         }
     }

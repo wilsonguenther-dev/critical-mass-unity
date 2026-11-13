@@ -20,6 +20,9 @@ namespace CriticalMass.Sim.Core
     /// <summary>Match winner (browser TeamId | "draw" | null; None = null).</summary>
     public enum MatchResult { None, Azure, Crimson, Draw }
 
+    /// <summary>DG-09: what a miner's F press does (U-053): dig into the carry, or place from it. Never compared by integer value.</summary>
+    public enum TerraformMode { Dig, Place }
+
     /// <summary>Resource node kind (browser ResourceNode.kind).</summary>
     public enum NodeKind { Biomass, Corruption }
 
@@ -46,8 +49,23 @@ namespace CriticalMass.Sim.Core
         /// <summary>CM-28: the berserk lock was set before the hatch, raised once per match: (X, Z) = the shrine, Value = instability.</summary>
         BerserkLocked,
         Ability,
-        // ITEM CM-30: added by its owner (Terraform)
-        // ITEM CM-31: added by its owner (Topple)
+        /// <summary>
+        /// CM-30 miner dig / place, one per attempt: A = miner, B = cell index (-1 = none), (X, Z) = the cell centre (the aim
+        /// point when there is no cell), Value = Terraform.Dug / Terraform.Placed or a negative Terraform.Refused* code.
+        /// </summary>
+        Terraform,
+        /// <summary>
+        /// CM-31 a decoration starts to fall (the grid changes this step; the view animates Topple.FallTicks): A = attacker
+        /// (-1 = none), B = decoration index, (X, Z) = base cell centre, Value = Topple.Ramp / Topple.Block or a negative
+        /// Topple.Refused* code (it did not fall).
+        /// </summary>
+        Topple,
+        /// <summary>DG-09: a swing chipped a standing decoration: A = attacker, B = decoration, (X, Z) = base cell centre, Value = hits left.</summary>
+        ToppleHit,
+        /// <summary>DG-09: a fallen decoration finished falling (Topple.FallTicks after its Topple event): B = decoration, (X, Z) = the far end of its footprint, Value = mode.</summary>
+        ToppleDown,
+        /// <summary>DG-09 fall rule: a grounded actor lost the ground under its centre: A = actor, B = cell fallen into, (X, Z) = where it climbs out, Value = get-up seconds.</summary>
+        Fall,
         // ITEM CM-84: added by its owner (ClassSwitch, ports CM-54)
         // ITEM CM-37: added by its owner (Heal)
         MatchEnd,

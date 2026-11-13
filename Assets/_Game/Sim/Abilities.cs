@@ -6,7 +6,8 @@ namespace CriticalMass.Sim.Core
 {
     /// <summary>
     /// Class abilities (CM-05, port of src/sim/abilities.ts on 09e0904). Runs first in SimStep.Step, before movement;
-    /// combat then ticks this step's timers once. Miner wall break is part of the miner's basic attack (Combat).
+    /// combat then ticks this step's timers once. Miner wall break is part of the miner's basic attack (Combat). Then
+    /// Terraform.TerraformSystem (CM-30): miner dig / place on InputFrame.Terraform, independent of AbilityCd.
     /// Allocation-free: static scratch only.
     /// </summary>
     public static class Abilities
@@ -114,7 +115,8 @@ namespace CriticalMass.Sim.Core
                 // CM-56: builder has no Space cast yet (CM-39 upgrade); an explicit miner check keeps it from casting a
                 // barricade that Barricades would refuse for a non-miner.
             }
-            // ITEM CM-30: added by its owner (miner dig / place on InputFrame.Terraform)
+            // CM-30: miner dig / place (InputFrame.Terraform, its own key, so Space stays the barricade). DG-09: and the mode switch.
+            Terraform.TerraformSystem(w);
             // ITEM CM-38: added by its owner (TNT throw on F)
         }
 

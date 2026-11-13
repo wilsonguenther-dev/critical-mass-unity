@@ -902,3 +902,36 @@ bridges). Max reviews each pull request afterwards and may take any item back. T
 ("the loop never touches a Max-owned item"); U-012's split of mechanics to Max no longer binds the loop. Max is not
 contacted by the loop about the change.
 **Status.** Decided; MAX-ITEMS.md and `loop/README.md` section 1 state it.
+
+## U-053 Dig, place and knock-down as built in DG-09: a dig / place mode, a three-block carry and a fall rule (2026-11-13T00:45:03Z)
+
+**Source.** Travis, "What Demo needs" (2026-11-12 email): "Ground removable and placeable by miners" and "I have an idea
+for some decoration structures to be able to knock down. Knock it down one direction, ramp to another area. Knock it down
+a different direction, path block. (it doesn't need to be fancy, just enough to show the versatility)". The DG-09 brief
+(rules lane, from the orchestrator) asks that F digs or places and that the wheel or LB / RB switches the mode, and that
+falling into dug holes is handled.
+**Ported as is (browser 09e0904, D-059, D-065).** `src/sim/terraform.ts` and `src/sim/topple.ts` rule for rule: the
+keep-outs, the "nobody under it" occupancy rule, the route guard (pads to hill, no new shrine cut), the rate cap (30-tick
+team cooldown, 15-tick world gap after any wall change, `World.WallChangeTick` stamped by `MapGrid.SetCell`), the two
+mirrored pillars (3 swings by any class, away from the attacker, ramp = Void to Bridge, block = walkable to Wall, 4 x 3
+footprint, refused while anyone stands in a wall cell). Oracle bots never dig or place, so the Unity bots do not either;
+they knock pillars over only as the oracle's do, when a melee swing happens to reach one.
+**Decided (not in the browser).**
+1. Mode. Each miner has a dig / place mode (`World.Terraform.Mode`). F digs in Dig mode and places in Place mode;
+   `InputFrame.TerraformSwitch` (mouse wheel notch, LB or RB, edge-latched by the human input layer, read and cleared by
+   the sim) flips it. A dig that fills the carry switches to Place, a place that empties it switches to Dig. This
+   supersedes U-007's "no dig / place mode" and U-023's "bound but unread" for the switch row, at the brief's request.
+2. Carry. `MinerTerraform.CarryMax` = 3 [guess], so the switch has something to choose (dig a short trench, then fill a
+   three-cell gap). CarryMax 1 replays the browser exactly (dig, place, dig...); the ported tests run with it.
+3. Fall rule. A grounded actor that has stood unsupported for more than the DG-02 coyote window (3 ticks) with no walkable
+   cell under its centre falls in and climbs out: it moves to the nearest cell centre within 6 rings
+   (`MinerTerraform.FallSearchRings`, [guess]) where its body fits, or to its pad spawn point if none, with zero velocity and
+   the knock-down get-up (`Respawn.StandUpSeconds`), and no damage (bible p13, "no accidental fall deaths"). A body corner
+   over a fresh hole, or a diagonal bridge deck, is not a fall. With the ported rules nobody stands where ground is removed
+   (digs and blocks are refused under actors), so in play this catches a jump that returns to a takeoff point dug while
+   airborne, and later craters (DG-22 TNT).
+4. Events. `Terraform` (dug / placed / refused) and `Topple` (falling: ramp / block / refused) as in the browser, plus
+   `ToppleHit` (each counted swing, value = hits left), `ToppleDown` (FallTicks after the fall, at the footprint's far end)
+   and `Fall` (where the actor climbs out), all with positions, for the effects and sound items.
+**Status.** Built in DG-09 (draft PR, stacked on DG-02 #19). Max reviews; the owner can drop the mode (set CarryMax 1 and
+unbind the switch) without touching the rules.

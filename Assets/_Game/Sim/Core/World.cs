@@ -28,6 +28,30 @@ namespace CriticalMass.Sim.Core
         public double HomeZ;
     }
 
+    /// <summary>CM-30 miner dig / place state (browser TerraformState), per-actor arrays at ActorCapacity.</summary>
+    public sealed class TerraformState
+    {
+        /// <summary>Blocks each actor carries (0 = empty-handed; at most MinerTerraform.CarryMax, DG-09).</summary>
+        public byte[] Carried;
+        /// <summary>InputFrame.Terraform as it was last step (1 = held), for the rising edge.</summary>
+        public byte[] PrevPressed;
+        /// <summary>World.Tick from which each team may change terrain again, indexed by (int)TeamId.</summary>
+        public int[] TeamReadyTick;
+        /// <summary>DG-09 (U-053): each actor's dig / place mode (0 = Dig, 1 = Place; see TerraformMode).</summary>
+        public byte[] Mode;
+    }
+
+    /// <summary>CM-31 knock-down decoration state (browser ToppleState), one slot per map decoration.</summary>
+    public sealed class ToppleState
+    {
+        /// <summary>Swings left before the piece falls (HitsToTopple standing; 0 once fallen).</summary>
+        public byte[] Hp;
+        /// <summary>Topple.Standing (0), Topple.Ramp (1) or Topple.Block (2).</summary>
+        public byte[] Fallen;
+        /// <summary>World.Tick the piece fell (the view animates the fall over Topple.FallTicks).</summary>
+        public int[] FallTick;
+    }
+
     /// <summary>The whole simulation state; per-actor arrays are allocated once at ActorCapacity and reused by ResetWorld.</summary>
     public sealed class World
     {
@@ -40,8 +64,12 @@ namespace CriticalMass.Sim.Core
         public int GridVersion;
         /// <summary>Bumps only on non-barricade grid changes (breakable walls; bot flow fields watch it).</summary>
         public int WallVersion;
-        // ITEM CM-30: added by its owner (WallChangeTick: tick of the last setCell that bumped WallVersion; Terraform: TerraformState)
-        // ITEM CM-31: added by its owner (Topple: ToppleState, one slot per map decoration)
+        /// <summary>CM-30: World.Tick of the last SetCell that bumped WallVersion (wall breaks, terraforming, topples); NeverTick after a (re)start.</summary>
+        public int WallChangeTick;
+        /// <summary>CM-30: miner dig / place state.</summary>
+        public TerraformState Terraform;
+        /// <summary>CM-31: knock-down decoration state, one slot per map decoration.</summary>
+        public ToppleState Topple;
         /// <summary>Bumps on every ResetWorld. Views must drop cached per-match state when it changes.</summary>
         public int Epoch;
         public int Tick;
@@ -89,7 +117,8 @@ namespace CriticalMass.Sim.Core
             return 2 * c.TeamSizeMax * (int)c.Abilities.MinerBarricade.MaxActivePerMiner;
         }
 
-        // ITEM CM-30: added by its owner (NEVER_TICK = -1_000_000, the WallChangeTick after a (re)start)
+        /// <summary>CM-30 browser NEVER_TICK: the WallChangeTick after a (re)start (far in the past).</summary>
+        public const int NeverTick = -1_000_000;
 
         /// <summary>Golden-angle spawn spiral around the team pad.</summary>
         private const double SpawnAngleStep = 2.39996;
@@ -279,8 +308,17 @@ namespace CriticalMass.Sim.Core
             world.Tick = 0;
             world.ActorCount = 2 * n;
             world.EventHead = 0;
-            // ITEM CM-30: added by its owner (WallChangeTick = NEVER_TICK; Terraform.Carried, PrevPressed, TeamReadyTick cleared)
-            // ITEM CM-31: added by its owner (Topple.Hp filled with HitsToTopple; Topple.Fallen, FallTick cleared)
+            // CM-30: no wall change yet; every carry, edge and team cooldown cleared (DG-09: every mode back to Dig).
+            world.WallChangeTick = NeverTick;
+            Array.Clear(world.Terraform.Carried, 0, world.Terraform.Carried.Length);
+            Array.Clear(world.Terraform.PrevPressed, 0, world.Terraform.PrevPressed.Length);
+            Array.Clear(world.Terraform.Mode, 0, world.Terraform.Mode.Length);
+            world.Terraform.TeamReadyTick[0] = 0;
+            world.Terraform.TeamReadyTick[1] = 0;
+            // CM-31: every decoration stands again (PaintSkybreakBasin restores the cells a topple changed).
+            Array.Fill(world.Topple.Hp, (byte)cfg.Abilities.Topple.HitsToTopple);
+            Array.Clear(world.Topple.Fallen, 0, world.Topple.Fallen.Length);
+            Array.Clear(world.Topple.FallTick, 0, world.Topple.FallTick.Length);
 
             if (RosterScratch.Length < cfg.TeamSizeMax) RosterScratch = new ClassId[cfg.TeamSizeMax];
 
@@ -478,6 +516,7 @@ namespace CriticalMass.Sim.Core
             f.ClassPick = -1;
             f.Terraform = false;
             f.Jump = false;
+            f.TerraformSwitch = false;
         }
 
         /// <summary>Build a world for opts: a fresh Skybreak Basin map and every buffer allocated at capacity.</summary>
@@ -501,6 +540,7 @@ namespace CriticalMass.Sim.Core
             for (int i = 0; i < nodeCount; i++)
                 nodes[i] = new ResourceNode { Id = i, Kind = NodeKind.Biomass, X = 0, Z = 0, Charges = 0, MaxCharges = 0, RegrowIn = 0 };
             int barricadeCap = BarricadeCapacity(cfg);
+            int decorationCount = map.Decorations != null ? map.Decorations.Length : 0;
             var barricades = new Barricade[barricadeCap];
             for (int i = 0; i < barricadeCap; i++)
                 barricades[i] = new Barricade { Active = false, Owner = -1, Team = TeamId.Azure, Cx = -1, Cz = -1, Hp = 0, Ttl = 0, PrevCell = 0 };
@@ -523,8 +563,20 @@ namespace CriticalMass.Sim.Core
                 Map = map,
                 GridVersion = 0,
                 WallVersion = 0,
-                // ITEM CM-30: added by its owner (WallChangeTick = NEVER_TICK; Terraform: Carried, PrevPressed byte[cap], TeamReadyTick 0/0)
-                // ITEM CM-31: added by its owner (Topple: Hp, Fallen byte[decorations], FallTick int[decorations])
+                WallChangeTick = NeverTick,
+                Terraform = new TerraformState
+                {
+                    Carried = new byte[cap],
+                    PrevPressed = new byte[cap],
+                    TeamReadyTick = new int[2],
+                    Mode = new byte[cap],
+                },
+                Topple = new ToppleState
+                {
+                    Hp = new byte[decorationCount],
+                    Fallen = new byte[decorationCount],
+                    FallTick = new int[decorationCount],
+                },
                 Epoch = 0,
                 Tick = 0,
                 ActorCount = 0,

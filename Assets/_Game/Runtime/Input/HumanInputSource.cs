@@ -45,6 +45,9 @@ namespace CriticalMass.Runtime.Input
         /// "back" while open). Null = every press toggles State.Paused.
         /// </summary>
         public Func<bool> PauseHandler;
+        /// <summary>DG-09: the SwitchDigPlace axis (wheel scroll/y, LB negative / RB positive), edge-detected each frame.</summary>
+        private InputAction _switchDigPlace;
+        private bool _switchWasActive;
         private readonly InputAction[] _actions = new InputAction[ButtonActions.Length];
         private readonly Action<InputAction.CallbackContext>[] _started = new Action<InputAction.CallbackContext>[ButtonActions.Length];
         private readonly Action<InputAction.CallbackContext>[] _canceled = new Action<InputAction.CallbackContext>[ButtonActions.Length];
@@ -57,6 +60,8 @@ namespace CriticalMass.Runtime.Input
             _move = map["Move"];
             _point = map["Point"];
             _aim = map.FindAction("Aim", false);
+            _switchDigPlace = map.FindAction("SwitchDigPlace");
+            _switchWasActive = false;
             for (int i = 0; i < ButtonActions.Length; i++)
             {
                 B b = Buttons[i];
@@ -89,6 +94,7 @@ namespace CriticalMass.Runtime.Input
             _move = null;
             _point = null;
             _aim = null;
+            _switchDigPlace = null;
         }
 
         private void Update()
@@ -96,6 +102,14 @@ namespace CriticalMass.Runtime.Input
             if (_map == null) return;
             var m = _move.ReadValue<Vector2>();
             State.SetMove(m.x, m.y);
+            // DG-09 (U-053): a wheel notch or a bumper press flips the miner's dig / place mode. The axis goes non-zero for a
+            // scroll frame or while a bumper is held; only the rising edge counts, so a held bumper switches once.
+            if (_switchDigPlace != null)
+            {
+                bool active = Mathf.Abs(_switchDigPlace.ReadValue<float>()) > 0.5f;
+                if (active && !_switchWasActive) State.SwitchDigPlace();
+                _switchWasActive = active;
+            }
 
             // Which device aims: the one used last (mouse movement or click vs a controller stick).
             ControlBindings.Sample();
