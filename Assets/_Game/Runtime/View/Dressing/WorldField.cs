@@ -82,6 +82,13 @@ namespace CriticalMass.Runtime.View.Dressing
         public static Texture2D Bake(WorldPlan plan)
         {
             Color[] px = Compute(plan, out int cols, out int rows);
+            return FromPixels(px, cols, rows);
+        }
+
+        /// <summary>perf-smooth-1: the texture for pixels Compute made (Compute is pure and runs on a worker thread during the
+        /// match-start build; only this part touches the engine).</summary>
+        public static Texture2D FromPixels(Color[] px, int cols, int rows)
+        {
             var tex = new Texture2D(cols, rows, TextureFormat.RGBAHalf, false, true)
             {
                 name = "WorldField", wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear,

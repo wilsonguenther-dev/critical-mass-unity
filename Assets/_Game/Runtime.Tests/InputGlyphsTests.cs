@@ -33,6 +33,15 @@ namespace CriticalMass.Runtime.Tests
         [Test]
         public void KeyboardDefaultsAreAMouseWithTheRightButtonLitAndKeycaps()
         {
+            // controls-1: these are the keyboard-and-mouse prompts; keyboard-only prompts are in ControlSchemesTests.
+            bool kbOnly = ControlBindings.KeyboardOnly;
+            ControlBindings.SetKeyboardOnly(false);
+            try { MouseSchemeDefaults(); }
+            finally { ControlBindings.SetKeyboardOnly(kbOnly); }
+        }
+
+        static void MouseSchemeDefaults()
+        {
             GlyphSpec attack = InputGlyphs.ForAction("Attack", ControlDevice.KeyboardMouse);
             Assert.AreEqual(GlyphKind.Mouse, attack.Kind);
             Assert.AreEqual(GlyphMark.Left, attack.Mark);

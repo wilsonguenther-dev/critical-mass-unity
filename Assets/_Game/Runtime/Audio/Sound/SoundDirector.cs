@@ -544,7 +544,7 @@ namespace CriticalMass.Runtime.Audio.Sound
 
         // ------------------------------------------------------------------ per frame (mixing only: no allocation)
 
-        private void LateUpdate() { long c = CriticalMass.Runtime.Game.FrameCost.Begin(); LateUpdateBody(); CriticalMass.Runtime.Game.FrameCost.End(CriticalMass.Runtime.Game.FrameCost.Slot.Sound, c); }
+        private void LateUpdate() { var c = CriticalMass.Runtime.Game.FrameCost.Enter(); LateUpdateBody(); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.Sound, c); }
 
         private void LateUpdateBody()
         {

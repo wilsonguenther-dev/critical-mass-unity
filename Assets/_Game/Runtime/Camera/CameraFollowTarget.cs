@@ -63,7 +63,9 @@ namespace CriticalMass.Runtime.Camera
         /// <summary>Back to following the human; the spring flies home.</summary>
         public void ClearOverride() => _override = false;
 
-        private void LateUpdate()
+        private void LateUpdate() { var cost = CriticalMass.Runtime.Game.FrameCost.Enter(); LateUpdateCost(); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.Camera, cost); }
+
+        void LateUpdateCost()
         {
             if (Driver == null) return;
             World w = Driver.World;

@@ -121,12 +121,15 @@ namespace CriticalMass.Runtime.Onboarding
             bool single = true;
             for (int k = 0; k < MoveParts.Length; k++)
             {
-                int bi = ControlBindings.FindBindingIndex(a, new RebindSlot("Move", ControlDevice.KeyboardMouse, 0, "WASD", MoveParts[k]));
+                // controls-1: the composite of the hand position in use (W A S D, or the arrows).
+                string comp = ControlBindings.HandName(ControlBindings.Hand);
+                int bi = ControlBindings.FindBindingIndex(a, new RebindSlot("Move", ControlDevice.KeyboardMouse, 0, comp, MoveParts[k]));
                 string key = bi >= 0 ? ControlBindings.Display(a, bi) : "-";
                 if (key == "-" || key.Length == 0) return "WASD";
                 keys[k] = key;
                 if (key.Length > 1) single = false;
             }
+            if (ControlBindings.Hand == KeyboardHand.Arrows && string.Join(" ", keys) == "UP LEFT DOWN RIGHT") return "ARROWS";
             // W A S D order (up, left, down, right) reads as "WASD"; multi-letter keys get spaces.
             return single ? string.Concat(keys) : string.Join(" ", keys);
         }

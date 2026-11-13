@@ -83,6 +83,23 @@ namespace CriticalMass.Runtime.Game
         /// <summary>The settings page saved a frame setting: re-read them on the next frame.</summary>
         public static void Reapply() => _reapply = true;
 
+        static int _forceLevel = -1;
+
+        /// <summary>perf-smooth-1 measurement only (autoplay -autoplayPacing): null or "rule" = the frame cap rule; "display" =
+        /// vsync every refresh, no cap; "timed60" = vsync off, a timed 60.</summary>
+        public static string PacingOverride;
+
+        /// <summary>perf-smooth-1 (autoplay -autoplayQualities): run the next match at this level, as -quality NAME would.</summary>
+        public static void ForceRunQuality(string name)
+        {
+            int l = QualityArg(new[] { "-quality", name }, QualitySettings.names);
+            if (l < 0) return;
+            _forceLevel = l;
+            _reapply = true;
+            if (l != QualitySettings.GetQualityLevel()) QualitySettings.SetQualityLevel(l, true);
+            RenderTier.Set(l);   // now, so the next scene's world builds at this tier
+        }
+
         /// <summary>A short line at the top of the screen for a few seconds ("Settings could not be saved").</summary>
         public static void ShowNotice(string text, float seconds = 6f)
         {
@@ -374,7 +391,15 @@ namespace CriticalMass.Runtime.Game
                 _inputPaused = _input != null && _input.State != null && _input.State.Paused;
                 _onBattery = SystemInfo.batteryStatus == BatteryStatus.Discharging;
                 SessionKeeper.Phase = _title ? "title" : _inputPaused ? "paused" : MenuOpen ? "menu" : "match";
-                if (reapplied)
+                if (reapplied && _forceLevel >= 0)
+                {
+                    _baseLevel = _forceLevel;
+                    _chosenScale = _forceLevel <= FramePolicy.LevelLow ? LowRenderScale : 1f;
+                    RequestedQuality = QualitySettings.names[_forceLevel];
+                    SetLevel(_forceLevel);
+                    _forceLevel = -1;
+                }
+                else if (reapplied)
                 {
                     int q = QualitySettings.GetQualityLevel();
                     if (q != _baseLevel && !_thermalDropped)
@@ -421,13 +446,20 @@ namespace CriticalMass.Runtime.Game
                 cap = background ? FramePolicy.BackgroundCap(fg, _prefBg != 0) : fg;
                 double hz = Screen.currentResolution.refreshRateRatio.value;
                 (vsync, target) = _guard.Settings(cap, hz);
-                if (_prefVSync == 0 || (background && _prefBg != 0))
+                if (cap == FramePolicy.Unlimited)
+                {
+                    vsync = 0;   // perf-smooth-1: the player chose UNLIMITED: vsync off, no target
+                    target = -1;
+                }
+                else if (_prefVSync == 0 || (background && _prefBg != 0))
                 {
                     vsync = 0;   // vsync off by choice (or the save-power cap): still capped, never unbounded
                     target = cap > 0 ? cap : (double.IsNaN(hz) || hz < 20 ? 60 : (int)Math.Round(hz));
                 }
                 _guard.Feed(dt, cap, vsync > 0);
             }
+            if (o.Autoplay && PacingOverride == "display") { vsync = 1; target = -1; }
+            else if (o.Autoplay && PacingOverride == "timed60") { vsync = 0; target = 60; }
             if (QualitySettings.vSyncCount != vsync) QualitySettings.vSyncCount = vsync;
             if (Application.targetFrameRate != target) Application.targetFrameRate = target;
             AppliedVSync = vsync;
