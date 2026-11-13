@@ -1,19 +1,30 @@
 {
- "schema": "cm.story.motioncomic/1",
+ "schema": "cm.story.motioncomic/2",
  "stageW": 1920,
  "stageH": 1080,
  "letterbox": 0.11,
- "skipPromptAfter": 1.0,
+ "skipPromptAfter": 1.5,
  "outroSeconds": 0.5,
  "cues": [
   {
    "id": "whoosh",
+   "synth": "whoosh_heavy",
+   "variants": 2,
    "files": [
     "knifeSlice",
     "knifeSlice2"
    ],
-   "pitch": 0.5,
-   "gain": 0.7
+   "pitch": 0.8,
+   "gain": 0.55
+  },
+  {
+   "id": "skycrack",
+   "synth": "blast_far",
+   "files": [
+    "impactPlate_heavy_001"
+   ],
+   "pitch": 0.75,
+   "gain": 0.9
   },
   {
    "id": "thunder",
@@ -21,16 +32,36 @@
     "impactPlate_heavy_001"
    ],
    "pitch": 0.45,
-   "gain": 0.9
+   "gain": 0.7
   },
   {
    "id": "impact",
+   "synth": "land_heavy",
    "files": [
     "impactWood_heavy_000",
     "impactWood_heavy_001"
    ],
-   "pitch": 0.6,
-   "gain": 0.9
+   "pitch": 0.7,
+   "gain": 0.85
+  },
+  {
+   "id": "eggland",
+   "synth": "blast_near",
+   "files": [
+    "impactWood_heavy_000"
+   ],
+   "pitch": 0.85,
+   "gain": 0.8
+  },
+  {
+   "id": "debris",
+   "synth": "debris",
+   "files": [
+    "impactMining_000",
+    "impactMining_001"
+   ],
+   "pitch": 0.9,
+   "gain": 0.5
   },
   {
    "id": "rumble",
@@ -39,7 +70,7 @@
     "impactSoft_heavy_001"
    ],
    "pitch": 0.45,
-   "gain": 0.8
+   "gain": 0.7
   },
   {
    "id": "hit",
@@ -48,7 +79,7 @@
     "impactPunch_heavy_001"
    ],
    "pitch": 0.8,
-   "gain": 0.75
+   "gain": 0.7
   },
   {
    "id": "clang",
@@ -57,16 +88,54 @@
     "impactPlate_medium_001"
    ],
    "pitch": 0.85,
-   "gain": 0.6
+   "gain": 0.55
+  },
+  {
+   "id": "hatch",
+   "synth": "kaiju_hatch",
+   "files": [
+    "impactMining_002"
+   ],
+   "pitch": 1.0,
+   "gain": 0.85
   },
   {
    "id": "roar",
+   "synth": "kaiju_roar",
+   "variants": 2,
    "files": [
     "impactPunch_heavy_002",
     "impactPlate_heavy_001"
    ],
-   "pitch": 0.5,
-   "gain": 1.0
+   "pitch": 1.0,
+   "gain": 0.95
+  },
+  {
+   "id": "slam",
+   "synth": "kaiju_slam",
+   "files": [
+    "impactWood_heavy_001"
+   ],
+   "pitch": 1.0,
+   "gain": 0.7
+  },
+  {
+   "id": "feed",
+   "synth": "egg_feed",
+   "files": [
+    "confirmation_003"
+   ],
+   "pitch": 1.0,
+   "gain": 0.6
+  },
+  {
+   "id": "corrupt",
+   "synth": "corrupt",
+   "files": [
+    "error_004"
+   ],
+   "pitch": 1.0,
+   "gain": 0.6
   },
   {
    "id": "bong",
@@ -74,7 +143,7 @@
     "bong_001"
    ],
    "pitch": 0.6,
-   "gain": 0.6
+   "gain": 0.5
   },
   {
    "id": "chime",
@@ -82,7 +151,7 @@
     "confirmation_002"
    ],
    "pitch": 0.9,
-   "gain": 0.5
+   "gain": 0.45
   }
  ],
  "sequences": [
@@ -169,9 +238,9 @@
  "shots": [
   {
    "id": "calm",
-   "seconds": 4.5,
-   "beat": "calm world: the Basin floats, quiet",
-   "boardAt": 2.7,
+   "seconds": 3.8,
+   "beat": "calm world: the Basin floats, then the storm rolls in",
+   "boardAt": 2.0,
    "layers": [
     {
      "tex": "sky_day",
@@ -192,6 +261,16 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": true,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": -4,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
@@ -202,16 +281,68 @@
        "r": 0,
        "b": 0,
        "ease": "inOutSine"
-      },
+      }
+     ]
+    },
+    {
+     "tex": "sky_storm",
+     "depth": 0.15,
+     "w": 2300,
+     "h": 0,
+     "flip": false,
+     "tint": "#FFFFFF",
+     "blur": "",
+     "from": 0,
+     "to": 999,
+     "frames": [],
+     "frameAt": 0,
+     "fps": 12,
+     "flicker": false,
+     "pulseHz": 0,
+     "pulseLo": 1,
+     "jitter": 0,
+     "jitterFrom": 0,
+     "jitterTo": 0,
+     "cover": false,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": -4,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
+     "keys": [
       {
-       "t": 4.5,
-       "x": -30,
+       "t": 0,
+       "x": 0,
        "y": 0,
        "s": 1,
-       "a": 1,
+       "a": 0,
        "r": 0,
        "b": 0,
        "ease": "inOutSine"
+      },
+      {
+       "t": 2.5,
+       "x": 0,
+       "y": 0,
+       "s": 1,
+       "a": 0,
+       "r": 0,
+       "b": 0,
+       "ease": "inOutSine"
+      },
+      {
+       "t": 3.8,
+       "x": 0,
+       "y": 0,
+       "s": 1,
+       "a": 0.6,
+       "r": 0,
+       "b": 0,
+       "ease": "inSine"
       }
      ]
     },
@@ -234,6 +365,16 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.15,
+     "bob": 6,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
@@ -246,9 +387,9 @@
        "ease": "inOutSine"
       },
       {
-       "t": 4.5,
-       "x": -40,
-       "y": -225,
+       "t": 3.8,
+       "x": 0,
+       "y": -238,
        "s": 1,
        "a": 1,
        "r": 0,
@@ -276,20 +417,20 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": -14,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
        "x": 0,
-       "y": -700,
-       "s": 1,
-       "a": 1,
-       "r": 0,
-       "b": 0,
-       "ease": "inOutSine"
-      },
-      {
-       "t": 4.5,
-       "x": -90,
        "y": -700,
        "s": 1,
        "a": 1,
@@ -318,6 +459,16 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
@@ -325,6 +476,16 @@
        "y": 0,
        "s": 1,
        "a": 0.45,
+       "r": 0,
+       "b": 0,
+       "ease": "inOutSine"
+      },
+      {
+       "t": 3.8,
+       "x": 0,
+       "y": 0,
+       "s": 1,
+       "a": 0.6,
        "r": 0,
        "b": 0,
        "ease": "inOutSine"
@@ -339,18 +500,18 @@
      "zx": 0,
      "zy": 0,
      "dolly": 1,
-     "x": 0,
+     "x": -40,
      "y": 0,
      "rot": 0,
      "ease": "inOutSine"
     },
     {
-     "t": 4.5,
+     "t": 3.8,
      "zoom": 1,
      "zx": 0,
      "zy": 0,
-     "dolly": 1.07,
-     "x": 0,
+     "dolly": 1.08,
+     "x": 30,
      "y": 10,
      "rot": 0,
      "ease": "inOutSine"
@@ -359,15 +520,16 @@
    "titles": [
     {
      "text": "LONG AGO",
-     "at": 1.1,
-     "out": 4.0,
+     "at": 0.6,
+     "out": 3.3,
      "size": 56,
      "color": "#F7F0E5",
      "x": 0,
      "y": 250,
      "font": "display",
      "track0": 44,
-     "track1": 18
+     "track1": 18,
+     "style": "rise"
     }
    ],
    "sub": {
@@ -376,7 +538,16 @@
     "out": 0
    },
    "vo": [],
-   "sfx": [],
+   "sfx": [
+    {
+     "cue": "rumble",
+     "at": 2.7
+    },
+    {
+     "cue": "whoosh",
+     "at": 3.5
+    }
+   ],
    "flash": [],
    "shake": [],
    "particles": [
@@ -384,11 +555,11 @@
      "tex": "mote",
      "color": "#F7F0E5",
      "t0": 0,
-     "t1": 4.5,
+     "t1": 3.8,
      "count": 18,
      "x": 0,
      "y": -100,
-     "sx": 1900,
+     "sx": 1600,
      "sy": 700,
      "vx": 6,
      "vy": 14,
@@ -412,13 +583,16 @@
      "v": 1,
      "ease": "outCubic"
     }
-   ]
+   ],
+   "trans": "cut",
+   "transDur": 0,
+   "camDrift": 5
   },
   {
    "id": "crack",
-   "seconds": 4.0,
-   "beat": "the sky cracks: snap zoom, white flash",
-   "boardAt": 2.2,
+   "seconds": 2.7,
+   "beat": "the sky cracks: anticipation, snap zoom, flash, debris",
+   "boardAt": 1.6,
    "layers": [
     {
      "tex": "sky_storm",
@@ -439,6 +613,16 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": true,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": -4,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
@@ -446,6 +630,78 @@
        "y": 0,
        "s": 1,
        "a": 1,
+       "r": 0,
+       "b": 0,
+       "ease": "inOutSine"
+      }
+     ]
+    },
+    {
+     "tex": "crack_glow",
+     "depth": 0.2,
+     "w": 3062.4,
+     "h": 0,
+     "flip": false,
+     "tint": "#FFFFFF",
+     "blur": "",
+     "from": 0,
+     "to": 999,
+     "frames": [],
+     "frameAt": 0,
+     "fps": 12,
+     "flicker": false,
+     "pulseHz": 0,
+     "pulseLo": 1,
+     "jitter": 0,
+     "jitterFrom": 0,
+     "jitterTo": 0,
+     "cover": false,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0.25,
+     "anchor": "",
+     "keys": [
+      {
+       "t": 0,
+       "x": 166,
+       "y": 19,
+       "s": 1,
+       "a": 0,
+       "r": 0,
+       "b": 0,
+       "ease": "inOutSine"
+      },
+      {
+       "t": 0.45,
+       "x": 166,
+       "y": 19,
+       "s": 1,
+       "a": 0,
+       "r": 0,
+       "b": 0,
+       "ease": "inOutSine"
+      },
+      {
+       "t": 0.6,
+       "x": 166,
+       "y": 19,
+       "s": 1,
+       "a": 0.6,
+       "r": 0,
+       "b": 0,
+       "ease": "outCubic"
+      },
+      {
+       "t": 2.7,
+       "x": 166,
+       "y": 19,
+       "s": 1,
+       "a": 0.3,
        "r": 0,
        "b": 0,
        "ease": "inOutSine"
@@ -478,6 +734,16 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
@@ -506,10 +772,20 @@
      "fps": 12,
      "flicker": false,
      "pulseHz": 1.3,
-     "pulseLo": 0.7,
+     "pulseLo": 0.75,
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0.2,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
@@ -532,7 +808,7 @@
        "ease": "inOutSine"
       },
       {
-       "t": 1.1,
+       "t": 1.0,
        "x": 166,
        "y": 19,
        "s": 1,
@@ -562,6 +838,16 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
@@ -584,11 +870,11 @@
        "ease": "inOutSine"
       },
       {
-       "t": 1.8,
+       "t": 1.6,
        "x": 166,
        "y": 19,
        "s": 1,
-       "a": 0.45,
+       "a": 0.5,
        "r": 0,
        "b": 0,
        "ease": "outCubic"
@@ -614,6 +900,16 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.15,
+     "bob": 6,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
@@ -626,9 +922,9 @@
        "ease": "inOutSine"
       },
       {
-       "t": 4.0,
+       "t": 2.7,
        "x": 0,
-       "y": -505,
+       "y": -510,
        "s": 1,
        "a": 1,
        "r": 0,
@@ -656,6 +952,16 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": -14,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
@@ -674,8 +980,8 @@
     {
      "t": 0,
      "zoom": 1,
-     "zx": 0,
-     "zy": 0,
+     "zx": 497,
+     "zy": 238,
      "dolly": 1,
      "x": 0,
      "y": 0,
@@ -683,10 +989,10 @@
      "ease": "inOutSine"
     },
     {
-     "t": 0.45,
-     "zoom": 1,
-     "zx": 0,
-     "zy": 0,
+     "t": 0.42,
+     "zoom": 0.985,
+     "zx": 497,
+     "zy": 238,
      "dolly": 1,
      "x": 0,
      "y": 0,
@@ -694,8 +1000,8 @@
      "ease": "inOutSine"
     },
     {
-     "t": 0.7,
-     "zoom": 1.08,
+     "t": 0.62,
+     "zoom": 1.1,
      "zx": 497,
      "zy": 238,
      "dolly": 1,
@@ -705,8 +1011,19 @@
      "ease": "outExpo"
     },
     {
-     "t": 4.0,
-     "zoom": 1.12,
+     "t": 0.95,
+     "zoom": 1.08,
+     "zx": 497,
+     "zy": 238,
+     "dolly": 1,
+     "x": 0,
+     "y": 0,
+     "rot": 0,
+     "ease": "outSine"
+    },
+    {
+     "t": 2.7,
+     "zoom": 1.11,
      "zx": 497,
      "zy": 238,
      "dolly": 1,
@@ -718,53 +1035,85 @@
    ],
    "titles": [],
    "sub": {
-    "text": "The sky cracked. And the land rose to meet it.",
-    "at": 0.6,
-    "out": 4.0
+    "text": "The sky cracked.",
+    "at": 1.1,
+    "out": 2.7
    },
    "vo": [
     {
      "clip": "CMVoice/story-card-1",
-     "at": 0.6
+     "at": 1.1
     }
    ],
    "sfx": [
     {
-     "cue": "whoosh",
-     "at": 0.25
+     "cue": "rumble",
+     "at": 0.0
+    },
+    {
+     "cue": "skycrack",
+     "at": 0.43
     },
     {
      "cue": "thunder",
-     "at": 0.42
+     "at": 0.47
+    },
+    {
+     "cue": "debris",
+     "at": 0.6
     }
    ],
    "flash": [
     {
      "t": 0.45,
-     "dur": 0.35,
-     "peak": 0.85,
+     "dur": 0.4,
+     "peak": 0.7,
      "color": "#F7F0E5"
     }
    ],
    "shake": [
     {
      "t": 0.45,
-     "dur": 0.8,
-     "amp": 22
+     "dur": 0.7,
+     "amp": 16
     }
    ],
-   "particles": [],
+   "particles": [
+    {
+     "tex": "ember",
+     "color": "#C9C2B4",
+     "t0": 0.45,
+     "t1": 0.6,
+     "count": 24,
+     "x": 497,
+     "y": 238,
+     "sx": 80,
+     "sy": 40,
+     "vx": 0,
+     "vy": 160,
+     "jx": 900,
+     "jy": 600,
+     "g": -520,
+     "life": 1.5,
+     "size": 18,
+     "loop": false,
+     "depth": 0.25
+    }
+   ],
    "bars": [
     {
      "t": 0,
      "v": 1,
      "ease": "linear"
     }
-   ]
+   ],
+   "trans": "cut",
+   "transDur": 0,
+   "camDrift": 5
   },
   {
    "id": "rise",
-   "seconds": 4.0,
+   "seconds": 3.6,
    "beat": "the land rises to meet it",
    "boardAt": 2.2,
    "layers": [
@@ -787,6 +1136,16 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": true,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": -4,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
@@ -819,6 +1178,16 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
@@ -851,6 +1220,16 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0.2,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
@@ -883,13 +1262,23 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
        "x": 166,
        "y": 19,
        "s": 1,
-       "a": 0.8,
+       "a": 0.7,
        "r": 0,
        "b": 0,
        "ease": "inOutSine"
@@ -915,6 +1304,16 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.15,
+     "bob": 6,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
@@ -927,19 +1326,19 @@
        "ease": "inOutSine"
       },
       {
-       "t": 1.6,
+       "t": 1.5,
        "x": 0,
-       "y": -230,
+       "y": -235,
        "s": 1,
        "a": 1,
        "r": 0,
        "b": 0,
-       "ease": "outBack"
+       "ease": "outBackSoft"
       },
       {
-       "t": 4.0,
+       "t": 3.6,
        "x": 0,
-       "y": -215,
+       "y": -222,
        "s": 1,
        "a": 1,
        "r": 0,
@@ -967,6 +1366,16 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": -14,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
@@ -979,9 +1388,9 @@
        "ease": "inOutSine"
       },
       {
-       "t": 1.6,
+       "t": 1.5,
        "x": 0,
-       "y": -740,
+       "y": -760,
        "s": 1,
        "a": 1,
        "r": 0,
@@ -1009,6 +1418,16 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
@@ -1023,7 +1442,7 @@
       {
        "t": 1.2,
        "x": 0,
-       "y": -420,
+       "y": -430,
        "s": 1,
        "a": 1,
        "r": 0,
@@ -1031,11 +1450,11 @@
        "ease": "outCubic"
       },
       {
-       "t": 4.0,
+       "t": 3.6,
        "x": 0,
-       "y": 900,
+       "y": 700,
        "s": 1,
-       "a": 0.6,
+       "a": 0.5,
        "r": 0,
        "b": 0,
        "ease": "inCubic"
@@ -1061,11 +1480,21 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
        "x": 830,
-       "y": -760,
+       "y": -800,
        "s": 1,
        "a": 1,
        "r": 0,
@@ -1073,9 +1502,9 @@
        "ease": "inOutSine"
       },
       {
-       "t": 0.9,
+       "t": 1.0,
        "x": 830,
-       "y": -360,
+       "y": -380,
        "s": 1,
        "a": 1,
        "r": 0,
@@ -1093,16 +1522,16 @@
      "zy": 0,
      "dolly": 1,
      "x": 0,
-     "y": 0,
+     "y": -30,
      "rot": 0,
      "ease": "inOutSine"
     },
     {
-     "t": 4.0,
+     "t": 3.6,
      "zoom": 1,
      "zx": 0,
      "zy": 0,
-     "dolly": 1.05,
+     "dolly": 1.06,
      "x": 0,
      "y": 30,
      "rot": 0,
@@ -1112,21 +1541,22 @@
    "titles": [
     {
      "text": "SKYBREAK BASIN",
-     "at": 1.7,
-     "out": 3.85,
+     "at": 1.85,
+     "out": 3.45,
      "size": 92,
      "color": "#F7F0E5",
      "x": 0,
-     "y": 230,
+     "y": 310,
      "font": "display",
      "track0": 48,
-     "track1": 12
+     "track1": 12,
+     "style": "pop"
     }
    ],
    "sub": {
-    "text": "",
-    "at": 0,
-    "out": 0
+    "text": "And the land rose to meet it.",
+    "at": 0.0,
+    "out": 1.9
    },
    "vo": [],
    "sfx": [
@@ -1137,14 +1567,23 @@
     {
      "cue": "impact",
      "at": 1.45
+    },
+    {
+     "cue": "debris",
+     "at": 1.5
     }
    ],
    "flash": [],
    "shake": [
     {
      "t": 0.0,
-     "dur": 1.8,
-     "amp": 10
+     "dur": 1.6,
+     "amp": 8
+    },
+    {
+     "t": 1.45,
+     "dur": 0.5,
+     "amp": 14
     }
    ],
    "particles": [
@@ -1156,7 +1595,7 @@
      "count": 30,
      "x": 0,
      "y": -380,
-     "sx": 1800,
+     "sx": 1600,
      "sy": 120,
      "vx": 0,
      "vy": 120,
@@ -1175,13 +1614,16 @@
      "v": 1,
      "ease": "linear"
     }
-   ]
+   ],
+   "trans": "cut",
+   "transDur": 0,
+   "camDrift": 5
   },
   {
    "id": "fall",
-   "seconds": 4.0,
+   "seconds": 3.4,
    "beat": "the egg falls through the crack",
-   "boardAt": 2.95,
+   "boardAt": 2.0,
    "layers": [
     {
      "tex": "sky_storm",
@@ -1202,6 +1644,16 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": true,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": -4,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
@@ -1234,6 +1686,16 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
@@ -1266,6 +1728,16 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0.25,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
@@ -1298,6 +1770,16 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.15,
+     "bob": 6,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
@@ -1330,6 +1812,16 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
@@ -1342,7 +1834,7 @@
        "ease": "inOutSine"
       },
       {
-       "t": 1.3,
+       "t": 0.3,
        "x": 0,
        "y": 0,
        "s": 1,
@@ -1352,27 +1844,27 @@
        "ease": "inOutSine"
       },
       {
-       "t": 1.6,
+       "t": 0.5,
        "x": 0,
        "y": 0,
        "s": 1,
-       "a": 0.75,
+       "a": 0.6,
        "r": 0,
        "b": 0,
        "ease": "inOutSine"
       },
       {
-       "t": 2.8,
+       "t": 1.35,
        "x": 0,
        "y": 0,
        "s": 1,
-       "a": 0.75,
+       "a": 0.6,
        "r": 0,
        "b": 0,
        "ease": "inOutSine"
       },
       {
-       "t": 2.9,
+       "t": 1.5,
        "x": 0,
        "y": 0,
        "s": 1,
@@ -1402,19 +1894,29 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0.32,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
        "x": 497,
        "y": 238,
-       "s": 0.4,
+       "s": 0.35,
        "a": 1,
        "r": -30,
        "b": 0,
        "ease": "inOutSine"
       },
       {
-       "t": 2.8,
+       "t": 1.5,
        "x": -40,
        "y": -140,
        "s": 1,
@@ -1424,7 +1926,17 @@
        "ease": "inExpo"
       },
       {
-       "t": 4.0,
+       "t": 1.62,
+       "x": -40,
+       "y": -128,
+       "s": 1,
+       "a": 1,
+       "r": 200,
+       "b": 0,
+       "ease": "outCubic"
+      },
+      {
+       "t": 1.9,
        "x": -40,
        "y": -140,
        "s": 1,
@@ -1454,19 +1966,29 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": true,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
        "x": 497,
        "y": 238,
-       "s": 0.4,
+       "s": 0.35,
        "a": 1,
        "r": -30,
        "b": 0,
        "ease": "inOutSine"
       },
       {
-       "t": 2.8,
+       "t": 1.5,
        "x": -40,
        "y": -140,
        "s": 1,
@@ -1476,7 +1998,17 @@
        "ease": "inExpo"
       },
       {
-       "t": 4.0,
+       "t": 1.62,
+       "x": -40,
+       "y": -128,
+       "s": 1,
+       "a": 1,
+       "r": 200,
+       "b": 0,
+       "ease": "outCubic"
+      },
+      {
+       "t": 1.9,
        "x": -40,
        "y": -140,
        "s": 1,
@@ -1506,6 +2038,16 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
@@ -1518,7 +2060,7 @@
        "ease": "inOutSine"
       },
       {
-       "t": 2.8,
+       "t": 1.5,
        "x": -40,
        "y": -170,
        "s": 0.2,
@@ -1528,7 +2070,7 @@
        "ease": "step"
       },
       {
-       "t": 2.81,
+       "t": 1.51,
        "x": -40,
        "y": -170,
        "s": 0.25,
@@ -1538,7 +2080,7 @@
        "ease": "step"
       },
       {
-       "t": 3.5,
+       "t": 2.2,
        "x": -40,
        "y": -170,
        "s": 3.2,
@@ -1563,7 +2105,7 @@
      "ease": "inOutSine"
     },
     {
-     "t": 2.8,
+     "t": 1.45,
      "zoom": 1,
      "zx": 0,
      "zy": 0,
@@ -1574,7 +2116,7 @@
      "ease": "inOutSine"
     },
     {
-     "t": 3.0,
+     "t": 1.65,
      "zoom": 1.1,
      "zx": -40,
      "zy": -140,
@@ -1585,7 +2127,7 @@
      "ease": "outExpo"
     },
     {
-     "t": 4.0,
+     "t": 3.4,
      "zoom": 1.12,
      "zx": -40,
      "zy": -140,
@@ -1599,15 +2141,16 @@
    "titles": [
     {
      "text": "SOMETHING FELL THROUGH.",
-     "at": 0.35,
-     "out": 2.5,
-     "size": 54,
+     "at": 1.95,
+     "out": 3.3,
+     "size": 56,
      "color": "#F7F0E5",
      "x": 0,
-     "y": 300,
+     "y": 330,
      "font": "display",
      "track0": 26,
-     "track1": 8
+     "track1": 8,
+     "style": "rise"
     }
    ],
    "sub": {
@@ -1619,38 +2162,42 @@
    "sfx": [
     {
      "cue": "whoosh",
-     "at": 1.2
+     "at": 0.8
     },
     {
-     "cue": "impact",
-     "at": 2.8
+     "cue": "eggland",
+     "at": 1.5
     },
     {
      "cue": "thunder",
-     "at": 2.85
+     "at": 1.55
+    },
+    {
+     "cue": "debris",
+     "at": 1.6
     }
    ],
    "flash": [
     {
-     "t": 2.8,
+     "t": 1.5,
      "dur": 0.3,
-     "peak": 1.0,
+     "peak": 0.65,
      "color": "#FFFFFF"
     }
    ],
    "shake": [
     {
-     "t": 2.8,
+     "t": 1.5,
      "dur": 0.6,
-     "amp": 28
+     "amp": 20
     }
    ],
    "particles": [
     {
      "tex": "mote",
      "color": "#D9D2C4",
-     "t0": 2.8,
-     "t1": 2.86,
+     "t0": 1.5,
+     "t1": 1.56,
      "count": 26,
      "x": -40,
      "y": -160,
@@ -1673,46 +2220,17 @@
      "v": 1,
      "ease": "linear"
     }
-   ]
+   ],
+   "trans": "cut",
+   "transDur": 0,
+   "camDrift": 5
   },
   {
    "id": "shrine",
-   "seconds": 5.0,
+   "seconds": 4.9,
    "beat": "far away, the egg sleeps in the shrine",
    "boardAt": 3.0,
    "layers": [
-    {
-     "tex": "sky_night",
-     "depth": 0.1,
-     "w": 2300,
-     "h": 0,
-     "flip": false,
-     "tint": "#FFFFFF",
-     "blur": "",
-     "from": 0,
-     "to": 999,
-     "frames": [],
-     "frameAt": 0,
-     "fps": 12,
-     "flicker": false,
-     "pulseHz": 0,
-     "pulseLo": 1,
-     "jitter": 0,
-     "jitterFrom": 0,
-     "jitterTo": 0,
-     "keys": [
-      {
-       "t": 0,
-       "x": 0,
-       "y": 0,
-       "s": 1,
-       "a": 1,
-       "r": 0,
-       "b": 0,
-       "ease": "inOutSine"
-      }
-     ]
-    },
     {
      "tex": "shrine",
      "depth": 0.5,
@@ -1732,6 +2250,16 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": true,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
@@ -1744,7 +2272,7 @@
        "ease": "inOutSine"
       },
       {
-       "t": 1.7,
+       "t": 1.4,
        "x": 0,
        "y": 0,
        "s": 1,
@@ -1770,10 +2298,20 @@
      "fps": 12,
      "flicker": false,
      "pulseHz": 0.8,
-     "pulseLo": 0.4,
+     "pulseLo": 0.45,
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0.3,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
@@ -1806,20 +2344,20 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
-       "x": 920,
-       "y": -440,
-       "s": 1,
-       "a": 1,
-       "r": 0,
-       "b": 0,
-       "ease": "inOutSine"
-      },
-      {
-       "t": 5.0,
-       "x": 950,
+       "x": 930,
        "y": -440,
        "s": 1,
        "a": 1,
@@ -1848,6 +2386,16 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
@@ -1869,18 +2417,18 @@
      "zx": -7,
      "zy": -169,
      "dolly": 1,
-     "x": 0,
+     "x": -30,
      "y": 0,
      "rot": 0,
      "ease": "inOutSine"
     },
     {
-     "t": 5.0,
-     "zoom": 1.12,
+     "t": 4.9,
+     "zoom": 1.1,
      "zx": -7,
      "zy": -169,
-     "dolly": 1.03,
-     "x": 0,
+     "dolly": 1.04,
+     "x": 30,
      "y": 0,
      "rot": 0,
      "ease": "inOutSine"
@@ -1889,19 +2437,19 @@
    "titles": [],
    "sub": {
     "text": "Far away, a Kaiju egg sleeps. It remembers every meal.",
-    "at": 0.5,
-    "out": 5.0
+    "at": 0.35,
+    "out": 4.9
    },
    "vo": [
     {
      "clip": "CMVoice/story-card-3",
-     "at": 0.5
+     "at": 0.35
     }
    ],
    "sfx": [
     {
      "cue": "bong",
-     "at": 0.35
+     "at": 0.3
     }
    ],
    "flash": [],
@@ -1911,11 +2459,11 @@
      "tex": "mote",
      "color": "#B7F238",
      "t0": 0,
-     "t1": 5.0,
+     "t1": 4.9,
      "count": 22,
      "x": 0,
      "y": -420,
-     "sx": 1500,
+     "sx": 1300,
      "sy": 80,
      "vx": 0,
      "vy": 70,
@@ -1934,13 +2482,16 @@
      "v": 1,
      "ease": "linear"
     }
-   ]
+   ],
+   "trans": "dissolve",
+   "transDur": 0.5,
+   "camDrift": 5
   },
   {
    "id": "peoples",
-   "seconds": 6.0,
+   "seconds": 3.35,
    "beat": "two peoples plant their banners",
-   "boardAt": 3.2,
+   "boardAt": 2.4,
    "layers": [
     {
      "tex": "sky_split",
@@ -1961,6 +2512,16 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": true,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": -4,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
@@ -1993,10 +2554,20 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 1.4,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
-       "x": -640,
+       "x": -600,
        "y": 900,
        "s": 1,
        "a": 1,
@@ -2005,8 +2576,8 @@
        "ease": "inOutSine"
       },
       {
-       "t": 0.5,
-       "x": -640,
+       "t": 0.35,
+       "x": -600,
        "y": 900,
        "s": 1,
        "a": 1,
@@ -2015,14 +2586,34 @@
        "ease": "inOutSine"
       },
       {
-       "t": 1.0,
-       "x": -640,
-       "y": 130,
+       "t": 0.65,
+       "x": -600,
+       "y": 150,
        "s": 1,
        "a": 1,
        "r": 0,
        "b": 0,
-       "ease": "outBack"
+       "ease": "inExpo"
+      },
+      {
+       "t": 0.73,
+       "x": -600,
+       "y": 144,
+       "s": 0.985,
+       "a": 1,
+       "r": 0,
+       "b": 0,
+       "ease": "outCubic"
+      },
+      {
+       "t": 1.05,
+       "x": -600,
+       "y": 150,
+       "s": 1,
+       "a": 1,
+       "r": 0,
+       "b": 0,
+       "ease": "outBackSoft"
       }
      ]
     },
@@ -2045,10 +2636,20 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 1.4,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
-       "x": 640,
+       "x": 600,
        "y": 900,
        "s": 1,
        "a": 1,
@@ -2057,8 +2658,8 @@
        "ease": "inOutSine"
       },
       {
-       "t": 1.2,
-       "x": 640,
+       "t": 0.55,
+       "x": 600,
        "y": 900,
        "s": 1,
        "a": 1,
@@ -2067,20 +2668,40 @@
        "ease": "inOutSine"
       },
       {
-       "t": 1.7,
-       "x": 640,
-       "y": 130,
+       "t": 0.85,
+       "x": 600,
+       "y": 150,
        "s": 1,
        "a": 1,
        "r": 0,
        "b": 0,
-       "ease": "outBack"
+       "ease": "inExpo"
+      },
+      {
+       "t": 0.9299999999999999,
+       "x": 600,
+       "y": 144,
+       "s": 0.985,
+       "a": 1,
+       "r": 0,
+       "b": 0,
+       "ease": "outCubic"
+      },
+      {
+       "t": 1.25,
+       "x": 600,
+       "y": 150,
+       "s": 1,
+       "a": 1,
+       "r": 0,
+       "b": 0,
+       "ease": "outBackSoft"
       }
      ]
     },
     {
      "tex": "farmer",
-     "depth": 0.75,
+     "depth": 0.72,
      "w": 405,
      "h": 0,
      "flip": false,
@@ -2097,11 +2718,21 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": true,
+     "breathe": 0.012,
+     "breatheHz": 0.34,
+     "bob": 2.5,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
        "x": -1500,
-       "y": -190,
+       "y": -170,
        "s": 1,
        "a": 1,
        "r": 0,
@@ -2109,9 +2740,9 @@
        "ease": "inOutSine"
       },
       {
-       "t": 0.9,
+       "t": 0.8,
        "x": -1500,
-       "y": -190,
+       "y": -170,
        "s": 1,
        "a": 1,
        "r": 0,
@@ -2119,20 +2750,122 @@
        "ease": "inOutSine"
       },
       {
-       "t": 1.5,
-       "x": -770,
-       "y": -200,
+       "t": 1.4,
+       "x": -610,
+       "y": -175,
        "s": 1,
        "a": 1,
        "r": 0,
        "b": 0,
-       "ease": "outBack"
+       "ease": "outBackSoft"
+      },
+      {
+       "t": 1.52,
+       "x": -610,
+       "y": -175,
+       "s": 1.012,
+       "a": 1,
+       "r": 0,
+       "b": 0,
+       "ease": "outSine"
+      },
+      {
+       "t": 1.7999999999999998,
+       "x": -610,
+       "y": -175,
+       "s": 1,
+       "a": 1,
+       "r": 0,
+       "b": 0,
+       "ease": "inOutSine"
+      }
+     ]
+    },
+    {
+     "tex": "farmer_crimson",
+     "depth": 0.72,
+     "w": 428,
+     "h": 0,
+     "flip": false,
+     "tint": "#FFFFFF",
+     "blur": "",
+     "from": 0,
+     "to": 999,
+     "frames": [],
+     "frameAt": 0,
+     "fps": 12,
+     "flicker": false,
+     "pulseHz": 0,
+     "pulseLo": 1,
+     "jitter": 0,
+     "jitterFrom": 0,
+     "jitterTo": 0,
+     "cover": false,
+     "subject": true,
+     "breathe": 0.012,
+     "breatheHz": 0.34,
+     "bob": 2.5,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
+     "keys": [
+      {
+       "t": 0,
+       "x": 1500,
+       "y": -170,
+       "s": 1,
+       "a": 1,
+       "r": 0,
+       "b": 0,
+       "ease": "inOutSine"
+      },
+      {
+       "t": 0.95,
+       "x": 1500,
+       "y": -170,
+       "s": 1,
+       "a": 1,
+       "r": 0,
+       "b": 0,
+       "ease": "inOutSine"
+      },
+      {
+       "t": 1.55,
+       "x": 610,
+       "y": -175,
+       "s": 1,
+       "a": 1,
+       "r": 0,
+       "b": 0,
+       "ease": "outBackSoft"
+      },
+      {
+       "t": 1.67,
+       "x": 610,
+       "y": -175,
+       "s": 1.012,
+       "a": 1,
+       "r": 0,
+       "b": 0,
+       "ease": "outSine"
+      },
+      {
+       "t": 1.9500000000000002,
+       "x": 610,
+       "y": -175,
+       "s": 1,
+       "a": 1,
+       "r": 0,
+       "b": 0,
+       "ease": "inOutSine"
       }
      ]
     },
     {
      "tex": "miner",
-     "depth": 0.85,
+     "depth": 0.82,
      "w": 398,
      "h": 0,
      "flip": false,
@@ -2149,6 +2882,16 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": true,
+     "breathe": 0.012,
+     "breatheHz": 0.34,
+     "bob": 2.5,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
@@ -2161,7 +2904,7 @@
        "ease": "inOutSine"
       },
       {
-       "t": 1.1,
+       "t": 0.9,
        "x": -1500,
        "y": -250,
        "s": 1,
@@ -2171,14 +2914,116 @@
        "ease": "inOutSine"
       },
       {
-       "t": 1.7,
-       "x": -300,
-       "y": -270,
+       "t": 1.5,
+       "x": -455,
+       "y": -265,
        "s": 1,
        "a": 1,
        "r": 0,
        "b": 0,
-       "ease": "outBack"
+       "ease": "outBackSoft"
+      },
+      {
+       "t": 1.62,
+       "x": -455,
+       "y": -265,
+       "s": 1.012,
+       "a": 1,
+       "r": 0,
+       "b": 0,
+       "ease": "outSine"
+      },
+      {
+       "t": 1.9,
+       "x": -455,
+       "y": -265,
+       "s": 1,
+       "a": 1,
+       "r": 0,
+       "b": 0,
+       "ease": "inOutSine"
+      }
+     ]
+    },
+    {
+     "tex": "miner_crimson",
+     "depth": 0.82,
+     "w": 358,
+     "h": 0,
+     "flip": false,
+     "tint": "#FFFFFF",
+     "blur": "",
+     "from": 0,
+     "to": 999,
+     "frames": [],
+     "frameAt": 0,
+     "fps": 12,
+     "flicker": false,
+     "pulseHz": 0,
+     "pulseLo": 1,
+     "jitter": 0,
+     "jitterFrom": 0,
+     "jitterTo": 0,
+     "cover": false,
+     "subject": true,
+     "breathe": 0.012,
+     "breatheHz": 0.34,
+     "bob": 2.5,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
+     "keys": [
+      {
+       "t": 0,
+       "x": 1500,
+       "y": -250,
+       "s": 1,
+       "a": 1,
+       "r": 0,
+       "b": 0,
+       "ease": "inOutSine"
+      },
+      {
+       "t": 1.05,
+       "x": 1500,
+       "y": -250,
+       "s": 1,
+       "a": 1,
+       "r": 0,
+       "b": 0,
+       "ease": "inOutSine"
+      },
+      {
+       "t": 1.65,
+       "x": 455,
+       "y": -265,
+       "s": 1,
+       "a": 1,
+       "r": 0,
+       "b": 0,
+       "ease": "outBackSoft"
+      },
+      {
+       "t": 1.77,
+       "x": 455,
+       "y": -265,
+       "s": 1.012,
+       "a": 1,
+       "r": 0,
+       "b": 0,
+       "ease": "outSine"
+      },
+      {
+       "t": 2.05,
+       "x": 455,
+       "y": -265,
+       "s": 1,
+       "a": 1,
+       "r": 0,
+       "b": 0,
+       "ease": "inOutSine"
       }
      ]
     },
@@ -2201,6 +3046,16 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": true,
+     "breathe": 0.012,
+     "breatheHz": 0.34,
+     "bob": 2.5,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
@@ -2213,51 +3068,9 @@
        "ease": "inOutSine"
       },
       {
-       "t": 0.8,
+       "t": 1.0,
        "x": -1500,
        "y": -210,
-       "s": 1,
-       "a": 1,
-       "r": 0,
-       "b": 0,
-       "ease": "inOutSine"
-      },
-      {
-       "t": 1.4,
-       "x": -560,
-       "y": -225,
-       "s": 1,
-       "a": 1,
-       "r": 0,
-       "b": 0,
-       "ease": "outBack"
-      }
-     ]
-    },
-    {
-     "tex": "farmer_crimson",
-     "depth": 0.75,
-     "w": 428,
-     "h": 0,
-     "flip": false,
-     "tint": "#FFFFFF",
-     "blur": "",
-     "from": 0,
-     "to": 999,
-     "frames": [],
-     "frameAt": 0,
-     "fps": 12,
-     "flicker": false,
-     "pulseHz": 0,
-     "pulseLo": 1,
-     "jitter": 0,
-     "jitterFrom": 0,
-     "jitterTo": 0,
-     "keys": [
-      {
-       "t": 0,
-       "x": 1500,
-       "y": -190,
        "s": 1,
        "a": 1,
        "r": 0,
@@ -2266,75 +3079,33 @@
       },
       {
        "t": 1.6,
-       "x": 1500,
-       "y": -190,
+       "x": -250,
+       "y": -225,
+       "s": 1,
+       "a": 1,
+       "r": 0,
+       "b": 0,
+       "ease": "outBackSoft"
+      },
+      {
+       "t": 1.7200000000000002,
+       "x": -250,
+       "y": -225,
+       "s": 1.012,
+       "a": 1,
+       "r": 0,
+       "b": 0,
+       "ease": "outSine"
+      },
+      {
+       "t": 2.0,
+       "x": -250,
+       "y": -225,
        "s": 1,
        "a": 1,
        "r": 0,
        "b": 0,
        "ease": "inOutSine"
-      },
-      {
-       "t": 2.2,
-       "x": 770,
-       "y": -200,
-       "s": 1,
-       "a": 1,
-       "r": 0,
-       "b": 0,
-       "ease": "outBack"
-      }
-     ]
-    },
-    {
-     "tex": "miner_crimson",
-     "depth": 0.85,
-     "w": 358,
-     "h": 0,
-     "flip": false,
-     "tint": "#FFFFFF",
-     "blur": "",
-     "from": 0,
-     "to": 999,
-     "frames": [],
-     "frameAt": 0,
-     "fps": 12,
-     "flicker": false,
-     "pulseHz": 0,
-     "pulseLo": 1,
-     "jitter": 0,
-     "jitterFrom": 0,
-     "jitterTo": 0,
-     "keys": [
-      {
-       "t": 0,
-       "x": 1500,
-       "y": -250,
-       "s": 1,
-       "a": 1,
-       "r": 0,
-       "b": 0,
-       "ease": "inOutSine"
-      },
-      {
-       "t": 1.8,
-       "x": 1500,
-       "y": -250,
-       "s": 1,
-       "a": 1,
-       "r": 0,
-       "b": 0,
-       "ease": "inOutSine"
-      },
-      {
-       "t": 2.4,
-       "x": 300,
-       "y": -270,
-       "s": 1,
-       "a": 1,
-       "r": 0,
-       "b": 0,
-       "ease": "outBack"
       }
      ]
     },
@@ -2357,6 +3128,16 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": true,
+     "breathe": 0.012,
+     "breatheHz": 0.34,
+     "bob": 2.5,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
@@ -2369,7 +3150,7 @@
        "ease": "inOutSine"
       },
       {
-       "t": 1.5,
+       "t": 1.15,
        "x": 1500,
        "y": -210,
        "s": 1,
@@ -2379,14 +3160,34 @@
        "ease": "inOutSine"
       },
       {
-       "t": 2.1,
-       "x": 560,
+       "t": 1.75,
+       "x": 250,
        "y": -225,
        "s": 1,
        "a": 1,
        "r": 0,
        "b": 0,
-       "ease": "outBack"
+       "ease": "outBackSoft"
+      },
+      {
+       "t": 1.87,
+       "x": 250,
+       "y": -225,
+       "s": 1.012,
+       "a": 1,
+       "r": 0,
+       "b": 0,
+       "ease": "outSine"
+      },
+      {
+       "t": 2.15,
+       "x": 250,
+       "y": -225,
+       "s": 1,
+       "a": 1,
+       "r": 0,
+       "b": 0,
+       "ease": "inOutSine"
       }
      ]
     }
@@ -2398,17 +3199,17 @@
      "zx": 0,
      "zy": 0,
      "dolly": 1,
-     "x": -20,
+     "x": -30,
      "y": 0,
      "rot": 0,
      "ease": "inOutSine"
     },
     {
-     "t": 6.0,
+     "t": 3.35,
      "zoom": 1,
      "zx": 0,
      "zy": 0,
-     "dolly": 1.04,
+     "dolly": 1.05,
      "x": 20,
      "y": 0,
      "rot": 0,
@@ -2418,57 +3219,62 @@
    "titles": [
     {
      "text": "TWO BANNERS.",
-     "at": 0.25,
-     "out": 2.6,
-     "size": 100,
+     "at": 2.2,
+     "out": 3.3,
+     "size": 96,
      "color": "#F7F0E5",
      "x": 0,
-     "y": 300,
+     "y": 320,
      "font": "display",
      "track0": 50,
-     "track1": 12
+     "track1": 12,
+     "style": "slam"
     }
    ],
    "sub": {
-    "text": "Two banners. One hill. Neither has learned to share.",
-    "at": 2.4,
-    "out": 6.0
+    "text": "Two banners.",
+    "at": 2.25,
+    "out": 3.35
    },
    "vo": [
     {
      "clip": "CMVoice/story-card-2",
-     "at": 2.4
+     "at": 2.25
     }
    ],
    "sfx": [
     {
      "cue": "whoosh",
-     "at": 0.75
+     "at": 0.3
     },
     {
      "cue": "clang",
-     "at": 1.4
+     "at": 0.65
+    },
+    {
+     "cue": "clang",
+     "at": 0.85
     },
     {
      "cue": "whoosh",
-     "at": 1.45
+     "at": 0.85
     },
     {
-     "cue": "clang",
-     "at": 2.1
+     "cue": "hit",
+     "at": 1.6
     }
    ],
    "flash": [],
    "shake": [
     {
-     "t": 1.4,
-     "dur": 0.25,
-     "amp": 6
+     "t": 0.65,
+     "dur": 0.2,
+     "amp": 5
     },
     {
-     "t": 2.1,
-     "dur": 0.25,
-     "amp": 6
+     "t": 0.85,
+     "dur": 0.2,
+     "amp": 5
     }
    ],
    "particles": [],
@@ -2478,13 +3284,16 @@
      "v": 1,
      "ease": "linear"
     }
-   ]
+   ],
+   "trans": "cut",
+   "transDur": 0,
+   "camDrift": 5
   },
   {
    "id": "hill",
-   "seconds": 5.5,
-   "beat": "one hill: they clash",
-   "boardAt": 3.4,
+   "seconds": 4.0,
+   "beat": "one hill: they clash, and neither gives",
+   "boardAt": 3.2,
    "layers": [
     {
      "tex": "hill",
@@ -2505,6 +3314,16 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": true,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
@@ -2513,11 +3332,11 @@
        "s": 1,
        "a": 1,
        "r": 0,
-       "b": 0.7,
+       "b": 0.6,
        "ease": "inOutSine"
       },
       {
-       "t": 0.9,
+       "t": 0.7,
        "x": 0,
        "y": -40,
        "s": 1,
@@ -2547,6 +3366,16 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
@@ -2559,7 +3388,7 @@
        "ease": "inOutSine"
       },
       {
-       "t": 2.35,
+       "t": 2.6,
        "x": 0,
        "y": 0,
        "s": 1,
@@ -2569,27 +3398,27 @@
        "ease": "inOutSine"
       },
       {
-       "t": 2.45,
+       "t": 2.7,
        "x": 0,
        "y": 0,
        "s": 1,
-       "a": 0.7,
+       "a": 0.6,
        "r": 0,
        "b": 0,
        "ease": "inOutSine"
       },
       {
-       "t": 3.0,
+       "t": 3.1,
        "x": 0,
        "y": 0,
        "s": 1,
-       "a": 0.7,
+       "a": 0.6,
        "r": 0,
        "b": 0,
        "ease": "inOutSine"
       },
       {
-       "t": 3.2,
+       "t": 3.3,
        "x": 0,
        "y": 0,
        "s": 1,
@@ -2603,7 +3432,7 @@
     {
      "tex": "warrior_charge",
      "depth": 1.0,
-     "w": 1006,
+     "w": 880,
      "h": 0,
      "flip": false,
      "tint": "#FFFFFF",
@@ -2616,9 +3445,19 @@
      "flicker": false,
      "pulseHz": 0,
      "pulseLo": 1,
-     "jitter": 0,
-     "jitterFrom": 0,
-     "jitterTo": 0,
+     "jitter": 3,
+     "jitterFrom": 2.7,
+     "jitterTo": 3.0,
+     "cover": false,
+     "subject": true,
+     "breathe": 0.012,
+     "breatheHz": 0.34,
+     "bob": 2.5,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
@@ -2631,18 +3470,28 @@
        "ease": "inOutSine"
       },
       {
-       "t": 1.1,
-       "x": -560,
+       "t": 1.0,
+       "x": -470,
        "y": -260,
        "s": 1,
        "a": 1,
        "r": 0,
        "b": 0,
-       "ease": "outBack"
+       "ease": "outBackSoft"
       },
       {
-       "t": 2.45,
-       "x": -400,
+       "t": 2.35,
+       "x": -510,
+       "y": -260,
+       "s": 1,
+       "a": 1,
+       "r": 0,
+       "b": 0,
+       "ease": "inOutSine"
+      },
+      {
+       "t": 2.68,
+       "x": -360,
        "y": -260,
        "s": 1,
        "a": 1,
@@ -2651,8 +3500,18 @@
        "ease": "inCubic"
       },
       {
-       "t": 5.5,
-       "x": -440,
+       "t": 3.0,
+       "x": -400,
+       "y": -260,
+       "s": 1,
+       "a": 1,
+       "r": 0,
+       "b": 0,
+       "ease": "outCubic"
+      },
+      {
+       "t": 4.0,
+       "x": -410,
        "y": -260,
        "s": 1,
        "a": 1,
@@ -2665,7 +3524,7 @@
     {
      "tex": "warrior_cleave_crimson",
      "depth": 1.0,
-     "w": 644,
+     "w": 607,
      "h": 0,
      "flip": false,
      "tint": "#FFFFFF",
@@ -2678,14 +3537,24 @@
      "flicker": false,
      "pulseHz": 0,
      "pulseLo": 1,
-     "jitter": 0,
-     "jitterFrom": 0,
-     "jitterTo": 0,
+     "jitter": 3,
+     "jitterFrom": 2.7,
+     "jitterTo": 3.0,
+     "cover": false,
+     "subject": true,
+     "breathe": 0.012,
+     "breatheHz": 0.34,
+     "bob": 2.5,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
        "x": 1700,
-       "y": -180,
+       "y": -190,
        "s": 1,
        "a": 1,
        "r": 0,
@@ -2693,19 +3562,29 @@
        "ease": "inOutSine"
       },
       {
-       "t": 1.3,
-       "x": 560,
-       "y": -180,
+       "t": 1.2,
+       "x": 520,
+       "y": -190,
        "s": 1,
        "a": 1,
        "r": 0,
        "b": 0,
-       "ease": "outBack"
+       "ease": "outBackSoft"
       },
       {
-       "t": 2.45,
-       "x": 420,
-       "y": -200,
+       "t": 2.35,
+       "x": 560,
+       "y": -195,
+       "s": 1,
+       "a": 1,
+       "r": 0,
+       "b": 0,
+       "ease": "inOutSine"
+      },
+      {
+       "t": 2.68,
+       "x": 400,
+       "y": -205,
        "s": 1,
        "a": 1,
        "r": 0,
@@ -2713,9 +3592,19 @@
        "ease": "inCubic"
       },
       {
-       "t": 5.5,
-       "x": 460,
-       "y": -200,
+       "t": 3.0,
+       "x": 440,
+       "y": -205,
+       "s": 1,
+       "a": 1,
+       "r": 0,
+       "b": 0,
+       "ease": "outCubic"
+      },
+      {
+       "t": 4.0,
+       "x": 450,
+       "y": -205,
        "s": 1,
        "a": 1,
        "r": 0,
@@ -2743,6 +3632,16 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
@@ -2755,7 +3654,7 @@
        "ease": "inOutSine"
       },
       {
-       "t": 2.45,
+       "t": 2.68,
        "x": 0,
        "y": -80,
        "s": 0.2,
@@ -2765,7 +3664,7 @@
        "ease": "step"
       },
       {
-       "t": 2.46,
+       "t": 2.69,
        "x": 0,
        "y": -80,
        "s": 0.25,
@@ -2775,7 +3674,7 @@
        "ease": "step"
       },
       {
-       "t": 3.2,
+       "t": 3.4,
        "x": 0,
        "y": -80,
        "s": 3.4,
@@ -2805,6 +3704,16 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
@@ -2826,16 +3735,38 @@
      "zx": 0,
      "zy": 300,
      "dolly": 1,
+     "x": -20,
+     "y": 0,
+     "rot": 0,
+     "ease": "inOutSine"
+    },
+    {
+     "t": 2.6,
+     "zoom": 1.06,
+     "zx": 0,
+     "zy": 300,
+     "dolly": 1,
      "x": 0,
      "y": 0,
      "rot": 0,
      "ease": "inOutSine"
     },
     {
-     "t": 5.5,
+     "t": 2.78,
+     "zoom": 1.1,
+     "zx": 0,
+     "zy": -80,
+     "dolly": 1,
+     "x": 0,
+     "y": 0,
+     "rot": 0,
+     "ease": "outExpo"
+    },
+    {
+     "t": 4.0,
      "zoom": 1.12,
      "zx": 0,
-     "zy": 300,
+     "zy": -80,
      "dolly": 1,
      "x": 0,
      "y": 0,
@@ -2846,50 +3777,55 @@
    "titles": [
     {
      "text": "ONE HILL.",
-     "at": 0.45,
-     "out": 2.3,
-     "size": 116,
+     "at": 0.02,
+     "out": 1.45,
+     "size": 104,
      "color": "#F7F0E5",
      "x": 0,
-     "y": 300,
+     "y": 320,
      "font": "display",
      "track0": 60,
-     "track1": 14
+     "track1": 14,
+     "style": "slam"
     }
    ],
    "sub": {
-    "text": "Two banners. One hill. Neither has learned to share.",
-    "at": 0,
-    "out": 1.0
+    "text": "One hill. Neither has learned to share.",
+    "at": 0.0,
+    "out": 2.75
    },
    "vo": [],
    "sfx": [
     {
      "cue": "whoosh",
-     "at": 0.3
+     "at": 0.2
     },
     {
-     "cue": "hit",
+     "cue": "whoosh",
      "at": 2.45
     },
     {
+     "cue": "hit",
+     "at": 2.68
+    },
+    {
      "cue": "clang",
-     "at": 2.5
+     "at": 2.72
     }
    ],
    "flash": [
     {
-     "t": 2.45,
+     "t": 2.68,
      "dur": 0.25,
-     "peak": 0.6,
+     "peak": 0.55,
      "color": "#FFFFFF"
     }
    ],
    "shake": [
     {
-     "t": 2.45,
+     "t": 2.68,
      "dur": 0.5,
-     "amp": 18
+     "amp": 16
     }
    ],
    "particles": [],
@@ -2899,13 +3835,16 @@
      "v": 1,
      "ease": "linear"
     }
-   ]
+   ],
+   "trans": "cut",
+   "transDur": 0,
+   "camDrift": 5
   },
   {
    "id": "choice",
-   "seconds": 6.5,
+   "seconds": 5.4,
    "beat": "feed it, or corrupt it",
-   "boardAt": 4.2,
+   "boardAt": 4.0,
    "layers": [
     {
      "tex": "sky_choice",
@@ -2926,6 +3865,16 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": true,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": -4,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
@@ -2954,10 +3903,20 @@
      "fps": 12,
      "flicker": false,
      "pulseHz": 1.1,
-     "pulseLo": 0.5,
+     "pulseLo": 0.55,
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0.32,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
@@ -2977,7 +3936,7 @@
        "a": 0.9,
        "r": 0,
        "b": 0,
-       "ease": "outBack"
+       "ease": "outBackSoft"
       }
      ]
     },
@@ -3000,6 +3959,16 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": true,
+     "breathe": 0.01,
+     "breatheHz": 0.27,
+     "bob": 3,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
@@ -3019,7 +3988,7 @@
        "a": 1,
        "r": 0,
        "b": 0,
-       "ease": "outBack"
+       "ease": "outBackSoft"
       }
      ]
     },
@@ -3042,10 +4011,20 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0.32,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
-       "x": -600,
+       "x": -560,
        "y": -900,
        "s": 1,
        "a": 1,
@@ -3054,8 +4033,8 @@
        "ease": "inOutSine"
       },
       {
-       "t": 0.3,
-       "x": -600,
+       "t": 0.2,
+       "x": -560,
        "y": -900,
        "s": 1,
        "a": 1,
@@ -3064,14 +4043,14 @@
        "ease": "inOutSine"
       },
       {
-       "t": 1.0,
-       "x": -600,
+       "t": 0.9,
+       "x": -560,
        "y": -365,
        "s": 1,
        "a": 1,
        "r": 0,
        "b": 0,
-       "ease": "outBack"
+       "ease": "outBackSoft"
       }
      ]
     },
@@ -3094,10 +4073,20 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": false,
+     "breathe": 0.006,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0.9,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
-       "x": -600,
+       "x": -560,
        "y": -900,
        "s": 1,
        "a": 1,
@@ -3106,8 +4095,8 @@
        "ease": "inOutSine"
       },
       {
-       "t": 0.3,
-       "x": -600,
+       "t": 0.2,
+       "x": -560,
        "y": -900,
        "s": 1,
        "a": 1,
@@ -3116,14 +4105,14 @@
        "ease": "inOutSine"
       },
       {
-       "t": 1.0,
-       "x": -600,
+       "t": 0.9,
+       "x": -560,
        "y": -365,
        "s": 1,
        "a": 1,
        "r": 0,
        "b": 0,
-       "ease": "outBack"
+       "ease": "outBackSoft"
       }
      ]
     },
@@ -3146,10 +4135,20 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0.32,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
-       "x": 620,
+       "x": 560,
        "y": -900,
        "s": 1,
        "a": 1,
@@ -3158,8 +4157,8 @@
        "ease": "inOutSine"
       },
       {
-       "t": 2.6,
-       "x": 620,
+       "t": 2.3,
+       "x": 560,
        "y": -900,
        "s": 1,
        "a": 1,
@@ -3168,14 +4167,14 @@
        "ease": "inOutSine"
       },
       {
-       "t": 3.3,
-       "x": 620,
+       "t": 3.0,
+       "x": 560,
        "y": -365,
        "s": 1,
        "a": 1,
        "r": 0,
        "b": 0,
-       "ease": "outBack"
+       "ease": "outBackSoft"
       }
      ]
     },
@@ -3198,10 +4197,20 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": false,
+     "breathe": 0.006,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0.9,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
-       "x": 620,
+       "x": 560,
        "y": -900,
        "s": 1,
        "a": 1,
@@ -3210,8 +4219,8 @@
        "ease": "inOutSine"
       },
       {
-       "t": 2.6,
-       "x": 620,
+       "t": 2.3,
+       "x": 560,
        "y": -900,
        "s": 1,
        "a": 1,
@@ -3220,21 +4229,21 @@
        "ease": "inOutSine"
       },
       {
-       "t": 3.3,
-       "x": 620,
+       "t": 3.0,
+       "x": 560,
        "y": -365,
        "s": 1,
        "a": 1,
        "r": 0,
        "b": 0,
-       "ease": "outBack"
+       "ease": "outBackSoft"
       }
      ]
     },
     {
      "tex": "farmer_harvest",
      "depth": 0.95,
-     "w": 569,
+     "w": 549,
      "h": 0,
      "flip": false,
      "tint": "#FFFFFF",
@@ -3250,11 +4259,21 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": true,
+     "breathe": 0.012,
+     "breatheHz": 0.34,
+     "bob": 2.5,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
        "x": -1600,
-       "y": -200,
+       "y": -205,
        "s": 1,
        "a": 1,
        "r": 0,
@@ -3262,9 +4281,9 @@
        "ease": "inOutSine"
       },
       {
-       "t": 0.6,
+       "t": 0.5,
        "x": -1600,
-       "y": -200,
+       "y": -205,
        "s": 1,
        "a": 1,
        "r": 0,
@@ -3272,14 +4291,34 @@
        "ease": "inOutSine"
       },
       {
-       "t": 1.3,
-       "x": -640,
-       "y": -200,
+       "t": 1.2,
+       "x": -535,
+       "y": -205,
        "s": 1,
        "a": 1,
        "r": 0,
        "b": 0,
-       "ease": "outBack"
+       "ease": "outBackSoft"
+      },
+      {
+       "t": 1.3199999999999998,
+       "x": -535,
+       "y": -205,
+       "s": 1.012,
+       "a": 1,
+       "r": 0,
+       "b": 0,
+       "ease": "outSine"
+      },
+      {
+       "t": 1.6,
+       "x": -535,
+       "y": -205,
+       "s": 1,
+       "a": 1,
+       "r": 0,
+       "b": 0,
+       "ease": "inOutSine"
       }
      ]
     }
@@ -3291,18 +4330,18 @@
      "zx": 0,
      "zy": 0,
      "dolly": 1,
-     "x": -60,
+     "x": -50,
      "y": 0,
      "rot": 0,
      "ease": "inOutSine"
     },
     {
-     "t": 6.5,
+     "t": 5.4,
      "zoom": 1,
      "zx": 0,
      "zy": 0,
-     "dolly": 1.04,
-     "x": 60,
+     "dolly": 1.05,
+     "x": 50,
      "y": 0,
      "rot": 0,
      "ease": "inOutSine"
@@ -3311,48 +4350,54 @@
    "titles": [
     {
      "text": "FEED IT",
-     "at": 0.5,
-     "out": 6.0,
-     "size": 104,
+     "at": 0.45,
+     "out": 5.2,
+     "size": 100,
      "color": "#B7F238",
-     "x": -470,
-     "y": 300,
+     "x": -405,
+     "y": 330,
      "font": "display",
      "track0": 40,
-     "track1": 10
+     "track1": 10,
+     "style": "slam"
     },
     {
      "text": "OR CORRUPT IT",
-     "at": 2.7,
-     "out": 6.0,
-     "size": 96,
+     "at": 2.55,
+     "out": 5.2,
+     "size": 80,
      "color": "#B98AF0",
-     "x": 420,
-     "y": 300,
+     "x": 282,
+     "y": 250,
      "font": "display",
-     "track0": 40,
-     "track1": 8
+     "track0": 36,
+     "track1": 8,
+     "style": "slam"
     }
    ],
    "sub": {
     "text": "Feed it, and it fights for you. Corrupt it, and it fights everyone.",
-    "at": 0.6,
-    "out": 6.5
+    "at": 0.4,
+    "out": 5.4
    },
    "vo": [
     {
      "clip": "CMVoice/story-card-4",
-     "at": 0.6
+     "at": 0.4
     }
    ],
    "sfx": [
     {
-     "cue": "chime",
-     "at": 0.6
+     "cue": "feed",
+     "at": 0.45
+    },
+    {
+     "cue": "corrupt",
+     "at": 2.55
     },
     {
      "cue": "bong",
-     "at": 2.7
+     "at": 2.6
     }
    ],
    "flash": [],
@@ -3362,11 +4407,11 @@
      "tex": "mote",
      "color": "#B7F238",
      "t0": 0,
-     "t1": 6.5,
+     "t1": 5.4,
      "count": 16,
      "x": -520,
      "y": -300,
-     "sx": 700,
+     "sx": 600,
      "sy": 200,
      "vx": 0,
      "vy": 60,
@@ -3381,12 +4426,12 @@
     {
      "tex": "ember",
      "color": "#B98AF0",
-     "t0": 2.6,
-     "t1": 6.5,
+     "t0": 2.4,
+     "t1": 5.4,
      "count": 16,
-     "x": 560,
+     "x": 520,
      "y": -300,
-     "sx": 700,
+     "sx": 600,
      "sy": 200,
      "vx": 0,
      "vy": 90,
@@ -3405,11 +4450,14 @@
      "v": 1,
      "ease": "linear"
     }
-   ]
+   ],
+   "trans": "dissolve",
+   "transDur": 0.45,
+   "camDrift": 5
   },
   {
    "id": "hatch",
-   "seconds": 3.5,
+   "seconds": 3.3,
    "beat": "the egg cracks open",
    "boardAt": 1.9,
    "layers": [
@@ -3432,6 +4480,16 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": true,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": -4,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
@@ -3464,6 +4522,16 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
@@ -3486,16 +4554,26 @@
      "tint": "#FFFFFF",
      "blur": "",
      "from": 0,
-     "to": 2.45,
+     "to": 2.3,
      "frames": [],
      "frameAt": 0,
      "fps": 12,
      "flicker": false,
      "pulseHz": 3.0,
      "pulseLo": 0.4,
-     "jitter": 7,
-     "jitterFrom": 0.6,
-     "jitterTo": 2.4,
+     "jitter": 8,
+     "jitterFrom": 0.5,
+     "jitterTo": 2.25,
+     "cover": false,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0.45,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
@@ -3518,16 +4596,26 @@
      "tint": "#FFFFFF",
      "blur": "",
      "from": 0,
-     "to": 0.61,
+     "to": 0.51,
      "frames": [],
      "frameAt": 0,
      "fps": 12,
      "flicker": false,
      "pulseHz": 0,
      "pulseLo": 1,
-     "jitter": 7,
-     "jitterFrom": 0.6,
-     "jitterTo": 2.4,
+     "jitter": 8,
+     "jitterFrom": 0.5,
+     "jitterTo": 2.25,
+     "cover": false,
+     "subject": true,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
@@ -3550,21 +4638,31 @@
      "tint": "#FFFFFF",
      "blur": "",
      "from": 0,
-     "to": 2.45,
+     "to": 2.3,
      "frames": [
       "egg_crack_1",
       "egg_crack_2",
       "egg_crack_3",
       "egg_crack_4"
      ],
-     "frameAt": 0.6,
-     "fps": 2.2,
+     "frameAt": 0.5,
+     "fps": 2.4,
      "flicker": false,
      "pulseHz": 0,
      "pulseLo": 1,
-     "jitter": 7,
-     "jitterFrom": 0.6,
-     "jitterTo": 2.4,
+     "jitter": 8,
+     "jitterFrom": 0.5,
+     "jitterTo": 2.25,
+     "cover": false,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
@@ -3577,7 +4675,7 @@
        "ease": "inOutSine"
       },
       {
-       "t": 0.6,
+       "t": 0.5,
        "x": 0,
        "y": -40,
        "s": 1,
@@ -3587,7 +4685,7 @@
        "ease": "step"
       },
       {
-       "t": 0.61,
+       "t": 0.51,
        "x": 0,
        "y": -40,
        "s": 1,
@@ -3617,6 +4715,16 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0.32,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
@@ -3629,7 +4737,7 @@
        "ease": "inOutSine"
       },
       {
-       "t": 2.45,
+       "t": 2.3,
        "x": 0,
        "y": -40,
        "s": 0.85,
@@ -3639,14 +4747,14 @@
        "ease": "step"
       },
       {
-       "t": 2.85,
+       "t": 2.7,
        "x": 0,
        "y": -40,
        "s": 1,
        "a": 0.9,
        "r": 0,
        "b": 0,
-       "ease": "outBack"
+       "ease": "outBackSoft"
       }
      ]
     },
@@ -3669,6 +4777,16 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": true,
+     "breathe": 0.01,
+     "breatheHz": 0.27,
+     "bob": 3,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
@@ -3681,7 +4799,7 @@
        "ease": "inOutSine"
       },
       {
-       "t": 2.45,
+       "t": 2.3,
        "x": 0,
        "y": -40,
        "s": 0.85,
@@ -3691,7 +4809,7 @@
        "ease": "step"
       },
       {
-       "t": 2.46,
+       "t": 2.31,
        "x": 0,
        "y": -40,
        "s": 0.85,
@@ -3701,14 +4819,14 @@
        "ease": "step"
       },
       {
-       "t": 2.85,
+       "t": 2.7,
        "x": 0,
        "y": -40,
        "s": 1,
        "a": 1,
        "r": 0,
        "b": 0,
-       "ease": "outBack"
+       "ease": "outBackSoft"
       }
      ]
     },
@@ -3731,6 +4849,16 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
@@ -3743,7 +4871,7 @@
        "ease": "inOutSine"
       },
       {
-       "t": 2.45,
+       "t": 2.3,
        "x": 0,
        "y": -40,
        "s": 0.2,
@@ -3753,7 +4881,7 @@
        "ease": "step"
       },
       {
-       "t": 2.46,
+       "t": 2.31,
        "x": 0,
        "y": -40,
        "s": 0.3,
@@ -3763,7 +4891,7 @@
        "ease": "step"
       },
       {
-       "t": 3.2,
+       "t": 3.0,
        "x": 0,
        "y": -40,
        "s": 3.4,
@@ -3793,6 +4921,16 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
@@ -3820,7 +4958,7 @@
      "ease": "inOutSine"
     },
     {
-     "t": 2.4,
+     "t": 2.25,
      "zoom": 1.16,
      "zx": 0,
      "zy": -40,
@@ -3831,8 +4969,8 @@
      "ease": "inCubic"
     },
     {
-     "t": 2.6,
-     "zoom": 1.04,
+     "t": 2.45,
+     "zoom": 1.03,
      "zx": 0,
      "zy": -40,
      "dolly": 1,
@@ -3842,8 +4980,8 @@
      "ease": "outExpo"
     },
     {
-     "t": 3.5,
-     "zoom": 1.06,
+     "t": 3.3,
+     "zoom": 1.05,
      "zx": 0,
      "zy": -40,
      "dolly": 1,
@@ -3863,43 +5001,47 @@
    "sfx": [
     {
      "cue": "rumble",
-     "at": 0.5
+     "at": 0.3
+    },
+    {
+     "cue": "hatch",
+     "at": 2.2
     },
     {
      "cue": "impact",
-     "at": 2.45
+     "at": 2.3
     },
     {
-     "cue": "bong",
-     "at": 2.5
+     "cue": "debris",
+     "at": 2.35
     }
    ],
    "flash": [
     {
-     "t": 2.45,
+     "t": 2.3,
      "dur": 0.4,
-     "peak": 0.9,
+     "peak": 0.7,
      "color": "#F4FFD9"
     }
    ],
    "shake": [
     {
-     "t": 0.6,
+     "t": 0.5,
      "dur": 1.8,
      "amp": 4
     },
     {
-     "t": 2.45,
+     "t": 2.3,
      "dur": 0.5,
-     "amp": 20
+     "amp": 18
     }
    ],
    "particles": [
     {
      "tex": "ember",
      "color": "#8D90A0",
-     "t0": 2.45,
-     "t1": 2.5,
+     "t0": 2.3,
+     "t1": 2.36,
      "count": 26,
      "x": 0,
      "y": -40,
@@ -3922,13 +5064,16 @@
      "v": 1,
      "ease": "linear"
     }
-   ]
+   ],
+   "trans": "cut",
+   "transDur": 0,
+   "camDrift": 5
   },
   {
    "id": "kaiju",
-   "seconds": 6.0,
+   "seconds": 4.4,
    "beat": "the Kaiju rises",
-   "boardAt": 3.6,
+   "boardAt": 2.6,
    "layers": [
     {
      "tex": "sky_storm",
@@ -3949,6 +5094,16 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": true,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": -4,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
@@ -3981,6 +5136,16 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
@@ -4013,6 +5178,16 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0.32,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
@@ -4025,20 +5200,20 @@
        "ease": "inOutSine"
       },
       {
-       "t": 1.3,
+       "t": 1.2,
        "x": 0,
        "y": -150,
        "s": 1,
        "a": 1,
        "r": 0,
        "b": 0,
-       "ease": "outBack"
+       "ease": "outBackSoft"
       },
       {
-       "t": 6.0,
+       "t": 4.4,
        "x": 0,
-       "y": -140,
-       "s": 1.04,
+       "y": -142,
+       "s": 1.03,
        "a": 1,
        "r": 0,
        "b": 0,
@@ -4065,6 +5240,16 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": true,
+     "breathe": 0.016,
+     "breatheHz": 0.21,
+     "bob": 4,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
@@ -4077,20 +5262,20 @@
        "ease": "inOutSine"
       },
       {
-       "t": 1.3,
+       "t": 1.2,
        "x": 0,
        "y": -150,
        "s": 1,
        "a": 1,
        "r": 0,
        "b": 0,
-       "ease": "outBack"
+       "ease": "outBackSoft"
       },
       {
-       "t": 6.0,
+       "t": 4.4,
        "x": 0,
-       "y": -140,
-       "s": 1.04,
+       "y": -142,
+       "s": 1.03,
        "a": 1,
        "r": 0,
        "b": 0,
@@ -4117,6 +5302,16 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": -14,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
@@ -4149,6 +5344,16 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
@@ -4161,7 +5366,7 @@
        "ease": "inOutSine"
       },
       {
-       "t": 1.4,
+       "t": 1.3,
        "x": 0,
        "y": -560,
        "s": 1,
@@ -4171,7 +5376,7 @@
        "ease": "outCubic"
       },
       {
-       "t": 3.2,
+       "t": 3.0,
        "x": 0,
        "y": 1100,
        "s": 1,
@@ -4201,6 +5406,16 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
@@ -4213,7 +5428,7 @@
        "ease": "inOutSine"
       },
       {
-       "t": 1.4,
+       "t": 1.2,
        "x": 0,
        "y": 0,
        "s": 1,
@@ -4223,27 +5438,27 @@
        "ease": "inOutSine"
       },
       {
-       "t": 1.5,
+       "t": 1.3,
        "x": 0,
        "y": 0,
        "s": 1,
-       "a": 0.65,
+       "a": 0.6,
        "r": 0,
        "b": 0,
        "ease": "inOutSine"
       },
       {
-       "t": 2.6,
+       "t": 2.2,
        "x": 0,
        "y": 0,
        "s": 1,
-       "a": 0.65,
+       "a": 0.6,
        "r": 0,
        "b": 0,
        "ease": "inOutSine"
       },
       {
-       "t": 2.9,
+       "t": 2.5,
        "x": 0,
        "y": 0,
        "s": 1,
@@ -4273,6 +5488,16 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
@@ -4300,7 +5525,7 @@
      "ease": "inOutSine"
     },
     {
-     "t": 1.4,
+     "t": 1.2,
      "zoom": 1,
      "zx": -6,
      "zy": 258,
@@ -4311,7 +5536,7 @@
      "ease": "inOutSine"
     },
     {
-     "t": 1.6,
+     "t": 1.4,
      "zoom": 1.08,
      "zx": -6,
      "zy": 258,
@@ -4322,7 +5547,7 @@
      "ease": "outExpo"
     },
     {
-     "t": 6.0,
+     "t": 4.4,
      "zoom": 1.11,
      "zx": -6,
      "zy": 258,
@@ -4336,15 +5561,16 @@
    "titles": [
     {
      "text": "IT PICKS A SIDE.",
-     "at": 3.0,
-     "out": 5.85,
-     "size": 88,
+     "at": 2.0,
+     "out": 4.25,
+     "size": 84,
      "color": "#F7F0E5",
      "x": 0,
-     "y": -300,
+     "y": -334,
      "font": "display",
      "track0": 40,
-     "track1": 10
+     "track1": 10,
+     "style": "slam"
     }
    ],
    "sub": {
@@ -4360,39 +5586,49 @@
     },
     {
      "cue": "roar",
-     "at": 1.4
+     "at": 1.2
+    },
+    {
+     "cue": "debris",
+     "at": 1.3
     }
    ],
    "flash": [
     {
-     "t": 1.4,
+     "t": 0.0,
      "dur": 0.3,
-     "peak": 0.7,
+     "peak": 0.5,
+     "color": "#FFFFFF"
+    },
+    {
+     "t": 1.2,
+     "dur": 0.3,
+     "peak": 0.5,
      "color": "#FFFFFF"
     }
    ],
    "shake": [
     {
-     "t": 0.2,
-     "dur": 1.1,
-     "amp": 8
+     "t": 0.1,
+     "dur": 1.0,
+     "amp": 6
     },
     {
-     "t": 1.4,
+     "t": 1.2,
      "dur": 1.2,
-     "amp": 26
+     "amp": 20
     }
    ],
    "particles": [
     {
      "tex": "ember",
      "color": "#8D90A0",
-     "t0": 0.8,
-     "t1": 1.5,
+     "t0": 0.7,
+     "t1": 1.3,
      "count": 30,
      "x": 0,
      "y": -420,
-     "sx": 1200,
+     "sx": 1100,
      "sy": 60,
      "vx": 0,
      "vy": 520,
@@ -4408,11 +5644,11 @@
      "tex": "mote",
      "color": "#D9D2C4",
      "t0": 0,
-     "t1": 6.0,
+     "t1": 4.4,
      "count": 20,
      "x": 0,
      "y": -400,
-     "sx": 1800,
+     "sx": 1600,
      "sy": 100,
      "vx": 0,
      "vy": 90,
@@ -4431,18 +5667,63 @@
      "v": 1,
      "ease": "linear"
     }
-   ]
+   ],
+   "trans": "cut",
+   "transDur": 0,
+   "camDrift": 5
   },
   {
    "id": "sides",
-   "seconds": 4.0,
+   "seconds": 3.4,
    "beat": "or no side at all",
-   "boardAt": 2.6,
+   "boardAt": 2.4,
    "layers": [
     {
      "tex": "@solid",
+     "depth": 0.0,
+     "w": 2600,
+     "h": 1700,
+     "flip": false,
+     "tint": "#141C30",
+     "blur": "",
+     "from": 0,
+     "to": 999,
+     "frames": [],
+     "frameAt": 0,
+     "fps": 12,
+     "flicker": false,
+     "pulseHz": 0,
+     "pulseLo": 1,
+     "jitter": 0,
+     "jitterFrom": 0,
+     "jitterTo": 0,
+     "cover": true,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
+     "keys": [
+      {
+       "t": 0,
+       "x": 0,
+       "y": 0,
+       "s": 1,
+       "a": 1,
+       "r": 0,
+       "b": 0,
+       "ease": "inOutSine"
+      }
+     ]
+    },
+    {
+     "tex": "@solid",
      "depth": 0.4,
-     "w": 700,
+     "w": 620,
      "h": 1500,
      "flip": false,
      "tint": "#123C55",
@@ -4458,10 +5739,20 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
-       "x": -660,
+       "x": -600,
        "y": 0,
        "s": 1,
        "a": 1,
@@ -4474,7 +5765,7 @@
     {
      "tex": "@solid",
      "depth": 0.4,
-     "w": 700,
+     "w": 620,
      "h": 1500,
      "flip": false,
      "tint": "#5A1E2C",
@@ -4490,6 +5781,16 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
@@ -4506,7 +5807,7 @@
     {
      "tex": "@solid",
      "depth": 0.4,
-     "w": 700,
+     "w": 620,
      "h": 1500,
      "flip": false,
      "tint": "#3A1A5C",
@@ -4522,10 +5823,20 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
-       "x": 660,
+       "x": 600,
        "y": 0,
        "s": 1,
        "a": 1,
@@ -4538,7 +5849,7 @@
     {
      "tex": "kaiju_neutral_glow",
      "depth": 0.6,
-     "w": 586,
+     "w": 507,
      "h": 0,
      "flip": false,
      "tint": "#FFFFFF",
@@ -4554,10 +5865,20 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0.32,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
-       "x": -640,
+       "x": -570,
        "y": -900,
        "s": 1,
        "a": 1,
@@ -4566,8 +5887,8 @@
        "ease": "inOutSine"
       },
       {
-       "t": 0.1,
-       "x": -640,
+       "t": 0.15,
+       "x": -570,
        "y": -900,
        "s": 1,
        "a": 1,
@@ -4576,21 +5897,41 @@
        "ease": "inOutSine"
       },
       {
-       "t": 0.7,
-       "x": -640,
-       "y": -80,
+       "t": 0.45,
+       "x": -570,
+       "y": -60,
        "s": 1,
        "a": 1,
        "r": 0,
        "b": 0,
-       "ease": "outBack"
+       "ease": "inExpo"
+      },
+      {
+       "t": 0.53,
+       "x": -570,
+       "y": -66,
+       "s": 0.985,
+       "a": 1,
+       "r": 0,
+       "b": 0,
+       "ease": "outCubic"
+      },
+      {
+       "t": 0.8500000000000001,
+       "x": -570,
+       "y": -60,
+       "s": 1,
+       "a": 1,
+       "r": 0,
+       "b": 0,
+       "ease": "outBackSoft"
       }
      ]
     },
     {
      "tex": "kaiju_neutral",
      "depth": 0.6,
-     "w": 586,
+     "w": 507,
      "h": 0,
      "flip": false,
      "tint": "#FFFFFF",
@@ -4606,10 +5947,20 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": true,
+     "breathe": 0.016,
+     "breatheHz": 0.21,
+     "bob": 4,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
-       "x": -640,
+       "x": -570,
        "y": -900,
        "s": 1,
        "a": 1,
@@ -4618,8 +5969,8 @@
        "ease": "inOutSine"
       },
       {
-       "t": 0.1,
-       "x": -640,
+       "t": 0.15,
+       "x": -570,
        "y": -900,
        "s": 1,
        "a": 1,
@@ -4628,21 +5979,41 @@
        "ease": "inOutSine"
       },
       {
-       "t": 0.7,
-       "x": -640,
-       "y": -80,
+       "t": 0.45,
+       "x": -570,
+       "y": -60,
        "s": 1,
        "a": 1,
        "r": 0,
        "b": 0,
-       "ease": "outBack"
+       "ease": "inExpo"
+      },
+      {
+       "t": 0.53,
+       "x": -570,
+       "y": -66,
+       "s": 0.985,
+       "a": 1,
+       "r": 0,
+       "b": 0,
+       "ease": "outCubic"
+      },
+      {
+       "t": 0.8500000000000001,
+       "x": -570,
+       "y": -60,
+       "s": 1,
+       "a": 1,
+       "r": 0,
+       "b": 0,
+       "ease": "outBackSoft"
       }
      ]
     },
     {
      "tex": "kaiju_crimson_glow",
      "depth": 0.6,
-     "w": 654,
+     "w": 566,
      "h": 0,
      "flip": false,
      "tint": "#FFFFFF",
@@ -4658,6 +6029,16 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0.32,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
@@ -4670,7 +6051,7 @@
        "ease": "inOutSine"
       },
       {
-       "t": 0.4,
+       "t": 0.45,
        "x": 0,
        "y": -900,
        "s": 1,
@@ -4680,21 +6061,41 @@
        "ease": "inOutSine"
       },
       {
-       "t": 1.0,
+       "t": 0.75,
        "x": 0,
-       "y": -80,
+       "y": -60,
        "s": 1,
        "a": 1,
        "r": 0,
        "b": 0,
-       "ease": "outBack"
+       "ease": "inExpo"
+      },
+      {
+       "t": 0.83,
+       "x": 0,
+       "y": -66,
+       "s": 0.985,
+       "a": 1,
+       "r": 0,
+       "b": 0,
+       "ease": "outCubic"
+      },
+      {
+       "t": 1.15,
+       "x": 0,
+       "y": -60,
+       "s": 1,
+       "a": 1,
+       "r": 0,
+       "b": 0,
+       "ease": "outBackSoft"
       }
      ]
     },
     {
      "tex": "kaiju_crimson",
      "depth": 0.6,
-     "w": 654,
+     "w": 566,
      "h": 0,
      "flip": false,
      "tint": "#FFFFFF",
@@ -4710,6 +6111,16 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": true,
+     "breathe": 0.016,
+     "breatheHz": 0.21,
+     "bob": 4,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
@@ -4722,7 +6133,7 @@
        "ease": "inOutSine"
       },
       {
-       "t": 0.4,
+       "t": 0.45,
        "x": 0,
        "y": -900,
        "s": 1,
@@ -4732,21 +6143,41 @@
        "ease": "inOutSine"
       },
       {
-       "t": 1.0,
+       "t": 0.75,
        "x": 0,
-       "y": -40,
+       "y": -60,
        "s": 1,
        "a": 1,
        "r": 0,
        "b": 0,
-       "ease": "outBack"
+       "ease": "inExpo"
+      },
+      {
+       "t": 0.83,
+       "x": 0,
+       "y": -66,
+       "s": 0.985,
+       "a": 1,
+       "r": 0,
+       "b": 0,
+       "ease": "outCubic"
+      },
+      {
+       "t": 1.15,
+       "x": 0,
+       "y": -60,
+       "s": 1,
+       "a": 1,
+       "r": 0,
+       "b": 0,
+       "ease": "outBackSoft"
       }
      ]
     },
     {
      "tex": "kaiju_berserk_glow",
      "depth": 0.6,
-     "w": 709,
+     "w": 613,
      "h": 0,
      "flip": false,
      "tint": "#FFFFFF",
@@ -4762,10 +6193,20 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0.32,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
-       "x": 640,
+       "x": 560,
        "y": -900,
        "s": 1,
        "a": 1,
@@ -4774,8 +6215,8 @@
        "ease": "inOutSine"
       },
       {
-       "t": 0.7,
-       "x": 640,
+       "t": 0.75,
+       "x": 560,
        "y": -900,
        "s": 1,
        "a": 1,
@@ -4784,21 +6225,41 @@
        "ease": "inOutSine"
       },
       {
-       "t": 1.3,
-       "x": 640,
-       "y": -40,
+       "t": 1.05,
+       "x": 560,
+       "y": -60,
        "s": 1,
        "a": 1,
        "r": 0,
        "b": 0,
-       "ease": "outBack"
+       "ease": "inExpo"
+      },
+      {
+       "t": 1.1300000000000001,
+       "x": 560,
+       "y": -66,
+       "s": 0.985,
+       "a": 1,
+       "r": 0,
+       "b": 0,
+       "ease": "outCubic"
+      },
+      {
+       "t": 1.4500000000000002,
+       "x": 560,
+       "y": -60,
+       "s": 1,
+       "a": 1,
+       "r": 0,
+       "b": 0,
+       "ease": "outBackSoft"
       }
      ]
     },
     {
      "tex": "kaiju_berserk",
      "depth": 0.6,
-     "w": 709,
+     "w": 613,
      "h": 0,
      "flip": false,
      "tint": "#FFFFFF",
@@ -4814,10 +6275,20 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": true,
+     "breathe": 0.016,
+     "breatheHz": 0.21,
+     "bob": 4,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
-       "x": 640,
+       "x": 560,
        "y": -900,
        "s": 1,
        "a": 1,
@@ -4826,8 +6297,8 @@
        "ease": "inOutSine"
       },
       {
-       "t": 0.7,
-       "x": 640,
+       "t": 0.75,
+       "x": 560,
        "y": -900,
        "s": 1,
        "a": 1,
@@ -4836,14 +6307,34 @@
        "ease": "inOutSine"
       },
       {
-       "t": 1.3,
-       "x": 640,
-       "y": -40,
+       "t": 1.05,
+       "x": 560,
+       "y": -60,
        "s": 1,
        "a": 1,
        "r": 0,
        "b": 0,
-       "ease": "outBack"
+       "ease": "inExpo"
+      },
+      {
+       "t": 1.1300000000000001,
+       "x": 560,
+       "y": -66,
+       "s": 0.985,
+       "a": 1,
+       "r": 0,
+       "b": 0,
+       "ease": "outCubic"
+      },
+      {
+       "t": 1.4500000000000002,
+       "x": 560,
+       "y": -60,
+       "s": 1,
+       "a": 1,
+       "r": 0,
+       "b": 0,
+       "ease": "outBackSoft"
       }
      ]
     },
@@ -4866,10 +6357,20 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
-       "x": -330,
+       "x": -300,
        "y": 0,
        "s": 1,
        "a": 1,
@@ -4898,10 +6399,20 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
-       "x": 330,
+       "x": 300,
        "y": 0,
        "s": 1,
        "a": 1,
@@ -4925,11 +6436,11 @@
      "ease": "inOutSine"
     },
     {
-     "t": 4.0,
+     "t": 3.4,
      "zoom": 1,
      "zx": 0,
      "zy": 0,
-     "dolly": 1.03,
+     "dolly": 1.04,
      "x": 0,
      "y": 0,
      "rot": 0,
@@ -4939,15 +6450,16 @@
    "titles": [
     {
      "text": "OR NO SIDE AT ALL.",
-     "at": 1.6,
-     "out": 3.95,
-     "size": 84,
+     "at": 1.35,
+     "out": 3.3,
+     "size": 80,
      "color": "#F7F0E5",
      "x": 0,
-     "y": -310,
+     "y": 330,
      "font": "display",
      "track0": 40,
-     "track1": 10
+     "track1": 10,
+     "style": "slam"
     }
    ],
    "sub": {
@@ -4959,37 +6471,37 @@
    "sfx": [
     {
      "cue": "hit",
-     "at": 0.6
+     "at": 0.45
     },
     {
      "cue": "hit",
-     "at": 0.9
+     "at": 0.75
     },
     {
-     "cue": "hit",
-     "at": 1.2
+     "cue": "slam",
+     "at": 1.05
     },
     {
      "cue": "bong",
-     "at": 1.6
+     "at": 1.35
     }
    ],
    "flash": [],
    "shake": [
     {
-     "t": 0.6,
+     "t": 0.45,
      "dur": 0.2,
      "amp": 5
     },
     {
-     "t": 0.9,
+     "t": 0.75,
      "dur": 0.2,
-     "amp": 5
+     "amp": 6
     },
     {
-     "t": 1.2,
-     "dur": 0.25,
-     "amp": 8
+     "t": 1.05,
+     "dur": 0.3,
+     "amp": 10
     }
    ],
    "particles": [],
@@ -4999,13 +6511,16 @@
      "v": 1,
      "ease": "linear"
     }
-   ]
+   ],
+   "trans": "cut",
+   "transDur": 0,
+   "camDrift": 5
   },
   {
    "id": "hero",
-   "seconds": 5.5,
-   "beat": "your turn: hold the hill",
-   "boardAt": 3.2,
+   "seconds": 5.9,
+   "beat": "your turn: hold the hill; the logo lands where the title's logo sits",
+   "boardAt": 4.0,
    "layers": [
     {
      "tex": "hero",
@@ -5026,6 +6541,16 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": true,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
@@ -5038,7 +6563,7 @@
        "ease": "inOutSine"
       },
       {
-       "t": 2.0,
+       "t": 2.8,
        "x": 0,
        "y": 0,
        "s": 1,
@@ -5048,7 +6573,7 @@
        "ease": "inOutSine"
       },
       {
-       "t": 2.5,
+       "t": 3.2,
        "x": 0,
        "y": 0,
        "s": 1,
@@ -5078,6 +6603,16 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0.2,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
@@ -5110,6 +6645,16 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
@@ -5126,7 +6671,7 @@
     {
      "tex": "UI/Logo/critical-mass-bible-logo-glow@2x",
      "depth": 0.0,
-     "w": 900,
+     "w": 766,
      "h": 0,
      "flip": false,
      "tint": "#FFFFFF",
@@ -5142,11 +6687,21 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "titleLogo",
      "keys": [
       {
        "t": 0,
        "x": 0,
-       "y": 170,
+       "y": 0,
        "s": 1.6,
        "a": 0,
        "r": 0,
@@ -5154,9 +6709,9 @@
        "ease": "inOutSine"
       },
       {
-       "t": 2.0,
+       "t": 2.95,
        "x": 0,
-       "y": 170,
+       "y": 0,
        "s": 1.6,
        "a": 0,
        "r": 0,
@@ -5164,21 +6719,31 @@
        "ease": "step"
       },
       {
-       "t": 2.45,
+       "t": 3.18,
        "x": 0,
-       "y": 170,
-       "s": 1,
+       "y": 0,
+       "s": 0.97,
        "a": 1,
        "r": 0,
        "b": 0,
-       "ease": "outBack"
+       "ease": "inCubic"
+      },
+      {
+       "t": 3.45,
+       "x": 0,
+       "y": 0,
+       "s": 1.0,
+       "a": 1,
+       "r": 0,
+       "b": 0,
+       "ease": "outBackSoft"
       }
      ]
     },
     {
      "tex": "UI/Logo/critical-mass-bible-logo@2x",
      "depth": 0.0,
-     "w": 900,
+     "w": 766,
      "h": 0,
      "flip": false,
      "tint": "#FFFFFF",
@@ -5194,11 +6759,21 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": true,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "titleLogo",
      "keys": [
       {
        "t": 0,
        "x": 0,
-       "y": 170,
+       "y": 0,
        "s": 1.6,
        "a": 0,
        "r": 0,
@@ -5206,9 +6781,9 @@
        "ease": "inOutSine"
       },
       {
-       "t": 2.0,
+       "t": 2.95,
        "x": 0,
-       "y": 170,
+       "y": 0,
        "s": 1.6,
        "a": 0,
        "r": 0,
@@ -5216,9 +6791,9 @@
        "ease": "step"
       },
       {
-       "t": 2.01,
+       "t": 2.96,
        "x": 0,
-       "y": 170,
+       "y": 0,
        "s": 1.6,
        "a": 1,
        "r": 0,
@@ -5226,14 +6801,24 @@
        "ease": "step"
       },
       {
-       "t": 2.45,
+       "t": 3.18,
        "x": 0,
-       "y": 170,
-       "s": 1,
+       "y": 0,
+       "s": 0.97,
        "a": 1,
        "r": 0,
        "b": 0,
-       "ease": "outBack"
+       "ease": "inCubic"
+      },
+      {
+       "t": 3.45,
+       "x": 0,
+       "y": 0,
+       "s": 1.0,
+       "a": 1,
+       "r": 0,
+       "b": 0,
+       "ease": "outBackSoft"
       }
      ]
     },
@@ -5256,6 +6841,16 @@
      "jitter": 0,
      "jitterFrom": 0,
      "jitterTo": 0,
+     "cover": false,
+     "subject": false,
+     "breathe": 0,
+     "breatheHz": 0.3,
+     "bob": 0,
+     "sway": 0,
+     "driftX": 0,
+     "driftY": 0,
+     "glint": 0,
+     "anchor": "",
      "keys": [
       {
        "t": 0,
@@ -5268,7 +6863,7 @@
        "ease": "inOutSine"
       },
       {
-       "t": 2.9,
+       "t": 3.6,
        "x": -1300,
        "y": 0,
        "s": 1,
@@ -5278,7 +6873,7 @@
        "ease": "step"
       },
       {
-       "t": 3.7,
+       "t": 4.4,
        "x": 1300,
        "y": 0,
        "s": 1,
@@ -5303,11 +6898,11 @@
      "ease": "inOutSine"
     },
     {
-     "t": 5.5,
+     "t": 5.9,
      "zoom": 1,
      "zx": 0,
      "zy": 0,
-     "dolly": 1.04,
+     "dolly": 1.05,
      "x": 0,
      "y": 0,
      "rot": 0,
@@ -5317,54 +6912,78 @@
    "titles": [
     {
      "text": "HOLD THE HILL.",
-     "at": 0.25,
-     "out": 2.0,
-     "size": 120,
+     "at": 0.3,
+     "out": 1.35,
+     "size": 116,
      "color": "#F7F0E5",
      "x": 0,
-     "y": 20,
+     "y": 40,
      "font": "display",
      "track0": 64,
-     "track1": 12
+     "track1": 12,
+     "style": "slam"
+    },
+    {
+     "text": "RAISE THE KAIJU.",
+     "at": 1.5,
+     "out": 2.85,
+     "size": 108,
+     "color": "#F7F0E5",
+     "x": 0,
+     "y": 40,
+     "font": "display",
+     "track0": 60,
+     "track1": 12,
+     "style": "slam"
     }
    ],
    "sub": {
     "text": "Hold the hill. Raise the Kaiju.",
-    "at": 0.2,
-    "out": 2.6
+    "at": 0.3,
+    "out": 3.0
    },
    "vo": [
     {
      "clip": "CMVoice/story-card-5",
-     "at": 0.2
+     "at": 0.3
     },
     {
      "clip": "CMVoice/story-title",
-     "at": 2.9
+     "at": 3.25
     }
    ],
    "sfx": [
     {
-     "cue": "impact",
-     "at": 2.0
+     "cue": "whoosh",
+     "at": 2.85
+    },
+    {
+     "cue": "slam",
+     "at": 3.18
     },
     {
      "cue": "chime",
-     "at": 2.9
+     "at": 3.4
     }
    ],
    "flash": [
     {
-     "t": 2.0,
+     "t": 0.0,
+     "dur": 0.25,
+     "peak": 0.45,
+     "color": "#FFE2B0"
+    },
+    {
+     "t": 3.18,
      "dur": 0.3,
-     "peak": 0.5,
+     "peak": 0.45,
      "color": "#FFFFFF"
     }
    ],
    "shake": [
     {
-     "t": 2.0,
-     "dur": 0.3,
+     "t": 3.18,
+     "dur": 0.35,
      "amp": 10
     }
    ],
@@ -5373,11 +6992,11 @@
      "tex": "ember",
      "color": "#F9A858",
      "t0": 0,
-     "t1": 5.5,
+     "t1": 5.9,
      "count": 24,
      "x": 0,
      "y": -420,
-     "sx": 1900,
+     "sx": 1700,
      "sy": 80,
      "vx": 0,
      "vy": 80,
@@ -5402,11 +7021,14 @@
      "ease": "linear"
     },
     {
-     "t": 4.6,
+     "t": 4.5,
      "v": 0,
      "ease": "inOutCubic"
     }
-   ]
+   ],
+   "trans": "cut",
+   "transDur": 0,
+   "camDrift": 5
   }
  ]
 }

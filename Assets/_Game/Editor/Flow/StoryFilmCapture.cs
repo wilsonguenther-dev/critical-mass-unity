@@ -33,7 +33,7 @@ namespace CriticalMass.Editor.Flow
         static readonly Color Hole = new Color(1f, 0f, 1f, 1f);
         public static readonly float[] Aspects = { 4f / 3f, 3024f / 1964f, 16f / 10f, 16f / 9f, 21f / 9f };
         const int SmallW = 756;
-        const float OutroFrames = 6f;
+        static float OutroSeconds => StoryIntro.ComicOutroSeconds;
 
         public static void Run()
         {
@@ -111,7 +111,7 @@ namespace CriticalMass.Editor.Flow
             var readFull = new Texture2D(W, H, TextureFormat.RGB24, false);
 
             float total = MotionComic.TotalSeconds(shots);
-            int n = Mathf.CeilToInt(total * fps) + (int)OutroFrames;
+            int n = Mathf.CeilToInt((total + OutroSeconds) * fps) + 1;
             var csv = new StringBuilder("frame,time,shot,id,local,uncovered,luma,titles\n");
             double[] starts = new double[shots.Length];
             double acc = 0;
@@ -125,12 +125,13 @@ namespace CriticalMass.Editor.Flow
                 float fade = 1f;
                 if (T >= total)
                 {
-                    float u = (float)((T - total) / Mathf.Max(0.05f, table.outroSeconds));
+                    float u = (float)((T - total) / Mathf.Max(0.05f, OutroSeconds));
                     fade = 1f - MotionComic.Ease(McEase.InOutSine, u);
                     title.enabled = true;
                 }
                 else title.enabled = false;
-                player.SetFade(fade);
+                player.SetFade(fade * MotionComic.Ease(McEase.OutCubic, (float)(T / StoryIntro.ComicOpenSeconds)));
+                player.SetSkipAlpha(T < total ? MotionComic.SkipPromptAlpha(T, SkipGate.LockSeconds) : 0f);
                 player.Render(si, local, T, false);
                 Draw(cam, rt);
                 Blit(rt, half, small);
