@@ -59,6 +59,8 @@ namespace CriticalMass.Runtime.Game
         static long _prevTs, _prevAlloc, _frameStartTs, _frameStartAlloc, _loopEndTs;
         static int _gcCount;
         static ProfilerRecorder _gcRec;
+        // development builds only: Unity's exact managed allocation of the previous frame (release players report nothing)
+        static ProfilerRecorder _gcAllocRec;
 
         // ---- recorded rows ----
         public const int ColFrameMs = 0, ColDtMs = 1, ColTicks = 2, ColMain = 3, ColWait = 4, ColRender = 5, ColGpu = 6,
@@ -126,6 +128,11 @@ namespace CriticalMass.Runtime.Game
             _slotSpike = new double[(int)FrameCost.Slot.Count];
             _slotAlloc = new double[(int)FrameCost.Slot.Count];
             _gcRec = ProfilerRecorder.StartNew(ProfilerCategory.Memory, "GC.Collect", 2);
+            if (UnityEngine.Debug.isDebugBuild)
+            {
+                _gcAllocRec = ProfilerRecorder.StartNew(ProfilerCategory.Memory, "GC Allocated In Frame", 2);
+                if (_gcAllocRec.Valid) AllocSource = "GC Allocated In Frame (development build, exact; per-subsystem split from " + AllocSource + ")";
+            }
             UnityEngine.Debug.Log($"[CM.Frames] recorder installed: {_labels.Length} stamps, allocation counter {AllocSource}");
         }
 
@@ -220,7 +227,9 @@ namespace CriticalMass.Runtime.Game
             _data[o + ColGpu] = SessionKeeper.GpuFrameMs;
             _data[o + ColGcMs] = _gcRec.Valid ? (float)(_gcRec.LastValue * 1e-6) : -1f;
             _data[o + ColGcCount] = gc - _gcCount;
-            _data[o + ColAllocKb] = (alloc - _frameStartAlloc) / 1024f;
+            _data[o + ColAllocKb] = _gcAllocRec.Valid && _gcAllocRec.Count > 0
+                ? _gcAllocRec.LastValue / 1024f
+                : (alloc - _frameStartAlloc) / 1024f;
             _data[o + ColLoading] = Loading ? 1 : 0;
             _data[o + ColOutside] = (float)outside;
             int c = o + FixedCols;
