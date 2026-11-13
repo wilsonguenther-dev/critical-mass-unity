@@ -510,8 +510,8 @@ CAP_BASE = 1.705
 
 
 def build_cap():
-    """Carpenter's flat cap: a wide crown of eight tweed panels (alternating tones, dark gaps = inner lines) that
-    overhangs a short brim, a broad team band, a cloth button on top. Tipped forward 7 degrees."""
+    """Carpenter's flat cap (ivy style): one smooth oval crown slung forward over a short brim, a stitched seam arc and
+    a button at the front, a broad team band. Tipped forward 7 degrees."""
     H = "head"
     TIP = (Matrix.Translation((0, -0.02, CAP_BASE)) @ Matrix.Rotation(math.radians(7), 4, "X") @
            Matrix.Translation((0, 0, -CAP_BASE)))
@@ -520,16 +520,17 @@ def build_cap():
     # teardrop), never the Miner's round helmet dome
     prof = [(0.335, z0), (0.38, z0 + 0.035), (0.395, z0 + 0.07), (0.37, z0 + 0.10), (0.28, z0 + 0.125),
             (0.13, z0 + 0.138), (0.02, z0 + 0.14)]
-    CROWN = M((0, -0.085, 0), (0, 0, 0), (1.0, 1.18, 1.0))
-    add(BODY, B.lathe([(r * 0.975, z) for r, z in prof], 12), "brow", H, "cap_detail", grad=False, m=CROWN,
-        post=TIP)
-    n = 8
-    for k in range(n):
-        a0 = 2 * math.pi * k / n + 0.05
-        a1 = 2 * math.pi * (k + 1) / n - 0.05
-        add(BODY, dome_sector([(r * 1.01, z) for r, z in prof[:-1]] + [(0.03, prof[-1][1] - 0.004)], a0, a1, 2),
-            "cap_light" if k % 2 == 0 else "cap", H, "cap", smooth=True, m=CROWN, post=TIP)
-    add(BODY, B.sphere((0.05, 0.05, 0.03), 8, 4), "cap", H, "cap", m=M((0, -0.085, z0 + 0.14)), post=TIP)
+    # v1.2: an ivy-style flat cap, one smooth crown (no radial panel seams: from the gameplay camera eight seams read as
+    # the Miner's segmented dome), narrower across and long front-to-back, so from above it is an oval slung forward
+    CROWN = M((0, -0.06, 0), (0, 0, 0), (0.93, 1.13, 1.0))
+    add(BODY, B.lathe(prof, 16), "cap", H, "cap", smooth=True, m=CROWN, post=TIP)
+    # stitched seam where the crown snaps down onto the brim (a dark arc across the front), and a button at the front
+    for k in range(7):
+        ang = math.radians(-60 + 20 * k)
+        x, y = 0.335 * math.sin(ang) * 0.93, -0.06 - 0.335 * math.cos(ang) * 1.13
+        add(BODY, B.box((0.07, 0.014, 0.012), 0.0), "brow", H, "cap_detail", smooth=False, grad=False,
+            m=M((x, y, z0 + 0.118), (-14 * math.cos(ang), 0, math.degrees(ang))), post=TIP)
+    add(BODY, B.sphere((0.04, 0.04, 0.022), 8, 4), "cap_light", H, "cap", m=M((0, -0.44, z0 + 0.075)), post=TIP)
     # team band round the crown base
     add(BODY, B.cyl((0, 0, CAP_BASE - 0.025), (0, 0, CAP_BASE + 0.06), 0.325, 0.335, 18), "team", H, "team_trim",
         m=M((0, -0.02, 0), (0, 0, 0), (1.0, 1.04, 1.0)), post=TIP)
