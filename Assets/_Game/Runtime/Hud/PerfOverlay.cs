@@ -61,6 +61,10 @@ namespace CriticalMass.Runtime.Hud
         static readonly HashSet<string> RecNames = new HashSet<string>();
         static bool _recordersStarted, _recording;
         static readonly List<float> MatchFrames = new List<float>(65536);
+        // DG-54: real CPU and GPU frame times from FrameTimingManager (SessionKeeper captures them once per frame).
+        static readonly List<float> MatchGpu = new List<float>(65536);
+        static readonly List<float> MatchCpuMain = new List<float>(65536);
+        const int MaxRecordedFrames = 1 << 17;   // a hard cap: a 2-hour soak never grows these lists without bound
         static double _recordStart;
 
         void Awake()
@@ -86,9 +90,11 @@ namespace CriticalMass.Runtime.Hud
                 _ringHead = (_ringHead + 1) % RingFrames;
                 if (_ringCount < RingFrames) _ringCount++;
             }
-            if (_recording)
+            if (_recording && MatchFrames.Count < MaxRecordedFrames)
             {
                 MatchFrames.Add(ms);
+                if (SessionKeeper.GpuFrameMs > 0f) MatchGpu.Add(SessionKeeper.GpuFrameMs);
+                if (SessionKeeper.CpuMainMs > 0f) MatchCpuMain.Add(SessionKeeper.CpuMainMs);
                 Sample();
             }
 
@@ -137,6 +143,9 @@ namespace CriticalMass.Runtime.Hud
                 Last("Main Thread"), Last("PostLateUpdate.FinishFrameRendering"), Last("Update.ScriptRunBehaviourUpdate"));
             sb.AppendFormat(CultureInfo.InvariantCulture, "batches {0:F0}  setpass {1:F0}  tris {2:F0}k  gc {3:F1} KB/frame\n",
                 Last("Batches Count"), Last("SetPass Calls Count"), Last("Triangles Count") / 1000.0, Last("GC Allocated In Frame") / 1024.0);
+            sb.AppendFormat(CultureInfo.InvariantCulture, "cpu {0:F1} ms  gpu {1:F1} ms  scale {2:0.00}  cap {3}  dropped sim {4:F2} s  hud events {5}\n",
+                SessionKeeper.CpuMainMs, SessionKeeper.GpuFrameMs, FrameGovernor.AppliedRenderScale, FrameGovernor.AppliedCap,
+                RuntimeCounters.SimDroppedSeconds, RuntimeCounters.HudEventsDropped);
             sb.AppendFormat(CultureInfo.InvariantCulture, "{0}x{1}  vsync {2}  {3}", Screen.width, Screen.height, QualitySettings.vSyncCount, BuildInfo.Label);
             return sb.ToString();
         }
@@ -226,6 +235,8 @@ namespace CriticalMass.Runtime.Hud
                 r.Samples = 0;
             }
             MatchFrames.Clear();
+            MatchGpu.Clear();
+            MatchCpuMain.Clear();
             _recordStart = Time.realtimeSinceStartupAsDouble;
             _recording = true;
         }
@@ -236,6 +247,8 @@ namespace CriticalMass.Runtime.Hud
             public int Frames;
             public double Seconds, P50, P95, P99, Mean, Worst, WorstAtSecond;
             public int Over50, Over33, Over20;
+            /// <summary>FrameTimingManager GPU and main-thread CPU frame times (ms); NaN when the platform reported none.</summary>
+            public double GpuP50 = double.NaN, GpuP95 = double.NaN, CpuMainP50 = double.NaN, CpuMainP95 = double.NaN;
             public List<(string name, string unit, double mean, double max)> MarkerMeans = new List<(string, string, double, double)>();
 
             public string Summary() => string.Format(CultureInfo.InvariantCulture,
@@ -249,6 +262,18 @@ namespace CriticalMass.Runtime.Hud
             _recording = false;
             Report rep = Analyse(MatchFrames);
             rep.Seconds = Time.realtimeSinceStartupAsDouble - _recordStart;
+            if (MatchGpu.Count > 0)
+            {
+                Report g = Analyse(MatchGpu);
+                rep.GpuP50 = g.P50;
+                rep.GpuP95 = g.P95;
+            }
+            if (MatchCpuMain.Count > 0)
+            {
+                Report c = Analyse(MatchCpuMain);
+                rep.CpuMainP50 = c.P50;
+                rep.CpuMainP95 = c.P95;
+            }
             foreach (Rec r in Recs)
             {
                 if (r.Samples == 0) continue;
@@ -419,6 +444,9 @@ namespace CriticalMass.Runtime.Hud
             sb.AppendFormat(c, "  \"frame_ms\": {{\"p50\": {0:0.###}, \"p95\": {1:0.###}, \"p99\": {2:0.###}, \"mean\": {3:0.###}, \"worst\": {4:0.###}, \"worst_at_s\": {5:0.##}}},\n",
                 r.P50, r.P95, r.P99, r.Mean, r.Worst, r.WorstAtSecond);
             sb.AppendFormat(c, "  \"frames_over_ms\": {{\"20\": {0}, \"33.3\": {1}, \"50\": {2}}},\n", r.Over20, r.Over33, r.Over50);
+            // null (never 0) when the platform reported no timing: the perf gate fails closed on a missing number.
+            sb.Append("  \"gpu_ms\": ").Append(double.IsNaN(r.GpuP95) ? "null" : string.Format(c, "{{\"p50\": {0:0.###}, \"p95\": {1:0.###}}}", r.GpuP50, r.GpuP95)).Append(",\n");
+            sb.Append("  \"cpu_main_ms\": ").Append(double.IsNaN(r.CpuMainP95) ? "null" : string.Format(c, "{{\"p50\": {0:0.###}, \"p95\": {1:0.###}}}", r.CpuMainP50, r.CpuMainP95)).Append(",\n");
             sb.Append("  \"markers\": [\n");
             for (int i = 0; i < r.MarkerMeans.Count; i++)
             {

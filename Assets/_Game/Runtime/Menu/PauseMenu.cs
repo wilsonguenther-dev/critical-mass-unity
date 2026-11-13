@@ -144,9 +144,15 @@ namespace CriticalMass.Runtime.Menu
         void Close()
         {
             CancelRebind();
+            FlushSettings();   // DG-53: saved once when the menu closes, not on every slider tick
             IsOpen = false;
             if (Canvas != null) Canvas.enabled = false;
             if (EventSystem.current != null) EventSystem.current.SetSelectedGameObject(null);
+        }
+
+        void FlushSettings()
+        {
+            if (!GameSettings.Flush() && _settingsPage != null) SetStatus("Settings could not be saved.", true);
         }
 
         void Update()
@@ -209,6 +215,7 @@ namespace CriticalMass.Runtime.Menu
         {
             Build();
             CancelRebind();
+            if (CurrentPage == Page.Settings) FlushSettings();   // DG-53: the settings page closed: one save
             CurrentPage = Page.Root;
             _rootPage.SetActive(true);
             _settingsPage.SetActive(false);
@@ -670,11 +677,13 @@ namespace CriticalMass.Runtime.Menu
                 Stepper(tab, 2, "VERTICAL SYNC", () => GameSettings.VSync ? "ON" : "OFF", d => GameSettings.VSync = !GameSettings.VSync),
                 Stepper(tab, 3, "QUALITY", QualityText, StepQuality),
                 Stepper(tab, 4, "FRAME RATE LIMIT", FpsCapText, StepFpsCap),
-                Stepper(tab, 5, "SLOW DOWN IN BACKGROUND", () => GameSettings.BackgroundThrottle ? "ON" : "OFF",
+                Stepper(tab, 5, "SAVE POWER IN BACKGROUND", () => GameSettings.BackgroundThrottle ? "ON" : "OFF",
                     d => GameSettings.BackgroundThrottle = !GameSettings.BackgroundThrottle),
             };
-            Note(tab, 6, GameSettings.CanChangeWindow ? "Changes apply at once and are kept for the next launch." :
-                "Video settings are saved here and apply in the built game.");
+            // DG-62: the safe-start notice lives here, neutral, never on the title screen.
+            string safe = CriticalMass.Runtime.Game.FrameGovernor.SafeNotice;
+            Note(tab, 6, safe ?? (GameSettings.CanChangeWindow ? "Changes apply at once and are kept for the next launch." :
+                "Video settings are saved here and apply in the built game."));
             ChainInTab(items);
             return tab.gameObject;
         }
@@ -694,10 +703,26 @@ namespace CriticalMass.Runtime.Menu
             reset.Submitted = () =>
             {
                 GameSettings.ResetAll();
+                CriticalMass.Runtime.Game.SupportReport.ResetDataFiles();   // DG-64: the data files and the keys together
                 RefreshAll();
                 SetStatus("Audio, video and game settings are back to their defaults.", false);
             };
             items.Add(reset);
+            // DG-64: a zip of the logs a tester can send us (no upload; the decision ledger rules out crash services).
+            MenuItem report = MenuUi.Item(tab, "Problem Report", ContentX, ContentY + 3 * (LineH + LineGap) + 96f, 420f, 56f,
+                "SAVE A PROBLEM REPORT", MenuItem.Kind.Button, 24, true, CMTokens.Display);
+            report.Submitted = () =>
+            {
+                string zip = CriticalMass.Runtime.Game.SupportReport.Export(null, out string error);
+                if (zip == null)
+                {
+                    SetStatus("The problem report could not be saved: " + error + ".", true);
+                    return;
+                }
+                SetStatus("Problem report saved: " + System.IO.Path.GetFileName(zip) + " (shown in its folder).", false);
+                CriticalMass.Runtime.Game.SupportReport.Reveal(zip);
+            };
+            items.Add(report);
             ChainInTab(items);
             return tab.gameObject;
         }

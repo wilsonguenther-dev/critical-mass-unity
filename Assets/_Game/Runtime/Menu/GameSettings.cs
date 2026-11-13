@@ -28,14 +28,17 @@ namespace CriticalMass.Runtime.Menu
         public const string BloodKey = "cm.blood";
         /// <summary>Frame-rate limit: 30, 60 or 120 frames per second, or 0 = the display's refresh rate (default 60).</summary>
         public const string FpsCapKey = "cm.fpsCap";
-        /// <summary>Lower the frame rate while the game is not the front window: 1 on (default), 0 off.</summary>
+        /// <summary>"Save power in background": 15 fps while the game is not the front window: 1 on, 0 off (default, DG-51).</summary>
         public const string BgThrottleKey = "cm.bgThrottle";
+        /// <summary>DG-53: the settings format version, so a later build can migrate or reset stored keys safely.</summary>
+        public const string PrefsVersionKey = "cm.prefsVersion";
+        public const int PrefsVersion = 1;
 
         /// <summary>Every key this class writes (tests back these up and restore them).</summary>
         public static readonly string[] AllKeys =
         {
             MasterKey, MusicKey, EffectsKey, WidthKey, HeightKey, FullScreenKey, VSyncKey, QualityKey, ShakeKey,
-            DamageNumbersKey, BloodKey, FpsCapKey, BgThrottleKey,
+            DamageNumbersKey, BloodKey, FpsCapKey, BgThrottleKey, PrefsVersionKey,
         };
 
         public const string MixerResource = "Audio/CMMixer";
@@ -79,12 +82,12 @@ namespace CriticalMass.Runtime.Menu
             {
                 PlayerPrefs.SetInt(FpsCapKey, Array.IndexOf(FpsCapOptions, value) >= 0 ? value : DefaultFpsCap);
                 Save();
-                CriticalMass.Runtime.Game.FrameGovernor.Reapply();
+                CriticalMass.Runtime.Game.FrameGovernor.Reapply();   // FrameGovernor applies it on the next frame
             }
         }
 
-        /// <summary>Reduce the frame rate when the game is not the front window (cm.bgThrottle, default on). Stored only.</summary>
-        public static bool BackgroundThrottle { get => GetB(BgThrottleKey, true); set { SetB(BgThrottleKey, value); CriticalMass.Runtime.Game.FrameGovernor.Reapply(); } }
+        /// <summary>Save power in background: 15 fps when the game is not the front window (cm.bgThrottle, default off, DG-51).</summary>
+        public static bool BackgroundThrottle { get => GetB(BgThrottleKey, false); set { SetB(BgThrottleKey, value); CriticalMass.Runtime.Game.FrameGovernor.Reapply(); } }
 
         public static bool FullScreen { get => GetB(FullScreenKey, true); set { SetB(FullScreenKey, value); ApplyVideo(); } }
         public static bool VSync { get => GetB(VSyncKey, true); set { SetB(VSyncKey, value); ApplyVideo(); } }
@@ -189,10 +192,20 @@ namespace CriticalMass.Runtime.Menu
             if (q >= 0 && q < QualitySettings.names.Length && QualitySettings.GetQualityLevel() != q) QualitySettings.SetQualityLevel(q, true);
             // Vertical sync and the frame limit are FrameGovernor's alone (it re-applies them after a level change).
             CriticalMass.Runtime.Game.FrameGovernor.Reapply();
-            Vector2Int r = Resolution;
+            Vector2Int r = ClampedResolution(Resolution, Display.main.systemWidth, Display.main.systemHeight);
             int w = r.x > 0 ? r.x : Screen.width, h = r.y > 0 ? r.y : Screen.height;
+            // DG-52: borderless fullscreen-window or a window, never exclusive fullscreen or a display-mode change; the
+            // governor spaces changes at least 1 s apart.
             FullScreenMode mode = FullScreen ? FullScreenMode.FullScreenWindow : FullScreenMode.Windowed;
-            if (w != Screen.width || h != Screen.height || Screen.fullScreenMode != mode) Screen.SetResolution(w, h, mode);
+            if (w != Screen.width || h != Screen.height || Screen.fullScreenMode != mode) CriticalMass.Runtime.Game.FrameGovernor.RequestWindow(w, h, mode);
+        }
+
+        /// <summary>DG-52: a saved size larger than the display shrinks to fit it (aspect kept); (0, 0) stays "current".</summary>
+        public static Vector2Int ClampedResolution(Vector2Int saved, int displayW, int displayH)
+        {
+            if (saved.x <= 0 || saved.y <= 0) return saved;
+            (int w, int h) = CriticalMass.Runtime.Game.FramePolicy.ClampToNative(saved.x, saved.y, displayW, displayH);
+            return new Vector2Int(w, h);
         }
 
         /// <summary>Applies every stored setting (boot).</summary>
@@ -207,6 +220,7 @@ namespace CriticalMass.Runtime.Menu
         {
             for (int i = 0; i < AllKeys.Length; i++) PlayerPrefs.DeleteKey(AllKeys[i]);
             Save();
+            Flush();
             ApplyAll();
         }
 
@@ -215,8 +229,27 @@ namespace CriticalMass.Runtime.Menu
         {
             _mixerLooked = false;
             _mixer = null;
+            Application.quitting -= OnQuit;
+            Application.quitting += OnQuit;
+            CheckPrefsVersion();
             if (Application.isBatchMode) return;   // gates and tests keep the project's settings
             ApplyAll();
+        }
+
+        static void OnQuit() => Flush();
+
+        /// <summary>DG-53: stamps cm.prefsVersion; a newer format (a later build ran) is kept and logged, never misread.</summary>
+        static void CheckPrefsVersion()
+        {
+            int v = PlayerPrefs.GetInt(PrefsVersionKey, 0);
+            if (v == PrefsVersion) return;
+            if (v > PrefsVersion)
+            {
+                Debug.LogWarning($"[CM.Settings] settings were saved by a newer build (format {v}); reading what this build knows");
+                return;
+            }
+            PlayerPrefs.SetInt(PrefsVersionKey, PrefsVersion);
+            _dirty = true;
         }
 
         static float GetF(string k, float d) => PlayerPrefs.GetFloat(k, d);
@@ -234,10 +267,47 @@ namespace CriticalMass.Runtime.Menu
             Save();
         }
 
+        static bool _dirty;
+
+        /// <summary>Disk writes of the settings since boot (DG-53 test: 100 volume changes, 0 saves until the page closes).</summary>
+        public static int SaveCount { get; private set; }
+
+        /// <summary>true while a change waits for Flush.</summary>
+        public static bool Dirty => _dirty;
+
+        /// <summary>The last save failure, or null.</summary>
+        public static string LastSaveError { get; private set; }
+
+        /// <summary>DG-53: a change is kept in memory and marked; it reaches the disk when the page closes (Flush), not per tick.</summary>
         static void Save()
         {
-            PlayerPrefs.Save();
+            _dirty = true;
             Changed?.Invoke();
+        }
+
+        /// <summary>
+        /// Writes pending changes to disk: the settings page and pause menu call it when they close, and the game at quit.
+        /// Returns false (and shows "Settings could not be saved") when the write failed.
+        /// </summary>
+        public static bool Flush()
+        {
+            if (!_dirty) return true;
+            try
+            {
+                PlayerPrefs.SetInt(PrefsVersionKey, PrefsVersion);
+                PlayerPrefs.Save();
+                _dirty = false;
+                SaveCount++;
+                LastSaveError = null;
+                return true;
+            }
+            catch (Exception e)
+            {
+                LastSaveError = e.Message;
+                Debug.LogError($"[CM.Settings] settings could not be saved: {e.Message}");
+                CriticalMass.Runtime.Game.FrameGovernor.ShowNotice("Settings could not be saved.");
+                return false;
+            }
         }
     }
 }
