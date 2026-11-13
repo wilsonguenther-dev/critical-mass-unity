@@ -935,3 +935,42 @@ they knock pillars over only as the oracle's do, when a melee swing happens to r
    and `Fall` (where the actor climbs out), all with positions, for the effects and sound items.
 **Status.** Built in DG-09 (draft PR, stacked on DG-02 #19). Max reviews; the owner can drop the mode (set CarryMax 1 and
 unbind the switch) without touching the rules.
+
+## U-054 Healing, meat, biomass corruption, contestable deliveries and the shrine cleanse as built in DG-16a / DG-16b (2026-11-13T01:05:37Z)
+
+**Source.** Travis, "Current ideas for the game (not needed for demo)" (2026-11-12 email): "Slower corruption/biomass
+corruption", "Different biomass types (meat from killed bodies/plants around the map", "A way to remove corruption (healer
+special or something else)", "A way to heal (healer class or fountain/flask)"; Nov 4 call: "there's no way ... to kill them
+before they drop off the resources". Gap list rows 6 to 9 and 14, items DG-16a and DG-16b.
+**Ported as is.** Browser 09e0904 for CM-37 (base fountain, 1 HP per tick inside radius 3.75 of the own pad, bots retreat
+below 30% HP as on main), CM-35 (a knocked-out unit drops a 2-unit meat orb for 600 ticks while the egg stands; walk-over
+pickup into a separate meat load; meat pays 6 allegiance per unit) and CM-85 (every biomass unit adds 0.125 instability).
+Unmerged branches cm/CM-64 (e056d8e: a 30-tick delivery wind-up, an enemy hit restarts it, Kaiju-duty bots contest carriers
+within 11 of the shrine, a dead feeder keeps its duty seat) and cm/CM-36 (1c6ce00: hold E empty-handed at the egg for 15
+ticks to drain 2 corruption units over 90 ticks, 2700-tick team cooldown, closed after the berserk lock or the hatch; only
+the human slot on autopilot cleanses, never pure bots).
+**Decided (not in the browser).**
+1. The two branches were written separately on batch 1 and are merged here. A meat load counts as a load for the cleanse:
+   an actor holding meat (or cargo) is disarmed until it lets go of E, so the press that delivers meat never cleanses.
+2. The cleanse test that delivered with one held press now holds for the wind-up first; every older delivery test runs
+   `Delivery.WindupTicks` passes, as the CM-64 branch did to its own tests.
+3. `AiState.Cleanse` is appended at the end of the enum (the browser lists it before retreat) so no stored integer moves.
+**Status.** Built in DG-16a and DG-16b (one draft PR, stacked on DG-09 #29). Known: the single-seed bot check
+`BotsMatchTests` (a) (5v5 seed 1, 120 s) reads azure hill presence 0.498 against its 0.70 floor once the wind-up and
+interception are on; the browser's CM-64 hit the same check (0.5224) and its bounce fix (interceptors are Kaiju-duty bots
+only, dead feeders keep their seat) is ported. See the PR for the soak numbers.
+
+## U-055 Damage cause, passive bots and attack events for the view (2026-11-13T01:05:37Z)
+
+**Source.** Two view builders (DG-11 kill feed and death recap, DG-12 guided first match, combat effects) asked the rules
+lane for small sim additions. Not in the browser.
+**Decided.**
+1. `DamageCause { None, Melee, KaijuMelee, KaijuSlam, Fall, Explosion }`, written on every Hit and Death event
+   (`SimEvent.Cause`) and kept in `Actor.LastCause` until respawn. Fall is reserved (the DG-09 fall rule does no damage),
+   Explosion for DG-22. `Damage.ApplyDamage` gains an overload with an explicit cause.
+2. The slam passes `Damage.KaijuSlamSource = -3` (the value DG-11's `CombatLog.KaijuSlam` already uses), but the event's B
+   and `LastAttacker` still read -1 for it, because ported tests pin that; the slam is told apart by its cause.
+3. `BotsConfig.PassiveSeconds` (default 0): while match time is below it, bots do not perceive, intercept, chase or swing
+   at actor 0, and a bot's cleave skips actor 0. Deterministic (sim time only). The tutorial sets 30.
+4. Events `AttackStart` (A attacker, at the swing's reach point, Value facing) and `KaijuDamaged` (A attacker, at the
+   contact point on the Kaiju's hit radius toward the attacker, Value damage), placed before the CM-84 marker.
