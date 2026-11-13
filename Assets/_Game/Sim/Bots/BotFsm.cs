@@ -406,7 +406,7 @@ namespace CriticalMass.Sim.Bots
                     tz = w.Z[P.Enemy];
                     if (sk != null && sk.TntLeadFraction > 0)
                     {
-                        double lead = sk.TntLeadFraction * T.FuseTicks / w.Config.SimHz;
+                        double lead = sk.TntLeadFraction * Durations.T30(w.Config, T.FuseTicks) / w.Config.SimHz;
                         tx += w.Vx[P.Enemy] * lead;
                         tz += w.Vz[P.Enemy] * lead;
                     }

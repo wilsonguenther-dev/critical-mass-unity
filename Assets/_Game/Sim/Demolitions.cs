@@ -271,8 +271,8 @@ namespace CriticalMass.Sim.Core
             mine.Cx = cx;
             mine.Cz = cz;
             mine.PlacedTick = w.Tick;
-            mine.ArmTick = w.Tick + (int)cfg.ArmTicks;
-            mine.ExpireTick = w.Tick + (int)cfg.LifetimeTicks;
+            mine.ArmTick = w.Tick + Durations.T30(w.Config, cfg.ArmTicks);
+            mine.ExpireTick = w.Tick + Durations.T30(w.Config, cfg.LifetimeTicks);
             a.AbilityCd = w.Config.Class(ClassId.Demolitions).AbilityCooldown;
             a.AnimAction = 0;
             s.Stats.MinesPlaced++;
@@ -392,9 +392,9 @@ namespace CriticalMass.Sim.Core
             b.FromX = w.X[id];
             b.FromZ = w.Z[id];
             b.ThrownTick = w.Tick;
-            b.BlastTick = w.Tick + (int)cfg.FuseTicks;
-            b.LandTick = Math.Min(b.BlastTick, w.Tick + (int)cfg.FlightTicks);
-            s.TntReadyTick[id] = w.Tick + (int)cfg.CooldownTicks;
+            b.BlastTick = w.Tick + Durations.T30(w.Config, cfg.FuseTicks);
+            b.LandTick = Math.Min(b.BlastTick, w.Tick + Durations.T30(w.Config, cfg.FlightTicks));
+            s.TntReadyTick[id] = w.Tick + Durations.T30(w.Config, cfg.CooldownTicks);
             s.Stats.TntThrown++;
             a.AnimAction = 0;
             a.SpawnProtect = 0;
@@ -410,7 +410,7 @@ namespace CriticalMass.Sim.Core
             DemolitionsTntConfig cfg = w.Config.Abilities.DemolitionsTnt;
             double bx = b.X;
             double bz = b.Z;
-            bool gapOk = w.Tick - w.WallChangeTick >= w.Config.Abilities.MinerTerraform.MinGapTicks; // before this blast's own breaks
+            bool gapOk = w.Tick - w.WallChangeTick >= Durations.T30(w.Config, w.Config.Abilities.MinerTerraform.MinGapTicks); // before this blast's own breaks
             s.Stats.TntBlasts++;
             int hit = BlastActors(w, b.Owner, b.Team, bx, bz, cfg.BlastRadius, cfg.Damage);
             Kaiju k = w.Kaiju;

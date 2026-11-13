@@ -158,7 +158,7 @@ namespace CriticalMass.Sim.Core
                 if (dropped[id] != 0) continue;
                 dropped[id] = 1;
                 if (!egg || w.Match.Phase == MatchPhase.Ended || res.MeatUnitsPerKill <= 0) continue;
-                World.SpawnLooseOrb(w, w.X[id], w.Z[id], (int)res.MeatUnitsPerKill, (int)res.MeatOrbLifetimeTicks, id);
+                World.SpawnLooseOrb(w, w.X[id], w.Z[id], (int)res.MeatUnitsPerKill, Durations.T30(w.Config, res.MeatOrbLifetimeTicks), id);
             }
         }
     }

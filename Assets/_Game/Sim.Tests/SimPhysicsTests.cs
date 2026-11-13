@@ -1,8 +1,13 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Reflection;
+using System.Text.RegularExpressions;
 using CriticalMass.Sim.Config;
 using CriticalMass.Sim.Core;
 using CriticalMass.Sim.Grid;
+using CriticalMass.Sim.Bots;
+using CriticalMass.Sim.Tests.Harness;
 using NUnit.Framework;
 
 namespace CriticalMass.Sim.Tests
@@ -143,6 +148,95 @@ namespace CriticalMass.Sim.Tests
         {
             ulong a = MatchHash.Run(3, 5, 2400, ClassId.Warrior);
             Assert.AreEqual(a, MatchHash.Run(3, 5, 2400, ClassId.Warrior));
+        }
+        // ------------------------------------------------------------------ DG-68 one timing unit
+
+        /// <summary>The Sim source folder (tests run in the checkout, as BoundaryTests does).</summary>
+        internal static string SimDir()
+        {
+            string d = Directory.GetCurrentDirectory();
+            for (int i = 0; i < 6 && d != null; i++, d = Path.GetDirectoryName(d))
+            {
+                string p = Path.Combine(d, "Assets", "_Game", "Sim");
+                if (Directory.Exists(p)) return p;
+            }
+            Assert.Ignore("Sim sources not found from the working directory");
+            return null;
+        }
+
+        [Test]
+        public void DG68NoConfigTicksFieldIsReadWithoutTheConverter()
+        {
+            // Every double field named *Ticks on a config group is a 30 Hz count: each read must pass through Durations.
+            var names = new HashSet<string>();
+            foreach (Type t in typeof(GameConfig).Assembly.GetTypes())
+            {
+                if (t.Namespace != "CriticalMass.Sim.Config" || !t.Name.EndsWith("Config")) continue;
+                foreach (FieldInfo f in t.GetFields()) if (f.Name.EndsWith("Ticks") && f.FieldType == typeof(double)) names.Add(f.Name);
+            }
+            Assert.Greater(names.Count, 10);
+            var rx = new Regex(@"\.(" + string.Join("|", names) + @")\b");
+            var bad = new List<string>();
+            foreach (string file in Directory.GetFiles(SimDir(), "*.cs", SearchOption.AllDirectories))
+            {
+                string fn = Path.GetFileName(file);
+                if (fn == "GameConfig.cs" || fn == "Durations.cs") continue;
+                string[] lines = File.ReadAllLines(file);
+                for (int i = 0; i < lines.Length; i++)
+                {
+                    string l = lines[i].Trim();
+                    if (l.StartsWith("//")) continue;
+                    if (rx.IsMatch(l) && !l.Contains("Durations.")) bad.Add(fn + ":" + (i + 1) + " " + l);
+                }
+            }
+            Assert.IsEmpty(bad, string.Join("\n", bad));
+        }
+
+        [Test]
+        public void DG68TheOnScreenTimingTableAtTheDefaultPaceMatchesTheCheckedInTable()
+        {
+            GameConfig c = GameConfig.CreateDefault();
+            World w = World.CreateWorld(new WorldOptions { Seed = 1, TeamSize = 16, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = c });
+            double pace = w.Dur.Pace;
+            Assert.AreEqual(2, pace);
+            // name, ticks, checked-in on-screen seconds at pace 2
+            var table = new (string, int, double)[]
+            {
+                ("kaiju claw wind-up", w.Dur.KaijuClawWindup, TableClaw),
+                ("kaiju slam telegraph", w.Dur.SlamTelegraph, TableSlam),
+                ("warrior wind-up", w.Dur.AttackWindup[(int)ClassId.Warrior], TableWarriorWindup),
+                ("farmer wind-up", w.Dur.AttackWindup[(int)ClassId.Farmer], TableFarmerWindup),
+                ("jump", Jump.AirTicks(c), 0.3),
+                ("tnt fuse", Durations.T30(c, c.Abilities.DemolitionsTnt.FuseTicks), 0.75),
+                ("mine arm", Durations.T30(c, c.Abilities.DemolitionsMine.ArmTicks), 0.25),
+                ("pillar fall", Durations.T30(c, c.Abilities.Topple.FallTicks), 0.3),
+                ("delivery wind-up", Delivery.WindupTicks(c), 0.2),
+            };
+            foreach (var (name, ticks, want) in table)
+            {
+                Console.WriteLine("{\"item\":\"DG-68\",\"window\":\"" + name + "\",\"ticks\":" + ticks + ",\"onScreen\":" + Durations.OnScreen(c, ticks, pace).ToString("0.000", System.Globalization.CultureInfo.InvariantCulture) + "}");
+                Assert.AreEqual(want, Durations.OnScreen(c, ticks, pace), 0.0085, name);
+            }
+        }
+
+        // The checked-in on-screen seconds (pace 2) of the windows later items change.
+        private const double TableClaw = 0.183;
+        private const double TableSlam = 0.6;
+        private const double TableWarriorWindup = 0;
+        private const double TableFarmerWindup = 0;
+
+        [Test]
+        public void DG68TicksAt30HzRescaleWithSimHzAndFloorsHoldAtAnyPace()
+        {
+            GameConfig c = GameConfig.CreateDefault();
+            Assert.AreEqual(45, Durations.T30(c, 45));
+            c.SimHz = 60;
+            Assert.AreEqual(90, Durations.T30(c, 45), "a 60 Hz sim keeps the same seconds");
+            c.SimHz = 30;
+            Assert.AreEqual(27, Durations.Floor(c, 11, 0.45, 2));
+            Assert.AreEqual(14, Durations.Floor(c, 11, 0.45, 1));
+            Assert.AreEqual(54, Durations.Floor(c, 11, 0.45, 4));
+            Assert.AreEqual(40, Durations.Floor(c, 40, 0.45, 2), "a longer window is kept");
         }
     }
 }

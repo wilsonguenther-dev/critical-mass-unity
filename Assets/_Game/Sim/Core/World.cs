@@ -350,6 +350,7 @@ namespace CriticalMass.Sim.Core
             world.Opts.BotDifficulty = opts.BotDifficulty; // DG-21
             world.Opts.AllyBotDifficulty = opts.AllyBotDifficulty;
             world.Opts.Pace = opts.Pace; // sim-physics lane (OD-1)
+            world.Dur.Derive(world.Config, Durations.PaceOf(opts, world.Config)); // DG-68
             Rng.SeedRng(world.Rng, unchecked((uint)opts.Seed));
             world.Tick = 0;
             world.ActorCount = 2 * n;
@@ -740,6 +741,7 @@ namespace CriticalMass.Sim.Core
                 Builder = BuilderState.Create(cfg),
                 Healer = HealerState.Create(cfg),
                 Hits = PendingHits.Create(cap),
+                Dur = Durations.Create(cfg),
             };
             InitWorld(world, opts);
             return world;
@@ -836,5 +838,7 @@ namespace CriticalMass.Sim.Core
         public HealerState Healer;
         /// <summary>DG-67: this tick's melee hits, applied together after every swing is decided (Combat).</summary>
         public PendingHits Hits;
+        /// <summary>DG-68: every duration of this world in ticks, derived once per CreateWorld / ResetWorld for the match pace.</summary>
+        public Durations Dur;
     }
 }

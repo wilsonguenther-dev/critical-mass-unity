@@ -327,10 +327,10 @@ namespace CriticalMass.Sim.Core
                 if (dx * dx + dz * dz <= kc.MeleeRange * kc.MeleeRange)
                 {
                     k.Facing = JsMath.Atan2(dz, dx);
-                    k.MeleeWindupIn = (int)kc.MeleeWindupTicks;
+                    k.MeleeWindupIn = w.Dur.KaijuClawWindup;
                     k.MeleeTargetId = t;
                     k.MeleeCd = kc.MeleeCooldown;
-                    World.PushEvent(w, SimEventType.KaijuMeleeWindup, t, -1, w.X[t], w.Z[t], kc.MeleeWindupTicks);
+                    World.PushEvent(w, SimEventType.KaijuMeleeWindup, t, -1, w.X[t], w.Z[t], w.Dur.KaijuClawWindup);
                 }
             }
         }

@@ -28,7 +28,7 @@ namespace CriticalMass.Sim.Core
         private static double[] PathZ = new double[19];
 
         /// <summary>J, airborne ticks of a full jump (18 at the browser config).</summary>
-        public static int AirTicks(GameConfig c) => (int)c.Jump.AirTicks;
+        public static int AirTicks(GameConfig c) => Durations.T30(c, c.Jump.AirTicks);
 
         /// <summary>DG-02: coyote window in whole sim ticks, JS round(CoyoteSeconds x SimHz) (3 at 0.1 s and 30 Hz).</summary>
         public static int CoyoteTicks(GameConfig c) => (int)JsMath.Round(c.Jump.CoyoteSeconds * c.SimHz);
@@ -44,7 +44,7 @@ namespace CriticalMass.Sim.Core
         public static int PlanJump(World w, int id, double vx, double vz, double dt)
         {
             int airTicks = AirTicks(w.Config);
-            int minAir = (int)w.Config.Jump.MinAirTicks;
+            int minAir = Durations.T30(w.Config, w.Config.Jump.MinAirTicks);
             if (PathX.Length < airTicks + 1)
             {
                 PathX = new double[airTicks + 1];
@@ -128,7 +128,7 @@ namespace CriticalMass.Sim.Core
         public static double JumpLift(GameConfig c, Actor a, double u)
         {
             if (a.AirLen <= 0 || !(u > 0) || !(u < 1)) return 0;
-            double s = a.AirLen / c.Jump.AirTicks;
+            double s = a.AirLen / (double)Durations.T30(c, c.Jump.AirTicks);
             return 4 * c.Jump.ApexUnits * s * s * u * (1 - u);
         }
     }

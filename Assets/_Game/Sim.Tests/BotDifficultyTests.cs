@@ -32,15 +32,18 @@ namespace CriticalMass.Sim.Tests
             AllyBotDifficulty = ally,
         };
 
+        private static readonly Action<GameConfig> Classic = c => c.Physics.Classic = true;
+
         [Test]
         public void DG21NormalIsTodaysBotsBitForBitOnTheGoldenSeeds()
         {
-            Assert.AreEqual(0x5C912AEED16BC302UL, MatchHash.Run(1, 16, 3600, ClassId.Warrior, Normal), "16v16 seed 1, 2:00");
-            Assert.AreEqual(0x7A3D359D8D0DB066UL, MatchHash.Run(7, 16, 3600, ClassId.Miner, Normal), "16v16 seed 7, 2:00");
-            Assert.AreEqual(0x0C1ACCC06A2C7E58UL, MatchHash.Run(1337, 16, 3600, ClassId.Farmer, Normal), "16v16 seed 1337, 2:00");
-            Assert.AreEqual(0x2980068FA0457CC2UL, MatchHash.Run(42, 5, 14500, ClassId.Warrior, Normal), "5v5 seed 42, whole match");
+            // Sim-physics lane: today's bots bit for bit WITH the classic (browser parity) physics setting on.
+            Assert.AreEqual(0x5C912AEED16BC302UL, MatchHash.Run(1, 16, 3600, ClassId.Warrior, Normal, Classic), "16v16 seed 1, 2:00");
+            Assert.AreEqual(0x7A3D359D8D0DB066UL, MatchHash.Run(7, 16, 3600, ClassId.Miner, Normal, Classic), "16v16 seed 7, 2:00");
+            Assert.AreEqual(0x0C1ACCC06A2C7E58UL, MatchHash.Run(1337, 16, 3600, ClassId.Farmer, Normal, Classic), "16v16 seed 1337, 2:00");
+            Assert.AreEqual(0x2980068FA0457CC2UL, MatchHash.Run(42, 5, 14500, ClassId.Warrior, Normal, Classic), "5v5 seed 42, whole match");
             // A WorldOptions that never names a difficulty is Normal.
-            Assert.AreEqual(0x5C912AEED16BC302UL, MatchHash.Run(1, 16, 3600, ClassId.Warrior));
+            Assert.AreEqual(0x5C912AEED16BC302UL, MatchHash.Run(1, 16, 3600, ClassId.Warrior, null, Classic));
             Assert.AreEqual(BotDifficulty.Normal, new WorldOptions().BotDifficulty);
         }
 

@@ -132,7 +132,7 @@ namespace CriticalMass.Sim.Core
                 World.PushEvent(w, SimEventType.Topple, attacker, k, x, z, RefusedFallen);
                 return RefusedFallen;
             }
-            if (w.Tick < w.WallChangeTick + (int)w.Config.Abilities.MinerTerraform.MinGapTicks)
+            if (w.Tick < w.WallChangeTick + Durations.T30(w.Config, w.Config.Abilities.MinerTerraform.MinGapTicks))
             {
                 World.PushEvent(w, SimEventType.Topple, attacker, k, x, z, RefusedRate);
                 return RefusedRate;
@@ -221,7 +221,7 @@ namespace CriticalMass.Sim.Core
         {
             ToppleState t = w.Topple;
             if (k < 0 || k >= t.Fallen.Length || t.Fallen[k] == Standing) return -1;
-            double ticks = w.Config.Abilities.Topple.FallTicks;
+            double ticks = Durations.T30(w.Config, w.Config.Abilities.Topple.FallTicks);
             if (!(ticks > 0)) return 1;
             double u = (w.Tick - t.FallTick[k] - 1 + alpha) / ticks;
             return u < 0 ? 0 : u > 1 ? 1 : u;
@@ -236,7 +236,7 @@ namespace CriticalMass.Sim.Core
             DecorationDef[] decs = w.Map.Decorations;
             if (decs == null) return;
             ToppleState t = w.Topple;
-            int fall = (int)w.Config.Abilities.Topple.FallTicks;
+            int fall = Durations.T30(w.Config, w.Config.Abilities.Topple.FallTicks);
             int length = (int)w.Config.Abilities.Topple.LengthCells;
             for (int k = 0; k < decs.Length; k++)
             {

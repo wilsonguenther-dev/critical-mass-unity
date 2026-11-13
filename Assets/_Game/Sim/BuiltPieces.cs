@@ -344,7 +344,7 @@ namespace CriticalMass.Sim.Core
 
         private static bool GapOk(World w)
         {
-            return w.Tick - w.WallChangeTick >= w.Config.Abilities.MinerTerraform.MinGapTicks;
+            return w.Tick - w.WallChangeTick >= Durations.T30(w.Config, w.Config.Abilities.MinerTerraform.MinGapTicks);
         }
 
         /// <summary>0 when Builder id may build looking along (dx, dz) right now (cooldown aside), else a Refused* code. Leaves the plan in the scratch.</summary>
@@ -426,7 +426,7 @@ namespace CriticalMass.Sim.Core
             p.Owner = id;
             p.Team = a.Team;
             p.PlacedTick = w.Tick;
-            p.ExpireTick = w.Tick + (int)w.Config.Abilities.BuilderPieces.LifetimeTicks;
+            p.ExpireTick = w.Tick + Durations.T30(w.Config, w.Config.Abilities.BuilderPieces.LifetimeTicks);
             p.Warned = false;
             a.AbilityCd = w.Config.Class(ClassId.Builder).AbilityCooldown;
             a.AnimAction = 0;
@@ -529,7 +529,7 @@ namespace CriticalMass.Sim.Core
                         break;
                     }
                 }
-                if (!p.Broken && !p.Warned && w.Tick >= p.ExpireTick - (int)cfg.WarnTicks)
+                if (!p.Broken && !p.Warned && w.Tick >= p.ExpireTick - Durations.T30(w.Config, cfg.WarnTicks))
                 {
                     p.Warned = true;
                     World.PushEvent(w, SimEventType.PieceCrumbling, p.Owner, k, p.X, p.Z, Math.Max(0, p.ExpireTick - w.Tick), null, DamageCause.None, p.HalfLen);

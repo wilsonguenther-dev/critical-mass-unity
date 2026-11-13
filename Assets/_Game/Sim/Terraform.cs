@@ -177,7 +177,7 @@ namespace CriticalMass.Sim.Core
         /// <summary>Ticks until team may change terrain again (0 = now): the team cooldown and the world-wide gap, whichever is later.</summary>
         public static int WaitTicks(World w, TeamId team)
         {
-            int ready = Math.Max(w.Terraform.TeamReadyTick[(int)team], w.WallChangeTick + (int)w.Config.Abilities.MinerTerraform.MinGapTicks);
+            int ready = Math.Max(w.Terraform.TeamReadyTick[(int)team], w.WallChangeTick + Durations.T30(w.Config, w.Config.Abilities.MinerTerraform.MinGapTicks));
             return ready > w.Tick ? ready - w.Tick : 0;
         }
 
@@ -267,7 +267,7 @@ namespace CriticalMass.Sim.Core
         {
             TeamId team = w.Actors[id].Team;
             MapGrid.SetCell(w, cx, cz, type);
-            w.Terraform.TeamReadyTick[(int)team] = w.Tick + (int)w.Config.Abilities.MinerTerraform.TeamCooldownTicks;
+            w.Terraform.TeamReadyTick[(int)team] = w.Tick + Durations.T30(w.Config, w.Config.Abilities.MinerTerraform.TeamCooldownTicks);
         }
 
         /// <summary>DG-09: blocks a miner may carry (MinerTerraform.CarryMax, at least 1, at most 255).</summary>
