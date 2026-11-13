@@ -21,28 +21,28 @@ namespace CriticalMass.Runtime.Tests
         static readonly string Dir = Path.Combine(Application.dataPath, "_Game", "Content", "Lore");
 
         // ---------------------------------------------------------------- JSON shapes (JsonUtility)
-        [Serializable] class Format { public string id; public string rule; }
-        [Serializable] class Token { public string id; public string path; public string format; }
-        [Serializable] class Slot { public string id; public string meaning; }
-        [Serializable] class TokensFile { public string schema; public Format[] formats; public Token[] tokens; public Slot[] runSlots; }
-        [Serializable] class Line { public string id; public string text; }
-        [Serializable] class PremiseFile { public string schema; public string title; public string text; public Line[] loreLines; }
-        [Serializable] class Card { public string id; public int ticks; public string caption; }
-        [Serializable] class StoryFile { public string schema; public int simHz; public string narrator; public string titleVo; public Card[] cards; }
-        [Serializable] class Callout { public string id; public string trigger; public int priority; public string text; }
-        [Serializable] class AnnouncerFile { public string schema; public Callout[] lines; }
-        [Serializable] class Tip { public string id; public string text; public string needsRule; }
-        [Serializable] class TipsFile { public string schema; public Tip[] tips; }
-        [Serializable] class Relic { public string id; public string name; public string line1; public string line2; }
-        [Serializable] class RelicsFile { public string schema; public Relic[] relics; }
-        [Serializable] class Ability { public string input; public string name; public string text; public string cooldown; public string needsRule; }
-        [Serializable] class ClassCard { public string id; public string name; public string role; public string bio; public int difficulty; public Ability[] abilities; }
-        [Serializable] class ClassesFile { public string schema; public ClassCard[] classes; }
-        [Serializable] class Result { public string id; public string title; public string line; public string reason; }
-        [Serializable] class Outro { public string id; public string caption; public string reason; }
-        [Serializable] class ResultsFile { public string schema; public Result[] results; public Outro[] outros; }
-        [Serializable] class Egg { public string id; public string name; public string design; public string reward; public string line; public string[] waitsOn; }
-        [Serializable] class EggsFile { public string schema; public Egg[] eggs; }
+        [Serializable] public class Format { public string id; public string rule; }
+        [Serializable] public class Token { public string id; public string path; public string format; }
+        [Serializable] public class Slot { public string id; public string meaning; }
+        [Serializable] public class TokensFile { public string schema; public Format[] formats; public Token[] tokens; public Slot[] runSlots; }
+        [Serializable] public class Line { public string id; public string text; }
+        [Serializable] public class PremiseFile { public string schema; public string title; public string text; public Line[] loreLines; }
+        [Serializable] public class Card { public string id; public int ticks; public string caption; }
+        [Serializable] public class StoryFile { public string schema; public int simHz; public string narrator; public string titleVo; public Card[] cards; }
+        [Serializable] public class Callout { public string id; public string trigger; public int priority; public string text; }
+        [Serializable] public class AnnouncerFile { public string schema; public Callout[] lines; }
+        [Serializable] public class Tip { public string id; public string text; public string needsRule; }
+        [Serializable] public class TipsFile { public string schema; public Tip[] tips; }
+        [Serializable] public class Relic { public string id; public string name; public string line1; public string line2; }
+        [Serializable] public class RelicsFile { public string schema; public Relic[] relics; }
+        [Serializable] public class Ability { public string input; public string name; public string text; public string cooldown; public string needsRule; }
+        [Serializable] public class ClassCard { public string id; public string name; public string role; public string bio; public int difficulty; public Ability[] abilities; }
+        [Serializable] public class ClassesFile { public string schema; public ClassCard[] classes; }
+        [Serializable] public class Result { public string id; public string title; public string line; public string reason; }
+        [Serializable] public class Outro { public string id; public string caption; public string reason; }
+        [Serializable] public class ResultsFile { public string schema; public Result[] results; public Outro[] outros; }
+        [Serializable] public class Egg { public string id; public string name; public string design; public string reward; public string line; public string[] waitsOn; }
+        [Serializable] public class EggsFile { public string schema; public Egg[] eggs; }
 
         static readonly string[] Files =
         {
@@ -61,7 +61,7 @@ namespace CriticalMass.Runtime.Tests
         static readonly Regex NeedsRuleRe = new Regex(@"^DG-\d{2}[ab]?$");
         /// <summary>Rules the sim does not run yet (gap list section 3): any line naming one must say what it waits for.</summary>
         static readonly Regex UnbuiltRuleRe = new Regex(
-            @"\b(jump\w*|heal\w*|fountain|meat|cleans\w*|dig|digs|mines?|tnt|ladders?|rope bridges?|upgrades?|stations?|heavy)\b",
+            @"\b(jump\w*|heal(?:s|ing|ed)?|fountain|meat|cleans\w*|dig|digs|mines?|tnt|ladders?|rope bridges?|upgrades?|stations?|heavy)\b",
             RegexOptions.IgnoreCase);
         /// <summary>Technology, vendor and other games' names never appear in the words.</summary>
         static readonly string[] Forbidden =

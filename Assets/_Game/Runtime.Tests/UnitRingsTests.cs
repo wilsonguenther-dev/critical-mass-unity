@@ -1,6 +1,7 @@
 using System;
 using CriticalMass.Runtime.Game;
 using CriticalMass.Runtime.View;
+using CriticalMass.Sim.Bots;
 using CriticalMass.Sim.Config;
 using CriticalMass.Sim.Core;
 using NUnit.Framework;
@@ -127,9 +128,10 @@ namespace CriticalMass.Runtime.Tests
         [Test]
         public void ShaderShipsInResourcesAndDrawsAfterGroundDecals()
         {
-            var shader = Resources.Load<Shader>(UnitRings.ShaderResource);
+            var shader = UnityEngine.Resources.Load<Shader>(UnitRings.ShaderResource);
             Assert.IsNotNull(shader, "Resources/" + UnitRings.ShaderResource);
             Assert.AreEqual("CM/UnitRing", shader.name);
+            Assert.IsTrue(shader.isSupported, "CM/UnitRing does not compile (a shader with errors draws nothing)");
             Assert.IsNotNull(_rings.Material);
             Assert.AreEqual(3000 - 40, _rings.Material.renderQueue, "Transparent-40: after CM/WorldDecal (Transparent-50)");
             Assert.AreEqual(Color(Palette.Brass), _rings.Material.GetColor("_SelfColor"));
