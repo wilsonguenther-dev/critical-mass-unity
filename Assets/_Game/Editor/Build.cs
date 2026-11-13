@@ -39,6 +39,19 @@ namespace CriticalMass.Editor
             return null;
         }
 
+        /// <summary>A 7-character commit id from a full or short SHA, or null.</summary>
+        internal static string Short(string sha)
+        {
+            if (string.IsNullOrEmpty(sha)) return null;
+            sha = sha.Trim();
+            if (sha.Length < 7 || !sha.All(Uri.IsHexDigit)) return null;
+            return sha.Substring(0, 7).ToLowerInvariant();
+        }
+
+        /// <summary>A non-negative whole number as text, or null.</summary>
+        internal static string Number(string v) =>
+            int.TryParse(v, NumberStyles.None, CultureInfo.InvariantCulture, out int n) && n >= 0 ? n.ToString(CultureInfo.InvariantCulture) : null;
+
         static bool Flag(string flag) =>
             Environment.GetCommandLineArgs().Any(x => string.Equals(x, flag, StringComparison.OrdinalIgnoreCase));
 
@@ -71,8 +84,11 @@ namespace CriticalMass.Editor
         static void WriteStamp(BuildTarget target, bool development)
         {
             string root = Directory.GetParent(Application.dataPath).FullName;
-            string commit = Git(root, "rev-parse --short=7 HEAD") ?? "unknown";
-            string count = Git(root, "rev-list --count HEAD") ?? "0";
+            // polish-audit-1: inside the CI build container git can fail (another user owns the checkout, or a shallow
+            // clone), and the CI player showed "v1.0.0 (unknown)" on the title. -buildCommit SHA and -buildCount N (the
+            // workflow passes both) are used when git gives nothing.
+            string commit = Git(root, "rev-parse --short=7 HEAD") ?? Short(Arg("-buildCommit")) ?? "unknown";
+            string count = Git(root, "rev-list --count HEAD") ?? Number(Arg("-buildCount")) ?? "0";
             string status = Git(root, "status --porcelain --untracked-files=no");
             bool dirty = !string.IsNullOrEmpty(status);
             string version = PlayerSettings.bundleVersion + "." + count;

@@ -147,6 +147,15 @@ namespace CriticalMass.Runtime.Menu
         public static bool BackgroundThrottle { get => GetB(BgThrottleKey, false); set { SetB(BgThrottleKey, value); CriticalMass.Runtime.Game.FrameGovernor.Reapply(); } }
 
         public static bool FullScreen { get => GetB(FullScreenKey, true); set { SetB(FullScreenKey, value); ApplyVideo(); } }
+
+        /// <summary>
+        /// polish-audit-1: stores the window mode the player picked outside Settings (Alt+Enter, the OS full-screen
+        /// control) without re-applying video, so Settings and the next launch agree with the screen (FrameGovernor).
+        /// </summary>
+        public static void RememberFullScreen(bool full)
+        {
+            if (GetB(FullScreenKey, true) != full) SetB(FullScreenKey, full);
+        }
         public static bool VSync { get => GetB(VSyncKey, true); set { SetB(VSyncKey, value); ApplyVideo(); } }
 
         /// <summary>Quality level index (QualitySettings.names); -1 = the project's default level.</summary>

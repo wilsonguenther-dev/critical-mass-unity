@@ -149,6 +149,8 @@ namespace CriticalMass.Runtime.Tests
             StringAssert.Contains("runInBackground: 1", p);
             Assert.IsTrue(Regex.IsMatch(p, @"(?m)^  fullscreenMode: 1$"), "borderless fullscreen-window (run ProjectSetup.Apply)");
             StringAssert.Contains("forceSingleInstance: 1", p);
+            // polish-audit-1: no engine splash (vendor logo on the first screen, and seconds on the cold launch).
+            Assert.IsTrue(Regex.IsMatch(p, @"(?m)^  m_ShowUnitySplashScreen: 0$"), "no engine splash (run ProjectSetup.Apply)");
             string editor = Path.Combine(Application.dataPath, "_Game", "Editor");
             var hits = Directory.GetFiles(editor, "*.cs", SearchOption.AllDirectories)
                 .Where(f => Regex.IsMatch(File.ReadAllText(f), @"ExclusiveFullScreen|FullScreenMode\.Windowed")).ToArray();

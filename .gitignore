@@ -53,3 +53,8 @@ Thumbs.db
 
 # python bytecode from the UI art build scripts
 __pycache__/
+
+# ci/offload: the no-Unity Sim projects are tracked; their build output is not
+!/tools/ci/**/*.csproj
+/tools/ci/**/bin/
+/tools/ci/**/obj/

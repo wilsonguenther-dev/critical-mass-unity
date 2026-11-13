@@ -396,9 +396,40 @@ namespace CriticalMass.Runtime.Menus
             if (_portrait != null) _portrait.SetTier(tier);
         }
 
+        /// <summary>polish-audit-1: how long the armed QUIT tile waits for the confirming press.</summary>
+        public const float QuitConfirmSeconds = 3f;
+        public const string QuitConfirmLabel = "CONFIRM QUIT";
+        float _quitArmedAt = float.NegativeInfinity;
+
+        /// <summary>The second press quits only inside the confirm window (pure; tests).</summary>
+        public static bool QuitArmed(float armedAt, float now) => now - armedAt >= 0f && now - armedAt <= QuitConfirmSeconds;
+
+        /// <summary>The QUIT tile is armed now (tests).</summary>
+        public bool QuitConfirming => QuitArmed(_quitArmedAt, Time.unscaledTime);
+
+        void ArmQuit()
+        {
+            _quitArmedAt = Time.unscaledTime;
+            if (_items.TryGetValue(OverlayRegistry.Quit, out MenuItem it) && it != null && it.Label != null) HudText.Set(it.Label, QuitConfirmLabel);
+        }
+
+        void DisarmQuitIfDue()
+        {
+            if (float.IsNegativeInfinity(_quitArmedAt) || QuitArmed(_quitArmedAt, Time.unscaledTime)) return;
+            _quitArmedAt = float.NegativeInfinity;
+            if (_items.TryGetValue(OverlayRegistry.Quit, out MenuItem it) && it != null && it.Label != null)
+            {
+                string label = "QUIT";
+                for (int i = 0; _entries != null && i < _entries.Count; i++)
+                    if (_entries[i].Id == OverlayRegistry.Quit) label = _entries[i].Label;
+                HudText.Set(it.Label, label);
+            }
+        }
+
         protected override void Tick()
         {
             float dt = Time.unscaledDeltaTime;
+            DisarmQuitIfDue();
             bool pad = ControlBindings.ActiveDevice == ControlDevice.Gamepad;
             _primaryGlyph.SetHint(pad ? "A PLAY" : "ENTER PLAY", pad ? ControlDevice.Gamepad : ControlDevice.KeyboardMouse);
             _changeGlyph.SetHint(pad ? "Y MODES" : "TAB MODES", pad ? ControlDevice.Gamepad : ControlDevice.KeyboardMouse);
@@ -506,7 +537,10 @@ namespace CriticalMass.Runtime.Menus
                     Director.OpenSettings(PauseMenu.Tab.Audio, e.Id);
                     return;
                 case OverlayRegistry.Quit:
-                    PauseMenu.QuitGame();
+                    // polish-audit-1: one stray Enter or A on QUIT closed the game. The first press arms it (the tile
+                    // reads CONFIRM QUIT for QuitConfirmSeconds), the second quits.
+                    if (QuitArmed(_quitArmedAt, Time.unscaledTime)) PauseMenu.QuitGame();
+                    else ArmQuit();
                     return;
                 case OverlayRegistry.HowTo:
                     if (e.ScreenType == null)

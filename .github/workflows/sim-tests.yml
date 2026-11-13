@@ -1,0 +1,87 @@
+# ci/offload (2026-11-13): the Sim gate off the Mac. No Unity, no licence, no secrets: a plain .NET SDK compiles
+# CriticalMass.Sim (.NET Standard 2.1, C# 9, the project's define symbols) and CriticalMass.Sim.Tests, and NUnitLite runs
+# the tests from the repo root (tools/ci/sim-tests.sh). About 2 to 5 Linux minutes per run.
+# Triggers: every PR to main that touches the Sim, its tests, the golden files or this harness; pushes to ci/** and
+# loop/** branches; manual (loop/gates/remote sim). The Slow set runs on manual request (suite=slow|all).
+name: sim-tests
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'Assets/_Game/Sim/**'
+      - 'Assets/_Game/Sim.Tests/**'
+      - 'tools/golden/**'
+      - 'tools/ci/**'
+      - 'ProjectSettings/ProjectSettings.asset'
+      - '.github/workflows/sim-tests.yml'
+  push:
+    branches: ['ci/**']
+    paths:
+      - 'Assets/_Game/Sim/**'
+      - 'Assets/_Game/Sim.Tests/**'
+      - 'tools/golden/**'
+      - 'tools/ci/**'
+      - '.github/workflows/sim-tests.yml'
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: "fast (not Slow), slow, or all"
+        type: choice
+        options: [fast, slow, all]
+        default: fast
+permissions:
+  contents: read
+  checks: write
+concurrency:
+  group: sim-tests-${{ github.event_name }}-${{ github.ref }}-${{ inputs.suite || 'fast' }}
+  cancel-in-progress: true
+jobs:
+  sim:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false   # the Sim and its golden JSON are plain git; no art needed
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('tools/ci/**/*.csproj') }}
+      - name: Compile and test (no Unity)
+        shell: bash
+        run: |
+          case "${{ inputs.suite || 'fast' }}" in
+            slow) tools/ci/sim-tests.sh --slow ;;
+            all)  tools/ci/sim-tests.sh --all ;;
+            *)    tools/ci/sim-tests.sh ;;
+          esac
+      - name: Summary
+        if: always()
+        shell: bash
+        run: |
+          f=Temp/ci/sim-results.xml
+          if [ -f "$f" ]; then
+            python3 - "$f" >> "$GITHUB_STEP_SUMMARY" <<'PY'
+          import sys, xml.etree.ElementTree as ET
+          r = ET.parse(sys.argv[1]).getroot()
+          print(f"### Sim tests (no Unity)\n\nresult **{r.get('result')}**: {r.get('passed')} passed, {r.get('failed')} failed, {r.get('skipped')} skipped of {r.get('total')} in {float(r.get('duration', 0)):.0f} s\n")
+          for tc in r.iter('test-case'):
+              if tc.get('result') == 'Failed':
+                  m = tc.find('failure/message')
+                  print(f"- FAIL `{tc.get('fullname')}`: {(m.text or '').strip()[:300] if m is not None else ''}")
+          PY
+          else
+            echo "### Sim tests: no results (compile failed; see the log)" >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sim-results
+          path: |
+            Temp/ci/sim-results.xml
+            Temp/ci/sim-build.log
+          if-no-files-found: ignore
+          retention-days: 7
