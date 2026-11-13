@@ -160,6 +160,11 @@ namespace CriticalMass.Runtime.View.Dressing
         private void ApplyTier()
         {
             if (_building != null) return;   // the running build re-checks the tier when it finishes
+            if (_replanning != null)
+            {
+                while (_replanning.MoveNext()) { }   // finish a running re-plan first (rare: a quality change mid-dig)
+                _replanning = null;
+            }
             // Environment v4 clutter follows the quality level: re-plan (only the groups that differ are rebuilt).
             if (Plan != null && QualityTable.ExtraClutter(RenderTier.Level) != _clutterOn) _replanPending = true;
             // Scenery LODs: another quality level needs other levels of detail or another clutter density: rebuild once.
@@ -273,7 +278,7 @@ namespace CriticalMass.Runtime.View.Dressing
                 CriticalMass.Runtime.Game.FrameRecorder.Loading = true;
                 double budget = Application.isEditor && !SliceInEditor ? double.PositiveInfinity : BuildBudgetMs;
                 var sw = System.Diagnostics.Stopwatch.StartNew();
-                bool done = CriticalMass.Runtime.Game.FrameBudget.Run(_building, budget, () => sw.Elapsed.TotalMilliseconds);
+                bool done = CriticalMass.Runtime.Game.FrameBudget.Run(_building, budget, StepClock());
                 double slice = sw.Elapsed.TotalMilliseconds;
                 LastBuildMs += slice;
                 LastBuildFrames++;
@@ -292,7 +297,8 @@ namespace CriticalMass.Runtime.View.Dressing
             if (Plan == null) return;
             UpdateLods();
             if (w.Match != null) ApplyHill(w.Match.HillState);
-            if (_replanPending && Time.frameCount - _lastReplanFrame >= ReplanEveryFrames) Replan();
+            if (_replanning != null && FrameBudget.Run(_replanning, ReplanBudgetMs, StepClock())) _replanning = null;
+            if (_replanPending && Time.frameCount - _lastReplanFrame >= ReplanEveryFrames) RequestReplan();
             if (w.GridVersion == _seenGridVersion) return;
             _seenGridVersion = w.GridVersion;
             HashSet<int> dirtyChunks = _dirtyChunks;
@@ -310,10 +316,80 @@ namespace CriticalMass.Runtime.View.Dressing
             foreach (int c in dirtyChunks) BuildGroundChunk(c);
             if (dirtyChunks.Count > 0)
             {
-                if (Time.frameCount - _lastReplanFrame >= ReplanEveryFrames) Replan();
+                if (Time.frameCount - _lastReplanFrame >= ReplanEveryFrames) RequestReplan();
                 else _replanPending = true;   // merged with the next digs into one re-plan
             }
             if (breakables) SyncBreakables();
+        }
+
+        // perf-smooth-1: in a match a dig re-plans on a worker thread (on a copy of the grid) and rebuilds the changed groups a
+        // few milliseconds a frame, then swaps them in at once; it was 55 to 105 ms in one frame (the in-match hitches the
+        // frame recorder attributed to WorldView). The editor and tests keep the one-frame Replan.
+        private IEnumerator _replanning;
+        public const double ReplanBudgetMs = 3.0;
+        private static readonly System.Diagnostics.Stopwatch StepWatch = new System.Diagnostics.Stopwatch();
+        private static readonly Func<double> StepClockFn = () => StepWatch.Elapsed.TotalMilliseconds;
+
+        private static Func<double> StepClock()
+        {
+            StepWatch.Restart();
+            return StepClockFn;
+        }
+
+        /// <summary>A re-plan is running over frames (tests).</summary>
+        public bool Replanning => _replanning != null;
+
+        private void RequestReplan()
+        {
+            if (Application.isEditor && !SliceInEditor)
+            {
+                Replan();
+                return;
+            }
+            if (_replanning != null)
+            {
+                _replanPending = true;
+                return;
+            }
+            _replanPending = false;
+            _lastReplanFrame = Time.frameCount;
+            Replans++;
+            _replanning = ReplanSteps();
+        }
+
+        private IEnumerator ReplanSteps()
+        {
+            _clutterOn = QualityTable.ExtraClutter(RenderTier.Level);
+            MapDef snap = _map.WithCells((byte[])_map.Cells.Clone());
+            WorldPlan old = Plan;
+            bool clutter = _clutterOn;
+            BasesFile bases = _bases;
+            WorldKitCatalog cat = _catalog;
+            var task = System.Threading.Tasks.Task.Run(() =>
+            {
+                WorldPlan p = WorldDresser.Plan(snap, bases, cat.Centroid, cat.Body, clutter);
+                return (p, ChangedGroups(old, p));
+            });
+            while (!task.IsCompleted) yield return null;
+            WorldPlan next;
+            HashSet<int> changed;
+            if (task.IsFaulted)
+            {
+                Debug.LogWarning("[CM.World] re-plan on a worker failed, planning on the main thread: " + task.Exception?.GetBaseException().Message);
+                next = WorldDresser.Plan(snap, bases, cat.Centroid, cat.Body, clutter);
+                changed = ChangedGroups(old, next);
+            }
+            else (next, changed) = task.Result;
+            Plan = next;
+            var fresh = new Dictionary<int, Chunk>();
+            IEnumerator steps = BuildGroupsSteps(changed, fresh);
+            while (steps.MoveNext()) yield return null;
+            foreach (int g in changed) DestroyGroup(g);
+            foreach (var kv in fresh) _groups[kv.Key] = kv.Value;
+            _dressed = Plan.Dressed;
+            _dressedTypes = Plan.CellsAtPlan;
+            DressVersion++;
+            UpdateLods();
         }
 
         /// <summary>A dig or place changed land: plan again on the current grid and rebuild the groups that differ.</summary>
@@ -450,7 +526,7 @@ namespace CriticalMass.Runtime.View.Dressing
 
         /// <summary>perf-smooth-1: the group build as steps (one placement, one combined group or one shadow group each), so
         /// the match-start build can run a few milliseconds a frame behind the loading screen.</summary>
-        private IEnumerator BuildGroupsSteps(HashSet<int> only)
+        private IEnumerator BuildGroupsSteps(HashSet<int> only, Dictionary<int, Chunk> into = null)
         {
             var bgw = System.Diagnostics.Stopwatch.StartNew();
             int q = RenderTier.Level;
@@ -523,7 +599,7 @@ namespace CriticalMass.Runtime.View.Dressing
                 (int chunk, int level, Material mat) = groupKeys[k];
                 GameObject go = FinishGroup(jobs[k]);
                 jobs[k] = null;
-                Chunk ch = ChunkFor(chunk, go);
+                Chunk ch = ChunkFor(chunk, go, into);
                 var r = go.GetComponent<MeshRenderer>();
                 ch.ByLevel[level].Add(r);
                 int tris = (int)(go.GetComponent<MeshFilter>().sharedMesh.GetIndexCount(0) / 3);
@@ -546,7 +622,7 @@ namespace CriticalMass.Runtime.View.Dressing
                 while (!jobs[jk].Done) yield return null;
                 GameObject go = FinishGroup(jobs[jk]);
                 jobs[jk] = null;
-                Chunk ch = ChunkFor(shadowKeys[k], go);
+                Chunk ch = ChunkFor(shadowKeys[k], go, into);
                 ch.Shadow = go.GetComponent<MeshRenderer>();
                 ch.ShadowTris = (int)(go.GetComponent<MeshFilter>().sharedMesh.GetIndexCount(0) / 3);
                 ch.Shadow.enabled = shadowsOn;
@@ -560,9 +636,10 @@ namespace CriticalMass.Runtime.View.Dressing
         private readonly List<(int chunk, Material mat, MeshData d, int sub, Matrix4x4 m)> _parts =
             new List<(int, Material, MeshData, int, Matrix4x4)>();
 
-        private Chunk ChunkFor(int key, GameObject go)
+        private Chunk ChunkFor(int key, GameObject go, Dictionary<int, Chunk> into = null)
         {
-            if (!_groups.TryGetValue(key, out Chunk ch)) _groups[key] = ch = new Chunk();
+            into = into ?? _groups;
+            if (!into.TryGetValue(key, out Chunk ch)) into[key] = ch = new Chunk();
             ch.Objects.Add(go);
             return ch;
         }
@@ -605,6 +682,7 @@ namespace CriticalMass.Runtime.View.Dressing
 
         private void OnDestroy()
         {
+            _replanning = null;
             if (_building != null)
             {
                 _building = null;

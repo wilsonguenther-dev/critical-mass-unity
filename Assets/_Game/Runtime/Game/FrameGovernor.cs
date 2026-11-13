@@ -85,6 +85,10 @@ namespace CriticalMass.Runtime.Game
 
         static int _forceLevel = -1;
 
+        /// <summary>perf-smooth-1 measurement only (autoplay -autoplayPacing): null or "rule" = the frame cap rule; "display" =
+        /// vsync every refresh, no cap; "timed60" = vsync off, a timed 60.</summary>
+        public static string PacingOverride;
+
         /// <summary>perf-smooth-1 (autoplay -autoplayQualities): run the next match at this level, as -quality NAME would.</summary>
         public static void ForceRunQuality(string name)
         {
@@ -454,6 +458,8 @@ namespace CriticalMass.Runtime.Game
                 }
                 _guard.Feed(dt, cap, vsync > 0);
             }
+            if (o.Autoplay && PacingOverride == "display") { vsync = 1; target = -1; }
+            else if (o.Autoplay && PacingOverride == "timed60") { vsync = 0; target = 60; }
             if (QualitySettings.vSyncCount != vsync) QualitySettings.vSyncCount = vsync;
             if (Application.targetFrameRate != target) Application.targetFrameRate = target;
             AppliedVSync = vsync;

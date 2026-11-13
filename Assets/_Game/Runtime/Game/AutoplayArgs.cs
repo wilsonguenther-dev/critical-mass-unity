@@ -64,6 +64,9 @@ namespace CriticalMass.Runtime.Game
             public string PerfLog;
             /// <summary>perf-smooth-1: -autoplayQualities A,B,C: the quality level of match 1, 2, 3 (match 1 also takes -quality).</summary>
             public string[] Qualities;
+            /// <summary>perf-smooth-1 experiment: -autoplayPacing A,B,C: frame pacing of match 1, 2, 3 (FrameGovernor.PacingOverride:
+            /// rule, display, timed60).</summary>
+            public string[] Pacing;
             public bool NoVsync;
             public int Matches;
             public double TitleSeconds;
@@ -109,6 +112,9 @@ namespace CriticalMass.Runtime.Game
                         if (!string.IsNullOrEmpty(next) && !next.StartsWith("-", StringComparison.Ordinal)) { o.SimHashOut = next; i++; }
                         break;
                     case "-shots": o.Shots = true; break;
+                    case "-autoplaypacing":
+                        if (!string.IsNullOrEmpty(next) && !next.StartsWith("-", StringComparison.Ordinal)) { o.Pacing = next.Split(','); i++; }
+                        break;
                     case "-autoplayqualities":
                         if (!string.IsNullOrEmpty(next) && !next.StartsWith("-", StringComparison.Ordinal)) { o.Qualities = next.Split(','); i++; }
                         break;
@@ -478,6 +484,7 @@ namespace CriticalMass.Runtime.Game
                     PerfOverlay.ClearPhase(PerfOverlay.PhaseMatch);
                     PerfOverlay.ClearPhase(PerfOverlay.PhaseResults);
                     PerfOverlay.SetPhase(PerfOverlay.PhaseMatch);
+                    if (_match == 1 && o.Pacing != null && o.Pacing.Length > 0) FrameGovernor.PacingOverride = o.Pacing[0];
                     PerfOverlay.BeginRecording();
                     FrameRecorder.Begin();
                 }
@@ -505,6 +512,7 @@ namespace CriticalMass.Runtime.Game
                 _match++;
                 // perf-smooth-1: -autoplayQualities High,Medium,Low runs match n at the n-th level (one smoke, three levels).
                 if (o.Qualities != null && _match - 1 < o.Qualities.Length) FrameGovernor.ForceRunQuality(o.Qualities[_match - 1]);
+                if (o.Pacing != null && _match - 1 < o.Pacing.Length) FrameGovernor.PacingOverride = o.Pacing[_match - 1];
                 _driver = null;
                 _title = null;
                 _titleSeen = false;
@@ -561,6 +569,7 @@ namespace CriticalMass.Runtime.Game
                 ("frame_cap", FrameGovernor.AppliedCap.ToString(CultureInfo.InvariantCulture)),
                 ("quality", Q(QualitySettings.names[QualitySettings.GetQualityLevel()])),
                 ("quality_requested", Q(FrameGovernor.RequestedQuality)),
+                ("pacing", Q(FrameGovernor.PacingOverride ?? "rule")),
                 ("render_scale", Num(FrameGovernor.AppliedRenderScale)),
                 ("render_pixels", ((long)(Screen.width * FrameGovernor.AppliedRenderScale) * (long)(Screen.height * FrameGovernor.AppliedRenderScale)).ToString(CultureInfo.InvariantCulture)),
                 ("max_queued_frames", QualitySettings.maxQueuedFrames.ToString(CultureInfo.InvariantCulture)),

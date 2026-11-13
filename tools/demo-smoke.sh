@@ -4,7 +4,7 @@
 # exceeded OR NOT MEASURED (fail closed), when the run started in safe mode, or when the quality is not the one asked for.
 #   tools/demo-smoke.sh [--app PATH.app] [--out DIR] [--matches N] [--speed X] [--novsync] [--width W --height H]
 #                       [--fullscreen] [--quality NAME] [--title-seconds S] [--timeout S] [--summarise-only DIR]
-#                       [--qualities High,Medium,Low] [--trace-states]
+#                       [--qualities High,Medium,Low] [--trace-states] [--pacing rule,display,timed60]
 # perf-smooth-1: --qualities runs match n at the n-th level (one hidden run measures three levels with the same match
 # settings; perf-mN.json names each level); --trace-states records the shader variants and graphics states the run met
 # (OUT/data/traces/<api>.graphicsstate, the source of Assets/StreamingAssets/ShaderWarmup). Each match also writes
@@ -42,6 +42,7 @@ while [[ $# -gt 0 ]]; do
     --summarise-only) SUMMARISE="${2:?}"; shift 2 ;;
     --qualities) QUALITIES=(-autoplayQualities "${2:?}"); shift 2 ;;
     --trace-states) TRACE=(-traceStates); shift ;;
+    --pacing) TRACE+=(-autoplayPacing "${2:?}"); shift 2 ;;
     *) echo "usage: demo-smoke.sh [--app PATH.app] [--out DIR] [--matches N] [--speed X] [--novsync] [--width W --height H] [--fullscreen] [--quality NAME] [--title-seconds S] [--timeout S] [--summarise-only DIR]" >&2; exit 64 ;;
   esac
 done
