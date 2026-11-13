@@ -176,7 +176,11 @@ namespace CriticalMass.Runtime.View.Anim
 
             // Stride: turning in place steps too (a 1 u stance swings at |yaw rate| x 1 u).
             double turnSpeed = Math.Abs(_yawRate) * Math.PI / 180.0 * (isHatchling ? 0.5 : 1.0);
-            double stepSpeed = Math.Max(speed, turnSpeed);
+            // Turning steps only while (nearly) standing: on the move the stride follows the ground speed. CI run 43491982024:
+            // the walk sat at its 3.2 cap while the Kaiju moved ~1.3 u/s (rate needed ~1.4), because a chasing Kaiju turns
+            // about 180 deg/s and the turn term (|yaw rate| x 1 u = ~3 u/s) won the max; the planted feet ran backwards at
+            // ~2.3x the body speed (slide 1.27 u/u). Pivot steps also use the half stance (0.5 u), not 1 u.
+            double stepSpeed = speed >= WalkFull ? speed : Math.Max(speed, 0.5 * turnSpeed);
             _idleT += dSim * (isHatchling ? 1.25 : 1.0);
             // Cap 3.2: the adult's Walk plants at 0.91 u/s at full size (CI run 4) and it moves at up to 2.6 u/s; a 2.2 cap slid.
             double walkRate = Math.Max(MinWalkRate, Math.Min(MaxWalkRate, stepSpeed / Math.Max(1e-3, me.WalkSpeed * s)));
