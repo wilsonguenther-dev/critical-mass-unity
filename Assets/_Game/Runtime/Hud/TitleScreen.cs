@@ -114,11 +114,20 @@ namespace CriticalMass.Runtime.Hud
             return false;
         }
 
+        /// <summary>
+        /// Dismisses the title. With the DG-01 flow running the main menu comes next (autoplay: a match) and the HUD stays
+        /// hidden; with the flow off the HUD shows, as before.
+        /// </summary>
         public void Hide()
         {
-            if (Hud != null && Hud.Canvas != null) Hud.Canvas.enabled = true;
+            if (_hidden) return;
+            _hidden = true;
+            bool flow = Flow.FlowDirector.TitleDismissed(this);
+            if (!flow && Hud != null && Hud.Canvas != null) Hud.Canvas.enabled = true;
             if (_canvas != null) Destroy(_canvas.gameObject);
             Destroy(this);
         }
+
+        bool _hidden;
     }
 }
