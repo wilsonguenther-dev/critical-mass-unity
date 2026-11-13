@@ -169,6 +169,14 @@ jobs:
         if: steps.want.outputs.run == 'true'
         with:
           lfs: true
+          fetch-depth: 0   # polish-audit-1: the build stamp's commit count (BuildInfo) needs the full history
+      - name: Build stamp (commit and count for BuildInfo; git can fail inside the build container)
+        id: stamp
+        if: steps.want.outputs.run == 'true'
+        shell: bash
+        run: |
+          echo "count=$(git rev-list --count HEAD)" >> "$GITHUB_OUTPUT"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - uses: actions/cache@v4
         if: steps.want.outputs.run == 'true'
         with:
@@ -189,6 +197,7 @@ jobs:
           buildMethod: ${{ matrix.method }}
           versioning: None
           allowDirtyBuild: true
+          customParameters: -buildCommit ${{ steps.stamp.outputs.sha }} -buildCount ${{ steps.stamp.outputs.count }}
       - name: Pack the player (tar keeps the macOS app's permissions)
         if: steps.want.outputs.run == 'true'
         run: sudo tar -C "${{ matrix.out }}" -czf "player-${{ matrix.target }}.tgz" .
