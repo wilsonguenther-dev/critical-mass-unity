@@ -195,6 +195,10 @@ if os.path.exists(os.path.join(RD, "staff-front_azure.png")):
     row = hrow([fit_h(ours(f"staff-{v}_azure.png"), 600) for v in ("front", "side", "back")], 30)
     checks["iou"]["staff-views"] = round(iou(bible_mask_file("07-staff-views.png"), alpha_mask(row)), 3)
     checks["sbs_kb"]["staff-views"] = sbs("staff-views", ref("07-staff-views.png"), row)
+if os.path.exists(os.path.join(RD, "face_azure.png")):            # v3: face close-up beside the bible's head
+    fo = ours("face_azure.png")
+    fo = fo.crop(fo.getbbox())
+    checks["sbs_kb"]["face"] = sbs("face", ref("07-front.png", (70, 0, 190, 128)), fo, H=640)
 if os.path.exists(os.path.join(RD, "front_crimson.png")):
     pair = hrow([fit_h(ours("front_azure.png"), 500), fit_h(ours("front_crimson.png"), 500)], 30)
     checks["sbs_kb"]["team-pair"] = sbs("team-pair", ref("09-farmer-actions.png"), pair)

@@ -748,8 +748,29 @@ def do_poses():
         bpy.data.objects.remove(ob, do_unlink=True)
 
 
+def do_face():
+    """Large face close-up, orthographic front, head held level (for sbs-face beside the bible's head)."""
+    show_only(meshes)
+    set_pose("Idle", 1)
+    hb = arm.pose.bones["head"]
+    c = (arm.matrix_world @ hb.matrix).translation + Vector((0, 0, 0.30))
+    cam_data.type = "ORTHO"
+    cam_data.ortho_scale = 0.95
+    cam.location = c + Vector((0, -12.0, 0))
+    cam.rotation_euler = Vector((0, 1, 0)).to_track_quat("-Z", "Y").to_euler()
+    scene.render.resolution_x = scene.render.resolution_y = 640 * SS
+    ppm = 640 / 0.95
+    outline(INNER_PX / ppm)
+    light_world(cam.matrix_world.to_3x3() @ Vector((-0.5, 0.6, 0.62)))
+    scene.render.film_transparent = True
+    team(False)
+    render(os.path.join(OUT, "face_azure.png"))
+
+
 if "fit" in MODES:
     do_fit()
+if "face" in MODES:
+    do_face()
 
 
 if "game" in MODES:

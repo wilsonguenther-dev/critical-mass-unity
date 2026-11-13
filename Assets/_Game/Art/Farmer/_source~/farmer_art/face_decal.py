@@ -1,7 +1,7 @@
 """Farmer painted face decal, 256 x 256 RGBA, drawn procedurally (deterministic, no hand edits), bible p07 face:
-big brown eyes with a heavy upper lid and lash flicks, shaded iris (dark top, warm bottom), two highlights, a soft lower
-lid, the character's LEFT brow cocked high, the right one low and straight (attitude), a lopsided closed smirk kicking
-up at the character's left with a dimple, rosy cheeks and a small nose hook.
+v3: big round brown eyes with a heavy upper lid and lash flicks, shaded iris (dark top, warm bottom), two highlights, a soft lower
+lid, the character's LEFT brow cocked high, the right one low and straight (attitude), an open lopsided smirk showing the top
+teeth, kicking up at the character's left with a dimple, rosy cheeks and a small nose hook.
 
 Texture space = the head's front planar projection (FarmerBuilder.add face_uv): u = (x - cx) / (2 hw) + 0.5,
 v = (z - cz) / (2 hh) + 0.5, metres -> texels. Outside the features everything is transparent, so the skin vertex
@@ -50,54 +50,56 @@ def paint(cx, cz, hw, hh):
     ink = _hex("#24161A")
     lash = _hex("#2A1A17")
     brow = _hex(FP.FARMER["f_brow"][0])
-    iris_dk, iris, iris_lt = _hex("#4A2A18"), _hex(FP.FARMER["f_iris"][0]), _hex("#B07A45")
-    for s in (1, -1):                                                               # rosy cheeks, soft
-        over(ell(0.135 * s, 1.425, 0.050, 0.030, soft=0.03), _hex("#F2867A", 0.55))
-        for k in range(3):                                                          # three faint freckles
-            over(ell(0.120 * s + 0.018 * (k - 1) * s, 1.448 - 0.006 * (k % 2), 0.0045, 0.0045, soft=0.003),
-                 _hex("#C9785A", 0.55))
+    iris_dk, iris, iris_lt = _hex("#4A2A18"), _hex(FP.FARMER["f_iris"][0]), _hex("#C08850")
+    for s in (1, -1):                                                               # big visible blush + hatch
+        over(ell(0.140 * s, 1.425, 0.056, 0.034, soft=0.018), _hex("#F27A72", 0.75))
+        for k in range(3):
+            x0 = 0.115 * s + 0.020 * (k - 1) * s
+            over(stroke([(x0 - 0.006 * s, 1.416), (x0 + 0.006 * s, 1.434)], [0.004, 0.004]), _hex("#E0605A", 0.7))
     for s in (1, -1):
-        ex, ez = 0.090 * s, 1.500
-        clip = ell(ex, ez - 0.004, 0.052, 0.064)                                    # eye opening (sclera)
+        ex, ez = 0.094 * s, 1.502
+        clip = ell(ex, ez - 0.004, 0.062, 0.070)                                    # big round eye opening
         over(clip, _hex("#FFFFFF"))
-        ix = ex - 0.006 * s                                                         # looking slightly to her right
-        over(ell(ix, ez - 0.004, 0.040, 0.054) * clip, iris_dk)
-        over(ell(ix, ez - 0.012, 0.036, 0.044) * clip, iris)                       # iris shading: dark top rim
-        over(ell(ix, ez - 0.028, 0.026, 0.020) * clip, iris_lt)                    # warm lower glow
-        over(ell(ix, ez - 0.004, 0.019, 0.026) * clip, ink)                        # pupil
-        over(ell(ix - 0.014 * s, ez + 0.020, 0.014, 0.016), _hex("#FFFFFF"))       # main highlight
-        over(ell(ix + 0.013 * s, ez - 0.030, 0.0065, 0.0065), _hex("#FFFFFF", 0.95))
-        # heavy upper lid (half-lidded confidence) with a thick lash line and two outer lash flicks
-        lid_top = ez + 0.040
-        over(stroke([(ex - 0.056 * s, ez + 0.008), (ex - 0.030 * s, lid_top + 0.010), (ex + 0.010 * s, lid_top + 0.016),
-                     (ex + 0.048 * s, lid_top + 0.002), (ex + 0.066 * s, lid_top - 0.006)],
-                    [0.010, 0.016, 0.018, 0.015, 0.008]), lash)
-        over(stroke([(ex + 0.050 * s, lid_top + 0.000), (ex + 0.082 * s, lid_top + 0.020)], [0.010, 0.003]), lash)
-        over(stroke([(ex + 0.036 * s, lid_top + 0.010), (ex + 0.060 * s, lid_top + 0.034)], [0.008, 0.003]), lash)
-        # lid crease (skin shadow) above the lash line
-        over(stroke([(ex - 0.040 * s, lid_top + 0.024), (ex + 0.004 * s, lid_top + 0.034), (ex + 0.046 * s, lid_top + 0.022)],
-                    [0.004, 0.005, 0.003]), _hex("#C97B5C", 0.7))
-        # soft lower lid
-        over(stroke([(ex - 0.040 * s, ez - 0.058), (ex + 0.000 * s, ez - 0.070), (ex + 0.044 * s, ez - 0.056)],
-                    [0.003, 0.005, 0.003]), _hex("#B9694E", 0.75))
-        # brows: the character's left brow cocked high and arched, the right one low, straight and a touch angry
-        if s > 0:
-            pts = [(0.034, 1.590), (0.080, 1.628), (0.130, 1.632), (0.162, 1.612)]
-            w = [0.020, 0.026, 0.020, 0.008]
-        else:
-            pts = [(-0.030, 1.574), (-0.078, 1.590), (-0.128, 1.592), (-0.160, 1.578)]
-            w = [0.022, 0.026, 0.020, 0.008]
+        ix = ex - 0.006 * s
+        over(ell(ix, ez - 0.006, 0.048, 0.066) * clip, iris_dk)
+        over(ell(ix, ez - 0.014, 0.043, 0.056) * clip, iris)                       # iris shading: dark top rim
+        over(ell(ix, ez - 0.034, 0.032, 0.024) * clip, iris_lt)                    # warm lower glow
+        over(ell(ix, ez - 0.006, 0.023, 0.031) * clip, ink)                        # pupil
+        over(ell(ix - 0.017 * s, ez + 0.022, 0.018, 0.020), _hex("#FFFFFF"))       # highlight 1 (big)
+        over(ell(ix + 0.015 * s, ez - 0.034, 0.009, 0.009), _hex("#FFFFFF"))       # highlight 2 (small)
+        lid_top = ez + 0.050                                                        # thick lash line, two flicks
+        over(stroke([(ex - 0.064 * s, ez + 0.012), (ex - 0.034 * s, lid_top + 0.010), (ex + 0.012 * s, lid_top + 0.016),
+                     (ex + 0.054 * s, lid_top + 0.002), (ex + 0.074 * s, lid_top - 0.008)],
+                    [0.010, 0.017, 0.019, 0.016, 0.008]), lash)
+        over(stroke([(ex + 0.056 * s, lid_top + 0.000), (ex + 0.090 * s, lid_top + 0.022)], [0.011, 0.003]), lash)
+        over(stroke([(ex + 0.040 * s, lid_top + 0.011), (ex + 0.066 * s, lid_top + 0.036)], [0.009, 0.003]), lash)
+        over(stroke([(ex - 0.044 * s, ez - 0.066), (ex + 0.000 * s, ez - 0.080), (ex + 0.048 * s, ez - 0.064)],
+                    [0.003, 0.005, 0.003]), _hex("#B9694E", 0.75))                 # soft lower lid
+        if s > 0:     # the character's left brow cocked HIGH and arched (exaggerated)
+            pts, w = [(0.034, 1.596), (0.080, 1.648), (0.132, 1.656), (0.174, 1.628)], [0.032, 0.040, 0.032, 0.012]
+        else:         # right brow low, flat, angled down to the nose: a sly look
+            pts, w = [(-0.028, 1.574), (-0.080, 1.588), (-0.132, 1.596), (-0.172, 1.582)], [0.034, 0.040, 0.030, 0.012]
         over(stroke(pts, w), brow)
     # nose: small warm shadow hook + a light tip
     over(stroke([(0.004, 1.452), (0.016, 1.436), (-0.002, 1.428)], [0.007, 0.010, 0.006]), _hex("#D7865F", 0.9))
     over(ell(-0.008, 1.446, 0.008, 0.006), _hex("#FFD8BE", 0.6))
-    # lopsided smirk: wide curve kicking up hard at the character's left, a dimple, a hint of the lower lip
-    mouth = _hex(FP.FARMER["f_mouth"][0])
-    over(stroke([(-0.070, 1.392), (-0.034, 1.380), (0.010, 1.378), (0.052, 1.388), (0.080, 1.410)],
-                [0.007, 0.012, 0.013, 0.011, 0.007]), mouth)
-    over(stroke([(0.082, 1.398), (0.090, 1.416)], [0.006, 0.004]), _hex(FP.FARMER["f_mouth"][0], 0.8))   # dimple
-    over(stroke([(-0.066, 1.388), (-0.074, 1.396)], [0.005, 0.003]), _hex(FP.FARMER["f_mouth"][0], 0.6))
-    over(stroke([(-0.020, 1.366), (0.014, 1.362), (0.036, 1.368)], [0.004, 0.006, 0.003]), _hex("#D9806A", 0.7))
+    # open, lopsided, toothy smirk: kicks up hard at the character's left, a strip of top teeth, tongue, dimple
+    xs_u = [-0.066, -0.030, 0.010, 0.050, 0.084]
+    up_z = [1.400, 1.392, 1.392, 1.400, 1.424]
+    lo_z = [1.400, 1.374, 1.364, 1.374, 1.424]
+    U = np.interp(X, xs_u, up_z)
+    Lz = np.interp(X, xs_u, lo_z)
+    inside = (X > xs_u[0]) & (X < xs_u[-1])
+    mouth_m = inside * np.clip((U - Z) / 0.002, 0, 1) * np.clip((Z - Lz) / 0.002, 0, 1)
+    over(mouth_m, _hex("#5A1E22"))
+    over(mouth_m * ell(0.018, 1.366, 0.034, 0.014, soft=0.004), _hex("#D9606A"))  # tongue
+    teeth = mouth_m * np.clip((Z - (U - 0.013)) / 0.002, 0, 1)
+    over(teeth, _hex("#FFFFFF"))
+    mouthc = _hex(FP.FARMER["f_mouth"][0])
+    over(stroke(list(zip(xs_u, up_z)), [0.006, 0.009, 0.009, 0.008, 0.006]), mouthc)
+    over(stroke(list(zip(xs_u, lo_z)), [0.004, 0.006, 0.007, 0.006, 0.004]), _hex(FP.FARMER["f_mouth"][0], 0.9))
+    over(stroke([(0.086, 1.414), (0.094, 1.432)], [0.006, 0.004]), _hex(FP.FARMER["f_mouth"][0], 0.85))  # dimple
+    over(stroke([(-0.020, 1.352), (0.016, 1.348), (0.040, 1.354)], [0.003, 0.005, 0.003]), _hex("#D9806A", 0.6))
     img[:4, :4, 3] = 0.0
     return img
 

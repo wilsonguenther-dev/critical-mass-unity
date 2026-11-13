@@ -159,17 +159,17 @@ def build_arms():
 
 
 # ===================================================================================================== head / face
-FACE_UV = (0.0, -0.06, 1.47, 0.20, 0.20)      # decal box: centre x, front cut y, centre z, half width, half height
+FACE_UV = (0.0, -0.06, 1.48, 0.21, 0.21)      # decal box: centre x, front cut y, centre z, half width, half height
 
 
 def build_head():
     H = "head"
     # wider, softer face: round skull, full cheeks and a soft jaw; features are the painted 256 px decal
-    add(BODY, B.sphere((0.235, 0.215, 0.235), 16, 12), "f_skin", H, "skin", m=M((0, -0.01, 1.545)), face_uv=FACE_UV)
-    add(BODY, B.sphere((0.195, 0.17, 0.135), 12, 8), "f_skin", H, "skin", m=M((0, -0.04, 1.43)), face_uv=FACE_UV)
-    add(BODY, B.sphere((0.026, 0.02, 0.024), 6, 4), "f_skin", H, "face", m=M((0, -0.236, 1.45)))      # nose tip
+    add(BODY, B.sphere((0.25, 0.228, 0.245), 16, 12), "f_skin", H, "skin", m=M((0, -0.01, 1.55)), face_uv=FACE_UV)
+    add(BODY, B.sphere((0.175, 0.175, 0.15), 12, 8), "f_skin", H, "skin", m=M((0, -0.05, 1.42)), face_uv=FACE_UV)
+    add(BODY, B.sphere((0.026, 0.02, 0.024), 6, 4), "f_skin", H, "face", m=M((0, -0.25, 1.45)))       # nose tip
     for s in (1, -1):
-        add(BODY, B.sphere((0.03, 0.04, 0.05), 5, 4), "f_skin", H, "skin", m=M((0.228 * s, 0.0, 1.49)))  # ears
+        add(BODY, B.sphere((0.03, 0.04, 0.05), 5, 4), "f_skin", H, "skin", m=M((0.243 * s, 0.0, 1.49)))  # ears
 
 
 def lock(p0, p3, bend, wave, r, n=6, flat=0.55, side_hint=(0, 0, 1)):
