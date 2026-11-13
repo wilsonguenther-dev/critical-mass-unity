@@ -38,6 +38,13 @@ namespace CriticalMass.Runtime.View.Anim
 
         double _phase, _lastX, _lastZ, _vx, _vz, _speed, _prevSpeed, _accel, _leftDeg;
         bool _hasLast;
+        // Sideways sectors (fix/animation-reds): the strafe kept by the hysteresis, the leg warp applied after evaluation
+        // (degrees, + left) and where the drawn lower body points relative to the drawn facing (tests).
+        int _side = Locomotion.NoSide;
+        double _warp;
+        float _legYaw;
+        /// <summary>The bone the leg warp turns (the KayKit rig's pelvis, parent of the legs and the spine).</summary>
+        public const string HipsBone = "hips";
         double _yaw, _yawVel;
         bool _hasYaw;
         float _roll, _pitch;
@@ -88,6 +95,17 @@ namespace CriticalMass.Runtime.View.Anim
         public float Speed => (float)_speed;
         public Vector3 Velocity => new Vector3((float)_vx, 0f, (float)_vz);
         public double Phase => _phase;
+        /// <summary>Velocity direction relative to the drawn facing, degrees, + left (what picks the locomotion clips).</summary>
+        public float TravelLeftDeg => (float)_leftDeg;
+        /// <summary>Leg warp applied this frame, degrees, + left (0 outside the sideways sectors).</summary>
+        public float LegWarpDeg => (float)_warp;
+        /// <summary>
+        /// Where the drawn lower body points relative to the drawn facing, degrees, + left: the weighted clips' own leg yaw
+        /// (Locomotion.LegYawDeg: 0 for Run and its reverse, +-60 for the strafes) plus the warp. 0 when not in locomotion.
+        /// </summary>
+        public float LegYawDeg => _legYaw;
+        /// <summary>The strafe index the sideways hysteresis holds, or Locomotion.NoSide.</summary>
+        public int StrafeSide => _side;
         public byte ActionKind => _kind;
         public string ActionClip => _actClip;
         public bool HasReaction => _hasReact;
@@ -108,6 +126,9 @@ namespace CriticalMass.Runtime.View.Anim
             _fresh = AnimLod.FreshFrames;
             _idleT = 0;
             _breakAt = -1;
+            _side = Locomotion.NoSide;
+            _warp = 0;
+            _legYaw = 0f;
         }
 
         /// <summary>
@@ -198,6 +219,8 @@ namespace CriticalMass.Runtime.View.Anim
             float idleW = 0f;
             float twist = 0f;
             bool upperAllowed = !corpse;
+            _warp = 0;
+            _legYaw = 0f;
 
             if (corpse)
             {
@@ -268,6 +291,7 @@ namespace CriticalMass.Runtime.View.Anim
             if (_fresh > 0) _fresh--;
             bool evaluate = AnimLod.ShouldEvaluate(m.AlwaysAnimate, fresh, m.AnyVisible, basePos, _id);
             bool evaluated = m.Evaluate(evaluate);
+            if (evaluated) ApplyLegWarp(m);
             if (evaluated && idleW > 0.01f)
             {
                 // Breathing: a 2% chest swell at 0.3 Hz while idle. fix/model-scale: set from the chest's rest scale, never
@@ -313,7 +337,9 @@ namespace CriticalMass.Runtime.View.Anim
             float run = Locomotion.RunWeight(speed);
             if (speed > 0.2)
                 _leftDeg = Locomotion.LeftAngleDeg(Math.Sin(_yaw * Math.PI / 180), Math.Cos(_yaw * Math.PI / 180), _vx, _vz);
-            Locomotion.DirectionWeights(_leftDeg, _w6);
+            double warp = Locomotion.DirectionWeights(_leftDeg, _w6, ref _side);
+            // The warp turns a real strafe; a model without the strafes plays the band's forward clip (AddEntry) unturned.
+            if (_side >= 0 && !m.HasClip(Locomotion.RunBand[_side].Clip)) warp = 0;
 
             _eCount = 0;
             for (int k = 0; k < Locomotion.DirCount; k++)
@@ -331,6 +357,14 @@ namespace CriticalMass.Runtime.View.Anim
                 wsum += _eW[e];
             }
             if (wsum > 0) { stride /= wsum; len /= wsum; }
+            _warp = warp * move;
+            double legs = 0;
+            for (int e = 0; e < _eCount && wsum > 0; e++)
+            {
+                ClipFact f = ClipFacts.Get(_eClip[e]);
+                if (f != null) legs += _eW[e] / wsum * Locomotion.LegYawDeg(f.moveDeg);
+            }
+            _legYaw = (float)((legs + warp) * move);
             _prevPhase = _phase;
             if (!air && move > 0.01f && loopDt > 0) _phase = Locomotion.Advance(_phase, speed * loopDt, stride, len, loopDt);
 
@@ -623,6 +657,24 @@ namespace CriticalMass.Runtime.View.Anim
                 Footfalls.Emit(new Footfall { Tick = w.Tick, Actor = i, Kind = FootfallKind.Step, Position = toe != null ? toe.position : basePos,
                     Strength = Footfalls.StepStrength, Radius = Footfalls.StepRadius, Left = foot == 0, Team = actor.Team });
             }
+        }
+
+        /// <summary>
+        /// Orientation warping for the sideways sectors (fix/animation-reds): after the graph wrote the pose, turn the hips
+        /// (and with them the legs) by the warp about the model's up axis, and the spine back by the same amount so the
+        /// chest and arms keep facing the aim. Only after an evaluation: on a skipped frame the bones hold last frame's
+        /// (already turned) pose, and the next evaluation rewrites hips and spine from the clips, so nothing compounds.
+        /// </summary>
+        void ApplyLegWarp(ModelView m)
+        {
+            if (Math.Abs(_warp) < 0.25) return;
+            Transform hips = m.Bone(HipsBone);
+            if (hips == null) return;
+            // Unity is left-handed with Y up: a positive angle about up turns to the right, so + left is a negative angle.
+            Quaternion q = Quaternion.AngleAxis(-(float)_warp, m.Transform.up);
+            hips.rotation = q * hips.rotation;
+            Transform spine = m.Bone(ModelView.UpperBodyRootBone);
+            if (spine != null && spine.IsChildOf(hips)) spine.rotation = Quaternion.Inverse(q) * spine.rotation;
         }
 
         // ------------------------------------------------------------------ helpers

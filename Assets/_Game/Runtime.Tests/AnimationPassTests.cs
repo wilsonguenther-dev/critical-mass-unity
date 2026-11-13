@@ -58,8 +58,9 @@ namespace CriticalMass.Runtime.Tests
             var w = new float[Locomotion.DirCount];
             for (int k = 0; k < 8; k++)
             {
+                int side = Locomotion.NoSide;
                 double left = k * 45.0;
-                Locomotion.DirectionWeights(left, w);
+                double warp = Locomotion.DirectionWeights(left, w, ref side);
                 double sx = 0, sz = 0;
                 for (int d = 0; d < Locomotion.DirCount; d++)
                 {
@@ -67,7 +68,7 @@ namespace CriticalMass.Runtime.Tests
                     Locomotion.Dir dir = Locomotion.RunBand[d];
                     ClipFact f = ClipFacts.Get(dir.Clip);
                     Assert.IsNotNull(f, dir.Clip + " has no clip fact");
-                    double travel = (f.moveDeg + (dir.Reversed ? 180 : 0)) * Math.PI / 180;
+                    double travel = (f.moveDeg + (dir.Reversed ? 180 : 0) + warp) * Math.PI / 180;
                     sx += w[d] * Math.Cos(travel);
                     sz += w[d] * Math.Sin(travel);
                 }
@@ -78,6 +79,121 @@ namespace CriticalMass.Runtime.Tests
             Assert.AreEqual(1f, w[3], 1e-5f);
             Assert.IsTrue(Locomotion.RunBand[3].Reversed && Locomotion.RunBand[3].Clip == ArtMapping.Run, "back = Run reversed");
             Assert.AreEqual(ArtMapping.WalkBack, Locomotion.WalkBand[3].Clip, "walking back = Walking_Backwards");
+        }
+
+        // ------------------------------------------------------------------ sideways sectors (fix/animation-reds)
+
+        /// <summary>The direction a clip's legs point (+ left of the facing): Locomotion.LegYawDeg of its measured travel.</summary>
+        static double Legs(int dirIndex) => Locomotion.LegYawDeg(ClipFacts.Get(Locomotion.RunBand[dirIndex].Clip).moveDeg);
+
+        /// <summary>
+        /// Integration batch 3 red (0.98 u/u at exactly sideways): the KayKit strafes turn the hips +-60 degrees, and a
+        /// per-bone rotation mix of StrafeL (hips +60) with StrafeR reversed (hips -60) marches in place. Pinned: at every
+        /// angle (with or without history) no two weighted clips have legs more than 60 degrees apart, so the mix never
+        /// cancels a stride.
+        /// </summary>
+        [Test]
+        public void NoAngleMixesStrafesWhoseHipsPointOppositeWays()
+        {
+            var w = new float[Locomotion.DirCount];
+            int side = Locomotion.NoSide;
+            for (double a = -720; a <= 720; a += 0.5)
+            {
+                Locomotion.DirectionWeights(a, w, ref side);
+                double lo = double.PositiveInfinity, hi = double.NegativeInfinity;
+                for (int d = 0; d < Locomotion.DirCount; d++)
+                {
+                    if (w[d] <= 1e-6f) continue;
+                    lo = Math.Min(lo, Legs(d));
+                    hi = Math.Max(hi, Legs(d));
+                }
+                Assert.LessOrEqual(hi - lo, 60.5, $"at {a} deg the mixed clips' legs point {lo:0} and {hi:0} deg: the strides cancel");
+                Assert.AreEqual(1f, w.Sum(), 1e-5f, "sum at " + a);
+            }
+        }
+
+        /// <summary>
+        /// Sideways, the diagonals and the backpedal with a fixed facing: the travel of the chosen clips plus the leg warp
+        /// equals the velocity angle (sideways: exactly), the warp stays within 45 degrees, and outside the sideways
+        /// sectors there is no warp.
+        /// </summary>
+        [TestCase(90.0)] [TestCase(-90.0)] [TestCase(270.0)] [TestCase(75.0)] [TestCase(105.0)] [TestCase(255.0)] [TestCase(285.0)]
+        [TestCase(45.0)] [TestCase(135.0)] [TestCase(-45.0)] [TestCase(-135.0)] [TestCase(180.0)] [TestCase(0.0)]
+        public void TheLegsTravelAlongTheVelocity(double left)
+        {
+            var w = new float[Locomotion.DirCount];
+            int side = Locomotion.NoSide;
+            double warp = Locomotion.DirectionWeights(left, w, ref side);
+            double sx = 0, sz = 0;
+            for (int d = 0; d < Locomotion.DirCount; d++)
+            {
+                if (w[d] <= 0f) continue;
+                Locomotion.Dir dir = Locomotion.RunBand[d];
+                double travel = (ClipFacts.Get(dir.Clip).moveDeg + (dir.Reversed ? 180 : 0) + warp) * Math.PI / 180;
+                sx += w[d] * Math.Cos(travel);
+                sz += w[d] * Math.Sin(travel);
+            }
+            double got = Math.Atan2(sz, sx) * 180 / Math.PI;
+            bool sideways = Math.Abs(Math.Abs(Wrap(left)) - 90) < 30;
+            Assert.LessOrEqual(Math.Abs(Wrap(got - left)), sideways ? 0.5 : 15.0, $"moving {left} deg: the legs travel {got:0.0} deg");
+            Assert.LessOrEqual(Math.Abs(warp), 45.0 + 1e-9, "warp");
+            if (!sideways) Assert.AreEqual(0.0, warp, 1e-9, "no warp outside the sideways sectors");
+            else Assert.AreEqual(1, w.Count(x => x > 0f), "one strafe sideways");
+        }
+
+        /// <summary>
+        /// With no history, exactly sideways runs toes-first: StrafeL going left, StrafeR going right (the same at -90 as
+        /// at 270). The hysteresis keeps the strafe through a 10 Hz aim wobble of +-12 degrees around the sideways line
+        /// and flips only past 15 degrees, once.
+        /// </summary>
+        [Test]
+        public void SidewaysPicksToesFirstAndHoldsThroughAWobble()
+        {
+            var w = new float[Locomotion.DirCount];
+            int side = Locomotion.NoSide;
+            Locomotion.DirectionWeights(90, w, ref side);
+            Assert.AreEqual(1, side, "left: StrafeL");
+            Assert.IsFalse(Locomotion.RunBand[side].Reversed);
+            side = Locomotion.NoSide;
+            Locomotion.DirectionWeights(-90, w, ref side);
+            Assert.AreEqual(5, side, "right: StrafeR");
+            Assert.IsFalse(Locomotion.RunBand[side].Reversed);
+
+            // 10 Hz wobble sampled at 60 fps for 2 s: the aim swings +-12 degrees, the legs never flip.
+            side = Locomotion.NoSide;
+            int flips = 0, last = -2;
+            for (int f = 0; f < 120; f++)
+            {
+                double a = 90 + 12 * Math.Sin(2 * Math.PI * 10 * f / 60.0);
+                double warp = Locomotion.DirectionWeights(a, w, ref side);
+                if (last != -2 && side != last) flips++;
+                last = side;
+                Assert.AreEqual(a, side * Locomotion.DirStepDeg + warp, 1e-9, "travel = strafe + warp");
+            }
+            Assert.AreEqual(0, flips, "the legs flipped during a 12 degree wobble");
+
+            // Past the hysteresis the legs flip once to the other strafe, and back only past it on the other side.
+            side = 1;
+            Locomotion.DirectionWeights(104, w, ref side);
+            Assert.AreEqual(1, side);
+            Locomotion.DirectionWeights(105.5, w, ref side);
+            Assert.AreEqual(2, side, "past 105: StrafeR reversed");
+            Locomotion.DirectionWeights(80, w, ref side);
+            Assert.AreEqual(2, side, "held until 75");
+            Locomotion.DirectionWeights(74, w, ref side);
+            Assert.AreEqual(1, side);
+            Locomotion.DirectionWeights(30, w, ref side);
+            Assert.AreEqual(Locomotion.NoSide, side, "leaving the sector forgets the strafe");
+        }
+
+        [Test]
+        public void LegYawFollowsTheClipsMeasuredTravel()
+        {
+            Assert.AreEqual(0, Locomotion.LegYawDeg(ClipFacts.Get(ArtMapping.Run).moveDeg), 1e-3);
+            Assert.AreEqual(60, Locomotion.LegYawDeg(ClipFacts.Get(ArtMapping.StrafeL).moveDeg), 1.0);
+            Assert.AreEqual(-60, Locomotion.LegYawDeg(ClipFacts.Get(ArtMapping.StrafeR).moveDeg), 1.0);
+            Assert.AreEqual(0, Locomotion.LegYawDeg(ClipFacts.Get(ArtMapping.WalkBack).moveDeg), 1e-3, "walking backwards: toes forward");
+            Assert.AreEqual(0, Locomotion.LegYawDeg(ClipFacts.Get(ArtMapping.Walk).moveDeg), 1e-3);
         }
 
         // ------------------------------------------------------------------ speed matching (DG-75)
