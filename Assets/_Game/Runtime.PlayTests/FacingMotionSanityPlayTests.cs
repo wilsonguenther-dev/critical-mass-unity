@@ -129,7 +129,7 @@ namespace CriticalMass.Runtime.PlayTests
                 yield return null;
             }
             if (_measured == 0) Assert.Inconclusive("no model had a measurable front (toes/foot bones missing)");
-            CollectionAssert.IsEmpty(_bad, $"{_bad.Count} facing problems:\n" + string.Join("\n", _bad.Take(16)));
+            CollectionAssert.IsEmpty(_bad, $"{_bad.Count} facing problems (clock stopped at sim tick {_w?.LoadTick}):\n" + string.Join("\n", _bad.Take(16)));
         }
 
         void Check(string who, string doing, Vector3 intended)
