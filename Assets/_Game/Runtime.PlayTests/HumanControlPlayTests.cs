@@ -6,6 +6,7 @@ using CriticalMass.Runtime.Hud;
 using CriticalMass.Runtime.Hud.Interact;
 using CriticalMass.Runtime.Input;
 using CriticalMass.Runtime.Menu;
+using CriticalMass.Runtime.Menus;
 using CriticalMass.Runtime.Spectator;
 using CriticalMass.Sim.Config;
 using CriticalMass.Sim.Core;
@@ -317,6 +318,174 @@ namespace CriticalMass.Runtime.PlayTests
             yield return Until(() => !SpectatorMode.IsSpectating, 15f, "R rejoins");
             yield return AssertPlayerMovesFighter("after leaving Spectate");
             LogAssert.NoUnexpectedReceived();
+        }
+
+        // ---------------------------------------------------------------- lobby paths (integration batch 4)
+
+        /// <summary>Boots to the title and waits for its backdrop (the title is the first screen).</summary>
+        IEnumerator BootToTitle()
+        {
+            SceneManager.LoadScene(BootScene);
+            yield return null;
+            yield return WaitForNewDriver(null);
+            Assert.AreEqual(FlowState.Title, GameFlow.State);
+            Assert.IsNotNull(UnityEngine.Object.FindAnyObjectByType<TitleScreen>(), "the title shows first");
+        }
+
+        /// <summary>Title, HOME, PLAY (the mode cards on a fresh session), then the card for mode m.</summary>
+        IEnumerator HomeToModeCard(MatchMode m)
+        {
+            yield return BootToTitle();
+            TitleScreen title = UnityEngine.Object.FindAnyObjectByType<TitleScreen>();
+            yield return Press(title.MainMenuItem);
+            yield return Until(() => GameFlow.State == FlowState.Menu && FlowDirector.Current.MainMenu.IsVisible, 5f, "HOME opens the home lobby");
+            FlowDirector d = FlowDirector.Current;
+            yield return Press(d.MainMenu.PlayItem);
+            yield return Until(() => d.Modes.IsVisible, 5f, "PLAY opens the mode cards");
+            yield return Press(d.Modes.Card(m));
+        }
+
+        /// <summary>The class screen is up: confirm the focused class; the READY screen follows.</summary>
+        IEnumerator ConfirmClassThenReady()
+        {
+            yield return Until(() => ClassSelect.IsOpen, 5f, "the mode card opens class select");
+            yield return null;
+            ClassSelect.Instance.ConfirmSetup(ClassSelect.SelectedClass);
+            yield return StartFromReady();
+        }
+
+        /// <summary>READY: START NOW, then wait for the match world.</summary>
+        IEnumerator StartFromReady()
+        {
+            FlowDirector d = FlowDirector.Current;
+            yield return Until(() => d.Ready.IsVisible, 5f, "the READY screen shows");
+            SimDriverBehaviour before = Driver();
+            yield return Press(d.Ready.StartItem);
+            yield return WaitForNewDriver(before);
+            Assert.AreEqual(FlowState.Match, GameFlow.State);
+        }
+
+        IEnumerator ModeCardPath(MatchMode m)
+        {
+            yield return HomeToModeCard(m);
+            yield return ConfirmClassThenReady();
+            yield return AssertPlayerMovesFighter("Home > Play > " + m + " > class select > Ready");
+            LogAssert.NoUnexpectedReceived();
+        }
+
+        [UnityTest, Timeout(120000)]
+        public IEnumerator TitlePlayNowGivesControl()
+        {
+            yield return BootToTitle();
+            SimDriverBehaviour before = Driver();
+            UnityEngine.Object.FindAnyObjectByType<TitleScreen>().PressPlayNow();
+            yield return WaitForNewDriver(before);
+            yield return AssertPlayerMovesFighter("Title > PLAY NOW");
+            LogAssert.NoUnexpectedReceived();
+        }
+
+        [UnityTest, Timeout(120000)]
+        public IEnumerator TitleQuickDemoGivesControl()
+        {
+            yield return BootToTitle();
+            SimDriverBehaviour before = Driver();
+            UnityEngine.Object.FindAnyObjectByType<TitleScreen>().PressDemo();
+            yield return WaitForNewDriver(before);
+            yield return AssertPlayerMovesFighter("Title > QUICK DEMO");
+            LogAssert.NoUnexpectedReceived();
+        }
+
+        [UnityTest, Timeout(120000)]
+        public IEnumerator HomeQuickMatchGivesControl() { yield return ModeCardPath(MatchMode.Quick); }
+
+        [UnityTest, Timeout(120000)]
+        public IEnumerator HomeFullBattleGivesControl() { yield return ModeCardPath(MatchMode.FullBattle); }
+
+        [UnityTest, Timeout(120000)]
+        public IEnumerator HomeTrainingGivesControl() { yield return ModeCardPath(MatchMode.Training); }
+
+        [UnityTest, Timeout(120000)]
+        public IEnumerator HomePracticeGivesControl() { yield return ModeCardPath(MatchMode.Practice); }
+
+        [UnityTest, Timeout(120000)]
+        public IEnumerator HomeCustomGivesControl()
+        {
+            yield return HomeToModeCard(MatchMode.Custom);
+            FlowDirector d = FlowDirector.Current;
+            yield return Until(() => GameFlow.State == FlowState.Setup && d.Setup.IsVisible, 5f, "CUSTOM opens the match setup");
+            SimDriverBehaviour before = Driver();
+            yield return Press(d.Setup.StartItem);
+            yield return WaitForNewDriver(before);
+            yield return AssertPlayerMovesFighter("Home > Play > Custom > setup > Start");
+            LogAssert.NoUnexpectedReceived();
+        }
+
+        [UnityTest, Timeout(120000)]
+        public IEnumerator HomeSpectateNeverHandsOverTheFighter()
+        {
+            yield return HomeToModeCard(MatchMode.Spectate);
+            yield return StartFromReady();
+            yield return Settle("Spectate");
+            SimDriverBehaviour d = Driver();
+            Assert.IsTrue(d.HumanAutopilot, "Spectate: the fighter plays itself");
+            InputSystem.QueueStateEvent(_kb, new KeyboardState(Key.W));
+            yield return Real(HoldSeconds);
+            InputSystem.QueueStateEvent(_kb, new KeyboardState());
+            InputSystem.QueueStateEvent(_pad, new GamepadState { leftStick = new Vector2(0f, 1f) });
+            yield return Real(HoldSeconds);
+            InputSystem.QueueStateEvent(_pad, new GamepadState());
+            yield return null;
+            Assert.IsTrue(d.HumanAutopilot, "Spectate is the one mode where W and the stick do not take the fighter");
+            LogAssert.NoUnexpectedReceived();
+        }
+
+        [UnityTest, Timeout(180000)]
+        public IEnumerator RematchFromHomeAfterQuittingGivesControl()
+        {
+            yield return ModeCardPathNoAsserts(MatchMode.Quick);
+            yield return Settle("first match");
+            PauseMenu pm = Driver().GetComponent<PauseMenu>();
+            yield return Tap(Key.Escape);
+            Assert.IsTrue(pm.IsOpen, "Escape opens the pause menu");
+            SimDriverBehaviour before = Driver();
+            pm.QuitToTitle();
+            yield return WaitForNewDriver(before);
+            TitleScreen title = UnityEngine.Object.FindAnyObjectByType<TitleScreen>();
+            Assert.IsNotNull(title, "Quit to title shows the title");
+            yield return Press(title.MainMenuItem);
+            FlowDirector d = FlowDirector.Current;
+            yield return Until(() => d.MainMenu.IsVisible, 5f, "HOME after quitting");
+            Assert.IsNotNull(d.MainMenu.RematchItem, "home offers REMATCH after an abandoned match");
+            yield return Press(d.MainMenu.RematchItem);
+            yield return StartFromReady();
+            yield return AssertPlayerMovesFighter("Quit > Home > REMATCH > Ready");
+            LogAssert.NoUnexpectedReceived();
+        }
+
+        [UnityTest, Timeout(180000)]
+        public IEnumerator ModeCardPlayAgainAndPauseResumeKeepControl()
+        {
+            yield return ModeCardPathNoAsserts(MatchMode.Quick);
+            yield return Settle("Quick match");
+            FlowDirector.Current.ShowResults();
+            yield return null;
+            SimDriverBehaviour before = Driver();
+            yield return Press(FlowDirector.Current.Results.PlayAgainItem);
+            yield return WaitForNewDriver(before);
+            yield return AssertPlayerMovesFighter("Quick match > results > Play again");
+            PauseMenu pm = Driver().GetComponent<PauseMenu>();
+            yield return Tap(Key.Escape);
+            Assert.IsTrue(pm.IsOpen, "Escape opens the pause menu");
+            yield return Tap(Key.Escape);
+            yield return Until(() => !pm.IsOpen, 2f, "Escape again resumes");
+            yield return AssertPlayerMovesFighter("Quick match > pause > resume");
+            LogAssert.NoUnexpectedReceived();
+        }
+
+        IEnumerator ModeCardPathNoAsserts(MatchMode m)
+        {
+            yield return HomeToModeCard(m);
+            yield return ConfirmClassThenReady();
         }
 
         // ---------------------------------------------------------------- autopilot and the watchdog
