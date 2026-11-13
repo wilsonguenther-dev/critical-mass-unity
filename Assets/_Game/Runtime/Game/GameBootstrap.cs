@@ -50,6 +50,7 @@ namespace CriticalMass.Runtime.Game
             SimDriverBehaviour driver = game.AddComponent<SimDriverBehaviour>();
             game.AddComponent<HumanInputSource>();
             game.AddComponent<ActorViews>();
+            game.AddComponent<CriticalMass.Runtime.View.Effects.CombatFx>();
             game.AddComponent<GridChunkMeshView>();
             DebugHud hud = game.AddComponent<DebugHud>();
             hud.Driver = game.GetComponent<SimDriverBehaviour>();
