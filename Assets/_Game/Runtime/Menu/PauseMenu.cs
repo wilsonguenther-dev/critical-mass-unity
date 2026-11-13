@@ -5,6 +5,7 @@ using CriticalMass.Runtime.Hud;
 using CriticalMass.Runtime.Hud.Style;
 using CriticalMass.Runtime.Hud.Ui;
 using CriticalMass.Runtime.Input;
+using CriticalMass.Runtime.Menus;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
@@ -108,6 +109,12 @@ namespace CriticalMass.Runtime.Menu
             // The title screen takes every key itself; the press that dismisses it must not also open the menu.
             if (GetComponent<TitleScreen>() != null) return true;
             if (!IsOpen) return false;
+            // DG-14: the controls card opened from this menu closes first (back to the entry that opened it).
+            if (ControlsCardScreen.IsOpen)
+            {
+                ControlsCardScreen.Hide();
+                return true;
+            }
             if (IsRebinding || Time.unscaledTime < _quietUntil) return true;
             Back();
             return true;
@@ -167,6 +174,12 @@ namespace CriticalMass.Runtime.Menu
                 return;
             }
             if (Time.unscaledTime < _quietUntil) return;
+            if (ControlsCardScreen.IsOpen)
+            {
+                Gamepad cardPad = Gamepad.current;
+                if (cardPad != null && cardPad.buttonEast.wasPressedThisFrame) ControlsCardScreen.Hide();
+                return;
+            }
             EventSystem es = EventSystem.current;
             if (es != null && !es.sendNavigationEvents) es.sendNavigationEvents = true;
 
@@ -259,6 +272,9 @@ namespace CriticalMass.Runtime.Menu
         }
 
         // ---- actions ----
+
+        /// <summary>DG-14: the one-screen controls card over the menu; the focus comes back here when it closes.</summary>
+        public void ShowControls() => ControlsCardScreen.Show();
 
         public void RestartMatch()
         {
@@ -366,12 +382,13 @@ namespace CriticalMass.Runtime.Menu
             MenuUi.Stretch(page);
             _rootPage = page.gameObject;
             MenuUi.Panel(page, "Panel", 640f, 200f, 640f, 640f);
-            string[] labels = { "RESUME", "SETTINGS", "RESTART MATCH", "QUIT TO TITLE", "QUIT GAME" };
-            Action[] acts = { Resume, () => ShowSettings(), RestartMatch, QuitToTitle, QuitGame };
+            // DG-14: CONTROLS opens the one-screen controls card; six entries at 96 px fit the same panel.
+            string[] labels = { "RESUME", "CONTROLS", "SETTINGS", "RESTART MATCH", "QUIT TO TITLE", "QUIT GAME" };
+            Action[] acts = { Resume, ShowControls, () => ShowSettings(), RestartMatch, QuitToTitle, QuitGame };
             var items = new MenuItem[labels.Length];
             for (int i = 0; i < labels.Length; i++)
             {
-                MenuItem it = MenuUi.Item(page, labels[i], 700f, 250f + i * 112f, 520f, 84f, labels[i], MenuItem.Kind.Button, 34,
+                MenuItem it = MenuUi.Item(page, labels[i], 700f, 246f + i * 96f, 520f, 76f, labels[i], MenuItem.Kind.Button, 32,
                     true, CMTokens.Display);
                 it.Body.Radius = 16f;
                 it.Submitted = acts[i];
@@ -475,6 +492,11 @@ namespace CriticalMass.Runtime.Menu
                     CellW, 28f, heads[c], 2f);
             y += 34f;
 
+            // DG-14: VIEW CONTROLS at the top of the tab, in the empty corner above the action labels.
+            MenuItem view = MenuUi.Item(tab, "View Controls", ContentX, ContentY - 4f, LabelW - 20f, 34f, "VIEW CONTROLS",
+                MenuItem.Kind.Button, 18, true, CMTokens.Display);
+            view.Submitted = ShowControls;
+
             InputActionAsset asset = InputSystem.actions;
             var grid = new List<MenuItem[]>();
             for (int r = 0; r < ControlBindings.Rows.Length; r++)
@@ -508,6 +530,15 @@ namespace CriticalMass.Runtime.Menu
                 SetStatus("Every control is back to its default.", false);
             };
             WireGrid(grid, reset);
+            MenuItem firstCell = grid.Count > 0 ? (grid[0][0] ?? grid[0][2]) : reset;
+            view.navigation = new Navigation { mode = Navigation.Mode.Explicit, selectOnUp = _tabButtons[0], selectOnDown = firstCell };
+            for (int c = 0; grid.Count > 0 && c < 4; c++)
+            {
+                if (grid[0][c] == null) continue;
+                Navigation n = grid[0][c].navigation;
+                n.selectOnUp = view;
+                grid[0][c].navigation = n;
+            }
             _refreshers.Add(RefreshCells);
             return tab.gameObject;
         }
