@@ -4,28 +4,6 @@ using UnityEngine;
 
 namespace CriticalMass.Runtime.View.Anim
 {
-#if !CM_HAS_POST_POSE
-    // Contract C3 (physics build list 2026-11-12): the animation lane's DG-71 adds ActorViews.PostPose(int actor, ModelView
-    // mv, in ActorPoseState s), dispatched to IPostPoseListener after ModelView.Evaluate and before render. Until that PR
-    // merges, these two local definitions stand in (same names, namespace and signature). When DG-71 is on main, define
-    // CM_HAS_POST_POSE (Player Settings > Scripting Define Symbols): these drop out, DG-71's types are used, the shim
-    // driver below stops dispatching, and ActorViews.PostPose must also call PostPoseHub.Dispatch (one line, or register
-    // PostPoseHub.Listeners in DG-71's registry). Nothing here reads ActorPoseState's fields, so any shape DG-71 gives
-    // the struct compiles.
-
-    /// <summary>Local stand-in for DG-71's per-actor pose state (no fields are read by the world-reactions lane).</summary>
-    public struct ActorPoseState
-    {
-        public bool Corpse;
-    }
-
-    /// <summary>Local stand-in for DG-71's post-pose listener (contract C3).</summary>
-    public interface IPostPoseListener
-    {
-        void PostPose(int actor, ModelView mv, in ActorPoseState s);
-    }
-#endif
-
     /// <summary>What the world-reactions lane needs from a posed model: the actor (-2 the Kaiju), its root and model key.</summary>
     public interface IPostPoseRootListener
     {
@@ -82,7 +60,8 @@ namespace CriticalMass.Runtime.View.Anim
     }
 
     /// <summary>
-    /// Stand-in driver for contract C3 until DG-71 merges: after ActorViews' LateUpdate (order 0) and before the camera
+    /// Integration batch 3: the animation pass's ActorViews.PostPose is on main, so this no longer dispatches anything; only
+    /// the model-name parser remains (tests). Former note: stand-in driver for contract C3 until DG-71 merges: after ActorViews' LateUpdate (order 0) and before the camera
     /// brain (100), it walks ActorViews' active models ("Actor i Key", "Kaiju Adult", "Kaiju Hatchling": the names the
     /// sanity suite reads too) and dispatches them to PostPoseHub. Allocation-free (manual name parse). With
     /// CM_HAS_POST_POSE defined it does nothing.
@@ -90,28 +69,6 @@ namespace CriticalMass.Runtime.View.Anim
     [DefaultExecutionOrder(50)]
     public sealed class PostPoseShim : MonoBehaviour
     {
-        private ActorViews _views;
-
-        private void LateUpdate()
-        {
-#if !CM_HAS_POST_POSE
-            if (PostPoseHub.Listeners.Count == 0) return;
-            if (_views == null) _views = GetComponent<ActorViews>();
-            if (_views == null || !_views.isActiveAndEnabled) return;
-            Transform root = _views.transform;
-            for (int k = 0; k < root.childCount; k++)
-            {
-                Transform c = root.GetChild(k);
-                if (!c.gameObject.activeSelf) continue;
-                string n = c.name;
-                if (n == "Kaiju Adult") { PostPoseHub.Dispatch(PostPoseHub.KaijuActor, c, ArtMapping.KaijuAdult); continue; }
-                if (n == "Kaiju Hatchling") { PostPoseHub.Dispatch(PostPoseHub.KaijuActor, c, ArtMapping.KaijuHatchling); continue; }
-                int actor = ParseActor(n);
-                if (actor >= 0) PostPoseHub.Dispatch(actor, c, null);
-            }
-#endif
-        }
-
         /// <summary>"Actor 12 Warrior" gives 12; the grey-box capsule "Actor 12" and anything else give -1.</summary>
         public static int ParseActor(string n)
         {

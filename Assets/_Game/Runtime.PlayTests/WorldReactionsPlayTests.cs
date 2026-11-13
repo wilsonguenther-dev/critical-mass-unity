@@ -36,7 +36,7 @@ namespace CriticalMass.Runtime.PlayTests
             Assert.IsNotNull(go.GetComponent<GroundPaint>(), "GroundPaint installed");
             Assert.IsNotNull(go.GetComponent<CameraResponse>(), "CameraResponse installed");
             Assert.IsNotNull(go.GetComponent<CharacterSprings>(), "CharacterSprings installed");
-            Assert.IsNotNull(go.GetComponent<CargoView>(), "CargoView installed");
+            Assert.IsNull(go.GetComponent<CargoView>(), "one cargo drawer: the animation pass's CarryProp");
             WorldForceBus bus = WorldForceBus.Active;
             Assert.IsNotNull(bus, "CombatFx made the force bus");
 

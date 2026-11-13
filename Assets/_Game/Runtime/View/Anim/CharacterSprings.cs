@@ -152,11 +152,14 @@ namespace CriticalMass.Runtime.View.Anim
         private ReactionBudget _budget;
         private int _budgetFrame = -1000;
 
-        private void OnEnable() => PostPoseHub.Register(this);
-        private void OnDisable() => PostPoseHub.Unregister(this);
+        // Integration batch 3: driven by the animation pass's real hook (ActorViews.PostPose -> PostPoseHooks, contract C3).
+        private void OnEnable() => PostPoseHooks.Register(this);
+        private void OnDisable() => PostPoseHooks.Unregister(this);
 
-        public void PostPose(int actor, ModelView mv, in ActorPoseState s)
+        public void OnPostPose(int actor, ModelView mv, in ActorPoseState s)
         {
+            // A frame the animation level of detail skipped keeps last frame's bones (springs already on them): never stack.
+            if (!s.Evaluated) return;
             if (mv != null) PostPoseRoot(actor, mv.Transform, mv.Entry != null ? mv.Entry.Key : null);
         }
 

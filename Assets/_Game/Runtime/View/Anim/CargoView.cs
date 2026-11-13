@@ -42,10 +42,11 @@ namespace CriticalMass.Runtime.View.Anim
         public int Shown { get; private set; }
         private int _shownFrame;
 
-        private void OnEnable() => PostPoseHub.Register(this);
-        private void OnDisable() => PostPoseHub.Unregister(this);
+        // Integration batch 3: driven by the animation pass's real hook (ActorViews.PostPose -> PostPoseHooks, contract C3).
+        private void OnEnable() => PostPoseHooks.Register(this);
+        private void OnDisable() => PostPoseHooks.Unregister(this);
 
-        public void PostPose(int actor, ModelView mv, in ActorPoseState s)
+        public void OnPostPose(int actor, ModelView mv, in ActorPoseState s)
         {
             if (mv != null) PostPoseRoot(actor, mv.Transform, mv.Entry != null ? mv.Entry.Key : null);
         }

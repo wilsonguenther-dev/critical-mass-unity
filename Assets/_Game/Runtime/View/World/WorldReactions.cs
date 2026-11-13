@@ -35,9 +35,9 @@ namespace CriticalMass.Runtime.View.Reactions
             Ensure<ForceField>(go);
             Ensure<GroundPaint>(go);
             Ensure<CameraResponse>(go);
-            Ensure<PostPoseShim>(go);
             Ensure<CharacterSprings>(go);
-            Ensure<CargoView>(go);
+            // Carried cargo: the animation pass's CarryProp (between the hands, matching its Carry pose) is the one drawer;
+            // CargoView (on the back) is not installed, so a load is never drawn twice.
             return go;
         }
 

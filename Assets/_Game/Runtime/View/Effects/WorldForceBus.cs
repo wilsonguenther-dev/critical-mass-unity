@@ -15,7 +15,7 @@ namespace CriticalMass.Runtime.View.Effects
     /// Kaiju slam survives a 16-Warrior brawl. A per-tick cap drops only forces weaker than StrongFloor once the tick has
     /// delivered PerTickCap of them, so a flood can never starve a slam. No allocation after construction. View only.</para>
     /// </summary>
-    public sealed class WorldForceBus : IFxSink
+    public sealed class WorldForceBus : IFxSink, CriticalMass.Runtime.View.Anim.IFootfallSink
     {
         public const int SlotCount = 16, MaxListeners = 16, MaxPending = 32;
         /// <summary>Forces at or above this strength are never dropped by the per-tick cap.</summary>
@@ -154,9 +154,45 @@ namespace CriticalMass.Runtime.View.Effects
             _pendingCount = k;
         }
 
-        /// <summary>A Kaiju footfall (until DG-93 pushes them from the clip's contact table).</summary>
+        /// <summary>The world the footfall sink reads surfaces and heights from (CombatFx sets it each tick).</summary>
+        public World FootfallWorld;
+        private int _clipKaijuStepTick = int.MinValue / 2;
+
+        /// <summary>
+        /// Integration batch 3 (DG-93): the animation pass's measured footfalls feed the bus. Steps become light Trample
+        /// pushes (the per-tick cap drops them first in a flood) and Kaiju steps the KaijuStep force; landings already
+        /// arrive from the sim feed (FxKind.Land), so they are not pushed twice.
+        /// </summary>
+        public void OnFootfall(in CriticalMass.Runtime.View.Anim.Footfall ff)
+        {
+            World w = FootfallWorld;
+            if (w == null) return;
+            SimSpace.ToSim(ff.Position, out double x, out double z);
+            switch (ff.Kind)
+            {
+                case CriticalMass.Runtime.View.Anim.FootfallKind.KaijuStep:
+                {
+                    _clipKaijuStepTick = w.Tick;
+                    var f = Make(w, ForceSource.KaijuStep, ForceShape.Footfall, x, z, 0, 0, 0f, ExplosionKind.KaijuSlam);
+                    f.Actor = -1;
+                    f.Other = Damage.KaijuSource;
+                    Push(f);
+                    break;
+                }
+                case CriticalMass.Runtime.View.Anim.FootfallKind.Step:
+                {
+                    var f = Make(w, ForceSource.Trample, ForceShape.Footfall, x, z, 0, 0, 0f, ExplosionKind.Tnt);
+                    f.Actor = ff.Actor;
+                    Push(f);
+                    break;
+                }
+            }
+        }
+
+        /// <summary>A Kaiju footfall from the effects scene's own stride guess: skipped while the clip contacts (DG-93) feed it.</summary>
         public void PushKaijuStep(World w, double x, double z)
         {
+            if (w != null && w.Tick - _clipKaijuStepTick < 90) return;
             var f = Make(w, ForceSource.KaijuStep, ForceShape.Footfall, x, z, 0, 0, 0f, ExplosionKind.KaijuSlam);
             f.Actor = -1;
             f.Other = Damage.KaijuSource;

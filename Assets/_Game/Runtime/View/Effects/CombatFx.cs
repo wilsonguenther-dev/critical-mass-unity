@@ -128,6 +128,8 @@ namespace CriticalMass.Runtime.View.Effects
             _audio = new CombatAudio(transform, cfg);
             _bus = new WorldForceBus(cfg.SimHz) { SimPerWall = _scene.S(1.0) };
             WorldForceBus.Active = _bus;
+            _bus.FootfallWorld = _driver != null ? _driver.World : null;
+            CriticalMass.Runtime.View.Anim.Footfalls.Register(_bus);   // DG-93: measured footfalls feed the one force bus
             _launch = new LaunchPlan[World.ActorCapacity(cfg)];
             _scene.KaijuFootfall = OnKaijuFootfall;
             _ground = new FxMeshBuilder("Fx Ground", GroundVerts, GroundVerts * 3);
@@ -143,7 +145,7 @@ namespace CriticalMass.Runtime.View.Effects
             _solidGo = Layer("Fx Solid", _solid, _solidMat);
             BuildVignette();
             PrewarmFlash();
-            _shakeOn = Effects.ShakeEnabled;
+            _shakeOn = false;   // integration batch 3: Camera.CameraShake (M11, FeelGate-scaled) is the one camera shake
             Effects.Active = this;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             _gallery = new FxGallery(_scene, _audio);
@@ -167,6 +169,7 @@ namespace CriticalMass.Runtime.View.Effects
             RestoreShake();
             if (Effects.Active == this) Effects.Active = null;
             if (WorldForceBus.Active == _bus) WorldForceBus.Active = null;
+            if (_bus != null) CriticalMass.Runtime.View.Anim.Footfalls.Unregister(_bus);
             foreach (Material m in _flash.Values) if (m != null) Destroy(m);
             foreach (Material m in _tint.Values) if (m != null) Destroy(m);
             _audio?.Dispose();
@@ -213,6 +216,7 @@ namespace CriticalMass.Runtime.View.Effects
             if (!enabled) return;
             _feed.OnTick(w, _scene, _audio, this);
             _scene.OnTickState(w);
+            _bus.FootfallWorld = w;
             _bus.OnTick(w);
         }
 
@@ -355,7 +359,7 @@ namespace CriticalMass.Runtime.View.Effects
             if (++_frame % 60 == 0)
             {
                 if (!galleryRunning) _scene.Blood = BloodSetting.Enabled;
-                _shakeOn = Effects.ShakeEnabled;
+                _shakeOn = false;   // integration batch 3: Camera.CameraShake (M11, FeelGate-scaled) is the one camera shake
                 if (!_scene.HasFoliage && _foliageTries < 20) FindFoliage();
             }
             _audio.Update(now, _driver.World);

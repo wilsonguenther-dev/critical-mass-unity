@@ -51,9 +51,9 @@ namespace CriticalMass.Runtime.Menu
         /// <summary>Show subtitles for spoken lines (default on).</summary>
         public static bool Subtitles { get => GetB(SubtitlesKey, true); set => SetB(SubtitlesKey, value); }
         /// <summary>Limit full-screen and HUD flashes to ReducedFlashesPerSecond (default off).</summary>
-        public static bool ReduceFlashing { get => GetB(ReduceFlashingKey, false); set => SetB(ReduceFlashingKey, value); }
+        public static bool ReduceFlashing { get => GameSettings.ReduceFlashing; set { GameSettings.ReduceFlashing = value; Changed?.Invoke(); } }
         /// <summary>Reduce motion (default off): fades instead of slides, a quarter of the world sway, no shake.</summary>
-        public static bool ReduceMotion { get => GetB(ReduceMotionKey, false); set => SetB(ReduceMotionKey, value); }
+        public static bool ReduceMotion { get => GameSettings.ReduceMotion; set { GameSettings.ReduceMotion = value; Changed?.Invoke(); } }
 
         /// <summary>Flashes allowed per second: 3 with Reduce flashing on, otherwise no limit.</summary>
         public static int MaxFlashesPerSecond => ReduceFlashing ? ReducedFlashesPerSecond : int.MaxValue;
@@ -93,7 +93,7 @@ namespace CriticalMass.Runtime.Menu
         public static void ResetAll()
         {
             for (int i = 0; i < AllKeys.Length; i++) PlayerPrefs.DeleteKey(AllKeys[i]);
-            GameSettings.CameraShake = false;
+            GameSettings.CameraShake = false;   // also raises GameSettings.Changed, so FeelGate reloads the cleared keys
             Save();
         }
 
