@@ -914,5 +914,86 @@ namespace CriticalMass.Sim.Tests
                 else Assert.Less(w.X[2] + r, cx + 1e-3, "a 0.5 overlap still stops");
             }
         }
+        // ------------------------------------------------------------------ DG-98 blasts carry force
+
+        private static Bomb DropTnt(World w, int slot, int owner, double x, double z, int blastTick)
+        {
+            Bomb b = w.Demolitions.Bombs[slot];
+            b.Active = true;
+            b.Owner = owner;
+            b.Team = w.Actors[owner].Team;
+            b.X = x;
+            b.Z = z;
+            b.FromX = x;
+            b.FromZ = z;
+            b.ThrownTick = w.Tick;
+            b.LandTick = w.Tick;
+            b.Landed = true;
+            b.BlastTick = blastTick;
+            return b;
+        }
+
+        [Test]
+        public void DG98CentreVictimFullDamageEdgeVictim35PercentPushedOutward()
+        {
+            World w = Make();
+            ParkOthers(w, 0, 5, 6);
+            Place(w, 0, HillX - 6, HillZ);
+            Place(w, 5, HillX, HillZ);
+            Place(w, 6, HillX, HillZ + 2.0);
+            double h5 = w.Actors[5].Hp, h6 = w.Actors[6].Hp;
+            DropTnt(w, 0, 0, HillX, HillZ, w.Tick + 1);
+            Idle(w);
+            SimStep.Step(w);
+            double dmg = w.Config.Abilities.DemolitionsTnt.Damage;
+            Assert.AreEqual(dmg, h5 - w.Actors[5].Hp, 1e-9, "centre");
+            Assert.AreEqual(dmg * 0.35, h6 - w.Actors[6].Hp, 1e-6, "edge");
+            for (int t = 0; t < 20; t++) { Idle(w); SimStep.Step(w); }
+            Assert.Greater(w.Z[6], HillZ + 2.0, "thrown outward");
+        }
+
+        [Test]
+        public void DG98BehindAWallTakesNothingAndAirborneIsPushedButNotHurt()
+        {
+            World w = Make();
+            Assert.IsTrue(FindWallFace(w, out int cx, out int cz));
+            MapGrid.SetCell(w, cx - 2, cz, Cell.Wall);
+            ParkOthers(w, 0, 5, 6);
+            Place(w, 5, cx - 0.5, cz + 0.5);
+            Place(w, 6, cx - 2.5, cz - 0.6);
+            Actor air = w.Actors[6];
+            air.AirLen = 12;
+            air.AirTick = 2;
+            air.AirFromX = air.AirToX = w.X[6];
+            air.AirFromZ = air.AirToZ = w.Z[6];
+            double h5 = w.Actors[5].Hp, h6 = air.Hp;
+            DropTnt(w, 0, 0, cx - 2.5, cz + 0.5, w.Tick + 1);
+            Idle(w);
+            SimStep.Step(w);
+            Assert.AreEqual(h5, w.Actors[5].Hp, "behind a wall");
+            Assert.AreEqual(h6, air.Hp, "airborne: no damage");
+            Assert.AreNotEqual(0, air.KVz, "airborne: pushed");
+        }
+
+        [Test]
+        public void DG98TwoTntOneAndAHalfApartDetonateOneTickApart()
+        {
+            World w = Make();
+            ParkOthers(w, 0);
+            Place(w, 0, HillX - 8, HillZ);
+            int head = w.EventHead;
+            DropTnt(w, 0, 0, HillX, HillZ, w.Tick + 1);
+            DropTnt(w, 1, 0, HillX + 1.5, HillZ, w.Tick + 40);
+            var ticks = new List<int>();
+            for (int t = 0; t < 5; t++)
+            {
+                int h = w.EventHead;
+                Idle(w);
+                SimStep.Step(w);
+                if (Events(w, SimEventType.Explosion, h).Count > 0) ticks.Add(w.Tick);
+            }
+            Assert.AreEqual(2, ticks.Count);
+            Assert.AreEqual(ticks[0] + 1, ticks[1]);
+        }
     }
 }
