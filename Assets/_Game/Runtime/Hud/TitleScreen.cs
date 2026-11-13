@@ -7,9 +7,10 @@ using UnityEngine.UI;
 namespace CriticalMass.Runtime.Hud
 {
     /// <summary>
-    /// Simple title screen: the bible p04 primary logo (vector source Art/UI/Logo/_source~, PNG exports in
-    /// Resources/UI/Logo at 1x/2x/4x; the 4x is picked above 1440 p, else the 2x, drawn at or below its pixel size so it is
-    /// never upscaled) over the live bot match under a Void Navy wash, and "PRESS ANY KEY". Any key, click or gamepad
+    /// Simple title screen: the bible's own primary logo (Visual Asset Bible p04, cut from its cream page by
+    /// Art/UI/Logo/_source~/cut_bible_logo.py; 766 x 597 native, drawn 1:1 at 1080p from @1x, from @2x up to 4K, @4x above)
+    /// with a slow bob and a pulsing glow on the egg's seams, over the live bot match under a Void Navy wash, and
+    /// "PRESS ANY KEY" in the HUD display face. The redrawn vector logo (critical-mass-logo@Nx) stays in the repo, unused. Any key, click or gamepad
     /// button hides it and shows the HUD. Shown on boot in player builds only (ShowOnBoot), never in the editor, batch
     /// mode or tests; the capture tool shows it explicitly.
     /// </summary>
@@ -19,8 +20,12 @@ namespace CriticalMass.Runtime.Hud
 
         public GameHud Hud;
         Canvas _canvas;
-        RawImage _logo;
+        RawImage _logo, _glow;
         Text _prompt;
+        /// <summary>Logo size in canvas units (1080p px): the @1x export's pixel size, so 1080p draws it 1:1.</summary>
+        public static readonly Vector2 LogoSize = new Vector2(766f, 597f);
+        public const float LogoY = 70f, BobPx = 6f, BobPeriod = 4f, GlowPeriod = 2.6f;
+        public RawImage Logo => _logo;
         float _t;
 
         public static TitleScreen Show(GameObject host, GameHud hud)
@@ -58,8 +63,13 @@ namespace CriticalMass.Runtime.Hud
             _logo.raycastTarget = false;
             RectTransform lr = _logo.rectTransform;
             lr.anchorMin = lr.anchorMax = new Vector2(0.5f, 0.5f);
-            lr.sizeDelta = new Vector2(820f, 820f * 470f / 600f);
-            lr.anchoredPosition = new Vector2(0f, 70f);
+            lr.sizeDelta = LogoSize;
+            lr.anchoredPosition = new Vector2(0f, LogoY);
+            _glow = new GameObject("Egg Glow", typeof(RectTransform)).AddComponent<RawImage>();
+            _glow.gameObject.layer = 5;
+            _glow.transform.SetParent(lr, false);
+            _glow.raycastTarget = false;
+            Stretch(_glow.rectTransform);
 
             _prompt = HudText.Make(root, "Prompt", CMTokens.Display, 34, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter);
             RectTransform pr = _prompt.rectTransform;
@@ -91,9 +101,13 @@ namespace CriticalMass.Runtime.Hud
             float w = cam != null ? cam.pixelWidth : Screen.width, h = cam != null ? cam.pixelHeight : Screen.height;
             if (w < 1 || h < 1) return;
             _canvas.scaleFactor = HudLayout.Scale(w, h);
-            string want = h > 1440 ? "UI/Logo/critical-mass-logo@4x" : "UI/Logo/critical-mass-logo@2x";
-            if (_logo.texture == null || _logo.texture.name != want.Substring(want.LastIndexOf('/') + 1))
-                _logo.texture = Resources.Load<Texture2D>(want);
+            string tier = _canvas.scaleFactor <= 1.01f ? "1x" : _canvas.scaleFactor <= 2.01f ? "2x" : "4x";
+            string want = "critical-mass-bible-logo@" + tier;
+            if (_logo.texture == null || _logo.texture.name != want)
+            {
+                _logo.texture = Resources.Load<Texture2D>("UI/Logo/" + want);
+                _glow.texture = Resources.Load<Texture2D>("UI/Logo/critical-mass-bible-logo-glow@" + tier);
+            }
         }
 
         void Update()
@@ -103,7 +117,17 @@ namespace CriticalMass.Runtime.Hud
             Color c = _prompt.color;
             c.a = 0.75f + 0.25f * Mathf.Cos(_t * Mathf.PI);   // slow 0.5 Hz breathe, no flashing
             _prompt.color = c;
+            Animate(_t);
             if (AnyInput()) Hide();
+        }
+
+        /// <summary>View-only idle motion: a slow bob and the egg's seam glow breathing (no flashing, below 0.5 Hz).</summary>
+        public void Animate(float t)
+        {
+            _logo.rectTransform.anchoredPosition = new Vector2(0f, LogoY + BobPx * Mathf.Sin(t * 2f * Mathf.PI / BobPeriod));
+            Color g = Color.white;
+            g.a = 0.25f + 0.5f * (0.5f + 0.5f * Mathf.Sin(t * 2f * Mathf.PI / GlowPeriod));
+            _glow.color = g;
         }
 
         static bool AnyInput()
