@@ -205,6 +205,23 @@ folded, deployed, damaged).
 `Assets/_Game/Art/Props/_source~/` would mirror the character layout), and whether the browser's script budgets
 (12,000 triangles, a builder's guess) carry over.
 
+### Character animation (animation pass, 2026-11-12)
+
+**Decided.** Clip choice is code, not an Animator Controller: `ModelView` builds one Playables graph per model with a
+full-body layer and an upper-body override layer (a Generic `AvatarMask` from `spine` down, built from the instance's own
+transform paths), and `Runtime/View/Anim/ActorAnimator` sets every clip time and weight each frame from sim state and sim
+time (directional locomotion with one synced phase, speed matched from the drawn displacement; attack timing per the
+hit-frame contract C2; tiered hit reactions; jump, landing, get-up, carry, end-screen poses; idle breaks). Every speed,
+phase and contact time comes from `Resources/Anim/clip_facts.json`, written by `tools/art/measure_clips.py` (forward
+kinematics on the KayKit source); nothing is estimated. The clip set is `tools/art/kaykit_clip_map.tsv` (32 of the 76
+KayKit clips), exported by `tools/art/build_kaykit_clips.py`. Anything that rides on bones attaches through
+`ActorViews.PostPose` / `IPostPoseListener` (contract C3); footfalls go out through `Anim.Footfalls` (`IFootfallSink`).
+
+**Root-motion policy (decided).** The sim owns translation. Every clip is in place (`applyRootMotion = false`); a looping
+clip may drift its hips at most 0.05 u per cycle, and `AnimationPassTests.LoopingClipsStayInPlace` fails above that
+(measured drift per clip is in `clip_facts.json`, `hipsDrift`). One-shot clips that travel (Lie_Down, Death) are posed
+in place on a body the view already holds still. Dodge clips (with root drift) are not imported.
+
 ### Export and import settings
 
 **OPEN (the architect specifies it in the art item spec):** FBX export settings (scale, forward and up axes, apply transforms, clip naming, embedded textures or not) and

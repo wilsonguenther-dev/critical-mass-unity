@@ -128,9 +128,10 @@ namespace CriticalMass.Runtime.PlayTests
         }
 
         /// <summary>20 sim seconds of 16v16 bots: every moving bot's model faces its sim facing (per class).</summary>
-        [UnityTest, Explicit("TO TRIAGE 2026-11-12: after the facing fix 4-8% of moving bot samples (Warrior 29/372, Miner 15/292) " +
-                             "still read 180 deg while actor 0 passes in 8 directions and while aiming; suspected the foot reading " +
-                             "during combat clips (Hit/Attack poses) rather than the model, unconfirmed. Listed by integration batch 1.")]
+        /// <para>Un-Explicit by the animation pass (2026-11-12, DG-76): bots kiting backwards or sideways now play the
+        /// reversed run and the strafes (no forward stride while moving back), and attacks and light hits play on the upper
+        /// body only, so the planted foot is a real stance foot during combat (the suspected source of the 180 degree reads).</para>
+        [UnityTest]
         public IEnumerator EveryMovingBotModelFacesItsSimFacing()
         {
             _w = new SanityWorld();
@@ -274,8 +275,8 @@ namespace CriticalMass.Runtime.PlayTests
     /// Gameplay sanity suite, part 2 of 3: MOTION MATCHES ANIMATION. Moving actors stride and idle ones stand, the planted
     /// foot does not skate (the clip speed tracks the ground speed), the dead fall and stay down, carried cargo is drawn
     /// on the carrier, and a jump lifts the model. All measured on the model's bones, the way a person sees it.
-    /// <para>KNOWN FAILING on main 2026-11-12: CarriedCargoIsDrawnOnTheCarrier (ActorViews draws no cargo at all); the
-    /// foot-slide band may fail (ActorViews.WalkClipSpeed / RunClipSpeed are estimates, "not measured on the clip").</para>
+    /// <para>Animation pass (2026-11-12): cargo is drawn (Anim.CarryProp) and the clip rate follows the drawn displacement
+    /// and the measured strides (Resources/Anim/clip_facts.json), so all of these run by default.</para>
     /// </summary>
     public sealed class MotionSanityPlayTests
     {
@@ -294,13 +295,45 @@ namespace CriticalMass.Runtime.PlayTests
 
         static float Along(Transform a, Transform b, Vector3 dir) => Vector3.Dot(a.position - b.position, dir);
 
+        /// <summary>Planted-foot slide gate (u per u travelled). The seat's target is 0.15; the gate leaves room for 30 Hz sampling.</summary>
+        public const double MaxSlide = 0.2;
+        /// <summary>A toe is planted while within this of its own lowest height over the sampled window (u).</summary>
+        public const float StanceHeight = 0.03f;
+
+        /// <summary>
+        /// Horizontal travel of each toe over consecutive frames in which that same toe is planted, and the body's travel
+        /// over the same frames (the planted foot only: a swinging foot is never counted).
+        /// </summary>
+        public static void PlantedSlide(Vector3[] left, Vector3[] right, Vector3[] body, out double footTravel, out double bodyTravel, out int pairs)
+        {
+            footTravel = bodyTravel = 0;
+            pairs = 0;
+            for (int f = 0; f < 2; f++)
+            {
+                Vector3[] p = f == 0 ? left : right;
+                float min = float.PositiveInfinity;
+                for (int t = 0; t < p.Length; t++) min = Mathf.Min(min, p[t].y);
+                for (int t = 1; t < p.Length; t++)
+                {
+                    if (p[t].y > min + StanceHeight || p[t - 1].y > min + StanceHeight) continue;
+                    Vector3 df = p[t] - p[t - 1], db = body[t] - body[t - 1];
+                    footTravel += new Vector2(df.x, df.z).magnitude;
+                    bodyTravel += new Vector2(db.x, db.z).magnitude;
+                    pairs++;
+                }
+            }
+        }
+
         /// <summary>
         /// Per class with a model: standing still the feet hold still (idle), running toward the hill the feet stride
-        /// (locomotion), and the planted foot slides at most half a unit per unit travelled.
+        /// (locomotion), and the planted foot slides at most MaxSlide u per unit travelled.
+        /// <para>Animation pass (2026-11-12, DG-75, seat finding A3 g): "planted" now means a toe within 0.03 u of its lowest
+        /// height over the run, sampled on every rendered frame (one view sync per tick here), and only consecutive planted
+        /// frames of the SAME toe count. The old reading took the lower toe, which in a run with 7-11 % stance is mostly the
+        /// swinging foot, and inflated the slide to 0.66. Un-Explicit: the clip rate now comes from the drawn displacement
+        /// and the measured stride (Anim.Locomotion).</para>
         /// </summary>
-        [UnityTest, Explicit("KNOWN DEFECT 2026-11-12: the walk and run clips do not track ground speed (the planted foot slides " +
-                             "about 0.66 u per unit travelled for all three classes); listed by integration batch 1, run explicitly " +
-                             "once ActorViews scales clip time by stride length.")]
+        [UnityTest]
         public IEnumerator MovingModelsStrideIdleOnesStandAndFeetDoNotSkate()
         {
             var classes = new List<ClassId>();
@@ -338,29 +371,24 @@ namespace CriticalMass.Runtime.PlayTests
                 _w.Tick(10);
                 lo = float.PositiveInfinity;
                 hi = float.NegativeInfinity;
-                double footTravel = 0, bodyTravel = 0, speedSum = 0;
-                Transform prevFoot = null;
-                Vector3 prevFootPos = Vector3.zero, prevBody = model.position;
-                for (int t = 0; t < 36; t++)
+                double speedSum = 0;
+                const int Samples = 90;
+                var pl = new Vector3[Samples];
+                var pr = new Vector3[Samples];
+                var pb = new Vector3[Samples];
+                for (int t = 0; t < Samples; t++)
                 {
                     _w.Tick(1);
                     speedSum += _w.Speed(0);
                     float s = Along(tl, tr, SanityRig.SimDir(_w.W.Actors[0].Facing));
                     lo = Mathf.Min(lo, s);
                     hi = Mathf.Max(hi, s);
-                    Transform planted = tl.position.y <= tr.position.y ? tl : tr;
-                    Vector3 body = model.position;
-                    if (planted == prevFoot)
-                    {
-                        Vector3 df = planted.position - prevFootPos, db = body - prevBody;
-                        footTravel += new Vector2(df.x, df.z).magnitude;
-                        bodyTravel += new Vector2(db.x, db.z).magnitude;
-                    }
-                    prevFoot = planted;
-                    prevFootPos = planted.position;
-                    prevBody = body;
+                    pl[t] = tl.position;
+                    pr[t] = tr.position;
+                    pb[t] = model.position;
                 }
-                double meanSpeed = speedSum / 36;
+                PlantedSlide(pl, pr, pb, out double footTravel, out double bodyTravel, out int pairs);
+                double meanSpeed = speedSum / Samples;
                 if (meanSpeed < 1.0)
                 {
                     _bad.Add($"{cls}: actor 0 could not run toward the hill (mean speed {meanSpeed:0.0} u/s); stride not measured");
@@ -369,7 +397,10 @@ namespace CriticalMass.Runtime.PlayTests
                 {
                     if (hi - lo < 0.25f)
                         _bad.Add($"{cls} running at {meanSpeed:0.0} u/s: the feet stride only {hi - lo:0.00} u: it glides like a statue (idle pose while moving)");
-                    if (bodyTravel > 0.5 && footTravel / bodyTravel > 0.5)
+                    Debug.Log($"[GameplaySanity] {cls} running at {meanSpeed:0.0} u/s: planted-foot slide {(bodyTravel > 0 ? footTravel / bodyTravel : 0):0.000} u/u over {pairs} planted frame pairs, {bodyTravel:0.00} u of travel");
+                    if (bodyTravel < 0.3)
+                        _bad.Add($"{cls} running at {meanSpeed:0.0} u/s: only {pairs} planted frame pairs ({bodyTravel:0.00} u of travel) were seen: the stance foot never stays down");
+                    else if (footTravel / bodyTravel > MaxSlide)
                         _bad.Add($"{cls} running at {meanSpeed:0.0} u/s: the planted foot slides {footTravel / bodyTravel:0.00} u per unit travelled (skating): the clip speed does not track the ground speed");
                 }
                 inp.SetMove(0, 0);
@@ -430,8 +461,8 @@ namespace CriticalMass.Runtime.PlayTests
         /// model (not one of its own ModelSpec.Meshes) within 0.6 u of hand.l, hand.r, handslot.l, handslot.r, chest or
         /// spine, and nothing cargo-like left at the world origin. KNOWN FAILING on main 2026-11-12: no cargo is drawn.
         /// </summary>
-        [UnityTest, Explicit("KNOWN DEFECT 2026-11-12: ActorViews draws no carried cargo at all; cargo drawing is not built yet " +
-                             "(integration batch 1 lists it). Run explicitly to check once it is.")]
+        /// <para>Un-Explicit by the animation pass (DG-71): Anim.CarryProp draws 1 to 3 bundles between the carrier's hands.</para>
+        [UnityTest]
         public IEnumerator CarriedCargoIsDrawnOnTheCarrier()
         {
             _w = new SanityWorld();
