@@ -99,22 +99,22 @@
     {
       "id": "tip-20",
       "text": "While you wait to respawn, you can pick a different class.",
-      "needsRule": "DG-10"
+      "needsRule": ""
     },
     {
       "id": "tip-21",
       "text": "Jump gaps and ledges to reach routes the crowd ignores.",
-      "needsRule": "DG-02"
+      "needsRule": ""
     },
     {
       "id": "tip-22",
       "text": "Stand in your base fountain to heal. Knocked-out enemies drop meat; the egg eats that too.",
-      "needsRule": "DG-16a"
+      "needsRule": ""
     },
     {
       "id": "tip-23",
       "text": "Miners dig ground out and place it elsewhere. A new ramp beats a long road.",
-      "needsRule": "DG-09"
+      "needsRule": ""
     },
     {
       "id": "tip-24",
