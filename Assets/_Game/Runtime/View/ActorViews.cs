@@ -252,6 +252,16 @@ namespace CriticalMass.Runtime.View
             ActiveModelCount = models;
         }
 
+        /// <summary>feat/ground-camera: horizontal radius around the low camera inside which other fighters are not drawn.</summary>
+        public const float NearLensMetres = 1.6f;
+
+        private bool NearLens(double x, double h, double z)
+        {
+            Vector3 p = SimSpace.ToWorld(x, h, z);
+            float dx = p.x - _camPos.x, dz = p.z - _camPos.z;
+            return dx * dx + dz * dz < NearLensMetres * NearLensMetres && _camPos.y < p.y + 2.6f;
+        }
+
         private bool SyncActor(int i, World w, GameConfig cfg, MapDef map, double a, double simTime, double dSim)
         {
             CharSlot slot = _actors[i];
@@ -304,6 +314,13 @@ namespace CriticalMass.Runtime.View
             }
 
             ModelView m = slot.Model;
+            // feat/ground-camera: from the low camera a fighter standing at the lens fills a third of the frame and hides the
+            // shot; bodies within NearLensMetres of the camera (horizontally, other than the followed one) are not drawn.
+            if (CriticalMass.Runtime.Camera.GroundView.LodActive && i != _lodSelf && NearLens(x, h, z))
+            {
+                m.SetActive(false);
+                return false;
+            }
             m.SetActive(true);
             m.ApplyTier();
             QualityRow row = QualityTable.Current;

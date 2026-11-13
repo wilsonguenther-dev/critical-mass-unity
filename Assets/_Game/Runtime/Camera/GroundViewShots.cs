@@ -101,11 +101,13 @@ namespace CriticalMass.Runtime.Camera
             }
             _frame++;
             if (_frame == 2) View.Aim(_pendingYaw, GroundCamera.PitchDeg);   // after the cut's snap
-            if (_frame == SettleFrames) Shot(StillNames[_still]);
+            if (_frame == SettleFrames && CriticalMass.Runtime.View.Moments.BigMoments.IsPlaying) { Hold(false); _frame--; return; }
+            if (_frame == SettleFrames) { Hold(true); Shot(StillNames[_still]); }
             if (_frame >= SettleFrames + 2) NextStill();
         }
 
         double _pendingYaw;
+        double _hatchSeen = double.NaN;
 
         void NextStill()
         {
@@ -126,7 +128,7 @@ namespace CriticalMass.Runtime.Camera
                 _lastCuts = View.Director.Cuts;
                 _cutFrame = 0;
             }
-            if (_cutFrame >= 0 && ++_cutFrame == 20)
+            if (_cutFrame >= 0 && ++_cutFrame >= 20 && !CriticalMass.Runtime.View.Moments.BigMoments.IsPlaying)
             {
                 _cutFrame = -1;
                 _stripShots++;
@@ -145,6 +147,9 @@ namespace CriticalMass.Runtime.Camera
             if (_frame < 0)
             {
                 if (!hatched && w.Match.Time < KaijuDeadline) return;
+                // Past the hatch's own takeover (band, flash, dim): the Kaiju itself, not the cut-in.
+                if (hatched && double.IsNaN(_hatchSeen)) _hatchSeen = w.Match.Time;
+                if (hatched && (w.Match.Time < _hatchSeen + 8 || CriticalMass.Runtime.View.Moments.BigMoments.IsPlaying)) return;
                 Hold(true);
                 if (hatched) View.Pick(GroundDirector.KaijuTarget);
                 else
