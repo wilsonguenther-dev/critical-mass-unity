@@ -56,11 +56,18 @@ PROTECT = dict(LOD0=(1.0, 1.0, 0.0, 0.0, 0.0), LOD1=(0.0, 0.0, 0.0, 0.0, 0.0), S
 # Run 2 measured: the voxel LOD1 lost colour and shape (overlap 0.30 to 0.90); the voxel Shadow won (0.93 to 0.96).
 # Run 5 (posed): the voxel Shadow tore at the joints (850 to 1,170 edges, bridges between parts); welded decimation cannot
 # bridge parts, so it ships and the voxel shell is rendered as a comparison only.
-METHOD = dict(fighter=dict(LOD0=["dec"], LOD1=["dec"], Shadow=["dec", "vox"]),
-              kaiju=dict(LOD0=["dec"], LOD1=["dec"], Shadow=["dec"]))
+# Fix pass (coordinator review): dec = weld exact duplicates; decw = weld 1.5 mm, finer planar pass, LOD1 drops parts under
+# 6 cm; hull = closed per-bone convex hulls, rigid to their bone (no tears possible); lod0 = LOD1 identical to LOD0.
+# CM_LOD_CHOICE (json {model: {level: method}}) picks one method per level for the final run.
+# Run 7b measured: dec beats decw on torn edges at LOD0/LOD1; hull is the closed Shadow proxy. LOD1 = LOD0 is exported
+# as a second file (out_lod1copy) and chosen outside Blender when the decimated LOD1 misses its gate.
+METHOD = dict(fighter=dict(LOD0=["dec"], LOD1=["dec"], Shadow=["hull"]),
+              kaiju=dict(LOD0=["dec"], LOD1=["dec"], Shadow=["hull"]))
+CHOICE = json.load(open(os.environ["CM_LOD_CHOICE"])) if os.environ.get("CM_LOD_CHOICE") else {}
+WELD_M = dict(dec=1e-5, decw=0.0015)
 VOXEL_M = dict(LOD1=0.012, Shadow=0.02)
-PLANAR_DEG = dict(LOD0=2.0, LOD1=5.0, Shadow=10.0)
-DROP_ISLAND_M = dict(LOD0=0.0, LOD1=0.045, Shadow=0.09)
+PLANAR_DEG = dict(dec=dict(LOD0=2.0, LOD1=5.0, Shadow=10.0), decw=dict(LOD0=0.5, LOD1=3.0, Shadow=8.0))
+DROP_ISLAND_M = dict(dec=dict(LOD0=0.0, LOD1=0.045, Shadow=0.09), decw=dict(LOD0=0.0, LOD1=0.06, Shadow=0.09))
 VG_FACTOR = 1.0
 HAND_BONES = ("hand.l", "hand.r")
 ISLANDS = {}
@@ -198,6 +205,8 @@ class Ref:
         self.isl = comp[weld]
         self.tri_isl = self.isl[self.TV[:, 0]]
         self._ibvh = {}
+        self.tri_decal = np.ones(len(self.TV), bool)
+        self.uv_out = None
         self.kd = KDTree(nv)
         for i, v in enumerate(self.V):
             self.kd.insert(Vector(v), i)
@@ -267,17 +276,19 @@ def resample(ref, ob, isl=None):
     uvs = {k: np.zeros((nl, 2), np.float32) for k in ref.uvs}
     nor = np.zeros((nl, 3), np.float32)
     mats = np.zeros(npo, np.int32)
+    cdec = np.zeros(nl, bool)
     PN = arr(me.polygons, "normal", npo, 3)
     for p in range(npo):
         ls = range(LS[p], LS[p] + LT[p])
         fn = Vector(PN[p])
         c = Vector(co[LV[list(ls)]].mean(axis=0))
-        ti, w, d = ref.bary(c, isl[LV[LS[p]]], fn)
+        ti, w, d = ref.bary(c, -1, fn)
         mats[p] = ref.PM[ref.TP[ti]]
         for l in ls:
             q = Vector(co[LV[l]]) * 0.75 + c * 0.25
-            ti, w, d = ref.bary(q, isl[LV[l]], fn)
+            ti, w, d = ref.bary(q, -1, fn)
             L3 = ref.TL[ti]
+            cdec[l] = ref.tri_decal[ti]
             for k, rc in ref.cols.items():
                 cols[k][l, :3] = w @ rc[L3, :3]
                 cols[k][l, 3] = round(float(rc[L3[int(np.argmax(w))], 3]) * 8.0) / 8.0
@@ -291,6 +302,14 @@ def resample(ref, ob, isl=None):
             me.color_attributes.remove(a)
     for k in [n for n in ref.cols if n != ref.colname] + ([ref.colname] if ref.colname in cols else []):
         set_col(me, k, cols[k])
+    # decal guard: a triangle keeps decal UVs only if every corner lies on a Hero triangle that touches the decal;
+    # otherwise its corners take the decal's transparent texel (no smear of face paint across large triangles)
+    if ref.uv_out is not None and uvs:
+        k0 = next(iter(uvs))
+        for p in range(npo):
+            ls = np.arange(LS[p], LS[p] + LT[p])
+            if not cdec[ls].all():
+                uvs[k0][ls] = ref.uv_out
     for k, u in uvs.items():
         if k not in me.uv_layers:
             me.uv_layers.new(name=k)
@@ -443,10 +462,10 @@ def make_lod(hero, ref, rig, prot, level, budget, name, invert, method="dec", sc
                 me.materials.append(mt)
     else:
         bm = bmesh.new(); bm.from_mesh(me)
-        bmesh.ops.remove_doubles(bm, verts=list(bm.verts), dist=1e-5)
+        bmesh.ops.remove_doubles(bm, verts=list(bm.verts), dist=WELD_M[method] * scale)
         bm.verts.ensure_lookup_table()
         # 1) drop small islands (LOD1 / Shadow: accessories under a few cm); never an island carrying the face
-        thr = DROP_ISLAND_M[level]
+        thr = DROP_ISLAND_M[method][level]
         if thr > 0:
             seen = set()
             kill = []
@@ -475,7 +494,7 @@ def make_lod(hero, ref, rig, prot, level, budget, name, invert, method="dec", sc
                 a, b = e.verts
                 if prot[a.index] >= 0.5 and prot[b.index] >= 0.5 and level != "Shadow":
                     e.seam = True
-        bmesh.ops.dissolve_limit(bm, angle_limit=math.radians(PLANAR_DEG[level]), use_dissolve_boundaries=False,
+        bmesh.ops.dissolve_limit(bm, angle_limit=math.radians(PLANAR_DEG[method][level]), use_dissolve_boundaries=False,
                                  verts=list(bm.verts), edges=list(bm.edges), delimit={"SEAM", "MATERIAL"})
         bmesh.ops.triangulate(bm, faces=list(bm.faces), quad_method="BEAUTY", ngon_method="BEAUTY")
         bm.to_mesh(me); bm.free()
@@ -523,6 +542,79 @@ def make_lod(hero, ref, rig, prot, level, budget, name, invert, method="dec", sc
     am = ob.modifiers.new("Armature", "ARMATURE"); am.object = rig
     return ob, dict(planar_tris=planar_tris, tris=tris, ratio=round(ratio, 4), survival=round(surv, 4),
                     dropped_island_verts=dropped, max_influences=maxinf, invert=invert, method=method)
+
+
+def hull_lod(hero, ref, rig, budget, name):
+    """Closed proxy: convex hull of each bone's dominant vertices, one collapse pass to budget, rigid weights."""
+    target, tmax = budget
+    dom = ref.W.argmax(1)
+    bm = bmesh.new()
+    hb = bm.verts.layers.int.new("hb")
+    parts = 0
+    # one hull per bone and per large welded part on that bone (a wide leaf or cape gets its own hull instead of
+    # inflating the torso's); parts under 40 vertices share their bone's hull
+    isl_v = np.asarray(ref.isl)
+    big = np.bincount(isl_v)[isl_v] >= 40
+    pkey = dom.astype(np.int64) * 100000 + np.where(big, isl_v, 99999)
+    for pk in np.unique(pkey):
+        idx = np.nonzero(pkey == pk)[0]
+        g = int(pk // 100000)
+        if len(idx) < 8:
+            continue
+        vs = []
+        for p_ in ref.V[idx]:
+            v = bm.verts.new(tuple(map(float, p_))); v[hb] = int(g); vs.append(v)
+        r = bmesh.ops.convex_hull(bm, input=vs)
+        junk = list({e for e in r["geom_interior"] + r["geom_unused"] if isinstance(e, bmesh.types.BMVert) and e.is_valid})
+        if junk:
+            bmesh.ops.delete(bm, geom=junk, context="VERTS")
+        parts += 1
+    bmesh.ops.triangulate(bm, faces=list(bm.faces))
+    me = bpy.data.meshes.new(name); bm.to_mesh(me); bm.free()
+    for mt in hero.data.materials:
+        me.materials.append(mt)
+    ob = hero.copy(); ob.data = me; ob.name = name
+    bpy.context.scene.collection.objects.link(ob)
+    ob.modifiers.clear()
+    for g in list(ob.vertex_groups):
+        ob.vertex_groups.remove(g)
+    work = me.copy(); full = tri_count(me); ratio = min(1.0, target / max(full, 1)); tris = full
+    for attempt in range(6):
+        ob.data = work.copy()
+        if ratio < 0.999:
+            md = ob.modifiers.new("dec", "DECIMATE"); md.decimate_type = "COLLAPSE"; md.ratio = ratio
+            md.use_collapse_triangulate = True
+            dg = bpy.context.evaluated_depsgraph_get(); dg.update()
+            new = bpy.data.meshes.new_from_object(ob.evaluated_get(dg), preserve_all_data_layers=True, depsgraph=dg)
+            ob.modifiers.remove(md); old = ob.data; ob.data = new; bpy.data.meshes.remove(old)
+        tris = tri_count(ob.data)
+        if tris <= tmax:
+            break
+        ratio *= (target / tris) * 0.98
+    ob.data.name = name
+    hbv = np.zeros(len(ob.data.vertices), np.int32)
+    ob.data.attributes["hb"].data.foreach_get("value", hbv)
+    isl = np.full(len(hbv), -1)
+    ISLANDS[ob.as_pointer()] = isl
+    resample(ref, ob, isl)
+    nv = len(ob.data.vertices)
+    for g in ob.vertex_groups:
+        g.remove(list(range(nv)))
+    for g in np.unique(hbv):
+        ob.vertex_groups[int(g)].add(np.nonzero(hbv == g)[0].tolist(), 1.0, "REPLACE")
+    ob.data.attributes.remove(ob.data.attributes["hb"])
+    am = ob.modifiers.new("Armature", "ARMATURE"); am.object = rig
+    return ob, dict(planar_tris=full, tris=tris, ratio=round(ratio, 4), survival=0.0, dropped_island_verts=0,
+                    max_influences=1, invert=False, method="hull", parts=parts)
+
+
+def island_stats(ob):
+    me = ob.data
+    lab = components(len(me.vertices), arr(me.edges, "vertices", len(me.edges), 2, np.int32))
+    me.calc_loop_triangles()
+    tv = arr(me.loop_triangles, "vertices", len(me.loop_triangles), 3, np.int32)
+    _, cnt = np.unique(lab[tv[:, 0]], return_counts=True)
+    return int(len(cnt)), int((cnt <= 6).sum())
 
 
 def mesh_stats(ob):
@@ -675,12 +767,50 @@ def fbx_stats(path, bake, anim):
     return out
 
 
+def orient_proof(src, out, bake, anim):
+    """Original FBX and LOD FBX imported into ONE scene: world bounding box per file, axis of largest extent, head bone."""
+    reset()
+    rep_ = {}
+    for tag, path in (("original", src), ("lod_file", out)):
+        objs, _ = import_fbx(path, bake, anim)
+        dg = bpy.context.evaluated_depsgraph_get(); dg.update()
+        pts = []
+        for o in objs:
+            if o.type == "MESH" and not o.name.endswith(("_LOD0", "_LOD1", "_Shadow")):
+                oe = o.evaluated_get(dg); me_ = oe.to_mesh()
+                pts += [oe.matrix_world @ v.co for v in me_.vertices]; oe.to_mesh_clear()
+        P = np.array(pts); ext = P.max(0) - P.min(0)
+        d = dict(objects=sorted(o.name for o in objs), bbox_min=[round(float(x), 3) for x in P.min(0)],
+                 bbox_max=[round(float(x), 3) for x in P.max(0)], tallest_axis="XYZ"[int(np.argmax(ext))],
+                 mesh_top_vertex=[round(float(x), 3) for x in P[int(np.argmax(P[:, 2]))]])
+        rig = next((o for o in objs if o.type == "ARMATURE"), None)
+        if rig is not None:
+            for b in ("head", "hips", "foot.l"):
+                if b in rig.data.bones:
+                    d[b] = [round(float(x), 3) for x in rig.matrix_world @ rig.data.bones[b].head_local]
+            d["rig_rotation_deg"] = [round(math.degrees(x), 1) for x in rig.matrix_world.to_euler()]
+        rep_[tag] = d
+    return rep_
+
+
+def build_variant(meth, lvl, nm, hero, ref, rig, flags, budget, inv, scale, lods):
+    if meth == "hull":
+        return hull_lod(hero, ref, rig, budget[lvl], nm)
+    if meth == "lod0":
+        src0 = lods["LOD0"][0]
+        ob = src0.copy(); ob.data = src0.data.copy(); ob.name = ob.data.name = nm
+        bpy.context.scene.collection.objects.link(ob)
+        ISLANDS[ob.as_pointer()] = ISLANDS.get(src0.as_pointer())
+        return ob, dict(lods["LOD0"][1], method="lod0")
+    return make_lod(hero, ref, rig, level_protect(flags, lvl), lvl, budget[lvl], nm, inv, meth, scale)
+
+
 def process(m):
     t0 = time.time()
     key, base = m["key"], m["base"]
     kind = m["kind"]
     budget = m.get("budget", FIGHTER)
-    bake = kind == "fighter"
+    bake = False   # import side only; FIGHTER_FBX keeps bake_space_transform=True for export
     src = os.path.join(SRC, m["fbx"])
     res = dict(key=key, source=m["fbx"], levels={})
     blend_pts = None
@@ -726,6 +856,18 @@ def process(m):
             bpy.ops.object.join()
     hero = body
     hero.name = hero.data.name = base + "_Hero"
+    # import without the experimental bake (that left the skinned mesh lying along -Y while the bones stood, so the
+    # LOD file came out lying along -Z); the importer's axis rotation is applied so rig and mesh are identity, Z up,
+    # like the source .blend the original export ran from
+    res["import_matrices"] = {o.name: [round(math.degrees(x), 1) for x in o.matrix_world.to_euler()] +
+                              [round(x, 4) for x in o.matrix_world.to_scale()] for o in (rig, hero)}
+    if kind == "fighter":
+        for o in bpy.context.view_layer.objects:
+            o.select_set(o in (rig, hero))
+        bpy.context.view_layer.objects.active = rig
+        bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+    hero.data.update()
+    res["mesh_up_extent"] = [round(float(x), 3) for x in np.ptp(np.array([hero.matrix_world @ v.co for v in hero.data.vertices]), axis=0)]
     ref = Ref(hero)
     face_px = None
     if m.get("face") and os.path.exists(os.path.join(SRC, m["face"])):
@@ -752,30 +894,51 @@ def process(m):
         res["blend_frame"] = str(bframe)
         m["_unlined"], m["_frame"] = idx, ((0, 2, 1), (1, 1, 1))
         res["sidecar_match"] = dict(blend_points=len(blend_pts), matched=hit, hero_vertices=len(idx))
+    if face_px is not None and ref.uvs and not m.get("face_slot"):
+        uv0 = next(iter(ref.uvs.values()))
+        a_ = decal_alpha(face_px, uv0) > 0.05
+        ref.tri_decal = a_[ref.TL].any(axis=1)
+        vals, cnt = np.unique(np.round(uv0[~a_], 4), axis=0, return_counts=True)
+        ref.uv_out = vals[int(np.argmax(cnt))].astype(np.float32)
+        res["decal_outside_uv"] = ref.uv_out.tolist()
     flags = protect_values(hero, ref, m, face_px)
     res["protect_counts"] = {k: int(v.sum()) for k, v in flags.items()}
     res["hero_tris"] = tri_count(hero.data)
     # LOD0 decides the protection sense of the decimate vertex group by measurement (survival of the hard set)
     lods = {}
-    p0 = level_protect(flags, "LOD0")
-    trial = {}
-    for inv in (False, True):
-        ob, st = make_lod(hero, ref, rig, p0, "LOD0", budget["LOD0"], base + "_LOD0", inv)
-        trial[inv] = (ob, st)
-    inv = max(trial, key=lambda k: trial[k][1]["survival"])
-    for k, (ob, st) in trial.items():
-        if k != inv:
-            me = ob.data; bpy.data.objects.remove(ob); bpy.data.meshes.remove(me)
-    lods["LOD0"] = trial[inv]
-    lods["LOD0"][0].name = base + "_LOD0"
+    inv = False   # measured in run 1 to 6: weight 1 - protection, not inverted, keeps 100 % of the locked vertices
     res["vgroup_invert"] = inv
-    res["survival_other_sense"] = trial[not inv][1]["survival"]
+    res["survival_other_sense"] = None
     scale = max(1.0, hero.dimensions.z / 2.0)
     extras = {}
-    for lvl in ("LOD1", "Shadow"):
-        for vi, meth in enumerate(METHOD[kind][lvl]):
-            nm = base + "_" + lvl + ("" if vi == 0 else "_v" + meth)
-            r_ = make_lod(hero, ref, rig, level_protect(flags, lvl), lvl, budget[lvl], nm, inv, meth, scale)
+    for lvl in ("LOD0", "LOD1", "Shadow"):
+        methods = [CHOICE[key][lvl]] if key in CHOICE and lvl in CHOICE[key] else METHOD[kind][lvl]
+        primary_done = False
+        for vi, meth in enumerate(methods):
+            nm = base + "_" + lvl + ("" if not primary_done else "_v" + meth)
+            try:
+                r_ = build_variant(meth, lvl, nm, hero, ref, rig, flags, budget, inv, scale, lods)
+            except Exception:
+                res.setdefault("variant_errors", {})[lvl + "_" + meth] = traceback.format_exc()[-600:]
+                continue
+            if not primary_done:
+                lods[lvl] = r_; primary_done = True
+            else:
+                extras[lvl + "_" + meth] = r_
+        if not primary_done:
+            raise RuntimeError("no method built " + lvl)
+        continue
+        for vi, meth in enumerate(methods):
+            if meth == "hull":
+                r_ = hull_lod(hero, ref, rig, budget[lvl], nm)
+            elif meth == "lod0":
+                src0 = lods["LOD0"][0]
+                ob = src0.copy(); ob.data = src0.data.copy(); ob.name = ob.data.name = nm
+                bpy.context.scene.collection.objects.link(ob)
+                ISLANDS[ob.as_pointer()] = ISLANDS.get(src0.as_pointer())
+                r_ = (ob, dict(lods["LOD0"][1], method="lod0"))
+            else:
+                r_ = make_lod(hero, ref, rig, level_protect(flags, lvl), lvl, budget[lvl], nm, inv, meth, scale)
             if vi == 0:
                 lods[lvl] = r_
             else:
@@ -786,6 +949,8 @@ def process(m):
         res["levels"][k] = st
     for k, (ob, st) in extras.items():
         res["levels"][k] = st
+    for k, ob in {**{k: v[0] for k, v in lods.items()}, **{k: v[0] for k, v in extras.items()}}.items():
+        res["levels"][k]["islands"], res["levels"][k]["shard_islands"] = island_stats(ob)
     allobs = {**levels, **{k: v[0] for k, v in extras.items()}}
     res["levels"]["Hero"] = dict(tris=res["hero_tris"])
     # outline_w sidecar for the new mesh names (Farmer)
@@ -800,7 +965,8 @@ def process(m):
             for v in co:
                 _, j, d = ref.kd.find(Vector(v))
                 if hero_unl[j] and d < (1e-4 if k == "Hero" else 0.003):
-                    pts += [round(float(x), 5) for x in (v[list(perm)] * np.array(sg))]
+                    wv = ob.matrix_world @ Vector(v)
+                    pts += [round(float(wv.x), 5), round(float(wv.z), 5), round(float(wv.y), 5)]
             entries.append(dict(name=ob.name, vertices=len(co), unlined=pts))
         side_out = os.path.join(OUT, os.path.dirname(m["rel"]), base + "_OutlineW.json")
         os.makedirs(os.path.dirname(side_out), exist_ok=True)
@@ -851,6 +1017,18 @@ def process(m):
                 pass
     r = bpy.ops.export_scene.fbx(filepath=out, use_selection=True, **opts)
     res["export"] = dict(path=m["rel"], result=list(r))
+    l1 = levels["LOD1"]; l1.name = base + "_LOD1_dec"
+    cp = levels["LOD0"].copy(); cp.data = levels["LOD0"].data.copy(); cp.name = cp.data.name = base + "_LOD1"
+    bpy.context.scene.collection.objects.link(cp)
+    for o in bpy.context.view_layer.objects:
+        o.select_set(o in (rig, levels["Hero"], levels["LOD0"], cp, levels["Shadow"]))
+    bpy.context.view_layer.objects.active = rig
+    out_b = os.path.join(ROOT, "out_lod1copy", m["rel"]); os.makedirs(os.path.dirname(out_b), exist_ok=True)
+    bpy.ops.export_scene.fbx(filepath=out_b, use_selection=True, **opts)
+    me_ = cp.data; bpy.data.objects.remove(cp); bpy.data.meshes.remove(me_); l1.name = base + "_LOD1"
+    if m.get("_frame"):
+        import shutil
+        shutil.copy(os.path.join(OUT, os.path.dirname(m["rel"]), base + "_OutlineW.json"), os.path.dirname(out_b))
     if kind == "kaiju":
         for t in rig.animation_data.nla_tracks:
             t.mute = True
@@ -945,6 +1123,12 @@ def process(m):
     if act:
         set_pose(pose_rig, act, 0.5, scene)
     res["rest_dims"] = [round(x, 3) for x in hero.dimensions]
+    if "upperleg.l" in rig.pose.bones and "foot.l" in rig.pose.bones:
+        dg = bpy.context.evaluated_depsgraph_get(); dg.update()
+        lv_ = (rig.matrix_world @ rig.pose.bones["foot.l"].head) - (rig.matrix_world @ rig.pose.bones["upperleg.l"].head)
+        res["idle_leg_dir"] = [round(x, 3) for x in lv_.normalized()]
+        hv_ = (rig.matrix_world @ rig.pose.bones["head"].head) - (rig.matrix_world @ rig.pose.bones["hips"].head)
+        res["idle_spine_dir"] = [round(x, 3) for x in hv_.normalized()]
     res["rig_matrix"] = [[round(x, 3) for x in r_] for r_ in rig.matrix_world]
     turn = bpy.data.objects.new("Turn", None); scene.collection.objects.link(turn)
     for o in [rig, pose_rig] + list(allobs.values()):
@@ -989,6 +1173,19 @@ def process(m):
                                                            for b in ("head", "hips", "foot.l") if b in rig.pose.bones}
                 scene.render.filepath = os.path.join(rdir, "%s_%s_%s.png" % (k, tag, size))
                 bpy.ops.render.render(write_still=True)
+    # rest pose (no clip) at the gameplay camera: separates any clip/retarget problem from the file's orientation
+    rig.data.pose_position = "REST"
+    for o in allobs.values():
+        o.hide_render = o is not hero
+    place_camera(scene, cam, target, 45, crop, crop * big)
+    scene.render.filepath = os.path.join(rdir, "Hero_rest_front_big.png")
+    bpy.ops.render.render(write_still=True)
+    if "head" in rig.pose.bones:
+        from bpy_extras.object_utils import world_to_camera_view
+        dg = bpy.context.evaluated_depsgraph_get(); dg.update()
+        place_camera(scene, cam, target, 45, crop, crop)
+        res["screen_y_rest"] = {b: round(world_to_camera_view(scene, cam, rig.matrix_world @ rig.pose.bones[b].head).y, 3)
+                                for b in ("head", "hips", "foot.l") if b in rig.pose.bones}
     res["crop_px"] = crop; res["scale"] = scale
     res["seconds_build"] = round(time.time() - t0, 1)
     # round trip
@@ -998,6 +1195,7 @@ def process(m):
     res["bones_missing"] = sorted(set(sb) - set(ob_))
     for st in (res["source_stats"], res["out_stats"]):
         st.pop("bone_heads", None)
+    res["orientation_proof"] = orient_proof(src, out, bake, kind == "kaiju")
     res["seconds"] = round(time.time() - t0, 1)
     return res
 

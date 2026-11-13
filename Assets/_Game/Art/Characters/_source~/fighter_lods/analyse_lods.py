@@ -27,6 +27,33 @@ def overlap(a, b):
     return float(inter / max(union, 1)), float(d.mean()) if d.size else 0.0, float((d > 48).mean()) if d.size else 0.0, int(ma.sum())
 
 
+REGION_GATE = {"LOD0": 16.0, "LOD1": 24.0}
+
+
+def region_diff(h, x, n=3):
+    """Largest per-region (n x n cells over the Hero silhouette box) difference of mean colour, 0-255."""
+    # colour only where both renders cover the pixel (silhouette loss is the overlap gate's job); a region counts when
+    # it holds at least 3 % of the silhouette, so a few pixels of a tool tip cannot decide it
+    both = (h[..., 3] > 200) & (x[..., 3] > 200)
+    mh = mx = both
+    ys, xs = np.nonzero(h[..., 3] > 127)
+    min_px = max(25, int(0.03 * len(ys)))
+    if not len(ys):
+        return 0.0
+    y0, y1, x0, x1 = ys.min(), ys.max() + 1, xs.min(), xs.max() + 1
+    worst = 0.0
+    for i in range(n):
+        for j in range(n):
+            sl = (slice(y0 + (y1 - y0) * i // n, y0 + (y1 - y0) * (i + 1) // n),
+                  slice(x0 + (x1 - x0) * j // n, x0 + (x1 - x0) * (j + 1) // n))
+            a, b = mh[sl], mx[sl]
+            if a.sum() < min_px:
+                continue
+            ca = h[sl][a][:, :3].mean(0); cb = x[sl][b][:, :3].mean(0)
+            worst = max(worst, float(np.abs(ca - cb).max()))
+    return worst
+
+
 def height_px(a):
     rows = np.nonzero((a[..., 3] > 127).any(axis=1))[0]
     return int(rows[-1] - rows[0] + 1) if len(rows) else 0
@@ -61,17 +88,21 @@ for fn in sorted(os.listdir(DATA)):
         L["team_drift_pp"] = round(100 * abs(team - hteam), 2)
         codes = set(shares[lv]) | set(shares["Hero"])
         L["max_code_drift_pp"] = round(100 * max(abs(shares[lv].get(c, 0) - shares["Hero"].get(c, 0)) for c in codes), 2)
-        ov, cd, cbad = [], [], []
+        ov, cd, cbad, rg = [], [], [], []
         for tag in ("front", "back"):
             h = load(os.path.join(rd, "Hero_%s_game.png" % tag))
             x = load(os.path.join(rd, "%s_%s_game.png" % (lv, tag)))
             o, c, b, _ = overlap(h, x)
-            ov.append(o); cd.append(c); cbad.append(b)
+            ov.append(o); cd.append(c); cbad.append(b); rg.append(region_diff(h, x))
             if lv == "Hero" and tag == "front":
                 res["hero_height_px"] = height_px(h)
         L["overlap"] = round(min(ov), 4)
         L["colour_mean_diff"] = round(max(cd), 2)
         L["colour_bad_px_pct"] = round(100 * max(cbad), 2)
+        L["region_colour_diff"] = round(max(rg), 1)
+        base_lv = lv.split("_")[0]
+        if base_lv in REGION_GATE:
+            L["region_pass"] = L["region_colour_diff"] <= REGION_GATE[base_lv]
         if lv in GATE:
             L["overlap_pass"] = L["overlap"] >= GATE[lv]
         # torn: an edge stretched 25 % and 2 cm (x scale) beyond the Hero surface between the same two points, or a
@@ -91,7 +122,8 @@ for fn in sorted(os.listdir(DATA)):
         L["bridge_edges"] = bridges
         L["max_stretch_vs_hero"] = round(worst, 2)
         L["deviation_p99_cm"] = max(r.get("deviation_cm", {}).get(lv, [0]))
-        for k in ("survival", "decal_mismatch", "dropped_island_verts", "max_influences", "planar_tris", "method"):
+        for k in ("survival", "decal_mismatch", "dropped_island_verts", "max_influences", "planar_tris", "method", "islands",
+                  "shard_islands", "parts"):
             if k in r["levels"][lv]:
                 L[k] = r["levels"][lv][k]
         res["levels"][lv] = L
@@ -105,7 +137,8 @@ for fn in sorted(os.listdir(DATA)):
         source_bbox=[[min(v["bbox_min"][i] for v in so["meshes"].values()) for i in range(3)],
                      [max(v["bbox_max"][i] for v in so["meshes"].values()) for i in range(3)]])
     for k in ("vgroup_invert", "survival_other_sense", "sidecar_match", "sidecar_out", "protect_counts", "poses",
-              "render_engine", "seconds", "joined"):
+              "render_engine", "seconds", "joined", "orientation_proof", "screen_y", "screen_y_rest", "idle_leg_dir",
+              "idle_spine_dir", "decal_outside_uv"):
         res[k] = r.get(k)
     out[key] = res
 
@@ -161,6 +194,24 @@ if fighters:
         note="lit + hull + shadow per fighter today (Hero mesh draws in match, casts itself); after: LOD0 lit+hull, LOD1 lit "
              "(+hull at High), Shadow proxy casts at Medium/High; typical = 8 within 25 u of the camera target, 24 beyond; "
              "Low = own fighter LOD0, everyone else LOD1 without hull, no shadow casters")
+# method choice for the final run: LOD0 best overlap among region-clean variants; LOD1 the best variant that is closed
+# and coherent (overlap >= 0.93, torn <= 50, shards <= 10, region colour clean) or else LOD1 = LOD0; Shadow = hull proxy
+choice = {}
+for k, v in out.items():
+    if k.startswith("_") or not v.get("ok"):
+        continue
+    lv = v["levels"]
+    def cands(base):
+        return [(n, L) for n, L in lv.items() if n == base or n.startswith(base + "_")]
+    c0 = sorted(cands("LOD0"), key=lambda t: (t[1].get("region_pass", True), t[1]["overlap"]), reverse=True)
+    c1 = [t for t in cands("LOD1") if t[1]["overlap"] >= 0.93 and t[1]["torn_edges"] <= 50 and
+          t[1].get("shard_islands", 0) <= 10 and t[1].get("region_pass", True)]
+    c1 = sorted(c1, key=lambda t: t[1]["overlap"], reverse=True)
+    cs = [t for t in cands("Shadow") if t[1].get("method") == "hull"]
+    choice[k] = dict(LOD0=c0[0][1].get("method"), LOD1=c1[0][1].get("method") if c1 else "lod0",
+                     Shadow="hull" if cs else lv["Shadow"].get("method"))
+json.dump(choice, open(os.path.join(ROOT, "choice.json"), "w"), indent=1)
+print("CHOICE", json.dumps(choice))
 json.dump(out, open(os.path.join(ROOT, "analysis.json"), "w"), indent=1, default=str)
 for k, v in out.items():
     if k.startswith("_"):
@@ -169,9 +220,9 @@ for k, v in out.items():
         print(k, "FAILED", v.get("error", "")[-300:])
     else:
         print(k, "h%dpx" % v.get("hero_height_px", 0), " | ".join(
-            "%s %s ov%.3f cd%.1f team%.2f/%.2f torn%d br%d dev%.1f dec%s" % (
-                lv, L["tris"], L["overlap"], L["colour_mean_diff"], L["team_drift_pp"], L["max_code_drift_pp"],
-                L["torn_edges"], L["bridge_edges"], L["deviation_p99_cm"], L.get("decal_mismatch", "-"))
-            for lv, L in v["levels"].items()), "inv", v["vgroup_invert"], "rt", v["roundtrip"]["bones_src"],
+            "%s %s ov%.3f rg%.0f team%.2f torn%d sh%s/%s dec%s" % (
+                lv, L["tris"], L["overlap"], L["region_colour_diff"], L["team_drift_pp"],
+                L["torn_edges"], L.get("shard_islands", "-"), L.get("islands", "-"), L.get("decal_mismatch", "-"))
+            for lv, L in v["levels"].items()), "rt", v["roundtrip"]["bones_src"],
             v["roundtrip"]["bones_out"], v["roundtrip"]["bone_head_max_delta_m"], len(v["roundtrip"]["clips_src"] or []),
             len(v["roundtrip"]["clips_out"] or []))
