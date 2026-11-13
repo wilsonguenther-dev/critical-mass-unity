@@ -91,7 +91,7 @@ namespace CriticalMass.Runtime.Game
         public static bool ExtraClutter(int level) => level >= FramePolicy.LevelHigh;
 
         /// <summary>The row in force now (RenderTier.Level; the editor and tests stay at High unless they set it).</summary>
-        public static QualityRow Current => FrameGovernor.TitleUp ? ForTitle(RenderTier.Level) : For(RenderTier.Level);
+        public static QualityRow Current => FrameGovernor.IdleTitle ? ForTitle(RenderTier.Level) : For(RenderTier.Level);
 
         /// <summary>
         /// perf-60hz-32p: the title screen's backdrop match (nobody plays it, the logo and menu sit over it): every fighter but

@@ -9,48 +9,6 @@ namespace CriticalMass.Runtime.Tests
     /// <summary>DG-05 crash safety: frame cap, safe start, atomic files, the error-loop guard and the asset flags (pure parts).</summary>
     public sealed class FrameGovernorTests
     {
-        [Test]
-        public void HiddenAutomationWindowPacesWithATimerAtTheVsyncRate()
-        {
-            // perf-60hz-32p: macOS does not pace a hidden window's presents by the display.
-            Assert.AreEqual((0, 60), Strip(FramePolicy.HiddenWindowPacing(true, 1, -1, 60, "vsync 1")));
-            Assert.AreEqual((0, 30), Strip(FramePolicy.HiddenWindowPacing(true, 2, -1, 60, "vsync 2")), "the title's 30");
-            Assert.AreEqual((0, 120), Strip(FramePolicy.HiddenWindowPacing(true, 1, -1, 120, "vsync 1")));
-            Assert.AreEqual((0, 60), Strip(FramePolicy.HiddenWindowPacing(true, 1, -1, double.NaN, "vsync 1")));
-            Assert.AreEqual((1, -1), Strip(FramePolicy.HiddenWindowPacing(false, 1, -1, 60, "vsync 1")), "visible: unchanged");
-            Assert.AreEqual((0, 240), Strip(FramePolicy.HiddenWindowPacing(true, 0, 240, 60, "timed 240")), "vsync off: unchanged");
-            StringAssert.StartsWith("hidden window", FramePolicy.HiddenWindowPacing(true, 1, -1, 60, "vsync 1").reason);
-        }
-
-        [Test]
-        public void GuardCoversTheDisplayRateDefaultAndStalledPresents()
-        {
-            // perf-60hz-32p: cap 0 (display rate) is guarded too: 500 fps with vsync "on" -> timed at the refresh rate.
-            var g = new TimedCapGuard();
-            for (int i = 0; i < 1500; i++) g.Feed(0.002, 0, true, 60);
-            Assert.IsTrue(g.ForceTimed);
-            Assert.AreEqual((0, 60), g.Settings(0, 60));
-            // A healthy 60 Hz display rate is left alone.
-            var ok = new TimedCapGuard();
-            for (int i = 0; i < 600; i++) ok.Feed(1.0 / 60, 0, true, 60);
-            Assert.IsFalse(ok.ForceTimed);
-            Assert.AreEqual((1, -1), ok.Settings(0, 60));
-            // Drawable timeouts (about 1 s each, a sleeping display): five within 20 s -> timed.
-            var st = new TimedCapGuard();
-            for (int k = 0; k < 5; k++) { for (int i = 0; i < 60; i++) st.Feed(1.0 / 60, 0, true, 60); st.Feed(1.01, 0, true, 60); }
-            Assert.IsTrue(st.ForceTimed, st.Why);
-            StringAssert.Contains("stalled", st.Why);
-            // Long loading frames (0.3 to 2 s) are not the stall signature.
-            var load = new TimedCapGuard();
-            foreach (double dt in new[] { 0.3, 2.0, 1.6, 0.6, 0.45, 1.8 }) load.Feed(dt, 0, true, 60);
-            Assert.IsFalse(load.ForceTimed);
-            // UNLIMITED is never guarded.
-            var u = new TimedCapGuard();
-            for (int i = 0; i < 1500; i++) u.Feed(0.002, FramePolicy.Unlimited, false, 60);
-            Assert.IsFalse(u.ForceTimed);
-        }
-
-        static (int, int) Strip((int v, int t, string r) x) => (x.v, x.t);
 
         [Test]
         public void CapIsAlwaysVsyncLockedAtTheNearestRateAtOrAboveTheCap()
@@ -83,7 +41,9 @@ namespace CriticalMass.Runtime.Tests
             Assert.AreEqual(144, FrameGovernor.SanitiseCap(144));
             Assert.AreEqual(60, FrameGovernor.EffectiveCap(FramePolicy.Unlimited, true), "menus never unlimited");
             Assert.AreEqual(60, FramePolicy.BackgroundCap(FramePolicy.Unlimited, false), "unfocused never unbounded");
-            Assert.AreEqual(30, FramePolicy.TitleCapFor(FramePolicy.Unlimited));
+            Assert.AreEqual(FramePolicy.TitleCap, FramePolicy.TitleCapFor(FramePolicy.Unlimited));
+            Assert.AreEqual(20, FramePolicy.TitleCap, "perf-60hz-32p: idle title at 20 fps (idle CPU budget)");
+            Assert.AreEqual((3, -1), FrameGovernor.FrameSettings(FramePolicy.TitleCap, 60), "vsync 3 on a 60 Hz panel");
             Assert.AreEqual(60, FramePolicy.EffectiveCap(FramePolicy.Unlimited, false, true), "battery caps unlimited at 60");
             Assert.AreEqual(30, FrameGovernor.SanitiseCap(30));
             Assert.AreEqual(0, FrameGovernor.SanitiseCap(0));

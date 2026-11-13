@@ -69,6 +69,9 @@ namespace CriticalMass.Runtime.Game
         public static int AppliedQueuedFrames { get; private set; }
         /// <summary>true while the title screen is up (read by SimDriverBehaviour's backdrop throttle).</summary>
         public static bool TitleUp { get; private set; }
+        /// <summary>perf-60hz-32p: the title is up and idle (no story film, no attract tour over it): the backdrop's LOD1,
+        /// half-rate poses and the 20 fps title cap apply.</summary>
+        public static bool IdleTitle { get; private set; }
 
         /// <summary>The quality the run asked for (-quality or the stored choice); the perf gate compares it with the real one.</summary>
         public static string RequestedQuality { get; private set; } = "";
@@ -497,12 +500,9 @@ namespace CriticalMass.Runtime.Game
             if (reasonGuard != null) reason += " (" + reasonGuard + ")";
             if (o.Autoplay && PacingOverride == "display") { vsync = 1; target = -1; reason = "override display"; }
             else if (o.Autoplay && PacingOverride == "timed60") { vsync = 0; target = 60; reason = "override timed60"; }
-            // perf-60hz-32p: a hidden automation window (AutomationWindow) is never composited, so macOS does not pace its
-            // drawables by the display: vsync frames came back at 16.7 or 33 to 37 ms at random (7.8% of frames at 33 ms or
-            // more on the Air, against 0.4% visible). A hidden run paces itself with a timer at the vsync rate instead, so the
-            // smoke measures the game, not the occluded window.
-            (vsync, target, reason) = FramePolicy.HiddenWindowPacing(AutomationWindow.Active, vsync, target,
-                Screen.currentResolution.refreshRateRatio.value, reason);
+            // perf-60hz-32p: hidden automation windows keep vsync too. Measured on the Air in one session (build a81efe4,
+            // Medium): vsync 1 = 0.67% of frames at 33 ms or more, p95 16.8 ms; a timed 60 (vsync off, targetFrameRate 60) =
+            // 7.59%, p95 24.2 ms. A timer is the worse pacer on macOS, hidden or not.
             if (QualitySettings.vSyncCount != vsync) QualitySettings.vSyncCount = vsync;
             if (Application.targetFrameRate != target) Application.targetFrameRate = target;
             AppliedVSync = vsync;
@@ -528,7 +528,9 @@ namespace CriticalMass.Runtime.Game
         {
             int pref = SafeMode ? Math.Min(_prefCap == 0 ? SafeCap : _prefCap, SafeCap) : _prefCap;
             int cap = FramePolicy.EffectiveCap(pref, menuLike, _onBattery);
-            return _title ? FramePolicy.TitleCapFor(cap) : cap;
+            // perf-60hz-32p: the idle title runs at TitleCap; the story film and the attract tour over it keep the menu rate.
+            IdleTitle = _title && !Menus.StoryIntro.IsPlaying && !Menus.AttractMode.IsTouring;
+            return IdleTitle ? FramePolicy.TitleCapFor(cap) : cap;
         }
     }
 

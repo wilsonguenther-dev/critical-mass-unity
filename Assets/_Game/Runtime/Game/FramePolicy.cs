@@ -20,8 +20,10 @@ namespace CriticalMass.Runtime.Game
         public const int DefaultCap = 0;
         public const int MenuCap = 60;
         public const int BatteryMenuCap = 30;
-        /// <summary>The title screen (a backdrop match behind it) at 30 fps: idle CPU budget (smoke measured 36.7% at 60).</summary>
-        public const int TitleCap = 30;
+        /// <summary>The idle title screen (a live 16v16 backdrop match behind the logo): 20 fps (vsync 3 on 60 Hz). perf-60hz-32p:
+        /// at 30 it cost 59 to 61% of a core on the 8 GB M1 Air against the 35% idle budget (main thread 27%, render thread
+        /// 15%, job workers and audio the rest). The story film and the attract tour over the title keep the menu rate.</summary>
+        public const int TitleCap = 20;
         public const int BatteryMatchCap = 60;
         public const int SavePowerBackgroundFps = 15;
         public const int MinBackgroundFps = 30;
@@ -61,20 +63,6 @@ namespace CriticalMass.Runtime.Game
             if (double.IsNaN(refreshHz) || refreshHz < 20) refreshHz = 60;
             int n = (int)Math.Floor(refreshHz / cap + 0.02);
             return (Math.Max(1, Math.Min(4, n)), -1);
-        }
-
-        /// <summary>
-        /// perf-60hz-32p: frame pacing for a hidden automation window (pure; tests). macOS never composites a hidden window,
-        /// so vsync does not pace it (presents wait on a display that is not showing it: 16.7 or 33 to 37 ms at random). A
-        /// hidden run with vsync on gets a timed cap at the same rate instead: refresh / vSyncCount. Visible windows and
-        /// vsync-off settings are returned unchanged.
-        /// </summary>
-        public static (int vSync, int target, string reason) HiddenWindowPacing(bool hidden, int vSync, int target, double refreshHz,
-            string reason)
-        {
-            if (!hidden || vSync <= 0) return (vSync, target, reason);
-            if (double.IsNaN(refreshHz) || refreshHz < 20) refreshHz = 60;
-            return (0, (int)Math.Round(refreshHz / vSync), "hidden window: timed " + (int)Math.Round(refreshHz / vSync) + " (was " + reason + ")");
         }
 
         /// <summary>A cap read from PlayerPrefs: one of CapChoices; anything else is 60.</summary>
