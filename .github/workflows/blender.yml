@@ -1,0 +1,39 @@
+# Critical Mass Blender jobs on GitHub (ci/offload-2, 2026-11-13): thin caller of reusable-blender.yml with this
+# project's Blender version (the Mac's /Applications/Blender.app is 5.2.3). Agents use
+# `loop/gates/remote blender --ref <branch> --script <path> [--blend <path>] [--args '...'] [--inputs DIR] --out DIR`
+# (tools/ci/offload.sh blender), which dispatches this from main, waits at one check per 120 s and downloads the outputs.
+# Runs here: scripted modelling, rigging and deformation metrics, FBX/GLB exports, verification renders (Workbench,
+# EEVEE on software GL, Cycles CPU). Stays on the Mac: the image-to-3D tool (needs Apple GPU memory).
+name: blender
+run-name: "blender ${{ inputs.script }} ${{ inputs.ref }} ${{ inputs.request-id }}"
+on:
+  workflow_dispatch:
+    inputs:
+      ref: { description: "Branch, tag or sha", required: true }
+      script: { description: "Python script path inside the repo", required: true }
+      args: { description: "Arguments after -- ({out} {inputs} {repo} placeholders)", default: '' }
+      blend: { description: "Optional .blend opened first (repo path or {inputs}/...)", default: '' }
+      env: { description: "Extra environment, NAME=value per line", default: '' }
+      inputs-asset: { description: "Input bundle asset name on the draft release ci-inputs ('' = none)", default: '' }
+      outputs: { description: "Extra output globs relative to the repo root, one per line", default: '' }
+      gl: { description: "egl | xvfb", type: choice, options: [egl, xvfb], default: egl }
+      factory-startup: { type: boolean, default: true }
+      request-id: { description: "Set by the helper so it can find its own run", default: '' }
+permissions:
+  contents: write     # read the DRAFT release that holds input bundles (drafts are listed only to push access)
+jobs:
+  blender:
+    uses: ./.github/workflows/reusable-blender.yml
+    with:
+      ref: ${{ inputs.ref }}
+      blender-version: '5.2.3'
+      script: ${{ inputs.script }}
+      args: ${{ inputs.args }}
+      blend: ${{ inputs.blend }}
+      env: ${{ inputs.env }}
+      inputs-release-tag: ci-inputs
+      inputs-asset: ${{ inputs.inputs-asset }}
+      outputs: ${{ inputs.outputs }}
+      gl: ${{ inputs.gl }}
+      factory-startup: ${{ inputs.factory-startup }}
+      artifact-name: blender-out

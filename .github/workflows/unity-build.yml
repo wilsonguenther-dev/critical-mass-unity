@@ -1,0 +1,44 @@
+# Critical Mass player builds on GitHub (ci/offload-2, 2026-11-13): the thin, project-specific caller of
+# reusable-unity-build.yml. Agents do not call this by hand: `loop/gates/remote build-mac --ref <branch>` (or
+# tools/ci/offload.sh unity-build) dispatches it FROM main with the branch as input, waits at one check per 120 s,
+# downloads, unpacks and prepares the .app. Dispatching from main means every branch is built by today's workflow and
+# the Library cache is saved in main's scope, which every branch can read (a cache saved on a branch is visible only to
+# that branch). The macOS player cross-builds on Linux with Mono, the same backend and build method as the local gate
+# (tools/unity-build-mac.sh -> CriticalMass.Editor.Build.MacOS); see docs/CI-OFFLOAD-KIT.md for the comparison.
+name: unity-build
+run-name: "unity-build ${{ inputs.target }} ${{ inputs.ref }} ${{ inputs.request-id }}"
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch, tag or sha to build"
+        required: true
+      target:
+        description: "Player"
+        type: choice
+        options: [StandaloneOSX, StandaloneWindows64]
+        default: StandaloneOSX
+      development:
+        description: "Development player (profiler markers for the F3 overlay and the autoplay report)"
+        type: boolean
+        default: false
+      request-id:
+        description: "Set by the helper so it can find its own run"
+        default: ''
+permissions:
+  contents: read
+concurrency:
+  group: unity-build-${{ inputs.target }}-${{ inputs.ref }}-${{ inputs.development }}
+  cancel-in-progress: false
+jobs:
+  build:
+    uses: ./.github/workflows/reusable-unity-build.yml
+    with:
+      ref: ${{ inputs.ref }}
+      target-platform: ${{ inputs.target }}
+      build-method: ${{ inputs.target == 'StandaloneOSX' && 'CriticalMass.Editor.Build.MacOS' || 'CriticalMass.Editor.Build.Windows' }}
+      output-dir: ${{ inputs.target == 'StandaloneOSX' && 'Builds/macOS' || 'Builds/Windows' }}
+      # -buildCommit/-buildCount feed the BuildInfo stamp where Editor/Build.cs reads them (git inside the GameCI
+      # container can fail on the mounted checkout); older Build.cs ignores unknown arguments.
+      custom-parameters: "-buildCommit {sha} -buildCount {count}${{ inputs.development && ' -development' || '' }}"
+    secrets: inherit
