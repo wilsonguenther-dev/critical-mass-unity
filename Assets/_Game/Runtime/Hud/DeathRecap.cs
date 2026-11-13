@@ -54,9 +54,9 @@ namespace CriticalMass.Runtime.Hud
             MenuUi.Panel(_card, "Panel", 0f, 0f, CardW, CardH);
             _frame = MenuUi.Shape(_card, "Portrait Frame", ShapeKind.Chamfer, 18f, 18f, 120f, 120f, CMTokens.VoidNavy.Color, 18f);
             _portrait = HudIcon.Make(_frame.transform, "Portrait", 7f, 7f, 106f, 106f);
-            _line = MenuUi.Label(_card, "Line", CMTokens.Ui, 32, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft, 160f, 22f, 640f, 44f, "", 3f);
-            _tipLabel = MenuUi.Label(_card, "Tip Label", CMTokens.Display, 18, CMTokens.ToolBrass.Color, TextAnchor.UpperLeft, 160f, 80f, 60f, 26f, "TIP", 2f);
-            _tip = MenuUi.Label(_card, "Tip", CMTokens.Ui, 21, CMTokens.WarmCream.Color, TextAnchor.UpperLeft, 220f, 78f, 580f, 64f, "", 2f);
+            _line = MenuUi.Label(_card, "Line", CMTokens.Ui, UiScale.TypeHeading, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft, 160f, 22f, 640f, 44f, "", 3f);
+            _tipLabel = MenuUi.Label(_card, "Tip Label", CMTokens.Display, UiScale.TypeSmall, CMTokens.ToolBrass.Color, TextAnchor.UpperLeft, 160f, 80f, 60f, 26f, "TIP", 2f);
+            _tip = MenuUi.Fit(MenuUi.Label(_card, "Tip", CMTokens.Ui, UiScale.TypeBody, CMTokens.WarmCream.Color, TextAnchor.UpperLeft, 220f, 78f, 580f, 64f, "", 2f), 21);
             _tip.horizontalOverflow = HorizontalWrapMode.Wrap;
             // best fit needs bounded overflow: a long name ("Demolitions Expert") shrinks to fit one line
             _line.horizontalOverflow = HorizontalWrapMode.Wrap;
@@ -100,6 +100,7 @@ namespace CriticalMass.Runtime.Hud
             bool hide = _log == null || _log.Suppressed;
             if (Canvas.enabled == hide) Canvas.enabled = !hide;
             if (!IsOpen) return;
+            if (!hide) HudZones.Hold(HudZone.Lower, HudPriority.Recap);
             World w = _log != null && _log.Driver != null ? _log.Driver.World : null;
             int local = _log != null ? _log.LocalActor : HudBinder.LocalActor;
             if (w != null && (w.Match.Phase == MatchPhase.Ended || (local < w.ActorCount && w.Actors[local].Alive))) { Hide(); return; }

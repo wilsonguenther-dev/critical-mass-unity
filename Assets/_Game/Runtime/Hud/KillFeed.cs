@@ -250,7 +250,8 @@ namespace CriticalMass.Runtime.Hud
         public const int Lines = 5;
         public const float LineSeconds = 4f;
         public const float FadeSeconds = 0.2f, SlideSeconds = 0.15f;
-        public const float Top = 120f, Right = 24f, LineW = 470f, LineH = 40f, Pitch = 46f;
+        // Polish pass 1: under the top band (136) and 400 wide, so the feed column (HudZones.Feed) never meets the centre lane.
+        public const float Top = 136f, Right = 24f, LineW = 400f, LineH = 40f, Pitch = 46f;
 
         /// <summary>One shown line, newest first, for tests and captures.</summary>
         public struct Entry
@@ -303,10 +304,10 @@ namespace CriticalMass.Runtime.Hud
                 s.Plate = MenuUi.Shape(s.Rt, "Plate", ShapeKind.RoundRect, 0f, 0f, LineW, LineH, CMTokens.WithAlpha(CMTokens.PanelNavy.Color, 0.9f), 12f);
                 s.Plate.RimPx = 2f;
                 s.KillerCrest = HudIcon.Make(s.Rt, "Killer Crest", 10f, 7f, 26f, 26f);
-                s.Killer = MenuUi.Label(s.Rt, "Killer", CMTokens.Ui, 22, CMTokens.WarmCream.Color, TextAnchor.MiddleRight, 40f, 0f, 160f, LineH, "", 2f);
-                s.AttackIcon = HudIcon.Make(s.Rt, "Attack", 212f, 3f, 34f, 34f);
-                s.VictimCrest = HudIcon.Make(s.Rt, "Victim Crest", 258f, 7f, 26f, 26f);
-                s.Victim = MenuUi.Label(s.Rt, "Victim", CMTokens.Ui, 22, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft, 290f, 0f, 170f, LineH, "", 2f);
+                s.Killer = MenuUi.Fit(MenuUi.Label(s.Rt, "Killer", CMTokens.Ui, UiScale.TypeBody, CMTokens.WarmCream.Color, TextAnchor.MiddleRight, 40f, 0f, 132f, LineH, "", 2f));
+                s.AttackIcon = HudIcon.Make(s.Rt, "Attack", 180f, 3f, 34f, 34f);
+                s.VictimCrest = HudIcon.Make(s.Rt, "Victim Crest", 222f, 7f, 26f, 26f);
+                s.Victim = MenuUi.Fit(MenuUi.Label(s.Rt, "Victim", CMTokens.Ui, UiScale.TypeBody, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft, 254f, 0f, 136f, LineH, "", 2f));
                 s.Rt.gameObject.SetActive(false);
                 _slots[i] = s;
                 _order[i] = i;
@@ -380,14 +381,14 @@ namespace CriticalMass.Runtime.Hud
             s.Plate.SetFill(own ? CMTokens.ToolBrass.Color : CMTokens.WithAlpha(CMTokens.PanelNavy.Color, 0.9f));
 
             // victim (always an actor)
-            s.Victim.color = CMTokens.Team(e.ActorTeam);
+            s.Victim.color = CMTokens.TeamInk(e.ActorTeam);
             HudText.Set(s.Victim, e.Actor == localActor ? KillWords.You : KillWords.ClassUpper[Ix(e.ActorClass)]);
             s.VictimCrest.Set(UiIcons.Crest[(int)e.ActorTeam], _tier);
 
             // killer: an actor, the Kaiju, or nobody known
             if (e.Other >= 0)
             {
-                s.Killer.color = CMTokens.Team(e.OtherTeam);
+                s.Killer.color = CMTokens.TeamInk(e.OtherTeam);
                 HudText.Set(s.Killer, e.Other == localActor ? KillWords.You : KillWords.ClassUpper[Ix(e.OtherClass)]);
                 s.KillerCrest.Set(UiIcons.Crest[(int)e.OtherTeam], _tier);
                 s.AttackIcon.Set(UiIcons.Attack[Ix(e.OtherClass), (int)e.OtherTeam], _tier);

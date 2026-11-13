@@ -138,12 +138,12 @@ namespace CriticalMass.Runtime.Hud.Interact
         {
             _rt = InteractUi.Floating(parent, "Tooltip", W, 120f);
             _panel = MenuUi.Panel(_rt, "Panel", 0f, 0f, W, 120f);
-            _title = MenuUi.Label(_rt, "Title", CMTokens.Display, 22, InteractUi.Cream, TextAnchor.MiddleLeft, 18f, 12f, W - 36f, 30f, "", 2f);
-            _body = InteractUi.Wrapped(_rt, "Body", CMTokens.Ui, 18, InteractUi.Cream, 18f, 46f, W - 36f, 40f, "");
-            _keyLabel = MenuUi.Label(_rt, "Key Word", CMTokens.Ui, 15, InteractUi.Brass, TextAnchor.MiddleLeft, 18f, 0f, 60f, 26f, "KEY", 2f);
+            _title = MenuUi.Label(_rt, "Title", CMTokens.Display, UiScale.TypeBody, InteractUi.Cream, TextAnchor.MiddleLeft, 18f, 12f, W - 36f, 30f, "", 2f);
+            _body = InteractUi.Wrapped(_rt, "Body", CMTokens.Ui, UiScale.TypeSmall, InteractUi.Cream, 18f, 46f, W - 36f, 40f, "");
+            _keyLabel = MenuUi.Fit(MenuUi.Label(_rt, "Key Word", CMTokens.Ui, UiScale.TypeMin, InteractUi.Brass, TextAnchor.MiddleLeft, 18f, 0f, 60f, 26f, "KEY", 2f), 15);
             _keyChip = MenuUi.Shape(_rt, "Key Chip", ShapeKind.RoundRect, 70f, 0f, 120f, 26f, InteractUi.Navy, -1f);
             _keyChip.RimColor = InteractUi.Cream;
-            _key = MenuUi.Label(_keyChip.transform, "Key", CMTokens.Mono, 15, InteractUi.Cream, TextAnchor.MiddleCenter, 0f, 0f, 120f, 26f, "", 0f);
+            _key = MenuUi.Fit(MenuUi.Label(_keyChip.transform, "Key", CMTokens.Mono, UiScale.TypeMin, InteractUi.Cream, TextAnchor.MiddleCenter, 0f, 0f, 120f, 26f, "", 0f), 15);
             _rt.gameObject.SetActive(false);
         }
 
@@ -219,10 +219,10 @@ namespace CriticalMass.Runtime.Hud.Interact
             _rt.pivot = new Vector2(0.5f, 0.5f);
             _rt.sizeDelta = new Vector2(W, 300f);
             _panel = MenuUi.Panel(_rt, "Panel", 0f, 0f, W, 300f);
-            _title = MenuUi.Label(_rt, "Title", CMTokens.Display, 34, InteractUi.Cream, TextAnchor.MiddleLeft, 32f, 22f, W - 64f, 46f, "", 3f);
-            _sub = MenuUi.Label(_rt, "Sub", CMTokens.Ui, 20, InteractUi.Brass, TextAnchor.MiddleLeft, 32f, 70f, W - 64f, 28f, "", 2f);
-            for (int i = 0; i < MaxLines; i++) _lines[i] = InteractUi.Wrapped(_rt, "Line " + i, CMTokens.Ui, 20, InteractUi.Cream, 32f, 110f, W - 64f, 30f, "");
-            _hint = MenuUi.Label(_rt, "Hint", CMTokens.Ui, 16, CMTokens.WithAlpha(InteractUi.Cream, 0.8f), TextAnchor.MiddleRight, 32f, 0f, W - 64f, 24f, "", 2f);
+            _title = MenuUi.Fit(MenuUi.Label(_rt, "Title", CMTokens.Display, UiScale.TypeLead, InteractUi.Cream, TextAnchor.MiddleLeft, 32f, 22f, W - 64f, 46f, "", 3f), 34);
+            _sub = MenuUi.Label(_rt, "Sub", CMTokens.Ui, UiScale.TypeSmall, InteractUi.Brass, TextAnchor.MiddleLeft, 32f, 70f, W - 64f, 28f, "", 2f);
+            for (int i = 0; i < MaxLines; i++) _lines[i] = InteractUi.Wrapped(_rt, "Line " + i, CMTokens.Ui, UiScale.TypeSmall, InteractUi.Cream, 32f, 110f, W - 64f, 30f, "");
+            _hint = MenuUi.Label(_rt, "Hint", CMTokens.Ui, UiScale.TypeMin, CMTokens.WithAlpha(InteractUi.Cream, 0.8f), TextAnchor.MiddleRight, 32f, 0f, W - 64f, 24f, "", 2f);
             _rt.gameObject.SetActive(false);
         }
 

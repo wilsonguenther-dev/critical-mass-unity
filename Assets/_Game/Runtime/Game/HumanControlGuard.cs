@@ -171,7 +171,8 @@ namespace CriticalMass.Runtime.Game
             }
 
             bool input = AnyGameplayInput();
-            if (input || !alive || paused || title || spectating || !HumanMatch) LastInputAt = now;
+            // The idle clock does not run behind the loading screen (feat/play-now): Play Now hands the human control on the first frame.
+            if (input || !alive || paused || title || spectating || !HumanMatch || Menus.LoadingScreen.IsOpen) LastInputAt = now;
 
             bool eligible = HumanMatch && !spectating;
             if (eligible && Driver.HumanAutopilot && input)
@@ -278,11 +279,11 @@ namespace CriticalMass.Runtime.Game
             _canvas = FeedUi.MakeCanvas(transform, "Human Control Canvas", SortingOrder);
             Color cream = CMTokens.WarmCream.Color;
 
-            RectTransform warn = FeedUi.Anchored(_canvas.transform, "Lockout Warning", new Vector2(0.5f, 1f), 0f, -90f, 1200f, 48f);
+            RectTransform warn = FeedUi.Anchored(_canvas.transform, "Lockout Warning", new Vector2(0.5f, 1f), 0f, -HudZones.AlertTop, WarningW, 48f);
             _warning = warn.gameObject;
-            VectorShape wp = MenuUi.Shape(warn, "Plate", ShapeKind.RoundRect, 0f, 0f, 1200f, 48f, new Color(0.62f, 0.08f, 0.08f, 0.95f), 12f);
+            VectorShape wp = MenuUi.Shape(warn, "Plate", ShapeKind.RoundRect, 0f, 0f, WarningW, 48f, new Color(0.62f, 0.08f, 0.08f, 0.95f), 12f);
             wp.OutlinePx = 3f;
-            _warningText = MenuUi.Label(warn, "Text", CMTokens.Ui, 20, cream, TextAnchor.MiddleCenter, 0f, 0f, 1200f, 48f, "", 2f);
+            _warningText = MenuUi.Label(warn, "Text", CMTokens.Ui, UiScale.TypeSmall, cream, TextAnchor.MiddleCenter, 0f, 0f, WarningW, 48f, "", 2f);
             _warning.SetActive(false);
 
             RectTransform plate = FeedUi.Anchored(_canvas.transform, "Automated Run Plate", new Vector2(0.5f, 0f), 0f, 24f, 1240f, 56f);
@@ -291,14 +292,21 @@ namespace CriticalMass.Runtime.Game
             pp.OutlinePx = 3f;
             pp.RimPx = 3f;
             pp.RimColor = CMTokens.ToolBrass.Color;
-            MenuUi.Label(plate, "Text", CMTokens.Ui, 22, cream, TextAnchor.MiddleCenter, 0f, 0f, 1240f, 56f,
+            MenuUi.Label(plate, "Text", CMTokens.Ui, UiScale.TypeBody, cream, TextAnchor.MiddleCenter, 0f, 0f, 1240f, 56f,
                 "AUTOMATED TEST RUN: THE COMPUTER IS PLAYING THIS WINDOW. YOUR KEYS DO NOTHING HERE. IT CLOSES BY ITSELF.", 2f);
             _plate.SetActive(false);
         }
 
+        /// <summary>
+        /// Lockout warning width: polish pass 1 moved it off the HUD clock row (it sat at y 90, over the hill bar) to the
+        /// top of the centre lane, where the autopilot banner outranks it.
+        /// </summary>
+        public const float WarningW = 1040f;
+
         void SetWarning(string text)
         {
-            bool on = text != null;
+            bool on = text != null && !HudZones.Blocked(HudZone.Callout, HudPriority.Lockout);
+            if (on) HudZones.Hold(HudZone.Callout, HudPriority.Lockout);
             if (!on && _warning == null) return;
             Build();
             if (on) HudText.Set(_warningText, text);

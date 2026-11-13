@@ -530,6 +530,7 @@ namespace CriticalMass.Runtime.Menus
         public TeamId Team { get; private set; }
 
         readonly float _w, _h;
+        float _rowY, _rowH;
         HudIcon _portrait;
         float _portraitPx;
         Text _name, _role, _bio, _hotkey, _diffLabel;
@@ -590,16 +591,16 @@ namespace CriticalMass.Runtime.Menus
             float y = 18f + p + 4f;
             _name = MenuUi.Label(Root, "Name", CMTokens.Display, _w > 260f ? 26 : 22, Cream, TextAnchor.MiddleCenter, 6f, y, _w - 12f, 32f, "", 3f);
             y += 32f;
-            _role = MenuUi.Label(Root, "Role", CMTokens.Ui, 18, Brass, TextAnchor.MiddleCenter, 6f, y, _w - 12f, 24f, "", 2f);
+            _role = MenuUi.Label(Root, "Role", CMTokens.Ui, UiScale.TypeSmall, Brass, TextAnchor.MiddleCenter, 6f, y, _w - 12f, 24f, "", 2f);
             y += 28f;
             BuildPips(Root, (_w - 3 * 16f - 2 * 8f) * 0.5f, y, 16f, 8f);
             y += 24f;
             _tileKey = Chip(Root, "Key", 14f, y, 78f, 28f, 16, out _);
-            _tileAbility = MenuUi.Label(Root, "Ability", CMTokens.Ui, 17, Cream, TextAnchor.MiddleLeft, 100f, y, _w - 110f, 28f, "", 2f);
+            _tileAbility = MenuUi.Label(Root, "Ability", CMTokens.Ui, UiScale.TypeMin, Cream, TextAnchor.MiddleLeft, 100f, y, _w - 110f, 28f, "", 2f);
             Fit(_name, 14);
             Fit(_role, 12);
             Fit(_tileAbility, 12);
-            _hotkey = MenuUi.Label(Root, "Hotkey", CMTokens.Mono, 18, Navy, TextAnchor.MiddleCenter, 10f, 10f, 30f, 30f, "", 0f);
+            _hotkey = MenuUi.Label(Root, "Hotkey", CMTokens.Mono, UiScale.TypeSmall, Navy, TextAnchor.MiddleCenter, 10f, 10f, 30f, 30f, "", 0f);
             VectorShape hk = MenuUi.Shape(Root, "Hotkey Badge", ShapeKind.Circle, 8f, 8f, 34f, 34f, Brass, 0f);
             hk.RimPx = 0f;
             hk.transform.SetSiblingIndex(_hotkey.transform.GetSiblingIndex());
@@ -633,16 +634,18 @@ namespace CriticalMass.Runtime.Menus
             disc.OutlinePx = 4f;
             _portrait = HudIcon.Make(Root, "Portrait", 36f, 34f, p, p);
             float tx = 30f + p + 40f, tw = _w - tx - 30f;
-            _name = MenuUi.Label(Root, "Name", CMTokens.Display, 52, Cream, TextAnchor.MiddleLeft, tx, 28f, tw, 70f, "", 4f);
-            _role = MenuUi.Label(Root, "Role", CMTokens.Ui, 28, Brass, TextAnchor.MiddleLeft, tx, 98f, tw, 38f, "", 3f);
+            _name = MenuUi.Label(Root, "Name", CMTokens.Display, UiScale.TypeDisplay, Cream, TextAnchor.MiddleLeft, tx, 28f, tw, 70f, "", 4f);
+            _role = MenuUi.Label(Root, "Role", CMTokens.Ui, UiScale.TypeButton, Brass, TextAnchor.MiddleLeft, tx, 98f, tw, 38f, "", 3f);
             Fit(_name, 30);
-            _diffLabel = MenuUi.Label(Root, "Difficulty", CMTokens.Ui, 18, CMTokens.WithAlpha(Cream, 0.85f), TextAnchor.MiddleLeft, tx, 140f, 130f, 26f, "DIFFICULTY", 2f);
+            _diffLabel = MenuUi.Label(Root, "Difficulty", CMTokens.Ui, UiScale.TypeSmall, CMTokens.WithAlpha(Cream, 0.85f), TextAnchor.MiddleLeft, tx, 140f, 130f, 26f, "DIFFICULTY", 2f);
             BuildPips(Root, tx + 132f, 145f, 16f, 8f);
-            _bio = MenuUi.Label(Root, "Bio", CMTokens.Ui, 21, Cream, TextAnchor.UpperLeft, tx, 176f, tw, 70f, "", 2f);
+            _bio = MenuUi.Fit(MenuUi.Label(Root, "Bio", CMTokens.Ui, UiScale.TypeBody, Cream, TextAnchor.UpperLeft, tx, 176f, tw, 70f, "", 2f), 21);
             _bio.horizontalOverflow = HorizontalWrapMode.Wrap;
             _bio.lineSpacing = 1.05f;
 
             float rowY = 260f, rowH = (_h - rowY - 24f) / 3f;
+            _rowY = rowY;
+            _rowH = rowH;
             for (int i = 0; i < 3; i++)
             {
                 var r = new AbilityRow();
@@ -653,14 +656,14 @@ namespace CriticalMass.Runtime.Menus
                 bg.OutlinePx = 0f;
                 r.Icon = HudIcon.Make(r.Rt, "Icon", 14f, (rowH - 10f - 64f) * 0.5f, 64f, 64f);
                 r.Key = Chip(r.Rt, "Key", 92f, 12f, 104f, 34f, 18, out r.Chip);
-                r.Name = MenuUi.Label(r.Rt, "Name", CMTokens.Display, 24, Cream, TextAnchor.MiddleLeft, 210f, 10f, 420f, 36f, "", 3f);
-                r.Cooldown = MenuUi.Label(r.Rt, "Cooldown", CMTokens.Mono, 18, CMTokens.WithAlpha(Cream, 0.85f), TextAnchor.MiddleRight, _w - 48f - 200f - 18f, 12f, 200f, 32f, "", 2f);
+                r.Name = MenuUi.Label(r.Rt, "Name", CMTokens.Display, UiScale.TypeBody, Cream, TextAnchor.MiddleLeft, 210f, 10f, 420f, 36f, "", 3f);
+                r.Cooldown = MenuUi.Label(r.Rt, "Cooldown", CMTokens.Mono, UiScale.TypeSmall, CMTokens.WithAlpha(Cream, 0.85f), TextAnchor.MiddleRight, _w - 48f - 200f - 18f, 12f, 200f, 32f, "", 2f);
                 r.SoonTag = MenuUi.Shape(r.Rt, "Soon", ShapeKind.RoundRect, _w - 48f - 180f - 18f, 12f, 180f, 30f, CMTokens.WithAlpha(Brass, 0.18f), -1f);
                 r.SoonTag.RimColor = Brass;
                 r.SoonTag.RimPx = 2f;
                 r.SoonTag.OutlinePx = 2f;
-                r.Soon = MenuUi.Label(r.SoonTag.transform, "Label", CMTokens.Ui, 15, Brass, TextAnchor.MiddleCenter, 0f, 0f, 180f, 30f, "COMING SOON", 2f);
-                r.Text = MenuUi.Label(r.Rt, "Text", CMTokens.Ui, 19, Cream, TextAnchor.UpperLeft, 92f, 52f, _w - 48f - 92f - 18f, rowH - 64f, "", 2f);
+                r.Soon = MenuUi.Fit(MenuUi.Label(r.SoonTag.transform, "Label", CMTokens.Ui, UiScale.TypeMin, Brass, TextAnchor.MiddleCenter, 0f, 0f, 180f, 30f, "", 2f), 15);
+                r.Text = MenuUi.Label(r.Rt, "Text", CMTokens.Ui, UiScale.TypeSmall, Cream, TextAnchor.UpperLeft, 92f, 52f, _w - 48f - 92f - 18f, rowH - 64f, "", 2f);
                 r.Text.horizontalOverflow = HorizontalWrapMode.Wrap;
                 _rows[i] = r;
             }
@@ -723,17 +726,23 @@ namespace CriticalMass.Runtime.Menus
                 _pips[i].SetFill(on ? Brass : Empty);
             }
             if (_bio != null) HudText.Set(_bio, _words.Bio);
+            int shown = 0;
             for (int i = 0; i < _rows.Length; i++)
             {
                 AbilityRow r = _rows[i];
                 if (r == null) continue;
                 bool has = i < _words.Abilities.Length;
+                // Polish pass 1: rows close up from the top, so a class with fewer lines leaves no hole.
                 r.Rt.gameObject.SetActive(has);
                 if (!has) continue;
+                MenuUi.Place(r.Rt, 24f, _rowY + shown * _rowH, _w - 48f, _rowH - 10f);
+                shown++;
                 AbilityWords a = _words.Abilities[i];
                 HudText.Set(r.Name, a.Name.ToUpperInvariant());
                 HudText.Set(r.Text, a.Text);
-                bool soon = a.NeedsRule.Length > 0;
+                // Polish pass 1: every rule a card names is in the game since batch 3 (Demolitions DG-22, Builder DG-24), so
+                // the old COMING SOON tag never shows (its label is empty too).
+                bool soon = false;
                 r.SoonTag.gameObject.SetActive(soon);
                 r.Cooldown.gameObject.SetActive(!soon && a.Cooldown.Length > 0);
                 if (a.Cooldown.Length > 0) HudText.Set(r.Cooldown, a.Cooldown + " S COOLDOWN");

@@ -51,7 +51,8 @@ namespace CriticalMass.Runtime.Tests
         [Test]
         public void DefaultStepListCoversTheSpecInOrder()
         {
-            string[] want = { "move", "marker", "knockout", "gather", "deliver", "hill", "ability", "jump", "dig", "place" };
+            // 2026-11-12: the first match teaches move, attack, ability, jump, map, then the objective (hill, egg).
+            string[] want = { "move", "marker", "knockout", "ability", "jump", "dig", "place", "map", "hill", "gather", "deliver" };
             Assert.AreEqual(want.Length, TrialSteps.Default.Length);
             for (int i = 0; i < want.Length; i++) Assert.AreEqual(want[i], TrialSteps.Default[i].Id);
         }
@@ -86,6 +87,30 @@ namespace CriticalMass.Runtime.Tests
             Assert.AreEqual(TrialFeature.Terraform, Step("place").Needs);
             Assert.AreEqual(ClassId.Miner, Step("dig").OnlyClass);
             Assert.AreEqual(ClassId.Miner, Step("place").OnlyClass);
+            Assert.AreEqual(TrialFeature.Map, Step("map").Needs);
+            StringAssert.Contains("{Map}", Step("map").Prompt);
+        }
+
+        [Test]
+        public void TheMapStepIsOffWithoutAMapAndDoneWhenTheMapOpens()
+        {
+            Func<bool> was = TrialFeatures.MapOpenProbe;
+            try
+            {
+                TrialFeatures.MapOpenProbe = null;
+                Assert.IsFalse(TrialFeatures.Has(TrialFeature.Map));
+                bool open = false;
+                TrialFeatures.MapOpenProbe = () => open;
+                Assert.IsTrue(TrialFeatures.Has(TrialFeature.Map));
+                World w = NewWorld();
+                var p = new TrialProbe();
+                TrialStep s = Step("map");
+                TrialChecks.Begin(w, s, p, null);
+                Assert.IsFalse(TrialChecks.Observe(w, s, p, null));
+                open = true;
+                Assert.IsTrue(TrialChecks.Observe(w, s, p, null));
+            }
+            finally { TrialFeatures.MapOpenProbe = was; }
         }
 
         [Test]
@@ -544,6 +569,7 @@ namespace CriticalMass.Runtime.Tests
         static TrialRunner PlayTrial(int seed, out double seconds)
         {
             World w = NewWorld(seed);
+            TrialFeatures.MapOpenProbe = null;   // headless: no HUD, so the map step is off (the autopilot cannot open it)
             var r = new TrialRunner(TrialSteps.Default, s => { });
             var pilot = new TrialAutopilot();
             InputFrame frame = SimInput.EmptyInput();
@@ -583,11 +609,11 @@ namespace CriticalMass.Runtime.Tests
             return string.Join(", ", parts);
         }
 
-        // Integration batch 2: KNOWN DEFECT, Explicit so the gate reports it by name instead of hiding the rest. With batch 2's
-        // sim rules the default seed's run differs: the jump step picks the gap nearest the player, which is now the one at
-        // (66.5, 28.5) on the enemy side, the autopilot is knocked out there and ends the 240 s at its pad (9, 36) with
-        // jump=Active, dig and place Pending. Same class as batch 1's seed 2026 stall. Fix the autopilot's gap choice.
-        [Test, Explicit("known defect (integration batch 2): the trial autopilot does not finish the jump step on the default seed under the batch 2 sim rules")]
+        // Integration batch 2 marked this Explicit: the jump step fixed the straight-line nearest gap at step start, on the
+        // default seed the one at (66.5, 28.5) on the enemy side; the autopilot was knocked out there and ended the 240 s at
+        // its pad with jump=Active. Fixed 2026-11-12 (fix/ui-rough-spots): the gap is the nearest own-side gap by walking
+        // distance (TrialChecks.NearestGap with a team), and after a knock-out the step re-picks from the respawn point.
+        [Test]
         public void AutopilotCompletesEveryRunnableStepInUnderFourSimMinutes()
         {
             TrialRunner r = PlayTrial(Seed, out double seconds);
@@ -603,6 +629,41 @@ namespace CriticalMass.Runtime.Tests
         // category filter selects Explicit tests, so as a Slow TestCase it still ran (and failed) in the sim-long gate.
         [Test, Explicit("known defect (batch 3): the trial autopilot stalls on the jump step on seed 2026")]
         public void AutopilotCompletesOnSeed2026KnownDefect() => AutopilotCompletesOnOtherSeeds(2026);
+        [Test]
+        public void JumpGapIsPickedOnTheOwnHalfWhenThereIsOne()
+        {
+            World w = NewWorld(Seed);
+            for (int team = 0; team < 2; team++)
+            {
+                MapDef map = w.Map;
+                PadDef own = map.Pads[team], foe = map.Pads[1 - team];
+                // From the hill (both halves equally far) the guided match must send the player to its own half.
+                bool found = TrialChecks.NearestGap(w, map.Hill.X, map.Hill.Z, TrialChecks.JumpReachCells(w), (TeamId)team,
+                    out double gx, out double gz, out double fx, out double fz);
+                if (!found) Assert.Ignore("this map has no jumpable gap");
+                Assert.LessOrEqual(TrialChecks.Dist2(fx, fz, own.X, own.Z), TrialChecks.Dist2(fx, fz, foe.X, foe.Z),
+                    $"team {team}: takeoff ({fx:0.0},{fz:0.0}) is on the enemy half; gap ({gx:0.0},{gz:0.0})");
+            }
+        }
+
+        [Test]
+        public void AKnockOutDuringTheJumpStepRepicksTheGapFromTheRespawn()
+        {
+            World w = NewWorld(Seed);
+            var p = new TrialProbe();
+            TrialStep jump = null;
+            foreach (TrialStep st in TrialSteps.Default) if (st.Goal == TrialGoal.JumpGap) jump = st;
+            Assert.NotNull(jump, "the default trial has a jump step");
+            TrialChecks.Begin(w, jump, p, null);
+            if (!p.HasFixed) Assert.Ignore("this map has no jumpable gap");
+            w.Actors[0].Alive = false;
+            TrialChecks.Observe(w, jump, p, null);
+            Assert.IsTrue(p.DiedThisStep);
+            w.Actors[0].Alive = true;
+            TrialChecks.Observe(w, jump, p, null);
+            Assert.AreEqual(1, p.GapRepicks, "re-picked once on the first alive observation");
+            Assert.IsFalse(p.DiedThisStep);
+        }
 
         [Category("Slow")]
         [TestCase(7)]

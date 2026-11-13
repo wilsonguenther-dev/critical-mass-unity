@@ -184,7 +184,8 @@ namespace CriticalMass.Runtime.Hud
     public sealed class Banner : MonoBehaviour
     {
         /// <summary>Reference layout (1920 x 1080 units): centre of the banner below the match cluster.</summary>
-        public const float Width = 1080f, Height = 168f, CentreFromTop = 284f;
+        // Polish pass 1: inside the centre lane (HudZones.Callout, 148..336 with the 18 px lift), clear of the kill feed column.
+        public const float Width = 1032f, Height = 168f, CentreFromTop = 250f;
         public const int SortingOrder = 15;
 
         private static readonly BannerQueue Queue = new BannerQueue();
@@ -285,10 +286,10 @@ namespace CriticalMass.Runtime.Hud
             _badgeDisc.RimPx = 3f;
             _badge = HudIcon.Make(_badgeDisc.transform, "Badge", 12f, 12f, 80f, 80f);
 
-            _headline = HudText.Make(_root, "Headline", CMTokens.Display, 50, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 4f);
+            _headline = HudText.Make(_root, "Headline", CMTokens.Display, UiScale.TypeDisplay, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 4f);
             Centre(_headline.rectTransform, new Vector2(20f, 22f), new Vector2(Width - 300f, 64f));
             _headlineOutline = _headline.GetComponent<TextOutline>();
-            _reason = HudText.Make(_root, "Reason", CMTokens.Ui, 28, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 2.5f);
+            _reason = HudText.Make(_root, "Reason", CMTokens.Ui, UiScale.TypeButton, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 2.5f);
             Centre(_reason.rectTransform, new Vector2(20f, -36f), new Vector2(Width - 300f, 36f));
             go.SetActive(false);
         }
@@ -335,7 +336,11 @@ namespace CriticalMass.Runtime.Hud
                     _badge.SetTier(tier);
                 }
             }
-            _group.alpha = Queue.Alpha(now);
+            // HUD zones: the autopilot banner and the lockout warning outrank event banners in the centre lane.
+            bool blocked = HudZones.Blocked(HudZone.Callout, HudPriority.Banner);
+            float alpha = blocked ? 0f : Queue.Alpha(now);
+            if (alpha > 0f) HudZones.Hold(HudZone.Callout, HudPriority.Banner);
+            _group.alpha = alpha;
             Queue.Motion(now, out float scale, out float lift);
             _root.localScale = new Vector3(scale, scale, 1f);
             _root.anchoredPosition = new Vector2(0f, -CentreFromTop + 18f * lift);

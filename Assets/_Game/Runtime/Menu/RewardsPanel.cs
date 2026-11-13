@@ -154,15 +154,15 @@ namespace CriticalMass.Runtime.Menu
             b._badge = MenuUi.Shape(b.Root, "Badge", ShapeKind.Hexagon, 0f, 0f, 76f, 76f, CMTokens.ToolBrass.Color, 0f);
             b._badge.OutlinePx = 4f;
             b._badge.RimPx = 2f;
-            b._level = MenuUi.Label(b._badge.transform, "Level", CMTokens.Display, 32, CMTokens.VoidNavy.Color, TextAnchor.MiddleCenter,
+            b._level = MenuUi.Label(b._badge.transform, "Level", CMTokens.Display, UiScale.TypeHeading, CMTokens.VoidNavy.Color, TextAnchor.MiddleCenter,
                 0f, 2f, 76f, 72f, "1", 0f);
-            b._caption = MenuUi.Label(b.Root, "Caption", CMTokens.Display, 20, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft,
+            b._caption = MenuUi.Label(b.Root, "Caption", CMTokens.Display, UiScale.TypeSmall, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft,
                 92f, 0f, w - 92f, 30f, ProgressionWords.Level + " 1", 2f);
             b._bar = MenuUi.Shape(b.Root, "Bar", ShapeKind.RoundRect, 92f, 36f, w - 92f, 30f, CMTokens.ToolBrass.Color, -1f);
             b._bar.SetEmpty(CMTokens.MeterEmpty.Color);
             b._bar.OutlinePx = 3f;
             b._bar.RimPx = 2f;
-            b._sp = MenuUi.Label(b.Root, "Skill Points", CMTokens.Mono, 17, CMTokens.WarmCream.Color, TextAnchor.MiddleRight,
+            b._sp = MenuUi.Label(b.Root, "Skill Points", CMTokens.Mono, UiScale.TypeMin, CMTokens.WarmCream.Color, TextAnchor.MiddleRight,
                 92f, 0f, w - 92f, 30f, "", 2f);
             return b;
         }
@@ -241,31 +241,31 @@ namespace CriticalMass.Runtime.Menu
             Transform t = transform;
             Color cream = CMTokens.WarmCream.Color, brass = CMTokens.ToolBrass.Color, stone = CMTokens.Stone.Color;
             MenuUi.Panel(t, "Panel", 0f, 0f, Width, PanelHeight);
-            MenuUi.Label(t, "Title", CMTokens.Display, 34, cream, TextAnchor.MiddleLeft, 32f, 20f, 400f, 46f, ProgressionWords.Rewards, 3f);
-            _outcome = MenuUi.Label(t, "Outcome", CMTokens.Display, 30, brass, TextAnchor.MiddleRight, Width - 352f, 20f, 320f, 46f, "", 3f);
+            MenuUi.Fit(MenuUi.Label(t, "Title", CMTokens.Display, UiScale.TypeLead, cream, TextAnchor.MiddleLeft, 32f, 20f, 400f, 46f, ProgressionWords.Rewards, 3f), 34);
+            _outcome = MenuUi.Label(t, "Outcome", CMTokens.Display, UiScale.TypeHeading, brass, TextAnchor.MiddleRight, Width - 352f, 20f, 320f, 46f, "", 3f);
             _bar = LevelBar.Build(t, "Level Bar", 32f, 80f, Width - 64f);
-            _levelUp = MenuUi.Label(t, "Level Up", CMTokens.Display, 22, brass, TextAnchor.MiddleLeft, 32f, 164f, 260f, 30f, "", 2f);
-            _unlock = MenuUi.Label(t, "Unlock", CMTokens.Ui, 18, cream, TextAnchor.MiddleLeft, 250f, 164f, Width - 282f, 30f, "", 2f);
-            MenuUi.Label(t, "Head Coins", CMTokens.Ui, 16, stone, TextAnchor.MiddleRight, 480f, 204f, 110f, 26f, ProgressionWords.Coins, 0f);
-            MenuUi.Label(t, "Head SP", CMTokens.Ui, 16, stone, TextAnchor.MiddleRight, 600f, 204f, 128f, 26f, ProgressionWords.Sp, 0f);
+            _levelUp = MenuUi.Label(t, "Level Up", CMTokens.Display, UiScale.TypeBody, brass, TextAnchor.MiddleLeft, 32f, 164f, 260f, 30f, "", 2f);
+            _unlock = MenuUi.Label(t, "Unlock", CMTokens.Ui, UiScale.TypeSmall, cream, TextAnchor.MiddleLeft, 250f, 164f, Width - 282f, 30f, "", 2f);
+            MenuUi.Label(t, "Head Coins", CMTokens.Ui, UiScale.TypeMin, stone, TextAnchor.MiddleRight, 480f, 204f, 110f, 26f, ProgressionWords.Coins, 0f);
+            MenuUi.Label(t, "Head SP", CMTokens.Ui, UiScale.TypeMin, stone, TextAnchor.MiddleRight, 600f, 204f, 128f, 26f, ProgressionWords.Sp, 0f);
             for (int i = 0; i < MaxRows; i++)
             {
                 RectTransform row = MenuUi.Rt(t, "Row " + i);
                 MenuUi.Place(row, 0f, 234f + i * 34f, Width, 34f);
                 _rows[i] = row.gameObject.AddComponent<CanvasGroup>();
                 _rows[i].alpha = 0f;
-                _cells[i, 0] = MenuUi.Label(row, "Label", CMTokens.Ui, 20, cream, TextAnchor.MiddleLeft, 32f, 0f, 330f, 34f, "", 2f);
-                _cells[i, 1] = MenuUi.Label(row, "Count", CMTokens.Mono, 18, stone, TextAnchor.MiddleRight, 340f, 0f, 120f, 34f, "", 0f);
-                _cells[i, 2] = MenuUi.Label(row, "Coins", CMTokens.Mono, 20, cream, TextAnchor.MiddleRight, 480f, 0f, 110f, 34f, "", 2f);
-                _cells[i, 3] = MenuUi.Label(row, "SP", CMTokens.Mono, 20, cream, TextAnchor.MiddleRight, 600f, 0f, 128f, 34f, "", 2f);
+                _cells[i, 0] = MenuUi.Label(row, "Label", CMTokens.Ui, UiScale.TypeSmall, cream, TextAnchor.MiddleLeft, 32f, 0f, 330f, 34f, "", 2f);
+                _cells[i, 1] = MenuUi.Label(row, "Count", CMTokens.Mono, UiScale.TypeSmall, stone, TextAnchor.MiddleRight, 340f, 0f, 120f, 34f, "", 0f);
+                _cells[i, 2] = MenuUi.Label(row, "Coins", CMTokens.Mono, UiScale.TypeSmall, cream, TextAnchor.MiddleRight, 480f, 0f, 110f, 34f, "", 2f);
+                _cells[i, 3] = MenuUi.Label(row, "SP", CMTokens.Mono, UiScale.TypeSmall, cream, TextAnchor.MiddleRight, 600f, 0f, 128f, 34f, "", 2f);
             }
             VectorShape rule = MenuUi.Shape(t, "Rule", ShapeKind.RoundRect, 32f, 544f, Width - 64f, 3f, stone, 0f);
             rule.OutlinePx = 0f;
             rule.RimPx = 0f;
-            MenuUi.Label(t, "Total", CMTokens.Display, 22, cream, TextAnchor.MiddleLeft, 32f, 552f, 200f, 40f, "TOTAL", 2f);
+            MenuUi.Label(t, "Total", CMTokens.Display, UiScale.TypeBody, cream, TextAnchor.MiddleLeft, 32f, 552f, 200f, 40f, "TOTAL", 2f);
             ProgressionUi.Coin(t, "Total Coin", 440f, 558f, 28f);
-            _totalCoins = MenuUi.Label(t, "Total Coins", CMTokens.Mono, 24, brass, TextAnchor.MiddleRight, 470f, 552f, 120f, 40f, "", 2f);
-            _totalSp = MenuUi.Label(t, "Total SP", CMTokens.Mono, 24, brass, TextAnchor.MiddleRight, 600f, 552f, 128f, 40f, "", 2f);
+            _totalCoins = MenuUi.Label(t, "Total Coins", CMTokens.Mono, UiScale.TypeBody, brass, TextAnchor.MiddleRight, 470f, 552f, 120f, 40f, "", 2f);
+            _totalSp = MenuUi.Label(t, "Total SP", CMTokens.Mono, UiScale.TypeBody, brass, TextAnchor.MiddleRight, 600f, 552f, 128f, 40f, "", 2f);
         }
 
         /// <summary>Shows a match's rewards and starts the fill (view time, unscaled).</summary>
@@ -437,7 +437,7 @@ namespace CriticalMass.Runtime.Menu
             float w = 236f, gap = 26f, x0 = (HudLayout.RefW - (3 * w + 2 * gap)) * 0.5f;
             for (int i = 0; i < labels.Length; i++)
             {
-                MenuItem it = MenuUi.Item(space, labels[i], x0 + i * (w + gap), 770f, w, 76f, labels[i], MenuItem.Kind.Button, 26, true,
+                MenuItem it = MenuUi.Item(space, labels[i], x0 + i * (w + gap), 770f, w, 76f, labels[i], MenuItem.Kind.Button, UiScale.TypeButton, true,
                     CMTokens.Display);
                 it.Body.Radius = 16f;
                 it.Submitted = acts[i];

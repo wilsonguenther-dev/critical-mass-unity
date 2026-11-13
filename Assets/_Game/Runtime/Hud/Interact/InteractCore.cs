@@ -101,6 +101,13 @@ namespace CriticalMass.Runtime.Hud.Interact
             }
         }
 
+        /// <summary>
+        /// Pressed this frame by a device that owns this key in context k (2026-11-12): while spectating the controller
+        /// d-pad belongs to the spectator's objective jumps, so only the keyboard press counts (InputContext).
+        /// </summary>
+        public bool WasPressedIn(CriticalMass.Runtime.Input.InputContextKind k) =>
+            WasPressed && (CriticalMass.Runtime.Input.InputContext.HudOwnsDpad(k) || !WasPressedOnGamepad);
+
         /// <summary>Pressed this frame on a controller (the HUD focus is a toggle on controller).</summary>
         public bool WasPressedOnGamepad
         {
@@ -291,6 +298,15 @@ namespace CriticalMass.Runtime.Hud.Interact
             if (f != null && f.crimson != null && f.crimson.Length > 0) _crimson = f.crimson;
             _numbered = new string[64];
             for (int i = 0; i < _numbered.Length; i++) _numbered[i] = (i + 1).ToString(CultureInfo.InvariantCulture);
+        }
+
+        /// <summary>The name a team slot gets in the match (the home lobby's ready screen lists rosters before the world exists).</summary>
+        public static string ForSlot(TeamId team, int slot)
+        {
+            Init();
+            string[] list = team == TeamId.Crimson ? _crimson : _azure;
+            if (slot >= 0 && slot < list.Length) return list[slot];
+            return slot >= 0 && slot < _numbered.Length ? _numbered[slot] : "-";
         }
 
         /// <summary>The unit's name ("YOU" for the local player).</summary>

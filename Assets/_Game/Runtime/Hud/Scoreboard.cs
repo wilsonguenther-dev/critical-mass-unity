@@ -88,16 +88,16 @@ namespace CriticalMass.Runtime.Hud
             var tb = new Table();
             tb.Rt = MenuUi.Rt(_board, team + " Table");
             MenuUi.Place(tb.Rt, x, 0f, TableW, Height(MaxRows));
-            Color tc = CMTokens.Team(team);
+            Color tc = CMTokens.TeamInk(team);   // polish pass 1: text ink (4.5 : 1 on the panel)
             tb.Crest = HudIcon.Make(tb.Rt, "Crest", 8f, 18f, 44f, 44f);
             tb.Crest.Set(UiIcons.Crest[(int)team], _tier);
-            tb.Name = MenuUi.Label(tb.Rt, "Team", CMTokens.Display, 34, tc, TextAnchor.MiddleLeft, 62f, 18f, 360f, 44f,
-                team == TeamId.Azure ? "AZURE" : "CRIMSON", 3f);
-            MenuUi.Label(tb.Rt, "Total Label", CMTokens.Ui, 17, CMTokens.WithAlpha(CMTokens.WarmCream.Color, 0.8f), TextAnchor.MiddleRight,
+            tb.Name = MenuUi.Fit(MenuUi.Label(tb.Rt, "Team", CMTokens.Display, UiScale.TypeLead, tc, TextAnchor.MiddleLeft, 62f, 18f, 360f, 44f,
+                team == TeamId.Azure ? "AZURE" : "CRIMSON", 3f), 34);
+            MenuUi.Label(tb.Rt, "Total Label", CMTokens.Ui, UiScale.TypeMin, CMTokens.WithAlpha(CMTokens.WarmCream.Color, 0.8f), TextAnchor.MiddleRight,
                 420f, 18f, 240f, 44f, "HILL SECONDS", 2f);
-            tb.Total = MenuUi.Label(tb.Rt, "Total", CMTokens.Mono, 30, tc, TextAnchor.MiddleRight, 670f, 18f, 100f, 44f, "", 3f);
+            tb.Total = MenuUi.Label(tb.Rt, "Total", CMTokens.Mono, UiScale.TypeHeading, tc, TextAnchor.MiddleRight, 670f, 18f, 100f, 44f, "", 3f);
             for (int c = 0; c < Columns; c++)
-                MenuUi.Label(tb.Rt, "Heading " + c, CMTokens.Ui, 17, CMTokens.WithAlpha(CMTokens.WarmCream.Color, 0.8f),
+                MenuUi.Label(tb.Rt, "Heading " + c, CMTokens.Ui, UiScale.TypeMin, CMTokens.WithAlpha(CMTokens.WarmCream.Color, 0.8f),
                     c == 0 ? TextAnchor.MiddleLeft : TextAnchor.MiddleCenter, ColX[c], 82f, ColW[c], 30f, Headings[c], 2f);
             for (int r = 0; r < MaxRows; r++)
             {

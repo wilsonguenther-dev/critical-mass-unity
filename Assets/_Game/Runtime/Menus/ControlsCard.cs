@@ -345,11 +345,11 @@ namespace CriticalMass.Runtime.Menus
 
             const float w = 1240f, h = 640f, x = (1920f - w) * 0.5f, y = 150f;
             Card = ControlsCard.Build(_space, x, y, w, h);
-            _back = MenuUi.Item(_space, "Back", (1920f - 320f) * 0.5f, y + h + 30f, 320f, 72f, "BACK", MenuItem.Kind.Button, 32, true, CMTokens.Display);
+            _back = MenuUi.Item(_space, "Back", (1920f - 320f) * 0.5f, y + h + 30f, 320f, 72f, "BACK", MenuItem.Kind.Button, UiScale.TypeHeading, true, CMTokens.Display);
             _back.Body.Radius = 16f;
             _back.Submitted = Close;
             _back.navigation = new Navigation { mode = Navigation.Mode.None };
-            _hint = MenuUi.Label(_space, "Hint", CMTokens.Ui, 20, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 260f, 1020f, 1400f, 36f, "", 2f);
+            _hint = MenuUi.Label(_space, "Hint", CMTokens.Ui, UiScale.TypeSmall, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 260f, 1020f, 1400f, 36f, "", 2f);
             _timer = MenuUi.Shape(_space, "Timer", ShapeKind.RoundRect, x + 32f, y + h - 10f, w - 64f, 6f, CMTokens.ToolBrass.Color, -1f);
             _timer.EmptyColor = CMTokens.WithAlpha(CMTokens.MeterEmpty.Color, 0.8f);
             _timer.OutlinePx = 0f;

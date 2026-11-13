@@ -928,14 +928,14 @@ namespace CriticalMass.Runtime.View.Moments
             _plateShape.Radius = 30f;
             _plate = Raw(_titleRt, "Plate", null, Color.white);
             Stretch(_plate.rectTransform);
-            _title = HudText.Make(_titleRt, "Title Text", CMTokens.Display, 96, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 5f);
+            _title = CriticalMass.Runtime.Menu.MenuUi.Fit(HudText.Make(_titleRt, "Title Text", CMTokens.Display, UiScale.TypeHero, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 5f), 96);
             Centre(_title.rectTransform, new Vector2(0f, 14f), new Vector2(TitleW * 0.8f, 120f));
             _title.resizeTextForBestFit = true;
             _title.resizeTextMinSize = 40;
             _title.resizeTextMaxSize = 96;
             _title.horizontalOverflow = HorizontalWrapMode.Wrap;
             _title.verticalOverflow = VerticalWrapMode.Truncate;
-            _subtitle = HudText.Make(_titleRt, "Subtitle", CMTokens.Ui, 34, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 3f);
+            _subtitle = CriticalMass.Runtime.Menu.MenuUi.Fit(HudText.Make(_titleRt, "Subtitle", CMTokens.Ui, UiScale.TypeLead, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 3f), 34);
             Centre(_subtitle.rectTransform, new Vector2(0f, -72f), new Vector2(TitleW * 0.8f, 44f));
 
             _flash = Raw(_root, "Flash", null, Color.white);
@@ -958,9 +958,9 @@ namespace CriticalMass.Runtime.View.Moments
             _stingerIcon.rectTransform.pivot = new Vector2(0f, 0.5f);
             _stingerIcon.rectTransform.sizeDelta = new Vector2(104f, 104f);
             _stingerIcon.rectTransform.anchoredPosition = new Vector2(24f, 0f);
-            _stingerTitle = HudText.Make(_stinger, "Stinger Title", CMTokens.Display, 46, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft, 4f);
+            _stingerTitle = CriticalMass.Runtime.Menu.MenuUi.Fit(HudText.Make(_stinger, "Stinger Title", CMTokens.Display, UiScale.TypeDisplay, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft, 4f), 46);
             Place(_stingerTitle.rectTransform, new Vector2(140f, 14f), new Vector2(StingerW - 170f, 56f));
-            _stingerSub = HudText.Make(_stinger, "Stinger Sub", CMTokens.Ui, 24, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft, 2.5f);
+            _stingerSub = HudText.Make(_stinger, "Stinger Sub", CMTokens.Ui, UiScale.TypeBody, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft, 2.5f);
             Place(_stingerSub.rectTransform, new Vector2(140f, -34f), new Vector2(StingerW - 170f, 30f));
             _stinger.gameObject.SetActive(false);
 

@@ -100,7 +100,8 @@ namespace CriticalMass.Runtime.Flow
         /// <summary>The menu's own lines; ids without a screen show as coming soon until an item registers one.</summary>
         public static MenuEntry[] Defaults() => new[]
         {
-            new MenuEntry { Id = Play, Label = "PLAY", Order = 10, Builtin = true },
+            new MenuEntry { Id = PlayNow, Label = Flow.PlayNow.Label, Order = 5, Builtin = true },
+            new MenuEntry { Id = Play, Label = "CUSTOM MATCH", Order = 10, Builtin = true },
             new MenuEntry { Id = HowTo, Label = "HOW TO PLAY", Order = 20, Builtin = TutorialStart() != null },
             new MenuEntry { Id = Barracks, Label = "BARRACKS", Order = 30 },
             new MenuEntry { Id = Controls, Label = "CONTROLS", Order = 35, Builtin = true },
@@ -112,6 +113,8 @@ namespace CriticalMass.Runtime.Flow
         };
 
         public const string Controls = "controls";
+        /// <summary>The first line: one press into a match with the last class and settings (Flow.PlayNow).</summary>
+        public const string PlayNow = "playnow";
         /// <summary>Integration batch 2: watch a match (match setup opens on SPECTATE).</summary>
         public const string Spectate = "spectate";
 

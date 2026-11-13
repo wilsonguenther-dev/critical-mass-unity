@@ -357,24 +357,24 @@ namespace CriticalMass.Runtime.Menus
             space.pivot = new Vector2(0.5f, 0.5f);
             space.sizeDelta = new Vector2(HudLayout.RefW, HudLayout.RefH);
 
-            MenuUi.Label(space, "Title", CMTokens.Display, 64, Cream, TextAnchor.MiddleCenter, 460f, 56f, 1000f, 90f, "CREDITS", 4f);
+            MenuUi.Label(space, "Title", CMTokens.Display, UiScale.TypeTitle, Cream, TextAnchor.MiddleCenter, 460f, 56f, 1000f, 90f, "CREDITS", 4f);
 
             RectTransform team = Column(space, 0, "TEAM");
             RectTransform tools = Column(space, 1, "MADE WITH");
             _soundCol = Column(space, 2, "SOUND");
 
             // Team: the creator large, then each member's first name and role.
-            MenuUi.Label(team, "Creator Role", CMTokens.Ui, 22, Brass, TextAnchor.MiddleLeft, 36f, 96f, ColW - 72f, 30f,
+            MenuUi.Label(team, "Creator Role", CMTokens.Ui, UiScale.TypeBody, Brass, TextAnchor.MiddleLeft, 36f, 96f, ColW - 72f, 30f,
                 CreditsContent.Creator.Role.ToUpperInvariant(), 2f);
-            MenuUi.Label(team, "Creator", CMTokens.Display, 52, Cream, TextAnchor.MiddleLeft, 36f, 128f, ColW - 72f, 70f,
+            MenuUi.Label(team, "Creator", CMTokens.Display, UiScale.TypeDisplay, Cream, TextAnchor.MiddleLeft, 36f, 128f, ColW - 72f, 70f,
                 CreditsContent.Creator.Name.ToUpperInvariant(), CMTokens.OutlinePx);
             for (int i = 0; i < CreditsContent.Team.Length; i++)
             {
                 float y = 236f + i * 112f;
                 CreditLine c = CreditsContent.Team[i];
-                MenuUi.Label(team, "Name " + i, CMTokens.Display, 32, Cream, TextAnchor.MiddleLeft, 36f, y, ColW - 72f, 44f,
+                MenuUi.Label(team, "Name " + i, CMTokens.Display, UiScale.TypeHeading, Cream, TextAnchor.MiddleLeft, 36f, y, ColW - 72f, 44f,
                     c.Name.ToUpperInvariant(), CMTokens.OutlinePx);
-                Text role = MenuUi.Label(team, "Role " + i, CMTokens.Ui, 22, CMTokens.WithAlpha(Cream, 0.85f), TextAnchor.UpperLeft,
+                Text role = MenuUi.Label(team, "Role " + i, CMTokens.Ui, UiScale.TypeBody, CMTokens.WithAlpha(Cream, 0.85f), TextAnchor.UpperLeft,
                     36f, y + 46f, ColW - 72f, 56f, c.Role, 2f);
                 role.horizontalOverflow = HorizontalWrapMode.Wrap;
             }
@@ -384,7 +384,7 @@ namespace CriticalMass.Runtime.Menus
             {
                 float y = 104f + i * 116f;
                 MenuUi.Shape(tools, "Dot " + i, ShapeKind.Diamond, 36f, y + 8f, 18f, 18f, Brass).RimPx = 0f;
-                Text t = MenuUi.Label(tools, "Tool " + i, CMTokens.Ui, 24, Cream, TextAnchor.UpperLeft, 68f, y, ColW - 104f, 104f,
+                Text t = MenuUi.Label(tools, "Tool " + i, CMTokens.Ui, UiScale.TypeBody, Cream, TextAnchor.UpperLeft, 68f, y, ColW - 104f, 104f,
                     CreditsContent.Tools[i], 2f);
                 t.horizontalOverflow = HorizontalWrapMode.Wrap;
             }
@@ -392,16 +392,16 @@ namespace CriticalMass.Runtime.Menus
             float gagY = 104f + CreditsContent.Tools.Length * 116f + 8f;
             if (gagY + 200f <= ColH) CriticalMass.Runtime.Secrets.CreditsGag.Build(tools, 36f, gagY, ColW - 72f);
 
-            Text intro = MenuUi.Label(_soundCol, "Sound Intro", CMTokens.Ui, 20, CMTokens.WithAlpha(Cream, 0.85f), TextAnchor.UpperLeft,
+            Text intro = MenuUi.Label(_soundCol, "Sound Intro", CMTokens.Ui, UiScale.TypeSmall, CMTokens.WithAlpha(Cream, 0.85f), TextAnchor.UpperLeft,
                 36f, 96f, ColW - 72f, 60f, CreditsContent.SoundIntro, 2f);
             intro.horizontalOverflow = HorizontalWrapMode.Wrap;
 
-            _back = MenuUi.Item(space, "Back", 760f, 924f, 400f, 80f, "BACK", MenuItem.Kind.Button, 34, true, CMTokens.Display);
+            _back = MenuUi.Item(space, "Back", 760f, 924f, 400f, 80f, "BACK", MenuItem.Kind.Button, UiScale.TypeLead, true, CMTokens.Display);
             _back.Body.Radius = 16f;
             _back.Submitted = Hide;
             var nav = new Navigation { mode = Navigation.Mode.None };
             _back.navigation = nav;
-            _hint = MenuUi.Label(space, "Hint", CMTokens.Ui, 20, Cream, TextAnchor.MiddleCenter, 260f, 1024f, 1400f, 36f, "", 2f);
+            _hint = MenuUi.Label(space, "Hint", CMTokens.Ui, UiScale.TypeSmall, Cream, TextAnchor.MiddleCenter, 260f, 1024f, 1400f, 36f, "", 2f);
 
             Canvas.enabled = false;
             UpdateScale();
@@ -412,7 +412,7 @@ namespace CriticalMass.Runtime.Menus
             float x = ColX0 + i * (ColW + ColGap);
             VectorShape panel = MenuUi.Panel(space, heading + " Panel", x, ColY, ColW, ColH);
             RectTransform col = panel.rectTransform;
-            MenuUi.Label(col, "Heading", CMTokens.Display, 30, Brass, TextAnchor.MiddleLeft, 36f, 28f, ColW - 72f, 48f, heading,
+            MenuUi.Label(col, "Heading", CMTokens.Display, UiScale.TypeHeading, Brass, TextAnchor.MiddleLeft, 36f, 28f, ColW - 72f, 48f, heading,
                 CMTokens.OutlinePx);
             return col;
         }
@@ -425,7 +425,7 @@ namespace CriticalMass.Runtime.Menus
             Packs = CreditsContent.ParseSoundCredits(CreditsContent.ReadSoundCredits());
             if (Packs.Count == 0)
             {
-                Text none = MenuUi.Label(_soundCol, "No Sound", CMTokens.Ui, 22, Cream, TextAnchor.UpperLeft, 36f, 176f, ColW - 72f, 60f,
+                Text none = MenuUi.Label(_soundCol, "No Sound", CMTokens.Ui, UiScale.TypeBody, Cream, TextAnchor.UpperLeft, 36f, 176f, ColW - 72f, 60f,
                     CreditsContent.NoSound, 2f);
                 none.horizontalOverflow = HorizontalWrapMode.Wrap;
                 _soundRows.Add(none.gameObject);
@@ -439,12 +439,12 @@ namespace CriticalMass.Runtime.Menus
                 RectTransform row = MenuUi.Rt(_soundCol, "Pack " + i);
                 MenuUi.Place(row, 36f, y, ColW - 72f, 84f);
                 _soundRows.Add(row.gameObject);
-                MenuUi.Label(row, "Name", CMTokens.Display, 22, Cream, TextAnchor.MiddleLeft, 0f, 0f, ColW - 72f, 30f,
+                MenuUi.Label(row, "Name", CMTokens.Display, UiScale.TypeBody, Cream, TextAnchor.MiddleLeft, 0f, 0f, ColW - 72f, 30f,
                     p.Name.ToUpperInvariant(), 2f);
-                MenuUi.Label(row, "Detail", CMTokens.Ui, 20, Brass, TextAnchor.MiddleLeft, 0f, 30f, ColW - 72f, 26f,
+                MenuUi.Label(row, "Detail", CMTokens.Ui, UiScale.TypeSmall, Brass, TextAnchor.MiddleLeft, 0f, 30f, ColW - 72f, 26f,
                     CreditsContent.PackDetail(p), 2f);
                 if (!string.IsNullOrEmpty(p.Page))
-                    MenuUi.Label(row, "Page", CMTokens.Mono, 16, CMTokens.WithAlpha(Cream, 0.8f), TextAnchor.MiddleLeft, 0f, 56f,
+                    MenuUi.Label(row, "Page", CMTokens.Mono, UiScale.TypeMin, CMTokens.WithAlpha(Cream, 0.8f), TextAnchor.MiddleLeft, 0f, 56f,
                         ColW - 72f, 24f, p.Page, 0f);
             }
         }

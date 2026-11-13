@@ -21,7 +21,7 @@ namespace CriticalMass.Runtime.Camera
         public const float FadeSeconds = 0.2f;
 
         // Words: built-in fallbacks (the words pack has no line for this hint yet).
-        public const string WordHold = "HOLD", WordClick = "CLICK", WordTail = "TO LOOK AROUND", KeyMouse = "MIDDLE CLICK", KeyPad = "RS";
+        public const string WordHold = "HOLD", WordClick = "CLICK", WordTail = "TO LOOK AROUND", KeyMouse = "MIDDLE CLICK", KeyPad = "RIGHT STICK";
 
         public SimDriverBehaviour Driver;
 
@@ -82,7 +82,7 @@ namespace CriticalMass.Runtime.Camera
             bg.FillColor = CMTokens.PanelNavy.Color;
             bg.raycastTarget = false;
 
-            _verb = HudText.Make(prt, "Verb", CMTokens.Ui, 22, CMTokens.WarmCream.Color, TextAnchor.MiddleRight, 2f);
+            _verb = HudText.Make(prt, "Verb", CMTokens.Ui, UiScale.TypeBody, CMTokens.WarmCream.Color, TextAnchor.MiddleRight, 2f);
             Place(_verb.rectTransform, -182f, 0f, 120f, 40f);
             var chip = new GameObject("Key Chip", typeof(RectTransform));
             chip.layer = 5;
@@ -94,9 +94,9 @@ namespace CriticalMass.Runtime.Camera
             cs.Radius = 8f;
             cs.FillColor = CMTokens.ToolBrass.Color;
             cs.raycastTarget = false;
-            _key = HudText.Make(crt, "Key", CMTokens.Mono, 20, CMTokens.VoidNavy.Color, TextAnchor.MiddleCenter, 0f);
+            _key = HudText.Make(crt, "Key", CMTokens.Mono, UiScale.TypeSmall, CMTokens.VoidNavy.Color, TextAnchor.MiddleCenter, 0f);
             Place(_key.rectTransform, 0f, 0f, 76f, 38f);
-            _tail = HudText.Make(prt, "Tail", CMTokens.Ui, 22, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft, 2f);
+            _tail = HudText.Make(prt, "Tail", CMTokens.Ui, UiScale.TypeBody, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft, 2f);
             Place(_tail.rectTransform, 92f, 0f, 260f, 40f);
             HudText.Set(_tail, WordTail);
         }

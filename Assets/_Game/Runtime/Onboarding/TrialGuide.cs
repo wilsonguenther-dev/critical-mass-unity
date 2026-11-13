@@ -266,7 +266,7 @@ namespace CriticalMass.Runtime.Onboarding
             VectorShape arrow = MakeShape(_edgeArrow, "Arrow", ShapeKind.TriangleRight, 22f, 26f, CMTokens.Biomass.Color);
             arrow.RimPx = 0f;
             arrow.rectTransform.anchoredPosition = new Vector2(38f, 0f);
-            _edgeDist = HudText.Make(_edge, "Distance", CMTokens.Mono, 22, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 2.5f);
+            _edgeDist = HudText.Make(_edge, "Distance", CMTokens.Mono, UiScale.TypeBody, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 2.5f);
             RectTransform dr = _edgeDist.rectTransform;
             dr.anchorMin = dr.anchorMax = new Vector2(0.5f, 0.5f);
             dr.pivot = new Vector2(0.5f, 0.5f);

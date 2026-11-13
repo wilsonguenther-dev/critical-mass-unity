@@ -5,6 +5,7 @@ using CriticalMass.Runtime.Hud.Style;
 using CriticalMass.Runtime.Menu;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 namespace CriticalMass.Runtime.Onboarding
@@ -13,7 +14,8 @@ namespace CriticalMass.Runtime.Onboarding
     /// The first-launch question, "First time? 3-minute guided match", with the mascot asking it from its corner. Two
     /// sticker buttons with one shared focus for keyboard (arrows, Enter), mouse (hover, click) and controller (stick or
     /// D-pad, A). The match behind it stands still while it is open (the driver's TimeScale is 0; restored on skip).
-    /// Either answer sets the done flag, so the next launch goes straight to the menu.
+    /// Either answer sets the done flag, so the next launch goes straight to the menu. Escape or B skips in one press. When
+    /// the title's PLAY NOW raised it (Flow.PlayNow.OfferThenPlay), Skip drops straight into that match instead of the menu.
     /// </summary>
     public sealed class TrialOffer : MonoBehaviour
     {
@@ -71,14 +73,15 @@ namespace CriticalMass.Runtime.Onboarding
 
             _card = MenuUi.Rt(space, "Card");
             MenuUi.Stretch(_card);
-            MenuUi.Panel(_card, "Panel", 610f, 290f, 700f, 400f);
-            MenuUi.Label(_card, "Title", CMTokens.Display, 56, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 610f, 320f, 700f, 80f,
+            // 2026-11-12: a bigger card (batch 1 called it a tiny modal); Escape or B answers Skip.
+            MenuUi.Panel(_card, "Panel", 540f, 260f, 840f, 460f);
+            MenuUi.Label(_card, "Title", CMTokens.Display, UiScale.TypeDisplay, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 540f, 292f, 840f, 84f,
                 MascotLines.Resolve(TrialText.OfferTitle), 4f);
-            MenuUi.Label(_card, "Sub", CMTokens.Ui, 24, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 610f, 400f, 700f, 40f,
+            MenuUi.Label(_card, "Sub", CMTokens.Ui, UiScale.TypeBody, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 580f, 380f, 760f, 44f,
                 MascotLines.Resolve(TrialText.OfferSub), 2f);
-            _play = MenuUi.Item(_card, "Play", 670f, 470f, 580f, 72f, MascotLines.Resolve(TrialText.OfferPlay), MenuItem.Kind.Button, 28,
+            _play = MenuUi.Item(_card, "Play", 600f, 456f, 720f, 80f, MascotLines.Resolve(TrialText.OfferPlay), MenuItem.Kind.Button, UiScale.TypeButton,
                 true, CMTokens.Display);
-            _skip = MenuUi.Item(_card, "Skip", 670f, 560f, 580f, 64f, MascotLines.Resolve(TrialText.OfferSkip), MenuItem.Kind.Button, 22,
+            _skip = MenuUi.Item(_card, "Skip", 600f, 556f, 720f, 72f, MascotLines.Resolve(TrialText.OfferSkip), MenuItem.Kind.Button, UiScale.TypeButton,
                 true);
             _play.Submitted = OnPlay;
             _skip.Submitted = OnSkip;
@@ -125,21 +128,34 @@ namespace CriticalMass.Runtime.Onboarding
             // Keep a focus for the keyboard and controller if the mouse cleared it.
             EventSystem es = EventSystem.current;
             if (es != null && es.currentSelectedGameObject == null) es.SetSelectedGameObject(_play.gameObject);
+            // Every screen closes with Escape or B: here that is Skip (the player knows how to play).
+            UnityEngine.InputSystem.Keyboard kb = UnityEngine.InputSystem.Keyboard.current;
+            UnityEngine.InputSystem.Gamepad pad = UnityEngine.InputSystem.Gamepad.current;
+            if (Time.unscaledTime >= MenuItem.SubmitBlockedUntil &&
+                ((kb != null && kb.escapeKey.wasPressedThisFrame) || (pad != null && pad.buttonEast.wasPressedThisFrame)))
+                OnSkip();
         }
 
         void OnPlay()
         {
+            Flow.PlayNow.ConsumeOfferThenPlay();
             TrialProgress.Done = true;
             Close(false);
             Trial.StartFromMenu();   // from the menus: a fresh 5 v 5 match through the flow; in a match: in place
         }
 
+        bool _answered;
+
         void OnSkip()
         {
+            if (_answered) return;
+            _answered = true;
             TrialProgress.Done = true;
             Close(true);
             MascotGuide m = MascotGuide.Instance;
             if (m != null) m.Hide();
+            // Raised by the title's PLAY NOW: skipping drops straight into that match.
+            if (Flow.PlayNow.ConsumeOfferThenPlay() && Flow.PlayNow.Go()) return;
             // The first-time card stood in for the main menu (TrialBoot): bring the menu back.
             if (GameFlow.Enabled && GameFlow.State == FlowState.Menu && FlowDirector.Current != null) FlowDirector.Current.ShowMenu();
         }

@@ -605,7 +605,7 @@ namespace CriticalMass.Runtime.Audio
             _panel = MenuUi.Panel(_space, "Subtitle", (HudLayout.RefW - 600f) * 0.5f, SubtitleY, 600f, SubtitleH);
             _panel.OutlinePx = 3f;
             _panel.RimPx = 2f;
-            _text = MenuUi.Label(_panel.transform, "Line", CMTokens.Ui, 28, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter,
+            _text = MenuUi.Label(_panel.transform, "Line", CMTokens.Ui, UiScale.TypeButton, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter,
                 0f, 0f, 600f, SubtitleH, string.Empty, 2f);
             _canvas.enabled = false;
         }

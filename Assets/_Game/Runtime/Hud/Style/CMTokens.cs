@@ -69,6 +69,15 @@ namespace CriticalMass.Runtime.Hud.Style
         public static readonly Swatch MeterEmpty = new Swatch("Meter Empty", "#2E304A", "sampled p15 kaiju meter (U-021, pending Jeisil)");
         public static readonly Swatch PanelNavy = new Swatch("Panel Navy", "#1B314D", "sampled p15 team panel (U-021, pending Jeisil)");
 
+        // ---- text inks (polish pass 1): lighter steps of a bible colour for TEXT on Panel Navy / Void Navy, so every
+        // line reads at 4.5 : 1 or better (Crimson #FF5A5F is 4.32 on Panel Navy, Stone #6F7282 is 2.77). Fills, rims and
+        // the world keep the bible colours; only text uses these. UiContrast and PolishPassTests hold the ratios. ----
+        public static readonly Swatch CrimsonInk = new Swatch("Crimson Ink", "#FF7276", "polish pass 1: Crimson lifted to 4.97 : 1 on Panel Navy");
+        public static readonly Swatch StoneInk = new Swatch("Stone Ink", "#9A9DAE", "polish pass 1: Stone lifted to 4.90 : 1 on Panel Navy");
+
+        /// <summary>A team's colour for TEXT on the navy panels (Azure as is, Crimson lifted).</summary>
+        public static Color TeamInk(TeamId t) => t == TeamId.Azure ? Azure.Color : CrimsonInk.Color;
+
         /// <summary>Every token, bible first (order is the p05 order).</summary>
         public static readonly Swatch[] All =
         {

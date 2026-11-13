@@ -73,7 +73,8 @@ namespace CriticalMass.Runtime.Hud
         {
             MatchState m = w.Match;
             GameConfig c = w.Config;
-            s.ClockRemaining = Math.Max(0, c.MatchSeconds - m.Time);
+            // Timers read in real seconds at any match speed (Flow.MatchSpeed.DisplayPace; 1 in tests).
+            s.ClockRemaining = Math.Max(0, global::CriticalMass.Runtime.Flow.MatchSpeed.ToReal(c.MatchSeconds - m.Time));
             s.Ended = m.Phase == MatchPhase.Ended;
             s.Winner = m.Winner;
             s.ScoreAzure = (int)Math.Floor(m.HillSeconds.Azure);
@@ -87,7 +88,7 @@ namespace CriticalMass.Runtime.Hud
             Kaiju k = w.Kaiju;
             s.Kaiju = k.State;
             s.Hatched = m.Hatched;
-            s.UntilHatch = Math.Max(0, c.HatchSeconds - m.Time);
+            s.UntilHatch = Math.Max(0, global::CriticalMass.Runtime.Flow.MatchSpeed.ToReal(c.HatchSeconds - m.Time));
             if (!m.Hatched || k.State == KaijuState.Egg)
                 s.KaijuMeter01 = c.HatchSeconds > 0 ? Clamp01((float)(m.Time / c.HatchSeconds)) : 1f;
             else
@@ -112,7 +113,7 @@ namespace CriticalMass.Runtime.Hud
             s.AbilityCdSeconds = (float)Math.Max(0, a.AbilityCd);
             s.Carry = a.Carry;
             s.CarryAmount = a.CarryAmount;
-            s.RespawnIn = a.Alive ? 0 : Math.Max(0, a.RespawnIn);
+            s.RespawnIn = a.Alive ? 0 : Math.Max(0, global::CriticalMass.Runtime.Flow.MatchSpeed.ToReal(a.RespawnIn));
             s.PlayerX = (float)w.X[localId];
             s.PlayerZ = (float)w.Z[localId];
             s.Kills = a.Kills;
