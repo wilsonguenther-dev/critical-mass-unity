@@ -104,11 +104,12 @@ namespace CriticalMass.Sim.Tests
         }
 
         [Test]
-        public void DefaultIs16v16At2xPace()
+        public void DefaultIs16v16At1xPace()
         {
+            // Owner 2026-11-12: default pace 1x (was CM-66's 2x); 2x stays as the "Fast" match option.
             var c = GameConfig.CreateDefault();
             Assert.AreEqual(16, c.TeamSize);
-            Assert.AreEqual(2d, c.DefaultSpeed);
+            Assert.AreEqual(1d, c.DefaultSpeed);
         }
 
         [Test]

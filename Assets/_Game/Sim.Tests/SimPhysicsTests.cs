@@ -205,7 +205,14 @@ namespace CriticalMass.Sim.Tests
         public void DG68TheOnScreenTimingTableAtTheDefaultPaceMatchesTheCheckedInTable()
         {
             GameConfig c = GameConfig.CreateDefault();
-            World w = World.CreateWorld(new WorldOptions { Seed = 1, TeamSize = 16, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = c });
+            // Owner 2026-11-12: the default pace is 1x; 2x is the "Fast" match option (WorldOptions.Pace = 2).
+            World w1 = World.CreateWorld(new WorldOptions { Seed = 1, TeamSize = 16, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = c });
+            Assert.AreEqual(1, w1.Dur.Pace);
+            Assert.AreEqual(14, w1.Dur.KaijuClawWindup, "0.45 s at 1x");
+            Assert.AreEqual(36, w1.Dur.SlamTelegraph, "the 1.2 s sim telegraph already beats 0.8 s at 1x");
+            Assert.AreEqual(4, w1.Dur.AttackWindup[(int)ClassId.Warrior], "0.12 s at 1x");
+            Assert.AreEqual(3, w1.Dur.AttackWindup[(int)ClassId.Farmer], "0.10 s at 1x");
+            World w = World.CreateWorld(new WorldOptions { Seed = 1, TeamSize = 16, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = c, Pace = 2 });
             double pace = w.Dur.Pace;
             Assert.AreEqual(2, pace);
             // name, ticks, checked-in on-screen seconds at pace 2
@@ -228,7 +235,7 @@ namespace CriticalMass.Sim.Tests
             }
         }
 
-        // The checked-in on-screen seconds (pace 2) of the windows later items change.
+        // The checked-in on-screen seconds at the Fast pace (2x) of the windows later items change.
         private const double TableClaw = 0.45;
         private const double TableSlam = 0.8;
         private const double TableWarriorWindup = 0.12;
@@ -735,7 +742,9 @@ namespace CriticalMass.Sim.Tests
         {
             GameConfig c = GameConfig.CreateDefault();
             World w = World.CreateWorld(new WorldOptions { Seed = 1, TeamSize = 16, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = c });
-            Assert.GreaterOrEqual(Durations.OnScreen(c, w.Dur.SlamTelegraph, 2), 0.8 - 1e-9);
+            Assert.GreaterOrEqual(Durations.OnScreen(c, w.Dur.SlamTelegraph, w.Dur.Pace), 0.8 - 1e-9);
+            World fast = World.CreateWorld(new WorldOptions { Seed = 1, TeamSize = 16, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = c, Pace = 2 });
+            Assert.GreaterOrEqual(Durations.OnScreen(c, fast.Dur.SlamTelegraph, 2), 0.8 - 1e-9);
             Assert.AreEqual(36, Make().Dur.SlamTelegraph, "pace 1: the 1.2 s sim telegraph is already longer");
         }
         // ------------------------------------------------------------------ DG-86 the Kaiju is solid

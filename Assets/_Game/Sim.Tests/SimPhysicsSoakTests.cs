@@ -12,7 +12,7 @@ using NUnit.Framework;
 namespace CriticalMass.Sim.Tests
 {
     /// <summary>
-    /// Sim-physics lane soaks: 16v16 at the shipped pace (GameConfig.CreateDefault, pace 2), all six classes, at Easy, Normal and
+    /// Sim-physics lane soaks: 16v16 at the shipped pace (GameConfig.CreateDefault, pace 1 since the owner's 2026-11-12 call), all six classes, at Easy, Normal and
     /// Hard: no NaN, nobody inside solid ground or inside the Kaiju, no travelling bot stuck, pads reach the hill, bands hold;
     /// and the before (PhysicsConfig.Classic) / after balance table the PR quotes. Also new golden hashes for the new default.
     /// </summary>

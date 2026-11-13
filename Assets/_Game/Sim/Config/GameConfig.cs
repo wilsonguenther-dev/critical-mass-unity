@@ -14,8 +14,11 @@ namespace CriticalMass.Sim.Config
         public int[] TeamSizeOptions = { 5, 16 };
         /// <summary>Largest team size; sizes actor storage.</summary>
         public int TeamSizeMax = 16;
-        /// <summary>Initial match pace (driver time scale, sim ticks per wall second / SimHz); CM-66 default 2.</summary>
-        public double DefaultSpeed = 2;
+        /// <summary>
+        /// Initial match pace (driver time scale, sim ticks per wall second / SimHz). Owner 2026-11-12: 1 (was CM-66's 2);
+        /// 2 stays as the "Fast" match option: the driver's time scale AND WorldOptions.Pace must both be set from the choice.
+        /// </summary>
+        public double DefaultSpeed = 1;
 
         /// <summary>Match clock (sim seconds); hill time is the only win condition.</summary>
         public double MatchSeconds = 480;
@@ -85,12 +88,12 @@ namespace CriticalMass.Sim.Config
         /// <summary>The sim-physics lane (DG-67..DG-100): every rule and number in one block (PhysicsConfig.Classic = browser parity).</summary>
         public PhysicsConfig Physics = new PhysicsConfig();
 
-        /// <summary>The game's config: 16v16 at 2x pace (U-004), every other value the browser main value.</summary>
+        /// <summary>The game's config: 16v16 at 1x pace (owner 2026-11-12; 2x is the Fast option), every other value the browser main value.</summary>
         public static GameConfig CreateDefault()
         {
             var c = new GameConfig();
             c.TeamSize = 16;
-            c.DefaultSpeed = 2;
+            c.DefaultSpeed = 1;
             return c;
         }
 
