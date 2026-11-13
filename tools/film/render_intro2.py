@@ -1242,7 +1242,7 @@ PLATE_ALPHA = float(os.environ.get('FILM_PLATE', '0.62'))
 # C19 exposure bridge: across each hard cut the outgoing shot eases its exposure toward the incoming one over its last
 # 0.5 s and the incoming shot eases back to its own grade over 0.6 s, so the mean-luma step at the cut is 15 or less
 # (measured on the encoded film by check_film.py). (gain on the last frame before the cut, gain on the first frame after)
-CUT_GAIN = {19.50: (1.09, 0.93), 28.50: (0.62, 1.6), 32.25: (1.2, 0.83), 40.50: (1.17, 0.86)}
+CUT_GAIN = {19.50: (1.09, 0.93), 28.50: (0.62, 1.6), 32.25: (1.2, 0.83), 40.50: (1.24, 0.84)}
 
 
 def cut_gain(t):
