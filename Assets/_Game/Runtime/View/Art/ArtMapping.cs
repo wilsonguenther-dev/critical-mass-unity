@@ -300,7 +300,7 @@ namespace CriticalMass.Runtime.View.Art
                 Bones = 41, ClipSource = "Assets/_Game/Art/Characters/KayKit_Clips.fbx",
                 Meshes = new[] { "Miner_Hero", "Miner_LOD0", "Miner_LOD1", "Miner_Shadow" }, MaskCodes = new[] { 0, 6, 8 },
                 OutlinePx = CharacterHullPx, Rim = 0.6f, Authored = MinerAzure, Crimson = MinerCrimson, Height = 2.0f,
-                VertexColourFace = true, ArtYawDeg = 180f },   // HY (2026-11-13, rigging pass); pre-HY: FaceTexture MinerFace.png in slot 1 (Miner/_fallback~)
+                FaceTexture = "Assets/_Game/Art/Miner/MinerFace.png", FaceSlot = 1, ArtYawDeg = 180f },
             new ModelSpec { Key = Farmer, AssetPath = "Assets/_Game/Art/Farmer/Farmer.fbx", Kind = ArtKind.Character, Rigged = true,
                 Bones = 41, ClipSource = "Assets/_Game/Art/Characters/KayKit_Clips.fbx",
                 Meshes = new[] { "Farmer_Hero", "Farmer_LOD0", "Farmer_LOD1", "Farmer_Shadow" }, MaskCodes = new[] { 0, 2, 8 },
