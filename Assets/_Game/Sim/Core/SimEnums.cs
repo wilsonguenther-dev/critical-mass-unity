@@ -87,7 +87,11 @@ namespace CriticalMass.Sim.Core
         ToppleDown,
         /// <summary>DG-09 fall rule: a grounded actor lost the ground under its centre: A = actor, B = cell fallen into, (X, Z) = where it climbs out, Value = get-up seconds.</summary>
         Fall,
-        /// <summary>DG-16 (view request): an actor started a melee swing: A = attacker, B = -1, (X, Z) = the swing's reach point (attacker + facing x AttackRange), Value = facing (radians).</summary>
+        /// <summary>
+        /// DG-16 (view request), moved by DG-69 to the PRESS tick: an attack or ability press was accepted: A = attacker, B = kind
+        /// (Combat.KindAttack = -1 for a melee swing, else an ability Combat.Kind*), (X, Z) = the reach point (attacker + facing x
+        /// AttackRange), Value = locked facing (radians), Windup / Recovery = ticks (0 = the hit is this tick), DirX / DirZ = facing.
+        /// </summary>
         AttackStart,
         /// <summary>DG-16 (view request): a swing hurt the hatched Kaiju: A = attacker, B = -1, (X, Z) = the contact point on the Kaiju's hit radius toward the attacker, Value = damage dealt.</summary>
         KaijuDamaged,
@@ -134,6 +138,26 @@ namespace CriticalMass.Sim.Core
         HealLanded,
         /// <summary>DG-40: a Healer purified the egg: A = the Healer, B = team index (0 azure, 1 crimson), (X, Z) = the shrine, Value = instability removed, Radius = Healer.PurifyRange.</summary>
         Purify,
+        /// <summary>
+        /// DG-69: a swing reached its hit tick (press tick + Windup), even on a whiff (whoosh, trail, hit-stop key off it):
+        /// A = attacker, B = -1, (X, Z) = the reach point along the locked facing, Value = actors hit, DirX / DirZ = locked facing.
+        /// </summary>
+        AttackContact,
+        /// <summary>DG-70: a hit-stun during the wind-up cancelled a swing (no damage): A = actor, B = who stunned it (-2 Kaiju), (X, Z) = the actor.</summary>
+        AttackCancel,
+        /// <summary>DG-70: a victim was staggered: A = victim, B = source, (X, Z) = victim, Value = stun ticks, Tier = hit tier, Cause.</summary>
+        HitStun,
+        /// <summary>
+        /// DG-70: a body was pushed (melee knock, claw, slam, blast, crush): A = victim, B = source, (X, Z) = victim, DirX / DirZ =
+        /// push direction, Impulse = knock distance in u after mass and shield, Value = 0, Cause = what pushed it.
+        /// </summary>
+        Knock,
+        /// <summary>DG-86: the Kaiju's body shoved fighters this tick: A = -2, B = -1, (X, Z) = the Kaiju, Value = bodies shoved, Radius = body radius, DirX / DirZ = its heading, Impulse = largest shove (u).</summary>
+        BodyShove,
+        /// <summary>DG-99: a landing pillar crushed an actor: A = victim, B = decoration, (X, Z) = where it ends, DirX / DirZ = push out of the strip, Impulse = shove (u), Value = damage.</summary>
+        PillarCrush,
+        /// <summary>DG-100: a meat orb popped from a corpse: A = corpse actor, B = orb slot, (X, Z) = where it lands, DirX / DirZ = hop direction, Radius = hop length.</summary>
+        MeatPop,
         // ITEM CM-84: added by its owner (ClassSwitch, ports CM-54)
         /// <summary>CM-37: one tick of fountain healing (Heal.HealSystem): A = the healed actor, B = -1, (X, Z) = the actor, Value = HP restored this tick (&gt; 0).</summary>
         Heal,

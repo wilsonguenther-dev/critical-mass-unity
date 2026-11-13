@@ -159,6 +159,7 @@ namespace CriticalMass.Sim.Core
                 a.SlowTimer = 0;
                 a.LastAttacker = -1;
                 a.LastCause = DamageCause.None;
+                World.ClearSwing(a); // DG-69 / DG-70
                 a.LostCargo.Kind = CarryKind.None;
                 a.LostCargo.Amount = 0;
                 a.Moving = false;

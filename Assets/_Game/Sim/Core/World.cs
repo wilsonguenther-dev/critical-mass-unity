@@ -588,6 +588,18 @@ namespace CriticalMass.Sim.Core
             a.UnsupportedTicks = 0;
             a.LastCause = DamageCause.None;
             a.DeliverTicks = 0;
+            ClearSwing(a);
+        }
+
+        /// <summary>DG-69: no swing in flight (reset, respawn, death).</summary>
+        public static void ClearSwing(Actor a)
+        {
+            a.SwingTick = NeverTick;
+            a.SwingWindup = 0;
+            a.SwingRecovery = 0;
+            a.SwingFacing = 0;
+            a.SwingPending = false;
+            a.HitStunTicks = 0;
         }
 
         private static void ResetInput(InputFrame f)
@@ -775,6 +787,29 @@ namespace CriticalMass.Sim.Core
 
         /// <summary>DG-22: PushEvent with the effect radius (SimEvent.Radius) of a Demolitions event; every push writes it.</summary>
         public static void PushEvent(World w, SimEventType type, int a, int b, double x, double z, double value, BiomassType? bio, DamageCause cause, double radius)
+        {
+            PushEvent(w, type, a, b, x, z, value, bio, cause, radius, 0, 0, 0, 0, 0, 0);
+        }
+
+        /// <summary>
+        /// Sim-physics lane: PushEvent with the world-force fields (C1): push direction (0, 0 = radial), Impulse (the sim's
+        /// knock distance in u), Tier (0 light, 1 heavy, 2 critical), and the Windup / Recovery ticks of a timed action.
+        /// Every push writes every field, so a reused slot never keeps a stale value.
+        /// </summary>
+        public static void PushEvent(World w, SimEventType type, int a, int b, double x, double z, double value, BiomassType? bio, DamageCause cause, double radius,
+            double dirX, double dirZ, double impulse, int tier, int windup, int recovery)
+        {
+            SimEvent ev = w.Events[w.EventHead % EventCapacity];
+            ev.DirX = dirX;
+            ev.DirZ = dirZ;
+            ev.Impulse = impulse;
+            ev.Tier = tier;
+            ev.Windup = windup;
+            ev.Recovery = recovery;
+            PushCore(w, type, a, b, x, z, value, bio, cause, radius);
+        }
+
+        private static void PushCore(World w, SimEventType type, int a, int b, double x, double z, double value, BiomassType? bio, DamageCause cause, double radius)
         {
             SimEvent e = w.Events[w.EventHead % EventCapacity];
             e.Type = type;

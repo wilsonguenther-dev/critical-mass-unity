@@ -67,6 +67,9 @@ namespace CriticalMass.Sim.Core
                     double speed = baseSpeed;
                     if (a.SlowTimer > 0) speed *= cfg.Abilities.FarmerRoots.SlowMultiplier;
                     if (a.Cls == ClassId.Warrior && a.AbilityActive > 0) speed *= cfg.Abilities.WarriorShield.MoveSpeedMultiplier;
+                    // DG-69: slowed through the wind-up and the recovery (no skating swings).
+                    if (a.SwingWindup + a.SwingRecovery > 0 && w.Tick > a.SwingTick && w.Tick <= a.SwingTick + a.SwingWindup + a.SwingRecovery)
+                        speed *= cfg.Physics.SwingMoveMultiplier;
                     tx = mx * speed;
                     tz = mz * speed;
                 }

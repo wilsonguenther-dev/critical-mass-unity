@@ -97,6 +97,7 @@ namespace CriticalMass.Sim.Core
                 t.AbilityActive = 0;
                 t.SlowTimer = 0;
                 t.Moving = false;
+                if (Phys.On(w, true)) World.ClearSwing(t); // DG-69: a corpse has no swing in flight
                 World.PushEvent(w, SimEventType.Death, targetId, credit, tx, tz, dmg, null, cause);
             }
             return dmg;

@@ -40,28 +40,33 @@ namespace CriticalMass.Sim.Config
             {
                 MaxHp = 160, MoveSpeed = 3.8, Radius = 0.45, AttackDamage = 22, AttackRange = 1.7, AttackArcDeg = 120,
                 AttackCooldown = 0.7, AbilityCooldown = 10, GatherSeconds = 2, CarryCapacity = 1,
+                AttackWindupSeconds = 0.12, RecoverySeconds = 0.08,
             },
             new ClassConfig
             {
                 MaxHp = 100, MoveSpeed = 4.2, Radius = 0.4, AttackDamage = 12, AttackRange = 1.4, AttackArcDeg = 90,
                 AttackCooldown = 0.6, AbilityCooldown = 9, GatherSeconds = 1, CarryCapacity = 3,
+                AttackWindupSeconds = 0.10, RecoverySeconds = 0.08,
             },
             new ClassConfig
             {
                 MaxHp = 120, MoveSpeed = 4.0, Radius = 0.45, AttackDamage = 16, AttackRange = 1.5, AttackArcDeg = 90,
                 AttackCooldown = 0.65, AbilityCooldown = 12, GatherSeconds = 2, CarryCapacity = 1,
+                AttackWindupSeconds = 0.10, RecoverySeconds = 0.08,
             },
             // CM-38: the Demolitions Expert has no regular attack; the attack fields keep the CM-56 miner copy.
             new ClassConfig
             {
                 MaxHp = 120, MoveSpeed = 4.0, Radius = 0.45, AttackDamage = 16, AttackRange = 1.5, AttackArcDeg = 90,
                 AttackCooldown = 0.65, AbilityCooldown = 12, GatherSeconds = 2, CarryCapacity = 1,
+                AttackWindupSeconds = 0.10, RecoverySeconds = 0.08,
             },
             // CM-56 placeholder: the miner row until CM-39 tunes it. DG-24 keeps it (the mallet swing; Space builds, 12 s).
             new ClassConfig
             {
                 MaxHp = 120, MoveSpeed = 4.0, Radius = 0.45, AttackDamage = 16, AttackRange = 1.5, AttackArcDeg = 90,
                 AttackCooldown = 0.65, AbilityCooldown = 12, GatherSeconds = 2, CarryCapacity = 1,
+                AttackWindupSeconds = 0.10, RecoverySeconds = 0.08,
             },
             // DG-40 (U-061, not in the browser): the Healer. No weapon, no damage: her attack press is the MEND (Healer.cs);
             // AttackRange is how close bots keep to a fight (they stop there and press attack); AttackCooldown paces the mend.
@@ -69,6 +74,7 @@ namespace CriticalMass.Sim.Config
             {
                 MaxHp = 110, MoveSpeed = 4.1, Radius = 0.42, AttackDamage = 0, AttackRange = 4.5, AttackArcDeg = 90,
                 AttackCooldown = 0.8, AbilityCooldown = 9, GatherSeconds = 1.5, CarryCapacity = 2,
+                AttackWindupSeconds = 0, RecoverySeconds = 0, // the mend is instant
             },
         };
 
@@ -327,6 +333,11 @@ namespace CriticalMass.Sim.Config
         public double GatherSeconds;
         /// <summary>Max units carried.</summary>
         public double CarryCapacity;
+        // Sim-physics lane (appended; not in SameStats, which compares the ten browser fields).
+        /// <summary>DG-69 / OD-2: real seconds from the attack press to the hit (0 = the browser's press-tick hit).</summary>
+        public double AttackWindupSeconds;
+        /// <summary>DG-69: real seconds of slowed follow-through after the hit (the view's recovery; movement stays slowed).</summary>
+        public double RecoverySeconds;
 
         public ClassConfig Clone() => (ClassConfig)MemberwiseClone();
 

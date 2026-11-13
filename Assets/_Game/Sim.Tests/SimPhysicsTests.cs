@@ -222,8 +222,8 @@ namespace CriticalMass.Sim.Tests
         // The checked-in on-screen seconds (pace 2) of the windows later items change.
         private const double TableClaw = 0.183;
         private const double TableSlam = 0.6;
-        private const double TableWarriorWindup = 0;
-        private const double TableFarmerWindup = 0;
+        private const double TableWarriorWindup = 0.12;
+        private const double TableFarmerWindup = 0.10;
 
         [Test]
         public void DG68TicksAt30HzRescaleWithSimHzAndFloorsHoldAtAnyPace()
@@ -237,6 +237,138 @@ namespace CriticalMass.Sim.Tests
             Assert.AreEqual(14, Durations.Floor(c, 11, 0.45, 1));
             Assert.AreEqual(54, Durations.Floor(c, 11, 0.45, 4));
             Assert.AreEqual(40, Durations.Floor(c, 40, 0.45, 2), "a longer window is kept");
+        }
+        // ------------------------------------------------------------------ DG-69 attack wind-up
+
+        private static World Duel(out int windup, double pace = 0, Action<GameConfig> tweak = null)
+        {
+            World w = Make(c => { c.Physics.Knockback = false; tweak?.Invoke(c); }, pace: pace);
+            ParkOthers(w, 0, 5);
+            Place(w, 0, HillX - 0.75, HillZ);
+            Place(w, 5, HillX + 0.75, HillZ);
+            windup = w.Dur.AttackWindup[(int)ClassId.Warrior];
+            Idle(w);
+            Input(w, 5, HillX - 0.75, HillZ, false);
+            return w;
+        }
+
+        [Test]
+        public void DG69APressAtTDoesNoDamageUntilTPlusWThenFullDamage()
+        {
+            World w = Duel(out int windup);
+            Assert.AreEqual(4, windup, "0.12 s at pace 1 = 4 ticks");
+            double hp0 = w.Actors[5].Hp;
+            Input(w, 0, HillX + 0.75, HillZ, true);
+            SimStep.Step(w);
+            int t = w.Tick;
+            Input(w, 0, HillX + 0.75, HillZ, false);
+            while (w.Tick < t + windup - 1)
+            {
+                Assert.AreEqual(hp0, w.Actors[5].Hp, "no damage during the wind-up (tick " + w.Tick + ")");
+                SimStep.Step(w);
+            }
+            Assert.AreEqual(hp0, w.Actors[5].Hp, "no damage on T+W-1");
+            SimStep.Step(w);
+            Assert.AreEqual(t + windup, w.Tick);
+            Assert.AreEqual(hp0 - w.Config.Class(ClassId.Warrior).AttackDamage, w.Actors[5].Hp, 1e-9, "full damage on T+W");
+        }
+
+        [Test]
+        public void DG69AVictimThatLeavesReachDuringTheWindupTakesNothing()
+        {
+            World w = Duel(out int windup);
+            Place(w, 5, HillX + 1.25, HillZ); // 2.0 apart: inside the 2.15 reach at the press
+            double hp0 = w.Actors[5].Hp;
+            Input(w, 0, HillX + 1.25, HillZ, true);
+            Input(w, 5, HillX + 10, HillZ, false, 1, 0); // and stepping away
+            SimStep.Step(w);
+            Input(w, 0, HillX + 1.25, HillZ, false);
+            for (int k = 0; k < windup + 2; k++) SimStep.Step(w);
+            Assert.AreEqual(hp0, w.Actors[5].Hp);
+        }
+
+        [Test]
+        public void DG69AttackStartOnThePressTickAndAttackContactOnTPlusWEvenOnAWhiff()
+        {
+            World w = Duel(out int windup);
+            Place(w, 5, HillX + 8, HillZ); // out of reach: a whiff
+            int head = w.EventHead;
+            Input(w, 0, HillX + 8, HillZ, true);
+            SimStep.Step(w);
+            int t = w.Tick;
+            List<SimEvent> starts = Events(w, SimEventType.AttackStart, head);
+            Assert.AreEqual(1, starts.Count);
+            Assert.AreEqual(0, starts[0].A);
+            Assert.AreEqual(Combat.KindAttack, starts[0].B);
+            SimEvent raw = null;
+            for (int i = head; i < w.EventHead; i++) if (w.Events[i % World.EventCapacity].Type == SimEventType.AttackStart) raw = w.Events[i % World.EventCapacity];
+            Assert.AreEqual(windup, raw.Windup);
+            Assert.AreEqual(t, w.Actors[0].SwingTick);
+            Assert.AreEqual(windup, w.Actors[0].SwingWindup);
+            Input(w, 0, HillX + 8, HillZ, false);
+            for (int k = 0; k < windup - 1; k++) SimStep.Step(w);
+            Assert.AreEqual(0, Events(w, SimEventType.AttackContact, head).Count, "no contact before T+W");
+            SimStep.Step(w);
+            List<SimEvent> contacts = Events(w, SimEventType.AttackContact, head);
+            Assert.AreEqual(1, contacts.Count, "contact on T+W");
+            Assert.AreEqual(0, contacts[0].Value, "a whiff hits nobody");
+        }
+
+        [Test]
+        public void DG69AttackersSlowTo40PercentWhileSwinging()
+        {
+            World w = Duel(out int windup);
+            Place(w, 5, HillX + 8, HillZ);
+            for (int k = 0; k < 20; k++) { Input(w, 0, HillX + 8, HillZ, false, 0, 1); SimStep.Step(w); }
+            double free = w.Z[0] - w.PrevZ[0];
+            Input(w, 0, HillX + 8, HillZ, true, 0, 1);
+            SimStep.Step(w);
+            Input(w, 0, HillX + 8, HillZ, false, 0, 1);
+            for (int k = 0; k < 6; k++) SimStep.Step(w);
+            double slowed = w.Z[0] - w.PrevZ[0];
+            Assert.AreEqual(0.4, slowed / free, 0.02);
+        }
+
+        [Test]
+        public void DG69WindupZeroIsTheBrowserPressTickHit()
+        {
+            World w = Duel(out int windup, 0, c => c.Physics.AttackWindup = false);
+            Assert.AreEqual(0, windup);
+            double hp0 = w.Actors[5].Hp;
+            Input(w, 0, HillX + 0.75, HillZ, true);
+            SimStep.Step(w);
+            Assert.Less(w.Actors[5].Hp, hp0);
+        }
+
+        [Test]
+        public void DG69WindupIsRealSecondsAtTheMatchPace()
+        {
+            World p2 = Make(null, pace: 2);
+            Assert.AreEqual(7, p2.Dur.AttackWindup[(int)ClassId.Warrior], "0.12 s at pace 2");
+            Assert.AreEqual(6, p2.Dur.AttackWindup[(int)ClassId.Farmer], "0.10 s at pace 2");
+        }
+
+        [Test]
+        public void DG69InputReadinessFuzzReadyEqualsSimAcceptanceOnEveryTick()
+        {
+            World w = Duel(out int windup);
+            var rng = new Random(11);
+            int agree = 0;
+            for (int k = 0; k < 600; k++)
+            {
+                bool press = rng.NextDouble() < 0.5;
+                bool ready = Combat.AttackReady(w, 0);
+                Input(w, 0, HillX + 0.75, HillZ, press);
+                Input(w, 5, HillX - 0.75, HillZ, rng.NextDouble() < 0.3);
+                int head = w.EventHead;
+                SimStep.Step(w);
+                bool accepted = false;
+                foreach (SimEvent e in Events(w, SimEventType.AttackStart, head)) if (e.A == 0) accepted = true;
+                if (press) Assert.AreEqual(ready, accepted, "tick " + w.Tick);
+                if (press) agree++;
+                if (!w.Actors[0].Alive || !w.Actors[5].Alive) break;
+            }
+            Assert.Greater(agree, 50);
         }
     }
 }

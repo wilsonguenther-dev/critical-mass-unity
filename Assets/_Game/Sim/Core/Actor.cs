@@ -89,5 +89,19 @@ namespace CriticalMass.Sim.Core
         /// Written only by Delivery (Damage calls InterruptDelivery).
         /// </summary>
         public int DeliverTicks;
+
+        // ---- Sim-physics lane (appended). Read by the view (animation, input buffer) without events.
+        /// <summary>DG-69: World.Tick of the last accepted attack press (World.NeverTick = none yet).</summary>
+        public int SwingTick;
+        /// <summary>DG-69: wind-up ticks of that swing (the hit lands on SwingTick + SwingWindup; 0 = on the press tick).</summary>
+        public int SwingWindup;
+        /// <summary>DG-69: slowed recovery ticks after the hit.</summary>
+        public int SwingRecovery;
+        /// <summary>DG-69: facing locked at the press; the hit resolves along it.</summary>
+        public double SwingFacing;
+        /// <summary>DG-69: a swing is winding up and will resolve on SwingTick + SwingWindup.</summary>
+        public bool SwingPending;
+        /// <summary>DG-70: ticks of hit-stun left (input ignored, no attack, ability or jump; a wind-up is cancelled).</summary>
+        public int HitStunTicks;
     }
 }

@@ -261,6 +261,14 @@ namespace CriticalMass.Sim.Bots
                         tx = w.X[t];
                         tz = w.Z[t];
                         reach = cc.AttackRange + AttackSlack;
+                        // DG-69: with a wind-up the bot swings at where the target will be on the contact tick.
+                        int windup = w.Dur.AttackWindup[(int)a.Cls];
+                        if (windup > 0)
+                        {
+                            double lead = windup / cfg.SimHz;
+                            tx += w.Vx[t] * lead;
+                            tz += w.Vz[t] * lead;
+                        }
                     }
                     if (!valid)
                     {

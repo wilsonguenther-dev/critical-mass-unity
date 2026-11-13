@@ -114,6 +114,16 @@ namespace CriticalMass.Sim.Core
                 else if (a.Cls == ClassId.Demolitions) Demolitions.CastMine(w, i); // DG-22 (CM-38): land mine on Space
                 else if (a.Cls == ClassId.Builder) BuiltPieces.CastBuild(w, i); // DG-24 (U-060): a ladder or a rope bridge on Space
                 else if (a.Cls == ClassId.Healer) Healer.CastPulse(w, i); // DG-40 (U-061): the healing pulse on Space
+                // DG-69: an accepted cast starts its action on this tick (the view's per-kind clip); casts have no wind-up.
+                if (a.AbilityCd > 0 && Phys.On(w, true))
+                {
+                    int kind = a.Cls == ClassId.Warrior ? Combat.KindShield : a.Cls == ClassId.Farmer ? Combat.KindRoots
+                        : a.Cls == ClassId.Miner ? Combat.KindBarricade : a.Cls == ClassId.Demolitions ? Combat.KindMine
+                        : a.Cls == ClassId.Builder ? Combat.KindBuild : Combat.KindPulse;
+                    double fx = JsMath.Cos(a.Facing);
+                    double fz = JsMath.Sin(a.Facing);
+                    World.PushEvent(w, SimEventType.AttackStart, i, kind, w.X[i], w.Z[i], a.Facing, null, DamageCause.None, 0, fx, fz, 0, 0, 0, 0);
+                }
             }
             // CM-30: miner dig / place (InputFrame.Terraform, its own key, so Space stays the barricade). DG-09: and the mode switch.
             Terraform.TerraformSystem(w);

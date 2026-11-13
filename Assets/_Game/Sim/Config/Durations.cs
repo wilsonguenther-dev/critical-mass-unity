@@ -72,10 +72,11 @@ namespace CriticalMass.Sim.Config
             Pace = pace;
             KaijuClawWindup = T30(c, c.Kaiju.MeleeWindupTicks);
             SlamTelegraph = SimSeconds(c, c.Kaiju.SlamTelegraphSeconds);
+            bool windup = Phys.On(c, c.Physics.AttackWindup);
             for (int i = 0; i < AttackWindup.Length; i++)
             {
-                AttackWindup[i] = 0;
-                Recovery[i] = 0;
+                AttackWindup[i] = windup ? RealSeconds(c, c.Classes[i].AttackWindupSeconds, pace) : 0;
+                Recovery[i] = windup ? RealSeconds(c, c.Classes[i].RecoverySeconds, pace) : 0;
             }
         }
     }
