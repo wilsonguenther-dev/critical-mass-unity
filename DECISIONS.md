@@ -901,5 +901,4 @@ of the demo gap list (DEMO-GAP-LIST-2026-11-12.md section 5.2, starting with DG-
 bridges). Max reviews each pull request afterwards and may take any item back. This supersedes U-045's ownership rule
 ("the loop never touches a Max-owned item"); U-012's split of mechanics to Max no longer binds the loop. Max is not
 contacted by the loop about the change.
-**Status.** Decided; MAX-ITEMS.md states it. `loop/README.md` section 1 still quotes U-045 and is updated with the next
-loop-harness change.
+**Status.** Decided; MAX-ITEMS.md and `loop/README.md` section 1 state it.
