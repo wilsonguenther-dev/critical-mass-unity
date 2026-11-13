@@ -35,10 +35,23 @@ sys.path.insert(0, LDSRC)
 from cm_art import export as cm_export  # noqa: E402
 
 BASE = os.environ.get("HY_BASE", "Warrior_HY")
+# Other fighters: HY_SRC_FBX=<the class's current FBX on the same KayKit rig> (weight source, "current" renders),
+# HY_PROPS="<prop>:<slot>,..." (raw_dir/<prop>.glb per prop), HY_PROP_SCALE (long props, x the current prop's length).
+SRC_FBX = os.environ.get("HY_SRC_FBX")
+PROP_SLOTS = dict(kv.split(":") for kv in os.environ.get("HY_PROPS", "shield:handslot.l,cleaver:handslot.r").split(",") if kv)
+PROP_SCALE = float(os.environ.get("HY_PROP_SCALE", "1.0"))
 HERO = dict(body=int(os.environ.get("HY_HERO_BODY", 19000)), shield=1500, cleaver=1000)
 LOD0 = dict(body=3700, shield=450, cleaver=300)
+for _k in PROP_SLOTS:
+    HERO.setdefault(_k, 1200)
+    LOD0.setdefault(_k, 400)
+LOD0["body"] = 4450 - sum(v for k, v in LOD0.items() if k != "body")
+HERO["body"] = min(HERO["body"], 21500 - sum(v for k, v in HERO.items() if k != "body"))
 SHIELD_THICK = 0.16          # shield depth / diameter (the single-view generation came back drum-thick, 0.55)
 CLEAVER_THICK = 0.5          # keep half of the generated blade thickness
+SHIELD_SCALE, SHIELD_TURN = 0.85, 35.0    # vs v7's shield: smaller, turned outward about the hand so the torso shows (bible)
+CLEAVER_SCALE = 1.25         # vs v7's cleaver: the bible blade is longer
+SMOOTH_IT = 80               # offline sweep on the dumped weights: k16/p2/80 halves the stretched edges vs k4/p4/16
 CAM_PITCH, CAM_FOV, CAM_DIST, CAM_YAW = 55.0, 35.0, 23.4, 45.0
 NAVY = (0x18 / 255, 0x23 / 255, 0x3B / 255)
 REPORT = {}
@@ -52,8 +65,32 @@ def log(*a):
 bpy.ops.wm.open_mainfile(filepath=os.path.join(LDSRC, "warrior.blend"))
 scene = bpy.context.scene
 arm = bpy.data.objects["Rig"]
-OLD = {k: bpy.data.objects[f"Warrior_{k.capitalize()}"] for k in ("body", "shield", "cleaver")}
 assert arm.matrix_world == Matrix.Identity(4), "rig object must be at identity"
+if not SRC_FBX:
+    OLD = {k: bpy.data.objects[f"Warrior_{k.capitalize()}"] for k in ("body", "shield", "cleaver")}
+    OLD_RENDER = list(OLD.values())
+else:
+    for o in list(bpy.data.objects):            # drop warrior.blend's meshes; keep the rig and its 76 clips
+        if o.type == "MESH":
+            bpy.data.objects.remove(o, do_unlink=True)
+    before = set(bpy.data.objects)
+    bpy.ops.import_scene.fbx(filepath=os.path.abspath(os.path.expanduser(SRC_FBX)), use_anim=False, colors_type="SRGB",
+                             ignore_leaf_bones=False, automatic_bone_orientation=False, primary_bone_axis="Y", secondary_bone_axis="X")
+    new = [o for o in bpy.data.objects if o not in before]
+    OLD_RENDER = [o for o in new if o.type == "MESH"]
+    for o in OLD_RENDER:
+        M = o.matrix_world.copy()
+        o.parent = None
+        o.data.transform(M)
+        o.matrix_world = Matrix.Identity(4)
+        for m in list(o.modifiers):
+            o.modifiers.remove(m)
+        o.parent = arm
+        o.modifiers.new("Armature", "ARMATURE").object = arm
+    for o in new:
+        if o.type != "MESH":
+            bpy.data.objects.remove(o, do_unlink=True)
+    OLD = None
 
 
 def rest_pose():
@@ -116,8 +153,19 @@ def lbs(V, W, S, inverse=False):
     return np.einsum("nij,nj->ni", M, Vh)[:, :3]
 
 
-OLDV = {k: verts_of(o) for k, o in OLD.items()}
-OLDW = {k: weights_of(o) for k, o in OLD.items()}
+if OLD:
+    OLDV = {k: verts_of(o) for k, o in OLD.items()}
+    OLDW = {k: weights_of(o) for k, o in OLD.items()}
+else:                                            # split the source by dominant bone: hand-slot parts are the props
+    _V = np.concatenate([verts_of(o) for o in OLD_RENDER])
+    _W = np.concatenate([weights_of(o) for o in OLD_RENDER])
+    _dom = np.array(BONES)[np.argmax(_W, 1)]
+    OLDV, OLDW = {}, {}
+    _props = np.isin(_dom, list(PROP_SLOTS.values()))
+    OLDV["body"], OLDW["body"] = _V[~_props], _W[~_props]
+    for _k, _slot in PROP_SLOTS.items():
+        _m = _dom == _slot
+        OLDV[_k], OLDW[_k] = _V[_m], _W[_m]
 H_T = float(OLDV["body"][:, 2].max())
 REPORT["v7"] = {k: {"verts": len(v), "dims": [round(float(x), 3) for x in v.max(0) - v.min(0)]} for k, v in OLDV.items()}
 REPORT["target_height"] = round(H_T, 4)
@@ -364,13 +412,13 @@ for tag, budget in (("Hero", HERO["body"]),):
     # ---- weights: inverse-distance from the posed v7 body, then smoothed along this mesh's edges
     W = np.zeros((len(Vb), len(BONES)))
     for i, p in enumerate(Vb):
-        for co, idx, dist in KD7.find_n(Vector(p), 4):
-            W[i] += OLDW["body"][idx] / (dist ** 4 + 1e-10)
+        for co, idx, dist in KD7.find_n(Vector(p), 16):
+            W[i] += OLDW["body"][idx] / (dist ** 2 + 1e-10)
     W /= np.maximum(W.sum(1, keepdims=True), 1e-12)
     ed = np.zeros(len(ob.data.edges) * 2, np.int32)
     ob.data.edges.foreach_get("vertices", ed)
     ed = ed.reshape(-1, 2)
-    for _ in range(16 if tag == "Hero" else 6):
+    for _ in range(SMOOTH_IT):
         acc = np.zeros_like(W)
         deg = np.zeros(len(Vb))
         np.add.at(acc, ed[:, 0], W[ed[:, 1]])
@@ -378,9 +426,6 @@ for tag, budget in (("Hero", HERO["body"]),):
         np.add.at(deg, ed[:, 0], 1.0)
         np.add.at(deg, ed[:, 1], 1.0)
         W = 0.5 * W + 0.5 * acc / np.maximum(deg, 1.0)[:, None]
-    top = (Vb[:, 2] > HEAD_Z + 0.22) & (np.abs(Vb[:, 0]) < 0.30)
-    W[top] = 0.0
-    W[top, BONES.index("head")] = 1.0
     # top 4, normalised
     idx = np.argsort(-W, 1)[:, 4:]
     np.put_along_axis(W, idx, 0.0, 1)
@@ -389,6 +434,7 @@ for tag, budget in (("Hero", HERO["body"]),):
     # ---- un-skin from the A-pose into the rig's rest pose
     Vr = lbs(Vb, W, S_P, inverse=True)
     set_verts(ob, Vr)
+    LEVEL["Hero_A"] = Vb.copy()
     back = lbs(Vr, W, S_P)
     REPORT.setdefault("unskin_roundtrip_max_m", {})[tag] = float(np.abs(back - Vb).max())
     for bi in np.nonzero(W.sum(0) > 0)[0]:
@@ -398,6 +444,9 @@ for tag, budget in (("Hero", HERO["body"]),):
             g.add([int(i)], float(W[i, bi]), "REPLACE")
     LEVEL[tag] = ob
     LEVEL[tag + "_W"] = W
+    fc = np.array([tuple(p.vertices) for p in ob.data.polygons], np.int32)
+    DUMP = dict(VA=Vb, ed=ed, f=fc, W=W, V7P=V7P, W7=OLDW["body"], V7=OLDV["body"], S_P=S_P, bones=np.array(BONES),
+                heads=np.array([list(J[b]) for b in BONES]))
     log(tag, "body", tri_count(ob), "groups", len(ob.vertex_groups))
 
 # LOD0 body: decimated from the un-skinned Hero (rest pose); colour and weights are resampled from the Hero further down.
@@ -408,9 +457,8 @@ del sampler
 set_clip("Idle", 1)
 S_IDLE = skin_mats()
 hsl, hsr = BONES.index("handslot.l"), BONES.index("handslot.r")
-HS = {"shield": np.array(arm.pose.bones["handslot.l"].matrix.translation),
-      "cleaver": np.array(arm.pose.bones["handslot.r"].matrix.translation)}
-OLDI = {k: lbs(OLDV[k], OLDW[k], S_IDLE) for k in ("shield", "cleaver")}
+HS = {k: np.array(arm.pose.bones[sl].matrix.translation) for k, sl in PROP_SLOTS.items()}
+OLDI = {k: lbs(OLDV[k], OLDW[k], S_IDLE) for k in PROP_SLOTS}
 rest_pose()
 
 
@@ -445,6 +493,12 @@ def prop(key):
         back_old = (od @ n_old).min()
         back_new = (Q @ n_old).min()
         Q += oc + n_old * (back_old - back_new)
+        Q = (Q - oc) * SHIELD_SCALE + oc
+        hs = HS[key]
+        ct, st = math.cos(math.radians(SHIELD_TURN)), math.sin(math.radians(SHIELD_TURN))
+        Rz = np.array([[ct, -st, 0], [st, ct, 0], [0, 0, 1.0]])
+        Q = (Q - hs) @ Rz.T + hs
+        k *= SHIELD_SCALE
     else:
         a_new = ax[0]
         t = P0 @ a_new
@@ -459,7 +513,8 @@ def prop(key):
         if (P0[blade] @ w_new).mean() < 0:     # blade bulk on +w
             f_new = -f_new
             w_new = np.cross(f_new, a_new)
-        P0 = P0 - np.outer(P0 @ f_new, f_new) * (1 - CLEAVER_THICK)
+        if key == "cleaver":
+            P0 = P0 - np.outer(P0 @ f_new, f_new) * (1 - CLEAVER_THICK)
         od = o - oc
         a_old = oax[0] * (1 if oax[0] @ (oc - HS[key]) > 0 else -1)
         f_old = oax[2]
@@ -473,13 +528,17 @@ def prop(key):
         Q = (P0 * k) @ R.T
         # handle end of the new blade sits where v7's handle end sits
         Q += oc + a_old * (to.min() - (Q @ a_old).min())
+        grip = oc + a_old * to.min()
+        sc = CLEAVER_SCALE if key == "cleaver" else PROP_SCALE
+        Q = (Q - grip) * sc + grip
+        k *= sc
     set_verts(hi, Q)                            # high mesh in the Idle-pose world, where the sampler reads it
     smp = Sampler(hi, img)
     out = {}
     for tag in ("Hero", "LOD0"):
         ob = decimated_copy(hi, (HERO if tag == "Hero" else LOD0)[key], f"{BASE}_{tag}_{key.capitalize()}")
         REPORT.setdefault("mask_faces", {})[ob.name] = bake_vcol(ob, smp)
-        slot = hsl if key == "shield" else hsr
+        slot = BONES.index(PROP_SLOTS[key])
         Wp = np.zeros((len(ob.data.vertices), len(BONES)))
         Wp[:, slot] = 1.0
         set_verts(ob, lbs(np_verts(ob), Wp, S_IDLE, inverse=True))
@@ -491,7 +550,7 @@ def prop(key):
     return out, img
 
 
-PROPS = {k: prop(k) for k in ("shield", "cleaver")}
+PROPS = {k: prop(k) for k in PROP_SLOTS}
 
 # --------------------------------------------------------------------------------------------- LOD0 body fix-up
 # LOD0 body lives in rest space like the Hero: colour (per-face vote) and weights come from the Hero surface.
@@ -525,6 +584,17 @@ for i, p in enumerate(LV):                       # weights from the Hero (same r
     d = np.linalg.norm(HV[vs] - np.array(loc), axis=1)
     wv = 1.0 / (d + 1e-6)
     LW[i] = (HWt[vs] * wv[:, None]).sum(0) / wv.sum()
+led = np.zeros(len(lod.data.edges) * 2, np.int32)
+lod.data.edges.foreach_get("vertices", led)
+led = led.reshape(-1, 2)
+for _ in range(10):                              # LOD0 edges are long: a few smoothing passes stop single-edge spikes
+    acc = np.zeros_like(LW)
+    deg = np.zeros(len(LV))
+    np.add.at(acc, led[:, 0], LW[led[:, 1]])
+    np.add.at(acc, led[:, 1], LW[led[:, 0]])
+    np.add.at(deg, led[:, 0], 1.0)
+    np.add.at(deg, led[:, 1], 1.0)
+    LW = 0.5 * LW + 0.5 * acc / np.maximum(deg, 1.0)[:, None]
 idx = np.argsort(-LW, 1)[:, 4:]
 np.put_along_axis(LW, idx, 0.0, 1)
 LW[LW < 0.01] = 0.0
@@ -544,7 +614,7 @@ log("LOD0 body recoloured and reweighted from the Hero")
 # --------------------------------------------------------------------------------------------- materials, textures
 TEXDIR = EXP
 tex_paths = {}
-for key, img, res in (("Body", body_img, 2048), ("Shield", PROPS["shield"][1], 1024), ("Cleaver", PROPS["cleaver"][1], 1024)):
+for key, img, res in [("Body", body_img, 2048)] + [(k.capitalize(), PROPS[k][1], 1024) for k in PROPS]:
     img.scale(res, res)
     px = np.empty(res * res * 4, np.float32)
     img.pixels.foreach_get(px)
@@ -570,7 +640,7 @@ for key, img, res in (("Body", body_img, 2048), ("Shield", PROPS["shield"][1], 1
         ob.data.materials.append(mat)
         ob.data.uv_layers[0].name = "UVMap"
 
-PARTS = {tag: [LEVEL[tag], PROPS["shield"][0][tag], PROPS["cleaver"][0][tag]] for tag in ("Hero", "LOD0")}
+PARTS = {tag: [LEVEL[tag]] + [PROPS[k][0][tag] for k in PROPS] for tag in ("Hero", "LOD0")}
 for tag, obs in PARTS.items():
     for ob in obs:
         ob.parent = arm
@@ -601,6 +671,7 @@ def posed(ob):
 CLIPS = (("Idle", 0.5), ("Running_A", 0.3), ("Running_A", 0.8), ("1H_Melee_Attack_Chop", 0.45), ("1H_Melee_Attack_Chop", 0.7))
 rest_pose()
 REST_P = {o.name: posed(o) for obs in PARTS.values() for o in obs}
+APOSE = {PARTS["Hero"][0].name: LEVEL["Hero_A"], PARTS["LOD0"][0].name: lbs(REST_P[PARTS["LOD0"][0].name], LEVEL["LOD0_W"], S_P)}
 deform = {}
 for clip, fr in CLIPS:
     f = set_clip(clip, fr)
@@ -613,15 +684,29 @@ for clip, fr in CLIPS:
         p0, p1 = REST_P[o.name], posed(o)
         l0 = np.linalg.norm(p0[e[:, 0]] - p0[e[:, 1]], axis=1)
         l1 = np.linalg.norm(p1[e[:, 0]] - p1[e[:, 1]], axis=1)
+        pa = APOSE[o.name]
+        la = np.linalg.norm(pa[e[:, 0]] - pa[e[:, 1]], axis=1)
+        oka = la > 1e-3
+        ra = l1[oka] / la[oka]
+        ra = np.maximum(ra, 1 / np.maximum(ra, 1e-6))          # stretch or squash, vs the generated shape
+        dla = np.abs(l1[oka] - la[oka])
         ok = l0 > 1e-3
         r = l1[ok] / l0[ok]
         bad = e[ok][r > 1.5]
         zs = p0[bad[:, 0], 2] if len(bad) else np.zeros(0)
         row[tag] = {"edges": int(ok.sum()), "over_1.5": int((r > 1.5).sum()), "over_2": int((r > 2).sum()),
                     "max": round(float(r.max()), 2), "p99": round(float(np.percentile(r, 99)), 3),
-                    "bad_z_hist": np.histogram(zs, bins=[0, 0.4, 0.8, 1.0, 1.2, 1.4, 2.1])[0].tolist()}
+                    "bad_z_hist": np.histogram(zs, bins=[0, 0.4, 0.8, 1.0, 1.2, 1.4, 2.1])[0].tolist(),
+                    "vs_generated_over_1.5": int((ra > 1.5).sum()), "vs_generated_over_2": int((ra > 2).sum()),
+                    "vs_generated_max": round(float(ra.max()), 2),
+                    "visible_over_1.5_and_15mm": int(((ra > 1.5) & (dla > 0.015)).sum()),
+                    "visible_over_1.5_and_30mm": int(((ra > 1.5) & (dla > 0.03)).sum())}
     deform[f"{clip}@{f}"] = row
 REPORT["deform"] = deform
+for clip, fr in CLIPS:
+    f = set_clip(clip, fr)
+    DUMP[f"S_{clip}@{f}"] = skin_mats()
+np.savez_compressed(os.path.join(WORK, "hero_dump.npz"), **DUMP)
 rest_pose()
 log("deform", json.dumps(deform)[:600])
 
@@ -673,13 +758,18 @@ ga = gm.color_attributes.new("Col", "BYTE_COLOR", "CORNER")
 for d in ga.data:
     d.color_srgb = (0.47, 0.49, 0.45, 0.0)
 ground = bpy.data.objects.new("Ground", gm)
+gmat = bpy.data.materials.new("GroundMat")
+gmat.diffuse_color = (0.19, 0.21, 0.18, 1.0)
+gmat.use_nodes = True
+gmat.node_tree.nodes["Principled BSDF"].inputs["Base Color"].default_value = (0.19, 0.21, 0.18, 1.0)
+gm.materials.append(gmat)
 scene.collection.objects.link(ground)
 
 cam_d = bpy.data.cameras.new("Cam")
 cam = bpy.data.objects.new("Cam", cam_d)
 scene.collection.objects.link(cam)
 scene.camera = cam
-SETS = {"v7": list(OLD.values()), "hero": PARTS["Hero"], "lod0": PARTS["LOD0"]}
+SETS = {"v7": OLD_RENDER, "hero": PARTS["Hero"], "lod0": PARTS["LOD0"]}
 
 
 def show(which):
