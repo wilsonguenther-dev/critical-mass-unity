@@ -621,94 +621,113 @@ namespace CriticalMass.Runtime.PlayTests
         public IEnumerator Need4_EveryBridgeBothWaysAt0_30_45_60DegreesWithTheStickAndWithTheNearestKeyPairsNoStallNoFall()
         {
             Restart(ClassId.Warrior, 1);
-            var bad = new List<string>();
-            int runs = 0, spans = 0;
-            double worstKeyAngle = 0;
-            int[] angles = { 0, 30, -30, 45, -45, 60, -60 };
-            double speed = C.Class(ClassId.Warrior).MoveSpeed;
-            double r = C.Class(ClassId.Warrior).Radius;
-            for (int s = 0; s < BridgeSpans.All.Count; s++)
+            // U-068 map events stay off for this sweep: a BRIDGE COLLAPSE voids a span's middle third for 45 s, and this
+            // 30-sim-minute sweep runs through about ten of them. Run 43461496029's only failures (B3 back, the stick at
+            // +-30 and +-45 deg, stall ticks 41 and 49 at the gap edge) were one of those collapses landing on the span under
+            // test, not collision (Sim.Tests BridgeCrossingSweepTests.TheAcceptanceFailureIsTheBridgeCollapseEventNotCollision
+            // reproduces the exact ticks). Every crossing, angle and device below is unchanged; each one now also asserts
+            // that its span is intact, so a collapse can never again pass for a movement defect.
+            bool eventsWere = C.Depth.Events.Enabled;
+            C.Depth.Events.Enabled = false;
+            try
             {
-                BridgeSpan sp = BridgeSpans.All[s];
-                if (!Chasm(W.Map, sp, out double enter, out double exit)) continue;
-                spans++;
-                for (int dirSign = 1; dirSign >= -1; dirSign -= 2)
+                var bad = new List<string>();
+                int runs = 0, spans = 0;
+                double worstKeyAngle = 0;
+                int[] angles = { 0, 30, -30, 45, -45, 60, -60 };
+                double speed = C.Class(ClassId.Warrior).MoveSpeed;
+                double r = C.Class(ClassId.Warrior).Radius;
+                for (int s = 0; s < BridgeSpans.All.Count; s++)
                 {
-                    // Origin and axis for this direction (reverse: start at the far end).
-                    double ux = sp.Ux * dirSign, uz = sp.Uz * dirSign;
-                    double ox = dirSign > 0 ? sp.X0 : sp.X1, oz = dirSign > 0 ? sp.Z0 : sp.Z1;
-                    double en = dirSign > 0 ? enter : sp.Len - exit, ex = dirSign > 0 ? exit : sp.Len - enter;
-                    double startA = -1;
-                    for (double a = Math.Max(0, en - 1); a <= en + 1; a += 0.25)
-                        if (Collide.ActorFits(W, ox + ux * a, oz + uz * a, r)) { startA = a; break; }
-                    string label = "B" + (s + 1) + (dirSign > 0 ? " fwd" : " back");
-                    if (startA < 0)
+                    BridgeSpan sp = BridgeSpans.All[s];
+                    if (!Chasm(W.Map, sp, out double enter, out double exit)) continue;
+                    spans++;
+                    for (int dirSign = 1; dirSign >= -1; dirSign -= 2)
                     {
-                        bad.Add(label + ": no fitting start");
-                        continue;
-                    }
-                    double sx = ox + ux * startA, sz = oz + uz * startA;
-                    double goal = Math.Min(sp.Len, ex + 1);
-                    double travel = goal - startA;
-                    double axis = Math.Atan2(uz, ux);
-                    foreach (int deg in angles)
-                    {
-                        double th = axis + deg * Math.PI / 180;
-                        Vector2 st = Stick(Math.Cos(th), Math.Sin(th));
-                        int budget = (int)Math.Ceiling(1.25 * travel / (speed * Math.Cos(deg * Math.PI / 180)) * C.SimHz) + (int)C.SimHz;
-                        var run = new Crossing();
-                        yield return Cross(sx, sz, ux, uz, goal, ox, oz, () => Pad(st, Vector2.zero), budget, run);
-                        runs++;
-                        if (!run.Arrived || run.StallTick >= 0)
+                        // Origin and axis for this direction (reverse: start at the far end).
+                        double ux = sp.Ux * dirSign, uz = sp.Uz * dirSign;
+                        double ox = dirSign > 0 ? sp.X0 : sp.X1, oz = dirSign > 0 ? sp.Z0 : sp.Z1;
+                        double en = dirSign > 0 ? enter : sp.Len - exit, ex = dirSign > 0 ? exit : sp.Len - enter;
+                        double startA = -1;
+                        for (double a = Math.Max(0, en - 1); a <= en + 1; a += 0.25)
+                            if (Collide.ActorFits(W, ox + ux * a, oz + uz * a, r)) { startA = a; break; }
+                        // The map's bridge name (BridgeSpans.Name: All[4] is B3, not "B5"), with the table index for the logs.
+                        string label = BridgeSpans.Name(s) + " [span " + s + "]" + (dirSign > 0 ? " fwd" : " back");
+                        if (startA < 0)
                         {
-                            // Diagnosis: the same crossing with the input layer's movement assist off.
-                            HumanInputSource src = _driver.GetComponent<HumanInputSource>();
-                            if (src == null) src = UnityEngine.Object.FindAnyObjectByType<HumanInputSource>();
-                            if (src != null)
-                            {
-                                src.State.MovementAssist = false;
-                                var diag = new Crossing();
-                                yield return Cross(sx, sz, ux, uz, goal, ox, oz, () => Pad(st, Vector2.zero), budget, diag);
-                                src.State.MovementAssist = true;
-                                bad.Add($"{label} stick {deg} deg: assist OFF -> arrived {diag.Arrived}, stall tick {diag.StallTick}");
-                            }
+                            bad.Add(label + ": no fitting start");
+                            continue;
                         }
-                        if (!run.Arrived) bad.Add($"{label} stick {deg} deg: not across in {budget} ticks");
-                        if (run.StallTick >= 0) bad.Add($"{label} stick {deg} deg: stalled 0.1 s at tick {run.StallTick}");
-                        if (run.FallTick >= 0) bad.Add($"{label} stick {deg} deg: fell at tick {run.FallTick}");
-                    }
-                    // Keyboard: the two key combinations nearest the bridge's axis, held unchanged.
-                    var order = new List<(int idx, double off)>();
-                    for (int q = 0; q < KeyDirs.Length; q++)
-                    {
-                        double wx = KeyDirs[q].right * HumanInputState.ScreenRightX + KeyDirs[q].up * HumanInputState.ScreenUpX;
-                        double wz = KeyDirs[q].right * HumanInputState.ScreenRightZ + KeyDirs[q].up * HumanInputState.ScreenUpZ;
-                        double off = Math.Abs(Math.IEEERemainder(Math.Atan2(wz, wx) - axis, 2 * Math.PI)) * 180 / Math.PI;
-                        order.Add((q, off));
-                    }
-                    order.Sort((p, q) => p.off.CompareTo(q.off));
-                    for (int o = 0; o < 2; o++)
-                    {
-                        var kd = KeyDirs[order[o].idx];
-                        double off = order[o].off;
-                        if (off > 60.5) continue;
-                        if (off > worstKeyAngle) worstKeyAngle = off;
-                        int budget = (int)Math.Ceiling(1.25 * travel / (speed * Math.Cos(off * Math.PI / 180)) * C.SimHz) + (int)C.SimHz;
-                        var run = new Crossing();
-                        Key[] keys = kd.keys;
-                        yield return Cross(sx, sz, ux, uz, goal, ox, oz, () => Keys(keys), budget, run);
-                        runs++;
-                        string kn = string.Join("+", keys);
-                        if (!run.Arrived) bad.Add($"{label} keys {kn} ({off:0} deg off): not across in {budget} ticks");
-                        if (run.StallTick >= 0) bad.Add($"{label} keys {kn} ({off:0} deg off): stalled 0.1 s at tick {run.StallTick}");
-                        if (run.FallTick >= 0) bad.Add($"{label} keys {kn} ({off:0} deg off): fell at tick {run.FallTick}");
+                        double sx = ox + ux * startA, sz = oz + uz * startA;
+                        double goal = Math.Min(sp.Len, ex + 1);
+                        double travel = goal - startA;
+                        double axis = Math.Atan2(uz, ux);
+                        foreach (int deg in angles)
+                        {
+                            double th = axis + deg * Math.PI / 180;
+                            Vector2 st = Stick(Math.Cos(th), Math.Sin(th));
+                            int budget = (int)Math.Ceiling(1.25 * travel / (speed * Math.Cos(deg * Math.PI / 180)) * C.SimHz) + (int)C.SimHz;
+                            var run = new Crossing();
+                            yield return Cross(sx, sz, ux, uz, goal, ox, oz, () => Pad(st, Vector2.zero), budget, run);
+                            runs++;
+                            if (W.Depth.BridgeState != MapEvents.BridgeNone) bad.Add($"{label} stick {deg} deg: a map event changed a bridge mid-sweep");
+                            if (!run.Arrived || run.StallTick >= 0)
+                            {
+                                // Diagnosis: the same crossing with the input layer's movement assist off.
+                                HumanInputSource src = _driver.GetComponent<HumanInputSource>();
+                                if (src == null) src = UnityEngine.Object.FindAnyObjectByType<HumanInputSource>();
+                                if (src != null)
+                                {
+                                    src.State.MovementAssist = false;
+                                    var diag = new Crossing();
+                                    yield return Cross(sx, sz, ux, uz, goal, ox, oz, () => Pad(st, Vector2.zero), budget, diag);
+                                    src.State.MovementAssist = true;
+                                    bad.Add($"{label} stick {deg} deg: assist OFF -> arrived {diag.Arrived}, stall tick {diag.StallTick}");
+                                }
+                            }
+                            if (!run.Arrived) bad.Add($"{label} stick {deg} deg: not across in {budget} ticks");
+                            if (run.StallTick >= 0) bad.Add($"{label} stick {deg} deg: stalled 0.1 s at tick {run.StallTick}");
+                            if (run.FallTick >= 0) bad.Add($"{label} stick {deg} deg: fell at tick {run.FallTick}");
+                        }
+                        // Keyboard: the two key combinations nearest the bridge's axis, held unchanged.
+                        var order = new List<(int idx, double off)>();
+                        for (int q = 0; q < KeyDirs.Length; q++)
+                        {
+                            double wx = KeyDirs[q].right * HumanInputState.ScreenRightX + KeyDirs[q].up * HumanInputState.ScreenUpX;
+                            double wz = KeyDirs[q].right * HumanInputState.ScreenRightZ + KeyDirs[q].up * HumanInputState.ScreenUpZ;
+                            double off = Math.Abs(Math.IEEERemainder(Math.Atan2(wz, wx) - axis, 2 * Math.PI)) * 180 / Math.PI;
+                            order.Add((q, off));
+                        }
+                        order.Sort((p, q) => p.off.CompareTo(q.off));
+                        for (int o = 0; o < 2; o++)
+                        {
+                            var kd = KeyDirs[order[o].idx];
+                            double off = order[o].off;
+                            if (off > 60.5) continue;
+                            if (off > worstKeyAngle) worstKeyAngle = off;
+                            int budget = (int)Math.Ceiling(1.25 * travel / (speed * Math.Cos(off * Math.PI / 180)) * C.SimHz) + (int)C.SimHz;
+                            var run = new Crossing();
+                            Key[] keys = kd.keys;
+                            yield return Cross(sx, sz, ux, uz, goal, ox, oz, () => Keys(keys), budget, run);
+                            runs++;
+                            if (W.Depth.BridgeState != MapEvents.BridgeNone) bad.Add($"{label} keys: a map event changed a bridge mid-sweep");
+                            string kn = string.Join("+", keys);
+                            if (!run.Arrived) bad.Add($"{label} keys {kn} ({off:0} deg off): not across in {budget} ticks");
+                            if (run.StallTick >= 0) bad.Add($"{label} keys {kn} ({off:0} deg off): stalled 0.1 s at tick {run.StallTick}");
+                            if (run.FallTick >= 0) bad.Add($"{label} keys {kn} ({off:0} deg off): fell at tick {run.FallTick}");
+                        }
                     }
                 }
+                Debug.Log($"[Creator] need4 {(bad.Count == 0 ? "PASS" : "FAIL")}: {spans} spans x 2 directions, {runs} crossings (stick 0/±30/±45/±60, " +
+                          $"the two nearest key combinations, worst key angle {worstKeyAngle:0} deg); failures {bad.Count}" + (bad.Count > 0 ? ":\n" + string.Join("\n", bad) : ""));
+                Assert.AreEqual(16, spans, "every bridge span and its mirror");
+                Assert.AreEqual(288, runs, "16 spans x 2 directions x (7 stick angles + 2 key combinations)");
+                Assert.IsTrue(bad.Count == 0, bad.Count + " failure(s):\n" + string.Join("\n", bad));
             }
-            Debug.Log($"[Creator] need4 {(bad.Count == 0 ? "PASS" : "FAIL")}: {spans} spans x 2 directions, {runs} crossings (stick 0/±30/±45/±60, " +
-                      $"the two nearest key combinations, worst key angle {worstKeyAngle:0} deg); failures {bad.Count}" + (bad.Count > 0 ? ":\n" + string.Join("\n", bad) : ""));
-            Assert.AreEqual(16, spans, "every bridge span and its mirror");
-            Assert.IsTrue(bad.Count == 0, bad.Count + " failure(s):\n" + string.Join("\n", bad));
+            finally
+            {
+                C.Depth.Events.Enabled = eventsWere;
+            }
         }
 
         // ---------------------------------------------------------------- 5. corruption: carry, instability, berserk, announced

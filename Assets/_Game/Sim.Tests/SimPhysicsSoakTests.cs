@@ -199,7 +199,8 @@ namespace CriticalMass.Sim.Tests
             // Rules-combined (U-069): one pair of goldens per rules profile, all from CreateBrowser5v5 at pace 1 unless named.
             // Classic: browser parity (no physics, no depth, pace 2x): must equal the DG-21 golden bit for bit.
             // PhysicsOnly: the physics lane on, depth off (the test config). Re-pinned 2026-11-12 for U-071 (allies pass head-on).
-            // Full: everything on (the game's default rules). Re-pinned 2026-11-13 for U-074..U-078 (Classic and PhysicsOnly unchanged).
+            // Full: everything on (the game's default rules). Re-pinned 2026-11-13 for U-074..U-078, then for bridge collapse off by
+            // default (Classic and PhysicsOnly unchanged both times: depth rules are off in them).
             foreach (RulesProfile p in new[] { RulesProfile.Classic, RulesProfile.PhysicsOnly, RulesProfile.Full })
             {
                 Action<GameConfig> t = c => c.ApplyRules(p);
@@ -217,8 +218,8 @@ namespace CriticalMass.Sim.Tests
         private static readonly ulong[,] Golden =
         {
             { 0x5C912AEED16BC302UL, 0x2980068FA0457CC2UL }, // Classic (DG-21, unchanged since the browser port)
-            { 0x2BE070768E23B442UL, 0x8616946C55B1FFF8UL }, // PhysicsOnly (re-pinned 2026-11-12: U-071 a retreating bot passes allies)
-            { 0x70C7D9F992CAC3CCUL, 0x8F3F947AE72E7815UL }, // Full (re-pinned 2026-11-13: U-074 hatch push-out, U-075 Builder builds, U-076 hill squad, U-077 short-handed share, U-078 Hard)
+            { 0x2BE070768E23B442UL, 0x8BCA67D3B8845532UL }, // PhysicsOnly (re-pinned 2026-11-12: U-071; 5v5 re-pinned 2026-11-13: fix/kaiju-alive-1 Kaiju hits stagger, throw at KaijuKnockScale 0.5, topple)
+            { 0xAA728D5DAF5451F4UL, 0xBF82793EEE8C78C8UL }, // Full (re-pinned 2026-11-13 integration batch 7: fix/bridge-holes MapEventsConfig.BridgeCollapse default false (16v16 and 5v5) plus fix/kaiju-alive-1 Kaiju hits stagger, throw at KaijuKnockScale 0.5, topple (5v5); before: 0x70C7D9F992CAC3CC / 0x8F3F947AE72E7815, U-074..U-078)
         };
     }
 }

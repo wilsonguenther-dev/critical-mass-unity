@@ -34,7 +34,8 @@ namespace CriticalMass.Runtime.Game
     ///   -quality NAME|N          this quality level for the run (FrameGovernor; the perf report has quality_requested)
     ///   -debugHangSeconds N      TEST ONLY: the main thread sleeps N s once, 3 s after the title (proves the hang watchdog)
     ///   -seed N -simHashOut PATH sim-only run (no view): one 16v16 bot match on seed N, its end-state hash to PATH, quit (DG-66)
-    ///   -shots                   screenshots shot-title.png, shot-start.png (3 s of match time) and shot-mid.png into the data folder (Windows graphics run)
+    ///   -stressHill              perf-60hz-32p: camera pinned on the hill, every living fighter drawn within 9 m of it (view only)
+    ///   -shots                   screenshots shot-title.png, shot-start.png (3 s of match time), shot-mid.png and shot-kaiju-1..6.png (Kaiju walk strip after the hatch) into the data folder (Windows graphics run)
     ///   -traceStates             record shader states for warm-up (ShaderWarmup); -exportReport, -diag: SupportReport
     /// DG-63: the crash log is written by CrashLog (bounded queue, one background writer, 20 lines per second, repeat keys
     /// with digits and hex as "#"); Exceptions and Errors both count. A stack in the sim or the match driver ends the match
@@ -74,6 +75,10 @@ namespace CriticalMass.Runtime.Game
             public string SimHashOut;
             public int Seed;
             public bool Shots;
+            /// <summary>perf-60hz-32p: -stressHill: the worst case for frame cost, all 32 fighters drawn on screen at once. The
+            /// camera is pinned on the hill and every living fighter is DRAWN within 9 m of it (ActorViews moves only the
+            /// models; the sim, its bots and its hash are untouched). Automation runs only.</summary>
+            public bool StressHill;
         }
 
         /// <summary>Pure parser (tests). Unknown flags are ignored, so Unity's own (-screen-width, -logFile) pass through.</summary>
@@ -112,6 +117,7 @@ namespace CriticalMass.Runtime.Game
                         if (!string.IsNullOrEmpty(next) && !next.StartsWith("-", StringComparison.Ordinal)) { o.SimHashOut = next; i++; }
                         break;
                     case "-shots": o.Shots = true; break;
+                    case "-stresshill": o.StressHill = true; break;
                     case "-autoplaypacing":
                         if (!string.IsNullOrEmpty(next) && !next.StartsWith("-", StringComparison.Ordinal)) { o.Pacing = next.Split(','); i++; }
                         break;
@@ -155,6 +161,31 @@ namespace CriticalMass.Runtime.Game
             if (cfg == null || !TryCameraYaw(Environment.GetCommandLineArgs(), out double y)) return;
             cfg.Render.CameraYawDeg = y;
             Debug.Log($"{LogTag} -cameraYaw: gameplay camera yaw {y.ToString("F1", CultureInfo.InvariantCulture)} deg (default 45)");
+        }
+
+        /// <summary>-shots, batch 7: 4 s after the Kaiju hatches the camera is held on it (CameraFollowTarget.SetOverride every
+        /// frame) and 1.5 s later six shots 0.25 s apart are written as shot-kaiju-1..6.png, each logged with the Kaiju's sim
+        /// position so a reader can tell it walked; then the camera goes back to the player.</summary>
+        void KaijuStrip(double now)
+        {
+            World w = _driver.World;
+            if (w.Kaiju == null) return;
+            if (_kaijuHatchAt < 0)
+            {
+                if (w.Match.Hatched && w.Kaiju.State != KaijuState.Egg) _kaijuHatchAt = now;
+                return;
+            }
+            if (now - _kaijuHatchAt < 4.0) return;
+            if (_kaijuCam == null) _kaijuCam = FindAnyObjectByType<Camera.CameraFollowTarget>();
+            if (_kaijuCam == null) { _kaijuShots = 6; return; }
+            _kaijuCam.SetOverride(w.Kaiju.X, w.Kaiju.Z);
+            if (now - _kaijuHatchAt < 5.5 || now < _kaijuNextShot) return;
+            _kaijuShots++;
+            _kaijuNextShot = now + 0.25;
+            ScreenCapture.CaptureScreenshot(Path.Combine(GamePaths.DataDir, "shot-kaiju-" + _kaijuShots + ".png"));
+            Debug.Log($"{LogTag} shot-kaiju-{_kaijuShots}: tick {w.Tick}, kaiju {w.Kaiju.State} at " +
+                      $"({w.Kaiju.X.ToString("F2", CultureInfo.InvariantCulture)}, {w.Kaiju.Z.ToString("F2", CultureInfo.InvariantCulture)})");
+            if (_kaijuShots >= 6) _kaijuCam.ClearOverride();
         }
 
         static bool TryNum(string s, out double v) =>
@@ -203,6 +234,8 @@ namespace CriticalMass.Runtime.Game
         SimDriverBehaviour _driver;
         TitleScreen _title;
         bool _titleSeen, _recording, _ended, _quitting, _timedOut, _hangDone, _shotTitle, _shotStart, _shotMid;
+        // batch 7: Kaiju walk strip under -shots (camera held on the walking Kaiju, 6 shots 0.25 s apart).
+        double _kaijuHatchAt = -1, _kaijuNextShot; int _kaijuShots; Camera.CameraFollowTarget _kaijuCam;
         double _titleAt = -1, _matchStart, _endAt, _firstTitleAt = -1;
         bool _costReset;
         int _exceptionsAtStart, _match = 1, _reloadFrame = -1;
@@ -479,6 +512,7 @@ namespace CriticalMass.Runtime.Game
                 _shotStart = true;
                 ScreenCapture.CaptureScreenshot(Path.Combine(GamePaths.DataDir, "shot-start.png"));
             }
+            if (o.Shots && _kaijuShots < 6 && _recording && _driver != null && _driver.World != null) KaijuStrip(now);
             if (o.Shots && !_shotMid && _recording && _driver != null && _driver.World != null && _driver.World.Match.Time > 60)
             {
                 _shotMid = true;
@@ -507,10 +541,21 @@ namespace CriticalMass.Runtime.Game
                 _driver.HumanAutopilot = true;
                 if (o.Speed > 0) _driver.TimeScale = o.Speed;
                 double hold = _match == 1 ? o.TitleSeconds : 1.0;
-                if (_title != null && !_costReset && now - _titleAt >= 2.0) { _costReset = true; FrameCost.Reset(); }
+                if (_title != null && !_costReset && now - _titleAt >= 2.0)
+                {
+                    _costReset = true;
+                    FrameCost.Reset();
+                    if (_match == 1) FrameRecorder.Begin();   // perf-60hz-32p: the title's own frames (frames-title.csv)
+                }
                 if (_title != null && now - _titleAt >= hold)
                 {
                     Debug.Log("[CM.Cost] title " + FrameCost.Report());
+                    if (FrameRecorder.Active)
+                    {
+                        string perfBase = string.IsNullOrEmpty(Current.PerfLog) ? Path.Combine(Application.persistentDataPath, "perf-last.json") : Current.PerfLog;
+                        string titleCsv = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(perfBase)) ?? "", "frames-title.csv");
+                        Debug.Log("[CM.Frames] title " + FrameRecorder.End(titleCsv));
+                    }
                     _title.Hide();
                     _title = null;
                 }
@@ -607,6 +652,9 @@ namespace CriticalMass.Runtime.Game
                 ("quality", Q(QualitySettings.names[QualitySettings.GetQualityLevel()])),
                 ("quality_requested", Q(FrameGovernor.RequestedQuality)),
                 ("pacing", Q(FrameGovernor.PacingOverride ?? "rule")),
+                ("pacing_reason", Q(FrameGovernor.PacingReason ?? "")),
+                ("window_hidden", AutomationWindow.Active ? "true" : "false"),
+                ("stress_hill", Current.StressHill ? "true" : "false"),
                 ("render_scale", Num(FrameGovernor.AppliedRenderScale)),
                 ("render_pixels", ((long)(Screen.width * FrameGovernor.AppliedRenderScale) * (long)(Screen.height * FrameGovernor.AppliedRenderScale)).ToString(CultureInfo.InvariantCulture)),
                 ("max_queued_frames", QualitySettings.maxQueuedFrames.ToString(CultureInfo.InvariantCulture)),

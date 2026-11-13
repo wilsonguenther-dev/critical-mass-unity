@@ -67,6 +67,36 @@ namespace CriticalMass.Runtime.Tests
         }
 
         [Test]
+        public void CrowdBudgetKeepsOnlyTheNearestFightersAtLod0()
+        {
+            // perf-60hz-32p: 31 others on screen at the hill; Medium keeps 10 at LOD0, High 16, Low none.
+            QualityRow low = QualityTable.For(FramePolicy.LevelLow), med = QualityTable.For(FramePolicy.LevelMedium),
+                high = QualityTable.For(FramePolicy.LevelHigh);
+            Assert.AreEqual(QualityTable.MediumLod0Budget, med.Lod0Budget);
+            Assert.AreEqual(QualityTable.HighLod0Budget, high.Lod0Budget);
+            var d = new float[31];
+            for (int i = 0; i < d.Length; i++) d[i] = 30f - i * 0.9f;   // 30 m down to 3 m, unsorted order
+            float cut = AnimLod.CrowdCut((float[])d.Clone(), d.Length, med.Lod0Budget);
+            int lod0 = 0;
+            foreach (float x in d) lod0 += AnimLod.PickLod(false, x, cut, med) == 0 ? 1 : 0;
+            Assert.AreEqual(med.Lod0Budget, lod0, "Medium: exactly the budget at LOD0 when more are within 25 m");
+            cut = AnimLod.CrowdCut((float[])d.Clone(), d.Length, high.Lod0Budget);
+            lod0 = 0;
+            foreach (float x in d) lod0 += AnimLod.PickLod(false, x, cut, high) == 0 ? 1 : 0;
+            Assert.AreEqual(high.Lod0Budget, lod0);
+            Assert.AreEqual(0, AnimLod.PickLod(true, 40f, float.NegativeInfinity, med), "your own fighter is always LOD0");
+            Assert.AreEqual(float.PositiveInfinity, AnimLod.CrowdCut(new float[4], 4, 10), "a small crowd is not cut");
+            Assert.AreEqual(1, AnimLod.PickLod(false, 2f, AnimLod.CrowdCut(new float[4], 4, 0), low));
+        }
+
+        [Test]
+        public void StressHillFlagParsesAndIsOffByDefault()
+        {
+            Assert.IsFalse(AutoplayArgs.Parse(new[] { "-autoplay" }).StressHill);
+            Assert.IsTrue(AutoplayArgs.Parse(new[] { "-autoplay", "-stressHill" }).StressHill);
+        }
+
+        [Test]
         public void AnimationCullsOffScreenAndThrottlesDistantFighters()
         {
             QualityRow high = QualityTable.For(FramePolicy.LevelHigh);

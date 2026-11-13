@@ -7,6 +7,8 @@
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 // SRGBToLinear / LinearToSRGB for the vertex-colour mode.
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
+// Time of day (arena night life 1): the global grade, the void colour, stars and moon; all globals 0 = Day.
+#include "CMTimeOfDay.hlsl"
 
 CBUFFER_START(UnityPerMaterial)
     half4 _BaseColor;
@@ -323,10 +325,21 @@ float4 CMToonPositionCS(CMToonAttributes input)
 }
 
 // Height fog below the islands (environment kit v3: starts at y -3.5): 0 above _FogTop, _FogAmount at _FogBottom.
+// Time of day: the fog colour comes from CMTodFogColor (the preset's void colour and gradient, stars and moon where
+// the fog is full); with every time-of-day global at 0 it is exactly _FogColor, as before.
 half3 CMToonFog(half3 color, float3 positionWS)
 {
     float f = _FogAmount * saturate((_FogTop - positionWS.y) / max(1e-3, _FogTop - _FogBottom));
-    return lerp(color, _FogColor.rgb, f);
+    if (f <= 0.0) return color;
+    return lerp(color, CMTodFogColor(_FogColor.rgb, positionWS, (half)f), f);
+}
+
+// Time of day: how much of the grade a CM/Toon material skips. Characters and the Kaiju (rim strength above 0: world
+// materials set 0, art direction 2.2) and crystals (lit multiplier above 1) are the bright layer and keep most of
+// their Day value; the rest of the world takes the full grade.
+half CMToonTodLift()
+{
+    return saturate(max(step(0.001h, _RimStrength), (_LitMultiplier - 1.0h) * 1.25h));
 }
 
 // Three tone bands (2.2): lit = base x 1.00, mid = base x _MidMultiplier, shadow = base x _ShadowMultiplier mixed

@@ -4,6 +4,7 @@
 #   tools/remote-playtest.sh [--host HOST] [--app PATH.app] [--mode smoke|captures] [--quality High|Medium|Low]
 #                            [--matches N] [--out DIR] [--speed X] [--novsync] [--profile default|floor]
 #                            [--width W --height H] [--title-seconds S] [--timeout S] [--lock-wait S] [--keep N]
+#                            [--extra "PLAYER FLAGS"]  (e.g. "-showWindow -autoplayPacing rule,timed60")
 # What it does: copies the .app (rsync, only changed files) to ~/cm-remote/builds/<build commit>/ on the box, starts
 # ~/cm-remote/bin/air-run.sh there detached (queue lock, mute for the run, caffeinate, settings isolation, the same
 # automation flags as tools/demo-smoke.sh: -autoplay -quitAfterMatch -autoplayMatches -autoplayTitleSeconds
@@ -17,13 +18,14 @@
 # Exit: 0 pass, 1 fail (exceptions, budget over or not measured), 4 match timeout, 124 overall timeout, 75 queue wait
 # ran out, 66 no app, 67 box refused (battery or disk), 69 box unreachable, 64 usage.
 set -euo pipefail
+EXTRA=""    # --extra "FLAGS": more player flags, passed as they are (perf-60hz-32p)
 CAMYAW=""   # --camera-yaw D: the player's -cameraYaw (builds from a81efe4+1 on; 0 = true north, 45 = default)
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$ROOT/tools/remote/_remote-lib.sh"
 APP="$ROOT/Builds/current/CriticalMass.app"; [[ -d "$APP" ]] || APP="$ROOT/Builds/macOS/CriticalMass.app"
 MODE=smoke; QUALITY=Medium; MATCHES=1; OUT=""; SPEED=""; NOVSYNC=""; PROFILE=default; W=1920; H=1080; TITLE_S=12
 TIMEOUT=900; LOCK_WAIT=3600; KEEP=2
-usage() { sed -n '4,6p' "${BASH_SOURCE[0]}" | sed 's/^# *//' >&2; exit 64; }
+usage() { sed -n '4,7p' "${BASH_SOURCE[0]}" | sed 's/^# *//' >&2; exit 64; }
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --host) REMOTE_HOST="${2:?}"; shift 2 ;;
@@ -35,6 +37,7 @@ while [[ $# -gt 0 ]]; do
     --speed) SPEED="${2:?}"; shift 2 ;;
     --novsync) NOVSYNC=1; shift ;;
     --camera-yaw) CAMYAW="$2"; shift 2 ;;
+    --extra) EXTRA="$2"; shift 2 ;;
     --profile) PROFILE="${2:?}"; shift 2 ;;
     --width) W="${2:?}"; shift 2 ;;
     --height) H="${2:?}"; shift 2 ;;
@@ -70,7 +73,7 @@ rsync_to --delete "$APP" "$REMOTE_USER@$REMOTE_HOST:cm-remote/builds/$COMMIT/" \
 FPS=(); [[ "$PROFILE" == floor ]] && FPS=(--fps-cap 30)
 ARGS=(--build "builds/$COMMIT" --matches "$MATCHES" --title-seconds "$TITLE_S" --timeout "$TIMEOUT"
       --quality "$QUALITY" --width "$W" --height "$H" --keep "$KEEP" --lock-wait "$LOCK_WAIT"
-      ${SPEED:+--speed "$SPEED"} ${NOVSYNC:+--novsync} ${CAMYAW:+--camera-yaw "$CAMYAW"} ${FPS[@]+"${FPS[@]}"})
+      ${SPEED:+--speed "$SPEED"} ${NOVSYNC:+--novsync} ${CAMYAW:+--camera-yaw "$CAMYAW"} ${EXTRA:+--extra "$EXTRA"} ${FPS[@]+"${FPS[@]}"})
 [[ "$MODE" == captures ]] && ARGS+=(--shots)
 MAX=$((LOCK_WAIT + MATCHES * (TIMEOUT + 60) + 300))
 echo "remote-playtest: $MODE, $MATCHES match(es) at $QUALITY on $REMOTE_HOST, job $ID (limit ${MAX}s incl. queue)"

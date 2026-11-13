@@ -315,7 +315,9 @@ namespace CriticalMass.Sim.Core
             {
                 int k = d.EventIndex++;
                 d.NextEventTick += Durations.T30(w.Config, E.PeriodTicks);
-                Start(w, (DepthRules.HashInt(w.Opts.Seed, 30, 0, 3) + k) % 3, k);
+                int kind = (DepthRules.HashInt(w.Opts.Seed, 30, 0, 3) + k) % 3;
+                // Off by default (MapEventsConfig.BridgeCollapse): the bridge turn is a quiet minute, no event at all.
+                if (kind != KindBridge || E.BridgeCollapse) Start(w, kind, k);
             }
             DropStep(w);
             EggStep(w);

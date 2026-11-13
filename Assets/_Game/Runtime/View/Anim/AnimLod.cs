@@ -51,7 +51,9 @@ namespace CriticalMass.Runtime.View.Anim
         {
             if (!Enabled || alwaysAnimate || fresh) return true;
             if (!anyVisible) return false;
-            return Near(pos) || ((_frame + id) & 1) == 0;
+            // perf-60hz-32p: on the title (the backdrop match nobody plays) every fighter poses every other frame.
+            bool near = Near(pos) && !CriticalMass.Runtime.Game.FrameGovernor.IdleTitle;
+            return near || ((_frame + id) & 1) == 0;
         }
 
         /// <summary>The pure decision for tests: visible, near or on the stagger frame.</summary>

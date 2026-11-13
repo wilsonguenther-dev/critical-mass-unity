@@ -266,6 +266,24 @@ namespace CriticalMass.Runtime.Audio
             StateChanged?.Invoke(prev, next);
         }
 
+        /// <summary>Story intro 3: the intro film's own soundtrack crossfades into music-title.ogg over its last 1.5 s at
+        /// exactly the level the title plays it; on the film's last frame this continues the title loop from the same sample
+        /// offset at full level, so the hand-off has no seam, no dip and no pop. Outside the title (a replay from a match's
+        /// pause menu) it only restores the music bed.</summary>
+        public static void ResumeTitleAt(float seconds)
+        {
+            FilmBed = 1f;
+            MusicDirector m = Instance;
+            if (m == null) return;
+            AudioSource cur = m._loops[m._cur];
+            AudioClip title = m._tracks[(int)MusicState.Title];
+            bool settled = Time.unscaledTime - m._fadeStart >= m._fadeLen;
+            if (title == null || cur.clip != title || !cur.isPlaying || !settled) return;
+            cur.time = Mathf.Repeat(Mathf.Max(0f, seconds), title.length);
+            m._duck = Time.unscaledTime < _duckUntil ? FilmDuck : 1f;
+            cur.volume = m._gain * m._duck;
+        }
+
         /// <summary>Crossfades to clip (null = fade to silence). The same clip already playing just keeps playing.</summary>
         void Switch(AudioClip clip, float seconds, float now)
         {

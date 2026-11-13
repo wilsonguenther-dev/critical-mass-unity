@@ -68,8 +68,8 @@ namespace CriticalMass.Runtime.Tests
             Assert.AreEqual(60, FramePolicy.EffectiveCap(120, false, true));
             Assert.AreEqual(30, FramePolicy.EffectiveCap(30, false, true));
             Assert.AreEqual(120, FramePolicy.EffectiveCap(120, false, false));
-            Assert.AreEqual(30, FramePolicy.TitleCapFor(60), "title idle cap");
-            Assert.AreEqual(30, FramePolicy.TitleCapFor(0));
+            Assert.AreEqual(FramePolicy.TitleCap, FramePolicy.TitleCapFor(60), "title idle cap");
+            Assert.AreEqual(FramePolicy.TitleCap, FramePolicy.TitleCapFor(0));
         }
 
         [Test]

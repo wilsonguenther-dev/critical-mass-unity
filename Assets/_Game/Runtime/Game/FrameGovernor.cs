@@ -69,6 +69,9 @@ namespace CriticalMass.Runtime.Game
         public static int AppliedQueuedFrames { get; private set; }
         /// <summary>true while the title screen is up (read by SimDriverBehaviour's backdrop throttle).</summary>
         public static bool TitleUp { get; private set; }
+        /// <summary>perf-60hz-32p: the title is up and idle (no story film, no attract tour over it): the backdrop's LOD1,
+        /// half-rate poses and the 20 fps title cap apply.</summary>
+        public static bool IdleTitle { get; private set; }
 
         /// <summary>The quality the run asked for (-quality or the stored choice); the perf gate compares it with the real one.</summary>
         public static string RequestedQuality { get; private set; } = "";
@@ -88,6 +91,9 @@ namespace CriticalMass.Runtime.Game
         /// <summary>perf-smooth-1 measurement only (autoplay -autoplayPacing): null or "rule" = the frame cap rule; "display" =
         /// vsync every refresh, no cap; "timed60" = vsync off, a timed 60.</summary>
         public static string PacingOverride;
+
+        /// <summary>perf-60hz-32p: why the frame pacing in force was chosen (perf report "pacing_reason", Player.log).</summary>
+        public static string PacingReason { get; private set; }
 
         /// <summary>perf-smooth-1 (autoplay -autoplayQualities): run the next match at this level, as -quality NAME would.</summary>
         public static void ForceRunQuality(string name)
@@ -465,6 +471,7 @@ namespace CriticalMass.Runtime.Game
             bool background = !_focused && !o.Autoplay;
             int cap;
             int vsync, target;
+            string reasonGuard = null;
             if (o.Autoplay && o.NoVsync)
             {
                 cap = 0;
@@ -486,15 +493,27 @@ namespace CriticalMass.Runtime.Game
                     vsync = 0;   // vsync off by choice (or the save-power cap): still capped, never unbounded
                     target = cap > 0 ? cap : (double.IsNaN(hz) || hz < 20 ? 60 : (int)Math.Round(hz));
                 }
-                _guard.Feed(dt, cap, vsync > 0);
+                _guard.Feed(dt, cap, vsync > 0, hz);
+                if (_guard.ForceTimed && cap >= 0 && vsync == 0 && target > 0 && _prefVSync != 0) reasonGuard = _guard.Why;
             }
-            if (o.Autoplay && PacingOverride == "display") { vsync = 1; target = -1; }
-            else if (o.Autoplay && PacingOverride == "timed60") { vsync = 0; target = 60; }
+            string reason = vsync > 0 ? "vsync " + vsync : target > 0 ? "timed " + target : "unlimited";
+            if (reasonGuard != null) reason += " (" + reasonGuard + ")";
+            if (o.Autoplay && PacingOverride == "display") { vsync = 1; target = -1; reason = "override display"; }
+            else if (o.Autoplay && PacingOverride == "timed60") { vsync = 0; target = 60; reason = "override timed60"; }
+            // perf-60hz-32p: hidden automation windows keep vsync too. Measured on the Air in one session (build a81efe4,
+            // Medium): vsync 1 = 0.67% of frames at 33 ms or more, p95 16.8 ms; a timed 60 (vsync off, targetFrameRate 60) =
+            // 7.59%, p95 24.2 ms. A timer is the worse pacer on macOS, hidden or not.
             if (QualitySettings.vSyncCount != vsync) QualitySettings.vSyncCount = vsync;
             if (Application.targetFrameRate != target) Application.targetFrameRate = target;
             AppliedVSync = vsync;
             AppliedTarget = target;
             AppliedCap = cap;
+            if (reason != PacingReason)
+            {
+                PacingReason = reason;
+                Debug.Log($"[CM.Governor] pacing: {reason} (cap {cap}, vSyncCount {vsync}, targetFrameRate {target}, " +
+                          $"{Screen.currentResolution.refreshRateRatio.value:0.#} Hz{(AutomationWindow.Active ? ", hidden window" : "")})");
+            }
 
             string notice = null;
             if (_notice != null && Time.realtimeSinceStartup < _noticeUntil) notice = _notice;
@@ -509,7 +528,9 @@ namespace CriticalMass.Runtime.Game
         {
             int pref = SafeMode ? Math.Min(_prefCap == 0 ? SafeCap : _prefCap, SafeCap) : _prefCap;
             int cap = FramePolicy.EffectiveCap(pref, menuLike, _onBattery);
-            return _title ? FramePolicy.TitleCapFor(cap) : cap;
+            // perf-60hz-32p: the idle title runs at TitleCap; the story film and the attract tour over it keep the menu rate.
+            IdleTitle = _title && !Menus.StoryIntro.IsPlaying && !Menus.AttractMode.IsTouring;
+            return IdleTitle ? FramePolicy.TitleCapFor(cap) : cap;
         }
     }
 

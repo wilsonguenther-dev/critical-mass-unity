@@ -192,16 +192,21 @@ namespace CriticalMass.Runtime.Hud
         }
 
         /// <summary>Canvas scale and logo resolution for the camera's current pixel size.</summary>
+        string _logoTier;
+
         public void UpdateScale()
         {
             UnityEngine.Camera cam = _canvas.worldCamera;
             float w = cam != null ? cam.pixelWidth : Screen.width, h = cam != null ? cam.pixelHeight : Screen.height;
             if (w < 1 || h < 1) return;
-            _canvas.scaleFactor = HudLayout.Scale(w, h);
+            float sf = HudLayout.Scale(w, h);
+            if (Mathf.Abs(_canvas.scaleFactor - sf) > 1e-4f) _canvas.scaleFactor = sf;   // a set re-lays the whole canvas
             string tier = _canvas.scaleFactor <= 1.01f ? "1x" : _canvas.scaleFactor <= 2.01f ? "2x" : "4x";
-            string want = "critical-mass-bible-logo@" + tier;
-            if (_logo.texture == null || _logo.texture.name != want)
+            // perf-60hz-32p: compare the tier, not texture.name (a native string copy every frame on the title).
+            if (_logo.texture == null || _logoTier != tier)
             {
+                _logoTier = tier;
+                string want = "critical-mass-bible-logo@" + tier;
                 _logo.texture = Resources.Load<Texture2D>("UI/Logo/" + want);
                 _glow.texture = Resources.Load<Texture2D>("UI/Logo/critical-mass-bible-logo-glow@" + tier);
             }
