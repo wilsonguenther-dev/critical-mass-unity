@@ -43,7 +43,7 @@ def hidden(o, vol, v):
     return other < -0.020
 
 
-def decimate(v, f, target):
+def decimate(v, f, target, keep_border=True):
     """MeshLab quadric edge collapse. (Fast-Quadric-Mesh-Simplification stalls on flat faces and tears them when
     forced: the first shield rim came out as shards, silhouette IoU against the sculpt 0.76; this gives 0.99.)"""
     import pymeshlab
@@ -51,7 +51,7 @@ def decimate(v, f, target):
         return v, f
     ms = pymeshlab.MeshSet()
     ms.add_mesh(pymeshlab.Mesh(v.astype(np.float64), f.astype(np.int32)))
-    ms.meshing_decimation_quadric_edge_collapse(targetfacenum=int(max(4, target)), qualitythr=0.5, preserveboundary=True,
+    ms.meshing_decimation_quadric_edge_collapse(targetfacenum=int(max(4, target)), qualitythr=0.5, preserveboundary=keep_border, boundaryweight=1.0 if keep_border else 4.0,
                                                 preservenormal=True, preservetopology=True, optimalplacement=True,
                                                 planarquadric=True, planarweight=0.001, autoclean=True)
     mm = ms.current_mesh()
@@ -145,7 +145,7 @@ def run(work):
             vol = o.fld[gid]
             want = max(60, int(BUDGET[name] * a * WEIGHT.get(W.GROUPS[gid], 1.0) / wsum))
             # decimate the CLOSED shell (open borders collapse badly), then drop the buried faces
-            v, f = decimate(v, f, int(want * min(1.6, atot / a)))
+            v, f = decimate(v, f, int(want * min(3.2 if name == 'body' else 1.6, atot / a)))
             for _ in range(2):                     # pull the decimated vertices back onto the true surface
                 v = v - o.grad(vol, v) * o.s(vol, v)[:, None]
             f = f[~(hidden(o, vol, v)[f]).all(1)]
@@ -168,9 +168,10 @@ def run(work):
             Lp = []
             for gid, v, f in per_group:
                 vol = o.fld[gid]
-                v2, f2 = decimate(v, f, max(8, int(len(f) * k)))
-                for _ in range(2):
-                    v2 = v2 - o.grad(vol, v2) * o.s(vol, v2)[:, None]
+                v2, f2 = decimate(v, f, max(8, int(len(f) * k)), keep_border=False)
+                for _ in range(2):                 # only where the field is a true distance (within 4 cm)
+                    dist = o.s(vol, v2)
+                    v2 = v2 - o.grad(vol, v2) * np.where(np.abs(dist) < 0.04, dist, 0.0)[:, None]
                 Lp.append((gid, v2.astype(F), f2))
             tot = sum(len(f2) for _, _, f2 in Lp)
             if tot <= LOD0_BUDGET[name]:

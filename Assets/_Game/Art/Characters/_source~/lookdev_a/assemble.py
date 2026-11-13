@@ -70,6 +70,20 @@ T_CLEAVER = held("handslot.r", poses["handslot.r"].translation.copy(), _z, -_dow
 
 
 def mesh_from_np(name, v, f, uv=None, n=None, cn=None):
+    # drop degenerate and duplicate faces here, so validate() never changes the face order under the per-corner data
+    f = np.asarray(f)
+    ok = (f[:, 0] != f[:, 1]) & (f[:, 1] != f[:, 2]) & (f[:, 0] != f[:, 2])
+    ar = np.linalg.norm(np.cross(v[f[:, 1]] - v[f[:, 0]], v[f[:, 2]] - v[f[:, 0]]), axis=1)
+    ok &= ar > 1e-10
+    _, first = np.unique(np.sort(f, axis=1), axis=0, return_index=True)
+    uniq = np.zeros(len(f), bool)
+    uniq[first] = True
+    ok &= uniq
+    f = f[ok]
+    if uv is not None and uv.ndim == 3:
+        uv = uv[ok]
+    if cn is not None:
+        cn = cn[ok]
     me = bpy.data.meshes.new(name)
     me.vertices.add(len(v))
     me.vertices.foreach_set("co", np.ascontiguousarray(v, np.float32).ravel())
@@ -82,7 +96,8 @@ def mesh_from_np(name, v, f, uv=None, n=None, cn=None):
     except Exception:
         pass                                   # derived from loop_start on current Blender
     me.update(calc_edges=True)
-    me.validate()
+    if me.validate():
+        print("LD WARNING validate changed", name, len(f), len(me.polygons), flush=True)
     me.polygons.foreach_set("use_smooth", np.ones(len(me.polygons), bool))
     if uv is not None:
         li = np.zeros(len(me.loops), np.int32)

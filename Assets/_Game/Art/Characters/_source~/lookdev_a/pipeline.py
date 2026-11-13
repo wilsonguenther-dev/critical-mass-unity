@@ -57,6 +57,33 @@ class Obj:
         return out
 
 
+FLOW_SOFT, FLOW_K = ("skin", "navy", "cream", "trouser", "leather"), 0.045     # flesh and cloth: one continuous body
+FLOW_DRAPE, DRAPE_K = ("teal",), 0.020                                           # scarf and tabard drape onto it
+FLOW_SHELL = 0.035
+
+
+def flow(g):
+    """ONE BODY, NOT STACKED PARTS. The flesh and cloth groups are smooth-unioned into a single continuous surface
+    (4.5 cm fillets: neck into shoulders, arm into bracer, hips into torso), the scarf and tabard join it with a
+    2 cm fillet, and then that one surface is cut back into its materials along the bisector between the original
+    parts. So materials meet in a clean seam ON one form instead of being separate lumps that touch."""
+    ids = [W.GID[n] for n in FLOW_SOFT + FLOW_DRAPE if W.GID[n] in g.fields]
+    raw = {i: g.fields[i].copy() for i in ids}
+    U = None
+    for n in FLOW_SOFT:
+        i = W.GID[n]
+        if i in raw:
+            U = raw[i].copy() if U is None else sdfkit.smin(U, raw[i], FLOW_K)
+    for n in FLOW_DRAPE:
+        i = W.GID[n]
+        if i in raw:
+            U = sdfkit.smin(U, raw[i], DRAPE_K)
+    for i in ids:
+        other = np.minimum.reduce([raw[j] for j in ids if j != i])
+        bis = (raw[i] - other) * 0.5
+        g.fields[i] = np.maximum(U, np.minimum(bis, U + FLOW_SHELL)).astype(F)
+
+
 def stage_fields(work):
     for name, (lo, hi, parts) in W.models().items():
         t0 = time.time()
@@ -64,6 +91,8 @@ def stage_fields(work):
         npts = 0
         for grp, shape in parts:
             npts += g.add(W.GID[grp], shape)
+        if name == "body":
+            flow(g)
         gids = sorted(g.fields)
         d1 = np.full(g.n, 9, F)
         d2 = np.full(g.n, 9, F)
