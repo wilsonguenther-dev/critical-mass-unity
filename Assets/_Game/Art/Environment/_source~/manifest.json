@@ -1809,23 +1809,23 @@
    "fbx": "Environment/env_path_ruts.fbx",
    "cat": "ground_decal",
    "pivot": "cell top centre (cx+0.5, h, -(cz+0.5)); local +Z along the route tangent",
-   "tris": 290,
+   "tris": 192,
    "outline_px": 0.0,
    "materials": [
     "CM_Toon"
    ],
-   "verts": 216,
+   "verts": 170,
    "cull": "down",
    "v4": "new",
    "bounds_unity_min": [
-    -0.8597,
+    -0.7482,
     -0.02,
-    -1.1299
+    -1.1861
    ],
    "bounds_unity_max": [
-    0.8742,
-    0.0979,
-    1.0499
+    0.7593,
+    0.15,
+    1.2569
    ],
    "covers": "v4 worn route shoulder: dirt, two ruts, edge stones (under 0.1 u)",
    "team_mask": false
@@ -2122,23 +2122,23 @@
    "fbx": "Environment/env_tree_gnarl.fbx",
    "cat": "tree",
    "pivot": "cell top centre (cx+0.5, h, -(cz+0.5)) (fill or edge)",
-   "tris": 446,
+   "tris": 450,
    "outline_px": 2.5,
    "materials": [
     "CM_Toon_Foliage"
    ],
-   "verts": 304,
+   "verts": 307,
    "cull": "down",
    "v4": "new",
    "bounds_unity_min": [
-    -1.3854,
-    -0.125,
-    -0.9126
+    -1.1723,
+    -0.15,
+    -0.9022
    ],
    "bounds_unity_max": [
-    1.7235,
-    3.0415,
-    0.8796
+    1.3933,
+    3.1306,
+    0.8696
    ],
    "covers": "v4 gnarled ancient tree, exposed roots, moss strands",
    "team_mask": false
@@ -2567,7 +2567,7 @@
    "fbx": "Environment/env_kaiju_statue.fbx",
    "cat": "landmark",
    "pivot": "cell top centre (cx+0.5, h, -(cz+0.5)) of a fill; yaw so local -Z faces the nearest route",
-   "tris": 178,
+   "tris": 180,
    "outline_px": 2.0,
    "materials": [
     "CM_Toon"
@@ -2576,13 +2576,13 @@
    "cull": "down",
    "v4": "new",
    "bounds_unity_min": [
-    -0.55,
+    -0.5599,
     0.0,
     -0.8488
    ],
    "bounds_unity_max": [
     0.55,
-    2.3756,
+    2.3885,
     0.55
    ],
    "covers": "v4 old Kaiju-cult idol (2.4 u)",

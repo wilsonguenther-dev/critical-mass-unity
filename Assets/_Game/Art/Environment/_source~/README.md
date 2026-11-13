@@ -1,4 +1,4 @@
-# Skybreak Basin environment kit, v3 (v2 structure + the owner's 2026-11-12 polish pass)
+# Skybreak Basin environment kit, v4 (v3 + the owner's "more detail" pass, 2026-11-12 evening)
 
 A modular kit that tiles on the game's 1 m cell grid (F-03), built by script in headless Blender 5.2.3 for the
 perspective gameplay camera (pitch 55, vertical FOV 35, 23.4 u, yaw 45; ART-DIRECTION-2026-11-12 sections 2 and 5,
@@ -39,6 +39,34 @@ FBX files are left untouched and only stand in for those structures in the rende
   one mass), flagstones #EDD3A6 / #E0C195 / #F3DDB2, grout #8C7556, kerb #C9AD84 / #BDA078 / #D6BA90, cast shadow x0.60
   + 16% navy. Rock #8A826D, rock mid #74705D, band #53564F, rim stone #8B826C / #7A7261. Height fog starts at y -3.5.
 - Structure stand-ins (walls, hill plaza, pads, banners, shrine) are left out of every v3 render; art/bases-blender owns them.
+
+## What v4 changed (2026-11-12 evening; read before porting)
+
+- **kit4 patches kit2 in place** (`env_art/kit4.py`, `kit4.patch()` is called by `build_env_kit.py`). Same names and pivots.
+  Bridges keep their v3 bounding boxes exactly (clamped): `env_bridge_span` [-1.66,-0.3,-0.08]..[1.66,0.8,2.0465],
+  `env_bridge_post` [-0.08,-0.3,-0.08]..[0.08,0.8,0.08], `env_bridge_pier` [-0.32,-0.9,-0.32]..[0.32,0.86,0.32],
+  `env_bridge_cell` [-0.5,-0.2,-0.5]..[0.5,-0.012,0.5]. Deck top stays +0.05. The span carries a lantern hook on its +X post
+  (local (1.31, 0.69, 0.02)). Cliff skirts keep length, pivot and top (-0.73 = roots start 2 cm above the old top);
+  their random depth differs per piece. Rim lips gain 0.05 u inland (grass roll). The waterfall's splash ring and mist
+  widen its box to x -0.87..0.97 (pool and lip unchanged).
+- **Upgraded**: cliffs (paler strata, cracks, hanging roots, vines; raw crystals and Kaiju-bone fossils only on skirts of
+  3 u or more so they never repeat 140 times), rim lips (lit grass roll + grass drips over the rock band), waterfall
+  (0.88 u ribbon, two stepped foam ledges, splash ring, 5 low-poly mist puffs), bridges (thick uneven planks with gaps
+  and nails, one cracked plank, chunky capped posts with rope wraps, knotted sagging ropes, hanger ropes).
+- **38 new pieces** (kit4.NEW): ground decals (light/dark patches, moss, worn dirt, route ruts, puddle), scatter
+  (grass and flower clumps, moss rocks, mushrooms, reeds, berry bush, edge stones, rubble), trees (oak, pine, gnarl),
+  floating chunks, `env_bridge_span_damaged` (same box as the span), `env_bridge_anchor`, lights (torch, lantern post,
+  hanging lantern, campfire), dressing (fence, signpost + 3 boards, neutral worship banner, sacks, woodpile), lore
+  (Kaiju statue, Kaiju skull, bone ribs, altar). Placement rules: `env_art/layout4.py` (`RULES`, `dress`), pure Python.
+- **Contract unchanged**: one `Col` layer, alpha 0 or 0.25 only (flames, embers, lantern glass, raw crystal facets and
+  puddles are 0.25 self-lit; no team codes). Glow decals use the existing `CM_GlowDecal` slot. Berries are slot 1
+  (`CM_Toon`) of `env_bush_berry` (slot 0 `CM_Toon_Foliage`).
+- **Painted finish**: `env_art/finish.py` is a verbatim copy of art/warrior-blender `cm_art/finish.py`;
+  `kit4.apply_finish` runs it on stone, wood, bone and metal pieces and multiplies the loop colours (helper layers removed
+  before export).
+- **Rebuild everything in one Blender process**: `run_all_v4.py -- <out>` (before renders with the v3 builders, build +
+  export, FBX re-import check, after renders, kit sheets; about 10 s), then `python3 measure_v4.py <out> <report_dir>
+  <v3 manifest.json> <world-plan.tsv>` for costs, densities and the step-over check.
 
 ## Rebuild (from the repo root; exit 0, about 20 s in total)
 
