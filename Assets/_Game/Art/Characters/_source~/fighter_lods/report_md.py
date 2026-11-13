@@ -23,13 +23,29 @@ w("1. **Colour:** colour, UVs, normals and material are taken per face corner fr
   "silhouette into 3 x 3 regions at gameplay size and gates the largest difference of mean colour per region "
   "(LOD0 at most 16, LOD1 at most 24, on 0-255).")
 w("2. **Shards:** vertices are welded by distance before decimating (1.5 mm in the `decw` method), with no seam "
-  "protection on LOD1 and the Shadow. The Shadow is now a closed proxy: the convex hull of each bone's vertices, "
+  "protection on LOD1 and the Shadow. The Shadow is now a closed proxy: one convex hull per bone and per large part on "
+  "that bone, "
   "decimated to budget, each hull rigid to its bone, so it cannot tear. LOD1 ships only if a closed, coherent "
   "variant reaches overlap 0.93 with at most 50 torn edges, at most 10 shard islands (6 triangles or fewer) and "
   "clean region colour. Otherwise LOD1 is identical to LOD0 (method `lod0` below).")
-w("3. **Orientation:** see the proof section below.")
-w("4. **LOD0:** the best of two variants per model (`dec`: exact weld, 2 degree planar; `decw`: 1.5 mm weld, 0.5 "
-  "degree planar), with face, hands-free and mask-border locks as before.\n")
+w("3. **Orientation (root cause found, it was the build, not only the sheet):** v1 imported the fighter FBX with "
+  "Blender's experimental bake_space_transform. That put the bones upright but left the skinned mesh in a frame "
+  "rotated 90 degrees against them, so the v1 LODs were built, posed and rendered lying down (my upright check "
+  "projected bones, not the mesh). The fix imports without the bake and applies the importer's axis rotation to rig "
+  "and mesh (identity, Z up, like the source .blend), then exports with the unchanged original settings. Proof: the "
+  "original FBX and the new LOD FBX re-imported into one scene give identical evaluated mesh bounding boxes, height "
+  "on Z (about 2.0 m), mesh top vertex and head bone at (0, 0, 1.241) for all six fighters (table below). Sheets now "
+  "render standing; at rest the head projects above the hips above the feet.")
+w("4. **LOD0:** with the frame fixed, the same collapse settings (exact weld, 2 degree planar pass, face and "
+  "mask-border locks) reach 0.975 to 0.986 on every fighter, so Farmer, Miner and Demolitions pass 0.97.\n")
+w("**Open items, stated plainly:** the region colour gate (16) still fails on LOD0 for Miner (26), Healer (20) and "
+  "Demolitions (18). In each case it is one of nine regions on the back view, the side holding the tool, measured on "
+  "pixels both renders cover; the Healer's navy cloak itself now matches (sheet). The decimated fighter LOD1 reached "
+  "0.91 to 0.96 overlap but kept 80 to 180 small islands, so per the rule every fighter and the hatchling ship LOD1 "
+  "identical to LOD0 (4,400 to 4,450 triangles); only the Kaiju adult ships a real LOD1 (4,000, overlap 0.982). The "
+  "Shadow hulls are closed and cannot tear, but are fatter than the body (overlap 0.83 to 0.94); that only widens "
+  "the cast shadow. The Kaiju bounding boxes differ in Y because both files carry clips and the importer poses each "
+  "at a clip frame; Z extent and top vertex are identical.\n")
 w("Methods shipped per model: " + "; ".join("%s %s" % (k, ", ".join("%s=%s" % kv for kv in v.items())) for k, v in choice.items()) + ".\n")
 w("## Results (re-imported FBX; gameplay camera pitch 55, vFOV 35 at 1080 px, 23.4 u; worst of front and back three-quarter)")
 part = tables.split("\n\n")
@@ -44,7 +60,7 @@ for k, v in a.items():
         k, lv["LOD0"]["region_colour_diff"], "pass" if lv["LOD0"].get("region_pass") else "FAIL",
         lv["LOD1"]["region_colour_diff"], "pass" if lv["LOD1"].get("region_pass") else "FAIL",
         lv["LOD1"].get("islands"), lv["LOD1"].get("shard_islands"), lv["Shadow"].get("islands"), lv["Shadow"].get("shard_islands")))
-w("\n## Orientation proof (original FBX and LOD FBX imported into one Blender scene with the export's axis settings)\n")
+w("\n## Orientation proof (original FBX and LOD FBX imported into one Blender scene, same import settings, evaluated mesh vertices)\n")
 w("| Model | File | Tallest axis | Bbox min | Bbox max | head bone | foot.l bone | Rig rotation |\n|---|---|---|---|---|---|---|---|")
 for k, v in a.items():
     if k.startswith("_") or not v.get("ok") or not v.get("orientation_proof"):
