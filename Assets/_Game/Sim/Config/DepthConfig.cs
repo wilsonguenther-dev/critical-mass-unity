@@ -20,6 +20,8 @@ namespace CriticalMass.Sim.Config
         public StationsConfig Stations = new StationsConfig();
         /// <summary>U-066: coins, power-ups and their deterministic spawner.</summary>
         public PickupsConfig Pickups = new PickupsConfig();
+        /// <summary>U-067: pings the bots answer, the bots' own calls, bot names and play styles.</summary>
+        public PingsConfig Pings = new PingsConfig();
 
         public DepthConfig Clone()
         {
@@ -28,6 +30,56 @@ namespace CriticalMass.Sim.Config
             c.Sources = Sources.Clone();
             c.Stations = Stations.Clone();
             c.Pickups = Pickups.Clone();
+            c.Pings = Pings.Clone();
+            return c;
+        }
+    }
+
+    /// <summary>U-067 pings, bot calls and play styles (our rule, to the HUD lane's spec). Timing in sim ticks at 30 Hz. Style arrays: Brawler, Guard, Harvester, Sapper.</summary>
+    public sealed class PingsConfig
+    {
+        public bool Enabled = true;
+        /// <summary>At most RateCount pings per actor in any RateWindowTicks (3 per 5 s, the HUD's limit).</summary>
+        public double RateCount = 3;
+        public double RateWindowTicks = 150;
+        /// <summary>Ticks the marker lives (6 s; the view fades it). An answer already taken runs its own timer.</summary>
+        public double PingLifeTicks = 180;
+        public double AnswerRange = 40;
+        public double MaxAttack = 3;
+        public double MaxDefend = 3;
+        public double MaxHelp = 2;
+        /// <summary>A bot holding the hill answers only with at least this many teammates on the hill.</summary>
+        public double HillMinMates = 2;
+        public double AttackSeekRange = 8;
+        public double AttackTicks = 360;
+        public double ArriveRange = 1.5;
+        public double DefendHoldRange = 5;
+        public double DefendReach = 3;
+        public double DefendTicks = 360;
+        public double HelpTicks = 240;
+        public double HelpKeepDistance = 2.5;
+        /// <summary>Utility of following an order (over the hill's 0.7 + inertia, under a retreat's 0.9 only for the hurt, who drop the order first).</summary>
+        public double OrderUtility = 0.98;
+        /// <summary>Route slots per team (one per answered ping, round robin; a bot whose slot was reused walks straight).</summary>
+        public double RouteSlotsPerTeam = 4;
+        /// <summary>Bots call too.</summary>
+        public bool BotCalls = true;
+        public double BotHelpHpFraction = 0.35;
+        public double BotPingCooldownTicks = 600;
+        public double BotTeamPingGapTicks = 240;
+        public double BotPingResponders = 1;
+        /// <summary>Play styles: share of Warriors that are Guards, how readily each style fights, and its distance multiplier when answering Attack, and Defend or Help.</summary>
+        public double WarriorGuardShare = 0.4;
+        public double[] StyleFightScale = { 1.15, 0.95, 0.8, 1 };
+        public double[] StyleAttackBias = { 0.6, 1, 1.5, 1 };
+        public double[] StyleDefendBias = { 1, 0.6, 1.5, 1 };
+
+        public PingsConfig Clone()
+        {
+            var c = (PingsConfig)MemberwiseClone();
+            c.StyleFightScale = (double[])StyleFightScale.Clone();
+            c.StyleAttackBias = (double[])StyleAttackBias.Clone();
+            c.StyleDefendBias = (double[])StyleDefendBias.Clone();
             return c;
         }
     }

@@ -28,6 +28,13 @@ namespace CriticalMass.Sim.Core
         /// never sets it buys nothing). One-shot: read and cleared by Stations.StationSystem. Only a Builder in its station succeeds.
         /// </summary>
         public int StationBuy;
+        /// <summary>
+        /// U-067: a ping, for ONE tick: (int)PingCall + 1 (0 = none) at (PingX, PingZ) in sim units. One-shot: read and
+        /// cleared by PingRules.PingSystem, which enforces the rate limit.
+        /// </summary>
+        public int PingKind;
+        public double PingX;
+        public double PingZ;
 
         public void CopyFrom(InputFrame other)
         {
@@ -43,6 +50,9 @@ namespace CriticalMass.Sim.Core
             Jump = other.Jump;
             TerraformSwitch = other.TerraformSwitch;
             StationBuy = other.StationBuy;
+            PingKind = other.PingKind;
+            PingX = other.PingX;
+            PingZ = other.PingZ;
         }
     }
 }

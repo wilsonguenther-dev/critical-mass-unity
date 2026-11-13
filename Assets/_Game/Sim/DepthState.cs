@@ -93,6 +93,31 @@ namespace CriticalMass.Sim.Core
         public int PowerUpsDropped;
         public int PickupOverflows;
 
+        /// <summary>U-067: per actor, the ticks of its last PingRing accepted pings (a ring) and the ring's next slot.</summary>
+        public int PingRing;
+        public int[] PingTicks;
+        public byte[] PingNext;
+        /// <summary>U-067: per bot, the order it follows ((int)PingCall + 1, 0 = none), its spot, who called, when it ends, and its route slot and serial.</summary>
+        public byte[] OrderKind;
+        public double[] OrderX;
+        public double[] OrderZ;
+        public int[] OrderBy;
+        public int[] OrderEnd;
+        public int[] OrderField;
+        public int[] OrderSerial;
+        /// <summary>U-067: the order routes ([team * slots + k], built on use), their serials and each team's next slot.</summary>
+        public Grid.FlowField[] PingFields;
+        public int[] PingFieldSerial;
+        public int[] PingFieldNext;
+        /// <summary>U-067: per bot and per team, the first tick it may call again.</summary>
+        public int[] BotPingReady;
+        public int[] TeamBotPingReady;
+        /// <summary>U-067 counters: pings accepted, refused, answers given, calls made by bots.</summary>
+        public int PingsAccepted;
+        public int PingsRefused;
+        public int PingAnswers;
+        public int BotPings;
+
         public static DepthState Create(GameConfig cfg, Grid.MapDef map)
         {
             int cap = World.ActorCapacity(cfg);
@@ -114,9 +139,24 @@ namespace CriticalMass.Sim.Core
                 PowerEndTick = new int[cap],
                 WardLeft = new double[cap],
                 WasAlive = new byte[cap],
+                PingRing = Math.Max(1, (int)cfg.Depth.Pings.RateCount),
+                PingNext = new byte[cap],
+                OrderKind = new byte[cap],
+                OrderX = new double[cap],
+                OrderZ = new double[cap],
+                OrderBy = new int[cap],
+                OrderEnd = new int[cap],
+                OrderField = new int[cap],
+                OrderSerial = new int[cap],
+                PingFields = new Grid.FlowField[2 * Math.Max(1, (int)cfg.Depth.Pings.RouteSlotsPerTeam)],
+                PingFieldNext = new int[2],
+                BotPingReady = new int[cap],
+                TeamBotPingReady = new int[2],
             };
             for (int i = 0; i < s.Pickups.Length; i++) s.Pickups[i] = new Pickup { Source = -1, Spot = -1 };
             s.CoinSpotNextTick = new int[s.CoinSpots.Length];
+            s.PingTicks = new int[cap * s.PingRing];
+            s.PingFieldSerial = new int[s.PingFields.Length];
             return s;
         }
 
@@ -162,6 +202,19 @@ namespace CriticalMass.Sim.Core
             PowerUpsTaken = 0;
             PowerUpsDropped = 0;
             PickupOverflows = 0;
+            Array.Fill(PingTicks, -1000000);
+            Array.Clear(PingNext, 0, PingNext.Length);
+            Array.Clear(OrderKind, 0, OrderKind.Length);
+            Array.Fill(OrderBy, -1);
+            Array.Clear(OrderEnd, 0, OrderEnd.Length);
+            Array.Fill(OrderField, -1);
+            Array.Clear(PingFieldNext, 0, 2);
+            Array.Clear(BotPingReady, 0, BotPingReady.Length);
+            Array.Clear(TeamBotPingReady, 0, 2);
+            PingsAccepted = 0;
+            PingsRefused = 0;
+            PingAnswers = 0;
+            BotPings = 0;
             for (int t = 0; t < 2; t++)
             {
                 w.Match.Delivered[t].Wood = 0;

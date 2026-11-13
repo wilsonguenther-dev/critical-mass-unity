@@ -616,7 +616,7 @@ namespace CriticalMass.Sim.Bots
             // Progress detector (CM-30): travelling but never leaving a ProgressRadius circle.
             double progDx = x - st.ProgressX[id];
             double progDz = z - st.ProgressZ[id];
-            bool travelling = cur == AiState.ToHill || cur == AiState.Deliver || cur == AiState.Retreat || cur == AiState.Supply;
+            bool travelling = cur == AiState.ToHill || cur == AiState.Deliver || cur == AiState.Retreat || cur == AiState.Supply || cur == AiState.Order;
             if (!travelling || st.WantMove[id] == 0 || progDx * progDx + progDz * progDz >= ProgressDist2)
             {
                 st.ProgressX[id] = JsMath.F32(x);
@@ -653,7 +653,7 @@ namespace CriticalMass.Sim.Bots
             }
             else if (P.Enemy >= 0)
             {
-                uFight = Cap1(hpFrac * (role == BotsState.RoleHill ? 1 : 0.6) * st.Aggression[id]);
+                uFight = Cap1(hpFrac * (role == BotsState.RoleHill ? 1 : 0.6) * st.Aggression[id] * BotNames.FightScale(w, id)); // U-067 play style (x 1 with the rule off)
                 fightTarget = P.Enemy;
                 if (cur == AiState.HoldHill && !cocky)
                 {
@@ -735,6 +735,30 @@ namespace CriticalMass.Sim.Bots
             if (Pickups.On(w) && cur != AiState.HoldHill && a.CarryAmount == 0 && hpFrac >= lowHp && Pickups.BotGrabSpot(w, id, out grabX, out grabZ))
                 uGrab = w.Config.Depth.Pickups.BotGrabUtility;
 
+            // U-067: an answered ping. A hurt bot or one with cargo drops it; an Attack is over once the spot is reached and clear.
+            double uOrder = 0;
+            if (PingRules.HasOrder(w, id))
+            {
+                PingsConfig PG = w.Config.Depth.Pings;
+                if (hpFrac < lowHp || a.CarryAmount > 0) PingRules.Drop(w, id);
+                else
+                {
+                    int oe = PingRules.OrderEnemy(w, id, FightKeepRange);
+                    if (oe >= 0)
+                    {
+                        fightTarget = oe;
+                        uFight = PG.OrderUtility;
+                    }
+                    else
+                    {
+                        PingRules.OrderGoal(w, id, out double ogx, out double ogz, out double ostop);
+                        bool there = (ogx - x) * (ogx - x) + (ogz - z) * (ogz - z) <= (ostop + 0.5) * (ostop + 0.5);
+                        if (there && PingRules.OrderCall(w, id) == PingCall.Attack) PingRules.Drop(w, id);
+                        else uOrder = PG.OrderUtility;
+                    }
+                }
+            }
+
             // CM-36: the shrine cleanse is the player's tool. Only the human slot on autopilot (IsHuman) uses it, and only for the
             // team that leads delivered biomass, once BotNetUnits net corruption units sit in the egg. Pure bots never cleanse
             // (D-060 retune). Reads delivery counts and cleanse timers only, never instability.
@@ -782,6 +806,9 @@ namespace CriticalMass.Sim.Bots
                 case AiState.Grab:
                     curU = uGrab;
                     break;
+                case AiState.Order:
+                    curU = uOrder;
+                    break;
                 case AiState.Retreat:
                     curU = uRetreat;
                     break;
@@ -802,6 +829,7 @@ namespace CriticalMass.Sim.Bots
             Consider(w, AiState.Escort, uEscort);
             Consider(w, AiState.Supply, uSupply);
             Consider(w, AiState.Grab, uGrab);
+            Consider(w, AiState.Order, uOrder);
             Consider(w, AiState.Retreat, uRetreat);
             AiState best = Sel.Best;
 
@@ -812,7 +840,8 @@ namespace CriticalMass.Sim.Bots
                 double elapsed = now - st.StateSince[id];
                 bool urgent = hpFrac < lowHp || P.Within3 > 0;
                 bool free = elapsed >= B.MinStateSeconds;
-                bool early = elapsed >= UrgentFloorSeconds && (urgent || curU <= 0 || (IsHillState(cur) && IsHillState(best)));
+                bool ordered = best == AiState.Order || (uOrder <= 0 && PingRules.HasOrder(w, id)); // U-067: an order is obeyed at once
+                bool early = ordered || (elapsed >= UrgentFloorSeconds && (urgent || curU <= 0 || (IsHillState(cur) && IsHillState(best))));
                 if (cur == AiState.None || cur == AiState.Unstick || free || early) next = best;
             }
             SetState(w, st, id, next, now);

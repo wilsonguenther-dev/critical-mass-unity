@@ -361,6 +361,21 @@ namespace CriticalMass.Sim.Bots
                 case AiState.Retreat:
                     Follow(w, st, id, TeamPadField(w, id));
                     break;
+                case AiState.Order:
+                {
+                    // U-067: to the ping (or the caller): straight when the line is clear, else the ping's route.
+                    if (!PingRules.HasOrder(w, id)) break;
+                    PingRules.OrderGoal(w, id, out double gx, out double gz, out double stop);
+                    FlowField route = PingRules.OrderRoute(w, id);
+                    if (FirstBlockedCell(map, x, z, gx, gz) < 0 || route == null) Toward(w, id, gx, gz, stop);
+                    else if (FlowField.SampleFlowDir(route, map, x, z, out double odx, out double odz))
+                    {
+                        Mv.X = odx;
+                        Mv.Z = odz;
+                    }
+                    else Toward(w, id, gx, gz, stop);
+                    break;
+                }
                 case AiState.Grab:
                     Toward(w, id, st.GrabX[id], st.GrabZ[id], 0.2); // U-066: straight at the power-up (it was in line of sight)
                     break;

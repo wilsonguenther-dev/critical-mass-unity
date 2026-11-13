@@ -42,6 +42,8 @@ namespace CriticalMass.Sim.Core
         Supply,
         /// <summary>U-066: a bot walks straight to a power-up it can see (appended).</summary>
         Grab,
+        /// <summary>U-067: a bot walks to the spot (or the caller) of the ping it answered (appended).</summary>
+        Order,
     }
 
     /// <summary>Match phase (browser MatchState.phase).</summary>
@@ -170,6 +172,12 @@ namespace CriticalMass.Sim.Core
         PowerUpEnded,
         /// <summary>U-066: a Ward soaked damage: A = the warded actor, B = attacker id (-1 none, -2 the Kaiju), (X, Z) = the actor, Value = damage soaked.</summary>
         WardAbsorb,
+        /// <summary>U-067: a ping was placed: A = the pinger (a player or a bot), B = (int)PingCall, (X, Z) = the spot, Value = ticks the marker lives.</summary>
+        Ping,
+        /// <summary>U-067: a ping was refused by the rate limit: A = the pinger, B = (int)PingCall, (X, Z), Value = ticks until the next is allowed.</summary>
+        PingRefused,
+        /// <summary>U-067: a bot took a ping: A = the bot, B = the pinger, (X, Z) = the bot, Value = (int)PingCall.</summary>
+        PingAnswered,
         // ITEM CM-84: added by its owner (ClassSwitch, ports CM-54)
         /// <summary>CM-37: one tick of fountain healing (Heal.HealSystem): A = the healed actor, B = -1, (X, Z) = the actor, Value = HP restored this tick (&gt; 0).</summary>
         Heal,

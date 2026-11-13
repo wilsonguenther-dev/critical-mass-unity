@@ -43,6 +43,7 @@ namespace CriticalMass.Sim.Core
             Sources.SourcesSystem(w, dt); // U-064: groves and springs, the bank at the base
             Kaiju.KaijuSystem(w, dt);
             Stations.StationSystem(w); // U-065: upgrade purchases at the base station
+            PingRules.PingSystem(w); // U-067: pings in, orders out, the bots' own calls
             Respawn.RespawnSystem(w, dt);
             // CM-37: after respawn (a fresh respawn is already at full HP), before the hill / match bookkeeping.
             Heal.HealSystem(w);

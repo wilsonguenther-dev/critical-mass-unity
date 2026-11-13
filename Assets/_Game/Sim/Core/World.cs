@@ -303,6 +303,7 @@ namespace CriticalMass.Sim.Core
                 Terraform = false,
                 Jump = false,
                 StationBuy = 0,
+                PingKind = 0,
             };
         }
 
@@ -607,6 +608,7 @@ namespace CriticalMass.Sim.Core
             f.Jump = false;
             f.TerraformSwitch = false;
             f.StationBuy = 0;
+            f.PingKind = 0;
         }
 
         /// <summary>Build a world for opts: a fresh Skybreak Basin map and every buffer allocated at capacity.</summary>
