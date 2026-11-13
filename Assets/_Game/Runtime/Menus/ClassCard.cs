@@ -599,7 +599,7 @@ namespace CriticalMass.Runtime.Menus
             _tileAbility = MenuUi.Label(Root, "Ability", CMTokens.Ui, UiScale.TypeMin, Cream, TextAnchor.MiddleLeft, 100f, y, _w - 110f, 28f, "", 2f);
             Fit(_name, 14);
             Fit(_role, 12);
-            Fit(_tileAbility, 12);
+            Fit(_tileAbility, 10);   // batch 4: "LADDER AND BRIDGE" was cut at 12 px on the 236 px respawn tile
             _hotkey = MenuUi.Label(Root, "Hotkey", CMTokens.Mono, UiScale.TypeSmall, Navy, TextAnchor.MiddleCenter, 10f, 10f, 30f, 30f, "", 0f);
             VectorShape hk = MenuUi.Shape(Root, "Hotkey Badge", ShapeKind.Circle, 8f, 8f, 34f, 34f, Brass, 0f);
             hk.RimPx = 0f;

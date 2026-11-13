@@ -343,6 +343,7 @@ namespace CriticalMass.Runtime.Hud
         {
             if (_log == null) Bind(GetComponent<CombatLog>());
             else Subscribe();
+            if (CriticalMass.Runtime.Flow.GameFlow.MenuIdle) return;   // batch 4: hidden behind a menu over a backdrop match
             int tier = FeedUi.Refresh(Canvas);
             if (tier != _tier) { _tier = tier; for (int i = 0; i < Lines; i++) SetTier(_slots[i], tier); }
             bool hide = _log == null || _log.Suppressed;

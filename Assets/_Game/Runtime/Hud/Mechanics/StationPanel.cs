@@ -197,6 +197,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
 
         void Update()
         {
+            if (CriticalMass.Runtime.Flow.GameFlow.MenuIdle) return;   // batch 4: hidden behind a menu over a backdrop match
             if (_driver == null) _driver = GetComponent<SimDriverBehaviour>();
             World w = _driver != null ? _driver.World : null;
             if (_openAction == null) _openAction = Action("OpenStation");

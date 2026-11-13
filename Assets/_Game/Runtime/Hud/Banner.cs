@@ -233,6 +233,11 @@ namespace CriticalMass.Runtime.Hud
         private readonly VectorShape[] _shards = new VectorShape[8];
         private int _seenVersion = -1;
         private bool _wasOpen;
+        private int _wallVersion = -1;
+        private double _wallShownAt;
+        private bool _wallHidden;
+        /// <summary>Wall seconds an event banner may stay on screen (auto-dismiss, batch 4).</summary>
+        public const double MaxWallSeconds = 4.0;
         private int _tier = 2;
 
         private static readonly Vector2[] ShardAt =
@@ -303,6 +308,7 @@ namespace CriticalMass.Runtime.Hud
             if (Hold != null && Hold())
             {
                 Queue.Postpone(now);
+                _wallVersion = -1;   // the wall clock restarts when the banner enters fresh after the takeover
                 if (_canvas != null && _canvas.gameObject.activeSelf) _canvas.gameObject.SetActive(false);
                 return;
             }
@@ -340,7 +346,13 @@ namespace CriticalMass.Runtime.Hud
                 }
             }
             // HUD zones: the autopilot banner and the lockout warning outrank event banners in the centre lane.
-            bool blocked = HudZones.Blocked(HudZone.Callout, HudPriority.Banner);
+            // Batch 4: an event banner never sits on screen longer than MaxWallSeconds of wall time, and it hides while the
+            // scoreboard or the full map is open (it covered the board and the pickup, timer and ping areas).
+            if (_seenVersion != _wallVersion) { _wallVersion = _seenVersion; _wallShownAt = Time.unscaledTimeAsDouble; _wallHidden = false; }
+            else if (!_wallHidden && Time.unscaledTimeAsDouble - _wallShownAt >= MaxWallSeconds) { _wallHidden = true; Queue.Hide(now); }
+            bool blocked = HudZones.Blocked(HudZone.Callout, HudPriority.Banner) || Scoreboard.AnyOpen ||
+                           CriticalMass.Runtime.Hud.Interact.FullMap.IsOpen ||
+                           CriticalMass.Runtime.Flow.GameFlow.State == CriticalMass.Runtime.Flow.FlowState.Results;
             float alpha = blocked ? 0f : Queue.Alpha(now);
             if (alpha > 0f) HudZones.Hold(HudZone.Callout, HudPriority.Banner);
             _group.alpha = alpha;

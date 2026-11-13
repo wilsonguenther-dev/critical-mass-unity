@@ -139,6 +139,23 @@ namespace CriticalMass.Runtime.Flow
         public static bool Enabled => ForceEnabled || TitleScreen.ShowOnBoot;
 
         public static FlowState State { get; private set; } = FlowState.Off;
+
+        /// <summary>
+        /// Integration batch 4 (title idle CPU): true while a menu screen (title, menu, setup) shows over a backdrop match and
+        /// no human match runs. The in-match HUD, the depth view and the ground paint skip their per-frame work then.
+        /// </summary>
+        public static bool MenuIdle
+        {
+            get
+            {
+                FlowState s = State;
+                if (s != FlowState.Title && s != FlowState.Menu && s != FlowState.Setup) return false;
+                FlowDirector fd = FlowDirector.Current;
+                MatchRequest r = fd != null && fd.Driver != null ? fd.Driver.Request : null;
+                return r != null && r.Backdrop;
+            }
+        }
+
         public static MatchSetupChoice LastSetup = MatchSetupChoice.Default;
         /// <summary>Seed of the last world created (match or backdrop).</summary>
         public static int LastSeed { get; private set; }

@@ -118,6 +118,7 @@ namespace CriticalMass.Runtime.View.Mechanics
 
         void LateUpdateBody()
         {
+            if (CriticalMass.Runtime.Flow.GameFlow.MenuIdle) return;   // batch 4: hidden behind a menu over a backdrop match
             if (_driver == null || _driver.World == null) return;
             if (_driver.World != _world) { _world = _driver.World; Feed.Reset(); }
             World w = _world;

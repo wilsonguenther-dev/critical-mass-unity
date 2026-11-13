@@ -32,6 +32,10 @@ namespace CriticalMass.Runtime.Hud
 
         public Canvas Canvas { get; private set; }
         public bool IsOpen { get; private set; }
+        /// <summary>true while any scoreboard is open (the event banner hides under it, batch 4).</summary>
+        public static bool AnyOpen { get; private set; }
+
+        void OnDisable() => AnyOpen = false;
 
         CombatLog _log;
         RectTransform _board;
@@ -100,8 +104,8 @@ namespace CriticalMass.Runtime.Hud
                 420f, 18f, 240f, 44f, "HILL SECONDS", 2f);
             tb.Total = MenuUi.Label(tb.Rt, "Total", CMTokens.Mono, UiScale.TypeHeading, tc, TextAnchor.MiddleRight, 670f, 18f, 100f, 44f, "", 3f);
             for (int c = 0; c < Columns; c++)
-                MenuUi.Label(tb.Rt, "Heading " + c, CMTokens.Ui, UiScale.TypeMin, CMTokens.WithAlpha(CMTokens.WarmCream.Color, 0.8f),
-                    c == 0 ? TextAnchor.MiddleLeft : TextAnchor.MiddleCenter, ColX[c], 82f, ColW[c], 30f, Headings[c], 2f);
+                HudText.SetOneLine(MenuUi.Label(tb.Rt, "Heading " + c, CMTokens.Ui, UiScale.TypeMin, CMTokens.WithAlpha(CMTokens.WarmCream.Color, 0.8f),
+                    c == 0 ? TextAnchor.MiddleLeft : TextAnchor.MiddleCenter, ColX[c], 82f, ColW[c], 30f, "", 2f), Headings[c], UiScale.TypeMin, 11);
             for (int r = 0; r < MaxRows; r++)
             {
                 var row = new Row { Index = r };
@@ -132,6 +136,7 @@ namespace CriticalMass.Runtime.Hud
         void LateUpdate()
         {
             if (_log == null) _log = GetComponent<CombatLog>();
+            if (CriticalMass.Runtime.Flow.GameFlow.MenuIdle) return;   // batch 4: hidden behind a menu over a backdrop match
             int tier = FeedUi.Refresh(Canvas);
             if (tier != _tier) { _tier = tier; SetTier(tier); }
             World w = _log != null && _log.Driver != null ? _log.Driver.World : null;
@@ -142,6 +147,7 @@ namespace CriticalMass.Runtime.Hud
             if (_board.gameObject.activeSelf != show) _board.gameObject.SetActive(show);
             if (Canvas.enabled != show) Canvas.enabled = show;
             IsOpen = want;
+            AnyOpen = want;
             if (!show) return;
             if (Mathf.Abs(_group.alpha - _alpha) > 1e-3f) _group.alpha = _alpha;
             Refresh(w, _log.Log, _log.LocalActor);
@@ -238,7 +244,7 @@ namespace CriticalMass.Runtime.Hud
             }
             row.Badge.Set(UiIcons.ClassBadge[cls, (int)s.Team], _tier);
             // Mechanics depth (U-067): named bots with their play style ("THORN  BRAWLER"); the class word without names.
-            HudText.Set(row.Cells[0], View.Mechanics.DepthNames.RowLabel(s.Id, own, KillWords.You, KillWords.ClassUpper[cls]));
+            HudText.SetOneLine(row.Cells[0], View.Mechanics.DepthNames.RowLabel(s.Id, own, KillWords.You, KillWords.ClassUpper[cls]), 21, 13);
             World w = _world;
             bool levels = w != null && View.Mechanics.DepthRead.StationsOn(w);
             int lvl = levels ? View.Mechanics.DepthRead.Level(w, s.Team, s.Cls) : 0, max = levels ? View.Mechanics.DepthRead.MaxLevel(w) : 0;
