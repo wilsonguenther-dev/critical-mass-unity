@@ -16,6 +16,36 @@ using Object = UnityEngine.Object;
 namespace CriticalMass.Runtime.PlayTests
 {
     /// <summary>
+    /// ci/playmode-triage (P-04): wall-clock WAIT budgets in PlayMode tests (how long a navigation or load may take), scaled
+    /// for slow machines. The Mac gate passes nothing (scale 1, budgets unchanged); unity-ci.yml passes
+    /// <c>-cmTestTimeScale 4</c> because a 4-core GitHub runner frames several times slower than the owner's Mac. Only for
+    /// waits whose length is not what the test checks; a product promise ("results within a second") is never scaled.
+    /// </summary>
+    internal static class TestClock
+    {
+        static float? _scale;
+
+        public static float Scale
+        {
+            get
+            {
+                if (_scale.HasValue) return _scale.Value;
+                float s = 1f;
+                string[] args = Environment.GetCommandLineArgs();
+                for (int i = 0; i + 1 < args.Length; i++)
+                    if (args[i] == "-cmTestTimeScale" &&
+                        float.TryParse(args[i + 1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float v) && v >= 1f)
+                        s = v;
+                _scale = s;
+                return s;
+            }
+        }
+
+        /// <summary>A wait budget in wall seconds on this machine.</summary>
+        public static float Budget(float seconds) => seconds * Scale;
+    }
+
+    /// <summary>
     /// Gameplay sanity suite: the real Boot game with the wall clock stopped (TimeScale 0, as SmokeTests and
     /// HumanInputPlayTests), so a test advances exactly the sim ticks it steps and reads the views it would see on screen.
     /// With manual input the HumanInputSource component is disabled (its Update would overwrite the move and aim every
@@ -60,6 +90,14 @@ namespace CriticalMass.Runtime.PlayTests
             {
                 Source.enabled = false;
                 Source.State.Reset();
+                // ci/playmode-triage (P-01): the test IS the player here, so the human-control watchdog is off too. With
+                // the input reader disabled on purpose, HumanControlGuard reports a LOCKOUT error after 2 s of WALL time
+                // and its idle autopilot takes actor 0 after 45 s of wall time; both are unscaled clocks that the stopped
+                // sim clock does not stop. On the Mac a sanity test finishes inside those 2 s; on a 4-core GitHub runner one
+                // synchronous Tick(55) frame took 7.2 s, and RunningRaisesFootfalls / HudShows... failed on the "unhandled"
+                // LOCKOUT log. HumanControlPlayTests (which keeps the reader on) still covers the guard.
+                HumanControlGuard guard = Driver.GetComponent<HumanControlGuard>();
+                if (guard != null) guard.enabled = false;
             }
             if (settleSeconds > 0) Driver.StepTicks((int)Math.Ceiling(settleSeconds * Cfg.SimHz));
             yield return null;
