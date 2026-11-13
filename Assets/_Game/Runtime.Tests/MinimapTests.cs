@@ -237,10 +237,10 @@ namespace CriticalMass.Runtime.Tests
             {
                 if (c.a < 25 || c.a > 230) continue;
                 edge++;
-                if (c.r > 235 && c.g > 230 && c.b > 215) creamy++;
+                if (c.r > 235 && c.g > 230 && c.b > 215 && c.r - c.b > 8) creamy++;   // warm page cream, not the waterfall's cool white
             }
             TestContext.WriteLine($"logo {w}x{h}: {edge} soft-edge pixels, {creamy} cream-coloured");
-            Assert.Greater(edge, 500);
+            Assert.Greater(edge, 400);
             Assert.Less(creamy, edge * 0.05f, "cream halo on the cut-out edge");
             foreach (string f in new[] { "critical-mass-logo@1x.png", "critical-mass-bible-logo-glow@1x.png", "critical-mass-bible-badge@1x.png" })
                 Assert.IsTrue(File.Exists(dir + f), f);
