@@ -217,6 +217,22 @@ namespace CriticalMass.Runtime.Input
             if (_driver == null) _driver = GetComponent<SimDriverBehaviour>();
             World w = _driver != null ? _driver.World : null;
             State.BindWorld(w);
+            // feat/ground-camera (experimental CAMERA: GROUND): the keys and the left stick move relative to the ground camera,
+            // and the aim is the point ahead along its facing at the reticle's ground distance. Same InputFrame fields as
+            // ever (a world-space move and a ground aim point): no Sim change, determinism untouched.
+            if (CriticalMass.Runtime.Camera.GroundView.PlayActive && w != null && w.ActorCount > 0)
+            {
+                CriticalMass.Runtime.Camera.GroundCamera.Basis(CriticalMass.Runtime.Camera.GroundView.PlayYaw,
+                    out double gux, out double guz, out double grx, out double grz);
+                State.SetCameraBasis(gux, guz, grx, grz);
+                State.SetPointerWalk(false);
+                State.ClearWalkTarget();
+                FacingLocked = false;
+                if (CriticalMass.Runtime.Camera.GroundView.TryPlayAim(w, out double gax, out double gaz)) State.SetAim(gax, gaz);
+                else State.ClearAim();
+                return;
+            }
+            State.ClearCameraBasis();
             // UnityEngine.Camera spelled out: CriticalMass.Runtime.Camera (F-08b) is a namespace and would shadow it.
             UnityEngine.Camera cam = UnityEngine.Camera.main;
             // Pointer walking reads the cursor's ground point whichever device aims.

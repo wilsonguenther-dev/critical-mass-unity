@@ -1021,9 +1021,10 @@ namespace CriticalMass.Runtime.Menu
         // took at 40 + 4 px, so the list still ends above the status line.
         const float CtlRowH = 30f, CtlRowGap = 3f;
         // controls-1: five columns (keys W A S D hand, keys arrow hand, mouse, controller, controller 2) and 24 rows at
-        // 26 + 2 px, so the list still ends above the toggles and Reset.
+        // 26 + 2 px, so the list still ends above the toggles and Reset. feat/ground-camera: 25 rows (Camera view) at
+        // 25 + 2 px take the height the 24 rows took (675 px against 672).
         const int GridCols = 5, KeyCols = 3;
-        const float GridRowH = 26f, GridRowGap = 2f, GridCellW = 172f, GridCellGap = 8f;
+        const float GridRowH = 25f, GridRowGap = 2f, GridCellW = 172f, GridCellGap = 8f;
 
         GameObject BuildControls(RectTransform parent)
         {
@@ -1330,6 +1331,8 @@ namespace CriticalMass.Runtime.Menu
                 Stepper(tab, 2, "PLAY INTRO AT LAUNCH", () => GameSettings.IntroAtLaunch ? "ON" : "OFF", d => GameSettings.IntroAtLaunch = !GameSettings.IntroAtLaunch),
                 // controls-1 round 2: blue / amber teams for colour-blind players (HUD, rings, team text).
                 Stepper(tab, 3, "COLOUR-BLIND TEAMS", () => GameSettings.ColourBlindTeams ? "BLUE / AMBER" : "OFF", d => GameSettings.ColourBlindTeams = !GameSettings.ColourBlindTeams),
+                // feat/ground-camera: play from behind the fighter (experimental); F5 / double-tap View flips it in a match.
+                Stepper(tab, 4, "CAMERA", () => GameSettings.GroundCamera ? "GROUND (EXPERIMENTAL)" : "HIGH", d => GameSettings.GroundCamera = !GameSettings.GroundCamera),
             };
             MenuItem watch = MenuUi.Item(tab, "Watch Intro", ContentX, ContentY + GameTabLines * (LineH + LineGap) + 20f, 420f, 56f,
                 "WATCH INTRO", MenuItem.Kind.Button, UiScale.TypeBody, true, CMTokens.Display);
@@ -1365,7 +1368,7 @@ namespace CriticalMass.Runtime.Menu
         }
 
         /// <summary>Stepper lines on the Game tab (the three buttons sit under them).</summary>
-        const int GameTabLines = 4;
+        const int GameTabLines = 5;
 
         /// <summary>Settings > WATCH INTRO: closes the menu and plays the story intro (on the title, Home or setup; never over a
         /// live match, where the menu says so instead).</summary>

@@ -105,9 +105,17 @@ namespace CriticalMass.Runtime.Input
             if (action == null || !ActsIn(action.name, scheme)) return r;
             var bs = action.bindings;
             for (int i = 0; i < bs.Count; i++)
-                if (InScheme(bs[i], scheme) && !string.IsNullOrEmpty(bs[i].effectivePath)) r.Add(bs[i].effectivePath);
+                if (InScheme(bs[i], scheme) && !string.IsNullOrEmpty(bs[i].effectivePath))
+                    r.Add(IsDoubleTap(bs[i]) ? bs[i].effectivePath + DoubleTapSuffix : bs[i].effectivePath);
             return r;
         }
+
+        /// <summary>feat/ground-camera: a double-tap binding (MultiTap) is its own gesture, so it may share a button with a
+        /// press or hold (Camera view: double-tap View; Scoreboard: hold View).</summary>
+        public const string DoubleTapSuffix = " (double tap)";
+
+        public static bool IsDoubleTap(InputBinding b) =>
+            !string.IsNullOrEmpty(b.effectiveInteractions) && b.effectiveInteractions.IndexOf("MultiTap", StringComparison.OrdinalIgnoreCase) >= 0;
 
         /// <summary>Actions of the map with neither a binding nor an Equivalent in the scheme ("Action (scheme)").</summary>
         public static List<string> Missing(InputActionMap map, ControlScheme scheme)

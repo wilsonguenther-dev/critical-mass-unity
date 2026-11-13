@@ -185,6 +185,15 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": true
+                },
+                {
+                    "name": "CameraView",
+                    "type": "Button",
+                    "id": "6d732925-a0a9-4a51-8c90-cfce6aa530d7",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
                 }
             ],
             "bindings": [
@@ -845,6 +854,28 @@
                     "processors": "",
                     "groups": "KeyboardMouse",
                     "action": "LockFacing",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "f476cafc-8d64-400d-ad70-3431bf965c5c",
+                    "path": "<Keyboard>/f5",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "KeyboardMouse",
+                    "action": "CameraView",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "360dc137-ad6c-41b5-9be8-1245e7eb6cde",
+                    "path": "<Gamepad>/select",
+                    "interactions": "MultiTap",
+                    "processors": "",
+                    "groups": "Gamepad",
+                    "action": "CameraView",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

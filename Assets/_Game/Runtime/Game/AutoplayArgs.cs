@@ -34,6 +34,9 @@ namespace CriticalMass.Runtime.Game
     ///   -quality NAME|N          this quality level for the run (FrameGovernor; the perf report has quality_requested)
     ///   -debugHangSeconds N      TEST ONLY: the main thread sleeps N s once, 3 s after the title (proves the hang watchdog)
     ///   -seed N -simHashOut PATH sim-only run (no view): one 16v16 bot match on seed N, its end-state hash to PATH, quit (DG-66)
+    ///   -seed N (with -autoplay, no -simHashOut) the match is played on seed N (camera grabs of the same moment, 2026-11-13)
+    ///   -shotTick T (with -shots) the clock stops at sim tick T exactly and shot-moment.png is written (same seed + tick = same frame)
+    ///   -groundView / -groundShots  ground view while watching (feat/ground-camera); -groundShots adds the capture tour
     ///   -shots                   screenshots shot-title.png, shot-start.png (3 s of match time) and shot-mid.png into the data folder (Windows graphics run)
     ///   -traceStates             record shader states for warm-up (ShaderWarmup); -exportReport, -diag: SupportReport
     /// DG-63: the crash log is written by CrashLog (bounded queue, one background writer, 20 lines per second, repeat keys
@@ -74,6 +77,35 @@ namespace CriticalMass.Runtime.Game
             public string SimHashOut;
             public int Seed;
             public bool Shots;
+            /// <summary>-shotTick T: stop the clock at tick T and write shot-moment.png (0 = off).</summary>
+            public int ShotTick;
+        }
+
+        /// <summary>A capture step holds the match clock (GroundViewShots): the -autoplaySpeed write stands aside.</summary>
+        public static bool ClockHeld;
+
+        /// <summary>True when flag (lower case) is on this process's command line together with an automation flag.</summary>
+        public static bool HasAutomationFlag(string flag) => HasAutomationFlag(Environment.GetCommandLineArgs(), flag);
+
+        /// <summary>Pure form (tests).</summary>
+        public static bool HasAutomationFlag(string[] args, string flag)
+        {
+            if (args == null) return false;
+            bool automation = false, found = false;
+            for (int i = 0; i < args.Length; i++)
+            {
+                string a = (args[i] ?? "").Trim().ToLowerInvariant();
+                if (Array.IndexOf(AutomationWindow.AutomationFlags, a) >= 0) automation = true;
+                if (a == flag) found = true;
+            }
+            return found && automation;
+        }
+
+        /// <summary>-seed N in an autoplay run that is not a sim-hash run: the seed the match is played on (0 = a new one).</summary>
+        public static int AutoplayMatchSeed()
+        {
+            Options o = Current;
+            return o.Autoplay && string.IsNullOrEmpty(o.SimHashOut) && o.Seed > 0 ? o.Seed : 0;
         }
 
         /// <summary>Pure parser (tests). Unknown flags are ignored, so Unity's own (-screen-width, -logFile) pass through.</summary>
@@ -112,6 +144,9 @@ namespace CriticalMass.Runtime.Game
                         if (!string.IsNullOrEmpty(next) && !next.StartsWith("-", StringComparison.Ordinal)) { o.SimHashOut = next; i++; }
                         break;
                     case "-shots": o.Shots = true; break;
+                    case "-shottick":
+                        if (TryNum(next, out double st) && st > 0) { o.ShotTick = (int)st; i++; }
+                        break;
                     case "-autoplaypacing":
                         if (!string.IsNullOrEmpty(next) && !next.StartsWith("-", StringComparison.Ordinal)) { o.Pacing = next.Split(','); i++; }
                         break;
@@ -202,6 +237,8 @@ namespace CriticalMass.Runtime.Game
         // ── autoplay state ──
         SimDriverBehaviour _driver;
         TitleScreen _title;
+        int _freezeFrame = -1;
+        double _freezeScale = 2;
         bool _titleSeen, _recording, _ended, _quitting, _timedOut, _hangDone, _shotTitle, _shotStart, _shotMid;
         double _titleAt = -1, _matchStart, _endAt, _firstTitleAt = -1;
         bool _costReset;
@@ -479,7 +516,34 @@ namespace CriticalMass.Runtime.Game
                 _shotStart = true;
                 ScreenCapture.CaptureScreenshot(Path.Combine(GamePaths.DataDir, "shot-start.png"));
             }
-            if (o.Shots && !_shotMid && _recording && _driver != null && _driver.World != null && _driver.World.Match.Time > 60)
+            if (o.Shots && o.ShotTick > 0 && !_shotMid && _recording && _driver != null && _driver.World != null)
+            {
+                // -shotTick: the clock stops at exactly tick T (StepTicks closes the gap), the frame settles, the shot is
+                // written, the clock runs again. Same seed and tick: the same moment whatever the camera yaw.
+                World sw = _driver.World;
+                if (_freezeFrame < 0 && sw.Tick >= o.ShotTick - 24)
+                {
+                    _freezeScale = _driver.TimeScale;
+                    _driver.TimeScale = 0;
+                    ClockHeld = true;
+                    int left = o.ShotTick - sw.Tick;
+                    if (left > 0) _driver.StepTicks(left);
+                    _freezeFrame = 0;
+                    Debug.Log($"{LogTag} -shotTick: clock held at tick {sw.Tick} (asked {o.ShotTick})");
+                }
+                if (_freezeFrame >= 0)
+                {
+                    _freezeFrame++;
+                    if (_freezeFrame == 6) ScreenCapture.CaptureScreenshot(Path.Combine(GamePaths.DataDir, "shot-moment.png"));
+                    if (_freezeFrame == 12)
+                    {
+                        _shotMid = true;
+                        ClockHeld = false;
+                        _driver.TimeScale = _freezeScale;
+                    }
+                }
+            }
+            if (o.Shots && o.ShotTick <= 0 && !_shotMid && _recording && _driver != null && _driver.World != null && _driver.World.Match.Time > 60)
             {
                 _shotMid = true;
                 ScreenCapture.CaptureScreenshot(Path.Combine(GamePaths.DataDir, "shot-mid.png"));
@@ -505,7 +569,7 @@ namespace CriticalMass.Runtime.Game
             if (o.Autoplay)
             {
                 _driver.HumanAutopilot = true;
-                if (o.Speed > 0) _driver.TimeScale = o.Speed;
+                if (o.Speed > 0 && !ClockHeld) _driver.TimeScale = o.Speed;
                 double hold = _match == 1 ? o.TitleSeconds : 1.0;
                 if (_title != null && !_costReset && now - _titleAt >= 2.0) { _costReset = true; FrameCost.Reset(); }
                 if (_title != null && now - _titleAt >= hold)

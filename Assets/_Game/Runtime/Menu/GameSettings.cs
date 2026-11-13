@@ -49,6 +49,8 @@ namespace CriticalMass.Runtime.Menu
         public const string MoveAssistKey = "cm.moveAssist";
         /// <summary>Easy movement: direction keys follow the map's grid instead of the screen, 1 on, 0 off (default).</summary>
         public const string KeysFollowMapKey = "cm.keysFollowMap";
+        /// <summary>feat/ground-camera: CAMERA HIGH (default) or GROUND (experimental, play from behind the fighter).</summary>
+        public const string GroundCameraKey = "cm.camera.ground";
         /// <summary>DG-53: the settings format version, so a later build can migrate or reset stored keys safely.</summary>
         public const string PrefsVersionKey = "cm.prefsVersion";
         public const int PrefsVersion = 1;
@@ -59,7 +61,7 @@ namespace CriticalMass.Runtime.Menu
         public static readonly string[] AllKeys =
         {
             MasterKey, MusicKey, EffectsKey, MuteMusicKey, MuteEffectsKey, MuteInBackgroundKey, ColourBlindTeamsKey, WidthKey, HeightKey, FullScreenKey, VSyncKey, QualityKey, ShakeKey,
-            DamageNumbersKey, BloodKey, FpsCapKey, BgThrottleKey, MoveAssistKey, KeysFollowMapKey, PrefsVersionKey,
+            DamageNumbersKey, BloodKey, FpsCapKey, BgThrottleKey, MoveAssistKey, KeysFollowMapKey, GroundCameraKey, PrefsVersionKey,
             ShakeScaleKey, ReduceFlashingKey, ReduceMotionKey, IntroAtLaunchKey,
         };
 
@@ -164,6 +166,9 @@ namespace CriticalMass.Runtime.Menu
         /// of screen up, left, down and right. The controller stick stays screen-relative.
         /// </summary>
         public static bool KeysFollowMap { get => GetB(KeysFollowMapKey, false); set => SetB(KeysFollowMapKey, value); }
+        /// <summary>Settings, Game, CAMERA: false = HIGH (default), true = GROUND (experimental): the local player plays from the
+        /// low third-person ground view (Camera.GroundView). Kept between launches.</summary>
+        public static bool GroundCamera { get => GetB(GroundCameraKey, false); set => SetB(GroundCameraKey, value); }
 
         // ---- video ----
         /// <summary>The frame-rate limit choices in screen order (FramePolicy.CapChoices): 30, 60, 120, 144, 0 = OFF (locked to

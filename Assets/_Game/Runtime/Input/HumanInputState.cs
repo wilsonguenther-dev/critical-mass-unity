@@ -110,6 +110,42 @@ namespace CriticalMass.Runtime.Input
         /// </summary>
         public bool KeysFollowMap { get; set; }
 
+        // feat/ground-camera: camera-relative movement for the experimental ground camera (GroundView). While set, the move
+        // keys and the stick go through this basis instead of the fixed screen one; Fill still writes a world-space move.
+        bool _basisOn;
+        double _bUpX, _bUpZ, _bRightX, _bRightZ;
+
+        /// <summary>
+        /// The ground camera's facing as the move basis (sim XZ, unit vectors): up = the camera forward on the ground, right
+        /// = its right. KeysFollowMap does not apply under it. The sim input is unchanged in kind: InputFrame.MoveX / MoveZ.
+        /// </summary>
+        public void SetCameraBasis(double upX, double upZ, double rightX, double rightZ)
+        {
+            _basisOn = true;
+            _bUpX = upX;
+            _bUpZ = upZ;
+            _bRightX = rightX;
+            _bRightZ = rightZ;
+        }
+
+        /// <summary>Back to the fixed screen basis (the high camera).</summary>
+        public void ClearCameraBasis() => _basisOn = false;
+
+        /// <summary>True while SetCameraBasis is in force.</summary>
+        public bool CameraBasisActive => _basisOn;
+
+        void Basis(out double rx, out double rz, out double ux, out double uz)
+        {
+            if (_basisOn)
+            {
+                rx = _bRightX; rz = _bRightZ; ux = _bUpX; uz = _bUpZ;
+                return;
+            }
+            bool map = _moveFromKeys && KeysFollowMap;
+            rx = map ? MapRightX : ScreenRightX; rz = map ? MapRightZ : ScreenRightZ;
+            ux = map ? MapUpX : ScreenUpX; uz = map ? MapUpZ : ScreenUpZ;
+        }
+
         /// <summary>The world whose actor 0 the assists read (position, collision); null = no assist, no pointer walk.</summary>
         public void BindWorld(World w) => _world = w;
 
@@ -246,9 +282,7 @@ namespace CriticalMass.Runtime.Input
         /// </summary>
         public void MoveDirection(out double x, out double z)
         {
-            bool map = _moveFromKeys && KeysFollowMap;
-            double rx = map ? MapRightX : ScreenRightX, rz = map ? MapRightZ : ScreenRightZ;
-            double ux = map ? MapUpX : ScreenUpX, uz = map ? MapUpZ : ScreenUpZ;
+            Basis(out double rx, out double rz, out double ux, out double uz);
             x = _moveRight * rx + _moveUp * ux;
             z = _moveRight * rz + _moveUp * uz;
         }
@@ -423,9 +457,7 @@ namespace CriticalMass.Runtime.Input
             bool human = w != null && w.ActorCount > 0 && w.Actors[0].Alive;
             if (_moveRight != 0 || _moveUp != 0)
             {
-                bool map = _moveFromKeys && KeysFollowMap;
-                double rx = map ? MapRightX : ScreenRightX, rz = map ? MapRightZ : ScreenRightZ;
-                double ux = map ? MapUpX : ScreenUpX, uz = map ? MapUpZ : ScreenUpZ;
+                Basis(out double rx, out double rz, out double ux, out double uz);
                 mx = _moveRight * rx + _moveUp * ux;
                 mz = _moveRight * rz + _moveUp * uz;
                 double len2 = mx * mx + mz * mz;

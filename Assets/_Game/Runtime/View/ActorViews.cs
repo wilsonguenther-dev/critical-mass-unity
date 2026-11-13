@@ -44,6 +44,7 @@ namespace CriticalMass.Runtime.View
         private readonly Dictionary<(int, string), string> _names = new Dictionary<(int, string), string>();
         private UnityEngine.Camera _cam;
         private Vector3 _camPos, _targetPos;
+        private int _lodSelf;
 
         private SimDriverBehaviour _driver;
         private ArtCatalog _catalog;
@@ -229,7 +230,11 @@ namespace CriticalMass.Runtime.View
             if (_cam == null || !_cam.isActiveAndEnabled) _cam = UnityEngine.Camera.main;
             _camPos = _cam != null ? _cam.transform.position : Vector3.zero;
             // Contract C4: LOD by distance to the camera target (the local player, whom the camera follows).
-            if (w.ActorCount > 0 && w.Actors[0].Alive) _targetPos = SimSpace.ToWorld(Lerp(w.PrevX[0], w.X[0], a), 0, Lerp(w.PrevZ[0], w.Z[0], a));
+            // feat/ground-camera: a low camera follows another body (spectating, knocked out): LOD by distance to it, and it
+            // counts as "self" (always LOD0), so the rule holds from that angle too.
+            _lodSelf = CriticalMass.Runtime.Camera.GroundView.LodActive ? CriticalMass.Runtime.Camera.GroundView.LodSelf : 0;
+            if (CriticalMass.Runtime.Camera.GroundView.LodActive) _targetPos = CriticalMass.Runtime.Camera.GroundView.LodAnchor;
+            else if (w.ActorCount > 0 && w.Actors[0].Alive) _targetPos = SimSpace.ToWorld(Lerp(w.PrevX[0], w.X[0], a), 0, Lerp(w.PrevZ[0], w.Z[0], a));
             int models = 0;
             Anim.AnimLod.BeginFrame();
 
@@ -302,7 +307,7 @@ namespace CriticalMass.Runtime.View
             m.SetActive(true);
             m.ApplyTier();
             QualityRow row = QualityTable.Current;
-            m.SetLod(AnimLod.PickLod(i == 0, Vector3.Distance(SimSpace.ToWorld(x, 0, z), _targetPos), row));
+            m.SetLod(AnimLod.PickLod(i == _lodSelf, Vector3.Distance(SimSpace.ToWorld(x, 0, z), _targetPos), row));
             Vector3 basePos = SimSpace.ToWorld(x, h, z);
             m.Transform.localPosition = basePos + (hasFx ? fx.Nudge : Vector3.zero) + JumpLift.Offset(w, map, i, a, x, z); // DG-02 jump arc
             Material teamMat = ArtMaterials.ForTeam(m.Spec, actor.Team);
