@@ -1,0 +1,22 @@
+<!-- No-Unity compile of CriticalMass.Sim (ci/offload, 2026-11-13). Same sources, assembly name, C# 9 and .NET Standard
+     2.1 API level as Unity compiles it (ProjectSettings apiCompatibilityLevel 6). The project's scripting define symbols
+     come in as -p:CmDefines=A%3BB (tools/ci/sim-tests.sh reads them from ProjectSettings). Unity never sees this file:
+     it lives outside Assets/. -->
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <AssemblyName>CriticalMass.Sim</AssemblyName>
+    <RootNamespace>CriticalMass.Sim</RootNamespace>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <DefineConstants>$(DefineConstants);$(CmDefines)</DefineConstants>
+    <NoWarn>$(NoWarn);1591;0618</NoWarn>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../../Assets/_Game/Sim/**/*.cs" Exclude="../../../Assets/_Game/Sim/**/*~/**" />
+  </ItemGroup>
+</Project>

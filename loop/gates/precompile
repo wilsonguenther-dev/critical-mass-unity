@@ -1,0 +1,158 @@
+#!/usr/bin/env python3
+"""Gate "precompile" (ci/offload, 2026-11-13): the FIRST gate. Type-checks all six CriticalMass assemblies of a worktree
+with the C# compiler that ships inside the Unity app (Roslyn csc.dll run by the bundled dotnet), WITHOUT starting the Unity
+editor: no cm-heavy slot, no licence, about 300 MB of memory and 20 to 60 seconds for all six.
+
+How: Unity writes the exact compiler arguments of every assembly to Library/Bee/artifacts/<dag>/<Assembly>.rsp (defines,
+langversion, analyzers, every engine and package reference). This gate reuses those arguments, swaps in the worktree's
+CURRENT source list (every .cs under the asmdef folder, `~` folders skipped), compiles in dependency order and points each
+project reference at the assembly it just built. Package references inside Library/Bee fall back to
+Library/ScriptAssemblies/<name>.dll when the Bee folder was deleted (integrators delete Bee when they move a Library).
+
+Limits (why the Unity compile gate still runs once per batch): a NEW asmdef, a new package or a changed asmdef reference
+list needs a fresh .rsp from one Unity compile; Unity-only steps (ILPostProcessors, the API updater, asset import, shader
+compile) are not run. A pass here means "Unity's compiler accepts these sources with last-known arguments".
+
+  loop/gates/precompile [--project DIR] [--library DIR]     (default DIR: this checkout; LIBRARY: DIR/Library, else
+                                                             the newest sibling worktree Library that has Bee rsp files)
+Prints ONE JSON line (appended to loop/logs/gates.jsonl); exit 0 pass, 1 compile errors, 78 skipped (no rsp found).
+"""
+import argparse, glob, json, os, re, subprocess, sys, tempfile, time
+from pathlib import Path
+
+UNITY = Path('/Applications/Unity/Hub/Editor/6000.3.28f1/Unity.app/Contents/Resources/Scripting')
+ORDER = [  # name, asmdef folder
+    ('CriticalMass.Sim', 'Assets/_Game/Sim'),
+    ('CriticalMass.Runtime', 'Assets/_Game/Runtime'),
+    ('CriticalMass.Sim.Tests', 'Assets/_Game/Sim.Tests'),
+    ('CriticalMass.Runtime.Tests', 'Assets/_Game/Runtime.Tests'),
+    ('CriticalMass.Runtime.PlayTests', 'Assets/_Game/Runtime.PlayTests'),
+    ('CriticalMass.Editor', 'Assets/_Game/Editor'),
+]
+OWN = {n for n, _ in ORDER}
+
+
+def emit(project, status, code, **kw):
+    row = {'gate': 'precompile', 'ts': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()), 'project': str(project),
+           'status': status, 'exit': code, **kw}
+    line = json.dumps(row)
+    print(line)
+    try:
+        logs = Path(__file__).resolve().parents[1] / 'logs'
+        logs.mkdir(exist_ok=True)
+        with open(logs / 'gates.jsonl', 'a') as f:
+            f.write(line + '\n')
+    except OSError:
+        pass
+    sys.exit(code)
+
+
+def find_dag(lib):
+    dags = sorted(glob.glob(str(lib / 'Bee' / 'artifacts' / '*.dag')), key=os.path.getmtime, reverse=True)
+    for d in dags:
+        if all(os.path.exists(os.path.join(d, n + '.rsp')) for n, _ in ORDER):
+            return Path(d)
+    return None
+
+
+def candidate_libraries(project):
+    yield project / 'Library'
+    home = Path.home()
+    sibs = [Path(p) for p in glob.glob(str(home / 'cm-wt-*' / 'Library'))] + [home / 'critical-mass-unity' / 'Library']
+    for p in sorted(sibs, key=lambda p: p.stat().st_mtime if p.exists() else 0, reverse=True):
+        yield p
+
+
+def sources(project, folder):
+    base = project / folder
+    out = []
+    for dirpath, dirnames, filenames in os.walk(base):
+        dirnames[:] = [d for d in dirnames if not d.endswith('~') and not d.startswith('.')]
+        out += [os.path.join(dirpath, f) for f in filenames if f.endswith('.cs')]
+    return sorted(out)
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument('--project', default=None)
+    ap.add_argument('--library', default=None)
+    a = ap.parse_args()
+    project = Path(a.project or subprocess.run(['git', 'rev-parse', '--show-toplevel'], capture_output=True, text=True,
+                                               cwd=os.getcwd()).stdout.strip() or Path(__file__).resolve().parents[2]).resolve()
+    if not (UNITY / 'NetCoreRuntime' / 'dotnet').exists():
+        emit(project, 'skipped', 78, reason='Unity 6000.3.28f1 (its bundled compiler) not installed')
+    libs = [Path(a.library).resolve()] if a.library else list(candidate_libraries(project))
+    lib = dag = None
+    for l in libs:
+        dag = find_dag(l) if l.exists() else None
+        if dag:
+            lib = l
+            break
+    if not dag:
+        emit(project, 'skipped', 78, reason='no Library/Bee rsp files for all six assemblies (run one Unity compile once)')
+    librt = lib.parent  # rsp paths like Library/... are relative to the project that owns that Library
+    t0 = time.time()
+    out = Path(tempfile.mkdtemp(prefix='cm-precompile.'))
+    built, results, errors = {}, [], []
+    for name, folder in ORDER:
+        rsp_lines = (dag / (name + '.rsp')).read_text().splitlines()
+        rsp2 = dag / (name + '.rsp2')
+        if rsp2.exists():
+            rsp_lines += rsp2.read_text().splitlines()
+        args = []
+        for ln in rsp_lines:
+            s = ln.strip()
+            if not s:
+                continue
+            if not s.startswith('-'):
+                continue  # Unity's source list: replaced by the worktree's current sources
+            if s.startswith('-out:') or s.startswith('-refout:'):
+                continue
+            m = re.match(r'-r:"?([^"]+)"?$', s)
+            if m:
+                ref = m.group(1)
+                stem = os.path.basename(ref).replace('.ref.dll', '').replace('.dll', '')
+                if stem in OWN:
+                    if stem in built:
+                        args.append(f'-r:"{built[stem]}"')
+                    continue
+                p = Path(ref) if os.path.isabs(ref) else librt / ref
+                if not p.exists():
+                    alt = lib / 'ScriptAssemblies' / (stem + '.dll')
+                    if alt.exists():
+                        p = alt
+                    else:
+                        continue  # editor-only helper missing: let csc report the type errors if it mattered
+                args.append(f'-r:"{p}"')
+                continue
+            m = re.match(r'-analyzer:"?([^"]+)"?$', s)
+            if m and not os.path.isabs(m.group(1)):
+                p = librt / m.group(1)
+                if not p.exists():
+                    continue
+                s = f'-analyzer:"{p}"'
+            args.append(s)
+        dll = out / (name + '.dll')
+        args.append(f'-out:"{dll}"')
+        srcs = sources(project, folder)
+        args += [f'"{x}"' for x in srcs]
+        rsp = out / (name + '.rsp')
+        rsp.write_text('\n'.join(args) + '\n')
+        p = subprocess.run([str(UNITY / 'NetCoreRuntime' / 'dotnet'), 'exec', str(UNITY / 'DotNetSdkRoslyn' / 'csc.dll'),
+                            '/nostdlib', '/noconfig', '/nologo', f'@{rsp}'], capture_output=True, text=True, cwd=str(project))
+        errs = sorted({l.replace(str(project) + '/', '') for l in p.stdout.splitlines() if ': error ' in l})
+        results.append({'assembly': name, 'files': len(srcs), 'errors': len(errs)})
+        errors += errs
+        if p.returncode == 0:
+            built[name] = dll
+        else:
+            built[name] = dll  # later assemblies still try; their errors may be follow-ons
+    for e in errors[:60]:
+        print(e, file=sys.stderr)
+    status = 'pass' if not errors else 'fail'
+    subprocess.run(['rm', '-rf', str(out)])
+    emit(project, status, 0 if not errors else 1, library=str(lib), dag=dag.name, seconds=round(time.time() - t0, 1),
+         assemblies=results, errors=len(errors))
+
+
+main()
