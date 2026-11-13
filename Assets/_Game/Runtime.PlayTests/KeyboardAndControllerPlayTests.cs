@@ -79,7 +79,7 @@ namespace CriticalMass.Runtime.PlayTests
                 _settingsSaved = false;
             }
             ControllerSettings.ForceFamily(null);
-            ControlBindings.SetKeyboardOnly(true);
+            ControlBindings.SetKeyboardOnly(false);   // the game's start state (keys and mouse), for the classes after this one
             ControlBindings.SetHand(KeyboardHand.Wasd);
             SimDriverBehaviour.CaptureMode = false;
             _driver = null;

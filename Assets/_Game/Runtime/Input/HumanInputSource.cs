@@ -92,6 +92,8 @@ namespace CriticalMass.Runtime.Input
             _lock = map.FindAction("LockFacing", false);
             _keyAimPressed = false;
             // controls-1: the match starts with the scheme the player used last (keyboard only until the mouse is used).
+            // Every match starts in the remembered layout's scheme (keys and mouse when none was picked).
+            ControlPresets.StartOfMatch();
             ControlScheme scheme = ControlBindings.ActiveScheme;
             Aim.SetMode(scheme == ControlScheme.Gamepad ? AimResolver.Mode.Stick
                 : scheme == ControlScheme.Keyboard ? AimResolver.Mode.Keys : AimResolver.Mode.Pointer);
@@ -111,6 +113,12 @@ namespace CriticalMass.Runtime.Input
                         if (b == B.Attack || b == B.Ability) _keyAimPressed = true;
                         KeyboardHand? hand = ControlBindings.HandOf(ctx.action, ctx.control);
                         if (hand.HasValue) ControlBindings.SetHand(hand.Value);
+                    }
+                    else if (ctx.control != null && ctx.control.device is Mouse && (b == B.Attack || b == B.Ability))
+                    {
+                        // A click aims with the mouse at once, even when the press lands in a frame Sample does not see.
+                        ControlBindings.NoteMouseUsed();
+                        Aim.NotePointer();
                     }
                     State.ButtonDown(b);
                 };

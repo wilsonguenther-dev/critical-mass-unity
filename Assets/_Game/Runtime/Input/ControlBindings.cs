@@ -519,6 +519,16 @@ namespace CriticalMass.Runtime.Input
             return move != null ? move.ReadValue<Vector2>() * radius : Vector2.zero;
         }
 
+        /// <summary>A new match: no mouse use seen yet (the menu clicks before it do not count).</summary>
+        public static void ForgetMouseUse() => _lastMouseUse = float.NegativeInfinity;
+
+        /// <summary>A mouse button drove an action (its click may arrive before Sample sees it): the mouse is in use.</summary>
+        public static void NoteMouseUsed()
+        {
+            _lastMouseUse = Time.unscaledTime;
+            SetKeyboardOnly(false);
+        }
+
         /// <summary>Sets keyboard-only play (tests, HumanInputSource); prompts redraw on a change.</summary>
         public static void SetKeyboardOnly(bool on)
         {

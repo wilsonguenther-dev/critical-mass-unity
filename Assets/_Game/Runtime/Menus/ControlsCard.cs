@@ -226,8 +226,8 @@ namespace CriticalMass.Runtime.Menus
             ControlRow r = ControlBindings.Rows[row];
             for (int k = 0; k < r.Keyboard.Length; k++)
             {
+                // A shared key in the mouse column (E, F) serves the hand positions too; mouse buttons are skipped below.
                 RebindSlot s = r.Keyboard[k];
-                if (s.Column == SlotColumn.Mouse) continue;
                 InputAction a = map.FindAction(s.Action, false);
                 int idx = ControlBindings.FindBindingIndex(a, s);
                 if (idx < 0 || !string.IsNullOrEmpty(a.bindings[idx].name)) continue;

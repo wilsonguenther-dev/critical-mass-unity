@@ -170,6 +170,18 @@ namespace CriticalMass.Runtime.Input
             if (s.HasValue) ApplyHand(s.Value);
         }
 
+        /// <summary>
+        /// A match starts (HumanInputSource enabled): the remembered layout's prompt pair, or keys and mouse when none was
+        /// picked. The device the player then touches takes over as always.
+        /// </summary>
+        public static void StartOfMatch()
+        {
+            ControlBindings.ForgetMouseUse();
+            ControlPreset? s = Stored;
+            if (s.HasValue) ApplyHand(s.Value);
+            else ControlBindings.SetKeyboardOnly(false);
+        }
+
         /// <summary>Tests: the cached left-handed flag without touching PlayerPrefs.</summary>
         public static void SetLeftHandedForTests(bool on) => _leftHanded = on;
     }
