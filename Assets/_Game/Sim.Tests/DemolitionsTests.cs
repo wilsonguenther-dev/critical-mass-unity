@@ -20,7 +20,7 @@ namespace CriticalMass.Sim.Tests
         private const double PadX = 5.5, PadZ = 13.5, HillX = 36.5, HillZ = 13.5;
         private const int Demo = 0;
 
-        private static GameConfig Cfg => GameConfig.CreateBrowser5v5();
+        private static GameConfig Cfg => SimPhysicsTests.ClassicBrowser();
         private static DemolitionsMineConfig MineCfg => Cfg.Abilities.DemolitionsMine;
         private static DemolitionsTntConfig TntCfg => Cfg.Abilities.DemolitionsTnt;
         private static double Dt => SimStep.Dt(Cfg);

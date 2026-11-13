@@ -14,8 +14,11 @@ namespace CriticalMass.Sim.Config
         public int[] TeamSizeOptions = { 5, 16 };
         /// <summary>Largest team size; sizes actor storage.</summary>
         public int TeamSizeMax = 16;
-        /// <summary>Initial match pace (driver time scale, sim ticks per wall second / SimHz); CM-66 default 2.</summary>
-        public double DefaultSpeed = 2;
+        /// <summary>
+        /// Initial match pace (driver time scale, sim ticks per wall second / SimHz). Owner 2026-11-12: 1 (was CM-66's 2);
+        /// 2 stays as the "Fast" match option: the driver's time scale AND WorldOptions.Pace must both be set from the choice.
+        /// </summary>
+        public double DefaultSpeed = 1;
 
         /// <summary>Match clock (sim seconds); hill time is the only win condition.</summary>
         public double MatchSeconds = 480;
@@ -40,28 +43,33 @@ namespace CriticalMass.Sim.Config
             {
                 MaxHp = 160, MoveSpeed = 3.8, Radius = 0.45, AttackDamage = 22, AttackRange = 1.7, AttackArcDeg = 120,
                 AttackCooldown = 0.7, AbilityCooldown = 10, GatherSeconds = 2, CarryCapacity = 1,
+                AttackWindupSeconds = 0.12, RecoverySeconds = 0.08, Mass = 1.6, Poise = 25,
             },
             new ClassConfig
             {
                 MaxHp = 100, MoveSpeed = 4.2, Radius = 0.4, AttackDamage = 12, AttackRange = 1.4, AttackArcDeg = 90,
                 AttackCooldown = 0.6, AbilityCooldown = 9, GatherSeconds = 1, CarryCapacity = 3,
+                AttackWindupSeconds = 0.10, RecoverySeconds = 0.08, Mass = 0.8, Poise = 15,
             },
             new ClassConfig
             {
                 MaxHp = 120, MoveSpeed = 4.0, Radius = 0.45, AttackDamage = 16, AttackRange = 1.5, AttackArcDeg = 90,
                 AttackCooldown = 0.65, AbilityCooldown = 12, GatherSeconds = 2, CarryCapacity = 1,
+                AttackWindupSeconds = 0.10, RecoverySeconds = 0.08, Mass = 1.1, Poise = 18,
             },
             // CM-38: the Demolitions Expert has no regular attack; the attack fields keep the CM-56 miner copy.
             new ClassConfig
             {
                 MaxHp = 120, MoveSpeed = 4.0, Radius = 0.45, AttackDamage = 16, AttackRange = 1.5, AttackArcDeg = 90,
                 AttackCooldown = 0.65, AbilityCooldown = 12, GatherSeconds = 2, CarryCapacity = 1,
+                AttackWindupSeconds = 0.10, RecoverySeconds = 0.08, Mass = 1.1, Poise = 18,
             },
             // CM-56 placeholder: the miner row until CM-39 tunes it. DG-24 keeps it (the mallet swing; Space builds, 12 s).
             new ClassConfig
             {
                 MaxHp = 120, MoveSpeed = 4.0, Radius = 0.45, AttackDamage = 16, AttackRange = 1.5, AttackArcDeg = 90,
                 AttackCooldown = 0.65, AbilityCooldown = 12, GatherSeconds = 2, CarryCapacity = 1,
+                AttackWindupSeconds = 0.10, RecoverySeconds = 0.08, Mass = 1.1, Poise = 18,
             },
             // DG-40 (U-061, not in the browser): the Healer. No weapon, no damage: her attack press is the MEND (Healer.cs);
             // AttackRange is how close bots keep to a fight (they stop there and press attack); AttackCooldown paces the mend.
@@ -69,6 +77,7 @@ namespace CriticalMass.Sim.Config
             {
                 MaxHp = 110, MoveSpeed = 4.1, Radius = 0.42, AttackDamage = 0, AttackRange = 4.5, AttackArcDeg = 90,
                 AttackCooldown = 0.8, AbilityCooldown = 9, GatherSeconds = 1.5, CarryCapacity = 2,
+                AttackWindupSeconds = 0, RecoverySeconds = 0, Mass = 0.9, Poise = 15, // the mend is instant
             },
         };
 
@@ -76,13 +85,17 @@ namespace CriticalMass.Sim.Config
         public BotsConfig Bots = new BotsConfig();
         public RenderConfig Render = new RenderConfig();
         public DebugConfig Debug = new DebugConfig();
+        /// <summary>The sim-physics lane (DG-67..DG-100): every rule and number in one block (PhysicsConfig.Classic = browser parity).</summary>
+        public PhysicsConfig Physics = new PhysicsConfig();
+        /// <summary>The mechanics-depth lane (U-063 onward): one block per rule set; DepthConfig.Classic = the game before it.</summary>
+        public DepthConfig Depth = new DepthConfig();
 
-        /// <summary>The game's config: 16v16 at 2x pace (U-004), every other value the browser main value.</summary>
+        /// <summary>The game's config: 16v16 at 1x pace (owner 2026-11-12; 2x is the Fast option), every other value the browser main value.</summary>
         public static GameConfig CreateDefault()
         {
             var c = new GameConfig();
             c.TeamSize = 16;
-            c.DefaultSpeed = 2;
+            c.DefaultSpeed = 1;
             return c;
         }
 
@@ -92,8 +105,30 @@ namespace CriticalMass.Sim.Config
             var c = CreateDefault();
             c.TeamSize = 5;
             c.DefaultSpeed = 1;
+            c.Depth.Classic = true; // the browser has none of the mechanics-depth rules (U-063 onward)
             return c;
         }
+
+        /// <summary>
+        /// Rules-combined (U-069): the one switch over both rule lanes. Classic = browser parity: every sim-physics rule off
+        /// (PhysicsConfig.Classic, instant hits) and every mechanics-depth rule off (DepthConfig.Classic), at the pre-2026-11-12
+        /// pace 2x, so the world hash is the DG-21 golden bit for bit. PhysicsOnly = the physics lane on, depth off (the test
+        /// config's rules). Full = everything on (what CreateDefault, the game, runs). Pace is left alone except for Classic.
+        /// </summary>
+        public GameConfig ApplyRules(RulesProfile profile)
+        {
+            Physics.Classic = profile == RulesProfile.Classic;
+            Depth.Classic = profile != RulesProfile.Full;
+            if (profile == RulesProfile.Classic) DefaultSpeed = 2;
+            return this;
+        }
+
+        /// <summary>Which rules profile this config is on (Custom when the two lane switches disagree with every profile).</summary>
+        public RulesProfile Rules => Physics.Classic ? (Depth.Classic ? RulesProfile.Classic : RulesProfile.Custom)
+            : (Depth.Classic ? RulesProfile.PhysicsOnly : RulesProfile.Full);
+
+        /// <summary>The classic match: the game's 16v16 with every new rule off, instant hits, pace 2x (browser parity).</summary>
+        public static GameConfig CreateClassic() => CreateDefault().ApplyRules(RulesProfile.Classic);
 
         /// <summary>Deep copy: every group object and array is copied.</summary>
         public GameConfig Clone()
@@ -114,6 +149,8 @@ namespace CriticalMass.Sim.Config
             c.Bots = Bots.Clone();
             c.Render = Render.Clone();
             c.Debug = Debug.Clone();
+            c.Physics = Physics.Clone();
+            c.Depth = Depth.Clone();
             return c;
         }
 
@@ -124,10 +161,25 @@ namespace CriticalMass.Sim.Config
         }
 
         /// <summary>The bot roster fraction of one class (browser GAME_CONFIG.bots.classMix[id]).</summary>
-        public double ClassMix(ClassId id)
+        public double ClassMix(ClassId id, int teamSize = int.MaxValue)
         {
-            return Bots.ClassMix[(int)id];
+            // U-063: with class roles on, the lineup holds all six classes (Depth.Roles.ClassMix).
+            double[] mix = !Depth.Classic && Depth.Roles.Enabled ? (teamSize <= Depth.Roles.SmallTeamMax ? Depth.Roles.SmallTeamClassMix : Depth.Roles.ClassMix) : Bots.ClassMix;
+            return mix[(int)id];
         }
+    }
+
+    /// <summary>U-069: the rule sets a match can run (GameConfig.ApplyRules). Appended members only.</summary>
+    public enum RulesProfile
+    {
+        /// <summary>Browser parity: no physics rules (instant hits), no mechanics-depth rules, pace 2x.</summary>
+        Classic,
+        /// <summary>Sim-physics rules on, mechanics-depth rules off (the test config, CreateBrowser5v5).</summary>
+        PhysicsOnly,
+        /// <summary>Everything on: the game's default (CreateDefault).</summary>
+        Full,
+        /// <summary>Only reported by GameConfig.Rules: physics classic with depth on.</summary>
+        Custom,
     }
 
     /// <summary>King-of-the-hill zone.</summary>
@@ -324,6 +376,15 @@ namespace CriticalMass.Sim.Config
         public double GatherSeconds;
         /// <summary>Max units carried.</summary>
         public double CarryCapacity;
+        // Sim-physics lane (appended; not in SameStats, which compares the ten browser fields).
+        /// <summary>DG-69 / OD-2: real seconds from the attack press to the hit (0 = the browser's press-tick hit).</summary>
+        public double AttackWindupSeconds;
+        /// <summary>DG-69: real seconds of slowed follow-through after the hit (the view's recovery; movement stays slowed).</summary>
+        public double RecoverySeconds;
+        /// <summary>DG-70 / OD-3: knock distances are divided by this (Warrior heaviest, Farmer lightest).</summary>
+        public double Mass = 1;
+        /// <summary>DG-70: a single hit of at least this much damage staggers this class (HeavyStunSeconds).</summary>
+        public double Poise = 18;
 
         public ClassConfig Clone() => (ClassConfig)MemberwiseClone();
 
@@ -547,10 +608,19 @@ namespace CriticalMass.Sim.Config
         public bool FocusCarriers = false;
         /// <summary>Target choice: distance-squared multiplier for a carrier when FocusCarriers is on.</summary>
         public double CarrierWeight = 0.25;
+        /// <summary>U-078 (depth rules only, with FocusCarriers): distance-squared multiplier for an enemy Healer (Hard 0.25: it cuts the healer down first).</summary>
+        public double HealerWeight = 1;
+        /// <summary>U-078 (depth rules only): share of the team's hill-duty bots in the hill squad (U-076); below 0 = Depth.Roles.HillSquadFraction.</summary>
+        public double HillSquadFraction = -1;
+        /// <summary>U-078: CarrierWeight while the class-roles rule is on (every class carries food, so chasing carriers pulls a
+        /// Hard bot off the hill all match: 1 = no carrier preference; measured Hard 16 -> 11 of 40 wins against it).</summary>
+        public double RolesCarrierWeight = 0.25;
         /// <summary>Objective discipline: a hill holder's fight utility vs an enemy off the hill is multiplied by this (Normal 0.5).</summary>
         public double OffHillChaseFactor = 0.5;
         /// <summary>Objective discipline: a hurt bot retreats when an enemy is within this range (Normal 6).</summary>
         public double RetreatRange = 6;
+        /// <summary>Sim-physics lane (appended): the bot steps out of a telegraphed Kaiju claw cone or slam ring (and jumps the slam). Hard only.</summary>
+        public bool DodgeKaiju = false;
 
         public static BotSkillConfig EasyDefaults() => new BotSkillConfig
         {
@@ -561,7 +631,8 @@ namespace CriticalMass.Sim.Config
         public static BotSkillConfig HardDefaults() => new BotSkillConfig
         {
             ThinkPeriodScale = 0.5, AimErrorUnits = 0, TntLeadFraction = 0.6, SwingHesitation = 0, AbilityChance = 1,
-            ShieldCrowd = 1, FocusCarriers = true, CarrierWeight = 0.25, OffHillChaseFactor = 0.25, RetreatRange = 3,
+            ShieldCrowd = 1, FocusCarriers = true, CarrierWeight = 0.25, OffHillChaseFactor = 0.25, RetreatRange = 3, DodgeKaiju = true,
+            HealerWeight = 0.25, RolesCarrierWeight = 1, HillSquadFraction = 1,
         };
 
         public BotSkillConfig Clone() => (BotSkillConfig)MemberwiseClone();

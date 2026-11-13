@@ -207,6 +207,48 @@ namespace CriticalMass.Sim.Bots
             return (dx * JsMath.Cos(f) + dz * JsMath.Sin(f)) / Math.Sqrt(d2) >= AttackCos - 1e-9;
         }
 
+        /// <summary>
+        /// Sim-physics lane: a telegraphed Kaiju attack covers this bot: move straight away from its origin (claw cone or slam
+        /// ring), drop the swing, and press jump when the slam lands inside the jump's air time. True when it dodged.
+        /// </summary>
+        private static bool DodgeKaiju(World w, int id, InputFrame output)
+        {
+            Kaiju k = w.Kaiju;
+            if (k.State == KaijuState.Egg || k.KoIn > 0 || !Kaiju.KaijuHostileTo(w, id)) return false;
+            GameConfig cfg = w.Config;
+            double ox;
+            double oz;
+            if (k.TelegraphIn > 0 && Phys.On(w, cfg.Physics.SlamShockwave))
+            {
+                ox = k.TelegraphX;
+                oz = k.TelegraphZ;
+                double ddx = w.X[id] - ox;
+                double ddz = w.Z[id] - oz;
+                if (ddx * ddx + ddz * ddz > (cfg.Kaiju.SlamRadius + 0.5) * (cfg.Kaiju.SlamRadius + 0.5)) return false;
+                int left = (int)Math.Ceiling(k.TelegraphIn * cfg.SimHz - 1e-9);
+                if (Phys.On(w, cfg.Physics.AirDodgesSlam) && w.Actors[id].AirLen == 0 && left >= 1 && left <= Jump.AirTicks(cfg) - 2) output.Jump = true;
+            }
+            else if (k.MeleeWindupIn > 0 && Phys.On(w, cfg.Physics.KaijuClawCone) && Kaiju.InClawCone(w, id))
+            {
+                ox = k.ClawX;
+                oz = k.ClawZ;
+            }
+            else return false;
+            double dx = w.X[id] - ox;
+            double dz = w.Z[id] - oz;
+            double d = Math.Sqrt(dx * dx + dz * dz);
+            if (d < 1e-6)
+            {
+                dx = JsMath.Cos(id * 2.39996);
+                dz = JsMath.Sin(id * 2.39996);
+                d = 1;
+            }
+            output.MoveX = dx / d;
+            output.MoveZ = dz / d;
+            output.Attack = false;
+            return true;
+        }
+
         /// <summary>Steer bot `id` (state in actor.AiState and st) into `output`.</summary>
         public static void SteerBot(World w, BotsState st, int id, InputFrame output)
         {
@@ -261,6 +303,14 @@ namespace CriticalMass.Sim.Bots
                         tx = w.X[t];
                         tz = w.Z[t];
                         reach = cc.AttackRange + AttackSlack;
+                        // DG-69: with a wind-up the bot swings at where the target will be on the contact tick.
+                        int windup = w.Dur.AttackWindup[(int)a.Cls];
+                        if (windup > 0)
+                        {
+                            double lead = windup / cfg.SimHz;
+                            tx += w.Vx[t] * lead;
+                            tz += w.Vz[t] * lead;
+                        }
                     }
                     if (!valid)
                     {
@@ -361,6 +411,69 @@ namespace CriticalMass.Sim.Bots
                 case AiState.Retreat:
                     Follow(w, st, id, TeamPadField(w, id));
                     break;
+                case AiState.Order:
+                {
+                    // U-067: to the ping (or the caller): straight when the line is clear, else the ping's route.
+                    if (!PingRules.HasOrder(w, id)) break;
+                    PingRules.OrderGoal(w, id, out double gx, out double gz, out double stop);
+                    FlowField route = PingRules.OrderRoute(w, id);
+                    if (FirstBlockedCell(map, x, z, gx, gz) < 0 || route == null) Toward(w, id, gx, gz, stop);
+                    else if (FlowField.SampleFlowDir(route, map, x, z, out double odx, out double odz))
+                    {
+                        Mv.X = odx;
+                        Mv.Z = odz;
+                    }
+                    else Toward(w, id, gx, gz, stop);
+                    break;
+                }
+                case AiState.Grab:
+                    Toward(w, id, st.GrabX[id], st.GrabZ[id], 0.2); // U-066: straight at the power-up (it was in line of sight)
+                    break;
+                case AiState.Supply:
+                {
+                    // U-064: to the source and gather; with no source (full, or none left) home to the base and bank.
+                    int si = st.SupplySource[id];
+                    SourceNode[] srcs = w.Depth.Sources;
+                    if (si >= 0 && si < srcs.Length)
+                    {
+                        SourceNode src = srcs[si];
+                        aimX = src.X;
+                        aimZ = src.Z;
+                        double reach = cfg.Resources.NodeInteractRange + cc.Radius - InteractMargin;
+                        double dx = src.X - x;
+                        double dz = src.Z - z;
+                        if (dx * dx + dz * dz <= reach * reach)
+                        {
+                            output.Interact = true;
+                            separate = false;
+                        }
+                        else if (FlowField.SampleFlowDir(Sources.EnsureField(w, si), map, x, z, out double fdx, out double fdz))
+                        {
+                            Mv.X = fdx;
+                            Mv.Z = fdz;
+                        }
+                        else Toward(w, id, src.X, src.Z, 0);
+                    }
+                    else
+                    {
+                        PadDef pad = map.Pads[(int)a.Team];
+                        double r = cfg.Depth.Sources.BankRange - 1;
+                        double dx = pad.X - x;
+                        double dz = pad.Z - z;
+                        if (dx * dx + dz * dz <= r * r) output.Interact = true;
+                        else if (!Follow(w, st, id, TeamPadField(w, id))) Toward(w, id, pad.X, pad.Z, 0);
+                    }
+                    break;
+                }
+                case AiState.Escort:
+                {
+                    // U-063: walk with the carrier (straight at it when the line is clear, else the shrine route it is on).
+                    int t = st.EscortOf[id];
+                    if (t >= 0 && t < w.ActorCount && w.Actors[t].Alive && FirstBlockedCell(map, x, z, w.X[t], w.Z[t]) < 0)
+                        Toward(w, id, w.X[t], w.Z[t], cfg.Depth.Roles.EscortKeepDistance);
+                    else if (!Follow(w, st, id, BotFields.FieldShrine)) Toward(w, id, map.Shrine.X, map.Shrine.Z, 3);
+                    break;
+                }
                 default:
                 {
                     // toHill (and 'none' before the first think).
@@ -550,6 +663,9 @@ namespace CriticalMass.Sim.Bots
 
             // DG-21 hesitation: an Easy bot holds its swing in SwingHesitation of 1/3-second windows (never for Normal).
             if (output.Attack && BotSkill.HoldsSwing(w, id)) output.Attack = false;
+            // Sim-physics lane (DG-84 / DG-85): a Hard bot steps out of a telegraphed claw cone or slam ring, and jumps a slam.
+            BotSkillConfig dsk = BotSkill.Profile(w, id);
+            if (dsk != null && dsk.DodgeKaiju && Phys.On(w, true) && DodgeKaiju(w, id, output)) st.WantMove[id] = 1;
 
             // Ability press decided at think time.
             if (st.AbilityReq[id] == 1)

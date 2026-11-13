@@ -27,7 +27,7 @@ namespace CriticalMass.Sim.Tests
 
         private static WorldOptions Opts()
         {
-            return new WorldOptions { Seed = 7, TeamSize = 5, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = GameConfig.CreateBrowser5v5() };
+            return new WorldOptions { Seed = 7, TeamSize = 5, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = SimPhysicsTests.ClassicBrowser() };
         }
 
         /// <summary>ResourcesSystem passes a delivery needs (1 before CM-64; KaijuFeed.DeliverWindupTicks after).</summary>

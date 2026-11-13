@@ -63,6 +63,16 @@ namespace CriticalMass.Sim.Bots
         public double[] AbilityZ;
         /// <summary>Count of AiState changes written by the FSM (debug / tests).</summary>
         public int StateChanges;
+        /// <summary>U-063: the allied carrier an AiState.Escort bot walks with (-1 = none).</summary>
+        public int[] EscortOf;
+        /// <summary>U-064: 1 = this hill bot runs supply before the hatch (BotDepth.AssignSupply); its source (-1 = walk home and bank).</summary>
+        public byte[] Supply;
+        public int[] SupplySource;
+        /// <summary>U-076: 1 = this hill bot is in its team's hill squad (BotDepth.AssignHillSquad): it holds the hill and leaves the side jobs (power-ups, drops, calls) to the others.</summary>
+        public byte[] HillSquad;
+        /// <summary>U-066: the power-up spot an AiState.Grab bot walks to.</summary>
+        public double[] GrabX;
+        public double[] GrabZ;
 
         /// <summary>Browser createBotsState: allocate every per-actor array at ActorCapacity (no reset).</summary>
         public static BotsState CreateBotsState(World w)
@@ -103,6 +113,12 @@ namespace CriticalMass.Sim.Bots
                 AbilityX = new double[cap],
                 AbilityZ = new double[cap],
                 StateChanges = 0,
+                EscortOf = new int[cap],
+                Supply = new byte[cap],
+                SupplySource = new int[cap],
+                HillSquad = new byte[cap],
+                GrabX = new double[cap],
+                GrabZ = new double[cap],
             };
         }
 
@@ -142,6 +158,10 @@ namespace CriticalMass.Sim.Bots
                 st.PostZ[id] = JsMath.F32(w.Map.Hill.Z);
                 st.PostUntil[id] = 0;
                 st.AbilityReq[id] = 0;
+                st.EscortOf[id] = -1;
+                st.Supply[id] = 0;
+                st.SupplySource[id] = -1;
+                st.HillSquad[id] = 0;
                 st.AbilityX[id] = JsMath.F32(0);
                 st.AbilityZ[id] = JsMath.F32(0);
             }

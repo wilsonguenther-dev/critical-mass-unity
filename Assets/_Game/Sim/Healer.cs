@@ -230,7 +230,7 @@ namespace CriticalMass.Sim.Core
             double removed = amount < m.Instability ? amount : m.Instability > 0 ? m.Instability : 0;
             m.Instability -= removed;
             s.PurifiedUnits += units;
-            s.PurifyReadyTick[id] = w.Tick + (int)w.Config.Abilities.Healer.PurifyCooldownTicks;
+            s.PurifyReadyTick[id] = w.Tick + Durations.T30(w.Config, w.Config.Abilities.Healer.PurifyCooldownTicks);
             s.Stats.Purifies++;
             s.Stats.InstabilityRemoved += removed;
             w.Actors[id].AnimAction = 0;

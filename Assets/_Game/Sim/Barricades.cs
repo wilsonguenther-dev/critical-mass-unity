@@ -295,6 +295,8 @@ namespace CriticalMass.Sim.Core
                 double d2 = dx * dx + dz * dz;
                 if (d2 > r2) continue;
                 if (d2 > 1e-12 && (dx * fx + dz * fz) / Math.Sqrt(d2) < cosHalf - 1e-9) continue;
+                // DG-83: no chip through another wall or barricade (its own cell excepted).
+                if (Phys.On(w, w.Config.Physics.WallsBlockHits) && !SegmentClear.Clear(w.Map, ax, az, b.Cx + 0.5, b.Cz + 0.5, b.Cx, b.Cz)) continue;
                 b.Hp -= damage;
             }
         }

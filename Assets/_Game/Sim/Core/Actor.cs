@@ -54,7 +54,10 @@ namespace CriticalMass.Sim.Core
         public bool Moving;
         /// <summary>Class to respawn as (CM-06). Set only while dead, via InputFrame.ClassPick; applied and cleared on respawn.</summary>
         public ClassId? PendingClass;
-        // ITEM CM-84: added by its owner (ClassSwitchCd, ClassSwitches)
+        /// <summary>CM-84 / U-065 (CM-54): sim ticks until this actor's next class switch is accepted (0 = ready).</summary>
+        public int ClassSwitchCd;
+        /// <summary>CM-84 / U-065 (CM-54): accepted class switches this match.</summary>
+        public int ClassSwitches;
         /// <summary>CM-20: sim seconds left of the post-respawn get-up; while > 0 the actor ignores input and is never pushed.</summary>
         public double StandUp;
         /// <summary>
@@ -89,5 +92,26 @@ namespace CriticalMass.Sim.Core
         /// Written only by Delivery (Damage calls InterruptDelivery).
         /// </summary>
         public int DeliverTicks;
+
+        // ---- Sim-physics lane (appended). Read by the view (animation, input buffer) without events.
+        /// <summary>DG-69: World.Tick of the last accepted attack press (World.NeverTick = none yet).</summary>
+        public int SwingTick;
+        /// <summary>DG-69: wind-up ticks of that swing (the hit lands on SwingTick + SwingWindup; 0 = on the press tick).</summary>
+        public int SwingWindup;
+        /// <summary>DG-69: slowed recovery ticks after the hit.</summary>
+        public int SwingRecovery;
+        /// <summary>DG-69: facing locked at the press; the hit resolves along it.</summary>
+        public double SwingFacing;
+        /// <summary>DG-69: a swing is winding up and will resolve on SwingTick + SwingWindup.</summary>
+        public bool SwingPending;
+        /// <summary>DG-70: ticks of hit-stun left (input ignored, no attack, ability or jump; a wind-up is cancelled).</summary>
+        public int HitStunTicks;
+        /// <summary>DG-70: length of the current stagger (ticks) for the view's hit-reaction timing.</summary>
+        public int HitStunLen;
+        /// <summary>DG-70: knock velocity (u/s, Float32), added on top of the input velocity and decaying each tick.</summary>
+        public double KVx;
+        public double KVz;
+        /// <summary>U-066 (DG-39): coins this actor picked up this match (knock-out drops and map piles). The progression screens read it.</summary>
+        public int CoinsPicked;
     }
 }

@@ -52,6 +52,32 @@ namespace CriticalMass.Sim.Core
         /// <summary>DG-16: ApplyDamage with an explicit cause (written to the Hit / Death event Cause and Actor.LastCause), for later sources such as DG-22 blasts.</summary>
         public static double ApplyDamage(World w, int targetId, double amount, int sourceId, double srcX, double srcZ, DamageCause cause)
         {
+            return ApplyHit(w, targetId, amount, sourceId, srcX, srcZ, cause, 0, 0, 0, 0);
+        }
+
+        /// <summary>
+        /// DG-70: a melee hit by actor src standing at (srcX, srcZ) with the swing facing (fbX, fbZ): damage, plus (Knockback on)
+        /// a push away from the attacker of MeleeKnockPerDamage x amount and a stagger when it reaches the victim's Poise.
+        /// </summary>
+        public static double ApplyMelee(World w, int targetId, double amount, int sourceId, double srcX, double srcZ)
+        {
+            if (!Phys.On(w, w.Config.Physics.Knockback)) return ApplyDamage(w, targetId, amount, sourceId, srcX, srcZ);
+            Actor s = sourceId >= 0 && sourceId < w.ActorCount ? w.Actors[sourceId] : null;
+            double fbX = s != null ? JsMath.Cos(s.SwingFacing) : 1;
+            double fbZ = s != null ? JsMath.Sin(s.SwingFacing) : 0;
+            Knock.Dir(w, targetId, srcX, srcZ, fbX, fbZ, out double dx, out double dz);
+            int stun = amount >= w.Config.Class(w.Actors[targetId].Cls).Poise ? w.Dur.HeavyStun : 0;
+            return ApplyHit(w, targetId, amount, sourceId, srcX, srcZ, CauseOf(w, sourceId), dx, dz, amount * w.Config.Physics.MeleeKnockPerDamage, stun);
+        }
+
+        /// <summary>
+        /// DG-70: the one entry point (ApplyDamage(..., cause) calls it with no knock): damage, then, when the victim lives and
+        /// Knockback is on, a knock of knock u (mass 1) along (dirX, dirZ) and stunTicks of stagger (Knock.Push). The Hit event
+        /// carries the direction, the travelled knock distance (Impulse) and the tier for the world-force bus (C1).
+        /// </summary>
+        public static double ApplyHit(World w, int targetId, double amount, int sourceId, double srcX, double srcZ, DamageCause cause,
+            double dirX, double dirZ, double knock, int stunTicks)
+        {
             if (!(targetId >= 0 && targetId < w.ActorCount)) return 0;
             if (!(amount > 0) || !double.IsFinite(amount)) return 0;
             if (w.Match.Phase == MatchPhase.Ended) return 0;
@@ -69,13 +95,29 @@ namespace CriticalMass.Sim.Core
                 dmg *= 1 - w.Config.Abilities.WarriorShield.DamageReduction;
             }
 
+            // U-066 Ward: soaks the hit (an explosion goes through and breaks it). A fully soaked hit still marks the attacker
+            // and still interrupts a delivery wind-up, but costs no HP and raises no Hit event (WardAbsorb instead).
+            dmg = Pickups.Absorb(w, targetId, dmg, cause, credit);
+            if (!(dmg > 0))
+            {
+                t.GatherProgress = 0;
+                t.LastAttacker = credit;
+                t.LastCause = cause;
+                Delivery.InterruptDelivery(w, targetId, credit);
+                return 0;
+            }
+
             t.Hp -= dmg;
             t.GatherProgress = 0;
             t.LastAttacker = credit;
             t.LastCause = cause;
             double tx = w.X[targetId];
             double tz = w.Z[targetId];
-            World.PushEvent(w, SimEventType.Hit, targetId, credit, tx, tz, dmg, null, cause);
+            bool physics = Phys.On(w, w.Config.Physics.Knockback);
+            double eff = physics && (knock > 0) ? Knock.Effective(w, targetId, knock, srcX, srcZ) : 0;
+            int tier = Knock.Tier(w.Config, dmg, t.Hp <= 0);
+            if (physics) World.PushEvent(w, SimEventType.Hit, targetId, credit, tx, tz, dmg, null, cause, 0, dirX, dirZ, eff, tier, 0, 0);
+            else World.PushEvent(w, SimEventType.Hit, targetId, credit, tx, tz, dmg, null, cause);
             // CM-64: a hit during a delivery wind-up at the shrine loses that delivery (DeliverIntercepted).
             Delivery.InterruptDelivery(w, targetId, credit);
 
@@ -97,8 +139,13 @@ namespace CriticalMass.Sim.Core
                 t.AbilityActive = 0;
                 t.SlowTimer = 0;
                 t.Moving = false;
-                World.PushEvent(w, SimEventType.Death, targetId, credit, tx, tz, dmg, null, cause);
+                if (Phys.On(w, true)) World.ClearSwing(t); // DG-69: a corpse has no swing in flight
+                if (physics) Knock.Clear(t);
+                if (physics) World.PushEvent(w, SimEventType.Death, targetId, credit, tx, tz, dmg, null, cause, 0, dirX, dirZ, eff, tier, 0, 0);
+                else World.PushEvent(w, SimEventType.Death, targetId, credit, tx, tz, dmg, null, cause);
+                return dmg;
             }
+            if (physics && (eff > 0 || stunTicks > 0)) Knock.Push(w, targetId, sourceId, dirX, dirZ, eff, stunTicks, tier, cause);
             return dmg;
         }
     }
