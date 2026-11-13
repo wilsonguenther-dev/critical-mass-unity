@@ -123,7 +123,7 @@ namespace CriticalMass.Runtime.Menu
         /// <summary>The frame-rate limit choices in screen order (FramePolicy.CapChoices): 30, 60, 120, 144, 0 = OFF (locked to
         /// the display), -1 = UNLIMITED (vsync off).</summary>
         public static readonly int[] FpsCapOptions = CriticalMass.Runtime.Game.FramePolicy.CapChoices;
-        public const int DefaultFpsCap = 60;
+        public const int DefaultFpsCap = CriticalMass.Runtime.Game.FramePolicy.DefaultCap;   // perf-smooth-1: OFF (vsync, one frame per refresh)
 
         /// <summary>
         /// Frame-rate limit (cm.fpsCap): 30, 60, 120, 144, 0 (off: the display's refresh rate) or -1 (unlimited); default 60. Stored here; FrameGovernor
