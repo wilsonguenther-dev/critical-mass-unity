@@ -178,6 +178,26 @@ namespace CriticalMass.Sim.Core
         PingRefused,
         /// <summary>U-067: a bot took a ping: A = the bot, B = the pinger, (X, Z) = the bot, Value = (int)PingCall.</summary>
         PingAnswered,
+        /// <summary>U-068: a supply drop is on its way: A = -1, B = event number, (X, Z) = where, Value = the tick it lands, Radius = claim range.</summary>
+        SupplyDropIncoming,
+        /// <summary>U-068: the supply drop landed: (X, Z), Value = the tick it is gone if unclaimed, Radius = claim range.</summary>
+        SupplyDropLanded,
+        /// <summary>U-068: who stands on the drop changed: A = an actor on it (-1 none), (X, Z), Value = MapEvents.ContestNobody / ContestAzure / ContestCrimson / ContestBoth.</summary>
+        SupplyDropContest,
+        /// <summary>U-068: the drop was claimed: A = the claimer, B = team index, (X, Z), Value = wood added to that team's stock.</summary>
+        SupplyDropClaimed,
+        /// <summary>U-068: the drop vanished unclaimed: (X, Z).</summary>
+        SupplyDropExpired,
+        /// <summary>U-068: the egg is exposed (deliveries count more): A = -1, B = event number, (X, Z) = the shrine, Value = the tick the window closes.</summary>
+        EggExposed,
+        /// <summary>U-068: the window closed: B = 1 when the hatch ended it, (X, Z) = the shrine.</summary>
+        EggExposedEnded,
+        /// <summary>U-068: a bridge will collapse: A = -1, B = BridgeSpans.All index, (X, Z) = the middle of the part that falls, Value = the tick it falls, Radius = half its length.</summary>
+        BridgeWarning,
+        /// <summary>U-068: the bridge part fell: B = span index, (X, Z), Value = the tick it rebuilds itself, Radius = cells removed.</summary>
+        BridgeCollapsed,
+        /// <summary>U-068: the bridge is back: A = the Builder (-1 = by itself), B = span index, (X, Z), Value = wood spent; -1 = the collapse was called off; -2 = a Builder's repair was refused for lack of wood (then (X, Z) = that Builder).</summary>
+        BridgeRepaired,
         // ITEM CM-84: added by its owner (ClassSwitch, ports CM-54)
         /// <summary>CM-37: one tick of fountain healing (Heal.HealSystem): A = the healed actor, B = -1, (X, Z) = the actor, Value = HP restored this tick (&gt; 0).</summary>
         Heal,

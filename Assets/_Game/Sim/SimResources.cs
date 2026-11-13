@@ -30,7 +30,7 @@ namespace CriticalMass.Sim.Core
                     // U-064: wood feeds a little less than plant; water feeds least but cools the egg (never under 0, never after the lock).
                     SourcesConfig S = w.Config.Depth.Sources;
                     bool water = bio == BiomassType.Water;
-                    m.Allegiance[team] += units * (water ? S.WaterAllegiancePerUnit : S.WoodAllegiancePerUnit);
+                    m.Allegiance[team] += units * (water ? S.WaterAllegiancePerUnit : S.WoodAllegiancePerUnit) * MapEvents.FeedScale(w);
                     m.Delivered[(int)team].Biomass += units;
                     if (water)
                     {
@@ -47,7 +47,7 @@ namespace CriticalMass.Sim.Core
                     return;
                 }
                 bool meat = bio == BiomassType.Meat;
-                m.Allegiance[team] += units * (meat ? feed.MeatAllegiancePerUnit : feed.BiomassAllegiancePerUnit);
+                m.Allegiance[team] += units * (meat ? feed.MeatAllegiancePerUnit : feed.BiomassAllegiancePerUnit) * MapEvents.FeedScale(w); // U-068 egg exposed (x 1 otherwise)
                 m.Delivered[(int)team].Biomass += units;
                 if (meat) m.Delivered[(int)team].Meat += units;
                 else m.Delivered[(int)team].Plant += units;
@@ -56,7 +56,7 @@ namespace CriticalMass.Sim.Core
             }
             else
             {
-                m.Allegiance[team] += units * feed.CorruptionAllegiancePerUnit;
+                m.Allegiance[team] += units * feed.CorruptionAllegiancePerUnit * MapEvents.FeedScale(w);
                 m.Instability += units * feed.CorruptionInstabilityPerUnit;
                 m.Delivered[(int)team].Corruption += units;
                 World.PushEvent(w, SimEventType.DeliverCorruption, actorId, teamIdx, sh.X, sh.Z, units);

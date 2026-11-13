@@ -734,6 +734,9 @@ namespace CriticalMass.Sim.Bots
             double grabZ = 0;
             if (Pickups.On(w) && cur != AiState.HoldHill && a.CarryAmount == 0 && hpFrac >= lowHp && Pickups.BotGrabSpot(w, id, out grabX, out grabZ))
                 uGrab = w.Config.Depth.Pickups.BotGrabUtility;
+            // U-068: a supply drop in sight and close: stand on it.
+            if (uGrab <= 0 && MapEvents.On(w) && a.CarryAmount == 0 && hpFrac >= lowHp && MapEvents.BotDropSpot(w, id, out grabX, out grabZ))
+                uGrab = w.Config.Depth.Events.BotDropUtility;
 
             // U-067: an answered ping. A hurt bot or one with cargo drops it; an Attack is over once the spot is reached and clear.
             double uOrder = 0;

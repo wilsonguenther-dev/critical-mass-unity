@@ -118,6 +118,36 @@ namespace CriticalMass.Sim.Core
         public int PingAnswers;
         public int BotPings;
 
+        /// <summary>U-068: events started so far and the tick of the next.</summary>
+        public int EventIndex;
+        public int NextEventTick;
+        /// <summary>U-068 supply drop: spots, state (MapEvents.Drop*), where, the tick it lands (incoming) or is gone (landed), each team's claim ticks, who stands on it.</summary>
+        public Grid.PointXZ[] DropSpots;
+        public int DropState;
+        public double DropX;
+        public double DropZ;
+        public int DropTick;
+        public int[] DropProgress;
+        public int DropContest;
+        /// <summary>U-068 egg exposed: the tick the window closes (0 = closed).</summary>
+        public int EggExposedUntil;
+        /// <summary>U-068 bridge: state (MapEvents.Bridge*), the span, the tick it falls (warned) or rebuilds itself (broken), its cells, the two broken ends, repair ticks.</summary>
+        public int BridgeState;
+        public int BrokenSpan;
+        public int BridgeTick;
+        public int[] BrokenIdx;
+        public int BrokenN;
+        public double BridgeAx;
+        public double BridgeAz;
+        public double BridgeBx;
+        public double BridgeBz;
+        public int RepairProgress;
+        /// <summary>U-068 counters.</summary>
+        public int DropsClaimed;
+        public int EggWindows;
+        public int BridgesCollapsed;
+        public int BridgesRepaired;
+
         public static DepthState Create(GameConfig cfg, Grid.MapDef map)
         {
             int cap = World.ActorCapacity(cfg);
@@ -152,6 +182,9 @@ namespace CriticalMass.Sim.Core
                 PingFieldNext = new int[2],
                 BotPingReady = new int[cap],
                 TeamBotPingReady = new int[2],
+                DropSpots = Core.Pickups.PlaceCentreSpots(map, cfg.Depth.Events.DropSpotsZ),
+                DropProgress = new int[2],
+                BrokenIdx = new int[MapEvents.MaxBrokenCells],
             };
             for (int i = 0; i < s.Pickups.Length; i++) s.Pickups[i] = new Pickup { Source = -1, Spot = -1 };
             s.CoinSpotNextTick = new int[s.CoinSpots.Length];
@@ -215,6 +248,21 @@ namespace CriticalMass.Sim.Core
             PingsRefused = 0;
             PingAnswers = 0;
             BotPings = 0;
+            EventIndex = 0;
+            NextEventTick = (int)w.Config.Depth.Events.FirstEventTicks;
+            DropState = MapEvents.DropNone;
+            DropProgress[0] = 0;
+            DropProgress[1] = 0;
+            DropContest = 0;
+            EggExposedUntil = 0;
+            BridgeState = MapEvents.BridgeNone;
+            BrokenSpan = -1;
+            BrokenN = 0;
+            RepairProgress = 0;
+            DropsClaimed = 0;
+            EggWindows = 0;
+            BridgesCollapsed = 0;
+            BridgesRepaired = 0;
             for (int t = 0; t < 2; t++)
             {
                 w.Match.Delivered[t].Wood = 0;

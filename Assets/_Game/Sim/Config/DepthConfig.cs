@@ -22,6 +22,8 @@ namespace CriticalMass.Sim.Config
         public PickupsConfig Pickups = new PickupsConfig();
         /// <summary>U-067: pings the bots answer, the bots' own calls, bot names and play styles.</summary>
         public PingsConfig Pings = new PingsConfig();
+        /// <summary>U-068: map events: supply drop, egg exposed, bridge collapse.</summary>
+        public MapEventsConfig Events = new MapEventsConfig();
 
         public DepthConfig Clone()
         {
@@ -31,6 +33,48 @@ namespace CriticalMass.Sim.Config
             c.Stations = Stations.Clone();
             c.Pickups = Pickups.Clone();
             c.Pings = Pings.Clone();
+            c.Events = Events.Clone();
+            return c;
+        }
+    }
+
+    /// <summary>U-068 map events (our rule). Timing in sim ticks at 30 Hz.</summary>
+    public sealed class MapEventsConfig
+    {
+        public bool Enabled = true;
+        /// <summary>First event at 50 s, then one every 60 s; the three kinds rotate from a seed-fixed start.</summary>
+        public double FirstEventTicks = 1500;
+        public double PeriodTicks = 1800;
+        /// <summary>Supply drop: centre-line spots (their z), warning 8 s, claim by standing 3 s uncontested within range, gone after 30 s.</summary>
+        public double[] DropSpotsZ = { 34, 46, 22, 58 };
+        public double DropWarnTicks = 240;
+        public double DropClaimRange = 2.5;
+        public double DropClaimTicks = 90;
+        public double DropLifetimeTicks = 900;
+        public double DropWood = 4;
+        public double DropWater = 2;
+        public double DropCoins = 10;
+        public double DropPowerUpDelayTicks = 30;
+        /// <summary>Bots: a bot within this range and in line of sight walks to the drop, at this utility (a healthy hill bot's fight still wins).</summary>
+        public double BotDropRange = 12;
+        public double BotDropUtility = 0.85;
+        /// <summary>Egg exposed: 20 s in which every delivery counts this many times toward allegiance.</summary>
+        public double EggWindowTicks = 600;
+        public double EggFeedScale = 2;
+        /// <summary>Bridge collapse: warning 8 s; the middle third within this half width falls; a span with fewer bridge cells there is skipped.</summary>
+        public double BridgeWarnTicks = 240;
+        public double BridgeHalfWidth = 3;
+        public double BridgeMinCells = 2;
+        /// <summary>A Builder within this range of a broken end holds interact 3 s and pays this much wood; else it rebuilds itself after 45 s.</summary>
+        public double BridgeRepairRange = 3;
+        public double BridgeRepairTicks = 90;
+        public double BridgeRepairWood = 2;
+        public double BridgeAutoRepairTicks = 1350;
+
+        public MapEventsConfig Clone()
+        {
+            var c = (MapEventsConfig)MemberwiseClone();
+            c.DropSpotsZ = (double[])DropSpotsZ.Clone();
             return c;
         }
     }
