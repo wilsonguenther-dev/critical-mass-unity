@@ -25,12 +25,20 @@ namespace CriticalMass.Runtime.View.Dressing
     /// vertex carries UV5 = (pivot world x, pivot world z, weight, kind): weight = height squared within the piece for
     /// foliage and trees, distance from the pole for banners, sin(pi t) along the deck for bridges. Still pieces (ledges,
     /// ground cells, cliffs) keep the plain material and pay nothing. Sway group bounds grow 0.6 u each way.
+    /// Scenery LODs (2026-11-12 triangle budget): groups are 16 x 16 cells (the sky too, so off-screen chunks are frustum
+    /// culled), and every group is combined once per level of detail it needs at the current quality (SceneryLod: the
+    /// lighter kit files *_lod1 / *_lod2, tiny pieces culled at level 2); LateUpdate shows one level per chunk from the
+    /// ground distance between the camera's look point and the chunk (SceneryLod.Pick, with hysteresis). Small clutter is
+    /// thinned by quality and only large pieces cast shadows. A quality change rebuilds the groups once. Still one material
+    /// per combined mesh (SRP Batcher), UV5 sway data per vertex as before (LOD meshes keep the source bounds).
     /// </summary>
     public sealed class WorldView : MonoBehaviour
     {
         public const int ChunkSize = 16;
         /// <summary>Cells per side of one combined kit group (ground chunks stay ChunkSize).</summary>
-        public const int GroupSize = 32;
+        public const int GroupSize = 16;
+        /// <summary>Sky groups (clouds, sky rocks) use their own keys: SkyKeyBase + the ground key of their position.</summary>
+        public const int SkyKeyBase = 1 << 16;
 
         private static bool[] _dressed;
         private static byte[] _dressedTypes;
@@ -60,7 +68,37 @@ namespace CriticalMass.Runtime.View.Dressing
         private readonly List<(WorldBreakable b, MeshFilter mf, string state)> _breakables = new List<(WorldBreakable, MeshFilter, string)>();
         private Material _ground;
         private Texture2D _field;
-        private readonly Dictionary<int, List<GameObject>> _groups = new Dictionary<int, List<GameObject>>();
+        private readonly Dictionary<int, Chunk> _groups = new Dictionary<int, Chunk>();
+
+        /// <summary>One spatial chunk of combined kit groups: its objects, its renderers per level of detail (with whether
+        /// each may cast), the level it shows and its world bounds (the LOD distance is measured to them).</summary>
+        private sealed class Chunk
+        {
+            public readonly List<GameObject> Objects = new List<GameObject>();
+            public readonly List<MeshRenderer>[] ByLevel = { new List<MeshRenderer>(), new List<MeshRenderer>(), new List<MeshRenderer>() };
+            /// <summary>The chunk's one shadow-only renderer (null when nothing in it is large enough to cast).</summary>
+            public MeshRenderer Shadow;
+            public int ShadowTris;
+            public Bounds Bounds;
+            public bool HasBounds;
+            public int Shown = -1;
+            public readonly int[] Tris = new int[SceneryLod.Levels];
+        }
+
+        // Scenery LODs: the quality the groups were built for (levels and clutter density).
+        private int _builtQuality = -1;
+        private int _groundTris;
+        private UnityEngine.Camera _cam;
+
+        /// <summary>Chunks drawn at each level right now (tests and the perf report).</summary>
+        public readonly int[] ChunksAtLevel = new int[SceneryLod.Levels];
+
+        /// <summary>Triangles combined per level over all chunks at the current quality (memory, not what is drawn).</summary>
+        public readonly int[] TrianglesAtLevel = new int[SceneryLod.Levels];
+
+        /// <summary>Kit chunks (16 x 16 cells, sky separate) the view built.</summary>
+        public int ChunkCount => _groups.Count;
+
         private readonly List<Material> _hillMats = new List<Material>();
         private readonly Dictionary<Material, Material> _swayMats = new Dictionary<Material, Material>();
 
@@ -114,17 +152,80 @@ namespace CriticalMass.Runtime.View.Dressing
         /// shared project assets in the editor).</summary>
         private void ApplyTier()
         {
+            // Scenery LODs: another quality level needs other levels of detail or another clutter density: rebuild once.
+            if (Plan != null && _root != null && NeedsRebuild(_builtQuality, RenderTier.Level))
+            {
+                var keys = new List<int>(_groups.Keys);
+                foreach (int g in keys) DestroyGroup(g);
+                BuildGroups(null);
+                for (int k = 0; k < _breakables.Count; k++) _breakables[k] = (_breakables[k].b, _breakables[k].mf, null);
+                if (_map != null) SyncBreakables();
+            }
             (bool outline, bool shadows) = RenderTier.Policy(RenderTier.Level);
             if (!Application.isEditor)
                 foreach (Material m in _sceneryMats)
                     if (m != null && m.GetShaderPassEnabled("SRPDefaultUnlit") != outline) m.SetShaderPassEnabled("SRPDefaultUnlit", outline);
-            foreach (List<GameObject> list in _groups.Values)
-                foreach (GameObject go in list)
+            foreach (Chunk ch in _groups.Values)
+                if (ch.Shadow != null) ch.Shadow.enabled = shadows;
+        }
+
+        /// <summary>True when groups built for quality "built" are wrong for quality "now" (levels built or clutter
+        /// density differ).</summary>
+        public static bool NeedsRebuild(int built, int now)
+        {
+            if (built < 0) return true;
+            if (SceneryLod.ClutterDensity(built) != SceneryLod.ClutterDensity(now)) return true;
+            for (int l = 0; l < SceneryLod.Levels; l++)
+                if (SceneryLod.Builds(built, l) != SceneryLod.Builds(now, l)) return true;
+            return false;
+        }
+
+        /// <summary>
+        /// Shows one level of detail per chunk: the ground distance from the camera's look point to the chunk's bounds
+        /// picks it (SceneryLod.Pick with hysteresis); a level the current quality did not build falls back to the nearest
+        /// one that was built. Renderers of the other levels are disabled (they are not culled, drawn or shadowed). No
+        /// allocations: it walks the chunk table once per frame.
+        /// </summary>
+        private void UpdateLods()
+        {
+            if (_groups.Count == 0) return;
+            if (_cam == null || !_cam.isActiveAndEnabled) _cam = UnityEngine.Camera.main;
+            // No camera yet (or a capture without one tagged MainCamera): every chunk shows the finest level built.
+            bool haveCam = _cam != null;
+            Vector3 look = haveCam ? SceneryLod.LookPoint(_cam.transform.position, _cam.transform.forward) : Vector3.zero;
+            int q = _builtQuality;
+            for (int l = 0; l < SceneryLod.Levels; l++) ChunksAtLevel[l] = 0;
+            int shown = 0;
+            foreach (Chunk ch in _groups.Values)
+            {
+                int want = SceneryLod.Pick(q, haveCam && ch.HasBounds ? SceneryLod.GroundDistance(look, ch.Bounds) : 0f, ch.Shown);
+                int show = BuiltLevel(q, want);
+                if (show != ch.Shown)
                 {
-                    if (go == null) continue;
-                    var r = go.GetComponent<MeshRenderer>();
-                    if (r != null) r.shadowCastingMode = shadows && CastsShadows(r.sharedMaterial) ? ShadowCastingMode.On : ShadowCastingMode.Off;
+                    for (int l = 0; l < SceneryLod.Levels; l++)
+                    {
+                        List<MeshRenderer> rs = ch.ByLevel[l];
+                        for (int i = 0; i < rs.Count; i++)
+                            if (rs[i] != null) rs[i].enabled = l == show;
+                    }
+                    ch.Shown = show;
                 }
+                ChunksAtLevel[show]++;
+                shown += ch.Tris[show];
+            }
+            LastTriangles = shown + _groundTris;
+        }
+
+        /// <summary>The nearest level to "want" that quality q builds (pure; tests).</summary>
+        public static int BuiltLevel(int q, int want)
+        {
+            if (SceneryLod.Builds(q, want)) return want;
+            for (int d = 1; d < SceneryLod.Levels; d++)
+            {
+                if (want + d < SceneryLod.Levels && SceneryLod.Builds(q, want + d)) return want + d;
+                if (want - d >= 0 && SceneryLod.Builds(q, want - d)) return want - d;
+            }
+            return 0;
         }
 
         // Physics audit DG-80 (R-M8): small props (WorldLook.Prop: barrels, crates, braziers, light pools, pebbles) never cast
@@ -150,6 +251,7 @@ namespace CriticalMass.Runtime.View.Dressing
                 return;
             }
             if (Plan == null) return;
+            UpdateLods();
             if (w.Match != null) ApplyHill(w.Match.HillState);
             if (_replanPending && Time.frameCount - _lastReplanFrame >= ReplanEveryFrames) Replan();
             if (w.GridVersion == _seenGridVersion) return;
@@ -198,7 +300,16 @@ namespace CriticalMass.Runtime.View.Dressing
             return gz * 64 + gx;
         }
 
-        static int GroupOf(WorldPlacement p) => p.Cat == "sky" ? -1 : GroupOf(p.SimX, p.SimZ);
+        static int GroupOf(WorldPlacement p) => p.Cat == "sky" ? SkyKeyBase + GroupOf(p.SimX, p.SimZ) : GroupOf(p.SimX, p.SimZ);
+
+        /// <summary>The sim-space cell rectangle (x0, z0, x1, z1) a ground group key covers (tests; sky keys map to the
+        /// same rectangle as their ground key). Edge keys also take the clamped placements beyond the map.</summary>
+        public static (int x0, int z0, int x1, int z1) GroupRect(int key)
+        {
+            if (key >= SkyKeyBase) key -= SkyKeyBase;
+            int gx = key % 64 - 1, gz = key / 64 - 1;
+            return (gx * GroupSize, gz * GroupSize, (gx + 1) * GroupSize, (gz + 1) * GroupSize);
+        }
 
         /// <summary>Groups whose placements (piece, position, yaw, team) differ between two plans.</summary>
         public static HashSet<int> ChangedGroups(WorldPlan a, WorldPlan b)
@@ -261,8 +372,15 @@ namespace CriticalMass.Runtime.View.Dressing
 
         private void DestroyGroup(int g)
         {
-            if (!_groups.TryGetValue(g, out List<GameObject> list)) return;
-            foreach (GameObject go in list)
+            if (!_groups.TryGetValue(g, out Chunk ch)) return;
+            for (int l = 0; l < SceneryLod.Levels; l++)
+                foreach (MeshRenderer r in ch.ByLevel[l])
+                {
+                    if (r == null) continue;
+                    var mf = r.GetComponent<MeshFilter>();
+                    if (mf != null && mf.sharedMesh != null) TrianglesAtLevel[l] -= (int)(mf.sharedMesh.GetIndexCount(0) / 3);
+                }
+            foreach (GameObject go in ch.Objects)
             {
                 if (go == null) continue;
                 Mesh mesh = go.GetComponent<MeshFilter>().sharedMesh;
@@ -278,50 +396,130 @@ namespace CriticalMass.Runtime.View.Dressing
             _groups.Remove(g);
         }
 
-        /// <summary>Combines the plan's kit pieces per group per material; only the groups in "only" when it is set.</summary>
+        /// <summary>
+        /// Combines the plan's kit pieces per chunk, per level of detail the current quality builds and per material; only
+        /// the chunks in "only" when it is set. Small clutter is thinned by quality; a piece tiny on screen is left out of
+        /// level 2 (SceneryLod.Resolve). The drawn groups never cast: each chunk gets ONE shadow-only proxy instead (the
+        /// lightest level of its large casting pieces, one material, so one shadow draw per chunk).
+        /// </summary>
         private void BuildGroups(HashSet<int> only)
         {
-            var groups = new Dictionary<(int chunk, Material mat), List<(MeshData d, int sub, Matrix4x4 m, SwayInfo sw)>>();
+            int q = RenderTier.Level;
+            _builtQuality = q;
+            var groups = new Dictionary<(int chunk, int level, Material mat), List<(MeshData d, int sub, Matrix4x4 m, SwayInfo sw)>>();
+            var shadows = new Dictionary<int, List<(MeshData d, int sub, Matrix4x4 m, SwayInfo sw)>>();
+            Func<string, bool> hasFile = n => _catalog.Find(n) != null;
+            List<(int chunk, Material mat, MeshData d, int sub, Matrix4x4 m)> parts = _parts;
             foreach (WorldPlacement p in Plan.Placements)
             {
                 if (p.Piece == "env_ground_cell") continue; // drawn per chunk by BuildGroundChunk
-                GameObject model = _catalog.Find(p.Piece);
-                if (model == null) continue;
+                if (_catalog.Find(p.Piece) == null) continue;
+                if (!SceneryLod.KeepClutter(p.Piece, p.SimX, p.SimZ, q)) continue;
                 int chunk = GroupOf(p);
                 bool layout = p.Piece.StartsWith("cm_layout_", StringComparison.Ordinal);
+                if (only != null && !layout && !only.Contains(chunk)) continue;
                 Vector3 pivot = p.Matrix.MultiplyPoint3x4(Vector3.zero);
                 var sw = new SwayInfo { PivotX = pivot.x, PivotZ = pivot.z, SpanA = p.SpanA, SpanB = p.SpanB, Kind = layout ? (byte)0 : WorldKit.SwayKind(p.Piece) };
-                if (only != null && !layout && !only.Contains(chunk)) continue;
-                foreach (MeshFilter mf in model.GetComponentsInChildren<MeshFilter>(true))
+                for (int level = 0; level < SceneryLod.Levels; level++)
                 {
-                    if (layout && !mf.name.Contains("cm_district_")) continue; // listed items are placed on their own
-                    MeshData d = Data(mf.sharedMesh);
-                    if (d == null) continue;
-                    var r = mf.GetComponent<MeshRenderer>();
-                    Material[] mats = r != null ? r.sharedMaterials : new Material[0];
-                    Matrix4x4 local = model.transform.worldToLocalMatrix * mf.transform.localToWorldMatrix;
-                    Matrix4x4 m = p.Matrix * local;
-                    int pieceChunk = chunk;
-                    if (layout)
+                    if (!SceneryLod.Builds(q, level)) continue;
+                    int drawn = SceneryLod.Resolve(p.Piece, level, hasFile);
+                    if (drawn < 0) continue; // tiny on screen: culled at the far level
+                    CollectParts(p, SceneryLod.LevelPiece(p.Piece, drawn), chunk, layout, only, parts);
+                    foreach (var (pc, mat, d, sub, m) in parts)
                     {
-                        Vector3 c = m.MultiplyPoint3x4(mf.sharedMesh.bounds.center);
-                        pieceChunk = GroupOf(c.x, -c.z);
-                        if (only != null && !only.Contains(pieceChunk)) continue;
+                        Material look = SwayMaterial(mat, sw.Kind);
+                        if (!groups.TryGetValue((pc, level, look), out var list)) groups[(pc, level, look)] = list = new List<(MeshData, int, Matrix4x4, SwayInfo)>();
+                        list.Add((d, sub, m, sw));
                     }
-                    for (int s = 0; s < d.Subs.Length; s++)
-                    {
-                        Material mat = SwayMaterial(Resolve(s < mats.Length ? mats[s] : null, p.Team), sw.Kind);
-                        if (mat == null) continue;
-                        if (!groups.TryGetValue((pieceChunk, mat), out var list)) groups[(pieceChunk, mat)] = list = new List<(MeshData, int, Matrix4x4, SwayInfo)>();
-                        list.Add((d, s, m, sw));
-                    }
+                }
+                if (!SceneryLod.LargeEnoughToCast(p.Piece)) continue;
+                int lightest = SceneryLod.Resolve(p.Piece, SceneryLod.ShadowProxyLevel, hasFile);
+                if (lightest < 0) continue;
+                CollectParts(p, SceneryLod.LevelPiece(p.Piece, lightest), chunk, layout, only, parts);
+                foreach (var (pc, mat, d, sub, m) in parts)
+                {
+                    if (!CastsShadows(mat)) continue;
+                    if (!shadows.TryGetValue(pc, out var list)) shadows[pc] = list = new List<(MeshData, int, Matrix4x4, SwayInfo)>();
+                    list.Add((d, sub, m, default(SwayInfo)));
                 }
             }
             foreach (var kv in groups)
             {
-                GameObject go = MakeGroup("Group " + kv.Key.chunk + " " + kv.Key.mat.name, kv.Key.mat, kv.Value);
-                if (!_groups.TryGetValue(kv.Key.chunk, out List<GameObject> l)) _groups[kv.Key.chunk] = l = new List<GameObject>();
-                l.Add(go);
+                (int chunk, int level, Material mat) = kv.Key;
+                GameObject go = MakeGroup("Group " + chunk + " L" + level + " " + mat.name, mat, kv.Value, ShadowCastingMode.Off);
+                Chunk ch = ChunkFor(chunk, go);
+                var r = go.GetComponent<MeshRenderer>();
+                ch.ByLevel[level].Add(r);
+                int tris = (int)(go.GetComponent<MeshFilter>().sharedMesh.GetIndexCount(0) / 3);
+                ch.Tris[level] += tris;
+                TrianglesAtLevel[level] += tris;
+                if (ch.HasBounds) ch.Bounds.Encapsulate(r.bounds);
+                else
+                {
+                    ch.Bounds = r.bounds;
+                    ch.HasBounds = true;
+                }
+                r.enabled = false; // UpdateLods shows one level
+                ch.Shown = -1;
+            }
+            Material caster = ShadowMaterial();
+            bool shadowsOn = RenderTier.Policy(q).sceneryShadows;
+            if (caster != null)
+                foreach (var kv in shadows)
+                {
+                    GameObject go = MakeGroup("Shadow " + kv.Key, caster, kv.Value, ShadowCastingMode.ShadowsOnly);
+                    Chunk ch = ChunkFor(kv.Key, go);
+                    ch.Shadow = go.GetComponent<MeshRenderer>();
+                    ch.ShadowTris = (int)(go.GetComponent<MeshFilter>().sharedMesh.GetIndexCount(0) / 3);
+                    ch.Shadow.enabled = shadowsOn;
+                }
+            UpdateLods();
+        }
+
+        private readonly List<(int chunk, Material mat, MeshData d, int sub, Matrix4x4 m)> _parts =
+            new List<(int, Material, MeshData, int, Matrix4x4)>();
+
+        private Chunk ChunkFor(int key, GameObject go)
+        {
+            if (!_groups.TryGetValue(key, out Chunk ch)) _groups[key] = ch = new Chunk();
+            ch.Objects.Add(go);
+            return ch;
+        }
+
+        /// <summary>The look material every shadow proxy uses (a structure: it has the toon ShadowCaster pass).</summary>
+        private static Material ShadowMaterial() => Resources.Load<Material>(WorldKit.ResourcePath(WorldLook.Structure));
+
+        /// <summary>The meshes of one placement drawn with the file "file" (a level of its piece): chunk, team-resolved
+        /// material, mesh data, sub-mesh and world matrix per part. Layouts draw only their cm_district_* children, each in
+        /// the chunk of its own centre.</summary>
+        private void CollectParts(WorldPlacement p, string file, int chunk, bool layout, HashSet<int> only,
+            List<(int chunk, Material mat, MeshData d, int sub, Matrix4x4 m)> into)
+        {
+            into.Clear();
+            GameObject model = _catalog.Find(file);
+            if (model == null) return;
+            foreach (MeshFilter mf in model.GetComponentsInChildren<MeshFilter>(true))
+            {
+                if (layout && !mf.name.Contains("cm_district_")) continue; // listed items are placed on their own
+                MeshData d = Data(mf.sharedMesh);
+                if (d == null) continue;
+                var r = mf.GetComponent<MeshRenderer>();
+                Material[] mats = r != null ? r.sharedMaterials : new Material[0];
+                Matrix4x4 local = model.transform.worldToLocalMatrix * mf.transform.localToWorldMatrix;
+                Matrix4x4 m = p.Matrix * local;
+                int pieceChunk = chunk;
+                if (layout)
+                {
+                    Vector3 c = m.MultiplyPoint3x4(mf.sharedMesh.bounds.center);
+                    pieceChunk = GroupOf(c.x, -c.z);
+                    if (only != null && !only.Contains(pieceChunk)) continue;
+                }
+                for (int s = 0; s < d.Subs.Length; s++)
+                {
+                    Material mat = Resolve(s < mats.Length ? mats[s] : null, p.Team);
+                    if (mat != null) into.Add((pieceChunk, mat, d, s, m));
+                }
             }
         }
 
@@ -358,8 +556,12 @@ namespace CriticalMass.Runtime.View.Dressing
             if (_root != null) Destroy(_root.gameObject);
             _root = null;
             _groundChunks.Clear();
+            _groundTris = 0;
+            _builtQuality = -1;
+            for (int l = 0; l < SceneryLod.Levels; l++) TrianglesAtLevel[l] = ChunksAtLevel[l] = 0;
             _breakables.Clear();
             _groups.Clear();
+
             _hillShown = (HillState)(-1);
             _dressed = null;
             _dressedTypes = null;
@@ -427,7 +629,9 @@ namespace CriticalMass.Runtime.View.Dressing
                 }
                 string s = b.Cells.Count == 0 || intact == b.Cells.Count ? "intact" : (intact == 0 && cracked == 0 ? "destroyed" : "cracked");
                 if (s == state) continue;
-                GameObject model = _catalog.Find(b.Family + s);
+                // Scenery LODs: at a quality that never draws level 0 (Low and below) breakables use their level 1 file.
+                GameObject model = SceneryLod.Builds(RenderTier.Level, 0) ? null : _catalog.Find(SceneryLod.LevelPiece(b.Family + s, 1));
+                if (model == null) model = _catalog.Find(b.Family + s);
                 MeshFilter src = model != null ? model.GetComponentInChildren<MeshFilter>(true) : null;
                 mf.sharedMesh = src != null ? src.sharedMesh : null;
                 var r = mf.GetComponent<MeshRenderer>();
@@ -448,9 +652,12 @@ namespace CriticalMass.Runtime.View.Dressing
             if (_root == null) return;
             if (_groundChunks.TryGetValue(chunk, out GameObject old) && old != null)
             {
-                Destroy(old.GetComponent<MeshFilter>().sharedMesh);
+                Mesh oldMesh = old.GetComponent<MeshFilter>().sharedMesh;
+                if (oldMesh != null) _groundTris -= (int)(oldMesh.GetIndexCount(0) / 3);
+                Destroy(oldMesh);
                 Destroy(old);
             }
+            _groundChunks.Remove(chunk);
             GameObject model = _catalog.Find("env_ground_cell");
             MeshFilter mf = model != null ? model.GetComponentInChildren<MeshFilter>(true) : null;
             MeshData d = mf != null ? Data(mf.sharedMesh) : null;
@@ -465,7 +672,9 @@ namespace CriticalMass.Runtime.View.Dressing
                 list.Add((d, 0, Matrix4x4.Translate(new Vector3(cx + 0.5f, (float)_map.Height01[i], -(cz + 0.5f))), default(SwayInfo)));
             }
             if (list.Count == 0) return;
-            _groundChunks[chunk] = MakeGroup("Ground " + chunk, GroundMaterial(), list);
+            GameObject ground = MakeGroup("Ground " + chunk, GroundMaterial(), list);
+            _groundChunks[chunk] = ground;
+            _groundTris += (int)(ground.GetComponent<MeshFilter>().sharedMesh.GetIndexCount(0) / 3);
         }
 
         private Material GroundMaterial()
@@ -589,7 +798,8 @@ namespace CriticalMass.Runtime.View.Dressing
         }
 
         /// <summary>One combined mesh: positions, normals, UV2 (foam extrusion) and UV3 (outline direction) transformed.</summary>
-        private GameObject MakeGroup(string name, Material mat, List<(MeshData d, int sub, Matrix4x4 m, SwayInfo sw)> parts)
+        private GameObject MakeGroup(string name, Material mat, List<(MeshData d, int sub, Matrix4x4 m, SwayInfo sw)> parts,
+            ShadowCastingMode? casting = null)
         {
             // UV5 only on groups whose material reads it (the sway clones): still groups carry no extra channel.
             bool swayMat = mat != null && mat.HasProperty("_SwayOn") && mat.GetFloat("_SwayOn") > 0.5f;
@@ -651,11 +861,11 @@ namespace CriticalMass.Runtime.View.Dressing
             var r = go.AddComponent<MeshRenderer>();
             r.sharedMaterial = mat;
             bool casts = CastsShadows(mat) && RenderTier.Policy(RenderTier.Level).sceneryShadows;
-            r.shadowCastingMode = casts ? ShadowCastingMode.On : ShadowCastingMode.Off;
-            if (mat != _ground && _sceneryMats.Add(mat) && !Application.isEditor)
+            r.shadowCastingMode = casting ?? (casts ? ShadowCastingMode.On : ShadowCastingMode.Off);
+            if (mat != _ground && casting != ShadowCastingMode.ShadowsOnly && _sceneryMats.Add(mat) && !Application.isEditor)
                 mat.SetShaderPassEnabled("SRPDefaultUnlit", RenderTier.Policy(RenderTier.Level).sceneryOutline);
-            LastTriangles = Triangles + tri.Count / 3;
             Triangles += tri.Count / 3;
+
             Renderers++;
             return go;
         }

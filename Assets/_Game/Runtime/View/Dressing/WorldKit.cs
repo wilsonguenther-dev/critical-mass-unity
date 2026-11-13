@@ -79,6 +79,7 @@ namespace CriticalMass.Runtime.View.Dressing
         /// <summary>The CM_Toon slot look of an environment piece (its outline class).</summary>
         public static WorldLook EnvToonLook(string piece)
         {
+            piece = SceneryLod.BasePiece(piece) ?? ""; // a lighter level (env_bush_lod1) takes its piece's look
             if (piece.StartsWith("env_lip_", StringComparison.Ordinal)) return WorldLook.Fringe;
             if (piece.StartsWith("env_ledge_", StringComparison.Ordinal) || piece == "env_bridge_cell" || piece == "env_grass_tuft" ||
                 piece == "env_flowers" || piece.StartsWith("env_cloud_", StringComparison.Ordinal) || piece == "env_ground_cell" ||
@@ -97,6 +98,7 @@ namespace CriticalMass.Runtime.View.Dressing
         public static byte SwayKind(string piece)
         {
             if (piece == null) return 0;
+            piece = SceneryLod.BasePiece(piece);
             if (piece == "env_grass_tuft" || piece == "env_flowers") return 1;
             if (piece == "env_bush") return 2;
             if (piece.StartsWith("env_tree_", StringComparison.Ordinal)) return 3;

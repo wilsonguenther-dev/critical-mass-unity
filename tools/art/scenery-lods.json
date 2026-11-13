@@ -1,0 +1,1913 @@
+{
+ "camera": [
+  35.0,
+  55.0,
+  23.4
+ ],
+ "pieces": {
+  "cm_banner": {
+   "count": 4,
+   "dims": [
+    1.35,
+    0.937,
+    3.14
+   ],
+   "far_cull": false,
+   "iou1": 0.9866,
+   "iou2": 0.991,
+   "lod1": 308,
+   "lod2": 100,
+   "ratio1": 0.45,
+   "ratio2": 0.15,
+   "sha256": "dc256d15b25d945eb140ca724ce4bf9b7d684a69277c2437358e978a79a9d831",
+   "tris0": 678
+  },
+  "cm_brazier": {
+   "count": 34,
+   "dims": [
+    0.64,
+    0.64,
+    1.38
+   ],
+   "far_cull": false,
+   "iou1": 0.981,
+   "iou2": 0.9663,
+   "lod1": 104,
+   "lod2": 32,
+   "ratio1": 0.45,
+   "ratio2": 0.15,
+   "sha256": "07e3b46a323fac2024cc639a10e23479cb391cee90bfdad1b045ed4a26eed475",
+   "tris0": 230
+  },
+  "cm_crystal_lamp": {
+   "count": 14,
+   "dims": [
+    0.722,
+    0.741,
+    1.02
+   ],
+   "far_cull": false,
+   "iou1": 0.9576,
+   "iou2": 0.964,
+   "lod1": 100,
+   "lod2": 32,
+   "ratio1": 0.45,
+   "ratio2": 0.15,
+   "sha256": "4405c3996a256d0accb5eba8eb401201357dbfeb16f22462e079693374f3fa77",
+   "tris0": 210
+  },
+  "cm_crystal_lamp_low": {
+   "count": 4,
+   "dims": [
+    0.423,
+    0.322,
+    0.322
+   ],
+   "far_cull": false,
+   "iou1": null,
+   "iou2": null,
+   "lod1": null,
+   "lod2": null,
+   "note": "lod1 rejected (IoU 0.940, tris 102)",
+   "sha256": "c6b35b415622b5fded67e5e40d71e874b4605c78100b26cdcf0f729fca351580",
+   "tris0": 136
+  },
+  "cm_dress_barrel": {
+   "count": 58,
+   "dims": [
+    0.68,
+    0.68,
+    0.81
+   ],
+   "far_cull": false,
+   "iou1": 0.961,
+   "iou2": null,
+   "lod1": 144,
+   "lod2": null,
+   "ratio1": 0.45,
+   "sha256": "8a1336f9b4d448ff31a384e827140b0c5d4c8b51f5482bd47ee04767b62759bf",
+   "tris0": 316
+  },
+  "cm_dress_blocks": {
+   "count": 0,
+   "dims": [
+    1.516,
+    1.313,
+    0.85
+   ],
+   "far_cull": false,
+   "iou1": null,
+   "iou2": null,
+   "lod1": null,
+   "lod2": null,
+   "sha256": "b2bd2215674043eb3ed62701dc8ed2527314420c773971369259a9cf335c15d0",
+   "tris0": 132
+  },
+  "cm_dress_crate": {
+   "count": 44,
+   "dims": [
+    0.8,
+    0.8,
+    0.708
+   ],
+   "far_cull": false,
+   "iou1": 0.9915,
+   "iou2": null,
+   "lod1": 306,
+   "lod2": null,
+   "ratio1": 0.45,
+   "sha256": "a4c8227d952464a80ad529699c94b4632f1ae53c4564e39a7115f28f904b5562",
+   "tris0": 684
+  },
+  "cm_dress_crate_small": {
+   "count": 26,
+   "dims": [
+    0.6,
+    0.6,
+    0.508
+   ],
+   "far_cull": false,
+   "iou1": 0.9883,
+   "iou2": null,
+   "lod1": 306,
+   "lod2": null,
+   "ratio1": 0.45,
+   "sha256": "4b9eca09dcc0cfd35feacdca50e35a28cc8d0ed4984978178407d44e26ffa6a4",
+   "tris0": 684
+  },
+  "cm_dress_stakes": {
+   "count": 12,
+   "dims": [
+    1.8,
+    1.596,
+    1.125
+   ],
+   "far_cull": false,
+   "iou1": 0.9682,
+   "iou2": 0.9672,
+   "lod1": 260,
+   "lod2": 72,
+   "ratio1": 0.6,
+   "ratio2": 0.15,
+   "sha256": "f79cb05b9a89d3d93f1c5386c2bdc370a7fc723213d53a9a5cf2cc6b0748288c",
+   "tris0": 414
+  },
+  "cm_dress_weapon_rack": {
+   "count": 2,
+   "dims": [
+    1.883,
+    0.902,
+    1.814
+   ],
+   "far_cull": false,
+   "iou1": 0.97,
+   "iou2": 0.9705,
+   "lod1": 414,
+   "lod2": 142,
+   "ratio1": 0.45,
+   "ratio2": 0.15,
+   "sha256": "2e8768b5f7e0597bddabaee1f29ad93ace8f40a76ac4378e47e9bc6005b093bb",
+   "tris0": 924
+  },
+  "cm_egg_pool": {
+   "count": 1,
+   "dims": [
+    6.0,
+    6.0,
+    0.0
+   ],
+   "far_cull": false,
+   "iou1": null,
+   "iou2": null,
+   "lod1": null,
+   "lod2": null,
+   "sha256": "45a7f8edf17fe1d89e1c7fef5d0c1aef6a57e9442fd0554c9a7da792fa88bafe",
+   "tris0": 72
+  },
+  "cm_gate_post": {
+   "count": 12,
+   "dims": [
+    1.34,
+    2.135,
+    3.75
+   ],
+   "far_cull": false,
+   "iou1": 0.9964,
+   "iou2": 0.9693,
+   "lod1": 322,
+   "lod2": 98,
+   "ratio1": 0.45,
+   "ratio2": 0.15,
+   "sha256": "54ae6fab627ca2fbde102c0a85eb2a97ee9b9a46c80d5145eb3169869e3f0828",
+   "tris0": 694
+  },
+  "cm_gate_post_ring": {
+   "count": 0,
+   "dims": [
+    1.12,
+    1.258,
+    3.75
+   ],
+   "far_cull": false,
+   "iou1": 0.9937,
+   "iou2": 0.9611,
+   "lod1": 316,
+   "lod2": 110,
+   "ratio1": 0.45,
+   "ratio2": 0.15,
+   "sha256": "3cef0e9eaf4505ca0b502148d7f015a34da6a9d27317ed5f2bc3b7e1324d9fb3",
+   "tris0": 694
+  },
+  "cm_hill_arc_a": {
+   "count": 4,
+   "dims": [
+    2.982,
+    4.263,
+    3.076
+   ],
+   "far_cull": false,
+   "iou1": 0.9908,
+   "iou2": 0.9904,
+   "lod1": 1444,
+   "lod2": 482,
+   "ratio1": 0.45,
+   "ratio2": 0.15,
+   "sha256": "953babca2c28d16112bd52b250ceabbb19bcf378a89cc7a363bd645ebed7c690",
+   "tris0": 3208
+  },
+  "cm_hill_arc_b": {
+   "count": 4,
+   "dims": [
+    4.269,
+    2.932,
+    3.009
+   ],
+   "far_cull": false,
+   "iou1": 0.9919,
+   "iou2": 0.9928,
+   "lod1": 1396,
+   "lod2": 472,
+   "ratio1": 0.45,
+   "ratio2": 0.15,
+   "sha256": "eb812ef8b4724100fcb6924a9f6e0eab4d117d5908e2dc39b7016cffe0a99610",
+   "tris0": 3092
+  },
+  "cm_hill_breakable_cracked": {
+   "count": 0,
+   "dims": [
+    2.864,
+    2.622,
+    3.074
+   ],
+   "far_cull": false,
+   "iou1": 0.9843,
+   "iou2": 0.9863,
+   "lod1": 1044,
+   "lod2": 348,
+   "ratio1": 0.45,
+   "ratio2": 0.15,
+   "sha256": "10d99d3ad18f6a9e52d6e20664607a5d717dc96d220e125fdb057b4ae22bbf90",
+   "tris0": 2316
+  },
+  "cm_hill_breakable_destroyed": {
+   "count": 0,
+   "dims": [
+    3.297,
+    2.714,
+    0.468
+   ],
+   "far_cull": false,
+   "iou1": 0.9905,
+   "iou2": 0.9896,
+   "lod1": 1218,
+   "lod2": 406,
+   "ratio1": 0.45,
+   "ratio2": 0.15,
+   "sha256": "781b335c254f2fd7ee5899bc6c60fa8cdd7343298117cc621144dd3d0eadca0d",
+   "tris0": 2700
+  },
+  "cm_hill_breakable_intact": {
+   "count": 0,
+   "dims": [
+    2.788,
+    2.733,
+    3.078
+   ],
+   "far_cull": false,
+   "iou1": 0.9876,
+   "iou2": 0.9869,
+   "lod1": 1128,
+   "lod2": 378,
+   "ratio1": 0.45,
+   "ratio2": 0.15,
+   "sha256": "0ae682225887a96428af5e015cf92383823ce0889095adaec7e1da4e502e0611",
+   "tris0": 2504
+  },
+  "cm_hill_dais": {
+   "count": 1,
+   "dims": [
+    13.905,
+    14.17,
+    0.324
+   ],
+   "far_cull": false,
+   "iou1": 0.9902,
+   "iou2": 0.9888,
+   "lod1": 4934,
+   "lod2": 1644,
+   "ratio1": 0.45,
+   "ratio2": 0.15,
+   "sha256": "d1e6a1fc05a283e8e68a8f6f56d8ebc7eb49debf89c05caf848c70e7d088b1c4",
+   "tris0": 10998
+  },
+  "cm_hill_horn_l": {
+   "count": 1,
+   "dims": [
+    5.575,
+    2.982,
+    7.323
+   ],
+   "far_cull": false,
+   "iou1": 0.9916,
+   "iou2": 0.9922,
+   "lod1": 470,
+   "lod2": 160,
+   "ratio1": 0.45,
+   "ratio2": 0.15,
+   "sha256": "1356ffb5b316f77610ef18e1728a1fa8b79960bb4f830b091326df9fa437f2af",
+   "tris0": 1040
+  },
+  "cm_hill_horn_r": {
+   "count": 1,
+   "dims": [
+    5.575,
+    2.945,
+    7.323
+   ],
+   "far_cull": false,
+   "iou1": 0.9927,
+   "iou2": 0.9933,
+   "lod1": 508,
+   "lod2": 174,
+   "ratio1": 0.45,
+   "ratio2": 0.15,
+   "sha256": "0afca5e532aa6fb0eb3d3a387db2670aae1bb0c70bc9c3d00199d6abbaf6b58b",
+   "tris0": 1124
+  },
+  "cm_hill_rim_half": {
+   "count": 2,
+   "dims": [
+    6.008,
+    12.06,
+    0.09
+   ],
+   "far_cull": false,
+   "iou1": null,
+   "iou2": null,
+   "lod1": null,
+   "lod2": null,
+   "note": "lod1 rejected (IoU 1.000, tris 288)",
+   "sha256": "8cba35cda1a31109de61fe4767f2fb8139ac5d068feebfaff37fa5940e7f44fb",
+   "tris0": 288
+  },
+  "cm_layout_district_azure": {
+   "count": 1,
+   "dims": [
+    25.666,
+    28.689,
+    5.3
+   ],
+   "far_cull": false,
+   "iou1": 0.9987,
+   "iou2": 0.9987,
+   "lod1": 17088,
+   "lod2": 7126,
+   "ratio1": 0.45,
+   "ratio2": 0.15,
+   "sha256": "370a63dcc986497136d9dabc8022b36ae0ab918cd3b19eed983444013bfba0c5",
+   "tris0": 37172
+  },
+  "cm_layout_district_crimson": {
+   "count": 1,
+   "dims": [
+    25.751,
+    28.689,
+    5.3
+   ],
+   "far_cull": false,
+   "iou1": 0.9987,
+   "iou2": 0.9984,
+   "lod1": 17094,
+   "lod2": 7120,
+   "ratio1": 0.45,
+   "ratio2": 0.15,
+   "sha256": "571c9dc310882fb8a2cf69a17138ea1dfc5896dfc76e47bd00dd23d656cfcfab",
+   "tris0": 37172
+  },
+  "cm_light_pool": {
+   "count": 40,
+   "dims": [
+    4.0,
+    4.0,
+    0.0
+   ],
+   "far_cull": false,
+   "iou1": null,
+   "iou2": null,
+   "lod1": null,
+   "lod2": null,
+   "sha256": "651cfcae568ca7258afe5605c5d8b8c6c25015e47e4ea9019248e43698107e4d",
+   "tris0": 72
+  },
+  "cm_marker_diamond": {
+   "count": 1,
+   "dims": [
+    1.24,
+    1.24,
+    1.85
+   ],
+   "far_cull": false,
+   "iou1": 0.97,
+   "iou2": null,
+   "lod1": 134,
+   "lod2": null,
+   "note2": "lod2 rejected (IoU 0.868, tris 106): far uses lod1",
+   "ratio1": 0.75,
+   "sha256": "7308f30920016e773970e9ee9f277221fbb0e306009c2d09b1d4fdcedf206f61",
+   "tris0": 168
+  },
+  "cm_respawn_pad": {
+   "count": 2,
+   "dims": [
+    8.272,
+    8.62,
+    0.362
+   ],
+   "far_cull": false,
+   "iou1": 0.9851,
+   "iou2": 0.9855,
+   "lod1": 3222,
+   "lod2": 1072,
+   "ratio1": 0.45,
+   "ratio2": 0.15,
+   "sha256": "87c433eef07c2c3faa19969b8c98a14c13c105c4221e4228de1af72910bfc0bd",
+   "tris0": 7150
+  },
+  "cm_roof_pitched": {
+   "count": 0,
+   "dims": [
+    3.54,
+    4.5,
+    1.977
+   ],
+   "far_cull": false,
+   "iou1": 0.9978,
+   "iou2": 0.9953,
+   "lod1": 384,
+   "lod2": 124,
+   "ratio1": 0.45,
+   "ratio2": 0.15,
+   "sha256": "748f787ee968fba2fc26bb69609ca32a3e3971a92d02ec8fd78f9c732dfbf61a",
+   "tris0": 836
+  },
+  "cm_shrine_breakable_cracked": {
+   "count": 0,
+   "dims": [
+    2.012,
+    1.893,
+    1.571
+   ],
+   "far_cull": false,
+   "iou1": 0.9686,
+   "iou2": 0.9695,
+   "lod1": 300,
+   "lod2": 100,
+   "ratio1": 0.45,
+   "ratio2": 0.15,
+   "sha256": "e4e3574f44fe49247b03aa6678db8aeede0f73ec9d2bb6eb94a6d21e2978808b",
+   "tris0": 668
+  },
+  "cm_shrine_breakable_destroyed": {
+   "count": 0,
+   "dims": [
+    1.905,
+    1.76,
+    0.443
+   ],
+   "far_cull": false,
+   "iou1": 0.9913,
+   "iou2": 0.9926,
+   "lod1": 772,
+   "lod2": 258,
+   "ratio1": 0.45,
+   "ratio2": 0.15,
+   "sha256": "0d8a6beab991452b1f7c3d368b7cfb6d88554493faaa48364c711a346feaf34f",
+   "tris0": 1716
+  },
+  "cm_shrine_breakable_intact": {
+   "count": 0,
+   "dims": [
+    1.54,
+    1.542,
+    1.571
+   ],
+   "far_cull": false,
+   "iou1": 0.9728,
+   "iou2": 0.9717,
+   "lod1": 200,
+   "lod2": 66,
+   "ratio1": 0.45,
+   "ratio2": 0.15,
+   "sha256": "e05f8b2b67e0c38464e718f3dc62a4ac2c1f645154628214d4215169bfefeee3",
+   "tris0": 448
+  },
+  "cm_shrine_core": {
+   "count": 1,
+   "dims": [
+    6.211,
+    7.255,
+    6.479
+   ],
+   "far_cull": false,
+   "iou1": 0.9882,
+   "iou2": 0.989,
+   "lod1": 3032,
+   "lod2": 1012,
+   "ratio1": 0.45,
+   "ratio2": 0.15,
+   "sha256": "9cd68209e31e4e6843ed3c733f7be3a867b3605ec71743f37bc642c129e39109",
+   "tris0": 6756
+  },
+  "cm_shrine_egg": {
+   "count": 1,
+   "dims": [
+    1.604,
+    1.534,
+    2.303
+   ],
+   "far_cull": false,
+   "iou1": 0.9785,
+   "iou2": 0.9789,
+   "lod1": 834,
+   "lod2": 174,
+   "ratio1": 0.75,
+   "ratio2": 0.15,
+   "sha256": "0a931ad81193b1bdc992d937c66d2309f0d8dbde8c51dcd78a78b623c617dd0d",
+   "tris0": 1112
+  },
+  "cm_shrine_yard_walls": {
+   "count": 1,
+   "dims": [
+    10.418,
+    4.931,
+    1.58
+   ],
+   "far_cull": false,
+   "iou1": 0.984,
+   "iou2": 0.9872,
+   "lod1": 1184,
+   "lod2": 396,
+   "ratio1": 0.45,
+   "ratio2": 0.15,
+   "sha256": "7b90ac196a55e195e2255aa282a4131af499fc203f79b14806d21ab217b4d077",
+   "tris0": 2628
+  },
+  "cm_stairs": {
+   "count": 0,
+   "dims": [
+    3.54,
+    2.07,
+    1.8
+   ],
+   "far_cull": false,
+   "iou1": 0.9957,
+   "iou2": null,
+   "lod1": 348,
+   "lod2": null,
+   "note2": "lod2 rejected (IoU 0.996, tris 272): far uses lod1",
+   "ratio1": 0.45,
+   "sha256": "b72a30a182ca3ecd8f06c754bd9d9b9d3304110fa473085df78e27860b5d9249",
+   "tris0": 792
+  },
+  "cm_tower": {
+   "count": 4,
+   "dims": [
+    4.321,
+    4.261,
+    6.6
+   ],
+   "far_cull": false,
+   "iou1": 0.9915,
+   "iou2": 0.9916,
+   "lod1": 2647,
+   "lod2": 884,
+   "ratio1": 0.45,
+   "ratio2": 0.15,
+   "sha256": "cac12699a3f4f4c5201ed2ed2889a54e4aea2cde54407f263a4b261d3b081486",
+   "tris0": 5845
+  },
+  "cm_tower_landmark": {
+   "count": 2,
+   "dims": [
+    5.64,
+    5.774,
+    11.6
+   ],
+   "far_cull": false,
+   "iou1": 0.9951,
+   "iou2": 0.9858,
+   "lod1": 4121,
+   "lod2": 1372,
+   "ratio1": 0.45,
+   "ratio2": 0.15,
+   "sha256": "a0a5c4aa749b4efd0c55e14ac87dc2c86e17477874e2c50604a359eb4562e6d8",
+   "tris0": 9123
+  },
+  "cm_wall_segment_cracked": {
+   "count": 0,
+   "dims": [
+    4.551,
+    2.566,
+    3.3
+   ],
+   "far_cull": false,
+   "iou1": 0.9918,
+   "iou2": 0.9923,
+   "lod1": 1364,
+   "lod2": 454,
+   "ratio1": 0.45,
+   "ratio2": 0.15,
+   "sha256": "94f3e2b9d2cca09020813b8a694fd3ab1851f5dfde4022121618849e9dd986d5",
+   "tris0": 3024
+  },
+  "cm_wall_segment_destroyed": {
+   "count": 0,
+   "dims": [
+    4.682,
+    2.976,
+    0.459
+   ],
+   "far_cull": false,
+   "iou1": 0.9873,
+   "iou2": 0.9891,
+   "lod1": 1782,
+   "lod2": 592,
+   "ratio1": 0.45,
+   "ratio2": 0.15,
+   "sha256": "b481648a5c9a9dc7a2e69385896d55745503f0d354f24572f7e1227e4e5b42e0",
+   "tris0": 3960
+  },
+  "cm_wall_segment_intact": {
+   "count": 0,
+   "dims": [
+    4.319,
+    1.612,
+    3.067
+   ],
+   "far_cull": false,
+   "iou1": 0.9949,
+   "iou2": 0.9957,
+   "lod1": 1412,
+   "lod2": 470,
+   "ratio1": 0.45,
+   "ratio2": 0.15,
+   "sha256": "918d02b52b97a0d9e3746093a4756651447af1294e19fff641c1c24b3dbf4493",
+   "tris0": 3140
+  },
+  "env_banner": {
+   "count": 0,
+   "dims": [
+    1.066,
+    1.066,
+    3.64
+   ],
+   "far_cull": false,
+   "iou1": null,
+   "iou2": null,
+   "lod1": null,
+   "lod2": null,
+   "sha256": "8bf5bf2e6d0b02b7785040c68c86df368435a9af58001af152ca18d9a7e27200",
+   "tris0": 49
+  },
+  "env_boulder_l": {
+   "count": 15,
+   "dims": [
+    1.661,
+    1.452,
+    0.991
+   ],
+   "far_cull": false,
+   "iou1": null,
+   "iou2": null,
+   "lod1": null,
+   "lod2": null,
+   "sha256": "6860479843f4384ea6bd5a76377566009426410f8910498bddb6cb9e49312651",
+   "tris0": 86
+  },
+  "env_boulder_m": {
+   "count": 18,
+   "dims": [
+    1.175,
+    1.285,
+    0.701
+   ],
+   "far_cull": false,
+   "iou1": null,
+   "iou2": null,
+   "lod1": null,
+   "lod2": null,
+   "sha256": "e4eb3c10fbc2549870c065847f497f1ce97b9c96cb3b08109f0a21b17c3e40a9",
+   "tris0": 78
+  },
+  "env_boulder_s": {
+   "count": 0,
+   "dims": [
+    0.677,
+    0.655,
+    0.35
+   ],
+   "far_cull": true,
+   "iou1": null,
+   "iou2": null,
+   "lod1": null,
+   "lod2": null,
+   "sha256": "33ddb38444525e1ec91aaae60221f6930ac2e9f4d87dca7df3a5fd5793ca81f9",
+   "tris0": 93
+  },
+  "env_bridge_cell": {
+   "count": 306,
+   "dims": [
+    1.0,
+    1.0,
+    0.195
+   ],
+   "far_cull": false,
+   "iou1": null,
+   "iou2": null,
+   "lod1": null,
+   "lod2": null,
+   "note": "lod1 rejected (IoU 1.000, tris 64)",
+   "sha256": "cacc0694470fc351c4d529b5efeeac8abf366ddcef7c39434c8c8214ac27f117",
+   "tris0": 76
+  },
+  "env_bridge_pier": {
+   "count": 54,
+   "dims": [
+    0.64,
+    0.64,
+    1.76
+   ],
+   "far_cull": false,
+   "iou1": null,
+   "iou2": null,
+   "lod1": null,
+   "lod2": null,
+   "sha256": "0861ffbb0d0a90a4bf8cea16715ae4c55e635561d5799f41ccc4d14acd2a3077",
+   "tris0": 36
+  },
+  "env_bridge_post": {
+   "count": 10,
+   "dims": [
+    0.16,
+    0.16,
+    1.1
+   ],
+   "far_cull": false,
+   "iou1": null,
+   "iou2": null,
+   "lod1": null,
+   "lod2": null,
+   "sha256": "9bec763211eaddaf6049df971c1623a7be138e91ae66e2f6a6d5afc31a140503",
+   "tris0": 18
+  },
+  "env_bridge_span": {
+   "count": 97,
+   "dims": [
+    3.32,
+    2.127,
+    1.1
+   ],
+   "far_cull": false,
+   "iou1": 0.9672,
+   "iou2": 0.9641,
+   "lod1": 172,
+   "lod2": 54,
+   "ratio1": 0.45,
+   "ratio2": 0.15,
+   "sha256": "6df549db0822883b0c9d4b5b384b05f27cdd0c8ffb8c86954bfdc0d433582d3e",
+   "tris0": 358
+  },
+  "env_bush": {
+   "count": 19,
+   "dims": [
+    1.019,
+    0.969,
+    0.278
+   ],
+   "far_cull": false,
+   "iou1": 0.9675,
+   "iou2": 0.9754,
+   "lod1": 53,
+   "lod2": 37,
+   "ratio1": 0.45,
+   "ratio2": 0.15,
+   "sha256": "f500ecb8d600b61f1242d00de610e728176468ee5d07e7e3fd402fe5c9192189",
+   "tris0": 121
+  },
+  "env_cliff_bend": {
+   "count": 144,
+   "dims": [
+    0.628,
+    0.627,
+    3.451
+   ],
+   "far_cull": false,
+   "iou1": 0.9733,
+   "iou2": 0.9783,
+   "lod1": 60,
+   "lod2": 22,
+   "ratio1": 0.6,
+   "ratio2": 0.15,
+   "sha256": "06fd2f0b5b7a25f99974676bb52348e6ebf0b79fef0be2719b35c66a9ab42f7c",
+   "tris0": 96
+  },
+  "env_cliff_corner": {
+   "count": 52,
+   "dims": [
+    0.851,
+    0.841,
+    4.618
+   ],
+   "far_cull": false,
+   "iou1": 0.962,
+   "iou2": 0.9635,
+   "lod1": 88,
+   "lod2": 24,
+   "ratio1": 0.6,
+   "ratio2": 0.15,
+   "sha256": "7afc5d47b0f9f8e4f06aae56c55cd1d941fb25c5ba58608d2fa96212dcd9ba23",
+   "tris0": 142
+  },
+  "env_cliff_d1": {
+   "count": 92,
+   "dims": [
+    1.414,
+    1.219,
+    4.884
+   ],
+   "far_cull": false,
+   "iou1": null,
+   "iou2": null,
+   "lod1": null,
+   "lod2": null,
+   "sha256": "a65bb1a1ec826ae96471df856491a6257f7a4734401be0c2b2327dd31d478048",
+   "tris0": 58
+  },
+  "env_cliff_d2": {
+   "count": 12,
+   "dims": [
+    2.828,
+    1.359,
+    5.965
+   ],
+   "far_cull": false,
+   "iou1": 0.981,
+   "iou2": null,
+   "lod1": 117,
+   "lod2": null,
+   "note2": "lod2 rejected (IoU 0.998, tris 117): far uses lod1",
+   "ratio1": 0.45,
+   "sha256": "664574893c8092f3ce50825b61f776398cb73155c51a14f2bc8d207ca68a8821",
+   "tris0": 155
+  },
+  "env_cliff_d3": {
+   "count": 6,
+   "dims": [
+    4.243,
+    1.43,
+    5.811
+   ],
+   "far_cull": false,
+   "iou1": 0.9746,
+   "iou2": null,
+   "lod1": 153,
+   "lod2": null,
+   "note2": "lod2 rejected (IoU 0.992, tris 127): far uses lod1",
+   "ratio1": 0.75,
+   "sha256": "97ef316058422208e5c8c2c8ba20f29c1bd5350989973305b30f702f8a627a3b",
+   "tris0": 198
+  },
+  "env_cliff_d4": {
+   "count": 0,
+   "dims": [
+    5.657,
+    1.206,
+    5.328
+   ],
+   "far_cull": false,
+   "iou1": null,
+   "iou2": null,
+   "lod1": null,
+   "lod2": null,
+   "sha256": "b6e3e84600aa8dbdf738b9b6ca7bdb18cc2a038056b2f1adf0c9c132c1cfd703",
+   "tris0": 231
+  },
+  "env_cliff_s1": {
+   "count": 140,
+   "dims": [
+    1.0,
+    1.22,
+    4.333
+   ],
+   "far_cull": false,
+   "iou1": null,
+   "iou2": null,
+   "lod1": null,
+   "lod2": null,
+   "sha256": "18ecf2623f316e29f6785d34cbefaafee4ab5803fa092bf427e16352a37d6aca",
+   "tris0": 58
+  },
+  "env_cliff_s2": {
+   "count": 20,
+   "dims": [
+    2.0,
+    1.174,
+    3.342
+   ],
+   "far_cull": false,
+   "iou1": null,
+   "iou2": null,
+   "lod1": null,
+   "lod2": null,
+   "sha256": "36282c53fdd9643d6c2e1fb8385d33753a597049b44e95f66bdb94128e96fa50",
+   "tris0": 31
+  },
+  "env_cliff_s3": {
+   "count": 9,
+   "dims": [
+    3.0,
+    1.327,
+    5.957
+   ],
+   "far_cull": false,
+   "iou1": 0.9811,
+   "iou2": null,
+   "lod1": 113,
+   "lod2": null,
+   "note2": "lod2 rejected (IoU 0.981, tris 113): far uses lod1",
+   "ratio1": 0.45,
+   "sha256": "f87b8e4575176803266cf02e38f74e3ff752f490bc66d47f86719c7a3f0ab670",
+   "tris0": 154
+  },
+  "env_cliff_s4": {
+   "count": 20,
+   "dims": [
+    4.0,
+    1.194,
+    5.039
+   ],
+   "far_cull": false,
+   "iou1": 0.9632,
+   "iou2": null,
+   "lod1": 118,
+   "lod2": null,
+   "note2": "lod2 rejected (IoU 0.971, tris 100): far uses lod1",
+   "ratio1": 0.75,
+   "sha256": "170e4753eaa785ee6b7907561ca99dba20eebeede48c127fe9b08005bf82e2e9",
+   "tris0": 148
+  },
+  "env_cliff_s5": {
+   "count": 7,
+   "dims": [
+    5.0,
+    1.349,
+    6.009
+   ],
+   "far_cull": false,
+   "iou1": 0.9759,
+   "iou2": null,
+   "lod1": 227,
+   "lod2": null,
+   "note2": "lod2 rejected (IoU 0.976, tris 185): far uses lod1",
+   "ratio1": 0.75,
+   "sha256": "310744cbb34243b852093126d3667bf23d9e685577aa9204b44bbf0a89845ac4",
+   "tris0": 296
+  },
+  "env_cliff_s6": {
+   "count": 19,
+   "dims": [
+    6.0,
+    1.242,
+    5.178
+   ],
+   "far_cull": false,
+   "iou1": null,
+   "iou2": null,
+   "lod1": null,
+   "lod2": null,
+   "note": "lod1 rejected (IoU 0.934, tris 219)",
+   "sha256": "90a2cc742ba0ff4d00460df05738d5890d862d49aa2db00281de2bbcecd009e9",
+   "tris0": 277
+  },
+  "env_cloud_floor": {
+   "count": 168,
+   "dims": [
+    64.0,
+    64.0,
+    0.0
+   ],
+   "far_cull": false,
+   "iou1": null,
+   "iou2": null,
+   "lod1": null,
+   "lod2": null,
+   "sha256": "30a4225dcaf08e11d688ff8ee29f1c7dceb971ea71f006c44b668fdea84b8ab4",
+   "tris0": 2
+  },
+  "env_cloud_puff": {
+   "count": 130,
+   "dims": [
+    5.678,
+    3.323,
+    0.862
+   ],
+   "far_cull": false,
+   "iou1": 0.9707,
+   "iou2": 0.9446,
+   "lod1": 110,
+   "lod2": 36,
+   "ratio1": 0.45,
+   "ratio2": 0.15,
+   "sha256": "16619c661186d29e6247995b864369801e40e824789c9940411f8e6566f79c07",
+   "tris0": 246
+  },
+  "env_crystal_biomass": {
+   "count": 15,
+   "dims": [
+    2.59,
+    2.59,
+    1.815
+   ],
+   "far_cull": false,
+   "iou1": 0.9999,
+   "iou2": 0.9906,
+   "lod1": 63,
+   "lod2": 20,
+   "ratio1": 0.45,
+   "ratio2": 0.15,
+   "sha256": "8e237047ec6e9892aee3da51450c91bb57d821ef94ae149e68c0b34b9303b586",
+   "tris0": 140
+  },
+  "env_crystal_cluster": {
+   "count": 15,
+   "dims": [
+    3.08,
+    3.08,
+    2.579
+   ],
+   "far_cull": false,
+   "iou1": 0.9959,
+   "iou2": 0.9863,
+   "lod1": 72,
+   "lod2": 22,
+   "ratio1": 0.45,
+   "ratio2": 0.15,
+   "sha256": "77e3265ab5136f7cccbfc9e1a758770564d593ab8cfbb0c5bdc17f5895730987",
+   "tris0": 160
+  },
+  "env_crystal_cluster_small": {
+   "count": 30,
+   "dims": [
+    2.415,
+    2.415,
+    1.585
+   ],
+   "far_cull": false,
+   "iou1": 1.0,
+   "iou2": 0.9938,
+   "lod1": 53,
+   "lod2": 17,
+   "ratio1": 0.45,
+   "ratio2": 0.15,
+   "sha256": "1fad515b537573f6348de4d608cb30309d5f9d8b9e3f5588640eb0d218ec3165",
+   "tris0": 120
+  },
+  "env_crystal_corrupt": {
+   "count": 2,
+   "dims": [
+    2.66,
+    2.66,
+    1.953
+   ],
+   "far_cull": false,
+   "iou1": 0.9982,
+   "iou2": 0.994,
+   "lod1": 63,
+   "lod2": 20,
+   "ratio1": 0.45,
+   "ratio2": 0.15,
+   "sha256": "dd58773105aeba0513748a325e8e37bc7152015cb46807002c7ac723c567c33b",
+   "tris0": 140
+  },
+  "env_flowers": {
+   "count": 26,
+   "dims": [
+    0.561,
+    0.564,
+    0.254
+   ],
+   "far_cull": true,
+   "iou1": null,
+   "iou2": null,
+   "lod1": null,
+   "lod2": null,
+   "sha256": "89c450e52053b5f03d32b8c7354bc0c1780289af5006c8ef5db7bd010d1865b2",
+   "tris0": 59
+  },
+  "env_grass_tuft": {
+   "count": 58,
+   "dims": [
+    0.588,
+    0.357,
+    0.26
+   ],
+   "far_cull": true,
+   "iou1": null,
+   "iou2": null,
+   "lod1": null,
+   "lod2": null,
+   "sha256": "c4aa26ce8ebbbac98d8a928a3a6858f29cda40bdcdba8aac758feba5db8a3539",
+   "tris0": 34
+  },
+  "env_ground_cell": {
+   "count": 2500,
+   "dims": [
+    1.0,
+    1.0,
+    0.0
+   ],
+   "far_cull": false,
+   "iou1": null,
+   "iou2": null,
+   "lod1": null,
+   "lod2": null,
+   "sha256": "c043cff88f10570aa69b9f825fc18cd43e9ce1796bd22c68e0339a9418de1211",
+   "tris0": 2
+  },
+  "env_ground_fill_tri": {
+   "count": 134,
+   "dims": [
+    1.0,
+    1.0,
+    0.0
+   ],
+   "far_cull": false,
+   "iou1": null,
+   "iou2": null,
+   "lod1": null,
+   "lod2": null,
+   "sha256": "c3f81cadf7464d32c886b7c25e810a0a82eba239713535b158c9bb86696af1e0",
+   "tris0": 1
+  },
+  "env_ground_placed": {
+   "count": 0,
+   "dims": [
+    1.0,
+    1.0,
+    0.8
+   ],
+   "far_cull": false,
+   "iou1": null,
+   "iou2": null,
+   "lod1": null,
+   "lod2": null,
+   "sha256": "e8631e063c8b64e88980dc4e7dcdfadb90635c85c96fb91dc1000d39ec76bf99",
+   "tris0": 38
+  },
+  "env_hill_plaza": {
+   "count": 0,
+   "dims": [
+    12.1,
+    12.1,
+    0.23
+   ],
+   "far_cull": false,
+   "iou1": 0.9827,
+   "iou2": null,
+   "lod1": 301,
+   "lod2": null,
+   "note2": "lod2 rejected (IoU 0.977, tris 276): far uses lod1",
+   "ratio1": 0.45,
+   "sha256": "631341aea6ee30bfdedbec12dfe3ce210abd1a444a854cab8b4b91eece04c1fc",
+   "tris0": 644
+  },
+  "env_hill_rim_half": {
+   "count": 0,
+   "dims": [
+    12.0,
+    6.0,
+    0.1
+   ],
+   "far_cull": false,
+   "iou1": null,
+   "iou2": null,
+   "lod1": null,
+   "lod2": null,
+   "sha256": "ab2f1325f68871ac140043cdbc3376f6191925075156703ebf02f0e64655d28a",
+   "tris0": 84
+  },
+  "env_ledge_band": {
+   "count": 0,
+   "dims": [
+    1.0,
+    0.0,
+    0.848
+   ],
+   "far_cull": false,
+   "iou1": null,
+   "iou2": null,
+   "lod1": null,
+   "lod2": null,
+   "sha256": "7eb06f7912dab215370850ae8efc6c04b15fad9deed3c345a4fd47b457da77d6",
+   "tris0": 8
+  },
+  "env_ledge_band_diag": {
+   "count": 0,
+   "dims": [
+    1.414,
+    0.0,
+    0.859
+   ],
+   "far_cull": false,
+   "iou1": null,
+   "iou2": null,
+   "lod1": null,
+   "lod2": null,
+   "sha256": "337ae51f93aff1b50d4e0ba4d3d04fdbd722d506dffe73e5710f9dcd60e59331",
+   "tris0": 12
+  },
+  "env_ledge_shadow": {
+   "count": 0,
+   "dims": [
+    1.0,
+    0.5,
+    0.0
+   ],
+   "far_cull": false,
+   "iou1": null,
+   "iou2": null,
+   "lod1": null,
+   "lod2": null,
+   "sha256": "e8d3eb5cb62b259ed8c620e75780140243e18f1d28b84681f87e6add199f6f16",
+   "tris0": 2
+  },
+  "env_ledge_shadow_diag": {
+   "count": 0,
+   "dims": [
+    1.414,
+    0.5,
+    0.0
+   ],
+   "far_cull": false,
+   "iou1": null,
+   "iou2": null,
+   "lod1": null,
+   "lod2": null,
+   "sha256": "522550d32e66a5916b3187f85aec16913c0c8e8eb367f8527bd2b6ad02c69800",
+   "tris0": 2
+  },
+  "env_lip_corner": {
+   "count": 0,
+   "dims": [
+    0.138,
+    0.131,
+    0.072
+   ],
+   "far_cull": false,
+   "iou1": null,
+   "iou2": null,
+   "lod1": null,
+   "lod2": null,
+   "sha256": "830e8ac43c00bff8a00ddfc76805867db782317bfe791d6e617f67dbe8ce96f8",
+   "tris0": 30
+  },
+  "env_lip_diag_a": {
+   "count": 0,
+   "dims": [
+    1.52,
+    0.306,
+    0.881
+   ],
+   "far_cull": false,
+   "iou1": null,
+   "iou2": null,
+   "lod1": null,
+   "lod2": null,
+   "note": "kept whole: fringe teeth are art-critical (sheet review)",
+   "sha256": "e7fe64b2618a416fbe76c168015452292eefd2475359db5d6e14fbee4859b995",
+   "tris0": 133
+  },
+  "env_lip_diag_b": {
+   "count": 0,
+   "dims": [
+    1.526,
+    0.302,
+    0.87
+   ],
+   "far_cull": false,
+   "iou1": null,
+   "iou2": null,
+   "lod1": null,
+   "lod2": null,
+   "note": "kept whole: fringe teeth are art-critical (sheet review)",
+   "sha256": "0843714961523b867bd323a608151c1a5fef2f109761a1a9007124b51185850e",
+   "tris0": 133
+  },
+  "env_lip_rim_corner45": {
+   "count": 144,
+   "dims": [
+    0.354,
+    0.5,
+    0.836
+   ],
+   "far_cull": false,
+   "iou1": null,
+   "iou2": null,
+   "lod1": null,
+   "lod2": null,
+   "sha256": "417ab1e7a174416c66a57711b36f63be793478f1acdada0427cb7a03cef758cd",
+   "tris0": 9
+  },
+  "env_lip_rim_corner90": {
+   "count": 52,
+   "dims": [
+    0.5,
+    0.5,
+    0.846
+   ],
+   "far_cull": false,
+   "iou1": null,
+   "iou2": null,
+   "lod1": null,
+   "lod2": null,
+   "sha256": "5cf2eaffdb49b880c9609264875235336b077e50897cb35872239c92fdaf2b9e",
+   "tris0": 48
+  },
+  "env_lip_rim_diag_a": {
+   "count": 69,
+   "dims": [
+    1.506,
+    0.653,
+    0.866
+   ],
+   "far_cull": false,
+   "iou1": null,
+   "iou2": null,
+   "lod1": null,
+   "lod2": null,
+   "note": "kept whole: fringe teeth are art-critical (sheet review)",
+   "sha256": "736f97fa0cb7c12ffbd9191871d49fed868dd472a97e760f22e409346d5ff789",
+   "tris0": 139
+  },
+  "env_lip_rim_diag_b": {
+   "count": 65,
+   "dims": [
+    1.519,
+    0.635,
+    0.875
+   ],
+   "far_cull": false,
+   "iou1": null,
+   "iou2": null,
+   "lod1": null,
+   "lod2": null,
+   "note": "kept whole: fringe teeth are art-critical (sheet review)",
+   "sha256": "a4431c1af9b2e64fb45b40d0655c90745ff2f1ab568d24be8b594fd10c8188bd",
+   "tris0": 139
+  },
+  "env_lip_rim_straight_a": {
+   "count": 127,
+   "dims": [
+    1.1,
+    0.642,
+    0.885
+   ],
+   "far_cull": false,
+   "iou1": null,
+   "iou2": null,
+   "lod1": null,
+   "lod2": null,
+   "note": "kept whole: fringe teeth are art-critical (sheet review)",
+   "sha256": "934d9908ca8b8ef943dfe781e6d89f8353113ef704b6cb01d455e6c64f82640d",
+   "tris0": 100
+  },
+  "env_lip_rim_straight_b": {
+   "count": 156,
+   "dims": [
+    1.104,
+    0.616,
+    0.876
+   ],
+   "far_cull": false,
+   "iou1": null,
+   "iou2": null,
+   "lod1": null,
+   "lod2": null,
+   "note": "kept whole: fringe teeth are art-critical (sheet review)",
+   "sha256": "ec9530985ebc3f28a03f2e6ff2000a549626cd1b49a1549fe7df329de1d58177",
+   "tris0": 100
+  },
+  "env_lip_rim_straight_c": {
+   "count": 153,
+   "dims": [
+    1.1,
+    0.637,
+    0.818
+   ],
+   "far_cull": false,
+   "iou1": null,
+   "iou2": null,
+   "lod1": null,
+   "lod2": null,
+   "note": "kept whole: fringe teeth are art-critical (sheet review)",
+   "sha256": "540b767bdde0eeb99b3049ce6b7f6d7c3bc02e8a1cace64255510e61e2511e24",
+   "tris0": 100
+  },
+  "env_lip_straight_a": {
+   "count": 0,
+   "dims": [
+    1.102,
+    0.284,
+    0.882
+   ],
+   "far_cull": false,
+   "iou1": null,
+   "iou2": null,
+   "lod1": null,
+   "lod2": null,
+   "sha256": "788f2d54e72c6034fe2fbf1c6dc44e7eaddff745196b411e4dc485e34336c538",
+   "tris0": 96
+  },
+  "env_lip_straight_b": {
+   "count": 0,
+   "dims": [
+    1.101,
+    0.295,
+    0.836
+   ],
+   "far_cull": false,
+   "iou1": null,
+   "iou2": null,
+   "lod1": null,
+   "lod2": null,
+   "sha256": "7f48a7d18c5fd83ec7dce60b11c0be2e327940974a2b1292b794cad7ca4809e0",
+   "tris0": 96
+  },
+  "env_lip_straight_c": {
+   "count": 0,
+   "dims": [
+    1.113,
+    0.303,
+    0.885
+   ],
+   "far_cull": false,
+   "iou1": null,
+   "iou2": null,
+   "lod1": null,
+   "lod2": null,
+   "sha256": "b4bd350a4bd0446d018fe23adb86fc8706d8d6800080b995c8aeeb0ae7f2f785",
+   "tris0": 96
+  },
+  "env_pebbles": {
+   "count": 20,
+   "dims": [
+    0.758,
+    0.577,
+    0.108
+   ],
+   "far_cull": true,
+   "iou1": 0.9773,
+   "iou2": null,
+   "lod1": 135,
+   "lod2": null,
+   "ratio1": 0.45,
+   "sha256": "0340febeda8dd64c5d39e87a143f22d12cbdfcb6546555af6cba9e8bbd56d24b",
+   "tris0": 303
+  },
+  "env_rocks": {
+   "count": 22,
+   "dims": [
+    2.463,
+    1.95,
+    0.948
+   ],
+   "far_cull": false,
+   "iou1": 0.9949,
+   "iou2": 0.9811,
+   "lod1": 362,
+   "lod2": 121,
+   "ratio1": 0.45,
+   "ratio2": 0.15,
+   "sha256": "1d495294c63be615fcd3c0a6c8fe21b056689388d84e7e0c8ca80011d51c1f7d",
+   "tris0": 803
+  },
+  "env_ruin_arch": {
+   "count": 0,
+   "dims": [
+    2.8,
+    0.8,
+    2.9
+   ],
+   "far_cull": false,
+   "iou1": null,
+   "iou2": null,
+   "lod1": null,
+   "lod2": null,
+   "sha256": "2b39519d43de12c1d4f46ca6245e880a34f037670c77f2bf2144bd1deccc4395",
+   "tris0": 90
+  },
+  "env_ruin_block": {
+   "count": 0,
+   "dims": [
+    0.877,
+    0.809,
+    0.609
+   ],
+   "far_cull": true,
+   "iou1": null,
+   "iou2": null,
+   "lod1": null,
+   "lod2": null,
+   "sha256": "acfc4b4caac926323a7a080d175c2f73118d48ea65debc25700eb3c18e17da0f",
+   "tris0": 36
+  },
+  "env_ruin_column_fallen_block": {
+   "count": 0,
+   "dims": [
+    2.855,
+    5.097,
+    0.85
+   ],
+   "far_cull": false,
+   "iou1": null,
+   "iou2": null,
+   "lod1": null,
+   "lod2": null,
+   "sha256": "e89711eac8143aba9c5ea1621d066d5648841c218bed68a002c681a971462de6",
+   "tris0": 244
+  },
+  "env_ruin_column_fallen_ramp": {
+   "count": 0,
+   "dims": [
+    2.92,
+    4.95,
+    1.666
+   ],
+   "far_cull": false,
+   "iou1": 0.9829,
+   "iou2": 0.9895,
+   "lod1": 164,
+   "lod2": 58,
+   "ratio1": 0.45,
+   "ratio2": 0.15,
+   "sha256": "0e10ec61e4a1c54c7ef6bec7d8678fa75d2558bd2e8b5717f83887cc626e1f92",
+   "tris0": 342
+  },
+  "env_ruin_column_intact": {
+   "count": 2,
+   "dims": [
+    1.24,
+    1.1,
+    4.6
+   ],
+   "far_cull": false,
+   "iou1": 0.9911,
+   "iou2": 0.9911,
+   "lod1": 98,
+   "lod2": 32,
+   "ratio1": 0.75,
+   "ratio2": 0.15,
+   "sha256": "3351ed0e3be38b977670074656dd621ac2fce1fd539788d5a0a278faccb059af",
+   "tris0": 126
+  },
+  "env_ruin_stub": {
+   "count": 0,
+   "dims": [
+    0.84,
+    0.84,
+    1.55
+   ],
+   "far_cull": false,
+   "iou1": null,
+   "iou2": null,
+   "lod1": null,
+   "lod2": null,
+   "sha256": "85d72ad5399f2816286c1dfdda84e9f2d3573ac74c89743e24c1946cc8d72f0d",
+   "tris0": 54
+  },
+  "env_shrine_dais": {
+   "count": 0,
+   "dims": [
+    4.6,
+    4.62,
+    0.69
+   ],
+   "far_cull": false,
+   "iou1": 0.9579,
+   "iou2": null,
+   "lod1": 139,
+   "lod2": null,
+   "note2": "lod2 rejected (IoU 0.955, tris 121): far uses lod1",
+   "ratio1": 0.45,
+   "sha256": "53973d7a5793f5462c2104465da3c6e461f60657b159fca07a6fadddc161c075",
+   "tris0": 324
+  },
+  "env_shrine_egg_proxy": {
+   "count": 0,
+   "dims": [
+    2.233,
+    2.237,
+    3.045
+   ],
+   "far_cull": false,
+   "iou1": null,
+   "iou2": null,
+   "lod1": null,
+   "lod2": null,
+   "sha256": "9e91fc8aed07fc79f3d54dce68d42922a75989152ad5f606aba0f15cd2490ad6",
+   "tris0": 156
+  },
+  "env_shrine_horns": {
+   "count": 0,
+   "dims": [
+    8.99,
+    1.55,
+    7.189
+   ],
+   "far_cull": false,
+   "iou1": null,
+   "iou2": null,
+   "lod1": null,
+   "lod2": null,
+   "sha256": "32696483bb01668e0a3705da7aca98afa1ede65e2d9c3d742f28887991e7e9e7",
+   "tris0": 296
+  },
+  "env_sky_rock_l": {
+   "count": 21,
+   "dims": [
+    3.841,
+    3.878,
+    7.4
+   ],
+   "far_cull": false,
+   "iou1": 0.9733,
+   "iou2": 0.9543,
+   "lod1": 118,
+   "lod2": 40,
+   "ratio1": 0.45,
+   "ratio2": 0.15,
+   "sha256": "2951823f2821530a48bbab442b22b734ec5fb4b85695c7ec7d03569c9ff8b630",
+   "tris0": 250
+  },
+  "env_sky_rock_m": {
+   "count": 20,
+   "dims": [
+    2.211,
+    2.257,
+    4.68
+   ],
+   "far_cull": false,
+   "iou1": 0.968,
+   "iou2": 0.9657,
+   "lod1": 76,
+   "lod2": 29,
+   "ratio1": 0.45,
+   "ratio2": 0.15,
+   "sha256": "8f48c3c28b75717f5be4298778c62343513f097f775e58d0d947a8245a2a3ee6",
+   "tris0": 176
+  },
+  "env_sky_rock_s": {
+   "count": 29,
+   "dims": [
+    1.353,
+    1.405,
+    2.98
+   ],
+   "far_cull": false,
+   "iou1": 0.9839,
+   "iou2": 0.9721,
+   "lod1": 68,
+   "lod2": 30,
+   "ratio1": 0.6,
+   "ratio2": 0.15,
+   "sha256": "61aab0ffb6af1f5c33631b4e41c0881b0592df90d5b2eeeb4fd5b8a6b71b6197",
+   "tris0": 106
+  },
+  "env_spawn_pad": {
+   "count": 0,
+   "dims": [
+    6.1,
+    6.1,
+    1.201
+   ],
+   "far_cull": false,
+   "iou1": 0.9954,
+   "iou2": 0.9931,
+   "lod1": 253,
+   "lod2": 84,
+   "ratio1": 0.45,
+   "ratio2": 0.15,
+   "sha256": "f05be750c92b4e4a1078a0218959e2a2e63b40dc60271238a8a4a660bcd22319",
+   "tris0": 563
+  },
+  "env_stump": {
+   "count": 18,
+   "dims": [
+    0.579,
+    0.579,
+    0.29
+   ],
+   "far_cull": true,
+   "iou1": null,
+   "iou2": null,
+   "lod1": null,
+   "lod2": null,
+   "sha256": "9b6ccead877de21b0cebb82b1af95fcb981ee5a9ed27bbaf1204825dc34a310a",
+   "tris0": 77
+  },
+  "env_tree_round_l": {
+   "count": 10,
+   "dims": [
+    4.021,
+    4.044,
+    3.676
+   ],
+   "far_cull": false,
+   "iou1": 0.9557,
+   "iou2": 0.9559,
+   "lod1": 170,
+   "lod2": 57,
+   "ratio1": 0.45,
+   "ratio2": 0.15,
+   "sha256": "046354ab94dca61b5a6d3e94fb92dfc7d678f703461a252d43f070ba1b71865e",
+   "tris0": 382
+  },
+  "env_tree_round_s": {
+   "count": 13,
+   "dims": [
+    2.625,
+    2.695,
+    2.508
+   ],
+   "far_cull": false,
+   "iou1": 0.9545,
+   "iou2": 0.9639,
+   "lod1": 172,
+   "lod2": 56,
+   "ratio1": 0.45,
+   "ratio2": 0.15,
+   "sha256": "9588032d5c9110aaa146d03cdd4e28e1370e26c4f9ab162dedebaca9650efa96",
+   "tris0": 383
+  },
+  "env_tree_tall_l": {
+   "count": 9,
+   "dims": [
+    2.416,
+    2.084,
+    4.213
+   ],
+   "far_cull": false,
+   "iou1": 0.9679,
+   "iou2": 0.9656,
+   "lod1": 120,
+   "lod2": 29,
+   "ratio1": 0.6,
+   "ratio2": 0.15,
+   "sha256": "97d23e35bd9a0ed83dcc02893e465c566fdd7631c2b23fd0bf15e18730358a9e",
+   "tris0": 203
+  },
+  "env_tree_tall_s": {
+   "count": 13,
+   "dims": [
+    1.665,
+    1.372,
+    2.774
+   ],
+   "far_cull": false,
+   "iou1": 0.965,
+   "iou2": 0.9565,
+   "lod1": 156,
+   "lod2": 39,
+   "ratio1": 0.6,
+   "ratio2": 0.15,
+   "sha256": "45e68c41088a549102f789512be4a3dd4d2e02256f1711cfd1101abde9d79329",
+   "tris0": 263
+  },
+  "env_wall": {
+   "count": 0,
+   "dims": [
+    1.021,
+    1.016,
+    2.31
+   ],
+   "far_cull": false,
+   "iou1": null,
+   "iou2": null,
+   "lod1": null,
+   "lod2": null,
+   "sha256": "d92c6b4b4542d245ac0cd49947e310567a449397ec8bd87750b17549fd9b4293",
+   "tris0": 160
+  },
+  "env_wall_breakable_cracked": {
+   "count": 0,
+   "dims": [
+    1.01,
+    1.021,
+    1.844
+   ],
+   "far_cull": false,
+   "iou1": 0.9915,
+   "iou2": 0.9783,
+   "lod1": 77,
+   "lod2": 39,
+   "ratio1": 0.45,
+   "ratio2": 0.15,
+   "sha256": "799cee690f72cc67e7bcf1f62798a8b3b49e486806008f99219a5e013593ef44",
+   "tris0": 172
+  },
+  "env_wall_breakable_destroyed": {
+   "count": 0,
+   "dims": [
+    1.0,
+    1.0,
+    0.912
+   ],
+   "far_cull": false,
+   "iou1": 1.0,
+   "iou2": 1.0,
+   "lod1": 35,
+   "lod2": 13,
+   "ratio1": 0.45,
+   "ratio2": 0.15,
+   "sha256": "4ef383c25e8ac6b134e466c878468a4b12a8efd520f1f32f6b803f8000101414",
+   "tris0": 84
+  },
+  "env_wall_breakable_intact": {
+   "count": 0,
+   "dims": [
+    1.041,
+    1.02,
+    2.235
+   ],
+   "far_cull": false,
+   "iou1": 0.9879,
+   "iou2": 0.9803,
+   "lod1": 96,
+   "lod2": 44,
+   "ratio1": 0.6,
+   "ratio2": 0.15,
+   "sha256": "f3941de618d2e1057fe57163dd6d75c6b6f91a5c4a554228206f805c3c6b4fb1",
+   "tris0": 150
+  },
+  "env_waterfall": {
+   "count": 20,
+   "dims": [
+    1.199,
+    2.598,
+    7.09
+   ],
+   "far_cull": false,
+   "iou1": 0.986,
+   "iou2": 0.9834,
+   "lod1": 373,
+   "lod2": 226,
+   "ratio1": 0.45,
+   "ratio2": 0.15,
+   "sha256": "d33fb1b0d5906233089aeca3ddb03c7cf413699e3e19837f3f6aba4434e49e97",
+   "tris0": 800
+  }
+ },
+ "rule": "<piece>_lod1.fbx ~45% (IoU>=0.95), <piece>_lod2.fbx ~15% (IoU>=0.80); far_cull: no far level",
+ "sheets": [
+  [
+   "cm_layout_district_azure",
+   "cm_layout_district_crimson",
+   "env_bridge_span",
+   "env_cloud_puff",
+   "cm_dress_crate",
+   "cm_tower",
+   "cm_dress_barrel",
+   "cm_tower_landmark"
+  ],
+  [
+   "cm_dress_crate_small",
+   "env_rocks",
+   "env_waterfall",
+   "env_lip_rim_straight_b",
+   "env_lip_rim_straight_c",
+   "cm_respawn_pad",
+   "env_cliff_bend",
+   "cm_hill_arc_a"
+  ]
+ ]
+}
