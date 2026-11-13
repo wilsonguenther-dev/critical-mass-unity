@@ -82,6 +82,8 @@ namespace CriticalMass.Runtime.Hud
             er.sizeDelta = new Vector2(230f, 250f);
             er.anchoredPosition = Vector2.zero;
             _eggHit = er;
+            _eggHitStatic = er;
+            _eggCam = cam;
             CriticalMass.Runtime.Secrets.TitleEgg.Attach(er);
 
             _prompt = HudText.Make(root, "Prompt", CMTokens.Display, 34, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter);
@@ -152,10 +154,14 @@ namespace CriticalMass.Runtime.Hud
         }
 
         /// <summary>The pointer is over the title egg's hit area (egg-01): that click is the secret's, not "any key".</summary>
-        bool PointerOnEgg()
+        static RectTransform _eggHitStatic;
+        static UnityEngine.Camera _eggCam;
+
+        static bool PointerOnEgg()
         {
+            RectTransform _eggHit = _eggHitStatic;
             if (_eggHit == null || Mouse.current == null || !_eggHit.gameObject.activeInHierarchy) return false;
-            UnityEngine.Camera cam = _canvas != null ? _canvas.worldCamera : null;
+            UnityEngine.Camera cam = _eggCam;
             return RectTransformUtility.RectangleContainsScreenPoint(_eggHit, Mouse.current.position.ReadValue(), cam);
         }
 
