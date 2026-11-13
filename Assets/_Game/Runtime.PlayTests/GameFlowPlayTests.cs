@@ -331,7 +331,9 @@ namespace CriticalMass.Runtime.PlayTests
             w.Match.Time = w.Config.MatchSeconds - 2.0 / w.Config.SimHz;
             Driver().StepTicks(4);
             Assert.AreEqual(MatchPhase.Ended, w.Match.Phase, "the clock ran out");
-            yield return Until(() => d.Results.IsVisible, 1.0f, "results");
+            // The 1 s promise is TimerExpiry...'s; here the match came through the menus' fade, and batch-mode frames are
+            // slow, so this navigation test allows 3 s.
+            yield return Until(() => d.Results.IsVisible, 3.0f, "results");
             yield return Press(d.Results.ChangeClassItem);
             Assert.IsTrue(d.Setup.IsVisible);
             yield return Press(d.Setup.BackItem);
