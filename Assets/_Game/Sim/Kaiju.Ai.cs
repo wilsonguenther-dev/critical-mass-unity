@@ -236,6 +236,12 @@ namespace CriticalMass.Sim.Core
                 k.Z += sz;
                 ResolveCircle(w);
                 ClampToBounds(w);
+                if (guard)
+                {
+                    // DG-100 (S19a): Float32 positions like the actors', so arm64 / x64 / Rosetta agree bit for bit.
+                    k.X = JsMath.F32(k.X);
+                    k.Z = JsMath.F32(k.Z);
+                }
                 // DG-86: a concave corner the 4-pass push-out cannot resolve for the wider collider: stay put this sub-step.
                 if (guard && !CircleClear(w))
                 {

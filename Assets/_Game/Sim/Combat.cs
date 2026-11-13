@@ -137,6 +137,9 @@ namespace CriticalMass.Sim.Core
             double fx = JsMath.Cos(facing);
             double fz = JsMath.Sin(facing);
             double cosHalf = JsMath.Cos(cc.AttackArcDeg / 2 * Math.PI / 180);
+            double halfRad = cc.AttackArcDeg / 2 * Math.PI / 180;
+            bool body = Phys.On(w, cfg.Physics.ArcCoversBody); // DG-100 (S13): the arc reaches the target's body, not just its centre
+            int cap = Phys.On(w, true) ? cfg.Physics.CleaveMaxTargets : 0; // OD-10: 0 = no cap
             int hits = 0;
             bool walls = Phys.On(w, cfg.Physics.WallsBlockHits); // DG-83: no hits through walls or barricades
             int count = SpatialHash.QueryCircle(w.Hash, ax, az, cc.AttackRange + maxTargetRadius, candidates);
@@ -156,9 +159,10 @@ namespace CriticalMass.Sim.Core
                 if (d2 > 1e-12)
                 {
                     double dot = (dx * fx + dz * fz) / Math.Sqrt(d2);
-                    if (dot < cosHalf - 1e-9) continue;
+                    if (dot < (body ? WidenedCos(halfRad, cfg.Class(t.Cls).Radius, Math.Sqrt(d2)) : cosHalf) - 1e-9) continue;
                 }
                 if (walls && !SegmentClear.Clear(w.Map, ax, az, w.X[j], w.Z[j])) continue;
+                if (cap > 0 && hits >= cap) break;
                 hits++;
                 if (fair) w.Hits.Add(j, i, cc.AttackDamage, ax, az);
                 else Damage.ApplyMelee(w, j, cc.AttackDamage, i, ax, az);
@@ -177,7 +181,8 @@ namespace CriticalMass.Sim.Core
                 double dz = kj.Z - az;
                 double reach = cc.AttackRange + cfg.Kaiju.Radius;
                 double d2 = dx * dx + dz * dz;
-                if (d2 <= reach * reach && (d2 <= 1e-12 || (dx * fx + dz * fz) / Math.Sqrt(d2) >= cosHalf - 1e-9)
+                double kcos = body && d2 > 1e-12 ? WidenedCos(halfRad, cfg.Kaiju.Radius, Math.Sqrt(d2)) : cosHalf;
+                if (d2 <= reach * reach && (d2 <= 1e-12 || (dx * fx + dz * fz) / Math.Sqrt(d2) >= kcos - 1e-9)
                     && (!walls || SegmentClear.Clear(w.Map, ax, az, kj.X, kj.Z)))
                 {
                     Kaiju.DamageKaiju(w, i, cc.AttackDamage);
@@ -185,6 +190,13 @@ namespace CriticalMass.Sim.Core
             }
             // DG-69: the contact tick, even on a whiff.
             if (lane) World.PushEvent(w, SimEventType.AttackContact, i, -1, ax + fx * cc.AttackRange, az + fz * cc.AttackRange, hits, null, DamageCause.None, 0, fx, fz, 0, 0, 0, 0);
+        }
+
+        /// <summary>DG-100 (S13): cosine of the arc half-angle widened by asin(min(1, r / d)) for a target of radius r at distance d.</summary>
+        public static double WidenedCos(double halfRad, double r, double d)
+        {
+            double a = halfRad + Math.Asin(Math.Min(1, r / d));
+            return a >= Math.PI ? -1 : JsMath.Cos(a);
         }
 
         /// <summary>DG-67: phase 2, every queued melee hit of the tick in queue order (attacker id, then candidate order).</summary>
@@ -218,7 +230,30 @@ namespace CriticalMass.Sim.Core
                 if (dropped[id] != 0) continue;
                 dropped[id] = 1;
                 if (!egg || w.Match.Phase == MatchPhase.Ended || res.MeatUnitsPerKill <= 0) continue;
-                World.SpawnLooseOrb(w, w.X[id], w.Z[id], (int)res.MeatUnitsPerKill, Durations.T30(w.Config, res.MeatOrbLifetimeTicks), id);
+                double ox = w.X[id];
+                double oz = w.Z[id];
+                double hx = 0;
+                double hz = 0;
+                bool pop = Phys.On(w, w.Config.Physics.MeatPop);
+                if (pop)
+                {
+                    // DG-100 (S16): a deterministic hop (angle from id and tick) onto walkable ground, so orbs never stack.
+                    double dist = w.Config.Physics.MeatPopDistance;
+                    double ang = id * 2.39996 + w.Tick;
+                    for (int q = 0; q < 4; q++, ang += Math.PI / 2)
+                    {
+                        double tx = ox + JsMath.Cos(ang) * dist;
+                        double tz = oz + JsMath.Sin(ang) * dist;
+                        if (!MapGrid.IsWalkable(w.Map, JsMath.FloorToInt(tx), JsMath.FloorToInt(tz))) continue;
+                        hx = JsMath.Cos(ang);
+                        hz = JsMath.Sin(ang);
+                        ox = JsMath.F32(tx);
+                        oz = JsMath.F32(tz);
+                        break;
+                    }
+                }
+                int slot = World.SpawnLooseOrb(w, ox, oz, (int)res.MeatUnitsPerKill, Durations.T30(w.Config, res.MeatOrbLifetimeTicks), id);
+                if (pop) World.PushEvent(w, SimEventType.MeatPop, id, slot, ox, oz, 0, null, DamageCause.None, w.Config.Physics.MeatPopDistance, hx, hz, 0, 0, 0, 0);
             }
         }
     }

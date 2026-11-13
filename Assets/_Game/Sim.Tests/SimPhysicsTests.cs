@@ -1062,5 +1062,81 @@ namespace CriticalMass.Sim.Tests
             }
             Assert.Greater(accepted, 0);
         }
+        // ------------------------------------------------------------------ DG-100 sim polish
+
+        private static bool SwingHitsKaijuAt(double offDeg)
+        {
+            World w = Make(c => c.Physics.Knockback = false);
+            Kaiju k = HatchedKaiju(w);
+            ParkOthers(w, 2);
+            double a = offDeg * Math.PI / 180;
+            // Farmer 2 stands 2 u from the Kaiju centre, facing +x; the Kaiju sits offDeg off that facing.
+            Place(w, 2, HillX - 2 * Math.Cos(a), HillZ - 2 * Math.Sin(a));
+            w.Actors[2].Facing = 0;
+            double hp = k.Hp;
+            Idle(w);
+            Input(w, 2, w.X[2] + 5, w.Z[2], true);
+            for (int t = 0; t < 6; t++) { SimStep.Step(w); Input(w, 2, w.X[2] + 5, w.Z[2], false); }
+            return k.Hp < hp;
+        }
+
+        [Test]
+        public void DG100ASwingAtTheKaijusFlankConnectsAt70DegreesAndMissesAt120()
+        {
+            Assert.IsTrue(SwingHitsKaijuAt(70));
+            Assert.IsFalse(SwingHitsKaijuAt(120));
+        }
+
+        [Test]
+        public void DG100ARevertedLandingResetsPrevX()
+        {
+            World w = Make();
+            ParkOthers(w, 2);
+            Place(w, 2, HillX, HillZ);
+            Actor a = w.Actors[2];
+            a.AirLen = 5;
+            a.AirTick = 5;
+            a.AirFromX = HillX - 2;
+            a.AirFromZ = HillZ;
+            w.X[2] = -5; // the landing spot is off the map: the guard reverts
+            Jump.LandJump(w, 2);
+            Assert.AreEqual(HillX - 2, w.X[2]);
+            Assert.AreEqual(w.X[2], w.PrevX[2]);
+            Assert.AreEqual(w.Z[2], w.PrevZ[2]);
+        }
+
+        [Test]
+        public void DG100TwoDeathsOnOnePointGiveTwoOrbsAtLeast05ApartOnWalkableCells()
+        {
+            World w = Make();
+            ParkOthers(w, 5, 6);
+            Place(w, 5, HillX, HillZ);
+            Place(w, 6, HillX, HillZ);
+            Damage.ApplyDamage(w, 5, 1000, -1, HillX, HillZ);
+            Damage.ApplyDamage(w, 6, 1000, -1, HillX, HillZ);
+            Combat.DropCorpseMeat(w);
+            var orbs = new List<LooseOrb>();
+            foreach (LooseOrb o in w.Orbs) if (o.Active) orbs.Add(o);
+            Assert.AreEqual(2, orbs.Count);
+            double d = Math.Sqrt((orbs[0].X - orbs[1].X) * (orbs[0].X - orbs[1].X) + (orbs[0].Z - orbs[1].Z) * (orbs[0].Z - orbs[1].Z));
+            Assert.GreaterOrEqual(d, 0.5);
+            foreach (LooseOrb o in orbs) Assert.IsTrue(MapGrid.IsWalkable(w.Map, JsMath.FloorToInt(o.X), JsMath.FloorToInt(o.Z)));
+        }
+
+        [Test]
+        public void DG100KaijuPositionsAreFloat32()
+        {
+            GameConfig cfg = GameConfig.CreateBrowser5v5();
+            World w = World.CreateWorld(new WorldOptions { Seed = 4, TeamSize = 5, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = cfg });
+            InputFrame scratch = SimInput.EmptyInput();
+            w.ForceHatch = true;
+            for (int t = 0; t < 400; t++)
+            {
+                MatchTick.Advance(w, null, scratch);
+                if (w.Kaiju.State == KaijuState.Egg) continue;
+                Assert.AreEqual(JsMath.F32(w.Kaiju.X), w.Kaiju.X, "tick " + t);
+                Assert.AreEqual(JsMath.F32(w.Kaiju.Z), w.Kaiju.Z, "tick " + t);
+            }
+        }
     }
 }

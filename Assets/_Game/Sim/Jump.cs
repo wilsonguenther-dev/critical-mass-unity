@@ -111,6 +111,12 @@ namespace CriticalMass.Sim.Core
             w.Z[id] = a.AirFromZ;
             w.Vx[id] = JsMath.F32(0);
             w.Vz[id] = JsMath.F32(0);
+            if (Phys.On(w, true))
+            {
+                // DG-100 (S20): a reverted landing is a teleport: no interpolation smear across the gap.
+                w.PrevX[id] = w.X[id];
+                w.PrevZ[id] = w.Z[id];
+            }
         }
 
         /// <summary>
