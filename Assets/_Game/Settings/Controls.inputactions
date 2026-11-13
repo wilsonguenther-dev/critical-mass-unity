@@ -142,6 +142,15 @@
                     "initialStateCheck": false
                 },
                 {
+                    "name": "Emote",
+                    "type": "Button",
+                    "id": "809fecf0-8fa7-4222-a93a-a335537d6665",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
                     "name": "Point",
                     "type": "PassThrough",
                     "id": "d04de962-378e-45b3-9d82-9ba080e61a3d",
@@ -611,6 +620,28 @@
                     "processors": "",
                     "groups": "Gamepad",
                     "action": "MinimapZoom",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "3df442c0-c58a-449d-abea-f42c6750a436",
+                    "path": "<Keyboard>/t",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "KeyboardMouse",
+                    "action": "Emote",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "3e0fa2fd-ad9c-4080-8a63-782a9f417a1b",
+                    "path": "<Gamepad>/leftStickPress",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "Gamepad",
+                    "action": "Emote",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }
