@@ -13,6 +13,11 @@ namespace CriticalMass.Runtime.Input
     /// re-latch). A held Attack stays true every step (the sim's cooldown gates repeats). Interact is held.</para>
     /// <para>Pause toggles Paused; while paused every down except Pause is dropped (never replayed) and Fill writes a
     /// neutral frame with no aim.</para>
+    /// <para>Input buffer (DG-14): with BufferWorld set (InputBufferBinder does it), an Attack or Ability press the sim
+    /// would refuse on its step (cooldown, getting up) is also delivered once on the first step, up to
+    /// InputBuffer.MaxEarlyTicks later (0.15 s), on which the sim accepts it. The press step itself is unchanged, so the
+    /// only difference the sim can see is that press arriving on its first ready step. Counted in sim steps (one per
+    /// Fill), so the same presses on the same ticks always give the same frames. BufferWorld null = the plain latch.</para>
     /// </summary>
     public sealed class HumanInputState
     {
@@ -47,6 +52,20 @@ namespace CriticalMass.Runtime.Input
         bool _hasAim;
         double _aimX;
         double _aimZ;
+        readonly InputBuffer _attackBuffer = new InputBuffer();
+        readonly InputBuffer _abilityBuffer = new InputBuffer();
+
+        /// <summary>The world the buffer reads readiness from (read-only); null = no buffering.</summary>
+        public World BufferWorld;
+
+        /// <summary>The actor this input drives (actor 0, HudBinder.LocalActor).</summary>
+        public int BufferActor;
+
+        /// <summary>An Attack press is waiting for a ready step.</summary>
+        public bool AttackBuffered => _attackBuffer.Pending;
+
+        /// <summary>An Ability press is waiting for a ready step.</summary>
+        public bool AbilityBuffered => _abilityBuffer.Pending;
 
         /// <summary>The pause menu is open (browser ui.paused).</summary>
         public bool Paused => _paused;
@@ -72,6 +91,8 @@ namespace CriticalMass.Runtime.Input
             _hasAim = false;
             _aimX = 0;
             _aimZ = 0;
+            _attackBuffer.Clear();
+            _abilityBuffer.Clear();
         }
 
         /// <summary>A button went down. repeat = an OS auto-repeat down while held (never re-latches, never re-toggles).</summary>
@@ -176,6 +197,8 @@ namespace CriticalMass.Runtime.Input
             _jumpLatch = false;
             _moveRight = 0;
             _moveUp = 0;
+            _attackBuffer.Clear();
+            _abilityBuffer.Clear();
         }
 
         /// <summary>Respawn class re-pick from the UI (CM-10): written into InputFrame.ClassPick once by the next Fill.</summary>
@@ -205,6 +228,8 @@ namespace CriticalMass.Runtime.Input
                 _switchLatch = false;
                 _jumpLatch = false;
                 _classPick = -1;
+                _attackBuffer.Clear();
+                _abilityBuffer.Clear();
                 return;
             }
 
@@ -239,9 +264,13 @@ namespace CriticalMass.Runtime.Input
                 output.MoveZ = mz;
             }
 
-            output.Attack = _attackHeld || _attackLatch;
+            World bw = BufferWorld;
+            bool canBuffer = bw != null && bw.Config != null;
+            int early = canBuffer ? InputBuffer.MaxEarlyTicks(bw.Config.SimHz) : 0;
+            bool attackNow = _attackBuffer.Step(_attackLatch, canBuffer, canBuffer && InputReadiness.Attack(bw, BufferActor), early);
+            output.Attack = _attackHeld || attackNow;
             _attackLatch = false;
-            output.Ability = _abilityLatch;
+            output.Ability = _abilityBuffer.Step(_abilityLatch, canBuffer, canBuffer && InputReadiness.Ability(bw, BufferActor), early);
             _abilityLatch = false;
             output.Interact = _interactHeld;
             output.Terraform = _terraformLatch;

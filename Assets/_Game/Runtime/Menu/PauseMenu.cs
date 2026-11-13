@@ -5,6 +5,7 @@ using CriticalMass.Runtime.Hud;
 using CriticalMass.Runtime.Hud.Style;
 using CriticalMass.Runtime.Hud.Ui;
 using CriticalMass.Runtime.Input;
+using CriticalMass.Runtime.Menus;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
@@ -108,6 +109,12 @@ namespace CriticalMass.Runtime.Menu
             // The title screen takes every key itself; the press that dismisses it must not also open the menu.
             if (GetComponent<TitleScreen>() != null) return true;
             if (!IsOpen) return false;
+            // DG-14: the controls card opened from this menu closes first (back to the entry that opened it).
+            if (ControlsCardScreen.IsOpen)
+            {
+                ControlsCardScreen.Hide();
+                return true;
+            }
             if (IsRebinding || Time.unscaledTime < _quietUntil) return true;
             Back();
             return true;
@@ -167,6 +174,12 @@ namespace CriticalMass.Runtime.Menu
                 return;
             }
             if (Time.unscaledTime < _quietUntil) return;
+            if (ControlsCardScreen.IsOpen)
+            {
+                Gamepad cardPad = Gamepad.current;
+                if (cardPad != null && cardPad.buttonEast.wasPressedThisFrame) ControlsCardScreen.Hide();
+                return;
+            }
             EventSystem es = EventSystem.current;
             if (es != null && !es.sendNavigationEvents) es.sendNavigationEvents = true;
 
@@ -259,6 +272,9 @@ namespace CriticalMass.Runtime.Menu
         }
 
         // ---- actions ----
+
+        /// <summary>DG-14: the one-screen controls card over the menu; the focus comes back here when it closes.</summary>
+        public void ShowControls() => ControlsCardScreen.Show();
 
         public void RestartMatch()
         {
@@ -371,7 +387,7 @@ namespace CriticalMass.Runtime.Menu
             string[] labels = { "RESUME", "HOW TO PLAY", "CONTROLS", "SETTINGS", "RESTART MATCH", "QUIT TO TITLE", "QUIT GAME" };
             Action[] acts =
             {
-                Resume, () => { if (Flow.OverlayRegistry.StartTutorial()) Resume(); }, () => ShowSettings(Tab.Controls),
+                Resume, () => { if (Flow.OverlayRegistry.StartTutorial()) Resume(); }, ShowControls, // DG-14: the one-screen controls card
                 () => ShowSettings(Tab.Audio), RestartMatch, QuitToTitle, QuitGame,
             };
             var items = new List<MenuItem>();
@@ -488,6 +504,11 @@ namespace CriticalMass.Runtime.Menu
                     CellW, 28f, heads[c], 2f);
             y += 34f;
 
+            // DG-14: VIEW CONTROLS at the top of the tab, in the empty corner above the action labels.
+            MenuItem view = MenuUi.Item(tab, "View Controls", ContentX, ContentY - 4f, LabelW - 20f, 34f, "VIEW CONTROLS",
+                MenuItem.Kind.Button, 18, true, CMTokens.Display);
+            view.Submitted = ShowControls;
+
             InputActionAsset asset = InputSystem.actions;
             var grid = new List<MenuItem[]>();
             for (int r = 0; r < ControlBindings.Rows.Length; r++)
@@ -521,6 +542,15 @@ namespace CriticalMass.Runtime.Menu
                 SetStatus("Every control is back to its default.", false);
             };
             WireGrid(grid, reset);
+            MenuItem firstCell = grid.Count > 0 ? (grid[0][0] ?? grid[0][2]) : reset;
+            view.navigation = new Navigation { mode = Navigation.Mode.Explicit, selectOnUp = _tabButtons[0], selectOnDown = firstCell };
+            for (int c = 0; grid.Count > 0 && c < 4; c++)
+            {
+                if (grid[0][c] == null) continue;
+                Navigation n = grid[0][c].navigation;
+                n.selectOnUp = view;
+                grid[0][c].navigation = n;
+            }
             _refreshers.Add(RefreshCells);
             return tab.gameObject;
         }
