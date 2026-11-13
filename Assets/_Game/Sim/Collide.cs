@@ -1,10 +1,23 @@
 using System;
+using System.Collections.Generic;
 using CriticalMass.Sim.Config;
 using CriticalMass.Sim.Grid;
+using CriticalMass.Sim.Maps;
 
 namespace CriticalMass.Sim.Core
 {
-    /// <summary>Collision (browser collide.ts): actor squares against the grid, then soft actor-actor separation.</summary>
+    /// <summary>
+    /// Collision (browser collide.ts): actor squares against the grid, then soft actor-actor separation.
+    /// <para>CM-32: an AIRBORNE actor (Actor.AirLen &gt; 0, Jump.cs) also passes over in-map VOID cells (a gap), never over
+    /// walls, water, intact breakables, barricades or the map edge. Landing is guarded by Jump.cs with FootprintClear.</para>
+    /// <para>DG-02 / CM-33 (browser branch cm/CM-33 at 003c970, D-069): DIAGONAL bridges are walked against a straight
+    /// rail, not the cell staircase. The cell raster is unchanged. A grounded actor may also stand where its circle lies
+    /// within BridgeHalfWidth - r (+ DeckPad) of a diagonal span's centre segment, the axis cells under it are walkable and
+    /// every blocked cell its square touches is in-map VOID (the staircase notches under the drawn deck). Near a diagonal
+    /// span a step the box rule would block is accepted when it lands on that deck, else slid along the rail. Off every
+    /// rail capture zone, and for any step the box rule does not block from a box-legal start, the result is bit-identical
+    /// to the plain push-out.</para>
+    /// </summary>
     public static class Collide
     {
         /// <summary>Push-out margin so a resting actor sits strictly clear of blocked cells (far above the Float32 ulp).</summary>
@@ -15,6 +28,15 @@ namespace CriticalMass.Sim.Core
 
         /// <summary>Max distance per collision sub-step (well under one cell, so no tunnelling).</summary>
         private const double MaxSubstep = 0.4;
+
+        /// <summary>
+        /// CM-33: deck band pad beyond BridgeHalfWidth - r. DERIVED: much more than the Float32 ulp at x &lt; 128 (7.6e-6),
+        /// so a rail target set exactly on the band edge always tests as on the deck; much less than the view's deck margin.
+        /// </summary>
+        public const double DeckPad = 0.01;
+
+        /// <summary>CM-33: lateral reach beyond BridgeHalfWidth within which a blocked step is slid along a diagonal rail. [guess]</summary>
+        public const double RailCapture = 1.0;
 
         /// <summary>Browser MAX_RADIUS: the largest of the warrior, farmer and miner radii, read from the world's config.</summary>
         private static double MaxRadius(GameConfig c)
@@ -35,8 +57,8 @@ namespace CriticalMass.Sim.Core
         {
             MapDef map = w.Map;
             if (MapGrid.IsWalkable(map, cx, cz)) return false;
-            // ITEM CM-32: added by its owner (airborne actors pass over in-map VOID)
-            return true;
+            // CM-32: airborne actors pass over in-map VOID.
+            return !(air && MapGrid.InBounds(map, cx, cz) && map.Cells[cz * map.Width + cx] == Cell.Void);
         }
 
         private static bool RowBlocked(World w, int cx, double z, double r, bool air)
@@ -55,15 +77,149 @@ namespace CriticalMass.Sim.Core
             return false;
         }
 
-        /// <summary>True when actor id's bounding square centred at (x, z) touches only walkable cells.</summary>
+        /// <summary>
+        /// CM-32: true when actor id may stand centred at (x, z): the box rule (its square touches only walkable cells) or
+        /// a diagonal deck (CM-33). Jump.cs lands an actor only where this holds; DG-02 coyote time reads it for support.
+        /// </summary>
         public static bool FootprintClear(World w, int id, double x, double z)
         {
-            double r = ActorRadius(w, id);
+            return ActorFits(w, x, z, ActorRadius(w, id));
+        }
+
+        /// <summary>The plain box rule: the square of half side r centred at (x, z) touches only walkable cells.</summary>
+        private static bool BoxFits(World w, double x, double z, double r)
+        {
             int x0 = JsMath.FloorToInt(x - r - RangeEps);
             int x1 = JsMath.FloorToInt(x + r + RangeEps);
             int z0 = JsMath.FloorToInt(z - r - RangeEps);
             int z1 = JsMath.FloorToInt(z + r + RangeEps);
             for (int cz = z0; cz <= z1; cz++) for (int cx = x0; cx <= x1; cx++) if (!MapGrid.IsWalkable(w.Map, cx, cz)) return false;
+            return true;
+        }
+
+        /// <summary>CM-33: every non-walkable cell the square touches is in-map VOID (no wall, water, breakable, barricade or edge).</summary>
+        private static bool OnlyVoidBlocks(World w, double x, double z, double r)
+        {
+            MapDef map = w.Map;
+            int x0 = JsMath.FloorToInt(x - r - RangeEps);
+            int x1 = JsMath.FloorToInt(x + r + RangeEps);
+            int z0 = JsMath.FloorToInt(z - r - RangeEps);
+            int z1 = JsMath.FloorToInt(z + r + RangeEps);
+            for (int cz = z0; cz <= z1; cz++)
+            {
+                for (int cx = x0; cx <= x1; cx++)
+                {
+                    if (MapGrid.IsWalkable(map, cx, cz)) continue;
+                    if (!MapGrid.InBounds(map, cx, cz) || map.Cells[cz * map.Width + cx] != Cell.Void) return false;
+                }
+            }
+            return true;
+        }
+
+        /// <summary>CM-33: the axis cells under the body (along a - r, a, a + r, clamped to the span) are walkable: the deck is intact.</summary>
+        private static bool AxisSupported(World w, BridgeSpan s, double a, double r)
+        {
+            for (int k = -1; k <= 1; k++)
+            {
+                double t = a + k * r;
+                if (t < 0) t = 0;
+                else if (t > s.Len) t = s.Len;
+                if (!MapGrid.IsWalkable(w.Map, JsMath.FloorToInt(s.X0 + s.Ux * t), JsMath.FloorToInt(s.Z0 + s.Uz * t))) return false;
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// CM-33: the diagonal span whose deck carries a circle of radius r at (x, z), else null: the centre within
+        /// BridgeHalfWidth - r + DeckPad of the span's centre segment, the deck intact under it and only VOID among the
+        /// blocked cells its square touches. First match in table order (deterministic).
+        /// </summary>
+        public static BridgeSpan DeckSpanAt(World w, double x, double z, double r)
+        {
+            double band = SkybreakBasinMap.BridgeHalfWidth - r + DeckPad;
+            bool voidChecked = false;
+            IReadOnlyList<BridgeSpan> spans = BridgeSpans.Diagonal;
+            for (int k = 0; k < spans.Count; k++)
+            {
+                BridgeSpan s = spans[k];
+                if (BridgeSpans.Distance(s, x, z) > band) continue;
+                if (!AxisSupported(w, s, BridgeSpans.Along(s, x, z), r)) continue;
+                if (!voidChecked)
+                {
+                    if (!OnlyVoidBlocks(w, x, z, r)) return null;
+                    voidChecked = true;
+                }
+                return s;
+            }
+            return null;
+        }
+
+        /// <summary>CM-33: true when a grounded circle of radius r may stand at (x, z): the box rule, or on a diagonal deck.</summary>
+        public static bool ActorFits(World w, double x, double z, double r)
+        {
+            return BoxFits(w, x, z, r) || DeckSpanAt(w, x, z, r) != null;
+        }
+
+        /// <summary>
+        /// CM-33: the diagonal span whose rail captures (x, z): along within [-BridgeHalfWidth, Len + BridgeHalfWidth] and
+        /// |lateral| at most BridgeHalfWidth + RailCapture; the smallest |lateral| wins, ties to the first in table order.
+        /// </summary>
+        private static BridgeSpan RailSpanAt(double x, double z)
+        {
+            double hw = SkybreakBasinMap.BridgeHalfWidth;
+            BridgeSpan best = null;
+            double bestL = hw + RailCapture;
+            IReadOnlyList<BridgeSpan> spans = BridgeSpans.Diagonal;
+            for (int k = 0; k < spans.Count; k++)
+            {
+                BridgeSpan s = spans[k];
+                double a = BridgeSpans.Along(s, x, z);
+                if (a < -hw || a > s.Len + hw) continue;
+                double l = Math.Abs(BridgeSpans.Lateral(s, x, z));
+                if (l < bestL || (best == null && l <= bestL))
+                {
+                    best = s;
+                    bestL = l;
+                }
+            }
+            return best;
+        }
+
+        /// <summary>
+        /// CM-33: the rail's answer to a blocked sub-step (sx, sz) from (x, z) on span s (false = no motion). On the band
+        /// the step keeps its along-axis part and its lateral end is clamped to the band edge. Outside the band the centre is
+        /// pulled toward it by at most the step's length, keeping as much of the along-axis part as the rest of that length
+        /// allows (keepAlong false: the pull alone).
+        /// </summary>
+        private static bool RailTarget(BridgeSpan s, double x, double z, double sx, double sz, double r, bool keepAlong, out double ox, out double oz)
+        {
+            ox = x;
+            oz = z;
+            double band = SkybreakBasinMap.BridgeHalfWidth - r;
+            double l0 = BridgeSpans.Lateral(s, x, z);
+            double aStep = sx * s.Ux + sz * s.Uz;
+            double lStep = sz * s.Ux - sx * s.Uz;
+            double da;
+            double dl;
+            if (Math.Abs(l0) <= band + DeckPad)
+            {
+                double lt = l0 + lStep;
+                if (lt > band) lt = band;
+                else if (lt < -band) lt = -band;
+                dl = lt - l0;
+                da = aStep;
+            }
+            else
+            {
+                double len = BridgeSpans.Hypot(sx, sz);
+                double pull = Math.Min(Math.Abs(l0) - band, len);
+                dl = l0 > 0 ? -pull : pull;
+                double room = Math.Sqrt(Math.Max(0, len * len - pull * pull));
+                da = !keepAlong ? 0 : aStep > room ? room : aStep < -room ? -room : aStep;
+            }
+            if (dl == 0 && da == 0) return false;
+            ox = JsMath.F32(x + s.Ux * da - s.Uz * dl);
+            oz = JsMath.F32(z + s.Uz * da + s.Ux * dl);
             return true;
         }
 
@@ -91,34 +247,94 @@ namespace CriticalMass.Sim.Core
             double pz = z0;
             for (int s = 0; s < steps; s++)
             {
+                // The plain axis-separated push-out (resolve X, then Z): bit-identical to the pre-CM-33 sweep.
+                double lx = px;
+                double lz = pz;
                 if (sx != 0)
                 {
-                    px = JsMath.F32(px + sx);
+                    lx = JsMath.F32(lx + sx);
                     if (sx > 0)
                     {
-                        int cx = JsMath.FloorToInt(px + r + RangeEps);
-                        if (RowBlocked(w, cx, pz, r, air)) px = JsMath.F32(cx - r - Skin);
+                        int cx = JsMath.FloorToInt(lx + r + RangeEps);
+                        if (RowBlocked(w, cx, lz, r, air)) lx = JsMath.F32(cx - r - Skin);
                     }
                     else
                     {
-                        int cx = JsMath.FloorToInt(px - r - RangeEps);
-                        if (RowBlocked(w, cx, pz, r, air)) px = JsMath.F32(cx + 1 + r + Skin);
+                        int cx = JsMath.FloorToInt(lx - r - RangeEps);
+                        if (RowBlocked(w, cx, lz, r, air)) lx = JsMath.F32(cx + 1 + r + Skin);
                     }
                 }
                 if (sz != 0)
                 {
-                    pz = JsMath.F32(pz + sz);
+                    lz = JsMath.F32(lz + sz);
                     if (sz > 0)
                     {
-                        int cz = JsMath.FloorToInt(pz + r + RangeEps);
-                        if (ColBlocked(w, cz, px, r, air)) pz = JsMath.F32(cz - r - Skin);
+                        int cz = JsMath.FloorToInt(lz + r + RangeEps);
+                        if (ColBlocked(w, cz, lx, r, air)) lz = JsMath.F32(cz - r - Skin);
                     }
                     else
                     {
-                        int cz = JsMath.FloorToInt(pz - r - RangeEps);
-                        if (ColBlocked(w, cz, px, r, air)) pz = JsMath.F32(cz + 1 + r + Skin);
+                        int cz = JsMath.FloorToInt(lz - r - RangeEps);
+                        if (ColBlocked(w, cz, lx, r, air)) lz = JsMath.F32(cz + 1 + r + Skin);
                     }
                 }
+                // CM-33: grounded, inside a diagonal rail's capture zone: the deck and the rail (see the class summary).
+                BridgeSpan rs = air ? null : RailSpanAt(px, pz);
+                if (rs == null)
+                {
+                    px = lx;
+                    pz = lz;
+                    continue;
+                }
+                bool startBox = BoxFits(w, px, pz, r);
+                if (!startBox && DeckSpanAt(w, px, pz, r) == null)
+                {
+                    // The grid changed under a deck-standing actor (a removed span): the plain rule. The browser logs this
+                    // once per episode; the Sim has no logger (conventions 11).
+                    px = lx;
+                    pz = lz;
+                    continue;
+                }
+                double tx = JsMath.F32(px + sx);
+                double tz = JsMath.F32(pz + sz);
+                bool pushed = lx != tx || lz != tz;
+                if (!pushed && (startBox || ActorFits(w, tx, tz, r)))
+                {
+                    px = tx;
+                    pz = tz;
+                    continue;
+                }
+                if (pushed && DeckSpanAt(w, tx, tz, r) != null)
+                {
+                    px = tx;
+                    pz = tz;
+                    continue;
+                }
+                if (pushed && startBox && (lx != px || lz != pz))
+                {
+                    // A box-legal start the plain rule still moves: keep the plain slide (walls, island edges).
+                    px = lx;
+                    pz = lz;
+                    continue;
+                }
+                if (RailTarget(rs, px, pz, sx, sz, r, true, out double rx, out double rz) && ActorFits(w, rx, rz, r))
+                {
+                    px = rx;
+                    pz = rz;
+                    continue;
+                }
+                if (RailTarget(rs, px, pz, sx, sz, r, false, out rx, out rz) && ActorFits(w, rx, rz, r))
+                {
+                    px = rx;
+                    pz = rz;
+                    continue;
+                }
+                if (startBox)
+                {
+                    px = lx;
+                    pz = lz;
+                }
+                // else: a deck-standing actor whose step and rail slide are both blocked (a wall or barricade on the deck) stays.
             }
             x = px;
             z = pz;
@@ -133,15 +349,14 @@ namespace CriticalMass.Sim.Core
             double reach = 2 * MaxRadius(w.Config);
             for (int i = 0; i < n; i++)
             {
-                // ITEM CM-32: added by its owner (airborne actors skip separation)
-                if (!w.Actors[i].Alive) continue;
+                // CM-32: an airborne actor is over everyone's head: it neither pushes nor is pushed until it lands.
+                if (!w.Actors[i].Alive || w.Actors[i].AirLen > 0) continue;
                 double ri = ActorRadius(w, i);
                 int cnt = SpatialHash.QueryCircle(w.Hash, w.X[i], w.Z[i], reach, Neighbours);
                 for (int k = 0; k < cnt; k++)
                 {
                     int j = Neighbours[k];
-                    // ITEM CM-32: added by its owner (airborne actors skip separation)
-                    if (j <= i || !w.Actors[j].Alive) continue;
+                    if (j <= i || !w.Actors[j].Alive || w.Actors[j].AirLen > 0) continue;
                     double rr = ri + ActorRadius(w, j);
                     double ddx = w.X[j] - w.X[i];
                     double ddz = w.Z[j] - w.Z[i];
