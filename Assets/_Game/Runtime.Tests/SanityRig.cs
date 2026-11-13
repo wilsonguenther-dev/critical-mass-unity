@@ -34,11 +34,14 @@ namespace CriticalMass.Runtime.Tests
             Transform tl = Find(root, "toes.l"), tr = Find(root, "toes.r"), fl = Find(root, "foot.l"), fr = Find(root, "foot.r");
             if (tl != null && tr != null && fl != null && fr != null)
             {
-                Vector3 d = Flat((tl.position - fl.position) + (tr.position - fr.position));
+                // The planted (lower) foot only: in a run cycle the trailing foot kicks up behind with its sole to the
+                // sky, and its toes then point backwards; summed with an airborne front foot that read a correct model as
+                // turned around in about one sampled frame in nine (integration batch 1).
+                Vector3 d = Flat(tl.position.y <= tr.position.y ? tl.position - fl.position : tr.position - fr.position);
                 if (d.sqrMagnitude > 1e-6f)
                 {
                     front = d.normalized;
-                    cue = "toes ahead of the ankles";
+                    cue = "toes ahead of the planted ankle";
                     return true;
                 }
             }
