@@ -232,7 +232,7 @@ namespace CriticalMass.Runtime.Tests
             var clips = Resources.LoadAll<AudioClip>(CombatAudio.ClipFolder);
             Assert.AreEqual(42, clips.Length, "clips under Audio/Resources/CMSfx");
             foreach (AudioClip c in clips) Assert.IsTrue(files.Contains(c.name), c.name + " has a cue");
-            string credits = System.IO.File.ReadAllText("Assets/_Game/Audio/CREDITS.md");
+            string credits = System.IO.File.ReadAllText("Assets/_Game/Audio/Resources/CREDITS.md");
             foreach (AudioClip c in clips) StringAssert.Contains(c.name + ".ogg", credits, "credited: " + c.name);
             var mixer = Resources.Load<UnityEngine.Audio.AudioMixer>(CombatAudio.MixerResource);
             Assert.IsNotNull(mixer, "CMAudioMixer in Audio/Resources (ProjectSetup.Apply creates it)");

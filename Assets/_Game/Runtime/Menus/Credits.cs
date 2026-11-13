@@ -70,7 +70,7 @@ namespace CriticalMass.Runtime.Menus
         /// <summary>Resources names tried for the sound credits (a CREDITS.md inside any Resources folder imports as text).</summary>
         public static readonly string[] SoundCreditsResources = { "CREDITS", "Audio/CREDITS" };
         /// <summary>The sound lane's credits file (feat/combat-feel): read directly in the editor.</summary>
-        public const string SoundCreditsAssetPath = "Assets/_Game/Audio/CREDITS.md";
+        public const string SoundCreditsAssetPath = "Assets/_Game/Audio/Resources/CREDITS.md";
         public const int MaxPacksShown = 6;
 
         static readonly Regex Backticked = new Regex("`([^`]+)`");
@@ -156,8 +156,29 @@ namespace CriticalMass.Runtime.Menus
     /// <para>Public API for the game-flow item (DG-01): <see cref="Show"/>, <see cref="Hide"/>, <see cref="IsOpen"/>,
     /// <see cref="Opened"/>, <see cref="Closed"/>.</para>
     /// </summary>
-    public sealed class Credits : MonoBehaviour
+    [Flow.GameOverlay(Order = 42)]   // installed by GameBootstrap through the DG-01 overlay registry
+    [Flow.MenuEntry(Flow.OverlayRegistry.Credits, "CREDITS", 60)]   // fills the main menu's Credits line
+    public sealed class Credits : MonoBehaviour, Flow.IMenuScreen
     {
+        Action _onMenuClosed;
+
+        /// <summary>The main menu's Credits line (DG-01): show; Back calls onClosed once and the menu returns.</summary>
+        public void Open(Action onClosed)
+        {
+            _onMenuClosed = onClosed;
+            Closed -= MenuClosed;
+            Closed += MenuClosed;
+            if (!Show()) MenuClosed();
+        }
+
+        void MenuClosed()
+        {
+            Closed -= MenuClosed;
+            Action a = _onMenuClosed;
+            _onMenuClosed = null;
+            a?.Invoke();
+        }
+
         public static Credits Instance { get; private set; }
         public static bool IsOpen => Instance != null && Instance._open;
         public static event Action Opened;

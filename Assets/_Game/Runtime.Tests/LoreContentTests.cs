@@ -12,13 +12,13 @@ using UnityEngine;
 namespace CriticalMass.Runtime.Tests
 {
     /// <summary>
-    /// DG-04 words pack (Assets/_Game/Content/Lore/*.json): schema of every file, counts and budgets from the build list,
+    /// DG-04 words pack (Assets/_Game/Resources/Lore/*.json, loaded as Resources "Lore/<name>" in player builds): schema of every file, counts and budgets from the build list,
     /// every number a GameConfig token that resolves, no digits outside tokens, no technology or vendor names, and any
     /// line about a rule the sim does not run yet flagged with the build-list id it waits for.
     /// </summary>
     public class LoreContentTests
     {
-        static readonly string Dir = Path.Combine(Application.dataPath, "_Game", "Content", "Lore");
+        static readonly string Dir = Path.Combine(Application.dataPath, "_Game", "Resources", "Lore");
 
         // ---------------------------------------------------------------- JSON shapes (JsonUtility)
         [Serializable] public class Format { public string id; public string rule; }

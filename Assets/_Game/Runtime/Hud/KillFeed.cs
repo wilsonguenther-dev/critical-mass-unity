@@ -67,7 +67,7 @@ namespace CriticalMass.Runtime.Hud
 
     /// <summary>
     /// The words the DG-11 / DG-38 overlays show. Names, attack names and tips come from the words pack
-    /// (Assets/_Game/Content/Lore/classes.json and tips.json, DG-04) when the files are present, else from the built-in
+    /// (Resources "Lore/classes" and "Lore/tips", Assets/_Game/Resources/Lore, DG-04) when the files are present, else from the built-in
     /// copies below (the same lines). Every string is built once; nothing here allocates during a match.
     /// </summary>
     public static class KillWords
@@ -155,16 +155,23 @@ namespace CriticalMass.Runtime.Hud
         [Serializable] sealed class PackTip { public string id; public string text; public string needsRule; }
         [Serializable] sealed class PackTips { public PackTip[] tips; }
 
-        public static string PackFolder => Path.Combine(Application.dataPath, "_Game", "Content", "Lore");
+        /// <summary>The words pack's Resources folder (Assets/_Game/Resources/Lore): the only path a player build can load by name.</summary>
+        public const string PackResources = "Lore/";
+
+        static string PackText(string name)
+        {
+            TextAsset ta = Resources.Load<TextAsset>(PackResources + name);
+            return ta != null ? ta.text : null;
+        }
 
         static void LoadPack()
         {
             try
             {
-                string classes = Path.Combine(PackFolder, "classes.json");
-                if (File.Exists(classes))
+                string classes = PackText("classes");
+                if (classes != null)
                 {
-                    PackClasses pc = JsonUtility.FromJson<PackClasses>(File.ReadAllText(classes));
+                    PackClasses pc = JsonUtility.FromJson<PackClasses>(classes);
                     if (pc != null && pc.classes != null)
                         foreach (PackClass k in pc.classes)
                         {
@@ -177,10 +184,10 @@ namespace CriticalMass.Runtime.Hud
                                     _attack[i] = string.IsNullOrEmpty(a.needsRule) && !string.IsNullOrEmpty(a.name) ? a.name : "";
                         }
                 }
-                string tips = Path.Combine(PackFolder, "tips.json");
-                if (File.Exists(tips))
+                string tips = PackText("tips");
+                if (tips != null)
                 {
-                    PackTips pt = JsonUtility.FromJson<PackTips>(File.ReadAllText(tips));
+                    PackTips pt = JsonUtility.FromJson<PackTips>(tips);
                     if (pt != null && pt.tips != null)
                         foreach (PackTip t in pt.tips)
                         {

@@ -9,10 +9,10 @@ namespace CriticalMass.Runtime.Flow
 {
     /// <summary>
     /// The words the flow screens show: class names, role lines and ability names (match setup), the result titles and
-    /// lines and the Kaiju outro captions (results). Read from DG-04's words pack (Content/Lore/classes.json and
+    /// lines and the Kaiju outro captions (results). Read from DG-04's words pack (Resources/Lore/classes.json and
     /// results.json) when it is present, with built-in fallbacks when it is absent or a line still carries a token this
     /// screen cannot fill. Lookup order: Resources "Lore/&lt;name&gt;" (a TextAsset, for player builds), then in the editor
-    /// the file under Assets/_Game/Content/Lore.
+    /// the file under Assets/_Game/Resources/Lore.
     /// </summary>
     public static class FlowWords
     {
@@ -108,7 +108,7 @@ namespace CriticalMass.Runtime.Flow
                 TextAsset ta = Resources.Load<TextAsset>("Lore/" + name);
                 if (ta != null) return ta.text;
 #if UNITY_EDITOR
-                string path = Path.Combine(Application.dataPath, "_Game", "Content", "Lore", name + ".json");
+                string path = Path.Combine(Application.dataPath, "_Game", "Resources", "Lore", name + ".json");
                 if (File.Exists(path)) return File.ReadAllText(path, Encoding.UTF8);
 #endif
             }

@@ -9,7 +9,7 @@ using UnityEngine.Audio;
 namespace CriticalMass.Runtime.View.Effects
 {
     /// <summary>
-    /// The 42 Kenney CC0 sounds (Assets/_Game/Audio/Resources/CMSfx, credits in Assets/_Game/Audio/CREDITS.md) wired to
+    /// The 42 Kenney CC0 sounds (Assets/_Game/Audio/Resources/CMSfx, credits in Assets/_Game/Audio/Resources/CREDITS.md) wired to
     /// the decoded sim events through the CMAudioMixer (groups Master > Music, Sfx; exposed MasterVol, MusicVol, SfxVol
     /// for the settings page). Positional falloff is measured from the local player (the camera follows them): full
     /// within 9 u, silent beyond 36 u, panned by screen side. A 20-voice pool, a voice cap and a sim-time cooldown per cue,
