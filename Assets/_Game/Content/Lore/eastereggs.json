@@ -1,0 +1,56 @@
+{
+  "schema": "cm.lore.eastereggs/1",
+  "eggs": [
+    {
+      "id": "egg-01",
+      "name": "Title egg",
+      "design": "Hit the egg on the title screen ten times.",
+      "reward": "A tiny hatchling climbs out and waddles off screen.",
+      "line": "Fine. Go on, then.",
+      "waitsOn": [
+        "DG-01"
+      ]
+    },
+    {
+      "id": "egg-02",
+      "name": "Crown of the Hill",
+      "design": "A golden relic on a ledge you can only reach by jumping.",
+      "reward": "The Crown of the Hill relic card (relic-12) and a brass glint on your ring for the match.",
+      "line": "",
+      "waitsOn": [
+        "DG-02",
+        "DG-25"
+      ]
+    },
+    {
+      "id": "egg-03",
+      "name": "Hill alone",
+      "design": "Hold the hill alone for sixty seconds with no ally on it.",
+      "reward": "The secret announcer line an-22.",
+      "line": "Still up there on your own? Respect.",
+      "waitsOn": [
+        "DG-18"
+      ]
+    },
+    {
+      "id": "egg-04",
+      "name": "Exact tie",
+      "design": "Allegiance exactly tied at the hatch.",
+      "reward": "The neutral outro shows the hatchling shrugging on the hill.",
+      "line": "The Kaiju chose no one, and sat down on the hill to think about it.",
+      "waitsOn": [
+        "DG-17"
+      ]
+    },
+    {
+      "id": "egg-05",
+      "name": "Credits gag",
+      "design": "The last line of the credits.",
+      "reward": "A line under the final credit, then the hatchling looks at the camera.",
+      "line": "No Kaiju were overfed in the making of this game. One was slightly corrupted.",
+      "waitsOn": [
+        "DG-29"
+      ]
+    }
+  ]
+}
