@@ -281,11 +281,45 @@ namespace CriticalMass.Runtime.Menu
             if (!GameSettings.Flush() && _settingsPage != null) SetStatus("Settings could not be saved.", true);
         }
 
+        // ---- controls-1: press-again confirmation for restart and quit ----
+
+        public const float ConfirmSeconds = 3f;
+        MenuItem _armed;
+        string _armedLabel;
+        float _armedAt;
+
+        /// <summary>The item waiting for its confirming second press (tests).</summary>
+        public MenuItem ArmedItem => _armed;
+
+        void ConfirmThen(MenuItem item, string label, Action act)
+        {
+            if (_armed == item && Time.unscaledTime - _armedAt <= ConfirmSeconds)
+            {
+                Disarm();
+                act();
+                return;
+            }
+            Disarm();
+            _armed = item;
+            _armedLabel = label;
+            _armedAt = Time.unscaledTime;
+            HudText.Set(item.Label, "PRESS AGAIN: " + label);
+            SetStatus(label.Substring(0, 1) + label.Substring(1).ToLowerInvariant() + "? Press it again to confirm.", true);
+        }
+
+        void Disarm()
+        {
+            if (_armed != null && _armed.Label != null) HudText.Set(_armed.Label, _armedLabel);
+            _armed = null;
+        }
+
         void Update()
         {
             if (Input == null) return;
             if (Input.PauseHandler == null) Input.PauseHandler = OnPausePressed;
             ControlBindings.Sample();
+            if (_armed != null && (Time.unscaledTime - _armedAt > ConfirmSeconds || !IsOpen ||
+                                   (EventSystem.current != null && EventSystem.current.currentSelectedGameObject != _armed.gameObject))) Disarm();
             bool paused = Input.State.Paused;
             if (paused && !IsOpen) Open();
             else if (!paused && IsOpen) Close();
@@ -761,7 +795,40 @@ namespace CriticalMass.Runtime.Menu
             es = go.AddComponent<EventSystem>();
             InputSystemUIInputModule m = go.AddComponent<InputSystemUIInputModule>();
             m.AssignDefaultActions();
+            AddSpaceSubmit(m);
             return es;
+        }
+
+        /// <summary>
+        /// controls-1: SPACE confirms in every menu as well as ENTER (the default UI actions bind Submit to ENTER only), so a
+        /// keyboard player in either hand position presses with the thumb. Added once; a failure leaves ENTER working.
+        /// </summary>
+        public static void AddSpaceSubmit(InputSystemUIInputModule m)
+        {
+            InputAction submit = m != null && m.submit != null ? m.submit.action : null;
+            if (submit == null) return;
+            foreach (InputBinding b in submit.bindings)
+                if (string.Equals(b.path, "<Keyboard>/space", StringComparison.OrdinalIgnoreCase)) return;
+            InputActionMap map = submit.actionMap;
+            bool on = map != null ? map.enabled : submit.enabled;
+            try
+            {
+                if (map != null) map.Disable();
+                else submit.Disable();
+                submit.AddBinding("<Keyboard>/space");
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[CM.Controls] SPACE could not be added to the menus' confirm ({e.GetType().Name})");
+            }
+            finally
+            {
+                if (on)
+                {
+                    if (map != null) map.Enable();
+                    else submit.Enable();
+                }
+            }
         }
 
         void BuildRoot(RectTransform space)
@@ -808,6 +875,15 @@ namespace CriticalMass.Runtime.Menu
                     n <= 10 ? 28 : 26, true, CMTokens.Display);
                 it.Body.Radius = 16f;
                 it.Submitted = acts[i];
+                // controls-1 hygiene: restart and the two quits ask once ("press again") so one stray ENTER, SPACE or A
+                // never throws a match away.
+                if (labels[i] == "RESTART MATCH" || labels[i] == "QUIT TO TITLE" || labels[i] == "QUIT GAME")
+                {
+                    MenuItem me = it;
+                    Action act = acts[i];
+                    string label = labels[i];
+                    it.Submitted = () => ConfirmThen(me, label, act);
+                }
                 if (i == 1) _spectate = it;
                 if (i == 2) _changeClass = it;
                 if (i == 3) _switchTeam = it;
@@ -944,17 +1020,21 @@ namespace CriticalMass.Runtime.Menu
         // Integration batch 2: 19 rows (Walk to pointer, Map, Ping, HUD cursor and Minimap zoom joined) at 30 + 3 px take the room 14 rows
         // took at 40 + 4 px, so the list still ends above the status line.
         const float CtlRowH = 30f, CtlRowGap = 3f;
+        // controls-1: five columns (keys W A S D hand, keys arrow hand, mouse, controller, controller 2) and 24 rows at
+        // 26 + 2 px, so the list still ends above the toggles and Reset.
+        const int GridCols = 5, KeyCols = 3;
+        const float GridRowH = 26f, GridRowGap = 2f, GridCellW = 172f, GridCellGap = 8f;
 
         GameObject BuildControls(RectTransform parent)
         {
             RectTransform tab = MenuUi.Rt(parent, "Controls Tab");
             MenuUi.Stretch(tab);
             float y = ContentY;
-            string[] heads = { "KEYBOARD", "KEYBOARD 2", "CONTROLLER", "CONTROLLER 2" };
-            for (int c = 0; c < 4; c++)
-                MenuUi.Label(tab, "Head " + c, CMTokens.Ui, UiScale.TypeSmall, Brass, TextAnchor.MiddleCenter, ContentX + LabelW + c * (CellW + CellGap), y,
-                    CellW, 28f, heads[c], 2f);
-            y += 34f;
+            string[] heads = { "KEYS: W A S D", "KEYS: ARROWS", "MOUSE", "CONTROLLER", "CONTROLLER 2" };
+            for (int c = 0; c < GridCols; c++)
+                MenuUi.Label(tab, "Head " + c, CMTokens.Ui, UiScale.TypeMin, Brass, TextAnchor.MiddleCenter, ContentX + LabelW + c * (GridCellW + GridCellGap), y,
+                    GridCellW, 28f, heads[c], 2f);
+            y += 32f;
 
             // DG-14: VIEW CONTROLS at the top of the tab, in the empty corner above the action labels.
             MenuItem view = MenuUi.Item(tab, "View Controls", ContentX, ContentY - 4f, LabelW - 20f, 34f, "VIEW CONTROLS",
@@ -966,16 +1046,17 @@ namespace CriticalMass.Runtime.Menu
             for (int r = 0; r < ControlBindings.Rows.Length; r++)
             {
                 ControlRow row = ControlBindings.Rows[r];
-                MenuUi.Label(tab, "Row " + row.Label, CMTokens.Ui, UiScale.TypeSmall, Cream, TextAnchor.MiddleLeft, ContentX + 8f, y, LabelW - 8f, CtlRowH,
+                MenuUi.Label(tab, "Row " + row.Label, CMTokens.Ui, UiScale.TypeMin, Cream, TextAnchor.MiddleLeft, ContentX + 8f, y, LabelW - 8f, GridRowH,
                     row.Label.ToUpperInvariant(), 2f);
-                var line = new MenuItem[4];
-                for (int c = 0; c < 4; c++)
+                var line = new MenuItem[GridCols];
+                var slots = new List<RebindSlot>(row.Keyboard);
+                slots.AddRange(row.Gamepad);
+                for (int si = 0; si < slots.Count; si++)
                 {
-                    RebindSlot[] set = c < 2 ? row.Keyboard : row.Gamepad;
-                    int k = c % 2;
-                    if (k >= set.Length) continue;
-                    RebindSlot slot = set[k];
-                    MenuItem cell = MenuUi.Item(tab, $"Cell {row.Label} {c}", ContentX + LabelW + c * (CellW + CellGap), y, CellW, CtlRowH, "-",
+                    RebindSlot slot = slots[si];
+                    int c = Mathf.Clamp((int)slot.Column, 0, GridCols - 1);
+                    if (line[c] != null) continue;
+                    MenuItem cell = MenuUi.Item(tab, $"Cell {row.Label} {c}", ContentX + LabelW + c * (GridCellW + GridCellGap), y, GridCellW, GridRowH, "-",
                         MenuItem.Kind.Button, UiScale.TypeMin, true, CMTokens.Mono);
                     var cref = new CellRef { Item = cell, Slot = slot, Row = row };
                     // The binding's glyph beside its name (a mouse with the button lit, a keycap, a controller button).
@@ -987,7 +1068,7 @@ namespace CriticalMass.Runtime.Menu
                     line[c] = cell;
                 }
                 grid.Add(line);
-                y += CtlRowH + CtlRowGap;
+                y += GridRowH + GridRowGap;
             }
             MenuItem reset = MenuUi.Item(tab, "Reset Controls", PanelX + PanelW - 40f - 340f, PanelY + PanelH - 78f, 340f, 56f,
                 "RESET TO DEFAULTS", MenuItem.Kind.Button, UiScale.TypeBody, true, CMTokens.Display);
@@ -1009,9 +1090,9 @@ namespace CriticalMass.Runtime.Menu
                 "Keys follow the screen: W moves up the screen.");
 
             WireGrid(grid, reset);
-            MenuItem firstCell = grid.Count > 0 ? (grid[0][0] ?? grid[0][2]) : reset;
+            MenuItem firstCell = grid.Count > 0 ? (grid[0][0] ?? grid[0][KeyCols]) : reset;
             view.navigation = new Navigation { mode = Navigation.Mode.Explicit, selectOnUp = _tabButtons[0], selectOnDown = firstCell };
-            for (int c = 0; grid.Count > 0 && c < 4; c++)
+            for (int c = 0; grid.Count > 0 && c < GridCols; c++)
             {
                 if (grid[0][c] == null) continue;
                 Navigation n = grid[0][c].navigation;
@@ -1022,17 +1103,17 @@ namespace CriticalMass.Runtime.Menu
             MenuItem lastLeft = null, lastRight = null;
             for (int r = grid.Count - 1; r >= 0 && (lastLeft == null || lastRight == null); r--)
             {
-                if (lastLeft == null) lastLeft = grid[r][0] ?? grid[r][1];
-                if (lastRight == null) lastRight = grid[r][2] ?? grid[r][3];
+                if (lastLeft == null) lastLeft = grid[r][0] ?? grid[r][1] ?? grid[r][2];
+                if (lastRight == null) lastRight = grid[r][3] ?? grid[r][4];
             }
             for (int r = 0; r < grid.Count; r++)
             {
-                for (int c = 0; c < 4; c++)
+                for (int c = 0; c < GridCols; c++)
                 {
                     MenuItem it = grid[r][c];
                     if (it == null || it.navigation.selectOnDown != reset) continue;
                     Navigation n = it.navigation;
-                    n.selectOnDown = c < 2 ? assist : keys;
+                    n.selectOnDown = c < KeyCols ? assist : keys;
                     it.navigation = n;
                 }
             }
@@ -1075,7 +1156,7 @@ namespace CriticalMass.Runtime.Menu
             int rows = grid.Count;
             for (int r = 0; r < rows; r++)
             {
-                for (int c = 0; c < 4; c++)
+                for (int c = 0; c < GridCols; c++)
                 {
                     MenuItem it = grid[r][c];
                     if (it == null) continue;
@@ -1083,12 +1164,12 @@ namespace CriticalMass.Runtime.Menu
                     n.selectOnUp = Find(grid, r, c, -1) ?? (Selectable)_tabButtons[0];
                     n.selectOnDown = Find(grid, r, c, 1) ?? reset;
                     for (int d = c - 1; d >= 0 && n.selectOnLeft == null; d--) n.selectOnLeft = grid[r][d];
-                    for (int d = c + 1; d < 4 && n.selectOnRight == null; d++) n.selectOnRight = grid[r][d];
+                    for (int d = c + 1; d < GridCols && n.selectOnRight == null; d++) n.selectOnRight = grid[r][d];
                     it.navigation = n;
                 }
             }
             MenuItem last = null;
-            for (int r = rows - 1; r >= 0 && last == null; r--) last = grid[r][0] ?? grid[r][2];
+            for (int r = rows - 1; r >= 0 && last == null; r--) last = grid[r][0] ?? grid[r][KeyCols];
             reset.navigation = new Navigation { mode = Navigation.Mode.Explicit, selectOnUp = last, selectOnDown = _tabButtons[0] };
         }
 
@@ -1098,10 +1179,10 @@ namespace CriticalMass.Runtime.Menu
             {
                 if (grid[i][c] != null) return grid[i][c];
                 // A gap in this column: the nearest filled cell of that row.
-                for (int d = 1; d < 4; d++)
+                for (int d = 1; d < GridCols; d++)
                 {
                     if (c - d >= 0 && grid[i][c - d] != null) return grid[i][c - d];
-                    if (c + d < 4 && grid[i][c + d] != null) return grid[i][c + d];
+                    if (c + d < GridCols && grid[i][c + d] != null) return grid[i][c + d];
                 }
             }
             return null;
@@ -1203,8 +1284,12 @@ namespace CriticalMass.Runtime.Menu
                 Slider(tab, 0, "MASTER VOLUME", () => GameSettings.MasterVolume, v => GameSettings.MasterVolume = v),
                 Slider(tab, 1, "MUSIC", () => GameSettings.MusicVolume, v => GameSettings.MusicVolume = v),
                 Slider(tab, 2, "EFFECTS", () => GameSettings.EffectsVolume, v => GameSettings.EffectsVolume = v),
+                // controls-1 round 2: mute switches keep the slider where it was.
+                Stepper(tab, 3, "MUTE MUSIC", () => GameSettings.MuteMusic ? "ON" : "OFF", d => GameSettings.MuteMusic = !GameSettings.MuteMusic),
+                Stepper(tab, 4, "MUTE SOUND EFFECTS", () => GameSettings.MuteEffects ? "ON" : "OFF", d => GameSettings.MuteEffects = !GameSettings.MuteEffects),
+                Stepper(tab, 5, "MUTE WHEN IN BACKGROUND", () => GameSettings.MuteInBackground ? "ON" : "OFF", d => GameSettings.MuteInBackground = !GameSettings.MuteInBackground),
             };
-            Note(tab, 3, "Routed through the game's audio mixer (Master, Music, Effects).");
+            Note(tab, 6, "Routed through the game's audio mixer (Master, Music, Effects). A mute keeps the slider's level.");
             ChainInTab(items);
             return tab.gameObject;
         }
@@ -1243,6 +1328,8 @@ namespace CriticalMass.Runtime.Menu
                 Stepper(tab, 1, "BLOOD", () => GameSettings.Blood ? "ON" : "OFF", d => GameSettings.Blood = !GameSettings.Blood),
                 // Owner, 2026-11-13: the story intro plays at every launch; this turns that off, WATCH INTRO plays it now.
                 Stepper(tab, 2, "PLAY INTRO AT LAUNCH", () => GameSettings.IntroAtLaunch ? "ON" : "OFF", d => GameSettings.IntroAtLaunch = !GameSettings.IntroAtLaunch),
+                // controls-1 round 2: blue / amber teams for colour-blind players (HUD, rings, team text).
+                Stepper(tab, 3, "COLOUR-BLIND TEAMS", () => GameSettings.ColourBlindTeams ? "BLUE / AMBER" : "OFF", d => GameSettings.ColourBlindTeams = !GameSettings.ColourBlindTeams),
             };
             MenuItem watch = MenuUi.Item(tab, "Watch Intro", ContentX, ContentY + GameTabLines * (LineH + LineGap) + 20f, 420f, 56f,
                 "WATCH INTRO", MenuItem.Kind.Button, UiScale.TypeBody, true, CMTokens.Display);
@@ -1278,7 +1365,7 @@ namespace CriticalMass.Runtime.Menu
         }
 
         /// <summary>Stepper lines on the Game tab (the three buttons sit under them).</summary>
-        const int GameTabLines = 3;
+        const int GameTabLines = 4;
 
         /// <summary>Settings > WATCH INTRO: closes the menu and plays the story intro (on the title, Home or setup; never over a
         /// live match, where the menu says so instead).</summary>

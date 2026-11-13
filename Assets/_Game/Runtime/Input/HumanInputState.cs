@@ -63,6 +63,9 @@ namespace CriticalMass.Runtime.Input
         bool _scoreboardHeld;
         bool _interactHeld;
         bool _attackHeld;
+        // controls-1 (hygiene): a press held through a death is ignored after the respawn until it is let go.
+        bool _attackHoldOff;
+        bool _aliveSeen, _wasAlive;
         bool _attackLatch;
         bool _abilityLatch;
         bool _terraformLatch;
@@ -140,6 +143,9 @@ namespace CriticalMass.Runtime.Input
             _scoreboardHeld = false;
             _interactHeld = false;
             _attackHeld = false;
+            _attackHoldOff = false;
+            _aliveSeen = false;
+            _wasAlive = false;
             _attackLatch = false;
             _abilityLatch = false;
             _terraformLatch = false;
@@ -175,6 +181,8 @@ namespace CriticalMass.Runtime.Input
                     if (!repeat) _jumpLatch = true;
                     break;
                 case HumanButton.Attack:
+                    if (repeat && _attackHoldOff) break;
+                    _attackHoldOff = false;
                     _attackHeld = true;
                     if (!repeat) _attackLatch = true;
                     break;
@@ -209,6 +217,7 @@ namespace CriticalMass.Runtime.Input
             {
                 case HumanButton.Attack:
                     _attackHeld = false;
+                    _attackHoldOff = false;
                     break;
                 case HumanButton.Interact:
                     _interactHeld = false;
@@ -228,6 +237,20 @@ namespace CriticalMass.Runtime.Input
             _moveRight = right;
             _moveUp = up;
             _moveFromKeys = fromKeys;
+        }
+
+        /// <summary>
+        /// controls-1: the move intent as a sim XZ direction through the same basis Fill uses (screen, or the map grid for
+        /// keys with KeysFollowMap), before lane assist and corner sliding; (0, 0) when nothing moves. Keyboard aim reads it so
+        /// the fighter faces the way the keys send it. Read-only: never changes what Fill writes.
+        /// </summary>
+        public void MoveDirection(out double x, out double z)
+        {
+            bool map = _moveFromKeys && KeysFollowMap;
+            double rx = map ? MapRightX : ScreenRightX, rz = map ? MapRightZ : ScreenRightZ;
+            double ux = map ? MapUpX : ScreenUpX, uz = map ? MapUpZ : ScreenUpZ;
+            x = _moveRight * rx + _moveUp * ux;
+            z = _moveRight * rz + _moveUp * uz;
         }
 
         /// <summary>The pointer's aim point on the ground in sim world space (the raycast is HumanInputSource's).</summary>
@@ -259,6 +282,7 @@ namespace CriticalMass.Runtime.Input
             _scoreboardHeld = false;
             _interactHeld = false;
             _attackHeld = false;
+            _attackHoldOff = false;
             _attackLatch = false;
             _abilityLatch = false;
             _terraformLatch = false;
@@ -285,6 +309,28 @@ namespace CriticalMass.Runtime.Input
                 }
             }
         }
+
+        /// <summary>
+        /// controls-1 (hygiene, owner veteran pass): the actor came back to life. An attack held (or mashed) through the death
+        /// does not swing on the first moment of the new life: the hold is dropped until the key is let go and pressed
+        /// again, and every latch and buffered press queued while dead is dropped. Presentation only (the frames the sim
+        /// receives), so the sim is unchanged. Called by Fill on the dead-to-alive edge of BufferActor.
+        /// </summary>
+        public void HoldOffAfterRespawn()
+        {
+            if (_attackHeld) _attackHoldOff = true;
+            _attackHeld = false;
+            _attackLatch = false;
+            _abilityLatch = false;
+            _terraformLatch = false;
+            _switchLatch = false;
+            _jumpLatch = false;
+            _attackBuffer.Clear();
+            _abilityBuffer.Clear();
+        }
+
+        /// <summary>True while a hold from before the respawn is being ignored.</summary>
+        public bool AttackHeldOff => _attackHoldOff;
 
         /// <summary>Fill actor 0's frame for one sim step and consume the latches and the queued class pick.</summary>
         public void Fill(InputFrame output)
@@ -324,6 +370,13 @@ namespace CriticalMass.Runtime.Input
             World bw = BufferWorld;
             bool canBuffer = bw != null && bw.Config != null;
             int early = canBuffer ? InputBuffer.MaxEarlyTicks(bw.Config.SimHz) : 0;
+            if (bw != null && BufferActor >= 0 && BufferActor < bw.ActorCount)
+            {
+                bool alive = bw.Actors[BufferActor].Alive;
+                if (_aliveSeen && alive && !_wasAlive) HoldOffAfterRespawn();
+                _wasAlive = alive;
+                _aliveSeen = true;
+            }
             bool attackNow = _attackBuffer.Step(_attackLatch, canBuffer, canBuffer && InputReadiness.Attack(bw, BufferActor), early);
             output.Attack = _attackHeld || attackNow;
             _attackLatch = false;

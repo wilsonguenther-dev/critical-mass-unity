@@ -70,6 +70,9 @@ namespace CriticalMass.Runtime.Hud.Interact
 
         int Me => HudBinder.LocalActor;
 
+        // controls-1 round 2: _kbHudFocus = the HUD focus was entered from the keyboard (keyboard-only play).
+        bool _kbHudFocus;
+        int _kbFocusFrame = -1;
         bool _built, _padHudFocus, _mapDrag, _promptsDirty = true, _pauseHooked, _titleUp;
         int _hovered = -1;
         float _hoverSince, _nextTitleCheck, _navRepeatAt;
@@ -216,7 +219,17 @@ namespace CriticalMass.Runtime.Hud.Interact
                     SetPadFocus(true);
                     _navRepeatAt = now + 0.35f;   // the press that entered focus does not also move it
                 }
-                CursorFree = CursorKey.IsPressedOnKeyboardMouse || _padHudFocus;
+                // controls-1 round 2 (veteran audit): with no mouse in use, a tap of the HUD cursor key (L ALT) gives the
+                // keyboard the controller's focus mode: the move keys walk the HUD info cards, ENTER or SPACE opens one,
+                // L ALT, ESC or BACKSPACE leaves. With the mouse in use L ALT stays a hold that frees the cursor.
+                else if (KeyboardFocusPressed() && !_padHudFocus && !Map.IsOpen && !Card.IsOpen && !Wheel.IsOpen)
+                {
+                    SetPadFocus(true);
+                    _kbHudFocus = true;
+                    _navRepeatAt = now + 0.35f;
+                    _kbFocusFrame = Time.frameCount;   // the press that entered focus does not also leave it
+                }
+                CursorFree = (CursorKey.IsPressedOnKeyboardMouse && !_kbHudFocus) || _padHudFocus;
 
                 bool swallow = TickPing(w, now, cam, rootLocal, padActive, pad, mouse, ref reasons);
                 if (Map.IsOpen) TickMap(screen, rootLocal, cam, padActive, pad, mouse, swallow, ref reasons);
@@ -225,7 +238,7 @@ namespace CriticalMass.Runtime.Hud.Interact
             }
             Reasons = reasons;
             Gate.Apply(reasons);
-            HookPause(Map.IsOpen || Card.IsOpen || Wheel.IsOpen);
+            HookPause(Map.IsOpen || Card.IsOpen || Wheel.IsOpen || _padHudFocus);
             Markers.Tick(w, cam, now, Me);
             Feed.Tick(now);
             Map.Tick(w, Me, now);
@@ -302,7 +315,8 @@ namespace CriticalMass.Runtime.Hud.Interact
                         x = w.X[Me] + Math.Cos(me.Facing) * 6.0;
                         z = w.Z[Me] + Math.Sin(me.Facing) * 6.0;
                     }
-                    at = padActive ? WorldToRoot(w, x, z, cam) : rootLocal;
+                    // controls-1: keyboard only, the wheel opens on the aim point in front of the fighter, not a resting cursor.
+                    at = padActive || ControlBindings.KeyboardOnly ? WorldToRoot(w, x, z, cam) : rootLocal;
                 }
                 if (ok)
                 {
@@ -314,7 +328,9 @@ namespace CriticalMass.Runtime.Hud.Interact
             if (!Wheel.IsOpen) return false;
             reasons |= GateReason.PingWheel;
             if (padActive) reasons |= GateReason.PadOwnsSticks;
-            Vector2 d = padActive && pad != null ? pad.rightStick.ReadValue() * PingWheel.Radius : rootLocal - _wheelStart;
+            Vector2 d = padActive && pad != null ? pad.rightStick.ReadValue() * PingWheel.Radius
+                : ControlBindings.KeyboardOnly ? ControlBindings.KeyboardSteer(PingWheel.Radius)   // controls-1: the move keys steer
+                : rootLocal - _wheelStart;
             Wheel.Steer(d);
             bool confirm = mouse != null && mouse.leftButton.wasPressedThisFrame && Wheel.Selected >= 0;
             bool cancel = (mouse != null && mouse.rightButton.wasPressedThisFrame) || (pad != null && pad.buttonEast.wasPressedThisFrame);
@@ -441,9 +457,29 @@ namespace CriticalMass.Runtime.Hud.Interact
             Hotspots.Highlight(CursorFree && hit >= 0 ? hit : -1);
         }
 
+        /// <summary>The HUD cursor key went down on the keyboard while the keys play without the mouse.</summary>
+        bool KeyboardFocusPressed() =>
+            ControlBindings.KeyboardOnly && ControlBindings.ActiveDevice == ControlDevice.KeyboardMouse &&
+            CursorKey.WasPressed && !CursorKey.WasPressedOnGamepad;
+
+        /// <summary>The HUD focus mode is on (controller or keyboard): the move keys or d-pad walk the HUD info cards.</summary>
+        public bool HudFocus => _padHudFocus;
+
+        /// <summary>Keyboard focus direction from both hand positions (pure: tests pass the four flags).</summary>
+        public static Vector2 KeyDirection(bool up, bool down, bool left, bool right) =>
+            new Vector2((right ? 1f : 0f) - (left ? 1f : 0f), (up ? 1f : 0f) - (down ? 1f : 0f));
+
+        /// <summary>Enters or leaves the keyboard HUD focus (tests; the game uses the HUD cursor key).</summary>
+        public void SetKeyboardHudFocus(bool on)
+        {
+            SetPadFocus(on);
+            _kbHudFocus = on;
+        }
+
         void SetPadFocus(bool on)
         {
             _padHudFocus = on;
+            if (!on) _kbHudFocus = false;
             Hotspots.Focused = on ? Hotspots.First() : -1;
             if (!on)
             {
@@ -454,14 +490,28 @@ namespace CriticalMass.Runtime.Hud.Interact
 
         void TickPadFocus(float now, Gamepad pad)
         {
-            if (pad == null) { SetPadFocus(false); return; }
+            Keyboard kb = Keyboard.current;
+            if (_kbHudFocus ? kb == null : pad == null) { SetPadFocus(false); return; }
             Vector2 dir = Vector2.zero;
-            if (pad.dpad.up.isPressed) dir.y += 1f;
-            if (pad.dpad.down.isPressed) dir.y -= 1f;
-            if (pad.dpad.left.isPressed) dir.x -= 1f;
-            if (pad.dpad.right.isPressed) dir.x += 1f;
-            Vector2 ls = pad.leftStick.ReadValue();
-            if (ls.sqrMagnitude > 0.36f) dir += ls;
+            bool confirm, back;
+            if (_kbHudFocus)
+            {
+                dir = KeyDirection(kb.upArrowKey.isPressed || kb.wKey.isPressed, kb.downArrowKey.isPressed || kb.sKey.isPressed,
+                    kb.leftArrowKey.isPressed || kb.aKey.isPressed, kb.rightArrowKey.isPressed || kb.dKey.isPressed);
+                confirm = kb.enterKey.wasPressedThisFrame || kb.numpadEnterKey.wasPressedThisFrame || kb.spaceKey.wasPressedThisFrame;
+                back = kb.backspaceKey.wasPressedThisFrame || (CursorKey.WasPressed && !CursorKey.WasPressedOnGamepad && Time.frameCount != _kbFocusFrame);
+            }
+            else
+            {
+                if (pad.dpad.up.isPressed) dir.y += 1f;
+                if (pad.dpad.down.isPressed) dir.y -= 1f;
+                if (pad.dpad.left.isPressed) dir.x -= 1f;
+                if (pad.dpad.right.isPressed) dir.x += 1f;
+                Vector2 ls = pad.leftStick.ReadValue();
+                if (ls.sqrMagnitude > 0.36f) dir += ls;
+                confirm = pad.buttonSouth.wasPressedThisFrame;
+                back = pad.buttonEast.wasPressedThisFrame;
+            }
             if (dir.sqrMagnitude > 0.1f)
             {
                 if (now >= _navRepeatAt)
@@ -475,8 +525,8 @@ namespace CriticalMass.Runtime.Hud.Interact
             else _navRepeatAt = 0f;
             int f = Hotspots.Focused;
             if (f < 0 || !Hotspots.Visible(f)) Hotspots.Focused = f = Hotspots.First();
-            if (pad.buttonSouth.wasPressedThisFrame && f >= 0) Activate(f);
-            if (pad.buttonEast.wasPressedThisFrame) { SetPadFocus(false); return; }
+            if (confirm && f >= 0) Activate(f);
+            if (back) { SetPadFocus(false); return; }
             Hotspots.Highlight(f);
             if (f >= 0) ShowTip(f);
             else Tip.Hide();
@@ -679,6 +729,7 @@ namespace CriticalMass.Runtime.Hud.Interact
             if (Wheel.IsOpen) { Wheel.Cancel(); return true; }
             if (Card.IsOpen) { Card.Close(); return true; }
             if (Map.IsOpen) { CloseMap(); return true; }
+            if (_padHudFocus) { SetPadFocus(false); return true; }
             return _prevPause != null && _prevPause();
         }
 

@@ -123,7 +123,8 @@ namespace CriticalMass.Runtime.Camera
                 _shownAt = t;
             }
             if (!_shown) return;
-            bool on = !_done; // the hint retires as soon as the player looks (Retire sets _done)
+            // controls-1: keyboard-only play has no mouse to look with, so the "hold middle click" hint never shows then.
+            bool on = !_done && !(ControlBindings.KeyboardOnly && ControlBindings.ActiveDevice == ControlDevice.KeyboardMouse);
             if (on && t - _shownAt >= ShowSimSeconds)
             {
                 Retire();
