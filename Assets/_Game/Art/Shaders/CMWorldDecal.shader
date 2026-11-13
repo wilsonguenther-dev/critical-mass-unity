@@ -32,6 +32,8 @@ Shader "CM/WorldDecal"
             #pragma fragment Frag
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
+            // Arena night life 1: glows and light pools grow by _CMTodSky.z (0 in Day); the ledge shadow takes the grade.
+            #include "CMTimeOfDay.hlsl"
             CBUFFER_START(UnityPerMaterial)
                 half _Mode;
                 half _Strength;
@@ -56,16 +58,16 @@ Shader "CM/WorldDecal"
                     // and squared it falls to nothing at the rim, added (Blend SrcAlpha One) as soft warm light, not a disc.
                     half k = saturate(i.color.a / 0.375h);
                     k = k * k * (3.0h - 2.0h * k);
-                    return half4(c, k * k * _Strength);
+                    return half4(c, saturate(k * k * _Strength * (1.0h + (half)_CMTodSky.z)));
                 }
-                if (_Mode > 0.5) return half4(_ShadowColor.rgb, _ShadowColor.a * saturate(1.0 - i.uv.y) * _Strength);
+                if (_Mode > 0.5) return half4(CMTodGrade(_ShadowColor.rgb, 0.0h, 0.0h), _ShadowColor.a * saturate(1.0 - i.uv.y) * _Strength);
                 half3 rgb = i.color.rgb;
                 if (_SwapTeam > 0.5 && (int)round(i.color.a * 8.0) == 6) rgb = LinearToSRGB(_TeamGlowDecal.rgb);
             #if !defined(UNITY_COLORSPACE_GAMMA)
                 rgb = SRGBToLinear(rgb);
             #endif
                 float r = saturate(length(i.uv - 0.5) * 2.0);
-                half a = (1.0 - r) * (1.0 - r) * _Strength;
+                half a = (1.0 - r) * (1.0 - r) * _Strength * (1.0h + (half)_CMTodSky.z);
                 return half4(rgb * a, a);
             }
             ENDHLSL

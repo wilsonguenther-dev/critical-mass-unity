@@ -1243,6 +1243,9 @@ namespace CriticalMass.Runtime.Menu
                 Stepper(tab, 1, "BLOOD", () => GameSettings.Blood ? "ON" : "OFF", d => GameSettings.Blood = !GameSettings.Blood),
                 // Owner, 2026-11-13: the story intro plays at every launch; this turns that off, WATCH INTRO plays it now.
                 Stepper(tab, 2, "PLAY INTRO AT LAUNCH", () => GameSettings.IntroAtLaunch ? "ON" : "OFF", d => GameSettings.IntroAtLaunch = !GameSettings.IntroAtLaunch),
+                // Arena night life 1: the map's time of day (also on the READY screen); applies at once, in a match too.
+                Stepper(tab, 3, "TIME OF DAY", () => View.Atmosphere.TimeOfDaySettings.Label(View.Atmosphere.TimeOfDaySettings.Choice),
+                    View.Atmosphere.TimeOfDaySettings.Step),
             };
             MenuItem watch = MenuUi.Item(tab, "Watch Intro", ContentX, ContentY + GameTabLines * (LineH + LineGap) + 20f, 420f, 56f,
                 "WATCH INTRO", MenuItem.Kind.Button, UiScale.TypeBody, true, CMTokens.Display);
@@ -1253,6 +1256,7 @@ namespace CriticalMass.Runtime.Menu
             reset.Submitted = () =>
             {
                 GameSettings.ResetAll();
+                View.Atmosphere.TimeOfDaySettings.Reset();
                 CriticalMass.Runtime.Game.SupportReport.ResetDataFiles();   // DG-64: the data files and the keys together
                 RefreshAll();
                 SetStatus("Audio, video and game settings are back to their defaults.", false);
@@ -1278,7 +1282,7 @@ namespace CriticalMass.Runtime.Menu
         }
 
         /// <summary>Stepper lines on the Game tab (the three buttons sit under them).</summary>
-        const int GameTabLines = 3;
+        const int GameTabLines = 4;
 
         /// <summary>Settings > WATCH INTRO: closes the menu and plays the story intro (on the title, Home or setup; never over a
         /// live match, where the menu says so instead).</summary>

@@ -41,6 +41,8 @@ Shader "CM/WorldGround"
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
             #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
+            // Arena night life 1: the time-of-day grade (all globals 0 = Day).
+            #include "CMTimeOfDay.hlsl"
             TEXTURE2D(_FieldTex);
             SAMPLER(sampler_FieldTex);
             // Ground paint (world reactions, GroundPaint.cs): blood, scorch, cracks and footprints stamped once into a
@@ -163,7 +165,7 @@ Shader "CM/WorldGround"
                 float4 shadowCoord = TransformWorldToShadowCoord(i.positionWS);
                 half atten = MainLightRealtimeShadow(shadowCoord);
                 if (atten < 0.5) col = lerp(col * 0.66, _ShadowTint.rgb, 0.12);
-                return half4(col, 1.0);
+                return half4(CMTodGrade(col, atten < 0.5 ? 0.0h : 1.0h, 0.0h), 1.0);
             }
             ENDHLSL
         }

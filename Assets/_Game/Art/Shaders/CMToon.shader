@@ -9,6 +9,8 @@
 // vertex colour with its alpha mask codes and team-glow contract (CMToonCommon.hlsl), and the DepthOnly and DepthNormals
 // passes put CM/Toon objects into the depth and normals textures. Art refresh 2: face decal (_DecalOn, _FaceTex on
 // UV0), Kaiju _Berserk darkening of fixed colours, per-vertex outline weight (UV4.x) so faces carry no hull.
+// Arena night life 1 (2026-11-13): the lit pass takes the global time-of-day grade (CMTimeOfDay.hlsl; all 0 = Day);
+// self-lit glows (mask codes 1, 2, 3, 5, 6, 7) never do, so team markers and glows read the same at every time of day.
 // World reactions (2026-11-12): every pass (lit, outline, shadow caster, depth, depth normals) places the vertex with the
 // same CMToonWorldPos (CMToonCommon.hlsl: wind + force-field sway from UV5 when _SwayOn, UV4.y wobble when _WobbleUV4Y),
 // so the bent silhouette, its outline hull and its shadow agree; the shadow caster has its own vertex for that reason.
@@ -128,6 +130,10 @@ Shader "CM/Toon"
                 half band = CMToonBand(ndl) * lerp(1.0h, step(0.5, mainLight.shadowAttenuation), _ReceiveShadows);
                 band = min(2.0h, band + _TopBandLift * smoothstep(0.65, 0.75, normalWS.y));
                 half3 lit = CMToonBandColor(albedo, band);
+                // Time of day (CMTimeOfDay.hlsl): key and shadow tint by band, sky fill, moon rim on world solids.
+                half todLift = CMToonTodLift();
+                lit = CMTodGrade(lit, band * 0.5h, todLift);
+                lit = CMTodRim(lit, normalWS, viewDirWS, mainLight.direction, todLift);
 
                 // Hard rim in the team colour.
                 float rim = 1.0 - saturate(dot(normalWS, normalize(viewDirWS)));

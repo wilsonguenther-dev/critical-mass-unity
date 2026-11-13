@@ -64,6 +64,8 @@ Shader "CM/ToonGround"
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+            // Arena night life 1: the time-of-day grade (all globals 0 = Day).
+            #include "CMTimeOfDay.hlsl"
 
             struct GroundAttributes
             {
@@ -157,7 +159,7 @@ Shader "CM/ToonGround"
                 Light mainLight = GetMainLight(shadowCoord);
                 half shadowed = 1.0h - step(0.5, mainLight.shadowAttenuation);
                 half3 shadow = lerp(albedo * _ShadowMultiplier, _ShadowTint.rgb, _ShadowTintAmount);
-                return half4(lerp(albedo, shadow, shadowed), 1.0);
+                return half4(CMTodGrade(lerp(albedo, shadow, shadowed), 1.0h - shadowed, 0.0h), 1.0);
             }
             ENDHLSL
         }
