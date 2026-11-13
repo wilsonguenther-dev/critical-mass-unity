@@ -11,6 +11,14 @@ namespace CriticalMass.Runtime.View.Anim
     /// (Run reversed), right 120 (StrafeL reversed), right 60 (StrafeR). The walk band swaps forward and back for Walk and
     /// WalkBack. The angle between the rendered facing and the rendered velocity picks the two neighbours and blends them
     /// linearly (a 1D circular blend space, like a Unity 2D Freeform Directional tree restricted to the unit circle).</para>
+    /// <para><b>Sideways sectors (fix/animation-reds).</b> The KayKit strafes are runs with the whole lower body turned 60
+    /// degrees (forward kinematics on Knight.glb: the planted toe and the hip line point +60 in Running_Strafe_Left, -60 in
+    /// Running_Strafe_Right). Clips mix per bone ROTATION, so StrafeL (hips +60) and StrafeR reversed (hips -60) average to
+    /// hips 0 with opposite stride motions: the legs march in place and the planted foot slides with the body (0.98 u per
+    /// u at exactly 90 degrees, reproduced by the same kinematics). Neighbours whose hips agree (0 and 60, 120 and 180, ...)
+    /// still blend; between 60 and 120 (and 240 and 300) ONE strafe plays and the legs are turned by the remainder
+    /// (orientation warping: ActorAnimator turns the hips by LegWarpDeg and the spine back, so the chest keeps the aim).
+    /// The strafe is kept until the travel angle passes the pure-sideways line by SideHysteresisDeg (no flip-flop).</para>
     /// <para><b>Speed matching.</b> One phase per actor (a sync group): it advances by distance travelled divided by the
     /// blended stride (ground speed x length of each weighted clip), so every clip completes a cycle exactly when the body
     /// has covered that clip's stride: the planted foot stays put. Distance comes from the RENDERED displacement, not the
@@ -64,18 +72,69 @@ namespace CriticalMass.Runtime.View.Anim
             return -Math.Atan2(crossY, dot) * 180.0 / Math.PI;
         }
 
+        /// <summary>Degrees past the pure-sideways line (90 or 270) before the legs flip to the other strafe.</summary>
+        public const double SideHysteresisDeg = 15.0;
+        /// <summary>The side state before any sideways motion (or after leaving the sideways sectors).</summary>
+        public const int NoSide = -1;
+
         /// <summary>
-        /// Weights of the six directions (sum 1) for a travel angle (+ left): the two neighbours of the angle, linear in angle.
+        /// Weights of the six directions (sum 1) for a travel angle (+ left), without history (see the stateful overload).
         /// </summary>
         public static void DirectionWeights(double leftDeg, float[] w6)
+        {
+            int side = NoSide;
+            DirectionWeights(leftDeg, w6, ref side);
+        }
+
+        /// <summary>
+        /// Weights of the six directions (sum 1) for a travel angle (+ left) and the leg warp in degrees (+ left).
+        /// Outside the sideways sectors: the two neighbours of the angle, linear in angle, warp 0. Inside (60..120,
+        /// 240..300, open): one strafe at weight 1 and warp = angle - that strafe's angle (at most 45 degrees). side is the
+        /// strafe index chosen last time (NoSide at first): it is kept until the angle passes 90 (270) by SideHysteresisDeg.
+        /// With no history, exactly sideways picks the strafe that runs toes-first (StrafeL going left, StrafeR going right).
+        /// </summary>
+        public static double DirectionWeights(double leftDeg, float[] w6, ref int side)
         {
             for (int i = 0; i < DirCount; i++) w6[i] = 0f;
             double a = leftDeg % 360.0;
             if (a < 0) a += 360.0;
-            int k = (int)Math.Floor(a / DirStepDeg) % DirCount;
-            float u = (float)((a - k * DirStepDeg) / DirStepDeg);
-            w6[k] += 1f - u;
-            w6[(k + 1) % DirCount] += u;
+            int lo = a > 60.0 && a < 120.0 ? 1 : a > 240.0 && a < 300.0 ? 4 : -1;
+            if (lo < 0)
+            {
+                side = NoSide;
+                int k = (int)Math.Floor(a / DirStepDeg) % DirCount;
+                float u = (float)((a - k * DirStepDeg) / DirStepDeg);
+                w6[k] += 1f - u;
+                w6[(k + 1) % DirCount] += u;
+                return 0.0;
+            }
+            int hi = lo + 1;
+            double mid = (lo + 0.5) * DirStepDeg; // 90 or 270
+            if (side != lo && side != hi) side = lo == 1 ? (a <= mid ? lo : hi) : (a < mid ? lo : hi);
+            else if (side == lo && a >= mid + SideHysteresisDeg) side = hi;
+            else if (side == hi && a <= mid - SideHysteresisDeg) side = lo;
+            w6[side] = 1f;
+            return a - side * DirStepDeg;
+        }
+
+        /// <summary>
+        /// Where a locomotion clip's lower body points relative to the facing (degrees, + left), from its measured travel
+        /// angle: the forward-running clips (Run, the strafes) point where they travel, a backwards clip (WalkBack) points
+        /// opposite. Playing a clip reversed does not turn its legs.
+        /// </summary>
+        public static double LegYawDeg(double clipMoveDeg)
+        {
+            double m = Wrap180(clipMoveDeg);
+            return Math.Abs(m) <= 90.0 ? m : Wrap180(m + 180.0);
+        }
+
+        /// <summary>Signed angle in (-180, 180].</summary>
+        public static double Wrap180(double deg)
+        {
+            deg %= 360.0;
+            if (deg > 180.0) deg -= 360.0;
+            else if (deg <= -180.0) deg += 360.0;
+            return deg;
         }
 
         /// <summary>Weight of locomotion over idle by speed (smoothstep MoveStart..MoveFull).</summary>
