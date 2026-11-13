@@ -68,6 +68,7 @@ namespace CriticalMass.Runtime.PlayTests
         /// <summary>Waits until a driver other than previous exists with a world (a Boot build finished).</summary>
         static IEnumerator WaitForNewDriver(SimDriverBehaviour previous, float timeout = 15f)
         {
+            timeout = TestClock.Budget(timeout);   // a Boot build: load time, not a promise (P-04)
             float t0 = Time.realtimeSinceStartup;
             while (true)
             {
@@ -387,7 +388,8 @@ namespace CriticalMass.Runtime.PlayTests
             Assert.AreEqual(MatchPhase.Ended, w.Match.Phase, "the clock ran out");
             // The 1 s promise is TimerExpiry...'s; here the match came through the menus' fade, and batch-mode frames are
             // slow, so this navigation test allows 3 s.
-            yield return Until(() => d.Results.IsVisible, 3.0f, "results");
+            // ci/playmode-triage (P-04): the menus' fade and ResultsDelaySeconds run on unscaled time, so the budget scales.
+            yield return Until(() => d.Results.IsVisible, TestClock.Budget(3.0f), "results");
             yield return Press(d.Results.ChangeClassItem);
             Assert.IsTrue(d.Setup.IsVisible);
             yield return Press(d.Setup.BackItem);
