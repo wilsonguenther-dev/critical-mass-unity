@@ -249,17 +249,21 @@ namespace CriticalMass.Runtime.View.Dressing
             if (_driver == null) _driver = FindAnyObjectByType<SimDriverBehaviour>();
         }
 
-        private void LateUpdate()
+        private void LateUpdate() { var cost = CriticalMass.Runtime.Game.FrameCost.Enter(); LateUpdateCost(); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.World, cost); }
+
+        void LateUpdateCost()
         {
             if (_driver == null || _driver.World == null) return;
             Sim.Core.World w = _driver.World;
+            CriticalMass.Runtime.Game.FrameRecorder.Loading = false;
             if (w != _world || w.Map != _map)
             {
+                CriticalMass.Runtime.Game.FrameRecorder.Loading = true;
                 var sw = System.Diagnostics.Stopwatch.StartNew();
                 Build(w);
                 LastBuildMs = sw.Elapsed.TotalMilliseconds;
                 if (!Application.isEditor)
-                    Debug.Log($"[CM.Load] world art built in {LastBuildMs:0} ms: {Renderers} renderers, {Triangles} triangles, quality {_builtQuality}");
+                    Debug.Log($"[CM.Load] world art built in {LastBuildMs:0} ms: {Renderers} renderers, {Triangles} triangles, quality {_builtQuality}; stages {LastStages}");
                 return;
             }
             if (Plan == null) return;
@@ -417,6 +421,7 @@ namespace CriticalMass.Runtime.View.Dressing
         /// </summary>
         private void BuildGroups(HashSet<int> only)
         {
+            var bgw = System.Diagnostics.Stopwatch.StartNew();
             int q = RenderTier.Level;
             _builtQuality = q;
             var groups = new Dictionary<(int chunk, int level, Material mat), List<(MeshData d, int sub, Matrix4x4 m, SwayInfo sw)>>();
@@ -457,6 +462,7 @@ namespace CriticalMass.Runtime.View.Dressing
                     list.Add((d, sub, m, default(SwayInfo)));
                 }
             }
+            _collectMs = bgw.Elapsed.TotalMilliseconds;
             foreach (var kv in groups)
             {
                 (int chunk, int level, Material mat) = kv.Key;
@@ -487,6 +493,7 @@ namespace CriticalMass.Runtime.View.Dressing
                     ch.ShadowTris = (int)(go.GetComponent<MeshFilter>().sharedMesh.GetIndexCount(0) / 3);
                     ch.Shadow.enabled = shadowsOn;
                 }
+            _combineMs = bgw.Elapsed.TotalMilliseconds - _collectMs;
             UpdateLods();
         }
 
@@ -587,6 +594,10 @@ namespace CriticalMass.Runtime.View.Dressing
             return cz * 64 + cx;
         }
 
+        /// <summary>perf-smooth-1: the last build's stage times ([CM.Load]).</summary>
+        public static string LastStages = "";
+        private double _collectMs, _combineMs;
+
         private void Build(Sim.Core.World w)
         {
             Clear();
@@ -596,22 +607,29 @@ namespace CriticalMass.Runtime.View.Dressing
             _cells = (byte[])_map.Cells.Clone();
             _catalog = WorldKitCatalog.Load();
             if (_catalog == null || _catalog.Names.Length == 0) return;
+            var st = System.Diagnostics.Stopwatch.StartNew();
             _bases = BasesFile.Load();
             BasesParses++;
             _clutterOn = QualityTable.ExtraClutter(RenderTier.Level);
+            double tLoad = st.Elapsed.TotalMilliseconds;
             Plan = WorldDresser.Plan(_map, _bases, _catalog.Centroid, _catalog.Body, _clutterOn);
+            double tPlan = st.Elapsed.TotalMilliseconds;
             _root = new GameObject("World Art").transform;
             _root.SetParent(transform, false);
             if (_field != null) Destroy(_field);
             _field = WorldField.Bake(Plan);
+            double tField = st.Elapsed.TotalMilliseconds;
             Triangles = 0;
             Renderers = 0;
 
             BuildGroups(null);
+            double tGroups = st.Elapsed.TotalMilliseconds;
             int chunksX = (_map.Width + ChunkSize - 1) / ChunkSize, chunksZ = (_map.Height + ChunkSize - 1) / ChunkSize;
             for (int cz = 0; cz < chunksZ; cz++)
             for (int cx = 0; cx < chunksX; cx++)
                 BuildGroundChunk(cz * 64 + cx);
+            double tGround = st.Elapsed.TotalMilliseconds;
+            LastStages = $"catalog+bases {tLoad:0}, plan {tPlan - tLoad:0}, field {tField - tPlan:0}, groups {tGroups - tField:0} (collect {_collectMs:0}, combine {_combineMs:0}), ground {tGround - tGroups:0} ms";
             foreach (WorldBreakable b in Plan.Breakables)
             {
                 var go = new GameObject("Breakable " + b.Family);

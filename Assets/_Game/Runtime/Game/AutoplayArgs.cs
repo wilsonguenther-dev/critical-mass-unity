@@ -62,6 +62,8 @@ namespace CriticalMass.Runtime.Game
             public double Speed;
             public double TimeoutSec;
             public string PerfLog;
+            /// <summary>perf-smooth-1: -autoplayQualities A,B,C: the quality level of match 1, 2, 3 (match 1 also takes -quality).</summary>
+            public string[] Qualities;
             public bool NoVsync;
             public int Matches;
             public double TitleSeconds;
@@ -107,6 +109,9 @@ namespace CriticalMass.Runtime.Game
                         if (!string.IsNullOrEmpty(next) && !next.StartsWith("-", StringComparison.Ordinal)) { o.SimHashOut = next; i++; }
                         break;
                     case "-shots": o.Shots = true; break;
+                    case "-autoplayqualities":
+                        if (!string.IsNullOrEmpty(next) && !next.StartsWith("-", StringComparison.Ordinal)) { o.Qualities = next.Split(','); i++; }
+                        break;
                     case "-perflog":
                         if (!string.IsNullOrEmpty(next) && !next.StartsWith("-", StringComparison.Ordinal)) { o.PerfLog = next; i++; }
                         break;
@@ -474,6 +479,7 @@ namespace CriticalMass.Runtime.Game
                     PerfOverlay.ClearPhase(PerfOverlay.PhaseResults);
                     PerfOverlay.SetPhase(PerfOverlay.PhaseMatch);
                     PerfOverlay.BeginRecording();
+                    FrameRecorder.Begin();
                 }
             }
 
@@ -497,6 +503,8 @@ namespace CriticalMass.Runtime.Game
             {
                 // Next match: reload Boot; the old game goes with the scene, GameBootstrap builds a fresh one.
                 _match++;
+                // perf-smooth-1: -autoplayQualities High,Medium,Low runs match n at the n-th level (one smoke, three levels).
+                if (o.Qualities != null && _match - 1 < o.Qualities.Length) FrameGovernor.ForceRunQuality(o.Qualities[_match - 1]);
                 _driver = null;
                 _title = null;
                 _titleSeen = false;
@@ -571,6 +579,12 @@ namespace CriticalMass.Runtime.Game
                 ("assets", assets),
                 ("phases", PerfOverlay.PhasesJson()),
             };
+            {
+                string perfBase = string.IsNullOrEmpty(Current.PerfLog) ? Path.Combine(Application.persistentDataPath, "perf-last.json") : Current.PerfLog;
+                string recorder = FrameRecorder.End(FrameRecorder.CsvPathFor(PerfPathFor(perfBase, _match)));
+                Array.Resize(ref extra, extra.Length + 1);
+                extra[extra.Length - 1] = ("frame_recorder", recorder);
+            }
             string json = PerfOverlay.ToJson(r, extra);
             _pendingExtra = extra;
             _pendingReport = r;

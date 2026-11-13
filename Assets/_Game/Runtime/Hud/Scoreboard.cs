@@ -134,7 +134,9 @@ namespace CriticalMass.Runtime.Hud
             return tb;
         }
 
-        void LateUpdate()
+        void LateUpdate() { var cost = CriticalMass.Runtime.Game.FrameCost.Enter(); LateUpdateCost(); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.Scoreboard, cost); }
+
+        void LateUpdateCost()
         {
             if (_log == null) _log = GetComponent<CombatLog>();
             if (CriticalMass.Runtime.Flow.GameFlow.MenuIdle) return;   // batch 4: hidden behind a menu over a backdrop match

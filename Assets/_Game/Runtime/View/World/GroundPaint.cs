@@ -114,7 +114,9 @@ namespace CriticalMass.Runtime.View.Reactions
             if (_driver != null) _driver.Ticked -= OnTicked;
         }
 
-        private void LateUpdate()
+        private void LateUpdate() { var cost = CriticalMass.Runtime.Game.FrameCost.Enter(); LateUpdateCost(); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.Ground, cost); }
+
+        void LateUpdateCost()
         {
             if (CriticalMass.Runtime.Flow.GameFlow.MenuIdle) return;   // batch 4: hidden behind a menu over a backdrop match
             if (_driver == null) _driver = GetComponent<SimDriverBehaviour>();

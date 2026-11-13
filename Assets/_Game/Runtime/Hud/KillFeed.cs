@@ -351,7 +351,9 @@ namespace CriticalMass.Runtime.Hud
             Subscribe();
         }
 
-        void LateUpdate()
+        void LateUpdate() { var cost = CriticalMass.Runtime.Game.FrameCost.Enter(); LateUpdateCost(); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.KillFeed, cost); }
+
+        void LateUpdateCost()
         {
             if (_log == null) Bind(GetComponent<CombatLog>());
             else Subscribe();

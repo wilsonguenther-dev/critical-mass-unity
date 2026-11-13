@@ -194,7 +194,7 @@ namespace CriticalMass.Runtime.View
             s.Push(m);
         }
 
-        private void LateUpdate() { long c = CriticalMass.Runtime.Game.FrameCost.Begin(); Sync(Time.deltaTime); CriticalMass.Runtime.Game.FrameCost.End(CriticalMass.Runtime.Game.FrameCost.Slot.ActorViews, c); }
+        private void LateUpdate() { var c = CriticalMass.Runtime.Game.FrameCost.Enter(); Sync(Time.deltaTime); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.ActorViews, c); }
 
         /// <summary>
         /// Contract C3 (DG-71): called once per drawn actor (and the Kaiju, actor -2) after its pose is evaluated and before

@@ -227,7 +227,9 @@ namespace CriticalMass.Runtime.Game
             Release(ref _logoRt);
         }
 
-        void LateUpdate()
+        void LateUpdate() { var cost = CriticalMass.Runtime.Game.FrameCost.Enter(); LateUpdateCost(); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.Moments, cost); }
+
+        void LateUpdateCost()
         {
             if (_driver == null) _driver = GetComponent<SimDriverBehaviour>();
             if (_menu == null) _menu = GetComponent<PauseMenu>();

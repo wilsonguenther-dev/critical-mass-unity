@@ -145,12 +145,13 @@ namespace CriticalMass.Runtime.Game
             }
             // Physics audit M7 / DG-101: count ability presses the sim will refuse (read-only on the World) for the HUD's cue.
             if (input != null && !HumanAutopilot) AbilityDenial.Observe(_humanFrame.Ability, World, 0, _dt);
-            long c0 = FrameCost.Begin();
+            FrameCost.Mark c0 = FrameCost.Enter();
             MatchTick.Advance(World, HumanAutopilot ? null : _humanFrame, _scratch);
-            FrameCost.End(FrameCost.Slot.Sim, c0);
-            c0 = FrameCost.Begin();
+            FrameCost.Exit(FrameCost.Slot.Sim, c0);
+            FrameCost.FrameTicks++;
+            c0 = FrameCost.Enter();
             Ticked?.Invoke(World);
-            FrameCost.End(FrameCost.Slot.Feeds, c0);
+            FrameCost.Exit(FrameCost.Slot.Feeds, c0);
         }
     }
 }
