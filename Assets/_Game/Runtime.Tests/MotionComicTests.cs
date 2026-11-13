@@ -342,6 +342,9 @@ namespace CriticalMass.Runtime.Tests
             finally
             {
                 Object.DestroyImmediate(go);
+                // TitleScreen.Show hands over its egg, and edit-mode DestroyImmediate skips the egg's OnDestroy: clear the flag.
+                typeof(CriticalMass.Runtime.Secrets.SecretsBoard).GetField("TitleEggAttached",
+                    System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)?.SetValue(null, false);
             }
         }
 
