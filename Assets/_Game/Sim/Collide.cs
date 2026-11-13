@@ -186,6 +186,57 @@ namespace CriticalMass.Sim.Core
         }
 
         /// <summary>
+        /// DG-02 (not in the browser; fixes the browser branch's own failing "-60..+60 deg" case): a blocked step from a
+        /// box-legal start, heading along the span (|along part| at least RailAlongFraction of the step), tries the rail
+        /// before the plain slide (lx, lz) when the start is OFF the deck band, or when the plain slide keeps less than half
+        /// of the step's along part. Without it the plain slide drags a body walking 15 to 60 degrees off the axis down the
+        /// staircase beside the deck into a riser corner, where it oscillates (rail pull up, plain slide down) and never
+        /// crosses, or slides it backwards along the island edge at a bridge mouth. A step across the axis keeps the plain slide.
+        /// </summary>
+        private static bool RailFirst(BridgeSpan s, double x, double z, double lx, double lz, double sx, double sz, double r)
+        {
+            double aStep = sx * s.Ux + sz * s.Uz;
+            if (Math.Abs(aStep) < RailAlongFraction * BridgeSpans.Hypot(sx, sz)) return false;
+            double band = SkybreakBasinMap.BridgeHalfWidth - r;
+            if (Math.Abs(BridgeSpans.Lateral(s, x, z)) > band + DeckPad) return true;
+            double plainAlong = (lx - x) * s.Ux + (lz - z) * s.Uz;
+            return (aStep > 0 ? plainAlong : -plainAlong) < 0.5 * Math.Abs(aStep);
+        }
+
+        /// <summary>
+        /// DG-02 (not in the browser): a free step heading along the span (RailFirst's along test) from the band edge or
+        /// beyond, over the chasm part (axis cell BRIDGE), whose end would sit further from the axis (the staircase beside a diagonal deck),
+        /// keeps its along part and no outward lateral part: the body rides the rail line instead of drifting down the
+        /// staircase into a riser corner. False (use the free step) anywhere else, or when that end does not fit.
+        /// </summary>
+        private static bool NoOutwardDrift(World w, BridgeSpan s, double x, double z, double tx, double tz, double sx, double sz, double r, out double ox, out double oz)
+        {
+            ox = tx;
+            oz = tz;
+            double aStep = sx * s.Ux + sz * s.Uz;
+            if (Math.Abs(aStep) < RailAlongFraction * BridgeSpans.Hypot(sx, sz)) return false;
+            double band = SkybreakBasinMap.BridgeHalfWidth - r;
+            double l0 = BridgeSpans.Lateral(s, x, z);
+            double lt = BridgeSpans.Lateral(s, tx, tz);
+            if (Math.Abs(lt) <= band + DeckPad || Math.Abs(lt) <= Math.Abs(l0) || Math.Abs(l0) < band) return false;
+            // Over the chasm part only (the axis cell under the body is BRIDGE), never on a landing.
+            double a0 = BridgeSpans.Along(s, x, z);
+            if (MapGrid.CellAt(w.Map, s.X0 + s.Ux * a0, s.Z0 + s.Uz * a0) != Cell.Bridge) return false;
+            double qx = JsMath.F32(x + s.Ux * aStep);
+            double qz = JsMath.F32(z + s.Uz * aStep);
+            if (!ActorFits(w, qx, qz, r)) return false;
+            ox = qx;
+            oz = qz;
+            return true;
+        }
+
+        /// <summary>DG-02: the share of a blocked step the off-band rail pull may use while keeping the along part (0.6 leaves 0.8). [guess]</summary>
+        public const double RailPullShare = 0.6;
+
+        /// <summary>DG-02: cos 65 degrees rounded down; steps within about 65 degrees of the axis count as heading along it. [guess]</summary>
+        public const double RailAlongFraction = 0.42;
+
+        /// <summary>
         /// CM-33: the rail's answer to a blocked sub-step (sx, sz) from (x, z) on span s (false = no motion). On the band
         /// the step keeps its along-axis part and its lateral end is clamped to the band edge. Outside the band the centre is
         /// pulled toward it by at most the step's length, keeping as much of the along-axis part as the rest of that length
@@ -212,7 +263,9 @@ namespace CriticalMass.Sim.Core
             else
             {
                 double len = BridgeSpans.Hypot(sx, sz);
-                double pull = Math.Min(Math.Abs(l0) - band, len);
+                // DG-02: with keepAlong the pull takes at most RailPullShare of the step, so the along part survives (the
+                // browser pulled by the whole step first, which left 3-tick stalls beside the deck at 30 degrees).
+                double pull = Math.Min(Math.Abs(l0) - band, keepAlong ? RailPullShare * len : len);
                 dl = l0 > 0 ? -pull : pull;
                 double room = Math.Sqrt(Math.Max(0, len * len - pull * pull));
                 da = !keepAlong ? 0 : aStep > room ? room : aStep < -room ? -room : aStep;
@@ -279,7 +332,10 @@ namespace CriticalMass.Sim.Core
                     }
                 }
                 // CM-33: grounded, inside a diagonal rail's capture zone: the deck and the rail (see the class summary).
-                BridgeSpan rs = air ? null : RailSpanAt(px, pz);
+                // DG-02: the person-steered actor only (the human, not on autopilot). Bots path on the flow field over the
+                // unchanged raster; the browser branch gave every actor the rail and its own bot test then failed (hill
+                // presence 0.49 of the 0.70 floor, also 0.49 in this port), so bots keep the plain push-out, as on main.
+                BridgeSpan rs = air || !w.Actors[id].IsHuman || Bots.BotBrain.ActorZeroOnAutopilot(w) ? null : RailSpanAt(px, pz);
                 if (rs == null)
                 {
                     px = lx;
@@ -300,6 +356,12 @@ namespace CriticalMass.Sim.Core
                 bool pushed = lx != tx || lz != tz;
                 if (!pushed && (startBox || ActorFits(w, tx, tz, r)))
                 {
+                    if (NoOutwardDrift(w, rs, px, pz, tx, tz, sx, sz, r, out double qx, out double qz))
+                    {
+                        px = qx;
+                        pz = qz;
+                        continue;
+                    }
                     px = tx;
                     pz = tz;
                     continue;
@@ -310,7 +372,7 @@ namespace CriticalMass.Sim.Core
                     pz = tz;
                     continue;
                 }
-                if (pushed && startBox && (lx != px || lz != pz))
+                if (pushed && startBox && (lx != px || lz != pz) && !RailFirst(rs, px, pz, lx, lz, sx, sz, r))
                 {
                     // A box-legal start the plain rule still moves: keep the plain slide (walls, island edges).
                     px = lx;

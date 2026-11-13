@@ -193,6 +193,12 @@ namespace CriticalMass.Sim.Tests
 
         private static readonly World World0 = Lone();
 
+        /// <summary>Fails with every entry listed (NUnit's collection message truncates long lists).</summary>
+        private static void NoneBad(List<string> bad)
+        {
+            Assert.IsTrue(bad.Count == 0, bad.Count + " failure(s):\n" + string.Join("\n", bad));
+        }
+
         [Test]
         public void BridgeSpansIsEveryBridgesRowAndItsMirror16SpansAndEverySpanHasAChasmPart()
         {
@@ -202,7 +208,7 @@ namespace CriticalMass.Sim.Tests
             Assert.AreEqual(n, BridgeSpans.All.Count);
             var bad = new List<string>();
             for (int s = 0; s < BridgeSpans.All.Count; s++) if (!Chasm(World0.Map, BridgeSpans.All[s], out _, out _)) bad.Add(Label(s));
-            CollectionAssert.IsEmpty(bad);
+            NoneBad(bad);
         }
 
         [Test]
@@ -235,7 +241,7 @@ namespace CriticalMass.Sim.Tests
                 }
                 if (!(worst >= MinBand - 1e-9)) bad.Add(Label(s) + " band " + worst.ToString("F3"));
             }
-            CollectionAssert.IsEmpty(bad);
+            NoneBad(bad);
         }
 
         [Test]
@@ -264,7 +270,7 @@ namespace CriticalMass.Sim.Tests
                     Report(bad, Label(s) + " key (" + kx + "," + kz + ") offset " + f, Cross(sp, p.X, p.Z, kx, kz, goal, budget), budget, false);
                 }
             }
-            CollectionAssert.IsEmpty(bad);
+            NoneBad(bad);
         }
 
         [Test]
@@ -291,7 +297,7 @@ namespace CriticalMass.Sim.Tests
                     Report(bad, Label(s) + " heading " + deg, run, budget, false);
                 }
             }
-            CollectionAssert.IsEmpty(bad);
+            NoneBad(bad);
         }
 
         [Test]
@@ -322,7 +328,7 @@ namespace CriticalMass.Sim.Tests
                 double hi = Math.Max(sp.H0, sp.H1) + 1e-9;
                 if (!(h >= lo && h <= hi)) bad.Add(Label(s) + " deck height " + h);
             }
-            CollectionAssert.IsEmpty(bad);
+            NoneBad(bad);
             Assert.IsTrue(double.IsNaN(BridgeSpans.DeckHeightAt(-50, -50)));
         }
 
@@ -353,7 +359,7 @@ namespace CriticalMass.Sim.Tests
                     Report(bad, Label(s) + " at " + deg + " deg", run, budget, true);
                 }
             }
-            CollectionAssert.IsEmpty(bad);
+            NoneBad(bad);
         }
     }
 }
