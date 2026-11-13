@@ -444,7 +444,7 @@ namespace CriticalMass.Runtime.Menu
             HudText.Set(_statValue[0], ProgressionWords.Number(k.MaxHp) + " HP");
             HudText.Set(_statValue[1], ProgressionWords.Number(k.MoveSpeed) + " M/S");
             HudText.Set(_statValue[2], ProgressionWords.Number(k.CarryCapacity));
-            HudText.Set(_statValue[3], ProgressionWords.Seconds(k.GatherSeconds));
+            HudText.Set(_statValue[3], ProgressionWords.Seconds(global::CriticalMass.Runtime.Flow.MatchSpeed.ToReal(k.GatherSeconds)));
             int tier = UiIcons.TierFor(_canvas.scaleFactor);
             _portrait.texture = UiIcons.Get(UiIcons.Portrait[ci, ti], tier);
 
@@ -480,12 +480,12 @@ namespace CriticalMass.Runtime.Menu
             }
             HudText.Set(_toolTitle[0], ToolNames[0]);
             HudText.Set(_toolText[0], ProgressionWords.AttackText(cfg, c));
-            HudText.Set(_toolCd[0], c == ClassId.Demolitions ? string.Empty : "EVERY " + ProgressionWords.Seconds(k.AttackCooldown));
+            HudText.Set(_toolCd[0], c == ClassId.Demolitions ? string.Empty : "EVERY " + ProgressionWords.Seconds(global::CriticalMass.Runtime.Flow.MatchSpeed.ToReal(k.AttackCooldown)));
             HudText.Set(_toolTitle[1], ProgressionWords.AbilityNames[ci]);
             HudText.Set(_toolText[1], ProgressionWords.AbilityText(cfg, c));
-            HudText.Set(_toolCd[1], "COOLDOWN " + ProgressionWords.Seconds(k.AbilityCooldown));
+            HudText.Set(_toolCd[1], "COOLDOWN " + ProgressionWords.Seconds(global::CriticalMass.Runtime.Flow.MatchSpeed.ToReal(k.AbilityCooldown)));
             HudText.Set(_toolTitle[2], ToolNames[2]);
-            HudText.Set(_toolText[2], "Hold at a plant to gather (" + ProgressionWords.Seconds(k.GatherSeconds).ToLowerInvariant() +
+            HudText.Set(_toolText[2], "Hold at a plant to gather (" + ProgressionWords.Seconds(global::CriticalMass.Runtime.Flow.MatchSpeed.ToReal(k.GatherSeconds)).ToLowerInvariant() +
                                       " each), carry up to " + ProgressionWords.Number(k.CarryCapacity) +
                                       ", and bring it to the egg. Whoever feeds the egg most turns the Kaiju to their side.");
             HudText.Set(_toolCd[2], "CARRY " + ProgressionWords.Number(k.CarryCapacity));

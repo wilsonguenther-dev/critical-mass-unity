@@ -29,7 +29,7 @@ namespace CriticalMass.Runtime.Flow
         public ClassId Class;
         /// <summary>Players per team: 16 or 5.</summary>
         public int TeamSize;
-        /// <summary>Sim seconds per wall second: 2 or 1.</summary>
+        /// <summary>Sim seconds per wall second: 0.75 (Relaxed), 1 (Standard) or 2 (Fast); see MatchSpeed.</summary>
         public double Pace;
         /// <summary>DG-21 (U-058): the enemy team's bots. Normal is today's bots bit for bit.</summary>
         public CriticalMass.Sim.Core.BotDifficulty BotDifficulty;
@@ -39,7 +39,7 @@ namespace CriticalMass.Runtime.Flow
             Team = TeamId.Azure,
             Class = ClassId.Warrior,
             TeamSize = 16,
-            Pace = 2,
+            Pace = MatchSpeed.DefaultPace,   // from GameConfig.DefaultSpeed; Standard while the sim constant is still 2
             BotDifficulty = CriticalMass.Sim.Core.BotDifficulty.Normal,
         };
     }
@@ -76,7 +76,7 @@ namespace CriticalMass.Runtime.Flow
             Team = s.Team,
             Class = s.Class,
             TeamSize = s.TeamSize,
-            Pace = s.Pace > 0 ? s.Pace : 2,
+            Pace = s.Pace > 0 ? s.Pace : MatchSpeed.DefaultPace,
             BotDifficulty = s.BotDifficulty,
             Backdrop = false,
         };
@@ -104,7 +104,7 @@ namespace CriticalMass.Runtime.Flow
         public const double AutoplayResultsSeconds = 5;
         /// <summary>
         /// Backdrop matches play at 0.5x behind the menus (physics audit DG-111, R-M10: half the sim ticks per second on an
-        /// idle title; nobody plays the backdrop). The match pace default (2x) is not this: see MatchSetupChoice.Default.
+        /// idle title; nobody plays the backdrop). The match pace default is not this: see MatchSetupChoice.Default and MatchSpeed.
         /// </summary>
         public const double BackdropPace = 0.5;
 
@@ -140,6 +140,8 @@ namespace CriticalMass.Runtime.Flow
             _pending = null;
             Autoplay = HasArg("-autoplay");
             SimDriverBehaviour.NextMatch = null;
+            MatchSpeed.DisplayPace = 1;
+            SetupPrefs.ResetForTests();
         }
 
         static bool HasArg(string flag)
@@ -183,6 +185,7 @@ namespace CriticalMass.Runtime.Flow
                 if (_pending == null)
                 {
                     State = FlowState.Off;
+                    MatchSpeed.DisplayPace = MatchSpeed.ConfigDefaultSpeed;   // the driver runs the config's own pace
                     return null;
                 }
             }
@@ -200,6 +203,9 @@ namespace CriticalMass.Runtime.Flow
             MatchRequest r = _pending;
             _pending = null;
             LastSeed = r.Seed;
+            // Real seconds on every timer: a match shows its own pace; behind the menus, the speed the next match will use
+            // (the class panel's cooldowns in setup and the Barracks).
+            MatchSpeed.DisplayPace = r.Backdrop ? (LastSetup.Pace > 0 ? LastSetup.Pace : MatchSpeed.DefaultPace) : r.Pace;
             return r;
         }
 
@@ -232,12 +238,19 @@ namespace CriticalMass.Runtime.Flow
         }
 
         /// <summary>Play / Play again / Change class then Start: a new world with a new seed.</summary>
-        public static void BeginMatch(MatchSetupChoice s)
+        public static void BeginMatch(MatchSetupChoice s) => BeginMatch(s, false);
+
+        /// <summary>
+        /// quick: Play Now and Play again. The loading screen still covers the reload and waits for the new world to draw,
+        /// but its minimum time on screen drops to LoadingScreen.QuickMinSeconds, so it lasts only as long as the build.
+        /// </summary>
+        public static void BeginMatch(MatchSetupChoice s, bool quick)
         {
             PrepareMatch(s);
             // DG-13: the loading screen covers the reload and stays until the new world has drawn (FlowDirector holds the
-            // match clock until it hides). Never in autoplay or batch runs.
-            if (!Autoplay && Menus.LoadingScreen.UseInFlow) Menus.LoadingScreen.ShowForMatch(_pending.Seed);
+            // match clock until it hides). Never in autoplay or batch runs. It names the speed the match runs at.
+            if (!Autoplay && Menus.LoadingScreen.UseInFlow)
+                Menus.LoadingScreen.ShowForMatch(_pending.Seed, MatchSpeed.LoadingLine(_pending.Pace), quick);
             Reload();
         }
 

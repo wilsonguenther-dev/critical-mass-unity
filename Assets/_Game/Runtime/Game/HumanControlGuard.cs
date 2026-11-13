@@ -169,7 +169,8 @@ namespace CriticalMass.Runtime.Game
             }
 
             bool input = AnyGameplayInput();
-            if (input || !alive || paused || title || spectating || !HumanMatch) LastInputAt = now;
+            // The idle clock does not run behind the loading screen (feat/play-now): Play Now hands the human control on the first frame.
+            if (input || !alive || paused || title || spectating || !HumanMatch || Menus.LoadingScreen.IsOpen) LastInputAt = now;
 
             bool eligible = HumanMatch && !spectating;
             if (eligible && Driver.HumanAutopilot && input)

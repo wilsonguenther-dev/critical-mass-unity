@@ -5,6 +5,7 @@ using CriticalMass.Runtime.Hud.Style;
 using CriticalMass.Runtime.Menu;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 namespace CriticalMass.Runtime.Onboarding
@@ -13,7 +14,8 @@ namespace CriticalMass.Runtime.Onboarding
     /// The first-launch question, "First time? 3-minute guided match", with the mascot asking it from its corner. Two
     /// sticker buttons with one shared focus for keyboard (arrows, Enter), mouse (hover, click) and controller (stick or
     /// D-pad, A). The match behind it stands still while it is open (the driver's TimeScale is 0; restored on skip).
-    /// Either answer sets the done flag, so the next launch goes straight to the menu.
+    /// Either answer sets the done flag, so the next launch goes straight to the menu. Escape or B skips in one press. When
+    /// the title's PLAY NOW raised it (Flow.PlayNow.OfferThenPlay), Skip drops straight into that match instead of the menu.
     /// </summary>
     public sealed class TrialOffer : MonoBehaviour
     {
@@ -136,17 +138,24 @@ namespace CriticalMass.Runtime.Onboarding
 
         void OnPlay()
         {
+            Flow.PlayNow.ConsumeOfferThenPlay();
             TrialProgress.Done = true;
             Close(false);
             Trial.StartFromMenu();   // from the menus: a fresh 5 v 5 match through the flow; in a match: in place
         }
 
+        bool _answered;
+
         void OnSkip()
         {
+            if (_answered) return;
+            _answered = true;
             TrialProgress.Done = true;
             Close(true);
             MascotGuide m = MascotGuide.Instance;
             if (m != null) m.Hide();
+            // Raised by the title's PLAY NOW: skipping drops straight into that match.
+            if (Flow.PlayNow.ConsumeOfferThenPlay() && Flow.PlayNow.Go()) return;
             // The first-time card stood in for the main menu (TrialBoot): bring the menu back.
             if (GameFlow.Enabled && GameFlow.State == FlowState.Menu && FlowDirector.Current != null) FlowDirector.Current.ShowMenu();
         }

@@ -10,14 +10,15 @@ namespace CriticalMass.Runtime.Menus
 {
     /// <summary>
     /// DG-01 main menu over the backdrop bot match: the logo on the right, a column of chunky stickers on the left. Lines
-    /// come from OverlayRegistry.MenuEntries: Play, How to play, Barracks, Controls, Settings, Codex, Credits, Quit. Lines
+    /// come from OverlayRegistry.MenuEntries: PLAY NOW (first and focused: one press into a match, Flow.PlayNow), Custom
+    /// match (the setup screen), How to play, Barracks, Controls, Settings, Codex, Credits, Quit. Lines
     /// with no screen yet (How to play until the guided match registers its start, Barracks, Codex, Credits) show dimmed
     /// with COMING SOON and are skipped by navigation and the mouse. Controls and Settings open the pause menu's settings
     /// page (Controls tab, Audio tab); its Back returns here. Back: the title.
     /// </summary>
     public sealed class MainMenu : FlowScreen
     {
-        public const float ColX = 150f, ColY = 250f, ItemW = 560f, ItemH = 64f, ItemStep = 76f;   // 9 lines (integration batch 2 added Spectate)
+        public const float ColX = 150f, ColY = 250f, ItemW = 560f, ItemH = 64f, ItemStep = 72f;   // 10 lines (batch 2 added Spectate, Play Now made 10)
 
         readonly Dictionary<string, MenuItem> _items = new Dictionary<string, MenuItem>();
         readonly List<MenuItem> _order = new List<MenuItem>();
@@ -69,7 +70,14 @@ namespace CriticalMass.Runtime.Menus
                 _order.Add(it);
             }
             ChainVertical(_order);
-            DefaultFocus = Item(OverlayRegistry.Play);
+            DefaultFocus = Item(OverlayRegistry.PlayNow) ?? Item(OverlayRegistry.Play);
+            MenuItem now = Item(OverlayRegistry.PlayNow);
+            if (now != null)
+            {
+                // The drop-in line reads as the main action: the brass rim of START MATCH.
+                now.Body.RimPx = 4f;
+                now.Body.SetRim(Brass);
+            }
 
             // Right: the logo (the bible logo when the logo lane's export is in, else the redrawn one, else the name).
             Texture2D logo = Resources.Load<Texture2D>("UI/Logo/critical-mass-bible-logo@2x");
@@ -102,6 +110,9 @@ namespace CriticalMass.Runtime.Menus
         {
             switch (e.Id)
             {
+                case OverlayRegistry.PlayNow:
+                    Flow.PlayNow.Go();
+                    return;
                 case OverlayRegistry.Play:
                     if (Spectator.SpectatorMode.SpectateNextMatch) Spectator.SpectatorMode.SpectateNextMatch = false;
                     Director.ShowSetup();

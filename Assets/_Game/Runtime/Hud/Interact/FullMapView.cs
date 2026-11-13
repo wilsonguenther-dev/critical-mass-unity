@@ -632,7 +632,7 @@ namespace CriticalMass.Runtime.Hud.Interact
                 m.Z = pad.Z;
                 m.RespawnSlot = respawnCount[team]++;
                 m.Disc.SetFill(CMTokens.Stone.Color);
-                HudText.Set(m.Timer, Seconds[Math.Min(99, (int)Math.Ceiling(Math.Max(0, a.RespawnIn)))]);
+                HudText.Set(m.Timer, Seconds[Math.Min(99, (int)Math.Ceiling(Math.Max(0, global::CriticalMass.Runtime.Flow.MatchSpeed.ToReal(a.RespawnIn))))]);
                 if (!m.Timer.gameObject.activeSelf) m.Timer.gameObject.SetActive(true);
             }
             else
@@ -783,7 +783,7 @@ namespace CriticalMass.Runtime.Hud.Interact
                     bool respawning = !a.Alive;
                     double x = i == _me ? _youX : _actors[i].X, z = i == _me ? _youZ : _actors[i].Z;
                     if (respawning)
-                        SetTip(Callsigns.For(w, i, _me), RespawnClass[cls], "BACK IN", Seconds[Math.Min(99, (int)Math.Ceiling(Math.Max(0, a.RespawnIn)))], "", "", "AT", team == 0 ? "AZURE BASE" : "CRIMSON BASE");
+                        SetTip(Callsigns.For(w, i, _me), RespawnClass[cls], "BACK IN", Seconds[Math.Min(99, (int)Math.Ceiling(Math.Max(0, global::CriticalMass.Runtime.Flow.MatchSpeed.ToReal(a.RespawnIn))))], "", "", "AT", team == 0 ? "AZURE BASE" : "CRIMSON BASE");
                     else
                         SetTip(Callsigns.For(w, i, _me), ClassTeam[cls, team], "HEALTH", NumberCache.Int(Mathf.CeilToInt((float)Math.Max(0, a.Hp))), "/",
                             NumberCache.Int(Mathf.CeilToInt((float)a.MaxHp)), "DISTANCE", i == _me ? "-" : Distance(x, z));
