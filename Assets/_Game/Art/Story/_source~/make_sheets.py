@@ -56,6 +56,7 @@ _cache = {}
 def tex(name):
     if name not in _cache:
         p = os.path.join(STORY, name + ".png")
+        if not os.path.exists(p): p = os.path.join(STORY, name + ".jpg")
         if not os.path.exists(p): p = os.path.join(RES, name + ".png")
         _cache[name] = Image.open(p).convert("RGBA") if os.path.exists(p) else None
     return _cache[name]
@@ -158,7 +159,7 @@ def compose(data, shot, t):
     return canvas.convert("RGB")
 
 def contact_sheet(outdir):
-    names = sorted(f[:-4] for f in os.listdir(STORY) if f.endswith(".png"))
+    names = sorted(f[:-4] for f in os.listdir(STORY) if f.endswith((".png", ".jpg")))
     cols, tw, th = 8, 300, 230
     rows = (len(names) + cols - 1) // cols
     sheet = Image.new("RGB", (cols * tw, rows * th), (24, 35, 59))
@@ -169,7 +170,7 @@ def contact_sheet(outdir):
         for xx in range(0, tw, 16):
             if (xx // 16 + yy // 16) % 2: d0.rectangle([xx, yy, xx + 15, yy + 15], fill=(98, 106, 126))
     for i, n in enumerate(names):
-        im = Image.open(os.path.join(STORY, n + ".png")).convert("RGBA")
+        im = tex(n)
         x, y = (i % cols) * tw, (i // cols) * th
         sheet.paste(chk, (x + 8, y + 8))
         t = im.copy(); t.thumbnail((tw - 16, th - 46), Image.LANCZOS)
