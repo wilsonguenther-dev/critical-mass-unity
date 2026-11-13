@@ -10,6 +10,12 @@ namespace CriticalMass.Runtime.View.Effects
         Hit, Block, Death, Respawn, Swing, Ability, KaijuHit, KaijuSlam, KaijuRoar, KaijuKO, BerserkLock, Hatch,
         Gather, DeliverBiomass, DeliverCorruption, BarricadePlaced, BarricadeRefused, BarricadeBroken, WallCrack, WallBreak,
         HillChange,
+        /// <summary>v2: an explosion (Effects.Explode): Value = radius, B = (int)ExplosionKind.</summary>
+        Explosion,
+        /// <summary>v2: something fell into water (Effects.Splash): Value = size.</summary>
+        Splash,
+        /// <summary>v2: a landing from a jump (Effects.Land or the CM_HAS_JUMP decode): Value = 1 heavy actor.</summary>
+        Land,
     }
 
     /// <summary>One decoded effect event. Tick is the sim tick the sim raised it in (exact: decoded once per tick).</summary>
@@ -29,6 +35,12 @@ namespace CriticalMass.Runtime.View.Effects
         public TeamId Team;
         public ClassId Cls;
         public bool Heavy;
+        /// <summary>v2 hit tier: 0 light, 1 heavy, 2 critical or finishing (a death is always 2).</summary>
+        public byte Tier;
+        /// <summary>v2: the attacker's class and facing when B is an actor (slash arcs follow the real swing).</summary>
+        public bool HasAttacker;
+        public ClassId AttCls;
+        public double AttFacing;
         /// <summary>The local player (actor 0) is A or B.</summary>
         public bool Local;
     }
@@ -50,6 +62,11 @@ namespace CriticalMass.Runtime.View.Effects
     {
         /// <summary>Damage at or above this is a heavy hit (Warrior cleave 22, Kaiju melee 30, slam 45): it holds poses.</summary>
         public const double HeavyDamage = 20;
+        /// <summary>v2: damage at or above this (the slam's 45) is a critical hit; a death is always critical (finishing).</summary>
+        public const double CriticalDamage = 40;
+
+        /// <summary>v2 hit tier from damage: 0 light (under 20), 1 heavy, 2 critical (40 and up) or finishing (a death).</summary>
+        public static byte TierOf(double damage, bool death) => death || damage >= CriticalDamage ? (byte)2 : damage >= HeavyDamage ? (byte)1 : (byte)0;
 
         private readonly int _capacity;
         private int _head;
@@ -58,6 +75,11 @@ namespace CriticalMass.Runtime.View.Effects
 
         public readonly int[] LastHitTick, HoldTick, DeathTick;
         public readonly double[] LastHitDmg, HitDirX, HitDirZ, DeathX, DeathZ;
+        /// <summary>v2: tier of the hold that started at HoldTick (0 light, 1 heavy, 2 critical): CombatFx maps it to a length.</summary>
+        public readonly byte[] HoldTier;
+        /// <summary>v2: last tick actor i landed a hit (weapon blood tint hook); KaijuDealtTick for the Kaiju's fists.</summary>
+        public readonly int[] LastDealtTick;
+        public int KaijuDealtTick = int.MinValue / 2;
 
         /// <summary>Events decoded since construction (tests).</summary>
         public long Decoded { get; private set; }
@@ -75,7 +97,17 @@ namespace CriticalMass.Runtime.View.Effects
             HitDirZ = new double[actorCapacity];
             DeathX = new double[actorCapacity];
             DeathZ = new double[actorCapacity];
+            HoldTier = new byte[actorCapacity];
+            LastDealtTick = Filled(actorCapacity, int.MinValue / 2);
+#if CM_HAS_JUMP
+            _airLen = new int[actorCapacity];
+#endif
         }
+#if CM_HAS_JUMP
+        // Jump landings (branch feat/dg-02-jump-bridges adds Actor.AirLen): the tick AirLen goes from > 0 to 0 is a landing.
+        // Define CM_HAS_JUMP (Player Settings > Scripting Define Symbols) once that branch is on main.
+        private readonly int[] _airLen;
+#endif
 
         private static int[] Filled(int n, int v)
         {
@@ -113,6 +145,19 @@ namespace CriticalMass.Runtime.View.Effects
                 Send(w, a, b, c);
             }
 
+#if CM_HAS_JUMP
+            for (int i = 0; i < w.ActorCount && i < _capacity; i++)
+            {
+                Actor ac = w.Actors[i];
+                int air = ac.AirLen;
+                if (_airLen[i] > 0 && air == 0 && ac.Alive)
+                {
+                    Begin(FxKind.Land, w, i, -1, w.X[i], w.Z[i], ac.Cls == ClassId.Warrior ? 1 : 0);
+                    Send(w, a, b, c);
+                }
+                _airLen[i] = air;
+            }
+#endif
             Kaiju k = w.Kaiju;
             if (k.State != KaijuState.Egg && !double.IsNaN(_kaijuHp) && k.Hp < _kaijuHp - 1e-9)
             {
@@ -142,6 +187,10 @@ namespace CriticalMass.Runtime.View.Effects
             _e.DirX = 0;
             _e.DirZ = 0;
             _e.Heavy = false;
+            _e.Tier = 0;
+            _e.HasAttacker = false;
+            _e.AttCls = ClassId.Warrior;
+            _e.AttFacing = 0;
             bool valid = a >= 0 && a < w.ActorCount;
             _e.Team = valid ? w.Actors[a].Team : TeamId.Azure;
             _e.Cls = valid ? w.Actors[a].Cls : ClassId.Warrior;
@@ -169,6 +218,15 @@ namespace CriticalMass.Runtime.View.Effects
                     _e.DirX = dx;
                     _e.DirZ = dz;
                     _e.Heavy = death || ev.Value >= HeavyDamage;
+                    _e.Tier = TierOf(ev.Value, death);
+                    if (ev.B >= 0 && ev.B < w.ActorCount)
+                    {
+                        _e.HasAttacker = true;
+                        _e.AttCls = w.Actors[ev.B].Cls;
+                        _e.AttFacing = w.Actors[ev.B].Facing;
+                        if (ev.B < _capacity) LastDealtTick[ev.B] = w.Tick;
+                    }
+                    else if (ev.B == Damage.KaijuSource) KaijuDealtTick = w.Tick;
                     if (death)
                     {
                         DeathTick[t] = w.Tick;
@@ -182,10 +240,12 @@ namespace CriticalMass.Runtime.View.Effects
                         HitDirX[t] = dx;
                         HitDirZ[t] = dz;
                     }
-                    if (_e.Heavy && !blocked)
+                    if (!blocked)
                     {
+                        // v2 tiers: every hit holds the victim's pose; heavy and critical hold the attacker too.
                         HoldTick[t] = w.Tick;
-                        if (ev.B >= 0 && ev.B < _capacity) HoldTick[ev.B] = w.Tick;
+                        HoldTier[t] = _e.Tier;
+                        if (_e.Tier > 0 && ev.B >= 0 && ev.B < _capacity) { HoldTick[ev.B] = w.Tick; HoldTier[ev.B] = _e.Tier; }
                     }
                     return true;
                 }
