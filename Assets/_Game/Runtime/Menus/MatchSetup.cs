@@ -3,6 +3,7 @@ using CriticalMass.Runtime.Flow;
 using CriticalMass.Runtime.Hud.Style;
 using CriticalMass.Runtime.Hud.Ui;
 using CriticalMass.Runtime.Menu;
+using CriticalMass.Runtime.Spectator;
 using CriticalMass.Sim.Config;
 using UnityEngine;
 using UnityEngine.UI;
@@ -16,6 +17,8 @@ namespace CriticalMass.Runtime.Menus
     /// items add them to Playable. Moving the focus onto a card picks it; A / Enter on a card jumps to Start. START MATCH
     /// creates the world with a new seed (GameFlow.BeginMatch). Back: the main menu (or the results, for Change class).
     /// The last setup is remembered between launches (PlayerPrefs).
+    /// <para>2026-11-12: the team line has a third choice beside the two teams, SPECTATE: the match starts with your fighter
+    /// playing itself and the free spectator camera (SpectatorMode.SpectateNextMatch); START MATCH reads WATCH MATCH.</para>
     /// </summary>
     public sealed class MatchSetup : FlowScreen
     {
@@ -31,6 +34,9 @@ namespace CriticalMass.Runtime.Menus
         public bool FromResults;
 
         public MatchSetupChoice Choice;
+
+        /// <summary>SPECTATE is chosen on the team line (the next match starts in spectator mode).</summary>
+        public bool Spectate { get; private set; }
 
         MenuItem _team, _size, _pace, _bots, _start, _back;
         readonly MenuItem[] _cards = new MenuItem[5];
@@ -60,8 +66,8 @@ namespace CriticalMass.Runtime.Menus
             MenuUi.Panel(space, "Panel", 140f, 140f, 1640f, 860f);
 
             const float sx = 460f, sw = 1000f, sh = 58f, step = 70f, sy = 170f;
-            _team = Stepper(space, "Team", sx, sy, sw, sh, "TEAM", () => Choice.Team == TeamId.Azure ? "AZURE" : "CRIMSON",
-                d => SetTeam(Choice.Team == TeamId.Azure ? TeamId.Crimson : TeamId.Azure), _refresh);
+            _team = Stepper(space, "Team", sx, sy, sw, sh, "TEAM",
+                () => Spectate ? "SPECTATE" : Choice.Team == TeamId.Azure ? "AZURE" : "CRIMSON", StepTeam, _refresh);
             _crest = HudIcon.Make(_team.transform, "Crest", sw * 0.42f - 92f, 7f, 44f, 44f);
             _size = Stepper(space, "Size", sx, sy + step, sw, sh, "MATCH SIZE", () => Choice.TeamSize <= 5 ? "5 V 5" : "16 V 16",
                 d => Choice.TeamSize = Choice.TeamSize <= 5 ? 16 : 5, _refresh);
@@ -200,13 +206,32 @@ namespace CriticalMass.Runtime.Menus
             if (!Playable.Contains(Choice.Class)) Choice.Class = ClassId.Warrior;
             if (Choice.TeamSize != 5) Choice.TeamSize = 16;
             Choice.Pace = Choice.Pace >= 2 ? 2 : 1;
+            Spectate = SpectatorMode.SpectateNextMatch;
             RefreshAll();
         }
 
         public void SetTeam(TeamId t)
         {
             Choice.Team = t;
+            Spectate = false;
             RefreshAll();
+        }
+
+        /// <summary>SPECTATE on the team line: watch the match (actor 0 plays itself on the Azure side).</summary>
+        public void SetSpectate(bool on)
+        {
+            Spectate = on;
+            if (on) Choice.Team = TeamId.Azure;
+            RefreshAll();
+        }
+
+        /// <summary>The team line cycles AZURE, CRIMSON, SPECTATE (right) or back (left).</summary>
+        void StepTeam(int d)
+        {
+            int i = Spectate ? 2 : Choice.Team == TeamId.Azure ? 0 : 1;
+            i = (i + (d < 0 ? 2 : 1)) % 3;
+            if (i == 2) SetSpectate(true);
+            else SetTeam(i == 0 ? TeamId.Azure : TeamId.Crimson);
         }
 
         public void SetClass(ClassId c)
@@ -234,6 +259,8 @@ namespace CriticalMass.Runtime.Menus
             for (int i = 0; i < _refresh.Count; i++) _refresh[i]();
             int t = (int)Choice.Team;
             _crest.Set(UiIcons.Crest[t], _tier);
+            _crest.Image.enabled = !Spectate;
+            if (_start != null) HudText.Set(_start.Label, Spectate ? "WATCH MATCH" : "START MATCH");
             for (int i = 0; i < 5; i++)
             {
                 _portraits[i].Set(UiIcons.Portrait[i, t], _tier);
@@ -283,6 +310,7 @@ namespace CriticalMass.Runtime.Menus
             PlayerPrefs.SetInt(PrefClass, (int)Choice.Class);
             PlayerPrefs.SetInt(PrefSize, Choice.TeamSize);
             PlayerPrefs.SetInt(PrefPace, Choice.Pace >= 2 ? 2 : 1);
+            SpectatorMode.SpectateNextMatch = Spectate;
             GameFlow.BeginMatch(Choice);
         }
 

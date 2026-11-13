@@ -84,8 +84,8 @@ namespace CriticalMass.Runtime.Onboarding
                 case "Skip": return pad ? "D-PAD DOWN" : "BACKSPACE";
                 case "Toggle": return MascotGuide.ControlDeviceKey();
                 case "Confirm": return pad ? "D-PAD RIGHT" : "ENTER";
-                case "Attack": return Action("Attack", device, pad ? "RT" : "LMB");
-                case "Ability": return Action("Ability", device, pad ? "LT" : "RMB");
+                case "Attack": return Action("Attack", device, pad ? "RT" : "LEFT CLICK");
+                case "Ability": return Action("Ability", device, pad ? "LT" : "RIGHT CLICK");
                 case "Interact": return Action("Interact", device, pad ? "X" : "E");
                 case "Jump": return Action("Jump", device, pad ? "A" : "SPACE");
                 case "DigPlace": return Action("DigPlace", device, pad ? "Y" : "F");

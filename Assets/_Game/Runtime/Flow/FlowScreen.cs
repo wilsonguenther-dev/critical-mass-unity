@@ -36,6 +36,7 @@ namespace CriticalMass.Runtime.Flow
         protected MenuItem DefaultFocus;
         protected RectTransform Space { get; private set; }
         Text _hint;
+        PromptStrip _hintStrip;
         CanvasGroup _group;
         RectTransform _rise;
         MenuItem _lastFocus;
@@ -169,7 +170,21 @@ namespace CriticalMass.Runtime.Flow
         void UpdateHint()
         {
             if (_hint == null) return;
-            HudText.Set(_hint, ControlBindings.ActiveDevice == ControlDevice.Gamepad ? HintPad : HintKeys);
+            string hint = ControlBindings.ActiveDevice == ControlDevice.Gamepad ? HintPad : HintKeys;
+            HudText.Set(_hint, hint);
+            // 2026-11-12: the hint's key words are drawn as glyphs (the text stays as the hidden plain line).
+            if (_hintStrip == null && _hint != null)
+            {
+                _hintStrip = PromptStrip.Make(_hint.transform.parent, "Hint Prompts", 30f, _hint.fontSize, _hint.color);
+                RectTransform hr = _hint.rectTransform, sr = _hintStrip.Rect;
+                sr.anchorMin = hr.anchorMin;
+                sr.anchorMax = hr.anchorMax;
+                sr.pivot = hr.pivot;
+                sr.sizeDelta = new Vector2(hr.sizeDelta.x, 44f);
+                sr.anchoredPosition = hr.anchoredPosition;
+                _hint.enabled = false;
+            }
+            if (_hintStrip != null) _hintStrip.SetHint(hint, ControlBindings.ActiveDevice);
         }
 
         protected virtual void Update()
