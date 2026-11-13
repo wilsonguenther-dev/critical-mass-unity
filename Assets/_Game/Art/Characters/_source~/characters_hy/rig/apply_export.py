@@ -239,6 +239,12 @@ def render_sets(stage, cfg, acts, arms, sets, tag):
             f = fr[which]
             set_action(arms, acts[clip], f, stage.scene)
             stage.close(sets[which]["close"], os.path.join(out, f"worst_{which}_{clip}.png"), centre, ortho)
+    if rp.get("game_all"):
+        for clip, fr in rp["worst"].items():
+            for which in ("before", "after"):
+                set_action(arms, acts[clip], fr[which], stage.scene)
+                stage.game(sets[which]["game"], os.path.join(out, f"gameworst_{which}_{clip}.png"), crop=rp.get("crop", 230),
+                           target=tuple(rp.get("game_target", (0, 0, 1.0))))
     for clip, frames in rp["strips"]:
         for which in ("before", "after"):
             for k, f in enumerate(frames):

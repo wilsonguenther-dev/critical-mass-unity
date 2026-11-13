@@ -107,7 +107,7 @@ namespace CriticalMass.Runtime.Tests
         }
 
         // ---- art/characters-hy-rig (2026-11-13): the rigging pass ------------------------------------------------------
-        static IEnumerable<string> RiggedHyKeys() => HyKeys().Concat(new[] { ArtMapping.KaijuAdult }).Distinct();
+        static IEnumerable<string> RiggedHyKeys() => HyKeys();   // the HY Kaiju adult is still staged (Kaiju/_hy~)
 
         static SkinnedMeshRenderer[] Renderers(ModelSpec spec)
         {
@@ -141,7 +141,7 @@ namespace CriticalMass.Runtime.Tests
             }
         }
 
-        /// <summary>Bind-pose height of the Hero matches the spec's height convention (fighters 2.0 u, the adult 5.0 u).</summary>
+        /// <summary>Bind-pose height of the Hero matches the spec's height convention (fighters 2.0 u).</summary>
         [TestCaseSource(nameof(RiggedHyKeys))]
         public void HeroBindPoseHeightMatchesTheSpec(string key)
         {
@@ -168,44 +168,6 @@ namespace CriticalMass.Runtime.Tests
             finally
             {
                 UnityEngine.Object.DestroyImmediate(inst);
-            }
-        }
-
-        /// <summary>The Kaiju adult is the HY model (38k-triangle Hero; the pre-HY adult had 12k) on its own 20-bone rig
-        /// with the joints refit to the HY body, clips re-baked from Kaiju.blend. It keeps the face-decal path: a decal UV fit
-        /// on the snout (the expression atlases and the ModelFacing face check read it), every other corner on the
-        /// transparent texel.</summary>
-        [Test]
-        public void TheKaijuAdultIsTheHyModelWithAFaceDecalFit()
-        {
-            ModelSpec spec = ArtMapping.Spec(ArtMapping.KaijuAdult);
-            Assert.IsFalse(spec.VertexColourFace, "the adult keeps the face decal (expressions)");
-            Assert.IsNotNull(spec.FaceTexture, "Kaiju_Face.png");
-            Assert.IsNotNull(spec.Expressions, "expression atlases");
-            SkinnedMeshRenderer[] smrs = Renderers(spec);
-            Assert.AreEqual(spec.Bones, smrs.SelectMany(s => s.bones).Where(b => b != null).Distinct().Count(), "Kaiju bones");
-            string b = FighterLod.BaseName(spec.Meshes[0]);
-            Mesh MeshOf(string suffix)
-            {
-                SkinnedMeshRenderer r = smrs.FirstOrDefault(s => s.name == b + suffix);
-                Assert.IsNotNull(r, "Kaiju renderer " + b + suffix);
-                return r.sharedMesh;
-            }
-            Mesh hero = MeshOf(FighterLod.HeroSuffix), lod0 = MeshOf(FighterLod.Lod0Suffix),
-                lod1 = MeshOf(FighterLod.Lod1Suffix), shadow = MeshOf(FighterLod.ShadowSuffix);
-            Assert.Greater(Tris(hero), 20000, "HY Hero");
-            Assert.LessOrEqual(Tris(hero), 40000, "Kaiju Hero");
-            Assert.LessOrEqual(Tris(lod0), 9000, "Kaiju match mesh");
-            Assert.LessOrEqual(Tris(lod1), 4500, "Kaiju LOD1");
-            Assert.LessOrEqual(Tris(shadow), FighterLod.KaijuShadowTriangles, "Kaiju shadow");
-            foreach (Mesh m in new[] { hero, lod0, lod1 })
-            {
-                Assert.IsTrue(m.HasVertexAttribute(VertexAttribute.Color), m.name + " vertex colour");
-                var uv = new List<Vector2>();
-                m.GetUVs(0, uv);
-                int face = uv.Count(u => Mathf.Abs(u.x - 0.01f) > 1e-3f || Mathf.Abs(u.y - 0.01f) > 1e-3f);
-                Assert.Greater(face, 20, m.name + ": decal UVs on the snout");
-                Assert.Less(face, uv.Count / 4, m.name + ": only the face carries decal UVs");
             }
         }
 
