@@ -1289,3 +1289,44 @@ strength, so the retreating bot was shoved back every tick and stood 96 ticks (l
    The 90-tick limit is unchanged. Rejected: every opposing ally pair passing (fixed the stall but cost the D-030 passive
    check 39 -> 21 of 200 and the berserk share 0.14 -> 0.10).
 2. **Measured.** DG-22 worst still: Easy 58, Normal 58, Hard 61 ticks (was 96 on Normal in #49).
+
+## U-070 Every class feeds the egg; the Farmer is the best at it (owner decision, supersedes U-063's Farmers-only feeding) (2026-11-13T06:12:27Z)
+
+**Source.** Owner decision 2026-11-12: the game's creator never restricted feeding and the browser lets anyone feed.
+Supersedes U-063 item "only Farmers feed" and the small-team relaxation variants the integrator was asked to test first
+(dropped: no longer needed).
+1. **Rule.** `RolesConfig.MayFeed` is true for all six classes at every team size: no `DeliverRefused` with the defaults.
+2. **The Farmer is the best feeder** (`RolesConfig.BestFeeder`): its browser stats already carry 3 a trip (others 1, Healer
+   2) and gather in 1 s (others 1.5 to 2 s); on top, its deliveries count `BestFeederBonus` = 0.25 extra allegiance.
+   Measured on 200 + 200 idle-player seeds and 100 CM-64 seeds: bonus 0, 0.25 and 0.5 gave the same bands within one
+   seed (5v5 idle 2 / 2 / 3 of 200 before U-072), so the mildest value that still makes the Farmer's unit worth more was taken.
+   Farmers deliver 0.73 of all food with the rules on (every class delivers the rest).
+3. **Optional plays.** A non-Farmer pressing interact beside an allied Farmer hands its food over (`Handoff`); food taken
+   out of the team stock is the same. Those units pay `PassBonus` = 0.1 extra once, on the delivery (`DepthState.PassUnits`);
+   a deposit pays nothing, so a bank-and-withdraw loop earns nothing.
+4. **Bots.** Every class delivers food it holds when full, when no node is near, or within `DeliverNearShrine` = 10 of the
+   shrine; a Farmer bot's gather utility is scaled by `BestFeederGatherBias` = 1.25. Escorts only exist when a config turns
+   `MayFeed` off for a class. The Farmer role line is "Best at feeding the egg"; no line tells another class it cannot feed.
+
+## U-072 Corruption reopened to every class but the Healer; raiders still go first (our rule, supersedes U-063's raiders-only corruption) (2026-11-13T06:12:27Z)
+
+**Source.** Integrator decision for the designer's question 3 (bots ran 1 unit in 3 minutes).
+1. **Cause, measured** (everything on, 100 seeds 5v5 unless named): with U-063's raiders-only corruption, bots delivered
+   4.5 units a match (8.5 with the depth rules off), the berserk share was 0 of 100 (band 0.10 to 0.50) and the idle
+   player's team won 2 of 200. Turning class roles off alone gave 19 of 200 and 14 of 100; the Healer, a lower trigger
+   (`CorruptWhenBehindBy` 5 or 0), the small-team lineup, map events, stations, pickups, pings and sources changed
+   nothing (each 0 to 2 of 200, berserk 0). Corruption open to every class gave 79 of 200 and 23 of 100.
+2. **Rule.** `RolesConfig.MayCorrupt` is true for every class except the Healer (she purifies). A trailing team's
+   deliberate run goes to a raider first (`CorruptionRunner` = Warrior, Miner, Demolitions), then by class index.
+
+## U-073 Knockback stays OFF by default; measured again with KnockSparesCarriers under the combined rules (our rule) (2026-11-13T06:31:40Z)
+
+**Source.** Integrator, owner rule from #49 (default ON only if every band passes).
+1. **PhysicsOnly + knockback + spares** (pace 1x): idle-player 5v5 19 of 200 (floor 30: 11 short; #49 read 27), CM-64
+   interceptions 86 of 100, berserk 0.16, hill 0.749 / 0.891, proxy 19 > 8 > 2. Fails the D-030 band.
+2. **Everything on + knockback + spares**: idle 5v5 64 of 200, 16v16 134 of 200, interceptions 82, berserk 0.21, but hill
+   presence 0.636 (floor 0.70: 0.064 short) and proxy Normal 8 = Hard 8 (ordering lost). Fails two bands.
+3. **Decision.** `PhysicsConfig.Knockback` stays false. Every DG-70 rule test still stages it on.
+4. **DG-24 build check.** U-071 moved paths so the single-seed "Builder bots built something" check read 0 at Hard on
+   seed 101; the check now widens to seeds 102 and 103 at the same difficulty (as U-056 did for hill presence). Measured
+   1 build in the three Hard seeds: the Builder bot's build rule is still thin (#49 said so too).

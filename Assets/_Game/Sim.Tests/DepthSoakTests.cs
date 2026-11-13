@@ -63,16 +63,15 @@ namespace CriticalMass.Sim.Tests
         }
 
         [Test, Category("Slow")]
-        public void DepthPassiveAnIdlePlayersTeamWinShareOn200SeedsIsReportedAndStaysOver6Percent()
+        public void DepthPassiveAnIdlePlayersTeamWinShareOn200SeedsHoldsTheD030Floor()
         {
             int wins = 0;
             for (int seed = 201; seed < 401; seed++)
                 if (OutcomeRunner.RunOutcomeMatch(seed, 5, HumanMode.Passive, DepthOn).Winner == MatchResult.Azure) wins++;
             Console.WriteLine("{\"item\":\"depth-soak\",\"batch\":\"passive-200-depth\",\"passiveTeamWins\":" + wins + ",\"of\":200}");
-            // Measured 20 of 200 (0.10) with the rules on; the classic check (D-030, rules off) measures 37 of 200 against its
-            // 0.15 floor. Class roles make an idle seat cost more: this floor (about two standard deviations under the measured
-            // share) only catches a collapse. Whether 0.10 is acceptable is an owner decision (PR, U-063).
-            Assert.GreaterOrEqual(wins / 200.0, 0.06);
+            // Rules-combined (U-070 every class feeds, U-072 corruption reopened): the D-030 floor (0.15) holds with every rule on
+            // (was 20 of 200 under U-063's Farmers-only feeding with physics off, 2 of 200 with physics on).
+            Assert.GreaterOrEqual(wins / 200.0, 0.15);
         }
     }
 }

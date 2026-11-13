@@ -10,7 +10,7 @@ using NUnit.Framework;
 namespace CriticalMass.Sim.Tests
 {
     /// <summary>
-    /// Rules-combined (U-069..U-072): the band checks of the earlier suites, run once more with EVERYTHING on (sim physics plus
+    /// Rules-combined (U-069..U-073): the band checks of the earlier suites, run once more with EVERYTHING on (sim physics plus
     /// mechanics depth, the game's default rules) at pace 1x, so all three rule profiles carry their own bands: Classic (the
     /// DG-21 goldens and the classic arms), PhysicsOnly (OutcomesSoakTests, RulesDg16bSoakTests, BotsMatchTests, BotDifficultyTests
     /// on CreateBrowser5v5) and Full (this fixture and DepthSoakTests). Measure() is also the PR's before / after table.
@@ -157,16 +157,16 @@ namespace CriticalMass.Sim.Tests
         private static Bands FullBands => _full ??= Measure(Full);
 
         [Test, Category("Slow")]
-        public void U071EverythingOnTheIdlePlayerFloorsHoldAt5v5And16v16()
+        public void RulesCombinedEverythingOnTheIdlePlayerFloorsHoldAt5v5And16v16()
         {
             Bands b = FullBands;
             Console.WriteLine(b.Json("everything on (shipped)"));
             Assert.GreaterOrEqual(b.Passive5 / 200.0, 0.15, "5v5 idle-player floor (D-030)");
-            Assert.GreaterOrEqual(b.Passive16, 30, "16v16 idle-player sweep (owner target 34 of 200)");
+            Assert.GreaterOrEqual(b.Passive16, 34, "16v16 idle-player sweep (owner floor 34 of 200)");
         }
 
         [Test, Category("Slow")]
-        public void U071EverythingOnInterceptsBerserkHillAndProxyBandsHold()
+        public void RulesCombinedEverythingOnInterceptsBerserkHillAndProxyBandsHold()
         {
             Bands b = FullBands;
             Assert.GreaterOrEqual(b.Intercepts, 80, "CM-64: interceptions in at least 80 of 100 seeds");
