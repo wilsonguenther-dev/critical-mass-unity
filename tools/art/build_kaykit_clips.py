@@ -1,5 +1,5 @@
 # Builds Assets/_Game/Art/Characters/KayKit_Clips.fbx: the shared KayKit 41-joint rig "Rig" with the clips the
-# Warrior and Miner views play (CC0, KayKit Adventurers 1.0 Knight.glb, copied into the art branches' _source~).
+# character views play (32 of the 76 since the animation pass, 2026-11-12; was 8) (CC0, KayKit Adventurers 1.0 Knight.glb, copied into the art branches' _source~).
 # Warrior.fbx and Miner.fbx (art v1) carry the rig but no clips; this file supplies them with the SAME FBX exporter
 # recipe as the art builds (gltf-glb-fbx-pipeline), so bone axes and units match and the Generic clips bind by path.
 # Usage: blender -b --factory-startup --python tools/art/build_kaykit_clips.py -- KNIGHT_GLB OUT_FBX
@@ -8,17 +8,15 @@ import bpy
 
 argv = sys.argv[sys.argv.index("--") + 1:]
 src, out = argv[0], argv[1]
-# KayKit clip name -> game clip name (the names the Unity views look up, ArtCatalog.Clip*).
-CLIPS = {
-    "Idle": "Idle",
-    "Walking_A": "Walk",
-    "Running_A": "Run",
-    "1H_Melee_Attack_Chop": "Attack",
-    "Interact": "Gather",
-    "Hit_A": "Hit",
-    "Death_A": "Death",
-    "Cheer": "Cheer",
-}
+# KayKit clip name -> game clip name (the names the Unity views look up, ArtMapping clip constants). The table lives in
+# kaykit_clip_map.tsv next to this script, shared with measure_clips.py (which writes Resources/Anim/clip_facts.json).
+import os
+_MAP = os.path.join(os.path.dirname(os.path.abspath(__file__)), "kaykit_clip_map.tsv")
+CLIPS = {}
+for _line in open(_MAP, encoding="utf-8"):
+    if _line.strip() and not _line.startswith("#"):
+        _k, _g = _line.rstrip("\n").split("\t")[:2]
+        CLIPS[_k] = _g
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.import_scene.gltf(filepath=src, disable_bone_shape=True)
