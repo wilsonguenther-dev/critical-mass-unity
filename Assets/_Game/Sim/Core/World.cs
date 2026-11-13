@@ -272,7 +272,8 @@ namespace CriticalMass.Sim.Core
                 AnimAction = 0,
                 Moving = false,
                 PendingClass = null,
-                // ITEM CM-84: added by its owner (ClassSwitchCd = 0, ClassSwitches = 0)
+                ClassSwitchCd = 0, // CM-84 / U-065
+                ClassSwitches = 0,
                 StandUp = 0,
                 AirLen = 0,
                 AirTick = 0,
@@ -301,6 +302,7 @@ namespace CriticalMass.Sim.Core
                 ClassPick = -1,
                 Terraform = false,
                 Jump = false,
+                StationBuy = 0,
             };
         }
 
@@ -575,7 +577,8 @@ namespace CriticalMass.Sim.Core
             a.AnimAction = 0;
             a.Moving = false;
             a.PendingClass = null;
-            // ITEM CM-84: added by its owner (ClassSwitchCd = 0, ClassSwitches = 0)
+            a.ClassSwitchCd = 0; // CM-84 / U-065
+            a.ClassSwitches = 0;
             a.StandUp = 0;
             a.AirLen = 0;
             a.AirTick = 0;
@@ -602,6 +605,7 @@ namespace CriticalMass.Sim.Core
             f.Terraform = false;
             f.Jump = false;
             f.TerraformSwitch = false;
+            f.StationBuy = 0;
         }
 
         /// <summary>Build a world for opts: a fresh Skybreak Basin map and every buffer allocated at capacity.</summary>

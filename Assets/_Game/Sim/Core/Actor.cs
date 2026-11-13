@@ -54,7 +54,10 @@ namespace CriticalMass.Sim.Core
         public bool Moving;
         /// <summary>Class to respawn as (CM-06). Set only while dead, via InputFrame.ClassPick; applied and cleared on respawn.</summary>
         public ClassId? PendingClass;
-        // ITEM CM-84: added by its owner (ClassSwitchCd, ClassSwitches)
+        /// <summary>CM-84 / U-065 (CM-54): sim ticks until this actor's next class switch is accepted (0 = ready).</summary>
+        public int ClassSwitchCd;
+        /// <summary>CM-84 / U-065 (CM-54): accepted class switches this match.</summary>
+        public int ClassSwitches;
         /// <summary>CM-20: sim seconds left of the post-respawn get-up; while > 0 the actor ignores input and is never pushed.</summary>
         public double StandUp;
         /// <summary>

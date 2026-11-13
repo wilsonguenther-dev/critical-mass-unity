@@ -351,7 +351,7 @@ namespace CriticalMass.Sim.Core
         }
 
         /// <summary>The source with charges a bot should walk to: nearest by walking distance, of a kind its cargo allows; -1 = none.</summary>
-        public static int BestSource(World w, int id)
+        public static int BestSource(World w, int id, bool waterOnly = false)
         {
             Actor a = w.Actors[id];
             SourceNode[] list = w.Depth.Sources;
@@ -362,6 +362,7 @@ namespace CriticalMass.Sim.Core
                 SourceNode s = list[i];
                 if (s.Charges <= 0) continue;
                 if (a.CarryAmount > 0 && a.Carry != CarryOf(s.Kind)) continue;
+                if (waterOnly && s.Kind != BiomassType.Water) continue;
                 double dist = FieldDist(w, i, w.X[id], w.Z[id]);
                 if (dist < bestD)
                 {

@@ -148,6 +148,13 @@ namespace CriticalMass.Sim.Core
         BankDeposit,
         /// <summary>U-064: a feeder took food out of the team stock: A = actor, B = team index, (X, Z) = the pad, Value = units, Bio = Plant.</summary>
         BankWithdraw,
+        /// <summary>
+        /// CM-84 / U-065 (ports CM-54 'classSwitch'): a class pick was answered: A = actor, B = Respawn.ClassSwitchAccepted /
+        /// ClassSwitchCooldown / ClassSwitchAlive, (X, Z) = the actor, Value = class index. Accepted while alive = switched now.
+        /// </summary>
+        ClassSwitch,
+        /// <summary>U-065 (ports CM-39 'upgrade'): a class upgrade purchase: A = the buyer, B = class index, (X, Z) = the pad, Value = the team's new level of that class (>= 2) or a Stations.Refused* code.</summary>
+        Upgrade,
         // ITEM CM-84: added by its owner (ClassSwitch, ports CM-54)
         /// <summary>CM-37: one tick of fountain healing (Heal.HealSystem): A = the healed actor, B = -1, (X, Z) = the actor, Value = HP restored this tick (&gt; 0).</summary>
         Heal,

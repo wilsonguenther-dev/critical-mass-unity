@@ -68,6 +68,10 @@ namespace CriticalMass.Sim.Core
         /// <summary>U-064: the World.Tick of the last source route rebuild (one per tick).</summary>
         public int FieldBuildTick;
 
+        /// <summary>U-065: each team's level of each class, [team * 6 + class] (0 or 1 = the spawn level).</summary>
+        public byte[] ClassLevel;
+        public int UpgradesBought;
+
         public static DepthState Create(GameConfig cfg, Grid.MapDef map)
         {
             int cap = World.ActorCapacity(cfg);
@@ -81,6 +85,7 @@ namespace CriticalMass.Sim.Core
                 PrevHp = new double[cap],
                 Stock = new int[2 * Core.Sources.StockKinds],
                 Gathered = new int[2],
+                ClassLevel = new byte[2 * ClassIds.All.Count],
             };
             return s;
         }
@@ -108,6 +113,8 @@ namespace CriticalMass.Sim.Core
             Withdrawn = 0;
             StockSpent = 0;
             FieldBuildTick = -1;
+            Array.Clear(ClassLevel, 0, ClassLevel.Length);
+            UpgradesBought = 0;
             for (int t = 0; t < 2; t++)
             {
                 w.Match.Delivered[t].Wood = 0;

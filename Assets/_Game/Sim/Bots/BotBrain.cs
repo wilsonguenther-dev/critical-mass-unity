@@ -77,6 +77,8 @@ namespace CriticalMass.Sim.Bots
             Demolitions.TakeBotTnt(w, id, output);
             // DG-40: a Healer bot's queued purify (BotFsm.DecideHealer) is its one DigPlace press.
             Healer.TakeBotPurify(w, id, output);
+            // U-065: a Builder bot in its station buys a class upgrade the team stock can pay.
+            Stations.TakeBotBuy(w, id, output);
         }
     }
 }

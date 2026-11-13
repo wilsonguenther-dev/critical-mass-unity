@@ -23,6 +23,11 @@ namespace CriticalMass.Sim.Core
         /// layer; bots never set it). Read and cleared by Terraform.TerraformSystem, so a stored true never switches twice.
         /// </summary>
         public bool TerraformSwitch;
+        /// <summary>
+        /// U-065: buy the next upgrade level of a class at the base station: class index + 1 (0 = no press, so a frame that
+        /// never sets it buys nothing). One-shot: read and cleared by Stations.StationSystem. Only a Builder in its station succeeds.
+        /// </summary>
+        public int StationBuy;
 
         public void CopyFrom(InputFrame other)
         {
@@ -37,6 +42,7 @@ namespace CriticalMass.Sim.Core
             Terraform = other.Terraform;
             Jump = other.Jump;
             TerraformSwitch = other.TerraformSwitch;
+            StationBuy = other.StationBuy;
         }
     }
 }

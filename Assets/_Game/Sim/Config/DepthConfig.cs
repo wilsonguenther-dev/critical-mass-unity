@@ -16,12 +16,45 @@ namespace CriticalMass.Sim.Config
         public RolesConfig Roles = new RolesConfig();
         /// <summary>U-064: wood and water on the map, the team stock at the base, supply bots.</summary>
         public SourcesConfig Sources = new SourcesConfig();
+        /// <summary>U-065: the base station: live class switching and class upgrades.</summary>
+        public StationsConfig Stations = new StationsConfig();
 
         public DepthConfig Clone()
         {
             var c = (DepthConfig)MemberwiseClone();
             c.Roles = Roles.Clone();
             c.Sources = Sources.Clone();
+            c.Stations = Stations.Clone();
+            return c;
+        }
+    }
+
+    /// <summary>
+    /// U-065 base stations. The switch cooldown is Respawn.ClassSwitchCooldownTicks (CM-54, 150). The ladder rows are
+    /// cm/CM-39's (cost 3 then 5, +15% then +30% max HP); the water column and paying in wood are ours.
+    /// </summary>
+    public sealed class StationsConfig
+    {
+        public bool Enabled = true;
+        /// <summary>The station zone: within this distance of the own pad centre.</summary>
+        public double Range = 4.5;
+        /// <summary>Wood to go from level L to L + 1 (index L - 1).</summary>
+        public double[] UpgradeWood = { 3, 5 };
+        /// <summary>Water to go from level L to L + 1.</summary>
+        public double[] UpgradeWater = { 1, 2 };
+        /// <summary>Max HP bonus at level L + 1 (index L - 1), over the class row.</summary>
+        public double[] MaxHpBonus = { 0.15, 0.3 };
+        /// <summary>Seconds the ability stays locked after a live class switch.</summary>
+        public double SwitchAbilityLockSeconds = 3;
+        /// <summary>Bots: a Builder bot in its station tries to buy once per this many ticks.</summary>
+        public double BotBuyPeriodTicks = 30;
+
+        public StationsConfig Clone()
+        {
+            var c = (StationsConfig)MemberwiseClone();
+            c.UpgradeWood = (double[])UpgradeWood.Clone();
+            c.UpgradeWater = (double[])UpgradeWater.Clone();
+            c.MaxHpBonus = (double[])MaxHpBonus.Clone();
             return c;
         }
     }

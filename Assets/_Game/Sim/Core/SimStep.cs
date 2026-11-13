@@ -41,6 +41,7 @@ namespace CriticalMass.Sim.Core
             Roles.HandoffSystem(w); // U-063: a carrier that may not feed hands its biomass to a feeder beside it
             Sources.SourcesSystem(w, dt); // U-064: groves and springs, the bank at the base
             Kaiju.KaijuSystem(w, dt);
+            Stations.StationSystem(w); // U-065: upgrade purchases at the base station
             Respawn.RespawnSystem(w, dt);
             // CM-37: after respawn (a fresh respawn is already at full HP), before the hill / match bookkeeping.
             Heal.HealSystem(w);

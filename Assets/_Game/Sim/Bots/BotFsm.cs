@@ -718,7 +718,13 @@ namespace CriticalMass.Sim.Bots
             bool holdsSupply = a.CarryAmount > 0 && (a.Carry == CarryKind.Wood || a.Carry == CarryKind.Water);
             if (Sources.On(w) && ((st.Supply[id] != 0 && egg && a.CarryAmount == 0) || holdsSupply))
             {
-                if (st.Supply[id] != 0 && egg && a.CarryAmount < cc.CarryCapacity) supplySource = Sources.BestSource(w, id);
+                if (st.Supply[id] != 0 && egg && a.CarryAmount < cc.CarryCapacity)
+                {
+                    // Upgrades need water too (U-065): with three wood banked per water (plus one), fetch water when a spring has some.
+                    bool wantWater = Sources.Stock(w, a.Team, Sources.StockWood) >= 3 * (Sources.Stock(w, a.Team, Sources.StockWater) + 1);
+                    if (wantWater) supplySource = Sources.BestSource(w, id, true);
+                    if (supplySource < 0) supplySource = Sources.BestSource(w, id);
+                }
                 if (supplySource >= 0 || holdsSupply) uSupply = w.Config.Depth.Sources.SupplyUtility;
             }
 
