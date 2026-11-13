@@ -72,12 +72,20 @@ namespace CriticalMass.Runtime.PlayTests
         {
             if (humanClass.HasValue)
                 GameFlow.QueueMatch(new MatchSetupChoice { Team = TeamId.Azure, Class = humanClass.Value, TeamSize = 16, Pace = 2 });
+            // ci/playmode-triage (P-05): until TimeScale is 0 below, the driver runs the sim on unscaled frame time (Pace 2,
+            // up to the tick cap per frame), so the two load frames advanced the world by however long they took: a few
+            // ticks on the Mac, dozens on a slow runner, and every sanity test started from a different state there
+            // (FacingSanity read 35..156 degrees on the same three samples across runs). A fixed frame time makes the load
+            // frames identical on every machine; it is off again once the clock is stopped (and in Reset()).
+            Time.captureDeltaTime = 1f / 60f;
             SceneManager.LoadScene(BootScene);
             yield return null;
             yield return null;
             Driver = Object.FindAnyObjectByType<SimDriverBehaviour>();
             Assert.IsNotNull(Driver, "Boot did not build a SimDriverBehaviour");
             Driver.TimeScale = 0;
+            Time.captureDeltaTime = 0f;   // only the load frames need it; the stopped sim clock holds from here
+            LoadTick = Driver.World != null ? Driver.World.Tick : -1;
             Driver.HumanAutopilot = autopilot;
             Views = Driver.GetComponent<ActorViews>();
             Source = Driver.GetComponent<HumanInputSource>();
@@ -105,7 +113,14 @@ namespace CriticalMass.Runtime.PlayTests
         }
 
         /// <summary>Back to the flow's first-boot state (QueueMatch changed it); call from every TearDown.</summary>
-        public static void Reset() => GameFlow.ResetForTests();
+        public static void Reset()
+        {
+            Time.captureDeltaTime = 0f;
+            GameFlow.ResetForTests();
+        }
+
+        /// <summary>The sim tick at which Load stopped the clock (before the settle): equal on every machine (P-05).</summary>
+        public int LoadTick = -1;
 
         /// <summary>One view update now (the frame's LateUpdate does the same; this lets a test sample every tick).</summary>
         /// <summary>
