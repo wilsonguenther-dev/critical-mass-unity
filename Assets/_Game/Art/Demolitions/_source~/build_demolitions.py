@@ -396,7 +396,6 @@ def build_head():
         add(BODY, B.sphere((0.04, 0.05, 0.07), 6, 4), "skin_shadow", H, "skin", m=M((0.265 * s, 0.02, 1.45)))
     add(BODY, face_plane(), "skin", H, "face_decal", smooth=True, grad=False)
     # soot smudges (value steps): his right cheek, his left jaw, the chin, the left temple
-    surface_patch(-0.215, 1.40, 0.04, 0.03, "soot", "soot", rot=20)
     # brows, eyes, the gap-tooth grin and the lips are PAINTED in the decal (smooth, round, clean: the artist's rule);
     # geometry keeps only the round head, cheeks, ears and a small button nose with a soot smudge on the tip
     add(BODY, B.sphere((0.042, 0.04, 0.038), 10, 7), "nose", H, "face", m=M((0, -0.255, 1.415)))
@@ -405,23 +404,23 @@ def build_head():
     # twin puffed pigtails from under the cap (her silhouette mark at head height), team-colour hair ties,
     # frizzy singed ends
     for s in (1, -1):
-        root = Vector((0.235 * s, 0.10, 1.54))
-        d = Vector((0.75 * s, 0.35, -0.55)).normalized()
+        root = Vector((0.235 * s, 0.07, 1.55))
+        d = Vector((0.90 * s, 0.22, -0.26)).normalized()   # out to the sides: a wide bar across the head
         add(BODY, B.torus(0.062, 0.03, 8, 3), "kerchief", H, "team_cloth", m=kit.frame(root + d * 0.05, d, (0, 0, 1)))
-        for k, (t, r) in enumerate(((0.10, 0.075), (0.17, 0.10), (0.26, 0.105), (0.34, 0.08))):
+        for k, (t, r) in enumerate(((0.10, 0.085), (0.19, 0.11), (0.30, 0.12), (0.41, 0.105), (0.50, 0.08))):
             c = root + d * t + Vector((0, 0, 0.012 * (k % 2)))
-            add(BODY, B.sphere((r, r * 0.92, r * 0.95), 7, 5), "hair" if k % 2 == 0 else "hair_light", H, "hair",
+            add(BODY, B.sphere((r, r * 0.92, r * 0.95), 7, 4), "hair" if k % 2 == 0 else "hair_light", H, "hair",
                 m=M(c, (0, 0, 25 * k)))
-        tipc = root + d * 0.38
-        for k in range(4):
-            a = 2 * math.pi * k / 4 + 0.4
-            side = Vector((0, 0, 1)).cross(d).normalized()
-            up_ = d.cross(side).normalized()
-            off = (side * math.cos(a) + up_ * math.sin(a)) * 0.05
+        tipc = root + d * 0.55
+        side = Vector((0, 0, 1)).cross(d).normalized()
+        up_ = d.cross(side).normalized()
+        for k in range(3):
+            a = 2 * math.pi * k / 3 + 0.5
+            off = (side * math.cos(a) + up_ * math.sin(a)) * 0.04
             base = tipc + off
-            tip = base + d * 0.09 + off * 0.9
-            add(BODY, B.cyl(base, tip, 0.03, 0.004, 5), "hair_singed" if k % 2 else "hair", H, "hair", smooth=False,
-                grad=False)
+            tip = base + d * 0.07 + off * 0.6
+            add(BODY, B.cyl(base, tip, 0.034, 0.006, 5), "hair_singed" if k == 1 else "hair", H, "hair",
+                smooth=False, grad=False)
     # short fringe locks escaping the cap at her left temple
     for k, (x, z) in enumerate(((0.17, 1.585), (0.215, 1.57))):
         base = Vector((x, head_front_y(x, z, 0.02), z + 0.03))
@@ -524,19 +523,19 @@ def build_keg():
         smooth=False, m=KEG_T @ Matrix.Translation(sock))
     # curled fuse: rises from the socket, one loop, up to the spark (tip of the top spark ray at z 2.0)
     ws = KEG_T @ (sock + Vector((0, 0, 0.055)))
-    spark_c = Vector((0.10, 0.34, 1.875))
+    spark_c = Vector((0.24, 0.40, 1.83))     # to her left of the cap so it reads beside it, not behind it
     pts = []
     N = 11
     for i in range(N + 1):
         t = i / N
         ang = 2 * math.pi * 1.15 * t
-        rad = 0.085 * math.sin(math.pi * min(t * 1.2, 1.0))
+        rad = 0.10 * math.sin(math.pi * min(t * 1.2, 1.0))
         base = ws.lerp(spark_c, t ** 0.9)
         base.z = ws.z + (spark_c.z - ws.z) * (t ** 0.75)
         pts.append(base + Vector((rad * math.cos(ang), rad * math.sin(ang) * 0.8, 0)))
     pts[-1] = spark_c.copy()
-    tube(BODY, pts, 0.021, "fuse", W, "fuse", seg=6, joints=False)
-    spark(BODY, spark_c, W, scale=1.0, n_rays=7, seed=3)
+    tube(BODY, pts, 0.027, "fuse", W, "fuse", seg=6, joints=False)
+    spark(BODY, spark_c, W, scale=1.45, n_rays=8, seed=3)
     # shoulder straps holding the keg
     for s in (1, -1):
         sp = [(0.15 * s, -0.20, 1.15), (0.17 * s, -0.10, 1.255), (0.17 * s, 0.06, 1.27), (0.16 * s, 0.24, 1.18)]
@@ -622,7 +621,7 @@ def build_props():
     o = PROPS["armed"]
     mound(o)
     plate(o, T=M((0, 0, 0.075)))
-    clods(o, 22, 0.35, 0.13, 2, ring=(0.48, 1.0))
+    clods(o, 18, 0.35, 0.13, 2, ring=(0.48, 1.0))
     for k in range(3):
         a = k * 2.1 + 0.4
         add(o, box((0.07, 0.06, 0.045), 0.018, 1), "stone", None, "pebbles", smooth=False,
@@ -633,7 +632,7 @@ def build_props():
     for k in range(n):
         a0 = 2 * math.pi * k / n
         a1 = a0 + 2 * math.pi / n * 0.55
-        add(o, shell_sector([(0.50, 0.0), (0.50, 0.02)], a0, a1, 0.05, 3), "kerchief", None, "team_cloth",
+        add(o, shell_sector([(0.50, 0.0), (0.50, 0.02)], a0, a1, 0.05, 2), "kerchief", None, "team_cloth",
             smooth=False)
     # triggered: blown open, scorched, the plate flipped into the air, clods flung, hazard burst
     o = PROPS["triggered"]
@@ -705,13 +704,18 @@ def assign_face_decal(ob, image):
     n = 0
     head_c = Vector(HEAD_C)
     for poly in me.polygons:
-        if all(i in vin for i in poly.vertices) and poly.normal.dot((poly.center - head_c).normalized()) > 0.5:
-            poly.material_index = slot
-            n += 1
+        if not all(i in vin for i in poly.vertices):
+            for li in poly.loop_indices:
+                uv.data[li].uv = (0.0, 0.0)
+            continue
+        # every face of the decal slab takes the decal material; only the outward front sheet is mapped, the back
+        # sheet and the thin rim walls sample the transparent corner texel, so no skin-coloured slab edge shows
+        poly.material_index = slot
+        front = poly.normal.dot((poly.center - head_c).normalized()) > 0.5
+        n += front
         for li in poly.loop_indices:
             co = me.vertices[me.loops[li].vertex_index].co
-            uv.data[li].uv = ((co.x - x0) / (x1 - x0), (co.z - z0) / (z1 - z0)) if poly.material_index == slot \
-                else (0.0, 0.0)
+            uv.data[li].uv = ((co.x - x0) / (x1 - x0), (co.z - z0) / (z1 - z0)) if front else (0.002, 0.002)
     return n
 
 

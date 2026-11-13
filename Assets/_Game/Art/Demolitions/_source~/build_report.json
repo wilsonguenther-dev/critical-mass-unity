@@ -1,8 +1,8 @@
 {
  "objects": {
   "Demolitions_Body": {
-   "triangles": 11346,
-   "vertices": 6159,
+   "triangles": 11286,
+   "vertices": 6131,
    "rest_bounds": {
     "min": [
      -1.098,
@@ -12,7 +12,7 @@
     "max": [
      1.098,
      0.825,
-     2.003
+     2.016
     ]
    },
    "materials": [
@@ -99,8 +99,8 @@
    ]
   },
   "Demolitions_Mine_Armed": {
-   "triangles": 1016,
-   "vertices": 584,
+   "triangles": 936,
+   "vertices": 536,
    "rest_bounds": {
     "min": [
      -0.395,
@@ -124,8 +124,8 @@
    ]
   },
   "Demolitions_Mine_Armed_OwnerRing": {
-   "triangles": 280,
-   "vertices": 160,
+   "triangles": 200,
+   "vertices": 120,
    "rest_bounds": {
     "min": [
      -0.5,
@@ -259,10 +259,10 @@
  "triangles_by_feature": {
   "Demolitions_Body:skin": 820,
   "Demolitions_Body:team_cloth": 756,
-  "Demolitions_Body:hair": 742,
   "Demolitions_Body:vest": 700,
   "Demolitions_Body:tnt": 696,
   "Demolitions_Body:keg": 688,
+  "Demolitions_Body:hair": 682,
   "Demolitions_Body:cap": 604,
   "Demolitions_Body:goggles": 604,
   "Demolitions_Body:bandolier": 572,
@@ -277,46 +277,46 @@
   "Demolitions_TNTHand:tnt_hand": 304,
   "Demolitions_Body:straps": 264,
   "Demolitions_Body:buckles": 256,
+  "Demolitions_Body:spark": 256,
   "Demolitions_Body:sleeve": 232,
-  "Demolitions_Body:spark": 232,
   "Demolitions_TNTHand:spark": 232,
   "Demolitions_Body:fuse": 220,
   "Demolitions_Body:cap_detail": 164,
   "Demolitions_Body:knee_patch": 160,
   "Demolitions_Body:belt": 148,
   "Demolitions_Body:face": 120,
-  "Demolitions_Body:soot": 96,
   "Demolitions_TNTHand:team_cloth": 88,
+  "Demolitions_Body:soot": 72,
   "Demolitions_Body:fuse_coil": 60
  },
  "triangles_props_by_feature": {
   "Demolitions_Explosion:boom": 1600,
   "Demolitions_Mine_Buried:dirt": 600,
-  "Demolitions_Mine_Armed:dirt": 440,
   "Demolitions_Mine_Triggered:dirt": 400,
+  "Demolitions_Mine_Armed:dirt": 360,
   "Demolitions_TNT_Flight:tnt": 304,
-  "Demolitions_Mine_Armed_OwnerRing:team_cloth": 280,
   "Demolitions_Mine_Triggered:mound": 280,
   "Demolitions_Mine_Armed:plate": 256,
   "Demolitions_Mine_Triggered:plate": 256,
   "Demolitions_Mine_Triggered:spark": 256,
   "Demolitions_CraterRim:crater": 224,
   "Demolitions_TNT_Flight:spark": 208,
+  "Demolitions_Mine_Armed_OwnerRing:team_cloth": 200,
   "Demolitions_Mine_Buried:mound": 188,
   "Demolitions_Mine_Armed:mound": 188,
   "Demolitions_Mine_Buried:pebbles": 176,
   "Demolitions_Mine_Armed:pebbles": 132,
   "Demolitions_TNT_Flight:team_cloth": 88
  },
- "triangles_character": 11970,
+ "triangles_character": 11910,
  "triangles_props": {
   "buried": 964,
-  "armed": 1016,
-  "ring": 280,
+  "armed": 936,
+  "ring": 200,
   "triggered": 1192,
   "flight": 600,
   "crater": 224,
   "boom": 1600
  },
- "triangles_mine_armed_with_ring": 1296
+ "triangles_mine_armed_with_ring": 1136
 }

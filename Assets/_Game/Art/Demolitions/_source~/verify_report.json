@@ -1,0 +1,500 @@
+{
+ "passed": 61,
+ "total": 61,
+ "failed": [],
+ "results": [
+  {
+   "check": "fbx has no baked animation (clips stay in the KayKit source, as the Miner)",
+   "ok": true,
+   "detail": 0
+  },
+  {
+   "check": "objects: Rig + Demolitions_Body + Demolitions_TNTHand",
+   "ok": true,
+   "detail": [
+    "Demolitions_Body",
+    "Demolitions_TNTHand"
+   ]
+  },
+  {
+   "check": "bone count 41",
+   "ok": true,
+   "detail": 41
+  },
+  {
+   "check": "bone names = KayKit rig",
+   "ok": true,
+   "detail": "match"
+  },
+  {
+   "check": "bone hierarchy = KayKit rig",
+   "ok": true,
+   "detail": "parents"
+  },
+  {
+   "check": "joint rest positions = KayKit (metres, after the round trip)",
+   "ok": true,
+   "detail": "max 0.000067 m"
+  },
+  {
+   "check": "armature root transform clean",
+   "ok": true,
+   "detail": [
+    [
+     -1.6292068494294654e-07,
+     0.0,
+     0.0
+    ],
+    [
+     1.0,
+     1.0,
+     1.0
+    ]
+   ]
+  },
+  {
+   "check": "Demolitions_Body material slots",
+   "ok": true,
+   "detail": [
+    "CM_Toon",
+    "CM_FaceDecal"
+   ]
+  },
+  {
+   "check": "Demolitions_Body loose / non-manifold",
+   "ok": true,
+   "detail": {
+    "loose_v": 0,
+    "loose_e": 0,
+    "non_manifold": 0
+   }
+  },
+  {
+   "check": "Demolitions_Body skinned to the rig",
+   "ok": true,
+   "detail": [
+    "Rig"
+   ]
+  },
+  {
+   "check": "Demolitions_Body weights (every vertex weighted, at most 4 influences)",
+   "ok": true,
+   "detail": {
+    "unweighted": 0,
+    "over4": 0
+   }
+  },
+  {
+   "check": "Demolitions_Body vertex-colour contract identical to the Miner's",
+   "ok": true,
+   "detail": {
+    "ours": [
+     [
+      "Col.001",
+      "CORNER",
+      "BYTE_COLOR"
+     ],
+     [
+      "Col",
+      "CORNER",
+      "BYTE_COLOR"
+     ]
+    ],
+    "codes": [
+     0.0,
+     0.75,
+     1.0
+    ],
+    "miner": [
+     [
+      "Col.001",
+      "CORNER",
+      "BYTE_COLOR"
+     ],
+     [
+      "Col",
+      "CORNER",
+      "BYTE_COLOR"
+     ]
+    ],
+    "miner_codes": [
+     0.0,
+     0.75,
+     1.0
+    ]
+   }
+  },
+  {
+   "check": "team mask codes on the body: cloth 1.0 and glow 0.75 (goggle lenses)",
+   "ok": true,
+   "detail": [
+    0.0,
+    0.75,
+    1.0
+   ]
+  },
+  {
+   "check": "Demolitions_TNTHand material slots",
+   "ok": true,
+   "detail": [
+    "CM_Toon"
+   ]
+  },
+  {
+   "check": "Demolitions_TNTHand loose / non-manifold",
+   "ok": true,
+   "detail": {
+    "loose_v": 0,
+    "loose_e": 0,
+    "non_manifold": 0
+   }
+  },
+  {
+   "check": "Demolitions_TNTHand skinned to the rig",
+   "ok": true,
+   "detail": [
+    "Rig"
+   ]
+  },
+  {
+   "check": "Demolitions_TNTHand weights (every vertex weighted, at most 4 influences)",
+   "ok": true,
+   "detail": {
+    "unweighted": 0,
+    "over4": 0
+   }
+  },
+  {
+   "check": "Demolitions_TNTHand vertex-colour contract identical to the Miner's",
+   "ok": true,
+   "detail": {
+    "ours": [
+     [
+      "Col.001",
+      "CORNER",
+      "BYTE_COLOR"
+     ],
+     [
+      "Col",
+      "CORNER",
+      "BYTE_COLOR"
+     ]
+    ],
+    "codes": [
+     0.0,
+     1.0
+    ],
+    "miner": [
+     [
+      "Col.001",
+      "CORNER",
+      "BYTE_COLOR"
+     ],
+     [
+      "Col",
+      "CORNER",
+      "BYTE_COLOR"
+     ]
+    ],
+    "miner_codes": [
+     0.0,
+     0.75,
+     1.0
+    ]
+   }
+  },
+  {
+   "check": "triangle budget <= 12000 (body + TNT in hand)",
+   "ok": true,
+   "detail": 11910
+  },
+  {
+   "check": "height 2.0 u after the round trip (boots to the fuse spark), feet at 0",
+   "ok": true,
+   "detail": [
+    -0.0,
+    2.016
+   ]
+  },
+  {
+   "check": "KayKit 'Idle' binds to the re-imported FBX rig by bone name (frame 1)",
+   "ok": true,
+   "detail": {
+    "max_offset_m": 0.0,
+    "hand.r moved": 0.451
+   }
+  },
+  {
+   "check": "KayKit 'Throw' binds to the re-imported FBX rig by bone name (frame 16)",
+   "ok": true,
+   "detail": {
+    "max_offset_m": 0.0,
+    "hand.r moved": 0.35
+   }
+  },
+  {
+   "check": "KayKit 'PickUp' binds to the re-imported FBX rig by bone name (frame 13)",
+   "ok": true,
+   "detail": {
+    "max_offset_m": 0.0,
+    "hand.r moved": 0.985
+   }
+  },
+  {
+   "check": "KayKit 'Hit_A' binds to the re-imported FBX rig by bone name (frame 5)",
+   "ok": true,
+   "detail": {
+    "max_offset_m": 0.0,
+    "hand.r moved": 0.409
+   }
+  },
+  {
+   "check": "KayKit 'Death_A' binds to the re-imported FBX rig by bone name (frame 20)",
+   "ok": true,
+   "detail": {
+    "max_offset_m": 0.0,
+    "hand.r moved": 1.288
+   }
+  },
+  {
+   "check": "KayKit 'Interact' binds to the re-imported FBX rig by bone name (frame 10)",
+   "ok": true,
+   "detail": {
+    "max_offset_m": 0.0,
+    "hand.r moved": 0.775
+   }
+  },
+  {
+   "check": "feature: round powder keg with staves and hoops",
+   "ok": true,
+   "detail": "present"
+  },
+  {
+   "check": "feature: curled fuse ending in a spark",
+   "ok": true,
+   "detail": "present"
+  },
+  {
+   "check": "feature: short leather cap",
+   "ok": true,
+   "detail": "present"
+  },
+  {
+   "check": "feature: big round goggles pushed up",
+   "ok": true,
+   "detail": "present"
+  },
+  {
+   "check": "feature: painted face decal (eyes, singed brows, gap-tooth grin, lips)",
+   "ok": true,
+   "detail": "present"
+  },
+  {
+   "check": "feature: soot as vertex-colour value steps",
+   "ok": true,
+   "detail": "present"
+  },
+  {
+   "check": "feature: bandolier of 3-stick TNT bundles",
+   "ok": true,
+   "detail": "present"
+  },
+  {
+   "check": "feature: fingerless gloves",
+   "ok": true,
+   "detail": "present"
+  },
+  {
+   "check": "feature: padded Stone vest with brass buckles",
+   "ok": true,
+   "detail": "present"
+  },
+  {
+   "check": "feature: navy trousers, heavy boots",
+   "ok": true,
+   "detail": "present"
+  },
+  {
+   "check": "feature: team cloth (scarf, armband, keg band, TNT bands, hair ties)",
+   "ok": true,
+   "detail": "present"
+  },
+  {
+   "check": "feature: female: puffed pigtails",
+   "ok": true,
+   "detail": "present"
+  },
+  {
+   "check": "feature: oversized TNT bundle in the throwing hand",
+   "ok": true,
+   "detail": [
+    "feat_spark",
+    "feat_team_cloth",
+    "feat_tnt_hand",
+    "handslot.r"
+   ]
+  },
+  {
+   "check": "no melee weapon object",
+   "ok": true,
+   "detail": [
+    "Demolitions_Body",
+    "Demolitions_TNTHand"
+   ]
+  },
+  {
+   "check": "flat toon shading (no glossy nodes in CM_Toon)",
+   "ok": true,
+   "detail": "ramped emission only"
+  },
+  {
+   "check": "props FBX: authored static meshes, no armature",
+   "ok": true,
+   "detail": [
+    "Demolitions_CraterRim",
+    "Demolitions_Explosion",
+    "Demolitions_Mine_Armed",
+    "Demolitions_Mine_Armed_OwnerRing",
+    "Demolitions_Mine_Buried",
+    "Demolitions_Mine_Triggered",
+    "Demolitions_TNT_Flight"
+   ]
+  },
+  {
+   "check": "Demolitions_Mine_Buried: tris <= 1200, closed shells",
+   "ok": true,
+   "detail": {
+    "tris": 964,
+    "non_manifold": 0,
+    "loose": 0
+   }
+  },
+  {
+   "check": "Demolitions_Mine_Triggered: tris <= 1200, closed shells",
+   "ok": true,
+   "detail": {
+    "tris": 1192,
+    "non_manifold": 0,
+    "loose": 0
+   }
+  },
+  {
+   "check": "Demolitions_TNT_Flight: tris <= 800, closed shells",
+   "ok": true,
+   "detail": {
+    "tris": 600,
+    "non_manifold": 0,
+    "loose": 0
+   }
+  },
+  {
+   "check": "Demolitions_CraterRim: tris <= 400, closed shells",
+   "ok": true,
+   "detail": {
+    "tris": 224,
+    "non_manifold": 0,
+    "loose": 0
+   }
+  },
+  {
+   "check": "Demolitions_Explosion: tris <= 2500, closed shells",
+   "ok": true,
+   "detail": {
+    "tris": 1600,
+    "non_manifold": 0,
+    "loose": 0
+   }
+  },
+  {
+   "check": "Demolitions_Mine_Armed + owner ring: tris <= 1200",
+   "ok": true,
+   "detail": 1136
+  },
+  {
+   "check": "Demolitions_CraterRim: sits on the ground (min z about 0)",
+   "ok": true,
+   "detail": 0.004
+  },
+  {
+   "check": "Demolitions_CraterRim: vertex colour 'Col' present",
+   "ok": true,
+   "detail": [
+    "Col.001",
+    "Col"
+   ]
+  },
+  {
+   "check": "Demolitions_Explosion: sits on the ground (min z about 0)",
+   "ok": true,
+   "detail": -0.018
+  },
+  {
+   "check": "Demolitions_Explosion: vertex colour 'Col' present",
+   "ok": true,
+   "detail": [
+    "Col.001",
+    "Col"
+   ]
+  },
+  {
+   "check": "Demolitions_Mine_Armed: sits on the ground (min z about 0)",
+   "ok": true,
+   "detail": -0.036
+  },
+  {
+   "check": "Demolitions_Mine_Armed: vertex colour 'Col' present",
+   "ok": true,
+   "detail": [
+    "Col.001",
+    "Col"
+   ]
+  },
+  {
+   "check": "Demolitions_Mine_Armed_OwnerRing: sits on the ground (min z about 0)",
+   "ok": true,
+   "detail": -0.0
+  },
+  {
+   "check": "Demolitions_Mine_Armed_OwnerRing: vertex colour 'Col' present",
+   "ok": true,
+   "detail": [
+    "Col.001",
+    "Col"
+   ]
+  },
+  {
+   "check": "Demolitions_Mine_Buried: sits on the ground (min z about 0)",
+   "ok": true,
+   "detail": -0.022
+  },
+  {
+   "check": "Demolitions_Mine_Buried: vertex colour 'Col' present",
+   "ok": true,
+   "detail": [
+    "Col.001",
+    "Col"
+   ]
+  },
+  {
+   "check": "Demolitions_Mine_Triggered: sits on the ground (min z about 0)",
+   "ok": true,
+   "detail": -0.036
+  },
+  {
+   "check": "Demolitions_Mine_Triggered: vertex colour 'Col' present",
+   "ok": true,
+   "detail": [
+    "Col.001",
+    "Col"
+   ]
+  },
+  {
+   "check": "Demolitions_TNT_Flight: vertex colour 'Col' present",
+   "ok": true,
+   "detail": [
+    "Col.001",
+    "Col"
+   ]
+  }
+ ]
+}

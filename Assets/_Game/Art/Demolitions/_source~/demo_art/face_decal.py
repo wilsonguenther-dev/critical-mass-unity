@@ -83,20 +83,17 @@ def paint():
         rgb = rgb * (1 - k[..., None]) + col * k[..., None]
         a = a + k * (1 - a)
 
-    # soft soot band across the eyes and the bridge of the nose (soft edge, not a hard blob)
-    blobs = [(0.0, 1.472, 0.205, 0.072, 0.0), (0.15, 1.455, 0.08, 0.066, 0.3), (-0.15, 1.46, 0.085, 0.062, -0.4),
-             (0.07, 1.512, 0.07, 0.038, 0.2), (-0.09, 1.517, 0.06, 0.034, -0.1)]
-    sd = np.min(np.stack([_ellipse(X, Z, *b) for b in blobs]), axis=0)
-    over(_cov(sd, pxm * 5.0), SOOT, 0.55)
+    # two soft soot smudges (her right cheek, the bridge of the nose): a hint of the job, the face stays clean
+    over(_cov(_ellipse(X, Z, -0.165, 1.392, 0.045, 0.024, 0.35), pxm * 6), SOOT, 0.45)
+    over(_cov(_ellipse(X, Z, 0.01, 1.468, 0.03, 0.016, -0.2), pxm * 5), SOOT, 0.35)
     for s in (1, -1):
         ex, ez = EYE_X * s, EYE_Z
-        over(_cov(_ellipse(X, Z, ex, ez + 0.002, 0.086, 0.083), pxm * 2.0), CLEAN)      # clean goggle ring
         over(_cov(_ellipse(X, Z, 0.165 * s, 1.392, 0.05, 0.026), pxm * 6), BLUSH, 0.45)  # cheek blush
-        eye = _ellipse(X, Z, ex, ez, 0.060, 0.068)
+        eye = _ellipse(X, Z, ex, ez, 0.066, 0.075)
         if s > 0:
-            lid_p, lid_q = (ex - 0.08, ez + 0.058), (ex + 0.08, ez + 0.050)
+            lid_p, lid_q = (ex - 0.08, ez + 0.066), (ex + 0.08, ez + 0.058)
         else:
-            lid_q, lid_p = (ex - 0.08, ez + 0.022), (ex + 0.08, ez + 0.034)
+            lid_p, lid_q = (ex - 0.08, ez + 0.036), (ex + 0.08, ez + 0.048)   # squint: lid lower
         open_eye = np.maximum(eye, -_halfplane(X, Z, lid_p, lid_q))
         over(_cov(eye - 0.006, pxm), INK)
         over(_cov(eye, pxm), LID)
@@ -110,13 +107,13 @@ def paint():
         lidline = np.abs(_halfplane(X, Z, lid_p, lid_q)) - 0.0085
         over(_cov(np.maximum(lidline, eye), pxm), INK)
         # winged lash line (bible Farmer): tapered flick out and up from the outer upper corner, two lashes
-        oz = ez + (0.050 if s > 0 else 0.028)
+        oz = ez + (0.058 if s > 0 else 0.044)
         over(_cov(_capsule(X, Z, (ex + 0.050 * s, oz - 0.004), (ex + 0.090 * s, oz + 0.028), 0.0075, 0.002), pxm), INK)
         over(_cov(_capsule(X, Z, (ex + 0.030 * s, oz + 0.006), (ex + 0.054 * s, oz + 0.034), 0.0045, 0.0015), pxm), INK)
         over(_cov(_capsule(X, Z, (ex + 0.010 * s, oz + 0.010), (ex + 0.024 * s, oz + 0.036), 0.004, 0.0015), pxm), INK)
         # thick arched brow; her left (s=+1) cocked high, her right flatter and lower over the squint
         lift = 0.020 if s > 0 else -0.004
-        p0, p1, p2 = (0.035 * s, 1.552 + lift), (0.112 * s, 1.578 + lift * 1.3), (0.19 * s, 1.562 + lift * 0.6)
+        p0, p1, p2 = (0.035 * s, 1.562 + lift), (0.112 * s, 1.588 + lift * 1.3), (0.19 * s, 1.572 + lift * 0.6)
         brow = np.minimum(_capsule(X, Z, p0, p1, 0.013, 0.012), _capsule(X, Z, p1, p2, 0.012, 0.005))
         over(_cov(brow, pxm), BROW)
         for k, (dx, dz) in enumerate(((0.012, 0.018), (0.022, 0.010), (0.016, -0.004))):   # singed frizz at the tail
