@@ -941,6 +941,14 @@ namespace CriticalMass.Runtime.View.Effects
                     float a = s * Mathf.PI / 4f + (float)now * 0.6f;
                     ground.Ring(c, gr, gu, R * p - 0.12f, R * p + 0.02f, a, a + 0.42f, 6, A(Navy, 0.6f));
                 }
+                // feat/ground-camera: from a low camera a ground ring is a thin line; a fading wall on the hitbox edge keeps
+                // the slam readable at a grazing angle (the shape stays the hitbox: radius R exactly).
+                if (CriticalMass.Runtime.Camera.GroundView.IsActive) Fence(air, c, R, 0f, Mathf.PI * 2f, 40, 1.6f, A(WarnHot, 0.55f * pulse));
+            }
+            if (k.MeleeWindupIn > 0 && CriticalMass.Runtime.Camera.GroundView.IsActive)
+            {
+                double kx = k.PrevX + (k.X - k.PrevX) * Alpha, kz = k.PrevZ + (k.Z - k.PrevZ) * Alpha;
+                Fence(air, W(kx, Ground(kx, kz) + 0.05, kz), (float)(_cfg.Kaiju.MeleeRange + Kaiju.MeleeLeash), 0f, Mathf.PI * 2f, 36, 1.0f, A(WarnHot, 0.4f));
             }
             if (k.MeleeWindupIn > 0) DrawMeleeTelegraph(w, ground, now);
             else DrawPreWarnings(w, ground);
@@ -1030,6 +1038,25 @@ namespace CriticalMass.Runtime.View.Effects
                     float a = s * Mathf.PI / 8f;
                     ground.Ring(c, gr, gu, R - 0.1f, R + 0.02f, a, a + 0.26f, 4, A(WarnHot, 0.32f));
                 }
+            }
+        }
+
+        /// <summary>
+        /// feat/ground-camera: a vertical band standing on a ground circle (centre c, radius r, angles a0..a1), colour at the
+        /// foot fading to clear at height h: the telegraph's vertical element for the low ground camera.
+        /// </summary>
+        private static void Fence(FxMeshBuilder b, Vector3 c, float r, float a0, float a1, int seg, float h, Color32 col)
+        {
+            Color32 top = col;
+            top.a = 0;
+            float step = (a1 - a0) / seg;
+            for (int i = 0; i < seg; i++)
+            {
+                float a = a0 + (i + 0.5f) * step;
+                Vector3 radial = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a));
+                Vector3 tangent = new Vector3(-Mathf.Sin(a), 0f, Mathf.Cos(a));
+                Vector3 mid = c + radial * r + Vector3.up * (h * 0.5f);
+                b.Quad(mid, tangent * (r * step * 0.5f * 1.02f), Vector3.up * (h * 0.5f), col, top);
             }
         }
 
