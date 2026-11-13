@@ -45,7 +45,7 @@ namespace CriticalMass.Runtime.Secrets
             {
                 SecretsBoard.Fire(SecretsBoard.HillAlone);
                 SecretsBoard.Announce(HillAloneLine);
-                if (SettingsExtras.Subtitles) CaptionBar.Show(LoreText.Announcer(HillAloneLine), 4f);
+                if (SettingsExtras.Subtitles && CriticalMass.Runtime.Audio.Announcer.Instance == null) CaptionBar.Show(LoreText.Announcer(HillAloneLine), 4f);
             }
             ReadEvents(w);
             UpdateCrown(w);

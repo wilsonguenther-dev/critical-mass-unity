@@ -438,7 +438,7 @@ namespace CriticalMass.Runtime.Menu
             // character
             GameConfig cfg = Config;
             ClassConfig k = cfg.Class(c);
-            HudText.Set(_nameBig, p.PlayerName);
+            HudText.Set(_nameBig, SettingsExtras.HideNames ? "PLAYER" : p.PlayerName); // integration batch 2: the ACCESS tab hides names
             _team.color = CMTokens.Team(team);
             HudText.Set(_team, team == TeamId.Azure ? "AZURE" : "CRIMSON");
             HudText.Set(_statValue[0], ProgressionWords.Number(k.MaxHp) + " HP");
