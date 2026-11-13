@@ -111,13 +111,14 @@ namespace CriticalMass.Sim.Core
                 if (a.Cls == ClassId.Warrior) CastWarriorShield(w, i);
                 else if (a.Cls == ClassId.Farmer) CastFarmerRoots(w, i);
                 else if (a.Cls == ClassId.Miner) CastMinerBarricade(w, i);
-                // ITEM CM-38: added by its owner (land mine cast)
+                else if (a.Cls == ClassId.Demolitions) Demolitions.CastMine(w, i); // DG-22 (CM-38): land mine on Space
                 // CM-56: builder has no Space cast yet (CM-39 upgrade); an explicit miner check keeps it from casting a
                 // barricade that Barricades would refuse for a non-miner.
             }
             // CM-30: miner dig / place (InputFrame.Terraform, its own key, so Space stays the barricade). DG-09: and the mode switch.
             Terraform.TerraformSystem(w);
-            // ITEM CM-38: added by its owner (TNT throw on F)
+            // DG-22 (CM-38): a Demolitions Expert's TNT throw on the same key (DigPlace: F, Y on a controller), its own cooldown.
+            Demolitions.DemolitionsInputSystem(w);
         }
 
         /// <summary>

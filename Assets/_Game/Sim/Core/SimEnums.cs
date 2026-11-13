@@ -100,6 +100,20 @@ namespace CriticalMass.Sim.Core
         Cleanse,
         /// <summary>CM-36: the cleanse in flight finished: A = cleanser (-1 scripted), B = team index, (X, Z) = the shrine, Value = instability drained.</summary>
         CleanseEnd,
+        /// <summary>DG-22: a land mine went down: A = owner, B = mine slot, (X, Z) = its cell centre, Value = the tick it arms, Radius = blast radius.</summary>
+        MinePlaced,
+        /// <summary>DG-22: a mine armed (the ring warning): A = owner, B = mine slot, (X, Z) = cell centre, Value = the tick it expires, Radius = blast radius.</summary>
+        MineArmed,
+        /// <summary>DG-22: an enemy stepped on an armed mine: A = that actor, B = the owner, (X, Z) = cell centre, Value = mine slot, Radius = blast radius (an Explosion follows).</summary>
+        MineTriggered,
+        /// <summary>DG-22: a mine left without a blast: A = owner, B = mine slot, (X, Z) = cell centre, Value = Demolitions.MineExpired / MineGroundGone / MineRecycled, Radius = blast radius.</summary>
+        MineRemoved,
+        /// <summary>DG-22: TNT left the thrower's hand: A = thrower, B = bomb slot, (X, Z) = where it will land, Value = the tick it lands, Radius = blast radius.</summary>
+        TntThrown,
+        /// <summary>DG-22: thrown TNT touched down (fuse burning): A = thrower, B = bomb slot, (X, Z) = where it lies, Value = the tick it blows, Radius = blast radius.</summary>
+        TntLanded,
+        /// <summary>DG-22: an explosion (Effects.Explode): A = owner, B = Demolitions.ExplosionMine / ExplosionTnt, (X, Z) = centre, Value = actors hurt, Radius = blast radius, Cause = Explosion.</summary>
+        Explosion,
         // ITEM CM-84: added by its owner (ClassSwitch, ports CM-54)
         /// <summary>CM-37: one tick of fountain healing (Heal.HealSystem): A = the healed actor, B = -1, (X, Z) = the actor, Value = HP restored this tick (&gt; 0).</summary>
         Heal,

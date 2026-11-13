@@ -450,6 +450,8 @@ namespace CriticalMass.Sim.Config
         public double Damage = 55;
         public double CarveRadius = 1;
         public double CooldownTicks = 150;
+        /// <summary>DG-22 (not in the browser, U-059): ticks from the throw until the bundle touches down (the TntLanded event; the fuse still counts from the throw) [guess: 0.4 s].</summary>
+        public double FlightTicks = 12;
 
         public DemolitionsTntConfig Clone() => (DemolitionsTntConfig)MemberwiseClone();
     }

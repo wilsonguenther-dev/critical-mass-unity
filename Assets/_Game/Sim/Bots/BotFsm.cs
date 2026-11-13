@@ -78,7 +78,6 @@ namespace CriticalMass.Sim.Bots
         /// <summary>CM-37: the CM-09 retreat threshold, kept in Heal.SeekHpShare (0.3).</summary>
         public static double LowHp(GameConfig c) => c.Heal.SeekHpShare;
 
-        // ITEM CM-38: added by its owner (canPlaceMine, requestBotTnt, tntWaitTicks from sim/demolitions)
 
         private static int[] Near = new int[0];
 
@@ -289,7 +288,11 @@ namespace CriticalMass.Sim.Bots
         {
             Actor a = w.Actors[id];
             st.AbilityReq[id] = 0;
-            // ITEM CM-38: added by its owner (Demolitions class branch: DecideDemolitions(w, st, id, state); return;)
+            if (a.Cls == ClassId.Demolitions)
+            {
+                DecideDemolitions(w, st, id, state, sk); // DG-22 (CM-38)
+                return;
+            }
             if (a.AbilityCd > 0) return;
             double x = w.X[id];
             double z = w.Z[id];
@@ -368,7 +371,59 @@ namespace CriticalMass.Sim.Bots
             st.AbilityZ[id] = JsMath.F32(tz);
         }
 
-        // ITEM CM-38: added by its owner (DecideDemolitions: TNT throw via requestBotTnt / tntWaitTicks, land mine via canPlaceMine)
+        /// <summary>
+        /// DG-22 (CM-38) Demolitions Expert (no melee: its attack press does nothing). TNT first (its own cooldown,
+        /// Demolitions.TntWaitTicks): at the chosen enemy when it is within DemolitionsTnt.ThrowRange, else at the centroid of
+        /// the enemies within 8 when that is in range; queued with Demolitions.RequestBotTnt and pressed by FillBotInput as one
+        /// press. Else a land mine (Space) on the bot's own cell while holding the hill, or while fighting / heading to it with an
+        /// enemy within 8; Demolitions.CanPlaceMine is asked first, so a press never produces a refused cast. One press per think.
+        /// DG-21: Hard leads a moving target by TntLeadFraction x fuse time; Easy throws AimErrorUnits off and only on
+        /// AbilityChance of its thinks (Normal is the browser rule).
+        /// </summary>
+        private static void DecideDemolitions(World w, BotsState st, int id, AiState state, BotSkillConfig sk)
+        {
+            double x = w.X[id];
+            double z = w.Z[id];
+            if (P.Within8 > 0 && Demolitions.TntWaitTicks(w, id) == 0 && BotSkill.UsesAbilityNow(w, id, sk))
+            {
+                DemolitionsTntConfig T = w.Config.Abilities.DemolitionsTnt;
+                double tr2 = T.ThrowRange * T.ThrowRange;
+                double tx = double.NaN;
+                double tz = double.NaN;
+                if (P.Enemy >= 0 && P.EnemyD2 <= tr2)
+                {
+                    tx = w.X[P.Enemy];
+                    tz = w.Z[P.Enemy];
+                    if (sk != null && sk.TntLeadFraction > 0)
+                    {
+                        double lead = sk.TntLeadFraction * T.FuseTicks / w.Config.SimHz;
+                        tx += w.Vx[P.Enemy] * lead;
+                        tz += w.Vz[P.Enemy] * lead;
+                    }
+                }
+                else
+                {
+                    double dx = P.Cx - x;
+                    double dz = P.Cz - z;
+                    if (dx * dx + dz * dz <= tr2)
+                    {
+                        tx = P.Cx;
+                        tz = P.Cz;
+                    }
+                }
+                if (double.IsFinite(tx))
+                {
+                    BotSkill.Jitter(w, id, sk, ref tx, ref tz);
+                    Demolitions.RequestBotTnt(w, id, tx, tz);
+                    return;
+                }
+            }
+            if (state != AiState.HoldHill && !((state == AiState.Fight || state == AiState.ToHill) && P.Within8 > 0)) return;
+            if (!Demolitions.CanPlaceMine(w, id, x, z)) return;
+            st.AbilityReq[id] = 1;
+            st.AbilityX[id] = JsMath.F32(x);
+            st.AbilityZ[id] = JsMath.F32(z);
+        }
 
         /// <summary>One think for bot id: perception, stuck check, utility selection, targets, ability decision.</summary>
         public static void ThinkBot(World w, BotsState st, int id)
