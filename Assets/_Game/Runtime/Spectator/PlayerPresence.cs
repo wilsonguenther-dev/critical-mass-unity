@@ -164,7 +164,8 @@ namespace CriticalMass.Runtime.Spectator
 
             bool input = AnyInput();
             float now = Time.unscaledTime;
-            if (input || !alive || paused || title || spectating) _lastInput = now;
+            // The idle clock does not run behind the loading screen: Play Now hands the human control on the first frame.
+            if (input || !alive || paused || title || spectating || Menus.LoadingScreen.IsOpen) _lastInput = now;
 
             bool eligible = !tool && !spectating && !title && playing;
             if (eligible && Driver.HumanAutopilot && input)

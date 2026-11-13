@@ -528,7 +528,7 @@ namespace CriticalMass.Runtime.Hud.Interact
             GameConfig c = Cfg;
             MatchState m = w.Match;
             bool egg = !m.Hatched || w.Kaiju.State == KaijuState.Egg;
-            string sub = egg ? "EGG · HATCHES IN " + Clock(c.HatchSeconds - m.Time)
+            string sub = egg ? "EGG · HATCHES IN " + Clock(global::CriticalMass.Runtime.Flow.MatchSpeed.ToReal(c.HatchSeconds - m.Time))
                 : w.Kaiju.State == KaijuState.Azure ? "AZURE · FIGHTS FOR AZURE"
                 : w.Kaiju.State == KaijuState.Crimson ? "CRIMSON · FIGHTS FOR CRIMSON"
                 : w.Kaiju.State == KaijuState.Berserk ? "BERSERK · FIGHTS EVERYONE" : "WILD · FIGHTS WHOEVER HITS IT";
@@ -597,7 +597,7 @@ namespace CriticalMass.Runtime.Hud.Interact
             int cls = Mathf.Clamp((int)a.Cls, 0, ClassUpper.Length - 1);
             Card.Open("health", "HEALTH", ClassUpper[cls], new[]
             {
-                a.Alive ? "Health " + N(Math.Ceiling(Math.Max(0, a.Hp))) + " of " + N(a.MaxHp) + ". Each heart is a quarter." : "Knocked out. Back in " + N(Math.Ceiling(Math.Max(0, a.RespawnIn))) + " s.",
+                a.Alive ? "Health " + N(Math.Ceiling(Math.Max(0, a.Hp))) + " of " + N(a.MaxHp) + ". Each heart is a quarter." : "Knocked out. Back in " + N(Math.Ceiling(Math.Max(0, global::CriticalMass.Runtime.Flow.MatchSpeed.ToReal(a.RespawnIn)))) + " s.",
                 LoreText.Tip("tip-14", c) ?? "Knocked out? You are back in " + N(c.Respawn.DelaySeconds) + " s, and nothing can hurt you for " + N(c.Respawn.ProtectionSeconds) + " s after.",
                 "Knockouts " + a.Kills + ", knocked out " + a.Deaths + ".",
             }, CardHint);
@@ -641,7 +641,7 @@ namespace CriticalMass.Runtime.Hud.Interact
             Card.Open("score", "SCORE", "HILL SECONDS DECIDE THE MATCH", new[]
             {
                 "Azure " + N(Math.Floor(m.HillSeconds.Azure)) + " s of hill, Crimson " + N(Math.Floor(m.HillSeconds.Crimson)) + " s.",
-                "Time left " + Clock(w.Config.MatchSeconds - m.Time) + ".",
+                "Time left " + Clock(global::CriticalMass.Runtime.Flow.MatchSpeed.ToReal(w.Config.MatchSeconds - m.Time)) + ".",
                 "You: " + a.Kills + " knockouts, knocked out " + a.Deaths + ", " + N(Math.Floor(a.HillSeconds)) + " s on the hill.",
             }, CardHint);
         }

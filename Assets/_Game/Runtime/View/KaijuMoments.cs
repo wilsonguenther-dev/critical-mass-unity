@@ -598,7 +598,7 @@ namespace CriticalMass.Runtime.View
             HudText.Set(_calloutText, soon ? KaijuMomentTracker.WordEggCracking :
                 _calloutKind == KaijuMomentKind.KnockedOut ? KaijuMomentTracker.WordKaijuDown : KaijuMomentTracker.WordKaijuUp);
             _calloutClock.gameObject.SetActive(soon);
-            if (soon) HudText.Set(_calloutClock, NumberCache.Mmss(w.Config.HatchSeconds - w.Match.Time));
+            if (soon) HudText.Set(_calloutClock, NumberCache.Mmss(global::CriticalMass.Runtime.Flow.MatchSpeed.ToReal(w.Config.HatchSeconds - w.Match.Time)));
             // entrance: 0.2 sim s drop-in from 14 units above
             float t = Mathf.Clamp01((float)(age / 0.2));
             _callout.anchoredPosition = new Vector2(0f, -168f + 14f * (1f - t) * (1f - t));

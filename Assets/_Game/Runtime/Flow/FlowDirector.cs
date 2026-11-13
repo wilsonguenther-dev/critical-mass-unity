@@ -292,7 +292,8 @@ namespace CriticalMass.Runtime.Flow
             });
         }
 
-        public void PlayAgain() => GameFlow.BeginMatch(GameFlow.LastSetup);
+        /// <summary>Results' PLAY AGAIN (focused, one press): the same setup on a new seed, with the short loading screen.</summary>
+        public void PlayAgain() => GameFlow.BeginMatch(GameFlow.LastSetup, true);
 
         public void ToMainMenu() => GameFlow.ReturnTo(FlowState.Menu);
 

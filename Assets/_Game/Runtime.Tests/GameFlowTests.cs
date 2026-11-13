@@ -149,7 +149,10 @@ namespace CriticalMass.Runtime.Tests
         {
             List<MenuEntry> e = OverlayRegistry.MenuEntries(Array.Empty<Type>());
             string[] ids = e.ConvertAll(x => x.Id).ToArray();
-            CollectionAssert.AreEqual(new[] { "play", "spectate", "howto", "barracks", "controls", "settings", "codex", "credits", "quit" }, ids);
+            CollectionAssert.AreEqual(new[] { "playnow", "play", "spectate", "howto", "barracks", "controls", "settings", "codex", "credits", "quit" }, ids);
+            Assert.IsTrue(e.Find(x => x.Id == "playnow").Available, "PLAY NOW is the first line");
+            Assert.AreEqual("PLAY NOW", e[0].Label);
+            Assert.AreEqual("CUSTOM MATCH", e.Find(x => x.Id == "play").Label, "the setup flow keeps its line as Custom match");
             Assert.IsTrue(e.Find(x => x.Id == "play").Available);
             Assert.IsTrue(e.Find(x => x.Id == "controls").Available);
             Assert.IsTrue(e.Find(x => x.Id == "settings").Available);

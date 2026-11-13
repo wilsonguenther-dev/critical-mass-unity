@@ -11,12 +11,12 @@ using UnityEngine.UI;
 namespace CriticalMass.Runtime.Menus
 {
     /// <summary>
-    /// DG-01 match setup: team (Azure or Crimson), size (16 v 16 or 5 v 5), pace (2x or 1x), bot difficulty (coming soon,
-    /// DG-21), and the five class cards (portrait in the chosen team's colour, name, role line, attack and ability names,
+    /// DG-01 match setup: team (Azure or Crimson), size (16 v 16 or 5 v 5), speed (Relaxed 0.75x, Standard 1x, Fast 2x;
+    /// MatchSpeed, default Standard), bot difficulty (DG-21), and the five class cards (portrait in the chosen team's colour, name, role line, attack and ability names,
     /// difficulty pips; words from DG-04's pack when present). Demolitions and Builder show as coming soon until their
     /// items add them to Playable. Moving the focus onto a card picks it; A / Enter on a card jumps to Start. START MATCH
     /// creates the world with a new seed (GameFlow.BeginMatch). Back: the main menu (or the results, for Change class).
-    /// The last setup is remembered between launches (PlayerPrefs).
+    /// The last setup is remembered between launches (SetupPrefs, which Play Now reads too).
     /// <para>2026-11-12: the team line has a third choice beside the two teams, SPECTATE: the match starts with your fighter
     /// playing itself and the free spectator camera (SpectatorMode.SpectateNextMatch); START MATCH reads WATCH MATCH.</para>
     /// </summary>
@@ -30,9 +30,6 @@ namespace CriticalMass.Runtime.Menus
 
         /// <summary>Cards on the class row: every class the sim has (six since DG-40).</summary>
         public static int CardCount => ClassIds.All.Count;
-
-        const string PrefTeam = "cm.flow.setup.team", PrefClass = "cm.flow.setup.class", PrefSize = "cm.flow.setup.size",
-            PrefPace = "cm.flow.setup.pace", PrefBots = "cm.flow.setup.bots";
 
         public const float CardW = 250f, CardH = 350f, CardGap = 16f, CardsY = 470f;
 
@@ -50,11 +47,8 @@ namespace CriticalMass.Runtime.Menus
         readonly Text[][] _cardTexts = new Text[CardCount][];
         HudIcon _crest;
         readonly List<System.Action> _refresh = new List<System.Action>();
-        static bool _prefsLoaded;
         int _tier = 2;
-
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        static void ResetOnPlay() => _prefsLoaded = false;
+        static double _matchSeconds = -1;
 
         public MenuItem TeamItem => _team;
         public MenuItem SizeItem => _size;
@@ -77,8 +71,8 @@ namespace CriticalMass.Runtime.Menus
             _crest = HudIcon.Make(_team.transform, "Crest", sw * 0.42f - 92f, 7f, 44f, 44f);
             _size = Stepper(space, "Size", sx, sy + step, sw, sh, "MATCH SIZE", () => Choice.TeamSize <= 5 ? "5 V 5" : "16 V 16",
                 d => Choice.TeamSize = Choice.TeamSize <= 5 ? 16 : 5, _refresh);
-            _pace = Stepper(space, "Pace", sx, sy + 2 * step, sw, sh, "PACE", PaceText,
-                d => Choice.Pace = Choice.Pace >= 2 ? 1 : 2, _refresh);
+            _pace = Stepper(space, "Pace", sx, sy + 2 * step, sw, sh, "SPEED", PaceText,
+                d => Choice.Pace = MatchSpeed.PaceOf(MatchSpeed.Step(MatchSpeed.FromPace(Choice.Pace), d)), _refresh);
             // DG-21: the enemy bots' difficulty (Easy, Normal, Hard); allies and the backdrop stay Normal.
             _bots = Stepper(space, "Bots", sx, sy + 3 * step, sw, sh, "ENEMY BOTS", BotText, StepBots, _refresh);
 
@@ -169,12 +163,22 @@ namespace CriticalMass.Runtime.Menus
 
         public MenuItem BotsItem => _bots;
 
+        /// <summary>The speed line: "STANDARD · 1X · 10:00 MATCH" (the match length in real minutes at that speed).</summary>
         string PaceText()
         {
-            double clock = GameConfig.CreateDefault().MatchSeconds;
-            double pace = Choice.Pace >= 2 ? 2 : 1;
-            return (pace >= 2 ? "2X" : "1X") + "   ·   " + NumberCache.Mmss(clock) + " CLOCK IN " +
-                   Mathf.RoundToInt((float)(clock / pace / 60.0)) + " MIN";
+            if (_matchSeconds <= 0) _matchSeconds = GameConfig.CreateDefault().MatchSeconds;
+            MatchSpeedChoice c = MatchSpeed.FromPace(Choice.Pace);
+            return MatchSpeed.Label(c) + "   ·   " + MatchSpeed.Multiplier(c) + "   ·   " +
+                   NumberCache.Mmss(MatchSpeed.ToReal(_matchSeconds, MatchSpeed.PaceOf(c))) + " MATCH";
+        }
+
+        /// <summary>The speed chosen on the SPEED line.</summary>
+        public MatchSpeedChoice Speed => MatchSpeed.FromPace(Choice.Pace);
+
+        public void SetSpeed(MatchSpeedChoice c)
+        {
+            Choice.Pace = MatchSpeed.PaceOf(c);
+            RefreshAll();
         }
 
         /// <summary>Explicit navigation: steppers in a column, the card row, then Back / Start.</summary>
@@ -229,23 +233,10 @@ namespace CriticalMass.Runtime.Menus
 
         protected override void OnShow()
         {
-            if (!_prefsLoaded && GameFlow.MatchesStarted == 0)
-            {
-                _prefsLoaded = true;
-                MatchSetupChoice d = MatchSetupChoice.Default;
-                GameFlow.LastSetup = new MatchSetupChoice
-                {
-                    Team = PlayerPrefs.GetInt(PrefTeam, (int)d.Team) == 1 ? TeamId.Crimson : TeamId.Azure,
-                    Class = (ClassId)Mathf.Clamp(PlayerPrefs.GetInt(PrefClass, (int)d.Class), 0, CardCount - 1),
-                    BotDifficulty = (CriticalMass.Sim.Core.BotDifficulty)Mathf.Clamp(PlayerPrefs.GetInt(PrefBots, (int)d.BotDifficulty), 0, 2),
-                    TeamSize = PlayerPrefs.GetInt(PrefSize, d.TeamSize) <= 5 ? 5 : 16,
-                    Pace = PlayerPrefs.GetInt(PrefPace, 2) <= 1 ? 1 : 2,
-                };
-            }
-            Choice = GameFlow.LastSetup;
+            Choice = SetupPrefs.EnsureLoaded();
             if (!Playable.Contains(Choice.Class)) Choice.Class = ClassId.Warrior;
             if (Choice.TeamSize != 5) Choice.TeamSize = 16;
-            Choice.Pace = Choice.Pace >= 2 ? 2 : 1;
+            Choice.Pace = Choice.Pace > 0 ? MatchSpeed.Snap(Choice.Pace) : MatchSpeed.DefaultPace;
             Spectate = SpectatorMode.SpectateNextMatch;
             RefreshAll();
         }
@@ -289,7 +280,7 @@ namespace CriticalMass.Runtime.Menus
 
         public void SetPace(double pace)
         {
-            Choice.Pace = pace >= 2 ? 2 : 1;
+            Choice.Pace = MatchSpeed.Snap(pace);
             RefreshAll();
         }
 
@@ -377,11 +368,7 @@ namespace CriticalMass.Runtime.Menus
         {
             ClassSelect.SelectedClass = Choice.Class;          // DG-10 reads it for the respawn strip and the pause menu
 
-            PlayerPrefs.SetInt(PrefTeam, (int)Choice.Team);
-            PlayerPrefs.SetInt(PrefClass, (int)Choice.Class);
-            PlayerPrefs.SetInt(PrefSize, Choice.TeamSize);
-            PlayerPrefs.SetInt(PrefPace, Choice.Pace >= 2 ? 2 : 1);
-            PlayerPrefs.SetInt(PrefBots, (int)Choice.BotDifficulty);
+            SetupPrefs.Save(Choice);
             SpectatorMode.SpectateNextMatch = Spectate;
             GameFlow.BeginMatch(Choice);
         }
@@ -389,7 +376,7 @@ namespace CriticalMass.Runtime.Menus
         public override void Back()
         {
             if (FromResults) Director.ReturnToResults();
-            else Director.ShowMenu(OverlayRegistry.Play);
+            else Director.ShowMenu(OverlayRegistry.Play);   // back onto CUSTOM MATCH, the line that opened setup
         }
     }
 }
