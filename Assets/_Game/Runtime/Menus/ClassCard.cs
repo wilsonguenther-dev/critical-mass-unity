@@ -530,6 +530,7 @@ namespace CriticalMass.Runtime.Menus
         public TeamId Team { get; private set; }
 
         readonly float _w, _h;
+        float _rowY, _rowH;
         HudIcon _portrait;
         float _portraitPx;
         Text _name, _role, _bio, _hotkey, _diffLabel;
@@ -643,6 +644,8 @@ namespace CriticalMass.Runtime.Menus
             _bio.lineSpacing = 1.05f;
 
             float rowY = 260f, rowH = (_h - rowY - 24f) / 3f;
+            _rowY = rowY;
+            _rowH = rowH;
             for (int i = 0; i < 3; i++)
             {
                 var r = new AbilityRow();
@@ -659,7 +662,7 @@ namespace CriticalMass.Runtime.Menus
                 r.SoonTag.RimColor = Brass;
                 r.SoonTag.RimPx = 2f;
                 r.SoonTag.OutlinePx = 2f;
-                r.Soon = MenuUi.Fit(MenuUi.Label(r.SoonTag.transform, "Label", CMTokens.Ui, UiScale.TypeMin, Brass, TextAnchor.MiddleCenter, 0f, 0f, 180f, 30f, "COMING SOON", 2f), 15);
+                r.Soon = MenuUi.Fit(MenuUi.Label(r.SoonTag.transform, "Label", CMTokens.Ui, UiScale.TypeMin, Brass, TextAnchor.MiddleCenter, 0f, 0f, 180f, 30f, "", 2f), 15);
                 r.Text = MenuUi.Label(r.Rt, "Text", CMTokens.Ui, UiScale.TypeSmall, Cream, TextAnchor.UpperLeft, 92f, 52f, _w - 48f - 92f - 18f, rowH - 64f, "", 2f);
                 r.Text.horizontalOverflow = HorizontalWrapMode.Wrap;
                 _rows[i] = r;
@@ -723,17 +726,23 @@ namespace CriticalMass.Runtime.Menus
                 _pips[i].SetFill(on ? Brass : Empty);
             }
             if (_bio != null) HudText.Set(_bio, _words.Bio);
+            int shown = 0;
             for (int i = 0; i < _rows.Length; i++)
             {
                 AbilityRow r = _rows[i];
                 if (r == null) continue;
                 bool has = i < _words.Abilities.Length;
+                // Polish pass 1: rows close up from the top, so a class with fewer lines leaves no hole.
                 r.Rt.gameObject.SetActive(has);
                 if (!has) continue;
+                MenuUi.Place(r.Rt, 24f, _rowY + shown * _rowH, _w - 48f, _rowH - 10f);
+                shown++;
                 AbilityWords a = _words.Abilities[i];
                 HudText.Set(r.Name, a.Name.ToUpperInvariant());
                 HudText.Set(r.Text, a.Text);
-                bool soon = a.NeedsRule.Length > 0;
+                // Polish pass 1: every rule a card names is in the game since batch 3 (Demolitions DG-22, Builder DG-24), so
+                // the old COMING SOON tag never shows (its label is empty too).
+                bool soon = false;
                 r.SoonTag.gameObject.SetActive(soon);
                 r.Cooldown.gameObject.SetActive(!soon && a.Cooldown.Length > 0);
                 if (a.Cooldown.Length > 0) HudText.Set(r.Cooldown, a.Cooldown + " S COOLDOWN");

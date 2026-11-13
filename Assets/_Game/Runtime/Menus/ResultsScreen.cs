@@ -111,7 +111,7 @@ namespace CriticalMass.Runtime.Menus
                 Rect r = ResultsLayout.Tab(i);
                 var tab = (ResultsTab)i;
                 MenuItem it = MenuUi.Item(space, "Tab " + TabNames[i], r.x, r.y, r.width, r.height, TabNames[i], MenuItem.Kind.Button,
-                    UiScale.TypeSmall + 4, true, CMTokens.Display);
+                    UiScale.TypeBody, true, CMTokens.Display);
                 it.Body.Radius = 14f;
                 it.Submitted = () => ShowTab(tab);
                 _tabs[i] = it;
@@ -245,7 +245,7 @@ namespace CriticalMass.Runtime.Menus
 
         void BuildAchievementsPage(RectTransform page)
         {
-            _achCount = L(page, "Count", CMTokens.Display, UiScale.TypeHeading - 4, Brass, TextAnchor.MiddleCenter, ResultsLayout.AchCount, 3f);
+            _achCount = L(page, "Count", CMTokens.Display, UiScale.TypeButton, Brass, TextAnchor.MiddleCenter, ResultsLayout.AchCount, 3f);
             int n = Mathf.Min(Achievements.All.Length, ResultsLayout.AchCols * ResultsLayout.AchRowsPerCol);
             for (int i = 0; i < n; i++)
             {
@@ -302,8 +302,8 @@ namespace CriticalMass.Runtime.Menus
                 img.raycastTarget = false;
                 img.enabled = false;
                 _stills[k] = img;
-                _tileLabel[k] = L(page, "Label " + k, CMTokens.Display, UiScale.TypeBody + 2, Cream, TextAnchor.MiddleLeft, ResultsLayout.TileLabel(k), 3f);
-                _tileTime[k] = L(page, "Time " + k, CMTokens.Mono, UiScale.TypeSmall + 2, Brass, TextAnchor.MiddleLeft, ResultsLayout.TileTime(k), 2f);
+                _tileLabel[k] = L(page, "Label " + k, CMTokens.Display, UiScale.TypeBody, Cream, TextAnchor.MiddleLeft, ResultsLayout.TileLabel(k), 3f);
+                _tileTime[k] = L(page, "Time " + k, CMTokens.Mono, UiScale.TypeSmall, Brass, TextAnchor.MiddleLeft, ResultsLayout.TileTime(k), 2f);
             }
             Rect sb = ResultsLayout.SaveButton;
             _save = MenuUi.Item(page, "Save Photo", sb.x, sb.y, sb.width, sb.height,
@@ -311,7 +311,7 @@ namespace CriticalMass.Runtime.Menus
                 MenuItem.Kind.Button, UiScale.TypeButton, true, CMTokens.Display);
             _save.Body.Radius = UiScale.ButtonRadius;
             _save.Submitted = SavePhoto;
-            _saveStatus = L(page, "Save Status", CMTokens.Ui, UiScale.TypeSmall + 2, Cream, TextAnchor.MiddleCenter, ResultsLayout.SaveStatus, 2f);
+            _saveStatus = L(page, "Save Status", CMTokens.Ui, UiScale.TypeSmall, Cream, TextAnchor.MiddleCenter, ResultsLayout.SaveStatus, 2f);
         }
 
         void RefreshHighlights()

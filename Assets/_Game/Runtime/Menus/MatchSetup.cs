@@ -128,7 +128,7 @@ namespace CriticalMass.Runtime.Menus
             {
                 card.interactable = false;
                 card.Submitted = null;
-                MenuUi.Label(card.transform, "Soon", CMTokens.Ui, UiScale.TypeSmall, Brass, TextAnchor.MiddleCenter, 0f, 300f, CardW, 32f, "COMING SOON", 2f);
+                MenuUi.Label(card.transform, "Soon", CMTokens.Ui, UiScale.TypeSmall, Brass, TextAnchor.MiddleCenter, 0f, 300f, CardW, 32f, "NOT IN THIS BUILD", 2f);
                 for (int k = 0; k < 3; k++) _cardTexts[i][k].color = CMTokens.WithAlpha(Cream, 0.45f);
             }
         }

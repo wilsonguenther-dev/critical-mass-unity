@@ -21,7 +21,7 @@ namespace CriticalMass.Runtime.Camera
         public const float FadeSeconds = 0.2f;
 
         // Words: built-in fallbacks (the words pack has no line for this hint yet).
-        public const string WordHold = "HOLD", WordClick = "CLICK", WordTail = "TO LOOK AROUND", KeyMouse = "MIDDLE CLICK", KeyPad = "RS";
+        public const string WordHold = "HOLD", WordClick = "CLICK", WordTail = "TO LOOK AROUND", KeyMouse = "MIDDLE CLICK", KeyPad = "RIGHT STICK";
 
         public SimDriverBehaviour Driver;
 

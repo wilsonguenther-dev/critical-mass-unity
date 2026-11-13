@@ -457,6 +457,9 @@ namespace CriticalMass.Runtime.Menu
                 opts.Clear();
                 if (slot == CosmeticSlot.Head) opts.Add(null);   // bare head
                 opts.AddRange(CosmeticItems.WithExtras(c, slot, Cosmetics.ArtIds(c, slot)));
+                // Polish pass 1: a look with no model in this build is left out of the list, never shown as coming soon.
+                for (int k = opts.Count - 1; k >= 0; k--)
+                    if (opts[k] != null && !Cosmetics.Has(c, slot, opts[k].Id)) opts.RemoveAt(k);
                 string saved = slot == CosmeticSlot.Head ? l.Head : slot == CosmeticSlot.Emblem ? l.Emblem : l.Emote;
                 _browse[s] = Mathf.Max(0, IndexOf(opts, string.IsNullOrEmpty(saved) && slot != CosmeticSlot.Head ? DefaultId(c, slot) : saved));
                 _slotItems[s].interactable = _editable;
