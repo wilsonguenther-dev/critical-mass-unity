@@ -140,8 +140,8 @@ def game(n):
 
 
 tiles = []
-for n, lab in (("game_v7", "version 7 (11.9k tris)"), ("game_new_none", "A LOD0 4.3k, line (a) none"), ("game_new_thin", "A LOD0 4.3k, line (b) thin"),
-               ("game_new_thick", "A LOD0 4.3k, line (c) thick"), ("game_hero_thin", "A Hero 22k, line (b)")):
+for n, lab in (("game_v7", "version 7 (11.9k tris)"), ("game_new_none", "A LOD0 4.4k, line (a) none"), ("game_new_thin", "A LOD0 4.4k, line (b) thin"),
+               ("game_new_thick", "A LOD0 4.4k, line (c) thick"), ("game_hero_thin", "A Hero 22k, line (b)")):
     c, hgt = game(n)
     p = Image.new("RGB", (c.width * 2 + 20, c.height * 2 + 60 + c.height), GRASS)
     p.paste(c, (10 + c.width // 2, 34))                              # true size (1080p pixels)
@@ -151,7 +151,7 @@ for n, lab in (("game_v7", "version 7 (11.9k tris)"), ("game_new_none", "A LOD0 
     iou.setdefault("game_px", {})[n] = hgt
 row(tiles, "game-84px.jpg")
 row([panel(bible("front"), "bible p06", 520, 450), panel(over(rp("new_front")), "Hero mesh (close cameras)", 520, 450),
-     panel(over(rp("lod0_front")), "LOD0, 4,348 triangles (in-match mesh), same texture", 520, 450)], "hero-vs-lod0-front.jpg")
+     panel(over(rp("lod0_front")), "LOD0, 4,441 triangles (in-match mesh), same texture", 520, 450)], "hero-vs-lod0-front.jpg")
 row([panel(bible("front", FACE), "bible p06", 430, 440), panel(over(rp("new_face"), shadow=False), "Hero", 430, 440),
      panel(over(rp("lod0_face"), shadow=False), "LOD0 (never seen this close in play)", 430, 440)], "hero-vs-lod0-face.jpg")
 row([panel(over(rp("new_front_crimson")), "Crimson through the team mask texture (R cloth, G glow)", 520, 470),
