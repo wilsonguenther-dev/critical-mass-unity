@@ -332,7 +332,8 @@ namespace CriticalMass.Editor.Flow
                 Transform tl = Deep(m, "toes.l"), tr = Deep(m, "toes.r"), fl = Deep(m, "foot.l"), fr = Deep(m, "foot.r");
                 if (tl != null && tr != null && fl != null && fr != null)
                 {
-                    Vector3 d = (tl.position - fl.position) + (tr.position - fr.position);
+                    // The planted foot only (its toes are the lower pair): a foot mid-swing can point its toes down and back.
+                    Vector3 d = tl.position.y <= tr.position.y ? tl.position - fl.position : tr.position - fr.position;
                     d.y = 0f;
                     float angle = Vector3.Angle(d, want);
                     if (angle > 30f) _stripBad++;
