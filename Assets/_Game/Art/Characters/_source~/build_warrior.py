@@ -66,7 +66,7 @@ def add(obj, bm, color, bones, feat, smooth=True, m=None, face_uv=None, grad=kit
         if feat == "topknot":
             m = Matrix.Translation((0, 0, TOPKNOT_LIFT)) @ m
     if steps is None:
-        steps = STONE_STEPS if color == "stone_armour" else (HAIR_STEPS if color == "hair" else True)
+        steps = STONE_STEPS if color in ("stone_armour", "stone_dark", "stone_toe") else (HAIR_STEPS if color == "hair" else True)
     B.add(obj, bm, color, bones, feat=feat, smooth=smooth, m=m, face_uv=face_uv, grad=grad, steps=steps, noao=noao)
 
 
@@ -89,7 +89,7 @@ def build_legs():
         add(BODY, B.cyl((lx * 1.08, 0.01, 0.31), (lx * 1.08, 0.02, 0.17), 0.125, 0.12, 12), "wrap_dark", [lo, ft],
             "clothes")
         # grey stone knee guard: rounded slab + brass rivet
-        add(BODY, B.chipped(B.slab((0.27, 0.14, 0.24), 0.5, 12, 8), rng, chips=2, lump=0.006), "stone_armour", lo,
+        add(BODY, B.chipped(B.slab((0.27, 0.14, 0.24), 0.5, 12, 8), rng, chips=2, lump=0.006), "stone_dark", lo,
             "stone_armour", m=M((lx * 1.10, -0.15, 0.33), (-10, 0, 8 * s)))
         add(BODY, brass_disc(0.058, 0.035), "brass", lo, "stone_armour",
             m=kit.frame((lx * 1.10, -0.215, 0.335), (0, -1, 0.15), (0, 0, 1)))
@@ -102,7 +102,7 @@ def build_legs():
             m=M((lx * 1.10 + 0.165 * s, 0.0, 0.14)))
         add(BODY, B.slab((0.37, 0.53, 0.20), 0.55, 12, 8), "boot", [ft, to], "boots",
             m=M((lx * 1.12, -0.115, 0.10)))
-        add(BODY, B.chipped(B.slab((0.375, 0.19, 0.165), 0.5, 12, 8), rng, chips=2, lump=0.005), "stone_armour", to,
+        add(BODY, B.chipped(B.slab((0.375, 0.19, 0.165), 0.5, 12, 8), rng, chips=2, lump=0.005), "stone_toe", to,
             "stone_armour",
             m=M((lx * 1.12, -0.305, 0.085)))
         add(BODY, B.box((0.37, 0.55, 0.045), 0.02), "leather_dark", [ft, to], "boots", smooth=False,
@@ -112,7 +112,7 @@ def build_legs():
 def build_torso():
     add(BODY, B.sphere((0.34, 0.25, 0.21), 16, 10), "trouser", ["hips", "spine"], "clothes", m=M((0, 0.0, 0.62)))
     # navy padded doublet, a barrel that overhangs the belt (fixed navy: the accent-swap keeps it navy)
-    add(BODY, B.sphere((0.36, 0.25, 0.31), 18, 12), "navy", ["spine", "chest"], "clothes", m=M((0, 0.01, 0.99)))
+    add(BODY, B.sphere((0.40, 0.27, 0.31), 18, 12), "navy", ["spine", "chest"], "clothes", m=M((0, 0.01, 0.99)))   # v5 broader chest
     # cream quilted undershirt: a broad panel down the chest, with two quilting grooves
     add(BODY, B.sphere((0.165, 0.13, 0.24), 14, 10), "cream", ["spine", "chest"], "clothes", m=M((0, -0.16, 0.99)))
     # brown leather belt with crease grooves at both edges + big round brass buckle disc
@@ -140,8 +140,8 @@ def build_torso():
     # the character's right and ONE tail hanging down the chest. No folds over the pauldrons (no cape, no hood).
     for k in range(8):
         a = 2 * math.pi * k / 8 + 0.2
-        cx, cy = 0.225 * math.cos(a), 0.0 + 0.185 * math.sin(a)
-        r = (0.130 * rng.uniform(0.94, 1.06), 0.110 * rng.uniform(0.94, 1.06), 0.085 * rng.uniform(0.92, 1.08))
+        cx, cy = 0.250 * math.cos(a), 0.0 + 0.195 * math.sin(a)
+        r = (0.145 * rng.uniform(0.94, 1.06), 0.115 * rng.uniform(0.94, 1.06), 0.088 * rng.uniform(0.92, 1.08))
         add(BODY, B.sphere(r, 10, 7), "team_cloth", "chest", "team_cloth",
             m=M((cx, cy, 1.195 + 0.012 * math.sin(3 * a)), (0, 0, math.degrees(a))))
     add(BODY, B.sphere((0.085, 0.065, 0.075), 10, 6), "team_cloth", "chest", "team_cloth", m=M((-0.08, -0.20, 1.18)))
@@ -389,27 +389,28 @@ def build_shield(poses):
         parts.append((bm, color, feat, smooth, m))
 
     # slightly domed wood face of vertical planks with modelled seam grooves
-    p(B.lathe([(0.50, -0.04), (0.50, 0.03), (0.38, 0.055), (0.19, 0.07), (0.001, 0.072)], 28), "wood", "shield", True)
+    p(B.lathe([(0.50, -0.04), (0.50, 0.03), (0.38, 0.055), (0.19, 0.07), (0.001, 0.072)], 24), "wood", "shield", True)
     for x in (-0.315, -0.105, 0.105, 0.315):
         h = 2 * math.sqrt(max(0.0, 0.47 ** 2 - x ** 2)) * 0.96
         p(B.box((0.022, h, 0.014), 0.0), "wood_seam", "shield", m=M((x, 0, 0.036 + 0.03 * (1 - abs(x) / 0.5))))
     p(B.torus(0.485, 0.012, 32, 4), groove("wood"), "shield", True, M((0, 0, 0.034)))        # rim crease
     n_seg = 9
+    p(B.torus(0.535, 0.075, 22, 4), "stone_gap", "shield", True, M((0, 0, -0.01)))     # v5: dark between the rim stones
     for k in range(n_seg):  # segmented grey stone rim: big chunky rounded slabs
         a = 2 * math.pi * (k + 0.5) / n_seg
         r = 0.535
-        sx = 2 * math.pi * r / n_seg * rng.uniform(0.86, 0.93)
+        sx = 2 * math.pi * r / n_seg * rng.uniform(0.76, 0.82)    # v5: separate stones with gaps
         sz = rng.uniform(0.19, 0.22)
         tilt = rng.uniform(-6, 6)
-        p(B.chipped(B.slab((sx, 0.20, sz), 0.45, 10, 6), rng, chips=2, lump=0.004), "stone_armour", "shield", True,
+        p(B.chipped(B.slab((sx, 0.20, sz), 0.22, 8, 5), rng, chips=2, lump=0.004), "stone_armour", "shield", False,
           m=M((r * math.cos(a), r * math.sin(a), 0.0), (tilt, 0, math.degrees(a) + 90)))
         if k in (1, 4, 7):  # v4: a small teal chip on three of the nine rim stones (bible), not a stripe on each
             p(B.box((0.075, 0.05, 0.016), 0.0, 1), "team_glow", "team_glow",
               m=M((r * math.cos(a), r * math.sin(a), sz / 2 - 0.004), (0, 0, math.degrees(a) + 90 + rng.uniform(-25, 25))))
     # core: navy ring, brass ring, glowing core (team glow), brass boss ring
     # v4 centre boss (bible): dark iron plate, a glowing teal ring, an iron dome with a small teal centre
-    p(B.cyl((0, 0, 0.03), (0, 0, 0.078), 0.26, 0.25, 28), "iron", "shield", True)
-    p(B.torus(0.180, 0.030, 28, 6), "team_glow", "team_glow", True, M((0, 0, 0.082)))
+    p(B.cyl((0, 0, 0.03), (0, 0, 0.078), 0.26, 0.25, 22), "iron", "shield", True)
+    p(B.torus(0.180, 0.030, 22, 5), "team_glow", "team_glow", True, M((0, 0, 0.082)))
     p(brass_disc(0.13, 0.075), "iron", "shield", True, M((0, 0, 0.078)))
     p(B.sphere((0.042, 0.042, 0.022), 10, 6), "team_glow", "team_glow", True, M((0, 0, 0.160)))
     for y in (-0.12, 0.12):  # back straps
