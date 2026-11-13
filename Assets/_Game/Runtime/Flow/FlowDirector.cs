@@ -394,6 +394,11 @@ namespace CriticalMass.Runtime.Flow
         bool OnPause()
         {
             if (_loadPath != null) return true;
+            // The loading screen covers the match: the press is swallowed (no pause menu under it).
+            if (Menus.LoadingScreen.IsOpen) return true;
+            // The story intro is on screen (WATCH INTRO from Home): it owns Esc (a deliberate skip); Home must not go Back
+            // underneath it.
+            if (CriticalMass.Runtime.Menus.StoryIntro.IsPlaying) return true;
             if (_external != null)
             {
                 if (_external is IMenuBack back) back.Back();
@@ -433,10 +438,19 @@ namespace CriticalMass.Runtime.Flow
             }
         }
 
+        /// <summary>
+        /// Who takes the Pause press (pure; tests): the flow (its screens' Back) outside a match, and also while the
+        /// loading screen covers a match (polish-audit-1: Escape or Start during loading toggled the pause menu UNDER the
+        /// opaque loading screen, where Enter or A then pressed its invisible items, and the match opened paused).
+        /// The settings bridge always leaves it to the pause menu.
+        /// </summary>
+        public static bool FlowOwnsPause(FlowState st, bool settingsBridge, bool loadingOpen) =>
+            !settingsBridge && (loadingOpen || (st != FlowState.Match && st != FlowState.Off));
+
         void ManagePause(FlowState st)
         {
             if (Input == null) return;
-            bool mine = !_settingsBridge && st != FlowState.Match && st != FlowState.Off;
+            bool mine = FlowOwnsPause(st, _settingsBridge, Menus.LoadingScreen.IsOpen);
             if (mine) Input.PauseHandler = _onPause;
             else if (Input.PauseHandler == _onPause) Input.PauseHandler = null;   // the pause menu takes it back
         }

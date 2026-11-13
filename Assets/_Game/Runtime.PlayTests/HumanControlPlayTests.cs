@@ -338,6 +338,99 @@ namespace CriticalMass.Runtime.PlayTests
             LogAssert.NoUnexpectedReceived();
         }
 
+        // ---------------------------------------------------------------- intro at launch (integration batch 5)
+
+        /// <summary>The once-only flag of earlier builds (the owner's saved profile has it set to 1).</summary>
+        const string OldStorySeenKey = "cm.story.seen";
+
+        /// <summary>Boots with the launch rule on, as a player build does, with the given saved profile.</summary>
+        IEnumerator WithLaunchProfile(bool introSetting, Func<TitleScreen, IEnumerator> body)
+        {
+            int oldSeen = PlayerPrefs.GetInt(OldStorySeenKey, 0), seenV2 = PlayerPrefs.GetInt(StoryIntro.SeenKey, 0);
+            bool atLaunch = GameSettings.IntroAtLaunch;
+            PlayerPrefs.SetInt(OldStorySeenKey, 1);
+            PlayerPrefs.SetInt(StoryIntro.SeenKey, 1);
+            GameSettings.IntroAtLaunch = introSetting;
+            StoryIntro.ResetLaunchForTests();
+            StoryIntro.LaunchRuleInEditorForTests = true;
+            try
+            {
+                yield return BootToTitle();
+                yield return body(UnityEngine.Object.FindAnyObjectByType<TitleScreen>());
+            }
+            finally
+            {
+                StoryIntro.LaunchRuleInEditorForTests = false;
+                StoryIntro.Skip();
+                StoryIntro.ResetLaunchForTests();
+                PlayerPrefs.SetInt(OldStorySeenKey, oldSeen);
+                PlayerPrefs.SetInt(StoryIntro.SeenKey, seenV2);
+                GameSettings.IntroAtLaunch = atLaunch;
+                PlayerPrefs.Save();
+            }
+        }
+
+        /// <summary>Escape on the title opens Home: the title reads real keys again.</summary>
+        IEnumerator AssertTitleTakesKeys(TitleScreen title, string where)
+        {
+            yield return Until(() => title != null && title.enabled, 5f, where + ": the title never took input back");
+            Assert.AreEqual(FlowState.Title, GameFlow.State, where + ": not on the title");
+            yield return null;
+            yield return null;
+            yield return Tap(Key.Escape);
+            yield return Until(() => GameFlow.State == FlowState.Menu && FlowDirector.Current.MainMenu.IsVisible, 5f,
+                where + ": Escape on the title did not open Home");
+        }
+
+        [UnityTest, Timeout(120000)]
+        public IEnumerator IntroPlaysAtLaunchForAReturningPlayerAndHandsTheTitleBack()
+        {
+            yield return WithLaunchProfile(true, title => IntroLaunchBody(title));
+            LogAssert.NoUnexpectedReceived();
+        }
+
+        IEnumerator IntroLaunchBody(TitleScreen title)
+        {
+            Assert.IsNotNull(title, "the title is under the intro");
+            yield return Until(() => StoryIntro.IsPlaying, 5f, "the intro did not play at launch with the old story-seen flags set");
+            Assert.IsFalse(StoryIntro.IsAttract, "the launch plays the intro, not the attract loop");
+            Assert.IsFalse(title.enabled, "the title reads no keys under the film");
+            yield return Until(() => StoryIntro.Instance.FilmTime >= 0.3, 10f, "the film clock runs");
+
+            // Inside the 1.5 s lock: fresh taps of Space, Enter and Escape do nothing.
+            yield return Tap(Key.Space);
+            Assert.IsTrue(StoryIntro.IsPlaying, "Space inside the first 1.5 s skipped the intro");
+            yield return Tap(Key.Enter);
+            Assert.IsTrue(StoryIntro.IsPlaying, "Enter inside the first 1.5 s skipped the intro");
+            yield return Tap(Key.Escape);
+            Assert.IsTrue(StoryIntro.IsPlaying, "Escape inside the first 1.5 s skipped the intro");
+            Assert.Less(StoryIntro.Instance.FilmTime, (double)SkipGate.LockSeconds, "the three taps landed inside the lock");
+
+            // Past the lock with no new press, the film keeps playing; then one fresh Space press skips.
+            yield return Until(() => !StoryIntro.IsPlaying || StoryIntro.Instance.FilmTime > SkipGate.LockSeconds + 0.25, 15f,
+                "the film never ran past the lock");
+            Assert.IsTrue(StoryIntro.IsPlaying, "the film stopped by itself right after the lock");
+            yield return Tap(Key.Space);
+            yield return Until(() => !StoryIntro.IsPlaying, 3f, "a fresh Space press after 1.5 s did not skip");
+            yield return AssertTitleTakesKeys(title, "after skipping the launch intro");
+        }
+
+        [UnityTest, Timeout(120000)]
+        public IEnumerator IntroSettingOffGoesStraightToTheTitle()
+        {
+            yield return WithLaunchProfile(false, title => IntroOffBody(title));
+            LogAssert.NoUnexpectedReceived();
+        }
+
+        IEnumerator IntroOffBody(TitleScreen title)
+        {
+            Assert.IsNotNull(title);
+            yield return null;
+            yield return null;
+            Assert.IsFalse(StoryIntro.IsPlaying, "PLAY INTRO AT LAUNCH off: the intro played anyway");
+            yield return AssertTitleTakesKeys(title, "intro setting off");
+        }
+
         // ---------------------------------------------------------------- lobby paths (integration batch 4)
 
         /// <summary>Boots to the title and waits for its backdrop (the title is the first screen).</summary>

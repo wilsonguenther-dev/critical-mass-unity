@@ -27,6 +27,14 @@ namespace CriticalMass.Runtime.Onboarding
         Place,
         /// <summary>The full map is open (asked through TrialFeatures.MapOpenProbe; needs the HUD's interact layer).</summary>
         OpenMap,
+        /// <summary>Creator acceptance: a knock-down pillar fell (World.Topple) since the step's start.</summary>
+        Topple,
+        /// <summary>Creator acceptance: actor 0 was seen on a bridge cell, then on ground at least Param units from where it stepped on.</summary>
+        CrossBridge,
+        /// <summary>Creator acceptance: actor 0 within Param world units of the step's (moving) target.</summary>
+        ReachTarget,
+        /// <summary>Creator acceptance: a spoken step, done after Param sim seconds (the arrow still points at the target).</summary>
+        Timer,
     }
 
     /// <summary>Where a step's world arrow points.</summary>
@@ -48,6 +56,12 @@ namespace CriticalMass.Runtime.Onboarding
         Gap,
         /// <summary>The ground at actor 0's feet.</summary>
         Self,
+        /// <summary>Creator acceptance: the standing knock-down pillar nearest the player's pad (any pillar once all fell).</summary>
+        Pillar,
+        /// <summary>Creator acceptance: the bridge cell nearest actor 0 (fixed at step start).</summary>
+        Bridge,
+        /// <summary>Creator acceptance: the nearest corruption node with charges left.</summary>
+        CorruptionNode,
     }
 
     /// <summary>A mechanic a step needs from the sim. None = on main today.</summary>
@@ -80,6 +94,8 @@ namespace CriticalMass.Runtime.Onboarding
         public double MarkerFraction;
         /// <summary>The step runs only when the player plays this class (null = every class).</summary>
         public ClassId? OnlyClass;
+        /// <summary>Creator acceptance: the step is skipped when the player plays this class (null = never).</summary>
+        public ClassId? NotClass;
         public TrialFeature Needs;
     }
 
@@ -129,6 +145,18 @@ namespace CriticalMass.Runtime.Onboarding
                 Id = "place", Prompt = "Now fill the gap. {DigPlace} again.", Goal = TrialGoal.Place, Target = TrialTarget.Gap,
                 Param = 2.5, OnlyClass = ClassId.Miner, Needs = TrialFeature.Terraform,
             },
+            // Creator acceptance (2026-11-13): the creator pitches terrain manipulation and corruption, so every first match
+            // shows both. Non-miners hear that miners reshape the ground; everyone knocks a pillar down.
+            new TrialStep
+            {
+                Id = "terrain", Prompt = "Miners dig the ground up and drop it anywhere. Try one next match.", Goal = TrialGoal.Timer,
+                Target = TrialTarget.Self, Param = 5, NotClass = ClassId.Miner,
+            },
+            new TrialStep
+            {
+                Id = "topple", Prompt = "{Attack} the stone pillar. It falls away from you: a ramp or a wall.", Goal = TrialGoal.Topple,
+                Target = TrialTarget.Pillar,
+            },
             // 2026-11-12: the first match teaches move, attack, ability, jump, map and the objective, in that order.
             new TrialStep
             {
@@ -149,6 +177,11 @@ namespace CriticalMass.Runtime.Onboarding
             {
                 Id = "deliver", Prompt = "Take it to the egg and hold {Interact}. It remembers who feeds it.", Goal = TrialGoal.DeliverBiomass,
                 Target = TrialTarget.Shrine,
+            },
+            new TrialStep
+            {
+                Id = "corruption", Prompt = "Violet ore is corruption. Feed the egg enough and it hatches berserk.", Goal = TrialGoal.Timer,
+                Target = TrialTarget.CorruptionNode, Param = 6,
             },
         };
     }

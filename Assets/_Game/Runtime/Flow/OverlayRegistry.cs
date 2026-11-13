@@ -108,11 +108,14 @@ namespace CriticalMass.Runtime.Flow
             new MenuEntry { Id = Settings, Label = "SETTINGS", Order = 40, Builtin = true },
             new MenuEntry { Id = Spectate, Label = "SPECTATE", Order = 15, Builtin = true },
             new MenuEntry { Id = Codex, Label = "CODEX", Order = 50, Builtin = true },
+            new MenuEntry { Id = Intro, Label = "WATCH INTRO", Order = 55, Builtin = true },
             new MenuEntry { Id = Credits, Label = "CREDITS", Order = 60 },
             new MenuEntry { Id = Quit, Label = "QUIT", Order = 90, Builtin = true },
         };
 
         public const string Controls = "controls";
+        /// <summary>Story intro 2: replay the story intro (StoryIntro.Play) from the home screen.</summary>
+        public const string Intro = "intro";
         /// <summary>The first line: one press into a match with the last class and settings (Flow.PlayNow).</summary>
         public const string PlayNow = "playnow";
         /// <summary>Integration batch 2: watch a match (match setup opens on SPECTATE).</summary>

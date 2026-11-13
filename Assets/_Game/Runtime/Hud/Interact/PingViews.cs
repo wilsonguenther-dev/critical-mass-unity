@@ -297,7 +297,9 @@ namespace CriticalMass.Runtime.Hud.Interact
     public sealed class PingFeed
     {
         public const int Lines = 4;
-        const float LineH = 30f, Bottom = 196f, Left = 28f, Life = (float)PingBook.Life, Fade = 0.4f;
+        // owner walk 1: the feed sits above the coin chip (Bottom was 196 and the bottom line ran under the chip)
+        static float Bottom => HudZones.PingFeedBottom;
+        const float LineH = HudZones.PingLineH, Left = 28f, Life = (float)PingBook.Life, Fade = 0.4f;
         readonly RectTransform[] _rt = new RectTransform[Lines];
         readonly Text[] _text = new Text[Lines];
         readonly VectorShape[] _icon = new VectorShape[Lines];

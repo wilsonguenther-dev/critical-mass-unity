@@ -65,6 +65,13 @@ namespace CriticalMass.Runtime.Hud
             Clusters[(int)HudCluster.Kaiju] = Cluster(HudCluster.Kaiju);
             Clusters[(int)HudCluster.Player] = Cluster(HudCluster.Player);
             Clusters[(int)HudCluster.Minimap] = Cluster(HudCluster.Minimap);
+            // Owner walk 1: the four clusters sit in the safe area (the camera notch of a full-screen MacBook, overscan).
+            RectTransform safe = FeedUi.SafeRoot(Root);
+            for (int i = 0; i < Clusters.Length; i++)
+            {
+                Clusters[i].SetParent(safe, false);
+                HudKeepOut.Add(Clusters[i]);   // world labels and edge pointers keep off the panels
+            }
             BuildMatch(Clusters[0]);
             BuildKaiju(Clusters[1]);
             BuildPlayer(Clusters[2]);
@@ -602,7 +609,9 @@ namespace CriticalMass.Runtime.Hud
 
         // ---------------------------------------------------------------- update
 
-        void LateUpdate()
+        void LateUpdate() { var cost = CriticalMass.Runtime.Game.FrameCost.Enter(); LateUpdateCost(); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.Hud, cost); }
+
+        void LateUpdateCost()
         {
             if (Driver == null) Driver = GetComponent<SimDriverBehaviour>();
             if (Driver == null || Driver.World == null || Root == null) return;
@@ -980,6 +989,7 @@ namespace CriticalMass.Runtime.Hud
             float kx = Mathf.Abs(d.x) > 1e-4f ? (c.x - pad) / Mathf.Abs(d.x) : float.MaxValue;
             float ky = Mathf.Abs(d.y) > 1e-4f ? (c.y - pad) / Mathf.Abs(d.y) : float.MaxValue;
             Vector2 pos = c + d * Mathf.Min(kx, ky);
+            pos = HudKeepOut.PushOut(pos, c.y, 36f * scale);   // owner walk 1: never on a HUD panel (the clock band, Kaiju panel, feed)
             p.anchoredPosition = pos / scale;
             _ptrArrow[i].localRotation = Quaternion.Euler(0, 0, Mathf.Atan2(d.y, d.x) * Mathf.Rad2Deg);
             double dx = tx - s.PlayerX, dz = tz - s.PlayerZ;
@@ -995,7 +1005,7 @@ namespace CriticalMass.Runtime.Hud
 
         void ApplyDeath(World w, HudState s)
         {
-            bool dead = s.HasPlayer && !s.Alive && !s.Ended;
+            bool dead = s.HasPlayer && !s.Alive && !s.Ended && !(CriticalMass.Runtime.Flow.GameFlow.State == CriticalMass.Runtime.Flow.FlowState.Results);   // batch 5: the results screen hides the death layer
             if (dead && _wasAlive && s.HasPlayer)
                 _koWorld = SimSpace.ToWorld(s.PlayerX, GroundHeight.At(w.Map, s.PlayerX, s.PlayerZ) + 0.05, s.PlayerZ);
             _wasAlive = !dead;

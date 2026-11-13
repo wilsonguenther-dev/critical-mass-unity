@@ -1,6 +1,7 @@
 using System;
 using CriticalMass.Runtime.Flow;
 using CriticalMass.Runtime.Menu;
+using CriticalMass.Sim.Config;
 using UnityEngine;
 
 namespace CriticalMass.Runtime.Menus
@@ -15,12 +16,17 @@ namespace CriticalMass.Runtime.Menus
     {
         Action _onClosed;
 
+        /// <summary>Owner walk 1: the class the next Open shows (the fighter clicked on Home); null = the class chosen last.</summary>
+        public static ClassId? NextClass;
+
         public void Open(Action onClosed)
         {
             _onClosed = onClosed;
             CharacterPanel.Closed -= Done;
             CharacterPanel.Closed += Done;
-            Barracks.Show(ClassSelect.SelectedClass);
+            ClassId cls = NextClass ?? ClassSelect.SelectedClass;
+            NextClass = null;
+            Barracks.Show(cls);
             if (!CharacterPanel.IsOpen) Done();
         }
 

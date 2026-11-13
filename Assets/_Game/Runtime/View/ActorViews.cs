@@ -194,7 +194,7 @@ namespace CriticalMass.Runtime.View
             s.Push(m);
         }
 
-        private void LateUpdate() { long c = CriticalMass.Runtime.Game.FrameCost.Begin(); Sync(Time.deltaTime); CriticalMass.Runtime.Game.FrameCost.End(CriticalMass.Runtime.Game.FrameCost.Slot.ActorViews, c); }
+        private void LateUpdate() { var c = CriticalMass.Runtime.Game.FrameCost.Enter(); Sync(Time.deltaTime); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.ActorViews, c); }
 
         /// <summary>
         /// Contract C3 (DG-71): called once per drawn actor (and the Kaiju, actor -2) after its pose is evaluated and before
@@ -205,6 +205,9 @@ namespace CriticalMass.Runtime.View
 
         /// <summary>The animator of actor i (tests and the capture report), or null.</summary>
         public Anim.ActorAnimator AnimatorOf(int i) => _actors != null && i >= 0 && i < _actors.Length ? _actors[i].Anim : null;
+
+        /// <summary>The imported model drawn for actor i (tests' pose diagnostics), or null (capsule, dead, out of range).</summary>
+        public ModelView ModelOf(int i) => _actors != null && i >= 0 && i < _actors.Length ? _actors[i].Model : null;
 
         /// <summary>The Kaiju's animator (tests).</summary>
         public Anim.KaijuAnimator KaijuAnimator => _kaijuAnim;
@@ -460,10 +463,11 @@ namespace CriticalMass.Runtime.View
                 m.Transform.localPosition = SimSpace.ToWorld(x, GroundHeight(map, x, z), z);
                 m.Transform.localRotation = Quaternion.identity;
                 string state = ArtMapping.BarricadeState(b.Hp, cfg.Abilities.MinerBarricade.MaxHp);
-                foreach (Renderer r in m.Renderers)
+                for (int k = 0; k < m.Renderers.Length; k++)
                 {
-                    bool show = r.name == state;
-                    if (r.enabled != show) r.enabled = show;
+                    Renderer r = m.Renderers[k];
+                    bool show = m.RendererNames[k] == state;   // cached names: Object.name allocates on every read
+                    if (r != null && r.enabled != show) r.enabled = show;
                 }
                 m.SetMaterial(ArtMaterials.ForTeam(m.Spec, b.Team));
             }

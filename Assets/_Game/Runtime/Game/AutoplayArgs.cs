@@ -34,7 +34,7 @@ namespace CriticalMass.Runtime.Game
     ///   -quality NAME|N          this quality level for the run (FrameGovernor; the perf report has quality_requested)
     ///   -debugHangSeconds N      TEST ONLY: the main thread sleeps N s once, 3 s after the title (proves the hang watchdog)
     ///   -seed N -simHashOut PATH sim-only run (no view): one 16v16 bot match on seed N, its end-state hash to PATH, quit (DG-66)
-    ///   -shots                   screenshots shot-title.png and shot-mid.png into the data folder (Windows graphics run)
+    ///   -shots                   screenshots shot-title.png, shot-start.png (3 s of match time) and shot-mid.png into the data folder (Windows graphics run)
     ///   -traceStates             record shader states for warm-up (ShaderWarmup); -exportReport, -diag: SupportReport
     /// DG-63: the crash log is written by CrashLog (bounded queue, one background writer, 20 lines per second, repeat keys
     /// with digits and hex as "#"); Exceptions and Errors both count. A stack in the sim or the match driver ends the match
@@ -62,6 +62,11 @@ namespace CriticalMass.Runtime.Game
             public double Speed;
             public double TimeoutSec;
             public string PerfLog;
+            /// <summary>perf-smooth-1: -autoplayQualities A,B,C: the quality level of match 1, 2, 3 (match 1 also takes -quality).</summary>
+            public string[] Qualities;
+            /// <summary>perf-smooth-1 experiment: -autoplayPacing A,B,C: frame pacing of match 1, 2, 3 (FrameGovernor.PacingOverride:
+            /// rule, display, timed60).</summary>
+            public string[] Pacing;
             public bool NoVsync;
             public int Matches;
             public double TitleSeconds;
@@ -107,12 +112,49 @@ namespace CriticalMass.Runtime.Game
                         if (!string.IsNullOrEmpty(next) && !next.StartsWith("-", StringComparison.Ordinal)) { o.SimHashOut = next; i++; }
                         break;
                     case "-shots": o.Shots = true; break;
+                    case "-autoplaypacing":
+                        if (!string.IsNullOrEmpty(next) && !next.StartsWith("-", StringComparison.Ordinal)) { o.Pacing = next.Split(','); i++; }
+                        break;
+                    case "-autoplayqualities":
+                        if (!string.IsNullOrEmpty(next) && !next.StartsWith("-", StringComparison.Ordinal)) { o.Qualities = next.Split(','); i++; }
+                        break;
                     case "-perflog":
                         if (!string.IsNullOrEmpty(next) && !next.StartsWith("-", StringComparison.Ordinal)) { o.PerfLog = next; i++; }
                         break;
                 }
             }
             return o;
+        }
+
+        /// <summary>-cameraYaw DEGREES (camera-orientation grabs, 2026-11-13): the gameplay camera's yaw for this run, in place of
+        /// RenderConfig.CameraYawDeg (45 = the map reads as a diamond, 0 = true north, bases left and right). Honoured only
+        /// together with an automation flag (AutomationWindow.AutomationFlags), so a person's launch never changes the
+        /// camera; normalised to [0, 360). Pure (EditMode tests: CameraYawFlagTests). The minimap stays baked at 45.</summary>
+        public static bool TryCameraYaw(string[] args, out double yawDeg)
+        {
+            yawDeg = 0;
+            if (args == null) return false;
+            bool automation = false, found = false;
+            for (int i = 0; i < args.Length; i++)
+            {
+                string a = (args[i] ?? "").Trim().ToLowerInvariant();
+                if (Array.IndexOf(AutomationWindow.AutomationFlags, a) >= 0) automation = true;
+                if (a == "-camerayaw" && i + 1 < args.Length && TryNum(args[i + 1], out double y))
+                {
+                    yawDeg = ((y % 360) + 360) % 360;
+                    found = true;
+                    i++;
+                }
+            }
+            return found && automation;
+        }
+
+        /// <summary>Applies -cameraYaw from this process's command line to a match config (player and editor alike).</summary>
+        public static void ApplyCameraYaw(GameConfig cfg)
+        {
+            if (cfg == null || !TryCameraYaw(Environment.GetCommandLineArgs(), out double y)) return;
+            cfg.Render.CameraYawDeg = y;
+            Debug.Log($"{LogTag} -cameraYaw: gameplay camera yaw {y.ToString("F1", CultureInfo.InvariantCulture)} deg (default 45)");
         }
 
         static bool TryNum(string s, out double v) =>
@@ -160,7 +202,7 @@ namespace CriticalMass.Runtime.Game
         // ── autoplay state ──
         SimDriverBehaviour _driver;
         TitleScreen _title;
-        bool _titleSeen, _recording, _ended, _quitting, _timedOut, _hangDone, _shotTitle, _shotMid;
+        bool _titleSeen, _recording, _ended, _quitting, _timedOut, _hangDone, _shotTitle, _shotStart, _shotMid;
         double _titleAt = -1, _matchStart, _endAt, _firstTitleAt = -1;
         bool _costReset;
         int _exceptionsAtStart, _match = 1, _reloadFrame = -1;
@@ -431,6 +473,12 @@ namespace CriticalMass.Runtime.Game
                 ScreenCapture.CaptureScreenshot(Path.Combine(GamePaths.DataDir, "shot-title.png"));
             }
             if (!o.Autoplay && !o.QuitAfterMatch) return;
+            if (o.Shots && !_shotStart && _recording && _driver != null && _driver.World != null && _driver.World.Match.Time > 3)
+            {
+                // Match start: the moment the owner saw rings without bodies (2026-11-13); proves fighters draw from the first seconds.
+                _shotStart = true;
+                ScreenCapture.CaptureScreenshot(Path.Combine(GamePaths.DataDir, "shot-start.png"));
+            }
             if (o.Shots && !_shotMid && _recording && _driver != null && _driver.World != null && _driver.World.Match.Time > 60)
             {
                 _shotMid = true;
@@ -473,7 +521,9 @@ namespace CriticalMass.Runtime.Game
                     PerfOverlay.ClearPhase(PerfOverlay.PhaseMatch);
                     PerfOverlay.ClearPhase(PerfOverlay.PhaseResults);
                     PerfOverlay.SetPhase(PerfOverlay.PhaseMatch);
+                    if (_match == 1 && o.Pacing != null && o.Pacing.Length > 0) FrameGovernor.PacingOverride = o.Pacing[0];
                     PerfOverlay.BeginRecording();
+                    FrameRecorder.Begin();
                 }
             }
 
@@ -497,6 +547,9 @@ namespace CriticalMass.Runtime.Game
             {
                 // Next match: reload Boot; the old game goes with the scene, GameBootstrap builds a fresh one.
                 _match++;
+                // perf-smooth-1: -autoplayQualities High,Medium,Low runs match n at the n-th level (one smoke, three levels).
+                if (o.Qualities != null && _match - 1 < o.Qualities.Length) FrameGovernor.ForceRunQuality(o.Qualities[_match - 1]);
+                if (o.Pacing != null && _match - 1 < o.Pacing.Length) FrameGovernor.PacingOverride = o.Pacing[_match - 1];
                 _driver = null;
                 _title = null;
                 _titleSeen = false;
@@ -553,6 +606,7 @@ namespace CriticalMass.Runtime.Game
                 ("frame_cap", FrameGovernor.AppliedCap.ToString(CultureInfo.InvariantCulture)),
                 ("quality", Q(QualitySettings.names[QualitySettings.GetQualityLevel()])),
                 ("quality_requested", Q(FrameGovernor.RequestedQuality)),
+                ("pacing", Q(FrameGovernor.PacingOverride ?? "rule")),
                 ("render_scale", Num(FrameGovernor.AppliedRenderScale)),
                 ("render_pixels", ((long)(Screen.width * FrameGovernor.AppliedRenderScale) * (long)(Screen.height * FrameGovernor.AppliedRenderScale)).ToString(CultureInfo.InvariantCulture)),
                 ("max_queued_frames", QualitySettings.maxQueuedFrames.ToString(CultureInfo.InvariantCulture)),
@@ -571,6 +625,12 @@ namespace CriticalMass.Runtime.Game
                 ("assets", assets),
                 ("phases", PerfOverlay.PhasesJson()),
             };
+            {
+                string perfBase = string.IsNullOrEmpty(Current.PerfLog) ? Path.Combine(Application.persistentDataPath, "perf-last.json") : Current.PerfLog;
+                string recorder = FrameRecorder.End(FrameRecorder.CsvPathFor(PerfPathFor(perfBase, _match)));
+                Array.Resize(ref extra, extra.Length + 1);
+                extra[extra.Length - 1] = ("frame_recorder", recorder);
+            }
             string json = PerfOverlay.ToJson(r, extra);
             _pendingExtra = extra;
             _pendingReport = r;

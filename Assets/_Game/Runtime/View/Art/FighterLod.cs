@@ -23,8 +23,9 @@ namespace CriticalMass.Runtime.View.Art
     /// as LOD0 at every distance, and they cast the shadow themselves (Medium, High). A model with LOD0 but no LOD1 stays
     /// on LOD0. A model with no _Shadow mesh lets LOD0 cast. Weapons and props that are separate objects without a
     /// suffix (Warrior_Cleaver) count as part of every LOD.</para>
-    /// <para>If the model importer built a LODGroup from the _LOD0/_LOD1 names, the pick drives it with ForceLOD; without
-    /// one the renderers are switched directly.</para>
+    /// <para>The renderers are always switched directly. If the model importer built a LODGroup from the _LOD0/_LOD1
+    /// names, ModelView disables it (fix/fighters-always-visible, 2026-11-13): an enabled group culls by screen height on
+    /// its own and fought the game's pick, so near fighters drew nothing (FighterVisibilityPlayTests).</para>
     /// </summary>
     public static class FighterLod
     {
