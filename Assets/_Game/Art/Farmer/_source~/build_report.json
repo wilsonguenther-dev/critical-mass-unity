@@ -53,12 +53,12 @@
  "staff_bottom_local": -0.53,
  "tank": {
   "centre": [
-   0.15,
-   0.5,
-   1.09
+   0.13,
+   0.44,
+   1.1
   ],
-  "diameter": 0.66,
-  "top_z": 1.42
+  "diameter": 0.58,
+  "top_z": 1.39
  },
  "feature_z_ranges_rest": {
   "feat_overalls": [
@@ -110,19 +110,19 @@
    1.854
   ],
   "feat_tank": [
-   0.659,
-   1.456
+   0.714,
+   1.426
   ],
   "feat_leaves": [
-   0.916,
-   1.573
+   0.938,
+   1.546
   ],
   "feat_tank_glint": [
-   1.212,
-   1.314
+   1.201,
+   1.302
   ],
   "feat_hose": [
-   0.616,
+   0.658,
    1.076
   ]
  },
@@ -131,7 +131,7 @@
   "on": true,
   "stats": {
    "Farmer_Body": {
-    "edge": 1165,
+    "edge": 1167,
     "chips": 0,
     "crack": 0,
     "hot": 51
