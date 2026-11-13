@@ -233,6 +233,8 @@ namespace CriticalMass.Runtime.Hud
         // ---------------------------------------------------------------- 02 KAIJU
 
         const int MeterSegments = 8;
+        /// <summary>hud-art-1: the egg badge shows the cracking egg in the last seconds before the hatch.</summary>
+        public const double CrackSeconds = 30.0;
         const int RagePips = 5;
         HudIcon _kaijuHead;
         VectorShape _eggFrame;
@@ -702,7 +704,7 @@ namespace CriticalMass.Runtime.Hud
         /// <summary>Egg before the hatch; the wild (neutral) Kaiju is the hatchling of bible p10; once a team turns it
         /// (or it goes berserk) the adult head in that state's colours (p10 azure / crimson / berserk adult).</summary>
         static string KaijuIcon(HudState s, bool egg) =>
-            egg ? UiIcons.Egg : s.Kaiju == KaijuState.Azure ? UiIcons.Adult[1] : s.Kaiju == KaijuState.Crimson ? UiIcons.Adult[2] :
+            egg ? (s.UntilHatch <= CrackSeconds ? UiIcons.EggCracking : UiIcons.Egg) : s.Kaiju == KaijuState.Azure ? UiIcons.Adult[1] : s.Kaiju == KaijuState.Crimson ? UiIcons.Adult[2] :
             s.Kaiju == KaijuState.Berserk ? UiIcons.Adult[3] : UiIcons.Hatchling;
 
         static Color KaijuColour(KaijuState k) =>

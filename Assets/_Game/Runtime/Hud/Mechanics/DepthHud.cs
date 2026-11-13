@@ -201,7 +201,16 @@ namespace CriticalMass.Runtime.Hud.Mechanics
                 RectTransform chip = MenuUi.Rt(_stock, "Chip " + k);
                 MenuUi.Place(chip, k * 118f, 0f, 106f, 40f);
                 Chip(chip, "Panel", ShapeKind.RoundRect, 0f, 0f, 106f, 40f, CMTokens.WithAlpha(panel, 0.92f), 12f);
-                Chip(chip, "Icon", icons[k], 10f, 9f, 22f, 22f, cols[k], 4f);
+                // hud-art-1: the painted resource icon (UI/Icons/res-*), the vector chip only when the file is missing
+                Texture2D tex = UiIcons.Get(UiIcons.Stock[k], 2);
+                if (tex != null)
+                {
+                    RawImage ri = MenuUi.Rt(chip, "Icon").gameObject.AddComponent<RawImage>();
+                    ri.texture = tex;
+                    ri.raycastTarget = false;
+                    MenuUi.Place(ri.rectTransform, 6f, 4f, 32f, 32f);
+                }
+                else Chip(chip, "Icon", icons[k], 10f, 9f, 22f, 22f, cols[k], 4f);
                 MenuUi.Label(chip, "Word", CMTokens.Ui, 13, CMTokens.WithAlpha(cream, 0.85f), TextAnchor.MiddleLeft, 38f, 1f, 40f, 38f,
                     k == 0 ? DepthWords.Wood : k == 1 ? DepthWords.Water : DepthWords.Food, 1.5f).resizeTextForBestFit = true;
                 _stockNum[k] = MenuUi.Label(chip, "Count", CMTokens.Mono, 22, cream, TextAnchor.MiddleRight, 60f, 0f, 38f, 40f, "0", 2f);
