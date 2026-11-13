@@ -316,6 +316,9 @@ namespace CriticalMass.Runtime.PlayTests
             yield return new WaitForSecondsRealtime(0.32f);
             _menu.Resume();
             Assert.IsFalse(_input.State.Paused);
+            // Integration batch 2: PlayerPresence (#35) hands actor 0 to the player on any input, by design. This test compares
+            // against an all-autopilot reference world, so it puts the autopilot back before stepping.
+            _driver.HumanAutopilot = true;
             _driver.StepTicks(150);
             int total = _driver.World.Tick;
 

@@ -211,6 +211,7 @@ namespace CriticalMass.Runtime.Spectator
             bool paused = Input != null && Input.State.Paused;
             double dt = Driver.FrameDt;
             if (!paused) ReadControls(w, dt);
+            if (!Active) return; // integration batch 2 (#35 fix): R rejoined inside ReadControls; applying the camera again undid the restore
             Rig.Step(w, Driver.Alpha, paused ? 0 : dt);
             ApplyCamera();
         }

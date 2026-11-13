@@ -625,10 +625,14 @@ namespace CriticalMass.Runtime.Menus
             _cam.enabled = false;
         }
 
+        // Integration batch 2 (#25 fix): with no graphics device (the -nographics test run) a camera that draws into a texture
+        // makes the pipeline log "RenderTexture.Create failed"; the preview simply stays off there.
+        static bool HasGraphics => SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Null;
+
         public void SetActive(bool on)
         {
             if (on) EnsureRig();
-            if (_cam != null) _cam.enabled = on && _current != null;
+            if (_cam != null) _cam.enabled = on && _current != null && HasGraphics;
         }
 
         public void Show(ClassId cls, TeamId team)
@@ -656,7 +660,7 @@ namespace CriticalMass.Runtime.Menus
                     Frame(m);
                 }
             }
-            if (_cam != null) _cam.enabled = _current != null;
+            if (_cam != null) _cam.enabled = _current != null && HasGraphics;
         }
 
         /// <summary>Points the camera at the model's bounds, three-quarter from slightly above.</summary>
