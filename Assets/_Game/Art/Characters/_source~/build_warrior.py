@@ -208,14 +208,13 @@ def build_arms():
             "bracers")
         add(BODY, B.torus(0.138, 0.022, 14, 5), "brass", la, "bracers", m=M((0.70 * s, 0, 1.107), (0, 90, 0)))
         add(BODY, B.torus(0.121, 0.01, 14, 4), groove("leather"), la, "bracers", m=M((0.53 * s, 0.01, 1.107), (0, 90, 0)))
-        # big gloved fist + thumb + cuff
-        add(BODY, B.slab((0.33, 0.32, 0.34), 0.72, 12, 8), "leather", hd, "gloves", m=M((0.87 * s, -0.005, 1.09)))
+        # v6 hand: a smaller fingerless dark glove, four bare curled fingers and a thumb (a hand, not a mitten)
+        add(BODY, B.slab((0.25, 0.25, 0.27), 0.62, 12, 8), "leather_dark", hd, "gloves", m=M((0.85 * s, -0.005, 1.09)))
+        for kz in (-0.072, -0.024, 0.024, 0.072):
+            add(BODY, B.sphere((0.040, 0.052, 0.030), 8, 5), "skin", hd, "gloves", m=M((0.965 * s, -0.035, 1.09 + kz)))
+        add(BODY, B.sphere((0.05, 0.048, 0.066), 8, 6), "skin", hd, "gloves", m=M((0.82 * s, -0.125, 1.115)))
         # v4: brass disc on the outside of the elbow (bible)
         add(BODY, brass_disc(0.062, 0.035), "brass", [ua, la], "bracers", m=M((0.46 * s, 0.012, 1.215)))
-        for kz in (-0.07, 0.0, 0.07):        # knuckle row: the fist reads as a hand, not a mitten
-            add(BODY, B.sphere((0.055, 0.06, 0.045), 8, 5), "leather", hd, "gloves",
-                m=M((1.02 * s, -0.04, 1.09 + kz)))
-        add(BODY, B.sphere((0.075, 0.065, 0.09), 8, 6), "leather", hd, "gloves", m=M((0.81 * s, -0.15, 1.12)))
         add(BODY, B.cyl((0.73 * s, 0, 1.105), (0.78 * s, 0, 1.105), 0.14, 0.135, 12), "leather_dark", [wr, hd],
             "gloves")
 
@@ -242,15 +241,15 @@ def build_pauldrons():
     a big domed brass plate on the front of the shoulder, brass rivets on the top block, cyan crack inlays."""
     for s, sd in ((1, "l"), (-1, "r")):
         w = {"chest": 0.55, f"upperarm.{sd}": 0.45}
-        top = M((0.30 * s, 0.0, 1.32), (0, -24 * s, 0))
+        top = M((0.30 * s, 0.0, 1.28), (0, -24 * s, 0))
         add(BODY, stone((0.40, 0.47, 0.235), chips=3), "stone_armour", w, "stone_armour", m=top.copy())
-        mid = M((0.44 * s, 0.01, 1.15), (0, -60 * s, 0))
+        mid = M((0.44 * s, 0.01, 1.12), (0, -60 * s, 0))
         add(BODY, stone((0.31, 0.42, 0.19), chips=2), "stone_armour", w, "stone_armour", m=mid.copy())
         # v4: small teal chips in the stone (bible), not long glowing stripes
         crack(top @ M((0, 0, 0.124)), [(-0.10 * s, -0.12), (-0.05 * s, -0.08), (-0.01 * s, -0.11)], 0.05, wset=w)
         crack(mid @ M((0, 0, 0.100)), [(0.02 * s, 0.06), (0.06 * s, 0.10)], 0.045, wset=w)
         # big domed brass plate on the front of the shoulder (bible: one per side, the brightest warm accent)
-        disc_m = kit.frame((0.34 * s, -0.215, 1.16), (0.42 * s, -0.90, 0.10), (0, 0, 1))
+        disc_m = kit.frame((0.34 * s, -0.215, 1.13), (0.42 * s, -0.90, 0.10), (0, 0, 1))
         add(BODY, brass_disc(0.115, 0.06), "brass", w, "stone_armour", m=disc_m)
         add(BODY, B.torus(0.088, 0.009, 18, 4), groove("brass"), w, "stone_armour", m=disc_m @ M((0, 0, 0.040)))
         # rivets: brass domes along the top block's outer edge and one on the arm block
@@ -335,11 +334,11 @@ def build_hair():
     add(BODY, B.torus(0.090, 0.007, 18, 4), groove("brass"), H, T, m=M((0, 0.10, 1.787)))
     LP = (0.55, 0.95, 1.05, 0.85, 0.55, 0.28)       # leaf: narrow root, full middle, long pointed tip
     b = (0.0, 0.10, 1.815)
-    tuft = [((-0.12, 0.08, 1.880), (-0.26, 0.10, 1.905), 0.17, 0.075, (0, -1, 0)),
+    tuft = [((-0.10, 0.08, 1.885), (-0.20, 0.10, 1.915), 0.17, 0.075, (0, -1, 0)),
             ((-0.06, 0.07, 1.930), (-0.13, 0.07, 1.975), 0.18, 0.08, (0, -1, 0)),
             ((0.02, 0.07, 1.950), (0.03, 0.06, 1.982), 0.18, 0.08, (0, -1, 0)),
-            ((0.09, 0.08, 1.930), (0.17, 0.08, 1.972), 0.18, 0.08, (0, -1, 0)),
-            ((0.15, 0.10, 1.880), (0.29, 0.13, 1.895), 0.16, 0.075, (0, -1, 0.2)),
+            ((0.07, 0.08, 1.935), (0.13, 0.08, 1.975), 0.18, 0.08, (0, -1, 0)),
+            ((0.12, 0.10, 1.885), (0.21, 0.13, 1.910), 0.16, 0.075, (0, -1, 0.2)),
             ((0.01, 0.25, 1.880), (0.04, 0.34, 1.840), 0.16, 0.075, (0, 0, 1))]
     for p1, p2, w, t, up in tuft:
         add(BODY, B.clump(b, p1, p2, w, t, 6, up=up, prof=LP), "hair", H, T, grad=0.32)
@@ -378,6 +377,17 @@ def outline_weights(ob, hair_feats=("feat_hair", "feat_topknot")):
         if hits >= 0.6 * len(edge):
             unlined.append(v.index)
     g.add(unlined, 0.0, "REPLACE")
+    # v6 (Blender preview only; Unity's UV4.x sidecar is binary, w < 0.5): half-weight hull on the hands and the head
+    # skin so the face and fists are not boxed in by a full-width line
+    half = set()
+    for name in ("feat_gloves",):
+        if name in ob.vertex_groups:
+            gi = ob.vertex_groups[name].index
+            half |= {v.index for v in me.vertices if any(e.group == gi for e in v.groups)}
+    if "feat_skin" in ob.vertex_groups:
+        gi = ob.vertex_groups["feat_skin"].index
+        half |= {v.index for v in me.vertices if v.co.z > 1.25 and any(e.group == gi for e in v.groups)}
+    g.add(sorted(half), 0.5, "REPLACE")
     return unlined
 
 
@@ -467,7 +477,7 @@ def build_shield(poses):
         p(B.box((0.34, 0.06, 0.03), 0.01, 1), "leather_dark", "shield", m=M((0, y, -0.05)))
 
     # display pose (Idle): on the left arm, face turned ~55 deg from the front view toward the viewer's right
-    origin = (0.68, -0.12, 0.75)      # v4: out at the side, clear of the torso in the front view (bible)
+    origin = (0.68, -0.12, 0.76)      # v4: out at the side, clear of the torso in the front view (bible)
     normal = (0.80, -0.60, 0.0)
     T = held_matrix(poses, W, origin, normal, (0, 0, 1))
     for bm, color, feat, smooth, m in parts:
@@ -483,16 +493,17 @@ def build_cleaver(poses):
     def p(bm, color, feat, smooth=False, m=None):
         parts.append((bm, color, feat, smooth, m))
 
-    blade = [(-0.07, -0.09), (0.10, -0.10), (0.19, -0.15), (0.205, -0.42), (0.20, -0.74), (0.14, -0.84),
-             (0.04, -0.83), (0.0, -0.78), (-0.05, -0.80), (-0.075, -0.69), (-0.055, -0.60), (-0.085, -0.48),
-             (-0.06, -0.39), (-0.09, -0.28), (-0.065, -0.18)]
+    # v6: the bible's notched cleaver: a broad slab with square notches cut into the spine and a chipped square tip
+    blade = [(-0.07, -0.09), (0.12, -0.10), (0.21, -0.16), (0.22, -0.80), (0.16, -0.88), (0.07, -0.86), (0.04, -0.90),
+             (-0.06, -0.88), (-0.10, -0.80), (-0.10, -0.70), (-0.05, -0.68), (-0.05, -0.60), (-0.10, -0.58),
+             (-0.10, -0.44), (-0.05, -0.42), (-0.05, -0.34), (-0.10, -0.32), (-0.10, -0.18)]
     BL = 0.88        # v4: longer blade, tip near the ground as the bible draws it. blade length scale: the bible's fist-to-tip run is ~0.6 u (front view)
     blade = [(x, y * BL) for x, y in blade]
     p(B.prism(blade, 0.10, bevel=0.025, seg=2), "stone_blade", "cleaver")
-    edge = [(0.17, -0.14), (0.27, -0.17), (0.26, -0.30), (0.29, -0.44), (0.27, -0.60), (0.28, -0.75),
-            (0.17, -0.92), (0.08, -0.87), (0.18, -0.75), (0.19, -0.42), (0.185, -0.18)]
+    edge = [(0.16, -0.14), (0.29, -0.18), (0.30, -0.32), (0.28, -0.40), (0.31, -0.52), (0.29, -0.64), (0.31, -0.76),
+            (0.22, -0.92), (0.14, -0.87), (0.18, -0.76), (0.18, -0.20)]
     edge = [(x, y * BL) for x, y in edge]     # v4: the bible's glowing edge only (v3 widened it for a team-% rule)
-    p(B.prism(edge, 0.055, bevel=0.012, seg=1), "team_glow", "team_glow")
+    p(B.prism(edge, 0.112, bevel=0.012, seg=1), "team_glow", "team_glow")     # v6: a glowing band on both faces of the edge
     p(B.cyl((0, 0.13, 0), (0, -0.10, 0), 0.038, 0.038, 10), "leather", "cleaver", True)
     for y in (0.08, 0.02, -0.04):
         p(B.torus(0.040, 0.012, 10, 4), "leather_dark", "cleaver", True, M((0, y, 0), (90, 0, 0)))
@@ -517,7 +528,7 @@ def build_cleaver(poses):
 # hanging loose and heavy, chin up and head cocked toward the shield side (+X). World-axis rotations about each joint
 # head at Idle frame 1 (the same convention as render_warrior.py POSES), applied in order.
 ATTITUDE = [
-    ("upperleg.l", (0, 1, 0), -15), ("upperleg.r", (0, 1, 0), 15), ("foot.l", (0, 1, 0), 15), ("foot.r", (0, 1, 0), -15),
+    ("upperleg.l", (0, 1, 0), -18), ("upperleg.r", (0, 1, 0), 18), ("foot.l", (0, 1, 0), 18), ("foot.r", (0, 1, 0), -18),
     ("hips", (0, 0, 1), 6), ("spine", (0, 0, 1), -8), ("chest", (1, 0, 0), -5), ("hips", (0, 1, 0), 2.5),
     ("spine", (0, 1, 0), 2),
     ("upperarm.l", (0, 1, 0), 10), ("upperarm.r", (0, 1, 0), -18), ("lowerarm.r", (1, 0, 0), -10),

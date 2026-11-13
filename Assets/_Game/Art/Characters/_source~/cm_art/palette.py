@@ -42,7 +42,7 @@ CHAR = {
     "stone_armour": ("#C9B0A0", "v4 SAMPLED warm stone mid (front crop lit #E1C7B1, mid #C9B0A0, shade #6B656D); v3 was #B4B0AA. SAMPLED warm light stone of pauldrons/knee guards/rim (front crop lit ~#C3AFA4, shade ~#696D6E); 0.66 shade band ~#77746F, near CORE Stone #6F7282"),
     "stone_blade":  ("#9FB8CF", "v5 icy blue-grey cleaver stone (bible blade reads ice-blue; v4 #8E97AE)"),
     "stone_dark":   ("#6E6A74", "v5 SAMPLED dark grey stone of the knee guards (front crop shade #6B656D)"),
-    "stone_toe":    ("#9C989C", "v5 mid-grey stone toe caps"),
+    "stone_toe":    ("#8A868A", "v6 mid-grey stone toe caps (v5 #9C989C read white after the finish)"),
     "stone_gap":    ("#4A4450", "v5 dark gaps between the shield rim stones"),
     "wrap_dark":    ("#3A3346", "SAMPLED dark shin wraps under the knee guards"),
     "skin":         ("#F7B48A", "SAMPLED warm tan skin (cheek #FBA779 lit, face mid-tones ~#F2B08A)"),
