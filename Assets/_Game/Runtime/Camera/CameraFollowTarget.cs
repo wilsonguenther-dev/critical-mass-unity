@@ -1,3 +1,4 @@
+using System;
 using CriticalMass.Runtime.Game;
 using CriticalMass.Runtime.Input;
 using CriticalMass.Sim.Config;
@@ -23,7 +24,8 @@ namespace CriticalMass.Runtime.Camera
     {
         public SimDriverBehaviour Driver;
 
-        private readonly CameraFollow _follow = new CameraFollow(HumanInputState.ScreenUpX, HumanInputState.ScreenUpZ);
+        private CameraFollow _follow = new CameraFollow(HumanInputState.ScreenUpX, HumanInputState.ScreenUpZ);
+        private bool _yawChecked;
         private HumanInputSource _input;
         private bool _override;
         private double _ox, _oz;
@@ -71,6 +73,18 @@ namespace CriticalMass.Runtime.Camera
             World w = Driver.World;
             if (w == null || w.ActorCount <= 0) return;
 
+            // feat/ground-camera: a -cameraYaw run (automation only) turns the camera; the 2 u screen-up offset must turn
+            // with it, or the player sits off centre in the yaw-0 grab. The default yaw 45 keeps the static basis exactly.
+            if (!_yawChecked)
+            {
+                _yawChecked = true;
+                double yaw = Driver.Config.Render.CameraYawDeg;
+                if (Math.Abs(yaw - 45) > 1e-9)
+                {
+                    GroundCamera.Basis(360 - yaw, out double ux, out double uz, out _, out _);
+                    _follow = new CameraFollow(ux, uz);
+                }
+            }
             double a = Driver.Alpha;
             MapDef map = w.Map;
             BoundsDef b = map.Bounds;

@@ -20,6 +20,7 @@
 # ran out, 66 no app, 67 box refused (battery or disk), 69 box unreachable, 64 usage.
 set -euo pipefail
 EXTRA=""    # --extra "FLAGS": more player flags, passed as they are (perf-60hz-32p)
+PLAYERARGS=""   # --player-args "..." extra player flags, word-split (e.g. "-seed 1337 -shotTick 4800", "-groundShots")
 CAMYAW=""   # --camera-yaw D: the player's -cameraYaw (builds from a81efe4+1 on; 0 = true north, 45 = default)
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$ROOT/tools/remote/_remote-lib.sh"
@@ -39,6 +40,7 @@ while [[ $# -gt 0 ]]; do
     --novsync) NOVSYNC=1; shift ;;
     --camera-yaw) CAMYAW="$2"; shift 2 ;;
     --extra) EXTRA="$2"; shift 2 ;;
+    --player-args) PLAYERARGS="$2"; shift 2 ;;
     --profile) PROFILE="${2:?}"; shift 2 ;;
     --width) W="${2:?}"; shift 2 ;;
     --height) H="${2:?}"; shift 2 ;;
@@ -75,7 +77,7 @@ rsync_to --delete "$APP" "$REMOTE_USER@$REMOTE_HOST:cm-remote/builds/$COMMIT/" \
 FPS=(); [[ "$PROFILE" == floor ]] && FPS=(--fps-cap 30)
 ARGS=(--build "builds/$COMMIT" --matches "$MATCHES" --title-seconds "$TITLE_S" --timeout "$TIMEOUT"
       --quality "$QUALITY" --width "$W" --height "$H" --keep "$KEEP" --lock-wait "$LOCK_WAIT"
-      ${SPEED:+--speed "$SPEED"} ${NOVSYNC:+--novsync} ${CAMYAW:+--camera-yaw "$CAMYAW"} ${EXTRA:+--extra "$EXTRA"} ${FPS[@]+"${FPS[@]}"})
+      ${SPEED:+--speed "$SPEED"} ${NOVSYNC:+--novsync} ${CAMYAW:+--camera-yaw "$CAMYAW"} ${EXTRA:+--extra "$EXTRA"} ${PLAYERARGS:+--player-args "$PLAYERARGS"} ${FPS[@]+"${FPS[@]}"})
 [[ "$MODE" == captures ]] && ARGS+=(--shots)
 [[ -n "${AFF:-}" ]] && ARGS+=(--affordance-shots)
 MAX=$((LOCK_WAIT + MATCHES * (TIMEOUT + 60) + 300))

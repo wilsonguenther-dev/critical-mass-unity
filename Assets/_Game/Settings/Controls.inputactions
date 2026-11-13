@@ -194,6 +194,15 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
+                },
+                {
+                    "name": "CameraView",
+                    "type": "Button",
+                    "id": "6d732925-a0a9-4a51-8c90-cfce6aa530d7",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
                 }
             ],
             "bindings": [
@@ -881,12 +890,34 @@
                 },
                 {
                     "name": "",
+                    "id": "f476cafc-8d64-400d-ad70-3431bf965c5c",
+                    "path": "<Keyboard>/f5",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "KeyboardMouse",
+                    "action": "CameraView",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
                     "id": "3867c493-8bb2-4bc4-bac3-913d48b99824",
                     "path": "<Gamepad>/rightStickPress",
                     "interactions": "",
                     "processors": "",
                     "groups": "Gamepad",
                     "action": "ShowTerrain",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "360dc137-ad6c-41b5-9be8-1245e7eb6cde",
+                    "path": "<Gamepad>/select",
+                    "interactions": "MultiTap",
+                    "processors": "",
+                    "groups": "Gamepad",
+                    "action": "CameraView",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }
