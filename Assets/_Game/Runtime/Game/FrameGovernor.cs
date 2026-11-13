@@ -61,6 +61,13 @@ namespace CriticalMass.Runtime.Game
         public static int AppliedCap { get; private set; }
 
         static GameObject _host;
+        static bool _reapply;
+
+        /// <summary>
+        /// The settings page saved cm.fpsCap, cm.bgThrottle, cm.video.vsync or cm.video.quality: re-read them on the next
+        /// frame. FrameGovernor is the only code that writes QualitySettings.vSyncCount and Application.targetFrameRate.
+        /// </summary>
+        public static void Reapply() => _reapply = true;
         string _dataDir;
         bool _focused = true, _pausedAudio, _forceTarget, _title, _inputPaused;
         float _checkAge = 10f, _measureAge, _noticeUntil;
@@ -68,9 +75,15 @@ namespace CriticalMass.Runtime.Game
         HumanInputSource _input;
         FrameGovernorGui _gui;
 
+        /// <summary>The frame target under -novsync.</summary>
+        public const int NoVsyncTarget = 240;
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         static void Install()
         {
+            // Keep running (at the background rate below) when the window loses focus: a streamer clicking away must not
+            // freeze the game. ProjectSettings sets the same; this covers builds made before it.
+            Application.runInBackground = true;
             if (_host != null) return;
             _host = new GameObject("CriticalMass FrameGovernor");
             DontDestroyOnLoad(_host);
@@ -238,9 +251,10 @@ namespace CriticalMass.Runtime.Game
         {
             float dt = Time.unscaledDeltaTime;
             _checkAge += dt;
-            if (_checkAge >= 0.5f)
+            if (_checkAge >= 0.5f || _reapply)
             {
                 _checkAge = 0f;
+                _reapply = false;
                 _prefCap = SanitiseCap(PlayerPrefs.GetInt(PrefFpsCap, DefaultCap));
                 _prefBg = PlayerPrefs.GetInt(PrefBgThrottle, 1);
                 _prefVSync = PlayerPrefs.GetInt(PrefVSync, 1);
@@ -257,7 +271,7 @@ namespace CriticalMass.Runtime.Game
             {
                 cap = 0;
                 vsync = 0;
-                target = -1;
+                target = NoVsyncTarget;   // -novsync: vsync off with a high target, never unbounded (DG-49)
             }
             else if (background)
             {
