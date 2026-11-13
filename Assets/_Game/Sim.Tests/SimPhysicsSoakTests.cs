@@ -218,10 +218,8 @@ namespace CriticalMass.Sim.Tests
         private static readonly ulong[,] Golden =
         {
             { 0x5C912AEED16BC302UL, 0x2980068FA0457CC2UL }, // Classic (DG-21, unchanged since the browser port)
-            { 0x2BE070768E23B442UL, 0x8616946C55B1FFF8UL }, // PhysicsOnly (re-pinned 2026-11-12: U-071 a retreating bot passes allies)
-            // Full re-pinned 2026-11-13 (fix/bridge-holes): MapEventsConfig.BridgeCollapse now defaults to false, so the
-            // rotation's bridge turn is a quiet minute (no event). Was 0x70C7D9F992CAC3CC / 0x8F3F947AE72E7815 (U-074..U-078).
-            { 0xAA728D5DAF5451F4UL, 0x619D9DCFE88715E6UL }, // Full
+            { 0x2BE070768E23B442UL, 0x8BCA67D3B8845532UL }, // PhysicsOnly (re-pinned 2026-11-12: U-071; 5v5 re-pinned 2026-11-13: fix/kaiju-alive-1 Kaiju hits stagger, throw at KaijuKnockScale 0.5, topple)
+            { 0xAA728D5DAF5451F4UL, 0xBF82793EEE8C78C8UL }, // Full (re-pinned 2026-11-13 integration batch 7: fix/bridge-holes MapEventsConfig.BridgeCollapse default false (16v16 and 5v5) plus fix/kaiju-alive-1 Kaiju hits stagger, throw at KaijuKnockScale 0.5, topple (5v5); before: 0x70C7D9F992CAC3CC / 0x8F3F947AE72E7815, U-074..U-078)
         };
     }
 }

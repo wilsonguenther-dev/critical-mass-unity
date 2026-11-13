@@ -116,6 +116,8 @@ namespace CriticalMass.Runtime.View.Anim
         /// <summary>Called when the model is (re)taken from the pool: forget motion history, evaluate the first frames.</summary>
         public void Reset()
         {
+            _lastCarried = -1; _climbW = 0f;
+            _terraClip = null;
             _hasLast = false;
             _hasYaw = false;
             _vx = _vz = _speed = _prevSpeed = _accel = 0;
@@ -303,6 +305,7 @@ namespace CriticalMass.Runtime.View.Anim
             bool evaluate = AnimLod.ShouldEvaluate(m.AlwaysAnimate, fresh, m.AnyVisible, basePos, _id);
             bool evaluated = m.Evaluate(evaluate);
             if (evaluated) ApplyLegWarp(m);
+            if (evaluated && !corpse && !air) ApplyClimb(m, w, i, simTime);
             {
                 // Breathing: a 2% chest swell at 0.3 Hz while idle. fix/model-scale: set from the chest's rest scale, never
                 // multiplied in place (a clip without a chest scale curve, or a frozen simTime in a hit-stop, compounded it).
@@ -550,6 +553,28 @@ namespace CriticalMass.Runtime.View.Anim
                 actW = Math.Max(actW, _holdW);
             }
 
+            // fix/kaiju-alive-1 (nothing-glides audit): a dig or a place had no pose at all (the block just appeared or vanished
+            // while the Miner stood in Idle). The carried-block count changing is the sim's dig (+) or place (-): a chop for a
+            // dig, Use_Item for a place, on the upper layer so the legs keep their state.
+            int carried = w.Terraform != null && w.Terraform.Carried != null && i < w.Terraform.Carried.Length ? w.Terraform.Carried[i] : 0;
+            if (_lastCarried >= 0 && carried != _lastCarried && actor.Alive)
+            {
+                _terraClip = carried > _lastCarried ? (m.HasClip(ArtMapping.Attack2HChop) ? ArtMapping.Attack2HChop : ArtMapping.UseItem) : ArtMapping.UseItem;
+                if (!m.HasClip(_terraClip)) _terraClip = null;
+                _terraAt = simTime;
+            }
+            _lastCarried = carried;
+            if (_terraClip != null)
+            {
+                double tt = simTime - _terraAt, tl = m.ClipLength(_terraClip);
+                if (tt >= tl || tt < 0) _terraClip = null;
+                else
+                {
+                    float tw = (float)Math.Min(1, Math.Min(tt / 0.08, (tl - tt) / 0.2)) * (1f - Mathf.Clamp01(actW));
+                    if (tw > 0f && m.PoseUpper(_terraClip, tt, tw, false, 0)) { sum += tw; actW = Math.Max(actW, tw); }
+                }
+            }
+
             // Carry pose (arms in) under everything else.
             bool carrying = actor.Carry != CarryKind.None && actor.CarryAmount > 0 && m.HasClip(ArtMapping.Carry);
             _carry = Approach(_carry, carrying ? 1f : 0f, dSim, CarryFade);
@@ -582,6 +607,9 @@ namespace CriticalMass.Runtime.View.Anim
         }
 
         double _actAge;
+        int _lastCarried = -1;
+        string _terraClip;
+        double _terraAt;
 
         void BeginAction(ModelView m, Actor actor, GameConfig cfg, double simTime)
         {
@@ -688,6 +716,52 @@ namespace CriticalMass.Runtime.View.Anim
         /// chest and arms keep facing the aim. Only after an evaluation: on a skipped frame the bones hold last frame's
         /// (already turned) pose, and the next evaluation rewrites hips and spine from the clips, so nothing compounds.
         /// </summary>
+        /// <summary>
+        /// fix/kaiju-alive-1 (nothing-glides audit): a fighter on a Builder LADDER cell (a Wall cell a ladder piece turned
+        /// walkable) used to run up it with the run cycle. Cheap procedural climb on top of the clip: the arms reach up
+        /// hand over hand (alternating, phase from the sim time and the actor id), the torso leans into the wall. View only.
+        /// </summary>
+        void ApplyClimb(ModelView m, World w, int i, double simTime)
+        {
+            float target = OnLadder(w, i) ? 1f : 0f;
+            _climbW += (target - _climbW) * 0.25f;
+            if (_climbW < 0.01f) { _climbW = 0f; return; }
+            float ph = (float)(2 * Math.PI * 1.6 * simTime + i * 0.9);
+            Reach(m.Bone("upperarm.l"), 150f + 25f * Mathf.Sin(ph));
+            Reach(m.Bone("upperarm.r"), 150f - 25f * Mathf.Sin(ph));
+            Transform spine = m.Bone("spine");
+            if (spine != null) spine.localRotation = Quaternion.Slerp(spine.localRotation, spine.localRotation * Quaternion.Euler(18f, 0f, 0f), _climbW);
+
+            void Reach(Transform arm, float deg)
+            {
+                if (arm == null || arm.parent == null) return;
+                // Raise the arm about the model's sideways axis, expressed in the arm's parent space.
+                Vector3 side = arm.parent.InverseTransformDirection(m.Transform.right);
+                Quaternion up = Quaternion.AngleAxis(-deg, side) * arm.localRotation;
+                arm.localRotation = Quaternion.Slerp(arm.localRotation, up, _climbW * 0.85f);
+            }
+        }
+
+        float _climbW;
+
+        /// <summary>True when actor i stands on a cell of an active ladder piece (BuiltPieces: the cell was a Wall).</summary>
+        static bool OnLadder(World w, int i)
+        {
+            BuiltPiece[] ps = w.Builder != null ? w.Builder.Pieces : null;
+            if (ps == null) return false;
+            var map = w.Map;
+            int cx = (int)Math.Floor(w.X[i]), cz = (int)Math.Floor(w.Z[i]);
+            if (cx < 0 || cz < 0 || cx >= map.Width || cz >= map.Height) return false;
+            int cell = cz * map.Width + cx;
+            for (int p = 0; p < ps.Length; p++)
+            {
+                BuiltPiece b = ps[p];
+                if (b == null || !b.Active || b.Carried || b.Kind != BuiltPieces.Ladder || b.Cells == null) continue;
+                for (int c = 0; c < b.Count; c++) if (b.Cells[c] == cell) return true;
+            }
+            return false;
+        }
+
         void ApplyLegWarp(ModelView m)
         {
             if (Math.Abs(_warp) < 0.25) return;

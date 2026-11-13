@@ -928,7 +928,9 @@ namespace CriticalMass.Runtime.View.Effects
             if (k.TelegraphIn > 0)
             {
                 float R = (float)_cfg.Kaiju.SlamRadius;
-                float p = 1f - (float)(k.TelegraphIn / _cfg.Kaiju.SlamTelegraphSeconds);
+                // fix/kaiju-alive-1: the fill runs over the sim's real telegraph (floored to KaijuSlamMinRealSeconds at the
+                // pace), not the config's 1.2 s: at pace 2 the disc stayed empty for the first quarter of the warning.
+                float p = Mathf.Clamp01(1f - (float)(k.TelegraphIn / Telegraphs.SlamTotalSim(w)));
                 double h = Ground(k.TelegraphX, k.TelegraphZ);
                 Vector3 c = W(k.TelegraphX, h + 0.04, k.TelegraphZ);
                 float pulse = 0.75f + 0.25f * (FeelGate.Pulse(now, PaceNow, SlamPulseHz) * 2f - 1f) * (FeelGate.ReduceFlashing ? 0.4f : 1f);
@@ -981,7 +983,8 @@ namespace CriticalMass.Runtime.View.Effects
             Kaiju k = w.Kaiju;
             Vector3 gr = Vector3.right, gu = Vector3.forward;
             float reach = (float)(_cfg.Kaiju.MeleeRange + Kaiju.MeleeLeash);
-            float p = Telegraphs.MeleeProgress(k.MeleeWindupIn, _cfg.Kaiju.MeleeWindupTicks, Alpha);
+            // fix/kaiju-alive-1: over the wind-up's real length (MeleeWindupLen, floored to 0.45 real s), not the config's 11 ticks.
+            float p = Telegraphs.MeleeProgress(k.MeleeWindupIn, k.MeleeWindupLen > 0 ? k.MeleeWindupLen : _cfg.Kaiju.MeleeWindupTicks, Alpha);
             float pulse = 0.7f + 0.3f * FeelGate.Pulse(now, PaceNow, MeleePulseHz) * (FeelGate.ReduceFlashing ? 0.4f : 1f);
             double kx = k.PrevX + (k.X - k.PrevX) * Alpha, kz = k.PrevZ + (k.Z - k.PrevZ) * Alpha;
             Vector3 c = W(kx, Ground(kx, kz) + 0.05, kz);

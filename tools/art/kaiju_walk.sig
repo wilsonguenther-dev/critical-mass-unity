@@ -1,0 +1,1 @@
+"design": {"stride_m": 2.708, "frames": 25, "seconds": 1.0417, "v": 2.6, "worst_reach": 0.976, "beta_h": 0.55, "beta_f": 0.62, "lift_h": 0.42, "lift_f": 0.46, "drop": 0.33, "bob": 0.065, "lengths": {"th_L": 0.569, "sh_L": 0.569, "ar_L": 0.936, "fa_L": 0.927, "th_R": 0.569, "sh_R": 0.569, "ar_R": 0.936, "fa_R": 0.927}

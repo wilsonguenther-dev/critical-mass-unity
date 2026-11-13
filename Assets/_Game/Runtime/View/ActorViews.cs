@@ -399,7 +399,17 @@ namespace CriticalMass.Runtime.View
             SetActive(_spikes, spikes);
             if (spikes)
             {
-                _spikes.Transform.localPosition = SimSpace.ToWorld(k.TelegraphX, GroundHeight(map, k.TelegraphX, k.TelegraphZ), k.TelegraphZ);
+                // fix/kaiju-alive-1 (nothing-glides audit): the spikes were a static mesh popped in for the whole telegraph.
+                // They now push up out of the ground over the wind-up (eased, overshoot near the end), turn slowly, and
+                // tremble in the last quarter before the slam lands. View only; the ring on the ground stays the hitbox.
+                double tTotal = Effects.Telegraphs.SlamTotalSim(w);
+                float u = Mathf.Clamp01(1f - (float)(k.TelegraphIn / tTotal));
+                float rise = u < 0.85f ? Mathf.SmoothStep(0f, 1.08f, u / 0.85f) : Mathf.Lerp(1.08f, 1f, (u - 0.85f) / 0.15f);
+                float shake = u > 0.75f ? 0.04f * Mathf.Sin((float)(simTime * 70.0)) * (u - 0.75f) * 4f : 0f;
+                Vector3 basePos = SimSpace.ToWorld(k.TelegraphX, GroundHeight(map, k.TelegraphX, k.TelegraphZ), k.TelegraphZ);
+                _spikes.Transform.localPosition = basePos + new Vector3(shake, -0.6f * (1f - rise), -shake);
+                _spikes.Transform.localScale = Vector3.Scale(_spikes.BaseScale, new Vector3(1f, Mathf.Max(0.05f, rise), 1f));
+                _spikes.SetFacing(Quaternion.Euler(0f, (float)(simTime * 25.0) % 360f, 0f));
                 _spikes.SetMaterial(ArtMaterials.ForGlow(_spikes.Spec, ArtMapping.KaijuGlow(k.State)));
                 count++;
             }

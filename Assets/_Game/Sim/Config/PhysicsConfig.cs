@@ -85,6 +85,19 @@ namespace CriticalMass.Sim.Config
         /// <summary>An actor in the air on the resolve tick takes no slam damage and no push.</summary>
         public bool AirDodgesSlam = true;
 
+        // ---- fix/kaiju-alive-1 (2026-11-13): the Kaiju's hits land
+        /// <summary>The Kaiju's claw and slam throw and stagger (KaijuClawKnock / KaijuStunSeconds, SlamKnock* / SlamStunSeconds)
+        /// even while the fighters' Knockback is off (the owner: "it's not hitting, it's not fighting"). Fighter hits keep
+        /// Knockback's default.</summary>
+        public bool KaijuKnockback = true;
+        /// <summary>The Kaiju's claw arc and slam ring knock down structures (Topple: each strike takes one hit off every
+        /// standing piece in the claw cone, or within KaijuSlamToppleShare x SlamRadius of the slam).</summary>
+        public bool KaijuTopples = true;
+        public double KaijuSlamToppleShare = 0.6;
+        /// <summary>Share of the Kaiju's designed throw distances (KaijuClawKnock, SlamKnock*) applied through KaijuKnockback while
+        /// the fighters' Knockback is off; the stagger (stun) is always full. With Knockback on, throws are full.</summary>
+        public double KaijuKnockScale = 0.5;
+
         // ---- DG-86 / OD-5 solid Kaiju
         /// <summary>The Kaiju is an immovable disc fighters cannot enter; it shoves them as it walks; no trample damage.</summary>
         public bool SolidKaiju = true;
