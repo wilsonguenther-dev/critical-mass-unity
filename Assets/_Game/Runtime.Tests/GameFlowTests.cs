@@ -225,11 +225,14 @@ namespace CriticalMass.Runtime.Tests
                 m.EnsureBuilt();
                 Assert.AreEqual(m.Entries.Count, m.Items.Count);
                 for (int i = 0; i < m.Entries.Count; i++) Assert.AreEqual(m.Entries[i].Available, m.Items[i].interactable, m.Entries[i].Id);
-                // Integration batch 2: every line leads somewhere (Barracks, Codex, Credits, Spectate are wired).
+                // Integration batch 2: every line leads somewhere (Barracks, Codex, Credits are wired).
                 Assert.IsTrue(m.Item("barracks").interactable);
                 Assert.IsTrue(m.Item("codex").interactable);
-                Assert.IsTrue(m.Item("spectate").interactable);
-                Assert.IsTrue(m.Item("play").interactable);
+                // Home lobby: Play now, Custom match and Spectate live on the mode cards; "play" / "playnow" are the PLAY button.
+                Assert.IsNull(m.Item("spectate"), "spectate is a mode card, not a home tile");
+                Assert.AreSame(m.PlayItem, m.Item("play"));
+                Assert.AreSame(m.PlayItem, m.Item("playnow"));
+                Assert.IsTrue(m.PlayItem.interactable);
                 AssertChainSkipsDisabled(m.Items);
                 for (int i = 0; i < m.Entries.Count; i++)
                     if (!m.Entries[i].Available) Assert.IsNotNull(m.Items[i].transform.Find("Soon"), "coming soon lines carry the tag");

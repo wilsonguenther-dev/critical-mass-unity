@@ -34,6 +34,8 @@ namespace CriticalMass.Runtime.Flow
 
         /// <summary>The focused item when the screen opens.</summary>
         protected MenuItem DefaultFocus;
+        /// <summary>The one item focused when the screen opens (tests check every screen has exactly one).</summary>
+        public MenuItem DefaultItem => DefaultFocus;
         protected RectTransform Space { get; private set; }
         Text _hint;
         PromptStrip _hintStrip;

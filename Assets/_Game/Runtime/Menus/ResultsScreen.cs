@@ -55,8 +55,8 @@ namespace CriticalMass.Runtime.Menus
         public string TitleText => _title != null ? _title.text : "";
         public string ReasonText => _reason != null ? _reason.text : "";
 
-        protected override string HintKeys => "ENTER SELECT   ·   ESC MAIN MENU";
-        protected override string HintPad => "A SELECT   ·   B MAIN MENU";
+        protected override string HintKeys => "ENTER SELECT   ·   ESC HOME";
+        protected override string HintPad => "A SELECT   ·   B HOME";
         protected override float WashAlpha => 0.72f;
 
         static readonly string[] StatNames = { "KNOCK-OUTS", "DEATHS", "HILL TIME", "BIOMASS FED", "CORRUPTION FED", "DAMAGE", "POINTS" };
@@ -78,7 +78,8 @@ namespace CriticalMass.Runtime.Menus
             BuildMvps(space, 1280f);
 
             // One row: the three drawers sit between the way out (left) and the way on (right).
-            _menu = Button(space, "Main Menu", 160f, 880f, 230f, 84f, "MAIN MENU", Back, 26);
+            // Home lobby: one press back to HOME, where this match's rewards land on the player card.
+            _menu = Button(space, "Main Menu", 160f, 880f, 230f, 84f, "HOME", Back, 30);
             _rewardsItem = Button(space, "Rewards", 398f, 880f, 220f, 84f, "REWARDS", () => ToggleDrawer(Drawer.Rewards), 26);
             _achievements = Button(space, "Achievements", 626f, 880f, 290f, 84f, "ACHIEVEMENTS", () => ToggleDrawer(Drawer.Achievements), 26);
             _highlightsItem = Button(space, "Highlights", 924f, 880f, 250f, 84f, "HIGHLIGHTS", () => ToggleDrawer(Drawer.Highlights), 26);
