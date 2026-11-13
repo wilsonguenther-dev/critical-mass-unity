@@ -160,6 +160,33 @@ namespace CriticalMass.Runtime.Game
         }
 
         /// <summary>
+        /// polish-audit-1: the window size after the player (or the OS) switched a full-screen window to a window with
+        /// Alt+Enter or the title-bar control. The engine keeps the full display size, so the window's title bar and edges
+        /// sit under the taskbar or off the screen; the game sizes it to a 16:9 window of about two thirds of the display
+        /// (never under 1280x720 unless the display is smaller, never larger than the display). A window that is already
+        /// clearly smaller than the display is left alone: (0, 0) means "keep it".
+        /// </summary>
+        public static (int w, int h) WindowAfterExternalToggle(int w, int h, int nativeW, int nativeH)
+        {
+            if (nativeW <= 0 || nativeH <= 0) return (0, 0);
+            if (w < nativeW * 0.9 || h < nativeH * 0.9) return (0, 0);
+            double tw = nativeW * 2.0 / 3.0, th = tw * 9.0 / 16.0;
+            if (th > nativeH * 2.0 / 3.0) { th = nativeH * 2.0 / 3.0; tw = th * 16.0 / 9.0; }
+            if (tw < 1280) { tw = 1280; th = 720; }
+            (int cw, int ch) = ClampToNative((int)Math.Round(tw), (int)Math.Round(th), nativeW, nativeH);
+            return (cw, ch);
+        }
+
+        /// <summary>
+        /// polish-audit-1: true when the window mode changed without the game asking for it (Alt+Enter, the macOS
+        /// full-screen control): the stored "Display" setting must follow, or Settings shows FULL SCREEN over a window and
+        /// the next launch silently undoes the player's choice. A change the game itself requested within the last
+        /// 3 seconds (RequestWindow) is not external.
+        /// </summary>
+        public static bool IsExternalModeChange(bool modeChanged, bool requestedThisMode, double secondsSinceRequest) =>
+            modeChanged && !(requestedThisMode && secondsSinceRequest >= 0 && secondsSinceRequest <= 3.0);
+
+        /// <summary>
         /// DG-62 safe-mode policy: safe only when the unclean run lasted under 60 s (a crash at startup) or after two unclean
         /// runs in a row (uncleanStreak counts the previous run). -safe always wins.
         /// </summary>
