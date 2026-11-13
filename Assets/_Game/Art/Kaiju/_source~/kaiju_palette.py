@@ -31,6 +31,8 @@ BASE = {
     "Pupil":      "#18233B",  # pupils, nose, mouth line: Void Navy (the darkest value on screen is the ink)
     "Mouth":      "#7A2E3A",  # mouth interior
     "Teeth":      "#F7F0E5",  # p05 Warm Cream
+    "Hide":       "#4A5A7C",  # v4: the smooth round head, a step lighter than Skin so the painted brows and ink read
+    "Tongue":     "#F0808A",  # v4: the tongue on the jaw (seen when the Jaw bone opens)
 }
 # per-stage overrides of fixed colours (the egg's plates are a neutral grey on p10)
 STAGE_BASE = {
@@ -83,7 +85,8 @@ TELEGRAPH_RED_LIGHT = "#F6716B"
 MASK_FIXED = 0.0
 MASK_TEAM_GLOW = 0.75
 ALLEGIANCES = ["Neutral", "Azure", "Crimson", "Berserk"]
-SLOTS = list(BASE) + list(GLOW_K) + ["Telegraph"]
+V4_SLOTS = ["Hide", "Tongue"]     # appended LAST so the v1-v3 slot indices (cm_slot in older .blend files) keep their meaning
+SLOTS = [k for k in BASE if k not in V4_SLOTS] + list(GLOW_K) + ["Telegraph"] + V4_SLOTS
 MATERIAL = "CM_Toon"
 
 
