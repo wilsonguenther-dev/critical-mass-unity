@@ -80,7 +80,7 @@ namespace CriticalMass.Runtime.PlayTests
                 Vector3 d = toe.position - foot.position;
                 d.y = 0f;
                 float ang = d.sqrMagnitude > 1e-8f ? Vector3.SignedAngle(sim, d, Vector3.up) : float.NaN;
-                sb.Append($" | toe.{s} y {toe.position.y:0.000} dir {ang:0}");
+                sb.Append($" | toe.{s} y {toe.position.y:0.000} ankle y {foot.position.y:0.000} dir {ang:0}");
             }
             if (SanityRig.TrySideFront(model, out Vector3 hipsFront)) sb.Append($" | hip line {Vector3.SignedAngle(sim, hipsFront, Vector3.up):0}");
             Transform hips = SanityRig.Find(model, "hips");
@@ -201,10 +201,11 @@ namespace CriticalMass.Runtime.PlayTests
         /// <para>Un-Explicit by the animation pass (2026-11-12, DG-76): bots kiting backwards or sideways now play the
         /// reversed run and the strafes (no forward stride while moving back), and attacks and light hits play on the upper
         /// body only, so the planted foot is a real stance foot during combat (the suspected source of the 180 degree reads).</para>
-        // KNOWN DEFECT (integration batch 3 finisher, 2026-11-13): after fix/animation-reds 60ae0d9 the turned-around reads fell from
-        // 20 to 27 % to 8.8 % (Warrior, 33 of 377) and 8.6 % (Farmer, 14 of 162), still over the 5 % budget (worst: leg yaw 0,
-        // 180 degrees, moving backwards). Explicit so the gate names it; back to the animation lane.
-        [UnityTest, Explicit("known defect (batch 3): 8.8 % of moving Warrior and 8.6 % of Farmer samples read turned around, budget 5 %; animation lane")]
+        // Explicit from the batch 3 finisher (8.8 % of Warrior and 8.6 % of Farmer samples "turned around": leg yaw 0, 180
+        // degrees, moving backwards) until fix/facing-frame-timing: those reads were the planted-toe cue picking the
+        // trailing foot (Run reversed, Walk, the strafes reversed: 1 to 6 % of phases by forward kinematics, every one a
+        // 180 degree read). SanityRig now picks the planted foot by its ankle. Budget unchanged (5 %).
+        [UnityTest]
         public IEnumerator EveryMovingBotModelFacesItsSimFacing()
         {
             _w = new SanityWorld();
@@ -236,8 +237,8 @@ namespace CriticalMass.Runtime.PlayTests
                     {
                         worstDeg[key] = score;
                         worst[key] = err > ToleranceDeg
-                            ? $"actor {i} at {w.Match.Time:0.0} s, front ({cue}) {err:0} degrees from the sim facing turned by the leg yaw {legYaw:0}: {SanityRig.Verdict(err)}"
-                            : $"actor {i} at {w.Match.Time:0.0} s, the legs stride {travel:0} degrees away from where it moves";
+                            ? $"actor {i} at {w.Match.Time:0.0} s, front ({cue}) {err:0} degrees from the sim facing turned by the leg yaw {legYaw:0}: {SanityRig.Verdict(err)} {PoseDiag(_w, i)}"
+                            : $"actor {i} at {w.Match.Time:0.0} s, the legs stride {travel:0} degrees away from where it moves {PoseDiag(_w, i)}";
                     }
                 }
             }

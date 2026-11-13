@@ -113,7 +113,14 @@ namespace CriticalMass.Runtime.Game
 
         private void Update()
         {
-            double unscaled = Time.unscaledDeltaTime;
+            // fix/facing-frame-timing: a capture clock (Time.captureDeltaTime: movie capture, the sanity tests' fixed load
+            // frames, the frame-rate tests' fake clocks) drives the sim too. Unity's capture clock does not touch
+            // unscaledDeltaTime (documented), so the driver used to run on real frame time under it: the load frames
+            // advanced the accumulator by however long the runner took, the tick cap pinned the tick (4) but not the
+            // interpolation alpha (0.44 / 0.54 / ... per load on GitHub), and every drawn pose after the stopped clock was
+            // offset by that fraction of a tick: the FacingSanity reads changed from run to run with the tick pinned.
+            float capture = Time.captureDeltaTime;
+            double unscaled = capture > 0f ? capture : Time.unscaledDeltaTime;
             FrameDt = Math.Min(unscaled, MaxFrameDt);
             HumanInputSource input = InputSource;
             bool paused = input != null && input.State.Paused;
