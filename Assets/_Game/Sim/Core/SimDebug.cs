@@ -34,7 +34,7 @@ namespace CriticalMass.Sim.Core
             KaijuFeedConfig feed = w.Config.KaijuFeed;
             m.Instability += corruptionUnits * feed.CorruptionInstabilityPerUnit;
             // CM-28: the same lock path as a real delivery, so the one BerserkLocked event fires here too.
-            if (m.Instability >= feed.BerserkThreshold) SimResources.LockBerserk(w);
+            if (m.Instability >= SimResources.BerserkLine(w)) SimResources.LockBerserk(w); // DG-41
             return true;
         }
     }

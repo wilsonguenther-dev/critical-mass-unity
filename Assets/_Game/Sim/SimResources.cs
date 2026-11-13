@@ -40,7 +40,35 @@ namespace CriticalMass.Sim.Core
                 m.Delivered[(int)team].Corruption += units;
                 World.PushEvent(w, SimEventType.DeliverCorruption, actorId, teamIdx, sh.X, sh.Z, units);
             }
-            if (m.Instability >= feed.BerserkThreshold) LockBerserk(w);
+            if (m.Instability >= BerserkLine(w)) LockBerserk(w);
+        }
+
+        /// <summary>
+        /// DG-41: the instability that locks berserk this match. KaijuFeed.BerserkThreshold unless KaijuFeed.RandomBerserk; then
+        /// u^2 x BerserkCurveMax with u = SeedUniform(seed) in [0, 1), fixed for the whole match and never drawn from the shared
+        /// RNG (P(line &lt;= I) = sqrt(I / BerserkCurveMax)). Pure function of the seed and config.
+        /// </summary>
+        public static double BerserkLine(World w)
+        {
+            KaijuFeedConfig feed = w.Config.KaijuFeed;
+            if (!feed.RandomBerserk) return feed.BerserkThreshold;
+            double u = SeedUniform(w.Opts.Seed);
+            return u * u * feed.BerserkCurveMax;
+        }
+
+        /// <summary>DG-41: a uniform value in [0, 1) from a match seed (a stateless integer hash; the same seed always gives the same value).</summary>
+        public static double SeedUniform(int seed)
+        {
+            unchecked
+            {
+                uint h = (uint)seed * 0x9E3779B1u + 0x7F4A7C15u;
+                h ^= h >> 16;
+                h *= 0x85EBCA6Bu;
+                h ^= h >> 13;
+                h *= 0xC2B2AE35u;
+                h ^= h >> 16;
+                return (h >> 8) / 16777216.0;
+            }
         }
 
         /// <summary>CM-28: set the berserk lock and raise the one BerserkLocked event of the match; false (and nothing pushed) when the lock was already set.</summary>

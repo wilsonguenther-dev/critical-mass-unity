@@ -211,6 +211,18 @@ namespace CriticalMass.Sim.Config
         public double BiomassInstabilityPerUnit = 0.125;
         /// <summary>Instability at or above this before hatch locks berserk.</summary>
         public double BerserkThreshold = 100;
+        /// <summary>
+        /// DG-41 (U-062, not in the browser): when true the line is random per match instead of BerserkThreshold:
+        /// u^2 x BerserkCurveMax with u uniform in [0, 1) from the match seed (SimResources.BerserkLine), so the chance that
+        /// instability I has locked berserk is sqrt(I / BerserkCurveMax), Travis's y = sqrt(x). Off by default: the owner turns
+        /// it on after reading the berserk-share soak (it changes match outcomes, so the golden Normal hashes move).
+        /// </summary>
+        public bool RandomBerserk = false;
+        /// <summary>
+        /// DG-41: the instability at which the random line has surely been crossed (the top of the sqrt curve). 800 keeps the
+        /// berserk share near today's (measured on 100 5v5 seeds: fixed 0.19; random with top 160: 0.68, 250: 0.51; see U-062).
+        /// </summary>
+        public double BerserkCurveMax = 800;
         public double ShrineInteractRange = 3;
         /// <summary>
         /// CM-64: sim ticks a carrier stands in the delivery zone holding interact before its load goes in; an enemy hit during

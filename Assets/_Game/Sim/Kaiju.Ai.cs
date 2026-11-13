@@ -230,7 +230,7 @@ namespace CriticalMass.Sim.Core
             Cleanse.CleanseSystem(w);
             if (!m.Hatched)
             {
-                if (m.Instability >= cfg.KaijuFeed.BerserkThreshold) SimResources.LockBerserk(w);
+                if (m.Instability >= SimResources.BerserkLine(w)) SimResources.LockBerserk(w); // DG-41
                 if (w.ForceHatch || m.Time + HatchTimeEps >= cfg.HatchSeconds) Hatch(w);
                 return;
             }

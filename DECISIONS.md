@@ -1145,3 +1145,17 @@ both of Travis's words a button on the bindings already on main:
 7. **Tuning, measured.** First cut (mend 9, pulse 40): a team with three Healers in place of three Warriors beat the default
    lineup 13 of 16; at mend 6, pulse 30: 10 of 16 (control, no swap: 8 of 16; three Miners: 3 of 16; three Builders: 0 of 16).
    Shields and revives were not added. The CM-54 class switch (CM-84 markers) is still unported.
+
+## U-062 Random berserk line on a square-root curve as built in DG-41, off by default (not in the browser) (2026-11-13T02:58:16Z)
+
+**Source.** No branch of the oracle has it (its lock is `instability >= berserkThreshold`, 100). Travis 2026-11-06:
+"Corruption berserk threshold should be random, but affected by deposited corruption on a parabolic curve (y=√x)".
+1. **Rule.** With `KaijuFeed.RandomBerserk` the line that locks berserk is u² x `BerserkCurveMax`, u uniform in [0, 1) from
+   a stateless hash of the match seed (`SimResources.SeedUniform`, never the shared RNG), fixed for the match. So the chance
+   that instability I has locked berserk is √(I / BerserkCurveMax): y = √x, x being the corruption deposited (instability).
+   Every lock check (delivery, the Kaiju step, the debug feed) reads `SimResources.BerserkLine`.
+2. **Off by default.** It changes match outcomes, so on it would move the golden Normal hashes (U-058) and every berserk band;
+   the owner turns it on. Measured on 100 whole 5v5 matches (seeds 1..100, shipped config): fixed threshold 0.19 berserk
+   share; random line with curve top 160: 0.68, 250: 0.51, **800 (shipped): 0.30**, 1200: 0.23 (CM-34 band 0.10 to 0.50).
+3. The HUD's instability bar (Runtime/Hud/HudState.cs line 95) still draws against BerserkThreshold; with the rule on, the
+   view should hide the line (it is a secret roll) or show the √ chance instead. Not changed here (rules lane only).
