@@ -390,7 +390,8 @@ namespace CriticalMass.Runtime.Menus
             // earlier builds, so the owner never saw this film); Settings > Game > PLAY INTRO AT LAUNCH turns it off.
             // Once per launch: going back to the title later (a scene reload in the Title state) does not replay it.
             if (_launchPlayed) return;
-            if (ShouldPlayAtLaunch(PlayOnFirstLaunch, TitleScreen.ShowOnBoot, GameFlow.State, GameFlow.Autoplay, GameSettings.IntroAtLaunch))
+            bool titleOnBoot = TitleScreen.ShowOnBoot || (LaunchRuleInEditorForTests && GameFlow.Enabled);
+            if (ShouldPlayAtLaunch(PlayOnFirstLaunch, titleOnBoot, GameFlow.State, GameFlow.Autoplay, GameSettings.IntroAtLaunch))
             {
                 _launchPlayed = true;
                 Play();
@@ -398,6 +399,13 @@ namespace CriticalMass.Runtime.Menus
         }
 
         static bool _launchPlayed;
+
+        /// <summary>Tests only (integration batch 5): run the launch rule in the editor with the flow forced on, where
+        /// TitleScreen.ShowOnBoot is false. Player builds never set it.</summary>
+        public static bool LaunchRuleInEditorForTests;
+
+        /// <summary>Tests only: forget that this launch already played the intro (domain reload is off).</summary>
+        public static void ResetLaunchForTests() => _launchPlayed = false;
 
         /// <summary>The launch rule: the boot's title, not autoplay, the setting on (seen flags no longer matter).</summary>
         public static bool ShouldPlayAtLaunch(bool enabled, bool titleOnBoot, FlowState state, bool autoplay, bool settingOn) =>
