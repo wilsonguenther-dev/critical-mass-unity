@@ -62,8 +62,9 @@ namespace CriticalMass.Runtime.PlayTests
                 RenderTier.Set(tier);
                 _w = new SanityWorld();
                 // Autopilot for everyone and 12 s of sim: the crowd spreads from the pad, so near (LOD0) and far (LOD1)
-                // fighters are both on screen.
-                yield return _w.Load(autopilot: true, manualInput: true, settleSeconds: 12);
+                // fighters are both on screen. The input reader stays on (manualInput false): this test sends no input, and
+                // a reader switched off for over 2 s trips HumanControlGuard's lockout watchdog (an error log fails the test).
+                yield return _w.Load(autopilot: true, manualInput: false, settleSeconds: 12);
                 UnityEngine.Camera cam = UnityEngine.Camera.main;
                 Assert.IsNotNull(cam, "no gameplay camera");
                 foreach (Vector2Int s in Screens)
