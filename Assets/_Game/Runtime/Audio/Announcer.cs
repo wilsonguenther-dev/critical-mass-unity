@@ -301,6 +301,9 @@ namespace CriticalMass.Runtime.Audio
             for (; _cursor < head; _cursor++)
             {
                 SimEvent e = w.Events[_cursor % World.EventCapacity];
+                // Integration batch 3 (sim-long FullMatchKeepsTheRule): once the result is called nothing else is queued.
+                // Events written in the same tick after MatchEnd (a hill-contested flip) used to play after "Victory".
+                if (_endCalled && e.Type != SimEventType.MatchEnd) continue;
                 switch (e.Type)
                 {
                     case SimEventType.HillOwnerChange: OnHill(e.A, me, q, now); break;

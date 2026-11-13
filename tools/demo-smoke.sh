@@ -18,6 +18,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP="$ROOT/Builds/current/CriticalMass.app"
 [[ -d "$APP" ]] || APP="$ROOT/Builds/macOS/CriticalMass.app"
+ORIG_ARGS=("$@")   # kept for the cm-heavy re-exec below (the option loop shifts "$@" empty: --out and --quality were lost)
 OUT=""; SPEED=""; NOVSYNC=(); W=1920; H=1080; TIMEOUT=900; MATCHES=3; TITLE_S=12; FULL=0; QUALITY=""; SUMMARISE=""
 PROFILE="${CM_PROFILE:-default}"
 while [[ $# -gt 0 ]]; do
@@ -173,7 +174,7 @@ fi
 
 # One graphics-heavy job machine-wide: re-run this script inside ~/bin/cm-heavy's Unity slot.
 if [[ -z "${CM_HEAVY_HELD:-}" && -x "$HOME/bin/cm-heavy" ]]; then
-  CM_HEAVY_HELD=1 exec "$HOME/bin/cm-heavy" unity env CM_HEAVY_HELD=1 bash "${BASH_SOURCE[0]}" "$@"
+  CM_HEAVY_HELD=1 exec "$HOME/bin/cm-heavy" unity env CM_HEAVY_HELD=1 bash "${BASH_SOURCE[0]}" ${ORIG_ARGS[@]+"${ORIG_ARGS[@]}"}
 fi
 [[ -d "$APP" ]] || { echo "demo-smoke: FAILED, no app at $APP (run tools/unity-build-mac.sh first)" >&2; exit 66; }
 EXE_NAME="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP/Contents/Info.plist")"
@@ -217,18 +218,22 @@ else
   perl -e 'alarm shift; exec @ARGV' "$LIMIT" "$EXE" "${ARGS[@]}" &
   pid=$!
 fi
-# Outside view, once a second (one ps per second, no tight loop): wall ms, resident KB, CPU time, log markers.
+# Outside view, once a second: wall ms, resident KB, CPU time, log markers. Low process churn (integration batch 3: the
+# machine guard's STOP-DISPATCH fired at 800+ new processes a minute): one ps and one sleep a second, bash builtins for
+# the rest (the wall clock is one date at the start plus $SECONDS, read), and the match-end count only every 5 s.
 printf 'ms\trss_kb\tcputime\ttitle\tmatch_ends\n' > "$SAMPLES"
+t=0; e=0; k=0; epoch0=$(( $(date +%s) - SECONDS ))
 while kill -0 "$pid" 2>/dev/null; do
   line="$(ps -o rss=,cputime= -p "$pid" 2>/dev/null || true)"
   if [[ -n "$line" ]]; then
-    t=0; e=0
-    if [[ -f "$LOG" ]]; then
-      grep -q '\[CM.Boot\] title on screen' "$LOG" && t=1
+    if [[ -f "$LOG" ]] && { (( ! t )) || (( k % 5 == 0 )); }; then   # the title flag every second until seen (idle window)
+      (( t )) || { grep -q '\[CM.Boot\] title on screen' "$LOG" && t=1; }
       e="$(grep -c '\[CM.Autoplay\] MATCH END' "$LOG" || true)"
     fi
-    printf '%s\t%s\t%s\t%s\t%s\n' "$(date +%s)000" "$(awk '{print $1}' <<<"$line")" "$(awk '{print $2}' <<<"$line")" "$t" "$e" >> "$SAMPLES"
+    read -r rss cput _ <<<"$line"
+    printf '%s000\t%s\t%s\t%s\t%s\n' "$((epoch0 + SECONDS))" "$rss" "$cput" "$t" "$e" >> "$SAMPLES"
   fi
+  k=$((k + 1))
   sleep 1
 done
 if [[ -n "$WATCHDOG" ]]; then

@@ -232,6 +232,10 @@ namespace CriticalMass.Editor.Flow
                 pm.Resume();
                 yield return Seconds(0.3);
             }
+            // Finisher (batch 3 captures): live big moments covered the crater, death-arc and cargo shots with cut-ins. They are
+            // off for the mechanic shots and on only for the gallery below; the owner's setting is untouched (override only).
+            CriticalMass.Runtime.View.Moments.BigMomentsSettings.ModeOverride = CriticalMass.Runtime.View.Moments.BigMomentsMode.Off;
+            CriticalMass.Runtime.View.Moments.BigMoments.StopAll();
 
             // Animation pass, actor 0 the Warrior at its spawn, one tick per frame.
             HumanInputState inp = src != null ? src.State : null;
@@ -353,6 +357,7 @@ namespace CriticalMass.Editor.Flow
             // Big moments gallery (F8): one frame mid-takeover per recipe for the first six.
             drv.TimeScale = 1;
             drv.HumanAutopilot = true;
+            CriticalMass.Runtime.View.Moments.BigMomentsSettings.ModeOverride = CriticalMass.Runtime.View.Moments.BigMomentsMode.Full;
             CriticalMass.Runtime.View.Moments.BigMoments.PlayGallery();
             for (int k = 0; k < 6; k++)
             {
@@ -361,6 +366,8 @@ namespace CriticalMass.Editor.Flow
                 Shot($"{17 + k}-big-moment-{k + 1}");
             }
             yield return () => !CriticalMass.Runtime.View.Moments.BigMoments.IsPlaying;
+            CriticalMass.Runtime.View.Moments.BigMomentsSettings.ModeOverride = CriticalMass.Runtime.View.Moments.BigMomentsMode.Off;
+            CriticalMass.Runtime.View.Moments.BigMoments.StopAll();
 
             // A death arc mid-flight: bots fight at 2x until someone is knocked out near the hill.
             drv.TimeScale = 2;
