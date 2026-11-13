@@ -155,7 +155,15 @@ def main():
         if name in ("hill", "hero"): save_blur_jpg(name, p, 12, "painted plate")
 
     # ---- the crack: one painted crack of light, revealed in six stages from its burst point
-    crack = light_from_black(fit(load("crack"), 1600))
+    if os.path.exists(os.path.join(SRC, "tear.jpg")):   # round 2: the sky tears open (painted rip + light, on magenta)
+        crack = fit(cutout(load("tear"), min_area=400, hole_area=200000), 1600)
+        crack = place(crack, crack.shape[1], crack.shape[0], (0, 0))
+    else:
+        crack = light_from_black(fit(load("crack"), 1600))
+    h0, w0 = crack.shape[:2]   # fade every border so the overlay never shows a cut edge
+    fy = np.clip(np.minimum(np.arange(h0), h0 - 1 - np.arange(h0)) / (0.07 * h0), 0, 1)
+    fx = np.clip(np.minimum(np.arange(w0), w0 - 1 - np.arange(w0)) / (0.07 * w0), 0, 1)
+    crack[..., 3] *= (fy[:, None] * fx[None, :]) ** 0.8
     ox, oy = brightest(crack[..., :3] * (crack[..., 3:4] / 255.0), 20)
     geom["crack_origin_uv"] = [round(ox, 4), round(oy, 4)]
     h, w = crack.shape[:2]
@@ -175,7 +183,7 @@ def main():
     save_png("basin", fit(basin, 2400), "painted cut-out: Skybreak Basin before the banners")
     deb = cutout(load("debris"), zero=[(0, 0, 1, 0.38)], min_area=600)
     save_png("debris", fit(deb, 1920), "painted cut-out: rising rock debris (parallax overlay)")
-    rocks = cutout(load("rocks_fg"), zero=[(0.36, 0, 0.80, 1.0), (0.22, 0, 0.36, 0.22), (0.80, 0, 1.0, 0.235), (0.89, 0, 1.0, 0.30)], keep_largest=2)
+    rocks = cutout(load("rocks_fg"), keep_largest=2)
     hv = B.hsv(rocks); rocks[..., 3] *= ~((hv[0] > 250) & (hv[0] < 340) & (hv[1] > 0.25))   # stray model marks (no purple in rock)
     hh, ww = rocks.shape[:2]; mid = ww // 2
     save_png("rocks_l", fit(B.trim(rocks[:, :mid].copy(), 6), 1200), "painted cut-out: foreground cliff, left")
@@ -212,12 +220,15 @@ def main():
     save_png("hatchling_glow", B.glow_from(hat, 62, 110, "biomass", sat=0.5, val=0.6, radius=14), "painted hatchling", "seam glow")
 
     # ---- Kaiju, three alignments, one pose
-    for n, hue, col, zero in [("kaiju_neutral", (160, 200), "seam", [(0, 0.6, 0.2, 1.0)]),
-                              ("kaiju_crimson", (0, 32), "crimson", [(0, 0.6, 0.2, 1.0)]),
-                              ("kaiju_berserk", (265, 320), "corruption", [(0, 0.6, 0.2, 1.0)])]:
+    for n, hue, col, zero in [("kaiju_neutral", (160, 200), "seam", []),      # the bible's reptile: the tail is canon
+                              ("kaiju_crimson", (0, 32), "crimson", []),
+                              ("kaiju_berserk", (265, 320), "corruption", [])]:
         if not os.path.exists(os.path.join(SRC, n + ".jpg")): continue
         k = fit(cutout(load(n), zero=zero, halo=True), 1280, 1536)
         save_png(n, k, "painted cut-out: adult Kaiju rising, low angle")
+        if n == "kaiju_neutral":
+            ys, xs = np.where(k[..., 3] > 128); band = ys < ys.min() + 0.15 * (ys.max() - ys.min())
+            geom["kaiju_head_uv"] = [round(float(xs[band].mean() / k.shape[1]), 4), round(float(ys[band].mean() / k.shape[0]), 4)]
         save_png(n + "_glow", B.glow_from(k, hue[0], hue[1], col, sat=0.5, val=0.6, radius=16), "painted Kaiju", "crystal glow")
 
     # ---- the two peoples, native poses (Crimson drawn as Crimson, facing left; Azure facing right)
@@ -226,6 +237,12 @@ def main():
         kl = 1 if n == "warrior_cleave_crimson" else 0   # drop the loose swoosh strokes the ink hull leaves behind
         c = fit(cutout(load(n), halo=True, keep_largest=kl), 1100, 1100)
         save_png(n, c, "painted cut-out: native %s pose" % n.replace("_", " "))
+    for n, hue, col, key_g in [("farmer_harvest", (62, 110), "biomass", False), ("biomass_plants", (62, 110), "biomass", False),
+                               ("corruption_growth", (265, 320), "corruption", True)]:
+        if not os.path.exists(os.path.join(SRC, n + ".jpg")): continue
+        c = B.pad(fit(cutout(load(n), min_area=900), 1400, 1100), 40)   # room for the glow so it never meets the border
+        save_png(n, c, "painted cut-out: %s" % n.replace("_", " "))
+        save_png(n + "_glow", B.glow_from(c, hue[0], hue[1], col, sat=0.5, val=0.6, radius=14), "painted %s" % n, "glow")
     fh = [r for r in ROWS if r[0] == "farmer"]
     if fh:
         f = np.asarray(Image.open(os.path.join(OUT, "farmer.png")).convert("RGBA")).astype(np.float32)

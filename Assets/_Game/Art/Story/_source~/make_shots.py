@@ -57,7 +57,8 @@ CRACK_AT = (round((_cu[0] - 0.5) * CRACK_W) + CRACK_DX, round((0.5 - _cu[1]) * C
 _ec = GEO.get("egg_canvas", {})
 EGGK = (_ec["w"] / _ec["egg_w"]) if _ec else 1.0   # egg textures share the hatch canvas; scale widths so the egg keeps its size
 HILL_MARK = (0, 300)   # the capture ring at the top of the painted hill
-KHEAD = (30, 160)   # the painted Kaiju's head on the stage after it rises (measured from the storyboard)
+_kh = GEO.get("kaiju_head_uv", [0.5, 0.2])   # head = centroid of the top band of the neutral Kaiju's matte
+KHEAD = (round((_kh[0] - 0.5) * 1040 / ASPECT("kaiju_neutral")), round(-150 + (0.5 - _kh[1]) * 1040))
 
 shots = [
     shot("calm", 4.5, "calm world: the Basin floats, quiet", [
@@ -87,7 +88,7 @@ shots = [
         L("basin", 0.6, 1900, [K(0, y=-900), K(1.6, y=-230, ease="outBack"), K(4.0, y=-215)]),
         L("cloudsea_storm", 0.85, 2700, [K(0, y=-620), K(1.6, y=-740, ease="outCubic")]),
         L("debris", 0.9, 2100, [K(0, y=-1100), K(1.2, y=-420, ease="outCubic"), K(4.0, y=900, a=0.6, ease="inCubic")]),
-        L("rocks_l", 1.0, WH("rocks_l", 900), [K(0, x=-800, y=-760), K(0.9, x=-800, y=-330, ease="outCubic")], tint="#9AA6BD"),
+        L("rocks_l", 1.0, WH("rocks_l", 1350), [K(0, x=-1010, y=-190), K(0.9, x=-1010, y=-140, ease="outCubic")], tint="#9AA6BD"),   # a full-height cliff: its cut top stays above the frame
         L("rocks_r", 1.0, WH("rocks_r", 820), [K(0, x=830, y=-760), K(0.9, x=830, y=-360, ease="outCubic")], tint="#9AA6BD"),
     ], [C(0), C(4.0, dolly=1.05, y=30)],
         titles=[T("SKYBREAK BASIN", 1.7, 3.85, size=92, y=230, track0=48, track1=12)],
@@ -111,7 +112,7 @@ shots = [
         L("sky_night", 0.1, SKY, [K(0)]),
         L("shrine", 0.5, SHRINE_W, [K(0, b=0.9), K(1.7, b=0, ease="inOutCubic")], blur="shrine_blur"),
         L("shrine_glow", 0.5, SHRINE_W, [K(0, a=0.9)], pulseHz=0.8, pulseLo=0.4),
-        L("rocks_l", 1.0, WH("rocks_l", 760), [K(0, x=-900, y=-420), K(5.0, x=-930, y=-420)], tint="#2A3550"),
+        L("rocks_l", 1.0, WH("rocks_l", 1350), [K(0, x=-1040, y=-130), K(5.0, x=-1070, y=-130)], tint="#2A3550"),
         L("rocks_r", 1.0, WH("rocks_r", 700), [K(0, x=920, y=-440), K(5.0, x=950, y=-440)], tint="#2A3550"),
         L("vignette", 0.0, 2112, [K(0, a=0.8)]),
     ], [C(0, zx=EGG_IN_SHRINE[0], zy=EGG_IN_SHRINE[1]), C(5.0, zoom=1.12, zx=EGG_IN_SHRINE[0], zy=EGG_IN_SHRINE[1], dolly=1.03)],
@@ -121,10 +122,10 @@ shots = [
         L("sky_split", 0.15, SKY, [K(0)]),
         L("banner_azure", 0.6, 300, [K(0, x=-640, y=900), K(0.5, x=-640, y=900), K(1.0, x=-640, y=130, ease="outBack")]),
         L("banner_crimson", 0.6, 300, [K(0, x=640, y=900), K(1.2, x=640, y=900), K(1.7, x=640, y=130, ease="outBack")]),
-        L("farmer", 0.75, WH("farmer", 540), [K(0, x=-1500, y=-190), K(0.9, x=-1500, y=-190), K(1.5, x=-830, y=-200, ease="outBack")]),
+        L("farmer", 0.75, WH("farmer", 540), [K(0, x=-1500, y=-190), K(0.9, x=-1500, y=-190), K(1.5, x=-770, y=-200, ease="outBack")]),
         L("miner", 0.85, WH("miner", 500), [K(0, x=-1500, y=-250), K(1.1, x=-1500, y=-250), K(1.7, x=-300, y=-270, ease="outBack")]),
         L("warrior", 0.8, WH("warrior", 600), [K(0, x=-1500, y=-210), K(0.8, x=-1500, y=-210), K(1.4, x=-560, y=-225, ease="outBack")]),
-        L("farmer_crimson", 0.75, WH("farmer_crimson", 540), [K(0, x=1500, y=-190), K(1.6, x=1500, y=-190), K(2.2, x=830, y=-200, ease="outBack")]),
+        L("farmer_crimson", 0.75, WH("farmer_crimson", 540), [K(0, x=1500, y=-190), K(1.6, x=1500, y=-190), K(2.2, x=770, y=-200, ease="outBack")]),
         L("miner_crimson", 0.85, WH("miner_crimson", 500), [K(0, x=1500, y=-250), K(1.8, x=1500, y=-250), K(2.4, x=300, y=-270, ease="outBack")]),
         L("warrior_crimson", 0.8, WH("warrior_crimson", 600), [K(0, x=1500, y=-210), K(1.5, x=1500, y=-210), K(2.1, x=560, y=-225, ease="outBack")]),
     ], [C(0, x=-20), C(6.0, dolly=1.04, x=20)],
@@ -146,11 +147,11 @@ shots = [
         L("sky_choice", 0.15, SKY, [K(0)]),
         L("egg_glow", 0.5, round(330 * EGGK), [K(0, y=-60, s=0.6, a=0), K(0.6, y=-60, s=1, a=0.9, ease="outBack")], pulseHz=1.1, pulseLo=0.5),
         L("egg", 0.5, round(330 * EGGK), [K(0, y=-60, s=0.6, a=0), K(0.6, y=-60, s=1, a=1, ease="outBack")]),
-        L("biomass_plants_glow", 0.8, 900, [K(0, x=-620, y=-760), K(0.3, x=-620, y=-760), K(1.0, x=-620, y=-330, ease="outBack")], pulseHz=0.9, pulseLo=0.5),
-        L("biomass_plants", 0.8, 900, [K(0, x=-620, y=-760), K(0.3, x=-620, y=-760), K(1.0, x=-620, y=-330, ease="outBack")]),
-        L("corruption_growth_glow", 0.8, 1000, [K(0, x=640, y=-760), K(2.6, x=640, y=-760), K(3.3, x=640, y=-330, ease="outBack")], pulseHz=1.4, pulseLo=0.4),
-        L("corruption_growth", 0.8, 1000, [K(0, x=640, y=-760), K(2.6, x=640, y=-760), K(3.3, x=640, y=-330, ease="outBack")]),
-        L("farmer_harvest", 0.95, 680, [K(0, x=-1600, y=-150), K(0.6, x=-1600, y=-150), K(1.3, x=-760, y=-150, ease="outBack")], flip=True),
+        L("biomass_plants_glow", 0.8, WH("biomass_plants", 430), [K(0, x=-600, y=-900), K(0.3, x=-600, y=-900), K(1.0, x=-600, y=-365, ease="outBack")], pulseHz=0.9, pulseLo=0.5),
+        L("biomass_plants", 0.8, WH("biomass_plants", 430), [K(0, x=-600, y=-900), K(0.3, x=-600, y=-900), K(1.0, x=-600, y=-365, ease="outBack")]),
+        L("corruption_growth_glow", 0.8, WH("corruption_growth", 430), [K(0, x=620, y=-900), K(2.6, x=620, y=-900), K(3.3, x=620, y=-365, ease="outBack")], pulseHz=1.4, pulseLo=0.4),
+        L("corruption_growth", 0.8, WH("corruption_growth", 430), [K(0, x=620, y=-900), K(2.6, x=620, y=-900), K(3.3, x=620, y=-365, ease="outBack")]),
+        L("farmer_harvest", 0.95, WH("farmer_harvest", 560), [K(0, x=-1600, y=-200), K(0.6, x=-1600, y=-200), K(1.3, x=-640, y=-200, ease="outBack")]),
     ], [C(0, x=-60), C(6.5, x=60, dolly=1.04)],
         titles=[T("FEED IT", 0.5, 6.0, size=104, color=BIOMASS, x=-470, y=300, track0=40, track1=10),
                 T("OR CORRUPT IT", 2.7, 6.0, size=96, color=CORR, x=420, y=300, track0=40, track1=8)],
@@ -180,7 +181,7 @@ shots = [
         L("cloudsea_storm", 0.9, 2700, [K(0, y=-640)]),
         L("debris", 0.95, 2100, [K(0, y=-1200), K(1.4, y=-560, ease="outCubic"), K(3.2, y=1100, a=0.5, ease="inCubic")]),
         L("speed_radial", 0.0, 2112, [K(0, a=0), K(1.4, a=0), K(1.5, a=0.65), K(2.6, a=0.65), K(2.9, a=0)], flicker=True, fps=16),
-        L("rocks_l", 1.0, WH("rocks_l", 700), [K(0, x=-930, y=-480)], tint="#5A6680"),
+        L("rocks_l", 1.0, WH("rocks_l", 1350), [K(0, x=-1060, y=-130)], tint="#5A6680"),
         L("rocks_r", 1.0, WH("rocks_r", 640), [K(0, x=950, y=-500)], tint="#5A6680"),
     ], [C(0, zx=KHEAD[0], zy=KHEAD[1]), C(1.4, zx=KHEAD[0], zy=KHEAD[1]), C(1.6, zoom=1.08, zx=KHEAD[0], zy=KHEAD[1], ease="outExpo"), C(6.0, zoom=1.11, zx=KHEAD[0], zy=KHEAD[1])],
         titles=[T("IT PICKS A SIDE.", 3.0, 5.85, size=88, y=-300, track0=40, track1=10)],
@@ -191,12 +192,12 @@ shots = [
         L("@solid", 0.4, 700, [K(0, x=-660, r=-6)], h=1500, tint="#123C55"),
         L("@solid", 0.4, 700, [K(0, x=0, r=-6)], h=1500, tint="#5A1E2C"),
         L("@solid", 0.4, 700, [K(0, x=660, r=-6)], h=1500, tint="#3A1A5C"),
-        L("kaiju_neutral_glow", 0.6, WH("kaiju_neutral", 820), [K(0, x=-640, y=-900), K(0.1, x=-640, y=-900), K(0.7, x=-640, y=-80, ease="outBack")], pulseHz=1.2, pulseLo=0.5),
-        L("kaiju_neutral", 0.6, WH("kaiju_neutral", 820), [K(0, x=-640, y=-900), K(0.1, x=-640, y=-900), K(0.7, x=-640, y=-80, ease="outBack")]),
-        L("kaiju_crimson_glow", 0.6, WH("kaiju_crimson", 820), [K(0, y=-900), K(0.4, y=-900), K(1.0, y=-80, ease="outBack")], pulseHz=1.2, pulseLo=0.5),
-        L("kaiju_crimson", 0.6, WH("kaiju_crimson", 820), [K(0, y=-900), K(0.4, y=-900), K(1.0, y=-40, ease="outBack")]),
-        L("kaiju_berserk_glow", 0.6, WH("kaiju_berserk", 820), [K(0, x=640, y=-900), K(0.7, x=640, y=-900), K(1.3, x=640, y=-40, ease="outBack")], pulseHz=2.0, pulseLo=0.4),
-        L("kaiju_berserk", 0.6, WH("kaiju_berserk", 820), [K(0, x=640, y=-900), K(0.7, x=640, y=-900), K(1.3, x=640, y=-40, ease="outBack")]),
+        L("kaiju_neutral_glow", 0.6, WH("kaiju_neutral", 740), [K(0, x=-640, y=-900), K(0.1, x=-640, y=-900), K(0.7, x=-640, y=-80, ease="outBack")], pulseHz=1.2, pulseLo=0.5),
+        L("kaiju_neutral", 0.6, WH("kaiju_neutral", 740), [K(0, x=-640, y=-900), K(0.1, x=-640, y=-900), K(0.7, x=-640, y=-80, ease="outBack")]),
+        L("kaiju_crimson_glow", 0.6, WH("kaiju_crimson", 740), [K(0, y=-900), K(0.4, y=-900), K(1.0, y=-80, ease="outBack")], pulseHz=1.2, pulseLo=0.5),
+        L("kaiju_crimson", 0.6, WH("kaiju_crimson", 740), [K(0, y=-900), K(0.4, y=-900), K(1.0, y=-40, ease="outBack")]),
+        L("kaiju_berserk_glow", 0.6, WH("kaiju_berserk", 740), [K(0, x=640, y=-900), K(0.7, x=640, y=-900), K(1.3, x=640, y=-40, ease="outBack")], pulseHz=2.0, pulseLo=0.4),
+        L("kaiju_berserk", 0.6, WH("kaiju_berserk", 740), [K(0, x=640, y=-900), K(0.7, x=640, y=-900), K(1.3, x=640, y=-40, ease="outBack")]),
         L("@solid", 0.4, 44, [K(0, x=-330, r=-6)], h=1600, tint=NAVY),
         L("@solid", 0.4, 44, [K(0, x=330, r=-6)], h=1600, tint=NAVY),
     ], [C(0), C(4.0, dolly=1.03)],
