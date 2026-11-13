@@ -76,6 +76,7 @@ namespace CriticalMass.Runtime.Game
         private void Awake()
         {
             GameConfig cfg = GameConfig.CreateDefault();
+            AutoplayArgs.ApplyCameraYaw(cfg);   // -cameraYaw: automation runs only
             Config = cfg;
             Flow.MatchRequest req = NextMatch;
             NextMatch = null;

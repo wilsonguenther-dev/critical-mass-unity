@@ -126,6 +126,37 @@ namespace CriticalMass.Runtime.Game
             return o;
         }
 
+        /// <summary>-cameraYaw DEGREES (camera-orientation grabs, 2026-11-13): the gameplay camera's yaw for this run, in place of
+        /// RenderConfig.CameraYawDeg (45 = the map reads as a diamond, 0 = true north, bases left and right). Honoured only
+        /// together with an automation flag (AutomationWindow.AutomationFlags), so a person's launch never changes the
+        /// camera; normalised to [0, 360). Pure (EditMode tests: CameraYawFlagTests). The minimap stays baked at 45.</summary>
+        public static bool TryCameraYaw(string[] args, out double yawDeg)
+        {
+            yawDeg = 0;
+            if (args == null) return false;
+            bool automation = false, found = false;
+            for (int i = 0; i < args.Length; i++)
+            {
+                string a = (args[i] ?? "").Trim().ToLowerInvariant();
+                if (Array.IndexOf(AutomationWindow.AutomationFlags, a) >= 0) automation = true;
+                if (a == "-camerayaw" && i + 1 < args.Length && TryNum(args[i + 1], out double y))
+                {
+                    yawDeg = ((y % 360) + 360) % 360;
+                    found = true;
+                    i++;
+                }
+            }
+            return found && automation;
+        }
+
+        /// <summary>Applies -cameraYaw from this process's command line to a match config (player and editor alike).</summary>
+        public static void ApplyCameraYaw(GameConfig cfg)
+        {
+            if (cfg == null || !TryCameraYaw(Environment.GetCommandLineArgs(), out double y)) return;
+            cfg.Render.CameraYawDeg = y;
+            Debug.Log($"{LogTag} -cameraYaw: gameplay camera yaw {y.ToString("F1", CultureInfo.InvariantCulture)} deg (default 45)");
+        }
+
         static bool TryNum(string s, out double v) =>
             double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out v) && !double.IsNaN(v) && !double.IsInfinity(v);
 
