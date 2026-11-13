@@ -60,28 +60,28 @@ namespace CriticalMass.Runtime.Menus
 
         protected override void BuildContent(RectTransform space)
         {
-            _title = MenuUi.Label(space, "Title", CMTokens.Display, 56, Cream, TextAnchor.MiddleCenter, 360f, 36f, 1200f, 76f, "MATCH READY", 4f);
-            _sub = MenuUi.Label(space, "Sub", CMTokens.Display, 26, Brass, TextAnchor.MiddleCenter, 160f, 112f, 1600f, 40f, "", 3f);
-            _objective = MenuUi.Label(space, "Objective", CMTokens.Ui, 24, Cream, TextAnchor.MiddleCenter, 160f, 160f, 1600f, 40f, "", 2f);
+            _title = MenuUi.Label(space, "Title", CMTokens.Display, UiScale.TypeDisplay, Cream, TextAnchor.MiddleCenter, 360f, 36f, 1200f, 76f, "MATCH READY", 4f);
+            _sub = MenuUi.Fit(MenuUi.Label(space, "Sub", CMTokens.Display, UiScale.TypeButton, Brass, TextAnchor.MiddleCenter, 160f, 112f, 1600f, 40f, "", 3f), 26);
+            _objective = MenuUi.Label(space, "Objective", CMTokens.Ui, UiScale.TypeBody, Cream, TextAnchor.MiddleCenter, 160f, 160f, 1600f, 40f, "", 2f);
 
             for (int side = 0; side < 2; side++)
             {
                 float x = side == 0 ? LeftX : RightX;
                 MenuUi.Panel(space, side == 0 ? "Your Team" : "Enemy Team", x, PanelY, PanelW, PanelH);
-                _teamName[side] = MenuUi.Label(space, "Team Name " + side, CMTokens.Display, 34, Cream, TextAnchor.MiddleLeft, x + 32f, PanelY + 18f,
-                    PanelW * 0.5f, 48f, "", 3f);
-                _teamRole[side] = MenuUi.Label(space, "Team Role " + side, CMTokens.Ui, 20, CMTokens.WithAlpha(Cream, 0.8f), TextAnchor.MiddleRight,
+                _teamName[side] = MenuUi.Fit(MenuUi.Label(space, "Team Name " + side, CMTokens.Display, UiScale.TypeLead, Cream, TextAnchor.MiddleLeft, x + 32f, PanelY + 18f,
+                    PanelW * 0.5f, 48f, "", 3f), 34);
+                _teamRole[side] = MenuUi.Label(space, "Team Role " + side, CMTokens.Ui, UiScale.TypeSmall, CMTokens.WithAlpha(Cream, 0.8f), TextAnchor.MiddleRight,
                     x + PanelW * 0.5f, PanelY + 18f, PanelW * 0.5f - 32f, 48f, "", 2f);
                 for (int i = 0; i < MaxRows; i++) BuildRow(space, side, i, x);
             }
 
-            MenuUi.Label(space, "Versus", CMTokens.Display, 44, Cream, TextAnchor.MiddleCenter, 820f, 380f, 280f, 60f, "VS", 4f);
-            _count = MenuUi.Label(space, "Countdown", CMTokens.Display, 120, Brass, TextAnchor.MiddleCenter, 820f, 450f, 280f, 160f, "", 5f);
-            _countLabel = MenuUi.Label(space, "Countdown Label", CMTokens.Ui, 22, Cream, TextAnchor.MiddleCenter, 820f, 612f, 280f, 34f, "", 2f);
-            _footer = MenuUi.Label(space, "Footer", CMTokens.Ui, 22, CMTokens.WithAlpha(Cream, 0.9f), TextAnchor.MiddleCenter, 160f, 838f, 1600f, 34f, "", 2f);
+            MenuUi.Fit(MenuUi.Label(space, "Versus", CMTokens.Display, UiScale.TypeDisplay, Cream, TextAnchor.MiddleCenter, 820f, 380f, 280f, 60f, "VS", 4f), 44);
+            _count = MenuUi.Label(space, "Countdown", CMTokens.Display, UiScale.TypeHero, Brass, TextAnchor.MiddleCenter, 820f, 450f, 280f, 160f, "", 5f);
+            _countLabel = MenuUi.Label(space, "Countdown Label", CMTokens.Ui, UiScale.TypeBody, Cream, TextAnchor.MiddleCenter, 820f, 612f, 280f, 34f, "", 2f);
+            _footer = MenuUi.Label(space, "Footer", CMTokens.Ui, UiScale.TypeBody, CMTokens.WithAlpha(Cream, 0.9f), TextAnchor.MiddleCenter, 160f, 838f, 1600f, 34f, "", 2f);
 
-            _back = Button(space, "Back", LeftX, 890f, 300f, 84f, "BACK", Back, 30);
-            _start = Button(space, "Start Now", RightX + PanelW - 340f, 890f, 340f, 84f, "START NOW", StartNow, 34);
+            _back = Button(space, "Back", LeftX, 890f, 300f, 84f, "BACK", Back, UiScale.TypeHeading);
+            _start = Button(space, "Start Now", RightX + PanelW - 340f, 890f, 340f, 84f, "START NOW", StartNow, UiScale.TypeLead);
             _start.Body.RimPx = 4f;
             _start.Body.SetRim(Brass);
             _start.navigation = new Navigation { mode = Navigation.Mode.Explicit, selectOnLeft = _back, selectOnRight = _back };
@@ -96,9 +96,9 @@ namespace CriticalMass.Runtime.Menus
             _rowGroups[side, i] = row.gameObject.AddComponent<CanvasGroup>();
             _rows[side, i] = row;
             _icons[side, i] = HudIcon.Make(row, "Portrait", 0f, 0f, 30f, 30f);
-            _names[side, i] = MenuUi.Label(row, "Name", CMTokens.Display, 22, Cream, TextAnchor.MiddleLeft, 44f, 0f, 300f, 30f, "", 2f);
-            _classes[side, i] = MenuUi.Label(row, "Class", CMTokens.Ui, 18, CMTokens.WithAlpha(Cream, 0.8f), TextAnchor.MiddleLeft, 356f, 0f, 200f, 30f, "", 2f);
-            _tags[side, i] = MenuUi.Label(row, "Tag", CMTokens.Ui, 18, Brass, TextAnchor.MiddleRight, PanelW - 48f - 130f, 0f, 130f, 30f, "", 2f);
+            _names[side, i] = MenuUi.Label(row, "Name", CMTokens.Display, UiScale.TypeBody, Cream, TextAnchor.MiddleLeft, 44f, 0f, 300f, 30f, "", 2f);
+            _classes[side, i] = MenuUi.Label(row, "Class", CMTokens.Ui, UiScale.TypeSmall, CMTokens.WithAlpha(Cream, 0.8f), TextAnchor.MiddleLeft, 356f, 0f, 200f, 30f, "", 2f);
+            _tags[side, i] = MenuUi.Label(row, "Tag", CMTokens.Ui, UiScale.TypeSmall, Brass, TextAnchor.MiddleRight, PanelW - 48f - 130f, 0f, 130f, 30f, "", 2f);
             row.gameObject.SetActive(false);
         }
 

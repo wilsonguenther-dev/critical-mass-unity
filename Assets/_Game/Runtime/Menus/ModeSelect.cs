@@ -37,8 +37,8 @@ namespace CriticalMass.Runtime.Menus
 
         protected override void BuildContent(RectTransform space)
         {
-            MenuUi.Label(space, "Title", CMTokens.Display, 52, Cream, TextAnchor.MiddleLeft, 152f, 52f, 1000f, 70f, "CHOOSE A MODE", 4f);
-            MenuUi.Label(space, "Offline", CMTokens.Ui, 22, CMTokens.WithAlpha(Cream, 0.85f), TextAnchor.MiddleLeft, 152f, 116f, 1300f, 34f,
+            MenuUi.Label(space, "Title", CMTokens.Display, UiScale.TypeDisplay, Cream, TextAnchor.MiddleLeft, 152f, 52f, 1000f, 70f, "CHOOSE A MODE", 4f);
+            MenuUi.Label(space, "Offline", CMTokens.Ui, UiScale.TypeBody, CMTokens.WithAlpha(Cream, 0.85f), TextAnchor.MiddleLeft, 152f, 116f, 1300f, 34f,
                 "Every match is offline. Everyone else on the field is a bot.", 2f);
 
             for (int i = 0; i < PlayModes.SelectOrder.Length; i++)
@@ -47,7 +47,7 @@ namespace CriticalMass.Runtime.Menus
                 BuildCard(space, PlayModes.SelectOrder[i], 152f + col * (CardW + CardGap), row == 0 ? Row0 : Row1);
             }
 
-            _back = Button(space, "Back", 152f, 870f, 300f, 84f, "BACK", Back, 30);
+            _back = Button(space, "Back", 152f, 870f, 300f, 84f, "BACK", Back, UiScale.TypeHeading);
             _size = Stepper(space, "Skirmish Size", 476f, 870f, 640f, 84f, "QUICK MATCH SIZE",
                 () => PlayModes.SizeLabel(PlayModes.ValidQuickSize(PlayFlow.QuickSize)), StepSize, _refresh);
             Wire();
@@ -57,7 +57,7 @@ namespace CriticalMass.Runtime.Menus
         void BuildCard(RectTransform space, MatchMode m, float x, float y)
         {
             ModeInfo info = PlayModes.Info(m);
-            MenuItem card = MenuUi.Item(space, "Mode " + m, x, y, CardW, CardH, "", MenuItem.Kind.Button, 30, true, CMTokens.Display);
+            MenuItem card = MenuUi.Item(space, "Mode " + m, x, y, CardW, CardH, "", MenuItem.Kind.Button, UiScale.TypeHeading, true, CMTokens.Display);
             card.Body.Radius = 20f;
             card.Body.RimPx = 3f;
             MatchMode pick = m;
@@ -69,8 +69,8 @@ namespace CriticalMass.Runtime.Menus
             emblem.OutlinePx = 3f;
             emblem.RimPx = 0f;
 
-            Text title = MenuUi.Label(t, "Name", CMTokens.Display, 38, Cream, TextAnchor.MiddleLeft, 28f, 24f, CardW - 130f, 54f, info.Title, 3f);
-            Text line = MenuUi.Label(t, "Line", CMTokens.Ui, 22, Cream, TextAnchor.UpperLeft, 28f, 88f, CardW - 56f, 64f, info.Line, 2f);
+            Text title = MenuUi.Label(t, "Name", CMTokens.Display, UiScale.TypeLead, Cream, TextAnchor.MiddleLeft, 28f, 24f, CardW - 130f, 54f, info.Title, 3f);
+            Text line = MenuUi.Label(t, "Line", CMTokens.Ui, UiScale.TypeBody, Cream, TextAnchor.UpperLeft, 28f, 88f, CardW - 56f, 64f, info.Line, 2f);
             line.horizontalOverflow = HorizontalWrapMode.Wrap;
             line.lineSpacing = 1.05f;
 
@@ -79,12 +79,12 @@ namespace CriticalMass.Runtime.Menus
             rule.RimPx = 0f;
 
             Color dim = CMTokens.WithAlpha(Cream, 0.75f);
-            Text l0 = MenuUi.Label(t, "Teams Label", CMTokens.Ui, 16, dim, TextAnchor.MiddleLeft, 28f, 184f, 150f, 24f, "TEAMS", 2f);
-            Text l1 = MenuUi.Label(t, "Length Label", CMTokens.Ui, 16, dim, TextAnchor.MiddleLeft, 186f, 184f, 190f, 24f, "LENGTH", 2f);
-            Text l2 = MenuUi.Label(t, "Difficulty Label", CMTokens.Ui, 16, dim, TextAnchor.MiddleLeft, 384f, 184f, 120f, 24f,
+            Text l0 = MenuUi.Label(t, "Teams Label", CMTokens.Ui, UiScale.TypeMin, dim, TextAnchor.MiddleLeft, 28f, 184f, 150f, 24f, "TEAMS", 2f);
+            Text l1 = MenuUi.Label(t, "Length Label", CMTokens.Ui, UiScale.TypeMin, dim, TextAnchor.MiddleLeft, 186f, 184f, 190f, 24f, "LENGTH", 2f);
+            Text l2 = MenuUi.Label(t, "Difficulty Label", CMTokens.Ui, UiScale.TypeMin, dim, TextAnchor.MiddleLeft, 384f, 184f, 120f, 24f,
                 info.Watching ? "YOU" : "CHALLENGE", 2f);
-            Text size = MenuUi.Label(t, "Teams", CMTokens.Display, 24, Cream, TextAnchor.MiddleLeft, 28f, 212f, 150f, 40f, "", 2f);
-            Text length = MenuUi.Label(t, "Length", CMTokens.Display, 22, Cream, TextAnchor.MiddleLeft, 186f, 212f, 196f, 40f, "", 2f);
+            Text size = MenuUi.Label(t, "Teams", CMTokens.Display, UiScale.TypeBody, Cream, TextAnchor.MiddleLeft, 28f, 212f, 150f, 40f, "", 2f);
+            Text length = MenuUi.Label(t, "Length", CMTokens.Display, UiScale.TypeBody, Cream, TextAnchor.MiddleLeft, 186f, 212f, 196f, 40f, "", 2f);
             length.resizeTextForBestFit = true;
             length.resizeTextMinSize = 14;
             length.resizeTextMaxSize = 22;
@@ -94,7 +94,7 @@ namespace CriticalMass.Runtime.Menus
             _labels[m] = new[] { l0, l1, l2 };
             if (info.Watching)
             {
-                MenuUi.Label(t, "Watching", CMTokens.Display, 22, Brass, TextAnchor.MiddleLeft, 384f, 212f, 130f, 40f, "WATCH", 2f);
+                MenuUi.Label(t, "Watching", CMTokens.Display, UiScale.TypeBody, Brass, TextAnchor.MiddleLeft, 384f, 212f, 130f, 40f, "WATCH", 2f);
             }
             else
             {

@@ -303,10 +303,10 @@ namespace CriticalMass.Runtime.Hud
                 s.Plate = MenuUi.Shape(s.Rt, "Plate", ShapeKind.RoundRect, 0f, 0f, LineW, LineH, CMTokens.WithAlpha(CMTokens.PanelNavy.Color, 0.9f), 12f);
                 s.Plate.RimPx = 2f;
                 s.KillerCrest = HudIcon.Make(s.Rt, "Killer Crest", 10f, 7f, 26f, 26f);
-                s.Killer = MenuUi.Label(s.Rt, "Killer", CMTokens.Ui, 22, CMTokens.WarmCream.Color, TextAnchor.MiddleRight, 40f, 0f, 160f, LineH, "", 2f);
+                s.Killer = MenuUi.Label(s.Rt, "Killer", CMTokens.Ui, UiScale.TypeBody, CMTokens.WarmCream.Color, TextAnchor.MiddleRight, 40f, 0f, 160f, LineH, "", 2f);
                 s.AttackIcon = HudIcon.Make(s.Rt, "Attack", 212f, 3f, 34f, 34f);
                 s.VictimCrest = HudIcon.Make(s.Rt, "Victim Crest", 258f, 7f, 26f, 26f);
-                s.Victim = MenuUi.Label(s.Rt, "Victim", CMTokens.Ui, 22, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft, 290f, 0f, 170f, LineH, "", 2f);
+                s.Victim = MenuUi.Label(s.Rt, "Victim", CMTokens.Ui, UiScale.TypeBody, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft, 290f, 0f, 170f, LineH, "", 2f);
                 s.Rt.gameObject.SetActive(false);
                 _slots[i] = s;
                 _order[i] = i;

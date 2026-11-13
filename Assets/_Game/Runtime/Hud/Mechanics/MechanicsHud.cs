@@ -145,7 +145,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             _kit = MenuUi.Rt(_space, "Class Kit");
             MenuUi.Place(_kit, KitX, player.y - 14f - kitH, KitW, kitH);
             _kitPanel = MenuUi.Panel(_kit, "Panel", 0f, 0f, KitW, kitH);
-            _kitTitle = MenuUi.Label(_kit, "Title", CMTokens.Display, 18, brass, TextAnchor.MiddleLeft, 18f, 8f, KitW - 36f, 28f, "", 2f);
+            _kitTitle = MenuUi.Label(_kit, "Title", CMTokens.Display, UiScale.TypeSmall, brass, TextAnchor.MiddleLeft, 18f, 8f, KitW - 36f, 28f, "", 2f);
             for (int r = 0; r < 2; r++)
             {
                 float y = 42f + r * RowH;
@@ -156,9 +156,9 @@ namespace CriticalMass.Runtime.Hud.Mechanics
                 _rowPie[r].EmptyColor = CMTokens.MeterEmpty.Color;
                 _rowPie[r].OutlinePx = 3f;
                 _rowPie[r].RimPx = 0f;
-                _rowCd[r] = MenuUi.Label(_kit, "Cd " + r, CMTokens.Mono, 15, cream, TextAnchor.MiddleCenter, 16f, y + 5f, 46f, 38f, "", 2f);
-                _rowName[r] = MenuUi.Label(_kit, "Name " + r, CMTokens.Ui, 20, cream, TextAnchor.MiddleLeft, 70f, y + 2f, 170f, 26f, "", 2f);
-                _rowNote[r] = MenuUi.Label(_kit, "Note " + r, CMTokens.Ui, 14, brass, TextAnchor.MiddleLeft, 70f, y + 26f, 170f, 20f, "", 2f);
+                _rowCd[r] = MenuUi.Fit(MenuUi.Label(_kit, "Cd " + r, CMTokens.Mono, UiScale.TypeMin, cream, TextAnchor.MiddleCenter, 16f, y + 5f, 46f, 38f, "", 2f), 15);
+                _rowName[r] = MenuUi.Label(_kit, "Name " + r, CMTokens.Ui, UiScale.TypeSmall, cream, TextAnchor.MiddleLeft, 70f, y + 2f, 170f, 26f, "", 2f);
+                _rowNote[r] = MenuUi.Fit(MenuUi.Label(_kit, "Note " + r, CMTokens.Ui, UiScale.TypeMin, brass, TextAnchor.MiddleLeft, 70f, y + 26f, 170f, 20f, "", 2f), 14);
                 for (int p = 0; p < 3; p++)
                 {
                     VectorShape pip = MenuUi.Shape(_kit, "Pip " + r + p, ShapeKind.Diamond, 236f + p * 20f, y + 15f, 16f, 18f, brass, 3f);
@@ -169,12 +169,12 @@ namespace CriticalMass.Runtime.Hud.Mechanics
                 VectorShape keyChip = MenuUi.Shape(_kit, "Key Chip " + r, ShapeKind.RoundRect, KitW - 92f, y + 9f, 68f, 30f, navy, 8f);
                 keyChip.RimColor = cream;
                 keyChip.RimPx = 2f;
-                _rowKey[r] = MenuUi.Label(keyChip.transform, "Key", CMTokens.Ui, 14, cream, TextAnchor.MiddleCenter, 0f, 0f, 68f, 30f, "", 2f);
+                _rowKey[r] = MenuUi.Fit(MenuUi.Label(keyChip.transform, "Key", CMTokens.Ui, UiScale.TypeMin, cream, TextAnchor.MiddleCenter, 0f, 0f, 68f, 30f, "", 2f), 14);
                 _rowKey[r].resizeTextForBestFit = true;
                 _rowKey[r].resizeTextMinSize = 9;
                 _rowKey[r].resizeTextMaxSize = 14;
             }
-            _bank = MenuUi.Label(_kit, "Bank", CMTokens.Ui, 16, CMTokens.Biomass.Color, TextAnchor.MiddleLeft, 18f, 44f + 2f * RowH - 2f, KitW - 36f, 28f, "", 2f);
+            _bank = MenuUi.Label(_kit, "Bank", CMTokens.Ui, UiScale.TypeMin, CMTokens.Biomass.Color, TextAnchor.MiddleLeft, 18f, 44f + 2f * RowH - 2f, KitW - 36f, 28f, "", 2f);
             _kit.gameObject.SetActive(false);
 
             // stun badge, dodge tick, jump hint: centre, below the player's head
@@ -185,7 +185,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             _stunPie = MenuUi.Shape(_stun, "Pie", ShapeKind.Pie, 10f, 8f, 36f, 36f, CMTokens.MeterOrange.Color, 18f);
             _stunPie.EmptyColor = CMTokens.MeterEmpty.Color;
             _stunPie.RimPx = 0f;
-            MenuUi.Label(_stun, "Word", CMTokens.Display, 24, cream, TextAnchor.MiddleLeft, 56f, 0f, 180f, 52f, "STUNNED", 3f);
+            MenuUi.Label(_stun, "Word", CMTokens.Display, UiScale.TypeBody, cream, TextAnchor.MiddleLeft, 56f, 0f, 180f, 52f, "STUNNED", 3f);
             _stun.gameObject.SetActive(false);
 
             _dodge = MenuUi.Rt(_space, "Dodged");
@@ -194,7 +194,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             _dodgeGroup.blocksRaycasts = false;
             VectorShape dp = MenuUi.Shape(_dodge, "Panel", ShapeKind.Banner, 0f, 0f, 220f, 56f, brass, 10f);
             dp.OutlinePx = 4f;
-            MenuUi.Label(_dodge, "Word", CMTokens.Display, 28, navy, TextAnchor.MiddleCenter, 0f, 0f, 220f, 56f, "DODGED", 0f);
+            MenuUi.Label(_dodge, "Word", CMTokens.Display, UiScale.TypeButton, navy, TextAnchor.MiddleCenter, 0f, 0f, 220f, 56f, "DODGED", 0f);
             _dodge.gameObject.SetActive(false);
 
             _jump = MenuUi.Rt(_space, "Jump Hint");
@@ -202,7 +202,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             VectorShape jp = MenuUi.Shape(_jump, "Panel", ShapeKind.RoundRect, 0f, 0f, 300f, 50f, CMTokens.PanelNavy.Color, 14f);
             jp.OutlinePx = 4f;
             jp.RimColor = cream;
-            _jumpText = MenuUi.Label(_jump, "Word", CMTokens.Ui, 22, cream, TextAnchor.MiddleCenter, 0f, 0f, 300f, 50f, "", 2f);
+            _jumpText = MenuUi.Label(_jump, "Word", CMTokens.Ui, UiScale.TypeBody, cream, TextAnchor.MiddleCenter, 0f, 0f, 300f, 50f, "", 2f);
             _jump.gameObject.SetActive(false);
 
             // off-screen damage chevrons
@@ -222,9 +222,9 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             _recap = MenuUi.Rt(_space, "Hit Recap");
             MenuUi.Place(_recap, 960f - 410f, 826f, 820f, 40f + HitRecapWords.Rows * 32f + 12f);
             MenuUi.Panel(_recap, "Panel", 0f, 0f, 820f, 40f + HitRecapWords.Rows * 32f + 12f);
-            _recapHead = MenuUi.Label(_recap, "Head", CMTokens.Display, 18, brass, TextAnchor.MiddleLeft, 22f, 8f, 600f, 28f, "YOU WERE HIT BY", 2f);
+            _recapHead = MenuUi.Label(_recap, "Head", CMTokens.Display, UiScale.TypeSmall, brass, TextAnchor.MiddleLeft, 22f, 8f, 600f, 28f, "YOU WERE HIT BY", 2f);
             for (int i = 0; i < HitRecapWords.Rows; i++)
-                _recapRows[i] = MenuUi.Label(_recap, "Row " + i, CMTokens.Ui, 20, cream, TextAnchor.MiddleLeft, 22f, 40f + i * 32f, 776f, 30f, "", 2f);
+                _recapRows[i] = MenuUi.Label(_recap, "Row " + i, CMTokens.Ui, UiScale.TypeSmall, cream, TextAnchor.MiddleLeft, 22f, 40f + i * 32f, 776f, 30f, "", 2f);
             _recap.gameObject.SetActive(false);
         }
 
@@ -627,7 +627,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             s.OutlinePx = 2f;
             s.RimPx = ring ? 3f : 0f;
             if (ring) s.RimColor = c;
-            MenuUi.Label(p, "Legend Word " + word, CMTokens.Ui, 17, cream, TextAnchor.MiddleLeft, LegendX + 38f, y, FullMapView.SideW - 38f, 26f, word, 2f);
+            MenuUi.Label(p, "Legend Word " + word, CMTokens.Ui, UiScale.TypeMin, cream, TextAnchor.MiddleLeft, LegendX + 38f, y, FullMapView.SideW - 38f, 26f, word, 2f);
         }
     }
 }

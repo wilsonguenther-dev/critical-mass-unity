@@ -64,7 +64,7 @@ namespace CriticalMass.Runtime.Menus
 
         protected override void BuildContent(RectTransform space)
         {
-            MenuUi.Label(space, "Title", CMTokens.Display, 56, Cream, TextAnchor.MiddleCenter, 460f, 40f, 1000f, 80f, "MATCH SETUP", 4f);
+            MenuUi.Label(space, "Title", CMTokens.Display, UiScale.TypeDisplay, Cream, TextAnchor.MiddleCenter, 460f, 40f, 1000f, 80f, "MATCH SETUP", 4f);
             MenuUi.Panel(space, "Panel", 140f, 140f, 1640f, 860f);
 
             const float sx = 460f, sw = 1000f, sh = 58f, step = 70f, sy = 170f;
@@ -84,7 +84,7 @@ namespace CriticalMass.Runtime.Menus
             for (int i = 0; i < n; i++) BuildCard(space, ClassIds.All[i], x0 + i * (CardW + CardGap));
 
             _back = Button(space, "Back", 200f, 880f, 380f, 80f, "BACK", Back);
-            _start = Button(space, "Start", 1340f, 880f, 380f, 80f, "START MATCH", StartMatch, 36);
+            _start = Button(space, "Start", 1340f, 880f, 380f, 80f, "START MATCH", StartMatch, UiScale.TypeLead);
             _start.Body.RimPx = 4f;
             _start.Body.SetRim(Brass);
             Wire();
@@ -95,7 +95,7 @@ namespace CriticalMass.Runtime.Menus
         {
             int i = (int)c;
             bool live = Playable.Contains(c);
-            MenuItem card = MenuUi.Item(space, "Card " + c, x, CardsY, CardW, CardH, "", MenuItem.Kind.Button, 30, true, CMTokens.Display);
+            MenuItem card = MenuUi.Item(space, "Card " + c, x, CardsY, CardW, CardH, "", MenuItem.Kind.Button, UiScale.TypeHeading, true, CMTokens.Display);
             card.Body.Radius = 18f;
             card.Body.RimPx = 2f;
             ClassId pick = c;
@@ -110,7 +110,7 @@ namespace CriticalMass.Runtime.Menus
             MenuUi.Fit(name, UiScale.TypeSmall);
             Text role = MenuUi.Fit(MenuUi.Label(card.transform, "Role", CMTokens.Ui, UiScale.TypeBody, Cream, TextAnchor.MiddleCenter, 10f, 230f,
                 CardW - 20f, 32f, FlowWords.ClassRole(c), 2f), UiScale.TypeMin);
-            Text abil = MenuUi.Fit(MenuUi.Label(card.transform, "Abilities", CMTokens.Ui, 17, Cream, TextAnchor.MiddleCenter, 10f, 264f,
+            Text abil = MenuUi.Fit(MenuUi.Label(card.transform, "Abilities", CMTokens.Ui, UiScale.TypeMin, Cream, TextAnchor.MiddleCenter, 10f, 264f,
                 CardW - 20f, 28f, FlowWords.AbilityLine(c), 2f), UiScale.TypeMin);
             _cardTexts[i] = new[] { name, role, abil };
             if (live)
@@ -128,7 +128,7 @@ namespace CriticalMass.Runtime.Menus
             {
                 card.interactable = false;
                 card.Submitted = null;
-                MenuUi.Label(card.transform, "Soon", CMTokens.Ui, 18, Brass, TextAnchor.MiddleCenter, 0f, 300f, CardW, 32f, "COMING SOON", 2f);
+                MenuUi.Label(card.transform, "Soon", CMTokens.Ui, UiScale.TypeSmall, Brass, TextAnchor.MiddleCenter, 0f, 300f, CardW, 32f, "COMING SOON", 2f);
                 for (int k = 0; k < 3; k++) _cardTexts[i][k].color = CMTokens.WithAlpha(Cream, 0.45f);
             }
         }

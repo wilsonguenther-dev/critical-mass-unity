@@ -107,18 +107,18 @@ namespace CriticalMass.Runtime.Hud
             sp.pivot = new Vector2(0.5f, 0.5f);
             sp.sizeDelta = new Vector2(HudLayout.RefW, HudLayout.RefH);
             float bx = 960f - ButtonW * 1.5f - ButtonGap;
-            _playNow = MenuUi.Item(sp, "Play Now", bx, ButtonsY, ButtonW, ButtonH, Flow.PlayNow.Label, MenuItem.Kind.Button, 38, true,
+            _playNow = MenuUi.Item(sp, "Play Now", bx, ButtonsY, ButtonW, ButtonH, Flow.PlayNow.Label, MenuItem.Kind.Button, UiScale.TypeLead, true,
                 CMTokens.Display);
             _playNow.Body.Radius = 18f;
             _playNow.Body.RimPx = 4f;
             _playNow.Body.SetRim(CMTokens.ToolBrass.Color);
             _playNow.Submitted = PressPlayNow;
-            _demo = MenuUi.Item(sp, "Quick Demo", 960f - ButtonW * 0.5f, ButtonsY, ButtonW, ButtonH, "QUICK DEMO", MenuItem.Kind.Button, 30,
+            _demo = MenuUi.Item(sp, "Quick Demo", 960f - ButtonW * 0.5f, ButtonsY, ButtonW, ButtonH, "QUICK DEMO", MenuItem.Kind.Button, UiScale.TypeHeading,
                 true, CMTokens.Display);
             _demo.Body.Radius = 18f;
             _demo.Body.RimPx = 3f;
             _demo.Submitted = PressDemo;
-            _toMenu = MenuUi.Item(sp, "Main Menu", 960f + ButtonW * 0.5f + ButtonGap, ButtonsY, ButtonW, ButtonH, "HOME", MenuItem.Kind.Button, 30,
+            _toMenu = MenuUi.Item(sp, "Main Menu", 960f + ButtonW * 0.5f + ButtonGap, ButtonsY, ButtonW, ButtonH, "HOME", MenuItem.Kind.Button, UiScale.TypeHeading,
                 true, CMTokens.Display);
             _toMenu.Body.Radius = 18f;
             _toMenu.Body.RimPx = 3f;
@@ -129,13 +129,13 @@ namespace CriticalMass.Runtime.Hud
             PauseMenu.EnsureEventSystem(transform);
             if (EventSystem.current != null) EventSystem.current.SetSelectedGameObject(_playNow.gameObject);
 
-            _prompt = HudText.Make(root, "Prompt", CMTokens.Ui, 22, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 2f);
+            _prompt = HudText.Make(root, "Prompt", CMTokens.Ui, UiScale.TypeBody, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 2f);
             RectTransform pr = _prompt.rectTransform;
             pr.anchorMin = pr.anchorMax = new Vector2(0.5f, 0.5f);
             pr.sizeDelta = new Vector2(1100f, 40f);
             pr.anchoredPosition = new Vector2(0f, -432f);
             _prompt.text = "ENTER, SPACE OR A   PLAY NOW      ·      ESC OR B   HOME";
-            Text sub = HudText.Make(root, "Tagline", CMTokens.Ui, 22, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 2f);
+            Text sub = HudText.Make(root, "Tagline", CMTokens.Ui, UiScale.TypeBody, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 2f);
             RectTransform sr = sub.rectTransform;
             sr.anchorMin = sr.anchorMax = new Vector2(0.5f, 0.5f);
             sr.sizeDelta = new Vector2(900f, 40f);

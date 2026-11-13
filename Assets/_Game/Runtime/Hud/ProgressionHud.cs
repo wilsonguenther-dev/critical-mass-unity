@@ -85,7 +85,7 @@ namespace CriticalMass.Runtime.Hud
             body.OutlinePx = 3f;
             body.RimPx = 2f;
             ProgressionUi.Coin(_chip, "Coin", 9f, 8f, 30f);
-            _count = MenuUi.Label(_chip, "Count", CMTokens.Mono, 26, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft, 50f, 0f, ChipW - 60f, ChipH, "0", 3f);
+            _count = MenuUi.Fit(MenuUi.Label(_chip, "Count", CMTokens.Mono, UiScale.TypeButton, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft, 50f, 0f, ChipW - 60f, ChipH, "0", 3f), 26);
 
             // Portrait click target (transparent; placed over the HUD portrait every frame).
             _portraitHit = MenuUi.Rt(_root, "Portrait Click");

@@ -769,12 +769,12 @@ namespace CriticalMass.Runtime.Menus
             MakeBar(space, "Top Bar", 0f, topBar);
             MakeBar(space, "Bottom Bar", HudLayout.RefH - bottomBar, bottomBar);
 
-            _caption = MenuUi.Label(space, "Subtitle", CMTokens.Ui, 40, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter,
+            _caption = MenuUi.Label(space, "Subtitle", CMTokens.Ui, UiScale.TypeLead, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter,
                 260f, HudLayout.RefH - bottomBar + 14f, HudLayout.RefW - 520f, bottomBar - 28f, "", CMTokens.OutlinePx);
             _caption.horizontalOverflow = HorizontalWrapMode.Wrap;
             _caption.lineSpacing = 1.05f;
 
-            _skip = MenuUi.Label(space, "Skip", CMTokens.Display, 22, CMTokens.ToolBrass.Color, TextAnchor.MiddleRight,
+            _skip = MenuUi.Label(space, "Skip", CMTokens.Display, UiScale.TypeBody, CMTokens.ToolBrass.Color, TextAnchor.MiddleRight,
                 HudLayout.RefW - 560f, 18f, 500f, 40f, SkipKeyboard, 2f);
 
             float pipsW = StoryContent.CardCount * 34f;

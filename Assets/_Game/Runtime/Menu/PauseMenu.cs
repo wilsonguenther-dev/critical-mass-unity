@@ -575,14 +575,14 @@ namespace CriticalMass.Runtime.Menu
             MenuUi.Stretch(page);
             _classPage = page.gameObject;
             MenuUi.Panel(page, "Panel", 560f, 160f, 800f, 700f);
-            MenuUi.Label(page, "Line", CMTokens.Ui, 24, Cream, TextAnchor.MiddleCenter, 560f, 186f, 800f, 40f,
+            MenuUi.Label(page, "Line", CMTokens.Ui, UiScale.TypeBody, Cream, TextAnchor.MiddleCenter, 560f, 186f, 800f, 40f,
                 "YOUR NEW CLASS APPLIES WHEN YOU NEXT RESPAWN", 2f);
             var items = new List<MenuItem>();
             for (int i = 0; i < _classItems.Length; i++)
             {
                 ClassId cls = (ClassId)i;
                 string name = KillWords.ClassName(cls).ToUpperInvariant();
-                MenuItem it = MenuUi.Item(page, "Class " + name, 700f, 250f + i * 84f, 520f, 70f, name, MenuItem.Kind.Button, 30, true,
+                MenuItem it = MenuUi.Item(page, "Class " + name, 700f, 250f + i * 84f, 520f, 70f, name, MenuItem.Kind.Button, UiScale.TypeHeading, true,
                     CMTokens.Display);
                 it.Body.Radius = 16f;
                 it.Submitted = () => PickClass(cls);
@@ -596,7 +596,7 @@ namespace CriticalMass.Runtime.Menu
                 }
                 items.Add(it);
             }
-            _classBack = MenuUi.Item(page, "Back", 760f, 690f + 60f, 400f, 70f, "BACK", MenuItem.Kind.Button, 28, true, CMTokens.Display);
+            _classBack = MenuUi.Item(page, "Back", 760f, 690f + 60f, 400f, 70f, "BACK", MenuItem.Kind.Button, UiScale.TypeButton, true, CMTokens.Display);
             _classBack.Submitted = ShowRoot;
             items.Add(_classBack);
             Chain(items);
@@ -609,13 +609,13 @@ namespace CriticalMass.Runtime.Menu
             MenuUi.Stretch(page);
             _confirmPage = page.gameObject;
             MenuUi.Panel(page, "Panel", 560f, 300f, 800f, 420f);
-            _confirmTitle = MenuUi.Label(page, "Question", CMTokens.Display, 44, Cream, TextAnchor.MiddleCenter, 560f, 340f, 800f, 70f,
-                "SWITCH TEAM?", 3f);
-            MenuUi.Label(page, "Line", CMTokens.Ui, 24, Cream, TextAnchor.MiddleCenter, 560f, 420f, 800f, 40f,
+            _confirmTitle = MenuUi.Fit(MenuUi.Label(page, "Question", CMTokens.Display, UiScale.TypeDisplay, Cream, TextAnchor.MiddleCenter, 560f, 340f, 800f, 70f,
+                "SWITCH TEAM?", 3f), 44);
+            MenuUi.Label(page, "Line", CMTokens.Ui, UiScale.TypeBody, Cream, TextAnchor.MiddleCenter, 560f, 420f, 800f, 40f,
                 "THE MATCH RESTARTS WITH YOU ON THE OTHER SIDE", 2f);
-            _confirmYes = MenuUi.Item(page, "Yes", 620f, 560f, 330f, 80f, "YES, SWITCH", MenuItem.Kind.Button, 30, true, CMTokens.Display);
+            _confirmYes = MenuUi.Item(page, "Yes", 620f, 560f, 330f, 80f, "YES, SWITCH", MenuItem.Kind.Button, UiScale.TypeHeading, true, CMTokens.Display);
             _confirmYes.Submitted = ConfirmSwitchTeam;
-            MenuItem no = MenuUi.Item(page, "No", 970f, 560f, 330f, 80f, "NO", MenuItem.Kind.Button, 30, true, CMTokens.Display);
+            MenuItem no = MenuUi.Item(page, "No", 970f, 560f, 330f, 80f, "NO", MenuItem.Kind.Button, UiScale.TypeHeading, true, CMTokens.Display);
             no.Submitted = ShowRoot;
             _confirmYes.navigation = new Navigation { mode = Navigation.Mode.Explicit, selectOnLeft = no, selectOnRight = no };
             no.navigation = new Navigation { mode = Navigation.Mode.Explicit, selectOnLeft = _confirmYes, selectOnRight = _confirmYes };
@@ -670,7 +670,7 @@ namespace CriticalMass.Runtime.Menu
             band.raycastTarget = false;
             _title = MenuUi.Label(space, "Title", CMTokens.Display, UiScale.TypeTitle, Cream, TextAnchor.MiddleCenter, 460f, 20f, 1000f, 96f, "PAUSED", 4f);
             MenuUi.Fit(_title, UiScale.TypeHeading);
-            _hint = MenuUi.Label(space, "Hint", CMTokens.Ui, 20, Cream, TextAnchor.MiddleCenter, 260f, 1020f, 1400f, 36f, "", 2f);
+            _hint = MenuUi.Label(space, "Hint", CMTokens.Ui, UiScale.TypeSmall, Cream, TextAnchor.MiddleCenter, 260f, 1020f, 1400f, 36f, "", 2f);
             _hint.gameObject.SetActive(false);   // drawn by _hintStrip; kept as the plain line
             _hintStrip = PromptStrip.Make(space, "Hint Prompts", 30f, 20, Cream);
             MenuUi.Place(_hintStrip.Rect, 260f, 1016f, 1400f, 44f);
@@ -812,7 +812,7 @@ namespace CriticalMass.Runtime.Menu
                 _tabButtons[i] = t;
             }
             MenuItem back = MenuUi.Item(page, "Back", PanelX + PanelW - 40f - 200f, PanelY + 30f, 200f, 60f, "BACK",
-                MenuItem.Kind.Button, 26, true, CMTokens.Display);
+                MenuItem.Kind.Button, UiScale.TypeButton, true, CMTokens.Display);
             back.Submitted = ShowRoot;
 
             _tabPages[0] = BuildControls(page);
@@ -821,7 +821,7 @@ namespace CriticalMass.Runtime.Menu
             _tabPages[3] = BuildGame(page);
             for (int e = 0; e < extraTabs.Count; e++) _tabPages[4 + e] = BuildExtraTab(page, extraTabs[e]);
 
-            _status = MenuUi.Label(page, "Status", CMTokens.Ui, 22, Brass, TextAnchor.MiddleLeft, ContentX, PanelY + PanelH - 70f,
+            _status = MenuUi.Label(page, "Status", CMTokens.Ui, UiScale.TypeBody, Brass, TextAnchor.MiddleLeft, ContentX, PanelY + PanelH - 70f,
                 900f, 40f, "", 2f);
 
             // Tab row: left/right across tabs and Back, down into the active tab's first line.
@@ -903,13 +903,13 @@ namespace CriticalMass.Runtime.Menu
             float y = ContentY;
             string[] heads = { "KEYBOARD", "KEYBOARD 2", "CONTROLLER", "CONTROLLER 2" };
             for (int c = 0; c < 4; c++)
-                MenuUi.Label(tab, "Head " + c, CMTokens.Ui, 18, Brass, TextAnchor.MiddleCenter, ContentX + LabelW + c * (CellW + CellGap), y,
+                MenuUi.Label(tab, "Head " + c, CMTokens.Ui, UiScale.TypeSmall, Brass, TextAnchor.MiddleCenter, ContentX + LabelW + c * (CellW + CellGap), y,
                     CellW, 28f, heads[c], 2f);
             y += 34f;
 
             // DG-14: VIEW CONTROLS at the top of the tab, in the empty corner above the action labels.
             MenuItem view = MenuUi.Item(tab, "View Controls", ContentX, ContentY - 4f, LabelW - 20f, 34f, "VIEW CONTROLS",
-                MenuItem.Kind.Button, 18, true, CMTokens.Display);
+                MenuItem.Kind.Button, UiScale.TypeSmall, true, CMTokens.Display);
             view.Submitted = ShowControls;
 
             InputActionAsset asset = InputSystem.actions;
@@ -917,7 +917,7 @@ namespace CriticalMass.Runtime.Menu
             for (int r = 0; r < ControlBindings.Rows.Length; r++)
             {
                 ControlRow row = ControlBindings.Rows[r];
-                MenuUi.Label(tab, "Row " + row.Label, CMTokens.Ui, 19, Cream, TextAnchor.MiddleLeft, ContentX + 8f, y, LabelW - 8f, CtlRowH,
+                MenuUi.Label(tab, "Row " + row.Label, CMTokens.Ui, UiScale.TypeSmall, Cream, TextAnchor.MiddleLeft, ContentX + 8f, y, LabelW - 8f, CtlRowH,
                     row.Label.ToUpperInvariant(), 2f);
                 var line = new MenuItem[4];
                 for (int c = 0; c < 4; c++)
@@ -927,7 +927,7 @@ namespace CriticalMass.Runtime.Menu
                     if (k >= set.Length) continue;
                     RebindSlot slot = set[k];
                     MenuItem cell = MenuUi.Item(tab, $"Cell {row.Label} {c}", ContentX + LabelW + c * (CellW + CellGap), y, CellW, CtlRowH, "-",
-                        MenuItem.Kind.Button, 17, true, CMTokens.Mono);
+                        MenuItem.Kind.Button, UiScale.TypeMin, true, CMTokens.Mono);
                     var cref = new CellRef { Item = cell, Slot = slot, Row = row };
                     // The binding's glyph beside its name (a mouse with the button lit, a keycap, a controller button).
                     cref.Glyph = InputGlyphView.Make(cell.transform, "Glyph", 22f);
@@ -941,7 +941,7 @@ namespace CriticalMass.Runtime.Menu
                 y += CtlRowH + CtlRowGap;
             }
             MenuItem reset = MenuUi.Item(tab, "Reset Controls", PanelX + PanelW - 40f - 340f, PanelY + PanelH - 78f, 340f, 56f,
-                "RESET TO DEFAULTS", MenuItem.Kind.Button, 24, true, CMTokens.Display);
+                "RESET TO DEFAULTS", MenuItem.Kind.Button, UiScale.TypeBody, true, CMTokens.Display);
             reset.Submitted = () =>
             {
                 ControlBindings.ResetAll(InputSystem.actions);
@@ -1007,7 +1007,7 @@ namespace CriticalMass.Runtime.Menu
         MenuItem MoveToggle(RectTransform tab, string name, float x, float y, Func<bool> get, Action<bool> set, string label,
             string onStatus, string offStatus)
         {
-            MenuItem it = MenuUi.Item(tab, name, x, y, ToggleW, ToggleH, label, MenuItem.Kind.Button, 19, true, CMTokens.Display);
+            MenuItem it = MenuUi.Item(tab, name, x, y, ToggleW, ToggleH, label, MenuItem.Kind.Button, UiScale.TypeSmall, true, CMTokens.Display);
             Action refresh = () => HudText.Set(it.Label, label + (get() ? "   ON" : "   OFF"));
             it.Submitted = () =>
             {
@@ -1194,7 +1194,7 @@ namespace CriticalMass.Runtime.Menu
                 Stepper(tab, 1, "BLOOD", () => GameSettings.Blood ? "ON" : "OFF", d => GameSettings.Blood = !GameSettings.Blood),
             };
             MenuItem reset = MenuUi.Item(tab, "Reset Settings", ContentX, ContentY + GameTabLines * (LineH + LineGap) + 20f, 420f, 56f,
-                "RESET ALL SETTINGS", MenuItem.Kind.Button, 24, true, CMTokens.Display);
+                "RESET ALL SETTINGS", MenuItem.Kind.Button, UiScale.TypeBody, true, CMTokens.Display);
             reset.Submitted = () =>
             {
                 GameSettings.ResetAll();
@@ -1205,7 +1205,7 @@ namespace CriticalMass.Runtime.Menu
             items.Add(reset);
             // DG-64: a zip of the logs a tester can send us (no upload; the decision ledger rules out crash services).
             MenuItem report = MenuUi.Item(tab, "Problem Report", ContentX, ContentY + GameTabLines * (LineH + LineGap) + 96f, 420f, 56f,
-                "SAVE A PROBLEM REPORT", MenuItem.Kind.Button, 24, true, CMTokens.Display);
+                "SAVE A PROBLEM REPORT", MenuItem.Kind.Button, UiScale.TypeBody, true, CMTokens.Display);
             report.Submitted = () =>
             {
                 string zip = CriticalMass.Runtime.Game.SupportReport.Export(null, out string error);
@@ -1258,19 +1258,19 @@ namespace CriticalMass.Runtime.Menu
 
         public void Note(RectTransform tab, int line, string text)
         {
-            MenuUi.Label(tab, "Note", CMTokens.Ui, 20, CMTokens.WithAlpha(Cream, 0.8f), TextAnchor.MiddleLeft, ContentX + 8f,
+            MenuUi.Label(tab, "Note", CMTokens.Ui, UiScale.TypeSmall, CMTokens.WithAlpha(Cream, 0.8f), TextAnchor.MiddleLeft, ContentX + 8f,
                 ContentY + line * (LineH + LineGap) + 10f, LineW, 36f, text, 2f);
         }
 
         public MenuItem Slider(RectTransform tab, int line, string label, Func<float> get, Action<float> set)
         {
             float y = ContentY + line * (LineH + LineGap);
-            MenuItem it = MenuUi.Item(tab, label, ContentX, y, LineW, LineH, label, MenuItem.Kind.Slider, 26, false, CMTokens.Display);
+            MenuItem it = MenuUi.Item(tab, label, ContentX, y, LineW, LineH, label, MenuItem.Kind.Slider, UiScale.TypeButton, false, CMTokens.Display);
             VectorShape bar = MenuUi.Shape(it.transform, "Bar", ShapeKind.RoundRect, 440f, 18f, 660f, 28f, CMTokens.Biomass.Color, -1f);
             bar.EmptyColor = CMTokens.MeterEmpty.Color;
             bar.RimPx = 0f;
             it.Bar = bar;
-            it.Value = MenuUi.Label(it.transform, "Value", CMTokens.Mono, 24, MenuItem.IdleText, TextAnchor.MiddleRight, LineW - 160f, 0f, 140f, LineH, "", 2f);
+            it.Value = MenuUi.Label(it.transform, "Value", CMTokens.Mono, UiScale.TypeBody, MenuItem.IdleText, TextAnchor.MiddleRight, LineW - 160f, 0f, 140f, LineH, "", 2f);
             Action refresh = () =>
             {
                 float v = get();
@@ -1294,10 +1294,10 @@ namespace CriticalMass.Runtime.Menu
         public MenuItem Stepper(RectTransform tab, int line, string label, Func<string> text, Action<int> step)
         {
             float y = ContentY + line * (LineH + LineGap);
-            MenuItem it = MenuUi.Item(tab, label, ContentX, y, LineW, LineH, label, MenuItem.Kind.Stepper, 26, false, CMTokens.Display);
-            it.Value = MenuUi.Label(it.transform, "Value", CMTokens.Ui, 26, MenuItem.IdleText, TextAnchor.MiddleCenter, 460f, 0f, 640f, LineH, "", 2f);
-            MenuUi.Label(it.transform, "Left", CMTokens.Display, 28, Brass, TextAnchor.MiddleCenter, 420f, 0f, 40f, LineH, "<", 2f);
-            MenuUi.Label(it.transform, "Right", CMTokens.Display, 28, Brass, TextAnchor.MiddleCenter, 1100f, 0f, 40f, LineH, ">", 2f);
+            MenuItem it = MenuUi.Item(tab, label, ContentX, y, LineW, LineH, label, MenuItem.Kind.Stepper, UiScale.TypeButton, false, CMTokens.Display);
+            it.Value = MenuUi.Fit(MenuUi.Label(it.transform, "Value", CMTokens.Ui, UiScale.TypeButton, MenuItem.IdleText, TextAnchor.MiddleCenter, 460f, 0f, 640f, LineH, "", 2f), 26);
+            MenuUi.Label(it.transform, "Left", CMTokens.Display, UiScale.TypeButton, Brass, TextAnchor.MiddleCenter, 420f, 0f, 40f, LineH, "<", 2f);
+            MenuUi.Label(it.transform, "Right", CMTokens.Display, UiScale.TypeButton, Brass, TextAnchor.MiddleCenter, 1100f, 0f, 40f, LineH, ">", 2f);
             Action refresh = () => HudText.Set(it.Value, text());
             it.Stepped = d =>
             {

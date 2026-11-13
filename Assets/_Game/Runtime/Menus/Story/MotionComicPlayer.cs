@@ -538,7 +538,7 @@ namespace CriticalMass.Runtime.Menus
 
             for (int k = 0; k < MotionComic.MaxTitles; k++)
             {
-                Text tx = HudText.Make(_ui, "Title " + (k + 1), CMTokens.Display, 96, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 0f);
+                Text tx = CriticalMass.Runtime.Menu.MenuUi.Fit(HudText.Make(_ui, "Title " + (k + 1), CMTokens.Display, UiScale.TypeHero, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 0f), 96);
                 RectTransform rt = tx.rectTransform;
                 rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
                 _tracks[k] = tx.gameObject.AddComponent<TextTracking>();      // before the outline: the outline copies spaced glyphs
@@ -547,7 +547,7 @@ namespace CriticalMass.Runtime.Menus
                 _titles[k] = tx;
             }
 
-            _sub = HudText.Make(_ui, "Subtitle", CMTokens.Ui, 34, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 2f);
+            _sub = CriticalMass.Runtime.Menu.MenuUi.Fit(HudText.Make(_ui, "Subtitle", CMTokens.Ui, UiScale.TypeLead, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 2f), 34);
             RectTransform srt = _sub.rectTransform;
             srt.anchorMin = srt.anchorMax = srt.pivot = new Vector2(0.5f, 0f);
             srt.anchoredPosition = new Vector2(0f, 58f);
@@ -555,7 +555,7 @@ namespace CriticalMass.Runtime.Menus
             _sub.horizontalOverflow = HorizontalWrapMode.Wrap;
             _sub.enabled = false;
 
-            _skip = HudText.Make(_ui, "Skip", CMTokens.Display, 22, CMTokens.WarmCream.Color, TextAnchor.MiddleRight, 2f);
+            _skip = HudText.Make(_ui, "Skip", CMTokens.Display, UiScale.TypeBody, CMTokens.WarmCream.Color, TextAnchor.MiddleRight, 2f);
             RectTransform krt = _skip.rectTransform;
             krt.anchorMin = krt.anchorMax = krt.pivot = new Vector2(1f, 0f);
             krt.anchoredPosition = new Vector2(-48f, 24f);

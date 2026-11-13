@@ -189,7 +189,7 @@ namespace CriticalMass.Runtime.Hud
             BuildTeamPanel(c, TeamId.Crimson, 456f, out _scoreC, _pipsC, out _onHillC);
             // clock pill
             Shape(c, "Clock Pill", ShapeKind.RoundRect, 316f, 0f, 168f, 72f, Navy, -1f);
-            _clock = Label(c, "Clock", CMTokens.Mono, 50, Cream, TextAnchor.MiddleCenter, 316f, 2f, 168f, 68f, "08:00", 0f);
+            _clock = Label(c, "Clock", CMTokens.Mono, UiScale.TypeDisplay, Cream, TextAnchor.MiddleCenter, 316f, 2f, 168f, 68f, "08:00", 0f);
             // hill-control bar with the crown medallion
             _hillBar = Shape(c, "Hill Bar", ShapeKind.RoundRect, 236f, 80f, 328f, 26f, CMTokens.Azure.Color, -1f);
             _hillBar.EmptyColor = CMTokens.Crimson.Color;
@@ -198,7 +198,7 @@ namespace CriticalMass.Runtime.Hud
             _medallionHalf.Fill01 = 0.5f;
             _medallionHalf.gameObject.SetActive(false);
             Icon(_medallion.transform, "Crown", UiIcons.Crown, 13f, 11f, 34f, 34f);
-            _hillWord = Label(c, "Hill Word", CMTokens.Ui, 19, Cream, TextAnchor.MiddleCenter, 250f, 106f, 300f, 24f, "NEUTRAL");
+            _hillWord = Label(c, "Hill Word", CMTokens.Ui, UiScale.TypeSmall, Cream, TextAnchor.MiddleCenter, 250f, 106f, 300f, 24f, "NEUTRAL");
         }
 
         void BuildTeamPanel(RectTransform c, TeamId team, float x, out Text score, VectorShape[] pips, out Text onHill)
@@ -217,10 +217,10 @@ namespace CriticalMass.Runtime.Hud
                 p.RimPx = 0f;
                 pips[i] = p;
             }
-            onHill = Label(c, team + " On Hill", CMTokens.Ui, 14, Cream, azure ? TextAnchor.MiddleLeft : TextAnchor.MiddleRight,
-                pipX0, 40f, Pips * 22f, 20f, "0 ON HILL", 2f);
-            score = Label(c, team + " Score", CMTokens.Mono, 44, Cream, azure ? TextAnchor.MiddleRight : TextAnchor.MiddleLeft,
-                azure ? 168f : 500f, 4f, 132f, 64f, "0");
+            onHill = CriticalMass.Runtime.Menu.MenuUi.Fit(Label(c, team + " On Hill", CMTokens.Ui, UiScale.TypeMin, Cream, azure ? TextAnchor.MiddleLeft : TextAnchor.MiddleRight,
+                pipX0, 40f, Pips * 22f, 20f, "0 ON HILL", 2f), 14);
+            score = CriticalMass.Runtime.Menu.MenuUi.Fit(Label(c, team + " Score", CMTokens.Mono, UiScale.TypeDisplay, Cream, azure ? TextAnchor.MiddleRight : TextAnchor.MiddleLeft,
+                azure ? 168f : 500f, 4f, 132f, 64f, "0"), 44);
         }
 
         // ---------------------------------------------------------------- 02 KAIJU
@@ -247,8 +247,8 @@ namespace CriticalMass.Runtime.Hud
                 _segments[i] = s;
             }
             VectorShape cap = Shape(c, "Meter Cap", ShapeKind.Hexagon, 288f, 6f, 52f, 54f, Navy);
-            _kaijuNumber = Label(cap.transform, "Meter Number", CMTokens.Mono, 20, Cream, TextAnchor.MiddleCenter, 0f, 0f, 52f, 54f, "0", 2f);
-            Label(c, "Rage Label", CMTokens.Ui, 13, Cream, TextAnchor.MiddleLeft, 92f, 60f, 44f, 22f, "RAGE", 2f);
+            _kaijuNumber = Label(cap.transform, "Meter Number", CMTokens.Mono, UiScale.TypeSmall, Cream, TextAnchor.MiddleCenter, 0f, 0f, 52f, 54f, "0", 2f);
+            CriticalMass.Runtime.Menu.MenuUi.Fit(Label(c, "Rage Label", CMTokens.Ui, UiScale.TypeMin, Cream, TextAnchor.MiddleLeft, 92f, 60f, 44f, 22f, "RAGE", 2f), 13);
             for (int i = 0; i < RagePips; i++)
             {
                 VectorShape p = Shape(c, "Rage " + i, ShapeKind.TriangleDown, 136f + i * 22f, 62f, 20f, 16f, Empty);
@@ -256,7 +256,7 @@ namespace CriticalMass.Runtime.Hud
                 p.RimPx = 0f;
                 _rage[i] = p;
             }
-            _kaijuWord = Label(c, "Kaiju Word", CMTokens.Ui, 20, Cream, TextAnchor.MiddleRight, 214f, 60f, 124f, 28f, "EGG");
+            _kaijuWord = Label(c, "Kaiju Word", CMTokens.Ui, UiScale.TypeSmall, Cream, TextAnchor.MiddleRight, 214f, 60f, 124f, 28f, "EGG");
         }
 
         // ---------------------------------------------------------------- 03 PLAYER
@@ -295,8 +295,8 @@ namespace CriticalMass.Runtime.Hud
             _portrait = Icon(_portraitFrame.transform, "Portrait", UiIcons.Portrait[0, 0], 5f, 1f, 106f, 106f);   // fills the card like p15
             Shape(_portraitFrame.transform, "Name Plate", ShapeKind.RoundRect, 6f, 92f, 104f, 24f, Navy, -1f).RimPx = 0f;
             _classBadge = Icon(_portraitFrame.transform, "Class Badge", UiIcons.ClassBadge[0, 0], -6f, -6f, 36f, 36f);
-            _className = Label(_portraitFrame.transform, "Class Name", CMTokens.Ui, 15, Cream, TextAnchor.MiddleCenter, 6f, 92f, 104f, 24f,
-                "WARRIOR", 2f);
+            _className = CriticalMass.Runtime.Menu.MenuUi.Fit(Label(_portraitFrame.transform, "Class Name", CMTokens.Ui, UiScale.TypeMin, Cream, TextAnchor.MiddleCenter, 6f, 92f, 104f, 24f,
+                "WARRIOR", 2f), 15);
 
             Shape(c, "Health Plate", ShapeKind.RoundRect, 124f, 22f, 252f, 90f, Panel, 14f);
             for (int i = 0; i < Hearts; i++)
@@ -310,7 +310,7 @@ namespace CriticalMass.Runtime.Hud
                     Full = Icon(hr, "Full", UiIcons.Heart[0], 0f, 0f, 34f, 34f, true),
                 };
             }
-            _hpNumber = Label(c, "HP Number", CMTokens.Mono, 24, Cream, TextAnchor.MiddleRight, 284f, 30f, 82f, 32f, "160", 2f);
+            _hpNumber = Label(c, "HP Number", CMTokens.Mono, UiScale.TypeBody, Cream, TextAnchor.MiddleRight, 284f, 30f, 82f, 32f, "160", 2f);
             _hpGhost = Shape(c, "HP Ghost", ShapeKind.RoundRect, 136f, 72f, 228f, 28f, Cream, -1f);
             _hpGhost.EmptyColor = Empty;
             _hpBar = Shape(c, "HP Bar", ShapeKind.RoundRect, 136f, 72f, 228f, 28f, CMTokens.Azure.Color, -1f);
@@ -325,11 +325,11 @@ namespace CriticalMass.Runtime.Hud
                 b.Icon = Icon(b.Body.transform, "Icon", i == 2 ? UiIcons.CarryEmpty : null, 10f, 7f, 56f, 56f);
                 b.Sweep = Shape(b.Body.transform, "Cooldown", ShapeKind.Pie, 5f, 5f, 66f, 66f, CMTokens.WithAlpha(Navy, 0.72f));
                 b.Sweep.Fill01 = 0f;
-                b.Seconds = Label(b.Body.transform, "Seconds", CMTokens.Mono, 30, Cream, TextAnchor.MiddleCenter, 0f, 0f, 76f, 76f, "", 3f);
-                b.Count = Label(b.Body.transform, "Count", CMTokens.Mono, 22, Cream, TextAnchor.MiddleRight, 34f, 44f, 38f, 28f, "", 3f);
+                b.Seconds = Label(b.Body.transform, "Seconds", CMTokens.Mono, UiScale.TypeHeading, Cream, TextAnchor.MiddleCenter, 0f, 0f, 76f, 76f, "", 3f);
+                b.Count = Label(b.Body.transform, "Count", CMTokens.Mono, UiScale.TypeBody, Cream, TextAnchor.MiddleRight, 34f, 44f, 38f, 28f, "", 3f);
                 Shape(c, "Key " + i, ShapeKind.RoundRect, bx + 14f, 86f, 48f, 28f, Navy, -1f).RimColor = Cream;
-                Label(c, "Key Label " + i, CMTokens.Ui, 15, Cream, TextAnchor.MiddleCenter, bx + 14f, 86f, 48f, 28f, keys[i], 0f);
-                b.Name = Label(c, "Ability Name " + i, CMTokens.Ui, 15, Cream, TextAnchor.MiddleCenter, bx - 14f, -20f, 104f, 22f, "", 2f);
+                CriticalMass.Runtime.Menu.MenuUi.Fit(Label(c, "Key Label " + i, CMTokens.Ui, UiScale.TypeMin, Cream, TextAnchor.MiddleCenter, bx + 14f, 86f, 48f, 28f, keys[i], 0f), 15);
+                b.Name = CriticalMass.Runtime.Menu.MenuUi.Fit(Label(c, "Ability Name " + i, CMTokens.Ui, UiScale.TypeMin, Cream, TextAnchor.MiddleCenter, bx - 14f, -20f, 104f, 22f, "", 2f), 15);
                 _buttons[i] = b;
             }
             bool showNames = PlayerPrefs.GetInt(MatchesPlayedKey, 0) < AbilityNameMatches;
@@ -409,15 +409,15 @@ namespace CriticalMass.Runtime.Hud
             // illustrated markers, each with its word (the v1 report's missing minimap labels), sized to leave the plazas visible
             _mapHill = Shape(_mapArea, "Map Hill", ShapeKind.Circle, 0f, 0f, 24f, 24f, Navy);
             Icon(_mapHill.transform, "Crown", UiIcons.MapCrown, 4f, 4f, 16f, 16f);
-            Label(_mapHill.transform, "Label", CMTokens.Ui, 11, Cream, TextAnchor.MiddleCenter, -23f, 24f, 70f, 14f, "HILL", 2f);
+            CriticalMass.Runtime.Menu.MenuUi.Fit(Label(_mapHill.transform, "Label", CMTokens.Ui, UiScale.TypeMin, Cream, TextAnchor.MiddleCenter, -23f, 24f, 70f, 14f, "HILL", 2f), 11);
             for (int t = 0; t < 2; t++)
             {
                 HudIcon b = Icon(_mapArea, (TeamId)t + " Base", UiIcons.Banner[t], 0f, 0f, 24f, 24f);
-                Label(b.Rt, "Label", CMTokens.Ui, 11, Cream, TextAnchor.MiddleCenter, -23f, 23f, 70f, 14f, t == 0 ? "AZURE" : "CRIMSON", 2f);
+                CriticalMass.Runtime.Menu.MenuUi.Fit(Label(b.Rt, "Label", CMTokens.Ui, UiScale.TypeMin, Cream, TextAnchor.MiddleCenter, -23f, 23f, 70f, 14f, t == 0 ? "AZURE" : "CRIMSON", 2f), 11);
                 _mapBases[t] = b;
             }
             _mapEgg = Icon(_mapArea, "Map Egg", UiIcons.MapEgg, 0f, 0f, 22f, 22f);
-            Label(_mapEgg.Rt, "Label", CMTokens.Ui, 11, Cream, TextAnchor.MiddleCenter, -24f, 20f, 70f, 14f, "KAIJU", 2f);
+            CriticalMass.Runtime.Menu.MenuUi.Fit(Label(_mapEgg.Rt, "Label", CMTokens.Ui, UiScale.TypeMin, Cream, TextAnchor.MiddleCenter, -24f, 20f, 70f, 14f, "KAIJU", 2f), 11);
             _mapYou = Rt(_mapArea, "Map You");
             Place(_mapYou, 0f, 0f, 18f, 18f);
             _youFacing = Rt(_mapYou, "Facing");
@@ -426,7 +426,7 @@ namespace CriticalMass.Runtime.Hud
             arrow.OutlinePx = 1.5f;
             arrow.RimPx = 0f;
             Icon(_mapYou, "Marker", UiIcons.You, 0f, 0f, 18f, 18f);
-            Label(_mapYou, "Label", CMTokens.Ui, 11, CMTokens.ToolBrass.Color, TextAnchor.MiddleLeft, 20f, -12f, 40f, 14f, "YOU", 2f);
+            CriticalMass.Runtime.Menu.MenuUi.Fit(Label(_mapYou, "Label", CMTokens.Ui, UiScale.TypeMin, CMTokens.ToolBrass.Color, TextAnchor.MiddleLeft, 20f, -12f, 40f, 14f, "YOU", 2f), 11);
             _mapYou.gameObject.SetActive(false);
         }
 
@@ -475,7 +475,7 @@ namespace CriticalMass.Runtime.Hud
             Center(marker, 120f, 80f);
             _hillMarker = Shape(marker, "Medallion", ShapeKind.Circle, 38f, 0f, 44f, 44f, CMTokens.Stone.Color);
             Icon(_hillMarker.transform, "Crown", UiIcons.Crown, 4f, 4f, 36f, 36f);
-            _hillMarkerWord = Label(marker, "Word", CMTokens.Ui, 16, Cream, TextAnchor.MiddleCenter, 0f, 46f, 120f, 22f, "NEUTRAL", 2.5f);
+            _hillMarkerWord = Label(marker, "Word", CMTokens.Ui, UiScale.TypeMin, Cream, TextAnchor.MiddleCenter, 0f, 46f, 120f, 22f, "NEUTRAL", 2.5f);
 
             for (int r = 0; r < HeartRows; r++)
             {
@@ -494,7 +494,7 @@ namespace CriticalMass.Runtime.Hud
             }
             for (int i = 0; i < DamageNumbers; i++)
             {
-                Text t = HudText.Make(_world, "Damage " + i, CMTokens.Mono, 30, Cream, TextAnchor.MiddleCenter, 3f);
+                Text t = HudText.Make(_world, "Damage " + i, CMTokens.Mono, UiScale.TypeHeading, Cream, TextAnchor.MiddleCenter, 3f);
                 Center(t.rectTransform, 80f, 32f);
                 t.gameObject.SetActive(false);
                 _dmg[i] = t;
@@ -517,7 +517,7 @@ namespace CriticalMass.Runtime.Hud
                 arrow.rectTransform.anchorMin = arrow.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
                 arrow.rectTransform.anchoredPosition = new Vector2(30f, 0f);
                 _ptrArrow[i] = arrowPivot;
-                _ptrDist[i] = Label(p, "Distance", CMTokens.Mono, 22, Cream, TextAnchor.MiddleCenter, -10f, 42f, 80f, 26f, "0m", 2.5f);
+                _ptrDist[i] = Label(p, "Distance", CMTokens.Mono, UiScale.TypeBody, Cream, TextAnchor.MiddleCenter, -10f, 42f, 80f, 26f, "0m", 2.5f);
                 p.gameObject.SetActive(false);
                 _ptr[i] = p;
             }
@@ -589,8 +589,8 @@ namespace CriticalMass.Runtime.Hud
             RectTransform mid = Rt(_death, "Centre");
             mid.anchorMin = mid.anchorMax = new Vector2(0.5f, 0.5f);
             mid.sizeDelta = new Vector2(400f, 160f);
-            Label(mid, "Respawn Label", CMTokens.Ui, 24, Cream, TextAnchor.MiddleCenter, 0f, 0f, 400f, 34f, "RESPAWN IN", 3f);
-            _respawn = Label(mid, "Respawn Seconds", CMTokens.Mono, 100, Cream, TextAnchor.MiddleCenter, 0f, 34f, 400f, 110f, "5", 3f);
+            Label(mid, "Respawn Label", CMTokens.Ui, UiScale.TypeBody, Cream, TextAnchor.MiddleCenter, 0f, 0f, 400f, 34f, "RESPAWN IN", 3f);
+            _respawn = CriticalMass.Runtime.Menu.MenuUi.Fit(Label(mid, "Respawn Seconds", CMTokens.Mono, UiScale.TypeHero, Cream, TextAnchor.MiddleCenter, 0f, 34f, 400f, 110f, "5", 3f), 100);
             _koRing = Shape(_world, "KO Ring", ShapeKind.Circle, 0f, 0f, 72f, 72f, new Color(0, 0, 0, 0));
             Center(_koRing.rectTransform, 72f, 72f);
             _koRing.OutlinePx = 4f;

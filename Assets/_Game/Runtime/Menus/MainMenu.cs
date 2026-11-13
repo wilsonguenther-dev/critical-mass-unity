@@ -86,8 +86,8 @@ namespace CriticalMass.Runtime.Menus
                 CMTokens.WithAlpha(Navy, 0.6f), 22f);
             band.OutlinePx = 0f;
             band.RimPx = 0f;
-            MenuUi.Label(space, "Wordmark", CMTokens.Display, 46, Cream, TextAnchor.MiddleLeft, ColX, 40f, 760f, 64f, "CRITICAL MASS", 4f);
-            MenuUi.Label(space, "Tagline", CMTokens.Ui, 22, CMTokens.WithAlpha(Cream, 0.85f), TextAnchor.MiddleLeft, ColX, 100f, 760f, 32f,
+            MenuUi.Fit(MenuUi.Label(space, "Wordmark", CMTokens.Display, UiScale.TypeDisplay, Cream, TextAnchor.MiddleLeft, ColX, 40f, 760f, 64f, "CRITICAL MASS", 4f), 46);
+            MenuUi.Label(space, "Tagline", CMTokens.Ui, UiScale.TypeBody, CMTokens.WithAlpha(Cream, 0.85f), TextAnchor.MiddleLeft, ColX, 100f, 760f, 32f,
                 "16 v 16. Hold the hill. Turn the Kaiju.", 2f);
 
             // Rail: the registry's lines that lead somewhere (the play lines live on the mode cards).
@@ -99,7 +99,7 @@ namespace CriticalMass.Runtime.Menus
             {
                 MenuEntry entry = _entries[i];
                 MenuItem it = MenuUi.Item(space, "Entry " + entry.Id, ColX, RailY + i * RailStep, ColW * 0.78f, RailH, entry.Label,
-                    MenuItem.Kind.Button, 24, false, CMTokens.Display);
+                    MenuItem.Kind.Button, UiScale.TypeBody, false, CMTokens.Display);
                 it.Body.Radius = 14f;
                 it.Body.RimPx = 2f;
                 it.Submitted = () => Choose(entry);
@@ -107,25 +107,25 @@ namespace CriticalMass.Runtime.Menus
                 _order.Add(it);
             }
 
-            _rematch = MenuUi.Item(space, "Rematch", ColX, RematchY, ColW, 56f, "REMATCH   ·   SAME SEED", MenuItem.Kind.Button, 24, false,
+            _rematch = MenuUi.Item(space, "Rematch", ColX, RematchY, ColW, 56f, "REMATCH   ·   SAME SEED", MenuItem.Kind.Button, UiScale.TypeBody, false,
                 CMTokens.Display);
             _rematch.Body.Radius = 14f;
             _rematch.Submitted = () => PlayFlow.Rematch(_offer);
-            _rematchNote = MenuUi.Label(space, "Rematch Note", CMTokens.Ui, 17, CMTokens.WithAlpha(Cream, 0.85f), TextAnchor.MiddleLeft,
+            _rematchNote = MenuUi.Label(space, "Rematch Note", CMTokens.Ui, UiScale.TypeMin, CMTokens.WithAlpha(Cream, 0.85f), TextAnchor.MiddleLeft,
                 ColX + 4f, RematchY + 60f, ColW, 26f, "The match you left can't be resumed. This replays it from the start.", 2f);
 
-            _change = MenuUi.Item(space, "Change Mode", ColX, ChangeY, ColW, 60f, "CHANGE MODE", MenuItem.Kind.Button, 26, false, CMTokens.Display);
+            _change = MenuUi.Item(space, "Change Mode", ColX, ChangeY, ColW, 60f, "CHANGE MODE", MenuItem.Kind.Button, UiScale.TypeButton, false, CMTokens.Display);
             _change.Body.Radius = 14f;
             _change.Submitted = OpenModes;
             _changeGlyph = Glyphs(_change.transform, ColW - 150f, 60f, 18);
 
-            _primary = MenuUi.Item(space, "Play", ColX, PrimaryY, ColW, PrimaryH, "PLAY", MenuItem.Kind.Button, 60, false, CMTokens.Display);
+            _primary = MenuUi.Item(space, "Play", ColX, PrimaryY, ColW, PrimaryH, "PLAY", MenuItem.Kind.Button, UiScale.TypeTitle, false, CMTokens.Display);
             _primary.Body.Radius = 22f;
             _primary.Body.RimPx = 5f;
             _primary.Body.SetRim(Brass);
             RectTransform pl = _primary.Label.rectTransform;
             MenuUi.Place(pl, 28f, 14f, ColW - 56f, 80f);
-            _primarySub = MenuUi.Label(_primary.transform, "Sub", CMTokens.Ui, 22, Cream, TextAnchor.MiddleLeft, 30f, 94f, ColW - 60f, 36f, "", 2f);
+            _primarySub = MenuUi.Label(_primary.transform, "Sub", CMTokens.Ui, UiScale.TypeBody, Cream, TextAnchor.MiddleLeft, 30f, 94f, ColW - 60f, 36f, "", 2f);
             _primary.Value = _primarySub;   // recoloured with the focus like the label
             _primary.Submitted = PressPrimary;
             _primaryGlyph = Glyphs(_primary.transform, ColW - 170f, 80f, 20);
@@ -133,7 +133,7 @@ namespace CriticalMass.Runtime.Menus
             BuildStage(space);
             BuildCard(space);
             BuildTip(space);
-            _land = MenuUi.Label(space, "Rewards Landing", CMTokens.Display, 30, Brass, TextAnchor.MiddleCenter, 960f, 520f, 700f, 50f, "", 3f);
+            _land = MenuUi.Label(space, "Rewards Landing", CMTokens.Display, UiScale.TypeHeading, Brass, TextAnchor.MiddleCenter, 960f, 520f, 700f, 50f, "", 3f);
             _land.enabled = false;
             Wire();
             DefaultFocus = _primary;
@@ -157,28 +157,28 @@ namespace CriticalMass.Runtime.Menus
             _stageImage.enabled = false;
             _portrait = HudIcon.Make(space, "Portrait", StageX + StageW * 0.5f - 200f, StageY + 120f, 340f, 340f);
             _portrait.Image.enabled = false;
-            _className = MenuUi.Label(space, "Class Name", CMTokens.Display, 34, Cream, TextAnchor.MiddleLeft, StageX + 32f, StageY + StageH - 70f,
-                StageW - 64f, 50f, "", 3f);
+            _className = MenuUi.Fit(MenuUi.Label(space, "Class Name", CMTokens.Display, UiScale.TypeLead, Cream, TextAnchor.MiddleLeft, StageX + 32f, StageY + StageH - 70f,
+                StageW - 64f, 50f, "", 3f), 34);
         }
 
         void BuildCard(RectTransform space)
         {
             MenuUi.Panel(space, "Player Card", CardX, CardY, CardW, CardH);
-            _name = MenuUi.Label(space, "Player Name", CMTokens.Display, 30, Cream, TextAnchor.MiddleLeft, CardX + 28f, CardY + 16f, 360f, 42f, "", 3f);
+            _name = MenuUi.Label(space, "Player Name", CMTokens.Display, UiScale.TypeHeading, Cream, TextAnchor.MiddleLeft, CardX + 28f, CardY + 16f, 360f, 42f, "", 3f);
             VectorShape badge = MenuUi.Shape(space, "Level Badge", ShapeKind.Hexagon, CardX + CardW - 98f, CardY + 14f, 76f, 76f, Brass, 8f);
             badge.OutlinePx = 4f;
             badge.RimPx = 0f;
-            _level = MenuUi.Label(space, "Level", CMTokens.Display, 30, Navy, TextAnchor.MiddleCenter, CardX + CardW - 98f, CardY + 14f, 76f, 76f, "", 0f);
+            _level = MenuUi.Label(space, "Level", CMTokens.Display, UiScale.TypeHeading, Navy, TextAnchor.MiddleCenter, CardX + CardW - 98f, CardY + 14f, 76f, 76f, "", 0f);
             _xpBar = MenuUi.Shape(space, "XP Bar", ShapeKind.RoundRect, CardX + 28f, CardY + 68f, 370f, 18f, Brass, 9f);
             _xpBar.SetEmpty(CMTokens.MeterEmpty.Color);
             _xpBar.OutlinePx = 3f;
             _xpBar.RimPx = 0f;
-            _xp = MenuUi.Label(space, "XP", CMTokens.Ui, 18, CMTokens.WithAlpha(Cream, 0.9f), TextAnchor.MiddleLeft, CardX + 28f, CardY + 90f, 400f, 26f, "", 2f);
+            _xp = MenuUi.Label(space, "XP", CMTokens.Ui, UiScale.TypeSmall, CMTokens.WithAlpha(Cream, 0.9f), TextAnchor.MiddleLeft, CardX + 28f, CardY + 90f, 400f, 26f, "", 2f);
             VectorShape coin = MenuUi.Shape(space, "Coin", ShapeKind.Diamond, CardX + 28f, CardY + 126f, 26f, 26f, Brass, 4f);
             coin.OutlinePx = 3f;
             coin.RimPx = 0f;
-            _coins = MenuUi.Label(space, "Coins", CMTokens.Display, 26, Cream, TextAnchor.MiddleLeft, CardX + 64f, CardY + 120f, 200f, 38f, "", 3f);
-            _record = MenuUi.Label(space, "Record", CMTokens.Ui, 18, CMTokens.WithAlpha(Cream, 0.9f), TextAnchor.MiddleRight, CardX + 240f, CardY + 120f,
+            _coins = MenuUi.Fit(MenuUi.Label(space, "Coins", CMTokens.Display, UiScale.TypeButton, Cream, TextAnchor.MiddleLeft, CardX + 64f, CardY + 120f, 200f, 38f, "", 3f), 26);
+            _record = MenuUi.Label(space, "Record", CMTokens.Ui, UiScale.TypeSmall, CMTokens.WithAlpha(Cream, 0.9f), TextAnchor.MiddleRight, CardX + 240f, CardY + 120f,
                 CardW - 268f, 38f, "", 2f);
         }
 
@@ -192,9 +192,9 @@ namespace CriticalMass.Runtime.Menus
             _mascot.texture = Resources.Load<Texture2D>(MascotGuide.PortraitResource(MascotReaction.Neutral, 2));
             _mascot.enabled = _mascot.texture != null;
             float tx = _mascot.enabled ? StageX + 104f : StageX + 24f;
-            MenuUi.Label(space, "Tip Label", CMTokens.Display, 20, Brass, TextAnchor.MiddleLeft, tx, y + 10f, 400f, 28f,
+            MenuUi.Label(space, "Tip Label", CMTokens.Display, UiScale.TypeSmall, Brass, TextAnchor.MiddleLeft, tx, y + 10f, 400f, 28f,
                 MascotGuide.MascotName.ToUpperInvariant() + " SAYS", 2f);
-            _tip = MenuUi.Label(space, "Tip", CMTokens.Ui, 22, Cream, TextAnchor.UpperLeft, tx, y + 40f, StageX + StageW - tx - 24f, 50f, "", 2f);
+            _tip = MenuUi.Label(space, "Tip", CMTokens.Ui, UiScale.TypeBody, Cream, TextAnchor.UpperLeft, tx, y + 40f, StageX + StageW - tx - 24f, 50f, "", 2f);
             _tip.horizontalOverflow = HorizontalWrapMode.Wrap;
         }
 

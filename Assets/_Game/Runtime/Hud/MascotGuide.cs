@@ -275,15 +275,15 @@ namespace CriticalMass.Runtime.Hud
             tail.RimPx = 0f;
 
             float tx = Portrait + 18f, tw = PanelW - Portrait - 38f;
-            _name = HudText.Make(_bubble.transform.parent, "Name", CMTokens.Display, 22, CMTokens.ToolBrass.Color, TextAnchor.MiddleLeft, 3f);
+            _name = HudText.Make(_bubble.transform.parent, "Name", CMTokens.Display, UiScale.TypeBody, CMTokens.ToolBrass.Color, TextAnchor.MiddleLeft, 3f);
             Place(_name.rectTransform, tx, 24f, tw, 30f);
             _name.text = MascotName.ToUpperInvariant();
-            _line = HudText.Make(_panel, "Line", CMTokens.Ui, 26, CMTokens.WarmCream.Color, TextAnchor.UpperLeft, 2.5f);
+            _line = CriticalMass.Runtime.Menu.MenuUi.Fit(HudText.Make(_panel, "Line", CMTokens.Ui, UiScale.TypeButton, CMTokens.WarmCream.Color, TextAnchor.UpperLeft, 2.5f), 26);
             Place(_line.rectTransform, tx, 56f, tw, 74f);
             _line.horizontalOverflow = HorizontalWrapMode.Wrap;
             _line.verticalOverflow = VerticalWrapMode.Truncate;
             _line.lineSpacing = 0.95f;
-            _hint = HudText.Make(_panel, "Hint", CMTokens.Mono, 16, CMTokens.WithAlpha(CMTokens.WarmCream.Color, 0.85f), TextAnchor.MiddleLeft, 2f);
+            _hint = HudText.Make(_panel, "Hint", CMTokens.Mono, UiScale.TypeMin, CMTokens.WithAlpha(CMTokens.WarmCream.Color, 0.85f), TextAnchor.MiddleLeft, 2f);
             Place(_hint.rectTransform, tx, PanelH - 46f, tw, 22f);
 
             // Portrait medallion: Void Navy disc, Warm Cream rim, the face on top. The pivot carries pose (hop, squash, tilt).
@@ -311,7 +311,7 @@ namespace CriticalMass.Runtime.Hud
             VectorShape chipDisc = Shape(_chip, "Disc", ShapeKind.Circle, 0f, 0f, ChipSize, ChipSize, CMTokens.VoidNavy.Color, 0f);
             chipDisc.RimColor = CMTokens.EggSeam.Color;
             _chipPortrait = Raw(_chip, "Face", 8f, 8f, ChipSize - 16f, ChipSize - 16f);
-            _chipKey = HudText.Make(_chip, "Key", CMTokens.Mono, 16, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 2.5f);
+            _chipKey = HudText.Make(_chip, "Key", CMTokens.Mono, UiScale.TypeMin, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 2.5f);
             Place(_chipKey.rectTransform, -8f, ChipSize - 4f, ChipSize + 16f, 22f);
             _chip.gameObject.SetActive(false);
 

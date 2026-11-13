@@ -248,25 +248,25 @@ namespace CriticalMass.Runtime.Menu
             ProgressionUi.Wash(_canvas.transform, 0.7f).transform.SetAsFirstSibling();
             Color cream = CMTokens.WarmCream.Color, brass = CMTokens.ToolBrass.Color;
             MenuUi.Panel(_space, "Panel", PX, PY, PW, PH);
-            _className = MenuUi.Label(_space, "Class", CMTokens.Display, 50, cream, TextAnchor.MiddleLeft, PX + 40f, PY + 24f, 760f, 64f, "", 4f);
-            _role = MenuUi.Label(_space, "Role", CMTokens.Ui, 20, cream, TextAnchor.MiddleLeft, PX + 40f, PY + 88f, 900f, 32f, "", 2f);
-            _headerInfo = MenuUi.Label(_space, "Header Info", CMTokens.Display, 24, brass, TextAnchor.MiddleRight, PX + PW - 680f, PY + 36f, 420f, 44f, "", 2f);
-            _back = MenuUi.Item(_space, "Back", PX + PW - 40f - 200f, PY + 30f, 200f, 60f, "BACK", MenuItem.Kind.Button, 26, true, CMTokens.Display);
+            _className = MenuUi.Label(_space, "Class", CMTokens.Display, UiScale.TypeDisplay, cream, TextAnchor.MiddleLeft, PX + 40f, PY + 24f, 760f, 64f, "", 4f);
+            _role = MenuUi.Label(_space, "Role", CMTokens.Ui, UiScale.TypeSmall, cream, TextAnchor.MiddleLeft, PX + 40f, PY + 88f, 900f, 32f, "", 2f);
+            _headerInfo = MenuUi.Label(_space, "Header Info", CMTokens.Display, UiScale.TypeBody, brass, TextAnchor.MiddleRight, PX + PW - 680f, PY + 36f, 420f, 44f, "", 2f);
+            _back = MenuUi.Item(_space, "Back", PX + PW - 40f - 200f, PY + 30f, 200f, 60f, "BACK", MenuItem.Kind.Button, UiScale.TypeButton, true, CMTokens.Display);
             _back.Submitted = Close;
             for (int i = 0; i < 4; i++)
             {
                 int k = i;
                 MenuItem t = MenuUi.Item(_space, "Tab " + TabNames[i], PX + 40f + i * 256f, PY + 140f, 240f, 60f, TabNames[i],
-                    MenuItem.Kind.Button, 24, true, CMTokens.Display);
+                    MenuItem.Kind.Button, UiScale.TypeBody, true, CMTokens.Display);
                 t.Submitted = () => ShowTab((Tab)k);
                 _tabs[i] = t;
             }
-            _classStep = MenuUi.Item(_space, "Class Step", PX + PW - 40f - 400f, PY + 140f, 400f, 60f, "CLASS", MenuItem.Kind.Stepper, 22, false, CMTokens.Display);
-            _classStep.Value = MenuUi.Label(_classStep.transform, "Value", CMTokens.Ui, 22, MenuItem.IdleText, TextAnchor.MiddleCenter, 150f, 0f, 220f, 60f, "", 2f);
-            MenuUi.Label(_classStep.transform, "Left", CMTokens.Display, 24, brass, TextAnchor.MiddleCenter, 120f, 0f, 30f, 60f, "<", 2f);
-            MenuUi.Label(_classStep.transform, "Right", CMTokens.Display, 24, brass, TextAnchor.MiddleCenter, 365f, 0f, 30f, 60f, ">", 2f);
+            _classStep = MenuUi.Item(_space, "Class Step", PX + PW - 40f - 400f, PY + 140f, 400f, 60f, "CLASS", MenuItem.Kind.Stepper, UiScale.TypeBody, false, CMTokens.Display);
+            _classStep.Value = MenuUi.Label(_classStep.transform, "Value", CMTokens.Ui, UiScale.TypeBody, MenuItem.IdleText, TextAnchor.MiddleCenter, 150f, 0f, 220f, 60f, "", 2f);
+            MenuUi.Label(_classStep.transform, "Left", CMTokens.Display, UiScale.TypeBody, brass, TextAnchor.MiddleCenter, 120f, 0f, 30f, 60f, "<", 2f);
+            MenuUi.Label(_classStep.transform, "Right", CMTokens.Display, UiScale.TypeBody, brass, TextAnchor.MiddleCenter, 365f, 0f, 30f, 60f, ">", 2f);
             _classStep.Stepped = StepClass;
-            _hint = MenuUi.Label(_space, "Hint", CMTokens.Ui, 20, cream, TextAnchor.MiddleCenter, 260f, 1012f, 1400f, 36f, "", 2f);
+            _hint = MenuUi.Label(_space, "Hint", CMTokens.Ui, UiScale.TypeSmall, cream, TextAnchor.MiddleCenter, 260f, 1012f, 1400f, 36f, "", 2f);
 
             // preview (Character and Outfit tabs)
             RectTransform pa = MenuUi.Rt(_space, "Preview Area");
@@ -300,17 +300,17 @@ namespace CriticalMass.Runtime.Menu
         void BuildCharacter(Transform page)
         {
             Color cream = CMTokens.WarmCream.Color;
-            _nameBig = MenuUi.Label(page, "Name", CMTokens.Display, 40, cream, TextAnchor.MiddleLeft, RX, CY, RW, 56f, "", 3f);
-            _team = MenuUi.Label(page, "Team", CMTokens.Display, 22, cream, TextAnchor.MiddleLeft, RX, CY + 60f, RW, 34f, "", 2f);
+            _nameBig = MenuUi.Label(page, "Name", CMTokens.Display, UiScale.TypeLead, cream, TextAnchor.MiddleLeft, RX, CY, RW, 56f, "", 3f);
+            _team = MenuUi.Label(page, "Team", CMTokens.Display, UiScale.TypeBody, cream, TextAnchor.MiddleLeft, RX, CY + 60f, RW, 34f, "", 2f);
             for (int i = 0; i < StatNames.Length; i++)
             {
                 float y = CY + 130f + i * 74f;
                 VectorShape row = MenuUi.Shape(page, "Stat " + StatNames[i], ShapeKind.RoundRect, RX, y, 620f, 60f, CMTokens.PanelNavy.Color, 12f);
                 row.RimPx = 2f;
-                MenuUi.Label(row.transform, "Label", CMTokens.Display, 22, cream, TextAnchor.MiddleLeft, 20f, 0f, 300f, 60f, StatNames[i], 2f);
-                _statValue[i] = MenuUi.Label(row.transform, "Value", CMTokens.Mono, 24, CMTokens.ToolBrass.Color, TextAnchor.MiddleRight, 300f, 0f, 300f, 60f, "", 2f);
+                MenuUi.Label(row.transform, "Label", CMTokens.Display, UiScale.TypeBody, cream, TextAnchor.MiddleLeft, 20f, 0f, 300f, 60f, StatNames[i], 2f);
+                _statValue[i] = MenuUi.Label(row.transform, "Value", CMTokens.Mono, UiScale.TypeBody, CMTokens.ToolBrass.Color, TextAnchor.MiddleRight, 300f, 0f, 300f, 60f, "", 2f);
             }
-            ProgressionUi.Wrap(MenuUi.Label(page, "Team Note", CMTokens.Ui, 18, CMTokens.Stone.Color, TextAnchor.UpperLeft, RX, CY + 440f, 760f, 60f,
+            ProgressionUi.Wrap(MenuUi.Label(page, "Team Note", CMTokens.Ui, UiScale.TypeSmall, CMTokens.Stone.Color, TextAnchor.UpperLeft, RX, CY + 440f, 760f, 60f,
                 ProgressionWords.TeamColoursLocked, 0f));
         }
 
@@ -323,24 +323,24 @@ namespace CriticalMass.Runtime.Menu
             {
                 int k = i;
                 float y = CY + i * 96f;
-                MenuItem it = MenuUi.Item(page, SlotNames[i], RX, y, 560f, 80f, SlotNames[i], MenuItem.Kind.Stepper, 22, false, CMTokens.Display);
-                it.Value = MenuUi.Label(it.transform, "Value", CMTokens.Ui, 22, MenuItem.IdleText, TextAnchor.MiddleCenter, 250f, 0f, 270f, 80f, "", 2f);
-                MenuUi.Label(it.transform, "Left", CMTokens.Display, 24, brass, TextAnchor.MiddleCenter, 230f, 0f, 24f, 80f, "<", 2f);
-                MenuUi.Label(it.transform, "Right", CMTokens.Display, 24, brass, TextAnchor.MiddleCenter, 520f, 0f, 24f, 80f, ">", 2f);
+                MenuItem it = MenuUi.Item(page, SlotNames[i], RX, y, 560f, 80f, SlotNames[i], MenuItem.Kind.Stepper, UiScale.TypeBody, false, CMTokens.Display);
+                it.Value = MenuUi.Label(it.transform, "Value", CMTokens.Ui, UiScale.TypeBody, MenuItem.IdleText, TextAnchor.MiddleCenter, 250f, 0f, 270f, 80f, "", 2f);
+                MenuUi.Label(it.transform, "Left", CMTokens.Display, UiScale.TypeBody, brass, TextAnchor.MiddleCenter, 230f, 0f, 24f, 80f, "<", 2f);
+                MenuUi.Label(it.transform, "Right", CMTokens.Display, UiScale.TypeBody, brass, TextAnchor.MiddleCenter, 520f, 0f, 24f, 80f, ">", 2f);
                 it.Stepped = d => StepSlot(k, d);
                 _slotItems[i] = it;
-                _slotStatus[i] = MenuUi.Label(page, SlotNames[i] + " Status", CMTokens.Ui, 18, CMTokens.Stone.Color, TextAnchor.MiddleLeft,
+                _slotStatus[i] = MenuUi.Label(page, SlotNames[i] + " Status", CMTokens.Ui, UiScale.TypeSmall, CMTokens.Stone.Color, TextAnchor.MiddleLeft,
                     RX + 580f, y, 260f, 80f, "", 0f);
             }
             float ny = CY + 3 * 96f;
-            _nameItem = MenuUi.Item(page, "Name", RX, ny, 560f, 80f, "NAME", MenuItem.Kind.Button, 22, false, CMTokens.Display);
-            _nameItem.Value = MenuUi.Label(_nameItem.transform, "Value", CMTokens.Ui, 24, MenuItem.IdleText, TextAnchor.MiddleCenter, 150f, 0f, 390f, 80f, "", 2f);
+            _nameItem = MenuUi.Item(page, "Name", RX, ny, 560f, 80f, "NAME", MenuItem.Kind.Button, UiScale.TypeBody, false, CMTokens.Display);
+            _nameItem.Value = MenuUi.Label(_nameItem.transform, "Value", CMTokens.Ui, UiScale.TypeBody, MenuItem.IdleText, TextAnchor.MiddleCenter, 150f, 0f, 390f, 80f, "", 2f);
             _nameItem.Submitted = StartTyping;
-            _randomItem = MenuUi.Item(page, "Random Name", RX + 580f, ny, 260f, 80f, "RANDOM", MenuItem.Kind.Button, 22, true, CMTokens.Display);
+            _randomItem = MenuUi.Item(page, "Random Name", RX + 580f, ny, 260f, 80f, "RANDOM", MenuItem.Kind.Button, UiScale.TypeBody, true, CMTokens.Display);
             _randomItem.Submitted = RandomName;
-            _outfitNote = ProgressionUi.Wrap(MenuUi.Label(page, "Outfit Note", CMTokens.Ui, 20, CMTokens.WarmCream.Color, TextAnchor.UpperLeft,
+            _outfitNote = ProgressionUi.Wrap(MenuUi.Label(page, "Outfit Note", CMTokens.Ui, UiScale.TypeSmall, CMTokens.WarmCream.Color, TextAnchor.UpperLeft,
                 RX, CY + 410f, RW, 90f, "", 2f));
-            ProgressionUi.Wrap(MenuUi.Label(page, "Team Note", CMTokens.Ui, 18, CMTokens.Stone.Color, TextAnchor.UpperLeft, RX, CY + 510f, RW, 60f,
+            ProgressionUi.Wrap(MenuUi.Label(page, "Team Note", CMTokens.Ui, UiScale.TypeSmall, CMTokens.Stone.Color, TextAnchor.UpperLeft, RX, CY + 510f, RW, 60f,
                 ProgressionWords.TeamColoursLocked, 0f));
         }
 
@@ -358,10 +358,10 @@ namespace CriticalMass.Runtime.Menu
                 _toolIcon[i] = MenuUi.Rt(card.transform, "Icon").gameObject.AddComponent<RawImage>();
                 MenuUi.Place(_toolIcon[i].rectTransform, 24f, 24f, 112f, 112f);
                 _toolIcon[i].raycastTarget = false;
-                _toolTitle[i] = ProgressionUi.Wrap(MenuUi.Label(card.transform, "Title", CMTokens.Display, 26, cream, TextAnchor.MiddleLeft, 152f, 24f, 260f, 66f, "", 2f));
-                _toolKey[i] = MenuUi.Label(card.transform, "Key", CMTokens.Mono, 22, CMTokens.ToolBrass.Color, TextAnchor.MiddleLeft, 152f, 92f, 260f, 34f, "", 2f);
-                _toolText[i] = ProgressionUi.Wrap(MenuUi.Label(card.transform, "Text", CMTokens.Ui, 21, cream, TextAnchor.UpperLeft, 24f, 166f, 384f, 320f, "", 2f));
-                _toolCd[i] = MenuUi.Label(card.transform, "Cooldown", CMTokens.Mono, 20, CMTokens.ToolBrass.Color, TextAnchor.MiddleLeft, 24f, 530f, 384f, 44f, "", 2f);
+                _toolTitle[i] = ProgressionUi.Wrap(MenuUi.Fit(MenuUi.Label(card.transform, "Title", CMTokens.Display, UiScale.TypeButton, cream, TextAnchor.MiddleLeft, 152f, 24f, 260f, 66f, "", 2f), 26));
+                _toolKey[i] = MenuUi.Label(card.transform, "Key", CMTokens.Mono, UiScale.TypeBody, CMTokens.ToolBrass.Color, TextAnchor.MiddleLeft, 152f, 92f, 260f, 34f, "", 2f);
+                _toolText[i] = ProgressionUi.Wrap(MenuUi.Fit(MenuUi.Label(card.transform, "Text", CMTokens.Ui, UiScale.TypeBody, cream, TextAnchor.UpperLeft, 24f, 166f, 384f, 320f, "", 2f), 21));
+                _toolCd[i] = MenuUi.Label(card.transform, "Cooldown", CMTokens.Mono, UiScale.TypeSmall, CMTokens.ToolBrass.Color, TextAnchor.MiddleLeft, 24f, 530f, 384f, 44f, "", 2f);
             }
         }
 
@@ -370,12 +370,12 @@ namespace CriticalMass.Runtime.Menu
             Color cream = CMTokens.WarmCream.Color;
             _bar = LevelBar.Build(page, "Level Bar", PX + 40f, CY, PW - 80f);
             ProgressionUi.Coin(page, "Coin", PX + 40f, CY + 116f, 40f);
-            _coins = MenuUi.Label(page, "Coins", CMTokens.Display, 30, CMTokens.ToolBrass.Color, TextAnchor.MiddleLeft, PX + 96f, CY + 110f, 600f, 52f, "", 3f);
-            _record = MenuUi.Label(page, "Record", CMTokens.Ui, 22, cream, TextAnchor.MiddleLeft, PX + 40f, CY + 176f, PW - 80f, 40f, "", 2f);
-            MenuUi.Label(page, "Next Head", CMTokens.Display, 24, CMTokens.ToolBrass.Color, TextAnchor.MiddleLeft, PX + 40f, CY + 246f, PW - 80f, 40f,
+            _coins = MenuUi.Label(page, "Coins", CMTokens.Display, UiScale.TypeHeading, CMTokens.ToolBrass.Color, TextAnchor.MiddleLeft, PX + 96f, CY + 110f, 600f, 52f, "", 3f);
+            _record = MenuUi.Label(page, "Record", CMTokens.Ui, UiScale.TypeBody, cream, TextAnchor.MiddleLeft, PX + 40f, CY + 176f, PW - 80f, 40f, "", 2f);
+            MenuUi.Label(page, "Next Head", CMTokens.Display, UiScale.TypeBody, CMTokens.ToolBrass.Color, TextAnchor.MiddleLeft, PX + 40f, CY + 246f, PW - 80f, 40f,
                 ProgressionWords.NextUnlock, 2f);
-            _next = ProgressionUi.Wrap(MenuUi.Label(page, "Next", CMTokens.Ui, 22, cream, TextAnchor.UpperLeft, PX + 40f, CY + 292f, PW - 80f, 200f, "", 2f));
-            ProgressionUi.Wrap(MenuUi.Label(page, "How", CMTokens.Ui, 18, CMTokens.Stone.Color, TextAnchor.UpperLeft, PX + 40f, CY + 520f, PW - 80f, 70f,
+            _next = ProgressionUi.Wrap(MenuUi.Label(page, "Next", CMTokens.Ui, UiScale.TypeBody, cream, TextAnchor.UpperLeft, PX + 40f, CY + 292f, PW - 80f, 200f, "", 2f));
+            ProgressionUi.Wrap(MenuUi.Label(page, "How", CMTokens.Ui, UiScale.TypeSmall, CMTokens.Stone.Color, TextAnchor.UpperLeft, PX + 40f, CY + 520f, PW - 80f, 70f,
                 "Knock-outs, deliveries to the egg, time on the hill and knocking out the Kaiju earn skill points and coins at the end of every match. " +
                 "Levels unlock looks only, never strength.", 0f));
         }

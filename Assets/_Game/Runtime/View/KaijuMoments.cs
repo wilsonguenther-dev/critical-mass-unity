@@ -351,7 +351,7 @@ namespace CriticalMass.Runtime.View
             }
             _barDisc = Shape(_bar, "Disc", ShapeKind.Circle, new Vector2(-BarWidth * 0.5f - 18f, 0f), new Vector2(50f, 50f), CMTokens.VoidNavy.Color);
             _barIcon = HudIcon.Make(_barDisc.transform, "Icon", 5f, 5f, 40f, 40f);
-            _barWord = HudText.Make(_bar, "Word", CMTokens.Ui, 15, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 2f);
+            _barWord = CriticalMass.Runtime.Menu.MenuUi.Fit(HudText.Make(_bar, "Word", CMTokens.Ui, UiScale.TypeMin, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 2f), 15);
             Centre(_barWord.rectTransform, new Vector2(22f, -26f), new Vector2(BarWidth, 20f));
             _bar.gameObject.SetActive(false);
 
@@ -361,9 +361,9 @@ namespace CriticalMass.Runtime.View
             _calloutPill.Radius = -1f;
             VectorShape disc = Shape(_callout, "Disc", ShapeKind.Circle, new Vector2(-236f, 0f), new Vector2(64f, 64f), CMTokens.VoidNavy.Color);
             _calloutIcon = HudIcon.Make(disc.transform, "Icon", 8f, 8f, 48f, 48f);
-            _calloutText = HudText.Make(_callout, "Words", CMTokens.Ui, 24, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft, 2.5f);
+            _calloutText = HudText.Make(_callout, "Words", CMTokens.Ui, UiScale.TypeBody, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft, 2.5f);
             Centre(_calloutText.rectTransform, new Vector2(-14f, 0f), new Vector2(360f, 40f));
-            _calloutClock = HudText.Make(_callout, "Clock", CMTokens.Mono, 26, CMTokens.WarmCream.Color, TextAnchor.MiddleRight, 2.5f);
+            _calloutClock = CriticalMass.Runtime.Menu.MenuUi.Fit(HudText.Make(_callout, "Clock", CMTokens.Mono, UiScale.TypeButton, CMTokens.WarmCream.Color, TextAnchor.MiddleRight, 2.5f), 26);
             Centre(_calloutClock.rectTransform, new Vector2(200f, 0f), new Vector2(90f, 40f));
             _callout.gameObject.SetActive(false);
         }

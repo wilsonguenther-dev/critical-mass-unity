@@ -331,19 +331,19 @@ namespace CriticalMass.Runtime.Menus
             MenuUi.Place(_logo.rectTransform, 110f, 80f, 560f, 560f * 470f / 600f);
             _logo.raycastTarget = false;
 
-            _lore = MenuUi.Label(space, "Lore", CMTokens.Ui, 34, cream, TextAnchor.LowerLeft, 120f, 560f, 1000f, 150f, "", 3f);
+            _lore = MenuUi.Fit(MenuUi.Label(space, "Lore", CMTokens.Ui, UiScale.TypeLead, cream, TextAnchor.LowerLeft, 120f, 560f, 1000f, 150f, "", 3f), 34);
             MenuUi.Fit(_lore, LoreMinSize);   // 2026-11-12: a long words-pack line shrinks before it spills (LayoutTextFitTests)
             VectorShape tipPanel = MenuUi.Panel(space, "Tip Panel", 110f, 740f, 1010f, 150f);
-            MenuUi.Label(tipPanel.transform, "Tip Head", CMTokens.Display, 26, brass, TextAnchor.MiddleLeft, 30f, 18f, 300f, 36f, "TIP", 3f);
-            _tip = MenuUi.Label(tipPanel.transform, "Tip", CMTokens.Ui, 26, cream, TextAnchor.UpperLeft, 30f, 58f, 950f, 80f, "", 2f);
+            MenuUi.Fit(MenuUi.Label(tipPanel.transform, "Tip Head", CMTokens.Display, UiScale.TypeButton, brass, TextAnchor.MiddleLeft, 30f, 18f, 300f, 36f, "TIP", 3f), 26);
+            _tip = MenuUi.Fit(MenuUi.Label(tipPanel.transform, "Tip", CMTokens.Ui, UiScale.TypeButton, cream, TextAnchor.UpperLeft, 30f, 58f, 950f, 80f, "", 2f), 26);
             MenuUi.Fit(_tip, TipMinSize);
 
             Controls = ControlsCard.Build(space, 1220f, 110f, 590f, 780f, "Loading Controls");
 
-            _step = MenuUi.Label(space, "Step", CMTokens.Ui, 22, cream, TextAnchor.MiddleLeft, 110f, 930f, 900f, 34f, StepLabels[0], 2f);
-            _pct = MenuUi.Label(space, "Percent", CMTokens.Mono, 22, cream, TextAnchor.MiddleRight, 1510f, 930f, 300f, 34f, "0%", 2f);
+            _step = MenuUi.Label(space, "Step", CMTokens.Ui, UiScale.TypeBody, cream, TextAnchor.MiddleLeft, 110f, 930f, 900f, 34f, StepLabels[0], 2f);
+            _pct = MenuUi.Label(space, "Percent", CMTokens.Mono, UiScale.TypeBody, cream, TextAnchor.MiddleRight, 1510f, 930f, 300f, 34f, "0%", 2f);
             // The match speed (Play Now / setup), between the step line and the percent, in brass so it reads as a setting.
-            _speed = MenuUi.Label(space, "Speed", CMTokens.Display, 24, brass, TextAnchor.MiddleCenter, 760f, 930f, 600f, 34f, "", 2f);
+            _speed = MenuUi.Label(space, "Speed", CMTokens.Display, UiScale.TypeBody, brass, TextAnchor.MiddleCenter, 760f, 930f, 600f, 34f, "", 2f);
             _bar = MenuUi.Shape(space, "Bar", ShapeKind.RoundRect, 110f, 972f, 1700f, 30f, CMTokens.Biomass.Color, -1f);
             _bar.EmptyColor = CMTokens.MeterEmpty.Color;
             _bar.OutlinePx = 3f;

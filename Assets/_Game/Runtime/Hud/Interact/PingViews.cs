@@ -44,7 +44,7 @@ namespace CriticalMass.Runtime.Hud.Interact
             _hub = MenuUi.Shape(_rt, "Hub", ShapeKind.Circle, 0f, 0f, 64f, 64f, InteractUi.Navy, 8f);
             CentreChild(_hub.rectTransform, Vector2.zero, 64f, 64f);
             _hub.RimColor = InteractUi.Cream;
-            _hubText = MenuUi.Label(_hub.transform, "Word", CMTokens.Ui, 13, InteractUi.Cream, TextAnchor.MiddleCenter, 0f, 0f, 64f, 64f, "PING", 2f);
+            _hubText = MenuUi.Fit(MenuUi.Label(_hub.transform, "Word", CMTokens.Ui, UiScale.TypeMin, InteractUi.Cream, TextAnchor.MiddleCenter, 0f, 0f, 64f, 64f, "PING", 2f), 13);
             _needlePivot = InteractUi.Centred(_rt, "Needle Pivot", 2f, 2f);
             _needle = MenuUi.Shape(_needlePivot, "Needle", ShapeKind.TriangleRight, 0f, 0f, 18f, 18f, InteractUi.Brass, 3f);
             CentreChild(_needle.rectTransform, new Vector2(44f, 0f), 18f, 18f);
@@ -59,7 +59,7 @@ namespace CriticalMass.Runtime.Hud.Interact
                 VectorShape icon = MenuUi.Shape(chip.transform, "Icon", PingWords.Shape[k], 12f, 11f, 28f, 28f, PingWords.Colour((PingKind)k), 4f);
                 icon.RimPx = 0f;
                 _icons[k] = icon;
-                _labels[k] = MenuUi.Label(chip.transform, "Label", CMTokens.Ui, 20, InteractUi.Cream, TextAnchor.MiddleLeft, 48f, 0f, ChipW - 56f, ChipH,
+                _labels[k] = MenuUi.Label(chip.transform, "Label", CMTokens.Ui, UiScale.TypeSmall, InteractUi.Cream, TextAnchor.MiddleLeft, 48f, 0f, ChipW - 56f, ChipH,
                     PingWords.Upper[k], 2f);
             }
             _rt.gameObject.SetActive(false);
@@ -189,8 +189,8 @@ namespace CriticalMass.Runtime.Hud.Interact
                 ring.OutlinePx = 3f;
                 ring.RimPx = 2f;
                 _worldShape[i] = MenuUi.Shape(rt, "Shape", ShapeKind.TriangleDown, 14f, 14f, 32f, 32f, CMTokens.MeterOrange.Color, 5f);
-                _worldWord[i] = MenuUi.Label(rt, "Word", CMTokens.Ui, 16, InteractUi.Cream, TextAnchor.MiddleCenter, -50f, -24f, 160f, 22f, "", 2.5f);
-                _worldDist[i] = MenuUi.Label(rt, "Distance", CMTokens.Mono, 16, InteractUi.Cream, TextAnchor.MiddleCenter, -10f, 60f, 80f, 20f, "", 2.5f);
+                _worldWord[i] = MenuUi.Label(rt, "Word", CMTokens.Ui, UiScale.TypeMin, InteractUi.Cream, TextAnchor.MiddleCenter, -50f, -24f, 160f, 22f, "", 2.5f);
+                _worldDist[i] = MenuUi.Label(rt, "Distance", CMTokens.Mono, UiScale.TypeMin, InteractUi.Cream, TextAnchor.MiddleCenter, -10f, 60f, 80f, 20f, "", 2.5f);
                 rt.gameObject.SetActive(false);
                 _world[i] = rt;
             }
@@ -325,7 +325,7 @@ namespace CriticalMass.Runtime.Hud.Interact
                 _group[i].blocksRaycasts = false;
                 _icon[i] = MenuUi.Shape(rt, "Icon", ShapeKind.TriangleDown, 0f, 4f, 22f, 22f, CMTokens.MeterOrange.Color, 4f);
                 _icon[i].RimPx = 0f;
-                _text[i] = MenuUi.Label(rt, "Text", CMTokens.Ui, 20, InteractUi.Cream, TextAnchor.MiddleLeft, 32f, 0f, 488f, LineH, "", 2.5f);
+                _text[i] = MenuUi.Label(rt, "Text", CMTokens.Ui, UiScale.TypeSmall, InteractUi.Cream, TextAnchor.MiddleLeft, 32f, 0f, 488f, LineH, "", 2.5f);
                 rt.gameObject.SetActive(false);
                 _rt[i] = rt;
             }

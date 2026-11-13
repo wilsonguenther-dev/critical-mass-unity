@@ -40,18 +40,18 @@ namespace CriticalMass.Runtime.Codex
         public static Selectable Build(PauseMenu menu, RectTransform page)
         {
             MenuUi.Panel(page, "Panel", PauseMenu.PanelX, PauseMenu.PanelY, PauseMenu.PanelW, PauseMenu.PanelH);
-            MenuUi.Label(page, "Heading", CMTokens.Display, 34, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft, PauseMenu.ContentX,
-                PauseMenu.PanelY + 30f, 600f, 60f, "BASIN RELICS", 3f);
-            _count = MenuUi.Label(page, "Count", CMTokens.Display, 26, CMTokens.ToolBrass.Color, TextAnchor.MiddleRight,
-                PauseMenu.PanelX + PauseMenu.PanelW - 40f - 200f - 24f - 300f - 24f - 300f, PauseMenu.PanelY + 30f, 300f, 60f, "", 3f);
-            _crown = MenuUi.Label(page, "Crown", CMTokens.Ui, 20, CMTokens.ToolBrass.Color, TextAnchor.MiddleLeft, PauseMenu.ContentX + 330f,
+            MenuUi.Fit(MenuUi.Label(page, "Heading", CMTokens.Display, UiScale.TypeLead, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft, PauseMenu.ContentX,
+                PauseMenu.PanelY + 30f, 600f, 60f, "BASIN RELICS", 3f), 34);
+            _count = MenuUi.Fit(MenuUi.Label(page, "Count", CMTokens.Display, UiScale.TypeButton, CMTokens.ToolBrass.Color, TextAnchor.MiddleRight,
+                PauseMenu.PanelX + PauseMenu.PanelW - 40f - 200f - 24f - 300f - 24f - 300f, PauseMenu.PanelY + 30f, 300f, 60f, "", 3f), 26);
+            _crown = MenuUi.Label(page, "Crown", CMTokens.Ui, UiScale.TypeSmall, CMTokens.ToolBrass.Color, TextAnchor.MiddleLeft, PauseMenu.ContentX + 330f,
                 PauseMenu.PanelY + 30f, 400f, 60f, "", 2f);
             MenuItem back = MenuUi.Item(page, "Back", PauseMenu.PanelX + PauseMenu.PanelW - 40f - 200f, PauseMenu.PanelY + 30f, 200f, 60f,
-                "BACK", MenuItem.Kind.Button, 26, true, CMTokens.Display);
+                "BACK", MenuItem.Kind.Button, UiScale.TypeButton, true, CMTokens.Display);
             back.Submitted = menu.ShowRoot;
             // The story's motion comic, from the same player as the intro (Esc / B / any key ends it and returns here).
             MenuItem story = MenuUi.Item(page, "Story", PauseMenu.PanelX + PauseMenu.PanelW - 40f - 200f - 24f - 300f, PauseMenu.PanelY + 30f,
-                300f, 60f, "WATCH STORY", MenuItem.Kind.Button, 26, true, CMTokens.Display);
+                300f, 60f, "WATCH STORY", MenuItem.Kind.Button, UiScale.TypeButton, true, CMTokens.Display);
             story.Submitted = () => Menus.StoryIntro.Play();
             back.navigation = new Navigation { mode = Navigation.Mode.Explicit, selectOnLeft = story };
             story.navigation = new Navigation { mode = Navigation.Mode.Explicit, selectOnRight = back };
@@ -67,9 +67,9 @@ namespace CriticalMass.Runtime.Codex
                 t.Plate = MenuUi.Shape(rt, "Plate", ShapeKind.RoundRect, 0f, 0f, TileW, TileH, CMTokens.VoidNavy.Color, 14f);
                 t.Plate.RimPx = 2f;
                 t.Badge = MenuUi.Shape(rt, "Badge", ShapeKind.Diamond, 26f, 42f, 50f, 60f, CMTokens.ToolBrass.Color, -1f);
-                t.Name = MenuUi.Label(rt, "Name", CMTokens.Display, 24, CMTokens.ToolBrass.Color, TextAnchor.MiddleLeft, 100f, 14f, TileW - 120f, 40f, "", 3f);
-                t.Line1 = MenuUi.Label(rt, "Line 1", CMTokens.Ui, 20, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft, 100f, 60f, TileW - 120f, 32f, "", 2f);
-                t.Line2 = MenuUi.Label(rt, "Line 2", CMTokens.Ui, 20, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft, 100f, 94f, TileW - 120f, 32f, "", 2f);
+                t.Name = MenuUi.Label(rt, "Name", CMTokens.Display, UiScale.TypeBody, CMTokens.ToolBrass.Color, TextAnchor.MiddleLeft, 100f, 14f, TileW - 120f, 40f, "", 3f);
+                t.Line1 = MenuUi.Label(rt, "Line 1", CMTokens.Ui, UiScale.TypeSmall, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft, 100f, 60f, TileW - 120f, 32f, "", 2f);
+                t.Line2 = MenuUi.Label(rt, "Line 2", CMTokens.Ui, UiScale.TypeSmall, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft, 100f, 94f, TileW - 120f, 32f, "", 2f);
                 _tiles[i] = t;
             }
             Refresh();

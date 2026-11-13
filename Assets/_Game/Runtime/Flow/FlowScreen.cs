@@ -90,7 +90,7 @@ namespace CriticalMass.Runtime.Flow
             space.sizeDelta = new Vector2(HudLayout.RefW, HudLayout.RefH);
             Space = space;
             BuildContent(space);
-            _hint = MenuUi.Label(space, "Hint", CMTokens.Ui, 20, Cream, TextAnchor.MiddleCenter, 260f, 1026f, 1400f, 36f, "", 2f);
+            _hint = MenuUi.Label(space, "Hint", CMTokens.Ui, UiScale.TypeSmall, Cream, TextAnchor.MiddleCenter, 260f, 1026f, 1400f, 36f, "", 2f);
             Canvas.enabled = false;
             UpdateScale();
         }
@@ -231,7 +231,7 @@ namespace CriticalMass.Runtime.Flow
         {
             it.interactable = false;
             it.Submitted = null;
-            MenuUi.Label(it.transform, "Soon", CMTokens.Ui, 16, Brass, TextAnchor.MiddleRight, w - 210f, 0f, 190f, h, "COMING SOON", 2f);
+            MenuUi.Label(it.transform, "Soon", CMTokens.Ui, UiScale.TypeMin, Brass, TextAnchor.MiddleRight, w - 210f, 0f, 190f, h, "COMING SOON", 2f);
         }
 
         /// <summary>
@@ -240,12 +240,12 @@ namespace CriticalMass.Runtime.Flow
         protected static MenuItem Stepper(Transform parent, string name, float x, float y, float w, float h, string label,
             Func<string> value, Action<int> step, List<Action> refreshers)
         {
-            MenuItem it = MenuUi.Item(parent, name, x, y, w, h, label, MenuItem.Kind.Stepper, 26, false, CMTokens.Display);
+            MenuItem it = MenuUi.Item(parent, name, x, y, w, h, label, MenuItem.Kind.Stepper, UiScale.TypeButton, false, CMTokens.Display);
             it.Body.Radius = 14f;
             float vx = w * 0.42f, vw = w * 0.5f;
-            it.Value = MenuUi.Label(it.transform, "Value", CMTokens.Display, 26, MenuItem.IdleText, TextAnchor.MiddleCenter, vx, 0f, vw, h, "", 2f);
-            MenuUi.Label(it.transform, "Left", CMTokens.Display, 28, Brass, TextAnchor.MiddleCenter, vx - 40f, 0f, 40f, h, "<", 2f);
-            MenuUi.Label(it.transform, "Right", CMTokens.Display, 28, Brass, TextAnchor.MiddleCenter, vx + vw, 0f, 40f, h, ">", 2f);
+            it.Value = MenuUi.Fit(MenuUi.Label(it.transform, "Value", CMTokens.Display, UiScale.TypeButton, MenuItem.IdleText, TextAnchor.MiddleCenter, vx, 0f, vw, h, "", 2f), 26);
+            MenuUi.Label(it.transform, "Left", CMTokens.Display, UiScale.TypeButton, Brass, TextAnchor.MiddleCenter, vx - 40f, 0f, 40f, h, "<", 2f);
+            MenuUi.Label(it.transform, "Right", CMTokens.Display, UiScale.TypeButton, Brass, TextAnchor.MiddleCenter, vx + vw, 0f, 40f, h, ">", 2f);
             Action refresh = () => HudText.Set(it.Value, value());
             it.Stepped = d =>
             {

@@ -57,7 +57,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             VectorShape hub = MenuUi.Shape(_wheel, "Hub", ShapeKind.Circle, 0f, 0f, 66f, 66f, CMTokens.VoidNavy.Color, 8f);
             Centre(hub.rectTransform, Vector2.zero, 66f, 66f);
             hub.RimColor = cream;
-            _hub = MenuUi.Label(hub.transform, "Word", CMTokens.Ui, 13, cream, TextAnchor.MiddleCenter, 0f, 0f, 66f, 66f, "EMOTE", 2f);
+            _hub = MenuUi.Fit(MenuUi.Label(hub.transform, "Word", CMTokens.Ui, UiScale.TypeMin, cream, TextAnchor.MiddleCenter, 0f, 0f, 66f, 66f, "EMOTE", 2f), 13);
             for (int k = 0; k < Emotes.Count; k++)
             {
                 VectorShape chip = MenuUi.Shape(_wheel, "Chip " + k, ShapeKind.RoundRect, 0f, 0f, ChipW, ChipH, CMTokens.PanelNavy.Color, 14f);
@@ -65,7 +65,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
                 chip.OutlinePx = 4f;
                 chip.RimPx = 2f;
                 _chips[k] = chip;
-                _labels[k] = MenuUi.Label(chip.transform, "Label", CMTokens.Display, 20, cream, TextAnchor.MiddleCenter, 0f, 0f, ChipW, ChipH, Emotes.Names[k], 2f);
+                _labels[k] = MenuUi.Label(chip.transform, "Label", CMTokens.Display, UiScale.TypeSmall, cream, TextAnchor.MiddleCenter, 0f, 0f, ChipW, ChipH, Emotes.Names[k], 2f);
             }
             _wheel.gameObject.SetActive(false);
 
@@ -75,7 +75,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             VectorShape bs = MenuUi.Shape(_bubble, "Panel", ShapeKind.RoundRect, 0f, 0f, 150f, 48f, cream, 16f);
             bs.OutlinePx = 4f;
             bs.RimPx = 0f;
-            _bubbleText = MenuUi.Label(_bubble, "Word", CMTokens.Display, 22, CMTokens.VoidNavy.Color, TextAnchor.MiddleCenter, 0f, 0f, 150f, 48f, "", 0f);
+            _bubbleText = MenuUi.Label(_bubble, "Word", CMTokens.Display, UiScale.TypeBody, CMTokens.VoidNavy.Color, TextAnchor.MiddleCenter, 0f, 0f, 150f, 48f, "", 0f);
             _bubble.gameObject.SetActive(false);
             ControlBindings.BindingsChanged += Rebind;
         }

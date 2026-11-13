@@ -465,13 +465,13 @@ namespace CriticalMass.Runtime.Menus
             _accent = MenuUi.Shape(space, "Accent", ShapeKind.RoundRect, 88f, 860f, 14f, 112f, CMTokens.ToolBrass.Color, 7f);
             _accent.OutlinePx = 2f;
             _accent.RimPx = 0f;
-            _capTitle = MenuUi.Label(space, "Caption Title", CMTokens.Display, 40, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft,
+            _capTitle = MenuUi.Label(space, "Caption Title", CMTokens.Display, UiScale.TypeLead, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft,
                 124f, 856f, 820f, 56f, "", CMTokens.OutlinePx);
-            _capLine = MenuUi.Label(space, "Caption Line", CMTokens.Ui, 26, CMTokens.WarmCream.Color, TextAnchor.UpperLeft,
-                124f, 916f, 816f, 70f, "", 2f);
+            _capLine = MenuUi.Fit(MenuUi.Label(space, "Caption Line", CMTokens.Ui, UiScale.TypeButton, CMTokens.WarmCream.Color, TextAnchor.UpperLeft,
+                124f, 916f, 816f, 70f, "", 2f), 26);
             _capLine.horizontalOverflow = HorizontalWrapMode.Wrap;
 
-            _press = MenuUi.Label(space, "Press", CMTokens.Display, 30, CMTokens.WarmCream.Color, TextAnchor.MiddleRight,
+            _press = MenuUi.Label(space, "Press", CMTokens.Display, UiScale.TypeHeading, CMTokens.WarmCream.Color, TextAnchor.MiddleRight,
                 HudLayout.RefW - 664f, 940f, 600f, 50f, PressAnyKey, CMTokens.OutlinePx);
 
             _dip = MenuUi.Rt(root, "Dip").gameObject.AddComponent<Image>();

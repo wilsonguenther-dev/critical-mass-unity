@@ -17,6 +17,10 @@ namespace CriticalMass.Runtime.Hud.Style
         public const int TypeHero = 104;
         /// <summary>Screen titles (PAUSED, MATCH SETUP, HIGHLIGHTS).</summary>
         public const int TypeTitle = 64;
+        /// <summary>Big figures and card titles that sit between a screen title and a heading (polish pass 1).</summary>
+        public const int TypeDisplay = 48;
+        /// <summary>Lead lines, big names and the HUD clock row (polish pass 1).</summary>
+        public const int TypeLead = 36;
         /// <summary>Card and panel headings.</summary>
         public const int TypeHeading = 30;
         /// <summary>Button labels (Display face).</summary>
@@ -47,6 +51,30 @@ namespace CriticalMass.Runtime.Hud.Style
 
         /// <summary>The two resolutions every layout test checks (and the integrator captures).</summary>
         public static readonly Vector2Int[] CheckResolutions = { new Vector2Int(1280, 720), new Vector2Int(2560, 1440) };
+
+        /// <summary>
+        /// Polish pass 1: the four resolutions the containment tests check, ultrawide included (the 1920x1080 space is
+        /// centred with side room there, never stretched).
+        /// </summary>
+        public static readonly Vector2Int[] AllResolutions =
+        {
+            new Vector2Int(1280, 720), new Vector2Int(1920, 1080), new Vector2Int(2560, 1440), new Vector2Int(3440, 1440),
+        };
+
+        /// <summary>Every step of the type scale, smallest first (tests: no screen draws a size that is not on it).</summary>
+        public static readonly int[] TypeSteps = { TypeMin, TypeSmall, TypeBody, TypeButton, TypeHeading, TypeLead, TypeDisplay, TypeTitle, TypeHero };
+
+        /// <summary>
+        /// The step of the scale nearest to <paramref name="px"/> (ties go to the smaller step, so a box never gets less room).
+        /// Used by code that still computes a size (words-pack driven layouts) so it lands on the scale.
+        /// </summary>
+        public static int Snap(int px)
+        {
+            int best = TypeSteps[0];
+            for (int i = 0; i < TypeSteps.Length; i++)
+                if (Mathf.Abs(TypeSteps[i] - px) < Mathf.Abs(best - px)) best = TypeSteps[i];
+            return best;
+        }
 
         /// <summary>
         /// Width in reference px of <paramref name="text"/> in <paramref name="font"/> at <paramref name="size"/> on one line

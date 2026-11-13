@@ -99,11 +99,11 @@ namespace CriticalMass.Runtime.Menus
             _line = L(space, "Line", CMTokens.Ui, UiScale.TypeBody, Cream, TextAnchor.MiddleCenter, ResultsLayout.Line, 2f);
             _reason = L(space, "Reason", CMTokens.Display, UiScale.TypeHeading, Brass, TextAnchor.MiddleCenter, ResultsLayout.Reason, 3f, UiScale.TypeSmall);
             // Hill split bar: Azure's share of the hill seconds from the left, Crimson's the rest.
-            _azSecs = L(space, "Azure Hill", CMTokens.Mono, 24, CMTokens.Azure.Color, TextAnchor.MiddleRight, ResultsLayout.AzureSecs, 3f);
+            _azSecs = L(space, "Azure Hill", CMTokens.Mono, UiScale.TypeBody, CMTokens.Azure.Color, TextAnchor.MiddleRight, ResultsLayout.AzureSecs, 3f);
             Rect hb = ResultsLayout.HillBar;
             _bar = MenuUi.Shape(space, "Hill Bar", ShapeKind.RoundRect, hb.x, hb.y, hb.width, hb.height, CMTokens.Azure.Color, -1f);
             _bar.EmptyColor = CMTokens.Crimson.Color;
-            _crSecs = L(space, "Crimson Hill", CMTokens.Mono, 24, CMTokens.Crimson.Color, TextAnchor.MiddleLeft, ResultsLayout.CrimsonSecs, 3f);
+            _crSecs = L(space, "Crimson Hill", CMTokens.Mono, UiScale.TypeBody, CMTokens.Crimson.Color, TextAnchor.MiddleLeft, ResultsLayout.CrimsonSecs, 3f);
 
             // ---- tab row ----
             for (int i = 0; i < ResultsLayout.TabCount; i++)
@@ -140,7 +140,7 @@ namespace CriticalMass.Runtime.Menus
             // Home lobby (feat/lobby): one press back to HOME, where this match's rewards land on the player card.
             _menu = Button(space, "Main Menu", mr.x, mr.y, mr.width, mr.height, "HOME", () => Director.ToMainMenu(), UiScale.TypeButton);
             _change = Button(space, "Change Class", cr.x, cr.y, cr.width, cr.height, "CHANGE CLASS", () => Director.ShowSetup(true), UiScale.TypeButton);
-            _again = Button(space, "Play Again", pr.x, pr.y, pr.width, pr.height, "PLAY AGAIN", () => Director.PlayAgain(), 32);
+            _again = Button(space, "Play Again", pr.x, pr.y, pr.width, pr.height, "PLAY AGAIN", () => Director.PlayAgain(), UiScale.TypeHeading);
             _again.Body.RimPx = 4f;
             _again.Body.SetRim(Brass);
             WireNavigation();
@@ -411,23 +411,23 @@ namespace CriticalMass.Runtime.Menus
         {
             Card(p, "Kaiju Card", x, "THE KAIJU");
             _kaijuIcon = HudIcon.Make(p, "Kaiju Icon", x + 196f, Top + 68f, 128f, 128f);
-            _kaijuCaption = Wrap(MenuUi.Label(p, "Kaiju Caption", CMTokens.Ui, 24, Cream, TextAnchor.UpperCenter, x + 32f, Top + 212f, 456f, 72f, "", 2f));
-            _kaijuReason = Wrap(MenuUi.Label(p, "Kaiju Reason", CMTokens.Ui, 21, Brass, TextAnchor.UpperCenter, x + 32f, Top + 292f, 456f, 64f, "", 2f));
-            _kaijuKOs = Wrap(MenuUi.Label(p, "Kaiju KOs", CMTokens.Ui, 20, Cream, TextAnchor.MiddleCenter, x + 32f, Top + 372f, 456f, 48f, "", 2f));
-            _kaijuKills = Wrap(MenuUi.Label(p, "Kaiju Kills", CMTokens.Ui, 20, Cream, TextAnchor.MiddleCenter, x + 32f, Top + 428f, 456f, 48f, "", 2f));
+            _kaijuCaption = Wrap(MenuUi.Label(p, "Kaiju Caption", CMTokens.Ui, UiScale.TypeBody, Cream, TextAnchor.UpperCenter, x + 32f, Top + 212f, 456f, 72f, "", 2f));
+            _kaijuReason = Wrap(MenuUi.Fit(MenuUi.Label(p, "Kaiju Reason", CMTokens.Ui, UiScale.TypeBody, Brass, TextAnchor.UpperCenter, x + 32f, Top + 292f, 456f, 64f, "", 2f), 21));
+            _kaijuKOs = Wrap(MenuUi.Label(p, "Kaiju KOs", CMTokens.Ui, UiScale.TypeSmall, Cream, TextAnchor.MiddleCenter, x + 32f, Top + 372f, 456f, 48f, "", 2f));
+            _kaijuKills = Wrap(MenuUi.Label(p, "Kaiju Kills", CMTokens.Ui, UiScale.TypeSmall, Cream, TextAnchor.MiddleCenter, x + 32f, Top + 428f, 456f, 48f, "", 2f));
         }
 
         void BuildYou(RectTransform p, float x)
         {
             Card(p, "You Card", x, "YOUR MATCH");
             _youPortrait = HudIcon.Make(p, "You Portrait", x + 32f, Top + 72f, 104f, 104f);
-            _youName = Wrap(MenuUi.Label(p, "You Name", CMTokens.Display, 26, Cream, TextAnchor.MiddleLeft, x + 156f, Top + 76f, 332f, 96f, "", 3f));
+            _youName = Wrap(MenuUi.Fit(MenuUi.Label(p, "You Name", CMTokens.Display, UiScale.TypeButton, Cream, TextAnchor.MiddleLeft, x + 156f, Top + 76f, 332f, 96f, "", 3f), 26));
             for (int i = 0; i < StatNames.Length; i++)
             {
                 float y = Top + 196f + i * 42f;
                 bool last = i == StatNames.Length - 1;
                 Wrap(MenuUi.Label(p, "Stat " + i, CMTokens.Ui, UiScale.TypeBody, last ? Brass : Cream, TextAnchor.MiddleLeft, x + 40f, y, 260f, 38f, StatNames[i], 2f));
-                _statValues[i] = Wrap(MenuUi.Label(p, "Stat Value " + i, CMTokens.Mono, 24, last ? Brass : Cream, TextAnchor.MiddleRight,
+                _statValues[i] = Wrap(MenuUi.Label(p, "Stat Value " + i, CMTokens.Mono, UiScale.TypeBody, last ? Brass : Cream, TextAnchor.MiddleRight,
                     x + 300f, y, 180f, 38f, "", 2f));
             }
         }
@@ -444,12 +444,12 @@ namespace CriticalMass.Runtime.Menus
                 tag.RimPx = 2f;
                 tag.RimColor = team;
                 // Inset 24 px inside the tag (it used to start at the tag's edge and clip "AZURE" / "CRIMSON").
-                MenuUi.Label(p, "MVP Team " + t, CMTokens.Display, 22, team, TextAnchor.MiddleLeft, x + 54f, y + 8f, 400f, 34f,
+                MenuUi.Label(p, "MVP Team " + t, CMTokens.Display, UiScale.TypeBody, team, TextAnchor.MiddleLeft, x + 54f, y + 8f, 400f, 34f,
                     t == 0 ? "AZURE" : "CRIMSON", 3f);
                 _mvpPortrait[t] = HudIcon.Make(p, "MVP Portrait " + t, x + 50f, y + 50f, 110f, 110f);
-                _mvpName[t] = Wrap(MenuUi.Label(p, "MVP Name " + t, CMTokens.Display, 26, Cream, TextAnchor.MiddleLeft, x + 176f, y + 50f, 296f, 40f, "", 3f));
-                _mvpLine[t] = Wrap(MenuUi.Label(p, "MVP Line " + t, CMTokens.Ui, 19, Cream, TextAnchor.UpperLeft, x + 176f, y + 94f, 296f, 50f, "", 2f));
-                _mvpPoints[t] = Wrap(MenuUi.Label(p, "MVP Points " + t, CMTokens.Mono, 22, Brass, TextAnchor.MiddleLeft, x + 176f, y + 146f, 296f, 34f, "", 2f));
+                _mvpName[t] = Wrap(MenuUi.Fit(MenuUi.Label(p, "MVP Name " + t, CMTokens.Display, UiScale.TypeButton, Cream, TextAnchor.MiddleLeft, x + 176f, y + 50f, 296f, 40f, "", 3f), 26));
+                _mvpLine[t] = Wrap(MenuUi.Label(p, "MVP Line " + t, CMTokens.Ui, UiScale.TypeSmall, Cream, TextAnchor.UpperLeft, x + 176f, y + 94f, 296f, 50f, "", 2f));
+                _mvpPoints[t] = Wrap(MenuUi.Label(p, "MVP Points " + t, CMTokens.Mono, UiScale.TypeBody, Brass, TextAnchor.MiddleLeft, x + 176f, y + 146f, 296f, 34f, "", 2f));
             }
         }
 

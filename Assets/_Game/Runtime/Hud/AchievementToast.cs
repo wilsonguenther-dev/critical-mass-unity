@@ -32,17 +32,17 @@ namespace CriticalMass.Runtime.Hud
             l.Rt = MenuUi.Rt(parent, "Achievements");
             MenuUi.Place(l.Rt, x, y, W, Height);
             MenuUi.Panel(l.Rt, "Panel", 0f, 0f, W, Height);
-            MenuUi.Label(l.Rt, "Title", CMTokens.Display, 36, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft, 28f, 20f, 460f, 52f, "ACHIEVEMENTS", 3f);
-            l._count = MenuUi.Label(l.Rt, "Count", CMTokens.Ui, 24, CMTokens.ToolBrass.Color, TextAnchor.MiddleRight, 420f, 20f, 312f, 52f, "", 2f);
+            MenuUi.Label(l.Rt, "Title", CMTokens.Display, UiScale.TypeLead, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft, 28f, 20f, 460f, 52f, "ACHIEVEMENTS", 3f);
+            l._count = MenuUi.Label(l.Rt, "Count", CMTokens.Ui, UiScale.TypeBody, CMTokens.ToolBrass.Color, TextAnchor.MiddleRight, 420f, 20f, 312f, 52f, "", 2f);
             for (int i = 0; i < Achievements.All.Length; i++)
             {
                 float ry = HeadH + i * Pitch;
                 l._plates[i] = MenuUi.Shape(l.Rt, "Row " + i, ShapeKind.RoundRect, 20f, ry, W - 40f, RowH, CMTokens.VoidNavy.Color, 12f);
                 l._plates[i].RimPx = 0f;
-                l._titles[i] = MenuUi.Label(l.Rt, "Name " + i, CMTokens.Ui, 22, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft, 40f, ry, 220f, RowH, Achievements.All[i].Title.ToUpperInvariant(), 2f);
-                l._lines[i] = MenuUi.Label(l.Rt, "Rule " + i, CMTokens.Ui, 17, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft, 262f, ry, 360f, RowH, Achievements.All[i].Description, 2f);
+                l._titles[i] = MenuUi.Label(l.Rt, "Name " + i, CMTokens.Ui, UiScale.TypeBody, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft, 40f, ry, 220f, RowH, Achievements.All[i].Title.ToUpperInvariant(), 2f);
+                l._lines[i] = MenuUi.Label(l.Rt, "Rule " + i, CMTokens.Ui, UiScale.TypeMin, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft, 262f, ry, 360f, RowH, Achievements.All[i].Description, 2f);
                 l._lines[i].horizontalOverflow = HorizontalWrapMode.Wrap;
-                l._states[i] = MenuUi.Label(l.Rt, "State " + i, CMTokens.Ui, 17, CMTokens.WarmCream.Color, TextAnchor.MiddleRight, 610f, ry, 120f, RowH, "", 2f);
+                l._states[i] = MenuUi.Label(l.Rt, "State " + i, CMTokens.Ui, UiScale.TypeMin, CMTokens.WarmCream.Color, TextAnchor.MiddleRight, 610f, ry, 120f, RowH, "", 2f);
             }
             return l;
         }
@@ -140,9 +140,9 @@ namespace CriticalMass.Runtime.Hud
             VectorShape medal = MenuUi.Shape(_toast, "Medal", ShapeKind.Shield, 18f, 14f, 60f, 68f, CMTokens.ToolBrass.Color, 10f);
             medal.OutlinePx = 3f;
             MenuUi.Shape(medal.transform, "Gem", ShapeKind.Diamond, 18f, 20f, 24f, 24f, CMTokens.WarmCream.Color, 4f).OutlinePx = 2f;
-            MenuUi.Label(_toast, "Kicker", CMTokens.Ui, 16, CMTokens.ToolBrass.Color, TextAnchor.MiddleLeft, 98f, 10f, 480f, 22f, "ACHIEVEMENT UNLOCKED", 2f);
-            _title = MenuUi.Label(_toast, "Title", CMTokens.Display, 28, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft, 98f, 30f, 480f, 36f, "", 3f);
-            _line = MenuUi.Label(_toast, "Rule", CMTokens.Ui, 18, CMTokens.WithAlpha(CMTokens.WarmCream.Color, 0.88f), TextAnchor.MiddleLeft, 98f, 64f, 480f, 24f, "", 2f);
+            MenuUi.Label(_toast, "Kicker", CMTokens.Ui, UiScale.TypeMin, CMTokens.ToolBrass.Color, TextAnchor.MiddleLeft, 98f, 10f, 480f, 22f, "ACHIEVEMENT UNLOCKED", 2f);
+            _title = MenuUi.Label(_toast, "Title", CMTokens.Display, UiScale.TypeButton, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft, 98f, 30f, 480f, 36f, "", 3f);
+            _line = MenuUi.Label(_toast, "Rule", CMTokens.Ui, UiScale.TypeSmall, CMTokens.WithAlpha(CMTokens.WarmCream.Color, 0.88f), TextAnchor.MiddleLeft, 98f, 64f, 480f, 24f, "", 2f);
             _toast.gameObject.SetActive(false);
 
             float lw = AchievementList.W, lh = AchievementList.Height;

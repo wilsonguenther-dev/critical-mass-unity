@@ -75,13 +75,13 @@ namespace CriticalMass.Runtime.Onboarding
             MenuUi.Stretch(_card);
             // 2026-11-12: a bigger card (batch 1 called it a tiny modal); Escape or B answers Skip.
             MenuUi.Panel(_card, "Panel", 540f, 260f, 840f, 460f);
-            MenuUi.Label(_card, "Title", CMTokens.Display, 56, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 540f, 292f, 840f, 84f,
+            MenuUi.Label(_card, "Title", CMTokens.Display, UiScale.TypeDisplay, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 540f, 292f, 840f, 84f,
                 MascotLines.Resolve(TrialText.OfferTitle), 4f);
-            MenuUi.Label(_card, "Sub", CMTokens.Ui, 24, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 580f, 380f, 760f, 44f,
+            MenuUi.Label(_card, "Sub", CMTokens.Ui, UiScale.TypeBody, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 580f, 380f, 760f, 44f,
                 MascotLines.Resolve(TrialText.OfferSub), 2f);
-            _play = MenuUi.Item(_card, "Play", 600f, 456f, 720f, 80f, MascotLines.Resolve(TrialText.OfferPlay), MenuItem.Kind.Button, 28,
+            _play = MenuUi.Item(_card, "Play", 600f, 456f, 720f, 80f, MascotLines.Resolve(TrialText.OfferPlay), MenuItem.Kind.Button, UiScale.TypeButton,
                 true, CMTokens.Display);
-            _skip = MenuUi.Item(_card, "Skip", 600f, 556f, 720f, 72f, MascotLines.Resolve(TrialText.OfferSkip), MenuItem.Kind.Button, 26,
+            _skip = MenuUi.Item(_card, "Skip", 600f, 556f, 720f, 72f, MascotLines.Resolve(TrialText.OfferSkip), MenuItem.Kind.Button, UiScale.TypeButton,
                 true);
             _play.Submitted = OnPlay;
             _skip.Submitted = OnSkip;

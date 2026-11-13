@@ -236,7 +236,7 @@ namespace CriticalMass.Runtime.Spectator
             VectorShape pill = MenuUi.Shape(_marker, "Pill", ShapeKind.RoundRect, 4f, 0f, 88f, 44f, brass, -1f);
             pill.OutlinePx = 4f;
             pill.RimPx = 0f;
-            MenuUi.Label(_marker, "You", CMTokens.Display, 26, navy, TextAnchor.MiddleCenter, 4f, 0f, 88f, 44f, "YOU", 0f);
+            MenuUi.Fit(MenuUi.Label(_marker, "You", CMTokens.Display, UiScale.TypeButton, navy, TextAnchor.MiddleCenter, 4f, 0f, 88f, 44f, "YOU", 0f), 26);
             VectorShape point = MenuUi.Shape(_marker, "Point", ShapeKind.TriangleDown, 34f, 42f, 28f, 22f, brass, 0f);
             point.OutlinePx = 4f;
             point.RimPx = 0f;
@@ -250,7 +250,7 @@ namespace CriticalMass.Runtime.Spectator
             VectorShape ip = MenuUi.Shape(intro, "Plate", ShapeKind.RoundRect, 0f, 0f, 900f, 120f, CMTokens.WithAlpha(CMTokens.PanelNavy.Color, 0.94f), 18f);
             ip.OutlinePx = 4f;
             ip.RimPx = 2f;
-            _introTitle = MenuUi.Label(intro, "Title", CMTokens.Display, 34, cream, TextAnchor.MiddleCenter, 0f, 10f, 900f, 50f, "", 3f);
+            _introTitle = MenuUi.Fit(MenuUi.Label(intro, "Title", CMTokens.Display, UiScale.TypeLead, cream, TextAnchor.MiddleCenter, 0f, 10f, 900f, 50f, "", 3f), 34);
             _introStrip = PromptStrip.Make(intro, "Prompt", 34f, 22, cream);
             RectTransform sr = _introStrip.Rect;
             sr.anchorMin = sr.anchorMax = new Vector2(0f, 0f);
@@ -291,8 +291,8 @@ namespace CriticalMass.Runtime.Spectator
             bp.RimColor = brass;
             VectorShape tag = MenuUi.Shape(banner, "Tag", ShapeKind.RoundRect, 16f, 16f, 220f, BannerH - 32f, brass, 14f);
             tag.RimPx = 0f;
-            MenuUi.Label(banner, "Autopilot", CMTokens.Display, 26, navy, TextAnchor.MiddleCenter, 16f, 16f, 220f, BannerH - 32f, "AUTOPILOT", 0f);
-            _bannerWhat = MenuUi.Label(banner, "What", CMTokens.Ui, 20, cream, TextAnchor.MiddleLeft, 256f, 10f, BannerW - 276f, 30f,
+            MenuUi.Fit(MenuUi.Label(banner, "Autopilot", CMTokens.Display, UiScale.TypeButton, navy, TextAnchor.MiddleCenter, 16f, 16f, 220f, BannerH - 32f, "AUTOPILOT", 0f), 26);
+            _bannerWhat = MenuUi.Label(banner, "What", CMTokens.Ui, UiScale.TypeSmall, cream, TextAnchor.MiddleLeft, 256f, 10f, BannerW - 276f, 30f,
                 BannerWhat(false), 2f);
             MenuUi.Fit(_bannerWhat, 16);
             _bannerStrip = PromptStrip.Make(banner, "Prompt", 36f, 30, cream);
@@ -309,7 +309,7 @@ namespace CriticalMass.Runtime.Spectator
             _notice = notice.gameObject;
             VectorShape np = MenuUi.Shape(notice, "Plate", ShapeKind.RoundRect, 0f, 0f, 760f, 44f, CMTokens.PanelNavy.Color, -1f);
             np.OutlinePx = 3f;
-            _noticeText = MenuUi.Label(notice, "Text", CMTokens.Ui, 22, cream, TextAnchor.MiddleCenter, 0f, 0f, 760f, 44f, "", 2f);
+            _noticeText = MenuUi.Label(notice, "Text", CMTokens.Ui, UiScale.TypeBody, cream, TextAnchor.MiddleCenter, 0f, 0f, 760f, 44f, "", 2f);
             _notice.SetActive(false);
         }
 
