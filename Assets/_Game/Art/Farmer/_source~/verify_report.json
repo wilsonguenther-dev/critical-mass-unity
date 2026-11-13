@@ -213,7 +213,7 @@
    "ok": true,
    "detail": {
     "min_z": -0.002,
-    "max_z": 1.994,
+    "max_z": 2.0,
     "mesh_object_rot": [
      1.5708,
      -0.0,

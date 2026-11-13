@@ -376,7 +376,7 @@ def isolate_tank():
     scene.collection.objects.link(ob)
     bm = bmesh.new()
     bm.from_mesh(me)
-    keep_g = {body.vertex_groups[n].index for n in ("feat_tank", "feat_leaves", "feat_tank_glint", "feat_hose")
+    keep_g = {body.vertex_groups[n].index for n in ("feat_tank", "feat_leaves", "feat_tank_glint")
               if n in body.vertex_groups}
     team_g = body.vertex_groups["feat_team_cloth"].index
     dl = bm.verts.layers.deform.active
@@ -409,6 +409,9 @@ FIT_PARAMS = [("spine", (1, 0, 0)), ("spine", (0, 1, 0)), ("spine", (0, 0, 1)),
               ("lowerarm.l", (1, 0, 0)), ("lowerarm.l", (0, 0, 1)),
               ("upperleg.l", (1, 0, 0)), ("upperleg.l", (0, 1, 0)), ("upperleg.r", (1, 0, 0)), ("upperleg.r", (0, 1, 0)),
               ("lowerleg.l", (1, 0, 0)), ("lowerleg.r", (1, 0, 0))]
+# natural ranges only (an unbounded fit folds the spine and neck to game the overlap number)
+FIT_LIMIT = {"spine": 12, "head": 18, "upperarm.r": 130, "lowerarm.r": 120, "hand.r": 60, "upperarm.l": 90,
+             "lowerarm.l": 90, "upperleg.l": 25, "upperleg.r": 25, "lowerleg.l": 25, "lowerleg.r": 25}
 RAISED = {("upperarm.r", (1, 0, 0)): -45.0, ("lowerarm.r", (1, 0, 0)): -70.0}
 ACROSS = {("upperarm.r", (1, 0, 0)): -50.0, ("upperarm.r", (0, 0, 1)): 30.0, ("lowerarm.r", (1, 0, 0)): -60.0}
 FIT_SET = {
@@ -601,7 +604,7 @@ def do_fit():
                     for i in range(len(x) + 2):
                         for sgn in (1, -1):
                             if i < len(x):
-                                lim = 130 if "arm" in FIT_PARAMS[i][0] or "hand" in FIT_PARAMS[i][0] else 70
+                                lim = FIT_LIMIT.get(FIT_PARAMS[i][0], 25)
                                 nx = list(x)
                                 nx[i] = max(-lim, min(lim, nx[i] + sgn * step))
                                 if nx[i] == x[i]:
@@ -631,7 +634,7 @@ def do_fit():
             for (b, ax), d in sd.items():
                 sx[FIT_PARAMS.index((b, ax))] = d
             starts += [(sx, float(a), float(cfg["el"]), float(a)) for a in cfg["az"]]
-        prev = result.get(name)
+        prev = result.get(name) if os.environ.get("FIT_WARM", "1") == "1" else None
         if prev:
             px = [0.0] * len(FIT_PARAMS)
             for b, ax, d in prev["extra"]:
@@ -690,8 +693,17 @@ def do_bible():
     meshes.append(tank)
     show_only(staff)
     set_pose("Idle", 1)
+    sp = points(staff)                                   # stand the staff upright for its own views (bible p07)
+    grip = (arm.matrix_world @ arm.pose.bones["handslot.r"].matrix).translation
+    tip = max(sp, key=lambda p: (p - grip).length)
+    q = (tip - grip).normalized().rotation_difference(Vector((0, 0, 1)))
+    saved = arm.matrix_world.copy()
+    arm.matrix_world = Matrix.Translation(grip) @ q.to_matrix().to_4x4() @ Matrix.Translation(-grip) @ saved
+    bpy.context.view_layer.update()
     for name, az in (("staff-front", 0), ("staff-side", 90), ("staff-back", 180)):
         ortho_shot(name, az, 0, staff, height=720)
+    arm.matrix_world = saved
+    bpy.context.view_layer.update()
     bpy.data.objects.remove(tank, do_unlink=True)
     meshes[:] = meshes_saved
     show_only(meshes)

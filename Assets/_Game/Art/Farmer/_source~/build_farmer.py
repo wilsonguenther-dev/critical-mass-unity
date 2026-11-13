@@ -39,8 +39,8 @@ STAFF_LEN = 0.972 * BODY_H            # bible p07 measured ratio
 B = None
 BODY, STAFF = "Farmer_Body", "Farmer_Staff"
 M = kit.mat_from
-TANK_C = Vector((0.15, 0.40, 1.25))   # globe centre: behind the LEFT shoulder (+X) as p07 front and back draw it
-TANK_R = 0.225                        # 0.45 u diameter (ART-DIRECTION 3.1)
+TANK_C = Vector((0.08, 0.43, 1.13))   # globe centre: on the upper back, offset to the LEFT shoulder (+X) as p07 draws it
+TANK_R = 0.26                         # bible p07 back view: the globe spans most of the back (0.52 u; brief said 0.45)
 
 
 def add(obj, bm, color, bones, feat, smooth=True, m=None, grad=True, face_uv=None):
@@ -193,25 +193,25 @@ def lock(p0, p3, bend, wave, r, n=6, flat=0.55, side_hint=(0, 0, 1)):
 def build_hair():
     H = "head"
     # big volume: cap over the crown, a full back mass, puffs at the sides (kept behind the face line, y > -0.08)
-    add(BODY, B.sphere((0.285, 0.27, 0.20), 14, 8), "f_hair", H, "hair", m=M((0, 0.035, 1.70)))
-    add(BODY, B.sphere((0.27, 0.235, 0.25), 12, 8), "f_hair", H, "hair", m=M((0, 0.095, 1.50)))
+    add(BODY, B.sphere((0.28, 0.265, 0.15), 14, 8), "f_hair", H, "hair", m=M((0, 0.04, 1.68)))
+    add(BODY, B.sphere((0.265, 0.23, 0.21), 12, 8), "f_hair", H, "hair", m=M((0, 0.10, 1.56)))
     for s in (1, -1):
-        add(BODY, B.sphere((0.13, 0.15, 0.19), 8, 6), "f_hair", H, "hair", m=M((0.255 * s, 0.075, 1.52)))
+        add(BODY, B.sphere((0.12, 0.14, 0.16), 8, 6), "f_hair", H, "hair", m=M((0.25 * s, 0.08, 1.56)))
     L = [  # 14 wavy locks: p0, p3, bend, wave, radius
         # swept bangs, parted at the character's right, falling over the forehead to the temples
-        ((-0.06, -0.14, 1.86), (0.25, -0.17, 1.60), (0.06, -0.14, 0.02), 0.03, 0.095),
-        ((-0.02, -0.15, 1.86), (-0.255, -0.15, 1.62), (-0.06, -0.13, 0.03), 0.03, 0.085),
-        ((0.03, -0.17, 1.85), (0.10, -0.25, 1.70), (0.03, -0.08, 0.0), 0.02, 0.06),
+        ((-0.06, -0.15, 1.81), (0.26, -0.15, 1.66), (0.06, -0.12, 0.03), 0.03, 0.085),
+        ((-0.02, -0.16, 1.81), (-0.26, -0.14, 1.67), (-0.06, -0.11, 0.03), 0.03, 0.08),
+        ((0.03, -0.18, 1.81), (0.12, -0.24, 1.73), (0.03, -0.07, 0.0), 0.02, 0.05),
         # temple curls framing the cheeks (behind the cheek line so the face stays clear in profile)
-        ((0.25, -0.10, 1.66), (0.29, -0.08, 1.36), (0.05, -0.02, 0.0), 0.05, 0.075),
-        ((-0.25, -0.10, 1.66), (-0.29, -0.08, 1.36), (-0.05, -0.02, 0.0), 0.05, 0.075),
+        ((0.25, -0.10, 1.66), (0.28, -0.08, 1.40), (0.05, -0.02, 0.0), 0.05, 0.07),
+        ((-0.25, -0.10, 1.66), (-0.28, -0.08, 1.40), (-0.05, -0.02, 0.0), 0.05, 0.07),
         # side volume down to the shoulders, curling outwards
-        ((0.27, 0.10, 1.64), (0.36, 0.18, 1.30), (0.09, 0.0, 0.0), 0.06, 0.095),
-        ((-0.27, 0.10, 1.64), (-0.36, 0.18, 1.30), (-0.09, 0.0, 0.0), 0.06, 0.095),
+        ((0.27, 0.10, 1.66), (0.33, 0.17, 1.42), (0.08, 0.0, 0.0), 0.05, 0.085),
+        ((-0.27, 0.10, 1.66), (-0.33, 0.17, 1.42), (-0.08, 0.0, 0.0), 0.05, 0.085),
         # back of the head to the nape
-        ((0.0, 0.25, 1.66), (0.03, 0.31, 1.26), (0.0, 0.10, 0.0), 0.06, 0.10),
-        ((0.16, 0.22, 1.66), (0.22, 0.27, 1.28), (0.04, 0.09, 0.0), 0.05, 0.09),
-        ((-0.16, 0.22, 1.66), (-0.22, 0.27, 1.28), (-0.04, 0.09, 0.0), 0.05, 0.09),
+        ((0.0, 0.25, 1.68), (0.03, 0.30, 1.40), (0.0, 0.08, 0.0), 0.05, 0.09),
+        ((0.16, 0.22, 1.68), (0.21, 0.26, 1.42), (0.04, 0.07, 0.0), 0.05, 0.08),
+        ((-0.16, 0.22, 1.68), (-0.21, 0.26, 1.42), (-0.04, 0.07, 0.0), 0.05, 0.08),
         # messy strands escaping the bun
         ((0.10, 0.0, 1.93), (0.30, 0.04, 1.86), (0.0, 0.0, 0.08), 0.03, 0.06),
         ((-0.10, 0.06, 1.93), (-0.30, 0.10, 1.88), (0.0, 0.0, 0.08), 0.03, 0.06),
@@ -221,21 +221,21 @@ def build_hair():
     for p0, p3, bend, wave, r in L:
         add(BODY, lock(p0, p3, bend, wave, r), "f_hair", H, "hair")
     # big high messy bun: a main ball and four lobes, tied with a wide teal band
-    add(BODY, B.sphere((0.20, 0.19, 0.13), 12, 7), "f_hair", H, "bun", m=M((0, 0.04, 1.85)))
-    for k, (az, r, dz) in enumerate(((30, 0.10, 0.05), (130, 0.095, 0.06), (220, 0.105, 0.045), (310, 0.09, 0.07))):
+    add(BODY, B.sphere((0.22, 0.21, 0.14), 12, 7), "f_hair", H, "bun", m=M((0, 0.05, 1.86)))
+    for k, (az, r, dz) in enumerate(((30, 0.10, 0.03), (130, 0.095, 0.035), (220, 0.105, 0.025), (310, 0.09, 0.04))):
         a = math.radians(az)
         add(BODY, B.sphere((r, r, r * 0.85), 7, 5), "f_hair", H, "bun",
-            m=M((0.11 * math.cos(a), 0.04 + 0.11 * math.sin(a), 1.848 + dz)))
-    add(BODY, B.torus(0.168, 0.056, 12, 4), "f_team_cloth", H, "team_cloth", m=M((0, 0.045, 1.775), (-8, 0, 0)))
+            m=M((0.11 * math.cos(a), 0.04 + 0.11 * math.sin(a), 1.86 + dz)))
+    add(BODY, B.torus(0.168, 0.056, 12, 4), "f_team_cloth", H, "team_cloth", m=M((0, 0.05, 1.765), (-8, 0, 0)))
     # brass goggles with teal lenses pushed up on top of the hair at the front
-    add(BODY, B.torus(0.27, 0.02, 16, 4), "f_brass", H, "goggles", m=M((0, 0.03, 1.765), (-25, 0, 0), (1.04, 1.0, 1)))
+    add(BODY, B.torus(0.27, 0.02, 16, 4), "f_brass", H, "goggles", m=M((0, 0.03, 1.735), (-25, 0, 0), (1.04, 1.0, 1)))
     for s in (1, -1):
         n = Vector((0.26 * s, -0.62, 0.74)).normalized()
-        c = Vector((0.12 * s, -0.215, 1.875))
+        c = Vector((0.12 * s, -0.205, 1.78))
         add(BODY, B.bcyl(c - n * 0.025, c + n * 0.03, 0.084, 0.078, 10, 0.012), "f_brass", H, "goggles")
         add(BODY, B.bcyl(c + n * 0.02, c + n * 0.042, 0.066, 0.064, 10, 0.008), "f_team_cloth", H, "team_cloth")
     add(BODY, B.box((0.07, 0.03, 0.035), 0.01, 1), "f_brass", H, "goggles", smooth=False,
-        m=M((0, -0.238, 1.885), (-40, 0, 0)))
+        m=M((0, -0.228, 1.79), (-40, 0, 0)))
 
 
 # ===================================================================================================== globe tank
@@ -325,7 +325,7 @@ def build_staff(poses):
     p(B.torus(0.091, 0.012, 10, 3), "f_brass", m=M((0, 0, 1.24), (0, 90, 0)))
     p(B.bcyl((0, 0, 1.325), (0, 0, 1.36), 0.042, 0.036, 10, 0.01), "f_brass")
     # brass hook arc (local YZ plane), cream crescent blade on its outer edge
-    cy, cz, R = 0.18, 1.23, 0.18
+    cy, cz, R = 0.14, 1.27, 0.14
     arc = [(0.0, cy + R * math.cos(math.radians(a)), cz + R * math.sin(math.radians(a)))
            for a in range(160, -71, -15)]
     radii = [0.036 - 0.014 * i / (len(arc) - 1) for i in range(len(arc))]
@@ -335,7 +335,7 @@ def build_staff(poses):
     for i in range(nseg + 1):
         t = i / nseg
         a = math.radians(a0 + (a1 - a0) * t)
-        wdt = 0.14 * math.sin(math.pi * min(1.0, t * 1.05)) ** 0.85
+        wdt = 0.10 * math.sin(math.pi * min(1.0, t * 1.05)) ** 0.85
         r_in = R + 0.012
         pts_in.append((r_in * math.cos(a), r_in * math.sin(a)))
         pts_out.append(((r_in + wdt) * math.cos(a), (r_in + wdt) * math.sin(a)))

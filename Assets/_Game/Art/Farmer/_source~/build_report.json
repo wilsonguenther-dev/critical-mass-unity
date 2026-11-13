@@ -47,18 +47,18 @@
   "Idle",
   1
  ],
- "body_height_rest": 1.9965,
+ "body_height_rest": 2.002,
  "body_min_z": -0.002,
  "staff_length_local": 1.944,
  "staff_bottom_local": -0.53,
  "tank": {
   "centre": [
-   0.15,
-   0.4,
-   1.25
+   0.08,
+   0.43,
+   1.13
   ],
-  "diameter": 0.45,
-  "top_z": 1.475
+  "diameter": 0.52,
+  "top_z": 1.39
  },
  "feature_z_ranges_rest": {
   "feat_overalls": [
@@ -71,7 +71,7 @@
   ],
   "feat_team_cloth": [
    0.175,
-   1.943
+   1.848
   ],
   "feat_jacket": [
    0.76,
@@ -98,31 +98,31 @@
    1.474
   ],
   "feat_hair": [
-   1.25,
+   1.35,
    1.991
   ],
   "feat_bun": [
    1.72,
-   1.994
+   2.0
   ],
   "feat_goggles": [
-   1.633,
-   1.939
+   1.603,
+   1.867
   ],
   "feat_tank": [
-   0.898,
-   1.511
+   0.778,
+   1.426
   ],
   "feat_leaves": [
-   1.121,
-   1.65
+   0.99,
+   1.53
   ],
   "feat_tank_glint": [
-   1.325,
-   1.409
+   1.223,
+   1.308
   ],
   "feat_hose": [
-   0.765,
+   0.706,
    1.076
   ]
  },

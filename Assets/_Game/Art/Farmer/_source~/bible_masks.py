@@ -37,7 +37,7 @@ def clean_mask(path):
     keep = np.zeros(n + 1, bool)
     for i in range(1, n + 1):
         a = area[i - 1]
-        if a == big or a >= 0.25 * big or (i not in border and a >= 0.004 * big):
+        if a == big or (i not in border and a >= 0.004 * big):
             keep[i] = True
     m = keep[lab]
     holes = ndimage.binary_fill_holes(m) & ~m
