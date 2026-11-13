@@ -96,7 +96,8 @@ namespace CriticalMass.Runtime.Menus
             _rowGroups[side, i] = row.gameObject.AddComponent<CanvasGroup>();
             _rows[side, i] = row;
             _icons[side, i] = HudIcon.Make(row, "Portrait", 0f, 0f, 30f, 30f);
-            _names[side, i] = MenuUi.Label(row, "Name", CMTokens.Display, UiScale.TypeBody, Cream, TextAnchor.MiddleLeft, 44f, 0f, 300f, 30f, "", 2f);
+            // owner walk 1: the name starts clear of the portrait (its first letter sat under the face)
+            _names[side, i] = MenuUi.Label(row, "Name", CMTokens.Display, UiScale.TypeBody, Cream, TextAnchor.MiddleLeft, 58f, 0f, 290f, 30f, "", 2f);
             _classes[side, i] = MenuUi.Label(row, "Class", CMTokens.Ui, UiScale.TypeSmall, CMTokens.WithAlpha(Cream, 0.8f), TextAnchor.MiddleLeft, 356f, 0f, 200f, 30f, "", 2f);
             _tags[side, i] = MenuUi.Label(row, "Tag", CMTokens.Ui, UiScale.TypeSmall, Brass, TextAnchor.MiddleRight, PanelW - 48f - 130f, 0f, 130f, 30f, "", 2f);
             row.gameObject.SetActive(false);

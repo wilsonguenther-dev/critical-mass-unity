@@ -136,7 +136,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
 
         void Build()
         {
-            _canvas = InteractUi.MakeCanvas(transform, "Mechanics HUD Canvas", SortingOrder, out _root, out _space);
+            _canvas = InteractUi.MakeHudCanvas(transform, "Mechanics HUD Canvas", SortingOrder, out _root, out _space);
             Color cream = CMTokens.WarmCream.Color, brass = CMTokens.ToolBrass.Color, navy = CMTokens.VoidNavy.Color;
 
             // class kit: above the player cluster (bottom left)

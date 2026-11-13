@@ -29,7 +29,17 @@ namespace CriticalMass.Runtime.Menu
         Transform _holder;
         ClassId _cls;
         TeamId _team;
-        float _yaw = 200f, _idle;
+        float _yaw = 200f, _idle, _heldUntil = -1f;
+
+        /// <summary>Owner walk 1: turn the model by hand (a drag on the Barracks preview); the slow turn waits 2 s after.</summary>
+        public void Turn(float deg)
+        {
+            _yaw = (_yaw + deg + 360f) % 360f;
+            _heldUntil = Time.unscaledTime + 2f;
+            if (_model != null) _model.Transform.localRotation = Quaternion.Euler(0f, _yaw, 0f);
+        }
+
+        public float Yaw => _yaw;
         int _mainMaskRemoved = -1;
 
         public Texture Texture => _rt;
@@ -98,7 +108,7 @@ namespace CriticalMass.Runtime.Menu
         public void Tick(float dt)
         {
             if (_model == null) return;
-            _yaw = (_yaw + TurnDegPerSecond * dt) % 360f;
+            if (Time.unscaledTime >= _heldUntil) _yaw = (_yaw + TurnDegPerSecond * dt) % 360f;
             _idle += dt;
             _model.Transform.localRotation = Quaternion.Euler(0f, _yaw, 0f);
             _model.BeginPose();
