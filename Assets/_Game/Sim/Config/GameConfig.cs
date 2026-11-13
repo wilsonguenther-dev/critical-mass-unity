@@ -128,10 +128,10 @@ namespace CriticalMass.Sim.Config
         }
 
         /// <summary>The bot roster fraction of one class (browser GAME_CONFIG.bots.classMix[id]).</summary>
-        public double ClassMix(ClassId id)
+        public double ClassMix(ClassId id, int teamSize = int.MaxValue)
         {
             // U-063: with class roles on, the lineup holds all six classes (Depth.Roles.ClassMix).
-            double[] mix = !Depth.Classic && Depth.Roles.Enabled ? Depth.Roles.ClassMix : Bots.ClassMix;
+            double[] mix = !Depth.Classic && Depth.Roles.Enabled ? (teamSize <= Depth.Roles.SmallTeamMax ? Depth.Roles.SmallTeamClassMix : Depth.Roles.ClassMix) : Bots.ClassMix;
             return mix[(int)id];
         }
     }

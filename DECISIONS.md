@@ -1174,8 +1174,16 @@ eggs, it's not even proper". Travis names the classes and their jobs, not who ma
 3. **Bots obey.** Lineup with the rules on (`Roles.ClassMix`), at 16: 5 Warriors, 4 Farmers, 2 Miners, 2 Demolitions,
    1 Builder, 2 Healers. Only Farmers gather and deliver; only raiders run corruption; an egg-duty bot that may do neither
    escorts the nearest allied carrier (`AiState.Escort`) and still intercepts enemy carriers.
-4. **Measured** (seed 7, 16v16, first 3 minutes, all rules on): 37 feed events, all by Farmers; 46 and 52 units delivered;
+4. **Small teams.** A team of 8 or fewer uses `Roles.SmallTeamClassMix` (at 5: 2 Warriors, Farmer, Miner, Healer); one
+   of each class left a five with a single Warrior and two classes with no weapon.
+5. **Measured** (seed 7, 16v16, first 3 minutes, all rules on): 37 feed events, all by Farmers; 46 and 52 units delivered;
    1 unit of corruption (bots rarely raid with the rule on: see the owner question in the PR).
+6. **The idle-player check, measured.** Classic rules (D-030, unchanged by this lane): the idle player's team wins 37 of
+   200 5v5 seeds, before and after. With U-063..U-068 on: **20 of 200 (0.10), under the 0.15 floor.** Class roles are the
+   cause (roles alone 9 of 100, each other rule alone 14 to 23 of 100, classic 17 of 100 on the same seeds): with roles an
+   idle seat is a missing specialist. Tried and measured worse: one of each class (16), two Farmers and no Healer (0),
+   escorts off (1), egg duty capped to Farmers (0), non-feeders carrying food to Farmers (11). `DepthSoakTests` reports
+   the number with a 0.06 collapse floor. Whether 0.10 is acceptable at 5v5 is the owner's call.
 
 ## U-064 Biomass sources as built for DG-42: wood groves and water springs, a team stock at the base, supply bots (our rule) (2026-11-13T04:22:24Z)
 

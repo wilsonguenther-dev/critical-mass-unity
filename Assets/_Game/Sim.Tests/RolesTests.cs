@@ -185,7 +185,7 @@ namespace CriticalMass.Sim.Tests
             World.BuildRoster(Cfg, 5, ClassId.Warrior, five);
             n = new int[6];
             foreach (ClassId c in five) n[(int)c]++;
-            CollectionAssert.AreEqual(new[] { 1, 1, 1, 1, 0, 1 }, n);
+            CollectionAssert.AreEqual(new[] { 2, 1, 1, 0, 0, 1 }, n, "a small team fields more fighters (SmallTeamClassMix)");
         }
 
         [Test]

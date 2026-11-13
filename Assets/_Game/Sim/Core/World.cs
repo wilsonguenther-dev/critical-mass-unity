@@ -210,7 +210,7 @@ namespace CriticalMass.Sim.Core
             int used = 0;
             for (int k = 0; k < classCount; k++)
             {
-                double q = n * c.ClassMix(ClassIds.All[k]);
+                double q = n * c.ClassMix(ClassIds.All[k], n);
                 counts[k] = JsMath.FloorToInt(q + 1e-9);
                 frac[k] = q - counts[k];
                 used += counts[k];

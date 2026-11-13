@@ -272,10 +272,18 @@ namespace CriticalMass.Sim.Config
         public double RefuseLockTicks = 45;
         /// <summary>
         /// The bot lineup when the rules are on (replaces Bots.ClassMix): every class on the field so every role exists.
-        /// At 16: 5 Warriors, 4 Farmers, 2 Miners, 2 Demolitions, 1 Builder, 2 Healers. At 5: one each of Warrior, Farmer,
-        /// Miner, Demolitions, Healer.
+        /// At 16: 5 Warriors, 4 Farmers, 2 Miners, 2 Demolitions, 1 Builder, 2 Healers. Teams of SmallTeamMax or fewer
+        /// use SmallTeamClassMix.
         /// </summary>
         public double[] ClassMix = { 0.3125, 0.25, 0.125, 0.125, 0.0625, 0.125 };
+        /// <summary>
+        /// The lineup for a team of SmallTeamMax or fewer: more fighters, no Demolitions or Builder (a five with one of each
+        /// class had a single Warrior and two classes with no weapon). At 5: 2 Warriors, Farmer, Miner, Healer. Measured on
+        /// 200 passive 5v5 seeds (the idle player's team winning): one of each class 16, this lineup 20, two Farmers and no
+        /// Healer 0 (an idle player's team wins by cutting down the other side's only Farmer).
+        /// </summary>
+        public double SmallTeamMax = 8;
+        public double[] SmallTeamClassMix = { 0.4, 0.2, 0.2, 0, 0, 0.2 };
         /// <summary>Bots: an escort (an egg-duty bot that may not feed) follows the nearest allied carrier within this many units.</summary>
         public double EscortSeekRange = 30;
         /// <summary>Bots: an escort stops this close to the carrier it guards.</summary>
@@ -289,6 +297,7 @@ namespace CriticalMass.Sim.Config
             c.MayFeed = (bool[])MayFeed.Clone();
             c.MayCorrupt = (bool[])MayCorrupt.Clone();
             c.ClassMix = (double[])ClassMix.Clone();
+            c.SmallTeamClassMix = (double[])SmallTeamClassMix.Clone();
             return c;
         }
     }
