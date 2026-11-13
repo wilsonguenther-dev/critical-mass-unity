@@ -23,6 +23,9 @@ namespace CriticalMass.Runtime.View.Art
     {
         /// <summary>The first bone of the upper-body layer's mask (it and every transform under it).</summary>
         public const string UpperBodyRootBone = "spine";
+        /// <summary>The Kaiju rig's upper-body root and the clips it layers over its walk (fix/kaiju-alive-1).</summary>
+        public const string KaijuUpperBodyRootBone = "Spine";
+        public static readonly string[] KaijuUpperBodyClips = { ArtMapping.Swipe, ArtMapping.Roar };
 
         public readonly ArtEntry Entry;
         public readonly ModelSpec Spec;
@@ -187,10 +190,14 @@ namespace CriticalMass.Runtime.View.Art
                 _index[c.name] = i;
             }
 
-            Transform spine = Spec != null && Spec.Kind == ArtKind.Character ? FindDeep(Transform, UpperBodyRootBone) : null;
+            // fix/kaiju-alive-1: the Kaiju gets the upper layer too (its "Spine" subtree: torso, arms, neck, head; the legs and
+            // tail hang off Hips), so a claw or a roar plays over a walking stride instead of freezing the legs mid-step.
+            bool kaijuUpper = Spec != null && Spec.Kind == ArtKind.Kaiju && Spec.Key != ArtMapping.KaijuEgg;
+            Transform spine = Spec != null && Spec.Kind == ArtKind.Character ? FindDeep(Transform, UpperBodyRootBone)
+                : kaijuUpper ? FindDeep(Transform, KaijuUpperBodyRootBone) : null;
             int upperCount = 0;
             if (spine != null)
-                foreach (string u in ArtMapping.UpperBodyClips)
+                foreach (string u in kaijuUpper ? KaijuUpperBodyClips : ArtMapping.UpperBodyClips)
                     if (_index.ContainsKey(u)) _upperIndex[u] = upperCount++;
             _hasUpper = upperCount > 0;
             if (!_hasUpper)

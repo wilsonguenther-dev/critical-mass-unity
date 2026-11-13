@@ -158,7 +158,7 @@ namespace CriticalMass.Runtime.PlayTests
             }
             sb.Append("\n  events:");
             foreach (KeyValuePair<string, int> kv in seen) sb.Append(' ').Append(kv.Key).Append(' ').Append(kv.Value);
-            sb.Append($"\n  Kaiju: {ka.Roars} roars, {ka.Steps} footfalls, walk rate {ka.WalkRate:0.00}, measured stride speed {ka.LastWalkSpeed:0.00} u/s");
+            sb.Append($"\n  Kaiju: {ka.Roars} roars, {ka.Steps} footfalls, walk rate {ka.WalkRate:0.00}, measured stride {ka.LastStrideMetres:0.00} m per cycle ({ka.LastWalkSpeed:0.00} m/s planted-foot speed)");
             Debug.Log(sb.ToString());
 
             var bad = new List<string>(missed);

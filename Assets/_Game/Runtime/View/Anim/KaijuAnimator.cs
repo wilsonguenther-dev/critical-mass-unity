@@ -28,6 +28,9 @@ namespace CriticalMass.Runtime.View.Anim
         public const double FallbackWalkSpeed = 1.5;
         /// <summary>Roar: delay after the hatch (the shell falls first), the moving share of the Roar clip (legs keep the
         /// stride), and the get-up after a knock-out.</summary>
+        /// <summary>Walk playback = ground speed / the clip's planted-foot speed, clamped; below WalkFrom u/s the Walk blends
+        /// to Idle, full Walk from WalkFull (a slow creep plays the Walk slowly, not a half-weight shuffle that slides).</summary>
+        public const double MinWalkRate = 0.25, MaxWalkRate = 3.2, WalkFrom = 0.08, WalkFull = 0.3;
         public const double HatchRoarDelay = 0.35, GetUpSeconds = 1.0;
         public const float RoarWhileMoving = 0.4f;
         /// <summary>Procedural limits (degrees) and the yaw spring (1/s). The adult turns at most TurnRateDeg per second.</summary>
@@ -80,6 +83,8 @@ namespace CriticalMass.Runtime.View.Anim
         public double WalkRate { get; private set; }
         /// <summary>The planted-foot speed of the drawn model's Walk at Scale 1 (world u/s), as measured.</summary>
         public double LastWalkSpeed { get; private set; }
+        /// <summary>Metres the body travels per Walk cycle at Scale 1 (planted-foot speed x cycle length).</summary>
+        public double LastStrideMetres { get; private set; }
         /// <summary>The drawn yaw (degrees, view space) and the procedural lean, tail and look angles of the last pose.</summary>
         public float DrawnYaw => (float)_yaw;
         public float LeanDeg => (float)_lean;
@@ -174,9 +179,10 @@ namespace CriticalMass.Runtime.View.Anim
             double stepSpeed = Math.Max(speed, turnSpeed);
             _idleT += dSim * (isHatchling ? 1.25 : 1.0);
             // Cap 3.2: the adult's Walk plants at 0.91 u/s at full size (CI run 4) and it moves at up to 2.6 u/s; a 2.2 cap slid.
-            double walkRate = Math.Max(0.4, Math.Min(3.2, stepSpeed / Math.Max(1e-3, me.WalkSpeed * s)));
+            double walkRate = Math.Max(MinWalkRate, Math.Min(MaxWalkRate, stepSpeed / Math.Max(1e-3, me.WalkSpeed * s)));
             WalkRate = walkRate;
             LastWalkSpeed = me.WalkSpeed;
+            LastStrideMetres = me.WalkSpeed * m.ClipLength(ArtMapping.Walk);
             _prevWalkT = _walkT;
             _walkT += dSim * walkRate;
 
@@ -195,11 +201,6 @@ namespace CriticalMass.Runtime.View.Anim
                 m.Pose(ArtMapping.SlamWindup, u * m.ClipLength(ArtMapping.SlamWindup), 1f, false);
                 dom = ArtMapping.SlamWindup;
             }
-            else if (since >= 0 && SlamTime(since, me.SlamContact, lead) < slamLen - 1e-3)
-            {
-                m.Pose(ArtMapping.Slam, SlamTime(since, me.SlamContact, lead), 1f, false);
-                dom = ArtMapping.Slam;
-            }
             else if (k.MeleeWindupIn > 0)
             {
                 // The wind-up runs over the sim's real wind-up (MeleeWindupLen ticks, floored to 0.45 real s), not the
@@ -215,14 +216,30 @@ namespace CriticalMass.Runtime.View.Anim
                 }
                 else { m.Pose(ArtMapping.Roar, u * m.ClipLength(ArtMapping.Roar), 1f, false); dom = ArtMapping.Roar; }
             }
+            else if (since >= 0 && SlamTime(since, me.SlamContact, lead) < slamLen - 1e-3)
+            {
+                m.Pose(ArtMapping.Slam, SlamTime(since, me.SlamContact, lead), 1f, false);
+                dom = ArtMapping.Slam;
+            }
             else if (strike >= 0 && strike < StrikeSeconds && StrikeClip(m, me, out string sc, out double sct))
             {
                 double t = Math.Max(0, sct - lead) + strike;
                 float wgt = (float)Math.Min(1, (StrikeSeconds - strike) / 0.15);
-                m.Pose(sc, Math.Min(t, m.ClipLength(sc) - 1e-3), wgt, false);
-                walkW = Locomotion.Smooth(0.15, 1.0, stepSpeed) * (1f - wgt);
-                m.Pose(ArtMapping.Idle, _idleT, 1f - wgt - walkW, true);
-                m.Pose(ArtMapping.Walk, _walkT, walkW, true);
+                walkW = Locomotion.Smooth(WalkFrom, WalkFull, stepSpeed);
+                if (walkW > 0f && m.HasUpperLayer && m.PoseUpper(sc, Math.Min(t, m.ClipLength(sc) - 1e-3), 1f, false))
+                {
+                    // Moving again after the swing: the legs keep the stride, the swing finishes on the torso and arms.
+                    m.UpperWeight = wgt;
+                    m.Pose(ArtMapping.Idle, _idleT, 1f - walkW, true);
+                    m.Pose(ArtMapping.Walk, _walkT, walkW, true);
+                }
+                else
+                {
+                    m.Pose(sc, Math.Min(t, m.ClipLength(sc) - 1e-3), wgt, false);
+                    walkW *= 1f - wgt;
+                    m.Pose(ArtMapping.Idle, _idleT, 1f - wgt - walkW, true);
+                    m.Pose(ArtMapping.Walk, _walkT, walkW, true);
+                }
                 dom = sc;
             }
             else if (getUp >= 0 && getUp < GetUpSeconds && koLen > 0f)
@@ -235,20 +252,30 @@ namespace CriticalMass.Runtime.View.Anim
             }
             else if (roar >= 0 && roar < roarLen)
             {
-                walkW = Locomotion.Smooth(0.15, 1.0, stepSpeed);
-                float rw = walkW > 0.3f ? RoarWhileMoving : 1f;
+                walkW = Locomotion.Smooth(WalkFrom, WalkFull, stepSpeed);
                 float fade = (float)Math.Min(1, (roarLen - roar) / 0.2);
-                rw *= fade;
-                m.Pose(ArtMapping.Roar, roar, rw, false);
-                m.Pose(ArtMapping.Idle, _idleT, (1f - rw) * (1f - walkW), true);
-                m.Pose(ArtMapping.Walk, _walkT, (1f - rw) * walkW, true);
-                walkW *= 1f - rw;
-                dom = rw >= 0.5f ? ArtMapping.Roar : walkW > 0.5f ? ArtMapping.Walk : ArtMapping.Roar;
+                if (walkW > 0f && m.HasUpperLayer && m.PoseUpper(ArtMapping.Roar, roar, 1f, false))
+                {
+                    // Roaring on the move: full roar on the torso, head and jaw over an unbroken stride.
+                    m.UpperWeight = fade;
+                    m.Pose(ArtMapping.Idle, _idleT, 1f - walkW, true);
+                    m.Pose(ArtMapping.Walk, _walkT, walkW, true);
+                    dom = ArtMapping.Roar;
+                }
+                else
+                {
+                    float rw = (walkW > 0.3f ? RoarWhileMoving : 1f) * fade;
+                    m.Pose(ArtMapping.Roar, roar, rw, false);
+                    m.Pose(ArtMapping.Idle, _idleT, (1f - rw) * (1f - walkW), true);
+                    m.Pose(ArtMapping.Walk, _walkT, (1f - rw) * walkW, true);
+                    walkW *= 1f - rw;
+                    dom = rw >= 0.5f ? ArtMapping.Roar : walkW > 0.5f ? ArtMapping.Walk : ArtMapping.Roar;
+                }
             }
             else if (simTime - berserkAt < berserkLen) { m.Pose(ArtMapping.Berserk, simTime - berserkAt, 1f, false); dom = ArtMapping.Berserk; }
             else
             {
-                walkW = Locomotion.Smooth(0.15, 1.0, stepSpeed);
+                walkW = Locomotion.Smooth(WalkFrom, WalkFull, stepSpeed);
                 m.Pose(ArtMapping.Idle, _idleT, 1f - walkW, true);
                 m.Pose(ArtMapping.Walk, _walkT, walkW, true);
                 dom = walkW >= 0.5f ? ArtMapping.Walk : ArtMapping.Idle;
