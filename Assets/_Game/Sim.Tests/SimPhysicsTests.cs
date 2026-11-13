@@ -34,6 +34,7 @@ namespace CriticalMass.Sim.Tests
         internal static World Make(Action<GameConfig> tweak = null, TeamId human = TeamId.Azure, double pace = 0, int seed = 7)
         {
             GameConfig cfg = GameConfig.CreateBrowser5v5();
+            cfg.Physics.Knockback = true; // the lane's rule tests stage the knockback feature (shipped default-off, see PR)
             tweak?.Invoke(cfg);
             World w = World.CreateWorld(new WorldOptions { Seed = seed, TeamSize = 5, HumanTeam = human, HumanClass = ClassId.Warrior, Config = cfg, Pace = pace });
             // Park everyone far apart on their pads so only the staged actors meet.

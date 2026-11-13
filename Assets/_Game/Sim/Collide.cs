@@ -363,6 +363,17 @@ namespace CriticalMass.Sim.Core
                 BridgeSpan rs = air || !w.Actors[id].IsHuman || Bots.BotBrain.ActorZeroOnAutopilot(w) ? null : RailSpanAt(px, pz);
                 if (rs == null)
                 {
+                    if (!air && Phys.On(w, true) && (lx != JsMath.F32(px + sx) || lz != JsMath.F32(pz + sz))
+                        && !BoxFits(w, px, pz, r) && DeckSpanAt(w, px, pz, r) != null)
+                    {
+                        // A bot standing on a diagonal deck (it landed a jump there): the plain push-out would snap it a
+                        // whole cell into the VOID beside the deck. Step only to where it may stand (deck or box rule).
+                        double fx = JsMath.F32(px + sx), fz = JsMath.F32(pz + sz);
+                        if (ActorFits(w, fx, fz, r)) { px = fx; pz = fz; }
+                        else if (ActorFits(w, fx, pz, r)) px = fx;
+                        else if (ActorFits(w, px, fz, r)) pz = fz;
+                        continue;
+                    }
                     px = lx;
                     pz = lz;
                     continue;
@@ -566,8 +577,8 @@ namespace CriticalMass.Sim.Core
                         }
                         double overlap = (rr - d) * p.SeparationRelax;
                         if (ai.Team == aj.Team) overlap *= p.AllyPushShare;
-                        double mi = w.Config.Class(ai.Cls).Mass;
-                        double mj = w.Config.Class(aj.Cls).Mass;
+                        double mi = p.SeparationByMass ? w.Config.Class(ai.Cls).Mass : 1;
+                        double mj = p.SeparationByMass ? w.Config.Class(aj.Cls).Mass : 1;
                         double pushI = jFixed ? overlap : iFixed ? 0 : overlap * mj / (mi + mj);
                         double pushJ = iFixed ? overlap : jFixed ? 0 : overlap - pushI;
                         SepX[i] -= ddx * pushI;

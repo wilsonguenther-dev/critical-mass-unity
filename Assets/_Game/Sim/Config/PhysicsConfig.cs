@@ -32,8 +32,9 @@ namespace CriticalMass.Sim.Config
         public double SwingMoveMultiplier = 0.4;
 
         // ---- DG-70 / OD-3 knockback, hit-stun, weight (per-class: ClassConfig.Mass, ClassConfig.Poise)
-        /// <summary>Hits shove, heavy hits stagger. Ships ON only while the soak bands hold (see the PR's balance table).</summary>
-        public bool Knockback = true;
+        /// <summary>Hits shove, heavy hits stagger. Default OFF: with it on, the D-030 passive check fell to 11 of 200 and the
+        /// CM-64 berserk share to 0.06 (bands 30 and 0.10). Turn on per match; every rule test stages it.</summary>
+        public bool Knockback = false;
         /// <summary>Knock velocity kept per 1/30 s (exponential decay, re-derived for other SimHz).</summary>
         public double KnockDecayPer30Hz = 0.82;
         /// <summary>Knock velocity below this (u/s) is zeroed.</summary>
@@ -87,13 +88,16 @@ namespace CriticalMass.Sim.Config
         public double KaijuGridRadius = 1.1;
 
         // ---- DG-97 / OD-9 crowds
-        /// <summary>Order-free relaxed separation: pushes accumulated, Iterations passes at Relax, capped per tick, split by mass.</summary>
+        /// <summary>Order-free relaxed separation: pushes accumulated, Iterations passes at Relax, capped per tick (mass split off:
+        /// it cost the passive check 9 of 200 seeds).</summary>
         public bool RelaxedSeparation = true;
         public int SeparationIterations = 3;
-        public double SeparationRelax = 0.6;
-        public double SeparationMaxStep = 0.15;
+        public double SeparationRelax = 1.0;
+        public double SeparationMaxStep = 0.2;
         /// <summary>Teammates push each other this much softer than enemies (a carrier squeezes past).</summary>
         public double AllyPushShare = 0.5;
+        /// <summary>Separation splits each push by ClassConfig.Mass (false: half each, as the classic pass).</summary>
+        public bool SeparationByMass = false;
         /// <summary>Bodies slide round convex wall corners instead of snagging (S10, every actor).</summary>
         public bool CornerRounding = true;
         /// <summary>Largest overlap with a corner cell that is slid round (u); deeper overlaps still stop.</summary>
