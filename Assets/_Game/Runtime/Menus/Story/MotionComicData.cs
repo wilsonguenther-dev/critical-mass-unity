@@ -9,7 +9,13 @@ namespace CriticalMass.Runtime.Menus
     // a safety net for hand edits. Units: seconds and stage units on a 1920 x 1080 stage, origin at the centre, y up.
 
     /// <summary>Easing curves; every move in the comic eases (Linear is kept for holds).</summary>
-    public enum McEase { InOutSine, OutSine, InSine, OutCubic, InCubic, InOutCubic, OutExpo, InExpo, OutBack, InBack, Step, Linear }
+    public enum McEase { InOutSine, OutSine, InSine, OutCubic, InCubic, InOutCubic, OutExpo, InExpo, OutBack, InBack, Step, Linear,
+        /// <summary>Quint curves: a long, soft settle (camera moves, big slides).</summary>
+        OutQuint, InOutQuint,
+        /// <summary>A small overshoot (about 4%) that settles: entrances that land without bouncing like a flat card.</summary>
+        OutBackSoft,
+        /// <summary>Anticipation and settle in one move: a small pull back, the move, a small overshoot.</summary>
+        InOutBack }
 
     [Serializable] public sealed class McKey { public float t, x, y, s = 1f, a = 1f, r, b; public string ease = "inOutSine"; [NonSerialized] public McEase E; }
     [Serializable] public sealed class McCamKey { public float t, zoom = 1f, zx, zy, dolly = 1f, x, y, rot; public string ease = "inOutSine"; [NonSerialized] public McEase E; }
@@ -29,6 +35,17 @@ namespace CriticalMass.Runtime.Menus
         public float frameAt, fps = 12f;
         public bool flicker;
         public float pulseHz, pulseLo = 1f, jitter, jitterFrom, jitterTo;
+        /// <summary>An opaque plate that must cover the film window (the coverage test checks these alone).</summary>
+        public bool cover;
+        /// <summary>A subject (a character, the egg, the Kaiju, the logo): its settled box must stay inside the subject-safe box.</summary>
+        public bool subject;
+        /// <summary>Procedural life, always on top of the keys (off with reduced motion): breathing scale (fraction) and its
+        /// rate, a slow bob (stage units), a sway (degrees), a constant drift (stage units per second: clouds) and a light
+        /// flicker on the layer's opacity (0..1: glows, seams, the egg).</summary>
+        public float breathe, breatheHz = 0.3f, bob, sway, driftX, driftY, glint;
+        /// <summary>"titleLogo": keys are relative to where the title screen draws its logo on this screen (x, y offsets and a
+        /// scale), so the film's last frame lands exactly on the title's logo.</summary>
+        public string anchor;
         public McKey[] keys;
         [NonSerialized] public Color Tint = Color.white;
     }
@@ -54,6 +71,9 @@ namespace CriticalMass.Runtime.Menus
         public float x, y;
         public string font = "display";
         public float track0, track1;
+        /// <summary>"pop" (scale down with a small overshoot), "slam" (fast hit from big, a settle and a kick: impact words),
+        /// "rise" (drifts up into place: quiet words).</summary>
+        public string style = "pop";
         [NonSerialized] public Color Color = Color.white;
     }
 
@@ -80,16 +100,29 @@ namespace CriticalMass.Runtime.Menus
         public McShake[] shake;
         public McParticles[] particles;
         public McBarKey[] bars;
+        /// <summary>How the shot comes in: "cut" (default) or "dissolve" over transDur seconds (the previous shot holds its last
+        /// frame underneath).</summary>
+        public string trans = "cut";
+        public float transDur;
+        /// <summary>Slow procedural camera drift (stage units): a held shot is never frozen.</summary>
+        public float camDrift = 5f;
     }
 
-    [Serializable] public sealed class McCue { public string id; public string[] files; public float pitch = 1f, gain = 1f; }
+    [Serializable] public sealed class McCue
+    {
+        public string id; public string[] files; public float pitch = 1f, gain = 1f;
+        /// <summary>A procedural recipe (SoundSynth) used instead of, or when missing, the files: heavy whooshes, blasts, the
+        /// hatch, the roar.</summary>
+        public string synth;
+        public int variants = 1;
+    }
     [Serializable] public sealed class McSequence { public string id; public string[] shots; }
 
     [Serializable]
     public sealed class McTable
     {
         public string schema;
-        public float stageW = 1920f, stageH = 1080f, letterbox = 0.11f, skipPromptAfter = 1f, outroSeconds = 0.5f;
+        public float stageW = 1920f, stageH = 1080f, letterbox = 0.11f, skipPromptAfter = 1.5f, outroSeconds = 0.5f;
         public McCue[] cues;
         public McSequence[] sequences;
         public McSequence[] codex;
@@ -153,10 +186,13 @@ namespace CriticalMass.Runtime.Menus
                 foreach (McKey k in l.keys) { k.E = ParseEase(k.ease); if (k.s <= 0f) k.s = 1f; }
                 if (l.frames == null) l.frames = new string[0];
                 if (l.fps <= 0f) l.fps = 12f;
+                if (l.breatheHz <= 0f) l.breatheHz = 0.3f;
                 l.Tint = Hex(l.tint, Color.white);
             }
             foreach (McParticles p in s.particles) { p.Color = Hex(p.color, Color.white); if (p.life <= 0f) p.life = 1f; }
-            foreach (McTitle ti in s.titles) ti.Color = Hex(ti.color, Color.white);
+            foreach (McTitle ti in s.titles) { ti.Color = Hex(ti.color, Color.white); if (string.IsNullOrEmpty(ti.style)) ti.style = "pop"; }
+            if (string.IsNullOrEmpty(s.trans)) s.trans = "cut";
+            if (s.camDrift < 0f) s.camDrift = 0f;
             foreach (McFlash f in s.flash) f.Color = Hex(f.color, Color.white);
         }
 
@@ -182,13 +218,18 @@ namespace CriticalMass.Runtime.Menus
                 case "inBack": return McEase.InBack;
                 case "step": return McEase.Step;
                 case "linear": return McEase.Linear;
+                case "outQuint": return McEase.OutQuint;
+                case "inOutQuint": return McEase.InOutQuint;
+                case "outBackSoft": return McEase.OutBackSoft;
+                case "inOutBack": return McEase.InOutBack;
                 default: return McEase.InOutSine;
             }
         }
 
         public static bool IsKnownEase(string name) =>
             name == "inOutSine" || name == "outSine" || name == "inSine" || name == "outCubic" || name == "inCubic" || name == "inOutCubic" ||
-            name == "outExpo" || name == "inExpo" || name == "outBack" || name == "inBack" || name == "step" || name == "linear";
+            name == "outExpo" || name == "inExpo" || name == "outBack" || name == "inBack" || name == "step" || name == "linear" ||
+            name == "outQuint" || name == "inOutQuint" || name == "outBackSoft" || name == "inOutBack";
 
         /// <summary>Eased 0..1 (OutBack overshoots above 1 before settling; InBack dips below 0).</summary>
         public static float Ease(McEase e, float t)
@@ -207,6 +248,16 @@ namespace CriticalMass.Runtime.Menus
                 case McEase.OutBack: { const float c1 = 1.70158f, c3 = c1 + 1f; float u = t - 1f; return 1f + c3 * u * u * u + c1 * u * u; }
                 case McEase.InBack: { const float c1 = 1.70158f, c3 = c1 + 1f; return c3 * t * t * t - c1 * t * t; }
                 case McEase.Step: return t >= 1f ? 1f : 0f;
+                case McEase.OutQuint: { float u = 1f - t; return 1f - u * u * u * u * u; }
+                case McEase.InOutQuint: { if (t < 0.5f) return 16f * t * t * t * t * t; float u = -2f * t + 2f; return 1f - u * u * u * u * u * 0.5f; }
+                case McEase.OutBackSoft: { const float c1 = 0.9f, c3 = c1 + 1f; float u = t - 1f; return 1f + c3 * u * u * u + c1 * u * u; }
+                case McEase.InOutBack:
+                {
+                    const float c2 = 1.70158f * 0.8f;
+                    if (t < 0.5f) return (2f * t) * (2f * t) * ((c2 + 1f) * 2f * t - c2) * 0.5f;
+                    float u = 2f * t - 2f;
+                    return (u * u * ((c2 + 1f) * u + c2) + 2f) * 0.5f;
+                }
                 default: return -(Mathf.Cos(Mathf.PI * t) - 1f) * 0.5f;
             }
         }
@@ -348,11 +399,214 @@ namespace CriticalMass.Runtime.Menus
             into.Add(tex);
         }
 
+        // ---------------------------------------------------------------- framing (any aspect)
+
+        /// <summary>Title-safe box, half extents in stage units: inside it on every screen from 4:3 to 21:9 (titles, the
+        /// notch's band at the top centre of a 14-inch MacBook Pro excluded).</summary>
+        public const float SafeHalfW = 680f, SafeHalfH = 380f;
+        /// <summary>Subject-safe box, half extents in stage units: a subject's settled box stays fully on screen at 1.54
+        /// (the owner's MacBook Pro) and loses at most a sliver at 4:3.</summary>
+        public const float SubjectHalfW = 830f, SubjectHalfH = 420f;
+
+        /// <summary>The stage (stageW x stageH) is scaled to cover the canvas, never stretched: canvas units per stage unit.</summary>
+        public static float StageScale(McTable t, Vector2 view) => Mathf.Max(view.x / t.stageW, view.y / t.stageH);
+
+        /// <summary>Height of the film window between full bars, in stage units (the 16:9 composition: 1080 less two bars).</summary>
+        public static float WindowH(McTable t) => t.stageH * (1f - 2f * Mathf.Clamp01(t.letterbox));
+
+        /// <summary>One letterbox bar's height in canvas units at bar level v: the bars keep the same film window on every
+        /// screen, so a 21:9 screen (already that shape) gets none and nothing is cropped twice.</summary>
+        public static float BarHeight(McTable t, Vector2 view, float v)
+        {
+            float s = StageScale(t, view);
+            return Mathf.Max(0f, (view.y - WindowH(t) * s) * 0.5f) * Mathf.Clamp01(v);
+        }
+
+        /// <summary>The part of the stage that is on screen and not under a bar, in stage units (centred on the origin).</summary>
+        public static Rect VisibleStage(McTable t, Vector2 view, float barV)
+        {
+            float s = StageScale(t, view);
+            float hw = view.x * 0.5f / s, hh = (view.y * 0.5f - BarHeight(t, view, barV)) / s;
+            return new Rect(-hw, -hh, 2f * hw, 2f * hh);
+        }
+
+        /// <summary>
+        /// Where the title screen's logo sits, in stage units, on a canvas of this size: its centre height and the size
+        /// factor that turns TitleScreen.LogoSize into stage units. The title canvas scales by min(w / 1920, h / 1080) while
+        /// the film's canvas is 1080 tall and its stage covers, so the two differ on any screen narrower or wider than 16:9.
+        /// </summary>
+        public static void TitleLogo(McTable t, Vector2 view, float titleLogoY, out float y, out float scale)
+        {
+            float k = Mathf.Min(view.x / 1920f, 1f);   // title canvas units -> film canvas units
+            float s = StageScale(t, view);
+            scale = k / s;
+            y = titleLogoY * scale;
+        }
+
+        // ---------------------------------------------------------------- layer pose (player and tests share it)
+
+        public struct Pose { public Vector2 P; public float W, H, Rot, A, Blur; public bool On; }
+
+        /// <summary>
+        /// A layer's box at time t (seconds into its shot): keys, procedural life, jitter, pulse, the parallax camera and the
+        /// shake. texAspect is the texture's height / width. lifeT drives the life (a dissolving shot keeps living under the
+        /// next one). The logo anchor needs the canvas size and the title logo's height in title canvas units.
+        /// </summary>
+        public static Pose LayerPose(McTable table, McLayer l, int index, in Cam cam, Vector2 shake, float t, float lifeT, bool reduced,
+            float lastKeyT, float texAspect, Vector2 view, float titleLogoY)
+        {
+            var o = new Pose { On = t >= l.@from && t <= l.to };
+            float x, y, s, a, r, b;
+            if (reduced)
+            {
+                Sample(l.keys, lastKeyT, out x, out y, out s, out _, out r, out b);
+                a = SampleAlpha(l.keys, t);
+                if (l.flicker) o.On = false;
+            }
+            else
+            {
+                Sample(l.keys, t, out x, out y, out s, out a, out r, out b);
+                Life(l, index, lifeT, out float lx, out float ly, out float ls, out float lr, out float la);
+                x += lx; y += ly; s *= 1f + ls; r += lr; a *= la;
+                if (l.jitter > 0f)
+                {
+                    float amp = l.jitter * Smooth01(l.jitterFrom, l.jitterTo, t);
+                    x += amp * (Mathf.Sin(t * 71f) + Mathf.Sin(t * 113f + 1.3f)) * 0.5f;
+                    y += amp * (Mathf.Sin(t * 89f + 0.7f) + Mathf.Sin(t * 57f + 2.1f)) * 0.5f;
+                }
+            }
+            if (l.pulseHz > 0f) a *= l.pulseLo + (1f - l.pulseLo) * (0.5f + 0.5f * Mathf.Sin(2f * Mathf.PI * l.pulseHz * t));
+            float h0 = l.h > 0f ? l.h : l.w * texAspect;
+            if (l.anchor == "titleLogo")
+            {
+                TitleLogo(table, view, titleLogoY, out float ly0, out float k);
+                o.P = new Vector2(x * k, ly0 + y * k) + shake * 0.4f;
+                o.W = l.w * s * k;
+                o.H = h0 * s * k;
+                o.Rot = r;
+            }
+            else
+            {
+                o.P = ToScreen(cam, l.depth, x, y, out float z) + shake * (0.4f + 0.6f * l.depth);
+                o.W = l.w * s * z;
+                o.H = h0 * s * z;
+                o.Rot = r + cam.Rot * l.depth;
+            }
+            o.A = a;
+            o.Blur = b;
+            return o;
+        }
+
+        /// <summary>Procedural life of a layer (see McLayer.breathe ...): offsets, a scale fraction, degrees and an opacity factor.</summary>
+        public static void Life(McLayer l, int index, float t, out float dx, out float dy, out float ds, out float dr, out float da)
+        {
+            float ph = Hash01(index, 7, 3) * 6.2831853f;
+            dx = l.driftX * t + l.bob * 0.35f * Mathf.Sin(t * 0.9f + ph * 1.7f);
+            dy = l.driftY * t + l.bob * Mathf.Sin(2f * Mathf.PI * 0.21f * t + ph);
+            ds = l.breathe * Mathf.Sin(2f * Mathf.PI * l.breatheHz * t + ph);
+            dr = l.sway * Mathf.Sin(2f * Mathf.PI * 0.27f * t + ph * 0.5f);
+            if (l.glint > 0f)
+            {
+                float n = 0.5f * Mathf.Sin(7.3f * t + ph) + 0.3f * Mathf.Sin(13.1f * t + 2f * ph) + 0.2f * Mathf.Sin(2.9f * t + 0.5f);
+                da = 1f - l.glint * (0.5f + 0.5f * n);
+            }
+            else da = 1f;
+        }
+
+        /// <summary>The shot's camera at time t with its slow procedural drift (none with reduced motion: the last framing).</summary>
+        public static Cam ShotCam(McShot s, float t, bool reduced)
+        {
+            Cam c = SampleCam(s.cam, reduced ? s.seconds : t);
+            if (reduced || s.camDrift <= 0f) return c;
+            float d = s.camDrift;
+            c.X += d * (Mathf.Sin(2f * Mathf.PI * 0.11f * t + 0.4f) + 0.5f * Mathf.Sin(2f * Mathf.PI * 0.23f * t + 1.9f));
+            c.Y += d * 0.6f * (Mathf.Sin(2f * Mathf.PI * 0.13f * t + 2.2f) + 0.5f * Mathf.Sin(2f * Mathf.PI * 0.29f * t + 0.7f));
+            c.Rot += d * 0.02f * Mathf.Sin(2f * Mathf.PI * 0.07f * t + 1.1f);
+            return c;
+        }
+
+        /// <summary>Decaying camera shake (stage units) at time t: a fast, irregular rattle that dies out quadratically.</summary>
+        public static Vector2 Shake(McShot s, float t)
+        {
+            Vector2 sum = Vector2.zero;
+            foreach (McShake sh in s.shake)
+            {
+                if (sh.dur <= 0f || t < sh.t || t > sh.t + sh.dur) continue;
+                float u = (t - sh.t) / sh.dur;
+                float amp = sh.amp * (1f - u) * (1f - u);
+                float w = 2f * Mathf.PI * t;
+                sum.x += amp * (0.6f * Mathf.Sin(w * 17f + 1.3f) + 0.4f * Mathf.Sin(w * 23.3f + 0.2f));
+                sum.y += amp * (0.6f * Mathf.Sin(w * 19.1f + 2.4f) + 0.4f * Mathf.Sin(w * 26.7f + 0.9f));
+            }
+            return sum;
+        }
+
+        /// <summary>Flash opacity and colour at time t: a 40 ms rise, then an eased fall; reduce flashing caps it at 20% and slows it.</summary>
+        public static float Flash(McShot s, float t, bool reduceFlashing, out Color color)
+        {
+            float fa = 0f;
+            color = Color.white;
+            foreach (McFlash f in s.flash)
+            {
+                float dur = reduceFlashing ? f.dur * 1.6f : f.dur;
+                if (dur <= 0f || t < f.t || t > f.t + dur) continue;
+                float peak = reduceFlashing ? Mathf.Min(f.peak, 0.2f) : f.peak;
+                float u = t - f.t;
+                const float rise = 0.04f;
+                float a = u < rise ? peak * u / rise : peak * (1f - Ease(McEase.OutCubic, (u - rise) / Mathf.Max(1e-3f, dur - rise)));
+                if (a > fa) { fa = a; color = f.Color; }
+            }
+            return fa;
+        }
+
+        static float Smooth01(float e0, float e1, float x)
+        {
+            if (e1 <= e0) return x >= e0 ? 1f : 0f;
+            float u = Mathf.Clamp01((x - e0) / (e1 - e0));
+            return u * u * (3f - 2f * u);
+        }
+
+        /// <summary>True when the point (stage units) is inside the layer's rotated box.</summary>
+        public static bool Contains(in Pose p, Vector2 q)
+        {
+            Vector2 d = q - p.P;
+            float rad = -p.Rot * Mathf.Deg2Rad;
+            float c = Mathf.Cos(rad), sn = Mathf.Sin(rad);
+            float lx = d.x * c - d.y * sn, ly = d.x * sn + d.y * c;
+            return Mathf.Abs(lx) <= p.W * 0.5f && Mathf.Abs(ly) <= p.H * 0.5f;
+        }
+
         public static float TotalSeconds(McShot[] shots)
         {
             float sum = 0f;
             if (shots != null) foreach (McShot s in shots) sum += s.seconds;
             return sum;
         }
+    }
+
+    /// <summary>
+    /// The intro's skip rule, free of input devices so tests can drive it: nothing skips during the first
+    /// <see cref="Lock"/> seconds the film is on screen; after that, one deliberate press of a skip key does. "Deliberate"
+    /// means the key goes down after the lock: a key already held when the film began (the Enter that chose WATCH INTRO) or
+    /// held through the lock has to be released and pressed again. Mouse movement is never a skip key.
+    /// </summary>
+    public sealed class SkipGate
+    {
+        public const float LockSeconds = 1.5f;
+        public readonly float Lock;
+        bool _wasUp;
+
+        public SkipGate(float lockSeconds = LockSeconds) { Lock = Mathf.Max(0f, lockSeconds); }
+
+        /// <summary>Feed one frame: seconds the film has been on screen, and whether a skip key is down this frame. True: skip.</summary>
+        public bool Update(double time, bool down)
+        {
+            bool press = down && _wasUp && time >= Lock;
+            _wasUp = !down;
+            return press;
+        }
+
+        /// <summary>The skip prompt shows once skipping works.</summary>
+        public bool PromptOn(double time) => time >= Lock;
     }
 }

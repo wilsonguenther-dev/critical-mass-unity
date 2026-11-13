@@ -26,7 +26,7 @@ namespace CriticalMass.Runtime.Menus
     /// </summary>
     public sealed class MainMenu : FlowScreen
     {
-        public const float ColX = 96f, ColW = 540f, RailY = 168f, RailStep = 60f, RailH = 50f;
+        public const float ColX = 96f, ColW = 540f, RailY = 168f, RailStep = 56f, RailH = 50f;
         public const float RematchY = 628f, ChangeY = 742f, PrimaryY = 830f, PrimaryH = 150f;
         public const float StageX = 680f, StageY = 226f, StageW = 1144f, StageH = 640f;
         public const float CardX = 1300f, CardY = 40f, CardW = 524f, CardH = 170f;
@@ -379,6 +379,10 @@ namespace CriticalMass.Runtime.Menus
                     break;
                 case OverlayRegistry.Controls:
                     Director.OpenSettings(PauseMenu.Tab.Controls, e.Id);
+                    return;
+                case OverlayRegistry.Intro:
+                    // The film freezes this screen while it plays and dissolves back into it at the end.
+                    StoryIntro.Play();
                     return;
                 case OverlayRegistry.Settings:
                     Director.OpenSettings(PauseMenu.Tab.Audio, e.Id);

@@ -8,7 +8,9 @@ using CriticalMass.Runtime.Hud.Ui;
 using CriticalMass.Runtime.Input;
 using CriticalMass.Runtime.Menu;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.Controls;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
@@ -279,9 +281,15 @@ namespace CriticalMass.Runtime.Menus
     /// (PlayerPrefs "cm.reducedMotion" = 1). Plays once on first launch in player builds (PlayerPrefs "cm.story.seen"), and
     /// whenever the game-flow menu calls <see cref="Play"/> ("Watch the story"). View only: it never touches the sim.
     /// <para>Since the motion-comic rebuild (2026-11-12) the intro plays the shot table Resources "Story/motion-comic" through
-    /// <see cref="MotionComicPlayer"/> (12 shots, about 58 s, the bible's own art; skippable with any key, "skip" prompt
-    /// after 1 s, a short fade into the title at the end). The five-card path below stays as the fallback when the table
-    /// or its layers are missing. The same player runs the title's attract loop (<see cref="PlayAttract"/>, narration off,
+    /// <see cref="MotionComicPlayer"/> (12 shots, about 48 s, the bible's own art). Since story intro 2 (2026-11-13): it
+    /// streams its textures in shot order (the film opens from navy as soon as the first shot is in, no hitch), skips only
+    /// after 1.5 s and only on a deliberate press of Space, Enter, Esc, a click or A / B / Start (<see cref="SkipGate"/>; mouse
+    /// movement, other keys and a key held from before never skip) with a "SPACE  SKIP" prompt from 1.5 s, quiets the
+    /// backdrop match and beds the music under the narration while it plays, and ends by dissolving into the screen it was
+    /// started from (on first launch, the title: the film's logo lands where the title's logo sits). It plays once on first
+    /// launch (key <see cref="SeenKey"/>, new for this version so players of earlier builds see it once too), and from WATCH
+    /// INTRO on the title, on the home screen and in the Codex. The five-card path below stays as the fallback when the
+    /// table or its layers are missing. The same player runs the title's attract loop (<see cref="PlayAttract"/>, narration off,
     /// any input returns to the title) and Codex lore vignettes (<see cref="PlayLore"/>).</para>
     /// <para>Public API for the game-flow item (DG-01): <see cref="Play"/>, <see cref="Skip"/>, <see cref="IsPlaying"/>,
     /// <see cref="Started"/>, <see cref="Finished"/> (argument: skipped), <see cref="PlayOnFirstLaunch"/> (set false if the
@@ -290,7 +298,9 @@ namespace CriticalMass.Runtime.Menus
     [Flow.GameOverlay(Order = 40)]   // installed by GameBootstrap through the DG-01 overlay registry
     public sealed class StoryIntro : MonoBehaviour
     {
-        public const string SeenKey = "cm.story.seen";
+        /// <summary>Set once the intro has played (or been skipped). Renamed for story intro 2 ("cm.story.seen" was set by the
+        /// five-card intro and the first motion comic, so players of those builds never saw this film).</summary>
+        public const string SeenKey = "cm.story.seen.v2";
         /// <summary>Reduced motion (int, 1 = on, default 0). Stored by the settings work; read here and by AttractMode.</summary>
         public const string ReducedMotionKey = "cm.reducedMotion";
 
@@ -332,8 +342,23 @@ namespace CriticalMass.Runtime.Menus
         float _outroT;
         MotionComicPlayer _comic;
         McTable _table;
-        static readonly string SkipAnyKeyboard = "ANY KEY   SKIP";
-        static readonly string SkipAnyPad = "ANY BUTTON   SKIP";
+        static readonly string SkipComicKeyboard = "SPACE   SKIP";
+        static readonly string SkipComicPad = "A   SKIP";
+        /// <summary>The open from navy once the first shot has streamed in.</summary>
+        public const float ComicOpenSeconds = 0.35f;
+        /// <summary>The dissolve into the screen underneath at the end of the intro.</summary>
+        public const float ComicOutroSeconds = 0.9f;
+        /// <summary>Longest the film waits for its first shot to stream in before it gives up (the title shows instead).</summary>
+        public const float FirstShotTimeout = 8f;
+        /// <summary>Mix while the film plays: music bed, the music under narration, the backdrop match's world sounds.</summary>
+        public const float FilmMusicBed = 0.8f, FilmMusicUnderVoice = 0.35f, FilmWorldSounds = 0.1f;
+        SkipGate _gate;
+        double _filmT;
+        float _loadWait;
+        /// <summary>Seconds the film has been on screen (the skip lock counts these).</summary>
+        public double FilmTime => _filmT;
+        /// <summary>True while the first shot is still streaming in (navy on screen, the clock waits).</summary>
+        public bool Loading => _playing && _comicMode && !_outro && _comic != null && !_comic.ShotReady(Timeline != null ? Timeline.Index : 0);
         CanvasGroup _group;
         readonly RectTransform[] _cardRoots = new RectTransform[StoryContent.CardCount];
         readonly CanvasGroup[] _cardGroups = new CanvasGroup[StoryContent.CardCount];
@@ -458,7 +483,7 @@ namespace CriticalMass.Runtime.Menus
             _comic.ReduceFlashing = GameSettings.ReduceFlashing;
             _comic.ShakeScale = PlayerPrefs.HasKey(GameSettings.ShakeScaleKey) ? GameSettings.ShakeScale : 1f;
             _comic.VoiceOn = _kind != PlayKind.Attract;
-            if (!_comic.Prepare(_table, shots))
+            if (!_comic.BeginStream(_table, shots))
             {
                 _comic.Release();
                 return false;
@@ -469,10 +494,22 @@ namespace CriticalMass.Runtime.Menus
             _comicMode = true;
             _playing = true;
             _hintDevice = (ControlDevice)(-1);
-            OverlayGuard.Begin(gameObject, ConsumePause);
+            _gate = new SkipGate(_table.skipPromptAfter > 0f ? _table.skipPromptAfter : SkipGate.LockSeconds);
+            _filmT = 0;
+            _loadWait = 0f;
+            OverlayGuard.Begin(gameObject, ConsumePause, _kind != PlayKind.Attract);
+            if (_kind != PlayKind.Attract)
+            {
+                Audio.MusicDirector.FilmBed = FilmMusicBed;
+                Audio.MusicDirector.FilmDuck = FilmMusicUnderVoice;
+                Audio.Sound.SoundDirector.FilmWorldGain = FilmWorldSounds;
+            }
+            _comic.TitleLogoY = TitleScreen.LogoY;
             _comic.Show();
+            _comic.SetFade(0f);
+            _comic.SetSkipAlpha(0f);
             UpdateComicHint();
-            _comic.Render(0, 0f, 0.0, true);
+            if (_comic.Pump() || _comic.ShotReady(0)) _comic.Render(0, 0f, 0.0, false);
             if (_kind == PlayKind.Intro) Started?.Invoke();
             return true;
         }
@@ -483,28 +520,51 @@ namespace CriticalMass.Runtime.Menus
             ControlDevice d = ControlBindings.ActiveDevice;
             if (d == _hintDevice) return;
             _hintDevice = d;
-            _comic.SetSkipText(d == ControlDevice.Gamepad ? SkipAnyPad : SkipAnyKeyboard);
+            _comic.SetSkipText(d == ControlDevice.Gamepad ? SkipComicPad : SkipComicKeyboard);
         }
 
         void UpdateComic()
         {
             float dt = Mathf.Min((float)MaxFrameDt, Time.unscaledDeltaTime);
+            _comic.Pump();
+            bool skipKey = SkipKeyDown();
             if (_outro)
             {
-                // The film has finished: a key here only shortens the fade (the title reads keys from now on as well).
+                // The film has finished and dissolves into the screen underneath, which stays frozen until the dissolve ends;
+                // a deliberate press only finishes the dissolve (it never reaches the title's buttons).
                 _outroT += dt;
-                float len = Mathf.Max(0.05f, _table.outroSeconds);
+                float len = _kind == PlayKind.Intro ? ComicOutroSeconds : Mathf.Max(0.05f, _table.outroSeconds);
+                _comic.TitleLogoY = OverlayGuard.TitleLogoY(TitleScreen.LogoY);
+                int last = Timeline.CardCount - 1;
+                _comic.Render(last, (float)Timeline.LengthOf(last), Timeline.Total, false);
                 _comic.SetFade(1f - MotionComic.Ease(McEase.InOutSine, _outroT / len));
-                if (_outroT >= len || AnyKeyPressed()) EndPlay(false, true);
+                _comic.SetSkipAlpha(0f);
+                if (_gate.Update(_filmT, skipKey) || _outroT >= len) EndPlay(false, true);
                 return;
             }
-            bool input = _kind == PlayKind.Attract ? AttractMode.AnyInput() : AnyKeyPressed();
-            if (input)
+            if (_kind == PlayKind.Attract)
             {
-                if (_kind == PlayKind.Attract) EndPlay(false, false);
-                else SkipNow();
+                if (AttractMode.AnyInput())
+                {
+                    EndPlay(false, false);
+                    return;
+                }
+            }
+            else if (_gate.Update(_filmT, skipKey))
+            {
+                SkipNow();
                 return;
             }
+            if (!_comic.ShotReady(Timeline.Index))
+            {
+                // Streaming: the clock waits on navy until the shot is in (only ever the first shot in practice).
+                _loadWait += dt;
+                if (Timeline.Index == 0 && _loadWait > FirstShotTimeout) EndPlay(false, true);
+                return;
+            }
+            _filmT += dt;
+            _comic.SetFade(MotionComic.Ease(McEase.OutCubic, (float)(_filmT / ComicOpenSeconds)));
+            _comic.SetSkipAlpha(_kind == PlayKind.Attract ? 0f : MotionComic.SkipPromptAlpha(_filmT, _gate.Lock));
             UpdateComicHint();
             Timeline.Advance(dt);
             if (Timeline.Done)
@@ -513,27 +573,37 @@ namespace CriticalMass.Runtime.Menus
                 {
                     var secs = new float[Timeline.CardCount];
                     for (int i = 0; i < secs.Length; i++) secs[i] = (float)Timeline.LengthOf(i);
-                    Timeline = new StoryTimeline(secs);   // loop (one small allocation per 58 s loop, on the title only)
+                    Timeline = new StoryTimeline(secs);   // loop (one small allocation per loop, on the title only)
                     _comic.Render(0, 0f, 0.0, false);
                     return;
                 }
                 int last = Timeline.CardCount - 1;
                 _comic.Render(last, (float)Timeline.LengthOf(last), Timeline.Total, false);
-                if (_kind == PlayKind.Intro)
-                {
-                    // The hero frame lands on the logo, then fades into the title screen, which is shown again now.
-                    _outro = true;
-                    _outroT = 0f;
-                    _comic.StopVoice();
-                    OverlayGuard.End();
-                    return;
-                }
-                EndPlay(false, true);
+                // The last frame dissolves into the screen it was started from (on first launch the title, whose logo the
+                // film's logo has landed on). The narration is left to finish.
+                _outro = true;
+                _outroT = 0f;
+                OverlayGuard.RevealUnder();
                 return;
             }
             int idx = Timeline.Index;
+            if (!_comic.ShotReady(idx)) return;
             _comic.Render(idx, (float)(Timeline.Time - Timeline.StartOf(idx)), Timeline.Time, true);
         }
+
+        /// <summary>A skip key is down this frame: Space, Enter, Esc, the left mouse button, or controller A, B or Start (never
+        /// mouse movement, never any other key). <see cref="SkipGate"/> turns this into a deliberate press.</summary>
+        public static bool SkipKeyDown()
+        {
+            Keyboard kb = Keyboard.current;
+            if (kb != null && (Held(kb.spaceKey) || Held(kb.enterKey) || Held(kb.numpadEnterKey) || Held(kb.escapeKey))) return true;
+            Mouse m = Mouse.current;
+            if (m != null && Held(m.leftButton)) return true;
+            Gamepad p = Gamepad.current;
+            return p != null && (Held(p.buttonSouth) || Held(p.buttonEast) || Held(p.startButton));
+        }
+
+        static bool Held(ButtonControl b) => b != null && (b.isPressed || b.wasPressedThisFrame);
 
         /// <summary>Any keyboard key, mouse button or controller button pressed this frame (mouse movement does not skip).</summary>
         public static bool AnyKeyPressed()
@@ -549,9 +619,12 @@ namespace CriticalMass.Runtime.Menus
                    p.leftShoulder.wasPressedThisFrame || p.rightShoulder.wasPressedThisFrame;
         }
 
+        /// <summary>The Pause press while the film plays: consumed (Esc is a skip key, so the skip gate decides; it never opens
+        /// the pause menu over the film). The attract loop ends on it.</summary>
         bool ConsumePause()
         {
-            if (_playing) SkipNow();
+            if (_playing && _comicMode && _kind == PlayKind.Attract) EndPlay(false, false);
+            else if (_playing && !_comicMode) SkipNow();
             return true;
         }
 
@@ -576,6 +649,9 @@ namespace CriticalMass.Runtime.Menus
                 PlayerPrefs.Save();
             }
             ReleaseAssets();
+            Audio.MusicDirector.FilmBed = 1f;
+            Audio.MusicDirector.FilmDuck = Audio.MusicDirector.DuckGain;
+            Audio.Sound.SoundDirector.FilmWorldGain = 1f;
             if (_comicMode && _comic != null)
             {
                 _comic.Hide();
@@ -816,6 +892,13 @@ namespace CriticalMass.Runtime.Menus
     {
         static TitleScreen _title;
         static GameObject _titleCanvas;
+        // Story intro 2: a flow screen (the home screen) frozen the same way when the film is started from it.
+        static FlowScreen _screen;
+        static GameObject _screenCanvas;
+        static int _screenRestoreFrame = -1;
+        // While the film plays no key or button reaches any menu under it (the WATCH STORY button would restart it).
+        static EventSystem _events;
+        static bool _eventsNav;
         static HumanInputSource _input;
         static Func<bool> _savedPause;
         static Func<bool> _ours;
@@ -828,6 +911,10 @@ namespace CriticalMass.Runtime.Menus
         {
             _title = null;
             _titleCanvas = null;
+            _screen = null;
+            _screenCanvas = null;
+            _screenRestoreFrame = -1;
+            _events = null;
             _input = null;
             _savedPause = null;
             _ours = null;
@@ -836,7 +923,10 @@ namespace CriticalMass.Runtime.Menus
         }
 
         /// <summary>Freezes the title (if any) and routes the Pause press to handler. Ends any earlier overlay's hold.</summary>
-        public static void Begin(GameObject host, Func<bool> pauseHandler)
+        public static void Begin(GameObject host, Func<bool> pauseHandler) => Begin(host, pauseHandler, false);
+
+        /// <summary>As Begin; freezeScreen also freezes the visible flow screen (the home screen under WATCH INTRO).</summary>
+        public static void Begin(GameObject host, Func<bool> pauseHandler, bool freezeScreen)
         {
             if (_active) End();
             _restoreFrame = -1;   // a pending title restore is cancelled: the title stays frozen for this overlay
@@ -849,6 +939,22 @@ namespace CriticalMass.Runtime.Menus
                 Transform c = host.transform.Find("Title Canvas");
                 _titleCanvas = c != null ? c.gameObject : null;
                 if (_titleCanvas != null) _titleCanvas.SetActive(false);
+            }
+            if (freezeScreen && EventSystem.current != null)
+            {
+                _events = EventSystem.current;
+                _eventsNav = _events.sendNavigationEvents;
+                _events.sendNavigationEvents = false;
+            }
+            FlowDirector d = FlowDirector.Current;
+            FlowScreen fs = freezeScreen && d != null ? d.Visible : null;
+            if (fs != null && fs.Canvas != null)
+            {
+                _screen = fs;
+                _screenRestoreFrame = -1;
+                fs.enabled = false;
+                _screenCanvas = fs.Canvas.gameObject;
+                _screenCanvas.SetActive(false);
             }
             _input = host != null ? host.GetComponent<HumanInputSource>() : null;
             if (_input != null)
@@ -870,11 +976,42 @@ namespace CriticalMass.Runtime.Menus
             if (_titleCanvas != null) _titleCanvas.SetActive(true);
             _titleCanvas = null;
             if (_title != null) _restoreFrame = Time.frameCount + 1;
+            if (_screenCanvas != null) _screenCanvas.SetActive(true);
+            _screenCanvas = null;
+            if (_screen != null) _screenRestoreFrame = Time.frameCount + 1;
         }
+
+        /// <summary>Shows the frozen screen (title or home) under the overlay without letting it read input: the film's
+        /// closing dissolve. <see cref="End"/> gives it its input back.</summary>
+        public static void RevealUnder()
+        {
+            if (!_active) return;
+            if (_titleCanvas != null) _titleCanvas.SetActive(true);
+            if (_screenCanvas != null) _screenCanvas.SetActive(true);
+        }
+
+        /// <summary>Height of the frozen title's logo centre (its bob included), or fallback when no title is frozen.</summary>
+        public static float TitleLogoY(float fallback) =>
+            _title != null && _title.Logo != null ? _title.Logo.rectTransform.anchoredPosition.y : fallback;
 
         /// <summary>Called every frame by each overlay component.</summary>
         public static void Tick()
         {
+            if (_events != null && !_active && Time.frameCount >= Mathf.Max(_restoreFrame, _screenRestoreFrame))
+            {
+                _events.sendNavigationEvents = _eventsNav;
+                _events = null;
+            }
+            if (_screenRestoreFrame >= 0 && Time.frameCount >= _screenRestoreFrame)
+            {
+                _screenRestoreFrame = -1;
+                if (_screen != null && !_active)
+                {
+                    _screen.enabled = true;
+                    if (_screen.IsVisible && _screen.DefaultItem != null && _screen.Focused == null) _screen.Focus(_screen.DefaultItem);
+                }
+                _screen = null;
+            }
             if (_restoreFrame < 0 || Time.frameCount < _restoreFrame) return;
             _restoreFrame = -1;
             if (_title != null && !_active) _title.enabled = true;
