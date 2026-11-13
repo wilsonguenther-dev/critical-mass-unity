@@ -86,7 +86,7 @@ namespace CriticalMass.Sim.Core
                 double uz = d > 1e-6 ? dz / d : JsMath.Sin(id * 2.39996);
                 double kd = p.SlamKnockCentre + (p.SlamKnockEdge - p.SlamKnockCentre) * (d / R);
                 if (Damage.ApplyHit(w, id, kc.SlamDamage * share, Damage.KaijuSlamSource, k.TelegraphX, k.TelegraphZ, DamageCause.KaijuSlam,
-                    ux, uz, knock ? kd : 0, knock ? w.Dur.SlamStun : 0) > 0) hits++;
+                    ux, uz, knock ? kd * Damage.KaijuThrow(w) : 0, knock ? w.Dur.SlamStun : 0) > 0) hits++;
             }
             k.SlamCd = kc.SlamCooldown;
             World.PushEvent(w, SimEventType.KaijuSlam, -1, hits, k.TelegraphX, k.TelegraphZ, R, null, DamageCause.None, R, 0, 0, knock ? p.SlamKnockCentre : 0, 2, 0, 0);
@@ -158,7 +158,7 @@ namespace CriticalMass.Sim.Core
                 if (walls && !SegmentClear.Clear(w.Map, k.ClawX, k.ClawZ, w.X[id], w.Z[id])) continue;
                 Knock.Dir(w, id, k.ClawX, k.ClawZ, fx, fz, out double dx, out double dz);
                 Damage.ApplyHit(w, id, kc.MeleeDamage, Damage.KaijuSource, k.ClawX, k.ClawZ, DamageCause.KaijuMelee, dx, dz,
-                    knock ? p.KaijuClawKnock : 0, knock ? w.Dur.KaijuStun : 0);
+                    knock ? p.KaijuClawKnock * Damage.KaijuThrow(w) : 0, knock ? w.Dur.KaijuStun : 0);
             }
         }
 

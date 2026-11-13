@@ -60,7 +60,7 @@ namespace CriticalMass.Sim.Tests
                 stunned |= w.Actors[6].HitStunTicks > 0;
             }
             Assert.Less(w.Actors[6].Hp, hp, "the claw hits");
-            Assert.Greater(w.X[6], SimPhysicsTests.HillX + 2.3, "and throws the fighter back (KaijuClawKnock)");
+            Assert.Greater(w.X[6], SimPhysicsTests.HillX + 2.05, "and throws the fighter back (KaijuClawKnock x KaijuKnockScale)");
             Assert.IsTrue(stunned, "and staggers it (KaijuStunSeconds)");
         }
 

@@ -78,6 +78,8 @@ namespace CriticalMass.Runtime.View.Anim
         public string Dominant { get; private set; } = "";
         /// <summary>The Walk clip's playback rate in the last pose (ground speed / measured stride speed).</summary>
         public double WalkRate { get; private set; }
+        /// <summary>The planted-foot speed of the drawn model's Walk at Scale 1 (world u/s), as measured.</summary>
+        public double LastWalkSpeed { get; private set; }
         /// <summary>The drawn yaw (degrees, view space) and the procedural lean, tail and look angles of the last pose.</summary>
         public float DrawnYaw => (float)_yaw;
         public float LeanDeg => (float)_lean;
@@ -173,6 +175,7 @@ namespace CriticalMass.Runtime.View.Anim
             _idleT += dSim * (isHatchling ? 1.25 : 1.0);
             double walkRate = Math.Max(0.4, Math.Min(2.2, stepSpeed / Math.Max(1e-3, me.WalkSpeed * s)));
             WalkRate = walkRate;
+            LastWalkSpeed = me.WalkSpeed;
             _prevWalkT = _walkT;
             _walkT += dSim * walkRate;
 
@@ -382,15 +385,20 @@ namespace CriticalMass.Runtime.View.Anim
             if (fl != null && fr != null && len > 0f)
             {
                 const int n = 48;
+                // Measure in WORLD units at the grown size (Scale 1): the root at its imported BaseScale for the measure, so the
+                // stride carries every scale above and below the root (CI run 2 read a stride ~2x short in model-local units,
+                // the Walk ran at its 2.2 cap and the planted feet slid 1.2 u per u travelled).
+                Vector3 keepScale = m.Transform.localScale;
+                m.Transform.localScale = m.BaseScale;
                 var y = new float[2, n + 1];
                 var p = new Vector3[2, n + 1];
                 for (int k = 0; k <= n; k++)
                 {
                     m.BeginPose();
                     m.Pose(ArtMapping.Walk, len * k / n, 1f, true);
-                    if (!m.Evaluate(true)) { _measured.Remove(m); return r; }
-                    p[0, k] = m.Transform.InverseTransformPoint(fl.position);
-                    p[1, k] = m.Transform.InverseTransformPoint(fr.position);
+                    if (!m.Evaluate(true)) { m.Transform.localScale = keepScale; _measured.Remove(m); return r; }
+                    p[0, k] = fl.position - m.Transform.position;
+                    p[1, k] = fr.position - m.Transform.position;
                     y[0, k] = p[0, k].y;
                     y[1, k] = p[1, k].y;
                 }
@@ -416,10 +424,8 @@ namespace CriticalMass.Runtime.View.Anim
                         if (!a && b) contacts.Add((double)(k + 1) / n);
                     }
                 }
-                double sp = speedN > 0 ? speedSum / speedN : 0;
-                // The model may be drawn at BaseScale != 1: the stride is in the model's local units.
-                float bs = m.BaseScale.x;
-                if (bs > 0f) sp *= bs;
+                m.Transform.localScale = keepScale;
+                double sp = speedN > 0 ? speedSum / speedN : 0;   // world units per second at Scale 1
                 if (sp > 0.2 && sp < 10) { r.WalkSpeed = sp; r.StrideMeasured = contacts.Count > 0; }
                 contacts.Sort();
                 r.Contacts = contacts.ToArray();

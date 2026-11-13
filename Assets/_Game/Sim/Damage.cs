@@ -72,6 +72,10 @@ namespace CriticalMass.Sim.Core
 
         /// <summary>fix/kaiju-alive-1: true when a hit of this cause knocks and staggers: Knockback on, or a Kaiju hit with
         /// PhysicsConfig.KaijuKnockback on.</summary>
+        /// <summary>fix/kaiju-alive-1: the share of the Kaiju's designed throw it applies (PhysicsConfig.KaijuKnockScale while
+        /// the fighters' Knockback is off).</summary>
+        public static double KaijuThrow(World w) => Phys.On(w, w.Config.Physics.Knockback) ? 1 : w.Config.Physics.KaijuKnockScale;
+
         public static bool Knocks(World w, DamageCause cause) =>
             Phys.On(w, w.Config.Physics.Knockback) ||
             (cause == DamageCause.KaijuMelee || cause == DamageCause.KaijuSlam) && Phys.On(w, w.Config.Physics.KaijuKnockback);

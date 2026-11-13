@@ -115,7 +115,8 @@ namespace CriticalMass.Runtime.PlayTests
                     switch (e.Type)
                     {
                         case SimEventType.KaijuMeleeWindup:
-                            pending.Add((now + EventLagTicks, "claw wind-up -> Swipe", () => ka.Dominant == "Swipe" || ka.Dominant == "SwipeWindup"));
+                            pending.Add((now + EventLagTicks, "claw wind-up -> Swipe", () => ka.Dominant == "Swipe" || ka.Dominant == "SwipeWindup" ||
+                                w.Kaiju.KoIn > 0 || w.Kaiju.TelegraphIn > 0));   // a KO or a slam overrides the claw
                             Count(seen, "KaijuMeleeWindup");
                             break;
                         case SimEventType.KaijuTelegraph:
@@ -128,8 +129,10 @@ namespace CriticalMass.Runtime.PlayTests
                             break;
                         case SimEventType.KaijuDamaged:
                         {
-                            double at = ka.LastFlinchAt;
-                            pending.Add((now + EventLagTicks, "hit -> flinch", () => ka.LastFlinchAt > at || w.Kaiju.KoIn > 0));
+                            // The views may already have posed this tick before the event is read: compare with the event's
+                            // sim time, not with the flinch time seen now.
+                            double at = (double)(now - 1) / w.Config.SimHz - 1e-6;
+                            pending.Add((now + EventLagTicks, "hit -> flinch", () => ka.LastFlinchAt >= at || w.Kaiju.KoIn > 0));
                             Count(seen, "KaijuDamaged");
                             break;
                         }
@@ -154,7 +157,7 @@ namespace CriticalMass.Runtime.PlayTests
             }
             sb.Append("\n  events:");
             foreach (KeyValuePair<string, int> kv in seen) sb.Append(' ').Append(kv.Key).Append(' ').Append(kv.Value);
-            sb.Append($"\n  Kaiju: {ka.Roars} roars, {ka.Steps} footfalls, walk rate {ka.WalkRate:0.00}");
+            sb.Append($"\n  Kaiju: {ka.Roars} roars, {ka.Steps} footfalls, walk rate {ka.WalkRate:0.00}, measured stride speed {ka.LastWalkSpeed:0.00} u/s");
             Debug.Log(sb.ToString());
 
             var bad = new List<string>(missed);
