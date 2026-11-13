@@ -163,6 +163,9 @@ namespace CriticalMass.Sim.Tests
             Console.WriteLine(b.Json("everything on (shipped)"));
             Assert.GreaterOrEqual(b.Passive5 / 200.0, 0.15, "5v5 idle-player floor (D-030)");
             Assert.GreaterOrEqual(b.Passive16, 34, "16v16 idle-player sweep (owner floor 34 of 200)");
+            // U-077: an idle human is a handicap: its team wins under half (an all-bot Azure wins about 59 of 100 at 16v16, 50 at 5v5).
+            Assert.Less(b.Passive16, b.Passive16Of / 2, "16v16: the idle player's team wins under half");
+            Assert.Less(b.Passive5, 100, "5v5: the idle player's team wins under half");
         }
 
         [Test, Category("Slow")]

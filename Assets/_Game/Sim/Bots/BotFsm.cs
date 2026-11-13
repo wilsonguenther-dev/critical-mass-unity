@@ -436,7 +436,7 @@ namespace CriticalMass.Sim.Bots
         }
 
         /// <summary>DG-24: a Builder bot builds only when the piece cuts at least this many cells off its walk to its goal.</summary>
-        public const double MinBuildGainCells = 2;
+        public const double MinBuildGainCells = 1;
 
         /// <summary>
         /// DG-24 (U-060, not in the browser) Builder bot: on its way to the hill (ToHill, Unstick) or the shrine (Deliver,
@@ -449,8 +449,10 @@ namespace CriticalMass.Sim.Bots
         private static void DecideBuilder(World w, BotsState st, int id, AiState state, BotSkillConfig sk)
         {
             int field;
-            if (state == AiState.ToHill || state == AiState.Unstick) field = BotFields.FieldHill;
-            else if (state == AiState.Deliver || state == AiState.Corrupt) field = BotFields.FieldShrine;
+            // U-075: also while fighting or holding near the hill (most useful spots, a gap or wall beside the hill, are met
+            // there, not on the walk) and while gathering (the way back to the shrine). Never while retreating.
+            if (state == AiState.ToHill || state == AiState.Unstick || state == AiState.HoldHill || state == AiState.Fight) field = BotFields.FieldHill;
+            else if (state == AiState.Deliver || state == AiState.Corrupt || state == AiState.Gather) field = BotFields.FieldShrine;
             else return;
             if (BuiltPieces.OwnedCount(w, id) >= w.Config.Abilities.BuilderPieces.MaxActivePerBuilder) return;
             double x = w.X[id];
@@ -641,6 +643,8 @@ namespace CriticalMass.Sim.Bots
             double hdx = x - hill.X;
             double hdz = z - hill.Z;
             double hillD = Math.Sqrt(hdx * hdx + hdz * hdz);
+            // U-076: a hill-squad bot holds the hill: no power-ups, drops or long chases (BotDepth.AssignHillSquad).
+            bool squad = st.HillSquad[id] != 0;
 
             // --- utilities ---
             double uFight = 0;
@@ -660,6 +664,13 @@ namespace CriticalMass.Sim.Bots
                     double ex = w.X[P.Enemy] - hill.X;
                     double ez = w.Z[P.Enemy] - hill.Z;
                     if (ex * ex + ez * ez > (hill.R + 1) * (hill.R + 1)) uFight *= sk == null ? 0.5 : sk.OffHillChaseFactor; // DG-21 discipline
+                }
+                else if (squad && !cocky)
+                {
+                    // U-076: the squad keeps the same discipline on its way back to the hill.
+                    double ex = w.X[P.Enemy] - hill.X;
+                    double ez = w.Z[P.Enemy] - hill.Z;
+                    if (ex * ex + ez * ez > (hill.R + 1) * (hill.R + 1)) uFight *= sk == null ? 0.5 : sk.OffHillChaseFactor;
                 }
             }
 
@@ -738,10 +749,10 @@ namespace CriticalMass.Sim.Bots
             double uGrab = 0;
             double grabX = 0;
             double grabZ = 0;
-            if (Pickups.On(w) && cur != AiState.HoldHill && a.CarryAmount == 0 && hpFrac >= lowHp && Pickups.BotGrabSpot(w, id, out grabX, out grabZ))
+            if (!squad && Pickups.On(w) && cur != AiState.HoldHill && a.CarryAmount == 0 && hpFrac >= lowHp && Pickups.BotGrabSpot(w, id, out grabX, out grabZ))
                 uGrab = w.Config.Depth.Pickups.BotGrabUtility;
             // U-068: a supply drop in sight and close: stand on it.
-            if (uGrab <= 0 && MapEvents.On(w) && a.CarryAmount == 0 && hpFrac >= lowHp && MapEvents.BotDropSpot(w, id, out grabX, out grabZ))
+            if (!squad && uGrab <= 0 && MapEvents.On(w) && a.CarryAmount == 0 && hpFrac >= lowHp && MapEvents.BotDropSpot(w, id, out grabX, out grabZ))
                 uGrab = w.Config.Depth.Events.BotDropUtility;
 
             // U-067: an answered ping. A hurt bot or one with cargo drops it; an Attack is over once the spot is reached and clear.

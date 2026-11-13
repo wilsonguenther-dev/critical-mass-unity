@@ -84,6 +84,11 @@ namespace CriticalMass.Sim.Core
             if (w.Depth.OrderKind[j] != 0 || b.CarryAmount > 0 || b.CarryMeat > 0) return false;
             if (call != PingCall.Defend && !(w.Config.Class(b.Cls).AttackDamage > 0)) return false;
             if (b.AiState == AiState.HoldHill && MatesOnHill(w, j) < (int)w.Config.Depth.Pings.HillMinMates) return false;
+            if (call != PingCall.Defend) // U-076: the hill squad answers Defend only
+            {
+                BotsState st = BotBrain.GetBotsState(w);
+                if (st != null && st.HillSquad[j] != 0) return false;
+            }
             return true;
         }
 

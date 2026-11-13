@@ -1330,3 +1330,64 @@ Supersedes U-063 item "only Farmers feed" and the small-team relaxation variants
 4. **DG-24 build check.** U-071 moved paths so the single-seed "Builder bots built something" check read 0 at Hard on
    seed 101; the check now widens to seeds 102 and 103 at the same difficulty (as U-056 did for hill presence). Measured
    1 build in the three Hard seeds: the Builder bot's build rule is still thin (#49 said so too).
+
+## U-074 The hatched Kaiju pushes actors out of its body on the hatch tick itself (our rule, physics lane) (2026-11-13T07:03:38Z)
+
+**Source.** Rules-lane fixer, PR #61 red: the physics soak at Hard (everything on) found an actor inside the Kaiju on the
+tick after the 240 s hatch. Cause: the step's separation pass (`Collide.SeparateActors` -> `KaijuBody`) runs inside
+movement, before `Kaiju.KaijuSystem` hatches, so the body appeared on top of whoever stood there and the push-out ran a tick later.
+1. **Rule.** `KaijuSystem` calls `Collide.KaijuBody` right after `Hatch` (no-op with `SolidKaiju` off, so Classic is unchanged).
+2. **Test.** `SimPhysicsTests.U074AnActorStandingWhereTheKaijuHatchesIsOutsideItsBodyOnTheHatchTick` (fails without the line: 0.3 u from the centre).
+
+## U-075 Builder bots build wherever a piece is useful, not only on the walk (our rule, supersedes U-073 item 4) (2026-11-13T07:03:38Z)
+
+**Source.** Rules-lane fixer. Measured on the DG-24 soak (16v16, three Builders a side, Hard seed 101): the bank held 50 to 80
+biomass all match, yet the only states that asked for a build (ToHill, Unstick, Deliver, Corrupt) almost never stood at a
+spot that cut 2 cells off the route; the spots that did were met while fighting near the hill. Zero builds on seeds 101 and 102.
+1. **Rule.** A Builder bot holding enough in the bank also builds while in Fight or HoldHill (gain toward the hill) and Gather
+   (gain toward the shrine), never while retreating; `BotFsm.MinBuildGainCells` 2 -> 1.
+2. **Measured** (seed 101, three Builders a side): Normal 9 and Hard 4 pieces a match in the DG-24 soak (Easy 7 in a probe;
+   before: 0 to 1 a match). The DG-24 "built something" check is back on its original single seed 101 (U-073 item 4 undone).
+
+## U-076 A hill squad by play style holds the hill while the other hill bots do the side jobs (our rule, depth rules only) (2026-11-13T07:03:38Z)
+
+**Source.** Rules-lane fixer, PR #61 red: bot hill presence 0.682 against the CM-09 0.70 band with everything on.
+1. **Rule.** Every director period, ceil(hill-duty bots not on supply x `Roles.HillSquadFraction` 0.5) of a team's hill bots
+   form the squad (`BotsState.HillSquad`, `BotDepth.AssignHillSquad`): lowest `Roles.HillSquadStyleRank` first (Guard,
+   Brawler, Sapper, Harvester), a bot already in the squad before a new one, then nearest the hill. A squad bot takes no
+   power-ups or supply drops, answers only Defend calls, keeps the off-hill chase discipline on its way back to the hill,
+   and is never picked for a corruption run. Food it picks up it still walks to the egg (keeping it cut the CM-64 band to
+   77 of 100). The others do every job as before.
+2. **Measured** (5v5 seeds 1..8, 120 s): hill presence 0.708 / 0.837 (was 0.682 / 0.790). Fraction 0.25 gave 0.702,
+   0.75 and 1.0 gave 0.700 and weakened a Normal team: 0.5 kept. Thin margin (0.008): the rest of the time off the hill
+   is the dead and the respawn walk back.
+
+## U-077 Short-handed means short by a real share of the team (our rule, depth rules only) (2026-11-13T07:03:38Z)
+
+**Source.** Rules-lane fixer, PR #61: the idle-player team won 142 of 200 at 16v16 and 80 of 200 at 5v5, more than an
+all-bot team. Cause, measured (100 + 100 idle seeds each): the CM-09 director plan, made for 5v5. One idle player makes
+its team "short-handed" (one egg-duty bot, everyone else on the hill) and the full team "ahead" (+2 egg duty). At 16v16
+that pulled three of four egg-duty bots onto a 14-bot hill blob, and with the depth rules (six-class lineup, Healers)
+numbers on the hill decide. Ablations: short-handed plan off 33 of 100 (16v16) / 14 of 100 (5v5); advantage extra off
+34 / 1; both off 12 / 0; browser lineup alone 26 / 11. Not the pickups, stations or feed bonus (each within noise).
+1. **Rule.** With class roles on, a team is short-handed only when it is down by at least `Roles.ShortHandedMinShare` = 0.15
+   of the other side's active players (one of five is, one of sixteen is not). The advantage extra is unchanged.
+   Rules off: any gap, the browser plan (Classic and PhysicsOnly unchanged).
+2. **Measured** (everything on, D-030 seeds 201..400): idle-player team 71 of 200 at 16v16 and 87 of 200 at 5v5; an
+   all-bot Azure wins 111 of 200 (16v16) and 109 of 200 (5v5). `RulesCombinedSoakTests` now also asserts under half.
+3. **Rejected.** The proportional plan (short-handed and advantage both by the size of the gap): 16v16 55 of 100, 5v5 9 of
+   100. The advantage extra only while not losing the hill: 16v16 14 of 100 (floor 34 of 200). A hill minimum of half the
+   team: 5v5 8 of 200. At 5v5 the director plan is all or nothing (one extra egg bot: 9 of 100; two: 87 of 200).
+
+## U-078 Hard bots under the depth rules stop chasing every carrier and go for the Healer (our rule, DG-21 profile) (2026-11-13T07:03:38Z)
+
+**Source.** Rules-lane fixer, PR #61: human-proxy wins Easy 19 / Normal 8 / Hard 7 with everything on (ordering barely held).
+With every class carrying food (U-070), Hard's carrier focus pulled it off the hill all match. Measured on 40 proxy seeds
+(Normal allies): class roles off Hard 9 of 40, Hard carrier weight 1 gave 11, think period 0.25 gave 11, wider power-up
+sight and a full hill squad for Hard did nothing (16, 15).
+1. **Rule.** `BotSkillConfig.RolesCarrierWeight` (Hard 1 = no carrier preference) replaces `CarrierWeight` while class roles
+   are on; `BotSkillConfig.HealerWeight` (Hard 0.25) makes an enemy Healer a first target when the depth rules are on;
+   `BotSkillConfig.HillSquadFraction` (Hard 1) puts every Hard hill bot in the U-076 squad. Normal has no profile
+   (unchanged); Classic and PhysicsOnly unchanged.
+2. **Measured**: proxy 20 / 8 / 6 on the band's seeds 1..20, 40 / 17 / 13 on seeds 1..40. Healer weight 1 gave 16 of 40,
+   0.1 gave 18. The gap on the band's seeds is two wins: strict, still narrow.

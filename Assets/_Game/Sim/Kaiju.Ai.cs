@@ -375,7 +375,13 @@ namespace CriticalMass.Sim.Core
             if (!m.Hatched)
             {
                 if (m.Instability >= SimResources.BerserkLine(w)) SimResources.LockBerserk(w); // DG-41
-                if (w.ForceHatch || m.Time + HatchTimeEps >= cfg.HatchSeconds) Hatch(w);
+                if (w.ForceHatch || m.Time + HatchTimeEps >= cfg.HatchSeconds)
+                {
+                    Hatch(w);
+                    // U-074: the body appears on top of whoever stands there; push them out on the hatch tick itself (the
+                    // separation pass of this step already ran while the Kaiju was still an egg). No-op with SolidKaiju off.
+                    Collide.KaijuBody(w);
+                }
                 return;
             }
             if (k.State == KaijuState.Egg) return;

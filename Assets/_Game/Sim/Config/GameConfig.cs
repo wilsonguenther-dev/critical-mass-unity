@@ -608,6 +608,13 @@ namespace CriticalMass.Sim.Config
         public bool FocusCarriers = false;
         /// <summary>Target choice: distance-squared multiplier for a carrier when FocusCarriers is on.</summary>
         public double CarrierWeight = 0.25;
+        /// <summary>U-078 (depth rules only, with FocusCarriers): distance-squared multiplier for an enemy Healer (Hard 0.25: it cuts the healer down first).</summary>
+        public double HealerWeight = 1;
+        /// <summary>U-078 (depth rules only): share of the team's hill-duty bots in the hill squad (U-076); below 0 = Depth.Roles.HillSquadFraction.</summary>
+        public double HillSquadFraction = -1;
+        /// <summary>U-078: CarrierWeight while the class-roles rule is on (every class carries food, so chasing carriers pulls a
+        /// Hard bot off the hill all match: 1 = no carrier preference; measured Hard 16 -> 11 of 40 wins against it).</summary>
+        public double RolesCarrierWeight = 0.25;
         /// <summary>Objective discipline: a hill holder's fight utility vs an enemy off the hill is multiplied by this (Normal 0.5).</summary>
         public double OffHillChaseFactor = 0.5;
         /// <summary>Objective discipline: a hurt bot retreats when an enemy is within this range (Normal 6).</summary>
@@ -625,6 +632,7 @@ namespace CriticalMass.Sim.Config
         {
             ThinkPeriodScale = 0.5, AimErrorUnits = 0, TntLeadFraction = 0.6, SwingHesitation = 0, AbilityChance = 1,
             ShieldCrowd = 1, FocusCarriers = true, CarrierWeight = 0.25, OffHillChaseFactor = 0.25, RetreatRange = 3, DodgeKaiju = true,
+            HealerWeight = 0.25, RolesCarrierWeight = 1, HillSquadFraction = 1,
         };
 
         public BotSkillConfig Clone() => (BotSkillConfig)MemberwiseClone();

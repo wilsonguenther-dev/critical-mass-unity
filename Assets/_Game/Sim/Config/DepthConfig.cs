@@ -311,6 +311,22 @@ namespace CriticalMass.Sim.Config
         public double EscortKeepDistance = 2.5;
         /// <summary>Bots: utility of escorting (over the 0.6 x hp fight of an egg-duty bot, under an intercept at 1).</summary>
         public double EscortUtility = 0.75;
+        /// <summary>
+        /// U-076 bots: the hill squad. Every director period, ceil(hill-duty bots x HillSquadFraction) of a team's hill-duty
+        /// bots that do not run supply hold the hill and leave the side jobs (power-ups, supply drops, calls other than Defend)
+        /// to the rest; food a squad bot picks up it still walks to the egg (keeping it cost the CM-64 band: 84 -> 77 of 100). Picked by play style (HillSquadStyleRank, lowest first: Guard, Brawler, Sapper, Harvester), a bot
+        /// already in the squad first, then the one nearest the hill. 0 = no squad (every hill bot free for side jobs).
+        /// </summary>
+        public double HillSquadFraction = 0.5;
+        /// <summary>U-076: squad rank per play style, indexed Brawler, Guard, Harvester, Sapper (BotNames).</summary>
+        public double[] HillSquadStyleRank = { 1, 0, 3, 2 };
+        /// <summary>
+        /// U-077 bots: the director's short-handed plan (CM-09: one egg-duty bot, everyone else on the hill) starts only when
+        /// the team is down by at least this share of the other side's active players. The browser plan was made for 5v5,
+        /// where one idle player is 20%; at 16v16 one idle player (6%) pulled three of four egg-duty bots onto the hill and,
+        /// with these rules on, won the idle player's team 142 of 200 matches (an all-bot team wins about half).
+        /// </summary>
+        public double ShortHandedMinShare = 0.15;
 
         public RolesConfig Clone()
         {
@@ -321,6 +337,7 @@ namespace CriticalMass.Sim.Config
             c.CorruptionRunner = (bool[])CorruptionRunner.Clone();
             c.ClassMix = (double[])ClassMix.Clone();
             c.SmallTeamClassMix = (double[])SmallTeamClassMix.Clone();
+            c.HillSquadStyleRank = (double[])HillSquadStyleRank.Clone();
             return c;
         }
     }

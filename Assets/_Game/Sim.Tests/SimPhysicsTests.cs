@@ -766,6 +766,25 @@ namespace CriticalMass.Sim.Tests
             Assert.AreEqual(w.Actors[2].MaxHp, w.Actors[2].Hp, "no trample damage");
         }
 
+        [Test]
+        public void U074AnActorStandingWhereTheKaijuHatchesIsOutsideItsBodyOnTheHatchTick()
+        {
+            World probe = Make();
+            probe.ForceHatch = true;
+            SimStep.Step(probe);
+            double hx = probe.Kaiju.X, hz = probe.Kaiju.Z;
+            World w = Make();
+            ParkOthers(w, 2);
+            Place(w, 2, hx + 0.3, hz);
+            Idle(w);
+            w.ForceHatch = true;
+            SimStep.Step(w); // the hatching step itself
+            Assert.IsTrue(w.Match.Hatched);
+            Kaiju k = w.Kaiju;
+            double d = Math.Sqrt((w.X[2] - k.X) * (w.X[2] - k.X) + (w.Z[2] - k.Z) * (w.Z[2] - k.Z));
+            Assert.GreaterOrEqual(d, w.Config.Physics.KaijuBodyRadius - 1e-6, "pushed out on the hatch tick, not one tick later");
+        }
+
         /// <summary>True when the Kaiju's wall collider circle overlaps no blocked cell.</summary>
         internal static bool KaijuClearOfWalls(World w)
         {
