@@ -49,6 +49,7 @@ namespace CriticalMass.Sim.Bots
                 Actor t = w.Actors[j];
                 if (!t.Alive || t.Team == a.Team || t.SpawnProtect > 0) continue;
                 if (t.CarryAmount <= 0 && t.CarryMeat <= 0) continue;
+                if (PassiveTarget(w, j)) continue; // DG-16 passive window
                 double dx = w.X[j] - sx;
                 double dz = w.Z[j] - sz;
                 double d2 = dx * dx + dz * dz;
@@ -57,6 +58,15 @@ namespace CriticalMass.Sim.Bots
                 bestD2 = d2;
             }
             return best;
+        }
+
+        /// <summary>
+        /// DG-16 (Bots.PassiveSeconds, the guided first match): true while bots must leave target alone, that is target is the
+        /// human slot and match time is still inside the passive window. Default 0 = never (every decision is unchanged).
+        /// </summary>
+        public static bool PassiveTarget(World w, int target)
+        {
+            return w.Actors[target].IsHuman && w.Match.Time < w.Config.Bots.PassiveSeconds;
         }
 
         /// <summary>CM-64: only a Kaiju-duty bot contests a carrier; the hill crew keeps the CM-09 rule.</summary>
@@ -117,6 +127,7 @@ namespace CriticalMass.Sim.Bots
                 if (j >= w.ActorCount) continue;
                 Actor t = w.Actors[j];
                 if (!t.Alive || t.Team == a.Team || t.SpawnProtect > 0) continue;
+                if (PassiveTarget(w, j)) continue; // DG-16 passive window: the human is not an enemy yet
                 double dx = w.X[j] - x;
                 double dz = w.Z[j] - z;
                 double d2 = dx * dx + dz * dz;

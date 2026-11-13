@@ -9,6 +9,21 @@ namespace CriticalMass.Sim.Core
         /// <summary>CM-26: source id of a Kaiju MELEE hit (the slam keeps -1); kept in lastAttacker and the hit / death event.</summary>
         public const int KaijuSource = -2;
 
+        /// <summary>
+        /// DG-16: source id the Kaiju slam passes (the view's CombatLog.KaijuSlam). The hit / death event B and LastAttacker
+        /// still read -1 for it (ported tests pin that); the slam is told apart by DamageCause.KaijuSlam.
+        /// </summary>
+        public const int KaijuSlamSource = -3;
+
+        /// <summary>DG-16: the cause a source id implies: an actor = Melee, KaijuSource = KaijuMelee, KaijuSlamSource = KaijuSlam, else None.</summary>
+        public static DamageCause CauseOf(World w, int sourceId)
+        {
+            if (sourceId >= 0 && sourceId < w.ActorCount) return DamageCause.Melee;
+            if (sourceId == KaijuSource) return DamageCause.KaijuMelee;
+            if (sourceId == KaijuSlamSource) return DamageCause.KaijuSlam;
+            return DamageCause.None;
+        }
+
         /// <summary>Half-angle of the shield's frontal cone.</summary>
         public const double ShieldHalfArcDeg = 60;
 
@@ -31,6 +46,12 @@ namespace CriticalMass.Sim.Core
         /// <summary>Damage actor targetId by amount from sourceId standing at (srcX, srcZ); returns the damage dealt (0 when ignored).</summary>
         public static double ApplyDamage(World w, int targetId, double amount, int sourceId, double srcX, double srcZ)
         {
+            return ApplyDamage(w, targetId, amount, sourceId, srcX, srcZ, CauseOf(w, sourceId));
+        }
+
+        /// <summary>DG-16: ApplyDamage with an explicit cause (written to the Hit / Death event Cause and Actor.LastCause), for later sources such as DG-22 blasts.</summary>
+        public static double ApplyDamage(World w, int targetId, double amount, int sourceId, double srcX, double srcZ, DamageCause cause)
+        {
             if (!(targetId >= 0 && targetId < w.ActorCount)) return 0;
             if (!(amount > 0) || !double.IsFinite(amount)) return 0;
             if (w.Match.Phase == MatchPhase.Ended) return 0;
@@ -51,9 +72,10 @@ namespace CriticalMass.Sim.Core
             t.Hp -= dmg;
             t.GatherProgress = 0;
             t.LastAttacker = credit;
+            t.LastCause = cause;
             double tx = w.X[targetId];
             double tz = w.Z[targetId];
-            World.PushEvent(w, SimEventType.Hit, targetId, credit, tx, tz, dmg);
+            World.PushEvent(w, SimEventType.Hit, targetId, credit, tx, tz, dmg, null, cause);
             // CM-64: a hit during a delivery wind-up at the shrine loses that delivery (DeliverIntercepted).
             Delivery.InterruptDelivery(w, targetId, credit);
 
@@ -75,7 +97,7 @@ namespace CriticalMass.Sim.Core
                 t.AbilityActive = 0;
                 t.SlowTimer = 0;
                 t.Moving = false;
-                World.PushEvent(w, SimEventType.Death, targetId, credit, tx, tz, dmg);
+                World.PushEvent(w, SimEventType.Death, targetId, credit, tx, tz, dmg, null, cause);
             }
             return dmg;
         }

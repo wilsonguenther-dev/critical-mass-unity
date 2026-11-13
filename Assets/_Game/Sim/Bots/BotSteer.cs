@@ -255,7 +255,7 @@ namespace CriticalMass.Sim.Bots
                         tz = k.Z;
                         reach = cc.AttackRange + cfg.Kaiju.Radius + AttackSlack;
                     }
-                    else if (t >= 0 && t < w.ActorCount && w.Actors[t].Alive)
+                    else if (t >= 0 && t < w.ActorCount && w.Actors[t].Alive && !BotFsm.PassiveTarget(w, t))
                     {
                         valid = true;
                         tx = w.X[t];
@@ -405,6 +405,7 @@ namespace CriticalMass.Sim.Bots
                     if (j >= w.ActorCount) continue;
                     Actor t = w.Actors[j];
                     if (!t.Alive || t.Team == a.Team || t.SpawnProtect > 0) continue;
+                    if (BotFsm.PassiveTarget(w, j)) continue; // DG-16 passive window
                     double dx = w.X[j] - x;
                     double dz = w.Z[j] - z;
                     double d2 = dx * dx + dz * dz;

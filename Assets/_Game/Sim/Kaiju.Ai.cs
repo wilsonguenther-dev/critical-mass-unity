@@ -38,7 +38,7 @@ namespace CriticalMass.Sim.Core
                 double dx = w.X[id] - k.TelegraphX;
                 double dz = w.Z[id] - k.TelegraphZ;
                 if (dx * dx + dz * dz > r2) continue;
-                if (Damage.ApplyDamage(w, id, kc.SlamDamage, -1, k.TelegraphX, k.TelegraphZ) > 0) hits++;
+                if (Damage.ApplyDamage(w, id, kc.SlamDamage, Damage.KaijuSlamSource, k.TelegraphX, k.TelegraphZ) > 0) hits++;
             }
             k.SlamCd = kc.SlamCooldown;
             World.PushEvent(w, SimEventType.KaijuSlam, -1, hits, k.TelegraphX, k.TelegraphZ, kc.SlamRadius);

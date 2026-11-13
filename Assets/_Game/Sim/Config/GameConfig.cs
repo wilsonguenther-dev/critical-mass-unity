@@ -475,6 +475,11 @@ namespace CriticalMass.Sim.Config
         public double TurnRateDegPerSec = 300;
         /// <summary>CM-64: an enemy carrier inside this radius of the shrine centre is contestable by Kaiju-duty bots (3 + FightKeepRange 8).</summary>
         public double InterceptShrineRadius = 11;
+        /// <summary>
+        /// DG-16 (the guided first match): for the first PassiveSeconds of match time bots neither target nor damage the
+        /// human slot (actor 0). 0 = off (the default; every bot decision is the browser's).
+        /// </summary>
+        public double PassiveSeconds = 0;
 
         public BotsConfig Clone()
         {

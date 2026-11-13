@@ -67,6 +67,8 @@ namespace CriticalMass.Sim.Core
                 double fx = JsMath.Cos(a.Facing);
                 double fz = JsMath.Sin(a.Facing);
                 double cosHalf = JsMath.Cos(cc.AttackArcDeg / 2 * Math.PI / 180);
+                // DG-16 (view request): the swing starts: attacker, reach point in front of it, facing.
+                World.PushEvent(w, SimEventType.AttackStart, i, -1, ax + fx * cc.AttackRange, az + fz * cc.AttackRange, a.Facing);
                 int count = SpatialHash.QueryCircle(w.Hash, ax, az, cc.AttackRange + maxTargetRadius, candidates);
                 for (int k = 0; k < count; k++)
                 {
@@ -74,6 +76,8 @@ namespace CriticalMass.Sim.Core
                     if (j == i) continue;
                     Actor t = w.Actors[j];
                     if (!t.Alive || t.Team == a.Team) continue;
+                    // DG-16 passive window: a bot's swing never hurts the human slot yet.
+                    if (!a.IsHuman && t.IsHuman && w.Match.Time < cfg.Bots.PassiveSeconds) continue;
                     double dx = w.X[j] - ax;
                     double dz = w.Z[j] - az;
                     double reach = cc.AttackRange + cfg.Class(t.Cls).Radius;
