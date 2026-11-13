@@ -30,6 +30,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import kaiju_palette as PAL  # noqa: E402
 import kaiju_face as FACE  # noqa: E402
+import kaiju_finish as FIN  # noqa: E402
 
 ART = os.path.dirname(HERE)
 FPS = 24
@@ -42,7 +43,8 @@ TRI_CAP = {"Egg": 4000, "Hatchling": 10000, "Adult": 15000}
 # Silhouette tunables fitted against the bible crops with iou_map.py (KJ_TUNE='{"sh_x": 1.05}' overrides one run;
 # the committed defaults below are the fitted values, so a plain run rebuilds the committed asset).
 TUNE = {"sh_x": 1.12, "fist_x": 1.68, "fist_r": 0.64, "crown_k": 1.05, "fan_k": 1.2, "head_dy": -0.25, "head_dz": -0.2,
-        "hip_z": 1.38, "thigh_x": 0.68, "fist_y": -0.8, "tail_k": 0.6, "arm_k": 1.38, "cry_k": 1.12, "rock_k": 1.18, "facets": 11, "crack_k": 1.42, "rim_k": 2.2, "moss_k": 0.6, "rim_d": 0.09}
+        "hip_z": 1.38, "thigh_x": 0.68, "fist_y": -0.8, "tail_k": 0.6, "arm_k": 1.38, "cry_k": 1.12, "rock_k": 1.18, "facets": 11, "crack_k": 1.27, "rim_k": 2.2, "moss_k": 0.6, "rim_d": 0.09,
+        "round": 0.24, "seg2_r": 0.58, "core": 0.66, "head_up": -12.0}
 TUNE.update(json.loads(os.environ.get("KJ_TUNE", "{}")))
 
 
@@ -100,7 +102,7 @@ class Geo:
         self.V, self.F, self.M, self.SM, self.B, self.G, self.D = [], [], [], [], [], [], []
         self.FS, self.GR = [], []      # v3: per-face value factor (three-step boulder read); graded team faces
 
-    def add(self, verts, faces, mats, bone=None, smooth=False, shade=None, fshade=None, graded=False):
+    def add(self, verts, faces, mats, bone=None, smooth=False, shade=None, fshade=None, graded=False, decal=None):
         """shade: per-vertex value factor baked into the vertex colour (+6 % toward the top of a part, -10 % in
         crevices, ART-DIRECTION 3.5). None = 1.0."""
         o = len(self.V)
@@ -111,7 +113,7 @@ class Geo:
             self.F.append(tuple(i + o for i in f))
             self.M.append(mats[k] if isinstance(mats, (list, tuple)) else mats)
             self.SM.append(smooth)
-            self.D.append(False)
+            self.D.append(bool(decal[k]) if decal is not None else False)
             self.FS.append(fshade[k] if fshade is not None else 1.0)
             self.GR.append(graded)
 
@@ -439,7 +441,11 @@ def boulder(geo, b, rng, core_bvh=None, rim_d=0.0, near=()):
     bm = _hull_bm(pts)
     bmesh.ops.dissolve_limit(bm, angle_limit=math.radians(9), verts=bm.verts[:], edges=bm.edges[:])
     ch = min(CHAMFER[0], 0.12 * min(radii))
-    res = bmesh.ops.bevel(bm, geom=bm.edges[:] + bm.verts[:], offset=ch, offset_type="OFFSET", segments=1,
+    seg = 1
+    if b.get("round", 0.0) > 0:           # v4: pillowed stones (bible: rounded boulders, not planed blocks)
+        ch = b["round"] * min(radii)
+        seg = 2 if max(radii) >= TUNE["seg2_r"] else 1
+    res = bmesh.ops.bevel(bm, geom=bm.edges[:] + bm.verts[:], offset=ch, offset_type="OFFSET", segments=seg,
                           profile=0.5, affect="EDGES", clamp_overlap=True)
     for f in bm.faces:
         f.tag = False
@@ -525,7 +531,7 @@ def crystal3(geo, base, d, length, radius, rng, bone=None, sides=6):
     d = Vector(d).normalized()
     M = frame(d, rng.uniform(0, math.tau))
     base = Vector(base) - d * (0.22 * length)
-    rings = [(0.0, radius * 0.92, 0.5), (length * 0.4, radius, 0.74), (length * 0.72, radius * 0.94, 0.94)]
+    rings = [(0.0, radius * 0.92, 0.62), (length * 0.4, radius, 0.84), (length * 0.72, radius * 0.94, 1.0)]
     V, G = [], []
     for z, r, k in rings:
         for i in range(sides):
@@ -827,6 +833,9 @@ def finish(name, geo, bones, target_h):
     return ob, rig, s
 
 
+FINISH_SCALE = {"Egg": 0.85, "Hatchling": 1.1, "Adult": 2.5}
+
+
 def paint(me, stage, geo):
     """Vertex colour layer "Col" (corner domain, sRGB bytes): RGB = slot lit colour x baked gradient, A = mask code.
     Team-glow slots are self-lit, so they get no gradient. Also stores the slot per face as an int attribute
@@ -849,6 +858,20 @@ def paint(me, stage, geo):
                 g = 1.0
             g *= geo.FS[poly.index]
             vals.append((min(1.0, base[0] * g), min(1.0, base[1] * g), min(1.0, base[2] * g), a))
+    # v4 painted finish (kaiju_finish.py): one value factor per vertex, fixed-colour faces only
+    kinds = [FIN.SLOT_KIND.get(names[mi], "other") for mi in geo.M]
+    team = [names[mi] in PAL.TEAM_SLOTS for mi in geo.M]
+    fac, stats = FIN.geo_factors([v.co.copy() for v in me.vertices], [tuple(p.vertices) for p in me.polygons], kinds, team,
+                                 seed=606, scale=FINISH_SCALE.get(stage, 1.0),
+                                 skip_faces=[d or names[mi] == "Hide" for d, mi in zip(geo.D, geo.M)])   # the painted head keeps its own gradient
+    print("FINISH %s %s" % (stage, stats))
+    for poly, mi in zip(me.polygons, geo.M):
+        if team[poly.index]:
+            continue
+        for li in poly.loop_indices:
+            f = fac[me.loops[li].vertex_index]
+            r, g, b, a = vals[li]
+            vals[li] = (min(1.0, r * f), min(1.0, g * f), min(1.0, b * f), a)
     for li, v in enumerate(vals):
         col.data[li].color_srgb = v
 
@@ -902,7 +925,7 @@ def key_clips(rig, clips, scale):
     for name, frames, fn in clips:
         act = bpy.data.actions.new(name)
         ad.action = act
-        step = 2
+        step = 1 if name == "Swipe" else 2       # the 4-frame strike needs every frame keyed
         fr = list(range(0, frames + 1, step))
         if fr[-1] != frames:
             fr.append(frames)
@@ -940,14 +963,44 @@ BERSERK_FIT = {"ra": -6.0, "ax": 12.0, "ay": 6, "sp": -1.0, "ch": -8, "nk": -2.0
 HATCH_IDLE_FIT = {"nk": -34.0, "hd": 18.0, "hy": 0.0, "sp": -11.25, "ch": 5.0, "ax": 12.0, "ay": -12.0, "tx": 30, "ty": -6.0, "tl": -14.0}
 
 
+def _clamp01(x):
+    return max(0.0, min(1.0, x))
+
+
+SWIPE_FRAMES, SWIPE_STRIKE = 30, (0.30, 0.47)     # the fist crosses the front at about t = 0.40 (frame 12)
+
+
+def swipe_w(t):
+    """Twist parameter of the swipe: 0 rest, -1 wound back to the right, +1 swung through to the left."""
+    a0, a1 = SWIPE_STRIKE
+    if t < a0:
+        return -smooth(t / (a0 - 0.04))                               # anticipation, held for the last frame
+    if t < a1:
+        x = (t - a0) / (a1 - a0)
+        return -1.0 + 2.0 * (x * x * (3 - 2 * x))                     # the strike: 4 frames
+    if t < 0.62:
+        return 1.0 + 0.16 * math.sin(math.pi * (t - a1) / (0.62 - a1))  # follow-through overshoot
+    return 1.0 - smooth((t - 0.62) / 0.38)                            # recover
+
+
 def creature_clips(stage="Adult"):
-    """Clips the docs name (ARCHITECTURE.md section 6, PARITY p10/p11): idle, walk, roar, slam wind-up, slam, berserk,
-    KO. Loops are in place (no root motion). Locations are design units (multiplied by the stage scale)."""
+    """Clips (names are a contract with the game; v4 ADDS Swipe and never renames): Idle, Walk, Roar, SlamWindup,
+    Slam, Berserk, KO, Swipe. Loops are in place (no root motion). Locations are design units (x stage scale).
+    v4 animation pass: every action clip has anticipation and follow-through; the idle breathes, cocks its head and
+    sways the tail with overlap; the walk drops its weight on each fist plant; the tail and head lag the body."""
+    HU = TUNE["head_up"] if stage == "Adult" else 0.0      # adult: face tilted up toward the high gameplay camera
 
     def idle(t):
-        s = math.sin(math.tau * t)
-        rot = {"Spine": [(X, -1.5 * s)], "Chest": [(X, -1.0 * s)], "Head": [(X, 2.5 * math.sin(math.tau * t + 1))],
-               "Arm_L": [(X, 2.0 * s)], "Arm_R": [(X, 2.0 * s)], "Tail1": [(Z, 5 * s)], "Tail2": [(Z, 6 * s)]}
+        p = math.tau * t
+        br = math.sin(2 * p)                 # two breaths per loop
+        sw = math.sin(p)                     # slow weight shift
+        rot = {"Spine": [(X, -2.0 * br), (Z, 2.0 * sw)], "Chest": [(X, -2.5 * br), (Y, 1.5 * sw)],
+               "Neck": [(X, 1.5 * br)],
+               "Head": [(X, HU + 2.5 * math.sin(2 * p - 0.5)), (Y, 8 * math.sin(p + 0.6)), (Z, 6 * math.sin(p - 0.4))],
+               "Jaw": [(X, 3 + 3 * max(0.0, br))],
+               "Arm_L": [(X, 4.0 * br), (Y, -1.0 * br)], "Arm_R": [(X, 4.0 * br), (Y, 1.0 * br)],
+               "Tail1": [(Z, 10 * sw)], "Tail2": [(Z, 14 * math.sin(p - 0.7))],
+               "Tail3": [(Z, 18 * math.sin(p - 1.4)), (X, 6 * br)]}
         if stage == "Hatchling":        # bible p10 hatchling: head up and turned to the viewer, chest lifted
             H = HATCH_IDLE_FIT
             base = {"Spine": [(X, H["sp"])], "Chest": [(X, H["ch"])], "Neck": [(X, H["nk"])],
@@ -956,55 +1009,95 @@ def creature_clips(stage="Adult"):
                     "Thigh_R": [(X, H["tx"]), (Y, H["ty"])], "Tail1": [(Z, H["tl"])]}
             for k, v in base.items():
                 rot[k] = v + rot.get(k, [])
-        return {"rot": rot, "loc": {"Hips": (0, 0, 0.015 * s)}}
+        return {"rot": rot, "loc": {"Hips": (0.015 * sw, 0, 0.025 * br)}}
 
     def walk(t):
         p = math.tau * t
         s, c = math.sin(p), math.cos(p)
         liftL, liftR = max(0.0, -s), max(0.0, s)
-        return {"rot": {"Arm_L": [(X, -6 - 20 * s)], "Arm_R": [(X, -6 + 20 * s)],
-                        "Forearm_L": [(X, 18 * liftL)], "Forearm_R": [(X, 18 * liftR)],
-                        "Fist_L": [(X, -20 * liftL)], "Fist_R": [(X, -20 * liftR)],
-                        "Thigh_L": [(X, 16 * s)], "Thigh_R": [(X, -16 * s)],
-                        "Foot_L": [(X, -10 * max(0.0, s))], "Foot_R": [(X, -10 * max(0.0, -s))],
-                        "Spine": [(X, 6), (Z, 4 * s), (Y, 3 * s)], "Chest": [(Y, 4 * s)], "Head": [(X, -6), (Z, -4 * s)],
-                        "Tail1": [(Z, 9 * s)], "Tail2": [(Z, 10 * c)]},
-                "loc": {"Hips": (0.04 * s, 0, 0.05 * abs(math.sin(2 * p)))}}
+        bob = abs(math.sin(p))               # the body drops as each fist plants (two drops per cycle)
+        return {"rot": {"Arm_L": [(X, -6 - 24 * s)], "Arm_R": [(X, -6 + 24 * s)],
+                        "Forearm_L": [(X, 26 * liftL)], "Forearm_R": [(X, 26 * liftR)],
+                        "Fist_L": [(X, -26 * liftL)], "Fist_R": [(X, -26 * liftR)],
+                        "Thigh_L": [(X, 20 * s)], "Thigh_R": [(X, -20 * s)],
+                        "Foot_L": [(X, -12 * max(0.0, s))], "Foot_R": [(X, -12 * max(0.0, -s))],
+                        "Spine": [(X, 7), (Z, 6 * s), (Y, 5 * s)], "Chest": [(Y, 6 * s), (Z, 4 * s)],
+                        "Neck": [(Z, -4 * s)],
+                        "Head": [(X, HU + 3 * math.cos(2 * p - 0.6)), (Z, -6 * s), (Y, -5 * math.sin(p - 0.5))],
+                        "Jaw": [(X, 4 + 4 * bob)],
+                        "Tail1": [(Z, 14 * math.sin(p - 0.5))], "Tail2": [(Z, 16 * math.sin(p - 1.2))],
+                        "Tail3": [(Z, 18 * math.sin(p - 1.9))]},
+                "loc": {"Hips": (0.07 * s, 0, 0.10 * bob - 0.05)}}
 
     def roar(t):
-        """Bible p11 roar: wide planted stance, arms splayed, head thrown up, jaw wide (ROAR_FIT)."""
-        e = smooth(t / 0.3) * (1 - smooth((t - 0.8) / 0.2))
+        """Bible p11 roar (ROAR_FIT at full weight). v4: a 6-frame crouch-and-inhale first, a burst up to the fitted
+        pose (jaw fully open by frame 11), a held shaking roar, then a settle."""
+        a = smooth(t / 0.15) * (1 - smooth((t - 0.15) / 0.12))
+        e = smooth((t - 0.15) / 0.15) * (1 - smooth((t - 0.82) / 0.18))
         sh = 2.5 * math.sin(math.tau * 9 * t) * e
         R = ROAR_FIT
-        rot = {"Spine": [(X, R["sp"] * e)], "Chest": [(X, R["ch"] * e)], "Neck": [(X, R["nk"] * e)],
-               "Head": [(X, R["hd"] * e + sh)], "Jaw": [(X, 42 * e)],
+        rot = {"Spine": [(X, R["sp"] * e + 7 * a)], "Chest": [(X, R["ch"] * e + 6 * a)], "Neck": [(X, R["nk"] * e)],
+               "Head": [(X, HU * (1 - e) + R["hd"] * e + 14 * a + sh)], "Jaw": [(X, 3 * (1 - e) + 46 * e + 1.5 * sh)],
                "Arm_L": [(X, R["ax"] * e), (Y, -R["ay"] * e)], "Arm_R": [(X, R["ax"] * e), (Y, R["ay"] * e)],
                "Forearm_L": [(X, R["fx"] * e), (Y, -R["fy"] * e)], "Forearm_R": [(X, R["fx"] * e), (Y, R["fy"] * e)],
                "Thigh_L": [(X, R["tx"] * e), (Y, -R["ty"] * e)], "Thigh_R": [(X, R["tx"] * e), (Y, R["ty"] * e)],
-               "Tail1": [(X, R["tl"] * e)]}
-        return {"rot": rot, "loc": {"Hips": (0, 0, R["hz"] * e)}}
+               "Tail1": [(X, R["tl"] * e), (Z, 8 * math.sin(math.tau * 3 * t) * e)],
+               "Tail2": [(Z, 12 * math.sin(math.tau * 3 * t - 0.8) * e)]}
+        return {"rot": rot, "loc": {"Hips": (0, 0, R["hz"] * e - 0.10 * a)}}
 
     def windup_pose(e, arc_back=True):
         """Bible p11 slam wind-up (WINDUP_FIT): the right fist swung back over the shoulder, body pitched down."""
         W = WINDUP_FIT
         arx = W["arx"] if arc_back else (W["arx"] - 360 if W["arx"] > 180 else W["arx"])
-        return {"Spine": [(X, W["sp"] * e)], "Chest": [(X, W["chx"] * e), (Y, W["chy"] * e)], "Head": [(X, W["hd"] * e)],
+        return {"Spine": [(X, W["sp"] * e)], "Chest": [(X, W["chx"] * e), (Y, W["chy"] * e)],
+                "Head": [(X, HU * (1 - e) + W["hd"] * e)],
                 "Arm_R": [(X, arx * e), (Y, W["ary"] * e)], "Forearm_R": [(X, W["frx"] * e)],
                 "Fist_R": [(X, W["fkx"] * e)], "Arm_L": [(X, W["alx"] * e), (Y, -W["aly"] * e)],
-                "Forearm_L": [(X, W["flx"] * e)], "Jaw": [(X, 12 * e)]}
+                "Forearm_L": [(X, W["flx"] * e)], "Jaw": [(X, 3 + 9 * e)]}
 
     def windup(t):
-        e = smooth(t)
-        return {"rot": windup_pose(e), "loc": {"Hips": (0, 0, WINDUP_FIT["hz"] * e)}}
+        """v4: a short dip the other way first (anticipation), then the backswing; ends exactly on the fitted pose."""
+        e = smooth((t - 0.15) / 0.85)
+        a = math.sin(math.pi * _clamp01(t / 0.4)) * (1 - e)
+        rot = windup_pose(e)
+        rot["Spine"] = rot["Spine"] + [(X, 6 * a)]
+        rot["Arm_R"] = rot["Arm_R"] + [(X, -10 * a)]
+        return {"rot": rot, "loc": {"Hips": (0, 0, WINDUP_FIT["hz"] * e - 0.05 * a)}}
 
     def slam(t):
-        """From the wind-up pose the fist comes down IN FRONT (forward arc) onto the telegraph centre."""
+        """From the wind-up pose the fist comes down IN FRONT onto the telegraph centre: the hit lands at t = 0.55
+        (frame 8 of 14). v4 follow-through: the body squashes into the hit, the head nods, the tail whips up, then a
+        small rebound over the last 6 frames."""
         s = smooth(t / 0.55) ** 2
+        r = _clamp01((t - 0.55) / 0.45)
+        q = math.sin(math.pi * r) * (1 - 0.5 * r)
         rot = windup_pose(1 - s, arc_back=False)
-        for b, add in (("Spine", 10 * s), ("Chest", 10 * s), ("Head", 4 * s)):
+        for b, add in (("Spine", 10 * s + 5 * q), ("Chest", 10 * s + 5 * q), ("Head", 4 * s + 9 * q)):
             rot[b] = rot.get(b, []) + [(X, add)]
-        rot["Jaw"] = [(X, 12 + 10 * s)]
-        return {"rot": rot, "loc": {"Hips": (0, 0, WINDUP_FIT["hz"] * (1 - s) - 0.08 * s)}}
+        rot["Arm_R"] = rot["Arm_R"] + [(X, -12 * s)]          # keeps the fist on the ground, not under it
+        rot["Jaw"] = [(X, 12 + 10 * s + 8 * q)]
+        rot["Tail1"] = [(X, -16 * q)]
+        rot["Tail2"] = [(X, -12 * q)]
+        return {"rot": rot, "loc": {"Hips": (0, 0, WINDUP_FIT["hz"] * (1 - s) - 0.08 * s - 0.07 * q)}}
+
+    def swipe(t):
+        """v4 SWIPE: a horizontal right-arm sweep across the front, right to left. Frames (30 at 24 fps): 0-9
+        anticipation (torso winds to the right, arm lifts back and out, weight sinks), 9-13 the strike (the fist
+        crosses the front: the HIT lands on frame 12), 13-19 follow-through (overshoot, tail and head trail), 19-30
+        recover to the idle pose."""
+        w = swipe_w(t)
+        r = smooth(t / 0.24) if t < 0.62 else 1 - smooth((t - 0.62) / 0.38)       # arm raised / body committed
+        strike = math.sin(math.pi * _clamp01((t - 0.28) / 0.34))
+        wl1, wl2 = swipe_w(max(0.0, t - 0.07)), swipe_w(max(0.0, t - 0.14))        # lagging copies for the tail
+        tw = w if w > 0 else 0.4 * w              # the wind-back twist is smaller than the swing-through
+        rot = {"Spine": [(Z, 20 * tw), (X, 7 * r)], "Chest": [(Z, 24 * tw), (Y, -7 * w)],
+               "Neck": [(Z, -12 * tw)], "Head": [(X, HU * (1 - 0.6 * strike)), (Z, -16 * tw + 8 * strike), (Y, 6 * w)],
+               "Jaw": [(X, 3 + 30 * strike)],
+               "Arm_R": [(Z, (50 * w if w > 0 else 18 * w) + 8 * r), (Y, 64 * r)], "Forearm_R": [(Y, 18 * r), (X, -12 * strike)],
+               "Fist_R": [(X, -14 * r)],
+               "Arm_L": [(Z, -36 * tw), (X, -6 * r)], "Forearm_L": [(X, 6 * r)],
+               "Tail1": [(Z, -22 * wl1)], "Tail2": [(Z, -26 * wl2)], "Tail3": [(Z, -30 * wl2), (X, -10 * strike)]}
+        return {"rot": rot, "loc": {"Hips": (0, -0.14 * max(0.0, w) * r, -0.09 * r + 0.03 * strike)}}
 
     def berserk(t):
         """Bible p10 berserk: a hunched-up roar. The body rears a little about the hind feet (Root turn plus the
@@ -1018,24 +1111,26 @@ def creature_clips(stage="Adult"):
         lift = (0, PIVOT_Y[0] * (1 - math.cos(ar)), -PIVOT_Y[0] * math.sin(ar))
         osc = 3 * (math.sin(p) - 1)
         return {"rot": {"Root": [(X, a)], "Spine": [(X, Bf["sp"]), (Y, 3 * sh)], "Chest": [(X, Bf["ch"])],
-                        "Neck": [(X, Bf["nk"])], "Head": [(X, Bf["hd"] + 4 * math.sin(4 * p))],
+                        "Neck": [(X, Bf["nk"])], "Head": [(X, Bf["hd"] + 4 * math.sin(4 * p)), (Y, 5 * math.sin(3 * p))],
                         "Jaw": [(X, 38 + 4 * math.sin(6 * p + math.pi))],
                         "Arm_L": [(X, Bf["ax"] + osc), (Y, -Bf["ay"])], "Arm_R": [(X, Bf["ax"] - osc), (Y, Bf["ay"])],
                         "Forearm_L": [(X, Bf["fx"])], "Forearm_R": [(X, Bf["fx"])], "Fist_L": [(X, Bf["fk"])],
                         "Fist_R": [(X, Bf["fk"])], "Thigh_L": [(X, Bf["tx"])], "Thigh_R": [(X, Bf["tx"])],
-                        "Foot_L": [(X, 2)], "Foot_R": [(X, 2)], "Tail1": [(Z, 12 * sh), (X, 8)]},
+                        "Foot_L": [(X, 2)], "Foot_R": [(X, 2)], "Tail1": [(Z, 12 * sh), (X, 8)],
+                        "Tail2": [(Z, 16 * math.sin(2 * p - 0.8))]},
                 "loc": {"Root": lift}}
 
     def ko(t):
         e = smooth(t / 0.7)
         b = math.sin(min(1.0, max(0.0, (t - 0.7) / 0.3)) * math.pi) * 0.04
-        return {"rot": {"Root": [(Y, 72 * e)], "Spine": [(X, 10 * e)], "Head": [(X, 22 * e), (Z, 10 * e)], "Jaw": [(X, 18 * e)],
+        return {"rot": {"Root": [(Y, 72 * e)], "Spine": [(X, 10 * e)], "Head": [(X, HU * (1 - e) + 22 * e), (Z, 10 * e)],
+                        "Jaw": [(X, 3 + 15 * e)],
                         "Arm_L": [(Y, -35 * e), (X, -15 * e)], "Arm_R": [(Y, 15 * e)], "Thigh_L": [(Y, -20 * e)],
                         "Tail1": [(Z, 20 * e)]},
                 "loc": {"Hips": (0, 0, -0.25 * e + b)}}
 
-    return [("Idle", 48, idle), ("Walk", 32, walk), ("Roar", 36, roar), ("SlamWindup", 20, windup), ("Slam", 14, slam),
-            ("Berserk", 36, berserk), ("KO", 36, ko)]
+    return [("Idle", 96, idle), ("Walk", 32, walk), ("Roar", 36, roar), ("SlamWindup", 20, windup), ("Slam", 14, slam),
+            ("Berserk", 36, berserk), ("KO", 36, ko), ("Swipe", SWIPE_FRAMES, swipe)]
 
 
 def egg_clips():
@@ -1071,10 +1166,16 @@ def creature(name, P, seed, target_h):
 
     def decal_zone(c, n):
         """head front that takes the painted face (eyes, lids, smirk / grin, tan muzzle)"""
+        if P.get("head_v4"):
+            return False        # v4: the decal lives on the separate smooth head, never on the core
         return ((c - Hc).length < RH * 1.9 and c.y < Hc.y - 0.1 * RH and n.y < -0.2 and c.z > Hc.z - 0.75 * RH
                 and FACE.uv_for(name, c.x, c.z) is not None)
 
     def body_slot(c, n):
+        if P.get("head_v4"):
+            if (c - Hc).length < RH * 1.3:
+                return "Skin"
+            return "Belly" if belly_zone(c, n) else "Glow"
         if decal_zone(c, n):
             return "Skin" if c.z > fr[1] - 0.15 * fr[3] / 0.36 else "Belly"   # paint lays the tan muzzle on top
         if face_zone(c, n):
@@ -1276,6 +1377,53 @@ def face_kit(eye_r, eye_off, brow, smile, open_jaw, teeth):
     return build
 
 
+def head_v4(geo, rng, Hc, RH):
+    """v4 adult head (personality pass): ONE big smooth round head (the shape the bible's artist approved on the
+    other characters) that carries the painted face decal on its whole front, a soft muzzle bulge under the paint, a
+    chunky tan lower jaw on the Jaw bone with two fat underbite tusks, and a dark mouth interior plus tongue that
+    only show when the Jaw bone opens. Eyes, lids, brows, nose and mouth are painted (kaiju_face.py), so every
+    expression is a texture swap."""
+    rx, ry, rz = HEAD_R
+    seg, rings = 20, 12
+    V, F = [], []
+    for j in range(1, rings):
+        th = math.pi * j / rings
+        for i in range(seg):
+            ph = math.tau * i / seg
+            q = Vector((math.sin(th) * math.cos(ph) * rx, math.sin(th) * math.sin(ph) * ry, math.cos(th) * rz))
+            if q.y < 0:        # muzzle bulge and a soft brow shelf (form under the paint; the projection is in x, z)
+                q.y -= 0.12 * math.exp(-((q.x / 0.48) ** 2 + ((q.z + 0.30) / 0.22) ** 2))
+                q.y -= 0.035 * math.exp(-(((q.z - 0.37) / 0.09) ** 2)) * (1.0 if abs(q.x) < 0.55 else 0.0)
+            V.append(Hc + q)
+    top = len(V); V.append(Hc + Vector((0, 0, rz)))
+    bot = len(V); V.append(Hc - Vector((0, 0, rz)))
+    for j in range(rings - 2):
+        for i in range(seg):
+            a, b = j * seg + i, j * seg + (i + 1) % seg
+            F.append([a, b, b + seg, a + seg])
+    for i in range(seg):
+        F.append([top, (i + 1) % seg, i])
+        o = (rings - 2) * seg
+        F.append([bot, o + i, o + (i + 1) % seg])
+    dec = []
+    for f in F:
+        c = sum((V[i] for i in f), Vector()) / len(f)
+        n = Vector(((c.x - Hc.x) / rx ** 2, (c.y - Hc.y) / ry ** 2, (c.z - Hc.z) / rz ** 2)).normalized()
+        dec.append(n.y < -0.18 and all(FACE.uv_for("Adult", V[i].x, V[i].z) is not None for i in f))
+    geo.add(V, F, SLOT["Hide"], "Head", smooth=True, decal=dec,
+            shade=[1.0 + 0.10 * (v.z - Hc.z) / rz + 0.05 * max(0.0, -(v.y - Hc.y) / ry) for v in V])   # painted top light, lighter face
+    # lower jaw (Jaw bone): chunky tan underbite
+    # (the jaw's top sits BELOW the painted mouth, so the paint is never hidden from the front or from above)
+    ellipsoid(geo, Hc + Vector((0, -0.16, -0.68)), 1.0, (0.60, 0.52, 0.16), "Belly", bone="Jaw", seg=14, rings=7)
+    for sx in (1, -1):         # two fat tusks standing on the jaw rim, up to the painted mouth corners
+        ellipsoid(geo, Hc + Vector((sx * 0.37, -0.61, -0.50)), 1.0, (0.10, 0.09, 0.15), "Teeth", bone="Jaw", seg=8, rings=5)
+    ellipsoid(geo, Hc + Vector((0, -0.16, -0.56)), 1.0, (0.42, 0.30, 0.10), "Mouth", bone="Head", seg=10, rings=5)
+    ellipsoid(geo, Hc + Vector((0, -0.20, -0.50)), 1.0, (0.20, 0.26, 0.05), "Tongue", bone="Jaw", seg=8, rings=4)
+
+
+HEAD_R = (0.82, 0.68, 0.66)     # v4 adult head radii (design units): about 1.95 m wide on the 5 m adult
+
+
 # ------------------------------------------------------------------------------------------------ adult (p10 / p11)
 def adult_params():
     """Proportions measured off p11 front/profile (total height incl. crest = 1): width 0.8, shoulder top 0.68,
@@ -1287,7 +1435,8 @@ def adult_params():
 
     def ty(y):          # tail length scale about its root
         return 1.45 + (y - 1.45) * TK
-    FACE.RECT["Adult"] = (FACE.ADULT_RECT[0], FACE.ADULT_RECT[1] + HZ, FACE.ADULT_RECT[2], FACE.ADULT_RECT[3])
+    HEADC = (0.0, -1.30 + HY, 3.22 + HZ)      # v4 head centre: forward of the shoulders, at the bible's head height
+    FACE.RECT["Adult"] = (0.0, HEADC[2], FACE.ADULT_RECT[2], FACE.ADULT_RECT[3])
     balls = [
         ((0, -0.1, 2.6), 0.8, (1.12, 1.0, 0.78)),      # shoulder hump (crest base)
         ((0, 0.55, 2.05), 0.68, (1.0, 1.15, 0.8)),     # back sloping down to the hips (p11 profile)
@@ -1295,8 +1444,7 @@ def adult_params():
         ((0, 0.0, 1.5), 0.7, (1.0, 1.1, 0.9)),         # belly
         ((0, 1.0, HIPZ), 0.6, (1.1, 1.0, 0.85)),       # hips (small, high enough to leave the arch between the legs)
         ((0, -0.72 + HY / 2, 2.88 + HZ / 2), 0.46),                # neck
-        ((0, -1.02 + HY, 3.25 + HZ), 0.49, (1.08, 1.0, 0.9)),      # v3: bigger head, still low between the shoulders
-        ((0, -1.29 + HY, 3.0 + HZ), 0.27, (1.25, 1.0, 0.74)),      # v3: short blunt muzzle, below the eyes
+        ((0, -0.42, 1.55), 0.72),                                  # v4: a round pot belly pushing out between the arms
     ]
     for sx in (1, -1):
         balls += [((sx * SX, -0.42, 2.24), 0.62),                     # shoulders: far wider than the hips
@@ -1333,7 +1481,7 @@ def adult_params():
                   ("Foot" + sfx, (sx * (THX + 0.02), 1.0, 0.7), (sx * (THX + 0.04), 0.7, 0.12), "Thigh" + sfx)]
 
     # ---- v3: separate masses, few large boulders (2026-11-12 review). Positions follow the v2 fitted skeleton.
-    CORE = 0.62             # the metaball body shrinks to a dark core the boulders stand proud of
+    CORE = TUNE["core"]     # the metaball body shrinks to a dark core the boulders stand proud of
     balls = [(c, r * (CORE if abs(c[0]) > 0.3 else 0.9)) + tuple(rest) for c, r, *rest in balls]
     limbs = [(a, b, r0 * CORE, r1 * CORE) if abs(a[0]) > 0.3 or abs(b[0]) > 0.3 else (a, b, r0, r1)
              for a, b, r0, r1 in limbs]
@@ -1349,7 +1497,7 @@ def adult_params():
                 r = tuple(x * TUNE["rock_k"] for x in r)
             n = min(n, TUNE["facets"]) if slot != "Belly" else n
             B.append({"c": tuple(c), "r": r, "bone": bone, "slot": slot, "moss": moss, "up": up, "n": n, "rim": rim,
-                      "flat": flat, "spin": spin})
+                      "flat": flat, "spin": spin, "round": TUNE["round"] if slot != "Belly" else 0.3})
         for sx, sf in ((1, "_L"), (-1, "_R")):
             # shoulder: the big rounded mass, moss draped over its top; a second one behind it toward the hump
             add((sx * (SX + 0.06), -0.42, 2.44), (0.6, 0.58, 0.5), "Arm" + sf, moss=0.8, up=(sx * 0.3, 0, 1))
@@ -1362,8 +1510,10 @@ def adult_params():
             add((sx * (FX - 0.05), FY + 0.0, 1.04), (0.55, 0.52, 0.4), "Forearm" + sf, up=(sx * 0.15, -0.7, 0.7))
             add((sx * (MX - 0.24), MY + 0.22, 1.12), (0.38, 0.38, 0.36), "Forearm" + sf, up=(-sx * 0.6, 0.2, 0.6))
             # fist: a big pale front boulder, an outer boulder, three knuckles on the ground
-            add((sx * FX, FY - 0.14, 0.56), (0.56, 0.46, 0.48), "Fist" + sf, slot="SlateLight",
-                up=(0, -1, 0.35))
+            add((sx * FX, FY - 0.14, 0.58), (0.6, 0.54, 0.56), "Fist" + sf, slot="SlateLight",
+                up=(0, -0.8, 0.6))
+            # v4: a filler mass between torso and upper arm (the bible's arm has no daylight)
+            add((sx * (SX - 0.2), -0.72, 1.78), (0.36, 0.36, 0.4), "Arm" + sf, up=(-sx * 0.5, -0.4, 0.6))
             add((sx * (FX + 0.22), FY + 0.16, 0.5), (0.4, 0.4, 0.42), "Fist" + sf, up=(sx * 1, 0, 0.4))
             for dx in (-0.3, 0.0, 0.3):
                 add((sx * (FX + dx), FY - 0.46, 0.17), (0.19, 0.17, 0.17), "Fist" + sf, n=12, rim=False, up=(0, -0.5, 1))
@@ -1376,8 +1526,6 @@ def adult_params():
             # flank and hip blocks
             add((sx * 0.48, 0.58, 2.28), (0.42, 0.44, 0.38), "Spine", moss=0.45, up=(sx * 0.45, 0.2, 1))
             add((sx * 0.44, 1.12, 1.7), (0.4, 0.4, 0.36), "Hips", up=(sx * 0.5, 0.4, 1))
-            # cranium blocks on the head top
-            add((sx * 0.24, -0.86 + HY, 3.58 + HZ), (0.19, 0.19, 0.14), "Head", moss=0.0, n=14, up=(sx * 0.4, 0.3, 1))
         # spine line: hump block behind the head, then down the back to the hips
         add((0, -0.22, 3.02), (0.5, 0.48, 0.38), "Chest", moss=0.5)
         add((0, 0.32, 2.8), (0.48, 0.46, 0.38), "Spine", moss=0.4, up=(0, 0.2, 1))
@@ -1388,10 +1536,11 @@ def adult_params():
         add((T * 0.18, ty(2.08), 0.98), (0.26, 0.27, 0.22), "Tail2", up=(T * 0.3, 0.3, 1))
         add((T * 0.42, ty(2.22), 1.02), (0.2, 0.2, 0.17), "Tail3", up=(T * 0.4, 0.2, 1), n=12)
         # heavy brow boulder over the painted eyes (stays above them), moss on its crown
-        add((0.04, -1.22 + HY, 3.6 + HZ), (0.5, 0.26, 0.13), "Head", moss=0.3, up=(-0.25, -0.6, 1), n=18, spin=0.0)
+        # v4: a mossy stone toupee on the smooth head (replaces the brow boulder and the ear-like cranium blocks)
+        add((0.03, HEADC[1] + 0.14, HEADC[2] + 0.57), (0.46, 0.4, 0.17), "Head", moss=0.95, up=(0.0, 0.25, 1), n=14, spin=0.0)
         # tan chest: two big pectoral plates, then three rows of belly segments (ray-cast onto the core)
-        tiles = [(-0.29, 2.3, 0.33, 0.25), (0.29, 2.3, 0.33, 0.25)]
-        tiles += [(sx * 0.17, z, 0.19, 0.13) for z in (1.92, 1.62, 1.34) for sx in (1, -1)]
+        tiles = [(-0.31, 2.26, 0.36, 0.27), (0.31, 2.26, 0.36, 0.27)]
+        tiles += [(sx * 0.22, z, 0.23, 0.155) for z in (1.88, 1.56, 1.25) for sx in (1, -1)]
         for (x, z, w, h) in tiles:
             p, n = ray(bvh, (x, -6, z), (0, 1, 0))
             if p is not None:
@@ -1406,7 +1555,11 @@ def adult_params():
         (0.74, 0.02, (0.6, 0.15, 1), 1.0, None), (0.92, 0.24, (0.95, 0.3, 0.8), 0.72, None),
         (-0.74, 0.02, (-0.6, 0.15, 1), 1.0, None), (-0.92, 0.24, (-0.95, 0.3, 0.8), 0.72, None),
         (0.12, 0.58, (0.15, 0.4, 1), 1.0, None), (-0.15, 0.9, (-0.2, 0.5, 1), 0.8, None),
-        (0.0, 1.22, (0, 0.7, 0.8), 0.62, None)]]
+        (0.0, 1.22, (0, 0.7, 0.8), 0.62, None),
+        # v4: a wider, deeper crown (fit tool: the top 30 % was 35-40 % too narrow in three-quarter and profile)
+        (0.46, -0.08, (0.55, 0.1, 1), 1.22, None), (-0.46, -0.08, (-0.55, 0.1, 1), 1.22, None),
+        (0.0, 0.14, (0, 0.38, 1), 1.42, None), (0.3, 0.46, (0.32, 0.55, 1), 1.02, None),
+        (-0.3, 0.46, (-0.32, 0.55, 1), 1.02, None)]]
 
     def belly(c, n):
         return c.y < -0.25 and abs(c.x) < 0.56 and 0.95 < c.z < 2.62 and n.y < -0.3
@@ -1446,14 +1599,15 @@ def adult_params():
                                          "jaw_size": (0.17, 0.17, 0.09), "mouth_back": 0.12},
                     brow=None, smile=(0.13, 0.31, -0.06, 0.05, 0.03), open_jaw=0, teeth=0)
     return {
-        "unit": U, "balls": balls, "limbs": limbs, "voxel": 0.05, "body_tris": 2600, "bones": bones,
+        "unit": U, "balls": balls, "limbs": limbs, "voxel": 0.05, "body_tris": 2200, "bones": bones,
         "gap": 0.024, "crack_w": 0.02, "chamfer_m": 0.05, "design_h": 4.2,
-        "head": (0, -1.02 + HY, 3.25 + HZ), "head_r": 0.49, "muzzle": (0, -1.29 + HY, 3.0 + HZ), "head_clear": 1.12, "belly": belly, "dmin": dmin,
+        "head": HEADC, "head_r": 0.6, "muzzle": (0, HEADC[1] - 0.5, HEADC[2] - 0.3), "head_clear": 1.12, "belly": belly, "dmin": dmin,
+        "head_v4": True,
         "samples": 16000, "plate_r": 1.0, "plate_thick": 0.4, "light_frac": light_frac, "moss": moss, "min_plate_z": 0.15,
         "belly_tiles": belly_tiles, "fist": (FX, FY, 0.52), "fist_plate_z": 0.85, "fist_plate_r": 0.44 * FR / 0.6,
         "knuckles": (-0.33, -0.11, 0.11, 0.33), "knuckle_fwd": 0.42, "knuckle_r": 0.15,
         "foot": (0.64, 0.95, 0.38), "toes": (-0.2, 0.0, 0.2), "toe_fwd": 0.42, "toe_r": 0.12,
-        "face": face, "crown": crown, "fans": fans, "crown_lean": 10.0, "crystal_r": 0.18, "spikes": spikes,
+        "face": head_v4, "crown": crown, "fans": fans, "crown_lean": 10.0, "crystal_r": 0.18, "spikes": spikes,
         "tail_tip": ((T * 0.6, ty(2.24), 1.16), (T * 0.35, 0.1, 0.9), 0.46),
         "boulders": boulders, "crystals": crystals, "crack_k": TUNE["crack_k"], "rim_d": TUNE["rim_d"],
     }
@@ -1738,8 +1892,10 @@ def main():
         tris = sum(len(p.vertices) - 2 for p in ob.data.polygons)
         h = max((rig.matrix_world @ ob.matrix_world @ Vector(c)).z for c in ob.bound_box)
         print("STAGE %s tris=%d bones=%d height=%.3f materials=%d" % (stage, tris, len(rig.data.bones), h, len(ob.data.materials)))
-        assert tris <= TRI_CAP[stage], (stage, tris)
+        if tris > TRI_CAP[stage]:
+            print("TRI_CAP_EXCEEDED %s %d > %d" % (stage, tris, TRI_CAP[stage]))      # check_kaiju.py fails the run
         export(stage, ob, rig)
+    FACE.write_states(bpy, ART)
     for prop in (build_shards(4004), build_telegraph(5005)):
         export_prop(prop)
     for stage, ob, rig in stages:      # spread out in the .blend for viewing; FBX roots stay at the origin

@@ -10,6 +10,7 @@ can be compared. Then the two props (berserk shards, telegraph spikes) and the a
 (shoulders vs hips, forelimbs vs hind legs, head low and forward, hatchling / adult height). Exits 1 on any failure.
 """
 import hashlib
+import math
 import os
 import sys
 
@@ -21,7 +22,7 @@ sys.path.insert(0, HERE)
 import kaiju_palette as PAL  # noqa: E402
 
 ART = os.path.dirname(HERE)
-CREATURE_CLIPS = {"Idle", "Walk", "Roar", "SlamWindup", "Slam", "Berserk", "KO"}
+CREATURE_CLIPS = {"Idle", "Walk", "Roar", "SlamWindup", "Slam", "Berserk", "KO", "Swipe"}   # v4 adds Swipe
 EXPECT = {
     "Egg": {"bones": 2, "clips": {"Idle", "Shake"}, "height": 1.7, "tri_max": 4000},
     "Hatchling": {"bones": 20, "clips": CREATURE_CLIPS, "height": 2.235, "tri_max": 10000},
@@ -101,6 +102,28 @@ for stage, exp in EXPECT.items():
         pb = arm.pose.bones[bone]
         deg = pb.matrix_basis.to_quaternion().angle * 57.2958   # the bone's own keyed turn, parents excluded
         check(deg >= min_deg, "%s at %.2f turns %s by %.1f deg (expect >= %.1f)" % (clip, phase, bone, deg, min_deg))
+    if stage == "Adult":      # v4: where the hits land (for the gameplay programmers) and the swipe's reach
+        for clip, bone, axis in (("Swipe", "Fist_R", 1), ("Slam", "Fist_R", 2), ("Roar", "Jaw", None)):
+            act = next(a for a in acts if a.name.split("|")[-1] == clip)
+            ad.action = act
+            if hasattr(ad, "action_slot") and ad.action_slot is None and len(getattr(act, "slots", [])):
+                ad.action_slot = act.slots[0]
+            f0, f1 = (int(round(x)) for x in act.frame_range)
+            rows = []
+            for f in range(f0, f1 + 1):
+                bpy.context.scene.frame_set(f)
+                pb = arm.pose.bones[bone]
+                w = arm.matrix_world @ pb.tail
+                rows.append((f - f0, w.x, w.y, w.z, pb.matrix_basis.to_quaternion().angle * 57.2958))
+            if axis is None:
+                best = max(rows, key=lambda r: r[4])
+                print("  HIT %s: %d frames; jaw widest (%.0f deg) at frame %d" % (clip, f1 - f0, best[4], best[0]))
+            else:
+                best = min(rows, key=lambda r: r[axis + 1])
+                print("  HIT %s: %d frames; %s tail extreme at frame %d  (x %.2f y %.2f z %.2f); path %s" % (
+                    clip, f1 - f0, bone, best[0], best[1], best[2], best[3],
+                    " ".join("%d:(%.1f,%.1f,%.1f)" % (r[0], r[1], r[2], r[3]) for r in rows[::2])))
+        check(any(a.name.split("|")[-1] == "Swipe" for a in acts), "Swipe clip present")
     ad.action = None
     if stage in ("Adult", "Hatchling"):
         B = {b.name: (arm.matrix_world @ b.head_local, arm.matrix_world @ b.tail_local) for b in arm.data.bones}
@@ -148,10 +171,31 @@ _face = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _ok = os.path.isfile(_face)
 if _ok:
     _im = bpy.data.images.load(_face)
-    _ok = tuple(_im.size) == (256, 256)
-check(_ok, "face decal Kaiju_Face.png next to the FBX, 256 x 256")
+    _ok = tuple(_im.size) == (512, 512)
+check(_ok, "face decal Kaiju_Face.png next to the FBX, 512 x 512 (v4; same layout as the 256 atlas)")
+import kaiju_face as _FACE  # noqa: E402
+for _st, _fn in _FACE.FILES.items():
+    _p = os.path.join(os.path.dirname(_face), _fn)
+    check(os.path.isfile(_p) and tuple(bpy.data.images.load(_p).size) == (512, 512), "expression atlas %s (%s)" % (_fn, _st))
 for _st in ("Adult", "Hatchling"):
     _fbx = os.path.join(os.path.dirname(_face), "Kaiju_%s.fbx" % _st)
     check(os.path.isfile(_fbx) and b"UVMap" in open(_fbx, "rb").read(), "UVMap for the face decal in Kaiju_%s.fbx" % _st)
+# v4: which way the FBX faces, next to a class character FBX (the game found every model walking backwards)
+_w = os.environ.get("KJ_WARRIOR_FBX")
+for _label, _path in (("Kaiju_Adult", os.path.join(ART, "Kaiju_Adult.fbx")), ("Warrior", _w)):
+    if not _path or not os.path.isfile(_path):
+        continue
+    bpy.ops.wm.read_factory_settings(use_empty=True)
+    bpy.ops.import_scene.fbx(filepath=_path, use_anim=False)
+    _arm = next(o for o in bpy.data.objects if o.type == "ARMATURE")
+    _B = {b.name: _arm.matrix_world @ b.head_local for b in _arm.data.bones}
+    _T = {b.name: _arm.matrix_world @ b.tail_local for b in _arm.data.bones}
+    _ws = [o.matrix_world @ v.co for o in bpy.data.objects if o.type == "MESH" for v in o.data.vertices]
+    _top = max(w.z for w in _ws)
+    print("FACING %s: armature rot %s; mesh y %.2f..%.2f, z top %.2f" % (
+        _label, tuple(round(math.degrees(a)) for a in _arm.matrix_world.to_euler()), min(w.y for w in _ws), max(w.y for w in _ws), _top))
+    for _n in sorted(_B):
+        if any(k in _n.lower() for k in ("toe", "foot", "head", "jaw", "hips", "root")):
+            print("   bone %-14s head (%.2f, %.2f, %.2f) tail (%.2f, %.2f, %.2f)" % ((_n,) + tuple(_B[_n]) + tuple(_T[_n])))
 print("RESULT", "PASS" if not fails else "FAIL (%d)" % len(fails))
 sys.exit(1 if fails else 0)

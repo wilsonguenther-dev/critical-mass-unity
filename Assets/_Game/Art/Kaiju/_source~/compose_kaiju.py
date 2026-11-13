@@ -254,7 +254,7 @@ for jid, m in sorted(meta.items()):
     sbs.paste(Rr, (L.width + 12, 22))
     d = ImageDraw.Draw(sbs)
     d.text((4, 4), "bible " + jid, fill=(0, 0, 0))
-    d.text((L.width + 16, 4), "ours (Blender v2)  IoU %.2f" % iou, fill=(0, 0, 0))
+    d.text((L.width + 16, 4), "ours (Blender v4)  IoU %.2f" % iou, fill=(0, 0, 0))
     save_jpeg(sbs, os.path.join(OUT, "sbs-%s.jpg" % jid), max_w=1400)
     print("BIBLE", jid, metrics["bible"][jid])
 

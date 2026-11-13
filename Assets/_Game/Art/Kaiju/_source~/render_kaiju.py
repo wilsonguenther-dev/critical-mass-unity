@@ -585,7 +585,7 @@ for stage, clip, phase, az, el in FACES:
     rig = ob.parent
     hb = rig.pose.bones["Head"]
     hc = rig.matrix_world @ ((hb.head + hb.tail) / 2)
-    hr = (hb.tail - hb.head).length * 1.25
+    hr = (hb.tail - hb.head).length * (2.1 if stage == "Adult" else 1.25)     # v4: the adult head is far bigger
     pts = [w for w in world_pts(ob) if (w - hc).length < hr]
     ppm = ortho_camera([ob], az, el, res=480, pts=pts)
     hull_width(2.0, ppm)
@@ -593,5 +593,98 @@ for stage, clip, phase, az, el in FACES:
     scene.render.filepath = os.path.join(OUT, jid + ".png")
     bpy.ops.render.render(write_still=True)
     print("RENDERED", jid)
+
+# ------------------------------------------------------------------------------------------------ v4 extras
+from mathutils import Quaternion  # noqa: E402
+
+
+def head_points(ob, k):
+    rig = ob.parent
+    hb = rig.pose.bones["Head"]
+    hc = rig.matrix_world @ ((hb.head + hb.tail) / 2)
+    hr = (hb.tail - hb.head).length * k
+    return [w for w in world_pts(ob) if (w - hc).length < hr]
+
+
+def freeze_pose(ob, clip, phase, jaw=None):
+    """Pose from a clip, then detach the action so single bones can be overridden (expression sheet)."""
+    set_pose(ob, clip, phase)
+    bpy.context.view_layer.update()
+    rig = ob.parent
+    keep = {pb.name: (pb.rotation_quaternion.copy(), pb.location.copy()) for pb in rig.pose.bones}
+    rig.animation_data.action = None
+    for pb in rig.pose.bones:
+        pb.rotation_quaternion, pb.location = keep[pb.name]
+    if jaw is not None:
+        pb = rig.pose.bones["Jaw"]
+        rest = pb.bone.matrix_local.to_3x3().to_quaternion()
+        pb.rotation_quaternion = rest.inverted() @ Quaternion((1, 0, 0), math.radians(jaw)) @ rest
+
+
+if (not ONLY or "expr" in ONLY) and tuple(bpy.data.images["Kaiju_Face"].size) == (512, 512):
+    import kaiju_face as FACE  # noqa: E402
+    img = bpy.data.images.get("Kaiju_Face")
+    EXPR = [("Neutral", 3, "Azure"), ("Happy", 8, "Azure"), ("Angry", 34, "Crimson"), ("Berserk", 16, "Berserk"),
+            ("Hurt", 5, "Azure"), ("Sleepy", 2, "Azure"), ("Blink", 3, "Azure")]
+    for stage, k, res in (("Adult", 2.1, 400), ("Hatchling", 1.25, 300)):
+        ob = STAGES[stage]
+        place(ob, (0, 0, 0), 0)
+        for state, jaw, alleg in EXPR:
+            if stage == "Hatchling" and state not in ("Neutral", "Sleepy", "Happy"):
+                continue
+            img.pixels.foreach_set(FACE.paint(state).ravel())
+            img.update()
+            freeze_pose(ob, "Idle", 0.0, jaw if stage == "Adult" else None)
+            set_team(PAL.STAGE_DEFAULT_GLOW[stage], alleg if stage == "Adult" else "Neutral")
+            show([ob, HULLS[stage]])
+            bpy.context.view_layer.update()
+            ppm = ortho_camera([ob], 14, 4, res=res, pts=head_points(ob, k))
+            hull_width(2.0, ppm)
+            scene.render.film_transparent = True
+            scene.render.filepath = os.path.join(OUT, "expr-%s-%s.png" % (stage.lower(), state.lower()))
+            bpy.ops.render.render(write_still=True)
+            print("RENDERED expr", stage, state)
+    img.pixels.foreach_set(FACE.paint("Neutral").ravel())
+    img.update()
+
+if not ONLY or "swipe" in ONLY:
+    ob = STAGES["Adult"]
+    place(ob, (0, 0, 0), 0)
+    set_team("Azure", "Azure")
+    show([ob, HULLS["Adult"]])
+    box = [Vector((x, y, z)) for x in (-3.3, 3.3) for y in (-2.4, 1.6) for z in (0.0, 5.0)]
+    for clip, phases in (("Swipe", (0.0, 0.27, 0.40, 0.50, 0.75)), ("Roar", (0.14, 0.45)), ("Slam", (0.0, 0.57, 0.8)),
+                         ("Walk", (0.25,)), ("Idle", (0.3,))):
+        for ph in phases:
+            set_pose(ob, clip, ph)
+            bpy.context.view_layer.update()
+            ppm = ortho_camera([ob], 24, 22, res=420, pts=box)
+            hull_width(2.0, ppm)
+            scene.render.film_transparent = True
+            scene.render.filepath = os.path.join(OUT, "pose-%s-%03d.png" % (clip.lower(), round(ph * 100)))
+            bpy.ops.render.render(write_still=True)
+    print("RENDERED pose strips")
+
+if (not ONLY or "fit" in ONLY) and os.environ.get("KJ_FIT_TOOLS"):
+    # bible_fit/project_paint.py: project the bible front and profile onto the posed mesh (where the mesh pokes outside
+    # the art, where the art has mass and the mesh has none, per height band / side / bone)
+    try:
+        sys.path.insert(0, os.environ["KJ_FIT_TOOLS"])
+        import project_paint as pp  # noqa: E402
+        ob = STAGES["Adult"]
+        place(ob, (0, 0, 0), 0)
+        set_pose(ob, "Idle", 0.0)
+        for h in HULLS.values():
+            h.hide_viewport = True
+        bpy.context.view_layer.update()
+        for view, az, el in (("front", 0.0, 8.0), ("profile", -80.0, 3.0)):
+            g = os.path.join(os.environ["KJ_GUIDES"], "guide-11-%s.json" % view)
+            res = pp.project_view([ob], g, azimuth_deg=az, elevation_deg=el, outline_m=0.035)
+            pp.save_result(res, os.path.join(OUT, "project-" + view))
+            print("PROJECT %s\n%s" % (view, "\n".join(res["report"]["summary"])))
+    except Exception as ex:     # the fit numbers are a diagnostic; never lose the render set over them
+        import traceback
+        traceback.print_exc()
+        print("PROJECT FAILED", ex)
 
 json.dump(meta, open(meta_path, "w"), indent=1)
