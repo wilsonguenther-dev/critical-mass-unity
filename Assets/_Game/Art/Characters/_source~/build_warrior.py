@@ -241,9 +241,9 @@ def build_head():
     H = "head"
     add(BODY, head_mesh(), "skin", H, "skin", face_uv=FACE_UV, grad=0.04, steps=False, noao=True)
     for s in (1, -1):        # simple round ears, set at eye height, the bible's visible ear
-        add(BODY, B.sphere((0.046, 0.066, 0.086), 10, 8), "skin", H, "skin", m=M((0.245 * s, 0.035, 1.425)),
+        add(BODY, B.sphere((0.050, 0.064, 0.070), 10, 8), "skin", H, "skin", m=M((0.245 * s, 0.035, 1.405)),
             steps=False)
-        add(BODY, B.sphere((0.016, 0.034, 0.050), 8, 6), "skin_shadow", H, "skin", m=M((0.279 * s, 0.03, 1.425)),
+        add(BODY, B.sphere((0.018, 0.034, 0.040), 8, 6), "skin_shadow", H, "skin", m=M((0.283 * s, 0.03, 1.405)),
             steps=False)
 
 

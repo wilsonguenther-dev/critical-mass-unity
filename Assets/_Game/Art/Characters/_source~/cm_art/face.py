@@ -48,27 +48,34 @@ def paint(cx, cz, hw, hh, head_scale=None):
             m = np.maximum(m, np.clip(0.5 - d / soft, 0, 1))
         return m
 
-    # v4 (bible p06 front): few, clean, simple shapes. No lashes, no lid lines, no cheek or jowl strokes, no lip colour.
-    dark = _hex("#3A2220")                         # eye and brow dark brown (front crop #3C2121)
-    iris = _hex(palette.CHAR["iris"][0])
+    # v5 (bible p06 front): few, clean shapes. No lashes, no lid lines, no jowl strokes, no lip colour.
+    dark = _hex("#3A2220")                         # eye rim and brow dark brown (front crop #3C2121)
+    over(ell(0.0, 1.588, 0.205, 0.036, soft=0.030), _hex("#E48F74", 0.42))    # soft shadow under the fringe
     for s in (1, -1):                              # soft warm blush, low on the outer cheeks
         over(ell(0.152 * s, 1.388, 0.040, 0.020, soft=0.026), _hex("#FF9A86", 0.42))
     for s in (1, -1):
-        ex, ez = 0.106 * s, 1.446                  # big eyes, set wide and low on the face
+        ex, ez = 0.108 * s, 1.444                  # big eyes, set wide and low on the face
         # the top of the eye is cut a little flat, lower toward the nose: the bible's confident look (a shape, not a line)
         u = (X - ex) * s / 0.05
-        top = np.clip((ez + 0.044 + 0.008 * u - Z) / 0.003 + 0.5, 0, 1)
-        over(ell(ex + 0.007 * s, ez, 0.050, 0.061) * top, _hex("#FFFFFF"))     # white shows only as an outer sliver
-        over(ell(ex - 0.002 * s, ez, 0.043, 0.060) * top, dark)               # big simple dark-brown eye
-        over(ell(ex - 0.002 * s, ez - 0.020, 0.029, 0.030) * ell(ex - 0.002 * s, ez, 0.043, 0.060) * top, iris)
-        over(ell(ex + 0.012 * s, ez + 0.018, 0.015, 0.017), _hex("#FFFFFF"))  # one white highlight
-        # thick dark brow: a simple angled wedge well above the eye, the inner end lower (confident)
-        over(stroke([(0.048 * s, 1.530), (0.105 * s, 1.552), (0.168 * s, 1.552)], [0.036, 0.031, 0.014],
+        top = np.clip((ez + 0.047 + 0.008 * u - Z) / 0.003 + 0.5, 0, 1)
+        rim = ell(ex - 0.002 * s, ez, 0.046, 0.065) * top
+        over(ell(ex + 0.007 * s, ez, 0.053, 0.066) * top, _hex("#FFFFFF"))     # white shows only as an outer sliver
+        over(rim, dark)                                                        # dark rim of the eye
+        ring = ell(ex - 0.002 * s, ez - 0.006, 0.037, 0.054) * rim
+        over(ring, _hex("#8A5232"))                                            # warm brown iris ring
+        over(ell(ex - 0.002 * s, ez - 0.030, 0.026, 0.018) * ring, _hex("#B0723F"))   # warmer lower iris
+        over(ell(ex - 0.002 * s, ez - 0.002, 0.021, 0.031) * ring, _hex("#2A1814"))   # pupil
+        over(ell(ex + 0.014 * s, ez + 0.020, 0.016, 0.018), _hex("#FFFFFF"))   # main highlight
+        over(ell(ex - 0.013 * s, ez - 0.027, 0.0075, 0.0075), _hex("#FFFFFF")) # small second highlight
+        # thick dark brow, close above the eye, inner end lower: the confident tilt
+        over(stroke([(0.050 * s, 1.513), (0.108 * s, 1.534), (0.172 * s, 1.531)], [0.042, 0.036, 0.016],
                     soft=0.005), dark)
     over(ell(0.0, 1.402, 0.012, 0.008, soft=0.010), _hex("#E2906C", 0.55))     # tiny nose hint
-    # small closed one-sided smile: a short curve whose character-left end lifts
-    over(stroke([(-0.048, 1.356), (-0.015, 1.343), (0.025, 1.346), (0.056, 1.366)], [0.010, 0.012, 0.011, 0.007],
-                soft=0.004), _hex(palette.CHAR["mouth"][0]))
+    # wide, warm closed smile curving up at both ends; the character-left end lifts higher into a small cheek crease
+    mouth = _hex("#8E4030")
+    over(stroke([(-0.066, 1.364), (-0.035, 1.346), (0.0, 1.340), (0.035, 1.347), (0.068, 1.371)],
+                [0.008, 0.012, 0.013, 0.012, 0.008], soft=0.004), mouth)
+    over(stroke([(0.077, 1.374), (0.083, 1.391)], [0.006, 0.003], soft=0.004), _hex("#C46F55", 0.85))
     a = img[..., 3:]
     img[..., :3] = np.where(a > 1e-4, img[..., :3] / np.maximum(a, 1e-4), 0.0)   # straight alpha (PNG), not premultiplied
     img[:3, :3, 3] = 0.0
