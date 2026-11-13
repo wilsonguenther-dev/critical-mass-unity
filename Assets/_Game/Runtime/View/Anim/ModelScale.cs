@@ -11,8 +11,10 @@ namespace CriticalMass.Runtime.View.Anim
     /// </summary>
     public static class ModelScale
     {
-        /// <summary>The sane range for the combined effect factor (the largest designed stack is about 1.2 x 1.08).</summary>
-        public const float MinFactor = 0.5f, MaxFactor = 1.5f;
+        /// <summary>The sane range for the combined effect factor (the largest designed stack is about 1.2 x 1.08). The floor is 0:
+        /// the corpse pop shrinks a body to nothing by design (finisher, batch 3: a 0.5 floor clamped every pop's last frames,
+        /// 190 clamps in the soak); an oversized fighter is the defect this owner exists to stop.</summary>
+        public const float MinFactor = 0f, MaxFactor = 1.5f;
 
         /// <summary>Times the clamp fired since the last ResetForTests (tests, perf report).</summary>
         public static int ClampCount { get; private set; }

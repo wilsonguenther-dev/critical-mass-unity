@@ -303,12 +303,15 @@ namespace CriticalMass.Runtime.View.Anim
             bool evaluate = AnimLod.ShouldEvaluate(m.AlwaysAnimate, fresh, m.AnyVisible, basePos, _id);
             bool evaluated = m.Evaluate(evaluate);
             if (evaluated) ApplyLegWarp(m);
-            if (evaluated && idleW > 0.01f)
             {
                 // Breathing: a 2% chest swell at 0.3 Hz while idle. fix/model-scale: set from the chest's rest scale, never
                 // multiplied in place (a clip without a chest scale curve, or a frozen simTime in a hit-stop, compounded it).
+                // Finisher (batch 3, AnInterruptedEffectNeverSurvivesTheNextFrame: chest 2.7x): written EVERY frame, idle or not,
+                // evaluated or skipped, so this is the chest's one final writer; the KayKit clips carry no chest scale curve, so a
+                // moving fighter used to keep whatever an interrupted effect left there.
                 Transform chest = m.Bone("chest");
-                if (chest != null) chest.localScale = ModelScale.FromRest(m.RestScale(chest), 1f + 0.02f * idleW * Mathf.Sin((float)(2 * Math.PI * 0.3 * simTime + _id * 1.7)));
+                float breath = evaluated && idleW > 0.01f ? 1f + 0.02f * idleW * Mathf.Sin((float)(2 * Math.PI * 0.3 * simTime + _id * 1.7)) : 1f;
+                if (chest != null) chest.localScale = ModelScale.FromRest(m.RestScale(chest), breath);
             }
             if (!corpse && !air && actor.StandUp <= 0) EmitSteps(m, w, actor, i, basePos, evaluated);
 

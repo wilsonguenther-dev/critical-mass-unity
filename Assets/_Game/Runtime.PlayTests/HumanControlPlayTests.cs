@@ -337,7 +337,7 @@ namespace CriticalMass.Runtime.PlayTests
             Assert.IsTrue(guard.IdleAutopilot);
             Assert.IsTrue(presence.BannerVisible, "the banner shows");
             StringAssert.Contains("COMPUTER IS PLAYING YOUR FIGHTER", presence.BannerPrompt);
-            StringAssert.Contains("PRESS ANY KEY TO PLAY", presence.BannerPrompt);
+            StringAssert.IsMatch("PRESS ANY (KEY|BUTTON) TO PLAY", presence.BannerPrompt);   // the prompt names the device used last (a test gamepad exists)
 
             // A key: control is back by the end of the frame the event arrives on (the guard runs before the driver).
             HumanControlGuard.IdleAutopilotSeconds = HumanControlGuard.DefaultIdleAutopilotSeconds;

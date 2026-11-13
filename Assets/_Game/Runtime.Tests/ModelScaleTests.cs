@@ -36,7 +36,7 @@ namespace CriticalMass.Runtime.Tests
             LogAssert.Expect(LogType.Warning, new Regex(@"^\[ModelScale\].*clamped"));
             Vector3 s = ModelScale.Compose(Vector3.one, new Vector3(2.7f, 2.7f, 2.7f), "Actor 3 warrior");
             Assert.AreEqual(ModelScale.MaxFactor, s.y, 1e-6f);
-            s = ModelScale.Compose(Vector3.one, new Vector3(0.01f, float.NaN, 3f), "Actor 3 warrior");   // second clamp: no second log
+            s = ModelScale.Compose(Vector3.one, new Vector3(-0.5f, float.NaN, 3f), "Actor 3 warrior");   // second clamp: no second log
             Assert.AreEqual(ModelScale.MinFactor, s.x, 1e-6f);
             Assert.AreEqual(1f, s.y, 1e-6f);
             Assert.AreEqual(ModelScale.MaxFactor, s.z, 1e-6f);

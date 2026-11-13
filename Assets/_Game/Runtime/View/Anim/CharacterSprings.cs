@@ -160,6 +160,10 @@ namespace CriticalMass.Runtime.View.Anim
         {
             // A frame the animation level of detail skipped keeps last frame's bones (springs already on them): never stack.
             if (!s.Evaluated) return;
+            // Finisher (batch 3, DeadActorsFallAndStayDown: "got back up while dead"): no fighter springs on a corpse. The
+            // death launch moves the root fast, the lag spring read that as a huge tilt and swung the lying body's spine, chest
+            // and head up. The Death clip owns the corpse; the lag resets when the fighter is posed alive again.
+            if (s.Corpse && !s.IsKaiju) return;
             if (mv != null) PostPoseRoot(actor, mv.Transform, mv.Entry != null ? mv.Entry.Key : null);
         }
 

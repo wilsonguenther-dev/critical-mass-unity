@@ -164,7 +164,9 @@ namespace CriticalMass.Runtime.Game
                     Driver.HumanAutopilot = false;
                     Debug.LogWarning($"{LogTag} a match started with actor 0 on autopilot; control handed to the player.");
                 }
-                if (!Driver.CreatedInCaptureMode)
+                // Player.log only (finisher, batch 3): in the editor this info line failed 19 PlayMode tests that assert no
+                // unexpected log; warnings and the lockout error still log everywhere.
+                if (!Driver.CreatedInCaptureMode && !Application.isEditor)
                     Debug.Log($"{LogTag} match start: actor 0 is {(watchFromSetup ? "watched (Spectate)" : "under the player's control")}.");
             }
 
@@ -176,7 +178,7 @@ namespace CriticalMass.Runtime.Game
             {
                 // Any input takes control at once: this runs before the driver's Update, so the next tick is the player's.
                 Driver.HumanAutopilot = false;
-                if (IdleAutopilot) Debug.Log($"{LogTag} input took control back from idle autopilot.");
+                if (IdleAutopilot) { if (!Application.isEditor) Debug.Log($"{LogTag} input took control back from idle autopilot."); }
                 else Debug.LogWarning($"{LogTag} input took control back from autopilot that had no idle reason.");
                 IdleAutopilot = false;
                 TookBackFrame = Time.frameCount;
@@ -186,7 +188,7 @@ namespace CriticalMass.Runtime.Game
             {
                 Driver.HumanAutopilot = true;
                 IdleAutopilot = true;
-                Debug.Log($"{LogTag} no input for {IdleAutopilotSeconds:0} s: autopilot plays actor 0 until any key or button.");
+                if (!Application.isEditor) Debug.Log($"{LogTag} no input for {IdleAutopilotSeconds:0} s: autopilot plays actor 0 until any key or button.");
             }
             if (!Driver.HumanAutopilot) IdleAutopilot = false;
             AutopilotBanner = eligible && playing && Driver.HumanAutopilot && !paused;
