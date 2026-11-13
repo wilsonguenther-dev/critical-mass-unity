@@ -261,7 +261,8 @@ namespace CriticalMass.Runtime.View.Anim
             Quaternion rot = Quaternion.Euler(0f, (float)_yaw + twist, 0f) * Quaternion.Euler(_pitch, 0f, _roll);
             if (hasFx) rot = fx.Lean * rot;
             m.SetFacing(rot);
-            m.Transform.localScale = scale;
+            // fix/model-scale: scale above is the effect factor, rebuilt from 1 this frame; the one owner composes and clamps it.
+            m.Transform.localScale = ModelScale.Compose(m.BaseScale, scale, m.AssignedName);
 
             bool fresh = _fresh > 0;
             if (_fresh > 0) _fresh--;
@@ -269,9 +270,10 @@ namespace CriticalMass.Runtime.View.Anim
             bool evaluated = m.Evaluate(evaluate);
             if (evaluated && idleW > 0.01f)
             {
-                // Breathing: a 2% chest swell at 0.3 Hz while idle (multiplied after Evaluate, which rewrites the chest).
+                // Breathing: a 2% chest swell at 0.3 Hz while idle. fix/model-scale: set from the chest's rest scale, never
+                // multiplied in place (a clip without a chest scale curve, or a frozen simTime in a hit-stop, compounded it).
                 Transform chest = m.Bone("chest");
-                if (chest != null) chest.localScale *= 1f + 0.02f * idleW * Mathf.Sin((float)(2 * Math.PI * 0.3 * simTime + _id * 1.7));
+                if (chest != null) chest.localScale = ModelScale.FromRest(m.RestScale(chest), 1f + 0.02f * idleW * Mathf.Sin((float)(2 * Math.PI * 0.3 * simTime + _id * 1.7)));
             }
             if (!corpse && !air && actor.StandUp <= 0) EmitSteps(m, w, actor, i, basePos, evaluated);
 

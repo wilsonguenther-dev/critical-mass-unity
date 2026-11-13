@@ -71,6 +71,45 @@ namespace CriticalMass.Runtime.View.Art
         /// <summary>The name the views gave the root last (compared by reference, so a respawn never rebuilds it).</summary>
         public string AssignedName;
 
+        /// <summary>
+        /// The root's scale as imported (fix/model-scale). Every drawn size is BaseScale x an effect factor rebuilt each frame
+        /// (Anim.ModelScale); nothing multiplies the root's current scale.
+        /// </summary>
+        public readonly Vector3 BaseScale;
+
+        private Dictionary<Transform, Vector3> _restScale;
+
+        /// <summary>A bone's scale as imported (captured the first time any bone is asked for, from the prefab).</summary>
+        public Vector3 RestScale(Transform bone)
+        {
+            if (bone == null) return Vector3.one;
+            if (_restScale == null)
+            {
+                _restScale = new Dictionary<Transform, Vector3>();
+                Transform prefab = Entry != null && Entry.Model != null ? Entry.Model.transform : null;
+                foreach (Transform t in Root.GetComponentsInChildren<Transform>(true))
+                {
+                    if (t == Transform) continue;
+                    // Only the imported hierarchy: attachments added at runtime (cosmetics, carried props) own their scale.
+                    Transform src = prefab != null ? prefab.Find(PathOf(Root.transform, t)) : null;
+                    if (src != null) _restScale[t] = src.localScale;
+                }
+            }
+            return _restScale.TryGetValue(bone, out Vector3 s) ? s : Vector3.one;
+        }
+
+        /// <summary>
+        /// Back to the imported size (fix/model-scale): the root at BaseScale and every bone at its rest scale. ActorViews
+        /// calls it when a model goes back to the pool and when it is taken out (respawn, class switch, pool reuse).
+        /// </summary>
+        public void ResetScale()
+        {
+            Transform.localScale = BaseScale;
+            if (_restScale == null) return;
+            foreach (KeyValuePair<Transform, Vector3> kv in _restScale)
+                if (kv.Key != null && kv.Key.localScale != kv.Value) kv.Key.localScale = kv.Value;
+        }
+
         /// <summary>Poses evaluated and skipped since creation (tests, perf report).</summary>
         public int Evaluations { get; private set; }
         public int SkippedEvaluations { get; private set; }
@@ -83,6 +122,8 @@ namespace CriticalMass.Runtime.View.Art
             Root.name = name;
             AssignedName = name;
             Transform = Root.transform;
+            // fix/model-scale: the base size is stored once, from the imported prefab, before anything poses the model.
+            BaseScale = Transform.localScale;
             Renderers = Root.GetComponentsInChildren<Renderer>(true);
             _slots = new Material[Renderers.Length][];
             _roles = new FighterLod.Role[Renderers.Length];

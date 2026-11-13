@@ -180,6 +180,7 @@ namespace CriticalMass.Runtime.View
                     m.Root.name = objectName;
                     m.AssignedName = objectName;
                 }
+                m.ResetScale();   // fix/model-scale: a reused model starts at its imported size (respawn, class switch)
                 return m;
             }
             return Make(key, objectName);
@@ -188,6 +189,7 @@ namespace CriticalMass.Runtime.View
         private void Give(ModelView m)
         {
             m.SetActive(false);
+            m.ResetScale();   // fix/model-scale: never park a model mid-effect (death pop, hit punch, squash)
             if (!_pool.TryGetValue(m.Entry.Key, out Stack<ModelView> s)) _pool[m.Entry.Key] = s = new Stack<ModelView>();
             s.Push(m);
         }
@@ -354,7 +356,7 @@ namespace CriticalMass.Runtime.View
                 double speed = Math.Sqrt((k.X - k.PrevX) * (k.X - k.PrevX) + (k.Z - k.PrevZ) * (k.Z - k.PrevZ)) * cfg.SimHz;
                 if (m == _egg)
                 {
-                    m.Transform.localScale = Vector3.one;
+                    m.Transform.localScale = m.BaseScale;
                     _eggIdleT += dSim;
                     m.BeginPose();
                     bool shake = cfg.HatchSeconds - w.Match.Time < EggShakeSeconds && m.HasClip(ArtMapping.Shake);

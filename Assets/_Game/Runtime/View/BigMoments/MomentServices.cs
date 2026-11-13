@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using CriticalMass.Runtime.Hud.Style;
 using CriticalMass.Runtime.View.Art;
 using CriticalMass.Sim.Config;
 using CriticalMass.Sim.Core;
@@ -160,7 +161,7 @@ namespace CriticalMass.Runtime.View.Moments
             _camera = camGo.AddComponent<UnityEngine.Camera>();
             _camera.enabled = false;
             _camera.clearFlags = CameraClearFlags.SolidColor;
-            _camera.backgroundColor = new Color(0f, 0f, 0f, 0f);
+            _camera.backgroundColor = BackdropFor(CMTokens.VoidNavy.Color);   // opaque: see BackdropFor
             _camera.fieldOfView = FieldOfView;
             _camera.nearClipPlane = 0.1f;
             _camera.farClipPlane = 60f;
@@ -189,20 +190,38 @@ namespace CriticalMass.Runtime.View.Moments
         {
             string key = ClassKey(c);
             if (!CanRender(key)) return null;
-            return Begin(key, ArtMaterials.ForTeam(ArtMapping.Spec(key), t), ArtMapping.Attack);
+            return Begin(key, ArtMaterials.ForTeam(ArtMapping.Spec(key), t), ArtMapping.Attack, BackdropFor(CMTokens.Team(t)));
         }
+
+        /// <summary>
+        /// fix/model-scale (the "giant Azure Warrior" report, 2026-11-12): the cut-in is drawn on an OPAQUE card. With the old
+        /// transparent clear the live render was a bare fighter cut-out 660 reference px tall composited straight over the
+        /// battlefield next to the real crowd, which read as one fighter inflated to about 3x. The card makes it a portrait.
+        /// </summary>
+        public static Color BackdropFor(Color accent)
+        {
+            Color c = Color.Lerp(CMTokens.VoidNavy.Color, accent, 0.35f);
+            c.a = 1f;
+            return c;
+        }
+
+        /// <summary>The live render's background this takeover (always opaque).</summary>
+        public Color Backdrop => _camera.backgroundColor;
 
         /// <summary>Starts rendering the adult Kaiju in its allegiance glow; null when it has no model.</summary>
         public RenderTexture BeginKaiju(KaijuState s)
         {
             string key = ArtMapping.KaijuAdult;
             if (!CanRender(key)) return null;
-            return Begin(key, ArtMaterials.ForGlow(ArtMapping.Spec(key), ArtMapping.KaijuGlow(s)), ArtMapping.Roar);
+            Color accent = s == KaijuState.Azure ? CMTokens.Azure.Color : s == KaijuState.Crimson ? CMTokens.Crimson.Color
+                : s == KaijuState.Berserk ? CMTokens.Corruption.Color : CMTokens.VoidNavy.Color;
+            return Begin(key, ArtMaterials.ForGlow(ArtMapping.Spec(key), ArtMapping.KaijuGlow(s)), ArtMapping.Roar, BackdropFor(accent));
         }
 
-        private RenderTexture Begin(string key, Material material, string clip)
+        private RenderTexture Begin(string key, Material material, string clip, Color backdrop)
         {
             End();
+            _camera.backgroundColor = backdrop;
             if (!_pool.TryGetValue(key, out ModelView m) || m == null || m.Root == null)
             {
                 m = new ModelView(_catalog.Find(key), _stage.transform, "BM Model " + key);
