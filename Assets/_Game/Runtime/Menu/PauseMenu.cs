@@ -688,8 +688,11 @@ namespace CriticalMass.Runtime.Menu
                 Stepper(tab, 0, "CAMERA SHAKE", () => GameSettings.CameraShake ? "ON" : "OFF", d => GameSettings.CameraShake = !GameSettings.CameraShake),
                 Stepper(tab, 1, "DAMAGE NUMBERS", () => GameSettings.DamageNumbers ? "ON" : "OFF", d => GameSettings.DamageNumbers = !GameSettings.DamageNumbers),
                 Stepper(tab, 2, "BLOOD", () => GameSettings.Blood ? "ON" : "OFF", d => GameSettings.Blood = !GameSettings.Blood),
+                // feat/big-moments: full, reduced (corner callouts only), off
+                Stepper(tab, 3, "BIG MOMENTS", () => View.Moments.BigMomentsSettings.Label(View.Moments.BigMomentsSettings.Mode),
+                    d => View.Moments.BigMomentsSettings.Mode = View.Moments.BigMomentsSettings.Step(View.Moments.BigMomentsSettings.Mode, d)),
             };
-            MenuItem reset = MenuUi.Item(tab, "Reset Settings", ContentX, ContentY + 3 * (LineH + LineGap) + 20f, 420f, 56f,
+            MenuItem reset = MenuUi.Item(tab, "Reset Settings", ContentX, ContentY + 4 * (LineH + LineGap) + 20f, 420f, 56f,
                 "RESET ALL SETTINGS", MenuItem.Kind.Button, 24, true, CMTokens.Display);
             reset.Submitted = () =>
             {
