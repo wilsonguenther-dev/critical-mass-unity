@@ -351,7 +351,7 @@ namespace CriticalMass.Runtime.Menus
         /// <summary>Longest the film waits for its first shot to stream in before it gives up (the title shows instead).</summary>
         public const float FirstShotTimeout = 8f;
         /// <summary>Mix while the film plays: music bed, the music under narration, the backdrop match's world sounds.</summary>
-        public const float FilmMusicBed = 0.8f, FilmMusicUnderVoice = 0.35f, FilmWorldSounds = 0.1f;
+        public const float FilmMusicBed = 0.8f, FilmMusicUnderVoice = 0.5f, FilmWorldSounds = 0.1f;
         SkipGate _gate;
         double _filmT;
         float _loadWait;
@@ -942,8 +942,11 @@ namespace CriticalMass.Runtime.Menus
             }
             if (freezeScreen && EventSystem.current != null)
             {
-                _events = EventSystem.current;
-                _eventsNav = _events.sendNavigationEvents;
+                if (_events != EventSystem.current)
+                {
+                    _events = EventSystem.current;
+                    _eventsNav = _events.sendNavigationEvents;   // not yet restored from a film just ended: keep the original
+                }
                 _events.sendNavigationEvents = false;
             }
             FlowDirector d = FlowDirector.Current;
