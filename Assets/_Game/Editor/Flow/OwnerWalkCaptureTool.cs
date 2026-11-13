@@ -70,6 +70,7 @@ namespace CriticalMass.Editor.Flow
                 }
                 Directory.CreateDirectory(_out);
                 _frames = _shots = _wanted = 0;
+                _invisibleFighters = 0;
                 Log.Clear();
                 EditorSceneManager.OpenScene(GameBootstrap.BootScenePath, OpenSceneMode.Single);
                 GameFlow.ForceEnabled = true;
@@ -473,16 +474,95 @@ namespace CriticalMass.Editor.Flow
                 tex.ReadPixels(new Rect(0, 0, r.W, r.H), 0, 0);
                 tex.Apply();
                 File.WriteAllBytes(path, tex.EncodeToPNG());
+                string fighters = name.StartsWith("10-", StringComparison.Ordinal) || name.StartsWith("11-", StringComparison.Ordinal)
+                    ? "; " + FighterPixels(cam, tex, r) : "";
                 UnityEngine.Object.DestroyImmediate(tex);
                 _shots++;
-                Note("wrote " + file + "; " + TextIssues() + (name.StartsWith("1", StringComparison.Ordinal) ? "; " + HudReport() : ""));
+                Note("wrote " + file + "; " + TextIssues() + (name.StartsWith("1", StringComparison.Ordinal) ? "; " + HudReport() : "") + fighters);
             }
             catch (Exception e) { Note(file + " FAILED: " + e.Message); }
             finally { RenderTexture.active = prev; }
         }
 
+        /// <summary>Fighter views judged invisible over the whole walk (exit 5 when the shots were otherwise all written).</summary>
+        static int _invisibleFighters;
+
+        /// <summary>
+        /// fix/fighters-always-visible (owner report 2026-11-13: fighters drawn as rings and name tags only): every living
+        /// fighter in view must put pixels on screen. The frame is rendered a second time with every fighter model switched
+        /// off; inside each fighter's projected box (feet to 2 m) the pixels that change are the fighter's own. A fighter with
+        /// fewer than MinFighterPixels changed pixels (scaled to the shot's height) is "INVISIBLE" in walk.log and the walk
+        /// exits 5. Team-colour pixels (Azure or Crimson hue among the changed ones) are counted for the log.
+        /// </summary>
+        static string FighterPixels(UnityEngine.Camera cam, Texture2D shot, Res r)
+        {
+            SimDriverBehaviour drv = Driver;
+            CriticalMass.Runtime.View.ActorViews views = drv != null ? drv.GetComponent<CriticalMass.Runtime.View.ActorViews>() : null;
+            if (drv == null || drv.World == null || views == null) return "fighters: no match";
+            World w = drv.World;
+            var off = new List<GameObject>();
+            for (int k = 0; k < views.transform.childCount; k++)
+            {
+                GameObject c = views.transform.GetChild(k).gameObject;
+                if (c.activeSelf && c.name.StartsWith("Actor ", StringComparison.Ordinal)) { c.SetActive(false); off.Add(c); }
+            }
+            Texture2D bare = new Texture2D(r.W, r.H, TextureFormat.RGB24, false);
+            try
+            {
+                var req = new RenderPipeline.StandardRequest { destination = _rt };
+                if (RenderPipeline.SupportsRenderRequest(cam, req)) RenderPipeline.SubmitRenderRequest(cam, req);
+                else cam.Render();
+                RenderTexture.active = _rt;
+                bare.ReadPixels(new Rect(0, 0, r.W, r.H), 0, 0);
+                bare.Apply();
+            }
+            finally { foreach (GameObject c in off) c.SetActive(true); }
+            Color32[] a = shot.GetPixels32(), b = bare.GetPixels32();
+            UnityEngine.Object.DestroyImmediate(bare);
+            int minPx = Mathf.Max(20, Mathf.RoundToInt(MinFighterPixels * r.H / 1080f));
+            int inView = 0, invisible = 0;
+            var worst = new List<string>();
+            for (int i = 0; i < w.ActorCount; i++)
+            {
+                if (!w.Actors[i].Alive) continue;
+                Vector3 feet = CriticalMass.Runtime.SimSpace.ToWorld(w.X[i], CriticalMass.Runtime.GroundHeight.At(w.Map, w.X[i], w.Z[i]), w.Z[i]);
+                Vector3 p0 = cam.WorldToScreenPoint(feet), p1 = cam.WorldToScreenPoint(feet + Vector3.up * 2f);
+                if (p0.z <= 0f || p1.z <= 0f) continue;
+                float h = Mathf.Abs(p1.y - p0.y), half = Mathf.Max(6f, h * 0.45f);
+                int x0 = Mathf.FloorToInt(Mathf.Min(p0.x, p1.x) - half), x1 = Mathf.CeilToInt(Mathf.Max(p0.x, p1.x) + half);
+                int y0 = Mathf.FloorToInt(Mathf.Min(p0.y, p1.y) - 4f), y1 = Mathf.CeilToInt(Mathf.Max(p0.y, p1.y) + 4f);
+                if (x0 < 0 || y0 < 0 || x1 >= r.W || y1 >= r.H) continue;
+                inView++;
+                int changed = 0, team = 0;
+                for (int y = y0; y <= y1; y++)
+                    for (int x = x0; x <= x1; x++)
+                    {
+                        Color32 c = a[y * r.W + x], d = b[y * r.W + x];
+                        if (Mathf.Abs(c.r - d.r) + Mathf.Abs(c.g - d.g) + Mathf.Abs(c.b - d.b) < 45) continue;
+                        changed++;
+                        Color.RGBToHSV(c, out float hue, out float sat, out float val);
+                        if (sat > 0.35f && val > 0.25f && (hue > 0.48f && hue < 0.60f || hue < 0.03f || hue > 0.94f)) team++;
+                    }
+                if (changed < minPx)
+                {
+                    invisible++;
+                    if (worst.Count < 6) worst.Add($"actor {i} {changed}px");
+                }
+            }
+            _invisibleFighters += invisible;
+            return $"fighters in view {inView}, INVISIBLE {invisible} (floor {minPx} px){(worst.Count > 0 ? ": " + string.Join(", ", worst) : "")}";
+        }
+
+        /// <summary>Changed pixels a fighter must own at 1080 px screen height (a 2 m fighter is about 140 px tall there).</summary>
+        const int MinFighterPixels = 120;
+
         static void Finish(int code)
         {
+            if (code == 0 && _invisibleFighters > 0)
+            {
+                Note($"FAILED: {_invisibleFighters} fighter view(s) drew no character (fix/fighters-always-visible check)");
+                code = 5;
+            }
             EditorApplication.update -= Update;
             GameFlow.ForceEnabled = false;
             Scoreboard.ForceOpen = false;

@@ -206,6 +206,10 @@ ARGS=(-autoplay -quitAfterMatch -autoplayMatches "$MATCHES" -autoplayTitleSecond
 # Integration batch 3 (owner report 2026-11-12): automated runs never take the owner's screen. By default the player is
 # launched through LaunchServices hidden and in the background (open -g -j: no activation, no focus steal, no visible
 # window); CM_SMOKE_VISIBLE=1 restores the old direct launch. The watchdog replaces perl's alarm for the hidden path.
+# fix/fighters-always-visible (owner report 2026-11-13: the player activates itself and re-shows its window at boot and at
+# every match load, so open -g -j alone did not keep it hidden): the GAME now hides itself whenever an automation flag is
+# on its command line (Runtime/Game/AutomationWindow.cs). CM_SMOKE_VISIBLE=1 also passes -showWindow, the only opt-in.
+[[ "${CM_SMOKE_VISIBLE:-0}" == 1 ]] && ARGS+=(-showWindow)
 WATCHDOG=""
 if [[ "${CM_SMOKE_VISIBLE:-0}" != 1 ]]; then
   BUNDLE="${EXE%/Contents/MacOS/*}"
