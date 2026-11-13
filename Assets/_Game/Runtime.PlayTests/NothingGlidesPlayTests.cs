@@ -275,6 +275,11 @@ namespace CriticalMass.Runtime.PlayTests
                 for (int t = 1; t < p.Length; t++)
                 {
                     if (p[t].y > min + stance || p[t - 1].y > min + stance) continue;
+                    // The planted foot is the LOWER foot: a low swing (the Kaiju lifts its feet about 0.1 u) dips within the
+                    // stance band mid-stride and was counted as planted while it travelled at twice the body's speed (CI run
+                    // 43487360396 read 1.14 u/u over 2.6 u). Only the foot that bears the weight at both samples counts.
+                    Vector3[] o = f == 0 ? right : left;
+                    if (p[t].y > o[t].y || p[t - 1].y > o[t - 1].y) continue;
                     // A pivot (the drawn body turning more than 2 degrees in a tick) swings the planted feet round the body:
                     // that is a turn, measured as one, not a glide.
                     if (yaw != null && Mathf.Abs(Mathf.DeltaAngle(yaw[t], yaw[t - 1])) > 2f) continue;
