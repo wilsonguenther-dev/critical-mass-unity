@@ -67,6 +67,8 @@ namespace CriticalMass.Runtime.Hud.Mechanics
         Text _eventWord, _eventTime;
         VectorShape _eventFill;
         const float EventW = 560f, EventH = 38f;
+        /// <summary>The pill word's width: from x 14 to 10 px before the clock (x EventW - 90).</summary>
+        public const float WordW = EventW - 90f - 10f - 14f;
 
         // gather ring
         RectTransform _gather;
@@ -225,10 +227,9 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             Chip(_event, "Track", ShapeKind.RoundRect, 0f, 0f, EventW, EventH, CMTokens.WithAlpha(panel, 0.92f), 12f);
             _eventFill = Chip(_event, "Fill", ShapeKind.RoundRect, 3f, 3f, EventW - 6f, EventH - 6f, CMTokens.MeterOrange.Color, 10f);
             _eventFill.OutlinePx = 0f;
-            _eventWord = MenuUi.Label(_event, "Word", CMTokens.Display, 17, cream, TextAnchor.MiddleLeft, 14f, 0f, EventW - 100f, EventH, "", 2.5f);
-            _eventWord.resizeTextForBestFit = true;
-            _eventWord.resizeTextMinSize = 11;
-            _eventWord.resizeTextMaxSize = 17;
+            // hud-art-1: the word ends 10 px short of the clock and shrinks to fit (SetOneLine). Best fit never worked here:
+            // Unity ignores it while the text overflows horizontally, so the egg line ran under the clock.
+            _eventWord = MenuUi.Label(_event, "Word", CMTokens.Display, 17, cream, TextAnchor.MiddleLeft, 14f, 0f, WordW, EventH, "", 2.5f);
             _eventTime = MenuUi.Label(_event, "Time", CMTokens.Mono, 20, cream, TextAnchor.MiddleRight, EventW - 90f, 0f, 76f, EventH, "", 2.5f);
             _event.gameObject.SetActive(false);
 
@@ -482,7 +483,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
                 int ds = DepthRead.DropState(w, out _, out _, out int dtick);
                 int bs = DepthRead.BridgeState(w, out int btick, out _);
                 int egg = DepthRead.EggExposedUntil(w);
-                if (egg > w.Tick) { word = DepthWords.EggExposed; ticksLeft = egg - w.Tick; span = DepthRead.EggWindowTicks(w); col = CMTokens.EggSeam.Color; }
+                if (egg > w.Tick) { word = DepthWords.EggExposedPill; ticksLeft = egg - w.Tick; span = DepthRead.EggWindowTicks(w); col = CMTokens.EggSeam.Color; }
                 else if (ds == DepthRead.DropIncoming) { word = DepthWords.DropIncoming; ticksLeft = dtick - w.Tick; span = Math.Max(1, (int)(8 * w.Config.SimHz)); col = PowerTimers.Colour[0]; }
                 else if (ds == DepthRead.DropLanded)
                 {
@@ -501,7 +502,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             bool show = word != null && !HudZones.Blocked(HudZone.Callout, HudPriority.Tip);   // owner walk 1: lane resident
             if (_event.gameObject.activeSelf != show) _event.gameObject.SetActive(show);
             if (!show) return;
-            HudText.Set(_eventWord, word);
+            HudText.SetOneLine(_eventWord, word, 17, 11);
             int secs = StationRules.Seconds(ticksLeft, w.Config.SimHz);
             HudText.Set(_eventTime, Clock[Mathf.Clamp(secs, 0, Clock.Length - 1)]);
             float frac = Mathf.Clamp01((float)ticksLeft / Math.Max(1, span));

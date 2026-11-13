@@ -168,5 +168,21 @@ namespace CriticalMass.Runtime.Tests
             Assert.Less(BigMoments.EaseIn(0.3f), 0.3f);
             Assert.Greater(BigMoments.PortraitIn + BigMoments.PortraitOut, 0.4f);
         }
+
+        [Test]
+        public void TheMapEventPillNeverRunsUnderItsClock()
+        {
+            // Art lead: "EVERY DELIVERY COUNTS DOUB0:10". The pill shows a short line, ends 10 px before the clock
+            // (x 470 of 560) and shrinks the line to fit instead of overflowing.
+            Assert.LessOrEqual(14f + CriticalMass.Runtime.Hud.Mechanics.DepthHud.WordW, 560f - 90f - 10f + 0.01f);
+            string[] lines =
+            {
+                CriticalMass.Runtime.View.Mechanics.DepthWords.EggExposedPill, CriticalMass.Runtime.View.Mechanics.DepthWords.DropIncoming,
+                CriticalMass.Runtime.View.Mechanics.DepthWords.DropLanded, CriticalMass.Runtime.View.Mechanics.DepthWords.DropContested,
+                CriticalMass.Runtime.View.Mechanics.DepthWords.BridgeWarning, CriticalMass.Runtime.View.Mechanics.DepthWords.BridgeCollapsed,
+            };
+            foreach (string l in lines)
+                Assert.LessOrEqual(l.Length, CriticalMass.Runtime.View.Mechanics.DepthWords.PillMaxChars, l);
+        }
     }
 }
