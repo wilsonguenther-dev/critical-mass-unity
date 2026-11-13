@@ -190,7 +190,7 @@ namespace CriticalMass.Runtime.Flow
                     else if (a.input == "ability") ability = a.name;
                 }
             }
-            return (attack + "  ·  " + ability).ToUpperInvariant();
+            return attack + " · " + ability;   // integration batch 4: title case, one space each side: "PICK-HAMMER · BARRICADE" did not fit a 230 px card at 16 px
         }
 
         /// <summary>Difficulty 1..3.</summary>

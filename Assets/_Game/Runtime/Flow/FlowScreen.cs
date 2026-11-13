@@ -19,12 +19,16 @@ namespace CriticalMass.Runtime.Flow
     /// (stick or d-pad, A) share one EventSystem focus, as in the pause menu. B, Escape and Start mean Back (Escape and
     /// Start arrive through FlowDirector's PauseHandler, B here). Focus is never lost: when nothing of this screen is
     /// selected, the last focused item (or the default) is selected again, so a focus is always visible.
-    /// <para>Show plays a 180 ms fade and 28 px rise (unscaled time, view only; never touches the sim). Hide is instant.</para>
+    /// <para>Show plays a 180 ms fade and 28 px rise and Hide a 120 ms fade (UiMotion: unscaled time, view only, never
+    /// touches the sim; Reduce motion keeps the fade and drops the rise, and hides at once). A hiding screen stops taking
+    /// input on the first frame, so the screen under it is live while the fade finishes.</para>
     /// </summary>
     public abstract class FlowScreen : MonoBehaviour
     {
-        public const float TransitionSeconds = 0.18f;
-        public const float RisePx = 28f;
+        public const float TransitionSeconds = UiMotion.EnterSeconds;
+        public const float RisePx = UiMotion.RisePx;
+        /// <summary>Top of the key-hint line: inside the HUD's 24 px edge margin at the bottom of the 1080 space.</summary>
+        public const float HintY = HudLayout.RefH - HudLayout.Margin - 36f;
         /// <summary>A press that opened a screen must not also press its focused button.</summary>
         public const float SubmitGuardSeconds = 0.15f;
 
@@ -34,14 +38,20 @@ namespace CriticalMass.Runtime.Flow
 
         /// <summary>The focused item when the screen opens.</summary>
         protected MenuItem DefaultFocus;
+        /// <summary>The one item focused when the screen opens (tests check every screen has exactly one).</summary>
+        public MenuItem DefaultItem => DefaultFocus;
         protected RectTransform Space { get; private set; }
         Text _hint;
         PromptStrip _hintStrip;
         CanvasGroup _group;
         RectTransform _rise;
         MenuItem _lastFocus;
-        float _shownAt;
-        bool _built;
+        float _shownAt, _hiddenAt, _alphaAtHide;
+        UiTextScale _textScale;
+
+        /// <summary>The text-size setting as applied to this screen (tests).</summary>
+        public UiTextScale TextScale => _textScale;
+        bool _built, _hiding;
 
         protected static Color Navy => CMTokens.VoidNavy.Color;
         protected static Color Cream => CMTokens.WarmCream.Color;
@@ -88,8 +98,10 @@ namespace CriticalMass.Runtime.Flow
             space.sizeDelta = new Vector2(HudLayout.RefW, HudLayout.RefH);
             Space = space;
             BuildContent(space);
-            _hint = MenuUi.Label(space, "Hint", CMTokens.Ui, 20, Cream, TextAnchor.MiddleCenter, 260f, 1026f, 1400f, 36f, "", 2f);
+            _hint = MenuUi.Label(space, "Hint", CMTokens.Ui, UiScale.TypeSmall, Cream, TextAnchor.MiddleCenter, 260f, HintY, 1400f, 36f, "", 2f);
             Canvas.enabled = false;
+            // Polish pass 1: the UI scale setting grows every line inside its own box (UiTextScale).
+            _textScale = UiTextScale.Capture(space);
             UpdateScale();
         }
 
@@ -97,10 +109,13 @@ namespace CriticalMass.Runtime.Flow
         {
             EnsureBuilt();
             IsVisible = true;
+            _hiding = false;
             Canvas.enabled = true;
+            _group.blocksRaycasts = true;
+            _group.interactable = true;
             _shownAt = Time.unscaledTime;
             _group.alpha = 0f;
-            _rise.anchoredPosition = new Vector2(0f, -RisePx);
+            _rise.anchoredPosition = new Vector2(0f, -UiMotion.Rise);
             MenuItem.SubmitBlockedUntil = Mathf.Max(MenuItem.SubmitBlockedUntil, Time.unscaledTime + SubmitGuardSeconds);
             OnShow();
             _lastFocus = null;
@@ -117,7 +132,16 @@ namespace CriticalMass.Runtime.Flow
         {
             if (!IsVisible) return;
             IsVisible = false;
-            if (Canvas != null) Canvas.enabled = false;
+            // Polish pass 1: a short fade out instead of a pop; input goes to whatever is under it at once.
+            if (_group != null)
+            {
+                _group.blocksRaycasts = false;
+                _group.interactable = false;
+                _alphaAtHide = _group.alpha;
+            }
+            _hiddenAt = Time.unscaledTime;
+            _hiding = Canvas != null && Canvas.enabled && !UiMotion.Reduced && isActiveAndEnabled;
+            if (!_hiding && Canvas != null) Canvas.enabled = false;
             EventSystem es = EventSystem.current;
             if (es != null && es.currentSelectedGameObject != null && Canvas != null &&
                 es.currentSelectedGameObject.transform.IsChildOf(Canvas.transform))
@@ -159,6 +183,7 @@ namespace CriticalMass.Runtime.Flow
             if (w < 1 || h < 1) return;
             float s = HudLayout.Scale(w, h);
             if (Mathf.Abs(Canvas.scaleFactor - s) > 1e-4f) Canvas.scaleFactor = s;
+            if (_textScale != null) _textScale.Apply(UiTextScale.Setting);
             OnScale(s);
         }
 
@@ -187,15 +212,35 @@ namespace CriticalMass.Runtime.Flow
             if (_hintStrip != null) _hintStrip.SetHint(hint, ControlBindings.ActiveDevice);
         }
 
+        /// <summary>The screen is fading out (hidden for input, still drawn for at most UiMotion.ExitSeconds).</summary>
+        public bool IsLeaving => _hiding;
+
+        void OnDisable()
+        {
+            if (!_hiding) return;
+            _hiding = false;
+            if (Canvas != null) Canvas.enabled = false;
+        }
+
         protected virtual void Update()
         {
-            if (!IsVisible) return;
+            if (!IsVisible)
+            {
+                if (!_hiding) return;
+                float a = UiMotion.Exit(Time.unscaledTime - _hiddenAt);
+                _group.alpha = a * _alphaAtHide;
+                if (a <= 0f)
+                {
+                    _hiding = false;
+                    Canvas.enabled = false;
+                }
+                return;
+            }
             UpdateScale();
             UpdateHint();
-            float k = Mathf.Clamp01((Time.unscaledTime - _shownAt) / TransitionSeconds);
-            float e = 1f - (1f - k) * (1f - k) * (1f - k);   // ease-out cubic
+            float e = UiMotion.Enter(Time.unscaledTime - _shownAt);
             _group.alpha = e;
-            _rise.anchoredPosition = new Vector2(0f, -RisePx * (1f - e));
+            _rise.anchoredPosition = new Vector2(0f, -UiMotion.Rise * (1f - e));
 
             // Focus is always visible: put it back when the mouse clicked empty space or the item went away.
             MenuItem f = Focused;
@@ -216,7 +261,7 @@ namespace CriticalMass.Runtime.Flow
 
         /// <summary>A big centred Display-face button.</summary>
         protected static MenuItem Button(Transform parent, string name, float x, float y, float w, float h, string text, Action act,
-            int size = 34)
+            int size = UiScale.TypeLead)
         {
             MenuItem it = MenuUi.Item(parent, name, x, y, w, h, text, MenuItem.Kind.Button, size, true, CMTokens.Display);
             it.Body.Radius = 16f;
@@ -224,12 +269,15 @@ namespace CriticalMass.Runtime.Flow
             return it;
         }
 
-        /// <summary>Dims an item, tags it COMING SOON and takes it out of navigation (and of the mouse focus).</summary>
+        /// <summary>
+        /// A line with nothing behind it: polish pass 1 takes it off the screen and out of navigation (never a dead
+        /// COMING SOON row). ChainVertical skips it.
+        /// </summary>
         protected static void MarkComingSoon(MenuItem it, float w, float h)
         {
             it.interactable = false;
             it.Submitted = null;
-            MenuUi.Label(it.transform, "Soon", CMTokens.Ui, 16, Brass, TextAnchor.MiddleRight, w - 210f, 0f, 190f, h, "COMING SOON", 2f);
+            it.gameObject.SetActive(false);
         }
 
         /// <summary>
@@ -238,12 +286,12 @@ namespace CriticalMass.Runtime.Flow
         protected static MenuItem Stepper(Transform parent, string name, float x, float y, float w, float h, string label,
             Func<string> value, Action<int> step, List<Action> refreshers)
         {
-            MenuItem it = MenuUi.Item(parent, name, x, y, w, h, label, MenuItem.Kind.Stepper, 26, false, CMTokens.Display);
+            MenuItem it = MenuUi.Item(parent, name, x, y, w, h, label, MenuItem.Kind.Stepper, UiScale.TypeButton, false, CMTokens.Display);
             it.Body.Radius = 14f;
             float vx = w * 0.42f, vw = w * 0.5f;
-            it.Value = MenuUi.Label(it.transform, "Value", CMTokens.Display, 26, MenuItem.IdleText, TextAnchor.MiddleCenter, vx, 0f, vw, h, "", 2f);
-            MenuUi.Label(it.transform, "Left", CMTokens.Display, 28, Brass, TextAnchor.MiddleCenter, vx - 40f, 0f, 40f, h, "<", 2f);
-            MenuUi.Label(it.transform, "Right", CMTokens.Display, 28, Brass, TextAnchor.MiddleCenter, vx + vw, 0f, 40f, h, ">", 2f);
+            it.Value = MenuUi.Fit(MenuUi.Label(it.transform, "Value", CMTokens.Display, UiScale.TypeButton, MenuItem.IdleText, TextAnchor.MiddleCenter, vx, 0f, vw, h, "", 2f), 26);
+            MenuUi.Label(it.transform, "Left", CMTokens.Display, UiScale.TypeButton, Brass, TextAnchor.MiddleCenter, vx - 40f, 0f, 40f, h, "<", 2f);
+            MenuUi.Label(it.transform, "Right", CMTokens.Display, UiScale.TypeButton, Brass, TextAnchor.MiddleCenter, vx + vw, 0f, 40f, h, ">", 2f);
             Action refresh = () => HudText.Set(it.Value, value());
             it.Stepped = d =>
             {

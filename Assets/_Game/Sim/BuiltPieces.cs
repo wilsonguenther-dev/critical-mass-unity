@@ -208,7 +208,8 @@ namespace CriticalMass.Sim.Core
         /// <summary>Spendable biomass of team (StartBiomass + delivered biomass - spent).</summary>
         public static double Bank(World w, TeamId team)
         {
-            return w.Config.Abilities.BuilderPieces.StartBiomass + w.Match.Delivered[(int)team].Biomass - w.Builder.Spent[(int)team];
+            // U-064: banked wood is building material too (0 without the sources rule).
+            return w.Config.Abilities.BuilderPieces.StartBiomass + w.Match.Delivered[(int)team].Biomass - w.Builder.Spent[(int)team] + Sources.Stock(w, team, Sources.StockWood);
         }
 
         /// <summary>Biomass a piece of kind costs.</summary>
@@ -344,7 +345,7 @@ namespace CriticalMass.Sim.Core
 
         private static bool GapOk(World w)
         {
-            return w.Tick - w.WallChangeTick >= w.Config.Abilities.MinerTerraform.MinGapTicks;
+            return w.Tick - w.WallChangeTick >= Durations.T30(w.Config, w.Config.Abilities.MinerTerraform.MinGapTicks);
         }
 
         /// <summary>0 when Builder id may build looking along (dx, dz) right now (cooldown aside), else a Refused* code. Leaves the plan in the scratch.</summary>
@@ -418,7 +419,7 @@ namespace CriticalMass.Sim.Core
             BuilderState s = w.Builder;
             BuiltPiece p = s.Pieces[slot];
             double cost = Cost(w.Config, PlanKind);
-            s.Spent[(int)a.Team] += cost;
+            s.Spent[(int)a.Team] += cost - Sources.SpendUpTo(w, a.Team, Sources.StockWood, cost); // U-064: banked wood pays first
             s.Stats.BiomassSpent += cost;
             if (PlanKind == Ladder) s.Stats.Ladders++;
             else s.Stats.Bridges++;
@@ -426,7 +427,7 @@ namespace CriticalMass.Sim.Core
             p.Owner = id;
             p.Team = a.Team;
             p.PlacedTick = w.Tick;
-            p.ExpireTick = w.Tick + (int)w.Config.Abilities.BuilderPieces.LifetimeTicks;
+            p.ExpireTick = w.Tick + Durations.T30(w.Config, w.Config.Abilities.BuilderPieces.LifetimeTicks);
             p.Warned = false;
             a.AbilityCd = w.Config.Class(ClassId.Builder).AbilityCooldown;
             a.AnimAction = 0;
@@ -529,7 +530,7 @@ namespace CriticalMass.Sim.Core
                         break;
                     }
                 }
-                if (!p.Broken && !p.Warned && w.Tick >= p.ExpireTick - (int)cfg.WarnTicks)
+                if (!p.Broken && !p.Warned && w.Tick >= p.ExpireTick - Durations.T30(w.Config, cfg.WarnTicks))
                 {
                     p.Warned = true;
                     World.PushEvent(w, SimEventType.PieceCrumbling, p.Owner, k, p.X, p.Z, Math.Max(0, p.ExpireTick - w.Tick), null, DamageCause.None, p.HalfLen);

@@ -54,7 +54,7 @@ namespace CriticalMass.Sim.Bots
                 Actor a = w.Actors[id];
                 // CM-35: only Kaiju-role bots walk-pick meat (hill and Kaiju-fight bots leave the bodies to the feeders); actor 0
                 // always can while a person drives it. Set every step, before ResourcesSystem. Meat rides in its own load.
-                a.MeatPickup = (id == 0 && !human) || st.Role[id] == BotsState.RoleKaiju;
+                a.MeatPickup = (id == 0 && !human) || (st.Role[id] == BotsState.RoleKaiju && Roles.MayFeed(w, a.Cls)); // U-063: bot escorts leave meat to feeders
                 if (id == 0 && !human) continue;
                 if (!a.Alive) continue;
                 // DG-21 reaction delay: Easy / Hard scale the think period (Normal keeps ThinkPeriod).
@@ -77,6 +77,8 @@ namespace CriticalMass.Sim.Bots
             Demolitions.TakeBotTnt(w, id, output);
             // DG-40: a Healer bot's queued purify (BotFsm.DecideHealer) is its one DigPlace press.
             Healer.TakeBotPurify(w, id, output);
+            // U-065: a Builder bot in its station buys a class upgrade the team stock can pay.
+            Stations.TakeBotBuy(w, id, output);
         }
     }
 }

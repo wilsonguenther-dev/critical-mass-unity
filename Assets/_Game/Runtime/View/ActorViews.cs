@@ -194,7 +194,7 @@ namespace CriticalMass.Runtime.View
             s.Push(m);
         }
 
-        private void LateUpdate() => Sync(Time.deltaTime);
+        private void LateUpdate() { long c = CriticalMass.Runtime.Game.FrameCost.Begin(); Sync(Time.deltaTime); CriticalMass.Runtime.Game.FrameCost.End(CriticalMass.Runtime.Game.FrameCost.Slot.ActorViews, c); }
 
         /// <summary>
         /// Contract C3 (DG-71): called once per drawn actor (and the Kaiju, actor -2) after its pose is evaluated and before
@@ -352,7 +352,14 @@ namespace CriticalMass.Runtime.View
                 double baseY = m == _egg ? h + RaisedTop(map, x, z) : h;
                 m.Transform.localPosition = SimSpace.ToWorld(x, baseY, z);
                 m.SetFacing(facing);
-                m.SetMaterial(ArtMaterials.ForGlow(m.Spec, glow));
+                // Kaiju v4 face swap (art landing): berserk, hurt after a hit or knock-out, angry while it telegraphs, winds
+                // up or strikes, sleepy just after the hatch, happy when allied, else neutral with a blink. View only.
+                bool kaijuAttacking = telegraph || k.MeleeWindupIn > 0 || simTime - _slamAt < Anim.KaijuAnimator.StrikeSeconds ||
+                                      simTime - _kaijuAnim.LastStrikeAt < Anim.KaijuAnimator.StrikeSeconds;
+                bool kaijuHurt = k.KoIn > 0 || simTime - _kaijuAnim.LastFlinchAt < ArtMapping.KaijuHurtSeconds;
+                KaijuExpression face = ArtMapping.KaijuExpressionFor(k.State, m == _hatchling ? simTime - _hatchTime : double.NegativeInfinity,
+                    kaijuAttacking, kaijuHurt, false, simTime);
+                m.SetMaterial(ArtMaterials.ForGlow(m.Spec, glow, face));
                 double speed = Math.Sqrt((k.X - k.PrevX) * (k.X - k.PrevX) + (k.Z - k.PrevZ) * (k.Z - k.PrevZ)) * cfg.SimHz;
                 if (m == _egg)
                 {

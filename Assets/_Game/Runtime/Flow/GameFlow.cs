@@ -29,17 +29,19 @@ namespace CriticalMass.Runtime.Flow
         public ClassId Class;
         /// <summary>Players per team: 16 or 5.</summary>
         public int TeamSize;
-        /// <summary>Sim seconds per wall second: 2 or 1.</summary>
+        /// <summary>Sim seconds per wall second: 0.75 (Relaxed), 1 (Standard) or 2 (Fast); see MatchSpeed.</summary>
         public double Pace;
         /// <summary>DG-21 (U-058): the enemy team's bots. Normal is today's bots bit for bit.</summary>
         public CriticalMass.Sim.Core.BotDifficulty BotDifficulty;
+        /// <summary>Home lobby: the mode this setup came from (Custom = match setup and today's rules bit for bit).</summary>
+        public MatchMode Mode;
 
         public static MatchSetupChoice Default => new MatchSetupChoice
         {
             Team = TeamId.Azure,
             Class = ClassId.Warrior,
             TeamSize = 16,
-            Pace = 2,
+            Pace = MatchSpeed.DefaultPace,   // from GameConfig.DefaultSpeed; Standard while the sim constant is still 2
             BotDifficulty = CriticalMass.Sim.Core.BotDifficulty.Normal,
         };
     }
@@ -59,8 +61,22 @@ namespace CriticalMass.Runtime.Flow
         public CriticalMass.Sim.Core.BotDifficulty BotDifficulty;
         /// <summary>true: the bot match behind the title and the menus (actor 0 on autopilot, never recorded).</summary>
         public bool Backdrop;
+        /// <summary>Home lobby: the mode the match was started from (QuickDemo and the results read it).</summary>
+        public MatchMode Mode;
+        /// <summary>Home lobby: the mode's match settings, applied to this world's own fresh config (default: none).</summary>
+        public MatchRules Rules;
 
-        public WorldOptions ToWorldOptions(GameConfig cfg) => new WorldOptions
+        /// <summary>
+        /// The sim's options for this request. cfg is the new world's own config (SimDriverBehaviour makes one per world):
+        /// a mode's rules (clock, hatch time, passive bots) are written into it here, never for a backdrop.
+        /// </summary>
+        public WorldOptions ToWorldOptions(GameConfig cfg)
+        {
+            if (!Backdrop) Rules.ApplyTo(cfg);
+            return BuildOptions(cfg);
+        }
+
+        WorldOptions BuildOptions(GameConfig cfg) => new WorldOptions
         {
             Seed = Seed,
             TeamSize = World.ClampTeamSize(cfg, TeamSize),
@@ -68,6 +84,9 @@ namespace CriticalMass.Runtime.Flow
             HumanClass = Class,
             Config = cfg,
             BotDifficulty = Backdrop ? CriticalMass.Sim.Core.BotDifficulty.Normal : BotDifficulty,
+            // Integration batch 4 (#61): the speed choice sets BOTH the driver's time scale (SimDriverBehaviour reads
+            // MatchRequest.Pace) and the sim's pace, so real-second windows (Durations.Floor) match the clock on screen.
+            Pace = Pace > 0 ? Pace : 0,
         };
 
         public static MatchRequest From(MatchSetupChoice s, int seed) => new MatchRequest
@@ -76,9 +95,11 @@ namespace CriticalMass.Runtime.Flow
             Team = s.Team,
             Class = s.Class,
             TeamSize = s.TeamSize,
-            Pace = s.Pace > 0 ? s.Pace : 2,
+            Pace = s.Pace > 0 ? s.Pace : MatchSpeed.DefaultPace,
             BotDifficulty = s.BotDifficulty,
             Backdrop = false,
+            Mode = s.Mode,
+            Rules = PlayModes.Rules(s.Mode),
         };
     }
 
@@ -104,7 +125,7 @@ namespace CriticalMass.Runtime.Flow
         public const double AutoplayResultsSeconds = 5;
         /// <summary>
         /// Backdrop matches play at 0.5x behind the menus (physics audit DG-111, R-M10: half the sim ticks per second on an
-        /// idle title; nobody plays the backdrop). The match pace default (2x) is not this: see MatchSetupChoice.Default.
+        /// idle title; nobody plays the backdrop). The match pace default is not this: see MatchSetupChoice.Default and MatchSpeed.
         /// </summary>
         public const double BackdropPace = 0.5;
 
@@ -118,6 +139,23 @@ namespace CriticalMass.Runtime.Flow
         public static bool Enabled => ForceEnabled || TitleScreen.ShowOnBoot;
 
         public static FlowState State { get; private set; } = FlowState.Off;
+
+        /// <summary>
+        /// Integration batch 4 (title idle CPU): true while a menu screen (title, menu, setup) shows over a backdrop match and
+        /// no human match runs. The in-match HUD, the depth view and the ground paint skip their per-frame work then.
+        /// </summary>
+        public static bool MenuIdle
+        {
+            get
+            {
+                FlowState s = State;
+                if (s != FlowState.Title && s != FlowState.Menu && s != FlowState.Setup) return false;
+                FlowDirector fd = FlowDirector.Current;
+                MatchRequest r = fd != null && fd.Driver != null ? fd.Driver.Request : null;
+                return r != null && r.Backdrop;
+            }
+        }
+
         public static MatchSetupChoice LastSetup = MatchSetupChoice.Default;
         /// <summary>Seed of the last world created (match or backdrop).</summary>
         public static int LastSeed { get; private set; }
@@ -140,6 +178,9 @@ namespace CriticalMass.Runtime.Flow
             _pending = null;
             Autoplay = HasArg("-autoplay");
             SimDriverBehaviour.NextMatch = null;
+            MatchSpeed.DisplayPace = 1;
+            SetupPrefs.ResetForTests();
+            PlayModes.ResetForTests();
         }
 
         static bool HasArg(string flag)
@@ -183,6 +224,7 @@ namespace CriticalMass.Runtime.Flow
                 if (_pending == null)
                 {
                     State = FlowState.Off;
+                    MatchSpeed.DisplayPace = MatchSpeed.ConfigDefaultSpeed;   // the driver runs the config's own pace
                     return null;
                 }
             }
@@ -192,6 +234,9 @@ namespace CriticalMass.Runtime.Flow
                 if (after != PauseMenu.AfterReload.None)
                 {
                     PauseMenu.PendingAfterReload = PauseMenu.AfterReload.None;
+                    // Home lobby: Quit to title from a running match is an abandoned match. The sim has no save and restore,
+                    // so it cannot be resumed; the home screen offers a rematch on the same seed instead.
+                    if (after == PauseMenu.AfterReload.Title && State == FlowState.Match) PlayModes.NoteAbandoned(LastSetup, LastSeed);
                     if (after == PauseMenu.AfterReload.Play) PrepareMatch(LastSetup);
                     else PrepareBackdrop(FlowState.Title);
                 }
@@ -200,21 +245,30 @@ namespace CriticalMass.Runtime.Flow
             MatchRequest r = _pending;
             _pending = null;
             LastSeed = r.Seed;
+            // Real seconds on every timer: a match shows its own pace; behind the menus, the speed the next match will use
+            // (the class panel's cooldowns in setup and the Barracks).
+            MatchSpeed.DisplayPace = r.Backdrop ? (LastSetup.Pace > 0 ? LastSetup.Pace : MatchSpeed.DefaultPace) : r.Pace;
             return r;
         }
 
         /// <summary>Queues a match for the next Boot build without reloading (tests; BeginMatch = queue + reload).</summary>
         public static void QueueMatch(MatchSetupChoice s) => PrepareMatch(s);
 
+        /// <summary>Queues a match on a given seed (0 = a new one) without reloading (tests; the rematch path).</summary>
+        public static void QueueMatch(MatchSetupChoice s, int seed) => PrepareMatch(s, seed);
+
         /// <summary>Queues a backdrop for screen (Title, Menu or Setup) without reloading (tests).</summary>
         public static void QueueBackdrop(FlowState screen) => PrepareBackdrop(screen);
 
-        static void PrepareMatch(MatchSetupChoice s)
+        static void PrepareMatch(MatchSetupChoice s) => PrepareMatch(s, 0);
+
+        static void PrepareMatch(MatchSetupChoice s, int seed)
         {
             LastSetup = s;
-            _pending = MatchRequest.From(s, NewSeed());
+            _pending = MatchRequest.From(s, seed > 0 ? seed : NewSeed());
             MatchesStarted++;
             State = FlowState.Match;
+            PlayModes.OnMatchPrepared(s);
         }
 
         static void PrepareBackdrop(FlowState screen)
@@ -232,12 +286,22 @@ namespace CriticalMass.Runtime.Flow
         }
 
         /// <summary>Play / Play again / Change class then Start: a new world with a new seed.</summary>
-        public static void BeginMatch(MatchSetupChoice s)
+        public static void BeginMatch(MatchSetupChoice s) => BeginMatch(s, false);
+
+        /// <summary>
+        /// quick: Play Now and Play again. The loading screen still covers the reload and waits for the new world to draw,
+        /// but its minimum time on screen drops to LoadingScreen.QuickMinSeconds, so it lasts only as long as the build.
+        /// </summary>
+        public static void BeginMatch(MatchSetupChoice s, bool quick) => BeginMatchWithSeed(s, 0, quick);
+
+        /// <summary>Home lobby: BeginMatch on a chosen seed (the ready screen's, or the rematch's); 0 = a new seed.</summary>
+        public static void BeginMatchWithSeed(MatchSetupChoice s, int seed, bool quick)
         {
-            PrepareMatch(s);
+            PrepareMatch(s, seed);
             // DG-13: the loading screen covers the reload and stays until the new world has drawn (FlowDirector holds the
-            // match clock until it hides). Never in autoplay or batch runs.
-            if (!Autoplay && Menus.LoadingScreen.UseInFlow) Menus.LoadingScreen.ShowForMatch(_pending.Seed);
+            // match clock until it hides). Never in autoplay or batch runs. It names the speed the match runs at.
+            if (!Autoplay && Menus.LoadingScreen.UseInFlow)
+                Menus.LoadingScreen.ShowForMatch(_pending.Seed, MatchSpeed.LoadingLine(_pending.Pace), quick);
             Reload();
         }
 

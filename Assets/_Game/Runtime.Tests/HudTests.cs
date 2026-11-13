@@ -161,6 +161,7 @@ namespace CriticalMass.Runtime.Tests
             World w = NewWorld();
             Run(w, 900);
             var s = new HudState();
+            CriticalMass.Runtime.Flow.MatchSpeed.DisplayPace = 1;   // sim seconds = wall seconds (Play Now / speed choice)
             HudBinder.Read(w, HudBinder.LocalActor, s);
             Assert.AreEqual(Math.Max(0, w.Config.MatchSeconds - w.Match.Time), s.ClockRemaining, 1e-9);
             Assert.AreEqual((int)Math.Floor(w.Match.HillSeconds.Azure), s.ScoreAzure);

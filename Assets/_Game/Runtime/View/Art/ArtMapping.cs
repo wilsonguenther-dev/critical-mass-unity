@@ -7,6 +7,9 @@ namespace CriticalMass.Runtime.View.Art
     /// <summary>What a model is, for import settings, materials and the views.</summary>
     public enum ArtKind { Character, Kaiju, Prop }
 
+    /// <summary>Kaiju v4 face expressions (one decal atlas each, ArtMapping.KaijuExpressionTextures; order is the index).</summary>
+    public enum KaijuExpression { Neutral, Happy, Angry, Berserk, Hurt, Sleepy, Blink }
+
     /// <summary>
     /// One team-channel swatch (sRGB hex): the colours CM/Toon's vertex-colour mode swaps to (code 8 cloth, codes 5 and 6
     /// glow, code 4 dark), or, as a model's Authored swatch, the colours the Blender art baked into those channels.
@@ -57,10 +60,21 @@ namespace CriticalMass.Runtime.View.Art
         /// decal and toes), never assumed per family. Measured 2026-11-12 (idle pose): Warrior face 179 / toes 176, Miner face
         /// 179 / toes 176, Farmer toes 176 (no face decal), Kaiju_Hatchling face 178, Kaiju_Adult face 178: each art file
         /// faces the root's -Z, so each carries 180.
+        /// Art landing (2026-11-12): every fighter FBX now comes from the LOD build (art/fighter-lods d536d30), which re-exports
+        /// with the class recipe unchanged (cm_art/export.py: authored facing Blender -Y, axis_forward -Z, axis_up Y,
+        /// FBX_SCALE_ALL, bake_space_transform True), and the Kaiju with build_kaiju.py export() (same axes, but
+        /// bake_space_transform False; with bakeAxisConversion on it should land the same way, the one thing to check in a
+        /// facing capture). Demolitions, Builder and Healer use that same recipe, so they arrive facing the root's -Z like
+        /// the Warrior and carry 180 too.
         /// </summary>
         public float ArtYawDeg;
         /// <summary>Sidecar of unlined vertices (tools/art/outline_weights.py from the .blend's outline_w group), or null.</summary>
         public string OutlineWeights;
+        /// <summary>
+        /// Face expression atlases indexed by <see cref="KaijuExpression"/> (Kaiju v4: same UV layout as FaceTexture, which
+        /// is entry 0), or null. The view swaps the material's face texture per state (ArtMaterials.ForGlow).
+        /// </summary>
+        public string[] Expressions;
         /// <summary>True when the importer bakes UV4.x outline weights (0 on the face) and the material reads them.</summary>
         public bool BakesOutlineWeights => OutlineWeights != null || (FaceTexture != null && FaceSlot < 0);
     }
@@ -77,6 +91,19 @@ namespace CriticalMass.Runtime.View.Art
         public const string Warrior = "Warrior";
         public const string Miner = "Miner";
         public const string Farmer = "Farmer";
+        public const string Demolitions = "Demolitions";
+        public const string Builder = "Builder";
+        public const string Healer = "Healer";
+        /// <summary>Class props (authored static meshes; one child mesh per state).</summary>
+        public const string DemolitionsProps = "DemolitionsProps", HealerProps = "HealerProps", BuilderLadder = "BuilderLadder",
+            BuilderRopeBridge = "BuilderRopeBridge", BuilderBuildGlow = "BuilderBuildGlow";
+        public const string MineBuried = "Demolitions_Mine_Buried", MineArmed = "Demolitions_Mine_Armed",
+            MineOwnerRing = "Demolitions_Mine_Armed_OwnerRing", MineTriggered = "Demolitions_Mine_Triggered",
+            TntFlight = "Demolitions_TNT_Flight", CraterRim = "Demolitions_CraterRim", Explosion = "Demolitions_Explosion";
+        public const string LadderCarried = "BuilderLadder_Carried", LadderPlaced = "BuilderLadder_Placed", LadderDamaged = "BuilderLadder_Damaged";
+        public const string RopeBridgeCarried = "BuilderRopeBridge_Carried", RopeBridgePlaced = "BuilderRopeBridge_Placed",
+            RopeBridgeDamaged = "BuilderRopeBridge_Damaged";
+        public const string HealerGauntlet = "Healer_BloomGauntlet_Prop", HealerLantern = "Healer_Lantern_Prop";
         public const string KaykitClips = "KayKit_Clips";
         public const string MinerBarricade = "MinerBarricade";
         public const string KaijuEgg = "Kaiju_Egg";
@@ -153,7 +180,11 @@ namespace CriticalMass.Runtime.View.Art
         /// <summary>
         /// Warrior: horizontal cleave (matches the 120 degree crescent), shield = Block then Blocking. Miner: two-hand chop,
         /// barricade = Use_Item, gather = the chop at 0.7 rate on rock. Farmer: two-hand staff sweep, roots = Spellcast_Shoot,
-        /// gather = PickUp on plants. Others: the one-hand chop and the reach.
+        /// gather = PickUp on plants. Art landing (2026-11-12), the three new classes on the same 32-clip KayKit set (no new
+        /// clips): Demolitions has no melee weapon, so her attack is the TNT Throw and the mine plant is PickUp (the crouch to
+        /// the ground her plant pose shows); Builder swings the one-hand mallet (Attack, the 1H chop) and builds with Use_Item;
+        /// Healer mends on attack with the gauntlet orb (Cast, Spellcast_Shoot) and raises the lantern for the healing pulse
+        /// (Use_Item). All three gather with the reach (Gather).
         /// </summary>
         public static ClassClipSet ClassClips(ClassId cls)
         {
@@ -162,6 +193,9 @@ namespace CriticalMass.Runtime.View.Art
                 case ClassId.Warrior: return new ClassClipSet(AttackSlice, Block, Blocking, Gather, 1f);
                 case ClassId.Miner: return new ClassClipSet(Attack2HChop, UseItem, null, Attack2HChop, 0.7f);
                 case ClassId.Farmer: return new ClassClipSet(Attack2HSlice, Cast, null, PickUp, 1f);
+                case ClassId.Demolitions: return new ClassClipSet(Throw, PickUp, null, Gather, 1f);
+                case ClassId.Builder: return new ClassClipSet(Attack, UseItem, null, Gather, 1f);
+                case ClassId.Healer: return new ClassClipSet(Cast, UseItem, null, Gather, 1f);
                 default: return new ClassClipSet(Attack, null, null, Gather, 1f);
             }
         }
@@ -187,6 +221,11 @@ namespace CriticalMass.Runtime.View.Art
         // team dark on the Farmer (the 0.25 biomass glow is fixed, never swapped), so those channels keep the Warrior's.
         static readonly TeamSwatch FarmerAzure = new TeamSwatch("#4999A5", "#4FE3F0", "#2A374D");
         static readonly TeamSwatch FarmerCrimson = new TeamSwatch("#E9705F", "#FF7461", "#652D2F");
+        // Demolitions: demo_art/dpal.py reuses the Miner's team values ("so both classes swap identically"). Healer:
+        // healer_art/hpal.py "same contract and team values as the Miner". Builder: builder_art/bpal.py team #2A9DBA,
+        // team_glow #4FE3F0, TEAM_SWAP cloth #E46753 / glow #FF7461; no team dark, so the Warrior's dark channels.
+        static readonly TeamSwatch BuilderAzure = new TeamSwatch("#2A9DBA", "#4FE3F0", "#2A374D");
+        static readonly TeamSwatch BuilderCrimson = new TeamSwatch("#E46753", "#FF7461", "#652D2F");
         // Props: props_art/core.py TEAM_CLOTH / TEAM_GLOW / TEAM_DARK and TEAM_SWAP (1.0 / 0.75 / 0.5).
         static readonly TeamSwatch PropAzure = new TeamSwatch("#127EC0", "#4FE3F0", "#1D6A8C");
         static readonly TeamSwatch PropCrimson = new TeamSwatch("#FC725A", "#FF7461", "#9B4132");
@@ -196,23 +235,99 @@ namespace CriticalMass.Runtime.View.Art
         /// <summary>One 256 px atlas for both creature stages (adult top half, hatchling bottom half) on UVMap.</summary>
         public const string KaijuFace = "Assets/_Game/Art/Kaiju/Kaiju_Face.png";
 
+        /// <summary>
+        /// Kaiju v4 expression atlases (512 px, adult top half, hatchling bottom half, same UVs as Kaiju_Face.png), indexed by
+        /// KaijuExpression. Neutral is the default goofy face; Blink is the default with the lids shut.
+        /// </summary>
+        public static readonly string[] KaijuExpressionTextures =
+        {
+            KaijuFace, "Assets/_Game/Art/Kaiju/Kaiju_Face_Happy.png", "Assets/_Game/Art/Kaiju/Kaiju_Face_Angry.png",
+            "Assets/_Game/Art/Kaiju/Kaiju_Face_Berserk.png", "Assets/_Game/Art/Kaiju/Kaiju_Face_Hurt.png",
+            "Assets/_Game/Art/Kaiju/Kaiju_Face_Sleepy.png", "Assets/_Game/Art/Kaiju/Kaiju_Face_Blink.png",
+        };
+
+        /// <summary>The first seconds of the hatchling stage show the sleepy face (egg-fresh).</summary>
+        public const double HatchlingSleepySeconds = 3.0;
+        /// <summary>The hurt face holds this long after the Kaiju loses health or is knocked out.</summary>
+        public const double KaijuHurtSeconds = 0.5;
+        /// <summary>The Kaiju blinks (Blink atlas) for BlinkSeconds every BlinkPeriodSeconds while its face is neutral.</summary>
+        public const double BlinkPeriodSeconds = 3.7, BlinkSeconds = 0.125;
+
+        /// <summary>
+        /// The Kaiju face per state (pure; view only, nothing feeds back into the sim). Priority: berserk, then hurt (a recent
+        /// health loss or a knock-out), then angry while it attacks (slam telegraph, melee wind-up, the strike itself), then
+        /// sleepy for the first HatchlingSleepySeconds after the hatch, then happy when it is allied to a team or was just
+        /// fed, else neutral with a blink on a timer. The egg shows no face (Neutral).
+        /// </summary>
+        public static KaijuExpression KaijuExpressionFor(KaijuState state, double secondsSinceHatch, bool attacking, bool hurt, bool fed, double viewSeconds)
+        {
+            if (state == KaijuState.Egg) return KaijuExpression.Neutral;
+            if (state == KaijuState.Berserk) return KaijuExpression.Berserk;
+            if (hurt) return KaijuExpression.Hurt;
+            if (attacking) return KaijuExpression.Angry;
+            if (secondsSinceHatch >= 0 && secondsSinceHatch < HatchlingSleepySeconds) return KaijuExpression.Sleepy;
+            if (fed || state == KaijuState.Azure || state == KaijuState.Crimson) return KaijuExpression.Happy;
+            return Blinking(viewSeconds) ? KaijuExpression.Blink : KaijuExpression.Neutral;
+        }
+
+        /// <summary>True during the blink window of the timer (pure).</summary>
+        public static bool Blinking(double seconds)
+        {
+            if (double.IsNaN(seconds) || double.IsInfinity(seconds)) return false;
+            double t = seconds % BlinkPeriodSeconds;
+            if (t < 0) t += BlinkPeriodSeconds;
+            return t >= BlinkPeriodSeconds - BlinkSeconds;
+        }
+
+        /// <summary>Project path of an expression atlas.</summary>
+        public static string KaijuFaceOf(KaijuExpression e) => KaijuExpressionTextures[(int)e];
+
         public static readonly ModelSpec[] Models =
         {
             new ModelSpec { Key = Warrior, AssetPath = "Assets/_Game/Art/Characters/Warrior.fbx", Kind = ArtKind.Character, Rigged = true,
                 Bones = 41, ClipSource = "Assets/_Game/Art/Characters/KayKit_Clips.fbx",
-                Meshes = new[] { "Warrior_Body", "Warrior_Cleaver", "Warrior_Shield" }, MaskCodes = new[] { 0, 6, 8 },
+                Meshes = new[] { "Warrior_Hero", "Warrior_LOD0", "Warrior_LOD1", "Warrior_Shadow" }, MaskCodes = new[] { 0, 6, 8 },
                 OutlinePx = CharacterHullPx, Rim = 0.6f, Authored = WarriorAzure, Crimson = WarriorCrimson, Height = 2.0f,
                 FaceTexture = "Assets/_Game/Art/Characters/Warrior_Face.png", ArtYawDeg = 180f },
             new ModelSpec { Key = Miner, AssetPath = "Assets/_Game/Art/Miner/Miner.fbx", Kind = ArtKind.Character, Rigged = true,
                 Bones = 41, ClipSource = "Assets/_Game/Art/Characters/KayKit_Clips.fbx",
-                Meshes = new[] { "Miner_Body", "Miner_PickHammer", "Miner_PickHammer_Hammer" }, MaskCodes = new[] { 0, 6, 8 },
+                Meshes = new[] { "Miner_Hero", "Miner_LOD0", "Miner_LOD1", "Miner_Shadow" }, MaskCodes = new[] { 0, 6, 8 },
                 OutlinePx = CharacterHullPx, Rim = 0.6f, Authored = MinerAzure, Crimson = MinerCrimson, Height = 2.0f,
                 FaceTexture = "Assets/_Game/Art/Miner/MinerFace.png", FaceSlot = 1, ArtYawDeg = 180f },
             new ModelSpec { Key = Farmer, AssetPath = "Assets/_Game/Art/Farmer/Farmer.fbx", Kind = ArtKind.Character, Rigged = true,
                 Bones = 41, ClipSource = "Assets/_Game/Art/Characters/KayKit_Clips.fbx",
-                Meshes = new[] { "Farmer_Body", "Farmer_Staff" }, MaskCodes = new[] { 0, 2, 8 },
+                Meshes = new[] { "Farmer_Hero", "Farmer_LOD0", "Farmer_LOD1", "Farmer_Shadow" }, MaskCodes = new[] { 0, 2, 8 },
                 OutlinePx = CharacterHullPx, Rim = 0.6f, Authored = FarmerAzure, Crimson = FarmerCrimson, Height = 2.0f,
-                OutlineWeights = "Assets/_Game/Art/Farmer/Farmer_OutlineW.json", ArtYawDeg = 180f },
+                OutlineWeights = "Assets/_Game/Art/Farmer/Farmer_OutlineW.json", FaceTexture = "Assets/_Game/Art/Farmer/Farmer_Face.png", ArtYawDeg = 180f },
+            // Art landing (2026-11-12): the three new classes, LOD files from art/fighter-lods d536d30 (weapons folded into
+            // every level). Each body carries CM_Toon plus CM_FaceDecal on slot 1, the Miner's decal method (class READMEs).
+            new ModelSpec { Key = Demolitions, AssetPath = "Assets/_Game/Art/Demolitions/Demolitions.fbx", Kind = ArtKind.Character, Rigged = true,
+                Bones = 41, ClipSource = "Assets/_Game/Art/Characters/KayKit_Clips.fbx",
+                Meshes = new[] { "Demolitions_Hero", "Demolitions_LOD0", "Demolitions_LOD1", "Demolitions_Shadow" }, MaskCodes = new[] { 0, 6, 8 },
+                OutlinePx = CharacterHullPx, Rim = 0.6f, Authored = MinerAzure, Crimson = MinerCrimson, Height = 2.0f,
+                FaceTexture = "Assets/_Game/Art/Demolitions/DemolitionsFace.png", FaceSlot = 1, ArtYawDeg = 180f },
+            new ModelSpec { Key = Builder, AssetPath = "Assets/_Game/Art/Builder/Builder.fbx", Kind = ArtKind.Character, Rigged = true,
+                Bones = 41, ClipSource = "Assets/_Game/Art/Characters/KayKit_Clips.fbx",
+                Meshes = new[] { "Builder_Hero", "Builder_LOD0", "Builder_LOD1", "Builder_Shadow" }, MaskCodes = new[] { 0, 8 },
+                // Height: the Hero mesh's bind-pose top is the ladder corner on his back (2.329 m in the FBX; cap crown 1.895).
+                OutlinePx = CharacterHullPx, Rim = 0.6f, Authored = BuilderAzure, Crimson = BuilderCrimson, Height = 2.33f,
+                FaceTexture = "Assets/_Game/Art/Builder/BuilderFace.png", FaceSlot = 1, ArtYawDeg = 180f },
+            new ModelSpec { Key = Healer, AssetPath = "Assets/_Game/Art/Healer/Healer.fbx", Kind = ArtKind.Character, Rigged = true,
+                Bones = 41, ClipSource = "Assets/_Game/Art/Characters/KayKit_Clips.fbx",
+                Meshes = new[] { "Healer_Hero", "Healer_LOD0", "Healer_LOD1", "Healer_Shadow" }, MaskCodes = new[] { 0, 6, 8 },
+                OutlinePx = CharacterHullPx, Rim = 0.6f, Authored = MinerAzure, Crimson = MinerCrimson, Height = 2.0f,
+                FaceTexture = "Assets/_Game/Art/Healer/HealerFace.png", FaceSlot = 1, ArtYawDeg = 180f },
+            new ModelSpec { Key = DemolitionsProps, AssetPath = "Assets/_Game/Art/Demolitions/DemolitionsProps.fbx", Kind = ArtKind.Prop,
+                Meshes = new[] { MineBuried, MineArmed, MineOwnerRing, MineTriggered, TntFlight, CraterRim, Explosion },
+                OutlinePx = 2.5f, Authored = MinerAzure, Crimson = MinerCrimson },
+            new ModelSpec { Key = BuilderLadder, AssetPath = "Assets/_Game/Art/Builder/BuilderLadder.fbx", Kind = ArtKind.Prop,
+                Meshes = new[] { LadderCarried, LadderPlaced, LadderDamaged }, OutlinePx = 2.5f, Authored = BuilderAzure, Crimson = BuilderCrimson },
+            new ModelSpec { Key = BuilderRopeBridge, AssetPath = "Assets/_Game/Art/Builder/BuilderRopeBridge.fbx", Kind = ArtKind.Prop,
+                Meshes = new[] { RopeBridgeCarried, RopeBridgePlaced, RopeBridgeDamaged }, OutlinePx = 2.5f, Authored = BuilderAzure, Crimson = BuilderCrimson },
+            new ModelSpec { Key = BuilderBuildGlow, AssetPath = "Assets/_Game/Art/Builder/BuilderBuildGlow.fbx", Kind = ArtKind.Prop,
+                Meshes = new[] { BuilderBuildGlow }, OutlinePx = 0f, Authored = BuilderAzure, Crimson = BuilderCrimson },
+            new ModelSpec { Key = HealerProps, AssetPath = "Assets/_Game/Art/Healer/HealerProps.fbx", Kind = ArtKind.Prop,
+                Meshes = new[] { HealerGauntlet, HealerLantern }, OutlinePx = 2.5f, Authored = MinerAzure, Crimson = MinerCrimson },
             new ModelSpec { Key = KaykitClips, AssetPath = "Assets/_Game/Art/Characters/KayKit_Clips.fbx", Kind = ArtKind.Character, Rigged = true,
                 Bones = 41, OwnClips = new[] { Idle, Walk, Run, Attack, Gather, Hit, Death, Cheer } },
             new ModelSpec { Key = MinerBarricade, AssetPath = "Assets/_Game/Art/Miner/MinerBarricade.fbx", Kind = ArtKind.Prop,
@@ -222,11 +337,13 @@ namespace CriticalMass.Runtime.View.Art
                 Bones = 2, OwnClips = new[] { Idle, Shake }, Meshes = new[] { "KaijuMesh" }, MaskCodes = new[] { 0, 6 },
                 OutlinePx = CharacterHullPx, Authored = KaijuDefault(GlowNeutral), Height = 1.7f },
             new ModelSpec { Key = KaijuHatchling, AssetPath = "Assets/_Game/Art/Kaiju/Kaiju_Hatchling.fbx", Kind = ArtKind.Kaiju, Rigged = true,
-                Bones = 20, OwnClips = new[] { Idle, Walk, Roar, SlamWindup, Slam, Berserk, KO }, Meshes = new[] { "KaijuMesh" },
-                MaskCodes = new[] { 0, 6 }, OutlinePx = CharacterHullPx, Authored = KaijuDefault(GlowNeutral), Height = 2.235f, FaceTexture = KaijuFace, ArtYawDeg = 180f },
+                Bones = 20, OwnClips = new[] { Idle, Walk, Roar, SlamWindup, Slam, Swipe, Berserk, KO }, Meshes = new[] { "Kaiju_Hero", "Kaiju_LOD0", "Kaiju_LOD1", "Kaiju_Shadow" },
+                MaskCodes = new[] { 0, 6 }, OutlinePx = CharacterHullPx, Authored = KaijuDefault(GlowNeutral), Height = 2.235f, FaceTexture = KaijuFace,
+                Expressions = KaijuExpressionTextures, ArtYawDeg = 180f },
             new ModelSpec { Key = KaijuAdult, AssetPath = "Assets/_Game/Art/Kaiju/Kaiju_Adult.fbx", Kind = ArtKind.Kaiju, Rigged = true,
-                Bones = 20, OwnClips = new[] { Idle, Walk, Roar, SlamWindup, Slam, Berserk, KO }, Meshes = new[] { "KaijuMesh" },
-                MaskCodes = new[] { 0, 6 }, OutlinePx = CharacterHullPx, Authored = KaijuDefault(GlowAzure), Height = 5.0f, FaceTexture = KaijuFace, ArtYawDeg = 180f },
+                Bones = 20, OwnClips = new[] { Idle, Walk, Roar, SlamWindup, Slam, Swipe, Berserk, KO }, Meshes = new[] { "Kaiju_Hero", "Kaiju_LOD0", "Kaiju_LOD1", "Kaiju_Shadow" },
+                MaskCodes = new[] { 0, 6 }, OutlinePx = CharacterHullPx, Authored = KaijuDefault(GlowAzure), Height = 5.0f, FaceTexture = KaijuFace,
+                Expressions = KaijuExpressionTextures, ArtYawDeg = 180f },
             new ModelSpec { Key = KaijuShards, AssetPath = "Assets/_Game/Art/Kaiju/Kaiju_BerserkShards.fbx", Kind = ArtKind.Kaiju,
                 Meshes = new[] { "Kaiju_BerserkShards" }, MaskCodes = new[] { 6 }, OutlinePx = 0f, Authored = KaijuDefault(GlowAzure) },
             new ModelSpec { Key = KaijuSpikes, AssetPath = "Assets/_Game/Art/Kaiju/Kaiju_TelegraphSpikes.fbx", Kind = ArtKind.Kaiju,
@@ -254,7 +371,7 @@ namespace CriticalMass.Runtime.View.Art
             return key != null && _byKey.TryGetValue(key, out ModelSpec s) ? s : null;
         }
 
-        /// <summary>Character model per class; null keeps the grey-box capsule (Demolitions, Builder: not built yet).</summary>
+        /// <summary>Character model per class (all six have art since the art landing); null keeps the grey-box capsule.</summary>
         public static string ClassModel(ClassId cls)
         {
             switch (cls)
@@ -262,6 +379,9 @@ namespace CriticalMass.Runtime.View.Art
                 case ClassId.Warrior: return Warrior;
                 case ClassId.Miner: return Miner;
                 case ClassId.Farmer: return Farmer;
+                case ClassId.Demolitions: return Demolitions;
+                case ClassId.Builder: return Builder;
+                case ClassId.Healer: return Healer;
                 default: return null;
             }
         }

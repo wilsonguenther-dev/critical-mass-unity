@@ -45,6 +45,9 @@ namespace CriticalMass.Runtime.View.Moments
         public static event Action<ActiveMoment> Started;
         public static event Action<MomentId> Ended;
 
+        /// <summary>The most one frame advances the director's clock (seconds).</summary>
+        public const float MaxFrameSeconds = 0.25f;   // SimClock.MaxDelta: slow editor capture frames still end a takeover
+
         /// <summary>A takeover is on screen or a banner-preempting one is about to start.</summary>
         public static bool IsPlaying => Instance != null && Instance._queue.Playing;
 
@@ -212,7 +215,9 @@ namespace CriticalMass.Runtime.View.Moments
         private void LateUpdate()
         {
             bool paused = _input != null && _input.State.Paused;
-            if (!paused) _clock += Time.unscaledDeltaTime;
+            // Integration batch 4: one hitch frame (the match-start load, a shader warm-up) advances the director at most
+            // MaxFrameSeconds, so a takeover that just started never ends behind a single slow frame unseen.
+            if (!paused) _clock += Mathf.Min(Time.unscaledDeltaTime, MaxFrameSeconds);
             double now = _clock;
 
             DebugKeys();
@@ -231,6 +236,9 @@ namespace CriticalMass.Runtime.View.Moments
                 if (_queue.StingerPlaying) BeginStinger(_queue.CurrentStinger);
                 else if (_stinger != null) _stinger.gameObject.SetActive(false);
             }
+            // Integration batch 4: a takeover claims the HUD's centre lane (HudZones top priority); banners, the lockout and
+            // autopilot lines, Kaiju callouts and the depth HUD's job line and event timer wait until it ends.
+            if (_queue.Playing) HudZones.Hold(HudZone.Callout, HudPriority.Takeover);
             if (_canvas == null) return;
             FitCanvas(_canvas);
             if (_queue.Playing) Animate(now);
@@ -375,7 +383,7 @@ namespace CriticalMass.Runtime.View.Moments
             {
                 KaijuState s = q.Kaiju == KaijuState.Egg ? KaijuState.Neutral : q.Kaiju;
                 src = MomentArt.ResolveKaiju(s, Model().CanRender(ArtMapping.KaijuAdult), true, out Texture2D img);
-                if (src == PortraitSource.TeamImage) tex = img;
+                if (src == PortraitSource.TeamImage || src == PortraitSource.Painted) tex = img;
                 else if (src == PortraitSource.LiveModel) tex = _model.BeginKaiju(s);
                 if (tex == null) tex = UiIcons.Get(UiIcons.Adult[s == KaijuState.Azure ? 1 : s == KaijuState.Crimson ? 2 : s == KaijuState.Berserk ? 3 : 0], 4);
             }
@@ -385,7 +393,7 @@ namespace CriticalMass.Runtime.View.Moments
                 int ci = (int)c;
                 bool hudIcon = ci >= 0 && ci < UiIcons.Classes.Length;
                 src = MomentArt.ResolvePortrait(c, q.Team, Model().CanRender(ModelPortrait.ClassKey(c)), hudIcon, out Texture2D img, out Texture2D mask);
-                if (src == PortraitSource.TeamImage || src == PortraitSource.TintedImage) tex = img;
+                if (src == PortraitSource.TeamImage || src == PortraitSource.TintedImage || src == PortraitSource.Painted) tex = img;
                 if (src == PortraitSource.TintedImage && mask != null)
                 {
                     _mask.gameObject.SetActive(true);
@@ -403,10 +411,15 @@ namespace CriticalMass.Runtime.View.Moments
             }
             _portrait.texture = tex;
             // mirror for the right-hand entry (portraits are painted facing right)
-            Rect uv = _fromRight ? new Rect(1f, 0f, -1f, 1f) : new Rect(0f, 0f, 1f, 1f);
+            Rect crop = src == PortraitSource.Painted ? MomentArt.PaintedCrop(tex) : new Rect(0f, 0f, 1f, 1f);
+            Rect uv = _fromRight ? new Rect(crop.xMax, 0f, -crop.width, 1f) : crop;
+            LastPortraitSource = src;
             _portrait.uvRect = uv;
             _mask.uvRect = uv;
         }
+
+        /// <summary>The source the last takeover's portrait used (tests, the capture walk's log).</summary>
+        public static PortraitSource LastPortraitSource { get; private set; } = PortraitSource.Shape;
 
         private ModelPortrait Model()
         {
@@ -928,14 +941,14 @@ namespace CriticalMass.Runtime.View.Moments
             _plateShape.Radius = 30f;
             _plate = Raw(_titleRt, "Plate", null, Color.white);
             Stretch(_plate.rectTransform);
-            _title = HudText.Make(_titleRt, "Title Text", CMTokens.Display, 96, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 5f);
+            _title = CriticalMass.Runtime.Menu.MenuUi.Fit(HudText.Make(_titleRt, "Title Text", CMTokens.Display, UiScale.TypeHero, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 5f), 96);
             Centre(_title.rectTransform, new Vector2(0f, 14f), new Vector2(TitleW * 0.8f, 120f));
             _title.resizeTextForBestFit = true;
             _title.resizeTextMinSize = 40;
             _title.resizeTextMaxSize = 96;
             _title.horizontalOverflow = HorizontalWrapMode.Wrap;
             _title.verticalOverflow = VerticalWrapMode.Truncate;
-            _subtitle = HudText.Make(_titleRt, "Subtitle", CMTokens.Ui, 34, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 3f);
+            _subtitle = CriticalMass.Runtime.Menu.MenuUi.Fit(HudText.Make(_titleRt, "Subtitle", CMTokens.Ui, UiScale.TypeLead, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 3f), 34);
             Centre(_subtitle.rectTransform, new Vector2(0f, -72f), new Vector2(TitleW * 0.8f, 44f));
 
             _flash = Raw(_root, "Flash", null, Color.white);
@@ -958,9 +971,9 @@ namespace CriticalMass.Runtime.View.Moments
             _stingerIcon.rectTransform.pivot = new Vector2(0f, 0.5f);
             _stingerIcon.rectTransform.sizeDelta = new Vector2(104f, 104f);
             _stingerIcon.rectTransform.anchoredPosition = new Vector2(24f, 0f);
-            _stingerTitle = HudText.Make(_stinger, "Stinger Title", CMTokens.Display, 46, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft, 4f);
+            _stingerTitle = CriticalMass.Runtime.Menu.MenuUi.Fit(HudText.Make(_stinger, "Stinger Title", CMTokens.Display, UiScale.TypeDisplay, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft, 4f), 46);
             Place(_stingerTitle.rectTransform, new Vector2(140f, 14f), new Vector2(StingerW - 170f, 56f));
-            _stingerSub = HudText.Make(_stinger, "Stinger Sub", CMTokens.Ui, 24, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft, 2.5f);
+            _stingerSub = HudText.Make(_stinger, "Stinger Sub", CMTokens.Ui, UiScale.TypeBody, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft, 2.5f);
             Place(_stingerSub.rectTransform, new Vector2(140f, -34f), new Vector2(StingerW - 170f, 30f));
             _stinger.gameObject.SetActive(false);
 

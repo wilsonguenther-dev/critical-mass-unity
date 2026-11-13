@@ -84,6 +84,9 @@ namespace CriticalMass.Runtime.Menus
 
         /// <summary>Master switch (true by default).</summary>
         public static bool Enabled = true;
+        /// <summary>Every other idle entry plays the story's motion comic as a loop instead of the camera tour.</summary>
+        public static bool StoryLoopEnabled = true;
+        int _idleEntries;
         /// <summary>Batch mode (gates, captures) never tours unless a test sets this.</summary>
         public static bool AllowInBatchMode;
         /// <summary>Optional override of "the title is showing"; null = a TitleScreen component is on the game object.</summary>
@@ -190,7 +193,12 @@ namespace CriticalMass.Runtime.Menus
             bool titleOpen = active && IsTitleOpen() && !StoryIntro.IsPlaying && !Credits.IsOpen;
             bool input = AnyInput();
             AttractClock.Change c = Clock.Step(Time.unscaledDeltaTime, titleOpen, input);
-            if (c == AttractClock.Change.Enter) StartTour();
+            if (c == AttractClock.Change.Enter)
+            {
+                // Idle on the title alternates the live camera tour (first) and the motion-comic story loop.
+                if (StoryLoopEnabled && (_idleEntries++ & 1) == 1 && StoryIntro.PlayAttract()) Clock.Reset();
+                else StartTour();
+            }
             else if (c == AttractClock.Change.Exit) StopTour(true);
             if (_touring) Tour(Time.unscaledDeltaTime);
         }
@@ -457,13 +465,13 @@ namespace CriticalMass.Runtime.Menus
             _accent = MenuUi.Shape(space, "Accent", ShapeKind.RoundRect, 88f, 860f, 14f, 112f, CMTokens.ToolBrass.Color, 7f);
             _accent.OutlinePx = 2f;
             _accent.RimPx = 0f;
-            _capTitle = MenuUi.Label(space, "Caption Title", CMTokens.Display, 40, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft,
+            _capTitle = MenuUi.Label(space, "Caption Title", CMTokens.Display, UiScale.TypeLead, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft,
                 124f, 856f, 820f, 56f, "", CMTokens.OutlinePx);
-            _capLine = MenuUi.Label(space, "Caption Line", CMTokens.Ui, 26, CMTokens.WarmCream.Color, TextAnchor.UpperLeft,
-                124f, 916f, 816f, 70f, "", 2f);
+            _capLine = MenuUi.Fit(MenuUi.Label(space, "Caption Line", CMTokens.Ui, UiScale.TypeButton, CMTokens.WarmCream.Color, TextAnchor.UpperLeft,
+                124f, 916f, 816f, 70f, "", 2f), 26);
             _capLine.horizontalOverflow = HorizontalWrapMode.Wrap;
 
-            _press = MenuUi.Label(space, "Press", CMTokens.Display, 30, CMTokens.WarmCream.Color, TextAnchor.MiddleRight,
+            _press = MenuUi.Label(space, "Press", CMTokens.Display, UiScale.TypeHeading, CMTokens.WarmCream.Color, TextAnchor.MiddleRight,
                 HudLayout.RefW - 664f, 940f, 600f, 50f, PressAnyKey, CMTokens.OutlinePx);
 
             _dip = MenuUi.Rt(root, "Dip").gameObject.AddComponent<Image>();

@@ -8,8 +8,12 @@ using UnityEngine.UI;
 
 namespace CriticalMass.Runtime.Hud
 {
-    /// <summary>The mascot's expressions; each has a portrait image by name (MascotGuide.PortraitResource).</summary>
-    public enum MascotReaction { Neutral, Cheer, Wince, Point, Surprised }
+    /// <summary>
+    /// The mascot's expressions; each has a portrait image by name (MascotGuide.PortraitResource). The first five are the
+    /// brief's; the art landing (2026-11-12) appends the six extra portraits Hatch v1 ships (append only: indices stay valid).
+    /// PointLeft is Point mirrored (toward screen left); Peek is the head and two claws hooked over the panel edge.
+    /// </summary>
+    public enum MascotReaction { Neutral, Cheer, Wince, Point, Surprised, PointLeft, Thinking, Laughing, Proud, Sleepy, Peek }
 
     /// <summary>
     /// The mascot's words: a line id resolves through Lookup (the words-pack loader sets it when it exists; ids are
@@ -29,6 +33,8 @@ namespace CriticalMass.Runtime.Hud
             { "mascot.cheer.3", "That'll do." },
             { "mascot.wince", "Ouch. Shake it off, you're back in a moment." },
             { "mascot.back", "Missed me?" },
+            { "mascot.thinking", "Take your time. Follow the arrow when you're ready." },
+            { "mascot.sleepy", "Zzz... oh! Still here. Whenever you're ready." },
         };
 
         /// <summary>Adds or replaces a built-in fallback line.</summary>
@@ -72,7 +78,19 @@ namespace CriticalMass.Runtime.Hud
         public const string MascotName = "Hatch";
 
         public const string PortraitFolder = "UI/Mascot/";
-        public static readonly string[] Expressions = { "neutral", "happy", "wince", "point", "surprised" };
+        public static readonly string[] Expressions =
+        {
+            "neutral", "happy", "wince", "point", "surprised", "point-left", "thinking", "laughing", "proud", "sleepy", "peek",
+        };
+
+        /// <summary>Both pointing faces (pure).</summary>
+        public static bool IsPointing(MascotReaction r) => r == MascotReaction.Point || r == MascotReaction.PointLeft;
+
+        /// <summary>The pointing face for a screen direction (pixels, y up): left of a small dead zone points left (pure).</summary>
+        public static MascotReaction PointFace(Vector2 screenDirection, MascotReaction current) =>
+            screenDirection.x < -0.25f ? MascotReaction.PointLeft
+            : screenDirection.x > 0.25f ? MascotReaction.Point
+            : IsPointing(current) ? current : MascotReaction.Point;
 
         /// <summary>The mascot on screen (one per game).</summary>
         public static MascotGuide Instance { get; private set; }
@@ -92,7 +110,7 @@ namespace CriticalMass.Runtime.Hud
         // reference layout (1920x1080, top-left origin)
         public const float PanelW = 620f, PanelH = 176f, Margin = 24f;
         public const float LowerY = 1080f - 24f - 132f - 24f - PanelH;   // above the HUD player card
-        public const float UpperY = 150f;                               // under the top edge, left of the match cluster
+        public const float UpperY = HudZones.GuideUpperY;               // polish pass 1: under the centre lane, never beside a banner
         const float Portrait = 148f, ChipSize = 84f;
         const float PopSeconds = 0.18f, ReactSeconds = 0.22f, SlideSeconds = 0.2f;
 
@@ -106,7 +124,7 @@ namespace CriticalMass.Runtime.Hud
         bool _upper;
         int _tier = -1;
         bool _hasArtLooked;
-        readonly Texture2D[] _art = new Texture2D[5];
+        readonly Texture2D[] _art = new Texture2D[Expressions.Length];
         Vector2 _pointDir;
         bool _pointing;
 
@@ -163,7 +181,7 @@ namespace CriticalMass.Runtime.Hud
         {
             Reaction = kind;
             _reactT = 0f;
-            _pointing = kind == MascotReaction.Point && _pointDir.sqrMagnitude > 0f;
+            _pointing = IsPointing(kind) && _pointDir.sqrMagnitude > 0f;
             ApplyPortrait();
         }
 
@@ -175,14 +193,20 @@ namespace CriticalMass.Runtime.Hud
         public void PointToward(Vector2 screenDirection)
         {
             _pointDir = screenDirection.sqrMagnitude > 1e-6f ? screenDirection.normalized : Vector2.zero;
-            if (Reaction == MascotReaction.Neutral && _pointDir.sqrMagnitude > 0f) React(MascotReaction.Point);
-            _pointing = Reaction == MascotReaction.Point && _pointDir.sqrMagnitude > 0f;
+            if (Reaction == MascotReaction.Neutral && _pointDir.sqrMagnitude > 0f) React(PointFace(_pointDir, Reaction));
+            else if (IsPointing(Reaction) && _pointDir.sqrMagnitude > 0f)
+            {
+                // Swap between the right and left pointing faces without restarting the reaction pose.
+                MascotReaction side = PointFace(_pointDir, Reaction);
+                if (side != Reaction) { Reaction = side; ApplyPortrait(); }
+            }
+            _pointing = IsPointing(Reaction) && _pointDir.sqrMagnitude > 0f;
         }
 
         public void StopPointing()
         {
             _pointing = false;
-            if (Reaction == MascotReaction.Point) React(MascotReaction.Neutral);
+            if (IsPointing(Reaction)) React(MascotReaction.Neutral);
         }
 
         public void Show()
@@ -214,6 +238,7 @@ namespace CriticalMass.Runtime.Hud
             if (!IsDismissed) return;
             IsDismissed = false;
             _popT = 0f;
+            if (!IsPointing(Reaction)) React(MascotReaction.Peek);   // pops his head back over the panel edge
             Toggled?.Invoke(true);
         }
 
@@ -275,15 +300,15 @@ namespace CriticalMass.Runtime.Hud
             tail.RimPx = 0f;
 
             float tx = Portrait + 18f, tw = PanelW - Portrait - 38f;
-            _name = HudText.Make(_bubble.transform.parent, "Name", CMTokens.Display, 22, CMTokens.ToolBrass.Color, TextAnchor.MiddleLeft, 3f);
+            _name = HudText.Make(_bubble.transform.parent, "Name", CMTokens.Display, UiScale.TypeBody, CMTokens.ToolBrass.Color, TextAnchor.MiddleLeft, 3f);
             Place(_name.rectTransform, tx, 24f, tw, 30f);
             _name.text = MascotName.ToUpperInvariant();
-            _line = HudText.Make(_panel, "Line", CMTokens.Ui, 26, CMTokens.WarmCream.Color, TextAnchor.UpperLeft, 2.5f);
+            _line = CriticalMass.Runtime.Menu.MenuUi.Fit(HudText.Make(_panel, "Line", CMTokens.Ui, UiScale.TypeButton, CMTokens.WarmCream.Color, TextAnchor.UpperLeft, 2.5f), 26);
             Place(_line.rectTransform, tx, 56f, tw, 74f);
             _line.horizontalOverflow = HorizontalWrapMode.Wrap;
             _line.verticalOverflow = VerticalWrapMode.Truncate;
             _line.lineSpacing = 0.95f;
-            _hint = HudText.Make(_panel, "Hint", CMTokens.Mono, 16, CMTokens.WithAlpha(CMTokens.WarmCream.Color, 0.85f), TextAnchor.MiddleLeft, 2f);
+            _hint = HudText.Make(_panel, "Hint", CMTokens.Mono, UiScale.TypeMin, CMTokens.WithAlpha(CMTokens.WarmCream.Color, 0.85f), TextAnchor.MiddleLeft, 2f);
             Place(_hint.rectTransform, tx, PanelH - 46f, tw, 22f);
 
             // Portrait medallion: Void Navy disc, Warm Cream rim, the face on top. The pivot carries pose (hop, squash, tilt).
@@ -311,7 +336,7 @@ namespace CriticalMass.Runtime.Hud
             VectorShape chipDisc = Shape(_chip, "Disc", ShapeKind.Circle, 0f, 0f, ChipSize, ChipSize, CMTokens.VoidNavy.Color, 0f);
             chipDisc.RimColor = CMTokens.EggSeam.Color;
             _chipPortrait = Raw(_chip, "Face", 8f, 8f, ChipSize - 16f, ChipSize - 16f);
-            _chipKey = HudText.Make(_chip, "Key", CMTokens.Mono, 16, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 2.5f);
+            _chipKey = HudText.Make(_chip, "Key", CMTokens.Mono, UiScale.TypeMin, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 2.5f);
             Place(_chipKey.rectTransform, -8f, ChipSize - 4f, ChipSize + 16f, 22f);
             _chip.gameObject.SetActive(false);
 
@@ -434,7 +459,10 @@ namespace CriticalMass.Runtime.Hud
             if (_chip.gameObject.activeSelf == full) _chip.gameObject.SetActive(!full);
 
             float ease = 1f - (1f - _popT) * (1f - _popT);
-            _group.alpha = Mathf.Lerp(0f, 1f, Mathf.Clamp01(_popT * 2f));
+            // HUD zones: the bubble steps back (transparent, still live) while the death recap or the "you are the ..."
+            // line holds the lower lane beside it.
+            bool yield = HudZones.Blocked(HudZone.Lower, HudPriority.Guide);
+            _group.alpha = yield ? 0f : Mathf.Lerp(0f, 1f, Mathf.Clamp01(_popT * 2f));
             float y = Mathf.Lerp(_fromY, _toY, 1f - (1f - _slideT) * (1f - _slideT));
             if (_slideT >= 1f) _fromY = _toY;
             Place(_panel, Margin - (1f - ease) * 40f, y, PanelW, PanelH);
@@ -461,7 +489,26 @@ namespace CriticalMass.Runtime.Hud
                     scl = Vector3.one * (1f + 0.08f * Mathf.Sin(_reactT * Mathf.PI));
                     break;
                 case MascotReaction.Point:
+                case MascotReaction.PointLeft:
                     if (_pointing) rot = Mathf.Clamp(_pointDir.x, -1f, 1f) * -8f;
+                    break;
+                case MascotReaction.Laughing:
+                    off.y = Mathf.Abs(Mathf.Sin(_reactT * Mathf.PI * 3f)) * 8f * k;
+                    rot = Mathf.Sin(_reactT * Mathf.PI * 6f) * 3f * k;
+                    break;
+                case MascotReaction.Proud:
+                    scl = Vector3.one * (1f + 0.05f * Mathf.Sin(_reactT * Mathf.PI * 0.5f));
+                    rot = -4f;
+                    break;
+                case MascotReaction.Thinking:
+                    rot = 6f * Mathf.Min(1f, _reactT * 2f);
+                    break;
+                case MascotReaction.Sleepy:
+                    off.y = Mathf.Sin(Time.unscaledTime * 1.6f) * 3f;
+                    scl = new Vector3(1.02f, 0.98f, 1f);
+                    break;
+                case MascotReaction.Peek:
+                    off.y = -(1f - Mathf.Min(1f, _reactT * 1.5f)) * 24f;
                     break;
             }
             _portraitPivot.anchoredPosition = new Vector2(Portrait * 0.5f + off.x, -(PanelH * 0.5f) + off.y);
@@ -469,7 +516,7 @@ namespace CriticalMass.Runtime.Hud
             _portraitPivot.localScale = scl;
             _portrait.color = Reaction == MascotReaction.Wince ? new Color(0.85f, 0.85f, 0.9f, 1f) : Color.white;
 
-            bool showPoint = _pointing && Reaction == MascotReaction.Point;
+            bool showPoint = _pointing && IsPointing(Reaction);
             if (_pointPivot.gameObject.activeSelf != showPoint) _pointPivot.gameObject.SetActive(showPoint);
             if (showPoint) _pointPivot.localRotation = Quaternion.Euler(0, 0, Mathf.Atan2(_pointDir.y, _pointDir.x) * Mathf.Rad2Deg);
         }

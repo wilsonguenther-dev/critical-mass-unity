@@ -31,6 +31,8 @@ namespace CriticalMass.Runtime.Menus
     public sealed class LoadingScreen : MonoBehaviour
     {
         public const float MinSeconds = 1.2f;
+        /// <summary>Play Now and Play again: the screen stays only as long as the build (plus the bar's short fill).</summary>
+        public const float QuickMinSeconds = 0.35f;
         public const float FadeOutSeconds = 0.2f;
         public const int WarmUpFrames = 4;
         /// <summary>A watched boot step that never reports is completed after this (the screen never hangs).</summary>
@@ -63,10 +65,19 @@ namespace CriticalMass.Runtime.Menus
         static bool? _flowOverride;
 
         /// <summary>Opens the screen for a match that is about to load; it waits (bar at zero) until WatchBuilt.</summary>
-        public static LoadingScreen ShowForMatch(int seed)
+        public static LoadingScreen ShowForMatch(int seed) => ShowForMatch(seed, null, false);
+
+        /// <summary>
+        /// As ShowForMatch(seed), naming the match speed (speedLine, e.g. "STANDARD SPEED · 1X"; null: none) and, quick, with
+        /// the shorter minimum time on screen (QuickMinSeconds) for Play Now and Play again.
+        /// </summary>
+        public static LoadingScreen ShowForMatch(int seed, string speedLine, bool quick)
         {
             LoadingScreen s = Show(seed);
             s._watchBoot = false;
+            s._minSeconds = quick ? QuickMinSeconds : MinSeconds;
+            s.SpeedLine = speedLine ?? string.Empty;
+            HudText.Set(s._speed, s.SpeedLine);
             return s;
         }
 
@@ -81,6 +92,10 @@ namespace CriticalMass.Runtime.Menus
         /// <summary>Key art for the slot; null = Resources "UI/KeyArt/loading", then the gradient and logo.</summary>
         public static Texture KeyArt;
 
+        /// <summary>Lore line rect (1000 x 150, Ui 34) and tip rect (950 x 80, Ui 26) and the sizes they may shrink to.</summary>
+        public const float LoreW = 1000f, LoreH = 150f, TipW = 950f, TipH = 80f;
+        public const int LoreSize = 34, LoreMinSize = 22, TipSize = 26, TipMinSize = 18;
+
         static LoadingScreen _instance;
         public static LoadingScreen Instance => _instance;
         public static bool IsOpen => _instance != null && _instance._open;
@@ -94,6 +109,10 @@ namespace CriticalMass.Runtime.Menus
         public LoadStep CurrentStep { get; private set; }
         public string LoreLine { get; private set; } = "";
         public string Tip { get; private set; } = "";
+        /// <summary>The match speed line under the tip ("" when none was given).</summary>
+        public string SpeedLine { get; private set; } = "";
+        /// <summary>The minimum time on screen for this opening (MinSeconds, or QuickMinSeconds for Play Now / Play again).</summary>
+        public float MinimumSeconds => _minSeconds;
         public float OpenSeconds => _open || _closing ? Time.unscaledTime - _openedAt : 0f;
         public bool FinishRequested => _finish;
         public ControlsCard Controls { get; private set; }
@@ -109,7 +128,8 @@ namespace CriticalMass.Runtime.Menus
         RawImage _art;
         SkyGradient _sky;
         RawImage _logo;
-        Text _lore, _tip, _step, _pct;
+        Text _lore, _tip, _step, _pct, _speed;
+        float _minSeconds = MinSeconds;
         VectorShape _bar;
         bool _dirtyCard;
 
@@ -228,6 +248,9 @@ namespace CriticalMass.Runtime.Menus
             }
             Target = 0f;
             Shown = 0f;
+            _minSeconds = MinSeconds;
+            SpeedLine = string.Empty;
+            HudText.Set(_speed, SpeedLine);
             _warmFrames = 0;
             CurrentStep = LoadStep.World;
             _bar.Fill01 = 0f;
@@ -308,17 +331,19 @@ namespace CriticalMass.Runtime.Menus
             MenuUi.Place(_logo.rectTransform, 110f, 80f, 560f, 560f * 470f / 600f);
             _logo.raycastTarget = false;
 
-            _lore = MenuUi.Label(space, "Lore", CMTokens.Ui, 34, cream, TextAnchor.LowerLeft, 120f, 560f, 1000f, 150f, "", 3f);
-            _lore.horizontalOverflow = HorizontalWrapMode.Wrap;
+            _lore = MenuUi.Fit(MenuUi.Label(space, "Lore", CMTokens.Ui, UiScale.TypeLead, cream, TextAnchor.LowerLeft, 120f, 560f, 1000f, 150f, "", 3f), 34);
+            MenuUi.Fit(_lore, LoreMinSize);   // 2026-11-12: a long words-pack line shrinks before it spills (LayoutTextFitTests)
             VectorShape tipPanel = MenuUi.Panel(space, "Tip Panel", 110f, 740f, 1010f, 150f);
-            MenuUi.Label(tipPanel.transform, "Tip Head", CMTokens.Display, 26, brass, TextAnchor.MiddleLeft, 30f, 18f, 300f, 36f, "TIP", 3f);
-            _tip = MenuUi.Label(tipPanel.transform, "Tip", CMTokens.Ui, 26, cream, TextAnchor.UpperLeft, 30f, 58f, 950f, 80f, "", 2f);
-            _tip.horizontalOverflow = HorizontalWrapMode.Wrap;
+            MenuUi.Fit(MenuUi.Label(tipPanel.transform, "Tip Head", CMTokens.Display, UiScale.TypeButton, brass, TextAnchor.MiddleLeft, 30f, 18f, 300f, 36f, "TIP", 3f), 26);
+            _tip = MenuUi.Fit(MenuUi.Label(tipPanel.transform, "Tip", CMTokens.Ui, UiScale.TypeButton, cream, TextAnchor.UpperLeft, 30f, 58f, 950f, 80f, "", 2f), 26);
+            MenuUi.Fit(_tip, TipMinSize);
 
             Controls = ControlsCard.Build(space, 1220f, 110f, 590f, 780f, "Loading Controls");
 
-            _step = MenuUi.Label(space, "Step", CMTokens.Ui, 22, cream, TextAnchor.MiddleLeft, 110f, 930f, 900f, 34f, StepLabels[0], 2f);
-            _pct = MenuUi.Label(space, "Percent", CMTokens.Mono, 22, cream, TextAnchor.MiddleRight, 1510f, 930f, 300f, 34f, "0%", 2f);
+            _step = MenuUi.Label(space, "Step", CMTokens.Ui, UiScale.TypeBody, cream, TextAnchor.MiddleLeft, 110f, 930f, 900f, 34f, StepLabels[0], 2f);
+            _pct = MenuUi.Label(space, "Percent", CMTokens.Mono, UiScale.TypeBody, cream, TextAnchor.MiddleRight, 1510f, 930f, 300f, 34f, "0%", 2f);
+            // The match speed (Play Now / setup), between the step line and the percent, in brass so it reads as a setting.
+            _speed = MenuUi.Label(space, "Speed", CMTokens.Display, UiScale.TypeBody, brass, TextAnchor.MiddleCenter, 760f, 930f, 600f, 34f, "", 2f);
             _bar = MenuUi.Shape(space, "Bar", ShapeKind.RoundRect, 110f, 972f, 1700f, 30f, CMTokens.Biomass.Color, -1f);
             _bar.EmptyColor = CMTokens.MeterEmpty.Color;
             _bar.OutlinePx = 3f;
@@ -377,7 +402,7 @@ namespace CriticalMass.Runtime.Menus
                 _bar.Fill01 = Shown;
                 HudText.Set(_pct, NumberCache.Int(Mathf.FloorToInt(Shown * 100f + 1e-3f)) + "%");
             }
-            if (_finish && Shown >= 0.999f && OpenSeconds >= MinSeconds)
+            if (_finish && Shown >= 0.999f && OpenSeconds >= _minSeconds)
             {
                 _open = false;
                 _closing = true;

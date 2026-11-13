@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using CriticalMass.Runtime.Audio;
 using CriticalMass.Runtime.Codex;
 using CriticalMass.Runtime.Game;
 using CriticalMass.Runtime.Hud;
@@ -238,6 +239,9 @@ namespace CriticalMass.Runtime.PlayTests
             string spoken = null;
             Action<string> onLine = id => spoken = id;
             SecretsBoard.AnnouncerLine += onLine;
+            bool heard = false;
+            Action<AnnouncerLine> onSaid = l => { if (l != null && l.Trigger == AnnouncerTrigger.SecretHillAlone) heard = true; };
+            Announcer.LineStarted += onSaid;
             try
             {
                 World w = _driver.World;
@@ -253,12 +257,20 @@ namespace CriticalMass.Runtime.PlayTests
                     yield return null;
                 }
                 Assert.AreEqual(SecretWatcher.HillAloneLine, spoken);
-                Assert.IsTrue(CaptionBar.IsShowing, "subtitles on: the caption shows");
-                Assert.AreEqual(LoreText.Announcer("an-22"), CaptionBar.Current);
+                // One caption only (batch 4): the announcer subtitles the line when it was free to take it, else the
+                // secret's own caption bar shows it (a busy announcer would let a queued low-priority line age out).
+                Assert.IsTrue(SettingsExtras.Subtitles, "subtitles are on by default");
+                bool bar = CaptionBar.IsShowing && CaptionBar.Current == LoreText.Announcer("an-22");
+                // The announcer starts its line on its next Update; wait by wall clock (batch-mode frames are about 1 ms).
+                float until = Time.realtimeSinceStartup + (bar ? 2.5f : 3f);
+                while (!heard && Time.realtimeSinceStartup < until) yield return null;
+                Assert.IsTrue(bar || heard, "the hill line is captioned: caption bar or announcer subtitle");
+                Assert.IsFalse(bar && heard, "never both captions");
             }
             finally
             {
                 SecretsBoard.AnnouncerLine -= onLine;
+                Announcer.LineStarted -= onSaid;
             }
         }
 

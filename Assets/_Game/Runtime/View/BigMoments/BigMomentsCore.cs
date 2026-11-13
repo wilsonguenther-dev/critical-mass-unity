@@ -589,7 +589,7 @@ namespace CriticalMass.Runtime.View.Moments
     }
 
     /// <summary>Where a cut-in's character art came from (best first).</summary>
-    public enum PortraitSource { TeamImage, TintedImage, LiveModel, HudIcon, Shape }
+    public enum PortraitSource { TeamImage, TintedImage, LiveModel, HudIcon, Shape, Painted }
 
     /// <summary>
     /// Art slots: every image a recipe can use, loaded by name from Resources/UI/BigMoments (brief:
@@ -614,7 +614,9 @@ namespace CriticalMass.Runtime.View.Moments
         {
             if (string.IsNullOrEmpty(name)) return null;
             if (Cache.TryGetValue(name, out Texture2D t)) return t;
-            t = Resources.Load<Texture2D>(Folder + name);
+            t = name.StartsWith(StoryPrefix, StringComparison.Ordinal)
+                ? Resources.Load<Texture2D>(StoryFolder + name.Substring(StoryPrefix.Length))
+                : Resources.Load<Texture2D>(Folder + name);
             if (t != null) t.wrapMode = name == SpeedBand || name == Band ? TextureWrapMode.Repeat : TextureWrapMode.Clamp;
             Cache[name] = t;
             return t;
@@ -631,6 +633,22 @@ namespace CriticalMass.Runtime.View.Moments
         public static string ClassName(ClassId c) => c.ToString().ToLowerInvariant();
 
         public static string TeamName(TeamId t) => t == TeamId.Azure ? "azure" : "crimson";
+
+        /// <summary>
+        /// Integration batch 4: the story's painted cut-ins (PR #62, Resources/Story/cutin_*.jpg, 16:9) fill the portrait slot
+        /// when no bm-portrait image exists, ahead of the live model. Loaded through Loader with this prefix (tests stub it).
+        /// </summary>
+        public const string StoryPrefix = "story:", StoryFolder = "Story/";
+        public static string PaintedName(ClassId c, TeamId t) => StoryPrefix + "cutin_" + ClassName(c) + "_" + TeamName(t);
+        public const string PaintedKaiju = StoryPrefix + "cutin_kaiju";
+        /// <summary>The square of a 16:9 painting the 660 px portrait shows: the subject stands right of centre.</summary>
+        public static Rect PaintedCrop(Texture tex)
+        {
+            if (tex == null || tex.width <= tex.height) return new Rect(0f, 0f, 1f, 1f);
+            float w = (float)tex.height / tex.width;
+            float x = Mathf.Clamp(0.62f - w * 0.5f, 0f, 1f - w);
+            return new Rect(x, 0f, w, 1f);
+        }
 
         public static string PortraitName(ClassId c, TeamId t) => "bm-portrait-" + ClassName(c) + "-" + TeamName(t);
         public static string NeutralPortraitName(ClassId c) => "bm-portrait-" + ClassName(c);
@@ -663,6 +681,8 @@ namespace CriticalMass.Runtime.View.Moments
                 mask = Load(TeamMaskName(c));
                 return PortraitSource.TintedImage;
             }
+            image = Load(PaintedName(c, t));
+            if (image != null) return PortraitSource.Painted;
             if (liveModel) return PortraitSource.LiveModel;
             return hudIcon ? PortraitSource.HudIcon : PortraitSource.Shape;
         }
@@ -672,6 +692,8 @@ namespace CriticalMass.Runtime.View.Moments
         {
             image = Load(KaijuName(s));
             if (image != null) return PortraitSource.TeamImage;
+            image = Load(PaintedKaiju);
+            if (image != null) return PortraitSource.Painted;
             if (liveModel) return PortraitSource.LiveModel;
             return hudIcon ? PortraitSource.HudIcon : PortraitSource.Shape;
         }

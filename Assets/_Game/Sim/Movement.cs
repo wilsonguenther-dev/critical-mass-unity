@@ -37,6 +37,7 @@ namespace CriticalMass.Sim.Core
                     Jump.ClearJump(a);
                     a.UnsupportedTicks = 0;
                     if (!a.Alive) a.JumpBuffer = 0;
+                    if (a.KVx != 0 || a.KVz != 0 || a.HitStunTicks != 0) Knock.Clear(a); // DG-70
                     continue;
                 }
                 if (a.AirLen > 0)
@@ -51,6 +52,15 @@ namespace CriticalMass.Sim.Core
                 if (Terraform.FallIfUnsupported(w, i)) continue;
                 double mx = inp.MoveX;
                 double mz = inp.MoveZ;
+                // DG-70: a staggered actor ignores its input (no move, no jump) while the stun counts down.
+                bool stunned = a.HitStunTicks > 0;
+                if (stunned)
+                {
+                    a.HitStunTicks--;
+                    mx = 0;
+                    mz = 0;
+                    wantJump = false;
+                }
                 double len2 = mx * mx + mz * mz;
                 bool moving = len2 > MoveDeadzone * MoveDeadzone;
                 if (len2 > 1)
@@ -67,6 +77,11 @@ namespace CriticalMass.Sim.Core
                     double speed = baseSpeed;
                     if (a.SlowTimer > 0) speed *= cfg.Abilities.FarmerRoots.SlowMultiplier;
                     if (a.Cls == ClassId.Warrior && a.AbilityActive > 0) speed *= cfg.Abilities.WarriorShield.MoveSpeedMultiplier;
+                    // DG-69: slowed through the wind-up and the recovery (no skating swings).
+                    int slowLen = a.SwingWindup + (cfg.Physics.SwingSlowsRecovery ? a.SwingRecovery : 0);
+                    if (slowLen > 0 && w.Tick > a.SwingTick && w.Tick <= a.SwingTick + slowLen)
+                        speed *= cfg.Physics.SwingMoveMultiplier;
+                    speed *= Pickups.SpeedScale(w, i); // U-066 Haste (exactly 1 without it)
                     tx = mx * speed;
                     tz = mz * speed;
                 }
@@ -98,7 +113,9 @@ namespace CriticalMass.Sim.Core
                     continue;
                 }
                 if (vx != 0 || vz != 0) Collide.MoveActor(w, i, vx * dt, vz * dt, false);
+                Knock.Step(w, i, dt); // DG-70: the knock velocity on top, through the same wall-sliding mover
                 a.Moving = moving;
+                if (stunned) continue;
                 // Facing: toward a real aim point (from the post-move position), else toward the move direction.
                 if (w.HasAim[i] == 1)
                 {

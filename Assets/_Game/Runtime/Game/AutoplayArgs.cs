@@ -162,6 +162,7 @@ namespace CriticalMass.Runtime.Game
         TitleScreen _title;
         bool _titleSeen, _recording, _ended, _quitting, _timedOut, _hangDone, _shotTitle, _shotMid;
         double _titleAt = -1, _matchStart, _endAt, _firstTitleAt = -1;
+        bool _costReset;
         int _exceptionsAtStart, _match = 1, _reloadFrame = -1;
 
         void Awake()
@@ -458,8 +459,10 @@ namespace CriticalMass.Runtime.Game
                 _driver.HumanAutopilot = true;
                 if (o.Speed > 0) _driver.TimeScale = o.Speed;
                 double hold = _match == 1 ? o.TitleSeconds : 1.0;
+                if (_title != null && !_costReset && now - _titleAt >= 2.0) { _costReset = true; FrameCost.Reset(); }
                 if (_title != null && now - _titleAt >= hold)
                 {
+                    Debug.Log("[CM.Cost] title " + FrameCost.Report());
                     _title.Hide();
                     _title = null;
                 }

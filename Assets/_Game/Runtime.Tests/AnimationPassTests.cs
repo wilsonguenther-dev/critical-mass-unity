@@ -361,6 +361,11 @@ namespace CriticalMass.Runtime.Tests
                 double ws = windupTicks / hz;
                 Assert.AreEqual(ws, contactAge, 1e-9, c + " contact age = W");
                 Assert.AreEqual(0, AttackTiming.ClipTime(0, contact, len, ws), 1e-9, c + " starts at clip time 0");
+                // The clip advances most on the last wind-up tick: the hand is fastest when the hit resolves.
+                double last = AttackTiming.ClipTime(ws, contact, len, ws) - AttackTiming.ClipTime(ws - 1 / hz, contact, len, ws);
+                for (int k = 1; k < windupTicks; k++)
+                    Assert.Less(AttackTiming.ClipTime(k / hz, contact, len, ws) - AttackTiming.ClipTime((k - 1) / hz, contact, len, ws), last,
+                        c + " wind-up tick " + k + " moves less than the contact tick");
                 Assert.AreEqual(contact, AttackTiming.ClipTime(ws, contact, len, ws), 1e-9, c + " contact exactly on tick T + W");
                 double prev = -1;
                 for (double age = 0; age < 2; age += 1 / 60.0)
@@ -392,7 +397,7 @@ namespace CriticalMass.Runtime.Tests
             Assert.AreEqual(4, AttackTiming.ReadWindupTicks(new FakeTicks(), 30, 2));
             Assert.AreEqual(4, AttackTiming.ReadWindupTicks(new FakeSeconds(), 30, 2), "0.06 on-screen s at pace 2 = 3.6 -> 4 ticks");
             Assert.AreEqual(0, AttackTiming.ReadWindupTicks(new FakeNone(), 30, 2), "no field yet: parity mode");
-            Assert.AreEqual(0, AttackTiming.WindupTicks(new GameConfig(), ClassId.Warrior), "main has no wind-up today");
+            Assert.Greater(AttackTiming.WindupTicks(new GameConfig(), ClassId.Warrior), 0, "the merged sim (#61) has a wind-up");
         }
 
         // ------------------------------------------------------------------ clip facts, root motion, import (DG-72, A24)

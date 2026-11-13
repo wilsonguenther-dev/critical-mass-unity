@@ -143,8 +143,8 @@ namespace CriticalMass.Runtime.Codex
             plate.Radius = 16f;
             _slot = MenuUi.Rt(space, "Slot");
             MenuUi.Place(_slot, x + 12f, PlateY - 30f, 96f, 96f);
-            _text = MenuUi.Label(space, "Text", CMTokens.Ui, 26, OverlayUi.Cream, TextAnchor.MiddleCenter, x + 110f, PlateY, PlateW - 140f,
-                PlateH, string.Empty, 2f);
+            _text = MenuUi.Fit(MenuUi.Label(space, "Text", CMTokens.Ui, UiScale.TypeButton, OverlayUi.Cream, TextAnchor.MiddleCenter, x + 110f, PlateY, PlateW - 140f,
+                PlateH, string.Empty, 2f), 26);
             _canvas.enabled = false;
         }
 

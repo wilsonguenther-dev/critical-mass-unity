@@ -11,13 +11,14 @@ namespace CriticalMass.Runtime.Tests
     public sealed class ArtMappingTests
     {
         [Test]
-        public void WarriorMinerAndFarmerHaveModelsEveryOtherClassKeepsTheCapsule()
+        public void EveryClassHasItsModelNoClassKeepsTheCapsule()
         {
             Assert.AreEqual(ArtMapping.Warrior, ArtMapping.ClassModel(ClassId.Warrior));
             Assert.AreEqual(ArtMapping.Miner, ArtMapping.ClassModel(ClassId.Miner));
             Assert.AreEqual(ArtMapping.Farmer, ArtMapping.ClassModel(ClassId.Farmer), "Farmer v1 replaces the capsule (art refresh 2)");
-            Assert.IsNull(ArtMapping.ClassModel(ClassId.Demolitions));
-            Assert.IsNull(ArtMapping.ClassModel(ClassId.Builder));
+            Assert.AreEqual(ArtMapping.Demolitions, ArtMapping.ClassModel(ClassId.Demolitions), "art landing");
+            Assert.AreEqual(ArtMapping.Builder, ArtMapping.ClassModel(ClassId.Builder), "art landing");
+            Assert.AreEqual(ArtMapping.Healer, ArtMapping.ClassModel(ClassId.Healer), "art landing");
         }
 
         [Test]
@@ -107,7 +108,7 @@ namespace CriticalMass.Runtime.Tests
             Material f = ArtMaterials.ForTeam(ArtMapping.Spec(ArtMapping.Farmer), TeamId.Crimson);
             Near(ArtMaterials.Hex("#4999A5"), f.GetColor("_DefaultCloth"));
             Near(ArtMaterials.Hex("#E9705F"), f.GetColor("_TeamCloth"));
-            Assert.AreEqual(0f, f.GetFloat("_DecalOn"), "the Farmer has no painted decal");
+            Assert.AreEqual(1f, f.GetFloat("_DecalOn"), "Farmer v4 carries a painted face decal (art landing, #46)");
             Assert.AreEqual(1f, f.GetFloat("_OutlineWeightUV4"), "Farmer face unlined through UV4 (outline_w sidecar)");
 
             ModelSpec minerSpec = ArtMapping.Spec(ArtMapping.Miner);

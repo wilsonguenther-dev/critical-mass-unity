@@ -166,10 +166,14 @@ namespace CriticalMass.Editor.Flow
             if (hi != null)
             {
                 Note("ping placed: " + Pings.Place(W, PingKind.Attack, W.X[0] + 3, W.Z[0], 0));
-                hi.Wheel.Open(W.X[0], W.Z[0], Vector2.zero, new Rect(-960, -540, 1920, 1080), Time.unscaledTime, false);
+                // 2026-11-12: the wheel closes on the next frame when the ping key is not held, so the capture holds it
+                // open through HudInteract's debug hook (capture-only; the hook is off in play).
+                HudInteract.DebugHoldWheel = true;
+                Note("ping wheel: debug open " + hi.DebugOpenWheel());
                 yield return Seconds(0.5);
                 Note($"ping wheel: open {hi.Wheel.IsOpen}");
                 Shot("08-ping-wheel");
+                HudInteract.DebugHoldWheel = false;
                 hi.Wheel.Cancel();
             }
             yield return Seconds(0.2);
@@ -186,16 +190,27 @@ namespace CriticalMass.Editor.Flow
             double aliveUntil = EditorApplication.timeSinceStartup + 30;
             yield return () => W.Actors[0].Alive || EditorApplication.timeSinceStartup > aliveUntil;
             int dug = 0, placed = 0;
-            double[] dirs = { 1, 0, 0, 1, -1, 0, 0, -1, 1, 1, -1, 1, -1, -1, 1, -1 };
-            for (int k = 0; k < 8 && dug != Terraform.Dug; k++)
-                dug = Terraform.Dig(W, 0, W.X[0] + dirs[k * 2] * 1.5, W.Z[0] + dirs[k * 2 + 1] * 1.5);
-            drv.StepTicks(Terraform.WaitTicks(W, W.Actors[0].Team) + 2);
-            for (int k = 7; k >= 0 && placed != Terraform.Placed; k--)
-                placed = Terraform.Place(W, 0, W.X[0] + dirs[k * 2] * 1.5, W.Z[0] + dirs[k * 2 + 1] * 1.5);
-            drv.StepTicks(3);
+            // 2026-11-12: batch 2's attempt was refused (-3) because the player stood on its pad, inside the dig keep-out.
+            // Find a cell the rules let us dig with a void cell to fill next to it, stand the player between them, dig,
+            // wait out the team rate cap, place, and frame the spot.
+            if (FindDigSpot(W, out int sx, out int sz, out int dcx, out int dcz, out int pcx, out int pcz))
+            {
+                W.X[0] = sx + 0.5;
+                W.Z[0] = sz + 0.5;
+                drv.StepTicks(Math.Max(0, Terraform.WaitTicks(W, W.Actors[0].Team)) + 1);
+                dug = Terraform.Dig(W, 0, dcx + 0.5, dcz + 0.5);
+                drv.StepTicks(Math.Max(0, Terraform.WaitTicks(W, W.Actors[0].Team)) + 2);
+                placed = Terraform.Place(W, 0, pcx + 0.5, pcz + 0.5);
+                drv.StepTicks(3);
+                CameraFollowTarget digCam = UnityEngine.Object.FindAnyObjectByType<CameraFollowTarget>();
+                if (digCam != null) digCam.SetOverride(sx + 0.5, sz + 0.5);
+                Note($"terraform spot: stand {sx},{sz}, dig {dcx},{dcz}, place {pcx},{pcz}");
+            }
+            else Note("terraform spot: none found (dig and place skipped)");
             Note($"terraform: dig {dug} (1 = dug), place {placed} (2 = placed), class {W.Actors[0].Cls}");
             yield return Seconds(0.7);
             Shot("10-dig-and-place");
+            { CameraFollowTarget c = UnityEngine.Object.FindAnyObjectByType<CameraFollowTarget>(); if (c != null) c.ClearOverride(); }
 
             // A toppled pillar, framed by the capture camera override.
             CameraFollowTarget follow = UnityEngine.Object.FindAnyObjectByType<CameraFollowTarget>();
@@ -240,10 +255,15 @@ namespace CriticalMass.Editor.Flow
             Note($"kill feed: {Dead(W)} down at sim {W.Match.Time:0.0}s");
             yield return Seconds(0.5);
             Shot("15-kill-feed");
-            Scoreboard.ForceOpen = true;
-            Note("score click hook: " + ItemHooks.ToggleScoreboard());
-            yield return Seconds(0.5);
+            // 2026-11-12: batch 2 set ForceOpen and then called the score-click toggle, which flipped it straight back off.
+            // Open it once through the hook (the player's path), and force it only if the hook is not in this build.
+            Scoreboard.ForceOpen = false;
+            bool hooked = ItemHooks.ToggleScoreboard();
+            if (!hooked) Scoreboard.ForceOpen = true;
+            Note("score click hook: " + hooked + ", forced " + Scoreboard.ForceOpen);
+            yield return Seconds(0.6);
             Shot("16-scoreboard");
+            if (hooked) ItemHooks.ReleaseScoreboard();
             Scoreboard.ForceOpen = false;
             yield return Seconds(0.2);
 
@@ -285,13 +305,17 @@ namespace CriticalMass.Editor.Flow
             yield return () => (GameFlow.State == FlowState.Results && D.Results.IsVisible) || EditorApplication.timeSinceStartup > resUntil;
             yield return Seconds(1.2);
             Note($"results: state {GameFlow.State}, {D.Results.TitleText} / {D.Results.ReasonText}, rewards {(MatchRewardTracker.Last != null)}");
-            Shot("22-results-rewards");
-            Drawer("Highlights");
-            yield return Seconds(1.0);
-            Shot("23-results-highlights");
-            Drawer("Achievements");
+            Shot("22-results-summary");
+            D.Results.ShowTab(ResultsTab.Rewards);
+            yield return Seconds(1.2);
+            Shot("23-results-rewards");
+            D.Results.ShowTab(ResultsTab.Highlights);
             yield return Seconds(0.6);
-            Shot("24-results-achievements");
+            Note($"highlights: pictures {D.Results.TileHasPicture(0)}, {D.Results.TileHasPicture(1)}, {D.Results.TileHasPicture(2)}");
+            Shot("24-results-highlights");
+            D.Results.ShowTab(ResultsTab.Achievements);
+            yield return Seconds(0.6);
+            Shot("25-results-achievements");
         }
 
         static Func<bool> SimAt(double t)
@@ -307,16 +331,38 @@ namespace CriticalMass.Editor.Flow
             return n;
         }
 
-        static void Drawer(string name)
+        /// <summary>
+        /// A floor cell the dig rules accept (DigRefusal 0), a walkable stand cell next to it and a void cell next to the
+        /// stand cell that a block may fill (PlaceRefusal 0), nearest the player first. Reads the world only.
+        /// </summary>
+        static bool FindDigSpot(World w, out int sx, out int sz, out int dcx, out int dcz, out int pcx, out int pcz)
         {
-            try
+            sx = sz = dcx = dcz = pcx = pcz = -1;
+            MapDef map = w.Map;
+            int[] n4 = { 1, 0, -1, 0, 0, 1, 0, -1 };
+            double best = double.MaxValue;
+            for (int cz = 1; cz < map.Height - 1; cz++)
+            for (int cx = 1; cx < map.Width - 1; cx++)
             {
-                const System.Reflection.BindingFlags f = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
-                Type dt = typeof(ResultsScreen).GetNestedType("Drawer", System.Reflection.BindingFlags.NonPublic);
-                typeof(ResultsScreen).GetMethod("ToggleDrawer", f).Invoke(D.Results, new[] { Enum.Parse(dt, name) });
-                Note("drawer " + name + " toggled");
+                if (!MapGrid.IsWalkable(map, cx, cz)) continue;
+                double d2 = (cx + 0.5 - w.X[0]) * (cx + 0.5 - w.X[0]) + (cz + 0.5 - w.Z[0]) * (cz + 0.5 - w.Z[0]);
+                if (d2 >= best) continue;
+                for (int a = 0; a < 4; a++)
+                {
+                    int ax = cx + n4[a * 2], az = cz + n4[a * 2 + 1];
+                    if (Terraform.DigRefusal(w, ax, az) != 0) continue;
+                    for (int b = 0; b < 4; b++)
+                    {
+                        int bx = cx + n4[b * 2], bz = cz + n4[b * 2 + 1];
+                        if (b == a || Terraform.PlaceRefusal(w, bx, bz) != 0) continue;
+                        best = d2;
+                        sx = cx; sz = cz; dcx = ax; dcz = az; pcx = bx; pcz = bz;
+                        goto nextCell;
+                    }
+                }
+                nextCell: ;
             }
-            catch (Exception e) { Note("drawer " + name + " FAILED: " + (e.InnerException ?? e).Message); }
+            return sx >= 0;
         }
 
         static void Update()
@@ -370,6 +416,11 @@ namespace CriticalMass.Editor.Flow
             try
             {
                 foreach (FlowScreen s in UnityEngine.Object.FindObjectsByType<FlowScreen>(FindObjectsSortMode.None)) s.UpdateScale();
+                // 2026-11-12: the loading screen (and every MenuCanvas screen) also re-attaches to the capture camera and
+                // takes the 1080p scale; batch 2 drew the loading screen at a third of full size from the batch window.
+                foreach (Canvas c in UnityEngine.Object.FindObjectsByType<Canvas>(FindObjectsSortMode.None))
+                    if (c.isRootCanvas && c.enabled && c.transform.Find("Space") != null) MenuCanvas.UpdateScale(c);
+                if (LoadingScreen.Instance != null && LoadingScreen.Instance.Canvas != null) MenuCanvas.UpdateScale(LoadingScreen.Instance.Canvas);
                 GameHud hud = UnityEngine.Object.FindAnyObjectByType<GameHud>();
                 if (hud != null) hud.UpdateScale();
                 Canvas.ForceUpdateCanvases();

@@ -148,7 +148,11 @@ namespace CriticalMass.Sim.Tests
                 Assert.Greater(w.Match.HillSeconds.Azure, 0, d + ": Azure bots reached the hill");
                 Assert.Greater(w.Match.HillSeconds.Crimson, 0, d + ": Crimson bots reached the hill");
                 Assert.GreaterOrEqual(ownedShare, OutcomeThresholds.OwnedShareMin, d + ": batch B's per-match owned-share band");
-                Assert.Greater(w.Builder.Stats.Ladders + w.Builder.Stats.Bridges, 0, d + ": the Builder bots built something");
+                // U-075: back on its original single seed (U-073 had widened it to 101..103): Builder bots now build while
+                // fighting or holding near the hill and on the way back from gathering, for a gain of one cell or more.
+                int built = w.Builder.Stats.Ladders + w.Builder.Stats.Bridges;
+                Console.WriteLine("{\"item\":\"DG-24 build check\",\"difficulty\":\"" + d + "\",\"seed\":101,\"built\":" + built + "}");
+                Assert.Greater(built, 0, d + ": the Builder bots built something");
                 Assert.Greater(w.Healer.Stats.Mends, 0, d + ": the Healer bots mended");
                 Assert.Greater(w.Healer.Stats.Pulses, 0, d + ": the Healer bots pulsed");
                 Assert.Greater(w.Healer.Stats.HealingDone, 0, d + ": healing done");

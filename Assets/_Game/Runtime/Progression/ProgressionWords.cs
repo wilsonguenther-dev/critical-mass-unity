@@ -18,7 +18,8 @@ namespace CriticalMass.Runtime.Progression
         public static string Sp = "SP";
         public static string Coins = "COINS";
         public static string Unlocks = "UNLOCKS AT LEVEL ";
-        public static string ComingSoon = "COMING SOON";
+        /// <summary>Kept for old callers; polish pass 1 leaves looks without a model out instead of showing this.</summary>
+        public static string ComingSoon = "NOT AVAILABLE";
         public static string Equipped = "EQUIPPED";
         public static string Locked = "LOCKED";
         public static string NoHeadgear = "NONE";

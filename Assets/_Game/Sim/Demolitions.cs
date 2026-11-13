@@ -20,6 +20,8 @@ namespace CriticalMass.Sim.Core
         public int PlacedTick;
         /// <summary>DG-22 (not in the browser): true once the MineArmed event went out (the view's ring warning).</summary>
         public bool Armed;
+        /// <summary>DG-98 (appended): World.Tick a nearby blast set this mine off (0 = none): it blows on that tick, armed or not.</summary>
+        public int ChainTick;
     }
 
     /// <summary>DG-22: one thrown TNT bundle (browser Bomb). Fixed pool DemolitionsState.Bombs.</summary>
@@ -271,8 +273,9 @@ namespace CriticalMass.Sim.Core
             mine.Cx = cx;
             mine.Cz = cz;
             mine.PlacedTick = w.Tick;
-            mine.ArmTick = w.Tick + (int)cfg.ArmTicks;
-            mine.ExpireTick = w.Tick + (int)cfg.LifetimeTicks;
+            mine.ChainTick = 0;
+            mine.ArmTick = w.Tick + Durations.T30(w.Config, cfg.ArmTicks);
+            mine.ExpireTick = w.Tick + Durations.T30(w.Config, cfg.LifetimeTicks);
             a.AbilityCd = w.Config.Class(ClassId.Demolitions).AbilityCooldown;
             a.AnimAction = 0;
             s.Stats.MinesPlaced++;
@@ -282,8 +285,82 @@ namespace CriticalMass.Sim.Core
         }
 
         /// <summary>Damage every living enemy of team within radius (+ its own radius) of (x, z), credited to owner. Returns how many were hit.</summary>
+        /// <summary>
+        /// DG-98 (ChainReaction): a blast at (x, z) sets off every live TNT bundle and every mine (armed or not) within radius on
+        /// the NEXT tick: a deterministic queue in slot order, never recursion inside one tick.
+        /// </summary>
+        private static void Chain(World w, double x, double z, double radius)
+        {
+            if (!Phys.On(w, w.Config.Physics.ChainReaction)) return;
+            DemolitionsState s = w.Demolitions;
+            double r2 = radius * radius;
+            int next = w.Tick + 1;
+            for (int k = 0; k < s.Bombs.Length; k++)
+            {
+                Bomb b = s.Bombs[k];
+                if (!b.Active || b.BlastTick <= next) continue;
+                if ((b.X - x) * (b.X - x) + (b.Z - z) * (b.Z - z) > r2) continue;
+                b.BlastTick = next;
+                if (b.LandTick > next) b.LandTick = next;
+            }
+            for (int k = 0; k < s.Mines.Length; k++)
+            {
+                Mine m = s.Mines[k];
+                if (!m.Active || m.ChainTick > 0) continue;
+                double mx = m.Cx + 0.5 - x;
+                double mz = m.Cz + 0.5 - z;
+                if (mx * mx + mz * mz > r2) continue;
+                m.ChainTick = next;
+            }
+        }
+
+        /// <summary>
+        /// DG-98 (BlastShockwave): damage falls from full at the centre to BlastEdgeDamageShare at the radius; walls stop it;
+        /// an airborne actor takes the push only; everyone hit is thrown outward (BlastKnockCentre to BlastKnockEdge) and
+        /// staggered (BlastStunSeconds). Off: the DG-22 flat blast.
+        /// </summary>
+        private static int BlastShock(World w, int owner, TeamId team, double x, double z, double radius, double damage)
+        {
+            DemolitionsStats st = w.Demolitions.Stats;
+            PhysicsConfig p = w.Config.Physics;
+            bool ownerIsBot = owner >= 0 && owner < w.ActorCount && !w.Actors[owner].IsHuman;
+            bool walls = Phys.On(w, p.WallsBlockHits);
+            bool knock = Phys.On(w, p.Knockback);
+            int hit = 0;
+            for (int j = 0; j < w.ActorCount; j++)
+            {
+                Actor t = w.Actors[j];
+                if (!t.Alive || t.Team == team) continue;
+                if (ownerIsBot && t.IsHuman && w.Match.Time < w.Config.Bots.PassiveSeconds) continue;
+                double r = radius + w.Config.Class(t.Cls).Radius;
+                double dx = w.X[j] - x;
+                double dz = w.Z[j] - z;
+                double d2 = dx * dx + dz * dz;
+                if (d2 > r * r) continue;
+                if (walls && !SegmentClear.Clear(w.Map, x, z, w.X[j], w.Z[j])) continue;
+                double d = Math.Sqrt(d2);
+                double u = Math.Min(1, d / radius);
+                double ux = d > 1e-6 ? dx / d : JsMath.Cos(j * 2.39996);
+                double uz = d > 1e-6 ? dz / d : JsMath.Sin(j * 2.39996);
+                double kd = knock ? p.BlastKnockCentre + (p.BlastKnockEdge - p.BlastKnockCentre) * u : 0;
+                if (t.AirLen > 0)
+                {
+                    // In the air: pushed, never hurt (the push applies when it lands).
+                    if (knock) Knock.Push(w, j, owner, ux, uz, Knock.Effective(w, j, kd, x, z), 0, 0, DamageCause.Explosion);
+                    continue;
+                }
+                double share = 1 - (1 - p.BlastEdgeDamageShare) * u;
+                double dealt = Damage.ApplyHit(w, j, damage * share, owner, x, z, DamageCause.Explosion, ux, uz, kd, knock ? w.Dur.BlastStun : 0);
+                st.Damage += dealt;
+                if (dealt > 0) hit++;
+                if (dealt > 0 && !t.Alive) st.Kills++;
+            }
+            return hit;
+        }
+
         private static int BlastActors(World w, int owner, TeamId team, double x, double z, double radius, double damage)
         {
+            if (Phys.On(w, w.Config.Physics.BlastShockwave)) return BlastShock(w, owner, team, x, z, radius, damage);
             DemolitionsStats st = w.Demolitions.Stats;
             bool ownerIsBot = owner >= 0 && owner < w.ActorCount && !w.Actors[owner].IsHuman;
             int hit = 0;
@@ -323,14 +400,15 @@ namespace CriticalMass.Sim.Core
                     World.PushEvent(w, SimEventType.MineRemoved, m.Owner, k, x, z, expired ? MineExpired : MineGroundGone, null, DamageCause.None, cfg.BlastRadius);
                     continue;
                 }
-                if (w.Tick < m.ArmTick) continue;
+                bool chained = m.ChainTick > 0 && w.Tick >= m.ChainTick; // DG-98: set off by a blast last tick
+                if (w.Tick < m.ArmTick && !chained) continue;
                 if (!m.Armed)
                 {
                     m.Armed = true;
                     World.PushEvent(w, SimEventType.MineArmed, m.Owner, k, x, z, m.ExpireTick, null, DamageCause.None, cfg.BlastRadius);
                 }
                 int trigger = -1;
-                for (int j = 0; j < w.ActorCount; j++)
+                for (int j = 0; j < w.ActorCount && !chained; j++)
                 {
                     Actor t = w.Actors[j];
                     if (!t.Alive || t.Team == m.Team || t.SpawnProtect > 0 || t.AirLen > 0) continue;
@@ -340,11 +418,12 @@ namespace CriticalMass.Sim.Core
                         break;
                     }
                 }
-                if (trigger < 0) continue;
+                if (trigger < 0 && !chained) continue;
                 m.Active = false;
                 s.Stats.MinesTriggered++;
                 World.PushEvent(w, SimEventType.MineTriggered, trigger, m.Owner, x, z, k, null, DamageCause.None, cfg.BlastRadius);
                 int hit = BlastActors(w, m.Owner, m.Team, x, z, cfg.BlastRadius, cfg.Damage);
+                Chain(w, x, z, cfg.BlastRadius);
                 World.PushEvent(w, SimEventType.Ability, -1, m.Owner, x, z, MineBlastCode);
                 World.PushEvent(w, SimEventType.Explosion, m.Owner, ExplosionMine, x, z, hit, null, DamageCause.Explosion, cfg.BlastRadius);
             }
@@ -392,9 +471,9 @@ namespace CriticalMass.Sim.Core
             b.FromX = w.X[id];
             b.FromZ = w.Z[id];
             b.ThrownTick = w.Tick;
-            b.BlastTick = w.Tick + (int)cfg.FuseTicks;
-            b.LandTick = Math.Min(b.BlastTick, w.Tick + (int)cfg.FlightTicks);
-            s.TntReadyTick[id] = w.Tick + (int)cfg.CooldownTicks;
+            b.BlastTick = w.Tick + Durations.T30(w.Config, cfg.FuseTicks);
+            b.LandTick = Math.Min(b.BlastTick, w.Tick + Durations.T30(w.Config, cfg.FlightTicks));
+            s.TntReadyTick[id] = w.Tick + Durations.T30(w.Config, cfg.CooldownTicks);
             s.Stats.TntThrown++;
             a.AnimAction = 0;
             a.SpawnProtect = 0;
@@ -410,9 +489,10 @@ namespace CriticalMass.Sim.Core
             DemolitionsTntConfig cfg = w.Config.Abilities.DemolitionsTnt;
             double bx = b.X;
             double bz = b.Z;
-            bool gapOk = w.Tick - w.WallChangeTick >= w.Config.Abilities.MinerTerraform.MinGapTicks; // before this blast's own breaks
+            bool gapOk = w.Tick - w.WallChangeTick >= Durations.T30(w.Config, w.Config.Abilities.MinerTerraform.MinGapTicks); // before this blast's own breaks
             s.Stats.TntBlasts++;
             int hit = BlastActors(w, b.Owner, b.Team, bx, bz, cfg.BlastRadius, cfg.Damage);
+            Chain(w, bx, bz, cfg.BlastRadius);
             Kaiju k = w.Kaiju;
             if (k.State != KaijuState.Egg)
             {

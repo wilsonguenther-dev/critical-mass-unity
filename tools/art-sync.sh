@@ -11,8 +11,19 @@
 #   ART_PROPS   (default ~/critical-mass-unity-art-props)  Assets/_Game/Art/Props/*.fbx            (pinned, see below)
 #   ART_ENV     (default ~/critical-mass-unity-art-env)    Assets/_Game/Art/Environment/*.fbx      (pinned)
 #   ART_BASES   (default ~/critical-mass-unity-art-bases)  Assets/_Game/Art/Bases/*.fbx + bases_placements.json (pinned)
+#   ART_LODS    (default ~/critical-mass-unity-art-lods)   THE character files (art landing, 2026-11-12): every fighter and
+#               both Kaiju creature stages ship as one rig with four meshes (<X>_Hero/_LOD0/_LOD1/_Shadow, contract C4),
+#               built on branch art/fighter-lods from the newest art (Warrior v7, Farmer v4, Miner v3, Kaiju v4,
+#               Demolitions v1, Builder v1, Healer v2). Warrior.fbx, Miner.fbx, Farmer.fbx (+ Farmer_OutlineW.json,
+#               regenerated there from farmer.blend), Demolitions.fbx, Builder.fbx, Healer.fbx, Kaiju_Adult.fbx,
+#               Kaiju_Hatchling.fbx and every face decal (the seven Kaiju expression atlases included) come from this pin,
+#               never from the per-class clones, so a sync never puts Hero-only files back.
+#   ART_BUILDER / ART_DEMOLITIONS / ART_HEALER (default ~/critical-mass-unity-art-<class>): only the class props
+#               (BuilderLadder, BuilderRopeBridge, BuilderBuildGlow, DemolitionsProps, HealerProps).
+#   ART_MASCOT  (default ~/critical-mass-unity-art-mascot) Assets/_Game/Resources/UI/Mascot/mascot-*@2x/@4x.png (11 expressions)
+#   The farmer pin is kept as provenance only (its blend is read by the LOD build, not here).
 # Every clone is pinned (art refresh 2): tools/art/art-sources.tsv starts with "#pin<TAB>name<TAB>commit" lines (kaiju,
-# miner, warrior, farmer, props, environment, bases); each is read at that commit with `git archive`, never its working folder.
+# miner, warrior, farmer, props, environment, bases, lods, builder, demolitions, healer, mascot); each is read at that commit with `git archive`, never its working folder.
 #   ART_SYNC_TIMEOUT seconds for the Unity re-import (default 900); BLENDER (default: blender on PATH)
 #   Every Blender and Unity call goes through the machine lock, cm-heavy (DG-44): CM_HEAVY (default ~/bin/cm-heavy).
 set -euo pipefail
@@ -34,6 +45,11 @@ PROPS="${ART_PROPS:-$HOME/critical-mass-unity-art-props}"
 ENV_CLONE="${ART_ENV:-$HOME/critical-mass-unity-art-env}"
 BASES_CLONE="${ART_BASES:-$HOME/critical-mass-unity-art-bases}"
 FARMER="${ART_FARMER:-$HOME/critical-mass-unity-art-farmer}"
+LODS="${ART_LODS:-$HOME/critical-mass-unity-art-lods}"
+BUILDER="${ART_BUILDER:-$HOME/critical-mass-unity-art-builder}"
+DEMOLITIONS="${ART_DEMOLITIONS:-$HOME/critical-mass-unity-art-demolitions}"
+HEALER="${ART_HEALER:-$HOME/critical-mass-unity-art-healer}"
+MASCOT="${ART_MASCOT:-$HOME/critical-mass-unity-art-mascot}"
 ART="$ROOT/Assets/_Game/Art"
 
 # A Git LFS pointer is ~130 bytes of text; a real FBX starts with "Kaydara FBX Binary", a real PNG with \x89PNG.
@@ -61,6 +77,11 @@ prune_stale() {
   local dst="$1" src="$2" f
   for f in "$dst"/*.fbx; do
     [[ -f "$f" ]] || continue
+    # Scenery LODs (<piece>_lod1.fbx, <piece>_lod2.fbx) are built in this repo by
+    # Assets/_Game/Art/Environment/_source~/build_scenery_lods.py, not copied from a clone: keep them. After a new kit pin,
+    # rebuild them (the EditMode test SceneryLodTests.LodSourcesMatchTheKit fails while they are stale).
+    [[ "$f" =~ _lod[12]\.fbx$ ]] && continue
+
     [[ -f "$src/$(basename "$f")" ]] || { rm -f "$f" "$f.meta"; echo "art-sync: removed stale $(basename "$f")"; }
   done
 }
@@ -92,15 +113,36 @@ extract_pinned() {
   echo "$PIN_TMP/$name/$sub"
 }
 n=0
+# Characters and the Kaiju creature stages: the LOD pin (four meshes per file); their face decals from the same pin.
+L_ROOT="$(extract_pinned lods "$LODS" Assets/_Game/Art/Characters)"; L_ROOT="${L_ROOT%/Characters}"
+for sub in Miner Farmer Kaiju Demolitions Builder Healer; do extract_pinned lods "$LODS" "Assets/_Game/Art/$sub" > /dev/null; done
+for f in Warrior.fbx Warrior_Face.png; do copy_art "$L_ROOT/Characters/$f" "$ART/Characters" "$(pin_of lods)"; n=$((n+1)); done
+copy_art "$L_ROOT/Miner/Miner.fbx" "$ART/Miner" "$(pin_of lods)"; n=$((n+1))
+for f in Farmer.fbx Farmer_Face.png Farmer_OutlineW.json; do copy_art "$L_ROOT/Farmer/$f" "$ART/Farmer" "$(pin_of lods)"; n=$((n+1)); done
+for f in Kaiju_Adult.fbx Kaiju_Hatchling.fbx "$L_ROOT"/Kaiju/Kaiju_Face*.png; do
+  copy_art "$L_ROOT/Kaiju/$(basename "$f")" "$ART/Kaiju" "$(pin_of lods)"; n=$((n+1))
+done
+for c in Demolitions Builder Healer; do
+  for f in "$c.fbx" "${c}Face.png"; do copy_art "$L_ROOT/$c/$f" "$ART/$c" "$(pin_of lods)"; n=$((n+1)); done
+done
+# The rest of the Kaiju set (egg, berserk shards, telegraph spikes) from the Kaiju pin.
 K_DIR="$(extract_pinned kaiju "$KAIJU" Assets/_Game/Art/Kaiju)"
-for f in "$K_DIR"/*.fbx "$K_DIR/Kaiju_Face.png"; do copy_art "$f" "$ART/Kaiju" "$(pin_of kaiju)"; n=$((n+1)); done
+for f in Kaiju_Egg.fbx Kaiju_BerserkShards.fbx Kaiju_TelegraphSpikes.fbx; do copy_art "$K_DIR/$f" "$ART/Kaiju" "$(pin_of kaiju)"; n=$((n+1)); done
 prune_stale "$ART/Kaiju" "$K_DIR"
 M_DIR="$(extract_pinned miner "$MINER" Assets/_Game/Art/Miner)"
-for f in Miner.fbx MinerBarricade.fbx MinerFace.png; do copy_art "$M_DIR/$f" "$ART/Miner" "$(pin_of miner)"; n=$((n+1)); done
+for f in MinerBarricade.fbx MinerFace.png; do copy_art "$M_DIR/$f" "$ART/Miner" "$(pin_of miner)"; n=$((n+1)); done
+# The warrior pin is read for the KayKit clip source (Knight.glb) only.
 W_DIR="$(extract_pinned warrior "$WARRIOR" Assets/_Game/Art/Characters)"
-for f in Warrior.fbx Warrior_Face.png; do copy_art "$W_DIR/$f" "$ART/Characters" "$(pin_of warrior)"; n=$((n+1)); done
-F_DIR="$(extract_pinned farmer "$FARMER" Assets/_Game/Art/Farmer)"
-copy_art "$F_DIR/Farmer.fbx" "$ART/Farmer" "$(pin_of farmer)"; n=$((n+1))
+# Class props (static meshes) from each class clone.
+BD_DIR="$(extract_pinned builder "$BUILDER" Assets/_Game/Art/Builder)"
+for f in BuilderLadder.fbx BuilderRopeBridge.fbx BuilderBuildGlow.fbx; do copy_art "$BD_DIR/$f" "$ART/Builder" "$(pin_of builder)"; n=$((n+1)); done
+DM_DIR="$(extract_pinned demolitions "$DEMOLITIONS" Assets/_Game/Art/Demolitions)"
+copy_art "$DM_DIR/DemolitionsProps.fbx" "$ART/Demolitions" "$(pin_of demolitions)"; n=$((n+1))
+HL_DIR="$(extract_pinned healer "$HEALER" Assets/_Game/Art/Healer)"
+copy_art "$HL_DIR/HealerProps.fbx" "$ART/Healer" "$(pin_of healer)"; n=$((n+1))
+# Mascot portraits (Resources/UI/Mascot, loaded by MascotGuide; import rules in Editor/Art/UiTexturePostprocessor.cs).
+MS_DIR="$(extract_pinned mascot "$MASCOT" Assets/_Game/Resources/UI/Mascot)"
+for f in "$MS_DIR"/mascot-*.png; do copy_art "$f" "$ROOT/Assets/_Game/Resources/UI/Mascot" "$(pin_of mascot)"; n=$((n+1)); done
 P_DIR="$(extract_pinned props "$PROPS" Assets/_Game/Art/Props)"
 for f in "$P_DIR"/*.fbx; do copy_art "$f" "$ART/Props" "$(pin_of props)"; n=$((n+1)); done
 E_DIR="$(extract_pinned environment "$ENV_CLONE" Assets/_Game/Art/Environment)"
@@ -114,16 +156,8 @@ mkdir -p "$ROOT/Assets/_Game/Resources/World"
 python3 -I "$ROOT/tools/art/bases_placements_to_unity.py" "$B_DIR/bases_placements.json" "$ROOT/Assets/_Game/Resources/World/bases_placements.json"
 printf '%s\t%s\t%s\t%s\n' "bases_placements.json" "$(shasum -a 256 "$B_DIR/bases_placements.json" | cut -c1-16)" "$(pin_of bases)" \
   "Assets/_Game/Art/Bases/bases_placements.json" >> "$SOURCES.tmp"
-# The Farmer's face carries no outline (its README: outline_w 0 on the face features). FBX drops that Blender vertex
-# group, so it is read from the pinned farmer.blend into a sidecar the importer bakes into UV4 (outline weight).
-FARMER_BLEND="$PIN_TMP/farmer/Assets/_Game/Art/Farmer/_source~/farmer.blend"
-if [[ $RUN_BLENDER -eq 1 && -f "$FARMER_BLEND" ]]; then
-  BL="${BLENDER:-$(command -v blender || echo /Applications/Blender.app/Contents/MacOS/Blender)}"
-  CM_HEAVY_TIMEOUT=300 "$CM_HEAVY" blender "$BL" -b "$FARMER_BLEND" --factory-startup --python-exit-code 1 \
-    --python "$ROOT/tools/art/outline_weights.py" -- "$ART/Farmer/Farmer_OutlineW.json" > "$PIN_TMP/ow.log" 2>&1 \
-    || { echo "art-sync: outline weight export failed:"; tail -20 "$PIN_TMP/ow.log"; exit 1; } >&2
-  grep OUTLINE_W_OK "$PIN_TMP/ow.log"
-fi
+# The Farmer's outline_w sidecar (Farmer_OutlineW.json, the unlined face vertices of Farmer_Hero/_LOD0/_LOD1) is
+# regenerated by the LOD build from farmer.blend and copied from the lods pin above (878 of 878 points matched there).
 cp "$SOURCES.tmp" "$SOURCES"
 echo "art-sync: $n art file(s) checked (sources: tools/art/art-sources.tsv)"
 

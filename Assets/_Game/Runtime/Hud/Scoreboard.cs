@@ -32,6 +32,10 @@ namespace CriticalMass.Runtime.Hud
 
         public Canvas Canvas { get; private set; }
         public bool IsOpen { get; private set; }
+        /// <summary>true while any scoreboard is open (the event banner hides under it, batch 4).</summary>
+        public static bool AnyOpen { get; private set; }
+
+        void OnDisable() => AnyOpen = false;
 
         CombatLog _log;
         RectTransform _board;
@@ -41,12 +45,15 @@ namespace CriticalMass.Runtime.Hud
         int _tier = 2;
         int _rowsShown = -1;
         readonly Table[] _tables = new Table[2];
+        World _world;
 
         sealed class Row
         {
             public RectTransform Rt;
             public VectorShape Plate;
             public HudIcon Badge;
+            /// <summary>Mechanics depth (U-065): the team's level of this row's class, as three pips under the badge.</summary>
+            public readonly VectorShape[] Pips = new VectorShape[3];
             public readonly Text[] Cells = new Text[Columns];
             public readonly TextOutline[] Outlines = new TextOutline[Columns];
             public int Index;
@@ -88,17 +95,17 @@ namespace CriticalMass.Runtime.Hud
             var tb = new Table();
             tb.Rt = MenuUi.Rt(_board, team + " Table");
             MenuUi.Place(tb.Rt, x, 0f, TableW, Height(MaxRows));
-            Color tc = CMTokens.Team(team);
+            Color tc = CMTokens.TeamInk(team);   // polish pass 1: text ink (4.5 : 1 on the panel)
             tb.Crest = HudIcon.Make(tb.Rt, "Crest", 8f, 18f, 44f, 44f);
             tb.Crest.Set(UiIcons.Crest[(int)team], _tier);
-            tb.Name = MenuUi.Label(tb.Rt, "Team", CMTokens.Display, 34, tc, TextAnchor.MiddleLeft, 62f, 18f, 360f, 44f,
-                team == TeamId.Azure ? "AZURE" : "CRIMSON", 3f);
-            MenuUi.Label(tb.Rt, "Total Label", CMTokens.Ui, 17, CMTokens.WithAlpha(CMTokens.WarmCream.Color, 0.8f), TextAnchor.MiddleRight,
+            tb.Name = MenuUi.Fit(MenuUi.Label(tb.Rt, "Team", CMTokens.Display, UiScale.TypeLead, tc, TextAnchor.MiddleLeft, 62f, 18f, 360f, 44f,
+                team == TeamId.Azure ? "AZURE" : "CRIMSON", 3f), 34);
+            MenuUi.Label(tb.Rt, "Total Label", CMTokens.Ui, UiScale.TypeMin, CMTokens.WithAlpha(CMTokens.WarmCream.Color, 0.8f), TextAnchor.MiddleRight,
                 420f, 18f, 240f, 44f, "HILL SECONDS", 2f);
-            tb.Total = MenuUi.Label(tb.Rt, "Total", CMTokens.Mono, 30, tc, TextAnchor.MiddleRight, 670f, 18f, 100f, 44f, "", 3f);
+            tb.Total = MenuUi.Label(tb.Rt, "Total", CMTokens.Mono, UiScale.TypeHeading, tc, TextAnchor.MiddleRight, 670f, 18f, 100f, 44f, "", 3f);
             for (int c = 0; c < Columns; c++)
-                MenuUi.Label(tb.Rt, "Heading " + c, CMTokens.Ui, 17, CMTokens.WithAlpha(CMTokens.WarmCream.Color, 0.8f),
-                    c == 0 ? TextAnchor.MiddleLeft : TextAnchor.MiddleCenter, ColX[c], 82f, ColW[c], 30f, Headings[c], 2f);
+                HudText.SetOneLine(MenuUi.Label(tb.Rt, "Heading " + c, CMTokens.Ui, UiScale.TypeMin, CMTokens.WithAlpha(CMTokens.WarmCream.Color, 0.8f),
+                    c == 0 ? TextAnchor.MiddleLeft : TextAnchor.MiddleCenter, ColX[c], 82f, ColW[c], 30f, "", 2f), Headings[c], UiScale.TypeMin, 11);
             for (int r = 0; r < MaxRows; r++)
             {
                 var row = new Row { Index = r };
@@ -109,6 +116,13 @@ namespace CriticalMass.Runtime.Hud
                 row.Plate.OutlinePx = 0f;
                 row.Plate.RimPx = 0f;
                 row.Badge = HudIcon.Make(row.Rt, "Badge", 12f, 2f, 32f, 32f);
+                for (int p = 0; p < 3; p++)
+                {
+                    row.Pips[p] = MenuUi.Shape(row.Rt, "Level Pip " + p, ShapeKind.Diamond, 13f + p * 11f, RowH - 9f, 8f, 9f, CMTokens.MeterEmpty.Color, 2f);
+                    row.Pips[p].OutlinePx = 1.5f;
+                    row.Pips[p].RimPx = 0f;
+                    row.Pips[p].gameObject.SetActive(false);
+                }
                 for (int c = 0; c < Columns; c++)
                     row.Cells[c] = MenuUi.Label(row.Rt, "Cell " + c, c == 0 ? CMTokens.Ui : CMTokens.Mono, c == 0 ? 21 : 22,
                         CMTokens.WarmCream.Color, c == 0 ? TextAnchor.MiddleLeft : TextAnchor.MiddleCenter, ColX[c], 0f, ColW[c], RowH, "", 2f);
@@ -122,6 +136,7 @@ namespace CriticalMass.Runtime.Hud
         void LateUpdate()
         {
             if (_log == null) _log = GetComponent<CombatLog>();
+            if (CriticalMass.Runtime.Flow.GameFlow.MenuIdle) return;   // batch 4: hidden behind a menu over a backdrop match
             int tier = FeedUi.Refresh(Canvas);
             if (tier != _tier) { _tier = tier; SetTier(tier); }
             World w = _log != null && _log.Driver != null ? _log.Driver.World : null;
@@ -132,6 +147,7 @@ namespace CriticalMass.Runtime.Hud
             if (_board.gameObject.activeSelf != show) _board.gameObject.SetActive(show);
             if (Canvas.enabled != show) Canvas.enabled = show;
             IsOpen = want;
+            AnyOpen = want;
             if (!show) return;
             if (Mathf.Abs(_group.alpha - _alpha) > 1e-3f) _group.alpha = _alpha;
             Refresh(w, _log.Log, _log.LocalActor);
@@ -151,6 +167,8 @@ namespace CriticalMass.Runtime.Hud
         {
             if (Canvas == null) Build();
             if (w == null || tally == null) return;
+            _world = w;
+            View.Mechanics.DepthNames.Bind(w);
             int n = Mathf.Min(w.ActorCount, CombatTally.MaxActors);
             _tables[0].Count = 0;
             _tables[1].Count = 0;
@@ -225,7 +243,20 @@ namespace CriticalMass.Runtime.Hud
                 }
             }
             row.Badge.Set(UiIcons.ClassBadge[cls, (int)s.Team], _tier);
-            HudText.Set(row.Cells[0], own ? KillWords.You : KillWords.ClassUpper[cls]);
+            // Mechanics depth (U-067): named bots with their play style ("THORN  BRAWLER"); the class word without names.
+            HudText.SetOneLine(row.Cells[0], View.Mechanics.DepthNames.RowLabel(s.Id, own, KillWords.You, KillWords.ClassUpper[cls]), 21, 13);
+            World w = _world;
+            bool levels = w != null && View.Mechanics.DepthRead.StationsOn(w);
+            int lvl = levels ? View.Mechanics.DepthRead.Level(w, s.Team, s.Cls) : 0, max = levels ? View.Mechanics.DepthRead.MaxLevel(w) : 0;
+            for (int p = 0; p < 3; p++)
+            {
+                bool on = levels && p < max;
+                VectorShape pip = row.Pips[p];
+                if (pip.gameObject.activeSelf != on) pip.gameObject.SetActive(on);
+                if (!on) continue;
+                Color pc = p < lvl ? CMTokens.ToolBrass.Color : CMTokens.MeterEmpty.Color;
+                if (pip.FillColor != pc) pip.SetFill(pc);
+            }
             HudText.Set(row.Cells[1], NumberCache.Int(s.Knockouts));
             HudText.Set(row.Cells[2], NumberCache.Int(s.Deaths));
             HudText.Set(row.Cells[3], NumberCache.Int((int)System.Math.Floor(s.HillSeconds)));

@@ -57,13 +57,13 @@ namespace CriticalMass.Sim.Core
             CleanseConfig cfg = w.Config.KaijuFeed.Cleanse;
             CleanseState c = w.Cleanse;
             double amount = CleanseAmount(w.Config);
-            int ticks = cfg.Ticks > 0 ? (int)System.Math.Floor(cfg.Ticks) : 1;
+            int ticks = cfg.Ticks > 0 ? Durations.T30(w.Config, System.Math.Floor(cfg.Ticks)) : 1;
             c.ActiveTicks = ticks;
             c.Team = teamIdx;
             c.Actor = actorId;
             c.PerTick = amount / ticks;
             c.Drained = 0;
-            c.Cooldown[teamIdx] = (int)cfg.CooldownTicks;
+            c.Cooldown[teamIdx] = Durations.T30(w.Config, cfg.CooldownTicks);
             c.Count++;
             World.PushEvent(w, SimEventType.Cleanse, actorId, teamIdx, w.Map.Shrine.X, w.Map.Shrine.Z, amount);
             return true;
@@ -119,7 +119,7 @@ namespace CriticalMass.Sim.Core
                     continue;
                 }
                 if (c.Hold[id] < ushort.MaxValue) c.Hold[id]++;
-                if (c.Hold[id] >= cfg.HoldTicks)
+                if (c.Hold[id] >= Durations.T30(w.Config, cfg.HoldTicks))
                 {
                     c.Hold[id] = 0;
                     c.Armed[id] = 0;

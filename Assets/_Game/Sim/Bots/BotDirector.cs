@@ -233,7 +233,7 @@ namespace CriticalMass.Sim.Bots
                 for (int c = 0; c < count; c++)
                 {
                     int id = Ids[c];
-                    if (st.Corrupt[id] != 0 && st.Role[id] == BotsState.RoleKaiju && world.Actors[id].Carry != CarryKind.Biomass) keep = id;
+                    if (st.Corrupt[id] != 0 && st.Role[id] == BotsState.RoleKaiju && world.Actors[id].Carry != CarryKind.Biomass && Roles.MayCorrupt(world, world.Actors[id].Cls)) keep = id;
                 }
                 if (keep < 0)
                 {
@@ -243,6 +243,7 @@ namespace CriticalMass.Sim.Bots
                     {
                         int id = Ids[c];
                         if (st.Role[id] != BotsState.RoleKaiju || world.Actors[id].Carry == CarryKind.Biomass) continue;
+                        if (!Roles.MayCorrupt(world, world.Actors[id].Cls)) continue; // U-063
                         double s = st.Role[id] == BotsState.RoleKaiju ? Score[c] : double.NegativeInfinity;
                         if (keep < 0 || s > bestScore)
                         {
@@ -252,12 +253,39 @@ namespace CriticalMass.Sim.Bots
                     }
                 }
             }
+            // U-063 class roles: the egg crew is feeders, who never touch corruption. A team that is behind and has no raider
+            // on egg duty sends one: the living raider bot of the highest class index (Demolitions, then Miner, then Warrior;
+            // lowest id on a tie) that carries no biomass takes egg duty for the corruption run.
+            if (behind && keep < 0 && Roles.On(world))
+            {
+                int pick = -1;
+                for (int c = 0; c < count; c++)
+                {
+                    int id = Ids[c];
+                    Actor ra = world.Actors[id];
+                    if (ra.Carry == CarryKind.Biomass || !Roles.MayCorrupt(world, ra.Cls)) continue;
+                    if (st.HillSquad[id] != 0) continue; // U-076: never the hill squad
+                    // U-072: a raider (CorruptionRunner) first, then the highest class index, lowest id on a tie.
+                    if (pick < 0) { pick = id; continue; }
+                    bool rr = Roles.IsRunner(world, ra.Cls), pr = Roles.IsRunner(world, world.Actors[pick].Cls);
+                    if ((rr && !pr) || (rr == pr && (int)ra.Cls > (int)world.Actors[pick].Cls)) pick = id;
+                }
+                if (pick >= 0)
+                {
+                    keep = pick;
+                    if (st.Role[pick] != BotsState.RoleKaiju)
+                    {
+                        st.Role[pick] = (byte)BotsState.RoleKaiju;
+                        st.RoleSince[pick] = now;
+                    }
+                }
+            }
             bool spoil = behind && shortHanded;
             for (int id = 0; id < n; id++)
             {
                 Actor a = world.Actors[id];
                 if (a.Team != team) continue;
-                st.Corrupt[id] = (byte)(id == keep || (spoil && st.Role[id] == BotsState.RoleKaiju && a.Carry != CarryKind.Biomass) ? 1 : 0);
+                st.Corrupt[id] = (byte)(id == keep || (spoil && st.Role[id] == BotsState.RoleKaiju && a.Carry != CarryKind.Biomass && Roles.MayCorrupt(world, a.Cls)) ? 1 : 0);
             }
         }
 
@@ -277,7 +305,12 @@ namespace CriticalMass.Sim.Bots
                 TeamId team = TeamIds.All[t];
                 int mine = team == TeamId.Azure ? activeA : activeC;
                 int theirs = team == TeamId.Azure ? activeC : activeA;
-                AssignTeam(w, st, team, now, mine < theirs, mine > theirs);
+                // U-077 (depth rules): a team is short-handed only when its gap is at least Roles.ShortHandedMinShare of the
+                // other side (one idle player of five is, one of sixteen is not). Rules off: any gap (the browser plan).
+                bool shortHanded = mine < theirs && (!Roles.On(w) || theirs - mine >= w.Config.Depth.Roles.ShortHandedMinShare * theirs - 1e-9);
+                AssignTeam(w, st, team, now, shortHanded, mine > theirs);
+                BotDepth.AssignSupply(w, st, team); // U-064
+                BotDepth.AssignHillSquad(w, st, team); // U-076
             }
             byte[] f = mem.Cocky;
             MatchState m = w.Match;

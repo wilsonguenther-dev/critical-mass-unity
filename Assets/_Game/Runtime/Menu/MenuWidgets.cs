@@ -41,6 +41,16 @@ namespace CriticalMass.Runtime.Menu
 
         bool Blocked => Time.unscaledTime < SubmitBlockedUntil;
 
+        /// <summary>
+        /// Polish pass 1: true while the shared focus was last moved by the mouse. Keyboard and controller focus draws a
+        /// thicker Warm Cream ring on top of the brass fill, so "the mouse is over it" and "Enter or A presses it" never
+        /// look the same.
+        /// </summary>
+        public static bool PointerNavigated;
+        /// <summary>Rim of the keyboard and controller focus ring, reference px.</summary>
+        public const float FocusRingPx = 5f;
+        float _idleRim = -1f;
+
         public void OnPointerClick(PointerEventData e)
         {
             if (!IsInteractable() || e.button != PointerEventData.InputButton.Left || Blocked) return;
@@ -67,6 +77,7 @@ namespace CriticalMass.Runtime.Menu
 
         public override void OnMove(AxisEventData e)
         {
+            PointerNavigated = false;
             if (ItemKind != Kind.Button && IsInteractable() &&
                 (e.moveDir == MoveDirection.Left || e.moveDir == MoveDirection.Right))
             {
@@ -86,6 +97,7 @@ namespace CriticalMass.Runtime.Menu
 
         public override void OnPointerEnter(PointerEventData e)
         {
+            PointerNavigated = true;
             base.OnPointerEnter(e);
             if (IsInteractable() && EventSystem.current != null && EventSystem.current.currentSelectedGameObject != gameObject)
                 Select();
@@ -119,7 +131,20 @@ namespace CriticalMass.Runtime.Menu
                 if (state == SelectionState.Pressed) f = Color.Lerp(f, CMTokens.VoidNavy.Color, 0.2f);
                 if (off) f = CMTokens.WithAlpha(f, 0.5f);
                 Body.SetFill(f);
+                // Keyboard / controller focus: a thick cream ring (hover keeps the thin rim).
+                if (_idleRim < 0f) _idleRim = Body.RimPx;
+                float rim = state == SelectionState.Selected && !PointerNavigated ? FocusRingPx : _idleRim;
+                if (!Mathf.Approximately(Body.RimPx, rim))
+                {
+                    Body.RimPx = rim;
+                    Body.SetVerticesDirty();
+                }
             }
+            // States: idle (navy), hover (brass, thin rim; hovering moves the shared focus), keyboard / controller focus
+            // (brass, thick cream ring), pressed (darker brass and a 3 % shrink, view only), disabled (half alpha, stone
+            // text, skipped by navigation).
+            float sc = state == SelectionState.Pressed ? UiScale.PressedScale : 1f;
+            if (transform.localScale.x != sc) transform.localScale = new Vector3(sc, sc, 1f);
             Color t = focus ? FocusText : IdleText;
             if (off) t = CMTokens.WithAlpha(CMTokens.Stone.Color, 0.9f);
             if (Label != null) Label.color = t;
@@ -159,6 +184,22 @@ namespace CriticalMass.Runtime.Menu
             rt.pivot = new Vector2(0.5f, 0.5f);
             rt.sizeDelta = new Vector2(w, h);
             rt.anchoredPosition = new Vector2(x + w * 0.5f, -(y + h * 0.5f));
+        }
+
+        /// <summary>
+        /// Never clip: the text wraps inside its rect and best-fit shrinks it from its size down to min (uGUI best-fit
+        /// only shrinks when the overflow modes are bounded, which HudText.Make leaves unbounded; that is why the match
+        /// setup's DEMOLITIONS EXPERT spilled past its card even with best-fit on).
+        /// </summary>
+        public static Text Fit(Text t, int min = UiScale.TypeMin)
+        {
+            if (t == null) return null;
+            t.horizontalOverflow = HorizontalWrapMode.Wrap;
+            t.verticalOverflow = VerticalWrapMode.Truncate;
+            t.resizeTextMaxSize = Mathf.Max(t.fontSize, min);
+            t.resizeTextMinSize = Mathf.Min(min, t.fontSize);
+            t.resizeTextForBestFit = true;
+            return t;
         }
 
         public static void Stretch(RectTransform rt)
@@ -214,6 +255,8 @@ namespace CriticalMass.Runtime.Menu
             float pad = centre ? 0f : 18f;
             item.Label = Label(body.transform, "Label", face ?? CMTokens.Ui, fontSize, MenuItem.IdleText,
                 centre ? TextAnchor.MiddleCenter : TextAnchor.MiddleLeft, pad, 0f, w - pad * 2f, h, text, 2f);
+            // One line that shrinks before it clips (largest UI scale, long words-pack labels).
+            Fit(item.Label, Mathf.Min(fontSize, Mathf.Max(UiScale.TypeMin, Mathf.RoundToInt(fontSize * 0.7f))));
             return item;
         }
     }

@@ -116,6 +116,14 @@ namespace CriticalMass.Runtime.View.Anim
         }
 
         /// <summary>
+        /// The wind-up of the actor's current swing in sim seconds, read from the sim's own swing (Actor.SwingWindup: the
+        /// hit resolves and AttackContact fires on SwingTick + SwingWindup), so the view never guesses it from the config at
+        /// a different pace.
+        /// </summary>
+        public static double SwingWindupSeconds(Actor a, double simHz) =>
+            a != null && simHz > 0 ? Math.Max(0, a.SwingWindup) / simHz : 0;
+
+        /// <summary>
         /// Clip time of an attack clip `age` sim seconds after the press: contact c, length L, wind-up W seconds.
         /// W > 0: 0..c over the wind-up, then c..L at rate 1. W = 0: starts ParityLeadFrames before c at rate 1, so the
         /// contact frame is shown within 2 frames of the damage tick (the hit cannot land before the swing).
@@ -124,7 +132,15 @@ namespace CriticalMass.Runtime.View.Anim
         {
             if (age < 0) age = 0;
             if (windupSeconds > 1e-9)
-                return age < windupSeconds ? contact * age / windupSeconds : Math.Min(length, contact + (age - windupSeconds));
+            {
+                if (age >= windupSeconds) return Math.Min(length, contact + (age - windupSeconds));
+                // Integration batch 4: 0..contact over the wind-up, eased in (cubic), so the weapon hand is fastest on the
+                // tick the sim resolves the hit (AttackContact): the last wind-up tick plays the strike, the early ones the
+                // ready pose (which is why it starts at clip time 0: the fade-in from the base pose stays small). A linear
+                // map peaked the hand mid wind-up; a late start (the strike only) peaked it on the fade-in.
+                double s = age / windupSeconds;
+                return contact * s * s * s;
+            }
             double start = Math.Max(0, contact - ParityLeadFrames / 30.0);
             return Math.Min(length, start + age);
         }
@@ -140,8 +156,16 @@ namespace CriticalMass.Runtime.View.Anim
         public static float Envelope(double age, double clipTime, double length, double windupSeconds)
         {
             if (clipTime >= length - 1e-4) return 0f;
-            double fin = windupSeconds > 1e-9 ? Math.Min(FadeIn, windupSeconds * 0.5) : 0.02;
-            double a = fin <= 0 ? 1 : Math.Min(1, age / fin);
+            double a;
+            if (windupSeconds > 1e-9)
+            {
+                // Closer (batch 4): with a wind-up the clip fades in over the whole wind-up, smoothstep (slow at both ends).
+                // A 0.05 s linear fade snapped the two-hand grips (Farmer slice, Miner chop: their first frame is far from
+                // the base pose) so fast that the hand peaked on the press tick, 5 ticks before the hit.
+                double s = Math.Min(1, age / windupSeconds);
+                a = s * s * (3 - 2 * s);
+            }
+            else a = Math.Min(1, age / 0.02);
             double b = Math.Min(1, (length - clipTime) / FadeOut);
             return (float)Math.Max(0, Math.Min(a, b));
         }

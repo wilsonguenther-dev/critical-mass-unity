@@ -95,7 +95,8 @@ namespace CriticalMass.Sim.Bots
         {
             Actor t = w.Actors[j];
             double s = d2;
-            if (t.CarryAmount > 0 || t.CarryMeat > 0) s *= sk.CarrierWeight;
+            if (t.CarryAmount > 0 || t.CarryMeat > 0) s *= Roles.On(w) ? sk.RolesCarrierWeight : sk.CarrierWeight; // U-078
+            if (t.Cls == ClassId.Healer && !w.Config.Depth.Classic) s *= sk.HealerWeight; // U-078
             double hp = t.MaxHp > 0 ? t.Hp / t.MaxHp : 1;
             return s * (0.5 + 0.5 * hp);
         }

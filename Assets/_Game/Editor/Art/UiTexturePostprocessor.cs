@@ -19,8 +19,13 @@ namespace CriticalMass.Editor.Art
         /// <summary>The size cap for a UI texture path (pure; tests).</summary>
         public static int MaxSizeFor(string path) => path.Contains("/Logo/") ? LogoMax : IconMax;
 
-        /// <summary>Only logos keep mipmaps (pure; tests).</summary>
-        public static bool MipsFor(string path) => path.Contains("/Logo/");
+        /// <summary>Logos and the mascot portraits keep mipmaps (pure; tests). Art landing (2026-11-12): the mascot brief
+        /// asks for sRGB, mipmaps, clamp and trilinear; the 256 and 512 px portraits are drawn at 148 px and as an 84 px chip,
+        /// so they are scaled down like the logos.</summary>
+        public static bool MipsFor(string path) => path.Contains("/Logo/") || IsMascot(path) || path.Contains("/UI/Icons/");   // integration batch 4: the @4x icons are drawn smaller than their size (HudTests); their shipped metas always had mips
+
+        /// <summary>A mascot portrait (Resources/UI/Mascot, MascotGuide.PortraitResource).</summary>
+        public static bool IsMascot(string path) => path.Contains("/UI/Mascot/");
 
         void OnPreprocessTexture()
         {

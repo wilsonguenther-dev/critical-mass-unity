@@ -79,15 +79,28 @@ namespace CriticalMass.Runtime.View.Dressing
         /// <summary>The CM_Toon slot look of an environment piece (its outline class).</summary>
         public static WorldLook EnvToonLook(string piece)
         {
+            piece = SceneryLod.BasePiece(piece) ?? ""; // a lighter level (env_bush_lod1) takes its piece's look
             if (piece.StartsWith("env_lip_", StringComparison.Ordinal)) return WorldLook.Fringe;
             if (piece.StartsWith("env_ledge_", StringComparison.Ordinal) || piece == "env_bridge_cell" || piece == "env_grass_tuft" ||
                 piece == "env_flowers" || piece.StartsWith("env_cloud_", StringComparison.Ordinal) || piece == "env_ground_cell" ||
-                piece == "env_ground_fill_tri") return WorldLook.Flat;
+                piece == "env_ground_fill_tri" || IsV4GroundDecal(piece)) return WorldLook.Flat;
             if (piece == "env_waterfall") return WorldLook.Water;
             if (piece.StartsWith("env_sky_rock_", StringComparison.Ordinal)) return WorldLook.Sky;
-            if (piece == "env_pebbles" || piece == "env_stump" || piece == "env_bush") return WorldLook.Prop;
+            if (piece == "env_pebbles" || piece == "env_stump" || piece == "env_bush" || IsV4SmallProp(piece)) return WorldLook.Prop;
             return WorldLook.Structure;
         }
+
+        /// <summary>Environment v4 flat ground decals (painted patches, ruts, puddles): no hull, no shadow, like the ground.</summary>
+        public static bool IsV4GroundDecal(string piece) =>
+            piece == "env_ground_patch_light" || piece == "env_ground_patch_dark" || piece == "env_moss_patch" || piece == "env_dirt_patch" ||
+            piece == "env_path_ruts" || piece == "env_puddle";
+
+        /// <summary>Environment v4 small scatter (the Prop look: lined, never casts, QualityTable.PropShadows).</summary>
+        public static bool IsV4SmallProp(string piece) =>
+            piece == "env_grass_clump" || piece == "env_flower_clump_a" || piece == "env_flower_clump_b" || piece == "env_moss_rocks" ||
+            piece == "env_mushrooms" || piece == "env_edge_stones" || piece == "env_ruin_rubble" || piece == "env_camp_sacks" ||
+            piece == "env_campfire" || piece == "env_reeds" || piece == "env_bush_berry" || piece == "env_woodpile" ||
+            piece == "env_float_chunk_s" || piece == "env_float_chunk_m";
 
         /// <summary>
         /// World reactions: how a piece moves in CMToonSwayOffset (UV5.w): 0 still, 1 grass and flowers, 2 bush, 3 tree,
@@ -97,8 +110,13 @@ namespace CriticalMass.Runtime.View.Dressing
         public static byte SwayKind(string piece)
         {
             if (piece == null) return 0;
-            if (piece == "env_grass_tuft" || piece == "env_flowers") return 1;
-            if (piece == "env_bush") return 2;
+            piece = SceneryLod.BasePiece(piece);
+            if (piece == "env_grass_tuft" || piece == "env_flowers" || piece == "env_grass_clump" || piece == "env_flower_clump_a" ||
+                piece == "env_flower_clump_b" || piece == "env_reeds") return 1;
+            if (piece == "env_bush" || piece == "env_bush_berry") return 2;
+            if (piece == "env_banner_worship") return 4;
+            if (piece == "env_bridge_span_damaged") return 5;   // same deck sag as the tile it replaces (SpanA/SpanB kept)
+            if (piece == "env_lantern_post") return 0;          // a post stands still; only the hanging lantern swings
             if (piece.StartsWith("env_tree_", StringComparison.Ordinal)) return 3;
             if (piece == "env_banner") return 4;
             if (piece == "env_bridge_span" || piece == "env_bridge_cell") return 5;

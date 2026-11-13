@@ -76,6 +76,13 @@ namespace CriticalMass.Runtime.Game
             return new QualityRow(HighShadowMetres, false, FighterShadow.Proxy, false, Lod0Metres, true, AnimFarMetres, 2);
         }
 
+        /// <summary>
+        /// Environment v4 extra clutter (art landing, 2026-11-12: about 525 ground patches, clumps, fences, torches, trees,
+        /// bones, anchors and lanterns, WorldDresser.Plan extraClutter) is drawn at High and above only: the scene was at
+        /// 4.36 M triangles against a budget near 2 M on High, so Medium and Low keep the v3 dressing. Pure; tests.
+        /// </summary>
+        public static bool ExtraClutter(int level) => level >= FramePolicy.LevelHigh;
+
         /// <summary>The row in force now (RenderTier.Level; the editor and tests stay at High unless they set it).</summary>
         public static QualityRow Current => For(RenderTier.Level);
     }

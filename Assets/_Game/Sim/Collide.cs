@@ -301,6 +301,30 @@ namespace CriticalMass.Sim.Core
             return true;
         }
 
+        /// <summary>
+        /// DG-97 (S10): an axis step into blocked line `line` (a column when alongX, else a row) that clips only the end cell
+        /// of the body's span by at most CornerNudgeMax: shift the cross coordinate `other` off that cell by the overlap (at
+        /// most `stepLen`) when the shifted body clears the line, so the body slides round the corner. False = still blocked.
+        /// </summary>
+        private static bool CornerNudge(World w, int line, bool alongX, double r, double stepLen, double along, ref double other)
+        {
+            double max = w.Config.Physics.CornerNudgeMax;
+            int lo = JsMath.FloorToInt(other - r - RangeEps);
+            int hi = JsMath.FloorToInt(other + r + RangeEps);
+            bool loB = alongX ? CellBlocks(w, line, lo, false) : CellBlocks(w, lo, line, false);
+            bool hiB = alongX ? CellBlocks(w, line, hi, false) : CellBlocks(w, hi, line, false);
+            for (int c = lo + 1; c < hi; c++) if (alongX ? CellBlocks(w, line, c, false) : CellBlocks(w, c, line, false)) return false;
+            double shift;
+            if (loB && !hiB) shift = (lo + 1) - (other - r) + Skin;
+            else if (hiB && !loB) shift = -((other + r) - hi + Skin);
+            else return false;
+            if (Math.Abs(shift) > max + Skin + 1e-6 || Math.Abs(shift) > stepLen + Skin) return false; // 1e-6: Float32 positions
+            double moved = JsMath.F32(other + shift);
+            if (!(alongX ? BoxFits(w, along, moved, r) : BoxFits(w, moved, along, r))) return false;
+            other = moved;
+            return true;
+        }
+
         /// <summary>Move actor id by (dx, dz) against the grid, sliding along walls. Does not touch other actors.</summary>
         public static void MoveActor(World w, int id, double dx, double dz, bool air = false)
         {
@@ -328,18 +352,19 @@ namespace CriticalMass.Sim.Core
                 // The plain axis-separated push-out (resolve X, then Z): bit-identical to the pre-CM-33 sweep.
                 double lx = px;
                 double lz = pz;
+                bool corners = !air && Phys.On(w, w.Config.Physics.CornerRounding); // DG-97 (S10): slide round convex corners
                 if (sx != 0)
                 {
                     lx = JsMath.F32(lx + sx);
                     if (sx > 0)
                     {
                         int cx = JsMath.FloorToInt(lx + r + RangeEps);
-                        if (RowBlocked(w, cx, lz, r, air)) lx = JsMath.F32(cx - r - Skin);
+                        if (RowBlocked(w, cx, lz, r, air) && !(corners && CornerNudge(w, cx, true, r, Math.Abs(sx), lx, ref lz))) lx = JsMath.F32(cx - r - Skin);
                     }
                     else
                     {
                         int cx = JsMath.FloorToInt(lx - r - RangeEps);
-                        if (RowBlocked(w, cx, lz, r, air)) lx = JsMath.F32(cx + 1 + r + Skin);
+                        if (RowBlocked(w, cx, lz, r, air) && !(corners && CornerNudge(w, cx, true, r, Math.Abs(sx), lx, ref lz))) lx = JsMath.F32(cx + 1 + r + Skin);
                     }
                 }
                 if (sz != 0)
@@ -348,12 +373,12 @@ namespace CriticalMass.Sim.Core
                     if (sz > 0)
                     {
                         int cz = JsMath.FloorToInt(lz + r + RangeEps);
-                        if (ColBlocked(w, cz, lx, r, air)) lz = JsMath.F32(cz - r - Skin);
+                        if (ColBlocked(w, cz, lx, r, air) && !(corners && CornerNudge(w, cz, false, r, Math.Abs(sz), lz, ref lx))) lz = JsMath.F32(cz - r - Skin);
                     }
                     else
                     {
                         int cz = JsMath.FloorToInt(lz - r - RangeEps);
-                        if (ColBlocked(w, cz, lx, r, air)) lz = JsMath.F32(cz + 1 + r + Skin);
+                        if (ColBlocked(w, cz, lx, r, air) && !(corners && CornerNudge(w, cz, false, r, Math.Abs(sz), lz, ref lx))) lz = JsMath.F32(cz + 1 + r + Skin);
                     }
                 }
                 // CM-33: grounded, inside a diagonal rail's capture zone: the deck and the rail (see the class summary).
@@ -363,6 +388,17 @@ namespace CriticalMass.Sim.Core
                 BridgeSpan rs = air || !w.Actors[id].IsHuman || Bots.BotBrain.ActorZeroOnAutopilot(w) ? null : RailSpanAt(px, pz);
                 if (rs == null)
                 {
+                    if (!air && Phys.On(w, true) && (lx != JsMath.F32(px + sx) || lz != JsMath.F32(pz + sz))
+                        && !BoxFits(w, px, pz, r) && DeckSpanAt(w, px, pz, r) != null)
+                    {
+                        // A bot standing on a diagonal deck (it landed a jump there): the plain push-out would snap it a
+                        // whole cell into the VOID beside the deck. Step only to where it may stand (deck or box rule).
+                        double fx = JsMath.F32(px + sx), fz = JsMath.F32(pz + sz);
+                        if (ActorFits(w, fx, fz, r)) { px = fx; pz = fz; }
+                        else if (ActorFits(w, fx, pz, r)) px = fx;
+                        else if (ActorFits(w, px, fz, r)) pz = fz;
+                        continue;
+                    }
                     px = lx;
                     pz = lz;
                     continue;
@@ -436,9 +472,194 @@ namespace CriticalMass.Sim.Core
             z = pz;
         }
 
+        /// <summary>
+        /// DG-86 (S5, OD-5): the hatched Kaiju is an immovable disc of PhysicsConfig.KaijuBodyRadius. Every living, grounded
+        /// actor overlapping it is pushed straight out through MoveActor (walls stop it); one pinned against a wall slides
+        /// round the body instead. No trample damage. One BodyShove event per tick that shoved anyone.
+        /// </summary>
+        public static void KaijuBody(World w)
+        {
+            Kaiju k = w.Kaiju;
+            if (k.State == KaijuState.Egg || !Phys.On(w, w.Config.Physics.SolidKaiju)) return;
+            double body = w.Config.Physics.KaijuBodyRadius;
+            int shoved = 0;
+            double most = 0;
+            for (int i = 0; i < w.ActorCount; i++)
+            {
+                Actor a = w.Actors[i];
+                if (!a.Alive || a.AirLen > 0) continue;
+                double rr = body + ActorRadius(w, i);
+                double dx = w.X[i] - k.X;
+                double dz = w.Z[i] - k.Z;
+                double d2 = dx * dx + dz * dz;
+                if (d2 >= rr * rr) continue;
+                double d = Math.Sqrt(d2);
+                double ux;
+                double uz;
+                if (d < 1e-6)
+                {
+                    ux = -JsMath.Cos(k.Facing);
+                    uz = -JsMath.Sin(k.Facing);
+                }
+                else
+                {
+                    ux = dx / d;
+                    uz = dz / d;
+                }
+                double push = rr - d;
+                double x0 = w.X[i];
+                double z0 = w.Z[i];
+                MoveActor(w, i, ux * push, uz * push);
+                double ex = w.X[i] - k.X;
+                double ez = w.Z[i] - k.Z;
+                if (ex * ex + ez * ez < (rr - 0.05) * (rr - 0.05))
+                {
+                    // Pinned against a wall: slide round the body (the tangent closer to its own motion, else counter-clockwise).
+                    double side = w.Vx[i] * -uz + w.Vz[i] * ux >= 0 ? 1 : -1;
+                    MoveActor(w, i, -uz * side * push * 1.5, ux * side * push * 1.5);
+                    ex = w.X[i] - k.X;
+                    ez = w.Z[i] - k.Z;
+                    double e2 = ex * ex + ez * ez;
+                    if (e2 < (rr - 0.05) * (rr - 0.05))
+                    {
+                        // Still wedged (a wall on both sides): the body gives way by the rest, through its own wall collider.
+                        double e = Math.Sqrt(e2);
+                        double vx = e > 1e-6 ? ex / e : ux;
+                        double vz = e > 1e-6 ? ez / e : uz;
+                        Kaiju.ShoveKaiju(w, -vx * (rr - e), -vz * (rr - e));
+                    }
+                }
+                double moved = Math.Sqrt((w.X[i] - x0) * (w.X[i] - x0) + (w.Z[i] - z0) * (w.Z[i] - z0));
+                if (moved > most) most = moved;
+                shoved++;
+            }
+            if (shoved > 0)
+                World.PushEvent(w, SimEventType.BodyShove, Damage.KaijuSource, -1, k.X, k.Z, shoved, null, DamageCause.None, body,
+                    JsMath.Cos(k.Facing), JsMath.Sin(k.Facing), most, 0, 0, 0);
+        }
+
         /// <summary>Soft actor-actor separation after all moves: each overlapping living pair is pushed apart through MoveActor.</summary>
         public static void SeparateActors(World w)
         {
+            SeparatePairs(w);
+            KaijuBody(w); // DG-86
+        }
+
+        private static double[] SepX = new double[0];
+        private static double[] SepZ = new double[0];
+        private static double[] SepMoved = new double[0];
+
+        /// <summary>
+        /// DG-97 (S9, OD-9): order-free relaxed (Jacobi) separation. Each of SeparationIterations passes accumulates every
+        /// overlapping pair's push into scratch (split by ClassConfig.Mass; teammates AllyPushShare as hard; a getting-up actor
+        /// immovable), scaled by SeparationRelax, then applies them through MoveActor, each actor capped at SeparationMaxStep
+        /// per tick over all passes. No id order decides who moves.
+        /// </summary>
+        private static void SeparateRelaxed(World w)
+        {
+            int n = w.ActorCount;
+            PhysicsConfig p = w.Config.Physics;
+            if (SepX.Length < n)
+            {
+                SepX = new double[n];
+                SepZ = new double[n];
+                SepMoved = new double[n];
+            }
+            if (Neighbours.Length < w.Hash.Capacity) Neighbours = new int[w.Hash.Capacity];
+            double reach = 2 * MaxRadius(w.Config);
+            for (int i = 0; i < n; i++) SepMoved[i] = 0;
+            for (int iter = 0; iter < p.SeparationIterations; iter++)
+            {
+                SpatialHash.Rebuild(w.Hash, w.X, w.Z, w.Actors, n);
+                for (int i = 0; i < n; i++)
+                {
+                    SepX[i] = 0;
+                    SepZ[i] = 0;
+                }
+                bool any = false;
+                for (int i = 0; i < n; i++)
+                {
+                    Actor ai = w.Actors[i];
+                    if (!ai.Alive || ai.AirLen > 0) continue;
+                    double ri = ActorRadius(w, i);
+                    int cnt = SpatialHash.QueryCircle(w.Hash, w.X[i], w.Z[i], reach, Neighbours);
+                    for (int k = 0; k < cnt; k++)
+                    {
+                        int j = Neighbours[k];
+                        Actor aj = w.Actors[j];
+                        if (j <= i || !aj.Alive || aj.AirLen > 0) continue;
+                        double rr = ri + ActorRadius(w, j);
+                        double ddx = w.X[j] - w.X[i];
+                        double ddz = w.Z[j] - w.Z[i];
+                        double d2 = ddx * ddx + ddz * ddz;
+                        if (d2 >= rr * rr) continue;
+                        bool iFixed = ai.StandUp > 0;
+                        bool jFixed = aj.StandUp > 0;
+                        if (iFixed && jFixed) continue;
+                        double d = Math.Sqrt(d2);
+                        if (d < 1e-6)
+                        {
+                            double a = (Math.Min(i, j) * 31 + Math.Max(i, j) * 17) * 2.39996;
+                            ddx = JsMath.Cos(a);
+                            ddz = JsMath.Sin(a);
+                            d = 0;
+                        }
+                        else
+                        {
+                            ddx /= d;
+                            ddz /= d;
+                        }
+                        double overlap = (rr - d) * p.SeparationRelax;
+                        if (ai.Team == aj.Team)
+                        {
+                            overlap *= p.AllyPushShare;
+                            // U-071: a retreating bot and an ally heading into it pass (no head-on jam in a one-cell corridor).
+                            if (p.AllyPassOpposing && (ai.AiState == AiState.Retreat || aj.AiState == AiState.Retreat))
+                            {
+                                InputFrame fi = w.Inputs[i], fj = w.Inputs[j];
+                                double li = fi.MoveX * fi.MoveX + fi.MoveZ * fi.MoveZ, lj = fj.MoveX * fj.MoveX + fj.MoveZ * fj.MoveZ;
+                                if (li > 1e-6 && lj > 1e-6 && (fi.MoveX * fj.MoveX + fi.MoveZ * fj.MoveZ) < p.AllyPassDot * Math.Sqrt(li * lj)) continue;
+                            }
+                        }
+                        double mi = p.SeparationByMass ? w.Config.Class(ai.Cls).Mass : 1;
+                        double mj = p.SeparationByMass ? w.Config.Class(aj.Cls).Mass : 1;
+                        double pushI = jFixed ? overlap : iFixed ? 0 : overlap * mj / (mi + mj);
+                        double pushJ = iFixed ? overlap : jFixed ? 0 : overlap - pushI;
+                        SepX[i] -= ddx * pushI;
+                        SepZ[i] -= ddz * pushI;
+                        SepX[j] += ddx * pushJ;
+                        SepZ[j] += ddz * pushJ;
+                        any = true;
+                    }
+                }
+                if (!any) break;
+                for (int i = 0; i < n; i++)
+                {
+                    double sx = SepX[i];
+                    double sz = SepZ[i];
+                    if (sx == 0 && sz == 0) continue;
+                    double len = Math.Sqrt(sx * sx + sz * sz);
+                    double room = p.SeparationMaxStep - SepMoved[i];
+                    if (room <= 0) continue;
+                    if (len > room)
+                    {
+                        sx *= room / len;
+                        sz *= room / len;
+                        len = room;
+                    }
+                    SepMoved[i] += len;
+                    MoveActor(w, i, sx, sz);
+                }
+            }
+        }
+
+        private static void SeparatePairs(World w)
+        {
+            if (Phys.On(w, w.Config.Physics.RelaxedSeparation))
+            {
+                SeparateRelaxed(w);
+                return;
+            }
             int n = w.ActorCount;
             SpatialHash.Rebuild(w.Hash, w.X, w.Z, w.Actors, n);
             if (Neighbours.Length < w.Hash.Capacity) Neighbours = new int[w.Hash.Capacity];
