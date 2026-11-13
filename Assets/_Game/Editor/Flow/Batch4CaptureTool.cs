@@ -339,12 +339,9 @@ namespace CriticalMass.Editor.Flow
                 yield return StepFrames(2);
                 double hx = W.Map.Hill.X, hz = W.Map.Hill.Z;
                 bool queued = CriticalMass.Runtime.View.Mechanics.DepthInputLatch.QueuePing(0, hx, hz);
-                int answered = 0;
-                for (int k = 0; k < 60; k++)
-                {
-                    yield return StepFrames(1);
-                    for (int e = 0; e < W.EventCount; e++) if (W.Events[e].Type == SimEventType.PingAnswered) answered++;
-                }
+                int h0 = W.EventHead;
+                yield return StepFrames(60);
+                int answered = CountEvents(W, h0, SimEventType.PingAnswered);
                 Note($"ping: queued {queued}, answers seen {answered}");
                 Shot("16-ping-answer");
             }
@@ -358,12 +355,10 @@ namespace CriticalMass.Editor.Flow
                 int eventAt = -1;
                 for (int guard = 0; guard < 140 && eventAt < 0; guard++)
                 {
+                    int h0 = W.EventHead;
                     drv.StepTicks((int)drv.Config.SimHz);
-                    for (int e = 0; e < W.EventCount; e++)
-                    {
-                        SimEventType t = W.Events[e].Type;
-                        if (t == SimEventType.SupplyDropIncoming || t == SimEventType.EggExposed || t == SimEventType.BridgeWarning) eventAt = W.Tick;
-                    }
+                    if (CountEvents(W, h0, SimEventType.SupplyDropIncoming) + CountEvents(W, h0, SimEventType.EggExposed) +
+                        CountEvents(W, h0, SimEventType.BridgeWarning) > 0) eventAt = W.Tick;
                 }
                 yield return StepFrames(12);
                 Note($"map event: at tick {eventAt}, sim {W.Match.Time:0}s");
@@ -553,6 +548,14 @@ namespace CriticalMass.Editor.Flow
             yield return Seconds(0.5);
             Shot("34-results-highlights");
             Note($"REAL INPUT summary: {(_realInputFails == 0 ? "PASS" : "FAIL (" + _realInputFails + ")")}");
+        }
+
+        /// <summary>Events of type t written to the ring since head value from (at most one ring's worth).</summary>
+        static int CountEvents(World w, int from, SimEventType t)
+        {
+            int n = 0, cap = w.Events.Length;
+            for (int h = Math.Max(from, w.EventHead - cap); h < w.EventHead; h++) if (w.Events[h % cap].Type == t) n++;
+            return n;
         }
 
         static GameObject FindPrefix(string prefix)
