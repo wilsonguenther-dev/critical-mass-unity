@@ -45,6 +45,7 @@ namespace CriticalMass.Runtime.Game
             if (existing != null) return existing.gameObject;
             if (scene.path != BootScenePath) return null;
 
+            long b0 = System.Diagnostics.Stopwatch.GetTimestamp();
             // Game root, components in this order.
             var game = new GameObject("Game");
             PlaceInScene(game, scene);
@@ -81,12 +82,15 @@ namespace CriticalMass.Runtime.Game
             if (rig != null && rig.transform.parent == null) PlaceInScene(rig, scene);
 
             // Bible p15 HUD (2026-11-12) and, in player builds, the p04 title screen over the live match.
+            long b1 = System.Diagnostics.Stopwatch.GetTimestamp();
             GameHud gameHud = game.AddComponent<GameHud>();
             gameHud.Driver = driver;
             // DG-01 game flow (title, menu, setup, results; the title only in player builds or when forced) and every
             // [GameOverlay] component registered by later items.
+            long b2 = System.Diagnostics.Stopwatch.GetTimestamp();
             FlowDirector.Install(game, driver, gameHud);
-            OverlayRegistry.InstallOverlays(game);
+            long b3 = System.Diagnostics.Stopwatch.GetTimestamp();
+            int overlays = OverlayRegistry.InstallOverlays(game);
 
             // One directional sun (art direction 2.2): from the screen's upper-left corner, elevation 50 degrees, so it
             // travels 135 degrees clockwise from screen-up (Unity yaw 315 + 135 = 90) and shadows fall to the lower right.
@@ -100,6 +104,12 @@ namespace CriticalMass.Runtime.Game
             light.color = Color.white;
             light.shadows = LightShadows.Hard;
 
+            // perf-title-start: the boot build runs inside the scene activation frame; name its parts in the log.
+            long b4 = System.Diagnostics.Stopwatch.GetTimestamp();
+            double f = 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+            Debug.Log($"[CM.Load] boot build {(b4 - b0) * f:0} ms: world and views {(b1 - b0) * f:0}, hud {(b2 - b1) * f:0}, " +
+                      $"flow {(b3 - b2) * f:0}, {overlays} overlays {OverlayRegistry.LastInstallMs:0} " +
+                      $"(slowest {OverlayRegistry.Slowest} {OverlayRegistry.SlowestMs:0})");
             return game;
         }
 

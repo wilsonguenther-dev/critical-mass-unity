@@ -64,6 +64,8 @@ namespace CriticalMass.Runtime.Hud
             _canvas.worldCamera = cam;
             _canvas.planeDistance = cam != null ? Mathf.Max(0.45f, cam.nearClipPlane * 1.4f) : 0.45f;
             var root = (RectTransform)go.transform;
+            // perf-title-start: after the backdrop settles, it becomes a drifting still and its match pauses.
+            go.AddComponent<TitleBackdrop>().Canvas = _canvas;
 
             var wash = new GameObject("Wash", typeof(RectTransform)).AddComponent<ScreenVignette>();
             wash.gameObject.layer = 5;
