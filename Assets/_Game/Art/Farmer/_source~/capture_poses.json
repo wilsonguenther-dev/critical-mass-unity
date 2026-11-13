@@ -417,47 +417,11 @@
      1
     ],
     -24.0
-   ],
-   [
-    "upperleg.l",
-    [
-     1,
-     0,
-     0
-    ],
-    14
-   ],
-   [
-    "upperleg.r",
-    [
-     1,
-     0,
-     0
-    ],
-    -14
-   ],
-   [
-    "lowerleg.l",
-    [
-     1,
-     0,
-     0
-    ],
-    8
-   ],
-   [
-    "lowerleg.r",
-    [
-     1,
-     0,
-     0
-    ],
-    10
    ]
   ],
   "iou_fit_raster": 0.797,
   "iou_vs_mirrored_bible": 0.428,
-  "note": "v4: walking stance front/back as p07 profile draws it (leg split at 0.40), no sideways spread"
+  "note": "v4: standing, feet flat and overlapping as p07 profile draws them"
  },
  "back": {
   "base": [
@@ -502,15 +466,6 @@
     -7
    ],
    [
-    "upperarm.l",
-    [
-     0,
-     1,
-     0
-    ],
-    -8
-   ],
-   [
     "head",
     [
      1,
@@ -518,6 +473,24 @@
      0
     ],
     -5
+   ],
+   [
+    "upperarm.l",
+    [
+     0,
+     1,
+     0
+    ],
+    6
+   ],
+   [
+    "upperarm.r",
+    [
+     0,
+     1,
+     0
+    ],
+    -6
    ]
   ],
   "az": 180.0,

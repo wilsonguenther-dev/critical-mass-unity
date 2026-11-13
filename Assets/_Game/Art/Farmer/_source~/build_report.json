@@ -53,12 +53,12 @@
  "staff_bottom_local": -0.53,
  "tank": {
   "centre": [
-   0.1,
+   0.15,
    0.5,
-   1.12
+   1.09
   ],
   "diameter": 0.66,
-  "top_z": 1.45
+  "top_z": 1.42
  },
  "feature_z_ranges_rest": {
   "feat_overalls": [
@@ -71,7 +71,7 @@
   ],
   "feat_team_cloth": [
    0.175,
-   1.857
+   1.862
   ],
   "feat_jacket": [
    0.93,
@@ -107,29 +107,42 @@
   ],
   "feat_goggles": [
    1.572,
-   1.842
+   1.854
   ],
   "feat_tank": [
-   0.689,
-   1.486
+   0.659,
+   1.456
   ],
   "feat_leaves": [
-   0.946,
-   1.603
+   0.916,
+   1.573
   ],
   "feat_tank_glint": [
-   1.242,
-   1.344
+   1.212,
+   1.314
   ],
   "feat_hose": [
-   0.638,
+   0.616,
    1.076
   ]
  },
  "triangles_total": 11600,
  "painted_finish": {
-  "on": false,
-  "stats": {}
+  "on": true,
+  "stats": {
+   "Farmer_Body": {
+    "edge": 1165,
+    "chips": 0,
+    "crack": 0,
+    "hot": 51
+   },
+   "Farmer_Staff": {
+    "edge": 257,
+    "chips": 0,
+    "crack": 0,
+    "hot": 27
+   }
+  }
  },
  "triangles_by_part": {
   "Farmer_Body/hair/f_hair": [

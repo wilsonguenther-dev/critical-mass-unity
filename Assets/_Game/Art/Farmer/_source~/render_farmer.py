@@ -749,7 +749,7 @@ HAND_POSES = {
     "pose-harvest": ("Idle", 1, [
         ("upperleg.r", (1, 0, 0), -78), ("lowerleg.r", (1, 0, 0), 88), ("upperleg.l", (1, 0, 0), 52),
         ("lowerleg.l", (1, 0, 0), 12), ("upperleg.l", (0, 1, 0), -8), ("upperleg.r", (0, 1, 0), 8),
-        ("spine", (1, 0, 0), 22), ("spine", (0, 0, 1), -15),
+        ("spine", (1, 0, 0), 32), ("spine", (0, 0, 1), -15),
         ("upperarm.r", (1, 0, 0), -50), ("lowerarm.r", (1, 0, 0), -20),
         ("upperarm.l", (1, 0, 0), -55), ("upperarm.l", (0, 0, 1), -35), ("lowerarm.l", (1, 0, 0), -35),
         ("@aim", (-0.15, -0.75, -0.65), 0),
@@ -757,7 +757,7 @@ HAND_POSES = {
     "pose-root-seed": ("Idle", 1, [
         ("upperleg.r", (1, 0, 0), -75), ("lowerleg.r", (1, 0, 0), 84), ("upperleg.l", (1, 0, 0), 54),
         ("lowerleg.l", (1, 0, 0), 8), ("upperleg.l", (0, 1, 0), -8), ("upperleg.r", (0, 1, 0), 8),
-        ("spine", (1, 0, 0), 12), ("spine", (0, 0, 1), -20),
+        ("spine", (1, 0, 0), 20), ("spine", (0, 0, 1), -20),
         ("upperarm.r", (1, 0, 0), -82), ("lowerarm.r", (1, 0, 0), -5),
         ("upperarm.l", (1, 0, 0), 40), ("lowerarm.l", (1, 0, 0), -35),
         ("@aim", (-0.05, -1.0, 0.08), 0),

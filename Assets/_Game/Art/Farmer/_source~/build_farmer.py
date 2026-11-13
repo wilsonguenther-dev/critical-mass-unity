@@ -39,8 +39,8 @@ STAFF_LEN = 0.972 * BODY_H            # bible p07 measured ratio
 B = None
 BODY, STAFF = "Farmer_Body", "Farmer_Staff"
 M = kit.mat_from
-TANK_C = Vector((0.10, 0.50, 1.12))   # globe centre: on the upper back, offset to the LEFT shoulder (+X) as p07 draws it
-TANK_R = 0.33                         # bible p07 back view: the globe spans most of the back (0.52 u; brief said 0.45)
+TANK_C = Vector((0.13, 0.44, 1.10))   # globe centre: on the upper back, offset to the LEFT shoulder (+X) as p07 draws it
+TANK_R = 0.29                         # bible p07 back view: the globe spans most of the back (0.52 u; brief said 0.45)
 
 
 def add(obj, bm, color, bones, feat, smooth=True, m=None, grad=True, face_uv=None, top_light=None):
@@ -90,10 +90,10 @@ def build_torso():
     for s in (1, -1):
         add(BODY, B.bcyl((0.075 * s, -0.222, 1.17), (0.075 * s, -0.244, 1.17), 0.022, 0.022, 8, 0.006), "f_brass",
             "chest", "overalls", smooth=False)
-        lap = [(0.0, 0.0), (0.055, 0.02), (0.075, 0.20), (0.03, 0.27), (0.0, 0.24)]
+        lap = [(0.0, 0.0), (0.055, 0.012), (0.075, 0.12), (0.03, 0.16), (0.0, 0.145)]   # v4: short, no spikes
         lap = [(x * s, z) for x, z in lap] if s > 0 else [(-x, z) for x, z in reversed(lap)]
         add(BODY, B.prism(lap, 0.02), "f_cream_dark", "chest", "jacket", smooth=False,
-            m=M((0.105 * s, -0.200, 1.02), (90, 0, -18 * s)))
+            m=M((0.105 * s, -0.200, 1.07), (90, 0, -18 * s)))
         add(BODY, B.box((0.085, 0.03, 0.09), 0.012, 1), "f_cream_dark", "chest", "jacket", smooth=False,
             m=M((0.205 * s, -0.175, 1.10), (0, 0, 30 * s)))
         add(BODY, B.box((0.095, 0.035, 0.035), 0.01, 1), "f_cream", "chest", "jacket", smooth=False,
@@ -208,8 +208,8 @@ def build_hair():
     for s in (1, -1):
         hair(B.sphere((0.075, 0.10, 0.10), 8, 6), m=M((0.205 * s, 0.04, 1.635)))
     L = [  # fat rounded locks: p0, p3, bend, wave, radius
-        ((-0.05, -0.12, 1.83), (0.215, -0.15, 1.625), (0.05, -0.07, 0.03), 0.025, 0.085),    # big swept bang (left)
-        ((-0.03, -0.13, 1.83), (-0.205, -0.135, 1.64), (-0.04, -0.06, 0.03), 0.02, 0.075),   # bang (right)
+        ((-0.05, -0.15, 1.75), (0.215, -0.15, 1.625), (0.05, -0.07, 0.03), 0.025, 0.085),    # big swept bang (left)
+        ((-0.03, -0.155, 1.75), (-0.205, -0.135, 1.64), (-0.04, -0.06, 0.03), 0.02, 0.075),   # bang (right)
         ((0.205, -0.07, 1.68), (0.235, -0.05, 1.48), (0.04, -0.02, 0.0), 0.03, 0.058),       # temple curl to the cheek
         ((-0.205, -0.07, 1.68), (-0.235, -0.05, 1.48), (-0.04, -0.02, 0.0), 0.03, 0.058),
         ((0.03, 0.0, 1.835), (0.255, 0.02, 1.78), (0.0, 0.0, 0.05), 0.02, 0.07),             # messy top curls
@@ -235,11 +235,11 @@ def build_hair():
     add(BODY, B.torus(0.228, 0.016, 16, 4), "f_brass", H, "goggles", m=M((0, 0.04, 1.70), (-30, 0, 0), (1.03, 1.0, 1)))
     for s in (1, -1):
         n = Vector((0.30 * s, -0.42, 0.86)).normalized()
-        c = Vector((0.10 * s, -0.165, 1.79))
-        add(BODY, B.bcyl(c - n * 0.026, c + n * 0.026, 0.078, 0.073, 10, 0.012), "f_brass", H, "goggles")
-        add(BODY, B.bcyl(c + n * 0.019, c + n * 0.038, 0.064, 0.062, 10, 0.007), "f_team_cloth", H, "team_cloth")
+        c = Vector((0.105 * s, -0.19, 1.80))       # v4: lenses sit in front of the hair, bangs fall from under them
+        add(BODY, B.bcyl(c - n * 0.026, c + n * 0.026, 0.082, 0.077, 10, 0.012), "f_brass", H, "goggles")
+        add(BODY, B.bcyl(c + n * 0.019, c + n * 0.038, 0.068, 0.066, 10, 0.007), "f_team_cloth", H, "team_cloth")
     add(BODY, B.box((0.07, 0.03, 0.035), 0.01, 1), "f_brass", H, "goggles", smooth=False,
-        m=M((0, -0.19, 1.80), (-55, 0, 0)))
+        m=M((0, -0.215, 1.80), (-55, 0, 0)))
 
 
 # ===================================================================================================== globe tank
