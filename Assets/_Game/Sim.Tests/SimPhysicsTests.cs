@@ -995,5 +995,72 @@ namespace CriticalMass.Sim.Tests
             Assert.AreEqual(2, ticks.Count);
             Assert.AreEqual(ticks[0] + 1, ticks[1]);
         }
+        // ------------------------------------------------------------------ DG-99 pillars land when they land
+
+        [Test]
+        public void DG99CellsChangeOnLandingAndAnActorUnderABlockIsCrushedAndPushedClearNeverIntoAWall()
+        {
+            World w = Make();
+            Assert.IsNotNull(w.Map.Decorations);
+            int fall = Durations.T30(w.Config, w.Config.Abilities.Topple.FallTicks);
+            var buf = new int[Topple.FootprintMax(w.Config)];
+            for (int k = 0; k < w.Map.Decorations.Length; k++)
+            {
+                World t = Make();
+                DecorationDef d = t.Map.Decorations[k];
+                int n = Topple.Footprint(t.Config, t.Map, d, Topple.Dir(d, Topple.Block), buf);
+                int cell = -1;
+                for (int j = 0; j < n; j++) if (Topple.ToppledType(t.Map.Cells[buf[j]], Topple.Block) == Cell.Wall && MapGrid.IsWalkableType(t.Map.Cells[buf[j]])) { cell = buf[j]; break; }
+                if (cell < 0) continue;
+                ParkOthers(t, 2);
+                int cx = cell % t.Map.Width, cz = cell / t.Map.Width;
+                Place(t, 2, cx + 0.5, cz + 0.5);
+                byte before = t.Map.Cells[cell];
+                int res = Topple.ToppleDecoration(t, k, Topple.Block, -1);
+                if (res != Topple.Block) continue; // the route guard refused this piece's block: try the next
+                int fallTick = t.Tick;
+                double hp0 = t.Actors[2].Hp;
+                while (t.Tick < fallTick + fall - 1)
+                {
+                    Idle(t);
+                    Place(t, 2, cx + 0.5, cz + 0.5);
+                    SimStep.Step(t);
+                }
+                Assert.AreEqual(before, t.Map.Cells[cell], "unchanged at FallTick + FallTicks - 1");
+                Idle(t);
+                SimStep.Step(t);
+                Assert.AreEqual(Cell.Wall, t.Map.Cells[cell], "changed at FallTick + FallTicks");
+                Assert.AreEqual(hp0 - t.Config.Physics.PillarCrushDamage, t.Actors[2].Hp, 1e-9, "crush damage");
+                Assert.IsTrue(Collide.FootprintClear(t, 2, t.X[2], t.Z[2]), "outside the strip, never in a wall");
+                for (int s = 0; s < 30; s++) { Idle(t); SimStep.Step(t); Assert.IsTrue(Collide.FootprintClear(t, 2, t.X[2], t.Z[2])); }
+                return;
+            }
+            Assert.Fail("no decoration could be toppled as a block onto a standing actor");
+        }
+
+        [Test]
+        public void DG99TheFinishingSwingIsNotRefusedByPeopleStandingThere()
+        {
+            World w = Make();
+            var buf = new int[Topple.FootprintMax(w.Config)];
+            int accepted = 0;
+            for (int k = 0; k < w.Map.Decorations.Length; k++)
+            {
+                World t = Make();
+                DecorationDef d = t.Map.Decorations[k];
+                int n = Topple.Footprint(t.Config, t.Map, d, Topple.Dir(d, Topple.Block), buf);
+                for (int j = 0; j < n; j++)
+                {
+                    if (!MapGrid.IsWalkableType(t.Map.Cells[buf[j]])) continue;
+                    ParkOthers(t, 2);
+                    Place(t, 2, buf[j] % t.Map.Width + 0.5, buf[j] / t.Map.Width + 0.5);
+                    break;
+                }
+                int res = Topple.ToppleDecoration(t, k, Topple.Block, -1);
+                Assert.AreNotEqual(Topple.RefusedOccupied, res);
+                if (res == Topple.Block) accepted++;
+            }
+            Assert.Greater(accepted, 0);
+        }
     }
 }

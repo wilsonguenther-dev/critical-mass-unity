@@ -13,7 +13,7 @@ namespace CriticalMass.Sim.Core
     /// DG-16: what dealt a hit (SimEvent.Cause on Hit and Death events, Actor.LastCause). Not in the browser. Never stored or
     /// compared by integer value: later items append members (Explosion is reserved for DG-22).
     /// </summary>
-    public enum DamageCause { None, Melee, KaijuMelee, KaijuSlam, Fall, Explosion }
+    public enum DamageCause { None, Melee, KaijuMelee, KaijuSlam, Fall, Explosion, Crush }
 
     /// <summary>
     /// DG-21 bot skill level (WorldOptions.BotDifficulty / AllyBotDifficulty). Normal is first so a WorldOptions that never
