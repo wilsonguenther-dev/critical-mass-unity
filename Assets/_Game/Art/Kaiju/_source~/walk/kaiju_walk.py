@@ -347,7 +347,13 @@ def render_sheets(rig, meshes, act, tracks, fps, fwd, right, vU, tag):
     rate = max(0.25, min(3.2, V_DESIGN / vU)) if vU > 1e-3 else 1.0
     L = (len(tracks["soleL"]) - 1) / fps
     cycle = L / rate
-    M0 = rig.matrix_world.copy()
+    # the body moves through the world on a parent empty (the imported takes key the armature object's own transform,
+    # so moving the rig itself is undone by every frame evaluation)
+    mover = bpy.data.objects.new("Mover", None)
+    sc.collection.objects.link(mover)
+    rig.parent = mover
+    rig.matrix_parent_inverse = Matrix.Identity(4)
+    M0 = Matrix.Identity(4)
     zg = min(min(p.z for p in tracks[k]) for k in ("soleL", "soleR")) - 0.12
     zg = min(zg, min((hero.matrix_world @ Vector(c)).z for c in hero.bound_box))
     g = ground(zg, -6.0, V_DESIGN * cycle * 1.6 + 8.0, fwd, right)
@@ -381,8 +387,8 @@ def render_sheets(rig, meshes, act, tracks, fps, fwd, right, vU, tag):
             # body (the imported takes key the armature object too, so frame_set resets its transform)
             f0, _ = frames_of(act)
             fr = f0 + (ft % L) * fps
+            mover.location = body
             sc.frame_set(int(math.floor(fr)), subframe=fr - math.floor(fr))
-            rig.matrix_world = Matrix.Translation(body) @ M0
             bpy.context.view_layer.update()
             tmp = []
             cols = {"soleL": (0.95, 0.15, 0.12), "soleR": (0.15, 0.35, 0.98), "knuckL": (0.98, 0.85, 0.1),
@@ -410,7 +416,8 @@ def render_sheets(rig, meshes, act, tracks, fps, fwd, right, vU, tag):
         path = os.path.join(OUT, "walk-%s-%s.jpg" % (tag, view))
         compose(tiles, 4, path)
         paths[view] = path
-    rig.matrix_world = M0
+    rig.parent = None
+    bpy.data.objects.remove(mover)
     bpy.data.objects.remove(g)
     bpy.data.objects.remove(cam)
     REPORT.setdefault("sheets", {})[tag] = dict(paths=paths, rate=round(rate, 3), cycle_s=round(cycle, 3))
@@ -421,6 +428,9 @@ def render_sheets(rig, meshes, act, tracks, fps, fwd, right, vU, tag):
 reset()
 rig, meshes, acts = import_fbx(SRC)
 sc = bpy.context.scene
+if "Shin_L" in rig.data.bones:
+    raise SystemExit("kaiju_walk: %s is already a walk build (it has Shin_L); pass the pre-walk file "
+                     "(Art/Kaiju/_source~/walk/Kaiju_Adult_prewalk.fbx, or art-sync's transplanted LOD-pin file)" % SRC)
 log("fps", sc.render.fps, sc.render.fps_base, "rig", rig.name, tuple(round(x, 4) for x in rig.matrix_world.to_scale()),
     "meshes", [m.name for m in meshes], "actions", {k: frames_of(a) for k, a in acts.items()})
 REPORT["input"] = dict(fps=sc.render.fps, bones=[b.name for b in rig.data.bones],

@@ -35,12 +35,15 @@ namespace CriticalMass.Runtime.View.Anim
         public const float RoarWhileMoving = 0.4f;
         /// <summary>Procedural limits (degrees) and the yaw spring (1/s). The adult turns at most TurnRateDeg per second.</summary>
         public const float LookMaxDeg = 40f, LeanMaxDeg = 7f, TailMaxDeg = 28f, HitHeadDeg = 12f;
-        public const double YawOmega = 18.0, TurnRateDeg = 360.0, HatchlingTurnRateDeg = 540.0;
+        public const double YawOmega = 18.0, TurnRateDeg = 360.0, HatchlingTurnRateDeg = 540.0, HeadLeadSeconds = 0.12;
 
         sealed class Measured
         {
             public double WalkSpeed = FallbackWalkSpeed;
             public double[] Contacts = new double[0];
+            /// <summary>Which foot (0 = Foot_L, 1 = Foot_R) lands at Contacts[i] (kaiju-walk-1: the re-authored Walk plants
+            /// the right foot first in clip time, so "even index = left" put every footfall under the wrong foot).</summary>
+            public int[] ContactFoot = new int[0];
             public double SlamContact = -1, SwipeContact = -1;
             public bool StrideMeasured;
         }
@@ -306,13 +309,14 @@ namespace CriticalMass.Runtime.View.Anim
                 for (int i = 0; i < me.Contacts.Length; i++)
                 {
                     if (!Locomotion.Crossed(p0, p1, me.Contacts[i])) continue;
-                    Transform foot = m.Bone((i & 1) == 0 ? "Foot_L" : "Foot_R");
+                    bool leftStep = i < me.ContactFoot.Length ? me.ContactFoot[i] == 0 : (i & 1) == 0;
+                    Transform foot = m.Bone(leftStep ? "Foot_L" : "Foot_R");
                     bool adultStep = m == adult;
                     Steps++;
                     Footfalls.Emit(new Footfall { Tick = w.Tick, Actor = -2, Kind = FootfallKind.KaijuStep,
                         Position = foot != null ? foot.position : m.Transform.position,
                         Strength = Footfalls.KaijuStepStrength * (adultStep ? 1f : 0.5f), Radius = Footfalls.KaijuStepRadius * (adultStep ? 1f : 0.5f),
-                        Left = (i & 1) == 0, Team = TeamId.Azure });
+                        Left = leftStep, Team = TeamId.Azure });
                 }
             }
         }
@@ -353,6 +357,9 @@ namespace CriticalMass.Runtime.View.Anim
         // The weight-bearing foot is pinned where it landed: its thigh is aimed at the pin (the rig's leg is Thigh -> Foot,
         // one bone, so an aim is the whole IK), the correction capped at MaxLockDeg (40 halved the slide to 0.49 in run 43496001979; 70 covers a full stride); it releases when the foot lifts or the
         // pin falls behind by more than a stride, and fades out over LockFade so the swing does not pop.
+        // kaiju-walk-1: the adult's Walk now plants at the source (each contact holds its world point through stance at
+        // playback 1.0 = 2.6 u/s) and its Foot_L/Foot_R are the real feet at the sole (Thigh > Shin > Foot), so this lock
+        // only trims what the clip cannot know: curved paths, blends and rate clamps. The hatchling keeps the old rig.
         public const float MaxLockDeg = 70f, LockFade = 0.08f, ReplantShare = 0.3f;
         readonly Vector3[] _pin = new Vector3[2];
         readonly bool[] _pinned = new bool[2];
@@ -412,6 +419,8 @@ namespace CriticalMass.Runtime.View.Anim
                     lookTarget = Math.Max(-LookMaxDeg, Math.Min(LookMaxDeg, Locomotion.Wrap180(want - _yaw)));
                 }
             }
+            // kaiju-walk-1: the head leads a turn (looks where the body is turning, HeadLeadSeconds ahead), the tail lags it.
+            if (k.KoIn <= 0) lookTarget = Math.Max(-LookMaxDeg, Math.Min(LookMaxDeg, lookTarget + _yawRate * HeadLeadSeconds));
             if (dSim > 0)
             {
                 _tail += (tailTarget - _tail) * (1 - Math.Exp(-(hatchling ? 9 : 6) * dSim));
@@ -489,7 +498,7 @@ namespace CriticalMass.Runtime.View.Anim
                 }
                 ModelSpec spec = m.Spec;
                 float tol = 0.015f * (spec != null && spec.Height > 0 ? spec.Height : 2f);
-                var contacts = new List<double>();
+                var contacts = new List<(double at, int foot)>();
                 double speedSum = 0;
                 int speedN = 0;
                 for (int f = 0; f < 2; f++)
@@ -506,14 +515,16 @@ namespace CriticalMass.Runtime.View.Anim
                             speedSum += new Vector2(d.x, d.z).magnitude / (len / n);
                             speedN++;
                         }
-                        if (!a && b) contacts.Add((double)(k + 1) / n);
+                        if (!a && b) contacts.Add(((double)(k + 1) / n, f));
                     }
                 }
                 m.Transform.localScale = keepScale;
                 double sp = speedN > 0 ? speedSum / speedN : 0;   // world units per second at Scale 1
                 if (sp > 0.2 && sp < 10) { r.WalkSpeed = sp; r.StrideMeasured = contacts.Count > 0; }
-                contacts.Sort();
-                r.Contacts = contacts.ToArray();
+                contacts.Sort((x, y2) => x.at.CompareTo(y2.at));
+                r.Contacts = new double[contacts.Count];
+                r.ContactFoot = new int[contacts.Count];
+                for (int i = 0; i < contacts.Count; i++) { r.Contacts[i] = contacts[i].at; r.ContactFoot[i] = contacts[i].foot; }
             }
             r.SlamContact = PeakTime(m, ArtMapping.Slam);
             r.SwipeContact = PeakTime(m, ArtMapping.Swipe);

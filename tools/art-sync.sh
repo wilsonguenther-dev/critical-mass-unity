@@ -119,9 +119,11 @@ for sub in Miner Farmer Kaiju Demolitions Builder Healer; do extract_pinned lods
 for f in Warrior.fbx Warrior_Face.png; do copy_art "$L_ROOT/Characters/$f" "$ART/Characters" "$(pin_of lods)"; n=$((n+1)); done
 copy_art "$L_ROOT/Miner/Miner.fbx" "$ART/Miner" "$(pin_of lods)"; n=$((n+1))
 for f in Farmer.fbx Farmer_Face.png Farmer_OutlineW.json; do copy_art "$L_ROOT/Farmer/$f" "$ART/Farmer" "$(pin_of lods)"; n=$((n+1)); done
-for f in Kaiju_Adult.fbx Kaiju_Hatchling.fbx "$L_ROOT"/Kaiju/Kaiju_Face*.png; do
+for f in Kaiju_Hatchling.fbx "$L_ROOT"/Kaiju/Kaiju_Face*.png; do
   copy_art "$L_ROOT/Kaiju/$(basename "$f")" "$ART/Kaiju" "$(pin_of lods)"; n=$((n+1))
 done
+# Kaiju_Adult.fbx is BUILT in this repo (kaiju-walk-1, 2026-11-13): the LOD pin's file is only its input (below).
+copy_art "$L_ROOT/Kaiju/Kaiju_Adult.fbx" "$PIN_TMP/adult" "$(pin_of lods)"; n=$((n+1))
 for c in Demolitions Builder Healer; do
   for f in "$c.fbx" "${c}Face.png"; do copy_art "$L_ROOT/$c/$f" "$ART/$c" "$(pin_of lods)"; n=$((n+1)); done
 done
@@ -131,11 +133,31 @@ K_DIR="$(extract_pinned kaiju "$KAIJU" Assets/_Game/Art/Kaiju)"
 # build_lods.py exported with rig.data.pose_position = "REST"), so the Kaiju glided. Their curves are replaced by the
 # Kaiju pin's real clips (same 20-bone rig, identical bind poses, same take names and ranges); meshes stay the LOD pin's.
 # The EditMode test KaijuClipMotionTests fails if a static clip ever lands again.
-for f in Kaiju_Adult.fbx Kaiju_Hatchling.fbx; do
+for f in Kaiju_Hatchling.fbx; do
   python3 -I "$ROOT/tools/art/fbx_transplant_clips.py" "$K_DIR/$f" "$ART/Kaiju/$f" "$PIN_TMP/$f.alive" > /dev/null &&
     { cmp -s "$PIN_TMP/$f.alive" "$ART/Kaiju/$f" || { cp "$PIN_TMP/$f.alive" "$ART/Kaiju/$f"; echo "art-sync: $f clips <- kaiju pin"; }; } ||
     { echo "art-sync: clip transplant failed for $f" >&2; exit 1; }
 done
+# Kaiju_Adult.fbx (kaiju-walk-1): LOD pin meshes + Kaiju pin clips (the same transplant), then
+# Art/Kaiju/_source~/walk/kaiju_walk.py: each hind Foot (knee -> sole) becomes Shin + a real Foot bone at the sole (22 bones),
+# and the Walk is re-authored with planted contacts (playback 1.0 = KaijuConfig.MoveSpeed 2.6 u/s). The Blender build
+# exports with pose_position POSE (never the rest-pose bake the LOD pass shipped). Without Blender (--no-blender) the
+# committed build is kept. The FBX header carries a timestamp, so the committed file is replaced only when the build's
+# design line (tools/art/kaiju_walk.sig) changes.
+python3 -I "$ROOT/tools/art/fbx_transplant_clips.py" "$K_DIR/Kaiju_Adult.fbx" "$PIN_TMP/adult/Kaiju_Adult.fbx" "$PIN_TMP/Kaiju_Adult.alive.fbx" > /dev/null \
+  || { echo "art-sync: clip transplant failed for Kaiju_Adult.fbx" >&2; exit 1; }
+if [[ $RUN_BLENDER -eq 1 ]]; then
+  BLW="${BLENDER:-$(command -v blender || true)}"
+  [[ -n "$BLW" ]] || { echo "art-sync: Blender not found for the Kaiju walk build (or pass --no-blender)" >&2; exit 1; }
+  CM_HEAVY_TIMEOUT=600 "$CM_HEAVY" blender "$BLW" -b --factory-startup --python "$ART/Kaiju/_source~/walk/kaiju_walk.py" -- \
+    "$PIN_TMP/Kaiju_Adult.alive.fbx" "$PIN_TMP/walk" --no-render > "$PIN_TMP/walk.log" 2>&1 && grep -q WALK_OK "$PIN_TMP/walk.log" \
+    || { echo "art-sync: Kaiju walk build failed (log kept at /tmp/kaiju_walk.log)" >&2; cp "$PIN_TMP/walk.log" /tmp/kaiju_walk.log; exit 1; }
+  sig="$(grep -o '"design": {[^}]*}' "$PIN_TMP/walk.log" | head -1)"
+  if [[ "$(cat "$ROOT/tools/art/kaiju_walk.sig" 2>/dev/null)" != "$sig" || ! -f "$ART/Kaiju/Kaiju_Adult.fbx" ]]; then
+    cp "$PIN_TMP/walk/Kaiju_Adult.fbx" "$ART/Kaiju/Kaiju_Adult.fbx"; printf '%s\n' "$sig" > "$ROOT/tools/art/kaiju_walk.sig"
+    echo "art-sync: rebuilt Kaiju_Adult.fbx (walk: $sig)"
+  fi
+fi
 for f in Kaiju_Egg.fbx Kaiju_BerserkShards.fbx Kaiju_TelegraphSpikes.fbx; do copy_art "$K_DIR/$f" "$ART/Kaiju" "$(pin_of kaiju)"; n=$((n+1)); done
 prune_stale "$ART/Kaiju" "$K_DIR"
 M_DIR="$(extract_pinned miner "$MINER" Assets/_Game/Art/Miner)"
