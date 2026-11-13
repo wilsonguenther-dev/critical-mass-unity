@@ -127,6 +127,15 @@ for c in Demolitions Builder Healer; do
 done
 # The rest of the Kaiju set (egg, berserk shards, telegraph spikes) from the Kaiju pin.
 K_DIR="$(extract_pinned kaiju "$KAIJU" Assets/_Game/Art/Kaiju)"
+# fix/kaiju-alive-1 (2026-11-13): the LOD pin's two Kaiju creature files carry 8 clips baked at the REST pose (its
+# build_lods.py exported with rig.data.pose_position = "REST"), so the Kaiju glided. Their curves are replaced by the
+# Kaiju pin's real clips (same 20-bone rig, identical bind poses, same take names and ranges); meshes stay the LOD pin's.
+# The EditMode test KaijuClipMotionTests fails if a static clip ever lands again.
+for f in Kaiju_Adult.fbx Kaiju_Hatchling.fbx; do
+  python3 -I "$ROOT/tools/art/fbx_transplant_clips.py" "$K_DIR/$f" "$ART/Kaiju/$f" "$PIN_TMP/$f.alive" > /dev/null &&
+    { cmp -s "$PIN_TMP/$f.alive" "$ART/Kaiju/$f" || { cp "$PIN_TMP/$f.alive" "$ART/Kaiju/$f"; echo "art-sync: $f clips <- kaiju pin"; }; } ||
+    { echo "art-sync: clip transplant failed for $f" >&2; exit 1; }
+done
 for f in Kaiju_Egg.fbx Kaiju_BerserkShards.fbx Kaiju_TelegraphSpikes.fbx; do copy_art "$K_DIR/$f" "$ART/Kaiju" "$(pin_of kaiju)"; n=$((n+1)); done
 prune_stale "$ART/Kaiju" "$K_DIR"
 M_DIR="$(extract_pinned miner "$MINER" Assets/_Game/Art/Miner)"
