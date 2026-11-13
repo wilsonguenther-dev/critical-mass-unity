@@ -709,7 +709,7 @@ namespace CriticalMass.Runtime.Camera
                 tc.a = 0.55f + 0.45f * near;
                 GUI.color = tc;
                 Matrix4x4 m = GUI.matrix;
-                GUIUtility.RotateAroundPivot(ang * Mathf.Rad2Deg, p);
+                GUIUtility.RotateAroundPivot(ang * Mathf.Rad2Deg + 180f, p);   // the texture apex is its bottom row: point outward, at the threat
                 GUI.DrawTexture(new Rect(p.x - size * 0.5f, p.y - size * 0.5f, size, size), Tri());
                 GUI.matrix = m;
             }
