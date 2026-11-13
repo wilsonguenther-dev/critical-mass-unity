@@ -25,15 +25,9 @@ namespace CriticalMass.Runtime.Onboarding
         /// <summary>The enemy the arrow follows (-1 = none) and the tick it was picked.</summary>
         public int EnemyId = -1;
         public int EnemyPickedTick = int.MinValue;
-        /// <summary>JumpGap: actor 0 was knocked out during this step; the gap is picked again from where it respawns.</summary>
-        public bool DiedThisStep;
-        /// <summary>JumpGap: how many times the gap was re-picked after a knock-out (tests, captures).</summary>
-        public int GapRepicks;
 
         public void Clear()
         {
-            DiedThisStep = false;
-            GapRepicks = 0;
             StartX = StartZ = 0;
             Kills = 0;
             Delivered = 0;
@@ -78,7 +72,7 @@ namespace CriticalMass.Runtime.Onboarding
             if (s.Target == TrialTarget.Marker)
                 p.HasFixed = MarkerPoint(w, a.Team, s.MarkerFraction, out p.FixedX, out p.FixedZ);
             else if (s.Target == TrialTarget.Gap)
-                p.HasFixed = NearestGap(w, w.X[Player], w.Z[Player], JumpReachCells(w), a.Team, out p.FixedX, out p.FixedZ, out p.FromX, out p.FromZ);
+                p.HasFixed = NearestGap(w, w.X[Player], w.Z[Player], JumpReachCells(w), out p.FixedX, out p.FixedZ, out p.FromX, out p.FromZ);
         }
 
         /// <summary>Observes the world once (call once per sim tick or per frame) and returns true when the step is done.</summary>
@@ -110,26 +104,7 @@ namespace CriticalMass.Runtime.Onboarding
                     if (!a.Alive)
                     {
                         p.SawOverGap = false;
-                        p.DiedThisStep = true;
                         return false;
-                    }
-                    if (p.DiedThisStep)
-                    {
-                        // 2026-11-12 (UI rough spots): the gap fixed at the step's start can sit on the enemy side, where the
-                        // player (or the autopilot) is knocked out again and again. After a knock-out the step re-picks the
-                        // nearest own-side gap from the respawn point, so the step can always be finished from home.
-                        p.DiedThisStep = false;
-                        p.GapRepicks++;
-                        bool found = NearestGap(w, w.X[Player], w.Z[Player], JumpReachCells(w), a.Team, out double gx, out double gz,
-                            out double fx, out double fz);
-                        if (found)
-                        {
-                            p.HasFixed = true;
-                            p.FixedX = gx;
-                            p.FixedZ = gz;
-                            p.FromX = fx;
-                            p.FromZ = fz;
-                        }
                     }
                     bool over = IsJumpGapCell(MapGrid.CellAt(w.Map, w.X[Player], w.Z[Player]));
                     if (over)
@@ -139,8 +114,6 @@ namespace CriticalMass.Runtime.Onboarding
                     }
                     return p.SawOverGap && MapGrid.IsWalkableType(MapGrid.CellAt(w.Map, w.X[Player], w.Z[Player]));
                 }
-                case TrialGoal.OpenMap:
-                    return TrialFeatures.MapOpenProbe != null && TrialFeatures.MapOpenProbe();
                 case TrialGoal.Dig:
                     return a.Alive && ChangedNear(w, snapshot, s.Param, true);
                 case TrialGoal.Place:
@@ -367,22 +340,7 @@ namespace CriticalMass.Runtime.Onboarding
             NearestGap(w, x, z, maxSpan, out gx, out gz, out _, out _);
 
         /// <summary>NearestGap, also giving the takeoff cell's centre (fx, fz): the jump crosses along the gap's axis.</summary>
-        public static bool NearestGap(World w, double x, double z, int maxSpan, out double gx, out double gz, out double fx, out double fz) =>
-            NearestGapCore(w, x, z, maxSpan, -1, out gx, out gz, out fx, out fz);
-
-        /// <summary>
-        /// The guided match's gap (2026-11-12): the nearest by walking distance from (x, z) among gaps whose takeoff cell is
-        /// on <paramref name="team"/>'s half (nearer its own pad than the enemy's); an enemy-side gap only when the own
-        /// half has none. Batch 2's default seed picked the straight-line nearest, an enemy-side gap, and the autopilot was
-        /// knocked out there until the clock ran out.
-        /// </summary>
-        public static bool NearestGap(World w, double x, double z, int maxSpan, TeamId team, out double gx, out double gz, out double fx, out double fz) =>
-            NearestGapCore(w, x, z, maxSpan, (int)team, out gx, out gz, out fx, out fz);
-
-        /// <summary>Added to the cost of an enemy-side takeoff cell: any own-side gap wins, an enemy-side one is the last resort.</summary>
-        public const double EnemySidePenalty = 1e6;
-
-        static bool NearestGapCore(World w, double x, double z, int maxSpan, int team, out double gx, out double gz, out double fx, out double fz)
+        public static bool NearestGap(World w, double x, double z, int maxSpan, out double gx, out double gz, out double fx, out double fz)
         {
             fx = fz = 0;
             MapDef map = w.Map;
@@ -409,19 +367,7 @@ namespace CriticalMass.Runtime.Onboarding
                             if (!IsJumpGapCell(map.Cells[mz * map.Width + mx])) break;
                             if (!MapGrid.IsWalkable(map, ex, ez)) continue;
                             double mxw = cx + 0.5 + DirX[d] * (span + 1) * 0.5, mzw = cz + 0.5 + DirZ[d] * (span + 1) * 0.5;
-                            double dd;
-                            if (team < 0) dd = Dist2(x, z, mxw, mzw);
-                            else
-                            {
-                                // Walking distance to the takeoff cell (squared, to rank like Dist2), plus the side rule.
-                                double walk = dist != null ? dist[cz * map.Width + cx] : Math.Sqrt(Dist2(x, z, cx + 0.5, cz + 0.5));
-                                dd = walk * walk;
-                                if (map.Pads != null && map.Pads.Length >= 2)
-                                {
-                                    PadDef own = map.Pads[team], foe = map.Pads[1 - team];
-                                    if (Dist2(cx + 0.5, cz + 0.5, foe.X, foe.Z) < Dist2(cx + 0.5, cz + 0.5, own.X, own.Z)) dd += EnemySidePenalty;
-                                }
-                            }
+                            double dd = Dist2(x, z, mxw, mzw);
                             if (dd < best)
                             {
                                 best = dd;

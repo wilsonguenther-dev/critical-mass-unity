@@ -185,7 +185,9 @@ namespace CriticalMass.Runtime.Audio
         public void Expire(double now)
         {
             for (int i = _count - 1; i >= 0; i--)
-                if (now - _at[i] > MaxAgeSeconds)
+                // Finisher (batch 3, sim-long FullMatchKeepsTheRule): the result never goes stale. A line that started under
+                // 6 s before the end held the result past MaxAgeSeconds and it was dropped, so the match ended uncalled.
+                if (now - _at[i] > MaxAgeSeconds && !IsResult(_trig[i]))
                 {
                     RemoveAt(i);
                     Dropped++;
@@ -193,6 +195,9 @@ namespace CriticalMass.Runtime.Audio
         }
 
         /// <summary>The line to start now, if the cooldown allows one; it is recorded in the history.</summary>
+        static bool IsResult(AnnouncerTrigger t) =>
+            t == AnnouncerTrigger.Victory || t == AnnouncerTrigger.Defeat || t == AnnouncerTrigger.Draw;
+
         public bool TryNext(double now, out AnnouncerLine line)
         {
             line = null;

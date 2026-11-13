@@ -49,7 +49,7 @@ namespace CriticalMass.Runtime.Onboarding
 
         static readonly StringBuilder Sb = new StringBuilder(160);
 
-        /// <summary>Replaces {Move} {Attack} {Ability} {Interact} {Jump} {DigPlace} {Map} {Skip} {Toggle} {Confirm} with glyph text.</summary>
+        /// <summary>Replaces {Move} {Attack} {Ability} {Interact} {Jump} {DigPlace} {Skip} {Toggle} {Confirm} with glyph text.</summary>
         public static string Fill(string text, ControlDevice device)
         {
             if (string.IsNullOrEmpty(text) || text.IndexOf('{') < 0) return text ?? string.Empty;
@@ -89,7 +89,6 @@ namespace CriticalMass.Runtime.Onboarding
                 case "Interact": return Action("Interact", device, pad ? "X" : "E");
                 case "Jump": return Action("Jump", device, pad ? "A" : "SPACE");
                 case "DigPlace": return Action("DigPlace", device, pad ? "Y" : "F");
-                case "Map": return Action("Map", device, pad ? "D-PAD UP" : "M");
                 default: return null;
             }
         }
