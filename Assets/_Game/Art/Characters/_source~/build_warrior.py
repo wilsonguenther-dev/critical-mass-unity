@@ -159,7 +159,7 @@ def build_torso():
     # navy padded doublet, a barrel that overhangs the belt (fixed navy: the accent-swap keeps it navy)
     add(BODY, B.sphere((0.40, 0.27, 0.31), 18, 12), "navy", ["spine", "chest"], "clothes", m=M((0, 0.01, 0.99)))   # v5 broader chest
     # cream quilted undershirt: a broad panel down the chest, with two quilting grooves
-    add(BODY, B.sphere((0.165, 0.13, 0.24), 14, 10), "cream", ["spine", "chest"], "clothes", m=M((0, -0.16, 0.99)))
+    add(BODY, B.sphere((0.12, 0.10, 0.19), 14, 10), "cream", ["spine", "chest"], "clothes", m=M((0, -0.185, 0.95)))   # v6: smaller cream panel, chest mostly navy
     # brown leather belt with crease grooves at both edges + big round brass buckle disc
     W = {"hips": 0.5, "spine": 0.5}
     add(BODY, B.cyl((0, 0, 0.75), (0, 0, 0.85), 0.33, 0.34, 22), "leather_dark", W, "belt",

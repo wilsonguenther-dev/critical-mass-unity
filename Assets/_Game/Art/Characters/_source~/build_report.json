@@ -69,13 +69,13 @@
  "finish": {
   "Warrior_Body": {
    "edge": 986,
-   "chips": 55,
-   "crack": 14,
+   "chips": 54,
+   "crack": 15,
    "hot": 59
   },
   "Warrior_Shield": {
    "edge": 283,
-   "chips": 68,
+   "chips": 67,
    "crack": 6,
    "hot": 20
   },
