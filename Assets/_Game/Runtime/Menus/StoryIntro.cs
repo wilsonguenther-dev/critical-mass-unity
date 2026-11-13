@@ -384,11 +384,24 @@ namespace CriticalMass.Runtime.Menus
 
         void Start()
         {
-            // Sequenced by the game flow (DG-01): only on the first boot's title (before the title, before the first-time
-            // card, which waits for the title to go), never on a reload into a match, results or the menu, never in autoplay.
-            if (PlayOnFirstLaunch && TitleScreen.ShowOnBoot && GameFlow.State == FlowState.Title && !GameFlow.Autoplay &&
-                PlayerPrefs.GetInt(SeenKey, 0) == 0) Play();
+            // Sequenced by the game flow (DG-01): on the boot's title (before the title, before the first-time card, which
+            // waits for the title to go), never on a reload into a match, results or the menu, never in autoplay.
+            // Owner, 2026-11-13: at EVERY launch, not only the first (the old once-only flag "cm.story.seen" was already set by
+            // earlier builds, so the owner never saw this film); Settings > Game > PLAY INTRO AT LAUNCH turns it off.
+            // Once per launch: going back to the title later (a scene reload in the Title state) does not replay it.
+            if (_launchPlayed) return;
+            if (ShouldPlayAtLaunch(PlayOnFirstLaunch, TitleScreen.ShowOnBoot, GameFlow.State, GameFlow.Autoplay, GameSettings.IntroAtLaunch))
+            {
+                _launchPlayed = true;
+                Play();
+            }
         }
+
+        static bool _launchPlayed;
+
+        /// <summary>The launch rule: the boot's title, not autoplay, the setting on (seen flags no longer matter).</summary>
+        public static bool ShouldPlayAtLaunch(bool enabled, bool titleOnBoot, FlowState state, bool autoplay, bool settingOn) =>
+            enabled && titleOnBoot && state == FlowState.Title && !autoplay && settingOn;
 
         // ---- static API ----
 

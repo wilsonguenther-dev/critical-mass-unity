@@ -346,6 +346,35 @@ namespace CriticalMass.Runtime.Tests
         }
 
         [Test]
+        public void IntroPlaysAtEveryLaunchUnlessSettingsTurnItOff()
+        {
+            bool had = PlayerPrefs.HasKey(CriticalMass.Runtime.Menu.GameSettings.IntroAtLaunchKey);
+            int saved = PlayerPrefs.GetInt(CriticalMass.Runtime.Menu.GameSettings.IntroAtLaunchKey, 1);
+            int seenOld = PlayerPrefs.GetInt("cm.story.seen", 0);
+            try
+            {
+                PlayerPrefs.DeleteKey(CriticalMass.Runtime.Menu.GameSettings.IntroAtLaunchKey);
+                Assert.IsTrue(CriticalMass.Runtime.Menu.GameSettings.IntroAtLaunch, "PLAY INTRO AT LAUNCH defaults to on");
+                PlayerPrefs.SetInt("cm.story.seen", 1);   // the owner's profile from earlier builds
+                PlayerPrefs.SetInt(StoryIntro.SeenKey, 1);
+                var title = CriticalMass.Runtime.Flow.FlowState.Title;
+                Assert.IsTrue(StoryIntro.ShouldPlayAtLaunch(true, true, title, false, CriticalMass.Runtime.Menu.GameSettings.IntroAtLaunch),
+                    "a seen flag from an earlier build no longer stops it");
+                Assert.IsFalse(StoryIntro.ShouldPlayAtLaunch(true, true, title, false, false), "Settings turned it off");
+                Assert.IsFalse(StoryIntro.ShouldPlayAtLaunch(true, true, title, true, true), "never in autoplay");
+                Assert.IsFalse(StoryIntro.ShouldPlayAtLaunch(true, true, CriticalMass.Runtime.Flow.FlowState.Match, false, true), "never into a match");
+                Assert.IsFalse(StoryIntro.ShouldPlayAtLaunch(true, false, title, false, true), "not in the editor or batch runs");
+                CollectionAssert.Contains(CriticalMass.Runtime.Menu.GameSettings.AllKeys, CriticalMass.Runtime.Menu.GameSettings.IntroAtLaunchKey);
+            }
+            finally
+            {
+                if (had) PlayerPrefs.SetInt(CriticalMass.Runtime.Menu.GameSettings.IntroAtLaunchKey, saved);
+                else PlayerPrefs.DeleteKey(CriticalMass.Runtime.Menu.GameSettings.IntroAtLaunchKey);
+                PlayerPrefs.SetInt("cm.story.seen", seenOld);
+            }
+        }
+
+        [Test]
         public void EasesStartAtZeroAndLandOnOne()
         {
             foreach (McEase e in System.Enum.GetValues(typeof(McEase)))
