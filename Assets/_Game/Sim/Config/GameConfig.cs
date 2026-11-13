@@ -63,6 +63,13 @@ namespace CriticalMass.Sim.Config
                 MaxHp = 120, MoveSpeed = 4.0, Radius = 0.45, AttackDamage = 16, AttackRange = 1.5, AttackArcDeg = 90,
                 AttackCooldown = 0.65, AbilityCooldown = 12, GatherSeconds = 2, CarryCapacity = 1,
             },
+            // DG-40 (U-061, not in the browser): the Healer. No weapon, no damage: her attack press is the MEND (Healer.cs);
+            // AttackRange is how close bots keep to a fight (they stop there and press attack); AttackCooldown paces the mend.
+            new ClassConfig
+            {
+                MaxHp = 110, MoveSpeed = 4.1, Radius = 0.42, AttackDamage = 0, AttackRange = 4.5, AttackArcDeg = 90,
+                AttackCooldown = 0.8, AbilityCooldown = 9, GatherSeconds = 1.5, CarryCapacity = 2,
+            },
         };
 
         public AbilitiesConfig Abilities = new AbilitiesConfig();
@@ -338,6 +345,8 @@ namespace CriticalMass.Sim.Config
         public DemolitionsTntConfig DemolitionsTnt = new DemolitionsTntConfig();
         /// <summary>DG-24: the Builder's ladders and rope bridges (BuiltPieces.cs).</summary>
         public BuilderPiecesConfig BuilderPieces = new BuilderPiecesConfig();
+        /// <summary>DG-40: the Healer's mend, healing pulse and purify (Healer.cs).</summary>
+        public HealerConfig Healer = new HealerConfig();
 
         public AbilitiesConfig Clone()
         {
@@ -351,6 +360,7 @@ namespace CriticalMass.Sim.Config
             c.DemolitionsMine = DemolitionsMine.Clone();
             c.DemolitionsTnt = DemolitionsTnt.Clone();
             c.BuilderPieces = BuilderPieces.Clone();
+            c.Healer = Healer.Clone();
             return c;
         }
     }
@@ -475,7 +485,7 @@ namespace CriticalMass.Sim.Config
         /// <summary>A team behind in allegiance by at least this many points may send corruption runs.</summary>
         public double CorruptWhenBehindBy = 10;
         /// <summary>Fraction of bots per team per class when filling the roster, indexed by (int)ClassId.</summary>
-        public double[] ClassMix = { 0.4, 0.3, 0.3, 0, 0 };
+        public double[] ClassMix = { 0.4, 0.3, 0.3, 0, 0, 0 };
         public double StuckSeconds = 1.5;
         /// <summary>CM-21: a moving bot's move direction turns toward its flow direction at most this fast (deg / s).</summary>
         public double TurnRateDegPerSec = 300;
@@ -618,5 +628,23 @@ namespace CriticalMass.Sim.Config
         public double RefuseLockSeconds = 0.5;
 
         public BuilderPiecesConfig Clone() => (BuilderPiecesConfig)MemberwiseClone();
+    }
+
+    /// <summary>DG-40 (U-061, not in the browser): the Healer's abilities. Timing in sim ticks.</summary>
+    public sealed class HealerConfig
+    {
+        /// <summary>MEND (the attack press, class AttackCooldown): HP to the hurt ally nearest the aim within MendRange of her (not herself).</summary>
+        public double MendHeal = 6;
+        public double MendRange = 5.5;
+        /// <summary>HEALING PULSE (Space, class AbilityCooldown): at the aim pulled back to PulseCastRange, PulseHeal to every ally within PulseRadius, her included.</summary>
+        public double PulseCastRange = 6;
+        public double PulseRadius = 3.5;
+        public double PulseHeal = 30;
+        /// <summary>PURIFY (DigPlace): within PurifyRange of the shrine while a cleanse could run, removes PurifyUnits corruption units at once.</summary>
+        public double PurifyUnits = 1;
+        public double PurifyRange = 4;
+        public double PurifyCooldownTicks = 900;
+
+        public HealerConfig Clone() => (HealerConfig)MemberwiseClone();
     }
 }

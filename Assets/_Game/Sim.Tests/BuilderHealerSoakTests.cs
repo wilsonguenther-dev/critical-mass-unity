@@ -24,8 +24,8 @@ namespace CriticalMass.Sim.Tests
         private const double StuckRadius = 0.5;
         private const int SamplePeriod = 300;
 
-        /// <summary>16 per team: 6 Warriors, 4 Farmers, 3 Miners, 3 Builders.</summary>
-        internal static double[] Mix() => new[] { 0.35, 0.25, 0.2, 0, 0.2 };
+        /// <summary>16 per team: 5 Warriors, 3 Farmers, 2 Miners, 3 Builders, 3 Healers (largest remainder of these shares).</summary>
+        internal static double[] Mix() => new[] { 0.3, 0.2, 0.15, 0, 0.175, 0.175 };
 
         internal static GameConfig MixConfig()
         {
@@ -111,9 +111,11 @@ namespace CriticalMass.Sim.Tests
             ownedShare = ownSamples > 0 ? (double)owned / ownSamples : 0;
             world = w;
             BuilderStats b = w.Builder.Stats;
+            HealerStats hs = w.Healer.Stats;
             return $"{{\"item\":\"DG-24/40\",\"difficulty\":\"{d}\",\"seed\":{seed},\"ticks\":{w.Tick},\"winner\":\"{w.Match.Winner}\",\"hillA\":{w.Match.HillSeconds.Azure:F1},\"hillC\":{w.Match.HillSeconds.Crimson:F1},\"ownedShare\":{ownedShare:F3},\"worstStill\":{worstStill},"
                 + PerClass(w)
-                + $"\"ladders\":{b.Ladders},\"bridges\":{b.Bridges},\"refused\":{b.Refused},\"pickedUp\":{b.PickedUp},\"expired\":{b.Expired},\"destroyed\":{b.Destroyed},\"deferred\":{b.Deferred},\"routeDeferred\":{b.RouteDeferred},\"biomassSpent\":" + b.BiomassSpent.ToString("F0") + "}";
+                + $"\"ladders\":{b.Ladders},\"bridges\":{b.Bridges},\"refused\":{b.Refused},\"pickedUp\":{b.PickedUp},\"expired\":{b.Expired},\"destroyed\":{b.Destroyed},\"deferred\":{b.Deferred},\"routeDeferred\":{b.RouteDeferred},\"biomassSpent\":" + b.BiomassSpent.ToString("F0") + ","
+                + $"\"mends\":{hs.Mends},\"pulses\":{hs.Pulses},\"purifies\":{hs.Purifies},\"healingDone\":" + hs.HealingDone.ToString("F0") + ",\"instabilityPurified\":" + hs.InstabilityRemoved.ToString("F1") + ",\"berserk\":" + (w.Match.BerserkLocked ? "true" : "false") + "}";
         }
 
         /// <summary>Knock-outs and deaths per class (both teams pooled).</summary>
@@ -147,8 +149,59 @@ namespace CriticalMass.Sim.Tests
                 Assert.Greater(w.Match.HillSeconds.Crimson, 0, d + ": Crimson bots reached the hill");
                 Assert.GreaterOrEqual(ownedShare, OutcomeThresholds.OwnedShareMin, d + ": batch B's per-match owned-share band");
                 Assert.Greater(w.Builder.Stats.Ladders + w.Builder.Stats.Bridges, 0, d + ": the Builder bots built something");
+                Assert.Greater(w.Healer.Stats.Mends, 0, d + ": the Healer bots mended");
+                Assert.Greater(w.Healer.Stats.Pulses, 0, d + ": the Healer bots pulsed");
+                Assert.Greater(w.Healer.Stats.HealingDone, 0, d + ": healing done");
             }
             CollectionAssert.IsEmpty(failures, string.Join("\n", failures));
+        }
+
+        /// <summary>
+        /// Balance: default 16v16 matches at Normal where ONE team's three bots in slots 1..3 are turned into the class under
+        /// test at tick 0 (the other team plays the default lineup; slots 1..3 are Warriors), on both sides of the map. Prints the new-class team's
+        /// wins, its per-class knock-outs and deaths and the healing done. Measurement only: the asserts are sanity (every
+        /// match ends), the owner decides from the numbers whether a class joins the default lineup.
+        /// </summary>
+        [Test, Category("Slow")]
+        public void DG24DG40WinRateOfATeamWithThreeOfTheNewClassAgainstTheDefaultLineup()
+        {
+            const int seeds = 8;
+            // Warrior is the control (slots 1..3 are Warriors already: no change); Miner shows what any non-Warrior swap costs.
+            foreach (ClassId c in new[] { ClassId.Warrior, ClassId.Miner, ClassId.Builder, ClassId.Healer })
+            {
+                int wins = 0, draws = 0, ko = 0, deaths = 0;
+                double heal = 0;
+                for (int seed = 1; seed <= seeds; seed++)
+                {
+                    foreach (TeamId side in new[] { TeamId.Azure, TeamId.Crimson })
+                    {
+                        GameConfig cfg = GameConfig.CreateBrowser5v5();
+                        World w = World.CreateWorld(new WorldOptions { Seed = 500 + seed, TeamSize = TeamSize, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = cfg });
+                        int baseId = side == TeamId.Azure ? 0 : TeamSize;
+                        for (int k = 1; k <= 3; k++)
+                        {
+                            Actor a = w.Actors[baseId + k];
+                            a.Cls = c;
+                            a.MaxHp = cfg.Class(c).MaxHp;
+                            a.Hp = a.MaxHp;
+                        }
+                        InputFrame scratch = SimInput.EmptyInput();
+                        int max = (int)(cfg.MatchSeconds * cfg.SimHz) + (int)cfg.SimHz;
+                        for (int t = 0; t < max && w.Match.Phase != MatchPhase.Ended; t++) MatchTick.Advance(w, null, scratch);
+                        Assert.AreEqual(MatchPhase.Ended, w.Match.Phase);
+                        MatchResult mine = side == TeamId.Azure ? MatchResult.Azure : MatchResult.Crimson;
+                        if (w.Match.Winner == mine) wins++;
+                        else if (w.Match.Winner == MatchResult.Draw) draws++;
+                        for (int k = 1; k <= 3; k++)
+                        {
+                            ko += w.Actors[baseId + k].Kills;
+                            deaths += w.Actors[baseId + k].Deaths;
+                        }
+                        heal += w.Healer.Stats.HealingDone;
+                    }
+                }
+                Console.WriteLine($"{{\"item\":\"DG-24/40 balance\",\"class\":\"{c}\",\"teamWithClassWins\":{wins},\"draws\":{draws},\"of\":{2 * seeds},\"classKo\":{ko},\"classDeaths\":{deaths},\"healingDone\":" + heal.ToString("F0") + "}");
+            }
         }
 
         /// <summary>Determinism with the new classes on both teams: same seed, same hash; another seed differs.</summary>

@@ -1118,3 +1118,30 @@ elevation levels ... rope bridges"). On this grid a cliff is a Wall cell and a g
 6. View events (appended before the CM-84 marker): PiecePlaced, PieceCrumbling, PieceExpired (expired / dropped / broken),
    PieceDestroyed, PiecePickedUp, each with a position and Radius = half the length; live state in `World.Builder.Pieces`.
 7. Names in one place: `BuilderNames` (BUILDER, BUILD, LADDER, ROPE BRIDGE, CARRY).
+
+## U-061 The Healer class as built in DG-40: mend, healing pulse, purify; no weapon (not in the browser) (2026-11-13T02:50:20Z)
+
+**Source.** The oracle has no Healer on any branch (its only heal is the CM-37 fountain, its only corruption removal the
+CM-36 shrine cleanse; cm/CM-36 `cleanse.ts` names "healer special" as the idea it chose not to build). Travis 2026-11-06:
+"Healer / Heal / Remove corruption"; "A way to remove corruption (healer special or something else)". Art direction: an
+armoured battle healer with wings and NO sword; she heals and supports. So the rules are ours, the smallest set that gives
+both of Travis's words a button on the bindings already on main:
+1. **ClassId.Healer = 5, appended** (every ClassPick index stays valid), class row MaxHp 110, speed 4.1, radius 0.42,
+   AttackDamage 0, AttackRange 4.5 (where bots stop from the fight), AttackCooldown 0.8, AbilityCooldown 9. Default
+   ClassMix 0: not in the default bot lineup.
+2. **MEND (attack).** No damage ever: the press heals the hurt ally (not herself) within 5.5 nearest the aim, 6 HP. No
+   target, no cooldown. Not an attack, so spawn protection stays.
+3. **HEALING WINGS (Space).** 30 HP to every ally within 3.5 of the aim (pulled back to 6), herself included.
+4. **PURIFY (DigPlace, F / Y).** Within 4 of the shrine, while `Cleanse.CleanseOpen` and corruption is in the egg: one
+   corruption unit removed at once (9 instability, the CM-36 units-to-instability rule), counted as cleansed
+   (`Cleanse.NetCorruptionUnits` subtracts `World.Healer.PurifiedUnits`, 0 without Healers, so CM-36 is unchanged); own
+   30 s cooldown, the team cleanse cooldown untouched. Refusals push an Ability event with a code.
+5. **Bots.** Attack presses come from the usual steering (she mends the hurt ally nearest the enemy she faces). Purify when
+   possible and her team is not behind in allegiance (or instability is at half the threshold). Pulse on the hurt ally
+   whose radius holds the most missing HP, when that is a full pulse or someone there is under a third of max HP. DG-21
+   Easy acts on half its thinks.
+6. Events (appended before the CM-84 marker): HealCast (mend / pulse, with position and pulse radius), HealLanded (per
+   actor), Purify (shrine, radius). Names in one place: `HealerNames` (HEALER, MEND, HEALING WINGS, PURIFY).
+7. **Tuning, measured.** First cut (mend 9, pulse 40): a team with three Healers in place of three Warriors beat the default
+   lineup 13 of 16; at mend 6, pulse 30: 10 of 16 (control, no swap: 8 of 16; three Miners: 3 of 16; three Builders: 0 of 16).
+   Shields and revives were not added. The CM-54 class switch (CM-84 markers) is still unported.

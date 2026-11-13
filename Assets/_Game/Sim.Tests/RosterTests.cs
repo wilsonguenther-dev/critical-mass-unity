@@ -29,9 +29,9 @@ namespace CriticalMass.Sim.Tests
                 foreach (ClassId? human in humans)
                 {
                     World.BuildRoster(cfg, n, human, output);
-                    int extra = human == ClassId.Demolitions || human == ClassId.Builder ? 1 : 0;
+                    int extra = human == ClassId.Demolitions || human == ClassId.Builder || human == ClassId.Healer ? 1 : 0;
                     string label = n + "v" + n + " human " + (human.HasValue ? human.Value.ToString() : "null");
-                    Assert.AreEqual(extra, Count(output, n, ClassId.Demolitions) + Count(output, n, ClassId.Builder), label);
+                    Assert.AreEqual(extra, Count(output, n, ClassId.Demolitions) + Count(output, n, ClassId.Builder) + Count(output, n, ClassId.Healer), label);
                     if (human.HasValue) Assert.AreEqual(human.Value, output[0]);
                 }
             }

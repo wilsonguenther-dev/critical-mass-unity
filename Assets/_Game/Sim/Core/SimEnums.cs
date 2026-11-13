@@ -128,6 +128,12 @@ namespace CriticalMass.Sim.Core
         PieceDestroyed,
         /// <summary>DG-24: an actor (any class) picked a piece up to carry it: A = carrier, B = slot, (X, Z) = the span's centre, Value = ticks it has left, Radius = half length.</summary>
         PiecePickedUp,
+        /// <summary>DG-40: a Healer cast: A = the Healer, B = Healer.KindMend / KindPulse, (X, Z) = the mended ally or the pulse centre, Value = HP it restored in all, Radius = the pulse radius (0 for a mend).</summary>
+        HealCast,
+        /// <summary>DG-40: Healer healing landed on one actor: A = that actor, B = the Healer, (X, Z) = the actor, Value = HP restored (&gt; 0).</summary>
+        HealLanded,
+        /// <summary>DG-40: a Healer purified the egg: A = the Healer, B = team index (0 azure, 1 crimson), (X, Z) = the shrine, Value = instability removed, Radius = Healer.PurifyRange.</summary>
+        Purify,
         // ITEM CM-84: added by its owner (ClassSwitch, ports CM-54)
         /// <summary>CM-37: one tick of fountain healing (Heal.HealSystem): A = the healed actor, B = -1, (X, Z) = the actor, Value = HP restored this tick (&gt; 0).</summary>
         Heal,

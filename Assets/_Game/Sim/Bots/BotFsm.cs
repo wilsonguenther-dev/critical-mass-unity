@@ -293,6 +293,11 @@ namespace CriticalMass.Sim.Bots
                 DecideDemolitions(w, st, id, state, sk); // DG-22 (CM-38)
                 return;
             }
+            if (a.Cls == ClassId.Healer)
+            {
+                DecideHealer(w, st, id, sk); // DG-40 (U-061)
+                return;
+            }
             if (a.AbilityCd > 0) return;
             if (a.Cls == ClassId.Builder)
             {
@@ -475,6 +480,72 @@ namespace CriticalMass.Sim.Bots
             st.AbilityReq[id] = 1;
             st.AbilityX[id] = JsMath.F32(x + bdx * 1.5);
             st.AbilityZ[id] = JsMath.F32(z + bdz * 1.5);
+        }
+
+        /// <summary>
+        /// DG-40 (U-061, not in the browser) Healer bot. Her attack presses come from the usual steering (she closes to her
+        /// AttackRange of the enemy and presses attack: the sim mends the hurt ally nearest that enemy). PURIFY when the sim
+        /// would accept it (Healer.CanPurify: at the shrine, egg open, corruption in it) and her team is not behind in
+        /// allegiance or instability is at least half the berserk threshold. HEALING PULSE (Space) centred on the hurt ally in
+        /// cast range (or herself) whose PulseRadius holds the most missing HP (each ally counted up to PulseHeal), cast when
+        /// that is at least PulseHeal or one ally there is under a third of its max HP. DG-21: Easy acts only on AbilityChance
+        /// of its thinks.
+        /// </summary>
+        private static void DecideHealer(World w, BotsState st, int id, BotSkillConfig sk)
+        {
+            Actor a = w.Actors[id];
+            if (Healer.CanPurify(w, id))
+            {
+                MatchState m = w.Match;
+                double mine = a.Team == TeamId.Azure ? m.Allegiance.Azure : m.Allegiance.Crimson;
+                double theirs = a.Team == TeamId.Azure ? m.Allegiance.Crimson : m.Allegiance.Azure;
+                if ((mine >= theirs || m.Instability >= 0.5 * w.Config.KaijuFeed.BerserkThreshold) && BotSkill.UsesAbilityNow(w, id, sk))
+                {
+                    Healer.RequestBotPurify(w, id);
+                    return;
+                }
+            }
+            if (a.AbilityCd > 0) return;
+            HealerConfig H = w.Config.Abilities.Healer;
+            double hx = w.X[id];
+            double hz = w.Z[id];
+            double cast2 = H.PulseCastRange * H.PulseCastRange;
+            double r2 = H.PulseRadius * H.PulseRadius;
+            int best = -1;
+            double bestSum = 0;
+            bool urgent = false;
+            for (int c = 0; c < w.ActorCount; c++)
+            {
+                Actor ca = w.Actors[c];
+                if (!ca.Alive || ca.Team != a.Team || !(ca.Hp < ca.MaxHp)) continue;
+                double cdx = w.X[c] - hx;
+                double cdz = w.Z[c] - hz;
+                if (cdx * cdx + cdz * cdz > cast2) continue;
+                double sum = 0;
+                bool low = false;
+                for (int j = 0; j < w.ActorCount; j++)
+                {
+                    Actor t = w.Actors[j];
+                    if (!t.Alive || t.Team != a.Team) continue;
+                    double dx = w.X[j] - w.X[c];
+                    double dz = w.Z[j] - w.Z[c];
+                    if (dx * dx + dz * dz > r2) continue;
+                    double miss = t.MaxHp - t.Hp;
+                    sum += miss < H.PulseHeal ? miss : H.PulseHeal;
+                    if (t.Hp < t.MaxHp / 3) low = true;
+                }
+                if (sum > bestSum)
+                {
+                    bestSum = sum;
+                    best = c;
+                    urgent = low;
+                }
+            }
+            if (best < 0 || (bestSum < H.PulseHeal && !urgent)) return;
+            if (!BotSkill.UsesAbilityNow(w, id, sk)) return;
+            st.AbilityReq[id] = 1;
+            st.AbilityX[id] = JsMath.F32(w.X[best]);
+            st.AbilityZ[id] = JsMath.F32(w.Z[best]);
         }
 
         /// <summary>One think for bot id: perception, stuck check, utility selection, targets, ability decision.</summary>
