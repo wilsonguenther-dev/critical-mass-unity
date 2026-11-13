@@ -54,7 +54,7 @@ def ENTER(x0, y0, x1, y1, t0, t1, s=1, ease="outBackSoft"):
             K(t1 + 0.4, x1, y1, s=s, ease="inOutSine")]
 def SLAM(x, y0, y1, t0, t1, s=1):
     """Drops in and hits (accelerating), squashes on the hit, settles."""
-    return [K(0, x, y0, s=s), K(t0, x, y0, s=s), K(t1, x, y1, s=s, ease="inExpo"), K(t1 + 0.08, x, y1 - 6, s=s * 0.985, ease="outCubic"),
+    return [K(0, x, y0, s=s)] + ([K(t0, x, y0, s=s)] if t0 > 0 else []) + [K(t1, x, y1, s=s, ease="inExpo"), K(t1 + 0.08, x, y1 - 6, s=s * 0.985, ease="outCubic"),
             K(t1 + 0.4, x, y1, s=s, ease="outBackSoft")]
 def P(tex, color, t0, t1, count, x, y, sx, sy, vx, vy, jx, jy, g=0, life=3, size=14, loop=True, depth=0.6):
     return dict(tex=tex, color=color, t0=t0, t1=t1, count=count, x=x, y=y, sx=sx, sy=sy, vx=vx, vy=vy, jx=jx, jy=jy, g=g, life=life,
@@ -142,7 +142,7 @@ shots = [
         L("shafts", 0.25, 2200, [K(0, x=CRACK_DX, y=CRACK_DY, a=0.7)]),
         L("basin", 0.6, 1900, [K(0, y=-900), K(1.5, y=-235, ease="outBackSoft"), K(3.6, y=-222)], life="float"),
         L("cloudsea_storm", 0.85, 2700, [K(0, y=-620), K(1.5, y=-760, ease="outCubic")], life="cloud"),
-        L("debris", 0.9, 2100, [K(0, y=-1100), K(1.2, y=-430, ease="outCubic"), K(3.6, y=700, a=0.5, ease="inCubic")]),
+        L("debris", 0.9, 2100, [K(0, y=-1100), K(1.2, y=-470, ease="outCubic"), K(2.7, y=-1300, ease="inCubic")]),   # thrown up, falls back (never a translucent sheet, never its cut edge)
         L("rocks_r", 1.0, WH("rocks_r", 820), [K(0, x=830, y=-800), K(1.0, x=830, y=-380, ease="outCubic")], tint="#9AA6BD"),
     ], [C(0, y=-30), C(3.6, dolly=1.06, y=30)],
         titles=[T("SKYBREAK BASIN", 1.85, 3.45, size=92, y=310, track0=48, track1=12)],
@@ -218,7 +218,7 @@ shots = [
         L("farmer_harvest", 0.95, WH("farmer_harvest", 540), ENTER(-1600, -205, -535, -205, 0.5, 1.2), subject=True, life="fighter"),
     ], [C(0, x=-50), C(5.4, x=50, dolly=1.05)],
         titles=[T("FEED IT", 0.45, 5.2, size=100, color=BIOMASS, x=-405, y=330, track0=40, track1=10, style="slam"),
-                T("OR CORRUPT IT", 2.55, 5.2, size=80, color=CORR, x=282, y=250, track0=36, track1=8, style="slam")],
+                T("OR CORRUPT IT", 2.55, 5.2, size=80, color=CORR, x=282, y=215, track0=36, track1=8, style="slam")],
         sub=dict(text=L4, at=0.4, out=5.4), vo=[(VO4, 0.4)], sfx=[("feed", 0.45), ("corrupt", 2.55), ("bong", 2.6)],
         particles=[P("mote", BIOMASS, 0, 5.4, 16, -520, -300, 600, 200, 0, 60, 20, 30, life=3.5, size=10, depth=0.85),
                    P("ember", CORR, 2.4, 5.4, 16, 520, -300, 600, 200, 0, 90, 30, 40, life=3.0, size=12, depth=0.85)], boardAt=4.0,
@@ -246,7 +246,7 @@ shots = [
         L("kaiju_neutral_glow", 0.7, WH("kaiju_neutral", 1040), [K(0, y=-1600), K(1.2, y=-150, ease="outBackSoft"), K(4.4, y=-142, s=1.03)], pulseHz=1.6, pulseLo=0.45, life="glow"),
         L("kaiju_neutral", 0.7, WH("kaiju_neutral", 1040), [K(0, y=-1600), K(1.2, y=-150, ease="outBackSoft"), K(4.4, y=-142, s=1.03)], subject=True, life="kaiju"),
         L("cloudsea_storm", 0.9, 2700, [K(0, y=-640)], life="cloud"),
-        L("debris", 0.95, 2100, [K(0, y=-1200), K(1.3, y=-560, ease="outCubic"), K(3.0, y=1100, a=0.5, ease="inCubic")]),
+        L("debris", 0.95, 2100, [K(0, y=-1200), K(1.3, y=-560, ease="outCubic"), K(2.8, y=-1350, ease="inCubic")]),
         L("speed_radial", 0.0, 2112, [K(0, a=0), K(1.2, a=0), K(1.3, a=0.6), K(2.2, a=0.6), K(2.5, a=0)], flicker=True, fps=16),
         L("rocks_r", 1.0, WH("rocks_r", 640), [K(0, x=950, y=-500)], tint="#5A6680"),
     ], [C(0, zx=KHEAD[0], zy=KHEAD[1]), C(1.2, zx=KHEAD[0], zy=KHEAD[1]), C(1.4, zoom=1.08, zx=KHEAD[0], zy=KHEAD[1], ease="outExpo"), C(4.4, zoom=1.11, zx=KHEAD[0], zy=KHEAD[1])],
@@ -259,17 +259,17 @@ shots = [
         L("@solid", 0.4, 620, [K(0, x=-600, r=-6)], h=1500, tint="#123C55"),
         L("@solid", 0.4, 620, [K(0, x=0, r=-6)], h=1500, tint="#5A1E2C"),
         L("@solid", 0.4, 620, [K(0, x=600, r=-6)], h=1500, tint="#3A1A5C"),
-        L("kaiju_neutral_glow", 0.6, WH("kaiju_neutral", 640), SLAM(-570, -900, -60, 0.15, 0.45), pulseHz=1.2, pulseLo=0.5, life="glow"),
-        L("kaiju_neutral", 0.6, WH("kaiju_neutral", 640), SLAM(-570, -900, -60, 0.15, 0.45), subject=True, life="kaiju"),
-        L("kaiju_crimson_glow", 0.6, WH("kaiju_crimson", 640), SLAM(0, -900, -60, 0.45, 0.75), pulseHz=1.2, pulseLo=0.5, life="glow"),
-        L("kaiju_crimson", 0.6, WH("kaiju_crimson", 640), SLAM(0, -900, -60, 0.45, 0.75), subject=True, life="kaiju"),
-        L("kaiju_berserk_glow", 0.6, WH("kaiju_berserk", 640), SLAM(560, -900, -60, 0.75, 1.05), pulseHz=2.0, pulseLo=0.4, life="glow"),
-        L("kaiju_berserk", 0.6, WH("kaiju_berserk", 640), SLAM(560, -900, -60, 0.75, 1.05), subject=True, life="kaiju"),
+        L("kaiju_neutral_glow", 0.6, WH("kaiju_neutral", 640), SLAM(-570, -900, -60, 0.0, 0.25), pulseHz=1.2, pulseLo=0.5, life="glow"),
+        L("kaiju_neutral", 0.6, WH("kaiju_neutral", 640), SLAM(-570, -900, -60, 0.0, 0.25), subject=True, life="kaiju"),
+        L("kaiju_crimson_glow", 0.6, WH("kaiju_crimson", 640), SLAM(0, -900, -60, 0.2, 0.45), pulseHz=1.2, pulseLo=0.5, life="glow"),
+        L("kaiju_crimson", 0.6, WH("kaiju_crimson", 640), SLAM(0, -900, -60, 0.2, 0.45), subject=True, life="kaiju"),
+        L("kaiju_berserk_glow", 0.6, WH("kaiju_berserk", 640), SLAM(560, -900, -60, 0.4, 0.65), pulseHz=2.0, pulseLo=0.4, life="glow"),
+        L("kaiju_berserk", 0.6, WH("kaiju_berserk", 640), SLAM(560, -900, -60, 0.4, 0.65), subject=True, life="kaiju"),
         L("@solid", 0.4, 44, [K(0, x=-300, r=-6)], h=1600, tint=NAVY),
         L("@solid", 0.4, 44, [K(0, x=300, r=-6)], h=1600, tint=NAVY),
     ], [C(0), C(3.4, dolly=1.04)],
-        titles=[T("OR NO SIDE AT ALL.", 1.35, 3.3, size=80, y=330, track0=40, track1=10, style="slam")],
-        sfx=[("hit", 0.45), ("hit", 0.75), ("slam", 1.05), ("bong", 1.35)], shake=[S(0.45, 0.2, 5), S(0.75, 0.2, 6), S(1.05, 0.3, 10)], boardAt=2.4),
+        titles=[T("OR NO SIDE AT ALL.", 1.0, 3.3, size=80, y=330, track0=40, track1=10, style="slam")],
+        sfx=[("hit", 0.25), ("hit", 0.45), ("slam", 0.65), ("bong", 1.0)], shake=[S(0.25, 0.2, 5), S(0.45, 0.2, 6), S(0.65, 0.3, 10)], boardAt=2.4),
     shot("hero", 5.9, "your turn: hold the hill; the logo lands where the title's logo sits", [
         L("hero", 0.4, 2300, [K(0, b=0.0), K(2.8, b=0.0), K(3.2, b=0.35, ease="outCubic")], blur="hero_blur", cover=True),
         L("shafts_warm", 0.2, 2200, [K(0, a=0.4)], glint=0.2),
