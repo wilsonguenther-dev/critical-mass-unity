@@ -198,3 +198,57 @@ jobs:
           name: player-${{ matrix.target }}
           path: player-${{ matrix.target }}.tgz
           retention-days: 7
+
+  # polish-audit-1 (2026-11-13): the cheapest real Windows test we have without a Windows PC. A GitHub windows-latest
+  # runner (Windows Server, no GPU: Direct3D 11 runs on Microsoft's WARP software rasteriser) unpacks the player built
+  # above and runs tools/windows-run.ps1, the same script the owner's PC test uses. Pass A (-batchmode -nographics, one
+  # autoplay match at 8x) proves the player starts, loads, plays and quits on Windows. Pass B (a real D3D11 window at
+  # 1280x720, screenshots) is best effort on WARP and never fails the run; its log and screenshots are uploaded either way.
+  smoke-windows:
+    needs: [plan, build]
+    if: needs.plan.outputs.build-windows == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: tools/windows-run.ps1
+          sparse-checkout-cone-mode: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: player-StandaloneWindows64
+      - name: Unpack the player
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path player | Out-Null
+          tar -xzf player-StandaloneWindows64.tgz -C player
+          Copy-Item tools/windows-run.ps1 player/
+          Get-ChildItem player | Format-Table Name, Length
+          $mb = [math]::Round(((Get-ChildItem player -Recurse | Measure-Object Length -Sum).Sum / 1MB), 1)
+          "player size: $mb MB" | Tee-Object -FilePath player-size.txt
+          Get-ChildItem player -Recurse -Include *.exe | Select-Object FullName | Tee-Object -FilePath player-exes.txt
+      - name: Pass A (logic, no window)
+        id: passa
+        shell: pwsh
+        timeout-minutes: 25
+        working-directory: player
+        run: powershell -ExecutionPolicy Bypass -File .\windows-run.ps1 -SkipB
+      - name: Pass B (Direct3D 11 window on WARP, best effort)
+        if: always()
+        continue-on-error: true
+        shell: pwsh
+        timeout-minutes: 25
+        working-directory: player
+        run: |
+          Get-CimInstance Win32_VideoController | Select-Object Name, DriverVersion | Format-Table
+          powershell -ExecutionPolicy Bypass -File .\windows-run.ps1 -Quick
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-smoke
+          path: |
+            player/test-*
+            player-size.txt
+            player-exes.txt
+          if-no-files-found: warn
+          retention-days: 7
