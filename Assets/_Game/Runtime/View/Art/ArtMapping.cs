@@ -48,6 +48,10 @@ namespace CriticalMass.Runtime.View.Art
         /// <summary>Body height in metres (bind-pose mesh bounds of Meshes[0]) the art reports, with tolerance HeightTolerance.</summary>
         public float Height;
         public const float HeightTolerance = 0.12f;
+        /// <summary>Leg length of this model's own joints over the KayKit skeleton's (hip to ankle), for models that
+        /// keep per-class joints under the shared KayKit clips (the HY swaps): the locomotion stride scales by it so the
+        /// planted foot holds. 1 for every model on the plain KayKit joints.</summary>
+        public float StrideScale = 1f;
         /// <summary>Painted face decal (PNG next to the FBX, UV0 of Meshes[0]), or null.</summary>
         public string FaceTexture;
         /// <summary>-1: the decal is mixed over the main material (every face that shows no face maps to a transparent
@@ -305,7 +309,7 @@ namespace CriticalMass.Runtime.View.Art
                 Bones = 41, ClipSource = "Assets/_Game/Art/Characters/KayKit_Clips.fbx",
                 Meshes = new[] { "Farmer_Hero", "Farmer_LOD0", "Farmer_LOD1", "Farmer_Shadow" }, MaskCodes = new[] { 0, 2, 8 },
                 OutlinePx = CharacterHullPx, Rim = 0.6f, Authored = FarmerAzure, Crimson = FarmerCrimson, Height = 2.0f,
-                VertexColourFace = true, ArtYawDeg = 180f },   // HY (2026-11-13); pre-HY: OutlineWeights Farmer_OutlineW.json + FaceTexture Farmer_Face.png (Farmer/_fallback~)
+                VertexColourFace = true, StrideScale = 0.714f, ArtYawDeg = 180f },   // HY (2026-11-13; legs 0.267 vs KayKit 0.374 hip to ankle); pre-HY: OutlineWeights Farmer_OutlineW.json + FaceTexture Farmer_Face.png (Farmer/_fallback~)
             // Art landing (2026-11-12): the three new classes, LOD files from art/fighter-lods d536d30 (weapons folded into
             // every level). Each body carries CM_Toon plus CM_FaceDecal on slot 1, the Miner's decal method (class READMEs).
             new ModelSpec { Key = Demolitions, AssetPath = "Assets/_Game/Art/Demolitions/Demolitions.fbx", Kind = ArtKind.Character, Rigged = true,

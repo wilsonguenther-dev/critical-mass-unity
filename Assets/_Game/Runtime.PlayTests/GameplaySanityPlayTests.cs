@@ -99,7 +99,7 @@ namespace CriticalMass.Runtime.PlayTests
                     if (!a.Alive) continue;
                     _w.SimPos(i, out double x, out double z);
                     int cx = (int)Math.Floor(x), cz = (int)Math.Floor(z);
-                    string at = $"actor {i} at {w.Match.Time:0} s, sim ({x:0.0}, {z:0.0})";
+                    string at = $"actor {i} ({_w.ActorModelKey(i)}) at {w.Match.Time:0} s, sim ({x:0.0}, {z:0.0})";
                     bool onBridge = cx >= 0 && cz >= 0 && cx < map.Width && cz < map.Height && map.Cells[cz * map.Width + cx] == Cell.Bridge;
                     if (!MapGrid.IsWalkable(map, cx, cz) && !onBridge && a.AirLen == 0)
                         Fail($"{at} stands inside a non-walkable cell (wall or void): the player sees it inside a wall or over the void");
