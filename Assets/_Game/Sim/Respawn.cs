@@ -158,6 +158,7 @@ namespace CriticalMass.Sim.Core
                 a.AbilityActive = 0;
                 a.SlowTimer = 0;
                 a.LastAttacker = -1;
+                a.LastCause = DamageCause.None;
                 a.LostCargo.Kind = CarryKind.None;
                 a.LostCargo.Amount = 0;
                 a.Moving = false;

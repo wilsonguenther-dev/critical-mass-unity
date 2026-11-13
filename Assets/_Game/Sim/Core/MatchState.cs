@@ -5,7 +5,9 @@ namespace CriticalMass.Sim.Core
     {
         public double Biomass;
         public double Corruption;
-        // ITEM CM-35: added by its owner (Plant, Meat)
+        /// <summary>CM-35: Biomass = Plant + Meat; these split it by type.</summary>
+        public double Plant;
+        public double Meat;
     }
 
     /// <summary>Match-level state (browser MatchState).</summary>

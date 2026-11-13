@@ -107,9 +107,35 @@ namespace CriticalMass.Sim.Core
                 }
             }
             // ITEM CM-38: added by its owner (Demolitions mines and TNT blasts: demolitionsBlastSystem)
-            // ITEM CM-35: added by its owner (corpse meat drop)
+            // CM-35: the last thing combat does: every body killed this step (or since last step's combat) drops its meat once.
+            DropCorpseMeat(w);
         }
 
-        // ITEM CM-35: added by its owner (corpse meat drop: dropCorpseMeat)
+        /// <summary>
+        /// CM-35: meat biomass from killed bodies. Every dead actor that has not dropped yet leaves one loose meat orb of
+        /// Resources.MeatUnitsPerKill at its corpse (X / Z hold the death position until respawn), lasting
+        /// Resources.MeatOrbLifetimeTicks, only while the Kaiju is an egg. MeatDropped makes it once per death whatever killed
+        /// the actor; it clears while alive. Allocation-free (a slot of the fixed World.Orbs pool).
+        /// </summary>
+        public static void DropCorpseMeat(World w)
+        {
+            int n = w.ActorCount;
+            ResourcesConfig res = w.Config.Resources;
+            bool egg = w.Kaiju.State == KaijuState.Egg && !w.Match.Hatched;
+            byte[] dropped = w.MeatDropped;
+            for (int id = 0; id < n; id++)
+            {
+                Actor a = w.Actors[id];
+                if (a.Alive)
+                {
+                    dropped[id] = 0;
+                    continue;
+                }
+                if (dropped[id] != 0) continue;
+                dropped[id] = 1;
+                if (!egg || w.Match.Phase == MatchPhase.Ended || res.MeatUnitsPerKill <= 0) continue;
+                World.SpawnLooseOrb(w, w.X[id], w.Z[id], (int)res.MeatUnitsPerKill, (int)res.MeatOrbLifetimeTicks, id);
+            }
+        }
     }
 }

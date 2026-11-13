@@ -86,7 +86,12 @@ namespace CriticalMass.Sim.Core
         /// <summary>1 when Inputs[id] carries a real aim point, 0 for "no aim".</summary>
         public byte[] HasAim;
         public ResourceNode[] Nodes;
-        // ITEM CM-35: added by its owner (Orbs: LooseOrb[ORB_CAPACITY], MeatDropped: byte[], OrbOverflows: int)
+        /// <summary>CM-35: loose meat orbs, fixed capacity OrbCapacity; inactive slots have Active = false. Only Combat.DropCorpseMeat and ResourcesSystem write it.</summary>
+        public LooseOrb[] Orbs;
+        /// <summary>CM-35: per actor, 1 once the current death's meat orb has dropped, back to 0 while the actor is alive.</summary>
+        public byte[] MeatDropped;
+        /// <summary>CM-35 telemetry: times SpawnLooseOrb found the pool full and recycled the orb with the least time left.</summary>
+        public int OrbOverflows;
         /// <summary>Fixed capacity BarricadeCapacity; inactive slots have Active = false.</summary>
         public Barricade[] Barricades;
         public Kaiju Kaiju;
@@ -109,7 +114,11 @@ namespace CriticalMass.Sim.Core
         /// <summary>Browser EVENT_CAPACITY.</summary>
         public const int EventCapacity = 512;
 
-        // ITEM CM-35: added by its owner (ORB_CAPACITY = 2 * ACTOR_CAPACITY)
+        /// <summary>CM-35 browser ORB_CAPACITY: two live orbs per actor (a death is at least Respawn.DelaySeconds apart).</summary>
+        public static int OrbCapacity(GameConfig c)
+        {
+            return 2 * ActorCapacity(c);
+        }
 
         /// <summary>Browser BARRICADE_CAPACITY.</summary>
         public static int BarricadeCapacity(GameConfig c)
@@ -221,7 +230,8 @@ namespace CriticalMass.Sim.Core
                 RespawnIn = 0,
                 Carry = CarryKind.None,
                 CarryAmount = 0,
-                // ITEM CM-35: added by its owner (CarryMeat = 0, MeatPickup = true)
+                CarryMeat = 0,
+                MeatPickup = true,
                 GatherProgress = 0,
                 GatherNodeId = -1,
                 LastAttacker = -1,
@@ -243,6 +253,7 @@ namespace CriticalMass.Sim.Core
                 AirToZ = 0,
                 JumpBuffer = 0,
                 UnsupportedTicks = 0,
+                LastCause = DamageCause.None,
             };
         }
 
@@ -281,9 +292,8 @@ namespace CriticalMass.Sim.Core
                 Allegiance = allegiance,
                 Delivered = new[]
                 {
-                    // ITEM CM-35: added by its owner (Plant = 0, Meat = 0 in each tally)
-                    new DeliveredTally { Biomass = 0, Corruption = 0 },
-                    new DeliveredTally { Biomass = 0, Corruption = 0 },
+                    new DeliveredTally { Biomass = 0, Corruption = 0, Plant = 0, Meat = 0 },
+                    new DeliveredTally { Biomass = 0, Corruption = 0, Plant = 0, Meat = 0 },
                 },
                 Instability = 0,
                 BerserkLocked = false,
@@ -394,7 +404,19 @@ namespace CriticalMass.Sim.Core
                 node.RegrowIn = 0;
             }
 
-            // ITEM CM-35: added by its owner (every orb inactive with Units 0, Ttl 0, Source -1; MeatDropped cleared; OrbOverflows = 0)
+            // CM-35: every orb inactive, every drop flag clear.
+            foreach (LooseOrb o in world.Orbs)
+            {
+                o.Active = false;
+                o.Kind = BiomassType.Meat;
+                o.X = 0;
+                o.Z = 0;
+                o.Units = 0;
+                o.Ttl = 0;
+                o.Source = -1;
+            }
+            Array.Clear(world.MeatDropped, 0, world.MeatDropped.Length);
+            world.OrbOverflows = 0;
 
             foreach (Barricade b in world.Barricades)
             {
@@ -453,7 +475,10 @@ namespace CriticalMass.Sim.Core
             m.Delivered[(int)TeamId.Azure].Corruption = 0;
             m.Delivered[(int)TeamId.Crimson].Biomass = 0;
             m.Delivered[(int)TeamId.Crimson].Corruption = 0;
-            // ITEM CM-35: added by its owner (Delivered[*].Plant = 0, Delivered[*].Meat = 0)
+            m.Delivered[(int)TeamId.Azure].Plant = 0;
+            m.Delivered[(int)TeamId.Azure].Meat = 0;
+            m.Delivered[(int)TeamId.Crimson].Plant = 0;
+            m.Delivered[(int)TeamId.Crimson].Meat = 0;
             m.Instability = 0;
             m.BerserkLocked = false;
             m.Hatched = false;
@@ -479,7 +504,8 @@ namespace CriticalMass.Sim.Core
             a.RespawnIn = 0;
             a.Carry = CarryKind.None;
             a.CarryAmount = 0;
-            // ITEM CM-35: added by its owner (CarryMeat = 0, MeatPickup = true)
+            a.CarryMeat = 0;
+            a.MeatPickup = true;
             a.GatherProgress = 0;
             a.GatherNodeId = -1;
             a.LastAttacker = -1;
@@ -502,6 +528,7 @@ namespace CriticalMass.Sim.Core
             a.AirToZ = 0;
             a.JumpBuffer = 0;
             a.UnsupportedTicks = 0;
+            a.LastCause = DamageCause.None;
         }
 
         private static void ResetInput(InputFrame f)
@@ -544,10 +571,12 @@ namespace CriticalMass.Sim.Core
             var barricades = new Barricade[barricadeCap];
             for (int i = 0; i < barricadeCap; i++)
                 barricades[i] = new Barricade { Active = false, Owner = -1, Team = TeamId.Azure, Cx = -1, Cz = -1, Hp = 0, Ttl = 0, PrevCell = 0 };
-            // ITEM CM-35: added by its owner (orbs: ORB_CAPACITY inactive LooseOrb slots)
+            int orbCap = OrbCapacity(cfg);
+            var orbs = new LooseOrb[orbCap];
+            for (int i = 0; i < orbCap; i++) orbs[i] = new LooseOrb { Active = false, Kind = BiomassType.Meat, X = 0, Z = 0, Units = 0, Ttl = 0, Source = -1 };
             var events = new SimEvent[EventCapacity];
             for (int i = 0; i < EventCapacity; i++)
-                events[i] = new SimEvent { Type = SimEventType.Hit, A = -1, B = -1, X = 0, Z = 0, Value = 0 }; // ITEM CM-35: added by its owner (Bio = undefined)
+                events[i] = new SimEvent { Type = SimEventType.Hit, A = -1, B = -1, X = 0, Z = 0, Value = 0, Bio = null, Cause = DamageCause.None };
             var world = new World
             {
                 Opts = new WorldOptions
@@ -590,7 +619,9 @@ namespace CriticalMass.Sim.Core
                 Inputs = inputs,
                 HasAim = new byte[cap],
                 Nodes = nodes,
-                // ITEM CM-35: added by its owner (Orbs = orbs, MeatDropped = new byte[cap], OrbOverflows = 0)
+                Orbs = orbs,
+                MeatDropped = new byte[cap],
+                OrbOverflows = 0,
                 Barricades = barricades,
                 Kaiju = new Kaiju
                 {
@@ -650,7 +681,15 @@ namespace CriticalMass.Sim.Core
         /// <summary>Write one event into the ring without allocating.</summary>
         public static void PushEvent(World w, SimEventType type, int a, int b, double x, double z, double value)
         {
-            // ITEM CM-35: added by its owner (optional bio parameter: the biomass type of a DeliverBiomass event)
+            PushEvent(w, type, a, b, x, z, value, null, DamageCause.None);
+        }
+
+        /// <summary>
+        /// Write one event into the ring with its CM-35 biomass type (DeliverBiomass only, else null) and its DG-16 damage
+        /// cause (Hit and Death only, else None). Every push writes both, so a reused slot never keeps a stale value.
+        /// </summary>
+        public static void PushEvent(World w, SimEventType type, int a, int b, double x, double z, double value, BiomassType? bio, DamageCause cause)
+        {
             SimEvent e = w.Events[w.EventHead % EventCapacity];
             e.Type = type;
             e.A = a;
@@ -658,10 +697,52 @@ namespace CriticalMass.Sim.Core
             e.X = x;
             e.Z = z;
             e.Value = value;
-            // ITEM CM-35: added by its owner (e.Bio = bio)
+            e.Bio = bio;
+            e.Cause = cause;
             w.EventHead++;
         }
 
-        // ITEM CM-35: added by its owner (SpawnLooseOrb: drop a loose meat orb, recycling the least-ttl slot when the pool is full)
+        /// <summary>
+        /// CM-35: drop a loose meat orb of units at (x, z), lasting ttl sim ticks. Takes the first inactive slot; a full pool
+        /// recycles the active orb with the least ttl (lowest index on a tie: deterministic) and counts it in OrbOverflows.
+        /// Allocation-free. Returns the slot.
+        /// </summary>
+        public static int SpawnLooseOrb(World w, double x, double z, int units, int ttl, int source)
+        {
+            LooseOrb[] orbs = w.Orbs;
+            int slot = -1;
+            int least = int.MaxValue;
+            int leastSlot = 0;
+            for (int i = 0; i < orbs.Length; i++)
+            {
+                LooseOrb o = orbs[i];
+                if (!o.Active)
+                {
+                    slot = i;
+                    break;
+                }
+                if (o.Ttl < least)
+                {
+                    least = o.Ttl;
+                    leastSlot = i;
+                }
+            }
+            if (slot < 0)
+            {
+                slot = leastSlot;
+                w.OrbOverflows++;
+            }
+            LooseOrb orb = orbs[slot];
+            orb.Active = true;
+            orb.Kind = BiomassType.Meat;
+            orb.X = x;
+            orb.Z = z;
+            orb.Units = units;
+            orb.Ttl = ttl;
+            orb.Source = source;
+            return slot;
+        }
+
+        // DG-16b additions follow (appended).
     }
 }

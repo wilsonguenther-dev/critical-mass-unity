@@ -256,7 +256,7 @@ namespace CriticalMass.Sim.Tests
             SimResources.ApplyDelivery(w, TeamId.Crimson, CarryKind.Corruption, 3);
             Assert.AreEqual(20, w.Match.Allegiance.Azure);
             Assert.AreEqual(12, w.Match.Allegiance.Crimson);
-            Assert.AreEqual(3 * feed.CorruptionInstabilityPerUnit, w.Match.Instability); // ITEM CM-85: restores "+ 2 * BiomassInstabilityPerUnit"
+            Assert.AreEqual(3 * feed.CorruptionInstabilityPerUnit + 2 * feed.BiomassInstabilityPerUnit, w.Match.Instability); // CM-85
             ForceHatch(w);
             SimResources.ApplyDelivery(w, TeamId.Azure, CarryKind.Biomass, 5);
             Assert.AreEqual(20, w.Match.Allegiance.Azure);
