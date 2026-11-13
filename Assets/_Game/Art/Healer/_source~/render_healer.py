@@ -9,7 +9,7 @@ Keys: gameplay, facings, ortho, face, props. Pose: the KayKit Idle, frame 1 (wha
   facing_<dir>.png                              8 facings at the gameplay camera, transparent
   ortho_<view>_<team>.png                       front / three-quarter / profile / back / accent, transparent
   face_closeup.png                              large orthographic head close-up
-  props_<team>.png                              the heal and cleanse props, three-quarter orthographic
+  props_<team>.png                              the heal (bloom gauntlet) and cleanse (lantern) props, three-quarter orthographic
 Outline in screen pixels: characters 3.0 px at 1080p, props 2.5 px, ortho sheets 5.0 px.
 """
 import json
@@ -60,20 +60,20 @@ scene.world = world
 
 arm = bpy.data.objects["Rig"]
 arm.rotation_mode = "XYZ"
-body, can, lantern = (bpy.data.objects[n] for n in ("Healer_Body", "Healer_BloomCan", "Healer_Lantern"))
-props = [bpy.data.objects[n] for n in ("Healer_BloomCan_Prop", "Healer_Lantern_Prop")]
+body, lantern = (bpy.data.objects[n] for n in ("Healer_Body", "Healer_Lantern"))
+props = [bpy.data.objects[n] for n in ("Healer_BloomGauntlet_Prop", "Healer_Lantern_Prop")]
 mat = bpy.data.materials["CM_Toon"]
 prop_mat = mat.copy()
 prop_mat.name = "CM_Toon_PropPreview"
 toon3.set_param(prop_mat, "RIM", 0.0)
 for ob in props:
     ob.data.materials[0] = prop_mat
-for ob in [body, can, lantern] + props:
+for ob in [body, lantern] + props:
     ob.hide_set(False)
 arm.animation_data_create()
 arm.animation_data.action = bpy.data.actions["Idle"]
 scene.frame_set(1)
-char_objs = [body, can, lantern]
+char_objs = [body, lantern]
 
 cam_data = bpy.data.cameras.new("Cam")
 cam = bpy.data.objects.new("Cam", cam_data)
@@ -130,7 +130,7 @@ gameplay_extras = [ground, blob, ref_blob] + refsil
 for ob in gameplay_extras:
     ob.hide_render = True
 
-INNER = {"feat_face", "feat_team_cloth", "feat_apron_detail", "feat_belt_detail", "feat_satchel_detail",
+INNER = {"feat_face", "feat_team_cloth", "feat_tabard_detail", "feat_tasset_detail", "feat_greave_detail", "feat_pauldron_detail", "feat_breastplate_detail", "feat_gauntlet_detail", "feat_belt_detail", "feat_satchel_detail",
          "feat_bandage", "feat_mantle_detail", "feat_lantern_detail", "feat_brooch", "feat_biomass"}
 
 
@@ -170,7 +170,7 @@ def set_team(crimson):
 
 
 def show(objs):
-    for ob in [body, can, lantern] + props:
+    for ob in [body, lantern] + props:
         ob.hide_render = ob not in objs
 
 

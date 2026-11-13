@@ -32,7 +32,8 @@ C = {
     "leather":      ("#7D5032", "= Miner leather (apron, satchel, belt)"),
     "leather_dark": ("#5F3E2A", "= Miner leather_dark (boots soles, strap)"),
     "wood":         ("#9A6640", "= Miner wood (can handle grip)"),
-    "stone":        ("#8A8481", "= Miner stone"),
+    "stone":        ("#8A8481", "= Miner stone (plate backing, greave edges)"),
+    "stone_light":  ("#BDB9B3", "bible p06 Warrior pale stone plates (pauldrons, breastplate, tassets, gauntlet)"),
     # ---- biomass (system colour, bible p05 lime; never team)
     "lime":         ("#9BE23A", "bible biomass lime (Farmer orb / tank glow, 07-front)"),
     "lime_light":   ("#D8FF7A", "lime highlight (sprout tips, liquid surface)"),

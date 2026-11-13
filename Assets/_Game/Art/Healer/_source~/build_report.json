@@ -1,17 +1,17 @@
 {
  "objects": {
   "Healer_Body": {
-   "triangles": 9368,
-   "vertices": 4897,
+   "triangles": 11278,
+   "vertices": 5938,
    "rest_bounds": {
     "min": [
-     -0.968,
-     -0.568,
-     0.0
+     -1.055,
+     -0.456,
+     -0.002
     ],
     "max": [
      0.968,
-     0.568,
+     0.456,
      2.001
     ]
    },
@@ -20,52 +20,38 @@
     "CM_FaceDecal"
    ],
    "feature_groups": [
-    "feat_apron",
-    "feat_apron_detail",
     "feat_bandage",
     "feat_belt",
     "feat_belt_detail",
     "feat_biomass",
     "feat_bodice",
     "feat_boots",
+    "feat_breastplate",
+    "feat_breastplate_detail",
     "feat_brooch",
+    "feat_cape",
     "feat_face",
     "feat_face_decal",
+    "feat_gauntlet",
+    "feat_gauntlet_detail",
+    "feat_greave",
+    "feat_greave_detail",
     "feat_hair",
     "feat_leggings",
-    "feat_mantle",
     "feat_mantle_detail",
+    "feat_pauldron",
+    "feat_pauldron_detail",
     "feat_satchel",
     "feat_satchel_detail",
     "feat_skin",
     "feat_skirt",
     "feat_skirt_hem",
     "feat_sleeve",
+    "feat_tabard",
+    "feat_tabard_detail",
+    "feat_tasset",
+    "feat_tasset_detail",
     "feat_team_cloth",
-    "feat_team_glow"
-   ]
-  },
-  "Healer_BloomCan": {
-   "triangles": 1232,
-   "vertices": 662,
-   "rest_bounds": {
-    "min": [
-     -1.058,
-     -0.861,
-     0.778
-    ],
-    "max": [
-     -0.491,
-     0.004,
-     1.2
-    ]
-   },
-   "materials": [
-    "CM_Toon"
-   ],
-   "feature_groups": [
-    "feat_biomass",
-    "feat_bloom_can",
     "feat_team_glow"
    ]
   },
@@ -95,19 +81,19 @@
     "feat_team_glow"
    ]
   },
-  "Healer_BloomCan_Prop": {
-   "triangles": 1232,
-   "vertices": 662,
+  "Healer_BloomGauntlet_Prop": {
+   "triangles": 1020,
+   "vertices": 546,
    "rest_bounds": {
     "min": [
-     -0.663,
-     -0.871,
-     0.005
+     -0.624,
+     -0.206,
+     0.004
     ],
     "max": [
-     -0.237,
-     0.004,
-     0.572
+     -0.082,
+     0.174,
+     0.585
     ]
    },
    "materials": [
@@ -115,8 +101,8 @@
    ],
    "feature_groups": [
     "feat_biomass",
-    "feat_bloom_can",
-    "feat_team_glow"
+    "feat_gauntlet",
+    "feat_gauntlet_detail"
    ]
   },
   "Healer_Lantern_Prop": {
@@ -169,46 +155,53 @@
   ]
  },
  "bevels": {
-  "boxes": 34,
+  "boxes": 30,
   "bevelled": 9,
-  "thin_exempt": 25
+  "thin_exempt": 21
  },
  "triangles_by_feature": {
   "Healer_Body:hair": 1708,
-  "Healer_Body:skin": 1144,
+  "Healer_Body:biomass": 1196,
+  "Healer_Body:tasset": 1104,
+  "Healer_Body:skin": 1018,
   "Healer_Body:boots": 872,
-  "Healer_Body:team_cloth": 868,
-  "Healer_Body:biomass": 764,
-  "Healer_Body:bandage": 652,
-  "Healer_BloomCan:bloom_can": 572,
-  "Healer_BloomCan:biomass": 548,
-  "Healer_Body:apron": 536,
-  "Healer_Body:mantle": 496,
+  "Healer_Body:team_cloth": 692,
+  "Healer_Body:gauntlet": 520,
+  "Healer_Body:pauldron": 384,
   "Healer_Body:sleeve": 360,
-  "Healer_Body:skirt": 316,
+  "Healer_Body:cape": 296,
+  "Healer_Body:skirt": 276,
   "Healer_Lantern:lantern_detail": 264,
   "Healer_Lantern:lantern": 260,
-  "Healer_Body:mantle_detail": 256,
+  "Healer_Body:pauldron_detail": 248,
   "Healer_Body:face": 244,
+  "Healer_Body:bandage": 240,
   "Healer_Body:bodice": 220,
-  "Healer_Body:apron_detail": 168,
+  "Healer_Body:greave": 184,
+  "Healer_Body:breastplate": 184,
+  "Healer_Body:mantle_detail": 176,
+  "Healer_Body:team_glow": 168,
   "Healer_Body:skirt_hem": 160,
   "Healer_Body:leggings": 152,
   "Healer_Body:satchel": 152,
+  "Healer_Body:tabard": 136,
   "Healer_Body:belt": 112,
-  "Healer_BloomCan:team_glow": 112,
+  "Healer_Body:tasset_detail": 96,
+  "Healer_Body:gauntlet_detail": 92,
+  "Healer_Body:greave_detail": 64,
   "Healer_Body:face_decal": 64,
-  "Healer_Body:team_glow": 56,
+  "Healer_Body:tabard_detail": 60,
   "Healer_Lantern:team_glow": 56,
   "Healer_Lantern:lantern_light": 44,
+  "Healer_Body:breastplate_detail": 32,
   "Healer_Body:brooch": 32,
   "Healer_Lantern:bandage": 28,
   "Healer_Body:satchel_detail": 24,
   "Healer_Body:belt_detail": 12
  },
- "triangles_character": 11252,
+ "triangles_character": 11930,
  "triangles_props": {
-  "Healer_BloomCan_Prop": 1232,
+  "Healer_BloomGauntlet_Prop": 1020,
   "Healer_Lantern_Prop": 652
  }
 }
