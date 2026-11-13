@@ -95,6 +95,12 @@ namespace CriticalMass.Runtime.Hud
                 _tier = tier;
                 for (int i = 0; i < _icons.Count; i++) _icons[i].SetTier(tier);
             }
+            int mapTier = MinimapGeometry.TierFor(s);
+            if (_mapImage != null && (mapTier != _mapTier || _mapImage.texture == null))
+            {
+                _mapTier = mapTier;
+                _mapImage.texture = MapTexture(mapTier);
+            }
         }
 
         // ---------------------------------------------------------------- illustrated icons (v2)
@@ -333,21 +339,45 @@ namespace CriticalMass.Runtime.Hud
         // ---------------------------------------------------------------- minimap
 
         const int MaxDots = 40;
-        MinimapLand _land;
+        /// <summary>An enemy shows on the minimap only within this many sim units of a living teammate (seen enemies).</summary>
+        public const double SightRadius = 16.0;
+        RawImage _mapImage;
+        MinimapGround _ground;
         RectTransform _mapArea;
         readonly VectorShape[] _dots = new VectorShape[MaxDots];
         VectorShape _mapHill;
-        HudIcon _mapEgg, _mapYou;
+        HudIcon _mapEgg;
+        RectTransform _mapYou, _youFacing;
         MapDef _mapFor;
+        MinimapProjection _proj;
+        int _mapTier = 1;
+        public RectTransform MapArea => _mapArea;
+        public int MapTier => _mapTier;
+        public MinimapProjection MapProjection => _proj;
 
+        /// <summary>
+        /// Minimap: the image baked from the real map (Ui/MinimapBake, camera-up like the gameplay view), ground changes
+        /// over it, then the live layer from sim state: teammates and seen enemies as team dots, the hill tinted by its
+        /// owner, the Kaiju egg / hatchling / adult in its allegiance, both base banners, and the brass YOU arrow turning
+        /// with the player's facing. Every marker goes through the one projection the image was baked with.
+        /// </summary>
         void BuildMinimap(RectTransform c)
         {
-            Shape(c, "Map Tab", ShapeKind.RoundRect, 104f, 186f, 64f, 34f, Navy, 12f);
-            Shape(c, "Map Frame", ShapeKind.Chamfer, 0f, 0f, 272f, 204f, Navy, 20f);
+            _proj = MinimapGeometry.Projection;
+            float f = HudLayout.MinimapFrame, w = _proj.Width, h = _proj.Height;
+            Shape(c, "Map Frame", ShapeKind.Chamfer, 0f, 0f, w + 2f * f, h + 2f * f, Navy, 20f);
             _mapArea = Rt(c, "Map Area");
-            Place(_mapArea, 12f, 12f, 248f, 180f);
-            _land = _mapArea.gameObject.AddComponent<MinimapLand>();
-            _land.raycastTarget = false;
+            Place(_mapArea, f, f, w, h);
+            _mapImage = _mapArea.gameObject.AddComponent<RawImage>();
+            _mapImage.raycastTarget = false;
+            _mapImage.texture = MapTexture(_mapTier);
+            RectTransform g = Rt(_mapArea, "Ground Changes");
+            g.anchorMin = Vector2.zero;
+            g.anchorMax = Vector2.one;
+            g.sizeDelta = Vector2.zero;
+            _ground = g.gameObject.AddComponent<MinimapGround>();
+            _ground.raycastTarget = false;
+            _ground.Bind(_proj, MinimapGeometry.BakedMap);
             for (int i = 0; i < MaxDots; i++)
             {
                 VectorShape d = Shape(_mapArea, "Dot " + i, ShapeKind.Circle, 0f, 0f, 7f, 7f, CMTokens.Azure.Color);
@@ -356,30 +386,39 @@ namespace CriticalMass.Runtime.Hud
                 d.gameObject.SetActive(false);
                 _dots[i] = d;
             }
-            // v2: illustrated markers, each with its word (the v1 report's missing minimap labels)
-            _mapEgg = Icon(_mapArea, "Map Egg", UiIcons.MapEgg, 0f, 0f, 26f, 26f);
-            Label(_mapEgg.Rt, "Label", CMTokens.Ui, 11, Cream, TextAnchor.MiddleCenter, -22f, 22f, 70f, 14f, "KAIJU", 2f);
-            _mapHill = Shape(_mapArea, "Map Hill", ShapeKind.Circle, 0f, 0f, 30f, 30f, Navy);
-            Icon(_mapHill.transform, "Crown", UiIcons.MapCrown, 5f, 5f, 20f, 20f);
-            Label(_mapHill.transform, "Label", CMTokens.Ui, 11, Cream, TextAnchor.MiddleCenter, -20f, 28f, 70f, 14f, "HILL", 2f);
+            // illustrated markers, each with its word (the v1 report's missing minimap labels), sized to leave the plazas visible
+            _mapHill = Shape(_mapArea, "Map Hill", ShapeKind.Circle, 0f, 0f, 24f, 24f, Navy);
+            Icon(_mapHill.transform, "Crown", UiIcons.MapCrown, 4f, 4f, 16f, 16f);
+            Label(_mapHill.transform, "Label", CMTokens.Ui, 11, Cream, TextAnchor.MiddleCenter, -23f, 24f, 70f, 14f, "HILL", 2f);
             for (int t = 0; t < 2; t++)
             {
-                HudIcon b = Icon(_mapArea, (TeamId)t + " Base", UiIcons.Banner[t], 0f, 0f, 30f, 30f);
-                Label(b.Rt, "Label", CMTokens.Ui, 11, Cream, TextAnchor.MiddleCenter, -20f, 27f, 70f, 14f, t == 0 ? "AZURE" : "CRIMSON", 2f);
+                HudIcon b = Icon(_mapArea, (TeamId)t + " Base", UiIcons.Banner[t], 0f, 0f, 24f, 24f);
+                Label(b.Rt, "Label", CMTokens.Ui, 11, Cream, TextAnchor.MiddleCenter, -23f, 23f, 70f, 14f, t == 0 ? "AZURE" : "CRIMSON", 2f);
                 _mapBases[t] = b;
             }
-            _mapYou = Icon(_mapArea, "Map You", UiIcons.You, 0f, 0f, 18f, 18f);
-            Label(_mapYou.Rt, "Label", CMTokens.Ui, 11, CMTokens.ToolBrass.Color, TextAnchor.MiddleLeft, 18f, 2f, 40f, 14f, "YOU", 2f);
-            _mapYou.Rt.gameObject.SetActive(false);
+            _mapEgg = Icon(_mapArea, "Map Egg", UiIcons.MapEgg, 0f, 0f, 22f, 22f);
+            Label(_mapEgg.Rt, "Label", CMTokens.Ui, 11, Cream, TextAnchor.MiddleCenter, -24f, 20f, 70f, 14f, "KAIJU", 2f);
+            _mapYou = Rt(_mapArea, "Map You");
+            Place(_mapYou, 0f, 0f, 18f, 18f);
+            _youFacing = Rt(_mapYou, "Facing");
+            Place(_youFacing, 0f, 0f, 18f, 18f);
+            VectorShape arrow = Shape(_youFacing, "Arrow", ShapeKind.TriangleRight, 13f, 3f, 11f, 12f, CMTokens.ToolBrass.Color, 2f);
+            arrow.OutlinePx = 1.5f;
+            arrow.RimPx = 0f;
+            Icon(_mapYou, "Marker", UiIcons.You, 0f, 0f, 18f, 18f);
+            Label(_mapYou, "Label", CMTokens.Ui, 11, CMTokens.ToolBrass.Color, TextAnchor.MiddleLeft, 20f, -12f, 40f, 14f, "YOU", 2f);
+            _mapYou.gameObject.SetActive(false);
         }
+
+        static Texture2D MapTexture(int tier) => Resources.Load<Texture2D>("UI/Minimap/minimap@" + tier + "x");
 
         readonly HudIcon[] _mapBases = new HudIcon[2];
 
         void PlaceOnMap(RectTransform rt, double simX, double simZ)
         {
-            Vector2 p = _land.ToLocal(simX, simZ);
+            Vector2 p = _proj.ToPixel(simX, simZ);
             rt.anchorMin = rt.anchorMax = new Vector2(0, 1);
-            rt.anchoredPosition = new Vector2(p.x, p.y);
+            rt.anchoredPosition = new Vector2(p.x, -p.y);
         }
 
         // ---------------------------------------------------------------- world layer
@@ -678,33 +717,53 @@ namespace CriticalMass.Runtime.Hud
             if (_mapFor != w.Map)
             {
                 _mapFor = w.Map;
-                _land.SetMap(w.Map);
-                PlaceOnMap(_mapEgg.Rt, w.Map.Shrine.X, w.Map.Shrine.Z);
                 PlaceOnMap(_mapHill.rectTransform, w.Map.Hill.X, w.Map.Hill.Z);
                 for (int t = 0; t < 2 && t < w.Map.Pads.Length; t++) PlaceOnMap(_mapBases[t].Rt, w.Map.Pads[t].X, w.Map.Pads[t].Z);
             }
+            _ground.Watch(w.Map, w.GridVersion);
             _mapHill.SetFill(s.Hill == HillState.Neutral ? Navy : HillColour(s.Hill));
             bool eggOnMap = !s.Hatched || s.Kaiju == KaijuState.Egg;
             _mapEgg.Set(eggOnMap ? UiIcons.MapEgg : KaijuIcon(s, false), _tier);
             if (s.Hatched) PlaceOnMap(_mapEgg.Rt, w.Kaiju.X, w.Kaiju.Z);
+            else PlaceOnMap(_mapEgg.Rt, w.Map.Shrine.X, w.Map.Shrine.Z);
             int n = Math.Min(w.ActorCount, MaxDots);
+            int me = HudBinder.LocalActor;
+            TeamId mine = me < w.ActorCount ? w.Actors[me].Team : TeamId.Azure;
             for (int i = 0; i < MaxDots; i++)
             {
-                bool self = i == HudBinder.LocalActor;
                 bool on = i < n && w.Actors[i].Alive;
-                if (self)
+                if (i == me)
                 {
-                    // own player: the brass arrow marker with its word, above every dot
-                    if (_mapYou.Rt.gameObject.activeSelf != on) _mapYou.Rt.gameObject.SetActive(on);
-                    if (on) { PlaceOnMap(_mapYou.Rt, w.X[i], w.Z[i]); _mapYou.Rt.SetAsLastSibling(); }
+                    // own player: the brass arrow marker with its word, turned to the facing, above every dot
+                    if (_mapYou.gameObject.activeSelf != on) _mapYou.gameObject.SetActive(on);
+                    if (on)
+                    {
+                        PlaceOnMap(_mapYou, w.X[i], w.Z[i]);
+                        _youFacing.localEulerAngles = new Vector3(0f, 0f, _proj.FacingToUiDeg(w.Actors[i].Facing));
+                        _mapYou.SetAsLastSibling();
+                    }
                     on = false;
                 }
+                if (on && w.Actors[i].Team != mine) on = Seen(w, i, mine, n);
                 VectorShape d = _dots[i];
                 if (d.gameObject.activeSelf != on) d.gameObject.SetActive(on);
                 if (!on) continue;
                 PlaceOnMap(d.rectTransform, w.X[i], w.Z[i]);
                 d.SetFill(CMTokens.Team(w.Actors[i].Team));
             }
+        }
+
+        /// <summary>True when a living actor of team <paramref name="mine"/> is within SightRadius of actor i.</summary>
+        static bool Seen(World w, int i, TeamId mine, int n)
+        {
+            double r2 = SightRadius * SightRadius;
+            for (int j = 0; j < n; j++)
+            {
+                if (!w.Actors[j].Alive || w.Actors[j].Team != mine) continue;
+                double dx = w.X[j] - w.X[i], dz = w.Z[j] - w.Z[i];
+                if (dx * dx + dz * dz <= r2) return true;
+            }
+            return false;
         }
 
         void ApplyWorld(World w, HudState s, float dt)
