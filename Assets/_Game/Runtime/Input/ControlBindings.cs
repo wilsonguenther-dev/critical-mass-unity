@@ -87,7 +87,11 @@ namespace CriticalMass.Runtime.Input
                 new[] { new RebindSlot("SwitchDigPlace", G, 0, "Shoulders", "negative"), new RebindSlot("SwitchDigPlace", G, 0, "Shoulders", "positive") }),
             new ControlRow("Scoreboard", new[] { new RebindSlot("Scoreboard", K) }, new[] { new RebindSlot("Scoreboard", G) }),
             new ControlRow("Full map", new[] { new RebindSlot("Map", K) }, new[] { new RebindSlot("Map", G) }),
-            new ControlRow("Ping wheel", new[] { new RebindSlot("Ping", K) }, new[] { new RebindSlot("Ping", G) }),
+            new ControlRow("Ping wheel", new[] { new RebindSlot("Ping", K), new RebindSlot("Ping", K, 1) }, new[] { new RebindSlot("Ping", G) }),
+            // feat/mechanics-depth-view: the base station panel (B, or press the right stick, inside your base ring) and its
+            // confirm (ENTER; on a controller the panel takes A like every menu, and holds it so the player never jumps).
+            new ControlRow("Base station", new[] { new RebindSlot("OpenStation", K) }, new[] { new RebindSlot("OpenStation", G) }),
+            new ControlRow("Station: confirm", new[] { new RebindSlot("StationBuy", K) }, None),
             // feat/new-mechanics-view: the emote wheel (T, or press the left stick), view only (EmoteWheel).
             new ControlRow("Emote wheel", new[] { new RebindSlot("Emote", K) }, new[] { new RebindSlot("Emote", G) }),
             new ControlRow("HUD cursor", new[] { new RebindSlot("HudCursor", K) }, new[] { new RebindSlot("HudCursor", G) }),

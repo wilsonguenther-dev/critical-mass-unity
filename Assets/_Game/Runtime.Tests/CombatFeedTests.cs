@@ -249,7 +249,7 @@ namespace CriticalMass.Runtime.Tests
                         seen[id] = true;
                         ActorTally t = tally.Tally(id);
                         Assert.AreEqual(team, t.Team);
-                        Assert.AreEqual(id == 0 ? "YOU" : KillWords.ClassUpper[(int)t.Cls], sb.Cell(team, r, 0));
+                        Assert.AreEqual(CriticalMass.Runtime.View.Mechanics.DepthNames.RowLabel(id, id == 0, "YOU", KillWords.ClassUpper[(int)t.Cls]), sb.Cell(team, r, 0));
                         Assert.AreEqual(t.Knockouts.ToString(), sb.Cell(team, r, 1));
                         Assert.AreEqual(t.Deaths.ToString(), sb.Cell(team, r, 2));
                         Assert.AreEqual(((int)Math.Floor(t.HillSeconds)).ToString(), sb.Cell(team, r, 3));

@@ -333,8 +333,11 @@ namespace CriticalMass.Runtime.Hud.Interact
 
         public string LastLine => _count > 0 ? _text[(_count - 1) % Lines].text : null;
 
-        public void Add(Ping p, float realNow) => Push(PingWords.FeedLine[(int)p.Kind, Mathf.Clamp(p.Place, 0, PingWords.Places.Length - 1)],
-            PingWords.Shape[(int)p.Kind], PingWords.Colour(p.Kind), realNow);
+        public void Add(Ping p, float realNow) => Push((PingWords.LineOverride != null ? PingWords.LineOverride(p) : null) ??
+            PingWords.FeedLine[(int)p.Kind, Mathf.Clamp(p.Place, 0, PingWords.Places.Length - 1)], PingWords.Shape[(int)p.Kind], PingWords.Colour(p.Kind), realNow);
+
+        /// <summary>Mechanics depth: any team line (hand-offs, power-ups, bot answers) in the same column and style.</summary>
+        public void AddLine(string line, ShapeKind shape, Color c, float realNow) => Push(line, shape, c, realNow);
 
         public void AddRefused(double waitSeconds, float realNow) =>
             Push(WaitLines[Mathf.Clamp(Mathf.CeilToInt((float)waitSeconds), 0, WaitLines.Length - 1)], ShapeKind.Diamond, CMTokens.Stone.Color, realNow);
