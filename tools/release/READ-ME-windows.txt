@@ -1,0 +1,14 @@
+Critical Mass demo build @VERSION@ (work in progress) - Windows
+
+1. Unzip this whole folder somewhere you can find it (for example your Desktop).
+   Do not run it from inside the zip: right-click the zip, Extract All, then open the extracted folder.
+2. Double-click CriticalMass.exe.
+3. Windows will probably say "Windows protected your PC" / "unknown publisher" because this test
+   build is not signed for Windows yet. Click "More info", then "Run anyway".
+
+Controls: arrow keys + Z X C, or W A S D + J K L, or W A S D + mouse. Controllers with
+A B X Y buttons or cross / circle / square / triangle buttons work by USB or Bluetooth.
+Settings, Controls lets you switch layouts and change any key.
+
+This Windows build has only been run on a test server so far, never on a real PC.
+Please tell us what happens (it starts or not, how smooth it is, anything odd): text the team.
