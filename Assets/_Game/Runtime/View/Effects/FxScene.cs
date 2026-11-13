@@ -7,17 +7,36 @@ using UnityEngine;
 namespace CriticalMass.Runtime.View.Effects
 {
     /// <summary>
-    /// Every pooled combat effect (bursts, blood droplets and decals, sparks, rings, swing trails, debris chunks, puffs)
-    /// plus the state-driven ones (Kaiju slam telegraph, berserk aura, Warrior shield arcs). Spawned from FxEvents with
-    /// the event's tick as birth time, evaluated analytically from SIM time (tick + alpha) / SimHz, so a replay or a
-    /// capture after the same ticks draws the same frame. Each pool is a fixed ring: a spawn into a full pool reuses the
-    /// oldest slot, so a pool can never exceed its cap. Plain C# (EditMode-testable); CombatFx owns the meshes.
+    /// Every pooled combat effect plus the state-driven ones (Kaiju slam telegraph, berserk aura, Warrior shield arcs).
+    /// Spawned from FxEvents with the event's tick as birth time, evaluated analytically from SIM time (tick + alpha) / SimHz,
+    /// so a replay or a capture after the same ticks draws the same frame. Each pool is a fixed ring: a spawn into a full
+    /// pool reuses the oldest slot, so a pool can never exceed its cap. Plain C# (EditMode-testable); CombatFx owns the meshes.
     /// Times below are authored in wall seconds at the default match speed and converted with Config.DefaultSpeed.
+    /// <para>v2 (this file: pools, palette, dispatch, hit tiers, trails, droplets, sparks, puffs, rings, shields, Kaiju
+    /// state). FxScene.Gore.cs: splat shapes, KO pools, drips, gibs, wall-top splats. FxScene.Boom.cs: explosions, light
+    /// pulse, smoke column, scorch, screen trauma. FxScene.World.cs: footsteps, plank dust, foliage rustle, splashes,
+    /// biomass motes, corruption bubbles and puddles.</para>
+    /// <para>Every element's worst-case vertex cost is a constant next to the code that draws it (Cost*), and
+    /// WorstCaseVerts sums pool caps times costs per layer; a test holds each layer's worst case under its fixed buffer.</para>
     /// </summary>
-    public sealed class FxScene : IFxSink
+    public sealed partial class FxScene : IFxSink
     {
-        // ---- hard budgets (32 fighters) ----
-        public const int MaxBursts = 48, MaxDroplets = 160, MaxDecals = 192, MaxRings = 32, MaxTrails = 40, MaxChunks = 120, MaxPuffs = 96, MaxSparks = 96;
+        // ---- hard budgets (32 fighters); v1 values in brackets, reasons in the PR budget table ----
+        public const int MaxBursts = 64;    // [48] three hit tiers + Kaiju claws share the pool
+        public const int MaxDroplets = 192; // [160] directional spray adds 2-3 mist drops on heavy hits
+        public const int MaxDecals = 224;   // [192] blood only now (scorch, cracks, corruption moved to Marks); wall tops too
+        public const int MaxRings = 48;     // [32] shock rings, block ripples, splash rings, Kaiju stomps
+        public const int MaxTrails = 48;    // [40] five classes have a trail now (v1: two shapes)
+        public const int MaxChunks = 144;   // [120] explosions throw 6 to 14 chunks each
+        public const int MaxPuffs = 128;    // [96] footstep puffs, plank dust, knock-back dust, splash foam
+        public const int MaxSparks = 128;   // [96] embers, water drops, grit
+        public const int MaxMarks = 24;     // new: slam cracks, scorch decals, corruption puddles (long-lived, few)
+        public const int MaxDrips = 96;     // new: blood trail drips behind badly hurt actors
+        public const int MaxGibs = 24;      // new: cartoon meat chunks and bones (a few per stomp or blast knock-out)
+        public const int MaxExplosions = 8; // new: fireball, lobes, smoke column, light pulse (analytic per explosion)
+        public const int MaxMotes = 48;     // new: biomass sparkles homing into the carrier
+        public const int MaxBubbles = 48;   // new: corruption bubbles
+        public const int MaxLeaves = 64;    // new: grass and bush rustle flecks
 
         // ---- palette (sRGB; three flat tone steps per material, Void Navy outline) ----
         public static readonly Color32 Navy = new Color32(24, 35, 59, 255);
@@ -31,13 +50,23 @@ namespace CriticalMass.Runtime.View.Effects
         public static readonly Color32 BiomassC = new Color32(183, 242, 56, 255), CorruptionC = new Color32(142, 63, 209, 255);
         public static readonly Color32 Berserk = new Color32(238, 44, 192, 255);
         public static readonly Color32 AzureC = new Color32(22, 199, 217, 255), CrimsonC = new Color32(255, 90, 95, 255);
+        // v2
+        public static readonly Color32 FireYellow = new Color32(255, 232, 112, 255), FireOrange = new Color32(255, 146, 38, 255), FireRed = new Color32(232, 64, 36, 255);
+        public static readonly Color32 Glow = new Color32(255, 176, 92, 255);
+        public static readonly Color32 SmokeLight = new Color32(196, 192, 200, 255), SmokeMid = new Color32(146, 142, 152, 255), SmokeDark = new Color32(100, 96, 108, 255);
+        public static readonly Color32 ScorchOuter = new Color32(74, 64, 62, 255), ScorchInner = new Color32(38, 32, 34, 255);
+        public static readonly Color32 DirtLight = new Color32(176, 136, 96, 255), DirtMid = new Color32(132, 96, 64, 255), DirtDark = new Color32(86, 60, 40, 255);
+        public static readonly Color32 MeatLight = new Color32(240, 120, 128, 255), MeatMid = new Color32(196, 60, 76, 255), MeatDark = new Color32(124, 28, 44, 255);
+        public static readonly Color32 BoneLight = new Color32(252, 244, 220, 255), BoneMid = new Color32(226, 210, 176, 255), BoneDark = new Color32(172, 152, 120, 255);
+        public static readonly Color32 CorruptDark = new Color32(70, 22, 110, 255), CorruptLight = new Color32(196, 128, 246, 255), OilSheen = new Color32(92, 232, 212, 255);
+        public static readonly Color32 WaterLight = new Color32(226, 246, 255, 255), WaterMid = new Color32(120, 200, 238, 255);
+        public static readonly Color32 HarvestGold = new Color32(255, 214, 110, 255);
 
-        private struct Burst { public double Born; public Vector3 P; public float Size; public byte Kind; public float Rot; }
+        private struct Burst { public double Born, Life; public Vector3 P, Tan; public float Size; public byte Kind; public float Rot; }
         private struct Droplet { public double Born; public Vector3 P0, V; public float Size, TLand, GroundY; public bool Landed, Pool; public double DirX, DirZ; }
-        private struct Decal { public double Born, Life; public Vector3 P; public float Size, Rot, Grow; public uint Seed; public byte Kind; public float DirA; }
-        private struct Ring { public double Born, Life; public Vector3 P; public float R0, R1, Width; public Color32 Col; public byte Kind; }
+        private struct Decal { public double Born, Life; public Vector3 P; public float Size, Rot, Grow; public uint Seed; public byte Kind, Shape; public float DirA; }
+        private struct Ring { public double Born, Life; public Vector3 P; public float R0, R1, Width, Facing; public Color32 Col; public byte Kind; }
         private struct Trail { public double Born; public Vector3 P; public float Facing, Arc, Radius; public Color32 Team; public byte Kind; }
-        private struct Chunk { public double Born, Life; public Vector3 P0, V, Axis; public float Size, Spin, TLand, GroundY; public byte Mat; }
         private struct Puff { public double Born, Life; public Vector3 P0, V; public float Size; public Color32 Col; public byte Kind; }
 
         private readonly Burst[] _bursts = new Burst[MaxBursts];
@@ -45,18 +74,18 @@ namespace CriticalMass.Runtime.View.Effects
         private readonly Decal[] _decals = new Decal[MaxDecals];
         private readonly Ring[] _rings = new Ring[MaxRings];
         private readonly Trail[] _trails = new Trail[MaxTrails];
-        private readonly Chunk[] _chunks = new Chunk[MaxChunks];
         private readonly Puff[] _puffs = new Puff[MaxPuffs];
         private readonly Puff[] _sparks = new Puff[MaxSparks];
-        private int _nb, _nd, _ndc, _nr, _nt, _nc, _np, _ns;
+        private int _nb, _nd, _ndc, _nr, _nt, _np, _ns;
 
-        private readonly float[] _radii = new float[12];
+        private readonly float[] _radii = new float[16];
         private readonly GameConfig _cfg;
         private readonly double _speed;
         private readonly double _hz;
         private readonly MapDef _map;
+        private readonly int _cap;
 
-        /// <summary>Blood on (the cm.blood setting): droplets and decals; off: neutral white-yellow sparks only.</summary>
+        /// <summary>Blood on (the cm.blood setting): droplets, splats, pools, drips, gibs; off: neutral white-yellow sparks only.</summary>
         public bool Blood = true;
 
         public FxScene(GameConfig cfg, MapDef map)
@@ -65,21 +94,23 @@ namespace CriticalMass.Runtime.View.Effects
             _map = map;
             _speed = cfg.DefaultSpeed > 0 ? cfg.DefaultSpeed : 1;
             _hz = cfg.SimHz;
+            _cap = World.ActorCapacity(cfg);
             for (int i = 0; i < MaxBursts; i++) _bursts[i].Born = double.NegativeInfinity;
             for (int i = 0; i < MaxDroplets; i++) { _drops[i].Born = double.NegativeInfinity; _drops[i].Landed = true; }
             for (int i = 0; i < MaxDecals; i++) { _decals[i].Born = double.NegativeInfinity; _decals[i].Life = 0; }
             for (int i = 0; i < MaxRings; i++) _rings[i].Born = double.NegativeInfinity;
             for (int i = 0; i < MaxTrails; i++) _trails[i].Born = double.NegativeInfinity;
-            for (int i = 0; i < MaxChunks; i++) _chunks[i].Born = double.NegativeInfinity;
             for (int i = 0; i < MaxPuffs; i++) _puffs[i].Born = double.NegativeInfinity;
             for (int i = 0; i < MaxSparks; i++) _sparks[i].Born = double.NegativeInfinity;
+            InitGore();
+            InitBoom();
+            InitWorld();
         }
 
         /// <summary>Sim seconds for a wall-clock duration at the default match speed.</summary>
         public double S(double wallSeconds) => wallSeconds * _speed;
 
         // Lifetimes (sim seconds).
-        private double BurstLife => S(0.16);
         private double DecalLife => S(20.0);
         private double TrailLife => S(0.2);
         private double PuffLife => S(0.42);
@@ -105,30 +136,57 @@ namespace CriticalMass.Runtime.View.Effects
 
         private double Ground(double x, double z) => CriticalMass.Runtime.GroundHeight.At(_map, x, z);
 
+        /// <summary>The cell type under sim (x, z), Void off the map.</summary>
+        public byte CellAt(double x, double z)
+        {
+            int cx = (int)Math.Floor(x), cz = (int)Math.Floor(z);
+            if (_map.Cells == null || cx < 0 || cz < 0 || cx >= _map.Width || cz >= _map.Height) return Cell.Void;
+            return _map.Cells[cz * _map.Width + cx];
+        }
+
         /// <summary>True when (x, z) is walkable ground (floor, bridge, rubble, barricade footing): decals land only there.</summary>
         public bool IsGround(double x, double z)
         {
-            int cx = (int)Math.Floor(x), cz = (int)Math.Floor(z);
-            if (_map.Cells == null || cx < 0 || cz < 0 || cx >= _map.Width || cz >= _map.Height) return false;
-            byte c = _map.Cells[cz * _map.Width + cx];
+            byte c = CellAt(x, z);
             return c == Cell.Floor || c == Cell.Bridge || c == Cell.BreakableDestroyed || c == Cell.Barricade;
+        }
+
+        /// <summary>
+        /// The top face a splat can rest on at sim (x, z): ground cells at their height, walls at their top face (the grey
+        /// box heights of GridChunkMeshView.CellBox: wall and intact breakable +1.5, cracked +0.75). False for void and water.
+        /// </summary>
+        public bool SurfaceTop(double x, double z, out double y)
+        {
+            byte c = CellAt(x, z);
+            double h = Ground(x, z);
+            switch (c)
+            {
+                case Cell.Floor:
+                case Cell.Bridge:
+                case Cell.BreakableDestroyed:
+                case Cell.Barricade: y = h; return true;
+                case Cell.Wall:
+                case Cell.BreakableIntact: y = h + 1.5; return true;
+                case Cell.BreakableCracked: y = h + 0.75; return true;
+                default: y = h; return false;
+            }
         }
 
         // ---- counts (tests, budgets) ----
         public int ActiveCount(double now)
         {
             int n = 0;
-            for (int i = 0; i < MaxBursts; i++) if (now - _bursts[i].Born < BurstLife) n++;
+            for (int i = 0; i < MaxBursts; i++) if (now - _bursts[i].Born < _bursts[i].Life) n++;
             for (int i = 0; i < MaxDroplets; i++) if (!_drops[i].Landed) n++;
             for (int i = 0; i < MaxDecals; i++) if (now - _decals[i].Born < _decals[i].Life) n++;
             for (int i = 0; i < MaxRings; i++) if (now - _rings[i].Born < _rings[i].Life) n++;
             for (int i = 0; i < MaxTrails; i++) if (now - _trails[i].Born < TrailLife) n++;
-            for (int i = 0; i < MaxChunks; i++) if (now - _chunks[i].Born < _chunks[i].Life) n++;
             for (int i = 0; i < MaxPuffs; i++) if (now - _puffs[i].Born < _puffs[i].Life) n++;
             for (int i = 0; i < MaxSparks; i++) if (now - _sparks[i].Born < _sparks[i].Life) n++;
-            return n;
+            return n + ActiveGore(now) + ActiveBoom(now) + ActiveWorld(now);
         }
 
+        /// <summary>Live blood splats and pools (wall tops included).</summary>
         public int DecalCount(double now)
         {
             int n = 0;
@@ -143,7 +201,36 @@ namespace CriticalMass.Runtime.View.Effects
             return n;
         }
 
-        public static int Capacity => MaxBursts + MaxDroplets + MaxDecals + MaxRings + MaxTrails + MaxChunks + MaxPuffs + MaxSparks;
+        /// <summary>Every live blood piece: droplets in flight, splats and pools, drips and gibs (0 whenever Blood is off).</summary>
+        public int BloodCount(double now)
+        {
+            int n = DecalCount(now) + DripCount(now) + GibCount(now);
+            for (int i = 0; i < MaxDroplets; i++) if (!_drops[i].Landed) n++;
+            return n;
+        }
+
+        public static int Capacity => MaxBursts + MaxDroplets + MaxDecals + MaxRings + MaxTrails + MaxChunks + MaxPuffs + MaxSparks +
+                                      MaxMarks + MaxDrips + MaxGibs + MaxExplosions + MaxMotes + MaxBubbles + MaxLeaves;
+
+        // ---- worst-case vertex cost per element and layer (the draw code below stays inside these) ----
+        public const int CostBurst = 270, CostDroplet = 30, CostDecal = 130, CostRingGround = 390, CostRingAir = 52, CostTrail = 100;
+        public const int CostChunk = 48, CostPuff = 40, CostSpark = 27, CostMark = 240, CostDrip = 14, CostGib = 144;
+        public const int CostExplosionAir = 520, CostExplosionGround = 21, CostMote = 36, CostBubble = 74, CostLeaf = 14;
+        public const int CostShield = 66, CostKaijuGround = 600, CostKaijuAir = 108;
+
+        /// <summary>Upper bound of vertices per layer (0 ground, 1 air, 2 solid) with every pool full at its worst shape.</summary>
+        public int WorstCaseVerts(int layer)
+        {
+            switch (layer)
+            {
+                case 0: return MaxDecals * CostDecal + MaxMarks * CostMark + MaxDrips * CostDrip + MaxRings * CostRingGround +
+                               MaxExplosions * CostExplosionGround + CostKaijuGround;
+                case 1: return MaxBursts * CostBurst + MaxDroplets * CostDroplet + MaxSparks * CostSpark + MaxPuffs * CostPuff +
+                               MaxTrails * CostTrail + _cap * CostShield + CostKaijuAir + MaxExplosions * CostExplosionAir +
+                               MaxMotes * CostMote + MaxBubbles * CostBubble + MaxLeaves * CostLeaf + MaxRings * CostRingAir;
+                default: return MaxChunks * CostChunk + MaxGibs * CostGib;
+            }
+        }
 
         // ---- spawning from events ----
 
@@ -155,41 +242,18 @@ namespace CriticalMass.Runtime.View.Effects
             {
                 case FxKind.Hit:
                 case FxKind.Death:
-                {
-                    double h = Ground(e.X, e.Z);
-                    double r = _cfg.Class(e.Cls).Radius;
-                    // Contact point: the victim's surface facing the source, at chest height.
-                    Vector3 contact = W(e.X - e.DirX * r * 0.8, h + 0.95, e.Z - e.DirZ * r * 0.8);
-                    float dmg01 = Mathf.Clamp01((float)(e.Value / 45.0));
-                    AddBurst(t, contact, 0.34f + 0.62f * dmg01 + (e.Kind == FxKind.Death ? 0.25f : 0f), 0, seed);
-                    int n = e.Kind == FxKind.Death ? 12 : 2 + (int)Math.Min(6, e.Value / 6);
-                    if (Blood)
-                    {
-                        for (int k = 0; k < n; k++) AddDroplet(t, e, h, seed, (uint)k, e.Kind == FxKind.Death);
-                        if (e.Kind == FxKind.Death && IsGround(e.X, e.Z))
-                            AddDecal(t, W(e.X + e.DirX * 0.25, h, e.Z + e.DirZ * 0.25), 1.05f, 1, seed, e.DirX, e.DirZ, S(0.7));
-                    }
-                    else
-                    {
-                        for (int k = 0; k < n + 2; k++) AddSpark(t, contact, e.DirX, e.DirZ, seed, (uint)k, 1);
-                    }
-                    if (e.Kind == FxKind.Death)
-                    {
-                        // The corpse pops out with a puff when CombatFx stops showing it (CorpseSeconds after the death).
-                        double pop = t + CorpseSeconds;
-                        Vector3 p = W(e.X, h + 0.5, e.Z);
-                        for (int k = 0; k < 7; k++) AddPuff(pop, p, seed, (uint)(k + 40), 0.42f, DustLight, 0);
-                    }
+                    SpawnHit(ref e, w, t, seed);
                     break;
-                }
                 case FxKind.Block:
                 {
                     double h = Ground(e.X, e.Z);
-                    Actor a = w.Actors[e.A];
-                    double fx = JsMath.Cos(a.Facing), fz = JsMath.Sin(a.Facing);
+                    double facing = e.A >= 0 && e.A < w.ActorCount ? w.Actors[e.A].Facing : Math.Atan2(-e.DirZ, -e.DirX);
+                    double fx = JsMath.Cos(facing), fz = JsMath.Sin(facing);
                     Vector3 p = W(e.X + fx * 0.7, h + 0.95, e.Z + fz * 0.7);
-                    AddBurst(t, p, 0.5f, 2, seed);
-                    for (int k = 0; k < 6; k++) AddSpark(t, p, -e.DirX, -e.DirZ, seed, (uint)k, 2);
+                    AddBurst(t, p, 0.5f, 2, seed, Vector3.zero, S(0.16));
+                    for (int k = 0; k < 7; k++) AddSpark(t, p, -e.DirX, -e.DirZ, seed, (uint)k, 2);
+                    // Ring ripple across the shield face: an expanding arc on the real +-60 degree cone.
+                    AddRing(t, W(e.X, h + 0.9, e.Z), 0.84f, 1.45f, 0.16f, S(0.24), Steel, 3, (float)-facing);
                     break;
                 }
                 case FxKind.Swing:
@@ -201,26 +265,19 @@ namespace CriticalMass.Runtime.View.Effects
                     double kr = _cfg.Kaiju.Radius;
                     float a = R01(seed, 1) * Mathf.PI * 2f;
                     Vector3 p = W(e.X + Math.Cos(a) * kr * 0.8, h + 1.4 + R01(seed, 2) * 0.8, e.Z + Math.Sin(a) * kr * 0.8);
-                    AddBurst(t, p, 0.45f + 0.3f * Mathf.Clamp01((float)(e.Value / 30.0)), 0, seed);
-                    for (int k = 0; k < 3; k++) AddSpark(t, p, Math.Cos(a), Math.Sin(a), seed, (uint)k, 1);
+                    byte tier = FxTier(e.Value, false);
+                    AddBurst(t, p, 0.45f + 0.3f * Mathf.Clamp01((float)(e.Value / 30.0)), tier == 0 ? (byte)0 : (byte)1, seed, Vector3.down, S(tier == 0 ? 0.16 : 0.2));
+                    for (int k = 0; k < 3 + tier * 2; k++) AddSpark(t, p, Math.Cos(a), Math.Sin(a), seed, (uint)k, 1);
                     break;
                 }
                 case FxKind.KaijuSlam:
+                    SpawnExplosion(t, e.X, e.Z, Mathf.Clamp((float)e.Value, 0.5f, 8f), ExplosionKind.KaijuSlam, seed, w);
+                    break;
+                case FxKind.Explosion:
                 {
-                    double h = Ground(e.X, e.Z);
-                    float rad = (float)e.Value;
-                    Vector3 c = W(e.X, h, e.Z);
-                    AddRing(t, c + Vector3.up * 0.05f, 0.4f, rad * 1.15f, 0.55f, S(0.32), DustLight, 0);
-                    AddRing(t + S(0.06), c + Vector3.up * 0.05f, 0.2f, rad * 0.8f, 0.3f, S(0.3), Warn, 0);
-                    AddDecal(t, c, rad * 0.75f, 2, seed, 1, 0, S(0.08), S(7.0));
-                    for (int k = 0; k < 14; k++)
-                    {
-                        float a = (k + R01(seed, (uint)k) * 0.6f) / 14f * Mathf.PI * 2f;
-                        Vector3 p = c + new Vector3(Mathf.Cos(a), 0.2f, Mathf.Sin(a)) * rad * (0.75f + 0.3f * R01(seed, (uint)k + 90));
-                        p.y = c.y + 0.25f;
-                        AddPuff(t + S(0.03 * (k % 3)), p, seed, (uint)k, 0.7f, k % 2 == 0 ? DustLight : DustMid, 1);
-                    }
-                    for (int k = 0; k < 12; k++) AddChunk(t, c + Vector3.up * 0.2f, rad * 0.55f, seed, (uint)k, 0, 1.0f);
+                    int k = e.B;
+                    if (k < 0 || k > (int)ExplosionKind.KaijuSlam) k = 0;
+                    SpawnExplosion(t, e.X, e.Z, Mathf.Clamp((float)e.Value, 0.5f, 6f), (ExplosionKind)k, seed, w);
                     break;
                 }
                 case FxKind.KaijuRoar:
@@ -234,6 +291,7 @@ namespace CriticalMass.Runtime.View.Effects
                     AddRing(t, c, 1.2f, 4.5f * big, 0.22f, S(0.45), col, 1);
                     AddRing(t + S(0.12), c, 1.2f, 3.4f * big, 0.16f, S(0.4), col, 1);
                     if (e.Kind != FxKind.KaijuRoar) AddRing(t + S(0.24), c, 1.0f, 6.5f, 0.3f, S(0.6), col, 1);
+                    if (e.Kind == FxKind.Hatch) RustleArea(e.X, e.Z, 4.0, t, seed);
                     break;
                 }
                 case FxKind.Respawn:
@@ -249,18 +307,8 @@ namespace CriticalMass.Runtime.View.Effects
                 case FxKind.Gather:
                 case FxKind.DeliverBiomass:
                 case FxKind.DeliverCorruption:
-                {
-                    double h = Ground(e.X, e.Z);
-                    Color32 col = e.Kind == FxKind.DeliverCorruption ? CorruptionC : BiomassC;
-                    bool deliver = e.Kind != FxKind.Gather;
-                    double px = e.X, pz = e.Z;
-                    if (deliver && e.A >= 0 && e.A < w.ActorCount) { px = w.X[e.A]; pz = w.Z[e.A]; }
-                    Vector3 c = W(px, h + 0.9, pz);
-                    AddRing(t, W(px, h + 0.06, pz), 0.2f, deliver ? 1.5f : 0.9f, 0.14f, S(0.35), col, 0);
-                    AddBurst(t, c, deliver ? 0.55f : 0.35f, 3, seed);
-                    for (int k = 0; k < (deliver ? 7 : 4); k++) AddSpark(t, c, 0, 0, seed, (uint)k, (byte)(deliver ? (e.Kind == FxKind.DeliverCorruption ? 4 : 3) : 3));
+                    SpawnResource(ref e, w, t, seed);
                     break;
-                }
                 case FxKind.BarricadePlaced:
                 {
                     double h = Ground(e.X, e.Z);
@@ -270,16 +318,24 @@ namespace CriticalMass.Runtime.View.Effects
                 }
                 case FxKind.BarricadeBroken:
                 case FxKind.WallCrack:
-                case FxKind.WallBreak:
                 {
                     double h = Ground(e.X, e.Z);
                     bool wood = e.Kind == FxKind.BarricadeBroken;
                     int n = e.Kind == FxKind.WallCrack ? 5 : 12;
                     Vector3 c = W(e.X, h + (wood ? 0.6 : 0.9), e.Z);
-                    for (int k = 0; k < n; k++) AddChunk(t, c, 0.4f, seed, (uint)k, wood ? (byte)1 : (byte)0, e.Kind == FxKind.WallCrack ? 0.6f : 0.85f);
+                    for (int k = 0; k < n; k++) AddChunk(t, c, 0.4f, seed, (uint)k, wood ? (byte)1 : (byte)0, e.Kind == FxKind.WallCrack ? 0.6f : 0.85f, 1f);
                     for (int k = 0; k < (n + 1) / 2; k++) AddPuff(t, c, seed, (uint)k + 20, 0.45f, DustMid, 1);
                     break;
                 }
+                case FxKind.WallBreak:
+                    SpawnExplosion(t, e.X, e.Z, 1.1f, ExplosionKind.WallBreak, seed, w);
+                    break;
+                case FxKind.Splash:
+                    SpawnSplash(t, e.X, e.Z, Mathf.Clamp((float)e.Value, 0.3f, 3f), seed);
+                    break;
+                case FxKind.Land:
+                    SpawnLanding(t, e.X, e.Z, e.Value >= 1, seed);
+                    break;
             }
         }
 
@@ -287,25 +343,106 @@ namespace CriticalMass.Runtime.View.Effects
         public double CorpseSeconds => S(1.35);
         public double PopSeconds => S(0.14);
 
-        private void AddBurst(double t, Vector3 p, float size, byte kind, uint seed)
+        /// <summary>Same tiers as CombatFeed.TierOf (hits decoded elsewhere carry their tier in FxEvent.Tier).</summary>
+        private static byte FxTier(double dmg, bool death) => CombatFeed.TierOf(dmg, death);
+
+        /// <summary>
+        /// The world direction the weapon travels through the victim (slash arcs follow it). Horizontal cleaves sweep across
+        /// the attack arc the way AddTrail draws them; chops (Miner, Builder) come down; Demolitions diagonal; Kaiju claws down
+        /// and across.
+        /// </summary>
+        private static Vector3 SwingTangent(ref FxEvent e)
         {
-            ref Burst b = ref _bursts[_nb++ % MaxBursts];
-            b.Born = t; b.P = p; b.Size = size; b.Kind = kind; b.Rot = R01(seed, 77) * Mathf.PI;
+            Vector3 d = W(e.DirX, 0, e.DirZ);
+            if (d.sqrMagnitude < 1e-6f) d = Vector3.right;
+            d.Normalize();
+            var across = new Vector3(d.z, 0, -d.x); // the cleave's sweep direction at the victim (basis angle decreasing)
+            if (e.B == Damage.KaijuSource) return (across + Vector3.down * 1.3f).normalized;
+            if (!e.HasAttacker) return across;
+            switch (e.AttCls)
+            {
+                case ClassId.Miner:
+                case ClassId.Builder: return (Vector3.down * 1.6f + d * 0.4f).normalized;
+                case ClassId.Demolitions: return (across + Vector3.down).normalized;
+                case ClassId.Farmer: return -across;
+                default: return across;
+            }
         }
 
-        private void AddDroplet(double t, FxEvent e, double h, uint seed, uint k, bool big)
+        private void SpawnHit(ref FxEvent e, World w, double t, uint seed)
+        {
+            bool death = e.Kind == FxKind.Death;
+            double h = Ground(e.X, e.Z);
+            double r = _cfg.Class(e.Cls).Radius;
+            // Contact point: the victim's surface facing the source, at chest height.
+            Vector3 contact = W(e.X - e.DirX * r * 0.8, h + 0.95, e.Z - e.DirZ * r * 0.8);
+            float dmg01 = Mathf.Clamp01((float)(e.Value / 45.0));
+            byte tier = death ? (byte)2 : e.Tier;
+            Vector3 tan = SwingTangent(ref e);
+            // Shape language per tier: light = star burst; heavy = star + slash arc along the swing; critical or finishing =
+            // the big cracked impact frame. Kaiju melee adds three claw rakes.
+            if (tier == 0) AddBurst(t, contact, 0.34f + 0.4f * dmg01, 0, seed, tan, S(0.16));
+            else if (tier == 1) AddBurst(t, contact, 0.52f + 0.4f * dmg01, 1, seed, tan, S(0.2));
+            else AddBurst(t, contact, 0.95f + (death ? 0.15f : 0f), 4, seed, tan, S(0.3));
+            if (e.B == Damage.KaijuSource) AddBurst(t, contact + Vector3.up * 0.2f, 1.05f, 5, seed + 1, tan, S(0.24));
+
+            // Knock-back dust at the feet, blown along the hit.
+            if (tier >= 1)
+            {
+                Vector3 feet = W(e.X, h + 0.12, e.Z);
+                for (int k = 0; k < 2 + tier; k++) AddPuff(t, feet, seed, (uint)(k + 60), 0.3f + 0.06f * tier, DustMid, 2, e.DirX, e.DirZ);
+                RustleArea(e.X, e.Z, 0.9 + 0.5 * tier, t, seed);
+            }
+
+            if (death) RememberDeath(t, e.X, e.Z, h, seed, e.DirX, e.DirZ);
+            if (Blood)
+            {
+                int n = death ? 14 : 2 + (int)Math.Min(6, e.Value / 6) + tier * 2;
+                float spread = tier == 0 ? 0.95f : tier == 1 ? 0.6f : 0.75f;
+                for (int k = 0; k < n; k++) AddDroplet(t, e, h, seed, (uint)k, death, spread, 1f);
+                // Mist: small fast drops straight down the hit line (the "spray").
+                for (int k = 0; k < tier; k++) AddDroplet(t, e, h, seed, (uint)(k + 40), false, 0.2f, 1.7f);
+                if (death)
+                {
+                    if (SurfaceTop(e.X, e.Z, out double py))
+                        AddDecal(t, W(e.X + e.DirX * 0.25, py, e.Z + e.DirZ * 0.25), 1.25f, 1, 6, seed, e.DirX, e.DirZ, S(1.0));
+                    if (GibWorthy(ref e, w)) AddGibs(t, e.X, e.Z, h, seed, e.DirX, e.DirZ);
+                }
+            }
+            else
+            {
+                int n = death ? 12 : 2 + (int)Math.Min(6, e.Value / 6);
+                for (int k = 0; k < n + 2 + tier * 2; k++) AddSpark(t, contact, e.DirX, e.DirZ, seed, (uint)k, 1);
+            }
+            if (death)
+            {
+                // The corpse pops out with a puff when CombatFx stops showing it (CorpseSeconds after the death).
+                double pop = t + CorpseSeconds;
+                Vector3 p = W(e.X, h + 0.5, e.Z);
+                for (int k = 0; k < 7; k++) AddPuff(pop, p, seed, (uint)(k + 40), 0.42f, DustLight, 0);
+            }
+            if (tier >= 1) AddImpulse(t, e.X, h, e.Z, 0.35f + 0.25f * tier);
+        }
+
+        private void AddBurst(double t, Vector3 p, float size, byte kind, uint seed, Vector3 tan, double life)
+        {
+            ref Burst b = ref _bursts[_nb++ % MaxBursts];
+            b.Born = t; b.P = p; b.Size = size; b.Kind = kind; b.Rot = R01(seed, 77) * Mathf.PI; b.Tan = tan; b.Life = life;
+        }
+
+        private void AddDroplet(double t, FxEvent e, double h, uint seed, uint k, bool big, float spreadRad, float speedMul)
         {
             ref Droplet d = ref _drops[_nd++ % MaxDroplets];
-            float spread = (R01(seed, k * 3 + 1) - 0.5f) * 1.4f;
+            float spread = (R01(seed, k * 3 + 1) - 0.5f) * 2f * spreadRad;
             double dx = e.DirX * Math.Cos(spread) - e.DirZ * Math.Sin(spread);
             double dz = e.DirX * Math.Sin(spread) + e.DirZ * Math.Cos(spread);
-            float sp = (big ? 2.4f : 1.6f) + R01(seed, k * 3 + 2) * (big ? 3.2f : 2.6f);
-            float vy = 3.0f + R01(seed, k * 3 + 3) * 3.4f;
+            float sp = ((big ? 2.4f : 1.6f) + R01(seed, k * 3 + 2) * (big ? 3.2f : 2.6f)) * speedMul;
+            float vy = (3.0f + R01(seed, k * 3 + 3) * 3.4f) / Mathf.Sqrt(speedMul);
             d.Born = t;
             d.P0 = W(e.X + e.DirX * 0.15, h + 0.95, e.Z + e.DirZ * 0.15);
             Vector3 dirW = W(dx, 0, dz);
             d.V = dirW * sp + Vector3.up * vy;
-            d.Size = (big ? 0.12f : 0.08f) + R01(seed, k * 7 + 5) * 0.07f;
+            d.Size = ((big ? 0.12f : 0.08f) + R01(seed, k * 7 + 5) * 0.07f) * (speedMul > 1f ? 0.6f : 1f);
             d.GroundY = (float)h;
             float dy = d.P0.y - d.GroundY;
             d.TLand = (vy + Mathf.Sqrt(vy * vy + 2f * G * dy)) / G;
@@ -315,19 +452,19 @@ namespace CriticalMass.Runtime.View.Effects
             d.DirZ = dz;
         }
 
-        private void AddDecal(double t, Vector3 p, float size, byte kind, uint seed, double dirX, double dirZ, double grow, double life = -1)
+        private void AddDecal(double t, Vector3 p, float size, byte kind, byte shape, uint seed, double dirX, double dirZ, double grow, double life = -1)
         {
             ref Decal d = ref _decals[_ndc++ % MaxDecals];
-            d.Born = t; d.P = p; d.Size = size; d.Kind = kind; d.Seed = seed; d.Grow = (float)grow;
+            d.Born = t; d.P = p; d.Size = size; d.Kind = kind; d.Shape = shape; d.Seed = seed; d.Grow = (float)grow;
             d.Life = life > 0 ? life : DecalLife;
             d.Rot = R01(seed, 11) * Mathf.PI * 2f;
             d.DirA = Mathf.Atan2((float)-dirZ, (float)dirX); // basis angle in the ground plane (right = +X, up = +Z world)
         }
 
-        private void AddRing(double t, Vector3 p, float r0, float r1, float width, double life, Color32 col, byte kind)
+        private void AddRing(double t, Vector3 p, float r0, float r1, float width, double life, Color32 col, byte kind, float facing = 0f)
         {
             ref Ring r = ref _rings[_nr++ % MaxRings];
-            r.Born = t; r.P = p; r.R0 = r0; r.R1 = r1; r.Width = width; r.Life = life; r.Col = col; r.Kind = kind;
+            r.Born = t; r.P = p; r.R0 = r0; r.R1 = r1; r.Width = width; r.Life = life; r.Col = col; r.Kind = kind; r.Facing = facing;
         }
 
         private void AddTrail(double t, FxEvent e, World w)
@@ -341,45 +478,27 @@ namespace CriticalMass.Runtime.View.Effects
             tr.Arc = (float)(cc.AttackArcDeg * Math.PI / 180);
             tr.Radius = (float)cc.AttackRange * 0.82f;
             tr.Team = e.Team == TeamId.Azure ? AzureC : CrimsonC;
-            tr.Kind = e.Cls == ClassId.Miner ? (byte)1 : (byte)0;
+            tr.Kind = (byte)e.Cls;
         }
 
-        private void AddChunk(double t, Vector3 p, float spread, uint seed, uint k, byte mat, float scale)
-        {
-            ref Chunk c = ref _chunks[_nc++ % MaxChunks];
-            float a = R01(seed, k * 5 + 1) * Mathf.PI * 2f;
-            float sp = 1.8f + R01(seed, k * 5 + 2) * 3.2f;
-            c.Born = t;
-            c.P0 = p + new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a)) * spread * R01(seed, k * 5 + 3);
-            c.V = new Vector3(Mathf.Cos(a) * sp, 4.5f + R01(seed, k * 5 + 4) * 4.5f, Mathf.Sin(a) * sp);
-            c.Axis = new Vector3(R01(seed, k + 60) - 0.5f, R01(seed, k + 61) - 0.5f, R01(seed, k + 62) - 0.5f).normalized;
-            if (c.Axis.sqrMagnitude < 0.01f) c.Axis = Vector3.right;
-            c.Spin = 8f + R01(seed, k + 63) * 10f;
-            c.Size = (0.09f + R01(seed, k + 64) * 0.12f) * scale;
-            c.GroundY = p.y - 0.85f;
-            double gy = Ground(SimX(c.P0), SimZ(c.P0));
-            c.GroundY = (float)gy;
-            float dy = c.P0.y - c.GroundY - c.Size;
-            c.TLand = (c.V.y + Mathf.Sqrt(c.V.y * c.V.y + 2f * G * Mathf.Max(0, dy))) / G;
-            c.Life = S(1.6);
-            c.Mat = mat;
-        }
-
-        private void AddPuff(double t, Vector3 p, uint seed, uint k, float size, Color32 col, byte kind)
+        private void AddPuff(double t, Vector3 p, uint seed, uint k, float size, Color32 col, byte kind, double dirX = 0, double dirZ = 0)
         {
             ref Puff f = ref _puffs[_np++ % MaxPuffs];
             float a = R01(seed, k * 3 + 100) * Mathf.PI * 2f;
             float sp = (kind == 1 ? 1.4f : 0.8f) + R01(seed, k * 3 + 101) * 1.2f;
             f.Born = t;
             f.P0 = p;
-            f.V = new Vector3(Mathf.Cos(a) * sp, 0.6f + R01(seed, k * 3 + 102) * 0.9f, Mathf.Sin(a) * sp);
+            var v = new Vector3(Mathf.Cos(a) * sp, 0.6f + R01(seed, k * 3 + 102) * 0.9f, Mathf.Sin(a) * sp);
+            if (kind == 2 && (dirX != 0 || dirZ != 0)) v = W(dirX, 0, dirZ) * (1.6f + R01(seed, k + 105) * 1.4f) + v * 0.45f; // knock-back: blown along the hit
+            if (kind == 3) v *= 0.5f; // plank dust: short and low
+            f.V = v;
             f.Size = size * (0.7f + 0.6f * R01(seed, k * 3 + 103));
             f.Col = col;
             f.Kind = kind;
-            f.Life = PuffLife * (0.8 + 0.4 * R01(seed, k + 104));
+            f.Life = PuffLife * (0.8 + 0.4 * R01(seed, k + 104)) * (kind == 5 ? 2.2 : 1.0);
         }
 
-        /// <summary>kind 1 white-yellow hit spark, 2 steel block spark, 3 biomass mote, 4 corruption mote.</summary>
+        /// <summary>kind 1 white-yellow hit spark, 2 steel block spark, 3 biomass mote, 5 ember, 6 water drop, 7 grit.</summary>
         private void AddSpark(double t, Vector3 p, double dirX, double dirZ, uint seed, uint k, byte kind)
         {
             ref Puff s = ref _sparks[_ns++ % MaxSparks];
@@ -387,14 +506,16 @@ namespace CriticalMass.Runtime.View.Effects
             Vector3 dir = new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a));
             if (dirX != 0 || dirZ != 0) dir = (W(dirX, 0, dirZ) * 1.3f + dir * 0.8f).normalized;
             float sp = 3f + R01(seed, k * 3 + 201) * 4f;
-            if (kind >= 3) sp *= 0.4f;
+            if (kind == 3) sp *= 0.4f;
+            if (kind == 5) sp *= 0.35f;
             s.Born = t;
             s.P0 = p;
-            s.V = dir * sp + Vector3.up * (kind >= 3 ? 3.2f : 1.5f + R01(seed, k + 202) * 2.5f);
-            s.Size = (kind >= 3 ? 0.12f : 0.09f) + R01(seed, k + 203) * 0.06f;
-            s.Col = kind == 2 ? Steel : kind == 3 ? BiomassC : kind == 4 ? CorruptionC : SparkYellow;
+            float up = kind == 3 ? 3.2f : kind == 5 ? 2.4f + R01(seed, k + 204) * 2f : kind == 6 ? 4f + R01(seed, k + 204) * 2.5f : 1.5f + R01(seed, k + 202) * 2.5f;
+            s.V = dir * sp + Vector3.up * up;
+            s.Size = (kind == 3 ? 0.12f : kind == 6 ? 0.1f : 0.09f) + R01(seed, k + 203) * 0.06f;
+            s.Col = kind == 2 ? Steel : kind == 3 ? BiomassC : kind == 5 ? FireOrange : kind == 6 ? WaterMid : kind == 7 ? DirtMid : SparkYellow;
             s.Kind = kind;
-            s.Life = SparkLife * (kind >= 3 ? 2.2 : 1.0);
+            s.Life = SparkLife * (kind == 3 ? 2.2 : kind == 5 ? 3.6 : kind == 6 ? 1.8 : 1.0);
         }
 
         private static double SimX(Vector3 p) => p.x;
@@ -402,7 +523,7 @@ namespace CriticalMass.Runtime.View.Effects
 
         // ---- per-frame update and mesh build ----
 
-        /// <summary>Land droplets whose flight ended by `now` (decal birth = the exact landing time).</summary>
+        /// <summary>Land droplets, chunks and gibs whose flight ended by `now` (each landing's birth = its exact landing time).</summary>
         public void Advance(double now)
         {
             for (int i = 0; i < MaxDroplets; i++)
@@ -412,11 +533,14 @@ namespace CriticalMass.Runtime.View.Effects
                 d.Landed = true;
                 Vector3 p = d.P0 + d.V * d.TLand;
                 double sx = p.x, sz = -p.z;
-                if (!IsGround(sx, sz)) continue;
-                p.y = (float)Ground(sx, sz);
+                if (!SurfaceTop(sx, sz, out double top)) continue;
+                p.y = (float)top;
                 uint seed = Hash((uint)i, (uint)(d.Born * 1000), 3u);
-                AddDecal(d.Born + d.TLand, p, d.Size * (d.Pool ? 3.6f : 3.0f), 0, seed, d.DirX, d.DirZ, S(0.05));
+                // Six splat shapes for flying drops; the pool shape (6) is the knock-out's own.
+                byte shape = (byte)(Hash(seed, 5u, 9u) % 6u);
+                AddDecal(d.Born + d.TLand, p, d.Size * (d.Pool ? 3.6f : 3.0f), 0, shape, seed, d.DirX, d.DirZ, S(0.05));
             }
+            AdvanceSolids(now);
         }
 
         private static Color32 A(Color32 c, float a)
@@ -425,7 +549,8 @@ namespace CriticalMass.Runtime.View.Effects
             return c;
         }
 
-        /// <summary>Rebuild the three layer meshes: ground (decals, rings, telegraph), air (billboards, trails), solid (chunks).</summary>
+        /// <summary>Rebuild the three layer meshes: ground (decals, marks, rings, telegraph, light pulses), air (billboards,
+        /// trails, fireballs, smoke), solid (chunks, gibs).</summary>
         public void Build(double now, World w, Vector3 camRight, Vector3 camUp, FxMeshBuilder ground, FxMeshBuilder air, FxMeshBuilder solid)
         {
             ground.Clear();
@@ -434,39 +559,11 @@ namespace CriticalMass.Runtime.View.Effects
             Vector3 gr = Vector3.right, gu = Vector3.forward; // ground plane basis (world)
             const float lift = 0.03f;
 
-            // Decals: outlined splats (kind 0), pools (1), slam cracks (2).
-            for (int i = 0; i < MaxDecals; i++)
-            {
-                ref Decal d = ref _decals[i];
-                double age = now - d.Born;
-                if (age < 0 || age >= d.Life) continue;
-                float grow = d.Grow > 0 ? Mathf.Clamp01((float)(age / d.Grow)) : 1f;
-                grow = 1f - (1f - grow) * (1f - grow);
-                float fade = (float)Math.Min(1.0, (d.Life - age) / (d.Life * 0.3));
-                Vector3 c = d.P + Vector3.up * lift;
-                if (d.Kind == 2) { DrawCrack(ground, c, d.Size * grow, d.Rot, d.Seed, fade); continue; }
-                float s = d.Size * grow * (d.Kind == 1 ? 1f : 1f);
-                int n = d.Kind == 1 ? 12 : 9;
-                for (int k = 0; k < n; k++) _radii[k] = 0.72f + 0.5f * R01(d.Seed, (uint)k);
-                // Stretch along the fly direction: offset the blob centre forward a little and add satellites.
-                ground.Blob(c, gr, gu, s * 1.16f + 0.03f, _radii, n, d.Rot, A(Navy, fade * 0.9f));
-                ground.Blob(c, gr, gu, s, _radii, n, d.Rot, A(BloodMid, fade));
-                Vector3 off = (gr * Mathf.Cos(d.DirA + Mathf.PI) + gu * Mathf.Sin(d.DirA + Mathf.PI)) * s * 0.18f;
-                ground.Blob(c + off, gr, gu, s * 0.58f, _radii, n, d.Rot + 0.9f, A(BloodDark, fade));
-                ground.Blob(c - off * 1.6f + (gr * 0.3f + gu * 0.25f) * s * 0.4f, gr, gu, s * 0.2f, null, 6, 0, A(BloodLight, fade));
-                int sats = d.Kind == 1 ? 4 : 2;
-                for (int k = 0; k < sats; k++)
-                {
-                    float a = d.DirA + (R01(d.Seed, (uint)k + 30) - 0.5f) * 1.1f;
-                    float dist = s * (1.3f + 0.7f * R01(d.Seed, (uint)k + 31));
-                    float sr = s * (0.16f + 0.14f * R01(d.Seed, (uint)k + 32));
-                    Vector3 p = c + (gr * Mathf.Cos(a) + gu * Mathf.Sin(a)) * dist;
-                    ground.Blob(p, gr, gu, sr + 0.025f, null, 7, 0, A(Navy, fade * 0.9f));
-                    ground.Blob(p, gr, gu, sr, null, 7, 0, A(BloodMid, fade));
-                }
-            }
+            BuildMarks(now, ground);
+            BuildDecals(now, ground);
+            BuildDrips(now, ground);
 
-            // Expanding rings (0 ground ring, 1 roar double ring, 2 respawn beam).
+            // Expanding rings (0 ground ring, 1 roar double ring, 2 respawn beam, 3 shield ripple, 4 water splash ring).
             for (int i = 0; i < MaxRings; i++)
             {
                 ref Ring r = ref _rings[i];
@@ -489,6 +586,14 @@ namespace CriticalMass.Runtime.View.Effects
                 float rad = Mathf.Lerp(r.R0, r.R1, e);
                 float wd = r.Width * (1f - 0.6f * t);
                 float fade = 1f - t * t;
+                if (r.Kind == 3)
+                {
+                    // Shield ripple: the struck arc pushed outward, navy then steel-white.
+                    float half = (float)(Damage.ShieldHalfArcDeg * Math.PI / 180) * (1f - 0.3f * t);
+                    air.Ring(r.P, gr, gu, rad - wd * 0.5f - 0.04f, rad + wd * 0.5f + 0.04f, r.Facing - half, r.Facing + half, 12, A(Navy, fade * 0.8f));
+                    air.Ring(r.P, gr, gu, rad - wd * 0.5f, rad + wd * 0.5f, r.Facing - half, r.Facing + half, 12, A(t < 0.3f ? SparkWhite : r.Col, fade));
+                    continue;
+                }
                 Vector3 c = r.P + Vector3.up * lift;
                 int seg = Mathf.Clamp((int)(rad * 10f), 20, 64);
                 ground.Ring(c, gr, gu, rad - wd * 0.5f - 0.05f, rad + wd * 0.5f + 0.05f, 0, Mathf.PI * 2f, seg, A(Navy, fade * 0.85f));
@@ -498,61 +603,12 @@ namespace CriticalMass.Runtime.View.Effects
 
             DrawKaijuState(w, ground, air, now);
             DrawShields(w, air, now);
+            BuildBoomGround(now, ground);
 
-            // Swing trails: Warrior cleave = horizontal crescent across the attack arc; Miner pick = vertical chop arc.
-            for (int i = 0; i < MaxTrails; i++)
-            {
-                ref Trail tr = ref _trails[i];
-                double age = now - tr.Born;
-                if (age < 0 || age >= TrailLife) continue;
-                float t = (float)(age / TrailLife);
-                float sweep = Mathf.Clamp01(t / 0.55f);
-                sweep = 1f - (1f - sweep) * (1f - sweep);
-                float fade = t < 0.55f ? 1f : 1f - (t - 0.55f) / 0.45f;
-                if (tr.Kind == 0)
-                {
-                    float centre = -tr.Facing; // sim angle -> ground basis angle
-                    float a0 = centre + tr.Arc * 0.5f, a1 = centre - tr.Arc * 0.5f;
-                    float head = Mathf.Lerp(a0, a1, sweep);
-                    float tail = Mathf.Lerp(a0, head, Mathf.Clamp01(t * 1.4f));
-                    Vector3 c = tr.P + Vector3.up * 0.85f;
-                    air.Crescent(c, gr, gu, tr.Radius, 0.26f, tail, head, 14, A(Navy, 0), A(Navy, fade * 0.95f));
-                    air.Crescent(c, gr, gu, tr.Radius, 0.2f, tail, head, 14, A(tr.Team, 0), A(tr.Team, fade * 0.85f));
-                    air.Crescent(c, gr, gu, tr.Radius + 0.02f, 0.1f, tail, head, 14, A(SparkWhite, 0), A(SparkWhite, fade));
-                }
-                else
-                {
-                    Vector3 fwd = W(Math.Cos(tr.Facing), 0, Math.Sin(tr.Facing)).normalized;
-                    Vector3 c = tr.P + Vector3.up * 0.75f;
-                    float a0 = 1.9f, a1 = -0.35f; // overhead behind -> low in front
-                    float head = Mathf.Lerp(a0, a1, sweep);
-                    float tail = Mathf.Lerp(a0, head, Mathf.Clamp01(t * 1.4f));
-                    air.Crescent(c, fwd, Vector3.up, 0.95f, 0.2f, tail, head, 12, A(Navy, 0), A(Navy, fade * 0.95f));
-                    air.Crescent(c, fwd, Vector3.up, 0.95f, 0.15f, tail, head, 12, A(SparkYellow, 0), A(SparkYellow, fade * 0.9f));
-                    air.Crescent(c, fwd, Vector3.up, 0.97f, 0.07f, tail, head, 12, A(SparkWhite, 0), A(SparkWhite, fade));
-                }
-            }
+            BuildTrails(now, air, gr, gu);
+            BuildBursts(now, air, camRight, camUp);
 
-            // Impact bursts: navy star, colour star, white core; pop then shrink.
-            for (int i = 0; i < MaxBursts; i++)
-            {
-                ref Burst b = ref _bursts[i];
-                double age = now - b.Born;
-                if (age < 0 || age >= BurstLife) continue;
-                float t = (float)(age / BurstLife);
-                float s = b.Size * (t < 0.25f ? Mathf.Lerp(0.55f, 1.15f, t / 0.25f) : Mathf.Lerp(1.15f, 0.35f, (t - 0.25f) / 0.75f));
-                float fade = t < 0.6f ? 1f : 1f - (t - 0.6f) / 0.4f;
-                Color32 mid = b.Kind == 2 ? Steel : b.Kind == 3 ? BiomassC : SparkYellow;
-                Color32 core = SparkWhite;
-                int pts = b.Kind == 2 ? 6 : 8;
-                Vector3 p = b.P - (camRight * 0 + Vector3.Cross(camRight, camUp)) * 0.3f; // nudge toward the camera
-                air.Star(p, camRight, camUp, s * 1.22f + 0.04f, 0.42f, pts, b.Rot, A(Navy, fade));
-                air.Star(p, camRight, camUp, s, 0.42f, pts, b.Rot, A(mid, fade));
-                air.Star(p, camRight, camUp, s * 0.62f, 0.5f, pts, b.Rot + 0.2f, A(core, fade));
-                if (b.Kind == 0) air.Blob(p, camRight, camUp, s * 0.24f, null, 8, 0, A(SparkOrange, fade));
-            }
-
-            // Blood droplets in flight (billboard blobs with navy rims).
+            // Blood droplets in flight: teardrops stretched along their own velocity, navy rims.
             for (int i = 0; i < MaxDroplets; i++)
             {
                 ref Droplet d = ref _drops[i];
@@ -560,12 +616,20 @@ namespace CriticalMass.Runtime.View.Effects
                 float age = (float)(now - d.Born);
                 if (age < 0) continue;
                 Vector3 p = d.P0 + d.V * age + Vector3.down * (0.5f * G * age * age);
+                Vector3 v = d.V + Vector3.down * (G * age);
+                float vx = Vector3.Dot(v, camRight), vy = Vector3.Dot(v, camUp);
+                float vl = Mathf.Sqrt(vx * vx + vy * vy);
+                Vector3 back = vl > 1e-3f ? -(camRight * (vx / vl) + camUp * (vy / vl)) : -camUp;
+                Vector3 side = Vector3.Cross(back, Vector3.Cross(camRight, camUp)).normalized;
+                float tail = d.Size * Mathf.Min(2.6f, 0.6f + vl * 0.12f);
                 air.Blob(p, camRight, camUp, d.Size + 0.03f, null, 7, 0, Navy);
+                air.Quad(p + back * (tail * 0.5f), back * (tail * 0.5f), side * (d.Size * 0.62f + 0.03f), Navy, Navy);
                 air.Blob(p, camRight, camUp, d.Size, null, 7, 0, BloodMid);
+                air.Quad(p + back * (tail * 0.5f), back * (tail * 0.5f), side * (d.Size * 0.62f), BloodMid, BloodMid);
                 air.Blob(p + (camUp - camRight) * d.Size * 0.3f, camRight, camUp, d.Size * 0.38f, null, 5, 0, BloodLight);
             }
 
-            // Sparks (diamonds) and motes.
+            // Sparks (diamonds), embers, water drops, grit.
             for (int i = 0; i < MaxSparks; i++)
             {
                 ref Puff s = ref _sparks[i];
@@ -573,15 +637,25 @@ namespace CriticalMass.Runtime.View.Effects
                 if (age < 0 || age >= s.Life) continue;
                 float t = (float)(age / s.Life);
                 float a = (float)age;
-                Vector3 p = s.P0 + s.V * a + Vector3.down * (0.5f * (s.Kind >= 3 ? -2f : G * 0.6f) * a * a);
+                float grav = s.Kind == 3 ? -2f : s.Kind == 5 ? 1.2f : s.Kind == 6 ? G : G * 0.6f;
+                Vector3 p = s.P0 + s.V * a + Vector3.down * (0.5f * grav * a * a);
+                if (s.Kind == 5) p += camRight * (0.12f * Mathf.Sin(a * 7f + i)); // embers flicker sideways as they float
                 float sz = s.Size * (1f - t * 0.7f);
                 float fade = 1f - t * t;
+                if (s.Kind == 6)
+                {
+                    air.Blob(p, camRight, camUp, sz + 0.03f, null, 6, 0, A(Navy, fade * 0.8f));
+                    air.Blob(p, camRight, camUp, sz, null, 6, 0, A(t < 0.4f ? WaterLight : s.Col, fade));
+                    continue;
+                }
                 air.Star(p, camRight, camUp, sz + 0.035f, 0.45f, 4, 0.785f, A(Navy, fade));
-                air.Star(p, camRight, camUp, sz, 0.45f, 4, 0.785f, A(s.Col, fade));
-                if (s.Kind <= 2) air.Star(p, camRight, camUp, sz * 0.5f, 0.5f, 4, 0.785f, A(SparkWhite, fade));
+                Color32 col = s.Col;
+                if (s.Kind == 5) col = t < 0.3f ? FireYellow : t < 0.65f ? FireOrange : FireRed; // stepped cooling
+                air.Star(p, camRight, camUp, sz, 0.45f, 4, 0.785f, A(col, fade));
+                if (s.Kind <= 2 || s.Kind == 5) air.Star(p, camRight, camUp, sz * 0.5f, 0.5f, 4, 0.785f, A(SparkWhite, fade));
             }
 
-            // Dust puffs: chunky outlined cloud blobs, rise and fade.
+            // Dust puffs: chunky outlined cloud blobs, rise and fade (kind 3 plank dust in wood tones, 4 foam, 5 smoke).
             for (int i = 0; i < MaxPuffs; i++)
             {
                 ref Puff f = ref _puffs[i];
@@ -592,60 +666,201 @@ namespace CriticalMass.Runtime.View.Effects
                 Vector3 p = f.P0 + f.V * (drag / 4f) * 1.6f;
                 float sz = f.Size * (0.5f + 0.8f * Mathf.Sqrt(t)) * (1f - t * 0.35f);
                 float fade = 1f - t * t;
+                Color32 hi = f.Kind == 3 ? WoodLight : f.Kind == 4 ? WaterLight : f.Kind == 5 ? SmokeLight : DustLight;
+                Color32 lo = f.Kind == 3 ? WoodDark : f.Kind == 4 ? WaterMid : f.Kind == 5 ? SmokeDark : DustDark;
                 air.Blob(p, camRight, camUp, sz + 0.05f, null, 9, 0, A(Navy, fade * 0.85f));
                 air.Blob(p, camRight, camUp, sz, null, 9, 0, A(f.Col, fade));
-                air.Blob(p + (camUp - camRight) * sz * 0.25f, camRight, camUp, sz * 0.55f, null, 8, 0, A(DustLight, fade));
-                air.Blob(p - (camUp - camRight * 0.4f) * sz * 0.3f, camRight, camUp, sz * 0.45f, null, 8, 0, A(DustDark, fade * 0.8f));
+                air.Blob(p + (camUp - camRight) * sz * 0.25f, camRight, camUp, sz * 0.55f, null, 8, 0, A(hi, fade));
+                air.Blob(p - (camUp - camRight * 0.4f) * sz * 0.3f, camRight, camUp, sz * 0.45f, null, 8, 0, A(lo, fade * 0.8f));
             }
 
-            // Debris chunks: toon cubes with an inverted navy hull; bounce once onto the ground, then shrink out.
-            for (int i = 0; i < MaxChunks; i++)
+            BuildBoomAir(now, air, camRight, camUp);
+            BuildWorldAir(now, w, air, camRight, camUp);
+            BuildSolids(now, solid);
+        }
+
+        // ---- hit bursts: light star, heavy star + slash, block, gather, critical impact frame, Kaiju claws ----
+
+        private void BuildBursts(double now, FxMeshBuilder air, Vector3 camRight, Vector3 camUp)
+        {
+            Vector3 toCam = -Vector3.Cross(camRight, camUp);
+            for (int i = 0; i < MaxBursts; i++)
             {
-                ref Chunk c = ref _chunks[i];
-                double age = now - c.Born;
-                if (age < 0 || age >= c.Life) continue;
-                float a = (float)Math.Min(age, c.TLand);
-                Vector3 p = c.P0 + c.V * a + Vector3.down * (0.5f * G * a * a);
-                if (age > c.TLand)
+                ref Burst b = ref _bursts[i];
+                double age = now - b.Born;
+                if (age < 0 || age >= b.Life) continue;
+                float t = (float)(age / b.Life);
+                float s = b.Size * (t < 0.25f ? Mathf.Lerp(0.55f, 1.15f, t / 0.25f) : Mathf.Lerp(1.15f, 0.35f, (t - 0.25f) / 0.75f));
+                float fade = t < 0.6f ? 1f : 1f - (t - 0.6f) / 0.4f;
+                Vector3 p = b.P + toCam * 0.3f; // nudge toward the camera
+                // The slash plane: the swing tangent projected into the camera plane.
+                float tx = Vector3.Dot(b.Tan, camRight), ty = Vector3.Dot(b.Tan, camUp);
+                float tl = Mathf.Sqrt(tx * tx + ty * ty);
+                if (tl < 1e-3f) { tx = 1; ty = 0; tl = 1; }
+                Vector3 sR = camRight * (tx / tl) + camUp * (ty / tl);
+                Vector3 sU = Vector3.Cross(toCam, sR).normalized;
+                switch (b.Kind)
                 {
-                    float sl = (float)(age - c.TLand);
-                    p += new Vector3(c.V.x, 0, c.V.z) * (0.18f * (1f - Mathf.Exp(-6f * sl)));
-                    p.y = c.GroundY + c.Size;
+                    case 4:
+                        DrawImpactFrame(air, p, sR, sU, camRight, camUp, b, (float)age, t, fade);
+                        break;
+                    case 5:
+                    {
+                        // Kaiju claws: three parallel rakes along the swing, hot yellow on navy.
+                        for (int k = -1; k <= 1; k++)
+                        {
+                            Vector3 o = sU * (k * 0.22f * b.Size);
+                            Slash(air, p + o, sR, sU, b.Size * 0.9f, 0.13f, t, fade, WarnHot, Warn, 1.15f);
+                        }
+                        air.Star(p, camRight, camUp, s * 0.5f + 0.04f, 0.42f, 8, b.Rot, A(Navy, fade));
+                        air.Star(p, camRight, camUp, s * 0.5f, 0.42f, 8, b.Rot, A(Warn, fade));
+                        break;
+                    }
+                    default:
+                    {
+                        Color32 mid = b.Kind == 2 ? Steel : b.Kind == 3 ? BiomassC : SparkYellow;
+                        int pts = b.Kind == 2 ? 6 : 8;
+                        if (b.Kind == 1) Slash(air, p, sR, sU, b.Size * 1.1f, 0.15f, t, fade, SparkYellow, SparkWhite, 1.0f);
+                        air.Star(p, camRight, camUp, s * 1.22f + 0.04f, 0.42f, pts, b.Rot, A(Navy, fade));
+                        air.Star(p, camRight, camUp, s, 0.42f, pts, b.Rot, A(mid, fade));
+                        air.Star(p, camRight, camUp, s * 0.62f, 0.5f, pts, b.Rot + 0.2f, A(SparkWhite, fade));
+                        if (b.Kind == 0 || b.Kind == 1) air.Blob(p, camRight, camUp, s * 0.24f, null, 8, 0, A(SparkOrange, fade));
+                        break;
+                    }
                 }
-                float tail = (float)((c.Life - age) / (c.Life * 0.25));
-                float sz = c.Size * Mathf.Clamp01(tail);
-                Quaternion rot = Quaternion.AngleAxis(Mathf.Rad2Deg * c.Spin * a, c.Axis);
-                Color32 l = c.Mat == 1 ? WoodLight : RockLight, m = c.Mat == 1 ? WoodMid : RockMid, dk = c.Mat == 1 ? WoodDark : RockDark;
-                solid.Chunk(p, rot, new Vector3(sz, sz * 0.8f, sz * 1.1f), 0.035f, l, m, dk, Navy);
             }
         }
 
-        private void DrawCrack(FxMeshBuilder g, Vector3 c, float size, float rot, uint seed, float fade)
+        /// <summary>A slash arc through p along sR (the head sweeps in, the tail follows): navy, colour, white core. 78 verts.</summary>
+        private static void Slash(FxMeshBuilder air, Vector3 p, Vector3 sR, Vector3 sU, float rad, float w, float t, float fade, Color32 col, Color32 core, float span)
         {
-            Vector3 gr = Vector3.right, gu = Vector3.forward;
-            // Scorched dust disc, then 9 jagged navy cracks with a pale lip.
-            for (int k = 0; k < 10; k++) _radii[k] = 0.85f + 0.3f * R01(seed, (uint)k + 300);
-            g.Blob(c, gr, gu, size * 0.9f, _radii, 10, rot, A(DustDark, fade * 0.55f));
-            g.Blob(c, gr, gu, size * 0.38f, _radii, 10, rot + 1, A(RockDark, fade * 0.8f));
-            for (int k = 0; k < 9; k++)
+            Vector3 c = p - sU * rad;
+            float a0 = Mathf.PI * 0.5f + span * 0.5f, a1 = Mathf.PI * 0.5f - span * 0.5f;
+            float sweep = Mathf.Clamp01(t / 0.45f);
+            sweep = 1f - (1f - sweep) * (1f - sweep);
+            float head = Mathf.Lerp(a0, a1, sweep);
+            float tail = Mathf.Lerp(a0, head, Mathf.Clamp01(t * 1.6f));
+            float f = t < 0.5f ? 1f : fade;
+            air.Crescent(c, sR, sU, rad, w * 1.4f, tail, head, 12, A(Navy, 0), A(Navy, f));
+            air.Crescent(c, sR, sU, rad, w, tail, head, 12, A(col, 0), A(col, f));
+            air.Crescent(c, sR, sU, rad + w * 0.15f, w * 0.45f, tail, head, 12, A(core, 0), A(core, f));
+        }
+
+        /// <summary>
+        /// The finisher's cracked impact frame: for its first two frames an inverted navy star with a white rim (a manga-style
+        /// impact frame, local to the hit, never full screen); then a 12-point white and yellow star, a slash across it and
+        /// six crack lines that shoot outward. At most 201 verts.
+        /// </summary>
+        private void DrawImpactFrame(FxMeshBuilder air, Vector3 p, Vector3 sR, Vector3 sU, Vector3 camRight, Vector3 camUp, in Burst b, float age, float t, float fade)
+        {
+            float s = b.Size * (t < 0.18f ? Mathf.Lerp(0.6f, 1.25f, t / 0.18f) : Mathf.Lerp(1.25f, 0.45f, (t - 0.18f) / 0.82f));
+            bool inverted = age < S(0.034);
+            air.Star(p, camRight, camUp, s * 1.18f + 0.06f, 0.36f, 12, b.Rot, A(inverted ? SparkWhite : Navy, fade));
+            air.Star(p, camRight, camUp, s, 0.36f, 12, b.Rot, A(inverted ? Navy : SparkWhite, fade));
+            if (!inverted) air.Star(p, camRight, camUp, s * 0.6f, 0.44f, 12, b.Rot + 0.13f, A(SparkYellow, fade));
+            Slash(air, p, sR, sU, b.Size * 1.25f, 0.2f, t, fade, SparkWhite, SparkYellow, 1.2f);
+            // Crack lines: jagged spokes that run out from the rim.
+            float run = Mathf.Clamp01(t / 0.35f);
+            for (int k = 0; k < 6; k++)
             {
-                float a = rot + k * Mathf.PI * 2f / 9f + (R01(seed, (uint)k + 310) - 0.5f) * 0.4f;
-                float len = size * (0.65f + 0.5f * R01(seed, (uint)k + 320));
-                Vector3 dir = gr * Mathf.Cos(a) + gu * Mathf.Sin(a);
-                Vector3 side = Vector3.Cross(Vector3.up, dir);
-                Vector3 mid = c + dir * len * 0.5f + side * (R01(seed, (uint)k + 330) - 0.5f) * size * 0.2f;
-                CrackSeg(g, c + dir * size * 0.2f, mid, 0.12f, fade);
-                CrackSeg(g, mid, c + dir * len, 0.07f, fade);
+                float a = b.Rot + k * Mathf.PI / 3f + 0.3f;
+                Vector3 dir = camRight * Mathf.Cos(a) + camUp * Mathf.Sin(a);
+                Vector3 perp = camRight * -Mathf.Sin(a) + camUp * Mathf.Cos(a);
+                float r0 = s * 0.9f, r1 = s * (1.0f + 0.9f * run);
+                Vector3 mid = p + dir * ((r0 + r1) * 0.5f);
+                air.Quad(mid, dir * ((r1 - r0) * 0.5f), perp * 0.07f, A(Navy, fade), A(Navy, fade));
+                air.Quad(mid, dir * ((r1 - r0) * 0.5f), perp * 0.03f, A(SparkWhite, fade), A(SparkWhite, fade));
             }
         }
 
-        private void CrackSeg(FxMeshBuilder g, Vector3 a, Vector3 b, float w, float fade)
+        // ---- per-class weapon trails ----
+
+        private void BuildTrails(double now, FxMeshBuilder air, Vector3 gr, Vector3 gu)
         {
-            Vector3 d = b - a;
-            Vector3 side = Vector3.Cross(Vector3.up, d.normalized) * w;
-            Vector3 c = (a + b) * 0.5f;
-            g.Quad(c, d * 0.5f, side * 1.6f, A(DustLight, fade * 0.7f), A(DustLight, fade * 0.7f));
-            g.Quad(c + Vector3.up * 0.002f, d * 0.5f, side, A(Navy, fade), A(Navy, fade));
+            for (int i = 0; i < MaxTrails; i++)
+            {
+                ref Trail tr = ref _trails[i];
+                double age = now - tr.Born;
+                if (age < 0 || age >= TrailLife) continue;
+                float t = (float)(age / TrailLife);
+                float sweep = Mathf.Clamp01(t / 0.55f);
+                sweep = 1f - (1f - sweep) * (1f - sweep);
+                float fade = t < 0.55f ? 1f : 1f - (t - 0.55f) / 0.45f;
+                Vector3 fwd = W(Math.Cos(tr.Facing), 0, Math.Sin(tr.Facing)).normalized;
+                switch ((ClassId)tr.Kind)
+                {
+                    case ClassId.Warrior:
+                    {
+                        // Cleave: a wide horizontal crescent across the real attack arc, team colour with a white edge.
+                        float centre = -tr.Facing; // sim angle -> ground basis angle
+                        float a0 = centre + tr.Arc * 0.5f, a1 = centre - tr.Arc * 0.5f;
+                        float head = Mathf.Lerp(a0, a1, sweep);
+                        float tail = Mathf.Lerp(a0, head, Mathf.Clamp01(t * 1.4f));
+                        Vector3 c = tr.P + Vector3.up * 0.85f;
+                        air.Crescent(c, gr, gu, tr.Radius, 0.3f, tail, head, 14, A(Navy, 0), A(Navy, fade * 0.95f));
+                        air.Crescent(c, gr, gu, tr.Radius, 0.23f, tail, head, 14, A(tr.Team, 0), A(tr.Team, fade * 0.9f));
+                        air.Crescent(c, gr, gu, tr.Radius + 0.03f, 0.1f, tail, head, 14, A(SparkWhite, 0), A(SparkWhite, fade));
+                        break;
+                    }
+                    case ClassId.Farmer:
+                    {
+                        // Harvest sweep: a thin, low, fast crescent the other way round, gold with a biomass-green edge.
+                        float centre = -tr.Facing;
+                        float a0 = centre - tr.Arc * 0.5f, a1 = centre + tr.Arc * 0.5f;
+                        float head = Mathf.Lerp(a0, a1, Mathf.Clamp01(sweep * 1.2f));
+                        float tail = Mathf.Lerp(a0, head, Mathf.Clamp01(t * 1.6f));
+                        Vector3 c = tr.P + Vector3.up * 0.6f;
+                        air.Crescent(c, gr, gu, tr.Radius * 1.05f, 0.18f, tail, head, 12, A(Navy, 0), A(Navy, fade * 0.95f));
+                        air.Crescent(c, gr, gu, tr.Radius * 1.05f, 0.13f, tail, head, 12, A(HarvestGold, 0), A(HarvestGold, fade * 0.9f));
+                        air.Crescent(c, gr, gu, tr.Radius * 1.05f + 0.04f, 0.05f, tail, head, 12, A(BiomassC, 0), A(BiomassC, fade));
+                        break;
+                    }
+                    case ClassId.Demolitions:
+                    {
+                        // Heavy diagonal haymaker in hot orange, with a puff of smoke where it ends.
+                        Vector3 up = (Vector3.up + Vector3.Cross(Vector3.up, fwd)).normalized;
+                        Vector3 c = tr.P + Vector3.up * 0.8f;
+                        float a0 = 2.1f, a1 = -0.5f;
+                        float head = Mathf.Lerp(a0, a1, sweep);
+                        float tail = Mathf.Lerp(a0, head, Mathf.Clamp01(t * 1.4f));
+                        air.Crescent(c, fwd, up, 0.9f, 0.26f, tail, head, 12, A(Navy, 0), A(Navy, fade * 0.95f));
+                        air.Crescent(c, fwd, up, 0.9f, 0.2f, tail, head, 12, A(WarnHot, 0), A(WarnHot, fade * 0.9f));
+                        air.Crescent(c, fwd, up, 0.92f, 0.08f, tail, head, 12, A(SparkYellow, 0), A(SparkYellow, fade));
+                        if (t > 0.45f)
+                        {
+                            Vector3 end = c + (fwd * Mathf.Cos(a1) + up * Mathf.Sin(a1)) * 0.9f;
+                            float pf = 1f - (t - 0.45f) / 0.55f;
+                            air.Blob(end, gr, Vector3.up, 0.22f + 0.04f, null, 9, 0, A(Navy, pf * 0.8f));
+                            air.Blob(end, gr, Vector3.up, 0.22f, null, 9, 0, A(SmokeMid, pf));
+                        }
+                        break;
+                    }
+                    case ClassId.Builder:
+                    {
+                        // Hammer: a short, tight overhead arc in wood tones with a white edge.
+                        Vector3 c = tr.P + Vector3.up * 0.7f;
+                        float a0 = 1.7f, a1 = -0.2f;
+                        float head = Mathf.Lerp(a0, a1, sweep);
+                        float tail = Mathf.Lerp(a0, head, Mathf.Clamp01(t * 1.5f));
+                        air.Crescent(c, fwd, Vector3.up, 0.72f, 0.22f, tail, head, 10, A(Navy, 0), A(Navy, fade * 0.95f));
+                        air.Crescent(c, fwd, Vector3.up, 0.72f, 0.16f, tail, head, 10, A(WoodLight, 0), A(WoodLight, fade * 0.9f));
+                        air.Crescent(c, fwd, Vector3.up, 0.74f, 0.06f, tail, head, 10, A(SparkWhite, 0), A(SparkWhite, fade));
+                        break;
+                    }
+                    default:
+                    {
+                        // Miner pick: a vertical chop arc, overhead behind to low in front, yellow and white.
+                        Vector3 c = tr.P + Vector3.up * 0.75f;
+                        float a0 = 1.9f, a1 = -0.35f;
+                        float head = Mathf.Lerp(a0, a1, sweep);
+                        float tail = Mathf.Lerp(a0, head, Mathf.Clamp01(t * 1.4f));
+                        air.Crescent(c, fwd, Vector3.up, 0.95f, 0.2f, tail, head, 12, A(Navy, 0), A(Navy, fade * 0.95f));
+                        air.Crescent(c, fwd, Vector3.up, 0.95f, 0.15f, tail, head, 12, A(SparkYellow, 0), A(SparkYellow, fade * 0.9f));
+                        air.Crescent(c, fwd, Vector3.up, 0.97f, 0.07f, tail, head, 12, A(SparkWhite, 0), A(SparkWhite, fade));
+                        break;
+                    }
+                }
+            }
         }
 
         private void DrawKaijuState(World w, FxMeshBuilder ground, FxMeshBuilder air, double now)

@@ -67,6 +67,8 @@ namespace CriticalMass.Sim.Core
                 double fx = JsMath.Cos(a.Facing);
                 double fz = JsMath.Sin(a.Facing);
                 double cosHalf = JsMath.Cos(cc.AttackArcDeg / 2 * Math.PI / 180);
+                // DG-16 (view request): the swing starts: attacker, reach point in front of it, facing.
+                World.PushEvent(w, SimEventType.AttackStart, i, -1, ax + fx * cc.AttackRange, az + fz * cc.AttackRange, a.Facing);
                 int count = SpatialHash.QueryCircle(w.Hash, ax, az, cc.AttackRange + maxTargetRadius, candidates);
                 for (int k = 0; k < count; k++)
                 {
@@ -74,6 +76,8 @@ namespace CriticalMass.Sim.Core
                     if (j == i) continue;
                     Actor t = w.Actors[j];
                     if (!t.Alive || t.Team == a.Team) continue;
+                    // DG-16 passive window: a bot's swing never hurts the human slot yet.
+                    if (!a.IsHuman && t.IsHuman && w.Match.Time < cfg.Bots.PassiveSeconds) continue;
                     double dx = w.X[j] - ax;
                     double dz = w.Z[j] - az;
                     double reach = cc.AttackRange + cfg.Class(t.Cls).Radius;
@@ -89,7 +93,8 @@ namespace CriticalMass.Sim.Core
                 // Structures (CM-05): the same swing chips enemy barricades in its arc; a Miner's pick also breaks breakables.
                 Barricades.DamageBarricadesInArc(w, i, ax, az, fx, fz, cc.AttackRange, cosHalf, cc.AttackDamage);
                 if (a.Cls == ClassId.Miner) Abilities.MinerWallBreak(w, i, ax, az, fx, fz);
-                // ITEM CM-31: added by its owner (swing chips decorations)
+                // CM-31: the same swing chips knock-down decorations in its arc (any class, bots included).
+                Topple.ToppleInArc(w, i, ax, az, fx, fz, cc.AttackRange, cosHalf);
 
                 // CM-08: the same cleave hits the hatched Kaiju within attackRange + kaiju.radius, inside the arc.
                 Kaiju kj = w.Kaiju;
@@ -106,9 +111,35 @@ namespace CriticalMass.Sim.Core
                 }
             }
             // ITEM CM-38: added by its owner (Demolitions mines and TNT blasts: demolitionsBlastSystem)
-            // ITEM CM-35: added by its owner (corpse meat drop)
+            // CM-35: the last thing combat does: every body killed this step (or since last step's combat) drops its meat once.
+            DropCorpseMeat(w);
         }
 
-        // ITEM CM-35: added by its owner (corpse meat drop: dropCorpseMeat)
+        /// <summary>
+        /// CM-35: meat biomass from killed bodies. Every dead actor that has not dropped yet leaves one loose meat orb of
+        /// Resources.MeatUnitsPerKill at its corpse (X / Z hold the death position until respawn), lasting
+        /// Resources.MeatOrbLifetimeTicks, only while the Kaiju is an egg. MeatDropped makes it once per death whatever killed
+        /// the actor; it clears while alive. Allocation-free (a slot of the fixed World.Orbs pool).
+        /// </summary>
+        public static void DropCorpseMeat(World w)
+        {
+            int n = w.ActorCount;
+            ResourcesConfig res = w.Config.Resources;
+            bool egg = w.Kaiju.State == KaijuState.Egg && !w.Match.Hatched;
+            byte[] dropped = w.MeatDropped;
+            for (int id = 0; id < n; id++)
+            {
+                Actor a = w.Actors[id];
+                if (a.Alive)
+                {
+                    dropped[id] = 0;
+                    continue;
+                }
+                if (dropped[id] != 0) continue;
+                dropped[id] = 1;
+                if (!egg || w.Match.Phase == MatchPhase.Ended || res.MeatUnitsPerKill <= 0) continue;
+                World.SpawnLooseOrb(w, w.X[id], w.Z[id], (int)res.MeatUnitsPerKill, (int)res.MeatOrbLifetimeTicks, id);
+            }
+        }
     }
 }

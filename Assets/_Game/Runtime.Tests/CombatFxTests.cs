@@ -74,6 +74,7 @@ namespace CriticalMass.Runtime.Tests
             public void Frame(World w)
             {
                 Feed.OnTick(w, Scene, Audio);
+                Scene.OnTickState(w);
                 double now = w.Tick / w.Config.SimHz;
                 Audio?.Update(now, w);
                 Scene.Advance(now);
@@ -250,11 +251,11 @@ namespace CriticalMass.Runtime.Tests
             string credits = System.IO.File.ReadAllText("Assets/_Game/Audio/Resources/CREDITS.md");
             foreach (AudioClip c in clips) StringAssert.Contains(c.name + ".ogg", credits, "credited: " + c.name);
             var mixer = Resources.Load<UnityEngine.Audio.AudioMixer>(CombatAudio.MixerResource);
-            Assert.IsNotNull(mixer, "CMAudioMixer in Audio/Resources (ProjectSetup.Apply creates it)");
+            Assert.IsNotNull(mixer, "the game's one mixer (Resources/Audio/CMMixer); the effects lane has no mixer of its own");
+            Assert.AreEqual(CriticalMass.Runtime.Menu.GameSettings.MixerResource, CombatAudio.MixerResource);
             Assert.AreEqual(1, mixer.FindMatchingGroups("Music").Length);
-            Assert.AreEqual(1, mixer.FindMatchingGroups("Sfx").Length);
-            string[] exposed = CriticalMassEditorBridge.ExposedNames(mixer);
-            CollectionAssert.IsSubsetOf(new[] { "MasterVol", "MusicVol", "SfxVol" }, exposed);
+            Assert.AreEqual(1, mixer.FindMatchingGroups("Effects").Length);
+            Assert.IsNull(Resources.Load<UnityEngine.Audio.AudioMixer>("CMAudioMixer"), "the second mixer is gone");
             Assert.AreEqual(1f, CombatAudio.Falloff(3f));
             Assert.AreEqual(0f, CombatAudio.Falloff(CombatAudio.FarDistance + 1f));
         }

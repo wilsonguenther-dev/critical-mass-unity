@@ -218,6 +218,9 @@ namespace CriticalMass.Runtime.Flow
         public static void BeginMatch(MatchSetupChoice s)
         {
             PrepareMatch(s);
+            // DG-13: the loading screen covers the reload and stays until the new world has drawn (FlowDirector holds the
+            // match clock until it hides). Never in autoplay or batch runs.
+            if (!Autoplay && Menus.LoadingScreen.UseInFlow) Menus.LoadingScreen.ShowForMatch(_pending.Seed);
             Reload();
         }
 

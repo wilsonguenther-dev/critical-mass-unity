@@ -14,10 +14,15 @@ namespace CriticalMass.Sim.Core
         public bool Interact;
         /// <summary>-1 = no pick, otherwise an index into ClassIds.All (consumed by CM-06 inside the sim).</summary>
         public int ClassPick;
-        /// <summary>CM-30: miner dig / place. Data only in Phase 0 (no system reads it).</summary>
+        /// <summary>CM-30: miner dig / place (F). Held state; Terraform.TerraformSystem acts on its rising edge only.</summary>
         public bool Terraform;
         /// <summary>CM-32: start a jump this step (edge-latched by the human input layer; bots never set it). Read and cleared by Movement (Jump.cs).</summary>
         public bool Jump;
+        /// <summary>
+        /// DG-09 (U-053): switch the miner's dig / place mode this step (mouse wheel, LB / RB; edge-latched by the human input
+        /// layer; bots never set it). Read and cleared by Terraform.TerraformSystem, so a stored true never switches twice.
+        /// </summary>
+        public bool TerraformSwitch;
 
         public void CopyFrom(InputFrame other)
         {
@@ -31,6 +36,7 @@ namespace CriticalMass.Sim.Core
             ClassPick = other.ClassPick;
             Terraform = other.Terraform;
             Jump = other.Jump;
+            TerraformSwitch = other.TerraformSwitch;
         }
     }
 }

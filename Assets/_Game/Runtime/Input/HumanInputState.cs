@@ -13,6 +13,15 @@ namespace CriticalMass.Runtime.Input
     /// re-latch). A held Attack stays true every step (the sim's cooldown gates repeats). Interact is held.</para>
     /// <para>Pause toggles Paused; while paused every down except Pause is dropped (never replayed) and Fill writes a
     /// neutral frame with no aim.</para>
+    /// <para>Input buffer (DG-14): with BufferWorld set (InputBufferBinder does it), an Attack or Ability press the sim
+    /// would refuse on its step (cooldown, getting up) is also delivered once on the first step, up to
+    /// InputBuffer.MaxEarlyTicks later (0.15 s), on which the sim accepts it. The press step itself is unchanged, so the
+    /// only difference the sim can see is that press arriving on its first ready step. Counted in sim steps (one per
+    /// Fill), so the same presses on the same ticks always give the same frames. BufferWorld null = the plain latch.</para>
+    /// <para>Easy movement (2026-11-12): Fill builds the move through WorldMove: keys (screen basis, or the map basis with
+    /// KeysFollowMap), else pointer walking while the MoveToPointer button is held, then MoveAssist's lane assist (one key
+    /// only) and corner slide when MovementAssist is on and BindWorld gave it the world. Fill runs once per tick right
+    /// before the step, so the assists see the position the step starts from and add no latency.</para>
     /// </summary>
     public sealed class HumanInputState
     {
@@ -29,6 +38,24 @@ namespace CriticalMass.Runtime.Input
         public static readonly double ScreenRightX = -ScreenUpZ;
         public static readonly double ScreenRightZ = ScreenUpX;
 
+        // Easy movement "Keys follow the map": the grid axis nearest screen up (ties turn clockwise on screen, so at
+        // today's yaw 45 W goes sim -Z, up-right on screen, and D goes sim +X, toward the Crimson base, down-right).
+        static readonly int KeyAxis = NearestAxis(ScreenUpX, ScreenUpZ);
+        static readonly double[] AxisX = { 1, 0, -1, 0 };
+        static readonly double[] AxisZ = { 0, 1, 0, -1 };
+        /// <summary>World XZ direction of the "up" key while KeysFollowMap is on (a sim grid axis).</summary>
+        public static readonly double MapUpX = AxisX[KeyAxis];
+        public static readonly double MapUpZ = AxisZ[KeyAxis];
+        /// <summary>World XZ direction of the "right" key while KeysFollowMap is on.</summary>
+        public static readonly double MapRightX = -MapUpZ;
+        public static readonly double MapRightZ = MapUpX;
+
+        static int NearestAxis(double x, double z)
+        {
+            double q = Math.Floor(Math.Atan2(z, x) / (Math.PI / 2) + 0.5 + 1e-9);
+            return (((int)q % 4) + 4) % 4;
+        }
+
         // Neutral frame copied while paused (no allocation per step); never handed out.
         readonly InputFrame _empty = SimInput.EmptyInput();
 
@@ -39,6 +66,7 @@ namespace CriticalMass.Runtime.Input
         bool _attackLatch;
         bool _abilityLatch;
         bool _terraformLatch;
+        bool _switchLatch;
         bool _jumpLatch;
         int _classPick = -1;
         double _moveRight;
@@ -46,6 +74,58 @@ namespace CriticalMass.Runtime.Input
         bool _hasAim;
         double _aimX;
         double _aimZ;
+        readonly InputBuffer _attackBuffer = new InputBuffer();
+        readonly InputBuffer _abilityBuffer = new InputBuffer();
+
+        /// <summary>The world the buffer reads readiness from (read-only); null = no buffering.</summary>
+        public World BufferWorld;
+
+        /// <summary>The actor this input drives (actor 0, HudBinder.LocalActor).</summary>
+        public int BufferActor;
+
+        /// <summary>An Attack press is waiting for a ready step.</summary>
+        public bool AttackBuffered => _attackBuffer.Pending;
+
+        /// <summary>An Ability press is waiting for a ready step.</summary>
+        public bool AbilityBuffered => _abilityBuffer.Pending;
+        bool _moveFromKeys;
+        bool _walkHeld;
+        bool _hasWalkTarget;
+        double _walkX;
+        double _walkZ;
+        World _world;
+
+        /// <summary>
+        /// Easy movement: lane assist for a single held key plus corner sliding (MoveAssist), applied in Fill. Setting
+        /// "Movement assist", default on; needs BindWorld. HumanInputSource copies the setting in.
+        /// </summary>
+        public bool MovementAssist { get; set; } = true;
+
+        /// <summary>
+        /// Easy movement setting "Keys follow the map" (default off): keyboard directions use the sim grid axes (MapUp,
+        /// MapRight) instead of the screen axes. The controller stick always stays screen-relative.
+        /// </summary>
+        public bool KeysFollowMap { get; set; }
+
+        /// <summary>The world whose actor 0 the assists read (position, collision); null = no assist, no pointer walk.</summary>
+        public void BindWorld(World w) => _world = w;
+
+        /// <summary>The walk-to-pointer button is held (rebindable action MoveToPointer).</summary>
+        public void SetPointerWalk(bool held) => _walkHeld = held;
+
+        /// <summary>The ground point under the cursor for pointer walking, in sim world space.</summary>
+        public void SetWalkTarget(double worldX, double worldZ)
+        {
+            _hasWalkTarget = true;
+            _walkX = worldX;
+            _walkZ = worldZ;
+        }
+
+        /// <summary>No ground point under the cursor: pointer walking stands still.</summary>
+        public void ClearWalkTarget() => _hasWalkTarget = false;
+
+        /// <summary>The walk-to-pointer button is held.</summary>
+        public bool PointerWalkHeld => _walkHeld;
 
         /// <summary>The pause menu is open (browser ui.paused).</summary>
         public bool Paused => _paused;
@@ -63,6 +143,7 @@ namespace CriticalMass.Runtime.Input
             _attackLatch = false;
             _abilityLatch = false;
             _terraformLatch = false;
+            _switchLatch = false;
             _jumpLatch = false;
             _classPick = -1;
             _moveRight = 0;
@@ -70,6 +151,13 @@ namespace CriticalMass.Runtime.Input
             _hasAim = false;
             _aimX = 0;
             _aimZ = 0;
+            _attackBuffer.Clear();
+            _abilityBuffer.Clear();
+            _moveFromKeys = false;
+            _walkHeld = false;
+            _hasWalkTarget = false;
+            _walkX = 0;
+            _walkZ = 0;
         }
 
         /// <summary>A button went down. repeat = an OS auto-repeat down while held (never re-latches, never re-toggles).</summary>
@@ -105,6 +193,15 @@ namespace CriticalMass.Runtime.Input
             }
         }
 
+        /// <summary>
+        /// DG-09 (U-053): the dig / place mode switch was pressed (mouse wheel notch, LB or RB; HumanInputSource edge-detects
+        /// the SwitchDigPlace axis). Latched like a button: one InputFrame.TerraformSwitch per press, dropped while paused.
+        /// </summary>
+        public void SwitchDigPlace()
+        {
+            if (!_paused) _switchLatch = true;
+        }
+
         /// <summary>A button went up. Latches stay set until Fill consumes them.</summary>
         public void ButtonUp(HumanButton b)
         {
@@ -122,11 +219,15 @@ namespace CriticalMass.Runtime.Input
             }
         }
 
-        /// <summary>The move intent in screen axes (right, up), each -1..1 (WASD composite or the left stick).</summary>
-        public void SetMove(double right, double up)
+        /// <summary>
+        /// The move intent in screen axes (right, up), each -1..1 (WASD composite or the left stick). fromKeys = it came
+        /// from direction keys (KeysFollowMap and lane assist apply to keys only).
+        /// </summary>
+        public void SetMove(double right, double up, bool fromKeys = false)
         {
             _moveRight = right;
             _moveUp = up;
+            _moveFromKeys = fromKeys;
         }
 
         /// <summary>The pointer's aim point on the ground in sim world space (the raycast is HumanInputSource's).</summary>
@@ -161,9 +262,15 @@ namespace CriticalMass.Runtime.Input
             _attackLatch = false;
             _abilityLatch = false;
             _terraformLatch = false;
+            _switchLatch = false;
             _jumpLatch = false;
             _moveRight = 0;
             _moveUp = 0;
+            _attackBuffer.Clear();
+            _abilityBuffer.Clear();
+            _moveFromKeys = false;
+            _walkHeld = false;
+            _hasWalkTarget = false;
         }
 
         /// <summary>Respawn class re-pick from the UI (CM-10): written into InputFrame.ClassPick once by the next Fill.</summary>
@@ -190,8 +297,11 @@ namespace CriticalMass.Runtime.Input
                 _attackLatch = false;
                 _abilityLatch = false;
                 _terraformLatch = false;
+                _switchLatch = false;
                 _jumpLatch = false;
                 _classPick = -1;
+                _attackBuffer.Clear();
+                _abilityBuffer.Clear();
                 return;
             }
 
@@ -206,15 +316,47 @@ namespace CriticalMass.Runtime.Input
                 output.AimZ = double.NaN;
             }
 
-            if (_moveRight == 0 && _moveUp == 0)
+            WorldMove(out double moveX, out double moveZ);
+            output.MoveX = moveX;
+            output.MoveZ = moveZ;
+
+            World bw = BufferWorld;
+            bool canBuffer = bw != null && bw.Config != null;
+            int early = canBuffer ? InputBuffer.MaxEarlyTicks(bw.Config.SimHz) : 0;
+            bool attackNow = _attackBuffer.Step(_attackLatch, canBuffer, canBuffer && InputReadiness.Attack(bw, BufferActor), early);
+            output.Attack = _attackHeld || attackNow;
+            _attackLatch = false;
+            output.Ability = _abilityBuffer.Step(_abilityLatch, canBuffer, canBuffer && InputReadiness.Ability(bw, BufferActor), early);
+            _abilityLatch = false;
+            output.Interact = _interactHeld;
+            output.Terraform = _terraformLatch;
+            _terraformLatch = false;
+            output.TerraformSwitch = _switchLatch;
+            _switchLatch = false;
+            output.Jump = _jumpLatch;
+            _jumpLatch = false;
+            output.ClassPick = _classPick;
+            _classPick = -1;
+        }
+
+        /// <summary>
+        /// This tick's move in sim world space (length at most 1): the keys or stick through the screen basis (or the map
+        /// basis for keys with KeysFollowMap), else pointer walking while its button is held; then, with MovementAssist
+        /// and a bound world, lane assist for a single key and corner sliding (MoveAssist).
+        /// </summary>
+        void WorldMove(out double mx, out double mz)
+        {
+            mx = 0;
+            mz = 0;
+            World w = _world;
+            bool human = w != null && w.ActorCount > 0 && w.Actors[0].Alive;
+            if (_moveRight != 0 || _moveUp != 0)
             {
-                output.MoveX = 0;
-                output.MoveZ = 0;
-            }
-            else
-            {
-                double mx = _moveRight * ScreenRightX + _moveUp * ScreenUpX;
-                double mz = _moveRight * ScreenRightZ + _moveUp * ScreenUpZ;
+                bool map = _moveFromKeys && KeysFollowMap;
+                double rx = map ? MapRightX : ScreenRightX, rz = map ? MapRightZ : ScreenRightZ;
+                double ux = map ? MapUpX : ScreenUpX, uz = map ? MapUpZ : ScreenUpZ;
+                mx = _moveRight * rx + _moveUp * ux;
+                mz = _moveRight * rz + _moveUp * uz;
                 double len2 = mx * mx + mz * mz;
                 if (len2 > 1)
                 {
@@ -222,21 +364,25 @@ namespace CriticalMass.Runtime.Input
                     mx *= inv;
                     mz *= inv;
                 }
-                output.MoveX = mx;
-                output.MoveZ = mz;
+                // One direction key alone (never two keys, never the stick): follow the lane it points along.
+                bool singleKey = _moveFromKeys && (_moveRight != 0) != (_moveUp != 0);
+                if (human && MovementAssist && singleKey && MoveAssist.LaneSteer(w.X[0], w.Z[0], mx, mz, out double lx, out double lz))
+                {
+                    double m = Math.Sqrt(mx * mx + mz * mz);
+                    mx = lx * m;
+                    mz = lz * m;
+                }
             }
-
-            output.Attack = _attackHeld || _attackLatch;
-            _attackLatch = false;
-            output.Ability = _abilityLatch;
-            _abilityLatch = false;
-            output.Interact = _interactHeld;
-            output.Terraform = _terraformLatch;
-            _terraformLatch = false;
-            output.Jump = _jumpLatch;
-            _jumpLatch = false;
-            output.ClassPick = _classPick;
-            _classPick = -1;
+            else if (human && _walkHeld && _hasWalkTarget)
+            {
+                if (!MoveAssist.PointerMove(w.X[0], w.Z[0], _walkX, _walkZ, out mx, out mz)) return;
+            }
+            else return;
+            if (human && MovementAssist && MoveAssist.CornerSlide(w, 0, mx, mz, out double sx, out double sz))
+            {
+                mx = sx;
+                mz = sz;
+            }
         }
     }
 }

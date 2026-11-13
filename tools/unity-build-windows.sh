@@ -19,11 +19,13 @@ LOG="${CM_BUILD_LOG:-$ROOT/Logs/build-windows.log}"
 case "$OUT" in /*) ABS="$OUT" ;; *) ABS="$ROOT/$OUT" ;; esac
 
 set +e
-perl -e 'alarm shift; exec @ARGV' "${CM_BUILD_TIMEOUT:-1800}" \
-  "$UNITY" -batchmode -nographics -projectPath "$ROOT" -buildTarget win64 \
+# Through the machine lock (cm-heavy unity, DG-44); never call "$UNITY" bare. The lock enforces the hard limit
+# (CM_BUILD_TIMEOUT -> CM_HEAVY_TIMEOUT; its exit 124 is reported as 142, the code this script always used).
+CM_HEAVY_TIMEOUT="${CM_BUILD_TIMEOUT:-1800}" "$CM_HEAVY" unity "$UNITY" -batchmode -nographics -projectPath "$ROOT" -buildTarget win64 \
   -executeMethod CriticalMass.Editor.Build.Windows -buildOutput "$ABS" ${DEV[@]+"${DEV[@]}"} -logFile "$LOG" -quit
 code=$?
 set -e
+[[ $code -eq 124 ]] && code=142
 
 if [[ $code -ne 0 ]]; then
   echo "unity-build-windows: FAILED, Unity exit code $code (log: $LOG)" >&2

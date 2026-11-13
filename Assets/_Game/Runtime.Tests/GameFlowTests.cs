@@ -149,13 +149,14 @@ namespace CriticalMass.Runtime.Tests
         {
             List<MenuEntry> e = OverlayRegistry.MenuEntries(Array.Empty<Type>());
             string[] ids = e.ConvertAll(x => x.Id).ToArray();
-            CollectionAssert.AreEqual(new[] { "play", "howto", "barracks", "controls", "settings", "codex", "credits", "quit" }, ids);
+            CollectionAssert.AreEqual(new[] { "play", "spectate", "howto", "barracks", "controls", "settings", "codex", "credits", "quit" }, ids);
             Assert.IsTrue(e.Find(x => x.Id == "play").Available);
             Assert.IsTrue(e.Find(x => x.Id == "controls").Available);
             Assert.IsTrue(e.Find(x => x.Id == "settings").Available);
             Assert.IsTrue(e.Find(x => x.Id == "quit").Available);
             Assert.IsFalse(e.Find(x => x.Id == "barracks").Available);
-            Assert.IsFalse(e.Find(x => x.Id == "codex").Available);
+            Assert.IsTrue(e.Find(x => x.Id == "spectate").Available);
+            Assert.IsTrue(e.Find(x => x.Id == "codex").Available, "the Codex opens the pause menu's Codex page (integration batch 2)");
             Assert.IsFalse(e.Find(x => x.Id == "credits").Available);
             Assert.AreEqual(OverlayRegistry.TutorialStart() != null, e.Find(x => x.Id == "howto").Available);
         }
@@ -221,11 +222,14 @@ namespace CriticalMass.Runtime.Tests
                 m.EnsureBuilt();
                 Assert.AreEqual(m.Entries.Count, m.Items.Count);
                 for (int i = 0; i < m.Entries.Count; i++) Assert.AreEqual(m.Entries[i].Available, m.Items[i].interactable, m.Entries[i].Id);
-                Assert.IsFalse(m.Item("barracks").interactable);
-                Assert.IsFalse(m.Item("codex").interactable);
+                // Integration batch 2: every line leads somewhere (Barracks, Codex, Credits, Spectate are wired).
+                Assert.IsTrue(m.Item("barracks").interactable);
+                Assert.IsTrue(m.Item("codex").interactable);
+                Assert.IsTrue(m.Item("spectate").interactable);
                 Assert.IsTrue(m.Item("play").interactable);
                 AssertChainSkipsDisabled(m.Items);
-                Assert.IsNotNull(m.Item("barracks").transform.Find("Soon"), "coming soon lines carry the tag");
+                for (int i = 0; i < m.Entries.Count; i++)
+                    if (!m.Entries[i].Available) Assert.IsNotNull(m.Items[i].transform.Find("Soon"), "coming soon lines carry the tag");
             }
             finally
             {

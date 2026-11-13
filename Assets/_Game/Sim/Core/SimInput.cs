@@ -20,6 +20,7 @@ namespace CriticalMass.Sim.Core
                 ClassPick = -1,
                 Terraform = false,
                 Jump = false,
+                TerraformSwitch = false,
             };
         }
 
@@ -49,6 +50,7 @@ namespace CriticalMass.Sim.Core
             dst.Interact = frame.Interact == true;
             dst.Terraform = frame.Terraform == true;
             dst.Jump = frame.Jump == true;
+            dst.TerraformSwitch = frame.TerraformSwitch == true;
             int cp = frame.ClassPick;
             dst.ClassPick = cp >= 0 && cp < ClassIds.All.Count ? cp : -1;
         }

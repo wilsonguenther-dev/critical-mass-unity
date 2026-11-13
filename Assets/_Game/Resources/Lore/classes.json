@@ -87,7 +87,7 @@
           "name": "Dig and Place",
           "text": "Dig ground out and put it back where it helps: a ramp, a step, a wall.",
           "cooldown": "",
-          "needsRule": "DG-09"
+          "needsRule": ""
         }
       ]
     },

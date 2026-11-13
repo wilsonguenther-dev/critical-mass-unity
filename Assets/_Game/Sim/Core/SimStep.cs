@@ -34,11 +34,13 @@ namespace CriticalMass.Sim.Core
             Movement.MovementSystem(w, dt);
             SpatialHash.Rebuild(w.Hash, w.X, w.Z, w.Actors, n);
             Combat.CombatSystem(w, dt);
+            Topple.ToppleSystem(w); // DG-09: ToppleDown events when a fall animation time has passed
             Barricades.BarricadesSystem(w, dt);
             SimResources.ResourcesSystem(w, dt);
             Kaiju.KaijuSystem(w, dt);
             Respawn.RespawnSystem(w, dt);
-            // ITEM CM-37: added by its owner (HealSystem)
+            // CM-37: after respawn (a fresh respawn is already at full HP), before the hill / match bookkeeping.
+            Heal.HealSystem(w);
             Hill.HillSystem(w, dt);
             Match.MatchSystem(w, dt);
 

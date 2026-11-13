@@ -8,9 +8,13 @@ namespace CriticalMass.Sim.Core
     public static class SimResources
     {
         /// <summary>The delivery math, shared by ResourcesSystem and the debug feed (CM-10 DebugAddFeed); does nothing after the hatch or for a non-positive unit count.</summary>
-        public static void ApplyDelivery(World w, TeamId team, CarryKind kind, double units, int actorId = -1)
+        /// <remarks>
+        /// CM-35: biomass pays by type (Plant BiomassAllegiancePerUnit, Meat MeatAllegiancePerUnit), tallies Delivered[team].Plant /
+        /// .Meat beside .Biomass, and tags the DeliverBiomass event with its type. CM-85 (D-068): every biomass unit, plant or
+        /// meat, also adds KaijuFeed.BiomassInstabilityPerUnit instability (corruption from feeding, slower).
+        /// </remarks>
+        public static void ApplyDelivery(World w, TeamId team, CarryKind kind, double units, int actorId = -1, BiomassType bio = BiomassType.Plant)
         {
-            // ITEM CM-35: added by its owner (bio parameter: BiomassType bio = plant, after actorId)
             if (kind != CarryKind.Biomass && kind != CarryKind.Corruption)
                 throw new ArgumentOutOfRangeException(nameof(kind), kind, "ApplyDelivery takes Biomass or Corruption.");
             MatchState m = w.Match;
@@ -21,12 +25,13 @@ namespace CriticalMass.Sim.Core
             int teamIdx = team == TeamId.Azure ? 0 : 1;
             if (kind == CarryKind.Biomass)
             {
-                // ITEM CM-35: added by its owner (meat = bio == meat; meat units credit MeatAllegiancePerUnit instead)
-                m.Allegiance[team] += units * feed.BiomassAllegiancePerUnit;
+                bool meat = bio == BiomassType.Meat;
+                m.Allegiance[team] += units * (meat ? feed.MeatAllegiancePerUnit : feed.BiomassAllegiancePerUnit);
                 m.Delivered[(int)team].Biomass += units;
-                // ITEM CM-35: added by its owner (delivered[team][bio] += units: the Meat / Plant tally)
-                // ITEM CM-85: added by its owner (biomass instability: m.Instability += units * KaijuFeed.BiomassInstabilityPerUnit)
-                World.PushEvent(w, SimEventType.DeliverBiomass, actorId, teamIdx, sh.X, sh.Z, units);
+                if (meat) m.Delivered[(int)team].Meat += units;
+                else m.Delivered[(int)team].Plant += units;
+                m.Instability += units * feed.BiomassInstabilityPerUnit;
+                World.PushEvent(w, SimEventType.DeliverBiomass, actorId, teamIdx, sh.X, sh.Z, units, meat ? BiomassType.Meat : BiomassType.Plant, DamageCause.None);
             }
             else
             {
@@ -111,16 +116,72 @@ namespace CriticalMass.Sim.Core
             return best;
         }
 
-        // ITEM CM-35: added by its owner (AgeOrbs: age every loose orb by one sim tick; an orb at ttl 0 or emptied goes inactive; returns how many are left)
+        /// <summary>CM-35: age every loose orb by one sim tick; an orb at ttl 0 (or emptied) goes inactive. Returns how many are left.</summary>
+        private static int AgeOrbs(World w)
+        {
+            LooseOrb[] orbs = w.Orbs;
+            int live = 0;
+            for (int i = 0; i < orbs.Length; i++)
+            {
+                LooseOrb o = orbs[i];
+                if (!o.Active) continue;
+                o.Ttl -= 1;
+                if (o.Ttl <= 0 || o.Units <= 0)
+                {
+                    o.Active = false;
+                    o.Units = 0;
+                    o.Ttl = 0;
+                    continue;
+                }
+                live++;
+            }
+            return live;
+        }
 
-        // ITEM CM-35: added by its owner (PickUpMeat: walk-over meat pickup into Actor.CarryMeat up to Resources.MeatCarryCapacity, slot order, no corruption carrier)
+        /// <summary>
+        /// CM-35: walk-over meat pickup for actor id (alive, not getting up, egg). Takes as many units as fit under
+        /// Resources.MeatCarryCapacity from every orb in reach, in slot order (deterministic), into Actor.CarryMeat only.
+        /// A corruption carrier takes none. True when anything was picked up.
+        /// </summary>
+        private static bool PickUpMeat(World w, int id)
+        {
+            Actor a = w.Actors[id];
+            if (a.Carry == CarryKind.Corruption) return false;
+            int cap = (int)w.Config.Resources.MeatCarryCapacity;
+            if (a.CarryMeat >= cap) return false;
+            double reach = w.Config.Resources.MeatPickupRange + Collide.ActorRadius(w, id);
+            double r2 = reach * reach;
+            double x = w.X[id];
+            double z = w.Z[id];
+            LooseOrb[] orbs = w.Orbs;
+            bool took = false;
+            for (int i = 0; i < orbs.Length && a.CarryMeat < cap; i++)
+            {
+                LooseOrb o = orbs[i];
+                if (!o.Active || o.Units <= 0) continue;
+                double dx = o.X - x;
+                double dz = o.Z - z;
+                if (dx * dx + dz * dz > r2) continue;
+                int take = Math.Min(o.Units, cap - a.CarryMeat);
+                o.Units -= take;
+                if (o.Units <= 0)
+                {
+                    o.Active = false;
+                    o.Units = 0;
+                    o.Ttl = 0;
+                }
+                a.CarryMeat += take;
+                took = true;
+            }
+            return took;
+        }
 
         /// <summary>Regrow every node, then per actor: deliver at the shrine first, else gather at the nearest valid node.</summary>
         public static void ResourcesSystem(World w, double dt)
         {
             ResourceNode[] nodes = w.Nodes;
             for (int i = 0; i < nodes.Length; i++) Regrow(w.Config, nodes[i], dt);
-            // ITEM CM-35: added by its owner (int liveOrbs = AgeOrbs(w))
+            int liveOrbs = AgeOrbs(w);
 
             int n = w.ActorCount;
             ShrineDef shrine = w.Map.Shrine;
@@ -129,36 +190,42 @@ namespace CriticalMass.Sim.Core
             for (int id = 0; id < n; id++)
             {
                 Actor a = w.Actors[id];
-                // ITEM CM-35: added by its owner (meat-at-death note: if (!a.Alive || !egg) a.CarryMeat = 0)
-                // ITEM CM-35: added by its owner (if (liveOrbs > 0 && egg && a.Alive && a.MeatPickup && a.StandUp <= 0) PickUpMeat(w, id))
+                // CM-35: Damage empties the cargo at death and the meat load goes with it; after the hatch meat feeds nothing.
+                if (!a.Alive || !egg) a.CarryMeat = 0;
+                if (liveOrbs > 0 && egg && a.Alive && a.MeatPickup && a.StandUp <= 0) PickUpMeat(w, id);
                 if (!a.Alive || a.StandUp > 0 || !w.Inputs[id].Interact)
                 {
                     a.GatherProgress = 0;
                     a.GatherNodeId = -1;
+                    Delivery.CancelDelivery(a);
                     continue;
                 }
 
-                // Delivery first: an actor at the shrine with cargo hands it all in.
-                if (a.CarryAmount > 0 && egg) // ITEM CM-35: added by its owner (|| a.CarryMeat > 0: meat rides with any load)
+                // Delivery first: an actor at the shrine with cargo or meat hands it all in (CM-35: meat rides with any load).
+                if ((a.CarryAmount > 0 || a.CarryMeat > 0) && egg)
                 {
                     double dx = w.X[id] - shrine.X;
                     double dz = w.Z[id] - shrine.Z;
                     if (dx * dx + dz * dz <= shrineR * shrineR)
                     {
+                        a.GatherProgress = 0;
+                        a.GatherNodeId = -1;
+                        // CM-64: the wind-up; the load goes in only on the pass it completes.
+                        if (!Delivery.StepDeliveryWindup(w, a)) continue;
+                        Delivery.CancelDelivery(a);
                         if (a.CarryAmount > 0)
                         {
                             if (a.Carry == CarryKind.Corruption) ApplyDelivery(w, a.Team, CarryKind.Corruption, a.CarryAmount, id);
-                            else ApplyDelivery(w, a.Team, CarryKind.Biomass, a.CarryAmount, id);
+                            else ApplyDelivery(w, a.Team, CarryKind.Biomass, a.CarryAmount, id, BiomassType.Plant);
                         }
-                        // ITEM CM-35: added by its owner (meat delivery: if (a.CarryMeat > 0) ApplyDelivery(w, a.Team, Biomass, a.CarryMeat, id, meat))
+                        if (a.CarryMeat > 0) ApplyDelivery(w, a.Team, CarryKind.Biomass, a.CarryMeat, id, BiomassType.Meat);
                         a.Carry = CarryKind.None;
                         a.CarryAmount = 0;
-                        // ITEM CM-35: added by its owner (a.CarryMeat = 0)
-                        a.GatherProgress = 0;
-                        a.GatherNodeId = -1;
+                        a.CarryMeat = 0;
                         continue;
                     }
                 }
+                Delivery.CancelDelivery(a);
 
                 int ni = GatherNode(w, id);
                 if (ni < 0)

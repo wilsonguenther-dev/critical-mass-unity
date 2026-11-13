@@ -29,7 +29,7 @@ namespace CriticalMass.Sim.Tests
             a.Carry = kind;
             a.CarryAmount = units;
             w.Inputs[id].Interact = true;
-            SimResources.ResourcesSystem(w, 1.0 / 30);
+            for (int t = 0; t < Delivery.WindupTicks(w.Config); t++) SimResources.ResourcesSystem(w, 1.0 / 30); // CM-64 wind-up
             w.Inputs[id].Interact = false;
             Assert.AreEqual(0, a.CarryAmount);
         }
@@ -102,7 +102,7 @@ namespace CriticalMass.Sim.Tests
 
             AssertSameFeed(Snapshot(real), Snapshot(dbg));
             Assert.AreEqual(3 * feed.BiomassAllegiancePerUnit + 2 * feed.CorruptionAllegiancePerUnit, dbg.Match.Allegiance.Azure);
-            Assert.AreEqual(2 * feed.CorruptionInstabilityPerUnit, dbg.Match.Instability); // ITEM CM-85: restores "+ 7 * BiomassInstabilityPerUnit"
+            Assert.AreEqual(2 * feed.CorruptionInstabilityPerUnit + 7 * feed.BiomassInstabilityPerUnit, dbg.Match.Instability); // CM-85
         }
 
         [Test]

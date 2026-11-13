@@ -75,6 +75,8 @@ namespace CriticalMass.Runtime.Input
             new ControlRow("Move left", new[] { new RebindSlot("Move", K, 0, "WASD", "left"), new RebindSlot("Move", K, 0, "Arrows", "left") }, None),
             new ControlRow("Move right", new[] { new RebindSlot("Move", K, 0, "WASD", "right"), new RebindSlot("Move", K, 0, "Arrows", "right") }, None),
             new ControlRow("Move (stick)", None, new[] { new RebindSlot("Move", G) }),
+            // Integration batch 2: a second default (hold L SHIFT) for trackpads and two-button mice with no side button.
+            new ControlRow("Walk to pointer", new[] { new RebindSlot("MoveToPointer", K), new RebindSlot("MoveToPointer", K, 1) }, None),
             new ControlRow("Aim", new[] { new RebindSlot("Point", K, 0, rebindable: false) }, new[] { new RebindSlot("Aim", G) }),
             new ControlRow("Attack", new[] { new RebindSlot("Attack", K) }, new[] { new RebindSlot("Attack", G) }),
             new ControlRow("Class ability", new[] { new RebindSlot("Ability", K) }, new[] { new RebindSlot("Ability", G), new RebindSlot("Ability", G, 1) }),
@@ -84,6 +86,10 @@ namespace CriticalMass.Runtime.Input
             new ControlRow("Switch dig / place", new[] { new RebindSlot("SwitchDigPlace", K, 0, rebindable: false) },
                 new[] { new RebindSlot("SwitchDigPlace", G, 0, "Shoulders", "negative"), new RebindSlot("SwitchDigPlace", G, 0, "Shoulders", "positive") }),
             new ControlRow("Scoreboard", new[] { new RebindSlot("Scoreboard", K) }, new[] { new RebindSlot("Scoreboard", G) }),
+            new ControlRow("Full map", new[] { new RebindSlot("Map", K) }, new[] { new RebindSlot("Map", G) }),
+            new ControlRow("Ping wheel", new[] { new RebindSlot("Ping", K) }, new[] { new RebindSlot("Ping", G) }),
+            new ControlRow("HUD cursor", new[] { new RebindSlot("HudCursor", K) }, new[] { new RebindSlot("HudCursor", G) }),
+            new ControlRow("Minimap zoom", new[] { new RebindSlot("MinimapZoom", K) }, new[] { new RebindSlot("MinimapZoom", G) }),
             new ControlRow("Pause menu", new[] { new RebindSlot("Pause", K) }, new[] { new RebindSlot("Pause", G) }),
         };
 
@@ -129,7 +135,8 @@ namespace CriticalMass.Runtime.Input
 
         public static InputActionMap Map(InputActionAsset asset) => asset != null ? asset.FindActionMap(MapName, false) : null;
 
-        /// <summary>Short glyph text for a control path, Xbox names on a controller (A, B, X, Y, LB, RT, VIEW, MENU).</summary>
+        /// <summary>Short text for a control path, Xbox names on a controller (A, B, X, Y, LB, RT, VIEW, MENU), plain words for
+        /// mouse buttons (LEFT CLICK, RIGHT CLICK, MIDDLE CLICK, SCROLL). Drawn prompts: InputGlyphs.</summary>
         public static string DisplayPath(string path)
         {
             if (string.IsNullOrEmpty(path)) return "-";
@@ -169,13 +176,15 @@ namespace CriticalMass.Runtime.Input
             {
                 switch (control)
                 {
-                    case "leftButton": return "LMB";
-                    case "rightButton": return "RMB";
-                    case "middleButton": return "MMB";
-                    case "forwardButton": return "MOUSE 4";
-                    case "backButton": return "MOUSE 5";
+                    // Plain words, never the LMB / RMB / MMB abbreviations (owner, 2026-11-12); glyphs: InputGlyphs.
+                    case "leftButton": return "LEFT CLICK";
+                    case "rightButton": return "RIGHT CLICK";
+                    case "middleButton": return "MIDDLE CLICK";
+                    // The thumb button nearest the palm is "back" (Windows XButton1, "Mouse 4" in most games).
+                    case "backButton": return "MOUSE 4";
+                    case "forwardButton": return "MOUSE 5";
                     case "scroll/y":
-                    case "scroll": return "WHEEL";
+                    case "scroll": return "SCROLL";
                     case "position": return "MOUSE";
                 }
             }
@@ -355,7 +364,8 @@ namespace CriticalMass.Runtime.Input
         /// <summary>The mouse moved more than 2 px or a button went down this frame.</summary>
         public static bool MouseUsed(Mouse mouse) =>
             mouse.delta.ReadValue().sqrMagnitude > 4f || mouse.leftButton.wasPressedThisFrame ||
-            mouse.rightButton.wasPressedThisFrame || mouse.middleButton.wasPressedThisFrame;
+            mouse.rightButton.wasPressedThisFrame || mouse.middleButton.wasPressedThisFrame ||
+            mouse.backButton.wasPressedThisFrame || mouse.forwardButton.wasPressedThisFrame;
 
         /// <summary>A stick is pushed past StickUseThreshold or any button or trigger went down this frame.</summary>
         public static bool GamepadUsed(Gamepad pad)

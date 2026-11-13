@@ -126,6 +126,14 @@ namespace CriticalMass.Sim.Core
             if (k.State == KaijuState.Crimson && src.Team != TeamId.Azure) return 0;
             if (k.State == KaijuState.Neutral) k.Threat[sourceId] = JsMath.F32(w.Config.Kaiju.NeutralThreatMemorySeconds);
             k.Hp -= amount;
+            // DG-16 (view request): who hit the Kaiju and where, for effects: the point on its hit radius toward the attacker.
+            double hx = w.X[sourceId] - k.X;
+            double hz = w.Z[sourceId] - k.Z;
+            double hd = Math.Sqrt(hx * hx + hz * hz);
+            double cr = w.Config.Kaiju.Radius;
+            double cx = hd > 1e-9 ? k.X + hx / hd * cr : k.X;
+            double cz = hd > 1e-9 ? k.Z + hz / hd * cr : k.Z;
+            World.PushEvent(w, SimEventType.KaijuDamaged, sourceId, -1, cx, cz, amount);
             if (k.Hp <= 0)
             {
                 k.Hp = 0;

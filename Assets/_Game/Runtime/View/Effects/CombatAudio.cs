@@ -10,8 +10,8 @@ namespace CriticalMass.Runtime.View.Effects
 {
     /// <summary>
     /// The 42 Kenney CC0 sounds (Assets/_Game/Audio/Resources/CMSfx, credits in Assets/_Game/Audio/Resources/CREDITS.md) wired to
-    /// the decoded sim events through the CMAudioMixer (groups Master > Music, Sfx; exposed MasterVol, MusicVol, SfxVol
-    /// for the settings page). Positional falloff is measured from the local player (the camera follows them): full
+    /// the decoded sim events through the game's one mixer (GameSettings.Mixer, Resources "Audio/CMMixer", group Effects:
+    /// the settings page's Effects and Master sliders move it). Positional falloff is measured from the local player (the camera follows them): full
     /// within 9 u, silent beyond 36 u, panned by screen side. A 20-voice pool, a voice cap and a sim-time cooldown per cue,
     /// and priority for the local player's own events keep 32 fighters from becoming noise. Sound never feeds the sim.
     /// Cue table ported from the browser bank (09e0904 src/audio/bank.ts): same files, gains, pitch jitter and rates.
@@ -20,7 +20,7 @@ namespace CriticalMass.Runtime.View.Effects
     {
         public const int Voices = 20;
         public const float NearDistance = 9f, FarDistance = 36f;
-        public const string MixerResource = "CMAudioMixer", ClipFolder = "CMSfx";
+        public const string MixerResource = CriticalMass.Runtime.Menu.GameSettings.MixerResource, ClipFolder = "CMSfx";
 
         public sealed class Cue
         {
@@ -101,14 +101,10 @@ namespace CriticalMass.Runtime.View.Effects
         {
             _cfg = cfg;
             _instance = this;
-            Mixer = Resources.Load<AudioMixer>(MixerResource);
-            if (Mixer != null)
-            {
-                AudioMixerGroup[] g = Mixer.FindMatchingGroups("Sfx");
-                SfxGroup = g.Length > 0 ? g[0] : null;
-                g = Mixer.FindMatchingGroups("Music");
-                MusicGroup = g.Length > 0 ? g[0] : null;
-            }
+            // One mixer for the whole game (integration batch 2): the settings mixer, so the Effects slider moves these sounds.
+            Mixer = CriticalMass.Runtime.Menu.GameSettings.Mixer;
+            SfxGroup = CriticalMass.Runtime.Menu.GameSettings.EffectsGroup;
+            MusicGroup = CriticalMass.Runtime.Menu.GameSettings.MusicGroup;
             var byName = new Dictionary<string, AudioClip>();
             foreach (AudioClip c in Resources.LoadAll<AudioClip>(ClipFolder)) byName[c.name] = c;
             var loaded = new HashSet<string>();
@@ -218,6 +214,16 @@ namespace CriticalMass.Runtime.View.Effects
                 case FxKind.WallCrack: Play("wall_crack", e.X, e.Z, e.Local, 1f, e.Tick); break;
                 case FxKind.WallBreak: Play("wall_break", e.X, e.Z, e.Local, 1f, e.Tick); break;
                 case FxKind.HillChange: Play("hill_capture", e.X, e.Z, true, 1f, e.Tick); break;
+                case FxKind.Explosion:
+                {
+                    // v2: no new files (the 42 credited sounds stay the set): the slam thump pitched per kind, layered
+                    // with the wall break crunch. WallBreak is the crunch alone.
+                    var kind = (ExplosionKind)Mathf.Clamp(e.B, 0, (int)ExplosionKind.KaijuSlam);
+                    if (kind != ExplosionKind.WallBreak)
+                        Play("kaiju_slam", e.X, e.Z, false, kind == ExplosionKind.Mine ? 0.95f : kind == ExplosionKind.Barrel ? 0.7f : 0.8f, e.Tick);
+                    Play("wall_break", e.X, e.Z, false, kind == ExplosionKind.WallBreak ? 1f : 0.85f, e.Tick);
+                    break;
+                }
             }
         }
 

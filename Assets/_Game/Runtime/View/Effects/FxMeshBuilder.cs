@@ -12,6 +12,9 @@ namespace CriticalMass.Runtime.View.Effects
     /// GPU side: the vertex and index buffers are sized ONCE to the budget in the constructor and only their contents and
     /// the sub-mesh index count change per frame (SetVertexBufferData / SetIndexBufferData / SetSubMesh), so a hit or a
     /// frame never creates, grows or frees a GPU buffer.
+    /// <para>v2: every vertex carries a second UNorm8x4 attribute (TEXCOORD0); its x is the additive amount. The shader
+    /// blends premultiplied (One, OneMinusSrcAlpha), so a vertex with Add = 255 adds its colour (the explosion light pulse)
+    /// while Add = 0 alpha-blends as before: glow and toon shapes share one material and one draw call.</para>
     /// </summary>
     public sealed class FxMeshBuilder
     {
@@ -22,6 +25,7 @@ namespace CriticalMass.Runtime.View.Effects
         {
             public Vector3 Pos;
             public Color32 Col;
+            public Color32 Ext;
         }
 
         private const MeshUpdateFlags Quiet = MeshUpdateFlags.DontValidateIndices | MeshUpdateFlags.DontRecalculateBounds |
@@ -33,6 +37,8 @@ namespace CriticalMass.Runtime.View.Effects
         /// <summary>Shapes refused because the budget was full (since the last Clear).</summary>
         public int Dropped { get; private set; }
         public readonly Mesh Mesh;
+        /// <summary>Additive amount written into every vertex added while set (0 alpha blend, 255 fully additive).</summary>
+        public byte Add;
 
         public FxMeshBuilder(string name, int maxVerts, int maxIndices)
         {
@@ -44,7 +50,8 @@ namespace CriticalMass.Runtime.View.Effects
             Mesh.MarkDynamic();
             Mesh.SetVertexBufferParams(maxVerts,
                 new VertexAttributeDescriptor(VertexAttribute.Position, VertexAttributeFormat.Float32, 3),
-                new VertexAttributeDescriptor(VertexAttribute.Color, VertexAttributeFormat.UNorm8, 4));
+                new VertexAttributeDescriptor(VertexAttribute.Color, VertexAttributeFormat.UNorm8, 4),
+                new VertexAttributeDescriptor(VertexAttribute.TexCoord0, VertexAttributeFormat.UNorm8, 4));
             Mesh.SetIndexBufferParams(maxIndices, IndexFormat.UInt32);
             Mesh.SetVertexBufferData(_v, 0, 0, maxVerts, 0, Quiet);
             Mesh.SetIndexBufferData(_idx, 0, 0, maxIndices, Quiet);
@@ -58,6 +65,7 @@ namespace CriticalMass.Runtime.View.Effects
             VertCount = 0;
             IndexCount = 0;
             Dropped = 0;
+            Add = 0;
         }
 
         public bool Room(int verts, int indices)
@@ -71,6 +79,7 @@ namespace CriticalMass.Runtime.View.Effects
         {
             _v[VertCount].Pos = p;
             _v[VertCount].Col = c;
+            _v[VertCount].Ext = new Color32(Add, 0, 0, 0);
             return VertCount++;
         }
 
@@ -202,6 +211,24 @@ namespace CriticalMass.Runtime.View.Effects
             if (!Room(48, 72)) return;
             AddBox(c, rot, half + Vector3.one * outline, navy, navy, navy, true);
             AddBox(c, rot, half, light, mid, dark, false);
+        }
+
+        /// <summary>
+        /// A cartoon bone (gib): a shaft and two knuckle knobs, each an outlined toon box (144 vertices). `half` is the
+        /// shaft half length along the rotated x axis, `thick` the shaft half thickness.
+        /// </summary>
+        public void Bone(Vector3 c, Quaternion rot, float half, float thick, float outline, Color32 light, Color32 mid, Color32 dark, Color32 navy)
+        {
+            if (!Room(144, 216)) return;
+            Vector3 ax = rot * Vector3.right;
+            var shaft = new Vector3(half, thick, thick);
+            var knob = new Vector3(thick * 1.25f, thick * 1.7f, thick * 1.7f);
+            AddBox(c, rot, shaft + Vector3.one * outline, navy, navy, navy, true);
+            AddBox(c + ax * half, rot, knob + Vector3.one * outline, navy, navy, navy, true);
+            AddBox(c - ax * half, rot, knob + Vector3.one * outline, navy, navy, navy, true);
+            AddBox(c, rot, shaft, light, mid, dark, false);
+            AddBox(c + ax * half, rot, knob, light, mid, dark, false);
+            AddBox(c - ax * half, rot, knob, light, mid, dark, false);
         }
 
         private readonly Vector3[] _corner = new Vector3[8];

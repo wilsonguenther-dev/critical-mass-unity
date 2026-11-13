@@ -1,5 +1,6 @@
 using System;
 using CriticalMass.Runtime.Game;
+using CriticalMass.Runtime.Menu;
 using CriticalMass.Sim.Core;
 using CriticalMass.Sim.Grid;
 using UnityEngine;
@@ -21,7 +22,13 @@ namespace CriticalMass.Runtime.Input
     /// recently than the mouse; with the right stick at rest the aim follows the move direction. The result reaches the
     /// sim exactly like a mouse aim point (State.SetAim), so the sim input path is unchanged. PauseHandler lets the pause
     /// menu take the Pause press while it is open (Escape or Start then means "back" instead of toggling).</para>
+    /// <para>Easy movement (2026-11-12): the rebindable "MoveToPointer" action (default mouse back button, MOUSE 4) walks
+    /// toward the ground point under the cursor while held; the settings "Movement assist" and "Keys follow the map"
+    /// (GameSettings) are copied into State, which applies them in Fill (MoveAssist). DefaultExecutionOrder(-100): this
+    /// Update samples the devices BEFORE SimDriverBehaviour.Update steps the sim in the same frame, so a key press reaches
+    /// the next tick with no extra frame of delay (the two scripts had the same order, which Unity leaves unspecified).</para>
     /// </summary>
+    [DefaultExecutionOrder(-100)]
     public sealed class HumanInputSource : MonoBehaviour
     {
         /// <summary>Action names in the Player map bound to game buttons, parallel to Buttons.</summary>
@@ -36,6 +43,7 @@ namespace CriticalMass.Runtime.Input
         private InputAction _move;
         private InputAction _point;
         private InputAction _aim;
+        private InputAction _walk;
 
         /// <summary>Which device aims and the controller aim point (view side).</summary>
         public AimResolver Aim { get; } = new AimResolver();
@@ -45,6 +53,9 @@ namespace CriticalMass.Runtime.Input
         /// "back" while open). Null = every press toggles State.Paused.
         /// </summary>
         public Func<bool> PauseHandler;
+        /// <summary>DG-09: the SwitchDigPlace axis (wheel scroll/y, LB negative / RB positive), edge-detected each frame.</summary>
+        private InputAction _switchDigPlace;
+        private bool _switchWasActive;
         private readonly InputAction[] _actions = new InputAction[ButtonActions.Length];
         private readonly Action<InputAction.CallbackContext>[] _started = new Action<InputAction.CallbackContext>[ButtonActions.Length];
         private readonly Action<InputAction.CallbackContext>[] _canceled = new Action<InputAction.CallbackContext>[ButtonActions.Length];
@@ -57,6 +68,11 @@ namespace CriticalMass.Runtime.Input
             _move = map["Move"];
             _point = map["Point"];
             _aim = map.FindAction("Aim", false);
+            _switchDigPlace = map.FindAction("SwitchDigPlace");
+            _switchWasActive = false;
+            _walk = map.FindAction("MoveToPointer", false);
+            ReadSettings();
+            GameSettings.Changed += ReadSettings;
             for (int i = 0; i < ButtonActions.Length; i++)
             {
                 B b = Buttons[i];
@@ -73,8 +89,16 @@ namespace CriticalMass.Runtime.Input
             }
         }
 
+        private void ReadSettings()
+        {
+            State.MovementAssist = GameSettings.MovementAssist;
+            State.KeysFollowMap = GameSettings.KeysFollowMap;
+        }
+
         private void OnDisable()
         {
+            GameSettings.Changed -= ReadSettings;
+            State.BindWorld(null);
             for (int i = 0; i < _actions.Length; i++)
             {
                 InputAction a = _actions[i];
@@ -89,13 +113,26 @@ namespace CriticalMass.Runtime.Input
             _move = null;
             _point = null;
             _aim = null;
+            _switchDigPlace = null;
+            _walk = null;
         }
 
         private void Update()
         {
             if (_map == null) return;
             var m = _move.ReadValue<Vector2>();
-            State.SetMove(m.x, m.y);
+            // DG-09 (U-053): a wheel notch or a bumper press flips the miner's dig / place mode. The axis goes non-zero for a
+            // scroll frame or while a bumper is held; only the rising edge counts, so a held bumper switches once.
+            if (_switchDigPlace != null)
+            {
+                bool active = Mathf.Abs(_switchDigPlace.ReadValue<float>()) > 0.5f;
+                if (active && !_switchWasActive) State.SwitchDigPlace();
+                _switchWasActive = active;
+            }
+            bool fromKeys = m.sqrMagnitude > 0f && _move.activeControl != null && _move.activeControl.device is Keyboard;
+            State.SetMove(m.x, m.y, fromKeys);
+            bool walk = _walk != null && _walk.IsPressed();
+            State.SetPointerWalk(walk);
 
             // Which device aims: the one used last (mouse movement or click vs a controller stick).
             ControlBindings.Sample();
@@ -106,6 +143,12 @@ namespace CriticalMass.Runtime.Input
 
             if (_driver == null) _driver = GetComponent<SimDriverBehaviour>();
             World w = _driver != null ? _driver.World : null;
+            State.BindWorld(w);
+            // UnityEngine.Camera spelled out: CriticalMass.Runtime.Camera (F-08b) is a namespace and would shadow it.
+            UnityEngine.Camera cam = UnityEngine.Camera.main;
+            // Pointer walking reads the cursor's ground point whichever device aims.
+            if (walk && Mouse.current != null && cam != null && PointerGround(cam, w, out double wx, out double wz)) State.SetWalkTarget(wx, wz);
+            else State.ClearWalkTarget();
             if (Aim.Current == AimResolver.Mode.Stick)
             {
                 if (w != null && w.ActorCount > 0 && Aim.ResolveStick(stick.x, stick.y, m.x, m.y, w.X[0], w.Z[0], out double ax, out double az))
@@ -114,19 +157,23 @@ namespace CriticalMass.Runtime.Input
                 return;
             }
 
-            // UnityEngine.Camera spelled out: CriticalMass.Runtime.Camera (F-08b) is a namespace and would shadow it.
-            UnityEngine.Camera cam = UnityEngine.Camera.main;
             if (Mouse.current == null || cam == null)
             {
                 State.ClearAim();
                 return;
             }
+            if (PointerGround(cam, w, out double sx, out double sz)) State.SetAim(sx, sz);
+            else State.ClearAim();
+        }
+
+        /// <summary>The sim ground point under the pointer (false when the ray misses).</summary>
+        private bool PointerGround(UnityEngine.Camera cam, World w, out double sx, out double sz)
+        {
             Ray ray = cam.ScreenPointToRay(_point.ReadValue<Vector2>());
             // pickHumanAim (humanInput.ts:166): the plane at the ground height of actor 0's cell, not y = 0.
             MapDef map = w != null && w.ActorCount > 0 ? w.Map : null;
             double hx = map != null ? w.X[0] : 0, hz = map != null ? w.Z[0] : 0;
-            if (GroundHeight.TryAimPoint(ray, map, hx, hz, out double sx, out double sz)) State.SetAim(sx, sz);
-            else State.ClearAim();
+            return GroundHeight.TryAimPoint(ray, map, hx, hz, out sx, out sz);
         }
 
         private void OnApplicationFocus(bool f)

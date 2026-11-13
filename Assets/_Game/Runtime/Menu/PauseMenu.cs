@@ -5,6 +5,10 @@ using CriticalMass.Runtime.Hud;
 using CriticalMass.Runtime.Hud.Style;
 using CriticalMass.Runtime.Hud.Ui;
 using CriticalMass.Runtime.Input;
+using CriticalMass.Runtime.Menus;
+using CriticalMass.Runtime.Spectator;
+using CriticalMass.Sim.Config;
+using CriticalMass.Sim.Core;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
@@ -23,16 +27,64 @@ namespace CriticalMass.Runtime.Menu
     /// drag) and controller (stick or d-pad, A) all drive the same focus through the EventSystem.
     /// Pages: root (Resume, Settings, Restart match, Quit to title, Quit game) and Settings with four tabs (Controls with
     /// interactive rebinding, Audio, Video, Game). Built in code, like the HUD, on a Screen Space - Camera canvas above it.
+    /// <para>2026-11-12 (spectator and readable prompts): the root page adds SPECTATE / REJOIN AS (class), CHANGE CLASS (a
+    /// class page, or DG-10's ClassSelect when in the build; the pick applies on the next respawn) and SWITCH TEAM (a
+    /// confirm page, then the match restarts on the other side). Hints are drawn as glyphs (PromptStrip) and the Controls
+    /// tab cells show each binding's glyph beside its name.</para>
     /// </summary>
     public sealed class PauseMenu : MonoBehaviour
     {
-        public enum Page { Root, Settings }
+        public enum Page { Root, Settings, Extra, Class, Confirm }
         public enum Tab { Controls, Audio, Video, Game }
 
         /// <summary>What the next PauseMenu does after a scene reload (Restart match, Quit to title).</summary>
         public enum AfterReload { None, Play, Title }
 
         public static AfterReload PendingAfterReload;
+
+        // ---- extension points (DG-25, DG-30): other features add a settings tab or a root-page entry without editing
+        // this file. Register before the menu builds (a BeforeSceneLoad RuntimeInitializeOnLoadMethod); registration is
+        // keyed by name, so registering again after a play-mode restart (domain reload is off) is a no-op. ----
+
+        /// <summary>A settings tab added after the four built-in ones.</summary>
+        public sealed class ExtraTab
+        {
+            /// <summary>Tab button text (short, upper case).</summary>
+            public string Name;
+            /// <summary>Builds the tab's lines on the empty, stretched tab page (use Stepper, Slider, Note and the layout
+            /// constants) and returns its focusable lines top to bottom; the menu chains them for keyboard and controller.</summary>
+            public Func<PauseMenu, RectTransform, List<MenuItem>> Build;
+        }
+
+        /// <summary>A root-page entry that opens a page of its own (Back returns to the root page).</summary>
+        public sealed class ExtraPage
+        {
+            /// <summary>Root-page button text.</summary>
+            public string Label;
+            /// <summary>Title shown above the page.</summary>
+            public string Title;
+            /// <summary>Builds the page once, on an empty page stretched over the 1920x1080 layout space; returns what to focus first.</summary>
+            public Func<PauseMenu, RectTransform, Selectable> Build;
+            /// <summary>Runs every time the page opens (refresh its contents here).</summary>
+            public Action Opened;
+        }
+
+        public static readonly List<ExtraTab> ExtraTabs = new List<ExtraTab>();
+        public static readonly List<ExtraPage> ExtraPages = new List<ExtraPage>();
+
+        public static void AddTab(ExtraTab tab)
+        {
+            if (tab == null || string.IsNullOrEmpty(tab.Name)) return;
+            for (int i = 0; i < ExtraTabs.Count; i++) if (ExtraTabs[i].Name == tab.Name) { ExtraTabs[i] = tab; return; }
+            ExtraTabs.Add(tab);
+        }
+
+        public static void AddPage(ExtraPage page)
+        {
+            if (page == null || string.IsNullOrEmpty(page.Label)) return;
+            for (int i = 0; i < ExtraPages.Count; i++) if (ExtraPages[i].Label == page.Label) { ExtraPages[i] = page; return; }
+            ExtraPages.Add(page);
+        }
 
         public HumanInputSource Input;
         public Canvas Canvas { get; private set; }
@@ -41,6 +93,10 @@ namespace CriticalMass.Runtime.Menu
         public Tab CurrentTab { get; private set; } = Tab.Controls;
         /// <summary>A rebinding is waiting for a key or button.</summary>
         public bool IsRebinding => _rebind != null;
+        /// <summary>The root page's SPECTATE / REJOIN AS, CHANGE CLASS and SWITCH TEAM lines (tests, captures).</summary>
+        public MenuItem SpectateItem => _spectate;
+        public MenuItem ChangeClassItem => _changeClass;
+        public MenuItem SwitchTeamItem => _switchTeam;
         /// <summary>The last conflict warning ("" when none).</summary>
         public string Status => _status != null ? _status.text : string.Empty;
 
@@ -49,8 +105,28 @@ namespace CriticalMass.Runtime.Menu
 
         RectTransform _root;
         GameObject _rootPage, _settingsPage;
-        readonly GameObject[] _tabPages = new GameObject[4];
-        readonly MenuItem[] _tabButtons = new MenuItem[4];
+        GameObject[] _tabPages = new GameObject[4];
+        MenuItem[] _tabButtons = new MenuItem[4];
+        readonly List<ExtraPage> _extraDefs = new List<ExtraPage>();
+        readonly List<GameObject> _extraPages = new List<GameObject>();
+        readonly List<Selectable> _extraFirst = new List<Selectable>();
+        /// <summary>Settings tabs: the four built-in ones plus ExtraTabs registered before the menu built.</summary>
+        public int TabCount => _tabPages.Length;
+        /// <summary>Index into the menu's extra pages of the open one (-1 when none).</summary>
+        public int CurrentExtra { get; private set; } = -1;
+        /// <summary>Index of the extra page with this root-page label (-1 when absent).</summary>
+        public int ExtraPageIndex(string label)
+        {
+            for (int i = 0; i < _extraDefs.Count; i++) if (_extraDefs[i].Label == label) return i;
+            return -1;
+        }
+        GameObject _classPage, _confirmPage;
+        MenuItem _spectate, _changeClass, _switchTeam, _confirmYes;
+        readonly MenuItem[] _classItems = new MenuItem[5];
+        MenuItem _classBack;
+        Text _rootNote, _confirmTitle;
+        PromptStrip _hintStrip;
+        bool _external;
         MenuItem _resume;
         Text _status, _hint, _title;
         readonly List<CellRef> _cells = new List<CellRef>();
@@ -66,6 +142,7 @@ namespace CriticalMass.Runtime.Menu
             public MenuItem Item;
             public RebindSlot Slot;
             public ControlRow Row;
+            public InputGlyphView Glyph;
         }
 
         void Awake()
@@ -108,15 +185,27 @@ namespace CriticalMass.Runtime.Menu
             // The title screen takes every key itself; the press that dismisses it must not also open the menu.
             if (GetComponent<TitleScreen>() != null) return true;
             if (!IsOpen) return false;
+            // DG-14: the controls card opened from this menu closes first (back to the entry that opened it).
+            if (ControlsCardScreen.IsOpen)
+            {
+                ControlsCardScreen.Hide();
+                return true;
+            }
+            if (_external)
+            {
+                ClassSwitch.CloseExternalPicker();
+                EndExternal(null);
+                return true;
+            }
             if (IsRebinding || Time.unscaledTime < _quietUntil) return true;
             Back();
             return true;
         }
 
-        /// <summary>Settings: back to the root page. Root: resume the match.</summary>
+        /// <summary>Settings, class or confirm page: back to the root page. Root: resume the match.</summary>
         public void Back()
         {
-            if (CurrentPage == Page.Settings) ShowRoot();
+            if (CurrentPage != Page.Root) ShowRoot();
             else Resume();
         }
 
@@ -144,6 +233,11 @@ namespace CriticalMass.Runtime.Menu
         void Close()
         {
             CancelRebind();
+            if (_external)
+            {
+                ClassSwitch.CloseExternalPicker();
+                _external = false;
+            }
             IsOpen = false;
             if (Canvas != null) Canvas.enabled = false;
             if (EventSystem.current != null) EventSystem.current.SetSelectedGameObject(null);
@@ -167,6 +261,13 @@ namespace CriticalMass.Runtime.Menu
                 return;
             }
             if (Time.unscaledTime < _quietUntil) return;
+            if (ControlsCardScreen.IsOpen)
+            {
+                Gamepad cardPad = Gamepad.current;
+                if (cardPad != null && cardPad.buttonEast.wasPressedThisFrame) ControlsCardScreen.Hide();
+                return;
+            }
+            if (_external) return;   // DG-10's class picker has the input until it closes
             EventSystem es = EventSystem.current;
             if (es != null && !es.sendNavigationEvents) es.sendNavigationEvents = true;
 
@@ -174,8 +275,8 @@ namespace CriticalMass.Runtime.Menu
             if (pad != null)
             {
                 if (pad.buttonEast.wasPressedThisFrame) Back();
-                else if (CurrentPage == Page.Settings && pad.leftShoulder.wasPressedThisFrame) ShowTab((Tab)(((int)CurrentTab + 3) % 4));
-                else if (CurrentPage == Page.Settings && pad.rightShoulder.wasPressedThisFrame) ShowTab((Tab)(((int)CurrentTab + 1) % 4));
+                else if (CurrentPage == Page.Settings && pad.leftShoulder.wasPressedThisFrame) ShowTab((Tab)(((int)CurrentTab + TabCount - 1) % TabCount));
+                else if (CurrentPage == Page.Settings && pad.rightShoulder.wasPressedThisFrame) ShowTab((Tab)(((int)CurrentTab + 1) % TabCount));
             }
             // Nothing focused (the mouse clicked empty space): any navigation key puts the focus back.
             if (es != null && es.currentSelectedGameObject == null && NavigationPressed()) SelectFirst();
@@ -199,8 +300,13 @@ namespace CriticalMass.Runtime.Menu
             if (IsRebinding) s = pad ? "PRESS A BUTTON   ·   WAIT 8 S TO CANCEL" : "PRESS A KEY OR MOUSE BUTTON   ·   ESC CANCELS";
             else if (CurrentPage == Page.Settings)
                 s = pad ? "A SELECT   ·   B BACK   ·   LB / RB TABS   ·   LEFT / RIGHT CHANGE" : "ENTER SELECT   ·   ESC BACK   ·   LEFT / RIGHT CHANGE";
+            else if (CurrentPage == Page.Extra) s = pad ? "A SELECT   ·   B BACK" : "ENTER SELECT   ·   ESC BACK";
+            else if (CurrentPage == Page.Class || CurrentPage == Page.Confirm)
+                s = pad ? "A SELECT   ·   B BACK" : "ENTER SELECT   ·   ESC BACK";
             else s = pad ? "A SELECT   ·   B RESUME" : "ENTER SELECT   ·   ESC RESUME";
             HudText.Set(_hint, s);
+            // Drawn: the key words become glyphs (the text above stays as the hidden plain line).
+            if (_hintStrip != null) _hintStrip.SetHint(s, ControlBindings.ActiveDevice);
         }
 
         // ---- pages ----
@@ -210,9 +316,13 @@ namespace CriticalMass.Runtime.Menu
             Build();
             CancelRebind();
             CurrentPage = Page.Root;
+            SetExtraPage(-1);
             _rootPage.SetActive(true);
             _settingsPage.SetActive(false);
+            _classPage.SetActive(false);
+            _confirmPage.SetActive(false);
             HudText.Set(_title, "PAUSED");
+            RefreshRootLabels();
             Select(_resume);
             UpdateHint();
         }
@@ -221,17 +331,46 @@ namespace CriticalMass.Runtime.Menu
         {
             Build();
             CurrentPage = Page.Settings;
+            SetExtraPage(-1);
             _rootPage.SetActive(false);
             _settingsPage.SetActive(true);
+            _classPage.SetActive(false);
+            _confirmPage.SetActive(false);
             HudText.Set(_title, "SETTINGS");
             ShowTab(tab);
+        }
+
+        /// <summary>Opens extra page <paramref name="index"/> (see ExtraPageIndex).</summary>
+        public void ShowExtra(int index)
+        {
+            Build();
+            if (index < 0 || index >= _extraPages.Count) return;
+            CancelRebind();
+            CurrentPage = Page.Extra;
+            _rootPage.SetActive(false);
+            _settingsPage.SetActive(false);
+            _classPage.SetActive(false);
+            _confirmPage.SetActive(false);
+            SetExtraPage(index);
+            HudText.Set(_title, _extraDefs[index].Title ?? string.Empty);
+            try { _extraDefs[index].Opened?.Invoke(); }
+            catch (Exception e) { Debug.LogException(e); }
+            Select(_extraFirst[index]);
+            UpdateHint();
+        }
+
+        void SetExtraPage(int index)
+        {
+            CurrentExtra = index;
+            for (int i = 0; i < _extraPages.Count; i++) _extraPages[i].SetActive(i == index);
         }
 
         public void ShowTab(Tab tab)
         {
             CancelRebind();
+            if ((int)tab < 0 || (int)tab >= TabCount) tab = Tab.Controls;
             CurrentTab = tab;
-            for (int i = 0; i < 4; i++)
+            for (int i = 0; i < TabCount; i++)
             {
                 _tabPages[i].SetActive(i == (int)tab);
                 VectorShape s = _tabButtons[i].Body;
@@ -255,10 +394,16 @@ namespace CriticalMass.Runtime.Menu
         void SelectFirst()
         {
             if (CurrentPage == Page.Root) Select(_resume);
+            else if (CurrentPage == Page.Extra && CurrentExtra >= 0) Select(_extraFirst[CurrentExtra]);
+            else if (CurrentPage == Page.Class) Select(FirstClassItem());
+            else if (CurrentPage == Page.Confirm) Select(_confirmYes);
             else Select(_tabButtons[(int)CurrentTab]);
         }
 
         // ---- actions ----
+
+        /// <summary>DG-14: the one-screen controls card over the menu; the focus comes back here when it closes.</summary>
+        public void ShowControls() => ControlsCardScreen.Show();
 
         public void RestartMatch()
         {
@@ -284,6 +429,189 @@ namespace CriticalMass.Runtime.Menu
 #else
             Application.Quit();
 #endif
+        }
+
+        // ---- spectate, change class, switch team (2026-11-12) ----
+
+        World CurrentWorld()
+        {
+            SimDriverBehaviour d = GetComponent<SimDriverBehaviour>();
+            return d != null ? d.World : null;
+        }
+
+        /// <summary>Root labels that depend on the match: SPECTATE or REJOIN AS (class); the pending class note.</summary>
+        void RefreshRootLabels()
+        {
+            if (_spectate != null)
+            {
+                string cls = KillWords.ClassName(SpectatorMode.RejoinClass()).ToUpperInvariant();
+                HudText.Set(_spectate.Label, SpectatorMode.IsSpectating ? "REJOIN AS " + cls : "SPECTATE");
+                _spectate.interactable = SpectatorMode.Current != null;
+            }
+            if (_rootNote != null)
+                HudText.Set(_rootNote, ClassSwitch.HasPending
+                    ? "YOU'LL RESPAWN AS THE " + KillWords.ClassName(ClassSwitch.Pending).ToUpperInvariant()
+                    : SpectatorMode.IsSpectating && SpectatorMode.Current.RejoinPending ? "BACK IN THE FIGHT AT YOUR RESPAWN" : "");
+        }
+
+        /// <summary>Spectate (actor 0 plays itself, free camera) or rejoin; resumes the match either way.</summary>
+        public void ToggleSpectate()
+        {
+            if (SpectatorMode.Current == null) return;
+            SpectatorMode.Toggle();
+            Resume();
+        }
+
+        /// <summary>The class picker: DG-10's ClassSelect when in the build, else the class page. Applies on the next respawn.</summary>
+        public void ShowClassPicker()
+        {
+            World w = CurrentWorld();
+            TeamId team = w != null && w.ActorCount > 0 ? w.Actors[0].Team : TeamId.Azure;
+            if (ClassSwitch.ExternalPickerAvailable)
+            {
+                _external = true;
+                if (Canvas != null) Canvas.enabled = false;
+                if (EventSystem.current != null) EventSystem.current.SetSelectedGameObject(null);
+                if (ClassSwitch.OpenExternalPicker(team, c => EndExternal(c), () => EndExternal(null))) return;
+                _external = false;
+                if (Canvas != null) Canvas.enabled = true;
+            }
+            ShowClassPage();
+        }
+
+        void EndExternal(ClassId? picked)
+        {
+            if (!_external) return;
+            _external = false;
+            if (picked.HasValue) ClassSwitch.Request(CurrentWorld(), picked.Value);
+            if (IsOpen && Canvas != null) Canvas.enabled = true;
+            if (IsOpen) ShowRoot();
+        }
+
+        public void ShowClassPage()
+        {
+            Build();
+            CurrentPage = Page.Class;
+            SetExtraPage(-1);
+            _rootPage.SetActive(false);
+            _settingsPage.SetActive(false);
+            _confirmPage.SetActive(false);
+            _classPage.SetActive(true);
+            HudText.Set(_title, "CHANGE CLASS");
+            World w = CurrentWorld();
+            ClassId now = SpectatorMode.RejoinClass();
+            for (int i = 0; i < _classItems.Length; i++)
+            {
+                MenuItem it = _classItems[i];
+                if (it == null) continue;
+                bool chosen = (int)now == i;
+                it.Body.SetRim(chosen ? Brass : Cream);
+                it.Body.RimPx = chosen ? 4f : 2f;
+                it.Body.SetVerticesDirty();
+            }
+            Select(FirstClassItem((int)now));
+            UpdateHint();
+        }
+
+        MenuItem FirstClassItem(int prefer = -1)
+        {
+            if (prefer >= 0 && prefer < _classItems.Length && _classItems[prefer] != null && _classItems[prefer].interactable)
+                return _classItems[prefer];
+            for (int i = 0; i < _classItems.Length; i++)
+                if (_classItems[i] != null && _classItems[i].interactable) return _classItems[i];
+            return _classBack;
+        }
+
+        /// <summary>Holds cls for the next respawn and returns to the root page with a line saying so.</summary>
+        public void PickClass(ClassId cls)
+        {
+            ClassSwitch.Request(CurrentWorld(), cls);
+            ShowRoot();
+        }
+
+        public void ShowSwitchTeam()
+        {
+            Build();
+            CurrentPage = Page.Confirm;
+            SetExtraPage(-1);
+            _rootPage.SetActive(false);
+            _settingsPage.SetActive(false);
+            _classPage.SetActive(false);
+            _confirmPage.SetActive(true);
+            HudText.Set(_title, "SWITCH TEAM");
+            HudText.Set(_confirmTitle, "SWITCH TO " + (OtherTeam() == TeamId.Azure ? "AZURE" : "CRIMSON") + "?");
+            Select(_confirmYes);
+            UpdateHint();
+        }
+
+        TeamId OtherTeam()
+        {
+            World w = CurrentWorld();
+            TeamId mine = w != null && w.ActorCount > 0 ? w.Actors[0].Team : Flow.GameFlow.LastSetup.Team;
+            return mine == TeamId.Azure ? TeamId.Crimson : TeamId.Azure;
+        }
+
+        /// <summary>Restarts the match on the other side (same class, size and pace; a new seed), playing.</summary>
+        public void ConfirmSwitchTeam()
+        {
+            Flow.MatchSetupChoice c = Flow.GameFlow.LastSetup;
+            World w = CurrentWorld();
+            c.Team = OtherTeam();
+            if (w != null && w.ActorCount > 0) c.Class = SpectatorMode.RejoinClass();
+            SpectatorMode.SpectateNextMatch = false;
+            Flow.GameFlow.BeginMatch(c);
+        }
+
+        void BuildClassPage(RectTransform space)
+        {
+            RectTransform page = MenuUi.Rt(space, "Class Page");
+            MenuUi.Stretch(page);
+            _classPage = page.gameObject;
+            MenuUi.Panel(page, "Panel", 560f, 160f, 800f, 700f);
+            MenuUi.Label(page, "Line", CMTokens.Ui, 24, Cream, TextAnchor.MiddleCenter, 560f, 186f, 800f, 40f,
+                "YOUR NEW CLASS APPLIES WHEN YOU NEXT RESPAWN", 2f);
+            var items = new List<MenuItem>();
+            for (int i = 0; i < _classItems.Length; i++)
+            {
+                ClassId cls = (ClassId)i;
+                string name = KillWords.ClassName(cls).ToUpperInvariant();
+                MenuItem it = MenuUi.Item(page, "Class " + name, 700f, 250f + i * 84f, 520f, 70f, name, MenuItem.Kind.Button, 30, true,
+                    CMTokens.Display);
+                it.Body.Radius = 16f;
+                it.Submitted = () => PickClass(cls);
+                _classItems[i] = it;
+                if (!Menus.MatchSetup.Playable.Contains(cls))
+                {
+                    it.interactable = false;
+                    MenuUi.Label(it.transform, "Soon", CMTokens.Ui, 16, Brass, TextAnchor.MiddleRight, 330f, 0f, 170f, 70f, "COMING SOON", 2f);
+                    continue;
+                }
+                items.Add(it);
+            }
+            _classBack = MenuUi.Item(page, "Back", 760f, 690f + 60f, 400f, 70f, "BACK", MenuItem.Kind.Button, 28, true, CMTokens.Display);
+            _classBack.Submitted = ShowRoot;
+            items.Add(_classBack);
+            Chain(items);
+            _classPage.SetActive(false);
+        }
+
+        void BuildConfirmPage(RectTransform space)
+        {
+            RectTransform page = MenuUi.Rt(space, "Confirm Page");
+            MenuUi.Stretch(page);
+            _confirmPage = page.gameObject;
+            MenuUi.Panel(page, "Panel", 560f, 300f, 800f, 420f);
+            _confirmTitle = MenuUi.Label(page, "Question", CMTokens.Display, 44, Cream, TextAnchor.MiddleCenter, 560f, 340f, 800f, 70f,
+                "SWITCH TEAM?", 3f);
+            MenuUi.Label(page, "Line", CMTokens.Ui, 24, Cream, TextAnchor.MiddleCenter, 560f, 420f, 800f, 40f,
+                "THE MATCH RESTARTS WITH YOU ON THE OTHER SIDE", 2f);
+            _confirmYes = MenuUi.Item(page, "Yes", 620f, 560f, 330f, 80f, "YES, SWITCH", MenuItem.Kind.Button, 30, true, CMTokens.Display);
+            _confirmYes.Submitted = ConfirmSwitchTeam;
+            MenuItem no = MenuUi.Item(page, "No", 970f, 560f, 330f, 80f, "NO", MenuItem.Kind.Button, 30, true, CMTokens.Display);
+            no.Submitted = ShowRoot;
+            _confirmYes.navigation = new Navigation { mode = Navigation.Mode.Explicit, selectOnLeft = no, selectOnRight = no };
+            no.navigation = new Navigation { mode = Navigation.Mode.Explicit, selectOnLeft = _confirmYes, selectOnRight = _confirmYes };
+            _confirmPage.SetActive(false);
         }
 
         // ---- build ----
@@ -324,9 +652,17 @@ namespace CriticalMass.Runtime.Menu
 
             _title = MenuUi.Label(space, "Title", CMTokens.Display, 64, Cream, TextAnchor.MiddleCenter, 460f, 40f, 1000f, 90f, "PAUSED", 4f);
             _hint = MenuUi.Label(space, "Hint", CMTokens.Ui, 20, Cream, TextAnchor.MiddleCenter, 260f, 1020f, 1400f, 36f, "", 2f);
+            _hint.gameObject.SetActive(false);   // drawn by _hintStrip; kept as the plain line
+            _hintStrip = PromptStrip.Make(space, "Hint Prompts", 30f, 20, Cream);
+            MenuUi.Place(_hintStrip.Rect, 260f, 1016f, 1400f, 44f);
 
+            _extraDefs.Clear();
+            _extraDefs.AddRange(ExtraPages);
             BuildRoot(space);
             BuildSettings(space);
+            BuildExtraPages(space);
+            BuildClassPage(space);
+            BuildConfirmPage(space);
             Canvas.enabled = false;
             UpdateScale();
         }
@@ -366,30 +702,50 @@ namespace CriticalMass.Runtime.Menu
             MenuUi.Stretch(page);
             _rootPage = page.gameObject;
             // DG-01: How to play (the guided match, when an item registers its start) and Controls joined the list.
+            // Integration batch 2: extra pages (the Codex) follow SETTINGS; the stride tightens so 8 entries fit one panel.
             bool howTo = Flow.OverlayRegistry.TutorialStart() != null;
-            MenuUi.Panel(page, "Panel", 640f, 150f, 640f, 760f);
-            string[] labels = { "RESUME", "HOW TO PLAY", "CONTROLS", "SETTINGS", "RESTART MATCH", "QUIT TO TITLE", "QUIT GAME" };
-            Action[] acts =
+            // 2026-11-12: Spectate / Rejoin, Change class and Switch team joined the list.
+            var labels = new List<string> { "RESUME", "SPECTATE", "CHANGE CLASS", "SWITCH TEAM", "HOW TO PLAY", "CONTROLS", "SETTINGS" };
+            var acts = new List<Action>
             {
-                Resume, () => { if (Flow.OverlayRegistry.StartTutorial()) Resume(); }, () => ShowSettings(Tab.Controls),
-                () => ShowSettings(Tab.Audio), RestartMatch, QuitToTitle, QuitGame,
+                Resume, ToggleSpectate, ShowClassPicker, ShowSwitchTeam,
+                () => { if (Flow.OverlayRegistry.StartTutorial()) Resume(); }, ShowControls, // DG-14: the one-screen controls card
+                () => ShowSettings(Tab.Audio),
             };
-            var items = new List<MenuItem>();
-            for (int i = 0; i < labels.Length; i++)
+            for (int e = 0; e < _extraDefs.Count; e++)
             {
-                MenuItem it = MenuUi.Item(page, labels[i], 700f, 190f + i * 100f, 520f, 80f, labels[i], MenuItem.Kind.Button, 32,
-                    true, CMTokens.Display);
+                int k = e;
+                labels.Add(_extraDefs[e].Label);
+                acts.Add(() => ShowExtra(k));
+            }
+            labels.AddRange(new[] { "RESTART MATCH", "QUIT TO TITLE", "QUIT GAME" });
+            acts.AddRange(new Action[] { RestartMatch, QuitToTitle, QuitGame });
+            // The list stays centred in one panel: 10 lines at 72 px (PR #35's layout), tighter when extra pages add lines.
+            int n = labels.Count;
+            float stride = n <= 10 ? 72f : 66f, itemH = n <= 10 ? 62f : 58f;
+            float total = (n - 1) * stride + itemH;
+            float y0 = Mathf.Max(150f, 540f - total * 0.5f);
+            MenuUi.Panel(page, "Panel", 640f, y0 - 28f, 640f, total + 56f);
+            var items = new List<MenuItem>();
+            for (int i = 0; i < n; i++)
+            {
+                MenuItem it = MenuUi.Item(page, labels[i], 700f, y0 + i * stride, 520f, itemH, labels[i], MenuItem.Kind.Button,
+                    n <= 10 ? 28 : 26, true, CMTokens.Display);
                 it.Body.Radius = 16f;
                 it.Submitted = acts[i];
-                if (i == 1 && !howTo)
+                if (i == 1) _spectate = it;
+                if (i == 2) _changeClass = it;
+                if (i == 3) _switchTeam = it;
+                if (i == 4 && !howTo)
                 {
                     // Present but not ready: dimmed, tagged and skipped by navigation.
                     it.interactable = false;
-                    MenuUi.Label(it.transform, "Soon", CMTokens.Ui, 16, Brass, TextAnchor.MiddleRight, 330f, 0f, 170f, 80f, "COMING SOON", 2f);
+                    MenuUi.Label(it.transform, "Soon", CMTokens.Ui, 16, Brass, TextAnchor.MiddleRight, 330f, 0f, 170f, itemH, "COMING SOON", 2f);
                     continue;
                 }
                 items.Add(it);
             }
+            _rootNote = MenuUi.Label(page, "Note", CMTokens.Ui, 22, Brass, TextAnchor.MiddleCenter, 640f, 918f, 640f, 36f, "", 2f);
             Chain(items);
             _resume = items[0];
         }
@@ -409,8 +765,8 @@ namespace CriticalMass.Runtime.Menu
             }
         }
 
-        const float PanelX = 280f, PanelY = 140f, PanelW = 1360f, PanelH = 870f;
-        const float ContentX = PanelX + 40f, ContentY = PanelY + 110f;
+        public const float PanelX = 280f, PanelY = 140f, PanelW = 1360f, PanelH = 870f;
+        public const float ContentX = PanelX + 40f, ContentY = PanelY + 110f;
 
         void BuildSettings(RectTransform space)
         {
@@ -418,12 +774,19 @@ namespace CriticalMass.Runtime.Menu
             MenuUi.Stretch(page);
             _settingsPage = page.gameObject;
             MenuUi.Panel(page, "Panel", PanelX, PanelY, PanelW, PanelH);
-            string[] tabNames = { "CONTROLS", "AUDIO", "VIDEO", "GAME" };
-            for (int i = 0; i < 4; i++)
+            var extraTabs = new List<ExtraTab>(ExtraTabs);
+            var tabNames = new List<string> { "CONTROLS", "AUDIO", "VIDEO", "GAME" };
+            for (int e = 0; e < extraTabs.Count; e++) tabNames.Add(extraTabs[e].Name);
+            int tabs = tabNames.Count;
+            _tabPages = new GameObject[tabs];
+            _tabButtons = new MenuItem[tabs];
+            // Four tabs keep the original layout; more share the row up to the Back button.
+            float tabStride = tabs <= 4 ? 250f : 1060f / tabs, tabW = tabs <= 4 ? 230f : tabStride - 14f;
+            for (int i = 0; i < tabs; i++)
             {
                 int k = i;
-                MenuItem t = MenuUi.Item(page, "Tab " + tabNames[i], ContentX + i * 250f, PanelY + 30f, 230f, 60f, tabNames[i],
-                    MenuItem.Kind.Button, 26, true, CMTokens.Display);
+                MenuItem t = MenuUi.Item(page, "Tab " + tabNames[i], ContentX + i * tabStride, PanelY + 30f, tabW, 60f, tabNames[i],
+                    MenuItem.Kind.Button, tabs <= 4 ? 26 : 22, true, CMTokens.Display);
                 t.Submitted = () => ShowTab((Tab)k);
                 _tabButtons[i] = t;
             }
@@ -435,6 +798,7 @@ namespace CriticalMass.Runtime.Menu
             _tabPages[1] = BuildAudio(page);
             _tabPages[2] = BuildVideo(page);
             _tabPages[3] = BuildGame(page);
+            for (int e = 0; e < extraTabs.Count; e++) _tabPages[4 + e] = BuildExtraTab(page, extraTabs[e]);
 
             _status = MenuUi.Label(page, "Status", CMTokens.Ui, 22, Brass, TextAnchor.MiddleLeft, ContentX, PanelY + PanelH - 70f,
                 900f, 40f, "", 2f);
@@ -451,12 +815,40 @@ namespace CriticalMass.Runtime.Menu
                 };
                 row[i].navigation = n;
             }
-            for (int i = 0; i < 4; i++)
+            for (int i = 0; i < tabs; i++)
             {
                 MenuItem first = FirstItem(_tabPages[i]);
                 Navigation n = _tabButtons[i].navigation;
                 n.selectOnDown = first;
                 _tabButtons[i].navigation = n;
+            }
+        }
+
+        GameObject BuildExtraTab(RectTransform parent, ExtraTab def)
+        {
+            RectTransform tab = MenuUi.Rt(parent, def.Name + " Tab");
+            MenuUi.Stretch(tab);
+            List<MenuItem> items = null;
+            try { items = def.Build != null ? def.Build(this, tab) : null; }
+            catch (Exception e) { Debug.LogException(e); }
+            if (items != null && items.Count > 0) ChainInTab(items);
+            return tab.gameObject;
+        }
+
+        void BuildExtraPages(RectTransform space)
+        {
+            _extraPages.Clear();
+            _extraFirst.Clear();
+            for (int i = 0; i < _extraDefs.Count; i++)
+            {
+                RectTransform page = MenuUi.Rt(space, _extraDefs[i].Label + " Page");
+                MenuUi.Stretch(page);
+                Selectable first = null;
+                try { first = _extraDefs[i].Build != null ? _extraDefs[i].Build(this, page) : null; }
+                catch (Exception e) { Debug.LogException(e); }
+                page.gameObject.SetActive(false);
+                _extraPages.Add(page.gameObject);
+                _extraFirst.Add(first);
             }
         }
 
@@ -466,7 +858,7 @@ namespace CriticalMass.Runtime.Menu
             return all.Length > 0 ? all[0] : null;
         }
 
-        void SetStatus(string s, bool warning)
+        public void SetStatus(string s, bool warning)
         {
             if (_status == null) return;
             _status.color = warning ? CMTokens.ToolBrass.Color : CMTokens.WarmCream.Color;
@@ -475,7 +867,13 @@ namespace CriticalMass.Runtime.Menu
 
         // ---- Controls tab ----
 
-        const float RowH = 40f, RowGap = 4f, LabelW = 330f, CellW = 210f, CellGap = 14f;
+        // Easy movement: rows 36 + 3 (were 40 + 4) so the Walk to pointer row and the two movement toggles fit above Reset.
+        // Integration batch 2: the two toggles sit on Reset's line (420 px each, left of it), which leaves the list its height.
+        const float RowH = 36f, RowGap = 3f, LabelW = 330f, CellW = 210f, CellGap = 14f, ToggleH = 46f, ToggleW = 420f;
+
+        // Integration batch 2: 19 rows (Walk to pointer, Map, Ping, HUD cursor and Minimap zoom joined) at 30 + 3 px take the room 14 rows
+        // took at 40 + 4 px, so the list still ends above the status line.
+        const float CtlRowH = 30f, CtlRowGap = 3f;
 
         GameObject BuildControls(RectTransform parent)
         {
@@ -488,12 +886,17 @@ namespace CriticalMass.Runtime.Menu
                     CellW, 28f, heads[c], 2f);
             y += 34f;
 
+            // DG-14: VIEW CONTROLS at the top of the tab, in the empty corner above the action labels.
+            MenuItem view = MenuUi.Item(tab, "View Controls", ContentX, ContentY - 4f, LabelW - 20f, 34f, "VIEW CONTROLS",
+                MenuItem.Kind.Button, 18, true, CMTokens.Display);
+            view.Submitted = ShowControls;
+
             InputActionAsset asset = InputSystem.actions;
             var grid = new List<MenuItem[]>();
             for (int r = 0; r < ControlBindings.Rows.Length; r++)
             {
                 ControlRow row = ControlBindings.Rows[r];
-                MenuUi.Label(tab, "Row " + row.Label, CMTokens.Ui, 22, Cream, TextAnchor.MiddleLeft, ContentX + 8f, y, LabelW - 8f, RowH,
+                MenuUi.Label(tab, "Row " + row.Label, CMTokens.Ui, 19, Cream, TextAnchor.MiddleLeft, ContentX + 8f, y, LabelW - 8f, CtlRowH,
                     row.Label.ToUpperInvariant(), 2f);
                 var line = new MenuItem[4];
                 for (int c = 0; c < 4; c++)
@@ -502,16 +905,19 @@ namespace CriticalMass.Runtime.Menu
                     int k = c % 2;
                     if (k >= set.Length) continue;
                     RebindSlot slot = set[k];
-                    MenuItem cell = MenuUi.Item(tab, $"Cell {row.Label} {c}", ContentX + LabelW + c * (CellW + CellGap), y, CellW, RowH, "-",
-                        MenuItem.Kind.Button, 20, true, CMTokens.Mono);
+                    MenuItem cell = MenuUi.Item(tab, $"Cell {row.Label} {c}", ContentX + LabelW + c * (CellW + CellGap), y, CellW, CtlRowH, "-",
+                        MenuItem.Kind.Button, 17, true, CMTokens.Mono);
                     var cref = new CellRef { Item = cell, Slot = slot, Row = row };
+                    // The binding's glyph beside its name (a mouse with the button lit, a keycap, a controller button).
+                    cref.Glyph = InputGlyphView.Make(cell.transform, "Glyph", 22f);
+                    cref.Glyph.Rect.anchoredPosition = new Vector2(8f, 0f);
                     cell.Submitted = () => StartRebind(cref);
                     if (!slot.Rebindable) cell.interactable = false;
                     _cells.Add(cref);
                     line[c] = cell;
                 }
                 grid.Add(line);
-                y += RowH + RowGap;
+                y += CtlRowH + CtlRowGap;
             }
             MenuItem reset = MenuUi.Item(tab, "Reset Controls", PanelX + PanelW - 40f - 340f, PanelY + PanelH - 78f, 340f, 56f,
                 "RESET TO DEFAULTS", MenuItem.Kind.Button, 24, true, CMTokens.Display);
@@ -520,9 +926,77 @@ namespace CriticalMass.Runtime.Menu
                 ControlBindings.ResetAll(InputSystem.actions);
                 SetStatus("Every control is back to its default.", false);
             };
+
+            // Easy movement toggles (GameSettings, kept between launches; HumanInputSource applies them at once).
+            y = PanelY + PanelH - 78f + 5f;
+            MenuItem assist = MoveToggle(tab, "Movement Assist", ContentX, y, () => GameSettings.MovementAssist,
+                v => GameSettings.MovementAssist = v, "MOVEMENT ASSIST",
+                "Movement assist on: one key follows a bridge it points along, and you slide past corners.",
+                "Movement assist off: you move exactly where the keys point.");
+            MenuItem keys = MoveToggle(tab, "Keys Follow Map", ContentX + ToggleW + 20f, y, () => GameSettings.KeysFollowMap,
+                v => GameSettings.KeysFollowMap = v, "KEYS FOLLOW THE MAP",
+                "Keys follow the map: W, A, S and D move along the map's grid instead of the screen.",
+                "Keys follow the screen: W moves up the screen.");
+
             WireGrid(grid, reset);
+            MenuItem firstCell = grid.Count > 0 ? (grid[0][0] ?? grid[0][2]) : reset;
+            view.navigation = new Navigation { mode = Navigation.Mode.Explicit, selectOnUp = _tabButtons[0], selectOnDown = firstCell };
+            for (int c = 0; grid.Count > 0 && c < 4; c++)
+            {
+                if (grid[0][c] == null) continue;
+                Navigation n = grid[0][c].navigation;
+                n.selectOnUp = view;
+                grid[0][c].navigation = n;
+            }
+            // The grid's bottom edge now leads to the toggles, the toggles to Reset.
+            MenuItem lastLeft = null, lastRight = null;
+            for (int r = grid.Count - 1; r >= 0 && (lastLeft == null || lastRight == null); r--)
+            {
+                if (lastLeft == null) lastLeft = grid[r][0] ?? grid[r][1];
+                if (lastRight == null) lastRight = grid[r][2] ?? grid[r][3];
+            }
+            for (int r = 0; r < grid.Count; r++)
+            {
+                for (int c = 0; c < 4; c++)
+                {
+                    MenuItem it = grid[r][c];
+                    if (it == null || it.navigation.selectOnDown != reset) continue;
+                    Navigation n = it.navigation;
+                    n.selectOnDown = c < 2 ? assist : keys;
+                    it.navigation = n;
+                }
+            }
+            assist.navigation = new Navigation
+            {
+                mode = Navigation.Mode.Explicit, selectOnUp = lastLeft ?? (Selectable)_tabButtons[0], selectOnDown = reset, selectOnRight = keys,
+            };
+            keys.navigation = new Navigation
+            {
+                mode = Navigation.Mode.Explicit, selectOnUp = lastRight ?? lastLeft ?? (Selectable)_tabButtons[0], selectOnDown = reset,
+                selectOnLeft = assist,
+            };
+            Navigation rn = reset.navigation;
+            rn.selectOnUp = keys;
+            reset.navigation = rn;
             _refreshers.Add(RefreshCells);
             return tab.gameObject;
+        }
+
+        /// <summary>An ON/OFF button for a movement setting: submit flips it, the label shows the state.</summary>
+        MenuItem MoveToggle(RectTransform tab, string name, float x, float y, Func<bool> get, Action<bool> set, string label,
+            string onStatus, string offStatus)
+        {
+            MenuItem it = MenuUi.Item(tab, name, x, y, ToggleW, ToggleH, label, MenuItem.Kind.Button, 19, true, CMTokens.Display);
+            Action refresh = () => HudText.Set(it.Label, label + (get() ? "   ON" : "   OFF"));
+            it.Submitted = () =>
+            {
+                set(!get());
+                refresh();
+                SetStatus(get() ? onStatus : offStatus, false);
+            };
+            _refreshers.Add(refresh);
+            refresh();
+            return it;
         }
 
         /// <summary>Explicit grid navigation: up/down within a column (skipping gaps), left/right within a row.</summary>
@@ -574,6 +1048,13 @@ namespace CriticalMass.Runtime.Menu
                 InputAction a = map != null ? map.FindAction(c.Slot.Action, false) : null;
                 int idx = ControlBindings.FindBindingIndex(a, c.Slot);
                 HudText.Set(c.Item.Label, ControlBindings.Display(a, idx));
+                if (c.Glyph != null)
+                {
+                    string path = a != null && idx >= 0 ? a.bindings[idx].effectivePath : null;
+                    GlyphSpec g = InputGlyphs.ForPath(path);
+                    c.Glyph.gameObject.SetActive(!g.IsEmpty);
+                    if (!g.IsEmpty) c.Glyph.Set(g);
+                }
             }
         }
 
@@ -641,7 +1122,7 @@ namespace CriticalMass.Runtime.Menu
 
         // ---- Audio, Video, Game tabs ----
 
-        const float LineH = 64f, LineGap = 14f, LineW = PanelW - 80f;
+        public const float LineH = 64f, LineGap = 14f, LineW = PanelW - 80f;
 
         GameObject BuildAudio(RectTransform parent)
         {
@@ -685,11 +1166,11 @@ namespace CriticalMass.Runtime.Menu
             MenuUi.Stretch(tab);
             var items = new List<MenuItem>
             {
-                Stepper(tab, 0, "CAMERA SHAKE", () => GameSettings.CameraShake ? "ON" : "OFF", d => GameSettings.CameraShake = !GameSettings.CameraShake),
-                Stepper(tab, 1, "DAMAGE NUMBERS", () => GameSettings.DamageNumbers ? "ON" : "OFF", d => GameSettings.DamageNumbers = !GameSettings.DamageNumbers),
-                Stepper(tab, 2, "BLOOD", () => GameSettings.Blood ? "ON" : "OFF", d => GameSettings.Blood = !GameSettings.Blood),
+                // Camera shake moved to the ACCESS tab as an amount, 0 to 100 (DG-30, SettingsExtras).
+                Stepper(tab, 0, "DAMAGE NUMBERS", () => GameSettings.DamageNumbers ? "ON" : "OFF", d => GameSettings.DamageNumbers = !GameSettings.DamageNumbers),
+                Stepper(tab, 1, "BLOOD", () => GameSettings.Blood ? "ON" : "OFF", d => GameSettings.Blood = !GameSettings.Blood),
             };
-            MenuItem reset = MenuUi.Item(tab, "Reset Settings", ContentX, ContentY + 3 * (LineH + LineGap) + 20f, 420f, 56f,
+            MenuItem reset = MenuUi.Item(tab, "Reset Settings", ContentX, ContentY + 2 * (LineH + LineGap) + 20f, 420f, 56f,
                 "RESET ALL SETTINGS", MenuItem.Kind.Button, 24, true, CMTokens.Display);
             reset.Submitted = () =>
             {
@@ -716,13 +1197,13 @@ namespace CriticalMass.Runtime.Menu
             }
         }
 
-        void Note(RectTransform tab, int line, string text)
+        public void Note(RectTransform tab, int line, string text)
         {
             MenuUi.Label(tab, "Note", CMTokens.Ui, 20, CMTokens.WithAlpha(Cream, 0.8f), TextAnchor.MiddleLeft, ContentX + 8f,
                 ContentY + line * (LineH + LineGap) + 10f, LineW, 36f, text, 2f);
         }
 
-        MenuItem Slider(RectTransform tab, int line, string label, Func<float> get, Action<float> set)
+        public MenuItem Slider(RectTransform tab, int line, string label, Func<float> get, Action<float> set)
         {
             float y = ContentY + line * (LineH + LineGap);
             MenuItem it = MenuUi.Item(tab, label, ContentX, y, LineW, LineH, label, MenuItem.Kind.Slider, 26, false, CMTokens.Display);
@@ -751,7 +1232,7 @@ namespace CriticalMass.Runtime.Menu
             return it;
         }
 
-        MenuItem Stepper(RectTransform tab, int line, string label, Func<string> text, Action<int> step)
+        public MenuItem Stepper(RectTransform tab, int line, string label, Func<string> text, Action<int> step)
         {
             float y = ContentY + line * (LineH + LineGap);
             MenuItem it = MenuUi.Item(tab, label, ContentX, y, LineW, LineH, label, MenuItem.Kind.Stepper, 26, false, CMTokens.Display);
@@ -768,7 +1249,7 @@ namespace CriticalMass.Runtime.Menu
             return it;
         }
 
-        void RefreshAll()
+        public void RefreshAll()
         {
             for (int i = 0; i < _refreshers.Count; i++) _refreshers[i]();
         }
