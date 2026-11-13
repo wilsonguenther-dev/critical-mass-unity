@@ -43,6 +43,12 @@ namespace CriticalMass.Runtime.Game
         /// <summary>min(Time.unscaledDeltaTime, 0.1), for the camera.</summary>
         public double FrameDt { get; private set; }
 
+        /// <summary>
+        /// Raised after every MatchTick.Advance with the world (view effects read the tick's events with an exact tick stamp).
+        /// Subscribers read the world only; they never write it.
+        /// </summary>
+        public event Action<World> Ticked;
+
         private double _dt;
         private double _acc;
         private HumanInputSource _input;
@@ -116,6 +122,7 @@ namespace CriticalMass.Runtime.Game
                 _humanFrame.AimZ = double.NaN;
             }
             MatchTick.Advance(World, HumanAutopilot ? null : _humanFrame, _scratch);
+            Ticked?.Invoke(World);
         }
     }
 }

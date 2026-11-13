@@ -60,6 +60,8 @@ namespace CriticalMass.Runtime.View
         private ModelView[] _barricades;
         private Transform _hill;
         private double _lastSimTime = double.NaN;
+        /// <summary>Combat feel (view only, Runtime/View/Effects): corpse, Hit clip, flash, hold and lean per actor.</summary>
+        private Effects.CombatFx _fx;
 
         /// <summary>Models in use (for tests and the capture's frame report).</summary>
         public int ActiveModelCount { get; private set; }
@@ -187,7 +189,11 @@ namespace CriticalMass.Runtime.View
         private bool SyncActor(int i, World w, GameConfig cfg, MapDef map, double a, double dSim)
         {
             CharSlot slot = _actors[i];
-            bool alive = i < w.ActorCount && w.Actors[i].Alive;
+            if (_fx == null) _fx = GetComponent<Effects.CombatFx>();
+            Effects.ActorPoseFx fx = default;
+            bool hasFx = _fx != null && _fx.isActiveAndEnabled && i < w.ActorCount && _fx.Pose(i, out fx);
+            // A dead actor's body stays for its Death clip and the pop (CombatFx decides how long); otherwise hidden.
+            bool alive = i < w.ActorCount && (w.Actors[i].Alive || (hasFx && fx.Corpse));
             Actor actor = alive ? w.Actors[i] : null;
             string key = alive ? ArtMapping.ClassModel(actor.Cls) : null;
             if (key != null && _catalog?.Find(key) == null) key = null;
@@ -208,10 +214,12 @@ namespace CriticalMass.Runtime.View
             if (slot.Capsule != null && slot.Capsule.gameObject.activeSelf != capsule) slot.Capsule.gameObject.SetActive(capsule);
             if (!alive) return false;
 
-            double x = Lerp(w.PrevX[i], w.X[i], a);
-            double z = Lerp(w.PrevZ[i], w.Z[i], a);
+            double x = hasFx && fx.Corpse ? fx.CorpseX : Lerp(w.PrevX[i], w.X[i], a);
+            double z = hasFx && fx.Corpse ? fx.CorpseZ : Lerp(w.PrevZ[i], w.Z[i], a);
             double h = GroundHeight(map, x, z);
             Quaternion facing = Quaternion.Euler(0f, SimSpace.YawDeg(actor.Facing), 0f);
+            if (hasFx) facing = fx.Lean * facing;
+            if (hasFx && fx.Holding) dSim = 0; // the fake hit-stop: loops do not advance during the hold
             if (capsule)
             {
                 double charHeight = cfg.Render.CharacterHeight;
@@ -226,9 +234,19 @@ namespace CriticalMass.Runtime.View
 
             ModelView m = slot.Model;
             m.SetActive(true);
-            m.Transform.localPosition = SimSpace.ToWorld(x, h, z);
+            m.Transform.localPosition = SimSpace.ToWorld(x, h, z) + (hasFx ? fx.Nudge : Vector3.zero);
             m.Transform.localRotation = facing;
-            m.SetMaterial(ArtMaterials.ForTeam(m.Spec, actor.Team));
+            m.Transform.localScale = Vector3.one * (hasFx ? fx.Scale : 1f);
+            Material teamMat = ArtMaterials.ForTeam(m.Spec, actor.Team);
+            m.SetMaterial(hasFx && fx.Flash ? _fx.FlashMaterial(teamMat) : teamMat);
+            if (hasFx && fx.Corpse)
+            {
+                // Death clip when the model has one; else the Hit clip held on its last frame.
+                m.BeginPose();
+                if (!m.Pose(ArtMapping.Death, fx.DeathT, 1f, false)) m.Pose(ArtMapping.Hit, fx.DeathT, 1f, false);
+                m.Evaluate();
+                return true;
+            }
 
             // Locomotion from the sim velocity: Idle below 0.15 u/s, Walk to 1.2 u/s, Run above 3.4 u/s (whatever exists).
             double speed = Math.Sqrt(w.Vx[i] * w.Vx[i] + w.Vz[i] * w.Vz[i]);
@@ -244,7 +262,11 @@ namespace CriticalMass.Runtime.View
             m.Pose(ArtMapping.Run, slot.RunT, run, true);
             // Attack: AnimAction is "seconds since the last attack / ability"; AttackCd > 0 means one happened.
             float attackLen = m.ClipLength(ArtMapping.Attack);
-            if (actor.AttackCd > 0 && actor.AnimAction < attackLen) m.Pose(ArtMapping.Attack, actor.AnimAction, 3f, false);
+            double attackT = hasFx ? _fx.AttackTime(i, actor.AnimAction, fx) : actor.AnimAction;
+            if (actor.AttackCd > 0 && attackT < attackLen) m.Pose(ArtMapping.Attack, attackT, 3f, false);
+            // Hit reaction (CombatFx): the Hit clip over locomotion, under an attack in progress.
+            float hitLen = m.ClipLength(ArtMapping.Hit);
+            if (hasFx && fx.HitT < hitLen * 0.8f) m.Pose(ArtMapping.Hit, fx.HitT - (fx.Holding ? fx.HoldOffset : 0), 2f * (1f - (float)(fx.HitT / hitLen)), false);
             if (actor.GatherProgress > 0 && speed < 0.3)
             {
                 slot.GatherT += dSim;
