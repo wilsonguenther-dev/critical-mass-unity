@@ -81,8 +81,14 @@ namespace CriticalMass.Runtime.PlayTests
             yield return null;
         }
 
+        IEnumerator WaitFilmTime(double seconds)
+        {
+            float until = Time.realtimeSinceStartup + 30f;
+            while (StoryIntro.IsPlaying && StoryIntro.Instance.FilmTime < seconds && Time.realtimeSinceStartup < until) yield return null;
+        }
+
         [UnityTest]
-        public IEnumerator SpaceSkipsTheStoryOnItsFirstFrame()
+        public IEnumerator SkipNeedsADeliberatePressAfterTheLock()
         {
             bool skipped = false;
             void OnFinished(bool s) => skipped = s;
@@ -93,9 +99,18 @@ namespace CriticalMass.Runtime.PlayTests
                 Assert.IsTrue(StoryIntro.IsPlaying);
                 Assert.AreEqual(0.0, StoryIntro.Instance.Timeline.Time);
                 yield return Send(new KeyboardState(Key.Space));
-                Assert.IsFalse(StoryIntro.IsPlaying, "Space on the first frame ends the story");
+                Assert.IsTrue(StoryIntro.IsPlaying, "Space on the first frame does not skip (story intro 2)");
+                yield return Send(new KeyboardState());
+                yield return WaitFilmTime(1.0);
+                Assert.IsTrue(StoryIntro.IsPlaying);
+                yield return Send(new KeyboardState(Key.Space));   // pressed inside the lock and held through it
+                yield return WaitFilmTime(SkipGate.LockSeconds + 0.3);
+                Assert.IsTrue(StoryIntro.IsPlaying, "a key held through the lock does not skip");
+                Assert.Greater(StoryIntro.Instance.FilmTime, SkipGate.LockSeconds, "the film ran past the lock");
+                yield return Send(new KeyboardState());
+                yield return Send(new KeyboardState(Key.Space));
+                Assert.IsFalse(StoryIntro.IsPlaying, "a fresh press after the lock skips");
                 Assert.IsTrue(skipped);
-                Assert.Less(StoryIntro.Instance.Timeline.Time, 0.2);
                 Assert.AreEqual(1, PlayerPrefs.GetInt(StoryIntro.SeenKey, 0));
                 yield return Send(new KeyboardState());
             }
