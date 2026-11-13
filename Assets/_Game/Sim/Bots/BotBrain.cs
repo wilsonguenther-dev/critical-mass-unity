@@ -57,7 +57,9 @@ namespace CriticalMass.Sim.Bots
                 a.MeatPickup = (id == 0 && !human) || st.Role[id] == BotsState.RoleKaiju;
                 if (id == 0 && !human) continue;
                 if (!a.Alive) continue;
-                if ((tick + id) % period == 0 || a.AiState == AiState.None) BotFsm.ThinkBot(w, st, id);
+                // DG-21 reaction delay: Easy / Hard scale the think period (Normal keeps ThinkPeriod).
+                int p = BotSkill.ThinkPeriod(w, id, period);
+                if ((tick + id) % p == 0 || a.AiState == AiState.None) BotFsm.ThinkBot(w, st, id);
             }
         }
 

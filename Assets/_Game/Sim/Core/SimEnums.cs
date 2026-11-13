@@ -15,6 +15,12 @@ namespace CriticalMass.Sim.Core
     /// </summary>
     public enum DamageCause { None, Melee, KaijuMelee, KaijuSlam, Fall, Explosion }
 
+    /// <summary>
+    /// DG-21 bot skill level (WorldOptions.BotDifficulty / AllyBotDifficulty). Normal is first so a WorldOptions that never
+    /// sets it plays exactly the browser bots. Never compared by integer value.
+    /// </summary>
+    public enum BotDifficulty { Normal, Easy, Hard }
+
     /// <summary>Kaiju state (browser KaijuState).</summary>
     public enum KaijuState { Egg, Neutral, Azure, Crimson, Berserk }
 

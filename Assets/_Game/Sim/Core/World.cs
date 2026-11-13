@@ -345,6 +345,8 @@ namespace CriticalMass.Sim.Core
             world.Opts.TeamSize = n;
             world.Opts.HumanTeam = opts.HumanTeam;
             world.Opts.HumanClass = opts.HumanClass;
+            world.Opts.BotDifficulty = opts.BotDifficulty; // DG-21
+            world.Opts.AllyBotDifficulty = opts.AllyBotDifficulty;
             Rng.SeedRng(world.Rng, unchecked((uint)opts.Seed));
             world.Tick = 0;
             world.ActorCount = 2 * n;
@@ -633,6 +635,8 @@ namespace CriticalMass.Sim.Core
                     HumanTeam = opts.HumanTeam,
                     HumanClass = opts.HumanClass,
                     Config = cfg,
+                    BotDifficulty = opts.BotDifficulty,
+                    AllyBotDifficulty = opts.AllyBotDifficulty,
                 },
                 Config = cfg,
                 Rng = Rng.CreateRng(unchecked((uint)opts.Seed)),

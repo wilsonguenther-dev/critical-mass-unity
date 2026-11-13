@@ -105,8 +105,11 @@ namespace CriticalMass.Sim.Bots
             if (Near.Length < cap) Near = new int[cap];
         }
 
-        private static void Perceive(World w, BotsState st, int id, double fightRange)
+        /// <summary>DG-21: perception with target choice. sk null or FocusCarriers off = nearest enemy (the browser rule).</summary>
+        private static void Perceive(World w, BotsState st, int id, double fightRange, BotSkillConfig sk)
         {
+            bool focus = sk != null && sk.FocusCarriers;
+            double bestScore = double.PositiveInfinity;
             Actor a = w.Actors[id];
             double x = w.X[id];
             double z = w.Z[id];
@@ -137,7 +140,19 @@ namespace CriticalMass.Sim.Bots
                 P.Cz += w.Z[j];
                 if (d2 <= FightRange * FightRange) P.Within6++;
                 if (d2 <= UrgentRange * UrgentRange) P.Within3++;
-                if (d2 <= fr2 && (d2 < P.EnemyD2 || (d2 == P.EnemyD2 && j < P.Enemy)))
+                if (d2 > fr2) continue;
+                if (focus)
+                {
+                    // DG-21 Hard: carriers and hurt enemies first (BotSkill.FocusScore), lowest id on a tie.
+                    double sc = BotSkill.FocusScore(w, sk, j, d2);
+                    if (sc < bestScore || (sc == bestScore && j < P.Enemy))
+                    {
+                        bestScore = sc;
+                        P.Enemy = j;
+                        P.EnemyD2 = d2;
+                    }
+                }
+                else if (d2 < P.EnemyD2 || (d2 == P.EnemyD2 && j < P.Enemy))
                 {
                     P.Enemy = j;
                     P.EnemyD2 = d2;
@@ -270,7 +285,7 @@ namespace CriticalMass.Sim.Bots
         }
 
         /// <summary>Ability decisions (sent by the next FillBotInput as one press).</summary>
-        private static void DecideAbility(World w, BotsState st, int id, AiState state)
+        private static void DecideAbility(World w, BotsState st, int id, AiState state, BotSkillConfig sk)
         {
             Actor a = w.Actors[id];
             st.AbilityReq[id] = 0;
@@ -280,7 +295,7 @@ namespace CriticalMass.Sim.Bots
             double z = w.Z[id];
             if (a.Cls == ClassId.Warrior)
             {
-                if (state == AiState.Fight && a.AbilityActive <= 0 && (P.Within3 >= 2 || a.Hp < 0.5 * a.MaxHp) && P.Enemy >= 0)
+                if (state == AiState.Fight && a.AbilityActive <= 0 && (P.Within3 >= (sk == null ? 2 : sk.ShieldCrowd) || a.Hp < 0.5 * a.MaxHp) && P.Enemy >= 0)
                 {
                     st.AbilityReq[id] = 1;
                     st.AbilityX[id] = JsMath.F32(w.X[P.Enemy]);
@@ -327,6 +342,12 @@ namespace CriticalMass.Sim.Bots
                     st.AbilityReq[id] = 1;
                     st.AbilityX[id] = JsMath.F32(w.X[best]);
                     st.AbilityZ[id] = JsMath.F32(w.Z[best]);
+                    // DG-21 aim error: an Easy farmer's roots land up to AimErrorUnits off (no change for Normal).
+                    double jx = st.AbilityX[id];
+                    double jz = st.AbilityZ[id];
+                    BotSkill.Jitter(w, id, sk, ref jx, ref jz);
+                    st.AbilityX[id] = jx;
+                    st.AbilityZ[id] = jz;
                 }
                 return;
             }
@@ -407,7 +428,8 @@ namespace CriticalMass.Sim.Bots
 
             bool fighting = cur == AiState.Fight;
             bool cocky = BotDirector.IsCocky(w, a.Team);
-            Perceive(w, st, id, fighting || cocky ? FightKeepRange : FightRange);
+            BotSkillConfig sk = BotSkill.Profile(w, id); // DG-21: null = Normal (the browser bots)
+            Perceive(w, st, id, fighting || cocky ? FightKeepRange : FightRange, sk);
             int role = st.Role[id];
             ClassConfig cc = w.Config.Class(a.Cls);
             double hpFrac = a.MaxHp > 0 ? a.Hp / a.MaxHp : 0;
@@ -434,7 +456,7 @@ namespace CriticalMass.Sim.Bots
                 {
                     double ex = w.X[P.Enemy] - hill.X;
                     double ez = w.Z[P.Enemy] - hill.Z;
-                    if (ex * ex + ez * ez > (hill.R + 1) * (hill.R + 1)) uFight *= 0.5;
+                    if (ex * ex + ez * ez > (hill.R + 1) * (hill.R + 1)) uFight *= sk == null ? 0.5 : sk.OffHillChaseFactor; // DG-21 discipline
                 }
             }
 
@@ -490,7 +512,7 @@ namespace CriticalMass.Sim.Bots
                     uCleanse = CleanseUtility;
             }
 
-            double uRetreat = hpFrac < lowHp && P.Within6 > 0 ? 0.9 : 0;
+            double uRetreat = hpFrac < lowHp && (sk == null ? P.Within6 : WithinRange(sk.RetreatRange)) > 0 ? 0.9 : 0;
 
             // --- current state's own utility (0 = its task is over) ---
             double curU;
@@ -563,7 +585,17 @@ namespace CriticalMass.Sim.Bots
                 st.PostUntil[id] = 0;
             }
 
-            DecideAbility(w, st, id, next);
+            DecideAbility(w, st, id, next, sk);
+            // DG-21 ability use: an Easy bot sends a decided press only on AbilityChance of its thinks (Normal always).
+            if (st.AbilityReq[id] == 1 && !BotSkill.UsesAbilityNow(w, id, sk)) st.AbilityReq[id] = 0;
+        }
+
+        /// <summary>DG-21: enemies counted by the last Perceive within r (3, 6 or 8; ranges between round up).</summary>
+        private static int WithinRange(double r)
+        {
+            if (r <= UrgentRange) return P.Within3;
+            if (r <= FightRange) return P.Within6;
+            return P.Within8;
         }
     }
 }

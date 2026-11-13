@@ -10,5 +10,12 @@ namespace CriticalMass.Sim.Core
         public TeamId HumanTeam;
         public ClassId HumanClass;
         public GameConfig Config;
+        /// <summary>
+        /// DG-21: skill of the bots on the team the human does NOT play (the match-setup "Bot difficulty" choice). Default
+        /// Normal = the browser bots exactly.
+        /// </summary>
+        public BotDifficulty BotDifficulty;
+        /// <summary>DG-21: skill of the bots on the human's own team (actor 0 on autopilot included). Default Normal; the menu leaves it.</summary>
+        public BotDifficulty AllyBotDifficulty;
     }
 }

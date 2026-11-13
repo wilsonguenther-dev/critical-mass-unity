@@ -548,6 +548,9 @@ namespace CriticalMass.Sim.Bots
                 st.WantMove[id] = 1;
             }
 
+            // DG-21 hesitation: an Easy bot holds its swing in SwingHesitation of 1/3-second windows (never for Normal).
+            if (output.Attack && BotSkill.HoldsSwing(w, id)) output.Attack = false;
+
             // Ability press decided at think time.
             if (st.AbilityReq[id] == 1)
             {
