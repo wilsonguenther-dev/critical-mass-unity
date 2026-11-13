@@ -241,6 +241,8 @@ namespace CriticalMass.Runtime.View
     /// API for other items: <see cref="MomentRaised"/>, <see cref="Tracker"/>, <see cref="SpotlightOn"/>.
     /// </summary>
     [Flow.GameOverlay(Order = 51, Scope = Flow.OverlayScope.MatchOnly)]   // installed by GameBootstrap through the DG-01 overlay registry
+    // Physics audit M3: runs after CinemachineBrain (LateUpdate order 100), so world-anchored marks use this frame's camera.
+    [DefaultExecutionOrder(200)]
     public sealed class KaijuMoments : MonoBehaviour
     {
         public const double SpotlightRadius = 6;
@@ -459,7 +461,8 @@ namespace CriticalMass.Runtime.View
 
         private void ApplySpotlight(World w, UnityEngine.Camera cam, float scale)
         {
-            bool on = Tracker.SpotlightActive(w.Tick);
+            // M11: reduce motion turns the full-screen spotlight dim off (FeelGate table: Motion | Flashing).
+            bool on = Tracker.SpotlightActive(w.Tick) && Effects.FeelGate.Allowed(Effects.FeelEffect.KaijuSpotlight);
             SpotlightOn = on;
             if (_spot.gameObject.activeSelf != on) _spot.gameObject.SetActive(on);
             if (!on) return;

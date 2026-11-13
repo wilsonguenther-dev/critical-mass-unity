@@ -22,6 +22,11 @@ namespace CriticalMass.Editor
         // DG-50 quality ladder: Very Low and Low use Low, Medium uses Medium, High and above use the original asset.
         const string UrpLowPath = SettingsDir + "/CriticalMass_URP_Low.asset";
         const string UrpMediumPath = SettingsDir + "/CriticalMass_URP_Medium.asset";
+        // Physics audit DG-80 (R-m7): Low and Medium draw with plain Forward (one directional light; CMToon has no Forward+
+        // variants, so Forward+ only paid for light binning). High keeps the original Forward+ renderer.
+        const string UrpForwardRendererPath = SettingsDir + "/CriticalMass_URP_Renderer_Forward.asset";
+        /// <summary>DG-80 (R-m3): the audio DSP buffer, "Good latency" (was 1024, about 45 to 90 ms behind the hit flash).</summary>
+        public const int DspBufferSize = 512;
         const int DefaultStandaloneQuality = 3;   // High; never Ultra
         const string BootScenePath = "Assets/_Game/Scenes/Boot.unity";
         const string ControlsPath = SettingsDir + "/Controls.inputactions";
@@ -77,6 +82,9 @@ namespace CriticalMass.Editor
             PlayerSettings.visibleInBackground = true;
             // DG-54: FrameTimingManager CPU and GPU frame times in release players too.
             PlayerSettings.enableFrameTimingStats = true;
+            // DG-80 (R-M1): skinning on the GPU through compute shaders, batched (6000.3 docs: PlayerSettings.meshDeformation,
+            // MeshDeformation.GPUBatched, needs a graphics API with compute shaders: Metal and Direct3D 11 both have them).
+            if (PlayerSettings.meshDeformation != MeshDeformation.GPUBatched) PlayerSettings.meshDeformation = MeshDeformation.GPUBatched;
             // DG-56: Windows pinned to Direct3D 11 first, 12 as the fallback.
             var win = new[] { GraphicsDeviceType.Direct3D11, GraphicsDeviceType.Direct3D12 };
             if (PlayerSettings.GetUseDefaultGraphicsAPIs(BuildTarget.StandaloneWindows64)) PlayerSettings.SetUseDefaultGraphicsAPIs(BuildTarget.StandaloneWindows64, false);
@@ -129,7 +137,9 @@ namespace CriticalMass.Editor
             // about 40 u from the camera at the top edge).
             asset.mainLightShadowmapResolution = 2048;
             asset.shadowCascadeCount = 1;
-            asset.shadowDistance = 60f;
+            // DG-80 (R-M8): 35 m at High covers the farthest ground the gameplay camera sees (about 31.5 m); it was 60 m on a
+            // 112 x 72 map, so the shadow pass drew almost every caster on the map at half the texel density.
+            asset.shadowDistance = CriticalMass.Runtime.Game.QualityTable.HighShadowMetres;
             EditorUtility.SetDirty(asset);
 
             GraphicsSettings.defaultRenderPipeline = asset;
@@ -143,11 +153,12 @@ namespace CriticalMass.Editor
                 d |= SetInt(so, "m_SupportsHDR", 0);
                 d |= SetInt(so, "m_MSAA", 1);                        // 1 = anti-aliasing off
                 d |= SetFloat(so, "m_RenderScale", 0.75f);
-                d |= SetInt(so, "m_MainLightShadowsSupported", 1);
+                // DG-80: no shadow map at Low (blob shadows under fighters instead, FxScene.BlobShadows).
+                d |= SetInt(so, "m_MainLightShadowsSupported", 0);
                 d |= SetInt(so, "m_MainLightShadowmapResolution", 1024);
                 d |= SetInt(so, "m_AdditionalLightShadowsSupported", 0);
                 d |= SetInt(so, "m_AdditionalLightsPerObjectLimit", 2);
-                d |= SetFloat(so, "m_ShadowDistance", 40f);
+                d |= SetFloat(so, "m_ShadowDistance", 0f);
                 return d;
             });
             var medium = EnsureTier(UrpMediumPath, so =>
@@ -156,9 +167,16 @@ namespace CriticalMass.Editor
                 d |= SetInt(so, "m_SupportsHDR", 0);
                 d |= SetInt(so, "m_MainLightShadowmapResolution", 1024);
                 d |= SetInt(so, "m_AdditionalLightShadowsSupported", 0);
-                d |= SetFloat(so, "m_ShadowDistance", 50f);   // fewer shadow casters than High's 60
+                d |= SetFloat(so, "m_ShadowDistance", CriticalMass.Runtime.Game.QualityTable.MediumShadowMetres);   // DG-80: 30 m
                 return d;
             });
+            UniversalRendererData forward = EnsureForwardRenderer();
+            if (forward != null)
+            {
+                SetFirstRenderer(low, forward);
+                SetFirstRenderer(medium, forward);
+            }
+            ApplyAudioAndPhysics();
 
             var tiers = new RenderPipelineAsset[] { low, medium, asset };
             int current = QualitySettings.GetQualityLevel();
@@ -171,6 +189,69 @@ namespace CriticalMass.Editor
             }
             QualitySettings.SetQualityLevel(current == 5 || current == 4 ? DefaultStandaloneQuality : current, false);
             SetStandaloneDefaultQuality(DefaultStandaloneQuality);
+        }
+
+        /// <summary>DG-80: a copy of the renderer in plain Forward mode for Low and Medium (created once, then only checked).</summary>
+        static UniversalRendererData EnsureForwardRenderer()
+        {
+            var r = AssetDatabase.LoadAssetAtPath<UniversalRendererData>(UrpForwardRendererPath);
+            if (r == null)
+            {
+                if (!AssetDatabase.CopyAsset(UrpRendererPath, UrpForwardRendererPath))
+                {
+                    Debug.LogWarning("[CriticalMass.Setup] could not copy the renderer for Forward; Low and Medium keep Forward+");
+                    return null;
+                }
+                r = AssetDatabase.LoadAssetAtPath<UniversalRendererData>(UrpForwardRendererPath);
+                if (r == null) return null;
+            }
+            if (r.renderingMode != RenderingMode.Forward)
+            {
+                r.renderingMode = RenderingMode.Forward;
+                EditorUtility.SetDirty(r);
+            }
+            return r;
+        }
+
+        /// <summary>Points a pipeline asset's first renderer at rendererData (skipped when it already does).</summary>
+        static void SetFirstRenderer(UniversalRenderPipelineAsset a, ScriptableRendererData rendererData)
+        {
+            if (a == null || rendererData == null) return;
+            var so = new SerializedObject(a);
+            SerializedProperty list = so.FindProperty("m_RendererDataList");
+            if (list == null || !list.isArray || list.arraySize == 0)
+            {
+                Debug.LogWarning("[CriticalMass.Setup] m_RendererDataList not found on " + a.name);
+                return;
+            }
+            SerializedProperty first = list.GetArrayElementAtIndex(0);
+            if (first.objectReferenceValue == rendererData) return;
+            first.objectReferenceValue = rendererData;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(a);
+        }
+
+        /// <summary>
+        /// DG-80: DSP buffer 512 (R-m3) and physics stepped only by script (R-m11: nothing in the game uses Unity physics;
+        /// view physics, if added, steps its own local scene). Both through SerializedObject on the project settings files;
+        /// each write is skipped when the value is already right, so a second Apply leaves git clean.
+        /// </summary>
+        static void ApplyAudioAndPhysics()
+        {
+            WriteSetting("ProjectSettings/AudioManager.asset", "m_DSPBufferSize", DspBufferSize);
+            WriteSetting("ProjectSettings/DynamicsManager.asset", "m_SimulationMode", 2);   // SimulationMode.Script
+        }
+
+        static void WriteSetting(string path, string property, int value)
+        {
+            UnityEngine.Object o = AssetDatabase.LoadAllAssetsAtPath(path).FirstOrDefault();
+            if (o == null) { Debug.LogWarning("[CriticalMass.Setup] " + path + " not found"); return; }
+            var so = new SerializedObject(o);
+            SerializedProperty p = so.FindProperty(property);
+            if (p == null) { Debug.LogWarning("[CriticalMass.Setup] " + property + " not found in " + path); return; }
+            if (p.intValue == value) return;
+            p.intValue = value;
+            so.ApplyModifiedPropertiesWithoutUndo();
         }
 
         static UniversalRenderPipelineAsset EnsureTier(string path, Func<SerializedObject, bool> configure)

@@ -8,7 +8,7 @@ namespace CriticalMass.Runtime.Menu
     /// <summary>
     /// The player's settings, stored in PlayerPrefs (kept between launches), read by the settings page and by any system
     /// that honours them. View side only: nothing here reaches the sim.
-    /// <para>Keys other code may read directly: cm.blood (int, 1 = blood on, default 1), cm.shake (camera shake, default 1),
+    /// <para>Keys other code may read directly: cm.blood (int, 1 = blood on, default 1), cm.shake (camera shake on/off, mirrors cm.access.shake, default off),
     /// cm.damagenumbers (default 1). Volumes are linear 0..1; the AudioMixer (Resources/Audio/CMMixer) gets them as dB on
     /// the exposed parameters MasterVolume, MusicVolume and EffectsVolume. Without the mixer, master volume falls back to
     /// AudioListener.volume.</para>
@@ -24,6 +24,14 @@ namespace CriticalMass.Runtime.Menu
         public const string VSyncKey = "cm.video.vsync";
         public const string QualityKey = "cm.video.quality";
         public const string ShakeKey = "cm.shake";
+        // Physics audit M11 / DG-94 / DG-106. The keys are PR #28's (SettingsExtras, DG-30) so both branches read and write
+        // the same stored values: shake is an int amount 0..100, default 0 (off, owner decision OD-6), reduce flashing an int.
+        /// <summary>Camera shake amount 0..100 (int, default 0 = off); same key as PR #28's SettingsExtras.ShakeAmountKey.</summary>
+        public const string ShakeScaleKey = "cm.access.shake";
+        /// <summary>Reduce flashing (1 on, default 0): hit flash as a light tint, a steady damage edge, pulses at 2 Hz or less.</summary>
+        public const string ReduceFlashingKey = "cm.access.reduceFlashing";
+        /// <summary>Reduce motion (1 on, default 0): no camera shake, no combat zoom, no Kaiju spotlight.</summary>
+        public const string ReduceMotionKey = "cm.access.reduceMotion";
         public const string DamageNumbersKey = "cm.damagenumbers";
         public const string BloodKey = "cm.blood";
         /// <summary>Frame-rate limit: 30, 60 or 120 frames per second, or 0 = the display's refresh rate (default 60).</summary>
@@ -39,6 +47,7 @@ namespace CriticalMass.Runtime.Menu
         {
             MasterKey, MusicKey, EffectsKey, WidthKey, HeightKey, FullScreenKey, VSyncKey, QualityKey, ShakeKey,
             DamageNumbersKey, BloodKey, FpsCapKey, BgThrottleKey, PrefsVersionKey,
+            ShakeScaleKey, ReduceFlashingKey, ReduceMotionKey,
         };
 
         public const string MixerResource = "Audio/CMMixer";
@@ -55,8 +64,30 @@ namespace CriticalMass.Runtime.Menu
         public static float EffectsVolume { get => GetF(EffectsKey, 1f); set { SetF(EffectsKey, Mathf.Clamp01(value)); ApplyAudio(); } }
 
         // ---- game ----
-        /// <summary>Camera shake allowed (no shake exists yet; the flag is stored for the effects work).</summary>
-        public static bool CameraShake { get => GetB(ShakeKey, true); set => SetB(ShakeKey, value); }
+        /// <summary>Camera shake allowed: ShakeScale above 0 (cm.shake is kept in step for older readers).</summary>
+        public static bool CameraShake { get => ShakeScale > 0f; set => ShakeScale = value ? 1f : 0f; }
+
+        /// <summary>The shake steps the settings page cycles through, in screen order (off is the default).</summary>
+        public static readonly float[] ShakeSteps = { 0f, 0.5f, 1f };
+
+        /// <summary>
+        /// Camera shake strength 0..1, stored as the int amount 0..100 (default 0: off). CameraShake reads it; ReduceMotion
+        /// overrides it to 0 in FeelGate. Writing it keeps the older on/off flag cm.shake in step.
+        /// </summary>
+        public static float ShakeScale
+        {
+            get => Mathf.Clamp(PlayerPrefs.GetInt(ShakeScaleKey, 0), 0, 100) / 100f;
+            set
+            {
+                int v = Mathf.Clamp(Mathf.RoundToInt(value * 100f), 0, 100);
+                PlayerPrefs.SetInt(ShakeKey, v > 0 ? 1 : 0);
+                PlayerPrefs.SetInt(ShakeScaleKey, v);
+                Save();
+            }
+        }
+
+        public static bool ReduceFlashing { get => GetB(ReduceFlashingKey, false); set => SetB(ReduceFlashingKey, value); }
+        public static bool ReduceMotion { get => GetB(ReduceMotionKey, false); set => SetB(ReduceMotionKey, value); }
         /// <summary>Floating damage numbers shown.</summary>
         public static bool DamageNumbers { get => GetB(DamageNumbersKey, true); set => SetB(DamageNumbersKey, value); }
         /// <summary>Blood effects on (PlayerPrefs cm.blood, default on).</summary>

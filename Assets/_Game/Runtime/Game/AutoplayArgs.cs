@@ -405,6 +405,7 @@ namespace CriticalMass.Runtime.Game
                 {
                     _titleSeen = true;
                     _titleAt = now;
+                    if (Current.Autoplay || Current.QuitAfterMatch) PerfOverlay.SetPhase(PerfOverlay.PhaseTitle);   // DG-111
                     if (!Application.isEditor && _firstTitleAt < 0)
                     {
                         _firstTitleAt = now;
@@ -466,6 +467,9 @@ namespace CriticalMass.Runtime.Game
                 {
                     _recording = true;
                     _exceptionsAtStart = _exceptions;
+                    PerfOverlay.ClearPhase(PerfOverlay.PhaseMatch);
+                    PerfOverlay.ClearPhase(PerfOverlay.PhaseResults);
+                    PerfOverlay.SetPhase(PerfOverlay.PhaseMatch);
                     PerfOverlay.BeginRecording();
                 }
             }
@@ -484,6 +488,7 @@ namespace CriticalMass.Runtime.Game
                 Finish("TIMEOUT");
             }
             if (!_ended || now - _endAt < 1.5) return;
+            if (_pendingExtra != null) RewriteWithPhases();   // DG-111: the results phase is complete now
 
             if (!_timedOut && o.Autoplay && _match < o.Matches)
             {
@@ -512,6 +517,7 @@ namespace CriticalMass.Runtime.Game
             World w = _driver.World;
             PerfOverlay.Report r = _recording ? PerfOverlay.EndRecording() : null;
             _recording = false;
+            PerfOverlay.SetPhase(PerfOverlay.PhaseResults);
             double wall = Time.realtimeSinceStartupAsDouble - _matchStart;
             const double Mb = 1024.0 * 1024.0;
             double allocated = Profiler.GetTotalAllocatedMemoryLong() / Mb;
@@ -519,7 +525,7 @@ namespace CriticalMass.Runtime.Game
             double mono = Profiler.GetMonoUsedSizeLong() / Mb;
             double gfx = Profiler.GetAllocatedMemoryForGraphicsDriver() / Mb;
             string assets = _match == 1 ? PerfOverlay.AssetReportJson() : "null";
-            string json = PerfOverlay.ToJson(r, new[]
+            var extra = new[]
             {
                 ("result", Q(why)),
                 ("match", _match.ToString(CultureInfo.InvariantCulture)),
@@ -560,10 +566,15 @@ namespace CriticalMass.Runtime.Game
                 ("render_tier", Q(RenderTier.Policy(RenderTier.Level).ToString())),
                 ("screen", Q($"{Screen.width}x{Screen.height}")),
                 ("assets", assets),
-            });
+                ("phases", PerfOverlay.PhasesJson()),
+            };
+            string json = PerfOverlay.ToJson(r, extra);
+            _pendingExtra = extra;
+            _pendingReport = r;
             string basePath = Current.PerfLog;
             if (string.IsNullOrEmpty(basePath)) basePath = Path.Combine(Application.persistentDataPath, "perf-last.json");
             string path = PerfPathFor(basePath, _match);
+            _pendingPath = path;
             try
             {
                 string dir = Path.GetDirectoryName(Path.GetFullPath(path));
@@ -577,6 +588,31 @@ namespace CriticalMass.Runtime.Game
             string frames = r == null ? "frames=0" : r.Summary();
             Debug.Log($"{LogTag} {why} match={_match}/{Current.Matches} winner={w.Match.Winner} sim={Num(w.Match.Time)}s ticks={w.Tick} " +
                       $"wall={Num(wall)}s {frames} unity_mb={Num(allocated)} mono_mb={Num(mono)} exceptions={_exceptions} errors={_errors} perf={path}");
+        }
+
+        (string key, string jsonValue)[] _pendingExtra;
+        PerfOverlay.Report _pendingReport;
+        string _pendingPath;
+
+        /// <summary>
+        /// DG-111: perf.json is written at the match end (so a crash during results loses nothing) and written again when
+        /// the results phase ends, with every phase's p50 and p95 (title, match, results).
+        /// </summary>
+        void RewriteWithPhases()
+        {
+            var extra = _pendingExtra;
+            _pendingExtra = null;
+            PerfOverlay.SetPhase(null);
+            for (int i = 0; i < extra.Length; i++)
+                if (extra[i].key == "phases") extra[i].jsonValue = PerfOverlay.PhasesJson();
+            try
+            {
+                SafeFile.WriteAtomic(_pendingPath, PerfOverlay.ToJson(_pendingReport, extra), false);
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"{LogTag} could not rewrite {_pendingPath}: {e.Message}");
+            }
         }
 
         /// <summary>DG-55/58: live object counts at a match end (the soak compares match 2 and match 3).</summary>
