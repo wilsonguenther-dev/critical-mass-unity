@@ -173,6 +173,9 @@ namespace CriticalMass.Sim.Tests
         internal static int[] CrossTicks(double corruptionPerUnit, double biomassPerUnit, out double share)
         {
             GameConfig cfg = GameConfig.CreateBrowser5v5();
+            // U-057: the sandwich isolates the instability rule (the browser's CM-85 predates the CM-36 cleanse), so the autopilot
+            // cleanse is off here; it would remove instability in one world and not the other. CM-36's own soak measures it on.
+            cfg.KaijuFeed.Cleanse.BotNetUnits = double.PositiveInfinity;
             cfg.KaijuFeed.CorruptionInstabilityPerUnit = corruptionPerUnit;
             cfg.KaijuFeed.BiomassInstabilityPerUnit = biomassPerUnit;
             var cross = new int[Seeds];
