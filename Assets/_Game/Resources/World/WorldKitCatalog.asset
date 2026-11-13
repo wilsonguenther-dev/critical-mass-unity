@@ -151,6 +151,7 @@ MonoBehaviour:
   - env_cliff_d2_lod1
   - env_cliff_d3
   - env_cliff_d3_lod1
+  - env_cliff_d3_lod2
   - env_cliff_d4
   - env_cliff_s1
   - env_cliff_s2
@@ -158,8 +159,10 @@ MonoBehaviour:
   - env_cliff_s3_lod1
   - env_cliff_s4
   - env_cliff_s4_lod1
+  - env_cliff_s4_lod2
   - env_cliff_s5
   - env_cliff_s5_lod1
+  - env_cliff_s5_lod2
   - env_cliff_s6
   - env_cloud_floor
   - env_cloud_puff
@@ -429,6 +432,7 @@ MonoBehaviour:
   - {fileID: 919132149155446097, guid: 7349a0d23731492404771274764d81d9, type: 3}
   - {fileID: 919132149155446097, guid: a40d833d8f6c8472e882161e9a477142, type: 3}
   - {fileID: 919132149155446097, guid: ad3b8235f25991efcb2666f257526f64, type: 3}
+  - {fileID: 919132149155446097, guid: bbfd57bee6861f124c7f39445698f4fe, type: 3}
   - {fileID: 919132149155446097, guid: 2155d63cb07934ab99ce188f2ffcaa1a, type: 3}
   - {fileID: 919132149155446097, guid: e726aa586135b4939aa0f4aa122cb7f5, type: 3}
   - {fileID: 919132149155446097, guid: 04704ce4486b042a3a3996987171707d, type: 3}
@@ -436,8 +440,10 @@ MonoBehaviour:
   - {fileID: 919132149155446097, guid: 959719749b482341dba9868c10aa12e9, type: 3}
   - {fileID: 919132149155446097, guid: f472f23d96d8b47e5837cad902408d77, type: 3}
   - {fileID: 919132149155446097, guid: dc67baad4a60d32c3f20d1fe222d77b2, type: 3}
+  - {fileID: 919132149155446097, guid: bfb75e169b42d3fd036e00e7b1f4eba8, type: 3}
   - {fileID: 919132149155446097, guid: f842b5162dd61469c9a581659aa5fc73, type: 3}
   - {fileID: 919132149155446097, guid: 15e65fbeedf7b4d12cba3d9ae9f01271, type: 3}
+  - {fileID: 919132149155446097, guid: 76184a86860f02d42fc7db3df9264920, type: 3}
   - {fileID: 919132149155446097, guid: 183338fca3a4b4cb5b694210448b0e2e, type: 3}
   - {fileID: 919132149155446097, guid: 370bc067fa32d4349944bc0d32cbf491, type: 3}
   - {fileID: 919132149155446097, guid: 9578faa5d3fb843b3a3d7ef78f486af2, type: 3}
