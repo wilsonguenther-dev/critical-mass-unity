@@ -106,7 +106,10 @@ namespace CriticalMass.Sim.Tests
                         bool carried = a.AirLen > 0 || Collide.DeckSpanAt(w, x, z, Collide.ActorRadius(w, id)) != null;
                         if (!(overVoid && carried)) failures.Add($"tick {tick}: actor {id} at ({x:F2}, {z:F2}) inside cell type {(MapGrid.InBounds(w.Map, cx, cz) ? w.Map.Cells[cz * w.Map.Width + cx] : -1)}");
                     }
-                    bool travelling = a.StandUp <= 0 && Travelling(a.AiState);
+                    // DG-16b (CM-64): a carrier winding up a delivery at the shrine (DeliverTicks != 0: winding, or the tick an enemy hit
+                    // interrupted it) stands still on purpose; that is the contested hand-off, not a pathing stall.
+                    bool windingUp = a.AiState == AiState.Deliver && a.DeliverTicks != 0;
+                    bool travelling = a.StandUp <= 0 && Travelling(a.AiState) && !windingUp;
                     double dx = x - anchorX[id];
                     double dz = z - anchorZ[id];
                     if (!travelling || a.AiState != anchorState[id] || dx * dx + dz * dz >= StuckRadius * StuckRadius)
