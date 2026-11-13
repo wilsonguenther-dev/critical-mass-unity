@@ -24,6 +24,9 @@ namespace CriticalMass.Runtime.View.Dressing
         public double SimX, SimZ, Y;
         /// <summary>True for pieces the kit lets stand over a walkable cell (the walkable surface itself: ground, bridge decks).</summary>
         public bool Surface;
+        /// <summary>World reactions: a bridge deck tile's start and end along its deck (0..1, piers at 0 and 1), else 0.
+        /// WorldView bakes the sag weight sin(pi t) from them.</summary>
+        public float SpanA, SpanB;
     }
 
     /// <summary>A unit edge of the island outline (rim) or of a step down inside an island (ledge), sim coordinates.</summary>
@@ -810,7 +813,10 @@ namespace CriticalMass.Runtime.View.Dressing
                 for (int k = 0; k < n; k++)
                 {
                     double[] a = pt(ta + (tb - ta) * k / n), b = pt(ta + (tb - ta) * (k + 1) / n);
-                    o.Add(SpanTile(a, b, w));
+                    WorldPlacement tile = SpanTile(a, b, w);
+                    tile.SpanA = (float)k / n;
+                    tile.SpanB = (float)(k + 1) / n;
+                    o.Add(tile);
                 }
                 double ang = Math.Atan2(z1 - z0, x1 - x0), ox = -Math.Sin(ang), oz = Math.Cos(ang);
                 for (int side = -1; side <= 1; side += 2)

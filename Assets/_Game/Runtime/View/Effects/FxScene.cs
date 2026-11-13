@@ -100,6 +100,45 @@ namespace CriticalMass.Runtime.View.Effects
         /// <summary>Slam telegraph rim pulse in wall Hz (was 18 rad per sim second: 5.7 Hz on screen at pace 2).</summary>
         public const float SlamPulseHz = 2f;
         public const float BerserkPulseHz = 1.5f, ShieldPulseHz = 2f, MeleePulseHz = 2f;
+        /// <summary>
+        /// World reactions: the ground paint texture (Reactions.GroundPaint). When set and accepting, a still decal or mark
+        /// (blood once spread, scorch, slam crack) is drawn ONCE into Paint.Builder and leaves the per-frame ground mesh one
+        /// paint flush later; animated parts (spreading pools, corruption puddles, drips) stay in the mesh. Null: as before.
+        /// </summary>
+        public IGroundPaintTarget Paint;
+
+        /// <summary>A Kaiju footfall at sim (x, z) (CombatFx forwards it to the WorldForceBus until DG-93 pushes contacts).</summary>
+        public System.Action<double, double> KaijuFootfall;
+
+        private readonly int[] _decalStamp = new int[MaxDecals];
+        private readonly int[] _markStamp = new int[MaxMarks];
+
+        /// <summary>True when the decal at p lies on the island ground (not a wall top): only those go to the paint.</summary>
+        private bool OnGround(Vector3 p)
+        {
+            double x = SimX(p), z = SimZ(p);
+            return IsGround(x, z) && Mathf.Abs(p.y - (float)Ground(x, z)) < 0.2f;
+        }
+
+        /// <summary>
+        /// Paint hand-off for one still mark: false = draw it in the mesh this frame. Stamps it on the first call after it
+        /// is still, keeps drawing it until the paint has flushed once since (no blank frame), then skips it.
+        /// </summary>
+        private bool PaintedAway(ref int stamp, Vector3 p, bool still)
+        {
+            if (Paint == null || !Paint.Accepts || !still) return false;
+            if (stamp == -2) return false;                    // not on paintable ground: mesh only
+            if (stamp == -1)
+            {
+                if (!OnGround(p)) { stamp = -2; return false; }
+                stamp = Paint.Frame;
+                return false;                                 // caller stamps now and still draws it this frame
+            }
+            return Paint.Frame > stamp;
+        }
+
+        /// <summary>Decals and marks drawn in the ground mesh last build (budget tests: under 6k verts with paint on).</summary>
+        public int LastGroundMarks { get; private set; }
 
         public FxScene(GameConfig cfg, MapDef map)
         {
@@ -110,7 +149,8 @@ namespace CriticalMass.Runtime.View.Effects
             _cap = World.ActorCapacity(cfg);
             for (int i = 0; i < MaxBursts; i++) _bursts[i].Born = double.NegativeInfinity;
             for (int i = 0; i < MaxDroplets; i++) { _drops[i].Born = double.NegativeInfinity; _drops[i].Landed = true; }
-            for (int i = 0; i < MaxDecals; i++) { _decals[i].Born = double.NegativeInfinity; _decals[i].Life = 0; }
+            for (int i = 0; i < MaxDecals; i++) { _decals[i].Born = double.NegativeInfinity; _decals[i].Life = 0; _decalStamp[i] = -1; }
+            for (int i = 0; i < MaxMarks; i++) _markStamp[i] = -1;
             for (int i = 0; i < MaxRings; i++) _rings[i].Born = double.NegativeInfinity;
             for (int i = 0; i < MaxTrails; i++) _trails[i].Born = double.NegativeInfinity;
             for (int i = 0; i < MaxPuffs; i++) _puffs[i].Born = double.NegativeInfinity;
@@ -434,7 +474,6 @@ namespace CriticalMass.Runtime.View.Effects
                 Vector3 p = W(e.X, h + 0.5, e.Z);
                 for (int k = 0; k < 7; k++) AddPuff(pop, p, seed, (uint)(k + 40), 0.42f, DustLight, 0);
             }
-            if (tier >= 1) AddImpulse(t, e.X, h, e.Z, 0.35f + 0.25f * tier);
         }
 
         private void AddBurst(double t, Vector3 p, float size, byte kind, uint seed, Vector3 tan, double life)
@@ -467,6 +506,7 @@ namespace CriticalMass.Runtime.View.Effects
 
         private void AddDecal(double t, Vector3 p, float size, byte kind, byte shape, uint seed, double dirX, double dirZ, double grow, double life = -1)
         {
+            _decalStamp[_ndc % MaxDecals] = -1;
             ref Decal d = ref _decals[_ndc++ % MaxDecals];
             d.Born = t; d.P = p; d.Size = size; d.Kind = kind; d.Shape = shape; d.Seed = seed; d.Grow = (float)grow;
             d.Life = life > 0 ? life : DecalLife;
@@ -573,6 +613,7 @@ namespace CriticalMass.Runtime.View.Effects
             const float lift = 0.03f;
             if (BlobShadows) DrawBlobShadows(w, ground);
 
+            LastGroundMarks = 0;
             BuildMarks(now, ground);
             BuildDecals(now, ground);
             BuildDrips(now, ground);

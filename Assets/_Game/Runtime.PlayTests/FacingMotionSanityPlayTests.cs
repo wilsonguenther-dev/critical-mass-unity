@@ -459,7 +459,7 @@ namespace CriticalMass.Runtime.PlayTests
         /// <summary>
         /// A bot carrying biomass or corruption shows it attached to a hand or the back: an extra active renderer under its
         /// model (not one of its own ModelSpec.Meshes) within 0.6 u of hand.l, hand.r, handslot.l, handslot.r, chest or
-        /// spine, and nothing cargo-like left at the world origin. KNOWN FAILING on main 2026-11-12: no cargo is drawn.
+        /// spine, and nothing cargo-like left at the world origin. Drawn by Anim.CargoView since the world-reactions PR.
         /// </summary>
         /// <para>Un-Explicit by the animation pass (DG-71): Anim.CarryProp draws 1 to 3 bundles between the carrier's hands.</para>
         [UnityTest]

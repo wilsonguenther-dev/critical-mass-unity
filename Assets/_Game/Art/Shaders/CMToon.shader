@@ -9,6 +9,10 @@
 // vertex colour with its alpha mask codes and team-glow contract (CMToonCommon.hlsl), and the DepthOnly and DepthNormals
 // passes put CM/Toon objects into the depth and normals textures. Art refresh 2: face decal (_DecalOn, _FaceTex on
 // UV0), Kaiju _Berserk darkening of fixed colours, per-vertex outline weight (UV4.x) so faces carry no hull.
+// World reactions (2026-11-12): every pass (lit, outline, shadow caster, depth, depth normals) places the vertex with the
+// same CMToonWorldPos (CMToonCommon.hlsl: wind + force-field sway from UV5 when _SwayOn, UV4.y wobble when _WobbleUV4Y),
+// so the bent silhouette, its outline hull and its shadow agree; the shadow caster has its own vertex for that reason.
+// Shader model 3.0 for the vertex texture fetch of the force field.
 Shader "CM/Toon"
 {
     Properties
@@ -55,6 +59,9 @@ Shader "CM/Toon"
         _BerserkTint ("Berserk Tint (Corruption)", Color) = (0.556863, 0.247059, 0.819608, 1)
         _BerserkTintAmount ("Berserk Tint Amount", Range(0, 1)) = 0.15
         [Toggle] _OutlineWeightUV4 ("Outline Weight From UV4.x", Float) = 0
+        [Toggle] _SwayOn ("World Sway From UV5 (pivot xz, weight, kind)", Float) = 0
+        _WaterFlow ("Water Flow (stripes and ripple rings; 0 off)", Range(0, 2)) = 0
+        [Toggle] _WobbleUV4Y ("Wobble Weight From UV4.y (hair, scarf, tabard)", Float) = 0
     }
 
     SubShader
@@ -70,7 +77,7 @@ Shader "CM/Toon"
             ZWrite On
 
             HLSLPROGRAM
-            #pragma target 2.0
+            #pragma target 3.0
             #pragma vertex CMToonForwardVertex
             #pragma fragment CMToonForwardFragment
 
@@ -93,7 +100,7 @@ Shader "CM/Toon"
             {
                 CMToonForwardVaryings output;
                 output.positionCS = CMToonPositionCS(input);
-                output.positionWS = TransformObjectToWorld(input.positionOS.xyz);
+                output.positionWS = CMToonWorldPos(input);
                 output.normalWS = TransformObjectToWorldNormal(input.normalOS);
                 output.color = input.color;
                 output.uv0 = _DecalOn > 0.5 ? input.uv0 : float2(0, 0);
@@ -129,6 +136,7 @@ Shader "CM/Toon"
 
                 // Glows are self-lit: unshaded, no rim.
                 color = selfLit > 0.5h ? albedo : color;
+                color = CMToonWater(color, input.positionWS, normalWS);
                 return half4(CMToonFog(color, input.positionWS), 1.0);
             }
             ENDHLSL
@@ -143,7 +151,7 @@ Shader "CM/Toon"
             ZWrite On
 
             HLSLPROGRAM
-            #pragma target 2.0
+            #pragma target 3.0
             #pragma vertex CMToonOutlineVertex
             #pragma fragment CMToonOutlineFragment
 
@@ -168,7 +176,9 @@ Shader "CM/Toon"
             ENDHLSL
         }
 
-        // Pass 2: shadow casting through URP's own pass.
+        // Pass 2: shadow casting. URP's ShadowCasterPass.hlsl supplies _LightDirection / _LightPosition and the bias
+        // helpers; the vertex is our own so the shadow is cast from the same swayed position as the lit pass (URP's
+        // ShadowPassVertex reads the undisplaced POSITION and the shadow would stay still under a bending bush).
         Pass
         {
             Name "ShadowCaster"
@@ -179,15 +189,40 @@ Shader "CM/Toon"
             ColorMask 0
 
             HLSLPROGRAM
-            #pragma target 2.0
-            #pragma vertex ShadowPassVertex
-            #pragma fragment ShadowPassFragment
+            #pragma target 3.0
+            #pragma vertex CMToonShadowVertex
+            #pragma fragment CMToonShadowFragment
 
             // Point and spot light shadows use _LightPosition instead of _LightDirection.
             #pragma multi_compile_vertex _ _CASTING_PUNCTUAL_LIGHT_SHADOW
 
             #include "CMToonCommon.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/Shaders/ShadowCasterPass.hlsl"
+
+            struct CMToonShadowVaryings
+            {
+                float4 positionCS : SV_POSITION;
+            };
+
+            CMToonShadowVaryings CMToonShadowVertex(CMToonAttributes input)
+            {
+                CMToonShadowVaryings output;
+                float3 positionWS = CMToonWorldPos(input);
+                float3 normalWS = TransformObjectToWorldNormal(input.normalOS);
+            #if _CASTING_PUNCTUAL_LIGHT_SHADOW
+                float3 lightDirectionWS = normalize(_LightPosition - positionWS);
+            #else
+                float3 lightDirectionWS = _LightDirection;
+            #endif
+                float4 positionCS = TransformWorldToHClip(ApplyShadowBias(positionWS, normalWS, lightDirectionWS));
+                output.positionCS = ApplyShadowClamping(positionCS);
+                return output;
+            }
+
+            half4 CMToonShadowFragment(CMToonShadowVaryings input) : SV_Target
+            {
+                return 0;
+            }
             ENDHLSL
         }
 
@@ -202,7 +237,7 @@ Shader "CM/Toon"
             ColorMask R
 
             HLSLPROGRAM
-            #pragma target 2.0
+            #pragma target 3.0
             #pragma vertex CMToonDepthVertex
             #pragma fragment CMToonDepthFragment
 
@@ -236,7 +271,7 @@ Shader "CM/Toon"
             ZWrite On
 
             HLSLPROGRAM
-            #pragma target 2.0
+            #pragma target 3.0
             #pragma vertex CMToonDepthNormalsVertex
             #pragma fragment CMToonDepthNormalsFragment
 

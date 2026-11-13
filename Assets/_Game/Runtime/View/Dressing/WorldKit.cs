@@ -89,6 +89,24 @@ namespace CriticalMass.Runtime.View.Dressing
             return WorldLook.Structure;
         }
 
+        /// <summary>
+        /// World reactions: how a piece moves in CMToonSwayOffset (UV5.w): 0 still, 1 grass and flowers, 2 bush, 3 tree,
+        /// 4 banner, 5 bridge deck (sags under weight), 6 lantern (pendulum; no kit piece yet: art), 7 water (stripes and
+        /// ripples, no vertex motion).
+        /// </summary>
+        public static byte SwayKind(string piece)
+        {
+            if (piece == null) return 0;
+            if (piece == "env_grass_tuft" || piece == "env_flowers") return 1;
+            if (piece == "env_bush") return 2;
+            if (piece.StartsWith("env_tree_", StringComparison.Ordinal)) return 3;
+            if (piece == "env_banner") return 4;
+            if (piece == "env_bridge_span" || piece == "env_bridge_cell") return 5;
+            if (piece.StartsWith("env_lantern", StringComparison.Ordinal)) return 6;
+            if (piece == "env_waterfall") return 7;
+            return 0;
+        }
+
         /// <summary>The look of one bases-kit renderer: ground pools are flat decals (no hull), the rest 2 px structures.</summary>
         public static WorldLook BasesLook(string rendererName)
         {

@@ -45,6 +45,8 @@ namespace CriticalMass.Runtime.Menu
         /// <summary>DG-53: the settings format version, so a later build can migrate or reset stored keys safely.</summary>
         public const string PrefsVersionKey = "cm.prefsVersion";
         public const int PrefsVersion = 1;
+        /// <summary>World reactions' name for the one reduce-motion key (same key as ReduceMotionKey).</summary>
+        public const string ReducedMotionKey = ReduceMotionKey;
 
         /// <summary>Every key this class writes (tests back these up and restore them).</summary>
         public static readonly string[] AllKeys =
@@ -92,6 +94,8 @@ namespace CriticalMass.Runtime.Menu
 
         public static bool ReduceFlashing { get => GetB(ReduceFlashingKey, false); set => SetB(ReduceFlashingKey, value); }
         public static bool ReduceMotion { get => GetB(ReduceMotionKey, false); set => SetB(ReduceMotionKey, value); }
+        /// <summary>Same setting as ReduceMotion (world reactions' name): sway, springs, launches and the edge flash at 25%.</summary>
+        public static bool ReducedMotion { get => ReduceMotion; set => ReduceMotion = value; }
         /// <summary>Floating damage numbers shown.</summary>
         public static bool DamageNumbers { get => GetB(DamageNumbersKey, true); set => SetB(DamageNumbersKey, value); }
         /// <summary>Blood effects on (PlayerPrefs cm.blood, default on).</summary>
