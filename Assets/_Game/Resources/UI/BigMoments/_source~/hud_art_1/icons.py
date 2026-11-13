@@ -46,7 +46,7 @@ def fit(img, box, align="center"):
     return img
 
 def tile_portrait(bust, team):
-    S = 424; R = 76; rim = 10
+    S = 848; R = 152; rim = 20   # drawn at 8x and downsampled (anti-aliased tile edge)
     base = Image.new("RGBA", (S, S), (0, 0, 0, 0))
     mask = Image.new("L", (S, S), 0); ImageDraw.Draw(mask).rounded_rectangle((0, 0, S - 1, S - 1), R, fill=255)
     tc = AZURE if team == "azure" else CRIMSON
@@ -63,7 +63,7 @@ def tile_portrait(bust, team):
     return out
 
 def disc_icon(obj, team):
-    S = 216; ring = 12
+    S = 432; ring = 24   # drawn at 8x and downsampled (anti-aliased disc edge)
     out = Image.new("RGBA", (S, S), (0, 0, 0, 0)); d = ImageDraw.Draw(out)
     tc = AZURE if team == "azure" else CRIMSON
     d.ellipse((0, 0, S - 1, S - 1), fill=NAVY + (255,))
@@ -119,5 +119,9 @@ if __name__ == "__main__":
     for st in ("azure", "crimson", "berserk"):
         write(plain(team_variant(adult, "kaiju-" + st, tmp, "adult-" + st), 288), f"kaiju-adult-{st}", outdir, 72)
     json.dump(report, open(os.path.join(outdir, "_icons-report.json"), "w"), indent=0)
+    names = sorted({f.split("@")[0] for f in os.listdir(outdir) if f.endswith("@1x.png")})
+    open(os.path.join(outdir, "_raster-sources.txt"), "w").write(
+        "# hud-art-1 raster icons (no SVG source): rebuilt by Assets/_Game/Resources/UI/BigMoments/_source~/hud_art_1/icons.py from the\n"
+        "# generated sheets (gen.py icon_jobs.json); class-<class>-<team> are copies of attack-<class>-<team>.\n" + "\n".join(names) + "\n")
     print("icons written:", len([f for f in os.listdir(outdir) if f.endswith("@1x.png")]), "names;", "max corner alpha", max(r["corner_alpha_max"] for r in report),
           "max fringe", max(r["fringe_ratio"] for r in report), "touching edge", [r["icon"] for r in report if r["touches_edge"]])

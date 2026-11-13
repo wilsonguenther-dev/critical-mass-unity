@@ -275,8 +275,11 @@ namespace CriticalMass.Runtime.Tests
             }
             Assert.GreaterOrEqual(n, 60, "icon catalogue shrank");
             string svg = Path.Combine(Application.dataPath, "_Game/Art/UI/Icons/_source~/svg");
+            // hud-art-1: the painted icons have no vector source; each is listed in the raster manifest with its rebuild script
+            string rasterList = Path.Combine(Application.dataPath, "_Game/Art/UI/Icons/_source~/hud-art-1-raster.txt");
+            var raster = new System.Collections.Generic.HashSet<string>(File.Exists(rasterList) ? File.ReadAllLines(rasterList) : new string[0]);
             foreach (string name in UiIcons.All())
-                Assert.IsTrue(File.Exists(Path.Combine(svg, name + ".svg")), name + ".svg vector source missing");
+                Assert.IsTrue(File.Exists(Path.Combine(svg, name + ".svg")) || raster.Contains(name), name + ": no vector source and not in the raster manifest");
         }
 
         [Test]
