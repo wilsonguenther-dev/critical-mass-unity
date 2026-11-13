@@ -480,9 +480,9 @@ namespace CriticalMass.Editor
             }
             if (hud != null)
             {
-                var land = UnityEngine.Object.FindAnyObjectByType<CriticalMass.Runtime.Hud.Ui.MinimapLand>();
+                RectTransform map = hud.MapArea;
                 Debug.Log($"[CaptureTool] hud canvas {hud.Root.rect.size} scale {hud.Canvas.scaleFactor} for {width}x{height}; " +
-                          $"minimap quads {(land != null ? land.Quads : -1)} rect {(land != null ? land.rectTransform.rect.ToString() : "-")}");
+                          $"minimap tier {hud.MapTier} rect {(map != null ? map.rect.ToString() : "-")}");
             }
             if (uiOnly)
             {
