@@ -216,6 +216,7 @@ namespace CriticalMass.Runtime.Menus
     /// Follows the device used last and every rebind live. Screen Space - Camera canvas, sorting order 45 (above the
     /// pause menu's 40).
     /// </summary>
+    [CriticalMass.Runtime.Flow.GameOverlay(Order = 31, Scope = CriticalMass.Runtime.Flow.OverlayScope.Always)]   // installed once by GameBootstrap through the overlay registry
     public sealed class ControlsCardScreen : MonoBehaviour
     {
         public const string SeenKey = "cm.controlsCardSeen";
@@ -537,16 +538,7 @@ namespace CriticalMass.Runtime.Menus
     /// <summary>Creates the controls card screen with the game on boot and after every scene load (MenuInstaller pattern).</summary>
     public static class ControlsCardInstaller
     {
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
-        static void Install()
-        {
-            SceneManager.sceneLoaded -= OnSceneLoaded;
-            SceneManager.sceneLoaded += OnSceneLoaded;
-            Attach(SceneManager.GetActiveScene());
-        }
-
-        static void OnSceneLoaded(Scene scene, LoadSceneMode mode) => Attach(scene);
-
+        // Integration batch 2: installed by GameBootstrap through the DG-01 overlay registry ([GameOverlay]); Attach stays for tests.
         public static ControlsCardScreen Attach(Scene scene)
         {
             GameBootstrap.Build(scene);

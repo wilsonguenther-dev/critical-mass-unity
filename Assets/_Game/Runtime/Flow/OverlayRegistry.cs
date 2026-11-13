@@ -36,6 +36,12 @@ namespace CriticalMass.Runtime.Flow
         void Open(Action onClosed);
     }
 
+    /// <summary>Optional on an IMenuScreen: the pause key (Escape / Start) while the screen is open calls Back.</summary>
+    public interface IMenuBack
+    {
+        void Back();
+    }
+
     /// <summary>
     /// Put on a MonoBehaviour that implements IMenuScreen to add it to the main menu, or to fill one of the menu's
     /// "coming soon" places by using its id ("howto", "barracks", "codex", "credits"). The main menu adds the component to
@@ -99,12 +105,15 @@ namespace CriticalMass.Runtime.Flow
             new MenuEntry { Id = Barracks, Label = "BARRACKS", Order = 30 },
             new MenuEntry { Id = Controls, Label = "CONTROLS", Order = 35, Builtin = true },
             new MenuEntry { Id = Settings, Label = "SETTINGS", Order = 40, Builtin = true },
-            new MenuEntry { Id = Codex, Label = "CODEX", Order = 50 },
+            new MenuEntry { Id = Spectate, Label = "SPECTATE", Order = 15, Builtin = true },
+            new MenuEntry { Id = Codex, Label = "CODEX", Order = 50, Builtin = true },
             new MenuEntry { Id = Credits, Label = "CREDITS", Order = 60 },
             new MenuEntry { Id = Quit, Label = "QUIT", Order = 90, Builtin = true },
         };
 
         public const string Controls = "controls";
+        /// <summary>Integration batch 2: watch a match (match setup opens on SPECTATE).</summary>
+        public const string Spectate = "spectate";
 
         static List<Type> _types;
         static bool _tutorialScanned;

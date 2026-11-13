@@ -95,6 +95,7 @@ namespace CriticalMass.Runtime.Input
     /// per match. View side only: it never writes the sim.
     /// </summary>
     [DefaultExecutionOrder(-50)]
+    [CriticalMass.Runtime.Flow.GameOverlay(Order = 20, Scope = CriticalMass.Runtime.Flow.OverlayScope.Always)]   // installed once by GameBootstrap through the overlay registry
     public sealed class InputBufferBinder : MonoBehaviour
     {
         HumanInputSource _input;
@@ -119,16 +120,7 @@ namespace CriticalMass.Runtime.Input
     /// (the MenuInstaller pattern; GameBootstrap is not edited).</summary>
     public static class InputBufferInstaller
     {
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
-        static void Install()
-        {
-            SceneManager.sceneLoaded -= OnSceneLoaded;
-            SceneManager.sceneLoaded += OnSceneLoaded;
-            Attach(SceneManager.GetActiveScene());
-        }
-
-        static void OnSceneLoaded(Scene scene, LoadSceneMode mode) => Attach(scene);
-
+        // Integration batch 2: installed by GameBootstrap through the DG-01 overlay registry ([GameOverlay]); Attach stays for tests.
         /// <summary>Adds the binder next to the HumanInputSource (none: no game, nothing done). Returns it.</summary>
         public static InputBufferBinder Attach(Scene scene)
         {

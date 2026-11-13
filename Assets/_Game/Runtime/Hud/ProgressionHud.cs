@@ -24,6 +24,7 @@ namespace CriticalMass.Runtime.Hud
     /// </list>
     /// Visible only while the HUD canvas is (the title screen hides it). Read-only on the sim.
     /// </summary>
+    [CriticalMass.Runtime.Flow.GameOverlay(Order = 53, Scope = CriticalMass.Runtime.Flow.OverlayScope.MatchOnly)]   // installed once by GameBootstrap through the overlay registry
     public sealed class ProgressionHud : MonoBehaviour
     {
         public static ProgressionHud Instance { get; private set; }
@@ -136,6 +137,9 @@ namespace CriticalMass.Runtime.Hud
             PlacePortraitHit();
         }
 
+        /// <summary>This component's own click target over the HUD portrait (off: HudInteract owns the portrait click).</summary>
+        public static bool PortraitClickEnabled;
+
         void Hotkeys()
         {
             if (!HotkeysEnabled || CharacterPanel.IsTyping || GetComponent<TitleScreen>() != null) return;
@@ -144,14 +148,22 @@ namespace CriticalMass.Runtime.Hud
             bool paused = _input != null && _input.State.Paused;
             bool key = kb != null && kb.cKey.wasPressedThisFrame;
             // D-pad up navigates the pause menu while paused; it opens the panel only in play.
-            bool padKey = pad != null && pad.dpad.up.wasPressedThisFrame && !paused && !CharacterPanel.IsOpen;
-            bool padClose = pad != null && pad.dpad.up.wasPressedThisFrame && CharacterPanel.IsOpen && !CharacterPanel.Editable;
+            // Integration batch 2: D-pad up is the Map action (full map) and a spectator objective; the panel opens with C
+            // or a click on the HUD portrait, and closes with B.
+            bool padKey = false, padClose = false;
             if (key || padKey || padClose) CharacterPanel.Toggle();
         }
 
         /// <summary>Keeps the click target over the HUD portrait (found by name; searched at most twice a second until found).</summary>
         void PlacePortraitHit()
         {
+            // Integration batch 2: the clickable HUD (HudInteract's portrait hotspot) opens the character panel; a second
+            // click target here would toggle it twice on one click. Off unless a build has no clickable HUD.
+            if (!PortraitClickEnabled)
+            {
+                if (_portraitHit != null && _portraitHit.gameObject.activeSelf) _portraitHit.gameObject.SetActive(false);
+                return;
+            }
             if (_portrait == null)
             {
                 if (Time.unscaledTime < _nextPortraitSearch) return;

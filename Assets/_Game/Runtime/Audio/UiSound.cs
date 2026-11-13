@@ -38,6 +38,21 @@ namespace CriticalMass.Runtime.Audio
         /// <summary>Plays a cue (other systems: an invalid action, a rebind conflict).</summary>
         public static void Play(UiCue cue) => UiSoundBinder.PlayCue(cue);
 
+        /// <summary>
+        /// Plays a cue by name (the hook the full map, pings and the clickable HUD look for): a refused or failed action
+        /// is the error cue, a close or back the back cue, a hover the hover cue, everything else (open, click, a ping
+        /// placed) the confirm cue.
+        /// </summary>
+        public static void Play(string cue)
+        {
+            if (string.IsNullOrEmpty(cue)) return;
+            UiCue c = UiCue.Confirm;
+            if (cue.IndexOf("refus", StringComparison.OrdinalIgnoreCase) >= 0 || cue.IndexOf("error", StringComparison.OrdinalIgnoreCase) >= 0) c = UiCue.Error;
+            else if (cue.IndexOf("close", StringComparison.OrdinalIgnoreCase) >= 0 || cue.IndexOf("back", StringComparison.OrdinalIgnoreCase) >= 0) c = UiCue.Back;
+            else if (cue.IndexOf("hover", StringComparison.OrdinalIgnoreCase) >= 0) c = UiCue.Hover;
+            UiSoundBinder.PlayCue(c);
+        }
+
         /// <summary>Adds UiSound to one Selectable (role from its label); returns the component.</summary>
         public static UiSound Bind(Selectable s)
         {

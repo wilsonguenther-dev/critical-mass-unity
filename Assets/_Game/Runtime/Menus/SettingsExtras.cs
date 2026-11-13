@@ -146,16 +146,7 @@ namespace CriticalMass.Runtime.Menu
             PauseMenu.AddTab(new PauseMenu.ExtraTab { Name = TabName, Build = BuildTab });
         }
 
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
-        static void Install()
-        {
-            SceneManager.sceneLoaded -= OnSceneLoaded;
-            SceneManager.sceneLoaded += OnSceneLoaded;
-            Attach(SceneManager.GetActiveScene());
-        }
-
-        static void OnSceneLoaded(Scene scene, LoadSceneMode mode) => Attach(scene);
-
+        // Integration batch 2: installed by GameBootstrap through the DG-01 overlay registry ([GameOverlay]); Attach stays for tests.
         /// <summary>Adds the applier to the game object (the one the pause menu lives on); null when there is no game.</summary>
         public static AccessibilityApplier Attach(Scene scene)
         {
@@ -214,6 +205,7 @@ namespace CriticalMass.Runtime.Menu
     /// LateUpdate. It only acts on changes it made, so another screen that hides the HUD (title, menus) is not fought.
     /// </summary>
     [DefaultExecutionOrder(1000)]
+    [CriticalMass.Runtime.Flow.GameOverlay(Order = 22, Scope = CriticalMass.Runtime.Flow.OverlayScope.Always)]   // installed once by GameBootstrap through the overlay registry
     public sealed class AccessibilityApplier : MonoBehaviour
     {
         GameHud _hud;

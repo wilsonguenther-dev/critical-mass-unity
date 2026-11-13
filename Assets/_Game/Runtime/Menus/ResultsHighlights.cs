@@ -20,6 +20,7 @@ namespace CriticalMass.Runtime.Menu
     /// <para>Until the game-flow results screen (DG-01) exists this shows itself 2 s after the match ends
     /// (AutoShowOnMatchEnd). The results screen sets AutoShowOnMatchEnd = false and calls Show() / Hide() itself.</para>
     /// </summary>
+    [CriticalMass.Runtime.Flow.GameOverlay(Order = 57, Scope = CriticalMass.Runtime.Flow.OverlayScope.MatchOnly)]   // installed once by GameBootstrap through the overlay registry
     public sealed class ResultsHighlights : MonoBehaviour
     {
         public const float AutoShowDelaySeconds = 2f;

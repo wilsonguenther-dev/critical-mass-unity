@@ -16,6 +16,7 @@ namespace CriticalMass.Runtime.Progression
     /// feeding Finish(stats) itself and setting AutoFinish false.</para>
     /// </summary>
     [DefaultExecutionOrder(50)]
+    [CriticalMass.Runtime.Flow.GameOverlay(Order = 52, Scope = CriticalMass.Runtime.Flow.OverlayScope.MatchOnly)]   // installed once by GameBootstrap through the overlay registry
     public sealed class MatchRewardTracker : MonoBehaviour
     {
         /// <summary>The local (human) actor id; the sim puts the human at 0.</summary>

@@ -29,6 +29,7 @@ namespace CriticalMass.Runtime.Menu
     /// by other screens through Show / Toggle / Barracks.Show. Escape or B closes it (it takes the Pause press while open,
     /// as the pause menu does). Read-only on the sim; the profile is the only thing it writes.
     /// </summary>
+    [CriticalMass.Runtime.Flow.GameOverlay(Order = 32, Scope = CriticalMass.Runtime.Flow.OverlayScope.Always)]   // installed once by GameBootstrap through the overlay registry
     public sealed class CharacterPanel : MonoBehaviour
     {
         public enum Tab { Character, Outfit, Tools, Skills }
@@ -114,6 +115,8 @@ namespace CriticalMass.Runtime.Menu
         public static bool MatchLive(SimDriverBehaviour d)
         {
             if (d == null) d = FindAnyObjectByType<SimDriverBehaviour>();
+            // The bot match behind the menus is not a live match: the Barracks stay editable there.
+            if (d != null && d.Request != null && d.Request.Backdrop) return false;
             return d != null && d.World != null && d.World.Match.Phase == MatchPhase.Playing;
         }
 

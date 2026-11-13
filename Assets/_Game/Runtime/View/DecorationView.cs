@@ -18,6 +18,7 @@ namespace CriticalMass.Runtime.View
     /// <para>Self-installs on the game's SimDriverBehaviour object after every scene load (the pause-menu installer pattern).
     /// Everything is built once per map and reused: no per-frame allocation.</para>
     /// </summary>
+    [CriticalMass.Runtime.Flow.GameOverlay(Order = 21, Scope = CriticalMass.Runtime.Flow.OverlayScope.Always)]   // installed once by GameBootstrap through the overlay registry
     public sealed class DecorationView : MonoBehaviour
     {
         /// <summary>Column height in world units [guess: the footprint length plus half a cell, so the fallen column covers it].</summary>
@@ -43,16 +44,7 @@ namespace CriticalMass.Runtime.View
         private Material _digMat;
         private Material _placeMat;
 
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
-        private static void Install()
-        {
-            SceneManager.sceneLoaded -= OnSceneLoaded;
-            SceneManager.sceneLoaded += OnSceneLoaded;
-            Attach();
-        }
-
-        private static void OnSceneLoaded(Scene scene, LoadSceneMode mode) => Attach();
-
+        // Integration batch 2: installed by GameBootstrap through the DG-01 overlay registry ([GameOverlay]); Attach stays for tests.
         /// <summary>Adds the view to the game's driver object (creating the game first when the Boot scene is open); returns it, or null without a game.</summary>
         public static DecorationView Attach()
         {

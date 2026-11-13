@@ -18,6 +18,7 @@ namespace CriticalMass.Runtime.Secrets
     /// egg-02, the Crown of the Hill, a large brass relic on the Azure overlook ledge, only when the sim can jump
     /// (JumpGate); taking it opens the relic-12 card and puts a small brass glint over your head for the match.
     /// </summary>
+    [CriticalMass.Runtime.Flow.GameOverlay(Order = 55, Scope = CriticalMass.Runtime.Flow.OverlayScope.MatchOnly)]   // installed once by GameBootstrap through the overlay registry
     public sealed class SecretWatcher : MonoBehaviour
     {
         public const string HillAloneLine = "an-22";
@@ -118,16 +119,7 @@ namespace CriticalMass.Runtime.Secrets
         /// <summary>The hill-alone timer (tests).</summary>
         public HillAloneTracker HillAlone => _alone;
 
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
-        static void Install()
-        {
-            SceneManager.sceneLoaded -= OnSceneLoaded;
-            SceneManager.sceneLoaded += OnSceneLoaded;
-            Attach(SceneManager.GetActiveScene());
-        }
-
-        static void OnSceneLoaded(Scene scene, LoadSceneMode mode) => Attach(scene);
-
+        // Integration batch 2: installed by GameBootstrap through the DG-01 overlay registry ([GameOverlay]); Attach stays for tests.
         public static SecretWatcher Attach(Scene scene)
         {
             PauseMenu menu = MenuInstaller.Attach(scene);

@@ -5,6 +5,7 @@ using CriticalMass.Runtime.Hud;
 using CriticalMass.Runtime.Hud.Style;
 using CriticalMass.Runtime.Hud.Ui;
 using CriticalMass.Runtime.Menu;
+using CriticalMass.Runtime.Progression;
 using CriticalMass.Sim.Config;
 using CriticalMass.Sim.Core;
 using UnityEngine;
@@ -18,11 +19,22 @@ namespace CriticalMass.Runtime.Menus
     /// knock-outs), the player's own line (knock-outs, deaths, hill time, biomass and corruption fed, damage, points) and
     /// an MVP per team (MatchStats points). PLAY AGAIN is focused, so one press starts the next match on a new seed;
     /// CHANGE CLASS opens match setup (its Back returns here); MAIN MENU. Back = Main menu.
+    /// <para>Integration batch 2: this screen is the one host for the end-of-match extras. REWARDS (DG-39's RewardsPanel:
+    /// level bar and what the match paid), ACHIEVEMENTS (DG-38) and HIGHLIGHTS (DG-23) each open as one drawer over the
+    /// cards, one at a time; Back closes the open drawer first. Rewards open by themselves when a match paid out.</para>
     /// </summary>
     public sealed class ResultsScreen : FlowScreen
     {
-        MenuItem _again, _change, _menu, _achievements;
+        MenuItem _again, _change, _menu, _achievements, _rewardsItem, _highlightsItem;
         AchievementList _list;
+        RewardsPanel _rewards;
+        int _highlightsClosedFrame = -1;
+        bool _highlightsHooked;
+
+        public MenuItem RewardsItem => _rewardsItem;
+        public MenuItem HighlightsItem => _highlightsItem;
+        public RewardsPanel Rewards => _rewards;
+        public bool RewardsOpen => _rewards != null && _rewards.gameObject.activeSelf;
         Text _title, _line, _reason, _azSecs, _crSecs, _footer;
         VectorShape _bar;
         HudIcon _kaijuIcon, _youPortrait;
@@ -65,13 +77,16 @@ namespace CriticalMass.Runtime.Menus
             BuildYou(space, 700f);
             BuildMvps(space, 1280f);
 
-            _menu = Button(space, "Main Menu", 160f, 880f, 360f, 84f, "MAIN MENU", Back);
-            _achievements = Button(space, "Achievements", 560f, 880f, 360f, 84f, "ACHIEVEMENTS", ToggleAchievements);
-            _change = Button(space, "Change Class", 960f, 880f, 360f, 84f, "CHANGE CLASS", () => Director.ShowSetup(true));
-            _again = Button(space, "Play Again", 1360f, 880f, 400f, 84f, "PLAY AGAIN", () => Director.PlayAgain(), 38);
+            // One row: the three drawers sit between the way out (left) and the way on (right).
+            _menu = Button(space, "Main Menu", 160f, 880f, 230f, 84f, "MAIN MENU", Back, 26);
+            _rewardsItem = Button(space, "Rewards", 398f, 880f, 220f, 84f, "REWARDS", () => ToggleDrawer(Drawer.Rewards), 26);
+            _achievements = Button(space, "Achievements", 626f, 880f, 290f, 84f, "ACHIEVEMENTS", () => ToggleDrawer(Drawer.Achievements), 26);
+            _highlightsItem = Button(space, "Highlights", 924f, 880f, 250f, 84f, "HIGHLIGHTS", () => ToggleDrawer(Drawer.Highlights), 26);
+            _change = Button(space, "Change Class", 1182f, 880f, 280f, 84f, "CHANGE CLASS", () => Director.ShowSetup(true), 26);
+            _again = Button(space, "Play Again", 1470f, 880f, 290f, 84f, "PLAY AGAIN", () => Director.PlayAgain(), 32);
             _again.Body.RimPx = 4f;
             _again.Body.SetRim(Brass);
-            MenuItem[] row = { _menu, _achievements, _change, _again };
+            MenuItem[] row = { _menu, _rewardsItem, _achievements, _highlightsItem, _change, _again };
             for (int i = 0; i < row.Length; i++)
             {
                 row[i].navigation = new Navigation
@@ -81,6 +96,11 @@ namespace CriticalMass.Runtime.Menus
                     selectOnRight = row[(i + 1) % row.Length],
                 };
             }
+            // The results own the end of the match: the highlights and the rewards never open by themselves over it.
+            ResultsHighlights.AutoShowOnMatchEnd = false;
+            RewardsOverlay.AutoShow = false;
+            _rewards = RewardsPanel.Create(space, 580f, 250f);
+            _rewards.gameObject.SetActive(false);
             // DG-38's list (the kill-feed item's AchievementList): this screen shows it, so the toast's own end-of-match
             // copy stays off. Hidden until ACHIEVEMENTS is pressed; it sits over the cards, above the button row.
             AchievementToast.ShowListAtMatchEnd = false;
@@ -155,8 +175,10 @@ namespace CriticalMass.Runtime.Menus
             _stats = stats;
             _sum = sum;
             EnsureBuilt();
-            if (_list != null) _list.Rt.gameObject.SetActive(false);
+            CloseDrawers();
             Refresh();
+            // A match that paid out opens on its rewards (the level bar fills); never in unattended runs.
+            if (!GameFlow.Autoplay && MatchRewardTracker.Last != null) ToggleDrawer(Drawer.Rewards);
         }
 
         static string I(double v) => Mathf.RoundToInt((float)v).ToString(CultureInfo.InvariantCulture);
@@ -238,20 +260,92 @@ namespace CriticalMass.Runtime.Menus
 
         public bool AchievementsOpen => _list != null && _list.Rt.gameObject.activeSelf;
 
-        void ToggleAchievements()
+        enum Drawer { Rewards, Achievements, Highlights }
+
+        /// <summary>Closes every drawer (the cards and the hill bar show again).</summary>
+        void CloseDrawers()
         {
-            if (_list == null) return;
-            bool on = !_list.Rt.gameObject.activeSelf;
-            if (on) _list.Refresh(Achievements.Current);
-            _list.Rt.gameObject.SetActive(on);
+            if (_list != null) _list.Rt.gameObject.SetActive(false);
+            if (_rewards != null) _rewards.gameObject.SetActive(false);
+            if (ResultsHighlights.IsOpen) ResultsHighlights.Hide();
+            ShowHillBar(true);
         }
 
-        /// <summary>Back closes the achievements list first, then goes to the main menu.</summary>
+        /// <summary>The hill split bar hides under a drawer (a drawer covers its middle).</summary>
+        void ShowHillBar(bool on)
+        {
+            if (_bar == null) return;
+            _bar.gameObject.SetActive(on);
+            _azSecs.gameObject.SetActive(on);
+            _crSecs.gameObject.SetActive(on);
+        }
+
+        /// <summary>Opens one drawer (closing the others), or closes it when it is the open one.</summary>
+        void ToggleDrawer(Drawer d)
+        {
+            bool wasOpen = d == Drawer.Rewards ? RewardsOpen : d == Drawer.Achievements ? AchievementsOpen : ResultsHighlights.IsOpen;
+            CloseDrawers();
+            if (wasOpen) return;
+            switch (d)
+            {
+                case Drawer.Rewards:
+                    if (_rewards == null) return;
+                    if (MatchRewardTracker.Last == null)
+                    {
+                        // Nothing was paid (a capture or an unfinished match): the button stays, the drawer does not open.
+                        return;
+                    }
+                    _rewards.Show(MatchRewardTracker.Last);
+                    ShowHillBar(false);
+                    break;
+                case Drawer.Achievements:
+                    if (_list == null) return;
+                    _list.Refresh(Achievements.Current);
+                    _list.Rt.gameObject.SetActive(true);
+                    ShowHillBar(false);
+                    break;
+                case Drawer.Highlights:
+                    if (!_highlightsHooked)
+                    {
+                        _highlightsHooked = true;
+                        ResultsHighlights.Hidden += OnHighlightsHidden;
+                    }
+                    ResultsHighlights.Show();   // its own panel sits over the cards, above this screen's button row
+                    break;
+            }
+        }
+
+        void OnHighlightsHidden()
+        {
+            _highlightsClosedFrame = Time.frameCount;
+            if (IsVisible) Focus(_highlightsItem);
+        }
+
+        void OnDestroy()
+        {
+            if (_highlightsHooked) ResultsHighlights.Hidden -= OnHighlightsHidden;
+        }
+
+        /// <summary>While the highlights are up they own the focus and the back button; this screen waits underneath.</summary>
+        protected override void Update()
+        {
+            if (IsVisible && ResultsHighlights.IsOpen) return;
+            base.Update();
+        }
+
+        public override void Hide()
+        {
+            if (ResultsHighlights.IsOpen) ResultsHighlights.Hide();
+            base.Hide();
+        }
+
+        /// <summary>Back closes the open drawer first, then goes to the main menu.</summary>
         public override void Back()
         {
-            if (AchievementsOpen)
+            if (_highlightsClosedFrame == Time.frameCount) return;   // the same press just closed the highlights
+            if (ResultsHighlights.IsOpen || AchievementsOpen || RewardsOpen)
             {
-                _list.Rt.gameObject.SetActive(false);
+                CloseDrawers();
                 return;
             }
             Director.ToMainMenu();

@@ -15,16 +15,7 @@ namespace CriticalMass.Runtime.Progression
     /// </summary>
     public static class ProgressionInstaller
     {
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
-        static void Install()
-        {
-            SceneManager.sceneLoaded -= OnSceneLoaded;
-            SceneManager.sceneLoaded += OnSceneLoaded;
-            Attach(SceneManager.GetActiveScene());
-        }
-
-        static void OnSceneLoaded(Scene scene, LoadSceneMode mode) => Attach(scene);
-
+        // Integration batch 2: installed by GameBootstrap through the DG-01 overlay registry ([GameOverlay]); Attach stays for tests.
         /// <summary>Adds the components once; returns the Game object (null: no game in this scene).</summary>
         public static GameObject Attach(Scene scene)
         {

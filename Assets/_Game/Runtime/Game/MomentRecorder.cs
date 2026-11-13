@@ -119,6 +119,7 @@ namespace CriticalMass.Runtime.Game
     /// the frame is composed, encoded and written on a worker thread, atomically (temp file, then rename) under
     /// persistentDataPath/Photos.
     /// </summary>
+    [CriticalMass.Runtime.Flow.GameOverlay(Order = 56, Scope = CriticalMass.Runtime.Flow.OverlayScope.MatchOnly)]   // installed once by GameBootstrap through the overlay registry
     public sealed class MomentRecorder : MonoBehaviour
     {
         public const int MaxStills = 6;
@@ -489,16 +490,7 @@ namespace CriticalMass.Runtime.Game
 
         // ---------------------------------------------------------------- install
 
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
-        static void Install()
-        {
-            SceneManager.sceneLoaded -= OnSceneLoaded;
-            SceneManager.sceneLoaded += OnSceneLoaded;
-            Attach(SceneManager.GetActiveScene());
-        }
-
-        static void OnSceneLoaded(Scene scene, LoadSceneMode mode) => Attach(scene);
-
+        // Integration batch 2: installed by GameBootstrap through the DG-01 overlay registry ([GameOverlay]); Attach stays for tests.
         /// <summary>Adds the recorder and the results highlights to the game object; null when there is no game.</summary>
         public static MomentRecorder Attach(Scene scene)
         {

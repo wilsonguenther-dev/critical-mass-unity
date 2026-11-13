@@ -34,6 +34,7 @@ namespace CriticalMass.Runtime.Hud.Interact
     /// Installed by InteractInstaller on the game object GameBootstrap builds (the DG-01 overlay registry is not on main;
     /// when it lands this class can take [GameOverlay(Scope = OverlayScope.MatchOnly)] instead of the installer).
     /// </summary>
+    [CriticalMass.Runtime.Flow.GameOverlay(Order = 58, Scope = CriticalMass.Runtime.Flow.OverlayScope.MatchOnly)]   // installed once by GameBootstrap through the overlay registry
     public sealed class HudInteract : MonoBehaviour
     {
         public const int SortingOrder = 14;
@@ -704,16 +705,7 @@ namespace CriticalMass.Runtime.Hud.Interact
     /// </summary>
     public static class InteractInstaller
     {
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
-        static void Install()
-        {
-            SceneManager.sceneLoaded -= OnSceneLoaded;
-            SceneManager.sceneLoaded += OnSceneLoaded;
-            Attach(SceneManager.GetActiveScene());
-        }
-
-        static void OnSceneLoaded(Scene scene, LoadSceneMode mode) => Attach(scene);
-
+        // Integration batch 2: installed by GameBootstrap through the DG-01 overlay registry ([GameOverlay]); Attach stays for tests.
         /// <summary>Adds HudInteract next to the GameHud; returns it (null: no game in this scene).</summary>
         public static HudInteract Attach(Scene scene)
         {

@@ -17,7 +17,7 @@ namespace CriticalMass.Runtime.Menus
     /// </summary>
     public sealed class MainMenu : FlowScreen
     {
-        public const float ColX = 150f, ColY = 250f, ItemW = 560f, ItemH = 70f, ItemStep = 84f;
+        public const float ColX = 150f, ColY = 250f, ItemW = 560f, ItemH = 64f, ItemStep = 76f;   // 9 lines (integration batch 2 added Spectate)
 
         readonly Dictionary<string, MenuItem> _items = new Dictionary<string, MenuItem>();
         readonly List<MenuItem> _order = new List<MenuItem>();
@@ -99,8 +99,21 @@ namespace CriticalMass.Runtime.Menus
             switch (e.Id)
             {
                 case OverlayRegistry.Play:
+                    if (Spectator.SpectatorMode.SpectateNextMatch) Spectator.SpectatorMode.SpectateNextMatch = false;
                     Director.ShowSetup();
                     return;
+                case OverlayRegistry.Spectate:
+                    // Match setup opens with the team line on SPECTATE and the start button reading WATCH MATCH.
+                    Spectator.SpectatorMode.SpectateNextMatch = true;
+                    Director.ShowSetup();
+                    return;
+                case OverlayRegistry.Codex:
+                    if (e.ScreenType == null)
+                    {
+                        Director.OpenPausePage(Codex.CodexPage.Label, e.Id);
+                        return;
+                    }
+                    break;
                 case OverlayRegistry.Controls:
                     Director.OpenSettings(PauseMenu.Tab.Controls, e.Id);
                     return;

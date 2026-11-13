@@ -489,7 +489,7 @@ namespace CriticalMass.Runtime.Hud.Interact
         static readonly object[] SoundArg = new object[1];
 
         static readonly string[] CharacterPanelTypes =
-            { "CriticalMass.Runtime.Menus.CharacterPanel", "CriticalMass.Runtime.Hud.CharacterPanel", "CriticalMass.Runtime.Menus.CharacterSheet" };
+            { "CriticalMass.Runtime.Menu.CharacterPanel", "CriticalMass.Runtime.Menus.CharacterPanel", "CriticalMass.Runtime.Hud.CharacterPanel", "CriticalMass.Runtime.Menus.CharacterSheet" };
         static readonly string[] SoundTypes =
             { "CriticalMass.Runtime.Audio.UiSound", "CriticalMass.Runtime.Audio.UiSounds", "CriticalMass.Runtime.View.Effects.UiSound" };
 

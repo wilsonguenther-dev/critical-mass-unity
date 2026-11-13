@@ -316,6 +316,7 @@ namespace CriticalMass.Runtime.View.Art
     /// model handed to another actor loses our pieces before it is seen.
     /// </summary>
     [DefaultExecutionOrder(200)]
+    [CriticalMass.Runtime.Flow.GameOverlay(Order = 33, Scope = CriticalMass.Runtime.Flow.OverlayScope.Always)]   // installed once by GameBootstrap through the overlay registry
     public sealed class LocalCosmetics : MonoBehaviour
     {
         const int Local = 0;

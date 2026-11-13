@@ -96,11 +96,8 @@ namespace CriticalMass.Runtime.Menus
             card.Body.Radius = 18f;
             card.Body.RimPx = 2f;
             ClassId pick = c;
-            card.Submitted = () =>
-            {
-                SetClass(pick);
-                Focus(_start);
-            };
+            // Integration batch 2: A / Enter on a card opens DG-10's full class screen (abilities, glyphs, turntable).
+            card.Submitted = () => OpenClassDetail(pick);
             _cards[i] = card;
             _portraits[i] = HudIcon.Make(card.transform, "Portrait", (CardW - 150f) * 0.5f, 20f, 150f, 150f);
             Text name = MenuUi.Label(card.transform, "Name", CMTokens.Display, 30, Cream, TextAnchor.MiddleCenter, 0f, 180f, CardW, 44f,
@@ -304,8 +301,39 @@ namespace CriticalMass.Runtime.Menus
             }
         }
 
+        /// <summary>
+        /// Opens DG-10's class screen on c over this one (this screen hides so one screen owns Back). Confirming there
+        /// picks the class and returns here with START focused; backing out returns with the choice unchanged.
+        /// </summary>
+        public void OpenClassDetail(ClassId c)
+        {
+            SetClass(c);
+            GameFlow.LastSetup = Choice;                       // Show() reads the choice back from here
+            SpectatorMode.SpectateNextMatch = Spectate;
+            bool fromResults = FromResults;
+            ClassSelect.SelectedClass = Choice.Class;
+            Hide();
+            ClassSelect.ShowSetup(Choice.Team, picked => ReturnFromClassDetail(picked, fromResults),
+                () => ReturnFromClassDetail(null, fromResults));
+        }
+
+        void ReturnFromClassDetail(ClassId? picked, bool fromResults)
+        {
+            if (picked.HasValue && Playable.Contains(picked.Value))
+            {
+                MatchSetupChoice s = GameFlow.LastSetup;
+                s.Class = picked.Value;
+                GameFlow.LastSetup = s;
+            }
+            FromResults = fromResults;
+            Show();
+            Focus(_start);
+        }
+
         public void StartMatch()
         {
+            ClassSelect.SelectedClass = Choice.Class;          // DG-10 reads it for the respawn strip and the pause menu
+
             PlayerPrefs.SetInt(PrefTeam, (int)Choice.Team);
             PlayerPrefs.SetInt(PrefClass, (int)Choice.Class);
             PlayerPrefs.SetInt(PrefSize, Choice.TeamSize);

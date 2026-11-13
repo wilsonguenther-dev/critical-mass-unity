@@ -96,6 +96,7 @@ namespace CriticalMass.Runtime.Flow
         void OnDestroy()
         {
             if (Current == this) Current = null;
+            Menus.LoadingScreen.Hidden -= ReleaseLoadingHold;
             if (Input != null && Input.PauseHandler == _onPause) Input.PauseHandler = null;
         }
 
@@ -123,8 +124,31 @@ namespace CriticalMass.Runtime.Flow
                 case FlowState.Match:
                 case FlowState.Off:
                     SetHud(true);
+                    HoldForLoading();
                     break;
             }
+        }
+
+        // ---- DG-13 loading screen: the match clock waits behind it ----
+
+        double _heldPace = -1;
+
+        /// <summary>The loading screen is up (GameFlow.BeginMatch): no sim tick runs until it hides.</summary>
+        void HoldForLoading()
+        {
+            if (!Menus.LoadingScreen.IsOpen || Driver == null) return;
+            _heldPace = Driver.TimeScale;
+            Driver.TimeScale = 0;
+            Menus.LoadingScreen.Hidden -= ReleaseLoadingHold;
+            Menus.LoadingScreen.Hidden += ReleaseLoadingHold;
+            Menus.LoadingScreen.WatchBuilt();
+        }
+
+        void ReleaseLoadingHold()
+        {
+            Menus.LoadingScreen.Hidden -= ReleaseLoadingHold;
+            if (_heldPace >= 0 && Driver != null) Driver.TimeScale = _heldPace;
+            _heldPace = -1;
         }
 
         /// <summary>The HUD shows only in a match (its component is off behind the menus, so a backdrop never counts).</summary>
@@ -218,11 +242,38 @@ namespace CriticalMass.Runtime.Flow
             if (pm == null) return;
             HideScreens();
             _settingsBridge = true;
+            _bridgePage = PauseMenu.Page.Settings;
             _settingsReturnId = returnId;
             if (Input != null && Input.PauseHandler == _onPause) Input.PauseHandler = null;
             pm.Pause();
             pm.ShowSettings(tab);
         }
+
+        /// <summary>
+        /// Opens one of the pause menu's extra pages (the Codex) from the main menu, the way OpenSettings opens the
+        /// settings page; its Back returns here. False when the menu has no page with that label.
+        /// </summary>
+        public bool OpenPausePage(string label, string returnId)
+        {
+            PauseMenu pm = GetComponent<PauseMenu>();
+            if (pm == null) return false;
+            if (Input != null && Input.PauseHandler == _onPause) Input.PauseHandler = null;
+            pm.Pause();
+            int index = pm.ExtraPageIndex(label);
+            if (index < 0)
+            {
+                pm.Resume();
+                return false;
+            }
+            HideScreens();
+            _settingsBridge = true;
+            _bridgePage = PauseMenu.Page.Extra;
+            _settingsReturnId = returnId;
+            pm.ShowExtra(index);
+            return true;
+        }
+
+        PauseMenu.Page _bridgePage = PauseMenu.Page.Settings;
 
         /// <summary>Opens a registered menu screen (Barracks, Codex...); its onClosed brings the main menu back.</summary>
         public void OpenRegistered(MenuEntry e)
@@ -308,7 +359,12 @@ namespace CriticalMass.Runtime.Flow
 
         bool OnPause()
         {
-            if (_loadPath != null || _external != null) return true;
+            if (_loadPath != null) return true;
+            if (_external != null)
+            {
+                if (_external is IMenuBack back) back.Back();
+                return true;
+            }
             if (GetComponent<TitleScreen>() != null) return true;   // the title takes every key itself
             FlowScreen s = Visible;
             if (s != null) s.Back();
@@ -391,7 +447,7 @@ namespace CriticalMass.Runtime.Flow
             }
             if (!_settingsBridge) return;
             PauseMenu pm = GetComponent<PauseMenu>();
-            if (pm != null && pm.IsOpen && pm.CurrentPage == PauseMenu.Page.Settings) return;
+            if (pm != null && pm.IsOpen && pm.CurrentPage == _bridgePage) return;
             // The settings page's Back (Escape, B or its button) lands on the pause root: resume and return to the menu
             // in the same frame, so the pause root is never drawn behind the main menu.
             _settingsBridge = false;

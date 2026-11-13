@@ -91,6 +91,7 @@ namespace CriticalMass.Runtime.Menus
     /// RequestClassChange); the "respawning as" line reads the sim's PendingClass back, so it shows what the sim holds.</para>
     /// Glyphs follow the device used last and every rebind. View only, no per-frame allocation.
     /// </summary>
+    [CriticalMass.Runtime.Flow.GameOverlay(Order = 30, Scope = CriticalMass.Runtime.Flow.OverlayScope.Always)]   // installed once by GameBootstrap through the overlay registry
     public sealed class ClassSelect : MonoBehaviour
     {
         public enum SelectMode { None, Setup, Respawn }
@@ -710,16 +711,7 @@ namespace CriticalMass.Runtime.Menus
     /// <summary>Attaches ClassSelect to the game's HumanInputSource object on boot and after every scene load.</summary>
     public static class ClassSelectInstaller
     {
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
-        static void Install()
-        {
-            SceneManager.sceneLoaded -= OnSceneLoaded;
-            SceneManager.sceneLoaded += OnSceneLoaded;
-            Attach(SceneManager.GetActiveScene());
-        }
-
-        static void OnSceneLoaded(Scene scene, LoadSceneMode mode) => Attach(scene);
-
+        // Integration batch 2: installed by GameBootstrap through the DG-01 overlay registry ([GameOverlay]); Attach stays for tests.
         public static ClassSelect Attach(Scene scene)
         {
             GameBootstrap.Build(scene);

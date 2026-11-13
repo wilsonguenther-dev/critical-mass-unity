@@ -44,11 +44,39 @@ namespace CriticalMass.Runtime.Menus
         /// <summary>Player builds show it on boot until the game flow takes over (set false there).</summary>
         public static bool ShowOnBoot
         {
-            get => _bootOverride ?? (!Application.isEditor && !Application.isBatchMode);
+            get => _bootOverride ?? false;   // integration batch 2: the game flow shows it (GameFlow.BeginMatch), never the boot
             set => _bootOverride = value;
         }
 
         static bool? _bootOverride;
+
+        /// <summary>
+        /// The game flow shows the screen from Play / Play again until the new world has drawn (GameFlow.BeginMatch,
+        /// FlowDirector). Off in batch mode (gates and tests start matches back to back and never look at it).
+        /// </summary>
+        public static bool UseInFlow
+        {
+            get => _flowOverride ?? !Application.isBatchMode;
+            set => _flowOverride = value;
+        }
+
+        static bool? _flowOverride;
+
+        /// <summary>Opens the screen for a match that is about to load; it waits (bar at zero) until WatchBuilt.</summary>
+        public static LoadingScreen ShowForMatch(int seed)
+        {
+            LoadingScreen s = Show(seed);
+            s._watchBoot = false;
+            return s;
+        }
+
+        /// <summary>The new scene's game exists: complete each step as the world, its dressing and its views report in.</summary>
+        public static void WatchBuilt()
+        {
+            if (_instance == null || !_instance._open) return;
+            _instance._watchBoot = true;
+            _instance._stepStart = Time.unscaledTime;
+        }
 
         /// <summary>Key art for the slot; null = Resources "UI/KeyArt/loading", then the gradient and logo.</summary>
         public static Texture KeyArt;

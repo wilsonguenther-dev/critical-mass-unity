@@ -16,6 +16,7 @@ namespace CriticalMass.Runtime.Codex
     /// CodexProgress and opens its lore card. View side only: it reads World positions and never writes the sim; the
     /// gems are built once (9 objects at most) and only toggled afterwards.
     /// </summary>
+    [CriticalMass.Runtime.Flow.GameOverlay(Order = 54, Scope = CriticalMass.Runtime.Flow.OverlayScope.MatchOnly)]   // installed once by GameBootstrap through the overlay registry
     public sealed class RelicField : MonoBehaviour
     {
         public const double PickupRadius = 1.1;
@@ -103,16 +104,7 @@ namespace CriticalMass.Runtime.Codex
             });
         }
 
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
-        static void Install()
-        {
-            SceneManager.sceneLoaded -= OnSceneLoaded;
-            SceneManager.sceneLoaded += OnSceneLoaded;
-            Attach(SceneManager.GetActiveScene());
-        }
-
-        static void OnSceneLoaded(Scene scene, LoadSceneMode mode) => Attach(scene);
-
+        // Integration batch 2: installed by GameBootstrap through the DG-01 overlay registry ([GameOverlay]); Attach stays for tests.
         /// <summary>Adds the relic field to the game object; null when there is no game in the scene.</summary>
         public static RelicField Attach(Scene scene)
         {
