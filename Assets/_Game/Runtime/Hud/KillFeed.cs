@@ -56,7 +56,8 @@ namespace CriticalMass.Runtime.Hud
         {
             // Owner walk 1: a piece anchored straight onto a HUD canvas goes into the canvas's safe-area root instead, so the
             // kill feed, recap, toasts and banners keep clear of the notch and stay beside the pieces they were laid out with.
-            if (parent != null && parent.GetComponent<Canvas>() != null) parent = SafeRoot(parent);
+            // Centre-anchored pieces (world markers placed from the canvas centre) stay on the canvas itself.
+            if (parent != null && anchor != new Vector2(0.5f, 0.5f) && parent.GetComponent<Canvas>() != null) parent = SafeRoot(parent);
             RectTransform rt = MenuUi.Rt(parent, name);
             rt.anchorMin = rt.anchorMax = anchor;
             rt.pivot = anchor;

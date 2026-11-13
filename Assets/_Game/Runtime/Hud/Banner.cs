@@ -299,6 +299,7 @@ namespace CriticalMass.Runtime.Hud
             _headlineOutline = _headline.GetComponent<TextOutline>();
             _reason = HudText.Make(_root, "Reason", CMTokens.Ui, UiScale.TypeButton, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 2.5f);
             Centre(_reason.rectTransform, new Vector2(20f, -36f), new Vector2(Width - 300f, 36f));
+            CriticalMass.Runtime.Menu.MenuUi.Fit(_reason, 18);   // owner walk 1: a long reason shrinks to one line instead of spilling past the plate
             go.SetActive(false);
         }
 

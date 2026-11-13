@@ -98,6 +98,30 @@ namespace CriticalMass.Runtime.Hud
             return bad;
         }
 
+        /// <summary>
+        /// Visible texts that are cut (truncated mid-word), or spill past their box with no best-fit; names and the first
+        /// letters. The PlayMode collision test asserts it is empty for the match HUD.
+        /// </summary>
+        public static List<string> TextIssues()
+        {
+            var bad = new List<string>();
+            foreach (Text t in Object.FindObjectsByType<Text>(FindObjectsSortMode.None))
+            {
+                if (!t.isActiveAndEnabled || string.IsNullOrEmpty(t.text) || t.canvas == null || !t.canvas.enabled || t.color.a < 0.05f) continue;
+                float alpha = 1f;
+                foreach (CanvasGroup g in t.GetComponentsInParent<CanvasGroup>()) alpha *= g.alpha;
+                if (alpha < 0.05f) continue;
+                Rect r = t.rectTransform.rect;
+                if (r.width < 1f || r.height < 1f) continue;
+                string plain = System.Text.RegularExpressions.Regex.Replace(t.text, "<[^>]+>", "").Replace("\n", "").Replace(" ", "");
+                int visible = t.cachedTextGenerator.characterCountVisible;
+                bool cut = visible > 0 && visible < plain.Length - 1 && t.verticalOverflow == VerticalWrapMode.Truncate;
+                bool spillW = t.horizontalOverflow == HorizontalWrapMode.Overflow && !t.resizeTextForBestFit && t.preferredWidth > r.width + 6f;
+                if (cut || spillW) bad.Add(t.name + "('" + (plain.Length > 18 ? plain.Substring(0, 18) : plain) + "' " + (cut ? "cut" : "wide") + ")");
+            }
+            return bad;
+        }
+
         /// <summary>One line for logs: the piece count and every overlap.</summary>
         public static string Describe()
         {
