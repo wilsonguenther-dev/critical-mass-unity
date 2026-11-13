@@ -78,7 +78,7 @@ namespace CriticalMass.Runtime.View.Anim
                 s = Mathf.Lerp(from, 1f, Locomotion.Smooth(0, 1, g / GrowSeconds));
             }
             Scale = s;
-            m.Transform.localScale = Vector3.one * s;
+            m.Transform.localScale = m.BaseScale * s;   // fix/model-scale: set from the stored base, the Kaiju's own models only
 
             // Flinch: a tip backwards (the Flinch clip blends on top when the art has it).
             double fl = simTime - _flinchAt;
