@@ -38,6 +38,13 @@ namespace CriticalMass.Runtime.View
             public double IdleT, WalkT, RunT, GatherT;
         }
 
+        /// <summary>M9: spare pooled models per class model made at load, so a class change on respawn never instantiates.</summary>
+        public const int PrewarmPerClass = 2;
+
+        private readonly Dictionary<(int, string), string> _names = new Dictionary<(int, string), string>();
+        private UnityEngine.Camera _cam;
+        private Vector3 _camPos, _targetPos;
+
         private SimDriverBehaviour _driver;
         private ArtCatalog _catalog;
         private CharSlot[] _actors;
@@ -109,6 +116,19 @@ namespace CriticalMass.Runtime.View
             GameObject hill = CreatePrimitive(PrimitiveType.Cube, "Hill");
             _hill = hill.transform;
             hill.GetComponent<Renderer>().sharedMaterial = ToonMaterials.Prop(Palette.Brass);
+
+            // M9 (physics audit): prewarm spare models per class so a respawn as another class takes one from the pool.
+            if (_catalog != null)
+                foreach (ClassId cls in ClassIds.All)
+                {
+                    string key = ArtMapping.ClassModel(cls);
+                    if (key == null || _catalog.Find(key) == null) continue;
+                    for (int k = 0; k < PrewarmPerClass; k++)
+                    {
+                        ModelView m = Make(key, "Pool " + key);
+                        if (m != null) Give(m);
+                    }
+                }
         }
 
         private void OnDestroy()
@@ -141,7 +161,11 @@ namespace CriticalMass.Runtime.View
             if (_pool.TryGetValue(key, out Stack<ModelView> s) && s.Count > 0)
             {
                 ModelView m = s.Pop();
-                m.Root.name = objectName;
+                if (!ReferenceEquals(m.AssignedName, objectName))
+                {
+                    m.Root.name = objectName;
+                    m.AssignedName = objectName;
+                }
                 return m;
             }
             return Make(key, objectName);
@@ -170,6 +194,10 @@ namespace CriticalMass.Runtime.View
             double simTime = (w.Tick + a) / cfg.SimHz;
             double dSim = double.IsNaN(_lastSimTime) ? 0 : Math.Max(0, simTime - _lastSimTime);
             _lastSimTime = simTime;
+            if (_cam == null || !_cam.isActiveAndEnabled) _cam = UnityEngine.Camera.main;
+            _camPos = _cam != null ? _cam.transform.position : Vector3.zero;
+            // Contract C4: LOD by distance to the camera target (the local player, whom the camera follows).
+            if (w.ActorCount > 0 && w.Actors[0].Alive) _targetPos = SimSpace.ToWorld(Lerp(w.PrevX[0], w.X[0], a), 0, Lerp(w.PrevZ[0], w.Z[0], a));
             int models = 0;
 
             for (int i = 0; i < _actors.Length; i++) models += SyncActor(i, w, cfg, map, a, dSim) ? 1 : 0;
@@ -203,7 +231,10 @@ namespace CriticalMass.Runtime.View
                 Give(slot.Model);
                 slot.Model = null;
             }
-            if (alive && key != null && slot.Model == null) slot.Model = Take(key, "Actor " + i + " " + key);
+            if (alive && key != null && slot.Model == null)
+            {
+                slot.Model = Take(key, ActorName(i, key));
+            }
             bool capsule = alive && slot.Model == null;
             if (capsule && slot.Capsule == null)
             {
@@ -235,6 +266,10 @@ namespace CriticalMass.Runtime.View
 
             ModelView m = slot.Model;
             m.SetActive(true);
+            m.ApplyTier();
+            QualityRow row = QualityTable.Current;
+            Vector3 flat = SimSpace.ToWorld(x, 0, z);
+            m.SetLod(AnimLod.PickLod(i == 0, Vector3.Distance(flat, _targetPos), row));
             m.Transform.localPosition = SimSpace.ToWorld(x, h, z) + (hasFx ? fx.Nudge : Vector3.zero);
             m.SetFacing(facing);
             m.Transform.localScale = Vector3.one * (hasFx ? fx.Scale : 1f);
@@ -274,7 +309,9 @@ namespace CriticalMass.Runtime.View
                 slot.GatherT += dSim;
                 m.Pose(ArtMapping.Gather, slot.GatherT, 3f, true);
             }
-            m.Evaluate();
+            // M4 (physics audit): off-screen fighters hold their pose; distant ones evaluate every 2nd or 3rd frame.
+            float camDist = _cam != null ? Vector3.Distance(_camPos, m.Transform.position) : 0f;
+            m.EvaluateIf(AnimLod.ShouldEvaluate(i == 0, m.JustActivated, m.AnyVisible, camDist, Time.frameCount, i, row));
             return true;
         }
 
@@ -430,6 +467,13 @@ namespace CriticalMass.Runtime.View
                 m.SetMaterial(ArtMaterials.ForTeam(m.Spec, b.Team));
             }
             return count;
+        }
+
+        /// <summary>"Actor i key", built once per (slot, model) pair so a respawn never formats a string.</summary>
+        private string ActorName(int i, string key)
+        {
+            if (!_names.TryGetValue((i, key), out string n)) _names[(i, key)] = n = "Actor " + i + " " + key;
+            return n;
         }
 
         private static void SetActive(ModelView m, bool on)

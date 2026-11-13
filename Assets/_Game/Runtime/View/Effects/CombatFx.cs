@@ -58,6 +58,8 @@ namespace CriticalMass.Runtime.View.Effects
         private GameObject _groundGo, _airGo, _solidGo;
         private Material _groundMat, _airMat, _solidMat;
         private readonly Dictionary<Material, Material> _flash = new Dictionary<Material, Material>();
+        /// <summary>Reduce flashing (M11, DG-106): the hit flash is a 30% tint toward white, cached per source like the flash.</summary>
+        private readonly Dictionary<Material, Material> _tint = new Dictionary<Material, Material>();
         private int _frame;
         private double _vignetteAt = double.NegativeInfinity, _vignetteAmount;
         private RawImage _vignette;
@@ -100,6 +102,9 @@ namespace CriticalMass.Runtime.View.Effects
             _solidGo = Layer("Fx Solid", _solid, _solidMat);
             BuildVignette();
             PrewarmFlash();
+            // M11: the camera shake (scaled by the setting, off with reduce motion) and its start-of-frame reset.
+            if (GetComponent<CriticalMass.Runtime.Camera.CameraShake>() == null) gameObject.AddComponent<CriticalMass.Runtime.Camera.CameraShake>();
+            if (GetComponent<CriticalMass.Runtime.Camera.CameraShakeReset>() == null) gameObject.AddComponent<CriticalMass.Runtime.Camera.CameraShakeReset>();
             _driver.Ticked -= OnTicked;
             _driver.Ticked += OnTicked;
             RenderPipelineManager.beginCameraRendering -= OnBeginCamera;
@@ -111,6 +116,7 @@ namespace CriticalMass.Runtime.View.Effects
             if (_driver != null) _driver.Ticked -= OnTicked;
             RenderPipelineManager.beginCameraRendering -= OnBeginCamera;
             foreach (Material m in _flash.Values) if (m != null) Destroy(m);
+            foreach (Material m in _tint.Values) if (m != null) Destroy(m);
             _audio?.Dispose();
         }
 
@@ -163,6 +169,40 @@ namespace CriticalMass.Runtime.View.Effects
                 _vignetteAt = e.Tick / w.Config.SimHz;
                 _vignetteAmount = e.Kind == FxKind.Block ? 0.25 : Mathf.Clamp((float)(e.Value / 40.0), 0.3f, 0.95f);
             }
+            ShakeFor(ref e, w);
+        }
+
+        /// <summary>
+        /// Camera shake impulses (M11, gated by FeelGate: amount x the shake setting, nothing with reduce motion or shake
+        /// off, which is the default). Only what lands on or near the local player shakes the view.
+        /// </summary>
+        private static void ShakeFor(ref FxEvent e, World w)
+        {
+            if (w.ActorCount == 0 || FeelGate.ShakeScale <= 0f) return;
+            float amount = ShakeAmount(e.Kind, e.A == 0, e.Value, DistanceToLocal(w, e.X, e.Z), w.Config.Kaiju.SlamRadius);
+            if (amount > 0f) CriticalMass.Runtime.Camera.CameraShake.Impulse(amount);
+        }
+
+        static double DistanceToLocal(World w, double x, double z)
+        {
+            double dx = w.X[0] - x, dz = w.Z[0] - z;
+            return System.Math.Sqrt(dx * dx + dz * dz);
+        }
+
+        /// <summary>Shake trauma 0..1 an effect adds (pure; tests). 0 for anything that is not big or not near you.</summary>
+        public static float ShakeAmount(FxKind kind, bool local, double value, double distance, double slamRadius)
+        {
+            switch (kind)
+            {
+                case FxKind.KaijuSlam: return distance <= slamRadius * 1.6 ? 0.6f : 0f;
+                case FxKind.Hit: return local && value >= 25 ? 0.25f : 0f;
+                case FxKind.Death: return local ? 0.4f : 0f;
+                case FxKind.Hatch: return distance <= 20 ? 0.45f : 0f;
+                case FxKind.BerserkLock: return 0.35f;
+                case FxKind.KaijuKO: return distance <= 12 ? 0.3f : 0f;
+                case FxKind.WallBreak: return distance <= 6 ? 0.2f : 0f;
+                default: return 0f;
+            }
         }
 
         private double SimNow()
@@ -190,6 +230,9 @@ namespace CriticalMass.Runtime.View.Effects
         public void Rebuild(Vector3 camRight, Vector3 camUp)
         {
             double now = SimNow();
+            _scene.Alpha = _driver.Alpha;
+            _scene.Pace = _driver.TimeScale > 0 ? _driver.TimeScale : 0;
+            _scene.BlobShadows = CriticalMass.Runtime.Game.QualityTable.Current.BlobShadows;
             _scene.Advance(now);
             _scene.Build(now, _driver.World, camRight, camUp, _ground, _air, _solid);
             _ground.Upload();
@@ -273,6 +316,7 @@ namespace CriticalMass.Runtime.View.Effects
         public Material FlashMaterial(Material source)
         {
             if (source == null) return null;
+            if (FeelGate.ReduceFlashing) return TintMaterial(source);
             if (_flash.TryGetValue(source, out Material m)) return m;
             m = new Material(source) { name = source.name + " (Flash)" };
             Color white = new Color(1f, 0.98f, 0.94f, 1f);
@@ -283,6 +327,19 @@ namespace CriticalMass.Runtime.View.Effects
             if (m.HasProperty("_ShadowTintAmount")) m.SetFloat("_ShadowTintAmount", 0);
             if (m.HasProperty("_RimStrength")) m.SetFloat("_RimStrength", 0);
             _flash[source] = m;
+            return m;
+        }
+
+        /// <summary>Reduce flashing: a copy of a CM/Toon material with its colours 30% toward white (no white frame).</summary>
+        public Material TintMaterial(Material source)
+        {
+            if (source == null) return null;
+            if (_tint.TryGetValue(source, out Material m)) return m;
+            m = new Material(source) { name = source.name + " (Tint)" };
+            Color white = new Color(1f, 0.98f, 0.94f, 1f);
+            foreach (string p in FlashColours)
+                if (m.HasProperty(p)) m.SetColor(p, Color.Lerp(m.GetColor(p), white, FeelGate.ReducedFlashTint));
+            _tint[source] = m;
             return m;
         }
 
@@ -301,6 +358,8 @@ namespace CriticalMass.Runtime.View.Effects
                 {
                     FlashMaterial(ArtMaterials.ForTeam(spec, TeamId.Azure));
                     FlashMaterial(ArtMaterials.ForTeam(spec, TeamId.Crimson));
+                    TintMaterial(ArtMaterials.ForTeam(spec, TeamId.Azure));
+                    TintMaterial(ArtMaterials.ForTeam(spec, TeamId.Crimson));
                 }
                 catch (System.InvalidOperationException)
                 {
@@ -310,7 +369,7 @@ namespace CriticalMass.Runtime.View.Effects
         }
 
         /// <summary>Flash materials created (bounded: class models x 2 teams; all made in Start).</summary>
-        public int FlashMaterialCount => _flash.Count;
+        public int FlashMaterialCount => _flash.Count + _tint.Count;
 
         private static readonly string[] FlashColours =
         {
@@ -364,8 +423,18 @@ namespace CriticalMass.Runtime.View.Effects
             if (_vignette == null) return;
             if (_vignetteCanvas.worldCamera == null) _vignetteCanvas.worldCamera = UnityEngine.Camera.main;
             double t = now - _vignetteAt;
-            double life = _scene.S(0.32);
-            float a = t >= 0 && t < life ? (float)(_vignetteAmount * (1 - t / life) * (1 - t / life)) : 0f;
+            float a;
+            if (FeelGate.ReduceFlashing)
+            {
+                // M11: a steady low edge while you are being hit (no bright pulse on every hit), easing out at the end.
+                double hold = _scene.S(0.8);
+                a = t >= 0 && t < hold ? (float)(System.Math.Min(0.3, _vignetteAmount * 0.4) * System.Math.Min(1.0, (hold - t) / _scene.S(0.3))) : 0f;
+            }
+            else
+            {
+                double life = _scene.S(0.32);
+                a = t >= 0 && t < life ? (float)(_vignetteAmount * (1 - t / life) * (1 - t / life)) : 0f;
+            }
             bool on = a > 0.01f;
             if (_vignette.enabled != on) _vignette.enabled = on;
             if (on) _vignette.color = new Color(1, 1, 1, a);

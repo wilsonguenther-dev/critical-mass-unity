@@ -7,11 +7,27 @@
     "worst_hitch_ms": 250,
     "idle_cpu_pct": 35,
     "batches": 1500,
-    "triangles": {"Very Low": 2000000, "Low": 2000000, "Medium": 3500000, "High": 5000000, "Very High": 5000000, "Ultra": 5000000},
+    "triangles": {
+      "Very Low": 1400000,
+      "Low": 1400000,
+      "Medium": 2200000,
+      "High": 3000000,
+      "Very High": 3000000,
+      "Ultra": 3000000
+    },
     "render_pixels_max": 2100000,
     "render_pixels_max_high": 3700000,
     "boot_to_title_s": 5,
-    "gfx_mb": 1024
+    "gfx_mb": 1024,
+    "gpu_p95_ms": 16.0,
+    "shadow_casters": {
+      "Very Low": 10,
+      "Low": 10,
+      "Medium": 150,
+      "High": 150,
+      "Very High": 150,
+      "Ultra": 150
+    }
   },
   "floor": {
     "_note": "CM_PROFILE=floor: Low quality, 1920x1080, a 30 fps cap; GPU and main-thread CPU proxies for a machine about 4x weaker (recalibrate after the owner's Windows run).",
@@ -21,12 +37,19 @@
     "worst_hitch_ms": 250,
     "idle_cpu_pct": 35,
     "batches": 1500,
-    "triangles": {"Very Low": 2000000, "Low": 2000000},
+    "triangles": {
+      "Very Low": 1400000,
+      "Low": 1400000
+    },
     "gpu_p95_ms": 4.0,
     "cpu_main_p95_ms": 5.0,
     "render_pixels_max": 2100000,
     "boot_to_title_s": 10,
-    "gfx_mb": 512
+    "gfx_mb": 512,
+    "shadow_casters": {
+      "Very Low": 10,
+      "Low": 10
+    }
   },
   "soak": {
     "min_matches": 20,
@@ -36,5 +59,6 @@
     "threads_files_tolerance": 0.05,
     "player_log_mb": 5,
     "exceptions": 0
-  }
+  },
+  "_note_physics_audit": "Physics audit 2026-11-12 (PR feat/perf-and-feel): triangles, batches and shadow_casters are now the MATCH phase p95 (perf.json phases.match), not the run maximum. Triangle budgets come from the runtime seat's section 3 estimate after this PR's cuts (shadow distance 35/30/off, props never cast, no fighter shadows at Low) with today's 11k-triangle fighters: High about 1.9-2.4 M, Medium about 1.7-1.8 M, Low about 1.0-1.15 M, plus roughly 25% headroom for the p95. Tighten to 1.9 / 1.0 / 0.6 M when the art LOD chain (contract C4, DG-82) lands. gpu_p95_ms is gated on every profile (B2: frame timing must be measured); 16.0 at default is the 60 fps frame minus 0.7 ms. shadow_casters: the seat's 150 at High in the wide view; Low has no shadow map (10 allows stray casters, should read 0)."
 }

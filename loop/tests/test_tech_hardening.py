@@ -36,7 +36,7 @@ def _smoke_run(tmp, perf, log_extra='', idle_cpu_s_per_s=0.15, title_ms=1000):
 
 def _perf(**kw):
     p = {'quality': 'High', 'quality_requested': 'High', 'safe_mode': False, 'data_isolated': True,
-         'frame_ms': {'p95': 15.0, 'worst': 120.0}, 'render_pixels': 2_000_000,
+         'frame_ms': {'p95': 15.0, 'worst': 120.0}, 'render_pixels': 2_000_000, 'gpu_ms': {'p50': 6.0, 'p95': 8.0},
          'markers': [{'name': 'Batches Count', 'max': 900}, {'name': 'Triangles Count', 'max': 3_000_000}]}
     p.update(kw)
     return p
@@ -196,3 +196,39 @@ def test_smoke_isolates_the_owners_settings():
     assert '-dataDir' in src and 'defaults export' in src and 'defaults import' in src and 'trap restore_prefs EXIT' in src
     soak = (TOOLS / 'player-soak.sh').read_text()
     assert '-dataDir' in soak and 'defaults export' in soak and 'STOP-DISPATCH' in soak
+
+
+# ---- physics audit 2026-11-12 (feat/perf-and-feel): per-phase numbers, GPU time measured on every profile ----
+
+def _phases(match_tris, casters=90, title_tris=4_400_000):
+    ph = lambda t, c: {'frames': 600, 'frame_ms': {'p50': 14.0, 'p95': 16.0}, 'gpu_ms': {'p50': 6.0, 'p95': 8.0},
+                       'triangles': {'p50': t * 0.8, 'p95': t}, 'batches': {'p50': 600, 'p95': 800},
+                       'setpass': {'p50': 80, 'p95': 120}, 'shadow_casters': {'p50': c * 0.8, 'p95': c},
+                       'visible_skinned_meshes': {'p50': 20, 'p95': 30}, 'canvas_ms': {'p50': 0.1, 'p95': 0.2}}
+    return {'title': ph(title_tris, casters), 'match': ph(match_tris, casters), 'results': ph(match_tris, casters)}
+
+
+def test_smoke_gates_the_match_phase_p95_not_the_run_maximum(tmp_path):
+    # the run maximum (title and loading frames) is far over budget; the match p95 is inside it: pass
+    perf = _perf(phases=_phases(2_500_000), markers=[{'name': 'Batches Count', 'max': 900}, {'name': 'Triangles Count', 'max': 4_470_000}])
+    code, s = _summarise(_smoke_run(tmp_path, perf))
+    assert s['measured']['triangles'] == 2_500_000 and s['triangles_run_max'] == 4_470_000, s['measured']
+    assert code == 0 and s['pass'] is True, s
+    assert set(s['phases']) == {'title', 'match', 'results'}
+
+
+def test_smoke_fails_when_gpu_time_reads_zero(tmp_path):
+    code, s = _summarise(_smoke_run(tmp_path, _perf(gpu_ms={'p50': 0.0, 'p95': 0.0})))
+    assert code == 1 and 'gpu_p95_ms' in s['not_measured'], s
+
+
+def test_smoke_gates_shadow_casters_in_the_match(tmp_path):
+    code, s = _summarise(_smoke_run(tmp_path, _perf(phases=_phases(2_000_000, casters=400))))
+    assert code == 1 and 'shadow_casters' in s['over_budget'], s
+
+
+def test_budgets_tighten_triangles_and_measure_gpu_everywhere():
+    b = json.loads((C.REPO / 'tools' / 'budgets.json').read_text())
+    t = b['default']['triangles']
+    assert t['Low'] <= 1_400_000 and t['Medium'] <= 2_200_000 and t['High'] <= 3_000_000
+    assert b['default']['gpu_p95_ms'] > 0 and b['floor']['gpu_p95_ms'] > 0

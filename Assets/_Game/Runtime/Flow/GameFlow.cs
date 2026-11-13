@@ -95,8 +95,11 @@ namespace CriticalMass.Runtime.Flow
         public static bool Autoplay;
 
         public const double AutoplayResultsSeconds = 5;
-        /// <summary>Backdrop matches play at 1x behind the menus.</summary>
-        public const double BackdropPace = 1;
+        /// <summary>
+        /// Backdrop matches play at 0.5x behind the menus (physics audit DG-111, R-M10: half the sim ticks per second on an
+        /// idle title; nobody plays the backdrop). The match pace default (2x) is not this: see MatchSetupChoice.Default.
+        /// </summary>
+        public const double BackdropPace = 0.5;
 
         /// <summary>
         /// Backdrop matches behind the title and menus are 8v8 (technical hardening 2026-11-12): the 16v16 backdrop cost 36.7%
