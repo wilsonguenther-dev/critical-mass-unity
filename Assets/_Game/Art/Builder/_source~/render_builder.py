@@ -284,12 +284,22 @@ def want(key):
 
 
 def pose(action, frac):
+    """frac in 0..1 of the clip, or "raised": the frame where the right hand slot is highest (the wind-up)."""
     act = bpy.data.actions[action]
     f0, f1 = act.frame_range
     arm.animation_data.action = act
     if getattr(act, "slots", None) and len(act.slots):
         arm.animation_data.action_slot = act.slots[0]
-    scene.frame_set(int(round(f0 + (f1 - f0) * frac)))
+    if frac == "raised":
+        # render-only build stance (mesh, rig rest and FBX untouched): the KayKit chop never lifts the hand above the
+        # chest, so the wind-up is posed with the Miner's Poser: right arm up, mallet raised over the shoulder
+        from builder_art.stance import Poser
+        Poser(arm, scene).apply({"upperarm.r": (-0.52, -0.02, 1.52), "lowerarm.r": (-0.58, -0.06, 1.90),
+                                 "upperarm.l": (0.42, -0.25, 0.90), "lowerarm.l": (0.32, -0.50, 0.95),
+                                 "pick_up": (-0.25, 0.45, 0.86), "lean": -6, "twist": 12, "leg_spread": 6})
+        measure["pose_build"] = "Poser stance (render only)"
+    else:
+        scene.frame_set(int(round(f0 + (f1 - f0) * frac)))
     bpy.context.view_layer.update()
 
 
@@ -424,7 +434,7 @@ ORTHO = {
     "profile": ("char", -90, 4, ("azure",), ("Idle", 0.0)),
     "back": ("char", 180, 6, ("azure",), ("Idle", 0.0)),
     "accent": ("char", -20, 6, ("crimson", "azure"), ("Idle", 0.0)),
-    "pose-build": ("char", -35, 8, ("azure",), ("1H_Melee_Attack_Chop", 0.38)),
+    "pose-build": ("char", 28, 8, ("azure",), ("1H_Melee_Attack_Chop", "raised")),
     "pose-interact": ("char", -35, 8, ("azure",), ("Interact", 0.5)),
     "top": ("char", 0, 89, ("azure",), ("Idle", 0.0)),
     "mallet": ("mallet", 0, 4, ("azure",), ("Idle", 0.0)),
@@ -435,7 +445,7 @@ ORTHO = {
     "bridge-placed": ("bri_placed", -62, 22, ("azure", "crimson"), None),
     "bridge-damaged": ("bri_damaged", -62, 22, ("azure",), None),
 }
-if want("ortho"):
+if want("ortho") or (ONLY is not None and any(k in ORTHO for k in ONLY)):
     cam_data.type = "ORTHO"
     cam_data.sensor_fit = "AUTO"
     scene.render.film_transparent = True
