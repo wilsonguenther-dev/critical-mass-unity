@@ -1,0 +1,604 @@
+{
+ "failed": [],
+ "results": [
+  {
+   "check": "fbx header axes (Y up, Z front, X coord)",
+   "ok": true,
+   "detail": {
+    "UpAxis": 1,
+    "UpAxisSign": 1,
+    "FrontAxis": 2,
+    "FrontAxisSign": 1,
+    "CoordAxis": 0,
+    "CoordAxisSign": 1,
+    "UnitScaleFactor": 100.0
+   }
+  },
+  {
+   "check": "fbx unit scale",
+   "ok": true,
+   "detail": "UnitScaleFactor=100.0; with FBX_SCALE_ALL the vertex data is already in metres x this factor's inverse, so Unity 'Convert Units' yields scale 1 (UNVERIFIED in Unity)"
+  },
+  {
+   "check": "fbx has no baked animation",
+   "ok": true,
+   "detail": "AnimationCurveNode records: 0"
+  },
+  {
+   "check": "objects",
+   "ok": true,
+   "detail": {
+    "armature": [
+     "Rig"
+    ],
+    "meshes": [
+     "Builder_Body",
+     "Builder_Mallet"
+    ]
+   }
+  },
+  {
+   "check": "bone count 41",
+   "ok": true,
+   "detail": 41
+  },
+  {
+   "check": "bone names = KayKit rig",
+   "ok": true,
+   "detail": {
+    "missing": [],
+    "extra": []
+   }
+  },
+  {
+   "check": "bone hierarchy = KayKit rig",
+   "ok": true,
+   "detail": "every joint has its KayKit parent"
+  },
+  {
+   "check": "joint rest positions = KayKit (metres, after the axis round trip)",
+   "ok": true,
+   "detail": "max error 0.000049 m"
+  },
+  {
+   "check": "armature root transform clean",
+   "ok": true,
+   "detail": {
+    "rot": [
+     -1.6292068494294654e-07,
+     0.0,
+     0.0
+    ],
+    "scale": [
+     1.0,
+     1.0,
+     1.0
+    ]
+   }
+  },
+  {
+   "check": "Builder_Body material slots",
+   "ok": true,
+   "detail": [
+    "CM_Toon",
+    "CM_FaceDecal"
+   ]
+  },
+  {
+   "check": "Builder_Body loose/non-manifold",
+   "ok": true,
+   "detail": {
+    "triangles": 9864,
+    "loose_verts": 0,
+    "loose_edges": 0,
+    "non_manifold_edges": 0,
+    "closed_shells": 198
+   }
+  },
+  {
+   "check": "Builder_Body skinned to the rig",
+   "ok": true,
+   "detail": [
+    "Rig"
+   ]
+  },
+  {
+   "check": "Builder_Body weights",
+   "ok": true,
+   "detail": {
+    "bones_used": 20,
+    "unweighted_verts": 0,
+    "verts_over_4_influences": 0
+   }
+  },
+  {
+   "check": "Builder_Body vertex colours + team mask",
+   "ok": true,
+   "detail": {
+    "layers": [
+     "Col.001",
+     "Col"
+    ],
+    "mask_codes": [
+     0.0,
+     1.0
+    ]
+   }
+  },
+  {
+   "check": "Builder_Body vertex-colour contract = Miner's (layer 'Col', alpha codes only 0 / 0.75 / 1.0)",
+   "ok": true,
+   "detail": {
+    "layers": [
+     "Col.001",
+     "Col"
+    ],
+    "codes": [
+     0.0,
+     1.0
+    ],
+    "miner_reimport_layers": [
+     "Col.001",
+     "Col"
+    ]
+   }
+  },
+  {
+   "check": "team cloth code on the body (cap band, apron trim, straps, rope wraps, rung tips)",
+   "ok": true,
+   "detail": [
+    0.0,
+    1.0
+   ]
+  },
+  {
+   "check": "Builder_Mallet material slots",
+   "ok": true,
+   "detail": [
+    "CM_Toon"
+   ]
+  },
+  {
+   "check": "Builder_Mallet loose/non-manifold",
+   "ok": true,
+   "detail": {
+    "triangles": 836,
+    "loose_verts": 0,
+    "loose_edges": 0,
+    "non_manifold_edges": 0,
+    "closed_shells": 21
+   }
+  },
+  {
+   "check": "Builder_Mallet skinned to the rig",
+   "ok": true,
+   "detail": [
+    "Rig"
+   ]
+  },
+  {
+   "check": "Builder_Mallet weights",
+   "ok": true,
+   "detail": {
+    "bones_used": 1,
+    "unweighted_verts": 0,
+    "verts_over_4_influences": 0
+   }
+  },
+  {
+   "check": "Builder_Mallet vertex colours + team mask",
+   "ok": true,
+   "detail": {
+    "layers": [
+     "Col.001",
+     "Col"
+    ],
+    "mask_codes": [
+     0.0,
+     1.0
+    ]
+   }
+  },
+  {
+   "check": "Builder_Mallet vertex-colour contract = Miner's (layer 'Col', alpha codes only 0 / 0.75 / 1.0)",
+   "ok": true,
+   "detail": {
+    "layers": [
+     "Col.001",
+     "Col"
+    ],
+    "codes": [
+     0.0,
+     1.0
+    ],
+    "miner_reimport_layers": [
+     "Col.001",
+     "Col"
+    ]
+   }
+  },
+  {
+   "check": "triangle budget <= 12000",
+   "ok": true,
+   "detail": 10700
+  },
+  {
+   "check": "body height in metres after round trip (cap 1.94, ladder tip about 2.3)",
+   "ok": true,
+   "detail": {
+    "min_z": -0.0,
+    "max_z": 2.329,
+    "mesh_object_rot": [
+     1.5708,
+     -0.0,
+     0.0
+    ],
+    "mesh_object_scale": [
+     1.0,
+     1.0,
+     1.0
+    ]
+   }
+  },
+  {
+   "check": "bone rest orientations FBX re-import vs builder.blend (informational)",
+   "ok": true,
+   "detail": {
+    "max_deg": 0.0,
+    "bones_over_0.5_deg": []
+   }
+  },
+  {
+   "check": "KayKit 'Idle' on the re-imported FBX rig matches the source rig (Blender, by bone name)",
+   "ok": true,
+   "detail": {
+    "offsets_m": {
+     "hand.l": 0.0,
+     "hand.r": 0.0,
+     "head": 0.0,
+     "foot.l": 0.0,
+     "foot.r": 0.0,
+     "handslot.l": 0.0,
+     "handslot.r": 0.0
+    },
+    "hand.l moved from rest by": 0.437
+   }
+  },
+  {
+   "check": "DG-08 feature: A-frame backpack carrying a folded ladder on a diagonal",
+   "ok": true,
+   "detail": "present"
+  },
+  {
+   "check": "DG-08 feature: rope coil on the hip (twisted tube)",
+   "ok": true,
+   "detail": "present"
+  },
+  {
+   "check": "DG-08 feature: carpenter's flat cap with team band + pencil behind the ear",
+   "ok": true,
+   "detail": "present"
+  },
+  {
+   "check": "DG-08 feature: canvas apron with tool pockets and brass rivets",
+   "ok": true,
+   "detail": "present"
+  },
+  {
+   "check": "DG-08 feature: rolled sleeves, bare forearms, work gloves",
+   "ok": true,
+   "detail": "present"
+  },
+  {
+   "check": "DG-08 feature: friendly face with a moustache (painted eye decal + modelled brows, nose, grin)",
+   "ok": true,
+   "detail": "present"
+  },
+  {
+   "check": "DG-08 feature: tool belt, knee pads, boots, plank pauldron",
+   "ok": true,
+   "detail": "present"
+  },
+  {
+   "check": "DG-08 feature: oversized mallet with brass bands and a Biomass gem",
+   "ok": true,
+   "detail": [
+    "feat_gem",
+    "feat_mallet",
+    "feat_mallet_detail",
+    "feat_team_trim",
+    "handslot.r"
+   ]
+  },
+  {
+   "check": "mallet gem stays Biomass (team mask 0, never team colour)",
+   "ok": true,
+   "detail": [
+    0.0
+   ]
+  },
+  {
+   "check": "ladder rises 0.25 to 0.45 u above the cap (rest pose, highest rail corner)",
+   "ok": true,
+   "detail": {
+    "ladder_top": 2.329,
+    "cap_top": 1.898
+   }
+  },
+  {
+   "check": "head + cap = 33 to 38 % of 2.0 u",
+   "ok": true,
+   "detail": {
+    "chin": 1.17,
+    "crown": 1.898,
+    "share": 0.364
+   }
+  },
+  {
+   "check": "BuilderLadder FBX: authored state meshes, no armature",
+   "ok": true,
+   "detail": [
+    "BuilderLadder_Carried",
+    "BuilderLadder_Damaged",
+    "BuilderLadder_Placed"
+   ]
+  },
+  {
+   "check": "BuilderLadder_Carried: tris <= 2500, closed shells",
+   "ok": true,
+   "detail": {
+    "tris": 1536,
+    "loose_v": 0,
+    "loose_e": 0,
+    "nonmanifold_e": 0,
+    "shells": 38
+   }
+  },
+  {
+   "check": "BuilderLadder_Carried: vertex colour contract (Col, codes 0/0.75/1.0)",
+   "ok": true,
+   "detail": {
+    "layers": [
+     "Col.001",
+     "Col"
+    ],
+    "codes": [
+     0.0,
+     1.0
+    ],
+    "dims_xyz_m": [
+     1.45,
+     0.622,
+     0.165
+    ]
+   }
+  },
+  {
+   "check": "BuilderLadder_Damaged: tris <= 2500, closed shells",
+   "ok": true,
+   "detail": {
+    "tris": 1036,
+    "loose_v": 0,
+    "loose_e": 0,
+    "nonmanifold_e": 0,
+    "shells": 28
+   }
+  },
+  {
+   "check": "BuilderLadder_Damaged: vertex colour contract (Col, codes 0/0.75/1.0)",
+   "ok": true,
+   "detail": {
+    "layers": [
+     "Col.001",
+     "Col"
+    ],
+    "codes": [
+     0.0,
+     1.0
+    ],
+    "dims_xyz_m": [
+     0.85,
+     1.354,
+     1.331
+    ]
+   }
+  },
+  {
+   "check": "BuilderLadder_Placed: tris <= 2500, closed shells",
+   "ok": true,
+   "detail": {
+    "tris": 1248,
+    "loose_v": 0,
+    "loose_e": 0,
+    "nonmanifold_e": 0,
+    "shells": 34
+   }
+  },
+  {
+   "check": "BuilderLadder_Placed: vertex colour contract (Col, codes 0/0.75/1.0)",
+   "ok": true,
+   "detail": {
+    "layers": [
+     "Col.001",
+     "Col"
+    ],
+    "codes": [
+     0.0,
+     1.0
+    ],
+    "dims_xyz_m": [
+     0.57,
+     0.87,
+     1.308
+    ]
+   }
+  },
+  {
+   "check": "BuilderLadder_Placed: feet on the ground, reaches over the 0.75 u step lip (y 0.5)",
+   "ok": true,
+   "detail": {
+    "min_z": -0.025,
+    "max_z": 1.283,
+    "max_y": 0.882
+   }
+  },
+  {
+   "check": "BuilderRopeBridge FBX: authored state meshes, no armature",
+   "ok": true,
+   "detail": [
+    "BuilderRopeBridge_Carried",
+    "BuilderRopeBridge_Damaged",
+    "BuilderRopeBridge_Placed"
+   ]
+  },
+  {
+   "check": "BuilderRopeBridge_Carried: tris <= 2500, closed shells",
+   "ok": true,
+   "detail": {
+    "tris": 1112,
+    "loose_v": 0,
+    "loose_e": 0,
+    "nonmanifold_e": 0,
+    "shells": 16
+   }
+  },
+  {
+   "check": "BuilderRopeBridge_Carried: vertex colour contract (Col, codes 0/0.75/1.0)",
+   "ok": true,
+   "detail": {
+    "layers": [
+     "Col.001",
+     "Col"
+    ],
+    "codes": [
+     0.0,
+     1.0
+    ],
+    "dims_xyz_m": [
+     1.12,
+     0.789,
+     1.043
+    ]
+   }
+  },
+  {
+   "check": "BuilderRopeBridge_Damaged: tris <= 2500, closed shells",
+   "ok": true,
+   "detail": {
+    "tris": 2164,
+    "loose_v": 0,
+    "loose_e": 0,
+    "nonmanifold_e": 0,
+    "shells": 57
+   }
+  },
+  {
+   "check": "BuilderRopeBridge_Damaged: vertex colour contract (Col, codes 0/0.75/1.0)",
+   "ok": true,
+   "detail": {
+    "layers": [
+     "Col.001",
+     "Col"
+    ],
+    "codes": [
+     0.0,
+     1.0
+    ],
+    "dims_xyz_m": [
+     1.46,
+     4.526,
+     1.47
+    ]
+   }
+  },
+  {
+   "check": "BuilderRopeBridge_Placed: tris <= 2500, closed shells",
+   "ok": true,
+   "detail": {
+    "tris": 2480,
+    "loose_v": 0,
+    "loose_e": 0,
+    "nonmanifold_e": 0,
+    "shells": 68
+   }
+  },
+  {
+   "check": "BuilderRopeBridge_Placed: vertex colour contract (Col, codes 0/0.75/1.0)",
+   "ok": true,
+   "detail": {
+    "layers": [
+     "Col.001",
+     "Col"
+    ],
+    "codes": [
+     0.0,
+     1.0
+    ],
+    "dims_xyz_m": [
+     1.7,
+     4.44,
+     1.42
+    ]
+   }
+  },
+  {
+   "check": "BuilderRopeBridge_Placed: span 3 to 5 cells (1 m grid) along the bridge axis",
+   "ok": true,
+   "detail": [
+    1.7,
+    4.44,
+    1.42
+   ]
+  },
+  {
+   "check": "BuilderBuildGlow FBX: authored state meshes, no armature",
+   "ok": true,
+   "detail": [
+    "BuilderBuildGlow"
+   ]
+  },
+  {
+   "check": "BuilderBuildGlow: tris <= 2500, closed shells",
+   "ok": true,
+   "detail": {
+    "tris": 576,
+    "loose_v": 0,
+    "loose_e": 0,
+    "nonmanifold_e": 0,
+    "shells": 17
+   }
+  },
+  {
+   "check": "BuilderBuildGlow: vertex colour contract (Col, codes 0/0.75/1.0)",
+   "ok": true,
+   "detail": {
+    "layers": [
+     "Col.001",
+     "Col"
+    ],
+    "codes": [
+     0.0
+    ],
+    "dims_xyz_m": [
+     1.31,
+     1.31,
+     0.524
+    ]
+   }
+  },
+  {
+   "check": "medium build: Idle body width between the Warrior and the Miner (ladder excluded)",
+   "ok": true,
+   "detail": {
+    "builder": 1.434,
+    "warrior": 1.367,
+    "miner": 1.444
+   }
+  },
+  {
+   "check": "flat shading: no glossy/metal nodes in CM_Toon",
+   "ok": true,
+   "detail": "Emission of ramped diffuse only"
+  }
+ ]
+}

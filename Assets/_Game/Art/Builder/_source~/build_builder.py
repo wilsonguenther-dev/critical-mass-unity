@@ -474,9 +474,11 @@ def build_cap():
     TIP = (Matrix.Translation((0, -0.02, CAP_BASE)) @ Matrix.Rotation(math.radians(7), 4, "X") @
            Matrix.Translation((0, 0, -CAP_BASE)))
     z0 = CAP_BASE + 0.035
-    prof = [(0.335, z0), (0.375, z0 + 0.045), (0.385, z0 + 0.09), (0.355, z0 + 0.135), (0.26, z0 + 0.175),
-            (0.12, z0 + 0.195), (0.02, z0 + 0.198)]
-    CROWN = M((0, -0.045, 0), (0, 0, 0), (1.0, 1.08, 1.0))
+    # v1.1: flatter and slung forward over the brim, so from above it reads as a flat cap (a forward-pointing
+    # teardrop), never the Miner's round helmet dome
+    prof = [(0.335, z0), (0.38, z0 + 0.035), (0.395, z0 + 0.07), (0.37, z0 + 0.10), (0.28, z0 + 0.125),
+            (0.13, z0 + 0.138), (0.02, z0 + 0.14)]
+    CROWN = M((0, -0.085, 0), (0, 0, 0), (1.0, 1.18, 1.0))
     add(BODY, B.lathe([(r * 0.975, z) for r, z in prof], 12), "brow", H, "cap_detail", grad=False, m=CROWN,
         post=TIP)
     n = 8
@@ -485,16 +487,16 @@ def build_cap():
         a1 = 2 * math.pi * (k + 1) / n - 0.05
         add(BODY, dome_sector([(r * 1.01, z) for r, z in prof[:-1]] + [(0.03, prof[-1][1] - 0.004)], a0, a1, 2),
             "cap_light" if k % 2 == 0 else "cap", H, "cap", smooth=True, m=CROWN, post=TIP)
-    add(BODY, B.sphere((0.05, 0.05, 0.03), 8, 4), "cap", H, "cap", m=M((0, -0.045, z0 + 0.20)), post=TIP)
+    add(BODY, B.sphere((0.05, 0.05, 0.03), 8, 4), "cap", H, "cap", m=M((0, -0.085, z0 + 0.14)), post=TIP)
     # team band round the crown base
     add(BODY, B.cyl((0, 0, CAP_BASE - 0.025), (0, 0, CAP_BASE + 0.06), 0.325, 0.335, 18), "team", H, "team_trim",
         m=M((0, -0.02, 0), (0, 0, 0), (1.0, 1.04, 1.0)), post=TIP)
     # brim: half-ellipse slab in front, tipped down a touch
-    pts = [(0.30 * math.cos(math.pi * i / 10), -0.17 * math.sin(math.pi * i / 10)) for i in range(11)]
-    add(BODY, B.prism(pts, 0.035, 0.012), "cap", H, "cap", smooth=False,
-        m=M((0, -0.25, CAP_BASE - 0.005), (-6, 0, 0)), post=TIP)
+    pts = [(0.30 * math.cos(math.pi * i / 10), -0.19 * math.sin(math.pi * i / 10)) for i in range(11)]
+    add(BODY, B.prism(pts, 0.035, 0.012), "cap_light", H, "cap", smooth=False,
+        m=M((0, -0.27, CAP_BASE - 0.005), (-6, 0, 0)), post=TIP)
     add(BODY, B.box((0.42, 0.012, 0.012), 0.0), "brow", H, "cap_detail", smooth=False, grad=False,
-        m=M((0, -0.262, CAP_BASE + 0.016), (-6, 0, 0)), post=TIP)       # brim stitch line
+        m=M((0, -0.282, CAP_BASE + 0.016), (-6, 0, 0)), post=TIP)       # brim stitch line
 
 
 # ----------------------------------------------------------------------------------------------- ladder (shared)
@@ -733,8 +735,8 @@ def build_bridge_props():
             else:
                 add(o, rope_tube(sag_pts(a, b, 0.14 if not dmg else 0.22, 16), 0.034, 6), "rope", None, "bridge",
                     smooth=True, alt="rope_dark")
-                for k in range(1, 6):
-                    t = k / 6
+                for k in range(1, 5):
+                    t = k / 5
                     y = 0.08 - (L + 0.16) * t
                     zt = 0.74 - (0.14 if not dmg else 0.22) * 4 * t * (1 - t)
                     zd = -sag * 4 * t * (1 - t) + 0.05

@@ -6,7 +6,7 @@
    "rest_bounds": {
     "min": [
      -1.072,
-     -0.496,
+     -0.584,
      0.0
     ],
     "max": [
@@ -102,12 +102,12 @@
     "min": [
      -0.285,
      0.011,
-     -0.05
+     -0.025
     ],
     "max": [
      0.285,
-     0.865,
-     1.268
+     0.882,
+     1.283
     ]
    },
    "materials": [
@@ -126,12 +126,12 @@
     "min": [
      -0.354,
      -0.472,
-     -0.073
+     -0.048
     ],
     "max": [
      0.496,
-     0.865,
-     1.268
+     0.882,
+     1.283
     ]
    },
    "materials": [
@@ -144,8 +144,8 @@
    ]
   },
   "BuilderRopeBridge_Placed": {
-   "triangles": 2512,
-   "vertices": 1396,
+   "triangles": 2480,
+   "vertices": 1376,
    "rest_bounds": {
     "min": [
      -0.85,
@@ -168,8 +168,8 @@
    ]
   },
   "BuilderRopeBridge_Damaged": {
-   "triangles": 2180,
-   "vertices": 1206,
+   "triangles": 2164,
+   "vertices": 1196,
    "rest_bounds": {
     "min": [
      -0.73,
@@ -290,8 +290,8 @@
   "BuilderLadder_Carried": 1536,
   "BuilderLadder_Placed": 1248,
   "BuilderLadder_Damaged": 1036,
-  "BuilderRopeBridge_Placed": 2512,
-  "BuilderRopeBridge_Damaged": 2180,
+  "BuilderRopeBridge_Placed": 2480,
+  "BuilderRopeBridge_Damaged": 2164,
   "BuilderRopeBridge_Carried": 1112,
   "BuilderBuildGlow": 576
  }
