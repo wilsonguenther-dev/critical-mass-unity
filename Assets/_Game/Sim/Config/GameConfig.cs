@@ -205,8 +205,38 @@ namespace CriticalMass.Sim.Config
         /// <summary>Instability at or above this before hatch locks berserk.</summary>
         public double BerserkThreshold = 100;
         public double ShrineInteractRange = 3;
+        /// <summary>
+        /// CM-64: sim ticks a carrier stands in the delivery zone holding interact before its load goes in; an enemy hit during
+        /// the wind-up interrupts it and it restarts from zero. U-056 (departs from the browser's 30): 12, SHORTER than the fastest
+        /// swing (18), so one defender alone can delay a carrier but never pin it; two still can. Tuned on the DG-16b soaks.
+        /// </summary>
+        public double DeliverWindupTicks = 12;
+        /// <summary>CM-36: the shrine cleanse.</summary>
+        public CleanseConfig Cleanse = new CleanseConfig();
 
-        public KaijuFeedConfig Clone() => (KaijuFeedConfig)MemberwiseClone();
+        public KaijuFeedConfig Clone()
+        {
+            var c = (KaijuFeedConfig)MemberwiseClone();
+            c.Cleanse = Cleanse.Clone();
+            return c;
+        }
+    }
+
+    /// <summary>CM-36 shrine cleanse (browser kaijuFeed.cleanse). All timing in sim ticks at SimHz 30.</summary>
+    public sealed class CleanseConfig
+    {
+        /// <summary>Corruption units one cleanse drains (x CorruptionInstabilityPerUnit = 18 instability at 9).</summary>
+        public double Units = 2;
+        /// <summary>Ticks the drain is spread over (3 s).</summary>
+        public double Ticks = 90;
+        /// <summary>Ticks the cleansing team waits from the start (90 s).</summary>
+        public double CooldownTicks = 2700;
+        /// <summary>Ticks of held interact that start it (0.5 s).</summary>
+        public double HoldTicks = 15;
+        /// <summary>The human slot on autopilot cleanses once this many net corruption units sit in the egg; pure bots never cleanse.</summary>
+        public double BotNetUnits = 8; // U-057 (browser 10): with CM-85 biomass instability, net corruption never reached 10 before the lock
+
+        public CleanseConfig Clone() => (CleanseConfig)MemberwiseClone();
     }
 
     /// <summary>Resource nodes and CM-35 meat orbs.</summary>
@@ -444,6 +474,14 @@ namespace CriticalMass.Sim.Config
         public double StuckSeconds = 1.5;
         /// <summary>CM-21: a moving bot's move direction turns toward its flow direction at most this fast (deg / s).</summary>
         public double TurnRateDegPerSec = 300;
+        /// <summary>CM-64: an enemy carrier inside this radius of the shrine centre is contestable by Kaiju-duty bots. U-056 (departs
+        /// from the browser's 11 = 3 + FightKeepRange 8): 14, one more shrine range, so the shorter wind-up stays contestable.</summary>
+        public double InterceptShrineRadius = 14;
+        /// <summary>
+        /// DG-16 (the guided first match): for the first PassiveSeconds of match time bots neither target nor damage the
+        /// human slot (actor 0). 0 = off (the default; every bot decision is the browser's).
+        /// </summary>
+        public double PassiveSeconds = 0;
 
         public BotsConfig Clone()
         {

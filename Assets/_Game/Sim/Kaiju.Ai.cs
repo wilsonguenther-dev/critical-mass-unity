@@ -38,7 +38,7 @@ namespace CriticalMass.Sim.Core
                 double dx = w.X[id] - k.TelegraphX;
                 double dz = w.Z[id] - k.TelegraphZ;
                 if (dx * dx + dz * dz > r2) continue;
-                if (Damage.ApplyDamage(w, id, kc.SlamDamage, -1, k.TelegraphX, k.TelegraphZ) > 0) hits++;
+                if (Damage.ApplyDamage(w, id, kc.SlamDamage, Damage.KaijuSlamSource, k.TelegraphX, k.TelegraphZ) > 0) hits++;
             }
             k.SlamCd = kc.SlamCooldown;
             World.PushEvent(w, SimEventType.KaijuSlam, -1, hits, k.TelegraphX, k.TelegraphZ, kc.SlamRadius);
@@ -226,6 +226,8 @@ namespace CriticalMass.Sim.Core
             MatchState m = w.Match;
             Kaiju k = w.Kaiju;
             if (m.Phase == MatchPhase.Ended) return;
+            // CM-36: the shrine cleanse runs first, so a drain this tick counts before the berserk check below.
+            Cleanse.CleanseSystem(w);
             if (!m.Hatched)
             {
                 if (m.Instability >= cfg.KaijuFeed.BerserkThreshold) SimResources.LockBerserk(w);

@@ -39,7 +39,8 @@ namespace CriticalMass.Sim.Core
             SimResources.ResourcesSystem(w, dt);
             Kaiju.KaijuSystem(w, dt);
             Respawn.RespawnSystem(w, dt);
-            // ITEM CM-37: added by its owner (HealSystem)
+            // CM-37: after respawn (a fresh respawn is already at full HP), before the hill / match bookkeeping.
+            Heal.HealSystem(w);
             Hill.HillSystem(w, dt);
             Match.MatchSystem(w, dt);
 

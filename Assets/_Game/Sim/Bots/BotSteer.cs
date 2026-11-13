@@ -255,7 +255,7 @@ namespace CriticalMass.Sim.Bots
                         tz = k.Z;
                         reach = cc.AttackRange + cfg.Kaiju.Radius + AttackSlack;
                     }
-                    else if (t >= 0 && t < w.ActorCount && w.Actors[t].Alive)
+                    else if (t >= 0 && t < w.ActorCount && w.Actors[t].Alive && !BotFsm.PassiveTarget(w, t))
                     {
                         valid = true;
                         tx = w.X[t];
@@ -337,6 +337,27 @@ namespace CriticalMass.Sim.Bots
                     }
                     break;
                 }
+                case AiState.Cleanse:
+                {
+                    // CM-36: walk to the shrine empty-handed, then hold interact; let go for a tick whenever the sim says this
+                    // bot is not armed (a press still held from a delivery does not count).
+                    ShrineDef sh = map.Shrine;
+                    aimX = sh.X;
+                    aimZ = sh.Z;
+                    double reach = cfg.KaijuFeed.ShrineInteractRange - InteractMargin;
+                    double dx = sh.X - x;
+                    double dz = sh.Z - z;
+                    if (dx * dx + dz * dz <= reach * reach)
+                    {
+                        output.Interact = w.Cleanse.Armed[id] == 1;
+                        separate = false;
+                    }
+                    else if (!Follow(w, st, id, BotFields.FieldShrine))
+                    {
+                        Toward(w, id, sh.X, sh.Z, 0);
+                    }
+                    break;
+                }
                 case AiState.Retreat:
                     Follow(w, st, id, TeamPadField(w, id));
                     break;
@@ -384,6 +405,7 @@ namespace CriticalMass.Sim.Bots
                     if (j >= w.ActorCount) continue;
                     Actor t = w.Actors[j];
                     if (!t.Alive || t.Team == a.Team || t.SpawnProtect > 0) continue;
+                    if (BotFsm.PassiveTarget(w, j)) continue; // DG-16 passive window
                     double dx = w.X[j] - x;
                     double dz = w.Z[j] - z;
                     double d2 = dx * dx + dz * dz;

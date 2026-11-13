@@ -935,3 +935,100 @@ they knock pillars over only as the oracle's do, when a melee swing happens to r
    and `Fall` (where the actor climbs out), all with positions, for the effects and sound items.
 **Status.** Built in DG-09 (draft PR, stacked on DG-02 #19). Max reviews; the owner can drop the mode (set CarryMax 1 and
 unbind the switch) without touching the rules.
+
+## U-054 Healing, meat, biomass corruption, contestable deliveries and the shrine cleanse as built in DG-16a / DG-16b (2026-11-13T01:05:37Z)
+
+**Source.** Travis, "Current ideas for the game (not needed for demo)" (2026-11-12 email): "Slower corruption/biomass
+corruption", "Different biomass types (meat from killed bodies/plants around the map", "A way to remove corruption (healer
+special or something else)", "A way to heal (healer class or fountain/flask)"; Nov 4 call: "there's no way ... to kill them
+before they drop off the resources". Gap list rows 6 to 9 and 14, items DG-16a and DG-16b.
+**Ported as is.** Browser 09e0904 for CM-37 (base fountain, 1 HP per tick inside radius 3.75 of the own pad, bots retreat
+below 30% HP as on main), CM-35 (a knocked-out unit drops a 2-unit meat orb for 600 ticks while the egg stands; walk-over
+pickup into a separate meat load; meat pays 6 allegiance per unit) and CM-85 (every biomass unit adds 0.125 instability).
+Unmerged branches cm/CM-64 (e056d8e: a 30-tick delivery wind-up, an enemy hit restarts it, Kaiju-duty bots contest carriers
+within 11 of the shrine, a dead feeder keeps its duty seat) and cm/CM-36 (1c6ce00: hold E empty-handed at the egg for 15
+ticks to drain 2 corruption units over 90 ticks, 2700-tick team cooldown, closed after the berserk lock or the hatch; only
+the human slot on autopilot cleanses, never pure bots).
+**Decided (not in the browser).**
+1. The two branches were written separately on batch 1 and are merged here. A meat load counts as a load for the cleanse:
+   an actor holding meat (or cargo) is disarmed until it lets go of E, so the press that delivers meat never cleanses.
+2. The cleanse test that delivered with one held press now holds for the wind-up first; every older delivery test runs
+   `Delivery.WindupTicks` passes, as the CM-64 branch did to its own tests.
+3. `AiState.Cleanse` is appended at the end of the enum (the browser lists it before retreat) so no stored integer moves.
+**Status.** Built in DG-16a and DG-16b (one draft PR, stacked on DG-09 #29). Known: the single-seed bot check
+`BotsMatchTests` (a) (5v5 seed 1, 120 s) reads azure hill presence 0.498 against its 0.70 floor once the wind-up and
+interception are on; the browser's CM-64 hit the same check (0.5224) and its bounce fix (interceptors are Kaiju-duty bots
+only, dead feeders keep their seat) is ported. See the PR for the soak numbers.
+
+## U-055 Damage cause, passive bots and attack events for the view (2026-11-13T01:05:37Z)
+
+**Source.** Two view builders (DG-11 kill feed and death recap, DG-12 guided first match, combat effects) asked the rules
+lane for small sim additions. Not in the browser.
+**Decided.**
+1. `DamageCause { None, Melee, KaijuMelee, KaijuSlam, Fall, Explosion }`, written on every Hit and Death event
+   (`SimEvent.Cause`) and kept in `Actor.LastCause` until respawn. Fall is reserved (the DG-09 fall rule does no damage),
+   Explosion for DG-22. `Damage.ApplyDamage` gains an overload with an explicit cause.
+2. The slam passes `Damage.KaijuSlamSource = -3` (the value DG-11's `CombatLog.KaijuSlam` already uses), but the event's B
+   and `LastAttacker` still read -1 for it, because ported tests pin that; the slam is told apart by its cause.
+3. `BotsConfig.PassiveSeconds` (default 0): while match time is below it, bots do not perceive, intercept, chase or swing
+   at actor 0, and a bot's cleave skips actor 0. Deterministic (sim time only). The tutorial sets 30.
+4. Events `AttackStart` (A attacker, at the swing's reach point, Value facing) and `KaijuDamaged` (A attacker, at the
+   contact point on the Kaiju's hit radius toward the attacker, Value damage), placed before the CM-84 marker.
+
+## U-056 DG-16b retune: delivery wind-up 12 ticks, intercept radius 14 (departs from the browser) (2026-11-13)
+
+**Finding.** The port of CM-64 is faithful. Diffing delivery.ts, resources.ts, damage.ts, fsm.ts (interceptTarget,
+interceptorRole, the intercept override), director.ts (deadKaijuDuty), steer.ts and the config line by line found no unit or
+selection error: ticks are ticks in both, the radius is world units in both, only Kaiju-duty bots intercept, and an
+interrupt only touches a wind-up in progress (deliverTicks > 0). The browser's own CM-64 branch, run unchanged
+(SLOW=1 vitest src/sim/delivery.slow.test.ts on cm/CM-64), measures berserk share 0.05 and fails its own CM-34 band
+[0.10, 0.50]; intercepts azure 386 / crimson 466 in 93 of 100 seeds (the port: 392 / 452, 93). That is why CM-64 never
+merged in the browser. The wind-up starves corruption deliveries, and berserk is the short-handed team's comeback, so the
+D-030 passive-human sweep falls with it.
+
+**Rule.** kaijuFeed.deliverWindupTicks 30 -> 12 and bots.interceptShrineRadius 11 -> 14. 12 is shorter than the fastest
+swing (farmer 18 ticks): one defender can delay a carrier but never pin it (the DG-09 soak's 'stationary carrier' was a
+lone interceptor pinning a 30-tick wind-up until the carrier died); two defenders still can. 14 = 11 + one
+shrineInteractRange, so the shorter wind-up stays contestable. DeliveryTests now asserts the wind-up is shorter than the
+fastest swing.
+
+**Measured** (no-Unity runner; berserk and intercepts: 5v5 seeds 1..100 all bots; passive: D-030 seeds 201..250):
+
+| wind-up, radius | berserk /100 | intercepts | seeds with one | passive-team wins /50 |
+| --- | --- | --- | --- | --- |
+| 1, off (before DG-16b) | 38 | 0 | 0 | 20 |
+| 30, 11 (browser) | 5 | 844 | 93 | 1 |
+| 30, off | 22 | 380 | 61 | 5 |
+| 20, 11 | 18 | 642 | 88 | 8 |
+| 20, 17 | 12 | 804 | 96 | 6 |
+| 15, 11 | 24 | 164 | 76 | 7 |
+| 10, 11 | 32 | 138 | 76 | 11 |
+| 10, 14 | 33 | 178 | 84 | 7 |
+| 12, 17 | 22 | 208 | 89 | 6 |
+| **12, 14 (chosen)** | **27** | **192** | **86** | **11** |
+
+Gates: berserk in [10, 50], intercepts in at least 80 of 100 seeds (DG-16b row), D-030 at least 11 of 50. Only 12 / 14
+clears all three, and the D-030 margin is zero: neighbouring settings read 6 to 11, so that sweep is noisy at 50 seeds and
+any later rule touching corruption delivery will move it. The structural cause (any wind-up taxes corruption carriers,
+which the short-handed team relies on) is not fixed here; a corruption hand-off without a wind-up is the candidate if it
+bounces.
+
+## U-057 Autopilot cleanse gate: 8 net corruption units, not 10 (departs from the browser) (2026-11-13)
+
+**Finding.** After U-056 the CM-36 soak still read 0 cleanses. The port of the CM-36 autopilot rule is faithful (actor 0,
+biomass lead, kaijuFeed.cleanse.botNetUnits net corruption units in the egg, cleanse ready). Instrumented over 30 seeds:
+net corruption units never exceeded 9 before the berserk lock or the hatch, so the browser's 10 can never be met here. The
+cause is CM-85 (DG-16a): delivered biomass also feeds instability, so berserk locks a few corruption units earlier than on
+the CM-36 branch, which predates that rule. **Rule.** botNetUnits 10 -> 8, the largest whole value below the measured
+ceiling that the cleanse can reach. **Measured** (CM-36 driver, 5v5 seeds 1..100, all bots, stop at lock or hatch):
+
+| botNetUnits | berserk /100 | cleanses | matches with one |
+| --- | --- | --- | --- |
+| 10 (browser) | 27 | 0 | 0 |
+| **8 (chosen)** | **19** | **17** | **17** |
+| 7 | 19 | 17 | 17 |
+| 6 | 17 | 36 | 35 |
+| 5 | 17 | 36 | 35 |
+
+Berserk stays inside the CM-34 band [10, 50]. Pure bots still never cleanse; only the autopilot slot does.
+

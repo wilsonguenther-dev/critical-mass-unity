@@ -3,7 +3,17 @@ namespace CriticalMass.Sim.Core
     /// <summary>What an actor carries in its class cargo (browser CarryKind).</summary>
     public enum CarryKind { None, Biomass, Corruption }
 
-    // ITEM CM-35: added by its owner (BiomassType { Plant, Meat })
+    /// <summary>
+    /// CM-35: the two biomass types (browser BiomassType). Plant comes from the map's biomass nodes (gathered with E) and
+    /// rides in the class cargo; meat drops from killed actors as a loose orb and rides in its own load (Actor.CarryMeat).
+    /// </summary>
+    public enum BiomassType { Plant, Meat }
+
+    /// <summary>
+    /// DG-16: what dealt a hit (SimEvent.Cause on Hit and Death events, Actor.LastCause). Not in the browser. Never stored or
+    /// compared by integer value: later items append members (Explosion is reserved for DG-22).
+    /// </summary>
+    public enum DamageCause { None, Melee, KaijuMelee, KaijuSlam, Fall, Explosion }
 
     /// <summary>Kaiju state (browser KaijuState).</summary>
     public enum KaijuState { Egg, Neutral, Azure, Crimson, Berserk }
@@ -12,7 +22,12 @@ namespace CriticalMass.Sim.Core
     public enum HillState { Neutral, Azure, Crimson, Contested }
 
     /// <summary>Bot FSM state shown on the actor (browser AiState).</summary>
-    public enum AiState { None, ToHill, HoldHill, Fight, Gather, Deliver, Corrupt, Retreat, Unstick }
+    public enum AiState
+    {
+        None, ToHill, HoldHill, Fight, Gather, Deliver, Corrupt, Retreat, Unstick,
+        /// <summary>CM-36: walk to the shrine empty-handed and hold interact for the shrine cleanse (appended: the browser lists it before Retreat).</summary>
+        Cleanse,
+    }
 
     /// <summary>Match phase (browser MatchState.phase).</summary>
     public enum MatchPhase { Playing, Ended }
@@ -66,8 +81,22 @@ namespace CriticalMass.Sim.Core
         ToppleDown,
         /// <summary>DG-09 fall rule: a grounded actor lost the ground under its centre: A = actor, B = cell fallen into, (X, Z) = where it climbs out, Value = get-up seconds.</summary>
         Fall,
+        /// <summary>DG-16 (view request): an actor started a melee swing: A = attacker, B = -1, (X, Z) = the swing's reach point (attacker + facing x AttackRange), Value = facing (radians).</summary>
+        AttackStart,
+        /// <summary>DG-16 (view request): a swing hurt the hatched Kaiju: A = attacker, B = -1, (X, Z) = the contact point on the Kaiju's hit radius toward the attacker, Value = damage dealt.</summary>
+        KaijuDamaged,
+        /// <summary>
+        /// CM-64: an enemy hit landed on a carrier during its delivery wind-up (Delivery.InterruptDelivery): A = the carrier,
+        /// B = the attacker (an actor id, else -1), (X, Z) = the carrier, Value = the wind-up ticks it had reached.
+        /// </summary>
+        DeliverIntercepted,
+        /// <summary>CM-36: a shrine cleanse started (Cleanse.StartCleanse): A = the cleanser (-1 scripted), B = team index (0 azure, 1 crimson), (X, Z) = the shrine, Value = instability it will drain.</summary>
+        Cleanse,
+        /// <summary>CM-36: the cleanse in flight finished: A = cleanser (-1 scripted), B = team index, (X, Z) = the shrine, Value = instability drained.</summary>
+        CleanseEnd,
         // ITEM CM-84: added by its owner (ClassSwitch, ports CM-54)
-        // ITEM CM-37: added by its owner (Heal)
+        /// <summary>CM-37: one tick of fountain healing (Heal.HealSystem): A = the healed actor, B = -1, (X, Z) = the actor, Value = HP restored this tick (&gt; 0).</summary>
+        Heal,
         MatchEnd,
     }
 }

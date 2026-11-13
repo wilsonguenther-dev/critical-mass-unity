@@ -195,7 +195,7 @@ namespace CriticalMass.Sim.Tests
             a.CarryAmount = 3;
             Place(w, 2, ShrineX, ShrineZ + 2.3);
             Hold(w, 2, true);
-            SimStep.Step(w);
+            StepN(w, Delivery.WindupTicks(w.Config)); // CM-64: the hand-in completes after the delivery wind-up
             Assert.AreEqual(3 * feed.BiomassAllegiancePerUnit, w.Match.Allegiance.Azure);
             Assert.AreEqual(30, w.Match.Allegiance.Azure);
             Assert.AreEqual(3, w.Match.Delivered[(int)TeamId.Azure].Biomass);
@@ -237,7 +237,7 @@ namespace CriticalMass.Sim.Tests
             a.CarryAmount = 1;
             Place(w, 7, ShrineX + 1.5, ShrineZ + 2);
             Hold(w, 7, true);
-            SimStep.Step(w);
+            StepN(w, Delivery.WindupTicks(w.Config)); // CM-64 wind-up
             Assert.AreEqual(feed.CorruptionAllegiancePerUnit, w.Match.Allegiance.Crimson);
             Assert.AreEqual(4, w.Match.Allegiance.Crimson);
             Assert.AreEqual(feed.CorruptionInstabilityPerUnit, w.Match.Instability);
@@ -256,7 +256,7 @@ namespace CriticalMass.Sim.Tests
             SimResources.ApplyDelivery(w, TeamId.Crimson, CarryKind.Corruption, 3);
             Assert.AreEqual(20, w.Match.Allegiance.Azure);
             Assert.AreEqual(12, w.Match.Allegiance.Crimson);
-            Assert.AreEqual(3 * feed.CorruptionInstabilityPerUnit, w.Match.Instability); // ITEM CM-85: restores "+ 2 * BiomassInstabilityPerUnit"
+            Assert.AreEqual(3 * feed.CorruptionInstabilityPerUnit + 2 * feed.BiomassInstabilityPerUnit, w.Match.Instability); // CM-85
             ForceHatch(w);
             SimResources.ApplyDelivery(w, TeamId.Azure, CarryKind.Biomass, 5);
             Assert.AreEqual(20, w.Match.Allegiance.Azure);

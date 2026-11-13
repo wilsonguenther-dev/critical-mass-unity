@@ -150,7 +150,7 @@ namespace CriticalMass.Sim.Tests
             Assert.AreEqual(World.EventCapacity + 2, last.X, 1e-4);
             Assert.AreEqual(-(World.EventCapacity + 2), last.Z, 1e-4);
             Assert.AreEqual(7, last.Value);
-            // ITEM CM-35: added by its owner (bio: undefined in the expected event)
+            Assert.IsNull(last.Bio); // CM-35: bio is undefined on every event but DeliverBiomass
         }
     }
 }

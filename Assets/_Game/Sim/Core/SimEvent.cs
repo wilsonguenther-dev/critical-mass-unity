@@ -9,6 +9,9 @@ namespace CriticalMass.Sim.Core
         public double X;
         public double Z;
         public double Value;
-        // ITEM CM-35: added by its owner (Bio: biomass type of a DeliverBiomass event)
+        /// <summary>CM-35: the biomass type of a DeliverBiomass event (a mixed load raises one event per type); null on every other event.</summary>
+        public BiomassType? Bio;
+        /// <summary>DG-16: what dealt the blow on Hit and Death events (None on every other event).</summary>
+        public DamageCause Cause;
     }
 }

@@ -30,7 +30,14 @@ namespace CriticalMass.Sim.Core
         public double RespawnIn;
         public CarryKind Carry;
         public int CarryAmount;
-        // ITEM CM-35: added by its owner (CarryMeat, MeatPickup)
+        /// <summary>
+        /// CM-35: meat units in the actor's own meat load (0..Resources.MeatCarryCapacity), separate from the class cargo:
+        /// Carry / CarryAmount never include meat, so every cargo-driven bot decision is unchanged by it. Zeroed while dead,
+        /// after the hatch (ResourcesSystem) and on reset.
+        /// </summary>
+        public int CarryMeat;
+        /// <summary>CM-35: may this actor take meat by walking over a loose orb? True by default; bots set it each step to "on the Kaiju role" (BotBrain).</summary>
+        public bool MeatPickup;
         public double GatherProgress;
         /// <summary>-1 = none.</summary>
         public int GatherNodeId;
@@ -74,5 +81,13 @@ namespace CriticalMass.Sim.Core
         /// Jump.CoyoteTicks.
         /// </summary>
         public int UnsupportedTicks;
+        /// <summary>DG-16: what dealt the last blow (Melee, KaijuMelee, KaijuSlam...); None until hit, cleared at respawn with LastAttacker.</summary>
+        public DamageCause LastCause;
+        /// <summary>
+        /// CM-64: sim ticks of the current delivery wind-up at the shrine (0 = not winding; delivers when it reaches
+        /// KaijuFeed.DeliverWindupTicks). Delivery.Interrupted (-1) for the rest of the tick an enemy hit interrupted it.
+        /// Written only by Delivery (Damage calls InterruptDelivery).
+        /// </summary>
+        public int DeliverTicks;
     }
 }

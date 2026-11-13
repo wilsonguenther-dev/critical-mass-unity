@@ -52,7 +52,9 @@ namespace CriticalMass.Sim.Bots
             for (int id = 0; id < n; id++)
             {
                 Actor a = w.Actors[id];
-                // ITEM CM-35: added by its owner (Kaiju-role bots walk-pick meat)
+                // CM-35: only Kaiju-role bots walk-pick meat (hill and Kaiju-fight bots leave the bodies to the feeders); actor 0
+                // always can while a person drives it. Set every step, before ResourcesSystem. Meat rides in its own load.
+                a.MeatPickup = (id == 0 && !human) || st.Role[id] == BotsState.RoleKaiju;
                 if (id == 0 && !human) continue;
                 if (!a.Alive) continue;
                 if ((tick + id) % period == 0 || a.AiState == AiState.None) BotFsm.ThinkBot(w, st, id);
