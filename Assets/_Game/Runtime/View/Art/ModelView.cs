@@ -482,8 +482,16 @@ namespace CriticalMass.Runtime.View.Art
         public void Dispose()
         {
             if (_graph.IsValid()) _graph.Destroy();
-            if (_mask != null) Object.Destroy(_mask);
-            if (Root != null) Object.Destroy(Root);
+            if (_mask != null) Kill(_mask);
+            if (Root != null) Kill(Root);
+        }
+
+        /// <summary>Integration batch 5: Destroy in play, DestroyImmediate in edit mode (the Barracks class chips swap the
+        /// preview model in EditMode tests; Destroy there logs an error and leaks the model).</summary>
+        static void Kill(Object o)
+        {
+            if (Application.isPlaying) Object.Destroy(o);
+            else Object.DestroyImmediate(o);
         }
     }
 }
