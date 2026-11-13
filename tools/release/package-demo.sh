@@ -13,9 +13,10 @@
 #   3. Sign inside-out: every Mach-O under Contents/Frameworks and Contents/PlugIns first (hardened runtime +
 #      timestamp, no entitlements), then the app with tools/release/CriticalMass.entitlements. No --deep.
 #   4. codesign --verify --deep --strict; spctl -a -vv (expected "Unnotarized Developer ID" until stapled).
-#   5. DMG: hdiutil UDZO, volume "Critical Mass Demo", the app plus an /Applications symlink; sign the DMG.
-#   6. Notarise (only when a credential is given AND works): notarytool submit --wait; on Invalid, print
-#      notarytool log; staple; spctl -a -t open --context context:primary-signature -vv.
+#   5. Notarise (only when a credential is given AND works): the app (zipped) first, staple the app; on Invalid,
+#      print notarytool log and stop.
+#   6. DMG: hdiutil UDZO, volume "Critical Mass Demo", the stapled app plus an /Applications symlink; sign the DMG,
+#      notarise and staple it too; spctl -a -t open --context context:primary-signature -vv.
 #   7. Windows: copy DIR minus *DoNotShip* folders, require CriticalMass.exe, *_Data and UnityPlayer.dll, add
 #      READ-ME.txt, zip -9 -X as CriticalMass-Windows-<version>.zip.
 #   8. SHA256SUMS.txt. With --publish: gh release create demo-v<version> --prerelease --target <full sha>.
@@ -67,27 +68,34 @@ codesign --verify --deep --strict --verbose=2 "$SAPP"
 codesign -dvv "$SAPP" 2>&1 | grep -E '^(Authority|TeamIdentifier|Timestamp)|flags=' || true
 spctl -a -vv "$SAPP" 2>&1 || true   # rejected "Unnotarized Developer ID" is expected before stapling
 
-# 5. DMG
-ROOTD="$SCRATCH/dmgroot"; rm -rf "$ROOTD"; mkdir -p "$ROOTD"; ditto "$SAPP" "$ROOTD/Critical Mass.app"
-ln -s /Applications "$ROOTD/Applications"
-hdiutil create -volname "Critical Mass Demo" -srcfolder "$ROOTD" -ov -format UDZO -imagekey zlib-level=9 -fs HFS+ "$DMG"
-rm -rf "$ROOTD"; codesign --force --timestamp --sign "$IDENTITY" "$DMG"
-
-# 6. notarise when a credential is given and accepted
-NOTARISED=0; NARGS=()
+# 5. notarisation credential (only used when given AND accepted by Apple)
+NOTARISED=0; NARGS=(); CAN_NOTARISE=0
 if [[ -n "$NPROFILE" ]]; then NARGS=(--keychain-profile "$NPROFILE")
 elif [[ -n "$NKEY" ]]; then NARGS=(--key "$NKEY" --key-id "$NKEYID"); [[ -n "$NISSUER" ]] && NARGS+=(--issuer "$NISSUER"); fi
 if [[ ${#NARGS[@]} -gt 0 ]]; then
-  if xcrun notarytool history "${NARGS[@]}" >/dev/null 2>&1; then
-    R="$(xcrun notarytool submit "$DMG" "${NARGS[@]}" --wait --output-format json)"; echo "$R"
-    ID="$(python3 -I -c 'import json,sys; print(json.loads(sys.argv[1]).get("id",""))' "$R")"
-    if [[ "$R" == *'"Accepted"'* ]]; then xcrun stapler staple "$DMG"; xcrun stapler validate "$DMG"; NOTARISED=1
-    else xcrun notarytool log "$ID" "${NARGS[@]}" || true; echo "notarisation failed: read the log above" >&2; exit 2; fi
+  if xcrun notarytool history "${NARGS[@]}" >/dev/null 2>&1; then CAN_NOTARISE=1
   else
     echo "notary credential refused by Apple (401?): DMG stays Developer-ID signed, not notarised" >&2
     echo "fix once, outside any sandbox: xcrun notarytool store-credentials <profile> --apple-id <id> --team-id <team>" >&2
   fi
 fi
+notarise() {  # $1 = file to submit (zip or dmg); prints the log and exits 2 unless Accepted
+  local R ID; R="$(xcrun notarytool submit "$1" "${NARGS[@]}" --wait --output-format json)"; echo "$R"
+  ID="$(python3 -I -c 'import json,sys; print(json.loads(sys.argv[1]).get("id",""))' "$R")"
+  [[ "$R" == *'"Accepted"'* ]] || { xcrun notarytool log "$ID" "${NARGS[@]}" || true; echo "notarisation of $1 failed: read the log above" >&2; exit 2; }
+}
+# 5a. notarise and staple the app itself first, so a copy dragged out of the DMG carries its own ticket offline
+if [[ $CAN_NOTARISE == 1 ]]; then
+  AZIP="$SCRATCH/app-for-notary.zip"; rm -f "$AZIP"; ditto -c -k --keepParent "$SAPP" "$AZIP"
+  notarise "$AZIP"; rm -f "$AZIP"; xcrun stapler staple "$SAPP"; xcrun stapler validate "$SAPP"; spctl -a -vv "$SAPP" 2>&1 || true
+fi
+
+# 6. DMG (built from the stapled app), signed, then notarised and stapled itself
+ROOTD="$SCRATCH/dmgroot"; rm -rf "$ROOTD"; mkdir -p "$ROOTD"; ditto "$SAPP" "$ROOTD/Critical Mass.app"
+ln -s /Applications "$ROOTD/Applications"
+hdiutil create -volname "Critical Mass Demo" -srcfolder "$ROOTD" -ov -format UDZO -imagekey zlib-level=9 -fs HFS+ "$DMG"
+rm -rf "$ROOTD"; codesign --force --timestamp --sign "$IDENTITY" "$DMG"
+if [[ $CAN_NOTARISE == 1 ]]; then notarise "$DMG"; xcrun stapler staple "$DMG"; xcrun stapler validate "$DMG"; NOTARISED=1; fi
 spctl -a -t open --context context:primary-signature -vv "$DMG" 2>&1 || true
 
 # 7. Windows zip
@@ -102,7 +110,7 @@ if [[ -n "$WINDIR" ]]; then
 fi
 
 # 8. checksums and optional publish
-(cd "$OUT" && shasum -a 256 ./*.dmg ./*.zip 2>/dev/null | sed 's| \./| |' > SHA256SUMS.txt; cat SHA256SUMS.txt)
+(cd "$OUT" && F=(); for f in *.dmg *.zip; do [[ -f "$f" ]] && F+=("$f"); done; shasum -a 256 "${F[@]}" > SHA256SUMS.txt; cat SHA256SUMS.txt)
 if [[ -n "$PUBLISH" ]]; then
   FULL="$(git -C "$ROOT" rev-parse "$COMMIT^{commit}")"
   NOTES="$SCRATCH/release-notes.md"; [[ -f "$NOTES" ]] || { echo "write $NOTES first (plain words, no tool names)" >&2; exit 1; }
