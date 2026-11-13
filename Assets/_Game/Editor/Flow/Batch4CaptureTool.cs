@@ -270,7 +270,9 @@ namespace CriticalMass.Editor.Flow
                 UnityEngine.InputSystem.InputSystem.QueueStateEvent(pad, new UnityEngine.InputSystem.LowLevel.GamepadState());
                 yield return Seconds(0.1);
                 UnityEngine.InputSystem.InputSystem.RemoveDevice(kb);
-                UnityEngine.InputSystem.InputSystem.RemoveDevice(pad);
+                // Finisher: the test pad stays connected. Removing the last gamepad mid-match pauses the game by design
+                // (SystemEvents: "controller disconnected during a match"), which left every later shot under the pause
+                // menu and froze the big-moment clock.
             }
             drv.HumanAutopilot = false;
             drv.TimeScale = 0;
