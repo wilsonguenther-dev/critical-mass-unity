@@ -162,7 +162,9 @@ namespace CriticalMass.Runtime.View.Dressing
             if (_building != null) return;   // the running build re-checks the tier when it finishes
             if (_replanning != null)
             {
+                _makeParent = _staging;
                 while (_replanning.MoveNext()) { }   // finish a running re-plan first (rare: a quality change mid-dig)
+                _makeParent = null;
                 _replanning = null;
             }
             // Environment v4 clutter follows the quality level: re-plan (only the groups that differ are rebuilt).
@@ -265,6 +267,8 @@ namespace CriticalMass.Runtime.View.Dressing
             CriticalMass.Runtime.Game.FrameRecorder.Loading = false;
             if (_building == null && (w != _world || w.Map != _map))
             {
+                _replanning = null;   // a new world: a running re-plan of the old one is dropped (Clear destroys its objects)
+                _replanPending = false;
                 _building = BuildSteps(w);
                 _buildWallStart = Time.realtimeSinceStartupAsDouble;
                 LastBuildMs = 0;
@@ -297,7 +301,25 @@ namespace CriticalMass.Runtime.View.Dressing
             if (Plan == null) return;
             UpdateLods();
             if (w.Match != null) ApplyHill(w.Match.HillState);
-            if (_replanning != null && FrameBudget.Run(_replanning, ReplanBudgetMs, StepClock())) _replanning = null;
+            if (_replanning != null)
+            {
+                // the new groups are made under a hidden staging parent, so the old ones draw alone until the swap
+                if (_staging == null)
+                {
+                    _staging = new GameObject("Replan Staging").transform;
+                    _staging.SetParent(_root, false);
+                    _staging.gameObject.SetActive(false);
+                }
+                _makeParent = _staging;
+                try
+                {
+                    if (FrameBudget.Run(_replanning, ReplanBudgetMs, StepClock())) _replanning = null;
+                }
+                finally
+                {
+                    _makeParent = null;
+                }
+            }
             if (_replanPending && Time.frameCount - _lastReplanFrame >= ReplanEveryFrames) RequestReplan();
             if (w.GridVersion == _seenGridVersion) return;
             _seenGridVersion = w.GridVersion;
@@ -326,6 +348,7 @@ namespace CriticalMass.Runtime.View.Dressing
         // few milliseconds a frame, then swaps them in at once; it was 55 to 105 ms in one frame (the in-match hitches the
         // frame recorder attributed to WorldView). The editor and tests keep the one-frame Replan.
         private IEnumerator _replanning;
+        private Transform _staging, _makeParent;
         public const double ReplanBudgetMs = 3.0;
         private static readonly System.Diagnostics.Stopwatch StepWatch = new System.Diagnostics.Stopwatch();
         private static readonly Func<double> StepClockFn = () => StepWatch.Elapsed.TotalMilliseconds;
@@ -385,7 +408,12 @@ namespace CriticalMass.Runtime.View.Dressing
             IEnumerator steps = BuildGroupsSteps(changed, fresh);
             while (steps.MoveNext()) yield return null;
             foreach (int g in changed) DestroyGroup(g);
-            foreach (var kv in fresh) _groups[kv.Key] = kv.Value;
+            foreach (var kv in fresh)
+            {
+                foreach (GameObject go in kv.Value.Objects)
+                    if (go != null) go.transform.SetParent(_root, false);
+                _groups[kv.Key] = kv.Value;
+            }
             _dressed = Plan.Dressed;
             _dressedTypes = Plan.CellsAtPlan;
             DressVersion++;
@@ -1195,7 +1223,7 @@ namespace CriticalMass.Runtime.View.Dressing
             }
             mesh.UploadMeshData(true);
             var go = new GameObject(name);
-            go.transform.SetParent(_root, false);
+            go.transform.SetParent(_makeParent != null ? _makeParent : _root, false);
             go.AddComponent<MeshFilter>().sharedMesh = mesh;
             var r = go.AddComponent<MeshRenderer>();
             r.sharedMaterial = mat;

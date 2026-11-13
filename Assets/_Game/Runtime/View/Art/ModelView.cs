@@ -30,6 +30,9 @@ namespace CriticalMass.Runtime.View.Art
         public readonly Transform Transform;
         public readonly Renderer[] Renderers;
 
+        /// <summary>perf-smooth-1: each renderer's object name, read once (Object.name makes a new string on every read).</summary>
+        public readonly string[] RendererNames;
+
         private readonly Animator _animator;
         private PlayableGraph _graph;
         private AnimationMixerPlayable _mixer;
@@ -125,6 +128,8 @@ namespace CriticalMass.Runtime.View.Art
             // fix/model-scale: the base size is stored once, from the imported prefab, before anything poses the model.
             BaseScale = Transform.localScale;
             Renderers = Root.GetComponentsInChildren<Renderer>(true);
+            RendererNames = new string[Renderers.Length];
+            for (int i = 0; i < Renderers.Length; i++) RendererNames[i] = Renderers[i].name;
             _slots = new Material[Renderers.Length][];
             _roles = new FighterLod.Role[Renderers.Length];
             _isBody = new bool[Renderers.Length];

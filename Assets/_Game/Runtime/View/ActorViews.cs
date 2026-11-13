@@ -460,10 +460,11 @@ namespace CriticalMass.Runtime.View
                 m.Transform.localPosition = SimSpace.ToWorld(x, GroundHeight(map, x, z), z);
                 m.Transform.localRotation = Quaternion.identity;
                 string state = ArtMapping.BarricadeState(b.Hp, cfg.Abilities.MinerBarricade.MaxHp);
-                foreach (Renderer r in m.Renderers)
+                for (int k = 0; k < m.Renderers.Length; k++)
                 {
-                    bool show = r.name == state;
-                    if (r.enabled != show) r.enabled = show;
+                    Renderer r = m.Renderers[k];
+                    bool show = m.RendererNames[k] == state;   // cached names: Object.name allocates on every read
+                    if (r != null && r.enabled != show) r.enabled = show;
                 }
                 m.SetMaterial(ArtMaterials.ForTeam(m.Spec, b.Team));
             }
