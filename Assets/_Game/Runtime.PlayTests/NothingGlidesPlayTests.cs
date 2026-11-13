@@ -33,6 +33,8 @@ namespace CriticalMass.Runtime.PlayTests
         /// <summary>Foot slide limits (planted-foot travel per unit of body travel). A frozen or unmatched stride reads ~1; a
         /// fighter in the crowd is also shoved by separation and knocks (first CI run: 0.30 to 0.65 per class), so its limit
         /// only catches the gross case; the Kaiju walks alone and must plant its feet.</summary>
+        /// <summary>Match length: 60 s gives the Kaiju enough walking to measure (40 s gave 2.3 to 2.9 u of planted travel).</summary>
+        public const int MatchSeconds = 60;
         public const double KaijuSlideLimit = 0.3, FighterSlideLimit = 0.75, KaijuMinPlantedTravel = 3.0;
         /// <summary>Ticks an animation may lag its sim event.</summary>
         public const int EventLagTicks = 3, RoarLagTicks = 30;
@@ -89,7 +91,7 @@ namespace CriticalMass.Runtime.PlayTests
             int roarsAtHatch = ka.Roars;
             pending.Add((w.Tick + RoarLagTicks, "hatch roar", () => ka.Roars > roarsAtHatch));
             int cursor = w.EventHead;
-            int total = _w.Ticks(40);
+            int total = _w.Ticks(MatchSeconds);
             for (int t = 0; t < total; t++)
             {
                 // Provoke: once a second the nearest fighter the Kaiju may target (away from its pad, no spawn shield) wounds
@@ -162,8 +164,8 @@ namespace CriticalMass.Runtime.PlayTests
             Debug.Log(sb.ToString());
 
             var bad = new List<string>(missed);
-            Assert.IsTrue(_tally.ContainsKey("Kaiju") && _tally["Kaiju"].Windows >= 3, "the Kaiju barely walked in 40 s of being provoked; nothing to measure\n" + sb);
-            Assert.IsTrue(seen.ContainsKey("KaijuMeleeWindup"), "the provoked Kaiju never wound up a claw in 40 s\n" + sb);
+            Assert.IsTrue(_tally.ContainsKey("Kaiju") && _tally["Kaiju"].Windows >= 3, $"the Kaiju barely walked in {MatchSeconds} s of being provoked; nothing to measure\n" + sb);
+            Assert.IsTrue(seen.ContainsKey("KaijuMeleeWindup"), $"the provoked Kaiju never wound up a claw in {MatchSeconds} s\n" + sb);
             foreach (KeyValuePair<string, Tally> kv in _tally)
             {
                 Tally y = kv.Value;

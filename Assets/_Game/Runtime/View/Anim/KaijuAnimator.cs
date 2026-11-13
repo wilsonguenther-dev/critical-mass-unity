@@ -351,9 +351,9 @@ namespace CriticalMass.Runtime.View.Anim
         // ---- foot locking (fix/kaiju-alive-1, CI run 43493373067): the Kaiju's Walk is a heavy stomp whose planted foot
         // barely sweeps back (the slide read ~1.0 u/u at every playback rate: the planted foot travelled with the body).
         // The weight-bearing foot is pinned where it landed: its thigh is aimed at the pin (the rig's leg is Thigh -> Foot,
-        // one bone, so an aim is the whole IK), the correction capped at MaxLockDeg; it releases when the foot lifts or the
+        // one bone, so an aim is the whole IK), the correction capped at MaxLockDeg (40 halved the slide to 0.49 in run 43496001979; 70 covers a full stride); it releases when the foot lifts or the
         // pin falls behind by more than a stride, and fades out over LockFade so the swing does not pop.
-        public const float MaxLockDeg = 40f, LockFade = 0.12f;
+        public const float MaxLockDeg = 70f, LockFade = 0.12f, ReplantShare = 0.3f;
         readonly Vector3[] _pin = new Vector3[2];
         readonly bool[] _pinned = new bool[2];
         readonly float[] _pinW = new float[2];
@@ -382,7 +382,7 @@ namespace CriticalMass.Runtime.View.Anim
                 if (_pinned[f])
                 {
                     Vector3 off = new Vector3(_pin[f].x - p.x, 0f, _pin[f].z - p.z);
-                    if (off.magnitude > 0.35f * h) { _pin[f] = p; off = Vector3.zero; }   // fell a stride behind: re-plant
+                    if (off.magnitude > ReplantShare * h) { _pin[f] = p; off = Vector3.zero; }   // fell a stride behind: re-plant
                     _pinW[f] = Mathf.Min(1f, _pinW[f] + (float)dSim / LockFade);
                     Vector3 hip = thigh.position;
                     Vector3 from = p - hip, to = p + off - hip;
