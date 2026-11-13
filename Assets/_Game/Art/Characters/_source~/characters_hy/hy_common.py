@@ -356,49 +356,39 @@ def decimate_protected(src, target, name, scene, protect=None, share=0.0, tmax=N
         P = protect(np_verts(ob))
         return sum(1 for p in ob.data.polygons if all(P[i] for i in p.vertices)), P
 
+    def locked_pass(ratio, lock):
+        """One collapse pass with the vertices in `lock` locked (decim weight 0, not inverted; measured: keeps them)."""
+        g = ob.vertex_groups.get("decim") or ob.vertex_groups.new(name="decim")
+        g.add(list(range(len(ob.data.vertices))), 1.0, "REPLACE")
+        idx = [int(i) for i in np.nonzero(lock)[0]]
+        if idx:
+            g.add(idx, 0.0, "REPLACE")
+        _decimate_once(ob, ratio, "decim")
+
     if protect is not None and share > 0:
-        rt, _ = region_tris()
-        frac = rt / max(1, tri_count(ob))
-        n1 = int(share * target / max(frac, 1e-3))
-        if n1 < tri_count(ob):
-            _decimate_once(ob, n1 / tri_count(ob))
-        info["region_frac_before"] = round(frac, 3)
-        info["stage1_tris"] = tri_count(ob)
+        # A uniform pass eats the dense head first (run 3: LOD0 head fell from 29 % to 8 %). So: stage A collapses
+        # only the region (rest locked) down to its share of the target; stage B collapses only the rest (region locked).
+        rt, P = region_tris()
+        info["region_frac_before"] = round(rt / max(1, tri_count(ob)), 3)
+        want = int(share * target)
+        if rt > want:
+            n = tri_count(ob)
+            locked_pass(max(0.01, (n - (rt - want)) / n), ~P)
+        info["stageA_tris"] = tri_count(ob)
+        info["stageA_region"] = region_tris()[0]
     ratio = target / max(1, tri_count(ob))
     for attempt in range(6):
         if ratio >= 0.999:
             break
         work = ob.data.copy()
         if protect is not None and share > 0:
-            # the region is locked through the decimate vertex group. Which weight locks is measured, not assumed
-            # (run 1 of this build: weight 0 + no invert let the head collapse): both are tried, the one that keeps
-            # more of the region wins.
-            rt0, P = region_tris()
-            cands = []
-            for inv in (False, True):
-                ob.data = work.copy()
-                g = ob.vertex_groups.get("decim") or ob.vertex_groups.new(name="decim")
-                g.add(list(range(len(ob.data.vertices))), 1.0, "REPLACE")
-                locked = [int(i) for i in np.nonzero(P)[0]]
-                if locked:
-                    g.add(locked, 0.0, "REPLACE")
-                _decimate_once(ob, ratio, "decim", invert=inv)
-                rt, _ = region_tris()
-                cands.append((rt, ob.data, inv))
-            best = max(cands, key=lambda c: c[0])
-            ob.data = best[1]
-            for c in cands:
-                if c[1] is not best[1] and c[1].users == 0:
-                    bpy.data.meshes.remove(c[1])
-            info["lock_invert"] = best[2]
-            info["lock_region_tris"] = {str(c[2]): c[0] for c in cands}
+            locked_pass(ratio, region_tris()[1])
         else:
             _decimate_once(ob, ratio)
         got = tri_count(ob)
         if got <= tmax:
             bpy.data.meshes.remove(work)
             break
-        # over budget: retry from the same start with a smaller ratio
         old = ob.data
         ob.data = work
         bpy.data.meshes.remove(old)

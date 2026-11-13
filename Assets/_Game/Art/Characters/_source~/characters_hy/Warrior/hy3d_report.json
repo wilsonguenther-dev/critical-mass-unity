@@ -1,0 +1,782 @@
+{
+ "v7": {
+  "body": {
+   "verts": 4756,
+   "dims": [
+    1.999,
+    0.881,
+    2.001
+   ]
+  },
+  "shield": {
+   "verts": 934,
+   "dims": [
+    1.079,
+    0.864,
+    0.904
+   ]
+  },
+  "cleaver": {
+   "verts": 513,
+   "dims": [
+    0.823,
+    0.525,
+    0.445
+   ]
+  }
+ },
+ "target_height": 2.0008,
+ "body_fit": {
+  "scale": 1.869,
+  "dims": [
+   1.629,
+   0.811,
+   2.001
+  ],
+  "high_tris": 500000
+ },
+ "landmarks_generated": {
+  "H": 2.001,
+  "crotch": 0.432,
+  "legx": 0.212,
+  "neck": 1.716,
+  "neck_w": 0.354
+ },
+ "head_region": {
+  "neck_z": 1.716,
+  "radius": 0.227
+ },
+ "pose_fit_deg": {
+  "upperarm.l": 32.1,
+  "upperleg.l": 15.2,
+  "upperarm.r": 32.1,
+  "upperleg.r": 15.2
+ },
+ "decimate": {
+  "Warrior_HY_Hero_Body": {
+   "start": 500000,
+   "region_frac_before": 0.058,
+   "stage1_tris": 97598,
+   "lock_invert": false,
+   "lock_region_tris": {
+    "False": 5477,
+    "True": 6
+   },
+   "region_tris": 5477,
+   "region_share": 0.288,
+   "tris": 19000
+  },
+  "Warrior_HY_LOD0_Body": {
+   "start": 19000,
+   "region_frac_before": 0.288,
+   "stage1_tris": 4106,
+   "lock_invert": false,
+   "lock_region_tris": {
+    "False": 298,
+    "True": 0
+   },
+   "region_tris": 298,
+   "region_share": 0.081,
+   "tris": 3700
+  },
+  "Warrior_HY_LOD1_Body": {
+   "start": 19000,
+   "tris": 1150
+  }
+ },
+ "colour_remap": {
+  "faces_seen_on_sheet": 7402,
+  "faces": 19000,
+  "hair_top_before": "#2E2027",
+  "hair_top_after": "#47343A",
+  "hair_top_sheet": "#3F2E34",
+  "clusters": [
+   {
+    "cluster": 0,
+    "faces": 6697,
+    "seen": 2133,
+    "generated": "#2E2027",
+    "sheet": "#402E34",
+    "shift_lab": [
+     7.1,
+     0.9,
+     1.8
+    ]
+   },
+   {
+    "cluster": 1,
+    "faces": 512,
+    "seen": 257,
+    "generated": "#F5E7D3",
+    "sheet": "#E6D4C0",
+    "shift_lab": [
+     -6.6,
+     1.6,
+     0.8
+    ]
+   },
+   {
+    "cluster": 2,
+    "faces": 137,
+    "seen": 25,
+    "generated": "#906658"
+   },
+   {
+    "cluster": 3,
+    "faces": 516,
+    "seen": 70,
+    "generated": "#544847",
+    "sheet": "#786661",
+    "shift_lab": [
+     11.9,
+     1.5,
+     3.1
+    ]
+   },
+   {
+    "cluster": 4,
+    "faces": 294,
+    "seen": 115,
+    "generated": "#948886",
+    "sheet": "#84756E",
+    "shift_lab": [
+     -7.7,
+     0.8,
+     2.5
+    ]
+   },
+   {
+    "cluster": 5,
+    "faces": 1627,
+    "seen": 812,
+    "generated": "#2B2D41",
+    "sheet": "#3D3E51",
+    "shift_lab": [
+     7.4,
+     -0.6,
+     1.5
+    ]
+   },
+   {
+    "cluster": 6,
+    "faces": 756,
+    "seen": 298,
+    "generated": "#4C2F22",
+    "sheet": "#694E41",
+    "shift_lab": [
+     13.2,
+     -2.6,
+     -2.3
+    ]
+   },
+   {
+    "cluster": 7,
+    "faces": 246,
+    "seen": 55,
+    "generated": "#24687C"
+   },
+   {
+    "cluster": 8,
+    "faces": 829,
+    "seen": 477,
+    "generated": "#A59A97",
+    "sheet": "#94837D",
+    "shift_lab": [
+     -8.0,
+     1.8,
+     2.8
+    ]
+   },
+   {
+    "cluster": 9,
+    "faces": 1131,
+    "seen": 376,
+    "generated": "#F5AA8D",
+    "sheet": "#ECA785",
+    "shift_lab": [
+     -2.2,
+     -2.2,
+     1.2
+    ]
+   },
+   {
+    "cluster": 10,
+    "faces": 472,
+    "seen": 208,
+    "generated": "#796C69",
+    "sheet": "#4C3C39",
+    "shift_lab": [
+     -15.0,
+     1.5,
+     1.5
+    ]
+   },
+   {
+    "cluster": 11,
+    "faces": 750,
+    "seen": 441,
+    "generated": "#A27A51",
+    "sheet": "#876246",
+    "shift_lab": [
+     -9.3,
+     1.2,
+     -7.0
+    ]
+   },
+   {
+    "cluster": 12,
+    "faces": 203,
+    "seen": 37,
+    "generated": "#2E5161"
+   },
+   {
+    "cluster": 13,
+    "faces": 461,
+    "seen": 236,
+    "generated": "#734F36",
+    "sheet": "#7D5B44",
+    "shift_lab": [
+     4.6,
+     -1.0,
+     -2.8
+    ]
+   },
+   {
+    "cluster": 14,
+    "faces": 475,
+    "seen": 94,
+    "generated": "#221B1B",
+    "sheet": "#4F3E38",
+    "shift_lab": [
+     15.0,
+     3.6,
+     5.2
+    ]
+   },
+   {
+    "cluster": 15,
+    "faces": 680,
+    "seen": 464,
+    "generated": "#278B9F",
+    "sheet": "#388392",
+    "shift_lab": [
+     -2.5,
+     2.6,
+     4.5
+    ]
+   },
+   {
+    "cluster": 16,
+    "faces": 1178,
+    "seen": 406,
+    "generated": "#342520",
+    "sheet": "#4D3A35",
+    "shift_lab": [
+     9.5,
+     1.3,
+     0.2
+    ]
+   },
+   {
+    "cluster": 17,
+    "faces": 235,
+    "seen": 38,
+    "generated": "#B6735A"
+   },
+   {
+    "cluster": 18,
+    "faces": 392,
+    "seen": 203,
+    "generated": "#8D6544",
+    "sheet": "#80604B",
+    "shift_lab": [
+     -2.2,
+     -1.8,
+     -9.1
+    ]
+   },
+   {
+    "cluster": 19,
+    "faces": 1409,
+    "seen": 657,
+    "generated": "#5E3B29",
+    "sheet": "#704B39",
+    "shift_lab": [
+     6.9,
+     -0.6,
+     -1.0
+    ]
+   }
+  ]
+ },
+ "mask_faces": {
+  "Warrior_HY_Hero_Body": {
+   "0.0": 18015,
+   "1.0": 985
+  },
+  "Warrior_HY_Hero_Shield": {
+   "0.0": 1446,
+   "0.75": 54
+  },
+  "Warrior_HY_LOD0_Shield": {
+   "0.0": 425,
+   "0.75": 23
+  },
+  "Warrior_HY_LOD1_Shield": {
+   "0.0": 176,
+   "0.75": 4
+  },
+  "Warrior_HY_Hero_Cleaver": {
+   "0.0": 889,
+   "0.75": 111
+  },
+  "Warrior_HY_LOD0_Cleaver": {
+   "0.0": 257,
+   "0.75": 43
+  },
+  "Warrior_HY_LOD1_Cleaver": {
+   "0.0": 123,
+   "0.75": 27
+  }
+ },
+ "unskin_roundtrip_max_m": {
+  "Hero": 4.440892098500626e-16
+ },
+ "props": {
+  "shield": {
+   "scale_vs_generated": 0.8628,
+   "dims_idle": [
+    0.155,
+    0.935,
+    0.933
+   ]
+  },
+  "cleaver": {
+   "scale_vs_generated": 0.956,
+   "dims_idle": [
+    0.603,
+    0.602,
+    0.989
+   ]
+  }
+ },
+ "shadow": {
+  "hull_tris": 1448,
+  "tris": 780
+ },
+ "tris": {
+  "Hero": {
+   "Warrior_HY_Hero_Body": 19000,
+   "Warrior_HY_Hero_Shield": 1500,
+   "Warrior_HY_Hero_Cleaver": 1000,
+   "total": 21500
+  },
+  "LOD0": {
+   "Warrior_HY_LOD0_Body": 3700,
+   "Warrior_HY_LOD0_Shield": 448,
+   "Warrior_HY_LOD0_Cleaver": 300,
+   "total": 4448
+  },
+  "LOD1": {
+   "Warrior_HY_LOD1_Body": 1150,
+   "Warrior_HY_LOD1_Shield": 180,
+   "Warrior_HY_LOD1_Cleaver": 150,
+   "total": 1480
+  },
+  "Shadow": {
+   "total": 780
+  }
+ },
+ "deform": {
+  "Idle@13": {
+   "Hero": {
+    "edges": 28487,
+    "over_1.5": 96,
+    "over_2": 24,
+    "max": 4.03,
+    "p99": 1.268,
+    "bad_z_hist": [
+     2,
+     19,
+     8,
+     35,
+     29,
+     3
+    ],
+    "vs_generated_over_1.5": 123,
+    "vs_generated_over_2": 19,
+    "vs_generated_max": 3.03,
+    "visible_over_1.5_and_15mm": 11,
+    "visible_over_1.5_and_30mm": 0
+   },
+   "LOD0": {
+    "edges": 5550,
+    "over_1.5": 10,
+    "over_2": 1,
+    "max": 2.18,
+    "p99": 1.235,
+    "bad_z_hist": [
+     2,
+     0,
+     1,
+     6,
+     1,
+     0
+    ],
+    "vs_generated_over_1.5": 11,
+    "vs_generated_over_2": 2,
+    "vs_generated_max": 3.09,
+    "visible_over_1.5_and_15mm": 3,
+    "visible_over_1.5_and_30mm": 0
+   },
+   "LOD1": {
+    "edges": 1725,
+    "over_1.5": 0,
+    "over_2": 0,
+    "max": 1.48,
+    "p99": 1.247,
+    "bad_z_hist": [
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "vs_generated_over_1.5": 2,
+    "vs_generated_over_2": 0,
+    "vs_generated_max": 1.6,
+    "visible_over_1.5_and_15mm": 2,
+    "visible_over_1.5_and_30mm": 0
+   }
+  },
+  "Running_A@6": {
+   "Hero": {
+    "edges": 28487,
+    "over_1.5": 178,
+    "over_2": 48,
+    "max": 4.71,
+    "p99": 1.382,
+    "bad_z_hist": [
+     16,
+     51,
+     11,
+     52,
+     43,
+     5
+    ],
+    "vs_generated_over_1.5": 292,
+    "vs_generated_over_2": 60,
+    "vs_generated_max": 6.66,
+    "visible_over_1.5_and_15mm": 87,
+    "visible_over_1.5_and_30mm": 17
+   },
+   "LOD0": {
+    "edges": 5550,
+    "over_1.5": 33,
+    "over_2": 4,
+    "max": 2.67,
+    "p99": 1.36,
+    "bad_z_hist": [
+     4,
+     7,
+     3,
+     15,
+     4,
+     0
+    ],
+    "vs_generated_over_1.5": 71,
+    "vs_generated_over_2": 10,
+    "vs_generated_max": 4.51,
+    "visible_over_1.5_and_15mm": 51,
+    "visible_over_1.5_and_30mm": 20
+   },
+   "LOD1": {
+    "edges": 1725,
+    "over_1.5": 4,
+    "over_2": 1,
+    "max": 2.01,
+    "p99": 1.341,
+    "bad_z_hist": [
+     0,
+     1,
+     1,
+     1,
+     1,
+     0
+    ],
+    "vs_generated_over_1.5": 15,
+    "vs_generated_over_2": 5,
+    "vs_generated_max": 2.51,
+    "visible_over_1.5_and_15mm": 15,
+    "visible_over_1.5_and_30mm": 9
+   }
+  },
+  "Running_A@15": {
+   "Hero": {
+    "edges": 28487,
+    "over_1.5": 156,
+    "over_2": 55,
+    "max": 6.56,
+    "p99": 1.367,
+    "bad_z_hist": [
+     8,
+     44,
+     11,
+     47,
+     41,
+     5
+    ],
+    "vs_generated_over_1.5": 304,
+    "vs_generated_over_2": 65,
+    "vs_generated_max": 12.58,
+    "visible_over_1.5_and_15mm": 82,
+    "visible_over_1.5_and_30mm": 17
+   },
+   "LOD0": {
+    "edges": 5550,
+    "over_1.5": 33,
+    "over_2": 4,
+    "max": 3.24,
+    "p99": 1.326,
+    "bad_z_hist": [
+     5,
+     8,
+     1,
+     15,
+     4,
+     0
+    ],
+    "vs_generated_over_1.5": 80,
+    "vs_generated_over_2": 13,
+    "vs_generated_max": 3.03,
+    "visible_over_1.5_and_15mm": 56,
+    "visible_over_1.5_and_30mm": 21
+   },
+   "LOD1": {
+    "edges": 1725,
+    "over_1.5": 4,
+    "over_2": 0,
+    "max": 1.99,
+    "p99": 1.337,
+    "bad_z_hist": [
+     0,
+     0,
+     3,
+     1,
+     0,
+     0
+    ],
+    "vs_generated_over_1.5": 18,
+    "vs_generated_over_2": 3,
+    "vs_generated_max": 3.11,
+    "visible_over_1.5_and_15mm": 18,
+    "visible_over_1.5_and_30mm": 15
+   }
+  },
+  "1H_Melee_Attack_Chop@12": {
+   "Hero": {
+    "edges": 28487,
+    "over_1.5": 103,
+    "over_2": 28,
+    "max": 4.34,
+    "p99": 1.288,
+    "bad_z_hist": [
+     2,
+     7,
+     8,
+     46,
+     34,
+     6
+    ],
+    "vs_generated_over_1.5": 189,
+    "vs_generated_over_2": 43,
+    "vs_generated_max": 4.41,
+    "visible_over_1.5_and_15mm": 23,
+    "visible_over_1.5_and_30mm": 5
+   },
+   "LOD0": {
+    "edges": 5550,
+    "over_1.5": 15,
+    "over_2": 2,
+    "max": 2.01,
+    "p99": 1.263,
+    "bad_z_hist": [
+     0,
+     0,
+     2,
+     10,
+     3,
+     0
+    ],
+    "vs_generated_over_1.5": 30,
+    "vs_generated_over_2": 5,
+    "vs_generated_max": 2.85,
+    "visible_over_1.5_and_15mm": 14,
+    "visible_over_1.5_and_30mm": 1
+   },
+   "LOD1": {
+    "edges": 1725,
+    "over_1.5": 5,
+    "over_2": 0,
+    "max": 1.72,
+    "p99": 1.291,
+    "bad_z_hist": [
+     0,
+     0,
+     0,
+     4,
+     1,
+     0
+    ],
+    "vs_generated_over_1.5": 3,
+    "vs_generated_over_2": 0,
+    "vs_generated_max": 1.73,
+    "visible_over_1.5_and_15mm": 3,
+    "visible_over_1.5_and_30mm": 2
+   }
+  },
+  "1H_Melee_Attack_Chop@18": {
+   "Hero": {
+    "edges": 28487,
+    "over_1.5": 105,
+    "over_2": 24,
+    "max": 4.63,
+    "p99": 1.278,
+    "bad_z_hist": [
+     5,
+     21,
+     6,
+     43,
+     23,
+     7
+    ],
+    "vs_generated_over_1.5": 174,
+    "vs_generated_over_2": 40,
+    "vs_generated_max": 3.79,
+    "visible_over_1.5_and_15mm": 25,
+    "visible_over_1.5_and_30mm": 5
+   },
+   "LOD0": {
+    "edges": 5550,
+    "over_1.5": 11,
+    "over_2": 1,
+    "max": 2.1,
+    "p99": 1.245,
+    "bad_z_hist": [
+     0,
+     1,
+     1,
+     7,
+     2,
+     0
+    ],
+    "vs_generated_over_1.5": 31,
+    "vs_generated_over_2": 3,
+    "vs_generated_max": 3.03,
+    "visible_over_1.5_and_15mm": 17,
+    "visible_over_1.5_and_30mm": 1
+   },
+   "LOD1": {
+    "edges": 1725,
+    "over_1.5": 1,
+    "over_2": 0,
+    "max": 1.61,
+    "p99": 1.218,
+    "bad_z_hist": [
+     0,
+     0,
+     1,
+     0,
+     0,
+     0
+    ],
+    "vs_generated_over_1.5": 6,
+    "vs_generated_over_2": 0,
+    "vs_generated_max": 1.89,
+    "visible_over_1.5_and_15mm": 6,
+    "visible_over_1.5_and_30mm": 4
+   }
+  }
+ },
+ "fbx": {
+  "path": "/Users/wilsonguenther/cm-hy-chars-scratch/Warrior/exp/Warrior.fbx",
+  "bytes": 1363036,
+  "textures": {
+   "Body": "/Users/wilsonguenther/cm-hy-chars-scratch/Warrior/exp/Warrior_HY_Body_Albedo.png",
+   "Shield": "/Users/wilsonguenther/cm-hy-chars-scratch/Warrior/exp/Warrior_HY_Shield_Albedo.png",
+   "Cleaver": "/Users/wilsonguenther/cm-hy-chars-scratch/Warrior/exp/Warrior_HY_Cleaver_Albedo.png"
+  }
+ },
+ "game_px": {
+  "game_v7": 124.6,
+  "game_hero_vcol": 117.8,
+  "game_hero_tex": 117.8,
+  "game_lod0_vcol": 118.3
+ },
+ "fbx_round_trip": {
+  "objects": {
+   "Warrior_Hero": {
+    "tris": 21500,
+    "groups": 22,
+    "colors": [
+     "Col"
+    ],
+    "uv": [
+     "UVMap"
+    ],
+    "dims": [
+     2.75,
+     2.061,
+     1.034
+    ]
+   },
+   "Warrior_LOD0": {
+    "tris": 4448,
+    "groups": 22,
+    "colors": [
+     "Col"
+    ],
+    "uv": [
+     "UVMap"
+    ],
+    "dims": [
+     2.748,
+     2.064,
+     1.032
+    ]
+   },
+   "Warrior_LOD1": {
+    "tris": 1480,
+    "groups": 22,
+    "colors": [
+     "Col"
+    ],
+    "uv": [
+     "UVMap"
+    ],
+    "dims": [
+     2.751,
+     2.068,
+     1.029
+    ]
+   },
+   "Warrior_Shadow": {
+    "tris": 780,
+    "groups": 18,
+    "colors": [
+     "Col"
+    ],
+    "uv": [
+     "UVMap"
+    ],
+    "dims": [
+     2.747,
+     2.065,
+     1.032
+    ]
+   }
+  },
+  "armature_bones": 41
+ }
+}
