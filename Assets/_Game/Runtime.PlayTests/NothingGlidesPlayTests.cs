@@ -75,6 +75,8 @@ namespace CriticalMass.Runtime.PlayTests
 
         /// <summary>The fixed route's minimum planted-foot travel (the route is about 26 u).</summary>
         public const double RouteMinPlantedTravel = 15.0;
+        /// <summary>Route stance band (u above the foot's lowest body-relative height in the window).</summary>
+        public const float RouteStanceBand = 0.3f;
 
         /// <summary>
         /// The Kaiju's foot slide, measured the same way every run: the adult is walked along a fixed route (10 u straight,
@@ -141,7 +143,10 @@ namespace CriticalMass.Runtime.PlayTests
                 if (++n == Window)
                 {
                     n = 0;
-                    PlantedSlide(pl, pr, pb, 0.08f, out double f, out double b, py);
+                    // The lower foot bears the weight; the band only drops a foot that is clearly in the air. 0.08 u kept
+                    // 6.3 of 25.7 u (run 43504194170: the planted ankle rides up and down more than 8 cm in the heavy
+                    // stomp), so most of the route went unjudged; RouteStanceBand counts nearly every stance tick.
+                    PlantedSlide(pl, pr, pb, RouteStanceBand, out double f, out double b, py);
                     foot += f; body += b;
                 }
             }
