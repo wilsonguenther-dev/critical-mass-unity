@@ -422,6 +422,12 @@ namespace CriticalMass.Runtime.Audio
             }
         }
 
+        /// <summary>
+        /// Free to speak a low-priority line now (nothing playing, nothing queued). A queued line ages out after
+        /// AnnouncerQueue.MaxAgeSeconds, so a rare line (the hill secret) is only handed over when it will really be said.
+        /// </summary>
+        public static bool Free => Instance != null && !IsSpeaking && Instance._queue.Pending == 0;
+
         public static bool IsSpeaking => Instance != null && Instance._lineEnds > Time.unscaledTime;
         /// <summary>The subtitle on screen ("" when none).</summary>
         public static string CurrentText => Instance != null && IsSpeaking && Instance._current != null ? Instance._current.Text : string.Empty;

@@ -360,8 +360,7 @@ namespace CriticalMass.Runtime.Tests
                 AttackTiming.Row(c, windupTicks, hz, out string clip, out double contact, out double len, out double contactAge);
                 double ws = windupTicks / hz;
                 Assert.AreEqual(ws, contactAge, 1e-9, c + " contact age = W");
-                Assert.AreEqual(Math.Max(0, contact - AttackTiming.StrikeLead), AttackTiming.ClipTime(0, contact, len, ws), 1e-9,
-                    c + " the wind-up starts on the strike, StrikeLead before contact");
+                Assert.AreEqual(0, AttackTiming.ClipTime(0, contact, len, ws), 1e-9, c + " starts at clip time 0");
                 // The clip advances most on the last wind-up tick: the hand is fastest when the hit resolves.
                 double last = AttackTiming.ClipTime(ws, contact, len, ws) - AttackTiming.ClipTime(ws - 1 / hz, contact, len, ws);
                 for (int k = 1; k < windupTicks; k++)

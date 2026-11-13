@@ -22,8 +22,6 @@ namespace CriticalMass.Runtime.View.Anim
     {
         /// <summary>Frames of the clip shown before contact in parity mode (W = 0), at 30 fps clip time.</summary>
         public const double ParityLeadFrames = 2;
-        /// <summary>Clip seconds of the strike played during a sim wind-up (ends exactly on the contact frame).</summary>
-        public const double StrikeLead = 0.25;
         /// <summary>Envelope (sim seconds): fade in, fade out at the end of the follow-through, cross-fade on a re-trigger.</summary>
         public const double FadeIn = 0.05, FadeOut = 0.12, Retrigger = 0.06;
 
@@ -136,12 +134,12 @@ namespace CriticalMass.Runtime.View.Anim
             if (windupSeconds > 1e-9)
             {
                 if (age >= windupSeconds) return Math.Min(length, contact + (age - windupSeconds));
-                // Integration batch 4: the wind-up shows the strike (the last StrikeLead clip seconds before contact), eased
-                // in (cubic), so the weapon hand is fastest on the tick the sim resolves the hit (AttackContact), not mid
-                // wind-up. Squeezing the whole 0..contact anticipation into 3 or 4 ticks peaked the hand 2 ticks early.
-                double from = Math.Max(0, contact - StrikeLead);
+                // Integration batch 4: 0..contact over the wind-up, eased in (cubic), so the weapon hand is fastest on the
+                // tick the sim resolves the hit (AttackContact): the last wind-up tick plays the strike, the early ones the
+                // ready pose (which is why it starts at clip time 0: the fade-in from the base pose stays small). A linear
+                // map peaked the hand mid wind-up; a late start (the strike only) peaked it on the fade-in.
                 double s = age / windupSeconds;
-                return from + (contact - from) * s * s * s;
+                return contact * s * s * s;
             }
             double start = Math.Max(0, contact - ParityLeadFrames / 30.0);
             return Math.Min(length, start + age);

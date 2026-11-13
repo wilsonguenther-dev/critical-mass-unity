@@ -608,11 +608,13 @@ namespace CriticalMass.Runtime.PlayTests
             yield return WaitForNewDriver(before);
             Assert.AreEqual(FlowState.Menu, GameFlow.State);
             FlowDirector fd = FlowDirector.Current;
-            yield return Press(fd.MainMenu.Item(OverlayRegistry.Play));
-            Assert.IsFalse(fd.Setup.Spectate, "PLAY never carries Spectate into setup");
-            before = Driver();
-            yield return Press(fd.Setup.StartItem);
-            yield return WaitForNewDriver(before);
+            // Integration batch 4: the home lobby (#60): PLAY opens the mode cards; QUICK then class select and READY.
+            yield return Until(() => fd.MainMenu.IsVisible, 5f, "back to the home lobby");
+            yield return Press(fd.MainMenu.PlayItem);
+            yield return Until(() => fd.Modes.IsVisible, 5f, "PLAY opens the mode cards");
+            yield return Press(fd.Modes.Card(MatchMode.Quick));
+            yield return ConfirmClassThenReady();
+            Assert.IsFalse(SpectatorMode.SpectateNextMatch, "PLAY never carries Spectate into the next match");
             yield return Settle("Play after Spectate");
             SpectatorOverlay overlay2 = Driver().GetComponent<SpectatorOverlay>();
             Assert.IsFalse(SpectatorMode.IsSpectating, "PLAY plays");

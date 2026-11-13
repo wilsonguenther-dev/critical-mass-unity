@@ -43,12 +43,15 @@ namespace CriticalMass.Runtime.Secrets
 
             if (_alone.Step(w))
             {
+                // Read before the line is handed over (handing it over queues it, and the announcer is no longer free).
+                bool announcerFree = CriticalMass.Runtime.Audio.Announcer.Free;
                 SecretsBoard.Fire(SecretsBoard.HillAlone);
                 SecretsBoard.Announce(HillAloneLine);
                 // One caption only: the announcer subtitles its own line, so the secret's bar shows only when nobody
-                // else will (no announcer installed, or its subtitles are off while the access subtitles are on).
+                // else will (no announcer installed, its subtitles are off while the access subtitles are on, or it is
+                // busy with another line and so was not given this one: BatchHooks).
                 if (ShouldShowOwnCaption(SettingsExtras.Subtitles, CriticalMass.Runtime.Audio.Announcer.Instance != null,
-                        CriticalMass.Runtime.Audio.Announcer.SubtitlesEnabled))
+                        CriticalMass.Runtime.Audio.Announcer.SubtitlesEnabled, announcerFree))
                     CaptionBar.Show(LoreText.Announcer(HillAloneLine), 4f);
             }
             ReadEvents(w);
@@ -59,8 +62,8 @@ namespace CriticalMass.Runtime.Secrets
         /// The hill-alone line is captioned exactly once: by the announcer's subtitle when it is installed with subtitles on,
         /// else by the secret's own caption bar when subtitles are on (EditMode test SecretCaptionTests).
         /// </summary>
-        public static bool ShouldShowOwnCaption(bool subtitlesOn, bool announcerInstalled, bool announcerSubtitles) =>
-            subtitlesOn && !(announcerInstalled && announcerSubtitles);
+        public static bool ShouldShowOwnCaption(bool subtitlesOn, bool announcerInstalled, bool announcerSubtitles, bool announcerFree = true) =>
+            subtitlesOn && !(announcerInstalled && announcerSubtitles && announcerFree);
 
         void NewMatch(World w)
         {

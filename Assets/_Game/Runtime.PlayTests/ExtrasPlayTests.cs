@@ -257,25 +257,15 @@ namespace CriticalMass.Runtime.PlayTests
                     yield return null;
                 }
                 Assert.AreEqual(SecretWatcher.HillAloneLine, spoken);
-                // One caption only (batch 4, UI rough spots): the announcer subtitles its own line when it is installed with
-                // subtitles on; the secret's caption bar shows only when nobody else will.
-                bool own = SecretWatcher.ShouldShowOwnCaption(SettingsExtras.Subtitles, Announcer.Instance != null, Announcer.SubtitlesEnabled);
-                if (own)
-                {
-                    Assert.IsTrue(CaptionBar.IsShowing, "subtitles on: the caption shows");
-                    Assert.AreEqual(LoreText.Announcer("an-22"), CaptionBar.Current);
-                }
-                else
-                {
-                    Assert.IsFalse(CaptionBar.IsShowing, "the announcer subtitles the line: no second caption");
-                    if (Announcer.Instance != null && Announcer.SubtitlesEnabled)
-                    {
-                        // The announcer may finish another line first: wait by wall clock (batch-mode frames are about 1 ms).
-                        float until = Time.realtimeSinceStartup + 10f;
-                        while (!heard && Time.realtimeSinceStartup < until) yield return null;
-                        Assert.IsTrue(heard, "the announcer speaks and subtitles the hill line");
-                    }
-                }
+                // One caption only (batch 4): the announcer subtitles the line when it was free to take it, else the
+                // secret's own caption bar shows it (a busy announcer would let a queued low-priority line age out).
+                Assert.IsTrue(SettingsExtras.Subtitles, "subtitles are on by default");
+                bool bar = CaptionBar.IsShowing && CaptionBar.Current == LoreText.Announcer("an-22");
+                // The announcer starts its line on its next Update; wait by wall clock (batch-mode frames are about 1 ms).
+                float until = Time.realtimeSinceStartup + (bar ? 2.5f : 3f);
+                while (!heard && Time.realtimeSinceStartup < until) yield return null;
+                Assert.IsTrue(bar || heard, "the hill line is captioned: caption bar or announcer subtitle");
+                Assert.IsFalse(bar && heard, "never both captions");
             }
             finally
             {
