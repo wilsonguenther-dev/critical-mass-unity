@@ -322,6 +322,30 @@ namespace CriticalMass.Runtime.Tests
         }
 
         [Test]
+        public void WatchIntroIsOnTheTitleAndOnHome()
+        {
+            var go = new GameObject("Story Intro 2 Title Test");
+            try
+            {
+                CriticalMass.Runtime.Hud.TitleScreen title = CriticalMass.Runtime.Hud.TitleScreen.Show(go, null);
+                var watch = title.WatchIntroItem;
+                Assert.IsNotNull(watch, "the title has WATCH INTRO");
+                Assert.AreEqual("WATCH INTRO", watch.Label.text);
+                Assert.IsTrue(watch.interactable);
+                Assert.AreSame(watch, title.PlayNowItem.navigation.selectOnUp, "Up from PLAY NOW reaches WATCH INTRO");
+                Assert.AreSame(title.PlayNowItem, watch.navigation.selectOnDown, "and Down comes back");
+                var m = go.AddComponent<MainMenu>();
+                m.EnsureBuilt();
+                Assert.IsNotNull(m.Item("intro"), "home has WATCH INTRO");
+                Assert.IsTrue(m.Item("intro").interactable);
+            }
+            finally
+            {
+                Object.DestroyImmediate(go);
+            }
+        }
+
+        [Test]
         public void EasesStartAtZeroAndLandOnOne()
         {
             foreach (McEase e in System.Enum.GetValues(typeof(McEase)))
