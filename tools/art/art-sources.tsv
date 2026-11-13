@@ -5,32 +5,32 @@
 #pin	props	1a983c8
 #pin	environment	47e37ac
 #pin	bases	ead6b1e
-#pin	lods	d536d30
+#pin	lods	3b15ccf
 #pin	builder	fff2850
 #pin	demolitions	09e7ac0
 #pin	healer	de9d0bb
 #pin	mascot	d92a9ac
-Warrior.fbx	ef1e13e513784cb5	d536d30	lods/Assets/_Game/Art/Characters/Warrior.fbx
-Warrior_Face.png	fd8a6ce20f18a61b	d536d30	lods/Assets/_Game/Art/Characters/Warrior_Face.png
-Miner.fbx	d4bfae585e8f8821	d536d30	lods/Assets/_Game/Art/Miner/Miner.fbx
-Farmer.fbx	40d25da464bcba3a	d536d30	lods/Assets/_Game/Art/Farmer/Farmer.fbx
-Farmer_Face.png	9c1671af7c0a4840	d536d30	lods/Assets/_Game/Art/Farmer/Farmer_Face.png
-Farmer_OutlineW.json	72a5c21888aed388	d536d30	lods/Assets/_Game/Art/Farmer/Farmer_OutlineW.json
-Kaiju_Adult.fbx	7c2dce3aabc8a723	d536d30	lods/Assets/_Game/Art/Kaiju/Kaiju_Adult.fbx
-Kaiju_Hatchling.fbx	99486449f135fef0	d536d30	lods/Assets/_Game/Art/Kaiju/Kaiju_Hatchling.fbx
-Kaiju_Face_Angry.png	6fcd68d8d6c4962b	d536d30	lods/Assets/_Game/Art/Kaiju/Kaiju_Face_Angry.png
-Kaiju_Face_Berserk.png	012e5968f8b2c9d8	d536d30	lods/Assets/_Game/Art/Kaiju/Kaiju_Face_Berserk.png
-Kaiju_Face_Blink.png	ab564c7e4423f4d2	d536d30	lods/Assets/_Game/Art/Kaiju/Kaiju_Face_Blink.png
-Kaiju_Face_Happy.png	2973ed916afaf019	d536d30	lods/Assets/_Game/Art/Kaiju/Kaiju_Face_Happy.png
-Kaiju_Face_Hurt.png	6280abb1c61583d1	d536d30	lods/Assets/_Game/Art/Kaiju/Kaiju_Face_Hurt.png
-Kaiju_Face_Sleepy.png	11018555850c26a2	d536d30	lods/Assets/_Game/Art/Kaiju/Kaiju_Face_Sleepy.png
-Kaiju_Face.png	3b55aa0ff7fa0193	d536d30	lods/Assets/_Game/Art/Kaiju/Kaiju_Face.png
-Demolitions.fbx	b142aaa4d3c51cb4	d536d30	lods/Assets/_Game/Art/Demolitions/Demolitions.fbx
-DemolitionsFace.png	cf85edfb61718c3b	d536d30	lods/Assets/_Game/Art/Demolitions/DemolitionsFace.png
-Builder.fbx	ed173c311e743305	d536d30	lods/Assets/_Game/Art/Builder/Builder.fbx
-BuilderFace.png	98a8c52c1fabd48c	d536d30	lods/Assets/_Game/Art/Builder/BuilderFace.png
-Healer.fbx	c2599c9672355f86	d536d30	lods/Assets/_Game/Art/Healer/Healer.fbx
-HealerFace.png	bef554b706ac4b9f	d536d30	lods/Assets/_Game/Art/Healer/HealerFace.png
+Warrior.fbx	ae0b27b53e254a1d	3b15ccf	lods/Assets/_Game/Art/Characters/Warrior.fbx
+Warrior_Face.png	fd8a6ce20f18a61b	3b15ccf	lods/Assets/_Game/Art/Characters/Warrior_Face.png
+Miner.fbx	38ff930943c43ab6	3b15ccf	lods/Assets/_Game/Art/Miner/Miner.fbx
+Farmer.fbx	187ba1e16074eb34	3b15ccf	lods/Assets/_Game/Art/Farmer/Farmer.fbx
+Farmer_Face.png	9c1671af7c0a4840	3b15ccf	lods/Assets/_Game/Art/Farmer/Farmer_Face.png
+Farmer_OutlineW.json	40a18d4d0368dbfe	3b15ccf	lods/Assets/_Game/Art/Farmer/Farmer_OutlineW.json
+Kaiju_Adult.fbx	0d866aa24bf699e0	3b15ccf	lods/Assets/_Game/Art/Kaiju/Kaiju_Adult.fbx
+Kaiju_Hatchling.fbx	e71c12f791de3b7a	3b15ccf	lods/Assets/_Game/Art/Kaiju/Kaiju_Hatchling.fbx
+Kaiju_Face_Angry.png	6fcd68d8d6c4962b	3b15ccf	lods/Assets/_Game/Art/Kaiju/Kaiju_Face_Angry.png
+Kaiju_Face_Berserk.png	012e5968f8b2c9d8	3b15ccf	lods/Assets/_Game/Art/Kaiju/Kaiju_Face_Berserk.png
+Kaiju_Face_Blink.png	ab564c7e4423f4d2	3b15ccf	lods/Assets/_Game/Art/Kaiju/Kaiju_Face_Blink.png
+Kaiju_Face_Happy.png	2973ed916afaf019	3b15ccf	lods/Assets/_Game/Art/Kaiju/Kaiju_Face_Happy.png
+Kaiju_Face_Hurt.png	6280abb1c61583d1	3b15ccf	lods/Assets/_Game/Art/Kaiju/Kaiju_Face_Hurt.png
+Kaiju_Face_Sleepy.png	11018555850c26a2	3b15ccf	lods/Assets/_Game/Art/Kaiju/Kaiju_Face_Sleepy.png
+Kaiju_Face.png	3b55aa0ff7fa0193	3b15ccf	lods/Assets/_Game/Art/Kaiju/Kaiju_Face.png
+Demolitions.fbx	9da1870e81127c84	3b15ccf	lods/Assets/_Game/Art/Demolitions/Demolitions.fbx
+DemolitionsFace.png	cf85edfb61718c3b	3b15ccf	lods/Assets/_Game/Art/Demolitions/DemolitionsFace.png
+Builder.fbx	d5afcf8f7fa56817	3b15ccf	lods/Assets/_Game/Art/Builder/Builder.fbx
+BuilderFace.png	98a8c52c1fabd48c	3b15ccf	lods/Assets/_Game/Art/Builder/BuilderFace.png
+Healer.fbx	2f40a8e13bbc0bf2	3b15ccf	lods/Assets/_Game/Art/Healer/Healer.fbx
+HealerFace.png	bef554b706ac4b9f	3b15ccf	lods/Assets/_Game/Art/Healer/HealerFace.png
 Kaiju_Egg.fbx	f5e3fef4526b8785	d908740	kaiju/Assets/_Game/Art/Kaiju/Kaiju_Egg.fbx
 Kaiju_BerserkShards.fbx	9b53959296475b16	d908740	kaiju/Assets/_Game/Art/Kaiju/Kaiju_BerserkShards.fbx
 Kaiju_TelegraphSpikes.fbx	4815b9a6a892944b	d908740	kaiju/Assets/_Game/Art/Kaiju/Kaiju_TelegraphSpikes.fbx
