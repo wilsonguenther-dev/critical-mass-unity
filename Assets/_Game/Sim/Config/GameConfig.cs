@@ -40,33 +40,33 @@ namespace CriticalMass.Sim.Config
             {
                 MaxHp = 160, MoveSpeed = 3.8, Radius = 0.45, AttackDamage = 22, AttackRange = 1.7, AttackArcDeg = 120,
                 AttackCooldown = 0.7, AbilityCooldown = 10, GatherSeconds = 2, CarryCapacity = 1,
-                AttackWindupSeconds = 0.12, RecoverySeconds = 0.08,
+                AttackWindupSeconds = 0.12, RecoverySeconds = 0.08, Mass = 1.6, Poise = 25,
             },
             new ClassConfig
             {
                 MaxHp = 100, MoveSpeed = 4.2, Radius = 0.4, AttackDamage = 12, AttackRange = 1.4, AttackArcDeg = 90,
                 AttackCooldown = 0.6, AbilityCooldown = 9, GatherSeconds = 1, CarryCapacity = 3,
-                AttackWindupSeconds = 0.10, RecoverySeconds = 0.08,
+                AttackWindupSeconds = 0.10, RecoverySeconds = 0.08, Mass = 0.8, Poise = 15,
             },
             new ClassConfig
             {
                 MaxHp = 120, MoveSpeed = 4.0, Radius = 0.45, AttackDamage = 16, AttackRange = 1.5, AttackArcDeg = 90,
                 AttackCooldown = 0.65, AbilityCooldown = 12, GatherSeconds = 2, CarryCapacity = 1,
-                AttackWindupSeconds = 0.10, RecoverySeconds = 0.08,
+                AttackWindupSeconds = 0.10, RecoverySeconds = 0.08, Mass = 1.1, Poise = 18,
             },
             // CM-38: the Demolitions Expert has no regular attack; the attack fields keep the CM-56 miner copy.
             new ClassConfig
             {
                 MaxHp = 120, MoveSpeed = 4.0, Radius = 0.45, AttackDamage = 16, AttackRange = 1.5, AttackArcDeg = 90,
                 AttackCooldown = 0.65, AbilityCooldown = 12, GatherSeconds = 2, CarryCapacity = 1,
-                AttackWindupSeconds = 0.10, RecoverySeconds = 0.08,
+                AttackWindupSeconds = 0.10, RecoverySeconds = 0.08, Mass = 1.1, Poise = 18,
             },
             // CM-56 placeholder: the miner row until CM-39 tunes it. DG-24 keeps it (the mallet swing; Space builds, 12 s).
             new ClassConfig
             {
                 MaxHp = 120, MoveSpeed = 4.0, Radius = 0.45, AttackDamage = 16, AttackRange = 1.5, AttackArcDeg = 90,
                 AttackCooldown = 0.65, AbilityCooldown = 12, GatherSeconds = 2, CarryCapacity = 1,
-                AttackWindupSeconds = 0.10, RecoverySeconds = 0.08,
+                AttackWindupSeconds = 0.10, RecoverySeconds = 0.08, Mass = 1.1, Poise = 18,
             },
             // DG-40 (U-061, not in the browser): the Healer. No weapon, no damage: her attack press is the MEND (Healer.cs);
             // AttackRange is how close bots keep to a fight (they stop there and press attack); AttackCooldown paces the mend.
@@ -74,7 +74,7 @@ namespace CriticalMass.Sim.Config
             {
                 MaxHp = 110, MoveSpeed = 4.1, Radius = 0.42, AttackDamage = 0, AttackRange = 4.5, AttackArcDeg = 90,
                 AttackCooldown = 0.8, AbilityCooldown = 9, GatherSeconds = 1.5, CarryCapacity = 2,
-                AttackWindupSeconds = 0, RecoverySeconds = 0, // the mend is instant
+                AttackWindupSeconds = 0, RecoverySeconds = 0, Mass = 0.9, Poise = 15, // the mend is instant
             },
         };
 
@@ -338,6 +338,10 @@ namespace CriticalMass.Sim.Config
         public double AttackWindupSeconds;
         /// <summary>DG-69: real seconds of slowed follow-through after the hit (the view's recovery; movement stays slowed).</summary>
         public double RecoverySeconds;
+        /// <summary>DG-70 / OD-3: knock distances are divided by this (Warrior heaviest, Farmer lightest).</summary>
+        public double Mass = 1;
+        /// <summary>DG-70: a single hit of at least this much damage staggers this class (HeavyStunSeconds).</summary>
+        public double Poise = 18;
 
         public ClassConfig Clone() => (ClassConfig)MemberwiseClone();
 

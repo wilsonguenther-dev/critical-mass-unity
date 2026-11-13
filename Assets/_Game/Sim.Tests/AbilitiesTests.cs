@@ -18,7 +18,7 @@ namespace CriticalMass.Sim.Tests
     [TestFixture]
     public sealed class AbilitiesTests
     {
-        private static readonly GameConfig Cfg = GameConfig.CreateBrowser5v5();
+        private static readonly GameConfig Cfg = SimPhysicsTests.ClassicBrowser();
         private static readonly double Dt = 1.0 / Cfg.SimHz;
         private static readonly AbilitiesConfig AB = Cfg.Abilities;
 
@@ -30,7 +30,7 @@ namespace CriticalMass.Sim.Tests
                 TeamSize = 5,
                 HumanTeam = TeamId.Azure,
                 HumanClass = cls,
-                Config = GameConfig.CreateBrowser5v5(),
+                Config = SimPhysicsTests.ClassicBrowser(),
             });
         }
 

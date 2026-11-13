@@ -599,7 +599,7 @@ namespace CriticalMass.Sim.Core
             a.SwingRecovery = 0;
             a.SwingFacing = 0;
             a.SwingPending = false;
-            a.HitStunTicks = 0;
+            Knock.Clear(a);
         }
 
         private static void ResetInput(InputFrame f)

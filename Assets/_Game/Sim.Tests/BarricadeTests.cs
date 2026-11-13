@@ -22,7 +22,7 @@ namespace CriticalMass.Sim.Tests
                 TeamSize = 5,
                 HumanTeam = TeamId.Azure,
                 HumanClass = cls,
-                Config = GameConfig.CreateBrowser5v5(),
+                Config = SimPhysicsTests.ClassicBrowser(),
             });
         }
 

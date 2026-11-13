@@ -108,6 +108,7 @@ namespace CriticalMass.Sim.Core
             {
                 Actor a = w.Actors[i];
                 if (!a.Alive || a.StandUp > 0 || !w.Inputs[i].Ability || a.AbilityCd > 0) continue;
+                if (a.HitStunTicks > 0 && Phys.On(w, true)) continue; // DG-70: no cast while staggered
                 if (a.Cls == ClassId.Warrior) CastWarriorShield(w, i);
                 else if (a.Cls == ClassId.Farmer) CastFarmerRoots(w, i);
                 else if (a.Cls == ClassId.Miner) CastMinerBarricade(w, i);

@@ -103,5 +103,10 @@ namespace CriticalMass.Sim.Core
         public bool SwingPending;
         /// <summary>DG-70: ticks of hit-stun left (input ignored, no attack, ability or jump; a wind-up is cancelled).</summary>
         public int HitStunTicks;
+        /// <summary>DG-70: length of the current stagger (ticks) for the view's hit-reaction timing.</summary>
+        public int HitStunLen;
+        /// <summary>DG-70: knock velocity (u/s, Float32), added on top of the input velocity and decaying each tick.</summary>
+        public double KVx;
+        public double KVz;
     }
 }

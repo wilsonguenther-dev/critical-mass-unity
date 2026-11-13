@@ -159,7 +159,7 @@ namespace CriticalMass.Sim.Core
                 }
                 hits++;
                 if (fair) w.Hits.Add(j, i, cc.AttackDamage, ax, az);
-                else Damage.ApplyDamage(w, j, cc.AttackDamage, i, ax, az);
+                else Damage.ApplyMelee(w, j, cc.AttackDamage, i, ax, az);
             }
             // Structures (CM-05): the same swing chips enemy barricades in its arc; a Miner's pick also breaks breakables.
             Barricades.DamageBarricadesInArc(w, i, ax, az, fx, fz, cc.AttackRange, cosHalf, cc.AttackDamage);
@@ -188,7 +188,7 @@ namespace CriticalMass.Sim.Core
         public static void ApplyPendingHits(World w)
         {
             PendingHits h = w.Hits;
-            for (int k = 0; k < h.Count; k++) Damage.ApplyDamage(w, h.Target[k], h.Amount[k], h.Source[k], h.SrcX[k], h.SrcZ[k]);
+            for (int k = 0; k < h.Count; k++) Damage.ApplyMelee(w, h.Target[k], h.Amount[k], h.Source[k], h.SrcX[k], h.SrcZ[k]);
             h.Count = 0;
         }
 

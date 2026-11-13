@@ -23,6 +23,14 @@ namespace CriticalMass.Sim.Tests
         internal const double HillX = 56;
         internal const double HillZ = 40;
 
+        /// <summary>The browser 5v5 config with PhysicsConfig.Classic on: ported browser tests that pin press-tick damage use it.</summary>
+        public static GameConfig ClassicBrowser()
+        {
+            GameConfig c = GameConfig.CreateBrowser5v5();
+            c.Physics.Classic = true;
+            return c;
+        }
+
         internal static World Make(Action<GameConfig> tweak = null, TeamId human = TeamId.Azure, double pace = 0, int seed = 7)
         {
             GameConfig cfg = GameConfig.CreateBrowser5v5();
@@ -369,6 +377,149 @@ namespace CriticalMass.Sim.Tests
                 if (!w.Actors[0].Alive || !w.Actors[5].Alive) break;
             }
             Assert.Greater(agree, 50);
+        }
+        // ------------------------------------------------------------------ DG-70 knockback, hit-stun, weight
+
+        /// <summary>Warrior 0 swings once along +x at victim v standing 1.2 u ahead; returns the victim's x travel 8 ticks after contact.</summary>
+        private static double KnockTravel(World w, int v, out int stunAfterHit)
+        {
+            ParkOthers(w, 0, v);
+            Place(w, 0, HillX - 1.2, HillZ);
+            Place(w, v, HillX, HillZ);
+            Idle(w);
+            Input(w, 0, HillX, HillZ, true);
+            SimStep.Step(w);
+            Input(w, 0, HillX, HillZ, false);
+            int windup = w.Actors[0].SwingWindup;
+            for (int k = 0; k < windup; k++) SimStep.Step(w);
+            Assert.Less(w.Actors[v].Hp, w.Actors[v].MaxHp, "the hit landed");
+            stunAfterHit = w.Actors[v].HitStunTicks;
+            double x0 = HillX;
+            for (int k = 0; k < 8; k++) SimStep.Step(w);
+            return w.X[v] - x0;
+        }
+
+        [Test]
+        public void DG70AWarriorHitPushesAStandingFarmerAtLeast06AndStaggersIt()
+        {
+            World w = Make();
+            double d = KnockTravel(w, 7, out int stun); // 7 = crimson farmer
+            Assert.GreaterOrEqual(d, 0.6);
+            Assert.Greater(stun, 0, "22 damage beats the Farmer's poise 15: a stagger");
+        }
+
+        [Test]
+        public void DG70TheSameHitOnAWarriorMovesItAtMostHalfAsFar()
+        {
+            double farmer = KnockTravel(Make(), 7, out _);
+            double warrior = KnockTravel(Make(), 5, out int stun);
+            Assert.LessOrEqual(warrior, farmer * 0.5 + 1e-4);
+            Assert.Greater(warrior, 0);
+            Assert.AreEqual(0, stun, "22 is under the Warrior's poise 25");
+        }
+
+        /// <summary>A Wall cell whose two west neighbours on the same row and the row cells above / below them are walkable.</summary>
+        internal static bool FindWallFace(World w, out int cx, out int cz)
+        {
+            MapDef m = w.Map;
+            for (cz = 2; cz < m.Height - 2; cz++)
+            {
+                for (cx = 4; cx < m.Width - 1; cx++)
+                {
+                    if (m.Cells[cz * m.Width + cx] != Cell.Wall) continue;
+                    bool ok = true;
+                    for (int dx = 1; dx <= 3 && ok; dx++) ok = MapGrid.IsWalkable(m, cx - dx, cz);
+                    if (ok) return true;
+                }
+            }
+            cx = cz = -1;
+            return false;
+        }
+
+        [Test]
+        public void DG70AVictimPushedIntoAWallStopsAtTheWallAndNeverEntersABlockedCellOver600Ticks()
+        {
+            World w = Make(c => c.Physics.WallsBlockHits = false);
+            Assert.IsTrue(FindWallFace(w, out int cx, out int cz));
+            ParkOthers(w, 0, 7);
+            double r = w.Config.Class(ClassId.Farmer).Radius;
+            Place(w, 7, cx - r - 0.01, cz + 0.5);
+            Place(w, 0, cx - r - 1.3, cz + 0.5);
+            for (int k = 0; k < 600; k++)
+            {
+                Idle(w);
+                w.Actors[7].Hp = w.Actors[7].MaxHp; // keep it alive
+                Input(w, 0, w.X[7], w.Z[7], true);
+                SimStep.Step(w);
+                Assert.IsTrue(Collide.FootprintClear(w, 7, w.X[7], w.Z[7]), "tick " + k);
+                Assert.LessOrEqual(w.X[7], cx - r + 1e-6, "tick " + k);
+            }
+        }
+
+        [Test]
+        public void DG70AStaggerDuringTheWindupCancelsTheSwing()
+        {
+            World w = Make();
+            ParkOthers(w, 0, 7);
+            Place(w, 0, HillX - 1.0, HillZ);
+            Place(w, 7, HillX, HillZ);
+            Idle(w);
+            int head = w.EventHead;
+            Input(w, 0, HillX, HillZ, true); // warrior presses first (wind-up 4)
+            SimStep.Step(w);
+            Input(w, 0, HillX, HillZ, false);
+            SimStep.Step(w);
+            Input(w, 7, HillX - 1.0, HillZ, true); // farmer presses 1 tick later (wind-up 3): its contact would come after the warrior's
+            SimStep.Step(w);
+            Input(w, 7, HillX - 1.0, HillZ, false);
+            for (int k = 0; k < 6; k++) SimStep.Step(w);
+            Assert.AreEqual(w.Actors[0].MaxHp, w.Actors[0].Hp, "the cancelled farmer swing did no damage");
+            Assert.AreEqual(1, Events(w, SimEventType.AttackCancel, head).Count);
+            Assert.AreEqual(1, Events(w, SimEventType.HitStun, head).Count);
+            Assert.GreaterOrEqual(Events(w, SimEventType.Knock, head).Count, 1);
+        }
+
+        [Test]
+        public void DG70HitEventsCarryDirectionImpulseAndTier()
+        {
+            World w = Make();
+            int head = w.EventHead;
+            KnockTravel(w, 7, out _);
+            SimEvent hit = null;
+            for (int i = head; i < w.EventHead; i++) if (w.Events[i % World.EventCapacity].Type == SimEventType.Hit) hit = w.Events[i % World.EventCapacity];
+            Assert.IsNotNull(hit);
+            Assert.AreEqual(1, hit.DirX, 1e-6);
+            Assert.AreEqual(0, hit.DirZ, 1e-6);
+            Assert.AreEqual(0.66 / 0.8, hit.Impulse, 1e-6);
+            Assert.AreEqual(1, hit.Tier, "22 damage = heavy");
+        }
+
+        [Test]
+        public void DG70StaggerBlocksAttackAbilityAndJumpAndReadinessSaysSo()
+        {
+            World w = Make();
+            KnockTravel(w, 7, out int stun);
+            Place(w, 7, HillX, HillZ);
+            w.Actors[7].HitStunTicks = 3;
+            Assert.IsFalse(Combat.AttackReady(w, 7));
+            int head = w.EventHead;
+            InputFrame f = SimInput.EmptyInput();
+            f.Attack = true;
+            f.Ability = true;
+            f.Jump = true;
+            f.AimX = HillX + 3;
+            f.AimZ = HillZ;
+            SimInput.ApplyInput(w, 7, f);
+            SimStep.Step(w);
+            foreach (SimEvent e in Events(w, SimEventType.AttackStart, head)) Assert.AreNotEqual(7, e.A);
+            Assert.AreEqual(0, w.Actors[7].AirLen);
+            Assert.AreEqual(0, w.Actors[7].AbilityCd);
+        }
+
+        [Test]
+        public void DG70ReplayWithKnockbackIsIdentical()
+        {
+            Assert.AreEqual(MatchHash.Run(5, 16, 1800, ClassId.Farmer), MatchHash.Run(5, 16, 1800, ClassId.Farmer));
         }
     }
 }

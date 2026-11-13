@@ -38,8 +38,8 @@ namespace CriticalMass.Sim.Config
         public double KnockDecayPer30Hz = 0.82;
         /// <summary>Knock velocity below this (u/s) is zeroed.</summary>
         public double KnockStopSpeed = 0.1;
-        /// <summary>Melee knock distance (u, for mass 1) per point of damage: the Warrior's 22 cleave = 0.6 u.</summary>
-        public double MeleeKnockPerDamage = 0.0275;
+        /// <summary>Melee knock distance (u, for mass 1) per point of damage: the Warrior's 22 cleave = 0.66 u.</summary>
+        public double MeleeKnockPerDamage = 0.03;
         /// <summary>Kaiju claw knock distance (u, mass 1).</summary>
         public double KaijuClawKnock = 2.0;
         /// <summary>Slam knock distance at the centre and at the edge (u, mass 1), outward.</summary>

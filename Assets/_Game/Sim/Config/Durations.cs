@@ -78,6 +78,12 @@ namespace CriticalMass.Sim.Config
                 AttackWindup[i] = windup ? RealSeconds(c, c.Classes[i].AttackWindupSeconds, pace) : 0;
                 Recovery[i] = windup ? RealSeconds(c, c.Classes[i].RecoverySeconds, pace) : 0;
             }
+            PhysicsConfig p = c.Physics;
+            HeavyStun = RealSeconds(c, p.HeavyStunSeconds, pace);
+            KaijuStun = RealSeconds(c, p.KaijuStunSeconds, pace);
+            SlamStun = RealSeconds(c, p.SlamStunSeconds, pace);
+            BlastStun = RealSeconds(c, p.BlastStunSeconds, pace);
+            CrushStun = RealSeconds(c, p.CrushStunSeconds, pace);
         }
     }
 }
