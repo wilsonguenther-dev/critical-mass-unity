@@ -168,6 +168,7 @@ namespace CriticalMass.Runtime.Hud
     /// <see cref="Clock"/> overrides both. Self-installs on the game object like the pause menu (no overlay registry on
     /// origin yet: DG-01 can call Show / Hide directly).</para>
     /// </summary>
+    [Flow.GameOverlay(Order = 50)]   // installed by GameBootstrap through the DG-01 overlay registry
     public sealed class Banner : MonoBehaviour
     {
         /// <summary>Reference layout (1920 x 1080 units): centre of the banner below the match cluster.</summary>
@@ -409,9 +410,8 @@ namespace CriticalMass.Runtime.Hud
         {
             // Domain reload is off on entering Play Mode: statics survive, so start clean and resubscribe once.
             Banner.ClearAll();
+            // Installed by the DG-01 overlay registry ([GameOverlay] on Banner); this only resets statics.
             SceneManager.sceneLoaded -= OnSceneLoaded;
-            SceneManager.sceneLoaded += OnSceneLoaded;
-            Attach(SceneManager.GetActiveScene());
         }
 
         static void OnSceneLoaded(Scene scene, LoadSceneMode mode) => Attach(scene);

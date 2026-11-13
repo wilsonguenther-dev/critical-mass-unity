@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using CriticalMass.Runtime.Flow;
 using CriticalMass.Runtime.Game;
 using CriticalMass.Runtime.Hud;
 using CriticalMass.Runtime.Hud.Style;
@@ -37,7 +38,7 @@ namespace CriticalMass.Runtime.Menus
     /// runs end to end with none of it present.
     /// <para><b>Words</b>: the words pack's story.json (DG-04, cards read by id "card-1".."card-5", caption and ticks at
     /// simHz). Read from Resources "Lore/story" when the pack is mirrored into a Resources folder, else (editor only) from
-    /// Assets/_Game/Content/Lore/story.json, else the built-in lines below (the pack's own text of 2026-11-12).</para>
+    /// Resources "Lore/story" (Assets/_Game/Resources/Lore/story.json), else the built-in lines below (the pack's own text of 2026-11-12).</para>
     /// <para><b>Narration</b>: one clip per card. Player builds load Resources "Narration/card-&lt;n&gt;" (for example
     /// Assets/_Game/Audio/Resources/Narration/card-&lt;n&gt;.ogg); the editor also accepts
     /// Assets/_Game/Audio/Narration/card-&lt;n&gt;.ogg. A card with a clip lasts the clip plus a short tail; without one, its
@@ -55,7 +56,7 @@ namespace CriticalMass.Runtime.Menus
         public const string PlaceholderSuffix = "-placeholder";
 
         public const string LoreResource = "Lore/story";
-        public const string LoreAssetPath = "Assets/_Game/Content/Lore/story.json";
+        public const string LoreAssetPath = "Assets/_Game/Resources/Lore/story.json";
         public const string ArtResourceRoot = "StoryCards";
         public const string NarrationResourceRoot = "Narration";
         public const string NarrationAssetPathFormat = "Assets/_Game/Audio/Narration/card-{0}.ogg";
@@ -279,6 +280,7 @@ namespace CriticalMass.Runtime.Menus
     /// <see cref="Started"/>, <see cref="Finished"/> (argument: skipped), <see cref="PlayOnFirstLaunch"/> (set false if the
     /// flow plays it itself), <see cref="SeenKey"/>, <see cref="ReducedMotionKey"/>.</para>
     /// </summary>
+    [Flow.GameOverlay(Order = 40)]   // installed by GameBootstrap through the DG-01 overlay registry
     public sealed class StoryIntro : MonoBehaviour
     {
         public const string SeenKey = "cm.story.seen";
@@ -336,7 +338,10 @@ namespace CriticalMass.Runtime.Menus
 
         void Start()
         {
-            if (PlayOnFirstLaunch && TitleScreen.ShowOnBoot && PlayerPrefs.GetInt(SeenKey, 0) == 0) Play();
+            // Sequenced by the game flow (DG-01): only on the first boot's title (before the title, before the first-time
+            // card, which waits for the title to go), never on a reload into a match, results or the menu, never in autoplay.
+            if (PlayOnFirstLaunch && TitleScreen.ShowOnBoot && GameFlow.State == FlowState.Title && !GameFlow.Autoplay &&
+                PlayerPrefs.GetInt(SeenKey, 0) == 0) Play();
         }
 
         // ---- static API ----
@@ -721,9 +726,8 @@ namespace CriticalMass.Runtime.Menus
         static void Install()
         {
             OverlayGuard.ResetStatics();
+            // Installed by the DG-01 overlay registry ([GameOverlay] on each component); this only resets statics.
             SceneManager.sceneLoaded -= OnSceneLoaded;
-            SceneManager.sceneLoaded += OnSceneLoaded;
-            Attach(SceneManager.GetActiveScene());
         }
 
         static void OnSceneLoaded(Scene scene, LoadSceneMode mode) => Attach(scene);

@@ -325,8 +325,10 @@ namespace CriticalMass.Runtime.Game
             if (w == null) { Suppressed = true; return; }
             if (_input == null) _input = Driver.GetComponent<HumanInputSource>();
             // TryGetComponent: GetComponent of a missing type allocates a placeholder in the Editor.
-            TitleUp = Driver.TryGetComponent(out TitleScreen _);
-            Suppressed = Paused || TitleUp;
+            // The bot backdrop behind the title and menus (DG-01) counts as the title: no feed, no achievements; nor do the
+            // results screen's seconds after the end.
+            TitleUp = Driver.TryGetComponent(out TitleScreen _) || (Driver.Request != null && Driver.Request.Backdrop);
+            Suppressed = Paused || TitleUp || Flow.GameFlow.State == Flow.FlowState.Results;
             Log.Pump(w);
         }
 

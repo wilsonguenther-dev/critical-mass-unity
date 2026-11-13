@@ -1,4 +1,5 @@
 using System;
+using CriticalMass.Runtime.Flow;
 using CriticalMass.Runtime.Game;
 using CriticalMass.Runtime.Hud;
 using CriticalMass.Runtime.Input;
@@ -77,6 +78,29 @@ namespace CriticalMass.Runtime.Onboarding
         }
 
         /// <summary>Shows the first-launch question now (the menu can call it; the installer calls it once).</summary>
+        /// <summary>A guided match asked for from the menus; the next Boot build's match starts it (TrialBoot).</summary>
+        internal static bool PendingStart;
+
+        /// <summary>
+        /// "How to play" in the main menu and the pause menu (DG-01's [TutorialStart]). In a match it starts in place; from the
+        /// title, menus or results (a backdrop world) it asks the flow for a new 5 v 5 match at 1x and starts there, so the
+        /// trial never runs on the backdrop behind the menus. The player's last setup is kept for Play again.
+        /// </summary>
+        [TutorialStart]
+        public static void StartFromMenu()
+        {
+            FlowState st = GameFlow.State;
+            if (GameFlow.Enabled && st != FlowState.Match && st != FlowState.Off)
+            {
+                MatchSetupChoice keep = GameFlow.LastSetup;
+                PendingStart = true;
+                GameFlow.BeginMatch(new MatchSetupChoice { Team = keep.Team, Class = keep.Class, TeamSize = 5, Pace = 1 });
+                GameFlow.LastSetup = keep;
+                return;
+            }
+            Start();
+        }
+
         public static TrialOffer ShowOffer()
         {
             SimDriverBehaviour driver = UnityEngine.Object.FindAnyObjectByType<SimDriverBehaviour>();
@@ -108,15 +132,33 @@ namespace CriticalMass.Runtime.Onboarding
     /// Waits on the game object for the title screen to go, then shows the first-launch offer once (player builds only,
     /// as the title screen: never in the editor, batch mode or tests, so no gate or test sees it uninvited).
     /// </summary>
+    [Flow.GameOverlay(Order = 60)]   // installed by GameBootstrap through the DG-01 overlay registry
     public sealed class TrialBoot : MonoBehaviour
     {
         /// <summary>The offer is shown on boot (player builds, done flag not set).</summary>
-        public static bool OfferOnBoot => !Application.isEditor && !Application.isBatchMode && !TrialProgress.Done;
+        public static bool OfferOnBoot => !Application.isEditor && !Application.isBatchMode && !GameFlow.Autoplay && !TrialProgress.Done;
 
         float _readyAt = -1f;
 
         void Update()
         {
+            // A guided match asked for from the menus starts once the new match's world exists.
+            if (Trial.PendingStart && GameFlow.State == FlowState.Match)
+            {
+                SimDriverBehaviour d = GetComponent<SimDriverBehaviour>();
+                if (d == null || d.World == null) return;
+                Trial.PendingStart = false;
+                Trial.Start();
+                enabled = false;
+                return;
+            }
+            // Sequencing (DG-01): story intro, then the title, then this card, which comes up in place of the main menu the
+            // first time the title is dismissed. Never over a match, setup or results.
+            if (GameFlow.Enabled && GameFlow.State != FlowState.Title && GameFlow.State != FlowState.Menu)
+            {
+                enabled = false;
+                return;
+            }
             if (!OfferOnBoot || Trial.IsRunning || TrialOffer.Current != null)
             {
                 enabled = false;
@@ -131,7 +173,9 @@ namespace CriticalMass.Runtime.Onboarding
             if (_readyAt < 0f) _readyAt = Time.unscaledTime + 0.25f;
             if (Time.unscaledTime < _readyAt) return;
             enabled = false;
-            Trial.ShowOffer();
+            // The card stands in for the main menu while it is up (its Skip brings the menu back), so the two never show at once.
+            if (Trial.ShowOffer() != null && GameFlow.State == FlowState.Menu && FlowDirector.Current != null)
+                FlowDirector.Current.MainMenu.Hide();
         }
     }
 
@@ -144,9 +188,9 @@ namespace CriticalMass.Runtime.Onboarding
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         static void Install()
         {
+            // Installed by the DG-01 overlay registry ([GameOverlay] on TrialBoot); PendingStart never survives a play session.
+            Trial.PendingStart = false;
             SceneManager.sceneLoaded -= OnSceneLoaded;
-            SceneManager.sceneLoaded += OnSceneLoaded;
-            Attach(SceneManager.GetActiveScene());
         }
 
         static void OnSceneLoaded(Scene scene, LoadSceneMode mode) => Attach(scene);

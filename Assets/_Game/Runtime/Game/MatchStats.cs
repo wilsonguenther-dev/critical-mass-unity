@@ -131,6 +131,8 @@ namespace CriticalMass.Runtime.Game
         public void Finish(World w)
         {
             Consume(w);
+            CombatTally tally = CombatLog.Current;
+            if (tally != null && tally.World != w) tally = null;
             int n = Math.Min(ActorCount, w.ActorCount);
             for (int i = 0; i < n; i++)
             {
@@ -141,6 +143,15 @@ namespace CriticalMass.Runtime.Game
                 s.Kills = a.Kills;
                 s.Deaths = a.Deaths;
                 s.HillSeconds = a.HillSeconds;
+                if (tally != null)
+                {
+                    // DG-11's CombatLog follows the same world from its own event pump: its knock-outs and deliveries
+                    // are the numbers the kill feed and scoreboard showed, so the results agree with them.
+                    ActorTally t = tally.Tally(i);
+                    s.Kills = t.Knockouts;
+                    s.Biomass = t.BiomassDelivered;
+                    s.Corruption = t.CorruptionDelivered;
+                }
                 s.Points = PointsFor(s);
             }
             Finished = w.Match.Phase == MatchPhase.Ended;

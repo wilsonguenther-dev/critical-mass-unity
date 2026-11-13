@@ -74,6 +74,7 @@ namespace CriticalMass.Runtime.Menus
     /// <see cref="Started"/>, <see cref="Ended"/>, <see cref="TitleOpen"/> (set it to the flow's own "title is showing"
     /// test; by default the tour runs while a TitleScreen component is on the game), <see cref="Enabled"/>.</para>
     /// </summary>
+    [Flow.GameOverlay(Order = 41)]   // installed by GameBootstrap through the DG-01 overlay registry
     public sealed class AttractMode : MonoBehaviour
     {
         public const double IdleSeconds = AttractClock.DefaultIdleSeconds;

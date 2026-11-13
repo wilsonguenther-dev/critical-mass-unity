@@ -1,3 +1,4 @@
+using CriticalMass.Runtime.Flow;
 using CriticalMass.Runtime.Game;
 using CriticalMass.Runtime.Hud;
 using CriticalMass.Runtime.Hud.Style;
@@ -130,7 +131,7 @@ namespace CriticalMass.Runtime.Onboarding
         {
             TrialProgress.Done = true;
             Close(false);
-            Trial.Start();
+            Trial.StartFromMenu();   // from the menus: a fresh 5 v 5 match through the flow; in a match: in place
         }
 
         void OnSkip()
@@ -139,6 +140,8 @@ namespace CriticalMass.Runtime.Onboarding
             Close(true);
             MascotGuide m = MascotGuide.Instance;
             if (m != null) m.Hide();
+            // The first-time card stood in for the main menu (TrialBoot): bring the menu back.
+            if (GameFlow.Enabled && GameFlow.State == FlowState.Menu && FlowDirector.Current != null) FlowDirector.Current.ShowMenu();
         }
 
         void Close(bool restoreScale)

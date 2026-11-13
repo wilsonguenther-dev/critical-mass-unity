@@ -1,6 +1,7 @@
 using System.Globalization;
 using CriticalMass.Runtime.Flow;
 using CriticalMass.Runtime.Game;
+using CriticalMass.Runtime.Hud;
 using CriticalMass.Runtime.Hud.Style;
 using CriticalMass.Runtime.Hud.Ui;
 using CriticalMass.Runtime.Menu;
@@ -20,7 +21,8 @@ namespace CriticalMass.Runtime.Menus
     /// </summary>
     public sealed class ResultsScreen : FlowScreen
     {
-        MenuItem _again, _change, _menu;
+        MenuItem _again, _change, _menu, _achievements;
+        AchievementList _list;
         Text _title, _line, _reason, _azSecs, _crSecs, _footer;
         VectorShape _bar;
         HudIcon _kaijuIcon, _youPortrait;
@@ -63,21 +65,27 @@ namespace CriticalMass.Runtime.Menus
             BuildYou(space, 700f);
             BuildMvps(space, 1280f);
 
-            _menu = Button(space, "Main Menu", 240f, 880f, 440f, 84f, "MAIN MENU", Back);
-            _change = Button(space, "Change Class", 740f, 880f, 440f, 84f, "CHANGE CLASS", () => Director.ShowSetup(true));
-            _again = Button(space, "Play Again", 1240f, 880f, 440f, 84f, "PLAY AGAIN", () => Director.PlayAgain(), 38);
+            _menu = Button(space, "Main Menu", 160f, 880f, 360f, 84f, "MAIN MENU", Back);
+            _achievements = Button(space, "Achievements", 560f, 880f, 360f, 84f, "ACHIEVEMENTS", ToggleAchievements);
+            _change = Button(space, "Change Class", 960f, 880f, 360f, 84f, "CHANGE CLASS", () => Director.ShowSetup(true));
+            _again = Button(space, "Play Again", 1360f, 880f, 400f, 84f, "PLAY AGAIN", () => Director.PlayAgain(), 38);
             _again.Body.RimPx = 4f;
             _again.Body.SetRim(Brass);
-            MenuItem[] row = { _menu, _change, _again };
-            for (int i = 0; i < 3; i++)
+            MenuItem[] row = { _menu, _achievements, _change, _again };
+            for (int i = 0; i < row.Length; i++)
             {
                 row[i].navigation = new Navigation
                 {
                     mode = Navigation.Mode.Explicit,
-                    selectOnLeft = row[(i + 2) % 3],
-                    selectOnRight = row[(i + 1) % 3],
+                    selectOnLeft = row[(i + row.Length - 1) % row.Length],
+                    selectOnRight = row[(i + 1) % row.Length],
                 };
             }
+            // DG-38's list (the kill-feed item's AchievementList): this screen shows it, so the toast's own end-of-match
+            // copy stays off. Hidden until ACHIEVEMENTS is pressed; it sits over the cards, above the button row.
+            AchievementToast.ShowListAtMatchEnd = false;
+            _list = AchievementList.Build(space, 580f, 236f);
+            _list.Rt.gameObject.SetActive(false);
             DefaultFocus = _again;
             _footer = MenuUi.Label(space, "Footer", CMTokens.Mono, 18, CMTokens.WithAlpha(Cream, 0.7f), TextAnchor.MiddleRight, 1180f, 990f,
                 600f, 30f, "", 2f);
@@ -147,6 +155,7 @@ namespace CriticalMass.Runtime.Menus
             _stats = stats;
             _sum = sum;
             EnsureBuilt();
+            if (_list != null) _list.Rt.gameObject.SetActive(false);
             Refresh();
         }
 
@@ -227,6 +236,25 @@ namespace CriticalMass.Runtime.Menus
             Refresh();
         }
 
-        public override void Back() => Director.ToMainMenu();
+        public bool AchievementsOpen => _list != null && _list.Rt.gameObject.activeSelf;
+
+        void ToggleAchievements()
+        {
+            if (_list == null) return;
+            bool on = !_list.Rt.gameObject.activeSelf;
+            if (on) _list.Refresh(Achievements.Current);
+            _list.Rt.gameObject.SetActive(on);
+        }
+
+        /// <summary>Back closes the achievements list first, then goes to the main menu.</summary>
+        public override void Back()
+        {
+            if (AchievementsOpen)
+            {
+                _list.Rt.gameObject.SetActive(false);
+                return;
+            }
+            Director.ToMainMenu();
+        }
     }
 }

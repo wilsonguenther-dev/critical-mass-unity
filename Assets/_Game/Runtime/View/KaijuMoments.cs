@@ -240,6 +240,7 @@ namespace CriticalMass.Runtime.View
     /// </list>
     /// API for other items: <see cref="MomentRaised"/>, <see cref="Tracker"/>, <see cref="SpotlightOn"/>.
     /// </summary>
+    [Flow.GameOverlay(Order = 51, Scope = Flow.OverlayScope.MatchOnly)]   // installed by GameBootstrap through the DG-01 overlay registry
     public sealed class KaijuMoments : MonoBehaviour
     {
         public const double SpotlightRadius = 6;
@@ -796,9 +797,8 @@ namespace CriticalMass.Runtime.View
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         static void Install()
         {
+            // Installed by the DG-01 overlay registry ([GameOverlay], match only, never behind the menus).
             SceneManager.sceneLoaded -= OnSceneLoaded;
-            SceneManager.sceneLoaded += OnSceneLoaded;
-            Attach(SceneManager.GetActiveScene());
         }
 
         static void OnSceneLoaded(Scene scene, LoadSceneMode mode) => Attach(scene);
