@@ -34,7 +34,7 @@ T0 = time.time()
 GROUPS = ["skin", "hair", "teal", "navy", "cream", "trouser", "leather", "leather_dark", "boot", "brass", "stone",
           "stone_dark", "wrap", "wood", "iron", "glow", "stone_blade", "wood_seam"]
 GID = {n: i for i, n in enumerate(GROUPS)}
-RIGID = {GID[n] for n in ("stone", "stone_dark", "brass")}
+RIGID = {GID[n] for n in ("stone", "stone_dark", "brass", "leather_dark", "wrap", "leather")}
 CAM_PITCH, CAM_FOV, CAM_DIST = 55.0, 35.0, 23.4
 THIN_BIBLE, THICK_BIBLE = 0.0055, 0.0135          # metres on the 2.0 u figure (v7 used 0.0135)
 THIN_PX, THICK_PX = 1.25, 2.5                     # at the gameplay camera, 1080p
@@ -69,7 +69,7 @@ _z = (_n - (-_down) * _n.dot(-_down)).normalized()
 T_CLEAVER = held("handslot.r", poses["handslot.r"].translation.copy(), _z, -_down)
 
 
-def mesh_from_np(name, v, f, uv=None, n=None):
+def mesh_from_np(name, v, f, uv=None, n=None, cn=None):
     me = bpy.data.meshes.new(name)
     me.vertices.add(len(v))
     me.vertices.foreach_set("co", np.ascontiguousarray(v, np.float32).ravel())
@@ -89,7 +89,9 @@ def mesh_from_np(name, v, f, uv=None, n=None):
         me.loops.foreach_get("vertex_index", li)
         layer = me.uv_layers.new(name="UVMap")
         layer.data.foreach_set("uv", np.ascontiguousarray(uv[li], np.float32).ravel())
-    if n is not None:
+    if cn is not None and len(cn) * 3 == len(me.loops):
+        me.normals_split_custom_set([tuple(x) for x in cn.reshape(-1, 3).tolist()])
+    elif n is not None:
         me.normals_split_custom_set_from_vertices([tuple(x) for x in n.tolist()])
     return me
 
@@ -125,9 +127,11 @@ for key, obname, T, slot in (("body", "WarriorLD_Body", None, None), ("shield", 
     v, n, f, uv, gid, comp = z["v"], z["n"], z["f"], z["uv"], z["gid"], z["comp"]
     if key == "body":
         BODY_GID = gid
+    cn = z["cn"].reshape(-1, 3)
     if T is not None:
         v, n = xform(T, v, n)
-    me = mesh_from_np(obname, v, f, uv, n)
+        cn = xform(T, np.zeros((1, 3), np.float32), cn)[1]
+    me = mesh_from_np(obname, v, f, uv, n, cn.reshape(-1, 3, 3))
     ob = bpy.data.objects.new(obname, me)
     coll.objects.link(ob)
     # ---- weights
@@ -143,6 +147,34 @@ for key, obname, T, slot in (("body", "WarriorLD_Body", None, None), ("shield", 
                 for b, w in oldw[idx].items():
                     acc[b] = acc.get(b, 0.0) + w * wgt
             W[i] = acc
+        # smooth the transferred weights over each piece (nearest-vertex transfer is discontinuous between old parts)
+        bones = sorted({b for acc in W for b in acc})
+        bi = {b: k for k, b in enumerate(bones)}
+        Wm = np.zeros((len(v), len(bones)), np.float64)
+        for i, acc in enumerate(W):
+            tot = sum(acc.values()) or 1.0
+            for b, w in acc.items():
+                Wm[i, bi[b]] = w / tot
+        _, weld = np.unique(np.round(v, 4), axis=0, return_inverse=True)
+        weld = weld.ravel()
+        ed = np.concatenate([f[:, [0, 1]], f[:, [1, 2]], f[:, [2, 0]]])
+        ea, eb = weld[ed[:, 0]], weld[ed[:, 1]]
+        nw = weld.max() + 1
+        Ww = np.zeros((nw, len(bones)))
+        cnt = np.zeros(nw)
+        np.add.at(Ww, weld, Wm)
+        np.add.at(cnt, weld, 1.0)
+        Ww /= cnt[:, None]
+        for _ in range(24):
+            acc2 = np.zeros_like(Ww)
+            deg = np.zeros(nw)
+            np.add.at(acc2, ea, Ww[eb])
+            np.add.at(acc2, eb, Ww[ea])
+            np.add.at(deg, ea, 1.0)
+            np.add.at(deg, eb, 1.0)
+            Ww = 0.4 * Ww + 0.6 * acc2 / np.maximum(deg, 1.0)[:, None]
+        Wm = Ww[weld]
+        W = [{bones[k]: float(Wm[i, k]) for k in np.nonzero(Wm[i] > 0.02)[0]} for i in range(len(v))]
         head = (gid == GID["hair"]) | ((gid == GID["skin"]) & (v[:, 2] > 1.31)) | ((gid == GID["brass"]) & (v[:, 2] > 1.6))
         for i in np.where(head)[0]:
             W[i] = {"head": 1.0}
@@ -328,8 +360,8 @@ def make_ld_material(name, albedo=None, mask=None, flat=None):
     return m
 
 
-albedo = img(os.path.join(WORK, "Warrior_LD_Albedo_1024.png"), "sRGB")
-maskim = img(os.path.join(WORK, "Warrior_LD_Mask_1024.png"), "Non-Color")
+albedo = img(os.path.join(WORK, "Warrior_LD_Albedo_2048.png"), "sRGB")
+maskim = img(os.path.join(WORK, "Warrior_LD_Mask_2048.png"), "Non-Color")
 MAT = make_ld_material("CM_ToonTex", albedo, maskim)
 CLAY = make_ld_material("LD_Clay", flat=(0.52, 0.47, 0.42))
 INK = toon.make_outline_material("LD_Ink")

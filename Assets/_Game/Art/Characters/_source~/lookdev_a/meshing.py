@@ -15,9 +15,9 @@ F = np.float32
 # game-mesh triangle budgets and per-material weights (more where the eye goes: face, hair, shield, brass)
 BUDGET = {"body": 15500, "shield": 4200, "cleaver": 1500}
 WEIGHT = {"skin": 3.2, "hair": 1.25, "brass": 1.0, "wrap": 0.6, "trouser": 0.8, "navy": 0.75, "wood_seam": 0.3, "leather_dark": 0.6, "wood": 1.3,
-          "glow": 1.2, "stone": 1.1}
-TEXEL = {"skin_head": 1.9, "shield": 0.85, "cleaver": 1.0}
-RIGID = {"stone", "stone_dark", "brass"}
+          "glow": 1.2, "stone": 1.5}
+TEXEL = {"skin_head": 2.6, "shield": 0.85, "cleaver": 1.0}
+HARD = {"stone", "stone_blade", "wood", "iron", "glow", "brass", "wood_seam"}     # flat planes keep flat shading normals
 
 
 def clean(v, f):
@@ -76,7 +76,7 @@ def run(work):
         hv, hf = np.concatenate(hv), np.concatenate(hf)
         np.savez(os.path.join(work, f"high_{name}.npz"), v=hv, f=hf.astype(np.int32))
         wsum = sum(a * WEIGHT.get(W.GROUPS[g], 1.0) for g, _, _, a, _ in parts)
-        V, Fc, Gd, Nn, Cp = [], [], [], [], []
+        V, Fc, Gd, Nn, Cp, CN = [], [], [], [], [], []
         nv = 0
         ncomp = 0
         for gid, v, f, a, atot in parts:
@@ -84,12 +84,19 @@ def run(work):
                 continue
             want = max(60, int(BUDGET[name] * a * WEIGHT.get(W.GROUPS[gid], 1.0) / wsum))
             # decimate the CLOSED shell (open borders collapse into spikes), then drop the buried faces
-            target = int(want * min(4.0, atot / a))
+            target = int(want * min(1.6, atot / a))
             for agg in (5, 7, 9, 10, 10):
                 if len(f) <= target * 1.08:
                     break
                 v, f = fast_simplification.simplify(v.astype(F), f.astype(np.int32), target_count=target, agg=agg)
                 v, f = clean(np.asarray(v, F), np.asarray(f, np.int64))
+            if len(f) > target * 1.25:             # the first decimator stalls on thin slabs: second engine, same algorithm
+                import pyfqmr
+                ms = pyfqmr.Simplify()
+                ms.setMesh(v.astype(np.float64), f.astype(np.int32))
+                ms.simplify_mesh(target_count=target, aggressiveness=8, preserve_border=False, verbose=False, max_iterations=200)
+                v2, f2, _ = ms.getMesh()
+                v, f = clean(np.asarray(v2, F), np.asarray(f2, np.int64))
             vol = o.fld[gid]
             for _ in range(2):                     # pull the decimated vertices back onto the true surface
                 v = v - o.grad(vol, v) * o.s(vol, v)[:, None]
@@ -102,6 +109,15 @@ def run(work):
             print(f"  {name}.{W.GROUPS[gid]} want {want} got {len(f)}", flush=True)
             n = o.grad(vol, v, o.h * 1.5)
             comp = components(len(v), f)
+            if W.GROUPS[gid] in HARD:
+                # shading normal of each corner = sculpt normal a third of the way into its face: big flat faces
+                # shade flat, bevels and curves stay smooth (what a face-weighted normal modifier does, from the field)
+                tri = v[f]
+                q = (tri * 0.62 + tri.mean(1, keepdims=True) * 0.38).reshape(-1, 3).astype(F)
+                q = q - o.grad(vol, q) * o.s(vol, q)[:, None]
+                CN.append(o.grad(vol, q, o.h * 1.5).reshape(-1, 3, 3))
+            else:
+                CN.append(n[f])
             V.append(v.astype(F))
             Fc.append(f + nv)
             Gd.append(np.full(len(v), gid, np.int32))
@@ -110,7 +126,7 @@ def run(work):
             ncomp += comp.max() + 1
             nv += len(v)
         V, Fc, Gd, Nn, Cp = np.concatenate(V), np.concatenate(Fc), np.concatenate(Gd), np.concatenate(Nn), np.concatenate(Cp)
-        low[name] = dict(v=V, f=Fc, gid=Gd, n=Nn, comp=Cp)
+        low[name] = dict(v=V, f=Fc, gid=Gd, n=Nn, comp=Cp, cn=np.concatenate(CN))
         # atlas: head skin gets more texels; one xatlas mesh per density class
         fg = Gd[Fc[:, 0]]
         if name == "body":
@@ -139,17 +155,19 @@ def run(work):
     out = {}
     for i, (name, fidx) in enumerate(order):
         vmap, idx, uv = atlas[i]
-        d = out.setdefault(name, dict(v=[], f=[], uv=[], gid=[], n=[], comp=[], nv=0))
+        d = out.setdefault(name, dict(v=[], f=[], uv=[], gid=[], n=[], comp=[], cn=[], nv=0))
         L = low[name]
         d["v"].append(L["v"][vmap])
         d["n"].append(L["n"][vmap])
         d["gid"].append(L["gid"][vmap])
         d["comp"].append(L["comp"][vmap])
         d["uv"].append(uv.astype(F))
+        assert len(idx) == len(fidx)
+        d["cn"].append(L["cn"][fidx])
         d["f"].append(idx.astype(np.int64) + d["nv"])
         d["nv"] += len(vmap)
     for name, d in out.items():
-        arr = {k: np.concatenate(d[k]) for k in ("v", "f", "uv", "gid", "n", "comp")}
+        arr = {k: np.concatenate(d[k]) for k in ("v", "f", "uv", "gid", "n", "comp", "cn")}
         np.savez(os.path.join(work, f"low_{name}.npz"), **arr)
         stats["objects"][name]["game_verts"] = int(len(arr["v"]))
     stats["atlas"] = {"charts": int(atlas.chart_count), "utilization": float(np.mean(atlas.utilization))}

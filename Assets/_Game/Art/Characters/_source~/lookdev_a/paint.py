@@ -55,15 +55,15 @@ def noise(P, freq, off=0.0):
 
 # material: base, shade, lit (bible palette + sampled lit/shade from the crops), style
 MAT = {
-    "skin": ("#F7B48A", "#DE8C68", "#FFD3B0"), "hair": ("#553842", "#38232F", "#77525A"),
-    "teal": ("#2A95AE", "#1B6186", "#62CBDC"), "navy": ("#2A374D", "#1A2136", "#465A80"),
+    "skin": ("#F7B48A", "#DE8C68", "#FFD3B0"), "hair": ("#43302F", "#2B1D21", "#664847"),
+    "teal": ("#1F8CAA", "#135A80", "#58C6DA"), "navy": ("#2A374D", "#1A2136", "#465A80"),
     "cream": ("#F2E5D5", "#CDB3A2", "#FFF8EC"), "trouser": ("#DCC4AD", "#A88B7E", "#F4E6D4"),
-    "leather": ("#AB6844", "#70402F", "#D09064"), "leather_dark": ("#633E2D", "#3E2520", "#8A5B40"),
-    "boot": ("#84533A", "#553226", "#A97450"), "brass": ("#C79245", "#7C4F2B", "#F3D07E"),
-    "stone": ("#C2A999", "#746B76", "#EBD8C5"), "stone_dark": ("#8B8286", "#55505C", "#B9B0B0"),
-    "wrap": ("#3A3346", "#262231", "#57506A"), "wood": ("#A66541", "#6F3F2C", "#CB8D5E"),
-    "iron": ("#576880", "#34405A", "#8EA2BE"), "glow": ("#4FE3F0", "#1FA9CF", "#E4FDFF"),
-    "stone_blade": ("#8493AC", "#4F5B7A", "#BAC8DC"), "wood_seam": ("#5A3526", "#3A2019", "#6A3E2A"),
+    "leather": ("#AD6743", "#733F2C", "#D39266"), "leather_dark": ("#633E2D", "#3E2520", "#8A5B40"),
+    "boot": ("#8A5535", "#573224", "#B27A50"), "brass": ("#C79245", "#7C4F2B", "#F3D07E"),
+    "stone": ("#C4AFA1", "#8C7A6F", "#EBDACA"), "stone_dark": ("#8C7A6F", "#584E52", "#B9A9A0"),
+    "wrap": ("#3A3346", "#262231", "#57506A"), "wood": ("#B36C42", "#7A452C", "#D4955F"),
+    "iron": ("#58697E", "#34405A", "#8EA2BE"), "glow": ("#4FE3F0", "#1FA9CF", "#E4FDFF"),
+    "stone_blade": ("#6F7F98", "#4A5872", "#A9B9CF"), "wood_seam": ("#5A3526", "#3A2019", "#6A3E2A"),
 }
 INK = hx("#18233B")
 LIGHTS = {"body": (-0.34, -0.30, 0.86), "shield": (-0.2, 0.84, 0.48), "cleaver": (-0.5, 0.6, 0.6)}
@@ -125,7 +125,7 @@ def paint(o, P, gid):
         eb = T["edge_b"][m]
         hard = name in ("stone", "stone_dark", "stone_blade", "brass", "iron", "hair")
         w = 0.035 if hard else 0.16                       # crisp planes on hard materials, soft roll on cloth and skin
-        t_sh = ss(0.50 - w, 0.50 + w, h_)
+        t_sh = ss((0.58 if hard else 0.50) - w, (0.58 if hard else 0.50) + w, h_)
         t_li = ss(0.80 - w * 0.8, 0.80 + w * 0.8, h_)
         c = mix(mix(s, b, t_sh), l, t_li * (0.75 if hard else 0.45))
         c = c * (0.90 + 0.10 * h_[:, None])              # a slow painted gradient across each form
@@ -142,10 +142,14 @@ def paint(o, P, gid):
             crack = ss(0.012, 0.004, np.abs(noise(p, (6, 6, 6), 1.3) - 0.5)) * ss(0.62, 0.72, noise(p, (3, 3, 3), 9.0))
             c = mix(c, s * 0.72, crack * 0.75)
             if name == "stone":                           # small teal shards (team glow), a few per block
-                tq = noise(p, (7.5, 7.5, 7.5), 21.0)
-                shard = ss(0.795, 0.805, tq) * ss(0.25, 0.45, a_) * (1 - ss(0.2, 0.4, eb) * 0.0)
-                c = mix(c, mix(hx("#35B7D2"), hx("#8DEBF5"), ss(0.82, 0.88, tq)), shard)
-                c = mix(c, hx("#1B6186"), shard * ss(0.815, 0.80, tq) * 0.8)
+                # crisp crystal chips: an octahedron in some cells of a 13 cm lattice, cut by the stone surface
+                cell = np.floor(p * 7.7)
+                q = p * 7.7 - cell - 0.5
+                hsh = np.abs(np.sin(cell @ np.array([12.9898, 78.233, 37.719], F)) * 43758.5453) % 1.0
+                oct_ = np.abs(q[:, 0]) * 1.3 + np.abs(q[:, 1]) + np.abs(q[:, 2]) * 1.15
+                shard = ss(0.275, 0.262, oct_) * (hsh < 0.30) * ss(0.35, 0.5, a_)
+                c = mix(c, mix(hx("#2CB4D2"), hx("#93EEF6"), ss(0.20, 0.05, oct_) * ss(0.4, 0.7, h_)[:, None] if False else ss(0.20, 0.05, oct_)), shard)
+                c = mix(c, hx("#176083"), shard * ss(0.235, 0.262, oct_) * 0.85)            # dark rim: the chip sits IN the stone
                 glow[m] = shard
                 emis[m] = shard * 0.45
         elif name in ("brass", "iron"):
@@ -193,6 +197,7 @@ def paint(o, P, gid):
             glow[m] = 1.0
             emis[m] = 1.0
         elif name == "teal":
+            c = mix(c, s * 0.80, ss(0.10, 0.55, c_) * 0.55)               # fold creases drawn dark and clean
             c = mix(c, l, hi_e * 0.45)
             if o.name == "body":                          # tabard: a pale band and hem trim that follow the zigzag
                 ax = np.abs(p[:, 0])

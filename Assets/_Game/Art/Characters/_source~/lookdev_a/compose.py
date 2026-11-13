@@ -165,3 +165,19 @@ for nm in ("Albedo", "Mask"):
                            "mask 1024 (linear): R team cloth, G team glow, B emission, A baked occlusion (not shown)", fill=(40, 40, 50), font=font(15))
     row([p], f"texture-{nm.lower()}.jpg")
 json.dump(iou, open(os.path.join(OUT, "iou.json"), "w"), indent=1)
+
+# one 960 px check sheet for the builder's own eyes (front, face strip, gameplay crops)
+parts = [Image.open(os.path.join(OUT, n)) for n in ("sbs-front.jpg", "strip-face-bible-v7-new.jpg", "game-84px.jpg")]
+parts = [p.resize((960, round(p.height * 960 / p.width)), Image.LANCZOS) for p in parts]
+sheet = Image.new("RGB", (960, sum(p.height for p in parts)), CREAM)
+y = 0
+for p in parts:
+    sheet.paste(p, (0, y))
+    y += p.height
+q = 70
+while True:
+    sheet.save(os.path.join(WORK, "check_sheet.jpg"), quality=q)
+    if os.path.getsize(os.path.join(WORK, "check_sheet.jpg")) < 148 * 1024 or q <= 30:
+        break
+    q -= 6
+print("CHECK", sheet.size, q)
