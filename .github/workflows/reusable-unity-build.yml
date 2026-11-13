@@ -90,15 +90,17 @@ jobs:
           TARGET: ${{ inputs.target-platform }}
           NAME: ${{ inputs.artifact-name }}
         run: |
-          sha=$(git rev-parse HEAD); count=$(git rev-list --count HEAD)
+          sha=$(git rev-parse HEAD); count=$(git rev-list --count HEAD); day=$(date -u +%Y%m%d)
           p="${PARAMS//\{sha\}/$sha}"; p="${p//\{count\}/$count}"; p="${p//\{ref\}/${REF//[^A-Za-z0-9._\/-]/_}}"
-          { echo "sha=$sha"; echo "count=$count"; echo "params=$p"; echo "artifact=${NAME:-player-$TARGET}"; } >> "$GITHUB_OUTPUT"
+          { echo "sha=$sha"; echo "count=$count"; echo "day=$day"; echo "params=$p"; echo "artifact=${NAME:-player-$TARGET}"; } >> "$GITHUB_OUTPUT"
           echo "building $REF at ${sha:0:12} (commit $count) for $TARGET; unity params: $p"
       - uses: actions/cache/restore@v4
         id: lib
         with:
           path: ${{ inputs.project-path }}/Library
-          key: ${{ inputs.cache-prefix }}-${{ inputs.target-platform }}-${{ hashFiles(format('{0}/Packages/packages-lock.json', inputs.project-path), format('{0}/ProjectSettings/ProjectVersion.txt', inputs.project-path)) }}-${{ steps.meta.outputs.sha }}
+          # One key per target, package set and UTC day (not per commit): a Library is ~1.4 GB and the repo's cache is
+          # capped at 10 GB, so per-commit saves evict everyone's caches within the hour. At most one save a day here.
+          key: ${{ inputs.cache-prefix }}-${{ inputs.target-platform }}-${{ hashFiles(format('{0}/Packages/packages-lock.json', inputs.project-path), format('{0}/ProjectSettings/ProjectVersion.txt', inputs.project-path)) }}-d${{ steps.meta.outputs.day }}
           restore-keys: |
             ${{ inputs.cache-prefix }}-${{ inputs.target-platform }}-${{ hashFiles(format('{0}/Packages/packages-lock.json', inputs.project-path), format('{0}/ProjectSettings/ProjectVersion.txt', inputs.project-path)) }}-
             ${{ inputs.cache-prefix }}-${{ inputs.target-platform }}-
