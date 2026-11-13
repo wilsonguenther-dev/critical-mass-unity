@@ -14,6 +14,19 @@
 # Safety: `pull_request` only (never pull_request_target), so a fork's PR gets no secrets; Unity jobs also refuse
 # fork PRs explicitly. Permissions are read-only except check runs for the test report.
 #
+# ci/playmode-triage (2026-11-13, panel P-01..P-11): GitHub runs PlayMode the way the Mac gate does
+# (tools/unity-playtest.sh: -batchmode -nographics), in 3 parallel shards by fixture, with the NUnit category
+# RequiresGpu excluded. A test that needs a real GPU (a rendered frame, a read-back) carries
+# [Category("RequiresGpu")]; GitHub's runners have none (llvmpipe at best), the owner's Mac integrator still runs them
+# (it passes no category exclusion). Wall-clock WAIT budgets in PlayMode tests scale by -cmTestTimeScale 4 here
+# (TestClock in Runtime.PlayTests/SanityWorld.cs); product promises ("within a second") never scale.
+# Input `graphics: software` runs PlayMode under the runner's llvmpipe OpenGL instead (diagnosis only: a batch-mode
+# Editor never runs WaitForEndOfFrame, and renderers become visible, which -nographics never exercises).
+# Speed: the Library cache is restored from any earlier key (main's caches are visible to every branch) and saved
+# even when tests fail (actions/cache/save, always()), so a red run still warms the next one.
+# Any branch: `gh workflow run unity-ci.yml --ref <branch> -f jobs=tests|all|...`; `jobs=all` runs EditMode, the 3
+# PlayMode shards and the Windows and macOS players in parallel.
+#
 # Triggers: manual (loop/gates/remote editmode|playmode|tests|build-windows|build-mac|builds|all), and PRs to main only
 # when the PR carries the label `ci:unity` or the repository variable UNITY_CI_ON_PR is 'true' (private-repo minutes
 # are limited: about 60 to 100 Linux minutes for tests plus one build).
@@ -27,8 +40,13 @@ on:
         options: [tests, editmode, playmode, build-windows, build-mac, builds, all]
         default: tests
       category:
-        description: "NUnit category filter for EditMode and PlayMode (Unity syntax; '!Slow' = the per-batch set, 'Slow' = the slow suite)"
+        description: "NUnit category filter for EditMode and PlayMode (Unity syntax; '!Slow' = the per-batch set, 'Slow' = the slow suite). RequiresGpu is always excluded here."
         default: '!Slow'
+      graphics:
+        description: "PlayMode graphics: nographics (as the Mac gate) or software (llvmpipe OpenGL, diagnosis only)"
+        type: choice
+        options: [nographics, software]
+        default: nographics
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened, ready_for_review, labeled]
@@ -48,6 +66,7 @@ jobs:
       build-windows: ${{ steps.p.outputs.build-windows }}
       build-mac: ${{ steps.p.outputs.build-mac }}
       category: ${{ steps.p.outputs.category }}
+      graphics: ${{ steps.p.outputs.graphics }}
     steps:
       - id: p
         shell: bash
@@ -56,6 +75,7 @@ jobs:
           EVENT: ${{ github.event_name }}
           WANT: ${{ inputs.jobs || 'tests' }}
           CATEGORY: ${{ inputs.category || '!Slow' }}
+          GRAPHICS: ${{ inputs.graphics || 'nographics' }}
           FORK: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
           DRAFT: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft }}
           LABELLED: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'ci:unity') }}
@@ -80,17 +100,33 @@ jobs:
               all) e=true; p=true; w=true; m=true ;;
             esac
           fi
-          { echo "editmode=$e"; echo "playmode=$p"; echo "build-windows=$w"; echo "build-mac=$m"; echo "category=$CATEGORY"; } >> "$GITHUB_OUTPUT"
+          { echo "editmode=$e"; echo "playmode=$p"; echo "build-windows=$w"; echo "build-mac=$m"; echo "category=$CATEGORY"; echo "graphics=$GRAPHICS"; } >> "$GITHUB_OUTPUT"
           echo "### unity-ci plan" >> "$GITHUB_STEP_SUMMARY"
-          echo "editmode=$e playmode=$p build-windows=$w build-mac=$m category='$CATEGORY' ${why}" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "editmode=$e playmode=$p build-windows=$w build-mac=$m category='$CATEGORY' graphics=$GRAPHICS ${why}" | tee -a "$GITHUB_STEP_SUMMARY"
 
   tests:
     needs: plan
     if: needs.plan.outputs.editmode == 'true' || needs.plan.outputs.playmode == 'true'
+    name: tests (${{ matrix.mode }}${{ matrix.shard && format(' {0}', matrix.shard) || '' }})
     strategy:
       fail-fast: false
       matrix:
-        mode: [EditMode, PlayMode]
+        # PlayMode shards by fixture (run 43451229397 durations, 1312 s in all): 1 = HumanControl + BigMoments (414 s),
+        # 2 = GameFlow + GameplaySanity + AnimationPass + TechHardening (452 s), 3 = every other fixture (446 s). Shard 3
+        # is "not 1 and not 2", so a new fixture always runs somewhere. -testFilter values are regexes on the full name.
+        include:
+          - mode: EditMode
+            shard: ''
+            filter: ''
+          - mode: PlayMode
+            shard: '1of3'
+            filter: '^CriticalMass.Runtime.PlayTests.HumanControlPlayTests.;^CriticalMass.Runtime.PlayTests.BigMomentsPlayTests.'
+          - mode: PlayMode
+            shard: '2of3'
+            filter: '^CriticalMass.Runtime.PlayTests.GameFlowPlayTests.;^CriticalMass.Runtime.PlayTests.GameplaySanityPlayTests.;^CriticalMass.Runtime.PlayTests.AnimationPassPlayTests.;^CriticalMass.Runtime.PlayTests.TechHardeningPlayTests.'
+          - mode: PlayMode
+            shard: '3of3'
+            filter: '!^CriticalMass.Runtime.PlayTests.HumanControlPlayTests.;!^CriticalMass.Runtime.PlayTests.BigMomentsPlayTests.;!^CriticalMass.Runtime.PlayTests.GameFlowPlayTests.;!^CriticalMass.Runtime.PlayTests.GameplaySanityPlayTests.;!^CriticalMass.Runtime.PlayTests.AnimationPassPlayTests.;!^CriticalMass.Runtime.PlayTests.TechHardeningPlayTests.'
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
@@ -102,14 +138,24 @@ jobs:
           [ "${{ matrix.mode }}" = EditMode ] && [ "${{ needs.plan.outputs.editmode }}" = true ] && w=true
           [ "${{ matrix.mode }}" = PlayMode ] && [ "${{ needs.plan.outputs.playmode }}" = true ] && w=true
           echo "run=$w" >> "$GITHUB_OUTPUT"
-      - name: Free disk (the editor image is ~5.3 GB, Library ~3.6 GB)
+          # The Unity arguments (no spaces inside a value: the runner splits customParameters on whitespace).
+          p="-testCategory ${{ needs.plan.outputs.category }};!RequiresGpu -cmTestTimeScale 4"
+          [ -n "${{ matrix.filter }}" ] && p="$p -testFilter ${{ matrix.filter }}"
+          [ "${{ matrix.mode }}" = PlayMode ] && [ "${{ needs.plan.outputs.graphics }}" = nographics ] && p="$p -nographics"
+          echo "params=$p" >> "$GITHUB_OUTPUT"
+          echo "unity params: $p"
+      - name: Free disk only when short (the editor image is ~5.3 GB, Library ~3.6 GB; the rm took 1.4 to 4.5 min)
         if: steps.want.outputs.run == 'true'
-        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL && df -h /
+        run: |
+          avail=$(df -BG --output=avail / | tail -1 | tr -dc 0-9)
+          echo "free: ${avail} GB"
+          if [ "$avail" -lt 30 ]; then sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL; df -h /; fi
       - uses: actions/checkout@v4
         if: steps.want.outputs.run == 'true'
         with:
           lfs: true
-      - uses: actions/cache@v4
+      - uses: actions/cache/restore@v4
+        id: lib
         if: steps.want.outputs.run == 'true'
         with:
           path: Library
@@ -117,6 +163,9 @@ jobs:
           restore-keys: |
             Library-editor-${{ hashFiles('Packages/packages-lock.json', 'ProjectSettings/ProjectVersion.txt') }}-
             Library-editor-
+      - name: Library cache
+        if: steps.want.outputs.run == 'true'
+        run: echo "Library cache hit=${{ steps.lib.outputs.cache-hit }} restored=${{ steps.lib.outputs.cache-matched-key || 'none (cold import)' }}"
       - uses: game-ci/unity-test-runner@v4
         if: steps.want.outputs.run == 'true'
         env:
@@ -125,17 +174,27 @@ jobs:
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         with:
           testMode: ${{ matrix.mode }}
-          customParameters: -testCategory ${{ needs.plan.outputs.category }}
+          customParameters: ${{ steps.want.outputs.params }}
           # No `coverageEnabled: false`: unity-test-runner@v4.4.0 turns it into `--no-coverageEnabled`, and game-ci CLI
           # v0.1.74 parses with "negation-prefix": false under strict mode, so the run dies in 1 s with
           # "Unknown argument: noCoverageEnabled" (run 43450423341). The default (true) passes no such flag.
           artifactsPath: artifacts/${{ matrix.mode }}
           githubToken: ${{ secrets.GITHUB_TOKEN }}
-          checkName: ${{ matrix.mode }} results
+          checkName: ${{ matrix.mode }}${{ matrix.shard && format(' {0}', matrix.shard) || '' }} results
+      # Saved even when tests fail (actions/cache saves only on success, so run 43451229397's PlayMode Library was lost).
+      # One key per commit: the first job to finish saves it, the others' "already exists" is not an error. The key is the
+      # one computed BEFORE Unity ran (cache-primary-key): Unity rewrites packages-lock.json during the run, so a
+      # hashFiles() here hashed differently (run 43458773839 saved under 27b243.. while restoring ab61dd..).
+      - uses: actions/cache/save@v4
+        if: always() && steps.want.outputs.run == 'true' && steps.lib.outputs.cache-hit != 'true'
+        continue-on-error: true
+        with:
+          path: Library
+          key: ${{ steps.lib.outputs.cache-primary-key }}
       - uses: actions/upload-artifact@v4
         if: always() && steps.want.outputs.run == 'true'
         with:
-          name: unity-${{ matrix.mode }}-results
+          name: unity-${{ matrix.mode }}${{ matrix.shard && format('-{0}', matrix.shard) || '' }}-results
           path: artifacts/${{ matrix.mode }}
           if-no-files-found: warn
           retention-days: 7
