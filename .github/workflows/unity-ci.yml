@@ -182,13 +182,15 @@ jobs:
           githubToken: ${{ secrets.GITHUB_TOKEN }}
           checkName: ${{ matrix.mode }}${{ matrix.shard && format(' {0}', matrix.shard) || '' }} results
       # Saved even when tests fail (actions/cache saves only on success, so run 43451229397's PlayMode Library was lost).
-      # One key per commit: the first job to finish saves it, the others' "already exists" is not an error.
+      # One key per commit: the first job to finish saves it, the others' "already exists" is not an error. The key is the
+      # one computed BEFORE Unity ran (cache-primary-key): Unity rewrites packages-lock.json during the run, so a
+      # hashFiles() here hashed differently (run 43458773839 saved under 27b243.. while restoring ab61dd..).
       - uses: actions/cache/save@v4
         if: always() && steps.want.outputs.run == 'true' && steps.lib.outputs.cache-hit != 'true'
         continue-on-error: true
         with:
           path: Library
-          key: Library-editor-${{ hashFiles('Packages/packages-lock.json', 'ProjectSettings/ProjectVersion.txt') }}-${{ github.sha }}
+          key: ${{ steps.lib.outputs.cache-primary-key }}
       - uses: actions/upload-artifact@v4
         if: always() && steps.want.outputs.run == 'true'
         with:
