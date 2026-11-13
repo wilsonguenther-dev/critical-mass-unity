@@ -509,7 +509,9 @@ namespace CriticalMass.Runtime.Audio
 #endif
         }
 
-        void Update()
+        void Update() { var cost = CriticalMass.Runtime.Game.FrameCost.Enter(); UpdateCost(); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.Sound, cost); }
+
+        void UpdateCost()
         {
             float now = Time.unscaledTime;
             // The match may be built after a scene load or later (game flow builds it on Play): look every 15 frames.

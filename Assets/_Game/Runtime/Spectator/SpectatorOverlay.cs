@@ -192,7 +192,7 @@ namespace CriticalMass.Runtime.Spectator
             bool paused = Mode != null && Mode.Input != null && Mode.Input.State.Paused;
             bool down = !w.Actors[0].Alive;
             bool offer = !watching && down && w.Match.Phase == MatchPhase.Playing && !paused && !SimDriverBehaviour.CaptureMode &&
-                         GetComponent<TitleScreen>() == null;
+                         GetComponent<TitleScreen>() == null && !(CriticalMass.Runtime.Flow.GameFlow.State == CriticalMass.Runtime.Flow.FlowState.Results);   // batch 5: never under the results
             if (!watching && !offer && _canvas == null) return;
             Build();
             int tier = FeedUi.Refresh(_canvas);

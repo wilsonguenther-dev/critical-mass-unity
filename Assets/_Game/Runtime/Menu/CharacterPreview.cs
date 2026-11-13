@@ -29,7 +29,17 @@ namespace CriticalMass.Runtime.Menu
         Transform _holder;
         ClassId _cls;
         TeamId _team;
-        float _yaw = 200f, _idle;
+        float _yaw = 200f, _idle, _heldUntil = -1f;
+
+        /// <summary>Owner walk 1: turn the model by hand (a drag on the Barracks preview); the slow turn waits 2 s after.</summary>
+        public void Turn(float deg)
+        {
+            _yaw = (_yaw + deg + 360f) % 360f;
+            _heldUntil = Time.unscaledTime + 2f;
+            if (_model != null) _model.Transform.localRotation = Quaternion.Euler(0f, _yaw, 0f);
+        }
+
+        public float Yaw => _yaw;
         int _mainMaskRemoved = -1;
 
         public Texture Texture => _rt;
@@ -98,7 +108,7 @@ namespace CriticalMass.Runtime.Menu
         public void Tick(float dt)
         {
             if (_model == null) return;
-            _yaw = (_yaw + TurnDegPerSecond * dt) % 360f;
+            if (Time.unscaledTime >= _heldUntil) _yaw = (_yaw + TurnDegPerSecond * dt) % 360f;
             _idle += dt;
             _model.Transform.localRotation = Quaternion.Euler(0f, _yaw, 0f);
             _model.BeginPose();
@@ -119,6 +129,13 @@ namespace CriticalMass.Runtime.Menu
             _model = null;
         }
 
+        /// <summary>Integration batch 5: Destroy in play, DestroyImmediate in edit mode (EditMode tests open and close the Barracks).</summary>
+        static void Kill(Object o)
+        {
+            if (Application.isPlaying) Object.Destroy(o);
+            else Object.DestroyImmediate(o);
+        }
+
         /// <summary>Destroys the model, the pieces, the camera and the render texture.</summary>
         public void Release()
         {
@@ -129,10 +146,10 @@ namespace CriticalMass.Runtime.Menu
             if (_rt != null)
             {
                 _rt.Release();
-                Object.Destroy(_rt);
+                Kill(_rt);
             }
             _rt = null;
-            if (_rig != null) Object.Destroy(_rig);
+            if (_rig != null) Kill(_rig);
             _rig = null;
             _cam = null;
             UnityEngine.Camera main = UnityEngine.Camera.main;

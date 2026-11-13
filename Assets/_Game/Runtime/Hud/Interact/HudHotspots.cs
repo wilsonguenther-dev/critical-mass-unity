@@ -189,7 +189,7 @@ namespace CriticalMass.Runtime.Hud.Interact
                 int n = 0;
                 for (int p = 0; p < s.Def.Paths.Length; p++)
                 {
-                    Transform t = canvas.Find(s.Def.Paths[p]) ?? FindDeep(canvas, s.Def.Paths[p]);
+                    Transform t = Resolve(canvas, s.Def.Paths[p]);
                     if (t is RectTransform rt) list[n++] = rt;
                 }
                 if (n == 0) { s.Found = false; continue; }
@@ -213,6 +213,11 @@ namespace CriticalMass.Runtime.Hud.Interact
             // the other items' canvases are direct children of the game object (FeedUi.MakeCanvas, MascotGuide)
             return _game != null ? _game.Find(d.Canvas) : null;
         }
+
+        /// <summary>A hotspot path under a canvas: as written, then under the canvas's "Safe Area" root (owner walk 1 moved the
+        /// four HUD clusters there, so "Match/Clock Pill" lives at "Safe Area/Match/Clock Pill"), then a plain name anywhere.</summary>
+        public static Transform Resolve(Transform canvas, string path) =>
+            canvas.Find(path) ?? canvas.Find("Safe Area/" + path) ?? FindDeep(canvas, path);
 
         static Transform FindDeep(Transform t, string name)
         {

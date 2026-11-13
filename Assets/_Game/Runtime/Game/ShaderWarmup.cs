@@ -21,6 +21,8 @@ namespace CriticalMass.Runtime.Game
     {
         public const string Folder = "ShaderWarmup";
         public const int PerFrame = 8;
+        /// <summary>perf-smooth-1: behind an opaque loading screen nothing is drawn that a hitch could spoil: warm faster.</summary>
+        public const int PerFrameLoading = 32;
 
         /// <summary>true once the shipped collection for this API is fully warmed (or there is none).</summary>
         public static bool Done { get; private set; }
@@ -97,7 +99,7 @@ namespace CriticalMass.Runtime.Game
             if (_titleCheck <= 0f)
             {
                 _titleCheck = 0.25f;
-                _title = FindAnyObjectByType<TitleScreen>() != null;
+                _title = FindAnyObjectByType<TitleScreen>() != null || Menus.LoadingScreen.IsOpen;
             }
             if (_jobRunning)
             {
@@ -114,7 +116,7 @@ namespace CriticalMass.Runtime.Game
                     Debug.Log("[CM.Warmup] done");
                     return;
                 }
-                _job = _warm.WarmUpProgressively(PerFrame);
+                _job = _warm.WarmUpProgressively(Menus.LoadingScreen.IsOpen ? PerFrameLoading : PerFrame);
                 _jobRunning = true;
             }
             catch (Exception e)

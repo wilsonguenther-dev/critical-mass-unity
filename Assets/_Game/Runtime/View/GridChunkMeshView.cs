@@ -85,7 +85,9 @@ namespace CriticalMass.Runtime.View
             }
         }
 
-        private void LateUpdate()
+        private void LateUpdate() { var cost = CriticalMass.Runtime.Game.FrameCost.Enter(); LateUpdateCost(); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.Ground, cost); }
+
+        void LateUpdateCost()
         {
             if (_driver == null) return;
             World w = _driver.World;

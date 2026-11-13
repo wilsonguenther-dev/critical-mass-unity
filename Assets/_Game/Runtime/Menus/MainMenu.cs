@@ -26,7 +26,7 @@ namespace CriticalMass.Runtime.Menus
     /// </summary>
     public sealed class MainMenu : FlowScreen
     {
-        public const float ColX = 96f, ColW = 540f, RailY = 168f, RailStep = 60f, RailH = 50f;
+        public const float ColX = 96f, ColW = 540f, RailY = 168f, RailStep = 56f, RailH = 50f;
         public const float RematchY = 628f, ChangeY = 742f, PrimaryY = 830f, PrimaryH = 150f;
         public const float StageX = 680f, StageY = 226f, StageW = 1144f, StageH = 640f;
         public const float CardX = 1300f, CardY = 40f, CardW = 524f, CardH = 170f;
@@ -38,7 +38,10 @@ namespace CriticalMass.Runtime.Menus
         readonly Dictionary<string, MenuItem> _items = new Dictionary<string, MenuItem>();
         readonly List<MenuItem> _order = new List<MenuItem>();
         List<MenuEntry> _entries;
-        MenuItem _primary, _change, _rematch;
+        MenuItem _primary, _change, _rematch, _plate;
+        FighterHotspot _fighter;
+        ClassId _shownClass = ClassId.Warrior;
+        TeamId _shownTeam = TeamId.Azure;
         Text _primarySub, _rematchNote, _className, _name, _level, _xp, _coins, _record, _tip, _land;
         VectorShape _xpBar;
         PromptStrip _primaryGlyph, _changeGlyph;
@@ -62,6 +65,14 @@ namespace CriticalMass.Runtime.Menus
         public MenuItem PlayItem => _primary;
         public MenuItem ChangeModeItem => _change;
         public MenuItem RematchItem => _rematch;
+        /// <summary>Owner walk 1: the fighter on the diorama (hover, click, Enter or A: the Barracks; drag: turn him).</summary>
+        public FighterHotspot FighterItem => _fighter;
+        /// <summary>Owner walk 1: the class name plate under the fighter (opens class select).</summary>
+        public MenuItem ClassPlateItem => _plate;
+        /// <summary>The fighter's facing on the diorama (tests).</summary>
+        public float FighterYaw => _stage.Yaw;
+        /// <summary>The fighter hotspot's rect in the 1920x1080 space (where the model stands on the stage).</summary>
+        public const float FighterX = StageX + 560f, FighterY = StageY + 100f, FighterW = 380f, FighterH = 440f;
         public HomeOffer CurrentOffer => _offer;
         public string PrimarySubText => _primarySub != null ? _primarySub.text : null;
         public bool RewardsLanding => _landAt >= 0f;
@@ -76,8 +87,8 @@ namespace CriticalMass.Runtime.Menus
 
         public void FocusEntry(string id) => Focus(Item(id));
 
-        protected override string HintKeys => "ENTER SELECT   ·   TAB CHANGE MODE   ·   ESC TITLE";
-        protected override string HintPad => "A SELECT   ·   Y CHANGE MODE   ·   B TITLE";
+        protected override string HintKeys => "ENTER SELECT   ·   C CUSTOMISE   ·   TAB CHANGE MODE   ·   ESC TITLE";
+        protected override string HintPad => "A SELECT   ·   X CUSTOMISE   ·   Y CHANGE MODE   ·   B TITLE";
         protected override float WashAlpha => 0.4f;
 
         protected override void BuildContent(RectTransform space)
@@ -157,8 +168,85 @@ namespace CriticalMass.Runtime.Menus
             _stageImage.enabled = false;
             _portrait = HudIcon.Make(space, "Portrait", StageX + StageW * 0.5f - 200f, StageY + 120f, 340f, 340f);
             _portrait.Image.enabled = false;
-            _className = MenuUi.Fit(MenuUi.Label(space, "Class Name", CMTokens.Display, UiScale.TypeLead, Cream, TextAnchor.MiddleLeft, StageX + 32f, StageY + StageH - 70f,
-                StageW - 64f, 50f, "", 3f), 34);
+            // Owner walk 1: the fighter is a control (hover ring + CUSTOMISE chip; click, Enter or A: the Barracks; drag turns
+            // him), and the class plate under him opens class select.
+            _fighter = FighterHotspot.Make(space, "Fighter", FighterX, FighterY, FighterW, FighterH, FighterY + FighterH - 66f, "CUSTOMISE");
+            _fighter.Submitted = () => OpenBarracks(_shownClass);
+            _fighter.Dragged = _stage.Drag;
+            const float plateW = 620f, plateH = 60f;
+            _plate = MenuUi.Item(space, "Class Plate", StageX + 24f, StageY + StageH - plateH - 16f, plateW, plateH, "", MenuItem.Kind.Button,
+                UiScale.TypeHeading, false, CMTokens.Display);
+            _plate.Body.Radius = 14f;
+            _plate.Body.RimPx = 2f;
+            _className = MenuUi.Fit(_plate.Label, 26);
+            MenuUi.Place(_className.rectTransform, 20f, 0f, plateW - 230f, plateH);
+            _plate.Value = MenuUi.Label(_plate.transform, "Change", CMTokens.Display, UiScale.TypeSmall, Cream, TextAnchor.MiddleRight, plateW - 210f, 0f, 190f, plateH,
+                "CHANGE CLASS  >", 2f);
+            _plate.Submitted = OpenClassSelect;
+        }
+
+        bool _fighterPlaced;
+
+        /// <summary>Moves the fighter's click target onto the model (stage image rect x the fighter's 0..1 rect, padded).</summary>
+        void PlaceFighterHotspot()
+        {
+            if (!_stage.FighterRect01(out Rect r)) return;
+            float ix = StageX + 8f, iy = StageY + 8f, iw = StageW - 16f, ih = StageH - 16f;
+            float x = ix + r.xMin * iw - 40f, y = iy + r.yMin * ih - 30f, w = r.width * iw + 80f, h = r.height * ih + 60f;
+            // keep it inside the stage and clear of the class plate
+            float maxY = StageY + StageH - 92f;
+            x = Mathf.Clamp(x, ix, ix + iw - 200f);
+            y = Mathf.Max(iy, y);
+            h = Mathf.Clamp(maxY - y, 200f, h);
+            w = Mathf.Clamp(w, 220f, ix + iw - x);
+            RectTransform rt = (RectTransform)_fighter.transform;
+            MenuUi.Place(rt, x, y, w, h);
+            _fighter.Fit(w, h);
+            _fighterPlaced = true;
+        }
+
+        /// <summary>The Barracks (the locker: cosmetics, class and loadout) for cls; closing it comes back here.</summary>
+        public void OpenBarracks(ClassId cls)
+        {
+            BarracksMenuScreen.NextClass = cls;
+            if (_entries != null && Director != null)
+                for (int i = 0; i < _entries.Count; i++)
+                    if (_entries[i].Id == OverlayRegistry.Barracks)
+                    {
+                        Choose(_entries[i]);
+                        return;
+                    }
+            BarracksMenuScreen.NextClass = null;
+            Barracks.Show(cls);
+        }
+
+        /// <summary>The class plate: class select for the class PLAY starts; confirming keeps it for the next match, back returns.</summary>
+        public void OpenClassSelect()
+        {
+            FlowDirector d = Director;
+            if (d == null) return;
+            TeamId team = _shownTeam;
+            d.HideFlowScreens();
+            ClassSelect.SelectedClass = _shownClass;
+            ClassSelect.ShowSetup(team, picked =>
+            {
+                if (MatchSetup.Playable.Contains(picked))
+                {
+                    SetupPrefs.EnsureLoaded();
+                    GameFlow.LastSetup.Class = picked;
+                    SetupPrefs.Save(GameFlow.LastSetup);
+                    ClassSelect.SelectedClass = picked;
+                }
+                d.ShowMenu();
+            }, () => d.ShowMenu());
+        }
+
+        /// <summary>Capture hook: the fighter's hover look on or off (the walk has no real pointer).</summary>
+        public void CaptureHoverFighter(bool on)
+        {
+            MenuItem.PointerNavigated = on;
+            if (on) _fighter.Select();
+            else Focus(DefaultFocus);
         }
 
         void BuildCard(RectTransform space)
@@ -207,6 +295,21 @@ namespace CriticalMass.Runtime.Menus
             chain.Add(_primary);
             ChainVertical(chain);
             if (!_rematch.gameObject.activeSelf) _rematch.navigation = new Navigation { mode = Navigation.Mode.None };
+            // Owner walk 1: right from the column reaches the fighter, down from him the class plate, left goes back.
+            for (int i = 0; i < chain.Count; i++)
+            {
+                Navigation n = chain[i].navigation;
+                n.selectOnRight = _fighter;
+                chain[i].navigation = n;
+            }
+            _fighter.navigation = new Navigation
+            {
+                mode = Navigation.Mode.Explicit, selectOnLeft = _primary, selectOnDown = _plate, selectOnUp = _plate, selectOnRight = _plate,
+            };
+            _plate.navigation = new Navigation
+            {
+                mode = Navigation.Mode.Explicit, selectOnLeft = _primary, selectOnUp = _fighter, selectOnDown = _fighter, selectOnRight = _fighter,
+            };
         }
 
         protected override void OnShow()
@@ -236,6 +339,9 @@ namespace CriticalMass.Runtime.Menus
             _stageImage.enabled = _stage.Built && _stage.Texture != null;
             _portrait.Set(UiIcons.Portrait[(int)cls, (int)team], _tier);
             _portrait.Image.enabled = !model;
+            if (cls != _shownClass || team != _shownTeam) _fighterPlaced = false;
+            _shownClass = cls;
+            _shownTeam = team;
             HudText.Set(_className, FlowWords.ClassName(cls) + "   ·   " + (team == TeamId.Azure ? "AZURE" : "CRIMSON"));
 
             RefreshCard(-1, -1);
@@ -305,6 +411,13 @@ namespace CriticalMass.Runtime.Menus
                 OpenModes();
                 return;
             }
+            // Owner walk 1: C (or X on a controller) opens the Barracks for the fighter on show, from anywhere on Home.
+            if (Time.unscaledTime >= MenuItem.SubmitBlockedUntil &&
+                ((k != null && k.cKey.wasPressedThisFrame) || (g != null && g.buttonWest.wasPressedThisFrame)))
+            {
+                OpenBarracks(_shownClass);
+                return;
+            }
 
             // The fighter turns to the pointer over the stage, or the right stick.
             Vector2 pointer = Mouse.current != null ? Mouse.current.position.ReadValue() : Vector2.zero;
@@ -317,6 +430,11 @@ namespace CriticalMass.Runtime.Menus
             }
             float stick = g != null ? g.rightStick.ReadValue().x : 0f;
             _stage.Tick(dt, pointer, px, stick);
+            // Owner walk 1: the class portrait shows only while there is no 3D fighter (it was drawn over the model), and the
+            // fighter's click target follows the model on the stage.
+            bool hasFighter = _stage.HasFighter;
+            if (_portrait.Image.enabled == hasFighter) _portrait.Image.enabled = !hasFighter;
+            if (!_fighterPlaced) PlaceFighterHotspot();
 
             if (_tips != null && _tips.Count > 1 && Time.unscaledTime - _tipAt >= TipSeconds)
             {
@@ -379,6 +497,10 @@ namespace CriticalMass.Runtime.Menus
                     break;
                 case OverlayRegistry.Controls:
                     Director.OpenSettings(PauseMenu.Tab.Controls, e.Id);
+                    return;
+                case OverlayRegistry.Intro:
+                    // The film freezes this screen while it plays and dissolves back into it at the end.
+                    StoryIntro.Play();
                     return;
                 case OverlayRegistry.Settings:
                     Director.OpenSettings(PauseMenu.Tab.Audio, e.Id);

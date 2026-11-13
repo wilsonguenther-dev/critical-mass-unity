@@ -143,6 +143,7 @@ namespace CriticalMass.Runtime.Menus
         MenuItem _confirm;
         Text _hint, _respawnLine, _setupTitle;
         RawImage _previewImage;
+        Text _previewNote;
         ClassPreview _preview;
         Action<ClassId> _onConfirm;
         Action _onBack;
@@ -172,6 +173,8 @@ namespace CriticalMass.Runtime.Menus
         public static ClassSelect ShowSetup(TeamId team, Action<ClassId> onConfirm = null, Action onBack = null)
         {
             ClassSelect s = Ensure();
+            // Owner walk 1: the click that opened this screen (a mode card, a double-click) must not also pick a class.
+            MenuItem.SubmitBlockedUntil = Mathf.Max(MenuItem.SubmitBlockedUntil, Time.unscaledTime + CriticalMass.Runtime.Flow.FlowScreen.SubmitGuardSeconds);
             s.OpenSetup(team, SelectedClass, onConfirm, onBack);
             return s;
         }
@@ -258,6 +261,11 @@ namespace CriticalMass.Runtime.Menus
             MenuUi.Place(_previewImage.rectTransform, 12f, 12f, PrevW - 24f, PrevH - 24f);
             _previewImage.raycastTarget = true;
             _previewImage.gameObject.AddComponent<ClassPreviewDrag>().Owner = this;
+            // Owner walk 1: the model on the class card is a control too: drag turns it, a click opens the Barracks for it.
+            _previewNote = MenuUi.Label(frame.transform, "Customise Note", CMTokens.Display, UiScale.TypeSmall, Cream, TextAnchor.MiddleCenter,
+                12f, PrevH - 52f, PrevW - 24f, 36f, "DRAG TO TURN   ·   CLICK TO CUSTOMISE", 2f);
+            _previewNote.raycastTarget = false;
+            _previewNote.color = CMTokens.WithAlpha(Cream, 0.7f);
             _confirm = MenuUi.Item(_setupPage, "Confirm", PrevX, PrevY + PrevH + 20f, PrevW, 70f, "PLAY AS WARRIOR", MenuItem.Kind.Button, UiScale.TypeHeading, true, CMTokens.Display);
             _confirm.Body.Radius = 16f;
             ClassCard.Fit(_confirm.Label, 18);
@@ -467,7 +475,7 @@ namespace CriticalMass.Runtime.Menus
             bool pad = ControlBindings.ActiveDevice == ControlDevice.Gamepad;
             string s;
             if (Mode == SelectMode.Setup) s = pad ? "A CHOOSE   ·   B BACK   ·   R STICK TURNS" : "ENTER OR CLICK TO CHOOSE   ·   ESC BACK   ·   DRAG TO TURN";
-            else s = pad ? "D-PAD PICKS   ·   A CONFIRMS" : "1-5 OR CLICK TO PICK";
+            else s = pad ? "D-PAD PICKS   ·   A CONFIRMS" : "1-6 OR CLICK TO PICK";
             HudText.Set(_hint, s);
         }
 
@@ -475,7 +483,7 @@ namespace CriticalMass.Runtime.Menus
         {
             if (!AutoRespawn || _driver == null || _input == null) return false;
             World w = _driver.World;
-            if (w == null || w.ActorCount < 1 || w.Match.Phase == MatchPhase.Ended) return false;
+            if (w == null || w.ActorCount < 1 || w.Match.Phase == MatchPhase.Ended || CriticalMass.Runtime.Flow.GameFlow.State == CriticalMass.Runtime.Flow.FlowState.Results) return false;
             if (_driver.HumanAutopilot || _input.State.Paused || ControlsCardScreen.IsOpen || LoadingScreen.IsOpen) return false;
             if (_driver.GetComponent<TitleScreen>() != null) return false;
             return !w.Actors[0].Alive;
@@ -528,12 +536,17 @@ namespace CriticalMass.Runtime.Menus
                 else if (kb.digit6Key.wasPressedThisFrame) PickRespawn(ClassId.Healer);
             }
             EventSystem es = EventSystem.current;
-            if (es != null && es.currentSelectedGameObject == null && Gamepad.current != null && ControlBindings.ActiveDevice == ControlDevice.Gamepad)
+            // controls-1: the keyboard gets the focus too (arrows, W A S D, TAB or ENTER), not only a controller.
+            if (es != null && es.currentSelectedGameObject == null &&
+                ((Gamepad.current != null && ControlBindings.ActiveDevice == ControlDevice.Gamepad) || ClassSelectNav.Pressed()))
                 Select(_respawnTiles[(int)NextClass(w)].Tile);
         }
 
         void UpdateSetup()
         {
+            // Owner walk 1: the Barracks opened from the class card own the input until they close (and the closing press
+            // must not also close this screen).
+            if (CharacterPanel.IsOpen || CharacterPanel.ClosedFrame >= Time.frameCount - 1) return;
             Keyboard kb = Keyboard.current;
             Gamepad gp = Gamepad.current;
             if ((kb != null && kb.escapeKey.wasPressedThisFrame) || (gp != null && gp.buttonEast.wasPressedThisFrame))
@@ -546,12 +559,44 @@ namespace CriticalMass.Runtime.Menus
             EventSystem es = EventSystem.current;
             if (es != null && es.currentSelectedGameObject == null && ClassSelectNav.Pressed()) Select(_setupTiles[(int)Focused].Tile);
             float stick = gp != null ? gp.rightStick.ReadValue().x : 0f;
-            if (Mathf.Abs(stick) > 0.2f)
+            // controls-1 round 2 (veteran audit): the preview turns from the keyboard too, Q / E for the left hand and
+            // , / . for the right (the mouse drags it, a controller uses the right stick).
+            bool turnLeft = kb != null && (kb.qKey.isPressed || kb.commaKey.isPressed);
+            bool turnRight = kb != null && (kb.eKey.isPressed || kb.periodKey.isPressed);
+            float turn = PreviewTurnInput(turnLeft, turnRight, stick);
+            if (turn != 0f)
             {
                 _lastDrag = Time.unscaledTime;
-                _preview?.Turn(stick * 180f * Time.unscaledDeltaTime);
+                _preview?.Turn(turn * PreviewTurnDegreesPerSecond * Time.unscaledDeltaTime);
             }
             _preview?.Tick(Time.unscaledDeltaTime, Time.unscaledTime - _lastDrag > 1.5f);
+        }
+
+        /// <summary>The preview's turn speed at a full push or a held key, degrees per second.</summary>
+        public const float PreviewTurnDegreesPerSecond = 180f;
+
+        /// <summary>
+        /// The preview turn input, -1..1 (pure): a held key turns at full speed, the stick past its 0.2 dead zone at its
+        /// push; keys win over the stick, two opposite keys cancel.
+        /// </summary>
+        public static float PreviewTurnInput(bool keyLeft, bool keyRight, float stickX)
+        {
+            if (keyLeft != keyRight) return keyLeft ? -1f : 1f;
+            if (keyLeft) return 0f;
+            return Mathf.Abs(stickX) > 0.2f ? Mathf.Clamp(stickX, -1f, 1f) : 0f;
+        }
+
+        /// <summary>Owner walk 1: a click on the class card's model opens the Barracks for that class over this screen.</summary>
+        internal void OpenBarracks()
+        {
+            if (Mode != SelectMode.Setup || CharacterPanel.IsOpen) return;
+            Barracks.Show(Focused);
+        }
+
+        /// <summary>The pointer is over the model (the note brightens).</summary>
+        internal void HoverPreview(bool on)
+        {
+            if (_previewNote != null) _previewNote.color = on ? Brass : CMTokens.WithAlpha(Cream, 0.7f);
         }
 
         /// <summary>Pointer drag on the preview turns the model (degrees per canvas unit 0.45).</summary>
@@ -567,7 +612,8 @@ namespace CriticalMass.Runtime.Menus
             {
                 Keyboard kb = Keyboard.current;
                 if (kb != null && (kb.leftArrowKey.wasPressedThisFrame || kb.rightArrowKey.wasPressedThisFrame || kb.tabKey.wasPressedThisFrame ||
-                                   kb.enterKey.wasPressedThisFrame)) return true;
+                                   kb.enterKey.wasPressedThisFrame || kb.upArrowKey.wasPressedThisFrame || kb.downArrowKey.wasPressedThisFrame ||
+                                   kb.aKey.wasPressedThisFrame || kb.dKey.wasPressedThisFrame || kb.spaceKey.wasPressedThisFrame)) return true;
                 Gamepad gp = Gamepad.current;
                 return gp != null && (gp.dpad.left.wasPressedThisFrame || gp.dpad.right.wasPressedThisFrame || gp.leftStick.ReadValue().sqrMagnitude > 0.25f);
             }
@@ -575,13 +621,41 @@ namespace CriticalMass.Runtime.Menus
     }
 
     /// <summary>Pointer drag on the setup preview turns the model.</summary>
-    public sealed class ClassPreviewDrag : MonoBehaviour, IDragHandler, IInitializePotentialDragHandler
+    public sealed class ClassPreviewDrag : MonoBehaviour, IDragHandler, IBeginDragHandler, IEndDragHandler, IPointerClickHandler,
+        IPointerEnterHandler, IPointerExitHandler
     {
         public ClassSelect Owner;
-        public void OnInitializePotentialDrag(PointerEventData e) => e.useDragThreshold = false;
+        bool _dragging;
+        public void OnBeginDrag(PointerEventData e) => _dragging = true;
+        public void OnEndDrag(PointerEventData e) => _dragging = false;
         public void OnDrag(PointerEventData e)
         {
             if (Owner != null) Owner.Drag(e.delta.x);
+        }
+
+        /// <summary>Owner walk 1: a click (not the end of a drag) opens the Barracks for the class on show.</summary>
+        public void OnPointerClick(PointerEventData e)
+        {
+            if (_dragging || e.button != PointerEventData.InputButton.Left || Owner == null || Time.unscaledTime < MenuItem.SubmitBlockedUntil) return;
+            Owner.OpenBarracks();
+        }
+
+        public void OnPointerEnter(PointerEventData e)
+        {
+            UiCursor.Hover(true);
+            if (Owner != null) Owner.HoverPreview(true);
+        }
+
+        public void OnPointerExit(PointerEventData e)
+        {
+            UiCursor.Hover(false);
+            if (Owner != null) Owner.HoverPreview(false);
+        }
+
+        void OnDisable()
+        {
+            _dragging = false;
+            if (UiCursor.Hovering) UiCursor.Reset();
         }
     }
 

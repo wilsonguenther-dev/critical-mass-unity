@@ -24,8 +24,9 @@ namespace CriticalMass.Runtime.Hud
 
         static readonly string[] Headings = { "CLASS", "KO", "DEATHS", "HILL S", "BIOMASS", "CORRUPTION" };
         /// <summary>Column x (from the table's left) and width.</summary>
-        static readonly float[] ColX = { 52f, 270f, 360f, 460f, 560f, 670f };
-        static readonly float[] ColW = { 210f, 80f, 90f, 90f, 100f, 100f };
+        // owner walk 1: CORRUPTION gets 128 px (it spilled out of 100 px even at the 11 px floor); the number columns give it room
+        static readonly float[] ColX = { 52f, 262f, 342f, 438f, 534f, 642f };
+        static readonly float[] ColW = { 210f, 76f, 92f, 92f, 104f, 128f };
 
         /// <summary>Opens the board regardless of input (captures, the results screen). Default false.</summary>
         public static bool ForceOpen;
@@ -133,7 +134,9 @@ namespace CriticalMass.Runtime.Hud
             return tb;
         }
 
-        void LateUpdate()
+        void LateUpdate() { var cost = CriticalMass.Runtime.Game.FrameCost.Enter(); LateUpdateCost(); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.Scoreboard, cost); }
+
+        void LateUpdateCost()
         {
             if (_log == null) _log = GetComponent<CombatLog>();
             if (CriticalMass.Runtime.Flow.GameFlow.MenuIdle) return;   // batch 4: hidden behind a menu over a backdrop match

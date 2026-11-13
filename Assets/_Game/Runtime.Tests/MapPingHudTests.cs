@@ -323,7 +323,7 @@ namespace CriticalMass.Runtime.Tests
                 foreach (HotspotDef d in HotspotTable.All)
                 {
                     if (d.Source != "main") continue;
-                    foreach (string path in d.Paths) Assert.IsNotNull(hud.Root.Find(path), d.Id + ": " + path + " is not on the HUD");
+                    foreach (string path in d.Paths) Assert.IsNotNull(HudHotspots.Resolve(hud.Root, path), d.Id + ": " + path + " is not on the HUD");
                 }
                 var spots = new HudHotspots();
                 var canvasGo = new GameObject("Interact test canvas", typeof(RectTransform));

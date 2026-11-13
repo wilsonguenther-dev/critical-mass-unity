@@ -131,6 +131,19 @@ card flushers raced and sent a duplicate digest) and R14 (a dead integrator's co
 Recommended rules: slips go out as one digest per checkpoint and skip person-owned items; exactly one process flushes
 cards; the compile lock records its owner pid and a lock whose pid is dead is reclaimed at arm.
 
+## 9b. Automated runs never show a window (HARD)
+
+Any player started with an automation flag (`-autoplay`, `-quitAfterMatch`, `-autoplayMatches`, `-autoplayQualities`,
+`-perfLog`, `-shots`, `-simHashOut`, `-capture`, `-soak`, `-traceStates`, `-debugHangSeconds`, `-automation`) hides
+itself: no Dock icon, no Dock bounce, windows transparent and click-through, app hidden, audio muted, fullscreen requests
+turned into a hidden window, and re-hidden on the same frame whenever Unity re-shows or activates it (it does so at boot
+and at every match load: that is why `open -g -j` alone failed on 2026-11-13). This lives in the game
+(`Assets/_Game/Runtime/Game/AutomationWindow.cs`, tests `Runtime.Tests/AutomationWindowTests.cs`), so no script can
+forget it. A person who wants to watch passes `-showWindow` (demo-smoke: `CM_SMOKE_VISIBLE=1`). The player log says
+`[CM.Window] automated run: window hidden`; if a test window is ever on the owner's screen, the build predates this or
+`-showWindow` was passed: find the launcher, never the owner's problem. Builds older than this change still pop a window:
+do not launch them for automation.
+
 ## 10. The harness (scripts in this folder)
 
 Python 3 stdlib and bash only; nothing is "found on the machine" beyond Unity, git, `gh`, `xmllint` and node (for the

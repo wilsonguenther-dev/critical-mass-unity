@@ -97,7 +97,9 @@ namespace CriticalMass.Runtime.Camera
             }
         }
 
-        private void LateUpdate()
+        private void LateUpdate() { var cost = CriticalMass.Runtime.Game.FrameCost.Enter(); LateUpdateCost(); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.Camera, cost); }
+
+        void LateUpdateCost()
         {
             World w = Driver != null ? Driver.World : null;
             UnityEngine.Camera cam = UnityEngine.Camera.main;

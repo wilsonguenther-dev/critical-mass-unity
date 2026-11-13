@@ -13,7 +13,11 @@ namespace CriticalMass.Runtime.Game
         // Quality level indices in ProjectSettings/QualitySettings.asset (Very Low, Low, Medium, High, Very High, Ultra).
         public const int LevelVeryLow = 0, LevelLow = 1, LevelMedium = 2, LevelHigh = 3;
 
-        public const int DefaultCap = 60;
+        /// <summary>perf-smooth-1: the default limit is OFF, i.e. vsync on and one frame per display refresh (60 on a 60 Hz
+        /// screen, 120 on a 120 Hz one). A 60 cap on a 120 Hz screen means vsync every 2 refreshes, and on this Mac 87% of
+        /// the frames over 33 ms were that 2-refresh slot holding a slightly late frame for a whole extra 60 Hz frame
+        /// (3.7% of frames at High; locked to the display: 0.02%). The 30/60/120/144 choices keep the whole-divisor rule.</summary>
+        public const int DefaultCap = 0;
         public const int MenuCap = 60;
         public const int BatteryMenuCap = 30;
         /// <summary>The title screen (a backdrop match behind it) at 30 fps: idle CPU budget (smoke measured 36.7% at 60).</summary>
@@ -36,22 +40,38 @@ namespace CriticalMass.Runtime.Game
         /// <summary>A long frame (seconds) that counts the session as unclean: Windows resets a GPU that stalls 2 s (TDR).</summary>
         public const double GpuStallSeconds = 1.5;
 
-        /// <summary>vSyncCount and targetFrameRate for a cap (0 = display rate) on a display of refreshHz.</summary>
+        /// <summary>perf-smooth-1: the "Unlimited" frame-rate choice (vsync off, no target).</summary>
+        public const int Unlimited = -1;
+
+        /// <summary>The frame-rate limit choices (cm.fpsCap) in screen order: 0 = OFF (no limit, locked to the display by
+        /// vsync), Unlimited = vsync off with no target.</summary>
+        public static readonly int[] CapChoices = { 30, 60, 120, 144, 0, Unlimited };
+
+        /// <summary>
+        /// vSyncCount and targetFrameRate for a cap (0 = display rate, Unlimited = none) on a display of refreshHz, vsync on.
+        /// perf-smooth-1 rule: always vsync-locked (no tearing, even frame spacing), at the display rate divided by the
+        /// largest whole number that keeps the rate at or above the cap (1 to 4): 60 on 60 and 120 Hz, 72 on 144 Hz, 82.5 on
+        /// 165 Hz, 75 on 75 Hz; a cap above the display runs at the display rate. The old timed cap (vsync off, target 60 on
+        /// 144 Hz) tore and paced unevenly on fixed-refresh panels.
+        /// </summary>
         public static (int vSync, int target) FrameSettings(int cap, double refreshHz)
         {
+            if (cap == Unlimited) return (0, -1);
             if (cap <= 0) return (1, -1);
             if (double.IsNaN(refreshHz) || refreshHz < 20) refreshHz = 60;
-            int n = (int)Math.Round(refreshHz / cap);
-            if (n >= 1 && n <= 4 && Math.Abs(refreshHz / n - cap) <= cap * 0.1) return (n, -1);
-            return (0, cap);
+            int n = (int)Math.Floor(refreshHz / cap + 0.02);
+            return (Math.Max(1, Math.Min(4, n)), -1);
         }
 
-        /// <summary>A cap read from PlayerPrefs: one of 30, 60, 120, 0; anything else is 60.</summary>
-        public static int SanitiseCap(int v) => v == 30 || v == 60 || v == 120 || v == 0 ? v : DefaultCap;
+        /// <summary>A cap read from PlayerPrefs: one of CapChoices; anything else is 60.</summary>
+        public static int SanitiseCap(int v) => Array.IndexOf(CapChoices, v) >= 0 ? v : DefaultCap;
 
-        /// <summary>The cap in force: title, pause and menus never above 60 (0 counts as above).</summary>
+        /// <summary>true for "no limit" choices (0 and Unlimited): menus, battery and the title count them as above any cap.</summary>
+        static bool NoLimit(int cap) => cap == 0 || cap == Unlimited;
+
+        /// <summary>The cap in force: title, pause and menus never above 60 (0 and Unlimited count as above).</summary>
         public static int EffectiveCap(int prefCap, bool menuLike) =>
-            menuLike && (prefCap == 0 || prefCap > MenuCap) ? MenuCap : prefCap;
+            menuLike && (NoLimit(prefCap) || prefCap > MenuCap) ? MenuCap : prefCap;
 
         /// <summary>DG-49: on battery, menus at 30 and matches at 60 or below.</summary>
         public static int EffectiveCap(int prefCap, bool menuLike, bool onBattery)
@@ -59,17 +79,18 @@ namespace CriticalMass.Runtime.Game
             int cap = EffectiveCap(prefCap, menuLike);
             if (!onBattery) return cap;
             int limit = menuLike ? BatteryMenuCap : BatteryMatchCap;
-            return cap == 0 || cap > limit ? limit : cap;
+            return NoLimit(cap) || cap > limit ? limit : cap;
         }
 
         /// <summary>The title screen's cap: never above TitleCap (0 = display rate counts as above).</summary>
-        public static int TitleCapFor(int cap) => cap == 0 || cap > TitleCap ? TitleCap : cap;
+        public static int TitleCapFor(int cap) => NoLimit(cap) || cap > TitleCap ? TitleCap : cap;
 
         /// <summary>DG-51: unfocused, keep the normal cap (never below 30); "save power in background" brings back 15.</summary>
         public static int BackgroundCap(int foregroundCap, bool savePower)
         {
             if (savePower) return SavePowerBackgroundFps;
             if (foregroundCap == 0) return foregroundCap;
+            if (foregroundCap == Unlimited) return MenuCap;   // unfocused never runs unbounded
             return Math.Max(MinBackgroundFps, foregroundCap);
         }
 
