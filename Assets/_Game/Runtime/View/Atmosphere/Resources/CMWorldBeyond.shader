@@ -19,6 +19,7 @@ Shader "CM/WorldBeyond"
         _FogBottom ("Height Fog Full (y)", Float) = -12
         _FogAmount ("Height Fog Amount", Range(0, 1)) = 0.78
         _BandFade ("Band Fade (at band 1)", Range(0, 1)) = 0.62
+        _NearFade ("Haze on the near band", Range(0, 1)) = 0.14
         _TeamTint ("Team Light Strength", Range(0, 1)) = 0.22
         _OutlinePx ("Outline Width (px at 1080p)", Range(0, 4)) = 1.0
         _OutlineColor ("Outline Colour (Void Navy)", Color) = (0.094118, 0.137255, 0.231373, 1)
@@ -42,6 +43,7 @@ Shader "CM/WorldBeyond"
             float _FogBottom;
             half _FogAmount;
             half _BandFade;
+            half _NearFade;
             half _TeamTint;
             float _OutlinePx;
             half4 _OutlineColor;
@@ -85,7 +87,7 @@ Shader "CM/WorldBeyond"
         {
             half bandFade = _BandFade * (_CMBeyondTune.x > 0.0 ? (half)_CMBeyondTune.x : 1.0h);
             half f = _FogAmount * saturate((_FogTop - y) / max(1e-3, _FogTop - _FogBottom));
-            f = 1.0h - (1.0h - f) * (1.0h - saturate(band * bandFade));
+            f = 1.0h - (1.0h - f) * (1.0h - saturate(band * bandFade + _NearFade));   // pass 2: even the near band sits in a little air
             // Glows pierce the haze at night (they are lights).
             f *= 1.0h - glow * saturate((half)_CMAmbient.w) * 0.65h;
             return min(f, 0.94h);
@@ -221,7 +223,7 @@ Shader "CM/WorldBeyond"
             {
                 half f = BeyondFog(i.positionWS.y, (half)i.band, 0.0h);
                 half3 fog = CMTodFogColor(_FogColor.rgb, i.positionWS, 0.0h);
-                return half4(lerp(_OutlineColor.rgb, fog, saturate(0.5h + f * 0.5h)), 1.0);
+                return half4(lerp(_OutlineColor.rgb, fog, saturate(0.6h + f * 0.4h)), 1.0);   // pass 2: softer ink, the arena keeps the strongest line
             }
             ENDHLSL
         }

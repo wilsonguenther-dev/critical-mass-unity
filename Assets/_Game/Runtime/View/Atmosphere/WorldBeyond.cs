@@ -400,8 +400,8 @@ namespace CriticalMass.Runtime.View.Atmosphere
             // 1. The old watchtower: a ruined round tower on an islet off the north-west corner, a fallen roof beside it,
             //    and a broken chain hanging from the islet's side toward the play island (the islands were once tied together).
             {
-                Vector3 c = new Vector3(-4f, -4.2f, 3.5f);
-                m.Islet(c, 4.2f, 6.5f, seg, 11u, low ? 0 : b.RootsPerIslet + 1, b.UnderCrystals);
+                Vector3 c = new Vector3(-3.0f, -5.0f, 2.7f);   // pass 2: lower and closer, so it rises into the top of the gameplay frame
+                m.Islet(c, 3.6f, 6.0f, seg, 11u, low ? 0 : b.RootsPerIslet + 1, b.UnderCrystals);
                 m.Tower(c + new Vector3(0.6f, 0f, 0.4f), 1.25f, 4.6f, low ? 6 : 8, 12u, BeyondMesh.WallStone, BeyondMesh.WallCap, null, true, BeyondMesh.Window, false);
                 m.Cone(c + new Vector3(-1.9f, 0.35f, -1.2f), 1.5f, 1.9f, low ? 5 : 7, BeyondMesh.Hex("#8C7A6A"), BeyondMesh.WallCap, new Vector3(0.9f, 0.35f, 0.3f));
                 m.Box(c + new Vector3(2.2f, 0.25f, -1.6f), new Vector3(0.9f, 0.5f, 0.7f), 20f, BeyondMesh.WallStone, BeyondMesh.WallCap);
@@ -418,11 +418,11 @@ namespace CriticalMass.Runtime.View.Atmosphere
                         m.Link(at, nrm, dir, 0.42f, 0.24f, 0.075f, BeyondMesh.Iron, 8, k == 5);
                     }
                 }
-                f.Add(new BeyondFeature { Name = "watchtower", Centre = c, Radius = 4.4f, Band = 0 });
+                f.Add(new BeyondFeature { Name = "watchtower", Centre = c, Radius = 3.8f, Band = 0 });
             }
             // 2. The waterfall islet north of the shrine: a spring falls off its south lip into the cloud sea.
             {
-                Vector3 c = new Vector3(W * 0.5f - 13f, -3.2f, 9.5f);
+                Vector3 c = new Vector3(W * 0.5f - 13f, -4.4f, 8.6f);
                 m.Islet(c, 3.6f, 5.5f, seg, 21u, low ? 0 : b.RootsPerIslet, b.UnderCrystals);
                 m.Box(c + new Vector3(0.2f, 0.08f, 0.6f), new Vector3(2.2f, 0.12f, 1.6f), 15f, BeyondMesh.Water, BeyondMesh.Water);
                 Vector3 lip = c + new Vector3(0.9f, -0.1f, -3.45f);
@@ -467,7 +467,7 @@ namespace CriticalMass.Runtime.View.Atmosphere
                 f.Add(new BeyondFeature { Name = "azure homeland outpost", Centre = c, Radius = 5.6f, Band = 1 });
                 m.Team = 0f;
             }
-            // 5. Crimson: the Ember Orchards (proposal): basalt columns, ember braziers and a grove of trees that burn without
+            // 5. Crimson: the Cinderholds (proposal; not the bible's Ember Orchard map): basalt columns, ember braziers and trees that burn without
             //    burning down (the relic "a road to an orchard of burning trees, past the edge"). The camera's yaw puts the east void
             //    at the bottom-right of the screen, where it is never seen, so the orchard stands off the north-east (the top-right of
             //    the screen from the Crimson half of the map); the Crimson massifs proper lie east, for wide cameras.
