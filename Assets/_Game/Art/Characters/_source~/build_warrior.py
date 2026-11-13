@@ -112,36 +112,23 @@ def build_torso():
     add(BODY, B.box((0.145, 0.115, 0.055), 0.02), "brass", {"hips": 0.6, "spine": 0.4}, "belt", smooth=False,
         m=M((0.25, -0.215, 0.79), (0, 0, -25)))
     # teal tabard strips, front and back, zigzag hem (team cloth), wide enough to read from above
-    hem = [(-0.20, 0.0), (0.20, 0.0), (0.21, -0.47), (0.14, -0.56), (0.07, -0.47), (0.0, -0.57),
-           (-0.07, -0.47), (-0.14, -0.56), (-0.21, -0.47)]
+    hem = [(-0.12, 0.0), (0.12, 0.0), (0.125, -0.42), (0.06, -0.50), (0.0, -0.43), (-0.06, -0.50),
+           (-0.125, -0.42)]      # v4: the bible's narrow tabard
     for y, ry in ((-0.275, 0), (0.265, 180)):
         add(BODY, B.prism(hem, 0.03, bevel=0.012, seg=1), "team_cloth", "hips", "team_cloth", smooth=False,
             m=M((0, y, 0.82), (90, 0, ry)) @ M((0, 0, 0), (-8, 0, 0)))
     add(BODY, B.cyl((0, 0, 1.15), (0, 0, 1.31), 0.10, 0.095, 12), "skin", ["chest", "head"], "skin")
-    # v3 teal scarf (bible p06): a bunched roll of puffy folds around the neck, sitting on the shoulders under the
-    # chin (the smirk stays visible), a knot at the front with a tapered end hanging down the chest, a wide back tail
+    # v4 teal scarf (bible p06): a compact roll wrapped round the neck, tucked under the chin, a knot at the front on
+    # the character's right and ONE tail hanging down the chest. No folds over the pauldrons (no cape, no hood).
     for k in range(8):
         a = 2 * math.pi * k / 8 + 0.2
-        cx, cy = 0.240 * math.cos(a) * 1.06, 0.012 + 0.215 * math.sin(a)
-        front = cy < -0.05
-        r = (0.168 * rng.uniform(0.92, 1.08), 0.150 * rng.uniform(0.92, 1.08), 0.110 * rng.uniform(0.9, 1.1))
-        side = abs(math.cos(a)) > 0.45 and not front       # side folds bunch up over the pauldrons' inner edge
-        z = 1.165 if front else (1.300 if side else 1.235)
-        if side:
-            right = cx < 0                        # the cleaver side bunches out further (asymmetric knot)
-            cx *= 1.50 if right else 1.20
-            r = (r[0] * (1.28 if right else 1.15), r[1] * (1.28 if right else 1.20), r[2] * 1.08)
+        cx, cy = 0.180 * math.cos(a), 0.0 + 0.165 * math.sin(a)
+        r = (0.105 * rng.uniform(0.94, 1.06), 0.095 * rng.uniform(0.94, 1.06), 0.075 * rng.uniform(0.92, 1.08))
         add(BODY, B.sphere(r, 10, 7), "team_cloth", "chest", "team_cloth",
-            m=M((cx, cy, z + 0.015 * math.sin(3 * a)), (0, 0, math.degrees(a))))
-    add(BODY, B.torus(0.37, 0.010, 22, 4), groove("team_cloth"), "chest", "team_cloth",
-        m=M((0, 0.012, 1.115), (0, 0, 0), (1.08, 1.0, 1.0)))
-    # knot and hanging end on the character's right, as the bible front draws it (viewer's left of centre)
-    add(BODY, B.sphere((0.11, 0.08, 0.09), 10, 6), "team_cloth", "chest", "team_cloth", m=M((-0.07, -0.33, 1.13)))
-    add(BODY, B.clump((-0.08, -0.33, 1.11), (-0.15, -0.37, 1.00), (-0.19, -0.34, 0.88), 0.20, 0.05, 7,
-                      up=(0, -1, 0), prof=(1.0, 1.05, 0.85, 0.5)), "team_cloth", "chest", "team_cloth")
-    tail = [(-0.27, 0.0), (0.27, 0.0), (0.26, -0.50), (0.13, -0.60), (0.0, -0.49), (-0.13, -0.60), (-0.26, -0.50)]
-    add(BODY, B.prism(tail, 0.035, bevel=0.012, seg=1), "team_cloth", "chest", "team_cloth", smooth=False,
-        m=M((0, 0.35, 1.20), (90, 0, 180)) @ M((0, 0, 0), (-6, 0, 0)))
+            m=M((cx, cy, 1.215 + 0.012 * math.sin(3 * a)), (0, 0, math.degrees(a))))
+    add(BODY, B.sphere((0.085, 0.065, 0.075), 10, 6), "team_cloth", "chest", "team_cloth", m=M((-0.08, -0.20, 1.18)))
+    add(BODY, B.clump((-0.085, -0.22, 1.15), (-0.15, -0.28, 1.03), (-0.19, -0.27, 0.90), 0.14, 0.045, 7,
+                      up=(0, -1, 0), prof=(1.0, 1.08, 0.95, 0.6)), "team_cloth", "chest", "team_cloth")
 
 
 def build_arms():
@@ -191,14 +178,9 @@ def build_pauldrons():
         add(BODY, stone((0.40, 0.47, 0.235), chips=3), "stone_armour", w, "stone_armour", m=top.copy())
         mid = M((0.44 * s, 0.01, 1.15), (0, -60 * s, 0))
         add(BODY, stone((0.31, 0.42, 0.19), chips=2), "stone_armour", w, "stone_armour", m=mid.copy())
-        crack(top @ M((0, 0, 0.126)), [(-0.15 * s, -0.17), (-0.05 * s, -0.08), (0.0, -0.13), (0.09 * s, 0.0),
-                                       (0.04 * s, 0.08), (0.14 * s, 0.18)], 0.10, wset=w)
-        crack(top @ M((0, 0, 0.123)), [(0.14 * s, -0.19), (0.08 * s, -0.11), (0.15 * s, -0.03)], 0.085, wset=w)
-        crack(top @ M((0, 0, 0.123)), [(-0.16 * s, 0.02), (-0.08 * s, 0.07), (-0.11 * s, 0.16)], 0.085, wset=w)
-        crack(mid @ M((0, 0, 0.104)), [(-0.10 * s, -0.16), (0.0, -0.05), (0.03 * s, 0.05), (0.11 * s, 0.16)], 0.11,
-              wset=w)
-        crack(mid @ M((0, 0, 0.101)), [(0.09 * s, -0.17), (0.05 * s, -0.08), (0.11 * s, 0.0)], 0.09, wset=w)
-        crack(mid @ M((0, 0, 0.101)), [(-0.11 * s, 0.05), (-0.05 * s, 0.10), (-0.08 * s, 0.18)], 0.09, wset=w)
+        # v4: small teal chips in the stone (bible), not long glowing stripes
+        crack(top @ M((0, 0, 0.124)), [(-0.10 * s, -0.12), (-0.05 * s, -0.08), (-0.01 * s, -0.11)], 0.05, wset=w)
+        crack(mid @ M((0, 0, 0.100)), [(0.02 * s, 0.06), (0.06 * s, 0.10)], 0.045, wset=w)
         # big domed brass plate on the front of the shoulder (bible: one per side, the brightest warm accent)
         disc_m = kit.frame((0.34 * s, -0.215, 1.16), (0.42 * s, -0.90, 0.10), (0, 0, 1))
         add(BODY, brass_disc(0.092), "brass", w, "stone_armour", m=disc_m)
@@ -351,14 +333,15 @@ def build_shield(poses):
         tilt = rng.uniform(-6, 6)
         p(B.slab((sx, 0.18, sz), 0.4, 10, 6), "stone_armour", "shield", True,
           m=M((r * math.cos(a), r * math.sin(a), 0.0), (tilt, 0, math.degrees(a) + 90)))
-        if True:  # cyan crack inlay on every rim slab (0.05 u wide), long and short alternating
-            p(B.box((sx * (0.66 if k % 2 else 0.48), 0.07, 0.016), 0.0, 1), "team_glow", "team_glow",
+        if k in (1, 4, 7):  # v4: a small teal chip on three of the nine rim stones (bible), not a stripe on each
+            p(B.box((0.075, 0.05, 0.016), 0.0, 1), "team_glow", "team_glow",
               m=M((r * math.cos(a), r * math.sin(a), sz / 2 - 0.004), (0, 0, math.degrees(a) + 90 + rng.uniform(-25, 25))))
     # core: navy ring, brass ring, glowing core (team glow), brass boss ring
-    p(B.cyl((0, 0, 0.03), (0, 0, 0.075), 0.30, 0.29, 28), "navy", "shield", True)
-    p(B.torus(0.245, 0.028, 28, 6), "brass", "shield", True, M((0, 0, 0.08)))
-    p(B.cyl((0, 0, 0.05), (0, 0, 0.105), 0.22, 0.215, 28), "team_glow", "team_glow", True)
-    p(B.torus(0.10, 0.018, 18, 5), "brass", "shield", True, M((0, 0, 0.108)))
+    # v4 centre boss (bible): dark iron plate, a glowing teal ring, an iron dome with a small teal centre
+    p(B.cyl((0, 0, 0.03), (0, 0, 0.078), 0.26, 0.25, 28), "iron", "shield", True)
+    p(B.torus(0.180, 0.030, 28, 6), "team_glow", "team_glow", True, M((0, 0, 0.082)))
+    p(brass_disc(0.13, 0.075), "iron", "shield", True, M((0, 0, 0.078)))
+    p(B.sphere((0.042, 0.042, 0.022), 10, 6), "team_glow", "team_glow", True, M((0, 0, 0.160)))
     for y in (-0.12, 0.12):  # back straps
         p(B.box((0.34, 0.06, 0.03), 0.01, 1), "leather_dark", "shield", m=M((0, y, -0.05)))
 
@@ -387,11 +370,8 @@ def build_cleaver(poses):
     p(B.prism(blade, 0.10, bevel=0.025, seg=2), "stone_blade", "cleaver")
     edge = [(0.17, -0.14), (0.27, -0.17), (0.26, -0.30), (0.29, -0.44), (0.27, -0.60), (0.28, -0.75),
             (0.17, -0.92), (0.08, -0.87), (0.18, -0.75), (0.19, -0.42), (0.185, -0.18)]
-    edge = [(x + 0.75 * max(0.0, x - 0.17), y * BL) for x, y in edge]     # v3: wider glowing edge (team read)
+    edge = [(x, y * BL) for x, y in edge]     # v4: the bible's glowing edge only (v3 widened it for a team-% rule)
     p(B.prism(edge, 0.055, bevel=0.012, seg=1), "team_glow", "team_glow")
-    for (x, y, ang) in ((0.05, -0.24, 30), (0.10, -0.43, -40), (0.0, -0.50, 70)):  # glowing chips in the faces
-        for z in (0.051, -0.051):
-            p(B.box((0.12, 0.06, 0.012), 0.0, 1), "team_glow", "team_glow", m=M((x, y, z), (0, 0, ang)))
     p(B.cyl((0, 0.13, 0), (0, -0.10, 0), 0.038, 0.038, 10), "leather", "cleaver", True)
     for y in (0.08, 0.02, -0.04):
         p(B.torus(0.040, 0.012, 10, 4), "leather_dark", "cleaver", True, M((0, y, 0), (90, 0, 0)))
