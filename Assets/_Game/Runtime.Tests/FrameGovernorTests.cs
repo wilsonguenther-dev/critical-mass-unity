@@ -9,6 +9,7 @@ namespace CriticalMass.Runtime.Tests
     /// <summary>DG-05 crash safety: frame cap, safe start, atomic files, the error-loop guard and the asset flags (pure parts).</summary>
     public sealed class FrameGovernorTests
     {
+
         [Test]
         public void CapIsAlwaysVsyncLockedAtTheNearestRateAtOrAboveTheCap()
         {
@@ -40,7 +41,9 @@ namespace CriticalMass.Runtime.Tests
             Assert.AreEqual(144, FrameGovernor.SanitiseCap(144));
             Assert.AreEqual(60, FrameGovernor.EffectiveCap(FramePolicy.Unlimited, true), "menus never unlimited");
             Assert.AreEqual(60, FramePolicy.BackgroundCap(FramePolicy.Unlimited, false), "unfocused never unbounded");
-            Assert.AreEqual(30, FramePolicy.TitleCapFor(FramePolicy.Unlimited));
+            Assert.AreEqual(FramePolicy.TitleCap, FramePolicy.TitleCapFor(FramePolicy.Unlimited));
+            Assert.AreEqual(20, FramePolicy.TitleCap, "perf-60hz-32p: idle title at 20 fps (idle CPU budget)");
+            Assert.AreEqual((3, -1), FrameGovernor.FrameSettings(FramePolicy.TitleCap, 60), "vsync 3 on a 60 Hz panel");
             Assert.AreEqual(60, FramePolicy.EffectiveCap(FramePolicy.Unlimited, false, true), "battery caps unlimited at 60");
             Assert.AreEqual(30, FrameGovernor.SanitiseCap(30));
             Assert.AreEqual(0, FrameGovernor.SanitiseCap(0));

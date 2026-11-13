@@ -20,8 +20,10 @@ namespace CriticalMass.Runtime.Game
         public const int DefaultCap = 0;
         public const int MenuCap = 60;
         public const int BatteryMenuCap = 30;
-        /// <summary>The title screen (a backdrop match behind it) at 30 fps: idle CPU budget (smoke measured 36.7% at 60).</summary>
-        public const int TitleCap = 30;
+        /// <summary>The idle title screen (a live 16v16 backdrop match behind the logo): 20 fps (vsync 3 on 60 Hz). perf-60hz-32p:
+        /// at 30 it cost 59 to 61% of a core on the 8 GB M1 Air against the 35% idle budget (main thread 27%, render thread
+        /// 15%, job workers and audio the rest). The story film and the attract tour over the title keep the menu rate.</summary>
+        public const int TitleCap = 20;
         public const int BatteryMatchCap = 60;
         public const int SavePowerBackgroundFps = 15;
         public const int MinBackgroundFps = 30;
@@ -221,48 +223,96 @@ namespace CriticalMass.Runtime.Game
     /// <summary>
     /// DG-49 safety net: when the measured frame rate stays above 1.5 times the cap for 2 s while vsync is meant to hold it
     /// (display asleep, window hidden, a panel that ignores vSyncCount 2), switch to a timed cap (vsync off, target = cap).
+    /// perf-60hz-32p: the display-rate default (cap 0) is covered too (its cap is the refresh rate; batch 6 left it
+    /// unguarded), and so is the opposite failure: vsync presents that stall for the drawable timeout (about 1 s: a sleeping
+    /// or occluded display; the Air ran 50 such frames a minute with its panel off). StallFrames frames of StallSeconds or
+    /// more inside StallWindowSeconds while vsync is on switch to the timed cap as well.
     /// </summary>
     public sealed class TimedCapGuard
     {
+        /// <summary>The drawable-timeout signature: a vsync frame of 0.9 to 1.25 s (CAMetalLayer gives up after about 1 s).
+        /// Loading frames are not in that band five times in 20 s.</summary>
+        public const double StallSeconds = 0.9, StallMaxSeconds = 1.25;
+        public const int StallFrames = 5;
+        public const double StallWindowSeconds = 20.0;
         double _age;
         int _frames;
-        int _cap = -1;
+        int _cap = -2;
+        double _stallAge;
+        int _stalls;
 
         /// <summary>true once the timed cap took over (until Reset).</summary>
         public bool ForceTimed { get; private set; }
 
+        /// <summary>Why the timed cap took over ("" while it has not).</summary>
+        public string Why { get; private set; } = "";
+
         public void Reset()
         {
             ForceTimed = false;
+            Why = "";
             _age = 0;
             _frames = 0;
+            _stallAge = 0;
+            _stalls = 0;
         }
 
-        /// <summary>One frame of dt seconds at this cap; vsyncActive: vsync is what holds the cap now.</summary>
-        public void Feed(double dt, int cap, bool vsyncActive)
+        /// <summary>One frame of dt seconds at this cap; vsyncActive: vsync is what holds the cap now; refreshHz: the display.</summary>
+        public void Feed(double dt, int cap, bool vsyncActive, double refreshHz = 60)
         {
             if (cap != _cap)
             {
+                // perf-60hz-32p: a new cap is judged afresh. The timed cap used to stick across caps: on the Air the 20 fps
+                // title (vsync 3, hidden window) tripped it and the whole match then ran on a 60 timer (5.6% of frames at
+                // 33 ms or more against 0.16% on vsync 1).
                 _cap = cap;
+                ForceTimed = false;
+                Why = "";
                 _age = 0;
                 _frames = 0;
+                _stallAge = 0;
+                _stalls = 0;
             }
-            if (cap <= 0 || ForceTimed) return;
+            if (cap < 0 || ForceTimed) return;
+            if (double.IsNaN(refreshHz) || refreshHz < 20) refreshHz = 60;
+            double rate = cap > 0 ? cap : refreshHz;
+            if (vsyncActive)
+            {
+                _stallAge += Math.Max(0, dt);
+                if (dt >= StallSeconds && dt <= StallMaxSeconds) _stalls++;
+                if (_stalls >= StallFrames)
+                {
+                    ForceTimed = true;
+                    Why = "vsync presents stalled (" + _stalls + " frames of about 1 s: display asleep or window occluded)";
+                    return;
+                }
+                if (_stallAge >= StallWindowSeconds)
+                {
+                    _stallAge = 0;
+                    _stalls = 0;
+                }
+            }
             _age += Math.Max(0, dt);
             _frames++;
             if (_age < FramePolicy.TimedCapWindowSeconds) return;
             double fps = _frames / _age;
-            if (vsyncActive && fps > cap * FramePolicy.TimedCapRatio) ForceTimed = true;
+            if (vsyncActive && fps > rate * FramePolicy.TimedCapRatio)
+            {
+                ForceTimed = true;
+                Why = "vsync not holding (" + Math.Round(fps) + " fps against " + Math.Round(rate) + ")";
+            }
             _age = 0;
             _frames = 0;
         }
 
-        /// <summary>The frame settings for a cap with the guard applied.</summary>
+        /// <summary>The frame settings for a cap with the guard applied (cap 0 timed at the display rate).</summary>
         public (int vSync, int target) Settings(int cap, double refreshHz)
         {
             (int v, int t) = FramePolicy.FrameSettings(cap, refreshHz);
-            if (ForceTimed && cap > 0) return (0, cap);
-            return (v, t);
+            if (!ForceTimed || cap < 0) return (v, t);
+            if (cap > 0) return (0, cap);
+            if (double.IsNaN(refreshHz) || refreshHz < 20) refreshHz = 60;
+            return (0, (int)Math.Round(refreshHz));
         }
     }
 

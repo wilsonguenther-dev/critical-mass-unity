@@ -4,6 +4,8 @@
 # file free of bash-4 features (no associative arrays, no mapfile, no ${x,,}).
 #   air-run.sh --id RUN_ID --build DIR [--matches N] [--title-seconds S] [--timeout S] [--quality NAME] [--speed X]
 #              [--novsync] [--fps-cap N] [--camera-yaw D] [--width W --height H] [--shots] [--keep N] [--lock-wait S]
+#              [--extra "PLAYER FLAGS"]   (perf-60hz-32p: extra player flags, split on spaces: -showWindow, -autoplayPacing
+#              rule,timed60, -autoplayQualities Low,Medium,High, -fpsCap N, -stressHill)
 #   air-run.sh --id RUN_ID --exec 'COMMAND' [--lock-wait S]   (tools/remote-run.sh: any command, same queue lock, run
 #              by bash in ~/cm-remote/work with ~/cm-remote/env.sh sourced: ffmpeg, the Python venv, dotnet on PATH;
 #              output in runs/<id>/output.txt)
@@ -14,7 +16,7 @@
 # (runs/<id>/ABORT exists), 75 lock wait timed out, 66 no app, 67 refused (low battery or low disk).
 set -u
 BASE="$HOME/cm-remote"
-ID=""; BUILD=""; MATCHES=1; TITLE_S=12; TIMEOUT=900; QUALITY=""; SPEED=""; NOVSYNC=""; W=1920; H=1080; SHOTS=""; FPSCAP=""; CAMYAW=""
+ID=""; BUILD=""; MATCHES=1; TITLE_S=12; TIMEOUT=900; QUALITY=""; SPEED=""; NOVSYNC=""; W=1920; H=1080; SHOTS=""; FPSCAP=""; CAMYAW=""; EXTRA=""
 KEEP=2; LOCK_WAIT=3600; EXEC=""
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -31,6 +33,7 @@ while [ $# -gt 0 ]; do
     --shots) SHOTS=1; shift ;;
     --fps-cap) FPSCAP="$2"; shift 2 ;;
     --camera-yaw) CAMYAW="$2"; shift 2 ;;
+    --extra) EXTRA="$2"; shift 2 ;;
     --keep) KEEP="$2"; shift 2 ;;
     --exec) EXEC="$2"; shift 2 ;;
     --lock-wait) LOCK_WAIT="$2"; shift 2 ;;
@@ -122,13 +125,13 @@ launch_ms=$(ms)
 others="$(pgrep -f 'Unity.app/Contents/MacOS/Unity|CriticalMass.app/Contents/MacOS' | tr '\n' ' ')"
 { echo "LAUNCH_MS=$launch_ms"; echo "MATCHES=$MATCHES"; echo "TITLE_S=$TITLE_S"; echo "NOVSYNC=${NOVSYNC:+-novsync}"
   echo "OTHERS=$others"; echo "HOST=$(scutil --get LocalHostName 2>/dev/null)"; echo "BUILD=$(basename "$BUILD")"
-  echo "QUALITY=$QUALITY"; echo "WIDTH=$W"; echo "HEIGHT=$H"; } > "$RUN/run.env"
+  echo "QUALITY=$QUALITY"; echo "WIDTH=$W"; echo "HEIGHT=$H"; echo "EXTRA=$EXTRA"; } > "$RUN/run.env"
 say "launch $(basename "$BUILD") matches=$MATCHES quality=${QUALITY:-default} ${W}x${H} limit=${LIMIT}s"
 # Started straight from this (ssh-born) shell: proven 2026-11-13 on macOS 26.3 that it gets a Metal device and a window
 # in the logged-in console session; no `open` or `launchctl asuser` needed (and exit codes survive).
 perl -e 'alarm shift; exec @ARGV' "$LIMIT" \
   "$EXE" -autoplay -quitAfterMatch -autoplayMatches "$MATCHES" -autoplayTitleSeconds "$TITLE_S" -autoplayTimeout "$TIMEOUT" \
-  ${SPEED:+-autoplaySpeed "$SPEED"} ${NOVSYNC:+-novsync} ${QUALITY:+-quality "$QUALITY"} ${SHOTS:+-shots} ${FPSCAP:+-fpsCap "$FPSCAP"} ${CAMYAW:+-cameraYaw "$CAMYAW"} \
+  ${SPEED:+-autoplaySpeed "$SPEED"} ${NOVSYNC:+-novsync} ${QUALITY:+-quality "$QUALITY"} ${SHOTS:+-shots} ${FPSCAP:+-fpsCap "$FPSCAP"} ${CAMYAW:+-cameraYaw "$CAMYAW"} $EXTRA \
   -dataDir "$RUN/data" -screen-fullscreen 0 -screen-width "$W" -screen-height "$H" -logFile "$LOG" -perfLog "$RUN/perf.json" \
   > "$RUN/stdout.txt" 2>&1 &
 pid=$!
