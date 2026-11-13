@@ -18,6 +18,8 @@ namespace CriticalMass.Runtime.Tests
     {
         /// <summary>A clip "moves" when some bone turns at least this far from the clip's first frame.</summary>
         public const float MinBoneTurnDeg = 3f;
+        /// <summary>The egg's Idle is a gentle rock of its Shell bone (2.4 degrees as imported).</summary>
+        public const float EggMinTurnDeg = 1f;
 
         /// <summary>The clips each fighter's ActorAnimator states play (locomotion, hit, death, get-up, jumps, carry, cheer,
         /// idle break), plus its class attack, ability and gather.</summary>
@@ -90,7 +92,8 @@ namespace CriticalMass.Runtime.Tests
                         if (clip == null) continue;
                         float turn = MaxTurnDeg(go, bones, clip, out string bone);
                         report.Append(' ').Append(c).Append(' ').Append(turn.ToString("0")).Append(" (").Append(bone).Append(')');
-                        if (turn < MinBoneTurnDeg) bad.Add($"{key} {c}: the largest bone turn is {turn:0.0} deg ({bone}); the clip is static");
+                        float floor = key == ArtMapping.KaijuEgg ? EggMinTurnDeg : MinBoneTurnDeg;   // the egg only rocks
+                        if (turn < floor) bad.Add($"{key} {c}: the largest bone turn is {turn:0.0} deg ({bone}); the clip is static");
                     }
                     report.Append('\n');
                 }

@@ -69,7 +69,7 @@ namespace CriticalMass.Sim.Core
             double R = kc.SlamRadius;
             double full = p.SlamFullRadiusShare * R;
             bool walls = Phys.On(w, p.WallsBlockHits);
-            bool knock = Phys.On(w, p.Knockback);
+            bool knock = Damage.Knocks(w, DamageCause.KaijuSlam);
             int hits = 0;
             for (int id = 0; id < w.ActorCount; id++)
             {
@@ -90,6 +90,8 @@ namespace CriticalMass.Sim.Core
             }
             k.SlamCd = kc.SlamCooldown;
             World.PushEvent(w, SimEventType.KaijuSlam, -1, hits, k.TelegraphX, k.TelegraphZ, R, null, DamageCause.None, R, 0, 0, knock ? p.SlamKnockCentre : 0, 2, 0, 0);
+            // fix/kaiju-alive-1: the slam ring knocks structures down (after the KaijuSlam event, so the view lands both).
+            if (Phys.On(w, p.KaijuTopples)) Topple.ToppleInArc(w, -1, k.TelegraphX, k.TelegraphZ, 1, 0, Math.Max(0, R * p.KaijuSlamToppleShare - w.Config.Abilities.Topple.Reach), -1);
         }
 
         /// <summary>
@@ -114,7 +116,7 @@ namespace CriticalMass.Sim.Core
             double dz = w.Z[t] - k.Z;
             double reach = kc.MeleeRange + MeleeLeash;
             if (dx * dx + dz * dz > reach * reach) return;
-            if (Phys.On(w, w.Config.Physics.Knockback))
+            if (Damage.Knocks(w, DamageCause.KaijuMelee))
             {
                 Knock.Dir(w, t, k.X, k.Z, JsMath.Cos(k.Facing), JsMath.Sin(k.Facing), out double kx, out double kz);
                 Damage.ApplyHit(w, t, kc.MeleeDamage, Damage.KaijuSource, k.X, k.Z, DamageCause.KaijuMelee, kx, kz, w.Config.Physics.KaijuClawKnock, w.Dur.KaijuStun);
@@ -143,9 +145,13 @@ namespace CriticalMass.Sim.Core
             PhysicsConfig p = w.Config.Physics;
             Kaiju k = w.Kaiju;
             bool walls = Phys.On(w, p.WallsBlockHits);
-            bool knock = Phys.On(w, p.Knockback);
+            bool knock = Damage.Knocks(w, DamageCause.KaijuMelee);
             double fx = JsMath.Cos(k.ClawFacing);
             double fz = JsMath.Sin(k.ClawFacing);
+            // fix/kaiju-alive-1: the claw arc takes one hit off every standing structure in the cone (reach as for actors).
+            if (Phys.On(w, p.KaijuTopples))
+                Topple.ToppleInArc(w, -1, k.ClawX, k.ClawZ, fx, fz, Math.Max(0, kc.MeleeRange + MeleeLeash - w.Config.Abilities.Topple.Reach),
+                    JsMath.Cos(p.KaijuClawConeDeg / 2 * Math.PI / 180));
             for (int id = 0; id < w.ActorCount; id++)
             {
                 if (!w.Actors[id].Alive || !KaijuHostileTo(w, id) || !InClawCone(w, id)) continue;

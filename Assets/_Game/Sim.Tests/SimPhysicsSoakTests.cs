@@ -217,8 +217,8 @@ namespace CriticalMass.Sim.Tests
         private static readonly ulong[,] Golden =
         {
             { 0x5C912AEED16BC302UL, 0x2980068FA0457CC2UL }, // Classic (DG-21, unchanged since the browser port)
-            { 0x2BE070768E23B442UL, 0x8616946C55B1FFF8UL }, // PhysicsOnly (re-pinned 2026-11-12: U-071 a retreating bot passes allies)
-            { 0x70C7D9F992CAC3CCUL, 0x8F3F947AE72E7815UL }, // Full (re-pinned 2026-11-13: U-074 hatch push-out, U-075 Builder builds, U-076 hill squad, U-077 short-handed share, U-078 Hard)
+            { 0x2BE070768E23B442UL, 0x506A64D1691F629AUL }, // PhysicsOnly (re-pinned 2026-11-12: U-071; 5v5 re-pinned 2026-11-13: fix/kaiju-alive-1 Kaiju hits knock, stagger and topple)
+            { 0x70C7D9F992CAC3CCUL, 0x405802912F3E9036UL }, // Full (5v5 re-pinned 2026-11-13 by fix/kaiju-alive-1: Kaiju hits knock, stagger, topple; before: U-074 hatch push-out, U-075 Builder builds, U-076 hill squad, U-077 short-handed share, U-078 Hard)
         };
     }
 }

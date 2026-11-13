@@ -116,6 +116,8 @@ namespace CriticalMass.Runtime.View.Anim
         /// <summary>Called when the model is (re)taken from the pool: forget motion history, evaluate the first frames.</summary>
         public void Reset()
         {
+            _lastCarried = -1;
+            _terraClip = null;
             _hasLast = false;
             _hasYaw = false;
             _vx = _vz = _speed = _prevSpeed = _accel = 0;
@@ -550,6 +552,28 @@ namespace CriticalMass.Runtime.View.Anim
                 actW = Math.Max(actW, _holdW);
             }
 
+            // fix/kaiju-alive-1 (nothing-glides audit): a dig or a place had no pose at all (the block just appeared or vanished
+            // while the Miner stood in Idle). The carried-block count changing is the sim's dig (+) or place (-): a chop for a
+            // dig, Use_Item for a place, on the upper layer so the legs keep their state.
+            int carried = w.Terraform != null && w.Terraform.Carried != null && i < w.Terraform.Carried.Length ? w.Terraform.Carried[i] : 0;
+            if (_lastCarried >= 0 && carried != _lastCarried && actor.Alive)
+            {
+                _terraClip = carried > _lastCarried ? (m.HasClip(ArtMapping.Attack2HChop) ? ArtMapping.Attack2HChop : ArtMapping.UseItem) : ArtMapping.UseItem;
+                if (!m.HasClip(_terraClip)) _terraClip = null;
+                _terraAt = simTime;
+            }
+            _lastCarried = carried;
+            if (_terraClip != null)
+            {
+                double tt = simTime - _terraAt, tl = m.ClipLength(_terraClip);
+                if (tt >= tl || tt < 0) _terraClip = null;
+                else
+                {
+                    float tw = (float)Math.Min(1, Math.Min(tt / 0.08, (tl - tt) / 0.2)) * (1f - Mathf.Clamp01(actW));
+                    if (tw > 0f && m.PoseUpper(_terraClip, tt, tw, false, 0)) { sum += tw; actW = Math.Max(actW, tw); }
+                }
+            }
+
             // Carry pose (arms in) under everything else.
             bool carrying = actor.Carry != CarryKind.None && actor.CarryAmount > 0 && m.HasClip(ArtMapping.Carry);
             _carry = Approach(_carry, carrying ? 1f : 0f, dSim, CarryFade);
@@ -582,6 +606,9 @@ namespace CriticalMass.Runtime.View.Anim
         }
 
         double _actAge;
+        int _lastCarried = -1;
+        string _terraClip;
+        double _terraAt;
 
         void BeginAction(ModelView m, Actor actor, GameConfig cfg, double simTime)
         {
