@@ -683,7 +683,7 @@ namespace CriticalMass.Sim.Bots
             if (role == BotsState.RoleKaiju && st.Corrupt[id] == 0 && egg && a.CarryAmount < cc.CarryCapacity && a.Carry != CarryKind.Corruption && Roles.MayFeed(w, a.Cls))
             {
                 gatherNode = BestNode(w, st, id, NodeKind.Biomass, double.PositiveInfinity);
-                if (gatherNode >= 0) uGather = Cap1(0.8 * st.Greed[id]);
+                if (gatherNode >= 0) uGather = Cap1(0.8 * st.Greed[id] * (Roles.IsBestFeeder(w, a.Cls) ? w.Config.Depth.Roles.BestFeederGatherBias : 1)); // U-070 Farmers prioritise feeding
             }
 
             double uDeliver = 0;
@@ -691,6 +691,12 @@ namespace CriticalMass.Sim.Bots
             {
                 NodeKind kind = a.Carry == CarryKind.Corruption ? NodeKind.Corruption : NodeKind.Biomass;
                 if (a.CarryAmount >= cc.CarryCapacity || BestNode(w, st, id, kind, NearbyNodeDist) < 0) uDeliver = 0.9;
+                else if (kind == NodeKind.Biomass && Roles.On(w))
+                {
+                    // U-070: any class holding food near the egg hands it in (every class feeds again).
+                    double ndx = x - w.Map.Shrine.X, ndz = z - w.Map.Shrine.Z, near = w.Config.Depth.Roles.DeliverNearShrine;
+                    if (ndx * ndx + ndz * ndz <= near * near) uDeliver = 0.9;
+                }
             }
 
             double uCorrupt = 0;

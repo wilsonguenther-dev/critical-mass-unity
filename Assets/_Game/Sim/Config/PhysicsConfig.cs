@@ -101,6 +101,13 @@ namespace CriticalMass.Sim.Config
         public double SeparationMaxStep = 0.2;
         /// <summary>Teammates push each other this much softer than enemies (a carrier squeezes past).</summary>
         public double AllyPushShare = 0.5;
+        /// <summary>
+        /// U-071 (DG-22 Demolitions soak stall): a bot in Retreat and a teammate walking INTO it (input directions with a dot
+        /// product under AllyPassDot) do not push at all, so the retreating bot and the allies coming the other way pass in a
+        /// one-cell corridor instead of jamming (every opposing ally pair passing cost the D-030 passive check 39 -> 21 of 200) (a Crimson bot in Retreat stood 96 ticks at (64.1, 41.5) against three allies heading to the fight).
+        /// </summary>
+        public bool AllyPassOpposing = true;
+        public double AllyPassDot = -0.3;
         /// <summary>Separation splits each push by ClassConfig.Mass (false: half each, as the classic pass).</summary>
         public bool SeparationByMass = false;
         /// <summary>Bodies slide round convex wall corners instead of snagging (S10, every actor).</summary>

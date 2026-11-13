@@ -576,7 +576,17 @@ namespace CriticalMass.Sim.Core
                             ddz /= d;
                         }
                         double overlap = (rr - d) * p.SeparationRelax;
-                        if (ai.Team == aj.Team) overlap *= p.AllyPushShare;
+                        if (ai.Team == aj.Team)
+                        {
+                            overlap *= p.AllyPushShare;
+                            // U-071: a retreating bot and an ally heading into it pass (no head-on jam in a one-cell corridor).
+                            if (p.AllyPassOpposing && (ai.AiState == AiState.Retreat || aj.AiState == AiState.Retreat))
+                            {
+                                InputFrame fi = w.Inputs[i], fj = w.Inputs[j];
+                                double li = fi.MoveX * fi.MoveX + fi.MoveZ * fi.MoveZ, lj = fj.MoveX * fj.MoveX + fj.MoveZ * fj.MoveZ;
+                                if (li > 1e-6 && lj > 1e-6 && (fi.MoveX * fj.MoveX + fi.MoveZ * fj.MoveZ) < p.AllyPassDot * Math.Sqrt(li * lj)) continue;
+                            }
+                        }
                         double mi = p.SeparationByMass ? w.Config.Class(ai.Cls).Mass : 1;
                         double mj = p.SeparationByMass ? w.Config.Class(aj.Cls).Mass : 1;
                         double pushI = jFixed ? overlap : iFixed ? 0 : overlap * mj / (mi + mj);

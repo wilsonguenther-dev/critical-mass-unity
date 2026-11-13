@@ -44,6 +44,8 @@ namespace CriticalMass.Sim.Core
     {
         /// <summary>U-063: per actor, the first World.Tick its next DeliverRefused event may be pushed.</summary>
         public int[] RefuseReadyTick;
+        /// <summary>U-070: units of each actor's load that came by a hand-off to a Farmer or out of the team stock (PassBonus on delivery).</summary>
+        public int[] PassUnits;
         /// <summary>U-063 counters (soak, tests): deliveries refused, hand-offs made, units handed off.</summary>
         public int Refusals;
         public int Handoffs;
@@ -154,6 +156,7 @@ namespace CriticalMass.Sim.Core
             var s = new DepthState
             {
                 RefuseReadyTick = new int[cap],
+                PassUnits = new int[cap],
                 PrevInteract = new byte[cap],
                 Sources = Core.Sources.Place(cfg, map),
                 SourceProgress = new double[cap],
@@ -197,6 +200,7 @@ namespace CriticalMass.Sim.Core
         public void Reset(World w)
         {
             Array.Clear(RefuseReadyTick, 0, RefuseReadyTick.Length);
+            Array.Clear(PassUnits, 0, PassUnits.Length);
             Refusals = 0;
             Handoffs = 0;
             HandoffUnits = 0;

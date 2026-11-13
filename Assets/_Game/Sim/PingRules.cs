@@ -57,9 +57,9 @@ namespace CriticalMass.Sim.Core
             return call == PingCall.Attack ? (int)P.MaxAttack : call == PingCall.Defend ? (int)P.MaxDefend : call == PingCall.Help ? (int)P.MaxHelp : 0;
         }
 
-        private static int TicksFor(PingsConfig P, PingCall call)
+        private static int TicksFor(GameConfig c, PingsConfig P, PingCall call)
         {
-            return call == PingCall.Attack ? Durations.T30(w.Config, P.AttackTicks) : call == PingCall.Defend ? Durations.T30(w.Config, P.DefendTicks) : Durations.T30(w.Config, P.HelpTicks);
+            return Durations.T30(c, call == PingCall.Attack ? P.AttackTicks : call == PingCall.Defend ? P.DefendTicks : P.HelpTicks);
         }
 
         private static int MatesOnHill(World w, int id)
@@ -153,7 +153,7 @@ namespace CriticalMass.Sim.Core
                 d.OrderX[best] = x;
                 d.OrderZ[best] = z;
                 d.OrderBy[best] = id;
-                d.OrderEnd[best] = w.Tick + TicksFor(P, call);
+                d.OrderEnd[best] = w.Tick + TicksFor(w.Config, P, call);
                 d.OrderField[best] = slot;
                 d.OrderSerial[best] = serial;
                 w.Actors[best].AiState = AiState.Order; // obeyed on this tick; the bot's next think keeps or refines it

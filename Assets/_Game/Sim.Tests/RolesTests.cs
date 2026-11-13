@@ -10,7 +10,8 @@ namespace CriticalMass.Sim.Tests
     [TestFixture]
     public sealed class RolesTests
     {
-        private static GameConfig Cfg => DepthKit.Cfg();
+        // U-070 (owner 2026-11-12) made every class a feeder; these tests pin the U-063 Farmers-only rule, still a config option.
+        private static GameConfig Cfg => DepthKit.Cfg(DepthKit.FarmersOnly);
 
         private static World AtShrine(ClassId cls, CarryKind kind, int amount, int meat = 0)
         {

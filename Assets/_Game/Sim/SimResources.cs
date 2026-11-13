@@ -30,7 +30,7 @@ namespace CriticalMass.Sim.Core
                     // U-064: wood feeds a little less than plant; water feeds least but cools the egg (never under 0, never after the lock).
                     SourcesConfig S = w.Config.Depth.Sources;
                     bool water = bio == BiomassType.Water;
-                    m.Allegiance[team] += units * (water ? S.WaterAllegiancePerUnit : S.WoodAllegiancePerUnit) * MapEvents.FeedScale(w);
+                    m.Allegiance[team] += units * (water ? S.WaterAllegiancePerUnit : S.WoodAllegiancePerUnit) * MapEvents.FeedScale(w) * Roles.AllegianceScale(w, actorId, units); // U-070
                     m.Delivered[(int)team].Biomass += units;
                     if (water)
                     {
@@ -47,7 +47,7 @@ namespace CriticalMass.Sim.Core
                     return;
                 }
                 bool meat = bio == BiomassType.Meat;
-                m.Allegiance[team] += units * (meat ? feed.MeatAllegiancePerUnit : feed.BiomassAllegiancePerUnit) * MapEvents.FeedScale(w); // U-068 egg exposed (x 1 otherwise)
+                m.Allegiance[team] += units * (meat ? feed.MeatAllegiancePerUnit : feed.BiomassAllegiancePerUnit) * MapEvents.FeedScale(w) * Roles.AllegianceScale(w, actorId, units); // U-068 egg exposed, U-070 Farmer / pass bonus (x 1 otherwise)
                 m.Delivered[(int)team].Biomass += units;
                 if (meat) m.Delivered[(int)team].Meat += units;
                 else m.Delivered[(int)team].Plant += units;
@@ -242,6 +242,7 @@ namespace CriticalMass.Sim.Core
                 Actor a = w.Actors[id];
                 // CM-35: Damage empties the cargo at death and the meat load goes with it; after the hatch meat feeds nothing.
                 if (!a.Alive || !egg) a.CarryMeat = 0;
+                if (a.CarryAmount <= 0 && a.CarryMeat <= 0) w.Depth.PassUnits[id] = 0; // U-070: a pass bonus never outlives its load
                 if (liveOrbs > 0 && egg && a.Alive && a.MeatPickup && a.StandUp <= 0) PickUpMeat(w, id);
                 if (!a.Alive || a.StandUp > 0 || !w.Inputs[id].Interact)
                 {

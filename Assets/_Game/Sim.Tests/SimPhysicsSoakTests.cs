@@ -196,16 +196,29 @@ namespace CriticalMass.Sim.Tests
         [Test]
         public void GoldenHashesOfTheNewDefaultAreStable()
         {
-            // New goldens for the physics default (printed so the integrator can pin them after the first Unity run).
-            ulong a = MatchHash.Run(1, 16, 3600, ClassId.Warrior);
-            ulong b = MatchHash.Run(42, 5, 14500, ClassId.Warrior);
-            Console.WriteLine("{\"item\":\"sim-physics golden\",\"16v16seed1\":\"0x" + a.ToString("X16") + "\",\"5v5seed42\":\"0x" + b.ToString("X16") + "\"}");
-            Assert.AreEqual(a, MatchHash.Run(1, 16, 3600, ClassId.Warrior));
-            Assert.AreEqual(Golden16v16Seed1, a, "16v16 seed 1, 2:00, physics default");
-            Assert.AreEqual(Golden5v5Seed42, b, "5v5 seed 42, whole match, physics default");
+            // Rules-combined (U-069): one pair of goldens per rules profile, all from CreateBrowser5v5 at pace 1 unless named.
+            // Classic: browser parity (no physics, no depth, pace 2x): must equal the DG-21 golden bit for bit.
+            // PhysicsOnly: the physics lane on, depth off (the test config). Re-pinned 2026-11-12 for U-071 (allies pass head-on).
+            // Full: everything on (the game's default rules). Re-pinned 2026-11-12 for U-070 / U-072 (every class feeds, raiders).
+            foreach (RulesProfile p in new[] { RulesProfile.Classic, RulesProfile.PhysicsOnly, RulesProfile.Full })
+            {
+                Action<GameConfig> t = c => c.ApplyRules(p);
+                ulong a = MatchHash.Run(1, 16, 3600, ClassId.Warrior, null, t);
+                ulong b = MatchHash.Run(42, 5, 14500, ClassId.Warrior, null, t);
+                Console.WriteLine("{\"item\":\"rules-combined golden\",\"profile\":\"" + p + "\",\"16v16seed1\":\"0x" + a.ToString("X16") + "\",\"5v5seed42\":\"0x" + b.ToString("X16") + "\"}");
+                Assert.AreEqual(a, MatchHash.Run(1, 16, 3600, ClassId.Warrior, null, t), p + ": same seed, same hash");
+                Assert.AreEqual(Golden[(int)p, 0], a, p + ": 16v16 seed 1, 2:00");
+                Assert.AreEqual(Golden[(int)p, 1], b, p + ": 5v5 seed 42, whole match");
+            }
+            Assert.AreEqual(MatchHash.Run(1, 16, 3600, ClassId.Warrior), Golden[(int)RulesProfile.PhysicsOnly, 0], "CreateBrowser5v5 is the PhysicsOnly profile");
         }
 
-        private const ulong Golden16v16Seed1 = 0xC650A26531E8C885UL;
-        private const ulong Golden5v5Seed42 = 0x66F27919805F6F75UL;
+        /// <summary>[profile, 0] = 16v16 seed 1 at 2:00, [profile, 1] = 5v5 seed 42 whole match. Classic = the DG-21 goldens.</summary>
+        private static readonly ulong[,] Golden =
+        {
+            { 0x5C912AEED16BC302UL, 0x2980068FA0457CC2UL }, // Classic (DG-21, unchanged since the browser port)
+            { 0x2BE070768E23B442UL, 0x8616946C55B1FFF8UL }, // PhysicsOnly (re-pinned 2026-11-12: U-071 a retreating bot passes allies)
+            { 0xFDD32DEA1AE29347UL, 0xEB76B17D3058D592UL }, // Full (pinned 2026-11-12: U-070 every class feeds, U-072 corruption reopened)
+        };
     }
 }

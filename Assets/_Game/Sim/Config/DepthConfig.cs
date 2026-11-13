@@ -262,10 +262,31 @@ namespace CriticalMass.Sim.Config
     public sealed class RolesConfig
     {
         public bool Enabled = true;
-        /// <summary>May this class hand biomass (plant, meat, wood, water) to the egg? Only the Farmer.</summary>
-        public bool[] MayFeed = { false, true, false, false, false, false };
-        /// <summary>May this class gather, carry and deliver corruption? The raiders: Warrior, Miner, Demolitions.</summary>
-        public bool[] MayCorrupt = { true, false, true, true, false, false };
+        /// <summary>
+        /// May this class hand biomass (plant, meat, wood, water) to the egg? U-070 (owner 2026-11-12, supersedes U-063's
+        /// Farmers-only feeding): every class, at every team size, as in the browser. False entries restore the old refusal.
+        /// </summary>
+        public bool[] MayFeed = { true, true, true, true, true, true };
+        /// <summary>U-070: the class that is BEST at feeding (the Farmer): its deliveries count BestFeederBonus extra, on top of
+        /// its browser carry (3 a trip) and gather speed (1 s). Other classes hand their food to it for the PassBonus.</summary>
+        public bool[] BestFeeder = { false, true, false, false, false, false };
+        /// <summary>U-070: extra allegiance share of a best feeder's delivery (0.25 = a Farmer's unit counts 1.25). Chosen from the PR table.</summary>
+        public double BestFeederBonus = 0.25;
+        /// <summary>U-070: extra allegiance share of a unit that reached the egg through a hand-off to a Farmer or the team stock
+        /// (the optional plays): paid once, on delivery, never on a deposit (no bank-and-withdraw loop).</summary>
+        public double PassBonus = 0.1;
+        /// <summary>U-070 bots: a Farmer bot's gather utility is scaled by this (it prioritises feeding).</summary>
+        public double BestFeederGatherBias = 1.25;
+        /// <summary>U-070 bots: any bot holding food within this many units of the shrine goes to deliver it.</summary>
+        public double DeliverNearShrine = 10;
+        /// <summary>
+        /// May this class gather, carry and deliver corruption? U-072 (2026-11-12): every class but the Healer (she purifies). U-063
+        /// allowed only the raiders (Warrior, Miner, Demolitions): bots then ran about 4 units a match against 8.5 before, the
+        /// berserk share fell to 0 of 100 (band 0.10..0.50) and the idle-player team won 2 of 200 (floor 30).
+        /// </summary>
+        public bool[] MayCorrupt = { true, true, true, true, true, false };
+        /// <summary>U-072 bots: the classes a team that is behind sends on a deliberate corruption run first (the raiders).</summary>
+        public bool[] CorruptionRunner = { true, false, true, true, false, false };
         /// <summary>A carrier that may not feed hands its biomass to an allied feeder within this distance (edge to edge) by holding interact.</summary>
         public double HandoffRange = 1.6;
         /// <summary>Sim ticks between two DeliverRefused events for one actor (a held key never floods the event ring).</summary>
@@ -295,7 +316,9 @@ namespace CriticalMass.Sim.Config
         {
             var c = (RolesConfig)MemberwiseClone();
             c.MayFeed = (bool[])MayFeed.Clone();
+            c.BestFeeder = (bool[])BestFeeder.Clone();
             c.MayCorrupt = (bool[])MayCorrupt.Clone();
+            c.CorruptionRunner = (bool[])CorruptionRunner.Clone();
             c.ClassMix = (double[])ClassMix.Clone();
             c.SmallTeamClassMix = (double[])SmallTeamClassMix.Clone();
             return c;

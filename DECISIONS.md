@@ -1265,3 +1265,27 @@ Travis: "Builder / Build class upgrades with biomass".
    BridgeCollapsed / BridgeRepaired, each with a position. Announcer lines in `MapEventNames`.
 6. **Measured** (seed 7, 16v16, 4 minutes): 4 events, 1 drop claimed by bots, 1 egg window, 2 bridges down, 1 back; both
    pads still reach the hill at the end. All 16 event numbers find a span that passes the route guard.
+
+## U-069 Rules combined: sim physics plus mechanics depth on one branch, one rules switch (our rule) (2026-11-13T05:57:05Z)
+
+**Source.** Integrator decision. Supersedes the separate drafts #49 (feat/sim-physics) and #58 (feat/mechanics-depth).
+1. **Merge order.** Physics events first, exactly as pinned by #49, then the mechanics events, all before the CM-84
+   marker; new `SimEvent` and `Actor` fields at the end in the same order; enum members appended only.
+2. **One switch.** `GameConfig.ApplyRules(RulesProfile)`: `Classic` = browser parity (every physics rule off, instant hits,
+   every depth rule off, pace 2x), `PhysicsOnly` = physics on, depth off (the test config, `CreateBrowser5v5`), `Full` =
+   everything on (`CreateDefault`, the game). `GameConfig.CreateClassic()` and `GameConfig.Rules` read it back.
+   `PhysicsConfig.Classic` and `DepthConfig.Classic` stay as the two lane switches underneath.
+3. **Composition.** Might scales the physics wind-up swing (fair hits included); Haste multiplies with the swing
+   multiplier; every mechanics `*Ticks` read goes through `Durations.T30` (the DG-68 one-time-unit scan).
+4. **Goldens per profile** (`GoldenHashesOfTheNewDefaultAreStable`): Classic equals the DG-21 goldens bit for bit at pace 2x.
+
+## U-071 Allies walking into each other pass instead of jamming (fixes the DG-22 Demolitions soak stall) (our rule) (2026-11-13T05:57:05Z)
+
+**Source.** Our rule (physics lane). Trace of the #49 red: a Crimson bot in Retreat at (64.1, 41.5) walking east along a
+one-cell corridor while three Crimson allies in Fight walked west through it. Teammates pushed each other at half
+strength, so the retreating bot was shoved back every tick and stood 96 ticks (limit 90). Not a Kaiju or wall-corner case.
+1. **Rule.** In the relaxed separation, a bot in Retreat and a teammate whose input direction points into it (dot product
+   under `PhysicsConfig.AllyPassDot` = -0.3) do not push at all (`AllyPassOpposing`, on). Everyone else pushes as before.
+   The 90-tick limit is unchanged. Rejected: every opposing ally pair passing (fixed the stall but cost the D-030 passive
+   check 39 -> 21 of 200 and the berserk share 0.14 -> 0.10).
+2. **Measured.** DG-22 worst still: Easy 58, Normal 58, Hard 61 ticks (was 96 on Normal in #49).

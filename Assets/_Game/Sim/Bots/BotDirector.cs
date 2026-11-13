@@ -264,7 +264,10 @@ namespace CriticalMass.Sim.Bots
                     int id = Ids[c];
                     Actor ra = world.Actors[id];
                     if (ra.Carry == CarryKind.Biomass || !Roles.MayCorrupt(world, ra.Cls)) continue;
-                    if (pick < 0 || (int)ra.Cls > (int)world.Actors[pick].Cls) pick = id;
+                    // U-072: a raider (CorruptionRunner) first, then the highest class index, lowest id on a tie.
+                    if (pick < 0) { pick = id; continue; }
+                    bool rr = Roles.IsRunner(world, ra.Cls), pr = Roles.IsRunner(world, world.Actors[pick].Cls);
+                    if ((rr && !pr) || (rr == pr && (int)ra.Cls > (int)world.Actors[pick].Cls)) pick = id;
                 }
                 if (pick >= 0)
                 {

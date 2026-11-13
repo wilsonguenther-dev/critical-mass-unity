@@ -40,6 +40,43 @@ namespace CriticalMass.Sim.Core
             return k >= 0 && k < m.Length && m[k];
         }
 
+        /// <summary>U-070: is cls the best feeder (the Farmer)? False with the rule off.</summary>
+        public static bool IsBestFeeder(World w, ClassId cls)
+        {
+            if (!On(w)) return false;
+            bool[] m = w.Config.Depth.Roles.BestFeeder;
+            int k = (int)cls;
+            return k >= 0 && k < m.Length && m[k];
+        }
+
+        /// <summary>
+        /// U-070: the allegiance multiplier of a delivery of units by actorId: 1 + BestFeederBonus for a Farmer, plus PassBonus
+        /// on the share of the units that came by a hand-off or out of the stock (those pass units are used up). Exactly 1 with
+        /// the rule off or both bonuses 0.
+        /// </summary>
+        public static double AllegianceScale(World w, int actorId, double units)
+        {
+            if (!On(w) || actorId < 0 || actorId >= w.ActorCount || !(units > 0)) return 1;
+            RolesConfig R = w.Config.Depth.Roles;
+            double s = IsBestFeeder(w, w.Actors[actorId].Cls) ? 1 + R.BestFeederBonus : 1;
+            int pass = w.Depth.PassUnits[actorId];
+            if (pass > 0)
+            {
+                double used = pass < units ? pass : units;
+                w.Depth.PassUnits[actorId] = pass - (int)used;
+                s += R.PassBonus * used / units;
+            }
+            return s;
+        }
+
+        /// <summary>U-072: is cls one of the classes a trailing team sends on a corruption run first (the raiders)?</summary>
+        public static bool IsRunner(World w, ClassId cls)
+        {
+            bool[] m = w.Config.Depth.Roles.CorruptionRunner;
+            int k = (int)cls;
+            return k >= 0 && k < m.Length && m[k];
+        }
+
         /// <summary>May actor a deliver cargo of this kind at the shrine?</summary>
         public static bool MayDeliver(World w, Actor a, CarryKind kind)
         {
@@ -87,7 +124,7 @@ namespace CriticalMass.Sim.Core
             {
                 if (j == id) continue;
                 Actor r = w.Actors[j];
-                if (!r.Alive || r.StandUp > 0 || r.Team != a.Team || !MayFeed(w, r.Cls)) continue;
+                if (!r.Alive || r.StandUp > 0 || r.Team != a.Team || !MayFeed(w, r.Cls) || (!IsBestFeeder(w, r.Cls) && MayFeed(w, a.Cls))) continue; // U-070: to a Farmer
                 bool room = (cargo && CargoRoom(w, r, a.Carry) > 0) || (a.CarryMeat > 0 && r.CarryMeat < meatCap && r.Carry != CarryKind.Corruption);
                 if (!room) continue;
                 double reach = range + cfg.Class(r.Cls).Radius;
@@ -103,7 +140,7 @@ namespace CriticalMass.Sim.Core
 
         /// <summary>
         /// Hand-offs, once per step after ResourcesSystem: every living, standing actor that PRESSES interact (rising edge), may NOT feed and
-        /// carries biomass (class cargo that is not corruption, or meat) gives as much as fits to HandoffTarget. One Handoff
+        /// carries biomass (class cargo that is not corruption, or meat) gives as much as fits to HandoffTarget. U-070: any non-Farmer may (optional play, PassBonus); a class that may not feed hands to any feeder. One Handoff
         /// event per type moved: A = giver, B = receiver, (X, Z) = the receiver, Value = units, Bio = the type.
         /// </summary>
         public static void HandoffSystem(World w)
@@ -115,7 +152,7 @@ namespace CriticalMass.Sim.Core
             for (int id = 0; id < n; id++)
             {
                 Actor a = w.Actors[id];
-                if (!a.Alive || a.StandUp > 0 || !w.Inputs[id].Interact || w.Depth.PrevInteract[id] != 0 || MayFeed(w, a.Cls)) continue;
+                if (!a.Alive || a.StandUp > 0 || !w.Inputs[id].Interact || w.Depth.PrevInteract[id] != 0 || IsBestFeeder(w, a.Cls)) continue; // U-070: a Farmer never hands off
                 int j = HandoffTarget(w, id);
                 if (j < 0) continue;
                 Actor r = w.Actors[j];
@@ -133,6 +170,7 @@ namespace CriticalMass.Sim.Core
                         a.GatherProgress = 0;
                         a.GatherNodeId = -1;
                         Count(w, give);
+                        w.Depth.PassUnits[j] += give; // U-070: the optional play pays PassBonus when the Farmer delivers it
                         World.PushEvent(w, SimEventType.Handoff, id, j, w.X[j], w.Z[j], give, BioOf(kind), DamageCause.None);
                     }
                 }
@@ -143,6 +181,7 @@ namespace CriticalMass.Sim.Core
                     r.CarryMeat += give;
                     a.CarryMeat -= give;
                     Count(w, give);
+                    w.Depth.PassUnits[j] += give;
                     World.PushEvent(w, SimEventType.Handoff, id, j, w.X[j], w.Z[j], give, BiomassType.Meat, DamageCause.None);
                 }
             }
@@ -171,13 +210,14 @@ namespace CriticalMass.Sim.Core
     {
         public static readonly string[] RoleLine =
         {
-            "FRONT LINE. Holds the hill, guards carriers, may carry corruption.",
-            "FEEDER. The only class the egg takes food from.",
+            "FRONT LINE. Holds the hill, guards carriers, runs corruption when the team is behind.",
+            "FEEDER. Best at feeding the egg: carries the most, gathers fastest, and its deliveries count extra.",
             "SAPPER. Digs and places ground, breaks walls, may carry corruption.",
             "BLASTER. TNT and mines, no weapon, may carry corruption.",
             "ENGINEER. Ladders, bridges, repairs and class upgrades at the base.",
             "MEDIC. Heals allies and purifies the egg, no weapon.",
         };
+        /// <summary>Shown only when a config turns MayFeed off for a class (not the default since U-070: every class feeds).</summary>
         public const string RefusedNotFeeder = "Only Farmers feed the egg. Press interact beside a Farmer to hand it over, or bank it at your base.";
         public const string RefusedNotRaider = "This class will not touch corruption.";
         public const string Escort = "ESCORT";

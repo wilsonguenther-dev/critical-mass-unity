@@ -304,7 +304,11 @@ namespace CriticalMass.Sim.Core
                 a.CarryMeat = 0;
                 moved = true;
             }
-            if (moved) return true;
+            if (moved)
+            {
+                d.PassUnits[id] = 0; // U-070: banking pays nothing itself; the bonus is paid once, on the delivery after a withdrawal
+                return true;
+            }
             bool egg = w.Kaiju.State == KaijuState.Egg && !w.Match.Hatched;
             int food = d.Stock[t * StockKinds + StockFood];
             if (!egg || food <= 0 || a.CarryAmount > 0 || !Roles.On(w) || !Roles.MayFeed(w, a.Cls)) return false;
@@ -312,6 +316,7 @@ namespace CriticalMass.Sim.Core
             int take = food < cap ? food : cap;
             d.Stock[t * StockKinds + StockFood] -= take;
             d.Withdrawn += take;
+            d.PassUnits[id] = take; // U-070 PassBonus
             a.Carry = CarryKind.Biomass;
             a.CarryAmount = take;
             World.PushEvent(w, SimEventType.BankWithdraw, id, t, pad.X, pad.Z, take, BiomassType.Plant, DamageCause.None);

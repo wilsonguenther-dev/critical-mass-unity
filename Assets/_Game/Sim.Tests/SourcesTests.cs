@@ -106,7 +106,7 @@ namespace CriticalMass.Sim.Tests
         [Test]
         public void U064AFarmerFeedsWoodAndWaterAndWaterCoolsTheEggButNotAfterTheLock()
         {
-            World w = DepthKit.Field(Cfg, ClassId.Farmer);
+            World w = DepthKit.Field(DepthKit.Cfg(d => d.Roles.BestFeederBonus = 0), ClassId.Farmer); // the U-070 Farmer bonus has its own test
             SourcesConfig S = w.Config.Depth.Sources;
             SimResources.ApplyDelivery(w, TeamId.Azure, CarryKind.Biomass, 2, 0, BiomassType.Wood);
             Assert.AreEqual(2 * S.WoodAllegiancePerUnit, w.Match.Allegiance.Azure);
@@ -188,7 +188,7 @@ namespace CriticalMass.Sim.Tests
             Assert.AreEqual(1, Sources.Stock(w, TeamId.Azure, Sources.StockFood), "held interact does not put it straight back");
             Assert.AreEqual(1, DepthKit.Since(w, head, SimEventType.BankWithdraw).Count);
 
-            World v = DepthKit.Field(Cfg, ClassId.Warrior);
+            World v = DepthKit.Field(DepthKit.Cfg(DepthKit.FarmersOnly), ClassId.Warrior); // a class that may not feed (U-063 staged; U-070 default: everyone)
             DepthKit.Put(v, 0, pad.X + 2, pad.Z);
             v.Depth.Stock[Sources.StockFood] = 4;
             v.Inputs[0].Interact = true;

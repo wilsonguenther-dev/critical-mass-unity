@@ -19,6 +19,15 @@ namespace CriticalMass.Sim.Tests.Harness
             return c;
         }
 
+        /// <summary>Stage U-063's original roles (only the Farmer feeds, only the raiders corrupt, no U-070 bonuses): the U-063 rule tests pin it.</summary>
+        public static void FarmersOnly(DepthConfig d)
+        {
+            d.Roles.MayFeed = new[] { false, true, false, false, false, false };
+            d.Roles.MayCorrupt = new[] { true, false, true, true, false, false };
+            d.Roles.BestFeederBonus = 0;
+            d.Roles.PassBonus = 0;
+        }
+
         public static World Make(GameConfig cfg, ClassId human, int seed = 63, int teamSize = 5)
         {
             return World.CreateWorld(new WorldOptions { Seed = seed, TeamSize = teamSize, HumanTeam = TeamId.Azure, HumanClass = human, Config = cfg });
