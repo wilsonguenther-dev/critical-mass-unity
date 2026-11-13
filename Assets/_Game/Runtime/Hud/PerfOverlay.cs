@@ -7,6 +7,7 @@ using CriticalMass.Runtime.Hud.Style;
 using Unity.Profiling;
 using Unity.Profiling.LowLevel.Unsafe;
 using UnityEngine;
+using UnityEngine.Experimental.Rendering;
 using UnityEngine.InputSystem;
 
 namespace CriticalMass.Runtime.Hud
@@ -315,6 +316,92 @@ namespace CriticalMass.Runtime.Hud
             foreach (float v in a) if (v > m) m = v;
             return m;
         }
+
+        public const int TextureFlagPx = 2048;
+
+        /// <summary>Estimated bytes of a texture (mip 0 times 4/3 with mips; RenderTextures at their format).</summary>
+        public static long TextureBytes(int w, int h, GraphicsFormat f, int mips, int depthOrSlices)
+        {
+            long b;
+            try { b = GraphicsFormatUtility.ComputeMipmapSize(w, h, f); }
+            catch (Exception) { b = (long)w * h * 4; }
+            if (mips > 1) b = b * 4 / 3;
+            return b * Math.Max(1, depthOrSlices);
+        }
+
+        /// <summary>true when a non-render texture should be flagged: over 2048 px on a side, or not block-compressed.</summary>
+        public static bool FlagTexture(int w, int h, bool compressed, bool renderTarget) =>
+            !renderTarget && (Math.Max(w, h) > TextureFlagPx || !compressed);
+
+        /// <summary>
+        /// Every loaded texture and mesh, largest first (top 12 of each), with flags for textures over 2048 px or
+        /// uncompressed, as one JSON object. Heavy (FindObjectsOfTypeAll): called once, at the end of the first match.
+        /// </summary>
+        public static string AssetReportJson()
+        {
+            CultureInfo c = CultureInfo.InvariantCulture;
+            var tex = new List<(string name, int w, int h, string fmt, bool comp, bool rt, long bytes)>();
+            foreach (Texture t in Resources.FindObjectsOfTypeAll<Texture>())
+            {
+                if (t == null) continue;
+                GraphicsFormat f = t.graphicsFormat;
+                bool rt = t is RenderTexture;
+                bool comp = GraphicsFormatUtility.IsCompressedFormat(f);
+                int slices = t is Cubemap ? 6 : t is Texture2DArray a ? a.depth : t is Texture3D d ? d.depth : 1;
+                tex.Add((t.name, t.width, t.height, f.ToString(), comp, rt, TextureBytes(t.width, t.height, f, t.mipmapCount, slices)));
+            }
+            tex.Sort((x, y) => y.bytes.CompareTo(x.bytes));
+            var meshes = new List<(string name, int verts, long tris, long bytes)>();
+            foreach (Mesh m in Resources.FindObjectsOfTypeAll<Mesh>())
+            {
+                if (m == null) continue;
+                long idx = 0;
+                for (int i = 0; i < m.subMeshCount; i++) idx += m.GetIndexCount(i);
+                long vb = 0;
+                for (int i = 0; i < m.vertexBufferCount; i++) vb += (long)m.GetVertexBufferStride(i) * m.vertexCount;
+                long bytes = vb + idx * (m.indexFormat == UnityEngine.Rendering.IndexFormat.UInt32 ? 4 : 2);
+                meshes.Add((m.name, m.vertexCount, idx / 3, bytes));
+            }
+            meshes.Sort((x, y) => y.bytes.CompareTo(x.bytes));
+
+            long texTotal = 0, meshTotal = 0;
+            int flagged = 0;
+            foreach (var t in tex)
+            {
+                texTotal += t.bytes;
+                if (FlagTexture(t.w, t.h, t.comp, t.rt)) flagged++;
+            }
+            foreach (var m in meshes) meshTotal += m.bytes;
+            var sb = new StringBuilder(4096);
+            sb.AppendFormat(c, "{{\"textures\": {0}, \"texture_mb\": {1:0.##}, \"textures_flagged\": {2}, \"meshes\": {3}, \"mesh_mb\": {4:0.##},\n",
+                tex.Count, texTotal / 1048576.0, flagged, meshes.Count, meshTotal / 1048576.0);
+            sb.Append("    \"largest_textures\": [");
+            for (int i = 0; i < Math.Min(12, tex.Count); i++)
+            {
+                var t = tex[i];
+                sb.AppendFormat(c, "{0}{{\"name\": \"{1}\", \"w\": {2}, \"h\": {3}, \"format\": \"{4}\", \"compressed\": {5}, \"render_target\": {6}, \"mb\": {7:0.###}, \"flag\": {8}}}",
+                    i == 0 ? "" : ", ", Esc(t.name), t.w, t.h, t.fmt, t.comp ? "true" : "false", t.rt ? "true" : "false", t.bytes / 1048576.0,
+                    FlagTexture(t.w, t.h, t.comp, t.rt) ? "true" : "false");
+            }
+            sb.Append("],\n    \"flagged_textures\": [");
+            int k = 0;
+            foreach (var t in tex)
+            {
+                if (!FlagTexture(t.w, t.h, t.comp, t.rt) || k >= 40) continue;
+                sb.AppendFormat(c, "{0}\"{1} {2}x{3} {4}\"", k++ == 0 ? "" : ", ", Esc(t.name), t.w, t.h, t.fmt);
+            }
+            sb.Append("],\n    \"largest_meshes\": [");
+            for (int i = 0; i < Math.Min(12, meshes.Count); i++)
+            {
+                var m = meshes[i];
+                sb.AppendFormat(c, "{0}{{\"name\": \"{1}\", \"verts\": {2}, \"tris\": {3}, \"mb\": {4:0.###}}}",
+                    i == 0 ? "" : ", ", Esc(m.name), m.verts, m.tris, m.bytes / 1048576.0);
+            }
+            sb.Append("]}");
+            return sb.ToString();
+        }
+
+        static string Esc(string s) => (s ?? "").Replace("\\", "\\\\").Replace("\"", "\\\"");
 
         /// <summary>The report as one JSON object, with extra pre-encoded fields first (values are JSON literals).</summary>
         public static string ToJson(Report r, (string key, string jsonValue)[] extra)

@@ -62,7 +62,10 @@ fi
 
 STAGE="$BASE/.staging-$short-$$"
 trap 'rm -rf "$STAGE"' EXIT
-CM_BUILD_LOG="$ROOT/Logs/play-latest-build.log" "$ROOT/tools/unity-build-mac.sh" --output "$STAGE/CriticalMass.app" >&2
+# One graphics-heavy job machine-wide (2026-11-12 watchdog restart): the build waits for ~/bin/cm-heavy's Unity slot.
+HEAVY=()
+[[ -x "$HOME/bin/cm-heavy" ]] && HEAVY=("$HOME/bin/cm-heavy" unity)
+CM_BUILD_LOG="$ROOT/Logs/play-latest-build.log" ${HEAVY[@]+"${HEAVY[@]}"} "$ROOT/tools/unity-build-mac.sh" --output "$STAGE/CriticalMass.app" >&2
 rm -rf "$DEST"
 mv "$STAGE" "$DEST"
 trap - EXIT

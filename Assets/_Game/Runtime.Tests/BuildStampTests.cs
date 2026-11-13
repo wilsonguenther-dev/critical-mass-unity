@@ -76,7 +76,8 @@ namespace CriticalMass.Runtime.Tests
             Assert.AreEqual(4.95, r.WorstAtSecond, 1e-6);   // sum of 1..99 ms before the worst frame
 
             Assert.AreEqual(0, PerfOverlay.Analyse(new float[0]).Frames);
-            Assert.AreEqual(7.0, PerfOverlay.Percentile(new[] { 9f, 7f, 8f }, 2, 100));   // only the first 2 count
+            Assert.AreEqual(9.0, PerfOverlay.Percentile(new[] { 9f, 7f, 8f }, 2, 100));   // only the first 2 count (7, 9)
+            Assert.AreEqual(7.0, PerfOverlay.Percentile(new[] { 9f, 7f, 8f }, 2, 50));
             Assert.AreEqual(0.0, PerfOverlay.Percentile(null, 3, 50));
 
             string json = PerfOverlay.ToJson(r, new[] { ("result", "\"MATCH END\"") });
