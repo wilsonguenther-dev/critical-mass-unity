@@ -1088,3 +1088,33 @@ else a mine on its own cell while holding the hill or fighting near it). The bro
    soak: in the 16v16 soak (seed 101, 3 per team) the six Demolitions bots score 144 blast knock-outs to 109 deaths at
    Normal, the most lethal class per head, so a damage or cooldown pass may be wanted first.
 7. On-screen names live in one place, `DemolitionsNames` (MINE, TNT, DEMOLITIONS); GameHud's AbilityNames should read them.
+
+## U-060 Builder ladders and rope bridges as built in DG-24: temporary, paid from a team bank, carried by any class (not in the browser) (2026-11-13T02:43:02Z)
+
+**Source.** The oracle (09e0904 and every branch) has no ladder or bridge piece: its only Builder code is cm/CM-39
+`upgrade.ts` (spend team biomass to raise an ally's class level), which this item does not port (the station / upgrade half
+of row DG-24 is still open). So the rule is ours, the smallest one that satisfies Travis 2026-11-06 ("Build temporary
+ladders/bridges with biomass / Ladders/bridges movable by all classes") and the Nov 4 call ("ladders to get from different
+elevation levels ... rope bridges"). On this grid a cliff is a Wall cell and a gap is Void or Water, so:
+1. **BUILD (Space, Builder).** Along the cardinal axis nearest the aim (no aim: facing), the first blocked cell within 2 of
+   the Builder's cell decides: a Wall run up to 2 long makes a LADDER (1 biomass), a Void / Water run up to 6 long a ROPE
+   BRIDGE (2 biomass); the next cell must be walkable (the landing). 3 lanes wide (Topple.WidthCells), centred on that line;
+   every cell of the kind's type in that rectangle becomes Cell.Bridge through `MapGrid.SetCell`. Refused (Ability event with
+   a code, Space locked 0.5 s): nothing to span, too long, breakable / barricade in the way, shrine keep-out, map edge, the
+   Builder's 2 pieces already out, bank short, the CM-30 world gap. Class row unchanged (the CM-56 miner copy: mallet swing).
+2. **BANK.** StartBiomass 2 + the team's delivered biomass - what it spent. Spending never changes allegiance, instability or
+   the hatch (the CM-39 bank idea, read from Delivered instead of a new MatchState field).
+3. **TEMPORARY.** 60 s from the build, carried time included; PieceCrumbling 3 s before. A cell that stops being Bridge (dug,
+   cratered) breaks the piece (PieceDestroyed). Taking a piece away (expiry, break, lift) only reverts cells still Bridge, and
+   only when nobody (or the hatched Kaiju, or a barricade) is on them, the world gap has run out and the ROUTE GUARD passes
+   (`Terraform.CellsKeepRoutes`); otherwise it retries every tick. So a piece never leaves anyone in a wall or over the void,
+   and never seals a base from the hill: a piece that became the only route stays until another route exists.
+4. **CARRY (Interact, any class of the team).** Empty-handed and outside a node's / the shrine's interact range (where E
+   gathers and delivers), within 1.0 + radius of a piece cell: lift it (same safety checks). The next press puts it down in
+   front by the build rule of its kind (no cost, no cooldown). A carrier that dies drops it: gone. Bots never carry.
+5. **Bots.** A Builder bot on its way to the hill (ToHill, Unstick) or the shrine (Deliver, Corrupt) builds the accepted
+   piece whose landing is at least 2 cells closer by its team flow field. Skybreak Basin is well connected, so this is rare:
+   1 ladder per Builder-heavy 16v16 match at Normal and at Hard (seed 101); Builders stay out of the default ClassMix.
+6. View events (appended before the CM-84 marker): PiecePlaced, PieceCrumbling, PieceExpired (expired / dropped / broken),
+   PieceDestroyed, PiecePickedUp, each with a position and Radius = half the length; live state in `World.Builder.Pieces`.
+7. Names in one place: `BuilderNames` (BUILDER, BUILD, LADDER, ROPE BRIDGE, CARRY).

@@ -35,6 +35,7 @@ namespace CriticalMass.Sim.Core
             SpatialHash.Rebuild(w.Hash, w.X, w.Z, w.Actors, n);
             Combat.CombatSystem(w, dt);
             Topple.ToppleSystem(w); // DG-09: ToppleDown events when a fall animation time has passed
+            BuiltPieces.PiecesSystem(w); // DG-24: broken / expired ladders and bridges, after this step's digs and craters
             Barricades.BarricadesSystem(w, dt);
             SimResources.ResourcesSystem(w, dt);
             Kaiju.KaijuSystem(w, dt);

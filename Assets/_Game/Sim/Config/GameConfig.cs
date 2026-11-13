@@ -57,7 +57,7 @@ namespace CriticalMass.Sim.Config
                 MaxHp = 120, MoveSpeed = 4.0, Radius = 0.45, AttackDamage = 16, AttackRange = 1.5, AttackArcDeg = 90,
                 AttackCooldown = 0.65, AbilityCooldown = 12, GatherSeconds = 2, CarryCapacity = 1,
             },
-            // CM-56 placeholder: the miner row until CM-39 tunes it.
+            // CM-56 placeholder: the miner row until CM-39 tunes it. DG-24 keeps it (the mallet swing; Space builds, 12 s).
             new ClassConfig
             {
                 MaxHp = 120, MoveSpeed = 4.0, Radius = 0.45, AttackDamage = 16, AttackRange = 1.5, AttackArcDeg = 90,
@@ -336,6 +336,8 @@ namespace CriticalMass.Sim.Config
         public ToppleConfig Topple = new ToppleConfig();
         public DemolitionsMineConfig DemolitionsMine = new DemolitionsMineConfig();
         public DemolitionsTntConfig DemolitionsTnt = new DemolitionsTntConfig();
+        /// <summary>DG-24: the Builder's ladders and rope bridges (BuiltPieces.cs).</summary>
+        public BuilderPiecesConfig BuilderPieces = new BuilderPiecesConfig();
 
         public AbilitiesConfig Clone()
         {
@@ -348,6 +350,7 @@ namespace CriticalMass.Sim.Config
             c.Topple = Topple.Clone();
             c.DemolitionsMine = DemolitionsMine.Clone();
             c.DemolitionsTnt = DemolitionsTnt.Clone();
+            c.BuilderPieces = BuilderPieces.Clone();
             return c;
         }
     }
@@ -583,5 +586,37 @@ namespace CriticalMass.Sim.Config
             c.ClockSpeedOptions = (double[])ClockSpeedOptions.Clone();
             return c;
         }
+    }
+
+    /// <summary>
+    /// DG-24 (U-060, not in the browser): the Builder's temporary ladders and rope bridges, paid from the team's biomass
+    /// bank (StartBiomass + biomass delivered - biomass spent). Timing in sim ticks.
+    /// </summary>
+    public sealed class BuilderPiecesConfig
+    {
+        /// <summary>Biomass a ladder costs (it spans a wall / cliff cell run up to LadderMaxCells long).</summary>
+        public double LadderCost = 1;
+        /// <summary>Biomass a rope bridge costs (it spans a void / water run up to BridgeMaxCells long).</summary>
+        public double BridgeCost = 2;
+        /// <summary>Spendable biomass each team starts a match with (so a Builder can act before the first delivery).</summary>
+        public double StartBiomass = 2;
+        public double LadderMaxCells = 2;
+        public double BridgeMaxCells = 6;
+        /// <summary>Lanes across the span, centred on the line the builder looks along (Topple.WidthCells: wide enough for bots).</summary>
+        public double WidthCells = 3;
+        /// <summary>The gap or wall must start within this many cells ahead of the builder's cell.</summary>
+        public double ReachCells = 2;
+        /// <summary>A piece lasts this long (60 s; Travis: "temporary ladders/bridges"), carried time included.</summary>
+        public double LifetimeTicks = 1800;
+        /// <summary>The PieceCrumbling warning goes out this long before the end (3 s).</summary>
+        public double WarnTicks = 90;
+        /// <summary>Pieces one Builder may own at once (on the ground or carried).</summary>
+        public double MaxActivePerBuilder = 2;
+        /// <summary>An actor picks a piece up (Interact) within this distance of one of its cells (cell edge, plus its radius).</summary>
+        public double PickupRange = 1.0;
+        /// <summary>A refused build locks Space this long (so a held key never floods the event ring).</summary>
+        public double RefuseLockSeconds = 0.5;
+
+        public BuilderPiecesConfig Clone() => (BuilderPiecesConfig)MemberwiseClone();
     }
 }

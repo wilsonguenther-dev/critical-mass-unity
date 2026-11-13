@@ -294,6 +294,11 @@ namespace CriticalMass.Sim.Bots
                 return;
             }
             if (a.AbilityCd > 0) return;
+            if (a.Cls == ClassId.Builder)
+            {
+                DecideBuilder(w, st, id, state, sk); // DG-24 (U-060)
+                return;
+            }
             double x = w.X[id];
             double z = w.Z[id];
             if (a.Cls == ClassId.Warrior)
@@ -423,6 +428,53 @@ namespace CriticalMass.Sim.Bots
             st.AbilityReq[id] = 1;
             st.AbilityX[id] = JsMath.F32(x);
             st.AbilityZ[id] = JsMath.F32(z);
+        }
+
+        /// <summary>DG-24: a Builder bot builds only when the piece cuts at least this many cells off its walk to its goal.</summary>
+        public const double MinBuildGainCells = 2;
+
+        /// <summary>
+        /// DG-24 (U-060, not in the browser) Builder bot: on its way to the hill (ToHill, Unstick) or the shrine (Deliver,
+        /// Corrupt), it tries the four directions; a build the sim would accept (BuiltPieces.BuildRefusal: limit, bank, gap,
+        /// plan) whose landing is reachable and closer to the goal by MinBuildGainCells or more (team flow-field distance at
+        /// the landing + the cells to it, against the distance where it stands; a bot cut off from its goal takes any landing
+        /// that reaches it) is pressed toward the best one. Bots never carry pieces. DG-21: Easy builds only on AbilityChance of
+        /// its thinks; Normal and Hard always.
+        /// </summary>
+        private static void DecideBuilder(World w, BotsState st, int id, AiState state, BotSkillConfig sk)
+        {
+            int field;
+            if (state == AiState.ToHill || state == AiState.Unstick) field = BotFields.FieldHill;
+            else if (state == AiState.Deliver || state == AiState.Corrupt) field = BotFields.FieldShrine;
+            else return;
+            if (BuiltPieces.OwnedCount(w, id) >= w.Config.Abilities.BuilderPieces.MaxActivePerBuilder) return;
+            double x = w.X[id];
+            double z = w.Z[id];
+            double d0 = BotFields.FieldDistAt(st.Fields, field, x, z);
+            double bestGain = MinBuildGainCells;
+            int bdx = 0;
+            int bdz = 0;
+            for (int k = 0; k < 4; k++)
+            {
+                int dx = k == 0 ? 1 : k == 1 ? -1 : 0;
+                int dz = k == 2 ? 1 : k == 3 ? -1 : 0;
+                if (BuiltPieces.BuildRefusal(w, id, dx, dz) != 0) continue;
+                BuiltPieces.LastPlanLanding(w, id, dx, dz, out double lx, out double lz, out int cells);
+                double d1 = BotFields.FieldDistAt(st.Fields, field, lx, lz);
+                if (!double.IsFinite(d1)) continue;
+                double gain = double.IsFinite(d0) ? d0 - (d1 + cells) : 1e9;
+                if (gain >= bestGain && (bdx != 0 || bdz != 0 ? gain > bestGain : true))
+                {
+                    bestGain = gain;
+                    bdx = dx;
+                    bdz = dz;
+                }
+            }
+            if (bdx == 0 && bdz == 0) return;
+            if (!BotSkill.UsesAbilityNow(w, id, sk)) return;
+            st.AbilityReq[id] = 1;
+            st.AbilityX[id] = JsMath.F32(x + bdx * 1.5);
+            st.AbilityZ[id] = JsMath.F32(z + bdz * 1.5);
         }
 
         /// <summary>One think for bot id: perception, stuck check, utility selection, targets, ability decision.</summary>
