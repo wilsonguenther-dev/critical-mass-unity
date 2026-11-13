@@ -559,12 +559,31 @@ namespace CriticalMass.Runtime.Menus
             EventSystem es = EventSystem.current;
             if (es != null && es.currentSelectedGameObject == null && ClassSelectNav.Pressed()) Select(_setupTiles[(int)Focused].Tile);
             float stick = gp != null ? gp.rightStick.ReadValue().x : 0f;
-            if (Mathf.Abs(stick) > 0.2f)
+            // controls-1 round 2 (veteran audit): the preview turns from the keyboard too, Q / E for the left hand and
+            // , / . for the right (the mouse drags it, a controller uses the right stick).
+            bool turnLeft = kb != null && (kb.qKey.isPressed || kb.commaKey.isPressed);
+            bool turnRight = kb != null && (kb.eKey.isPressed || kb.periodKey.isPressed);
+            float turn = PreviewTurnInput(turnLeft, turnRight, stick);
+            if (turn != 0f)
             {
                 _lastDrag = Time.unscaledTime;
-                _preview?.Turn(stick * 180f * Time.unscaledDeltaTime);
+                _preview?.Turn(turn * PreviewTurnDegreesPerSecond * Time.unscaledDeltaTime);
             }
             _preview?.Tick(Time.unscaledDeltaTime, Time.unscaledTime - _lastDrag > 1.5f);
+        }
+
+        /// <summary>The preview's turn speed at a full push or a held key, degrees per second.</summary>
+        public const float PreviewTurnDegreesPerSecond = 180f;
+
+        /// <summary>
+        /// The preview turn input, -1..1 (pure): a held key turns at full speed, the stick past its 0.2 dead zone at its
+        /// push; keys win over the stick, two opposite keys cancel.
+        /// </summary>
+        public static float PreviewTurnInput(bool keyLeft, bool keyRight, float stickX)
+        {
+            if (keyLeft != keyRight) return keyLeft ? -1f : 1f;
+            if (keyLeft) return 0f;
+            return Mathf.Abs(stickX) > 0.2f ? Mathf.Clamp(stickX, -1f, 1f) : 0f;
         }
 
         /// <summary>Owner walk 1: a click on the class card's model opens the Barracks for that class over this screen.</summary>

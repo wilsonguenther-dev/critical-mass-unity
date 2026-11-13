@@ -1284,8 +1284,12 @@ namespace CriticalMass.Runtime.Menu
                 Slider(tab, 0, "MASTER VOLUME", () => GameSettings.MasterVolume, v => GameSettings.MasterVolume = v),
                 Slider(tab, 1, "MUSIC", () => GameSettings.MusicVolume, v => GameSettings.MusicVolume = v),
                 Slider(tab, 2, "EFFECTS", () => GameSettings.EffectsVolume, v => GameSettings.EffectsVolume = v),
+                // controls-1 round 2: mute switches keep the slider where it was.
+                Stepper(tab, 3, "MUTE MUSIC", () => GameSettings.MuteMusic ? "ON" : "OFF", d => GameSettings.MuteMusic = !GameSettings.MuteMusic),
+                Stepper(tab, 4, "MUTE SOUND EFFECTS", () => GameSettings.MuteEffects ? "ON" : "OFF", d => GameSettings.MuteEffects = !GameSettings.MuteEffects),
+                Stepper(tab, 5, "MUTE WHEN IN BACKGROUND", () => GameSettings.MuteInBackground ? "ON" : "OFF", d => GameSettings.MuteInBackground = !GameSettings.MuteInBackground),
             };
-            Note(tab, 3, "Routed through the game's audio mixer (Master, Music, Effects).");
+            Note(tab, 6, "Routed through the game's audio mixer (Master, Music, Effects). A mute keeps the slider's level.");
             ChainInTab(items);
             return tab.gameObject;
         }
@@ -1324,6 +1328,8 @@ namespace CriticalMass.Runtime.Menu
                 Stepper(tab, 1, "BLOOD", () => GameSettings.Blood ? "ON" : "OFF", d => GameSettings.Blood = !GameSettings.Blood),
                 // Owner, 2026-11-13: the story intro plays at every launch; this turns that off, WATCH INTRO plays it now.
                 Stepper(tab, 2, "PLAY INTRO AT LAUNCH", () => GameSettings.IntroAtLaunch ? "ON" : "OFF", d => GameSettings.IntroAtLaunch = !GameSettings.IntroAtLaunch),
+                // controls-1 round 2: blue / amber teams for colour-blind players (HUD, rings, team text).
+                Stepper(tab, 3, "COLOUR-BLIND TEAMS", () => GameSettings.ColourBlindTeams ? "BLUE / AMBER" : "OFF", d => GameSettings.ColourBlindTeams = !GameSettings.ColourBlindTeams),
             };
             MenuItem watch = MenuUi.Item(tab, "Watch Intro", ContentX, ContentY + GameTabLines * (LineH + LineGap) + 20f, 420f, 56f,
                 "WATCH INTRO", MenuItem.Kind.Button, UiScale.TypeBody, true, CMTokens.Display);
@@ -1359,7 +1365,7 @@ namespace CriticalMass.Runtime.Menu
         }
 
         /// <summary>Stepper lines on the Game tab (the three buttons sit under them).</summary>
-        const int GameTabLines = 3;
+        const int GameTabLines = 4;
 
         /// <summary>Settings > WATCH INTRO: closes the menu and plays the story intro (on the title, Home or setup; never over a
         /// live match, where the menu says so instead).</summary>

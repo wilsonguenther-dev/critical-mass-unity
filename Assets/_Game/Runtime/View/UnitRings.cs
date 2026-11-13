@@ -159,8 +159,7 @@ namespace CriticalMass.Runtime.View
                 {
                     _material = new Material(shader) { name = "CM UnitRing" };
                     _material.SetColor("_SelfColor", Hex(Palette.Brass));
-                    _material.SetColor("_AzureColor", Hex(Palette.Azure));
-                    _material.SetColor("_CrimsonColor", Hex(Palette.Crimson));
+                    ApplyTeamColours();
                     _material.SetColor("_OutlineColor", Hex(Palette.VoidNavy));
                     _material.SetFloat("_Radius", Radius);
                     _material.SetFloat("_SelfWidth", SelfWidth);
@@ -198,6 +197,7 @@ namespace CriticalMass.Runtime.View
         public void Sync(double alpha, Vector3 cameraForward)
         {
             if (_world == null) return;
+            if (_material != null && _colourBlind != CriticalMass.Runtime.Hud.Style.CMTokens.ColourBlindTeams) ApplyTeamColours();
             World w = _world;
             MapDef map = w.Map;
             Vector2 up = new Vector2(cameraForward.x, cameraForward.z);
@@ -233,6 +233,16 @@ namespace CriticalMass.Runtime.View
             const MeshUpdateFlags flags = MeshUpdateFlags.DontRecalculateBounds | MeshUpdateFlags.DontValidateIndices;
             _mesh.SetVertices(_vertices, 0, _vertices.Length, flags);
             _mesh.SetUVs(1, _uv1, 0, _uv1.Length, flags);
+        }
+
+        bool _colourBlind;
+
+        /// <summary>controls-1 round 2: the team ring colours follow the colour-blind setting (CMTokens.Team).</summary>
+        void ApplyTeamColours()
+        {
+            _colourBlind = CriticalMass.Runtime.Hud.Style.CMTokens.ColourBlindTeams;
+            _material.SetColor("_AzureColor", CriticalMass.Runtime.Hud.Style.CMTokens.Team(TeamId.Azure));
+            _material.SetColor("_CrimsonColor", CriticalMass.Runtime.Hud.Style.CMTokens.Team(TeamId.Crimson));
         }
 
         private static Color Hex(string hex)

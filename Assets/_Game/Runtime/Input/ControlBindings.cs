@@ -119,8 +119,8 @@ namespace CriticalMass.Runtime.Input
             new ControlRow("Class ability", new[] { new RebindSlot("Ability", K, 0, column: SlotColumn.Mouse), new RebindSlot("Ability", K, 1, column: SlotColumn.Wasd), new RebindSlot("Ability", K, 2, column: SlotColumn.Arrows) },
                 new[] { new RebindSlot("Ability", G), new RebindSlot("Ability", G, 1) }),
             new ControlRow("Jump", new[] { new RebindSlot("Jump", K, 0, column: SlotColumn.Wasd), new RebindSlot("Jump", K, 1, column: SlotColumn.Arrows) }, new[] { new RebindSlot("Jump", G) }),
-            new ControlRow("Interact / carry", new[] { new RebindSlot("Interact", K, 0, column: SlotColumn.Wasd), new RebindSlot("Interact", K, 1, column: SlotColumn.Arrows) }, new[] { new RebindSlot("Interact", G) }),
-            new ControlRow("Dig / place", new[] { new RebindSlot("DigPlace", K) }, new[] { new RebindSlot("DigPlace", G) }),
+            new ControlRow("Interact / carry", new[] { new RebindSlot("Interact", K, 0, column: SlotColumn.Mouse), new RebindSlot("Interact", K, 2, column: SlotColumn.Wasd), new RebindSlot("Interact", K, 1, column: SlotColumn.Arrows) }, new[] { new RebindSlot("Interact", G) }),
+            new ControlRow("Dig / place", new[] { new RebindSlot("DigPlace", K, 0, column: SlotColumn.Mouse), new RebindSlot("DigPlace", K, 1, column: SlotColumn.Wasd) }, new[] { new RebindSlot("DigPlace", G) }),
             new ControlRow("Switch dig / place", new[] { new RebindSlot("SwitchDigPlace", K, 0, rebindable: false, column: SlotColumn.Mouse),
                     new RebindSlot("SwitchDigPlace", K, 1, column: SlotColumn.Wasd), new RebindSlot("SwitchDigPlace", K, 2, column: SlotColumn.Arrows) },
                 new[] { new RebindSlot("SwitchDigPlace", G, 0, "Shoulders", "negative"), new RebindSlot("SwitchDigPlace", G, 0, "Shoulders", "positive") }),
@@ -298,8 +298,18 @@ namespace CriticalMass.Runtime.Input
         public static int PromptBindingIndex(InputAction action, ControlDevice device)
         {
             if (action == null) return -1;
-            if (device == ControlDevice.Gamepad || !KeyboardOnly) return FindBindingIndex(action, new RebindSlot(action.name, device));
+            if (device == ControlDevice.Gamepad) return FindBindingIndex(action, new RebindSlot(action.name, device));
             var bs = action.bindings;
+            if (!KeyboardOnly)
+            {
+                int first = FindBindingIndex(action, new RebindSlot(action.name, device));
+                // Left-handed preset: the mouse is in the left hand, so a key prompt names the key by the arrows (right hand).
+                if (!ControlPresets.LeftHandedActive || first < 0 || !(bs[first].effectivePath ?? "").StartsWith("<Keyboard>", StringComparison.OrdinalIgnoreCase)) return first;
+                for (int i = 0; i < bs.Count; i++)
+                    if (!bs[i].isComposite && !bs[i].isPartOfComposite && InGroup(bs[i], KeyboardGroup) && string.Equals(bs[i].name, ArrowsHand, StringComparison.Ordinal) &&
+                        (bs[i].effectivePath ?? "").StartsWith("<Keyboard>", StringComparison.OrdinalIgnoreCase)) return i;
+                return first;
+            }
             string hand = HandName(Hand);
             int best = -1, bestScore = -1;
             for (int i = 0; i < bs.Count; i++)
@@ -437,6 +447,7 @@ namespace CriticalMass.Runtime.Input
         {
             if (asset != null) asset.RemoveAllBindingOverrides();
             PlayerPrefs.DeleteKey(PrefsKey);
+            ControlPresets.Forget();
             PlayerPrefs.Save();
             BindingsChanged?.Invoke();
         }
@@ -450,12 +461,13 @@ namespace CriticalMass.Runtime.Input
             // Domain reload is off in Play Mode: reset the device state, then apply the player's saved bindings.
             _active = ControlDevice.KeyboardMouse;
             _sampledFrame = -1;
-            _keyboardOnly = true;
+            _keyboardOnly = false;
             _hand = KeyboardHand.Wasd;
             _lastMouseUse = float.NegativeInfinity;
             if (Application.isBatchMode) return;   // tests and gates run on the defaults
             InputActionAsset actions = InputSystem.actions;
             if (actions != null) Restore(actions);
+            ControlPresets.RestoreOnBoot();
         }
 
         // ---- the device used last ----
@@ -471,7 +483,7 @@ namespace CriticalMass.Runtime.Input
 
         // ---- controls-1: keyboard only versus keyboard and mouse, and the hand position ----
 
-        static bool _keyboardOnly = true;
+        static bool _keyboardOnly;
         static KeyboardHand _hand = KeyboardHand.Wasd;
         static float _lastMouseUse = float.NegativeInfinity;
 

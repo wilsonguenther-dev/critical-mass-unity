@@ -10,6 +10,13 @@ touched. There is no setting: move the mouse and the mouse aims; press a keyboar
 for half a second and the keys aim again; touch a controller and the controller takes over. On-screen prompts change
 with it (a keyboard player is never told to click).
 
+The keyboard layouts follow the genre (sources in the controls-1 audit): the arrows with Z X C V on the other hand, as
+in Brawlhalla's Keyboard A, Touhou and Celeste; W A S D with J K L H, as in Brawlhalla's Keyboard B; W A S D with the
+mouse, as in Hades and Nuclear Throne. No keyboard-only layout puts a verb on the movement hand. The Controls screen
+has four named layouts that apply in one press: ARROWS + Z X C, WASD + J K L, WASD + MOUSE and LEFT-HANDED (mouse in
+the left hand; R SHIFT jump, / interact, . dig, , switch, ; ping beside the arrows). Single keys still rebind in
+Settings, Controls, with a conflict warning and RESET ALL.
+
 | Action | Keys, left hand on W A S D | Keys, right hand on the arrows | Keys and mouse | Controller |
 | --- | --- | --- | --- | --- |
 | Move | W A S D | Arrow keys | W A S D or arrows | Left stick |
@@ -18,9 +25,9 @@ with it (a keyboard player is never told to click).
 | Attack (hold to repeat) | J | Z | Left click (J and Z still work) | RT / R2 |
 | Class ability | K | X | Right click (K and X still work) | LT / L2, or B / circle |
 | Jump / dodge | SPACE | C | SPACE | A / cross |
-| Interact / carry / use station | E | V | E | X / square |
-| Dig / place | F | F | F | Y / triangle |
-| Switch dig / place | Q | / | Mouse wheel | LB or RB / L1 or R1 |
+| Interact / carry / use station | H | V | E | X / square |
+| Dig / place | U | F | F | Y / triangle |
+| Switch dig / place | I | R | Mouse wheel | LB or RB / L1 or R1 |
 | Ping wheel | G | G | G or middle click | D-pad left |
 | Scoreboard (hold) | TAB | TAB | TAB | View / Create |
 | Full map | M | M | M | D-pad up |

@@ -102,8 +102,9 @@ namespace CriticalMass.Runtime.Tests
                 { "Attack", new[] { "<Keyboard>/j", "<Keyboard>/z" } },
                 { "Ability", new[] { "<Keyboard>/k", "<Keyboard>/x" } },
                 { "Jump", new[] { "<Keyboard>/space", "<Keyboard>/c" } },
-                { "Interact", new[] { "<Keyboard>/e", "<Keyboard>/v" } },
-                { "SwitchDigPlace", new[] { "<Keyboard>/q", "<Keyboard>/slash" } },
+                { "Interact", new[] { "<Keyboard>/e", "<Keyboard>/h", "<Keyboard>/v" } },
+                { "DigPlace", new[] { "<Keyboard>/f", "<Keyboard>/u" } },
+                { "SwitchDigPlace", new[] { "<Keyboard>/i", "<Keyboard>/r" } },
                 { "LockFacing", new[] { "<Keyboard>/l", "<Keyboard>/leftShift" } },
             };
             foreach (var kv in expect)
@@ -174,14 +175,19 @@ namespace CriticalMass.Runtime.Tests
             Assert.AreEqual("K", ControlBindings.PromptLabel(A("Ability"), ControlDevice.KeyboardMouse));
             Assert.AreEqual("SPACE", ControlBindings.PromptLabel(A("Jump"), ControlDevice.KeyboardMouse));
             Assert.AreEqual("G", ControlBindings.PromptLabel(A("Ping"), ControlDevice.KeyboardMouse), "shared key, not middle click");
+            Assert.AreEqual("H", ControlBindings.PromptLabel(A("Interact"), ControlDevice.KeyboardMouse), "J K L hand: interact beside J");
+            Assert.AreEqual("U", ControlBindings.PromptLabel(A("DigPlace"), ControlDevice.KeyboardMouse));
+            Assert.AreEqual("I", ControlBindings.PromptLabel(A("SwitchDigPlace"), ControlDevice.KeyboardMouse));
             ControlBindings.SetHand(KeyboardHand.Arrows);
             Assert.AreEqual("Z", ControlBindings.PromptLabel(A("Attack"), ControlDevice.KeyboardMouse));
             Assert.AreEqual("X", ControlBindings.PromptLabel(A("Ability"), ControlDevice.KeyboardMouse));
             Assert.AreEqual("C", ControlBindings.PromptLabel(A("Jump"), ControlDevice.KeyboardMouse));
             Assert.AreEqual("V", ControlBindings.PromptLabel(A("Interact"), ControlDevice.KeyboardMouse));
             Assert.AreEqual("F", ControlBindings.PromptLabel(A("DigPlace"), ControlDevice.KeyboardMouse), "shared key");
+            Assert.AreEqual("R", ControlBindings.PromptLabel(A("SwitchDigPlace"), ControlDevice.KeyboardMouse), "left hand, never beside the arrows");
             ControlBindings.SetKeyboardOnly(false);
             Assert.AreEqual("LEFT CLICK", ControlBindings.PromptLabel(A("Attack"), ControlDevice.KeyboardMouse), "mouse in use: the click");
+            Assert.AreEqual("E", ControlBindings.PromptLabel(A("Interact"), ControlDevice.KeyboardMouse), "mouse in use: E, the genre's interact");
         }
 
         [Test]
@@ -318,6 +324,8 @@ namespace CriticalMass.Runtime.Tests
             Assert.AreEqual(PadFamily.Xbox, ControllerSettings.FamilyOf("XInputControllerWindows"));
             Assert.AreEqual(PadFamily.Xbox, ControllerSettings.FamilyOf("XboxGamepadMacOSWireless"));
             Assert.AreEqual(PadFamily.Xbox, ControllerSettings.FamilyOf("Gamepad", "Xbox Wireless Controller", "Microsoft"));
+            Assert.AreEqual(PadFamily.Xbox, ControllerSettings.FamilyOf("Gamepad", "Xbox Wireless Controller", null), "Bluetooth Xbox on a Mac: no maker string");
+            Assert.AreEqual(PadFamily.PlayStation, ControllerSettings.FamilyOf("Gamepad", "Wireless Controller", null));
             Assert.AreEqual(PadFamily.Generic, ControllerSettings.FamilyOf("Gamepad", "USB Gamepad", "Generic"));
         }
 
@@ -352,7 +360,7 @@ namespace CriticalMass.Runtime.Tests
             // Low sensitivity: half a push moves slower than half speed; direction kept.
             Vector2 low = ControllerSettings.Shape(new Vector2(0.3f, 0.4f), 0.2f, 1.6f);
             Assert.Less(low.magnitude, 0.5f);
-            Assert.AreEqual(0.75f, low.y / low.x, 1e-4f);
+            Assert.AreEqual(0.4f / 0.3f, low.y / low.x, 1e-4f);
 
             ControllerSettings.InvertAimY = true;
             Assert.AreEqual(-1f, ControllerSettings.ShapeAim(new Vector2(0f, 1f)).y, 1e-5f);

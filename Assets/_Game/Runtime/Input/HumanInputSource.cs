@@ -168,10 +168,15 @@ namespace CriticalMass.Runtime.Input
             }
             bool fromKeys = m.sqrMagnitude > 0f && _move.activeControl != null && _move.activeControl.device is Keyboard;
             State.SetMove(m.x, m.y, fromKeys);
+            bool arrowsMove = false;
             if (fromKeys)
             {
                 KeyboardHand? hand = ControlBindings.HandOf(_move, _move.activeControl);
                 if (hand.HasValue) ControlBindings.SetHand(hand.Value);
+                // controls-1 (owner 2026-11-13): moving on the arrows means the right hand is on the arrows, not the mouse,
+                // so the prompts and the tutorial switch to Z X C at once (not after the first attack). Not in the
+                // LEFT-HANDED layout, where the mouse is in the left hand while the right hand moves on the arrows.
+                arrowsMove = hand == KeyboardHand.Arrows && !ControlPresets.LeftHandedActive;
             }
 
             // Which device aims: the one used last (mouse movement or click, a controller stick, or a keyboard attack key
@@ -184,7 +189,7 @@ namespace CriticalMass.Runtime.Input
             _keyAimPressed = false;
             if (stick.sqrMagnitude > 0f || moveByPad) Aim.NoteStick();
             else if (Mouse.current != null && ControlBindings.MouseUsed(Mouse.current)) Aim.NotePointer();
-            else if (keyAim && ControlBindings.MouseIdleFor >= ControlBindings.MouseIdleSeconds)
+            else if ((keyAim || (arrowsMove && Aim.Current == AimResolver.Mode.Pointer)) && ControlBindings.MouseIdleFor >= ControlBindings.MouseIdleSeconds)
             {
                 Aim.NoteKeys();
                 ControlBindings.SetKeyboardOnly(true);

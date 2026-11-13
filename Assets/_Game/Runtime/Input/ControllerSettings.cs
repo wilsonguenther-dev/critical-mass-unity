@@ -109,9 +109,11 @@ namespace CriticalMass.Runtime.Input
         public static PadFamily FamilyOf(string layout, string product = null, string manufacturer = null)
         {
             string all = ((layout ?? "") + " " + (product ?? "") + " " + (manufacturer ?? "")).ToLowerInvariant();
-            if (all.Contains("dualshock") || all.Contains("dualsense") || all.Contains("sony") || all.Contains("playstation") ||
-                all.Contains("wireless controller")) return PadFamily.PlayStation;
+            // Xbox names first: an Xbox pad over Bluetooth reports "Xbox Wireless Controller", which also contains the
+            // bare "Wireless Controller" that a PlayStation pad reports (CI caught this on 2026-11-13).
             if (all.Contains("xinput") || all.Contains("xbox") || all.Contains("microsoft")) return PadFamily.Xbox;
+            if (all.Contains("dualshock") || all.Contains("dualsense") || all.Contains("sony") || all.Contains("playstation") ||
+                (product ?? "").Trim().Equals("Wireless Controller", System.StringComparison.OrdinalIgnoreCase)) return PadFamily.PlayStation;
             return PadFamily.Generic;
         }
 

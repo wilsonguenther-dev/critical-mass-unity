@@ -475,7 +475,7 @@
                     "isPartOfComposite": false
                 },
                 {
-                    "name": "WASD",
+                    "name": "",
                     "id": "f595af5d-1768-427c-9d83-11a145b6014d",
                     "path": "<Keyboard>/e",
                     "interactions": "",
@@ -508,6 +508,17 @@
                     "isPartOfComposite": false
                 },
                 {
+                    "name": "WASD",
+                    "id": "a1e7fb90-0ded-4ff2-b4d1-d6ec58eacd47",
+                    "path": "<Keyboard>/h",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "KeyboardMouse",
+                    "action": "Interact",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
                     "name": "",
                     "id": "741053d5-1740-4195-beeb-83c58b72adcb",
                     "path": "<Keyboard>/f",
@@ -525,6 +536,17 @@
                     "interactions": "",
                     "processors": "",
                     "groups": "Gamepad",
+                    "action": "DigPlace",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "WASD",
+                    "id": "ad69c92b-ca65-45ff-8ab1-782fd2ab2f3f",
+                    "path": "<Keyboard>/u",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "KeyboardMouse",
                     "action": "DigPlace",
                     "isComposite": false,
                     "isPartOfComposite": false
@@ -576,7 +598,7 @@
                 {
                     "name": "WASD",
                     "id": "14d423ab-aece-5492-9eff-c2c2c759dd35",
-                    "path": "<Keyboard>/q",
+                    "path": "<Keyboard>/i",
                     "interactions": "",
                     "processors": "",
                     "groups": "KeyboardMouse",
@@ -587,7 +609,7 @@
                 {
                     "name": "Arrows",
                     "id": "77193204-84aa-5501-8cf2-e2a1a407ae4e",
-                    "path": "<Keyboard>/slash",
+                    "path": "<Keyboard>/r",
                     "interactions": "",
                     "processors": "",
                     "groups": "KeyboardMouse",

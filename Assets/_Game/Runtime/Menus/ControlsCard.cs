@@ -347,6 +347,8 @@ namespace CriticalMass.Runtime.Menus
         Image _wash;
         MenuItem _back;
         MenuItem _tabAll, _tabPad;
+        readonly List<MenuItem> _presetItems = new List<MenuItem>();
+        Text _presetLine;
         RectTransform _padPage;
         Text _padTitle, _padLayout, _padHelp;
         readonly List<MenuItem> _padItems = new List<MenuItem>();
@@ -430,7 +432,11 @@ namespace CriticalMass.Runtime.Menus
         }
 
         void OnDevice(ControlDevice d) => _dirty = true;
-        void OnBindings() => _dirty = true;
+        void OnBindings()
+        {
+            _dirty = true;
+            RefreshPresetLine();
+        }
         void OnPadChange(InputDevice d, InputDeviceChange c)
         {
             if (d is Gamepad) _dirty = true;
@@ -468,6 +474,7 @@ namespace CriticalMass.Runtime.Menus
             _tabAll.Submitted = () => SetPage(false);
             _tabPad = MenuUi.Item(_space, "Tab Controller", x + 316f, y - 64f, 300f, 52f, "CONTROLLER", MenuItem.Kind.Button, UiScale.TypeBody, true, CMTokens.Display);
             _tabPad.Submitted = () => SetPage(true);
+            BuildPresets(x, y, w);
             BuildControllerPage(x, y, w, h);
             WireNavigation();
             _hint = MenuUi.Label(_space, "Hint", CMTokens.Ui, UiScale.TypeSmall, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 260f, 1020f, 1400f, 36f, "", 2f);
@@ -476,6 +483,52 @@ namespace CriticalMass.Runtime.Menus
             _timer.OutlinePx = 0f;
             _timer.RimPx = 0f;
             Canvas.enabled = false;
+        }
+
+        // ---- controls-1 round 2: named keyboard layouts (owner 2026-11-13) ----
+
+        void BuildPresets(float x, float y, float w)
+        {
+            float px = x + 632f, rowW = w - 632f, gap = 8f;
+            float pw = (rowW - gap * (ControlPresets.All.Length - 1)) / ControlPresets.All.Length;
+            _presetLine = MenuUi.Label(_space, "Layout Line", CMTokens.Ui, UiScale.TypeSmall, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft, x, y - 108f, w, 36f, "", 2f);
+            ClassCard.Fit(_presetLine, 11);
+            for (int i = 0; i < ControlPresets.All.Length; i++)
+            {
+                ControlPreset p = ControlPresets.All[i];
+                MenuItem it = MenuUi.Item(_space, "Preset " + p, px + i * (pw + gap), y - 64f, pw, 52f, ControlPresets.Title(p), MenuItem.Kind.Button, UiScale.TypeSmall, true, CMTokens.Display);
+                ClassCard.Fit(it.Label, 11);
+                it.Submitted = () => ApplyPreset(p);
+                _presetItems.Add(it);
+            }
+            RefreshPresetLine();
+        }
+
+        /// <summary>One press: the layout's keys, saved; the table and every prompt redraw (BindingsChanged).</summary>
+        public void ApplyPreset(ControlPreset p)
+        {
+            ControlPresets.Apply(InputSystem.actions, p);
+            RefreshPresetLine();
+            _dirty = true;
+        }
+
+        /// <summary>The layout in use, in words: a preset, or CUSTOM once a key was changed on top of it.</summary>
+        public static string PresetLineText(InputActionAsset asset)
+        {
+            ControlPreset? c = asset != null ? ControlPresets.Current(asset) : null;
+            if (c.HasValue) return "LAYOUT: " + ControlPresets.Title(c.Value) + ".  " + ControlPresets.Summary(c.Value);
+            bool custom = false;
+            InputActionMap map = asset != null ? ControlBindings.Map(asset) : null;
+            if (map != null)
+                foreach (InputBinding bd in map.bindings)
+                    if (bd.overridePath != null) custom = true;
+            return custom ? "LAYOUT: CUSTOM (your own keys). Pick a layout to start again from it, or change single keys in Settings, Controls."
+                : "LAYOUT: ALL THREE AT ONCE. Arrows + Z X C, WASD + J K L and WASD + mouse all work; prompts follow the keys you press.";
+        }
+
+        void RefreshPresetLine()
+        {
+            if (_presetLine != null) HudText.Set(_presetLine, PresetLineText(InputSystem.actions));
         }
 
         // ---- controls-1: the CONTROLLER page ----
@@ -625,11 +678,20 @@ namespace CriticalMass.Runtime.Menus
             ControllerPage = controller;
             Card.Root.gameObject.SetActive(!controller);
             _padPage.gameObject.SetActive(controller);
+            ShowPresets(!controller && Mode == CardMode.Modal);
             if (controller) RefreshControllerPage();
             WireNavigation();
             UpdateHint();
             EventSystem es = EventSystem.current;
             if (es != null && Mode == CardMode.Modal) es.SetSelectedGameObject((controller ? _tabPad : _tabAll).gameObject);
+        }
+
+        void ShowPresets(bool on)
+        {
+            for (int i = 0; i < _presetItems.Count; i++)
+                if (_presetItems[i].gameObject.activeSelf != on) _presetItems[i].gameObject.SetActive(on);
+            if (_presetLine != null && _presetLine.gameObject.activeSelf != on) _presetLine.gameObject.SetActive(on);
+            if (on) RefreshPresetLine();
         }
 
         /// <summary>Explicit focus order: the two tabs, the page's items (controller page), BACK; nothing is mouse-only.</summary>
@@ -641,7 +703,18 @@ namespace CriticalMass.Runtime.Menus
             order.Add(_back);
             Selectable firstBelow = order.Count > 1 ? order[1] : _back;
             _tabAll.navigation = new Navigation { mode = Navigation.Mode.Explicit, selectOnRight = _tabPad, selectOnDown = firstBelow, selectOnUp = _back };
-            _tabPad.navigation = new Navigation { mode = Navigation.Mode.Explicit, selectOnLeft = _tabAll, selectOnDown = firstBelow, selectOnUp = _back };
+            bool presets = !ControllerPage && _presetItems.Count > 0 && _presetItems[0].gameObject.activeInHierarchy;
+            _tabPad.navigation = new Navigation { mode = Navigation.Mode.Explicit, selectOnLeft = _tabAll, selectOnRight = presets ? _presetItems[0] : null, selectOnDown = firstBelow, selectOnUp = _back };
+            // The layout buttons continue the tab row: left and right walk it, down goes to the page, up to BACK.
+            for (int i = 0; i < _presetItems.Count; i++)
+                _presetItems[i].navigation = new Navigation
+                {
+                    mode = Navigation.Mode.Explicit,
+                    selectOnLeft = i == 0 ? (Selectable)_tabPad : _presetItems[i - 1],
+                    selectOnRight = i + 1 < _presetItems.Count ? _presetItems[i + 1] : null,
+                    selectOnDown = firstBelow,
+                    selectOnUp = _back,
+                };
             for (int i = 1; i < order.Count; i++)
             {
                 Selectable up = order[i - 1] == _tabAll ? (ControllerPage ? (Selectable)_tabPad : _tabAll) : order[i - 1];
@@ -697,6 +770,8 @@ namespace CriticalMass.Runtime.Menus
             _back.gameObject.SetActive(modal);
             _tabAll.gameObject.SetActive(modal);
             _tabPad.gameObject.SetActive(modal);
+            ShowPresets(modal && !ControllerPage);
+            WireNavigation();
             if (!modal && ControllerPage) SetPage(false);
             _timer.gameObject.SetActive(!modal);
             _timer.Fill01 = 1f;

@@ -18,6 +18,11 @@ namespace CriticalMass.Runtime.Menu
         public const string MasterKey = "cm.audio.master";
         public const string MusicKey = "cm.audio.music";
         public const string EffectsKey = "cm.audio.effects";
+        // controls-1 round 2 (veteran hygiene): mutes next to the sliders, and silence while the window is in the background.
+        public const string MuteMusicKey = "cm.audio.muteMusic";
+        public const string MuteEffectsKey = "cm.audio.muteEffects";
+        public const string MuteInBackgroundKey = "cm.audio.muteInBackground";
+        public const string ColourBlindTeamsKey = "cm.access.colourBlindTeams";
         public const string WidthKey = "cm.video.width";
         public const string HeightKey = "cm.video.height";
         public const string FullScreenKey = "cm.video.fullscreen";
@@ -53,7 +58,7 @@ namespace CriticalMass.Runtime.Menu
         /// <summary>Every key this class writes (tests back these up and restore them).</summary>
         public static readonly string[] AllKeys =
         {
-            MasterKey, MusicKey, EffectsKey, WidthKey, HeightKey, FullScreenKey, VSyncKey, QualityKey, ShakeKey,
+            MasterKey, MusicKey, EffectsKey, MuteMusicKey, MuteEffectsKey, MuteInBackgroundKey, ColourBlindTeamsKey, WidthKey, HeightKey, FullScreenKey, VSyncKey, QualityKey, ShakeKey,
             DamageNumbersKey, BloodKey, FpsCapKey, BgThrottleKey, MoveAssistKey, KeysFollowMapKey, PrefsVersionKey,
             ShakeScaleKey, ReduceFlashingKey, ReduceMotionKey, IntroAtLaunchKey,
         };
@@ -70,6 +75,47 @@ namespace CriticalMass.Runtime.Menu
         public static float MasterVolume { get => GetF(MasterKey, 1f); set { SetF(MasterKey, Mathf.Clamp01(value)); ApplyAudio(); } }
         public static float MusicVolume { get => GetF(MusicKey, 0.8f); set { SetF(MusicKey, Mathf.Clamp01(value)); ApplyAudio(); } }
         public static float EffectsVolume { get => GetF(EffectsKey, 1f); set { SetF(EffectsKey, Mathf.Clamp01(value)); ApplyAudio(); } }
+        /// <summary>Music muted, the slider kept (PlayerPrefs cm.audio.muteMusic, default off).</summary>
+        public static bool MuteMusic { get => GetB(MuteMusicKey, false); set { SetB(MuteMusicKey, value); ApplyAudio(); } }
+        /// <summary>Sound effects muted, the slider kept (PlayerPrefs cm.audio.muteEffects, default off).</summary>
+        public static bool MuteEffects { get => GetB(MuteEffectsKey, false); set { SetB(MuteEffectsKey, value); ApplyAudio(); } }
+        /// <summary>Everything silent while another window has the focus (PlayerPrefs cm.audio.muteInBackground, default off).</summary>
+        public static bool MuteInBackground { get => GetB(MuteInBackgroundKey, false); set { SetB(MuteInBackgroundKey, value); ApplyAudio(); } }
+
+        /// <summary>
+        /// The colour-blind team palette (blue / amber instead of cyan / coral) on HUD, rings and team text (PlayerPrefs
+        /// cm.access.colourBlindTeams, default off). Mirrored into CMTokens.ColourBlindTeams, which every view reads.
+        /// </summary>
+        public static bool ColourBlindTeams
+        {
+            get => GetB(ColourBlindTeamsKey, false);
+            set
+            {
+                SetB(ColourBlindTeamsKey, value);
+                CriticalMass.Runtime.Hud.Style.CMTokens.ColourBlindTeams = value;
+            }
+        }
+
+        static bool _appFocused = true;
+
+        /// <summary>The window gained or lost the focus (CursorAutoHide reports it each frame); re-applies the mix on a change.</summary>
+        public static void SetAppFocused(bool focused)
+        {
+            if (_appFocused == focused) return;
+            _appFocused = focused;
+            ApplyAudio();
+        }
+
+        /// <summary>
+        /// The linear volumes actually played: the sliders, with the two mutes and the background mute applied. Pure, so the
+        /// tests pin it without a mixer.
+        /// </summary>
+        public static (float master, float music, float effects) Mix(float master, float music, float effects,
+            bool muteMusic, bool muteEffects, bool muteInBackground, bool focused)
+        {
+            if (muteInBackground && !focused) master = 0f;
+            return (Mathf.Clamp01(master), muteMusic ? 0f : Mathf.Clamp01(music), muteEffects ? 0f : Mathf.Clamp01(effects));
+        }
 
         // ---- game ----
         /// <summary>Camera shake allowed: ShakeScale above 0 (cm.shake is kept in step for older readers).</summary>
@@ -227,14 +273,15 @@ namespace CriticalMass.Runtime.Menu
         {
             if (!Application.isPlaying) return;   // edit mode (tests): never touch the mixer asset or the editor's listener
             AudioMixer m = Mixer;
+            (float master, float music, float effects) = Mix(MasterVolume, MusicVolume, EffectsVolume, MuteMusic, MuteEffects, MuteInBackground, _appFocused);
             if (m != null)
             {
-                m.SetFloat(MasterParam, ToDecibels(MasterVolume));
-                m.SetFloat(MusicParam, ToDecibels(MusicVolume));
-                m.SetFloat(EffectsParam, ToDecibels(EffectsVolume));
+                m.SetFloat(MasterParam, ToDecibels(master));
+                m.SetFloat(MusicParam, ToDecibels(music));
+                m.SetFloat(EffectsParam, ToDecibels(effects));
                 AudioListener.volume = 1f;
             }
-            else AudioListener.volume = MasterVolume;
+            else AudioListener.volume = master;
         }
 
         /// <summary>True where the window may be changed (player builds; never the editor, batch mode or tests).</summary>
@@ -268,6 +315,7 @@ namespace CriticalMass.Runtime.Menu
         /// <summary>Applies every stored setting (boot).</summary>
         public static void ApplyAll()
         {
+            CriticalMass.Runtime.Hud.Style.CMTokens.ColourBlindTeams = ColourBlindTeams;
             ApplyAudio();
             ApplyVideo();
         }

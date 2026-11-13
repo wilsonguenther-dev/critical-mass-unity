@@ -26,7 +26,10 @@ namespace CriticalMass.Runtime.Input
         void Update()
         {
             ControlBindings.Sample();
-            bool want = CursorWanted(ControlBindings.ActiveScheme) || !Application.isFocused;
+            bool focused = Application.isFocused;
+            // controls-1 round 2: the same per-frame focus read drives "Mute when in background" (GameSettings.Mix).
+            CriticalMass.Runtime.Menu.GameSettings.SetAppFocused(focused);
+            bool want = CursorWanted(ControlBindings.ActiveScheme) || !focused;
             if (Cursor.visible != want) Cursor.visible = want;
         }
 
