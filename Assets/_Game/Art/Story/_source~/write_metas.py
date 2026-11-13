@@ -118,7 +118,7 @@ DIR = "fileFormatVersion: 2\nguid: {guid}\nfolderAsset: yes\nDefaultImporter:\n 
 for f in glob.glob(os.path.join(STORY, "*.meta")): os.remove(f)
 for f in sorted(glob.glob(os.path.join(STORY, "*"))):
     rel = os.path.relpath(f, REPO)
-    body = TEX if f.endswith(".png") else TXT if f.endswith(".json") else None
+    body = TEX if f.endswith((".png", ".jpg")) else TXT if f.endswith(".json") else None
     if body: open(f + ".meta", "w").write(body.format(guid=guid(rel)))
 open(STORY + ".meta", "w").write(DIR.format(guid=guid(os.path.relpath(STORY, REPO))))
 print("metas", len(glob.glob(os.path.join(STORY, "*.meta"))))

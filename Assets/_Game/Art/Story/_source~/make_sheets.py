@@ -4,7 +4,9 @@ layers and the SAME shot table the game plays (Assets/_Game/Resources/Story/moti
 transform rules as Runtime/Menus/Story/MotionComic.cs (camera zoom/pan with per-layer depth parallax, eased keys,
 y up, origin at the stage centre, 1920 x 1080 stage units).
 
-Usage: python3 make_sheets.py OUTDIR [--at 0.5]   (writes contact-sheet.png, storyboard.png, shot-NN-<id>.png)
+Usage: python3 make_sheets.py OUTDIR [--at 0.5] [--board-only] [--check-only]   (writes contact-sheet.png, storyboard.png,
+shot-NN-<id>.png; then the coverage gate: exits 1 if any frame at the start, board time or end of a shot has an uncovered
+pixel or shows a layer's cut edge inside the frame)
 """
 import json, math, os, sys
 import numpy as np
@@ -56,6 +58,7 @@ _cache = {}
 def tex(name):
     if name not in _cache:
         p = os.path.join(STORY, name + ".png")
+        if not os.path.exists(p): p = os.path.join(STORY, name + ".jpg")
         if not os.path.exists(p): p = os.path.join(RES, name + ".png")
         _cache[name] = Image.open(p).convert("RGBA") if os.path.exists(p) else None
     return _cache[name]
@@ -158,7 +161,7 @@ def compose(data, shot, t):
     return canvas.convert("RGB")
 
 def contact_sheet(outdir):
-    names = sorted(f[:-4] for f in os.listdir(STORY) if f.endswith(".png"))
+    names = sorted(f[:-4] for f in os.listdir(STORY) if f.endswith((".png", ".jpg")))
     cols, tw, th = 8, 300, 230
     rows = (len(names) + cols - 1) // cols
     sheet = Image.new("RGB", (cols * tw, rows * th), (24, 35, 59))
@@ -169,7 +172,7 @@ def contact_sheet(outdir):
         for xx in range(0, tw, 16):
             if (xx // 16 + yy // 16) % 2: d0.rectangle([xx, yy, xx + 15, yy + 15], fill=(98, 106, 126))
     for i, n in enumerate(names):
-        im = Image.open(os.path.join(STORY, n + ".png")).convert("RGBA")
+        im = tex(n)
         x, y = (i % cols) * tw, (i // cols) * th
         sheet.paste(chk, (x + 8, y + 8))
         t = im.copy(); t.thumbnail((tw - 16, th - 46), Image.LANCZOS)
@@ -201,8 +204,92 @@ def storyboard(outdir, at):
     board.save(os.path.join(outdir, "storyboard.png"), optimize=True)
     return t0
 
+# ---- coverage gate: no uncovered pixel and no visible layer edge inside the frame
+SC = 0.25   # checked on a quarter-size grid (480 x 270): 1 cell = 4 stage px
+
+def _alpha(name):
+    if name == "@solid": return np.full((8, 8), 1.0, np.float32)
+    im = tex(name)
+    return None if im is None else np.asarray(im)[..., 3].astype(np.float32) / 255.0
+
+def _hard_sides(a):
+    """Sides of a texture where the art is cut by the image border (opaque pixels touching it)."""
+    out = {}
+    for side, strip in (("left", a[:, :2].min(1)), ("right", a[:, -2:].min(1)), ("top", a[:2].min(0)), ("bottom", a[-2:].min(0))):
+        m = strip > 0.5
+        if m.mean() > 0.04: out[side] = m
+    return out
+
+def coverage_check(data, shot, t):
+    Wl, Hl = int(W * SC), int(H * SC)
+    cam = sample(shot["cam"], t, ["zoom", "zx", "zy", "dolly", "x", "y", "rot"])
+    masks, edges = [], []
+    for L in shot["layers"]:
+        k = sample(L["keys"], t, ["x", "y", "s", "a", "r", "b"])
+        if k is None or t < L.get("from", 0) or t > L.get("to", 1e9) or k["a"] <= 0.003: continue
+        name = L["tex"]
+        if L.get("frames"):
+            f = int(max(0, t - L.get("frameAt", 0)) * L.get("fps", 12)); fr = L["frames"]; name = fr[min(f, len(fr) - 1)]
+        a = _alpha(name)
+        if a is None: continue
+        px, py, z = to_screen(cam, L["depth"], k["x"], k["y"])
+        w = L["w"] * k["s"] * z; h = (L["h"] if L.get("h", 0) > 0 else L["w"] * a.shape[0] / a.shape[1]) * k["s"] * z
+        aa = k["a"] * (L["pulseLo"] if L.get("pulseHz", 0) > 0 else 1.0)
+        img = Image.fromarray((a * 255).astype(np.uint8), "L").resize((max(1, int(w * SC)), max(1, int(h * SC))), Image.BILINEAR)
+        if L.get("flip"): img = img.transpose(Image.FLIP_LEFT_RIGHT)
+        rot = k["r"] + cam["rot"] * L["depth"]
+        if abs(rot) > 0.01: img = img.rotate(rot, resample=Image.BILINEAR, expand=True)
+        m = np.zeros((Hl, Wl), np.float32)
+        x0 = int(round((W / 2 + px) * SC - img.width / 2)); y0 = int(round((H / 2 - py) * SC - img.height / 2))
+        sa = np.asarray(img).astype(np.float32) / 255.0 * aa
+        xa, ya, xb, yb = max(0, x0), max(0, y0), min(Wl, x0 + img.width), min(Hl, y0 + img.height)
+        if xb > xa and yb > ya: m[ya:yb, xa:xb] = sa[ya - y0:yb - y0, xa - x0:xb - x0]
+        masks.append(m)
+        if abs(rot) > 0.01 or name == "@solid": edges.append(None); continue
+        sides = _hard_sides(a)
+        if L.get("flip") and sides: sides = {{"left": "right", "right": "left"}.get(k2, k2): v for k2, v in sides.items()}
+        X0, X1 = (W / 2 + px - w / 2) * SC, (W / 2 + px + w / 2) * SC; Y0, Y1 = (H / 2 - py - h / 2) * SC, (H / 2 - py + h / 2) * SC
+        segs = []
+        for side, msk in sides.items():
+            n = max(2, int((Y1 - Y0) if side in ("left", "right") else (X1 - X0)))
+            u = np.linspace(0, 1, n); on = msk[np.minimum((u * (len(msk) - 1)).astype(int), len(msk) - 1)]
+            if side in ("left", "right"): xs = np.full(n, X0 if side == "left" else X1 - 1); ys = Y0 + u * (Y1 - Y0)
+            else: ys = np.full(n, Y0 if side == "top" else Y1 - 1); xs = X0 + u * (X1 - X0)
+            segs.append((L["tex"] + ":" + side, xs[on], ys[on]))
+        edges.append(segs)
+    bars = sample(shot.get("bars", [{"t": 0, "v": 1, "ease": "linear"}]), t, ["v"])["v"]
+    bh = int(data["letterbox"] * Hl * bars)
+    union = np.zeros((Hl, Wl), np.float32)
+    for m in masks: union = union + m * (1 - union)
+    vis = union[bh:Hl - bh]
+    problems = []
+    holes = int((vis < 0.9).sum())
+    if holes: problems.append("%d uncovered cells (4x4 px) at t=%.2f" % (holes, t))
+    above = np.zeros((Hl, Wl), np.float32)
+    for m, segs in zip(reversed(masks), reversed(edges)):
+        for tag, xs, ys in (segs or []):
+            xi, yi = np.round(xs).astype(int), np.round(ys).astype(int)
+            inside = (xi >= 1) & (xi <= Wl - 2) & (yi >= bh + 1) & (yi <= Hl - bh - 2)
+            if inside.any():
+                shown = above[yi[inside], xi[inside]] < 0.9
+                if shown.sum() > 2: problems.append("edge %s visible over %d cells at t=%.2f" % (tag, int(shown.sum()), t))
+        above = above + m * (1 - above)
+    return problems
+
+def check_all():
+    data = json.load(open(os.path.join(STORY, "motion-comic.json")))
+    bad = 0
+    for i, s in enumerate(data["shots"]):
+        for t in sorted({0.0, s.get("boardAt", s["seconds"] * 0.6), s["seconds"]}):
+            for p in coverage_check(data, s, t):
+                print("COVERAGE FAIL shot %02d %s: %s" % (i + 1, s["id"], p)); bad += 1
+    print("coverage check:", "PASS" if not bad else "%d problems" % bad)
+    return bad == 0
+
 if __name__ == "__main__":
     out = sys.argv[1]; os.makedirs(out, exist_ok=True)
     at = float(sys.argv[sys.argv.index("--at") + 1]) if "--at" in sys.argv else 0.6
     if "--board-only" not in sys.argv: contact_sheet(out)
-    if os.path.exists(os.path.join(STORY, "motion-comic.json")): print("total seconds", storyboard(out, at))
+    if os.path.exists(os.path.join(STORY, "motion-comic.json")):
+        if "--check-only" not in sys.argv: print("total seconds", storyboard(out, at))
+        if not check_all(): sys.exit(1)   # a frame with a hole or a visible layer edge fails the build
