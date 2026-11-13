@@ -16,6 +16,8 @@ namespace CriticalMass.Runtime.Game
         public const int DefaultCap = 60;
         public const int MenuCap = 60;
         public const int BatteryMenuCap = 30;
+        /// <summary>The title screen (a backdrop match behind it) at 30 fps: idle CPU budget (smoke measured 36.7% at 60).</summary>
+        public const int TitleCap = 30;
         public const int BatteryMatchCap = 60;
         public const int SavePowerBackgroundFps = 15;
         public const int MinBackgroundFps = 30;
@@ -59,6 +61,9 @@ namespace CriticalMass.Runtime.Game
             int limit = menuLike ? BatteryMenuCap : BatteryMatchCap;
             return cap == 0 || cap > limit ? limit : cap;
         }
+
+        /// <summary>The title screen's cap: never above TitleCap (0 = display rate counts as above).</summary>
+        public static int TitleCapFor(int cap) => cap == 0 || cap > TitleCap ? TitleCap : cap;
 
         /// <summary>DG-51: unfocused, keep the normal cap (never below 30); "save power in background" brings back 15.</summary>
         public static int BackgroundCap(int foregroundCap, bool savePower)
@@ -280,6 +285,30 @@ namespace CriticalMass.Runtime.Game
         }
 
         public double Alpha(double dt) => dt > 0 ? _acc / dt : 0;
+    }
+
+    /// <summary>
+    /// Triangle budget per quality level (integrator smoke 2026-11-12: 4.47 M triangles at High against a 1 M budget; every
+    /// CMToon mesh draws three times: lit, inverted-hull outline, shadow caster). Scenery (WorldView's combined groups) is
+    /// where the cut is safe; characters keep outline and shadow at every level (readability in a 16v16 crowd).
+    /// Low: scenery without outline and without shadow casting. Medium: scenery outline kept, no scenery shadows.
+    /// High and above: everything. FrameGovernor sets the level in players; the editor stays at High.
+    /// </summary>
+    public static class RenderTier
+    {
+        public static int Level { get; private set; } = FramePolicy.LevelHigh;
+        public static event Action Changed;
+
+        /// <summary>(scenery outline, scenery shadows) for a quality level (pure; tests).</summary>
+        public static (bool sceneryOutline, bool sceneryShadows) Policy(int level) =>
+            level <= FramePolicy.LevelLow ? (false, false) : level == FramePolicy.LevelMedium ? (true, false) : (true, true);
+
+        public static void Set(int level)
+        {
+            if (level == Level) return;
+            Level = level;
+            Changed?.Invoke();
+        }
     }
 
     /// <summary>Counters the F3 overlay, the heartbeat and the perf report read (written on the main thread only).</summary>

@@ -233,6 +233,7 @@ namespace CriticalMass.Runtime.Menu
             Application.quitting += OnQuit;
             CheckPrefsVersion();
             if (Application.isBatchMode) return;   // gates and tests keep the project's settings
+            if (CriticalMass.Runtime.Game.GamePaths.IsolatedRun) return;   // a -dataDir measurement run keeps its own window and quality
             ApplyAll();
         }
 
@@ -292,6 +293,11 @@ namespace CriticalMass.Runtime.Menu
         public static bool Flush()
         {
             if (!_dirty) return true;
+            if (CriticalMass.Runtime.Game.GamePaths.IsolatedRun)
+            {
+                _dirty = false;   // a -dataDir measurement run never writes the player's saved settings
+                return true;
+            }
             try
             {
                 PlayerPrefs.SetInt(PrefsVersionKey, PrefsVersion);

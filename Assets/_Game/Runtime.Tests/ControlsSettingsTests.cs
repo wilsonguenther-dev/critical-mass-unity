@@ -287,7 +287,7 @@ namespace CriticalMass.Runtime.Tests
             PlayerPrefs.DeleteKey("cm.fpsCap");
             PlayerPrefs.DeleteKey("cm.bgThrottle");
             Assert.AreEqual(60, GameSettings.FpsCap, "default 60");
-            Assert.IsTrue(GameSettings.BackgroundThrottle, "default on");
+            Assert.IsFalse(GameSettings.BackgroundThrottle, "default off: save power in background (DG-51)");
             CollectionAssert.AreEqual(new[] { 30, 60, 120, 0 }, GameSettings.FpsCapOptions);
             Assert.AreEqual("60 FPS", PauseMenu.FpsCapText());
 

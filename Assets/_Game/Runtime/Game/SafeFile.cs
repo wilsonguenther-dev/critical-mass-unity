@@ -267,6 +267,10 @@ namespace CriticalMass.Runtime.Game
             return null;
         }
 
+        /// <summary>true for a -dataDir run without touching the engine (safe from any thread after boot; tests can set it).</summary>
+        public static bool IsolatedRun => _isolatedArg ?? (bool)(_isolatedArg = DataDirArg(Environment.GetCommandLineArgs()) != null);
+        static bool? _isolatedArg;
+
         /// <summary>true when a flag is on the command line (case-insensitive).</summary>
         public static bool HasFlag(string flag) => HasFlag(Environment.GetCommandLineArgs(), flag);
 

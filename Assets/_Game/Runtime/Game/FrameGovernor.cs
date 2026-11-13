@@ -67,6 +67,9 @@ namespace CriticalMass.Runtime.Game
         public static int AppliedCap { get; private set; }
         public static float AppliedRenderScale { get; private set; } = 1f;
         public static int AppliedQueuedFrames { get; private set; }
+        /// <summary>true while the title screen is up (read by SimDriverBehaviour's backdrop throttle).</summary>
+        public static bool TitleUp { get; private set; }
+
         /// <summary>The quality the run asked for (-quality or the stored choice); the perf gate compares it with the real one.</summary>
         public static string RequestedQuality { get; private set; } = "";
 
@@ -105,6 +108,7 @@ namespace CriticalMass.Runtime.Game
         int _prefCap = DefaultCap, _prefBg, _prefVSync = 1, _baseLevel = -1, _seenW, _seenH, _seenDisplays;
         double _seenHz;
         float _chosenScale = 1f;
+        int _argCap = -1;   // -fpsCap N (measurement runs: the floor profile uses 30); -1 = none
         readonly TimedCapGuard _guard = new TimedCapGuard();
         HumanInputSource _input;
         FrameGovernorGui _gui;
@@ -170,6 +174,10 @@ namespace CriticalMass.Runtime.Game
             }
             _dataDir = GamePaths.DataDir;
             if (SessionKeeper.ToolRun) return;
+            string[] args = Environment.GetCommandLineArgs();
+            for (int i = 0; i + 1 < args.Length; i++)
+                if (string.Equals(args[i], "-fpsCap", StringComparison.OrdinalIgnoreCase) && int.TryParse(args[i + 1], out int c))
+                    _argCap = SanitiseCap(c);
             ApplyQuality();
             ClampWindow();
             ReadDisplay();
@@ -244,6 +252,7 @@ namespace CriticalMass.Runtime.Game
         {
             level = Mathf.Clamp(level, 0, QualitySettings.names.Length - 1);
             if (level != QualitySettings.GetQualityLevel()) QualitySettings.SetQualityLevel(level, true);
+            RenderTier.Set(level);
             ApplyPixels();
             int queued = FramePolicy.MaxQueuedFrames(level, SafeMode);
             if (QualitySettings.maxQueuedFrames != queued) QualitySettings.maxQueuedFrames = queued;
@@ -354,10 +363,13 @@ namespace CriticalMass.Runtime.Game
                 bool reapplied = _reapply;
                 _checkAge = 0f;
                 _reapply = false;
-                _prefCap = SanitiseCap(PlayerPrefs.GetInt(PrefFpsCap, DefaultCap));
-                _prefBg = PlayerPrefs.GetInt(PrefBgThrottle, 0);
-                _prefVSync = PlayerPrefs.GetInt(PrefVSync, 1);
+                // An isolated measurement run (-dataDir) never reads the owner's choices: defaults plus its own flags.
+                bool own = !GamePaths.Isolated;
+                _prefCap = _argCap >= 0 ? _argCap : own ? SanitiseCap(PlayerPrefs.GetInt(PrefFpsCap, DefaultCap)) : DefaultCap;
+                _prefBg = own ? PlayerPrefs.GetInt(PrefBgThrottle, 0) : 0;
+                _prefVSync = own ? PlayerPrefs.GetInt(PrefVSync, 1) : 1;
                 _title = FindAnyObjectByType<TitleScreen>() != null;
+                TitleUp = _title;
                 if (_input == null) _input = FindAnyObjectByType<HumanInputSource>();
                 _inputPaused = _input != null && _input.State != null && _input.State.Paused;
                 _onBattery = SystemInfo.batteryStatus == BatteryStatus.Discharging;
@@ -434,7 +446,8 @@ namespace CriticalMass.Runtime.Game
         int EffectiveCapFor(bool menuLike)
         {
             int pref = SafeMode ? Math.Min(_prefCap == 0 ? SafeCap : _prefCap, SafeCap) : _prefCap;
-            return FramePolicy.EffectiveCap(pref, menuLike, _onBattery);
+            int cap = FramePolicy.EffectiveCap(pref, menuLike, _onBattery);
+            return _title ? FramePolicy.TitleCapFor(cap) : cap;
         }
     }
 

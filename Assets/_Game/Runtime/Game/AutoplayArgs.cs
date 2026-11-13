@@ -556,6 +556,8 @@ namespace CriticalMass.Runtime.Game
                 ("sim_dropped_ticks", RuntimeCounters.SimDroppedTicks.ToString(CultureInfo.InvariantCulture)),
                 ("hud_events_dropped", RuntimeCounters.HudEventsDropped.ToString(CultureInfo.InvariantCulture)),
                 ("objects", ObjectCountsJson()),
+                ("world_triangles", CriticalMass.Runtime.View.Dressing.WorldView.LastTriangles.ToString(CultureInfo.InvariantCulture)),
+                ("render_tier", Q(RenderTier.Policy(RenderTier.Level).ToString())),
                 ("screen", Q($"{Screen.width}x{Screen.height}")),
                 ("assets", assets),
             });

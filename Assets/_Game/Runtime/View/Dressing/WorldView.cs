@@ -75,6 +75,36 @@ namespace CriticalMass.Runtime.View.Dressing
         /// <summary>The hill tint shown now (tests read it).</summary>
         public HillState HillShown => _hillShown;
 
+        // Render tier (2026-11-12 triangle budget): the materials and renderers the scenery uses, so a quality change can
+        // drop the scenery outline pass and scenery shadow casting without touching the characters.
+        private readonly HashSet<Material> _sceneryMats = new HashSet<Material>();
+
+        /// <summary>Scenery triangles drawn once (the perf report's world_triangles; outline and shadow passes multiply it).</summary>
+        public static int LastTriangles { get; private set; }
+
+        private void OnEnable() => RenderTier.Changed += ApplyTier;
+        private void OnDisable() => RenderTier.Changed -= ApplyTier;
+
+        /// <summary>Applies RenderTier.Policy to every scenery renderer and material (players only for materials: they are
+        /// shared project assets in the editor).</summary>
+        private void ApplyTier()
+        {
+            (bool outline, bool shadows) = RenderTier.Policy(RenderTier.Level);
+            if (!Application.isEditor)
+                foreach (Material m in _sceneryMats)
+                    if (m != null && m.GetShaderPassEnabled("SRPDefaultUnlit") != outline) m.SetShaderPassEnabled("SRPDefaultUnlit", outline);
+            foreach (List<GameObject> list in _groups.Values)
+                foreach (GameObject go in list)
+                {
+                    if (go == null) continue;
+                    var r = go.GetComponent<MeshRenderer>();
+                    if (r != null) r.shadowCastingMode = shadows && CastsShadows(r.sharedMaterial) ? ShadowCastingMode.On : ShadowCastingMode.Off;
+                }
+        }
+
+        private static bool CastsShadows(Material mat) =>
+            mat != null && Enum.TryParse(mat.name.StartsWith("World", StringComparison.Ordinal) ? mat.name.Substring(5).Split(' ')[0] : "", out WorldLook look) && WorldKit.CastsShadows(look);
+
         private void Start()
         {
             _driver = GetComponent<SimDriverBehaviour>();
@@ -290,6 +320,7 @@ namespace CriticalMass.Runtime.View.Dressing
                 if (m != null) Destroy(m);
             _mats.Clear();
             _hillMats.Clear();
+            _sceneryMats.Clear();
             if (_ground != null) Destroy(_ground);
             _ground = null;
             _replanPending = false;
@@ -533,8 +564,11 @@ namespace CriticalMass.Runtime.View.Dressing
             go.AddComponent<MeshFilter>().sharedMesh = mesh;
             var r = go.AddComponent<MeshRenderer>();
             r.sharedMaterial = mat;
-            bool casts = Enum.TryParse(mat.name.StartsWith("World", StringComparison.Ordinal) ? mat.name.Substring(5).Split(' ')[0] : "", out WorldLook look) && WorldKit.CastsShadows(look);
+            bool casts = CastsShadows(mat) && RenderTier.Policy(RenderTier.Level).sceneryShadows;
             r.shadowCastingMode = casts ? ShadowCastingMode.On : ShadowCastingMode.Off;
+            if (mat != _ground && _sceneryMats.Add(mat) && !Application.isEditor)
+                mat.SetShaderPassEnabled("SRPDefaultUnlit", RenderTier.Policy(RenderTier.Level).sceneryOutline);
+            LastTriangles = Triangles + tri.Count / 3;
             Triangles += tri.Count / 3;
             Renderers++;
             return go;

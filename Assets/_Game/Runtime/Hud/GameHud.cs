@@ -576,7 +576,7 @@ namespace CriticalMass.Runtime.Hud
             {
                 _countedMatch = true;
                 PlayerPrefs.SetInt(MatchesPlayedKey, PlayerPrefs.GetInt(MatchesPlayedKey, 0) + 1);
-                PlayerPrefs.Save();   // DG-53: the counter reaches the disk once per match
+                if (!CriticalMass.Runtime.Game.GamePaths.IsolatedRun) PlayerPrefs.Save();   // DG-53: once per match; never in a -dataDir run
             }
         }
 

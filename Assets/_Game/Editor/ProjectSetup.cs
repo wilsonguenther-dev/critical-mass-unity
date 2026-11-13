@@ -156,6 +156,7 @@ namespace CriticalMass.Editor
                 d |= SetInt(so, "m_SupportsHDR", 0);
                 d |= SetInt(so, "m_MainLightShadowmapResolution", 1024);
                 d |= SetInt(so, "m_AdditionalLightShadowsSupported", 0);
+                d |= SetFloat(so, "m_ShadowDistance", 50f);   // fewer shadow casters than High's 60
                 return d;
             });
 

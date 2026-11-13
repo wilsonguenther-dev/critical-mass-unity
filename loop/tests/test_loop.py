@@ -313,7 +313,7 @@ def test_setup_is_the_first_unity_gate_and_clean_reimport_follows_compile():
     assert I.DEFAULT_GATES[:3] == ['setup', 'compile', 'clean-reimport']
     assert 'first Unity gate' in I.gate_order_error(['compile', 'setup'])
     assert I.gate_order_error(['setup', 'clean-reimport', 'compile'])
-    assert I.gate_order_error(['budgets']) is None  # no Unity gate, nothing to order
+    assert I.gate_order_error(['perf']) is None  # no Unity gate, nothing to order
 
 
 def test_order_sentence_is_the_same_in_integrate_and_the_workflow():

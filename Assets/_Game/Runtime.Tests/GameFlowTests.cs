@@ -65,7 +65,7 @@ namespace CriticalMass.Runtime.Tests
             MatchRequest r = GameFlow.RequestForBuild();
             Assert.AreEqual(FlowState.Title, GameFlow.State);
             Assert.IsTrue(r.Backdrop);
-            Assert.AreEqual(16, r.TeamSize);
+            Assert.AreEqual(GameFlow.BackdropTeamSize, r.TeamSize, "8v8 behind the menus (idle CPU budget)");
             Assert.AreNotEqual(new GameConfig().Seed, r.Seed, "the backdrop must not be the fixed 1337 match");
         }
 
