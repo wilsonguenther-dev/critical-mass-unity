@@ -9,7 +9,7 @@ def cls_refs(c, prop):
     return [f"{TA}/{c}/{c}-three-quarter-2k.jpg", f"{TA}/{c}/{c}-front-2k.jpg", f"{TA}/{c}/{c}-prop-{prop}-2k.jpg"]
 CLASSES = {
     "warrior": (WAR, "raising the stone-blue cleaver high for a downward chop, round wooden shield braced forward, mouth open in a battle shout"),
-    "farmer": (cls_refs("farmer", "staff"), "swinging her staff (exactly the simple wooden staff of the prop reference image, no blade, no hose) around in a wide two-handed arc, one foot forward, fierce determined grin"),
+    "farmer": (cls_refs("farmer", "staff"), "leaping forward mid-attack, both hands on her staff (exactly the simple wooden staff of the prop reference image, no blade, no hose) sweeping it down diagonally across her body in a powerful hooking strike, hair and scarf flying back, knees bent, fierce determined grin; a dynamic, off-balance action pose, not standing still"),
     "miner": (cls_refs("miner", "pick-hammer"), "lifting the pick-hammer high over the shoulder about to smash it down, knees bent, gritted teeth"),
     "demolitions": (cls_refs("demolitions", "dynamite"), "holding a lit dynamite bundle up in one raised hand ready to throw, other fist clenched, wild cheeky grin, barrel on her back"),
     "builder": (cls_refs("builder", "mallet"), "swinging the big wooden mallet up over the shoulder mid-strike, wide stance, confident shout"),

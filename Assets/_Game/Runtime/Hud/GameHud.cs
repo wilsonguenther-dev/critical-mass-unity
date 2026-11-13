@@ -673,6 +673,16 @@ namespace CriticalMass.Runtime.Hud
         static string HillWord(HillState h) =>
             h == HillState.Azure ? "AZURE HOLDS" : h == HillState.Crimson ? "CRIMSON HOLDS" : h == HillState.Contested ? "CONTESTED" : "NEUTRAL";
 
+        static readonly Color[] RageColour = BuildRageColours();
+
+        static Color[] BuildRageColours()
+        {
+            var a = new Color[RagePips];
+            Color hot = CMTokens.ParseHex(CriticalMass.Runtime.View.Art.ArtMapping.GlowBerserk);
+            for (int i = 0; i < RagePips; i++) a[i] = Color.Lerp(CMTokens.Meat.Color, hot, i / (float)(RagePips - 1));
+            return a;
+        }
+
         static readonly string[] HatchWords = BuildHatchWords();
 
         static string[] BuildHatchWords()
@@ -693,7 +703,8 @@ namespace CriticalMass.Runtime.Hud
             for (int i = 0; i < MeterSegments; i++) _segments[i].SetFill(i < lit ? litColour : Empty);
             HudText.Set(_kaijuNumber, NumberCache.Int(Mathf.RoundToInt(s.KaijuMeter01 * 100f)));
             int rage = Mathf.FloorToInt(s.Instability01 * RagePips + 1e-4f);
-            for (int i = 0; i < RagePips; i++) _rage[i].SetFill(i < rage ? CMTokens.Meat.Color : Empty);
+            // hud-art-1: the rage pips heat from meat orange toward the berserk magenta as the egg nears berserk
+            for (int i = 0; i < RagePips; i++) _rage[i].SetFill(i < rage ? RageColour[i] : Empty);
             string word = egg ? HatchWords[Math.Min(600, (int)Math.Ceiling(s.UntilHatch - 1e-6))] :
                 s.Kaiju == KaijuState.Azure ? "AZURE" : s.Kaiju == KaijuState.Crimson ? "CRIMSON" :
                 s.Kaiju == KaijuState.Berserk ? "BERSERK" : "NEUTRAL";
