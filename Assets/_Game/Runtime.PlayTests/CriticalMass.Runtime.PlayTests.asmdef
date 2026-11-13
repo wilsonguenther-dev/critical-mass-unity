@@ -5,7 +5,8 @@
         "CriticalMass.Sim",
         "CriticalMass.Runtime",
         "Unity.InputSystem",
-        "UnityEngine.TestRunner"
+        "UnityEngine.TestRunner",
+        "UnityEngine.UI"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

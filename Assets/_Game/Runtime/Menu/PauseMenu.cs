@@ -365,17 +365,30 @@ namespace CriticalMass.Runtime.Menu
             RectTransform page = MenuUi.Rt(space, "Root Page");
             MenuUi.Stretch(page);
             _rootPage = page.gameObject;
-            MenuUi.Panel(page, "Panel", 640f, 200f, 640f, 640f);
-            string[] labels = { "RESUME", "SETTINGS", "RESTART MATCH", "QUIT TO TITLE", "QUIT GAME" };
-            Action[] acts = { Resume, () => ShowSettings(), RestartMatch, QuitToTitle, QuitGame };
-            var items = new MenuItem[labels.Length];
+            // DG-01: How to play (the guided match, when an item registers its start) and Controls joined the list.
+            bool howTo = Flow.OverlayRegistry.TutorialStart() != null;
+            MenuUi.Panel(page, "Panel", 640f, 150f, 640f, 760f);
+            string[] labels = { "RESUME", "HOW TO PLAY", "CONTROLS", "SETTINGS", "RESTART MATCH", "QUIT TO TITLE", "QUIT GAME" };
+            Action[] acts =
+            {
+                Resume, () => { if (Flow.OverlayRegistry.StartTutorial()) Resume(); }, () => ShowSettings(Tab.Controls),
+                () => ShowSettings(Tab.Audio), RestartMatch, QuitToTitle, QuitGame,
+            };
+            var items = new List<MenuItem>();
             for (int i = 0; i < labels.Length; i++)
             {
-                MenuItem it = MenuUi.Item(page, labels[i], 700f, 250f + i * 112f, 520f, 84f, labels[i], MenuItem.Kind.Button, 34,
+                MenuItem it = MenuUi.Item(page, labels[i], 700f, 190f + i * 100f, 520f, 80f, labels[i], MenuItem.Kind.Button, 32,
                     true, CMTokens.Display);
                 it.Body.Radius = 16f;
                 it.Submitted = acts[i];
-                items[i] = it;
+                if (i == 1 && !howTo)
+                {
+                    // Present but not ready: dimmed, tagged and skipped by navigation.
+                    it.interactable = false;
+                    MenuUi.Label(it.transform, "Soon", CMTokens.Ui, 16, Brass, TextAnchor.MiddleRight, 330f, 0f, 170f, 80f, "COMING SOON", 2f);
+                    continue;
+                }
+                items.Add(it);
             }
             Chain(items);
             _resume = items[0];
