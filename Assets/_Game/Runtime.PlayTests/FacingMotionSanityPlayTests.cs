@@ -54,6 +54,42 @@ namespace CriticalMass.Runtime.PlayTests
             return Mathf.Abs(Mathf.DeltaAngle((float)rel, anim.TravelLeftDeg));
         }
 
+        /// <summary>
+        /// Everything that decides actor i's drawn legs, for a failure message: the frame, the sim yaw against the drawn
+        /// yaw and the model root's actual yaw, each toe's height and direction, the hip line, the animator's locomotion
+        /// state and the clips the graph was given. Read-only.
+        /// </summary>
+        internal static string PoseDiag(SanityWorld w, int i)
+        {
+            Transform model = w.ActorModel(i);
+            ActorAnimator anim = w.Views.AnimatorOf(i);
+            ModelView mv = w.Views.ModelOf(i);
+            if (model == null || anim == null) return "(no model or animator)";
+            Actor a = w.W.Actors[i];
+            Vector3 sim = SanityRig.SimDir(a.Facing);
+            float simYaw = SimSpace.YawDeg(a.Facing);
+            var sb = new System.Text.StringBuilder();
+            sb.Append($"[frame {Time.frameCount} dt {Time.deltaTime:0.000} tick {w.W.Tick} alpha {w.Driver.Alpha:0.000} | sim yaw {simYaw:0} drawn {anim.Yaw:0} root {model.eulerAngles.y:0}");
+            if (mv != null && mv.Spec != null) sb.Append($" art {mv.Spec.ArtYawDeg:0}");
+            sb.Append($" | speed {anim.Speed:0.00} sim {w.Speed(i):0.00} travel {anim.TravelLeftDeg:0} legs {anim.LegYawDeg:0} warp {anim.LegWarpDeg:0} side {anim.StrafeSide} phase {anim.Phase:0.000}");
+            sb.Append($" act {anim.ActionClip ?? "-"} hit {(anim.HasReaction ? anim.Reaction.Clip + " " + anim.Reaction.Layer : "-")} gather {a.GatherProgress:0.00} carry {a.Carry} air {a.AirLen} standUp {a.StandUp:0.00}");
+            foreach (string s in new[] { "l", "r" })
+            {
+                Transform toe = SanityRig.Find(model, "toes." + s), foot = SanityRig.Find(model, "foot." + s);
+                if (toe == null || foot == null) continue;
+                Vector3 d = toe.position - foot.position;
+                d.y = 0f;
+                float ang = d.sqrMagnitude > 1e-8f ? Vector3.SignedAngle(sim, d, Vector3.up) : float.NaN;
+                sb.Append($" | toe.{s} y {toe.position.y:0.000} ankle y {foot.position.y:0.000} dir {ang:0}");
+            }
+            if (SanityRig.TrySideFront(model, out Vector3 hipsFront)) sb.Append($" | hip line {Vector3.SignedAngle(sim, hipsFront, Vector3.up):0}");
+            Transform hips = SanityRig.Find(model, "hips");
+            if (hips != null) sb.Append($" hips local {hips.localRotation.eulerAngles}");
+            if (mv != null) sb.Append(" | pose ").Append(mv.DescribePose());
+            sb.Append(']');
+            return sb.ToString();
+        }
+
         SanityWorld _w;
         readonly List<string> _bad = new List<string>();
         int _measured;
@@ -155,20 +191,21 @@ namespace CriticalMass.Runtime.PlayTests
             float err = SanityRig.AngleDeg(front, ExpectedFront(_w, 0, out float legYaw));
             if (err > ToleranceDeg)
                 _bad.Add($"{who} {doing}: the model's front ({cue}) points {err:0} degrees away from the sim's facing turned by the " +
-                         $"clip's leg yaw {legYaw:0}, so on screen it is {SanityRig.Verdict(err)}");
+                         $"clip's leg yaw {legYaw:0}, so on screen it is {SanityRig.Verdict(err)} {PoseDiag(_w, 0)}");
             float travel = TravelError(_w, 0);
             if (travel > ToleranceDeg)
-                _bad.Add($"{who} {doing}: the legs stride {travel:0} degrees away from where the model moves");
+                _bad.Add($"{who} {doing}: the legs stride {travel:0} degrees away from where the model moves {PoseDiag(_w, 0)}");
         }
 
         /// <summary>20 sim seconds of 16v16 bots: every moving bot's model faces its sim facing (per class).</summary>
         /// <para>Un-Explicit by the animation pass (2026-11-12, DG-76): bots kiting backwards or sideways now play the
         /// reversed run and the strafes (no forward stride while moving back), and attacks and light hits play on the upper
         /// body only, so the planted foot is a real stance foot during combat (the suspected source of the 180 degree reads).</para>
-        // KNOWN DEFECT (integration batch 3 finisher, 2026-11-13): after fix/animation-reds 60ae0d9 the turned-around reads fell from
-        // 20 to 27 % to 8.8 % (Warrior, 33 of 377) and 8.6 % (Farmer, 14 of 162), still over the 5 % budget (worst: leg yaw 0,
-        // 180 degrees, moving backwards). Explicit so the gate names it; back to the animation lane.
-        [UnityTest, Explicit("known defect (batch 3): 8.8 % of moving Warrior and 8.6 % of Farmer samples read turned around, budget 5 %; animation lane")]
+        // Explicit from the batch 3 finisher (8.8 % of Warrior and 8.6 % of Farmer samples "turned around": leg yaw 0, 180
+        // degrees, moving backwards) until fix/facing-frame-timing: those reads were the planted-toe cue picking the
+        // trailing foot (Run reversed, Walk, the strafes reversed: 1 to 6 % of phases by forward kinematics, every one a
+        // 180 degree read). SanityRig now picks the planted foot by its ankle. Budget unchanged (5 %).
+        [UnityTest]
         public IEnumerator EveryMovingBotModelFacesItsSimFacing()
         {
             _w = new SanityWorld();
@@ -200,8 +237,8 @@ namespace CriticalMass.Runtime.PlayTests
                     {
                         worstDeg[key] = score;
                         worst[key] = err > ToleranceDeg
-                            ? $"actor {i} at {w.Match.Time:0.0} s, front ({cue}) {err:0} degrees from the sim facing turned by the leg yaw {legYaw:0}: {SanityRig.Verdict(err)}"
-                            : $"actor {i} at {w.Match.Time:0.0} s, the legs stride {travel:0} degrees away from where it moves";
+                            ? $"actor {i} at {w.Match.Time:0.0} s, front ({cue}) {err:0} degrees from the sim facing turned by the leg yaw {legYaw:0}: {SanityRig.Verdict(err)} {PoseDiag(_w, i)}"
+                            : $"actor {i} at {w.Match.Time:0.0} s, the legs stride {travel:0} degrees away from where it moves {PoseDiag(_w, i)}";
                     }
                 }
             }

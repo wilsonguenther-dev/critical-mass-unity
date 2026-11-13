@@ -479,6 +479,36 @@ namespace CriticalMass.Runtime.View.Art
             return true;
         }
 
+        /// <summary>
+        /// The clips weighted in the last pose with their normalised weights and times, the upper layer's, and the
+        /// evaluation counters (test diagnostics; allocates, never call it per frame in the game).
+        /// </summary>
+        public string DescribePose()
+        {
+            var sb = new System.Text.StringBuilder();
+            float sum = 0f;
+            for (int i = 0; i < _weight.Length; i++) sum += _weight[i];
+            foreach (KeyValuePair<string, int> kv in _index)
+            {
+                float w = _weight[kv.Value];
+                if (w <= 0f) continue;
+                sb.Append(kv.Key).Append(' ').Append((w / Mathf.Max(1e-6f, sum)).ToString("0.00")).Append('@')
+                  .Append(_clips[kv.Value].GetTime().ToString("0.000")).Append(' ');
+            }
+            if (_hasUpper)
+            {
+                sb.Append("| upper ").Append(_upperLayerWeight.ToString("0.00")).Append(':');
+                foreach (KeyValuePair<string, int> kv in _upperIndex)
+                    for (int slot = 0; slot < 2; slot++)
+                    {
+                        int k = kv.Value * 2 + slot;
+                        if (_upperW[k] > 0f) sb.Append(' ').Append(kv.Key).Append(' ').Append(_upperW[k].ToString("0.00"));
+                    }
+            }
+            sb.Append(" | evaluated ").Append(Evaluations).Append(", skipped ").Append(SkippedEvaluations);
+            return sb.ToString();
+        }
+
         public void Dispose()
         {
             if (_graph.IsValid()) _graph.Destroy();
