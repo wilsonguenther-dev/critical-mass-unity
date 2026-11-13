@@ -33,7 +33,7 @@ namespace CriticalMass.Runtime.PlayTests
         /// <summary>Foot slide limits (planted-foot travel per unit of body travel). A frozen or unmatched stride reads ~1; a
         /// fighter in the crowd is also shoved by separation and knocks (first CI run: 0.30 to 0.65 per class), so its limit
         /// only catches the gross case; the Kaiju walks alone and must plant its feet.</summary>
-        public const double KaijuSlideLimit = 0.3, FighterSlideLimit = 0.75;
+        public const double KaijuSlideLimit = 0.3, FighterSlideLimit = 0.75, KaijuMinPlantedTravel = 3.0;
         /// <summary>Ticks an animation may lag its sim event.</summary>
         public const int EventLagTicks = 3, RoarLagTicks = 30;
 
@@ -172,6 +172,9 @@ namespace CriticalMass.Runtime.PlayTests
                 double share = y.Frozen / (double)y.Windows;
                 if (kaiju ? y.Frozen > 0 : share > MaxFrozenShare)
                     bad.Add($"{kv.Key}: {y.Frozen} of {y.Windows} moving windows had frozen bones (least turn {y.WorstTurn:0.0} deg): it glides");
+                    // The Kaiju's verdict needs real planted travel (no vacuous pass on a metre of data).
+                if (kaiju && y.BodyTravel < KaijuMinPlantedTravel)
+                    bad.Add($"Kaiju: only {y.BodyTravel:0.0} u of planted-foot travel measured (need {KaijuMinPlantedTravel}): the slide is unmeasured");
                 double slide = y.BodyTravel > 2 ? y.FootTravel / y.BodyTravel : 0;
                 if (slide > (kaiju ? KaijuSlideLimit : FighterSlideLimit))
                     bad.Add($"{kv.Key}: the planted foot slides {slide:0.00} u per u travelled (limit {(kaiju ? KaijuSlideLimit : FighterSlideLimit)})");
@@ -270,11 +273,14 @@ namespace CriticalMass.Runtime.PlayTests
             for (int f = 0; f < 2; f++)
             {
                 Vector3[] p = f == 0 ? left : right;
+                // Heights relative to the body's root (on the ground under the body), not world y: a 30-tick window that crosses
+                // a slope or a bridge put the window's lowest world height on one end, and the feet on the other end never
+                // read as planted (CI run 43489741589: the Kaiju had 1.2 u of planted travel in 6 moving windows).
                 float min = float.PositiveInfinity;
-                for (int t = 0; t < p.Length; t++) min = Mathf.Min(min, p[t].y);
+                for (int t = 0; t < p.Length; t++) min = Mathf.Min(min, p[t].y - body[t].y);
                 for (int t = 1; t < p.Length; t++)
                 {
-                    if (p[t].y > min + stance || p[t - 1].y > min + stance) continue;
+                    if (p[t].y - body[t].y > min + stance || p[t - 1].y - body[t - 1].y > min + stance) continue;
                     // The planted foot is the LOWER foot: a low swing (the Kaiju lifts its feet about 0.1 u) dips within the
                     // stance band mid-stride and was counted as planted while it travelled at twice the body's speed (CI run
                     // 43487360396 read 1.14 u/u over 2.6 u). Only the foot that bears the weight at both samples counts.
