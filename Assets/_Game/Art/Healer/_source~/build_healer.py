@@ -60,6 +60,7 @@ BV = 0.03
 BV_MIN = 0.02
 LEG_X = 0.19
 TOP_Z = 2.0
+LANTERN_K = Matrix.Diagonal((1.3, 1.3, 1.3, 1.0))   # v1.2: lantern 30 % bigger so it reads at the gameplay camera
 BEVELS = {"boxes": 0, "bevelled": 0, "thin_exempt": 0}
 
 
@@ -169,7 +170,7 @@ def build_legs():
             m=M((lx + 0.105 * s, -0.04, 0.17), (0, 0, 75 * s)))
 
 
-SKIRT = [(0.25, 0.835), (0.29, 0.77), (0.35, 0.655), (0.42, 0.525), (0.47, 0.42), (0.497, 0.36), (0.49, 0.33)]
+SKIRT = [(0.25, 0.835), (0.30, 0.76), (0.37, 0.64), (0.45, 0.50), (0.53, 0.36), (0.60, 0.235), (0.632, 0.17), (0.625, 0.145)]   # v1.4 long bell to the ankles: a solid A outline, no leg gap (the other five all stand on two legs)
 SKIRT_SY = 0.86
 TORSO = [(0.235, 0.78), (0.255, 0.86), (0.285, 0.97), (0.305, 1.06), (0.285, 1.16), (0.205, 1.235), (0.08, 1.27)]
 TORSO_SY = 0.80
@@ -179,7 +180,7 @@ def build_torso():
     SK = ["hips", "upperleg.l", "upperleg.r"]
     add(BODY, B.lathe(list(reversed(SKIRT)), 20), "navy", SK, "skirt", m=M((0, 0, 0), (0, 0, 0), (1, SKIRT_SY, 1)))
     # cream hem band: the bell outline gets a light rim from every angle
-    add(BODY, B.torus(0.492, 0.03, 20, 4), "cream", SK, "skirt_hem", m=M((0, 0, 0.345), (0, 0, 0), (1, SKIRT_SY, 1)))
+    add(BODY, B.torus(0.628, 0.032, 20, 4), "cream", SK, "skirt_hem", m=M((0, 0, 0.16), (0, 0, 0), (1, SKIRT_SY, 1)))
     add(BODY, B.lathe(TORSO, 16), "navy", ["hips", "spine", "chest"], "bodice",
         m=M((0, 0, 0), (0, 0, 0), (1, TORSO_SY, 1)))
     # belt and buckle
@@ -190,7 +191,7 @@ def build_torso():
     add(BODY, box((0.05, 0.03, 0.04), 0.0), "leather_dark", {"hips": 0.5, "spine": 0.5}, "belt_detail", smooth=False,
         m=M((0, -0.243, 0.825)))
     # linen medic apron: skirt panel and chest bib, leather pockets, lime leaf
-    ap_rows = [(interp(SKIRT, z), z) for z in (0.80, 0.70, 0.60, 0.50, 0.44)]
+    ap_rows = [(interp(SKIRT, z), z) for z in (0.80, 0.70, 0.60, 0.50, 0.40, 0.30)]
     add(BODY, shell_sector(ap_rows, -90 - 46, -90 + 46, 8, 0.02, SKIRT_SY, 0.008), "linen", SK, "apron",
         smooth=True)
     bib_rows = [(interp(TORSO, z), z) for z in (0.87, 0.95, 1.03, 1.10)]
@@ -297,23 +298,22 @@ def head_front_y(x, z, proud=0.0):
 
 
 def face_plane(rows=4, cols=8):
+    """Face decal card: ONE open sheet hugging the front of the head, 8 mm proud. v1.1: no back sheet or rim (the only
+    open shell on the model, by design): a closed slab's back sheet doubled the preview outline hull into a dark band,
+    and in Unity the card is an alpha decal with no outline pass. UVs and material: assign_face_decal()."""
     bm = bmesh.new()
     grid = []
     for j in range(rows + 1):
         z = face_decal.Z0 + (face_decal.Z1 - face_decal.Z0) * j / rows
         grid.append([bm.verts.new((x, head_front_y(x, z, 0.008), z)) for x in
                      (face_decal.X0 + (face_decal.X1 - face_decal.X0) * i / cols for i in range(cols + 1))])
-    back = [[bm.verts.new(v.co + Vector((0, 0.004, 0))) for v in row] for row in grid]
     for j in range(rows):
         for i in range(cols):
-            bm.faces.new((grid[j][i], grid[j][i + 1], grid[j + 1][i + 1], grid[j + 1][i]))
-            bm.faces.new((back[j][i], back[j + 1][i], back[j + 1][i + 1], back[j][i + 1]))
-    ring = ([(0, i) for i in range(cols)] + [(j, cols) for j in range(rows)] +
-            [(rows, i) for i in range(cols, 0, -1)] + [(j, 0) for j in range(rows, 0, -1)])
-    for k, (j, i) in enumerate(ring):
-        j2, i2 = ring[(k + 1) % len(ring)]
-        bm.faces.new((grid[j][i], back[j][i], back[j2][i2], grid[j2][i2]))
+            bm.faces.new((grid[j][i], grid[j + 1][i], grid[j + 1][i + 1], grid[j][i + 1]))
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    for f in bm.faces:              # face away from the head centre
+        if f.normal.dot(f.calc_center_median() - Vector(HEAD_C)) < 0:
+            f.normal_flip()
     return bm
 
 
@@ -376,17 +376,19 @@ def lock(pts, widths, thick_k=0.62, seg=8, center=(0.0, 0.02, 1.52)):
 def build_hair():
     H = "head"
     add(BODY, B.sphere((0.322, 0.292, 0.282), 20, 12), "hair", H, "hair", m=M((0, 0.062, 1.56)))
-    # v1.1 fringe: three smooth swept locks from a side part on her left, sweeping to her right, rounded ends
-    add(BODY, lock([(0.11, -0.10, 1.82), (0.02, -0.235, 1.75), (-0.10, -0.282, 1.675), (-0.20, -0.262, 1.635)],
-                   [0.10, 0.095, 0.075, 0.05]), "hair", H, "hair")
-    add(BODY, lock([(0.12, -0.12, 1.81), (0.08, -0.255, 1.72), (0.045, -0.288, 1.66)], [0.075, 0.07, 0.05]), "hair",
-        H, "hair")
-    add(BODY, lock([(0.17, -0.10, 1.79), (0.215, -0.225, 1.70), (0.235, -0.25, 1.645)], [0.075, 0.065, 0.045]),
+    # v1.2 fringe: three smooth swept locks from a side part on her left, sweeping to her right, rounded ends. Lock
+    # centre lines sit on the forehead surface (v1.1 floated 8 cm proud and hid the face from the gameplay camera)
+    def fp(x, z, proud=0.022):
+        return (x, head_front_y(x, z) - proud, z)
+    add(BODY, lock([(0.11, -0.06, 1.83), fp(0.02, 1.745), fp(-0.10, 1.68), fp(-0.20, 1.64, 0.018)],
+                   [0.10, 0.092, 0.072, 0.048]), "hair", H, "hair")
+    add(BODY, lock([(0.12, -0.08, 1.82), fp(0.08, 1.725), fp(0.045, 1.665)], [0.075, 0.068, 0.048]), "hair", H, "hair")
+    add(BODY, lock([(0.17, -0.06, 1.80), fp(0.215, 1.70, 0.02), fp(0.235, 1.645, 0.018)], [0.075, 0.062, 0.044]),
         "hair", H, "hair")
-    # side locks framing the face, in front of the ears, ends curling out a little
+    # side locks framing the face, close to the head, ends curling out a little
     for s in (1, -1):
-        add(BODY, lock([(0.24 * s, -0.04, 1.72), (0.285 * s, -0.135, 1.56), (0.28 * s, -0.17, 1.42),
-                        (0.30 * s, -0.16, 1.32)], [0.075, 0.07, 0.06, 0.045]), "hair", H, "hair")
+        add(BODY, lock([(0.25 * s, -0.02, 1.72), (0.29 * s, -0.10, 1.56), (0.295 * s, -0.115, 1.42),
+                        (0.315 * s, -0.10, 1.32)], [0.072, 0.066, 0.056, 0.042]), "hair", H, "hair")
     # short braid down the back with a team ribbon tie (back read)
     for k, (z, r) in enumerate(((1.47, 0.085), (1.39, 0.078), (1.315, 0.07), (1.245, 0.06))):
         add(BODY, B.sphere((r * 1.05, r * 0.85, r), 10, 6), "hair", H, "hair",
@@ -420,14 +422,14 @@ def held_matrix(poses, slot, origin, z_axis, y_hint):
 
 def can_parts(p):
     """Bloom can (heal), item space: grip on the rear handle at the origin, +Z up, spout toward -Y."""
-    C = Vector((0, -0.30, 0))
+    C = Vector((0, -0.40, 0))   # v1.4: body further forward, clear of the long bell skirt
     prof = [(0.13, -0.17), (0.172, -0.15), (0.182, -0.03), (0.17, 0.05), (0.13, 0.095), (0.115, 0.105)]
     p(B.lathe(prof, 14), "brass", True, M(tuple(C)), True)
     for z in (-0.13, 0.03):
         p(B.torus(0.182, 0.018, 14, 3), "brass_dark", True, M(tuple(C + Vector((0, 0, z)))), False)
     p(B.lathe([(0.14, 0.0), (0.135, 0.02)], 14), "brass_dark", False, M(tuple(C + Vector((0, 0, -0.175)))), False)
     # rear handle (wood grip in a brass loop) and top handle
-    p(B.torus(0.11, 0.026, 12, 4), "brass", True, M((0, -0.115, 0.0), (0, 90, 0)), True)
+    p(B.torus(0.14, 0.026, 12, 4), "brass", True, M((0, -0.17, 0.0), (0, 90, 0)), True)
     p(B.cyl((0, -0.03, -0.06), (0, -0.03, 0.06), 0.034, 0.034, 8), "wood", True, None, True)
     # glowing biomass liquid at the mouth, sprouts growing out of it
     p(B.cyl(tuple(C + Vector((0, 0, 0.09))), tuple(C + Vector((0, 0, 0.115))), 0.105, 0.105, 12), "lime_light", True,
@@ -456,24 +458,34 @@ def build_can(obj, bones, T, gem=True):
                           post=T)
 
 
+LIFT = 0.0         # v1.4: v1.3 raised it on a 0.3 u pole; at 64 px that read as the Farmer's staff (IoU up)
+
+
 def build_lantern(obj, bones, T):
-    """Cleansing lantern, item space: grip at the origin, +Z up, lantern body above the fist."""
-    def p(bm, color, feat="lantern", smooth=False, m=None, grad=True):
-        B.add(obj, bm, color, bones, feat=feat, smooth=smooth, m=m, grad=grad, post=T)
-    p(B.cyl((0, 0, -0.09), (0, 0, 0.13), 0.034, 0.036, 8), "wood", smooth=True)
-    p(B.sphere((0.05, 0.05, 0.045), 8, 5), "brass", smooth=True, m=M((0, 0, -0.10)))
-    p(B.lathe([(0.04, 0.10), (0.14, 0.13), (0.145, 0.17), (0.12, 0.18)], 6), "brass", m=M((0, 0, 0), (0, 0, 30)))
-    p(B.lathe([(0.105, 0.175), (0.12, 0.25), (0.115, 0.36), (0.095, 0.40)], 6), "lamp_glass", feat="lantern_light",
+    """Cleansing lantern, item space: grip at the origin, +Z along the pole, lantern body LIFT above the fist."""
+    U = Matrix.Translation((0, 0, LIFT))
+
+    def q(bm, color, feat="lantern", smooth=False, m=None, grad=True):
+        B.add(obj, bm, color, bones, feat=feat, smooth=smooth, m=(U @ m) if m is not None else U, grad=grad, post=T)
+    B.add(obj, B.cyl((0, 0, -0.09), (0, 0, 0.13 + LIFT), 0.032, 0.036, 8), "wood", bones, feat="lantern", smooth=True,
+          post=T)
+    for z in ((-0.075,) if LIFT < 0.1 else (0.02, 0.20)):
+        B.add(obj, B.cyl((0, 0, z), (0, 0, z + 0.05), 0.042, 0.042, 8), "linen", bones, feat="bandage", smooth=True,
+              post=T)
+    B.add(obj, B.sphere((0.05, 0.05, 0.045), 8, 5), "brass", bones, feat="lantern", smooth=True,
+          m=M((0, 0, -0.10)), post=T)
+    q(B.lathe([(0.04, 0.10), (0.14, 0.13), (0.145, 0.17), (0.12, 0.18)], 6), "brass", m=M((0, 0, 0), (0, 0, 30)))
+    q(B.lathe([(0.105, 0.175), (0.12, 0.25), (0.115, 0.36), (0.095, 0.40)], 6), "lamp_glass", feat="lantern_light",
       m=M((0, 0, 0), (0, 0, 30)), grad=False)
     for k in range(6):
         a = math.radians(30 + 60 * k + 30)
         r0, r1 = 0.125, 0.11
         bm, mm = strap((r0 * math.cos(a), r0 * math.sin(a), 0.175), (r1 * math.cos(a), r1 * math.sin(a), 0.405), 0.03,
                        0.03, (math.cos(a), math.sin(a), 0), bevel=0.008)
-        p(bm, "brass_dark", feat="lantern_detail", m=mm)
-    p(B.lathe([(0.135, 0.395), (0.13, 0.43), (0.085, 0.48), (0.035, 0.51)], 6), "brass", m=M((0, 0, 0), (0, 0, 30)))
-    p(B.torus(0.055, 0.016, 10, 4), "brass_dark", m=M((0, 0, 0.55), (90, 0, 0)))
-    B.add_crystal(obj, bones, "team_glow", M((0, 0, 0.49), (0, 0, 30)), 0.05, 0.075, seg=6, waist=0.85, cap=0.45,
+        q(bm, "brass_dark", feat="lantern_detail", m=mm)
+    q(B.lathe([(0.135, 0.395), (0.13, 0.43), (0.085, 0.48), (0.035, 0.51)], 6), "brass", m=M((0, 0, 0), (0, 0, 30)))
+    q(B.torus(0.055, 0.016, 10, 4), "brass_dark", m=M((0, 0, 0.55), (90, 0, 0)))
+    B.add_crystal(obj, bones, "team_glow", U @ M((0, 0, 0.49), (0, 0, 30)), 0.05, 0.075, seg=6, waist=0.85, cap=0.45,
                   post=T)
 
 
@@ -540,7 +552,7 @@ def main():
     o_r = poses["handslot.r"].translation.copy()
     o_l = poses["handslot.l"].translation.copy()
     build_can(CAN, "handslot.r", held_matrix(poses, "handslot.r", o_r, (0, 0, 1), (0, 1, 0)))
-    build_lantern(LANTERN, "handslot.l", held_matrix(poses, "handslot.l", o_l, (0, 0, 1), (0, 1, 0)))
+    build_lantern(LANTERN, "handslot.l", held_matrix(poses, "handslot.l", o_l, (math.sin(math.radians(22)), 0, math.cos(math.radians(22))), (0, 1, 0)) @ LANTERN_K)
     coll = bpy.data.collections.new("Healer")
     scene.collection.children.link(coll)
     for c in list(arm.users_collection):
@@ -555,7 +567,7 @@ def main():
     B = mkit.MinerBuilder(None)
     B.arm = None
     build_can(PROP_CAN, None, M((-0.45, 0.0, 0.18)))
-    build_lantern(PROP_LANTERN, None, M((0.45, 0.0, 0.15)))
+    build_lantern(PROP_LANTERN, None, M((0.45, 0.0, 0.19)) @ LANTERN_K)
     pcoll = bpy.data.collections.new("HealerProps")
     scene.collection.children.link(pcoll)
     pobjs = B.finalize_static(pcoll, mat)
