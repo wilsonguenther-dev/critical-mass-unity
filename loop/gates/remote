@@ -1,0 +1,113 @@
+#!/usr/bin/env bash
+# Gate "remote" (ci/offload, 2026-11-13): run a gate on GitHub's runners instead of the Mac's one Unity slot.
+# One command: push the branch, start the workflow, wait (polling every 30 s, no agent tokens), fetch the results.
+#   loop/gates/remote sim            [--suite fast|slow|all]     no-Unity Sim compile + tests (sim-tests.yml, ~1-3 min)
+#   loop/gates/remote editmode|playmode|tests [--category '!Slow'|Slow]                      (unity-ci.yml, needs the licence)
+#   loop/gates/remote build-windows|build-mac|builds|all                                      (unity-ci.yml, needs the licence)
+#   common: [--ref BRANCH] (default: current branch) [--no-push] [--max-wait MIN] (default 150)
+# Prints ONE JSON line (also appended to loop/logs/gates.jsonl); results land in loop/logs/remote/<run id>/.
+# Exit: 0 pass, 1 fail, 78 skipped (no Unity licence secret yet, or the workflow is not on main yet), 75 could not start
+# or timed out waiting (never a test result), 64 usage. Never pushes main.
+set -uo pipefail
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; ROOT="$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || (cd "$HERE/../.." && pwd))"
+LOGS="$HERE/../logs"; mkdir -p "$LOGS/remote"
+what="${1:-}"; shift || true
+REF=''; PUSH=1; MAXW=150; SUITE=fast; CATEGORY='!Slow'
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --ref) REF="${2:?}"; shift 2 ;;
+    --no-push) PUSH=0; shift ;;
+    --max-wait) MAXW="${2:?}"; shift 2 ;;
+    --suite) SUITE="${2:?}"; shift 2 ;;
+    --category) CATEGORY="${2:?}"; shift 2 ;;
+    *) echo "remote: unknown option $1" >&2; exit 64 ;;
+  esac
+done
+case "$what" in
+  sim) WF=sim-tests.yml; INPUTS=(-f "suite=$SUITE") ;;
+  editmode|playmode|tests|build-windows|build-mac|builds|all) WF=unity-ci.yml; INPUTS=(-f "jobs=$what" -f "category=$CATEGORY") ;;
+  *) sed -n '2,12p' "$0" >&2; exit 64 ;;
+esac
+REF="${REF:-$(git -C "$ROOT" rev-parse --abbrev-ref HEAD)}"
+SHA="$(git -C "$ROOT" rev-parse HEAD)"
+out() {  # status exit [extra json fields]
+  local line
+  line=$(printf '{"gate":"remote","ts":"%s","what":"%s","workflow":"%s","ref":"%s","sha":"%s","status":"%s","exit":%d%s}' \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$what" "$WF" "$REF" "${SHA:0:12}" "$1" "$2" "${3:-}")
+  echo "$line"; echo "$line" >> "$LOGS/gates.jsonl"; exit "$2"
+}
+gh auth status >/dev/null 2>&1 || out could-not-start 75 ',"reason":"gh not authenticated or GitHub unreachable"'
+if [[ $PUSH -eq 1 ]]; then
+  [[ "$REF" == main ]] && out could-not-start 64 ',"reason":"refusing to push main; use a branch"'
+  git -C "$ROOT" push -q origin "HEAD:refs/heads/$REF" 2>/dev/null || out could-not-start 75 ',"reason":"git push failed"'
+fi
+t0=$(date -u +%Y-%m-%dT%H:%M:%SZ); s0=$(date +%s)
+RUN=''
+if err=$(gh workflow run "$WF" --ref "$REF" "${INPUTS[@]}" 2>&1); then
+  for _ in $(seq 1 24); do
+    sleep 5
+    RUN=$(gh run list --workflow "$WF" --branch "$REF" --event workflow_dispatch --limit 10 --json databaseId,createdAt \
+          -q "[.[] | select(.createdAt >= \"$t0\")] | sort_by(.createdAt) | .[0].databaseId // empty" 2>/dev/null)
+    [[ -n "$RUN" ]] && break
+  done
+else
+  # Before the workflow is on main GitHub refuses a manual start; fall back to the run a push or PR already started
+  # for this exact commit (sim-tests runs on every push to ci/** and on PRs).
+  for _ in $(seq 1 12); do
+    RUN=$(gh run list --workflow "$WF" --commit "$SHA" --limit 5 --json databaseId,createdAt \
+          -q 'sort_by(.createdAt) | reverse | .[0].databaseId // empty' 2>/dev/null)
+    [[ -n "$RUN" ]] && break
+    sleep 10
+  done
+  [[ -n "$RUN" ]] || out skipped 78 ",\"reason\":\"$WF cannot be started by hand until it is on main (merge the ci/offload PR), and no push/PR run exists for ${SHA:0:12}\""
+  echo "remote: manual start refused ($(head -1 <<<"$err" | cut -c1-120)); using the run for this commit" >&2
+fi
+[[ -n "$RUN" ]] || out could-not-start 75 ',"reason":"run did not appear within 120 s"'
+URL="https://github.com/$(gh repo view --json nameWithOwner -q .nameWithOwner)/actions/runs/$RUN"
+echo "remote: $WF on $REF -> $URL (waiting, polls every 30 s, max ${MAXW} min)" >&2
+deadline=$(( s0 + MAXW * 60 ))
+while :; do
+  st=$(gh run view "$RUN" --json status -q .status 2>/dev/null || echo unknown)
+  [[ "$st" == completed ]] && break
+  (( $(date +%s) > deadline )) && out timed-out 75 ",\"run\":$RUN,\"url\":\"$URL\",\"reason\":\"still $st after ${MAXW} min (the run keeps going on GitHub)\""
+  sleep 30
+done
+D="$LOGS/remote/$RUN"; mkdir -p "$D"
+gh run view "$RUN" --json conclusion,jobs > "$D/run.json" 2>/dev/null
+gh run download "$RUN" -D "$D" >/dev/null 2>&1 || true
+gh run view "$RUN" --log-failed > "$D/failed.log" 2>/dev/null || true
+summary=$(python3 -I - "$D" "$what" <<'PY'
+import json, sys, glob, os, xml.etree.ElementTree as ET
+d, what = sys.argv[1], sys.argv[2]
+run = json.load(open(os.path.join(d, 'run.json')))
+jobs = {j['name']: j['conclusion'] for j in run.get('jobs', [])}
+tot = {'total': 0, 'passed': 0, 'failed': 0, 'skipped': 0}; fails = []
+for x in glob.glob(os.path.join(d, '**', '*.xml'), recursive=True):
+    try:
+        r = ET.parse(x).getroot()
+    except ET.ParseError:
+        continue
+    if r.tag != 'test-run':
+        continue
+    for k in tot:
+        tot[k] += int(r.get(k, 0) or 0)
+    fails += [tc.get('fullname') for tc in r.iter('test-case') if tc.get('result') == 'Failed']
+gate_jobs = {k: v for k, v in jobs.items() if not k.startswith('plan')}
+ran = [v for v in gate_jobs.values() if v not in ('skipped', None)]
+concl = run.get('conclusion')
+if concl == 'success' and not ran:
+    status = 'skipped'
+elif concl == 'success':
+    status = 'pass'
+else:
+    status = 'fail'
+print(json.dumps({'status': status, 'conclusion': concl, 'jobs': jobs, 'tests': tot, 'failed_tests': fails[:30]}))
+PY
+)
+status=$(python3 -I -c 'import json,sys; print(json.loads(sys.argv[1])["status"])' "$summary")
+extra=",\"run\":$RUN,\"url\":\"$URL\",\"minutes\":$(( ($(date +%s) - s0 + 59) / 60 )),\"results\":\"$D\",\"detail\":$summary"
+case "$status" in
+  pass) out pass 0 "$extra" ;;
+  skipped) out skipped 78 "$extra,\"reason\":\"every gate job was skipped (no Unity licence secret yet, or not requested)\"" ;;
+  *) out fail 1 "$extra" ;;
+esac
