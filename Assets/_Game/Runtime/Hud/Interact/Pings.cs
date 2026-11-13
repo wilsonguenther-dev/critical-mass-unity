@@ -82,6 +82,18 @@ namespace CriticalMass.Runtime.Hud.Interact
             if (!CanPlace(now)) return false;
             _recent[_recentNext] = now;
             _recentNext = (_recentNext + 1) % RateCount;
+            slot = Put(kind, x, z, now, owner, place);
+            return true;
+        }
+
+        /// <summary>
+        /// Mechanics depth (U-067): mirrors a ping the SIM accepted (its Ping event), so no view-side rate limit applies; the
+        /// sim enforces it in ticks. Returns the slot.
+        /// </summary>
+        public int Mirror(PingKind kind, double x, double z, double now, int owner, int place) => Put(kind, x, z, now, owner, place);
+
+        int Put(PingKind kind, double x, double z, double now, int owner, int place)
+        {
             // a free slot, else the oldest
             int best = 0;
             double oldest = double.MaxValue;
@@ -94,8 +106,7 @@ namespace CriticalMass.Runtime.Hud.Interact
             {
                 Active = true, Kind = kind, X = x, Z = z, Time = now, Owner = owner, Place = place, Serial = ++_serial,
             };
-            slot = best;
-            return true;
+            return best;
         }
 
         /// <summary>Retires pings older than Life; a clock that went backwards (a new match) clears the book.</summary>
@@ -162,6 +173,11 @@ namespace CriticalMass.Runtime.Hud.Interact
         {
             if (w == null) return false;
             Track(w);
+            // Mechanics depth (U-067): with the rules lane compiled in and on, the wheel WRITES the sim input
+            // (InputFrame.PingKind = call + 1, PingX, PingZ for one tick); the book mirrors the sim's Ping event, the sim's
+            // PingRefused puts the wait in the ping feed, and bots answer. Only the local human's pings go through the sim.
+            if (owner == 0 && View.Mechanics.DepthRead.PingsOn(w))
+                return View.Mechanics.DepthInputLatch.QueuePing((int)kind, x, z);
             double now = w.Match.Time;
             int place = PingWords.NearestPlace(w, x, z);
             if (!Book.TryPlace(kind, x, z, now, owner, place, out int slot))
@@ -174,6 +190,26 @@ namespace CriticalMass.Runtime.Hud.Interact
             Placed?.Invoke(Book.Get(slot), slot);
             return true;
         }
+
+        /// <summary>
+        /// Mechanics depth: a ping the sim accepted (Ping event of the local team: a player or a bot) into the book, with the
+        /// call's sound and the Placed event (the feed, the markers). lifeSeconds is informational (the book's Life rules).
+        /// </summary>
+        public static void Mirror(World w, PingKind kind, double x, double z, int owner, double lifeSeconds)
+        {
+            if (w == null) return;
+            Track(w);
+            int slot = Book.Mirror(kind, x, z, w.Match.Time, owner, PingWords.NearestPlace(w, x, z));
+            ItemHooks.Sound(PingWords.SoundCue[(int)kind]);
+            Placed?.Invoke(Book.Get(slot), slot);
+        }
+
+        /// <summary>Mechanics depth: the sim refused the local player's ping (PingRefused): the feed and the wheel say so.</summary>
+        public static void NotifyRefused(double waitSeconds)
+        {
+            Refused?.Invoke(waitSeconds);
+            ItemHooks.Sound("ping-refused");
+        }
     }
 
     /// <summary>Words, colours and shapes of the pings, and the landmark names used in the feed line.</summary>
@@ -185,6 +221,12 @@ namespace CriticalMass.Runtime.Hud.Interact
         /// <summary>Shape per kind, so the call reads without colour: a target arrow, a forward arrow, a shield, a diamond.</summary>
         public static readonly ShapeKind[] Shape = { ShapeKind.TriangleDown, ShapeKind.TriangleRight, ShapeKind.Shield, ShapeKind.Diamond };
         public static readonly string[] Glyph = { "!", ">", "", "?" };
+
+        /// <summary>
+        /// Mechanics depth: the feed line of a ping by someone other than the local player ("Brook: Help!"); null = the
+        /// built-in "You: ..." line. Set by the depth HUD.
+        /// </summary>
+        public static Func<Ping, string> LineOverride;
 
         /// <summary>Colours outside both team hues (art direction: team colours mean teams only).</summary>
         public static Color Colour(PingKind k) =>

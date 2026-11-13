@@ -719,7 +719,7 @@ namespace CriticalMass.Runtime.Menus
             int c = (int)cls, t = (int)team;
             _portrait.Set(UiIcons.Portrait[c, t], TierFor(_portraitPx, 106f, canvasScale));
             HudText.Set(_name, _words.Name.ToUpperInvariant());
-            HudText.Set(_role, _words.Role);
+            HudText.Set(_role, View.Mechanics.DepthRead.Compiled ? View.Mechanics.DepthWords.WithRoleLine(_words.Role, _words.Id) : _words.Role); // U-063 role line
             for (int i = 0; i < 3; i++)
             {
                 bool on = i < _words.Difficulty;

@@ -41,12 +41,15 @@ namespace CriticalMass.Runtime.Hud
         int _tier = 2;
         int _rowsShown = -1;
         readonly Table[] _tables = new Table[2];
+        World _world;
 
         sealed class Row
         {
             public RectTransform Rt;
             public VectorShape Plate;
             public HudIcon Badge;
+            /// <summary>Mechanics depth (U-065): the team's level of this row's class, as three pips under the badge.</summary>
+            public readonly VectorShape[] Pips = new VectorShape[3];
             public readonly Text[] Cells = new Text[Columns];
             public readonly TextOutline[] Outlines = new TextOutline[Columns];
             public int Index;
@@ -109,6 +112,13 @@ namespace CriticalMass.Runtime.Hud
                 row.Plate.OutlinePx = 0f;
                 row.Plate.RimPx = 0f;
                 row.Badge = HudIcon.Make(row.Rt, "Badge", 12f, 2f, 32f, 32f);
+                for (int p = 0; p < 3; p++)
+                {
+                    row.Pips[p] = MenuUi.Shape(row.Rt, "Level Pip " + p, ShapeKind.Diamond, 13f + p * 11f, RowH - 9f, 8f, 9f, CMTokens.MeterEmpty.Color, 2f);
+                    row.Pips[p].OutlinePx = 1.5f;
+                    row.Pips[p].RimPx = 0f;
+                    row.Pips[p].gameObject.SetActive(false);
+                }
                 for (int c = 0; c < Columns; c++)
                     row.Cells[c] = MenuUi.Label(row.Rt, "Cell " + c, c == 0 ? CMTokens.Ui : CMTokens.Mono, c == 0 ? 21 : 22,
                         CMTokens.WarmCream.Color, c == 0 ? TextAnchor.MiddleLeft : TextAnchor.MiddleCenter, ColX[c], 0f, ColW[c], RowH, "", 2f);
@@ -151,6 +161,8 @@ namespace CriticalMass.Runtime.Hud
         {
             if (Canvas == null) Build();
             if (w == null || tally == null) return;
+            _world = w;
+            View.Mechanics.DepthNames.Bind(w);
             int n = Mathf.Min(w.ActorCount, CombatTally.MaxActors);
             _tables[0].Count = 0;
             _tables[1].Count = 0;
@@ -225,7 +237,20 @@ namespace CriticalMass.Runtime.Hud
                 }
             }
             row.Badge.Set(UiIcons.ClassBadge[cls, (int)s.Team], _tier);
-            HudText.Set(row.Cells[0], own ? KillWords.You : KillWords.ClassUpper[cls]);
+            // Mechanics depth (U-067): named bots with their play style ("THORN  BRAWLER"); the class word without names.
+            HudText.Set(row.Cells[0], View.Mechanics.DepthNames.RowLabel(s.Id, own, KillWords.You, KillWords.ClassUpper[cls]));
+            World w = _world;
+            bool levels = w != null && View.Mechanics.DepthRead.StationsOn(w);
+            int lvl = levels ? View.Mechanics.DepthRead.Level(w, s.Team, s.Cls) : 0, max = levels ? View.Mechanics.DepthRead.MaxLevel(w) : 0;
+            for (int p = 0; p < 3; p++)
+            {
+                bool on = levels && p < max;
+                VectorShape pip = row.Pips[p];
+                if (pip.gameObject.activeSelf != on) pip.gameObject.SetActive(on);
+                if (!on) continue;
+                Color pc = p < lvl ? CMTokens.ToolBrass.Color : CMTokens.MeterEmpty.Color;
+                if (pip.FillColor != pc) pip.SetFill(pc);
+            }
             HudText.Set(row.Cells[1], NumberCache.Int(s.Knockouts));
             HudText.Set(row.Cells[2], NumberCache.Int(s.Deaths));
             HudText.Set(row.Cells[3], NumberCache.Int((int)System.Math.Floor(s.HillSeconds)));
