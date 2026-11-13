@@ -52,7 +52,7 @@ namespace CriticalMass.Runtime.Tests
         public void DefaultStepListCoversTheSpecInOrder()
         {
             // 2026-11-12: the first match teaches move, attack, ability, jump, map, then the objective (hill, egg).
-            string[] want = { "move", "marker", "knockout", "ability", "jump", "dig", "place", "map", "hill", "gather", "deliver" };
+            string[] want = { "move", "marker", "knockout", "ability", "jump", "dig", "place", "terrain", "topple", "map", "hill", "gather", "deliver", "corruption" };
             Assert.AreEqual(want.Length, TrialSteps.Default.Length);
             for (int i = 0; i < want.Length; i++) Assert.AreEqual(want[i], TrialSteps.Default[i].Id);
         }

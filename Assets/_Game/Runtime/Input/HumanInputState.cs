@@ -347,6 +347,21 @@ namespace CriticalMass.Runtime.Input
         /// basis for keys with KeysFollowMap), else pointer walking while its button is held; then, with MovementAssist
         /// and a bound world, lane assist for a single key and corner sliding (MoveAssist).
         /// </summary>
+        /// <summary>True within a bridge's deck band plus one unit, from one unit before its start to one after its end.</summary>
+        static bool NearBridge(double x, double z)
+        {
+            var all = CriticalMass.Sim.Maps.BridgeSpans.All;
+            double reach = CriticalMass.Sim.Maps.SkybreakBasinMap.BridgeHalfWidth + 1.0;
+            for (int i = 0; i < all.Count; i++)
+            {
+                CriticalMass.Sim.Maps.BridgeSpan sp = all[i];
+                double a = CriticalMass.Sim.Maps.BridgeSpans.Along(sp, x, z);
+                if (a < -1.5 || a > sp.Len + 1.5) continue;
+                if (Math.Abs(CriticalMass.Sim.Maps.BridgeSpans.Lateral(sp, x, z)) <= reach) return true;
+            }
+            return false;
+        }
+
         void WorldMove(out double mx, out double mz)
         {
             mx = 0;
@@ -381,7 +396,10 @@ namespace CriticalMass.Runtime.Input
                 if (!MoveAssist.PointerMove(w.X[0], w.Z[0], _walkX, _walkZ, out mx, out mz)) return;
             }
             else return;
-            if (human && MovementAssist && MoveAssist.CornerSlide(w, 0, mx, mz, out double sx, out double sz))
+            // Creator acceptance (bridge travel): on and around a bridge the sim's own rail rule (Collide.RailFirst, DG-02)
+            // carries a body walking up to 60 degrees off the axis; the input layer's corner slide must not turn the move
+            // away from the span there first (the creator's "fighting the keys" on diagonal bridges).
+            if (human && MovementAssist && !NearBridge(w.X[0], w.Z[0]) && MoveAssist.CornerSlide(w, 0, mx, mz, out double sx, out double sz))
             {
                 mx = sx;
                 mz = sz;

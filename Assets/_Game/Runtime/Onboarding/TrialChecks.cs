@@ -29,9 +29,17 @@ namespace CriticalMass.Runtime.Onboarding
         public bool DiedThisStep;
         /// <summary>JumpGap: how many times the gap was re-picked after a knock-out (tests, captures).</summary>
         public int GapRepicks;
+        /// <summary>Topple: pillars already down at the step's start. Timer: the step's start tick.</summary>
+        public int Toppled;
+        public int StartTick;
+        /// <summary>CrossBridge: where actor 0 first stood on a bridge cell this step (SawOverGap = it did).</summary>
+        public double BridgeX, BridgeZ;
 
         public void Clear()
         {
+            Toppled = 0;
+            StartTick = 0;
+            BridgeX = BridgeZ = 0;
             DiedThisStep = false;
             GapRepicks = 0;
             StartX = StartZ = 0;
@@ -75,7 +83,11 @@ namespace CriticalMass.Runtime.Onboarding
             p.HillSeconds = a.HillSeconds;
             p.LastAbilityCd = a.AbilityCd;
             if (snapshot != null && snapshot.Length == w.Map.Cells.Length) Buffer.BlockCopy(w.Map.Cells, 0, snapshot, 0, snapshot.Length);
-            if (s.Target == TrialTarget.Marker)
+            p.Toppled = FallenCount(w);
+            p.StartTick = w.Tick;
+            if (s.Target == TrialTarget.Bridge)
+                p.HasFixed = NearestCellOfType(w.Map, w.X[Player], w.Z[Player], Cell.Bridge, out p.FixedX, out p.FixedZ);
+            else if (s.Target == TrialTarget.Marker)
                 p.HasFixed = MarkerPoint(w, a.Team, s.MarkerFraction, out p.FixedX, out p.FixedZ);
             else if (s.Target == TrialTarget.Gap)
                 p.HasFixed = NearestGap(w, w.X[Player], w.Z[Player], JumpReachCells(w), a.Team, out p.FixedX, out p.FixedZ, out p.FromX, out p.FromZ);
@@ -145,9 +157,100 @@ namespace CriticalMass.Runtime.Onboarding
                     return a.Alive && ChangedNear(w, snapshot, s.Param, true);
                 case TrialGoal.Place:
                     return a.Alive && ChangedNear(w, snapshot, s.Param, false);
+                case TrialGoal.Topple:
+                    return FallenCount(w) > p.Toppled;
+                case TrialGoal.Timer:
+                    return w.Tick - p.StartTick >= (int)Math.Ceiling(s.Param * w.Config.SimHz);
+                case TrialGoal.ReachTarget:
+                    return a.Alive && Target(w, s, p, out double rx, out double rz) &&
+                           Dist2(w.X[Player], w.Z[Player], rx, rz) <= s.Param * s.Param;
+                case TrialGoal.CrossBridge:
+                {
+                    if (!a.Alive)
+                    {
+                        p.SawOverGap = false;
+                        return false;
+                    }
+                    int here = MapGrid.CellAt(w.Map, w.X[Player], w.Z[Player]);
+                    if (here == Cell.Bridge)
+                    {
+                        if (!p.SawOverGap)
+                        {
+                            p.SawOverGap = true;
+                            p.BridgeX = w.X[Player];
+                            p.BridgeZ = w.Z[Player];
+                        }
+                        return false;
+                    }
+                    return p.SawOverGap && MapGrid.IsWalkableType(here) &&
+                           Dist2(w.X[Player], w.Z[Player], p.BridgeX, p.BridgeZ) >= s.Param * s.Param;
+                }
                 default:
                     return false;
             }
+        }
+
+        /// <summary>Knock-down pillars lying down right now (World.Topple.Fallen != Standing).</summary>
+        public static int FallenCount(World w)
+        {
+            if (w.Topple == null || w.Topple.Fallen == null) return 0;
+            int n = 0;
+            for (int k = 0; k < w.Topple.Fallen.Length; k++) if (w.Topple.Fallen[k] != 0) n++;
+            return n;
+        }
+
+        /// <summary>The standing pillar nearest the team's pad (-1 = none standing; then the nearest pillar of any state).</summary>
+        public static int PillarFor(World w, TeamId team)
+        {
+            DecorationDef[] ds = w.Map.Decorations;
+            if (ds == null || ds.Length == 0) return -1;
+            PadDef pad = w.Map.Pads[(int)team];
+            int best = -1, any = -1;
+            double bd = double.PositiveInfinity, ad = double.PositiveInfinity;
+            for (int k = 0; k < ds.Length; k++)
+            {
+                double d = Dist2(pad.X, pad.Z, ds[k].Cx + 0.5, ds[k].Cz + 0.5);
+                if (d < ad) { ad = d; any = k; }
+                bool standing = w.Topple == null || w.Topple.Fallen == null || k >= w.Topple.Fallen.Length || w.Topple.Fallen[k] == 0;
+                if (standing && d < bd) { bd = d; best = k; }
+            }
+            return best >= 0 ? best : any;
+        }
+
+        /// <summary>The centre of the cell of type t nearest (x, z); false when the map has none.</summary>
+        public static bool NearestCellOfType(MapDef map, double x, double z, byte t, out double cx, out double cz)
+        {
+            cx = cz = 0;
+            double best = double.PositiveInfinity;
+            for (int iz = 0; iz < map.Height; iz++)
+            {
+                for (int ix = 0; ix < map.Width; ix++)
+                {
+                    if (map.Cells[iz * map.Width + ix] != t) continue;
+                    double d = Dist2(x, z, ix + 0.5, iz + 0.5);
+                    if (d >= best) continue;
+                    best = d;
+                    cx = ix + 0.5;
+                    cz = iz + 0.5;
+                }
+            }
+            return best < double.PositiveInfinity;
+        }
+
+        /// <summary>The nearest corruption node with charges left, else the nearest corruption node, else -1.</summary>
+        public static int NearestCorruptionNode(World w, double x, double z)
+        {
+            int best = -1, bestEmpty = -1;
+            double bd = double.PositiveInfinity, be = double.PositiveInfinity;
+            for (int i = 0; i < w.Nodes.Length; i++)
+            {
+                ResourceNode n = w.Nodes[i];
+                if (n.Kind != NodeKind.Corruption) continue;
+                double d = Dist2(x, z, n.X, n.Z);
+                if (n.Charges > 0) { if (d < bd) { bd = d; best = i; } }
+                else if (d < be) { be = d; bestEmpty = i; }
+            }
+            return best >= 0 ? best : bestEmpty;
         }
 
         /// <summary>
@@ -159,6 +262,14 @@ namespace CriticalMass.Runtime.Onboarding
             Actor a = w.Actors[Player];
             if (s.OnlyClass.HasValue && a.Cls != s.OnlyClass.Value)
                 return "it is for the " + s.OnlyClass.Value + " and the player is a " + a.Cls;
+            if (s.NotClass.HasValue && a.Cls == s.NotClass.Value)
+                return "it is not for the " + s.NotClass.Value + " (the player plays one)";
+            if (s.Target == TrialTarget.Pillar && PillarFor(w, a.Team) < 0) return "this map has no knock-down pillar";
+            if (s.Goal == TrialGoal.Topple && w.Map.Decorations != null && FallenCount(w) >= w.Map.Decorations.Length)
+                return "every pillar is already down";
+            if (s.Target == TrialTarget.Bridge && !p.HasFixed) return "this map has no bridge";
+            if (s.Target == TrialTarget.CorruptionNode && NearestCorruptionNode(w, w.X[Player], w.Z[Player]) < 0)
+                return "no corruption node exists on this map";
             if (s.Goal == TrialGoal.DeliverBiomass && (w.Match.Hatched || w.Kaiju.State != KaijuState.Egg))
                 return "the egg has hatched, so it takes no more deliveries";
             if ((s.Target == TrialTarget.Marker || s.Target == TrialTarget.Gap) && !p.HasFixed)
@@ -207,6 +318,26 @@ namespace CriticalMass.Runtime.Onboarding
                     x = w.X[Player];
                     z = w.Z[Player];
                     return w.Actors[Player].Alive;
+                case TrialTarget.Bridge:
+                    x = p.FixedX;
+                    z = p.FixedZ;
+                    return p.HasFixed;
+                case TrialTarget.Pillar:
+                {
+                    int k = PillarFor(w, w.Actors[Player].Team);
+                    if (k < 0) return false;
+                    x = w.Map.Decorations[k].Cx + 0.5;
+                    z = w.Map.Decorations[k].Cz + 0.5;
+                    return true;
+                }
+                case TrialTarget.CorruptionNode:
+                {
+                    int ni = NearestCorruptionNode(w, w.X[Player], w.Z[Player]);
+                    if (ni < 0) return false;
+                    x = w.Nodes[ni].X;
+                    z = w.Nodes[ni].Z;
+                    return true;
+                }
                 default:
                     return false;
             }

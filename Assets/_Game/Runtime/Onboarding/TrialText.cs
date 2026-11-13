@@ -90,6 +90,7 @@ namespace CriticalMass.Runtime.Onboarding
                 case "Jump": return Action("Jump", device, pad ? "A" : "SPACE");
                 case "DigPlace": return Action("DigPlace", device, pad ? "Y" : "F");
                 case "Map": return Action("Map", device, pad ? "D-PAD UP" : "M");
+                case "Switch": return pad ? "LB / RB" : "WHEEL";   // creator acceptance: the dig / place mode switch
                 default: return null;
             }
         }
