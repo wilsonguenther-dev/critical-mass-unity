@@ -293,6 +293,40 @@ namespace CriticalMass.Runtime.Audio.Sound
             R(SimEventType.Purify, Pick.Fixed, "purify"),
             R(SimEventType.Heal, Pick.Fixed, "heal_tick"),
             Silent(SimEventType.MatchEnd, "the music director plays the victory, defeat or draw sting"),
+            // ---- integration batch 4: the physics events (#61, DG-69/70/86/99/100)
+            R(SimEventType.AttackContact, Pick.Fixed, "swing_light"),
+            R(SimEventType.AttackCancel, Pick.Fixed, "block_shield"),
+            Silent(SimEventType.HitStun, "the Hit that caused it plays the impact and the heavy-hit grunt"),
+            Silent(SimEventType.Knock, "the Hit or blast that pushed the body is the sound; launched landings come from the force bus"),
+            Silent(SimEventType.BodyShove, "the Kaiju's steps and the low-frequency layer come from the force bus"),
+            R(SimEventType.PillarCrush, Pick.Fixed, "hit_stone"),
+            Silent(SimEventType.MeatPop, "the meat pickup edge plays when someone takes the orb"),
+            // ---- integration batch 4: the mechanics-depth events (#61, U-063..U-068)
+            Silent(SimEventType.DeliverRefused, "the depth HUD (PR #59) plays its own depth-* cue through UiSound for the local player"),
+            Silent(SimEventType.Handoff, "the depth HUD (PR #59) plays its own depth-* cue through UiSound for the local player"),
+            R(SimEventType.SourceGather, Pick.Fixed, "gather_done"),
+            Silent(SimEventType.BankDeposit, "the depth HUD (PR #59) plays its own depth-* cue through UiSound for the local player"),
+            Silent(SimEventType.BankWithdraw, "the depth HUD (PR #59) plays its own depth-* cue through UiSound for the local player"),
+            Silent(SimEventType.ClassSwitch, "the depth HUD (PR #59) plays its own depth-* cue through UiSound for the local player"),
+            Silent(SimEventType.Upgrade, "the depth HUD (PR #59) plays its own depth-* cue through UiSound for the local player"),
+            Silent(SimEventType.PickupSpawned, "the depth HUD (PR #59) plays its own depth-* cue through UiSound for the local player"),
+            R(SimEventType.PickupTaken, Pick.Fixed, "pickup_relic"),
+            Silent(SimEventType.PickupExpired, "a pickup fading untaken is visual only"),
+            Silent(SimEventType.PowerUpEnded, "the depth HUD (PR #59) plays its own depth-* cue through UiSound for the local player"),
+            R(SimEventType.WardAbsorb, Pick.Fixed, "block_heavy"),
+            Silent(SimEventType.Ping, "pings play through UiSound.Play(ping-*) from the ping wheel and PingBook"),
+            Silent(SimEventType.PingRefused, "the ping wheel plays ping-refused"),
+            Silent(SimEventType.PingAnswered, "the depth HUD (PR #59) plays its own depth-* cue through UiSound for the local player"),
+            Silent(SimEventType.SupplyDropIncoming, "the depth HUD (PR #59) plays its own depth-* cue through UiSound for the local player"),
+            R(SimEventType.SupplyDropLanded, Pick.Fixed, "body_land"),
+            Silent(SimEventType.SupplyDropContest, "the contest ring is visual; the claim plays"),
+            Silent(SimEventType.SupplyDropClaimed, "the depth HUD (PR #59) plays its own depth-* cue through UiSound for the local player"),
+            Silent(SimEventType.SupplyDropExpired, "a drop fading untaken is visual only"),
+            Silent(SimEventType.EggExposed, "the depth HUD (PR #59) plays its own depth-* cue through UiSound for the local player"),
+            Silent(SimEventType.EggExposedEnded, "the depth HUD (PR #59) plays its own depth-* cue through UiSound for the local player"),
+            Silent(SimEventType.BridgeWarning, "the depth HUD (PR #59) plays its own depth-* cue through UiSound for the local player"),
+            R(SimEventType.BridgeCollapsed, Pick.Fixed, "piece_break"),
+            Silent(SimEventType.BridgeRepaired, "the depth HUD (PR #59) plays its own depth-* cue through UiSound for the local player"),
         };
 
         /// <summary>Every world-force source (draft PR #43): audible cue or silence, and the low-frequency layer.</summary>
@@ -365,6 +399,16 @@ namespace CriticalMass.Runtime.Audio.Sound
             ("ping-refused", "refused"), ("map-open", "map_open"), ("map-close", "map_close"), ("ui-click", "ui_click"), ("ui_click", "ui_click"),
             ("ability_denied", "ability_denied"), ("barricade_invalid", "refused"), ("hill_capture", "hill_captured"), ("hill_enter", "hill_enter"),
             ("berserk_lock", "berserk_lock"), ("level_up", "level_up"), ("coins", "coins"),
+            // integration batch 4: the depth HUD's named hooks (PR #59, ItemHooks.Sound -> UiSound.Play -> PlayNamed)
+            ("depth-ack", "ping_onmyway"), ("depth-bank", "gather_done"), ("depth-withdraw", "gather_done"), ("depth-chop", "hit_wood"),
+            ("depth-splash", "splash"), ("depth-coin", "coins"), ("depth-handoff", "piece_pickup"), ("depth-no", "refused"),
+            ("depth-bridge-creak", "build_warn"), ("depth-bridge-fall", "piece_break"), ("depth-hammer", "build_bridge"),
+            ("depth-drop-incoming", "ping_attack"), ("depth-drop-thud", "body_land"), ("depth-drop-claim", "hill_fanfare"),
+            ("depth-egg-exposed", "kaiju_growl"), ("depth-egg-sealed", "cleanse_end"), ("depth-egg-cool", "egg_feed"),
+            ("depth-power-spawn", "pickup_relic"), ("depth-power-take", "level_up"), ("depth-power-other", "ui_click"),
+            ("depth-power-end", "piece_expire"), ("depth-ward-break", "barricade_break"),
+            ("depth-station-open", "map_open"), ("depth-station-move", "ui_click"), ("depth-station-pick", "ui_click"),
+            ("depth-station-buy", "coins"), ("depth-switch", "respawn"), ("depth-upgrade", "level_up"),
         };
 
         private static SimRoute R(SimEventType t, Pick p, params string[] cues) => new SimRoute { Type = t, Pick = p, Cues = cues };

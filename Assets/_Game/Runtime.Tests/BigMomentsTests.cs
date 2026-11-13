@@ -273,6 +273,58 @@ namespace CriticalMass.Runtime.Tests
         }
 
         [Test]
+        public void ThePaintedStoryCutInsFillThePortraitSlotBeforeTheLiveModel()
+        {
+            // Integration batch 4: the seven painted cut-ins of PR #62 (Resources/Story/cutin_*.jpg).
+            string[] files = { "cutin_warrior_azure", "cutin_warrior_crimson", "cutin_miner_azure", "cutin_miner_crimson",
+                "cutin_farmer_azure", "cutin_farmer_crimson", "cutin_kaiju" };
+            foreach (string f in files) Assert.IsTrue(File.Exists("Assets/_Game/Resources/Story/" + f + ".jpg"), f);
+            Assert.AreEqual("story:cutin_warrior_azure", MomentArt.PaintedName(ClassId.Warrior, TeamId.Azure));
+            Assert.AreEqual("story:cutin_kaiju", MomentArt.PaintedKaiju);
+
+            var tex = new Texture2D(1920, 1072);
+            try
+            {
+                MomentArt.Loader = n => n.StartsWith(MomentArt.StoryPrefix) && n != "story:cutin_builder_azure" ? tex : null;
+                Assert.AreEqual(PortraitSource.Painted, MomentArt.ResolvePortrait(ClassId.Warrior, TeamId.Azure, true, true, out Texture2D a, out _));
+                Assert.AreSame(tex, a);
+                Assert.AreEqual(PortraitSource.Painted, MomentArt.ResolveKaiju(KaijuState.Berserk, true, true, out _));
+                MomentArt.Loader = n => n == "bm-portrait-miner-crimson" || n.StartsWith(MomentArt.StoryPrefix) ? tex : null;
+                Assert.AreEqual(PortraitSource.TeamImage, MomentArt.ResolvePortrait(ClassId.Miner, TeamId.Crimson, true, true, out _, out _), "a bm-portrait image still wins");
+                Rect crop = MomentArt.PaintedCrop(tex);
+                Assert.AreEqual(1072f / 1920f, crop.width, 1e-4f, "a square of the 16:9 painting");
+                Assert.GreaterOrEqual(crop.x, 0f);
+                Assert.LessOrEqual(crop.xMax, 1f + 1e-5f);
+            }
+            finally
+            {
+                MomentArt.ResetLoader();
+                Object.DestroyImmediate(tex);
+            }
+        }
+
+        [Test]
+        public void ATakeoverClaimsTheCentreLane()
+        {
+            HudZones.Clear();
+            HudZones.FrameOverride = 100;
+            try
+            {
+                HudZones.Hold(HudZone.Callout, HudPriority.Takeover);
+                Assert.IsTrue(HudZones.Blocked(HudZone.Callout, HudPriority.Banner), "banners wait for a takeover");
+                Assert.IsTrue(HudZones.Blocked(HudZone.Callout, HudPriority.Autopilot), "the autopilot line waits too");
+                Assert.IsTrue(HudZones.Blocked(HudZone.Callout, HudPriority.Guide), "the depth event timer waits");
+                HudZones.FrameOverride = 102;
+                Assert.IsFalse(HudZones.Blocked(HudZone.Callout, HudPriority.Banner), "the lane frees the frame after the next");
+            }
+            finally
+            {
+                HudZones.FrameOverride = -1;
+                HudZones.Clear();
+            }
+        }
+
+        [Test]
         public void ArtNamesMatchTheBrief()
         {
             Assert.AreEqual("bm-portrait-warrior-azure", MomentArt.PortraitName(ClassId.Warrior, TeamId.Azure));

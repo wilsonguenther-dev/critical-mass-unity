@@ -231,6 +231,9 @@ namespace CriticalMass.Runtime.View.Moments
                 if (_queue.StingerPlaying) BeginStinger(_queue.CurrentStinger);
                 else if (_stinger != null) _stinger.gameObject.SetActive(false);
             }
+            // Integration batch 4: a takeover claims the HUD's centre lane (HudZones top priority); banners, the lockout and
+            // autopilot lines, Kaiju callouts and the depth HUD's job line and event timer wait until it ends.
+            if (_queue.Playing) HudZones.Hold(HudZone.Callout, HudPriority.Takeover);
             if (_canvas == null) return;
             FitCanvas(_canvas);
             if (_queue.Playing) Animate(now);
@@ -375,7 +378,7 @@ namespace CriticalMass.Runtime.View.Moments
             {
                 KaijuState s = q.Kaiju == KaijuState.Egg ? KaijuState.Neutral : q.Kaiju;
                 src = MomentArt.ResolveKaiju(s, Model().CanRender(ArtMapping.KaijuAdult), true, out Texture2D img);
-                if (src == PortraitSource.TeamImage) tex = img;
+                if (src == PortraitSource.TeamImage || src == PortraitSource.Painted) tex = img;
                 else if (src == PortraitSource.LiveModel) tex = _model.BeginKaiju(s);
                 if (tex == null) tex = UiIcons.Get(UiIcons.Adult[s == KaijuState.Azure ? 1 : s == KaijuState.Crimson ? 2 : s == KaijuState.Berserk ? 3 : 0], 4);
             }
@@ -385,7 +388,7 @@ namespace CriticalMass.Runtime.View.Moments
                 int ci = (int)c;
                 bool hudIcon = ci >= 0 && ci < UiIcons.Classes.Length;
                 src = MomentArt.ResolvePortrait(c, q.Team, Model().CanRender(ModelPortrait.ClassKey(c)), hudIcon, out Texture2D img, out Texture2D mask);
-                if (src == PortraitSource.TeamImage || src == PortraitSource.TintedImage) tex = img;
+                if (src == PortraitSource.TeamImage || src == PortraitSource.TintedImage || src == PortraitSource.Painted) tex = img;
                 if (src == PortraitSource.TintedImage && mask != null)
                 {
                     _mask.gameObject.SetActive(true);
@@ -403,10 +406,15 @@ namespace CriticalMass.Runtime.View.Moments
             }
             _portrait.texture = tex;
             // mirror for the right-hand entry (portraits are painted facing right)
-            Rect uv = _fromRight ? new Rect(1f, 0f, -1f, 1f) : new Rect(0f, 0f, 1f, 1f);
+            Rect crop = src == PortraitSource.Painted ? MomentArt.PaintedCrop(tex) : new Rect(0f, 0f, 1f, 1f);
+            Rect uv = _fromRight ? new Rect(crop.xMax, 0f, -crop.width, 1f) : crop;
+            LastPortraitSource = src;
             _portrait.uvRect = uv;
             _mask.uvRect = uv;
         }
+
+        /// <summary>The source the last takeover's portrait used (tests, the capture walk's log).</summary>
+        public static PortraitSource LastPortraitSource { get; private set; } = PortraitSource.Shape;
 
         private ModelPortrait Model()
         {

@@ -204,6 +204,21 @@ namespace CriticalMass.Runtime.Tests
                 for (int i = 0; i < 8; i++) Assert.AreEqual("BOT", r.RowTag(1, i), "every opponent is labelled a bot");
                 Assert.IsFalse(r.RowShown(0, 8), "no rows past the team size");
 
+                // Integration batch 4: bots carry the names they will have in the match (the sim's table for this seed).
+                var named = new PlayLaunch { Choice = c, Seed = 4242 };
+                r.Bind(named);
+                Assert.AreEqual(4242, named.Seed, "a given seed is kept");
+                var world = World.CreateWorld(MatchRequest.From(c, 4242).ToWorldOptions(GameConfig.CreateDefault()));
+                CriticalMass.Runtime.View.Mechanics.DepthNames.Bind(world);
+                for (int i = 1; i < 8; i++)
+                    Assert.AreEqual(CriticalMass.Runtime.View.Mechanics.DepthNames.Name(i), r.RowName(0, i), "ally row " + i);
+                for (int i = 0; i < 8; i++)
+                    Assert.AreEqual(CriticalMass.Runtime.View.Mechanics.DepthNames.Name(8 + i), r.RowName(1, i), "enemy row " + i);
+                Assert.IsNotNull(r.RowName(1, 0));
+                var fresh = new PlayLaunch { Choice = c };
+                r.Bind(fresh);
+                Assert.AreNotEqual(0, fresh.Seed, "the READY screen fixes the seed so the names on it are the match's");
+
                 // The roster on screen is the one the sim builds (classes come from World.BuildRoster, seed-independent).
                 var expect = new ClassId[16];
                 World.BuildRoster(GameConfig.CreateDefault(), 8, ClassId.Miner, expect);

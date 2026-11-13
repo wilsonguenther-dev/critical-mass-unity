@@ -370,7 +370,9 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             ObjectiveFacts f = View.Mechanics.Objective.Facts(w, me);
             ObjectiveId id = View.Mechanics.Objective.For(f);
             Objective = id;
-            bool show = id != ObjectiveId.None && w.Match.Phase != MatchPhase.Ended;
+            // Integration batch 4: the job line sits on the top of the centre lane; it steps back while the autopilot banner or a
+            // big-moment takeover holds the lane (HudZones), and comes back the frame after.
+            bool show = id != ObjectiveId.None && w.Match.Phase != MatchPhase.Ended && !HudZones.Blocked(HudZone.Callout, HudPriority.Recap);
             if (_obj.gameObject.activeSelf != show) _obj.gameObject.SetActive(show);
             if (show) HudText.Set(_objText, View.Mechanics.Objective.Words(id, f.Cls));
         }
@@ -423,7 +425,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
 
         void TickStock(World w, int me, bool on, float real)
         {
-            bool show = on && DepthRead.SourcesOn(w);
+            bool show = on && DepthRead.SourcesOn(w) && !HudZones.Blocked(HudZone.Callout, HudPriority.Recap);
             if (_stock.gameObject.activeSelf != show) _stock.gameObject.SetActive(show);
             if (!show) return;
             TeamId t = w.Actors[me].Team;
@@ -467,7 +469,9 @@ namespace CriticalMass.Runtime.Hud.Mechanics
                 else if (bs == DepthRead.BridgeBroken) { word = DepthWords.BridgeCollapsed; ticksLeft = btick - w.Tick; span = Math.Max(1, (int)(45 * w.Config.SimHz)); col = CMTokens.Stone.Color; }
                 if (f == null) word = null;
             }
-            bool show = word != null;
+            // The map-event timer shares the centre lane at the bottom of the order: it waits while a Kaiju callout, a banner,
+            // the lockout or autopilot line or a big-moment takeover holds the lane (integration batch 4).
+            bool show = word != null && !HudZones.Blocked(HudZone.Callout, HudPriority.Guide);
             if (_event.gameObject.activeSelf != show) _event.gameObject.SetActive(show);
             if (!show) return;
             HudText.Set(_eventWord, word);
