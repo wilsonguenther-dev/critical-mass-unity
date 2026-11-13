@@ -728,6 +728,13 @@ namespace CriticalMass.Sim.Bots
                 if (supplySource >= 0 || holdsSupply) uSupply = w.Config.Depth.Sources.SupplyUtility;
             }
 
+            // U-066: a power-up in sight and close: go for it (not while holding the hill, carrying, or hurt).
+            double uGrab = 0;
+            double grabX = 0;
+            double grabZ = 0;
+            if (Pickups.On(w) && cur != AiState.HoldHill && a.CarryAmount == 0 && hpFrac >= lowHp && Pickups.BotGrabSpot(w, id, out grabX, out grabZ))
+                uGrab = w.Config.Depth.Pickups.BotGrabUtility;
+
             // CM-36: the shrine cleanse is the player's tool. Only the human slot on autopilot (IsHuman) uses it, and only for the
             // team that leads delivered biomass, once BotNetUnits net corruption units sit in the egg. Pure bots never cleanse
             // (D-060 retune). Reads delivery counts and cleanse timers only, never instability.
@@ -772,6 +779,9 @@ namespace CriticalMass.Sim.Bots
                 case AiState.Supply:
                     curU = uSupply;
                     break;
+                case AiState.Grab:
+                    curU = uGrab;
+                    break;
                 case AiState.Retreat:
                     curU = uRetreat;
                     break;
@@ -791,6 +801,7 @@ namespace CriticalMass.Sim.Bots
             Consider(w, AiState.Cleanse, uCleanse);
             Consider(w, AiState.Escort, uEscort);
             Consider(w, AiState.Supply, uSupply);
+            Consider(w, AiState.Grab, uGrab);
             Consider(w, AiState.Retreat, uRetreat);
             AiState best = Sel.Best;
 
@@ -810,6 +821,11 @@ namespace CriticalMass.Sim.Bots
             st.Target[id] = next == AiState.Fight ? fightTarget : -1;
             st.EscortOf[id] = next == AiState.Escort ? escortOf : -1;
             st.SupplySource[id] = next == AiState.Supply ? supplySource : -1;
+            if (next == AiState.Grab)
+            {
+                st.GrabX[id] = grabX;
+                st.GrabZ[id] = grabZ;
+            }
             if (next == AiState.Gather) st.TargetNode[id] = gatherNode;
             else if (next == AiState.Corrupt) st.TargetNode[id] = corruptNode;
             else st.TargetNode[id] = -1;

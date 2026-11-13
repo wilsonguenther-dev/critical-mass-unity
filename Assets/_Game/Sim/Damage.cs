@@ -69,6 +69,18 @@ namespace CriticalMass.Sim.Core
                 dmg *= 1 - w.Config.Abilities.WarriorShield.DamageReduction;
             }
 
+            // U-066 Ward: soaks the hit (an explosion goes through and breaks it). A fully soaked hit still marks the attacker
+            // and still interrupts a delivery wind-up, but costs no HP and raises no Hit event (WardAbsorb instead).
+            dmg = Pickups.Absorb(w, targetId, dmg, cause, credit);
+            if (!(dmg > 0))
+            {
+                t.GatherProgress = 0;
+                t.LastAttacker = credit;
+                t.LastCause = cause;
+                Delivery.InterruptDelivery(w, targetId, credit);
+                return 0;
+            }
+
             t.Hp -= dmg;
             t.GatherProgress = 0;
             t.LastAttacker = credit;

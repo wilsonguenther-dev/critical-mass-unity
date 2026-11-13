@@ -72,6 +72,27 @@ namespace CriticalMass.Sim.Core
         public byte[] ClassLevel;
         public int UpgradesBought;
 
+        /// <summary>U-066: the pickup pool (fixed capacity; inactive slots have Active = false).</summary>
+        public Pickup[] Pickups;
+        /// <summary>U-066: coin spots and centre-line power-up spots of this map, and the tick each coin spot refills (int.MaxValue while a pile waits).</summary>
+        public Grid.PointXZ[] CoinSpots;
+        public Grid.PointXZ[] PowerSpots;
+        public int[] CoinSpotNextTick;
+        /// <summary>U-066: power-up spawns so far, and the tick of the next one.</summary>
+        public int PowerIndex;
+        public int NextPowerTick;
+        /// <summary>U-066: per actor, the power-up it holds ((byte)PickupKind, 0 = none), the tick it ends and the ward HP left.</summary>
+        public byte[] PowerKind;
+        public int[] PowerEndTick;
+        public double[] WardLeft;
+        /// <summary>U-066: per actor, was it alive at the end of the last pickups pass (a knock-out is the 1 to 0 edge).</summary>
+        public byte[] WasAlive;
+        /// <summary>U-066 counters: coins picked up, power-ups taken, power-ups dropped by the knocked out, pool recycles.</summary>
+        public int CoinsTaken;
+        public int PowerUpsTaken;
+        public int PowerUpsDropped;
+        public int PickupOverflows;
+
         public static DepthState Create(GameConfig cfg, Grid.MapDef map)
         {
             int cap = World.ActorCapacity(cfg);
@@ -86,7 +107,16 @@ namespace CriticalMass.Sim.Core
                 Stock = new int[2 * Core.Sources.StockKinds],
                 Gathered = new int[2],
                 ClassLevel = new byte[2 * ClassIds.All.Count],
+                Pickups = new Pickup[(int)cfg.Depth.Pickups.Capacity],
+                CoinSpots = Core.Pickups.PlaceCoinSpots(cfg, map),
+                PowerSpots = Core.Pickups.PlaceCentreSpots(map, cfg.Depth.Pickups.PowerSpotsZ),
+                PowerKind = new byte[cap],
+                PowerEndTick = new int[cap],
+                WardLeft = new double[cap],
+                WasAlive = new byte[cap],
             };
+            for (int i = 0; i < s.Pickups.Length; i++) s.Pickups[i] = new Pickup { Source = -1, Spot = -1 };
+            s.CoinSpotNextTick = new int[s.CoinSpots.Length];
             return s;
         }
 
@@ -115,6 +145,23 @@ namespace CriticalMass.Sim.Core
             FieldBuildTick = -1;
             Array.Clear(ClassLevel, 0, ClassLevel.Length);
             UpgradesBought = 0;
+            foreach (Pickup p in Pickups)
+            {
+                p.Active = false;
+                p.Source = -1;
+                p.Spot = -1;
+            }
+            Array.Fill(CoinSpotNextTick, (int)w.Config.Depth.Pickups.CoinFirstTicks);
+            PowerIndex = 0;
+            NextPowerTick = (int)w.Config.Depth.Pickups.FirstPowerUpTicks;
+            Array.Clear(PowerKind, 0, PowerKind.Length);
+            Array.Clear(PowerEndTick, 0, PowerEndTick.Length);
+            Array.Clear(WardLeft, 0, WardLeft.Length);
+            for (int id = 0; id < WasAlive.Length; id++) WasAlive[id] = (byte)(id < w.ActorCount && w.Actors[id].Alive ? 1 : 0);
+            CoinsTaken = 0;
+            PowerUpsTaken = 0;
+            PowerUpsDropped = 0;
+            PickupOverflows = 0;
             for (int t = 0; t < 2; t++)
             {
                 w.Match.Delivered[t].Wood = 0;

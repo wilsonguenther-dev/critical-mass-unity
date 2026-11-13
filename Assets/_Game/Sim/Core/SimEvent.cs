@@ -15,5 +15,7 @@ namespace CriticalMass.Sim.Core
         public DamageCause Cause;
         /// <summary>DG-22: the effect radius (world units) of a MinePlaced / MineArmed / MineTriggered / MineRemoved / TntThrown / TntLanded / Explosion event; 0 on every other event.</summary>
         public double Radius;
+        /// <summary>U-066: the World.Depth.Pickups slot of a PickupSpawned / PickupTaken / PickupExpired event; -1 on every other event.</summary>
+        public int Slot = -1;
     }
 }

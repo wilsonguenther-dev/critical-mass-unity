@@ -67,6 +67,7 @@ namespace CriticalMass.Sim.Core
                     double speed = baseSpeed;
                     if (a.SlowTimer > 0) speed *= cfg.Abilities.FarmerRoots.SlowMultiplier;
                     if (a.Cls == ClassId.Warrior && a.AbilityActive > 0) speed *= cfg.Abilities.WarriorShield.MoveSpeedMultiplier;
+                    speed *= Pickups.SpeedScale(w, i); // U-066 Haste (exactly 1 without it)
                     tx = mx * speed;
                     tz = mz * speed;
                 }

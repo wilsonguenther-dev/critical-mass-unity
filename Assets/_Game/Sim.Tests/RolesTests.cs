@@ -211,7 +211,7 @@ namespace CriticalMass.Sim.Tests
                     for (int i = 0; i < w.ActorCount; i++) if (w.Actors[i].AiState == AiState.Escort) escortTicks++;
             });
             Assert.Greater(fed, 0, "Farmers fed the egg");
-            Assert.AreEqual(0, w.Depth.Handoffs, "bots that may not feed never pick biomass up, so they never hand off");
+            Assert.LessOrEqual(w.Depth.Handoffs, 4, "a supply bot may pass wood or water to a Farmer it meets (U-064); nobody else hands off");
             System.Console.WriteLine("{\"item\":\"U-063\",\"fedEvents\":" + fed + ",\"escortSamples\":" + escortTicks + ",\"deliveredAzure\":" + w.Match.Delivered[0].Biomass + ",\"deliveredCrimson\":" + w.Match.Delivered[1].Biomass + ",\"corruption\":" + (w.Match.Delivered[0].Corruption + w.Match.Delivered[1].Corruption) + "}");
         }
 

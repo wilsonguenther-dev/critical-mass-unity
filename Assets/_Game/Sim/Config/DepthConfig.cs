@@ -18,6 +18,8 @@ namespace CriticalMass.Sim.Config
         public SourcesConfig Sources = new SourcesConfig();
         /// <summary>U-065: the base station: live class switching and class upgrades.</summary>
         public StationsConfig Stations = new StationsConfig();
+        /// <summary>U-066: coins, power-ups and their deterministic spawner.</summary>
+        public PickupsConfig Pickups = new PickupsConfig();
 
         public DepthConfig Clone()
         {
@@ -25,6 +27,52 @@ namespace CriticalMass.Sim.Config
             c.Roles = Roles.Clone();
             c.Sources = Sources.Clone();
             c.Stations = Stations.Clone();
+            c.Pickups = Pickups.Clone();
+            return c;
+        }
+    }
+
+    /// <summary>U-066 pickups and drops (DG-39; our rule). Timing in sim ticks at 30 Hz.</summary>
+    public sealed class PickupsConfig
+    {
+        public bool Enabled = true;
+        /// <summary>Walk-over reach from the pickup centre, added to the actor's radius.</summary>
+        public double PickupRange = 1.2;
+        /// <summary>Slots of the fixed pickup pool.</summary>
+        public double Capacity = 96;
+        /// <summary>Coins a knocked-out actor leaves where it fell, and how long they lie there (20 s).</summary>
+        public double CoinsPerKnockOut = 3;
+        public double CoinDropLifetimeTicks = 600;
+        /// <summary>Coin piles on the map: west-half (x, z) anchors, each mirrored; value, first spawn and respawn after a pick-up (30 s).</summary>
+        public double[] CoinAnchors = { 31, 17, 31, 56, 46, 29, 46, 51, 52, 11 };
+        public double CoinPileValue = 5;
+        public double CoinFirstTicks = 150;
+        public double CoinRespawnTicks = 900;
+        /// <summary>Power-up spots on the centre line (x = half the map width): their z.</summary>
+        public double[] PowerSpotsZ = { 30, 50, 14, 66 };
+        /// <summary>First power-up at 20 s, then one every 45 s; announced 5 s before it can be taken; gone 30 s after that.</summary>
+        public double FirstPowerUpTicks = 600;
+        public double PowerUpPeriodTicks = 1350;
+        public double PowerUpArmTicks = 150;
+        public double PowerUpLifetimeTicks = 900;
+        public double HasteSpeed = 1.3;
+        public double HasteTicks = 300;
+        public double MightDamage = 1.5;
+        public double MightTicks = 300;
+        public double WardHp = 60;
+        public double WardTicks = 450;
+        /// <summary>A knocked-out carrier drops its power-up when at least this much time was left; the drop lies 15 s.</summary>
+        public double DropMinTicks = 60;
+        public double DropLifetimeTicks = 450;
+        /// <summary>Bots: a bot in transit or in a fight goes for a power-up within this range and in line of sight, at this utility.</summary>
+        public double BotGrabRange = 9;
+        public double BotGrabUtility = 0.97;
+
+        public PickupsConfig Clone()
+        {
+            var c = (PickupsConfig)MemberwiseClone();
+            c.CoinAnchors = (double[])CoinAnchors.Clone();
+            c.PowerSpotsZ = (double[])PowerSpotsZ.Clone();
             return c;
         }
     }

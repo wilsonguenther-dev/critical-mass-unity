@@ -93,7 +93,7 @@ namespace CriticalMass.Sim.Core
                         double dot = (dx * fx + dz * fz) / Math.Sqrt(d2);
                         if (dot < cosHalf - 1e-9) continue;
                     }
-                    Damage.ApplyDamage(w, j, cc.AttackDamage, i, ax, az);
+                    Damage.ApplyDamage(w, j, cc.AttackDamage * Pickups.DamageScale(w, i), i, ax, az); // U-066 Might (x 1 without it)
                 }
                 // Structures (CM-05): the same swing chips enemy barricades in its arc; a Miner's pick also breaks breakables.
                 Barricades.DamageBarricadesInArc(w, i, ax, az, fx, fz, cc.AttackRange, cosHalf, cc.AttackDamage);
@@ -111,7 +111,7 @@ namespace CriticalMass.Sim.Core
                     double d2 = dx * dx + dz * dz;
                     if (d2 <= reach * reach && (d2 <= 1e-12 || (dx * fx + dz * fz) / Math.Sqrt(d2) >= cosHalf - 1e-9))
                     {
-                        Kaiju.DamageKaiju(w, i, cc.AttackDamage);
+                        Kaiju.DamageKaiju(w, i, cc.AttackDamage * Pickups.DamageScale(w, i));
                     }
                 }
             }

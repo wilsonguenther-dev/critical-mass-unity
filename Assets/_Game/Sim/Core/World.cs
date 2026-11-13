@@ -590,6 +590,7 @@ namespace CriticalMass.Sim.Core
             a.UnsupportedTicks = 0;
             a.LastCause = DamageCause.None;
             a.DeliverTicks = 0;
+            a.CoinsPicked = 0;
         }
 
         private static void ResetInput(InputFrame f)
@@ -787,6 +788,7 @@ namespace CriticalMass.Sim.Core
             e.Bio = bio;
             e.Cause = cause;
             e.Radius = radius;
+            e.Slot = -1; // U-066: Pickups writes it after the push
             w.EventHead++;
         }
 

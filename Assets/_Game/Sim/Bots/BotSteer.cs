@@ -361,6 +361,9 @@ namespace CriticalMass.Sim.Bots
                 case AiState.Retreat:
                     Follow(w, st, id, TeamPadField(w, id));
                     break;
+                case AiState.Grab:
+                    Toward(w, id, st.GrabX[id], st.GrabZ[id], 0.2); // U-066: straight at the power-up (it was in line of sight)
+                    break;
                 case AiState.Supply:
                 {
                     // U-064: to the source and gather; with no source (full, or none left) home to the base and bank.

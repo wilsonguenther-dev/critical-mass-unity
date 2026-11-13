@@ -21,6 +21,9 @@ namespace CriticalMass.Sim.Core
     /// </summary>
     public enum BotDifficulty { Normal, Easy, Hard }
 
+    /// <summary>U-066: what a pickup is. Coin first so a power-up kind is never 0 (DepthState.PowerKind: 0 = none). Never reordered: later items append.</summary>
+    public enum PickupKind { Coin, Haste, Might, Ward }
+
     /// <summary>Kaiju state (browser KaijuState).</summary>
     public enum KaijuState { Egg, Neutral, Azure, Crimson, Berserk }
 
@@ -37,6 +40,8 @@ namespace CriticalMass.Sim.Core
         Escort,
         /// <summary>U-064: a supply bot walks to a grove or spring, fills up and banks it at the base (appended).</summary>
         Supply,
+        /// <summary>U-066: a bot walks straight to a power-up it can see (appended).</summary>
+        Grab,
     }
 
     /// <summary>Match phase (browser MatchState.phase).</summary>
@@ -155,6 +160,16 @@ namespace CriticalMass.Sim.Core
         ClassSwitch,
         /// <summary>U-065 (ports CM-39 'upgrade'): a class upgrade purchase: A = the buyer, B = class index, (X, Z) = the pad, Value = the team's new level of that class (>= 2) or a Stations.Refused* code.</summary>
         Upgrade,
+        /// <summary>U-066: a pickup appeared: A = the actor it dropped from (-1 = the map spawner), B = (int)PickupKind, (X, Z), Value = coins, or for a power-up the tick it can be taken, Radius = pickup range, Slot = World.Depth.Pickups slot.</summary>
+        PickupSpawned,
+        /// <summary>U-066: an actor walked over a pickup: A = actor, B = (int)PickupKind, (X, Z) = the pickup, Value = coins, or ticks the power-up will last, Slot = pool slot.</summary>
+        PickupTaken,
+        /// <summary>U-066: a pickup vanished untaken: A = -1, B = (int)PickupKind, (X, Z), Slot = pool slot.</summary>
+        PickupExpired,
+        /// <summary>U-066: an actor's power-up ended: A = actor, B = (int)PickupKind, (X, Z) = the actor, Value = Pickups.EndExpired / EndBroken / EndDropped / EndStripped / EndReplaced.</summary>
+        PowerUpEnded,
+        /// <summary>U-066: a Ward soaked damage: A = the warded actor, B = attacker id (-1 none, -2 the Kaiju), (X, Z) = the actor, Value = damage soaked.</summary>
+        WardAbsorb,
         // ITEM CM-84: added by its owner (ClassSwitch, ports CM-54)
         /// <summary>CM-37: one tick of fountain healing (Heal.HealSystem): A = the healed actor, B = -1, (X, Z) = the actor, Value = HP restored this tick (&gt; 0).</summary>
         Heal,

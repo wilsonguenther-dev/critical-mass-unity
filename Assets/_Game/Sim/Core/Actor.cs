@@ -92,5 +92,7 @@ namespace CriticalMass.Sim.Core
         /// Written only by Delivery (Damage calls InterruptDelivery).
         /// </summary>
         public int DeliverTicks;
+        /// <summary>U-066 (DG-39): coins this actor picked up this match (knock-out drops and map piles). The progression screens read it.</summary>
+        public int CoinsPicked;
     }
 }

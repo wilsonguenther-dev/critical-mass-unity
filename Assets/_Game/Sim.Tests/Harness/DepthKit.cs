@@ -33,6 +33,7 @@ namespace CriticalMass.Sim.Tests.Harness
                 w.Actors[j].Alive = false;
                 w.Actors[j].RespawnIn = 1e9;
                 w.MeatDropped[j] = 1; // no meat orbs from the bodies the kit removed
+                w.Depth.WasAlive[j] = 0; // and no coins (U-066)
             }
             Put(w, 0, x, z);
             w.Tick = 100;
@@ -73,7 +74,7 @@ namespace CriticalMass.Sim.Tests.Harness
             for (int i = Math.Max(head, w.EventHead - World.EventCapacity); i < w.EventHead; i++)
             {
                 SimEvent e = w.Events[i % World.EventCapacity];
-                if (e.Type == type) list.Add(new SimEvent { Type = e.Type, A = e.A, B = e.B, X = e.X, Z = e.Z, Value = e.Value, Bio = e.Bio, Cause = e.Cause, Radius = e.Radius });
+                if (e.Type == type) list.Add(new SimEvent { Type = e.Type, A = e.A, B = e.B, X = e.X, Z = e.Z, Value = e.Value, Bio = e.Bio, Cause = e.Cause, Radius = e.Radius, Slot = e.Slot });
             }
             return list;
         }
