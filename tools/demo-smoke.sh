@@ -8,7 +8,8 @@
 # 4 minutes each), 1920x1080 windowed, 12 s idle on the title first, timeout 900 s per match (the player quits itself;
 # this script's hard limit is matches x (timeout + 60) + 120 s).
 # PASS needs all of: player exit 0, every match logs "[CM.Autoplay] MATCH END", zero exception lines in Player.log, and
-# every budget below (override with env vars). A budget whose counter the build does not expose is reported, not failed.
+# every budget below (override with env vars). A budget whose counter the run did not produce FAILS the run (fail closed,
+# DG-54): it is listed under not_measured.
 #   CM_BUDGET_PEAK_RSS_MB=1536   peak resident memory of the player over the run
 #   CM_BUDGET_GROWTH_MB=50       resident memory at the end of the last match minus the end of match 1 (3+ matches)
 #   CM_BUDGET_P95_MS=17.5        match 1 p95 frame time with the 60 fps cap (a vsync miss is 33 ms); 16.7 with --novsync
@@ -133,10 +134,14 @@ p95 = (p1.get('frame_ms') or {}).get('p95')
 meas = {'peak_rss_mb': peak, 'growth_mb': growth, 'p95_ms': p95, 'idle_cpu_pct': idle, 'batches': batches, 'triangles': tris}
 over = [k for k, v in meas.items() if v is not None and v > B[k]]
 not_measured = [k for k, v in meas.items() if v is None]
-s = {'pass': code == 0 and ends == matches and not exc and not over, 'exit': code, 'matches': matches,
+boot_s = round((int(m.group(3)) - launch_ms) / 1000, 2) if m else None
+if boot_s is None:
+    not_measured.append('boot_to_title_s')
+# Fail closed (DG-54): a number the run did not produce is a failure, never a silent pass.
+s = {'pass': code == 0 and ends == matches and not exc and not over and not not_measured, 'exit': code, 'matches': matches,
      'match_end_logged': ends, 'exception_lines': len(exc), 'exceptions': exc[:20],
      'errors_logged': p1.get('errors'), 'over_budget': over, 'not_measured': not_measured, 'measured': meas, 'budgets': B,
-     'boot_to_title_from_launch_s': round((int(m.group(3)) - launch_ms) / 1000, 2) if m else None,
+     'boot_to_title_from_launch_s': boot_s,
      'boot_to_title_engine_s': float(m.group(1)) if m else None,
      'frame_ms': p1.get('frame_ms'), 'frames_over_ms': p1.get('frames_over_ms'),
      'setpass_max': mk.get('SetPass Calls Count', {}).get('max'), 'draw_calls_max': mk.get('Draw Calls Count', {}).get('max'),
@@ -146,7 +151,7 @@ s = {'pass': code == 0 and ends == matches and not exc and not over, 'exit': cod
      'quality': p1.get('quality'), 'winner': [p.get('winner') for p in perfs], 'version': p1.get('version'),
      'commit': p1.get('commit'), 'other_unity_pids': others.split(), 'out': out}
 open(os.path.join(out, 'summary.json'), 'w').write(json.dumps(s, indent=1) + '\n')
-print(json.dumps({k: s[k] for k in ('pass', 'exit', 'match_end_logged', 'exception_lines', 'over_budget', 'measured',
+print(json.dumps({k: s[k] for k in ('pass', 'exit', 'match_end_logged', 'exception_lines', 'over_budget', 'not_measured', 'measured',
                                      'boot_to_title_from_launch_s', 'frame_ms', 'other_unity_pids')}))
 sys.exit(0 if s['pass'] else 1)
 PY
