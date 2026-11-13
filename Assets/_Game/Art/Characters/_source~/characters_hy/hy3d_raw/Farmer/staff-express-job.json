@@ -1,0 +1,12 @@
+{
+ "job": "1512822488067801088",
+ "action": "QueryHunyuanTo3DRapidJob",
+ "types": [
+  "GLB",
+  "GLB"
+ ],
+ "files": [
+  "staff-express-235da637-de7a-4154-863e-01933bb9312c_0.glb",
+  "staff-express-preview-preview_235da637-de7a-4154-863e-01933bb9312c_0.png"
+ ]
+}

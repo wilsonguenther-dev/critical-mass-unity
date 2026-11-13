@@ -1,0 +1,16 @@
+{
+ "job": "1512822872232484864",
+ "action": "QueryHunyuanTo3DProJob",
+ "types": [
+  "OBJ",
+  "OBJ",
+  "GLB",
+  "GLB"
+ ],
+ "files": [
+  "body-pro31-mv-86047937-ce04-4e39-9e59-b8856df24681_0.zip",
+  "body-pro31-mv-preview-preview_86047937-ce04-4e39-9e59-b8856df24681_0.png",
+  "body-pro31-mv-86047937-ce04-4e39-9e59-b8856df24681_0.glb",
+  "body-pro31-mv-preview-preview_86047937-ce04-4e39-9e59-b8856df24681_0.png"
+ ]
+}
