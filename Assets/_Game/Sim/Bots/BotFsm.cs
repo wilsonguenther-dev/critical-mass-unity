@@ -293,7 +293,17 @@ namespace CriticalMass.Sim.Bots
                 DecideDemolitions(w, st, id, state, sk); // DG-22 (CM-38)
                 return;
             }
+            if (a.Cls == ClassId.Healer)
+            {
+                DecideHealer(w, st, id, sk); // DG-40 (U-061)
+                return;
+            }
             if (a.AbilityCd > 0) return;
+            if (a.Cls == ClassId.Builder)
+            {
+                DecideBuilder(w, st, id, state, sk); // DG-24 (U-060)
+                return;
+            }
             double x = w.X[id];
             double z = w.Z[id];
             if (a.Cls == ClassId.Warrior)
@@ -423,6 +433,119 @@ namespace CriticalMass.Sim.Bots
             st.AbilityReq[id] = 1;
             st.AbilityX[id] = JsMath.F32(x);
             st.AbilityZ[id] = JsMath.F32(z);
+        }
+
+        /// <summary>DG-24: a Builder bot builds only when the piece cuts at least this many cells off its walk to its goal.</summary>
+        public const double MinBuildGainCells = 2;
+
+        /// <summary>
+        /// DG-24 (U-060, not in the browser) Builder bot: on its way to the hill (ToHill, Unstick) or the shrine (Deliver,
+        /// Corrupt), it tries the four directions; a build the sim would accept (BuiltPieces.BuildRefusal: limit, bank, gap,
+        /// plan) whose landing is reachable and closer to the goal by MinBuildGainCells or more (team flow-field distance at
+        /// the landing + the cells to it, against the distance where it stands; a bot cut off from its goal takes any landing
+        /// that reaches it) is pressed toward the best one. Bots never carry pieces. DG-21: Easy builds only on AbilityChance of
+        /// its thinks; Normal and Hard always.
+        /// </summary>
+        private static void DecideBuilder(World w, BotsState st, int id, AiState state, BotSkillConfig sk)
+        {
+            int field;
+            if (state == AiState.ToHill || state == AiState.Unstick) field = BotFields.FieldHill;
+            else if (state == AiState.Deliver || state == AiState.Corrupt) field = BotFields.FieldShrine;
+            else return;
+            if (BuiltPieces.OwnedCount(w, id) >= w.Config.Abilities.BuilderPieces.MaxActivePerBuilder) return;
+            double x = w.X[id];
+            double z = w.Z[id];
+            double d0 = BotFields.FieldDistAt(st.Fields, field, x, z);
+            double bestGain = MinBuildGainCells;
+            int bdx = 0;
+            int bdz = 0;
+            for (int k = 0; k < 4; k++)
+            {
+                int dx = k == 0 ? 1 : k == 1 ? -1 : 0;
+                int dz = k == 2 ? 1 : k == 3 ? -1 : 0;
+                if (BuiltPieces.BuildRefusal(w, id, dx, dz) != 0) continue;
+                BuiltPieces.LastPlanLanding(w, id, dx, dz, out double lx, out double lz, out int cells);
+                double d1 = BotFields.FieldDistAt(st.Fields, field, lx, lz);
+                if (!double.IsFinite(d1)) continue;
+                double gain = double.IsFinite(d0) ? d0 - (d1 + cells) : 1e9;
+                if (gain >= bestGain && (bdx != 0 || bdz != 0 ? gain > bestGain : true))
+                {
+                    bestGain = gain;
+                    bdx = dx;
+                    bdz = dz;
+                }
+            }
+            if (bdx == 0 && bdz == 0) return;
+            if (!BotSkill.UsesAbilityNow(w, id, sk)) return;
+            st.AbilityReq[id] = 1;
+            st.AbilityX[id] = JsMath.F32(x + bdx * 1.5);
+            st.AbilityZ[id] = JsMath.F32(z + bdz * 1.5);
+        }
+
+        /// <summary>
+        /// DG-40 (U-061, not in the browser) Healer bot. Her attack presses come from the usual steering (she closes to her
+        /// AttackRange of the enemy and presses attack: the sim mends the hurt ally nearest that enemy). PURIFY when the sim
+        /// would accept it (Healer.CanPurify: at the shrine, egg open, corruption in it) and her team is not behind in
+        /// allegiance or instability is at least half the berserk threshold. HEALING PULSE (Space) centred on the hurt ally in
+        /// cast range (or herself) whose PulseRadius holds the most missing HP (each ally counted up to PulseHeal), cast when
+        /// that is at least PulseHeal or one ally there is under a third of its max HP. DG-21: Easy acts only on AbilityChance
+        /// of its thinks.
+        /// </summary>
+        private static void DecideHealer(World w, BotsState st, int id, BotSkillConfig sk)
+        {
+            Actor a = w.Actors[id];
+            if (Healer.CanPurify(w, id))
+            {
+                MatchState m = w.Match;
+                double mine = a.Team == TeamId.Azure ? m.Allegiance.Azure : m.Allegiance.Crimson;
+                double theirs = a.Team == TeamId.Azure ? m.Allegiance.Crimson : m.Allegiance.Azure;
+                if ((mine >= theirs || m.Instability >= 0.5 * w.Config.KaijuFeed.BerserkThreshold) && BotSkill.UsesAbilityNow(w, id, sk))
+                {
+                    Healer.RequestBotPurify(w, id);
+                    return;
+                }
+            }
+            if (a.AbilityCd > 0) return;
+            HealerConfig H = w.Config.Abilities.Healer;
+            double hx = w.X[id];
+            double hz = w.Z[id];
+            double cast2 = H.PulseCastRange * H.PulseCastRange;
+            double r2 = H.PulseRadius * H.PulseRadius;
+            int best = -1;
+            double bestSum = 0;
+            bool urgent = false;
+            for (int c = 0; c < w.ActorCount; c++)
+            {
+                Actor ca = w.Actors[c];
+                if (!ca.Alive || ca.Team != a.Team || !(ca.Hp < ca.MaxHp)) continue;
+                double cdx = w.X[c] - hx;
+                double cdz = w.Z[c] - hz;
+                if (cdx * cdx + cdz * cdz > cast2) continue;
+                double sum = 0;
+                bool low = false;
+                for (int j = 0; j < w.ActorCount; j++)
+                {
+                    Actor t = w.Actors[j];
+                    if (!t.Alive || t.Team != a.Team) continue;
+                    double dx = w.X[j] - w.X[c];
+                    double dz = w.Z[j] - w.Z[c];
+                    if (dx * dx + dz * dz > r2) continue;
+                    double miss = t.MaxHp - t.Hp;
+                    sum += miss < H.PulseHeal ? miss : H.PulseHeal;
+                    if (t.Hp < t.MaxHp / 3) low = true;
+                }
+                if (sum > bestSum)
+                {
+                    bestSum = sum;
+                    best = c;
+                    urgent = low;
+                }
+            }
+            if (best < 0 || (bestSum < H.PulseHeal && !urgent)) return;
+            if (!BotSkill.UsesAbilityNow(w, id, sk)) return;
+            st.AbilityReq[id] = 1;
+            st.AbilityX[id] = JsMath.F32(w.X[best]);
+            st.AbilityZ[id] = JsMath.F32(w.Z[best]);
         }
 
         /// <summary>One think for bot id: perception, stuck check, utility selection, targets, ability decision.</summary>

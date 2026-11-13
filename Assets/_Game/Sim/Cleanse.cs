@@ -29,7 +29,8 @@ namespace CriticalMass.Sim.Core
         public static double NetCorruptionUnits(World w)
         {
             DeliveredTally[] d = w.Match.Delivered;
-            double net = d[(int)TeamId.Azure].Corruption + d[(int)TeamId.Crimson].Corruption - w.Cleanse.Count * w.Config.KaijuFeed.Cleanse.Units;
+            // DG-40: units a Healer purified count as cleansed too (0 without Healers, so the CM-36 rule is unchanged).
+            double net = d[(int)TeamId.Azure].Corruption + d[(int)TeamId.Crimson].Corruption - w.Cleanse.Count * w.Config.KaijuFeed.Cleanse.Units - w.Healer.PurifiedUnits;
             return net > 0 ? net : 0;
         }
 

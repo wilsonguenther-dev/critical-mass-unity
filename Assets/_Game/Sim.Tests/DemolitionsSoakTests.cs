@@ -29,7 +29,7 @@ namespace CriticalMass.Sim.Tests
         internal static GameConfig DemoMix()
         {
             GameConfig cfg = GameConfig.CreateBrowser5v5();
-            cfg.Bots.ClassMix = new[] { 0.35, 0.25, 0.2, 0.2, 0 };
+            cfg.Bots.ClassMix = new[] { 0.35, 0.25, 0.2, 0.2, 0, 0 };
             return cfg;
         }
 
@@ -173,7 +173,7 @@ namespace CriticalMass.Sim.Tests
         [Test]
         public void DG22SameSeedSameStateHashIn16v16WithMinesTntAndCraters()
         {
-            Action<GameConfig> mix = c => c.Bots.ClassMix = new[] { 0.35, 0.25, 0.2, 0.2, 0 };
+            Action<GameConfig> mix = c => c.Bots.ClassMix = new[] { 0.35, 0.25, 0.2, 0.2, 0, 0 };
             ulong a = MatchHash.Run(1337, 16, 2700, ClassId.Demolitions, null, mix);
             Assert.AreEqual(a, MatchHash.Run(1337, 16, 2700, ClassId.Demolitions, null, mix));
             Assert.AreNotEqual(a, MatchHash.Run(1338, 16, 2700, ClassId.Demolitions, null, mix));

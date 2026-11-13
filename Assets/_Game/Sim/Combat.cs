@@ -57,6 +57,11 @@ namespace CriticalMass.Sim.Core
                 Actor a = w.Actors[i];
                 if (!a.Alive || a.StandUp > 0 || !w.Inputs[i].Attack || a.AttackCd > 0) continue;
                 if (a.Cls == ClassId.Demolitions) continue; // DG-22 (CM-38): no regular attack (Travis 2026-11-06)
+                if (a.Cls == ClassId.Healer)
+                {
+                    Healer.TryMend(w, i); // DG-40 (U-061): no weapon; the attack press mends a hurt ally
+                    continue;
+                }
                 ClassConfig cc = cfg.Class(a.Cls);
                 a.AttackCd = cc.AttackCooldown;
                 a.AnimAction = 0;

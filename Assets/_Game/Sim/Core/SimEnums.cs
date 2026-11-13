@@ -114,6 +114,26 @@ namespace CriticalMass.Sim.Core
         TntLanded,
         /// <summary>DG-22: an explosion (Effects.Explode): A = owner, B = Demolitions.ExplosionMine / ExplosionTnt, (X, Z) = centre, Value = actors hurt, Radius = blast radius, Cause = Explosion.</summary>
         Explosion,
+        /// <summary>
+        /// DG-24: a ladder or rope bridge went down (built by a Builder or put down by a carrier): A = that actor, B = piece slot
+        /// (World.Builder.Pieces: Kind, cells, direction), (X, Z) = the span's centre, Value = the tick it crumbles, Radius = half
+        /// its length in units.
+        /// </summary>
+        PiecePlaced,
+        /// <summary>DG-24: a piece starts to crumble (the warning, BuilderPieces.WarnTicks before the end): A = owner, B = slot, (X, Z) = centre, Value = ticks left, Radius = half length.</summary>
+        PieceCrumbling,
+        /// <summary>DG-24: a piece left the map: A = owner, B = slot, (X, Z) = centre, Value = BuiltPieces.EndExpired / EndDropped / EndBroken, Radius = half length.</summary>
+        PieceExpired,
+        /// <summary>DG-24: a piece's cell was dug or blown out (it breaks; the rest follows as PieceExpired EndBroken): A = owner, B = slot, (X, Z) = the broken cell, Value = cells it had, Radius = half length.</summary>
+        PieceDestroyed,
+        /// <summary>DG-24: an actor (any class) picked a piece up to carry it: A = carrier, B = slot, (X, Z) = the span's centre, Value = ticks it has left, Radius = half length.</summary>
+        PiecePickedUp,
+        /// <summary>DG-40: a Healer cast: A = the Healer, B = Healer.KindMend / KindPulse, (X, Z) = the mended ally or the pulse centre, Value = HP it restored in all, Radius = the pulse radius (0 for a mend).</summary>
+        HealCast,
+        /// <summary>DG-40: Healer healing landed on one actor: A = that actor, B = the Healer, (X, Z) = the actor, Value = HP restored (&gt; 0).</summary>
+        HealLanded,
+        /// <summary>DG-40: a Healer purified the egg: A = the Healer, B = team index (0 azure, 1 crimson), (X, Z) = the shrine, Value = instability removed, Radius = Healer.PurifyRange.</summary>
+        Purify,
         // ITEM CM-84: added by its owner (ClassSwitch, ports CM-54)
         /// <summary>CM-37: one tick of fountain healing (Heal.HealSystem): A = the healed actor, B = -1, (X, Z) = the actor, Value = HP restored this tick (&gt; 0).</summary>
         Heal,

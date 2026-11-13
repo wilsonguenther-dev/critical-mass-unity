@@ -536,6 +536,9 @@ namespace CriticalMass.Sim.Core
 
             // DG-22: mines, bombs and counters, reset in place.
             world.Demolitions.Reset();
+            // DG-24: every piece gone (the repaint restored its cells), banks full again.
+            world.Builder.Reset();
+            world.Healer.Reset(); // DG-40
 
             SpatialHash.Rebuild(world.Hash, world.X, world.Z, world.Actors, world.ActorCount);
         }
@@ -732,6 +735,8 @@ namespace CriticalMass.Sim.Core
                 Events = events,
                 EventHead = 0,
                 Hash = SpatialHash.CreateSpatialHash(map.Width, map.Height, cap),
+                Builder = BuilderState.Create(cfg),
+                Healer = HealerState.Create(cfg),
             };
             InitWorld(world, opts);
             return world;
@@ -821,5 +826,10 @@ namespace CriticalMass.Sim.Core
         }
 
         // DG-16b additions follow (appended).
+
+        /// <summary>DG-24: ladders and rope bridges, each team's spent biomass and the carry state (BuiltPieces.cs).</summary>
+        public BuilderState Builder;
+        /// <summary>DG-40: the Healer's purify cooldowns and counters (Healer.cs).</summary>
+        public HealerState Healer;
     }
 }

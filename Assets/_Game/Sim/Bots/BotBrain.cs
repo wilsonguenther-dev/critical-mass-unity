@@ -75,6 +75,8 @@ namespace CriticalMass.Sim.Bots
             BotSteer.SteerBot(w, st, id, output);
             // DG-22 (CM-38): a Demolitions bot's queued TNT throw (BotFsm.DecideDemolitions) is its one press, aimed at the throw point.
             Demolitions.TakeBotTnt(w, id, output);
+            // DG-40: a Healer bot's queued purify (BotFsm.DecideHealer) is its one DigPlace press.
+            Healer.TakeBotPurify(w, id, output);
         }
     }
 }
