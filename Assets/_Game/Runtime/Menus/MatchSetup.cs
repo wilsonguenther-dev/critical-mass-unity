@@ -236,6 +236,7 @@ namespace CriticalMass.Runtime.Menus
         protected override void OnShow()
         {
             Choice = SetupPrefs.EnsureLoaded();
+            Choice.Mode = MatchMode.Custom;   // home lobby: the setup screen is the CUSTOM mode (standard rules)
             if (!Playable.Contains(Choice.Class)) Choice.Class = ClassId.Warrior;
             if (Choice.TeamSize != 5) Choice.TeamSize = 16;
             Choice.Pace = Choice.Pace > 0 ? MatchSpeed.Snap(Choice.Pace) : MatchSpeed.DefaultPace;
@@ -370,6 +371,7 @@ namespace CriticalMass.Runtime.Menus
         {
             ClassSelect.SelectedClass = Choice.Class;          // DG-10 reads it for the respawn strip and the pause menu
 
+            Choice.Mode = MatchMode.Custom;
             SetupPrefs.Save(Choice);
             SpectatorMode.SpectateNextMatch = Spectate;
             GameFlow.BeginMatch(Choice);
@@ -378,7 +380,7 @@ namespace CriticalMass.Runtime.Menus
         public override void Back()
         {
             if (FromResults) Director.ReturnToResults();
-            else Director.ShowMenu(OverlayRegistry.Play);   // back onto CUSTOM MATCH, the line that opened setup
+            else Director.ShowModes(MatchMode.Custom);   // home lobby: back onto the CUSTOM card that opened setup
         }
     }
 }

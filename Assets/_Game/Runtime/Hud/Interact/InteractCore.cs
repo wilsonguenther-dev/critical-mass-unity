@@ -300,6 +300,15 @@ namespace CriticalMass.Runtime.Hud.Interact
             for (int i = 0; i < _numbered.Length; i++) _numbered[i] = (i + 1).ToString(CultureInfo.InvariantCulture);
         }
 
+        /// <summary>The name a team slot gets in the match (the home lobby's ready screen lists rosters before the world exists).</summary>
+        public static string ForSlot(TeamId team, int slot)
+        {
+            Init();
+            string[] list = team == TeamId.Crimson ? _crimson : _azure;
+            if (slot >= 0 && slot < list.Length) return list[slot];
+            return slot >= 0 && slot < _numbered.Length ? _numbered[slot] : "-";
+        }
+
         /// <summary>The unit's name ("YOU" for the local player).</summary>
         public static string For(World w, int id, int me)
         {

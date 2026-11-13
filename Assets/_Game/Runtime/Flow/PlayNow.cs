@@ -99,6 +99,7 @@ namespace CriticalMass.Runtime.Flow
         public static MatchSetupChoice Choice()
         {
             MatchSetupChoice c = SetupPrefs.EnsureLoaded();
+            c.Mode = MatchMode.Custom;   // home lobby: Play Now keeps the standard rules whatever mode was played last
             if (!MatchSetup.Playable.Contains(c.Class)) c.Class = ClassId.Warrior;
             if (c.TeamSize != 5) c.TeamSize = 16;
             c.Pace = c.Pace > 0 ? MatchSpeed.Snap(c.Pace) : MatchSpeed.DefaultPace;

@@ -137,7 +137,8 @@ namespace CriticalMass.Runtime.Menus
 
             // ---- the way out, always visible ----
             Rect mr = ResultsLayout.MainMenuButton, cr = ResultsLayout.ChangeClassButton, pr = ResultsLayout.PlayAgainButton;
-            _menu = Button(space, "Main Menu", mr.x, mr.y, mr.width, mr.height, "MAIN MENU", () => Director.ToMainMenu(), UiScale.TypeButton);
+            // Home lobby (feat/lobby): one press back to HOME, where this match's rewards land on the player card.
+            _menu = Button(space, "Main Menu", mr.x, mr.y, mr.width, mr.height, "HOME", () => Director.ToMainMenu(), UiScale.TypeButton);
             _change = Button(space, "Change Class", cr.x, cr.y, cr.width, cr.height, "CHANGE CLASS", () => Director.ShowSetup(true), UiScale.TypeButton);
             _again = Button(space, "Play Again", pr.x, pr.y, pr.width, pr.height, "PLAY AGAIN", () => Director.PlayAgain(), 32);
             _again.Body.RimPx = 4f;
@@ -563,7 +564,7 @@ namespace CriticalMass.Runtime.Menus
             else if ((pad != null && pad.rightShoulder.wasPressedThisFrame) || (kb != null && kb.eKey.wasPressedThisFrame)) StepTab(1);
         }
 
-        /// <summary>Back returns to the summary page first, then goes to the main menu.</summary>
+        /// <summary>Back returns to the summary page first, then goes home.</summary>
         public override void Back()
         {
             if (ActiveTab != ResultsTab.Summary)

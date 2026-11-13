@@ -12,9 +12,9 @@ namespace CriticalMass.Runtime.Hud
     /// Simple title screen: the bible's own primary logo (Visual Asset Bible p04, cut from its cream page by
     /// Art/UI/Logo/_source~/cut_bible_logo.py; 766 x 597 native, drawn 1:1 at 1080p from @1x, from @2x up to 4K, @4x above)
     /// with a slow bob and a pulsing glow on the egg's seams, over the live bot match under a Void Navy wash, and
-    /// two stickers under it: PLAY NOW (first and focused; Enter, Space, controller A or a click drops straight into a match
-    /// with the last class and settings, Flow.PlayNow) and MAIN MENU (Escape, B, Start, or the sticker). Left / right
-    /// moves the focus. The redrawn vector logo (critical-mass-logo@Nx) stays in the repo, unused. Hide() is the main-menu
+    /// three stickers under it: PLAY NOW (first and focused; Enter, Space, controller A or a click drops straight into a match
+    /// with the last class and settings, Flow.PlayNow), QUICK DEMO (a guided minute: move, hit, the hill and the Kaiju, then
+    /// home; Flow.PlayFlow.StartDemo) and HOME (Escape, B, Start, or the sticker: the home lobby). Left / right moves the focus. The redrawn vector logo (critical-mass-logo@Nx) stays in the repo, unused. Hide() is the main-menu
     /// path (tools and tests call it); with the flow off both paths just show the HUD. Shown on boot in player builds
     /// only (ShowOnBoot), never in the editor, batch mode or tests; the capture tool shows it explicitly.
     /// </summary>
@@ -31,12 +31,14 @@ namespace CriticalMass.Runtime.Hud
         public static readonly Vector2 LogoSize = new Vector2(766f, 597f);
         public const float LogoY = 70f, BobPx = 6f, BobPeriod = 4f, GlowPeriod = 2.6f;
         /// <summary>The two stickers, in 1920 x 1080 space from the top-left: y, width, height, gap.</summary>
-        public const float ButtonsY = 838f, ButtonW = 420f, ButtonH = 84f, ButtonGap = 24f;
+        public const float ButtonsY = 838f, ButtonW = 380f, ButtonH = 84f, ButtonGap = 24f;
         public RawImage Logo => _logo;
         /// <summary>PLAY NOW, the first and focused sticker.</summary>
         public MenuItem PlayNowItem => _playNow;
         public MenuItem MainMenuItem => _toMenu;
-        MenuItem _playNow, _toMenu;
+        /// <summary>QUICK DEMO, the middle sticker.</summary>
+        public MenuItem DemoItem => _demo;
+        MenuItem _playNow, _toMenu, _demo;
         float _t;
 
         public static TitleScreen Show(GameObject host, GameHud hud)
@@ -104,20 +106,26 @@ namespace CriticalMass.Runtime.Hud
             sp.anchorMin = sp.anchorMax = new Vector2(0.5f, 0.5f);
             sp.pivot = new Vector2(0.5f, 0.5f);
             sp.sizeDelta = new Vector2(HudLayout.RefW, HudLayout.RefH);
-            float bx = 960f - ButtonW - ButtonGap * 0.5f;
+            float bx = 960f - ButtonW * 1.5f - ButtonGap;
             _playNow = MenuUi.Item(sp, "Play Now", bx, ButtonsY, ButtonW, ButtonH, Flow.PlayNow.Label, MenuItem.Kind.Button, 38, true,
                 CMTokens.Display);
             _playNow.Body.Radius = 18f;
             _playNow.Body.RimPx = 4f;
             _playNow.Body.SetRim(CMTokens.ToolBrass.Color);
             _playNow.Submitted = PressPlayNow;
-            _toMenu = MenuUi.Item(sp, "Main Menu", 960f + ButtonGap * 0.5f, ButtonsY, ButtonW, ButtonH, "MAIN MENU", MenuItem.Kind.Button, 30,
+            _demo = MenuUi.Item(sp, "Quick Demo", 960f - ButtonW * 0.5f, ButtonsY, ButtonW, ButtonH, "QUICK DEMO", MenuItem.Kind.Button, 30,
+                true, CMTokens.Display);
+            _demo.Body.Radius = 18f;
+            _demo.Body.RimPx = 3f;
+            _demo.Submitted = PressDemo;
+            _toMenu = MenuUi.Item(sp, "Main Menu", 960f + ButtonW * 0.5f + ButtonGap, ButtonsY, ButtonW, ButtonH, "HOME", MenuItem.Kind.Button, 30,
                 true, CMTokens.Display);
             _toMenu.Body.Radius = 18f;
             _toMenu.Body.RimPx = 3f;
             _toMenu.Submitted = Hide;
-            _playNow.navigation = new Navigation { mode = Navigation.Mode.Explicit, selectOnRight = _toMenu, selectOnLeft = _toMenu };
-            _toMenu.navigation = new Navigation { mode = Navigation.Mode.Explicit, selectOnLeft = _playNow, selectOnRight = _playNow };
+            _playNow.navigation = new Navigation { mode = Navigation.Mode.Explicit, selectOnRight = _demo, selectOnLeft = _toMenu };
+            _demo.navigation = new Navigation { mode = Navigation.Mode.Explicit, selectOnLeft = _playNow, selectOnRight = _toMenu };
+            _toMenu.navigation = new Navigation { mode = Navigation.Mode.Explicit, selectOnLeft = _demo, selectOnRight = _playNow };
             PauseMenu.EnsureEventSystem(transform);
             if (EventSystem.current != null) EventSystem.current.SetSelectedGameObject(_playNow.gameObject);
 
@@ -126,7 +134,7 @@ namespace CriticalMass.Runtime.Hud
             pr.anchorMin = pr.anchorMax = new Vector2(0.5f, 0.5f);
             pr.sizeDelta = new Vector2(1100f, 40f);
             pr.anchoredPosition = new Vector2(0f, -432f);
-            _prompt.text = "ENTER, SPACE OR A   PLAY NOW      ·      ESC OR B   MAIN MENU";
+            _prompt.text = "ENTER, SPACE OR A   PLAY NOW      ·      ESC OR B   HOME";
             Text sub = HudText.Make(root, "Tagline", CMTokens.Ui, 22, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 2f);
             RectTransform sr = sub.rectTransform;
             sr.anchorMin = sr.anchorMax = new Vector2(0.5f, 0.5f);
@@ -201,11 +209,13 @@ namespace CriticalMass.Runtime.Hud
             if (_hidden) return;
             // Keep a focus for the keyboard and controller if the mouse cleared it.
             EventSystem es = EventSystem.current;
-            if (es != null && es.currentSelectedGameObject != _playNow.gameObject && es.currentSelectedGameObject != _toMenu.gameObject)
+            GameObject sel = es != null ? es.currentSelectedGameObject : null;
+            if (es != null && sel != _playNow.gameObject && sel != _toMenu.gameObject && sel != _demo.gameObject)
                 es.SetSelectedGameObject(_playNow.gameObject);
             if (Confirm())
             {
-                if (es != null && es.currentSelectedGameObject == _toMenu.gameObject) Hide();
+                if (sel == _toMenu.gameObject) Hide();
+                else if (sel == _demo.gameObject) PressDemo();
                 else PressPlayNow();
             }
             else if (BackPressed()) Hide();
@@ -246,6 +256,25 @@ namespace CriticalMass.Runtime.Hud
             if (_canvas != null) Destroy(_canvas.gameObject);
             Destroy(this);
             Flow.PlayNow.FromTitle();
+        }
+
+        /// <summary>
+        /// QUICK DEMO: a guided minute against easy bots (move, hit, the hill, the Kaiju), then the home screen. With the flow
+        /// off (editor) or in autoplay it is the same as Hide().
+        /// </summary>
+        public void PressDemo()
+        {
+            if (_hidden) return;
+            if (!Flow.GameFlow.Enabled || Flow.FlowDirector.Current == null || Flow.GameFlow.State == Flow.FlowState.Off ||
+                Flow.GameFlow.Autoplay)
+            {
+                Hide();
+                return;
+            }
+            _hidden = true;
+            if (_canvas != null) Destroy(_canvas.gameObject);
+            Destroy(this);
+            Flow.PlayFlow.StartDemo();
         }
 
         /// <summary>View-only idle motion: a slow bob and the egg's seam glow breathing (no flashing, below 0.5 Hz).</summary>

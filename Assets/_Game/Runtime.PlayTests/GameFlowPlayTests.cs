@@ -86,6 +86,14 @@ namespace CriticalMass.Runtime.PlayTests
             yield return null;
         }
 
+        /// <summary>Home lobby: HOME, CHANGE MODE, then the CUSTOM card opens the full match setup.</summary>
+        static IEnumerator OpenCustomSetup(FlowDirector d)
+        {
+            yield return Press(d.MainMenu.ChangeModeItem);
+            Assert.IsTrue(d.Modes.IsVisible, "CHANGE MODE opens the mode cards");
+            yield return Press(d.Modes.Card(MatchMode.Custom));
+        }
+
         static IEnumerator Until(Func<bool> condition, float timeout, string what)
         {
             float t0 = Time.realtimeSinceStartup;
@@ -118,9 +126,9 @@ namespace CriticalMass.Runtime.PlayTests
             FlowDirector d = FlowDirector.Current;
             Assert.AreEqual(FlowState.Menu, GameFlow.State);
             Assert.IsTrue(d.MainMenu.IsVisible);
-            Assert.AreEqual(d.MainMenu.Item("playnow"), d.MainMenu.Focused, "PLAY NOW is focused (one press into a match)");
+            Assert.AreEqual(d.MainMenu.PlayItem, d.MainMenu.Focused, "home: PLAY is focused");
 
-            yield return Press(d.MainMenu.Item("play"));
+            yield return OpenCustomSetup(d);
             Assert.AreEqual(FlowState.Setup, GameFlow.State);
             Assert.IsTrue(d.Setup.IsVisible);
             d.Setup.SetTeam(TeamId.Crimson);
@@ -278,7 +286,7 @@ namespace CriticalMass.Runtime.PlayTests
             UnityEngine.Object.FindAnyObjectByType<TitleScreen>().Hide();
             yield return null;
             FlowDirector d = FlowDirector.Current;
-            yield return Press(d.MainMenu.Item("play"));
+            yield return OpenCustomSetup(d);
             Assert.AreEqual(FlowState.Setup, GameFlow.State);
             SimDriverBehaviour previous = Driver();
             yield return Press(d.Setup.StartItem);
@@ -320,13 +328,10 @@ namespace CriticalMass.Runtime.PlayTests
             FlowDirector d = FlowDirector.Current;
             while (Time.unscaledTime < MenuItem.SubmitBlockedUntil) yield return null;
 
-            // Down from Play lands on the next line that exists (How to play, Barracks are coming soon unless registered).
-            string next = null;
-            var entries = d.MainMenu.Entries;
-            for (int i = 1; i < entries.Count && next == null; i++)
-                if (entries[i].Available) next = entries[i].Id;
+            // Home lobby: down from PLAY wraps to the first tile on the rail (only lines that lead somewhere are shown).
+            string next = d.MainMenu.Entries[0].Id;
             yield return Tap(Key.DownArrow);
-            Assert.AreEqual(d.MainMenu.Item(next), d.MainMenu.Focused, "down skips the coming-soon lines");
+            Assert.AreEqual(d.MainMenu.Item(next), d.MainMenu.Focused, "down from PLAY wraps to the first home tile");
 
             // Walk down to Controls and open it: the pause menu's own settings page on the Controls tab.
             for (int guard = 0; guard < 8 && d.MainMenu.Focused != d.MainMenu.Item("controls"); guard++) yield return Tap(Key.DownArrow);
@@ -358,13 +363,15 @@ namespace CriticalMass.Runtime.PlayTests
             UnityEngine.Object.FindAnyObjectByType<TitleScreen>().Hide();
             yield return null;
             FlowDirector d = FlowDirector.Current;
-            yield return Press(d.MainMenu.Item("play"));
+            yield return OpenCustomSetup(d);
             Assert.IsTrue(d.Setup.IsVisible);
             yield return Press(d.Setup.BackItem);
+            Assert.IsTrue(d.Modes.IsVisible, "setup's Back returns to the mode cards");
+            yield return Press(d.Modes.BackItem);
             Assert.IsTrue(d.MainMenu.IsVisible);
             Assert.AreEqual(FlowState.Menu, GameFlow.State);
 
-            yield return Press(d.MainMenu.Item("play"));
+            yield return OpenCustomSetup(d);
             SimDriverBehaviour previous = Driver();
             d.Setup.SetSize(5);
             yield return Press(d.Setup.StartItem);
