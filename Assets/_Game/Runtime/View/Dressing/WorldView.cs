@@ -20,6 +20,11 @@ namespace CriticalMass.Runtime.View.Dressing
     /// renderer count; a dig or place re-plans the world (WorldDresser.Plan is a pure function of the map) and rebuilds
     /// only the groups whose placements changed (ChangedGroups), so lips, cliffs and ledges follow the new edge; the hill
     /// site's team materials take the colours of the team holding the hill (MatchState.HillState, HillSwatch).
+    /// World reactions (2026-11-12): pieces that move (WorldKit.SwayKind: grass, flowers, bushes, trees, banners, bridge
+    /// decks, waterfalls) combine onto a sway clone of their look material (_SwayOn 1, _WaterFlow 1 for water) and every
+    /// vertex carries UV5 = (pivot world x, pivot world z, weight, kind): weight = height squared within the piece for
+    /// foliage and trees, distance from the pole for banners, sin(pi t) along the deck for bridges. Still pieces (ledges,
+    /// ground cells, cliffs) keep the plain material and pay nothing. Sway group bounds grow 0.6 u each way.
     /// </summary>
     public sealed class WorldView : MonoBehaviour
     {
@@ -57,6 +62,26 @@ namespace CriticalMass.Runtime.View.Dressing
         private Texture2D _field;
         private readonly Dictionary<int, List<GameObject>> _groups = new Dictionary<int, List<GameObject>>();
         private readonly List<Material> _hillMats = new List<Material>();
+        private readonly Dictionary<Material, Material> _swayMats = new Dictionary<Material, Material>();
+
+        /// <summary>Per-part sway data baked into UV5 by MakeGroup (kind 0 = still).</summary>
+        private struct SwayInfo
+        {
+            public float PivotX, PivotZ, SpanA, SpanB;
+            public byte Kind;
+        }
+
+        /// <summary>The sway clone of a look material (_SwayOn 1; water also flows). Hill-tinted materials never sway.</summary>
+        private Material SwayMaterial(Material src, byte kind)
+        {
+            if (src == null || kind == 0 || _hillMats.Contains(src) || !src.HasProperty("_SwayOn")) return src;
+            if (_swayMats.TryGetValue(src, out Material m) && m != null) return m;
+            m = new Material(src) { name = src.name + " (sway)" };
+            m.SetFloat("_SwayOn", 1f);
+            if (kind == 7 && m.HasProperty("_WaterFlow")) m.SetFloat("_WaterFlow", 1f);
+            _swayMats[src] = m;
+            return m;
+        }
         private HillState _hillShown = (HillState)(-1);
 
         /// <summary>The hill tint shown now (tests read it).</summary>
@@ -200,7 +225,7 @@ namespace CriticalMass.Runtime.View.Dressing
         /// <summary>Combines the plan's kit pieces per group per material; only the groups in "only" when it is set.</summary>
         private void BuildGroups(HashSet<int> only)
         {
-            var groups = new Dictionary<(int chunk, Material mat), List<(MeshData d, int sub, Matrix4x4 m)>>();
+            var groups = new Dictionary<(int chunk, Material mat), List<(MeshData d, int sub, Matrix4x4 m, SwayInfo sw)>>();
             foreach (WorldPlacement p in Plan.Placements)
             {
                 if (p.Piece == "env_ground_cell") continue; // drawn per chunk by BuildGroundChunk
@@ -208,6 +233,8 @@ namespace CriticalMass.Runtime.View.Dressing
                 if (model == null) continue;
                 int chunk = GroupOf(p);
                 bool layout = p.Piece.StartsWith("cm_layout_", StringComparison.Ordinal);
+                Vector3 pivot = p.Matrix.MultiplyPoint3x4(Vector3.zero);
+                var sw = new SwayInfo { PivotX = pivot.x, PivotZ = pivot.z, SpanA = p.SpanA, SpanB = p.SpanB, Kind = layout ? (byte)0 : WorldKit.SwayKind(p.Piece) };
                 if (only != null && !layout && !only.Contains(chunk)) continue;
                 foreach (MeshFilter mf in model.GetComponentsInChildren<MeshFilter>(true))
                 {
@@ -227,10 +254,10 @@ namespace CriticalMass.Runtime.View.Dressing
                     }
                     for (int s = 0; s < d.Subs.Length; s++)
                     {
-                        Material mat = Resolve(s < mats.Length ? mats[s] : null, p.Team);
+                        Material mat = SwayMaterial(Resolve(s < mats.Length ? mats[s] : null, p.Team), sw.Kind);
                         if (mat == null) continue;
-                        if (!groups.TryGetValue((pieceChunk, mat), out var list)) groups[(pieceChunk, mat)] = list = new List<(MeshData, int, Matrix4x4)>();
-                        list.Add((d, s, m));
+                        if (!groups.TryGetValue((pieceChunk, mat), out var list)) groups[(pieceChunk, mat)] = list = new List<(MeshData, int, Matrix4x4, SwayInfo)>();
+                        list.Add((d, s, m, sw));
                     }
                 }
             }
@@ -349,13 +376,13 @@ namespace CriticalMass.Runtime.View.Dressing
             MeshData d = mf != null ? Data(mf.sharedMesh) : null;
             if (d == null) return;
             int x0 = (chunk % 64) * ChunkSize, z0 = (chunk / 64) * ChunkSize;
-            var list = new List<(MeshData, int, Matrix4x4)>();
+            var list = new List<(MeshData, int, Matrix4x4, SwayInfo)>();
             for (int cz = z0; cz < Math.Min(z0 + ChunkSize, _map.Height); cz++)
             for (int cx = x0; cx < Math.Min(x0 + ChunkSize, _map.Width); cx++)
             {
                 int i = cz * _map.Width + cx;
                 if (!WorldDresser.Solid(_map.Cells[i])) continue;
-                list.Add((d, 0, Matrix4x4.Translate(new Vector3(cx + 0.5f, (float)_map.Height01[i], -(cz + 0.5f)))));
+                list.Add((d, 0, Matrix4x4.Translate(new Vector3(cx + 0.5f, (float)_map.Height01[i], -(cz + 0.5f))), default(SwayInfo)));
             }
             if (list.Count == 0) return;
             _groundChunks[chunk] = MakeGroup("Ground " + chunk, GroundMaterial(), list);
@@ -424,6 +451,42 @@ namespace CriticalMass.Runtime.View.Dressing
             public Vector2[] UV;
             public List<Vector3> UV2 = new List<Vector3>(), UV3 = new List<Vector3>();
             public int[][] Subs;
+            /// <summary>Mesh-local bounds (sway weights are relative to the piece).</summary>
+            public Vector3 Min, Max;
+        }
+
+        /// <summary>UV5 weight of one mesh-local vertex for a sway kind (0 root .. 1 free tip).</summary>
+        private static float SwayWeight(MeshData d, Vector3 v, in SwayInfo sw)
+        {
+            switch (sw.Kind)
+            {
+                case 1:
+                case 2:
+                case 3:
+                {
+                    float h = Mathf.Clamp01((v.y - d.Min.y) / Mathf.Max(1e-3f, d.Max.y - d.Min.y));
+                    return h * h;
+                }
+                case 4:
+                case 6:
+                {
+                    // Banner / lantern: away from the pole (mesh origin) and down from the top hinge for the lantern.
+                    float r = Mathf.Max(1e-3f, Mathf.Max(Mathf.Max(Mathf.Abs(d.Min.x), Mathf.Abs(d.Max.x)), Mathf.Max(Mathf.Abs(d.Min.z), Mathf.Abs(d.Max.z))));
+                    float k = Mathf.Clamp01(new Vector2(v.x, v.z).magnitude / r);
+                    if (sw.Kind == 6) k = Mathf.Clamp01((d.Max.y - v.y) / Mathf.Max(1e-3f, d.Max.y - d.Min.y));
+                    return k * k;
+                }
+                case 5:
+                {
+                    if (sw.SpanB <= sw.SpanA) return 1f; // a deck cell not under a span: the local pressure alone shapes the dip
+                    float a = Mathf.Clamp01((v.z - d.Min.z) / Mathf.Max(1e-3f, d.Max.z - d.Min.z));
+                    return Mathf.Sin(Mathf.PI * Mathf.Lerp(sw.SpanA, sw.SpanB, a));
+                }
+                case 7:
+                    return 1f;
+                default:
+                    return 0f;
+            }
         }
 
         private MeshData Data(Mesh mesh)
@@ -436,6 +499,8 @@ namespace CriticalMass.Runtime.View.Dressing
                 return null;
             }
             d = new MeshData { V = mesh.vertices, N = mesh.normals, C = mesh.colors, UV = mesh.uv, Subs = new int[mesh.subMeshCount][] };
+            d.Min = mesh.bounds.min;
+            d.Max = mesh.bounds.max;
             mesh.GetUVs(2, d.UV2);
             mesh.GetUVs(3, d.UV3);
             for (int s = 0; s < mesh.subMeshCount; s++) d.Subs[s] = mesh.GetTriangles(s);
@@ -444,8 +509,12 @@ namespace CriticalMass.Runtime.View.Dressing
         }
 
         /// <summary>One combined mesh: positions, normals, UV2 (foam extrusion) and UV3 (outline direction) transformed.</summary>
-        private GameObject MakeGroup(string name, Material mat, List<(MeshData d, int sub, Matrix4x4 m)> parts)
+        private GameObject MakeGroup(string name, Material mat, List<(MeshData d, int sub, Matrix4x4 m, SwayInfo sw)> parts)
         {
+            // UV5 only on groups whose material reads it (the sway clones): still groups carry no extra channel.
+            bool swayMat = mat != null && mat.HasProperty("_SwayOn") && mat.GetFloat("_SwayOn") > 0.5f;
+            var uv5 = swayMat ? new List<Vector4>() : null;
+            bool sways = false;
             var v = new List<Vector3>();
             var n = new List<Vector3>();
             var c = new List<Color>();
@@ -454,7 +523,7 @@ namespace CriticalMass.Runtime.View.Dressing
             var uv3 = new List<Vector3>();
             var tri = new List<int>();
             var map = new Dictionary<int, int>();
-            foreach (var (d, sub, m) in parts)
+            foreach (var (d, sub, m, sw) in parts)
             {
                 Matrix4x4 nm = m.inverse.transpose;
                 map.Clear();
@@ -470,6 +539,12 @@ namespace CriticalMass.Runtime.View.Dressing
                         uv.Add(d.UV.Length > i ? d.UV[i] : Vector2.zero);
                         uv2.Add(d.UV2.Count > i && d.UV2[i].sqrMagnitude > 0.25f ? nm.MultiplyVector(d.UV2[i]).normalized : Vector3.zero);
                         uv3.Add(d.UV3.Count > i ? nm.MultiplyVector(d.UV3[i]).normalized : n[j]);
+                        if (uv5 != null)
+                        {
+                            float wgt = SwayWeight(d, d.V[i], in sw);
+                            if (wgt > 0f) sways = true;
+                            uv5.Add(new Vector4(sw.PivotX, sw.PivotZ, wgt, sw.Kind));
+                        }
                     }
                     tri.Add(j);
                 }
@@ -481,7 +556,14 @@ namespace CriticalMass.Runtime.View.Dressing
             mesh.SetUVs(0, uv);
             mesh.SetUVs(2, uv2);
             mesh.SetUVs(3, uv3);
+            if (uv5 != null) mesh.SetUVs(5, uv5);
             mesh.SetTriangles(tri, 0, true);
+            if (sways)
+            {
+                Bounds b = mesh.bounds;
+                b.Expand(1.2f); // the sway clamps at 0.6 u: never culled while bent
+                mesh.bounds = b;
+            }
             mesh.UploadMeshData(true);
             var go = new GameObject(name);
             go.transform.SetParent(_root, false);

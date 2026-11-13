@@ -8,8 +8,9 @@ namespace CriticalMass.Runtime.Menu
     /// <summary>
     /// The player's settings, stored in PlayerPrefs (kept between launches), read by the settings page and by any system
     /// that honours them. View side only: nothing here reaches the sim.
-    /// <para>Keys other code may read directly: cm.blood (int, 1 = blood on, default 1), cm.shake (camera shake, default 1),
-    /// cm.damagenumbers (default 1). Volumes are linear 0..1; the AudioMixer (Resources/Audio/CMMixer) gets them as dB on
+    /// <para>Keys other code may read directly: cm.blood (int, 1 = blood on, default 1), cm.shake (camera shake, default 0 = OFF:
+    /// the owner's accessibility decision OD-6; Effects.ShakeEnabled reads CameraShake, the one source of truth),
+    /// cm.reducedMotion (default 0; world sway, springs and launches drop to 25%), cm.damagenumbers (default 1). Volumes are linear 0..1; the AudioMixer (Resources/Audio/CMMixer) gets them as dB on
     /// the exposed parameters MasterVolume, MusicVolume and EffectsVolume. Without the mixer, master volume falls back to
     /// AudioListener.volume.</para>
     /// </summary>
@@ -30,12 +31,14 @@ namespace CriticalMass.Runtime.Menu
         public const string FpsCapKey = "cm.fpsCap";
         /// <summary>Lower the frame rate while the game is not the front window: 1 on (default), 0 off.</summary>
         public const string BgThrottleKey = "cm.bgThrottle";
+        /// <summary>Reduced motion (shared with the story intro and attract mode): 1 on, default 0.</summary>
+        public const string ReducedMotionKey = "cm.reducedMotion";
 
         /// <summary>Every key this class writes (tests back these up and restore them).</summary>
         public static readonly string[] AllKeys =
         {
             MasterKey, MusicKey, EffectsKey, WidthKey, HeightKey, FullScreenKey, VSyncKey, QualityKey, ShakeKey,
-            DamageNumbersKey, BloodKey, FpsCapKey, BgThrottleKey,
+            DamageNumbersKey, BloodKey, FpsCapKey, BgThrottleKey, ReducedMotionKey,
         };
 
         public const string MixerResource = "Audio/CMMixer";
@@ -52,8 +55,11 @@ namespace CriticalMass.Runtime.Menu
         public static float EffectsVolume { get => GetF(EffectsKey, 1f); set { SetF(EffectsKey, Mathf.Clamp01(value)); ApplyAudio(); } }
 
         // ---- game ----
-        /// <summary>Camera shake allowed (no shake exists yet; the flag is stored for the effects work).</summary>
-        public static bool CameraShake { get => GetB(ShakeKey, true); set => SetB(ShakeKey, value); }
+        /// <summary>Camera shake allowed. Default OFF (OD-6); with it off, impacts land through the shake replacement
+        /// (grass shock ring, edge flash toward the source, controller rumble, bass hook: Reactions.CameraResponse).</summary>
+        public static bool CameraShake { get => GetB(ShakeKey, false); set => SetB(ShakeKey, value); }
+        /// <summary>Reduced motion: world sway, spring bones, death launches and the edge flash at 25% (cm.reducedMotion).</summary>
+        public static bool ReducedMotion { get => GetB(ReducedMotionKey, false); set => SetB(ReducedMotionKey, value); }
         /// <summary>Floating damage numbers shown.</summary>
         public static bool DamageNumbers { get => GetB(DamageNumbersKey, true); set => SetB(DamageNumbersKey, value); }
         /// <summary>Blood effects on (PlayerPrefs cm.blood, default on).</summary>

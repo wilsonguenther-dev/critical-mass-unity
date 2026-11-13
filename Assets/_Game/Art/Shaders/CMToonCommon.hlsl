@@ -55,11 +55,33 @@ CBUFFER_START(UnityPerMaterial)
     half4 _BerserkTint;
     half _BerserkTintAmount;
     float _OutlineWeightUV4;
+    // World reactions (2026-11-12, physics audit seat "world reactions"): _SwayOn reads UV5 (pivot xz, weight, kind) and
+    // displaces the vertex in every pass; _WaterFlow scrolls the water stripes and draws ripple rings; _WobbleUV4Y reads
+    // a hair / scarf / tabard wobble weight from UV4.y (art supplies it; 0 everywhere = no motion). All default 0.
+    float _SwayOn;
+    float _WaterFlow;
+    float _WobbleUV4Y;
 CBUFFER_END
 
 // Outside the per-material block (textures are not CBUFFER members; SRP Batcher compatible).
 TEXTURE2D(_FaceTex);
 SAMPLER(sampler_FaceTex);
+
+// World reactions globals (contract C1 of the physics build list; set by Runtime/View/World/ForceField.cs). Every one is
+// 0 until it runs, which means no motion at all. PR #30's _CMFxImpulses / _CMFxImpulseCount are retired.
+// _CMForceTex: RGBA half over a square window following the camera target: RG push (world x, z), B pressure (walkers,
+// bridge sag, water rings). _CMForceTexWindow: world origin x, world origin z, window size (u), unused.
+// _CMForces[16 x 2]: the 16 live force slots, (pos x, pos z (world), radius, strength x remaining life) and
+// (dir x, dir z, age s, shape); _CMForceCount slots used. _CMWind: world dir x, dir z, strength 0..1, gust frequency
+// (Hz). _CMSwayParams: x amplitude (0 off, 1 full, 0.25 reduced motion), y bridge sag (u at full pressure), z 1 when
+// _CMForceTex is bound (Medium, High; Low reads the 16 slots instead), w view time (s).
+TEXTURE2D(_CMForceTex);
+SAMPLER(sampler_CMForceTex);
+float4 _CMForceTexWindow;
+float4 _CMForces[32];
+float _CMForceCount;
+float4 _CMWind;
+float4 _CMSwayParams;
 
 // Shared vertex input. uv0 is read only when _DecalOn is set and outlineW (UV4.x, baked by ArtImportPostprocessor) only
 // when _OutlineWeightUV4 is set, for the same reason as UV3 below: meshes without the channel are never asked for it.
@@ -78,6 +100,7 @@ struct CMToonAttributes
     float3 extrudeOS  : TEXCOORD2;
     float3 outlineOS  : TEXCOORD3;
     float2 outlineW   : TEXCOORD4;
+    float4 sway       : TEXCOORD5;
 };
 
 // Vertex-colour mode (_ColorMode 1; Blender art import 2026-11-12). The art's colour set "Col" carries the lit colour
@@ -159,11 +182,141 @@ float4 CMToonPushPx(float4 positionCS, float3 dirOS, float px)
     return positionCS;
 }
 
-// Clip position of the lit, depth and normals passes: the plain transform, plus the foam extrusion when the material
-// sets _ExtrudePx (only the water look; other meshes may carry no UV2, so it is never read for them).
+// ------------------------------------------------------------------------------------------- world reactions
+// UV of a world xz in the force window. The window texture is written with raw clip positions (ForceField's stamp mesh),
+// so on platforms whose texture rows start at the top the logical v flips, exactly as the core Blit full-screen
+// triangle does (GetFullScreenTriangleTexCoord).
+float2 CMForceUV(float2 xz)
+{
+    float2 uv = (xz - _CMForceTexWindow.xy) / max(_CMForceTexWindow.z, 1e-3);
+#if UNITY_UV_STARTS_AT_TOP
+    uv.y = 1.0 - uv.y;
+#endif
+    return uv;
+}
+
+// Push (xy, world x / z) and pressure (z) at a world xz: the force texture at Medium and High, else the 16 force
+// slots (Low). Fades to 0 over the outer 10% of the window so nothing pops as it scrolls.
+float3 CMForceAt(float2 xz)
+{
+    float3 f = float3(0.0, 0.0, 0.0);
+    if (_CMSwayParams.z > 0.5)
+    {
+        float2 uv = CMForceUV(xz);
+        float edge = saturate(min(min(uv.x, 1.0 - uv.x), min(uv.y, 1.0 - uv.y)) * 10.0);
+        if (edge > 0.0)
+            f = SAMPLE_TEXTURE2D_LOD(_CMForceTex, sampler_CMForceTex, uv, 0).xyz * edge;
+    }
+    else
+    {
+        // Low tier: the 16 force slots directly (an expanding push front for radial shapes would need the texture).
+        [unroll] for (int i = 0; i < 16; i++)
+        {
+            float4 a = _CMForces[i * 2];
+            float2 d = xz - a.xy;
+            float dist = length(d);
+            float k = saturate(1.0 - dist / max(a.z, 1e-3)) * a.w * step((float)i, _CMForceCount - 0.5);
+            f.xy += d / max(dist, 1e-3) * k;
+            f.z += k;
+        }
+    }
+    return f;
+}
+
+float CMToonHash12(float2 p)
+{
+    float3 p3 = frac(float3(p.xyx) * 0.1031);
+    p3 += dot(p3, p3.yzx + 33.33);
+    return frac((p3.x + p3.y) * p3.z);
+}
+
+// The ONE sway function (world space offset). sway = UV5 baked by WorldView.MakeGroup: pivot x, pivot z (world), weight
+// (0 at the root, 1 at the free tip: height squared for foliage, sin along the span for bridge decks), kind:
+// 1 grass / flowers, 2 bush, 3 tree, 4 banner, 5 bridge deck, 6 lantern (pendulum), 7 water (no vertex motion).
+// Wind (2-octave sine, per-piece phase from the pivot hash) plus the force field read at the pivot (a whole tuft bends
+// together; bridge decks read it at the vertex so the deck dips under the walker). Clamped to 0.6 u (bounds grow 0.6).
+float3 CMToonSwayOffset(float3 positionWS, float4 sway)
+{
+    float w = sway.z;
+    float amp = _CMSwayParams.x;
+    if (w <= 0.0 || amp <= 0.0) return float3(0.0, 0.0, 0.0);
+    int kind = (int)round(sway.w);
+    if (kind <= 0 || kind >= 7) return float3(0.0, 0.0, 0.0);
+    float2 pivot = sway.xy;
+    float t = _CMSwayParams.w;
+    float phase = CMToonHash12(pivot);
+    float windAmp = kind == 1 ? 0.10 : (kind == 2 ? 0.05 : (kind == 3 ? 0.06 : (kind == 4 ? 0.16 : (kind == 6 ? 0.05 : 0.0))));
+    float pushAmp = kind == 1 ? 0.45 : (kind == 2 ? 0.22 : (kind == 3 ? 0.10 : (kind == 4 ? 0.30 : (kind == 6 ? 0.25 : 0.0))));
+    float slow = kind == 4 ? 5.3 : 1.7;
+    float fast = kind == 4 ? 9.1 : 3.9;
+    float gust = 0.55 + 0.45 * sin(t * 6.2831853 * _CMWind.w + dot(pivot, float2(0.11, 0.07)));
+    float wave = 0.65 * sin(t * slow + phase * 6.2831853) + 0.35 * sin(t * fast + phase * 11.0);
+    float2 off = _CMWind.xy * (_CMWind.z * gust * (0.6 + 0.4 * wave)) * windAmp;
+    float3 f = CMForceAt(kind == 5 ? positionWS.xz : pivot);
+    off += f.xy * pushAmp;
+    if (kind == 3 || kind == 6)
+    {
+        // Tree shake / lantern swing: an oscillation whose size follows the local push.
+        float m = saturate(length(f.xy));
+        float fl = length(f.xy);
+        float2 axis = fl > 1e-3 ? f.xy / max(fl, 1e-3) : float2(0.7071, 0.7071);
+        off += axis * (m * sin(t * (kind == 3 ? 21.0 : 7.0) + phase * 6.2831853) * (kind == 3 ? 0.06 : 0.12));
+    }
+    off *= w * amp;
+    float len = length(off);
+    if (len > 0.6) { off *= 0.6 / len; len = 0.6; }
+    float3 o = float3(off.x, -0.5 * len * len, off.y);
+    if (kind == 1) o.y -= saturate(f.z) * 0.12 * w * amp;                         // flattened under a blast or a walker
+    if (kind == 5)
+    {
+        float p = saturate(f.z);
+        o.y -= (_CMSwayParams.y * p + 0.02 * p * sin(t * 25.0 + phase * 6.2831853)) * w * amp;   // sag + plank bounce
+    }
+    return o;
+}
+
+// Hair / scarf / tabard wobble from UV4.y (no joints for them on the KayKit rig). Art supplies the weight; 0 = still.
+float3 CMToonWobble(float3 positionWS, float weight)
+{
+    float amp = _CMSwayParams.x;
+    if (weight <= 0.0 || amp <= 0.0) return float3(0.0, 0.0, 0.0);
+    float t = _CMSwayParams.w;
+    float3 o = float3(sin(t * 7.0 + positionWS.y * 3.0), 0.0, cos(t * 6.1 + positionWS.x * 2.7)) * 0.025;
+    o.xz += _CMWind.xy * (0.03 * _CMWind.z);
+    return o * saturate(weight) * amp;
+}
+
+// World position of a vertex in every pass: the plain transform plus the sway (world meshes with UV5) and the wobble.
+float3 CMToonWorldPos(CMToonAttributes input)
+{
+    float3 positionWS = TransformObjectToWorld(input.positionOS.xyz);
+    if (_SwayOn > 0.5) positionWS += CMToonSwayOffset(positionWS, input.sway);
+    if (_WobbleUV4Y > 0.5) positionWS += CMToonWobble(positionWS, input.outlineW.y);
+    return positionWS;
+}
+
+// Water (_WaterFlow): stripes that fall down steep faces (the waterfall) and drift on flat ones, plus ripple rings where
+// the force field has pressure (fighters wading, splashes). Lit-pass only.
+half3 CMToonWater(half3 color, float3 positionWS, float3 normalWS)
+{
+    if (_WaterFlow <= 0.0) return color;
+    float t = _CMSwayParams.w;
+    float steep = 1.0 - saturate(abs(normalWS.y));
+    float coord = steep > 0.5 ? positionWS.y * 1.6 + t * 1.8 * _WaterFlow
+                              : dot(positionWS.xz, float2(0.7071, 0.7071)) * 1.2 - t * 0.35 * _WaterFlow;
+    float stripe = step(0.82, frac(coord + 0.15 * sin(positionWS.x * 1.3 + positionWS.z * 0.9)));
+    half3 light = saturate(color * 1.18h + 0.04h);
+    color = lerp(color, light, stripe * 0.85h);
+    float p = saturate(CMForceAt(positionWS.xz).z);
+    float ring = step(0.7, frac(p * 3.0 - t * 2.0)) * step(0.05, p);
+    return lerp(color, light, ring * 0.6 * (1.0 - steep));
+}
+
+// Clip position of the lit, depth and normals passes: the displaced world position, plus the foam extrusion when the
+// material sets _ExtrudePx (only the water look; other meshes may carry no UV2, so it is never read for them).
 float4 CMToonPositionCS(CMToonAttributes input)
 {
-    float4 positionCS = TransformObjectToHClip(input.positionOS.xyz);
+    float4 positionCS = TransformWorldToHClip(CMToonWorldPos(input));
     if (_ExtrudePx > 0.0 && dot(input.extrudeOS, input.extrudeOS) > 0.25)
         positionCS = CMToonPushPx(positionCS, input.extrudeOS, _ExtrudePx);
     return positionCS;
@@ -204,7 +357,7 @@ float4 CMToonOutlinePositionCS(CMToonAttributes input)
     // 3 (art refresh 2): the smoothed direction in TANGENT.xyz, which skinning deforms (characters and Kaiju).
     float3 dirOS = _OutlineSource > 2.5 ? input.tangentOS.xyz
                  : _OutlineSource > 1.5 ? input.outlineOS : (_OutlineSource > 0.5 ? input.positionOS.xyz : input.normalOS);
-    float4 positionCS = TransformObjectToHClip(input.positionOS.xyz);
+    float4 positionCS = TransformWorldToHClip(CMToonWorldPos(input));   // same displaced position as the fill
     float3 dirWS = TransformObjectToWorldDir(dirOS, true);
     float2 dirCS = mul((float3x3)GetWorldToHClipMatrix(), dirWS).xy;
     float len = length(dirCS);

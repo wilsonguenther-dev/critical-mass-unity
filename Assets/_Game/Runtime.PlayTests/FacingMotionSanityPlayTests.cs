@@ -274,7 +274,7 @@ namespace CriticalMass.Runtime.PlayTests
     /// Gameplay sanity suite, part 2 of 3: MOTION MATCHES ANIMATION. Moving actors stride and idle ones stand, the planted
     /// foot does not skate (the clip speed tracks the ground speed), the dead fall and stay down, carried cargo is drawn
     /// on the carrier, and a jump lifts the model. All measured on the model's bones, the way a person sees it.
-    /// <para>KNOWN FAILING on main 2026-11-12: CarriedCargoIsDrawnOnTheCarrier (ActorViews draws no cargo at all); the
+    /// <para>CarriedCargoIsDrawnOnTheCarrier passes once Anim.CargoView is installed (world reactions, 2026-11-12); the
     /// foot-slide band may fail (ActorViews.WalkClipSpeed / RunClipSpeed are estimates, "not measured on the clip").</para>
     /// </summary>
     public sealed class MotionSanityPlayTests
@@ -428,10 +428,9 @@ namespace CriticalMass.Runtime.PlayTests
         /// <summary>
         /// A bot carrying biomass or corruption shows it attached to a hand or the back: an extra active renderer under its
         /// model (not one of its own ModelSpec.Meshes) within 0.6 u of hand.l, hand.r, handslot.l, handslot.r, chest or
-        /// spine, and nothing cargo-like left at the world origin. KNOWN FAILING on main 2026-11-12: no cargo is drawn.
+        /// spine, and nothing cargo-like left at the world origin. Drawn by Anim.CargoView since the world-reactions PR.
         /// </summary>
-        [UnityTest, Explicit("KNOWN DEFECT 2026-11-12: ActorViews draws no carried cargo at all; cargo drawing is not built yet " +
-                             "(integration batch 1 lists it). Run explicitly to check once it is.")]
+        [UnityTest] // un-skipped 2026-11-12: Anim.CargoView draws the load on the carrier's back (world-reactions PR)
         public IEnumerator CarriedCargoIsDrawnOnTheCarrier()
         {
             _w = new SanityWorld();
