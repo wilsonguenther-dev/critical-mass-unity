@@ -105,7 +105,10 @@ namespace CriticalMass.Runtime.PlayTests
                     {
                         if (!w.Actors[i].Alive || w.Actors[i].SpawnProtect > 0 || Kaiju.NearOwnPad(w, i)) continue;
                         double ex = w.X[i] - w.Kaiju.X, ez = w.Z[i] - w.Kaiju.Z, e2 = ex * ex + ez * ez;
-                        if (e2 < best) { best = e2; src = i; }
+                        // Prefer a provoker at least 8 u away (the Kaiju walks to it, then claws), else the nearest: with the
+                        // nearest only, the Kaiju stood clawing and walked ~3 u in 60 s (run 43496938662), too little to judge.
+                        double rank = e2 >= 64 ? e2 : e2 + 1e6;
+                        if (rank < best) { best = rank; src = i; }
                     }
                     if (src >= 0) Kaiju.DamageKaiju(w, src, 5);
                 }
