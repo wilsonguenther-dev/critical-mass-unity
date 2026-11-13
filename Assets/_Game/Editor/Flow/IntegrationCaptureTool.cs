@@ -27,7 +27,7 @@ namespace CriticalMass.Editor.Flow
     /// </summary>
     public static class IntegrationCaptureTool
     {
-        const int Width = 1920, Height = 1080, MaxFrames = 40000;
+        const int Width = 1920, Height = 1080, MaxFrames = 150000;
         static string _out;
         static int _frames, _shots, _wanted;
         static IEnumerator<Func<bool>> _walk;
@@ -114,6 +114,7 @@ namespace CriticalMass.Editor.Flow
             D.Setup.StartMatch();
             yield return () => Driver != null && Driver != from && W != null && GameFlow.State == FlowState.Match && !D.Loading;
             SimDriverBehaviour drv = Driver;
+            double spawnX = W.X[0], spawnZ = W.Z[0];
             Note($"match: seed {W.Opts.Seed}, actors {W.ActorCount}, pace {drv.TimeScale}");
             drv.HumanAutopilot = true;
             drv.StepTicks((int)(20 * drv.Config.SimHz));
@@ -173,6 +174,122 @@ namespace CriticalMass.Editor.Flow
             yield return Seconds(0.7);
             Shot("12-kaiju-banner");
 
+            // Facing (owner's field report 2026-11-12: every model walked backwards). The same moves twice: "before" with
+            // every ModelSpec.ArtYawDeg set to 0 (the old mapping), "after" with the measured values. Sim directions:
+            // screen down (toward the camera) is sim (1, 1)/sqrt2, facing 45 deg; screen right is sim (1, -1)/sqrt2.
+            foreach (bool corrected in new[] { false, true })
+            {
+                string tag = corrected ? "after" : "before";
+                SetArtYaw(corrected);
+                input.enabled = false;   // the devices' Update would overwrite the scripted move and aim every frame
+                drv.HumanAutopilot = false;
+                drv.TimeScale = 1;
+                input.State.ButtonUp(HumanInputState.HumanButton.Attack);
+                yield return () => W.Actors[0].Alive;
+                // Back at its spawn, away from the fight on the hill, so nothing knocks it down mid-shot.
+                W.X[0] = W.PrevX[0] = spawnX; W.Z[0] = W.PrevZ[0] = spawnZ;
+                input.State.ClearAim();
+                input.State.SetMove(0, -1);
+                yield return Seconds(1.5);
+                drv.TimeScale = 0;
+                Note($"facing {tag}: actor 0 walking toward the camera, sim facing {W.Actors[0].Facing * 180 / Math.PI:0} deg (toward camera = 45)");
+                yield return Seconds(0.15);
+                ShotFramed("14-walk-toward-camera-" + tag, ActorModel(0), 6f, 30f);
+                drv.TimeScale = 1;
+                input.State.SetMove(0, 1);
+                yield return Seconds(1.0);
+                drv.TimeScale = 0;
+                Note($"facing {tag}: actor 0 walking away from the camera, sim facing {W.Actors[0].Facing * 180 / Math.PI:0} deg (away = -135)");
+                yield return Seconds(0.15);
+                ShotFramed("15-walk-away-" + tag, ActorModel(0), 6f, 30f);
+                drv.TimeScale = 1;
+                input.State.SetMove(0, 0);
+                // Aim at a point 2.5 u screen-left of the player and swing: the cleaver arc and the shield must point there.
+                // Screen left is sim (-1, 1)/sqrt2, facing 135 deg.
+                double ax = W.X[0] - 2.5 / Math.Sqrt(2), az = W.Z[0] + 2.5 / Math.Sqrt(2);
+                input.State.SetAim(ax, az);
+                yield return Seconds(0.3);
+                input.State.ButtonDown(HumanInputState.HumanButton.Attack);
+                yield return Seconds(0.12);
+                drv.TimeScale = 0;
+                Note($"facing {tag}: aim screen-left (sim facing wanted 135 deg), actor 0 facing {W.Actors[0].Facing * 180 / Math.PI:0} deg, attack cd {W.Actors[0].AttackCd:0.00}");
+                yield return Seconds(0.15);
+                ShotFramed("16-aim-left-attack-" + tag, ActorModel(0), 6f, 30f);
+                input.State.ButtonUp(HumanInputState.HumanButton.Attack);
+                input.State.ClearAim();
+
+                // The Kaiju turned toward the camera (a framed shot of the Kaiju itself).
+                Kaiju k = W.Kaiju;
+                double kdx = W.X[0] - k.X, kdz = W.Z[0] - k.Z;
+                double kspeed = Math.Sqrt((k.X - k.PrevX) * (k.X - k.PrevX) + (k.Z - k.PrevZ) * (k.Z - k.PrevZ)) * drv.Config.SimHz;
+                Note($"facing {tag}: kaiju {k.State} facing {k.Facing * 180 / Math.PI:0} deg, speed {kspeed:0.00} u/s, heading {(kspeed > 0.05 ? (Math.Atan2(k.Z - k.PrevZ, k.X - k.PrevX) * 180 / Math.PI).ToString("0") : "-")} deg");
+                k.Facing = Math.PI / 4;
+                yield return Seconds(0.3);
+                Note($"facing {tag}: kaiju turned to 45 deg (toward the camera), {Math.Sqrt(kdx * kdx + kdz * kdz):0.0} u from the player");
+                ShotFramed("17-kaiju-toward-camera-" + tag, KaijuModel(), 12f, 30f);
+                // Then let it walk at 4x and shoot it mid-stride on its own heading.
+                drv.TimeScale = 4;
+                double walkUntil = EditorApplication.timeSinceStartup + 3;
+                yield return () => Math.Abs(W.Kaiju.X - W.Kaiju.PrevX) + Math.Abs(W.Kaiju.Z - W.Kaiju.PrevZ) > 1e-3 || EditorApplication.timeSinceStartup > walkUntil;
+                drv.TimeScale = 0;
+                k = W.Kaiju;
+                bool walking = Math.Abs(k.X - k.PrevX) + Math.Abs(k.Z - k.PrevZ) > 1e-3;
+                Note($"facing {tag}: kaiju {(walking ? "walking" : "not walking")}, facing {k.Facing * 180 / Math.PI:0} deg, heading {(walking ? (Math.Atan2(k.Z - k.PrevZ, k.X - k.PrevX) * 180 / Math.PI).ToString("0") : "-")} deg");
+                yield return Seconds(0.2);
+                ShotFramed("18-kaiju-walking-" + tag, KaijuModel(), 12f, 30f);
+                input.enabled = true;
+                drv.TimeScale = 1;
+            }
+            SetArtYaw(true);
+
+            // tools/sanity-capture-checklist.md, the square and attacks strips (delivery: no cargo is drawn yet; kaiju: it
+            // sits while Neutral). Clock stopped, StepTicks only, actor 0 back at its spawn; every frame logs the model's
+            // front (toes ahead of the ankles) against the sim facing, and any frame over 30 deg fails the run.
+            input.enabled = false;
+            drv.HumanAutopilot = false;
+            drv.TimeScale = 0;
+            yield return () => W.Actors[0].Alive;
+            W.X[0] = W.PrevX[0] = spawnX; W.Z[0] = W.PrevZ[0] = spawnZ;
+            int[] legs = { 0, 1, 2, 3 };
+            double[,] screen = { { 1, 0 }, { 0, 1 }, { -1, 0 }, { 0, -1 } };
+            int frame = 0;
+            foreach (int leg in legs)
+            {
+                input.State.SetMove(screen[leg, 0], screen[leg, 1]);
+                for (int half = 0; half < 2; half++)
+                {
+                    drv.StepTicks(half == 0 ? 22 : 22);
+                    yield return Seconds(0.08);
+                    StripFrame("square", ++frame);
+                }
+                drv.StepTicks(1);
+            }
+            input.State.SetMove(0, 0);
+            frame = 0;
+            foreach (int leg in legs)
+            {
+                // Aim 3 u along the screen axis (right, up, left, down) and press Attack for one tick.
+                double sx = screen[leg, 0], sy = screen[leg, 1];
+                double ax = W.X[0] + 3 * (sx - sy) / Math.Sqrt(2), az = W.Z[0] + 3 * (-sx - sy) / Math.Sqrt(2);
+                input.State.SetAim(ax, az);
+                drv.StepTicks(4);
+                input.State.ButtonDown(HumanInputState.HumanButton.Attack);
+                drv.StepTicks(1);
+                input.State.ButtonUp(HumanInputState.HumanButton.Attack);
+                drv.StepTicks(2);
+                yield return Seconds(0.08);
+                StripFrame("attacks", ++frame);
+                drv.StepTicks(5);
+                yield return Seconds(0.08);
+                StripFrame("attacks", ++frame);
+                drv.StepTicks(20);
+            }
+            input.State.ClearAim();
+            input.enabled = true;
+            drv.TimeScale = 1;
+            if (_stripBad > 0) Note($"strips: {_stripBad} frame(s) with the model's front more than 30 deg from the sim facing");
+            drv.HumanAutopilot = true;
+
             // Results: run the clock out.
             W.Match.Time = drv.Config.MatchSeconds - 2.0 / drv.Config.SimHz;
             drv.StepTicks(4);
@@ -187,6 +304,89 @@ namespace CriticalMass.Editor.Flow
             D.PlayAgain();
             yield return () => Driver != null && Driver != before && W != null && GameFlow.State == FlowState.Match && !D.Loading;
             Note($"play again: state {GameFlow.State}, seed {W.Opts.Seed} (was {oldSeed}), tick {W.Tick}, phase {W.Match.Phase}");
+        }
+
+        static int _stripBad;
+
+        static Transform Deep(Transform t, string name)
+        {
+            if (t.name == name) return t;
+            for (int i = 0; i < t.childCount; i++)
+            {
+                Transform f = Deep(t.GetChild(i), name);
+                if (f != null) return f;
+            }
+            return null;
+        }
+
+        /// <summary>One strip frame of actor 0 (framed close), with its front-versus-facing reading in walk.log.</summary>
+        static void StripFrame(string strip, int n)
+        {
+            World w = W;
+            Transform m = ActorModel(0);
+            double f = w.Actors[0].Facing;
+            var want = new Vector3((float)Math.Cos(f), 0f, (float)-Math.Sin(f));
+            string reading = "no model";
+            if (m != null)
+            {
+                Transform tl = Deep(m, "toes.l"), tr = Deep(m, "toes.r"), fl = Deep(m, "foot.l"), fr = Deep(m, "foot.r");
+                if (tl != null && tr != null && fl != null && fr != null)
+                {
+                    // The planted foot only (its toes are the lower pair): a foot mid-swing can point its toes down and back.
+                    Vector3 d = tl.position.y <= tr.position.y ? tl.position - fl.position : tr.position - fr.position;
+                    d.y = 0f;
+                    float angle = Vector3.Angle(d, want);
+                    if (angle > 30f) _stripBad++;
+                    reading = $"front vs facing {angle:0} deg{(angle > 30f ? " BAD" : "")}";
+                }
+            }
+            Note($"strip {strip} {n}: tick {w.Tick}, actor 0 at ({w.X[0]:0.0}, {w.Z[0]:0.0}) facing {f * 180 / Math.PI:0} deg, {reading}");
+            ShotFramed($"strip-{strip}-{n}", m, 8f, 40f);
+        }
+
+        static Transform ActorModel(int i)
+        {
+            string prefix = "Actor " + i + " ";
+            foreach (Animator a in UnityEngine.Object.FindObjectsByType<Animator>(FindObjectsSortMode.None))
+                if (a.gameObject.activeInHierarchy && a.name.StartsWith(prefix, StringComparison.Ordinal)) return a.transform;
+            return null;
+        }
+
+        static Transform KaijuModel()
+        {
+            GameObject g = GameObject.Find("Kaiju Adult");
+            if (g == null) g = GameObject.Find("Kaiju Hatchling");
+            return g != null ? g.transform : null;
+        }
+
+        /// <summary>A close shot from the gameplay camera's yaw at the given pitch, dist metres from the target, then put back.</summary>
+        static void ShotFramed(string name, Transform target, float dist, float pitch)
+        {
+            UnityEngine.Camera cam = UnityEngine.Camera.main;
+            if (cam == null || target == null)
+            {
+                Note(name + ": no camera or no target, shot at the gameplay framing");
+                Shot(name);
+                return;
+            }
+            Vector3 pos = cam.transform.position;
+            Quaternion rot = cam.transform.rotation;
+            cam.transform.rotation = Quaternion.Euler(pitch, rot.eulerAngles.y, 0f);
+            cam.transform.position = target.position + Vector3.up * 1.0f - cam.transform.forward * dist;
+            try { Shot(name); }
+            finally { cam.transform.position = pos; cam.transform.rotation = rot; }
+        }
+
+        static readonly Dictionary<string, float> MeasuredYaw = new Dictionary<string, float>();
+
+        /// <summary>false: every model's ArtYawDeg is 0 (the mapping before the 2026-11-12 fix); true: the measured values.</summary>
+        static void SetArtYaw(bool corrected)
+        {
+            foreach (CriticalMass.Runtime.View.Art.ModelSpec m in CriticalMass.Runtime.View.Art.ArtMapping.Models)
+            {
+                if (!MeasuredYaw.ContainsKey(m.Key)) MeasuredYaw[m.Key] = m.ArtYawDeg;
+                m.ArtYawDeg = corrected ? MeasuredYaw[m.Key] : 0f;
+            }
         }
 
         static int EnemiesNear(World w, double r)
@@ -215,7 +415,7 @@ namespace CriticalMass.Editor.Flow
                     _wait = null;
                 }
                 if (_walk.MoveNext()) _wait = _walk.Current;
-                else Finish(_shots == _wanted ? 0 : 1);
+                else Finish(_shots == _wanted && _stripBad == 0 ? 0 : 1);
             }
             catch (Exception e)
             {

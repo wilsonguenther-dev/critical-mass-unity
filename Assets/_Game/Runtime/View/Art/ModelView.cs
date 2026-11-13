@@ -73,6 +73,16 @@ namespace CriticalMass.Runtime.View.Art
 
         public bool Active => Root.activeSelf;
 
+        /// <summary>
+        /// Turn the model to a view rotation (for actors: Euler(0, SimSpace.YawDeg(facing), 0)), adding the art's own yaw
+        /// (ModelSpec.ArtYawDeg) so the face leads. The one place a model's forward axis is mapped onto the sim's.
+        /// </summary>
+        public void SetFacing(Quaternion rotation)
+        {
+            float art = Spec != null ? Spec.ArtYawDeg : 0f;
+            Transform.localRotation = art == 0f ? rotation : rotation * Quaternion.Euler(0f, art, 0f);
+        }
+
         public void SetActive(bool on)
         {
             if (Root.activeSelf != on) Root.SetActive(on);

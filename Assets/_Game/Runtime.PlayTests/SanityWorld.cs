@@ -70,7 +70,18 @@ namespace CriticalMass.Runtime.PlayTests
         public static void Reset() => GameFlow.ResetForTests();
 
         /// <summary>One view update now (the frame's LateUpdate does the same; this lets a test sample every tick).</summary>
-        public void Sync() => Views.Sync(0f);
+        /// <summary>
+        /// Sync the views. The PlayMode gate runs -nographics, where no camera renders, so ModelView's
+        /// AnimatorCullingMode.CullCompletely would cull every model and leave its bones in the bind pose; the sanity
+        /// checks measure bones, so every Animator here always animates (a test-only setting, the game is unchanged).
+        /// </summary>
+        public void Sync()
+        {
+            Views.Sync(0f);
+            foreach (Animator a in Object.FindObjectsByType<Animator>(FindObjectsSortMode.None))
+                if (a.cullingMode != AnimatorCullingMode.AlwaysAnimate) a.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+            Views.Sync(0f);
+        }
 
         /// <summary>n sim ticks, the views synced after each (poses advance with sim time).</summary>
         public void Tick(int n = 1)

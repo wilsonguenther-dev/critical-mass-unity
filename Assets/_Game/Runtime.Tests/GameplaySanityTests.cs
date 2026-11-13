@@ -57,7 +57,10 @@ namespace CriticalMass.Runtime.Tests
             int samples = 0;
             try
             {
-                go.transform.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
+                // The model's root turned exactly as ModelView.SetFacing turns it for sim facing along local +Z: the view's
+                // yaw times the model's declared art yaw (ModelSpec.ArtYawDeg, the 2026-11-12 fix), so what is measured is
+                // what the game shows. The assertion is unchanged: the front must lead within the tolerance.
+                go.transform.SetPositionAndRotation(Vector3.zero, Quaternion.Euler(0f, ArtMapping.Spec(key).ArtYawDeg, 0f));
                 go.transform.localScale = Vector3.one;
                 Measure(go.transform, key, "bind pose", bad, ref samples);
                 foreach (string clipName in new[] { ArtMapping.Idle, ArtMapping.Walk, ArtMapping.Run, ArtMapping.Attack })
