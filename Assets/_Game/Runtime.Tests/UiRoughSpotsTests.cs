@@ -180,7 +180,7 @@ namespace CriticalMass.Runtime.Tests
             // The hatch banner headline (plate width - 300, best-fit 48..30, 4 px outline).
             foreach (string team in new[] { "AZURE", "CRIMSON", "NOBODY" })
                 Assert.IsTrue(UiScale.FitsOneLine(Display, CriticalMass.Runtime.View.KaijuMomentTracker.WordSidesWith + team, UiScale.TypeDisplay,
-                    UiScale.TypeHeading, CriticalMass.Runtime.Hud.Banner.Width - 300f, 4f), team);
+                    20, CriticalMass.Runtime.Hud.Banner.Width - 300f, 4f), team);
         }
 
         [Test]

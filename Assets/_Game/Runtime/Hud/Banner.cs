@@ -290,7 +290,7 @@ namespace CriticalMass.Runtime.Hud
             Centre(_headline.rectTransform, new Vector2(20f, 22f), new Vector2(Width - 300f, 64f));
             // Closer (batch 4): "THE KAIJU SIDES WITH CRIMSON" is wider than the plate at 48 px; best-fit shrinks it onto
             // one line (down to 30 px) instead of spilling past the plate.
-            CriticalMass.Runtime.Menu.MenuUi.Fit(_headline, UiScale.TypeHeading);
+            CriticalMass.Runtime.Menu.MenuUi.Fit(_headline, 20);   // long event headlines wrap to two lines
             _headlineOutline = _headline.GetComponent<TextOutline>();
             _reason = HudText.Make(_root, "Reason", CMTokens.Ui, UiScale.TypeButton, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 2.5f);
             Centre(_reason.rectTransform, new Vector2(20f, -36f), new Vector2(Width - 300f, 36f));
