@@ -28,6 +28,9 @@ namespace CriticalMass.Runtime.Camera
         public static float Trauma => _instance != null ? _instance._trauma : 0f;
         public static Vector3 Applied => _instance != null ? _instance._applied : Vector3.zero;
 
+        /// <summary>Share of the shake offset applied (ground view sets 0.3: a 0.32 u shake 3 u from the pivot is a lot).</summary>
+        public static float Limit = 1f;
+
         void OnEnable() => _instance = this;
 
         void OnDisable()
@@ -62,7 +65,7 @@ namespace CriticalMass.Runtime.Camera
             if (cam == null) return;
             float dt = Time.unscaledDeltaTime;
             _t += dt;
-            Vector2 o = Offset(_trauma, _t);
+            Vector2 o = Offset(_trauma, _t) * Limit;
             Transform tr = cam.transform;
             Vector3 off = tr.right * o.x + tr.up * o.y;
             tr.position += off;

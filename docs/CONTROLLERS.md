@@ -29,6 +29,7 @@ Settings, Controls, with a conflict warning and RESET ALL.
 | Dig / place | U | F | F | Y / triangle |
 | Switch dig / place | I | R | Mouse wheel | LB or RB / L1 or R1 |
 | Ping wheel | G | G | G or middle click | D-pad left |
+| Show usable terrain (hold; terrain classes) | O | Q | Q | R3 (outside the base ring; inside it R3 opens the station) |
 | Scoreboard (hold) | TAB | TAB | TAB | View / Create |
 | Full map | M | M | M | D-pad up |
 | Base station | B | B | B | Press the right stick (R3) |
@@ -37,6 +38,7 @@ Settings, Controls, with a conflict warning and RESET ALL.
 | HUD cursor | L ALT | L ALT | L ALT | D-pad down |
 | Minimap zoom | N | N | N | D-pad right |
 | Character panel | P | P | P or click the portrait | (HUD cursor) |
+| Camera view: high / ground | F5 | F5 | F5 | Double-tap View / Create |
 | Pause | ESC | ESC | ESC | Menu / Options |
 | Menus: move focus | W A S D or arrows | Arrows | Arrows or hover | D-pad or left stick |
 | Menus: confirm / back | ENTER or SPACE / ESC | ENTER or SPACE / ESC | ENTER or click / ESC | A / B (cross / circle) |
@@ -112,3 +114,20 @@ connected, the one used last plays.
 - Keyboard aim and target assist: `AimResolver.ResolveKeys` (view side; the sim only receives an aim point).
 - Controller family, dead zone, sensitivity, invert, vibration: `Assets/_Game/Runtime/Input/ControllerSettings.cs`.
 - Hot-plug pause: `Assets/_Game/Runtime/Game/SystemEvents.cs`.
+
+## Ground view (feat/ground-camera, 2026-11-13)
+
+A low camera about 3 m behind and 1.6 m above a fighter, over his shoulder, with the horizon and the sky on screen.
+
+Watching (spectating, or knocked out and waiting to respawn): CAMERA VIEW (F5, double-tap View) switches between the
+high view and ground view. Q / E or LB / RB pick the previous or next fighter (while spectating, the spectator's own
+keys do it and ground view follows), right mouse drag or the right stick orbits (the camera swings back behind the
+fighter 2.5 s after you let go), F6 turns the auto-director on or off (it cuts between duels, crowds, the hill,
+carriers and the Kaiju, at least 4 s per shot). The minimap and Kaiju panels hide; the clock and score stay.
+
+Playing (experimental): Settings, Game, CAMERA: GROUND, or CAMERA VIEW during a match. The mouse turns the camera (the
+cursor is locked while you play; ESC frees it), or the right stick on a controller. W A S D, the arrows and the left
+stick move relative to the camera; attacks and abilities go toward the reticle at the screen centre. Not supported
+from this camera: keyboard-only play (nothing turns the camera), walk to pointer, and precise dig / place targeting
+(the target is the ground point ahead of you at the reticle's distance).
+

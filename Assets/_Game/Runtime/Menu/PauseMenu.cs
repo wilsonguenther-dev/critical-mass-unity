@@ -55,6 +55,8 @@ namespace CriticalMass.Runtime.Menu
             /// <summary>Builds the tab's lines on the empty, stretched tab page (use Stepper, Slider, Note and the layout
             /// constants) and returns its focusable lines top to bottom; the menu chains them for keyboard and controller.</summary>
             public Func<PauseMenu, RectTransform, List<MenuItem>> Build;
+            /// <summary>Sort key among the extra tabs (lower first, ties keep registration order): ACCESS 0, WORLD 10.</summary>
+            public int Order;
         }
 
         /// <summary>A root-page entry that opens a page of its own (Back returns to the root page).</summary>
@@ -77,7 +79,10 @@ namespace CriticalMass.Runtime.Menu
         {
             if (tab == null || string.IsNullOrEmpty(tab.Name)) return;
             for (int i = 0; i < ExtraTabs.Count; i++) if (ExtraTabs[i].Name == tab.Name) { ExtraTabs[i] = tab; return; }
-            ExtraTabs.Add(tab);
+            // Stable insert by Order, so registration order (RuntimeInitializeOnLoad order is unspecified) cannot move a tab.
+            int at = ExtraTabs.Count;
+            while (at > 0 && ExtraTabs[at - 1].Order > tab.Order) at--;
+            ExtraTabs.Insert(at, tab);
         }
 
         public static void AddPage(ExtraPage page)
@@ -1021,9 +1026,10 @@ namespace CriticalMass.Runtime.Menu
         // took at 40 + 4 px, so the list still ends above the status line.
         const float CtlRowH = 30f, CtlRowGap = 3f;
         // controls-1: five columns (keys W A S D hand, keys arrow hand, mouse, controller, controller 2) and 24 rows at
-        // 26 + 2 px, so the list still ends above the toggles and Reset.
+        // 26 + 2 px, so the list still ends above the toggles and Reset. feat/ground-camera: 25 rows (Camera view) at
+        // 25 + 2 px take the height the 24 rows took (675 px against 672).
         const int GridCols = 5, KeyCols = 3;
-        const float GridRowH = 26f, GridRowGap = 2f, GridCellW = 172f, GridCellGap = 8f;
+        const float GridRowH = 25f, GridRowGap = 2f, GridCellW = 172f, GridCellGap = 8f;
 
         GameObject BuildControls(RectTransform parent)
         {
@@ -1334,12 +1340,14 @@ namespace CriticalMass.Runtime.Menu
                 // Arena night life 1: the map's time of day (also on the READY screen); applies at once, in a match too.
                 Stepper(tab, 5, "TIME OF DAY", () => View.Atmosphere.TimeOfDaySettings.Label(View.Atmosphere.TimeOfDaySettings.Choice),
                     View.Atmosphere.TimeOfDaySettings.Step),
+                // feat/ground-camera: play from behind the fighter (experimental); F5 / double-tap View flips it in a match.
+                Stepper(tab, 6, "CAMERA", () => GameSettings.GroundCamera ? "GROUND (EXPERIMENTAL)" : "HIGH", d => GameSettings.GroundCamera = !GameSettings.GroundCamera),
             };
-            MenuItem watch = MenuUi.Item(tab, "Watch Intro", ContentX, ContentY + GameTabLines * (LineH + LineGap) + 20f, 420f, 56f,
+            MenuItem watch = MenuUi.Item(tab, "Watch Intro", ContentX, ContentY + GameTabLines * (LineH + LineGap) + 12f, 420f, 56f,
                 "WATCH INTRO", MenuItem.Kind.Button, UiScale.TypeBody, true, CMTokens.Display);
             watch.Submitted = WatchIntro;
             items.Add(watch);
-            MenuItem reset = MenuUi.Item(tab, "Reset Settings", ContentX, ContentY + GameTabLines * (LineH + LineGap) + 96f, 420f, 56f,
+            MenuItem reset = MenuUi.Item(tab, "Reset Settings", ContentX, ContentY + GameTabLines * (LineH + LineGap) + 80f, 420f, 56f,
                 "RESET ALL SETTINGS", MenuItem.Kind.Button, UiScale.TypeBody, true, CMTokens.Display);
             reset.Submitted = () =>
             {
@@ -1351,7 +1359,7 @@ namespace CriticalMass.Runtime.Menu
             };
             items.Add(reset);
             // DG-64: a zip of the logs a tester can send us (no upload; the decision ledger rules out crash services).
-            MenuItem report = MenuUi.Item(tab, "Problem Report", ContentX, ContentY + GameTabLines * (LineH + LineGap) + 172f, 420f, 56f,
+            MenuItem report = MenuUi.Item(tab, "Problem Report", ContentX, ContentY + GameTabLines * (LineH + LineGap) + 148f, 420f, 56f,
                 "SAVE A PROBLEM REPORT", MenuItem.Kind.Button, UiScale.TypeBody, true, CMTokens.Display);
             report.Submitted = () =>
             {
@@ -1370,7 +1378,9 @@ namespace CriticalMass.Runtime.Menu
         }
 
         /// <summary>Stepper lines on the Game tab (the three buttons sit under them).</summary>
-        const int GameTabLines = 6;
+        // batch 7: 7 lines (colour-blind, subtitles, time of day, camera); the three buttons sit 68 apart so Problem Report
+        // ends at y 1000, inside the panel (PanelY 140 + PanelH 870 = 1010).
+        const int GameTabLines = 7;
 
         /// <summary>Settings > WATCH INTRO: closes the menu and plays the story intro (on the title, Home or setup; never over a
         /// live match, where the menu says so instead).</summary>

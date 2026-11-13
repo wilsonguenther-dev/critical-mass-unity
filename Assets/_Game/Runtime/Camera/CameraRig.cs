@@ -47,6 +47,9 @@ namespace CriticalMass.Runtime.Camera
             seeThrough.Driver = driver;
             var hint = camGo.AddComponent<LookHint>();
             hint.Driver = driver;
+            // feat/ground-camera: the low third-person view (spectating, knocked out, the experimental CAMERA: GROUND setting).
+            var ground = camGo.AddComponent<GroundView>();
+            ground.Driver = driver;
 
             return camGo;
         }

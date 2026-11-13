@@ -23,7 +23,7 @@ namespace CriticalMass.Editor
     /// simulated seconds by StepTicks with the wall clock stopped, then frames four targets with the gameplay camera
     /// (CameraFollowTarget.SetOverride) and writes 1920x1080 PNGs plus capture.json to the output folder. Needs graphics
     /// (no -nographics). Run (tools/unity-capture.sh wraps it):
-    /// Unity -batchmode -projectPath . -executeMethod CriticalMass.Editor.CaptureTool.Run -captureOut DIR [-captureSeconds 30] [-captureYaw DEG]
+    /// Unity -batchmode -projectPath . -executeMethod CriticalMass.Editor.CaptureTool.Run -captureOut DIR [-captureSeconds 30] [-captureYaw DEG] [-captureGround]
     /// Exit codes: 0 written, 1 exception, 2 timed out in frames, 64 bad arguments.
     /// <para>Targets: the Azure base, the hill and the shrine at the gameplay distance, and "wide": the centre of the land
     /// from the gameplay pitch and FOV, pulled back to <see cref="WideDistance"/>, the one distance that fits all the land
@@ -50,6 +50,9 @@ namespace CriticalMass.Editor
         private const string SecondsKey = "cm.capture.seconds";
         private const string YawKey = "cm.capture.yaw";
         private const string HasYawKey = "cm.capture.hasYaw";
+        /// <summary>-captureGround (feat/ground-camera): every target is shot from ground view instead, following the fighter
+        /// nearest the target point (capture-ground-NAME.png).</summary>
+        private const string GroundKey = "cm.capture.ground";
         /// <summary>Wide target: the map corners stay this far inside the frame edges (fraction of the half-extent).</summary>
         private const double WideMargin = 0.04;
 
@@ -94,6 +97,7 @@ namespace CriticalMass.Editor
                 }
                 Directory.CreateDirectory(outDir);
                 SessionState.SetBool(HasYawKey, hasYaw);
+                SessionState.SetBool(GroundKey, Array.IndexOf(Environment.GetCommandLineArgs(), "-captureGround") >= 0);
                 SessionState.SetFloat(YawKey, (float)yaw);
                 SessionState.SetBool(ActiveKey, true);
                 SessionState.SetString(OutKey, Path.GetFullPath(outDir));
@@ -347,6 +351,20 @@ namespace CriticalMass.Editor
                 ApplyPose(targets[_target].Distance);
                 follow.ClearOverride();
                 follow.SetOverride(targets[_target].X, targets[_target].Z);
+                if (SessionState.GetBool(GroundKey, false) && GroundView.Current != null)
+                {
+                    World gw = _driver.World;
+                    int best = -1;
+                    double bd = double.MaxValue;
+                    for (int i = 0; i < gw.ActorCount; i++)
+                    {
+                        if (!gw.Actors[i].Alive) continue;
+                        double dx = gw.X[i] - targets[_target].X, dz = gw.Z[i] - targets[_target].Z;
+                        if (dx * dx + dz * dz < bd) { bd = dx * dx + dz * dz; best = i; }
+                    }
+                    GroundView.Current.WatchGround = true;
+                    if (best >= 0) GroundView.Current.Pick(best);
+                }
                 _settle = SettleFrames;
                 return;
             }
@@ -360,7 +378,8 @@ namespace CriticalMass.Editor
                       $"hill={(hillGo != null ? hillGo.transform.position + " scale " + hillGo.transform.lossyScale + " active " + hillGo.activeInHierarchy + " mat " + hillGo.GetComponent<Renderer>().sharedMaterial.shader.name : "none")}");
             if (_driver.World.Tick != _ticksWanted)
                 throw new InvalidOperationException($"world tick {_driver.World.Tick} != {_ticksWanted}: frame-time ticks leaked in, the capture is not deterministic");
-            string path = Path.Combine(SessionState.GetString(OutKey, "."), "capture-" + targets[_target].Name + ".png");
+            string path = Path.Combine(SessionState.GetString(OutKey, "."),
+                (SessionState.GetBool(GroundKey, false) ? "capture-ground-" : "capture-") + targets[_target].Name + ".png");
             RenderTo(path);
             Written.Add(path);
             Debug.Log("[CaptureTool] wrote " + path);

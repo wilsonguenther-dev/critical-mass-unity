@@ -51,6 +51,7 @@ namespace CriticalMass.Runtime.Input
             new Remap("SwitchDigPlace", "<Keyboard>/r", "<Keyboard>/comma"),
             new Remap("Ping", "<Keyboard>/g", "<Keyboard>/semicolon"),
             new Remap("HudCursor", "<Keyboard>/leftAlt", "<Keyboard>/rightAlt"),
+            new Remap("ShowTerrain", "<Keyboard>/q", "<Keyboard>/quote"),
         };
 
         public static IReadOnlyList<Remap> Remaps(ControlPreset p) => p == ControlPreset.LeftHanded ? LeftHandedRemaps : NoRemaps;

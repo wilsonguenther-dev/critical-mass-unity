@@ -342,6 +342,9 @@ namespace CriticalMass.Sim.Core
 
         /// <summary>Kind of the last successful Plan.</summary>
         public static int LastPlanKind => PlanKind;
+        /// <summary>Terrain affordances (view, read-only): cells of the last successful Plan, and cell k of them (map index).</summary>
+        public static int LastPlanCount => PlanCount;
+        public static int LastPlanCell(int k) => PlanCells[k];
 
         private static bool GapOk(World w)
         {
@@ -551,7 +554,7 @@ namespace CriticalMass.Sim.Core
         // ------------------------------------------------------------------------------------------------- carry
 
         /// <summary>True when (x, z) is where Interact means gather or deliver: a node with charges within its interact range, or the shrine's.</summary>
-        private static bool InteractBusy(World w, double x, double z)
+        public static bool InteractBusy(World w, double x, double z)
         {
             double nr = w.Config.Resources.NodeInteractRange;
             for (int k = 0; k < w.Nodes.Length; k++)

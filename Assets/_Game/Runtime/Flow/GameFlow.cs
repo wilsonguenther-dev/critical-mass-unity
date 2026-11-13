@@ -265,6 +265,12 @@ namespace CriticalMass.Runtime.Flow
         static void PrepareMatch(MatchSetupChoice s, int seed)
         {
             LastSetup = s;
+            // feat/ground-camera: -seed N in an autoplay run plays every match on seed N (same moment for the camera grabs).
+            if (seed <= 0 && Autoplay)
+            {
+                int fixedSeed = CriticalMass.Runtime.Game.AutoplayArgs.AutoplayMatchSeed();
+                if (fixedSeed > 0) seed = fixedSeed;
+            }
             _pending = MatchRequest.From(s, seed > 0 ? seed : NewSeed());
             MatchesStarted++;
             State = FlowState.Match;
