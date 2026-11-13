@@ -353,7 +353,7 @@ namespace CriticalMass.Runtime.View.Anim
         // The weight-bearing foot is pinned where it landed: its thigh is aimed at the pin (the rig's leg is Thigh -> Foot,
         // one bone, so an aim is the whole IK), the correction capped at MaxLockDeg (40 halved the slide to 0.49 in run 43496001979; 70 covers a full stride); it releases when the foot lifts or the
         // pin falls behind by more than a stride, and fades out over LockFade so the swing does not pop.
-        public const float MaxLockDeg = 70f, LockFade = 0.12f, ReplantShare = 0.3f;
+        public const float MaxLockDeg = 70f, LockFade = 0.08f, ReplantShare = 0.3f;
         readonly Vector3[] _pin = new Vector3[2];
         readonly bool[] _pinned = new bool[2];
         readonly float[] _pinW = new float[2];
@@ -371,25 +371,27 @@ namespace CriticalMass.Runtime.View.Anim
             float h = (spec != null && spec.Height > 0 ? spec.Height : 5f) * Scale;
             float yl = fl.position.y - rootY, yr = fr.position.y - rootY;
             float band = 0.02f * h;   // double support: both feet within 2 % of the height of each other
+            // Which foot bears the weight: the lower one, or both in double support.
+            bool bl = yl <= yr + band, br = yr <= yl + band;
             for (int f = 0; f < 2; f++)
             {
                 Transform thigh = f == 0 ? tl : tr, foot = f == 0 ? fl : fr;
-                float y = f == 0 ? yl : yr, other = f == 0 ? yr : yl;
-                bool bearing = _lockWalkW > 0.05f && y <= other + band;   // walking, and the lower foot (or double support)
+                bool bearing = f == 0 ? bl : br, otherBearing = f == 0 ? br : bl;
                 Vector3 p = foot.position;
-                if (bearing && !_pinned[f]) { _pinned[f] = true; _pin[f] = p; }
-                if (!bearing) _pinned[f] = false;
+                // Plant on landing while walking; a planted foot stays planted (through a stop, too) until it lifts AND the
+                // other foot has the weight, so the body is never left with no foot down.
+                if (!_pinned[f] && bearing && _lockWalkW > 0.05f) { _pinned[f] = true; _pin[f] = p; _pinW[f] = 1f; _lastFix[f] = Quaternion.identity; }
+                else if (_pinned[f] && !bearing && otherBearing) _pinned[f] = false;
                 if (_pinned[f])
                 {
                     Vector3 off = new Vector3(_pin[f].x - p.x, 0f, _pin[f].z - p.z);
-                    if (off.magnitude > ReplantShare * h) { _pin[f] = p; off = Vector3.zero; }   // fell a stride behind: re-plant
-                    _pinW[f] = Mathf.Min(1f, _pinW[f] + (float)dSim / LockFade);
+                    if (off.magnitude > ReplantShare * h) { _pin[f] = p; off = Vector3.zero; }   // a stride behind: re-plant
                     Vector3 hip = thigh.position;
                     Vector3 from = p - hip, to = p + off - hip;
-                    Quaternion fix = Quaternion.RotateTowards(Quaternion.identity, Quaternion.FromToRotation(from, to), MaxLockDeg);
-                    _lastFix[f] = fix;
+                    _lastFix[f] = Quaternion.RotateTowards(Quaternion.identity, Quaternion.FromToRotation(from, to), MaxLockDeg);
+                    _pinW[f] = 1f;
                 }
-                else _pinW[f] = Mathf.Max(0f, _pinW[f] - (float)dSim / LockFade);
+                else _pinW[f] = Mathf.Max(0f, _pinW[f] - (float)dSim / LockFade);   // out over 2 to 3 frames
                 if (_pinW[f] > 0f) thigh.rotation = Quaternion.Slerp(Quaternion.identity, _lastFix[f], _pinW[f]) * thigh.rotation;
             }
         }

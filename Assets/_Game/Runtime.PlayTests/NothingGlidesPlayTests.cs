@@ -35,7 +35,7 @@ namespace CriticalMass.Runtime.PlayTests
         /// only catches the gross case; the Kaiju walks alone and must plant its feet.</summary>
         /// <summary>Match length: 60 s gives the Kaiju enough walking to measure (40 s gave 2.3 to 2.9 u of planted travel).</summary>
         public const int MatchSeconds = 60;
-        public const double KaijuSlideLimit = 0.3, FighterSlideLimit = 0.75, KaijuMinPlantedTravel = 3.0;
+        public const double KaijuSlideLimit = 0.3, FighterSlideLimit = 0.75;
         /// <summary>Ticks an animation may lag its sim event.</summary>
         public const int EventLagTicks = 3, RoarLagTicks = 30;
 
@@ -72,6 +72,96 @@ namespace CriticalMass.Runtime.PlayTests
 
         readonly Dictionary<int, Track> _tracks = new Dictionary<int, Track>();
         readonly Dictionary<string, Tally> _tally = new Dictionary<string, Tally>();
+
+        /// <summary>The fixed route's minimum planted-foot travel (the route is about 26 u).</summary>
+        public const double RouteMinPlantedTravel = 15.0;
+
+        /// <summary>
+        /// The Kaiju's foot slide, measured the same way every run: the adult is walked along a fixed route (10 u straight,
+        /// a 90 degree turn on a 3 u radius, 5 u straight, a 1.5 s stop, a start from rest, 6 u straight) by writing its sim
+        /// position each tick after the sim step (its AI is calmed: no target, no attacks). The views see an ordinary walking
+        /// Kaiju: speed from the displacement, the facing from its heading. Planted-foot travel per unit of body travel must
+        /// stay under KaijuSlideLimit over at least RouteMinPlantedTravel.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator TheKaijuWalksAFixedRouteWithoutSliding()
+        {
+            _w = new SanityWorld();
+            yield return _w.Load(ClassId.Warrior);
+            World w = _w.W;
+            w.ForceHatch = true;
+            for (int i = 0; i < _w.Ticks(6) && w.Kaiju.State == KaijuState.Egg; i++) _w.Tick();
+            Assert.AreNotEqual(KaijuState.Egg, w.Kaiju.State, "the forced hatch did not happen");
+            if (_w.KaijuModel() == null) Assert.Ignore("the Kaiju has no model (grey-box cube)");
+            Kaiju k = w.Kaiju;
+            for (int i = 0; i < _w.Ticks(Runtime.View.Art.ArtMapping.HatchlingSeconds + 1.5); i++) { Calm(w); _w.Tick(); }
+            yield return null;
+
+            // The route as per-tick positions.
+            double dt = 1.0 / w.Config.SimHz, x = k.X, z = k.Z, hd = 0;   // heading 0 = +X (Facing: x = cos, z = sin)
+            var route = new List<(double x, double z, double h)>();
+            void Leg(double dist, double v0, double v1, double turnDeg)
+            {
+                double done = 0, v = v0, h0 = hd;
+                while (done < dist - 1e-9)
+                {
+                    v = Math.Min(v1, v + 2.2 / 0.7 * dt);   // accelerate to v1 in 0.7 s
+                    double d = Math.Min(v * dt, dist - done);
+                    done += d;
+                    hd = h0 + turnDeg * Math.PI / 180 * (done / dist);
+                    x += Math.Cos(hd) * d;
+                    z += Math.Sin(hd) * d;
+                    route.Add((x, z, hd));
+                }
+            }
+            Leg(10, 2.2, 2.2, 0);
+            Leg(3 * Math.PI / 2, 1.6, 1.6, 90);
+            Leg(5, 2.2, 2.2, 0);
+            for (int i = 0; i < _w.Ticks(1.5); i++) route.Add((x, z, hd));
+            Leg(6, 0, 2.2, 0);
+
+            Transform km = _w.KaijuModel();
+            Transform fl = SanityRig.Find(km, "Foot_L"), fr = SanityRig.Find(km, "Foot_R");
+            Assert.IsNotNull(fl, "the Kaiju has no Foot_L");
+            var pl = new Vector3[Window]; var pr = new Vector3[Window]; var pb = new Vector3[Window]; var py = new float[Window];
+            double foot = 0, body = 0, routeLen = 0;
+            double px = k.X, pz = k.Z;
+            int n = 0;
+            foreach (var p in route)
+            {
+                _w.Driver.StepTicks(1);
+                Calm(w);
+                k.PrevX = px; k.PrevZ = pz;
+                k.X = p.x; k.Z = p.z;
+                k.Facing = p.h;
+                routeLen += Math.Sqrt((p.x - px) * (p.x - px) + (p.z - pz) * (p.z - pz));
+                px = p.x; pz = p.z;
+                _w.Sync();
+                pl[n] = fl.position; pr[n] = fr.position; pb[n] = km.position; py[n] = km.eulerAngles.y;
+                if (++n == Window)
+                {
+                    n = 0;
+                    PlantedSlide(pl, pr, pb, 0.08f, out double f, out double b, py);
+                    foot += f; body += b;
+                }
+            }
+            double slide = body > 0 ? foot / body : double.PositiveInfinity;
+            KaijuAnimator ka = _w.Views.KaijuAnimator;
+            string report = $"[KaijuRoute] route {routeLen:0.0} u, planted body travel {body:0.0} u, planted foot travel {foot:0.00} u, " +
+                            $"slide {slide:0.00} u/u (limit {KaijuSlideLimit}); stride {ka.LastStrideMetres:0.00} m per cycle, " +
+                            $"{ka.Steps} footfalls";
+            Debug.Log(report);
+            Assert.GreaterOrEqual(body, RouteMinPlantedTravel, "too little planted travel on the route to judge\n" + report);
+            Assert.Less(slide, KaijuSlideLimit, "the Kaiju's planted foot slides\n" + report);
+        }
+
+        static void Calm(World w)
+        {
+            Kaiju k = w.Kaiju;
+            k.MeleeCd = Math.Max(k.MeleeCd, 1000); k.SlamCd = Math.Max(k.SlamCd, 1000);
+            k.TargetId = -1; k.MeleeTargetId = -1; k.MeleeWindupIn = 0; k.TelegraphIn = 0;
+            for (int i = 0; i < k.Threat.Length; i++) k.Threat[i] = 0;
+        }
 
         [UnityTest]
         public IEnumerator EveryMovingActorAnimatesAndTheKaijuReactsToItsEvents()
@@ -159,7 +249,7 @@ namespace CriticalMass.Runtime.PlayTests
             {
                 Tally y = kv.Value;
                 double slide = y.BodyTravel > 1e-6 ? y.FootTravel / y.BodyTravel : 0;
-                sb.Append($"\n  {kv.Key}: {y.Windows} moving windows, {y.Frozen} frozen (least bone turn {y.WorstTurn:0.0} deg {y.Worst}), foot slide {slide:0.00} over {y.BodyTravel:0.0} u");
+                sb.Append($"\n  {kv.Key}: {y.Windows} moving windows, {y.Frozen} frozen (least bone turn {y.WorstTurn:0.0} deg {y.Worst}), foot slide {slide:0.00} over {y.BodyTravel:0.0} u" + (kv.Key == "Kaiju" ? " (judged on the route test)" : ""));
             }
             sb.Append("\n  events:");
             foreach (KeyValuePair<string, int> kv in seen) sb.Append(' ').Append(kv.Key).Append(' ').Append(kv.Value);
@@ -177,9 +267,10 @@ namespace CriticalMass.Runtime.PlayTests
                 double share = y.Frozen / (double)y.Windows;
                 if (kaiju ? y.Frozen > 0 : share > MaxFrozenShare)
                     bad.Add($"{kv.Key}: {y.Frozen} of {y.Windows} moving windows had frozen bones (least turn {y.WorstTurn:0.0} deg): it glides");
-                    // The Kaiju's verdict needs real planted travel (no vacuous pass on a metre of data).
-                if (kaiju && y.BodyTravel < KaijuMinPlantedTravel)
-                    bad.Add($"Kaiju: only {y.BodyTravel:0.0} u of planted-foot travel measured (need {KaijuMinPlantedTravel}): the slide is unmeasured");
+                    // The Kaiju's foot slide is judged on its fixed route (TheKaijuWalksAFixedRouteWithoutSliding): how far it
+                // happens to walk in a live match is noise (2.3 to 2.9 u of planted travel over five runs). Here it only has
+                // to animate and react.
+                if (kaiju) continue;
                 double slide = y.BodyTravel > 2 ? y.FootTravel / y.BodyTravel : 0;
                 if (slide > (kaiju ? KaijuSlideLimit : FighterSlideLimit))
                     bad.Add($"{kv.Key}: the planted foot slides {slide:0.00} u per u travelled (limit {(kaiju ? KaijuSlideLimit : FighterSlideLimit)})");
