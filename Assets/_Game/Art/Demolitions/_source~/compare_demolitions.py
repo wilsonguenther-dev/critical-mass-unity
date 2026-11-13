@@ -112,7 +112,7 @@ for src, dst in (("gameplay_azure.png", "gameplay-azure.jpg"), ("gameplay_crimso
                  ("gameplay_props_azure.png", "gameplay-props-azure.jpg"),
                  ("gameplay_props_crimson.png", "gameplay-props-crimson.jpg")):
     im = Image.open(rp(src)).convert("RGB")
-    checks["files"][dst] = save_jpg(im, os.path.join(OUT, dst), maxw=None if "2x" in src else 1400)
+    checks["files"][dst] = save_jpg(im, os.path.join(OUT, dst), maxw=None)
 
 # ---------------------------------------------------------------- facings: team share, height, outline
 fac, tiles = {}, []

@@ -95,7 +95,7 @@ for name, arm in classes.items():
     widths[name] = {"body_object": body.name, "idle_width_x": round(max(xs) - min(xs), 3),
                     "idle_depth_y": round(max(ys) - min(ys), 3)}
     ev.to_mesh_clear()
-    # lean measure: rest pose (T-pose, arms out of the way), body vertices between z 0.5 and 1.0, |y| < 0.35 (packs
+    # lean measure: rest pose (T-pose, arms out of the way), body vertices between z 0.45 and 0.90, |y| < 0.35 (packs
     # and crates on the back excluded): the hip-to-waist width of the figure
     arm.data.pose_position = "REST"
     bpy.context.view_layer.update()
@@ -103,8 +103,8 @@ for name, arm in classes.items():
     ev = body.evaluated_get(dg)
     me = ev.to_mesh()
     ws = [ev.matrix_world @ v.co for v in me.vertices]
-    tx = [w.x for w in ws if 0.5 <= w.z <= 1.0 and abs(w.y) < 0.35]
-    widths[name]["rest_torso_width_z0.5_1.0"] = round(max(tx) - min(tx), 3)
+    tx = [w.x for w in ws if 0.45 <= w.z <= 0.90 and abs(w.y) < 0.35]
+    widths[name]["rest_hip_waist_width_z0.45_0.90"] = round(max(tx) - min(tx), 3)
     ev.to_mesh_clear()
     arm.data.pose_position = "POSE"
     bpy.context.view_layer.update()

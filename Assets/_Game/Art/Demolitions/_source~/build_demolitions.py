@@ -366,9 +366,13 @@ def face_plane(rows=7, cols=9):
     grid = []
     for j in range(rows + 1):
         z = face_decal.Z0 + (face_decal.Z1 - face_decal.Z0) * j / rows
+        # each row stays on the head (no flaps past the jaw): x limited to where the ellipsoid is still in front
+        kz = 1.0 - ((z - HEAD_C[2]) / HEAD_R[2]) ** 2
+        xm = HEAD_R[0] * math.sqrt(max(kz - 0.06, 0.0))
+        xa, xb = max(face_decal.X0, -xm), min(face_decal.X1, xm)
         grid.append([bm.verts.new((x, head_front_y(x, z, 0.008), z)) for x in
-                     (face_decal.X0 + (face_decal.X1 - face_decal.X0) * i / cols for i in range(cols + 1))])
-    back = [[bm.verts.new(v.co + Vector((0, 0.004, 0))) for v in row] for row in grid]
+                     (xa + (xb - xa) * i / cols for i in range(cols + 1))])
+    back = [[bm.verts.new(v.co + Vector((0, 0.018, 0))) for v in row] for row in grid]   # back sheet inside the head
     for j in range(rows):
         for i in range(cols):
             bm.faces.new((grid[j][i], grid[j][i + 1], grid[j + 1][i + 1], grid[j + 1][i]))
@@ -405,13 +409,13 @@ def build_head():
     # frizzy singed ends
     for s in (1, -1):
         root = Vector((0.235 * s, 0.07, 1.55))
-        d = Vector((0.90 * s, 0.22, -0.26)).normalized()   # out to the sides: a wide bar across the head
+        d = Vector((0.88 * s, 0.20, -0.40)).normalized()   # out to the sides: a wide bar across the head
         add(BODY, B.torus(0.062, 0.03, 8, 3), "kerchief", H, "team_cloth", m=kit.frame(root + d * 0.05, d, (0, 0, 1)))
-        for k, (t, r) in enumerate(((0.10, 0.085), (0.19, 0.11), (0.30, 0.12), (0.41, 0.105), (0.50, 0.08))):
+        for k, (t, r) in enumerate(((0.10, 0.09), (0.19, 0.115), (0.30, 0.125), (0.40, 0.105), (0.48, 0.08))):
             c = root + d * t + Vector((0, 0, 0.012 * (k % 2)))
             add(BODY, B.sphere((r, r * 0.92, r * 0.95), 7, 4), "hair" if k % 2 == 0 else "hair_light", H, "hair",
                 m=M(c, (0, 0, 25 * k)))
-        tipc = root + d * 0.55
+        tipc = root + d * 0.53
         side = Vector((0, 0, 1)).cross(d).normalized()
         up_ = d.cross(side).normalized()
         for k in range(3):
@@ -484,7 +488,7 @@ def build_cap():
         m=T @ kit.frame(Vector((0, -0.296, 1.665)), nrm, (0, 0, 1)))
 
 
-KEG_C = Vector((0.0, 0.50, 0.70))      # keg base centre (rest space)
+KEG_C = Vector((0.0, 0.43, 0.70))      # keg base centre (rest space)
 KEG_T = Matrix.Translation(KEG_C) @ Matrix.Rotation(math.radians(-7), 4, "X")
 KEG_H, KEG_R = 0.62, 0.25
 
@@ -523,7 +527,7 @@ def build_keg():
         smooth=False, m=KEG_T @ Matrix.Translation(sock))
     # curled fuse: rises from the socket, one loop, up to the spark (tip of the top spark ray at z 2.0)
     ws = KEG_T @ (sock + Vector((0, 0, 0.055)))
-    spark_c = Vector((0.24, 0.40, 1.83))     # to her left of the cap so it reads beside it, not behind it
+    spark_c = Vector((0.24, 0.34, 1.83))     # to her left of the cap so it reads beside it, not behind it
     pts = []
     N = 11
     for i in range(N + 1):
@@ -538,7 +542,7 @@ def build_keg():
     spark(BODY, spark_c, W, scale=1.45, n_rays=8, seed=3)
     # shoulder straps holding the keg
     for s in (1, -1):
-        sp = [(0.15 * s, -0.20, 1.15), (0.17 * s, -0.10, 1.255), (0.17 * s, 0.06, 1.27), (0.16 * s, 0.24, 1.18)]
+        sp = [(0.15 * s, -0.20, 1.15), (0.17 * s, -0.10, 1.255), (0.17 * s, 0.06, 1.27), (0.16 * s, 0.21, 1.18)]
         for a, b in zip(sp[:-1], sp[1:]):
             n_ = Vector((0, -(b[2] - a[2]), b[1] - a[1])).normalized()
             if n_.z < 0:
@@ -695,27 +699,21 @@ def assign_face_decal(ob, image):
     gi = ob.vertex_groups["feat_face_decal"].index
     vin = {v.index for v in me.vertices if any(g.group == gi for g in v.groups)}
     uv = me.uv_layers.new(name="UVMap")
-    xs = [me.vertices[i].co.x for i in vin]
-    zs = [me.vertices[i].co.z for i in vin]
-    x0, x1, z0, z1 = min(xs), max(xs), min(zs), max(zs)
+    x0, x1, z0, z1 = face_decal.X0, face_decal.X1, face_decal.Z0, face_decal.Z1   # planar map in head space
     mat = toon3.make_decal_material("CM_FaceDecal", image)
     me.materials.append(mat)
     slot = len(me.materials) - 1
     n = 0
     head_c = Vector(HEAD_C)
     for poly in me.polygons:
-        if not all(i in vin for i in poly.vertices):
-            for li in poly.loop_indices:
-                uv.data[li].uv = (0.0, 0.0)
-            continue
-        # every face of the decal slab takes the decal material; only the outward front sheet is mapped, the back
-        # sheet and the thin rim walls sample the transparent corner texel, so no skin-coloured slab edge shows
-        poly.material_index = slot
-        front = poly.normal.dot((poly.center - head_c).normalized()) > 0.5
-        n += front
+        # front sheet only (outward-facing); the back sheet sits inside the head and the rim walls cross the skin
+        if all(i in vin for i in poly.vertices) and poly.normal.dot((poly.center - head_c).normalized()) > 0.5:
+            poly.material_index = slot
+            n += 1
         for li in poly.loop_indices:
             co = me.vertices[me.loops[li].vertex_index].co
-            uv.data[li].uv = ((co.x - x0) / (x1 - x0), (co.z - z0) / (z1 - z0)) if front else (0.002, 0.002)
+            uv.data[li].uv = ((co.x - x0) / (x1 - x0), (co.z - z0) / (z1 - z0)) if poly.material_index == slot \
+                else (0.0, 0.0)
     return n
 
 
