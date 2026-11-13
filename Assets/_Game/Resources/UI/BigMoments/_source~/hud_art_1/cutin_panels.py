@@ -60,8 +60,9 @@ def plate(out, name, x0, x1, y0, y1, lean=12, lip=0, accent=False):
 if __name__ == "__main__":
     out = sys.argv[1]
     band(out)
-    plate(out, "bm-title-plate.png", 150, 1360, 70, 300)
-    plate(out, "bm-title-plate-impact.png", 130, 1380, 62, 300, lean=14, lip=12)
-    plate(out, "bm-title-plate-ribbon.png", 70, 1440, 92, 288, lean=10)
-    plate(out, "bm-title-plate-accent.png", 150, 1360, 70, 300, accent=True)
+    # the plate holds the title (centre, 80 % of the 1080 canvas width) and the subtitle under it (y -72 of 270)
+    plate(out, "bm-title-plate.png", 60, 1430, 52, 340)
+    plate(out, "bm-title-plate-impact.png", 50, 1440, 46, 336, lean=14, lip=10)
+    plate(out, "bm-title-plate-ribbon.png", 30, 1470, 60, 336, lean=10)
+    plate(out, "bm-title-plate-accent.png", 60, 1430, 52, 340, accent=True)
     print("panels written to", out)

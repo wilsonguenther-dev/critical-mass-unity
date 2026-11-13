@@ -628,7 +628,8 @@ namespace CriticalMass.Runtime.View.Moments
             if (_edge.gameObject.activeSelf)
             {
                 // a slow breathe (well under 3 Hz), still with reduced motion
-                float pulse = motion ? 0.6f + 0.2f * Mathf.Sin(t * Mathf.PI * 2f * 1.5f) : 0.6f;
+                // hud-art-1: a frame, not a wash (the owner's captures were flooded with the accent at 0.6..0.8)
+                float pulse = motion ? 0.26f + 0.08f * Mathf.Sin(t * Mathf.PI * 2f * 1.5f) : 0.26f;
                 _edge.color = CMTokens.WithAlpha(_accent, pulse * Mathf.Clamp01(tb / 0.12f));
             }
 

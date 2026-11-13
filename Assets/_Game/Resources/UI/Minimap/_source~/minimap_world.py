@@ -21,7 +21,16 @@ def main(ortho, simref, out):
     src = np.asarray(Image.open(ortho).convert("RGBA")).astype(np.float32)
     rgb = src[..., :3]
     mag = (rgb[..., 0] > 200) & (rgb[..., 1] < 70) & (rgb[..., 2] > 200)
-    land = ~mag & (src[..., 3] > 10) if (src[..., 3] < 250).mean() > 0.2 and (src[..., 3] > 10).mean() > 0.02 else ~mag
+    # the arena floats over a pale cloud sea: sky = pale, low-saturation blue-cyan (water on the islands is far more saturated)
+    hsv = cv2.cvtColor(rgb.astype(np.uint8), cv2.COLOR_RGB2HSV).astype(np.float32)
+    sky = (hsv[..., 0] > 80) & (hsv[..., 0] < 115) & (hsv[..., 1] < 105) & (hsv[..., 2] > 170)
+    # and only where the sim map has land (the sim reference: land and cliffs are lighter than its navy sky), so the floating
+    # scenery islets and clouds outside the playable map are dropped
+    ref8 = np.asarray(Image.open(simref).convert("RGB").resize((rgb.shape[1], rgb.shape[0]))).astype(np.float32)
+    simland = (0.299 * ref8[..., 0] + 0.587 * ref8[..., 1] + 0.114 * ref8[..., 2]) > 82
+    simland = ndi.binary_dilation(simland, iterations=6)
+    land = ~mag & ~sky & simland
+    land = ndi.binary_closing(land, iterations=3)
     land = ndi.binary_opening(land, iterations=2)
     lab, n = ndi.label(land)
     if n:

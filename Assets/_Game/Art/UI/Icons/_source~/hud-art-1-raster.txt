@@ -62,3 +62,4 @@ class-builder-azure
 class-builder-crimson
 class-healer-azure
 class-healer-crimson
+map-egg
