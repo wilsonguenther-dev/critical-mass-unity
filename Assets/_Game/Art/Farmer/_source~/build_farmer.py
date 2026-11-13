@@ -39,7 +39,7 @@ STAFF_LEN = 0.972 * BODY_H            # bible p07 measured ratio
 B = None
 BODY, STAFF = "Farmer_Body", "Farmer_Staff"
 M = kit.mat_from
-TANK_C = Vector((0.07, 0.41, 1.20))   # globe centre: behind the LEFT shoulder (+X) as p07 front and back draw it
+TANK_C = Vector((0.15, 0.40, 1.25))   # globe centre: behind the LEFT shoulder (+X) as p07 front and back draw it
 TANK_R = 0.225                        # 0.45 u diameter (ART-DIRECTION 3.1)
 
 
@@ -60,17 +60,17 @@ def build_legs():
         lx = 0.205 * s
         up, lo, ft, to = f"upperleg.{sd}", f"lowerleg.{sd}", f"foot.{sd}", f"toes.{sd}"
         # navy baggy overall legs ballooning at the knee (bible p07: very wide, soft trousers), gathered into the cuff
-        prof = [(0.14, 0.24), (0.18, 0.30), (0.192, 0.38), (0.185, 0.48), (0.165, 0.62)]
+        prof = [(0.135, 0.24), (0.165, 0.30), (0.176, 0.38), (0.172, 0.48), (0.16, 0.62)]
         add(BODY, B.lathe(prof, 12), "f_navy", ["hips", up, lo], "overalls", m=M((lx, 0.0, 0)))
         add(BODY, B.box((0.17, 0.06, 0.16), 0.03, 1), "f_patch", [up, lo], "overalls", smooth=False,
             m=M((lx * 1.02, -0.188, 0.375), (-8, 0, 4 * s)))
         # chunky boot (bible: big, round-toed, a fat cream fold and a wide teal trim band), sole, strap + brass buckle
         add(BODY, B.bcyl((lx, 0.02, 0.06), (lx, 0.02, 0.19), 0.172, 0.166, 12, 0.022), "f_boot", [lo, ft], "boots")
-        add(BODY, B.bcyl((lx, 0.02, 0.138), (lx, 0.02, 0.262), 0.188, 0.19, 12, 0.014), "f_team_cloth", lo,
+        add(BODY, B.bcyl((lx, 0.02, 0.175), (lx, 0.02, 0.24), 0.18, 0.18, 12, 0.012), "f_team_cloth", lo,
             "team_cloth")
         add(BODY, B.bcyl((lx, 0.02, 0.245), (lx, 0.02, 0.335), 0.194, 0.205, 12, 0.028), "f_cream", lo, "boots")
-        add(BODY, B.box((0.32, 0.47, 0.17), 0.055, 2), "f_boot", [ft, to], "boots", m=M((lx, -0.095, 0.088)))
-        add(BODY, B.box((0.335, 0.49, 0.055), 0.018, 1), "f_sole", [ft, to], "boots", smooth=False,
+        add(BODY, B.box((0.345, 0.48, 0.18), 0.06, 2), "f_boot", [ft, to], "boots", m=M((lx, -0.095, 0.088)))
+        add(BODY, B.box((0.36, 0.50, 0.055), 0.018, 1), "f_sole", [ft, to], "boots", smooth=False,
             m=M((lx, -0.10, 0.026)))
         add(BODY, B.box((0.055, 0.03, 0.05), 0.012, 1), "f_brass", [lo, ft], "boots", smooth=False,
             m=M((lx + 0.168 * s, 0.0, 0.11)))
@@ -138,20 +138,20 @@ def build_torso():
 def build_arms():
     for s, sd in ((1, "l"), (-1, "r")):
         ua, la, wr, hd = f"upperarm.{sd}", f"lowerarm.{sd}", f"wrist.{sd}", f"hand.{sd}"
-        # puffy cream short sleeve, a wide rolled teal sleeve band, and a big domed teal shoulder patch on top
+        # puffy cream short sleeve, a rolled teal sleeve band and a small teal shoulder patch (bible p07 sizes)
         add(BODY, B.sphere((0.13, 0.13, 0.13), 10, 7), "f_cream", ["chest", ua], "jacket", m=M((0.235 * s, 0, 1.12)))
         add(BODY, B.bcyl((0.22 * s, 0, 1.107), (0.37 * s, 0.01, 1.107), 0.112, 0.106, 12, 0.02), "f_cream",
             ["chest", ua, la], "jacket")
-        add(BODY, B.bcyl((0.32 * s, 0.01, 1.107), (0.47 * s, 0.01, 1.107), 0.13, 0.13, 12, 0.016), "f_team_cloth",
+        add(BODY, B.bcyl((0.35 * s, 0.01, 1.107), (0.43 * s, 0.01, 1.107), 0.12, 0.12, 12, 0.016), "f_team_cloth",
             ua, "team_cloth")
-        add(BODY, B.sphere((0.188, 0.178, 0.068), 10, 4), "f_team_cloth", ["chest", ua], "team_cloth",
-            m=M((0.25 * s, 0.0, 1.228), (0, -16 * s, 0)))
+        add(BODY, B.box((0.19, 0.2, 0.03), 0.01, 1), "f_team_cloth", ["chest", ua], "team_cloth", smooth=False,
+            m=M((0.25 * s, 0.0, 1.236), (0, -16 * s, 0)))
         add(BODY, B.bcyl((0.43 * s, 0.01, 1.107), (0.56 * s, 0, 1.107), 0.072, 0.068, 10, 0.01), "f_skin",
             [ua, la, wr], "skin")
         # big work glove gauntlet (bible: oversized), a long flared teal cuff, fist, thumb, knuckle ridge
         add(BODY, B.bcyl((0.55 * s, 0, 1.107), (0.75 * s, 0, 1.107), 0.108, 0.135, 10, 0.028), "f_glove", [la, wr],
             "gloves")
-        add(BODY, B.bcyl((0.50 * s, 0, 1.107), (0.685 * s, 0, 1.107), 0.13, 0.152, 12, 0.016), "f_team_cloth",
+        add(BODY, B.bcyl((0.535 * s, 0, 1.107), (0.645 * s, 0, 1.107), 0.13, 0.14, 12, 0.016), "f_team_cloth",
             [la, wr], "team_cloth")
         add(BODY, B.sphere((0.158, 0.15, 0.155), 10, 7), "f_glove", hd, "gloves", m=M((0.865 * s, -0.005, 1.095)))
         add(BODY, B.sphere((0.06, 0.055, 0.075), 6, 5), "f_glove", hd, "gloves", m=M((0.81 * s, -0.14, 1.12)))
@@ -226,14 +226,14 @@ def build_hair():
         a = math.radians(az)
         add(BODY, B.sphere((r, r, r * 0.85), 7, 5), "f_hair", H, "bun",
             m=M((0.11 * math.cos(a), 0.04 + 0.11 * math.sin(a), 1.848 + dz)))
-    add(BODY, B.torus(0.174, 0.084, 12, 4), "f_team_cloth", H, "team_cloth", m=M((0, 0.045, 1.775), (-8, 0, 0)))
+    add(BODY, B.torus(0.168, 0.056, 12, 4), "f_team_cloth", H, "team_cloth", m=M((0, 0.045, 1.775), (-8, 0, 0)))
     # brass goggles with teal lenses pushed up on top of the hair at the front
     add(BODY, B.torus(0.27, 0.02, 16, 4), "f_brass", H, "goggles", m=M((0, 0.03, 1.765), (-25, 0, 0), (1.04, 1.0, 1)))
     for s in (1, -1):
         n = Vector((0.26 * s, -0.62, 0.74)).normalized()
         c = Vector((0.12 * s, -0.215, 1.875))
-        add(BODY, B.bcyl(c - n * 0.025, c + n * 0.03, 0.097, 0.091, 10, 0.012), "f_brass", H, "goggles")
-        add(BODY, B.bcyl(c + n * 0.02, c + n * 0.042, 0.08, 0.078, 10, 0.008), "f_team_cloth", H, "team_cloth")
+        add(BODY, B.bcyl(c - n * 0.025, c + n * 0.03, 0.084, 0.078, 10, 0.012), "f_brass", H, "goggles")
+        add(BODY, B.bcyl(c + n * 0.02, c + n * 0.042, 0.066, 0.064, 10, 0.008), "f_team_cloth", H, "team_cloth")
     add(BODY, B.box((0.07, 0.03, 0.035), 0.01, 1), "f_brass", H, "goggles", smooth=False,
         m=M((0, -0.238, 1.885), (-40, 0, 0)))
 
@@ -262,14 +262,14 @@ def build_tank():
     n0, n1 = G + Vector((0, 0.04, -0.20)), G + Vector((0, 0.10, -0.31))
     add(BODY, B.bcyl(n0, n1, 0.068, 0.054, 12, 0.015), "f_frame_dark", W, T)
     add(BODY, B.torus(0.058, 0.016, 10, 4), "f_brass", W, T, m=kit.frame(n1, n1 - n0, (1, 0, 0)))
-    # teal side canisters (team), tucked low and forward against the globe so they never stick out like wings
+    # teal side canisters (team, bible size), tucked low and forward against the globe so they never stick out like wings
     # from behind; brass caps and a bracket each
     for s in (1, -1):
         cx = G + Vector((0.205 * s, -0.085, -0.05))
         a, b = cx + Vector((0.012 * s, 0, -0.17)), cx + Vector((-0.012 * s, 0, 0.17))
-        add(BODY, B.bcyl(a, b, 0.098, 0.098, 10, 0.016), "f_team_cloth", W, "team_cloth")
+        add(BODY, B.bcyl(a, b, 0.075, 0.075, 10, 0.016), "f_team_cloth", W, "team_cloth")
         for e in (a, b):
-            add(BODY, B.bcyl(e - (b - a).normalized() * 0.022, e + (b - a).normalized() * 0.022, 0.104, 0.104, 10,
+            add(BODY, B.bcyl(e - (b - a).normalized() * 0.022, e + (b - a).normalized() * 0.022, 0.081, 0.081, 10,
                              0.01), "f_brass", W, T)
         add(BODY, B.box((0.05, 0.04, 0.035), 0.01, 1), "f_brass", W, T, smooth=False,
             m=M(G + Vector((0.16 * s, -0.07, -0.05))))
@@ -314,9 +314,9 @@ def build_staff(poses):
     p(B.bcyl((0, 0, z0), (0, 0, z0 + 0.075), 0.036, 0.042, 10, 0.012), "f_brass")
     for z in (-0.36, -0.12, 0.22, 0.60, 1.02):
         p(B.bcyl((0, 0, z - 0.022), (0, 0, z + 0.022), 0.042, 0.042, 8, 0.01), "f_brass")
-    p(B.bcyl((0, 0, 0.245), (0, 0, 0.575), 0.045, 0.045, 8, 0.008), "f_team_cloth", "team_cloth")
-    p(B.bcyl((0, 0, 0.625), (0, 0, 0.995), 0.045, 0.045, 8, 0.008), "f_team_cloth", "team_cloth")
-    p(B.bcyl((0, 0, -0.335), (0, 0, -0.145), 0.045, 0.045, 8, 0.008), "f_team_cloth", "team_cloth")
+    p(B.bcyl((0, 0, 0.245), (0, 0, 0.575), 0.038, 0.038, 8, 0.008), "f_team_cloth", "team_cloth")
+    p(B.bcyl((0, 0, 0.625), (0, 0, 0.995), 0.038, 0.038, 8, 0.008), "f_team_cloth", "team_cloth")
+    p(B.bcyl((0, 0, -0.335), (0, 0, -0.145), 0.037, 0.037, 8, 0.008), "f_team_cloth", "team_cloth")
     p(B.bcyl((0, 0, -0.095), (0, 0, 0.075), 0.038, 0.038, 8, 0.008), "f_brown")
     # head: socket, glowing lime bulb in a brass cage, cap
     p(B.bcyl((0, 0, 1.08), (0, 0, 1.165), 0.048, 0.062, 12, 0.012), "f_brass")
@@ -325,7 +325,7 @@ def build_staff(poses):
     p(B.torus(0.091, 0.012, 10, 3), "f_brass", m=M((0, 0, 1.24), (0, 90, 0)))
     p(B.bcyl((0, 0, 1.325), (0, 0, 1.36), 0.042, 0.036, 10, 0.01), "f_brass")
     # brass hook arc (local YZ plane), cream crescent blade on its outer edge
-    cy, cz, R = 0.16, 1.25, 0.16
+    cy, cz, R = 0.18, 1.23, 0.18
     arc = [(0.0, cy + R * math.cos(math.radians(a)), cz + R * math.sin(math.radians(a)))
            for a in range(160, -71, -15)]
     radii = [0.036 - 0.014 * i / (len(arc) - 1) for i in range(len(arc))]
@@ -335,7 +335,7 @@ def build_staff(poses):
     for i in range(nseg + 1):
         t = i / nseg
         a = math.radians(a0 + (a1 - a0) * t)
-        wdt = 0.12 * math.sin(math.pi * min(1.0, t * 1.05)) ** 0.85
+        wdt = 0.14 * math.sin(math.pi * min(1.0, t * 1.05)) ** 0.85
         r_in = R + 0.012
         pts_in.append((r_in * math.cos(a), r_in * math.sin(a)))
         pts_out.append(((r_in + wdt) * math.cos(a), (r_in + wdt) * math.sin(a)))

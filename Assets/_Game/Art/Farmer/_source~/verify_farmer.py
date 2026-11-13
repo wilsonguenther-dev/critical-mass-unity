@@ -148,6 +148,12 @@ for name, ob in sorted(meshes.items()):
         check(f"{name} team trim (1.0) + fixed biomass glow (0.25) codes", {1.0, 0.25} <= codes, sorted(codes))
 check(f"triangle budget <= {TRI_BUDGET}", total <= TRI_BUDGET, total)
 body = meshes["Farmer_Body"]
+_face_png = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "Farmer_Face.png")
+_uv = body.data.uv_layers[0] if len(body.data.uv_layers) else None
+_in_box = sum(1 for d in _uv.data if 0.05 < d.uv[0] < 0.95 and 0.05 < d.uv[1] < 0.95) if _uv else 0
+check("painted face decal: Farmer_Face.png 256x256 + body UV map with a face projection",
+      os.path.exists(_face_png) and _uv is not None and _in_box > 100,
+      {"png": os.path.exists(_face_png), "uv_layers": [u.name for u in body.data.uv_layers], "face_loops": _in_box})
 zs = [(body.matrix_world @ v.co).z for v in body.data.vertices]
 check("body height in metres after round trip (Blender Z = Unity Y)", 1.97 < max(zs) - min(zs) < 2.03 and abs(min(zs)) < 0.02,
       {"min_z": round(min(zs), 3), "max_z": round(max(zs), 3),

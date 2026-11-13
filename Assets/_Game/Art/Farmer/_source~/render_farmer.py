@@ -409,11 +409,13 @@ FIT_PARAMS = [("spine", (1, 0, 0)), ("spine", (0, 1, 0)), ("spine", (0, 0, 1)),
               ("lowerarm.l", (1, 0, 0)), ("lowerarm.l", (0, 0, 1)),
               ("upperleg.l", (1, 0, 0)), ("upperleg.l", (0, 1, 0)), ("upperleg.r", (1, 0, 0)), ("upperleg.r", (0, 1, 0)),
               ("lowerleg.l", (1, 0, 0)), ("lowerleg.r", (1, 0, 0))]
+RAISED = {("upperarm.r", (1, 0, 0)): -45.0, ("lowerarm.r", (1, 0, 0)): -70.0}
+ACROSS = {("upperarm.r", (1, 0, 0)): -50.0, ("upperarm.r", (0, 0, 1)): 30.0, ("lowerarm.r", (1, 0, 0)): -60.0}
 FIT_SET = {
-    "front": dict(base=("Idle", 1), az=[0], el=4, rng=14),
-    "three-quarter": dict(base=("Idle", 1), az=[-35, 35], el=4, rng=25),
-    "profile": dict(base=("Idle", 1), az=[-90], el=2, rng=14),
-    "back": dict(base=("Idle", 1), az=[180], el=4, rng=14),
+    "front": dict(base=("Idle", 1), az=[0], el=4, rng=14, seeds=[RAISED]),
+    "three-quarter": dict(base=("Idle", 1), az=[-35], el=4, rng=25, seeds=[RAISED, ACROSS]),
+    "profile": dict(base=("Idle", 1), az=[-90], el=2, rng=14, seeds=[RAISED]),
+    "back": dict(base=("Idle", 1), az=[180], el=4, rng=14, seeds=[RAISED]),
     "pose-harvest": dict(base=("Dualwield_Melee_Attack_Slice", 19), az=[-62, -100], el=6, rng=40, props="harvest"),
     "pose-root-seed": dict(base=("1H_Melee_Attack_Slice_Horizontal", 11), az=[-62, -95], el=6, rng=40, props="seed"),
 }
@@ -624,6 +626,11 @@ def do_fit():
         import random
         rng = random.Random(7)
         starts = [([0.0] * len(FIT_PARAMS), float(a), float(cfg["el"]), float(a)) for a in cfg["az"]]
+        for sd in cfg.get("seeds", ()):           # hand-placed starting poses (staff raised / held across)
+            sx = [0.0] * len(FIT_PARAMS)
+            for (b, ax), d in sd.items():
+                sx[FIT_PARAMS.index((b, ax))] = d
+            starts += [(sx, float(a), float(cfg["el"]), float(a)) for a in cfg["az"]]
         prev = result.get(name)
         if prev:
             px = [0.0] * len(FIT_PARAMS)

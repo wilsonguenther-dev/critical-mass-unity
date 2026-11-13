@@ -87,7 +87,7 @@
    "check": "Farmer_Body loose/non-manifold",
    "ok": true,
    "detail": {
-    "triangles": 10112,
+    "triangles": 10080,
     "loose_verts": 0,
     "loose_edges": 0,
     "non_manifold_edges": 0,
@@ -195,7 +195,18 @@
   {
    "check": "triangle budget <= 12000",
    "ok": true,
-   "detail": 11784
+   "detail": 11752
+  },
+  {
+   "check": "painted face decal: Farmer_Face.png 256x256 + body UV map with a face projection",
+   "ok": true,
+   "detail": {
+    "png": true,
+    "uv_layers": [
+     "UVMap"
+    ],
+    "face_loops": 288
+   }
   },
   {
    "check": "body height in metres after round trip (Blender Z = Unity Y)",
