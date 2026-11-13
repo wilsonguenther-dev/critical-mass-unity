@@ -584,7 +584,7 @@ namespace CriticalMass.Runtime.View
         // ---------------------------------------------------------------- callout
 
         /// <summary>Centre of the callout pill from the top (polish pass 1: inside the centre lane, under the top band).</summary>
-        public const float CalloutCentre = HudZones.AlertTop + 36f;
+        public const float CalloutCentre = HudZones.AlertTop + 41f;   // 27 half-height + the 14 px drop-in
 
         private void ApplyCallout(World w, double simNow)
         {
