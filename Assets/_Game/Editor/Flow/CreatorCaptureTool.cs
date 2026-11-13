@@ -253,7 +253,8 @@ namespace CriticalMass.Editor.Flow
                 Teleport(sx - 0.6, sz + 0.5);
                 yield return StepFrames(6);
                 Shot("c03-dig-hole-and-carry");
-                int holeX = sx + 1, holeZ = sz;
+                ShotClose("c03b-dig-hole-close", sx + 1.5, sz + 0.5, 9f, 52f);
+                int holeX = CellAt(w.Map, sx + 1, sz) == Cell.Void ? sx + 1 : sx + 2, holeZ = sz;   // the aim reach (1.6 u) may land one cell further
                 if (EdgeSpot(w, w.X[0], w.Z[0], out int fx, out int fz, out int vx, out int vz))
                 {
                     Teleport(fx + 0.5, fz + 0.5);
@@ -278,6 +279,7 @@ namespace CriticalMass.Editor.Flow
                     yield return StepFrames(10);
                     Note($"stands on ({(int)Math.Floor(w.X[0])},{(int)Math.Floor(w.Z[0])}); step {(Trial.Guide != null && Trial.Guide.Runner.ActiveStep != null ? Trial.Guide.Runner.ActiveStep.Id : "-")}");
                     Shot("c04-placed-block-new-ground");
+                    ShotClose("c04b-placed-block-close", w.X[0], w.Z[0], 9f, 52f);
                 }
                 // 3. Jump over the dug hole (Space).
                 Teleport(holeX - 1.7, holeZ + 0.5);
@@ -291,7 +293,7 @@ namespace CriticalMass.Editor.Flow
                 Keys();
                 yield return StepFrames(7);
                 Note($"jump: air {w.Actors[0].AirTick}/{w.Actors[0].AirLen} at x {w.X[0]:0.00} (hole x {holeX})");
-                Shot("c09-jump-over-dug-gap");
+                ShotClose("c09-jump-over-dug-gap", holeX + 0.5, holeZ + 0.5, 8f, 35f);
                 yield return StepFrames(20);
                 Pad(Vector2.zero, Vector2.zero);
                 yield return Frames(2);
@@ -308,6 +310,7 @@ namespace CriticalMass.Editor.Flow
                 yield return StepFrames(30);
                 Note($"pillar {k} of {w.Map.Decorations.Length}: chip '{TerrainPrompt.Line}', step {(Trial.Guide != null && Trial.Guide.Runner.ActiveStep != null ? Trial.Guide.Runner.ActiveStep.Id : "-")}");
                 Shot("c05-pillar-fall-arrows-and-prompt");
+                ShotClose("c05b-pillar-arrows-close", bx, bz, 10f, 55f);
                 foreach (Func<bool> f in Swing(bx, bz, k, 12)) yield return f;
                 yield return StepFrames(10);
                 Shot("c06a-pillar-falling");
@@ -320,6 +323,7 @@ namespace CriticalMass.Editor.Flow
                 yield return StepFrames(4);
                 Note($"on the ramp at ({w.X[0]:0.0},{w.Z[0]:0.0}) cell {MapGrid.CellAt(w.Map, w.X[0], w.Z[0])}");
                 Shot("c06-ramp-fighter-walks-up");
+                ShotClose("c06b-ramp-close", bx + d.Ramp.Dx * 2.5, bz + d.Ramp.Dz * 2.5, 11f, 52f);
             }
 
             // 4. A diagonal bridge crossing with the stick 45 degrees off the axis (B2, next to the pillar).
@@ -351,6 +355,7 @@ namespace CriticalMass.Editor.Flow
                 Pad(Vector2.zero, Vector2.zero);
                 Note($"wall: fallen {w.Topple.Fallen[k]}, fighter at ({w.X[0]:0.0},{w.Z[0]:0.0})");
                 Shot("c07-wall-blocks-the-path");
+                ShotClose("c07b-wall-close", bx + d.Block.Dx * 2.5, bz + d.Block.Dz * 2.5, 11f, 52f);
             }
 
             // 5. Corruption: carry it, deliver it (tour line: one load locks berserk), the berserk hatch.
@@ -393,6 +398,20 @@ namespace CriticalMass.Editor.Flow
             yield return Seconds(0.8);
             Shot("c14-berserk-kaiju");
             if (cf != null) cf.ClearOverride();
+        }
+
+        /// <summary>A close shot of sim point (x, z): the camera moved to dist units back at pitch, restored after.</summary>
+        static void ShotClose(string name, double x, double z, float dist, float pitch)
+        {
+            UnityEngine.Camera cam = UnityEngine.Camera.main;
+            if (cam == null) { Shot(name); return; }
+            Vector3 pos = cam.transform.position;
+            Quaternion rot = cam.transform.rotation;
+            Vector3 target = CriticalMass.Runtime.SimSpace.ToWorld(x, CriticalMass.Runtime.GroundHeight.At(W.Map, x, z), z);
+            cam.transform.rotation = Quaternion.Euler(pitch, rot.eulerAngles.y, 0f);
+            cam.transform.position = target + Vector3.up * 0.5f - cam.transform.forward * dist;
+            try { Shot(name); }
+            finally { cam.transform.position = pos; cam.transform.rotation = rot; }
         }
 
         static void Update()

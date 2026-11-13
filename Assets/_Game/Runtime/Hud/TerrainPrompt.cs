@@ -28,7 +28,7 @@ namespace CriticalMass.Runtime.Hud
     {
         /// <summary>World units from a pillar's base cell centre inside which the knock-down line shows.</summary>
         public const double PillarRange = 4.5;
-        const float ChipW = 620f, ChipH = 46f, LiftY = 214f;
+        const float ChipW = 620f, ChipH = 46f, LiftY = 214f, ShiftX = 190f;
 
         public static TerrainPrompt Instance { get; private set; }
         /// <summary>What the chip says now ("" = hidden). Tests and captures read it.</summary>
@@ -76,7 +76,7 @@ namespace CriticalMass.Runtime.Hud
             _chip.anchorMin = _chip.anchorMax = new Vector2(0.5f, 0f);
             _chip.pivot = new Vector2(0.5f, 0f);
             _chip.sizeDelta = new Vector2(ChipW, ChipH);
-            _chip.anchoredPosition = new Vector2(0f, LiftY);
+            _chip.anchoredPosition = new Vector2(ShiftX, LiftY);   // right of the mascot box and the intro card
             VectorShape body = MenuUi.Shape(_chip, "Body", ShapeKind.RoundRect, 0f, 0f, ChipW, ChipH, CMTokens.PanelNavy.Color, -1f);
             body.OutlinePx = 3f;
             body.RimPx = 2f;
