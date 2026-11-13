@@ -145,3 +145,17 @@ repo; nothing in this folder should be committed from a render run.
   half weight on hands and head skin (`outline_w` 0.5, Blender preview only; Unity's sidecar is binary).
 - **One Blender process per run:** `run_all.py -- plan.json` chains build, verify and every render (machine rule:
   at most one Blender launch per 4 minutes); comparisons run afterwards in plain Python.
+
+## v7 (2026-11-13): driven by bible_fit
+- The fitting tool came in by merging branch `art/fit-tools` (9a1b89c): `Assets/_Game/Art/_tools~/bible_fit/`.
+- One Blender run per round: `run_all.py -- plan.json` with steps build_warrior.py, verify_warrior.py,
+  render_warrior.py bible (cleave, shield-charge, front-shield, face, crimson), then
+  `../../_tools~/bible_fit/examples/warrior_fit_run.py <this folder> <tools>/guides <out>/fit` (front, three-quarter,
+  profile, back renders + ID masks + project_paint), then render_warrior.py game and facings.
+- Afterwards in plain Python: `fit_report.py guides/guide-06-<view>.json <view>.png <out> --mask <view>.mask.png` per
+  view, `fit_summary.py`, and `compare_warrior.py bible|game|facings`.
+- `cm_art/kit.py` finalize no longer creates a second colour attribute: the FBX carries exactly one set (`Col`) per mesh
+  (v6 shipped Col + Col.001 on all three meshes); verify_warrior.py checks it in the file and after re-import.
+- Display pose (Idle ATTITUDE + held-item placement) reworked against the bible front; render POSES front, back and
+  crimson are the plain Idle. `render_warrior.py` logs POSEBOX / POSEJOINT lines (world boxes of the parts, hand and
+  foot joints) for each bible framing.

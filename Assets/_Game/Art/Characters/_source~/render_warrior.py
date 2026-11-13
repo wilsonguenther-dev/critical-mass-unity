@@ -80,7 +80,7 @@ POSES = {
     # down at 45 degrees, cleaver hand further out, no chest-out lean), so the front framing is the plain Idle. The
     # three-quarter and profile keep only the shield turn the bible draws in those views.
     "front": ("Idle", 1, [], 8, 6, "azure", "all"),
-    "three-quarter": ("Idle", 1, shield_turn(-60), -35, 6, "azure", "all"),
+    "three-quarter": ("Idle", 1, shield_turn(-60) + cleaver_turn(-50), -35, 6, "azure", "all"),   # bible 3/4 draws the blade swung out to screen left
     "profile": ("Idle", 1, [("upperarm.l", (1, 0, 0), -10)] + shield_turn(-50), -90, 4, "azure", "all"),
     "back": ("Idle", 1, [], 180, 6, "azure", "all"),
     "cleave": ("Idle", 1, CLEAVE + shield_turn(-70), -50, 6, "azure", "all"),

@@ -66,7 +66,7 @@ def add(obj, bm, color, bones, feat, smooth=True, m=None, face_uv=None, grad=kit
         if feat == "topknot":
             m = Matrix.Translation((0, 0, TOPKNOT_LIFT)) @ m
     if steps is None:
-        steps = STONE_STEPS if color in ("stone_armour", "stone_dark", "stone_toe") else (HAIR_STEPS if color == "hair" else True)
+        steps = STONE_STEPS if color in ("stone_armour", "stone_dark", "stone_toe", "knee_dark") else (HAIR_STEPS if color == "hair" else True)
     B.add(obj, bm, color, bones, feat=feat, smooth=smooth, m=m, face_uv=face_uv, grad=grad, steps=steps, noao=noao)
 
 
@@ -125,75 +125,83 @@ def groove(name):
 
 
 def build_legs():
+    """v7 lower body, rebuilt against the bible_fit measurements (v6: 53 to 68 % too much filled mass between 3 and 28 %
+    of height, legs closing at 4 % instead of 24 %, boots 18 % of the figure instead of 8 %). Longer-reading, separated
+    legs: baggy cream trousers that bulge at the thigh and gather into a dark shin wrap, a round DARK knee guard, and a
+    SHORT brown boot (top at ~10 % of height) with a mid-grey stone toe cap. Each thigh is a little narrower than the
+    hip-to-midline distance, so the Idle stance (upper legs spread 18 degrees, ATTITUDE) opens a gap between the legs
+    from the crotch (~25 %) down to the feet."""
     for s, sd in ((1, "l"), (-1, "r")):
         lx = 0.171 * s
         up, lo, ft, to = f"upperleg.{sd}", f"lowerleg.{sd}", f"foot.{sd}", f"toes.{sd}"
-        # baggy cream trousers: wide bulge at the thigh, gathered into the shin wrap (bottom-heavy read)
-        prof = [(0.13, 0.25), (0.19, 0.30), (0.225, 0.39), (0.22, 0.49), (0.19, 0.61)]
-        add(BODY, B.lathe(prof, 14), "trouser", ["hips", up, lo], "clothes", m=M((lx * 1.10, 0.0, 0)))
-        add(BODY, B.cyl((lx * 1.08, 0.01, 0.31), (lx * 1.08, 0.02, 0.17), 0.125, 0.12, 12), "wrap_dark", [lo, ft],
-            "clothes")
-        # grey stone knee guard: rounded slab + brass rivet
-        add(BODY, B.chipped(B.slab((0.27, 0.14, 0.24), 0.5, 12, 8), rng, chips=2, lump=0.006), "stone_dark", lo,
-            "stone_armour", m=M((lx * 1.10, -0.15, 0.33), (-10, 0, 8 * s)))
-        add(BODY, brass_disc(0.058, 0.035), "brass", lo, "stone_armour",
-            m=kit.frame((lx * 1.10, -0.215, 0.335), (0, -1, 0.15), (0, 0, 1)))
-        # oversized brown boot: shaft, cuff, strap + buckle, rounded foot, grey stone toe cap, dark sole
-        add(BODY, B.cyl((lx * 1.10, 0.02, 0.07), (lx * 1.10, 0.02, 0.25), 0.165, 0.155, 14), "boot", [lo, ft],
-            "boots")
-        add(BODY, B.torus(0.158, 0.036, 14, 6), "leather_dark", lo, "boots", m=M((lx * 1.10, 0.02, 0.245)))
-        add(BODY, B.torus(0.168, 0.02, 14, 5), "leather_dark", [lo, ft], "boots", m=M((lx * 1.10, 0.02, 0.14)))
-        add(BODY, B.box((0.05, 0.035, 0.055), 0.012), "brass", [lo, ft], "boots", smooth=False,
-            m=M((lx * 1.10 + 0.165 * s, 0.0, 0.14)))
-        add(BODY, B.slab((0.37, 0.53, 0.20), 0.55, 12, 8), "boot", [ft, to], "boots",
-            m=M((lx * 1.12, -0.115, 0.10)))
-        add(BODY, B.chipped(B.slab((0.375, 0.19, 0.165), 0.5, 12, 8), rng, chips=2, lump=0.005), "stone_toe", to,
-            "stone_armour",
-            m=M((lx * 1.12, -0.305, 0.085)))
-        add(BODY, B.box((0.37, 0.55, 0.045), 0.02), "leather_dark", [ft, to], "boots", smooth=False,
-            m=M((lx * 1.12, -0.12, 0.0225)))
+        cx = lx * 1.12
+        # baggy trouser: full at the thigh, gathered just under the knee into the wrap
+        prof = [(0.100, 0.245), (0.135, 0.285), (0.155, 0.345), (0.158, 0.42), (0.150, 0.50), (0.145, 0.60)]   # v7 r3 slimmer (front 28 % too much mass)
+        add(BODY, B.lathe(prof, 14), "trouser", ["hips", up, lo], "clothes", m=M((cx, 0.0, 0)))
+        # dark shin wrap between the gather and the short boot
+        add(BODY, B.cyl((cx, 0.012, 0.27), (cx, 0.02, 0.16), 0.112, 0.104, 12), "wrap_dark", [lo, ft], "clothes")
+        # round dark knee guard (bible: near-black domed cap with a small brass rivet), on the front of the knee
+        add(BODY, B.chipped(B.slab((0.215, 0.13, 0.20), 0.5, 10, 6), rng, chips=2, lump=0.004), "knee_dark", [up, lo],
+            "stone_armour", m=M((cx, -0.125, 0.34), (-12, 0, 6 * s)))
+        add(BODY, brass_disc(0.040, 0.03), "brass", [up, lo], "stone_armour",
+            m=kit.frame((cx, -0.188, 0.347), (0, -1, 0.2), (0, 0, 1)))
+        # short brown boot: low shaft, rolled cuff, one strap with a buckle, rounded foot, mid-grey stone toe cap
+        add(BODY, B.cyl((cx, 0.02, 0.06), (cx, 0.02, 0.175), 0.138, 0.132, 14), "boot", [lo, ft], "boots")
+        add(BODY, B.torus(0.134, 0.030, 14, 6), "leather_dark", [lo, ft], "boots", m=M((cx, 0.02, 0.172)))
+        add(BODY, B.torus(0.142, 0.016, 14, 5), "leather_dark", [lo, ft], "boots", m=M((cx, 0.02, 0.11)))
+        add(BODY, B.box((0.045, 0.03, 0.045), 0.01), "brass", [lo, ft], "boots", smooth=False,
+            m=M((cx + 0.140 * s, 0.0, 0.11)))
+        add(BODY, B.slab((0.33, 0.48, 0.15), 0.55, 12, 8), "boot", [ft, to], "boots", m=M((cx, -0.10, 0.08)))
+        add(BODY, B.chipped(B.slab((0.335, 0.17, 0.13), 0.5, 12, 8), rng, chips=2, lump=0.004), "stone_toe", to,
+            "stone_armour", m=M((cx, -0.275, 0.07)))
+        add(BODY, B.box((0.33, 0.50, 0.04), 0.018), "leather_dark", [ft, to], "boots", smooth=False,
+            m=M((cx, -0.105, 0.02)))
 
 
 def build_torso():
-    add(BODY, B.sphere((0.34, 0.25, 0.21), 16, 10), "trouser", ["hips", "spine"], "clothes", m=M((0, 0.0, 0.62)))
+    add(BODY, B.sphere((0.31, 0.22, 0.16), 14, 8), "trouser", ["hips", "spine"], "clothes", m=M((0, 0.0, 0.66)))   # v7: crotch up to ~0.5 u
     # navy padded doublet, a barrel that overhangs the belt (fixed navy: the accent-swap keeps it navy)
-    add(BODY, B.sphere((0.40, 0.27, 0.31), 18, 12), "navy", ["spine", "chest"], "clothes", m=M((0, 0.01, 0.99)))   # v5 broader chest
+    add(BODY, B.sphere((0.40, 0.235, 0.31), 18, 12), "navy", ["spine", "chest"], "clothes", m=M((0, 0.03, 0.99)))   # v5 broader chest; v7 shallower (profile tuck)
     # cream quilted undershirt: a broad panel down the chest, with two quilting grooves
-    add(BODY, B.sphere((0.12, 0.10, 0.19), 14, 10), "cream", ["spine", "chest"], "clothes", m=M((0, -0.185, 0.95)))   # v6: smaller cream panel, chest mostly navy
+    add(BODY, B.sphere((0.12, 0.10, 0.19), 14, 10), "cream", ["spine", "chest"], "clothes", m=M((0, -0.155, 0.95)))   # v7 tucked; v6: smaller cream panel, chest mostly navy
     # brown leather belt with crease grooves at both edges + big round brass buckle disc
     W = {"hips": 0.5, "spine": 0.5}
     add(BODY, B.cyl((0, 0, 0.75), (0, 0, 0.85), 0.33, 0.34, 22), "leather_dark", W, "belt",
-        m=M((0, 0, 0), (0, 0, 0), (1, 0.84, 1)))
+        m=M((0, 0, 0), (0, 0, 0), (1, 0.76, 1)))
     for z, r in ((0.752, 0.333), (0.848, 0.343)):
-        add(BODY, B.torus(r, 0.008, 22, 4), groove("leather_dark"), W, "belt", m=M((0, 0, z), (0, 0, 0), (1, 0.84, 1)))
-    add(BODY, brass_disc(0.13, 0.06), "brass", W, "belt", m=kit.frame((0, -0.275, 0.80), (0, -1, 0), (0, 0, 1)))
-    add(BODY, B.torus(0.092, 0.012, 18, 4), groove("brass"), W, "belt", m=M((0, -0.318, 0.80), (90, 0, 0)))
+        add(BODY, B.torus(r, 0.008, 22, 4), groove("leather_dark"), W, "belt", m=M((0, 0, z), (0, 0, 0), (1, 0.76, 1)))
+    add(BODY, brass_disc(0.13, 0.06), "brass", W, "belt", m=kit.frame((0, -0.248, 0.80), (0, -1, 0), (0, 0, 1)))
+    add(BODY, B.torus(0.092, 0.012, 18, 4), groove("brass"), W, "belt", m=M((0, -0.291, 0.80), (90, 0, 0)))
     add(BODY, brass_disc(0.075, 0.035), "brass", W, "belt",
-        m=kit.frame((-0.27, -0.19, 0.79), (-0.62, -0.78, 0), (0, 0, 1)))
+        m=kit.frame((-0.27, -0.17, 0.79), (-0.62, -0.78, 0), (0, 0, 1)))
     add(BODY, B.slab((0.14, 0.11, 0.15), 0.55, 10, 6), "leather", {"hips": 0.6, "spine": 0.4}, "belt",
-        m=M((0.25, -0.21, 0.73), (0, 0, -25)))
+        m=M((0.25, -0.185, 0.73), (0, 0, -25)))
     add(BODY, B.box((0.145, 0.115, 0.055), 0.02), "brass", {"hips": 0.6, "spine": 0.4}, "belt", smooth=False,
-        m=M((0.25, -0.215, 0.79), (0, 0, -25)))
+        m=M((0.25, -0.19, 0.79), (0, 0, -25)))
     # teal tabard strips, front and back, zigzag hem (team cloth), wide enough to read from above
-    hem = [(-0.12, 0.0), (0.12, 0.0), (0.125, -0.42), (0.06, -0.50), (0.0, -0.43), (-0.06, -0.50),
-           (-0.125, -0.42)]      # v4: the bible's narrow tabard
-    for y, ry in ((-0.275, 0), (0.265, 180)):
+    hem = [(-0.12, 0.0), (0.12, 0.0), (0.125, -0.31), (0.06, -0.37), (0.0, -0.32), (-0.06, -0.37),
+           (-0.125, -0.31)]      # v4: the bible's narrow tabard; v7 shorter (ends ~26 % of height, above the leg split)
+    for y, ry in ((-0.25, 0), (0.245, 180)):   # v7 tucked with the belt
         add(BODY, B.prism(hem, 0.03, bevel=0.012, seg=1), "team_cloth", "hips", "team_cloth", smooth=False,
             m=M((0, y, 0.82), (90, 0, ry)) @ M((0, 0, 0), (-8, 0, 0)))
     add(BODY, B.cyl((0, 0, 1.15), (0, 0, 1.31), 0.10, 0.095, 12), "skin", ["chest", "head"], "skin")
     # v6 teal scarf (bible p06): a big soft scarf wrapped twice round the neck as a thick roll with folds, sagging onto
     # the upper chest at the front, a wide fold of cloth covering the upper chest under the roll, a knot on the
     # character's right and ONE tail. No folds over the pauldrons (no cape, no hood).
-    add(BODY, loop_tube(0.215, 0.185, lambda a: 1.205 - 0.065 * max(0.0, -math.sin(a)),
+    add(BODY, loop_tube(0.215, 0.185, lambda a: 1.212 - 0.050 * max(0.0, -math.sin(a)),
                         lambda a: 0.098 * (1.0 + 0.16 * math.sin(5 * a + 0.7)), 18, 6), "team_cloth", "chest",
         "team_cloth")
-    add(BODY, loop_tube(0.185, 0.165, lambda a: 1.270 - 0.055 * max(0.0, -math.sin(a)),
+    add(BODY, loop_tube(0.185, 0.165, lambda a: 1.272 - 0.045 * max(0.0, -math.sin(a)),
                         lambda a: 0.074 * (1.0 + 0.18 * math.sin(4 * a + 2.1)), 16, 6, y0=0.01), "team_cloth", "chest",
         "team_cloth")
-    add(BODY, B.clump((0.01, -0.19, 1.16), (0.03, -0.275, 1.08), (0.0, -0.255, 0.985), 0.30, 0.06, 7,
+    add(BODY, B.clump((0.01, -0.18, 1.17), (0.03, -0.245, 1.11), (0.0, -0.232, 1.05), 0.30, 0.06, 7,
                       up=(0, -1, 0), prof=(1.0, 1.06, 0.92, 0.62)), "team_cloth", "chest", "team_cloth")
-    add(BODY, B.sphere((0.085, 0.065, 0.075), 10, 6), "team_cloth", "chest", "team_cloth", m=M((-0.10, -0.24, 1.165)))
-    add(BODY, B.clump((-0.10, -0.24, 1.14), (-0.17, -0.295, 1.00), (-0.21, -0.27, 0.86), 0.15, 0.05, 7,
+    add(BODY, B.sphere((0.085, 0.065, 0.075), 10, 6), "team_cloth", "chest", "team_cloth", m=M((-0.10, -0.225, 1.17)))
+    # v7: the bible back view (06-back) drapes the scarf end down the upper back (bible_fit back: teal 3.1 % vs ours
+    # 1.2 % at 60-70 %, navy 7.7 % vs 3.1 % at 40-50 %). A cloth fall from the roll, not a cape: it stops above the belt.
+    add(BODY, B.clump((0.0, 0.215, 1.20), (0.01, 0.275, 1.08), (0.0, 0.255, 0.93), 0.30, 0.05, 5, rings=4,
+                      up=(0, 1, 0), prof=(1.0, 0.95, 0.78, 0.45)), "team_cloth", "chest", "team_cloth")
+    add(BODY, B.clump((-0.10, -0.225, 1.15), (-0.16, -0.258, 1.06), (-0.19, -0.242, 0.97), 0.15, 0.05, 7,
                       up=(0, -1, 0), prof=(1.0, 1.08, 0.95, 0.6)), "team_cloth", "chest", "team_cloth")
 
 
@@ -209,7 +217,7 @@ def build_arms():
         add(BODY, B.torus(0.138, 0.022, 14, 5), "brass", la, "bracers", m=M((0.70 * s, 0, 1.107), (0, 90, 0)))
         add(BODY, B.torus(0.121, 0.01, 14, 4), groove("leather"), la, "bracers", m=M((0.53 * s, 0.01, 1.107), (0, 90, 0)))
         # v6 hand: a smaller fingerless dark glove, four bare curled fingers and a thumb (a hand, not a mitten)
-        add(BODY, B.slab((0.25, 0.25, 0.27), 0.62, 12, 8), "leather_dark", hd, "gloves", m=M((0.85 * s, -0.005, 1.09)))
+        add(BODY, B.slab((0.25, 0.25, 0.27), 0.62, 12, 8), "leather", hd, "gloves", m=M((0.85 * s, -0.005, 1.09)))
         for kz in (-0.072, -0.024, 0.024, 0.072):
             add(BODY, B.sphere((0.040, 0.052, 0.030), 8, 5), "skin", hd, "gloves", m=M((0.965 * s, -0.035, 1.09 + kz)))
         add(BODY, B.sphere((0.05, 0.048, 0.066), 8, 6), "skin", hd, "gloves", m=M((0.82 * s, -0.125, 1.115)))
@@ -242,21 +250,25 @@ def build_pauldrons():
     for s, sd in ((1, "l"), (-1, "r")):
         w = {"chest": 0.55, f"upperarm.{sd}": 0.45}
         top = M((0.30 * s, 0.0, 1.28), (0, -24 * s, 0))
-        add(BODY, stone((0.40, 0.47, 0.235), chips=3), "stone_armour", w, "stone_armour", m=top.copy())
+        add(BODY, stone((0.34, 0.38, 0.20), chips=3), "stone_armour", w, "stone_armour", m=top.copy())
         mid = M((0.44 * s, 0.01, 1.12), (0, -60 * s, 0))
-        add(BODY, stone((0.31, 0.42, 0.19), chips=2), "stone_armour", w, "stone_armour", m=mid.copy())
+        add(BODY, stone((0.26, 0.34, 0.16), chips=2), "stone_armour", w, "stone_armour", m=mid.copy())
         # v4: small teal chips in the stone (bible), not long glowing stripes
-        crack(top @ M((0, 0, 0.124)), [(-0.10 * s, -0.12), (-0.05 * s, -0.08), (-0.01 * s, -0.11)], 0.05, wset=w)
-        crack(mid @ M((0, 0, 0.100)), [(0.02 * s, 0.06), (0.06 * s, 0.10)], 0.045, wset=w)
+        crack(top @ M((0, 0, 0.108)), [(-0.10 * s, -0.12), (-0.05 * s, -0.08), (-0.01 * s, -0.11)], 0.05, wset=w)
+        crack(mid @ M((0, 0, 0.088)), [(0.02 * s, 0.06), (0.06 * s, 0.10)], 0.045, wset=w)
         # big domed brass plate on the front of the shoulder (bible: one per side, the brightest warm accent)
         disc_m = kit.frame((0.34 * s, -0.215, 1.13), (0.42 * s, -0.90, 0.10), (0, 0, 1))
         add(BODY, brass_disc(0.115, 0.06), "brass", w, "stone_armour", m=disc_m)
         add(BODY, B.torus(0.088, 0.009, 18, 4), groove("brass"), w, "stone_armour", m=disc_m @ M((0, 0, 0.040)))
         # rivets: brass domes along the top block's outer edge and one on the arm block
-        for rx, ry in ((0.13, -0.13), (0.14, 0.12)):
+        for rx, ry in ((0.12, -0.12), (0.13, 0.11)):
             add(BODY, B.sphere((0.032, 0.032, 0.022), 8, 5), "brass", w, "stone_armour",
-                m=top @ M((rx * s, ry, 0.10)))
-        add(BODY, B.sphere((0.03, 0.03, 0.02), 8, 5), "brass", w, "stone_armour", m=mid @ M((0.08 * s, 0.10, 0.085)))
+                m=top @ M((rx * s, ry, 0.088)))
+        add(BODY, B.sphere((0.03, 0.03, 0.02), 8, 5), "brass", w, "stone_armour", m=mid @ M((0.08 * s, 0.09, 0.076)))
+
+
+SHIELD_K = 0.85                         # v7 shield scale (bible front: 53 % of figure height)
+CLEAVER_DOWN = (-0.50, -0.50, -0.70)    # v7 blade direction in the Idle display pose (world)
 
 
 HEAD_C, HEAD_R = (0.0, -0.01, 1.49), (0.250, 0.232, 0.234)
@@ -302,26 +314,26 @@ def build_hair():
     (outline_w, see outline_weights) so lock overlaps do not read as black cracks."""
     H = "head"
     add(BODY, B.sphere((0.268, 0.255, 0.175), 16, 10), "hair", H, "hair", m=M((0, 0.03, 1.62)), grad=0.24)
-    add(BODY, B.sphere((0.255, 0.210, 0.220), 14, 9), "hair", H, "hair", m=M((0, 0.10, 1.49)), grad=0.24)
+    add(BODY, B.sphere((0.255, 0.245, 0.230), 14, 9), "hair", H, "hair", m=M((0, 0.12, 1.49)), grad=0.24)   # v7 fuller back
     FP = (1.0, 1.10, 0.86, 0.46)              # chunky lock: full, swelling, then a clear point
     F = (0, -1, 0.35)
     C = [  # (base, control, tip, width, thickness, up)
         # fringe: one big lock sweeping across the forehead to the character's right, one to the left, two outer locks
-        ((0.06, -0.12, 1.775), (-0.06, -0.30, 1.720), (-0.17, -0.255, 1.555), 0.26, 0.095, F),
-        ((0.08, -0.10, 1.770), (0.17, -0.29, 1.700), (0.22, -0.235, 1.565), 0.22, 0.09, F),
+        ((0.06, -0.12, 1.775), (-0.06, -0.37, 1.720), (-0.17, -0.28, 1.555), 0.26, 0.095, F),
+        ((0.08, -0.10, 1.770), (0.17, -0.35, 1.700), (0.22, -0.26, 1.565), 0.22, 0.09, F),
         ((-0.12, -0.06, 1.765), (-0.25, -0.24, 1.690), (-0.30, -0.17, 1.565), 0.20, 0.09, F),
         ((0.17, -0.05, 1.755), (0.28, -0.21, 1.680), (0.31, -0.14, 1.570), 0.18, 0.085, F),
         # round locks curling out at the temples, in front of the ears
-        ((0.20, -0.06, 1.69), (0.33, -0.12, 1.62), (0.37, -0.06, 1.53), 0.16, 0.10, (1, 0, 0.2)),
-        ((-0.20, -0.06, 1.69), (-0.33, -0.12, 1.62), (-0.37, -0.06, 1.53), 0.16, 0.10, (-1, 0, 0.2)),
+        ((0.20, -0.06, 1.69), (0.30, -0.12, 1.62), (0.33, -0.06, 1.53), 0.16, 0.10, (1, 0, 0.2)),
+        ((-0.20, -0.06, 1.69), (-0.30, -0.12, 1.62), (-0.33, -0.06, 1.53), 0.16, 0.10, (-1, 0, 0.2)),
         # behind the ears
-        ((0.21, 0.12, 1.70), (0.32, 0.19, 1.62), (0.33, 0.20, 1.48), 0.20, 0.13, (1, 0.6, 0)),
-        ((-0.21, 0.12, 1.70), (-0.32, 0.19, 1.62), (-0.33, 0.20, 1.48), 0.20, 0.13, (-1, 0.6, 0)),
+        ((0.21, 0.12, 1.70), (0.31, 0.22, 1.63), (0.31, 0.24, 1.50), 0.20, 0.13, (1, 0.6, 0)),
+        ((-0.21, 0.12, 1.70), (-0.31, 0.22, 1.63), (-0.31, 0.24, 1.50), 0.20, 0.13, (-1, 0.6, 0)),
         # nape and back of the crown
-        ((0.08, 0.22, 1.62), (0.13, 0.34, 1.50), (0.14, 0.33, 1.36), 0.20, 0.13, (0.3, 1, 0)),
-        ((-0.08, 0.22, 1.62), (-0.13, 0.34, 1.50), (-0.14, 0.33, 1.36), 0.20, 0.13, (-0.3, 1, 0)),
-        ((0.09, 0.17, 1.74), (0.13, 0.35, 1.71), (0.15, 0.42, 1.60), 0.20, 0.12, (0.2, 1, 0.3)),
-        ((-0.09, 0.17, 1.74), (-0.13, 0.35, 1.71), (-0.15, 0.42, 1.60), 0.20, 0.12, (-0.2, 1, 0.3)),
+        ((0.08, 0.22, 1.62), (0.13, 0.31, 1.51), (0.14, 0.30, 1.40), 0.20, 0.12, (0.3, 1, 0)),
+        ((-0.08, 0.22, 1.62), (-0.13, 0.31, 1.51), (-0.14, 0.30, 1.40), 0.20, 0.12, (-0.3, 1, 0)),
+        ((0.09, 0.17, 1.76), (0.15, 0.46, 1.76), (0.17, 0.57, 1.66), 0.23, 0.16, (0.2, 1, 0.3)),
+        ((-0.09, 0.17, 1.76), (-0.15, 0.46, 1.76), (-0.17, 0.57, 1.66), 0.23, 0.16, (-0.2, 1, 0.3)),
     ]
     for p0, p1, p2, w, t, up in C:
         add(BODY, B.clump(p0, p1, p2, w, t, 6, up=up, prof=FP), "hair", H, "hair", grad=0.32)
@@ -339,7 +351,7 @@ def build_hair():
             ((0.02, 0.07, 1.950), (0.03, 0.06, 1.982), 0.18, 0.08, (0, -1, 0)),
             ((0.07, 0.08, 1.935), (0.13, 0.08, 1.975), 0.18, 0.08, (0, -1, 0)),
             ((0.12, 0.10, 1.885), (0.21, 0.13, 1.910), 0.16, 0.075, (0, -1, 0.2)),
-            ((0.01, 0.25, 1.880), (0.04, 0.34, 1.840), 0.16, 0.075, (0, 0, 1))]
+            ((0.01, 0.34, 1.920), (0.03, 0.58, 1.830), 0.23, 0.11, (0, 0, 1))]   # v7 ponytail
     for p1, p2, w, t, up in tuft:
         add(BODY, B.clump(b, p1, p2, w, t, 6, up=up, prof=LP), "hair", H, T, grad=0.32)
 
@@ -477,9 +489,11 @@ def build_shield(poses):
         p(B.box((0.34, 0.06, 0.03), 0.01, 1), "leather_dark", "shield", m=M((0, y, -0.05)))
 
     # display pose (Idle): on the left arm, face turned ~55 deg from the front view toward the viewer's right
-    origin = (0.68, -0.12, 0.76)      # v4: out at the side, clear of the torso in the front view (bible)
-    normal = (0.80, -0.60, 0.0)
-    T = held_matrix(poses, W, origin, normal, (0, 0, 1))
+    # v7 (bible_fit + front crop): the bible's shield spans 13 to 66 % of the figure height (ours 0 to 67 %, sitting on
+    # the ground and hiding the left leg). Scaled to 0.85 and raised so its bottom clears the knee guard.
+    origin = (0.58, -0.16, 0.84)
+    normal = (0.84, -0.54, 0.0)
+    T = held_matrix(poses, W, origin, normal, (0, 0, 1)) @ Matrix.Diagonal((SHIELD_K, SHIELD_K, SHIELD_K, 1.0))
     for bm, color, feat, smooth, m in parts:
         mm = T @ (m if m is not None else Matrix.Identity(4))
         add(SHIELD, bm, color, W, feat, smooth=smooth, m=mm)
@@ -497,13 +511,15 @@ def build_cleaver(poses):
     blade = [(-0.07, -0.09), (0.12, -0.10), (0.21, -0.16), (0.22, -0.80), (0.16, -0.88), (0.07, -0.86), (0.04, -0.90),
              (-0.06, -0.88), (-0.10, -0.80), (-0.10, -0.70), (-0.05, -0.68), (-0.05, -0.60), (-0.10, -0.58),
              (-0.10, -0.44), (-0.05, -0.42), (-0.05, -0.34), (-0.10, -0.32), (-0.10, -0.18)]
-    BL = 0.88        # v4: longer blade, tip near the ground as the bible draws it. blade length scale: the bible's fist-to-tip run is ~0.6 u (front view)
-    blade = [(x, y * BL) for x, y in blade]
-    p(B.prism(blade, 0.10, bevel=0.025, seg=2), "stone_blade", "cleaver")
-    edge = [(0.16, -0.14), (0.29, -0.18), (0.30, -0.32), (0.28, -0.40), (0.31, -0.52), (0.29, -0.64), (0.31, -0.76),
-            (0.22, -0.92), (0.14, -0.87), (0.18, -0.76), (0.18, -0.20)]
-    edge = [(x, y * BL) for x, y in edge]     # v4: the bible's glowing edge only (v3 widened it for a team-% rule)
-    p(B.prism(edge, 0.112, bevel=0.012, seg=1), "team_glow", "team_glow")     # v6: a glowing band on both faces of the edge
+    BL, BW = 0.70, 0.95     # v7 shorter and broader (bible front: fist-to-tip ~0.58 u); v4: longer blade, tip near the ground as the bible draws it. blade length scale: the bible's fist-to-tip run is ~0.6 u (front view)
+    blade = [(x * BW, y * BL) for x, y in blade]
+    # v7: a THICK hewn stone blade with chipped corners (v6 was a flat 0.10 slab)
+    p(B.chipped(B.prism(blade, 0.135, bevel=0.03, seg=2), rng, chips=3, depth=0.14), "stone_blade", "cleaver")
+    # v7: the bible's BROAD bright glowing edge, chipped and stepped, standing proud of both blade faces
+    edge = [(0.11, -0.13), (0.30, -0.17), (0.33, -0.30), (0.30, -0.38), (0.34, -0.50), (0.31, -0.60), (0.34, -0.74),
+            (0.30, -0.84), (0.20, -0.95), (0.12, -0.90), (0.13, -0.76), (0.10, -0.60), (0.12, -0.40), (0.10, -0.20)]
+    edge = [(x * BW, y * BL) for x, y in edge]
+    p(B.prism(edge, 0.150, bevel=0.012, seg=1), "team_glow", "team_glow")
     p(B.cyl((0, 0.13, 0), (0, -0.10, 0), 0.038, 0.038, 10), "leather", "cleaver", True)
     for y in (0.08, 0.02, -0.04):
         p(B.torus(0.040, 0.012, 10, 4), "leather_dark", "cleaver", True, M((0, y, 0), (90, 0, 0)))
@@ -511,11 +527,13 @@ def build_cleaver(poses):
     p(B.box((0.19, 0.05, 0.11), 0.02), "brass", "cleaver", m=M((0.02, -0.095, 0)))
 
     origin = poses[W].translation.copy()
-    down = Vector((-0.80, -0.25, -0.54)).normalized()       # blade points low, out to the viewer's left, forward
+    # v7 pose: the bible holds the blade out and down at ~45 degrees in BOTH the front view (tip low and out to the
+    # viewer's left, clear of the leg) and the profile (tip low and forward), so the blade points along the diagonal and
+    # its broad face is turned half to the front and half to the side (seen wide in both views); cutting edge down.
+    down = Vector(CLEAVER_DOWN).normalized()
     y_axis = -down
-    x_hint = Vector((-0.6, -0.2, -0.75))     # glowing edge faces down and out (seen from the high camera)
-    x_axis = (x_hint - y_axis * x_hint.dot(y_axis)).normalized()  # cutting edge faces down
-    z_axis = x_axis.cross(y_axis)
+    n = Vector((0.707, -0.707, 0.0))
+    z_axis = (n - y_axis * n.dot(y_axis)).normalized()
     T = held_matrix(poses, W, origin, z_axis, y_axis)
     for bm, color, feat, smooth, m in parts:
         mm = T @ (m if m is not None else Matrix.Identity(4))
@@ -529,9 +547,9 @@ def build_cleaver(poses):
 # head at Idle frame 1 (the same convention as render_warrior.py POSES), applied in order.
 ATTITUDE = [
     ("upperleg.l", (0, 1, 0), -18), ("upperleg.r", (0, 1, 0), 18), ("foot.l", (0, 1, 0), 18), ("foot.r", (0, 1, 0), -18),
-    ("hips", (0, 0, 1), 6), ("spine", (0, 0, 1), -8), ("chest", (1, 0, 0), -5), ("hips", (0, 1, 0), 2.5),
+    ("hips", (0, 0, 1), 6), ("spine", (0, 0, 1), -8), ("chest", (1, 0, 0), -1), ("hips", (0, 1, 0), 2.5),
     ("spine", (0, 1, 0), 2),
-    ("upperarm.l", (0, 1, 0), 10), ("upperarm.r", (0, 1, 0), -18), ("lowerarm.r", (1, 0, 0), -10),
+    ("upperarm.l", (0, 1, 0), 10), ("upperarm.r", (0, 1, 0), -4), ("lowerarm.r", (1, 0, 0), -10),
     ("head", (1, 0, 0), -6), ("head", (0, 1, 0), 5), ("head", (0, 0, 1), 5),
 ]
 
