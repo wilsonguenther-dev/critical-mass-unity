@@ -157,7 +157,8 @@ namespace CriticalMass.Runtime.Menus
             if (Mathf.Abs(stickX) > 0.2f) want = -LookDeg * stickX;
             else if (_stillFor < IdleReturnSeconds) want = -LookDeg * Mathf.Clamp(pointerX, -1f, 1f);
             else want = 8f * Mathf.Sin(_idle * 0.4f);   // nobody is pointing: a slow look around
-            _yaw = Mathf.Lerp(_yaw, want, 1f - Mathf.Exp(-TurnSharpness * dt));
+            // Owner walk 1: a drag on the fighter turns it by hand; it stays where it was left for a moment, then drifts back.
+            if (Time.unscaledTime >= _manualUntil) _yaw = Mathf.Lerp(_yaw, want, 1f - Mathf.Exp(-TurnSharpness * dt));
             if (_fighter != null)
             {
                 _fighter.SetFacing(Quaternion.Euler(0f, _yaw + FacingOffsetDeg, 0f));
@@ -171,6 +172,51 @@ namespace CriticalMass.Runtime.Menus
                 _egg.Pose(ArtMapping.Idle, _idle, 1f, true);
                 _egg.Evaluate();
             }
+        }
+
+        float _manualUntil = -1f;
+        static readonly Vector3[] BoxCorners = new Vector3[8];
+
+        /// <summary>
+        /// Owner walk 1: where the fighter stands in the stage texture, 0..1 (x right, y DOWN from the top), from its renderers'
+        /// bounds through the stage camera; false with no fighter. Home puts the fighter's click target there.
+        /// </summary>
+        public bool FighterRect01(out Rect r)
+        {
+            r = default;
+            if (_fighter == null || _cam == null) return false;
+            bool any = false;
+            Bounds b = default;
+            foreach (Renderer rd in _fighter.Root.GetComponentsInChildren<Renderer>())
+            {
+                if (!rd.enabled) continue;
+                if (!any) { b = rd.bounds; any = true; }
+                else b.Encapsulate(rd.bounds);
+            }
+            if (!any) return false;
+            Vector3 mn = b.min, mx = b.max;
+            for (int i = 0; i < 8; i++)
+                BoxCorners[i] = new Vector3((i & 1) == 0 ? mn.x : mx.x, (i & 2) == 0 ? mn.y : mx.y, (i & 4) == 0 ? mn.z : mx.z);
+            float x0 = 1f, y0 = 1f, x1 = 0f, y1 = 0f;
+            for (int i = 0; i < 8; i++)
+            {
+                Vector3 v = _cam.WorldToViewportPoint(BoxCorners[i]);
+                x0 = Mathf.Min(x0, v.x); x1 = Mathf.Max(x1, v.x);
+                y0 = Mathf.Min(y0, 1f - v.y); y1 = Mathf.Max(y1, 1f - v.y);
+            }
+            r = Rect.MinMaxRect(Mathf.Clamp01(x0), Mathf.Clamp01(y0), Mathf.Clamp01(x1), Mathf.Clamp01(y1));
+            return r.width > 0.02f && r.height > 0.02f;
+        }
+
+        /// <summary>The fighter's facing, degrees (0 faces the camera).</summary>
+        public float Yaw => _yaw;
+
+        /// <summary>Owner walk 1: turn the fighter by hand (a drag on Home): deg added to the facing, held for a moment.</summary>
+        public void Drag(float deg)
+        {
+            _yaw = Mathf.Repeat(_yaw + deg + 180f, 360f) - 180f;
+            _manualUntil = Time.unscaledTime + IdleReturnSeconds;
+            if (_fighter != null) _fighter.SetFacing(Quaternion.Euler(0f, _yaw + FacingOffsetDeg, 0f));
         }
 
         static void SetLayer(Transform t, int layer)

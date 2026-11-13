@@ -175,12 +175,12 @@ namespace CriticalMass.Runtime.Hud.Mechanics
 
         void Build()
         {
-            _canvas = InteractUi.MakeCanvas(transform, "Depth HUD Canvas", SortingOrder, out _root, out _space);
+            _canvas = InteractUi.MakeHudCanvas(transform, "Depth HUD Canvas", SortingOrder, out _root, out _space);
             Color cream = CMTokens.WarmCream.Color, brass = CMTokens.ToolBrass.Color, panel = CMTokens.PanelNavy.Color;
 
             // the "your job now" line: top centre, small and steady
             _obj = MenuUi.Rt(_space, "Objective");
-            MenuUi.Place(_obj, 960f - 380f, 140f, 760f, 40f);
+            MenuUi.Place(_obj, (HudLayout.RefW - HudZones.JobW) * 0.5f, HudZones.JobY, HudZones.JobW, HudZones.JobH);
             VectorShape op = Chip(_obj, "Panel", ShapeKind.RoundRect, 0f, 0f, 760f, 40f, CMTokens.WithAlpha(panel, 0.92f), 14f);
             op.RimPx = 2f;
             op.RimColor = brass;
@@ -190,7 +190,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
 
             // team stock: three chips under the objective (own team only)
             _stock = MenuUi.Rt(_space, "Team Stock");
-            MenuUi.Place(_stock, 960f - 171f, 188f, 342f, 40f);
+            MenuUi.Place(_stock, (HudLayout.RefW - HudZones.StockW) * 0.5f, HudZones.StockY, HudZones.StockW, HudZones.StockH);
             ShapeKind[] icons = { ShapeKind.Hexagon, ShapeKind.Egg, ShapeKind.Circle };
             Color[] cols = { new Color32(160, 116, 72, 255), new Color32(96, 176, 232, 255), CMTokens.Biomass.Color };
             for (int k = 0; k < 3; k++)
@@ -208,7 +208,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
 
             // map-event bar
             _event = MenuUi.Rt(_space, "Map Event");
-            MenuUi.Place(_event, 960f - EventW * 0.5f, 236f, EventW, EventH);
+            MenuUi.Place(_event, (HudLayout.RefW - EventW) * 0.5f, HudZones.EventY, EventW, EventH);
             Chip(_event, "Track", ShapeKind.RoundRect, 0f, 0f, EventW, EventH, CMTokens.WithAlpha(panel, 0.92f), 12f);
             _eventFill = Chip(_event, "Fill", ShapeKind.RoundRect, 3f, 3f, EventW - 6f, EventH - 6f, CMTokens.MeterOrange.Color, 10f);
             _eventFill.OutlinePx = 0f;
@@ -221,7 +221,8 @@ namespace CriticalMass.Runtime.Hud.Mechanics
 
             // interact prompt: lower centre (key chip, words, a progress ring for gathering or the bridge repair)
             _prompt = MenuUi.Rt(_space, "Depth Prompt");
-            MenuUi.Place(_prompt, 960f - 260f, 770f, 520f, 50f);
+            Rect pz = HudZones.Prompt;   // owner walk 1: under the lower lane (the intro line and the recap drew over it)
+            MenuUi.Place(_prompt, pz.x, pz.y, pz.width, pz.height);
             _promptPanel = Chip(_prompt, "Panel", ShapeKind.RoundRect, 0f, 0f, 520f, 50f, panel, 14f);
             _promptPanel.OutlinePx = 4f;
             _promptPanel.RimPx = 2f;
@@ -249,7 +250,8 @@ namespace CriticalMass.Runtime.Hud.Mechanics
 
             // coin counter (bottom right) and power-up timer beside it
             _coins = MenuUi.Rt(_space, "Coins");
-            MenuUi.Place(_coins, 1920f - 24f - 168f, 1080f - 24f - 52f - 150f, 168f, 52f);
+            Rect cr = HudZones.Coins;   // owner walk 1: above the minimap frame, not on it
+            MenuUi.Place(_coins, cr.x, cr.y, cr.width, cr.height);
             Chip(_coins, "Panel", ShapeKind.RoundRect, 0f, 0f, 168f, 52f, panel, 14f);
             VectorShape coin = Chip(_coins, "Coin", ShapeKind.Circle, 12f, 11f, 30f, 30f, PowerTimers.Colour[0], 15f);
             coin.RimPx = 2f;
@@ -257,6 +259,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             MenuUi.Label(_coins, "Word", CMTokens.Ui, 14, CMTokens.WithAlpha(cream, 0.85f), TextAnchor.MiddleLeft, 50f, 0f, 60f, 52f, DepthWords.Pickup(0), 1.5f);
             _coinNum = MenuUi.Label(_coins, "Count", CMTokens.Mono, 24, cream, TextAnchor.MiddleRight, 96f, 0f, 60f, 52f, "0", 2f);
             _coins.gameObject.SetActive(false);
+            HudKeepOut.Add(_coins);
             for (int i = 0; i < Coins; i++)
             {
                 _coinFly[i] = InteractUi.Centred(_space, "Coin Fly " + i, 22f, 22f);
@@ -265,7 +268,8 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             }
 
             _power = MenuUi.Rt(_space, "Power Up");
-            MenuUi.Place(_power, 1920f - 24f - 168f - 12f - 330f, 1080f - 24f - 52f - 150f - 16f, 330f, 68f);
+            Rect pr = HudZones.Power;
+            MenuUi.Place(_power, pr.x, pr.y, pr.width, pr.height);
             VectorShape pp = Chip(_power, "Panel", ShapeKind.RoundRect, 0f, 0f, 330f, 68f, panel, 14f);
             pp.RimPx = 2f;
             _powerPie = Chip(_power, "Pie", ShapeKind.Pie, 10f, 10f, 48f, 48f, cream, 24f);
@@ -279,6 +283,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             _powerHint.resizeTextMinSize = 9;
             _powerHint.resizeTextMaxSize = 13;
             _power.gameObject.SetActive(false);
+            HudKeepOut.Add(_power);
 
             // name tags, speech marks, floating pops
             for (int i = 0; i < Tags; i++)
@@ -327,7 +332,9 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             DepthWorldView view = DepthWorldView.Active;
             InteractUi.UpdateScale(_canvas);
             if (_canvas.worldCamera == null) _canvas.worldCamera = UnityEngine.Camera.main;
-            bool hide = w == null || view == null || (_log != null && _log.Suppressed) || w.Match.Phase == MatchPhase.Ended;
+            // owner walk 1: the depth HUD (job line, prompt, coins, power-up) steps away under the scoreboard (its prompt drew
+            // through the board's bottom edge)
+            bool hide = w == null || view == null || (_log != null && _log.Suppressed) || w.Match.Phase == MatchPhase.Ended || Scoreboard.AnyOpen;
             if (_canvas.enabled == hide) _canvas.enabled = !hide;
             if (hide) return;
             int me = view.Feed.LocalActor;
@@ -372,7 +379,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             Objective = id;
             // Integration batch 4: the job line sits on the top of the centre lane; it steps back while the autopilot banner or a
             // big-moment takeover holds the lane (HudZones), and comes back the frame after.
-            bool show = id != ObjectiveId.None && w.Match.Phase != MatchPhase.Ended && !HudZones.Blocked(HudZone.Callout, HudPriority.Recap);
+            bool show = id != ObjectiveId.None && w.Match.Phase != MatchPhase.Ended && !HudZones.Blocked(HudZone.Callout, HudPriority.Tip);   // owner walk 1: lane resident, steps back for any banner
             if (_obj.gameObject.activeSelf != show) _obj.gameObject.SetActive(show);
             if (show) HudText.Set(_objText, View.Mechanics.Objective.Words(id, f.Cls));
         }
@@ -425,7 +432,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
 
         void TickStock(World w, int me, bool on, float real)
         {
-            bool show = on && DepthRead.SourcesOn(w) && !HudZones.Blocked(HudZone.Callout, HudPriority.Recap);
+            bool show = on && DepthRead.SourcesOn(w) && !HudZones.Blocked(HudZone.Callout, HudPriority.Tip);   // owner walk 1: lane resident, steps back for any banner
             if (_stock.gameObject.activeSelf != show) _stock.gameObject.SetActive(show);
             if (!show) return;
             TeamId t = w.Actors[me].Team;
@@ -471,7 +478,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             }
             // The map-event timer shares the centre lane at the bottom of the order: it waits while a Kaiju callout, a banner,
             // the lockout or autopilot line or a big-moment takeover holds the lane (integration batch 4).
-            bool show = word != null && !HudZones.Blocked(HudZone.Callout, HudPriority.Guide);
+            bool show = word != null && !HudZones.Blocked(HudZone.Callout, HudPriority.Tip);   // owner walk 1: lane resident
             if (_event.gameObject.activeSelf != show) _event.gameObject.SetActive(show);
             if (!show) return;
             HudText.Set(_eventWord, word);
@@ -504,7 +511,9 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             HudText.Set(_coinNum, DepthLines.Int(DepthRead.CoinsPicked(w, me)));
             DepthFeed f = view.Feed;
             // the counter's coin icon in centre space (MenuUi.Place positions from the space's top-left corner, y down)
-            Vector2 target = new Vector2(_coins.anchoredPosition.x - 84f + 27f - HudLayout.RefW * 0.5f, _coins.anchoredPosition.y + HudLayout.RefH * 0.5f);
+            // owner walk 1: the counter lives in its anchor frame, so its centre is read through the transforms
+            Vector2 cc = _space.InverseTransformPoint(_coins.position);
+            Vector2 target = new Vector2(cc.x - 84f + 27f, cc.y);
             bool started = ToLocal(cam, Head(w, me, _driver.Alpha, 1.8f), out Vector2 from);
             const float life = 0.55f;
             for (int i = 0; i < Coins; i++)
@@ -563,7 +572,11 @@ namespace CriticalMass.Runtime.Hud.Mechanics
                     if (!a.Alive) continue;
                     double dx = w.X[id] - mx, dz = w.Z[id] - mz;
                     if (dx * dx + dz * dz > TagRange * TagRange) continue;
-                    if (!ToLocal(cam, Head(w, id, _driver.Alpha, 2.65f), out Vector2 at)) continue;
+                    Vector3 head = Head(w, id, _driver.Alpha, 2.65f);
+                    if (!ToLocal(cam, head, out Vector2 at)) continue;
+                    // owner walk 1: a tag that would sit on a HUD panel (the Kaiju panel, the feed, the minimap) waits
+                    Vector3 hp = cam.WorldToScreenPoint(head);
+                    if (HudKeepOut.Contains(new Vector2(hp.x, hp.y), 40f * _canvas.scaleFactor)) continue;
                     RectTransform rt = _tag[used];
                     if (!rt.gameObject.activeSelf) rt.gameObject.SetActive(true);
                     rt.anchoredPosition = at;

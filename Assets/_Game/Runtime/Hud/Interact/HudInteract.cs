@@ -129,7 +129,7 @@ namespace CriticalMass.Runtime.Hud.Interact
 
             Canvas = InteractUi.MakeCanvas(transform, "HUD Interact Canvas", SortingOrder, out _root, out _space);
             int tier = UiIcons.TierFor(Canvas.scaleFactor);
-            Feed.Build(_root);
+            Feed.Build(FeedUi.SafeRoot(_root));   // owner walk 1: inside the safe area
             Markers.Build(_root);
             Hotspots.Build(_root, Hud, transform);
             Map.Build(_root, tier);

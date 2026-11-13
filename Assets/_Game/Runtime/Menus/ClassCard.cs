@@ -595,8 +595,9 @@ namespace CriticalMass.Runtime.Menus
             y += 28f;
             BuildPips(Root, (_w - 3 * 16f - 2 * 8f) * 0.5f, y, 16f, 8f);
             y += 24f;
-            _tileKey = Chip(Root, "Key", 14f, y, 78f, 28f, 16, out _);
-            _tileAbility = MenuUi.Label(Root, "Ability", CMTokens.Ui, UiScale.TypeMin, Cream, TextAnchor.MiddleLeft, 100f, y, _w - 110f, 28f, "", 2f);
+            // owner walk 1: the key chip is wide enough for RIGHT CLICK (it overflowed the 78 px chip into the ability name)
+            _tileKey = Chip(Root, "Key", 12f, y, 104f, 28f, 16, out _);
+            _tileAbility = MenuUi.Label(Root, "Ability", CMTokens.Ui, UiScale.TypeMin, Cream, TextAnchor.MiddleLeft, 124f, y, _w - 132f, 28f, "", 2f);
             Fit(_name, 14);
             Fit(_role, 12);
             Fit(_tileAbility, 10);   // batch 4: "LADDER AND BRIDGE" was cut at 12 px on the 236 px respawn tile
@@ -720,7 +721,9 @@ namespace CriticalMass.Runtime.Menus
             int c = (int)cls, t = (int)team;
             _portrait.Set(UiIcons.Portrait[c, t], TierFor(_portraitPx, 106f, canvasScale));
             HudText.Set(_name, _words.Name.ToUpperInvariant());
-            HudText.Set(_role, View.Mechanics.DepthRead.Compiled ? View.Mechanics.DepthWords.WithRoleLine(_words.Role, _words.Id) : _words.Role); // U-063 role line
+            // owner walk 1: the small tile shows the one-line role only (the role tag after it was cut on every tile); the
+            // detail card keeps the full line with the tag
+            HudText.Set(_role, Kind == Layout.Tile || !View.Mechanics.DepthRead.Compiled ? _words.Role : View.Mechanics.DepthWords.WithRoleLine(_words.Role, _words.Id)); // U-063 role line
             for (int i = 0; i < 3; i++)
             {
                 bool on = i < _words.Difficulty;
