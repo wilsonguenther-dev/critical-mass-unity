@@ -104,7 +104,14 @@ Paint the {c['title'].upper()} as a new character sheet entry by the SAME painte
 - Design: {c['desc']} Bible palette: warm cream, navy, brown leather, brass, grey carved stone, with teal team colour only on trim, bands and small accents, and acid-lime only for glowing biomass.
 - {STYLE}
 - {LIGHT}""")
-    for v in ("side", "back"):
+    w(f"{k}_side", f"""Image 1 is an accepted FRONT VIEW modelling reference of our game's {c['title']} in a neutral A-pose with empty hands. Image 2 shows the exact camera angle wanted: another class (the Warrior) seen in TRUE SIDE PROFILE. Image 3 is a rough 3D blockout of the {c['title']}'s design (for the parts worn on the back and sides only; ignore its plastic look).
+
+Paint the {c['title']} from image 1 turned on a turntable by a full 90 degrees, so that the WHOLE BODY is in profile exactly like image 2, not only the head: the feet, knees, hips, chest, shoulders and head all face the LEFT edge of the image. This is a narrow side silhouette: the figure is only about half as wide as in image 1. The chest and stomach are seen edge-on as the left outline of the body; the back is the right outline, with everything worn on the back (seen edge-on, sticking out to the RIGHT behind the shoulders). Both boots are seen from the side with the toes pointing LEFT, one boot partly in front of the other. Only ONE arm is visible: the near arm hangs nearly vertically beside the torso, slightly in front of the hip, hand open; the far arm is hidden behind the body. Only one eye is visible. Do NOT paint a front-facing body with a turned head.
+- {SAME}
+- Every design detail must match image 1: {c['desc']}
+- {STYLE}
+- {LIGHT}""")
+    for v in ("back",):
         w(f"{k}_{v}", f"""Image 1 is an accepted FRONT VIEW modelling reference of our game's {c['title']} in a neutral A-pose with empty hands. Image 2 is the accepted turnaround {'side profile' if v=='side' else 'back view'} of another class (the Warrior) in the same pose, showing the exact camera angle wanted. Image 3 is a rough 3D blockout of the {c['title']}'s design (for the parts worn on the back and sides only; ignore its plastic look).
 
 {SAME} Seen from a different angle: {TURN[v]}
@@ -155,3 +162,48 @@ Paint the SAME CREATURE in EXACTLY the same neutral standing pose, proportions, 
 Paint the in-between angle: the SAME creature in the SAME neutral standing pose, rotated exactly halfway between image 1 and image 2, a 45-degree THREE-QUARTER FRONT VIEW, facing toward the left side of the image like image 2 does, but turned halfway back toward the viewer: the face in three-quarter pointing left, the right shoulder nearer the viewer, the tail visible behind on the right. Legs straight and apart, mouth closed.
 Same design, NEUTRAL acid-lime crystals and cracks, proportions and bold outlines as images 1 and 2. The same size in frame as image 1. {KLIGHT}""")
 print(len(os.listdir(P)), "prompts")
+
+# ---- second-round prompts (after looking at round one) ----
+# Side views of the designed classes came back as front bodies with a turned head, even with turntable wording.
+# Fix: give an accepted, same-pipeline SIDE view of a bible class as a pose-and-angle template (image 1).
+for k, c in DESIGNED.items():
+    w(f"{k}_side3", f"""Image 1 is a POSE AND CAMERA TEMPLATE: an accepted modelling reference of a different character of the same game, in TRUE SIDE PROFILE facing left, neutral A-pose. Image 2 is the accepted FRONT VIEW of our {c['title']}, the character to paint. Image 3 is a rough 3D blockout of the {c['title']}'s design (only for the parts worn on the back and sides; ignore its plastic look).
+
+Paint the {c['title']} from image 2 in EXACTLY the body orientation, pose and camera angle of image 1: the whole body in true 90-degree side profile facing the LEFT edge of the image, feet, knees, hips, chest, shoulders and head all in profile, one arm visible hanging beside the body like image 1, the far arm hidden, both boots seen from the side with toes pointing left, a narrow side silhouette, only one eye visible. Everything worn on the back sticks out to the RIGHT behind the shoulders, seen edge-on. Do not copy anything from image 1 except the pose and angle; the outfit, face, hair, colours, head size and height in frame come from image 2.
+- Design (must match image 2): {c['desc']}
+- {STYLE}
+- {LIGHT}""")
+    w(f"{k}_prop2", f"""Image 1 is a rough 3D blockout of props from our game (design reference only; ignore its plastic look). Paint ONLY ONE OBJECT: {c['prop']}. A clean prop modelling reference in a painted stylised-3D game concept style with BOLD thick dark outlines. The object ALONE: absolutely NO person, no character, no hands, no body parts, no faint or ghosted figure behind it, nothing else in the picture. Upright in the picture plane, seen from the side with a slight 20-degree turn so its thickness is visible, the whole object in frame, centred, filling about 85 % of the image height. Flat even shadowless lighting, plain flat light grey background (#D9D9D9), no shadow, no glow trail, no text. Orthographic feel.""")
+w("demolitions_back2", f"""Image 1 is an accepted FRONT VIEW modelling reference of our game's Demolitions expert in a neutral A-pose with empty hands. Image 2 is the accepted back view of another class (the Warrior), showing the exact camera angle wanted.
+
+Paint the SAME Demolitions expert from image 1 seen directly from BEHIND, facing away from the viewer, same neutral A-pose, arms out about 35 degrees, hands open and empty, the same height in frame. On her back she wears ONE SINGLE round wooden powder keg lying HORIZONTALLY across her shoulder blades (exactly the one keg whose two round ends show beside her shoulders in image 1): a single barrel seen from its side, wooden staves, two brass hoops near its ends, ONE teal band around its middle, held by brown leather shoulder straps, a curled fuse rising from it beside her head. NOT two barrels. Show the back of the leather cap with the goggles strap, the twin puffed pigtails with teal ties, the teal scarf knot, the back of the quilted vest, the cream rolled sleeves, the back of the navy cargo trousers and boots.
+- {STYLE}
+- {LIGHT}""")
+# Three-quarter: the accepted Miner three-quarter (mirrored so it faces left) becomes the pose-and-angle template.
+for k, nm in (("farmer", "Farmer"), ("builder", "Builder"), ("healer", "Healer"), ("demolitions", "Demolitions")):
+    w(f"{k}_tq3", f"""Image 1 is a POSE AND CAMERA TEMPLATE: an accepted modelling reference of a different character of the same game in a 45-degree THREE-QUARTER FRONT VIEW, facing toward the left, neutral A-pose. Image 2 is the accepted FRONT VIEW and image 3 the accepted SIDE PROFILE of our {nm}, the character to paint.
+
+Paint the {nm} in EXACTLY the body orientation, pose and camera angle of image 1: the whole body (feet, hips, chest, shoulders and head) rotated 45 degrees, halfway between image 2 and image 3; the chest seen at an angle, the character's right shoulder nearer the viewer, the left shoulder partly behind the chest, the face in three-quarter with the nose pointing left, both boots pointing down-left. Do NOT paint a front-facing body with a turned head. Do not copy anything from image 1 except pose and angle; outfit, face, hair, colours, head size and height in frame come from images 2 and 3. Hands open and empty, nothing held, no effects.
+- {STYLE}
+- {LIGHT}""")
+# Kaiju fronts came back at a slight three-quarter angle (the bible draws them that way). Force a symmetric front.
+for k, src, crop in (("kaiju_adult", "the art bible's Adult Kaiju turnaround sheet", "its front view"),
+                     ("kaiju_hatchling", "the art bible's Kaiju lifecycle sheet", "the neutral hatchling")):
+    desc = KADULT if k == "kaiju_adult" else KHATCH
+    w(f"{k}_front2", f"""Image 1 is {src}. Image 2 is a close crop of {crop}. Image 3 is our accepted design and NEUTRAL colouring of this creature, but drawn at a slight angle.
+
+Paint the SAME creature as image 3 (same design, colours, crystals, proportions and painted style with bold dark outlines), but as a STRICT, SYMMETRICAL FRONT VIEW for a 3D modeller: the creature faces the viewer dead-on, its spine pointing straight away from the camera, the left and right halves mirror images of each other, both forelimbs equally visible at the same size, both hind legs equally visible, the head centred and facing straight at the viewer, only the tip of the tail peeking out to one side behind a leg. {KPOSE}
+- Design: {desc}
+- {KNEUTRAL}
+- {KLIGHT}""")
+# tq3 drifted off-model on the Farmer (new hair, denim, new backpack): the template's identity leaked and the design text was missing.
+# Rewrite tq3 with the full design text and a hard identity clause (same image order: template, front, side).
+ALL = {k: dict(title=v["page"], desc=v["desc"]) for k, v in C.items()}; ALL.update({k: dict(title=v["title"], desc=v["desc"]) for k, v in DESIGNED.items()})
+for k, c in ALL.items():
+    nm = c["title"]
+    w(f"{k}_tq3", f"""Three images. Image 2 (FRONT VIEW) and image 3 (SIDE PROFILE) are accepted modelling references of our {nm}: THIS is the character to paint, and it must stay IDENTICAL to them: the same face, the same hair shape, colour and volume, the same outfit parts, materials and colours, the same gear worn on the back, the same proportions, head size, line weight and painted rendering. Change NOTHING about the design. Image 1 is only a CAMERA-ANGLE TEMPLATE showing a different character at the wanted angle; take nothing from it except the angle and pose.
+
+Paint the {nm} from images 2 and 3 seen from the in-between angle: a 45-degree THREE-QUARTER FRONT VIEW facing toward the left, exactly the body orientation of image 1: the whole body (feet, hips, chest, shoulders and head) rotated 45 degrees, halfway between image 2 and image 3; the chest seen at an angle, the character's right shoulder nearer the viewer, the left shoulder partly behind the chest, the face in three-quarter with the nose pointing left, both boots pointing down-left. Not a front-facing body with a turned head. Neutral A-pose, arms out about 35 degrees, hands open and empty, nothing held, no effects. The figure the same height in frame as image 2.
+- The design, exactly as in images 2 and 3: {c['desc']}
+- {STYLE}
+- {LIGHT}""")
