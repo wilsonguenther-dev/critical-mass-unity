@@ -286,7 +286,11 @@ namespace CriticalMass.Runtime.View.Dressing
                 double slice = sw.Elapsed.TotalMilliseconds;
                 LastBuildMs += slice;
                 LastBuildFrames++;
-                if (slice > LastBuildWorstSliceMs) LastBuildWorstSliceMs = slice;
+                if (slice > LastBuildWorstSliceMs)
+                {
+                    LastBuildWorstSliceMs = slice;
+                    LastBuildWorstStage = _stage;
+                }
                 BuildProgress = done ? 1f : Mathf.Clamp01((float)_buildDone / Math.Max(1, _buildTotal));
                 if (!done) return;
                 _building = null;
@@ -295,7 +299,7 @@ namespace CriticalMass.Runtime.View.Dressing
                 if (!Application.isEditor)
                     Debug.Log($"[CM.Load] world art built in {LastBuildMs:0} ms of work over {LastBuildFrames} frames " +
                               $"({(Time.realtimeSinceStartupAsDouble - _buildWallStart) * 1000.0:0} ms wall, slowest frame's slice " +
-                              $"{LastBuildWorstSliceMs:0.0} ms): {Renderers} renderers, {Triangles} triangles, quality {_builtQuality}; stages {LastStages}");
+                              $"{LastBuildWorstSliceMs:0.0} ms, in {LastBuildWorstStage}): {Renderers} renderers, {Triangles} triangles, quality {_builtQuality}; stages {LastStages}");
                 return;
             }
             if (Plan == null) return;
@@ -563,6 +567,7 @@ namespace CriticalMass.Runtime.View.Dressing
             var shadows = new Dictionary<int, List<(MeshData d, int sub, Matrix4x4 m, SwayInfo sw)>>();
             Func<string, bool> hasFile = n => _catalog.Find(n) != null;
             List<(int chunk, Material mat, MeshData d, int sub, Matrix4x4 m)> parts = _parts;
+            _stage = "collect";
             foreach (WorldPlacement p in Plan.Placements)
             {
                 if (p.Piece == "env_ground_cell") continue; // drawn per chunk by BuildGroundChunk
@@ -610,6 +615,8 @@ namespace CriticalMass.Runtime.View.Dressing
                 (int chunk, int level, Material mat) = kv.Key;
                 groupKeys.Add(kv.Key);
                 jobs.Add(PrepareGroup("Group " + chunk + " L" + level + " " + mat.name, mat, kv.Value, ShadowCastingMode.Off));
+                _stage = "prepare";
+                yield return null;   // perf-smooth-1: the per-part matrices of one group per step (was all groups in one step)
             }
             Material caster = ShadowMaterial();
             bool shadowsOn = RenderTier.Policy(q).sceneryShadows;
@@ -619,8 +626,10 @@ namespace CriticalMass.Runtime.View.Dressing
                 {
                     shadowKeys.Add(kv.Key);
                     jobs.Add(PrepareGroup("Shadow " + kv.Key, caster, kv.Value, ShadowCastingMode.ShadowsOnly));
+                    yield return null;
                 }
             ComputeOnWorkers(jobs);
+            _stage = "finish groups";
             for (int k = 0; k < groupKeys.Count; k++)
             {
                 while (!jobs[k].Done) yield return null;
@@ -795,11 +804,27 @@ namespace CriticalMass.Runtime.View.Dressing
         public int LastBuildFrames { get; private set; }
         public double LastBuildWorstSliceMs { get; private set; }
 
+        /// <summary>The build stage the slowest frame's slice ended in ([CM.Load]).</summary>
+        public string LastBuildWorstStage { get; private set; } = "";
+
+        private string _stage = "";
+
         private IEnumerator BuildSteps(Sim.Core.World w)
         {
             _buildDone = 0;
             _buildTotal = 1;
+            _stage = "clear";
+            if (_groups.Count > 0)
+            {
+                var oldKeys = new List<int>(_groups.Keys);   // the previous world's groups go a few per frame
+                for (int i = 0; i < oldKeys.Count; i++)
+                {
+                    DestroyGroup(oldKeys[i]);
+                    if ((i & 7) == 7) yield return null;
+                }
+            }
             Clear();
+            _stage = "catalog";
             _world = w;
             _map = w.Map;
             _seenGridVersion = w.GridVersion;
@@ -813,6 +838,7 @@ namespace CriticalMass.Runtime.View.Dressing
             // perf-smooth-1: the planner reads every piece's centroid and body from the kit meshes (cached on the catalog
             // after the first build: 0.5 s cold); warm them one piece a step first, so the plan itself is one short step.
             _buildTotal = 2 + _catalog.Names.Length;
+            _stage = "kit warm";
             foreach (string piece in _catalog.Names)
             {
                 if (string.IsNullOrEmpty(piece)) continue;
@@ -823,8 +849,10 @@ namespace CriticalMass.Runtime.View.Dressing
             }
             double tLoad = st.Elapsed.TotalMilliseconds;
             yield return null;
+            _stage = "plan";
             Plan = WorldDresser.Plan(_map, _bases, _catalog.Centroid, _catalog.Body, _clutterOn);
             double tPlan = st.Elapsed.TotalMilliseconds;
+            _stage = "field start";
             int chunksX0 = (_map.Width + ChunkSize - 1) / ChunkSize, chunksZ0 = (_map.Height + ChunkSize - 1) / ChunkSize;
             _buildTotal = _buildDone + 2 + Plan.Placements.Count + chunksX0 * chunksZ0 + Plan.Breakables.Count / 16 + 1;
             _buildDone++;
@@ -850,7 +878,9 @@ namespace CriticalMass.Runtime.View.Dressing
             IEnumerator groupSteps = BuildGroupsSteps(null);
             while (groupSteps.MoveNext()) yield return null;
             double tGroups = st.Elapsed.TotalMilliseconds;
+            _stage = "field wait";
             while (!fieldTask.IsCompleted) yield return null;
+            _stage = "field apply";
             {
                 var (fpx, fc, fr) = fieldTask.Result;   // rethrows a worker exception here, on the main thread
                 _field = WorldField.FromPixels(fpx, fc, fr);
@@ -889,6 +919,7 @@ namespace CriticalMass.Runtime.View.Dressing
             // perf-smooth-1: the build leaves tens of MB of garbage (combine buffers, mesh copies). Collect it now, in
             // incremental slices behind the loading screen, so no stop-the-world collection lands in the match.
             if (!Application.isEditor && UnityEngine.Scripting.GarbageCollector.isIncremental)
+                _stage = "gc settle";
                 for (int k = 0; k < GcSettleMaxSteps && UnityEngine.Scripting.GarbageCollector.CollectIncremental(GcSettleSliceNs); k++)
                     yield return null;
             _buildDone = _buildTotal;
