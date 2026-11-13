@@ -219,21 +219,20 @@ else
   pid=$!
 fi
 # Outside view, once a second: wall ms, resident KB, CPU time, log markers. Low process churn (integration batch 3: the
-# machine guard's STOP-DISPATCH fired at 800+ new processes a minute): one ps and one sleep a second, bash builtins for
-# the rest (the wall clock is one date at the start plus $SECONDS, read), and the match-end count only every 5 s.
+# machine guard's STOP-DISPATCH fired at 800+ new processes a minute): one ps, one grep and one sleep a second, bash
+# builtins for the rest (the wall clock is one date at the start plus $SECONDS, read).
 printf 'ms\trss_kb\tcputime\ttitle\tmatch_ends\n' > "$SAMPLES"
-t=0; e=0; k=0; epoch0=$(( $(date +%s) - SECONDS ))
+t=0; e=0; epoch0=$(( $(date +%s) - SECONDS ))
 while kill -0 "$pid" 2>/dev/null; do
   line="$(ps -o rss=,cputime= -p "$pid" 2>/dev/null || true)"
   if [[ -n "$line" ]]; then
-    if [[ -f "$LOG" ]] && { (( ! t )) || (( k % 5 == 0 )); }; then   # the title flag every second until seen (idle window)
-      (( t )) || { grep -q '\[CM.Boot\] title on screen' "$LOG" && t=1; }
-      e="$(grep -c '\[CM.Autoplay\] MATCH END' "$LOG" || true)"
+    if [[ -f "$LOG" ]]; then   # one grep a second: the title flag until seen, then the match-end count (growth needs every end)
+      if (( ! t )); then grep -q '\[CM.Boot\] title on screen' "$LOG" && t=1
+      else e="$(grep -c '\[CM.Autoplay\] MATCH END' "$LOG" || true)"; fi
     fi
     read -r rss cput _ <<<"$line"
     printf '%s000\t%s\t%s\t%s\t%s\n' "$((epoch0 + SECONDS))" "$rss" "$cput" "$t" "$e" >> "$SAMPLES"
   fi
-  k=$((k + 1))
   sleep 1
 done
 if [[ -n "$WATCHDOG" ]]; then
