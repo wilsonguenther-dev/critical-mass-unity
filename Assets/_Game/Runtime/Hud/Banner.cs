@@ -80,6 +80,18 @@ namespace CriticalMass.Runtime.Hud
             _waiting[_count++] = s;
         }
 
+        /// <summary>
+        /// Holds the banner on screen back while a full-screen takeover plays (Banner.Hold): its entrance restarts at now, so
+        /// it enters fresh, with its full hold, once the takeover is over. Waiting banners stay queued.
+        /// </summary>
+        public void Postpone(double now)
+        {
+            Rewind(now);
+            if (!HasCurrent) return;
+            _shownAt = now;
+            if (!double.IsPositiveInfinity(_hideAt)) _hideAt = now;
+        }
+
         /// <summary>Starts the exit of the banner on screen now (waiting banners follow).</summary>
         public void Hide(double now)
         {
@@ -179,6 +191,11 @@ namespace CriticalMass.Runtime.Hud
 
         /// <summary>Overrides the banner clock (seconds) when set.</summary>
         public static Func<double> Clock;
+        /// <summary>
+        /// Big moments (feat/big-moments): while this returns true the banner is hidden and postponed, so a full-screen
+        /// takeover and a banner never stack (one queue for full-screen moments). Null = never held.
+        /// </summary>
+        public static Func<bool> Hold;
         public static event Action<BannerSpec> Shown;
         public static event Action Hidden;
 
@@ -279,6 +296,12 @@ namespace CriticalMass.Runtime.Hud
         private void LateUpdate()
         {
             double now = Now();
+            if (Hold != null && Hold())
+            {
+                Queue.Postpone(now);
+                if (_canvas != null && _canvas.gameObject.activeSelf) _canvas.gameObject.SetActive(false);
+                return;
+            }
             Queue.Update(now);
             bool open = Queue.HasCurrent;
             if (open && _canvas == null) Build();

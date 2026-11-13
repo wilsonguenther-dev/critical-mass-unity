@@ -29,7 +29,7 @@ namespace CriticalMass.Runtime.Menu
         /// <summary>Reduce motion: one key for every reader (StoryIntro, AttractMode, FeelGate, big moments, world reactions).</summary>
         public const string ReduceMotionKey = GameSettings.ReduceMotionKey;
 
-        public static readonly string[] AllKeys = { HideNamesKey, CleanHudKey, SubtitlesKey, UiScaleKey, ReduceFlashingKey, ShakeAmountKey, ReduceMotionKey };
+        public static readonly string[] AllKeys = { HideNamesKey, CleanHudKey, SubtitlesKey, UiScaleKey, ReduceFlashingKey, ShakeAmountKey, ReduceMotionKey, View.Moments.BigMomentsSettings.ModeKey };
 
         /// <summary>UI scale choices in percent, screen order.</summary>
         public static readonly int[] UiScaleOptions = { 80, 90, 100, 110, 120, 130 };
@@ -37,9 +37,6 @@ namespace CriticalMass.Runtime.Menu
         /// <summary>The flash ceiling while Reduce flashing is on.</summary>
         public const int ReducedFlashesPerSecond = 3;
         public const string TabName = "ACCESS";
-
-        /// <summary>Other screens' rows on the ACCESS tab (big moments): appended after the built-in lines, before Reset.</summary>
-        public static Action<PauseMenu, RectTransform, List<MenuItem>> AddExtraRows;
 
         /// <summary>Raised after any of these options changes.</summary>
         public static event Action Changed;
@@ -126,8 +123,10 @@ namespace CriticalMass.Runtime.Menu
                 menu.Stepper(tab, 4, "REDUCE FLASHING", () => OnOff(ReduceFlashing), d => ReduceFlashing = !ReduceFlashing),
                 menu.Stepper(tab, 5, "REDUCE MOTION", () => OnOff(ReduceMotion), d => ReduceMotion = !ReduceMotion),
                 menu.Slider(tab, 6, "CAMERA SHAKE", () => Shake01, v => ShakeAmount = Mathf.RoundToInt(v * 100f)),
+                // Big moments (screen takeovers): full, reduced (corner callouts only), off.
+                menu.Stepper(tab, 7, "BIG MOMENTS", () => View.Moments.BigMomentsSettings.Label(View.Moments.BigMomentsSettings.Mode),
+                    d => View.Moments.BigMomentsSettings.Mode = View.Moments.BigMomentsSettings.Step(View.Moments.BigMomentsSettings.Mode, d)),
             };
-            AddExtraRows?.Invoke(menu, tab, items);
             float y = PauseMenu.ContentY + items.Count * (PauseMenu.LineH + PauseMenu.LineGap) + 10f;
             MenuItem reset = MenuUi.Item(tab, "Reset Access", PauseMenu.ContentX, y, 460f, 56f, "RESET THESE OPTIONS",
                 MenuItem.Kind.Button, 24, true, CMTokens.Display);
