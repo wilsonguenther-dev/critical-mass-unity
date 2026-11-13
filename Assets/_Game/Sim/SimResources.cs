@@ -130,6 +130,7 @@ namespace CriticalMass.Sim.Core
                 ResourceNode n = nodes[i];
                 if (n.Charges <= 0) continue;
                 if (a.Carry != CarryKind.None && a.Carry != CarryOf(n.Kind)) continue;
+                if (n.Kind == NodeKind.Corruption && !Roles.MayCorrupt(w, a.Cls)) continue; // U-063: only raiders take corruption
                 double dx = n.X - x;
                 double dz = n.Z - z;
                 double d2 = dx * dx + dz * dz;
@@ -238,18 +239,34 @@ namespace CriticalMass.Sim.Core
                     {
                         a.GatherProgress = 0;
                         a.GatherNodeId = -1;
+                        // U-063 class roles: only a feeder hands in biomass, only a raider corruption. A load the shrine will
+                        // not take stays with the carrier: no wind-up, one DeliverRefused event. (Rule off: both always true.)
+                        bool cargoOk = a.CarryAmount > 0 && Roles.MayDeliver(w, a, a.Carry);
+                        bool meatOk = a.CarryMeat > 0 && Roles.MayFeed(w, a.Cls);
+                        if (!cargoOk && !meatOk)
+                        {
+                            Delivery.CancelDelivery(a);
+                            Roles.Refuse(w, id, a.CarryAmount > 0 && a.Carry == CarryKind.Corruption ? Roles.RefusedNotRaider : Roles.RefusedNotFeeder, a.CarryAmount + a.CarryMeat);
+                            continue;
+                        }
                         // CM-64: the wind-up; the load goes in only on the pass it completes.
                         if (!Delivery.StepDeliveryWindup(w, a)) continue;
                         Delivery.CancelDelivery(a);
-                        if (a.CarryAmount > 0)
+                        if (cargoOk)
                         {
                             if (a.Carry == CarryKind.Corruption) ApplyDelivery(w, a.Team, CarryKind.Corruption, a.CarryAmount, id);
                             else ApplyDelivery(w, a.Team, CarryKind.Biomass, a.CarryAmount, id, BiomassType.Plant);
                         }
-                        if (a.CarryMeat > 0) ApplyDelivery(w, a.Team, CarryKind.Biomass, a.CarryMeat, id, BiomassType.Meat);
-                        a.Carry = CarryKind.None;
-                        a.CarryAmount = 0;
-                        a.CarryMeat = 0;
+                        if (cargoOk || a.CarryAmount <= 0)
+                        {
+                            a.Carry = CarryKind.None;
+                            a.CarryAmount = 0;
+                        }
+                        if (meatOk)
+                        {
+                            ApplyDelivery(w, a.Team, CarryKind.Biomass, a.CarryMeat, id, BiomassType.Meat);
+                            a.CarryMeat = 0;
+                        }
                         continue;
                     }
                 }

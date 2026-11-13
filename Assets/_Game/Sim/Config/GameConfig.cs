@@ -76,6 +76,8 @@ namespace CriticalMass.Sim.Config
         public BotsConfig Bots = new BotsConfig();
         public RenderConfig Render = new RenderConfig();
         public DebugConfig Debug = new DebugConfig();
+        /// <summary>The mechanics-depth lane (U-063 onward): one block per rule set; DepthConfig.Classic = the game before it.</summary>
+        public DepthConfig Depth = new DepthConfig();
 
         /// <summary>The game's config: 16v16 at 2x pace (U-004), every other value the browser main value.</summary>
         public static GameConfig CreateDefault()
@@ -92,6 +94,7 @@ namespace CriticalMass.Sim.Config
             var c = CreateDefault();
             c.TeamSize = 5;
             c.DefaultSpeed = 1;
+            c.Depth.Classic = true; // the browser has none of the mechanics-depth rules (U-063 onward)
             return c;
         }
 
@@ -114,6 +117,7 @@ namespace CriticalMass.Sim.Config
             c.Bots = Bots.Clone();
             c.Render = Render.Clone();
             c.Debug = Debug.Clone();
+            c.Depth = Depth.Clone();
             return c;
         }
 
@@ -126,7 +130,9 @@ namespace CriticalMass.Sim.Config
         /// <summary>The bot roster fraction of one class (browser GAME_CONFIG.bots.classMix[id]).</summary>
         public double ClassMix(ClassId id)
         {
-            return Bots.ClassMix[(int)id];
+            // U-063: with class roles on, the lineup holds all six classes (Depth.Roles.ClassMix).
+            double[] mix = !Depth.Classic && Depth.Roles.Enabled ? Depth.Roles.ClassMix : Bots.ClassMix;
+            return mix[(int)id];
         }
     }
 

@@ -548,6 +548,31 @@ namespace CriticalMass.Sim.Bots
             st.AbilityZ[id] = JsMath.F32(w.Z[best]);
         }
 
+        /// <summary>
+        /// U-063: the allied carrier bot id should escort, or -1: a living feeder of its team holding cargo or meat within
+        /// Roles.EscortSeekRange (straight line), nearest first, lowest id on a tie.
+        /// </summary>
+        public static int EscortTarget(World w, int id)
+        {
+            Actor a = w.Actors[id];
+            double r = w.Config.Depth.Roles.EscortSeekRange;
+            double bestD2 = r * r;
+            int best = -1;
+            for (int j = 0; j < w.ActorCount; j++)
+            {
+                if (j == id) continue;
+                Actor t = w.Actors[j];
+                if (!t.Alive || t.Team != a.Team || (t.CarryAmount <= 0 && t.CarryMeat <= 0) || !Roles.MayFeed(w, t.Cls)) continue;
+                double dx = w.X[j] - w.X[id];
+                double dz = w.Z[j] - w.Z[id];
+                double d2 = dx * dx + dz * dz;
+                if (d2 >= bestD2) continue;
+                best = j;
+                bestD2 = d2;
+            }
+            return best;
+        }
+
         /// <summary>One think for bot id: perception, stuck check, utility selection, targets, ability decision.</summary>
         public static void ThinkBot(World w, BotsState st, int id)
         {
@@ -655,14 +680,14 @@ namespace CriticalMass.Sim.Bots
 
             double uGather = 0;
             int gatherNode = -1;
-            if (role == BotsState.RoleKaiju && st.Corrupt[id] == 0 && egg && a.CarryAmount < cc.CarryCapacity && a.Carry != CarryKind.Corruption)
+            if (role == BotsState.RoleKaiju && st.Corrupt[id] == 0 && egg && a.CarryAmount < cc.CarryCapacity && a.Carry != CarryKind.Corruption && Roles.MayFeed(w, a.Cls))
             {
                 gatherNode = BestNode(w, st, id, NodeKind.Biomass, double.PositiveInfinity);
                 if (gatherNode >= 0) uGather = Cap1(0.8 * st.Greed[id]);
             }
 
             double uDeliver = 0;
-            if (a.CarryAmount > 0 && egg)
+            if (a.CarryAmount > 0 && egg && Roles.MayDeliver(w, a, a.Carry))
             {
                 NodeKind kind = a.Carry == CarryKind.Corruption ? NodeKind.Corruption : NodeKind.Biomass;
                 if (a.CarryAmount >= cc.CarryCapacity || BestNode(w, st, id, kind, NearbyNodeDist) < 0) uDeliver = 0.9;
@@ -670,11 +695,20 @@ namespace CriticalMass.Sim.Bots
 
             double uCorrupt = 0;
             int corruptNode = -1;
-            if (st.Corrupt[id] != 0 && egg && a.Carry != CarryKind.Biomass && a.CarryAmount < cc.CarryCapacity)
+            if (st.Corrupt[id] != 0 && egg && a.Carry != CarryKind.Biomass && a.CarryAmount < cc.CarryCapacity && Roles.MayCorrupt(w, a.Cls))
             {
                 corruptNode = BestNode(w, st, id, NodeKind.Corruption, double.PositiveInfinity);
                 if (corruptNode >= 0 && BotFields.FieldDistAt(st.Fields, BotFields.FieldCorruption, x, z) < double.PositiveInfinity)
                     uCorrupt = Cap1(0.85 * st.Greed[id]);
+            }
+
+            // U-063 class roles: an egg-duty bot that may not feed (and is not on a corruption run) escorts the nearest allied carrier.
+            double uEscort = 0;
+            int escortOf = -1;
+            if (role == BotsState.RoleKaiju && egg && st.Corrupt[id] == 0 && a.CarryAmount == 0 && hpFrac >= lowHp && Roles.On(w) && !Roles.MayFeed(w, a.Cls))
+            {
+                escortOf = EscortTarget(w, id);
+                if (escortOf >= 0) uEscort = w.Config.Depth.Roles.EscortUtility;
             }
 
             // CM-36: the shrine cleanse is the player's tool. Only the human slot on autopilot (IsHuman) uses it, and only for the
@@ -715,6 +749,9 @@ namespace CriticalMass.Sim.Bots
                 case AiState.Cleanse:
                     curU = uCleanse;
                     break;
+                case AiState.Escort:
+                    curU = uEscort;
+                    break;
                 case AiState.Retreat:
                     curU = uRetreat;
                     break;
@@ -732,6 +769,7 @@ namespace CriticalMass.Sim.Bots
             Consider(w, AiState.Deliver, uDeliver);
             Consider(w, AiState.Corrupt, uCorrupt);
             Consider(w, AiState.Cleanse, uCleanse);
+            Consider(w, AiState.Escort, uEscort);
             Consider(w, AiState.Retreat, uRetreat);
             AiState best = Sel.Best;
 
@@ -749,6 +787,7 @@ namespace CriticalMass.Sim.Bots
 
             // --- targets ---
             st.Target[id] = next == AiState.Fight ? fightTarget : -1;
+            st.EscortOf[id] = next == AiState.Escort ? escortOf : -1;
             if (next == AiState.Gather) st.TargetNode[id] = gatherNode;
             else if (next == AiState.Corrupt) st.TargetNode[id] = corruptNode;
             else st.TargetNode[id] = -1;

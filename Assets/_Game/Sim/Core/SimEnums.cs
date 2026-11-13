@@ -33,6 +33,8 @@ namespace CriticalMass.Sim.Core
         None, ToHill, HoldHill, Fight, Gather, Deliver, Corrupt, Retreat, Unstick,
         /// <summary>CM-36: walk to the shrine empty-handed and hold interact for the shrine cleanse (appended: the browser lists it before Retreat).</summary>
         Cleanse,
+        /// <summary>U-063 class roles: an egg-duty bot that may not feed walks with the nearest allied carrier (appended).</summary>
+        Escort,
     }
 
     /// <summary>Match phase (browser MatchState.phase).</summary>
@@ -134,6 +136,10 @@ namespace CriticalMass.Sim.Core
         HealLanded,
         /// <summary>DG-40: a Healer purified the egg: A = the Healer, B = team index (0 azure, 1 crimson), (X, Z) = the shrine, Value = instability removed, Radius = Healer.PurifyRange.</summary>
         Purify,
+        /// <summary>U-063: the shrine refused a load (class roles): A = the carrier, B = Roles.RefusedNotFeeder / RefusedNotRaider, (X, Z) = the shrine, Value = units it holds.</summary>
+        DeliverRefused,
+        /// <summary>U-063: a carrier handed biomass to an allied feeder: A = giver, B = receiver, (X, Z) = the receiver, Value = units, Bio = the type.</summary>
+        Handoff,
         // ITEM CM-84: added by its owner (ClassSwitch, ports CM-54)
         /// <summary>CM-37: one tick of fountain healing (Heal.HealSystem): A = the healed actor, B = -1, (X, Z) = the actor, Value = HP restored this tick (&gt; 0).</summary>
         Heal,

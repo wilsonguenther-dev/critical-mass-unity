@@ -539,6 +539,7 @@ namespace CriticalMass.Sim.Core
             // DG-24: every piece gone (the repaint restored its cells), banks full again.
             world.Builder.Reset();
             world.Healer.Reset(); // DG-40
+            world.Depth.Reset(world); // U-063 onward
 
             SpatialHash.Rebuild(world.Hash, world.X, world.Z, world.Actors, world.ActorCount);
         }
@@ -737,6 +738,7 @@ namespace CriticalMass.Sim.Core
                 Hash = SpatialHash.CreateSpatialHash(map.Width, map.Height, cap),
                 Builder = BuilderState.Create(cfg),
                 Healer = HealerState.Create(cfg),
+                Depth = DepthState.Create(cfg, map),
             };
             InitWorld(world, opts);
             return world;
@@ -831,5 +833,7 @@ namespace CriticalMass.Sim.Core
         public BuilderState Builder;
         /// <summary>DG-40: the Healer's purify cooldowns and counters (Healer.cs).</summary>
         public HealerState Healer;
+        /// <summary>Mechanics depth (U-063 onward): roles, sources, stations, pickups, pings and map events (DepthState.cs).</summary>
+        public DepthState Depth;
     }
 }

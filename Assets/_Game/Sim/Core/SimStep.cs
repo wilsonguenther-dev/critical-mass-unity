@@ -38,6 +38,7 @@ namespace CriticalMass.Sim.Core
             BuiltPieces.PiecesSystem(w); // DG-24: broken / expired ladders and bridges, after this step's digs and craters
             Barricades.BarricadesSystem(w, dt);
             SimResources.ResourcesSystem(w, dt);
+            Roles.HandoffSystem(w); // U-063: a carrier that may not feed hands its biomass to a feeder beside it
             Kaiju.KaijuSystem(w, dt);
             Respawn.RespawnSystem(w, dt);
             // CM-37: after respawn (a fresh respawn is already at full HP), before the hill / match bookkeeping.

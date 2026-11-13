@@ -361,6 +361,15 @@ namespace CriticalMass.Sim.Bots
                 case AiState.Retreat:
                     Follow(w, st, id, TeamPadField(w, id));
                     break;
+                case AiState.Escort:
+                {
+                    // U-063: walk with the carrier (straight at it when the line is clear, else the shrine route it is on).
+                    int t = st.EscortOf[id];
+                    if (t >= 0 && t < w.ActorCount && w.Actors[t].Alive && FirstBlockedCell(map, x, z, w.X[t], w.Z[t]) < 0)
+                        Toward(w, id, w.X[t], w.Z[t], cfg.Depth.Roles.EscortKeepDistance);
+                    else if (!Follow(w, st, id, BotFields.FieldShrine)) Toward(w, id, map.Shrine.X, map.Shrine.Z, 3);
+                    break;
+                }
                 default:
                 {
                     // toHill (and 'none' before the first think).
