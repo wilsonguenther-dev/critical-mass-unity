@@ -26,8 +26,9 @@ namespace CriticalMass.Runtime.Flow
         static void OnSecretLine(string lineId)
         {
             // Batch 4 finisher: handed to the announcer only when it is free (SecretWatcher captions it itself otherwise),
-            // so the line is never lost by ageing out behind another one.
-            if (lineId == "an-22" && Announcer.Free) Announcer.Say(AnnouncerTrigger.SecretHillAlone);
+            // so the line is never lost by ageing out behind another one. It starts in this frame (SayIfFree), so no line
+            // decoded before the next Update can take its slot after SecretWatcher has decided not to show its own bar.
+            if (lineId == "an-22") Announcer.SayIfFree(AnnouncerTrigger.SecretHillAlone);
         }
 
         static void OnRelic(int index)

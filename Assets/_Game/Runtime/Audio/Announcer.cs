@@ -441,6 +441,21 @@ namespace CriticalMass.Runtime.Audio
         /// <summary>Queues a trigger now (it obeys the anti-spam rule like any match event).</summary>
         public static bool Say(AnnouncerTrigger t) => Instance != null && Instance._queue.Enqueue(t, Time.unscaledTimeAsDouble);
 
+        /// <summary>
+        /// Starts a line at once when the announcer is <see cref="Free"/> (it restarts the cooldown like any line); false,
+        /// and nothing is queued, otherwise. The hill secret uses this instead of <see cref="Say"/>: a queued line waits
+        /// a frame for the next Update, and a higher-priority line decoded in that frame would win the slot and leave the
+        /// secret to age out uncaptioned (SecretWatcher showed no caption bar because the announcer was free).
+        /// </summary>
+        public static bool SayIfFree(AnnouncerTrigger t)
+        {
+            if (!Free) return false;
+            AnnouncerLine line = AnnouncerLines.For(t);
+            Instance._queue.MarkStarted(line, Time.unscaledTimeAsDouble);
+            Instance.Begin(line);
+            return true;
+        }
+
         /// <summary>Plays a line at once, skipping the queue (capture tools and tests only).</summary>
         public static void ForceLine(AnnouncerTrigger t)
         {
