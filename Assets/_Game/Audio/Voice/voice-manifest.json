@@ -1,0 +1,258 @@
+{
+  "schema": "cm.audio.voice/1",
+  "engine": "Kokoro-82M (hexgrad/Kokoro-82M, Apache-2.0), stock voice",
+  "lines": [
+    {
+      "id": "an-01",
+      "role": "announcer",
+      "text": "Banners up. The hill is open.",
+      "voice": "bm_george",
+      "speed": 0.95,
+      "ms": 2389,
+      "key": "9497cf5b9c59"
+    },
+    {
+      "id": "an-02",
+      "role": "announcer",
+      "text": "Hill taken. Now keep it.",
+      "voice": "bm_george",
+      "speed": 0.95,
+      "ms": 2106,
+      "key": "2df79217a2a2"
+    },
+    {
+      "id": "an-03",
+      "role": "announcer",
+      "text": "They have the hill. Take it back.",
+      "voice": "bm_george",
+      "speed": 0.95,
+      "ms": 2247,
+      "key": "36ac1878974b"
+    },
+    {
+      "id": "an-04",
+      "role": "announcer",
+      "text": "Hill lost.",
+      "voice": "bm_george",
+      "speed": 0.95,
+      "ms": 1145,
+      "key": "a792440976af"
+    },
+    {
+      "id": "an-05",
+      "role": "announcer",
+      "text": "The hill is contested.",
+      "voice": "bm_george",
+      "speed": 0.95,
+      "ms": 1995,
+      "key": "19e39261b032"
+    },
+    {
+      "id": "an-06",
+      "role": "announcer",
+      "text": "One minute left. Make it count.",
+      "voice": "bm_george",
+      "speed": 0.95,
+      "ms": 2274,
+      "key": "d8ccc5f40aef"
+    },
+    {
+      "id": "an-07",
+      "role": "announcer",
+      "text": "The egg is cracking!",
+      "voice": "bm_george",
+      "speed": 0.95,
+      "ms": 1716,
+      "key": "f960c266697b"
+    },
+    {
+      "id": "an-08",
+      "role": "announcer",
+      "text": "The Kaiju sides with Azure!",
+      "voice": "bm_george",
+      "speed": 0.95,
+      "ms": 2234,
+      "key": "2c18d440b2e8"
+    },
+    {
+      "id": "an-09",
+      "role": "announcer",
+      "text": "The Kaiju sides with Crimson!",
+      "voice": "bm_george",
+      "speed": 0.95,
+      "ms": 2317,
+      "key": "f091c0c3d336"
+    },
+    {
+      "id": "an-10",
+      "role": "announcer",
+      "text": "Dead even. The Kaiju sides with nobody.",
+      "voice": "bm_george",
+      "speed": 0.95,
+      "ms": 3114,
+      "key": "79e486123701"
+    },
+    {
+      "id": "an-11",
+      "role": "announcer",
+      "text": "Too much corruption. That egg is going to hatch angry.",
+      "voice": "bm_george",
+      "speed": 0.95,
+      "ms": 3543,
+      "key": "9d8146548109"
+    },
+    {
+      "id": "an-12",
+      "role": "announcer",
+      "text": "Berserk! It wants everyone.",
+      "voice": "bm_george",
+      "speed": 0.95,
+      "ms": 2043,
+      "key": "813bfedae5f9"
+    },
+    {
+      "id": "an-13",
+      "role": "announcer",
+      "text": "The Kaiju is down!",
+      "voice": "bm_george",
+      "speed": 0.95,
+      "ms": 1875,
+      "key": "ae42eba92d84"
+    },
+    {
+      "id": "an-14",
+      "role": "announcer",
+      "text": "The Kaiju is back up. It remembers.",
+      "voice": "bm_george",
+      "speed": 0.95,
+      "ms": 2702,
+      "key": "886668edff7f"
+    },
+    {
+      "id": "an-15",
+      "role": "announcer",
+      "text": "First knock-out of the match.",
+      "voice": "bm_george",
+      "speed": 0.95,
+      "ms": 2219,
+      "key": "0b87175b9b71"
+    },
+    {
+      "id": "an-16",
+      "role": "announcer",
+      "text": "Double knock-out!",
+      "voice": "bm_george",
+      "speed": 0.95,
+      "ms": 1489,
+      "key": "f26b29e0014b"
+    },
+    {
+      "id": "an-17",
+      "role": "announcer",
+      "text": "Triple knock-out!",
+      "voice": "bm_george",
+      "speed": 0.95,
+      "ms": 1510,
+      "key": "ee1c9bc893ee"
+    },
+    {
+      "id": "an-18",
+      "role": "announcer",
+      "text": "Four down. Somebody stop them.",
+      "voice": "bm_george",
+      "speed": 0.95,
+      "ms": 2251,
+      "key": "f6548ccc0a88"
+    },
+    {
+      "id": "an-19",
+      "role": "announcer",
+      "text": "Victory. The hill is yours.",
+      "voice": "bm_george",
+      "speed": 0.95,
+      "ms": 2431,
+      "key": "8c084e0b13d9"
+    },
+    {
+      "id": "an-20",
+      "role": "announcer",
+      "text": "Defeat. Regroup, and climb again.",
+      "voice": "bm_george",
+      "speed": 0.95,
+      "ms": 2697,
+      "key": "667c22a8b7f1"
+    },
+    {
+      "id": "an-21",
+      "role": "announcer",
+      "text": "A draw. The hill will take a rematch.",
+      "voice": "bm_george",
+      "speed": 0.95,
+      "ms": 2602,
+      "key": "5a7b63994834"
+    },
+    {
+      "id": "an-22",
+      "role": "announcer",
+      "text": "Still up there on your own? Respect.",
+      "voice": "bm_george",
+      "speed": 0.95,
+      "ms": 2615,
+      "key": "5774268c4e3e"
+    },
+    {
+      "id": "story-title",
+      "role": "narrator",
+      "text": "Critical Mass. Hold the hill.",
+      "voice": "bm_george",
+      "speed": 0.9,
+      "ms": 2447,
+      "key": "1efe3b8df4eb"
+    },
+    {
+      "id": "story-card-1",
+      "role": "narrator",
+      "text": "The sky cracked. And the land rose to meet it.",
+      "voice": "bm_george",
+      "speed": 0.9,
+      "ms": 3340,
+      "key": "790e83656f7c"
+    },
+    {
+      "id": "story-card-2",
+      "role": "narrator",
+      "text": "Two banners. One hill. Neither has learned to share.",
+      "voice": "bm_george",
+      "speed": 0.9,
+      "ms": 3746,
+      "key": "3d828afbd3af"
+    },
+    {
+      "id": "story-card-3",
+      "role": "narrator",
+      "text": "Far away, a Kaiju egg sleeps. It remembers every meal.",
+      "voice": "bm_george",
+      "speed": 0.9,
+      "ms": 4300,
+      "key": "61e85cb1cb51"
+    },
+    {
+      "id": "story-card-4",
+      "role": "narrator",
+      "text": "Feed it, and it fights for you. Corrupt it, and it fights everyone.",
+      "voice": "bm_george",
+      "speed": 0.9,
+      "ms": 4500,
+      "key": "f75434c34047"
+    },
+    {
+      "id": "story-card-5",
+      "role": "narrator",
+      "text": "Hold the hill. Raise the Kaiju.",
+      "voice": "bm_george",
+      "speed": 0.9,
+      "ms": 2569,
+      "key": "5f513ea5a8e1"
+    }
+  ]
+}
