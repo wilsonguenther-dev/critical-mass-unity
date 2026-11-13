@@ -1391,3 +1391,24 @@ sight and a full hill squad for Hard did nothing (16, 15).
    (unchanged); Classic and PhysicsOnly unchanged.
 2. **Measured**: proxy 20 / 8 / 6 on the band's seeds 1..20, 40 / 17 / 13 on seeds 1..40. Healer weight 1 gave 16 of 40,
    0.1 gave 18. The gap on the band's seeds is two wins: strict, still narrow.
+
+## U-079 Bridges no longer show random holes: bridge collapse off by default, no decorative missing-plank deck tiles (our rule) (2026-11-13T19:10:32Z)
+
+**Source.** Co-founder after watching the owner's build: "The bridges have random holes, fix that." The creator's spec never
+asks for bridges that break (brief: "Stairs, ramps and bridges are walkable", no fall deaths; CM-33 asks that every bridge
+is crossed naturally). The browser oracle has no map events. U-068 (315626e) added the collapse as our rule.
+1. **Two kinds of hole.** (a) U-068 BRIDGE COLLAPSE: on in every normal match (Depth rules on), first event at 50 s, one a
+   minute, the three kinds rotate, so a span loses its middle third for 45 s about every 3 minutes. It had an 8 s warning
+   (banner, creak, red hatch, dust, shake), a fall banner, plank pops and a rebuild banner, but the dressed deck tiles were
+   planned from the span's whole t-range, so planks stayed drawn over the voided cells (the player dropped through a deck
+   that looked whole, or saw it vanish on the async re-plan). (b) Rendering, on intact bridges: with extra clutter on
+   (higher render tiers) 14 % of every span's inner deck tiles were swapped for env_bridge_span_damaged, a tile with a
+   missing and a snapped plank: a visible hole the player walks straight over.
+2. **Decision.** MapEventsConfig.BridgeCollapse, default false: the rotation's bridge turn is a quiet minute, no event.
+   (Tried first: a supply drop on that turn. It broke two bands of RulesCombinedSoakTests: CM-64 interceptions 77 of 100,
+   floor 80, and Normal/Hard proxy 6/8, inverted. The quiet minute keeps every band: interceptions 83, proxy E/N/H
+   20/9/7, berserk 0.22, hill 0.708/0.838, idle floors 78/200 and 66/200.) The rule, its warning, repair, view and tests are kept; true restores U-068 exactly;
+   MapEvents.Start(KindBridge) ignores the switch. No deck tile becomes the damaged tile. A deck tile whose axis cell is
+   in-map VOID is not drawn (an intact span has none, so the intact plan and tools/art/world-plan.tsv are unchanged).
+3. **Goldens.** Full profile re-pinned (16v16 seed 1 at 2:00: 0xAA728D5DAF5451F4; 5v5 seed 42: 0x619D9DCFE88715E6), because
+   a scheduled bridge collapse became a quiet minute. Classic and PhysicsOnly unchanged (depth rules off there).

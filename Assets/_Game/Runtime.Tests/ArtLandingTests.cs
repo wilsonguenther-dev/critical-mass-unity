@@ -245,16 +245,16 @@ namespace CriticalMass.Runtime.Tests
             WorldPlan rich = WorldDresser.Plan(map, BasesFile.Load(), cat.Centroid, cat.Body, true);
             Assert.AreEqual(0, plain.ClutterCount, "off by default: tools/art/world-plan.tsv is unchanged");
             Assert.AreEqual(plain.Placements.Count + rich.ClutterCount, rich.Placements.Count);
-            // The proposed rows count 525 placements and 12 damaged tiles on this map; the C# dresser's base plan differs a
+            // The proposed rows count 525 placements (and had 12 damaged tiles, removed 2026-11-13) on this map; the C# dresser's base plan differs a
             // little from layout2 (edge trees, keep-outs), so allow a margin.
             Assert.That(rich.ClutterCount, Is.InRange(350, 750), "about 525 v4 placements");
-            Assert.That(rich.DamagedSpans, Is.InRange(4, 24), "about 12 damaged deck tiles");
+            // 2026-11-13 ("the bridges have random holes"): the missing-plank tile read as a hole in a walkable deck; none now.
+            Assert.AreEqual(0, rich.DamagedSpans, "no decorative damaged deck tiles (they read as holes)");
             for (int i = 0; i < plain.Placements.Count; i++)
             {
                 WorldPlacement a = plain.Placements[i], b = rich.Placements[i];
                 Assert.AreEqual(a.Matrix, b.Matrix, "base placement " + i + " moved");
-                if (a.Piece != b.Piece)
-                    Assert.IsTrue(a.Piece == "env_bridge_span" && b.Piece == "env_bridge_span_damaged", a.Piece + " -> " + b.Piece);
+                Assert.AreEqual(a.Piece, b.Piece, "base placement " + i + " swapped (no deck tile becomes env_bridge_span_damaged)");
             }
             foreach (string piece in rich.Counts().Keys)
                 Assert.IsNotNull(cat.Find(piece), piece + " is not in the WorldKitCatalog (import Art/Environment, ProjectSetup.Apply)");
