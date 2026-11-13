@@ -181,16 +181,19 @@ def build_torso():
         add(BODY, B.prism(hem, 0.03, bevel=0.012, seg=1), "team_cloth", "hips", "team_cloth", smooth=False,
             m=M((0, y, 0.82), (90, 0, ry)) @ M((0, 0, 0), (-8, 0, 0)))
     add(BODY, B.cyl((0, 0, 1.15), (0, 0, 1.31), 0.10, 0.095, 12), "skin", ["chest", "head"], "skin")
-    # v4 teal scarf (bible p06): a compact roll wrapped round the neck, tucked under the chin, a knot at the front on
-    # the character's right and ONE tail hanging down the chest. No folds over the pauldrons (no cape, no hood).
-    for k in range(8):
-        a = 2 * math.pi * k / 8 + 0.2
-        cx, cy = 0.250 * math.cos(a), 0.0 + 0.195 * math.sin(a)
-        r = (0.145 * rng.uniform(0.94, 1.06), 0.115 * rng.uniform(0.94, 1.06), 0.088 * rng.uniform(0.92, 1.08))
-        add(BODY, B.sphere(r, 10, 7), "team_cloth", "chest", "team_cloth",
-            m=M((cx, cy, 1.195 + 0.012 * math.sin(3 * a)), (0, 0, math.degrees(a))))
-    add(BODY, B.sphere((0.085, 0.065, 0.075), 10, 6), "team_cloth", "chest", "team_cloth", m=M((-0.08, -0.20, 1.18)))
-    add(BODY, B.clump((-0.085, -0.22, 1.15), (-0.15, -0.28, 1.03), (-0.19, -0.27, 0.90), 0.14, 0.045, 7,
+    # v6 teal scarf (bible p06): a big soft scarf wrapped twice round the neck as a thick roll with folds, sagging onto
+    # the upper chest at the front, a wide fold of cloth covering the upper chest under the roll, a knot on the
+    # character's right and ONE tail. No folds over the pauldrons (no cape, no hood).
+    add(BODY, loop_tube(0.215, 0.185, lambda a: 1.205 - 0.065 * max(0.0, -math.sin(a)),
+                        lambda a: 0.098 * (1.0 + 0.16 * math.sin(5 * a + 0.7)), 18, 6), "team_cloth", "chest",
+        "team_cloth")
+    add(BODY, loop_tube(0.185, 0.165, lambda a: 1.270 - 0.055 * max(0.0, -math.sin(a)),
+                        lambda a: 0.074 * (1.0 + 0.18 * math.sin(4 * a + 2.1)), 16, 6, y0=0.01), "team_cloth", "chest",
+        "team_cloth")
+    add(BODY, B.clump((0.01, -0.19, 1.16), (0.03, -0.275, 1.08), (0.0, -0.255, 0.985), 0.30, 0.06, 7,
+                      up=(0, -1, 0), prof=(1.0, 1.06, 0.92, 0.62)), "team_cloth", "chest", "team_cloth")
+    add(BODY, B.sphere((0.085, 0.065, 0.075), 10, 6), "team_cloth", "chest", "team_cloth", m=M((-0.10, -0.24, 1.165)))
+    add(BODY, B.clump((-0.10, -0.24, 1.14), (-0.17, -0.295, 1.00), (-0.21, -0.27, 0.86), 0.15, 0.05, 7,
                       up=(0, -1, 0), prof=(1.0, 1.08, 0.95, 0.6)), "team_cloth", "chest", "team_cloth")
 
 
