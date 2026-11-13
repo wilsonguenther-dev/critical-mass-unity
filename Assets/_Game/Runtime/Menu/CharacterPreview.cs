@@ -129,6 +129,13 @@ namespace CriticalMass.Runtime.Menu
             _model = null;
         }
 
+        /// <summary>Integration batch 5: Destroy in play, DestroyImmediate in edit mode (EditMode tests open and close the Barracks).</summary>
+        static void Kill(Object o)
+        {
+            if (Application.isPlaying) Object.Destroy(o);
+            else Object.DestroyImmediate(o);
+        }
+
         /// <summary>Destroys the model, the pieces, the camera and the render texture.</summary>
         public void Release()
         {
@@ -139,10 +146,10 @@ namespace CriticalMass.Runtime.Menu
             if (_rt != null)
             {
                 _rt.Release();
-                Object.Destroy(_rt);
+                Kill(_rt);
             }
             _rt = null;
-            if (_rig != null) Object.Destroy(_rig);
+            if (_rig != null) Kill(_rig);
             _rig = null;
             _cam = null;
             UnityEngine.Camera main = UnityEngine.Camera.main;
