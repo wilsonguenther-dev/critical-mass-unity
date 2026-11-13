@@ -30,9 +30,14 @@ for a in list(bpy.data.actions):
         bpy.data.actions.remove(a)
 missing = [k for k in CLIPS if k not in bpy.data.actions]
 assert not missing, f"Knight.glb lacks clips {missing}"
-for a in bpy.data.actions:
-    a.name = CLIPS[a.name]
+# Two-phase rename over a snapshot: renaming re-sorts bpy.data.actions, and a game name may equal another source name.
+_acts = [(a, CLIPS[a.name]) for a in list(bpy.data.actions)]
+for i, (a, _g) in enumerate(_acts):
+    a.name = "__cm_clip_%02d" % i
+for a, g in _acts:
+    a.name = g
     a.use_fake_user = True
+assert sorted(a.name for a in bpy.data.actions) == sorted(set(CLIPS.values())), "clip rename collided"
 rig.animation_data_create()
 rig.animation_data.action = bpy.data.actions["Idle"]
 rig.select_set(True)
