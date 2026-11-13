@@ -39,7 +39,6 @@ namespace CriticalMass.Runtime.PlayTests
         public void SetUp()
         {
             _errors.Clear();
-            LogAssert.ignoreFailingMessages = true;
             Application.logMessageReceived += OnLog;
             _level = RenderTier.Level;
             _hadPref = PlayerPrefs.HasKey(TimeOfDaySettings.Key);
@@ -71,6 +70,8 @@ namespace CriticalMass.Runtime.PlayTests
         [UnityTest]
         public IEnumerator SwitchingTimeOfDayInAMatchWorks()
         {
+            // Set inside the test: the runner opens a fresh log scope per test after SetUp, which resets this flag.
+            LogAssert.ignoreFailingMessages = true;
             _w = new SanityWorld();
             yield return _w.Load(autopilot: true);
             GameObject go = _w.Driver.gameObject;
