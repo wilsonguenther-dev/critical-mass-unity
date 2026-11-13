@@ -207,3 +207,45 @@ Paint the {nm} from images 2 and 3 seen from the in-between angle: a 45-degree T
 - The design, exactly as in images 2 and 3: {c['desc']}
 - {STYLE}
 - {LIGHT}""")
+# Round three. The Kaiju side views and two class three-quarters came back as front views: the accepted FRONT reference anchors the angle.
+# Fix: the angle template goes FIRST, the character's front and back/side follow as design-only references.
+for k, desc in (("kaiju_adult", KADULT), ("kaiju_hatchling", KHATCH)):
+    for v, word in (("side2", "a TRUE 90-degree SIDE PROFILE: the creature walks toward the left edge of the image; we see only its right flank; the head in profile at the left with one eye visible; the near legs in front of the far legs; the tail stretching out to the RIGHT; the belly seen edge-on as the bottom outline"),
+                    ("tq2", "a 45-degree THREE-QUARTER FRONT VIEW: body turned halfway between a front view and a side profile, the face in three-quarter, one shoulder nearer the viewer, the tail visible behind on the far side")):
+        w(f"{k}_{v}", f"""Image 1 is an ANGLE TEMPLATE only: a drawing of a creature of the same species at the wanted camera angle (ignore its colours, crystals' colour and exact pose). Image 2 is the accepted FRONT VIEW and image 3 the accepted REAR VIEW of our creature: they fix its design, NEUTRAL acid-lime colouring, proportions and painted style. Do NOT paint another front view.
+
+Paint our creature (images 2 and 3) seen from {word}. If image 1 faces right, still paint it facing LEFT. Neutral standing pose for rigging: all four legs straight and apart, weight even, the tail extended and fully visible, head level, mouth closed, calm. The creature the same size in frame as image 2.
+- Design: {desc}
+- {KNEUTRAL}
+- Same bold dark outlines as images 2 and 3.
+- {KLIGHT}""")
+for k, c in ALL.items():
+    nm = c["title"]
+    w(f"{k}_tq5", f"""Image 1 is the accepted SIDE PROFILE and image 2 the accepted FRONT VIEW of our {nm}, the character to paint: keep the design IDENTICAL (face, hair, outfit, colours, gear on the back, proportions, head size, line weight). Image 3 is a different character of the same game at EXACTLY the wanted camera angle; take only the angle from it.
+
+Start from image 1 and turn the {nm} 45 degrees back toward the viewer, so the result is a true 45-degree THREE-QUARTER FRONT VIEW facing left like image 3. Concrete checks: the torso is clearly narrower than in image 2; the character's right shoulder and right arm are nearer the viewer and larger, the left arm is partly hidden behind the body; the face is in three-quarter with the nose pointing left and the far cheek partly hidden; the near (right) boot points down-left and the far boot is partly behind it; part of the gear worn on the back shows behind the right side of the body. It must NOT look like image 2 with a turned head. Neutral A-pose, hands open and empty, nothing held, no effects; the same height in frame as image 2.
+- The design, exactly as in images 1 and 2: {c['desc']}
+- {STYLE}
+- {LIGHT}""")
+# Round four: two angle templates (the accepted Warrior and Miner three-quarters, both facing left) outvote the front reference.
+for k, c in ALL.items():
+    nm = c["title"]
+    w(f"{k}_tq6", f"""Images 1 and 2 are ANGLE TEMPLATES: two DIFFERENT characters of our game, both drawn at exactly the wanted camera angle, a 45-degree THREE-QUARTER FRONT VIEW facing left, neutral A-pose. Take ONLY the angle, pose and framing from them. Image 3 (FRONT VIEW) and image 4 (SIDE PROFILE) are the accepted references of our {nm}: the character to paint, with an IDENTICAL design (face, hair shape, colour and volume, outfit parts and colours, gear worn on the back, proportions, head size, line weight).
+
+Paint the {nm} of images 3 and 4 at the same angle as images 1 and 2: the whole body (boots, hips, chest, shoulders, head) turned 45 degrees to face the lower left, the torso narrower than in image 3, the right shoulder and arm nearer the viewer, the left arm partly behind the body, the face in three-quarter with the nose pointing left, the back gear showing behind the right side of the body. Standing still in the neutral A-pose like images 1 and 2 (NOT walking), arms out about 35 degrees, hands open and empty, nothing held, no effects; the same height in frame as image 3.
+- The design, exactly as in images 3 and 4: {c['desc']}
+- {STYLE}
+- {LIGHT}""")
+# Round five: the hatchling side/three-quarter came back as a slender lizard without the boulder forefists of our accepted front and rear.
+HANAT = ("Keep the EXACT anatomy of images 2 and 3: a compact, broad, chunky body; two HUGE grey boulder-plated forearms and fists planted wide "
+         "apart (the biggest shapes of the silhouette, as tall as the body); short sturdy hind legs; a big round head with a tan muzzle and big "
+         "yellow-green eyes; a tan segmented belly; dark slate plates with lime moss and lime crystal back spikes; a short tail. NOT a slender "
+         "long-bodied lizard, NOT a stegosaurus.")
+for v, word in (("side4", "a TRUE 90-degree SIDE PROFILE facing the LEFT edge of the image: we see its right flank, the near boulder forefist in front, the far one partly hidden behind it, the head in profile at the left with one eye, the short tail to the right"),
+                ("tq4", "a 45-degree THREE-QUARTER FRONT VIEW facing left: body turned halfway between the front view and a side profile, the near (right) boulder forefist larger and nearer the viewer, the far one partly behind the body, the face in three-quarter, the tail visible behind on the right")):
+    w(f"kaiju_hatchling_{v}", f"""Image 1 is an ANGLE TEMPLATE only: the adult of the same species at the wanted camera angle (ignore its size, proportions and pose). Image 2 is the accepted FRONT VIEW and image 3 the accepted REAR VIEW of our Kaiju HATCHLING: they fix its design, anatomy, NEUTRAL acid-lime colouring and painted style.
+
+Paint our hatchling (images 2 and 3) seen from {word}. {HANAT} Neutral standing pose for rigging, limbs straight and apart, mouth closed, calm. The same size in frame as image 2.
+- {KNEUTRAL}
+- Same bold dark outlines as images 2 and 3.
+- {KLIGHT}""")

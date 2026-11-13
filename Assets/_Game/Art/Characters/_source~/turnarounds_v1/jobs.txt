@@ -1,0 +1,37 @@
+# The batch.py jobs that produced each ACCEPTED view (out:prompt:refs, refs relative to the scratch folder).
+# refs/ = refs.py output plus design_*.jpg (Obsidian builder-v1/turnaround.jpg, healer-v2/turnaround.jpg + props.jpg,
+# demolitions-v1/turnaround.jpg + props-states.jpg) and warrior_<view>.jpg (warrior_v8/turnaround/*-2k.jpg). gen/<x>.jpg = accepted view as JPEG.
+farmer_front:farmer_front:refs/page7.jpg,refs/crop_farmer_front.jpg,refs/warrior_front.jpg
+farmer_side:farmer_side:refs/page7.jpg,gen/farmer_front.jpg,refs/crop_farmer_side.jpg
+farmer_back:farmer_back:refs/page7.jpg,gen/farmer_front.jpg,refs/crop_farmer_back.jpg
+farmer_tq6:farmer_tq6:refs/warrior_three-quarter.jpg,gen/miner_tq.jpg,gen/farmer_front.jpg,gen/farmer_side.jpg
+farmer_prop:farmer_prop:refs/page7.jpg,refs/crop_farmer_staff.jpg
+miner_front:miner_front:refs/page8.jpg,refs/crop_miner_front.jpg,refs/warrior_front.jpg
+miner_side:miner_side:refs/page8.jpg,gen/miner_front.jpg,refs/crop_miner_side.jpg
+miner_back:miner_back:refs/page8.jpg,gen/miner_front.jpg,refs/crop_miner_back.jpg
+miner_tq:miner_tq:gen/miner_front.jpg,gen/miner_side.jpg,refs/crop_miner_tq.jpg   (then mirrored)
+miner_prop:miner_prop:refs/page8.jpg,refs/crop_miner_pick.jpg
+builder_front:builder_front:refs/page6.jpg,refs/page7.jpg,refs/design_builder.jpg,refs/warrior_front.jpg
+builder_side3:builder_side3:gen/miner_side.jpg,gen/builder_front.jpg,refs/design_builder.jpg
+builder_back:builder_back:gen/builder_front.jpg,refs/warrior_back.jpg,refs/design_builder.jpg
+builder_tq6:builder_tq6:refs/warrior_three-quarter.jpg,gen/miner_tq.jpg,gen/builder_front.jpg,gen/builder_side.jpg
+builder_prop:builder_prop:gen/builder_front.jpg,refs/design_builder.jpg
+healer_front:healer_front:refs/page6.jpg,refs/page7.jpg,refs/design_healer.jpg,refs/warrior_front.jpg
+healer_side3:healer_side3:gen/farmer_side.jpg,gen/healer_front.jpg,refs/design_healer.jpg
+healer_back:healer_back:gen/healer_front.jpg,refs/warrior_back.jpg,refs/design_healer.jpg
+healer_tq3:healer_tq3:gen/miner_tq.jpg,gen/healer_front.jpg,gen/healer_side.jpg
+healer_prop2:healer_prop2:refs/design_healer_props.jpg
+demolitions_front:demolitions_front:refs/page6.jpg,refs/page7.jpg,refs/design_demolitions.jpg,refs/warrior_front.jpg
+demolitions_side3:demolitions_side3:gen/farmer_side.jpg,gen/demolitions_front.jpg,refs/design_demolitions.jpg
+demolitions_back2:demolitions_back2:gen/demolitions_front.jpg,refs/warrior_back.jpg
+demolitions_tq6:demolitions_tq6:refs/warrior_three-quarter.jpg,gen/miner_tq.jpg,gen/demolitions_front.jpg,gen/demolitions_side.jpg
+demolitions_prop2:demolitions_prop2:refs/design_demolitions_props.jpg
+kaiju_hatchling_front2:kaiju_hatchling_front2:refs/page10.jpg,refs/crop_hatchling.jpg,gen/kaiju_hatchling_front_r1.jpg
+kaiju_hatchling_back:kaiju_hatchling_back:refs/page10.jpg,gen/kaiju_hatchling_front.jpg,refs/crop_hatchling.jpg
+kaiju_hatchling_side4:kaiju_hatchling_side4:gen/kaiju_adult_side2.jpg,gen/kaiju_hatchling_front.jpg,gen/kaiju_hatchling_back.jpg
+kaiju_hatchling_tq4:kaiju_hatchling_tq4:gen/kaiju_adult_tq2.jpg,gen/kaiju_hatchling_front.jpg,gen/kaiju_hatchling_back.jpg
+kaiju_adult_front2:kaiju_adult_front2:refs/page11.jpg,refs/crop_kaiju_front.jpg,gen/kaiju_adult_front_r1.jpg
+kaiju_adult_back:kaiju_adult_back:refs/page11.jpg,gen/kaiju_adult_front.jpg,refs/crop_kaiju_back.jpg
+kaiju_adult_side2:kaiju_adult_side2:refs/crop_kaiju_side.jpg,gen/kaiju_adult_front.jpg,gen/kaiju_adult_back.jpg
+kaiju_adult_tq2:kaiju_adult_tq2:refs/crop_kaiju_tq.jpg,gen/kaiju_adult_front.jpg,gen/kaiju_adult_back.jpg
+# *_front_r1.jpg = the first-round front tries (kaiju_*_front prompts with page + crop), used as design references.
