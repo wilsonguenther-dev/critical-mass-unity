@@ -1,5 +1,5 @@
 """Painted face decal, 256 x 256 RGBA, drawn procedurally (deterministic, no hand edits): large
-brown eyes with white highlights, a confident closed-mouth smirk, cheek blush (bible p06 face callout).
+brown eyes with one white highlight, wedge brows, a tiny nose hint, a small one-sided smile, cheek blush (bible p06).
 
 Texture space = the head's front planar projection (kit.Builder.add face_uv): u = (x - cx) / (2 hw) + 0.5,
 v = (z - cz) / (2 hh) + 0.5, metres -> texels. Everything outside the features is fully transparent, so the skin
@@ -45,39 +45,26 @@ def paint(cx, cz, hw, hh):
             m = np.maximum(m, np.clip(0.5 - d / soft, 0, 1))
         return m
 
-    ink = _hex(palette.CHAR["pupil"][0])
-    lash = _hex("#2A1810")
-    blush = _hex("#F2867A", 0.55)
+    # v4 (bible p06 front): few, clean, simple shapes. No lashes, no lid lines, no cheek or jowl strokes, no lip colour.
+    dark = _hex("#3A2220")                         # eye and brow dark brown (front crop #3C2121)
+    iris = _hex(palette.CHAR["iris"][0])
+    for s in (1, -1):                              # soft warm blush, low on the outer cheeks
+        over(ell(0.152 * s, 1.388, 0.040, 0.020, soft=0.026), _hex("#FF9A86", 0.42))
     for s in (1, -1):
-        over(ell(0.140 * s, 1.384, 0.056, 0.030, soft=0.03), blush)                # warm cheeks, on the cheek volumes
-    for s in (1, -1):
-        # v3 eyes (bible p06 front): big, tall, set wide, cut flat across the top by a heavy upper lid; the brown
-        # iris sits toward the nose so the white shows as a wedge on the outer side only (no ring: v2 read as glasses)
-        ex, ez = 0.098 * s, 1.464
-        u = (X - ex) * s / 0.06                                                    # -1 inner .. +1 outer
-        lid = ez + 0.044 + 0.010 * u                                               # inner corner lower: determined
-        under = (Z < lid).astype(np.float32)
-        over(ell(ex, ez - 0.002, 0.055, 0.066) * under, _hex("#FFFFFF"))
-        ix = ex - 0.011 * s
-        over(ell(ix, ez - 0.004, 0.043, 0.060) * under, _hex(palette.CHAR["iris"][0]))
-        over(ell(ix, ez - 0.030, 0.032, 0.026) * under * ell(ix, ez - 0.004, 0.043, 0.060), _hex("#A0623A"))
-        over(ell(ix, ez + 0.002, 0.025, 0.035) * under, ink)
-        over(ell(ix - 0.015 * s, ez + 0.022, 0.016, 0.018), _hex("#FFFFFF"))      # main highlight
-        over(ell(ix + 0.015 * s, ez - 0.030, 0.008, 0.008), _hex("#FFFFFF"))      # small lower highlight
-        # heavy upper lid with an outer lash flick, plus a short lower lash at the outer corner
-        over(stroke([(ex - 0.058 * s, ez + 0.033), (ex - 0.02 * s, ez + 0.040),
-                     (ex + 0.03 * s, ez + 0.050), (ex + 0.058 * s, ez + 0.054), (ex + 0.080 * s, ez + 0.068)],
-                    [0.018, 0.028, 0.030, 0.022, 0.008]), lash)
-        over(stroke([(ex + 0.036 * s, ez - 0.058), (ex + 0.054 * s, ez - 0.044)], [0.008, 0.004]), lash)
-    # nose: the nose is modelled (v3); only a soft warm shadow under it
-    over(ell(0.004, 1.366, 0.026, 0.009, soft=0.012), _hex("#C9775A", 0.55))
-    # confident smirk (bible p06): a wide closed smile, the character's left corner kicks up into a dimple
-    mouth = _hex(palette.CHAR["mouth"][0])
-    over(stroke([(-0.070, 1.343), (-0.034, 1.331), (0.015, 1.330), (0.057, 1.342), (0.086, 1.366)],
-                [0.012, 0.020, 0.022, 0.018, 0.012]), mouth)
-    over(stroke([(0.084, 1.354), (0.098, 1.378)], [0.010, 0.006]), _hex(palette.CHAR["mouth"][0], 0.9))
-    over(stroke([(-0.070, 1.339), (-0.082, 1.349)], [0.008, 0.005]), _hex(palette.CHAR["mouth"][0], 0.7))
-    over(ell(0.000, 1.313, 0.034, 0.008, soft=0.010), _hex("#C9775A", 0.45))      # lower-lip shadow
+        ex, ez = 0.106 * s, 1.446                  # big eyes, set wide and low on the face
+        over(ell(ex + 0.007 * s, ez, 0.050, 0.061), _hex("#FFFFFF"))           # white shows only as an outer sliver
+        over(ell(ex - 0.002 * s, ez, 0.043, 0.060), dark)                     # big simple dark-brown eye
+        over(ell(ex - 0.002 * s, ez - 0.020, 0.029, 0.030) * ell(ex - 0.002 * s, ez, 0.043, 0.060), iris)
+        over(ell(ex + 0.012 * s, ez + 0.022, 0.015, 0.017), _hex("#FFFFFF"))  # one white highlight
+        # thick dark brow: a simple angled wedge well above the eye, the inner end lower (confident)
+        over(stroke([(0.048 * s, 1.530), (0.105 * s, 1.552), (0.168 * s, 1.552)], [0.036, 0.031, 0.014],
+                    soft=0.005), dark)
+    over(ell(0.0, 1.402, 0.012, 0.008, soft=0.010), _hex("#E2906C", 0.55))     # tiny nose hint
+    # small closed one-sided smile: a short curve whose character-left end lifts
+    over(stroke([(-0.048, 1.356), (-0.015, 1.343), (0.025, 1.346), (0.056, 1.366)], [0.010, 0.012, 0.011, 0.007],
+                soft=0.004), _hex(palette.CHAR["mouth"][0]))
+    a = img[..., 3:]
+    img[..., :3] = np.where(a > 1e-4, img[..., :3] / np.maximum(a, 1e-4), 0.0)   # straight alpha (PNG), not premultiplied
     img[:3, :3, 3] = 0.0
     return img
 

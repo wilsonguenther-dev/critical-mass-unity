@@ -73,7 +73,7 @@ class Builder:
             }
         return self.objs[obj]
 
-    def add(self, obj, src, color, bones, feat=None, smooth=True, m=None, face_uv=None, grad=GRADIENT, steps=True):
+    def add(self, obj, src, color, bones, feat=None, smooth=True, m=None, face_uv=None, grad=GRADIENT, steps=True, noao=False):
         """Merge temp bmesh `src` (transformed by m) into object `obj`.
 
         grad: value gradient across the part's height (bottom x(1-grad/2) .. top x(1+grad/2)), the "+6 % toward the
@@ -104,13 +104,14 @@ class Builder:
             t = (v.co.z - z0) / max(z1 - z0, 1e-6)
             k = 1.0 + grad * (t - 0.5)
             if steps:
+                st, su = steps if isinstance(steps, tuple) else (STEP_TOP, STEP_UNDER)
                 nz = v.normal.z
-                k *= (1.0 + STEP_TOP) if nz > 0.45 else ((1.0 - STEP_UNDER) if nz < -0.35 else 1.0)
+                k *= (1.0 + st) if nz > 0.45 else ((1.0 - su) if nz < -0.35 else 1.0)
             f = 1.0 if glow else k ** 2.2      # value step in sRGB, applied in linear
             nv[d["col"]] = (rgba[0] * f, rgba[1] * f, rgba[2] * f, rgba[3])
             nv[d["ws"]] = wi
             nv[d["ft"]] = fi
-            nv[d["nogo"]] = 1 if glow else 0
+            nv[d["nogo"]] = 1 if (glow or noao) else 0
             vmap[v] = nv
         uvl = d["uv"]
         for f in src.faces:

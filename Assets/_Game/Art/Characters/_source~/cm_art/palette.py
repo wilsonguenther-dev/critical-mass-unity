@@ -39,17 +39,18 @@ CHAR = {
     "wood":         ("#9C6040", "SAMPLED shield planks"),
     "wood_seam":    ("#6A3E2A", "SAMPLED shield plank seams"),
     "brass":        ("#C79245", "CORE Tool Brass (rivets, buckle, topknot ring, shield rings)"),
-    "stone_armour": ("#B4B0AA", "SAMPLED warm light stone of pauldrons/knee guards/rim (front crop lit ~#C3AFA4, shade ~#696D6E); 0.66 shade band ~#77746F, near CORE Stone #6F7282"),
+    "stone_armour": ("#C9B0A0", "v4 SAMPLED warm stone mid (front crop lit #E1C7B1, mid #C9B0A0, shade #6B656D); v3 was #B4B0AA. SAMPLED warm light stone of pauldrons/knee guards/rim (front crop lit ~#C3AFA4, shade ~#696D6E); 0.66 shade band ~#77746F, near CORE Stone #6F7282"),
     "stone_blade":  ("#8E97AE", "SAMPLED blue-grey cleaver stone (front crop #8089A6, lit)"),
     "wrap_dark":    ("#3A3346", "SAMPLED dark shin wraps under the knee guards"),
     "skin":         ("#F7B48A", "SAMPLED warm tan skin (cheek #FBA779 lit, face mid-tones ~#F2B08A)"),
     "skin_shadow":  ("#D7865F", "SAMPLED ears / nose underside"),
-    "hair":         ("#3B2622", "SAMPLED dark-brown hair (front crop #382D3E / #24191A)"),
+    "hair":         ("#4F353E", "v4 SAMPLED warm dark-brown hair (front crop mid #4F353E, shade #3F2A35, lit #64434B)"),
     "brow":         ("#2C1B19", "SAMPLED thick dark eyebrows"),
     "eye_white":    ("#FFFFFF", "eye white and highlights"),
-    "iris":         ("#6B3A22", "SAMPLED large brown eyes"),
+    "iris":         ("#5A3328", "SAMPLED large brown eyes"),
     "pupil":        ("#24161A", "SAMPLED pupil"),
-    "mouth":        ("#7A3328", "SAMPLED closed-mouth smirk line"),
+    "iron":         ("#576880", "v4 SAMPLED blue-grey iron of the shield centre boss"),
+    "mouth":        ("#6E3428", "SAMPLED closed-mouth smirk line"),
 }
 
 # Crimson replacements for each team channel (bible p06 accent-swap crop and P06 Crimson row).

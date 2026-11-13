@@ -43,8 +43,14 @@ BODY, SHIELD, CLEAVER = "Warrior_Body", "Warrior_Shield", "Warrior_Cleaver"
 M = kit.mat_from
 
 
-def add(obj, bm, color, bones, feat, smooth=True, m=None, face_uv=None, grad=kit.GRADIENT):
-    B.add(obj, bm, color, bones, feat=feat, smooth=smooth, m=m, face_uv=face_uv, grad=grad)
+STONE_STEPS = (0.12, 0.30)     # v4: stone reads as form under the flat toon shader: light top, mid, dark underside
+HAIR_STEPS = (0.14, 0.22)
+
+
+def add(obj, bm, color, bones, feat, smooth=True, m=None, face_uv=None, grad=kit.GRADIENT, steps=None, noao=False):
+    if steps is None:
+        steps = STONE_STEPS if color == "stone_armour" else (HAIR_STEPS if color == "hair" else True)
+    B.add(obj, bm, color, bones, feat=feat, smooth=smooth, m=m, face_uv=face_uv, grad=grad, steps=steps, noao=noao)
 
 
 # ===================================================================================================== body
@@ -204,66 +210,114 @@ def build_pauldrons():
         add(BODY, B.sphere((0.03, 0.03, 0.02), 8, 5), "brass", w, "stone_armour", m=mid @ M((0.08 * s, 0.10, 0.085)))
 
 
+HEAD_C, HEAD_R = (0.0, -0.01, 1.50), (0.268, 0.248, 0.248)
+
+
+def head_mesh():
+    """v4 head (bible p06): ONE smooth, finely divided round mesh, no glued-on cheeks, nose or brows, so the toon bands
+    run in clean curves and the outline never draws a line inside the face. A big round cranium, full soft cheeks and
+    a small round chin (the lower half narrows gently), the face front a little flatter for the painted decal."""
+    import bmesh as _bm
+    bm = _bm.new()
+    _bm.ops.create_uvsphere(bm, u_segments=36, v_segments=24, radius=1.0)
+    rx, ry, rz = HEAD_R
+    for v in bm.verts:
+        x, y, z = v.co
+        if z < 0:                                     # lower half: narrower toward a small, round chin
+            t = -z
+            x *= 1.0 - 0.13 * t ** 2
+            y *= 1.0 - 0.08 * t ** 2
+        else:                                         # cranium: slightly fuller above the brow line
+            x *= 1.0 + 0.03 * z
+        if y < 0:
+            y *= 0.92                                 # flatter face front
+        v.co = Vector((HEAD_C[0] + x * rx, HEAD_C[1] + y * ry, HEAD_C[2] + z * rz))
+    return bm
+
+
 def build_head():
-    """v3 head (bible p06 front): a wider, softer face. Round skull, a broad jaw, modelled cheek volumes (blush is painted
-    on them), a small modelled button nose low between the cheeks, big ears, and modelled brows that sit low enough to
-    overlap the top of the painted eyes. Eye and mouth detail stay in the face decal."""
     H = "head"
-    add(BODY, B.sphere((0.262, 0.238, 0.212), 24, 16), "skin", H, "skin", m=M((0, -0.01, 1.525)), face_uv=FACE_UV)
-    add(BODY, B.sphere((0.238, 0.207, 0.142), 18, 10), "skin", H, "skin", m=M((0, -0.04, 1.42)), face_uv=FACE_UV)
-    for s, k in ((1, 1.06), (-1, 1.0)):    # cheeks: the smirk side (character's left) is fuller and higher
-        add(BODY, B.sphere((0.098 * k, 0.056, 0.076 * k), 12, 8), "skin", H, "skin",
-            m=M((0.134 * s, -0.163, 1.388 + (0.008 if s > 0 else 0.0))), face_uv=FACE_UV)
-    add(BODY, B.sphere((0.050, 0.024, 0.034), 10, 6), "skin", H, "skin", m=M((0, -0.236, 1.392)), face_uv=FACE_UV)
-    for s in (1, -1):
-        add(BODY, B.sphere((0.034, 0.058, 0.074), 8, 6), "skin", H, "skin", m=M((0.262 * s, 0.03, 1.462)))
-        add(BODY, B.sphere((0.016, 0.03, 0.04), 6, 4), groove("skin"), H, "skin", m=M((0.284 * s, 0.025, 1.462)))
-        # brows: thick tapered dark-brown wedges, inner ends low and close (over the inner lid), outer ends up
-        add(BODY, B.clump((0.046 * s, -0.254, 1.534), (0.11 * s, -0.238, 1.562), (0.19 * s, -0.175, 1.576), 0.056,
-                          0.032, 7, up=(0, -1, 0.2), prof=(0.85, 1.0, 0.92, 0.62)), "brow", H, "skin", grad=0.0)
+    add(BODY, head_mesh(), "skin", H, "skin", face_uv=FACE_UV, grad=0.04, steps=False, noao=True)
+    for s in (1, -1):        # simple round ears, set at eye height, the bible's visible ear
+        add(BODY, B.sphere((0.046, 0.066, 0.086), 10, 8), "skin", H, "skin", m=M((0.262 * s, 0.035, 1.425)),
+            steps=False)
+        add(BODY, B.sphere((0.016, 0.034, 0.050), 8, 6), "skin_shadow", H, "skin", m=M((0.296 * s, 0.03, 1.425)),
+            steps=False)
+
 
 def build_hair():
-    """v3 hair (bible p06): spiky volume made of separate tapered spikes over a small hidden cap, not a helmet:
-    a fringe of six locks curling down over the forehead, side spikes flaring over the ears, crown and nape spikes,
-    and a tall topknot spray in a brass ring that leans to the character's left and sweeps back."""
+    """v4 hair (bible p06): warm dark brown, a soft rounded volume of big swept clumps. The fringe parts near the
+    middle and sweeps out to both temples (tips point down and outward, ending above the brows); temple locks frame
+    the face in front of the ears; the back is a full round crown with nape spikes; a tall spiky topknot fans up from
+    a brass tie on top of the head."""
     H = "head"
-    add(BODY, B.sphere((0.250, 0.245, 0.150), 13, 7), "hair", H, "hair", m=M((0, 0.035, 1.605)), grad=0.14)
-    add(BODY, B.sphere((0.240, 0.185, 0.200), 11, 7), "hair", H, "hair", m=M((0, 0.105, 1.49)), grad=0.14)
-    SP = (0.92, 1.0, 0.68, 0.30)          # spike profile: full at the root, sharp tip
+    add(BODY, B.sphere((0.272, 0.255, 0.170), 16, 10), "hair", H, "hair", m=M((0, 0.03, 1.63)), grad=0.22)
+    add(BODY, B.sphere((0.255, 0.205, 0.215), 14, 9), "hair", H, "hair", m=M((0, 0.105, 1.50)), grad=0.22)
+    SP = (0.95, 1.0, 0.70, 0.30)          # clump profile: full at the root, soft swell, pointed tip
+    F = (0, -1, 0.35)
     C = [  # (base, control, tip, width, thickness, up)
-        # fringe: six locks curling forward and down, tips staggered, two kicking sideways
-        ((-0.17, -0.05, 1.715), (-0.24, -0.245, 1.685), (-0.26, -0.225, 1.610), 0.16, 0.075, (0, -1, 0.3)),
-        ((-0.10, -0.08, 1.735), (-0.14, -0.275, 1.705), (-0.15, -0.245, 1.620), 0.16, 0.075, (0, -1, 0.3)),
-        ((-0.03, -0.09, 1.745), (-0.04, -0.285, 1.715), (-0.07, -0.255, 1.635), 0.16, 0.075, (0, -1, 0.3)),
-        ((0.04, -0.09, 1.745), (0.06, -0.285, 1.715), (0.05, -0.255, 1.615), 0.16, 0.075, (0, -1, 0.3)),
-        ((0.11, -0.08, 1.735), (0.16, -0.275, 1.705), (0.17, -0.245, 1.625), 0.16, 0.075, (0, -1, 0.3)),
-        ((0.17, -0.05, 1.715), (0.25, -0.235, 1.675), (0.27, -0.205, 1.605), 0.16, 0.075, (0, -1, 0.3)),
-        # sides: spikes flaring out over the temples and ears
-        ((0.20, 0.00, 1.74), (0.31, -0.04, 1.70), (0.31, -0.08, 1.58), 0.15, 0.08, (1, 0, 0.2)),
-        ((-0.20, 0.00, 1.74), (-0.31, -0.04, 1.70), (-0.31, -0.08, 1.58), 0.15, 0.08, (-1, 0, 0.2)),
-        ((0.20, 0.15, 1.70), (0.30, 0.22, 1.62), (0.30, 0.22, 1.47), 0.15, 0.08, (1, 0.6, 0)),
-        ((-0.20, 0.15, 1.70), (-0.30, 0.22, 1.62), (-0.30, 0.22, 1.47), 0.15, 0.08, (-1, 0.6, 0)),
-        # nape: three spikes down and back
-        ((0.10, 0.22, 1.62), (0.14, 0.34, 1.50), (0.15, 0.34, 1.35), 0.15, 0.08, (0.3, 1, 0)),
-        ((-0.10, 0.22, 1.62), (-0.14, 0.34, 1.50), (-0.16, 0.33, 1.35), 0.15, 0.08, (-0.3, 1, 0)),
-        ((0.0, 0.25, 1.64), (0.0, 0.37, 1.52), (0.01, 0.36, 1.33), 0.15, 0.08, (0, 1, 0)),
-        # back of the crown: two spikes sweeping back under the topknot (the bible's full round back of the head)
-        ((0.09, 0.18, 1.72), (0.13, 0.36, 1.71), (0.15, 0.44, 1.62), 0.15, 0.08, (0.2, 1, 0.3)),
-        ((-0.09, 0.18, 1.72), (-0.13, 0.36, 1.71), (-0.16, 0.43, 1.61), 0.15, 0.08, (-0.2, 1, 0.3)),
+        # fringe: two big swept clumps from the part, outer clumps sweeping to the temples, one small centre lock
+        ((-0.03, -0.10, 1.775), (-0.08, -0.285, 1.725), (-0.17, -0.25, 1.600), 0.19, 0.075, F),
+        ((0.04, -0.10, 1.775), (0.10, -0.285, 1.725), (0.19, -0.245, 1.605), 0.18, 0.075, F),
+        ((-0.13, -0.07, 1.765), (-0.25, -0.24, 1.705), (-0.33, -0.17, 1.595), 0.17, 0.075, F),
+        ((0.14, -0.07, 1.765), (0.26, -0.24, 1.705), (0.34, -0.16, 1.600), 0.17, 0.075, F),
+        ((0.00, -0.12, 1.765), (0.01, -0.29, 1.705), (0.035, -0.255, 1.630), 0.14, 0.075, F),
+        # temple locks in front of the ears
+        ((0.20, -0.04, 1.72), (0.30, -0.12, 1.64), (0.295, -0.16, 1.535), 0.13, 0.07, (1, 0, 0.2)),
+        ((-0.20, -0.04, 1.72), (-0.30, -0.12, 1.64), (-0.295, -0.16, 1.535), 0.13, 0.07, (-1, 0, 0.2)),
+        # sides behind the ears
+        ((0.21, 0.13, 1.70), (0.31, 0.21, 1.62), (0.31, 0.21, 1.47), 0.17, 0.085, (1, 0.6, 0)),
+        ((-0.21, 0.13, 1.70), (-0.31, 0.21, 1.62), (-0.31, 0.21, 1.47), 0.17, 0.085, (-1, 0.6, 0)),
+        # nape
+        ((0.10, 0.22, 1.62), (0.15, 0.34, 1.50), (0.16, 0.34, 1.35), 0.17, 0.085, (0.3, 1, 0)),
+        ((-0.10, 0.22, 1.62), (-0.15, 0.34, 1.50), (-0.17, 0.33, 1.35), 0.17, 0.085, (-0.3, 1, 0)),
+        ((0.0, 0.25, 1.64), (0.0, 0.37, 1.52), (0.01, 0.36, 1.33), 0.17, 0.085, (0, 1, 0)),
+        # back of the crown
+        ((0.10, 0.17, 1.74), (0.14, 0.36, 1.71), (0.16, 0.43, 1.60), 0.17, 0.085, (0.2, 1, 0.3)),
+        ((-0.10, 0.17, 1.74), (-0.14, 0.36, 1.71), (-0.17, 0.42, 1.59), 0.17, 0.085, (-0.2, 1, 0.3)),
     ]
     for p0, p1, p2, w, t, up in C:
-        add(BODY, B.clump(p0, p1, p2, w, t, 6, up=up, prof=SP), "hair", H, "hair", grad=0.18)
-    T = "topknot"          # base set 0.08 back of the crown: the spray sweeps back in profile (bible p06)
-    add(BODY, B.sphere((0.10, 0.10, 0.08), 12, 8), "hair", H, T, m=M((0, 0.15, 1.74)))
-    add(BODY, B.torus(0.080, 0.032, 16, 6), "brass", H, T, m=M((0, 0.155, 1.795), (-20, 0, 0)))
-    tuft = [((-0.02, 0.15, 1.830), (-0.05, 0.13, 1.910), (-0.09, 0.15, 1.935), 0.15, 0.085, (0, -1, 0)),
-            ((0.01, 0.15, 1.840), (0.04, 0.12, 1.950), (0.08, 0.11, 1.998), 0.16, 0.09, (0, -1, 0)),
-            ((0.02, 0.15, 1.840), (0.10, 0.13, 1.940), (0.16, 0.14, 1.945), 0.15, 0.085, (0, -1, 0)),
-            ((0.03, 0.15, 1.830), (0.14, 0.16, 1.910), (0.21, 0.18, 1.880), 0.14, 0.08, (0, -1, 0.2)),
-            ((0.00, 0.17, 1.820), (0.04, 0.30, 1.930), (0.07, 0.40, 1.920), 0.15, 0.085, (0, 0, 1)),
-            ((0.00, 0.18, 1.800), (0.00, 0.34, 1.850), (0.00, 0.44, 1.770), 0.14, 0.08, (0, 0, 1))]
+        add(BODY, B.clump(p0, p1, p2, w, t, 7, up=up, prof=SP), "hair", H, "hair", grad=0.30)
+    T = "topknot"
+    add(BODY, B.sphere((0.095, 0.095, 0.075), 12, 8), "hair", H, T, m=M((0, 0.10, 1.775)), grad=0.22)
+    add(BODY, B.torus(0.072, 0.030, 16, 6), "brass", H, T, m=M((0, 0.10, 1.825), (-12, 0, 0)))
+    b = (0.0, 0.10, 1.84)
+    tuft = [  # a tall spiky fan: up-left, up, up-right, out to the right, one back (bible p06 front)
+            ((-0.03, 0.10, 1.84), (-0.10, 0.08, 1.925), (-0.19, 0.10, 1.950), 0.15, 0.075, (0, -1, 0)),
+            ((-0.02, 0.10, 1.85), (-0.05, 0.07, 1.960), (-0.09, 0.06, 1.995), 0.16, 0.08, (0, -1, 0)),
+            ((0.00, 0.10, 1.85), (0.01, 0.07, 1.975), (0.03, 0.06, 2.000), 0.17, 0.085, (0, -1, 0)),
+            ((0.02, 0.10, 1.85), (0.07, 0.08, 1.965), (0.13, 0.08, 1.995), 0.16, 0.08, (0, -1, 0)),
+            ((0.04, 0.10, 1.85), (0.12, 0.10, 1.935), (0.21, 0.12, 1.960), 0.14, 0.075, (0, -1, 0.1)),
+            ((0.05, 0.11, 1.84), (0.16, 0.14, 1.880), (0.27, 0.17, 1.870), 0.12, 0.065, (0, -1, 0.2)),
+            ((0.00, 0.12, 1.84), (0.01, 0.24, 1.930), (0.03, 0.33, 1.900), 0.13, 0.07, (0, 0, 1))]
     for p0, p1, p2, w, t, up in tuft:
-        add(BODY, B.clump(p0, p1, p2, w, t, 6, up=up, prof=SP), "hair", H, T, grad=0.18)
+        add(BODY, B.clump(p0, p1, p2, w, t, 7, up=up, prof=SP), "hair", H, T, grad=0.30)
+
+
+def soften_face_normals(ob, blend=0.85):
+    """v4: anime-face shading normals. The face's corner normals lean toward the direction from a point behind the
+    head, so the whole face falls in the lit band in the bible framings (no shadow band blotching the cheeks), while
+    the silhouette and the sides of the head keep their true normals. Custom normals are written to the FBX."""
+    me = ob.data
+    far = Vector((HEAD_C[0], HEAD_C[1] + 0.40, HEAD_C[2] - 0.02))
+    c = Vector(HEAD_C)
+    g = ob.vertex_groups.get("feat_skin")
+    skin = set()
+    for v in me.vertices:
+        if g and any(e.group == g.index for e in v.groups):
+            p = v.co
+            if p.z > 1.25 and abs(p.x) < 0.25 and p.y < c.y + 0.02 and (p - c).length < 0.32:
+                skin.add(v.index)
+    normals = [n.vector.copy() for n in me.corner_normals]
+    for lp in me.loops:
+        if lp.vertex_index in skin:
+            p = me.vertices[lp.vertex_index].co
+            n = normals[lp.index]
+            fwd = max(0.0, min(1.0, (c.y - p.y) / 0.20))      # full effect on the face front, fading to the sides
+            tgt = ((p - far).normalized() * 0.35 + Vector((0.0, -1.0, 0.30)).normalized()).normalized()
+            normals[lp.index] = n.lerp(tgt, blend * fwd).normalized()
+    me.normals_split_custom_set(normals)
+    return len(skin)
 
 
 # ===================================================================================================== held items
@@ -458,6 +512,7 @@ def main():
         c.objects.unlink(arm)
     coll.objects.link(arm)
     objs = B.finalize(coll, mat)
+    face_verts = soften_face_normals(objs[BODY])
 
     # leave the source scene showing the display pose (the FBX is written in rest pose regardless)
     arm.animation_data_create()
@@ -465,7 +520,7 @@ def main():
     scene.frame_set(DISPLAY_FRAME)
 
     report = {"objects": {}, "bones": len(arm.data.bones), "display_pose": [DISPLAY_ACTION, DISPLAY_FRAME],
-              "idle_attitude_bones": baked}
+              "idle_attitude_bones": baked, "face_normal_verts": face_verts}
     total = 0
     for name, ob in objs.items():
         tris = sum(len(p.vertices) - 2 for p in ob.data.polygons)
