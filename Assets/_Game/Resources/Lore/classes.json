@@ -108,7 +108,7 @@
         {
           "input": "ability",
           "name": "Land Mine",
-          "text": "Lay a mine on your spot. It arms after {cfg:mineArm} s and blows on the first enemy who steps on it for {cfg:mineDamage} damage. Up to {cfg:mineMax} at a time; another recycles the oldest.",
+          "text": "Lay a mine at your feet. It arms after {cfg:mineArm} s and hits the first enemy on it for {cfg:mineDamage}. Up to {cfg:mineMax} at once.",
           "cooldown": "",
           "needsRule": ""
         },
@@ -130,8 +130,8 @@
       "abilities": [
         {
           "input": "ability",
-          "name": "Ladder",
-          "text": "Spend {cfg:ladderCost} biomass on a ladder up a wall of up to {cfg:ladderCells} cells, or {cfg:bridgeCost} on a rope bridge across up to {cfg:bridgeCells} cells of gap or water, toward your aim. Pieces last {cfg:pieceLife} s.",
+          "name": "Ladder and Bridge",
+          "text": "A ladder up a wall costs {cfg:ladderCost} biomass; a rope bridge over a gap or water costs {cfg:bridgeCost}. Pieces last {cfg:pieceLife} s.",
           "cooldown": "",
           "needsRule": ""
         },

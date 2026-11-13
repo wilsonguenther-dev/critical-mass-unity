@@ -354,8 +354,6 @@ namespace CriticalMass.Runtime.Menus
             // integration batch 3: Builder (DG-24) and Healer (DG-40)
             "ladderCost", "Abilities.BuilderPieces.LadderCost", "number",
             "bridgeCost", "Abilities.BuilderPieces.BridgeCost", "number",
-            "ladderCells", "Abilities.BuilderPieces.LadderMaxCells", "number",
-            "bridgeCells", "Abilities.BuilderPieces.BridgeMaxCells", "number",
             "pieceLife", "Abilities.BuilderPieces.LifetimeTicks", "ticksAsSeconds",
             "mendHeal", "Abilities.Healer.MendHeal", "number",
             "mendRange", "Abilities.Healer.MendRange", "number",
