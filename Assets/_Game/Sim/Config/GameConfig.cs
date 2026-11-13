@@ -569,6 +569,8 @@ namespace CriticalMass.Sim.Config
         public double OffHillChaseFactor = 0.5;
         /// <summary>Objective discipline: a hurt bot retreats when an enemy is within this range (Normal 6).</summary>
         public double RetreatRange = 6;
+        /// <summary>Sim-physics lane (appended): the bot steps out of a telegraphed Kaiju claw cone or slam ring (and jumps the slam). Hard only.</summary>
+        public bool DodgeKaiju = false;
 
         public static BotSkillConfig EasyDefaults() => new BotSkillConfig
         {
@@ -579,7 +581,7 @@ namespace CriticalMass.Sim.Config
         public static BotSkillConfig HardDefaults() => new BotSkillConfig
         {
             ThinkPeriodScale = 0.5, AimErrorUnits = 0, TntLeadFraction = 0.6, SwingHesitation = 0, AbilityChance = 1,
-            ShieldCrowd = 1, FocusCarriers = true, CarrierWeight = 0.25, OffHillChaseFactor = 0.25, RetreatRange = 3,
+            ShieldCrowd = 1, FocusCarriers = true, CarrierWeight = 0.25, OffHillChaseFactor = 0.25, RetreatRange = 3, DodgeKaiju = true,
         };
 
         public BotSkillConfig Clone() => (BotSkillConfig)MemberwiseClone();

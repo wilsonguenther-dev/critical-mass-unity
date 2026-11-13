@@ -71,6 +71,7 @@ namespace CriticalMass.Sim.Config
         {
             Pace = pace;
             KaijuClawWindup = T30(c, c.Kaiju.MeleeWindupTicks);
+            if (!c.Physics.Classic) KaijuClawWindup = Floor(c, KaijuClawWindup, c.Physics.KaijuClawMinRealSeconds, pace); // DG-84 / OD-7
             SlamTelegraph = SimSeconds(c, c.Kaiju.SlamTelegraphSeconds);
             bool windup = Phys.On(c, c.Physics.AttackWindup);
             for (int i = 0; i < AttackWindup.Length; i++)

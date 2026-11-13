@@ -26,5 +26,12 @@ namespace CriticalMass.Sim.Core
         public int TargetId;
         /// <summary>Per actor, seconds of remembered threat (browser Float32Array: stores go through JsMath.F32).</summary>
         public double[] Threat;
+        // ---- Sim-physics lane (appended)
+        /// <summary>DG-84: length (ticks) of the claw wind-up in flight (World.Dur.KaijuClawWindup when it started); the view maps the swipe to it.</summary>
+        public int MeleeWindupLen;
+        /// <summary>DG-84: the cone locked at wind-up start: origin and facing (half angle PhysicsConfig.KaijuClawConeDeg / 2, reach MeleeRange + MeleeLeash).</summary>
+        public double ClawX;
+        public double ClawZ;
+        public double ClawFacing;
     }
 }

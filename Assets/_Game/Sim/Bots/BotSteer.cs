@@ -207,6 +207,48 @@ namespace CriticalMass.Sim.Bots
             return (dx * JsMath.Cos(f) + dz * JsMath.Sin(f)) / Math.Sqrt(d2) >= AttackCos - 1e-9;
         }
 
+        /// <summary>
+        /// Sim-physics lane: a telegraphed Kaiju attack covers this bot: move straight away from its origin (claw cone or slam
+        /// ring), drop the swing, and press jump when the slam lands inside the jump's air time. True when it dodged.
+        /// </summary>
+        private static bool DodgeKaiju(World w, int id, InputFrame output)
+        {
+            Kaiju k = w.Kaiju;
+            if (k.State == KaijuState.Egg || k.KoIn > 0 || !Kaiju.KaijuHostileTo(w, id)) return false;
+            GameConfig cfg = w.Config;
+            double ox;
+            double oz;
+            if (k.TelegraphIn > 0 && Phys.On(w, cfg.Physics.SlamShockwave))
+            {
+                ox = k.TelegraphX;
+                oz = k.TelegraphZ;
+                double ddx = w.X[id] - ox;
+                double ddz = w.Z[id] - oz;
+                if (ddx * ddx + ddz * ddz > (cfg.Kaiju.SlamRadius + 0.5) * (cfg.Kaiju.SlamRadius + 0.5)) return false;
+                int left = (int)Math.Ceiling(k.TelegraphIn * cfg.SimHz - 1e-9);
+                if (Phys.On(w, cfg.Physics.AirDodgesSlam) && w.Actors[id].AirLen == 0 && left >= 1 && left <= Jump.AirTicks(cfg) - 2) output.Jump = true;
+            }
+            else if (k.MeleeWindupIn > 0 && Phys.On(w, cfg.Physics.KaijuClawCone) && Kaiju.InClawCone(w, id))
+            {
+                ox = k.ClawX;
+                oz = k.ClawZ;
+            }
+            else return false;
+            double dx = w.X[id] - ox;
+            double dz = w.Z[id] - oz;
+            double d = Math.Sqrt(dx * dx + dz * dz);
+            if (d < 1e-6)
+            {
+                dx = JsMath.Cos(id * 2.39996);
+                dz = JsMath.Sin(id * 2.39996);
+                d = 1;
+            }
+            output.MoveX = dx / d;
+            output.MoveZ = dz / d;
+            output.Attack = false;
+            return true;
+        }
+
         /// <summary>Steer bot `id` (state in actor.AiState and st) into `output`.</summary>
         public static void SteerBot(World w, BotsState st, int id, InputFrame output)
         {
@@ -558,6 +600,9 @@ namespace CriticalMass.Sim.Bots
 
             // DG-21 hesitation: an Easy bot holds its swing in SwingHesitation of 1/3-second windows (never for Normal).
             if (output.Attack && BotSkill.HoldsSwing(w, id)) output.Attack = false;
+            // Sim-physics lane (DG-84 / DG-85): a Hard bot steps out of a telegraphed claw cone or slam ring, and jumps a slam.
+            BotSkillConfig dsk = BotSkill.Profile(w, id);
+            if (dsk != null && dsk.DodgeKaiju && Phys.On(w, true) && DodgeKaiju(w, id, output)) st.WantMove[id] = 1;
 
             // Ability press decided at think time.
             if (st.AbilityReq[id] == 1)

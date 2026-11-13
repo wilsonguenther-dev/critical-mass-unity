@@ -15,7 +15,7 @@ namespace CriticalMass.Sim.Tests
     [TestFixture]
     public sealed class KaijuHatchTests
     {
-        private static readonly GameConfig Cfg = GameConfig.CreateBrowser5v5();
+        private static readonly GameConfig Cfg = SimPhysicsTests.ClassicBrowser();
         private static readonly double Hz = Cfg.SimHz;
         private static readonly KaijuConfig K = Cfg.Kaiju;
         private static readonly KaijuFeedConfig Feed = Cfg.KaijuFeed;
@@ -29,7 +29,7 @@ namespace CriticalMass.Sim.Tests
                 TeamSize = teamSize,
                 HumanTeam = TeamId.Azure,
                 HumanClass = ClassId.Warrior,
-                Config = GameConfig.CreateBrowser5v5(),
+                Config = SimPhysicsTests.ClassicBrowser(),
             };
         }
 

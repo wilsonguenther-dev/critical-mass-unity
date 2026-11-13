@@ -183,7 +183,7 @@ namespace CriticalMass.Sim.Tests
                 foreach (FieldInfo f in t.GetFields()) if (f.Name.EndsWith("Ticks") && f.FieldType == typeof(double)) names.Add(f.Name);
             }
             Assert.Greater(names.Count, 10);
-            var rx = new Regex(@"\.(" + string.Join("|", names) + @")\b");
+            var rx = new Regex(@"\.(" + string.Join("|", names) + @")\b(?!\s*\()"); // a field read, not a method call (Jump.AirTicks(c))
             var bad = new List<string>();
             foreach (string file in Directory.GetFiles(SimDir(), "*.cs", SearchOption.AllDirectories))
             {
@@ -228,7 +228,7 @@ namespace CriticalMass.Sim.Tests
         }
 
         // The checked-in on-screen seconds (pace 2) of the windows later items change.
-        private const double TableClaw = 0.183;
+        private const double TableClaw = 0.45;
         private const double TableSlam = 0.6;
         private const double TableWarriorWindup = 0.12;
         private const double TableFarmerWindup = 0.10;
@@ -572,6 +572,93 @@ namespace CriticalMass.Sim.Tests
             Assert.IsTrue(SegmentClear.Clear(w.Map, cx - 2.5, cz + 0.5, cx - 1.5, cz + 0.5));
             Assert.IsTrue(SegmentClear.Blocks(Cell.Barricade));
             Assert.IsFalse(SegmentClear.Blocks(Cell.Void));
+        }
+        // ------------------------------------------------------------------ DG-84 Kaiju claw you can dodge
+
+        /// <summary>Hatch now, make the Kaiju berserk (hostile to all) on the hill with no slam or new swing of its own.</summary>
+        internal static Kaiju HatchedKaiju(World w)
+        {
+            w.ForceHatch = true;
+            Idle(w);
+            SimStep.Step(w);
+            Assert.IsTrue(w.Match.Hatched);
+            Kaiju k = w.Kaiju;
+            k.State = KaijuState.Berserk;
+            k.X = HillX;
+            k.Z = HillZ;
+            k.PrevX = HillX;
+            k.PrevZ = HillZ;
+            k.SlamCd = 1000;
+            k.MeleeCd = 1000;
+            return k;
+        }
+
+        private static void LockClaw(World w, double facing)
+        {
+            Kaiju k = w.Kaiju;
+            k.MeleeWindupIn = w.Dur.KaijuClawWindup;
+            k.MeleeWindupLen = w.Dur.KaijuClawWindup;
+            k.ClawX = k.X;
+            k.ClawZ = k.Z;
+            k.ClawFacing = facing;
+            k.Facing = facing;
+            k.MeleeTargetId = 5;
+        }
+
+        [Test]
+        public void DG84ATargetThatLeavesTheConeDuringTheWindupTakesNothingASecondHostileInTheConeIsHit()
+        {
+            World w = Make();
+            Kaiju k = HatchedKaiju(w);
+            ParkOthers(w, 5, 6);
+            Place(w, 5, HillX + 2, HillZ);
+            Place(w, 6, HillX + 1.6, HillZ + 0.8);
+            LockClaw(w, 0);
+            double hp5 = w.Actors[5].Hp, hp6 = w.Actors[6].Hp;
+            int windup = k.MeleeWindupIn;
+            for (int t = 0; t < windup + 1; t++)
+            {
+                Idle(w);
+                if (t < windup - 2) Place(w, 5, HillX - 2, HillZ); // the locked target circles behind the Kaiju
+                SimStep.Step(w);
+            }
+            Assert.AreEqual(hp5, w.Actors[5].Hp, "behind the Kaiju: out of the shown cone");
+            Assert.Less(w.Actors[6].Hp, hp6, "the second hostile in the cone is hit");
+            Assert.Greater(w.X[6], HillX + 1.6, "and pushed back");
+        }
+
+        [Test]
+        public void DG84ClawWindupIsAtLeast045SecondsOnScreenAtTheDefaultPaceAndAtPace1()
+        {
+            GameConfig c = GameConfig.CreateDefault();
+            World w = World.CreateWorld(new WorldOptions { Seed = 1, TeamSize = 16, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = c });
+            Assert.GreaterOrEqual(Durations.OnScreen(c, w.Dur.KaijuClawWindup, w.Dur.Pace), 0.45 - 1e-9);
+            World p1 = Make(null, pace: 1);
+            Assert.GreaterOrEqual(Durations.OnScreen(p1.Config, p1.Dur.KaijuClawWindup, 1), 0.45 - 1e-9);
+            World classic = Make(cc => cc.Physics.Classic = true, pace: 2);
+            Assert.AreEqual(11, classic.Dur.KaijuClawWindup, "Classic keeps the browser's 11 ticks");
+        }
+
+        [Test]
+        public void DG84TheWindupEventCarriesTheCone()
+        {
+            World w = Make();
+            Kaiju k = HatchedKaiju(w);
+            ParkOthers(w, 5);
+            Place(w, 5, HillX + 2, HillZ);
+            k.MeleeCd = 0;
+            k.TargetId = 5;
+            w.KaijuNav.RetargetIn = 100;
+            int head = w.EventHead;
+            Idle(w);
+            SimStep.Step(w);
+            SimEvent e = null;
+            for (int i = head; i < w.EventHead; i++) if (w.Events[i % World.EventCapacity].Type == SimEventType.KaijuMeleeWindup) e = w.Events[i % World.EventCapacity];
+            Assert.IsNotNull(e, "the claw started");
+            Assert.AreEqual(w.Dur.KaijuClawWindup, e.Windup);
+            Assert.AreEqual(w.Config.Kaiju.MeleeRange + Kaiju.MeleeLeash, e.Radius, 1e-9);
+            Assert.AreEqual(1, e.DirX, 1e-6);
+            Assert.AreEqual(k.X, k.ClawX);
         }
     }
 }

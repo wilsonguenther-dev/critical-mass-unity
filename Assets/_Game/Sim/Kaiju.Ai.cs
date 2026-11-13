@@ -44,20 +44,68 @@ namespace CriticalMass.Sim.Core
             World.PushEvent(w, SimEventType.KaijuSlam, -1, hits, k.TelegraphX, k.TelegraphZ, kc.SlamRadius);
         }
 
-        /// <summary>CM-26: the wound-up swing lands on a still-valid target within meleeRange + MeleeLeash, else a whiff.</summary>
+        /// <summary>
+        /// CM-26: the wound-up swing lands on a still-valid target within meleeRange + MeleeLeash, else a whiff. DG-84 (S7,
+        /// OD-7, KaijuClawCone): it hits the cone locked at wind-up start instead (every hostile within reach and the cone with
+        /// line of sight, the locked target or not), throws them back (KaijuClawKnock) and stuns them (KaijuStunSeconds).
+        /// </summary>
         private static void ResolveMelee(World w)
         {
             KaijuConfig kc = w.Config.Kaiju;
             Kaiju k = w.Kaiju;
             int t = k.MeleeTargetId;
             k.MeleeTargetId = -1;
+            if (Phys.On(w, w.Config.Physics.KaijuClawCone))
+            {
+                ResolveClawCone(w);
+                if (t >= 0 && !w.Actors[t].Alive && k.TargetId == t) k.TargetId = -1;
+                return;
+            }
             if (t < 0 || !KaijuCanTarget(w, t)) return;
             double dx = w.X[t] - k.X;
             double dz = w.Z[t] - k.Z;
             double reach = kc.MeleeRange + MeleeLeash;
             if (dx * dx + dz * dz > reach * reach) return;
-            Damage.ApplyDamage(w, t, kc.MeleeDamage, Damage.KaijuSource, k.X, k.Z);
+            if (Phys.On(w, w.Config.Physics.Knockback))
+            {
+                Knock.Dir(w, t, k.X, k.Z, JsMath.Cos(k.Facing), JsMath.Sin(k.Facing), out double kx, out double kz);
+                Damage.ApplyHit(w, t, kc.MeleeDamage, Damage.KaijuSource, k.X, k.Z, DamageCause.KaijuMelee, kx, kz, w.Config.Physics.KaijuClawKnock, w.Dur.KaijuStun);
+            }
+            else Damage.ApplyDamage(w, t, kc.MeleeDamage, Damage.KaijuSource, k.X, k.Z);
             if (!w.Actors[t].Alive && k.TargetId == t) k.TargetId = -1;
+        }
+
+        /// <summary>DG-84: true when actor id stands inside the locked claw cone (reach and angle).</summary>
+        public static bool InClawCone(World w, int id)
+        {
+            Kaiju k = w.Kaiju;
+            double reach = w.Config.Kaiju.MeleeRange + MeleeLeash;
+            double dx = w.X[id] - k.ClawX;
+            double dz = w.Z[id] - k.ClawZ;
+            double d2 = dx * dx + dz * dz;
+            if (d2 > reach * reach) return false;
+            if (d2 < 1e-12) return true;
+            double cosHalf = JsMath.Cos(w.Config.Physics.KaijuClawConeDeg / 2 * Math.PI / 180);
+            return (dx * JsMath.Cos(k.ClawFacing) + dz * JsMath.Sin(k.ClawFacing)) / Math.Sqrt(d2) >= cosHalf - 1e-9;
+        }
+
+        private static void ResolveClawCone(World w)
+        {
+            KaijuConfig kc = w.Config.Kaiju;
+            PhysicsConfig p = w.Config.Physics;
+            Kaiju k = w.Kaiju;
+            bool walls = Phys.On(w, p.WallsBlockHits);
+            bool knock = Phys.On(w, p.Knockback);
+            double fx = JsMath.Cos(k.ClawFacing);
+            double fz = JsMath.Sin(k.ClawFacing);
+            for (int id = 0; id < w.ActorCount; id++)
+            {
+                if (!w.Actors[id].Alive || !KaijuHostileTo(w, id) || !InClawCone(w, id)) continue;
+                if (walls && !SegmentClear.Clear(w.Map, k.ClawX, k.ClawZ, w.X[id], w.Z[id])) continue;
+                Knock.Dir(w, id, k.ClawX, k.ClawZ, fx, fz, out double dx, out double dz);
+                Damage.ApplyHit(w, id, kc.MeleeDamage, Damage.KaijuSource, k.ClawX, k.ClawZ, DamageCause.KaijuMelee, dx, dz,
+                    knock ? p.KaijuClawKnock : 0, knock ? w.Dur.KaijuStun : 0);
+            }
         }
 
         /// <summary>Push the Kaiju's grid circle out of every non-walkable cell it overlaps (out of the map counts as blocked).</summary>
@@ -328,9 +376,17 @@ namespace CriticalMass.Sim.Core
                 {
                     k.Facing = JsMath.Atan2(dz, dx);
                     k.MeleeWindupIn = w.Dur.KaijuClawWindup;
+                    k.MeleeWindupLen = w.Dur.KaijuClawWindup;
                     k.MeleeTargetId = t;
                     k.MeleeCd = kc.MeleeCooldown;
-                    World.PushEvent(w, SimEventType.KaijuMeleeWindup, t, -1, w.X[t], w.Z[t], w.Dur.KaijuClawWindup);
+                    k.ClawX = k.X;
+                    k.ClawZ = k.Z;
+                    k.ClawFacing = k.Facing;
+                    // DG-84: the event carries the cone (Radius = reach, DirX / DirZ = facing, Windup = ticks; angle = KaijuClawConeDeg).
+                    if (Phys.On(w, true))
+                        World.PushEvent(w, SimEventType.KaijuMeleeWindup, t, -1, w.X[t], w.Z[t], w.Dur.KaijuClawWindup, null, DamageCause.None,
+                            kc.MeleeRange + MeleeLeash, JsMath.Cos(k.Facing), JsMath.Sin(k.Facing), 0, 0, w.Dur.KaijuClawWindup, 0);
+                    else World.PushEvent(w, SimEventType.KaijuMeleeWindup, t, -1, w.X[t], w.Z[t], w.Dur.KaijuClawWindup);
                 }
             }
         }
