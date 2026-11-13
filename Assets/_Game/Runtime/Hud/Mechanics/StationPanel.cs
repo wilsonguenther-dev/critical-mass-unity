@@ -8,6 +8,7 @@ using CriticalMass.Runtime.Input;
 using CriticalMass.Runtime.Menu;
 using CriticalMass.Runtime.View.Effects;
 using CriticalMass.Runtime.View.Mechanics;
+using CriticalMass.Sim.Config;
 using CriticalMass.Sim.Core;
 using UnityEngine;
 using UnityEngine.InputSystem;

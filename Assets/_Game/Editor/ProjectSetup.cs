@@ -61,6 +61,9 @@ namespace CriticalMass.Editor
             }
         }
 
+        /// <summary>The view's compile switches for the merged sim lanes (PR #50 / #59: physics fields, mechanics depth).</summary>
+        public static readonly string[] SimDefines = { "CM_SIM_PHYSICS", "CM_SIM_MECHANICS" };
+
         static void ApplyPlayerSettings()
         {
             var standalone = NamedBuildTarget.Standalone;
@@ -91,6 +94,12 @@ namespace CriticalMass.Editor
             PlayerSettings.SetApiCompatibilityLevel(standalone, ApiCompatibilityLevel.NET_Standard);
             PlayerSettings.SetScriptingBackend(standalone, ScriptingImplementation.Mono2x);
             PlayerSettings.colorSpace = ColorSpace.Linear;
+            // Integration batch 4: the merged sim (#61) carries the physics and mechanics-depth fields; the view reads them
+            // only behind these two defines (MechPhysics, DepthRead). Kept in order, added once, other symbols untouched.
+            var defines = PlayerSettings.GetScriptingDefineSymbols(standalone).Split(';').Where(d => d.Length > 0).ToList();
+            foreach (string d in SimDefines) if (!defines.Contains(d)) defines.Add(d);
+            string joined = string.Join(";", defines);
+            if (joined != PlayerSettings.GetScriptingDefineSymbols(standalone)) PlayerSettings.SetScriptingDefineSymbols(standalone, joined);
 
             // Active Input Handling: 0 = Input Manager (old), 1 = Input System (new), 2 = both.
             var playerSettings = AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/ProjectSettings.asset")

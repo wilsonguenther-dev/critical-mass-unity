@@ -1183,6 +1183,20 @@ namespace CriticalMass.Runtime.View.Mechanics
         /// <summary>A name, else the fallback (class word).</summary>
         public static string OrFallback(int id, string fallback) => Name(id) ?? fallback;
 
+        /// <summary>
+        /// Integration batch 4: the name actor id WILL have in a match created on seed with cfg (the READY screen, before the
+        /// world exists). Same table as the match (BotNames.NameIndex(seed, id)), upper case; null with the depth rules off.
+        /// </summary>
+        public static string Preview(GameConfig cfg, int seed, int id)
+        {
+#if CM_SIM_MECHANICS
+            if (cfg == null || cfg.Depth == null || cfg.Depth.Classic || id < 0) return null;
+            return BotNames.Pool[BotNames.NameIndex(seed, id)].ToUpperInvariant();
+#else
+            return null;
+#endif
+        }
+
         /// <summary>The scoreboard's first cell: "YOU" for the local player, "THORN  BRAWLER" for a named bot, else the class word.</summary>
         public static string RowLabel(int id, bool own, string you, string classWord)
         {

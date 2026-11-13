@@ -25,6 +25,8 @@ namespace CriticalMass.Runtime.Onboarding
         Dig,
         /// <summary>A gap cell within Param of actor 0 became walkable since the step's start (needs dig and place).</summary>
         Place,
+        /// <summary>The full map is open (asked through TrialFeatures.MapOpenProbe; needs the HUD's interact layer).</summary>
+        OpenMap,
     }
 
     /// <summary>Where a step's world arrow points.</summary>
@@ -56,6 +58,8 @@ namespace CriticalMass.Runtime.Onboarding
         Jump,
         /// <summary>CM-30 dig and place (DG-09, not yet built).</summary>
         Terraform,
+        /// <summary>The full map (the HUD's interact layer sets TrialFeatures.MapOpenProbe).</summary>
+        Map,
     }
 
     /// <summary>One step of the guided match. Plain data: the runner and the checks interpret it.</summary>

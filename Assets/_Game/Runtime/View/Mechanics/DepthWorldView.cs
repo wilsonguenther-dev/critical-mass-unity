@@ -2,6 +2,7 @@ using System;
 using CriticalMass.Runtime.Game;
 using CriticalMass.Runtime.Hud.Style;
 using CriticalMass.Runtime.View.Effects;
+using CriticalMass.Sim.Config;
 using CriticalMass.Sim.Core;
 using UnityEngine;
 using UnityEngine.Rendering;

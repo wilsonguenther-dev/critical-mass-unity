@@ -116,6 +116,9 @@ namespace CriticalMass.Runtime.Menus
             if (n > MaxRows) n = MaxRows;
             _rowsPerSide = n;
             bool watching = c.Mode == MatchMode.Spectate;
+            // Integration batch 4: the seed is fixed here (0 = a new one) so the rows show the bots' real in-match names
+            // (DepthNames.Preview reads the sim's name table for that seed); the match then starts on the same seed.
+            if (launch.Seed == 0) launch.Seed = GameFlow.NewSeed();
 
             HudText.Set(_title, launch.Rematch ? "REMATCH READY" : watching ? "MATCH READY TO WATCH" : "MATCH READY");
             HudText.Set(_sub, (c.Mode == MatchMode.Custom ? "CUSTOM MATCH" : info.Title) + "   ·   " + PlayModes.MapName + "   ·   " +
@@ -148,7 +151,7 @@ namespace CriticalMass.Runtime.Menus
                     ir.anchoredPosition = new Vector2(h * 0.5f, -h * 0.5f);
                     _icons[side, i].Set(_iconNames[side, i], _tier);
                     bool human = side == 0 && i == 0;
-                    string name = human && !watching ? PlayerName() : Callsigns.ForSlot(team, i).ToUpperInvariant();
+                    string name = human && !watching ? PlayerName() : (View.Mechanics.DepthNames.Preview(_cfg, launch.Seed, side * n + i) ?? Callsigns.ForSlot(team, i).ToUpperInvariant());
                     bool big = h >= 44f;
                     SetRowText(_names[side, i], name, h, big ? 28 : 22);
                     SetRowText(_classes[side, i], FlowWords.ClassName(cls), h, big ? 22 : 18);

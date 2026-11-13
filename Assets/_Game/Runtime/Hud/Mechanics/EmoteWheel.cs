@@ -9,6 +9,7 @@ using CriticalMass.Runtime.View.Mechanics;
 using CriticalMass.Sim.Core;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.LowLevel;
 using UnityEngine.UI;
 
 namespace CriticalMass.Runtime.Hud.Mechanics

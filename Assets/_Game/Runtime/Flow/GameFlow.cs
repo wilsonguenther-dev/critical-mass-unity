@@ -84,6 +84,9 @@ namespace CriticalMass.Runtime.Flow
             HumanClass = Class,
             Config = cfg,
             BotDifficulty = Backdrop ? CriticalMass.Sim.Core.BotDifficulty.Normal : BotDifficulty,
+            // Integration batch 4 (#61): the speed choice sets BOTH the driver's time scale (SimDriverBehaviour reads
+            // MatchRequest.Pace) and the sim's pace, so real-second windows (Durations.Floor) match the clock on screen.
+            Pace = Pace > 0 ? Pace : 0,
         };
 
         public static MatchRequest From(MatchSetupChoice s, int seed) => new MatchRequest

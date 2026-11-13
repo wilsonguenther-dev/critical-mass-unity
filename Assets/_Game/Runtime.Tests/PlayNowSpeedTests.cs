@@ -93,6 +93,23 @@ namespace CriticalMass.Runtime.Tests
             WorldOptions o = r.ToWorldOptions(GameConfig.CreateDefault());
             Assert.AreEqual(ClassId.Miner, o.HumanClass);
             Assert.AreEqual(TeamId.Crimson, o.HumanTeam);
+            Assert.AreEqual(MatchSpeed.FastPace, o.Pace, 1e-9, "the speed choice reaches the sim pace too (#61 WorldOptions.Pace)");
+        }
+
+        [Test]
+        public void EverySpeedChoiceSetsBothTheTimeScaleAndTheSimPace()
+        {
+            foreach (MatchSpeedChoice c in MatchSpeed.Order)
+            {
+                var setup = MatchSetupChoice.Default;
+                setup.Pace = MatchSpeed.PaceOf(c);
+                MatchRequest r = MatchRequest.From(setup, 7);
+                WorldOptions o = r.ToWorldOptions(GameConfig.CreateDefault());
+                Assert.AreEqual(MatchSpeed.PaceOf(c), r.Pace, 1e-9, c + ": driver time scale (MatchRequest.Pace)");
+                Assert.AreEqual(MatchSpeed.PaceOf(c), o.Pace, 1e-9, c + ": WorldOptions.Pace");
+                World w = World.CreateWorld(o);
+                Assert.AreEqual(MatchSpeed.PaceOf(c), w.Dur.Pace, 1e-9, c + ": the world's durations use the same pace");
+            }
         }
 
         [Test]

@@ -8,6 +8,7 @@ using CriticalMass.Runtime.Input;
 using CriticalMass.Runtime.Menu;
 using CriticalMass.Runtime.View.Effects;
 using CriticalMass.Runtime.View.Mechanics;
+using CriticalMass.Sim.Config;
 using CriticalMass.Sim.Core;
 using UnityEngine;
 using UnityEngine.UI;
@@ -132,14 +133,14 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             DepthOut.Prompt -= _onPrompt;
             ControlBindings.BindingsChanged -= MarkGlyphs;
             ControlBindings.ActiveDeviceChanged -= OnDevice;
-            if (PingWords.LineOverride == (Func<Ping, string>)PingLine) PingWords.LineOverride = null;
+            if (PingWords.LineOverride == (Func<CriticalMass.Runtime.Hud.Interact.Ping, string>)PingLine) PingWords.LineOverride = null;
         }
 
         void MarkGlyphs() => _glyphDirty = true;
         void OnDevice(ControlDevice d) => _glyphDirty = true;
 
         /// <summary>The ping feed's line for a call by a teammate or a bot ("Brook: Help!"); null keeps "You: ...".</summary>
-        string PingLine(Ping p)
+        string PingLine(CriticalMass.Runtime.Hud.Interact.Ping p)
         {
             World w = _driver != null ? _driver.World : null;
             if (w == null || p.Owner == 0 || p.Owner < 0 || p.Owner >= w.ActorCount) return null;
