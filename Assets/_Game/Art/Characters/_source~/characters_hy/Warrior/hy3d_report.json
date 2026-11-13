@@ -38,13 +38,13 @@
  "landmarks_generated": {
   "H": 2.001,
   "crotch": 0.432,
-  "legx": 0.212,
-  "neck": 1.716,
-  "neck_w": 0.354
+  "legx": 0.184,
+  "neck": 1.496,
+  "neck_w": 0.652
  },
  "head_region": {
-  "neck_z": 1.716,
-  "radius": 0.227
+  "neck_z": 1.496,
+  "radius": 0.404
  },
  "pose_fit_deg": {
   "upperarm.l": 32.1,
@@ -55,29 +55,21 @@
  "decimate": {
   "Warrior_HY_Hero_Body": {
    "start": 500000,
-   "region_frac_before": 0.058,
-   "stage1_tris": 97598,
-   "lock_invert": false,
-   "lock_region_tris": {
-    "False": 5477,
-    "True": 6
-   },
-   "region_tris": 5477,
-   "region_share": 0.288,
+   "region_frac_before": 0.114,
+   "stageA_tris": 448594,
+   "stageA_region": 6096,
+   "region_tris": 6104,
+   "region_share": 0.321,
    "tris": 19000
   },
   "Warrior_HY_LOD0_Body": {
    "start": 19000,
-   "region_frac_before": 0.288,
-   "stage1_tris": 4106,
-   "lock_invert": false,
-   "lock_region_tris": {
-    "False": 298,
-    "True": 0
-   },
-   "region_tris": 298,
-   "region_share": 0.081,
-   "tris": 3700
+   "region_frac_before": 0.323,
+   "stageA_tris": 14054,
+   "stageA_region": 1268,
+   "region_tris": 1270,
+   "region_share": 0.343,
+   "tris": 3698
   },
   "Warrior_HY_LOD1_Body": {
    "start": 19000,
@@ -85,28 +77,28 @@
   }
  },
  "colour_remap": {
-  "faces_seen_on_sheet": 7402,
+  "faces_seen_on_sheet": 7349,
   "faces": 19000,
   "hair_top_before": "#2E2027",
-  "hair_top_after": "#47343A",
+  "hair_top_after": "#48343A",
   "hair_top_sheet": "#3F2E34",
   "clusters": [
    {
     "cluster": 0,
-    "faces": 6697,
-    "seen": 2133,
-    "generated": "#2E2027",
-    "sheet": "#402E34",
+    "faces": 1328,
+    "seen": 451,
+    "generated": "#362620",
+    "sheet": "#4E3A34",
     "shift_lab": [
-     7.1,
-     0.9,
-     1.8
+     9.4,
+     1.3,
+     0.1
     ]
    },
    {
     "cluster": 1,
-    "faces": 512,
-    "seen": 257,
+    "faces": 528,
+    "seen": 268,
     "generated": "#F5E7D3",
     "sheet": "#E6D4C0",
     "shift_lab": [
@@ -117,206 +109,207 @@
    },
    {
     "cluster": 2,
-    "faces": 137,
-    "seen": 25,
-    "generated": "#906658"
+    "faces": 676,
+    "seen": 455,
+    "generated": "#268A9F",
+    "sheet": "#378392",
+    "shift_lab": [
+     -2.5,
+     2.6,
+     4.3
+    ]
    },
    {
     "cluster": 3,
-    "faces": 516,
-    "seen": 70,
-    "generated": "#544847",
-    "sheet": "#786661",
-    "shift_lab": [
-     11.9,
-     1.5,
-     3.1
-    ]
-   },
-   {
-    "cluster": 4,
-    "faces": 294,
-    "seen": 115,
-    "generated": "#948886",
-    "sheet": "#84756E",
-    "shift_lab": [
-     -7.7,
-     0.8,
-     2.5
-    ]
-   },
-   {
-    "cluster": 5,
-    "faces": 1627,
-    "seen": 812,
+    "faces": 1717,
+    "seen": 849,
     "generated": "#2B2D41",
     "sheet": "#3D3E51",
     "shift_lab": [
      7.4,
      -0.6,
-     1.5
+     1.7
+    ]
+   },
+   {
+    "cluster": 4,
+    "faces": 744,
+    "seen": 455,
+    "generated": "#A27A51",
+    "sheet": "#835E43",
+    "shift_lab": [
+     -10.8,
+     1.2,
+     -7.1
+    ]
+   },
+   {
+    "cluster": 5,
+    "faces": 6232,
+    "seen": 1916,
+    "generated": "#2E2028",
+    "sheet": "#443237",
+    "shift_lab": [
+     8.8,
+     1.0,
+     2.3
     ]
    },
    {
     "cluster": 6,
-    "faces": 756,
-    "seen": 298,
-    "generated": "#4C2F22",
-    "sheet": "#694E41",
+    "faces": 491,
+    "seen": 218,
+    "generated": "#796C6A",
+    "sheet": "#4C3C38",
     "shift_lab": [
-     13.2,
-     -2.6,
-     -2.3
+     -15.0,
+     1.5,
+     1.8
     ]
    },
    {
     "cluster": 7,
-    "faces": 246,
-    "seen": 55,
-    "generated": "#24687C"
+    "faces": 172,
+    "seen": 31,
+    "generated": "#334A57"
    },
    {
     "cluster": 8,
-    "faces": 829,
-    "seen": 477,
-    "generated": "#A59A97",
-    "sheet": "#94837D",
+    "faces": 337,
+    "seen": 97,
+    "generated": "#B8785F",
+    "sheet": "#D18E71",
     "shift_lab": [
-     -8.0,
-     1.8,
-     2.8
+     7.1,
+     -0.4,
+     2.4
     ]
    },
    {
     "cluster": 9,
-    "faces": 1131,
-    "seen": 376,
-    "generated": "#F5AA8D",
-    "sheet": "#ECA785",
+    "faces": 1212,
+    "seen": 402,
+    "generated": "#F5AA8C",
+    "sheet": "#E9A584",
     "shift_lab": [
-     -2.2,
-     -2.2,
+     -2.9,
+     -2.1,
      1.2
     ]
    },
    {
     "cluster": 10,
-    "faces": 472,
-    "seen": 208,
-    "generated": "#796C69",
-    "sheet": "#4C3C39",
+    "faces": 820,
+    "seen": 484,
+    "generated": "#A49997",
+    "sheet": "#95847E",
     "shift_lab": [
-     -15.0,
-     1.5,
-     1.5
+     -7.6,
+     1.7,
+     2.8
     ]
    },
    {
     "cluster": 11,
-    "faces": 750,
-    "seen": 441,
-    "generated": "#A27A51",
-    "sheet": "#876246",
-    "shift_lab": [
-     -9.3,
-     1.2,
-     -7.0
-    ]
+    "faces": 81,
+    "seen": 26,
+    "generated": "#64999E"
    },
    {
     "cluster": 12,
-    "faces": 203,
-    "seen": 37,
-    "generated": "#2E5161"
-   },
-   {
-    "cluster": 13,
-    "faces": 461,
-    "seen": 236,
-    "generated": "#734F36",
-    "sheet": "#7D5B44",
+    "faces": 1931,
+    "seen": 855,
+    "generated": "#5A3827",
+    "sheet": "#6D4C3D",
     "shift_lab": [
-     4.6,
-     -1.0,
+     8.2,
+     -1.6,
      -2.8
     ]
    },
    {
-    "cluster": 14,
-    "faces": 475,
+    "cluster": 13,
+    "faces": 492,
     "seen": 94,
     "generated": "#221B1B",
-    "sheet": "#4F3E38",
+    "sheet": "#4C3B37",
     "shift_lab": [
      15.0,
-     3.6,
-     5.2
+     3.7,
+     4.8
+    ]
+   },
+   {
+    "cluster": 14,
+    "faces": 562,
+    "seen": 74,
+    "generated": "#554846",
+    "sheet": "#7C6662",
+    "shift_lab": [
+     12.4,
+     3.0,
+     2.8
     ]
    },
    {
     "cluster": 15,
-    "faces": 680,
-    "seen": 464,
-    "generated": "#278B9F",
-    "sheet": "#388392",
+    "faces": 295,
+    "seen": 109,
+    "generated": "#948885",
+    "sheet": "#84746E",
     "shift_lab": [
-     -2.5,
-     2.6,
-     4.5
+     -7.6,
+     0.7,
+     2.5
     ]
    },
    {
     "cluster": 16,
-    "faces": 1178,
-    "seen": 406,
-    "generated": "#342520",
-    "sheet": "#4D3A35",
+    "faces": 556,
+    "seen": 271,
+    "generated": "#714C36",
+    "sheet": "#7A5843",
     "shift_lab": [
-     9.5,
-     1.3,
-     0.2
+     4.5,
+     -1.2,
+     -3.0
     ]
    },
    {
     "cluster": 17,
-    "faces": 235,
-    "seen": 38,
-    "generated": "#B6735A"
+    "faces": 284,
+    "seen": 58,
+    "generated": "#256478"
    },
    {
     "cluster": 18,
-    "faces": 392,
-    "seen": 203,
-    "generated": "#8D6544",
-    "sheet": "#80604B",
-    "shift_lab": [
-     -2.2,
-     -1.8,
-     -9.1
-    ]
+    "faces": 98,
+    "seen": 25,
+    "generated": "#BDB1A6"
    },
    {
     "cluster": 19,
-    "faces": 1409,
-    "seen": 657,
-    "generated": "#5E3B29",
-    "sheet": "#704B39",
+    "faces": 444,
+    "seen": 211,
+    "generated": "#8B6343",
+    "sheet": "#83634D",
     "shift_lab": [
-     6.9,
-     -0.6,
-     -1.0
+     0.1,
+     -1.9,
+     -7.8
     ]
    }
   ]
  },
  "mask_faces": {
   "Warrior_HY_Hero_Body": {
-   "0.0": 18015,
-   "1.0": 985
+   "0.0": 17980,
+   "1.0": 1020
   },
   "Warrior_HY_Hero_Shield": {
-   "0.0": 1446,
-   "0.75": 54
+   "0.0": 1444,
+   "0.75": 54,
+   "1.0": 2
   },
   "Warrior_HY_LOD0_Shield": {
    "0.0": 425,
@@ -361,7 +354,7 @@
   }
  },
  "shadow": {
-  "hull_tris": 1448,
+  "hull_tris": 1300,
   "tris": 780
  },
  "tris": {
@@ -372,10 +365,10 @@
    "total": 21500
   },
   "LOD0": {
-   "Warrior_HY_LOD0_Body": 3700,
+   "Warrior_HY_LOD0_Body": 3698,
    "Warrior_HY_LOD0_Shield": 448,
    "Warrior_HY_LOD0_Cleaver": 300,
-   "total": 4448
+   "total": 4446
   },
   "LOD1": {
    "Warrior_HY_LOD1_Body": 1150,
@@ -390,318 +383,318 @@
  "deform": {
   "Idle@13": {
    "Hero": {
-    "edges": 28487,
-    "over_1.5": 96,
-    "over_2": 24,
-    "max": 4.03,
-    "p99": 1.268,
+    "edges": 28499,
+    "over_1.5": 98,
+    "over_2": 23,
+    "max": 3.86,
+    "p99": 1.261,
     "bad_z_hist": [
-     2,
-     19,
-     8,
-     35,
-     29,
-     3
+     5,
+     13,
+     10,
+     30,
+     28,
+     12
     ],
-    "vs_generated_over_1.5": 123,
-    "vs_generated_over_2": 19,
-    "vs_generated_max": 3.03,
-    "visible_over_1.5_and_15mm": 11,
+    "vs_generated_over_1.5": 112,
+    "vs_generated_over_2": 21,
+    "vs_generated_max": 3.97,
+    "visible_over_1.5_and_15mm": 5,
     "visible_over_1.5_and_30mm": 0
    },
    "LOD0": {
-    "edges": 5550,
+    "edges": 5547,
     "over_1.5": 10,
-    "over_2": 1,
-    "max": 2.18,
-    "p99": 1.235,
+    "over_2": 0,
+    "max": 1.66,
+    "p99": 1.201,
     "bad_z_hist": [
-     2,
      0,
      1,
-     6,
      1,
+     4,
+     4,
      0
     ],
     "vs_generated_over_1.5": 11,
-    "vs_generated_over_2": 2,
-    "vs_generated_max": 3.09,
-    "visible_over_1.5_and_15mm": 3,
+    "vs_generated_over_2": 0,
+    "vs_generated_max": 1.99,
+    "visible_over_1.5_and_15mm": 7,
     "visible_over_1.5_and_30mm": 0
    },
    "LOD1": {
     "edges": 1725,
-    "over_1.5": 0,
+    "over_1.5": 3,
     "over_2": 0,
-    "max": 1.48,
-    "p99": 1.247,
+    "max": 1.71,
+    "p99": 1.238,
     "bad_z_hist": [
      0,
      0,
-     0,
-     0,
+     1,
+     2,
      0,
      0
     ],
     "vs_generated_over_1.5": 2,
     "vs_generated_over_2": 0,
-    "vs_generated_max": 1.6,
+    "vs_generated_max": 1.63,
     "visible_over_1.5_and_15mm": 2,
-    "visible_over_1.5_and_30mm": 0
+    "visible_over_1.5_and_30mm": 2
    }
   },
   "Running_A@6": {
    "Hero": {
-    "edges": 28487,
-    "over_1.5": 178,
-    "over_2": 48,
-    "max": 4.71,
-    "p99": 1.382,
+    "edges": 28499,
+    "over_1.5": 174,
+    "over_2": 39,
+    "max": 5.38,
+    "p99": 1.349,
     "bad_z_hist": [
      16,
-     51,
-     11,
-     52,
+     39,
+     15,
+     53,
      43,
-     5
+     8
     ],
-    "vs_generated_over_1.5": 292,
-    "vs_generated_over_2": 60,
-    "vs_generated_max": 6.66,
-    "visible_over_1.5_and_15mm": 87,
-    "visible_over_1.5_and_30mm": 17
+    "vs_generated_over_1.5": 265,
+    "vs_generated_over_2": 48,
+    "vs_generated_max": 4.61,
+    "visible_over_1.5_and_15mm": 64,
+    "visible_over_1.5_and_30mm": 19
    },
    "LOD0": {
-    "edges": 5550,
-    "over_1.5": 33,
-    "over_2": 4,
-    "max": 2.67,
-    "p99": 1.36,
+    "edges": 5547,
+    "over_1.5": 26,
+    "over_2": 2,
+    "max": 2.61,
+    "p99": 1.298,
     "bad_z_hist": [
+     2,
      4,
-     7,
-     3,
-     15,
-     4,
+     1,
+     10,
+     9,
      0
     ],
-    "vs_generated_over_1.5": 71,
-    "vs_generated_over_2": 10,
-    "vs_generated_max": 4.51,
-    "visible_over_1.5_and_15mm": 51,
-    "visible_over_1.5_and_30mm": 20
+    "vs_generated_over_1.5": 47,
+    "vs_generated_over_2": 8,
+    "vs_generated_max": 3.55,
+    "visible_over_1.5_and_15mm": 41,
+    "visible_over_1.5_and_30mm": 19
    },
    "LOD1": {
     "edges": 1725,
-    "over_1.5": 4,
+    "over_1.5": 9,
     "over_2": 1,
-    "max": 2.01,
-    "p99": 1.341,
+    "max": 2.61,
+    "p99": 1.34,
     "bad_z_hist": [
-     0,
      1,
      1,
      1,
-     1,
+     3,
+     3,
      0
     ],
-    "vs_generated_over_1.5": 15,
-    "vs_generated_over_2": 5,
-    "vs_generated_max": 2.51,
-    "visible_over_1.5_and_15mm": 15,
-    "visible_over_1.5_and_30mm": 9
+    "vs_generated_over_1.5": 23,
+    "vs_generated_over_2": 3,
+    "vs_generated_max": 2.29,
+    "visible_over_1.5_and_15mm": 23,
+    "visible_over_1.5_and_30mm": 19
    }
   },
   "Running_A@15": {
    "Hero": {
-    "edges": 28487,
-    "over_1.5": 156,
-    "over_2": 55,
-    "max": 6.56,
-    "p99": 1.367,
+    "edges": 28499,
+    "over_1.5": 158,
+    "over_2": 44,
+    "max": 5.05,
+    "p99": 1.348,
     "bad_z_hist": [
-     8,
-     44,
-     11,
-     47,
-     41,
-     5
+     14,
+     32,
+     14,
+     51,
+     40,
+     7
     ],
-    "vs_generated_over_1.5": 304,
-    "vs_generated_over_2": 65,
-    "vs_generated_max": 12.58,
-    "visible_over_1.5_and_15mm": 82,
-    "visible_over_1.5_and_30mm": 17
+    "vs_generated_over_1.5": 295,
+    "vs_generated_over_2": 55,
+    "vs_generated_max": 6.8,
+    "visible_over_1.5_and_15mm": 77,
+    "visible_over_1.5_and_30mm": 12
    },
    "LOD0": {
-    "edges": 5550,
-    "over_1.5": 33,
-    "over_2": 4,
-    "max": 3.24,
-    "p99": 1.326,
+    "edges": 5547,
+    "over_1.5": 22,
+    "over_2": 1,
+    "max": 2.55,
+    "p99": 1.285,
     "bad_z_hist": [
-     5,
-     8,
+     0,
+     4,
      1,
-     15,
+     10,
+     7,
+     0
+    ],
+    "vs_generated_over_1.5": 47,
+    "vs_generated_over_2": 11,
+    "vs_generated_max": 3.25,
+    "visible_over_1.5_and_15mm": 42,
+    "visible_over_1.5_and_30mm": 15
+   },
+   "LOD1": {
+    "edges": 1725,
+    "over_1.5": 9,
+    "over_2": 0,
+    "max": 1.81,
+    "p99": 1.319,
+    "bad_z_hist": [
+     0,
+     1,
+     2,
+     3,
+     3,
+     0
+    ],
+    "vs_generated_over_1.5": 26,
+    "vs_generated_over_2": 4,
+    "vs_generated_max": 2.69,
+    "visible_over_1.5_and_15mm": 26,
+    "visible_over_1.5_and_30mm": 24
+   }
+  },
+  "1H_Melee_Attack_Chop@12": {
+   "Hero": {
+    "edges": 28499,
+    "over_1.5": 112,
+    "over_2": 35,
+    "max": 4.35,
+    "p99": 1.298,
+    "bad_z_hist": [
+     4,
+     8,
+     14,
+     42,
+     37,
+     7
+    ],
+    "vs_generated_over_1.5": 195,
+    "vs_generated_over_2": 36,
+    "vs_generated_max": 3.71,
+    "visible_over_1.5_and_15mm": 27,
+    "visible_over_1.5_and_30mm": 5
+   },
+   "LOD0": {
+    "edges": 5547,
+    "over_1.5": 11,
+    "over_2": 3,
+    "max": 2.19,
+    "p99": 1.217,
+    "bad_z_hist": [
+     0,
+     0,
+     1,
+     6,
      4,
      0
     ],
-    "vs_generated_over_1.5": 80,
-    "vs_generated_over_2": 13,
-    "vs_generated_max": 3.03,
-    "visible_over_1.5_and_15mm": 56,
-    "visible_over_1.5_and_30mm": 21
+    "vs_generated_over_1.5": 20,
+    "vs_generated_over_2": 1,
+    "vs_generated_max": 2.18,
+    "visible_over_1.5_and_15mm": 12,
+    "visible_over_1.5_and_30mm": 3
    },
    "LOD1": {
     "edges": 1725,
     "over_1.5": 4,
     "over_2": 0,
-    "max": 1.99,
-    "p99": 1.337,
-    "bad_z_hist": [
-     0,
-     0,
-     3,
-     1,
-     0,
-     0
-    ],
-    "vs_generated_over_1.5": 18,
-    "vs_generated_over_2": 3,
-    "vs_generated_max": 3.11,
-    "visible_over_1.5_and_15mm": 18,
-    "visible_over_1.5_and_30mm": 15
-   }
-  },
-  "1H_Melee_Attack_Chop@12": {
-   "Hero": {
-    "edges": 28487,
-    "over_1.5": 103,
-    "over_2": 28,
-    "max": 4.34,
-    "p99": 1.288,
-    "bad_z_hist": [
-     2,
-     7,
-     8,
-     46,
-     34,
-     6
-    ],
-    "vs_generated_over_1.5": 189,
-    "vs_generated_over_2": 43,
-    "vs_generated_max": 4.41,
-    "visible_over_1.5_and_15mm": 23,
-    "visible_over_1.5_and_30mm": 5
-   },
-   "LOD0": {
-    "edges": 5550,
-    "over_1.5": 15,
-    "over_2": 2,
-    "max": 2.01,
+    "max": 1.96,
     "p99": 1.263,
     "bad_z_hist": [
      0,
      0,
-     2,
-     10,
+     0,
      3,
-     0
-    ],
-    "vs_generated_over_1.5": 30,
-    "vs_generated_over_2": 5,
-    "vs_generated_max": 2.85,
-    "visible_over_1.5_and_15mm": 14,
-    "visible_over_1.5_and_30mm": 1
-   },
-   "LOD1": {
-    "edges": 1725,
-    "over_1.5": 5,
-    "over_2": 0,
-    "max": 1.72,
-    "p99": 1.291,
-    "bad_z_hist": [
-     0,
-     0,
-     0,
-     4,
      1,
      0
     ],
-    "vs_generated_over_1.5": 3,
+    "vs_generated_over_1.5": 4,
     "vs_generated_over_2": 0,
-    "vs_generated_max": 1.73,
-    "visible_over_1.5_and_15mm": 3,
-    "visible_over_1.5_and_30mm": 2
+    "vs_generated_max": 1.65,
+    "visible_over_1.5_and_15mm": 4,
+    "visible_over_1.5_and_30mm": 3
    }
   },
   "1H_Melee_Attack_Chop@18": {
    "Hero": {
-    "edges": 28487,
-    "over_1.5": 105,
-    "over_2": 24,
-    "max": 4.63,
-    "p99": 1.278,
+    "edges": 28499,
+    "over_1.5": 87,
+    "over_2": 22,
+    "max": 4.96,
+    "p99": 1.269,
     "bad_z_hist": [
      5,
+     15,
+     9,
+     33,
      21,
-     6,
-     43,
-     23,
-     7
+     4
     ],
-    "vs_generated_over_1.5": 174,
-    "vs_generated_over_2": 40,
-    "vs_generated_max": 3.79,
-    "visible_over_1.5_and_15mm": 25,
-    "visible_over_1.5_and_30mm": 5
+    "vs_generated_over_1.5": 169,
+    "vs_generated_over_2": 34,
+    "vs_generated_max": 3.45,
+    "visible_over_1.5_and_15mm": 17,
+    "visible_over_1.5_and_30mm": 3
    },
    "LOD0": {
-    "edges": 5550,
-    "over_1.5": 11,
-    "over_2": 1,
-    "max": 2.1,
-    "p99": 1.245,
+    "edges": 5547,
+    "over_1.5": 7,
+    "over_2": 0,
+    "max": 1.76,
+    "p99": 1.197,
     "bad_z_hist": [
      0,
-     1,
-     1,
-     7,
      2,
+     0,
+     2,
+     3,
      0
     ],
-    "vs_generated_over_1.5": 31,
+    "vs_generated_over_1.5": 19,
     "vs_generated_over_2": 3,
-    "vs_generated_max": 3.03,
-    "visible_over_1.5_and_15mm": 17,
-    "visible_over_1.5_and_30mm": 1
+    "vs_generated_max": 2.45,
+    "visible_over_1.5_and_15mm": 14,
+    "visible_over_1.5_and_30mm": 3
    },
    "LOD1": {
     "edges": 1725,
-    "over_1.5": 1,
+    "over_1.5": 2,
     "over_2": 0,
-    "max": 1.61,
-    "p99": 1.218,
+    "max": 1.52,
+    "p99": 1.247,
     "bad_z_hist": [
      0,
      0,
      1,
-     0,
+     1,
      0,
      0
     ],
-    "vs_generated_over_1.5": 6,
+    "vs_generated_over_1.5": 9,
     "vs_generated_over_2": 0,
-    "vs_generated_max": 1.89,
-    "visible_over_1.5_and_15mm": 6,
-    "visible_over_1.5_and_30mm": 4
+    "vs_generated_max": 1.84,
+    "visible_over_1.5_and_15mm": 9,
+    "visible_over_1.5_and_30mm": 6
    }
   }
  },
  "fbx": {
   "path": "/Users/wilsonguenther/cm-hy-chars-scratch/Warrior/exp/Warrior.fbx",
-  "bytes": 1363036,
+  "bytes": 1359388,
   "textures": {
    "Body": "/Users/wilsonguenther/cm-hy-chars-scratch/Warrior/exp/Warrior_HY_Body_Albedo.png",
    "Shield": "/Users/wilsonguenther/cm-hy-chars-scratch/Warrior/exp/Warrior_HY_Shield_Albedo.png",
@@ -710,9 +703,9 @@
  },
  "game_px": {
   "game_v7": 124.6,
-  "game_hero_vcol": 117.8,
-  "game_hero_tex": 117.8,
-  "game_lod0_vcol": 118.3
+  "game_hero_vcol": 117.9,
+  "game_hero_tex": 117.9,
+  "game_lod0_vcol": 118.2
  },
  "fbx_round_trip": {
   "objects": {
@@ -732,7 +725,7 @@
     ]
    },
    "Warrior_LOD0": {
-    "tris": 4448,
+    "tris": 4446,
     "groups": 22,
     "colors": [
      "Col"
@@ -742,8 +735,8 @@
     ],
     "dims": [
      2.748,
-     2.064,
-     1.032
+     2.062,
+     1.029
     ]
    },
    "Warrior_LOD1": {
@@ -757,8 +750,8 @@
     ],
     "dims": [
      2.751,
-     2.068,
-     1.029
+     2.074,
+     1.039
     ]
    },
    "Warrior_Shadow": {
@@ -772,8 +765,8 @@
     ],
     "dims": [
      2.747,
-     2.065,
-     1.032
+     2.064,
+     1.029
     ]
    }
   },

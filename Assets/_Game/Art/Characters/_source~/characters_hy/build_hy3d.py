@@ -91,6 +91,10 @@ else:
     OLD_RENDER = [o for o in new if o.type == "MESH"]
     if any(o.name.endswith("_Hero") for o in OLD_RENDER):   # LOD-contract source: the Hero alone is the weight source
         OLD_RENDER = [o for o in OLD_RENDER if o.name.endswith("_Hero")]
+    for o in new:                                   # free the class names (<Class>_Hero ...) for the export
+        o.name = "OLD_" + o.name
+        if o.data is not None:
+            o.data.name = "OLD_" + o.data.name
     for o in OLD_RENDER:
         M = o.matrix_world.copy()
         o.parent = None
@@ -407,18 +411,18 @@ def apply_pose(pose):
 
 
 def landmarks(P):
-    """Crotch height, leg-centre |x| at knee height, neck height (narrowest front column between 0.55 and 0.85 of the
-    height), hand centres: measured on a mesh in the A-pose, facing -Y."""
+    """Crotch height, leg-centre |x| at knee height, neck height (narrowest front column between 0.50 and 0.75 of the
+    height; 0.86 caught the Farmer's top-knot, run 1), hand centres: measured on a mesh in the A-pose, facing -Y."""
     H = float(P[:, 2].max())
     centre = P[np.abs(P[:, 0]) < 0.03]
     crotch = next((float(z) for z in np.arange(0.12 * H, 0.75 * H, 0.004)
                    if (np.abs(centre[:, 2] - z) < 0.003).sum() > 3), 0.25 * H)
     knee = 0.55 * crotch
-    band = P[(np.abs(P[:, 2] - knee) < 0.012) & (np.abs(P[:, 0]) > 0.02)]
+    band = P[(np.abs(P[:, 2] - knee) < 0.012) & (np.abs(P[:, 0]) > 0.02) & (np.abs(P[:, 0]) < 0.36)]   # legs, not hands
     legx = float(np.median(np.abs(band[:, 0])))
     col = P[(np.abs(P[:, 0]) < 0.35) & (P[:, 1] < 0.08)]
     best = (0.7 * H, 9.0)
-    for z in np.arange(0.55 * H, 0.86 * H, 0.008):
+    for z in np.arange(0.50 * H, 0.75 * H, 0.008):
         b = col[np.abs(col[:, 2] - z) < 0.004]
         if len(b) >= 10 and np.ptp(b[:, 0]) < best[1]:
             best = (float(z), float(np.ptp(b[:, 0])))
@@ -611,6 +615,10 @@ def pca(P):
 
 def prop(key):
     hi, img = import_glb(os.path.join(RAW, f"{key}.glb"), f"HY_{key}_high")
+    if key == "staff":
+        lime = lambda c: (lambda h, s_, v: 60 <= h * 360 <= 110 and s_ > 0.5 and v > 0.55)(*__import__("colorsys").rgb_to_hsv(*c))
+        REPORT.setdefault("prop_cleanup", {})[key] = {"membrane_faces_removed": hc.drop_membrane(hi, img, lime)}
+        log("staff membrane removed", REPORT["prop_cleanup"][key])
     P = np_verts(hi)
     c, ax, _ = pca(P)
     P0 = P - c

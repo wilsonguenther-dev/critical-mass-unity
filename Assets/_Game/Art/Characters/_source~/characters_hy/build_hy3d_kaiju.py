@@ -336,6 +336,9 @@ rest_pose()
 log("deform", json.dumps(deform)[:700])
 
 # --------------------------------------------------------------------------------------------- export (swap file)
+for o in list(OLD.values()):                       # free the names Kaiju_Hero ... for the export copies
+    o.name = "OLD_" + o.name
+    o.data.name = "OLD_" + o.data.name
 SWAP_MAT = bpy.data.materials.new("CM_Toon")
 exp = []
 for t in ("Hero", "LOD0", "LOD1", "Shadow"):
@@ -352,8 +355,6 @@ for t in ("Hero", "LOD0", "LOD1", "Shadow"):
     c.data.color_attributes.active_color_name = "Col"
     c.hide_render = True
     exp.append(c)
-for o in list(OLD.values()):
-    o.name = "OLD_" + o.name
 ad = arm.animation_data or arm.animation_data_create()
 ad.action = None
 for tr in list(ad.nla_tracks):

@@ -465,3 +465,38 @@ def constant_uv(ob, uv=(0.01, 0.01), name="UVMap"):
         me.uv_layers.remove(me.uv_layers[0])
     lay = me.uv_layers.new(name=name)
     lay.data.foreach_set("uv", np.tile(np.array(uv, np.float32), len(me.loops)))
+
+
+def drop_membrane(ob, img, head_rgb_test, keep_head_frac=0.3):
+    """Delete the pale, unsaturated faces away from the prop's head end. The Farmer staff input enclosed the background
+    inside the hose loop (only border-connected background was cut), and the generator built it as a pale sheet.
+    head_rgb_test(rgb) marks faces of the head end (the lime orbs). Returns the number of faces removed."""
+    me = ob.data
+    tex = tex_array(img)
+    h, w = tex.shape[:2]
+    uv = np.zeros(len(me.loops) * 2)
+    me.uv_layers[0].data.foreach_get("uv", uv)
+    uv = uv.reshape(-1, 2)
+    V = np_verts(ob)
+    cen = np.array([V[list(p.vertices)].mean(0) for p in me.polygons])
+    col = np.array([tex[int(np.clip((uv[list(p.loop_indices)].mean(0)[1] % 1) * h, 0, h - 1)),
+                        int(np.clip((uv[list(p.loop_indices)].mean(0)[0] % 1) * w, 0, w - 1)), :3] for p in me.polygons])
+    c = cen.mean(0)
+    _, U = np.linalg.eigh(np.cov((cen - c).T))
+    ax = U[:, -1]
+    t = (cen - c) @ ax
+    head = np.array([head_rgb_test(x) for x in col])
+    if head.any() and t[head].mean() < 0:
+        t = -t
+    t = (t.max() - t) / max(np.ptp(t), 1e-9)              # 0 at the head end, 1 at the butt
+    hsv = np.array([colorsys.rgb_to_hsv(*np.clip(x, 0, 1)) for x in col])
+    kill = (hsv[:, 1] < 0.18) & (hsv[:, 2] > 0.62) & (t > keep_head_frac)
+    bm = bmesh.new()
+    bm.from_mesh(me)
+    bm.faces.ensure_lookup_table()
+    bmesh.ops.delete(bm, geom=[bm.faces[i] for i in np.nonzero(kill)[0]], context="FACES")
+    bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context="VERTS")
+    bm.to_mesh(me)
+    bm.free()
+    me.update()
+    return int(kill.sum())
