@@ -230,6 +230,20 @@ namespace CriticalMass.Runtime.Input
             _moveFromKeys = fromKeys;
         }
 
+        /// <summary>
+        /// controls-1: the move intent as a sim XZ direction through the same basis Fill uses (screen, or the map grid for
+        /// keys with KeysFollowMap), before lane assist and corner sliding; (0, 0) when nothing moves. Keyboard aim reads it so
+        /// the fighter faces the way the keys send it. Read-only: never changes what Fill writes.
+        /// </summary>
+        public void MoveDirection(out double x, out double z)
+        {
+            bool map = _moveFromKeys && KeysFollowMap;
+            double rx = map ? MapRightX : ScreenRightX, rz = map ? MapRightZ : ScreenRightZ;
+            double ux = map ? MapUpX : ScreenUpX, uz = map ? MapUpZ : ScreenUpZ;
+            x = _moveRight * rx + _moveUp * ux;
+            z = _moveRight * rz + _moveUp * uz;
+        }
+
         /// <summary>The pointer's aim point on the ground in sim world space (the raycast is HumanInputSource's).</summary>
         public void SetAim(double worldX, double worldZ)
         {

@@ -536,7 +536,9 @@ namespace CriticalMass.Runtime.Menus
                 else if (kb.digit6Key.wasPressedThisFrame) PickRespawn(ClassId.Healer);
             }
             EventSystem es = EventSystem.current;
-            if (es != null && es.currentSelectedGameObject == null && Gamepad.current != null && ControlBindings.ActiveDevice == ControlDevice.Gamepad)
+            // controls-1: the keyboard gets the focus too (arrows, W A S D, TAB or ENTER), not only a controller.
+            if (es != null && es.currentSelectedGameObject == null &&
+                ((Gamepad.current != null && ControlBindings.ActiveDevice == ControlDevice.Gamepad) || ClassSelectNav.Pressed()))
                 Select(_respawnTiles[(int)NextClass(w)].Tile);
         }
 
@@ -591,7 +593,8 @@ namespace CriticalMass.Runtime.Menus
             {
                 Keyboard kb = Keyboard.current;
                 if (kb != null && (kb.leftArrowKey.wasPressedThisFrame || kb.rightArrowKey.wasPressedThisFrame || kb.tabKey.wasPressedThisFrame ||
-                                   kb.enterKey.wasPressedThisFrame)) return true;
+                                   kb.enterKey.wasPressedThisFrame || kb.upArrowKey.wasPressedThisFrame || kb.downArrowKey.wasPressedThisFrame ||
+                                   kb.aKey.wasPressedThisFrame || kb.dKey.wasPressedThisFrame || kb.spaceKey.wasPressedThisFrame)) return true;
                 Gamepad gp = Gamepad.current;
                 return gp != null && (gp.dpad.left.wasPressedThisFrame || gp.dpad.right.wasPressedThisFrame || gp.leftStick.ReadValue().sqrMagnitude > 0.25f);
             }

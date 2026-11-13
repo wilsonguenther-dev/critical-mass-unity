@@ -182,7 +182,11 @@ namespace CriticalMass.Runtime.Tests
             Assert.AreEqual("UP", ControlBindings.DisplayPath("<Keyboard>/upArrow"));
             Assert.AreEqual("E", ControlBindings.DisplayPath("<Keyboard>/e"));
             Assert.AreEqual("SPACE", ControlBindings.DisplayPath("<Keyboard>/space"));
-            Assert.AreEqual("LEFT CLICK", ControlBindings.PromptLabel(A("Attack"), ControlDevice.KeyboardMouse));
+            // controls-1: with the mouse in use the prompt names the click; keyboard only, the key (ControlSchemesTests).
+            bool kbOnly = ControlBindings.KeyboardOnly;
+            ControlBindings.SetKeyboardOnly(false);
+            try { Assert.AreEqual("LEFT CLICK", ControlBindings.PromptLabel(A("Attack"), ControlDevice.KeyboardMouse)); }
+            finally { ControlBindings.SetKeyboardOnly(kbOnly); }
             Assert.AreEqual("RT", ControlBindings.PromptLabel(A("Attack"), ControlDevice.Gamepad));
             Assert.AreEqual("LT", ControlBindings.PromptLabel(A("Ability"), ControlDevice.Gamepad));
             Assert.AreEqual("X", ControlBindings.PromptLabel(A("Interact"), ControlDevice.Gamepad));
