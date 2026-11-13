@@ -8,7 +8,8 @@ from pathlib import Path
 
 _TMP = Path(tempfile.mkdtemp(prefix='cmloop-tests-'))
 for k, sub in (('CM_LOOP_STATE', 'state'), ('CM_LOOP_LOGS', 'logs'), ('CM_LOOP_LANES', 'lanes'),
-               ('CM_LOOP_LIVELOG_DIR', 'livelog'), ('CM_LOOP_PROJECTS_DIR', 'projects')):
+               ('CM_LOOP_LIVELOG_DIR', 'livelog'), ('CM_LOOP_PROJECTS_DIR', 'projects'),
+               ('CM_INCIDENTS_DIR', 'incidents')):
     os.environ[k] = str(_TMP / sub)
     (_TMP / sub).mkdir(parents=True, exist_ok=True)
 os.environ['CM_LOOP_TEST_TMP'] = str(_TMP)

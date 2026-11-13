@@ -12,7 +12,8 @@ source "$(dirname "${BASH_SOURCE[0]}")/_unity-env.sh"
 LOG="$ROOT/Logs/capture.log"
 mkdir -p "$OUT"
 set +e
-"$UNITY" -batchmode -projectPath "$ROOT" -executeMethod CriticalMass.Editor.CaptureTool.Run \
+# Through the machine lock (cm-heavy unity, DG-44); never call "$UNITY" bare.
+"$CM_HEAVY" unity "$UNITY" -batchmode -projectPath "$ROOT" -executeMethod CriticalMass.Editor.CaptureTool.Run \
   -captureOut "$OUT" -captureSeconds "$SECONDS_ARG" ${YAW_ARGS[@]+"${YAW_ARGS[@]}"} -logFile "$LOG"
 code=$?
 set -e

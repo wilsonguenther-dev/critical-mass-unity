@@ -795,6 +795,56 @@ def pr_merge(number, subject, body_file, runner=sh):
 
 
 # ───────────────────────────── halt check (builders and the integrator run it first) ─────────────────────────────
+INCIDENTS = Path(os.environ.get('CM_INCIDENTS_DIR') or Path.home() / 'cm-incidents')
+PLAYER_NAME = 'Critical Mass'
+
+
+def player_running():
+    """pid of a process named exactly "Critical Mass" (kernel name or argv[0] basename, as `pgrep -x` matches), or
+    None. Reads the process table in-process (libproc/sysctl): no ps, no pgrep, no new processes."""
+    try:
+        import ctypes
+        import ctypes.util
+        libc = ctypes.CDLL(ctypes.util.find_library('c'))
+        n = libc.proc_listallpids(None, 0)
+        buf = (ctypes.c_int * (n + 512))()
+        n = libc.proc_listallpids(buf, ctypes.sizeof(buf))
+    except (OSError, AttributeError):
+        return None
+    name = ctypes.create_string_buffer(256)
+    args = ctypes.create_string_buffer(8192)
+    want = PLAYER_NAME.encode()
+    for pid in buf[:max(n, 0)]:
+        if pid <= 0 or pid == os.getpid():
+            continue
+        if libc.proc_name(pid, name, 256) > 0 and name.value == want:
+            return pid
+        mib = (ctypes.c_int * 3)(1, 49, pid)  # CTL_KERN, KERN_PROCARGS2
+        size = ctypes.c_size_t(8192)
+        if libc.sysctl(mib, 3, args, ctypes.byref(size), None, 0) == 0 and size.value > 8:
+            rest = args.raw[4:size.value]
+            rest = rest[rest.find(b'\0'):].lstrip(b'\0')
+            if rest.split(b'\0', 1)[0].rsplit(b'/', 1)[-1] == want:
+                return pid
+    return None
+
+
+def machine_hold():
+    """DG-43: machine-level reasons the fleet must not dispatch (owner-play mode). None = clear."""
+    for name in ('PAUSED-AFTER-UNCLEAN-RESTART', 'STOP-DISPATCH'):
+        f = INCIDENTS / name
+        if f.exists():
+            try:
+                why = f.read_text().strip()[:300]
+            except OSError:
+                why = ''
+            return f'paused: {f} ({why})'
+    pid = player_running()
+    if pid:
+        return f'paused: owner playing ("{PLAYER_NAME}" pid {pid})'
+    return None
+
+
 def halt_check(wait_launch=120):
     for name in ('HALT', 'STALL'):
         f = STATE / name
@@ -802,6 +852,9 @@ def halt_check(wait_launch=120):
             return 3, f'{name}: {f.read_text().strip()[:300]}'
     if (STATE / 'STOP-DISPATCH').exists():
         return 4, 'STOP-DISPATCH: ' + (STATE / 'STOP-DISPATCH').read_text().strip()[:300]
+    hold = machine_hold()
+    if hold:
+        return 4, hold
     blk = review_blocking()
     if blk:
         return 6, f'{len(blk)} unresolved BLOCKING review entr(y/ies), first {blk[0]["key"]} in {blk[0]["file"]}'

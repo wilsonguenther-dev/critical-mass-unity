@@ -20,6 +20,16 @@ fails an item; a flag goes to the architect.
 
 Unity gates refuse to run inside a builder lane (builders never run Unity), refuse when a Unity editor already has the
 project open, refuse under the 15 GB disk floor, and run under the compile lock (one Unity process at a time).
+
+Machine lock (DG-44, 2026-11-12): the compile lock still decides which gate runs, but the Unity process itself is
+always started through ~/bin/cm-heavy (`cm-heavy unity ...`, env CM_HEAVY overrides the path): the tools/unity-*.sh
+scripts wrap their own Unity call, and the two gates that start Unity directly (setup, clean-reimport) wrap it here.
+cm-heavy is the ONE machine-wide lock shared with Blender: it WAITS (it never refuses) while the owner plays, for 15
+minutes after a boot, while ~/cm-incidents/STOP-DISPATCH or PAUSED-AFTER-UNCLEAN-RESTART exists, under 30 GB free,
+and for 20 s after the previous Unity job; it kills the whole Unity process group on its timeout (exit 124).
+Exit 75 (EX_TEMPFAIL) means "did not start, try again later", never a test result: either the compile lock is held by
+another gate (unchanged), or cm-heavy gave up waiting because the caller set CM_HEAVY_MAX_WAIT. With CM_HEAVY_MAX_WAIT
+unset (the default) a gate waits for the machine lock as long as it takes; there is no override for the integrator.
 """
 import argparse
 import json
@@ -47,6 +57,11 @@ def emit(gate, status, code, detail, **kw):
     print(line, flush=True)
     C.append_jsonl(C.LOGS / 'gates.jsonl', rec)
     return code
+
+
+def cm_heavy():
+    """DG-44: the machine lock every Unity launch goes through."""
+    return os.environ.get('CM_HEAVY') or str(Path.home() / 'bin' / 'cm-heavy')
 
 
 def unity_binary(project):
@@ -210,7 +225,8 @@ def g_setup(a):
     if r is not None:
         return r
     log = proj / 'Logs/setup-gate.log'
-    cmd = [unity_binary(proj), '-batchmode', '-nographics', '-projectPath', str(proj), '-executeMethod',
+    cmd = [cm_heavy(), 'unity', unity_binary(proj), '-batchmode', '-nographics', '-projectPath', str(proj),
+           '-executeMethod',
            'CriticalMass.Editor.ProjectSetup.Apply', '-logFile', str(log), '-quit']
     code, out, err, owner = run_locked('setup', cmd, proj)
     dirty = [p for _, p in C.dirty_files(proj)]
@@ -236,7 +252,8 @@ def g_clean_reimport(a):
         return emit('clean-reimport', 'fail', 1, f'tree not clean before the re-import: {len(before)} file(s)',
                     dirty=[f'{x.strip()} {p}' for x, p in before][:30])
     log = proj / 'Logs/reimport-gate.log'
-    cmd = [unity_binary(proj), '-batchmode', '-nographics', '-projectPath', str(proj), '-executeMethod',
+    cmd = [cm_heavy(), 'unity', unity_binary(proj), '-batchmode', '-nographics', '-projectPath', str(proj),
+           '-executeMethod',
            'CriticalMass.Editor.ProjectSetup.Apply', '-logFile', str(log), '-quit']
     code, out, err, owner = run_locked('clean-reimport', cmd, proj)
     after = C.dirty_files(proj)

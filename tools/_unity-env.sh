@@ -12,4 +12,12 @@ if [[ ! -x "$UNITY" ]]; then
   echo "Unity $UNITY_VERSION not found at $UNITY (set UNITY_PATH to override)" >&2
   exit 127
 fi
+# DG-44: every Unity call goes through the one machine lock, cm-heavy (~/bin/cm-heavy). It waits while the owner plays,
+# right after a boot, under STOP-DISPATCH or after an unclean restart, and kills the whole job on its timeout.
+# Calling "$UNITY" without "$CM_HEAVY" unity in front of it is a defect (loop/tests/machine/run_machine_safety_tests.py).
+CM_HEAVY="${CM_HEAVY:-$HOME/bin/cm-heavy}"
+if [[ ! -x "$CM_HEAVY" ]]; then
+  echo "cm-heavy not found at $CM_HEAVY: every Unity call goes through the machine lock (DG-44)" >&2
+  exit 127
+fi
 mkdir -p "$ROOT/Logs"
