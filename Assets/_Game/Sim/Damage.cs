@@ -54,6 +54,8 @@ namespace CriticalMass.Sim.Core
             double tx = w.X[targetId];
             double tz = w.Z[targetId];
             World.PushEvent(w, SimEventType.Hit, targetId, credit, tx, tz, dmg);
+            // CM-64: a hit during a delivery wind-up at the shrine loses that delivery (DeliverIntercepted).
+            Delivery.InterruptDelivery(w, targetId, credit);
 
             if (t.Hp <= 0)
             {

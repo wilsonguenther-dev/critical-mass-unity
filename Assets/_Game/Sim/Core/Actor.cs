@@ -83,6 +83,11 @@ namespace CriticalMass.Sim.Core
         public int UnsupportedTicks;
         /// <summary>DG-16: what dealt the last blow (Melee, KaijuMelee, KaijuSlam...); None until hit, cleared at respawn with LastAttacker.</summary>
         public DamageCause LastCause;
-        // DG-16b fields follow (appended).
+        /// <summary>
+        /// CM-64: sim ticks of the current delivery wind-up at the shrine (0 = not winding; delivers when it reaches
+        /// KaijuFeed.DeliverWindupTicks). Delivery.Interrupted (-1) for the rest of the tick an enemy hit interrupted it.
+        /// Written only by Delivery (Damage calls InterruptDelivery).
+        /// </summary>
+        public int DeliverTicks;
     }
 }

@@ -26,5 +26,7 @@ namespace CriticalMass.Sim.Core
         public bool BerserkLocked;
         public bool Hatched;
         public MatchResult Winner;
+        /// <summary>CM-64: delivery wind-ups interrupted by an enemy hit, keyed by the CARRIER's team (DeliverIntercepted events).</summary>
+        public PerTeam Intercepted;
     }
 }

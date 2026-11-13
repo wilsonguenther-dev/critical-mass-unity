@@ -144,6 +144,23 @@ namespace CriticalMass.Sim.Bots
             }
         }
 
+        /// <summary>
+        /// CM-64: the team's dead bots that still hold Kaiju duty (a dead bot is outside the living roster, so AssignTeam never
+        /// rewrites its role; it respawns as the incumbent). Before the hatch their seats are reserved: the Kaiju quota minus
+        /// this many go to living bots, so a feeder killed at the shrine never pulls a hill bot off the hill. Allocation-free.
+        /// </summary>
+        public static int DeadKaijuDuty(World world, BotsState st, TeamId team)
+        {
+            int dead = 0;
+            for (int id = 0; id < world.ActorCount; id++)
+            {
+                Actor a = world.Actors[id];
+                if (a.Team != team || a.Alive || st.Role[id] != BotsState.RoleKaiju || !BotsState.IsBot(st, world, id)) continue;
+                dead++;
+            }
+            return dead;
+        }
+
         private static void AssignTeam(World world, BotsState st, TeamId team, double now, bool shortHanded, bool ahead)
         {
             GameConfig cfg = world.Config;
@@ -173,6 +190,8 @@ namespace CriticalMass.Sim.Bots
                     if (m.HillSeconds[otherT] - m.HillSeconds[team] >= GambitDeficitSeconds) kaijuQuota += (int)GambitExtra;
                 }
                 if (kaijuQuota > count - hillQuota) kaijuQuota = Math.Max(0, count - hillQuota);
+                // CM-64: a Kaiju-duty bot that died keeps its duty while it respawns.
+                kaijuQuota = Math.Max(0, kaijuQuota - DeadKaijuDuty(world, st, team));
                 for (int c = 0; c < count; c++)
                 {
                     int id = Ids[c];

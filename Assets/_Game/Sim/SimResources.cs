@@ -197,6 +197,7 @@ namespace CriticalMass.Sim.Core
                 {
                     a.GatherProgress = 0;
                     a.GatherNodeId = -1;
+                    Delivery.CancelDelivery(a);
                     continue;
                 }
 
@@ -207,6 +208,11 @@ namespace CriticalMass.Sim.Core
                     double dz = w.Z[id] - shrine.Z;
                     if (dx * dx + dz * dz <= shrineR * shrineR)
                     {
+                        a.GatherProgress = 0;
+                        a.GatherNodeId = -1;
+                        // CM-64: the wind-up; the load goes in only on the pass it completes.
+                        if (!Delivery.StepDeliveryWindup(w, a)) continue;
+                        Delivery.CancelDelivery(a);
                         if (a.CarryAmount > 0)
                         {
                             if (a.Carry == CarryKind.Corruption) ApplyDelivery(w, a.Team, CarryKind.Corruption, a.CarryAmount, id);
@@ -216,11 +222,10 @@ namespace CriticalMass.Sim.Core
                         a.Carry = CarryKind.None;
                         a.CarryAmount = 0;
                         a.CarryMeat = 0;
-                        a.GatherProgress = 0;
-                        a.GatherNodeId = -1;
                         continue;
                     }
                 }
+                Delivery.CancelDelivery(a);
 
                 int ni = GatherNode(w, id);
                 if (ni < 0)

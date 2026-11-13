@@ -18,6 +18,53 @@ namespace CriticalMass.Sim.Bots
         /// <summary>CM-30 progress detector radius squared.</summary>
         private const double ProgressDist2 = ProgressRadius * ProgressRadius;
 
+        /// <summary>CM-64: fight utility against a contestable enemy carrier; must beat hill + inertia (0.95) and gather (0.8 x greed).</summary>
+        public const double InterceptUtility = 1;
+        /// <summary>CM-64: a defender must itself be within this many InterceptShrineRadius of the shrine.</summary>
+        public const double InterceptDefenderFactor = 2;
+        /// <summary>CM-36: under deliver (0.9) so cargo goes in first, over any gather (0.8 x greed) and the hill (0.7).</summary>
+        public const double CleanseUtility = 0.88;
+
+        /// <summary>
+        /// CM-64: the enemy carrier bot id should contest at the shrine, or -1: an alive, unprotected enemy holding cargo or
+        /// meat within Bots.InterceptShrineRadius of the shrine centre, nearest the shrine first (lowest id on a tie). Bots
+        /// carrying cargo never intercept, nor bots further than InterceptDefenderFactor x the radius from the shrine.
+        /// </summary>
+        public static int InterceptTarget(World w, int id)
+        {
+            Actor a = w.Actors[id];
+            if (a.CarryAmount > 0) return -1;
+            double sx = w.Map.Shrine.X;
+            double sz = w.Map.Shrine.Z;
+            double r = w.Config.Bots.InterceptShrineRadius;
+            double r2 = r * r;
+            double reach = r * InterceptDefenderFactor;
+            double bx = w.X[id] - sx;
+            double bz = w.Z[id] - sz;
+            if (bx * bx + bz * bz > reach * reach) return -1;
+            int best = -1;
+            double bestD2 = double.PositiveInfinity;
+            for (int j = 0; j < w.ActorCount; j++)
+            {
+                Actor t = w.Actors[j];
+                if (!t.Alive || t.Team == a.Team || t.SpawnProtect > 0) continue;
+                if (t.CarryAmount <= 0 && t.CarryMeat <= 0) continue;
+                double dx = w.X[j] - sx;
+                double dz = w.Z[j] - sz;
+                double d2 = dx * dx + dz * dz;
+                if (d2 > r2 || d2 >= bestD2) continue;
+                best = j;
+                bestD2 = d2;
+            }
+            return best;
+        }
+
+        /// <summary>CM-64: only a Kaiju-duty bot contests a carrier; the hill crew keeps the CM-09 rule.</summary>
+        public static bool InterceptorRole(int role)
+        {
+            return role == BotsState.RoleKaiju;
+        }
+
         /// <summary>CM-37: the CM-09 retreat threshold, kept in Heal.SeekHpShare (0.3).</summary>
         public static double LowHp(GameConfig c) => c.Heal.SeekHpShare;
 
@@ -380,6 +427,17 @@ namespace CriticalMass.Sim.Bots
                 }
             }
 
+            // CM-64: contest an enemy carrier at the shrine before it hands its load in (Delivery wind-up). Only Kaiju-duty bots.
+            if (egg && InterceptorRole(role) && hpFrac >= lowHp && uFight < InterceptUtility)
+            {
+                int carrier = InterceptTarget(w, id);
+                if (carrier >= 0)
+                {
+                    uFight = InterceptUtility;
+                    fightTarget = carrier;
+                }
+            }
+
             double uHill = role == BotsState.RoleKaiju ? KaijuRoleHillUtility : cocky ? HillUtility * CockyHillFactor : HillUtility;
             bool holding = cur == AiState.HoldHill ? hillD < hill.R + 2 : hillD < hill.R - 1;
             AiState hillState = holding ? AiState.HoldHill : AiState.ToHill;
@@ -408,6 +466,19 @@ namespace CriticalMass.Sim.Bots
                     uCorrupt = Cap1(0.85 * st.Greed[id]);
             }
 
+            // CM-36: the shrine cleanse is the player's tool. Only the human slot on autopilot (IsHuman) uses it, and only for the
+            // team that leads delivered biomass, once BotNetUnits net corruption units sit in the egg. Pure bots never cleanse
+            // (D-060 retune). Reads delivery counts and cleanse timers only, never instability.
+            double uCleanse = 0;
+            if (a.IsHuman && st.Corrupt[id] == 0 && egg && a.CarryAmount == 0)
+            {
+                int teamIdx = a.Team == TeamId.Azure ? 0 : 1;
+                double own = w.Match.Delivered[teamIdx].Biomass;
+                double other = w.Match.Delivered[1 - teamIdx].Biomass;
+                if (own > other && Cleanse.NetCorruptionUnits(w) >= w.Config.KaijuFeed.Cleanse.BotNetUnits && Cleanse.CleanseReady(w, teamIdx))
+                    uCleanse = CleanseUtility;
+            }
+
             double uRetreat = hpFrac < lowHp && P.Within6 > 0 ? 0.9 : 0;
 
             // --- current state's own utility (0 = its task is over) ---
@@ -430,6 +501,9 @@ namespace CriticalMass.Sim.Bots
                 case AiState.Corrupt:
                     curU = uCorrupt;
                     break;
+                case AiState.Cleanse:
+                    curU = uCleanse;
+                    break;
                 case AiState.Retreat:
                     curU = uRetreat;
                     break;
@@ -446,6 +520,7 @@ namespace CriticalMass.Sim.Bots
             Consider(w, AiState.Gather, uGather);
             Consider(w, AiState.Deliver, uDeliver);
             Consider(w, AiState.Corrupt, uCorrupt);
+            Consider(w, AiState.Cleanse, uCleanse);
             Consider(w, AiState.Retreat, uRetreat);
             AiState best = Sel.Best;
 

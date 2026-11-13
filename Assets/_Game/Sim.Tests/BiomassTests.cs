@@ -31,7 +31,7 @@ namespace CriticalMass.Sim.Tests
         }
 
         /// <summary>ResourcesSystem passes a delivery needs (1 before CM-64; KaijuFeed.DeliverWindupTicks after).</summary>
-        internal static int Windup(World w) => 1;
+        internal static int Windup(World w) => Delivery.WindupTicks(w.Config);
 
         private static void Place(World w, int id, double x, double z)
         {

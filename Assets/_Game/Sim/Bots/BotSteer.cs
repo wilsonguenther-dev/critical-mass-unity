@@ -337,6 +337,27 @@ namespace CriticalMass.Sim.Bots
                     }
                     break;
                 }
+                case AiState.Cleanse:
+                {
+                    // CM-36: walk to the shrine empty-handed, then hold interact; let go for a tick whenever the sim says this
+                    // bot is not armed (a press still held from a delivery does not count).
+                    ShrineDef sh = map.Shrine;
+                    aimX = sh.X;
+                    aimZ = sh.Z;
+                    double reach = cfg.KaijuFeed.ShrineInteractRange - InteractMargin;
+                    double dx = sh.X - x;
+                    double dz = sh.Z - z;
+                    if (dx * dx + dz * dz <= reach * reach)
+                    {
+                        output.Interact = w.Cleanse.Armed[id] == 1;
+                        separate = false;
+                    }
+                    else if (!Follow(w, st, id, BotFields.FieldShrine))
+                    {
+                        Toward(w, id, sh.X, sh.Z, 0);
+                    }
+                    break;
+                }
                 case AiState.Retreat:
                     Follow(w, st, id, TeamPadField(w, id));
                     break;

@@ -52,6 +52,31 @@ namespace CriticalMass.Sim.Core
         public int[] FallTick;
     }
 
+    /// <summary>CM-36 shrine cleanse state (browser CleanseState), allocated once per World and reset in place. All timers count sim ticks.</summary>
+    public sealed class CleanseState
+    {
+        /// <summary>Per team (0 azure, 1 crimson): sim ticks until that team may cleanse again; 0 = ready.</summary>
+        public int[] Cooldown;
+        /// <summary>Sim ticks left of the cleanse in flight; 0 = none.</summary>
+        public int ActiveTicks;
+        /// <summary>Team index of the cleanse in flight (-1 none).</summary>
+        public int Team;
+        /// <summary>Actor that started the cleanse in flight (-1 none or scripted).</summary>
+        public int Actor;
+        /// <summary>Instability the cleanse in flight drains per tick (fixed at the start).</summary>
+        public double PerTick;
+        /// <summary>Instability the cleanse in flight has drained so far.</summary>
+        public double Drained;
+        /// <summary>Per actor: consecutive ticks of interact held empty-handed at the shrine while a cleanse is possible.</summary>
+        public ushort[] Hold;
+        /// <summary>Per actor: 1 once interact was released since the actor last carried a load.</summary>
+        public byte[] Armed;
+        /// <summary>Cleanses started this match (both teams).</summary>
+        public int Count;
+        /// <summary>Instability drained by cleanses this match.</summary>
+        public double Removed;
+    }
+
     /// <summary>The whole simulation state; per-actor arrays are allocated once at ActorCapacity and reused by ResetWorld.</summary>
     public sealed class World
     {
@@ -70,6 +95,8 @@ namespace CriticalMass.Sim.Core
         public TerraformState Terraform;
         /// <summary>CM-31: knock-down decoration state, one slot per map decoration.</summary>
         public ToppleState Topple;
+        /// <summary>CM-36: the shrine cleanse (Cleanse.cs).</summary>
+        public CleanseState Cleanse;
         /// <summary>Bumps on every ResetWorld. Views must drop cached per-match state when it changes.</summary>
         public int Epoch;
         public int Tick;
@@ -254,6 +281,7 @@ namespace CriticalMass.Sim.Core
                 JumpBuffer = 0,
                 UnsupportedTicks = 0,
                 LastCause = DamageCause.None,
+                DeliverTicks = 0,
             };
         }
 
@@ -282,6 +310,8 @@ namespace CriticalMass.Sim.Core
             hillCount.Set(0, 0);
             var allegiance = new PerTeam();
             allegiance.Set(0, 0);
+            var intercepted = new PerTeam();
+            intercepted.Set(0, 0);
             return new MatchState
             {
                 Time = 0,
@@ -299,6 +329,7 @@ namespace CriticalMass.Sim.Core
                 BerserkLocked = false,
                 Hatched = false,
                 Winner = MatchResult.None,
+                Intercepted = intercepted,
             };
         }
 
@@ -483,6 +514,21 @@ namespace CriticalMass.Sim.Core
             m.BerserkLocked = false;
             m.Hatched = false;
             m.Winner = MatchResult.None;
+            m.Intercepted.Azure = 0;
+            m.Intercepted.Crimson = 0;
+
+            // CM-36: the shrine cleanse, reset in place.
+            CleanseState cl = world.Cleanse;
+            Array.Clear(cl.Cooldown, 0, cl.Cooldown.Length);
+            cl.ActiveTicks = 0;
+            cl.Team = -1;
+            cl.Actor = -1;
+            cl.PerTick = 0;
+            cl.Drained = 0;
+            Array.Clear(cl.Hold, 0, cl.Hold.Length);
+            Array.Clear(cl.Armed, 0, cl.Armed.Length);
+            cl.Count = 0;
+            cl.Removed = 0;
 
             SpatialHash.Rebuild(world.Hash, world.X, world.Z, world.Actors, world.ActorCount);
         }
@@ -529,6 +575,7 @@ namespace CriticalMass.Sim.Core
             a.JumpBuffer = 0;
             a.UnsupportedTicks = 0;
             a.LastCause = DamageCause.None;
+            a.DeliverTicks = 0;
         }
 
         private static void ResetInput(InputFrame f)
@@ -605,6 +652,19 @@ namespace CriticalMass.Sim.Core
                     Hp = new byte[decorationCount],
                     Fallen = new byte[decorationCount],
                     FallTick = new int[decorationCount],
+                },
+                Cleanse = new CleanseState
+                {
+                    Cooldown = new int[2],
+                    ActiveTicks = 0,
+                    Team = -1,
+                    Actor = -1,
+                    PerTick = 0,
+                    Drained = 0,
+                    Hold = new ushort[cap],
+                    Armed = new byte[cap],
+                    Count = 0,
+                    Removed = 0,
                 },
                 Epoch = 0,
                 Tick = 0,
