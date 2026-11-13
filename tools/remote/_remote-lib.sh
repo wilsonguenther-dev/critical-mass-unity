@@ -8,7 +8,17 @@ SSH_OPTS=(-o BatchMode=yes -o ConnectTimeout=15 -o ServerAliveInterval=20 -o Ser
 REMOTE_JOB=""
 
 rssh() { ssh "${SSH_OPTS[@]}" "$REMOTE_USER@$REMOTE_HOST" "$@"; }
-rsync_to() { rsync -a -e "ssh ${SSH_OPTS[*]}" "$@"; }
+# Over the internet tunnel (2026-11-13 evening: the Air is reached through cloudflared, see ~/.ssh/config): --partial keeps a
+# dropped copy's progress, -z compresses, and a build upload reuses the box's newest older build as a copy base, so only
+# changed files cross the link.
+rsync_to() {
+  local extra=() last="${!#}"
+  if [[ "$last" == *:cm-remote/builds/* ]]; then
+    local prev; prev="$(rssh 'ls -t ~/cm-remote/builds 2>/dev/null | head -2' 2>/dev/null | tr '\n' ' ')"
+    for b in $prev; do [[ "$last" == *"/builds/$b/" || "$last" == *"/builds/$b" ]] || extra+=("--copy-dest=../$b/"); done
+  fi
+  rsync -a --partial -z --timeout=300 ${extra[@]+"${extra[@]}"} -e "ssh ${SSH_OPTS[*]}" "$@"
+}
 
 remote_preflight() {  # reachable, ~/cm-remote exists, the runner is current
   rssh 'mkdir -p ~/cm-remote/bin ~/cm-remote/builds ~/cm-remote/runs ~/cm-remote/work' 2>/dev/null \
