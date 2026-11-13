@@ -25,6 +25,13 @@
    "detail": "AnimationCurveNode records: 0"
   },
   {
+   "check": "fbx carries exactly one colour layer per mesh (3 meshes)",
+   "ok": true,
+   "detail": {
+    "LayerElementColor": 6
+   }
+  },
+  {
    "check": "objects",
    "ok": true,
    "detail": {
@@ -88,11 +95,11 @@
    "check": "Warrior_Body loose/non-manifold",
    "ok": true,
    "detail": {
-    "triangles": 9086,
+    "triangles": 9158,
     "loose_verts": 0,
     "loose_edges": 0,
     "non_manifold_edges": 0,
-    "closed_shells": 118
+    "closed_shells": 120
    }
   },
   {
@@ -112,11 +119,17 @@
    }
   },
   {
+   "check": "Warrior_Body exactly one vertex colour set (v7)",
+   "ok": true,
+   "detail": [
+    "Col"
+   ]
+  },
+  {
    "check": "Warrior_Body vertex colours + team mask",
    "ok": true,
    "detail": {
     "layers": [
-     "Col.001",
      "Col"
     ],
     "mask_codes": [
@@ -146,7 +159,7 @@
    "check": "Warrior_Cleaver loose/non-manifold",
    "ok": true,
    "detail": {
-    "triangles": 946,
+    "triangles": 1004,
     "loose_verts": 0,
     "loose_edges": 0,
     "non_manifold_edges": 0,
@@ -170,11 +183,17 @@
    }
   },
   {
+   "check": "Warrior_Cleaver exactly one vertex colour set (v7)",
+   "ok": true,
+   "detail": [
+    "Col"
+   ]
+  },
+  {
    "check": "Warrior_Cleaver vertex colours + team mask",
    "ok": true,
    "detail": {
     "layers": [
-     "Col.001",
      "Col"
     ],
     "mask_codes": [
@@ -226,11 +245,17 @@
    }
   },
   {
+   "check": "Warrior_Shield exactly one vertex colour set (v7)",
+   "ok": true,
+   "detail": [
+    "Col"
+   ]
+  },
+  {
    "check": "Warrior_Shield vertex colours + team mask",
    "ok": true,
    "detail": {
     "layers": [
-     "Col.001",
      "Col"
     ],
     "mask_codes": [
@@ -250,13 +275,13 @@
   {
    "check": "triangle budget <= 12000",
    "ok": true,
-   "detail": 11808
+   "detail": 11938
   },
   {
    "check": "body height in metres after round trip (Blender Z = Unity Y)",
    "ok": true,
    "detail": {
-    "min_z": -0.001,
+    "min_z": -0.0,
     "max_z": 2.001,
     "mesh_object_rot": [
      1.5708,

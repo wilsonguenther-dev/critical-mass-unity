@@ -89,6 +89,8 @@ check("fbx unit scale", hdr["UnitScaleFactor"] in (1.0, 100.0),
       "factor's inverse, so Unity 'Convert Units' yields scale 1 (UNVERIFIED in Unity)")
 check("fbx has no baked animation", data.find(b"AnimationStack") < 0 or data.count(b"AnimationCurveNode") == 0,
       f"AnimationCurveNode records: {data.count(b'AnimationCurveNode')}")
+# v7: one colour set per mesh in the file itself (v6 Warrior_Body carried Col and Col.001)
+check("fbx carries exactly one colour layer per mesh (3 meshes)", data.count(b"LayerElementColor") <= 6, {"LayerElementColor": data.count(b"LayerElementColor")})
 
 # ---------------------------------------------------------------- re-import
 bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -141,6 +143,7 @@ for name, ob in sorted(meshes.items()):
     if len(ca):
         for d in ca[0].data:
             codes.add(round(d.color[3], 2))
+    check(f"{name} exactly one vertex colour set (v7)", len(ca) == 1, [c.name for c in ca])
     check(f"{name} vertex colours + team mask", len(ca) >= 1, {"layers": [c.name for c in ca],
                                                                 "mask_codes": sorted(codes)})
     if name == "Warrior_Body":

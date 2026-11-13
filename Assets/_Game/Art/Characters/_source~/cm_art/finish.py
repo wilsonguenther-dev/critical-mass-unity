@@ -52,7 +52,7 @@ DEFAULTS = {
 }
 
 COLOUR_KIND = {   # palette colour name -> kind (class scripts may extend this dict)
-    "stone_armour": "stone", "stone_dark": "stone", "stone_toe": "stone", "stone_blade": "stone", "stone_gap": "stone",
+    "stone_armour": "stone", "stone_dark": "stone", "stone_toe": "stone", "stone_blade": "stone", "stone_gap": "stone", "knee_dark": "stone",
     "brass": "metal", "iron": "metal",
     "leather": "leather", "leather_dark": "leather", "boot": "leather", "wrap_dark": "leather",
     "wood": "wood", "wood_seam": "wood",

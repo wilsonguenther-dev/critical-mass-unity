@@ -361,7 +361,11 @@ class Builder:
             ob = bpy.data.objects.new(name, me)
             coll.objects.link(ob)
             # colour attribute (point domain, float, linear); alpha = team mask code
-            ca = me.color_attributes.new("Col", "FLOAT_COLOR", "POINT")
+            # v7: bm.to_mesh already writes the bmesh float_color layer "Col" as a colour attribute; creating another
+            # one here made "Col.001" and the FBX carried two colour sets. Reuse the one that exists.
+            ca = me.color_attributes.get("Col") or me.color_attributes.new("Col", "FLOAT_COLOR", "POINT")
+            for extra in [c.name for c in me.color_attributes if c.name != "Col"]:
+                me.color_attributes.remove(me.color_attributes[extra])
             cl = bm.verts.layers.float_color["Col"]
             ws = bm.verts.layers.int["wset"]
             ft = bm.verts.layers.int["feat"]
