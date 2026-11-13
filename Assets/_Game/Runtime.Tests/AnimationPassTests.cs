@@ -455,6 +455,31 @@ namespace CriticalMass.Runtime.Tests
         sealed class Sink : IFootfallSink { public int N; public void OnFootfall(in Footfall f) => N++; }
         sealed class Listener : IPostPoseListener { public int N; public void OnPostPose(int actor, ModelView mv, in ActorPoseState s) => N++; }
 
+        /// <summary>
+        /// Integration batch 3 red (RunningRaisesFootfalls: 0 footfalls): the step cap's window was the Unity frame only, and
+        /// a world stepped tick by tick inside one frame dropped every step after the first 12. Pinned: within one frame the
+        /// cap holds per tick (13 steps on one tick: 12 pass), and the next tick opens a new window; landings and the Kaiju
+        /// always pass.
+        /// </summary>
+        [Test]
+        public void TheStepCapIsPerTickNotPerUnityFrame()
+        {
+            Footfalls.ResetForTests();
+            var s = new Sink();
+            Footfalls.Register(s);
+            for (int k = 0; k < Footfalls.StepCapPerFrame + 1; k++) Footfalls.Emit(new Footfall { Tick = 100, Kind = FootfallKind.Step });
+            Assert.AreEqual(Footfalls.StepCapPerFrame, s.N, "one tick: capped");
+            Assert.AreEqual(1, Footfalls.Dropped);
+            Footfalls.Emit(new Footfall { Tick = 100, Kind = FootfallKind.Land });
+            Footfalls.Emit(new Footfall { Tick = 100, Kind = FootfallKind.KaijuStep });
+            Assert.AreEqual(Footfalls.StepCapPerFrame + 2, s.N, "landings and the Kaiju pass the cap");
+            for (int t = 101; t < 156; t++)
+                for (int k = 0; k < 20; k++) Footfalls.Emit(new Footfall { Tick = t, Kind = FootfallKind.Step });
+            Assert.AreEqual(Footfalls.StepCapPerFrame + 2 + 55 * Footfalls.StepCapPerFrame, s.N, "55 ticks in one frame: 12 each");
+            Footfalls.Unregister(s);
+            Footfalls.ResetForTests();
+        }
+
         [Test]
         public void FootfallsAndPostPoseHooksDispatchWithoutDuplicates()
         {
