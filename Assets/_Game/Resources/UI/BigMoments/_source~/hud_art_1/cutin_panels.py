@@ -1,6 +1,6 @@
 # hud-art-1: the cut-in panel system, drawn by code (deterministic, no generation). Writes into Resources/UI/BigMoments/:
 #   bm-band.png               2048x512, tileable in x: the slanted panel the character breaks out of. Greyscale, tinted by the
-#                             team (or Kaiju) accent in BigMoments: a darker brushed core (value 0.38..0.46) between two bright
+#                             team (or Kaiju) accent in BigMoments: a darker brushed core (value 0.50..0.62) between two bright
 #                             energy rails (value 1.0), soft brushed edges (amplitude 5 px, never jagged).
 #   bm-title-plate*.png       1536x384, tinted Void Navy: a clean slanted plate (12 degree lean, 10 px corner bevel) with a faint
 #                             inner hairline; -impact (Kaiju) has a heavier lower lip, -ribbon (finisher) is longer and thinner.
@@ -30,7 +30,7 @@ def band(out):
     rail = 22 * SS; gap = 9 * SS
     rails = ((y > top) & (y < top + rail)) | ((y < bot) & (y > bot - rail))
     inner = (y > top + rail + gap) & (y < bot - rail - gap)
-    streak = 0.42 + periodic(w, 3, 40, 0.035)[None, :] * np.ones_like(y) + 0.03 * np.sin(y / (17 * SS) + periodic(w, 4, 6, 2.0)[None, :])
+    streak = 0.56 + periodic(w, 3, 40, 0.05)[None, :] * np.ones_like(y) + 0.03 * np.sin(y / (17 * SS) + periodic(w, 4, 6, 2.0)[None, :])
     v = np.where(rails, 1.0, np.where(inner, streak, 0.0))
     a = a * np.where(rails | inner, 0.96, 0.0)
     save(os.path.join(out, "bm-band.png"), v, a, 2048, 512)
