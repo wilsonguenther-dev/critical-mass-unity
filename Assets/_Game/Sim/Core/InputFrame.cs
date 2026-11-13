@@ -16,7 +16,7 @@ namespace CriticalMass.Sim.Core
         public int ClassPick;
         /// <summary>CM-30: miner dig / place. Data only in Phase 0 (no system reads it).</summary>
         public bool Terraform;
-        /// <summary>CM-32: start a jump this step. Data only in Phase 0 (no system reads it).</summary>
+        /// <summary>CM-32: start a jump this step (edge-latched by the human input layer; bots never set it). Read and cleared by Movement (Jump.cs).</summary>
         public bool Jump;
 
         public void CopyFrom(InputFrame other)

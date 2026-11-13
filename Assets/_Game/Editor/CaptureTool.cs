@@ -183,6 +183,7 @@ namespace CriticalMass.Editor
             return new[]
             {
                 ("base-azure", azure.X, azure.Z, GameplayCamera.Distance),
+                ("base-crimson", map.Pads[(int)TeamId.Crimson].X, map.Pads[(int)TeamId.Crimson].Z, GameplayCamera.Distance),
                 ("hill", map.Hill.X, map.Hill.Z, GameplayCamera.Distance),
                 ("shrine", map.Shrine.X, map.Shrine.Z, GameplayCamera.Distance),
                 ("wide", cx, cz, WideDistance(map, land, cx, cz)),
@@ -388,6 +389,12 @@ namespace CriticalMass.Editor
             RenderTexture prevActive = RenderTexture.active;
             cam.aspect = (float)Width / Height;
             var ms = new List<double>();
+            // Draw calls, batches and SetPass calls of the measured frames (Render profiler counters; 0 when the counter
+            // is not available in this editor build, reported as -1).
+            var drawRec = Unity.Profiling.ProfilerRecorder.StartNew(Unity.Profiling.ProfilerCategory.Render, "Draw Calls Count");
+            var batchRec = Unity.Profiling.ProfilerRecorder.StartNew(Unity.Profiling.ProfilerCategory.Render, "Batches Count");
+            var setPassRec = Unity.Profiling.ProfilerRecorder.StartNew(Unity.Profiling.ProfilerCategory.Render, "SetPass Calls Count");
+            long draws = -1, batches = -1, setPass = -1;
             try
             {
                 for (int i = 0; i < PerfFrames + 5; i++)
@@ -401,10 +408,19 @@ namespace CriticalMass.Editor
                     RenderTexture.active = prevActive;
                     sw.Stop();
                     if (i >= 5) ms.Add(sw.Elapsed.TotalMilliseconds);
+                    if (i >= 5 && drawRec.Valid && drawRec.CurrentValue > 0) draws = Math.Max(draws, drawRec.CurrentValue);
+                    if (i >= 5 && UnityStats.drawCalls > 0) draws = Math.Max(draws, UnityStats.drawCalls);
+                    if (i >= 5 && UnityStats.batches > 0) batches = Math.Max(batches, UnityStats.batches);
+                    if (i >= 5 && UnityStats.setPassCalls > 0) setPass = Math.Max(setPass, UnityStats.setPassCalls);
+                    if (i >= 5 && batchRec.Valid && batchRec.CurrentValue > 0) batches = Math.Max(batches, batchRec.CurrentValue);
+                    if (i >= 5 && setPassRec.Valid && setPassRec.CurrentValue > 0) setPass = Math.Max(setPass, setPassRec.CurrentValue);
                 }
             }
             finally
             {
+                drawRec.Dispose();
+                batchRec.Dispose();
+                setPassRec.Dispose();
                 RenderTexture.active = prevActive;
                 cam.ResetAspect();
                 rt.Release();
@@ -413,8 +429,12 @@ namespace CriticalMass.Editor
             }
             ms.Sort();
             double median = ms[ms.Count / 2], p95 = ms[(int)Math.Floor(ms.Count * 0.95)];
-            int renderers = 0, skinned = 0;
-            long tris = 0;
+            int renderers = 0, skinned = 0, visible = 0;
+            long tris = 0, visibleTris = 0, estDraws = 0;
+            // Batch mode reports no Render profiler counters, so the frame's draws are also estimated from the camera:
+            // each renderer whose bounds meet the frustum costs one forward draw per submesh, plus one hull draw per
+            // submesh when its material keeps the outline pass, plus one shadow-caster draw when it casts (no batching).
+            Plane[] frustum = GeometryUtility.CalculateFrustumPlanes(cam);
             foreach (Renderer r in UnityEngine.Object.FindObjectsByType<Renderer>(FindObjectsSortMode.None))
             {
                 if (!r.enabled || !r.gameObject.activeInHierarchy) continue;
@@ -422,10 +442,21 @@ namespace CriticalMass.Editor
                 Mesh m = r is SkinnedMeshRenderer smr ? smr.sharedMesh : (r.GetComponent<MeshFilter>() != null ? r.GetComponent<MeshFilter>().sharedMesh : null);
                 if (r is SkinnedMeshRenderer) skinned++;
                 if (m != null) for (int s = 0; s < m.subMeshCount; s++) tris += (long)m.GetIndexCount(s) / 3;
+                if (m == null || !GeometryUtility.TestPlanesAABB(frustum, r.bounds)) continue;
+                visible++;
+                Material[] mats = r.sharedMaterials;
+                for (int s = 0; s < m.subMeshCount; s++)
+                {
+                    visibleTris += (long)m.GetIndexCount(s) / 3;
+                    Material mat = s < mats.Length ? mats[s] : null;
+                    estDraws += 1;
+                    if (mat != null && mat.FindPass("Outline") >= 0 && mat.GetShaderPassEnabled("SRPDefaultUnlit")) estDraws++;
+                    if (r.shadowCastingMode != ShadowCastingMode.Off) estDraws++;
+                }
             }
             string line = string.Format(CultureInfo.InvariantCulture,
-                "{{\"name\": \"{0}\", \"frameMsMedian\": {1:0.00}, \"frameMsP95\": {2:0.00}, \"frames\": {3}, \"renderers\": {4}, \"skinned\": {5}, \"sceneTris\": {6}}}",
-                name, median, p95, ms.Count, renderers, skinned, tris);
+                "{{\"name\": \"{0}\", \"frameMsMedian\": {1:0.00}, \"frameMsP95\": {2:0.00}, \"frames\": {3}, \"renderers\": {4}, \"skinned\": {5}, \"sceneTris\": {6}, \"drawCalls\": {7}, \"batches\": {8}, \"setPass\": {9}, \"visibleRenderers\": {10}, \"visibleTris\": {11}, \"estDrawCalls\": {12}}}",
+                name, median, p95, ms.Count, renderers, skinned, tris, draws, batches, setPass, visible, visibleTris, estDraws);
             Debug.Log("[CaptureTool] perf " + line);
             return line;
         }
@@ -461,11 +492,28 @@ namespace CriticalMass.Editor
             if (title != null) title.UpdateScale();
             Canvas.ForceUpdateCanvases();
             Canvas.ForceUpdateCanvases();   // the first pass re-sizes the canvas to the texture, the second lays out at that size
+            if (hud != null || title != null)
+            {
+                // HUD v2 fix: a Screen Space - Camera canvas takes its size from the camera's target only when that camera
+                // renders, so the first shot of a run laid the HUD out at the editor's Game view size (1920x1440). One
+                // throw-away render at the target size, then a fresh layout and HUD refresh, before the real render.
+                var warm = new RenderPipeline.StandardRequest { destination = rt };
+                if (RenderPipeline.SupportsRenderRequest(cam, warm)) RenderPipeline.SubmitRenderRequest(cam, warm);
+                else cam.Render();
+                if (hud != null)
+                {
+                    hud.UpdateScale();
+                    if (_driver != null && _driver.World != null) hud.Refresh(_driver.World, 0f);
+                }
+                if (title != null) title.UpdateScale();
+                Canvas.ForceUpdateCanvases();
+                Canvas.ForceUpdateCanvases();
+            }
             if (hud != null)
             {
-                var land = UnityEngine.Object.FindAnyObjectByType<CriticalMass.Runtime.Hud.Ui.MinimapLand>();
+                RectTransform map = hud.MapArea;
                 Debug.Log($"[CaptureTool] hud canvas {hud.Root.rect.size} scale {hud.Canvas.scaleFactor} for {width}x{height}; " +
-                          $"minimap quads {(land != null ? land.Quads : -1)} rect {(land != null ? land.rectTransform.rect.ToString() : "-")}");
+                          $"minimap tier {hud.MapTier} rect {(map != null ? map.rect.ToString() : "-")}");
             }
             if (uiOnly)
             {
@@ -538,6 +586,7 @@ namespace CriticalMass.Editor
             if (_extra >= HudShots.Length)
             {
                 GameHud.PreviewOverride = null;
+                ShootTopDown(Path.Combine(SessionState.GetString(OutKey, "."), "topdown-minimap-4x.png"), 4);
                 Finish(0);
                 return;
             }
@@ -558,6 +607,7 @@ namespace CriticalMass.Editor
             hud.SnapAnimations = true;
             GameHud.PreviewOverride = OverrideFor(shot.Name);
             TitleScreen title = shot.Name == "title" ? TitleScreen.Show(hud.gameObject, hud) : null;
+            if (title != null) title.Animate(0.65f);   // a fixed point of the idle motion: bob near the top, glow at 75%
             string path = Path.Combine(SessionState.GetString(OutKey, "."), shot.Name + ".png");
             RenderTo(path, shot.W, shot.H, shot.Name == "hud-mask", title);
             if (title != null) title.Hide();
@@ -566,6 +616,51 @@ namespace CriticalMass.Editor
             Debug.Log("[CaptureTool] wrote " + path);
             _extra++;
             _settle = -1;
+        }
+
+        /// <summary>
+        /// The real world straight down (orthographic), turned like the gameplay camera (screen up = camera forward) and
+        /// framed exactly on the baked minimap's rect at the given tier: pixel (i, j) of this PNG and of minimap@{tier}x.png
+        /// show the same ground point.
+        /// </summary>
+        private static void ShootTopDown(string path, int tier)
+        {
+            CriticalMass.Runtime.Hud.Ui.MinimapProjection p = CriticalMass.Runtime.Hud.Ui.MinimapGeometry.Projection;
+            p.ToSim(p.Width * 0.5, p.Height * 0.5, 1, out double cx, out double cz);
+            var go = new GameObject("TopDown Capture Camera");
+            try
+            {
+                var cam = go.AddComponent<UnityEngine.Camera>();
+                cam.orthographic = true;
+                cam.orthographicSize = (float)(p.Height * 0.5 / CriticalMass.Runtime.Hud.Ui.MinimapProjection.PxPerUnit);
+                cam.aspect = (float)p.Width / p.Height;
+                cam.nearClipPlane = 1f;
+                cam.farClipPlane = 600f;
+                cam.cullingMask = ~(1 << 5);
+                cam.clearFlags = CameraClearFlags.SolidColor;
+                cam.backgroundColor = new Color(0.118f, 0.176f, 0.29f, 1f);
+                go.transform.position = SimSpace.ToWorld(cx, 300, cz);
+                go.transform.rotation = Quaternion.Euler(90f, (float)(360 - _driver.Config.Render.CameraYawDeg), 0f);
+                int w = p.Width * tier, h = p.Height * tier;
+                var rt = new RenderTexture(w, h, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB) { antiAliasing = 4 };
+                rt.Create();
+                var req = new RenderPipeline.StandardRequest { destination = rt };
+                if (RenderPipeline.SupportsRenderRequest(cam, req)) RenderPipeline.SubmitRenderRequest(cam, req);
+                else { cam.targetTexture = rt; cam.Render(); cam.targetTexture = null; }
+                RenderTexture prev = RenderTexture.active;
+                RenderTexture.active = rt;
+                var tex = new Texture2D(w, h, TextureFormat.RGB24, false);
+                tex.ReadPixels(new Rect(0, 0, w, h), 0, 0);
+                tex.Apply();
+                RenderTexture.active = prev;
+                File.WriteAllBytes(path, tex.EncodeToPNG());
+                UnityEngine.Object.DestroyImmediate(tex);
+                rt.Release();
+                UnityEngine.Object.DestroyImmediate(rt);
+                Written.Add(path);
+                Debug.Log("[CaptureTool] wrote " + path);
+            }
+            finally { UnityEngine.Object.DestroyImmediate(go); }
         }
 
         private static void WriteManifest((string Name, double X, double Z, double Distance)[] targets)

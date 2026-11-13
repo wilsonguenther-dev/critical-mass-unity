@@ -37,6 +37,8 @@ namespace CriticalMass.Editor.Dressing
                 string root = Path.GetDirectoryName(Application.dataPath);
                 File.WriteAllText(Path.Combine(root, PlanTsv), PlanText(plan));
                 Debug.Log($"[WorldBake] {plan.Placements.Count} placements, hash {plan.Hash()} -> {PlanTsv}");
+                foreach (string note in plan.Notes) Debug.Log("[WorldBake] note: " + note);
+                foreach (string dropped in plan.DroppedBases) Debug.Log("[WorldBake] dropped: " + dropped);
                 if (Application.isBatchMode) EditorApplication.Exit(0);
             }
             catch (Exception e)

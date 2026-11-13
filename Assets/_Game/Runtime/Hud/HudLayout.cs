@@ -20,7 +20,9 @@ namespace CriticalMass.Runtime.Hud
         public static readonly Vector2 MatchSize = new Vector2(800f, 128f);
         public static readonly Vector2 KaijuSize = new Vector2(340f, 100f);
         public static readonly Vector2 PlayerSize = new Vector2(640f, 132f);
-        public static readonly Vector2 MinimapSize = new Vector2(272f, 222f);
+        /// <summary>The baked minimap (Ui/MinimapGeometry, 1x px = canvas units) plus a 12 px frame on each side.</summary>
+        public static readonly Vector2 MinimapSize = new Vector2(Ui.MinimapGeometry.Projection.Width + 2 * MinimapFrame, Ui.MinimapGeometry.Projection.Height + 2 * MinimapFrame);
+        public const float MinimapFrame = 12f;
 
         // size floor (art direction 6.5)
         public const float ClockDigitPx = 36f, ScoreDigitPx = 32f, PanelIconPx = 40f, AbilityButtonPx = 64f;

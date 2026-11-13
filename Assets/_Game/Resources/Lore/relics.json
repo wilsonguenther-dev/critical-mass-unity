@@ -1,0 +1,77 @@
+{
+  "schema": "cm.lore.relics/1",
+  "relics": [
+    {
+      "id": "relic-01",
+      "name": "The First Banner",
+      "line1": "Nobody remembers if it was Azure or Crimson.",
+      "line2": "Both sides are certain."
+    },
+    {
+      "id": "relic-02",
+      "name": "Sky-Stone Shard",
+      "line1": "A piece of the night the sky split.",
+      "line2": "Still warm, which is worrying."
+    },
+    {
+      "id": "relic-03",
+      "name": "Shrine Keeper's Ladle",
+      "line1": "Someone once fed the egg on purpose.",
+      "line2": "Their last note reads: less violet."
+    },
+    {
+      "id": "relic-04",
+      "name": "Waterfall Coin",
+      "line1": "Thrown off the edge for luck.",
+      "line2": "The cloud below has kept every one."
+    },
+    {
+      "id": "relic-05",
+      "name": "Lamp Crystal",
+      "line1": "Cut from the old roads under the hill.",
+      "line2": "It glows brighter near anything hollow."
+    },
+    {
+      "id": "relic-06",
+      "name": "Empty Seed Pouch",
+      "line1": "A Farmer's first harvest went straight to the egg.",
+      "line2": "The egg did not say thank you."
+    },
+    {
+      "id": "relic-07",
+      "name": "Orchard Road Map",
+      "line1": "A road to an orchard of burning trees, past the edge.",
+      "line2": "Not this season."
+    },
+    {
+      "id": "relic-08",
+      "name": "Tide Shell",
+      "line1": "Hold it to your ear and you hear the sea.",
+      "line2": "There is no sea. That is the strange part."
+    },
+    {
+      "id": "relic-09",
+      "name": "Hatchling Tooth",
+      "line1": "Lost by a very young Kaiju.",
+      "line2": "Found by a very brave Miner."
+    },
+    {
+      "id": "relic-10",
+      "name": "Bridge Knot",
+      "line1": "Builders tie this knot first and trust it most.",
+      "line2": "Nobody else has ever untied one."
+    },
+    {
+      "id": "relic-11",
+      "name": "Burnt Fuse",
+      "line1": "Left by the Basin's first Demolitions Expert.",
+      "line2": "Found a long way from where it was lit."
+    },
+    {
+      "id": "relic-12",
+      "name": "Crown of the Hill",
+      "line1": "Whoever wore it held the hill from dawn to dusk.",
+      "line2": "Then they came down for supper."
+    }
+  ]
+}

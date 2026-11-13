@@ -1,0 +1,155 @@
+{
+  "schema": "cm.lore.classes/1",
+  "classes": [
+    {
+      "id": "Warrior",
+      "name": "Warrior",
+      "role": "Holds the hill.",
+      "bio": "Wide shield, low stance, no plans to leave. The Warrior is how a team keeps the hill once it has it.",
+      "difficulty": 1,
+      "abilities": [
+        {
+          "input": "attack",
+          "name": "Cleave",
+          "text": "A wide swing across {cfg:warriorArc}° in front for {cfg:warriorDamage} damage.",
+          "cooldown": "",
+          "needsRule": ""
+        },
+        {
+          "input": "ability",
+          "name": "Shield Up",
+          "text": "Takes {cfg:shieldReductionPct}% off hits from the front for {cfg:shieldSeconds} s. You move at {cfg:shieldSpeedPct}% while it is up.",
+          "cooldown": "{cfg:warriorCooldown}",
+          "needsRule": ""
+        },
+        {
+          "input": "passive",
+          "name": "Low Stance",
+          "text": "{cfg:warriorHp} health, the most in the Basin. You are the wall.",
+          "cooldown": "",
+          "needsRule": ""
+        }
+      ]
+    },
+    {
+      "id": "Farmer",
+      "name": "Farmer",
+      "role": "Feeds the egg.",
+      "bio": "Part gardener, part something older. The backpack glows with whatever it carried last, and the egg can tell from across the Basin.",
+      "difficulty": 2,
+      "abilities": [
+        {
+          "input": "attack",
+          "name": "Staff Hook",
+          "text": "A quick hook for {cfg:farmerDamage} damage. Not the reason anyone picks a Farmer.",
+          "cooldown": "",
+          "needsRule": ""
+        },
+        {
+          "input": "ability",
+          "name": "Root Seeds",
+          "text": "Lob seeds up to {cfg:rootRange} m. Enemies within {cfg:rootRadius} m of the landing lose {cfg:rootSlowPct}% speed for {cfg:rootSlowSeconds} s.",
+          "cooldown": "{cfg:farmerCooldown}",
+          "needsRule": ""
+        },
+        {
+          "input": "passive",
+          "name": "Green Thumb",
+          "text": "Gathers in {cfg:farmerGather} s and carries {cfg:farmerCarry} at once. Light on armour at {cfg:farmerHp} health.",
+          "cooldown": "",
+          "needsRule": ""
+        }
+      ]
+    },
+    {
+      "id": "Miner",
+      "name": "Miner",
+      "role": "Opens the roads.",
+      "bio": "Lamp on, pick out, and a firm belief that every wall is a door nobody has told yet.",
+      "difficulty": 2,
+      "abilities": [
+        {
+          "input": "attack",
+          "name": "Pick-Hammer",
+          "text": "{cfg:minerDamage} damage, and every swing knocks a wall down a stage: intact, cracked, gone.",
+          "cooldown": "",
+          "needsRule": ""
+        },
+        {
+          "input": "ability",
+          "name": "Barricade",
+          "text": "Drop a timber-and-stone barricade with {cfg:barricadeHp} health. Up to {cfg:barricadeMax} at once, {cfg:barricadeLife} s each.",
+          "cooldown": "{cfg:minerCooldown}",
+          "needsRule": ""
+        },
+        {
+          "input": "passive",
+          "name": "Dig and Place",
+          "text": "Dig ground out and put it back where it helps: a ramp, a step, a wall.",
+          "cooldown": "",
+          "needsRule": "DG-09"
+        }
+      ]
+    },
+    {
+      "id": "Demolitions",
+      "name": "Demolitions Expert",
+      "role": "Rewrites the map.",
+      "bio": "Singed eyebrows, steady hands, and a backpack nobody stands next to. Carries no weapon. Has never needed one.",
+      "difficulty": 3,
+      "abilities": [
+        {
+          "input": "passive",
+          "name": "No Sword",
+          "text": "No regular attack. Everything you hit, you planned.",
+          "cooldown": "",
+          "needsRule": "DG-22"
+        },
+        {
+          "input": "ability",
+          "name": "Land Mine",
+          "text": "A loose-dirt mound everyone can see. It arms in {cfg:mineArm} s and hits for {cfg:mineDamage}. Up to {cfg:mineMax} at once.",
+          "cooldown": "",
+          "needsRule": "DG-22"
+        },
+        {
+          "input": "throw",
+          "name": "TNT",
+          "text": "Thrown up to {cfg:tntRange} m. After a {cfg:tntFuse} s fuse it deals {cfg:tntDamage} and blows a hole in the ground.",
+          "cooldown": "{cfg:tntCooldown}",
+          "needsRule": "DG-22"
+        }
+      ]
+    },
+    {
+      "id": "Builder",
+      "name": "Builder",
+      "role": "Builds the way across.",
+      "bio": "Flat cap, pencil behind the ear, ladder on his back. Give the Builder biomass and a gap, and he hands you a shortcut.",
+      "difficulty": 3,
+      "abilities": [
+        {
+          "input": "ability",
+          "name": "Ladder",
+          "text": "Spend biomass on a ladder up one level. Anyone can pick it up and move it.",
+          "cooldown": "",
+          "needsRule": "DG-24"
+        },
+        {
+          "input": "interact",
+          "name": "Rope Bridge",
+          "text": "Spend biomass to span a gap. Anyone can carry it off, so guard it.",
+          "cooldown": "",
+          "needsRule": "DG-24"
+        },
+        {
+          "input": "passive",
+          "name": "Station Upgrades",
+          "text": "At your base station, turn biomass into upgrades for the whole team.",
+          "cooldown": "",
+          "needsRule": "DG-24"
+        }
+      ]
+    }
+  ]
+}

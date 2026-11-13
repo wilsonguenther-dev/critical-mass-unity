@@ -73,6 +73,16 @@ namespace CriticalMass.Runtime.View.Art
 
         public bool Active => Root.activeSelf;
 
+        /// <summary>
+        /// Turn the model to a view rotation (for actors: Euler(0, SimSpace.YawDeg(facing), 0)), adding the art's own yaw
+        /// (ModelSpec.ArtYawDeg) so the face leads. The one place a model's forward axis is mapped onto the sim's.
+        /// </summary>
+        public void SetFacing(Quaternion rotation)
+        {
+            float art = Spec != null ? Spec.ArtYawDeg : 0f;
+            Transform.localRotation = art == 0f ? rotation : rotation * Quaternion.Euler(0f, art, 0f);
+        }
+
         public void SetActive(bool on)
         {
             if (Root.activeSelf != on) Root.SetActive(on);
@@ -86,16 +96,22 @@ namespace CriticalMass.Runtime.View.Art
         {
             if (_material == m) return;
             _material = m;
+            // A model with a face slot (Miner CM_FaceDecal) draws that submesh of its body with the face material.
+            Material face = ArtMaterials.Face(Spec, m);
             foreach (Renderer r in Renderers)
             {
                 Material[] mats = r.sharedMaterials;
+                bool body = Spec != null && Spec.Meshes.Length > 0 && r.name == Spec.Meshes[0];
                 bool same = true;
-                for (int i = 0; i < mats.Length; i++) same &= mats[i] == m;
+                for (int i = 0; i < mats.Length; i++) same &= mats[i] == SlotMaterial(m, face, body, i);
                 if (same) continue;
-                for (int i = 0; i < mats.Length; i++) mats[i] = m;
+                for (int i = 0; i < mats.Length; i++) mats[i] = SlotMaterial(m, face, body, i);
                 r.sharedMaterials = mats;
             }
         }
+
+        private Material SlotMaterial(Material m, Material face, bool body, int slot) =>
+            face != null && body && slot == Spec.FaceSlot ? face : m;
 
         /// <summary>Starts a frame's pose: every clip weight back to 0.</summary>
         public void BeginPose()

@@ -23,6 +23,10 @@ namespace CriticalMass.Editor.Art
     /// Every world mesh gets a smoothed outline direction in UV3 (averaged normals of coincident vertices), so the
     /// constant-pixel hull does not tear at the hard edges, and the waterfall's pool foam band gets its constant-pixel
     /// extrusion direction in UV2 (WorldFoam.Bake).
+    /// Art refresh 2 (2026-11-12): face decal PNGs (ModelSpec.FaceTexture) import as clamped sRGB textures with alpha, and
+    /// every model with ModelSpec.BakesOutlineWeights gets a per-vertex outline weight in UV4.x (1 lined, 0 no hull): from
+    /// the decal's alpha at the vertex's UV0 (Warrior, Kaiju: the painted face carries no hull) or from the outline_w
+    /// sidecar (Farmer_OutlineW.json, rest positions of the unlined vertices, matched within OutlineMatchMetres).
     /// </summary>
     public sealed class ArtImportPostprocessor : AssetPostprocessor
     {
@@ -30,7 +34,7 @@ namespace CriticalMass.Editor.Art
         public const string ArtMaterialPath = "Assets/_Game/Resources/Toon/CMToonArt.mat";
 
         /// <summary>Bump when the contract changes: Unity re-imports every model this postprocessor touches.</summary>
-        public override uint GetVersion() => 5;
+        public override uint GetVersion() => 8;
 
         public static bool IsArt(string path) =>
             path.StartsWith(ArtRoot, StringComparison.Ordinal) && path.EndsWith(".fbx", StringComparison.OrdinalIgnoreCase);
@@ -81,6 +85,142 @@ namespace CriticalMass.Editor.Art
             mi.resampleCurves = true;
         }
 
+        public const float OutlineMatchMetres = 0.002f;
+
+        /// <summary>True for a face decal PNG some ModelSpec names.</summary>
+        public static bool IsFaceTexture(string path) => ArtMapping.Models.Any(m => m.FaceTexture == path);
+
+        private void OnPreprocessTexture()
+        {
+            if (!IsFaceTexture(assetPath)) return;
+            var ti = (TextureImporter)assetImporter;
+            ti.textureType = TextureImporterType.Default;
+            ti.sRGBTexture = true;
+            ti.alphaSource = TextureImporterAlphaSource.FromInput;
+            ti.alphaIsTransparency = true;
+            ti.wrapMode = TextureWrapMode.Clamp;
+            ti.filterMode = FilterMode.Bilinear;
+            ti.mipmapEnabled = true;
+            ti.textureCompression = TextureImporterCompression.Uncompressed;
+            ti.isReadable = false;
+        }
+
+        /// <summary>
+        /// UV4.x outline weight per vertex of each renderer mesh of a model (ModelSpec.BakesOutlineWeights). Returns, per
+        /// mesh name, how many vertices were set unlined (logged; the import tests check the counts).
+        /// </summary>
+        private void BakeOutlineWeights(GameObject root, ModelSpec spec)
+        {
+            Texture2D decal = null;
+            OutlineSidecar side = null;
+            if (spec.OutlineWeights != null)
+            {
+                context.DependsOnSourceAsset(spec.OutlineWeights);
+                if (System.IO.File.Exists(spec.OutlineWeights))
+                    side = JsonUtility.FromJson<OutlineSidecar>(System.IO.File.ReadAllText(spec.OutlineWeights));
+                if (side == null) Debug.LogWarning($"[ArtImport] {spec.OutlineWeights} missing: {assetPath} keeps every vertex lined");
+            }
+            else if (spec.FaceTexture != null)
+            {
+                context.DependsOnSourceAsset(spec.FaceTexture);
+                if (System.IO.File.Exists(spec.FaceTexture))
+                {
+                    decal = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+                    if (!decal.LoadImage(System.IO.File.ReadAllBytes(spec.FaceTexture))) decal = null;
+                }
+                if (decal == null) Debug.LogWarning($"[ArtImport] {spec.FaceTexture} unreadable: {assetPath} keeps every vertex lined");
+            }
+            foreach (Renderer r in root.GetComponentsInChildren<Renderer>(true))
+            {
+                Mesh mesh = r is SkinnedMeshRenderer smr ? smr.sharedMesh : r.GetComponent<MeshFilter>()?.sharedMesh;
+                if (mesh == null) continue;
+                var w = new List<Vector2>(new Vector2[mesh.vertexCount]);
+                for (int i = 0; i < w.Count; i++) w[i] = Vector2.one;
+                int unlined = 0;
+                if (decal != null)
+                {
+                    var uv = new List<Vector2>();
+                    mesh.GetUVs(0, uv);
+                    for (int i = 0; i < uv.Count; i++)
+                        if (decal.GetPixelBilinear(uv[i].x, uv[i].y).a > 0.05f) { w[i] = Vector2.zero; unlined++; }
+                }
+                else if (side != null)
+                {
+                    OutlineSidecar.Entry e = side.meshes?.FirstOrDefault(x => x.name == r.name);
+                    if (e != null && e.unlined != null && e.unlined.Length >= 3)
+                    {
+                        Vector3[] v = mesh.vertices;
+                        // The sidecar is in Unity axes for the art's FBX settings (-x, z, -y). Should an export ever
+                        // change the axes or units, the candidate frame that matches the most points wins, and it is logged.
+                        int best = -1;
+                        bool[] bestHit = null;
+                        string bestFrame = null;
+                        foreach (var (name, f) in SidecarFrames)
+                        {
+                            bool[] hit = MatchPoints(v, e.unlined, f, out int listedHit);
+                            if (listedHit > best) { best = listedHit; bestHit = hit; bestFrame = name; }
+                        }
+                        for (int i = 0; i < v.Length; i++) if (bestHit[i]) { w[i] = Vector2.zero; unlined++; }
+                        Debug.Log($"[ArtImport] {spec.Key}/{r.name}: sidecar frame {bestFrame}, {best} of {e.unlined.Length / 3} outline_w points matched");
+                    }
+                }
+                mesh.SetUVs(4, w);
+                Debug.Log($"[ArtImport] {spec.Key}/{r.name}: outline weights baked, {unlined} of {mesh.vertexCount} vertices unlined");
+            }
+            if (decal != null) UnityEngine.Object.DestroyImmediate(decal);
+        }
+
+        /// <summary>Frames a sidecar point (sx, sy, sz) may need to reach mesh space: the expected one first.</summary>
+        static readonly (string, Func<Vector3, Vector3>)[] SidecarFrames =
+        {
+            ("as-written", p => p),
+            ("mirror-x", p => new Vector3(-p.x, p.y, p.z)),
+            ("mirror-z", p => new Vector3(p.x, p.y, -p.z)),
+            ("mirror-xz", p => new Vector3(-p.x, p.y, -p.z)),
+            ("blender-zup", p => new Vector3(-p.x, -p.z, p.y)),
+            ("as-written-cm", p => p * 100f),
+            ("mirror-x-cm", p => new Vector3(-p.x, p.y, p.z) * 100f),
+            ("mirror-xz-cm", p => new Vector3(-p.x, p.y, -p.z) * 100f),
+        };
+
+        /// <summary>Mesh vertices within OutlineMatchMetres (scaled with the frame) of a sidecar point; listedHit counts matched points.</summary>
+        static bool[] MatchPoints(Vector3[] v, float[] pts, Func<Vector3, Vector3> frame, out int listedHit)
+        {
+            Vector3 probe = frame(Vector3.one);
+            float tol = OutlineMatchMetres * Mathf.Max(1f, Mathf.Abs(probe.y)), cell = tol * 4f;
+            var cells = new Dictionary<Vector3Int, List<int>>();
+            for (int i = 0; i < v.Length; i++)
+            {
+                var key = Vector3Int.FloorToInt(v[i] / cell);
+                if (!cells.TryGetValue(key, out var l)) cells[key] = l = new List<int>();
+                l.Add(i);
+            }
+            var hit = new bool[v.Length];
+            listedHit = 0;
+            for (int k = 0; k + 2 < pts.Length; k += 3)
+            {
+                Vector3 p = frame(new Vector3(pts[k], pts[k + 1], pts[k + 2]));
+                Vector3Int c0 = Vector3Int.FloorToInt(p / cell);
+                bool any = false;
+                for (int dz = -1; dz <= 1; dz++)
+                for (int dy = -1; dy <= 1; dy++)
+                for (int dx = -1; dx <= 1; dx++)
+                    if (cells.TryGetValue(c0 + new Vector3Int(dx, dy, dz), out var l))
+                        foreach (int i in l)
+                            if ((v[i] - p).sqrMagnitude < tol * tol) { hit[i] = true; any = true; }
+                if (any) listedHit++;
+            }
+            return hit;
+        }
+
+        [Serializable]
+        public sealed class OutlineSidecar
+        {
+            [Serializable] public sealed class Entry { public string name; public int vertices; public float[] unlined; }
+            public string source;
+            public Entry[] meshes;
+        }
+
         private void OnPreprocessAnimation()
         {
             if (!IsArt(assetPath)) return;
@@ -122,6 +262,7 @@ namespace CriticalMass.Editor.Art
                     if (mats[i] == null && !warned && (warned = true)) Debug.LogWarning($"[ArtImport] {WorldKit.AssetPath(look)} missing while importing {assetPath}: run ProjectSetup.Apply");
                 }
                 r.sharedMaterials = mats;
+                if (piece.StartsWith("env_bridge_", StringComparison.Ordinal)) WorldMeshBake.KitWoodBrowns(mesh);
                 WorldMeshBake.SmoothOutlineDirections(mesh);
                 if (piece == "env_waterfall") WorldMeshBake.FoamExtrusion(mesh);
             }
@@ -157,6 +298,16 @@ namespace CriticalMass.Editor.Art
                 for (int i = 0; i < n; i++) mats[i] = mat;
                 r.sharedMaterials = mats;
             }
+            ModelSpec spec = SpecFor(assetPath);
+            if (spec != null && spec.BakesOutlineWeights) BakeOutlineWeights(root, spec);
+            // Smoothed hull directions in the (skinned) tangent channel: no torn hull or inner crease lines on the
+            // bevelled characters and Kaiju at the gameplay camera (CM/Toon _OutlineSource 3).
+            if (spec != null && spec.Rigged && spec.OutlinePx > 0f)
+                foreach (Renderer r in root.GetComponentsInChildren<Renderer>(true))
+                {
+                    Mesh mesh = r is SkinnedMeshRenderer smr ? smr.sharedMesh : r.GetComponent<MeshFilter>()?.sharedMesh;
+                    if (mesh != null) WorldMeshBake.SmoothOutlineTangents(mesh);
+                }
         }
     }
 }

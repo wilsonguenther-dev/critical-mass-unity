@@ -9,7 +9,9 @@ using UnityEngine;
 
 namespace CriticalMass.Runtime.View.Dressing
 {
-    public enum WorldTeam : byte { None, Azure, Crimson, Neutral }
+    /// <summary>Who a placed piece belongs to. Hill (art refresh 2): the hill site, tinted at run time by the team that
+    /// holds the hill in the Sim (MatchState.HillState), neutral when nobody does.</summary>
+    public enum WorldTeam : byte { None, Azure, Crimson, Neutral, Hill }
 
     /// <summary>One kit piece in the dressed world: the FBX name, its Unity world matrix and what it is.</summary>
     public struct WorldPlacement
@@ -252,6 +254,8 @@ namespace CriticalMass.Runtime.View.Dressing
             var skip = new HashSet<long>();
             foreach (int[] f in lfl) skip.Add(Key(f[0], f[1]));
             Decor(g, map, plan, fl, flH, wfCells, skip);
+            // 8. Knock-down decorations (CM-31): the environment kit's ruin column for a pillar.
+            Decorations(g, map, plan.Placements);
             // Sky rocks, cloud puffs and the cloud floor under the arena (layout.py place, v1 kept).
             Sky(plan.Placements);
             // Bases kit: districts, hill, shrine; their breakables; the Sim wall cells they cover.
@@ -851,6 +855,33 @@ namespace CriticalMass.Runtime.View.Dressing
         }
 
         // ------------------------------------------------------------------------------------------- sky
+        /// <summary>The kit piece of a knock-down decoration (MapDef.Decorations): a pillar is env_ruin_column_intact standing,
+        /// env_ruin_column_fallen_ramp fallen along its Ramp (bridging the void), env_ruin_column_fallen_block fallen along
+        /// its Block. The Sim keeps no topple state yet (CM-31 is the owner's item), so the view draws the standing column.</summary>
+        public static string DecorationPiece(DecorationKind kind, bool fallen, bool alongRamp)
+        {
+            switch (kind)
+            {
+                case DecorationKind.Pillar:
+                    return !fallen ? "env_ruin_column_intact" : alongRamp ? "env_ruin_column_fallen_ramp" : "env_ruin_column_fallen_block";
+                default:
+                    return null;
+            }
+        }
+
+        static void Decorations(G g, MapDef map, List<WorldPlacement> o)
+        {
+            if (map.Decorations == null) return;
+            foreach (DecorationDef d in map.Decorations)
+            {
+                string piece = DecorationPiece(d.Kind, false, false);
+                if (piece == null) continue;
+                // Yaw faces the ramp direction, so the fallen pieces (authored falling along +Z) line up when they land.
+                double yaw = Math.Atan2(d.Ramp.Dx, -d.Ramp.Dz) * 180.0 / Math.PI;
+                o.Add(At(piece, d.Cx + 0.5, g.Hh(d.Cx, d.Cz), d.Cz + 0.5, yaw, "decor"));
+            }
+        }
+
         static void Sky(List<WorldPlacement> o)
         {
             for (int k = 0; k < 70; k++)
@@ -868,8 +899,10 @@ namespace CriticalMass.Runtime.View.Dressing
                 double x = -20 + (hx % 1520) / 10.0, z = -20 + ((hx >> 11) % 1120) / 10.0;
                 o.Add(At("env_cloud_puff", x, -9.0 - (hx >> 24) % 3, z, (hx >> 5) % 360, "sky"));
             }
-            for (int gx = -1; gx < 4; gx++)
-            for (int gz = -1; gz < 3; gz++)
+            // Art refresh 2: the flat cloud floor reaches past the wide frame on every side (it ended inside it with 5 x 4
+            // tiles); the tiles are 4-vertex quads, so 14 x 12 costs nothing.
+            for (int gx = -6; gx < 8; gx++)
+            for (int gz = -5; gz < 7; gz++)
                 o.Add(At("env_cloud_floor", gx * 64 + 32 - 40, -11.0, gz * 64 + 32 - 28, 0, "sky"));
         }
 
@@ -877,7 +910,7 @@ namespace CriticalMass.Runtime.View.Dressing
         public static readonly string[] BaseSites = { "district_azure", "district_crimson", "hill", "shrine" };
 
         static WorldTeam SiteTeam(string site) =>
-            site == "district_azure" ? WorldTeam.Azure : site == "district_crimson" ? WorldTeam.Crimson : WorldTeam.Neutral;
+            site == "district_azure" ? WorldTeam.Azure : site == "district_crimson" ? WorldTeam.Crimson : site == "hill" ? WorldTeam.Hill : WorldTeam.Neutral;
 
         static void Bases(G g, MapDef map, BasesFile bases, WorldPlan plan, Func<string, Vector3> centroidOf, Func<string, Vector3[]> bodyOf)
         {
@@ -891,6 +924,8 @@ namespace CriticalMass.Runtime.View.Dressing
                 // Site turn: the bases kit v1 shrine is authored north-south mirrored against the Sim (its breakables sit at
                 // sim z 4.7, the Sim's yard breakables and gap are on the south side, z 11), so a site whose breakables
                 // match the Sim's breakable cells better when turned 180 degrees about its anchor is turned.
+                // Bases v2 (ead6b1e, checked 2026-11-12 in art refresh 2): still mirrored at source (the bake notes "shrine:
+                // turned 180"), so the turn stays; it switches itself off once the art matches the Sim.
                 float siteYaw = BreakableFit(g, s, anchor, 180f, centroidOf) > BreakableFit(g, s, anchor, 0f, centroidOf) ? 180f : 0f;
                 if (siteYaw != 0f) plan.Notes.Add($"{name}: turned {siteYaw:0} degrees about its anchor to match the Sim breakable cells");
                 Quaternion siteRot = Quaternion.Euler(0f, siteYaw, 0f);

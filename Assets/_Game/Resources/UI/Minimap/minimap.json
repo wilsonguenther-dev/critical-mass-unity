@@ -1,0 +1,9 @@
+{
+  "note": "Baked by CriticalMass.Editor.MinimapBaker from SkybreakBasinMap (default config). Camera-up: up on the minimap is up on the screen (gameplay camera yaw 45).",
+  "yawDeg": 45,
+  "pxPerUnit1x": 2.1,
+  "u0": -31.485407670453391,
+  "v0": 13.071843353822906,
+  "size1x": [205, 210],
+  "map": [112, 72]
+}

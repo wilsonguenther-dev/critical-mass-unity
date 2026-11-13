@@ -1,7 +1,8 @@
 // CM/WorldDecal (environment kit v3, 2026-11-12): the kit's ground decals, unlit, no outline, no depth write.
 // _Mode 0 = CM_GlowDecal (crystal ground glow: vertex colour, radial alpha from the disc's UV centre, additive), and a
 // team decal (vertex alpha code 6) takes _TeamGlowDecal instead of its authored Azure when _SwapTeam is 1 (Crimson).
-// _Mode 2 = bases light / egg pool: the vertex colour at _Strength alpha (props README: brazier pool decal at 35%).
+// _Mode 2 = bases light / egg pool: the vertex colour added with an alpha that falls from _Strength at the centre to 0 at
+// the rim along the pool's authored vertex-alpha rings (art refresh 2; was a flat 35% disc).
 // _Mode 1 = CM_ShadowDecal (ledge soft shadow on the lower ground: alpha = 1 - UV.v, alpha-blended _ShadowColor).
 Shader "CM/WorldDecal"
 {
@@ -51,7 +52,11 @@ Shader "CM/WorldDecal"
                 #if !defined(UNITY_COLORSPACE_GAMMA)
                     c = SRGBToLinear(c);
                 #endif
-                    return half4(c, _Strength);
+                    // Art refresh 2: the pool's vertex alpha carries its falloff rings (centre 3/8, mid 1/8, rim 0); smoothed
+                    // and squared it falls to nothing at the rim, added (Blend SrcAlpha One) as soft warm light, not a disc.
+                    half k = saturate(i.color.a / 0.375h);
+                    k = k * k * (3.0h - 2.0h * k);
+                    return half4(c, k * k * _Strength);
                 }
                 if (_Mode > 0.5) return half4(_ShadowColor.rgb, _ShadowColor.a * saturate(1.0 - i.uv.y) * _Strength);
                 half3 rgb = i.color.rgb;

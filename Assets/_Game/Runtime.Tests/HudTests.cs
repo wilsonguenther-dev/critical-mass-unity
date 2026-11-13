@@ -255,6 +255,89 @@ namespace CriticalMass.Runtime.Tests
             }
         }
 
+        // ---- v2: illustrated icons, class portraits, death grade ----
+
+        [Test]
+        public void EveryIconShipsAtThreeTiersAtDoubleAndQuadrupleSize()
+        {
+            int n = 0;
+            foreach (string name in UiIcons.All())
+            {
+                Texture2D t1 = UiIcons.Get(name, 1), t2 = UiIcons.Get(name, 2), t4 = UiIcons.Get(name, 4);
+                Assert.IsNotNull(t1, name + "@1x missing");
+                Assert.IsNotNull(t2, name + "@2x missing");
+                Assert.IsNotNull(t4, name + "@4x missing");
+                Assert.AreEqual(t1.width * 2, t2.width, name + " @2x is not twice @1x");
+                Assert.AreEqual(t1.width * 4, t4.width, name + " @4x is not four times @1x");
+                Assert.Greater(t4.mipmapCount, 1, name + "@4x has no mipmaps (it is drawn smaller than its size)");
+                n++;
+            }
+            Assert.GreaterOrEqual(n, 60, "icon catalogue shrank");
+            string svg = Path.Combine(Application.dataPath, "_Game/Art/UI/Icons/_source~/svg");
+            foreach (string name in UiIcons.All())
+                Assert.IsTrue(File.Exists(Path.Combine(svg, name + ".svg")), name + ".svg vector source missing");
+        }
+
+        [Test]
+        public void EveryClassHasAPortraitBadgeAttackAndAbilityPerTeam()
+        {
+            foreach (ClassId c in Enum.GetValues(typeof(ClassId)))
+            foreach (TeamId t in Enum.GetValues(typeof(TeamId)))
+            {
+                Assert.IsNotNull(UiIcons.Get(UiIcons.Portrait[(int)c, (int)t], 2), c + " " + t + " portrait");
+                Assert.IsNotNull(UiIcons.Get(UiIcons.ClassBadge[(int)c, (int)t], 2), c + " " + t + " badge");
+                Assert.IsNotNull(UiIcons.Get(UiIcons.Attack[(int)c, (int)t], 2), c + " " + t + " attack");
+                Assert.IsNotNull(UiIcons.Get(UiIcons.Ability[(int)c, (int)t], 2), c + " " + t + " ability");
+            }
+        }
+
+        [TestCase(1280, 720, 1)]
+        [TestCase(1920, 1080, 2)]
+        [TestCase(3840, 2160, 4)]
+        public void IconTierNeverUpscales(int w, int h, int tier)
+        {
+            float s = HudLayout.Scale(w, h);
+            Assert.AreEqual(tier, UiIcons.TierFor(s));
+            Assert.GreaterOrEqual(UiIcons.TierFor(s), s, "an icon texture would be stretched above its size");
+        }
+
+        [Test]
+        public void HudShowsTheLocalClassPortraitAndCrests()
+        {
+            World w = NewWorld();
+            Run(w, 60);
+            var go = new GameObject("HUD test");
+            try
+            {
+                GameHud hud = go.AddComponent<GameHud>();
+                hud.Build();
+                hud.Refresh(w, 0.016f);
+                int cls = (int)w.Actors[0].Cls, team = (int)w.Actors[0].Team;
+                bool portrait = false, crestA = false, crestC = false;
+                foreach (HudIcon i in hud.Icons)
+                {
+                    if (i.Name == UiIcons.Portrait[cls, team]) portrait = i.Image.texture != null;
+                    if (i.Name == UiIcons.Crest[0]) crestA = i.Image.texture != null;
+                    if (i.Name == UiIcons.Crest[1]) crestC = i.Image.texture != null;
+                }
+                Assert.IsTrue(portrait, "player card does not show " + UiIcons.Portrait[cls, team]);
+                Assert.IsTrue(crestA && crestC, "team crests missing");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(go); }
+        }
+
+        [Test]
+        public void DeathGradeShaderShipsAndTargetsTheBrief()
+        {
+            Shader sh = Resources.Load<Shader>(DeathGrade.ShaderResource);
+            Assert.IsNotNull(sh, "death grade shader missing from Resources");
+            Assert.IsTrue(sh.isSupported, "death grade shader does not compile (a shader with errors draws nothing)");
+            Material m = DeathGrade.GradeMaterial;
+            Assert.IsNotNull(m);
+            Assert.AreEqual(0.7f, m.GetFloat("_Brightness"), 1e-4f);
+            Assert.AreEqual(0.6f, m.GetFloat("_Saturation"), 1e-4f);
+        }
+
         static float Area(System.Collections.Generic.List<Vector2> p)
         {
             float a = 0;

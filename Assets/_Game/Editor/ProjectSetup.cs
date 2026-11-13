@@ -205,9 +205,10 @@ namespace CriticalMass.Editor
                 {
                     bool glow = look == WorldLook.GlowDecal, pool = look == WorldLook.Pool;
                     dirty |= SetF(m, "_Mode", glow ? 0f : pool ? 2f : 1f);
-                    dirty |= SetF(m, "_Strength", glow ? 0.6f : pool ? 0.35f : 1f);
+                    // Pools (art refresh 2): additive soft light, 0.3 at the centre, nothing at the rim.
+                    dirty |= SetF(m, "_Strength", glow ? 0.6f : pool ? 0.3f : 1f);
                     dirty |= SetF(m, "_SrcBlend", glow ? 1f : 5f);
-                    dirty |= SetF(m, "_DstBlend", glow ? 1f : 10f);
+                    dirty |= SetF(m, "_DstBlend", glow || pool ? 1f : 10f);
                 }
                 if (dirty) EditorUtility.SetDirty(m);
             }

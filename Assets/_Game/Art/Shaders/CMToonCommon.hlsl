@@ -47,8 +47,22 @@ CBUFFER_START(UnityPerMaterial)
     float _FogBottom;
     half _FogAmount;
     float _ExtrudePx;
+    // Art refresh 2 (2026-11-12): painted face decal over vertex colour (UV0, mixed by its alpha before the bands), the
+    // Kaiju berserk darkening of fixed colours, and a per-vertex outline weight in UV4.x (0 = no hull: faces).
+    float _DecalOn;
+    float _Berserk;
+    half4 _BerserkMul;
+    half4 _BerserkTint;
+    half _BerserkTintAmount;
+    float _OutlineWeightUV4;
 CBUFFER_END
 
+// Outside the per-material block (textures are not CBUFFER members; SRP Batcher compatible).
+TEXTURE2D(_FaceTex);
+SAMPLER(sampler_FaceTex);
+
+// Shared vertex input. uv0 is read only when _DecalOn is set and outlineW (UV4.x, baked by ArtImportPostprocessor) only
+// when _OutlineWeightUV4 is set, for the same reason as UV3 below: meshes without the channel are never asked for it.
 // Shared vertex input. color.r is the team mask (vertex colour layer "TeamMask", U-043):
 // 1 paints _TeamColor, 0 keeps _BaseColor, values between lerp.
 // texcoord3.xyz is a smoothed outline direction (object space), read only when _OutlineSource is 2: a mesh without UV3
@@ -58,14 +72,18 @@ struct CMToonAttributes
 {
     float4 positionOS : POSITION;
     float3 normalOS   : NORMAL;
+    float4 tangentOS  : TANGENT;
     half4  color      : COLOR;
+    float2 uv0        : TEXCOORD0;
     float3 extrudeOS  : TEXCOORD2;
     float3 outlineOS  : TEXCOORD3;
+    float2 outlineW   : TEXCOORD4;
 };
 
 // Vertex-colour mode (_ColorMode 1; Blender art import 2026-11-12). The art's colour set "Col" carries the lit colour
 // in RGB (sRGB hex from the bible) and a mask code in A, read here in eighths:
-//   0 fixed (banded)        1 fixed glow, lined (self-lit)   2 fixed glow (self-lit, no hull)
+//   0 fixed (banded)        1 fixed glow, lined (self-lit)   2 fixed glow (self-lit, no hull; alpha 0.25: the Farmer's
+//                                                            biomass glow, never team-swapped)
 //   4 team dark (banded)    5 team glow, lined (self-lit)    6 team glow (self-lit, no hull)    8 team cloth (banded)
 //   3 team marker light (self-lit, no hull)    7 team marker dark (self-lit, no hull)   (props v2, 2026-11-12: Azure
 //   authored #27F8F8 / #43C2C5, Crimson #E6A595 / #D6594F)
@@ -95,6 +113,10 @@ void CMToonVertexColour(half4 col, out half3 albedo, out half selfLit)
     else if (code == 8) rgb = CMToonSwap(rgb, _TeamCloth.rgb, _DefaultCloth.rgb);
     else if (code == 3) rgb = CMToonSwap(rgb, _TeamMarker.rgb, _DefaultMarker.rgb);
     else if (code == 7) rgb = CMToonSwap(rgb, _TeamMarkerDark.rgb, _DefaultMarkerDark.rgb);
+    // Kaiju berserk (kaiju v3 report, kaiju_palette.py): fixed colours only, in sRGB, before the bands:
+    // fixed' = lerp(fixed, lerp(fixed * (0.82, 0.56, 0.78), Corruption #8E3FD1, 0.15), _Berserk).
+    if (code == 0 && _Berserk > 0.0)
+        rgb = lerp(rgb, lerp(rgb * _BerserkMul.rgb, LinearToSRGB(_BerserkTint.rgb), _BerserkTintAmount), _Berserk);
     selfLit = (code == 1 || code == 2 || code == 3 || code == 5 || code == 6 || code == 7) ? 1.0h : 0.0h;
 #if defined(UNITY_COLORSPACE_GAMMA)
     albedo = rgb;
@@ -110,6 +132,15 @@ half CMToonOutlineMask(half4 col)
     if (_ColorMode < 0.5) return 1.0h;
     int code = CMToonMaskCode(col.a);
     return (code == 2 || code == 3 || code == 6 || code == 7) ? 0.0h : 1.0h;
+}
+
+// The painted face decal (Kaiju_Face.png, Warrior_Face.png, MinerFace.png) over the linear albedo, by its alpha; faces
+// that show no face map to a transparent texel. Banded afterwards like the vertex colour it covers.
+half3 CMToonDecal(half3 albedo, float2 uv)
+{
+    if (_DecalOn < 0.5) return albedo;
+    half4 d = SAMPLE_TEXTURE2D(_FaceTex, sampler_FaceTex, uv);
+    return lerp(albedo, d.rgb, d.a);
 }
 
 // Pushes a clip-space position px pixels (at 1080p, scaled with the target height) along the screen projection of an
@@ -170,14 +201,17 @@ float4 CMToonOutlinePositionCS(CMToonAttributes input)
 {
     // _OutlineSource: 0 the vertex normal (smooth meshes), 1 away from the pivot (convex primitives with split normals,
     // so the hull has no gaps at the corners), 2 the UV3 direction (chunk meshes write each box corner's direction).
-    float3 dirOS = _OutlineSource > 1.5 ? input.outlineOS : (_OutlineSource > 0.5 ? input.positionOS.xyz : input.normalOS);
+    // 3 (art refresh 2): the smoothed direction in TANGENT.xyz, which skinning deforms (characters and Kaiju).
+    float3 dirOS = _OutlineSource > 2.5 ? input.tangentOS.xyz
+                 : _OutlineSource > 1.5 ? input.outlineOS : (_OutlineSource > 0.5 ? input.positionOS.xyz : input.normalOS);
     float4 positionCS = TransformObjectToHClip(input.positionOS.xyz);
     float3 dirWS = TransformObjectToWorldDir(dirOS, true);
     float2 dirCS = mul((float3x3)GetWorldToHClipMatrix(), dirWS).xy;
     float len = length(dirCS);
     if (len > 1e-6)
     {
-        float2 offset = dirCS / len * (_OutlinePx * CMToonOutlineMask(input.color) * 2.0 / 1080.0);
+        half w = _OutlineWeightUV4 > 0.5 ? saturate(input.outlineW.x) : 1.0h;
+        float2 offset = dirCS / len * (_OutlinePx * CMToonOutlineMask(input.color) * w * 2.0 / 1080.0);
         offset.x *= _ScreenParams.y / _ScreenParams.x;
         positionCS.xy += offset * positionCS.w;
     }

@@ -16,668 +16,1001 @@
     {
      "piece": "cm_brazier",
      "pos": [
-      10.3137,
+      11.1801,
       2.31,
-      -6.2467
+      -6.6334
      ],
      "yaw": -0.0
     },
     {
      "piece": "cm_light_pool",
      "pos": [
-      8.9111,
+      9.4187,
       0.0,
-      -5.5192
+      -5.729
      ],
      "yaw": -0.0
     },
     {
-     "piece": "cm_dress_rubble_low",
+     "piece": "cm_brazier",
      "pos": [
-      9.6719,
-      0.0,
-      -4.8513
+      2.3035,
+      2.31,
+      -12.4892
      ],
-     "yaw": -326.85
+     "yaw": -0.0
     },
     {
-     "piece": "cm_dress_rubble_low",
+     "piece": "cm_light_pool",
      "pos": [
-      9.2652,
+      2.3595,
       0.0,
-      -5.8873
+      -10.51
      ],
-     "yaw": -238.728
+     "yaw": -0.0
     },
     {
-     "piece": "cm_dress_planks_low",
+     "piece": "cm_brazier",
      "pos": [
-      8.9752,
+      -1.5961,
+      2.31,
+      -12.253
+     ],
+     "yaw": -0.0
+    },
+    {
+     "piece": "cm_light_pool",
+     "pos": [
+      -0.8433,
       0.0,
-      -6.7887
+      -10.4217
+     ],
+     "yaw": -0.0
+    },
+    {
+     "piece": "cm_dress_crate",
+     "pos": [
+      1.2918,
+      2.31,
+      -12.5134
+     ],
+     "yaw": 2.607
+    },
+    {
+     "piece": "cm_dress_barrel",
+     "pos": [
+      0.541,
+      2.31,
+      -12.5398
+     ],
+     "yaw": -0.0
+    },
+    {
+     "piece": "cm_dress_crate",
+     "pos": [
+      -0.8579,
+      2.31,
+      -12.5136
+     ],
+     "yaw": 4.72
+    },
+    {
+     "piece": "cm_dress_barrel",
+     "pos": [
+      -1.5392,
+      2.31,
+      -12.2439
+     ],
+     "yaw": -0.0
+    },
+    {
+     "piece": "cm_dress_barrel",
+     "pos": [
+      2.1068,
+      0.0,
+      -11.7702
+     ],
+     "yaw": -216.626
+    },
+    {
+     "piece": "cm_dress_barrel",
+     "pos": [
+      1.4333,
+      0.0,
+      -11.8058
+     ],
+     "yaw": -330.144
+    },
+    {
+     "piece": "cm_dress_barrel",
+     "pos": [
+      1.7534,
+      0.0,
+      -11.482
      ],
      "yaw": -174.678
     },
     {
+     "piece": "cm_dress_barrel",
+     "pos": [
+      1.0271,
+      0.0,
+      -11.5756
+     ],
+     "yaw": -281.742
+    },
+    {
+     "piece": "cm_dress_crate",
+     "pos": [
+      -0.0093,
+      0.0,
+      -11.7998
+     ],
+     "yaw": 4.78
+    },
+    {
+     "piece": "cm_dress_crate",
+     "pos": [
+      -0.5634,
+      0.0,
+      -11.7858
+     ],
+     "yaw": 5.901
+    },
+    {
+     "piece": "cm_dress_crate_small",
+     "pos": [
+      -0.0863,
+      0.7,
+      -11.8006
+     ],
+     "yaw": 22.429
+    },
+    {
+     "piece": "cm_dress_crate_small",
+     "pos": [
+      -1.0242,
+      0.0,
+      -11.6874
+     ],
+     "yaw": -19.684
+    },
+    {
      "piece": "cm_brazier",
      "pos": [
-      2.138,
+      -7.2296,
       2.31,
-      -11.5356
+      -6.5362
      ],
      "yaw": -0.0
     },
     {
      "piece": "cm_light_pool",
      "pos": [
-      2.1537,
+      -5.4612,
       0.0,
-      -9.9557
+      -5.6456
      ],
      "yaw": -0.0
     },
     {
+     "piece": "cm_dress_crate",
+     "pos": [
+      -7.7332,
+      2.31,
+      -5.6625
+     ],
+     "yaw": 59.097
+    },
+    {
      "piece": "cm_dress_barrel",
      "pos": [
-      0.7278,
+      -8.0793,
       2.31,
-      -11.6223
+      -5.0033
      ],
-     "yaw": -22.237
+     "yaw": -0.0
     },
     {
-     "piece": "cm_dress_rubble_low",
+     "piece": "cm_dress_crate_small",
      "pos": [
-      3.0272,
-      0.0,
-      -10.5993
+      -8.329,
+      2.31,
+      -4.4363
      ],
-     "yaw": -160.195
+     "yaw": 50.574
     },
     {
-     "piece": "cm_dress_planks_low",
+     "piece": "cm_dress_crate",
      "pos": [
-      1.9675,
-      0.0,
-      -10.5397
+      -8.5214,
+      2.31,
+      -3.6767
      ],
-     "yaw": -85.932
+     "yaw": 82.625
     },
     {
-     "piece": "cm_dress_rubble_low",
+     "piece": "cm_dress_barrel",
      "pos": [
-      0.7905,
-      0.0,
-      -10.4774
+      -8.5549,
+      2.31,
+      -2.948
      ],
-     "yaw": -154.777
+     "yaw": -0.0
     },
     {
-     "piece": "cm_dress_flagstones",
+     "piece": "cm_dress_crate_small",
      "pos": [
-      0.0502,
-      0.0,
-      -10.7267
+      -8.6856,
+      2.31,
+      -2.3546
      ],
-     "yaw": -244.729
+     "yaw": 84.424
+    },
+    {
+     "piece": "cm_dress_crate",
+     "pos": [
+      -6.5033,
+      0.0,
+      -6.1887
+     ],
+     "yaw": 61.112
+    },
+    {
+     "piece": "cm_dress_crate",
+     "pos": [
+      -6.9449,
+      0.0,
+      -5.4609
+     ],
+     "yaw": 60.343
+    },
+    {
+     "piece": "cm_dress_crate_small",
+     "pos": [
+      -6.545,
+      0.7,
+      -6.1053
+     ],
+     "yaw": 73.03
+    },
+    {
+     "piece": "cm_dress_crate_small",
+     "pos": [
+      -7.2713,
+      0.0,
+      -5.0022
+     ],
+     "yaw": 38.531
+    },
+    {
+     "piece": "cm_dress_crate",
+     "pos": [
+      -7.5438,
+      0.0,
+      -4.2506
+     ],
+     "yaw": 76.404
+    },
+    {
+     "piece": "cm_dress_crate",
+     "pos": [
+      -7.7424,
+      0.0,
+      -3.6323
+     ],
+     "yaw": 82.377
+    },
+    {
+     "piece": "cm_dress_crate_small",
+     "pos": [
+      -7.5714,
+      0.7,
+      -4.161
+     ],
+     "yaw": 58.672
+    },
+    {
+     "piece": "cm_dress_crate_small",
+     "pos": [
+      -7.8431,
+      0.0,
+      -3.1424
+     ],
+     "yaw": 78.287
     },
     {
      "piece": "cm_brazier",
      "pos": [
-      -5.0713,
+      -8.4735,
       2.31,
-      -8.5444
+      3.9191
      ],
      "yaw": -0.0
     },
     {
      "piece": "cm_light_pool",
      "pos": [
-      -3.8875,
+      -6.5425,
       0.0,
-      -7.498
+      3.4814
      ],
      "yaw": -0.0
     },
     {
+     "piece": "cm_dress_crate",
+     "pos": [
+      -8.1902,
+      2.31,
+      4.8555
+     ],
+     "yaw": 119.378
+    },
+    {
      "piece": "cm_dress_barrel",
      "pos": [
-      -5.8119,
+      -7.8078,
       2.31,
-      -7.4102
+      5.4809
      ],
-     "yaw": 70.049
+     "yaw": -0.0
     },
     {
-     "piece": "cm_dress_planks_low",
+     "piece": "cm_dress_crate_small",
      "pos": [
-      -3.7351,
-      0.0,
-      -8.3014
+      -7.4915,
+      2.31,
+      6.042
      ],
-     "yaw": -267.873
+     "yaw": 95.948
     },
     {
-     "piece": "cm_dress_rubble_low",
+     "piece": "cm_dress_crate",
      "pos": [
-      -4.0611,
-      0.0,
-      -7.5667
+      -7.1144,
+      2.31,
+      6.7597
      ],
-     "yaw": -192.532
+     "yaw": 120.744
     },
     {
-     "piece": "cm_dress_flagstones",
+     "piece": "cm_dress_barrel",
      "pos": [
-      -4.8584,
-      0.0,
-      -7.3493
+      -6.7675,
+      2.31,
+      7.4393
      ],
-     "yaw": -129.395
+     "yaw": -0.0
     },
     {
-     "piece": "cm_dress_rubble_low",
+     "piece": "cm_dress_crate_small",
      "pos": [
-      -4.7099,
-      0.0,
-      -6.4873
+      -6.7318,
+      2.31,
+      7.9062
      ],
-     "yaw": -155.365
+     "yaw": 131.418
+    },
+    {
+     "piece": "cm_dress_crate",
+     "pos": [
+      -7.6278,
+      0.0,
+      3.9709
+     ],
+     "yaw": 107.055
+    },
+    {
+     "piece": "cm_dress_crate",
+     "pos": [
+      -7.4765,
+      0.0,
+      4.5556
+     ],
+     "yaw": 111.211
+    },
+    {
+     "piece": "cm_dress_crate_small",
+     "pos": [
+      -7.6015,
+      0.7,
+      4.0609
+     ],
+     "yaw": 91.014
+    },
+    {
+     "piece": "cm_dress_crate_small",
+     "pos": [
+      -7.2486,
+      0.0,
+      5.0412
+     ],
+     "yaw": 112.672
     },
     {
      "piece": "cm_brazier",
      "pos": [
-      -7.5188,
+      -2.384,
       2.31,
-      0.3441
+      11.8885
      ],
      "yaw": -0.0
     },
     {
      "piece": "cm_light_pool",
      "pos": [
-      -5.9391,
+      -1.6069,
       0.0,
-      0.3729
+      10.0673
      ],
      "yaw": -0.0
     },
     {
+     "piece": "cm_dress_crate",
+     "pos": [
+      -1.4777,
+      2.31,
+      12.3008
+     ],
+     "yaw": 150.912
+    },
+    {
+     "piece": "cm_dress_barrel",
+     "pos": [
+      -0.7783,
+      2.31,
+      12.5017
+     ],
+     "yaw": -0.0
+    },
+    {
+     "piece": "cm_dress_barrel",
+     "pos": [
+      -1.9831,
+      0.0,
+      11.2812
+     ],
+     "yaw": -179.352
+    },
+    {
+     "piece": "cm_dress_barrel",
+     "pos": [
+      -1.4128,
+      0.0,
+      11.5768
+     ],
+     "yaw": -315.164
+    },
+    {
+     "piece": "cm_dress_barrel",
+     "pos": [
+      -1.5148,
+      0.0,
+      11.1717
+     ],
+     "yaw": -112.009
+    },
+    {
+     "piece": "cm_dress_barrel",
+     "pos": [
+      -1.0093,
+      0.0,
+      11.458
+     ],
+     "yaw": -313.038
+    },
+    {
      "piece": "cm_brazier",
      "pos": [
-      -6.9497,
+      11.798,
       2.31,
-      5.1314
+      5.5559
      ],
      "yaw": -0.0
     },
     {
      "piece": "cm_light_pool",
      "pos": [
-      -5.6009,
+      10.1012,
       0.0,
-      4.3085
+      4.5354
      ],
      "yaw": -0.0
     },
     {
-     "piece": "cm_dress_barrel",
+     "piece": "cm_dress_crate",
      "pos": [
-      -7.603,
+      12.2467,
       2.31,
-      1.7475
+      4.6953
      ],
-     "yaw": 89.372
-    },
-    {
-     "piece": "cm_dress_barrel",
-     "pos": [
-      -7.5939,
-      2.31,
-      3.5064
-     ],
-     "yaw": 86.76
+     "yaw": -112.352
     },
     {
      "piece": "cm_dress_barrel",
      "pos": [
-      -7.0835,
+      12.429,
       2.31,
-      4.9067
-     ],
-     "yaw": 120.219
-    },
-    {
-     "piece": "cm_dress_rubble_low",
-     "pos": [
-      -6.457,
-      0.0,
-      -0.5123
-     ],
-     "yaw": -248.663
-    },
-    {
-     "piece": "cm_dress_rubble_low",
-     "pos": [
-      -6.6456,
-      0.0,
-      0.6178
-     ],
-     "yaw": -23.729
-    },
-    {
-     "piece": "cm_dress_flagstones",
-     "pos": [
-      -6.392,
-      0.0,
-      1.6344
-     ],
-     "yaw": -315.095
-    },
-    {
-     "piece": "cm_dress_flagstones",
-     "pos": [
-      -6.7068,
-      0.0,
-      2.6579
-     ],
-     "yaw": -219.442
-    },
-    {
-     "piece": "cm_dress_flagstones",
-     "pos": [
-      -6.4459,
-      0.0,
-      3.3499
-     ],
-     "yaw": -50.488
-    },
-    {
-     "piece": "cm_dress_flagstones",
-     "pos": [
-      -6.0672,
-      0.0,
-      3.9472
-     ],
-     "yaw": -335.681
-    },
-    {
-     "piece": "cm_dress_rubble_low",
-     "pos": [
-      -5.6657,
-      0.0,
-      4.4226
-     ],
-     "yaw": -29.225
-    },
-    {
-     "piece": "cm_dress_planks_low",
-     "pos": [
-      -5.5213,
-      0.0,
-      5.4441
-     ],
-     "yaw": -24.307
-    },
-    {
-     "piece": "cm_dress_planks_low",
-     "pos": [
-      -4.854,
-      0.0,
-      6.329
-     ],
-     "yaw": -166.601
-    },
-    {
-     "piece": "cm_brazier",
-     "pos": [
-      -1.8852,
-      2.31,
-      11.0674
+      3.9785
      ],
      "yaw": -0.0
     },
     {
-     "piece": "cm_light_pool",
+     "piece": "cm_dress_crate_small",
      "pos": [
-      -1.2855,
-      0.0,
-      9.6057
+      12.5628,
+      2.31,
+      3.362
      ],
-     "yaw": -0.0
+     "yaw": -84.316
+    },
+    {
+     "piece": "cm_dress_weapon_rack",
+     "pos": [
+      11.3935,
+      0.0,
+      4.7455
+     ],
+     "yaw": -118.86
     },
     {
      "piece": "cm_dress_barrel",
      "pos": [
-      -0.6107,
-      2.31,
-      11.5963
-     ],
-     "yaw": 179.737
-    },
-    {
-     "piece": "cm_dress_rubble_low",
-     "pos": [
-      -2.2287,
+      11.6734,
       0.0,
-      9.7808
+      3.9932
      ],
-     "yaw": -152.916
-    },
-    {
-     "piece": "cm_dress_planks_low",
-     "pos": [
-      -1.1715,
-      0.0,
-      9.8918
-     ],
-     "yaw": -87.921
-    },
-    {
-     "piece": "cm_dress_rubble_low",
-     "pos": [
-      -0.4476,
-      0.0,
-      10.1094
-     ],
-     "yaw": -4.358
-    },
-    {
-     "piece": "cm_dress_planks_low",
-     "pos": [
-      0.0073,
-      0.0,
-      10.2786
-     ],
-     "yaw": -236.019
-    },
-    {
-     "piece": "cm_brazier",
-     "pos": [
-      11.0043,
-      2.31,
-      5.041
-     ],
-     "yaw": -0.0
-    },
-    {
-     "piece": "cm_light_pool",
-     "pos": [
-      9.6484,
-      0.0,
-      4.23
-     ],
-     "yaw": -0.0
-    },
-    {
-     "piece": "cm_dress_barrel",
-     "pos": [
-      11.5299,
-      2.31,
-      3.7881
-     ],
-     "yaw": -96.122
-    },
-    {
-     "piece": "cm_dress_flagstones",
-     "pos": [
-      9.4597,
-      0.0,
-      5.0882
-     ],
-     "yaw": -213.416
-    },
-    {
-     "piece": "cm_dress_rubble_low",
-     "pos": [
-      10.2753,
-      0.0,
-      4.5234
-     ],
-     "yaw": -103.682
-    },
-    {
-     "piece": "cm_dress_planks_low",
-     "pos": [
-      10.0905,
-      0.0,
-      3.6681
-     ],
-     "yaw": -229.694
+     "yaw": -192.211
     },
     {
      "piece": "cm_gate_post",
      "pos": [
-      11.1138,
+      11.9676,
       0.0,
-      -5.3218
+      -5.7383
      ],
      "yaw": 116.0
     },
     {
      "piece": "cm_crystal_lamp",
      "pos": [
-      10.39,
+      11.2,
       2.31,
-      -6.1864
+      -6.6828
      ],
      "yaw": -0.0
     },
     {
      "piece": "cm_brazier",
      "pos": [
-      10.6138,
+      11.4478,
       2.31,
-      -5.6538
+      -6.1085
      ],
      "yaw": -0.0
     },
     {
      "piece": "cm_light_pool",
      "pos": [
-      9.2266,
+      9.4021,
       0.0,
-      -4.8974
+      -4.9932
      ],
      "yaw": -0.0
     },
     {
+     "piece": "cm_dress_barrel",
+     "pos": [
+      10.6956,
+      0.0,
+      -5.7897
+     ],
+     "yaw": 1.985
+    },
+    {
+     "piece": "cm_dress_barrel",
+     "pos": [
+      10.5601,
+      0.0,
+      -6.0805
+     ],
+     "yaw": -10.905
+    },
+    {
+     "piece": "cm_dress_crate",
+     "pos": [
+      10.3968,
+      0.0,
+      -6.4005
+     ],
+     "yaw": 16.814
+    },
+    {
+     "piece": "cm_dress_stakes",
+     "pos": [
+      12.4529,
+      0.0,
+      -7.035
+     ],
+     "yaw": -60.0
+    },
+    {
      "piece": "cm_gate_post",
      "pos": [
-      10.0287,
+      10.7773,
       0.0,
-      -7.504
+      -8.0889
      ],
      "yaw": 128.0
     },
     {
      "piece": "cm_crystal_lamp",
      "pos": [
-      10.299,
+      11.1002,
       2.31,
-      -6.3616
+      -6.8721
      ],
      "yaw": -0.0
     },
     {
      "piece": "cm_brazier",
      "pos": [
-      10.0367,
+      10.8111,
       2.31,
-      -6.8699
+      -7.4203
      ],
      "yaw": -0.0
     },
     {
      "piece": "cm_light_pool",
      "pos": [
-      8.7488,
+      8.9118,
       0.0,
-      -5.9547
+      -6.0705
      ],
      "yaw": -0.0
     },
     {
+     "piece": "cm_dress_barrel",
+     "pos": [
+      10.1839,
+      0.0,
+      -6.8776
+     ],
+     "yaw": -6.386
+    },
+    {
+     "piece": "cm_dress_barrel",
+     "pos": [
+      10.3064,
+      0.0,
+      -6.578
+     ],
+     "yaw": -14.59
+    },
+    {
+     "piece": "cm_dress_crate",
+     "pos": [
+      10.4704,
+      0.0,
+      -6.259
+     ],
+     "yaw": -70.196
+    },
+    {
+     "piece": "cm_dress_stakes",
+     "pos": [
+      12.016,
+      0.0,
+      -7.8742
+     ],
+     "yaw": -56.0
+    },
+    {
      "piece": "cm_gate_post",
      "pos": [
-      3.3901,
+      3.5224,
       0.0,
-      -11.8719
+      -12.8127
      ],
      "yaw": 172.0
     },
     {
      "piece": "cm_crystal_lamp",
      "pos": [
-      2.4187,
+      2.4601,
       2.31,
-      -11.5875
+      -12.5366
      ],
      "yaw": -0.0
     },
     {
      "piece": "cm_brazier",
      "pos": [
-      2.9074,
+      2.9968,
       2.31,
-      -11.5906
+      -12.5364
      ],
      "yaw": -0.0
     },
     {
      "piece": "cm_light_pool",
      "pos": [
-      2.7587,
+      2.7775,
       0.0,
-      -10.0176
+      -10.2167
      ],
      "yaw": -0.0
     },
     {
+     "piece": "cm_dress_barrel",
+     "pos": [
+      2.8518,
+      0.0,
+      -11.7288
+     ],
+     "yaw": -15.715
+    },
+    {
+     "piece": "cm_dress_barrel",
+     "pos": [
+      2.5768,
+      0.0,
+      -11.7044
+     ],
+     "yaw": -13.217
+    },
+    {
+     "piece": "cm_dress_crate",
+     "pos": [
+      2.2705,
+      0.0,
+      -11.6844
+     ],
+     "yaw": -36.443
+    },
+    {
+     "piece": "cm_dress_stakes",
+     "pos": [
+      2.8278,
+      0.0,
+      -13.8334
+     ],
+     "yaw": -4.0
+    },
+    {
      "piece": "cm_gate_post",
      "pos": [
-      0.2481,
+      0.0832,
       0.0,
-      11.9049
+      12.8405
      ],
      "yaw": -10.0
     },
     {
      "piece": "cm_crystal_lamp",
      "pos": [
-      -0.6873,
+      -0.9411,
       2.31,
-      11.6173
+      12.5327
      ],
      "yaw": -0.0
     },
     {
      "piece": "cm_brazier",
      "pos": [
-      -0.1716,
+      -0.3788,
       2.31,
-      11.6669
+      12.5941
      ],
      "yaw": -0.0
     },
     {
      "piece": "cm_light_pool",
      "pos": [
-      0.1731,
+      0.1295,
       0.0,
-      10.125
+      10.3202
      ],
      "yaw": -0.0
     },
     {
+     "piece": "cm_dress_barrel",
+     "pos": [
+      -0.2751,
+      0.0,
+      11.8031
+     ],
+     "yaw": 5.928
+    },
+    {
+     "piece": "cm_dress_barrel",
+     "pos": [
+      -0.5584,
+      0.0,
+      11.7573
+     ],
+     "yaw": 7.559
+    },
+    {
+     "piece": "cm_dress_crate",
+     "pos": [
+      -0.87,
+      0.0,
+      11.6701
+     ],
+     "yaw": 62.734
+    },
+    {
+     "piece": "cm_dress_stakes",
+     "pos": [
+      -1.4905,
+      0.0,
+      13.7015
+     ],
+     "yaw": 163.5
+    },
+    {
      "piece": "cm_gate_post",
      "pos": [
-      10.606,
+      11.4203,
       0.0,
-      6.2011
+      6.6903
      ],
      "yaw": 59.0
     },
     {
      "piece": "cm_crystal_lamp",
      "pos": [
-      10.9872,
+      11.8446,
       2.31,
-      5.1477
+      5.5567
      ],
      "yaw": -0.0
     },
     {
      "piece": "cm_brazier",
      "pos": [
-      10.6361,
+      11.4718,
       2.31,
-      5.6208
+      6.0726
      ],
      "yaw": -0.0
     },
     {
      "piece": "cm_light_pool",
      "pos": [
-      9.2463,
+      9.4222,
       0.0,
-      4.8693
+      4.9644
      ],
      "yaw": -0.0
     },
     {
+     "piece": "cm_dress_barrel",
+     "pos": [
+      10.8087,
+      0.0,
+      5.6226
+     ],
+     "yaw": 7.543
+    },
+    {
+     "piece": "cm_dress_barrel",
+     "pos": [
+      10.9851,
+      0.0,
+      5.3495
+     ],
+     "yaw": -16.406
+    },
+    {
+     "piece": "cm_dress_crate",
+     "pos": [
+      11.1769,
+      0.0,
+      5.0341
+     ],
+     "yaw": 92.778
+    },
+    {
+     "piece": "cm_dress_stakes",
+     "pos": [
+      12.813,
+      0.0,
+      6.4175
+     ],
+     "yaw": -117.0
+    },
+    {
      "piece": "cm_gate_post",
      "pos": [
-      11.88,
+      12.7977,
       0.0,
-      3.165
+      3.4109
      ],
      "yaw": 75.0
     },
     {
      "piece": "cm_crystal_lamp",
      "pos": [
-      11.4417,
+      12.3315,
       2.31,
-      4.2305
+      4.5632
      ],
      "yaw": -0.0
     },
     {
      "piece": "cm_brazier",
      "pos": [
-      11.5668,
+      12.4723,
       2.31,
-      3.6395
+      3.9267
      ],
      "yaw": -0.0
     },
     {
      "piece": "cm_light_pool",
      "pos": [
-      10.0607,
+      10.2514,
       0.0,
-      3.1618
+      3.2222
      ],
      "yaw": -0.0
     },
     {
-     "piece": "cm_tower",
+     "piece": "cm_dress_barrel",
      "pos": [
-      -3.1615,
+      11.6865,
       0.0,
-      -12.3802
+      3.7654
      ],
-     "yaw": 14.325
+     "yaw": 5.622
+    },
+    {
+     "piece": "cm_dress_barrel",
+     "pos": [
+      11.5949,
+      0.0,
+      4.0875
+     ],
+     "yaw": -9.999
+    },
+    {
+     "piece": "cm_dress_crate",
+     "pos": [
+      11.4828,
+      0.0,
+      4.446
+     ],
+     "yaw": -37.224
+    },
+    {
+     "piece": "cm_dress_stakes",
+     "pos": [
+      13.6393,
+      0.0,
+      4.6589
+     ],
+     "yaw": -109.0
     },
     {
      "piece": "cm_tower_landmark",
      "pos": [
-      -9.4222,
+      -5.7015,
       0.0,
-      -4.3293
+      -10.7104
      ],
-     "yaw": 65.322
+     "yaw": 28.028
+    },
+    {
+     "piece": "cm_tower",
+     "pos": [
+      -9.2343,
+      0.0,
+      -0.0
+     ],
+     "yaw": -270.0
     },
     {
      "piece": "cm_tower",
@@ -689,6 +1022,24 @@
      "yaw": -209.836
     },
     {
+     "piece": "cm_banner",
+     "pos": [
+      -2.2732,
+      0.0,
+      -11.0026
+     ],
+     "yaw": 24.94
+    },
+    {
+     "piece": "cm_banner",
+     "pos": [
+      -6.1473,
+      0.0,
+      -6.8374
+     ],
+     "yaw": 55.06
+    },
+    {
      "piece": "cm_respawn_pad",
      "pos": [
       0.0,
@@ -698,193 +1049,22 @@
      "yaw": -0.0
     },
     {
-     "piece": "cm_dress_flagstones",
+     "piece": "cm_crystal_lamp_low",
      "pos": [
-      5.0323,
+      3.9837,
       0.0,
-      -0.0198
+      2.3
      ],
-     "yaw": -239.252
-    },
-    {
-     "piece": "cm_dress_rubble_low",
-     "pos": [
-      4.7322,
-      0.0,
-      -1.0294
-     ],
-     "yaw": -8.557
-    },
-    {
-     "piece": "cm_dress_planks_low",
-     "pos": [
-      3.8763,
-      0.0,
-      -3.1658
-     ],
-     "yaw": -241.54
+     "yaw": 30.0
     },
     {
      "piece": "cm_crystal_lamp_low",
      "pos": [
-      3.1565,
+      3.9837,
       0.0,
-      -4.6575
+      -2.3
      ],
-     "yaw": -225.394
-    },
-    {
-     "piece": "cm_dress_flagstones",
-     "pos": [
-      2.3691,
-      0.0,
-      -4.9822
-     ],
-     "yaw": -200.098
-    },
-    {
-     "piece": "cm_dress_rubble_low",
-     "pos": [
-      0.637,
-      0.0,
-      -5.1631
-     ],
-     "yaw": -91.956
-    },
-    {
-     "piece": "cm_dress_planks_low",
-     "pos": [
-      -1.5566,
-      0.0,
-      -4.759
-     ],
-     "yaw": -350.521
-    },
-    {
-     "piece": "cm_crystal_lamp_low",
-     "pos": [
-      -2.8073,
-      0.0,
-      -4.2484
-     ],
-     "yaw": -208.035
-    },
-    {
-     "piece": "cm_dress_flagstones",
-     "pos": [
-      -4.4939,
-      0.0,
-      -4.4973
-     ],
-     "yaw": -157.786
-    },
-    {
-     "piece": "cm_dress_rubble_low",
-     "pos": [
-      -4.8449,
-      0.0,
-      -3.0133
-     ],
-     "yaw": -73.569
-    },
-    {
-     "piece": "cm_dress_planks_low",
-     "pos": [
-      -6.1821,
-      0.0,
-      -1.6546
-     ],
-     "yaw": -350.739
-    },
-    {
-     "piece": "cm_crystal_lamp_low",
-     "pos": [
-      -6.1807,
-      0.0,
-      1.1121
-     ],
-     "yaw": -4.765
-    },
-    {
-     "piece": "cm_dress_flagstones",
-     "pos": [
-      -5.0551,
-      0.0,
-      3.1089
-     ],
-     "yaw": -277.075
-    },
-    {
-     "piece": "cm_dress_rubble_low",
-     "pos": [
-      -3.6496,
-      0.0,
-      4.2141
-     ],
-     "yaw": -289.754
-    },
-    {
-     "piece": "cm_dress_planks_low",
-     "pos": [
-      -2.2026,
-      0.0,
-      4.1193
-     ],
-     "yaw": -313.059
-    },
-    {
-     "piece": "cm_crystal_lamp_low",
-     "pos": [
-      -0.9588,
-      0.0,
-      4.7465
-     ],
-     "yaw": -30.987
-    },
-    {
-     "piece": "cm_dress_flagstones",
-     "pos": [
-      0.5749,
-      0.0,
-      5.4693
-     ],
-     "yaw": -187.264
-    },
-    {
-     "piece": "cm_dress_rubble_low",
-     "pos": [
-      1.485,
-      0.0,
-      5.3363
-     ],
-     "yaw": -350.887
-    },
-    {
-     "piece": "cm_dress_planks_low",
-     "pos": [
-      2.5251,
-      0.0,
-      3.8603
-     ],
-     "yaw": -128.456
-    },
-    {
-     "piece": "cm_crystal_lamp_low",
-     "pos": [
-      4.7869,
-      0.0,
-      3.0264
-     ],
-     "yaw": -353.119
-    },
-    {
-     "piece": "cm_dress_flagstones",
-     "pos": [
-      5.7289,
-      0.0,
-      1.4211
-     ],
-     "yaw": -61.894
+     "yaw": -30.0
     }
    ]
   },
@@ -904,686 +1084,1028 @@
     {
      "piece": "cm_brazier",
      "pos": [
-      -10.3137,
+      -11.1801,
       2.31,
-      -6.2467
+      -6.6334
      ],
      "yaw": -0.0
     },
     {
      "piece": "cm_light_pool",
      "pos": [
-      -8.9111,
+      -9.4188,
       0.0,
-      -5.5192
+      -5.729
      ],
      "yaw": -0.0
     },
     {
-     "piece": "cm_dress_rubble_low",
+     "piece": "cm_brazier",
      "pos": [
-      -9.6719,
-      0.0,
-      -4.8513
+      -2.3035,
+      2.31,
+      -12.4892
      ],
-     "yaw": -326.85
+     "yaw": -0.0
     },
     {
-     "piece": "cm_dress_rubble_low",
+     "piece": "cm_light_pool",
      "pos": [
-      -9.2652,
+      -2.3595,
       0.0,
-      -5.8872
+      -10.51
      ],
-     "yaw": -238.728
+     "yaw": -0.0
     },
     {
-     "piece": "cm_dress_planks_low",
+     "piece": "cm_brazier",
      "pos": [
-      -8.9752,
+      1.5961,
+      2.31,
+      -12.253
+     ],
+     "yaw": -0.0
+    },
+    {
+     "piece": "cm_light_pool",
+     "pos": [
+      0.8433,
       0.0,
-      -6.7888
+      -10.4217
+     ],
+     "yaw": -0.0
+    },
+    {
+     "piece": "cm_dress_crate",
+     "pos": [
+      -1.2918,
+      2.31,
+      -12.5134
+     ],
+     "yaw": -362.609
+    },
+    {
+     "piece": "cm_dress_barrel",
+     "pos": [
+      -0.541,
+      2.31,
+      -12.5398
+     ],
+     "yaw": -0.0
+    },
+    {
+     "piece": "cm_dress_crate",
+     "pos": [
+      0.8579,
+      2.31,
+      -12.5136
+     ],
+     "yaw": -4.72
+    },
+    {
+     "piece": "cm_dress_barrel",
+     "pos": [
+      1.5392,
+      2.31,
+      -12.2439
+     ],
+     "yaw": -0.0
+    },
+    {
+     "piece": "cm_dress_barrel",
+     "pos": [
+      -2.1068,
+      0.0,
+      -11.7702
+     ],
+     "yaw": -216.626
+    },
+    {
+     "piece": "cm_dress_barrel",
+     "pos": [
+      -1.4333,
+      0.0,
+      -11.8058
+     ],
+     "yaw": -330.144
+    },
+    {
+     "piece": "cm_dress_barrel",
+     "pos": [
+      -1.7534,
+      0.0,
+      -11.482
      ],
      "yaw": -174.678
     },
     {
+     "piece": "cm_dress_barrel",
+     "pos": [
+      -1.0271,
+      0.0,
+      -11.5756
+     ],
+     "yaw": -281.742
+    },
+    {
+     "piece": "cm_dress_crate",
+     "pos": [
+      0.0093,
+      0.0,
+      -11.7998
+     ],
+     "yaw": -364.78
+    },
+    {
+     "piece": "cm_dress_crate",
+     "pos": [
+      0.5634,
+      0.0,
+      -11.7858
+     ],
+     "yaw": -365.901
+    },
+    {
+     "piece": "cm_dress_crate_small",
+     "pos": [
+      0.0863,
+      0.7,
+      -11.8006
+     ],
+     "yaw": -382.428
+    },
+    {
+     "piece": "cm_dress_crate_small",
+     "pos": [
+      1.0243,
+      0.0,
+      -11.6874
+     ],
+     "yaw": -340.316
+    },
+    {
      "piece": "cm_brazier",
      "pos": [
-      -2.138,
+      7.2296,
       2.31,
-      -11.5356
+      -6.5362
      ],
      "yaw": -0.0
     },
     {
      "piece": "cm_light_pool",
      "pos": [
-      -2.1537,
+      5.4611,
       0.0,
-      -9.9557
+      -5.6458
      ],
      "yaw": -0.0
     },
     {
+     "piece": "cm_dress_crate",
+     "pos": [
+      7.7332,
+      2.31,
+      -5.6625
+     ],
+     "yaw": -59.094
+    },
+    {
      "piece": "cm_dress_barrel",
      "pos": [
-      -0.7278,
+      8.0793,
       2.31,
-      -11.6223
+      -5.0033
      ],
-     "yaw": -190.152
+     "yaw": -0.0
     },
     {
-     "piece": "cm_dress_rubble_low",
+     "piece": "cm_dress_crate_small",
      "pos": [
-      -3.0272,
-      0.0,
-      -10.5993
+      8.329,
+      2.31,
+      -4.4363
      ],
-     "yaw": -160.195
+     "yaw": -50.571
     },
     {
-     "piece": "cm_dress_planks_low",
+     "piece": "cm_dress_crate",
      "pos": [
-      -1.9675,
-      0.0,
-      -10.5397
+      8.5214,
+      2.31,
+      -3.6767
      ],
-     "yaw": -85.932
+     "yaw": -82.62
     },
     {
-     "piece": "cm_dress_rubble_low",
+     "piece": "cm_dress_barrel",
      "pos": [
-      -0.7905,
-      0.0,
-      -10.4774
+      8.5549,
+      2.31,
+      -2.948
      ],
-     "yaw": -154.777
+     "yaw": -0.0
     },
     {
-     "piece": "cm_dress_flagstones",
+     "piece": "cm_dress_crate_small",
      "pos": [
-      -0.0501,
-      0.0,
-      -10.7267
+      8.6856,
+      2.31,
+      -2.3546
      ],
-     "yaw": -244.729
+     "yaw": -84.419
+    },
+    {
+     "piece": "cm_dress_crate",
+     "pos": [
+      6.5033,
+      0.0,
+      -6.1887
+     ],
+     "yaw": -61.11
+    },
+    {
+     "piece": "cm_dress_crate",
+     "pos": [
+      6.9449,
+      0.0,
+      -5.4609
+     ],
+     "yaw": -60.341
+    },
+    {
+     "piece": "cm_dress_crate_small",
+     "pos": [
+      6.545,
+      0.7,
+      -6.1053
+     ],
+     "yaw": -73.029
+    },
+    {
+     "piece": "cm_dress_crate_small",
+     "pos": [
+      7.2713,
+      0.0,
+      -5.0022
+     ],
+     "yaw": -38.53
+    },
+    {
+     "piece": "cm_dress_crate",
+     "pos": [
+      7.5438,
+      0.0,
+      -4.2506
+     ],
+     "yaw": -76.405
+    },
+    {
+     "piece": "cm_dress_crate",
+     "pos": [
+      7.7423,
+      0.0,
+      -3.6324
+     ],
+     "yaw": -82.378
+    },
+    {
+     "piece": "cm_dress_crate_small",
+     "pos": [
+      7.5714,
+      0.7,
+      -4.161
+     ],
+     "yaw": -58.673
+    },
+    {
+     "piece": "cm_dress_crate_small",
+     "pos": [
+      7.8431,
+      0.0,
+      -3.1424
+     ],
+     "yaw": -78.288
     },
     {
      "piece": "cm_brazier",
      "pos": [
-      5.0713,
+      8.4735,
       2.31,
-      -8.5447
+      3.9191
      ],
      "yaw": -0.0
     },
     {
      "piece": "cm_light_pool",
      "pos": [
-      3.8861,
+      6.5425,
       0.0,
-      -7.4999
+      3.4815
      ],
      "yaw": -0.0
     },
     {
+     "piece": "cm_dress_crate",
+     "pos": [
+      8.1902,
+      2.31,
+      4.8555
+     ],
+     "yaw": -119.372
+    },
+    {
      "piece": "cm_dress_barrel",
      "pos": [
-      5.8119,
+      7.8078,
       2.31,
-      -7.4102
+      5.4809
      ],
-     "yaw": 117.229
+     "yaw": -0.0
     },
     {
-     "piece": "cm_dress_planks_low",
+     "piece": "cm_dress_crate_small",
      "pos": [
-      3.7353,
-      0.0,
-      -8.3012
+      7.4915,
+      2.31,
+      6.042
      ],
-     "yaw": -267.873
+     "yaw": -95.942
     },
     {
-     "piece": "cm_dress_rubble_low",
+     "piece": "cm_dress_crate",
      "pos": [
-      4.062,
-      0.0,
-      -7.5656
+      7.1144,
+      2.31,
+      6.7597
      ],
-     "yaw": -192.532
+     "yaw": -120.744
     },
     {
-     "piece": "cm_dress_flagstones",
+     "piece": "cm_dress_barrel",
      "pos": [
-      4.8577,
-      0.0,
-      -7.3491
+      6.7675,
+      2.31,
+      7.4393
      ],
-     "yaw": -129.395
+     "yaw": -0.0
     },
     {
-     "piece": "cm_dress_rubble_low",
+     "piece": "cm_dress_crate_small",
      "pos": [
-      4.7095,
-      0.0,
-      -6.4883
+      6.7318,
+      2.31,
+      7.9062
      ],
-     "yaw": -155.365
+     "yaw": -131.418
     },
     {
-     "piece": "cm_dress_planks_low",
+     "piece": "cm_dress_crate",
      "pos": [
-      5.1507,
+      7.6278,
       0.0,
-      -5.5822
+      3.9708
      ],
-     "yaw": -246.427
+     "yaw": -107.057
+    },
+    {
+     "piece": "cm_dress_crate",
+     "pos": [
+      7.4765,
+      0.0,
+      4.5557
+     ],
+     "yaw": -111.213
+    },
+    {
+     "piece": "cm_dress_crate_small",
+     "pos": [
+      7.6015,
+      0.7,
+      4.0608
+     ],
+     "yaw": -91.015
+    },
+    {
+     "piece": "cm_dress_crate_small",
+     "pos": [
+      7.2486,
+      0.0,
+      5.0413
+     ],
+     "yaw": -112.673
     },
     {
      "piece": "cm_brazier",
      "pos": [
-      7.515,
+      2.384,
       2.31,
-      0.0681
+      11.8885
      ],
      "yaw": -0.0
     },
     {
      "piece": "cm_light_pool",
      "pos": [
-      5.9351,
+      1.607,
       0.0,
-      0.0777
+      10.0673
+     ],
+     "yaw": -0.0
+    },
+    {
+     "piece": "cm_dress_crate",
+     "pos": [
+      1.4777,
+      2.31,
+      12.3008
+     ],
+     "yaw": -150.913
+    },
+    {
+     "piece": "cm_dress_barrel",
+     "pos": [
+      0.7783,
+      2.31,
+      12.5017
      ],
      "yaw": -0.0
     },
     {
      "piece": "cm_dress_barrel",
      "pos": [
-      7.584,
-      2.31,
-      1.4735
+      1.9831,
+      0.0,
+      11.2812
      ],
-     "yaw": 80.213
+     "yaw": -179.352
     },
     {
-     "piece": "cm_dress_flagstones",
+     "piece": "cm_dress_barrel",
      "pos": [
-      6.5622,
+      1.4128,
       0.0,
-      -0.8129
+      11.5767
+     ],
+     "yaw": -315.164
+    },
+    {
+     "piece": "cm_dress_barrel",
+     "pos": [
+      1.5148,
+      0.0,
+      11.1717
      ],
      "yaw": -112.009
     },
     {
-     "piece": "cm_dress_flagstones",
+     "piece": "cm_dress_barrel",
      "pos": [
-      6.2251,
+      1.0094,
       0.0,
-      0.4029
+      11.458
      ],
-     "yaw": -314.133
-    },
-    {
-     "piece": "cm_dress_flagstones",
-     "pos": [
-      6.6689,
-      0.0,
-      1.5686
-     ],
-     "yaw": -124.412
+     "yaw": -313.038
     },
     {
      "piece": "cm_brazier",
      "pos": [
-      5.1109,
+      -11.798,
       2.31,
-      8.4989
+      5.5559
      ],
      "yaw": -0.0
     },
     {
      "piece": "cm_light_pool",
      "pos": [
-      3.9049,
+      -10.1012,
       0.0,
-      7.4781
+      4.5353
      ],
      "yaw": -0.0
     },
     {
-     "piece": "cm_brazier",
+     "piece": "cm_dress_crate",
      "pos": [
-      1.1963,
+      -12.2467,
       2.31,
-      11.3918
+      4.6953
      ],
-     "yaw": -0.0
-    },
-    {
-     "piece": "cm_light_pool",
-     "pos": [
-      0.6052,
-      0.0,
-      9.9265
-     ],
-     "yaw": -0.0
-    },
-    {
-     "piece": "cm_dress_blocks",
-     "pos": [
-      4.1509,
-      2.31,
-      9.5105
-     ],
-     "yaw": 35.771
-    },
-    {
-     "piece": "cm_dress_blocks",
-     "pos": [
-      3.2455,
-      2.31,
-      10.3642
-     ],
-     "yaw": 25.961
+     "yaw": -247.65
     },
     {
      "piece": "cm_dress_barrel",
      "pos": [
-      2.1405,
+      -12.429,
       2.31,
-      10.9583
-     ],
-     "yaw": 9.446
-    },
-    {
-     "piece": "cm_dress_blocks",
-     "pos": [
-      0.9421,
-      2.31,
-      11.4899
-     ],
-     "yaw": 3.923
-    },
-    {
-     "piece": "cm_dress_rubble_low",
-     "pos": [
-      4.787,
-      0.0,
-      7.4051
-     ],
-     "yaw": -318.25
-    },
-    {
-     "piece": "cm_dress_flagstones",
-     "pos": [
-      4.3692,
-      0.0,
-      7.9489
-     ],
-     "yaw": -198.02
-    },
-    {
-     "piece": "cm_dress_rubble_low",
-     "pos": [
-      3.4141,
-      0.0,
-      8.6026
-     ],
-     "yaw": -100.271
-    },
-    {
-     "piece": "cm_dress_rubble_low",
-     "pos": [
-      2.8926,
-      0.0,
-      9.4618
-     ],
-     "yaw": -89.961
-    },
-    {
-     "piece": "cm_dress_planks_low",
-     "pos": [
-      2.4135,
-      0.0,
-      9.7896
-     ],
-     "yaw": -87.921
-    },
-    {
-     "piece": "cm_dress_rubble_low",
-     "pos": [
-      1.5036,
-      0.0,
-      9.6367
-     ],
-     "yaw": -4.358
-    },
-    {
-     "piece": "cm_dress_planks_low",
-     "pos": [
-      0.6661,
-      0.0,
-      10.1025
-     ],
-     "yaw": -236.019
-    },
-    {
-     "piece": "cm_dress_planks_low",
-     "pos": [
-      0.2623,
-      0.0,
-      10.5656
-     ],
-     "yaw": -169.566
-    },
-    {
-     "piece": "cm_brazier",
-     "pos": [
-      -11.0043,
-      2.31,
-      5.041
+      3.9785
      ],
      "yaw": -0.0
     },
     {
-     "piece": "cm_light_pool",
+     "piece": "cm_dress_crate_small",
      "pos": [
-      -9.6484,
-      0.0,
-      4.23
+      -12.5628,
+      2.31,
+      3.362
      ],
-     "yaw": -0.0
+     "yaw": -275.686
+    },
+    {
+     "piece": "cm_dress_weapon_rack",
+     "pos": [
+      -11.3934,
+      0.0,
+      4.7455
+     ],
+     "yaw": 118.858
     },
     {
      "piece": "cm_dress_barrel",
      "pos": [
-      -11.5299,
-      2.31,
-      3.7881
-     ],
-     "yaw": -69.189
-    },
-    {
-     "piece": "cm_dress_flagstones",
-     "pos": [
-      -9.6541,
+      -11.6734,
       0.0,
-      5.1982
+      3.9932
      ],
-     "yaw": -131.096
-    },
-    {
-     "piece": "cm_dress_flagstones",
-     "pos": [
-      -9.9713,
-      0.0,
-      4.3068
-     ],
-     "yaw": -79.303
-    },
-    {
-     "piece": "cm_dress_rubble_low",
-     "pos": [
-      -10.4621,
-      0.0,
-      3.9819
-     ],
-     "yaw": -52.481
-    },
-    {
-     "piece": "cm_dress_flagstones",
-     "pos": [
-      -10.7126,
-      0.0,
-      3.3556
-     ],
-     "yaw": -72.827
+     "yaw": -192.211
     },
     {
      "piece": "cm_gate_post",
      "pos": [
-      -11.1138,
+      -11.9676,
       0.0,
-      -5.3218
+      -5.7383
      ],
      "yaw": -116.0
     },
     {
      "piece": "cm_crystal_lamp",
      "pos": [
-      -10.39,
+      -11.2,
       2.31,
-      -6.1864
+      -6.6828
      ],
      "yaw": -0.0
     },
     {
      "piece": "cm_brazier",
      "pos": [
-      -10.6138,
+      -11.4478,
       2.31,
-      -5.6538
+      -6.1085
      ],
      "yaw": -0.0
     },
     {
      "piece": "cm_light_pool",
      "pos": [
-      -9.2266,
+      -9.4021,
       0.0,
-      -4.8974
+      -4.9932
      ],
      "yaw": -0.0
     },
     {
+     "piece": "cm_dress_barrel",
+     "pos": [
+      -10.6956,
+      0.0,
+      -5.7897
+     ],
+     "yaw": -1.985
+    },
+    {
+     "piece": "cm_dress_barrel",
+     "pos": [
+      -10.5601,
+      0.0,
+      -6.0805
+     ],
+     "yaw": 10.905
+    },
+    {
+     "piece": "cm_dress_crate",
+     "pos": [
+      -10.3968,
+      0.0,
+      -6.4005
+     ],
+     "yaw": -16.814
+    },
+    {
+     "piece": "cm_dress_stakes",
+     "pos": [
+      -12.4529,
+      0.0,
+      -7.035
+     ],
+     "yaw": 60.0
+    },
+    {
      "piece": "cm_gate_post",
      "pos": [
-      -10.0287,
+      -10.7773,
       0.0,
-      -7.504
+      -8.0889
      ],
      "yaw": -128.0
     },
     {
      "piece": "cm_crystal_lamp",
      "pos": [
-      -10.299,
+      -11.1002,
       2.31,
-      -6.3616
+      -6.8721
      ],
      "yaw": -0.0
     },
     {
      "piece": "cm_brazier",
      "pos": [
-      -10.0367,
+      -10.8111,
       2.31,
-      -6.8699
+      -7.4203
      ],
      "yaw": -0.0
     },
     {
      "piece": "cm_light_pool",
      "pos": [
-      -8.7488,
+      -8.9118,
       0.0,
-      -5.9547
+      -6.0705
      ],
      "yaw": -0.0
     },
     {
+     "piece": "cm_dress_barrel",
+     "pos": [
+      -10.1839,
+      0.0,
+      -6.8776
+     ],
+     "yaw": 6.386
+    },
+    {
+     "piece": "cm_dress_barrel",
+     "pos": [
+      -10.3064,
+      0.0,
+      -6.578
+     ],
+     "yaw": 14.59
+    },
+    {
+     "piece": "cm_dress_crate",
+     "pos": [
+      -10.4704,
+      0.0,
+      -6.259
+     ],
+     "yaw": -289.804
+    },
+    {
+     "piece": "cm_dress_stakes",
+     "pos": [
+      -12.016,
+      0.0,
+      -7.8742
+     ],
+     "yaw": 56.0
+    },
+    {
      "piece": "cm_gate_post",
      "pos": [
-      -3.3901,
+      -3.5224,
       0.0,
-      -11.8719
+      -12.8127
      ],
      "yaw": -172.0
     },
     {
      "piece": "cm_crystal_lamp",
      "pos": [
-      -2.4187,
+      -2.4601,
       2.31,
-      -11.5875
+      -12.5366
      ],
      "yaw": -0.0
     },
     {
      "piece": "cm_brazier",
      "pos": [
-      -2.9074,
+      -2.9968,
       2.31,
-      -11.5906
+      -12.5364
      ],
      "yaw": -0.0
     },
     {
      "piece": "cm_light_pool",
      "pos": [
-      -2.7587,
+      -2.7775,
       0.0,
-      -10.0176
+      -10.2167
      ],
      "yaw": -0.0
     },
     {
+     "piece": "cm_dress_barrel",
+     "pos": [
+      -2.8518,
+      0.0,
+      -11.7288
+     ],
+     "yaw": 15.715
+    },
+    {
+     "piece": "cm_dress_barrel",
+     "pos": [
+      -2.5768,
+      0.0,
+      -11.7044
+     ],
+     "yaw": 13.217
+    },
+    {
+     "piece": "cm_dress_crate",
+     "pos": [
+      -2.2705,
+      0.0,
+      -11.6844
+     ],
+     "yaw": -323.557
+    },
+    {
+     "piece": "cm_dress_stakes",
+     "pos": [
+      -2.8278,
+      0.0,
+      -13.8334
+     ],
+     "yaw": 4.0
+    },
+    {
      "piece": "cm_gate_post",
      "pos": [
-      -0.2481,
+      -0.0832,
       0.0,
-      11.9049
+      12.8405
      ],
      "yaw": 10.0
     },
     {
      "piece": "cm_crystal_lamp",
      "pos": [
-      0.6873,
+      0.9411,
       2.31,
-      11.6173
+      12.5327
      ],
      "yaw": -0.0
     },
     {
      "piece": "cm_brazier",
      "pos": [
-      0.1716,
+      0.3788,
       2.31,
-      11.6669
+      12.5941
      ],
      "yaw": -0.0
     },
     {
      "piece": "cm_light_pool",
      "pos": [
-      -0.1731,
+      -0.1295,
       0.0,
-      10.125
+      10.3202
      ],
      "yaw": -0.0
     },
     {
+     "piece": "cm_dress_barrel",
+     "pos": [
+      0.2751,
+      0.0,
+      11.8031
+     ],
+     "yaw": -5.928
+    },
+    {
+     "piece": "cm_dress_barrel",
+     "pos": [
+      0.5584,
+      0.0,
+      11.7573
+     ],
+     "yaw": -7.559
+    },
+    {
+     "piece": "cm_dress_crate",
+     "pos": [
+      0.87,
+      0.0,
+      11.6701
+     ],
+     "yaw": -62.734
+    },
+    {
+     "piece": "cm_dress_stakes",
+     "pos": [
+      1.4905,
+      0.0,
+      13.7015
+     ],
+     "yaw": -163.5
+    },
+    {
      "piece": "cm_gate_post",
      "pos": [
-      -10.606,
+      -11.4203,
       0.0,
-      6.2011
+      6.6903
      ],
      "yaw": -59.0
     },
     {
      "piece": "cm_crystal_lamp",
      "pos": [
-      -10.9872,
+      -11.8446,
       2.31,
-      5.1477
+      5.5567
      ],
      "yaw": -0.0
     },
     {
      "piece": "cm_brazier",
      "pos": [
-      -10.6361,
+      -11.4718,
       2.31,
-      5.6208
+      6.0726
      ],
      "yaw": -0.0
     },
     {
      "piece": "cm_light_pool",
      "pos": [
-      -9.2463,
+      -9.4222,
       0.0,
-      4.8693
+      4.9644
      ],
      "yaw": -0.0
     },
     {
+     "piece": "cm_dress_barrel",
+     "pos": [
+      -10.8087,
+      0.0,
+      5.6226
+     ],
+     "yaw": -7.543
+    },
+    {
+     "piece": "cm_dress_barrel",
+     "pos": [
+      -10.9851,
+      0.0,
+      5.3495
+     ],
+     "yaw": 16.406
+    },
+    {
+     "piece": "cm_dress_crate",
+     "pos": [
+      -11.1769,
+      0.0,
+      5.0341
+     ],
+     "yaw": -92.778
+    },
+    {
+     "piece": "cm_dress_stakes",
+     "pos": [
+      -12.813,
+      0.0,
+      6.4175
+     ],
+     "yaw": 117.0
+    },
+    {
      "piece": "cm_gate_post",
      "pos": [
-      -11.88,
+      -12.7977,
       0.0,
-      3.165
+      3.4109
      ],
      "yaw": -75.0
     },
     {
      "piece": "cm_crystal_lamp",
      "pos": [
-      -11.4417,
+      -12.3315,
       2.31,
-      4.2305
+      4.5632
      ],
      "yaw": -0.0
     },
     {
      "piece": "cm_brazier",
      "pos": [
-      -11.5668,
+      -12.4723,
       2.31,
-      3.6395
+      3.9267
      ],
      "yaw": -0.0
     },
     {
      "piece": "cm_light_pool",
      "pos": [
-      -10.0607,
+      -10.2514,
       0.0,
-      3.1618
+      3.2222
      ],
      "yaw": -0.0
     },
     {
-     "piece": "cm_tower",
+     "piece": "cm_dress_barrel",
      "pos": [
-      3.1615,
+      -11.6865,
       0.0,
-      -12.3802
+      3.7654
      ],
-     "yaw": -14.325
+     "yaw": -5.622
     },
     {
-     "piece": "cm_tower",
+     "piece": "cm_dress_barrel",
      "pos": [
-      9.1844,
+      -11.5949,
       0.0,
-      -4.2521
+      4.0875
      ],
-     "yaw": -65.157
+     "yaw": 9.999
+    },
+    {
+     "piece": "cm_dress_crate",
+     "pos": [
+      -11.4828,
+      0.0,
+      4.446
+     ],
+     "yaw": -322.776
+    },
+    {
+     "piece": "cm_dress_stakes",
+     "pos": [
+      -13.6393,
+      0.0,
+      4.6589
+     ],
+     "yaw": 109.0
     },
     {
      "piece": "cm_tower_landmark",
      "pos": [
-      8.7889,
+      5.7015,
       0.0,
-      5.8762
+      -10.7104
      ],
-     "yaw": -123.766
+     "yaw": -28.028
+    },
+    {
+     "piece": "cm_tower",
+     "pos": [
+      9.2343,
+      0.0,
+      -0.0
+     ],
+     "yaw": -90.0
+    },
+    {
+     "piece": "cm_tower",
+     "pos": [
+      5.8575,
+      0.0,
+      10.2129
+     ],
+     "yaw": -150.164
+    },
+    {
+     "piece": "cm_banner",
+     "pos": [
+      2.2732,
+      0.0,
+      -11.0026
+     ],
+     "yaw": -24.94
+    },
+    {
+     "piece": "cm_banner",
+     "pos": [
+      6.1473,
+      0.0,
+      -6.8374
+     ],
+     "yaw": -55.06
     },
     {
      "piece": "cm_respawn_pad",
@@ -1595,193 +2117,22 @@
      "yaw": -0.0
     },
     {
-     "piece": "cm_dress_flagstones",
+     "piece": "cm_crystal_lamp_low",
      "pos": [
-      -5.6094,
+      -3.9837,
       0.0,
-      -0.436
+      2.3
      ],
-     "yaw": -225.394
-    },
-    {
-     "piece": "cm_dress_rubble_low",
-     "pos": [
-      -5.3723,
-      0.0,
-      -1.2542
-     ],
-     "yaw": -200.098
-    },
-    {
-     "piece": "cm_dress_planks_low",
-     "pos": [
-      -4.4338,
-      0.0,
-      -2.7211
-     ],
-     "yaw": -91.956
+     "yaw": -30.0
     },
     {
      "piece": "cm_crystal_lamp_low",
      "pos": [
-      -2.7503,
+      -3.9837,
       0.0,
-      -4.1842
+      -2.3
      ],
-     "yaw": -350.521
-    },
-    {
-     "piece": "cm_dress_flagstones",
-     "pos": [
-      -1.5712,
-      0.0,
-      -4.8437
-     ],
-     "yaw": -208.035
-    },
-    {
-     "piece": "cm_dress_rubble_low",
-     "pos": [
-      -0.7142,
-      0.0,
-      -6.3175
-     ],
-     "yaw": -157.786
-    },
-    {
-     "piece": "cm_dress_planks_low",
-     "pos": [
-      0.6648,
-      0.0,
-      -5.6666
-     ],
-     "yaw": -73.569
-    },
-    {
-     "piece": "cm_crystal_lamp_low",
-     "pos": [
-      2.5609,
-      0.0,
-      -5.865
-     ],
-     "yaw": -350.739
-    },
-    {
-     "piece": "cm_dress_flagstones",
-     "pos": [
-      4.7231,
-      0.0,
-      -4.1388
-     ],
-     "yaw": -4.765
-    },
-    {
-     "piece": "cm_dress_rubble_low",
-     "pos": [
-      5.5825,
-      0.0,
-      -2.0138
-     ],
-     "yaw": -277.075
-    },
-    {
-     "piece": "cm_dress_planks_low",
-     "pos": [
-      5.5702,
-      0.0,
-      -0.2259
-     ],
-     "yaw": -289.754
-    },
-    {
-     "piece": "cm_crystal_lamp_low",
-     "pos": [
-      4.5939,
-      0.0,
-      0.8463
-     ],
-     "yaw": -313.059
-    },
-    {
-     "piece": "cm_dress_flagstones",
-     "pos": [
-      4.3088,
-      0.0,
-      2.2097
-     ],
-     "yaw": -30.987
-    },
-    {
-     "piece": "cm_dress_rubble_low",
-     "pos": [
-      3.9176,
-      0.0,
-      3.8595
-     ],
-     "yaw": -187.264
-    },
-    {
-     "piece": "cm_dress_planks_low",
-     "pos": [
-      3.2462,
-      0.0,
-      4.4882
-     ],
-     "yaw": -350.887
-    },
-    {
-     "piece": "cm_crystal_lamp_low",
-     "pos": [
-      1.4437,
-      0.0,
-      4.3811
-     ],
-     "yaw": -128.456
-    },
-    {
-     "piece": "cm_dress_flagstones",
-     "pos": [
-      -0.6184,
-      0.0,
-      5.6294
-     ],
-     "yaw": -353.119
-    },
-    {
-     "piece": "cm_dress_rubble_low",
-     "pos": [
-      -2.4608,
-      0.0,
-      5.365
-     ],
-     "yaw": -61.894
-    },
-    {
-     "piece": "cm_dress_planks_low",
-     "pos": [
-      -4.3049,
-      0.0,
-      4.4124
-     ],
-     "yaw": -266.004
-    },
-    {
-     "piece": "cm_crystal_lamp_low",
-     "pos": [
-      -3.8132,
-      0.0,
-      3.0356
-     ],
-     "yaw": -354.649
-    },
-    {
-     "piece": "cm_dress_flagstones",
-     "pos": [
-      -6.3492,
-      0.0,
-      1.3143
-     ],
-     "yaw": -285.853
+     "yaw": 30.0
     }
    ]
   },
@@ -2189,7 +2540,7 @@
      "piece": "cm_marker_diamond",
      "pos": [
       0.0,
-      4.6,
+      5.2,
       -0.0
      ],
      "yaw": -0.0
@@ -2600,7 +2951,7 @@
      "piece": "cm_marker_diamond",
      "pos": [
       0.0,
-      4.6,
+      5.2,
       -0.0
      ],
      "yaw": -0.0
@@ -2633,7 +2984,7 @@
      "piece": "cm_shrine_egg",
      "pos": [
       0.0,
-      0.66,
+      1.45,
       -0.0
      ],
      "yaw": -0.0
@@ -2804,7 +3155,7 @@
      "piece": "cm_marker_diamond",
      "pos": [
       0.0,
-      6.2,
+      7.4,
       -0.0
      ],
      "yaw": -0.0

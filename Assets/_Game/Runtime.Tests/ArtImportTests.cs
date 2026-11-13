@@ -124,6 +124,7 @@ namespace CriticalMass.Runtime.Tests
 
         [TestCase(ArtMapping.Warrior)]
         [TestCase(ArtMapping.Miner)]
+        [TestCase(ArtMapping.Farmer)]
         public void TheKaykitClipsBindToTheRigByPath(string key)
         {
             ModelSpec spec = ArtMapping.Spec(key);
@@ -136,6 +137,106 @@ namespace CriticalMass.Runtime.Tests
                 string[] missing = bindings.Select(b => b.path).Distinct().Where(p => p.Length > 0 && go.transform.Find(p) == null).ToArray();
                 CollectionAssert.IsEmpty(missing, c.name + " paths missing on " + key);
             }
+        }
+
+        static IEnumerable<string> FaceKeys() => ArtMapping.Models.Where(m => m.FaceTexture != null).Select(m => m.Key);
+        static IEnumerable<string> OutlineKeys() => ArtMapping.Models.Where(m => m.BakesOutlineWeights).Select(m => m.Key);
+
+        static Mesh BodyMesh(ModelSpec spec)
+        {
+            Renderer body = Model(spec).GetComponentsInChildren<Renderer>(true).FirstOrDefault(r => r.name == spec.Meshes[0]);
+            Assert.IsNotNull(body, spec.Meshes[0]);
+            return body is SkinnedMeshRenderer smr ? smr.sharedMesh : body.GetComponent<MeshFilter>().sharedMesh;
+        }
+
+        static Texture2D ReadPng(string path)
+        {
+            var t = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+            Assert.IsTrue(t.LoadImage(System.IO.File.ReadAllBytes(path)), path);
+            return t;
+        }
+
+        /// <summary>Art refresh 2: every face decal imports clamped sRGB with alpha and rides in the catalog entry.</summary>
+        [TestCaseSource(nameof(FaceKeys))]
+        public void FaceDecalImportsClampedSrgbAndIsInTheCatalog(string key)
+        {
+            ModelSpec spec = ArtMapping.Spec(key);
+            var ti = AssetImporter.GetAtPath(spec.FaceTexture) as TextureImporter;
+            Assert.IsNotNull(ti, spec.FaceTexture + " is not imported (run tools/art-sync.sh)");
+            Assert.IsTrue(ti.sRGBTexture, "sRGB");
+            Assert.AreEqual(TextureWrapMode.Clamp, ti.wrapMode, "clamped");
+            Assert.IsTrue(ti.DoesSourceTextureHaveAlpha(), "the decal mixes by its alpha");
+            var cat = AssetDatabase.LoadAssetAtPath<ArtCatalog>(ArtCatalog.AssetPath);
+            Assert.AreSame(AssetDatabase.LoadAssetAtPath<Texture2D>(spec.FaceTexture), cat.Find(key).Face, "catalog face");
+            CollectionAssert.IsNotEmpty(GetUv(BodyMesh(spec), 0), spec.Meshes[0] + " carries the decal UVs");
+        }
+
+        /// <summary>Art refresh 2: UV4.x is 0 on the face (decal alpha or the outline_w sidecar) and 1 elsewhere.</summary>
+        [TestCaseSource(nameof(OutlineKeys))]
+        public void FaceVerticesCarryNoOutlineWeight(string key)
+        {
+            ModelSpec spec = ArtMapping.Spec(key);
+            Mesh mesh = BodyMesh(spec);
+            List<Vector2> w = GetUv(mesh, 4);
+            Assert.AreEqual(mesh.vertexCount, w.Count, "UV4 outline weights baked on " + spec.Meshes[0]);
+            int unlined = w.Count(v => v.x < 0.5f);
+            Assert.Greater(unlined, 0, "the face is unlined");
+            Assert.Less(unlined, w.Count / 4, "only the face is unlined");
+            CollectionAssert.IsSubsetOf(w.Select(v => v.x).Distinct().ToArray(), new[] { 0f, 1f }, "weights are 0 or 1");
+            if (spec.OutlineWeights != null)
+            {
+                var side = JsonUtility.FromJson<Sidecar>(System.IO.File.ReadAllText(spec.OutlineWeights));
+                int listed = side.meshes.First(m => m.name == spec.Meshes[0]).unlined.Length / 3;
+                // FBX splits a Blender vertex per face corner normal, so Unity has at least as many unlined vertices.
+                Assert.GreaterOrEqual(unlined, listed, "every outline_w 0 vertex of the .blend matched");
+            }
+            else
+            {
+                Texture2D decal = ReadPng(spec.FaceTexture);
+                List<Vector2> uv = GetUv(mesh, 0);
+                for (int i = 0; i < uv.Count; i++)
+                    Assert.AreEqual(decal.GetPixelBilinear(uv[i].x, uv[i].y).a > 0.05f ? 0f : 1f, w[i].x, "vertex " + i + " weight follows the decal alpha");
+                Object.DestroyImmediate(decal);
+            }
+        }
+
+        /// <summary>The Miner's decal is its own material slot (CM_FaceDecal): that submesh is the painted face.</summary>
+        [Test]
+        public void TheMinerFaceSlotIsTheDecalSubmesh()
+        {
+            ModelSpec spec = ArtMapping.Spec(ArtMapping.Miner);
+            Mesh mesh = BodyMesh(spec);
+            Assert.AreEqual(2, mesh.subMeshCount, "Miner_Body: CM_Toon + CM_FaceDecal");
+            Texture2D decal = ReadPng(spec.FaceTexture);
+            List<Vector2> uv = GetUv(mesh, 0);
+            int[] idx = mesh.GetTriangles(spec.FaceSlot).Distinct().ToArray();
+            int painted = 0;
+            float minX = 1, minY = 1, maxX = 0, maxY = 0;
+            foreach (int i in idx)
+            {
+                minX = Mathf.Min(minX, uv[i].x); maxX = Mathf.Max(maxX, uv[i].x);
+                minY = Mathf.Min(minY, uv[i].y); maxY = Mathf.Max(maxY, uv[i].y);
+            }
+            // The slab's UVs span the decal (the painted features sit inside it, not on every corner).
+            Assert.Greater(maxX - minX, 0.5f, "face slot UVs span the decal");
+            for (int k = 0; k < 400; k++)
+                if (decal.GetPixelBilinear(minX + (maxX - minX) * (k % 20 + 0.5f) / 20f, minY + (maxY - minY) * (k / 20 + 0.5f) / 20f).a > 0.05f) painted++;
+            Assert.Greater(painted, 40, "the decal paints the face slot");
+            Object.DestroyImmediate(decal);
+        }
+
+        /// <summary>The outline_w sidecar's JsonUtility form (tools/art/outline_weights.py).</summary>
+        [System.Serializable] sealed class Sidecar
+        {
+            [System.Serializable] public sealed class Entry { public string name; public int vertices; public float[] unlined; }
+            public Entry[] meshes;
+        }
+
+        static List<Vector2> GetUv(Mesh mesh, int channel)
+        {
+            var l = new List<Vector2>();
+            mesh.GetUVs(channel, l);
+            return l;
         }
 
         [Test]

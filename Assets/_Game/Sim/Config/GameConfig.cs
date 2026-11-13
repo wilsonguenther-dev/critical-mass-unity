@@ -149,6 +149,16 @@ namespace CriticalMass.Sim.Config
         public double ApexUnits = 0.8;
         /// <summary>Shortest jump the landing guard may shorten to (ticks).</summary>
         public double MinAirTicks = 6;
+        /// <summary>
+        /// DG-02 coyote time in sim seconds (not in the browser; Travis's "Jumping", gap list row DG-02): a grounded actor
+        /// whose footing was removed may still take off for this long. Counted in ticks (Jump.CoyoteTicks, 3 at 30 Hz).
+        /// </summary>
+        public double CoyoteSeconds = 0.1;
+        /// <summary>
+        /// DG-02 jump buffer in sim seconds (not in the browser): a press this early (before landing, before the get-up
+        /// ends, or refused by the landing guard) fires on the first tick it can. Counted in ticks (Jump.BufferTicks, 3).
+        /// </summary>
+        public double BufferSeconds = 0.1;
 
         public JumpConfig Clone() => (JumpConfig)MemberwiseClone();
     }

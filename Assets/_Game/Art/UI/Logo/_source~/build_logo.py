@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Critical Mass logo (bible p04): primary lockup and compact badge, rebuilt as vector art.
+"""Critical Mass logo (bible p04): primary lockup and compact badge, rebuilt as vector art (v2: carved stone letters).
 
 The wordmark is the Bungee typeface (SIL OFL 1.1, Resources/UI/Fonts/Bungee-OFL.txt) converted to outline paths with
 fontTools, each letter tilted and lifted for the bouncy baseline, then stacked as flat sticker layers: Void Navy outer
@@ -20,6 +20,9 @@ import sys
 from fontTools.pens.svgPathPen import SVGPathPen
 from fontTools.pens.transformPen import TransformPen
 from fontTools.ttLib import TTFont
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import stone  # noqa: E402  (v2 carved-stone letters and faceted egg, shapely)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 GAME = os.path.abspath(os.path.join(HERE, '..', '..', '..', '..'))
@@ -190,36 +193,21 @@ def waterfall(x, y, w, h):
 
 
 def wordmark_layers(top, bottom, cx, top_base, top_size, bot_base, bot_size):
-    """Return SVG for the two-word sticker: outer navy, cream rim, bevel, face."""
+    """The two-word wordmark as carved stone (v2): chiselled letter faces, a lighter top plane, a darker lower bevel,
+    a deep extruded side under each letter, faceted planes, cracks and moss caps; Warm Cream inner rim and a thick Void
+    Navy outer outline around the whole block (brief: double outline)."""
     trk_t, trk_b = top_size * 0.02, bot_size * 0.03
     wt = measure(top, top_size, trk_t)
     wb = measure(bottom, bot_size, trk_b)
-    assert wt < 2000 and wb < 2000
     tilts_t = (-4, 3, -2, 4, -3, 2, -4, 3)
     lifts_t = (0, 8, 2, 10, 0, 7, 3, 9)
     tilts_b = (3, -3, 4, -2)
     lifts_b = (6, 0, 9, 2)
-    pt, _ = word(top, cx - wt / 2, top_base, top_size, tilts_t, lifts_t, trk_t)
-    pb, _ = word(bottom, cx - wb / 2, bot_base, bot_size, tilts_b, lifts_b, trk_b)
-    pt_bev, _ = word(top, cx - wt / 2, top_base + top_size * 0.07, top_size, tilts_t, lifts_t, trk_t)
-    pb_bev, _ = word(bottom, cx - wb / 2, bot_base + bot_size * 0.07, bot_size, tilts_b, lifts_b, trk_b)
-    ow = top_size * 0.30   # outer navy stroke (both sides of the path: visible ~0.15 cap)
-    cw = top_size * 0.13   # cream rim
-    both = pt + ' ' + pb + ' ' + pt_bev + ' ' + pb_bev
-    split = bot_base - bot_size * 0.48
-    return (
-        f'<path d="{both}" fill="{NAVY}" stroke="{NAVY}" stroke-width="{ow:.1f}" stroke-linejoin="round"/>'
-        f'<path d="{pt} {pt_bev}" fill="{CREAM}" stroke="{CREAM}" stroke-width="{cw:.1f}" stroke-linejoin="round"/>'
-        f'<path d="{pb} {pb_bev}" fill="{CREAM}" stroke="{CREAM}" stroke-width="{cw:.1f}" stroke-linejoin="round"/>'
-        f'<path d="{pt_bev}" fill="{AZURE_BEVEL}"/>'
-        f'<path d="{pb_bev}" fill="{MASS_BEVEL}"/>'
-        f'<path d="{pt}" fill="{AZURE_FACE}"/>'
-        f'<clipPath id="massLow"><rect x="0" y="{split:.1f}" width="4000" height="4000"/></clipPath>'
-        f'<path d="{pb}" fill="{CORAL}"/>'
-        f'<path d="{pb}" fill="{ORANGE_RED}" clip-path="url(#massLow)"/>'
-        # thin navy contour on the faces so the letters separate where they touch
-        f'<path d="{pt} {pb}" fill="none" stroke="{NAVY}" stroke-width="{top_size * 0.025:.1f}" stroke-linejoin="round"/>'
-    ), wt, wb
+    lt = stone.word_geoms(glyphs, cmap, CAP, top, cx - wt / 2, top_base, top_size, tilts_t, lifts_t, trk_t, seed=11)
+    lb = stone.word_geoms(glyphs, cmap, CAP, bottom, cx - wb / 2, bot_base, bot_size, tilts_b, lifts_b, trk_b, seed=29)
+    parts = stone.carve(lt + lb, [top_size] * len(lt) + [bot_size] * len(lb),
+                        [stone.CRITICAL] * len(lt) + [stone.MASS] * len(lb), seed=5)
+    return parts, wt, wb
 
 
 def primary():
@@ -227,10 +215,15 @@ def primary():
     cx = W / 2
     top = fit('CRITICAL', W * 0.80)
     bot = min(fit('MASS', W * 0.62), top * 1.45)
-    parts = [egg(cx, 300, 185, 225)]
+    parts = [stone.egg(cx, 300, 185, 225)]
     parts += [rock(300, 300, 120, 150), rock(905, 285, 130, 160), rock(150, 560, 150, 150), rock(1050, 590, 150, 140)]
     parts += [chip(250, 140, 22, 10), chip(960, 110, 24, 40), chip(430, 70, 18, 70), chip(800, 60, 20, 5, STONE_LIGHT),
-              chip(80, 430, 18, 30), chip(1130, 450, 20, 60), chip(200, 840, 22, 15), chip(1000, 850, 20, 50)]
+              chip(80, 430, 18, 30), chip(1130, 450, 20, 60), chip(200, 840, 22, 15), chip(1000, 850, 20, 50),
+              # v2: denser debris field like p04
+              chip(330, 120, 26, 25), chip(870, 150, 28, 65), chip(380, 210, 16, 50, STONE_LIGHT), chip(820, 230, 18, 10),
+              chip(60, 300, 22, 80), chip(1150, 300, 24, 20), chip(260, 420, 14, 35, STONE_LIGHT), chip(950, 420, 16, 75),
+              chip(120, 760, 20, 40), chip(1080, 740, 22, 5), chip(330, 900, 18, 60), chip(880, 905, 20, 30),
+              chip(520, 40, 14, 15, STONE_LIGHT), chip(690, 30, 16, 55), chip(1170, 620, 16, 45), chip(30, 640, 18, 20)]
     parts.append(crystals(150, 520, 230))
     parts.append(plume(1040, 575, 300))
     parts.append(waterfall(100, 610, 80, 250))
@@ -246,7 +239,7 @@ def badge():
     cx = W / 2
     top = fit('CRITICAL', W * 0.86)
     bot = min(fit('MASS', W * 0.74), top * 1.6)
-    parts = [egg(cx, 290, 175, 210), rock(150, 230, 110, 160, moss=False), rock(650, 230, 110, 160, moss=False),
+    parts = [stone.egg(cx, 290, 175, 210), rock(150, 230, 110, 160, moss=False), rock(650, 230, 110, 160, moss=False),
              chip(220, 70, 22, 20), chip(560, 60, 22, 70), chip(400, 30, 18, 40, STONE_LIGHT), chip(90, 520, 18, 10),
              chip(720, 540, 18, 50)]
     parts += [rock(cx, 840, 420, 170), rock(120, 640, 120, 110), rock(680, 640, 120, 110)]

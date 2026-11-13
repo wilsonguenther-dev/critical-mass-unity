@@ -228,6 +228,7 @@ namespace CriticalMass.Runtime.View
                 float d = (float)(2 * cfg.Class(actor.Cls).Radius);
                 if (i == 0) d *= HumanScale;
                 slot.Capsule.localScale = new Vector3(d, (float)(charHeight / 2), d);
+                slot.Capsule.localPosition += JumpLift.Offset(w, map, i, a, x, z); // DG-02 jump arc
                 SetMaterial(slot.CapsuleRenderer, ToonMaterials.Character(actor.Team == TeamId.Azure ? Palette.Azure : Palette.Crimson));
                 return false;
             }
@@ -235,7 +236,7 @@ namespace CriticalMass.Runtime.View
             ModelView m = slot.Model;
             m.SetActive(true);
             m.Transform.localPosition = SimSpace.ToWorld(x, h, z) + (hasFx ? fx.Nudge : Vector3.zero);
-            m.Transform.localRotation = facing;
+            m.SetFacing(facing);
             m.Transform.localScale = Vector3.one * (hasFx ? fx.Scale : 1f);
             Material teamMat = ArtMaterials.ForTeam(m.Spec, actor.Team);
             m.SetMaterial(hasFx && fx.Flash ? _fx.FlashMaterial(teamMat) : teamMat);
@@ -253,6 +254,7 @@ namespace CriticalMass.Runtime.View
             float move = Smooth(0.15, 1.2, speed);
             float run = m.HasClip(ArtMapping.Run) ? move * Smooth(2.2, 3.4, speed) : 0f;
             float walk = m.HasClip(ArtMapping.Walk) ? move - run : 0f;
+            m.Transform.localPosition += JumpLift.Offset(w, map, i, a, x, z); // DG-02 jump arc (after the position is set)
             slot.IdleT += dSim;
             slot.WalkT += dSim * Clamp(speed / WalkClipSpeed, 0.5, 2.0);
             slot.RunT += dSim * Clamp(speed / RunClipSpeed, 0.6, 1.6);
@@ -317,7 +319,7 @@ namespace CriticalMass.Runtime.View
                 // The egg rests on the shrine's raised centre cell (a 1.5 u wall block in the grid view), not inside it.
                 double baseY = m == _egg ? h + RaisedTop(map, x, z) : h;
                 m.Transform.localPosition = SimSpace.ToWorld(x, baseY, z);
-                m.Transform.localRotation = facing;
+                m.SetFacing(facing);
                 m.SetMaterial(ArtMaterials.ForGlow(m.Spec, glow));
                 double speed = Math.Sqrt((k.X - k.PrevX) * (k.X - k.PrevX) + (k.Z - k.PrevZ) * (k.Z - k.PrevZ)) * cfg.SimHz;
                 _kaijuIdleT += dSim;

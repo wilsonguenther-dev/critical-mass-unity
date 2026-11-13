@@ -114,5 +114,36 @@ namespace CriticalMass.Sim.Tests
                 Assert.IsFalse(shared.Terraform, "bot " + id + " terraform");
             }
         }
+
+        [Test]
+        public void ASimDriverStyleStepWithTheHumanPressingJumpLiftsOnlyActor0EveryBotStaysOnTheGround()
+        {
+            World w = MakeWorld(1, 5);
+            // Every body can jump this step: alive, not getting up, grounded. Without the fix every bot would take off too.
+            for (int i = 0; i < w.ActorCount; i++)
+            {
+                Actor a = w.Actors[i];
+                a.Alive = true;
+                a.StandUp = 0;
+                Assert.AreEqual(0, a.AirLen, "actor " + i + " grounded before");
+            }
+            InputFrame shared = SimInput.EmptyInput();
+            // The human frame, as the human input layer writes it on the step Space is pressed: standing still, jump edge true.
+            shared.MoveX = 0;
+            shared.MoveZ = 0;
+            shared.AimX = double.NaN;
+            shared.AimZ = double.NaN;
+            shared.Jump = true;
+            SimInput.ApplyInput(w, 0, shared);
+            BotBrain.BotsThink(w, SimStep.Dt(w.Config));
+            for (int id = 1; id < w.ActorCount; id++)
+            {
+                BotBrain.FillBotInput(w, id, shared);
+                SimInput.ApplyInput(w, id, shared);
+            }
+            SimStep.Step(w, SimStep.Dt(w.Config));
+            Assert.Greater(w.Actors[0].AirLen, 0, "human airborne");
+            for (int id = 1; id < w.ActorCount; id++) Assert.AreEqual(0, w.Actors[id].AirLen, "bot " + id + " airLen");
+        }
     }
 }
