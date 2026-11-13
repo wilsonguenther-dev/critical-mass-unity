@@ -115,8 +115,9 @@ namespace CriticalMass.Runtime.Tests
                 Vector2 got = p.ToPixel(pts[i, 0], pts[i, 1]);
                 Assert.Less(Vector2.Distance(expect, got), 0.05f, $"point {i}: camera says {expect}, minimap says {got}");
                 p.ToSim(got.x, got.y, 1, out double bx, out double bz);
-                Assert.AreEqual(pts[i, 0], bx, 1e-6);
-                Assert.AreEqual(pts[i, 1], bz, 1e-6);
+                // The pixel is a float: a round trip through it is exact to float precision (~1e-5 u at 100 u), not 1e-6.
+                Assert.AreEqual(pts[i, 0], bx, 1e-4);
+                Assert.AreEqual(pts[i, 1], bz, 1e-4);
             }
             // camera-up at yaw 45: Azure base upper left of Crimson, shrine above the corruption island
             Vector2 az = p.ToPixel(8, 36), cr = p.ToPixel(104, 36), sh = p.ToPixel(56, 8), so = p.ToPixel(56, 65);

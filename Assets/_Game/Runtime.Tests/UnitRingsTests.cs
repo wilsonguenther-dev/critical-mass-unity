@@ -134,10 +134,10 @@ namespace CriticalMass.Runtime.Tests
             Assert.IsTrue(shader.isSupported, "CM/UnitRing does not compile (a shader with errors draws nothing)");
             Assert.IsNotNull(_rings.Material);
             Assert.AreEqual(3000 - 40, _rings.Material.renderQueue, "Transparent-40: after CM/WorldDecal (Transparent-50)");
-            Assert.AreEqual(Color(Palette.Brass), _rings.Material.GetColor("_SelfColor"));
-            Assert.AreEqual(Color(Palette.Azure), _rings.Material.GetColor("_AzureColor"));
-            Assert.AreEqual(Color(Palette.Crimson), _rings.Material.GetColor("_CrimsonColor"));
-            Assert.AreEqual(Color(Palette.VoidNavy), _rings.Material.GetColor("_OutlineColor"));
+            AssertColor(Color(Palette.Brass), _rings.Material.GetColor("_SelfColor"), "_SelfColor");
+            AssertColor(Color(Palette.Azure), _rings.Material.GetColor("_AzureColor"), "_AzureColor");
+            AssertColor(Color(Palette.Crimson), _rings.Material.GetColor("_CrimsonColor"), "_CrimsonColor");
+            AssertColor(Color(Palette.VoidNavy), _rings.Material.GetColor("_OutlineColor"), "_OutlineColor");
             var r = _go.GetComponentInChildren<MeshRenderer>();
             Assert.IsNotNull(r);
             Assert.AreEqual(UnityEngine.Rendering.ShadowCastingMode.Off, r.shadowCastingMode);
@@ -160,6 +160,12 @@ namespace CriticalMass.Runtime.Tests
             {
                 UnityEngine.Object.DestroyImmediate(driverGo);
             }
+        }
+
+        /// <summary>Material colours round-trip through float storage: equal within 1/1000 per channel, not bit-exact.</summary>
+        static void AssertColor(Color want, Color got, string what)
+        {
+            for (int c = 0; c < 4; c++) Assert.AreEqual(want[c], got[c], 1e-3, what + " channel " + c);
         }
 
         static Color Color(string hex)

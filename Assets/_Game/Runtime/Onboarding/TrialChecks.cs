@@ -103,7 +103,7 @@ namespace CriticalMass.Runtime.Onboarding
                         p.SawOverGap = false;
                         return false;
                     }
-                    bool over = IsGapCell(MapGrid.CellAt(w.Map, w.X[Player], w.Z[Player]));
+                    bool over = IsJumpGapCell(MapGrid.CellAt(w.Map, w.X[Player], w.Z[Player]));
                     if (over)
                     {
                         p.SawOverGap = true;
@@ -192,6 +192,9 @@ namespace CriticalMass.Runtime.Onboarding
 
         /// <summary>Void and water are the gaps a jump crosses or a place fills.</summary>
         public static bool IsGapCell(int cellType) => cellType == Cell.Void || cellType == Cell.Water;
+
+        /// <summary>A gap a jump can clear: in-map VOID only (CM-32: airborne actors pass over void, never over water).</summary>
+        public static bool IsJumpGapCell(int cellType) => cellType == Cell.Void;
 
         /// <summary>The enemy the arrow follows, kept for EnemyRepickTicks unless it dies (-1 = no living enemy).</summary>
         public static int TrackEnemy(World w, TrialProbe p, bool weakest)
@@ -341,7 +344,7 @@ namespace CriticalMass.Runtime.Onboarding
                             int ex = cx + DirX[d] * (span + 1), ez = cz + DirZ[d] * (span + 1);
                             if (!MapGrid.InBounds(map, ex, ez)) break;
                             int mx = cx + DirX[d] * span, mz = cz + DirZ[d] * span;
-                            if (!IsGapCell(map.Cells[mz * map.Width + mx])) break;
+                            if (!IsJumpGapCell(map.Cells[mz * map.Width + mx])) break;
                             if (!MapGrid.IsWalkable(map, ex, ez)) continue;
                             double mxw = cx + 0.5 + DirX[d] * (span + 1) * 0.5, mzw = cz + 0.5 + DirZ[d] * (span + 1) * 0.5;
                             double dd = Dist2(x, z, mxw, mzw);

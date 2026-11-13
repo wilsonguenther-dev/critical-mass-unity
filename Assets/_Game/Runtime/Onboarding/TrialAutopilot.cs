@@ -116,9 +116,10 @@ namespace CriticalMass.Runtime.Onboarding
                         _jumpPressed = false;
                         return;
                     }
-                    // At the edge: run straight across the gap centre and press jump once.
+                    // Near the edge: run straight across the gap centre and press jump whenever on the ground close to it
+                    // (a jump the landing guard shortened, or one taken off too early, is simply tried again).
                     Toward(px, pz, tx + (tx - px), tz + (tz - pz), frame);
-                    if (!_jumpPressed)
+                    if (w.Actors[TrialChecks.Player].AirLen == 0 && d2 <= 1.8 * 1.8)
                     {
                         frame.Jump = true;
                         _jumpPressed = true;
