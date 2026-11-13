@@ -251,6 +251,7 @@ namespace CriticalMass.Editor
             if (p.intValue == value) return;
             p.intValue = value;
             so.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(o);   // integration batch 3: AudioManager kept 1024 without this (project settings save only when dirty)
         }
 
         static UniversalRenderPipelineAsset EnsureTier(string path, Func<SerializedObject, bool> configure)
