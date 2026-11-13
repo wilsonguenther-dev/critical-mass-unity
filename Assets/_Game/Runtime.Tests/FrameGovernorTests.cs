@@ -33,8 +33,9 @@ namespace CriticalMass.Runtime.Tests
         [Test]
         public void PrefsAreSanitisedAndMenusNeverExceedSixty()
         {
-            Assert.AreEqual(60, FrameGovernor.SanitiseCap(999));
-            Assert.AreEqual(60, FrameGovernor.SanitiseCap(-2));
+            Assert.AreEqual(FramePolicy.DefaultCap, FrameGovernor.SanitiseCap(999));
+            Assert.AreEqual(FramePolicy.DefaultCap, FrameGovernor.SanitiseCap(-2));
+            Assert.AreEqual(0, FramePolicy.DefaultCap, "perf-smooth-1: default OFF = vsync on, one frame per refresh");
             Assert.AreEqual(FramePolicy.Unlimited, FrameGovernor.SanitiseCap(-1), "perf-smooth-1: UNLIMITED is a choice");
             Assert.AreEqual(144, FrameGovernor.SanitiseCap(144));
             Assert.AreEqual(60, FrameGovernor.EffectiveCap(FramePolicy.Unlimited, true), "menus never unlimited");

@@ -20,14 +20,16 @@ def rows_for(d):
         perf = json.load(open(p))
         fr = perf.get('frame_recorder') or {}
         csvp = os.path.join(d, 'frames.csv' if k == 1 else f'frames-m{k}.csv')
-        frames, loading, gcmax = [], [], 0.0
+        frames, loading, gcmax, gcover10 = [], [], 0.0, 0
         if os.path.exists(csvp):
             with open(csvp) as f:
                 lines = [l for l in f if not l.startswith('#')]
             for r in csv.DictReader(lines):
                 ms = float(r['frame_ms'])
                 (loading if r['loading'] == '1' else frames).append(ms)
-                gcmax = max(gcmax, float(r['gc_ms'] or 0))
+                if r['loading'] != '1':
+                    gcmax = max(gcmax, float(r['gc_ms'] or 0))   # in-match collections only
+                    gcover10 += float(r['gc_ms'] or 0) > 10
         frames.sort()
         n = len(frames)
         p99 = frames[min(n - 1, int(0.99 * (n - 1) + 0.5))] if n else None
@@ -37,7 +39,7 @@ def rows_for(d):
         out.append({
             'run': os.path.basename(os.path.normpath(d)), 'match': k, 'quality': perf.get('quality'),
             'frames': n, 'pct33': 100.0 * over33 / n if n else None, 'over33': over33, 'p99': p99, 'over50': over50,
-            'worst': frames[-1] if n else None, 'gc_n': fr.get('gc_collections'), 'gc_max': gcmax or fr.get('gc_max_ms'),
+            'worst': frames[-1] if n else None, 'gc_n': fr.get('gc_collections'), 'gc_max': gcmax, 'gc_over10': gcover10, 'pacing': perf.get('pacing', 'rule'),
             'gc_marker_max': next((m['max'] for m in perf.get('markers', []) if m['name'] == 'GC.Collect'), None),
             'alloc': (fr.get('alloc_kb_per_frame') or {}).get('mean'), 'load_frames': len(loading),
             'load_max': max(loading) if loading else None, 'ticks': fr.get('ticks_per_frame'), 'top': top,
@@ -51,12 +53,12 @@ def f(v, fmt='{:.1f}'):
 
 
 def main(dirs):
-    print('| run | match | quality | frames | p50 ms | p99 ms | >=33 ms | % >=33 | >50 ms | worst ms | GC n | GC max ms | alloc KB/frame | loading frames | worst loading ms | slow frames spend extra in |')
-    print('| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |')
+    print('| run | match | quality | frames | p50 ms | p99 ms | >=33 ms | % >=33 | >50 ms | worst ms | pacing | GC n | in-match GC max ms | GC >10 ms | alloc KB/frame | loading frames | worst loading ms | slow frames spend extra in |')
+    print('| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |')
     for d in dirs:
         for r in rows_for(d):
             print(f"| {r['run']} | {r['match']} | {r['quality']} | {r['frames']} | {f(r['p50'])} | {f(r['p99'])} | {r['over33']} | "
-                  f"{f(r['pct33'], '{:.2f}')} | {r['over50']} | {f(r['worst'])} | {r['gc_n']} | {f(r['gc_marker_max'])} | "
+                  f"{f(r['pct33'], '{:.2f}')} | {r['over50']} | {f(r['worst'])} | {r['pacing']} | {r['gc_n']} | {f(r['gc_max'])} | {r['gc_over10']} | "
                   f"{f(r['alloc'], '{:.2f}')} | {r['load_frames']} | {f(r['load_max'])} | {r['top']} |")
 
 

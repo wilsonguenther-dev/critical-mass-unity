@@ -13,7 +13,11 @@ namespace CriticalMass.Runtime.Game
         // Quality level indices in ProjectSettings/QualitySettings.asset (Very Low, Low, Medium, High, Very High, Ultra).
         public const int LevelVeryLow = 0, LevelLow = 1, LevelMedium = 2, LevelHigh = 3;
 
-        public const int DefaultCap = 60;
+        /// <summary>perf-smooth-1: the default limit is OFF, i.e. vsync on and one frame per display refresh (60 on a 60 Hz
+        /// screen, 120 on a 120 Hz one). A 60 cap on a 120 Hz screen means vsync every 2 refreshes, and on this Mac 87% of
+        /// the frames over 33 ms were that 2-refresh slot holding a slightly late frame for a whole extra 60 Hz frame
+        /// (3.7% of frames at High; locked to the display: 0.02%). The 30/60/120/144 choices keep the whole-divisor rule.</summary>
+        public const int DefaultCap = 0;
         public const int MenuCap = 60;
         public const int BatteryMenuCap = 30;
         /// <summary>The title screen (a backdrop match behind it) at 30 fps: idle CPU budget (smoke measured 36.7% at 60).</summary>
@@ -86,7 +90,7 @@ namespace CriticalMass.Runtime.Game
         {
             if (savePower) return SavePowerBackgroundFps;
             if (foregroundCap == 0) return foregroundCap;
-            if (foregroundCap == Unlimited) return DefaultCap;   // unfocused never runs unbounded
+            if (foregroundCap == Unlimited) return MenuCap;   // unfocused never runs unbounded
             return Math.Max(MinBackgroundFps, foregroundCap);
         }
 

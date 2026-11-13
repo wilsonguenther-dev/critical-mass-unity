@@ -286,9 +286,11 @@ namespace CriticalMass.Runtime.Tests
         {
             PlayerPrefs.DeleteKey("cm.fpsCap");
             PlayerPrefs.DeleteKey("cm.bgThrottle");
-            Assert.AreEqual(60, GameSettings.FpsCap, "default 60");
+            Assert.AreEqual(0, GameSettings.FpsCap, "perf-smooth-1: default OFF (vsync on, locked to the display)");
             Assert.IsFalse(GameSettings.BackgroundThrottle, "default off: save power in background (DG-51)");
             CollectionAssert.AreEqual(new[] { 30, 60, 120, 144, 0, -1 }, GameSettings.FpsCapOptions);
+            Assert.AreEqual("OFF", PauseMenu.FpsCapText());
+            GameSettings.FpsCap = 60;
             Assert.AreEqual("60 FPS", PauseMenu.FpsCapText());
 
             GameSettings.FpsCap = 120;
@@ -302,7 +304,7 @@ namespace CriticalMass.Runtime.Tests
             Assert.AreEqual(-1, PlayerPrefs.GetInt("cm.fpsCap"));
             Assert.AreEqual("UNLIMITED", PauseMenu.FpsCapText());
             GameSettings.FpsCap = 45;   // not a choice: back to the default
-            Assert.AreEqual(60, PlayerPrefs.GetInt("cm.fpsCap"));
+            Assert.AreEqual(0, PlayerPrefs.GetInt("cm.fpsCap"));
             GameSettings.BackgroundThrottle = false;
             Assert.AreEqual(0, PlayerPrefs.GetInt("cm.bgThrottle", 1));
         }
