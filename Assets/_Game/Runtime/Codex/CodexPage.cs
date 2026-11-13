@@ -43,13 +43,18 @@ namespace CriticalMass.Runtime.Codex
             MenuUi.Label(page, "Heading", CMTokens.Display, 34, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft, PauseMenu.ContentX,
                 PauseMenu.PanelY + 30f, 600f, 60f, "BASIN RELICS", 3f);
             _count = MenuUi.Label(page, "Count", CMTokens.Display, 26, CMTokens.ToolBrass.Color, TextAnchor.MiddleRight,
-                PauseMenu.PanelX + PauseMenu.PanelW - 40f - 220f - 24f - 360f, PauseMenu.PanelY + 30f, 360f, 60f, "", 3f);
+                PauseMenu.PanelX + PauseMenu.PanelW - 40f - 200f - 24f - 300f - 24f - 300f, PauseMenu.PanelY + 30f, 300f, 60f, "", 3f);
             _crown = MenuUi.Label(page, "Crown", CMTokens.Ui, 20, CMTokens.ToolBrass.Color, TextAnchor.MiddleLeft, PauseMenu.ContentX + 330f,
                 PauseMenu.PanelY + 30f, 400f, 60f, "", 2f);
             MenuItem back = MenuUi.Item(page, "Back", PauseMenu.PanelX + PauseMenu.PanelW - 40f - 200f, PauseMenu.PanelY + 30f, 200f, 60f,
                 "BACK", MenuItem.Kind.Button, 26, true, CMTokens.Display);
             back.Submitted = menu.ShowRoot;
-            back.navigation = new Navigation { mode = Navigation.Mode.None };
+            // The story's motion comic, from the same player as the intro (Esc / B / any key ends it and returns here).
+            MenuItem story = MenuUi.Item(page, "Story", PauseMenu.PanelX + PauseMenu.PanelW - 40f - 200f - 24f - 300f, PauseMenu.PanelY + 30f,
+                300f, 60f, "WATCH STORY", MenuItem.Kind.Button, 26, true, CMTokens.Display);
+            story.Submitted = () => Menus.StoryIntro.Play();
+            back.navigation = new Navigation { mode = Navigation.Mode.Explicit, selectOnLeft = story };
+            story.navigation = new Navigation { mode = Navigation.Mode.Explicit, selectOnRight = back };
 
             _tiles = new Tile[CodexProgress.RelicCount];
             for (int i = 0; i < _tiles.Length; i++)

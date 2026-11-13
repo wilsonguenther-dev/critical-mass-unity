@@ -84,6 +84,9 @@ namespace CriticalMass.Runtime.Menus
 
         /// <summary>Master switch (true by default).</summary>
         public static bool Enabled = true;
+        /// <summary>Every other idle entry plays the story's motion comic as a loop instead of the camera tour.</summary>
+        public static bool StoryLoopEnabled = true;
+        int _idleEntries;
         /// <summary>Batch mode (gates, captures) never tours unless a test sets this.</summary>
         public static bool AllowInBatchMode;
         /// <summary>Optional override of "the title is showing"; null = a TitleScreen component is on the game object.</summary>
@@ -190,7 +193,12 @@ namespace CriticalMass.Runtime.Menus
             bool titleOpen = active && IsTitleOpen() && !StoryIntro.IsPlaying && !Credits.IsOpen;
             bool input = AnyInput();
             AttractClock.Change c = Clock.Step(Time.unscaledDeltaTime, titleOpen, input);
-            if (c == AttractClock.Change.Enter) StartTour();
+            if (c == AttractClock.Change.Enter)
+            {
+                // Idle on the title alternates the live camera tour (first) and the motion-comic story loop.
+                if (StoryLoopEnabled && (_idleEntries++ & 1) == 1 && StoryIntro.PlayAttract()) Clock.Reset();
+                else StartTour();
+            }
             else if (c == AttractClock.Change.Exit) StopTour(true);
             if (_touring) Tour(Time.unscaledDeltaTime);
         }

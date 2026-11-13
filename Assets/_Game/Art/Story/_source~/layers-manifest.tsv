@@ -1,0 +1,67 @@
+name	width	height	source	note
+basin	1920	796	p03 moodboard central painting, lower 64% x2, top edge feathered	
+shrine	1140	868	p03 moodboard central, shrine crop x3	
+shrine_blur	568	432	p03	depth-of-field copy, half size
+shrine_glow	1140	872	p03	egg and beam glow, aligned to shrine
+hill	1708	1008	p01 cover key art middle crop x2	
+hill_blur	852	504	p01	depth-of-field copy, half size
+egg	504	512	p10 egg	
+egg_glow	504	512	p10 egg	seam / crystal rim glow
+egg_crack_1	504	512	p10 egg + procedural	egg splitting, stage 1 of 4 (masked to the egg)
+egg_crack_2	504	512	p10 egg + procedural	egg splitting, stage 2 of 4 (masked to the egg)
+egg_crack_3	504	512	p10 egg + procedural	egg splitting, stage 3 of 4 (masked to the egg)
+egg_crack_4	504	512	p10 egg + procedural	egg splitting, stage 4 of 4 (masked to the egg)
+hatchling	636	548	p10 hatchling	
+hatchling_glow	636	548	p10 hatchling	seam / crystal rim glow
+kaiju_neutral	792	892	p10 neutral adult	
+kaiju_neutral_glow	792	892	p10 neutral adult	seam / crystal rim glow
+kaiju_crimson	688	900	p10 Crimson-aligned adult	
+kaiju_crimson_glow	688	900	p10 Crimson-aligned adult	seam / crystal rim glow
+kaiju_berserk	756	960	p10 berserk adult	
+kaiju_berserk_glow	756	960	p10 berserk adult	seam / crystal rim glow
+warrior	884	956	p06 Warrior front	
+warrior_crimson	884	956	p06 Warrior front	accent swap Azure -> Crimson (bible p06 item 07 rule)
+warrior_cleave_crimson	1180	788	p06 Warrior pose (cleave)	accent swap Azure -> Crimson (bible p06 item 07 rule)
+warrior_charge	1028	732	p06 Warrior pose (shield charge)	
+farmer	740	1064	p07 Farmer front	
+farmer_crimson	740	1064	p07 Farmer front	accent swap Azure -> Crimson (bible p06 item 07 rule)
+farmer_glow	740	1064	p07 Farmer front	seam / crystal rim glow
+farmer_harvest	988	832	p07 Farmer pose (harvest)	
+farmer_harvest_glow	988	832	p07 Farmer pose (harvest)	seam / crystal rim glow
+miner	856	828	p08 Miner front	
+miner_crimson	856	828	p08 Miner front	accent swap Azure -> Crimson (bible p06 item 07 rule)
+banner_azure	424	624	p14 Azure banner	
+banner_crimson	448	624	p14 Crimson banner	
+biomass_plants	1024	500	p14 biomass plants	
+biomass_plants_glow	1024	500	p14 biomass plants	seam / crystal rim glow
+corruption_growth	1248	472	p14 corruption growth	
+corruption_growth_glow	1248	472	p14 corruption growth	seam / crystal rim glow
+orb	312	328	p14 loose biomass orb	
+orb_glow	312	328	p14 loose biomass orb	seam / crystal rim glow
+sky_day	1280	720	procedural	Sky Top -> Sky Horizon, cream sun, soft cloud
+sky_storm	1280	720	procedural	darkened sky under the crack
+sky_night	1280	720	procedural	Void Navy night, cream stars, teal ground glow
+sky_split	1280	720	procedural	Azure | Crimson split, diagonal cream seam
+sky_choice	1280	720	procedural	Biomass | Corruption split
+sky_warm	1280	720	procedural	late-afternoon hero sky
+cloudsea	1600	540	procedural	cloud sea, lower frame
+cloudsea_warm	1600	540	procedural	
+cloudsea_storm	1600	540	procedural	
+rocks_l	900	640	procedural	foreground framing rock, left
+rocks_r	900	640	procedural	foreground framing rock, right
+crack_1	1920	1080	procedural	spreading crack, stage 1 of 6
+crack_2	1920	1080	procedural	spreading crack, stage 2 of 6
+crack_3	1920	1080	procedural	spreading crack, stage 3 of 6
+crack_4	1920	1080	procedural	spreading crack, stage 4 of 6
+crack_5	1920	1080	procedural	spreading crack, stage 5 of 6
+crack_6	1920	1080	procedural	spreading crack, stage 6 of 6
+crack_glow	960	540	procedural	light pouring through the crack
+shafts	960	540	procedural	light shafts from the crack
+shafts_warm	960	540	procedural	
+speed_radial	1280	720	procedural	radial speed lines
+speed_down	1280	720	procedural	falling speed lines
+mote	48	48	procedural	soft dot (dust motes, sparks)
+ember	48	48	procedural	ember / shard
+sweep	512	16	procedural	light sweep band
+vignette	960	540	procedural	Void Navy vignette
+ring	256	256	procedural	impact shock ring
