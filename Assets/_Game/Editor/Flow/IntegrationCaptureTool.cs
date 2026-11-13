@@ -241,6 +241,53 @@ namespace CriticalMass.Editor.Flow
                 drv.TimeScale = 1;
             }
             SetArtYaw(true);
+
+            // tools/sanity-capture-checklist.md, the square and attacks strips (delivery: no cargo is drawn yet; kaiju: it
+            // sits while Neutral). Clock stopped, StepTicks only, actor 0 back at its spawn; every frame logs the model's
+            // front (toes ahead of the ankles) against the sim facing, and any frame over 30 deg fails the run.
+            input.enabled = false;
+            drv.HumanAutopilot = false;
+            drv.TimeScale = 0;
+            yield return () => W.Actors[0].Alive;
+            W.X[0] = W.PrevX[0] = spawnX; W.Z[0] = W.PrevZ[0] = spawnZ;
+            int[] legs = { 0, 1, 2, 3 };
+            double[,] screen = { { 1, 0 }, { 0, 1 }, { -1, 0 }, { 0, -1 } };
+            int frame = 0;
+            foreach (int leg in legs)
+            {
+                input.State.SetMove(screen[leg, 0], screen[leg, 1]);
+                for (int half = 0; half < 2; half++)
+                {
+                    drv.StepTicks(half == 0 ? 22 : 22);
+                    yield return Seconds(0.08);
+                    StripFrame("square", ++frame);
+                }
+                drv.StepTicks(1);
+            }
+            input.State.SetMove(0, 0);
+            frame = 0;
+            foreach (int leg in legs)
+            {
+                // Aim 3 u along the screen axis (right, up, left, down) and press Attack for one tick.
+                double sx = screen[leg, 0], sy = screen[leg, 1];
+                double ax = W.X[0] + 3 * (sx - sy) / Math.Sqrt(2), az = W.Z[0] + 3 * (-sx - sy) / Math.Sqrt(2);
+                input.State.SetAim(ax, az);
+                drv.StepTicks(4);
+                input.State.ButtonDown(HumanInputState.HumanButton.Attack);
+                drv.StepTicks(1);
+                input.State.ButtonUp(HumanInputState.HumanButton.Attack);
+                drv.StepTicks(2);
+                yield return Seconds(0.08);
+                StripFrame("attacks", ++frame);
+                drv.StepTicks(5);
+                yield return Seconds(0.08);
+                StripFrame("attacks", ++frame);
+                drv.StepTicks(20);
+            }
+            input.State.ClearAim();
+            input.enabled = true;
+            drv.TimeScale = 1;
+            if (_stripBad > 0) Note($"strips: {_stripBad} frame(s) with the model's front more than 30 deg from the sim facing");
             drv.HumanAutopilot = true;
 
             // Results: run the clock out.
@@ -257,6 +304,43 @@ namespace CriticalMass.Editor.Flow
             D.PlayAgain();
             yield return () => Driver != null && Driver != before && W != null && GameFlow.State == FlowState.Match && !D.Loading;
             Note($"play again: state {GameFlow.State}, seed {W.Opts.Seed} (was {oldSeed}), tick {W.Tick}, phase {W.Match.Phase}");
+        }
+
+        static int _stripBad;
+
+        static Transform Deep(Transform t, string name)
+        {
+            if (t.name == name) return t;
+            for (int i = 0; i < t.childCount; i++)
+            {
+                Transform f = Deep(t.GetChild(i), name);
+                if (f != null) return f;
+            }
+            return null;
+        }
+
+        /// <summary>One strip frame of actor 0 (framed close), with its front-versus-facing reading in walk.log.</summary>
+        static void StripFrame(string strip, int n)
+        {
+            World w = W;
+            Transform m = ActorModel(0);
+            double f = w.Actors[0].Facing;
+            var want = new Vector3((float)Math.Cos(f), 0f, (float)-Math.Sin(f));
+            string reading = "no model";
+            if (m != null)
+            {
+                Transform tl = Deep(m, "toes.l"), tr = Deep(m, "toes.r"), fl = Deep(m, "foot.l"), fr = Deep(m, "foot.r");
+                if (tl != null && tr != null && fl != null && fr != null)
+                {
+                    Vector3 d = (tl.position - fl.position) + (tr.position - fr.position);
+                    d.y = 0f;
+                    float angle = Vector3.Angle(d, want);
+                    if (angle > 30f) _stripBad++;
+                    reading = $"front vs facing {angle:0} deg{(angle > 30f ? " BAD" : "")}";
+                }
+            }
+            Note($"strip {strip} {n}: tick {w.Tick}, actor 0 at ({w.X[0]:0.0}, {w.Z[0]:0.0}) facing {f * 180 / Math.PI:0} deg, {reading}");
+            ShotFramed($"strip-{strip}-{n}", m, 8f, 40f);
         }
 
         static Transform ActorModel(int i)
@@ -330,7 +414,7 @@ namespace CriticalMass.Editor.Flow
                     _wait = null;
                 }
                 if (_walk.MoveNext()) _wait = _walk.Current;
-                else Finish(_shots == _wanted ? 0 : 1);
+                else Finish(_shots == _wanted && _stripBad == 0 ? 0 : 1);
             }
             catch (Exception e)
             {
