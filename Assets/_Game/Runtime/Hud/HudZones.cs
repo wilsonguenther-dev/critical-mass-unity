@@ -140,6 +140,7 @@ namespace CriticalMass.Runtime.Hud
                 new Piece("intro line (you are the ...)", Lower, HudZone.Lower, false),
                 new Piece("death recap (centre lane, Recap priority)", new Rect((RefW - DeathRecap.CardW) * 0.5f, DeathRecap.TopY, DeathRecap.CardW, DeathRecap.CardH), HudZone.Callout, true),
                 new Piece("interact prompt", Prompt, HudZone.Lower, false),
+                new Piece("hit recap (under the death recap)", Mechanics.MechanicsHud.RecapRect, HudZone.Callout, false),
             };
         }
 

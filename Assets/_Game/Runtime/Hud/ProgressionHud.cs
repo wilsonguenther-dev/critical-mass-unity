@@ -133,6 +133,10 @@ namespace CriticalMass.Runtime.Hud
             float sc = t >= 0f && t < 1f ? 1f + 0.12f * (1f - ProgressionUi.EaseOut(t)) : 1f;
             Vector3 want = new Vector3(sc, sc, 1f);
             if (_chip.localScale != want) _chip.localScale = want;
+            // Integration batch 5: one coin readout in a match. The match coin counter above the minimap wins; the chip
+            // shows when the match has no coin pickups.
+            bool chipOn = Mechanics.DepthHud.Instance == null || !Mechanics.DepthHud.Instance.CoinsShown;
+            if (_chip.gameObject.activeSelf != chipOn) _chip.gameObject.SetActive(chipOn);
 
             PlacePortraitHit();
         }

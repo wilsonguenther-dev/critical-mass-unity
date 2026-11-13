@@ -722,8 +722,9 @@ namespace CriticalMass.Runtime.Menus
             _portrait.Set(UiIcons.Portrait[c, t], TierFor(_portraitPx, 106f, canvasScale));
             HudText.Set(_name, _words.Name.ToUpperInvariant());
             // owner walk 1: the small tile shows the one-line role only (the role tag after it was cut on every tile); the
-            // detail card keeps the full line with the tag
-            HudText.Set(_role, Kind == Layout.Tile || !View.Mechanics.DepthRead.Compiled ? _words.Role : View.Mechanics.DepthWords.WithRoleLine(_words.Role, _words.Id)); // U-063 role line
+            // detail card keeps the full line with the tag. Integration batch 5: on ONE line ("Feeds the egg.   FEEDER"): two
+            // lines in the 38 px row were cut at the bottom on every class (Bind runs on a class change, not per frame)
+            HudText.Set(_role, Kind == Layout.Tile || !View.Mechanics.DepthRead.Compiled ? _words.Role : View.Mechanics.DepthWords.WithRoleLine(_words.Role, _words.Id).Replace("\n", "   ")); // U-063 role line
             for (int i = 0; i < 3; i++)
             {
                 bool on = i < _words.Difficulty;

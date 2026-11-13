@@ -32,6 +32,9 @@ namespace CriticalMass.Runtime.Hud.Mechanics
         /// <summary>True while the class kit panel is shown (game-flow overlays can read it).</summary>
         public bool KitShown => _kit != null && _kit.gameObject.activeSelf;
         public bool StunShown => _stun != null && _stun.gameObject.activeSelf;
+        /// <summary>The hit recap panel, reference px (top-left origin): centred, just under the centre lane that holds the
+        /// death recap card, clear of the guide column, the stingers, the player card and the lower lane.</summary>
+        public static readonly Rect RecapRect = new Rect((HudZones.RefW - 620f) * 0.5f, HudZones.GuideUpperY, 620f, 40f + HitRecapWords.Rows * 32f + 12f);
         public bool RecapOpen => _recapOpen;
         public string RecapText => _recapRows != null ? _recapRows[0].text : string.Empty;
         public int ChevronsShown { get; private set; }
@@ -218,13 +221,14 @@ namespace CriticalMass.Runtime.Hud.Mechanics
                 _chev[i] = rt;
             }
 
-            // "you were hit by": under the death recap card
+            // "you were hit by": under the death recap card, in the centre column (integration batch 5: it sat at y 826,
+            // over the player card and the spectate offer)
             _recap = MenuUi.Rt(_space, "Hit Recap");
-            MenuUi.Place(_recap, 960f - 410f, 826f, 820f, 40f + HitRecapWords.Rows * 32f + 12f);
-            MenuUi.Panel(_recap, "Panel", 0f, 0f, 820f, 40f + HitRecapWords.Rows * 32f + 12f);
-            _recapHead = MenuUi.Label(_recap, "Head", CMTokens.Display, UiScale.TypeSmall, brass, TextAnchor.MiddleLeft, 22f, 8f, 600f, 28f, "YOU WERE HIT BY", 2f);
+            MenuUi.Place(_recap, RecapRect.x, RecapRect.y, RecapRect.width, RecapRect.height);
+            MenuUi.Panel(_recap, "Panel", 0f, 0f, RecapRect.width, RecapRect.height);
+            _recapHead = MenuUi.Label(_recap, "Head", CMTokens.Display, UiScale.TypeSmall, brass, TextAnchor.MiddleLeft, 22f, 8f, RecapRect.width - 44f, 28f, "YOU WERE HIT BY", 2f);
             for (int i = 0; i < HitRecapWords.Rows; i++)
-                _recapRows[i] = MenuUi.Label(_recap, "Row " + i, CMTokens.Ui, UiScale.TypeSmall, cream, TextAnchor.MiddleLeft, 22f, 40f + i * 32f, 776f, 30f, "", 2f);
+                _recapRows[i] = MenuUi.Label(_recap, "Row " + i, CMTokens.Ui, UiScale.TypeSmall, cream, TextAnchor.MiddleLeft, 22f, 40f + i * 32f, RecapRect.width - 44f, 30f, "", 2f);
             _recap.gameObject.SetActive(false);
         }
 

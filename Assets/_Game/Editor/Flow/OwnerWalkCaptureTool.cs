@@ -170,6 +170,8 @@ namespace CriticalMass.Editor.Flow
             Note($"boot: state {GameFlow.State}, seed {W.Opts.Seed}, resolutions {_res.Length}");
             StoryIntro.Skip();
             yield return Seconds(1.0);
+            // Integration batch 5: the title with WATCH INTRO.
+            foreach (var f in Shots("00-title")) yield return f;
             UnityEngine.Object.FindAnyObjectByType<TitleScreen>().Hide();
             yield return Seconds(0.6);
             D.ShowMenu();
@@ -328,6 +330,10 @@ namespace CriticalMass.Editor.Flow
                 pm.Pause();
                 yield return Seconds(0.6);
                 foreach (var f in Shots("18-pause")) yield return f;
+                // Integration batch 5: Settings > Game with PLAY INTRO AT LAUNCH and WATCH INTRO.
+                pm.ShowSettings(PauseMenu.Tab.Game);
+                yield return Seconds(0.6);
+                foreach (var f in Shots("18b-settings-game")) yield return f;
                 pm.Resume();
                 yield return Seconds(0.3);
             }

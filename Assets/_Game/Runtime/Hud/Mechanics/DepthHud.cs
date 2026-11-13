@@ -33,6 +33,9 @@ namespace CriticalMass.Runtime.Hud.Mechanics
         public const double TagRange = 14;
 
         public static DepthHud Instance { get; private set; }
+        /// <summary>True while the match coin counter (right column) shows; the progression coin chip hides then (integration
+        /// batch 5: a match showed two coin readouts).</summary>
+        public bool CoinsShown => _coins != null && _coins.gameObject.activeSelf;
         /// <summary>The objective line's current words (tests and captures).</summary>
         public string ObjectiveText => _objText != null ? _objText.text : string.Empty;
         public string PromptText => _promptText != null && _prompt.gameObject.activeSelf ? _promptText.text : string.Empty;
