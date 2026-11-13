@@ -192,6 +192,13 @@ namespace CriticalMass.Runtime.Menu
         {
             // The title screen takes every key itself; the press that dismisses it must not also open the menu.
             if (GetComponent<TitleScreen>() != null) return true;
+            // Integration batch 4 (known defect: the station panel's Escape chained through to pause): an open station
+            // panel takes the press and closes, whichever of the two holds HumanInputSource.PauseHandler right now.
+            if (!IsOpen && Hud.Mechanics.StationPanel.IsOpen)
+            {
+                Hud.Mechanics.StationPanel.Close();
+                return true;
+            }
             if (!IsOpen) return false;
             // DG-14: the controls card opened from this menu closes first (back to the entry that opened it).
             if (ControlsCardScreen.IsOpen)
