@@ -429,7 +429,9 @@ namespace CriticalMass.Runtime.PlayTests
             _w.SimPos(victim, out double x0, out double z0);
             float standing = head.position.y - (float)_w.Ground(x0, z0);
             string who = $"actor {victim} ({_w.ActorModelKey(victim)})";
-            Damage.ApplyDamage(w, victim, 1e6, -1, w.X[victim], w.Z[victim]);
+            // integration batch 3: an ordinary killing blow; a 1e6 hit is a critical launch with a whole tumble (#43), which this pose check would read as getting up
+            w.Actors[victim].Hp = 1;
+            Damage.ApplyDamage(w, victim, 10, -1, w.X[victim], w.Z[victim]);
             Assert.IsFalse(w.Actors[victim].Alive, "the test's lethal hit did not kill " + who);
 
             int shown = 0;

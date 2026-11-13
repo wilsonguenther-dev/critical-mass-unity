@@ -178,6 +178,8 @@ namespace CriticalMass.Runtime.View.Moments
         public bool CanRender(string key)
         {
             if (string.IsNullOrEmpty(key) || _catalog == null || ArtMapping.Spec(key) == null) return false;
+            // integration batch 3: no off-screen render without a GPU (batch tests, -nographics); the HUD icon stands in
+            if (SystemInfo.graphicsDeviceType == UnityEngine.Rendering.GraphicsDeviceType.Null) return false;
             ArtEntry e = _catalog.Find(key);
             return e != null && e.Model != null;
         }

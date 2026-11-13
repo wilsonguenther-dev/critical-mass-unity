@@ -708,6 +708,7 @@ namespace CriticalMass.Runtime.View.Moments
         private bool EnsureFreezeTarget()
         {
             if (_frozenMat == null) return false;
+            if (SystemInfo.graphicsDeviceType == UnityEngine.Rendering.GraphicsDeviceType.Null) return false;   // integration batch 3
             int w = Screen.width, h = Screen.height;
             if (w < 16 || h < 16) return false;
             if (_freezeRt != null && (_freezeRt.width != w || _freezeRt.height != h))

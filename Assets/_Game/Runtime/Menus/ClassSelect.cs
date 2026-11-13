@@ -155,7 +155,7 @@ namespace CriticalMass.Runtime.Menus
         int _nextLook;
         string[] _respawnLines;
 
-        static readonly string[] Hotkeys = { "1", "2", "3", "4", "5" };
+        static readonly string[] Hotkeys = { "1", "2", "3", "4", "5", "6" };
 
         // ---------------------------------------------------------------- static API
 

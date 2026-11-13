@@ -50,10 +50,10 @@ namespace CriticalMass.Runtime.PlayTests
                 foreach (MomentId id in MomentRecipes.Gallery())
                 {
                     BigMoments.Play(id, MomentScale.Takeover);
-                    int frames = 0;
+                    float until = Time.realtimeSinceStartup;   // integration batch 3: wait by wall clock, batch-mode ticks are about 1 ms
                     yield return null;
                     Assert.IsTrue(BigMoments.IsPlaying, id + " did not start");
-                    while (BigMoments.IsPlaying && frames++ < 400) yield return null;
+                    until += 4f; while (BigMoments.IsPlaying && Time.realtimeSinceStartup < until) yield return null;
                     Assert.IsFalse(BigMoments.IsPlaying, id + " never ended");
                     BigMoments.Play(id, MomentScale.Stinger);
                     yield return null;
@@ -84,8 +84,8 @@ namespace CriticalMass.Runtime.PlayTests
             yield return null;
             Assert.IsTrue(BigMoments.IsPlaying);
             Assert.IsTrue(BigMoments.HoldBanner(), "the banner is held while the takeover plays");
-            int frames = 0;
-            while (BigMoments.IsPlaying && frames++ < 400) yield return null;
+            float until = Time.realtimeSinceStartup;   // integration batch 3: wait by wall clock, batch-mode ticks are about 1 ms
+            until += 4f; while (BigMoments.IsPlaying && Time.realtimeSinceStartup < until) yield return null;
             Assert.IsFalse(BigMoments.HoldBanner());
             Assert.IsTrue(Banner.IsOpen, "the banner comes back after the takeover");
             LogAssert.NoUnexpectedReceived();
@@ -97,10 +97,10 @@ namespace CriticalMass.Runtime.PlayTests
             yield return Boot();
             BigMomentsSettings.ModeOverride = BigMomentsMode.Full;
             BigMoments.PlayGallery();
-            int frames = 0;
+            float until = Time.realtimeSinceStartup;   // integration batch 3: wait by wall clock, batch-mode ticks are about 1 ms
             yield return null;
             Assert.IsTrue(BigMoments.GalleryRunning);
-            while (BigMoments.GalleryRunning && frames++ < 6000) yield return null;
+            until += 60f; while (BigMoments.GalleryRunning && Time.realtimeSinceStartup < until) yield return null;
             Assert.IsFalse(BigMoments.GalleryRunning, "the gallery finished");
             LogAssert.NoUnexpectedReceived();
         }
