@@ -81,7 +81,7 @@ namespace CriticalMass.Sim.Tests
         }
 
         [Test]
-        public void TheWindupIsTheConfiguredWholeNumberOfTicksAndOutlastsTheFastestSwing()
+        public void TheWindupIsTheConfiguredWholeNumberOfTicksAndIsShorterThanTheFastestSwingU056()
         {
             GameConfig c = GameConfig.CreateBrowser5v5();
             int windup = Delivery.WindupTicks(c);
@@ -89,7 +89,9 @@ namespace CriticalMass.Sim.Tests
             Assert.Greater(windup, 1);
             double fastest = double.PositiveInfinity;
             foreach (ClassConfig cc in c.Classes) fastest = Math.Min(fastest, JsMath.Round(cc.AttackCooldown * c.SimHz));
-            Assert.Greater(windup, fastest);
+            // U-056: the browser's 30 outlasted every swing, so one defender could pin a carrier at the egg until it died (the
+            // DG-09 soak's 'stationary carrier'). Shorter than the fastest swing: a lone defender delays, it never pins.
+            Assert.Less(windup, fastest);
         }
 
         [Test]

@@ -974,3 +974,42 @@ lane for small sim additions. Not in the browser.
    at actor 0, and a bot's cleave skips actor 0. Deterministic (sim time only). The tutorial sets 30.
 4. Events `AttackStart` (A attacker, at the swing's reach point, Value facing) and `KaijuDamaged` (A attacker, at the
    contact point on the Kaiju's hit radius toward the attacker, Value damage), placed before the CM-84 marker.
+
+## U-056 DG-16b retune: delivery wind-up 12 ticks, intercept radius 14 (departs from the browser) (2026-11-13)
+
+**Finding.** The port of CM-64 is faithful. Diffing delivery.ts, resources.ts, damage.ts, fsm.ts (interceptTarget,
+interceptorRole, the intercept override), director.ts (deadKaijuDuty), steer.ts and the config line by line found no unit or
+selection error: ticks are ticks in both, the radius is world units in both, only Kaiju-duty bots intercept, and an
+interrupt only touches a wind-up in progress (deliverTicks > 0). The browser's own CM-64 branch, run unchanged
+(SLOW=1 vitest src/sim/delivery.slow.test.ts on cm/CM-64), measures berserk share 0.05 and fails its own CM-34 band
+[0.10, 0.50]; intercepts azure 386 / crimson 466 in 93 of 100 seeds (the port: 392 / 452, 93). That is why CM-64 never
+merged in the browser. The wind-up starves corruption deliveries, and berserk is the short-handed team's comeback, so the
+D-030 passive-human sweep falls with it.
+
+**Rule.** kaijuFeed.deliverWindupTicks 30 -> 12 and bots.interceptShrineRadius 11 -> 14. 12 is shorter than the fastest
+swing (farmer 18 ticks): one defender can delay a carrier but never pin it (the DG-09 soak's 'stationary carrier' was a
+lone interceptor pinning a 30-tick wind-up until the carrier died); two defenders still can. 14 = 11 + one
+shrineInteractRange, so the shorter wind-up stays contestable. DeliveryTests now asserts the wind-up is shorter than the
+fastest swing.
+
+**Measured** (no-Unity runner; berserk and intercepts: 5v5 seeds 1..100 all bots; passive: D-030 seeds 201..250):
+
+| wind-up, radius | berserk /100 | intercepts | seeds with one | passive-team wins /50 |
+| --- | --- | --- | --- | --- |
+| 1, off (before DG-16b) | 38 | 0 | 0 | 20 |
+| 30, 11 (browser) | 5 | 844 | 93 | 1 |
+| 30, off | 22 | 380 | 61 | 5 |
+| 20, 11 | 18 | 642 | 88 | 8 |
+| 20, 17 | 12 | 804 | 96 | 6 |
+| 15, 11 | 24 | 164 | 76 | 7 |
+| 10, 11 | 32 | 138 | 76 | 11 |
+| 10, 14 | 33 | 178 | 84 | 7 |
+| 12, 17 | 22 | 208 | 89 | 6 |
+| **12, 14 (chosen)** | **27** | **192** | **86** | **11** |
+
+Gates: berserk in [10, 50], intercepts in at least 80 of 100 seeds (DG-16b row), D-030 at least 11 of 50. Only 12 / 14
+clears all three, and the D-030 margin is zero: neighbouring settings read 6 to 11, so that sweep is noisy at 50 seeds and
+any later rule touching corruption delivery will move it. The structural cause (any wind-up taxes corruption carriers,
+which the short-handed team relies on) is not fixed here; a corruption hand-off without a wind-up is the candidate if it
+bounces.
+
