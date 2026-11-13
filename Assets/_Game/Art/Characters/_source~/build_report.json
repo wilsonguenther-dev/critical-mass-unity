@@ -68,21 +68,21 @@
  "outline_unlined_verts": 490,
  "finish": {
   "Warrior_Body": {
-   "edge": 923,
-   "chips": 55,
-   "crack": 15,
+   "edge": 920,
+   "chips": 62,
+   "crack": 21,
    "hot": 61
   },
   "Warrior_Shield": {
-   "edge": 285,
-   "chips": 60,
-   "crack": 9,
+   "edge": 288,
+   "chips": 84,
+   "crack": 7,
    "hot": 19
   },
   "Warrior_Cleaver": {
-   "edge": 120,
-   "chips": 20,
-   "crack": 25,
+   "edge": 124,
+   "chips": 40,
+   "crack": 23,
    "hot": 4
   }
  },
