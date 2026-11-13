@@ -3,7 +3,7 @@
 # and starts it detached with nohup, so a dropped ssh connection never kills a run. macOS /bin/bash is 3.2: keep this
 # file free of bash-4 features (no associative arrays, no mapfile, no ${x,,}).
 #   air-run.sh --id RUN_ID --build DIR [--matches N] [--title-seconds S] [--timeout S] [--quality NAME] [--speed X]
-#              [--novsync] [--fps-cap N] [--camera-yaw D] [--width W --height H] [--shots] [--keep N] [--lock-wait S]
+#              [--novsync] [--fps-cap N] [--camera-yaw D] [--width W --height H] [--shots] [--affordance-shots] [--keep N] [--lock-wait S]
 #   air-run.sh --id RUN_ID --exec 'COMMAND' [--lock-wait S]   (tools/remote-run.sh: any command, same queue lock, run
 #              by bash in ~/cm-remote/work with ~/cm-remote/env.sh sourced: ffmpeg, the Python venv, dotnet on PATH;
 #              output in runs/<id>/output.txt)
@@ -29,6 +29,7 @@ while [ $# -gt 0 ]; do
     --width) W="$2"; shift 2 ;;
     --height) H="$2"; shift 2 ;;
     --shots) SHOTS=1; shift ;;
+    --affordance-shots) AFF=1; shift ;;   # the player's -affordanceShots (feat/terrain-affordances captures)
     --fps-cap) FPSCAP="$2"; shift 2 ;;
     --camera-yaw) CAMYAW="$2"; shift 2 ;;
     --keep) KEEP="$2"; shift 2 ;;
@@ -128,7 +129,7 @@ say "launch $(basename "$BUILD") matches=$MATCHES quality=${QUALITY:-default} ${
 # in the logged-in console session; no `open` or `launchctl asuser` needed (and exit codes survive).
 perl -e 'alarm shift; exec @ARGV' "$LIMIT" \
   "$EXE" -autoplay -quitAfterMatch -autoplayMatches "$MATCHES" -autoplayTitleSeconds "$TITLE_S" -autoplayTimeout "$TIMEOUT" \
-  ${SPEED:+-autoplaySpeed "$SPEED"} ${NOVSYNC:+-novsync} ${QUALITY:+-quality "$QUALITY"} ${SHOTS:+-shots} ${FPSCAP:+-fpsCap "$FPSCAP"} ${CAMYAW:+-cameraYaw "$CAMYAW"} \
+  ${SPEED:+-autoplaySpeed "$SPEED"} ${NOVSYNC:+-novsync} ${QUALITY:+-quality "$QUALITY"} ${SHOTS:+-shots} ${AFF:+-affordanceShots} ${FPSCAP:+-fpsCap "$FPSCAP"} ${CAMYAW:+-cameraYaw "$CAMYAW"} \
   -dataDir "$RUN/data" -screen-fullscreen 0 -screen-width "$W" -screen-height "$H" -logFile "$LOG" -perfLog "$RUN/perf.json" \
   > "$RUN/stdout.txt" 2>&1 &
 pid=$!

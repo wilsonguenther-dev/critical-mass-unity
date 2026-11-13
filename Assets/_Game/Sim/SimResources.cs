@@ -134,7 +134,7 @@ namespace CriticalMass.Sim.Core
         }
 
         /// <summary>Index of the node actor id can gather from right now, or -1. Prefers the node it is already working.</summary>
-        private static int GatherNode(World w, int id)
+        public static int GatherNode(World w, int id)
         {
             Actor a = w.Actors[id];
             double cap = w.Config.Class(a.Cls).CarryCapacity;
@@ -149,9 +149,7 @@ namespace CriticalMass.Sim.Core
             for (int i = 0; i < nodes.Length; i++)
             {
                 ResourceNode n = nodes[i];
-                if (n.Charges <= 0) continue;
-                if (a.Carry != CarryKind.None && a.Carry != CarryOf(n.Kind)) continue;
-                if (n.Kind == NodeKind.Corruption && !Roles.MayCorrupt(w, a.Cls)) continue; // U-063: only raiders take corruption
+                if (!NodeTakes(w, a, n)) continue;
                 double dx = n.X - x;
                 double dz = n.Z - z;
                 double d2 = dx * dx + dz * dz;
@@ -164,6 +162,18 @@ namespace CriticalMass.Sim.Core
                 }
             }
             return best;
+        }
+
+        /// <summary>
+        /// GatherNode's per-node rules without the reach (terrain-affordances view, read-only): charges left, a cargo of that
+        /// kind or none, and U-063's raider rule for corruption. The carry-capacity check is GatherNode's first line.
+        /// </summary>
+        public static bool NodeTakes(World w, Actor a, ResourceNode n)
+        {
+            if (n.Charges <= 0) return false;
+            if (a.Carry != CarryKind.None && a.Carry != CarryOf(n.Kind)) return false;
+            if (n.Kind == NodeKind.Corruption && !Roles.MayCorrupt(w, a.Cls)) return false; // U-063: only raiders take corruption
+            return true;
         }
 
         /// <summary>CM-35: age every loose orb by one sim tick; an orb at ttl 0 (or emptied) goes inactive. Returns how many are left.</summary>

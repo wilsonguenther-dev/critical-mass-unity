@@ -664,6 +664,7 @@ namespace CriticalMass.Runtime.Menus
                 case "OpenStation": return "Base station";
                 case "HudCursor": return "HUD cursor";
                 case "MinimapZoom": return "Minimap zoom";
+                case "ShowTerrain": return "Show usable terrain";
                 case "Ability": return "Class ability";
                 case "Interact": return "Interact / carry";
                 case "Move": return "Move";

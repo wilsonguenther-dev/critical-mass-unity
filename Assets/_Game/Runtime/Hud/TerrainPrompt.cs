@@ -1,3 +1,4 @@
+using System;
 using CriticalMass.Runtime.Game;
 using CriticalMass.Runtime.Hud.Style;
 using CriticalMass.Runtime.Hud.Ui;
@@ -129,7 +130,22 @@ namespace CriticalMass.Runtime.Hud
             if (!a.Alive) return -1;
             int pillar = PillarModeHere(w, me);
             bool miner = a.Cls == ClassId.Miner;
-            if (pillar == 0 && !miner) return -1;
+            // feat/terrain-affordances (e): the other terrain classes keep their resource in the same strip.
+            if (pillar == 0 && !miner)
+            {
+                int dev = (int)ControlBindings.ActiveDevice;
+                switch (a.Cls)
+                {
+                    case ClassId.Builder:
+                        return (1 << 16) | (Math.Min(4095, (int)Math.Floor(Math.Max(0, BuiltPieces.Bank(w, a.Team)))) << 19) | (dev << 15);
+                    case ClassId.Farmer:
+                        return (1 << 17) | (Math.Min(63, a.CarryAmount + a.CarryMeat) << 19) | (Math.Min(63, (int)w.Config.Class(a.Cls).CarryCapacity) << 25) | (dev << 15);
+                    case ClassId.Demolitions:
+                        return (1 << 18) | (Math.Min(4095, (int)Math.Ceiling(Demolitions.TntWaitTicks(w, me) / w.Config.SimHz)) << 19) | (dev << 15);
+                    default:
+                        return -1;
+                }
+            }
             int mode = miner ? (int)Terraform.ModeOf(w, me) : 0;
             int carried = miner ? w.Terraform.Carried[me] : 0;
             int max = miner ? Terraform.CarryMax(w.Config) : 0;
@@ -160,6 +176,13 @@ namespace CriticalMass.Runtime.Hud
         static string Compose(World w, int key)
         {
             ControlDevice device = ControlBindings.ActiveDevice;
+            if ((key & (7 << 16)) != 0)
+            {
+                int v = (key >> 19) & 63, v12 = (key >> 19) & 4095;
+                if ((key & (1 << 16)) != 0) return "TEAM WOOD " + v12 + "   ·   " + TrialText.Fill("{Ability}", device) + ": BUILD";
+                if ((key & (1 << 17)) != 0) return "CARRYING " + v + "/" + ((key >> 25) & 63) + "   ·   HOLD " + TrialText.Fill("{Interact}", device) + ": GATHER";
+                return (v12 == 0 ? "TNT READY" : "TNT IN " + v12 + " S") + "   ·   " + TrialText.Fill("{DigPlace}", device) + ": THROW";
+            }
             int pillar = key & 3;
             if (pillar != 0)
                 return TrialText.Fill("{Attack}", device) + "  KNOCK IT DOWN   ·   FROM HERE: " + (pillar == Topple.Ramp ? "RAMP" : "WALL");

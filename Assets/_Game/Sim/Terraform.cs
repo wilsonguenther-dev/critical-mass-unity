@@ -209,6 +209,17 @@ namespace CriticalMass.Sim.Core
         /// <summary>0 when cell (cx, cz) may be dug right now (ignoring carry and rate cap), else a Refused* code.</summary>
         public static int DigRefusal(World w, int cx, int cz)
         {
+            int why = DigRefusalBeforeRoute(w, cx, cz);
+            if (why != 0) return why;
+            return DigKeepsRoutes(w, cz * w.Map.Width + cx) ? 0 : RefusedRoute;
+        }
+
+        /// <summary>
+        /// Every DigRefusal rule except the route guard, in the same order (terrain-affordances view: the route proof depends
+        /// on the grid alone, so the view caches it per World.GridVersion; DigRefusal = this, then DigKeepsRoutes).
+        /// </summary>
+        public static int DigRefusalBeforeRoute(World w, int cx, int cz)
+        {
             MapDef map = w.Map;
             if (cx < 0 || cz < 0 || cx >= map.Width || cz >= map.Height) return RefusedOutside;
             int i = cz * map.Width + cx;
@@ -239,7 +250,7 @@ namespace CriticalMass.Sim.Core
             }
             // Nobody may end up standing in a hole: any living actor (or the hatched Kaiju) touching the square blocks the dig.
             if (CellOccupied(w, cx, cz)) return RefusedOccupied;
-            return DigKeepsRoutes(w, i) ? 0 : RefusedRoute;
+            return 0;
         }
 
         /// <summary>0 when a block may be placed on cell (cx, cz) right now (ignoring carry and rate cap), else a Refused* code.</summary>
