@@ -126,7 +126,9 @@ jobs:
         with:
           testMode: ${{ matrix.mode }}
           customParameters: -testCategory ${{ needs.plan.outputs.category }}
-          coverageEnabled: false
+          # No `coverageEnabled: false`: unity-test-runner@v4.4.0 turns it into `--no-coverageEnabled`, and game-ci CLI
+          # v0.1.74 parses with "negation-prefix": false under strict mode, so the run dies in 1 s with
+          # "Unknown argument: noCoverageEnabled" (run 43450423341). The default (true) passes no such flag.
           artifactsPath: artifacts/${{ matrix.mode }}
           githubToken: ${{ secrets.GITHUB_TOKEN }}
           checkName: ${{ matrix.mode }} results
