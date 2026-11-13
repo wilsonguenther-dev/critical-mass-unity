@@ -193,7 +193,10 @@ namespace CriticalMass.Runtime.Audio
             bool title = _driver != null && _driver.TryGetComponent(out TitleScreen _);
             bool paused = _input != null && _input.State.Paused;
 
-            MusicState want = Decide(w, title, _menuMusic);
+            // Integration batch 2: the game flow's menus (main menu, match setup) play the menu music too.
+            Flow.FlowState fs = Flow.GameFlow.State;
+            bool menus = _menuMusic || fs == Flow.FlowState.Menu || fs == Flow.FlowState.Setup || fs == Flow.FlowState.Title;
+            MusicState want = Decide(w, title, menus);
             if (want != _state) Enter(want, w, now);
 
             // Results: the sting first, then the title loop returns under the results screen.
