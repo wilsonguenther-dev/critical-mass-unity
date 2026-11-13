@@ -850,8 +850,8 @@ def arms(l_up, l_hand, r_up=None, r_hand=None):
 
 
 REST_ARMS = arms((0.40, -0.25, -0.88), (0.15, -0.65, -0.70))
-POINT = dict(arms((0.55, -0.75, 0.38), (0.62, -0.60, 0.50), (-0.40, -0.25, -0.88), (-0.15, -0.65, -0.70)))
-POINT.update({"Head": {"rot": (-3, 6, 20)}, "Body": {"rot": (0, 0, 8)}})
+POINT = dict(arms((0.60, -0.70, 0.30), (0.70, -0.55, 0.42), (-0.40, -0.25, -0.88), (-0.15, -0.65, -0.70)))
+POINT.update({"Head": {"rot": (-3, 6, 22)}})
 POSES = {
     "neutral": dict(REST_ARMS, Head={"rot": (0, 5, 4)}),
     "happy": dict(arms((0.62, -0.25, 0.74), (0.30, -0.25, 0.92)), Head={"rot": (-7, 0, 0)}, Body={"loc": (0, 0, 0.04)}),
@@ -897,8 +897,10 @@ SPAN = head_w / 0.76
 CX = (max(xs) + min(xs)) / 2 - 0.025 * head_w / 0.76
 CY = max(tops) + SPAN * 0.045 - SPAN / 2
 meta = {"portrait": {"span_m": SPAN, "head_w_m": head_w, "head_fill": head_w / SPAN, "yaw": P_YAW, "el": P_EL}}
+YAW_OVR = {"point": 0.0, "point-left": 0.0}    # body square to the camera so the pointing arm is in front
 for stem in EXPR:
     RIG.location = (0, 0, 0)
+    RIG.rotation_euler = (0, 0, math.radians(YAW_OVR.get(stem, P_YAW)))
     apply_pose(POSES[stem])
     TOON_FACE.image = FACE_IMG[stem]
     objs = [MESH, bpy.data.objects[MESH["hull"]]]

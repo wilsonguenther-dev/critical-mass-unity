@@ -371,17 +371,16 @@ def thinking(f):
 
 
 def laughing(f):
+    """Squeezed 'XD' eyes with tears and a huge open mouth (told apart from happy's arcs at 64 px)."""
     face_plate(f)
     for s in (-1, 1):
-        x0 = s * EYE_X
-        pts = [(x0 - 0.20, EYE_Z + 0.02), (x0 - 0.04, EYE_Z + 0.13), (x0 + 0.04, EYE_Z + 0.13), (x0 + 0.20, EYE_Z + 0.02)]
-        f.fill(f.taper(bez(pts[0], (x0, EYE_Z + 0.24), pts[3]), INK * 2.0, INK * 2.0), NAVY)
-        tear(f, s * (EYE_X + 0.24), EYE_Z - 0.08, 0.9)
-    brow(f, -1, 0.52, 0.48, curve=0.05)
-    brow(f, 1, 0.52, 0.48, curve=0.05)
+        eye_chevron(f, s, w=INK * 2.3, size=0.23)
+        tear(f, s * (EYE_X + 0.25), EYE_Z - 0.10, 1.0)
+    brow(f, -1, 0.52, 0.46, curve=0.05)
+    brow(f, 1, 0.52, 0.46, curve=0.05)
     nose(f)
     blush(f, 0.75, dz=0.03)
-    open_mouth(f, 0.0, -0.30, 0.72, 0.36, top_curve=0.08)
+    open_mouth(f, 0.0, -0.28, 0.76, 0.40, top_curve=0.08)
 
 
 def proud(f):
