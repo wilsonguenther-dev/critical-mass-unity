@@ -120,3 +120,13 @@ builder pieces, pillar topple, pickups, level up, hill stings, pings, big-moment
 water and birds) is rendered at load by the game's own deterministic synthesiser (`Runtime/Audio/Sound/SoundSynth.cs`:
 oscillators, xorshift noise, filters and envelopes, recipe ids seed the noise). Nothing imitates a person or an animal.
 `SoundTable.SynthOnly()` lists the cues to replace with recorded CC0 sounds later.
+
+## Story intro film (story intro 3)
+
+The intro film's soundtrack (`Assets/StreamingAssets/Story/intro-film-1.mp4`, built offline by `tools/film/build_soundtrack.py`)
+is mixed from the repo's own music (`music-final.ogg`, `music-title.ogg`), the repo's narration lines, the game's synthesis
+recipes, and these CC0 1.0 Kenney clips, read from the same pack downloads listed above (nothing new is copied into the repo
+as a loose file; they exist only inside the film's mixed AAC track): Kenney Impact Sounds (`impactGlass_heavy_000`,
+`impactGlass_heavy_002`, `impactMetal_medium_002`, `impactMining_001`, `impactSoft_medium_001`, `impactWood_heavy_000`,
+`impactWood_heavy_001`, `impactWood_heavy_003`, `footstep_grass_001`) and Kenney RPG Audio (cloth, creak and draw-knife
+clips named in the builder). Credit is not required; we give it anyway.
