@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using CriticalMass.Runtime.Game;
 using CriticalMass.Sim.Core;
@@ -158,6 +159,7 @@ namespace CriticalMass.Runtime.View.Dressing
         /// shared project assets in the editor).</summary>
         private void ApplyTier()
         {
+            if (_building != null) return;   // the running build re-checks the tier when it finishes
             // Environment v4 clutter follows the quality level: re-plan (only the groups that differ are rebuilt).
             if (Plan != null && QualityTable.ExtraClutter(RenderTier.Level) != _clutterOn) _replanPending = true;
             // Scenery LODs: another quality level needs other levels of detail or another clutter density: rebuild once.
@@ -256,14 +258,35 @@ namespace CriticalMass.Runtime.View.Dressing
             if (_driver == null || _driver.World == null) return;
             Sim.Core.World w = _driver.World;
             CriticalMass.Runtime.Game.FrameRecorder.Loading = false;
-            if (w != _world || w.Map != _map)
+            if (_building == null && (w != _world || w.Map != _map))
+            {
+                _building = BuildSteps(w);
+                _buildWallStart = Time.realtimeSinceStartupAsDouble;
+                LastBuildMs = 0;
+                LastBuildFrames = 0;
+                LastBuildWorstSliceMs = 0;
+                Building = true;
+                BuildProgress = 0f;
+            }
+            if (_building != null)
             {
                 CriticalMass.Runtime.Game.FrameRecorder.Loading = true;
+                double budget = Application.isEditor ? double.PositiveInfinity : BuildBudgetMs;
                 var sw = System.Diagnostics.Stopwatch.StartNew();
-                Build(w);
-                LastBuildMs = sw.Elapsed.TotalMilliseconds;
+                bool done = CriticalMass.Runtime.Game.FrameBudget.Run(_building, budget, () => sw.Elapsed.TotalMilliseconds);
+                double slice = sw.Elapsed.TotalMilliseconds;
+                LastBuildMs += slice;
+                LastBuildFrames++;
+                if (slice > LastBuildWorstSliceMs) LastBuildWorstSliceMs = slice;
+                BuildProgress = done ? 1f : Mathf.Clamp01((float)_buildDone / Math.Max(1, _buildTotal));
+                if (!done) return;
+                _building = null;
+                Building = false;
+                if (NeedsRebuild(_builtQuality, RenderTier.Level) || QualityTable.ExtraClutter(RenderTier.Level) != _clutterOn) ApplyTier();
                 if (!Application.isEditor)
-                    Debug.Log($"[CM.Load] world art built in {LastBuildMs:0} ms: {Renderers} renderers, {Triangles} triangles, quality {_builtQuality}; stages {LastStages}");
+                    Debug.Log($"[CM.Load] world art built in {LastBuildMs:0} ms of work over {LastBuildFrames} frames " +
+                              $"({(Time.realtimeSinceStartupAsDouble - _buildWallStart) * 1000.0:0} ms wall, slowest frame's slice " +
+                              $"{LastBuildWorstSliceMs:0.0} ms): {Renderers} renderers, {Triangles} triangles, quality {_builtQuality}; stages {LastStages}");
                 return;
             }
             if (Plan == null) return;
@@ -307,6 +330,7 @@ namespace CriticalMass.Runtime.View.Dressing
             BuildGroups(changed);
             _dressed = Plan.Dressed;
             _dressedTypes = Plan.CellsAtPlan;
+            _buildDone = _buildTotal;
             DressVersion++;
         }
 
@@ -421,6 +445,14 @@ namespace CriticalMass.Runtime.View.Dressing
         /// </summary>
         private void BuildGroups(HashSet<int> only)
         {
+            IEnumerator e = BuildGroupsSteps(only);
+            while (e.MoveNext()) { }
+        }
+
+        /// <summary>perf-smooth-1: the group build as steps (one placement, one combined group or one shadow group each), so
+        /// the match-start build can run a few milliseconds a frame behind the loading screen.</summary>
+        private IEnumerator BuildGroupsSteps(HashSet<int> only)
+        {
             var bgw = System.Diagnostics.Stopwatch.StartNew();
             int q = RenderTier.Level;
             _builtQuality = q;
@@ -461,8 +493,11 @@ namespace CriticalMass.Runtime.View.Dressing
                     if (!shadows.TryGetValue(pc, out var list)) shadows[pc] = list = new List<(MeshData, int, Matrix4x4, SwayInfo)>();
                     list.Add((d, sub, m, default(SwayInfo)));
                 }
+                _buildDone++;
+                yield return null;
             }
             _collectMs = bgw.Elapsed.TotalMilliseconds;
+            _buildTotal += groups.Count + shadows.Count;
             foreach (var kv in groups)
             {
                 (int chunk, int level, Material mat) = kv.Key;
@@ -481,6 +516,8 @@ namespace CriticalMass.Runtime.View.Dressing
                 }
                 r.enabled = false; // UpdateLods shows one level
                 ch.Shown = -1;
+                _buildDone++;
+                yield return null;
             }
             Material caster = ShadowMaterial();
             bool shadowsOn = RenderTier.Policy(q).sceneryShadows;
@@ -492,6 +529,8 @@ namespace CriticalMass.Runtime.View.Dressing
                     ch.Shadow = go.GetComponent<MeshRenderer>();
                     ch.ShadowTris = (int)(go.GetComponent<MeshFilter>().sharedMesh.GetIndexCount(0) / 3);
                     ch.Shadow.enabled = shadowsOn;
+                    _buildDone++;
+                    yield return null;
                 }
             _combineMs = bgw.Elapsed.TotalMilliseconds - _collectMs;
             UpdateLods();
@@ -545,6 +584,12 @@ namespace CriticalMass.Runtime.View.Dressing
 
         private void OnDestroy()
         {
+            if (_building != null)
+            {
+                _building = null;
+                Building = false;
+                BuildProgress = 1f;
+            }
             Clear();
             if (_field != null) Destroy(_field);
             _field = null;
@@ -600,20 +645,52 @@ namespace CriticalMass.Runtime.View.Dressing
 
         private void Build(Sim.Core.World w)
         {
+            IEnumerator e = BuildSteps(w);
+            while (e.MoveNext()) { }
+        }
+
+        // perf-smooth-1: the match-start build in steps behind the loading screen (players); progress for the loading bar.
+        private int _buildDone, _buildTotal = 1;
+        private IEnumerator _building;
+        private double _buildWallStart;
+
+        /// <summary>Main-thread milliseconds the world build may use per frame in a player (the loading screen stays smooth).
+        /// The editor and tests build in one frame (PlayMode tests read the world a few frames after load).</summary>
+        public static double BuildBudgetMs = 6.0;
+
+        /// <summary>A world build is running (the sim waits: SimDriverBehaviour, the loading screen bar: BuildProgress).</summary>
+        public static bool Building { get; private set; }
+
+        /// <summary>The running build's progress 0..1 (1 when none runs).</summary>
+        public static float BuildProgress { get; private set; } = 1f;
+
+        /// <summary>Frames the last build took and its slowest frame's build work, ms (the loading budget's proof).</summary>
+        public int LastBuildFrames { get; private set; }
+        public double LastBuildWorstSliceMs { get; private set; }
+
+        private IEnumerator BuildSteps(Sim.Core.World w)
+        {
+            _buildDone = 0;
+            _buildTotal = 1;
             Clear();
             _world = w;
             _map = w.Map;
             _seenGridVersion = w.GridVersion;
             _cells = (byte[])_map.Cells.Clone();
             _catalog = WorldKitCatalog.Load();
-            if (_catalog == null || _catalog.Names.Length == 0) return;
+            if (_catalog == null || _catalog.Names.Length == 0) yield break;
             var st = System.Diagnostics.Stopwatch.StartNew();
             _bases = BasesFile.Load();
             BasesParses++;
             _clutterOn = QualityTable.ExtraClutter(RenderTier.Level);
             double tLoad = st.Elapsed.TotalMilliseconds;
+            yield return null;
             Plan = WorldDresser.Plan(_map, _bases, _catalog.Centroid, _catalog.Body, _clutterOn);
             double tPlan = st.Elapsed.TotalMilliseconds;
+            int chunksX0 = (_map.Width + ChunkSize - 1) / ChunkSize, chunksZ0 = (_map.Height + ChunkSize - 1) / ChunkSize;
+            _buildTotal = 2 + Plan.Placements.Count + chunksX0 * chunksZ0 + Plan.Breakables.Count / 16 + 1;
+            _buildDone = 1;
+            yield return null;
             _root = new GameObject("World Art").transform;
             _root.SetParent(transform, false);
             if (_field != null) Destroy(_field);
@@ -621,13 +698,20 @@ namespace CriticalMass.Runtime.View.Dressing
             double tField = st.Elapsed.TotalMilliseconds;
             Triangles = 0;
             Renderers = 0;
+            _buildDone++;
+            yield return null;
 
-            BuildGroups(null);
+            IEnumerator groupSteps = BuildGroupsSteps(null);
+            while (groupSteps.MoveNext()) yield return null;
             double tGroups = st.Elapsed.TotalMilliseconds;
             int chunksX = (_map.Width + ChunkSize - 1) / ChunkSize, chunksZ = (_map.Height + ChunkSize - 1) / ChunkSize;
             for (int cz = 0; cz < chunksZ; cz++)
             for (int cx = 0; cx < chunksX; cx++)
+            {
                 BuildGroundChunk(cz * 64 + cx);
+                _buildDone++;
+                yield return null;
+            }
             double tGround = st.Elapsed.TotalMilliseconds;
             LastStages = $"catalog+bases {tLoad:0}, plan {tPlan - tLoad:0}, field {tField - tPlan:0}, groups {tGroups - tField:0} (collect {_collectMs:0}, combine {_combineMs:0}), ground {tGround - tGroups:0} ms";
             foreach (WorldBreakable b in Plan.Breakables)
@@ -639,10 +723,16 @@ namespace CriticalMass.Runtime.View.Dressing
                 var mf = go.AddComponent<MeshFilter>();
                 go.AddComponent<MeshRenderer>();
                 _breakables.Add((b, mf, null));
+                if (_breakables.Count % 16 == 0)
+                {
+                    _buildDone++;
+                    yield return null;
+                }
             }
             SyncBreakables();
             _dressed = Plan.Dressed;
             _dressedTypes = Plan.CellsAtPlan;
+            _buildDone = _buildTotal;
             DressVersion++;
         }
 
