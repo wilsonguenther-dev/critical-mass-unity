@@ -232,7 +232,7 @@ namespace CriticalMass.Runtime.Menu
                 VectorShape frame = MenuUi.Shape(space, "Frame " + k, ShapeKind.RoundRect, x - 6f, TileY - 6f, TileW + 12f, TileH + 12f,
                     CMTokens.VoidNavy.Color, 12f);
                 frame.RimPx = 2f;
-                _empty[k] = MenuUi.Label(space, "Empty " + k, CMTokens.Display, UiScale.TypeBody, CMTokens.Stone.Color, TextAnchor.MiddleCenter, x, TileY, TileW, TileH, "", 2f);
+                _empty[k] = MenuUi.Label(space, "Empty " + k, CMTokens.Display, UiScale.TypeBody, CMTokens.StoneInk.Color, TextAnchor.MiddleCenter, x, TileY, TileW, TileH, "", 2f);
                 RawImage img = MenuUi.Rt(space, "Still " + k).gameObject.AddComponent<RawImage>();
                 MenuUi.Place(img.rectTransform, x, TileY, TileW, TileH);
                 img.raycastTarget = false;

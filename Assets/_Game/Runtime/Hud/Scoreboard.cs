@@ -88,7 +88,7 @@ namespace CriticalMass.Runtime.Hud
             var tb = new Table();
             tb.Rt = MenuUi.Rt(_board, team + " Table");
             MenuUi.Place(tb.Rt, x, 0f, TableW, Height(MaxRows));
-            Color tc = CMTokens.Team(team);
+            Color tc = CMTokens.TeamInk(team);   // polish pass 1: text ink (4.5 : 1 on the panel)
             tb.Crest = HudIcon.Make(tb.Rt, "Crest", 8f, 18f, 44f, 44f);
             tb.Crest.Set(UiIcons.Crest[(int)team], _tier);
             tb.Name = MenuUi.Fit(MenuUi.Label(tb.Rt, "Team", CMTokens.Display, UiScale.TypeLead, tc, TextAnchor.MiddleLeft, 62f, 18f, 360f, 44f,

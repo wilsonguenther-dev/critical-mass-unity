@@ -233,7 +233,7 @@ namespace CriticalMass.Runtime.Hud.Interact
             crown.Set(UiIcons.MapCrown, _tier);
             MenuUi.Fit(MenuUi.Label(_hill, "Label", CMTokens.Ui, UiScale.TypeMin, Cream, TextAnchor.MiddleCenter, -36f, 56f, 120f, 18f, "HILL", 2f), 14);
             _hillA = MenuUi.Label(_hill, "On Hill Azure", CMTokens.Mono, UiScale.TypeSmall, CMTokens.Azure.Color, TextAnchor.MiddleRight, -46f, 12f, 40f, 24f, "0", 2.5f);
-            _hillC = MenuUi.Label(_hill, "On Hill Crimson", CMTokens.Mono, UiScale.TypeSmall, CMTokens.Crimson.Color, TextAnchor.MiddleLeft, 54f, 12f, 40f, 24f, "0", 2.5f);
+            _hillC = MenuUi.Label(_hill, "On Hill Crimson", CMTokens.Mono, UiScale.TypeSmall, CMTokens.CrimsonInk.Color, TextAnchor.MiddleLeft, 54f, 12f, 40f, 24f, "0", 2.5f);
 
             _shrine = InteractUi.Centred(_markers, "Shrine", 30f, 30f);
             VectorShape sh = MenuUi.Shape(_shrine, "Shrine", ShapeKind.Hexagon, 0f, 0f, 30f, 30f, Navy, 8f);
@@ -305,7 +305,7 @@ namespace CriticalMass.Runtime.Hud.Interact
             MenuUi.Label(_space, "Objectives", CMTokens.Display, UiScale.TypeBody, Brass, TextAnchor.MiddleLeft, x, ViewY - 4f, w, 34f, "OBJECTIVES", 2f);
             MenuUi.Label(_space, "Hill Head", CMTokens.Ui, UiScale.TypeSmall, Cream, TextAnchor.MiddleLeft, x, ViewY + 38f, w, 24f, "HILL SECONDS", 2f);
             _scoreA = MenuUi.Label(_space, "Score Azure", CMTokens.Mono, UiScale.TypeLead, CMTokens.Azure.Color, TextAnchor.MiddleLeft, x, ViewY + 62f, 200f, 50f, "0", 3f);
-            _scoreC = MenuUi.Label(_space, "Score Crimson", CMTokens.Mono, UiScale.TypeLead, CMTokens.Crimson.Color, TextAnchor.MiddleRight, x + w - 200f, ViewY + 62f, 200f, 50f, "0", 3f);
+            _scoreC = MenuUi.Label(_space, "Score Crimson", CMTokens.Mono, UiScale.TypeLead, CMTokens.CrimsonInk.Color, TextAnchor.MiddleRight, x + w - 200f, ViewY + 62f, 200f, 50f, "0", 3f);
             MenuUi.Fit(MenuUi.Label(_space, "Azure Word", CMTokens.Ui, UiScale.TypeMin, Cream, TextAnchor.MiddleLeft, x + 110f, ViewY + 72f, 120f, 30f, "AZURE", 2f), 15);
             MenuUi.Fit(MenuUi.Label(_space, "Crimson Word", CMTokens.Ui, UiScale.TypeMin, Cream, TextAnchor.MiddleRight, x + w - 230f, ViewY + 72f, 120f, 30f, "CRIMSON", 2f), 15);
             _hillBar = MenuUi.Shape(_space, "Hill Share", ShapeKind.RoundRect, x, ViewY + 118f, w, 20f, CMTokens.Azure.Color, -1f);
@@ -316,7 +316,7 @@ namespace CriticalMass.Runtime.Hud.Interact
             _kaijuState = MenuUi.Label(_space, "Kaiju State", CMTokens.Display, UiScale.TypeSmall, Cream, TextAnchor.MiddleRight, x + 160f, ViewY + 154f, w - 160f, 28f, "EGG", 2f);
             MenuUi.Fit(MenuUi.Label(_space, "Allegiance Head", CMTokens.Ui, UiScale.TypeMin, Cream, TextAnchor.MiddleLeft, x, ViewY + 186f, 200f, 22f, "ALLEGIANCE", 2f), 15);
             _allyA = MenuUi.Label(_space, "Allegiance Azure", CMTokens.Mono, UiScale.TypeSmall, CMTokens.Azure.Color, TextAnchor.MiddleLeft, x + 150f, ViewY + 186f, 90f, 22f, "0", 2f);
-            _allyC = MenuUi.Label(_space, "Allegiance Crimson", CMTokens.Mono, UiScale.TypeSmall, CMTokens.Crimson.Color, TextAnchor.MiddleRight, x + w - 90f, ViewY + 186f, 90f, 22f, "0", 2f);
+            _allyC = MenuUi.Label(_space, "Allegiance Crimson", CMTokens.Mono, UiScale.TypeSmall, CMTokens.CrimsonInk.Color, TextAnchor.MiddleRight, x + w - 90f, ViewY + 186f, 90f, 22f, "0", 2f);
             _allyBar = MenuUi.Shape(_space, "Allegiance Bar", ShapeKind.RoundRect, x, ViewY + 214f, w, 18f, CMTokens.Azure.Color, -1f);
             _allyBar.EmptyColor = CMTokens.Crimson.Color;
             _allyBar.Fill01 = 0.5f;
@@ -640,6 +640,13 @@ namespace CriticalMass.Runtime.Hud.Interact
                 m.X = w.X[i];
                 m.Z = w.Z[i];
                 m.Disc.SetFill(CMTokens.Team(a.Team));
+                // Polish pass 1: team by shape too (Azure circle, Crimson diamond), as on the minimap.
+                ShapeKind dk = GameHud.TeamDot(a.Team);
+                if (m.Disc.Kind != dk)
+                {
+                    m.Disc.Kind = dk;
+                    m.Disc.SetVerticesDirty();
+                }
                 if (m.Timer.gameObject.activeSelf) m.Timer.gameObject.SetActive(false);
             }
             float hp01 = a.MaxHp > 0 ? Mathf.Clamp01((float)(a.Hp / a.MaxHp)) : 0f;

@@ -356,7 +356,7 @@ namespace CriticalMass.Runtime.Spectator
         {
             Actor a = w.Actors[0];
             HudText.Set(_introTitle, "YOU ARE THE " + SpectatorOverlay.ActorName(a.Team, a.Cls));
-            _introTitle.color = CMTokens.Team(a.Team);
+            _introTitle.color = CMTokens.TeamInk(a.Team);
             BuildIntroPrompt(ControlBindings.ActiveDevice);
         }
 

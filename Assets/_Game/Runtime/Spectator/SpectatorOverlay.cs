@@ -117,7 +117,7 @@ namespace CriticalMass.Runtime.Spectator
             MenuUi.Label(badge, "Spectating", CMTokens.Display, UiScale.TypeBody, navy, TextAnchor.MiddleCenter, 14f, 12f, 200f, 36f, "SPECTATING", 0f);
             _azureScore = MenuUi.Fit(MenuUi.Label(badge, "Azure Score", CMTokens.Mono, UiScale.TypeButton, CMTokens.Azure.Color, TextAnchor.MiddleRight, 222f, 12f, 80f, 36f, "0", 2f), 26);
             MenuUi.Label(badge, "Dash", CMTokens.Mono, UiScale.TypeBody, cream, TextAnchor.MiddleCenter, 302f, 12f, 28f, 36f, "-", 2f);
-            _crimsonScore = MenuUi.Fit(MenuUi.Label(badge, "Crimson Score", CMTokens.Mono, UiScale.TypeButton, CMTokens.Crimson.Color, TextAnchor.MiddleLeft, 330f, 12f, 80f, 36f, "0", 2f), 26);
+            _crimsonScore = MenuUi.Fit(MenuUi.Label(badge, "Crimson Score", CMTokens.Mono, UiScale.TypeButton, CMTokens.CrimsonInk.Color, TextAnchor.MiddleLeft, 330f, 12f, 80f, 36f, "0", 2f), 26);
             _badgeSub = MenuUi.Label(badge, "Sub", CMTokens.Ui, UiScale.TypeMin, cream, TextAnchor.MiddleLeft, 18f, 54f, 390f, 30f, "", 2f);
 
             RectTransform ticker = FeedUi.Anchored(watch, "Ticker", new Vector2(0f, 1f), HudLayout.Margin + 6f, -HudLayout.Margin - 108f, 520f, TickerLines * 30f);
@@ -371,7 +371,7 @@ namespace CriticalMass.Runtime.Spectator
                     _portrait.Image.enabled = true;
                     _portrait.Set(UiIcons.Portrait[(int)a.Cls, t], _tier);
                     HudText.Set(_name, ActorName(a.Team, a.Cls));
-                    _name.color = CMTokens.Team(a.Team);
+                    _name.color = CMTokens.TeamInk(a.Team);
                     HudText.Set(_sub, id == 0 ? "YOUR FIGHTER, ON AUTOPILOT" : a.Team == TeamId.Azure ? "AZURE TEAM" : "CRIMSON TEAM");
                     _hpBar.SetFill(CMTokens.Team(a.Team));
                     _hpBar.gameObject.SetActive(true);

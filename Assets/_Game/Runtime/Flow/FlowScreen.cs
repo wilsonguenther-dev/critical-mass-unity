@@ -47,6 +47,10 @@ namespace CriticalMass.Runtime.Flow
         RectTransform _rise;
         MenuItem _lastFocus;
         float _shownAt, _hiddenAt, _alphaAtHide;
+        UiTextScale _textScale;
+
+        /// <summary>The text-size setting as applied to this screen (tests).</summary>
+        public UiTextScale TextScale => _textScale;
         bool _built, _hiding;
 
         protected static Color Navy => CMTokens.VoidNavy.Color;
@@ -96,6 +100,8 @@ namespace CriticalMass.Runtime.Flow
             BuildContent(space);
             _hint = MenuUi.Label(space, "Hint", CMTokens.Ui, UiScale.TypeSmall, Cream, TextAnchor.MiddleCenter, 260f, HintY, 1400f, 36f, "", 2f);
             Canvas.enabled = false;
+            // Polish pass 1: the UI scale setting grows every line inside its own box (UiTextScale).
+            _textScale = UiTextScale.Capture(space);
             UpdateScale();
         }
 
@@ -177,6 +183,7 @@ namespace CriticalMass.Runtime.Flow
             if (w < 1 || h < 1) return;
             float s = HudLayout.Scale(w, h);
             if (Mathf.Abs(Canvas.scaleFactor - s) > 1e-4f) Canvas.scaleFactor = s;
+            if (_textScale != null) _textScale.Apply(UiTextScale.Setting);
             OnScale(s);
         }
 

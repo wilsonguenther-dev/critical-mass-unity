@@ -381,14 +381,14 @@ namespace CriticalMass.Runtime.Hud
             s.Plate.SetFill(own ? CMTokens.ToolBrass.Color : CMTokens.WithAlpha(CMTokens.PanelNavy.Color, 0.9f));
 
             // victim (always an actor)
-            s.Victim.color = CMTokens.Team(e.ActorTeam);
+            s.Victim.color = CMTokens.TeamInk(e.ActorTeam);
             HudText.Set(s.Victim, e.Actor == localActor ? KillWords.You : KillWords.ClassUpper[Ix(e.ActorClass)]);
             s.VictimCrest.Set(UiIcons.Crest[(int)e.ActorTeam], _tier);
 
             // killer: an actor, the Kaiju, or nobody known
             if (e.Other >= 0)
             {
-                s.Killer.color = CMTokens.Team(e.OtherTeam);
+                s.Killer.color = CMTokens.TeamInk(e.OtherTeam);
                 HudText.Set(s.Killer, e.Other == localActor ? KillWords.You : KillWords.ClassUpper[Ix(e.OtherClass)]);
                 s.KillerCrest.Set(UiIcons.Crest[(int)e.OtherTeam], _tier);
                 s.AttackIcon.Set(UiIcons.Attack[Ix(e.OtherClass), (int)e.OtherTeam], _tier);

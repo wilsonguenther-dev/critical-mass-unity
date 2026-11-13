@@ -101,7 +101,7 @@ namespace CriticalMass.Runtime.Codex
                     HudText.Set(t.Line1, "Somewhere off the beaten path.");
                     HudText.Set(t.Line2, string.Empty);
                 }
-                t.Name.color = found ? CMTokens.ToolBrass.Color : CMTokens.Stone.Color;
+                t.Name.color = found ? CMTokens.ToolBrass.Color : CMTokens.StoneInk.Color;
                 t.Badge.SetFill(found ? CMTokens.ToolBrass.Color : CMTokens.MeterEmpty.Color);
                 t.Plate.SetFill(found ? CMTokens.PanelNavy.Color : CMTokens.VoidNavy.Color);
             }

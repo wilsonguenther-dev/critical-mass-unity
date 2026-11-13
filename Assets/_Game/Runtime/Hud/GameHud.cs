@@ -846,8 +846,19 @@ namespace CriticalMass.Runtime.Hud
                 if (!on) continue;
                 PlaceOnMap(d.rectTransform, w.X[i], w.Z[i]);
                 d.SetFill(CMTokens.Team(w.Actors[i].Team));
+                // Polish pass 1: colour is never the only team signal: Azure dots are circles, Crimson dots diamonds
+                // (the crests' shapes on the scoreboard and kill feed carry the same split).
+                ShapeKind k = TeamDot(w.Actors[i].Team);
+                if (d.Kind != k)
+                {
+                    d.Kind = k;
+                    d.SetVerticesDirty();
+                }
             }
         }
+
+        /// <summary>The minimap dot shape of a team (polish pass 1: shape as well as colour).</summary>
+        public static ShapeKind TeamDot(TeamId t) => t == TeamId.Azure ? ShapeKind.Circle : ShapeKind.Diamond;
 
         /// <summary>True when a living actor of team <paramref name="mine"/> is within SightRadius of actor i.</summary>
         static bool Seen(World w, int i, TeamId mine, int n)

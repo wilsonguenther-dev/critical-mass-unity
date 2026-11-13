@@ -103,7 +103,7 @@ namespace CriticalMass.Runtime.Menus
             Rect hb = ResultsLayout.HillBar;
             _bar = MenuUi.Shape(space, "Hill Bar", ShapeKind.RoundRect, hb.x, hb.y, hb.width, hb.height, CMTokens.Azure.Color, -1f);
             _bar.EmptyColor = CMTokens.Crimson.Color;
-            _crSecs = L(space, "Crimson Hill", CMTokens.Mono, UiScale.TypeBody, CMTokens.Crimson.Color, TextAnchor.MiddleLeft, ResultsLayout.CrimsonSecs, 3f);
+            _crSecs = L(space, "Crimson Hill", CMTokens.Mono, UiScale.TypeBody, CMTokens.CrimsonInk.Color, TextAnchor.MiddleLeft, ResultsLayout.CrimsonSecs, 3f);
 
             // ---- tab row ----
             for (int i = 0; i < ResultsLayout.TabCount; i++)
@@ -295,7 +295,7 @@ namespace CriticalMass.Runtime.Menus
                 // Stand-in picture: the fighter who made the moment (or the hatched Kaiju), drawn when no still was captured.
                 _stand[k] = HudIcon.Make(page, "Stand-in " + k, r.center.x - 100f, r.y + 24f, 200f, 200f);
                 _stand[k].Image.enabled = false;
-                _tileEmpty[k] = L(page, "Empty " + k, CMTokens.Display, UiScale.TypeBody, CMTokens.Stone.Color, TextAnchor.LowerCenter,
+                _tileEmpty[k] = L(page, "Empty " + k, CMTokens.Display, UiScale.TypeBody, CMTokens.StoneInk.Color, TextAnchor.LowerCenter,
                     new Rect(r.x, r.yMax - 44f, r.width, 36f), 2f);
                 RawImage img = MenuUi.Rt(page, "Still " + k).gameObject.AddComponent<RawImage>();
                 MenuUi.Place(img.rectTransform, r.x, r.y, r.width, r.height);
@@ -482,7 +482,7 @@ namespace CriticalMass.Runtime.Menus
             bool draw = _sum.Winner == MatchResult.Draw;
             TeamId winTeam = _sum.Winner == MatchResult.Crimson ? TeamId.Crimson : TeamId.Azure;
             _title.text = _sum.Title;
-            _title.color = draw ? Cream : CMTokens.Team(winTeam);
+            _title.color = draw ? Cream : CMTokens.TeamInk(winTeam);
             HudText.Set(_line, _sum.Line);
             HudText.Set(_reason, _sum.Reason);
             double az = m.HillSeconds.Azure, cr = m.HillSeconds.Crimson;
@@ -502,7 +502,7 @@ namespace CriticalMass.Runtime.Menus
                 ActorStats me = _stats.Actors[0];
                 _youPortrait.Set(UiIcons.Portrait[(int)me.Cls, (int)me.Team], _tier);
                 HudText.Set(_youName, FlowWords.ClassName(me.Cls) + "\n" + (me.Team == TeamId.Azure ? "AZURE" : "CRIMSON"));
-                _youName.color = CMTokens.Team(me.Team);
+                _youName.color = CMTokens.TeamInk(me.Team);
                 string[] v =
                 {
                     me.Kills.ToString(CultureInfo.InvariantCulture), me.Deaths.ToString(CultureInfo.InvariantCulture),

@@ -310,7 +310,7 @@ namespace CriticalMass.Runtime.Menu
                 MenuUi.Label(row.transform, "Label", CMTokens.Display, UiScale.TypeBody, cream, TextAnchor.MiddleLeft, 20f, 0f, 300f, 60f, StatNames[i], 2f);
                 _statValue[i] = MenuUi.Label(row.transform, "Value", CMTokens.Mono, UiScale.TypeBody, CMTokens.ToolBrass.Color, TextAnchor.MiddleRight, 300f, 0f, 300f, 60f, "", 2f);
             }
-            ProgressionUi.Wrap(MenuUi.Label(page, "Team Note", CMTokens.Ui, UiScale.TypeSmall, CMTokens.Stone.Color, TextAnchor.UpperLeft, RX, CY + 440f, 760f, 60f,
+            ProgressionUi.Wrap(MenuUi.Label(page, "Team Note", CMTokens.Ui, UiScale.TypeSmall, CMTokens.StoneInk.Color, TextAnchor.UpperLeft, RX, CY + 440f, 760f, 60f,
                 ProgressionWords.TeamColoursLocked, 0f));
         }
 
@@ -329,7 +329,7 @@ namespace CriticalMass.Runtime.Menu
                 MenuUi.Label(it.transform, "Right", CMTokens.Display, UiScale.TypeBody, brass, TextAnchor.MiddleCenter, 520f, 0f, 24f, 80f, ">", 2f);
                 it.Stepped = d => StepSlot(k, d);
                 _slotItems[i] = it;
-                _slotStatus[i] = MenuUi.Label(page, SlotNames[i] + " Status", CMTokens.Ui, UiScale.TypeSmall, CMTokens.Stone.Color, TextAnchor.MiddleLeft,
+                _slotStatus[i] = MenuUi.Label(page, SlotNames[i] + " Status", CMTokens.Ui, UiScale.TypeSmall, CMTokens.StoneInk.Color, TextAnchor.MiddleLeft,
                     RX + 580f, y, 260f, 80f, "", 0f);
             }
             float ny = CY + 3 * 96f;
@@ -340,7 +340,7 @@ namespace CriticalMass.Runtime.Menu
             _randomItem.Submitted = RandomName;
             _outfitNote = ProgressionUi.Wrap(MenuUi.Label(page, "Outfit Note", CMTokens.Ui, UiScale.TypeSmall, CMTokens.WarmCream.Color, TextAnchor.UpperLeft,
                 RX, CY + 410f, RW, 90f, "", 2f));
-            ProgressionUi.Wrap(MenuUi.Label(page, "Team Note", CMTokens.Ui, UiScale.TypeSmall, CMTokens.Stone.Color, TextAnchor.UpperLeft, RX, CY + 510f, RW, 60f,
+            ProgressionUi.Wrap(MenuUi.Label(page, "Team Note", CMTokens.Ui, UiScale.TypeSmall, CMTokens.StoneInk.Color, TextAnchor.UpperLeft, RX, CY + 510f, RW, 60f,
                 ProgressionWords.TeamColoursLocked, 0f));
         }
 
@@ -375,7 +375,7 @@ namespace CriticalMass.Runtime.Menu
             MenuUi.Label(page, "Next Head", CMTokens.Display, UiScale.TypeBody, CMTokens.ToolBrass.Color, TextAnchor.MiddleLeft, PX + 40f, CY + 246f, PW - 80f, 40f,
                 ProgressionWords.NextUnlock, 2f);
             _next = ProgressionUi.Wrap(MenuUi.Label(page, "Next", CMTokens.Ui, UiScale.TypeBody, cream, TextAnchor.UpperLeft, PX + 40f, CY + 292f, PW - 80f, 200f, "", 2f));
-            ProgressionUi.Wrap(MenuUi.Label(page, "How", CMTokens.Ui, UiScale.TypeSmall, CMTokens.Stone.Color, TextAnchor.UpperLeft, PX + 40f, CY + 520f, PW - 80f, 70f,
+            ProgressionUi.Wrap(MenuUi.Label(page, "How", CMTokens.Ui, UiScale.TypeSmall, CMTokens.StoneInk.Color, TextAnchor.UpperLeft, PX + 40f, CY + 520f, PW - 80f, 70f,
                 "Knock-outs, deliveries to the egg, time on the hill and knocking out the Kaiju earn skill points and coins at the end of every match. " +
                 "Levels unlock looks only, never strength.", 0f));
         }
@@ -439,7 +439,7 @@ namespace CriticalMass.Runtime.Menu
             GameConfig cfg = Config;
             ClassConfig k = cfg.Class(c);
             HudText.Set(_nameBig, SettingsExtras.HideNames ? "PLAYER" : p.PlayerName); // integration batch 2: the ACCESS tab hides names
-            _team.color = CMTokens.Team(team);
+            _team.color = CMTokens.TeamInk(team);
             HudText.Set(_team, team == TeamId.Azure ? "AZURE" : "CRIMSON");
             HudText.Set(_statValue[0], ProgressionWords.Number(k.MaxHp) + " HP");
             HudText.Set(_statValue[1], ProgressionWords.Number(k.MoveSpeed) + " M/S");
@@ -535,7 +535,7 @@ namespace CriticalMass.Runtime.Menu
             HudText.Set(_slotItems[s].Value, it == null ? ProgressionWords.NoHeadgear : it.DisplayName);
             int level = Profile.Current.Level;
             string status;
-            Color col = CMTokens.Stone.Color;
+            Color col = CMTokens.StoneInk.Color;
             if (it == null || (CosmeticItems.Unlocked(it, level) && Cosmetics.Has(ShownClass, (CosmeticSlot)s, it.Id)))
             {
                 bool equipped = IsEquipped(s, it);

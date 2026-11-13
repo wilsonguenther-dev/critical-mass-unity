@@ -102,6 +102,34 @@ namespace CriticalMass.Runtime.Hud
             HudZone.Lower, HudZone.PlayerCard, HudZone.Minimap,
         };
 
+        /// <summary>Where a zone is anchored (normalised, y up, as HudLayout.Anchor): right column right, lanes centre.</summary>
+        public static Vector2 AnchorOf(HudZone z)
+        {
+            switch (z)
+            {
+                case HudZone.TopBand: case HudZone.Callout: return new Vector2(0.5f, 1f);
+                case HudZone.Feed: case HudZone.Stinger: case HudZone.Toast: return new Vector2(1f, 1f);
+                case HudZone.Guide: return new Vector2(0f, 1f);
+                case HudZone.Lower: return new Vector2(0.5f, 0.5f);
+                case HudZone.PlayerCard: return HudLayout.Anchor(HudCluster.Player);
+                default: return HudLayout.Anchor(HudCluster.Minimap);
+            }
+        }
+
+        /// <summary>A zone in device pixels on a w x h screen (top-left origin), keeping its anchor (HudLayout.PixelRect's rule).</summary>
+        public static Rect PixelRect(HudZone z, float w, float h)
+        {
+            float s = HudLayout.Scale(w, h);
+            Rect r = Of(z);
+            Vector2 a = AnchorOf(z);
+            float ax = a.x * RefW, ay = (1f - a.y) * RefH;
+            return new Rect(a.x * w + (r.x - ax) * s, (1f - a.y) * h + (r.y - ay) * s, r.width * s, r.height * s);
+        }
+
+        /// <summary>Zones that may overlap because they share one priority order (the mascot steps back for the lower lane).</summary>
+        public static bool Arbitrated(HudZone a, HudZone b) =>
+            (a == HudZone.Guide && b == HudZone.Lower) || (a == HudZone.Lower && b == HudZone.Guide);
+
         // ---- arbiter ----
         const int Zones = 9, Priorities = 9;
         static readonly int[] _held = NewHeld();

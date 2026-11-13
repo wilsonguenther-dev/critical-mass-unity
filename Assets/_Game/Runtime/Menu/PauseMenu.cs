@@ -136,6 +136,14 @@ namespace CriticalMass.Runtime.Menu
         float _rebindStarted;
         float _quietUntil;
         bool _built;
+        // Polish pass 1: the shared motion (UiMotion fade in and out) and the text-size setting (UiTextScale).
+        CanvasGroup _group;
+        UiTextScale _textScale;
+        float _openedAt, _closedAt;
+        bool _closing;
+
+        /// <summary>The text-size setting as applied to the menu (tests).</summary>
+        public UiTextScale TextScale => _textScale;
 
         sealed class CellRef
         {
@@ -226,7 +234,15 @@ namespace CriticalMass.Runtime.Menu
         {
             Build();
             IsOpen = true;
+            _closing = false;
             Canvas.enabled = true;
+            _openedAt = Time.unscaledTime;
+            if (_group != null)
+            {
+                _group.alpha = UiMotion.Reduced ? 1f : 0f;
+                _group.blocksRaycasts = true;
+                _group.interactable = true;
+            }
             ShowRoot();
         }
 
@@ -240,7 +256,15 @@ namespace CriticalMass.Runtime.Menu
             }
             FlushSettings();   // DG-53: saved once when the menu closes, not on every slider tick
             IsOpen = false;
-            if (Canvas != null) Canvas.enabled = false;
+            // A short fade out (input goes back to the game at once); Reduce motion closes at once.
+            _closedAt = Time.unscaledTime;
+            _closing = Canvas != null && Canvas.enabled && _group != null && !UiMotion.Reduced;
+            if (_group != null)
+            {
+                _group.blocksRaycasts = false;
+                _group.interactable = false;
+            }
+            if (!_closing && Canvas != null) Canvas.enabled = false;
             if (EventSystem.current != null) EventSystem.current.SetSelectedGameObject(null);
         }
 
@@ -257,7 +281,21 @@ namespace CriticalMass.Runtime.Menu
             bool paused = Input.State.Paused;
             if (paused && !IsOpen) Open();
             else if (!paused && IsOpen) Close();
-            if (!IsOpen) return;
+            if (!IsOpen)
+            {
+                if (_closing)
+                {
+                    float a = UiMotion.Exit(Time.unscaledTime - _closedAt);
+                    _group.alpha = a;
+                    if (a <= 0f)
+                    {
+                        _closing = false;
+                        Canvas.enabled = false;
+                    }
+                }
+                return;
+            }
+            if (_group != null && _group.alpha < 1f) _group.alpha = UiMotion.Reduced ? 1f : UiMotion.Enter(Time.unscaledTime - _openedAt);
             UpdateScale();
             UpdateHint();
 
@@ -644,6 +682,7 @@ namespace CriticalMass.Runtime.Menu
             Canvas.worldCamera = cam;
             Canvas.planeDistance = cam != null ? Mathf.Max(0.4f, cam.nearClipPlane * 1.3f) : 0.4f;
             go.AddComponent<GraphicRaycaster>();
+            _group = go.AddComponent<CanvasGroup>();
             _root = (RectTransform)go.transform;
 
             // Full-screen Void Navy wash; it also catches clicks so nothing behind the menu reacts.
@@ -683,6 +722,7 @@ namespace CriticalMass.Runtime.Menu
             BuildClassPage(space);
             BuildConfirmPage(space);
             Canvas.enabled = false;
+            _textScale = UiTextScale.Capture(space);
             UpdateScale();
         }
 
@@ -700,6 +740,7 @@ namespace CriticalMass.Runtime.Menu
             if (w < 1 || h < 1) return;
             float s = HudLayout.Scale(w, h);
             if (Mathf.Abs(Canvas.scaleFactor - s) > 1e-4f) Canvas.scaleFactor = s;
+            if (_textScale != null) _textScale.Apply(UiTextScale.Setting);
         }
 
         /// <summary>The UI needs one EventSystem with the Input System's UI module (keyboard, mouse, controller).</summary>

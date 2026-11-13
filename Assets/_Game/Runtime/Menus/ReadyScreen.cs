@@ -128,7 +128,7 @@ namespace CriticalMass.Runtime.Menus
             {
                 TeamId team = side == 0 ? mine : other;
                 _teamName[side].text = team == TeamId.Azure ? "AZURE" : "CRIMSON";
-                _teamName[side].color = CMTokens.Team(team);
+                _teamName[side].color = CMTokens.TeamInk(team);
                 _teamRole[side].text = watching ? (side == 0 ? "HOLDS YOUR FIGHTER" : "BOTS") : side == 0 ? "YOUR TEAM" : "ENEMY TEAM";
                 World.BuildRoster(_cfg, n, side == 0 ? c.Class : (ClassId?)null, _roster);
                 float step = Mathf.Min(64f, RowsH / n);
