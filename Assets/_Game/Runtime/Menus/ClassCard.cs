@@ -711,6 +711,16 @@ namespace CriticalMass.Runtime.Menus
             return need <= basePx ? 1 : need <= basePx * 2f ? 2 : 4;
         }
 
+        /// <summary>Integration batch 5: the detail card's one-line role, "Holds the hill.   FRONT LINE": the role and the tag
+        /// (the depth role line up to its first full stop); the rest of that sentence ran past the card.</summary>
+        public static string RoleWithTag(string role, string depthLine)
+        {
+            if (string.IsNullOrEmpty(depthLine)) return role ?? string.Empty;
+            int dot = depthLine.IndexOf('.');
+            string tag = dot > 0 ? depthLine.Substring(0, dot) : depthLine;
+            return string.IsNullOrEmpty(role) ? tag : role + "   " + tag;
+        }
+
         /// <summary>Fills the card with a class's words, portrait and icons for a team.</summary>
         public void Bind(ClassId cls, TeamId team, float canvasScale)
         {
@@ -724,7 +734,7 @@ namespace CriticalMass.Runtime.Menus
             // owner walk 1: the small tile shows the one-line role only (the role tag after it was cut on every tile); the
             // detail card keeps the full line with the tag. Integration batch 5: on ONE line ("Feeds the egg.   FEEDER"): two
             // lines in the 38 px row were cut at the bottom on every class (Bind runs on a class change, not per frame)
-            HudText.Set(_role, Kind == Layout.Tile || !View.Mechanics.DepthRead.Compiled ? _words.Role : View.Mechanics.DepthWords.WithRoleLine(_words.Role, _words.Id).Replace("\n", "   ")); // U-063 role line
+            HudText.Set(_role, Kind == Layout.Tile || !View.Mechanics.DepthRead.Compiled ? _words.Role : RoleWithTag(_words.Role, View.Mechanics.DepthWords.Role(_words.Id))); // U-063 role line
             for (int i = 0; i < 3; i++)
             {
                 bool on = i < _words.Difficulty;

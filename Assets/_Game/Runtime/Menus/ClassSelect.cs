@@ -483,7 +483,7 @@ namespace CriticalMass.Runtime.Menus
         {
             if (!AutoRespawn || _driver == null || _input == null) return false;
             World w = _driver.World;
-            if (w == null || w.ActorCount < 1 || w.Match.Phase == MatchPhase.Ended) return false;
+            if (w == null || w.ActorCount < 1 || w.Match.Phase == MatchPhase.Ended || CriticalMass.Runtime.Flow.GameFlow.State == CriticalMass.Runtime.Flow.FlowState.Results) return false;
             if (_driver.HumanAutopilot || _input.State.Paused || ControlsCardScreen.IsOpen || LoadingScreen.IsOpen) return false;
             if (_driver.GetComponent<TitleScreen>() != null) return false;
             return !w.Actors[0].Alive;

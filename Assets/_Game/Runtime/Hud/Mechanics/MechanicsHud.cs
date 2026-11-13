@@ -230,6 +230,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             for (int i = 0; i < HitRecapWords.Rows; i++)
                 _recapRows[i] = MenuUi.Label(_recap, "Row " + i, CMTokens.Ui, UiScale.TypeSmall, cream, TextAnchor.MiddleLeft, 22f, 40f + i * 32f, RecapRect.width - 44f, 30f, "", 2f);
             _recap.gameObject.SetActive(false);
+            HudKeepOut.Add(_recap);   // integration batch 5: name tags keep off the recap (BROOK drew through it)
         }
 
         void LateUpdate()

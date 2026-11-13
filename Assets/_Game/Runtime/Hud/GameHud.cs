@@ -1003,7 +1003,7 @@ namespace CriticalMass.Runtime.Hud
 
         void ApplyDeath(World w, HudState s)
         {
-            bool dead = s.HasPlayer && !s.Alive && !s.Ended;
+            bool dead = s.HasPlayer && !s.Alive && !s.Ended && !(CriticalMass.Runtime.Flow.GameFlow.State == CriticalMass.Runtime.Flow.FlowState.Results);   // batch 5: the results screen hides the death layer
             if (dead && _wasAlive && s.HasPlayer)
                 _koWorld = SimSpace.ToWorld(s.PlayerX, GroundHeight.At(w.Map, s.PlayerX, s.PlayerZ) + 0.05, s.PlayerZ);
             _wasAlive = !dead;
