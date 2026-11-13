@@ -86,6 +86,8 @@ namespace CriticalMass.Runtime.View.Anim
         bool _wasEnded;
 
         int _fresh;
+        // Sim time of the last Pose (NaN after Reset): the motion step during a hit-stop hold (fix/animation-reds).
+        double _lastPoseT = double.NaN;
 
         public ActorAnimator(int id) { _id = id; }
 
@@ -129,6 +131,7 @@ namespace CriticalMass.Runtime.View.Anim
             _side = Locomotion.NoSide;
             _warp = 0;
             _legYaw = 0f;
+            _lastPoseT = double.NaN;
         }
 
         /// <summary>
@@ -145,27 +148,35 @@ namespace CriticalMass.Runtime.View.Anim
             bool holding = hasFx && fx.Holding;
             CombatFeed feed = combat != null ? combat.Feed : null;
 
+            // fix/animation-reds: ActorViews passes dSim = 0 during a hit-stop hold (loops must not advance), and the facing
+            // spring and the velocity used it too, so a held fighter kept the yaw and velocity of its last unheld update
+            // while the sim turned it: up to 0.22 sim s stale in a match, and in the bot facing test (one view update per
+            // 15 ticks) half a second stale, read as turned around. Motion (velocity, facing, lean) follows sim time;
+            // only loops (loopDt below) stop during the hold.
+            double dMotion = holding && !double.IsNaN(_lastPoseT) ? Math.Max(0, simTime - _lastPoseT) : dSim;
+            _lastPoseT = simTime;
+
             // ---- rendered velocity from the drawn displacement (DG-75: never the sim's intended velocity)
-            if (_hasLast && dSim > 0)
+            if (_hasLast && dMotion > 0)
             {
                 double dx = basePos.x - _lastX, dz = basePos.z - _lastZ;
-                double inst = Math.Sqrt(dx * dx + dz * dz) / dSim;
+                double inst = Math.Sqrt(dx * dx + dz * dz) / dMotion;
                 if (inst > TeleportSpeed) { _vx = _vz = 0; _hasYaw = false; }
                 else
                 {
-                    double k = 1 - Math.Exp(-dSim / VelocityTau);
-                    _vx += (dx / dSim - _vx) * k;
-                    _vz += (dz / dSim - _vz) * k;
+                    double k = 1 - Math.Exp(-dMotion / VelocityTau);
+                    _vx += (dx / dMotion - _vx) * k;
+                    _vz += (dz / dMotion - _vz) * k;
                 }
             }
             _lastX = basePos.x;
             _lastZ = basePos.z;
             _hasLast = true;
             _speed = corpse ? 0 : Math.Sqrt(_vx * _vx + _vz * _vz);
-            if (dSim > 0)
+            if (dMotion > 0)
             {
-                double acc = (_speed - _prevSpeed) / dSim;
-                _accel += (acc - _accel) * (1 - Math.Exp(-dSim / 0.1));
+                double acc = (_speed - _prevSpeed) / dMotion;
+                _accel += (acc - _accel) * (1 - Math.Exp(-dMotion / 0.1));
                 _prevSpeed = _speed;
             }
             double loopDt = holding ? 0 : dSim; // the fake hit-stop: loops do not advance during the hold
@@ -181,7 +192,7 @@ namespace CriticalMass.Runtime.View.Anim
             else
             {
                 _wasCorpse = false;
-                StepYaw(target, dSim);
+                StepYaw(target, dMotion);
             }
 
             // ---- actions: AnimAction resets to 0 on the press tick of an attack or an ability
@@ -276,7 +287,7 @@ namespace CriticalMass.Runtime.View.Anim
             {
                 double bank = Clamp(-_yawVel * _speed * BankGain, -BankMaxDeg, BankMaxDeg);
                 double pitch = Clamp(_accel * PitchGain, -PitchMaxDeg, PitchMaxDeg);
-                double kk = dSim > 0 ? 1 - Math.Exp(-dSim / 0.08) : 0;
+                double kk = dMotion > 0 ? 1 - Math.Exp(-dMotion / 0.08) : 0;
                 _roll += (float)((bank - _roll) * kk);
                 _pitch += (float)((pitch - _pitch) * kk);
             }
