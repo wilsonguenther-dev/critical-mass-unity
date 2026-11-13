@@ -204,6 +204,8 @@ jobs:
   # above and runs tools/windows-run.ps1, the same script the owner's PC test uses. Pass A (-batchmode -nographics, one
   # autoplay match at 8x) proves the player starts, loads, plays and quits on Windows. Pass B (a real D3D11 window at
   # 1280x720, screenshots) is best effort on WARP and never fails the run; its log and screenshots are uploaded either way.
+  # Pass B also traces the Direct3D 11 shader warm-up states (-Trace): the game ships no warm-up file for any API yet
+  # (Assets/StreamingAssets/ShaderWarmup is absent), and this is the one D3D11 device we have.
   smoke-windows:
     needs: [plan, build]
     if: needs.plan.outputs.build-windows == 'true'
@@ -241,7 +243,8 @@ jobs:
         working-directory: player
         run: |
           Get-CimInstance Win32_VideoController | Select-Object Name, DriverVersion | Format-Table
-          powershell -ExecutionPolicy Bypass -File .\windows-run.ps1 -Quick
+          powershell -ExecutionPolicy Bypass -File .\windows-run.ps1 -Quick -Trace
+          Get-ChildItem -Recurse -Filter *.graphicsstate | Select-Object FullName, Length | Format-Table
       - uses: actions/upload-artifact@v4
         if: always()
         with:
