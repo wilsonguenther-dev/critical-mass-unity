@@ -892,3 +892,14 @@ F-08c) is on main, and after every landed batch from then on. A red writes a BLO
 landed; the next batch waits for the architect); skipped is recorded as skipped, never as a pass.
 **Status.** Built and tested (`test_batch2_prep.py`: real 78 skip through the gate script, due rule against the real
 _ORDER.md, red = BLOCKING, skipped recorded, not due = not run). Not yet run against a real Unity build.
+
+## U-052 The loop takes over all of Max's items (2026-11-12)
+
+**Decision.** The owner, Wilson, decided on 2026-11-12 by voice message: "take over all Max items ... all of it". The
+loop now builds every item MAX-ITEMS.md gave Max (CM-30 to CM-38, CM-84, CM-85 and the rest), in the rules lane order
+of the demo gap list (DEMO-GAP-LIST-2026-11-12.md section 5.2, starting with DG-02 = CM-32 jumping plus CM-33 any-angle
+bridges). Max reviews each pull request afterwards and may take any item back. This supersedes U-045's ownership rule
+("the loop never touches a Max-owned item"); U-012's split of mechanics to Max no longer binds the loop. Max is not
+contacted by the loop about the change.
+**Status.** Decided; MAX-ITEMS.md states it. `loop/README.md` section 1 still quotes U-045 and is updated with the next
+loop-harness change.
