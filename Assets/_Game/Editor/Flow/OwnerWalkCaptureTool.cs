@@ -475,7 +475,7 @@ namespace CriticalMass.Editor.Flow
                 tex.Apply();
                 File.WriteAllBytes(path, tex.EncodeToPNG());
                 string fighters = name.StartsWith("10-", StringComparison.Ordinal) || name.StartsWith("11-", StringComparison.Ordinal)
-                    ? "; " + FighterPixels(cam, tex, r) : "";
+                    ? "; " + FighterPixels(cam, r) : "";
                 UnityEngine.Object.DestroyImmediate(tex);
                 _shots++;
                 Note("wrote " + file + "; " + TextIssues() + (name.StartsWith("1", StringComparison.Ordinal) ? "; " + HudReport() : "") + fighters);
@@ -489,71 +489,105 @@ namespace CriticalMass.Editor.Flow
 
         /// <summary>
         /// fix/fighters-always-visible (owner report 2026-11-13: fighters drawn as rings and name tags only): every living
-        /// fighter in view must put pixels on screen. The frame is rendered a second time with every fighter model switched
-        /// off; inside each fighter's projected box (feet to 2 m) the pixels that change are the fighter's own. A fighter with
-        /// fewer than MinFighterPixels changed pixels (scaled to the shot's height) is "INVISIBLE" in walk.log and the walk
-        /// exits 5. Team-colour pixels (Azure or Crimson hue among the changed ones) are counted for the log.
+        /// fighter in view must put pixels on screen. The frame is rendered once more with ONLY the fighter models (moved to
+        /// FighterLayer for the pass, the camera masked to it, cleared to black, no HUD), so scenery in front of a fighter and
+        /// HUD panels over it never count against it, while a disabled or culled renderer, a missing mesh or a LOD that draws
+        /// nothing does. Inside each fighter's projected box (feet to 2 m, drawn position) the lit pixels are the fighter's
+        /// own; fewer than MinFighterPixels (scaled to the shot's height) is "INVISIBLE" in walk.log, and any invisible fighter
+        /// makes the walk exit 5. Team-colour pixels (Azure or Crimson hue) are counted for the log.
         /// </summary>
-        static string FighterPixels(UnityEngine.Camera cam, Texture2D shot, Res r)
+        static string FighterPixels(UnityEngine.Camera cam, Res r)
         {
             SimDriverBehaviour drv = Driver;
             CriticalMass.Runtime.View.ActorViews views = drv != null ? drv.GetComponent<CriticalMass.Runtime.View.ActorViews>() : null;
             if (drv == null || drv.World == null || views == null) return "fighters: no match";
             World w = drv.World;
-            var off = new List<GameObject>();
+            double alpha = drv.Alpha;
+            var canvases = new List<Canvas>();
+            foreach (Canvas cv in UnityEngine.Object.FindObjectsByType<Canvas>(FindObjectsSortMode.None))
+                if (cv.enabled && cv.isRootCanvas) { cv.enabled = false; canvases.Add(cv); }
+            var moved = new List<KeyValuePair<GameObject, int>>();
             for (int k = 0; k < views.transform.childCount; k++)
             {
-                GameObject c = views.transform.GetChild(k).gameObject;
-                if (c.activeSelf && c.name.StartsWith("Actor ", StringComparison.Ordinal)) { c.SetActive(false); off.Add(c); }
+                Transform c = views.transform.GetChild(k);
+                if (!c.gameObject.activeSelf || !c.name.StartsWith("Actor ", StringComparison.Ordinal)) continue;
+                foreach (Transform t in c.GetComponentsInChildren<Transform>(true))
+                {
+                    moved.Add(new KeyValuePair<GameObject, int>(t.gameObject, t.gameObject.layer));
+                    t.gameObject.layer = FighterLayer;
+                }
             }
-            Texture2D bare = new Texture2D(r.W, r.H, TextureFormat.RGB24, false);
+            int mask = cam.cullingMask;
+            CameraClearFlags flags = cam.clearFlags;
+            Color bg = cam.backgroundColor;
+            var urp = cam.GetComponent<UnityEngine.Rendering.Universal.UniversalAdditionalCameraData>();
+            bool post = urp != null && urp.renderPostProcessing;
+            Texture2D only = new Texture2D(r.W, r.H, TextureFormat.RGB24, false);
             try
             {
+                cam.cullingMask = 1 << FighterLayer;
+                cam.clearFlags = CameraClearFlags.SolidColor;
+                cam.backgroundColor = Color.black;
+                if (urp != null) urp.renderPostProcessing = false;
                 var req = new RenderPipeline.StandardRequest { destination = _rt };
                 if (RenderPipeline.SupportsRenderRequest(cam, req)) RenderPipeline.SubmitRenderRequest(cam, req);
                 else cam.Render();
                 RenderTexture.active = _rt;
-                bare.ReadPixels(new Rect(0, 0, r.W, r.H), 0, 0);
-                bare.Apply();
+                only.ReadPixels(new Rect(0, 0, r.W, r.H), 0, 0);
+                only.Apply();
             }
-            finally { foreach (GameObject c in off) c.SetActive(true); }
-            Color32[] a = shot.GetPixels32(), b = bare.GetPixels32();
-            UnityEngine.Object.DestroyImmediate(bare);
+            finally
+            {
+                cam.cullingMask = mask;
+                cam.clearFlags = flags;
+                cam.backgroundColor = bg;
+                if (urp != null) urp.renderPostProcessing = post;
+                foreach (KeyValuePair<GameObject, int> kv in moved) if (kv.Key != null) kv.Key.layer = kv.Value;
+                foreach (Canvas cv in canvases) if (cv != null) cv.enabled = true;
+            }
+            Color32[] a = only.GetPixels32();
+            UnityEngine.Object.DestroyImmediate(only);
             int minPx = Mathf.Max(20, Mathf.RoundToInt(MinFighterPixels * r.H / 1080f));
-            int inView = 0, invisible = 0;
+            int inView = 0, invisible = 0, teamTotal = 0;
             var worst = new List<string>();
             for (int i = 0; i < w.ActorCount; i++)
             {
                 if (!w.Actors[i].Alive) continue;
-                Vector3 feet = CriticalMass.Runtime.SimSpace.ToWorld(w.X[i], CriticalMass.Runtime.GroundHeight.At(w.Map, w.X[i], w.Z[i]), w.Z[i]);
+                double x = w.PrevX[i] + (w.X[i] - w.PrevX[i]) * alpha, z = w.PrevZ[i] + (w.Z[i] - w.PrevZ[i]) * alpha;
+                Vector3 feet = CriticalMass.Runtime.SimSpace.ToWorld(x, CriticalMass.Runtime.GroundHeight.At(w.Map, x, z), z);
                 Vector3 p0 = cam.WorldToScreenPoint(feet), p1 = cam.WorldToScreenPoint(feet + Vector3.up * 2f);
                 if (p0.z <= 0f || p1.z <= 0f) continue;
-                float h = Mathf.Abs(p1.y - p0.y), half = Mathf.Max(6f, h * 0.45f);
+                float h = Mathf.Abs(p1.y - p0.y), half = Mathf.Max(6f, h * 0.6f);
                 int x0 = Mathf.FloorToInt(Mathf.Min(p0.x, p1.x) - half), x1 = Mathf.CeilToInt(Mathf.Max(p0.x, p1.x) + half);
-                int y0 = Mathf.FloorToInt(Mathf.Min(p0.y, p1.y) - 4f), y1 = Mathf.CeilToInt(Mathf.Max(p0.y, p1.y) + 4f);
+                int y0 = Mathf.FloorToInt(Mathf.Min(p0.y, p1.y) - 8f), y1 = Mathf.CeilToInt(Mathf.Max(p0.y, p1.y) + 8f);
                 if (x0 < 0 || y0 < 0 || x1 >= r.W || y1 >= r.H) continue;
                 inView++;
-                int changed = 0, team = 0;
+                int lit = 0, team = 0;
                 for (int y = y0; y <= y1; y++)
-                    for (int x = x0; x <= x1; x++)
+                    for (int xx = x0; xx <= x1; xx++)
                     {
-                        Color32 c = a[y * r.W + x], d = b[y * r.W + x];
-                        if (Mathf.Abs(c.r - d.r) + Mathf.Abs(c.g - d.g) + Mathf.Abs(c.b - d.b) < 45) continue;
-                        changed++;
+                        Color32 c = a[y * r.W + xx];
+                        if (c.r + c.g + c.b < 45) continue;
+                        lit++;
                         Color.RGBToHSV(c, out float hue, out float sat, out float val);
                         if (sat > 0.35f && val > 0.25f && (hue > 0.48f && hue < 0.60f || hue < 0.03f || hue > 0.94f)) team++;
                     }
-                if (changed < minPx)
+                teamTotal += team;
+                if (lit < minPx)
                 {
                     invisible++;
-                    if (worst.Count < 6) worst.Add($"actor {i} {changed}px");
+                    if (worst.Count < 6) worst.Add($"actor {i} {lit}px at ({p0.x:F0},{p0.y:F0})");
                 }
             }
             _invisibleFighters += invisible;
-            return $"fighters in view {inView}, INVISIBLE {invisible} (floor {minPx} px){(worst.Count > 0 ? ": " + string.Join(", ", worst) : "")}";
+            return $"fighters in view {inView}, INVISIBLE {invisible} (floor {minPx} px), team-colour px {teamTotal}{(worst.Count > 0 ? ": " + string.Join(", ", worst) : "")}";
         }
 
-        /// <summary>Changed pixels a fighter must own at 1080 px screen height (a 2 m fighter is about 140 px tall there).</summary>
+        /// <summary>The layer the fighter-only pass moves fighter models to for one render (unused by the game: the
+        /// previews own 30 and 31).</summary>
+        const int FighterLayer = 29;
+
+        /// <summary>Lit pixels a fighter must own in the fighter-only pass at 1080 px screen height (a 2 m fighter is about 140 px tall there).</summary>
         const int MinFighterPixels = 120;
 
         static void Finish(int code)
