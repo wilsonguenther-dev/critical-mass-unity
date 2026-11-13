@@ -19,14 +19,13 @@ namespace CriticalMass.Runtime.Spectator
     /// <item>On spawn, after every respawn and when control comes back from spectating: a bobbing "YOU" tag over actor 0 for
     /// MarkerSeconds and, for IntroSeconds, "YOU ARE THE AZURE WARRIOR" with "MOVE WITH [W][A][S][D] OR [arrows]" (or the
     /// left stick) drawn as glyphs from the current bindings.</item>
-    /// <item>Autopilot: whenever actor 0 is bot-driven in a real match (SimDriverBehaviour.HumanAutopilot outside spectator
-    /// mode, capture, the menus' backdrop and the -autoplay tool runs), the banner "AUTOPILOT: PRESS ANY KEY TO TAKE
-    /// CONTROL" shows and the first key, click, mouse move, controller button or stick push hands actor 0 back to the
-    /// human input at once. After IdleAutopilotSeconds with no input from a standing player, autopilot takes over (same
-    /// banner, same way back), so an idle player is never mistaken for one who is playing.</item>
+    /// <item>Autopilot: whenever actor 0 is bot-driven in a real match, the banner "AUTOPILOT | YOU WERE IDLE, SO THE
+    /// COMPUTER IS PLAYING YOUR FIGHTER. PRESS ANY KEY TO PLAY." shows. Who drives actor 0 is decided by HumanControlGuard
+    /// (fix/human-control): it runs before the driver steps, hands actor 0 back on the same frame as any input, and turns
+    /// autopilot on only after its idle time; this component only draws the result.</item>
     /// <item>Short notices: "YOU'LL RESPAWN AS THE MINER" after a live class change.</item>
     /// </list>
-    /// View only: reads the world, writes only the driver's public HumanAutopilot field.
+    /// View only: reads the world and the guard; writes nothing outside its own canvas.
     /// </summary>
     [GameOverlay(Order = 71, Scope = OverlayScope.MatchOnly)]
     [DefaultExecutionOrder(950)]
@@ -36,15 +35,23 @@ namespace CriticalMass.Runtime.Spectator
         public const float IntroSeconds = 2f;
         public const float NoticeSeconds = 3f;
         public const float FadeSeconds = 0.2f;
-        /// <summary>Seconds without any input before autopilot takes a standing player's fighter (tests shorten it).</summary>
-        public static float IdleAutopilotSeconds = DefaultIdleAutopilotSeconds;
-        public const float DefaultIdleAutopilotSeconds = 10f;
+        /// <summary>Seconds without any input before autopilot takes a standing player's fighter (HumanControlGuard owns it).</summary>
+        public static float IdleAutopilotSeconds
+        {
+            get => HumanControlGuard.IdleAutopilotSeconds;
+            set => HumanControlGuard.IdleAutopilotSeconds = value;
+        }
+        public const float DefaultIdleAutopilotSeconds = HumanControlGuard.DefaultIdleAutopilotSeconds;
         public const int SortingOrder = 13;
         /// <summary>Height of the YOU tag's point above the ground under actor 0, world units.</summary>
         public const float MarkerHeight = 2.6f;
 
         /// <summary>false: idle never hands actor 0 to autopilot (the banner still shows for any other autopilot).</summary>
-        public static bool IdleAutopilotEnabled = true;
+        public static bool IdleAutopilotEnabled
+        {
+            get => HumanControlGuard.IdleAutopilotEnabled;
+            set => HumanControlGuard.IdleAutopilotEnabled = value;
+        }
 
         public SimDriverBehaviour Driver { get; private set; }
         public HumanInputSource Input { get; private set; }
@@ -58,9 +65,11 @@ namespace CriticalMass.Runtime.Spectator
         public string IntroText => _introTitle != null ? _introTitle.text : string.Empty;
         public string IntroPrompt => _introStrip != null ? _introStrip.PlainText : string.Empty;
         /// <summary>Autopilot was turned on by this component after the idle time.</summary>
-        public bool IdleAutopilot => _idleAutopilot;
+        public bool IdleAutopilot => Guard != null && Guard.IdleAutopilot;
         /// <summary>Unscaled time of the last input seen.</summary>
-        public float LastInputAt => _lastInput;
+        public float LastInputAt => Guard != null ? Guard.LastInputAt : 0f;
+        /// <summary>Who drives actor 0 (takeover, idle autopilot, the lockout watchdog): this component only draws it.</summary>
+        public HumanControlGuard Guard { get; private set; }
 
         Canvas _canvas;
         RectTransform _marker;
@@ -70,30 +79,22 @@ namespace CriticalMass.Runtime.Spectator
         Text _introTitle, _noticeText;
         PromptStrip _introStrip, _bannerStrip;
         float _markerUntil = -1f, _introUntil = -1f, _noticeUntil = -1f;
-        float _lastInput;
-        bool _idleAutopilot;
+        int _tookBackSeen = -1;
         bool _seenAlive, _wasAlive;
         int _epoch = int.MinValue;
         bool _pendingIntro;
         ControlDevice _introDevice;
         bool _bannerBuilt;
         ControlDevice _bannerDevice;
+        bool _bannerIdle;
         readonly GlyphSpec[] _move = new GlyphSpec[4];
         readonly GlyphSpec[] _arrows = new GlyphSpec[4];
         bool _arrowsReady;
-
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        static void ResetStatics()
-        {
-            IdleAutopilotSeconds = DefaultIdleAutopilotSeconds;
-            IdleAutopilotEnabled = true;
-        }
 
         void Awake()
         {
             Driver = GetComponent<SimDriverBehaviour>();
             Input = GetComponent<HumanInputSource>();
-            _lastInput = Time.unscaledTime;
         }
 
         void OnEnable()
@@ -112,7 +113,6 @@ namespace CriticalMass.Runtime.Spectator
 
         void OnControlReturned()
         {
-            _lastInput = Time.unscaledTime;
             ShowSelf();
         }
 
@@ -143,12 +143,10 @@ namespace CriticalMass.Runtime.Spectator
             World w = Driver.World;
             if (w == null || w.ActorCount <= 0) return;
             bool title = GetComponent<TitleScreen>() != null;
-            bool tool = SimDriverBehaviour.CaptureMode || GameFlow.Autoplay || AutoplayArgs.Current.Autoplay ||
-                        (Driver.Request != null && Driver.Request.Backdrop);
+            if (Guard == null) Guard = GetComponent<HumanControlGuard>();
+            bool tool = HumanControlGuard.ToolWorld(Driver);
             bool spectating = SpectatorMode.IsSpectating;
             bool paused = Input != null && Input.State.Paused;
-            bool playing = w.Match.Phase == MatchPhase.Playing;
-            bool trial = Onboarding.Trial.IsRunning;
             bool alive = w.Actors[0].Alive;
 
             // Spawn and respawn: a new world, or actor 0 back on its feet.
@@ -162,27 +160,14 @@ namespace CriticalMass.Runtime.Spectator
             _seenAlive |= alive;
             _wasAlive = alive;
 
-            bool input = AnyInput();
             float now = Time.unscaledTime;
-            if (input || !alive || paused || title || spectating) _lastInput = now;
-
-            bool eligible = !tool && !spectating && !title && playing;
-            if (eligible && Driver.HumanAutopilot && input)
+            // HumanControlGuard (order -50, before the driver steps) takes control back on any input and runs idle autopilot.
+            bool banner = Guard != null && Guard.AutopilotBanner;
+            if (Guard != null && Guard.TookBackFrame != _tookBackSeen)
             {
-                // Any input takes control at once.
-                Driver.HumanAutopilot = false;
-                _idleAutopilot = false;
-                _pendingIntro = true;
+                _tookBackSeen = Guard.TookBackFrame;
+                _pendingIntro = true;   // control came back: show who you are again
             }
-            else if (eligible && !Driver.HumanAutopilot && IdleAutopilotEnabled && !trial && alive && !paused &&
-                     now - _lastInput >= IdleAutopilotSeconds)
-            {
-                Driver.HumanAutopilot = true;
-                _idleAutopilot = true;
-            }
-            if (!Driver.HumanAutopilot) _idleAutopilot = false;
-
-            bool banner = eligible && Driver.HumanAutopilot && !paused;
             bool show = !tool && !spectating && !title;
             if (_pendingIntro && show && alive && !paused)
             {
@@ -224,23 +209,7 @@ namespace CriticalMass.Runtime.Spectator
         }
 
         /// <summary>Any key, mouse button, mouse move, scroll, controller button or stick push this frame (held keys count).</summary>
-        public static bool AnyInput()
-        {
-            Keyboard kb = Keyboard.current;
-            if (kb != null && kb.anyKey.isPressed) return true;
-            Mouse m = Mouse.current;
-            if (m != null && (ControlBindings.MouseUsed(m) || m.leftButton.isPressed || m.rightButton.isPressed ||
-                              m.middleButton.isPressed || Mathf.Abs(m.scroll.ReadValue().y) > 0.01f)) return true;
-            Gamepad pad = Gamepad.current;
-            if (pad != null)
-            {
-                if (ControlBindings.GamepadUsed(pad)) return true;
-                float t = ControlBindings.StickUseThreshold;
-                if (pad.leftStick.ReadValue().sqrMagnitude > t * t || pad.rightStick.ReadValue().sqrMagnitude > t * t) return true;
-                if (pad.leftTrigger.ReadValue() > 0.5f || pad.rightTrigger.ReadValue() > 0.5f) return true;
-            }
-            return false;
-        }
+        public static bool AnyInput() => HumanControlGuard.AnyGameplayInput();
 
         // ---------------------------------------------------------------- pieces
 
@@ -282,9 +251,9 @@ namespace CriticalMass.Runtime.Spectator
             _intro.SetActive(false);
 
             // Autopilot banner, under the match panel.
-            RectTransform banner = FeedUi.Anchored(_canvas.transform, "Autopilot Banner", new Vector2(0.5f, 1f), 0f, -150f, 760f, 64f);
+            RectTransform banner = FeedUi.Anchored(_canvas.transform, "Autopilot Banner", new Vector2(0.5f, 1f), 0f, -150f, BannerWidth, 64f);
             _banner = banner.gameObject;
-            VectorShape bp = MenuUi.Shape(banner, "Plate", ShapeKind.RoundRect, 0f, 0f, 760f, 64f, navy, 16f);
+            VectorShape bp = MenuUi.Shape(banner, "Plate", ShapeKind.RoundRect, 0f, 0f, BannerWidth, 64f, navy, 16f);
             bp.OutlinePx = 4f;
             bp.RimPx = 3f;
             bp.RimColor = brass;
@@ -295,7 +264,7 @@ namespace CriticalMass.Runtime.Spectator
             RectTransform br = _bannerStrip.Rect;
             br.anchorMin = br.anchorMax = new Vector2(0f, 0.5f);
             br.pivot = new Vector2(0f, 0.5f);
-            br.sizeDelta = new Vector2(530f, 64f);
+            br.sizeDelta = new Vector2(BannerWidth - 230f, 64f);
             br.anchoredPosition = new Vector2(218f, 0f);
             _bannerStrip.Align = TextAnchor.MiddleLeft;
             _banner.SetActive(false);
@@ -312,13 +281,25 @@ namespace CriticalMass.Runtime.Spectator
         void UpdateBanner()
         {
             ControlDevice d = ControlBindings.ActiveDevice;
-            if (_bannerBuilt && d == _bannerDevice) return;
+            bool idle = IdleAutopilot;
+            if (_bannerBuilt && d == _bannerDevice && idle == _bannerIdle) return;
             _bannerBuilt = true;
             _bannerDevice = d;
+            _bannerIdle = idle;
             _bannerStrip.Begin();
-            _bannerStrip.AddText(d == ControlDevice.Gamepad ? "PRESS ANY BUTTON TO TAKE CONTROL" : "PRESS ANY KEY TO TAKE CONTROL");
+            _bannerStrip.AddText(BannerText(d, idle));
             _bannerStrip.End();
         }
+
+        /// <summary>The banner's line: what is happening and the one thing that ends it.</summary>
+        public static string BannerText(ControlDevice d, bool idle) =>
+            (idle ? "YOU WERE IDLE, SO THE COMPUTER IS PLAYING YOUR FIGHTER. " : "THE COMPUTER IS PLAYING YOUR FIGHTER. ") +
+            (d == ControlDevice.Gamepad ? "PRESS ANY BUTTON TO PLAY." : "PRESS ANY KEY TO PLAY.");
+
+        /// <summary>The banner's line as drawn (tests).</summary>
+        public string BannerPrompt => _bannerStrip != null ? _bannerStrip.PlainText : string.Empty;
+
+        public const float BannerWidth = 1180f;
 
         void BuildIntro(World w)
         {
