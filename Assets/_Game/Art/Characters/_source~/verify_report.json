@@ -88,11 +88,11 @@
    "check": "Warrior_Body loose/non-manifold",
    "ok": true,
    "detail": {
-    "triangles": 9380,
+    "triangles": 9506,
     "loose_verts": 0,
     "loose_edges": 0,
     "non_manifold_edges": 0,
-    "closed_shells": 120
+    "closed_shells": 121
    }
   },
   {
@@ -206,7 +206,7 @@
     "loose_verts": 0,
     "loose_edges": 0,
     "non_manifold_edges": 0,
-    "closed_shells": 24
+    "closed_shells": 25
    }
   },
   {
@@ -250,14 +250,14 @@
   {
    "check": "triangle budget <= 12000",
    "ok": true,
-   "detail": 11844
+   "detail": 11970
   },
   {
    "check": "body height in metres after round trip (Blender Z = Unity Y)",
    "ok": true,
    "detail": {
     "min_z": -0.002,
-    "max_z": 1.997,
+    "max_z": 2.001,
     "mesh_object_rot": [
      1.5708,
      -0.0,
