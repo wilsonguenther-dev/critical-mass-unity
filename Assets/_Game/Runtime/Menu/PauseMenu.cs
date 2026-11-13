@@ -120,7 +120,7 @@ namespace CriticalMass.Runtime.Menu
             for (int i = 0; i < _extraDefs.Count; i++) if (_extraDefs[i].Label == label) return i;
             return -1;
         }
-        GameObject _rootPage, _settingsPage, _classPage, _confirmPage;
+        GameObject _classPage, _confirmPage;
         MenuItem _spectate, _changeClass, _switchTeam, _confirmYes;
         readonly MenuItem[] _classItems = new MenuItem[5];
         MenuItem _classBack;

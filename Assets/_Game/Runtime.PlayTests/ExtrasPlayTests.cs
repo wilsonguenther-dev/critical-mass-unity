@@ -7,6 +7,7 @@ using CriticalMass.Runtime.Game;
 using CriticalMass.Runtime.Hud;
 using CriticalMass.Runtime.Menu;
 using CriticalMass.Runtime.Secrets;
+using CriticalMass.Sim.Config;
 using CriticalMass.Sim.Core;
 using NUnit.Framework;
 using UnityEngine;

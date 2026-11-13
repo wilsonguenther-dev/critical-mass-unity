@@ -709,7 +709,7 @@ namespace CriticalMass.Runtime.Game
             {
                 ms.WriteByte(0x78);
                 ms.WriteByte(0x01);
-                using (var d = new DeflateStream(ms, CompressionLevel.Fastest, true))
+                using (var d = new DeflateStream(ms, System.IO.Compression.CompressionLevel.Fastest, true))
                 {
                     var filter = new byte[1];
                     for (int y = 0; y < h; y++)

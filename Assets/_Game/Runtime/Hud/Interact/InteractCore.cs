@@ -335,8 +335,8 @@ namespace CriticalMass.Runtime.Hud.Interact
 
         [Serializable] sealed class Token { public string id; public string path; public string format; }
         [Serializable] sealed class TokensFile { public Token[] tokens; }
-        [Serializable] sealed class Tip { public string id; public string text; public string needsRule; }
-        [Serializable] sealed class TipsFile { public Tip[] tips; }
+        [Serializable] sealed class TipRow { public string id; public string text; public string needsRule; }
+        [Serializable] sealed class TipsFile { public TipRow[] tips; }
         [Serializable] public sealed class PackAbility { public string input; public string name; public string text; public string cooldown; public string needsRule; }
         [Serializable] public sealed class PackClass { public string id; public string name; public string role; public string bio; public PackAbility[] abilities; }
         [Serializable] sealed class ClassesFile { public PackClass[] classes; }
@@ -358,7 +358,7 @@ namespace CriticalMass.Runtime.Hud.Interact
             _tips = new Dictionary<string, string>();
             TipsFile tips = Load<TipsFile>("tips.json");
             if (tips != null && tips.tips != null)
-                foreach (Tip t in tips.tips)
+                foreach (TipRow t in tips.tips)
                     if (t != null && !string.IsNullOrEmpty(t.id) && string.IsNullOrEmpty(t.needsRule)) _tips[t.id] = t.text;
             ClassesFile cf = Load<ClassesFile>("classes.json");
             _classes = cf != null ? cf.classes : null;

@@ -245,7 +245,7 @@ namespace CriticalMass.Runtime.Tests
 
             var c = new PingBook();
             Assert.IsTrue(c.TryPlace(PingKind.Attack, 3, 4, 10.0, 0, 2, out int slot));
-            Ping p = c.Get(slot);
+            CriticalMass.Runtime.Hud.Interact.Ping p = c.Get(slot);
             Assert.AreEqual(1f, PingBook.Alpha(p, 10.0), 1e-6);
             Assert.AreEqual(1f, PingBook.Alpha(p, 15.0), 1e-6);
             Assert.Less(PingBook.Alpha(p, 15.8), 1f);

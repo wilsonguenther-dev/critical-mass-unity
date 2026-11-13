@@ -1,4 +1,5 @@
 using System;
+using CriticalMass.Sim.Config;
 using CriticalMass.Sim.Core;
 
 namespace CriticalMass.Runtime.Secrets
