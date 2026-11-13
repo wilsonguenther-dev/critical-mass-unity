@@ -82,6 +82,11 @@ namespace CriticalMass.Runtime.PlayTests
             quick.Class = ClassId.Warrior;
             quick.Team = TeamId.Azure;
             d.ShowReady(new PlayLaunch { Choice = quick, Seed = 4242, BackTo = LobbyScreen.ModeSelect });
+            // Integration batch 5: START NOW (as HumanControlPlayTests does) instead of waiting out the countdown, which timed
+            // out under the PlayMode harness; this test is about the HUD, not READY.
+            yield return Until(() => d.Ready.IsVisible, 5f, "READY shows");
+            yield return Frames(2);
+            d.Ready.StartNow();
             yield return Until(() => Driver() != null && Driver() != from && Driver().World != null && GameFlow.State == FlowState.Match &&
                                      !d.Loading && !LoadingScreen.IsOpen, 60f, "READY launches the match");
             SimDriverBehaviour drv = Driver();

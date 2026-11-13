@@ -66,7 +66,7 @@ namespace CriticalMass.Runtime.Menus
             f.ChipGlyphs = PromptStrip.Make(f.Chip, "Glyphs", 30f, UiScale.TypeBody, CMTokens.WarmCream.Color, CMTokens.Display);
             MenuUi.Place(f.ChipGlyphs.Rect, 12f, 0f, cw - 24f, ch);
             f.ChipGlyphs.Align = TextAnchor.MiddleCenter;
-            f.ChipGlyphs.SetHint("ENTER " + words, ControlDevice.KeyboardMouse);
+            // glyphs are filled by Update for the active device (the key caps follow the device's glyph size)
             f._chipGroup = f.Chip.gameObject.AddComponent<CanvasGroup>();
             f._chipGroup.blocksRaycasts = false;
             f._chipGroup.alpha = 0f;

@@ -179,7 +179,7 @@ namespace CriticalMass.Runtime.Tests
                 Assert.IsNotNull(p);
                 var chips = new List<MenuItem>();
                 foreach (MenuItem it in p.GetComponentsInChildren<MenuItem>(true))
-                    if (it.name.StartsWith("Class ", StringComparison.Ordinal) && it.name != "Class Step") chips.Add(it);   // not the CLASS stepper
+                    if (it.transform.parent != null && it.transform.parent.name == "Class Chips") chips.Add(it);
                 Assert.AreEqual(6, chips.Count, "one class tab per class");
                 MenuItem miner = chips.Find(c => c.name == "Class " + ClassId.Miner);
                 Assert.IsNotNull(miner);
