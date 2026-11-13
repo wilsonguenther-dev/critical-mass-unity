@@ -1,8 +1,8 @@
 {
  "objects": {
   "Warrior_Body": {
-   "triangles": 9506,
-   "vertices": 4967,
+   "triangles": 9000,
+   "vertices": 4714,
    "materials": [
     "CM_Toon"
    ],
@@ -22,8 +22,8 @@
    "bone_groups": 20
   },
   "Warrior_Shield": {
-   "triangles": 1602,
-   "vertices": 845,
+   "triangles": 1756,
+   "vertices": 924,
    "materials": [
     "CM_Toon"
    ],
@@ -64,9 +64,29 @@
   "upperleg.l",
   "upperleg.r"
  ],
- "face_normal_verts": 488,
- "outline_unlined_verts": 489,
- "triangles_total": 11970,
- "rest_height_m": 2.0024,
- "rest_min_z": -0.0016
+ "face_normal_verts": 486,
+ "outline_unlined_verts": 472,
+ "finish": {
+  "Warrior_Body": {
+   "edge": 989,
+   "chips": 57,
+   "crack": 9,
+   "hot": 59
+  },
+  "Warrior_Shield": {
+   "edge": 266,
+   "chips": 78,
+   "crack": 4,
+   "hot": 20
+  },
+  "Warrior_Cleaver": {
+   "edge": 117,
+   "chips": 22,
+   "crack": 11,
+   "hot": 2
+  }
+ },
+ "triangles_total": 11618,
+ "rest_height_m": 2.0013,
+ "rest_min_z": -0.0005
 }

@@ -74,6 +74,51 @@ def add(obj, bm, color, bones, feat, smooth=True, m=None, face_uv=None, grad=kit
 FACE_UV = (0.0, -0.06, 1.46, 0.25, 0.25)    # cx, cy, cz, half width, half height of the painted face projection
 
 
+def plank(w, ln, t, nx, ny, dome=(0.0, 0.0)):
+    """v6 closed plank: grid top (nx x ny quads) for painted grain, flat n-gon bottom, side strips. dome = (x offset of
+    the plank on the shield, rise): the top bulges like the bible's domed shield face."""
+    import bmesh as _bm
+    bm = _bm.new()
+    xo, rise = dome
+    top = [[bm.verts.new((-w / 2 + w * i / nx, -ln / 2 + ln * j / ny, 0.0)) for j in range(ny + 1)] for i in range(nx + 1)]
+    for row in top:
+        for v in row:
+            r2 = ((v.co.x + xo) ** 2 + v.co.y ** 2) / 0.25
+            v.co.z = t / 2 + rise * max(0.0, 1.0 - r2)
+    ring = ([top[i][0] for i in range(nx + 1)] + [top[nx][j] for j in range(1, ny + 1)]
+            + [top[i][ny] for i in range(nx - 1, -1, -1)] + [top[0][j] for j in range(ny - 1, 0, -1)])
+    bot = [bm.verts.new((v.co.x, v.co.y, -t / 2)) for v in ring]
+    for i in range(nx):
+        for j in range(ny):
+            bm.faces.new((top[i][j], top[i + 1][j], top[i + 1][j + 1], top[i][j + 1]))
+    n = len(ring)
+    for k in range(n):
+        bm.faces.new((ring[k], bot[k], bot[(k + 1) % n], ring[(k + 1) % n]))
+    bm.faces.new(list(reversed(bot)))
+    _bm.ops.recalc_face_normals(bm, faces=bm.faces)
+    return bm
+
+
+def loop_tube(R, Ry, zf, rf, seg=18, ring=6, y0=0.0):
+    """v6 closed tube around the neck: centre (R cos a, y0 + Ry sin a, zf(a)), tube radius rf(a) (folds)."""
+    import bmesh as _bm
+    bm = _bm.new()
+    rows = []
+    for i in range(seg):
+        a = 2 * math.pi * i / seg
+        c = Vector((R * math.cos(a), y0 + Ry * math.sin(a), zf(a)))
+        out = Vector((math.cos(a), math.sin(a), 0.0))
+        r = rf(a)
+        rows.append([bm.verts.new(c + out * (r * math.cos(2 * math.pi * j / ring))
+                                  + Vector((0, 0, 1)) * (r * 0.85 * math.sin(2 * math.pi * j / ring))) for j in range(ring)])
+    for i in range(seg):
+        for j in range(ring):
+            i2, j2 = (i + 1) % seg, (j + 1) % ring
+            bm.faces.new((rows[i][j], rows[i2][j], rows[i2][j2], rows[i][j2]))
+    _bm.ops.recalc_face_normals(bm, faces=bm.faces)
+    return bm
+
+
 def groove(name):
     """Colour of a modelled inner crease: the region colour 25 % darker (reads as a 1 to 1.5 px line)."""
     return palette.vcol_scaled(name, 0.75)
@@ -388,11 +433,13 @@ def build_shield(poses):
     def p(bm, color, feat, smooth=False, m=None):
         parts.append((bm, color, feat, smooth, m))
 
-    # slightly domed wood face of vertical planks with modelled seam grooves
-    p(B.lathe([(0.50, -0.04), (0.50, 0.03), (0.38, 0.055), (0.19, 0.07), (0.001, 0.072)], 24), "wood", "shield", True)
-    for x in (-0.315, -0.105, 0.105, 0.315):
-        h = 2 * math.sqrt(max(0.0, 0.47 ** 2 - x ** 2)) * 0.96
-        p(B.box((0.022, h, 0.014), 0.0), "wood_seam", "shield", m=M((x, 0, 0.036 + 0.03 * (1 - abs(x) / 0.5))))
+    # v6: five separate domed planks with a grid top (vertices for the painted wood grain), over a dark backing disc
+    # that shows through the gaps between them
+    p(B.cyl((0, 0, -0.05), (0, 0, -0.025), 0.50, 0.50, 18), "wood_seam", "shield", True)
+    for i in range(5):
+        x = -0.40 + 0.20 * i
+        ln = 2 * math.sqrt(max(0.0, 0.50 ** 2 - x ** 2)) * 0.98 + 0.06
+        p(plank(0.192, ln, 0.07, 5, 3, dome=(x, 0.03)), "wood", "shield", False, M((x, 0, 0.0)))
     p(B.torus(0.485, 0.012, 32, 4), groove("wood"), "shield", True, M((0, 0, 0.034)))        # rim crease
     n_seg = 9
     p(B.torus(0.535, 0.075, 22, 4), "stone_gap", "shield", True, M((0, 0, -0.01)))     # v5: dark between the rim stones
@@ -574,7 +621,8 @@ def main():
     scene.frame_set(DISPLAY_FRAME)
 
     report = {"objects": {}, "bones": len(arm.data.bones), "display_pose": [DISPLAY_ACTION, DISPLAY_FRAME],
-              "idle_attitude_bones": baked, "face_normal_verts": face_verts, "outline_unlined_verts": len(unlined)}
+              "idle_attitude_bones": baked, "face_normal_verts": face_verts, "outline_unlined_verts": len(unlined),
+              "finish": getattr(B, "finish_stats", {})}
     total = 0
     for name, ob in objs.items():
         tris = sum(len(p.vertices) - 2 for p in ob.data.polygons)

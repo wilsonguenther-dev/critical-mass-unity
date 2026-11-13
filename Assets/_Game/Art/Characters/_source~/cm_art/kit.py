@@ -12,12 +12,12 @@ import bmesh
 import bpy
 from mathutils import Matrix, Vector
 
-from . import palette
+from . import finish, palette
 
 MAX_INFLUENCES = 4
 GRADIENT = 0.06        # +6 % value toward the top of each part (ART-DIRECTION 3.5)
 CREVICE = 0.10         # -10 % value in crevices (baked ray occlusion, finalize)
-SEG = 0.70             # global segment scale for round primitives (the 12,000-triangle budget knob)
+SEG = 0.66             # global segment scale for round primitives (the 12,000-triangle budget knob)
 STEP_TOP, STEP_UNDER = 0.08, 0.12   # v3 value steps from the surface normal: +8 % on top faces, -12 % on undersides
 
 
@@ -68,6 +68,8 @@ class Builder:
                 "ft": bm.verts.layers.int.new("feat"),
                 "uv": bm.loops.layers.uv.new("UVMap"),
                 "nogo": bm.verts.layers.int.new("noao"),
+                "kind": bm.verts.layers.int.new("kind"),           # v6: painted-finish material kind
+                "lco": bm.verts.layers.float_vector.new("lco"),    # v6: part-local position (grain, folds)
                 "wsets": [],
                 "feats": [],
             }
@@ -81,9 +83,11 @@ class Builder:
         bible's painted form shadow), stepped at n.z > 0.45 and n.z < -0.35. face_uv = (cx, cy, cz, half_w, half_h): planar front projection for the painted face
         decal on faces whose centre is in front of cy; every other face samples UV (0.002, 0.002), a transparent texel.
         """
+        local = {v: v.co.copy() for v in src.verts}
         if m is not None:
             bmesh.ops.transform(src, matrix=m, verts=src.verts)
         d = self._get(obj)
+        kid = finish.kind_of(color)
         bm = d["bm"]
         key = repr(bones)
         if key not in [repr(w) for w in d["wsets"]]:
@@ -112,6 +116,8 @@ class Builder:
             nv[d["ws"]] = wi
             nv[d["ft"]] = fi
             nv[d["nogo"]] = 1 if (glow or noao) else 0
+            nv[d["kind"]] = kid
+            nv[d["lco"]] = local[v]
             vmap[v] = nv
         uvl = d["uv"]
         for f in src.faces:
@@ -341,12 +347,15 @@ class Builder:
             v[col] = (c[0] * k, c[1] * k, c[2] * k, c[3])
 
     # ------------------------------------------------------------------ finalise
-    def finalize(self, coll, material):
+    def finalize(self, coll, material, finish_params=None, seed=606):
         out = {}
         for name, d in self.objs.items():
             bm = d["bm"]
             bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
-            self.bake_crevices(bm, d["col"], d["nogo"])
+            # v6: the painted finish (cm_art/finish.py) replaces the plain crevice bake: AO is part of it
+            self.finish_stats = getattr(self, "finish_stats", {})
+            self.finish_stats[name] = finish.painted_finish(bm, d["col"], d["kind"], lco=d["lco"], skip=d["nogo"],
+                                                            seed=seed, params=finish_params)
             me = bpy.data.meshes.new(name)
             bm.to_mesh(me)
             ob = bpy.data.objects.new(name, me)
@@ -361,7 +370,7 @@ class Builder:
                 ca.data[i].color = v[cl]
             me.color_attributes.active_color = ca
             me.color_attributes.render_color_index = me.color_attributes.find("Col")
-            for a in ("wset", "feat", "noao"):
+            for a in ("wset", "feat", "noao", "kind", "lco"):
                 if a in me.attributes:
                     me.attributes.remove(me.attributes[a])
             # feature tags as non-deform vertex groups (FBX ignores them; the .blend keeps them)
