@@ -394,6 +394,9 @@ namespace CriticalMass.Runtime.Flow
         bool OnPause()
         {
             if (_loadPath != null) return true;
+            // The story intro is on screen (WATCH INTRO from Home): it owns Esc (a deliberate skip); Home must not go Back
+            // underneath it.
+            if (CriticalMass.Runtime.Menus.StoryIntro.IsPlaying) return true;
             if (_external != null)
             {
                 if (_external is IMenuBack back) back.Back();

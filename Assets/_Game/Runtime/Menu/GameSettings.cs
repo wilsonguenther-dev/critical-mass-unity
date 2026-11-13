@@ -30,6 +30,8 @@ namespace CriticalMass.Runtime.Menu
         public const string ShakeScaleKey = "cm.access.shake";
         /// <summary>Reduce flashing (1 on, default 0): hit flash as a light tint, a steady damage edge, pulses at 2 Hz or less.</summary>
         public const string ReduceFlashingKey = "cm.access.reduceFlashing";
+        /// <summary>Story intro at every launch, before the title (owner, 2026-11-13: default on; Settings turns it off).</summary>
+        public const string IntroAtLaunchKey = "cm.story.atLaunch";
         /// <summary>Reduce motion (1 on, default 0): no camera shake, no combat zoom, no Kaiju spotlight.</summary>
         public const string ReduceMotionKey = "cm.reducedMotion";   // one key: StoryIntro, AttractMode, big moments and world reactions read it too
         public const string DamageNumbersKey = "cm.damagenumbers";
@@ -53,7 +55,7 @@ namespace CriticalMass.Runtime.Menu
         {
             MasterKey, MusicKey, EffectsKey, WidthKey, HeightKey, FullScreenKey, VSyncKey, QualityKey, ShakeKey,
             DamageNumbersKey, BloodKey, FpsCapKey, BgThrottleKey, MoveAssistKey, KeysFollowMapKey, PrefsVersionKey,
-            ShakeScaleKey, ReduceFlashingKey, ReduceMotionKey,
+            ShakeScaleKey, ReduceFlashingKey, ReduceMotionKey, IntroAtLaunchKey,
         };
 
         public const string MixerResource = "Audio/CMMixer";
@@ -99,6 +101,7 @@ namespace CriticalMass.Runtime.Menu
 
         public static bool ReduceFlashing { get => GetB(ReduceFlashingKey, false); set => SetB(ReduceFlashingKey, value); }
         public static bool ReduceMotion { get => GetB(ReduceMotionKey, false); set => SetB(ReduceMotionKey, value); }
+        public static bool IntroAtLaunch { get => GetB(IntroAtLaunchKey, true); set => SetB(IntroAtLaunchKey, value); }
         /// <summary>Same setting as ReduceMotion (world reactions' name): sway, springs, launches and the edge flash at 25%.</summary>
         public static bool ReducedMotion { get => ReduceMotion; set => ReduceMotion = value; }
         /// <summary>Floating damage numbers shown.</summary>

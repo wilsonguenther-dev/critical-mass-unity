@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using CriticalMass.Runtime.Game;
+using CriticalMass.Runtime.Flow;
 using CriticalMass.Runtime.Hud;
 using CriticalMass.Runtime.Hud.Style;
 using CriticalMass.Runtime.Hud.Ui;
@@ -1240,8 +1241,14 @@ namespace CriticalMass.Runtime.Menu
                 // Camera shake, reduce flashing and reduce motion live on the ACCESS tab (one source of truth, SettingsExtras).
                 Stepper(tab, 0, "DAMAGE NUMBERS", () => GameSettings.DamageNumbers ? "ON" : "OFF", d => GameSettings.DamageNumbers = !GameSettings.DamageNumbers),
                 Stepper(tab, 1, "BLOOD", () => GameSettings.Blood ? "ON" : "OFF", d => GameSettings.Blood = !GameSettings.Blood),
+                // Owner, 2026-11-13: the story intro plays at every launch; this turns that off, WATCH INTRO plays it now.
+                Stepper(tab, 2, "PLAY INTRO AT LAUNCH", () => GameSettings.IntroAtLaunch ? "ON" : "OFF", d => GameSettings.IntroAtLaunch = !GameSettings.IntroAtLaunch),
             };
-            MenuItem reset = MenuUi.Item(tab, "Reset Settings", ContentX, ContentY + GameTabLines * (LineH + LineGap) + 20f, 420f, 56f,
+            MenuItem watch = MenuUi.Item(tab, "Watch Intro", ContentX, ContentY + GameTabLines * (LineH + LineGap) + 20f, 420f, 56f,
+                "WATCH INTRO", MenuItem.Kind.Button, UiScale.TypeBody, true, CMTokens.Display);
+            watch.Submitted = WatchIntro;
+            items.Add(watch);
+            MenuItem reset = MenuUi.Item(tab, "Reset Settings", ContentX, ContentY + GameTabLines * (LineH + LineGap) + 96f, 420f, 56f,
                 "RESET ALL SETTINGS", MenuItem.Kind.Button, UiScale.TypeBody, true, CMTokens.Display);
             reset.Submitted = () =>
             {
@@ -1252,7 +1259,7 @@ namespace CriticalMass.Runtime.Menu
             };
             items.Add(reset);
             // DG-64: a zip of the logs a tester can send us (no upload; the decision ledger rules out crash services).
-            MenuItem report = MenuUi.Item(tab, "Problem Report", ContentX, ContentY + GameTabLines * (LineH + LineGap) + 96f, 420f, 56f,
+            MenuItem report = MenuUi.Item(tab, "Problem Report", ContentX, ContentY + GameTabLines * (LineH + LineGap) + 172f, 420f, 56f,
                 "SAVE A PROBLEM REPORT", MenuItem.Kind.Button, UiScale.TypeBody, true, CMTokens.Display);
             report.Submitted = () =>
             {
@@ -1270,8 +1277,34 @@ namespace CriticalMass.Runtime.Menu
             return tab.gameObject;
         }
 
-        /// <summary>Stepper lines on the Game tab (the two buttons sit under them).</summary>
-        const int GameTabLines = 2;
+        /// <summary>Stepper lines on the Game tab (the three buttons sit under them).</summary>
+        const int GameTabLines = 3;
+
+        /// <summary>Settings > WATCH INTRO: closes the menu and plays the story intro (on the title, Home or setup; never over a
+        /// live match, where the menu says so instead).</summary>
+        public void WatchIntro()
+        {
+            FlowState st = CriticalMass.Runtime.Flow.GameFlow.State;
+            if (st == FlowState.Match || st == FlowState.Results)
+            {
+                SetStatus("The intro can be watched from the title or Home.", false);
+                return;
+            }
+            if (_external)
+            {
+                ClassSwitch.CloseExternalPicker();
+                EndExternal(null);
+            }
+            if (IsOpen) Resume();
+            // Next frame: the settings bridge puts Home back this frame, so the film freezes Home (not an empty screen).
+            StartCoroutine(PlayIntroNextFrame());
+        }
+
+        static System.Collections.IEnumerator PlayIntroNextFrame()
+        {
+            yield return null;
+            StoryIntro.Play();
+        }
 
         static string ShakeText()
         {
