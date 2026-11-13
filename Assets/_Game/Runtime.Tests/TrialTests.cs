@@ -557,7 +557,23 @@ namespace CriticalMass.Runtime.Tests
                 r.Observe(w);
             }
             seconds = w.Match.Time - r.StartedAt;
+            _lastWorld = w;
             return r;
+        }
+
+        static World _lastWorld;
+
+        /// <summary>Where actor 0 and the step's fixed target are when the trial did not finish (for the failure message).</summary>
+        static string Where(TrialRunner r)
+        {
+            World w = _lastWorld;
+            if (w == null) return "";
+            TrialProbe p = r.Probe;
+            int here = MapGrid.CellAt(w.Map, w.X[0], w.Z[0]);
+            int there = p.HasFixed ? MapGrid.CellAt(w.Map, p.FixedX, p.FixedZ) : -1;
+            return $"; actor0 ({w.X[0]:0.00},{w.Z[0]:0.00}) cell {here} alive {w.Actors[0].Alive} air {w.Actors[0].AirTick}/{w.Actors[0].AirLen}" +
+                   $" jumps? kills {w.Actors[0].Kills}; target {(p.HasFixed ? $"({p.FixedX:0.00},{p.FixedZ:0.00}) cell {there}" : "none")}" +
+                   $" sawOverGap {p.SawOverGap}";
         }
 
         static string Report(TrialRunner r)
@@ -571,7 +587,7 @@ namespace CriticalMass.Runtime.Tests
         public void AutopilotCompletesEveryRunnableStepInUnderFourSimMinutes()
         {
             TrialRunner r = PlayTrial(Seed, out double seconds);
-            Assert.IsTrue(r.Finished, "not finished in " + BudgetSeconds + " s: " + Report(r));
+            Assert.IsTrue(r.Finished, "not finished in " + BudgetSeconds + " s: " + Report(r) + Where(r));
             Assert.AreEqual(0, r.Count(TrialStepState.Skipped), Report(r));
             Assert.AreEqual(r.Steps.Length - r.Count(TrialStepState.Off), r.Count(TrialStepState.Done), Report(r));
             Assert.Less(seconds, BudgetSeconds);

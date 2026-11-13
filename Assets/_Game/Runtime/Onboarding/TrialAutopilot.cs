@@ -110,16 +110,22 @@ namespace CriticalMass.Runtime.Onboarding
                 {
                     if (!has) return;
                     double d2 = TrialChecks.Dist2(px, pz, tx, tz);
-                    if (d2 > 2.5 * 2.5 && !runner.Probe.SawOverGap)
+                    // First the takeoff cell on the gap's axis (a diagonal run-up meets the gap at a corner, where every
+                    // landing is blocked and the jump is refused), then straight across along that axis.
+                    double fx = runner.Probe.FromX, fz = runner.Probe.FromZ;
+                    bool lined = Math.Abs((px - fx) * (tz - fz) - (pz - fz) * (tx - fx)) <= 0.25 &&
+                                 TrialChecks.Dist2(px, pz, tx, tz) <= TrialChecks.Dist2(fx, fz, tx, tz) + 0.05;
+                    if (!runner.Probe.SawOverGap && !lined)
                     {
-                        WalkTo(w, tx, tz, 1.2, frame);
+                        if (TrialChecks.Dist2(px, pz, fx, fz) > 0.3 * 0.3) WalkTo(w, fx, fz, 0.2, frame);
+                        else Toward(px, pz, fx, fz, frame);
                         _jumpPressed = false;
                         return;
                     }
                     // Near the edge: run straight across the gap centre and press jump whenever on the ground close to it
-                    // (a jump the landing guard shortened, or one taken off too early, is simply tried again).
-                    Toward(px, pz, tx + (tx - px), tz + (tz - pz), frame);
-                    if (w.Actors[TrialChecks.Player].AirLen == 0 && d2 <= 1.8 * 1.8)
+                    // (a jump the landing guard shortened is simply tried again).
+                    Toward(px, pz, tx + (tx - fx), tz + (tz - fz), frame);
+                    if (w.Actors[TrialChecks.Player].AirLen == 0 && d2 <= 1.2 * 1.2)
                     {
                         frame.Jump = true;
                         _jumpPressed = true;

@@ -20,6 +20,8 @@ namespace CriticalMass.Runtime.Onboarding
         /// <summary>A target fixed at step start (Marker, Gap): HasFixed false = none could be found.</summary>
         public bool HasFixed;
         public double FixedX, FixedZ;
+        /// <summary>Gap only: the centre of the walkable cell to take off from, on the gap's axis.</summary>
+        public double FromX, FromZ;
         /// <summary>The enemy the arrow follows (-1 = none) and the tick it was picked.</summary>
         public int EnemyId = -1;
         public int EnemyPickedTick = int.MinValue;
@@ -34,6 +36,7 @@ namespace CriticalMass.Runtime.Onboarding
             SawOverGap = false;
             HasFixed = false;
             FixedX = FixedZ = 0;
+            FromX = FromZ = 0;
             EnemyId = -1;
             EnemyPickedTick = int.MinValue;
         }
@@ -69,7 +72,7 @@ namespace CriticalMass.Runtime.Onboarding
             if (s.Target == TrialTarget.Marker)
                 p.HasFixed = MarkerPoint(w, a.Team, s.MarkerFraction, out p.FixedX, out p.FixedZ);
             else if (s.Target == TrialTarget.Gap)
-                p.HasFixed = NearestGap(w, w.X[Player], w.Z[Player], JumpReachCells(w), out p.FixedX, out p.FixedZ);
+                p.HasFixed = NearestGap(w, w.X[Player], w.Z[Player], JumpReachCells(w), out p.FixedX, out p.FixedZ, out p.FromX, out p.FromZ);
         }
 
         /// <summary>Observes the world once (call once per sim tick or per frame) and returns true when the step is done.</summary>
@@ -316,7 +319,10 @@ namespace CriticalMass.Runtime.Onboarding
         public static int JumpReachCells(World w)
         {
             GameConfig c = w.Config;
-            double reach = c.Jump.AirTicks / c.SimHz * c.Class(w.Actors[Player].Cls).MoveSpeed;
+            ClassConfig cc = c.Class(w.Actors[Player].Cls);
+            // A gap is cleared only when the footprint lands clear of it (the landing guard): the flight must cover the gap
+            // plus a body width (2.28 u of flight for a Warrior clears 1 cell, not 2).
+            double reach = c.Jump.AirTicks / c.SimHz * cc.MoveSpeed - 2 * cc.Radius;
             return Math.Max(1, (int)Math.Floor(reach));
         }
 
@@ -327,8 +333,13 @@ namespace CriticalMass.Runtime.Onboarding
         /// The middle of the nearest straight run of 1..maxSpan gap cells with walkable ground on both ends (a gap a jump
         /// clears), measured from (x, z). False when the map has none.
         /// </summary>
-        public static bool NearestGap(World w, double x, double z, int maxSpan, out double gx, out double gz)
+        public static bool NearestGap(World w, double x, double z, int maxSpan, out double gx, out double gz) =>
+            NearestGap(w, x, z, maxSpan, out gx, out gz, out _, out _);
+
+        /// <summary>NearestGap, also giving the takeoff cell's centre (fx, fz): the jump crosses along the gap's axis.</summary>
+        public static bool NearestGap(World w, double x, double z, int maxSpan, out double gx, out double gz, out double fx, out double fz)
         {
+            fx = fz = 0;
             MapDef map = w.Map;
             double best = double.PositiveInfinity;
             gx = gz = 0;
@@ -353,6 +364,8 @@ namespace CriticalMass.Runtime.Onboarding
                                 best = dd;
                                 gx = mxw;
                                 gz = mzw;
+                                fx = cx + 0.5;
+                                fz = cz + 0.5;
                             }
                             break;
                         }
