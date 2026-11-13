@@ -9,6 +9,8 @@ namespace CriticalMass.Runtime.Camera
     /// <summary>
     /// Builds the fixed-angle perspective Cinemachine 3 follow rig (U-005 amendment 2026-11-12: pitch 55, vertical FOV 35,
     /// 23.4 u from the look target, yaw 45, no rotation control, no shake). The follow itself is CameraFollowTarget.
+    /// DG-20 adds CameraDirector (combat framing, hatch focus, hold-to-look) through CameraFollowTarget, the SeeThrough
+    /// silhouette and the one-time LookHint, all on the objects made here.
     /// </summary>
     public static class CameraRig
     {
@@ -37,6 +39,14 @@ namespace CriticalMass.Runtime.Camera
             follow.TrackerSettings.BindingMode = BindingMode.WorldSpace;
             follow.TrackerSettings.PositionDamping = Vector3.zero;
             follow.FollowOffset = -(rotation * Vector3.forward) * (float)GameplayCamera.Distance;
+
+            // DG-20: the director's zoom scales this offset; see-through silhouette and the one-time look hint.
+            followTarget.Rig = follow;
+            followTarget.BaseOffset = follow.FollowOffset;
+            var seeThrough = camGo.AddComponent<SeeThrough>();
+            seeThrough.Driver = driver;
+            var hint = camGo.AddComponent<LookHint>();
+            hint.Driver = driver;
 
             return camGo;
         }
