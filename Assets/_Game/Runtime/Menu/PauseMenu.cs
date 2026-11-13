@@ -281,11 +281,45 @@ namespace CriticalMass.Runtime.Menu
             if (!GameSettings.Flush() && _settingsPage != null) SetStatus("Settings could not be saved.", true);
         }
 
+        // ---- controls-1: press-again confirmation for restart and quit ----
+
+        public const float ConfirmSeconds = 3f;
+        MenuItem _armed;
+        string _armedLabel;
+        float _armedAt;
+
+        /// <summary>The item waiting for its confirming second press (tests).</summary>
+        public MenuItem ArmedItem => _armed;
+
+        void ConfirmThen(MenuItem item, string label, Action act)
+        {
+            if (_armed == item && Time.unscaledTime - _armedAt <= ConfirmSeconds)
+            {
+                Disarm();
+                act();
+                return;
+            }
+            Disarm();
+            _armed = item;
+            _armedLabel = label;
+            _armedAt = Time.unscaledTime;
+            HudText.Set(item.Label, "PRESS AGAIN: " + label);
+            SetStatus(label.Substring(0, 1) + label.Substring(1).ToLowerInvariant() + "? Press it again to confirm.", true);
+        }
+
+        void Disarm()
+        {
+            if (_armed != null && _armed.Label != null) HudText.Set(_armed.Label, _armedLabel);
+            _armed = null;
+        }
+
         void Update()
         {
             if (Input == null) return;
             if (Input.PauseHandler == null) Input.PauseHandler = OnPausePressed;
             ControlBindings.Sample();
+            if (_armed != null && (Time.unscaledTime - _armedAt > ConfirmSeconds || !IsOpen ||
+                                   (EventSystem.current != null && EventSystem.current.currentSelectedGameObject != _armed.gameObject))) Disarm();
             bool paused = Input.State.Paused;
             if (paused && !IsOpen) Open();
             else if (!paused && IsOpen) Close();
@@ -841,6 +875,15 @@ namespace CriticalMass.Runtime.Menu
                     n <= 10 ? 28 : 26, true, CMTokens.Display);
                 it.Body.Radius = 16f;
                 it.Submitted = acts[i];
+                // controls-1 hygiene: restart and the two quits ask once ("press again") so one stray ENTER, SPACE or A
+                // never throws a match away.
+                if (labels[i] == "RESTART MATCH" || labels[i] == "QUIT TO TITLE" || labels[i] == "QUIT GAME")
+                {
+                    MenuItem me = it;
+                    Action act = acts[i];
+                    string label = labels[i];
+                    it.Submitted = () => ConfirmThen(me, label, act);
+                }
                 if (i == 1) _spectate = it;
                 if (i == 2) _changeClass = it;
                 if (i == 3) _switchTeam = it;

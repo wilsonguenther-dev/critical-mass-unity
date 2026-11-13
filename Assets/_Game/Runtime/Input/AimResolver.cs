@@ -43,6 +43,9 @@ namespace CriticalMass.Runtime.Input
         /// <summary>Sets the mode directly (HumanInputSource at enable, from ControlBindings.ActiveScheme).</summary>
         public void SetMode(Mode m) => Current = m;
 
+        /// <summary>Forget the keyboard facing (a respawn faces the hill; the keys take the actor's new facing from there).</summary>
+        public void ForgetKeysDirection() => _hasDir = false;
+
         /// <summary>The keyboard facing direction (sim XZ unit) is known.</summary>
         public bool HasKeysDirection => _hasDir;
 

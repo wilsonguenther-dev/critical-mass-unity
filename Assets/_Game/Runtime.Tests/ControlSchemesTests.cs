@@ -366,5 +366,30 @@ namespace CriticalMass.Runtime.Tests
             Assert.AreEqual(0, ControllerSettings.DeadZoneIndex);
             Assert.AreEqual(1, ControllerSettings.SensitivityIndex);
         }
+    
+        [Test]
+        public void TheCursorShowsOnlyWhileTheMouseIsInUse()
+        {
+            Assert.IsTrue(CursorAutoHide.CursorWanted(ControlScheme.KeyboardMouse));
+            Assert.IsFalse(CursorAutoHide.CursorWanted(ControlScheme.Keyboard));
+            Assert.IsFalse(CursorAutoHide.CursorWanted(ControlScheme.Gamepad));
+        }
+
+        [Test]
+        public void ActiveSchemeFollowsTheDeviceAndTheMouse()
+        {
+            ControlDevice d = ControlBindings.ActiveDevice;
+            try
+            {
+                ControlBindings.SetActiveDevice(ControlDevice.KeyboardMouse);
+                ControlBindings.SetKeyboardOnly(true);
+                Assert.AreEqual(ControlScheme.Keyboard, ControlBindings.ActiveScheme);
+                ControlBindings.SetKeyboardOnly(false);
+                Assert.AreEqual(ControlScheme.KeyboardMouse, ControlBindings.ActiveScheme);
+                ControlBindings.SetActiveDevice(ControlDevice.Gamepad);
+                Assert.AreEqual(ControlScheme.Gamepad, ControlBindings.ActiveScheme);
+            }
+            finally { ControlBindings.SetActiveDevice(d); }
+        }
     }
 }

@@ -152,6 +152,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             Vector2 d = Vector2.zero;
             Gamepad pad = Gamepad.current;
             if (ControlBindings.ActiveDevice == ControlDevice.Gamepad && pad != null) d = pad.rightStick.ReadValue() * Radius;
+            else if (ControlBindings.KeyboardOnly) d = ControlBindings.KeyboardSteer(Radius);   // controls-1: the move keys steer
             else
             {
                 Mouse mouse = Mouse.current;

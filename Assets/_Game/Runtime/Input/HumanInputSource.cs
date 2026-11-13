@@ -56,6 +56,7 @@ namespace CriticalMass.Runtime.Input
         private InputAction _walk;
         private InputAction _lock;
         private bool _keyAimPressed;
+        private bool _wasAlive;
         private double[] _enemyX = new double[64];
         private double[] _enemyZ = new double[64];
 
@@ -212,6 +213,10 @@ namespace CriticalMass.Runtime.Input
             {
                 if (w != null && w.ActorCount > 0)
                 {
+                    // A respawn faces the hill (Respawn.cs); the keyboard facing starts again from there.
+                    bool alive = w.Actors[0].Alive;
+                    if (alive && !_wasAlive) Aim.ForgetKeysDirection();
+                    _wasAlive = alive;
                     State.MoveDirection(out double dx, out double dz);
                     int n = CollectEnemies(w);
                     Aim.ResolveKeys(dx, dz, w.X[0], w.Z[0], w.Actors[0].Facing, FacingLocked, _enemyX, _enemyZ, n, out double kx, out double kz);

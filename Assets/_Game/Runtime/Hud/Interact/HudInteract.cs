@@ -302,7 +302,8 @@ namespace CriticalMass.Runtime.Hud.Interact
                         x = w.X[Me] + Math.Cos(me.Facing) * 6.0;
                         z = w.Z[Me] + Math.Sin(me.Facing) * 6.0;
                     }
-                    at = padActive ? WorldToRoot(w, x, z, cam) : rootLocal;
+                    // controls-1: keyboard only, the wheel opens on the aim point in front of the fighter, not a resting cursor.
+                    at = padActive || ControlBindings.KeyboardOnly ? WorldToRoot(w, x, z, cam) : rootLocal;
                 }
                 if (ok)
                 {
@@ -314,7 +315,9 @@ namespace CriticalMass.Runtime.Hud.Interact
             if (!Wheel.IsOpen) return false;
             reasons |= GateReason.PingWheel;
             if (padActive) reasons |= GateReason.PadOwnsSticks;
-            Vector2 d = padActive && pad != null ? pad.rightStick.ReadValue() * PingWheel.Radius : rootLocal - _wheelStart;
+            Vector2 d = padActive && pad != null ? pad.rightStick.ReadValue() * PingWheel.Radius
+                : ControlBindings.KeyboardOnly ? ControlBindings.KeyboardSteer(PingWheel.Radius)   // controls-1: the move keys steer
+                : rootLocal - _wheelStart;
             Wheel.Steer(d);
             bool confirm = mouse != null && mouse.leftButton.wasPressedThisFrame && Wheel.Selected >= 0;
             bool cancel = (mouse != null && mouse.rightButton.wasPressedThisFrame) || (pad != null && pad.buttonEast.wasPressedThisFrame);

@@ -495,6 +495,18 @@ namespace CriticalMass.Runtime.Input
         /// <summary>Unscaled seconds since the mouse last moved or clicked (infinity before it ever did).</summary>
         public static float MouseIdleFor => Time.unscaledTime - _lastMouseUse;
 
+        /// <summary>
+        /// controls-1: keyboard-only steering for the ping and emote wheels: the Move keys (W A S D or arrows) as a
+        /// direction scaled to radius; zero unless the keyboard plays alone (mouse and stick steer as before).
+        /// </summary>
+        public static Vector2 KeyboardSteer(float radius)
+        {
+            if (!KeyboardOnly || _active != ControlDevice.KeyboardMouse) return Vector2.zero;
+            InputActionMap map = Map(InputSystem.actions);
+            InputAction move = map != null ? map.FindAction("Move", false) : null;
+            return move != null ? move.ReadValue<Vector2>() * radius : Vector2.zero;
+        }
+
         /// <summary>Sets keyboard-only play (tests, HumanInputSource); prompts redraw on a change.</summary>
         public static void SetKeyboardOnly(bool on)
         {
