@@ -156,7 +156,9 @@ namespace CriticalMass.Sim.Tests
         private static Bands _full;
         private static Bands FullBands => _full ??= Measure(Full);
 
-        [Test, Category("Slow")]
+        // Integration batch 4: the shared FullBands measure (100 seeds + 200 passive matches, physics and mechanics on)
+        // runs inside whichever of these two tests is first and took just over the default 180 s; 10 minutes of headroom.
+        [Test, Category("Slow"), Timeout(600000)]
         public void RulesCombinedEverythingOnTheIdlePlayerFloorsHoldAt5v5And16v16()
         {
             Bands b = FullBands;
@@ -168,7 +170,9 @@ namespace CriticalMass.Sim.Tests
             Assert.Less(b.Passive5, 100, "5v5: the idle player's team wins under half");
         }
 
-        [Test, Category("Slow")]
+        // Integration batch 4: the shared FullBands measure (100 seeds + 200 passive matches, physics and mechanics on)
+        // runs inside whichever of these two tests is first and took just over the default 180 s; 10 minutes of headroom.
+        [Test, Category("Slow"), Timeout(600000)]
         public void RulesCombinedEverythingOnInterceptsBerserkHillAndProxyBandsHold()
         {
             Bands b = FullBands;
