@@ -46,7 +46,7 @@ namespace CriticalMass.Runtime.View.Moments
         public static event Action<MomentId> Ended;
 
         /// <summary>The most one frame advances the director's clock (seconds).</summary>
-        public const float MaxFrameSeconds = 0.1f;
+        public const float MaxFrameSeconds = 0.25f;   // SimClock.MaxDelta: slow editor capture frames still end a takeover
 
         /// <summary>A takeover is on screen or a banner-preempting one is about to start.</summary>
         public static bool IsPlaying => Instance != null && Instance._queue.Playing;
