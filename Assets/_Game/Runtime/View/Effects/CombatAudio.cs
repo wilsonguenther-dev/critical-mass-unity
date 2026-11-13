@@ -218,6 +218,16 @@ namespace CriticalMass.Runtime.View.Effects
                 case FxKind.WallCrack: Play("wall_crack", e.X, e.Z, e.Local, 1f, e.Tick); break;
                 case FxKind.WallBreak: Play("wall_break", e.X, e.Z, e.Local, 1f, e.Tick); break;
                 case FxKind.HillChange: Play("hill_capture", e.X, e.Z, true, 1f, e.Tick); break;
+                case FxKind.Explosion:
+                {
+                    // v2: no new files (the 42 credited sounds stay the set): the slam thump pitched per kind, layered
+                    // with the wall break crunch. WallBreak is the crunch alone.
+                    var kind = (ExplosionKind)Mathf.Clamp(e.B, 0, (int)ExplosionKind.KaijuSlam);
+                    if (kind != ExplosionKind.WallBreak)
+                        Play("kaiju_slam", e.X, e.Z, false, kind == ExplosionKind.Mine ? 0.95f : kind == ExplosionKind.Barrel ? 0.7f : 0.8f, e.Tick);
+                    Play("wall_break", e.X, e.Z, false, kind == ExplosionKind.WallBreak ? 1f : 0.85f, e.Tick);
+                    break;
+                }
             }
         }
 

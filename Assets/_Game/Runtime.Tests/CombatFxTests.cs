@@ -74,6 +74,7 @@ namespace CriticalMass.Runtime.Tests
             public void Frame(World w)
             {
                 Feed.OnTick(w, Scene, Audio);
+                Scene.OnTickState(w);
                 double now = w.Tick / w.Config.SimHz;
                 Audio?.Update(now, w);
                 Scene.Advance(now);
