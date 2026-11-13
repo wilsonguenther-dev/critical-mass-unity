@@ -427,7 +427,8 @@ namespace CriticalMass.Runtime.PlayTests
             Transform model = _w.ActorModel(victim);
             Transform head = SanityRig.Find(model, "head");
             _w.SimPos(victim, out double x0, out double z0);
-            float standing = head.position.y - (float)_w.Ground(x0, z0);
+            // integration batch 3: head height above the model root, so the death launch arc (#43) does not read as standing up
+            float standing = head.position.y - model.position.y;
             string who = $"actor {victim} ({_w.ActorModelKey(victim)})";
             // integration batch 3: an ordinary killing blow; a 1e6 hit is a critical launch with a whole tumble (#43), which this pose check would read as getting up
             w.Actors[victim].Hp = 1;
@@ -444,7 +445,7 @@ namespace CriticalMass.Runtime.PlayTests
                 Transform m = _w.ActorModel(victim);
                 if (m == null || m != model) break; // the body was removed (the pop)
                 shown++;
-                float h = head.position.y - (float)_w.Ground(x0, z0);
+                float h = head.position.y - model.position.y;
                 lowest = Mathf.Min(lowest, h);
                 if (h <= 0.45f * standing) down = true;
                 else if (down && h > 0.6f * standing)
