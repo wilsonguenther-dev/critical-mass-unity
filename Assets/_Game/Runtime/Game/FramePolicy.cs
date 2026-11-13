@@ -262,7 +262,12 @@ namespace CriticalMass.Runtime.Game
         {
             if (cap != _cap)
             {
+                // perf-60hz-32p: a new cap is judged afresh. The timed cap used to stick across caps: on the Air the 20 fps
+                // title (vsync 3, hidden window) tripped it and the whole match then ran on a 60 timer (5.6% of frames at
+                // 33 ms or more against 0.16% on vsync 1).
                 _cap = cap;
+                ForceTimed = false;
+                Why = "";
                 _age = 0;
                 _frames = 0;
                 _stallAge = 0;
