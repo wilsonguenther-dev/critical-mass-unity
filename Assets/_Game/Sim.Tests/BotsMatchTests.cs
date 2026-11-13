@@ -17,7 +17,8 @@ namespace CriticalMass.Sim.Tests
         /// <summary>The one scratch frame every bot-driven tick fills (browser module-level `frame`).</summary>
         private static readonly InputFrame Frame = SimInput.EmptyInput();
 
-        // (a): 5v5 seed 1, 120 s.
+        // (a): 5v5 seed 1, 120 s (hill presence pooled over seeds 1..HillSeeds, U-056).
+        private const int HillSeeds = 8;
         private static World _worldA;
         private static int _samplesTotal;
         private static int _samplesAzure;
@@ -150,6 +151,23 @@ namespace CriticalMass.Sim.Tests
                 if (HillPresence(w, TeamId.Crimson)) _samplesCrimson++;
             });
             _flapWorstA = flA.Worst(10);
+            // DG-16b (U-056): the CM-09 70% hill floor pooled over seeds 1..HillSeeds instead of seed 1 alone. One seed was luck
+            // even before DG-16b (seeds 1..8 read 0.73 0.60 0.69 0.94 0.73 0.60 0.69 0.73 for the weaker team); the floor and
+            // the sampling (every 15 ticks after 20 s, 120 s, all bots) are unchanged, only the sample is wider. Seed 1 also keeps
+            // the flap and delivery checks below.
+            for (int seed = 2; seed <= HillSeeds; seed++)
+            {
+                World wh = MakeWorld(seed, 5);
+                int kh = 0;
+                Run(wh, 120, w =>
+                {
+                    if (++kh % 15 != 0 || w.Match.Time <= 20) return;
+                    _samplesTotal++;
+                    if (HillPresence(w, TeamId.Azure)) _samplesAzure++;
+                    if (HillPresence(w, TeamId.Crimson)) _samplesCrimson++;
+                });
+            }
+            Console.WriteLine("HILL pooled seeds 1.." + HillSeeds + " azure " + ((double)_samplesAzure / _samplesTotal).ToString("F3") + " crimson " + ((double)_samplesCrimson / _samplesTotal).ToString("F3"));
 
             // (b)/(d) 16v16 seed 2, 240 s.
             _owned = 0;
