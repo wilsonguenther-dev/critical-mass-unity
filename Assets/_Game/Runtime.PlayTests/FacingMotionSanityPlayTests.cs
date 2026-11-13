@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using CriticalMass.Runtime.Input;
+using CriticalMass.Runtime.View.Anim;
 using CriticalMass.Runtime.View.Art;
 using CriticalMass.Sim.Config;
 using CriticalMass.Sim.Core;
@@ -20,9 +21,38 @@ namespace CriticalMass.Runtime.PlayTests
     /// the Kaiju's head ahead of its tail) and compare it with the sim's facing on the real Boot game.
     /// <para>KNOWN FAILING on main 2026-11-12: the facing tests (the owner's report). A red means fix the GAME.</para>
     /// </summary>
+    /// <para><b>What "faces" means since the animation pass (fix/animation-reds, 2026-11-13).</b> The toe cue reads where
+    /// the LOWER body points. Until the animation pass every locomotion clip ran toes-forward, so toes = facing. The pass
+    /// plays the KayKit strafes for sideways motion, and those clips turn the whole lower body by +-60 degrees
+    /// (forward kinematics on Knight.glb: planted toe and hip line at +60 in Running_Strafe_Left, -60 in
+    /// Running_Strafe_Right); between 60 and 120 degrees the legs are turned further onto the velocity (orientation
+    /// warping) while the spine turns back so the chest keeps the aim. A correctly drawn fighter strafing past its aim
+    /// therefore shows toes up to 90 degrees off its facing, and the old check counted every such sample as wrong (most
+    /// of the 20 to 27 % in integration batch 3). The check is now: the planted toes point where the animator says the
+    /// legs point (sim facing turned by ActorAnimator.LegYawDeg, 0 for Run, its reverse and the walks) within 30
+    /// degrees, which still catches a model drawn turned around (180 off), and the chosen locomotion travels along the
+    /// drawn velocity relative to the facing (ActorAnimator.TravelLeftDeg), which catches a backwards stride.</para>
     public sealed class FacingSanityPlayTests
     {
         const float ToleranceDeg = 30f;
+
+        /// <summary>Where actor i's planted toes should point: the sim facing turned left by the animator's leg yaw.</summary>
+        static Vector3 ExpectedFront(SanityWorld w, int i, out float legYaw)
+        {
+            ActorAnimator anim = w.Views.AnimatorOf(i);
+            legYaw = anim != null ? anim.LegYawDeg : 0f;
+            return Quaternion.AngleAxis(-legYaw, Vector3.up) * SanityRig.SimDir(w.W.Actors[i].Facing);
+        }
+
+        /// <summary>Degrees between the drawn velocity's angle to the sim facing and the locomotion's travel angle, or -1.</summary>
+        static float TravelError(SanityWorld w, int i)
+        {
+            ActorAnimator anim = w.Views.AnimatorOf(i);
+            if (anim == null || anim.Speed < 0.5f) return -1f;
+            Vector3 f = SanityRig.SimDir(w.W.Actors[i].Facing), v = anim.Velocity;
+            double rel = Locomotion.LeftAngleDeg(f.x, f.z, v.x, v.z);
+            return Mathf.Abs(Mathf.DeltaAngle((float)rel, anim.TravelLeftDeg));
+        }
 
         SanityWorld _w;
         readonly List<string> _bad = new List<string>();
@@ -122,9 +152,13 @@ namespace CriticalMass.Runtime.PlayTests
             }
             if (!SanityRig.TryFront(model, out Vector3 front, out string cue)) return;
             _measured++;
-            float err = SanityRig.AngleDeg(front, simFacing);
+            float err = SanityRig.AngleDeg(front, ExpectedFront(_w, 0, out float legYaw));
             if (err > ToleranceDeg)
-                _bad.Add($"{who} {doing}: the model's front ({cue}) points {err:0} degrees away from the sim's facing, so on screen it is {SanityRig.Verdict(err)}");
+                _bad.Add($"{who} {doing}: the model's front ({cue}) points {err:0} degrees away from the sim's facing turned by the " +
+                         $"clip's leg yaw {legYaw:0}, so on screen it is {SanityRig.Verdict(err)}");
+            float travel = TravelError(_w, 0);
+            if (travel > ToleranceDeg)
+                _bad.Add($"{who} {doing}: the legs stride {travel:0} degrees away from where the model moves");
         }
 
         /// <summary>20 sim seconds of 16v16 bots: every moving bot's model faces its sim facing (per class).</summary>
@@ -151,15 +185,20 @@ namespace CriticalMass.Runtime.PlayTests
                     if (!a.Alive || a.AirLen > 0 || _w.Speed(i) < 1.0) continue;
                     Transform model = _w.ActorModel(i);
                     if (model == null || !SanityRig.TryFront(model, out Vector3 front, out string cue)) continue;
-                    string key = _w.ActorModelKey(i);
-                    float err = SanityRig.AngleDeg(front, SanityRig.SimDir(a.Facing));
+                    // Carriers are their own bucket (arms in, the legs the same rules), counted when there are 20 samples.
+                    string key = _w.ActorModelKey(i) + (a.Carry != CarryKind.None ? " carrying" : "");
+                    float err = SanityRig.AngleDeg(front, ExpectedFront(_w, i, out float legYaw));
+                    float travel = TravelError(_w, i);
                     samples[key] = samples.TryGetValue(key, out int n) ? n + 1 : 1;
-                    if (err <= ToleranceDeg) continue;
+                    if (err <= ToleranceDeg && travel <= ToleranceDeg) continue;
                     off[key] = off.TryGetValue(key, out int o) ? o + 1 : 1;
-                    if (!worstDeg.TryGetValue(key, out float wd) || err > wd)
+                    float score = Mathf.Max(err, travel);
+                    if (!worstDeg.TryGetValue(key, out float wd) || score > wd)
                     {
-                        worstDeg[key] = err;
-                        worst[key] = $"actor {i} at {w.Match.Time:0.0} s, front ({cue}) {err:0} degrees from the sim facing: {SanityRig.Verdict(err)}";
+                        worstDeg[key] = score;
+                        worst[key] = err > ToleranceDeg
+                            ? $"actor {i} at {w.Match.Time:0.0} s, front ({cue}) {err:0} degrees from the sim facing turned by the leg yaw {legYaw:0}: {SanityRig.Verdict(err)}"
+                            : $"actor {i} at {w.Match.Time:0.0} s, the legs stride {travel:0} degrees away from where it moves";
                     }
                 }
             }
@@ -167,10 +206,38 @@ namespace CriticalMass.Runtime.PlayTests
             foreach (KeyValuePair<string, int> kv in samples)
             {
                 int o = off.TryGetValue(kv.Key, out int v) ? v : 0;
+                if (kv.Key.EndsWith(" carrying", StringComparison.Ordinal) && kv.Value < 20) continue;
                 if (o > kv.Value * 0.05) _bad.Add($"{kv.Key}: {o} of {kv.Value} moving samples face the wrong way; worst: {worst[kv.Key]}");
             }
             Debug.Log("[GameplaySanity] bot facing samples: " + string.Join(", ", samples.Select(kv => kv.Key + " " + kv.Value)));
             CollectionAssert.IsEmpty(_bad, string.Join("\n", _bad));
+        }
+
+        /// <summary>
+        /// fix/animation-reds: during a hit-stop hold the loops stop, but the drawn facing keeps following the sim. Actor 0
+        /// stands aiming screen right, a heavy hold is put on it (view state only: CombatFeed.HoldTick), the aim flips to
+        /// screen left and one view update covers 15 ticks: the drawn yaw must be on the new aim (it used to stay on the
+        /// old one, read as turned around).
+        /// </summary>
+        [UnityTest]
+        public IEnumerator TheDrawnFacingFollowsTheAimThroughAHitStop()
+        {
+            _w = new SanityWorld();
+            yield return _w.Load(ClassId.Warrior);
+            ActorAnimator anim = _w.Views.AnimatorOf(0);
+            var fx = _w.Driver.GetComponent<CriticalMass.Runtime.View.Effects.CombatFx>();
+            if (_w.ActorModel(0) == null || anim == null || fx == null || fx.Feed == null) Assert.Ignore("no Warrior model or no combat effects");
+            HumanInputState inp = _w.HumanInput;
+            SanityWorld.FromScreenIntent(1, 0, out double dx, out double dz);
+            inp.SetAim(_w.W.X[0] + 4 * dx, _w.W.Z[0] + 4 * dz);
+            _w.Tick(6);
+            inp.SetAim(_w.W.X[0] - 4 * dx, _w.W.Z[0] - 4 * dz);
+            _w.Driver.StepTicks(15);
+            fx.Feed.HoldTick[0] = _w.W.Tick;
+            fx.Feed.HoldTier[0] = 2;
+            _w.Views.Sync(0f);
+            float err = Mathf.Abs(Mathf.DeltaAngle(anim.Yaw, SimSpace.YawDeg(_w.W.Actors[0].Facing)));
+            Assert.LessOrEqual(err, 5f, "the drawn facing froze during the hit-stop hold");
         }
 
         /// <summary>
