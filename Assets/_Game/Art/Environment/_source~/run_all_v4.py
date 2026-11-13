@@ -39,6 +39,12 @@ exec(compile(src[:-len("main()")], RV3, "exec"), ns)
 
 from env_art import kit2, kit4, layout2, layout4, palette  # noqa: E402
 
+ERRS = kit4.preflight()
+if ERRS:
+    for e in ERRS:
+        print("PREFLIGHT", e)
+    raise SystemExit("PREFLIGHT_FAILED %d" % len(ERRS))
+log("preflight ok")
 lay = layout2.place_map()
 corner = layout4.pick_corner(lay)
 g = lay["g"]
@@ -215,8 +221,8 @@ def lineup(names, ground, tag, cols, sp, y0=0.0):
         off = R * (c - (cols - 1) / 2) * sp + Fw * (r - (rows - 1) / 2) * sp * 0.95
         x, z = cx + off.x, cz + off.y
         p = dict(piece=nm, x=x, y=y0, z=z, yaw=0.0)
-        if nm.startswith("env_cliff") or nm.startswith("env_lip") or nm == "env_fence":
-            p.update(x=x - 1.0, z=z, yaw=0.0)
+        if nm.startswith("env_cliff") or nm.startswith("env_lip") or nm == "env_fence" or nm == "env_waterfall":
+            p.update(x=x - 0.7, z=z + 0.7, yaw=-45.0)     # outward face (local -Z) toward the camera
         if nm.startswith("env_bridge_span") or nm == "env_bridge_anchor":
             p.update(z=z - 1.0, yaw=0.0)
         sobjs.append(ns["instance"](p, sheet))

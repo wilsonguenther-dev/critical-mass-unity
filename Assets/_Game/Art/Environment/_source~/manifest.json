@@ -16,6 +16,7 @@
    ],
    "verts": 4,
    "cull": "down",
+   "v4": "",
    "bounds_unity_min": [
     -0.5,
     0.0,
@@ -41,6 +42,7 @@
    ],
    "verts": 3,
    "cull": "down",
+   "v4": "",
    "bounds_unity_min": [
     -0.5,
     0.0,
@@ -66,6 +68,7 @@
    ],
    "verts": 28,
    "cull": "down",
+   "v4": "",
    "bounds_unity_min": [
     -0.5,
     -0.75,
@@ -91,6 +94,7 @@
    ],
    "verts": 94,
    "cull": "down",
+   "v4": "",
    "bounds_unity_min": [
     -0.0526,
     -0.8758,
@@ -116,6 +120,7 @@
    ],
    "verts": 94,
    "cull": "down",
+   "v4": "",
    "bounds_unity_min": [
     -0.0497,
     -0.8303,
@@ -141,6 +146,7 @@
    ],
    "verts": 94,
    "cull": "down",
+   "v4": "",
    "bounds_unity_min": [
     -0.0577,
     -0.8793,
@@ -166,6 +172,7 @@
    ],
    "verts": 128,
    "cull": "down",
+   "v4": "",
    "bounds_unity_min": [
     -0.0553,
     -0.8746,
@@ -191,6 +198,7 @@
    ],
    "verts": 128,
    "cull": "down",
+   "v4": "",
    "bounds_unity_min": [
     -0.0582,
     -0.8636,
@@ -216,6 +224,7 @@
    ],
    "verts": 27,
    "cull": "down",
+   "v4": "",
    "bounds_unity_min": [
     0.0,
     -0.066,
@@ -241,6 +250,7 @@
    ],
    "verts": 10,
    "cull": "down",
+   "v4": "",
    "bounds_unity_min": [
     0.0,
     -0.8485,
@@ -267,6 +277,7 @@
    ],
    "verts": 4,
    "cull": "down",
+   "v4": "",
    "bounds_unity_min": [
     0.0,
     -0.746,
@@ -292,6 +303,7 @@
    ],
    "verts": 14,
    "cull": "down",
+   "v4": "",
    "bounds_unity_min": [
     0.0,
     -0.8588,
@@ -318,6 +330,7 @@
    ],
    "verts": 4,
    "cull": "down",
+   "v4": "",
    "bounds_unity_min": [
     0.0,
     -0.746,
@@ -336,13 +349,14 @@
    "fbx": "Environment/env_lip_rim_straight_a.fbx",
    "cat": "edge",
    "pivot": "lip start point at ground height; local +X runs along the rim, outward -Z; yaw = atan2(dz, dx) in sim",
-   "tris": 100,
+   "tris": 119,
    "outline_px": 0.0,
    "materials": [
     "CM_Toon"
    ],
-   "verts": 96,
+   "verts": 123,
    "cull": "down",
+   "v4": "upgraded",
    "bounds_unity_min": [
     -0.0563,
     -0.8793,
@@ -350,8 +364,8 @@
    ],
    "bounds_unity_max": [
     1.0432,
-    0.006,
-    0.1036
+    0.0085,
+    0.1568
    ],
    "covers": "island rim: fringe + ink + rim rock band (30-degree chamfer) + face band",
    "team_mask": false
@@ -361,13 +375,14 @@
    "fbx": "Environment/env_lip_rim_straight_b.fbx",
    "cat": "edge",
    "pivot": "lip start point at ground height; local +X runs along the rim, outward -Z; yaw = atan2(dz, dx) in sim",
-   "tris": 100,
+   "tris": 119,
    "outline_px": 0.0,
    "materials": [
     "CM_Toon"
    ],
-   "verts": 96,
+   "verts": 123,
    "cull": "down",
+   "v4": "upgraded",
    "bounds_unity_min": [
     -0.0576,
     -0.8701,
@@ -375,8 +390,8 @@
    ],
    "bounds_unity_max": [
     1.0464,
-    0.006,
-    0.1027
+    0.0085,
+    0.1449
    ],
    "covers": "island rim variant",
    "team_mask": false
@@ -386,13 +401,14 @@
    "fbx": "Environment/env_lip_rim_straight_c.fbx",
    "cat": "edge",
    "pivot": "lip start point at ground height; local +X runs along the rim, outward -Z; yaw = atan2(dz, dx) in sim",
-   "tris": 100,
+   "tris": 119,
    "outline_px": 0.0,
    "materials": [
     "CM_Toon"
    ],
-   "verts": 96,
+   "verts": 123,
    "cull": "down",
+   "v4": "upgraded",
    "bounds_unity_min": [
     -0.0461,
     -0.8117,
@@ -400,8 +416,8 @@
    ],
    "bounds_unity_max": [
     1.054,
-    0.006,
-    0.0948
+    0.0085,
+    0.1452
    ],
    "covers": "island rim variant",
    "team_mask": false
@@ -411,13 +427,14 @@
    "fbx": "Environment/env_lip_rim_diag_a.fbx",
    "cat": "edge",
    "pivot": "lip start point at ground height; local +X runs along the rim, outward -Z; yaw = atan2(dz, dx) in sim (1.414 u, along a fill hypotenuse)",
-   "tris": 139,
+   "tris": 166,
    "outline_px": 0.0,
    "materials": [
     "CM_Toon"
    ],
-   "verts": 130,
+   "verts": 169,
    "cull": "down",
+   "v4": "upgraded",
    "bounds_unity_min": [
     -0.0532,
     -0.8602,
@@ -425,8 +442,8 @@
    ],
    "bounds_unity_max": [
     1.4532,
-    0.006,
-    0.1136
+    0.0085,
+    0.1588
    ],
    "covers": "diagonal island rim",
    "team_mask": false
@@ -436,13 +453,14 @@
    "fbx": "Environment/env_lip_rim_diag_b.fbx",
    "cat": "edge",
    "pivot": "lip start point at ground height; local +X runs along the rim, outward -Z; yaw = atan2(dz, dx) in sim (1.414 u)",
-   "tris": 139,
+   "tris": 166,
    "outline_px": 0.0,
    "materials": [
     "CM_Toon"
    ],
-   "verts": 130,
+   "verts": 169,
    "cull": "down",
+   "v4": "upgraded",
    "bounds_unity_min": [
     -0.0546,
     -0.8689,
@@ -450,8 +468,8 @@
    ],
    "bounds_unity_max": [
     1.4641,
-    0.006,
-    0.1065
+    0.0085,
+    0.1506
    ],
    "covers": "diagonal island rim variant",
    "team_mask": false
@@ -468,6 +486,7 @@
    ],
    "verts": 42,
    "cull": "down",
+   "v4": "",
    "bounds_unity_min": [
     0.0,
     -0.84,
@@ -493,6 +512,7 @@
    ],
    "verts": 9,
    "cull": "down",
+   "v4": "",
    "bounds_unity_min": [
     0.0,
     -0.84,
@@ -511,17 +531,18 @@
    "fbx": "Environment/env_cliff_s1.fbx",
    "cat": "cliff",
    "pivot": "lip start point at ground height; local +X runs along the rim, outward -Z; yaw = atan2(dz, dx) in sim; 1 cell(s) long",
-   "tris": 58,
+   "tris": 62,
    "outline_px": 2.0,
    "materials": [
     "CM_Toon"
    ],
-   "verts": 37,
+   "verts": 45,
    "cull": "down",
+   "v4": "upgraded",
    "bounds_unity_min": [
     0.0,
-    -5.0831,
-    -0.6201
+    -5.2931,
+    -0.6
    ],
    "bounds_unity_max": [
     1.0,
@@ -536,22 +557,23 @@
    "fbx": "Environment/env_cliff_s2.fbx",
    "cat": "cliff",
    "pivot": "lip start point at ground height; local +X runs along the rim, outward -Z; yaw = atan2(dz, dx) in sim; 2 cell(s) long",
-   "tris": 31,
+   "tris": 76,
    "outline_px": 2.0,
    "materials": [
     "CM_Toon"
    ],
-   "verts": 21,
+   "verts": 53,
    "cull": "down",
+   "v4": "upgraded",
    "bounds_unity_min": [
     0.0,
-    -4.0919,
-    -0.5745
+    -6.2657,
+    -0.5606
    ],
    "bounds_unity_max": [
     2.0,
-    -0.75,
-    0.6
+    -0.73,
+    0.7434
    ],
    "covers": "p12/p15 continuous island cliff skirt",
    "team_mask": false
@@ -561,22 +583,23 @@
    "fbx": "Environment/env_cliff_s3.fbx",
    "cat": "cliff",
    "pivot": "lip start point at ground height; local +X runs along the rim, outward -Z; yaw = atan2(dz, dx) in sim; 3 cell(s) long",
-   "tris": 154,
+   "tris": 175,
    "outline_px": 2.0,
    "materials": [
     "CM_Toon"
    ],
-   "verts": 92,
+   "verts": 154,
    "cull": "down",
+   "v4": "upgraded",
    "bounds_unity_min": [
     0.0,
-    -6.7065,
-    -0.6292
+    -5.7378,
+    -0.6628
    ],
    "bounds_unity_max": [
     3.0,
-    -0.75,
-    0.6979
+    -0.73,
+    0.6
    ],
    "covers": "p12/p15 continuous island cliff skirt",
    "team_mask": false
@@ -586,22 +609,23 @@
    "fbx": "Environment/env_cliff_s4.fbx",
    "cat": "cliff",
    "pivot": "lip start point at ground height; local +X runs along the rim, outward -Z; yaw = atan2(dz, dx) in sim; 4 cell(s) long",
-   "tris": 148,
+   "tris": 252,
    "outline_px": 2.0,
    "materials": [
     "CM_Toon"
    ],
-   "verts": 87,
+   "verts": 238,
    "cull": "down",
+   "v4": "upgraded",
    "bounds_unity_min": [
     0.0,
-    -5.7891,
-    -0.5938
+    -5.8149,
+    -0.8313
    ],
    "bounds_unity_max": [
     4.0,
-    -0.75,
-    0.6
+    -0.73,
+    0.7325
    ],
    "covers": "p12/p15 continuous island cliff skirt",
    "team_mask": false
@@ -611,22 +635,23 @@
    "fbx": "Environment/env_cliff_s5.fbx",
    "cat": "cliff",
    "pivot": "lip start point at ground height; local +X runs along the rim, outward -Z; yaw = atan2(dz, dx) in sim; 5 cell(s) long",
-   "tris": 296,
+   "tris": 292,
    "outline_px": 2.0,
    "materials": [
     "CM_Toon"
    ],
-   "verts": 171,
+   "verts": 238,
    "cull": "down",
+   "v4": "upgraded",
    "bounds_unity_min": [
     0.0,
-    -6.759,
-    -0.5851
+    -6.3211,
+    -0.6796
    ],
    "bounds_unity_max": [
     5.0,
-    -0.75,
-    0.7639
+    -0.73,
+    0.7424
    ],
    "covers": "p12/p15 continuous island cliff skirt",
    "team_mask": false
@@ -636,22 +661,23 @@
    "fbx": "Environment/env_cliff_s6.fbx",
    "cat": "cliff",
    "pivot": "lip start point at ground height; local +X runs along the rim, outward -Z; yaw = atan2(dz, dx) in sim; 6 cell(s) long",
-   "tris": 277,
+   "tris": 426,
    "outline_px": 2.0,
    "materials": [
     "CM_Toon"
    ],
-   "verts": 159,
+   "verts": 356,
    "cull": "down",
+   "v4": "upgraded",
    "bounds_unity_min": [
     0.0,
-    -5.9283,
-    -0.6371
+    -6.4012,
+    -0.792
    ],
    "bounds_unity_max": [
     6.0,
-    -0.75,
-    0.6051
+    -0.73,
+    0.7585
    ],
    "covers": "p12/p15 continuous island cliff skirt",
    "team_mask": false
@@ -661,21 +687,22 @@
    "fbx": "Environment/env_cliff_d1.fbx",
    "cat": "cliff",
    "pivot": "lip start point at ground height; local +X runs along the rim, outward -Z; yaw = atan2(dz, dx) in sim; 1 diagonal step(s), 1.414 u",
-   "tris": 58,
+   "tris": 86,
    "outline_px": 2.0,
    "materials": [
     "CM_Toon"
    ],
-   "verts": 37,
+   "verts": 79,
    "cull": "down",
+   "v4": "upgraded",
    "bounds_unity_min": [
     0.0,
-    -5.6339,
-    -0.6192
+    -5.7633,
+    -0.619
    ],
    "bounds_unity_max": [
     1.4142,
-    -0.75,
+    -0.73,
     0.6
    ],
    "covers": "p12 cliff skirt on a 45-degree rim",
@@ -686,22 +713,23 @@
    "fbx": "Environment/env_cliff_d2.fbx",
    "cat": "cliff",
    "pivot": "lip start point at ground height; local +X runs along the rim, outward -Z; yaw = atan2(dz, dx) in sim; 2 diagonal step(s), 2.828 u",
-   "tris": 155,
+   "tris": 110,
    "outline_px": 2.0,
    "materials": [
     "CM_Toon"
    ],
-   "verts": 92,
+   "verts": 105,
    "cull": "down",
+   "v4": "upgraded",
    "bounds_unity_min": [
     0.0,
-    -6.7151,
-    -0.6222
+    -3.8489,
+    -0.6522
    ],
    "bounds_unity_max": [
     2.8284,
-    -0.75,
-    0.7371
+    -0.73,
+    0.6
    ],
    "covers": "p12 cliff skirt on a 45-degree rim",
    "team_mask": false
@@ -711,22 +739,23 @@
    "fbx": "Environment/env_cliff_d3.fbx",
    "cat": "cliff",
    "pivot": "lip start point at ground height; local +X runs along the rim, outward -Z; yaw = atan2(dz, dx) in sim; 3 diagonal step(s), 4.243 u",
-   "tris": 198,
+   "tris": 342,
    "outline_px": 2.0,
    "materials": [
     "CM_Toon"
    ],
-   "verts": 117,
+   "verts": 292,
    "cull": "down",
+   "v4": "upgraded",
    "bounds_unity_min": [
     0.0,
-    -6.561,
-    -0.5848
+    -6.0934,
+    -0.9064
    ],
    "bounds_unity_max": [
     4.2426,
-    -0.75,
-    0.845
+    -0.73,
+    0.6
    ],
    "covers": "p12 cliff skirt on a 45-degree rim",
    "team_mask": false
@@ -736,22 +765,23 @@
    "fbx": "Environment/env_cliff_d4.fbx",
    "cat": "cliff",
    "pivot": "lip start point at ground height; local +X runs along the rim, outward -Z; yaw = atan2(dz, dx) in sim; 4 diagonal step(s), 5.657 u",
-   "tris": 231,
+   "tris": 427,
    "outline_px": 2.0,
    "materials": [
     "CM_Toon"
    ],
-   "verts": 137,
+   "verts": 368,
    "cull": "down",
+   "v4": "upgraded",
    "bounds_unity_min": [
     0.0,
-    -6.0784,
-    -0.6063
+    -6.2074,
+    -0.6707
    ],
    "bounds_unity_max": [
     5.6569,
-    -0.75,
-    0.6
+    -0.73,
+    0.7568
    ],
    "covers": "p12 cliff skirt on a 45-degree rim",
    "team_mask": false
@@ -768,6 +798,7 @@
    ],
    "verts": 73,
    "cull": "down",
+   "v4": "",
    "bounds_unity_min": [
     -0.1585,
     -5.3677,
@@ -793,6 +824,7 @@
    ],
    "verts": 50,
    "cull": "down",
+   "v4": "",
    "bounds_unity_min": [
     -0.2042,
     -4.2013,
@@ -811,20 +843,21 @@
    "fbx": "Environment/env_waterfall.fbx",
    "cat": "water",
    "pivot": "rim edge midpoint (1 u axis edge); yaw = atan2(dz, dx) of the edge",
-   "tris": 800,
+   "tris": 756,
    "outline_px": 0.0,
    "materials": [
     "CM_Toon"
    ],
-   "verts": 643,
+   "verts": 681,
    "cull": "down",
+   "v4": "upgraded",
    "bounds_unity_min": [
-    -0.5333,
+    -0.8652,
     -7.07,
-    -1.8583
+    -2.1444
    ],
    "bounds_unity_max": [
-    0.6653,
+    0.9685,
     0.02,
     0.74
    ],
@@ -836,13 +869,14 @@
    "fbx": "Environment/env_bridge_span.fbx",
    "cat": "bridge",
    "pivot": "deck centre of the near end; local +Z along the bridge, stretch to fit",
-   "tris": 358,
+   "tris": 574,
    "outline_px": 2.0,
    "materials": [
     "CM_Toon"
    ],
-   "verts": 372,
+   "verts": 590,
    "cull": "down",
+   "v4": "upgraded",
    "bounds_unity_min": [
     -1.66,
     -0.3,
@@ -861,13 +895,14 @@
    "fbx": "Environment/env_bridge_post.fbx",
    "cat": "bridge",
    "pivot": "post foot at deck height",
-   "tris": 18,
+   "tris": 66,
    "outline_px": 2.0,
    "materials": [
     "CM_Toon"
    ],
-   "verts": 12,
+   "verts": 48,
    "cull": "down",
+   "v4": "upgraded",
    "bounds_unity_min": [
     -0.08,
     -0.3,
@@ -886,13 +921,14 @@
    "fbx": "Environment/env_bridge_pier.fbx",
    "cat": "bridge",
    "pivot": "lip point beside a bridge mouth",
-   "tris": 36,
+   "tris": 75,
    "outline_px": 2.0,
    "materials": [
     "CM_Toon"
    ],
-   "verts": 24,
+   "verts": 57,
    "cull": "down",
+   "v4": "upgraded",
    "bounds_unity_min": [
     -0.32,
     -0.9,
@@ -911,13 +947,14 @@
    "fbx": "Environment/env_bridge_cell.fbx",
    "cat": "bridge",
    "pivot": "cell top centre (cx+0.5, h, -(cz+0.5))",
-   "tris": 76,
+   "tris": 100,
    "outline_px": 0.0,
    "materials": [
     "CM_Toon"
    ],
-   "verts": 56,
+   "verts": 104,
    "cull": "down",
+   "v4": "upgraded",
    "bounds_unity_min": [
     -0.5,
     -0.2,
@@ -925,7 +962,7 @@
    ],
    "bounds_unity_max": [
     0.5,
-    -0.0051,
+    -0.0119,
     0.5
    ],
    "covers": "BRIDGE cell outside a span (stair-step of diagonal bridges)",
@@ -943,6 +980,7 @@
    ],
    "verts": 240,
    "cull": "down",
+   "v4": "",
    "bounds_unity_min": [
     -1.86,
     -0.0909,
@@ -968,6 +1006,7 @@
    ],
    "verts": 240,
    "cull": "down",
+   "v4": "",
    "bounds_unity_min": [
     -1.2284,
     -0.0721,
@@ -993,6 +1032,7 @@
    ],
    "verts": 132,
    "cull": "down",
+   "v4": "",
    "bounds_unity_min": [
     -1.284,
     -0.0784,
@@ -1018,6 +1058,7 @@
    ],
    "verts": 168,
    "cull": "down",
+   "v4": "",
    "bounds_unity_min": [
     -0.8575,
     -0.0683,
@@ -1043,6 +1084,7 @@
    ],
    "verts": 54,
    "cull": "down",
+   "v4": "",
    "bounds_unity_min": [
     -0.2827,
     -0.04,
@@ -1068,6 +1110,7 @@
    ],
    "verts": 47,
    "cull": "down",
+   "v4": "",
    "bounds_unity_min": [
     -0.5187,
     -0.04,
@@ -1093,6 +1136,7 @@
    ],
    "verts": 51,
    "cull": "down",
+   "v4": "",
    "bounds_unity_min": [
     -0.7065,
     -0.04,
@@ -1118,6 +1162,7 @@
    ],
    "verts": 480,
    "cull": "down",
+   "v4": "",
    "bounds_unity_min": [
     -1.7141,
     -0.3651,
@@ -1144,6 +1189,7 @@
    ],
    "verts": 140,
    "cull": "down",
+   "v4": "",
    "bounds_unity_min": [
     -1.54,
     -0.1877,
@@ -1170,6 +1216,7 @@
    ],
    "verts": 106,
    "cull": "down",
+   "v4": "",
    "bounds_unity_min": [
     -1.2075,
     -0.1409,
@@ -1196,6 +1243,7 @@
    ],
    "verts": 123,
    "cull": "down",
+   "v4": "",
    "bounds_unity_min": [
     -1.295,
     -0.1167,
@@ -1222,6 +1270,7 @@
    ],
    "verts": 123,
    "cull": "down",
+   "v4": "",
    "bounds_unity_min": [
     -1.33,
     -0.1587,
@@ -1247,6 +1296,7 @@
    ],
    "verts": 180,
    "cull": "down",
+   "v4": "",
    "bounds_unity_min": [
     -0.2675,
     -0.04,
@@ -1272,6 +1322,7 @@
    ],
    "verts": 102,
    "cull": "down",
+   "v4": "",
    "bounds_unity_min": [
     -0.2519,
     0.0,
@@ -1297,6 +1348,7 @@
    ],
    "verts": 107,
    "cull": "down",
+   "v4": "",
    "bounds_unity_min": [
     -0.1262,
     0.0,
@@ -1322,6 +1374,7 @@
    ],
    "verts": 54,
    "cull": "down",
+   "v4": "",
    "bounds_unity_min": [
     -0.2894,
     -0.05,
@@ -1347,6 +1400,7 @@
    ],
    "verts": 79,
    "cull": "down",
+   "v4": "",
    "bounds_unity_min": [
     -0.463,
     0.0,
@@ -1372,6 +1426,7 @@
    ],
    "verts": 55,
    "cull": "down",
+   "v4": "",
    "bounds_unity_min": [
     -0.6254,
     -2.98,
@@ -1397,6 +1452,7 @@
    ],
    "verts": 91,
    "cull": "down",
+   "v4": "",
    "bounds_unity_min": [
     -1.0786,
     -4.68,
@@ -1422,6 +1478,7 @@
    ],
    "verts": 127,
    "cull": "down",
+   "v4": "",
    "bounds_unity_min": [
     -1.8597,
     -7.4,
@@ -1447,6 +1504,7 @@
    ],
    "verts": 162,
    "cull": "down",
+   "v4": "",
    "bounds_unity_min": [
     -2.9348,
     -0.1,
@@ -1472,6 +1530,7 @@
    ],
    "verts": 4,
    "cull": "down",
+   "v4": "",
    "bounds_unity_min": [
     -32.0,
     0.0,
@@ -1497,6 +1556,7 @@
    ],
    "verts": 84,
    "cull": "down",
+   "v4": "",
    "bounds_unity_min": [
     -0.62,
     -0.05,
@@ -1522,6 +1582,7 @@
    ],
    "verts": 228,
    "cull": "down",
+   "v4": "",
    "bounds_unity_min": [
     -1.46,
     -1.0455,
@@ -1547,6 +1608,7 @@
    ],
    "verts": 168,
    "cull": "down",
+   "v4": "",
    "bounds_unity_min": [
     -1.3651,
     -0.0996,
@@ -1572,6 +1634,7 @@
    ],
    "verts": 24,
    "cull": "down",
+   "v4": "",
    "bounds_unity_min": [
     -0.4406,
     -0.1049,
@@ -1597,6 +1660,7 @@
    ],
    "verts": 36,
    "cull": "down",
+   "v4": "",
    "bounds_unity_min": [
     -0.42,
     -0.05,
@@ -1622,6 +1686,7 @@
    ],
    "verts": 60,
    "cull": "down",
+   "v4": "",
    "bounds_unity_min": [
     -1.4,
     -0.05,
@@ -1633,6 +1698,998 @@
     0.4
    ],
    "covers": "broken arch",
+   "team_mask": false
+  },
+  {
+   "piece": "env_ground_patch_light",
+   "fbx": "Environment/env_ground_patch_light.fbx",
+   "cat": "ground_decal",
+   "pivot": "cell top centre (cx+0.5, h, -(cz+0.5)); any yaw (hash)",
+   "tris": 43,
+   "outline_px": 0.0,
+   "materials": [
+    "CM_Toon"
+   ],
+   "verts": 53,
+   "cull": "down",
+   "v4": "new",
+   "bounds_unity_min": [
+    -1.3758,
+    0.006,
+    -1.4236
+   ],
+   "bounds_unity_max": [
+    1.556,
+    0.0105,
+    1.2006
+   ],
+   "covers": "v4 painted light grass patch, 2.6 x 2.1 u, flat",
+   "team_mask": false
+  },
+  {
+   "piece": "env_ground_patch_dark",
+   "fbx": "Environment/env_ground_patch_dark.fbx",
+   "cat": "ground_decal",
+   "pivot": "cell top centre (cx+0.5, h, -(cz+0.5)); any yaw (hash)",
+   "tris": 43,
+   "outline_px": 0.0,
+   "materials": [
+    "CM_Toon"
+   ],
+   "verts": 51,
+   "cull": "down",
+   "v4": "new",
+   "bounds_unity_min": [
+    -2.0045,
+    0.006,
+    -1.268
+   ],
+   "bounds_unity_max": [
+    2.0578,
+    0.0105,
+    1.3644
+   ],
+   "covers": "v4 painted dark grass patch, 3.2 x 2.0 u, flat",
+   "team_mask": false
+  },
+  {
+   "piece": "env_moss_patch",
+   "fbx": "Environment/env_moss_patch.fbx",
+   "cat": "ground_decal",
+   "pivot": "cell top centre (cx+0.5, h, -(cz+0.5)); any yaw",
+   "tris": 94,
+   "outline_px": 0.0,
+   "materials": [
+    "CM_Toon"
+   ],
+   "verts": 72,
+   "cull": "down",
+   "v4": "new",
+   "bounds_unity_min": [
+    -0.7947,
+    -0.02,
+    -0.662
+   ],
+   "bounds_unity_max": [
+    0.6584,
+    0.0839,
+    0.6239
+   ],
+   "covers": "v4 moss patch with 3 pebbles (under 0.1 u)",
+   "team_mask": false
+  },
+  {
+   "piece": "env_dirt_patch",
+   "fbx": "Environment/env_dirt_patch.fbx",
+   "cat": "ground_decal",
+   "pivot": "cell top centre (cx+0.5, h, -(cz+0.5)); any yaw",
+   "tris": 105,
+   "outline_px": 0.0,
+   "materials": [
+    "CM_Toon"
+   ],
+   "verts": 93,
+   "cull": "down",
+   "v4": "new",
+   "bounds_unity_min": [
+    -1.042,
+    -0.02,
+    -0.8481
+   ],
+   "bounds_unity_max": [
+    1.0357,
+    0.198,
+    0.9827
+   ],
+   "covers": "v4 worn dirt patch with pebbles and grass edge",
+   "team_mask": false
+  },
+  {
+   "piece": "env_path_ruts",
+   "fbx": "Environment/env_path_ruts.fbx",
+   "cat": "ground_decal",
+   "pivot": "cell top centre (cx+0.5, h, -(cz+0.5)); local +Z along the route tangent",
+   "tris": 290,
+   "outline_px": 0.0,
+   "materials": [
+    "CM_Toon"
+   ],
+   "verts": 216,
+   "cull": "down",
+   "v4": "new",
+   "bounds_unity_min": [
+    -0.8597,
+    -0.02,
+    -1.1299
+   ],
+   "bounds_unity_max": [
+    0.8742,
+    0.0979,
+    1.0499
+   ],
+   "covers": "v4 worn route shoulder: dirt, two ruts, edge stones (under 0.1 u)",
+   "team_mask": false
+  },
+  {
+   "piece": "env_edge_stones",
+   "fbx": "Environment/env_edge_stones.fbx",
+   "cat": "small",
+   "pivot": "first stone end; local +X along the path edge",
+   "tris": 95,
+   "outline_px": 2.0,
+   "materials": [
+    "CM_Toon"
+   ],
+   "verts": 69,
+   "cull": "down",
+   "v4": "new",
+   "bounds_unity_min": [
+    0.0809,
+    -0.02,
+    -0.0999
+   ],
+   "bounds_unity_max": [
+    0.9495,
+    0.16,
+    0.1601
+   ],
+   "covers": "v4 kerb stones (under 0.12 u)",
+   "team_mask": false
+  },
+  {
+   "piece": "env_puddle",
+   "fbx": "Environment/env_puddle.fbx",
+   "cat": "ground_decal",
+   "pivot": "cell top centre (cx+0.5, h, -(cz+0.5)); any yaw",
+   "tris": 64,
+   "outline_px": 0.0,
+   "materials": [
+    "CM_Toon"
+   ],
+   "verts": 70,
+   "cull": "down",
+   "v4": "new",
+   "bounds_unity_min": [
+    -0.8058,
+    0.005,
+    -0.5267
+   ],
+   "bounds_unity_max": [
+    0.8343,
+    0.0125,
+    0.4535
+   ],
+   "covers": "v4 puddle (self-lit water, flat)",
+   "team_mask": false
+  },
+  {
+   "piece": "env_grass_clump",
+   "fbx": "Environment/env_grass_clump.fbx",
+   "cat": "small",
+   "pivot": "cell top centre (cx+0.5, h, -(cz+0.5)); any yaw",
+   "tris": 14,
+   "outline_px": 0.0,
+   "materials": [
+    "CM_Toon"
+   ],
+   "verts": 42,
+   "cull": "down",
+   "v4": "new",
+   "bounds_unity_min": [
+    -0.183,
+    0.0,
+    -0.2318
+   ],
+   "bounds_unity_max": [
+    0.1847,
+    0.2853,
+    0.173
+   ],
+   "covers": "v4 grass clump, blades shaded base to tip (0.29 u)",
+   "team_mask": false
+  },
+  {
+   "piece": "env_flower_clump_a",
+   "fbx": "Environment/env_flower_clump_a.fbx",
+   "cat": "small",
+   "pivot": "cell top centre (cx+0.5, h, -(cz+0.5)); any yaw",
+   "tris": 28,
+   "outline_px": 0.0,
+   "materials": [
+    "CM_Toon"
+   ],
+   "verts": 49,
+   "cull": "down",
+   "v4": "new",
+   "bounds_unity_min": [
+    -0.2589,
+    0.0,
+    -0.1726
+   ],
+   "bounds_unity_max": [
+    0.1589,
+    0.254,
+    0.2083
+   ],
+   "covers": "v4 flower clump yellow/cream (0.25 u)",
+   "team_mask": false
+  },
+  {
+   "piece": "env_flower_clump_b",
+   "fbx": "Environment/env_flower_clump_b.fbx",
+   "cat": "small",
+   "pivot": "cell top centre (cx+0.5, h, -(cz+0.5)); any yaw",
+   "tris": 28,
+   "outline_px": 0.0,
+   "materials": [
+    "CM_Toon"
+   ],
+   "verts": 49,
+   "cull": "down",
+   "v4": "new",
+   "bounds_unity_min": [
+    -0.2201,
+    0.0,
+    -0.2547
+   ],
+   "bounds_unity_max": [
+    0.2102,
+    0.2361,
+    0.1535
+   ],
+   "covers": "v4 flower clump lilac/cream (0.25 u)",
+   "team_mask": false
+  },
+  {
+   "piece": "env_moss_rocks",
+   "fbx": "Environment/env_moss_rocks.fbx",
+   "cat": "small",
+   "pivot": "cell top centre (cx+0.5, h, -(cz+0.5)); any yaw",
+   "tris": 88,
+   "outline_px": 2.0,
+   "materials": [
+    "CM_Toon"
+   ],
+   "verts": 66,
+   "cull": "down",
+   "v4": "new",
+   "bounds_unity_min": [
+    -0.2937,
+    -0.02,
+    -0.3324
+   ],
+   "bounds_unity_max": [
+    0.1748,
+    0.2006,
+    0.3134
+   ],
+   "covers": "v4 three mossy stones (0.24 u)",
+   "team_mask": false
+  },
+  {
+   "piece": "env_mushrooms",
+   "fbx": "Environment/env_mushrooms.fbx",
+   "cat": "small",
+   "pivot": "cell top centre (cx+0.5, h, -(cz+0.5)); any yaw",
+   "tris": 140,
+   "outline_px": 2.0,
+   "materials": [
+    "CM_Toon"
+   ],
+   "verts": 132,
+   "cull": "down",
+   "v4": "new",
+   "bounds_unity_min": [
+    -0.2946,
+    -0.01,
+    -0.2392
+   ],
+   "bounds_unity_max": [
+    0.1402,
+    0.251,
+    0.2633
+   ],
+   "covers": "v4 mushroom cluster (0.27 u)",
+   "team_mask": false
+  },
+  {
+   "piece": "env_reeds",
+   "fbx": "Environment/env_reeds.fbx",
+   "cat": "small_tall",
+   "pivot": "rim edge midpoint pushed 0.15 u out (non-walkable)",
+   "tris": 70,
+   "outline_px": 0.0,
+   "materials": [
+    "CM_Toon"
+   ],
+   "verts": 78,
+   "cull": "down",
+   "v4": "new",
+   "bounds_unity_min": [
+    -0.2946,
+    0.0,
+    -0.1669
+   ],
+   "bounds_unity_max": [
+    0.1882,
+    0.781,
+    0.2506
+   ],
+   "covers": "v4 reeds with cattails by water (0.8 u)",
+   "team_mask": false
+  },
+  {
+   "piece": "env_bush_berry",
+   "fbx": "Environment/env_bush_berry.fbx",
+   "cat": "small_tall",
+   "pivot": "cell top centre (cx+0.5, h, -(cz+0.5)) of a fill or past a lip (non-walkable)",
+   "tris": 417,
+   "outline_px": 2.5,
+   "materials": [
+    "CM_Toon_Foliage",
+    "CM_Toon"
+   ],
+   "verts": 317,
+   "cull": "down",
+   "v4": "new",
+   "bounds_unity_min": [
+    -0.55,
+    0.0,
+    -0.5818
+   ],
+   "bounds_unity_max": [
+    0.5815,
+    0.4267,
+    0.6134
+   ],
+   "covers": "v4 bush with violet berries (0.45 u)",
+   "team_mask": false
+  },
+  {
+   "piece": "env_tree_oak",
+   "fbx": "Environment/env_tree_oak.fbx",
+   "cat": "tree",
+   "pivot": "cell top centre (cx+0.5, h, -(cz+0.5)) (fill or edge, like edge trees)",
+   "tris": 584,
+   "outline_px": 2.5,
+   "materials": [
+    "CM_Toon_Foliage"
+   ],
+   "verts": 390,
+   "cull": "down",
+   "v4": "new",
+   "bounds_unity_min": [
+    -2.0483,
+    -0.0745,
+    -2.2927
+   ],
+   "bounds_unity_max": [
+    2.4466,
+    3.4247,
+    2.0501
+   ],
+   "covers": "v4 broadleaf oak, layered canopy, root flare, 3.4 u",
+   "team_mask": false
+  },
+  {
+   "piece": "env_tree_pine",
+   "fbx": "Environment/env_tree_pine.fbx",
+   "cat": "tree",
+   "pivot": "cell top centre (cx+0.5, h, -(cz+0.5)) (fill or edge)",
+   "tris": 148,
+   "outline_px": 2.5,
+   "materials": [
+    "CM_Toon_Foliage"
+   ],
+   "verts": 118,
+   "cull": "down",
+   "v4": "new",
+   "bounds_unity_min": [
+    -1.0498,
+    -0.0675,
+    -0.9926
+   ],
+   "bounds_unity_max": [
+    0.8604,
+    3.66,
+    1.0043
+   ],
+   "covers": "v4 conifer, 4 scalloped tiers, 3.6 u tall",
+   "team_mask": false
+  },
+  {
+   "piece": "env_tree_gnarl",
+   "fbx": "Environment/env_tree_gnarl.fbx",
+   "cat": "tree",
+   "pivot": "cell top centre (cx+0.5, h, -(cz+0.5)) (fill or edge)",
+   "tris": 446,
+   "outline_px": 2.5,
+   "materials": [
+    "CM_Toon_Foliage"
+   ],
+   "verts": 304,
+   "cull": "down",
+   "v4": "new",
+   "bounds_unity_min": [
+    -1.3854,
+    -0.125,
+    -0.9126
+   ],
+   "bounds_unity_max": [
+    1.7235,
+    3.0415,
+    0.8796
+   ],
+   "covers": "v4 gnarled ancient tree, exposed roots, moss strands",
+   "team_mask": false
+  },
+  {
+   "piece": "env_float_chunk_s",
+   "fbx": "Environment/env_float_chunk_s.fbx",
+   "cat": "sky",
+   "pivot": "grass top centre",
+   "tris": 38,
+   "outline_px": 2.0,
+   "materials": [
+    "CM_Toon"
+   ],
+   "verts": 36,
+   "cull": "down",
+   "v4": "new",
+   "bounds_unity_min": [
+    -0.5375,
+    -1.045,
+    -0.5886
+   ],
+   "bounds_unity_max": [
+    0.5668,
+    0.0,
+    0.4994
+   ],
+   "covers": "v4 floating earth chunk 1.1 u under the islands",
+   "team_mask": false
+  },
+  {
+   "piece": "env_float_chunk_m",
+   "fbx": "Environment/env_float_chunk_m.fbx",
+   "cat": "sky",
+   "pivot": "grass top centre",
+   "tris": 39,
+   "outline_px": 2.0,
+   "materials": [
+    "CM_Toon"
+   ],
+   "verts": 36,
+   "cull": "down",
+   "v4": "new",
+   "bounds_unity_min": [
+    -1.0425,
+    -1.9,
+    -0.903
+   ],
+   "bounds_unity_max": [
+    1.0156,
+    0.0,
+    1.0821
+   ],
+   "covers": "v4 floating earth chunk 2.0 u under the islands",
+   "team_mask": false
+  },
+  {
+   "piece": "env_bridge_span_damaged",
+   "fbx": "Environment/env_bridge_span_damaged.fbx",
+   "cat": "bridge",
+   "pivot": "deck centre of the near end; local +Z along the bridge, stretch to fit (same as env_bridge_span)",
+   "tris": 516,
+   "outline_px": 2.0,
+   "materials": [
+    "CM_Toon"
+   ],
+   "verts": 522,
+   "cull": "down",
+   "v4": "new",
+   "bounds_unity_min": [
+    -1.665,
+    -0.7244,
+    -0.085
+   ],
+   "bounds_unity_max": [
+    1.665,
+    0.8,
+    2.0728
+   ],
+   "covers": "v4 damaged span tile (missing + snapped plank, snapped rope); same box as env_bridge_span",
+   "team_mask": false
+  },
+  {
+   "piece": "env_bridge_anchor",
+   "fbx": "Environment/env_bridge_anchor.fbx",
+   "cat": "bridge",
+   "pivot": "span end deck centre; local +Z onto the bridge; scale w across like a span",
+   "tris": 240,
+   "outline_px": 2.0,
+   "materials": [
+    "CM_Toon"
+   ],
+   "verts": 190,
+   "cull": "down",
+   "v4": "new",
+   "bounds_unity_min": [
+    -1.725,
+    -0.35,
+    -0.7104
+   ],
+   "bounds_unity_max": [
+    1.725,
+    0.6471,
+    0.04
+   ],
+   "covers": "v4 stone-and-timber bridge end anchor",
+   "team_mask": false
+  },
+  {
+   "piece": "env_lantern_hang",
+   "fbx": "Environment/env_lantern_hang.fbx",
+   "cat": "light",
+   "pivot": "hook point (span +X post bracket: local (1.31, 0.69, 0.02) of a span tile)",
+   "tris": 96,
+   "outline_px": 2.0,
+   "materials": [
+    "CM_Toon"
+   ],
+   "verts": 72,
+   "cull": "down",
+   "v4": "new",
+   "bounds_unity_min": [
+    -0.085,
+    -0.38,
+    -0.085
+   ],
+   "bounds_unity_max": [
+    0.085,
+    0.0,
+    0.085
+   ],
+   "covers": "v4 hanging lantern, self-lit glass",
+   "team_mask": false
+  },
+  {
+   "piece": "env_fence",
+   "fbx": "Environment/env_fence.fbx",
+   "cat": "dress_tall",
+   "pivot": "lip start point at ground height; local +X runs along the rim, outward -Z; yaw = atan2(dz, dx) in sim (rim edges only, on the rock band)",
+   "tris": 80,
+   "outline_px": 2.0,
+   "materials": [
+    "CM_Toon"
+   ],
+   "verts": 58,
+   "cull": "down",
+   "v4": "new",
+   "bounds_unity_min": [
+    -0.0003,
+    -0.3729,
+    -0.285
+   ],
+   "bounds_unity_max": [
+    1.0002,
+    0.5995,
+    -0.15
+   ],
+   "covers": "v4 1 u timber fence on a rim",
+   "team_mask": false
+  },
+  {
+   "piece": "env_signpost",
+   "fbx": "Environment/env_signpost.fbx",
+   "cat": "dress_tall",
+   "pivot": "cell top centre (cx+0.5, h, -(cz+0.5)) of a fill (non-walkable)",
+   "tris": 50,
+   "outline_px": 2.0,
+   "materials": [
+    "CM_Toon"
+   ],
+   "verts": 35,
+   "cull": "down",
+   "v4": "new",
+   "bounds_unity_min": [
+    -0.22,
+    -0.02,
+    -0.1905
+   ],
+   "bounds_unity_max": [
+    0.22,
+    1.58,
+    0.1905
+   ],
+   "covers": "v4 signpost (1.58 u)",
+   "team_mask": false
+  },
+  {
+   "piece": "env_sign_board_hill",
+   "fbx": "Environment/env_sign_board_hill.fbx",
+   "cat": "dress_tall",
+   "pivot": "post centre at y 1.25; yaw = atan2(dz, dx) to the hill",
+   "tris": 32,
+   "outline_px": 2.0,
+   "materials": [
+    "CM_Toon"
+   ],
+   "verts": 32,
+   "cull": "down",
+   "v4": "new",
+   "bounds_unity_min": [
+    -0.075,
+    -0.11,
+    -0.075
+   ],
+   "bounds_unity_max": [
+    0.93,
+    0.11,
+    0.075
+   ],
+   "covers": "v4 arrow board, crown icon",
+   "team_mask": false
+  },
+  {
+   "piece": "env_sign_board_shrine",
+   "fbx": "Environment/env_sign_board_shrine.fbx",
+   "cat": "dress_tall",
+   "pivot": "post centre at y 1.02; yaw to the shrine",
+   "tris": 38,
+   "outline_px": 2.0,
+   "materials": [
+    "CM_Toon"
+   ],
+   "verts": 38,
+   "cull": "down",
+   "v4": "new",
+   "bounds_unity_min": [
+    -0.075,
+    -0.11,
+    -0.075
+   ],
+   "bounds_unity_max": [
+    0.93,
+    0.11,
+    0.075
+   ],
+   "covers": "v4 arrow board, egg icon",
+   "team_mask": false
+  },
+  {
+   "piece": "env_sign_board_base",
+   "fbx": "Environment/env_sign_board_base.fbx",
+   "cat": "dress_tall",
+   "pivot": "post centre at y 0.79; yaw to the nearer base",
+   "tris": 28,
+   "outline_px": 2.0,
+   "materials": [
+    "CM_Toon"
+   ],
+   "verts": 28,
+   "cull": "down",
+   "v4": "new",
+   "bounds_unity_min": [
+    -0.075,
+    -0.11,
+    -0.075
+   ],
+   "bounds_unity_max": [
+    0.93,
+    0.11,
+    0.075
+   ],
+   "covers": "v4 arrow board, shield icon",
+   "team_mask": false
+  },
+  {
+   "piece": "env_banner_worship",
+   "fbx": "Environment/env_banner_worship.fbx",
+   "cat": "dress_tall",
+   "pivot": "cell top centre (cx+0.5, h, -(cz+0.5)) of a fill (non-walkable)",
+   "tris": 104,
+   "outline_px": 2.0,
+   "materials": [
+    "CM_Toon"
+   ],
+   "verts": 89,
+   "cull": "down",
+   "v4": "new",
+   "bounds_unity_min": [
+    -0.42,
+    -0.02,
+    -0.1732
+   ],
+   "bounds_unity_max": [
+    0.42,
+    2.7,
+    0.1732
+   ],
+   "covers": "v4 neutral Kaiju-cult banner (2.7 u)",
+   "team_mask": false
+  },
+  {
+   "piece": "env_torch",
+   "fbx": "Environment/env_torch.fbx",
+   "cat": "light",
+   "pivot": "rim edge midpoint pushed 0.18 u out, or a fill",
+   "tris": 83,
+   "outline_px": 2.0,
+   "materials": [
+    "CM_Toon",
+    "CM_GlowDecal"
+   ],
+   "verts": 72,
+   "cull": "down",
+   "v4": "new",
+   "bounds_unity_min": [
+    -1.1,
+    -0.02,
+    -1.1
+   ],
+   "bounds_unity_max": [
+    1.1,
+    1.45,
+    1.1
+   ],
+   "covers": "v4 torch, self-lit flame + glow decal",
+   "team_mask": false
+  },
+  {
+   "piece": "env_lantern_post",
+   "fbx": "Environment/env_lantern_post.fbx",
+   "cat": "light",
+   "pivot": "cell top centre (cx+0.5, h, -(cz+0.5)) of a fill (non-walkable)",
+   "tris": 176,
+   "outline_px": 2.0,
+   "materials": [
+    "CM_Toon",
+    "CM_GlowDecal"
+   ],
+   "verts": 131,
+   "cull": "down",
+   "v4": "new",
+   "bounds_unity_min": [
+    -0.7,
+    -0.02,
+    -1.0
+   ],
+   "bounds_unity_max": [
+    1.3,
+    1.55,
+    1.0
+   ],
+   "covers": "v4 lantern post, self-lit glass + glow decal",
+   "team_mask": false
+  },
+  {
+   "piece": "env_campfire",
+   "fbx": "Environment/env_campfire.fbx",
+   "cat": "small",
+   "pivot": "cell top centre (cx+0.5, h, -(cz+0.5)); any yaw",
+   "tris": 246,
+   "outline_px": 2.0,
+   "materials": [
+    "CM_Toon",
+    "CM_GlowDecal"
+   ],
+   "verts": 186,
+   "cull": "down",
+   "v4": "new",
+   "bounds_unity_min": [
+    -1.0,
+    -0.02,
+    -1.0
+   ],
+   "bounds_unity_max": [
+    1.0,
+    0.288,
+    1.0
+   ],
+   "covers": "v4 campfire, stone ring, embers (0.29 u)",
+   "team_mask": false
+  },
+  {
+   "piece": "env_camp_sacks",
+   "fbx": "Environment/env_camp_sacks.fbx",
+   "cat": "small",
+   "pivot": "cell top centre (cx+0.5, h, -(cz+0.5)); any yaw",
+   "tris": 102,
+   "outline_px": 2.0,
+   "materials": [
+    "CM_Toon"
+   ],
+   "verts": 86,
+   "cull": "down",
+   "v4": "new",
+   "bounds_unity_min": [
+    -0.4116,
+    0.0,
+    -0.296
+   ],
+   "bounds_unity_max": [
+    0.6,
+    0.29,
+    0.36
+   ],
+   "covers": "v4 sacks, bedroll, small crate (0.29 u)",
+   "team_mask": false
+  },
+  {
+   "piece": "env_woodpile",
+   "fbx": "Environment/env_woodpile.fbx",
+   "cat": "dress_tall",
+   "pivot": "cell top centre (cx+0.5, h, -(cz+0.5)) of a fill or past a lip",
+   "tris": 162,
+   "outline_px": 2.0,
+   "materials": [
+    "CM_Toon"
+   ],
+   "verts": 120,
+   "cull": "down",
+   "v4": "new",
+   "bounds_unity_min": [
+    -0.53,
+    -0.1,
+    -0.33
+   ],
+   "bounds_unity_max": [
+    0.53,
+    0.5,
+    0.33
+   ],
+   "covers": "v4 log stack (0.5 u)",
+   "team_mask": false
+  },
+  {
+   "piece": "env_kaiju_statue",
+   "fbx": "Environment/env_kaiju_statue.fbx",
+   "cat": "landmark",
+   "pivot": "cell top centre (cx+0.5, h, -(cz+0.5)) of a fill; yaw so local -Z faces the nearest route",
+   "tris": 178,
+   "outline_px": 2.0,
+   "materials": [
+    "CM_Toon"
+   ],
+   "verts": 144,
+   "cull": "down",
+   "v4": "new",
+   "bounds_unity_min": [
+    -0.55,
+    0.0,
+    -0.8488
+   ],
+   "bounds_unity_max": [
+    0.55,
+    2.3756,
+    0.55
+   ],
+   "covers": "v4 old Kaiju-cult idol (2.4 u)",
+   "team_mask": false
+  },
+  {
+   "piece": "env_kaiju_skull",
+   "fbx": "Environment/env_kaiju_skull.fbx",
+   "cat": "landmark",
+   "pivot": "cell top centre (cx+0.5, h, -(cz+0.5)) of a fill; any yaw",
+   "tris": 142,
+   "outline_px": 2.0,
+   "materials": [
+    "CM_Toon"
+   ],
+   "verts": 180,
+   "cull": "down",
+   "v4": "new",
+   "bounds_unity_min": [
+    -0.7307,
+    -0.02,
+    -1.15
+   ],
+   "bounds_unity_max": [
+    0.7444,
+    1.3668,
+    0.7842
+   ],
+   "covers": "v4 half-buried Kaiju skull (1.35 u)",
+   "team_mask": false
+  },
+  {
+   "piece": "env_bone_ribs",
+   "fbx": "Environment/env_bone_ribs.fbx",
+   "cat": "dress_tall",
+   "pivot": "cell top centre (cx+0.5, h, -(cz+0.5)) of a fill; any yaw",
+   "tris": 197,
+   "outline_px": 2.0,
+   "materials": [
+    "CM_Toon"
+   ],
+   "verts": 165,
+   "cull": "down",
+   "v4": "new",
+   "bounds_unity_min": [
+    -0.0852,
+    -0.0403,
+    -0.6736
+   ],
+   "bounds_unity_max": [
+    0.5593,
+    1.062,
+    0.69
+   ],
+   "covers": "v4 Kaiju rib cage remains (1.1 u)",
+   "team_mask": false
+  },
+  {
+   "piece": "env_ruin_altar",
+   "fbx": "Environment/env_ruin_altar.fbx",
+   "cat": "dress_tall",
+   "pivot": "cell top centre (cx+0.5, h, -(cz+0.5)) of a fill",
+   "tris": 107,
+   "outline_px": 2.0,
+   "materials": [
+    "CM_Toon"
+   ],
+   "verts": 89,
+   "cull": "down",
+   "v4": "new",
+   "bounds_unity_min": [
+    -0.5,
+    0.0,
+    -0.36
+   ],
+   "bounds_unity_max": [
+    0.5,
+    0.62,
+    0.36
+   ],
+   "covers": "v4 offering altar, candles self-lit (0.56 u)",
+   "team_mask": false
+  },
+  {
+   "piece": "env_ruin_rubble",
+   "fbx": "Environment/env_ruin_rubble.fbx",
+   "cat": "small",
+   "pivot": "cell top centre (cx+0.5, h, -(cz+0.5)); any yaw",
+   "tris": 90,
+   "outline_px": 2.0,
+   "materials": [
+    "CM_Toon"
+   ],
+   "verts": 60,
+   "cull": "down",
+   "v4": "new",
+   "bounds_unity_min": [
+    -0.4119,
+    -0.0471,
+    -0.4231
+   ],
+   "bounds_unity_max": [
+    0.3277,
+    0.2049,
+    0.4465
+   ],
+   "covers": "v4 low rubble (under 0.25 u)",
    "team_mask": false
   }
  ]

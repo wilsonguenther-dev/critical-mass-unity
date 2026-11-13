@@ -83,7 +83,11 @@ for p in new:
     if "a" in p or p["piece"] in ("env_lantern_hang",):
         continue
     top = m4[p["piece"]]["bounds_unity_max"][1]
-    cell = g.t(int(math.floor(p["x"])), int(math.floor(p["z"])))
+    px, pz = p["x"], p["z"]
+    if p["piece"] == "env_fence":       # edge piece: geometry spans the edge 0..1 along, 0.2 u outward
+        yw = math.radians(p["yaw"])
+        px, pz = px + 0.5 * math.cos(yw) - 0.2 * math.sin(yw), pz + 0.5 * math.sin(yw) + 0.2 * math.cos(yw)
+    cell = g.t(int(math.floor(px)), int(math.floor(pz)))
     if top > 0.3 and L1.walkable(cell):
         if p.get("cat") == "tree":
             edge_trees += 1

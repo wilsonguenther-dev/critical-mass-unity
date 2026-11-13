@@ -31,8 +31,8 @@ from .geo import M, Mesh
 F, UP, OUT, BAND, CH_OUT, CH_DROP, TILE, SQ2 = kit2.F, kit2.UP, kit2.OUT, kit2.BAND, kit2.CH_OUT, kit2.CH_DROP, kit2.TILE, kit2.SQ2
 
 NEW_COLOURS = {
-    "patch_light": ("#B6D35E", "v4 painted light ground patch"),
-    "patch_dark": ("#8CA944", "v4 painted dark ground patch"),
+    "patch_light": ("#AECB58", "v4 painted light ground patch"),
+    "patch_dark": ("#8DAA44", "v4 painted dark ground patch"),
     "moss_patch": ("#7FA040", "v4 moss patch"),
     "dirt_worn": ("#C9955A", "v4 worn dirt (P14 dirt tile #D99855, one step darker)"),
     "dirt_edge": ("#B5A55A", "v4 dirt-to-grass blend ring"),
@@ -59,7 +59,7 @@ NEW_COLOURS = {
     "flame_hot": ("#FFEBB5", "v4 flame core (self-lit)"),
     "ember": ("#FF9248", "v4 embers (self-lit)"),
     "glass": ("#FFD58C", "v4 lantern glass (self-lit)"),
-    "puddle": ("#7CC6EA", "v4 puddle water (self-lit, like water_f)"),
+    "puddle": ("#68AFD8", "v4 puddle water (self-lit, like water_f)"),
 }
 SELF_LIT = ("crystal_n", "flame", "flame_hot", "ember", "glass", "puddle")
 
@@ -150,7 +150,7 @@ def blob_pts(rng, r, n, jit=0.16, sx=1.0, sz=1.0):
     return out
 
 
-def patch(m, pts, core, ring, y=0.006, ring_w=0.30, cx=0.0, cz=0.0):
+def gpatch(m, pts, core, ring, y=0.006, ring_w=0.30, cx=0.0, cz=0.0):
     inner = [(cx + (x - cx) * (1 - ring_w), cz + (z - cz) * (1 - ring_w)) for x, z in pts]
     F(m, [(x, y + 0.002, z) for x, z in inner], core, UP)
     n = len(pts)
@@ -184,23 +184,23 @@ def nails(m, xs, z0, z1, y):
 def ground_patch(m, seed, kind):
     rng = random.Random(seed)
     if kind == "light":
-        patch(m, blob_pts(rng, 1.25, 11, sx=1.25), C("patch_light"), C("grass_l"))
+        gpatch(m, blob_pts(rng, 1.25, 11, sx=1.25), C("patch_light"), C("grass", 1.03))
         for k in range(4):
             a, r = rng.uniform(0, 6.28), rng.uniform(0.2, 0.8)
             F(m, [(math.cos(a) * r + x, 0.0105, math.sin(a) * r + z) for x, z in blob_pts(rng, 0.15, 5)], C("leaf_hi", 0.96), UP)
     elif kind == "dark":
-        patch(m, blob_pts(rng, 1.4, 12, sx=1.35, sz=0.85), C("patch_dark"), C("grass_d"))
+        gpatch(m, blob_pts(rng, 1.4, 12, sx=1.35, sz=0.85), C("patch_dark"), C("grass_d"))
         for k in range(3):
             a, r = rng.uniform(0, 6.28), rng.uniform(0.2, 0.8)
             F(m, [(math.cos(a) * r + x, 0.0105, math.sin(a) * r + z) for x, z in blob_pts(rng, 0.2, 5)], C("grass_dark"), UP)
     elif kind == "moss":
-        patch(m, blob_pts(rng, 0.75, 9), C("moss_patch"), C("patch_dark"))
+        gpatch(m, blob_pts(rng, 0.75, 9), C("moss_patch"), C("patch_dark"))
         for k in range(3):
             a, r = rng.uniform(0, 6.28), rng.uniform(0.1, 0.45)
             stone(m, math.cos(a) * r, math.sin(a) * r, rng.uniform(0.06, 0.11), rng.uniform(0.05, 0.09), C("rock", 1.12),
                   C("moss"), rot=rng.uniform(0, 6))
     else:   # worn dirt
-        patch(m, blob_pts(rng, 0.9, 10, sx=1.2), C("dirt_worn"), C("dirt_edge"), ring_w=0.34)
+        gpatch(m, blob_pts(rng, 0.9, 10, sx=1.2), C("dirt_worn"), C("dirt_edge"), ring_w=0.34)
         for k in range(4):
             a, r = rng.uniform(0, 6.28), rng.uniform(0.1, 0.6)
             stone(m, math.cos(a) * r, math.sin(a) * r, rng.uniform(0.04, 0.07), rng.uniform(0.03, 0.05), C("stone_pale"),
@@ -213,27 +213,22 @@ def ground_patch(m, seed, kind):
 def path_ruts(m, seed):
     """Worn shoulder of a route, 2.2 u along local +Z (centred), 1.4 u wide: dirt, two ruts, edge stones both sides."""
     rng = random.Random(seed)
-    L, W = 1.1, 0.7
-    out = []
-    for i in range(14):
-        a = 2 * math.pi * i / 14
-        x, z = math.cos(a), math.sin(a)
-        k = rng.uniform(0.9, 1.06)
-        out.append((math.copysign(abs(x) ** 0.6, x) * W * k, math.copysign(abs(z) ** 0.6, z) * L * k))
-    patch(m, out, C("dirt_worn"), C("dirt_edge"), ring_w=0.22)
-    for sx in (-0.28, 0.28):
-        zs = [-0.95 + 1.9 * i / 5 for i in range(6)]
-        xs = [sx + rng.uniform(-0.03, 0.03) for _ in zs]
-        for i in range(5):
-            F(m, [(xs[i] - 0.06, 0.0115, zs[i]), (xs[i] + 0.06, 0.0115, zs[i]), (xs[i + 1] + 0.06, 0.0115, zs[i + 1]),
-                  (xs[i + 1] - 0.06, 0.0115, zs[i + 1])], C("rut"), UP)
-    for sx in (-0.74, 0.74):
-        z = -0.9
-        while z < 0.9:
-            r = rng.uniform(0.07, 0.11)
-            stone(m, sx + rng.uniform(-0.05, 0.05), z, r, rng.uniform(0.05, 0.1), C("stone_pale", rng.uniform(0.92, 1.0)),
+    gpatch(m, blob_pts(rng, 1.0, 12, jit=0.12, sx=0.62, sz=1.18), C("dirt_worn"), C("dirt_edge"), ring_w=0.32)
+    for sx in (-0.2, 0.2):
+        z = -0.85
+        while z < 0.8:
+            L = rng.uniform(0.2, 0.42)
+            x = sx + rng.uniform(-0.03, 0.03)
+            F(m, [(x - 0.045, 0.0115, z), (x + 0.045, 0.0115, z), (x + 0.04, 0.0115, z + L), (x - 0.04, 0.0115, z + L)], C("dirt_worn", 0.86), UP)
+            z += L + rng.uniform(0.08, 0.2)
+    for sx in (-0.62, 0.62):
+        for k in range(3):
+            z = -0.7 + k * 0.6 + rng.uniform(-0.12, 0.12)
+            r = rng.uniform(0.06, 0.1)
+            stone(m, sx * rng.uniform(0.9, 1.1), z, r, rng.uniform(0.04, 0.08), C("stone_pale", rng.uniform(0.92, 1.0)),
                   C("stone_pale", 1.08) if rng.random() < 0.6 else C("moss"), rot=rng.uniform(0, 6))
-            z += r * 2 + rng.uniform(0.12, 0.3)
+    for k in range(4):
+        blade(m, rng.choice((-0.5, 0.5)) * rng.uniform(0.8, 1.2), rng.uniform(-0.9, 0.9), 0.15, 0.04, 0.05, rng.uniform(0, 6), C("grass_dark"), C("grass_l"))
 
 
 def edge_stones(m, seed):
@@ -252,8 +247,8 @@ def edge_stones(m, seed):
 def puddle(m, seed):
     rng = random.Random(seed)
     pts = blob_pts(rng, 0.5, 10, sx=1.3, sz=0.8)
-    patch(m, [(x * 1.25, z * 1.25) for x, z in pts], C("rut"), C("dirt_edge"), y=0.005)
-    patch(m, pts, C("puddle"), C("water_lf"), y=0.0085, ring_w=0.16)
+    gpatch(m, [(x * 1.25, z * 1.25) for x, z in pts], C("rut"), C("dirt_edge"), y=0.005)
+    gpatch(m, pts, C("puddle"), C("water_f"), y=0.0085, ring_w=0.1)
     F(m, [(x * 0.35 - 0.12, 0.0125, z * 0.25 - 0.05) for x, z in pts], C("water_lf"), UP)   # sky glint
 
 
@@ -381,29 +376,29 @@ def tree_pine(m, seed):
         for i in range(n):
             j = (i + 1) % n
             q = [low[i], low[j], midr[i]]
-            nrm = (sum(Vector(p) for p in q) / 3 - Vector((0, y0 + 0.2, 0))).normalized()
+            nrm = (sum((Vector(p) for p in q), Vector()) / 3 - Vector((0, y0 + 0.2, 0))).normalized()
             F(m, q, C("leaf_hi") if nrm.dot(kit2.HI_DIR) > 0.72 else C("leaf_light", mul), tuple(nrm), smooth=True)
             q2 = [midr[i], midr[(i + 1) % n], low[j]]
-            nrm2 = (sum(Vector(p) for p in q2) / 3 - Vector((0, y0 + 0.2, 0))).normalized()
+            nrm2 = (sum((Vector(p) for p in q2), Vector()) / 3 - Vector((0, y0 + 0.2, 0))).normalized()
             F(m, q2, C("leaf_light", mul * 0.96), tuple(nrm2), smooth=True)
             q3 = [midr[i], apex, midr[(i + 1) % n]]
-            nrm3 = (sum(Vector(p) for p in q3) / 3 - Vector((0, y0 + hgt * 0.4, 0))).normalized()
+            nrm3 = (sum((Vector(p) for p in q3), Vector()) / 3 - Vector((0, y0 + hgt * 0.4, 0))).normalized()
             F(m, q3, C("leaf_hi") if nrm3.dot(kit2.HI_DIR) > 0.80 else C("leaf_light", mul * 1.04), tuple(nrm3), smooth=True)
 
 
 def tree_gnarl(m, seed):
     rng = random.Random(seed)
     path = [(0, -0.05, 0), (0.18, 0.5, 0.05), (0.02, 1.0, -0.08), (-0.25, 1.45, 0.0), (-0.32, 1.85, 0.1)]
-    tube(m, path, 0.24, C("bark_old"), n=6, taper=0.55)
+    tube(m, path, 0.32, C("bark_old"), n=6, taper=0.6)
     for k in range(3):
         a = 2.3 * k + 0.4
         tube(m, [(math.cos(a) * 0.12, 0.3, math.sin(a) * 0.12), (math.cos(a) * 0.45, 0.22, math.sin(a) * 0.45),
                  (math.cos(a) * 0.8, -0.06, math.sin(a) * 0.8)], 0.09, C("bark_old", 0.92), n=4, taper=0.4)
-    br = [[(0.0, 1.05, -0.06), (0.5, 1.45, -0.2), (0.95, 1.7, -0.3)], [(-0.25, 1.5, 0.0), (-0.8, 1.75, 0.25)]]
+    br = [[(0.0, 1.05, -0.06), (0.45, 1.45, -0.18), (0.75, 1.75, -0.25)], [(-0.25, 1.5, 0.0), (-0.6, 1.8, 0.22)]]
     for b in br:
         tube(m, b, 0.09, C("bark_old"), n=5, taper=0.5)
-    cl = [((0.95, 2.0, -0.3), 0.62, 0.9), ((0.55, 2.25, 0.1), 0.55, 0.95), ((1.25, 2.15, 0.15), 0.48, 0.88),
-          ((-0.85, 2.0, 0.3), 0.58, 0.9), ((-0.4, 2.35, 0.1), 0.55, 0.97), ((0.1, 2.65, 0.0), 0.5, 1.0)]
+    cl = [((0.75, 2.0, -0.25), 0.66, 0.9), ((0.35, 2.3, 0.1), 0.6, 0.95), ((0.9, 2.2, 0.2), 0.5, 0.88),
+          ((-0.6, 2.05, 0.25), 0.62, 0.9), ((-0.3, 2.4, 0.05), 0.58, 0.97), ((0.15, 2.7, 0.0), 0.55, 1.0)]
     for i, (c, r, mul) in enumerate(cl):
         kit2.lobe(m, c, (r, r * 0.78, r), seed * 13 + i, mul * 0.97, flat_bottom=c[1] - r * 0.45)
     for (x, y, z) in ((0.55, 1.45, -0.2), (-0.6, 1.66, 0.18), (0.95, 1.65, -0.3)):
@@ -968,8 +963,8 @@ def kaiju_statue(m, seed):
         for k in range(2):
             x = s * (0.07 + 0.09 * k)
             F(m, [(x - 0.03, 1.05, -0.722), (x + 0.03, 1.05, -0.722), (x, 0.97, -0.722)], C("bone"), (0, 0, -1))
-        tube(m, [(s * 0.24, 1.5, 0.0), (s * 0.42, 1.82, 0.1), (s * 0.48, 2.12, 0.3), (s * 0.4, 2.32, 0.5)], 0.1, C("statue", 1.04),
-             n=5, taper=0.25)
+        tube(m, [(s * 0.24, 1.5, 0.0), (s * 0.42, 1.82, 0.1), (s * 0.48, 2.12, 0.3), (s * 0.4, 2.32, 0.5)], 0.15, C("statue", 1.04),
+             n=5, taper=0.3)
     F(m, [(-0.3, 1.556, -0.3), (0.25, 1.556, -0.3), (0.2, 1.556, 0.25), (-0.28, 1.556, 0.2)], C("moss"), UP)
     m.pop()
     F(m, [(0.1, 0.9, -0.225), (0.14, 0.9, -0.225), (0.05, 0.62, -0.225), (0.02, 0.62, -0.225)], C("socket"), (0, 0, -1))
@@ -1142,6 +1137,35 @@ UPGRADES = {   # existing name -> (builder, finish, clamp box)
     "env_waterfall": (waterfall_v4, False, None),
 }
 _PATCHED = []
+
+
+def add_palette():
+    for k, v in NEW_COLOURS.items():
+        palette.ENV.setdefault(k, v)
+    for k in SELF_LIT:
+        palette.MASK_FOR[k] = palette.MASK_FIXED_GLOW
+
+
+def preflight():
+    """Build every v4 builder once into a throwaway mesh (kit2 untouched); returns a list of error strings."""
+    import traceback
+    add_palette()
+    jobs = [(sp["name"], sp["fn"], sp["finish"]) for sp in NEW]
+    jobs += [(nm, fn, fin) for nm, (fn, fin, box) in UPGRADES.items()]
+    jobs += [("cliff_s4", lambda m, s: cliff_skirt_v4(m, s, 4.0), True), ("cliff_s1", lambda m, s: cliff_skirt_v4(m, s, 1.0), True),
+             ("rim_lip", lambda m, s: rim_lip_v4(m, s, 1.0), False)]
+    errs = []
+    for nm, fn, fin in jobs:
+        m = Mesh("pf_" + nm, cull="down")
+        try:
+            fn(m, 5)
+            if fin:
+                apply_finish(m)
+        except Exception:
+            errs.append(nm + ": " + traceback.format_exc().strip().splitlines()[-1] + " @ " +
+                        [l for l in traceback.format_exc().splitlines() if "kit4.py" in l][-1].strip())
+        m.bm.free()
+    return errs
 
 
 def patch():
