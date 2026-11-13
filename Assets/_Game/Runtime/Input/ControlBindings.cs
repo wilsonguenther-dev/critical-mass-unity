@@ -129,7 +129,8 @@ namespace CriticalMass.Runtime.Input
 
         public static InputActionMap Map(InputActionAsset asset) => asset != null ? asset.FindActionMap(MapName, false) : null;
 
-        /// <summary>Short glyph text for a control path, Xbox names on a controller (A, B, X, Y, LB, RT, VIEW, MENU).</summary>
+        /// <summary>Short text for a control path, Xbox names on a controller (A, B, X, Y, LB, RT, VIEW, MENU), plain words for
+        /// mouse buttons (LEFT CLICK, RIGHT CLICK, MIDDLE CLICK, SCROLL). Drawn prompts: InputGlyphs.</summary>
         public static string DisplayPath(string path)
         {
             if (string.IsNullOrEmpty(path)) return "-";
@@ -169,13 +170,14 @@ namespace CriticalMass.Runtime.Input
             {
                 switch (control)
                 {
-                    case "leftButton": return "LMB";
-                    case "rightButton": return "RMB";
-                    case "middleButton": return "MMB";
+                    // Plain words, never the LMB / RMB / MMB abbreviations (owner, 2026-11-12); glyphs: InputGlyphs.
+                    case "leftButton": return "LEFT CLICK";
+                    case "rightButton": return "RIGHT CLICK";
+                    case "middleButton": return "MIDDLE CLICK";
                     case "forwardButton": return "MOUSE 4";
                     case "backButton": return "MOUSE 5";
                     case "scroll/y":
-                    case "scroll": return "WHEEL";
+                    case "scroll": return "SCROLL";
                     case "position": return "MOUSE";
                 }
             }

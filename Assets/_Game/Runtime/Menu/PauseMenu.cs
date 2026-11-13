@@ -5,6 +5,9 @@ using CriticalMass.Runtime.Hud;
 using CriticalMass.Runtime.Hud.Style;
 using CriticalMass.Runtime.Hud.Ui;
 using CriticalMass.Runtime.Input;
+using CriticalMass.Runtime.Spectator;
+using CriticalMass.Sim.Config;
+using CriticalMass.Sim.Core;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
@@ -23,10 +26,14 @@ namespace CriticalMass.Runtime.Menu
     /// drag) and controller (stick or d-pad, A) all drive the same focus through the EventSystem.
     /// Pages: root (Resume, Settings, Restart match, Quit to title, Quit game) and Settings with four tabs (Controls with
     /// interactive rebinding, Audio, Video, Game). Built in code, like the HUD, on a Screen Space - Camera canvas above it.
+    /// <para>2026-11-12 (spectator and readable prompts): the root page adds SPECTATE / REJOIN AS (class), CHANGE CLASS (a
+    /// class page, or DG-10's ClassSelect when in the build; the pick applies on the next respawn) and SWITCH TEAM (a
+    /// confirm page, then the match restarts on the other side). Hints are drawn as glyphs (PromptStrip) and the Controls
+    /// tab cells show each binding's glyph beside its name.</para>
     /// </summary>
     public sealed class PauseMenu : MonoBehaviour
     {
-        public enum Page { Root, Settings }
+        public enum Page { Root, Settings, Class, Confirm }
         public enum Tab { Controls, Audio, Video, Game }
 
         /// <summary>What the next PauseMenu does after a scene reload (Restart match, Quit to title).</summary>
@@ -41,6 +48,10 @@ namespace CriticalMass.Runtime.Menu
         public Tab CurrentTab { get; private set; } = Tab.Controls;
         /// <summary>A rebinding is waiting for a key or button.</summary>
         public bool IsRebinding => _rebind != null;
+        /// <summary>The root page's SPECTATE / REJOIN AS, CHANGE CLASS and SWITCH TEAM lines (tests, captures).</summary>
+        public MenuItem SpectateItem => _spectate;
+        public MenuItem ChangeClassItem => _changeClass;
+        public MenuItem SwitchTeamItem => _switchTeam;
         /// <summary>The last conflict warning ("" when none).</summary>
         public string Status => _status != null ? _status.text : string.Empty;
 
@@ -48,7 +59,13 @@ namespace CriticalMass.Runtime.Menu
         const float AfterRebindQuietSeconds = 0.3f;
 
         RectTransform _root;
-        GameObject _rootPage, _settingsPage;
+        GameObject _rootPage, _settingsPage, _classPage, _confirmPage;
+        MenuItem _spectate, _changeClass, _switchTeam, _confirmYes;
+        readonly MenuItem[] _classItems = new MenuItem[5];
+        MenuItem _classBack;
+        Text _rootNote, _confirmTitle;
+        PromptStrip _hintStrip;
+        bool _external;
         readonly GameObject[] _tabPages = new GameObject[4];
         readonly MenuItem[] _tabButtons = new MenuItem[4];
         MenuItem _resume;
@@ -66,6 +83,7 @@ namespace CriticalMass.Runtime.Menu
             public MenuItem Item;
             public RebindSlot Slot;
             public ControlRow Row;
+            public InputGlyphView Glyph;
         }
 
         void Awake()
@@ -108,15 +126,21 @@ namespace CriticalMass.Runtime.Menu
             // The title screen takes every key itself; the press that dismisses it must not also open the menu.
             if (GetComponent<TitleScreen>() != null) return true;
             if (!IsOpen) return false;
+            if (_external)
+            {
+                ClassSwitch.CloseExternalPicker();
+                EndExternal(null);
+                return true;
+            }
             if (IsRebinding || Time.unscaledTime < _quietUntil) return true;
             Back();
             return true;
         }
 
-        /// <summary>Settings: back to the root page. Root: resume the match.</summary>
+        /// <summary>Settings, class or confirm page: back to the root page. Root: resume the match.</summary>
         public void Back()
         {
-            if (CurrentPage == Page.Settings) ShowRoot();
+            if (CurrentPage != Page.Root) ShowRoot();
             else Resume();
         }
 
@@ -144,6 +168,11 @@ namespace CriticalMass.Runtime.Menu
         void Close()
         {
             CancelRebind();
+            if (_external)
+            {
+                ClassSwitch.CloseExternalPicker();
+                _external = false;
+            }
             IsOpen = false;
             if (Canvas != null) Canvas.enabled = false;
             if (EventSystem.current != null) EventSystem.current.SetSelectedGameObject(null);
@@ -167,6 +196,7 @@ namespace CriticalMass.Runtime.Menu
                 return;
             }
             if (Time.unscaledTime < _quietUntil) return;
+            if (_external) return;   // DG-10's class picker has the input until it closes
             EventSystem es = EventSystem.current;
             if (es != null && !es.sendNavigationEvents) es.sendNavigationEvents = true;
 
@@ -199,8 +229,12 @@ namespace CriticalMass.Runtime.Menu
             if (IsRebinding) s = pad ? "PRESS A BUTTON   ·   WAIT 8 S TO CANCEL" : "PRESS A KEY OR MOUSE BUTTON   ·   ESC CANCELS";
             else if (CurrentPage == Page.Settings)
                 s = pad ? "A SELECT   ·   B BACK   ·   LB / RB TABS   ·   LEFT / RIGHT CHANGE" : "ENTER SELECT   ·   ESC BACK   ·   LEFT / RIGHT CHANGE";
+            else if (CurrentPage == Page.Class || CurrentPage == Page.Confirm)
+                s = pad ? "A SELECT   ·   B BACK" : "ENTER SELECT   ·   ESC BACK";
             else s = pad ? "A SELECT   ·   B RESUME" : "ENTER SELECT   ·   ESC RESUME";
             HudText.Set(_hint, s);
+            // Drawn: the key words become glyphs (the text above stays as the hidden plain line).
+            if (_hintStrip != null) _hintStrip.SetHint(s, ControlBindings.ActiveDevice);
         }
 
         // ---- pages ----
@@ -212,7 +246,10 @@ namespace CriticalMass.Runtime.Menu
             CurrentPage = Page.Root;
             _rootPage.SetActive(true);
             _settingsPage.SetActive(false);
+            _classPage.SetActive(false);
+            _confirmPage.SetActive(false);
             HudText.Set(_title, "PAUSED");
+            RefreshRootLabels();
             Select(_resume);
             UpdateHint();
         }
@@ -223,6 +260,8 @@ namespace CriticalMass.Runtime.Menu
             CurrentPage = Page.Settings;
             _rootPage.SetActive(false);
             _settingsPage.SetActive(true);
+            _classPage.SetActive(false);
+            _confirmPage.SetActive(false);
             HudText.Set(_title, "SETTINGS");
             ShowTab(tab);
         }
@@ -255,6 +294,8 @@ namespace CriticalMass.Runtime.Menu
         void SelectFirst()
         {
             if (CurrentPage == Page.Root) Select(_resume);
+            else if (CurrentPage == Page.Class) Select(FirstClassItem());
+            else if (CurrentPage == Page.Confirm) Select(_confirmYes);
             else Select(_tabButtons[(int)CurrentTab]);
         }
 
@@ -284,6 +325,187 @@ namespace CriticalMass.Runtime.Menu
 #else
             Application.Quit();
 #endif
+        }
+
+        // ---- spectate, change class, switch team (2026-11-12) ----
+
+        World CurrentWorld()
+        {
+            SimDriverBehaviour d = GetComponent<SimDriverBehaviour>();
+            return d != null ? d.World : null;
+        }
+
+        /// <summary>Root labels that depend on the match: SPECTATE or REJOIN AS (class); the pending class note.</summary>
+        void RefreshRootLabels()
+        {
+            if (_spectate != null)
+            {
+                string cls = KillWords.ClassName(SpectatorMode.RejoinClass()).ToUpperInvariant();
+                HudText.Set(_spectate.Label, SpectatorMode.IsSpectating ? "REJOIN AS " + cls : "SPECTATE");
+                _spectate.interactable = SpectatorMode.Current != null;
+            }
+            if (_rootNote != null)
+                HudText.Set(_rootNote, ClassSwitch.HasPending
+                    ? "YOU'LL RESPAWN AS THE " + KillWords.ClassName(ClassSwitch.Pending).ToUpperInvariant()
+                    : SpectatorMode.IsSpectating && SpectatorMode.Current.RejoinPending ? "BACK IN THE FIGHT AT YOUR RESPAWN" : "");
+        }
+
+        /// <summary>Spectate (actor 0 plays itself, free camera) or rejoin; resumes the match either way.</summary>
+        public void ToggleSpectate()
+        {
+            if (SpectatorMode.Current == null) return;
+            SpectatorMode.Toggle();
+            Resume();
+        }
+
+        /// <summary>The class picker: DG-10's ClassSelect when in the build, else the class page. Applies on the next respawn.</summary>
+        public void ShowClassPicker()
+        {
+            World w = CurrentWorld();
+            TeamId team = w != null && w.ActorCount > 0 ? w.Actors[0].Team : TeamId.Azure;
+            if (ClassSwitch.ExternalPickerAvailable)
+            {
+                _external = true;
+                if (Canvas != null) Canvas.enabled = false;
+                if (EventSystem.current != null) EventSystem.current.SetSelectedGameObject(null);
+                if (ClassSwitch.OpenExternalPicker(team, c => EndExternal(c), () => EndExternal(null))) return;
+                _external = false;
+                if (Canvas != null) Canvas.enabled = true;
+            }
+            ShowClassPage();
+        }
+
+        void EndExternal(ClassId? picked)
+        {
+            if (!_external) return;
+            _external = false;
+            if (picked.HasValue) ClassSwitch.Request(CurrentWorld(), picked.Value);
+            if (IsOpen && Canvas != null) Canvas.enabled = true;
+            if (IsOpen) ShowRoot();
+        }
+
+        public void ShowClassPage()
+        {
+            Build();
+            CurrentPage = Page.Class;
+            _rootPage.SetActive(false);
+            _settingsPage.SetActive(false);
+            _confirmPage.SetActive(false);
+            _classPage.SetActive(true);
+            HudText.Set(_title, "CHANGE CLASS");
+            World w = CurrentWorld();
+            ClassId now = SpectatorMode.RejoinClass();
+            for (int i = 0; i < _classItems.Length; i++)
+            {
+                MenuItem it = _classItems[i];
+                if (it == null) continue;
+                bool chosen = (int)now == i;
+                it.Body.SetRim(chosen ? Brass : Cream);
+                it.Body.RimPx = chosen ? 4f : 2f;
+                it.Body.SetVerticesDirty();
+            }
+            Select(FirstClassItem((int)now));
+            UpdateHint();
+        }
+
+        MenuItem FirstClassItem(int prefer = -1)
+        {
+            if (prefer >= 0 && prefer < _classItems.Length && _classItems[prefer] != null && _classItems[prefer].interactable)
+                return _classItems[prefer];
+            for (int i = 0; i < _classItems.Length; i++)
+                if (_classItems[i] != null && _classItems[i].interactable) return _classItems[i];
+            return _classBack;
+        }
+
+        /// <summary>Holds cls for the next respawn and returns to the root page with a line saying so.</summary>
+        public void PickClass(ClassId cls)
+        {
+            ClassSwitch.Request(CurrentWorld(), cls);
+            ShowRoot();
+        }
+
+        public void ShowSwitchTeam()
+        {
+            Build();
+            CurrentPage = Page.Confirm;
+            _rootPage.SetActive(false);
+            _settingsPage.SetActive(false);
+            _classPage.SetActive(false);
+            _confirmPage.SetActive(true);
+            HudText.Set(_title, "SWITCH TEAM");
+            HudText.Set(_confirmTitle, "SWITCH TO " + (OtherTeam() == TeamId.Azure ? "AZURE" : "CRIMSON") + "?");
+            Select(_confirmYes);
+            UpdateHint();
+        }
+
+        TeamId OtherTeam()
+        {
+            World w = CurrentWorld();
+            TeamId mine = w != null && w.ActorCount > 0 ? w.Actors[0].Team : Flow.GameFlow.LastSetup.Team;
+            return mine == TeamId.Azure ? TeamId.Crimson : TeamId.Azure;
+        }
+
+        /// <summary>Restarts the match on the other side (same class, size and pace; a new seed), playing.</summary>
+        public void ConfirmSwitchTeam()
+        {
+            Flow.MatchSetupChoice c = Flow.GameFlow.LastSetup;
+            World w = CurrentWorld();
+            c.Team = OtherTeam();
+            if (w != null && w.ActorCount > 0) c.Class = SpectatorMode.RejoinClass();
+            SpectatorMode.SpectateNextMatch = false;
+            Flow.GameFlow.BeginMatch(c);
+        }
+
+        void BuildClassPage(RectTransform space)
+        {
+            RectTransform page = MenuUi.Rt(space, "Class Page");
+            MenuUi.Stretch(page);
+            _classPage = page.gameObject;
+            MenuUi.Panel(page, "Panel", 560f, 160f, 800f, 700f);
+            MenuUi.Label(page, "Line", CMTokens.Ui, 24, Cream, TextAnchor.MiddleCenter, 560f, 186f, 800f, 40f,
+                "YOUR NEW CLASS APPLIES WHEN YOU NEXT RESPAWN", 2f);
+            var items = new List<MenuItem>();
+            for (int i = 0; i < _classItems.Length; i++)
+            {
+                ClassId cls = (ClassId)i;
+                string name = KillWords.ClassName(cls).ToUpperInvariant();
+                MenuItem it = MenuUi.Item(page, "Class " + name, 700f, 250f + i * 84f, 520f, 70f, name, MenuItem.Kind.Button, 30, true,
+                    CMTokens.Display);
+                it.Body.Radius = 16f;
+                it.Submitted = () => PickClass(cls);
+                _classItems[i] = it;
+                if (!Menus.MatchSetup.Playable.Contains(cls))
+                {
+                    it.interactable = false;
+                    MenuUi.Label(it.transform, "Soon", CMTokens.Ui, 16, Brass, TextAnchor.MiddleRight, 330f, 0f, 170f, 70f, "COMING SOON", 2f);
+                    continue;
+                }
+                items.Add(it);
+            }
+            _classBack = MenuUi.Item(page, "Back", 760f, 690f + 60f, 400f, 70f, "BACK", MenuItem.Kind.Button, 28, true, CMTokens.Display);
+            _classBack.Submitted = ShowRoot;
+            items.Add(_classBack);
+            Chain(items);
+            _classPage.SetActive(false);
+        }
+
+        void BuildConfirmPage(RectTransform space)
+        {
+            RectTransform page = MenuUi.Rt(space, "Confirm Page");
+            MenuUi.Stretch(page);
+            _confirmPage = page.gameObject;
+            MenuUi.Panel(page, "Panel", 560f, 300f, 800f, 420f);
+            _confirmTitle = MenuUi.Label(page, "Question", CMTokens.Display, 44, Cream, TextAnchor.MiddleCenter, 560f, 340f, 800f, 70f,
+                "SWITCH TEAM?", 3f);
+            MenuUi.Label(page, "Line", CMTokens.Ui, 24, Cream, TextAnchor.MiddleCenter, 560f, 420f, 800f, 40f,
+                "THE MATCH RESTARTS WITH YOU ON THE OTHER SIDE", 2f);
+            _confirmYes = MenuUi.Item(page, "Yes", 620f, 560f, 330f, 80f, "YES, SWITCH", MenuItem.Kind.Button, 30, true, CMTokens.Display);
+            _confirmYes.Submitted = ConfirmSwitchTeam;
+            MenuItem no = MenuUi.Item(page, "No", 970f, 560f, 330f, 80f, "NO", MenuItem.Kind.Button, 30, true, CMTokens.Display);
+            no.Submitted = ShowRoot;
+            _confirmYes.navigation = new Navigation { mode = Navigation.Mode.Explicit, selectOnLeft = no, selectOnRight = no };
+            no.navigation = new Navigation { mode = Navigation.Mode.Explicit, selectOnLeft = _confirmYes, selectOnRight = _confirmYes };
+            _confirmPage.SetActive(false);
         }
 
         // ---- build ----
@@ -324,9 +546,14 @@ namespace CriticalMass.Runtime.Menu
 
             _title = MenuUi.Label(space, "Title", CMTokens.Display, 64, Cream, TextAnchor.MiddleCenter, 460f, 40f, 1000f, 90f, "PAUSED", 4f);
             _hint = MenuUi.Label(space, "Hint", CMTokens.Ui, 20, Cream, TextAnchor.MiddleCenter, 260f, 1020f, 1400f, 36f, "", 2f);
+            _hint.gameObject.SetActive(false);   // drawn by _hintStrip; kept as the plain line
+            _hintStrip = PromptStrip.Make(space, "Hint Prompts", 30f, 20, Cream);
+            MenuUi.Place(_hintStrip.Rect, 260f, 1016f, 1400f, 44f);
 
             BuildRoot(space);
             BuildSettings(space);
+            BuildClassPage(space);
+            BuildConfirmPage(space);
             Canvas.enabled = false;
             UpdateScale();
         }
@@ -367,29 +594,39 @@ namespace CriticalMass.Runtime.Menu
             _rootPage = page.gameObject;
             // DG-01: How to play (the guided match, when an item registers its start) and Controls joined the list.
             bool howTo = Flow.OverlayRegistry.TutorialStart() != null;
-            MenuUi.Panel(page, "Panel", 640f, 150f, 640f, 760f);
-            string[] labels = { "RESUME", "HOW TO PLAY", "CONTROLS", "SETTINGS", "RESTART MATCH", "QUIT TO TITLE", "QUIT GAME" };
+            // 2026-11-12: Spectate / Rejoin, Change class and Switch team joined the list (ten lines at 72 px).
+            MenuUi.Panel(page, "Panel", 640f, 140f, 640f, 770f);
+            string[] labels =
+            {
+                "RESUME", "SPECTATE", "CHANGE CLASS", "SWITCH TEAM", "HOW TO PLAY", "CONTROLS", "SETTINGS", "RESTART MATCH",
+                "QUIT TO TITLE", "QUIT GAME",
+            };
             Action[] acts =
             {
-                Resume, () => { if (Flow.OverlayRegistry.StartTutorial()) Resume(); }, () => ShowSettings(Tab.Controls),
+                Resume, ToggleSpectate, ShowClassPicker, ShowSwitchTeam,
+                () => { if (Flow.OverlayRegistry.StartTutorial()) Resume(); }, () => ShowSettings(Tab.Controls),
                 () => ShowSettings(Tab.Audio), RestartMatch, QuitToTitle, QuitGame,
             };
             var items = new List<MenuItem>();
             for (int i = 0; i < labels.Length; i++)
             {
-                MenuItem it = MenuUi.Item(page, labels[i], 700f, 190f + i * 100f, 520f, 80f, labels[i], MenuItem.Kind.Button, 32,
+                MenuItem it = MenuUi.Item(page, labels[i], 700f, 168f + i * 72f, 520f, 62f, labels[i], MenuItem.Kind.Button, 28,
                     true, CMTokens.Display);
                 it.Body.Radius = 16f;
                 it.Submitted = acts[i];
-                if (i == 1 && !howTo)
+                if (i == 1) _spectate = it;
+                if (i == 2) _changeClass = it;
+                if (i == 3) _switchTeam = it;
+                if (i == 4 && !howTo)
                 {
                     // Present but not ready: dimmed, tagged and skipped by navigation.
                     it.interactable = false;
-                    MenuUi.Label(it.transform, "Soon", CMTokens.Ui, 16, Brass, TextAnchor.MiddleRight, 330f, 0f, 170f, 80f, "COMING SOON", 2f);
+                    MenuUi.Label(it.transform, "Soon", CMTokens.Ui, 16, Brass, TextAnchor.MiddleRight, 330f, 0f, 170f, 62f, "COMING SOON", 2f);
                     continue;
                 }
                 items.Add(it);
             }
+            _rootNote = MenuUi.Label(page, "Note", CMTokens.Ui, 22, Brass, TextAnchor.MiddleCenter, 640f, 918f, 640f, 36f, "", 2f);
             Chain(items);
             _resume = items[0];
         }
@@ -505,6 +742,9 @@ namespace CriticalMass.Runtime.Menu
                     MenuItem cell = MenuUi.Item(tab, $"Cell {row.Label} {c}", ContentX + LabelW + c * (CellW + CellGap), y, CellW, RowH, "-",
                         MenuItem.Kind.Button, 20, true, CMTokens.Mono);
                     var cref = new CellRef { Item = cell, Slot = slot, Row = row };
+                    // The binding's glyph beside its name (a mouse with the button lit, a keycap, a controller button).
+                    cref.Glyph = InputGlyphView.Make(cell.transform, "Glyph", 26f);
+                    cref.Glyph.Rect.anchoredPosition = new Vector2(8f, 0f);
                     cell.Submitted = () => StartRebind(cref);
                     if (!slot.Rebindable) cell.interactable = false;
                     _cells.Add(cref);
@@ -574,6 +814,13 @@ namespace CriticalMass.Runtime.Menu
                 InputAction a = map != null ? map.FindAction(c.Slot.Action, false) : null;
                 int idx = ControlBindings.FindBindingIndex(a, c.Slot);
                 HudText.Set(c.Item.Label, ControlBindings.Display(a, idx));
+                if (c.Glyph != null)
+                {
+                    string path = a != null && idx >= 0 ? a.bindings[idx].effectivePath : null;
+                    GlyphSpec g = InputGlyphs.ForPath(path);
+                    c.Glyph.gameObject.SetActive(!g.IsEmpty);
+                    if (!g.IsEmpty) c.Glyph.Set(g);
+                }
             }
         }
 

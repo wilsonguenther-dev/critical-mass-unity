@@ -178,11 +178,11 @@ namespace CriticalMass.Runtime.Tests
             Assert.AreEqual("LB", ControlBindings.DisplayPath("<Gamepad>/leftShoulder"));
             Assert.AreEqual("MENU", ControlBindings.DisplayPath("<Gamepad>/start"));
             Assert.AreEqual("VIEW", ControlBindings.DisplayPath("<Gamepad>/select"));
-            Assert.AreEqual("LMB", ControlBindings.DisplayPath("<Mouse>/leftButton"));
+            Assert.AreEqual("LEFT CLICK", ControlBindings.DisplayPath("<Mouse>/leftButton"));
             Assert.AreEqual("UP", ControlBindings.DisplayPath("<Keyboard>/upArrow"));
             Assert.AreEqual("E", ControlBindings.DisplayPath("<Keyboard>/e"));
             Assert.AreEqual("SPACE", ControlBindings.DisplayPath("<Keyboard>/space"));
-            Assert.AreEqual("LMB", ControlBindings.PromptLabel(A("Attack"), ControlDevice.KeyboardMouse));
+            Assert.AreEqual("LEFT CLICK", ControlBindings.PromptLabel(A("Attack"), ControlDevice.KeyboardMouse));
             Assert.AreEqual("RT", ControlBindings.PromptLabel(A("Attack"), ControlDevice.Gamepad));
             Assert.AreEqual("LT", ControlBindings.PromptLabel(A("Ability"), ControlDevice.Gamepad));
             Assert.AreEqual("X", ControlBindings.PromptLabel(A("Interact"), ControlDevice.Gamepad));
