@@ -11,13 +11,14 @@ namespace CriticalMass.Runtime.Tests
     public sealed class ArtMappingTests
     {
         [Test]
-        public void WarriorMinerAndFarmerHaveModelsEveryOtherClassKeepsTheCapsule()
+        public void EveryClassHasItsModelNoClassKeepsTheCapsule()
         {
             Assert.AreEqual(ArtMapping.Warrior, ArtMapping.ClassModel(ClassId.Warrior));
             Assert.AreEqual(ArtMapping.Miner, ArtMapping.ClassModel(ClassId.Miner));
             Assert.AreEqual(ArtMapping.Farmer, ArtMapping.ClassModel(ClassId.Farmer), "Farmer v1 replaces the capsule (art refresh 2)");
-            Assert.IsNull(ArtMapping.ClassModel(ClassId.Demolitions));
-            Assert.IsNull(ArtMapping.ClassModel(ClassId.Builder));
+            Assert.AreEqual(ArtMapping.Demolitions, ArtMapping.ClassModel(ClassId.Demolitions), "art landing");
+            Assert.AreEqual(ArtMapping.Builder, ArtMapping.ClassModel(ClassId.Builder), "art landing");
+            Assert.AreEqual(ArtMapping.Healer, ArtMapping.ClassModel(ClassId.Healer), "art landing");
         }
 
         [Test]

@@ -97,6 +97,27 @@ namespace CriticalMass.Runtime.View.Art
             return m;
         }
 
+        static readonly Dictionary<(Material, int), Material> ExpressionCache = new Dictionary<(Material, int), Material>();
+
+        /// <summary>
+        /// A Kaiju stage in an allegiance glow wearing an expression (Kaiju v4 face swap): the ForGlow material with the
+        /// expression's atlas as _FaceTex (same UVs). Neutral, a model without expressions, or a missing atlas returns the
+        /// plain ForGlow material. Cached per (glow material, expression): at most 2 stages x 4 glows x 7 faces; no allocation
+        /// once warm beyond what ForGlow does.
+        /// </summary>
+        public static Material ForGlow(ModelSpec spec, string glowHex, KaijuExpression expression)
+        {
+            Material m = ForGlow(spec, glowHex);
+            if (expression == KaijuExpression.Neutral || spec.Expressions == null || m == null) return m;
+            if (ExpressionCache.TryGetValue((m, (int)expression), out Material cached) && cached != null) return cached;
+            Texture2D face = ArtCatalog.Load()?.Find(spec.Key)?.Expression((int)expression);
+            if (face == null) return m;
+            var e = new Material(m) { name = m.name + " face " + expression };
+            e.SetTexture("_FaceTex", face);
+            ExpressionCache[(m, (int)expression)] = e;
+            return e;
+        }
+
         public static Color Hex(string hex)
         {
             if (!ColorUtility.TryParseHtmlString(hex, out Color c)) throw new ArgumentException("not an html colour: " + hex, nameof(hex));

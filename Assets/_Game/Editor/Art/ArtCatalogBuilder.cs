@@ -31,6 +31,8 @@ namespace CriticalMass.Editor.Art
                     Model = AssetDatabase.LoadAssetAtPath<GameObject>(spec.AssetPath),
                     Clips = Clips(spec.ClipSource ?? spec.AssetPath),
                     Face = spec.FaceTexture != null ? AssetDatabase.LoadAssetAtPath<Texture2D>(spec.FaceTexture) : null,
+                    Expressions = spec.Expressions == null ? new Texture2D[0]
+                        : spec.Expressions.Select(p => AssetDatabase.LoadAssetAtPath<Texture2D>(p)).ToArray(),
                 })
                 .Where(e => e.Model != null)
                 .ToArray();
@@ -99,6 +101,8 @@ namespace CriticalMass.Editor.Art
             {
                 if (a[i].Key != b[i].Key || a[i].Model != b[i].Model || a[i].Face != b[i].Face) return false;
                 if ((a[i].Clips?.Length ?? 0) != b[i].Clips.Length) return false;
+                if ((a[i].Expressions?.Length ?? 0) != b[i].Expressions.Length) return false;
+                for (int j = 0; j < b[i].Expressions.Length; j++) if (a[i].Expressions[j] != b[i].Expressions[j]) return false;
                 for (int j = 0; j < b[i].Clips.Length; j++) if (a[i].Clips[j] != b[i].Clips[j]) return false;
             }
             return true;

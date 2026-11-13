@@ -34,7 +34,7 @@ namespace CriticalMass.Editor.Art
         public const string ArtMaterialPath = "Assets/_Game/Resources/Toon/CMToonArt.mat";
 
         /// <summary>Bump when the contract changes: Unity re-imports every model this postprocessor touches.</summary>
-        public override uint GetVersion() => 8;
+        public override uint GetVersion() => 9;
 
         public static bool IsArt(string path) =>
             path.StartsWith(ArtRoot, StringComparison.Ordinal) && path.EndsWith(".fbx", StringComparison.OrdinalIgnoreCase);
@@ -88,7 +88,8 @@ namespace CriticalMass.Editor.Art
         public const float OutlineMatchMetres = 0.002f;
 
         /// <summary>True for a face decal PNG some ModelSpec names.</summary>
-        public static bool IsFaceTexture(string path) => ArtMapping.Models.Any(m => m.FaceTexture == path);
+        public static bool IsFaceTexture(string path) =>
+            ArtMapping.Models.Any(m => m.FaceTexture == path || (m.Expressions != null && Array.IndexOf(m.Expressions, path) >= 0));
 
         private void OnPreprocessTexture()
         {

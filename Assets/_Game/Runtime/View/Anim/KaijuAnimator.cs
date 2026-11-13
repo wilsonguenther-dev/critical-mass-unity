@@ -39,6 +39,11 @@ namespace CriticalMass.Runtime.View.Anim
         /// <summary>Measured walk ground speed of a model (u/s at rate 1), for tests and the capture report.</summary>
         public double WalkSpeedOf(ModelView m) => m != null && _measured.TryGetValue(m, out Measured r) ? r.WalkSpeed : FallbackWalkSpeed;
 
+        /// <summary>Sim time of the last claw strike (wind-up ended) and of the last health loss (the flinch); -infinity before
+        /// any. ActorViews reads them for the Kaiju face (angry while striking, hurt after a hit).</summary>
+        public double LastStrikeAt => _strikeAt;
+        public double LastFlinchAt => _flinchAt;
+
         /// <summary>Footfalls raised by the Kaiju since start.</summary>
         public int Steps { get; private set; }
 
