@@ -1,0 +1,298 @@
+{
+ "objects": {
+  "Builder_Body": {
+   "triangles": 9864,
+   "vertices": 5294,
+   "rest_bounds": {
+    "min": [
+     -1.072,
+     -0.496,
+     0.0
+    ],
+    "max": [
+     1.072,
+     0.561,
+     2.329
+    ]
+   },
+   "materials": [
+    "CM_Toon",
+    "CM_FaceDecal"
+   ],
+   "feature_groups": [
+    "feat_aframe",
+    "feat_apron",
+    "feat_apron_detail",
+    "feat_belt",
+    "feat_boots",
+    "feat_cap",
+    "feat_cap_detail",
+    "feat_face",
+    "feat_face_decal",
+    "feat_gloves",
+    "feat_hair",
+    "feat_knee_pad",
+    "feat_ladder",
+    "feat_ladder_detail",
+    "feat_moustache",
+    "feat_pauldron",
+    "feat_pauldron_detail",
+    "feat_pencil",
+    "feat_rope_coil",
+    "feat_shirt",
+    "feat_skin",
+    "feat_sleeve",
+    "feat_team_trim",
+    "feat_trousers"
+   ]
+  },
+  "Builder_Mallet": {
+   "triangles": 836,
+   "vertices": 456,
+   "rest_bounds": {
+    "min": [
+     -1.207,
+     -0.284,
+     0.777
+    ],
+    "max": [
+     -0.014,
+     0.186,
+     1.439
+    ]
+   },
+   "materials": [
+    "CM_Toon"
+   ],
+   "feature_groups": [
+    "feat_gem",
+    "feat_mallet",
+    "feat_mallet_detail",
+    "feat_team_trim"
+   ]
+  },
+  "BuilderLadder_Carried": {
+   "triangles": 1536,
+   "vertices": 840,
+   "rest_bounds": {
+    "min": [
+     -0.725,
+     -0.314,
+     -0.082
+    ],
+    "max": [
+     0.725,
+     0.308,
+     0.083
+    ]
+   },
+   "materials": [
+    "CM_Toon"
+   ],
+   "feature_groups": [
+    "feat_ladder",
+    "feat_ladder_detail",
+    "feat_team_trim"
+   ]
+  },
+  "BuilderLadder_Placed": {
+   "triangles": 1248,
+   "vertices": 692,
+   "rest_bounds": {
+    "min": [
+     -0.285,
+     0.011,
+     -0.05
+    ],
+    "max": [
+     0.285,
+     0.865,
+     1.268
+    ]
+   },
+   "materials": [
+    "CM_Toon"
+   ],
+   "feature_groups": [
+    "feat_ladder",
+    "feat_ladder_detail",
+    "feat_team_trim"
+   ]
+  },
+  "BuilderLadder_Damaged": {
+   "triangles": 1036,
+   "vertices": 574,
+   "rest_bounds": {
+    "min": [
+     -0.354,
+     -0.472,
+     -0.073
+    ],
+    "max": [
+     0.496,
+     0.865,
+     1.268
+    ]
+   },
+   "materials": [
+    "CM_Toon"
+   ],
+   "feature_groups": [
+    "feat_ladder",
+    "feat_ladder_detail",
+    "feat_team_trim"
+   ]
+  },
+  "BuilderRopeBridge_Placed": {
+   "triangles": 2512,
+   "vertices": 1396,
+   "rest_bounds": {
+    "min": [
+     -0.85,
+     -4.26,
+     -0.3
+    ],
+    "max": [
+     0.85,
+     0.18,
+     1.12
+    ]
+   },
+   "materials": [
+    "CM_Toon"
+   ],
+   "feature_groups": [
+    "feat_bridge",
+    "feat_bridge_detail",
+    "feat_team_trim"
+   ]
+  },
+  "BuilderRopeBridge_Damaged": {
+   "triangles": 2180,
+   "vertices": 1206,
+   "rest_bounds": {
+    "min": [
+     -0.73,
+     -4.346,
+     -0.614
+    ],
+    "max": [
+     0.73,
+     0.18,
+     0.856
+    ]
+   },
+   "materials": [
+    "CM_Toon"
+   ],
+   "feature_groups": [
+    "feat_bridge",
+    "feat_bridge_detail",
+    "feat_team_trim"
+   ]
+  },
+  "BuilderRopeBridge_Carried": {
+   "triangles": 1112,
+   "vertices": 584,
+   "rest_bounds": {
+    "min": [
+     -0.56,
+     -0.396,
+     -0.035
+    ],
+    "max": [
+     0.56,
+     0.393,
+     1.008
+    ]
+   },
+   "materials": [
+    "CM_Toon"
+   ],
+   "feature_groups": [
+    "feat_bridge",
+    "feat_team_trim"
+   ]
+  },
+  "BuilderBuildGlow": {
+   "triangles": 576,
+   "vertices": 320,
+   "rest_bounds": {
+    "min": [
+     -0.655,
+     -0.655,
+     0.006
+    ],
+    "max": [
+     0.655,
+     0.655,
+     0.53
+    ]
+   },
+   "materials": [
+    "CM_Toon"
+   ],
+   "feature_groups": [
+    "feat_glow"
+   ]
+  }
+ },
+ "bones": 41,
+ "display_pose": [
+  "Idle",
+  1
+ ],
+ "face_decal": {
+  "png": "BuilderFace.png",
+  "size": 256,
+  "faces": 40
+ },
+ "bevels": {
+  "boxes": 218,
+  "at_min_or_more": 174,
+  "groove_strips_exempt": 44,
+  "hidden_cores_unbevelled": 0,
+  "min_bevel": 0.02,
+  "thickened_to_carry_bevel": 23
+ },
+ "triangles_by_feature": {
+  "Builder_Body:team_trim": 1544,
+  "Builder_Body:skin": 700,
+  "Builder_Body:rope_coil": 648,
+  "Builder_Body:ladder": 584,
+  "Builder_Body:gloves": 556,
+  "Builder_Body:boots": 552,
+  "Builder_Body:trousers": 512,
+  "Builder_Body:cap": 512,
+  "Builder_Body:shirt": 472,
+  "Builder_Body:aframe": 452,
+  "Builder_Body:belt": 384,
+  "Builder_Body:ladder_detail": 384,
+  "Builder_Mallet:mallet": 380,
+  "Builder_Body:apron_detail": 348,
+  "Builder_Body:knee_pad": 336,
+  "Builder_Mallet:mallet_detail": 308,
+  "Builder_Body:pauldron": 296,
+  "Builder_Body:moustache": 276,
+  "Builder_Body:face": 260,
+  "Builder_Body:hair": 252,
+  "Builder_Body:sleeve": 232,
+  "Builder_Body:face_decal": 176,
+  "Builder_Body:cap_detail": 176,
+  "Builder_Mallet:gem": 112,
+  "Builder_Body:apron": 88,
+  "Builder_Body:pauldron_detail": 84,
+  "Builder_Body:pencil": 40,
+  "Builder_Mallet:team_trim": 36
+ },
+ "triangles_character": 10700,
+ "triangles_props": {
+  "BuilderLadder_Carried": 1536,
+  "BuilderLadder_Placed": 1248,
+  "BuilderLadder_Damaged": 1036,
+  "BuilderRopeBridge_Placed": 2512,
+  "BuilderRopeBridge_Damaged": 2180,
+  "BuilderRopeBridge_Carried": 1112,
+  "BuilderBuildGlow": 576
+ }
+}
