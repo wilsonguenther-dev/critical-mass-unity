@@ -173,6 +173,61 @@ namespace CriticalMass.Editor.Flow
             yield return Seconds(0.7);
             Shot("12-kaiju-banner");
 
+            // Facing (owner's field report 2026-11-12: every model walked backwards). The same moves twice: "before" with
+            // every ModelSpec.ArtYawDeg set to 0 (the old mapping), "after" with the measured values. Sim directions:
+            // screen down (toward the camera) is sim (1, 1)/sqrt2, facing 45 deg; screen right is sim (1, -1)/sqrt2.
+            foreach (bool corrected in new[] { false, true })
+            {
+                string tag = corrected ? "after" : "before";
+                SetArtYaw(corrected);
+                drv.HumanAutopilot = false;
+                drv.TimeScale = 1;
+                input.State.ButtonUp(HumanInputState.HumanButton.Attack);
+                yield return () => W.Actors[0].Alive;
+                input.State.ClearAim();
+                input.State.SetMove(0, -1);
+                yield return Seconds(2.0);
+                drv.TimeScale = 0;
+                Note($"facing {tag}: actor 0 walking toward the camera, sim facing {W.Actors[0].Facing * 180 / Math.PI:0} deg (toward camera = 45)");
+                yield return Seconds(0.15);
+                Shot("14-walk-toward-camera-" + tag);
+                drv.TimeScale = 1;
+                input.State.SetMove(1, 0);
+                yield return Seconds(1.0);
+                drv.TimeScale = 0;
+                Note($"facing {tag}: actor 0 walking screen-right, sim facing {W.Actors[0].Facing * 180 / Math.PI:0} deg (screen right = -45)");
+                yield return Seconds(0.15);
+                Shot("15-walk-right-" + tag);
+                drv.TimeScale = 1;
+                input.State.SetMove(0, 0);
+                // Aim at a point 2.5 u screen-left of the player and swing: the cleaver arc and the shield must point there.
+                double ax = W.X[0] - 2.5 / Math.Sqrt(2), az = W.Z[0] + 2.5 / Math.Sqrt(2);
+                input.State.SetAim(ax, az);
+                yield return Seconds(0.3);
+                input.State.ButtonDown(HumanInputState.HumanButton.Attack);
+                yield return Seconds(0.12);
+                drv.TimeScale = 0;
+                Note($"facing {tag}: aim screen-left (sim facing wanted 135 deg), actor 0 facing {W.Actors[0].Facing * 180 / Math.PI:0} deg, attack cd {W.Actors[0].AttackCd:0.00}");
+                yield return Seconds(0.15);
+                Shot("16-aim-left-attack-" + tag);
+                input.State.ButtonUp(HumanInputState.HumanButton.Attack);
+                input.State.ClearAim();
+
+                // The Kaiju turned toward the camera, the player stood beside it so the camera frames it.
+                Kaiju k = W.Kaiju;
+                double kdx = W.X[0] - k.X, kdz = W.Z[0] - k.Z;
+                double kspeed = Math.Sqrt((k.X - k.PrevX) * (k.X - k.PrevX) + (k.Z - k.PrevZ) * (k.Z - k.PrevZ)) * drv.Config.SimHz;
+                Note($"facing {tag}: kaiju {k.State} facing {k.Facing * 180 / Math.PI:0} deg, speed {kspeed:0.00} u/s, heading {(kspeed > 0.05 ? (Math.Atan2(k.Z - k.PrevZ, k.X - k.PrevX) * 180 / Math.PI).ToString("0") : "-")} deg");
+                W.X[0] = W.PrevX[0] = k.X + 3.5; W.Z[0] = W.PrevZ[0] = k.Z + 3.5;
+                k.Facing = Math.PI / 4;
+                yield return Seconds(0.3);
+                Note($"facing {tag}: kaiju turned to 45 deg (toward the camera); player moved beside it (was {Math.Sqrt(kdx * kdx + kdz * kdz):0.0} u away)");
+                Shot("17-kaiju-toward-camera-" + tag);
+                drv.TimeScale = 1;
+            }
+            SetArtYaw(true);
+            drv.HumanAutopilot = true;
+
             // Results: run the clock out.
             W.Match.Time = drv.Config.MatchSeconds - 2.0 / drv.Config.SimHz;
             drv.StepTicks(4);
@@ -187,6 +242,18 @@ namespace CriticalMass.Editor.Flow
             D.PlayAgain();
             yield return () => Driver != null && Driver != before && W != null && GameFlow.State == FlowState.Match && !D.Loading;
             Note($"play again: state {GameFlow.State}, seed {W.Opts.Seed} (was {oldSeed}), tick {W.Tick}, phase {W.Match.Phase}");
+        }
+
+        static readonly Dictionary<string, float> MeasuredYaw = new Dictionary<string, float>();
+
+        /// <summary>false: every model's ArtYawDeg is 0 (the mapping before the 2026-11-12 fix); true: the measured values.</summary>
+        static void SetArtYaw(bool corrected)
+        {
+            foreach (CriticalMass.Runtime.View.Art.ModelSpec m in CriticalMass.Runtime.View.Art.ArtMapping.Models)
+            {
+                if (!MeasuredYaw.ContainsKey(m.Key)) MeasuredYaw[m.Key] = m.ArtYawDeg;
+                m.ArtYawDeg = corrected ? MeasuredYaw[m.Key] : 0f;
+            }
         }
 
         static int EnemiesNear(World w, double r)

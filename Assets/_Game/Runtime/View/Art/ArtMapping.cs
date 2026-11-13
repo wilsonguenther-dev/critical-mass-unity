@@ -51,6 +51,14 @@ namespace CriticalMass.Runtime.View.Art
         /// texel; Warrior, Kaiju). 0 or more: the decal is its own material slot (submesh) of Meshes[0], drawn by a face
         /// material with no hull (Miner: CM_FaceDecal is slot 1).</summary>
         public int FaceSlot = -1;
+        /// <summary>
+        /// Yaw in degrees that turns this model's art so its face is on the root's +Z, the side the view turns toward the
+        /// sim facing (ModelView.SetFacing). 0 when the art already faces +Z. Measured per model by ModelFacingTests (face
+        /// decal and toes), never assumed per family. Measured 2026-11-12 (idle pose): Warrior face 179 / toes 176, Miner face
+        /// 179 / toes 176, Farmer toes 176 (no face decal), Kaiju_Hatchling face 178, Kaiju_Adult face 178: each art file
+        /// faces the root's -Z, so each carries 180.
+        /// </summary>
+        public float ArtYawDeg;
         /// <summary>Sidecar of unlined vertices (tools/art/outline_weights.py from the .blend's outline_w group), or null.</summary>
         public string OutlineWeights;
         /// <summary>True when the importer bakes UV4.x outline weights (0 on the face) and the material reads them.</summary>
@@ -132,17 +140,17 @@ namespace CriticalMass.Runtime.View.Art
                 Bones = 41, ClipSource = "Assets/_Game/Art/Characters/KayKit_Clips.fbx",
                 Meshes = new[] { "Warrior_Body", "Warrior_Cleaver", "Warrior_Shield" }, MaskCodes = new[] { 0, 6, 8 },
                 OutlinePx = CharacterHullPx, Rim = 0.6f, Authored = WarriorAzure, Crimson = WarriorCrimson, Height = 2.0f,
-                FaceTexture = "Assets/_Game/Art/Characters/Warrior_Face.png" },
+                FaceTexture = "Assets/_Game/Art/Characters/Warrior_Face.png", ArtYawDeg = 180f },
             new ModelSpec { Key = Miner, AssetPath = "Assets/_Game/Art/Miner/Miner.fbx", Kind = ArtKind.Character, Rigged = true,
                 Bones = 41, ClipSource = "Assets/_Game/Art/Characters/KayKit_Clips.fbx",
                 Meshes = new[] { "Miner_Body", "Miner_PickHammer", "Miner_PickHammer_Hammer" }, MaskCodes = new[] { 0, 6, 8 },
                 OutlinePx = CharacterHullPx, Rim = 0.6f, Authored = MinerAzure, Crimson = MinerCrimson, Height = 2.0f,
-                FaceTexture = "Assets/_Game/Art/Miner/MinerFace.png", FaceSlot = 1 },
+                FaceTexture = "Assets/_Game/Art/Miner/MinerFace.png", FaceSlot = 1, ArtYawDeg = 180f },
             new ModelSpec { Key = Farmer, AssetPath = "Assets/_Game/Art/Farmer/Farmer.fbx", Kind = ArtKind.Character, Rigged = true,
                 Bones = 41, ClipSource = "Assets/_Game/Art/Characters/KayKit_Clips.fbx",
                 Meshes = new[] { "Farmer_Body", "Farmer_Staff" }, MaskCodes = new[] { 0, 2, 8 },
                 OutlinePx = CharacterHullPx, Rim = 0.6f, Authored = FarmerAzure, Crimson = FarmerCrimson, Height = 2.0f,
-                OutlineWeights = "Assets/_Game/Art/Farmer/Farmer_OutlineW.json" },
+                OutlineWeights = "Assets/_Game/Art/Farmer/Farmer_OutlineW.json", ArtYawDeg = 180f },
             new ModelSpec { Key = KaykitClips, AssetPath = "Assets/_Game/Art/Characters/KayKit_Clips.fbx", Kind = ArtKind.Character, Rigged = true,
                 Bones = 41, OwnClips = new[] { Idle, Walk, Run, Attack, Gather, Hit, Death, Cheer } },
             new ModelSpec { Key = MinerBarricade, AssetPath = "Assets/_Game/Art/Miner/MinerBarricade.fbx", Kind = ArtKind.Prop,
@@ -153,10 +161,10 @@ namespace CriticalMass.Runtime.View.Art
                 OutlinePx = CharacterHullPx, Authored = KaijuDefault(GlowNeutral), Height = 1.7f },
             new ModelSpec { Key = KaijuHatchling, AssetPath = "Assets/_Game/Art/Kaiju/Kaiju_Hatchling.fbx", Kind = ArtKind.Kaiju, Rigged = true,
                 Bones = 20, OwnClips = new[] { Idle, Walk, Roar, SlamWindup, Slam, Berserk, KO }, Meshes = new[] { "KaijuMesh" },
-                MaskCodes = new[] { 0, 6 }, OutlinePx = CharacterHullPx, Authored = KaijuDefault(GlowNeutral), Height = 2.235f, FaceTexture = KaijuFace },
+                MaskCodes = new[] { 0, 6 }, OutlinePx = CharacterHullPx, Authored = KaijuDefault(GlowNeutral), Height = 2.235f, FaceTexture = KaijuFace, ArtYawDeg = 180f },
             new ModelSpec { Key = KaijuAdult, AssetPath = "Assets/_Game/Art/Kaiju/Kaiju_Adult.fbx", Kind = ArtKind.Kaiju, Rigged = true,
                 Bones = 20, OwnClips = new[] { Idle, Walk, Roar, SlamWindup, Slam, Berserk, KO }, Meshes = new[] { "KaijuMesh" },
-                MaskCodes = new[] { 0, 6 }, OutlinePx = CharacterHullPx, Authored = KaijuDefault(GlowAzure), Height = 5.0f, FaceTexture = KaijuFace },
+                MaskCodes = new[] { 0, 6 }, OutlinePx = CharacterHullPx, Authored = KaijuDefault(GlowAzure), Height = 5.0f, FaceTexture = KaijuFace, ArtYawDeg = 180f },
             new ModelSpec { Key = KaijuShards, AssetPath = "Assets/_Game/Art/Kaiju/Kaiju_BerserkShards.fbx", Kind = ArtKind.Kaiju,
                 Meshes = new[] { "Kaiju_BerserkShards" }, MaskCodes = new[] { 6 }, OutlinePx = 0f, Authored = KaijuDefault(GlowAzure) },
             new ModelSpec { Key = KaijuSpikes, AssetPath = "Assets/_Game/Art/Kaiju/Kaiju_TelegraphSpikes.fbx", Kind = ArtKind.Kaiju,
