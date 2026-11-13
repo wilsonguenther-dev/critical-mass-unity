@@ -523,10 +523,10 @@ namespace CriticalMass.Runtime.Tests
         }
 
         [Test]
-        public void MascotNameLivesInOneStringAndPortraitsHaveFiveExpressions()
+        public void MascotNameLivesInOneStringAndPortraitsHaveElevenExpressions()
         {
             Assert.IsFalse(string.IsNullOrEmpty(MascotGuide.MascotName));
-            Assert.AreEqual(5, MascotGuide.Expressions.Length);
+            Assert.AreEqual(11, MascotGuide.Expressions.Length, "the brief's five plus Hatch v1's six extras (art landing)");
             Assert.AreEqual(Enum.GetValues(typeof(MascotReaction)).Length, MascotGuide.Expressions.Length);
             Assert.AreEqual("UI/Mascot/mascot-happy@2x", MascotGuide.PortraitResource(MascotReaction.Cheer, 2));
             Assert.AreEqual("UI/Mascot/mascot-wince@4x", MascotGuide.PortraitResource(MascotReaction.Wince, 4));

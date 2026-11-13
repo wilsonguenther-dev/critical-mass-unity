@@ -103,6 +103,9 @@ namespace CriticalMass.Runtime.View.Dressing
         // Render tier (2026-11-12 triangle budget): the materials and renderers the scenery uses, so a quality change can
         // drop the scenery outline pass and scenery shadow casting without touching the characters.
         private readonly HashSet<Material> _sceneryMats = new HashSet<Material>();
+        /// <summary>The plan in use carries the environment v4 clutter (QualityTable.ExtraClutter at the time it was made).</summary>
+        private bool _clutterOn;
+        public bool ClutterOn => _clutterOn;
 
         /// <summary>Scenery triangles drawn once (the perf report's world_triangles; outline and shadow passes multiply it).</summary>
         public static int LastTriangles { get; private set; }
@@ -114,6 +117,8 @@ namespace CriticalMass.Runtime.View.Dressing
         /// shared project assets in the editor).</summary>
         private void ApplyTier()
         {
+            // Environment v4 clutter follows the quality level: re-plan (only the groups that differ are rebuilt).
+            if (Plan != null && QualityTable.ExtraClutter(RenderTier.Level) != _clutterOn) _replanPending = true;
             (bool outline, bool shadows) = RenderTier.Policy(RenderTier.Level);
             if (!Application.isEditor)
                 foreach (Material m in _sceneryMats)
@@ -181,7 +186,8 @@ namespace CriticalMass.Runtime.View.Dressing
             _replanPending = false;
             _lastReplanFrame = Time.frameCount;
             Replans++;
-            WorldPlan next = WorldDresser.Plan(_map, _bases, _catalog.Centroid, _catalog.Body);
+            _clutterOn = QualityTable.ExtraClutter(RenderTier.Level);
+            WorldPlan next = WorldDresser.Plan(_map, _bases, _catalog.Centroid, _catalog.Body, _clutterOn);
             HashSet<int> changed = ChangedGroups(Plan, next);
             Plan = next;
             foreach (int g in changed) DestroyGroup(g);
@@ -383,7 +389,8 @@ namespace CriticalMass.Runtime.View.Dressing
             if (_catalog == null || _catalog.Names.Length == 0) return;
             _bases = BasesFile.Load();
             BasesParses++;
-            Plan = WorldDresser.Plan(_map, _bases, _catalog.Centroid, _catalog.Body);
+            _clutterOn = QualityTable.ExtraClutter(RenderTier.Level);
+            Plan = WorldDresser.Plan(_map, _bases, _catalog.Centroid, _catalog.Body, _clutterOn);
             _root = new GameObject("World Art").transform;
             _root.SetParent(transform, false);
             if (_field != null) Destroy(_field);
