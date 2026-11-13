@@ -30,6 +30,9 @@ namespace CriticalMass.Runtime.Game
 
         /// <summary>Raised on the main thread after the audio output device changed and audio was reset.</summary>
         public static event Action AudioDeviceChanged;
+        /// <summary>Integration batch 5: tests that assert no unexpected log turn this off; a real audio device change on the
+        /// test machine (headphones, a call) otherwise logs "audio output changed" mid-test and fails it. The reset still runs.</summary>
+        public static bool LogAudioResets = true;
 
         /// <summary>Pauses opened by this class since boot (tests).</summary>
         public static int PausesOpened { get; private set; }
@@ -141,7 +144,7 @@ namespace CriticalMass.Runtime.Game
             {
                 AudioConfiguration cfg = AudioSettings.GetConfiguration();
                 AudioSettings.Reset(cfg);
-                Debug.Log("[CM.System] audio output changed: audio reset");
+                if (LogAudioResets) Debug.Log("[CM.System] audio output changed: audio reset");
                 AudioDeviceChanged?.Invoke();
             }
             catch (Exception e)

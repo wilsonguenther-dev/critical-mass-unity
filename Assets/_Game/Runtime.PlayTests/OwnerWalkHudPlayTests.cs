@@ -88,7 +88,8 @@ namespace CriticalMass.Runtime.PlayTests
             yield return Frames(2);
             d.Ready.StartNow();
             yield return Until(() => Driver() != null && Driver() != from && Driver().World != null && GameFlow.State == FlowState.Match &&
-                                     !d.Loading && !LoadingScreen.IsOpen, 60f, "READY launches the match");
+                                     FlowDirector.Current != null && !FlowDirector.Current.Loading && !LoadingScreen.IsOpen, 60f, "READY launches the match");
+            // (batch 5: the director is rebuilt with the match scene; the old one captured above stays Loading forever)
             SimDriverBehaviour drv = Driver();
             yield return Until(() => drv.World.Match.Phase == MatchPhase.Playing && drv.World.Actors[0].Alive, 30f, "the match plays");
             float t1 = Time.realtimeSinceStartup;

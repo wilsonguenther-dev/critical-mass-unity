@@ -37,6 +37,7 @@ namespace CriticalMass.Runtime.PlayTests
         [SetUp]
         public void SetUp()
         {
+            SystemEvents.LogAudioResets = false;   // batch 5: a device change on the test Mac is not a game log
             GameFlow.ResetForTests();
             GameFlow.ForceEnabled = true;
             GameFlow.Autoplay = false;
@@ -47,6 +48,7 @@ namespace CriticalMass.Runtime.PlayTests
         [TearDown]
         public void TearDown()
         {
+            SystemEvents.LogAudioResets = true;
             if (_kb != null) InputSystem.RemoveDevice(_kb);
             _kb = null;
             if (_settingsSaved)
