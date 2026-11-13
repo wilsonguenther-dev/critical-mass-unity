@@ -30,7 +30,9 @@ namespace CriticalMass.Runtime.Flow
         /// <summary>Top of the key-hint line: inside the HUD's 24 px edge margin at the bottom of the 1080 space.</summary>
         public const float HintY = HudLayout.RefH - HudLayout.Margin - 36f;
         /// <summary>A press that opened a screen must not also press its focused button.</summary>
-        public const float SubmitGuardSeconds = 0.15f;
+        /// <para>Owner walk 1: 0.3 s (was 0.15), longer than a double-click, so a double-click on a mode card opens class select
+        /// and never also picks the class under the pointer.</para>
+        public const float SubmitGuardSeconds = 0.3f;
 
         public Canvas Canvas { get; private set; }
         public bool IsVisible { get; private set; }

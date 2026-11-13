@@ -99,8 +99,21 @@ namespace CriticalMass.Runtime.Menu
         {
             PointerNavigated = true;
             base.OnPointerEnter(e);
+            UiCursor.Hover(IsInteractable());   // owner walk 1: pointer feedback on everything clickable
             if (IsInteractable() && EventSystem.current != null && EventSystem.current.currentSelectedGameObject != gameObject)
                 Select();
+        }
+
+        public override void OnPointerExit(PointerEventData e)
+        {
+            base.OnPointerExit(e);
+            UiCursor.Hover(false);
+        }
+
+        protected override void OnDisable()
+        {
+            base.OnDisable();
+            if (UiCursor.Hovering) UiCursor.Reset();
         }
 
         float LocalX01(PointerEventData e)

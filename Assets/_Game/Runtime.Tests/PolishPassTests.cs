@@ -343,7 +343,7 @@ namespace CriticalMass.Runtime.Tests
                 AchievementToast.ToastW, AchievementToast.ToastH), HudZone.Toast);
             AssertIn("mascot (upper)", new Rect(MascotGuide.Margin, MascotGuide.UpperY, MascotGuide.PanelW, MascotGuide.PanelH), HudZone.Guide);
             AssertIn("mascot (lower)", new Rect(MascotGuide.Margin, MascotGuide.LowerY, MascotGuide.PanelW, MascotGuide.PanelH), HudZone.Guide);
-            AssertIn("death recap", new Rect(960f - DeathRecap.CardW * 0.5f, 540f - DeathRecap.OffsetY - DeathRecap.CardH * 0.5f, DeathRecap.CardW, DeathRecap.CardH), HudZone.Lower);
+            AssertIn("death recap", new Rect(960f - DeathRecap.CardW * 0.5f, DeathRecap.TopY, DeathRecap.CardW, DeathRecap.CardH), HudZone.Callout);   // owner walk 1: centre lane
             AssertIn("you are the ... line", new Rect(960f - PlayerPresence.IntroW * 0.5f, 1080f - 250f - 120f, PlayerPresence.IntroW, 120f), HudZone.Lower);
         }
 

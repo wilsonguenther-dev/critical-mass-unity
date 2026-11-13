@@ -39,6 +39,18 @@ namespace CriticalMass.Runtime.Hud.Interact
             return c;
         }
 
+        /// <summary>
+        /// Owner walk 1: MakeCanvas for a match HUD layer. The space covers the safe area and every piece placed MenuUi.Place
+        /// style goes into its anchor frame (HudSafeSpace, HudFrames), so it keeps its distance to its own screen edge at any
+        /// screen shape and never sits under the notch. Modal panels (scoreboard, station, full map) keep MakeCanvas.
+        /// </summary>
+        public static Canvas MakeHudCanvas(Transform parent, string name, int sortingOrder, out RectTransform root, out RectTransform space)
+        {
+            Canvas c = MakeCanvas(parent, name, sortingOrder, out root, out space);
+            HudSafeSpace.Attach(space, true);
+            return c;
+        }
+
         /// <summary>Canvas scale for the camera's pixel size (same rule as the HUD and pause menu).</summary>
         public static void UpdateScale(Canvas c)
         {

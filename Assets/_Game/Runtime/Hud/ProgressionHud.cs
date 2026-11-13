@@ -76,11 +76,11 @@ namespace CriticalMass.Runtime.Hud
             _root = (RectTransform)go.transform;
 
             // Coin chip: bottom-left, 12 px above the player card (HudLayout Player cluster).
-            _chip = MenuUi.Rt(_root, "Coin Chip");
+            _chip = MenuUi.Rt(FeedUi.SafeRoot(_root), "Coin Chip");   // owner walk 1: inside the safe area
             _chip.anchorMin = _chip.anchorMax = Vector2.zero;
             _chip.pivot = Vector2.zero;
             _chip.sizeDelta = new Vector2(ChipW, ChipH);
-            _chip.anchoredPosition = new Vector2(HudLayout.Margin, HudLayout.Margin + HudLayout.PlayerSize.y + 12f);
+            _chip.anchoredPosition = new Vector2(HudZones.CoinChip.x, HudLayout.RefH - HudZones.CoinChip.yMax);
             VectorShape body = MenuUi.Shape(_chip, "Body", ShapeKind.RoundRect, 0f, 0f, ChipW, ChipH, CMTokens.PanelNavy.Color, -1f);
             body.OutlinePx = 3f;
             body.RimPx = 2f;

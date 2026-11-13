@@ -54,12 +54,22 @@ namespace CriticalMass.Runtime.Hud
         /// <summary>A container of size (w, h) whose pivot sits at anchor, offset (x, y) reference px (y up, uGUI).</summary>
         public static RectTransform Anchored(Transform parent, string name, Vector2 anchor, float x, float y, float w, float h)
         {
+            // Owner walk 1: a piece anchored straight onto a HUD canvas goes into the canvas's safe-area root instead, so the
+            // kill feed, recap, toasts and banners keep clear of the notch and stay beside the pieces they were laid out with.
+            if (parent != null && parent.GetComponent<Canvas>() != null) parent = SafeRoot(parent);
             RectTransform rt = MenuUi.Rt(parent, name);
             rt.anchorMin = rt.anchorMax = anchor;
             rt.pivot = anchor;
             rt.sizeDelta = new Vector2(w, h);
             rt.anchoredPosition = new Vector2(x, y);
             return rt;
+        }
+
+        /// <summary>The canvas's "Safe Area" child (made once): a stretch container kept on the safe area.</summary>
+        public static RectTransform SafeRoot(Transform canvas)
+        {
+            Transform t = canvas.Find("Safe Area");
+            return t != null ? (RectTransform)t : HudSafeSpace.MakeSafeRoot(canvas);
         }
 
         public static float Ease(float t) => 1f - (1f - t) * (1f - t);
@@ -293,6 +303,7 @@ namespace CriticalMass.Runtime.Hud
             KillWords.Init(null);
             Canvas = FeedUi.MakeCanvas(transform, "Kill Feed Canvas", 12);
             _box = FeedUi.Anchored(Canvas.transform, "Kill Feed", new Vector2(1f, 1f), -Right, -Top, LineW, Pitch * Lines);
+            HudKeepOut.Add(_box);
             for (int i = 0; i < Lines; i++)
             {
                 var s = new Slot();
@@ -346,7 +357,8 @@ namespace CriticalMass.Runtime.Hud
             if (CriticalMass.Runtime.Flow.GameFlow.MenuIdle) return;   // batch 4: hidden behind a menu over a backdrop match
             int tier = FeedUi.Refresh(Canvas);
             if (tier != _tier) { _tier = tier; for (int i = 0; i < Lines; i++) SetTier(_slots[i], tier); }
-            bool hide = _log == null || _log.Suppressed;
+            // owner walk 1: the feed steps away under the full map (its panel covers the right column) and the scoreboard
+            bool hide = _log == null || _log.Suppressed || CriticalMass.Runtime.Hud.Interact.FullMap.IsOpen || Scoreboard.AnyOpen;
             if (Canvas.enabled == hide) Canvas.enabled = !hide;
             Tick(_log != null && _log.Paused ? 0f : Time.unscaledDeltaTime);
         }

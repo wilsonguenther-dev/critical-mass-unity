@@ -40,6 +40,8 @@ namespace CriticalMass.Runtime.Menu
         public static bool Editable => Instance != null && Instance._editable;
         public static bool IsTyping => Instance != null && Instance._typing;
         public static event Action Opened, Closed;
+        /// <summary>Owner walk 1: the frame the panel last closed (a screen under it ignores that frame's Back press).</summary>
+        public static int ClosedFrame = -10;
         /// <summary>The loadout or name changed (after the profile was saved).</summary>
         public static event Action<ClassId> LoadoutChanged;
 
@@ -64,6 +66,10 @@ namespace CriticalMass.Runtime.Menu
         readonly MenuItem[] _tabs = new MenuItem[4];
         readonly GameObject[] _pages = new GameObject[4];
         MenuItem _back, _classStep;
+        // owner walk 1: class chips under the preview (the locker's class tabs) and the drag-to-turn surface
+        readonly MenuItem[] _classChips = new MenuItem[6];
+        readonly HudIcon[] _classChipIcons = new HudIcon[6];
+        GameObject _chipRow;
         Text _className, _role, _headerInfo, _hint;
 
         // character page
@@ -155,6 +161,8 @@ namespace CriticalMass.Runtime.Menu
             if (!_editable && me != null) ShownClass = me.Cls;
             _open = true;
             _canvas.enabled = true;
+            // Owner walk 1: the press that opened the Barracks (a click on the fighter) never also presses a button in them.
+            MenuItem.SubmitBlockedUntil = Mathf.Max(MenuItem.SubmitBlockedUntil, Time.unscaledTime + CriticalMass.Runtime.Flow.FlowScreen.SubmitGuardSeconds);
             if (_input != null && _input.PauseHandler != (Func<bool>)OnPause)
             {
                 _prevPause = _input.PauseHandler;
@@ -172,6 +180,7 @@ namespace CriticalMass.Runtime.Menu
             if (!_open) return;
             StopTyping();
             _open = false;
+            ClosedFrame = Time.frameCount;
             if (_canvas != null) _canvas.enabled = false;
             _preview.Release();
             if (_input != null && _input.PauseHandler == (Func<bool>)OnPause) _input.PauseHandler = _prevPause;
@@ -225,6 +234,7 @@ namespace CriticalMass.Runtime.Menu
             if (preview) RefreshPreview();
             else _preview.Release();
             WireNavigation();
+            RefreshChips();
             ProgressionUi.Select(tab == Tab.Outfit && _editable ? _slotItems[0] : (Selectable)_tabs[(int)tab]);
             UpdateHint();
         }
@@ -256,7 +266,8 @@ namespace CriticalMass.Runtime.Menu
             for (int i = 0; i < 4; i++)
             {
                 int k = i;
-                MenuItem t = MenuUi.Item(_space, "Tab " + TabNames[i], PX + 40f + i * 256f, PY + 140f, 240f, 60f, TabNames[i],
+                // owner walk 1: 220 wide on a 236 step (the SKILLS tab ran 48 px under the CLASS stepper)
+                MenuItem t = MenuUi.Item(_space, "Tab " + TabNames[i], PX + 40f + i * 236f, PY + 140f, 220f, 60f, TabNames[i],
                     MenuItem.Kind.Button, UiScale.TypeBody, true, CMTokens.Display);
                 t.Submitted = () => ShowTab((Tab)k);
                 _tabs[i] = t;
@@ -272,14 +283,20 @@ namespace CriticalMass.Runtime.Menu
             RectTransform pa = MenuUi.Rt(_space, "Preview Area");
             MenuUi.Stretch(pa);
             _previewArea = pa.gameObject;
-            VectorShape frame = MenuUi.Shape(pa, "Preview Frame", ShapeKind.Chamfer, PX + 40f, CY, 480f, 600f, CMTokens.PanelNavy.Color, 22f);
+            // Owner walk 1: the preview is a turntable you drag (the frame is 520 tall; the class chips sit under it).
+            VectorShape frame = MenuUi.Shape(pa, "Preview Frame", ShapeKind.Chamfer, PX + 40f, CY, 480f, PreviewH, CMTokens.PanelNavy.Color, 22f);
             frame.OutlinePx = 4f;
             frame.RimPx = 3f;
             _previewImage = MenuUi.Rt(frame.transform, "Preview").gameObject.AddComponent<RawImage>();
-            MenuUi.Place(_previewImage.rectTransform, 8f, 8f, 464f, 584f);
-            _previewImage.raycastTarget = false;
+            float iw = (PreviewH - 16f) * CharacterPreview.TexWidth / CharacterPreview.TexHeight;
+            MenuUi.Place(_previewImage.rectTransform, (480f - iw) * 0.5f, 8f, iw, PreviewH - 16f);
+            _previewImage.raycastTarget = true;
+            _previewImage.gameObject.AddComponent<PreviewTurn>().Turned = d => _preview.Turn(d);
+            MenuUi.Label(frame.transform, "Turn Note", CMTokens.Display, UiScale.TypeSmall, CMTokens.WithAlpha(cream, 0.75f), TextAnchor.MiddleCenter,
+                8f, PreviewH - 46f, 464f, 32f, "DRAG TO TURN", 2f).raycastTarget = false;
             _portrait = MenuUi.Rt(frame.transform, "Portrait").gameObject.AddComponent<RawImage>();
-            MenuUi.Place(_portrait.rectTransform, 40f, 100f, 400f, 400f);
+            MenuUi.Place(_portrait.rectTransform, 40f, 60f, 400f, 400f);
+            BuildClassChips(pa);
             _portrait.raycastTarget = false;
 
             for (int i = 0; i < 4; i++)
@@ -293,6 +310,56 @@ namespace CriticalMass.Runtime.Menu
             BuildTools(_pages[2].transform);
             BuildSkills(_pages[3].transform);
             _canvas.enabled = false;
+        }
+
+        const float PreviewH = 520f, ChipY = CY + PreviewH + 14f, ChipH = 66f;
+
+        /// <summary>Owner walk 1: six class chips (portraits) under the preview; the shown class wears the brass rim.</summary>
+        void BuildClassChips(Transform parent)
+        {
+            RectTransform row = MenuUi.Rt(parent, "Class Chips");
+            MenuUi.Stretch(row);
+            _chipRow = row.gameObject;
+            int n = Mathf.Min(_classChips.Length, ClassIds.All.Count);
+            const float gap = 8f;
+            float w = (480f - (n - 1) * gap) / n;
+            for (int i = 0; i < n; i++)
+            {
+                ClassId cls = ClassIds.All[i];
+                MenuItem chip = MenuUi.Item(row, "Class " + cls, PX + 40f + i * (w + gap), ChipY, w, ChipH, "", MenuItem.Kind.Button, UiScale.TypeSmall, true, CMTokens.Display);
+                chip.Body.Radius = 12f;
+                _classChipIcons[i] = HudIcon.Make(chip.transform, "Portrait", (w - 54f) * 0.5f, 6f, 54f, 54f);
+                _classChipIcons[i].Image.raycastTarget = false;
+                chip.Submitted = () => PickClass(cls);
+                _classChips[i] = chip;
+            }
+        }
+
+        void PickClass(ClassId cls)
+        {
+            if (!_editable || cls == ShownClass) return;
+            ShownClass = cls;
+            RefreshAll();
+            if (_previewArea.activeSelf) RefreshPreview();
+        }
+
+        /// <summary>The class chips (tests).</summary>
+        public IReadOnlyList<MenuItem> ClassChips => _classChips;
+
+        void RefreshChips()
+        {
+            if (_chipRow == null) return;
+            _chipRow.SetActive(_editable && (CurrentTab == Tab.Character || CurrentTab == Tab.Outfit));
+            for (int i = 0; i < _classChips.Length; i++)
+            {
+                if (_classChips[i] == null) continue;
+                ClassId cls = ClassIds.All[i];
+                _classChipIcons[i].Set(UiIcons.Portrait[(int)cls, (int)ShownTeam], 2);
+                bool on = cls == ShownClass;
+                _classChips[i].Body.SetRim(on ? CMTokens.ToolBrass.Color : CMTokens.WarmCream.Color);
+                _classChips[i].Body.RimPx = on ? 4f : 2f;
+                _classChips[i].Body.SetVerticesDirty();
+            }
         }
 
         static readonly string[] StatNames = { "HEALTH", "SPEED", "CARRY", "GATHER" };
@@ -402,6 +469,17 @@ namespace CriticalMass.Runtime.Menu
                 n.selectOnUp = rows.Count > 0 ? rows[rows.Count - 1] : null;
                 t.navigation = n;
             }
+            // owner walk 1: the class chips chain left and right; up returns to the tab row
+            for (int i = 0; i < _classChips.Length; i++)
+            {
+                if (_classChips[i] == null) continue;
+                int n = _classChips.Length;
+                _classChips[i].navigation = new Navigation
+                {
+                    mode = Navigation.Mode.Explicit, selectOnLeft = _classChips[(i + n - 1) % n], selectOnRight = _classChips[(i + 1) % n],
+                    selectOnUp = current, selectOnDown = current,
+                };
+            }
             if (rows.Count == 0) return;
             ProgressionUi.ChainVertical(rows);
             Navigation first = rows[0].navigation;
@@ -430,6 +508,7 @@ namespace CriticalMass.Runtime.Menu
             TeamId team = ShownTeam;
             int ci = (int)c, ti = (int)team;
             HudText.Set(_className, ProgressionWords.ClassName(c));
+            RefreshChips();
             HudText.Set(_role, ProgressionWords.RoleLines[ci]);
             HudText.Set(_headerInfo, ProgressionWords.Level + " " + p.Level.ToString(CultureInfo.InvariantCulture) + "   " +
                                      ProgressionUi.Thousands(p.Coins) + " " + ProgressionWords.Coins);
@@ -680,6 +759,8 @@ namespace CriticalMass.Runtime.Menu
                     Close();
                     return;
                 }
+                float turn = pad.rightStick.ReadValue().x;
+                if (Mathf.Abs(turn) > 0.2f && _previewArea.activeSelf) _preview.Turn(-turn * 180f * Time.unscaledDeltaTime);
                 if (pad.leftShoulder.wasPressedThisFrame) ShowTab((Tab)(((int)CurrentTab + 3) % 4));
                 else if (pad.rightShoulder.wasPressedThisFrame) ShowTab((Tab)(((int)CurrentTab + 1) % 4));
             }
@@ -705,6 +786,7 @@ namespace CriticalMass.Runtime.Menu
             else if (CurrentTab == Tab.Outfit && _editable)
                 s = pad ? "A SELECT   ·   LEFT / RIGHT CHANGE   ·   LB / RB TABS   ·   B CLOSE" : "LEFT / RIGHT CHANGE   ·   ENTER SELECT   ·   ESC CLOSE";
             else s = pad ? "A SELECT   ·   LB / RB TABS   ·   B CLOSE" : "ENTER SELECT   ·   ESC CLOSE";
+            if (_editable && (CurrentTab == Tab.Character || CurrentTab == Tab.Outfit)) s = (pad ? "RIGHT STICK TURN   ·   " : "DRAG TO TURN   ·   ") + s;
             HudText.Set(_hint, s);
         }
 
@@ -723,6 +805,22 @@ namespace CriticalMass.Runtime.Menu
     /// The Barracks (DG-27): the character panel opened editable on the Outfit tab. Between matches only: in a live
     /// match it opens view-only. DG-01's main menu calls Barracks.Show().
     /// </summary>
+    /// <summary>Owner walk 1: a drag on the Barracks preview turns the model (degrees per reference px, like the class card).</summary>
+    public sealed class PreviewTurn : MonoBehaviour, IDragHandler, IPointerEnterHandler, IPointerExitHandler
+    {
+        public Action<float> Turned;
+
+        public void OnDrag(PointerEventData e)
+        {
+            Canvas c = GetComponentInParent<Canvas>();
+            float scale = c != null && c.rootCanvas.scaleFactor > 1e-4f ? c.rootCanvas.scaleFactor : 1f;
+            Turned?.Invoke(-e.delta.x / scale * 0.45f);
+        }
+
+        public void OnPointerEnter(PointerEventData e) => UiCursor.Hover(true);
+        public void OnPointerExit(PointerEventData e) => UiCursor.Hover(false);
+    }
+
     public static class Barracks
     {
         public static bool IsOpen => CharacterPanel.IsOpen && CharacterPanel.Editable;
