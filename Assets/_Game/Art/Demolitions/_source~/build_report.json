@@ -1,0 +1,322 @@
+{
+ "objects": {
+  "Demolitions_Body": {
+   "triangles": 11346,
+   "vertices": 6159,
+   "rest_bounds": {
+    "min": [
+     -1.098,
+     -0.364,
+     0.0
+    ],
+    "max": [
+     1.098,
+     0.825,
+     2.003
+    ]
+   },
+   "materials": [
+    "CM_Toon",
+    "CM_FaceDecal"
+   ],
+   "feature_groups": [
+    "feat_bandolier",
+    "feat_belt",
+    "feat_boots",
+    "feat_buckles",
+    "feat_cap",
+    "feat_cap_detail",
+    "feat_face",
+    "feat_face_decal",
+    "feat_fingers",
+    "feat_fuse",
+    "feat_fuse_coil",
+    "feat_gloves",
+    "feat_goggles",
+    "feat_hair",
+    "feat_keg",
+    "feat_keg_detail",
+    "feat_knee_patch",
+    "feat_shirt",
+    "feat_skin",
+    "feat_sleeve",
+    "feat_soot",
+    "feat_spark",
+    "feat_straps",
+    "feat_team_cloth",
+    "feat_tnt",
+    "feat_trousers",
+    "feat_vest",
+    "feat_vest_detail"
+   ]
+  },
+  "Demolitions_TNTHand": {
+   "triangles": 624,
+   "vertices": 370,
+   "rest_bounds": {
+    "min": [
+     -1.089,
+     -0.148,
+     0.908
+    ],
+    "max": [
+     -0.434,
+     0.143,
+     1.195
+    ]
+   },
+   "materials": [
+    "CM_Toon"
+   ],
+   "feature_groups": [
+    "feat_spark",
+    "feat_team_cloth",
+    "feat_tnt_hand"
+   ]
+  },
+  "Demolitions_Mine_Buried": {
+   "triangles": 964,
+   "vertices": 552,
+   "rest_bounds": {
+    "min": [
+     -0.4,
+     -0.387,
+     -0.022
+    ],
+    "max": [
+     0.415,
+     0.409,
+     0.162
+    ]
+   },
+   "materials": [
+    "CM_Toon"
+   ],
+   "feature_groups": [
+    "feat_dirt",
+    "feat_mound",
+    "feat_pebbles"
+   ]
+  },
+  "Demolitions_Mine_Armed": {
+   "triangles": 1016,
+   "vertices": 584,
+   "rest_bounds": {
+    "min": [
+     -0.395,
+     -0.414,
+     -0.036
+    ],
+    "max": [
+     0.385,
+     0.36,
+     0.16
+    ]
+   },
+   "materials": [
+    "CM_Toon"
+   ],
+   "feature_groups": [
+    "feat_dirt",
+    "feat_mound",
+    "feat_pebbles",
+    "feat_plate"
+   ]
+  },
+  "Demolitions_Mine_Armed_OwnerRing": {
+   "triangles": 280,
+   "vertices": 160,
+   "rest_bounds": {
+    "min": [
+     -0.5,
+     -0.5,
+     0.0
+    ],
+    "max": [
+     0.5,
+     0.5,
+     0.02
+    ]
+   },
+   "materials": [
+    "CM_Toon"
+   ],
+   "feature_groups": [
+    "feat_team_cloth"
+   ]
+  },
+  "Demolitions_Mine_Triggered": {
+   "triangles": 1192,
+   "vertices": 698,
+   "rest_bounds": {
+    "min": [
+     -0.509,
+     -0.42,
+     -0.036
+    ],
+    "max": [
+     0.42,
+     0.497,
+     0.561
+    ]
+   },
+   "materials": [
+    "CM_Toon"
+   ],
+   "feature_groups": [
+    "feat_dirt",
+    "feat_mound",
+    "feat_plate",
+    "feat_spark"
+   ]
+  },
+  "Demolitions_TNT_Flight": {
+   "triangles": 600,
+   "vertices": 354,
+   "rest_bounds": {
+    "min": [
+     -0.19,
+     -0.142,
+     0.155
+    ],
+    "max": [
+     0.258,
+     0.203,
+     0.482
+    ]
+   },
+   "materials": [
+    "CM_Toon"
+   ],
+   "feature_groups": [
+    "feat_spark",
+    "feat_team_cloth",
+    "feat_tnt"
+   ]
+  },
+  "Demolitions_CraterRim": {
+   "triangles": 224,
+   "vertices": 112,
+   "rest_bounds": {
+    "min": [
+     -0.824,
+     -0.818,
+     0.004
+    ],
+    "max": [
+     0.834,
+     0.809,
+     0.012
+    ]
+   },
+   "materials": [
+    "CM_Toon"
+   ],
+   "feature_groups": [
+    "feat_crater"
+   ]
+  },
+  "Demolitions_Explosion": {
+   "triangles": 1600,
+   "vertices": 840,
+   "rest_bounds": {
+    "min": [
+     -1.05,
+     -1.05,
+     -0.018
+    ],
+    "max": [
+     1.05,
+     1.05,
+     1.531
+    ]
+   },
+   "materials": [
+    "CM_Toon"
+   ],
+   "feature_groups": [
+    "feat_boom"
+   ]
+  }
+ },
+ "bones": 41,
+ "display_pose": [
+  "Idle",
+  1
+ ],
+ "face_decal": {
+  "png": "DemolitionsFace.png",
+  "size": 256,
+  "faces": 95
+ },
+ "bevels": {
+  "boxes": 66,
+  "at_min_or_more": 55,
+  "groove_strips_exempt": 11,
+  "hidden_cores_unbevelled": 0,
+  "min_bevel": 0.02
+ },
+ "triangles_by_feature": {
+  "Demolitions_Body:skin": 820,
+  "Demolitions_Body:team_cloth": 756,
+  "Demolitions_Body:hair": 742,
+  "Demolitions_Body:vest": 700,
+  "Demolitions_Body:tnt": 696,
+  "Demolitions_Body:keg": 688,
+  "Demolitions_Body:cap": 604,
+  "Demolitions_Body:goggles": 604,
+  "Demolitions_Body:bandolier": 572,
+  "Demolitions_Body:boots": 544,
+  "Demolitions_Body:vest_detail": 492,
+  "Demolitions_Body:fingers": 448,
+  "Demolitions_Body:keg_detail": 404,
+  "Demolitions_Body:trousers": 352,
+  "Demolitions_Body:gloves": 340,
+  "Demolitions_Body:shirt": 316,
+  "Demolitions_Body:face_decal": 316,
+  "Demolitions_TNTHand:tnt_hand": 304,
+  "Demolitions_Body:straps": 264,
+  "Demolitions_Body:buckles": 256,
+  "Demolitions_Body:sleeve": 232,
+  "Demolitions_Body:spark": 232,
+  "Demolitions_TNTHand:spark": 232,
+  "Demolitions_Body:fuse": 220,
+  "Demolitions_Body:cap_detail": 164,
+  "Demolitions_Body:knee_patch": 160,
+  "Demolitions_Body:belt": 148,
+  "Demolitions_Body:face": 120,
+  "Demolitions_Body:soot": 96,
+  "Demolitions_TNTHand:team_cloth": 88,
+  "Demolitions_Body:fuse_coil": 60
+ },
+ "triangles_props_by_feature": {
+  "Demolitions_Explosion:boom": 1600,
+  "Demolitions_Mine_Buried:dirt": 600,
+  "Demolitions_Mine_Armed:dirt": 440,
+  "Demolitions_Mine_Triggered:dirt": 400,
+  "Demolitions_TNT_Flight:tnt": 304,
+  "Demolitions_Mine_Armed_OwnerRing:team_cloth": 280,
+  "Demolitions_Mine_Triggered:mound": 280,
+  "Demolitions_Mine_Armed:plate": 256,
+  "Demolitions_Mine_Triggered:plate": 256,
+  "Demolitions_Mine_Triggered:spark": 256,
+  "Demolitions_CraterRim:crater": 224,
+  "Demolitions_TNT_Flight:spark": 208,
+  "Demolitions_Mine_Buried:mound": 188,
+  "Demolitions_Mine_Armed:mound": 188,
+  "Demolitions_Mine_Buried:pebbles": 176,
+  "Demolitions_Mine_Armed:pebbles": 132,
+  "Demolitions_TNT_Flight:team_cloth": 88
+ },
+ "triangles_character": 11970,
+ "triangles_props": {
+  "buried": 964,
+  "armed": 1016,
+  "ring": 280,
+  "triggered": 1192,
+  "flight": 600,
+  "crater": 224,
+  "boom": 1600
+ },
+ "triangles_mine_armed_with_ring": 1296
+}
