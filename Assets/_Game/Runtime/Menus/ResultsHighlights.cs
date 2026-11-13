@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Reflection;
 using CriticalMass.Runtime.Codex;
 using CriticalMass.Runtime.Game;
 using CriticalMass.Runtime.Hud.Style;
@@ -87,7 +88,7 @@ namespace CriticalMass.Runtime.Menu
                 _endedAt = -1f;
                 if (_open) Close();
             }
-            if (AutoShowOnMatchEnd && w != null && !_shownThisMatch && w.Match.Phase == MatchPhase.Ended)
+            if (AutoShowOnMatchEnd && w != null && !_shownThisMatch && w.Match.Phase == MatchPhase.Ended && !FlowRunning())
             {
                 if (_endedAt < 0f) _endedAt = Time.unscaledTime;
                 if (Time.unscaledTime - _endedAt >= AutoShowDelaySeconds) Open();
@@ -103,6 +104,26 @@ namespace CriticalMass.Runtime.Menu
             }
             EventSystem es = EventSystem.current;
             if (es != null && es.currentSelectedGameObject == null && NavigationPressed()) Select(_share);
+        }
+
+        static PropertyInfo _flowCurrent;
+        static bool _flowLooked;
+
+        /// <summary>
+        /// True when the game-flow director (DG-01) runs: its results screen owns the end of the match, so this panel
+        /// waits to be called (Show) instead of covering it. Found by name, so this file compiles with or without DG-01.
+        /// </summary>
+        static bool FlowRunning()
+        {
+            if (!_flowLooked)
+            {
+                _flowLooked = true;
+                Type t = typeof(ResultsHighlights).Assembly.GetType("CriticalMass.Runtime.Flow.FlowDirector");
+                _flowCurrent = t != null ? t.GetProperty("Current", BindingFlags.Public | BindingFlags.Static) : null;
+            }
+            if (_flowCurrent == null) return false;
+            object cur = _flowCurrent.GetValue(null);
+            return cur is UnityEngine.Object o ? o != null : cur != null;
         }
 
         static bool NavigationPressed()
