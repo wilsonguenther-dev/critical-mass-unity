@@ -261,7 +261,7 @@ namespace CriticalMass.Runtime.Flow
 
         /// <summary>A big centred Display-face button.</summary>
         protected static MenuItem Button(Transform parent, string name, float x, float y, float w, float h, string text, Action act,
-            int size = 34)
+            int size = UiScale.TypeLead)
         {
             MenuItem it = MenuUi.Item(parent, name, x, y, w, h, text, MenuItem.Kind.Button, size, true, CMTokens.Display);
             it.Body.Radius = 16f;

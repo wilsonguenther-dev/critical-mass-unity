@@ -155,9 +155,11 @@ namespace CriticalMass.Runtime.Tests
         public void OwnAndThreatsOutrankTheCrowd()
         {
             float crowd = SoundSpace.Priority(45, 1f, false, false);
-            float own = SoundSpace.Priority(10, 0.2f, true, false);
+            // Integration batch 4: the table's own bonus is +40 (PR #51's design), so the player's own SWING (base 30) beats a
+            // full-volume crowd hit; a quiet own footstep (base 10) may yield to it, which is fine in a 32-fighter brawl.
+            float own = SoundSpace.Priority(30, 0.2f, true, false);
             float threat = SoundSpace.Priority(30, 0.3f, false, true);
-            Assert.Greater(own, crowd, "your own footstep beats a full-volume heavy hit in the crowd");
+            Assert.Greater(own, crowd, "your own swing beats a full-volume heavy hit in the crowd");
             Assert.Greater(threat, crowd, "a wind-up at you beats the crowd");
             Assert.Greater(SoundSpace.Priority(30, 1f, false, false), SoundSpace.Priority(30, 0.1f, false, false), "nearer wins");
 

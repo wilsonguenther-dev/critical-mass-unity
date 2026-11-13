@@ -197,6 +197,8 @@ namespace CriticalMass.Runtime.Tests
                 // integration batch 3: readers that landed in batch 2 or beside this PR (each decodes only its own events)
                 "Audio/Announcer.cs", "Game/MomentRecorder.cs", "Progression/MatchRewardTracker.cs", "Secrets/SecretWatcher.cs",
                 "Spectator/SpectatorOverlay.cs", "View/BigMoments/MomentTriggers.cs",
+                // integration batch 4: the sound feed (#51) and the mechanics views (#50, #59) decode their own event types
+                "Audio/Sound/SoundFeed.cs", "View/Mechanics/DepthFeed.cs", "View/Mechanics/MechanicsFeed.cs",
             };
             var readers = Directory.GetFiles(root, "*.cs", SearchOption.AllDirectories)
                 .Where(f => Regex.IsMatch(File.ReadAllText(f), @"\.EventHead\b"))

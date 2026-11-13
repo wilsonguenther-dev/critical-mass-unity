@@ -108,7 +108,7 @@ namespace CriticalMass.Runtime.Tests
             Material f = ArtMaterials.ForTeam(ArtMapping.Spec(ArtMapping.Farmer), TeamId.Crimson);
             Near(ArtMaterials.Hex("#4999A5"), f.GetColor("_DefaultCloth"));
             Near(ArtMaterials.Hex("#E9705F"), f.GetColor("_TeamCloth"));
-            Assert.AreEqual(0f, f.GetFloat("_DecalOn"), "the Farmer has no painted decal");
+            Assert.AreEqual(1f, f.GetFloat("_DecalOn"), "Farmer v4 carries a painted face decal (art landing, #46)");
             Assert.AreEqual(1f, f.GetFloat("_OutlineWeightUV4"), "Farmer face unlined through UV4 (outline_w sidecar)");
 
             ModelSpec minerSpec = ArtMapping.Spec(ArtMapping.Miner);

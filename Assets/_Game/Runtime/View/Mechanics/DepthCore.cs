@@ -1177,6 +1177,14 @@ namespace CriticalMass.Runtime.View.Mechanics
             }
         }
 
+        /// <summary>Forgets the bound match (tests that bind a throwaway world; a new match binds again on its first tick).</summary>
+        public static void Unbind()
+        {
+            _w = null;
+            _epoch = int.MinValue;
+            for (int i = 0; i < _name.Length; i++) { _name[i] = null; _row[i] = null; }
+        }
+
         /// <summary>The bound match's name of actor id (upper case), or null without names.</summary>
         public static string Name(int id) => id >= 0 && id < _name.Length ? _name[id] : null;
 

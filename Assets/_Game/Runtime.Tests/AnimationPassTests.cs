@@ -392,7 +392,7 @@ namespace CriticalMass.Runtime.Tests
             Assert.AreEqual(4, AttackTiming.ReadWindupTicks(new FakeTicks(), 30, 2));
             Assert.AreEqual(4, AttackTiming.ReadWindupTicks(new FakeSeconds(), 30, 2), "0.06 on-screen s at pace 2 = 3.6 -> 4 ticks");
             Assert.AreEqual(0, AttackTiming.ReadWindupTicks(new FakeNone(), 30, 2), "no field yet: parity mode");
-            Assert.AreEqual(0, AttackTiming.WindupTicks(new GameConfig(), ClassId.Warrior), "main has no wind-up today");
+            Assert.Greater(AttackTiming.WindupTicks(new GameConfig(), ClassId.Warrior), 0, "the merged sim (#61) has a wind-up");
         }
 
         // ------------------------------------------------------------------ clip facts, root motion, import (DG-72, A24)

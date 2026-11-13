@@ -459,7 +459,7 @@ namespace CriticalMass.Runtime.Tests
             Assert.AreEqual(30, req.PassiveBotSeconds);
             TrialMatchRequest normal = TrialMatchRequest.Normal(cfg, TeamId.Azure, ClassId.Warrior, 2);
             Assert.AreEqual(16, normal.TeamSize);
-            Assert.AreEqual(2, normal.TimeScale);
+            Assert.AreEqual(cfg.DefaultSpeed, normal.TimeScale, "a normal match runs at the config pace (1x since #61)");
         }
 
         [Test]

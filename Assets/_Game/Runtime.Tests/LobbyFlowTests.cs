@@ -215,6 +215,7 @@ namespace CriticalMass.Runtime.Tests
                 for (int i = 0; i < 8; i++)
                     Assert.AreEqual(CriticalMass.Runtime.View.Mechanics.DepthNames.Name(8 + i), r.RowName(1, i), "enemy row " + i);
                 Assert.IsNotNull(r.RowName(1, 0));
+                CriticalMass.Runtime.View.Mechanics.DepthNames.Unbind();
                 var fresh = new PlayLaunch { Choice = c };
                 r.Bind(fresh);
                 Assert.AreNotEqual(0, fresh.Seed, "the READY screen fixes the seed so the names on it are the match's");
