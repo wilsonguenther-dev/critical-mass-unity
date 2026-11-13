@@ -34,7 +34,7 @@ namespace CriticalMass.Editor.Art
         public const string ArtMaterialPath = "Assets/_Game/Resources/Toon/CMToonArt.mat";
 
         /// <summary>Bump when the contract changes: Unity re-imports every model this postprocessor touches.</summary>
-        public override uint GetVersion() => 9;
+        public override uint GetVersion() => 10;
 
         public static bool IsArt(string path) =>
             path.StartsWith(ArtRoot, StringComparison.Ordinal) && path.EndsWith(".fbx", StringComparison.OrdinalIgnoreCase);
@@ -240,6 +240,54 @@ namespace CriticalMass.Editor.Art
                 c.lockRootPositionXZ = false;
             }
             mi.clipAnimations = clips.OrderBy(c => c.name, StringComparer.Ordinal).ToArray();
+        }
+
+        /// <summary>
+        /// HY characters (2026-11-13, art/characters-hy): the shared KayKit clips drop every bone translation curve that is
+        /// constant over the clip AND equal to the rest position. Measured on all 76 KayKit actions: only root, hips, the hand slots and the IK helpers move
+        /// in translation; every deform bone's translation is a constant equal to the KayKit rest. Without those constant
+        /// curves each class keeps its OWN joint positions from its FBX bind pose (the Farmer and Miner HY models place
+        /// knees, ankles, neck and arm lengths per class), while models on the plain KayKit skeleton look exactly as before
+        /// (their bind pose equals the constants that were removed). Rotations are untouched.
+        /// </summary>
+        public const string KaykitClipsPath = "Assets/_Game/Art/Characters/KayKit_Clips.fbx";
+
+        /// <summary>True when a translation curve set (x, y, z) of one bone is constant over the clip (pure; tests).</summary>
+        public static bool IsConstant(AnimationCurve c, float eps = 1e-5f)
+        {
+            if (c == null || c.length == 0) return true;
+            float v0 = c.keys[0].value;
+            foreach (Keyframe k in c.keys)
+                if (Math.Abs(k.value - v0) > eps) return false;
+            return true;
+        }
+
+        private void OnPostprocessAnimation(GameObject root, AnimationClip clip)
+        {
+            if (assetPath != KaykitClipsPath || clip == null) return;
+            var byPath = new Dictionary<string, List<EditorCurveBinding>>();
+            foreach (EditorCurveBinding b in AnimationUtility.GetCurveBindings(clip))
+            {
+                if (b.type != typeof(Transform) || !b.propertyName.StartsWith("m_LocalPosition", StringComparison.Ordinal)) continue;
+                if (!byPath.TryGetValue(b.path, out List<EditorCurveBinding> l)) byPath[b.path] = l = new List<EditorCurveBinding>();
+                l.Add(b);
+            }
+            foreach (KeyValuePair<string, List<EditorCurveBinding>> kv in byPath)
+            {
+                Transform t = root != null ? root.transform.Find(kv.Key) : null;
+                if (t == null) continue;
+                bool same = true;
+                foreach (EditorCurveBinding b in kv.Value)
+                {
+                    AnimationCurve c = AnimationUtility.GetEditorCurve(clip, b);
+                    if (!IsConstant(c) || c == null || c.length == 0) { same = false; break; }
+                    char axis = b.propertyName[b.propertyName.Length - 1];
+                    float rest = axis == 'x' ? t.localPosition.x : axis == 'y' ? t.localPosition.y : t.localPosition.z;
+                    if (Math.Abs(c.keys[0].value - rest) > 1e-4f) { same = false; break; }   // a held offset is motion: keep
+                }
+                if (!same) continue;
+                foreach (EditorCurveBinding b in kv.Value) AnimationUtility.SetEditorCurve(clip, b, null);
+            }
         }
 
         /// <summary>World art: per-slot look materials, smoothed outline directions (UV3), foam extrusion (UV2).</summary>

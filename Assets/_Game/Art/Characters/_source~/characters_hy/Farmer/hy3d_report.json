@@ -1,0 +1,800 @@
+{
+ "v7": {
+  "body": {
+   "verts": 5164,
+   "dims": [
+    1.946,
+    1.086,
+    1.976
+   ]
+  },
+  "staff": {
+   "verts": 930,
+   "dims": [
+    2.02,
+    0.219,
+    0.584
+   ]
+  }
+ },
+ "target_height": 1.975,
+ "body_fit": {
+  "scale": 1.8657,
+  "dims": [
+   1.341,
+   0.881,
+   1.975
+  ],
+  "high_tris": 500000
+ },
+ "landmarks_generated": {
+  "H": 1.975,
+  "crotch": 0.617,
+  "legx": 0.26,
+  "neck": 1.363,
+  "neck_w": 0.336
+ },
+ "head_region": {
+  "neck_z": 1.363,
+  "radius": 0.489
+ },
+ "bone_fit": {
+  "crotch_generated": 0.617,
+  "crotch_v7": 0.865,
+  "leg_length_scale": 0.713,
+  "leg_spacing_scale": 1.134,
+  "neck_generated": 1.363,
+  "neck_v7": 1.371,
+  "torso_scale": 0.99,
+  "arm_scale": {
+   "l": 0.763,
+   "r": 0.763
+  },
+  "joints_moved_m": {
+   "upperleg.l": 0.151,
+   "lowerleg.l": 0.087,
+   "foot.l": 0.047,
+   "toes.l": 0.023,
+   "upperarm.l": 0.007,
+   "lowerarm.l": 0.058,
+   "wrist.l": 0.119,
+   "hand.l": 0.136,
+   "handslot.l": 0.136,
+   "upperleg.r": 0.151,
+   "lowerleg.r": 0.087,
+   "foot.r": 0.047,
+   "toes.r": 0.023,
+   "upperarm.r": 0.007,
+   "lowerarm.r": 0.058,
+   "wrist.r": 0.119,
+   "hand.r": 0.136,
+   "handslot.r": 0.136,
+   "spine": 0.002,
+   "chest": 0.005,
+   "head": 0.008
+  },
+  "hips_kept_at": 0.406
+ },
+ "pose_fit_deg": {
+  "upperarm.l": 37.7,
+  "upperleg.l": 26.1,
+  "upperarm.r": 37.7,
+  "upperleg.r": 26.2
+ },
+ "decimate": {
+  "Farmer_HY_Hero_Body": {
+   "start": 500000,
+   "region_frac_before": 0.274,
+   "stageA_tris": 368230,
+   "stageA_region": 5876,
+   "region_tris": 5876,
+   "region_share": 0.33,
+   "tris": 17800
+  },
+  "Farmer_HY_LOD0_Body": {
+   "start": 17800,
+   "region_frac_before": 0.332,
+   "stageA_tris": 12952,
+   "stageA_region": 1136,
+   "region_tris": 1136,
+   "region_share": 0.344,
+   "tris": 3300
+  },
+  "Farmer_HY_LOD1_Body": {
+   "start": 17800,
+   "tris": 990
+  }
+ },
+ "colour_remap": {
+  "faces_seen_on_sheet": 7184,
+  "faces": 17800,
+  "hair_top_before": "#372118",
+  "hair_top_after": "#56382F",
+  "hair_top_sheet": "#50352E",
+  "clusters": [
+   {
+    "cluster": 0,
+    "faces": 1467,
+    "seen": 562,
+    "generated": "#8D5D36",
+    "sheet": "#8D6A4A",
+    "shift_lab": [
+     3.5,
+     -5.6,
+     -7.4
+    ]
+   },
+   {
+    "cluster": 1,
+    "faces": 791,
+    "seen": 312,
+    "generated": "#654025",
+    "sheet": "#72523A",
+    "shift_lab": [
+     6.8,
+     -4.9,
+     -4.5
+    ]
+   },
+   {
+    "cluster": 2,
+    "faces": 1979,
+    "seen": 1072,
+    "generated": "#323655",
+    "sheet": "#444961",
+    "shift_lab": [
+     7.6,
+     -2.0,
+     4.0
+    ]
+   },
+   {
+    "cluster": 3,
+    "faces": 1541,
+    "seen": 687,
+    "generated": "#F9DEBF",
+    "sheet": "#E9D1B0",
+    "shift_lab": [
+     -4.6,
+     -1.9,
+     1.4
+    ]
+   },
+   {
+    "cluster": 4,
+    "faces": 579,
+    "seen": 301,
+    "generated": "#C6F11F",
+    "sheet": "#97AF42",
+    "shift_lab": [
+     -15.0,
+     12.0,
+     -12.0
+    ]
+   },
+   {
+    "cluster": 5,
+    "faces": 583,
+    "seen": 150,
+    "generated": "#161315",
+    "sheet": "#5D4A41",
+    "shift_lab": [
+     15.0,
+     4.7,
+     8.3
+    ]
+   },
+   {
+    "cluster": 6,
+    "faces": 1393,
+    "seen": 404,
+    "generated": "#57453B",
+    "sheet": "#6A5447",
+    "shift_lab": [
+     6.1,
+     0.7,
+     1.6
+    ]
+   },
+   {
+    "cluster": 7,
+    "faces": 517,
+    "seen": 175,
+    "generated": "#4F8F93",
+    "sheet": "#7C716B",
+    "shift_lab": [
+     -7.2,
+     12.0,
+     12.0
+    ]
+   },
+   {
+    "cluster": 8,
+    "faces": 604,
+    "seen": 312,
+    "generated": "#A37530",
+    "sheet": "#A78A4C",
+    "shift_lab": [
+     6.6,
+     -8.5,
+     -6.4
+    ]
+   },
+   {
+    "cluster": 9,
+    "faces": 612,
+    "seen": 160,
+    "generated": "#2B1A14",
+    "sheet": "#5C4139",
+    "shift_lab": [
+     15.0,
+     4.4,
+     1.6
+    ]
+   },
+   {
+    "cluster": 10,
+    "faces": 728,
+    "seen": 362,
+    "generated": "#F6AC8D",
+    "sheet": "#EEAC88",
+    "shift_lab": [
+     -1.5,
+     -3.3,
+     0.8
+    ]
+   },
+   {
+    "cluster": 11,
+    "faces": 1217,
+    "seen": 361,
+    "generated": "#323138",
+    "sheet": "#4E4A50",
+    "shift_lab": [
+     8.2,
+     0.8,
+     1.5
+    ]
+   },
+   {
+    "cluster": 12,
+    "faces": 212,
+    "seen": 76,
+    "generated": "#89743F",
+    "sheet": "#A08B6A",
+    "shift_lab": [
+     9.4,
+     1.0,
+     -11.8
+    ]
+   },
+   {
+    "cluster": 13,
+    "faces": 635,
+    "seen": 331,
+    "generated": "#956632",
+    "sheet": "#936C43",
+    "shift_lab": [
+     1.5,
+     -3.5,
+     -7.9
+    ]
+   },
+   {
+    "cluster": 14,
+    "faces": 66,
+    "seen": 9,
+    "generated": "#A2AA17"
+   },
+   {
+    "cluster": 15,
+    "faces": 59,
+    "seen": 10,
+    "generated": "#E0E491"
+   },
+   {
+    "cluster": 16,
+    "faces": 324,
+    "seen": 96,
+    "generated": "#B59E87",
+    "sheet": "#BB9D7F",
+    "shift_lab": [
+     -2.4,
+     0.6,
+     3.0
+    ]
+   },
+   {
+    "cluster": 17,
+    "faces": 187,
+    "seen": 75,
+    "generated": "#BC962F",
+    "sheet": "#605453",
+    "shift_lab": [
+     -15.0,
+     -1.5,
+     -12.0
+    ]
+   },
+   {
+    "cluster": 18,
+    "faces": 3879,
+    "seen": 1558,
+    "generated": "#372117",
+    "sheet": "#523632",
+    "shift_lab": [
+     10.5,
+     2.5,
+     -2.9
+    ]
+   },
+   {
+    "cluster": 19,
+    "faces": 427,
+    "seen": 171,
+    "generated": "#506064",
+    "sheet": "#77644A",
+    "shift_lab": [
+     5.5,
+     8.7,
+     12.0
+    ]
+   }
+  ]
+ },
+ "mask_faces": {
+  "Farmer_HY_Hero_Body": {
+   "0.0": 17155,
+   "0.25": 633,
+   "1.0": 12
+  },
+  "Farmer_HY_Hero_Staff": {
+   "0.0": 1079,
+   "0.25": 60,
+   "1.0": 61
+  },
+  "Farmer_HY_LOD0_Staff": {
+   "0.0": 364,
+   "0.25": 15,
+   "1.0": 20
+  },
+  "Farmer_HY_LOD1_Staff": {
+   "0.0": 142,
+   "0.25": 10,
+   "1.0": 7
+  }
+ },
+ "unskin_roundtrip_max_m": {
+  "Hero": 4.440892098500626e-16
+ },
+ "prop_cleanup": {
+  "staff": {
+   "membrane_faces_removed": 3777
+  }
+ },
+ "props": {
+  "staff": {
+   "scale_vs_generated": 1.7164,
+   "dims_idle": [
+    0.696,
+    0.534,
+    1.987
+   ]
+  }
+ },
+ "shadow": {
+  "hull_tris": 1018,
+  "tris": 780
+ },
+ "tris": {
+  "Hero": {
+   "Farmer_HY_Hero_Body": 17800,
+   "Farmer_HY_Hero_Staff": 1200,
+   "total": 19000
+  },
+  "LOD0": {
+   "Farmer_HY_LOD0_Body": 3300,
+   "Farmer_HY_LOD0_Staff": 399,
+   "total": 3699
+  },
+  "LOD1": {
+   "Farmer_HY_LOD1_Body": 990,
+   "Farmer_HY_LOD1_Staff": 159,
+   "total": 1149
+  },
+  "Shadow": {
+   "total": 780
+  }
+ },
+ "deform": {
+  "Idle@13": {
+   "Hero": {
+    "edges": 26699,
+    "over_1.5": 118,
+    "over_2": 20,
+    "max": 5.66,
+    "p99": 1.307,
+    "bad_z_hist": [
+     5,
+     55,
+     14,
+     26,
+     18,
+     0
+    ],
+    "vs_generated_over_1.5": 256,
+    "vs_generated_over_2": 63,
+    "vs_generated_max": 4.75,
+    "visible_over_1.5_and_15mm": 82,
+    "visible_over_1.5_and_30mm": 28
+   },
+   "LOD0": {
+    "edges": 4950,
+    "over_1.5": 9,
+    "over_2": 1,
+    "max": 3.13,
+    "p99": 1.239,
+    "bad_z_hist": [
+     1,
+     3,
+     0,
+     3,
+     2,
+     0
+    ],
+    "vs_generated_over_1.5": 33,
+    "vs_generated_over_2": 9,
+    "vs_generated_max": 5.82,
+    "visible_over_1.5_and_15mm": 26,
+    "visible_over_1.5_and_30mm": 6
+   },
+   "LOD1": {
+    "edges": 1485,
+    "over_1.5": 1,
+    "over_2": 0,
+    "max": 1.57,
+    "p99": 1.243,
+    "bad_z_hist": [
+     0,
+     0,
+     0,
+     1,
+     0,
+     0
+    ],
+    "vs_generated_over_1.5": 6,
+    "vs_generated_over_2": 1,
+    "vs_generated_max": 2.14,
+    "visible_over_1.5_and_15mm": 5,
+    "visible_over_1.5_and_30mm": 5
+   }
+  },
+  "Running_A@6": {
+   "Hero": {
+    "edges": 26699,
+    "over_1.5": 151,
+    "over_2": 34,
+    "max": 5.93,
+    "p99": 1.349,
+    "bad_z_hist": [
+     21,
+     71,
+     14,
+     25,
+     20,
+     0
+    ],
+    "vs_generated_over_1.5": 393,
+    "vs_generated_over_2": 102,
+    "vs_generated_max": 14.11,
+    "visible_over_1.5_and_15mm": 115,
+    "visible_over_1.5_and_30mm": 23
+   },
+   "LOD0": {
+    "edges": 4950,
+    "over_1.5": 21,
+    "over_2": 4,
+    "max": 2.43,
+    "p99": 1.307,
+    "bad_z_hist": [
+     4,
+     8,
+     1,
+     5,
+     3,
+     0
+    ],
+    "vs_generated_over_1.5": 55,
+    "vs_generated_over_2": 15,
+    "vs_generated_max": 4.4,
+    "visible_over_1.5_and_15mm": 46,
+    "visible_over_1.5_and_30mm": 17
+   },
+   "LOD1": {
+    "edges": 1485,
+    "over_1.5": 10,
+    "over_2": 0,
+    "max": 1.78,
+    "p99": 1.425,
+    "bad_z_hist": [
+     0,
+     2,
+     1,
+     5,
+     2,
+     0
+    ],
+    "vs_generated_over_1.5": 28,
+    "vs_generated_over_2": 2,
+    "vs_generated_max": 2.97,
+    "visible_over_1.5_and_15mm": 27,
+    "visible_over_1.5_and_30mm": 26
+   }
+  },
+  "Running_A@15": {
+   "Hero": {
+    "edges": 26699,
+    "over_1.5": 135,
+    "over_2": 34,
+    "max": 11.93,
+    "p99": 1.327,
+    "bad_z_hist": [
+     20,
+     48,
+     24,
+     24,
+     19,
+     0
+    ],
+    "vs_generated_over_1.5": 417,
+    "vs_generated_over_2": 104,
+    "vs_generated_max": 7.97,
+    "visible_over_1.5_and_15mm": 100,
+    "visible_over_1.5_and_30mm": 30
+   },
+   "LOD0": {
+    "edges": 4950,
+    "over_1.5": 23,
+    "over_2": 6,
+    "max": 3.7,
+    "p99": 1.275,
+    "bad_z_hist": [
+     4,
+     8,
+     3,
+     5,
+     3,
+     0
+    ],
+    "vs_generated_over_1.5": 67,
+    "vs_generated_over_2": 15,
+    "vs_generated_max": 6.89,
+    "visible_over_1.5_and_15mm": 57,
+    "visible_over_1.5_and_30mm": 21
+   },
+   "LOD1": {
+    "edges": 1485,
+    "over_1.5": 10,
+    "over_2": 0,
+    "max": 1.8,
+    "p99": 1.376,
+    "bad_z_hist": [
+     1,
+     1,
+     1,
+     5,
+     2,
+     0
+    ],
+    "vs_generated_over_1.5": 29,
+    "vs_generated_over_2": 2,
+    "vs_generated_max": 2.75,
+    "visible_over_1.5_and_15mm": 29,
+    "visible_over_1.5_and_30mm": 27
+   }
+  },
+  "2H_Melee_Attack_Slice@12": {
+   "Hero": {
+    "edges": 26699,
+    "over_1.5": 289,
+    "over_2": 73,
+    "max": 7.48,
+    "p99": 1.522,
+    "bad_z_hist": [
+     6,
+     101,
+     27,
+     62,
+     74,
+     19
+    ],
+    "vs_generated_over_1.5": 817,
+    "vs_generated_over_2": 200,
+    "vs_generated_max": 8.56,
+    "visible_over_1.5_and_15mm": 286,
+    "visible_over_1.5_and_30mm": 79
+   },
+   "LOD0": {
+    "edges": 4950,
+    "over_1.5": 36,
+    "over_2": 7,
+    "max": 4.65,
+    "p99": 1.408,
+    "bad_z_hist": [
+     4,
+     10,
+     3,
+     8,
+     7,
+     4
+    ],
+    "vs_generated_over_1.5": 124,
+    "vs_generated_over_2": 26,
+    "vs_generated_max": 8.66,
+    "visible_over_1.5_and_15mm": 104,
+    "visible_over_1.5_and_30mm": 46
+   },
+   "LOD1": {
+    "edges": 1485,
+    "over_1.5": 5,
+    "over_2": 1,
+    "max": 2.02,
+    "p99": 1.357,
+    "bad_z_hist": [
+     0,
+     2,
+     0,
+     2,
+     1,
+     0
+    ],
+    "vs_generated_over_1.5": 36,
+    "vs_generated_over_2": 4,
+    "vs_generated_max": 2.39,
+    "visible_over_1.5_and_15mm": 35,
+    "visible_over_1.5_and_30mm": 31
+   }
+  },
+  "2H_Melee_Attack_Slice@18": {
+   "Hero": {
+    "edges": 26699,
+    "over_1.5": 384,
+    "over_2": 95,
+    "max": 7.1,
+    "p99": 1.605,
+    "bad_z_hist": [
+     24,
+     143,
+     50,
+     68,
+     79,
+     20
+    ],
+    "vs_generated_over_1.5": 1171,
+    "vs_generated_over_2": 291,
+    "vs_generated_max": 10.15,
+    "visible_over_1.5_and_15mm": 422,
+    "visible_over_1.5_and_30mm": 106
+   },
+   "LOD0": {
+    "edges": 4950,
+    "over_1.5": 46,
+    "over_2": 11,
+    "max": 4.58,
+    "p99": 1.462,
+    "bad_z_hist": [
+     4,
+     19,
+     5,
+     7,
+     7,
+     4
+    ],
+    "vs_generated_over_1.5": 178,
+    "vs_generated_over_2": 30,
+    "vs_generated_max": 8.52,
+    "visible_over_1.5_and_15mm": 151,
+    "visible_over_1.5_and_30mm": 73
+   },
+   "LOD1": {
+    "edges": 1485,
+    "over_1.5": 10,
+    "over_2": 0,
+    "max": 1.95,
+    "p99": 1.421,
+    "bad_z_hist": [
+     1,
+     5,
+     1,
+     2,
+     1,
+     0
+    ],
+    "vs_generated_over_1.5": 58,
+    "vs_generated_over_2": 8,
+    "vs_generated_max": 2.51,
+    "visible_over_1.5_and_15mm": 55,
+    "visible_over_1.5_and_30mm": 47
+   }
+  }
+ },
+ "fbx": {
+  "path": "/Users/wilsonguenther/cm-hy-chars-scratch/Farmer/exp/Farmer.fbx",
+  "bytes": 1273596,
+  "textures": {
+   "Body": "/Users/wilsonguenther/cm-hy-chars-scratch/Farmer/exp/Farmer_HY_Body_Albedo.png",
+   "Staff": "/Users/wilsonguenther/cm-hy-chars-scratch/Farmer/exp/Farmer_HY_Staff_Albedo.png"
+  }
+ },
+ "game_px": {
+  "game_v7": 155.1,
+  "game_hero_vcol": 146.1,
+  "game_hero_tex": 146.1,
+  "game_lod0_vcol": 146.5
+ },
+ "fbx_round_trip": {
+  "objects": {
+   "Farmer_Hero": {
+    "tris": 19000,
+    "groups": 21,
+    "colors": [
+     "Col"
+    ],
+    "uv": [
+     "UVMap"
+    ],
+    "dims": [
+     2.067,
+     2.064,
+     0.863
+    ]
+   },
+   "Farmer_LOD0": {
+    "tris": 3699,
+    "groups": 21,
+    "colors": [
+     "Col"
+    ],
+    "uv": [
+     "UVMap"
+    ],
+    "dims": [
+     2.063,
+     2.06,
+     0.87
+    ]
+   },
+   "Farmer_LOD1": {
+    "tris": 1149,
+    "groups": 21,
+    "colors": [
+     "Col"
+    ],
+    "uv": [
+     "UVMap"
+    ],
+    "dims": [
+     2.06,
+     2.038,
+     0.862
+    ]
+   },
+   "Farmer_Shadow": {
+    "tris": 780,
+    "groups": 17,
+    "colors": [
+     "Col"
+    ],
+    "uv": [
+     "UVMap"
+    ],
+    "dims": [
+     2.063,
+     2.06,
+     0.87
+    ]
+   }
+  },
+  "armature_bones": 41
+ }
+}

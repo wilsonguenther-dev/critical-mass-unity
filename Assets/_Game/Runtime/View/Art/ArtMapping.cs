@@ -75,6 +75,13 @@ namespace CriticalMass.Runtime.View.Art
         /// is entry 0), or null. The view swaps the material's face texture per state (ArtMaterials.ForGlow).
         /// </summary>
         public string[] Expressions;
+        /// <summary>
+        /// HY models (Tencent HY 3D Global, art/characters-hy, 2026-11-13): the face is painted in the per-face vertex colour
+        /// of every LOD (the generated texture baked and colour-corrected toward the turnaround), not a decal. Such a model has
+        /// no FaceTexture, no decal slot and no outline sidecar; its UV0 sits on one transparent texel. The pre-HY FBX of the
+        /// class is kept in its folder's _fallback~ (restore: copy it back and revert this spec's line).
+        /// </summary>
+        public bool VertexColourFace;
         /// <summary>True when the importer bakes UV4.x outline weights (0 on the face) and the material reads them.</summary>
         public bool BakesOutlineWeights => OutlineWeights != null || (FaceTexture != null && FaceSlot < 0);
     }
@@ -288,7 +295,7 @@ namespace CriticalMass.Runtime.View.Art
                 Bones = 41, ClipSource = "Assets/_Game/Art/Characters/KayKit_Clips.fbx",
                 Meshes = new[] { "Warrior_Hero", "Warrior_LOD0", "Warrior_LOD1", "Warrior_Shadow" }, MaskCodes = new[] { 0, 6, 8 },
                 OutlinePx = CharacterHullPx, Rim = 0.6f, Authored = WarriorAzure, Crimson = WarriorCrimson, Height = 2.0f,
-                FaceTexture = "Assets/_Game/Art/Characters/Warrior_Face.png", ArtYawDeg = 180f },
+                VertexColourFace = true, ArtYawDeg = 180f },   // HY (2026-11-13); pre-HY: FaceTexture Warrior_Face.png
             new ModelSpec { Key = Miner, AssetPath = "Assets/_Game/Art/Miner/Miner.fbx", Kind = ArtKind.Character, Rigged = true,
                 Bones = 41, ClipSource = "Assets/_Game/Art/Characters/KayKit_Clips.fbx",
                 Meshes = new[] { "Miner_Hero", "Miner_LOD0", "Miner_LOD1", "Miner_Shadow" }, MaskCodes = new[] { 0, 6, 8 },
@@ -298,7 +305,7 @@ namespace CriticalMass.Runtime.View.Art
                 Bones = 41, ClipSource = "Assets/_Game/Art/Characters/KayKit_Clips.fbx",
                 Meshes = new[] { "Farmer_Hero", "Farmer_LOD0", "Farmer_LOD1", "Farmer_Shadow" }, MaskCodes = new[] { 0, 2, 8 },
                 OutlinePx = CharacterHullPx, Rim = 0.6f, Authored = FarmerAzure, Crimson = FarmerCrimson, Height = 2.0f,
-                OutlineWeights = "Assets/_Game/Art/Farmer/Farmer_OutlineW.json", FaceTexture = "Assets/_Game/Art/Farmer/Farmer_Face.png", ArtYawDeg = 180f },
+                VertexColourFace = true, ArtYawDeg = 180f },   // HY (2026-11-13); pre-HY: OutlineWeights Farmer_OutlineW.json + FaceTexture Farmer_Face.png (Farmer/_fallback~)
             // Art landing (2026-11-12): the three new classes, LOD files from art/fighter-lods d536d30 (weapons folded into
             // every level). Each body carries CM_Toon plus CM_FaceDecal on slot 1, the Miner's decal method (class READMEs).
             new ModelSpec { Key = Demolitions, AssetPath = "Assets/_Game/Art/Demolitions/Demolitions.fbx", Kind = ArtKind.Character, Rigged = true,
