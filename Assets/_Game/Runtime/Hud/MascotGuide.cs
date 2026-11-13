@@ -92,7 +92,7 @@ namespace CriticalMass.Runtime.Hud
         // reference layout (1920x1080, top-left origin)
         public const float PanelW = 620f, PanelH = 176f, Margin = 24f;
         public const float LowerY = 1080f - 24f - 132f - 24f - PanelH;   // above the HUD player card
-        public const float UpperY = 150f;                               // under the top edge, left of the match cluster
+        public const float UpperY = HudZones.GuideUpperY;               // polish pass 1: under the centre lane, never beside a banner
         const float Portrait = 148f, ChipSize = 84f;
         const float PopSeconds = 0.18f, ReactSeconds = 0.22f, SlideSeconds = 0.2f;
 
@@ -434,7 +434,10 @@ namespace CriticalMass.Runtime.Hud
             if (_chip.gameObject.activeSelf == full) _chip.gameObject.SetActive(!full);
 
             float ease = 1f - (1f - _popT) * (1f - _popT);
-            _group.alpha = Mathf.Lerp(0f, 1f, Mathf.Clamp01(_popT * 2f));
+            // HUD zones: the bubble steps back (transparent, still live) while the death recap or the "you are the ..."
+            // line holds the lower lane beside it.
+            bool yield = HudZones.Blocked(HudZone.Lower, HudPriority.Guide);
+            _group.alpha = yield ? 0f : Mathf.Lerp(0f, 1f, Mathf.Clamp01(_popT * 2f));
             float y = Mathf.Lerp(_fromY, _toY, 1f - (1f - _slideT) * (1f - _slideT));
             if (_slideT >= 1f) _fromY = _toY;
             Place(_panel, Margin - (1f - ease) * 40f, y, PanelW, PanelH);

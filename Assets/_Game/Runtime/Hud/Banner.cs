@@ -184,7 +184,8 @@ namespace CriticalMass.Runtime.Hud
     public sealed class Banner : MonoBehaviour
     {
         /// <summary>Reference layout (1920 x 1080 units): centre of the banner below the match cluster.</summary>
-        public const float Width = 1080f, Height = 168f, CentreFromTop = 284f;
+        // Polish pass 1: inside the centre lane (HudZones.Callout, 148..336 with the 18 px lift), clear of the kill feed column.
+        public const float Width = 1032f, Height = 168f, CentreFromTop = 250f;
         public const int SortingOrder = 15;
 
         private static readonly BannerQueue Queue = new BannerQueue();
@@ -335,7 +336,11 @@ namespace CriticalMass.Runtime.Hud
                     _badge.SetTier(tier);
                 }
             }
-            _group.alpha = Queue.Alpha(now);
+            // HUD zones: the autopilot banner and the lockout warning outrank event banners in the centre lane.
+            bool blocked = HudZones.Blocked(HudZone.Callout, HudPriority.Banner);
+            float alpha = blocked ? 0f : Queue.Alpha(now);
+            if (alpha > 0f) HudZones.Hold(HudZone.Callout, HudPriority.Banner);
+            _group.alpha = alpha;
             Queue.Motion(now, out float scale, out float lift);
             _root.localScale = new Vector3(scale, scale, 1f);
             _root.anchoredPosition = new Vector2(0f, -CentreFromTop + 18f * lift);

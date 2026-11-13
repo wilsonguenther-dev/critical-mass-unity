@@ -356,7 +356,7 @@ namespace CriticalMass.Runtime.View
             _bar.gameObject.SetActive(false);
 
             _calloutCanvas = MakeCanvas("Kaiju Callout", CalloutSortingOrder);
-            _callout = Rect(_calloutCanvas.transform, "Callout", new Vector2(0.5f, 1f), new Vector2(0f, -168f), new Vector2(520f, 54f));
+            _callout = Rect(_calloutCanvas.transform, "Callout", new Vector2(0.5f, 1f), new Vector2(0f, -CalloutCentre), new Vector2(520f, 54f));
             _calloutPill = Shape(_callout, "Pill", ShapeKind.RoundRect, Vector2.zero, new Vector2(520f, 54f), CMTokens.PanelNavy.Color);
             _calloutPill.Radius = -1f;
             VectorShape disc = Shape(_callout, "Disc", ShapeKind.Circle, new Vector2(-236f, 0f), new Vector2(64f, 64f), CMTokens.VoidNavy.Color);
@@ -583,10 +583,16 @@ namespace CriticalMass.Runtime.View
 
         // ---------------------------------------------------------------- callout
 
+        /// <summary>Centre of the callout pill from the top (polish pass 1: inside the centre lane, under the top band).</summary>
+        public const float CalloutCentre = HudZones.AlertTop + 36f;
+
         private void ApplyCallout(World w, double simNow)
         {
             double age = simNow - _calloutAt;
             bool on = age >= 0 && age < CalloutSeconds && _calloutKind != KaijuMomentKind.None;
+            // HUD zones: the callout waits while an event banner or the autopilot banner holds the centre lane.
+            if (on && HudZones.Blocked(HudZone.Callout, HudPriority.KaijuCallout)) on = false;
+            if (on) HudZones.Hold(HudZone.Callout, HudPriority.KaijuCallout);
             if (_callout.gameObject.activeSelf != on) _callout.gameObject.SetActive(on);
             if (!on) return;
             bool corrupt = Tracker.BerserkLocked || w.Kaiju.State == KaijuState.Berserk;
@@ -601,7 +607,7 @@ namespace CriticalMass.Runtime.View
             if (soon) HudText.Set(_calloutClock, NumberCache.Mmss(global::CriticalMass.Runtime.Flow.MatchSpeed.ToReal(w.Config.HatchSeconds - w.Match.Time)));
             // entrance: 0.2 sim s drop-in from 14 units above
             float t = Mathf.Clamp01((float)(age / 0.2));
-            _callout.anchoredPosition = new Vector2(0f, -168f + 14f * (1f - t) * (1f - t));
+            _callout.anchoredPosition = new Vector2(0f, -CalloutCentre + 14f * (1f - t) * (1f - t));
         }
 
         // ---------------------------------------------------------------- the HUD's Kaiju pointer

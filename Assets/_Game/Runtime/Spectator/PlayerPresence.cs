@@ -42,8 +42,11 @@ namespace CriticalMass.Runtime.Spectator
             set => HumanControlGuard.IdleAutopilotSeconds = value;
         }
         public const float DefaultIdleAutopilotSeconds = HumanControlGuard.DefaultIdleAutopilotSeconds;
-        public const float BannerW = 1040f, BannerH = 96f, BannerTop = 178f, FrameEdgePx = 10f;
+        // Polish pass 1: the top of the centre lane (HudZones.AlertTop), right under the top band.
+        public const float BannerW = 1040f, BannerH = 96f, BannerTop = HudZones.AlertTop, FrameEdgePx = 10f;
         public const int SortingOrder = 13;
+        /// <summary>Width of the "you are the ..." line: the lower lane (HudZones.Lower), beside the mascot's column.</summary>
+        public const float IntroW = 820f;
         /// <summary>Height of the YOU tag's point above the ground under actor 0, world units.</summary>
         public const float MarkerHeight = 2.6f;
 
@@ -190,6 +193,7 @@ namespace CriticalMass.Runtime.Spectator
             if (_frame.activeSelf != banner) _frame.SetActive(banner);
             if (banner)
             {
+                HudZones.Hold(HudZone.Callout, HudPriority.Autopilot);
                 UpdateBanner();
                 _frameGroup.alpha = 0.6f + 0.35f * (0.5f + 0.5f * Mathf.Sin(now * Mathf.PI * 2f));
             }
@@ -202,6 +206,7 @@ namespace CriticalMass.Runtime.Spectator
             }
             if (intro)
             {
+                HudZones.Hold(HudZone.Lower, HudPriority.Intro);
                 ControlDevice d = ControlBindings.ActiveDevice;
                 if (d != _introDevice) BuildIntroPrompt(d);
                 _introGroup.alpha = Fade(now, _introUntil);
@@ -243,7 +248,7 @@ namespace CriticalMass.Runtime.Spectator
             _marker.gameObject.SetActive(false);
 
             // "You are the ..." line, low centre.
-            RectTransform intro = FeedUi.Anchored(_canvas.transform, "Intro", new Vector2(0.5f, 0f), 0f, 250f, 900f, 120f);
+            RectTransform intro = FeedUi.Anchored(_canvas.transform, "Intro", new Vector2(0.5f, 0f), 0f, 250f, IntroW, 120f);
             _intro = intro.gameObject;
             _introGroup = _intro.AddComponent<CanvasGroup>();
             _introGroup.blocksRaycasts = false;
@@ -305,7 +310,7 @@ namespace CriticalMass.Runtime.Spectator
             _banner.SetActive(false);
 
             // Notice line.
-            RectTransform notice = FeedUi.Anchored(_canvas.transform, "Notice", new Vector2(0.5f, 1f), 0f, -(BannerTop + BannerH * 0.5f + 40f), 760f, 44f);
+            RectTransform notice = FeedUi.Anchored(_canvas.transform, "Notice", new Vector2(0.5f, 1f), 0f, -(BannerTop + BannerH + 8f), 760f, 44f);
             _notice = notice.gameObject;
             VectorShape np = MenuUi.Shape(notice, "Plate", ShapeKind.RoundRect, 0f, 0f, 760f, 44f, CMTokens.PanelNavy.Color, -1f);
             np.OutlinePx = 3f;

@@ -93,7 +93,8 @@ namespace CriticalMass.Runtime.Hud
     public sealed class AchievementToast : MonoBehaviour
     {
         public const float InSeconds = 0.2f, HoldSeconds = 3.2f, OutSeconds = 0.2f, ListDelaySeconds = 1.5f;
-        public const float ToastW = 600f, ToastH = 96f, ToastTop = 146f;
+        // Polish pass 1: the right column under the big-moment stingers (HudZones.Toast), off the centre lane.
+        public const float ToastW = HudZones.ColumnW, ToastH = 96f, ToastTop = HudZones.ToastTop, ToastRight = HudLayout.Margin;
         public const int QueueCap = 10;
 
         /// <summary>false: the results screen hosts the list, this component shows none at match end.</summary>
@@ -132,7 +133,7 @@ namespace CriticalMass.Runtime.Hud
         {
             if (Canvas != null) return;
             Canvas = FeedUi.MakeCanvas(transform, "Achievements Canvas", 18);
-            _toast = FeedUi.Anchored(Canvas.transform, "Achievement Toast", new Vector2(0.5f, 1f), 0f, -ToastTop, ToastW, ToastH);
+            _toast = FeedUi.Anchored(Canvas.transform, "Achievement Toast", new Vector2(1f, 1f), -ToastRight, -ToastTop, ToastW, ToastH);
             _group = _toast.gameObject.AddComponent<CanvasGroup>();
             _group.blocksRaycasts = false;
             _group.interactable = false;
@@ -249,7 +250,8 @@ namespace CriticalMass.Runtime.Hud
             }
             float a = _age < InSeconds ? FeedUi.Ease(_age / InSeconds) : _age > InSeconds + HoldSeconds ? 1f - (_age - InSeconds - HoldSeconds) / OutSeconds : 1f;
             if (Mathf.Abs(_group.alpha - a) > 1e-3f) _group.alpha = a;
-            _toast.anchoredPosition = new Vector2(0f, -ToastTop + (1f - a) * 18f);
+            // Slides in from the right edge (18 px, none with Reduce motion).
+            _toast.anchoredPosition = new Vector2(-ToastRight + (UiMotion.Reduced ? 0f : (1f - a) * 18f), -ToastTop);
         }
 
         public int Queued => _qCount;
