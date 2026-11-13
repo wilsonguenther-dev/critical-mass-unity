@@ -1,0 +1,181 @@
+# Reusable headless Blender job (ci/offload-2, 2026-11-13). Project-neutral: part of the CI offload kit
+# (docs/CI-OFFLOAD-KIT.md). Runs `blender -b [file.blend] --factory-startup --python-exit-code 1 --python <script> -- <args>`
+# on a standard Linux runner with the official Linux build of the requested Blender version, and uploads what it wrote.
+#
+# Blender: downloaded from download.blender.org/release/Blender<major.minor>/blender-<v>-linux-x64.tar.xz, checked against
+# the release's published blender-<v>.sha256, cached by version (actions/cache), so a warm job does not download it.
+# Rendering without a GPU: Workbench and EEVEE need an OpenGL context. Since Blender 3.4 regular Linux builds fall back to
+# a headless EGL context in background mode when no display is available ("Introduce headless OpenGL rendering on
+# Linux", bf-blender-cvs 2022-08, commit 3195a381200), and Mesa's llvmpipe gives EGL/OpenGL 4.5 on the CPU, so `gl: egl`
+# (the default) runs with DISPLAY unset and LIBGL_ALWAYS_SOFTWARE=1. `gl: xvfb` runs the same under xvfb-run (Mesa GLX,
+# llvmpipe) for scripts that insist on a window system. Cycles needs no GL at all (CPU device). The GL renderer Blender
+# actually got is written to blender-report.json (gl_renderer).
+#
+# Inputs Blender scripts read: (a) files committed on `ref` (LFS objects pulled and cached), (b) an input bundle: a .tar.gz
+# release asset on the repository's DRAFT release `inputs-release-tag` (tools/ci/offload.sh blender --inputs uploads it),
+# unpacked into $CI_INPUTS. Draft releases are listed only to users with push access, so the bundle is not public; this
+# job needs `contents: write` from the caller only to read it. Outputs: the folder $CI_OUT (also the {out} placeholder)
+# plus any `outputs` globs (relative to the repo root) are uploaded as one artifact. On a PUBLIC repo that artifact and
+# the job log can be downloaded by any signed-in GitHub user for retention-days.
+#
+# Placeholders in `script`, `args`, `blend` and `env`: {out} = $CI_OUT, {inputs} = $CI_INPUTS, {repo} = the checkout,
+# {kit} = the caller commit's kit-dir (tools/ci): `script: '{kit}/blender_plan.py'` + `env: CI_PLAN=[...]` runs several steps.
+name: reusable-blender
+on:
+  workflow_call:
+    inputs:
+      ref: { type: string, required: true }
+      blender-version: { type: string, required: true, description: "e.g. 5.2.3 (the version the artists' machines run)" }
+      script: { type: string, required: true, description: "Python script path inside the repo" }
+      args: { type: string, default: '', description: "Arguments after `--` (shell words; placeholders {out} {inputs} {repo})" }
+      blend: { type: string, default: '', description: "Optional .blend opened before the script (repo path or {inputs}/...)" }
+      factory-startup: { type: boolean, default: true }
+      env: { type: string, default: '', description: "Extra environment, one NAME=value per line (placeholders allowed)" }
+      inputs-release-tag: { type: string, default: '', description: "Draft release holding input bundles ('' = none)" }
+      inputs-asset: { type: string, default: '', description: "Asset name (.tar.gz) on that release, unpacked into $CI_INPUTS" }
+      outputs: { type: string, default: '', description: "Extra output globs relative to the repo root, one per line" }
+      lfs: { type: boolean, default: true }
+      gl: { type: string, default: egl, description: "egl (headless EGL, llvmpipe) | xvfb (xvfb-run, llvmpipe)" }
+      kit-dir: { type: string, default: tools/ci, description: "Where the caller repo keeps the kit's helpers ({kit})" }
+      artifact-name: { type: string, default: blender-out }
+      retention-days: { type: number, default: 7 }
+      timeout-minutes: { type: number, default: 60 }
+    outputs:
+      artifact-name: { value: "${{ inputs.artifact-name }}" }
+jobs:
+  blender:
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+          lfs: false
+      # The kit's own helpers (tools/ci/blender_plan.py: several scripts in one Blender process) come from the CALLER's
+      # commit, so a branch cut before the kit existed can still use them: placeholder {kit}.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: .ci-kit
+          sparse-checkout: ${{ inputs.kit-dir }}
+          sparse-checkout-cone-mode: false
+      - name: LFS object list
+        id: lfsid
+        if: inputs.lfs
+        run: echo "id=$(git lfs ls-files --long | cut -d' ' -f1 | sort | sha256sum | cut -c1-40)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        if: inputs.lfs
+        with:
+          path: .git/lfs/objects
+          key: lfs-${{ steps.lfsid.outputs.id }}
+          restore-keys: lfs-
+      - name: LFS pull
+        if: inputs.lfs
+        run: |
+          git lfs pull && echo "lfs files: $(git lfs ls-files | wc -l)"
+      - uses: actions/cache@v4
+        id: bl
+        with:
+          path: ~/blender
+          key: blender-${{ inputs.blender-version }}-linux-x64
+      - name: Install Blender ${{ inputs.blender-version }} (official tarball, sha256 checked)
+        if: steps.bl.outputs.cache-hit != 'true'
+        env:
+          V: ${{ inputs.blender-version }}
+        run: |
+          set -euo pipefail
+          t0=$(date +%s); mm="${V%.*}"; f="blender-$V-linux-x64.tar.xz"
+          base="https://download.blender.org/release/Blender$mm"
+          curl -fsSL --retry 3 -o "/tmp/$f" "$base/$f"
+          curl -fsSL --retry 3 -o /tmp/sums "$base/blender-$V.sha256"
+          (cd /tmp && grep " $f\$" sums | sha256sum -c -)
+          mkdir -p ~/blender && tar -xJf "/tmp/$f" -C ~/blender --strip-components=1 && rm "/tmp/$f"
+          echo "downloaded and unpacked in $(( $(date +%s) - t0 )) s"
+      - name: System libraries (Mesa EGL/GLX software GL, X client libs Blender links)
+        env:
+          GL: ${{ inputs.gl }}
+        run: |
+          t0=$(date +%s)
+          pk="libegl1 libegl-mesa0 libgl1 libgl1-mesa-dri libglx-mesa0 libxi6 libxrender1 libxkbcommon0 libxkbcommon-x11-0 libsm6 libxxf86vm1 libxfixes3 libxext6 libx11-6 libxcursor1 libxinerama1 libxrandr2 libwayland-client0 libwayland-egl1 libdecor-0-0"
+          [ "$GL" = xvfb ] && pk="$pk xvfb xauth"
+          sudo apt-get -qq update >/dev/null && sudo DEBIAN_FRONTEND=noninteractive apt-get -qq install -y --no-install-recommends $pk >/dev/null
+          ~/blender/blender --version | head -1; echo "took $(( $(date +%s) - t0 )) s"
+      - name: Input bundle
+        if: inputs.inputs-asset != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.inputs-release-tag }}
+          ASSET: ${{ inputs.inputs-asset }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/inputs" "$RUNNER_TEMP/dl"
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern "$ASSET" --dir "$RUNNER_TEMP/dl"
+          tar -xzf "$RUNNER_TEMP/dl/$ASSET" -C "$RUNNER_TEMP/inputs"
+          echo "unpacked $(find "$RUNNER_TEMP/inputs" -type f | wc -l) files, $(du -sh "$RUNNER_TEMP/inputs" | cut -f1)"
+      - name: Run Blender
+        id: run
+        env:
+          GL: ${{ inputs.gl }}
+          SCRIPT: ${{ inputs.script }}
+          ARGS: ${{ inputs.args }}
+          BLEND: ${{ inputs.blend }}
+          EXTRA_ENV: ${{ inputs.env }}
+          FACTORY: ${{ inputs.factory-startup }}
+          BV: ${{ inputs.blender-version }}
+          KIT_DIR: ${{ inputs.kit-dir }}
+        run: |
+          set -uo pipefail
+          export CI_OUT="$RUNNER_TEMP/out" CI_INPUTS="$RUNNER_TEMP/inputs" CI_REPO="$GITHUB_WORKSPACE" CI_KIT="$GITHUB_WORKSPACE/.ci-kit/$KIT_DIR"
+          mkdir -p "$CI_OUT" "$CI_INPUTS"
+          sub() { local s="$1"; s="${s//\{out\}/$CI_OUT}"; s="${s//\{inputs\}/$CI_INPUTS}"; s="${s//\{repo\}/$CI_REPO}"; s="${s//\{kit\}/$CI_KIT}"; printf '%s' "$s"; }
+          while IFS= read -r kv; do [ -n "$kv" ] && export "$(sub "$kv")"; done <<< "$EXTRA_ENV"
+          eval "words=( $(sub "$ARGS") )"                     # shell words, so quoted arguments survive
+          cmd=(~/blender/blender -b)
+          [ -n "$BLEND" ] && cmd+=("$(sub "$BLEND")")
+          [ "$FACTORY" = true ] && cmd+=(--factory-startup)
+          cmd+=(--python-exit-code 1 --python "$(sub "$SCRIPT")" -- "${words[@]}")
+          export LIBGL_ALWAYS_SOFTWARE=1
+          if [ "$GL" = xvfb ]; then pre=(xvfb-run -a -s "-screen 0 1920x1080x24"); else unset DISPLAY WAYLAND_DISPLAY; pre=(); fi
+          # The GL renderer Blender gets in this mode (a 1x1 offscreen draw forces the context).
+          "${pre[@]}" ~/blender/blender -b --factory-startup --python-expr 'import gpu
+          try:
+              o = gpu.types.GPUOffScreen(1, 1); o.free()
+              print("CI_GL", gpu.platform.backend_type_get(), "|", gpu.platform.renderer_get(), "|", gpu.platform.version_get())
+          except Exception as e:
+              print("CI_GL none |", e)' 2>&1 | grep '^CI_GL' | tee "$RUNNER_TEMP/gl.txt" || true
+          echo "+ ${pre[*]} ${cmd[*]}"
+          t0=$(date +%s)
+          "${pre[@]}" "${cmd[@]}" 2>&1 | tee "$CI_OUT/blender.log"
+          code=${PIPESTATUS[0]}
+          secs=$(( $(date +%s) - t0 ))
+          python3 - "$CI_OUT/blender-report.json" "$code" "$secs" "$RUNNER_TEMP/gl.txt" <<'PY'
+          import json, os, sys
+          out, code, secs, glf = sys.argv[1], int(sys.argv[2]), int(sys.argv[3]), sys.argv[4]
+          gl = open(glf).read().strip() if os.path.exists(glf) else ''
+          json.dump({"exit": code, "seconds": secs, "blender": os.environ["BV"], "gl_mode": os.environ["GL"], "gl_renderer": gl,
+                     "script": os.environ["SCRIPT"], "args": os.environ["ARGS"], "blend": os.environ["BLEND"],
+                     "ref": "${{ inputs.ref }}", "sha": os.popen("git rev-parse HEAD").read().strip(), "run": "${{ github.run_id }}"},
+                    open(out, "w"), indent=1)
+          PY
+          cat "$CI_OUT/blender-report.json"
+          echo "blender exit $code after $secs s"
+          exit "$code"
+      - name: Collect outputs
+        if: always()
+        env:
+          GLOBS: ${{ inputs.outputs }}
+        run: |
+          shopt -s globstar nullglob
+          mkdir -p "$RUNNER_TEMP/out/repo"
+          while IFS= read -r g; do
+            [ -z "$g" ] && continue
+            for f in $g; do [ -f "$f" ] && { mkdir -p "$RUNNER_TEMP/out/repo/$(dirname "$f")"; cp "$f" "$RUNNER_TEMP/out/repo/$f"; }; done
+          done <<< "$GLOBS"
+          find "$RUNNER_TEMP/out" -type f | sed "s|$RUNNER_TEMP/out/||" | sort | head -200
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ${{ inputs.artifact-name }}
+          path: ${{ runner.temp }}/out
+          retention-days: ${{ inputs.retention-days }}
+          if-no-files-found: warn

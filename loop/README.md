@@ -148,7 +148,7 @@ workflow dry run). `loop/logs/` and `loop/state/` are git-ignored.
 | `gates/{setup,clean-reimport,compile,editmode,playmode-smoke,build-mac,build-windows,parity,scope,budgets,soak}` | One JSON line each, real exit codes; `skipped` exits 78, never 0. `build-windows` (U-051, the shipping build) runs on the new main after a landed batch once batch 4's coupled set is on main; skipped without the editor's Windows module; a red is a BLOCKING review entry. `budgets` only reports or flags (no limits yet, ruling 4). `playmode-smoke` calls `tools/unity-playtest.sh` (assembly `Assets/_Game/Runtime.PlayTests`, F-08c); `soak` calls `tools/unity-soak.sh`; both report skipped until those scripts exist. |
 | `gates/precompile` | ci/offload (2026-11-13), the FIRST gate: all six assemblies type-checked by Unity's bundled compiler with the arguments Unity last wrote to `Library/Bee/artifacts/*/<Assembly>.rsp`, the worktree's current sources, no editor, no cm-heavy slot, ~3 s. A pass means Unity's compiler accepts the sources; a new asmdef or package still needs the Unity compile gate. |
 | `../tools/ci/sim-tests-mac.sh`, `../tools/ci/sim-tests.sh` | The no-Unity Sim gate: Sim + Sim.Tests compiled (C# 9; CI: .NET Standard 2.1) and run without the editor. Mac: Unity's bundled csc + Mono (~30 s). CI and any machine with a .NET SDK: NUnitLite (`.github/workflows/sim-tests.yml`). |
-| `gates/remote` | Run a gate on GitHub instead of the Mac: push, start the workflow, poll every 30 s, download results to `logs/remote/<run>/`, one JSON line. `sim` needs nothing; `editmode`, `playmode`, `tests`, `build-windows`, `build-mac` need the Unity licence secrets (`.github/workflows/unity-ci.yml`, GameCI) and exit 78 (skipped) until they exist. |
+| `gates/remote` | Run a gate on GitHub instead of the Mac (one check per 120 s, LOW-CHURN-NOTICE). `sim` needs nothing; `editmode`, `playmode`, `tests`, `builds`, `all` use `.github/workflows/unity-ci.yml` (GameCI, Unity licence secrets). `build-mac`, `build-windows` and `blender` delegate to `../tools/ci/offload.sh` (section 11): the DEFAULT build path. |
 | `RequiresGpu` (NUnit category) | ci/playmode-triage, 2026-11-13: a PlayMode test that needs a real GPU (a rendered frame, a read-back) carries `[Category("RequiresGpu")]`. `unity-ci.yml` always adds `;!RequiresGpu` to the category filter (GitHub's runners have no GPU), while the Mac integrator (`tools/unity-playtest.sh`, `gates/gate.py playmode-smoke`) passes no such exclusion and still runs them. GitHub runs PlayMode `-nographics` like the Mac gate, in 3 parallel shards by fixture, with `-cmTestTimeScale 4` (wall-clock wait budgets in tests go through `TestClock.Budget`, scale 1 on the Mac; product promises are never scaled). `gates/remote playmode --graphics software` runs it under llvmpipe instead (diagnosis: the batch-mode Editor never runs WaitForEndOfFrame, so still captures cannot complete there). |
 | `../tools/library-seed.sh` | Seeds a new worktree's `Library/` from the most recent one with APFS clones (`cp -c`): 3.4 GB in ~4 s for ~15 MB of disk; Bee, BuildPlayerData and ScriptAssemblies dropped (old absolute paths). Integrators call it right after `git worktree add`, instead of moving a Library by hand. |
 | `review/<batch>.md` | Review BLOCKING and ADVISORY entries (ruling 6); soak reports as ADVISORY (U-034). |
@@ -164,3 +164,21 @@ The defects in the OPEN note above are now handled: R4 (slips go to the live log
 items skipped, never texted), R6 (one flusher under a lock, one text per key ever), R14 (dead-pid locks reclaimed).
 The Unity process names in section 6's OPEN were measured during a compile and are listed in `watchers/watch.py`; the
 memory threshold (14 GB of loop RSS, report only) is still the architect's to set.
+
+## 11. Builds and Blender jobs run on GitHub now (ci/offload-2, 2026-11-13)
+
+Unity player builds and scripted Blender jobs run on GitHub's standard runners (free: the repository is public), not in
+the Mac's one heavy slot. **Local Unity builds (`gates/build-mac`, `tools/unity-build-mac.sh`) only when GitHub Actions is
+down** (https://www.githubstatus.com). Kit guide, costs, limits and traps: `../docs/CI-OFFLOAD-KIT.md`.
+
+| Command | What it does |
+| --- | --- |
+| `loop/gates/remote build-mac --ref <branch>` | Dispatches `unity-build.yml` from main for that branch (Linux runner, GameCI mac-mono, the same `CriticalMass.Editor.Build.MacOS` as the local gate), waits, downloads to `~/cm-ci-out/`, unpacks, fixes exec bits, quarantine and the ad-hoc signature, checks the stamp's commit; prints the `.app` path in the JSON line (`app`). `--push` pushes HEAD to the branch first. |
+| `loop/gates/remote build-mac --ref <branch> --then-playtest [--mode smoke\|captures]` | The same, then `tools/remote-playtest.sh` on the Air (default `captures`: one match plus shots). Push to play-tested build without the main Mac's heavy slot. |
+| `loop/gates/remote build-windows --ref <branch>` | Windows player, unpacked into `~/cm-ci-out/.../player/`. |
+| `tools/install-build.sh <app>` | Integrators: installs into `~/critical-mass-unity/Builds` (old one kept as `.prev`); installs as `.app.new` if the game is running from there. |
+| `loop/gates/remote blender --ref <branch> --script <path> [--blend <path>] [--args '...'] --out <dir>` | Headless Blender 5.2.3 on GitHub (`blender.yml`): scripted modelling, rigging and deformation metrics, FBX/GLB exports, verification renders (Workbench and EEVEE on llvmpipe software GL, Cycles CPU). `--plan '[{...},{...}]'` runs several scripts in one process; `--inputs <file or dir>` ships files that are not in git (draft release `ci-inputs`, deleted after the job); `--outputs '<glob>'` brings back files the script wrote into the repo. |
+
+Stays on the Mac: the image-to-3D tool (needs Apple GPU memory), PlayMode tests tagged `RequiresGpu`, anything that
+needs the owner's screen. Public: everything committed (LFS too), job logs and artifacts (7 days); input bundles on the
+draft release are not public.

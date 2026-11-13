@@ -3,8 +3,14 @@
 # One command: push the branch, start the workflow, wait (polling every 30 s, no agent tokens), fetch the results.
 #   loop/gates/remote sim            [--suite fast|slow|all]     no-Unity Sim compile + tests (sim-tests.yml, ~1-3 min)
 #   loop/gates/remote editmode|playmode|tests [--category '!Slow'|Slow] [--graphics nographics|software]                      (unity-ci.yml, needs the licence)
-#   loop/gates/remote build-windows|build-mac|builds|all                                      (unity-ci.yml, needs the licence)
+#   loop/gates/remote builds|all                                                              (unity-ci.yml, needs the licence)
+#   loop/gates/remote build-mac|build-windows --ref BRANCH [--development] [--out DIR] [--then-playtest [--mode smoke|captures]]
+#       (ci/offload-2: THE default build path. unity-build.yml dispatched from main; downloads, unpacks and prepares
+#       the .app; --then-playtest plays it on the Air. Delegates to tools/ci/offload.sh; values in tools/ci/offload.conf)
+#   loop/gates/remote blender --ref BRANCH --script PATH [--blend PATH] [--args '...'] [--plan JSON|FILE]
+#       [--inputs PATH]... [--outputs GLOB]... [--gl egl|xvfb] [--out DIR]                     (blender.yml, no licence)
 #   common: [--ref BRANCH] (default: current branch) [--no-push] [--max-wait MIN] (default 150)
+#   Waiting is one check per 120 s (~/cm-incidents/LOW-CHURN-NOTICE.md).
 # Prints ONE JSON line (also appended to loop/logs/gates.jsonl); results land in loop/logs/remote/<run id>/.
 # Exit: 0 pass, 1 fail, 78 skipped (no Unity licence secret yet, or the workflow is not on main yet), 75 could not start
 # or timed out waiting (never a test result), 64 usage. Never pushes main.
@@ -12,6 +18,13 @@ set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; ROOT="$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || (cd "$HERE/../.." && pwd))"
 LOGS="$HERE/../logs"; mkdir -p "$LOGS/remote"
 what="${1:-}"; shift || true
+# Player builds and Blender jobs: the generic offload helper (push only with --push; default builds what is on GitHub).
+case "$what" in
+  build-mac|build-windows|blender)
+    export CI_LOG_FILE="$LOGS/gates.jsonl"
+    if [[ "$what" == blender ]]; then exec "$ROOT/tools/ci/offload.sh" blender "$@"; fi
+    exec "$ROOT/tools/ci/offload.sh" unity-build --target "${what#build-}" "$@" ;;
+esac
 REF=''; PUSH=1; MAXW=150; SUITE=fast; CATEGORY='!Slow'; GRAPHICS=nographics
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -26,8 +39,8 @@ while [[ $# -gt 0 ]]; do
 done
 case "$what" in
   sim) WF=sim-tests.yml; INPUTS=(-f "suite=$SUITE") ;;
-  editmode|playmode|tests|build-windows|build-mac|builds|all) WF=unity-ci.yml; INPUTS=(-f "jobs=$what" -f "category=$CATEGORY" -f "graphics=$GRAPHICS") ;;
-  *) sed -n '2,12p' "$0" >&2; exit 64 ;;
+  editmode|playmode|tests|builds|all) WF=unity-ci.yml; INPUTS=(-f "jobs=$what" -f "category=$CATEGORY" -f "graphics=$GRAPHICS") ;;
+  *) sed -n '2,18p' "$0" >&2; exit 64 ;;
 esac
 REF="${REF:-$(git -C "$ROOT" rev-parse --abbrev-ref HEAD)}"
 SHA="$(git -C "$ROOT" rev-parse HEAD)"
@@ -45,8 +58,8 @@ fi
 t0=$(date -u +%Y-%m-%dT%H:%M:%SZ); s0=$(date +%s)
 RUN=''
 if err=$(gh workflow run "$WF" --ref "$REF" "${INPUTS[@]}" 2>&1); then
-  for _ in $(seq 1 24); do
-    sleep 5
+  for w in 20 40 120; do   # find the run: one short wait, then at most two slower looks (LOW-CHURN-NOTICE)
+    sleep "$w"
     RUN=$(gh run list --workflow "$WF" --branch "$REF" --event workflow_dispatch --limit 10 --json databaseId,createdAt \
           -q "[.[] | select(.createdAt >= \"$t0\")] | sort_by(.createdAt) | .[0].databaseId // empty" 2>/dev/null)
     [[ -n "$RUN" ]] && break
@@ -54,24 +67,24 @@ if err=$(gh workflow run "$WF" --ref "$REF" "${INPUTS[@]}" 2>&1); then
 else
   # Before the workflow is on main GitHub refuses a manual start; fall back to the run a push or PR already started
   # for this exact commit (sim-tests runs on every push to ci/** and on PRs).
-  for _ in $(seq 1 12); do
+  for w in 20 40 120; do
     RUN=$(gh run list --workflow "$WF" --commit "$SHA" --limit 5 --json databaseId,createdAt \
           -q 'sort_by(.createdAt) | reverse | .[0].databaseId // empty' 2>/dev/null)
     [[ -n "$RUN" ]] && break
-    sleep 10
+    sleep "$w"
   done
   [[ -n "$RUN" ]] || out skipped 78 ",\"reason\":\"$WF cannot be started by hand until it is on main (merge the ci/offload PR), and no push/PR run exists for ${SHA:0:12}\""
   echo "remote: manual start refused ($(head -1 <<<"$err" | cut -c1-120)); using the run for this commit" >&2
 fi
-[[ -n "$RUN" ]] || out could-not-start 75 ',"reason":"run did not appear within 120 s"'
+[[ -n "$RUN" ]] || out could-not-start 75 ',"reason":"run did not appear within 3 min"'
 URL="https://github.com/$(gh repo view --json nameWithOwner -q .nameWithOwner)/actions/runs/$RUN"
-echo "remote: $WF on $REF -> $URL (waiting, polls every 30 s, max ${MAXW} min)" >&2
+echo "remote: $WF on $REF -> $URL (waiting, one check per 120 s, max ${MAXW} min)" >&2
 deadline=$(( s0 + MAXW * 60 ))
 while :; do
   st=$(gh run view "$RUN" --json status -q .status 2>/dev/null || echo unknown)
   [[ "$st" == completed ]] && break
   (( $(date +%s) > deadline )) && out timed-out 75 ",\"run\":$RUN,\"url\":\"$URL\",\"reason\":\"still $st after ${MAXW} min (the run keeps going on GitHub)\""
-  sleep 30
+  sleep 120   # LOW-CHURN-NOTICE: never faster than one check per 120 s
 done
 D="$LOGS/remote/$RUN"; mkdir -p "$D"
 gh run view "$RUN" --json conclusion,jobs > "$D/run.json" 2>/dev/null

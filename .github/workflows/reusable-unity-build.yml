@@ -1,0 +1,156 @@
+# Reusable Unity player build (ci/offload-2, 2026-11-13). Project-neutral: every project value comes in as an input.
+# Part of the CI offload kit (docs/CI-OFFLOAD-KIT.md). Call it from a thin workflow in the project:
+#
+#   jobs:
+#     build:
+#       uses: ./.github/workflows/reusable-unity-build.yml
+#       with: { ref: ..., target-platform: StandaloneOSX, build-method: My.Editor.Build.MacOS, output-dir: Builds/macOS }
+#       secrets: inherit                       # UNITY_LICENSE (.ulf contents) or UNITY_EMAIL + UNITY_PASSWORD
+#
+# What it does: checks out `ref` (any branch, tag or sha: the CALLER's workflow file is used, so dispatching the caller
+# from the default branch builds an old branch with today's workflow and saves the Library cache in the default
+# branch's scope, which every branch can read), restores Git LFS objects and the Library from cache, builds with GameCI
+# (game-ci/unity-builder@v4: Docker image unityci/editor:<os>-<version>-<module>), and uploads ONE artifact holding a
+# .tgz of output-dir plus build-info.json. Tar, not the artifact zip: upload-artifact zips files and drops Unix modes, so
+# a macOS .app loses the executable bit on Contents/MacOS/* and will not start (https://github.com/actions/upload-artifact
+# "Permission Loss"). The caller's helper unpacks it, clears quarantine and re-signs ad hoc (tools/ci/offload.sh).
+#
+# Mac players: on a Linux runner StandaloneOSX cross-builds with Mono only (the image's mac-mono module). IL2CPP for macOS
+# needs a macOS runner and Xcode; set `runner: macos-latest` and expect 10x the minute price on a PRIVATE repo
+# (free on public repos). The player is unsigned; Unity applies an ad-hoc signature on macOS hosts only.
+name: reusable-unity-build
+on:
+  workflow_call:
+    inputs:
+      ref: { type: string, required: true, description: "Branch, tag or sha to build" }
+      target-platform: { type: string, required: true, description: "Unity BuildTarget: StandaloneOSX, StandaloneWindows64, StandaloneLinux64, ..." }
+      build-method: { type: string, required: true, description: "Static editor method (-executeMethod) that builds the player" }
+      output-dir: { type: string, required: true, description: "Folder (relative to project-path) the build method writes; packed whole" }
+      project-path: { type: string, default: '.', description: "Unity project folder inside the repo" }
+      unity-version: { type: string, default: auto, description: "auto = ProjectSettings/ProjectVersion.txt" }
+      custom-parameters: { type: string, default: '', description: "Extra Unity arguments; {sha}, {count}, {ref} are replaced (no spaces inside one value)" }
+      artifact-name: { type: string, default: '', description: "Default player-<target-platform>" }
+      runner: { type: string, default: ubuntu-latest }
+      lfs: { type: boolean, default: true, description: "Pull Git LFS files (cached by object list)" }
+      free-disk: { type: boolean, default: true, description: "Delete unused runner toolchains first (the editor image is ~6 GB)" }
+      cache-prefix: { type: string, default: Library }
+      retention-days: { type: number, default: 7 }
+      timeout-minutes: { type: number, default: 120 }
+    secrets:
+      UNITY_LICENSE: { required: false }
+      UNITY_EMAIL: { required: false }
+      UNITY_PASSWORD: { required: false }
+    outputs:
+      artifact-name: { description: "Name of the uploaded artifact", value: "${{ jobs.build.outputs.artifact }}" }
+      commit: { description: "Full sha that was built", value: "${{ jobs.build.outputs.sha }}" }
+jobs:
+  build:
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    outputs:
+      artifact: ${{ steps.meta.outputs.artifact }}
+      sha: ${{ steps.meta.outputs.sha }}
+    steps:
+      - name: Licence present
+        env:
+          HAS: ${{ secrets.UNITY_LICENSE != '' || (secrets.UNITY_EMAIL != '' && secrets.UNITY_PASSWORD != '') }}
+        run: |
+          [ "$HAS" = true ] || { echo "::error::no Unity licence secret (UNITY_LICENSE, or UNITY_EMAIL and UNITY_PASSWORD); did the caller pass secrets: inherit?"; exit 1; }
+      - name: Free disk
+        if: inputs.free-disk && runner.os == 'Linux'
+        run: |
+          t0=$(date +%s)
+          avail=$(df -BG --output=avail / | tail -1 | tr -dc 0-9); echo "free: ${avail} GB"
+          if [ "$avail" -lt 30 ]; then sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL; fi
+          df -h / | tail -1; echo "took $(( $(date +%s) - t0 )) s"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+          fetch-depth: 0          # the commit count for version stamps
+          lfs: false              # LFS below, from cache (Actions LFS downloads count against the account's LFS bandwidth)
+      - name: LFS object list
+        id: lfsid
+        if: inputs.lfs
+        run: echo "id=$(git lfs ls-files --long | cut -d' ' -f1 | sort | sha256sum | cut -c1-40)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        if: inputs.lfs
+        with:
+          path: .git/lfs/objects
+          key: lfs-${{ steps.lfsid.outputs.id }}
+          restore-keys: lfs-
+      - name: LFS pull (only objects missing from the cache are downloaded)
+        if: inputs.lfs
+        run: git lfs pull && git lfs ls-files | wc -l
+      - name: Build metadata
+        id: meta
+        shell: bash
+        env:
+          REF: ${{ inputs.ref }}
+          PARAMS: ${{ inputs.custom-parameters }}
+          TARGET: ${{ inputs.target-platform }}
+          NAME: ${{ inputs.artifact-name }}
+        run: |
+          sha=$(git rev-parse HEAD); count=$(git rev-list --count HEAD)
+          p="${PARAMS//\{sha\}/$sha}"; p="${p//\{count\}/$count}"; p="${p//\{ref\}/${REF//[^A-Za-z0-9._\/-]/_}}"
+          { echo "sha=$sha"; echo "count=$count"; echo "params=$p"; echo "artifact=${NAME:-player-$TARGET}"; } >> "$GITHUB_OUTPUT"
+          echo "building $REF at ${sha:0:12} (commit $count) for $TARGET; unity params: $p"
+      - uses: actions/cache/restore@v4
+        id: lib
+        with:
+          path: ${{ inputs.project-path }}/Library
+          key: ${{ inputs.cache-prefix }}-${{ inputs.target-platform }}-${{ hashFiles(format('{0}/Packages/packages-lock.json', inputs.project-path), format('{0}/ProjectSettings/ProjectVersion.txt', inputs.project-path)) }}-${{ steps.meta.outputs.sha }}
+          restore-keys: |
+            ${{ inputs.cache-prefix }}-${{ inputs.target-platform }}-${{ hashFiles(format('{0}/Packages/packages-lock.json', inputs.project-path), format('{0}/ProjectSettings/ProjectVersion.txt', inputs.project-path)) }}-
+            ${{ inputs.cache-prefix }}-${{ inputs.target-platform }}-
+            ${{ inputs.cache-prefix }}-editor-
+      - name: Library cache
+        run: echo "hit=${{ steps.lib.outputs.cache-hit }} restored=${{ steps.lib.outputs.cache-matched-key || 'none (cold import)' }}"
+      - uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          projectPath: ${{ inputs.project-path }}
+          unityVersion: ${{ inputs.unity-version }}
+          targetPlatform: ${{ inputs.target-platform }}
+          buildMethod: ${{ inputs.build-method }}
+          customParameters: ${{ steps.meta.outputs.params }}
+          versioning: None
+          allowDirtyBuild: true
+      # Saved even when a later step fails, under the key computed BEFORE Unity ran (Unity rewrites packages-lock.json).
+      - uses: actions/cache/save@v4
+        if: always() && steps.lib.outputs.cache-hit != 'true'
+        continue-on-error: true
+        with:
+          path: ${{ inputs.project-path }}/Library
+          key: ${{ steps.lib.outputs.cache-primary-key }}
+      - name: Pack the player (tar keeps Unix modes; the artifact zip would not)
+        shell: bash
+        env:
+          OUT: ${{ inputs.project-path }}/${{ inputs.output-dir }}
+          REF: ${{ inputs.ref }}
+          TARGET: ${{ inputs.target-platform }}
+          METHOD: ${{ inputs.build-method }}
+        run: |
+          [ -d "$OUT" ] || { echo "::error::build method wrote nothing to $OUT"; exit 1; }
+          sudo chown -R "$(id -u):$(id -g)" "$OUT"     # the GameCI container writes as root
+          python3 - "$OUT" <<'PY' > build-info.json
+          import json, os, sys
+          out = sys.argv[1]
+          files = sum(len(f) for _, _, f in os.walk(out)); size = sum(os.path.getsize(os.path.join(d, x)) for d, _, f in os.walk(out) for x in f)
+          print(json.dumps({"ref": os.environ["REF"], "sha": "${{ steps.meta.outputs.sha }}", "count": int("${{ steps.meta.outputs.count }}"),
+                            "target": os.environ["TARGET"], "method": os.environ["METHOD"], "runner": "${{ runner.os }}-${{ runner.arch }}",
+                            "run": "${{ github.run_id }}", "files": files, "bytes": size}))
+          PY
+          cat build-info.json
+          tar -C "$OUT" -czf player.tgz .
+          ls -l player.tgz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.meta.outputs.artifact }}
+          path: |
+            player.tgz
+            build-info.json
+          compression-level: 0        # already gzipped
+          retention-days: ${{ inputs.retention-days }}
