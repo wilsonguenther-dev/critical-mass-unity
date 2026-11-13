@@ -140,15 +140,20 @@ def game(n):
 
 
 tiles = []
-for n, lab in (("game_v7", "version 7"), ("game_new_none", "A, line (a) none"), ("game_new_thin", "A, line (b) thin"), ("game_new_thick", "A, line (c) thick")):
+for n, lab in (("game_v7", "version 7 (11.9k tris)"), ("game_new_none", "A LOD0 4.3k, line (a) none"), ("game_new_thin", "A LOD0 4.3k, line (b) thin"),
+               ("game_new_thick", "A LOD0 4.3k, line (c) thick"), ("game_hero_thin", "A Hero 22k, line (b)")):
     c, hgt = game(n)
-    p = Image.new("RGB", (c.width * 3 + 20, c.height * 3 + 60 + c.height), GRASS)
-    p.paste(c, (10 + c.width, 34))                                   # true size (1080p pixels)
-    p.paste(c.resize((c.width * 3, c.height * 3), Image.NEAREST), (10, 44 + c.height))
-    ImageDraw.Draw(p).text((8, 8), f"{lab}: {hgt} px tall at the gameplay camera (top: true size, below: 3x)", fill=(20, 30, 20), font=font(13))
+    p = Image.new("RGB", (c.width * 2 + 20, c.height * 2 + 60 + c.height), GRASS)
+    p.paste(c, (10 + c.width // 2, 34))                              # true size (1080p pixels)
+    p.paste(c.resize((c.width * 2, c.height * 2), Image.NEAREST), (10, 44 + c.height))
+    ImageDraw.Draw(p).text((8, 8), lab, fill=(20, 30, 20), font=font(14))
     tiles.append(p)
     iou.setdefault("game_px", {})[n] = hgt
 row(tiles, "game-84px.jpg")
+row([panel(bible("front"), "bible p06", 520, 450), panel(over(rp("new_front")), "Hero mesh (close cameras)", 520, 450),
+     panel(over(rp("lod0_front")), "LOD0, 4,348 triangles (in-match mesh), same texture", 520, 450)], "hero-vs-lod0-front.jpg")
+row([panel(bible("front", FACE), "bible p06", 430, 440), panel(over(rp("new_face"), shadow=False), "Hero", 430, 440),
+     panel(over(rp("lod0_face"), shadow=False), "LOD0 (never seen this close in play)", 430, 440)], "hero-vs-lod0-face.jpg")
 row([panel(over(rp("new_front_crimson")), "Crimson through the team mask texture (R cloth, G glow)", 520, 470),
      panel(over(rp("new_front")), "Azure (as painted)", 520, 470)], "team-swap.jpg")
 if os.path.exists(rp("sculpt_rest")):
@@ -167,7 +172,7 @@ for nm in ("Albedo", "Mask"):
 json.dump(iou, open(os.path.join(OUT, "iou.json"), "w"), indent=1)
 
 # one 960 px check sheet for the builder's own eyes (front, face strip, gameplay crops)
-parts = [Image.open(os.path.join(OUT, n)) for n in ("sbs-front.jpg", "strip-face-bible-v7-new.jpg", "game-84px.jpg")]
+parts = [Image.open(os.path.join(OUT, n)) for n in ("hero-vs-lod0-front.jpg", "strip-face-bible-v7-new.jpg", "game-84px.jpg")]
 parts = [p.resize((960, round(p.height * 960 / p.width)), Image.LANCZOS) for p in parts]
 sheet = Image.new("RGB", (960, sum(p.height for p in parts)), CREAM)
 y = 0

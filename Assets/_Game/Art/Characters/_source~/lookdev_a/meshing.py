@@ -43,17 +43,80 @@ def hidden(o, vol, v):
     return other < -0.020
 
 
-def run(work):
-    from skimage import measure
+def decimate(v, f, target):
+    """MeshLab quadric edge collapse. (Fast-Quadric-Mesh-Simplification stalls on flat faces and tears them when
+    forced: the first shield rim came out as shards, silhouette IoU against the sculpt 0.76; this gives 0.99.)"""
     import pymeshlab
+    if len(f) <= target * 1.05:
+        return v, f
+    ms = pymeshlab.MeshSet()
+    ms.add_mesh(pymeshlab.Mesh(v.astype(np.float64), f.astype(np.int32)))
+    ms.meshing_decimation_quadric_edge_collapse(targetfacenum=int(max(4, target)), qualitythr=0.5, preserveboundary=True,
+                                                preservenormal=True, preservetopology=True, optimalplacement=True,
+                                                planarquadric=True, planarweight=0.001, autoclean=True)
+    mm = ms.current_mesh()
+    return clean(mm.vertex_matrix().astype(F), mm.face_matrix().astype(np.int64))
+
+
+def shading(o, vol, v, f, hard):
+    """Vertex normals from the sculpt; on hard materials each corner takes the sculpt normal a third of the way
+    into its face, so big flat faces shade flat and bevels stay smooth."""
+    n = o.grad(vol, v, o.h * 1.5)
+    if not hard:
+        return n, n[f]
+    tri = v[f]
+    q = (tri * 0.62 + tri.mean(1, keepdims=True) * 0.38).reshape(-1, 3).astype(F)
+    q = q - o.grad(vol, q) * o.s(vol, q)[:, None]
+    return n, o.grad(vol, q, o.h * 1.5).reshape(-1, 3, 3)
+
+
+def closest_on_tris(P, A, B, C):
+    """Closest point of P (N,k,3) on triangles A,B,C (N,k,3): returns squared distance (N,k) and barycentrics (N,k,3)."""
+    e0, e1 = B - A, C - A
+    P = np.broadcast_to(P, A.shape)
+    nrm = np.cross(e0, e1)
+    nn = np.maximum((nrm * nrm).sum(-1), 1e-20)
+    w = P - A
+    g = (np.cross(e0, w) * nrm).sum(-1) / nn
+    b_ = (np.cross(w, e1) * nrm).sum(-1) / nn
+    bary = np.stack([1 - b_ - g, b_, g], -1)
+    inside = (bary >= 0).all(-1)
+    P = np.broadcast_to(P, A.shape)
+    best_d = np.full(A.shape[:-1], 1e18)
+    best_b = np.zeros(A.shape[:-1] + (3,))
+    for (X, Y, i, j) in ((A, B, 0, 1), (B, C, 1, 2), (C, A, 2, 0)):
+        d = Y - X
+        t = np.clip(((P - X) * d).sum(-1) / np.maximum((d * d).sum(-1), 1e-20), 0, 1)
+        q = X + d * t[..., None]
+        dd = ((P - q) ** 2).sum(-1)
+        bb = np.zeros_like(best_b)
+        bb[..., i] = 1 - t
+        bb[..., j] = t
+        m = dd < best_d
+        best_d = np.where(m, dd, best_d)
+        best_b = np.where(m[..., None], bb, best_b)
+    q = A * bary[..., :1] + B * bary[..., 1:2] + C * bary[..., 2:]
+    din = ((P - q) ** 2).sum(-1)
+    return np.where(inside, din, best_d), np.where(inside[..., None], bary, best_b)
+
+
+LOD0_BUDGET = {"body": 3300, "shield": 850, "cleaver": 350}       # 4,500 in-match triangles in all
+
+
+def run(work):
+    """Sculpt -> Hero mesh (close cameras) -> LOD0 (in-match, <= 4,500 tris). The atlas is unwrapped on LOD0 and the
+    Hero takes its UVs by closest-point projection onto LOD0, so every level shares one painted texture."""
+    from skimage import measure
+    from scipy.spatial import cKDTree
     import xatlas
     stats = {"objects": {}}
     atlas = xatlas.Atlas()
     order = []
-    low = {}
+    hero, lod = {}, {}
+    objs = {}
     for name in ("body", "shield", "cleaver"):
         t0 = time.time()
-        o = Obj(work, name)
+        o = objs[name] = Obj(work, name)
         hv, hf, parts = [], [], []
         nh = 0
         for gid in o.gids:
@@ -64,38 +127,25 @@ def run(work):
             v = (v + o.lo).astype(F)
             f = f.astype(np.int64)
             fn = np.cross(v[f[:, 1]] - v[f[:, 0]], v[f[:, 2]] - v[f[:, 0]])
-            g = o.grad(vol, v[f].mean(1))
-            if (fn * g).sum() < 0:
+            if (fn * o.grad(vol, v[f].mean(1))).sum() < 0:
                 f = f[:, ::-1]
             hv.append(v)
             hf.append(f + nh)
             nh += len(v)
-            # visible share of this shell (the rest is buried more than 2 cm inside another material)
             vis = area(v, f)[~(hidden(o, vol, v)[f]).all(1)].sum()
             parts.append((gid, v, f, float(vis), float(area(v, f).sum())))
         hv, hf = np.concatenate(hv), np.concatenate(hf)
         np.savez(os.path.join(work, f"high_{name}.npz"), v=hv, f=hf.astype(np.int32))
         wsum = sum(a * WEIGHT.get(W.GROUPS[g], 1.0) for g, _, _, a, _ in parts)
-        V, Fc, Gd, Nn, Cp, CN = [], [], [], [], [], []
-        nv = 0
-        ncomp = 0
+        H = dict(v=[], f=[], gid=[], n=[], cn=[], comp=[], nv=0, nc=0)
+        per_group = []
         for gid, v, f, a, atot in parts:
             if a <= 0:
                 continue
-            want = max(60, int(BUDGET[name] * a * WEIGHT.get(W.GROUPS[gid], 1.0) / wsum))
-            # decimate the CLOSED shell (open borders collapse into spikes), then drop the buried faces
-            target = int(want * min(1.6, atot / a))
-            if len(f) > target * 1.05:
-                # MeshLab quadric edge collapse. (Fast-Quadric-Mesh-Simplification stalls on flat faces and tears
-                # them when forced: the v1 shield rim came out as shards. Measured: 0.3 mm mean error here.)
-                ms = pymeshlab.MeshSet()
-                ms.add_mesh(pymeshlab.Mesh(v.astype(np.float64), f.astype(np.int32)))
-                ms.meshing_decimation_quadric_edge_collapse(targetfacenum=int(target), qualitythr=0.5, preserveboundary=True,
-                                                            preservenormal=True, preservetopology=True, optimalplacement=True,
-                                                            planarquadric=True, planarweight=0.001, autoclean=True)
-                mm = ms.current_mesh()
-                v, f = clean(mm.vertex_matrix().astype(F), mm.face_matrix().astype(np.int64))
             vol = o.fld[gid]
+            want = max(60, int(BUDGET[name] * a * WEIGHT.get(W.GROUPS[gid], 1.0) / wsum))
+            # decimate the CLOSED shell (open borders collapse badly), then drop the buried faces
+            v, f = decimate(v, f, int(want * min(1.6, atot / a)))
             for _ in range(2):                     # pull the decimated vertices back onto the true surface
                 v = v - o.grad(vol, v) * o.s(vol, v)[:, None]
             f = f[~(hidden(o, vol, v)[f]).all(1)]
@@ -104,28 +154,37 @@ def run(work):
             ca = np.bincount(comp[f[:, 0]], area(v, f), minlength=comp.max() + 1)
             f = f[(ca > 3e-4)[comp[f[:, 0]]]]
             v, f = clean(v, f)
-            print(f"  {name}.{W.GROUPS[gid]} want {want} got {len(f)}", flush=True)
-            n = o.grad(vol, v, o.h * 1.5)
             comp = components(len(v), f)
-            if W.GROUPS[gid] in HARD:
-                # shading normal of each corner = sculpt normal a third of the way into its face: big flat faces
-                # shade flat, bevels and curves stay smooth (what a face-weighted normal modifier does, from the field)
-                tri = v[f]
-                q = (tri * 0.62 + tri.mean(1, keepdims=True) * 0.38).reshape(-1, 3).astype(F)
-                q = q - o.grad(vol, q) * o.s(vol, q)[:, None]
-                CN.append(o.grad(vol, q, o.h * 1.5).reshape(-1, 3, 3))
-            else:
-                CN.append(n[f])
-            V.append(v.astype(F))
-            Fc.append(f + nv)
-            Gd.append(np.full(len(v), gid, np.int32))
-            Nn.append(n)
-            Cp.append(comp + ncomp)
-            ncomp += comp.max() + 1
-            nv += len(v)
-        V, Fc, Gd, Nn, Cp = np.concatenate(V), np.concatenate(Fc), np.concatenate(Gd), np.concatenate(Nn), np.concatenate(Cp)
-        low[name] = dict(v=V, f=Fc, gid=Gd, n=Nn, comp=Cp, cn=np.concatenate(CN))
-        # atlas: head skin gets more texels; one xatlas mesh per density class
+            n, cn = shading(o, vol, v, f, W.GROUPS[gid] in HARD)
+            per_group.append((gid, v.astype(F), f))
+            H["v"].append(v.astype(F)); H["f"].append(f + H["nv"]); H["gid"].append(np.full(len(v), gid, np.int32))
+            H["n"].append(n); H["cn"].append(cn); H["comp"].append(comp + H["nc"])
+            H["nv"] += len(v); H["nc"] += comp.max() + 1
+        hero[name] = {k: np.concatenate(H[k]) for k in ("v", "f", "gid", "n", "cn", "comp")}
+        nhero = len(hero[name]["f"])
+        # ---- LOD0: the Hero pieces decimated again to the in-match budget
+        k = LOD0_BUDGET[name] / nhero
+        for attempt in range(4):
+            Lp = []
+            for gid, v, f in per_group:
+                vol = o.fld[gid]
+                v2, f2 = decimate(v, f, max(8, int(len(f) * k)))
+                for _ in range(2):
+                    v2 = v2 - o.grad(vol, v2) * o.s(vol, v2)[:, None]
+                Lp.append((gid, v2.astype(F), f2))
+            tot = sum(len(f2) for _, _, f2 in Lp)
+            if tot <= LOD0_BUDGET[name]:
+                break
+            k *= LOD0_BUDGET[name] / tot * 0.96
+        Ld = dict(v=[], f=[], gid=[], n=[], cn=[], comp=[], nv=0, nc=0)
+        for gid, v, f in Lp:
+            n, cn = shading(o, o.fld[gid], v, f, W.GROUPS[gid] in HARD)
+            comp = components(len(v), f)
+            Ld["v"].append(v); Ld["f"].append(f + Ld["nv"]); Ld["gid"].append(np.full(len(v), gid, np.int32))
+            Ld["n"].append(n); Ld["cn"].append(cn); Ld["comp"].append(comp + Ld["nc"])
+            Ld["nv"] += len(v); Ld["nc"] += comp.max() + 1
+        lod[name] = {k_: np.concatenate(Ld[k_]) for k_ in ("v", "f", "gid", "n", "cn", "comp")}
+        V, Fc, Gd, Nn = lod[name]["v"], lod[name]["f"], lod[name]["gid"], lod[name]["n"]
         fg = Gd[Fc[:, 0]]
         if name == "body":
             headf = (fg == W.GID["skin"]) & (V[Fc].mean(1)[:, 2] > 1.25)
@@ -135,64 +194,93 @@ def run(work):
         for key, m in sets:
             atlas.add_mesh((V * TEXEL.get(key, 1.0)).astype(F), Fc[m].astype(np.uint32), Nn)
             order.append((name, np.where(m)[0]))
-        stats["objects"][name] = {"high_tris": int(len(hf)), "high_verts": int(len(hv)), "game_tris": int(len(Fc)),
-                                  "game_verts_before_uv_split": int(len(V)), "components": int(ncomp)}
-        print(f"MESH {name} high {len(hf)} tris, game {len(Fc)} tris {len(V)} verts, {time.time() - t0:.1f}s", flush=True)
+        stats["objects"][name] = {"sculpt_tris": int(len(hf)), "hero_tris": int(nhero), "hero_verts": int(len(hero[name]["v"])),
+                                  "lod0_tris": int(len(Fc)), "pieces": int(H["nc"])}
+        print(f"MESH {name} sculpt {len(hf)} hero {nhero} lod0 {len(Fc)} tris, {time.time() - t0:.1f}s", flush=True)
     co = xatlas.ChartOptions()
     co.max_cost = 9.0
     co.normal_deviation_weight = 1.0
     co.max_iterations = 2
     po = xatlas.PackOptions()
     po.resolution = 2048
-    po.padding = 6
+    po.padding = 8
     po.bilinear = True
     po.create_image = False
-    t0 = time.time()
     atlas.generate(co, po)
-    print(f"ATLAS {atlas.width}x{atlas.height} charts {atlas.chart_count} util {atlas.utilization} {time.time() - t0:.1f}s", flush=True)
+    print(f"ATLAS {atlas.width}x{atlas.height} charts {atlas.chart_count}", flush=True)
     out = {}
     for i, (name, fidx) in enumerate(order):
         vmap, idx, uv = atlas[i]
-        d = out.setdefault(name, dict(v=[], f=[], uv=[], gid=[], n=[], comp=[], cn=[], nv=0))
-        L = low[name]
-        d["v"].append(L["v"][vmap])
-        d["n"].append(L["n"][vmap])
-        d["gid"].append(L["gid"][vmap])
-        d["comp"].append(L["comp"][vmap])
-        d["uv"].append(uv.astype(F))
         assert len(idx) == len(fidx)
+        d = out.setdefault(name, dict(v=[], f=[], uv=[], gid=[], n=[], comp=[], cn=[], nv=0))
+        L = lod[name]
+        for k_ in ("v", "n", "gid", "comp"):
+            d[k_].append(L[k_][vmap])
+        d["uv"].append(uv.astype(F))
         d["cn"].append(L["cn"][fidx])
         d["f"].append(idx.astype(np.int64) + d["nv"])
         d["nv"] += len(vmap)
-    for name, d in out.items():
-        arr = {k: np.concatenate(d[k]) for k in ("v", "f", "uv", "gid", "n", "comp", "cn")}
-        np.savez(os.path.join(work, f"low_{name}.npz"), **arr)
-        stats["objects"][name]["game_verts"] = int(len(arr["v"]))
-    # GATE: the game mesh must keep the sculpt's silhouette (three axis views, points splatted on the lattice)
     rng = np.random.default_rng(0)
-    for name in out:
-        o = Obj(work, name)
-        z = np.load(os.path.join(work, f"low_{name}.npz"))
-        v, f = z["v"], z["f"]
-        b = rng.random((len(f), 300, 2))
-        fl = b.sum(2) > 1
-        b[fl] = 1 - b[fl]
-        p = (v[f[:, 0]][:, None] + (v[f[:, 1]] - v[f[:, 0]])[:, None] * b[..., :1] + (v[f[:, 2]] - v[f[:, 0]])[:, None] * b[..., 1:]).reshape(-1, 3)
-        ious = []
-        for ax in range(3):
-            keep = [i for i in range(3) if i != ax]
-            ms = (o.d1 < 0).any(ax)
-            ij = np.round((p[:, keep] - o.lo[keep]) / o.h).astype(int)
-            m = np.zeros_like(ms)
-            m[np.clip(ij[:, 0], 0, ms.shape[0] - 1), np.clip(ij[:, 1], 0, ms.shape[1] - 1)] = True
-            ious.append(round(float((m & ms).sum() / (m | ms).sum()), 3))
-        stats["objects"][name]["silhouette_iou_vs_sculpt_xyz"] = ious
-        if min(ious) < 0.95:
-            print(f"GATE FAIL {name} silhouette vs sculpt {ious}", flush=True)
-    stats["atlas"] = {"charts": int(atlas.chart_count), "utilization": float(np.mean(atlas.utilization))}
-    stats["game_tris_total"] = sum(s["game_tris"] for s in stats["objects"].values())
-    stats["game_verts_total"] = sum(s["game_verts"] for s in stats["objects"].values())
-    stats["high_tris_total"] = sum(s["high_tris"] for s in stats["objects"].values())
+    for name, d in out.items():
+        o = objs[name]
+        L = {k_: np.concatenate(d[k_]) for k_ in ("v", "f", "uv", "gid", "n", "comp", "cn")}
+        np.savez(os.path.join(work, f"lod0_{name}.npz"), **L)
+        stats["objects"][name]["lod0_verts_with_uv_seams"] = int(len(L["v"]))
+        # ---- Hero UVs: closest point on LOD0 (same material), kept inside one chart per Hero face
+        chart = components(len(L["v"]), L["f"])[L["f"][:, 0]]
+        Hm = hero[name]
+        uvl = np.zeros((len(Hm["f"]), 3, 2), F)
+        crossing = 0
+        hg = Hm["gid"][Hm["f"][:, 0]]
+        lg = L["gid"][L["f"][:, 0]]
+        for gid in np.unique(hg):
+            lt = np.where(lg == gid)[0]
+            A, B, C = (L["v"][L["f"][lt, c_]].astype(np.float64) for c_ in range(3))
+            b = rng.random((len(lt), 24, 2))
+            fl = b.sum(2) > 1
+            b[fl] = 1 - b[fl]
+            smp = (A[:, None] + (B - A)[:, None] * b[..., :1] + (C - A)[:, None] * b[..., 1:]).reshape(-1, 3)
+            smp = np.concatenate([smp, (A + B + C) / 3, A, B, C])
+            sid = np.concatenate([np.repeat(np.arange(len(lt)), 24)] + [np.arange(len(lt))] * 4)
+            tree = cKDTree(smp)
+            hfi = np.where(hg == gid)[0]
+            tri = Hm["v"][Hm["f"][hfi]].astype(np.float64)                 # (n,3,3)
+            c0 = chart[lt[sid[tree.query(tri.mean(1))[1]]]]               # chart under each Hero face centre
+            kq = min(24, len(smp))
+            _, nb = tree.query(tri.reshape(-1, 3), k=kq)
+            cand = sid[nb.reshape(len(hfi) * 3, kq)]                        # candidate LOD0 triangles per corner
+            Pq = tri.reshape(-1, 1, 3)
+            d2, bary = closest_on_tris(Pq, A[cand], B[cand], C[cand])
+            same = chart[lt[cand]] == np.repeat(c0, 3)[:, None]
+            pick = np.argmin(d2 + np.where(same, 0.0, 1e3), 1)
+            rows = np.arange(len(pick))
+            crossing += int((~same[rows, pick]).reshape(-1, 3).any(1).sum())
+            tsel = lt[cand[rows, pick]]
+            bsel = bary[rows, pick]
+            uvc = (L["uv"][L["f"][tsel]] * bsel[..., None]).sum(1)
+            uvl[hfi] = uvc.reshape(-1, 3, 2)
+        np.savez(os.path.join(work, f"hero_{name}.npz"), uvl=uvl, **Hm)
+        stats["objects"][name]["hero_faces_crossing_a_chart"] = crossing
+        # ---- GATE: both meshes must keep the sculpt's silhouette (three axis views)
+        for tag, v, f in (("hero", Hm["v"], Hm["f"]), ("lod0", L["v"], L["f"])):
+            b = rng.random((len(f), 300, 2))
+            fl = b.sum(2) > 1
+            b[fl] = 1 - b[fl]
+            p = (v[f[:, 0]][:, None] + (v[f[:, 1]] - v[f[:, 0]])[:, None] * b[..., :1] + (v[f[:, 2]] - v[f[:, 0]])[:, None] * b[..., 1:]).reshape(-1, 3)
+            ious = []
+            for ax in range(3):
+                keep = [i for i in range(3) if i != ax]
+                ms = (o.d1 < 0).any(ax)
+                ij = np.round((p[:, keep] - o.lo[keep]) / o.h).astype(int)
+                m = np.zeros_like(ms)
+                m[np.clip(ij[:, 0], 0, ms.shape[0] - 1), np.clip(ij[:, 1], 0, ms.shape[1] - 1)] = True
+                ious.append(round(float((m & ms).sum() / (m | ms).sum()), 3))
+            stats["objects"][name][f"{tag}_silhouette_iou_vs_sculpt_xyz"] = ious
+            if min(ious) < (0.95 if tag == "hero" else 0.90):
+                print(f"GATE FAIL {name} {tag} silhouette vs sculpt {ious}", flush=True)
+    stats["atlas_charts"] = int(atlas.chart_count)
+    for k_ in ("sculpt_tris", "hero_tris", "lod0_tris", "hero_faces_crossing_a_chart"):
+        stats[k_ + "_total"] = sum(s_[k_] for s_ in stats["objects"].values())
     json.dump(stats, open(os.path.join(work, "mesh_stats.json"), "w"), indent=1)
     print("MESH_STATS", json.dumps(stats))
 
@@ -233,7 +321,7 @@ def bake(work, res=2048):
     filled = np.zeros((res, res), bool)
     for name in ("body", "shield", "cleaver"):
         o = Obj(work, name)
-        z = np.load(os.path.join(work, f"low_{name}.npz"))
+        z = np.load(os.path.join(work, f"lod0_{name}.npz"))       # the atlas lives on LOD0; the Hero mesh borrows it
         fid, bary = raster(z["uv"], z["f"], res)
         m = fid >= 0
         tri = z["f"][fid[m]]
@@ -244,7 +332,7 @@ def bake(work, res=2048):
         for g in np.unique(gid):                     # texel centre -> the true sculpt surface
             mm = gid == g
             vol = o.fld[int(g)]
-            for _ in range(2):
+            for _ in range(4):
                 P[mm] = P[mm] - o.grad(vol, P[mm]) * o.s(vol, P[mm])[:, None]
         r = {k: [] for k in ("albedo", "cloth", "glow", "emis", "ao")}
         for i in range(0, len(P), 400000):

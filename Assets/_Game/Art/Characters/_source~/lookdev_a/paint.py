@@ -100,8 +100,19 @@ def terms(o, P, gid):
     own = o.group_sample(P, gid, lambda vol, p: o.s(vol, p)[:, None])[:, 0]
     other = np.where(np.abs(own - d1) < o.h * 0.6, d2, d1)
     line = 1.0 - ss(0.0035, 0.0075, other)
-    edge = o.group_sample(P, gid, lambda vol, p: ((o.s(vol, p - o.grad(vol, p) * 0.011) + 0.011) / 0.011)[:, None])[:, 0]
-    edge_b = o.group_sample(P, gid, lambda vol, p: ((o.s(vol, p - o.grad(vol, p) * 0.05) + 0.05) / 0.05)[:, None])[:, 0]
+    # curvature = divergence of the sculpt normal over 8 mm: about 40 on a 2.4 cm bevel, 80 on its corners,
+    # 10 on the head, 0 on a flat face, negative in a crease. This is what draws the thin light edge lines.
+    aux = np.where(np.abs(n[:, 2:3]) < 0.9, np.array([[0, 0, 1]], F), np.array([[1, 0, 0]], F))
+    t1 = np.cross(n, aux)
+    t1 /= np.maximum(np.linalg.norm(t1, axis=1, keepdims=True), 1e-9)
+    t2 = np.cross(n, t1)
+    gn = lambda Q: o.group_sample(Q, gid, lambda vol, q: o.grad(vol, q, o.h * 1.5))
+    dd = 0.008
+    div = np.zeros(len(P), F)
+    for t in (t1, t2):
+        div += ((gn(P + t * dd) - gn(P - t * dd)) * t).sum(1) / (2 * dd)
+    edge = ss(20.0, 34.0, div)
+    edge_b = ss(8.0, 26.0, div)
     cav = o.group_sample(P, gid, lambda vol, p: ((0.018 - o.s(vol, p + o.grad(vol, p) * 0.018)) / 0.018)[:, None])[:, 0]
     return dict(n=n, hl=hl, ao=np.clip(ao, 0, 1), line=line, edge=np.clip(edge, 0, 1), edge_b=np.clip(edge_b, 0, 1),
                 cav=np.clip(cav, 0, 1), L=L, up=up)
@@ -132,12 +143,12 @@ def paint(o, P, gid):
         occ = (1 - a_) ** 0.9
         c = mix(c, s * 0.72, np.clip(occ * 1.25, 0, 1) * 0.85)
         c = mix(c, s * 0.62, ss(0.25, 0.75, c_) * 0.75)   # creases of the own form
-        hi_e = ss(0.30, 0.48, e_) * ss(0.40, 0.62, h_)    # crisp light edge, lit side only
+        hi_e = e_ * ss(0.40, 0.62, h_)    # crisp light edge, lit side only
         if name == "stone" or name == "stone_blade" or name == "stone_dark":
-            bev = ss(0.10, 0.24, eb)                                   # the bevel itself (radius 2-3 cm)
+            bev = e_                                                   # the bevel itself (radius 2-3 cm)
             c = mix(c, np.minimum(l * 1.12, 1.0), bev * ss(0.42, 0.60, h_) * 0.85)     # crisp light bevel, lit side
             c = mix(c, s * 0.80, bev * ss(0.40, 0.22, h_) * 0.55)                      # dark bevel, shade side
-            nick = ss(0.60, 0.63, noise(p, (13, 13, 13), 7.7)) * ss(0.30, 0.45, eb)    # a few nicks ON the edges only
+            nick = ss(0.60, 0.63, noise(p, (13, 13, 13), 7.7)) * e_    # a few nicks ON the edges only
             c = mix(c, s * 0.85, nick * 0.7)
             crack = ss(0.012, 0.004, np.abs(noise(p, (6, 6, 6), 1.3) - 0.5)) * ss(0.62, 0.72, noise(p, (3, 3, 3), 9.0))
             c = mix(c, s * 0.72, crack * 0.75)
@@ -147,9 +158,9 @@ def paint(o, P, gid):
                 q = p * 7.7 - cell - 0.5
                 hsh = np.abs(np.sin(cell @ np.array([12.9898, 78.233, 37.719], F)) * 43758.5453) % 1.0
                 oct_ = np.abs(q[:, 0]) * 1.3 + np.abs(q[:, 1]) + np.abs(q[:, 2]) * 1.15
-                shard = ss(0.275, 0.262, oct_) * (hsh < 0.30) * ss(0.35, 0.5, a_)
-                c = mix(c, mix(hx("#2CB4D2"), hx("#93EEF6"), ss(0.20, 0.05, oct_) * ss(0.4, 0.7, h_)[:, None] if False else ss(0.20, 0.05, oct_)), shard)
-                c = mix(c, hx("#176083"), shard * ss(0.235, 0.262, oct_) * 0.85)            # dark rim: the chip sits IN the stone
+                shard = ss(0.46, 0.445, oct_) * (hsh < 0.40) * ss(0.35, 0.5, a_)
+                c = mix(c, mix(hx("#2CB4D2"), hx("#93EEF6"), ss(0.36, 0.16, oct_)), shard)
+                c = mix(c, hx("#176083"), shard * ss(0.41, 0.445, oct_) * 0.85)            # dark rim: the chip sits IN the stone
                 glow[m] = shard
                 emis[m] = shard * 0.45
         elif name in ("brass", "iron"):
@@ -160,13 +171,13 @@ def paint(o, P, gid):
             c = mix(c, np.array([1.0, 0.97, 0.84], F) if name == "brass" else hx("#D7E4F4"), ss(0.70, 0.78, spec) * 0.95)
             bounce = ss(0.35, 0.05, h_) * ss(0.0, -0.6, upn)       # warm bounce light on the underside
             c = mix(c, b * 1.05, bounce * 0.35)
-            c = mix(c, np.minimum(l * 1.05, 1.0), ss(0.10, 0.26, eb) * ss(0.45, 0.62, h_) * 0.5)
+            c = mix(c, np.minimum(l * 1.05, 1.0), e_ * ss(0.45, 0.62, h_) * 0.5)
         elif name == "hair":
             c = mix(c, l * 1.10, ss(0.80, 0.84, h_) * 0.55)                # one clean painted light shape per lock
             c = mix(c, s * 0.85, ss(0.15, 0.6, c_) * 0.5)
-            c = mix(c, l, ss(0.10, 0.25, eb) * ss(0.5, 0.7, h_) * 0.35)
+            c = mix(c, l, eb * ss(0.5, 0.7, h_) * 0.35)
         elif name in ("leather", "leather_dark", "boot", "wrap"):
-            c = mix(c, l, ss(0.10, 0.26, eb) * ss(0.45, 0.62, h_) * 0.6)
+            c = mix(c, l, e_ * ss(0.45, 0.62, h_) * 0.6)
         elif name == "wood":
             g1 = noise(p, (55, 3.0, 55), 1.0)
             grain = ss(0.035, 0.0, np.abs(g1 - 0.5)) * 0.5 + ss(0.02, 0.0, np.abs(noise(p, (90, 5.0, 90), 6.0) - 0.42)) * 0.3

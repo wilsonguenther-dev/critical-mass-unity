@@ -88,7 +88,11 @@ def mesh_from_np(name, v, f, uv=None, n=None, cn=None):
         li = np.zeros(len(me.loops), np.int32)
         me.loops.foreach_get("vertex_index", li)
         layer = me.uv_layers.new(name="UVMap")
-        layer.data.foreach_set("uv", np.ascontiguousarray(uv[li], np.float32).ravel())
+        if uv.ndim == 3:                       # per-corner UVs (Hero: borrowed from the LOD0 atlas)
+            if uv.shape[0] * 3 == len(me.loops):
+                layer.data.foreach_set("uv", np.ascontiguousarray(uv, np.float32).ravel())
+        else:
+            layer.data.foreach_set("uv", np.ascontiguousarray(uv[li], np.float32).ravel())
     if cn is not None and len(cn) * 3 == len(me.loops):
         me.normals_split_custom_set([tuple(x) for x in cn.reshape(-1, 3).tolist()])
     elif n is not None:
@@ -120,128 +124,142 @@ for vtx in old_body.data.vertices:
 kd.balance()
 log("old body verts", len(oldw), "world identity", old_body.matrix_world == Matrix.Identity(4))
 
-NEW, HULL = [], []
-for key, obname, T, slot in (("body", "WarriorLD_Body", None, None), ("shield", "WarriorLD_Shield", T_SHIELD, "handslot.l"),
-                             ("cleaver", "WarriorLD_Cleaver", T_CLEAVER, "handslot.r")):
-    z = np.load(os.path.join(WORK, f"low_{key}.npz"))
-    v, n, f, uv, gid, comp = z["v"], z["n"], z["f"], z["uv"], z["gid"], z["comp"]
-    if key == "body":
-        BODY_GID = gid
-    cn = z["cn"].reshape(-1, 3)
-    if T is not None:
-        v, n = xform(T, v, n)
-        cn = xform(T, np.zeros((1, 3), np.float32), cn)[1]
-    me = mesh_from_np(obname, v, f, uv, n, cn.reshape(-1, 3, 3))
-    ob = bpy.data.objects.new(obname, me)
-    coll.objects.link(ob)
-    # ---- weights
-    W = [None] * len(v)
-    if slot:
-        for i in range(len(v)):
-            W[i] = {slot: 1.0}
-    else:
-        for i in range(len(v)):
-            acc = {}
-            for co, idx, dist in kd.find_n(Vector(v[i]), 5):
-                wgt = 1.0 / (dist * dist + 1e-5)
-                for b, w in oldw[idx].items():
-                    acc[b] = acc.get(b, 0.0) + w * wgt
-            W[i] = acc
-        # smooth the transferred weights over each piece (nearest-vertex transfer is discontinuous between old parts)
-        bones = sorted({b for acc in W for b in acc})
-        bi = {b: k for k, b in enumerate(bones)}
-        Wm = np.zeros((len(v), len(bones)), np.float64)
+SETS, GIDS = {}, {}
+for TAG in ("Hero", "LOD0"):
+    NEW, HULL = [], []
+    for key, base, T, slot in (("body", "Body", None, None), ("shield", "Shield", T_SHIELD, "handslot.l"), ("cleaver", "Cleaver", T_CLEAVER, "handslot.r")):
+        obname = f"WarriorLD_{TAG}_{base}"
+        z = np.load(os.path.join(WORK, f"{TAG.lower()}_{key}.npz"))
+        v, n, f, gid, comp = z["v"], z["n"], z["f"], z["gid"], z["comp"]
+        uv = z["uvl"] if "uvl" in z else z["uv"]
+        if key == "body":
+            GIDS[TAG] = gid
+        cn = z["cn"].reshape(-1, 3)
+        if T is not None:
+            v, n = xform(T, v, n)
+            cn = xform(T, np.zeros((1, 3), np.float32), cn)[1]
+        me = mesh_from_np(obname, v, f, uv, n, cn.reshape(-1, 3, 3))
+        ob = bpy.data.objects.new(obname, me)
+        coll.objects.link(ob)
+        # ---- weights
+        W = [None] * len(v)
+        if slot:
+            for i in range(len(v)):
+                W[i] = {slot: 1.0}
+        else:
+            for i in range(len(v)):
+                acc = {}
+                for co, idx, dist in kd.find_n(Vector(v[i]), 5):
+                    wgt = 1.0 / (dist * dist + 1e-5)
+                    for b, w in oldw[idx].items():
+                        acc[b] = acc.get(b, 0.0) + w * wgt
+                W[i] = acc
+            # smooth the transferred weights over each piece (nearest-vertex transfer is discontinuous between old parts)
+            bones = sorted({b for acc in W for b in acc})
+            bi = {b: k for k, b in enumerate(bones)}
+            Wm = np.zeros((len(v), len(bones)), np.float64)
+            for i, acc in enumerate(W):
+                tot = sum(acc.values()) or 1.0
+                for b, w in acc.items():
+                    Wm[i, bi[b]] = w / tot
+            _, weld = np.unique(np.round(v, 4), axis=0, return_inverse=True)
+            weld = weld.ravel()
+            ed = np.concatenate([f[:, [0, 1]], f[:, [1, 2]], f[:, [2, 0]]])
+            ea, eb = weld[ed[:, 0]], weld[ed[:, 1]]
+            nw = weld.max() + 1
+            Ww = np.zeros((nw, len(bones)))
+            cnt = np.zeros(nw)
+            np.add.at(Ww, weld, Wm)
+            np.add.at(cnt, weld, 1.0)
+            Ww /= cnt[:, None]
+            for _ in range(24):
+                acc2 = np.zeros_like(Ww)
+                deg = np.zeros(nw)
+                np.add.at(acc2, ea, Ww[eb])
+                np.add.at(acc2, eb, Ww[ea])
+                np.add.at(deg, ea, 1.0)
+                np.add.at(deg, eb, 1.0)
+                Ww = 0.4 * Ww + 0.6 * acc2 / np.maximum(deg, 1.0)[:, None]
+            Wm = Ww[weld]
+            W = [{bones[k]: float(Wm[i, k]) for k in np.nonzero(Wm[i] > 0.02)[0]} for i in range(len(v))]
+            head = (gid == GID["hair"]) | ((gid == GID["skin"]) & (v[:, 2] > 1.31)) | ((gid == GID["brass"]) & (v[:, 2] > 1.6))
+            for i in np.where(head)[0]:
+                W[i] = {"head": 1.0}
+            for c in np.unique(comp[np.isin(gid, list(RIGID))]):          # rigid parts: one weight set per piece
+                idx = np.where(comp == c)[0]
+                acc = {}
+                for i in idx:
+                    tot = sum(W[i].values()) or 1.0
+                    for b, w in W[i].items():
+                        acc[b] = acc.get(b, 0.0) + w / tot
+                top = sorted(acc.items(), key=lambda kv: -kv[1])[:2]
+                if len(top) == 2 and top[1][1] < 0.25 * top[0][1]:
+                    top = top[:1]
+                for i in idx:
+                    W[i] = dict(top)
+        vgs = {}
+        unweighted = 0
         for i, acc in enumerate(W):
-            tot = sum(acc.values()) or 1.0
-            for b, w in acc.items():
-                Wm[i, bi[b]] = w / tot
-        _, weld = np.unique(np.round(v, 4), axis=0, return_inverse=True)
-        weld = weld.ravel()
-        ed = np.concatenate([f[:, [0, 1]], f[:, [1, 2]], f[:, [2, 0]]])
-        ea, eb = weld[ed[:, 0]], weld[ed[:, 1]]
-        nw = weld.max() + 1
-        Ww = np.zeros((nw, len(bones)))
-        cnt = np.zeros(nw)
-        np.add.at(Ww, weld, Wm)
-        np.add.at(cnt, weld, 1.0)
-        Ww /= cnt[:, None]
-        for _ in range(24):
-            acc2 = np.zeros_like(Ww)
-            deg = np.zeros(nw)
-            np.add.at(acc2, ea, Ww[eb])
-            np.add.at(acc2, eb, Ww[ea])
-            np.add.at(deg, ea, 1.0)
-            np.add.at(deg, eb, 1.0)
-            Ww = 0.4 * Ww + 0.6 * acc2 / np.maximum(deg, 1.0)[:, None]
-        Wm = Ww[weld]
-        W = [{bones[k]: float(Wm[i, k]) for k in np.nonzero(Wm[i] > 0.02)[0]} for i in range(len(v))]
-        head = (gid == GID["hair"]) | ((gid == GID["skin"]) & (v[:, 2] > 1.31)) | ((gid == GID["brass"]) & (v[:, 2] > 1.6))
-        for i in np.where(head)[0]:
-            W[i] = {"head": 1.0}
-        for c in np.unique(comp[np.isin(gid, list(RIGID))]):          # rigid parts: one weight set per piece
-            idx = np.where(comp == c)[0]
-            acc = {}
-            for i in idx:
-                tot = sum(W[i].values()) or 1.0
-                for b, w in W[i].items():
-                    acc[b] = acc.get(b, 0.0) + w / tot
-            top = sorted(acc.items(), key=lambda kv: -kv[1])[:2]
-            if len(top) == 2 and top[1][1] < 0.25 * top[0][1]:
-                top = top[:1]
-            for i in idx:
-                W[i] = dict(top)
-    vgs = {}
-    unweighted = 0
-    for i, acc in enumerate(W):
-        top = sorted(acc.items(), key=lambda kv: -kv[1])[:4]
-        tot = sum(w for _, w in top)
-        if tot <= 0:
-            unweighted += 1
-            top, tot = [("hips", 1.0)], 1.0
-        for b, w in top:
-            if w / tot > 0.01:
-                vgs.setdefault(b, ob.vertex_groups.new(name=b) if b not in ob.vertex_groups else ob.vertex_groups[b]).add([i], w / tot, "REPLACE")
-    ob.parent = arm
-    mod = ob.modifiers.new("Armature", "ARMATURE")
-    mod.object = arm
-    NEW.append(ob)
-    REPORT[obname] = {"triangles": int(len(f)), "vertices": int(len(v)), "bone_groups": sorted(vgs), "unweighted": unweighted}
-    # ---- hull object: welded copy, faces flipped, pushed out along smooth normals by a Displace modifier
-    hm = me.copy()
-    bm = bmesh.new()
-    bm.from_mesh(hm)
-    bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-5)
-    border = {vv.index for e in bm.edges if e.is_boundary for vv in e.verts}
-    bm.verts.index_update()
-    border = [vv.index for vv in bm.verts if any(e.is_boundary for e in vv.link_edges)]
-    bmesh.ops.reverse_faces(bm, faces=bm.faces)
-    bm.to_mesh(hm)
-    bm.free()
-    hob = bpy.data.objects.new(obname + "_Hull", hm)
-    coll.objects.link(hob)
-    kd2 = KDTree(len(v))
-    for i in range(len(v)):
-        kd2.insert(Vector(v[i]), i)
-    kd2.balance()
-    for b in vgs:
-        hob.vertex_groups.new(name=b)
-    ow = hob.vertex_groups.new(name="outline_w")
-    ow.add(list(range(len(hm.vertices))), 1.0, "REPLACE")
-    ow.add(border, 0.0, "REPLACE")
-    for hv in hm.vertices:
-        _, idx, _ = kd2.find(hv.co)
-        for e in me.vertices[idx].groups:
-            hob.vertex_groups[ob.vertex_groups[e.group].name].add([hv.index], e.weight, "REPLACE")
-    hob.parent = arm
-    hmod = hob.modifiers.new("Armature", "ARMATURE")
-    hmod.object = arm
-    dm = hob.modifiers.new("Hull", "DISPLACE")
-    dm.direction = "NORMAL"
-    dm.mid_level = 0.0
-    dm.strength = -THIN_BIBLE                  # faces are flipped, so the normals point inward
-    dm.vertex_group = "outline_w"
-    HULL.append(hob)
-    REPORT[obname]["hull_border_verts"] = len(border)
+            top = sorted(acc.items(), key=lambda kv: -kv[1])[:4]
+            tot = sum(w for _, w in top)
+            if tot <= 0:
+                unweighted += 1
+                top, tot = [("hips", 1.0)], 1.0
+            for b, w in top:
+                if w / tot > 0.01:
+                    vgs.setdefault(b, ob.vertex_groups.new(name=b) if b not in ob.vertex_groups else ob.vertex_groups[b]).add([i], w / tot, "REPLACE")
+        ob.parent = arm
+        mod = ob.modifiers.new("Armature", "ARMATURE")
+        mod.object = arm
+        NEW.append(ob)
+        REPORT[obname] = {"triangles": int(len(f)), "vertices": int(len(v)), "bone_groups": sorted(vgs), "unweighted": unweighted}
+        # ---- hull object: welded copy, faces flipped, pushed out along smooth normals by a Displace modifier
+        hm = me.copy()
+        bm = bmesh.new()
+        bm.from_mesh(hm)
+        bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-5)
+        border = {vv.index for e in bm.edges if e.is_boundary for vv in e.verts}
+        bm.verts.index_update()
+        border = [vv.index for vv in bm.verts if any(e.is_boundary for e in vv.link_edges)]
+        bmesh.ops.reverse_faces(bm, faces=bm.faces)
+        bm.to_mesh(hm)
+        bm.free()
+        hob = bpy.data.objects.new(obname + "_Hull", hm)
+        coll.objects.link(hob)
+        kd2 = KDTree(len(v))
+        for i in range(len(v)):
+            kd2.insert(Vector(v[i]), i)
+        kd2.balance()
+        for b in vgs:
+            hob.vertex_groups.new(name=b)
+        ow = hob.vertex_groups.new(name="outline_w")
+        ow.add(list(range(len(hm.vertices))), 1.0, "REPLACE")
+        ow.add(border, 0.0, "REPLACE")
+        for hv in hm.vertices:
+            _, idx, _ = kd2.find(hv.co)
+            for e in me.vertices[idx].groups:
+                hob.vertex_groups[ob.vertex_groups[e.group].name].add([hv.index], e.weight, "REPLACE")
+        hob.parent = arm
+        hmod = hob.modifiers.new("Armature", "ARMATURE")
+        hmod.object = arm
+        dm = hob.modifiers.new("Hull", "DISPLACE")
+        dm.direction = "NORMAL"
+        dm.mid_level = 0.0
+        dm.strength = -THIN_BIBLE                  # faces are flipped, so the normals point inward
+        dm.vertex_group = "outline_w"
+        HULL.append(hob)
+        REPORT[obname]["hull_border_verts"] = len(border)
+    SETS[TAG] = (NEW, HULL)
+ALLNEW = [o for t in SETS.values() for o in t[0]]
+ALLHULL = [o for t in SETS.values() for o in t[1]]
+NEW, HULL = SETS["Hero"]
+
+
+def use(tag):
+    global NEW, HULL
+    NEW, HULL = SETS[tag]
+
+
 log("meshes", {k: (v["triangles"], v["vertices"]) for k, v in REPORT.items()})
 
 # ------------------------------------------------------------------------------------------ materials
@@ -366,9 +384,9 @@ MAT = make_ld_material("CM_ToonTex", albedo, maskim)
 CLAY = make_ld_material("LD_Clay", flat=(0.52, 0.47, 0.42))
 INK = toon.make_outline_material("LD_Ink")
 INK.use_backface_culling = True
-for ob in NEW:
+for ob in ALLNEW:
     ob.data.materials.append(MAT)
-for hob in HULL:
+for hob in ALLHULL:
     hob.data.materials.clear()
     hob.data.materials.append(INK)
 
@@ -411,6 +429,8 @@ if scene.world is None:
 
 def show(which, line="thin"):
     """which: 'new' | 'old' | 'high'; line: 'none' | 'thin' | 'thick' (new only)."""
+    for o in ALLNEW + ALLHULL:
+        o.hide_render = True
     for o in NEW:
         o.hide_render = which != "new"
     for o in HULL:
@@ -422,7 +442,7 @@ def show(which, line="thin"):
 
 
 def set_hull(width):
-    for h in HULL:
+    for h in ALLHULL:
         h.modifiers["Hull"].strength = -width
 
 
@@ -588,7 +608,7 @@ def deform_stats():
                            "edge_ratio_max": round(float(r.max()), 3), "stretched_over_1.5": int((r > 1.5).sum()), "edges": int(len(r))}
             if o is NEW[0]:
                 bad = e[ok][r > 1.5]
-                gids = BODY_GID[bad[:, 0]]
+                gids = GIDS[CUR_TAG][bad[:, 0]]
                 row[o.name]["stretched_by_material"] = {GROUPS[g]: int((gids == g).sum()) for g in np.unique(gids)}
         out[f"{clip}@{f}"] = row
     return out
@@ -602,6 +622,10 @@ bible_shot("front", "new", "none", H, "new_front_line_none")
 bible_shot("front", "new", "thick", H, "new_front_line_thick")
 bible_shot("face", "new", "none", H, "new_face_line_none")
 bible_shot("front", "new", "thin", 600, "new_front_crimson", crimson=True)
+use("LOD0")
+bible_shot("front", "new", "thin", H, "lod0_front")
+bible_shot("face", "new", "thin", H, "lod0_face")
+use("Hero")
 bible_shot("front", "old", "thick", H, "v7_front")
 bible_shot("face", "old", "thick", H, "v7_face")
 if HIGH:                                       # the sculpt, rest pose, clay
@@ -633,8 +657,9 @@ sun = (fwd_h - right_h).normalized() * math.cos(math.radians(50))
 sun.z = math.sin(math.radians(50))
 set_light(sun.normalized())
 set_team(False)
-for which, line, tag in (("new", "none", "game_new_none"), ("new", "thin", "game_new_thin"), ("new", "thick", "game_new_thick"),
-                         ("old", "thick", "game_v7")):
+for which, line, tag, st in (("new", "none", "game_new_none", "LOD0"), ("new", "thin", "game_new_thin", "LOD0"), ("new", "thick", "game_new_thick", "LOD0"),
+                             ("new", "thin", "game_hero_thin", "Hero"), ("old", "thick", "game_v7", "Hero")):
+    use(st)
     pose("Idle", 1, [], [(NEW if which == "new" else OLD)[0]])
     set_hull({"thin": THIN_PX * m_per_px, "thick": THICK_PX * m_per_px}.get(line, 0.0))
     for hmod in old_hulls:
@@ -650,7 +675,8 @@ yt = world_to_camera_view(scene, cam, Vector(top.tolist())).y * 1080
 yf = world_to_camera_view(scene, cam, Vector((float(top[0]), float(top[1]), 0.0))).y * 1080
 REPORT["game_feet_to_top_px"] = round(yt - yf, 1)
 
-# animation frames: walk and attack, three-quarter view
+# animation frames: walk and attack, three-quarter view, on the in-match mesh
+use("LOD0")
 for clip, fr, tag in (("Walking_A", 0.25, "anim_walk"), ("1H_Melee_Attack_Chop", 0.45, "anim_chop"), ("Running_A", 0.3, "anim_run")):
     act = bpy.data.actions[clip]
     f = int(round(act.frame_range[0] + (act.frame_range[1] - act.frame_range[0]) * fr))
@@ -661,16 +687,19 @@ for clip, fr, tag in (("Walking_A", 0.25, "anim_walk"), ("1H_Melee_Attack_Chop",
     set_hull(THIN_BIBLE)
     show("new", "thin")
     render(tag)
-REPORT["deform"] = deform_stats()
+REPORT["deform"] = {}
+for CUR_TAG in ("Hero", "LOD0"):
+    use(CUR_TAG)
+    REPORT["deform"][CUR_TAG] = deform_stats()
 
 # ------------------------------------------------------------------------------------------ export
 rest_pose()
 show("new", "none")
 fbx = os.path.join(EXP, "WarriorLD.fbx")
-for o in NEW:
+for o in ALLNEW:
     o.data.materials.clear()
     o.data.materials.append(MAT)
-export.export_fbx(fbx, arm, NEW)
+export.export_fbx(fbx, arm, ALLNEW)
 REPORT["fbx"] = {"path": fbx, "bytes": os.path.getsize(fbx), "options": {k: (sorted(v) if isinstance(v, set) else v) for k, v in export.FBX_OPTS.items()}}
 # facing proof: the nose (lowest Blender Y on the head) through the exporter's axis matrix
 from bpy_extras.io_utils import axis_conversion  # noqa: E402
@@ -679,7 +708,7 @@ nose = Vector((0.0, -1.0, 0.0))
 left = Vector((1.0, 0.0, 0.0))
 REPORT["facing"] = {"blender_forward": [0, -1, 0], "fbx_forward": [round(c, 3) for c in (conv @ nose)],
                     "fbx_character_left": [round(c, 3) for c in (conv @ left)], "fbx_up": [round(c, 3) for c in (conv @ Vector((0, 0, 1)))]}
-REPORT["weights_total_tris"] = sum(REPORT[o.name]["triangles"] for o in NEW)
+REPORT["tris"] = {t: sum(REPORT[o.name]["triangles"] for o in SETS[t][0]) for t in SETS}
 REPORT["bones"] = len(arm.data.bones)
 with open(os.path.join(OUT, "assemble_report.json"), "w") as fh:
     json.dump(REPORT, fh, indent=1)
