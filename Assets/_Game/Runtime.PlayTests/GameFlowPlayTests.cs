@@ -118,7 +118,7 @@ namespace CriticalMass.Runtime.PlayTests
             FlowDirector d = FlowDirector.Current;
             Assert.AreEqual(FlowState.Menu, GameFlow.State);
             Assert.IsTrue(d.MainMenu.IsVisible);
-            Assert.AreEqual(d.MainMenu.Item("play"), d.MainMenu.Focused, "Play is focused");
+            Assert.AreEqual(d.MainMenu.Item("playnow"), d.MainMenu.Focused, "PLAY NOW is focused (one press into a match)");
 
             yield return Press(d.MainMenu.Item("play"));
             Assert.AreEqual(FlowState.Setup, GameFlow.State);

@@ -179,7 +179,7 @@ namespace CriticalMass.Runtime.Menu
                 _stills[k].texture = still;
                 _stills[k].enabled = still != null;
                 HudText.Set(_labels[k], Label(kind, has, m));
-                HudText.Set(_times[k], has ? "AT " + NumberCache.Mmss(m.MatchTime) : string.Empty);
+                HudText.Set(_times[k], has ? "AT " + NumberCache.Mmss(global::CriticalMass.Runtime.Flow.MatchSpeed.ToReal(m.MatchTime)) : string.Empty);
                 HudText.Set(_empty[k], still != null ? string.Empty : has ? "NO PICTURE" : Missing(kind));
             }
         }
