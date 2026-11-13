@@ -326,6 +326,9 @@ namespace CriticalMass.Runtime.Onboarding
             return Math.Max(1, (int)Math.Floor(reach));
         }
 
+        static readonly PointXZ[] _reach = new PointXZ[1];
+        static FlowField _reachField;
+
         static readonly int[] DirX = { 1, -1, 0, 0 };
         static readonly int[] DirZ = { 0, 0, 1, -1 };
 
@@ -341,6 +344,11 @@ namespace CriticalMass.Runtime.Onboarding
         {
             fx = fz = 0;
             MapDef map = w.Map;
+            // Only takeoff cells the player can walk to (one flow field from the player, at step start only): the
+            // nearest gap in a straight line may sit on ground reachable only across another gap.
+            _reach[0] = new PointXZ(x, z);
+            _reachField = FlowField.ComputeFlowField(map, _reach, _reachField);
+            double[] dist = _reachField.Dist;
             double best = double.PositiveInfinity;
             gx = gz = 0;
             for (int cz = 0; cz < map.Height; cz++)
@@ -348,6 +356,7 @@ namespace CriticalMass.Runtime.Onboarding
                 for (int cx = 0; cx < map.Width; cx++)
                 {
                     if (!MapGrid.IsWalkable(map, cx, cz)) continue;
+                    if (dist != null && double.IsPositiveInfinity(dist[cz * map.Width + cx])) continue;
                     for (int d = 0; d < 4; d++)
                     {
                         for (int span = 1; span <= maxSpan; span++)
