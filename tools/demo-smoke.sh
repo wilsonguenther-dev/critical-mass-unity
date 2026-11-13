@@ -199,11 +199,24 @@ others="$(pgrep -f 'Unity.app/Contents/MacOS/Unity' | tr '\n' ' ' || true)"
 launch_ms="$(python3 -c 'import time; print(int(time.time()*1000))')"
 LIMIT=$((MATCHES * (TIMEOUT + 60) + 120))
 set +e
-perl -e 'alarm shift; exec @ARGV' "$LIMIT" \
-  "$EXE" -autoplay -quitAfterMatch -autoplayMatches "$MATCHES" -autoplayTitleSeconds "$TITLE_S" \
+ARGS=(-autoplay -quitAfterMatch -autoplayMatches "$MATCHES" -autoplayTitleSeconds "$TITLE_S" \
   -autoplayTimeout "$TIMEOUT" ${SPEED:+-autoplaySpeed "$SPEED"} ${NOVSYNC[@]+"${NOVSYNC[@]}"} ${CAP_ARGS[@]+"${CAP_ARGS[@]}"} \
-  -quality "$QUALITY" -dataDir "$OUT/data" "${WIN[@]}" -logFile "$LOG" -perfLog "$PERF" &
-pid=$!
+  -quality "$QUALITY" -dataDir "$OUT/data" "${WIN[@]}" -logFile "$LOG" -perfLog "$PERF")
+# Integration batch 3 (owner report 2026-11-12): automated runs never take the owner's screen. By default the player is
+# launched through LaunchServices hidden and in the background (open -g -j: no activation, no focus steal, no visible
+# window); CM_SMOKE_VISIBLE=1 restores the old direct launch. The watchdog replaces perl's alarm for the hidden path.
+WATCHDOG=""
+if [[ "${CM_SMOKE_VISIBLE:-0}" != 1 ]]; then
+  BUNDLE="${EXE%/Contents/MacOS/*}"
+  open -g -j -n "$BUNDLE" --args "${ARGS[@]}"
+  pid=""
+  for _ in $(seq 1 30); do pid="$(pgrep -n -f -- "$LOG" || true)"; [[ -n "$pid" ]] && break; sleep 1; done
+  if [[ -z "$pid" ]]; then echo "demo-smoke: the hidden player did not start" >&2; pid=999999999; fi
+  ( sleep "$LIMIT"; kill "$pid" 2>/dev/null ) & WATCHDOG=$!
+else
+  perl -e 'alarm shift; exec @ARGV' "$LIMIT" "$EXE" "${ARGS[@]}" &
+  pid=$!
+fi
 # Outside view, once a second (one ps per second, no tight loop): wall ms, resident KB, CPU time, log markers.
 printf 'ms\trss_kb\tcputime\ttitle\tmatch_ends\n' > "$SAMPLES"
 while kill -0 "$pid" 2>/dev/null; do
@@ -218,7 +231,12 @@ while kill -0 "$pid" 2>/dev/null; do
   fi
   sleep 1
 done
-wait "$pid"; code=$?
+if [[ -n "$WATCHDOG" ]]; then
+  # Not our child: the exit code is read from the log (the player logs MATCH END and quits 0 after its matches).
+  if kill -0 "$WATCHDOG" 2>/dev/null; then kill "$WATCHDOG" 2>/dev/null; code=0; else code=142; fi
+else
+  wait "$pid"; code=$?
+fi
 set -e
 set +e; summarise "$OUT" "$code" "$launch_ms" "$others"; rc=$?; set -e
 exit "$rc"
