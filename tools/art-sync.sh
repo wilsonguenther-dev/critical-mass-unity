@@ -77,6 +77,11 @@ prune_stale() {
   local dst="$1" src="$2" f
   for f in "$dst"/*.fbx; do
     [[ -f "$f" ]] || continue
+    # Scenery LODs (<piece>_lod1.fbx, <piece>_lod2.fbx) are built in this repo by
+    # Assets/_Game/Art/Environment/_source~/build_scenery_lods.py, not copied from a clone: keep them. After a new kit pin,
+    # rebuild them (the EditMode test SceneryLodTests.LodSourcesMatchTheKit fails while they are stale).
+    [[ "$f" =~ _lod[12]\.fbx$ ]] && continue
+
     [[ -f "$src/$(basename "$f")" ]] || { rm -f "$f" "$f.meta"; echo "art-sync: removed stale $(basename "$f")"; }
   done
 }

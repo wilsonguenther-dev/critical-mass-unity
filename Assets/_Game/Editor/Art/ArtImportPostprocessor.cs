@@ -246,7 +246,8 @@ namespace CriticalMass.Editor.Art
         private void PostprocessWorld(GameObject root)
         {
             bool env = WorldKit.IsEnvironment(assetPath);
-            string piece = System.IO.Path.GetFileNameWithoutExtension(assetPath);
+            // Scenery LODs: env_bridge_span_lod1.fbx is baked like env_bridge_span (looks, wood browns, foam).
+            string piece = SceneryLod.BasePiece(System.IO.Path.GetFileNameWithoutExtension(assetPath));
             foreach (WorldLook look in WorldKit.AllLooks) context.DependsOnSourceAsset(WorldKit.AssetPath(look));
             bool warned = false;
             foreach (MeshFilter mf in root.GetComponentsInChildren<MeshFilter>(true))
