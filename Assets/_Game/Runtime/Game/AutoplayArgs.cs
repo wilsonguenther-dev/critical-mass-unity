@@ -36,6 +36,7 @@ namespace CriticalMass.Runtime.Game
     ///   -seed N -simHashOut PATH sim-only run (no view): one 16v16 bot match on seed N, its end-state hash to PATH, quit (DG-66)
     ///   -stressHill              perf-60hz-32p: camera pinned on the hill, every living fighter drawn within 9 m of it (view only)
     ///   -seed N (with -autoplay, no -simHashOut) the match is played on seed N (camera grabs of the same moment, 2026-11-13)
+    ///   -creatorGrab (with -shots -shotTick T) from T, the first tick actor 0 is on the hill: shot-grab-{normal,wide}-{hud,clean}.png
     ///   -shotTick T (with -shots) the clock stops at sim tick T exactly and shot-moment.png is written (same seed + tick = same frame)
     ///   -groundView / -groundShots  ground view while watching (feat/ground-camera); -groundShots adds the capture tour
     ///   -shots                   screenshots shot-title.png, shot-start.png (3 s of match time), shot-mid.png and shot-kaiju-1..6.png (Kaiju walk strip after the hatch) into the data folder (Windows graphics run)
@@ -269,6 +270,7 @@ namespace CriticalMass.Runtime.Game
         SimDriverBehaviour _driver;
         TitleScreen _title;
         int _freezeFrame = -1;
+        CreatorGrab _grab;   // -creatorGrab: the four creator stills at the held tick
         double _freezeScale = 2;
         bool _titleSeen, _recording, _ended, _quitting, _timedOut, _hangDone, _shotTitle, _shotStart, _shotMid;
         // batch 7: Kaiju walk strip under -shots (camera held on the walking Kaiju, 6 shots 0.25 s apart).
@@ -569,8 +571,10 @@ namespace CriticalMass.Runtime.Game
                 if (_freezeFrame >= 0)
                 {
                     _freezeFrame++;
-                    if (_freezeFrame == 6) ScreenCapture.CaptureScreenshot(Path.Combine(GamePaths.DataDir, "shot-moment.png"));
-                    if (_freezeFrame == 12)
+                    if (_freezeFrame == 1 && CreatorGrab.Wanted()) _grab = new CreatorGrab(_driver);
+                    bool grabDone = _grab != null && _grab.Step(_freezeFrame);
+                    if (_grab == null && _freezeFrame == 6) ScreenCapture.CaptureScreenshot(Path.Combine(GamePaths.DataDir, "shot-moment.png"));
+                    if (_grab == null ? _freezeFrame == 12 : grabDone)
                     {
                         _shotMid = true;
                         ClockHeld = false;
