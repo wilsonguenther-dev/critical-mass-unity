@@ -54,6 +54,42 @@ namespace CriticalMass.Runtime.PlayTests
             return Mathf.Abs(Mathf.DeltaAngle((float)rel, anim.TravelLeftDeg));
         }
 
+        /// <summary>
+        /// Everything that decides actor i's drawn legs, for a failure message: the frame, the sim yaw against the drawn
+        /// yaw and the model root's actual yaw, each toe's height and direction, the hip line, the animator's locomotion
+        /// state and the clips the graph was given. Read-only.
+        /// </summary>
+        internal static string PoseDiag(SanityWorld w, int i)
+        {
+            Transform model = w.ActorModel(i);
+            ActorAnimator anim = w.Views.AnimatorOf(i);
+            ModelView mv = w.Views.ModelOf(i);
+            if (model == null || anim == null) return "(no model or animator)";
+            Actor a = w.W.Actors[i];
+            Vector3 sim = SanityRig.SimDir(a.Facing);
+            float simYaw = SimSpace.YawDeg(a.Facing);
+            var sb = new System.Text.StringBuilder();
+            sb.Append($"[frame {Time.frameCount} dt {Time.deltaTime:0.000} tick {w.W.Tick} alpha {w.Driver.Alpha:0.000} | sim yaw {simYaw:0} drawn {anim.Yaw:0} root {model.eulerAngles.y:0}");
+            if (mv != null && mv.Spec != null) sb.Append($" art {mv.Spec.ArtYawDeg:0}");
+            sb.Append($" | speed {anim.Speed:0.00} sim {w.Speed(i):0.00} travel {anim.TravelLeftDeg:0} legs {anim.LegYawDeg:0} warp {anim.LegWarpDeg:0} side {anim.StrafeSide} phase {anim.Phase:0.000}");
+            sb.Append($" act {anim.ActionClip ?? "-"} hit {(anim.HasReaction ? anim.Reaction.Clip + " " + anim.Reaction.Layer : "-")} gather {a.GatherProgress:0.00} carry {a.Carry} air {a.AirLen} standUp {a.StandUp:0.00}");
+            foreach (string s in new[] { "l", "r" })
+            {
+                Transform toe = SanityRig.Find(model, "toes." + s), foot = SanityRig.Find(model, "foot." + s);
+                if (toe == null || foot == null) continue;
+                Vector3 d = toe.position - foot.position;
+                d.y = 0f;
+                float ang = d.sqrMagnitude > 1e-8f ? Vector3.SignedAngle(sim, d, Vector3.up) : float.NaN;
+                sb.Append($" | toe.{s} y {toe.position.y:0.000} dir {ang:0}");
+            }
+            if (SanityRig.TrySideFront(model, out Vector3 hipsFront)) sb.Append($" | hip line {Vector3.SignedAngle(sim, hipsFront, Vector3.up):0}");
+            Transform hips = SanityRig.Find(model, "hips");
+            if (hips != null) sb.Append($" hips local {hips.localRotation.eulerAngles}");
+            if (mv != null) sb.Append(" | pose ").Append(mv.DescribePose());
+            sb.Append(']');
+            return sb.ToString();
+        }
+
         SanityWorld _w;
         readonly List<string> _bad = new List<string>();
         int _measured;
@@ -155,10 +191,10 @@ namespace CriticalMass.Runtime.PlayTests
             float err = SanityRig.AngleDeg(front, ExpectedFront(_w, 0, out float legYaw));
             if (err > ToleranceDeg)
                 _bad.Add($"{who} {doing}: the model's front ({cue}) points {err:0} degrees away from the sim's facing turned by the " +
-                         $"clip's leg yaw {legYaw:0}, so on screen it is {SanityRig.Verdict(err)}");
+                         $"clip's leg yaw {legYaw:0}, so on screen it is {SanityRig.Verdict(err)} {PoseDiag(_w, 0)}");
             float travel = TravelError(_w, 0);
             if (travel > ToleranceDeg)
-                _bad.Add($"{who} {doing}: the legs stride {travel:0} degrees away from where the model moves");
+                _bad.Add($"{who} {doing}: the legs stride {travel:0} degrees away from where the model moves {PoseDiag(_w, 0)}");
         }
 
         /// <summary>20 sim seconds of 16v16 bots: every moving bot's model faces its sim facing (per class).</summary>

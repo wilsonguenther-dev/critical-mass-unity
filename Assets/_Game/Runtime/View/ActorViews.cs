@@ -206,6 +206,9 @@ namespace CriticalMass.Runtime.View
         /// <summary>The animator of actor i (tests and the capture report), or null.</summary>
         public Anim.ActorAnimator AnimatorOf(int i) => _actors != null && i >= 0 && i < _actors.Length ? _actors[i].Anim : null;
 
+        /// <summary>The imported model drawn for actor i (tests' pose diagnostics), or null (capsule, dead, out of range).</summary>
+        public ModelView ModelOf(int i) => _actors != null && i >= 0 && i < _actors.Length ? _actors[i].Model : null;
+
         /// <summary>The Kaiju's animator (tests).</summary>
         public Anim.KaijuAnimator KaijuAnimator => _kaijuAnim;
 
