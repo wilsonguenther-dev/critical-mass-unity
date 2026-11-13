@@ -148,7 +148,13 @@ def block(name, x0, y0, x1, y1, z1):
     b = bpy.context.active_object
     b.name = name
     b.scale = (x1 - x0, y1 - y0, z1)
-    b.data.materials.append(block_mat)
+    b.data.materials.append(block_side)
+    bpy.ops.mesh.primitive_plane_add(size=1, location=((x0 + x1) / 2, (y0 + y1) / 2, z1 + 0.003))
+    t = bpy.context.active_object
+    t.scale = (x1 - x0, y1 - y0, 1)
+    t.data.materials.append(block_mat)
+    t.parent = b
+    t.matrix_parent_inverse = b.matrix_world.inverted()
     return b
 
 
@@ -384,6 +390,8 @@ if want("props"):
     GLOW.location = (0, 0, 0)
     arm.location = (0, 0, 0)
     for b in blocks:
+        for ch in list(b.children):
+            bpy.data.objects.remove(ch, do_unlink=True)
         bpy.data.objects.remove(b, do_unlink=True)
     for ob in [ground] + ctx:
         ob.hide_render = True

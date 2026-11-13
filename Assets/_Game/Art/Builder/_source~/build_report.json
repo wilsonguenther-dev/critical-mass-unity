@@ -1,8 +1,8 @@
 {
  "objects": {
   "Builder_Body": {
-   "triangles": 9864,
-   "vertices": 5294,
+   "triangles": 10740,
+   "vertices": 5736,
    "rest_bounds": {
     "min": [
      -1.072,
@@ -256,16 +256,18 @@
   "thickened_to_carry_bevel": 23
  },
  "triangles_by_feature": {
-  "Builder_Body:team_trim": 1544,
+  "Builder_Body:team_trim": 2128,
   "Builder_Body:skin": 700,
   "Builder_Body:rope_coil": 648,
   "Builder_Body:ladder": 584,
-  "Builder_Body:gloves": 556,
   "Builder_Body:boots": 552,
+  "Builder_Body:hair": 520,
   "Builder_Body:trousers": 512,
   "Builder_Body:cap": 512,
   "Builder_Body:shirt": 472,
   "Builder_Body:aframe": 452,
+  "Builder_Body:gloves": 436,
+  "Builder_Body:apron": 392,
   "Builder_Body:belt": 384,
   "Builder_Body:ladder_detail": 384,
   "Builder_Mallet:mallet": 380,
@@ -275,17 +277,15 @@
   "Builder_Body:pauldron": 296,
   "Builder_Body:moustache": 276,
   "Builder_Body:face": 260,
-  "Builder_Body:hair": 252,
-  "Builder_Body:sleeve": 232,
   "Builder_Body:face_decal": 176,
   "Builder_Body:cap_detail": 176,
   "Builder_Mallet:gem": 112,
-  "Builder_Body:apron": 88,
   "Builder_Body:pauldron_detail": 84,
+  "Builder_Body:sleeve": 72,
   "Builder_Body:pencil": 40,
   "Builder_Mallet:team_trim": 36
  },
- "triangles_character": 10700,
+ "triangles_character": 11576,
  "triangles_props": {
   "BuilderLadder_Carried": 1536,
   "BuilderLadder_Placed": 1248,

@@ -88,11 +88,11 @@
    "check": "Builder_Body loose/non-manifold",
    "ok": true,
    "detail": {
-    "triangles": 9864,
+    "triangles": 10740,
     "loose_verts": 0,
     "loose_edges": 0,
     "non_manifold_edges": 0,
-    "closed_shells": 198
+    "closed_shells": 200
    }
   },
   {
@@ -220,7 +220,7 @@
   {
    "check": "triangle budget <= 12000",
    "ok": true,
-   "detail": 10700
+   "detail": 11576
   },
   {
    "check": "body height in metres after round trip (cap 1.94, ladder tip about 2.3)",

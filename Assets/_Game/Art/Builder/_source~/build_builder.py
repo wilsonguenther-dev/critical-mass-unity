@@ -209,50 +209,89 @@ def build_torso():
     add(BODY, B.torus(0.17, 0.035, 12, 4), "navy_roll", "chest", "shirt", m=M((0, 0.005, 1.245), (6, 0, 0), (1, 0.9, 1)))
 
 
+def curved_panel(w0, w1, z0, z1, R, cy, t, lean=0.0, rows=4, cols=8, bottom_round=0.0):
+    """Closed slab whose front lies on a vertical cylinder (radius R, axis at y = cy): an apron panel that wraps the
+    body instead of a flat board. Half width w0 at z0 (bottom) to w1 at z1 (top); lean pushes the bottom forward;
+    bottom_round lifts the bottom corners (a rounded hem)."""
+    bm = bmesh.new()
+    front, back = [], []
+    for j in range(rows + 1):
+        v = j / rows
+        z = z0 + (z1 - z0) * v
+        hw = w0 + (w1 - w0) * v
+        fr, bk = [], []
+        for i in range(cols + 1):
+            u = -1 + 2 * i / cols
+            zz = z + bottom_round * (1 - v) ** 2 * u * u
+            ang = u * hw / R
+            dy = -lean * (1 - v)
+            fr.append(bm.verts.new((R * math.sin(ang), cy - R * math.cos(ang) + dy, zz)))
+            bk.append(bm.verts.new(((R - t) * math.sin(ang), cy - (R - t) * math.cos(ang) + dy, zz)))
+        front.append(fr)
+        back.append(bk)
+    for j in range(rows):
+        for i in range(cols):
+            bm.faces.new((front[j][i], front[j][i + 1], front[j + 1][i + 1], front[j + 1][i]))
+            bm.faces.new((back[j][i], back[j + 1][i], back[j + 1][i + 1], back[j][i + 1]))
+    ring = ([(0, i) for i in range(cols)] + [(j, cols) for j in range(rows)] +
+            [(rows, i) for i in range(cols, 0, -1)] + [(j, 0) for j in range(rows, 0, -1)])
+    for k, (j, i) in enumerate(ring):
+        j2, i2 = ring[(k + 1) % len(ring)]
+        bm.faces.new((front[j][i], back[j][i], back[j2][i2], front[j2][i2]))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    return bm
+
+
+def on_panel(x, z, R, cy, out, tilt=0.0, lean=0.0, z0=0.0, z1=1.0):
+    """Matrix for a detail sitting `out` in front of a curved panel at (x along the arc, z); local +Z = outward."""
+    ang = x / R
+    v = (z - z0) / max(z1 - z0, 1e-6)
+    dy = -lean * (1 - v)
+    return M(((R + out) * math.sin(ang), cy - (R + out) * math.cos(ang) + dy, z), (90 - tilt, 0, math.degrees(ang)))
+
+
 def build_apron():
-    """Canvas apron: bib and skirt panels with a team-colour trim border (a larger team plate behind each canvas
-    plate), stitched pockets with brass rivets, a carpenter's square and a folding rule in the pockets, team neck strap
-    and a team bow at the back."""
+    """v1.1 canvas apron: bib and skirt WRAP the body (cylindrical panels), each over a slightly larger team-colour
+    panel that shows as a trim border; stitched pockets with brass rivets, a carpenter's square and a folding rule in
+    the pockets, team neck strap and a team bow at the back."""
     F, FD = "apron", "apron_detail"
-    # bib (chest)
-    PB = M((0, -0.318, 0.985), (90 - 9, 0, 0))
-    bib = [(-0.20, -0.17), (0.20, -0.17), (0.18, 0.15), (-0.18, 0.15)]
-    add(BODY, B.prism([(x * 1.0 + (0.03 if x > 0 else -0.03), y + (0.03 if y > 0 else -0.0)) for x, y in bib], 0.03,
-                      0.01), "team", "chest", "team_trim", smooth=False, m=PB)
-    add(BODY, B.prism(bib, 0.03, 0.01), "canvas", "chest", F, smooth=False, m=PB @ M((0, 0, 0.018)))
+    # bib (chest): front of the torso ellipse, curvature radius 0.5
+    BR, BCY = 0.50, 0.17
+    add(BODY, curved_panel(0.225, 0.205, 0.80, 1.165, BR + 0.005, BCY, 0.03), "team", "chest", "team_trim",
+        smooth=True)
+    add(BODY, curved_panel(0.195, 0.175, 0.83, 1.14, BR + 0.02, BCY, 0.03), "canvas", "chest", F, smooth=True)
+    PB = on_panel(0.02, 0.99, BR, BCY, 0.03)
     pocket = [(-0.10, -0.08), (0.10, -0.08), (0.10, 0.06), (-0.10, 0.06)]
-    add(BODY, B.prism(pocket, 0.022, 0.006), "canvas_dark", "chest", FD, smooth=False, m=PB @ M((0.02, -0.04, 0.04)))
-    for x in (-0.085, 0.125):
-        add(BODY, rivet(0.014, 0.01), "brass", "chest", FD, smooth=False, m=PB @ M((x, 0.015, 0.05)))
-    # carpenter's square sticking out of the bib pocket (brass L)
+    add(BODY, B.prism(pocket, 0.022, 0.006), "canvas_dark", "chest", FD, smooth=False, m=PB)
+    for x in (-0.085, 0.085):
+        add(BODY, rivet(0.014, 0.01), "brass", "chest", FD, smooth=False, m=PB @ M((x, 0.045, 0.012)))
     sq = [(0, 0), (0.035, 0), (0.035, 0.17), (0.11, 0.17), (0.11, 0.205), (0, 0.205)]
-    add(BODY, B.prism(sq, 0.018), "brass", "chest", FD, smooth=False, m=PB @ M((0.05, -0.03, 0.035)))
-    # skirt (belly to mid-thigh), wider, tipped forward
-    PS = M((0, -0.335, 0.555), (90 + 7, 0, 0))
-    sk = [(-0.27, -0.21), (0.27, -0.21), (0.25, 0.20), (-0.25, 0.20)]
+    add(BODY, B.prism(sq, 0.018), "brass", "chest", FD, smooth=False, m=PB @ M((0.03, -0.02, 0.0)))
+    # skirt: belly to mid-thigh, wider, leaning forward over the thighs, rounded hem
+    SR, SCY, LEAN = 0.56, 0.21, 0.07
     skw = {"hips": 0.8, "upperleg.l": 0.1, "upperleg.r": 0.1}
-    add(BODY, B.prism([(x + (0.03 if x > 0 else -0.03), y - (0.035 if y < 0 else 0.0)) for x, y in sk], 0.03, 0.01),
-        "team", skw, "team_trim", smooth=False, m=PS)
-    add(BODY, B.prism(sk, 0.03, 0.01), "canvas", skw, F, smooth=False, m=PS @ M((0, 0, 0.018)))
-    # centre seam (1 px line) and two pockets with rivets, tools in them
-    add(BODY, B.box((0.012, 0.36, 0.01), 0.0), "canvas_dark", skw, FD, smooth=False, grad=False,
-        m=PS @ M((0, -0.01, 0.036)))
+    add(BODY, curved_panel(0.30, 0.28, 0.32, 0.77, SR + 0.005, SCY, 0.03, LEAN, 4, 10, 0.03), "team", skw,
+        "team_trim", smooth=True)
+    add(BODY, curved_panel(0.27, 0.255, 0.355, 0.77, SR + 0.02, SCY, 0.03, LEAN, 4, 10, 0.03), "canvas", skw, F,
+        smooth=True)
+    add(BODY, B.box((0.012, 0.012, 0.36), 0.0), "canvas_dark", skw, FD, smooth=False, grad=False,
+        m=on_panel(0.0, 0.56, SR, SCY, 0.025, 0, LEAN, 0.355, 0.77) @ M((0, 0, 0), (-90, 0, 0)))
     for s in (1, -1):
+        PK = on_panel(0.14 * s, 0.50, SR, SCY, 0.03, 0, LEAN, 0.355, 0.77)
         pk = [(-0.095, -0.08), (0.095, -0.08), (0.10, 0.075), (-0.10, 0.075)]
-        PK = PS @ M((0.135 * s, -0.06, 0.04))
         add(BODY, B.prism(pk, 0.024, 0.006), "canvas_dark", skw, FD, smooth=False, m=PK)
         add(BODY, B.box((0.20, 0.03, 0.012), 0.0), "canvas", skw, FD, smooth=False, grad=False,
-            m=PK @ M((0, 0.06, 0.012)))      # hem fold line along the pocket top
+            m=PK @ M((0, 0.06, 0.012)))
         for x in (-0.08, 0.08):
             add(BODY, rivet(0.014, 0.01), "brass", skw, FD, smooth=False, m=PK @ M((x, 0.06, 0.016)))
-    # folding rule (wood with brass hinge) in his left pocket, a chisel handle in the right
+    # folding rule in his left pocket, a chisel handle in the right
     add(BODY, box((0.045, 0.03, 0.17), 0.012, 1), "pencil", skw, FD, smooth=False,
-        m=PS @ M((0.15, 0.04, 0.035), (90, 0, -8)))
-    add(BODY, B.cyl((-0.13, 0, 0), (-0.13, 0.15, 0), 0.026, 0.03, 6), "wood_b", skw, FD, smooth=False,
-        m=PS @ M((0, 0.0, 0.03)))
+        m=on_panel(0.15, 0.60, SR, SCY, 0.04, 0, LEAN, 0.355, 0.77) @ M((0, 0, 0), (-90, -8, 0)))
+    add(BODY, B.cyl((0, 0, 0), (0, 0.15, 0), 0.026, 0.03, 6), "wood_b", skw, FD, smooth=False,
+        m=on_panel(-0.13, 0.55, SR, SCY, 0.035, 0, LEAN, 0.355, 0.77))
     # team neck strap (bib corners up round the neck) and a waist bow at the back
     for s in (1, -1):
-        bm, mm = strap((0.17 * s, -0.31, 1.13), (0.13 * s, -0.17, 1.29), 0.05, 0.025, (0, -1, 0.4))
+        bm, mm = strap((0.17 * s, -0.31, 1.15), (0.13 * s, -0.17, 1.29), 0.05, 0.025, (0, -1, 0.4))
         add(BODY, bm, "team", "chest", "team_trim", smooth=False, m=mm)
     add(BODY, B.torus(0.15, 0.024, 12, 4), "team", "chest", "team_trim", m=M((0, 0.01, 1.30), (-18, 0, 0)))
     add(BODY, B.sphere((0.06, 0.04, 0.045), 6, 4), "team", "spine", "team_trim", m=M((0, 0.30, 0.74)))
@@ -309,12 +348,12 @@ def build_arms():
         add(BODY, B.sphere((0.145, 0.145, 0.145), 8, 5), "navy", ["chest", ua], "shirt", m=M((0.26 * s, 0, Z)))
         add(BODY, B.cyl((0.23 * s, 0.0, Z), (0.42 * s, 0.008, Z), 0.145, 0.135, 10), "navy", ["chest", ua, la],
             "sleeve")
-        add(BODY, B.torus(0.132, 0.05, 10, 4), "navy_roll", ua, "sleeve", m=M((0.425 * s, 0.008, Z), (0, 90, 0)))
+        add(BODY, B.torus(0.132, 0.05, 10, 4), "team", ua, "team_trim", m=M((0.425 * s, 0.008, Z), (0, 90, 0)))
         add(BODY, B.sphere((0.108, 0.108, 0.108), 8, 5), "skin", [ua, la], "skin", m=M((0.47 * s, 0.01, Z)))
         add(BODY, B.cyl((0.47 * s, 0.01, Z), (0.645 * s, 0.0, Z), 0.11, 0.125, 10), "skin", [la, wr], "skin")
         # work gloves: flared leather cuff with a stitched brass band, fist, knuckle ridge, thumb
         add(BODY, B.cyl((0.625 * s, 0, Z), (0.80 * s, 0, Z), 0.145, 0.165, 10), "leather", [la, wr, hd], "gloves")
-        add(BODY, B.torus(0.15, 0.03, 10, 3), "brass", [la, wr], "gloves", m=M((0.635 * s, 0, Z), (0, 90, 0)))
+        add(BODY, B.torus(0.15, 0.032, 10, 3), "team", [la, wr], "team_trim", m=M((0.635 * s, 0, Z), (0, 90, 0)))
         add(BODY, B.sphere((0.175, 0.17, 0.18), 9, 6), "leather_dark", hd, "gloves", m=M((0.90 * s, -0.01, 1.09)))
         add(BODY, box((0.11, 0.22, 0.115), 0.04, 1), "leather_dark", hd, "gloves", m=M((1.0 * s, -0.03, 1.12)))
         add(BODY, B.sphere((0.078, 0.072, 0.09), 6, 5), "leather_dark", hd, "gloves", m=M((0.835 * s, -0.175, 1.13)))
@@ -409,6 +448,9 @@ def build_head():
     add(BODY, B.prism(teeth, 0.03), "teeth", H, "face", smooth=False, m=M((0, -0.324, 1.34), (90 - 16, 0, 0)))
     # hair at the back of the head under the cap, and a copper curl escaping over the forehead
     add(BODY, B.sphere((0.30, 0.25, 0.15), 10, 6), "hair", H, "hair", m=M((0, 0.06, 1.64)))
+    # v1.1: short copper hair covering the back of the head down to the nape (the back view showed bare skin)
+    add(BODY, B.sphere((0.305, 0.22, 0.25), 12, 8), "hair", H, "hair", m=M((0, 0.085, 1.50)))
+    add(BODY, B.sphere((0.22, 0.12, 0.10), 10, 6), "hair_light", H, "hair", m=M((0, 0.20, 1.56)))
     for (x, tip, bend) in ((0.12, (0.20, -0.31, 1.60), (0.0, -0.02, 0.03)), (0.04, (0.08, -0.32, 1.585),
                                                                               (0.01, -0.02, 0.02))):
         add(BODY, B.spike((x, -0.22, 1.71), tip, 0.045, 6, bend), "hair", H, "hair")
