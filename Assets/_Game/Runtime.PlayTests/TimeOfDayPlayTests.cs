@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using CriticalMass.Runtime.Game;
 using CriticalMass.Runtime.View.Atmosphere;
 using NUnit.Framework;
@@ -19,10 +20,27 @@ namespace CriticalMass.Runtime.PlayTests
         int _level;
         bool _hadPref;
         int _pref;
+        readonly List<string> _errors = new List<string>();
+
+        // The input watchdog logs "[CM.Control] LOCKOUT" when an autopilot match runs for more than 2 s on a CI runner
+        // with no input reader (it fails RunningRaisesFootfalls on the base branch too). It is not this feature's error,
+        // so this test collects every other error and exception itself and fails on those.
+        void OnLog(string msg, string stack, LogType type)
+        {
+            if (type != LogType.Error && type != LogType.Exception && type != LogType.Assert) return;
+            if (msg.StartsWith("[CM.Control] LOCKOUT")) return;
+            _errors.Add(type + ": " + msg);
+        }
+
+        void AssertNoErrors(string where) =>
+            Assert.IsEmpty(_errors, where + ": errors logged:\n" + string.Join("\n", _errors));
 
         [SetUp]
         public void SetUp()
         {
+            _errors.Clear();
+            LogAssert.ignoreFailingMessages = true;
+            Application.logMessageReceived += OnLog;
             _level = RenderTier.Level;
             _hadPref = PlayerPrefs.HasKey(TimeOfDaySettings.Key);
             _pref = PlayerPrefs.GetInt(TimeOfDaySettings.Key, 0);
@@ -31,6 +49,8 @@ namespace CriticalMass.Runtime.PlayTests
         [TearDown]
         public void TearDown()
         {
+            Application.logMessageReceived -= OnLog;
+            LogAssert.ignoreFailingMessages = false;
             TimeOfDayDirector.Override = null;
             AmbientLife.ClockOverride = null;
             if (RenderTier.Level != _level) RenderTier.Set(_level);
@@ -110,6 +130,7 @@ namespace CriticalMass.Runtime.PlayTests
             Assert.Greater(life.Builds, before, "a quality change rebuilds the ambient life");
             Assert.AreEqual(0, life.Creatures, "no creatures on Low");
             Assert.LessOrEqual(life.Draws, 2, "at most two ambient draws on Low");
+            AssertNoErrors("time of day and ambient life in a match");
         }
     }
 }
