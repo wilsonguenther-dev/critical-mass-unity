@@ -27,5 +27,7 @@ namespace CriticalMass.Sim.Core
         public int Windup;
         /// <summary>Recovery ticks of an AttackStart event.</summary>
         public int Recovery;
+        /// <summary>U-066: the World.Depth.Pickups slot of a PickupSpawned / PickupTaken / PickupExpired event; -1 on every other event.</summary>
+        public int Slot = -1;
     }
 }

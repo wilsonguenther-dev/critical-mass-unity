@@ -87,6 +87,8 @@ namespace CriticalMass.Sim.Config
         public DebugConfig Debug = new DebugConfig();
         /// <summary>The sim-physics lane (DG-67..DG-100): every rule and number in one block (PhysicsConfig.Classic = browser parity).</summary>
         public PhysicsConfig Physics = new PhysicsConfig();
+        /// <summary>The mechanics-depth lane (U-063 onward): one block per rule set; DepthConfig.Classic = the game before it.</summary>
+        public DepthConfig Depth = new DepthConfig();
 
         /// <summary>The game's config: 16v16 at 1x pace (owner 2026-11-12; 2x is the Fast option), every other value the browser main value.</summary>
         public static GameConfig CreateDefault()
@@ -103,8 +105,30 @@ namespace CriticalMass.Sim.Config
             var c = CreateDefault();
             c.TeamSize = 5;
             c.DefaultSpeed = 1;
+            c.Depth.Classic = true; // the browser has none of the mechanics-depth rules (U-063 onward)
             return c;
         }
+
+        /// <summary>
+        /// Rules-combined (U-069): the one switch over both rule lanes. Classic = browser parity: every sim-physics rule off
+        /// (PhysicsConfig.Classic, instant hits) and every mechanics-depth rule off (DepthConfig.Classic), at the pre-2026-11-12
+        /// pace 2x, so the world hash is the DG-21 golden bit for bit. PhysicsOnly = the physics lane on, depth off (the test
+        /// config's rules). Full = everything on (what CreateDefault, the game, runs). Pace is left alone except for Classic.
+        /// </summary>
+        public GameConfig ApplyRules(RulesProfile profile)
+        {
+            Physics.Classic = profile == RulesProfile.Classic;
+            Depth.Classic = profile != RulesProfile.Full;
+            if (profile == RulesProfile.Classic) DefaultSpeed = 2;
+            return this;
+        }
+
+        /// <summary>Which rules profile this config is on (Custom when the two lane switches disagree with every profile).</summary>
+        public RulesProfile Rules => Physics.Classic ? (Depth.Classic ? RulesProfile.Classic : RulesProfile.Custom)
+            : (Depth.Classic ? RulesProfile.PhysicsOnly : RulesProfile.Full);
+
+        /// <summary>The classic match: the game's 16v16 with every new rule off, instant hits, pace 2x (browser parity).</summary>
+        public static GameConfig CreateClassic() => CreateDefault().ApplyRules(RulesProfile.Classic);
 
         /// <summary>Deep copy: every group object and array is copied.</summary>
         public GameConfig Clone()
@@ -126,6 +150,7 @@ namespace CriticalMass.Sim.Config
             c.Render = Render.Clone();
             c.Debug = Debug.Clone();
             c.Physics = Physics.Clone();
+            c.Depth = Depth.Clone();
             return c;
         }
 
@@ -136,10 +161,25 @@ namespace CriticalMass.Sim.Config
         }
 
         /// <summary>The bot roster fraction of one class (browser GAME_CONFIG.bots.classMix[id]).</summary>
-        public double ClassMix(ClassId id)
+        public double ClassMix(ClassId id, int teamSize = int.MaxValue)
         {
-            return Bots.ClassMix[(int)id];
+            // U-063: with class roles on, the lineup holds all six classes (Depth.Roles.ClassMix).
+            double[] mix = !Depth.Classic && Depth.Roles.Enabled ? (teamSize <= Depth.Roles.SmallTeamMax ? Depth.Roles.SmallTeamClassMix : Depth.Roles.ClassMix) : Bots.ClassMix;
+            return mix[(int)id];
         }
+    }
+
+    /// <summary>U-069: the rule sets a match can run (GameConfig.ApplyRules). Appended members only.</summary>
+    public enum RulesProfile
+    {
+        /// <summary>Browser parity: no physics rules (instant hits), no mechanics-depth rules, pace 2x.</summary>
+        Classic,
+        /// <summary>Sim-physics rules on, mechanics-depth rules off (the test config, CreateBrowser5v5).</summary>
+        PhysicsOnly,
+        /// <summary>Everything on: the game's default (CreateDefault).</summary>
+        Full,
+        /// <summary>Only reported by GameConfig.Rules: physics classic with depth on.</summary>
+        Custom,
     }
 
     /// <summary>King-of-the-hill zone.</summary>

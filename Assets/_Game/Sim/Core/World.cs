@@ -210,7 +210,7 @@ namespace CriticalMass.Sim.Core
             int used = 0;
             for (int k = 0; k < classCount; k++)
             {
-                double q = n * c.ClassMix(ClassIds.All[k]);
+                double q = n * c.ClassMix(ClassIds.All[k], n);
                 counts[k] = JsMath.FloorToInt(q + 1e-9);
                 frac[k] = q - counts[k];
                 used += counts[k];
@@ -272,7 +272,8 @@ namespace CriticalMass.Sim.Core
                 AnimAction = 0,
                 Moving = false,
                 PendingClass = null,
-                // ITEM CM-84: added by its owner (ClassSwitchCd = 0, ClassSwitches = 0)
+                ClassSwitchCd = 0, // CM-84 / U-065
+                ClassSwitches = 0,
                 StandUp = 0,
                 AirLen = 0,
                 AirTick = 0,
@@ -301,6 +302,8 @@ namespace CriticalMass.Sim.Core
                 ClassPick = -1,
                 Terraform = false,
                 Jump = false,
+                StationBuy = 0,
+                PingKind = 0,
             };
         }
 
@@ -541,6 +544,7 @@ namespace CriticalMass.Sim.Core
             // DG-24: every piece gone (the repaint restored its cells), banks full again.
             world.Builder.Reset();
             world.Healer.Reset(); // DG-40
+            world.Depth.Reset(world); // U-063 onward
 
             SpatialHash.Rebuild(world.Hash, world.X, world.Z, world.Actors, world.ActorCount);
         }
@@ -576,7 +580,8 @@ namespace CriticalMass.Sim.Core
             a.AnimAction = 0;
             a.Moving = false;
             a.PendingClass = null;
-            // ITEM CM-84: added by its owner (ClassSwitchCd = 0, ClassSwitches = 0)
+            a.ClassSwitchCd = 0; // CM-84 / U-065
+            a.ClassSwitches = 0;
             a.StandUp = 0;
             a.AirLen = 0;
             a.AirTick = 0;
@@ -588,6 +593,7 @@ namespace CriticalMass.Sim.Core
             a.UnsupportedTicks = 0;
             a.LastCause = DamageCause.None;
             a.DeliverTicks = 0;
+            a.CoinsPicked = 0;
             ClearSwing(a);
         }
 
@@ -615,6 +621,8 @@ namespace CriticalMass.Sim.Core
             f.Terraform = false;
             f.Jump = false;
             f.TerraformSwitch = false;
+            f.StationBuy = 0;
+            f.PingKind = 0;
         }
 
         /// <summary>Build a world for opts: a fresh Skybreak Basin map and every buffer allocated at capacity.</summary>
@@ -754,6 +762,7 @@ namespace CriticalMass.Sim.Core
                 Healer = HealerState.Create(cfg),
                 Hits = PendingHits.Create(cap),
                 Dur = Durations.Create(cfg),
+                Depth = DepthState.Create(cfg, map),
             };
             InitWorld(world, opts);
             return world;
@@ -821,6 +830,7 @@ namespace CriticalMass.Sim.Core
             e.Bio = bio;
             e.Cause = cause;
             e.Radius = radius;
+            e.Slot = -1; // U-066: Pickups writes it after the push
             w.EventHead++;
         }
 
@@ -875,5 +885,7 @@ namespace CriticalMass.Sim.Core
         public PendingHits Hits;
         /// <summary>DG-68: every duration of this world in ticks, derived once per CreateWorld / ResetWorld for the match pace.</summary>
         public Durations Dur;
+        /// <summary>Mechanics depth (U-063 onward): roles, sources, stations, pickups, pings and map events (DepthState.cs).</summary>
+        public DepthState Depth;
     }
 }

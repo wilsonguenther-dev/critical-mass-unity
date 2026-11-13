@@ -548,6 +548,31 @@ namespace CriticalMass.Sim.Bots
             st.AbilityZ[id] = JsMath.F32(w.Z[best]);
         }
 
+        /// <summary>
+        /// U-063: the allied carrier bot id should escort, or -1: a living feeder of its team holding cargo or meat within
+        /// Roles.EscortSeekRange (straight line), nearest first, lowest id on a tie.
+        /// </summary>
+        public static int EscortTarget(World w, int id)
+        {
+            Actor a = w.Actors[id];
+            double r = w.Config.Depth.Roles.EscortSeekRange;
+            double bestD2 = r * r;
+            int best = -1;
+            for (int j = 0; j < w.ActorCount; j++)
+            {
+                if (j == id) continue;
+                Actor t = w.Actors[j];
+                if (!t.Alive || t.Team != a.Team || (t.CarryAmount <= 0 && t.CarryMeat <= 0) || !Roles.MayFeed(w, t.Cls)) continue;
+                double dx = w.X[j] - w.X[id];
+                double dz = w.Z[j] - w.Z[id];
+                double d2 = dx * dx + dz * dz;
+                if (d2 >= bestD2) continue;
+                best = j;
+                bestD2 = d2;
+            }
+            return best;
+        }
+
         /// <summary>One think for bot id: perception, stuck check, utility selection, targets, ability decision.</summary>
         public static void ThinkBot(World w, BotsState st, int id)
         {
@@ -591,7 +616,7 @@ namespace CriticalMass.Sim.Bots
             // Progress detector (CM-30): travelling but never leaving a ProgressRadius circle.
             double progDx = x - st.ProgressX[id];
             double progDz = z - st.ProgressZ[id];
-            bool travelling = cur == AiState.ToHill || cur == AiState.Deliver || cur == AiState.Retreat;
+            bool travelling = cur == AiState.ToHill || cur == AiState.Deliver || cur == AiState.Retreat || cur == AiState.Supply || cur == AiState.Order;
             if (!travelling || st.WantMove[id] == 0 || progDx * progDx + progDz * progDz >= ProgressDist2)
             {
                 st.ProgressX[id] = JsMath.F32(x);
@@ -628,7 +653,7 @@ namespace CriticalMass.Sim.Bots
             }
             else if (P.Enemy >= 0)
             {
-                uFight = Cap1(hpFrac * (role == BotsState.RoleHill ? 1 : 0.6) * st.Aggression[id]);
+                uFight = Cap1(hpFrac * (role == BotsState.RoleHill ? 1 : 0.6) * st.Aggression[id] * BotNames.FightScale(w, id)); // U-067 play style (x 1 with the rule off)
                 fightTarget = P.Enemy;
                 if (cur == AiState.HoldHill && !cocky)
                 {
@@ -655,14 +680,14 @@ namespace CriticalMass.Sim.Bots
 
             double uGather = 0;
             int gatherNode = -1;
-            if (role == BotsState.RoleKaiju && st.Corrupt[id] == 0 && egg && a.CarryAmount < cc.CarryCapacity && a.Carry != CarryKind.Corruption)
+            if (role == BotsState.RoleKaiju && st.Corrupt[id] == 0 && egg && a.CarryAmount < cc.CarryCapacity && a.Carry != CarryKind.Corruption && Roles.MayFeed(w, a.Cls))
             {
                 gatherNode = BestNode(w, st, id, NodeKind.Biomass, double.PositiveInfinity);
                 if (gatherNode >= 0) uGather = Cap1(0.8 * st.Greed[id]);
             }
 
             double uDeliver = 0;
-            if (a.CarryAmount > 0 && egg)
+            if (a.CarryAmount > 0 && egg && Roles.MayDeliver(w, a, a.Carry))
             {
                 NodeKind kind = a.Carry == CarryKind.Corruption ? NodeKind.Corruption : NodeKind.Biomass;
                 if (a.CarryAmount >= cc.CarryCapacity || BestNode(w, st, id, kind, NearbyNodeDist) < 0) uDeliver = 0.9;
@@ -670,11 +695,71 @@ namespace CriticalMass.Sim.Bots
 
             double uCorrupt = 0;
             int corruptNode = -1;
-            if (st.Corrupt[id] != 0 && egg && a.Carry != CarryKind.Biomass && a.CarryAmount < cc.CarryCapacity)
+            if (st.Corrupt[id] != 0 && egg && a.Carry != CarryKind.Biomass && a.CarryAmount < cc.CarryCapacity && Roles.MayCorrupt(w, a.Cls))
             {
                 corruptNode = BestNode(w, st, id, NodeKind.Corruption, double.PositiveInfinity);
                 if (corruptNode >= 0 && BotFields.FieldDistAt(st.Fields, BotFields.FieldCorruption, x, z) < double.PositiveInfinity)
                     uCorrupt = Cap1(0.85 * st.Greed[id]);
+            }
+
+            // U-063 class roles: an egg-duty bot that may not feed (and is not on a corruption run) escorts the nearest allied carrier.
+            double uEscort = 0;
+            int escortOf = -1;
+            if (role == BotsState.RoleKaiju && egg && st.Corrupt[id] == 0 && a.CarryAmount == 0 && hpFrac >= lowHp && Roles.On(w) && !Roles.MayFeed(w, a.Cls))
+            {
+                escortOf = EscortTarget(w, id);
+                if (escortOf >= 0) uEscort = w.Config.Depth.Roles.EscortUtility;
+            }
+
+            // U-064 supply duty: fill up at the nearest grove or spring, then bank it at the base. A bot left holding wood or
+            // water (the duty moved on) still walks it home.
+            double uSupply = 0;
+            int supplySource = -1;
+            bool holdsSupply = a.CarryAmount > 0 && (a.Carry == CarryKind.Wood || a.Carry == CarryKind.Water);
+            if (Sources.On(w) && ((st.Supply[id] != 0 && egg && a.CarryAmount == 0) || holdsSupply))
+            {
+                if (st.Supply[id] != 0 && egg && a.CarryAmount < cc.CarryCapacity)
+                {
+                    // Upgrades need water too (U-065): with three wood banked per water (plus one), fetch water when a spring has some.
+                    bool wantWater = Sources.Stock(w, a.Team, Sources.StockWood) >= 3 * (Sources.Stock(w, a.Team, Sources.StockWater) + 1);
+                    if (wantWater) supplySource = Sources.BestSource(w, id, true);
+                    if (supplySource < 0) supplySource = Sources.BestSource(w, id);
+                }
+                if (supplySource >= 0 || holdsSupply) uSupply = w.Config.Depth.Sources.SupplyUtility;
+            }
+
+            // U-066: a power-up in sight and close: go for it (not while holding the hill, carrying, or hurt).
+            double uGrab = 0;
+            double grabX = 0;
+            double grabZ = 0;
+            if (Pickups.On(w) && cur != AiState.HoldHill && a.CarryAmount == 0 && hpFrac >= lowHp && Pickups.BotGrabSpot(w, id, out grabX, out grabZ))
+                uGrab = w.Config.Depth.Pickups.BotGrabUtility;
+            // U-068: a supply drop in sight and close: stand on it.
+            if (uGrab <= 0 && MapEvents.On(w) && a.CarryAmount == 0 && hpFrac >= lowHp && MapEvents.BotDropSpot(w, id, out grabX, out grabZ))
+                uGrab = w.Config.Depth.Events.BotDropUtility;
+
+            // U-067: an answered ping. A hurt bot or one with cargo drops it; an Attack is over once the spot is reached and clear.
+            double uOrder = 0;
+            if (PingRules.HasOrder(w, id))
+            {
+                PingsConfig PG = w.Config.Depth.Pings;
+                if (hpFrac < lowHp || a.CarryAmount > 0) PingRules.Drop(w, id);
+                else
+                {
+                    int oe = PingRules.OrderEnemy(w, id, FightKeepRange);
+                    if (oe >= 0)
+                    {
+                        fightTarget = oe;
+                        uFight = PG.OrderUtility;
+                    }
+                    else
+                    {
+                        PingRules.OrderGoal(w, id, out double ogx, out double ogz, out double ostop);
+                        bool there = (ogx - x) * (ogx - x) + (ogz - z) * (ogz - z) <= (ostop + 0.5) * (ostop + 0.5);
+                        if (there && PingRules.OrderCall(w, id) == PingCall.Attack) PingRules.Drop(w, id);
+                        else uOrder = PG.OrderUtility;
+                    }
+                }
             }
 
             // CM-36: the shrine cleanse is the player's tool. Only the human slot on autopilot (IsHuman) uses it, and only for the
@@ -715,6 +800,18 @@ namespace CriticalMass.Sim.Bots
                 case AiState.Cleanse:
                     curU = uCleanse;
                     break;
+                case AiState.Escort:
+                    curU = uEscort;
+                    break;
+                case AiState.Supply:
+                    curU = uSupply;
+                    break;
+                case AiState.Grab:
+                    curU = uGrab;
+                    break;
+                case AiState.Order:
+                    curU = uOrder;
+                    break;
                 case AiState.Retreat:
                     curU = uRetreat;
                     break;
@@ -732,6 +829,10 @@ namespace CriticalMass.Sim.Bots
             Consider(w, AiState.Deliver, uDeliver);
             Consider(w, AiState.Corrupt, uCorrupt);
             Consider(w, AiState.Cleanse, uCleanse);
+            Consider(w, AiState.Escort, uEscort);
+            Consider(w, AiState.Supply, uSupply);
+            Consider(w, AiState.Grab, uGrab);
+            Consider(w, AiState.Order, uOrder);
             Consider(w, AiState.Retreat, uRetreat);
             AiState best = Sel.Best;
 
@@ -742,13 +843,21 @@ namespace CriticalMass.Sim.Bots
                 double elapsed = now - st.StateSince[id];
                 bool urgent = hpFrac < lowHp || P.Within3 > 0;
                 bool free = elapsed >= B.MinStateSeconds;
-                bool early = elapsed >= UrgentFloorSeconds && (urgent || curU <= 0 || (IsHillState(cur) && IsHillState(best)));
+                bool ordered = best == AiState.Order || (uOrder <= 0 && PingRules.HasOrder(w, id)); // U-067: an order is obeyed at once
+                bool early = ordered || (elapsed >= UrgentFloorSeconds && (urgent || curU <= 0 || (IsHillState(cur) && IsHillState(best))));
                 if (cur == AiState.None || cur == AiState.Unstick || free || early) next = best;
             }
             SetState(w, st, id, next, now);
 
             // --- targets ---
             st.Target[id] = next == AiState.Fight ? fightTarget : -1;
+            st.EscortOf[id] = next == AiState.Escort ? escortOf : -1;
+            st.SupplySource[id] = next == AiState.Supply ? supplySource : -1;
+            if (next == AiState.Grab)
+            {
+                st.GrabX[id] = grabX;
+                st.GrabZ[id] = grabZ;
+            }
             if (next == AiState.Gather) st.TargetNode[id] = gatherNode;
             else if (next == AiState.Corrupt) st.TargetNode[id] = corruptNode;
             else st.TargetNode[id] = -1;

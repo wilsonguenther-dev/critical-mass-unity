@@ -132,6 +132,7 @@ namespace CriticalMass.Sim.Core
             GameConfig cfg = w.Config;
             Actor a = w.Actors[i];
             ClassConfig cc = cfg.Class(a.Cls);
+            double dmg = cc.AttackDamage * Pickups.DamageScale(w, i); // U-066 Might (x 1 without it)
             double ax = w.X[i];
             double az = w.Z[i];
             double fx = JsMath.Cos(facing);
@@ -164,8 +165,8 @@ namespace CriticalMass.Sim.Core
                 if (walls && !SegmentClear.Clear(w.Map, ax, az, w.X[j], w.Z[j])) continue;
                 if (cap > 0 && hits >= cap) break;
                 hits++;
-                if (fair) w.Hits.Add(j, i, cc.AttackDamage, ax, az);
-                else Damage.ApplyMelee(w, j, cc.AttackDamage, i, ax, az);
+                if (fair) w.Hits.Add(j, i, dmg, ax, az);
+                else Damage.ApplyMelee(w, j, dmg, i, ax, az);
             }
             // Structures (CM-05): the same swing chips enemy barricades in its arc; a Miner's pick also breaks breakables.
             Barricades.DamageBarricadesInArc(w, i, ax, az, fx, fz, cc.AttackRange, cosHalf, cc.AttackDamage);
@@ -185,7 +186,7 @@ namespace CriticalMass.Sim.Core
                 if (d2 <= reach * reach && (d2 <= 1e-12 || (dx * fx + dz * fz) / Math.Sqrt(d2) >= kcos - 1e-9)
                     && (!walls || SegmentClear.Clear(w.Map, ax, az, kj.X, kj.Z)))
                 {
-                    Kaiju.DamageKaiju(w, i, cc.AttackDamage);
+                    Kaiju.DamageKaiju(w, i, dmg);
                 }
             }
             // DG-69: the contact tick, even on a whiff.

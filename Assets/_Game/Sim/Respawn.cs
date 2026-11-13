@@ -7,7 +7,8 @@ namespace CriticalMass.Sim.Core
     /// <summary>Respawn system (CM-06, port of src/sim/respawn.ts on 09e0904): dead actors count down RespawnIn, then come back at a free spawn slot around their own pad with full hp and spawn protection; class re-pick arrives only through InputFrame.ClassPick.</summary>
     public static class Respawn
     {
-        // ITEM CM-84: added by its owner (CM-54 CLASS_SWITCH_ACCEPTED = 0, CLASS_SWITCH_COOLDOWN = 1, CLASS_SWITCH_ALIVE = 2)
+        /// <summary>CM-84 / U-065: ClassSwitch event outcome codes (SimEvent.B), CM-54's values.</summary>
+        public const int ClassSwitchAccepted = 0, ClassSwitchCooldown = 1, ClassSwitchAlive = 2;
 
         /// <summary>Two living actors closer than this (centre to centre) make a spawn slot "taken". 2 x the largest class radius.</summary>
         private static double SlotClearance(GameConfig c)
@@ -31,19 +32,35 @@ namespace CriticalMass.Sim.Core
             Actor a = w.Actors[actorId];
             if (a.Alive)
             {
-                // ITEM CM-84: added by its owner (CM-54 'classSwitch' event CLASS_SWITCH_ALIVE at the actor's x/z, value ci)
+                // CM-84 / U-065: with the station rule on a living actor switches at its base station (else a ClassSwitch
+                // Alive refusal, CM-54); with it off a living pick is dropped silently, as before.
+                if (Stations.On(w)) return Stations.TrySwitchAlive(w, actorId, cls);
                 return false;
             }
             if ((a.PendingClass ?? a.Cls) == cls) return true;
-            // ITEM CM-84: added by its owner (CM-54 cooldown refusal: ClassSwitchCd > 0 pushes 'classSwitch' CLASS_SWITCH_COOLDOWN and returns false)
+            bool station = Stations.On(w); // CM-84 / U-065: CM-54's cooldown, counter and event ride with the station rule
+            if (station && a.ClassSwitchCd > 0)
+            {
+                World.PushEvent(w, SimEventType.ClassSwitch, actorId, ClassSwitchCooldown, w.X[actorId], w.Z[actorId], ci);
+                return false;
+            }
             a.PendingClass = cls;
-            // ITEM CM-84: added by its owner (CM-54 ClassSwitchCd = Respawn.ClassSwitchCooldownTicks)
-            // ITEM CM-84: added by its owner (CM-54 classSwitches counter: ClassSwitches++)
-            // ITEM CM-84: added by its owner (CM-54 'classSwitch' event CLASS_SWITCH_ACCEPTED at the actor's x/z, value ci)
+            if (station)
+            {
+                a.ClassSwitchCd = Durations.T30(w.Config, w.Config.Respawn.ClassSwitchCooldownTicks);
+                a.ClassSwitches++;
+                World.PushEvent(w, SimEventType.ClassSwitch, actorId, ClassSwitchAccepted, w.X[actorId], w.Z[actorId], ci);
+            }
             return true;
         }
 
-        // ITEM CM-84: added by its owner (CM-54 teamClassSwitches: accepted switches by bots per team)
+        /// <summary>CM-84 / U-065 (CM-54 teamClassSwitches): accepted switches by the non-human actors of team.</summary>
+        public static int TeamClassSwitches(World w, TeamId team)
+        {
+            int n = 0;
+            for (int i = 0; i < w.ActorCount; i++) if (!w.Actors[i].IsHuman && w.Actors[i].Team == team) n += w.Actors[i].ClassSwitches;
+            return n;
+        }
 
         /// <summary>The actor's bounding square (side 2r) at the Float32 position touches only walkable cells (collide.ts invariant).</summary>
         private static bool SquareClear(World w, double x, double z, double r)
@@ -121,7 +138,7 @@ namespace CriticalMass.Sim.Core
             {
                 Actor a = w.Actors[i];
                 InputFrame inp = w.Inputs[i];
-                // ITEM CM-84: added by its owner (CM-54 R2 cooldown tick: if (a.ClassSwitchCd > 0) a.ClassSwitchCd--, before this step's pick)
+                if (a.ClassSwitchCd > 0) a.ClassSwitchCd--; // CM-84 / U-065 (CM-54 R2): before this step's pick
                 int pick = inp.ClassPick;
                 if (pick >= 0)
                 {
@@ -144,8 +161,8 @@ namespace CriticalMass.Sim.Core
                     a.PendingClass = null;
                 }
                 ClassConfig cc = cfg.Class(a.Cls);
-                a.MaxHp = cc.MaxHp;
-                a.Hp = cc.MaxHp;
+                a.MaxHp = Stations.MaxHp(w, a.Team, a.Cls); // U-065: the team's upgrade level of the class (the class row with the rule off)
+                a.Hp = a.MaxHp;
                 a.Alive = true;
                 a.RespawnIn = 0;
                 a.SpawnProtect = cfg.Respawn.ProtectionSeconds;

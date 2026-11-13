@@ -81,6 +81,7 @@ namespace CriticalMass.Sim.Core
                     int slowLen = a.SwingWindup + (cfg.Physics.SwingSlowsRecovery ? a.SwingRecovery : 0);
                     if (slowLen > 0 && w.Tick > a.SwingTick && w.Tick <= a.SwingTick + slowLen)
                         speed *= cfg.Physics.SwingMoveMultiplier;
+                    speed *= Pickups.SpeedScale(w, i); // U-066 Haste (exactly 1 without it)
                     tx = mx * speed;
                     tz = mz * speed;
                 }

@@ -1,13 +1,13 @@
 namespace CriticalMass.Sim.Core
 {
     /// <summary>What an actor carries in its class cargo (browser CarryKind).</summary>
-    public enum CarryKind { None, Biomass, Corruption }
+    public enum CarryKind { None, Biomass, Corruption, /* U-064, appended: */ Wood, Water }
 
     /// <summary>
     /// CM-35: the two biomass types (browser BiomassType). Plant comes from the map's biomass nodes (gathered with E) and
     /// rides in the class cargo; meat drops from killed actors as a loose orb and rides in its own load (Actor.CarryMeat).
     /// </summary>
-    public enum BiomassType { Plant, Meat }
+    public enum BiomassType { Plant, Meat, /* U-064 (DG-42), appended: gathered at groves and springs, ride in the class cargo */ Wood, Water }
 
     /// <summary>
     /// DG-16: what dealt a hit (SimEvent.Cause on Hit and Death events, Actor.LastCause). Not in the browser. Never stored or
@@ -21,6 +21,9 @@ namespace CriticalMass.Sim.Core
     /// </summary>
     public enum BotDifficulty { Normal, Easy, Hard }
 
+    /// <summary>U-066: what a pickup is. Coin first so a power-up kind is never 0 (DepthState.PowerKind: 0 = none). Never reordered: later items append.</summary>
+    public enum PickupKind { Coin, Haste, Might, Ward }
+
     /// <summary>Kaiju state (browser KaijuState).</summary>
     public enum KaijuState { Egg, Neutral, Azure, Crimson, Berserk }
 
@@ -33,6 +36,14 @@ namespace CriticalMass.Sim.Core
         None, ToHill, HoldHill, Fight, Gather, Deliver, Corrupt, Retreat, Unstick,
         /// <summary>CM-36: walk to the shrine empty-handed and hold interact for the shrine cleanse (appended: the browser lists it before Retreat).</summary>
         Cleanse,
+        /// <summary>U-063 class roles: an egg-duty bot that may not feed walks with the nearest allied carrier (appended).</summary>
+        Escort,
+        /// <summary>U-064: a supply bot walks to a grove or spring, fills up and banks it at the base (appended).</summary>
+        Supply,
+        /// <summary>U-066: a bot walks straight to a power-up it can see (appended).</summary>
+        Grab,
+        /// <summary>U-067: a bot walks to the spot (or the caller) of the ping it answered (appended).</summary>
+        Order,
     }
 
     /// <summary>Match phase (browser MatchState.phase).</summary>
@@ -158,6 +169,59 @@ namespace CriticalMass.Sim.Core
         PillarCrush,
         /// <summary>DG-100: a meat orb popped from a corpse: A = corpse actor, B = orb slot, (X, Z) = where it lands, DirX / DirZ = hop direction, Radius = hop length.</summary>
         MeatPop,
+        /// <summary>U-063: the shrine refused a load (class roles): A = the carrier, B = Roles.RefusedNotFeeder / RefusedNotRaider, (X, Z) = the shrine, Value = units it holds.</summary>
+        DeliverRefused,
+        /// <summary>U-063: a carrier handed biomass to an allied feeder: A = giver, B = receiver, (X, Z) = the receiver, Value = units, Bio = the type.</summary>
+        Handoff,
+        /// <summary>U-064: an actor took one unit from a grove or spring: A = actor, B = source index (World.Depth.Sources), (X, Z) = the source, Value = units it now carries, Bio = Wood / Water.</summary>
+        SourceGather,
+        /// <summary>U-064: a load went into the team stock at the base: A = actor, B = team index, (X, Z) = the pad, Value = units, Bio = the type.</summary>
+        BankDeposit,
+        /// <summary>U-064: a feeder took food out of the team stock: A = actor, B = team index, (X, Z) = the pad, Value = units, Bio = Plant.</summary>
+        BankWithdraw,
+        /// <summary>
+        /// CM-84 / U-065 (ports CM-54 'classSwitch'): a class pick was answered: A = actor, B = Respawn.ClassSwitchAccepted /
+        /// ClassSwitchCooldown / ClassSwitchAlive, (X, Z) = the actor, Value = class index. Accepted while alive = switched now.
+        /// </summary>
+        ClassSwitch,
+        /// <summary>U-065 (ports CM-39 'upgrade'): a class upgrade purchase: A = the buyer, B = class index, (X, Z) = the pad, Value = the team's new level of that class (>= 2) or a Stations.Refused* code.</summary>
+        Upgrade,
+        /// <summary>U-066: a pickup appeared: A = the actor it dropped from (-1 = the map spawner), B = (int)PickupKind, (X, Z), Value = coins, or for a power-up the tick it can be taken, Radius = pickup range, Slot = World.Depth.Pickups slot.</summary>
+        PickupSpawned,
+        /// <summary>U-066: an actor walked over a pickup: A = actor, B = (int)PickupKind, (X, Z) = the pickup, Value = coins, or ticks the power-up will last, Slot = pool slot.</summary>
+        PickupTaken,
+        /// <summary>U-066: a pickup vanished untaken: A = -1, B = (int)PickupKind, (X, Z), Slot = pool slot.</summary>
+        PickupExpired,
+        /// <summary>U-066: an actor's power-up ended: A = actor, B = (int)PickupKind, (X, Z) = the actor, Value = Pickups.EndExpired / EndBroken / EndDropped / EndStripped / EndReplaced.</summary>
+        PowerUpEnded,
+        /// <summary>U-066: a Ward soaked damage: A = the warded actor, B = attacker id (-1 none, -2 the Kaiju), (X, Z) = the actor, Value = damage soaked.</summary>
+        WardAbsorb,
+        /// <summary>U-067: a ping was placed: A = the pinger (a player or a bot), B = (int)PingCall, (X, Z) = the spot, Value = ticks the marker lives.</summary>
+        Ping,
+        /// <summary>U-067: a ping was refused by the rate limit: A = the pinger, B = (int)PingCall, (X, Z), Value = ticks until the next is allowed.</summary>
+        PingRefused,
+        /// <summary>U-067: a bot took a ping: A = the bot, B = the pinger, (X, Z) = the bot, Value = (int)PingCall.</summary>
+        PingAnswered,
+        /// <summary>U-068: a supply drop is on its way: A = -1, B = event number, (X, Z) = where, Value = the tick it lands, Radius = claim range.</summary>
+        SupplyDropIncoming,
+        /// <summary>U-068: the supply drop landed: (X, Z), Value = the tick it is gone if unclaimed, Radius = claim range.</summary>
+        SupplyDropLanded,
+        /// <summary>U-068: who stands on the drop changed: A = an actor on it (-1 none), (X, Z), Value = MapEvents.ContestNobody / ContestAzure / ContestCrimson / ContestBoth.</summary>
+        SupplyDropContest,
+        /// <summary>U-068: the drop was claimed: A = the claimer, B = team index, (X, Z), Value = wood added to that team's stock.</summary>
+        SupplyDropClaimed,
+        /// <summary>U-068: the drop vanished unclaimed: (X, Z).</summary>
+        SupplyDropExpired,
+        /// <summary>U-068: the egg is exposed (deliveries count more): A = -1, B = event number, (X, Z) = the shrine, Value = the tick the window closes.</summary>
+        EggExposed,
+        /// <summary>U-068: the window closed: B = 1 when the hatch ended it, (X, Z) = the shrine.</summary>
+        EggExposedEnded,
+        /// <summary>U-068: a bridge will collapse: A = -1, B = BridgeSpans.All index, (X, Z) = the middle of the part that falls, Value = the tick it falls, Radius = half its length.</summary>
+        BridgeWarning,
+        /// <summary>U-068: the bridge part fell: B = span index, (X, Z), Value = the tick it rebuilds itself, Radius = cells removed.</summary>
+        BridgeCollapsed,
+        /// <summary>U-068: the bridge is back: A = the Builder (-1 = by itself), B = span index, (X, Z), Value = wood spent; -1 = the collapse was called off; -2 = a Builder's repair was refused for lack of wood (then (X, Z) = that Builder).</summary>
+        BridgeRepaired,
         // ITEM CM-84: added by its owner (ClassSwitch, ports CM-54)
         /// <summary>CM-37: one tick of fountain healing (Heal.HealSystem): A = the healed actor, B = -1, (X, Z) = the actor, Value = HP restored this tick (&gt; 0).</summary>
         Heal,

@@ -411,6 +411,69 @@ namespace CriticalMass.Sim.Bots
                 case AiState.Retreat:
                     Follow(w, st, id, TeamPadField(w, id));
                     break;
+                case AiState.Order:
+                {
+                    // U-067: to the ping (or the caller): straight when the line is clear, else the ping's route.
+                    if (!PingRules.HasOrder(w, id)) break;
+                    PingRules.OrderGoal(w, id, out double gx, out double gz, out double stop);
+                    FlowField route = PingRules.OrderRoute(w, id);
+                    if (FirstBlockedCell(map, x, z, gx, gz) < 0 || route == null) Toward(w, id, gx, gz, stop);
+                    else if (FlowField.SampleFlowDir(route, map, x, z, out double odx, out double odz))
+                    {
+                        Mv.X = odx;
+                        Mv.Z = odz;
+                    }
+                    else Toward(w, id, gx, gz, stop);
+                    break;
+                }
+                case AiState.Grab:
+                    Toward(w, id, st.GrabX[id], st.GrabZ[id], 0.2); // U-066: straight at the power-up (it was in line of sight)
+                    break;
+                case AiState.Supply:
+                {
+                    // U-064: to the source and gather; with no source (full, or none left) home to the base and bank.
+                    int si = st.SupplySource[id];
+                    SourceNode[] srcs = w.Depth.Sources;
+                    if (si >= 0 && si < srcs.Length)
+                    {
+                        SourceNode src = srcs[si];
+                        aimX = src.X;
+                        aimZ = src.Z;
+                        double reach = cfg.Resources.NodeInteractRange + cc.Radius - InteractMargin;
+                        double dx = src.X - x;
+                        double dz = src.Z - z;
+                        if (dx * dx + dz * dz <= reach * reach)
+                        {
+                            output.Interact = true;
+                            separate = false;
+                        }
+                        else if (FlowField.SampleFlowDir(Sources.EnsureField(w, si), map, x, z, out double fdx, out double fdz))
+                        {
+                            Mv.X = fdx;
+                            Mv.Z = fdz;
+                        }
+                        else Toward(w, id, src.X, src.Z, 0);
+                    }
+                    else
+                    {
+                        PadDef pad = map.Pads[(int)a.Team];
+                        double r = cfg.Depth.Sources.BankRange - 1;
+                        double dx = pad.X - x;
+                        double dz = pad.Z - z;
+                        if (dx * dx + dz * dz <= r * r) output.Interact = true;
+                        else if (!Follow(w, st, id, TeamPadField(w, id))) Toward(w, id, pad.X, pad.Z, 0);
+                    }
+                    break;
+                }
+                case AiState.Escort:
+                {
+                    // U-063: walk with the carrier (straight at it when the line is clear, else the shrine route it is on).
+                    int t = st.EscortOf[id];
+                    if (t >= 0 && t < w.ActorCount && w.Actors[t].Alive && FirstBlockedCell(map, x, z, w.X[t], w.Z[t]) < 0)
+                        Toward(w, id, w.X[t], w.Z[t], cfg.Depth.Roles.EscortKeepDistance);
+                    else if (!Follow(w, st, id, BotFields.FieldShrine)) Toward(w, id, map.Shrine.X, map.Shrine.Z, 3);
+                    break;
+                }
                 default:
                 {
                     // toHill (and 'none' before the first think).
