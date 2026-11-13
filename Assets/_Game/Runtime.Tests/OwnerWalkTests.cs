@@ -52,7 +52,7 @@ namespace CriticalMass.Runtime.Tests
                 Assert.AreEqual(p.Rect.y, px.y, 0.01f, p.Name);
                 Assert.AreEqual(p.Rect.width, px.width, 0.01f, p.Name);
             }
-            Assert.AreEqual(HudAnchor.TopRight, HudFrames.Classify(HudZones.Coins), "the coin counter rides the right column");
+            Assert.AreEqual(HudAnchor.BottomRight, HudFrames.Classify(HudZones.Coins), "the coin counter rides with the minimap");
             Assert.AreEqual(HudAnchor.Top, HudFrames.Classify(HudZones.Job), "the job line stays under the clock");
             Assert.AreEqual(HudAnchor.BottomRight, HudFrames.Classify(HudZones.Minimap));
         }
@@ -177,7 +177,7 @@ namespace CriticalMass.Runtime.Tests
                 Assert.IsNotNull(p);
                 var chips = new List<MenuItem>();
                 foreach (MenuItem it in p.GetComponentsInChildren<MenuItem>(true))
-                    if (it.name.StartsWith("Class ", StringComparison.Ordinal)) chips.Add(it);
+                    if (it.transform.parent != null && it.transform.parent.name == "Class Chips") chips.Add(it);
                 Assert.AreEqual(6, chips.Count, "one class tab per class");
                 MenuItem miner = chips.Find(c => c.name == "Class " + ClassId.Miner);
                 Assert.IsNotNull(miner);
