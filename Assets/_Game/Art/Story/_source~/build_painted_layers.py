@@ -90,7 +90,7 @@ def keycolour(arr):
     sat = b.max(1) - b.min(1)
     return np.median(b[sat > 150], 0) if (sat > 150).sum() > 50 else np.median(b, 0)
 
-def cutout(src, zero=(), halo=False, keep_largest=0, min_area=1500, hole_area=600):
+def cutout(src, zero=(), halo=False, keep_largest=0, min_area=1500, hole_area=600, drop_touching=False):
     """src: RGB painted on a flat key colour. zero: list of (x0, y0, x1, y1) fractions forced to the key colour first
     (drops stray marks the model left in a corner). Returns straight RGBA, trimmed."""
     arr = src.copy(); h, w = arr.shape[:2]
@@ -101,6 +101,13 @@ def cutout(src, zero=(), halo=False, keep_largest=0, min_area=1500, hole_area=60
         a = rgba[..., 3] / 255.0
         hull = ndimage.gaussian_filter(ink_hull(rgba[..., :3], a).astype(np.float32), 1.0)
         rgba[..., 3] = rgba[..., 3] * np.clip(hull * 1.2, 0, 1)
+    if drop_touching and zero:   # anything cut flat by a cleared band goes too (no straight edges left behind)
+        lab, n = ndimage.label(rgba[..., 3] > 20)
+        band = np.zeros((h, w), bool)
+        for x0, y0, x1, y1 in zero:
+            band[max(0, int(y0 * h) - 1):min(h, int(y1 * h) + 4), max(0, int(x0 * w) - 1):min(w, int(x1 * w) + 1)] = True
+        bad = np.unique(lab[band & (lab > 0)])
+        rgba[..., 3] *= ~np.isin(lab, bad)
     rgba = purge(rgba, key[1] > key[0])
     # despill: pull any remaining key-hued edge pixels toward neutral
     a = rgba[..., 3:4] / 255.0
@@ -172,7 +179,8 @@ def main():
     for i, reach in enumerate([0.10, 0.22, 0.38, 0.56, 0.78, 1.02], 1):
         st = crack.copy(); st[..., 3] *= np.clip((reach * dmax - d) / (0.05 * dmax), 0, 1)
         save_png("crack_%d" % i, st, "painted crack of light", "revealed from the burst point, stage %d of 6" % i)
-    g = crack[..., 3] / 255.0
+    lum = crack[..., :3].mean(-1) / 255.0   # glow only from the light pouring through, not the torn cloud flaps
+    g = crack[..., 3] / 255.0 * np.clip((lum - 0.72) / 0.2, 0, 1) * 0.8
     g = ndimage.gaussian_filter(fit(np.repeat(g[..., None], 3, -1) * 255, 960)[..., 0] / 255.0, 14) * 1.6
     glow = np.zeros(g.shape + (4,), np.float32); glow[..., :3] = B.rgb("seam") * 0.5 + 0.5 * np.array([247, 240, 229.0]); glow[..., 3] = np.clip(g, 0, 1) * 255
     save_png("crack_glow", glow, "painted crack of light", "soft glow, aligned to the crack")
@@ -181,7 +189,7 @@ def main():
     # ---- land, debris, framing rocks
     basin = cutout(load("basin"))
     save_png("basin", fit(basin, 2400), "painted cut-out: Skybreak Basin before the banners")
-    deb = cutout(load("debris"), zero=[(0, 0, 1, 0.38)], min_area=600)
+    deb = cutout(load("debris"), zero=[(0, 0, 1, 0.40)], min_area=600, drop_touching=True)   # reference scraps in the top band
     save_png("debris", fit(deb, 1920), "painted cut-out: rising rock debris (parallax overlay)")
     rocks = cutout(load("rocks_fg"), keep_largest=2)
     hv = B.hsv(rocks); rocks[..., 3] *= ~((hv[0] > 250) & (hv[0] < 340) & (hv[1] > 0.25))   # stray model marks (no purple in rock)
@@ -196,14 +204,19 @@ def main():
             src = load(n)
             rgba = B.cut(src, min_area=800, hole_area=900)
             a = rgba[..., 3] / 255.0
-            rgba[..., 3] *= np.clip(ndimage.gaussian_filter(ink_hull(rgba[..., :3], a).astype(np.float32), 1.0) * 1.2, 0, 1)
+            hull = ink_hull(rgba[..., :3], a)
+            if n == "hatch_b" and "egg" in eggs:   # the burst breaks the outline: the egg's own (eroded) matte stays solid too
+                hull |= ndimage.binary_erosion(eggs["egg"][..., 3] > 128, iterations=12) & (a > 0.5)
+            rgba[..., 3] *= np.clip(ndimage.gaussian_filter(hull.astype(np.float32), 1.0) * 1.2, 0, 1)
             eggs[n] = purge(rgba, False)
     if "hatch_a" in eggs:   # the burst of light breaks the outline, so the aligned egg's own silhouette is the hull
         m = ndimage.binary_erosion(eggs["egg"][..., 3] > 128, iterations=12).astype(np.float32)   # the egg matte carries its own thin rim glow
         eggs["hatch_a"][..., 3] *= ndimage.gaussian_filter(m, 1.0)
     ys, xs = np.where(sum(e[..., 3] for e in eggs.values()) > 8)
-    y0, y1, x0, x1 = ys.min() - 8, ys.max() + 9, xs.min() - 8, xs.max() + 9
-    egg_ys, egg_xs = np.where(eggs["egg"][..., 3] > 8)
+    pad_all = 70   # room for the seam glow on the shared canvas
+    eggs = {k: B.pad(v, pad_all) for k, v in eggs.items()}; ys, xs = ys + pad_all, xs + pad_all
+    y0, y1, x0, x1 = ys.min() - 60, ys.max() + 61, xs.min() - 60, xs.max() + 61
+    egg_ys, egg_xs = np.where(eggs["egg"][..., 3] > 8)   # (already in padded coordinates)
     geom["egg_canvas"] = dict(w=int(x1 - x0), h=int(y1 - y0), egg_w=int(egg_xs.max() - egg_xs.min()),
                               egg_cx=float((egg_xs.mean() - x0) / (x1 - x0)), egg_cy=float((egg_ys.mean() - y0) / (y1 - y0)))
     crop = {k: fit(v[y0:y1, x0:x1], 1024) for k, v in eggs.items()}
