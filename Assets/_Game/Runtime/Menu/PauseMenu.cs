@@ -55,6 +55,8 @@ namespace CriticalMass.Runtime.Menu
             /// <summary>Builds the tab's lines on the empty, stretched tab page (use Stepper, Slider, Note and the layout
             /// constants) and returns its focusable lines top to bottom; the menu chains them for keyboard and controller.</summary>
             public Func<PauseMenu, RectTransform, List<MenuItem>> Build;
+            /// <summary>Sort key among the extra tabs (lower first, ties keep registration order): ACCESS 0, WORLD 10.</summary>
+            public int Order;
         }
 
         /// <summary>A root-page entry that opens a page of its own (Back returns to the root page).</summary>
@@ -77,7 +79,10 @@ namespace CriticalMass.Runtime.Menu
         {
             if (tab == null || string.IsNullOrEmpty(tab.Name)) return;
             for (int i = 0; i < ExtraTabs.Count; i++) if (ExtraTabs[i].Name == tab.Name) { ExtraTabs[i] = tab; return; }
-            ExtraTabs.Add(tab);
+            // Stable insert by Order, so registration order (RuntimeInitializeOnLoad order is unspecified) cannot move a tab.
+            int at = ExtraTabs.Count;
+            while (at > 0 && ExtraTabs[at - 1].Order > tab.Order) at--;
+            ExtraTabs.Insert(at, tab);
         }
 
         public static void AddPage(ExtraPage page)

@@ -317,7 +317,8 @@ namespace CriticalMass.Runtime.Tests
             foreach (ResourceNode n in w.Nodes)
             {
                 double dx = n.X - w.X[Me], dz = n.Z - w.Z[Me];
-                if (dx * dx + dz * dz > AffordanceScan.Radius * AffordanceScan.Radius) continue;
+                double rr = AffordanceScan.Radius + w.Config.Resources.NodeInteractRange + Collide.ActorRadius(w, Me);
+                if (dx * dx + dz * dz > rr * rr) continue;
                 bool takes = SimResources.NodeTakes(w, a, n) && a.CarryAmount < w.Config.Class(a.Cls).CarryCapacity;
                 long key = ((long)Math.Round(n.X * 8) << 20) ^ (long)Math.Round(n.Z * 8);
                 if (takes) { expected++; if (!scan.Capped) Assert.IsTrue(marked.Contains(key), "a node he can gather is not marked"); }
@@ -467,11 +468,12 @@ namespace CriticalMass.Runtime.Tests
             Assert.IsTrue(FindSpot(w, scan, s => s.Secondary.Has && s.Secondary.Valid && s.Secondary.Action == AffAction.Barricade));
             Actor a = w.Actors[Me];
             double r = w.Config.Abilities.MinerBarricade.PlaceRange;
+            var rx = new WorldReactions();
+            rx.Read(w, 0);
             Assert.IsTrue(Barricades.TryPlaceBarricade(w, Me, w.X[Me] + Math.Cos(a.Facing) * r, w.Z[Me] + Math.Sin(a.Facing) * r));
             int slot = -1;
             for (int i = 0; i < w.Barricades.Length; i++) if (w.Barricades[i].Active) slot = i;
-            var rx = new WorldReactions();
-            rx.Read(w, 0);
+            rx.Read(w, 0.5);
             Assert.AreEqual(1, rx.Builds, "placing raises a build pulse");
             Assert.AreEqual(0, WorldReactions.StageOf(WorldReactions.BarricadeLeft01(w, slot)));
             double max = w.Config.Abilities.MinerBarricade.MaxHp;
@@ -502,11 +504,12 @@ namespace CriticalMass.Runtime.Tests
             double hps = w.Config.Abilities.MinerWallBreak.HitsPerState;
             Assert.AreEqual(1.0, WorldReactions.WallLeft01(w, wall), 1e-9);
             Assert.AreEqual((int)Math.Round(2 * hps), WorldReactions.WallHitsLeft(w, wall));
+            var rx = new WorldReactions();
+            rx.Read(w, 9);
             // One hit, as Abilities.MinerWallBreak writes it: the state drops to cracked, hp to HitsPerState.
             m.WallHp[wall] = (byte)hps;
             m.Cells[wall] = Cell.BreakableCracked;
             World.PushEvent(w, SimEventType.WallBreak, Me, wall, wall % m.Width + 0.5, wall / m.Width + 0.5, Cell.BreakableCracked);
-            var rx = new WorldReactions();
             rx.Read(w, 10);
             Assert.AreEqual(1, rx.Hits);
             Assert.AreEqual(wall, rx.LocalWallCell);
@@ -529,9 +532,10 @@ namespace CriticalMass.Runtime.Tests
             if (w.Map.Decorations == null || w.Map.Decorations.Length == 0 || w.Topple == null) Assert.Ignore("no pillars");
             int k = 0;
             DecorationDef d = w.Map.Decorations[k];
+            var rx = new WorldReactions();
+            rx.Read(w, 0.5);
             w.Topple.Hp[k] = (byte)Math.Max(1, w.Topple.Hp[k] - 1);
             World.PushEvent(w, SimEventType.ToppleHit, Me, k, d.Cx + 0.5, d.Cz + 0.5, w.Topple.Hp[k]);
-            var rx = new WorldReactions();
             rx.Read(w, 1);
             Assert.AreEqual(1, rx.Hits);
             var focus = new ProgressFocus();

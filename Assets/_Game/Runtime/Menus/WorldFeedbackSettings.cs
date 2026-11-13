@@ -108,7 +108,7 @@ namespace CriticalMass.Runtime.Menu
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         static void Register()
         {
-            PauseMenu.AddTab(new PauseMenu.ExtraTab { Name = TabName, Build = BuildTab });
+            PauseMenu.AddTab(new PauseMenu.ExtraTab { Name = TabName, Build = BuildTab, Order = 10 });
         }
 
         static bool GetB(string k, bool d) => PlayerPrefs.GetInt(k, d ? 1 : 0) != 0;
