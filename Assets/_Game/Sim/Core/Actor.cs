@@ -50,6 +50,29 @@ namespace CriticalMass.Sim.Core
         // ITEM CM-84: added by its owner (ClassSwitchCd, ClassSwitches)
         /// <summary>CM-20: sim seconds left of the post-respawn get-up; while > 0 the actor ignores input and is never pushed.</summary>
         public double StandUp;
-        // ITEM CM-32: added by its owner (AirLen, AirTick, AirFromX, AirFromZ, AirToX, AirToZ)
+        /// <summary>
+        /// CM-32: length in sim ticks of the current jump, 0 on the ground. Set at takeoff to Jump.AirTicks, or shorter when
+        /// the landing guard (Jump.cs) shortens a jump that would land on a blocked cell. Cleared on landing, death and reset.
+        /// </summary>
+        public int AirLen;
+        /// <summary>CM-32: ticks flown so far, 1..AirLen while airborne (the takeoff step is tick 1), 0 on the ground.</summary>
+        public int AirTick;
+        /// <summary>CM-32: takeoff point (the landing-blocked fallback) and planned landing point of the current jump.</summary>
+        public double AirFromX;
+        public double AirFromZ;
+        public double AirToX;
+        public double AirToZ;
+        /// <summary>
+        /// DG-02 jump buffer (not in the browser): sim ticks a jump press stays wanted, set to Jump.BufferTicks + 1 on a
+        /// press and counted down once per movement step, so a press up to BufferTicks early (landing, getting up, a
+        /// refused takeoff) fires on the first tick it can. 0 = no press pending.
+        /// </summary>
+        public int JumpBuffer;
+        /// <summary>
+        /// DG-02 coyote time (not in the browser): consecutive ticks this grounded actor has stood where its footprint no
+        /// longer fits (the ground was removed or blocked under it). 0 = supported. A jump may start while this is at most
+        /// Jump.CoyoteTicks.
+        /// </summary>
+        public int UnsupportedTicks;
     }
 }

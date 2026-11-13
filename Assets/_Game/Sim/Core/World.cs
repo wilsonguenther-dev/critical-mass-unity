@@ -206,7 +206,14 @@ namespace CriticalMass.Sim.Core
                 PendingClass = null,
                 // ITEM CM-84: added by its owner (ClassSwitchCd = 0, ClassSwitches = 0)
                 StandUp = 0,
-                // ITEM CM-32: added by its owner (AirLen, AirTick, AirFromX, AirFromZ, AirToX, AirToZ = 0)
+                AirLen = 0,
+                AirTick = 0,
+                AirFromX = 0,
+                AirFromZ = 0,
+                AirToX = 0,
+                AirToZ = 0,
+                JumpBuffer = 0,
+                UnsupportedTicks = 0,
             };
         }
 
@@ -449,7 +456,14 @@ namespace CriticalMass.Sim.Core
             a.PendingClass = null;
             // ITEM CM-84: added by its owner (ClassSwitchCd = 0, ClassSwitches = 0)
             a.StandUp = 0;
-            // ITEM CM-32: added by its owner (AirLen, AirTick, AirFromX, AirFromZ, AirToX, AirToZ = 0)
+            a.AirLen = 0;
+            a.AirTick = 0;
+            a.AirFromX = 0;
+            a.AirFromZ = 0;
+            a.AirToX = 0;
+            a.AirToZ = 0;
+            a.JumpBuffer = 0;
+            a.UnsupportedTicks = 0;
         }
 
         private static void ResetInput(InputFrame f)

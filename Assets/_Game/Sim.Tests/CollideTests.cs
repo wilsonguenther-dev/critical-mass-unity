@@ -10,6 +10,17 @@ namespace CriticalMass.Sim.Tests
     [TestFixture]
     public sealed class CollideTests
     {
+        /// <summary>
+        /// DG-02 / CM-33 (D-069 on cm/CM-33): a body standing on a diagonal bridge deck overlaps the VOID notches of the
+        /// cell staircase under the drawn deck by design; that is not a blocked-cell overlap. Walls, water, breakables,
+        /// barricades and the map edge still count (DeckSpanAt is null when any of them touch the body).
+        /// </summary>
+        private static bool OnDeckOverVoid(World w, int i, int cx, int cz)
+        {
+            if (!MapGrid.InBounds(w.Map, cx, cz) || w.Map.Cells[cz * w.Map.Width + cx] != Cell.Void) return false;
+            return Collide.DeckSpanAt(w, w.X[i], w.Z[i], Collide.ActorRadius(w, i)) != null;
+        }
+
         private static World MakeWorld(int seed, int teamSize, ClassId humanClass)
         {
             return World.CreateWorld(new WorldOptions
@@ -160,7 +171,7 @@ namespace CriticalMass.Sim.Tests
                     for (int cz = JsMath.FloorToInt(z - rad); cz <= JsMath.FloorToInt(z + rad) && first.Length == 0; cz++)
                         for (int cx = JsMath.FloorToInt(x - rad); cx <= JsMath.FloorToInt(x + rad) && first.Length == 0; cx++)
                         {
-                            if (MapGrid.IsWalkable(w.Map, cx, cz)) continue;
+                            if (MapGrid.IsWalkable(w.Map, cx, cz) || OnDeckOverVoid(w, i, cx, cz)) continue;
                             double nx = Math.Max(cx, Math.Min(x, cx + 1));
                             double nz = Math.Max(cz, Math.Min(z, cz + 1));
                             if ((x - nx) * (x - nx) + (z - nz) * (z - nz) < rad * rad)
@@ -215,7 +226,7 @@ namespace CriticalMass.Sim.Tests
                         for (int cz = JsMath.FloorToInt(z - rad) - 1; cz <= JsMath.FloorToInt(z + rad) + 1; cz++)
                             for (int cx = JsMath.FloorToInt(x - rad) - 1; cx <= JsMath.FloorToInt(x + rad) + 1; cx++)
                             {
-                                if (MapGrid.IsWalkable(w.Map, cx, cz)) continue;
+                                if (MapGrid.IsWalkable(w.Map, cx, cz) || OnDeckOverVoid(w, i, cx, cz)) continue;
                                 double nx = Math.Max(cx, Math.Min(x, cx + 1));
                                 double nz = Math.Max(cz, Math.Min(z, cz + 1));
                                 double pen = rad - Math.Sqrt((x - nx) * (x - nx) + (z - nz) * (z - nz));

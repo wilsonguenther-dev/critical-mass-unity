@@ -511,9 +511,9 @@ namespace CriticalMass.Editor
             }
             if (hud != null)
             {
-                var land = UnityEngine.Object.FindAnyObjectByType<CriticalMass.Runtime.Hud.Ui.MinimapLand>();
+                RectTransform map = hud.MapArea;
                 Debug.Log($"[CaptureTool] hud canvas {hud.Root.rect.size} scale {hud.Canvas.scaleFactor} for {width}x{height}; " +
-                          $"minimap quads {(land != null ? land.Quads : -1)} rect {(land != null ? land.rectTransform.rect.ToString() : "-")}");
+                          $"minimap tier {hud.MapTier} rect {(map != null ? map.rect.ToString() : "-")}");
             }
             if (uiOnly)
             {
@@ -586,6 +586,7 @@ namespace CriticalMass.Editor
             if (_extra >= HudShots.Length)
             {
                 GameHud.PreviewOverride = null;
+                ShootTopDown(Path.Combine(SessionState.GetString(OutKey, "."), "topdown-minimap-4x.png"), 4);
                 Finish(0);
                 return;
             }
@@ -606,6 +607,7 @@ namespace CriticalMass.Editor
             hud.SnapAnimations = true;
             GameHud.PreviewOverride = OverrideFor(shot.Name);
             TitleScreen title = shot.Name == "title" ? TitleScreen.Show(hud.gameObject, hud) : null;
+            if (title != null) title.Animate(0.65f);   // a fixed point of the idle motion: bob near the top, glow at 75%
             string path = Path.Combine(SessionState.GetString(OutKey, "."), shot.Name + ".png");
             RenderTo(path, shot.W, shot.H, shot.Name == "hud-mask", title);
             if (title != null) title.Hide();
@@ -614,6 +616,51 @@ namespace CriticalMass.Editor
             Debug.Log("[CaptureTool] wrote " + path);
             _extra++;
             _settle = -1;
+        }
+
+        /// <summary>
+        /// The real world straight down (orthographic), turned like the gameplay camera (screen up = camera forward) and
+        /// framed exactly on the baked minimap's rect at the given tier: pixel (i, j) of this PNG and of minimap@{tier}x.png
+        /// show the same ground point.
+        /// </summary>
+        private static void ShootTopDown(string path, int tier)
+        {
+            CriticalMass.Runtime.Hud.Ui.MinimapProjection p = CriticalMass.Runtime.Hud.Ui.MinimapGeometry.Projection;
+            p.ToSim(p.Width * 0.5, p.Height * 0.5, 1, out double cx, out double cz);
+            var go = new GameObject("TopDown Capture Camera");
+            try
+            {
+                var cam = go.AddComponent<UnityEngine.Camera>();
+                cam.orthographic = true;
+                cam.orthographicSize = (float)(p.Height * 0.5 / CriticalMass.Runtime.Hud.Ui.MinimapProjection.PxPerUnit);
+                cam.aspect = (float)p.Width / p.Height;
+                cam.nearClipPlane = 1f;
+                cam.farClipPlane = 600f;
+                cam.cullingMask = ~(1 << 5);
+                cam.clearFlags = CameraClearFlags.SolidColor;
+                cam.backgroundColor = new Color(0.118f, 0.176f, 0.29f, 1f);
+                go.transform.position = SimSpace.ToWorld(cx, 300, cz);
+                go.transform.rotation = Quaternion.Euler(90f, (float)(360 - _driver.Config.Render.CameraYawDeg), 0f);
+                int w = p.Width * tier, h = p.Height * tier;
+                var rt = new RenderTexture(w, h, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB) { antiAliasing = 4 };
+                rt.Create();
+                var req = new RenderPipeline.StandardRequest { destination = rt };
+                if (RenderPipeline.SupportsRenderRequest(cam, req)) RenderPipeline.SubmitRenderRequest(cam, req);
+                else { cam.targetTexture = rt; cam.Render(); cam.targetTexture = null; }
+                RenderTexture prev = RenderTexture.active;
+                RenderTexture.active = rt;
+                var tex = new Texture2D(w, h, TextureFormat.RGB24, false);
+                tex.ReadPixels(new Rect(0, 0, w, h), 0, 0);
+                tex.Apply();
+                RenderTexture.active = prev;
+                File.WriteAllBytes(path, tex.EncodeToPNG());
+                UnityEngine.Object.DestroyImmediate(tex);
+                rt.Release();
+                UnityEngine.Object.DestroyImmediate(rt);
+                Written.Add(path);
+                Debug.Log("[CaptureTool] wrote " + path);
+            }
+            finally { UnityEngine.Object.DestroyImmediate(go); }
         }
 
         private static void WriteManifest((string Name, double X, double Z, double Distance)[] targets)

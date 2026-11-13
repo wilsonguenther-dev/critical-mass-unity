@@ -1,0 +1,137 @@
+{
+  "schema": "cm.lore.announcer/1",
+  "lines": [
+    {
+      "id": "an-01",
+      "trigger": "matchStart",
+      "priority": 2,
+      "text": "Banners up. The hill is open."
+    },
+    {
+      "id": "an-02",
+      "trigger": "hillTaken",
+      "priority": 2,
+      "text": "Hill taken. Now keep it."
+    },
+    {
+      "id": "an-03",
+      "trigger": "hillTakenByEnemy",
+      "priority": 2,
+      "text": "They have the hill. Take it back."
+    },
+    {
+      "id": "an-04",
+      "trigger": "hillLost",
+      "priority": 2,
+      "text": "Hill lost."
+    },
+    {
+      "id": "an-05",
+      "trigger": "hillContested",
+      "priority": 1,
+      "text": "The hill is contested."
+    },
+    {
+      "id": "an-06",
+      "trigger": "finalMinute",
+      "priority": 3,
+      "text": "One minute left. Make it count."
+    },
+    {
+      "id": "an-07",
+      "trigger": "eggSoon",
+      "priority": 3,
+      "text": "The egg is cracking!"
+    },
+    {
+      "id": "an-08",
+      "trigger": "hatchAzure",
+      "priority": 3,
+      "text": "The Kaiju sides with Azure!"
+    },
+    {
+      "id": "an-09",
+      "trigger": "hatchCrimson",
+      "priority": 3,
+      "text": "The Kaiju sides with Crimson!"
+    },
+    {
+      "id": "an-10",
+      "trigger": "hatchNeutral",
+      "priority": 3,
+      "text": "Dead even. The Kaiju sides with nobody."
+    },
+    {
+      "id": "an-11",
+      "trigger": "berserkLocked",
+      "priority": 3,
+      "text": "Too much corruption. That egg is going to hatch angry."
+    },
+    {
+      "id": "an-12",
+      "trigger": "berserkHatch",
+      "priority": 3,
+      "text": "Berserk! It wants everyone."
+    },
+    {
+      "id": "an-13",
+      "trigger": "kaijuKnockedOut",
+      "priority": 3,
+      "text": "The Kaiju is down!"
+    },
+    {
+      "id": "an-14",
+      "trigger": "kaijuRecovers",
+      "priority": 2,
+      "text": "The Kaiju is back up. It remembers."
+    },
+    {
+      "id": "an-15",
+      "trigger": "firstKnockOut",
+      "priority": 1,
+      "text": "First knock-out of the match."
+    },
+    {
+      "id": "an-16",
+      "trigger": "multiKo2",
+      "priority": 1,
+      "text": "Double knock-out!"
+    },
+    {
+      "id": "an-17",
+      "trigger": "multiKo3",
+      "priority": 1,
+      "text": "Triple knock-out!"
+    },
+    {
+      "id": "an-18",
+      "trigger": "multiKo4",
+      "priority": 1,
+      "text": "Four down. Somebody stop them."
+    },
+    {
+      "id": "an-19",
+      "trigger": "victory",
+      "priority": 3,
+      "text": "Victory. The hill is yours."
+    },
+    {
+      "id": "an-20",
+      "trigger": "defeat",
+      "priority": 3,
+      "text": "Defeat. Regroup, and climb again."
+    },
+    {
+      "id": "an-21",
+      "trigger": "draw",
+      "priority": 3,
+      "text": "A draw. The hill will take a rematch."
+    },
+    {
+      "id": "an-22",
+      "trigger": "secretHillAlone",
+      "priority": 1,
+      "text": "Still up there on your own? Respect."
+    }
+  ]
+}

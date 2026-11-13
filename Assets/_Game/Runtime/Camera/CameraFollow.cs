@@ -19,6 +19,10 @@ namespace CriticalMass.Runtime.Camera
         /// <summary>Override target (capture tool, the browser's DIRECTOR.overrideOn); OverrideY is its ground height.</summary>
         public bool Override;
         public double OverrideX, OverrideZ, OverrideY;
+        /// <summary>DG-20 (CameraDirector): a goal offset in sim u (hatch focus, hold-to-look), ignored under Override.</summary>
+        public double ExtraX, ExtraZ;
+        /// <summary>DG-20: drop the cursor look-ahead this frame (hold-to-look already moves the view).</summary>
+        public bool SuppressAim;
     }
 
     /// <summary>
@@ -95,7 +99,7 @@ namespace CriticalMass.Runtime.Camera
 
             double dx = vx * CameraSpring.LookAheadSeconds;
             double dz = vz * CameraSpring.LookAheadSeconds;
-            if (f.HasAim && !f.Override)
+            if (f.HasAim && !f.Override && !f.SuppressAim)
             {
                 dx += (f.AimX - hx) * GameplayCamera.AimLookAheadGain;
                 dz += (f.AimZ - hz) * GameplayCamera.AimLookAheadGain;
@@ -123,8 +127,8 @@ namespace CriticalMass.Runtime.Camera
             }
             else
             {
-                gx = hx + LaX + _upX * screenOffset;
-                gz = hz + LaZ + _upZ * screenOffset;
+                gx = hx + LaX + _upX * screenOffset + f.ExtraX;
+                gz = hz + LaZ + _upZ * screenOffset + f.ExtraZ;
             }
             double tx = Clamp(gx, f.MinX, f.MaxX);
             double tz = Clamp(gz, f.MinZ, f.MaxZ);

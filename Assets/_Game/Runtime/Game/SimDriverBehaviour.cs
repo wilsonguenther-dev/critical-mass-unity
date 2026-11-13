@@ -43,6 +43,12 @@ namespace CriticalMass.Runtime.Game
         /// <summary>min(Time.unscaledDeltaTime, 0.1), for the camera.</summary>
         public double FrameDt { get; private set; }
 
+        /// <summary>
+        /// Raised after every MatchTick.Advance with the world (view effects read the tick's events with an exact tick stamp).
+        /// Subscribers read the world only; they never write it.
+        /// </summary>
+        public event Action<World> Ticked;
+
         private double _dt;
         private double _acc;
         private HumanInputSource _input;
@@ -50,11 +56,23 @@ namespace CriticalMass.Runtime.Game
         private readonly InputFrame _scratch = SimInput.EmptyInput();
         private readonly InputFrame _neutral = SimInput.EmptyInput();
 
+        /// <summary>
+        /// DG-01: the match the next driver to wake creates (GameBootstrap sets it from GameFlow just before adding the
+        /// driver; Awake consumes it). Null = GameConfig defaults (seed 1337, Azure Warrior, 16v16 at the default pace).
+        /// </summary>
+        public static Flow.MatchRequest NextMatch;
+
+        /// <summary>The request this world was created from (null: config defaults).</summary>
+        public Flow.MatchRequest Request { get; private set; }
+
         private void Awake()
         {
             GameConfig cfg = GameConfig.CreateDefault();
             Config = cfg;
-            World = World.CreateWorld(new WorldOptions
+            Flow.MatchRequest req = NextMatch;
+            NextMatch = null;
+            Request = req;
+            World = World.CreateWorld(req != null ? req.ToWorldOptions(cfg) : new WorldOptions
             {
                 Seed = cfg.Seed,
                 TeamSize = cfg.TeamSize,
@@ -62,7 +80,8 @@ namespace CriticalMass.Runtime.Game
                 HumanClass = ClassId.Warrior,
                 Config = cfg,
             });
-            TimeScale = cfg.DefaultSpeed;
+            TimeScale = req != null && req.Pace > 0 ? req.Pace : cfg.DefaultSpeed;
+            if (req != null && req.Backdrop) HumanAutopilot = true;
             if (CaptureMode)
             {
                 HumanAutopilot = true;
@@ -116,6 +135,7 @@ namespace CriticalMass.Runtime.Game
                 _humanFrame.AimZ = double.NaN;
             }
             MatchTick.Advance(World, HumanAutopilot ? null : _humanFrame, _scratch);
+            Ticked?.Invoke(World);
         }
     }
 }

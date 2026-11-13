@@ -14,6 +14,15 @@ namespace CriticalMass.Sim.Bots
         private static readonly ConditionalWeakTable<World, BotsState> States = new ConditionalWeakTable<World, BotsState>();
 
         /// <summary>The bot state for `world`, created on first use and reset when the world restarted or changed size.</summary>
+        /// <summary>
+        /// DG-02: true while actor 0 is on autopilot (FillBotInput was asked for it this tick or the previous one). Looks
+        /// the state up without creating it, so a world no bot ever thought about answers false.
+        /// </summary>
+        public static bool ActorZeroOnAutopilot(World w)
+        {
+            return States.TryGetValue(w, out BotsState st) && BotsState.HumanDriven(st, w);
+        }
+
         public static BotsState GetBotsState(World w)
         {
             BotsState st;

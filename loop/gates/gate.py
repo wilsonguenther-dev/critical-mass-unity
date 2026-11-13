@@ -4,6 +4,9 @@ the real exit code: 0 pass, the tool's own non-zero code on fail, 78 skipped. "s
 that reads exit codes can mistake a skip for a pass. `budgets` exits 0 with status "reported" or "flagged": it never
 fails an item; a flag goes to the architect.
 
+  --project defaults to the worktree the gate is invoked from (cwd's checkout of this repo, else this script's
+  checkout), never the main checkout (DG-05).
+
   gate.py setup          [--project DIR]                    -executeMethod CriticalMass.Editor.ProjectSetup.Apply (U-029)
   gate.py compile        [--project DIR]                    tools/unity-compile.sh
   gate.py editmode       [--project DIR]                    tools/unity-test.sh, category "!Slow" (fails on zero tests)
@@ -256,7 +259,7 @@ def g_build_mac(a):
     outf = save_out('build-mac', out, err)
     log = proj / 'Logs/build-mac.log'
     if code == 0:
-        return emit('build-mac', 'pass', 0, 'Builds/macOS/CriticalMass.app built', log=str(log), out=outf,
+        return emit('build-mac', 'pass', 0, f'{proj}/Builds/macOS/CriticalMass.app built', log=str(log), out=outf,
                     lock_owner=owner)
     errs = cs_errors(log)
     ef = C.LOGS / 'gate-build-mac-errors.txt'
@@ -285,7 +288,7 @@ def g_build_windows(a):
     outf = save_out('build-windows', out, err)
     log = proj / 'Logs/build-windows.log'
     if code == 0:
-        return emit('build-windows', 'pass', 0, 'Builds/Windows/CriticalMass.exe built', log=str(log), out=outf,
+        return emit('build-windows', 'pass', 0, f'{proj}/Builds/Windows/CriticalMass.exe built', log=str(log), out=outf,
                     lock_owner=owner)
     errs = cs_errors(log)
     ef = C.LOGS / 'gate-build-windows-errors.txt'
@@ -376,16 +379,46 @@ def g_budgets(a):
                 measured=meas, limits=limits)
 
 
+def _common_dir(path):
+    """The absolute git common dir of the checkout holding path, or None outside git."""
+    try:
+        out = subprocess.run(['git', '-C', str(path), 'rev-parse', '--path-format=absolute', '--git-common-dir'],
+                             capture_output=True, text=True, check=True).stdout.strip()
+        return Path(out).resolve()
+    except Exception:
+        return None
+
+
+def default_project(cwd=None, repo=None):
+    """DG-05: the checkout a gate runs in when --project is not given. It is the git worktree holding cwd when that
+    worktree belongs to this repository (same git common dir), else the checkout holding this copy of the gates
+    (C.REPO). Never the main checkout by default: before DG-05 the default was C.MAIN, so `loop/gates/build-mac` run
+    from a worktree built in the main checkout."""
+    repo = Path(repo or C.REPO).resolve()
+    cwd = Path(cwd or os.getcwd()).resolve()
+    common = _common_dir(repo)
+    if common is not None and _common_dir(cwd) == common:
+        try:
+            top = subprocess.run(['git', '-C', str(cwd), 'rev-parse', '--show-toplevel'], capture_output=True,
+                                 text=True, check=True).stdout.strip()
+            return Path(top).resolve()
+        except Exception:
+            pass
+    return repo
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument('gate', choices=['setup', 'clean-reimport', 'compile', 'editmode', 'playmode-smoke', 'build-mac', 'build-windows',
                                      'parity', 'scope', 'budgets', 'soak'])
-    ap.add_argument('--project', default=str(C.MAIN))
+    ap.add_argument('--project', default=None, help='default: the worktree invoked from (default_project)')
     ap.add_argument('--item')
     ap.add_argument('--items-dir', default=str(C.ITEMS_DIR))
     ap.add_argument('--ref')
     ap.add_argument('--base', default='origin/main')
     a = ap.parse_args(argv)
+    if a.project is None:
+        a.project = str(default_project())
     if a.gate in ('parity', 'scope') and not a.item:
         ap.error(f'{a.gate} needs --item')
     if a.gate == 'scope' and not a.ref:

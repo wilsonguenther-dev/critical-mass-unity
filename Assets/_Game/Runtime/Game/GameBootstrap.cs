@@ -1,4 +1,5 @@
 using CriticalMass.Runtime.Camera;
+using CriticalMass.Runtime.Flow;
 using CriticalMass.Runtime.Hud;
 using CriticalMass.Runtime.Input;
 using CriticalMass.Runtime.View;
@@ -47,9 +48,12 @@ namespace CriticalMass.Runtime.Game
             // Game root, components in this order.
             var game = new GameObject("Game");
             PlaceInScene(game, scene);
+            // DG-01: the world is created from the flow's request (a new seed per match; the menus' backdrop otherwise).
+            SimDriverBehaviour.NextMatch = GameFlow.RequestForBuild();
             SimDriverBehaviour driver = game.AddComponent<SimDriverBehaviour>();
             game.AddComponent<HumanInputSource>();
             game.AddComponent<ActorViews>();
+            game.AddComponent<CriticalMass.Runtime.View.Effects.CombatFx>();
             game.AddComponent<GridChunkMeshView>();
             DebugHud hud = game.AddComponent<DebugHud>();
             hud.Driver = game.GetComponent<SimDriverBehaviour>();
@@ -79,7 +83,10 @@ namespace CriticalMass.Runtime.Game
             // Bible p15 HUD (2026-11-12) and, in player builds, the p04 title screen over the live match.
             GameHud gameHud = game.AddComponent<GameHud>();
             gameHud.Driver = driver;
-            if (TitleScreen.ShowOnBoot) TitleScreen.Show(game, gameHud);
+            // DG-01 game flow (title, menu, setup, results; the title only in player builds or when forced) and every
+            // [GameOverlay] component registered by later items.
+            FlowDirector.Install(game, driver, gameHud);
+            OverlayRegistry.InstallOverlays(game);
 
             // One directional sun (art direction 2.2): from the screen's upper-left corner, elevation 50 degrees, so it
             // travels 135 degrees clockwise from screen-up (Unity yaw 315 + 135 = 90) and shadows fall to the lower right.

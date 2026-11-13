@@ -65,8 +65,8 @@ namespace CriticalMass.Runtime.Menu
         public const int DefaultFpsCap = 60;
 
         /// <summary>
-        /// Frame-rate limit (cm.fpsCap): 30, 60, 120, or 0 for the display's refresh rate; default 60. Stored only: the
-        /// limiter that applies it is another system's (it reads the key).
+        /// Frame-rate limit (cm.fpsCap): 30, 60, 120, or 0 for the display's refresh rate; default 60. Stored here; FrameGovernor
+        /// applies it (Reapply on save).
         /// </summary>
         public static int FpsCap
         {
@@ -79,11 +79,12 @@ namespace CriticalMass.Runtime.Menu
             {
                 PlayerPrefs.SetInt(FpsCapKey, Array.IndexOf(FpsCapOptions, value) >= 0 ? value : DefaultFpsCap);
                 Save();
+                CriticalMass.Runtime.Game.FrameGovernor.Reapply();
             }
         }
 
         /// <summary>Reduce the frame rate when the game is not the front window (cm.bgThrottle, default on). Stored only.</summary>
-        public static bool BackgroundThrottle { get => GetB(BgThrottleKey, true); set => SetB(BgThrottleKey, value); }
+        public static bool BackgroundThrottle { get => GetB(BgThrottleKey, true); set { SetB(BgThrottleKey, value); CriticalMass.Runtime.Game.FrameGovernor.Reapply(); } }
 
         public static bool FullScreen { get => GetB(FullScreenKey, true); set { SetB(FullScreenKey, value); ApplyVideo(); } }
         public static bool VSync { get => GetB(VSyncKey, true); set { SetB(VSyncKey, value); ApplyVideo(); } }
@@ -186,7 +187,8 @@ namespace CriticalMass.Runtime.Menu
             if (!CanChangeWindow) return;
             int q = Quality;
             if (q >= 0 && q < QualitySettings.names.Length && QualitySettings.GetQualityLevel() != q) QualitySettings.SetQualityLevel(q, true);
-            QualitySettings.vSyncCount = VSync ? 1 : 0;   // after the level: a level change resets vSyncCount
+            // Vertical sync and the frame limit are FrameGovernor's alone (it re-applies them after a level change).
+            CriticalMass.Runtime.Game.FrameGovernor.Reapply();
             Vector2Int r = Resolution;
             int w = r.x > 0 ? r.x : Screen.width, h = r.y > 0 ? r.y : Screen.height;
             FullScreenMode mode = FullScreen ? FullScreenMode.FullScreenWindow : FullScreenMode.Windowed;

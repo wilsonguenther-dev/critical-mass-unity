@@ -1,0 +1,45 @@
+{
+  "schema": "cm.lore.results/1",
+  "results": [
+    {
+      "id": "victory",
+      "title": "VICTORY",
+      "line": "The hill is yours. Someone will paint this banner on a wall.",
+      "reason": "{run:winner} held the hill {run:winnerHillSeconds} s to {run:loserHillSeconds} s."
+    },
+    {
+      "id": "defeat",
+      "title": "DEFEAT",
+      "line": "The hill is theirs, for now. Climb again.",
+      "reason": "{run:winner} held the hill {run:winnerHillSeconds} s to {run:loserHillSeconds} s."
+    },
+    {
+      "id": "draw",
+      "title": "DRAW",
+      "line": "Dead even. The hill will take a rematch.",
+      "reason": "Hill time within {cfg:drawEpsilon} s: {run:azureHillSeconds} s to {run:crimsonHillSeconds} s."
+    }
+  ],
+  "outros": [
+    {
+      "id": "azure",
+      "caption": "The Kaiju stood with Azure.",
+      "reason": "Fed most by Azure: {run:topAllegiance} to {run:otherAllegiance} allegiance."
+    },
+    {
+      "id": "crimson",
+      "caption": "The Kaiju stood with Crimson.",
+      "reason": "Fed most by Crimson: {run:topAllegiance} to {run:otherAllegiance} allegiance."
+    },
+    {
+      "id": "neutral",
+      "caption": "The Kaiju chose no one, and sat down on the hill to think about it.",
+      "reason": "Allegiance tied at the hatch: {run:tiedAllegiance} each."
+    },
+    {
+      "id": "berserk",
+      "caption": "Corruption won. The Kaiju turned on everyone, starting with whoever fed it most.",
+      "reason": "Instability reached {cfg:berserkThreshold} before the hatch."
+    }
+  ]
+}

@@ -38,6 +38,7 @@ namespace CriticalMass.Editor
                 ApplyPlaceholderMaterial();
                 ApplyToonMaterials();
                 ApplyWorldMaterials();
+                Effects.CombatAudioSetup.EnsureMixer();
                 AssetDatabase.SaveAssets();
                 Art.ArtCatalogBuilder.Build();
                 MoveIntoSettings("Assets/UniversalRenderPipelineGlobalSettings.asset");

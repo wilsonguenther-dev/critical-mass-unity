@@ -1,0 +1,33 @@
+{
+  "schema": "cm.lore.story/1",
+  "simHz": 30,
+  "narrator": "Deep, warm and slow, about 125 words a minute: short sentences, a full beat after each, never rushed. The same voice calls the match, read a touch quicker.",
+  "titleVo": "Critical Mass. Hold the hill.",
+  "cards": [
+    {
+      "id": "card-1",
+      "ticks": 150,
+      "caption": "The sky cracked. And the land rose to meet it."
+    },
+    {
+      "id": "card-2",
+      "ticks": 135,
+      "caption": "Two banners. One hill. Neither has learned to share."
+    },
+    {
+      "id": "card-3",
+      "ticks": 150,
+      "caption": "Far away, a Kaiju egg sleeps. It remembers every meal."
+    },
+    {
+      "id": "card-4",
+      "ticks": 165,
+      "caption": "Feed it, and it fights for you. Corrupt it, and it fights everyone."
+    },
+    {
+      "id": "card-5",
+      "ticks": 90,
+      "caption": "Hold the hill. Raise the Kaiju."
+    }
+  ]
+}

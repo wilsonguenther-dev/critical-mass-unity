@@ -1,0 +1,39 @@
+{
+  "schema": "cm.lore.premise/1",
+  "title": "Skybreak Basin",
+  "text": "Long ago the sky cracked, and the land rose with it. Skybreak Basin is what stayed up: floating ruins, mossy stone, waterfalls that fall into cloud, and one hill at the centre where whoever stands on it is heard. Two banners take turns holding it, Azure and Crimson, and neither has learned to share. Far from the hill, in an old shrine, a Kaiju egg sleeps. It does not care who holds the hill; it cares what it is fed. Living biomass makes it loyal to the side that fed it most. Corruption makes it angry at everyone. Warriors hold the line. Farmers bring the harvest in. Miners open the old roads, Demolitions Experts open them faster, and Builders bridge whatever is left. Every step toward the shrine is a step off the hill. When the egg cracks, the Kaiju picks a side, or no side at all.",
+  "loreLines": [
+    {
+      "id": "ll-01",
+      "text": "The Basin floats. Nobody has asked what it floats on, and the Basin prefers it that way."
+    },
+    {
+      "id": "ll-02",
+      "text": "Whoever stands on the hill is heard. Whoever stands on it longest is remembered."
+    },
+    {
+      "id": "ll-03",
+      "text": "The egg was here before the banners. It intends to be here after them."
+    },
+    {
+      "id": "ll-04",
+      "text": "Biomass grows back. Patience, it turns out, does not."
+    },
+    {
+      "id": "ll-05",
+      "text": "The violet growths were not here before the sky cracked. They seem to like it now."
+    },
+    {
+      "id": "ll-06",
+      "text": "Azure fights under the shield. Crimson fights under the flame. Both fight uphill."
+    },
+    {
+      "id": "ll-07",
+      "text": "Every road in the Basin leads to the hill, except the ones the Miners made."
+    },
+    {
+      "id": "ll-08",
+      "text": "A Kaiju never forgets a meal. It is less clear on who served it."
+    }
+  ]
+}

@@ -1,0 +1,130 @@
+{
+  "schema": "cm.lore.tips/1",
+  "tips": [
+    {
+      "id": "tip-01",
+      "text": "Your team scores only while it has more living players on the hill than the enemy.",
+      "needsRule": ""
+    },
+    {
+      "id": "tip-02",
+      "text": "An even hill scores nothing. Bring one more friend than they did.",
+      "needsRule": ""
+    },
+    {
+      "id": "tip-03",
+      "text": "The match ends at {cfg:matchClock}. Most hill time wins. Nothing else counts.",
+      "needsRule": ""
+    },
+    {
+      "id": "tip-04",
+      "text": "The egg hatches at {cfg:hatchClock}. Whatever it was fed by then decides who it fights for.",
+      "needsRule": ""
+    },
+    {
+      "id": "tip-05",
+      "text": "Each biomass delivered is worth {cfg:biomassAllegiance} allegiance. Corruption gives {cfg:corruptionAllegiance}, and costs far more than it pays.",
+      "needsRule": ""
+    },
+    {
+      "id": "tip-06",
+      "text": "Each corruption delivered adds {cfg:corruptionInstability} instability. At {cfg:berserkThreshold}, the egg is lost to berserk for good.",
+      "needsRule": ""
+    },
+    {
+      "id": "tip-07",
+      "text": "Tied allegiance at the hatch leaves the Kaiju neutral. It fights whoever hit it in the last {cfg:kaijuNeutralMemory} s.",
+      "needsRule": ""
+    },
+    {
+      "id": "tip-08",
+      "text": "A berserk Kaiju attacks both sides, but it hunts the bigger biomass feeder harder.",
+      "needsRule": ""
+    },
+    {
+      "id": "tip-09",
+      "text": "Farmers gather in {cfg:farmerGather} s and carry {cfg:farmerCarry}. Everyone else takes {cfg:baseGather} s and carries {cfg:baseCarry}.",
+      "needsRule": ""
+    },
+    {
+      "id": "tip-10",
+      "text": "Root seeds slow every enemy they land on by {cfg:rootSlowPct}% for {cfg:rootSlowSeconds} s. Aim at the hill's edge.",
+      "needsRule": ""
+    },
+    {
+      "id": "tip-11",
+      "text": "A raised Warrior shield takes {cfg:shieldReductionPct}% off hits from the front. Face the trouble, not the exit.",
+      "needsRule": ""
+    },
+    {
+      "id": "tip-12",
+      "text": "Every pick swing knocks a wall down a stage: intact, cracked, gone. Walls are only suggestions to a Miner.",
+      "needsRule": ""
+    },
+    {
+      "id": "tip-13",
+      "text": "A Miner keeps up to {cfg:barricadeMax} barricades standing, {cfg:barricadeLife} s each, unless someone breaks them first.",
+      "needsRule": ""
+    },
+    {
+      "id": "tip-14",
+      "text": "Knocked out? You are back in {cfg:respawnSeconds} s, and nothing can hurt you for {cfg:protectionSeconds} s after.",
+      "needsRule": ""
+    },
+    {
+      "id": "tip-15",
+      "text": "The Kaiju's slam marks the ground {cfg:slamTelegraph} s before it lands. Leave the circle; it reaches {cfg:slamRadius} m.",
+      "needsRule": ""
+    },
+    {
+      "id": "tip-16",
+      "text": "A knocked-out Kaiju sleeps {cfg:kaijuKoSeconds} s, then gets up with full health and a grudge.",
+      "needsRule": ""
+    },
+    {
+      "id": "tip-17",
+      "text": "Biomass plants regrow in {cfg:biomassRegrow} s. Violet corruption growths take {cfg:corruptionRegrow} s.",
+      "needsRule": ""
+    },
+    {
+      "id": "tip-18",
+      "text": "Every step toward the shrine is a step off the hill. Send carriers, not the whole team.",
+      "needsRule": ""
+    },
+    {
+      "id": "tip-19",
+      "text": "Carriers are slow targets with full pockets. Escort yours, and hunt theirs.",
+      "needsRule": ""
+    },
+    {
+      "id": "tip-20",
+      "text": "While you wait to respawn, you can pick a different class.",
+      "needsRule": "DG-10"
+    },
+    {
+      "id": "tip-21",
+      "text": "Jump gaps and ledges to reach routes the crowd ignores.",
+      "needsRule": "DG-02"
+    },
+    {
+      "id": "tip-22",
+      "text": "Stand in your base fountain to heal. Knocked-out enemies drop meat; the egg eats that too.",
+      "needsRule": "DG-16a"
+    },
+    {
+      "id": "tip-23",
+      "text": "Miners dig ground out and place it elsewhere. A new ramp beats a long road.",
+      "needsRule": "DG-09"
+    },
+    {
+      "id": "tip-24",
+      "text": "Demolitions mines are visible to everyone. The trick is where you put them, not hiding them.",
+      "needsRule": "DG-22"
+    },
+    {
+      "id": "tip-25",
+      "text": "Anyone can carry a Builder's ladder or rope bridge, including the enemy. Guard your shortcuts.",
+      "needsRule": "DG-24"
+    }
+  ]
+}
