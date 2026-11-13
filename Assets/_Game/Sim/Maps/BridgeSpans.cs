@@ -22,6 +22,10 @@ namespace CriticalMass.Sim.Maps
         public double H0;
         public double H1;
         public bool Diagonal;
+        /// <summary>Metadata only (no rule reads it): the SkybreakBasinMap.Bridges row this span comes from (0 = B1).</summary>
+        public int Row;
+        /// <summary>Metadata only: true for the mirrored copy (x' = MirrorX - x) of that row.</summary>
+        public bool Mirror;
     }
 
     /// <summary>The span table and its geometry helpers (browser map.ts on cm/CM-33). Pure functions of the map table.</summary>
@@ -54,10 +58,26 @@ namespace CriticalMass.Sim.Maps
                 SkybreakBasinMap.Bridge b = rows[k];
                 double h0 = SkybreakBasinMap.EndpointHeight(b.X0, b.Z0);
                 double h1 = SkybreakBasinMap.EndpointHeight(b.X1, b.Z1);
-                output.Add(MakeSpan(b.X0, b.Z0, b.X1, b.Z1, h0, h1));
-                if (b.Mirror) output.Add(MakeSpan(SkybreakBasinMap.MirrorX - b.X0, b.Z0, SkybreakBasinMap.MirrorX - b.X1, b.Z1, h0, h1));
+                BridgeSpan own = MakeSpan(b.X0, b.Z0, b.X1, b.Z1, h0, h1);
+                own.Row = k;
+                output.Add(own);
+                if (!b.Mirror) continue;
+                BridgeSpan mirror = MakeSpan(SkybreakBasinMap.MirrorX - b.X0, b.Z0, SkybreakBasinMap.MirrorX - b.X1, b.Z1, h0, h1);
+                mirror.Row = k;
+                mirror.Mirror = true;
+                output.Add(mirror);
             }
             return Array.AsReadOnly(output.ToArray());
+        }
+
+        /// <summary>
+        /// The map's name for span index i of All: "B3" for the Bridges row B3, "B3 mirror" for its Crimson-side copy (the
+        /// index is NOT the bridge number: All[4] is B3, because every mirrored row adds two spans).
+        /// </summary>
+        public static string Name(int i)
+        {
+            BridgeSpan s = All[i];
+            return "B" + (s.Row + 1) + (s.Mirror ? " mirror" : "");
         }
 
         private static IReadOnlyList<BridgeSpan> Filter(IReadOnlyList<BridgeSpan> all)
