@@ -156,7 +156,7 @@ namespace CriticalMass.Sim.Core
             byte[] cells = nav.Clear.Cells;
             int width = map.Width;
             int height = map.Height;
-            double r = w.Config.Kaiju.GridRadius;
+            double r = GridR(w);
             for (int cz = 0; cz < height; cz++)
                 for (int cx = 0; cx < width; cx++) cells[cz * width + cx] = MapGrid.ClearanceOk(map, cx, cz, r) ? Cell.Floor : Cell.Wall;
             nav.ClearGridVersion = w.GridVersion;

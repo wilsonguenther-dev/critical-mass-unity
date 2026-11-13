@@ -74,8 +74,8 @@ namespace CriticalMass.Sim.Config
         // ---- DG-85 / OD-8 slam
         /// <summary>Slam damage: full inside SlamFullRadiusShare x R, falling linearly to SlamEdgeDamageShare at R.</summary>
         public bool SlamShockwave = true;
-        public double SlamFullRadiusShare = 0.3;
-        public double SlamEdgeDamageShare = 0.4;
+        public double SlamFullRadiusShare = 0.35; // 1.75 u: anyone touching the solid body (1.3 + r) takes the full slam
+        public double SlamEdgeDamageShare = 0.38;
         /// <summary>An actor in the air on the resolve tick takes no slam damage and no push.</summary>
         public bool AirDodgesSlam = true;
 

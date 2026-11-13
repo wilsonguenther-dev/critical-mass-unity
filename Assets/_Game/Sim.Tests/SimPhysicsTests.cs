@@ -676,7 +676,7 @@ namespace CriticalMass.Sim.Tests
         [Test]
         public void DG85FullDamageAtTheCentreLessAtTheEdgeAndMorePushAtTheCentre()
         {
-            World w = Make();
+            World w = Make(c => c.Physics.SolidKaiju = false); // d = 1 is inside the solid body: the list's check runs without it
             HatchedKaiju(w);
             ParkOthers(w, 5, 6);
             Place(w, 5, HillX + 1, HillZ);
@@ -684,6 +684,7 @@ namespace CriticalMass.Sim.Tests
             double h5 = w.Actors[5].Hp, h6 = w.Actors[6].Hp;
             SlamNow(w, HillX, HillZ);
             Assert.AreEqual(45, h5 - w.Actors[5].Hp, 1e-9, "d = 1");
+            Assert.AreEqual(45 * 0.38, w.Config.Kaiju.SlamDamage * w.Config.Physics.SlamEdgeDamageShare, 1e-9);
             Assert.LessOrEqual(h6 - w.Actors[6].Hp, 22, "d = 4.5");
             Assert.Greater(h6 - w.Actors[6].Hp, 0);
             for (int t = 0; t < 30; t++) { Idle(w); SimStep.Step(w); }
@@ -691,6 +692,18 @@ namespace CriticalMass.Sim.Tests
             double push6 = (HillX - 4.5) - w.X[6];
             Assert.Greater(push5, push6, "outward push at d = 1 beats d = 4.5");
             Assert.Greater(push6, 0);
+        }
+
+        [Test]
+        public void DG85WithTheSolidBodyAFighterTouchingItTakesTheFullSlam()
+        {
+            World w = Make();
+            HatchedKaiju(w);
+            ParkOthers(w, 2);
+            Place(w, 2, HillX + 1.7, HillZ);
+            double h = w.Actors[2].Hp;
+            SlamNow(w, HillX, HillZ);
+            Assert.AreEqual(45, h - w.Actors[2].Hp, 1e-9);
         }
 
         [Test]
@@ -723,6 +736,71 @@ namespace CriticalMass.Sim.Tests
             World w = World.CreateWorld(new WorldOptions { Seed = 1, TeamSize = 16, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = c });
             Assert.GreaterOrEqual(Durations.OnScreen(c, w.Dur.SlamTelegraph, 2), 0.8 - 1e-9);
             Assert.AreEqual(36, Make().Dur.SlamTelegraph, "pace 1: the 1.2 s sim telegraph is already longer");
+        }
+        // ------------------------------------------------------------------ DG-86 the Kaiju is solid
+
+        [Test]
+        public void DG86AnActorPlaced05FromTheKaijuCentreIsOutsideItsBodyAfterOneTick()
+        {
+            World w = Make();
+            Kaiju k = HatchedKaiju(w);
+            ParkOthers(w, 2);
+            Place(w, 2, HillX + 0.5, HillZ);
+            int head = w.EventHead;
+            Idle(w);
+            SimStep.Step(w);
+            double d = Math.Sqrt((w.X[2] - k.X) * (w.X[2] - k.X) + (w.Z[2] - k.Z) * (w.Z[2] - k.Z));
+            Assert.GreaterOrEqual(d, w.Config.Physics.KaijuBodyRadius + w.Config.Class(ClassId.Farmer).Radius - 1e-3);
+            Assert.AreEqual(1, Events(w, SimEventType.BodyShove, head).Count);
+            Assert.AreEqual(w.Actors[2].MaxHp, w.Actors[2].Hp, "no trample damage");
+        }
+
+        /// <summary>True when the Kaiju's wall collider circle overlaps no blocked cell.</summary>
+        internal static bool KaijuClearOfWalls(World w)
+        {
+            Kaiju k = w.Kaiju;
+            double r = Kaiju.GridR(w) - 1e-3;
+            for (int cz = JsMath.FloorToInt(k.Z - r); cz <= JsMath.FloorToInt(k.Z + r); cz++)
+            {
+                for (int cx = JsMath.FloorToInt(k.X - r); cx <= JsMath.FloorToInt(k.X + r); cx++)
+                {
+                    if (MapGrid.IsWalkable(w.Map, cx, cz)) continue;
+                    double nx = Math.Max(cx, Math.Min(k.X, cx + 1));
+                    double nz = Math.Max(cz, Math.Min(k.Z, cz + 1));
+                    if ((k.X - nx) * (k.X - nx) + (k.Z - nz) * (k.Z - nz) < r * r) return false;
+                }
+            }
+            return true;
+        }
+
+        [Test]
+        public void DG86Soak1800TicksNoLivingActorInsideTheKaijuBodyAndItsColliderNeverOverAWall()
+        {
+            GameConfig cfg = GameConfig.CreateBrowser5v5();
+            World w = World.CreateWorld(new WorldOptions { Seed = 21, TeamSize = 16, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = cfg });
+            InputFrame scratch = SimInput.EmptyInput();
+            w.ForceHatch = true;
+            MatchTick.Advance(w, null, scratch);
+            w.Kaiju.State = KaijuState.Berserk;
+            double body = cfg.Physics.KaijuBodyRadius;
+            int worst = 0;
+            for (int t = 0; t < 1800 && w.Match.Phase != MatchPhase.Ended; t++)
+            {
+                MatchTick.Advance(w, null, scratch);
+                Kaiju k = w.Kaiju;
+                for (int i = 0; i < w.ActorCount; i++)
+                {
+                    if (!w.Actors[i].Alive || w.Actors[i].AirLen > 0) continue;
+                    double dx = w.X[i] - k.X, dz = w.Z[i] - k.Z;
+                    if (dx * dx + dz * dz < body * body)
+                    {
+                        worst++;
+                        Console.WriteLine("inside: t " + t + " id " + i + " d " + Math.Sqrt(dx * dx + dz * dz) + " standUp " + w.Actors[i].StandUp + " k " + k.X + "," + k.Z + " a " + w.X[i] + "," + w.Z[i] + " ko " + k.KoIn);
+                    }
+                }
+                Assert.IsTrue(KaijuClearOfWalls(w), "tick " + t + " kaiju at " + k.X + "," + k.Z);
+            }
+            Assert.AreEqual(0, worst, "living actor centres inside the Kaiju body");
         }
     }
 }

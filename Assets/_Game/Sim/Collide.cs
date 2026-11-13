@@ -402,8 +402,80 @@ namespace CriticalMass.Sim.Core
             z = pz;
         }
 
+        /// <summary>
+        /// DG-86 (S5, OD-5): the hatched Kaiju is an immovable disc of PhysicsConfig.KaijuBodyRadius. Every living, grounded
+        /// actor overlapping it is pushed straight out through MoveActor (walls stop it); one pinned against a wall slides
+        /// round the body instead. No trample damage. One BodyShove event per tick that shoved anyone.
+        /// </summary>
+        public static void KaijuBody(World w)
+        {
+            Kaiju k = w.Kaiju;
+            if (k.State == KaijuState.Egg || !Phys.On(w, w.Config.Physics.SolidKaiju)) return;
+            double body = w.Config.Physics.KaijuBodyRadius;
+            int shoved = 0;
+            double most = 0;
+            for (int i = 0; i < w.ActorCount; i++)
+            {
+                Actor a = w.Actors[i];
+                if (!a.Alive || a.AirLen > 0) continue;
+                double rr = body + ActorRadius(w, i);
+                double dx = w.X[i] - k.X;
+                double dz = w.Z[i] - k.Z;
+                double d2 = dx * dx + dz * dz;
+                if (d2 >= rr * rr) continue;
+                double d = Math.Sqrt(d2);
+                double ux;
+                double uz;
+                if (d < 1e-6)
+                {
+                    ux = -JsMath.Cos(k.Facing);
+                    uz = -JsMath.Sin(k.Facing);
+                }
+                else
+                {
+                    ux = dx / d;
+                    uz = dz / d;
+                }
+                double push = rr - d;
+                double x0 = w.X[i];
+                double z0 = w.Z[i];
+                MoveActor(w, i, ux * push, uz * push);
+                double ex = w.X[i] - k.X;
+                double ez = w.Z[i] - k.Z;
+                if (ex * ex + ez * ez < (rr - 0.05) * (rr - 0.05))
+                {
+                    // Pinned against a wall: slide round the body (the tangent closer to its own motion, else counter-clockwise).
+                    double side = w.Vx[i] * -uz + w.Vz[i] * ux >= 0 ? 1 : -1;
+                    MoveActor(w, i, -uz * side * push * 1.5, ux * side * push * 1.5);
+                    ex = w.X[i] - k.X;
+                    ez = w.Z[i] - k.Z;
+                    double e2 = ex * ex + ez * ez;
+                    if (e2 < (rr - 0.05) * (rr - 0.05))
+                    {
+                        // Still wedged (a wall on both sides): the body gives way by the rest, through its own wall collider.
+                        double e = Math.Sqrt(e2);
+                        double vx = e > 1e-6 ? ex / e : ux;
+                        double vz = e > 1e-6 ? ez / e : uz;
+                        Kaiju.ShoveKaiju(w, -vx * (rr - e), -vz * (rr - e));
+                    }
+                }
+                double moved = Math.Sqrt((w.X[i] - x0) * (w.X[i] - x0) + (w.Z[i] - z0) * (w.Z[i] - z0));
+                if (moved > most) most = moved;
+                shoved++;
+            }
+            if (shoved > 0)
+                World.PushEvent(w, SimEventType.BodyShove, Damage.KaijuSource, -1, k.X, k.Z, shoved, null, DamageCause.None, body,
+                    JsMath.Cos(k.Facing), JsMath.Sin(k.Facing), most, 0, 0, 0);
+        }
+
         /// <summary>Soft actor-actor separation after all moves: each overlapping living pair is pushed apart through MoveActor.</summary>
         public static void SeparateActors(World w)
+        {
+            SeparatePairs(w);
+            KaijuBody(w); // DG-86
+        }
+
+        private static void SeparatePairs(World w)
         {
             int n = w.ActorCount;
             SpatialHash.Rebuild(w.Hash, w.X, w.Z, w.Actors, n);

@@ -7,6 +7,12 @@ namespace CriticalMass.Sim.Core
     /// <summary>Kaiju behaviour (browser kaiju.ts lines 263-543): slam, melee, grid collider, pathing, kaijuSystem.</summary>
     public sealed partial class Kaiju
     {
+        /// <summary>DG-86: the Kaiju's wall collider: PhysicsConfig.KaijuGridRadius while SolidKaiju (its body no longer sinks into walls), else KaijuConfig.GridRadius.</summary>
+        public static double GridR(World w)
+        {
+            return Phys.On(w, w.Config.Physics.SolidKaiju) ? w.Config.Physics.KaijuGridRadius : w.Config.Kaiju.GridRadius;
+        }
+
         /// <summary>Hostile, living, unprotected actors within `r` of (x, z).</summary>
         private static int CountHostilesWithin(World w, double x, double z, double r)
         {
@@ -155,7 +161,7 @@ namespace CriticalMass.Sim.Core
         {
             Kaiju k = w.Kaiju;
             MapDef map = w.Map;
-            double r = w.Config.Kaiju.GridRadius;
+            double r = GridR(w);
             double r2 = r * r;
             for (int iter = 0; iter < 4; iter++)
             {
@@ -206,7 +212,7 @@ namespace CriticalMass.Sim.Core
         {
             Kaiju k = w.Kaiju;
             BoundsDef b = w.Map.Bounds;
-            double r = w.Config.Kaiju.GridRadius;
+            double r = GridR(w);
             if (k.X < b.MinX + r) k.X = b.MinX + r;
             else if (k.X > b.MaxX - r) k.X = b.MaxX - r;
             if (k.Z < b.MinZ + r) k.Z = b.MinZ + r;
@@ -228,6 +234,12 @@ namespace CriticalMass.Sim.Core
                 ResolveCircle(w);
                 ClampToBounds(w);
             }
+        }
+
+        /// <summary>DG-86: move the Kaiju by (dx, dz) through its wall collider (a fighter wedged against a wall holds it back).</summary>
+        internal static void ShoveKaiju(World w, double dx, double dz)
+        {
+            MoveKaiju(w, dx, dz);
         }
 
         /// <summary>Walk toward (gx, gz) over the clearance flow field at kaiju.moveSpeed.</summary>
