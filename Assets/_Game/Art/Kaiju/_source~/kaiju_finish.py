@@ -77,7 +77,7 @@ DEFAULTS = {
     "boulder": {"top": 0.20, "ao": 0.34, "ao_dist": 0.16, "edge": 0.16, "chips": 0.22, "crack": 0.20, "strata": 0.05},
     "hide":    {"top": 0.12, "ao": 0.20, "ao_dist": 0.12, "edge": 0.00, "mottle": 0.07, "mottle_size": 0.16},
     "scales":  {"top": 0.10, "ao": 0.20, "ao_dist": 0.10, "edge": 0.06, "mottle": 0.12, "mottle_size": 0.07},
-    "belly":   {"top": 0.16, "ao": 0.28, "ao_dist": 0.12, "edge": 0.10, "groove": 0.10},
+    "belly":   {"top": 0.28, "ao": 0.28, "ao_dist": 0.12, "edge": 0.10, "groove": 0.10},
     "moss":    {"top": 0.22, "ao": 0.22, "ao_dist": 0.10, "edge": 0.00, "speckle": 0.08},
     "horn":    {"top": 0.26, "ao": 0.14, "ao_dist": 0.06, "edge": 0.08, "hot": 0.20, "rim": 0.0},
     "vein":    {},
@@ -213,7 +213,7 @@ def painted_finish(bm, col, kind, lco=None, skip=None, seed=606, params=None, sc
 
 
 # ------------------------------------------------------------------------------------------------ Kaiju v4 entry
-SLOT_KIND = {"Slate": "boulder", "SlateLight": "boulder", "Skin": "hide", "Moss": "moss", "Belly": "belly",
+SLOT_KIND = {"Slate": "boulder", "SlateLight": "boulder", "StoneGrey": "boulder", "Skin": "hide", "Moss": "moss", "Belly": "belly",
              "Teeth": "horn", "Hide": "hide", "Tongue": "other", "Eye": "other", "Pupil": "other", "Mouth": "other", "Telegraph": "other"}
 
 

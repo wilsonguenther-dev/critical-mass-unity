@@ -25,7 +25,7 @@ import numpy as np
 
 SIZE = 512
 ADULT_RECT = (0.0, 3.17, 1.08, 0.54)      # cx, cz, hw, hh; build_kaiju.adult_params re-centres it on the v4 head
-HATCH_RECT = (0.0, 1.70, 0.80, 0.40)      # hatch_params
+HATCH_RECT = (0.0, 1.72, 0.92, 0.46)      # hatch_params (v4: larger, so no head triangle under the eyes or brows straddles the rect edge and loses its paint)
 ADULT_DROP = 0.07
 ADULT_SCALE = 1.1                # the adult face is authored at 1.0 and painted this much larger
 HALF = {"Adult": 0.5, "Hatchling": 0.0}
@@ -190,7 +190,7 @@ def brow(cv, ex, ez, r, s, inner_dz, outer_dz, lift, thick=0.42):
     cv.over(cv.stroke([pi, pm, po], [thick * r * 1.1 + 0.03, thick * r * 1.25 + 0.03, thick * r * 0.8 + 0.03]), NAVY)
     cv.over(cv.stroke([pi, pm, po], [thick * r * 1.1, thick * r * 1.25, thick * r * 0.8]), BROW)
     up = 0.1 * r
-    cv.over(cv.stroke([(pi[0], pi[1] + up), (pm[0], pm[1] + up * 1.3), (po[0], po[1] + up)], [0.1 * r, 0.14 * r, 0.08 * r]),
+    cv.over(cv.stroke([(pi[0], pi[1] + up), (pm[0], pm[1] + up * 1.3), (po[0], po[1] + up)], [0.15 * r, 0.2 * r, 0.12 * r]),
             BROW_LIGHT)
 
 
@@ -325,7 +325,7 @@ def paint_hatchling(cv, state):
     B = {"Neutral": (0.1, 0.0, 1.42), "Blink": (0.1, 0.0, 1.38), "Happy": (0.1, 0.0, 1.45), "Angry": (-0.45, 0.35, 1.2),
          "Berserk": (-0.55, 0.5, 1.22), "Hurt": (0.45, -0.3, 1.3), "Sleepy": (0.0, -0.15, 1.15)}[state]
     for s in (1, -1):
-        brow(cv, 0.24 * s, 1.835, 0.112, s, *B, thick=0.24)
+        brow(cv, 0.24 * s, 1.835, 0.112, s, *B, thick=0.18)
     if state in ("Neutral", "Happy", "Blink"):
         open_mouth(cv, 0.0, 1.60, 0.30, 0.16, teeth_top=2, lip=0.02)
     elif state == "Angry":

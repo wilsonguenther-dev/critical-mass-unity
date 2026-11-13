@@ -43,7 +43,7 @@ TRI_CAP = {"Egg": 4000, "Hatchling": 10000, "Adult": 15000}
 # Silhouette tunables fitted against the bible crops with iou_map.py (KJ_TUNE='{"sh_x": 1.05}' overrides one run;
 # the committed defaults below are the fitted values, so a plain run rebuilds the committed asset).
 TUNE = {"sh_x": 1.12, "fist_x": 1.68, "fist_r": 0.64, "crown_k": 1.05, "fan_k": 1.2, "head_dy": -0.25, "head_dz": -0.2,
-        "hip_z": 1.38, "thigh_x": 0.68, "fist_y": -0.8, "tail_k": 0.6, "arm_k": 1.38, "cry_k": 1.12, "rock_k": 1.18, "facets": 11, "crack_k": 1.27, "rim_k": 2.2, "moss_k": 0.6, "rim_d": 0.09,
+        "hip_z": 1.38, "thigh_x": 0.68, "fist_y": -0.8, "tail_k": 0.6, "arm_k": 1.38, "cry_k": 1.12, "rock_k": 1.18, "facets": 11, "crack_k": 1.27, "rim_k": 2.2, "moss_k": 0.6, "rim_d": 0.085,
         "round": 0.24, "seg2_r": 0.58, "core": 0.66, "head_up": -12.0}
 TUNE.update(json.loads(os.environ.get("KJ_TUNE", "{}")))
 
@@ -1072,9 +1072,9 @@ def creature_clips(stage="Adult"):
         r = _clamp01((t - 0.55) / 0.45)
         q = math.sin(math.pi * r) * (1 - 0.5 * r)
         rot = windup_pose(1 - s, arc_back=False)
-        for b, add in (("Spine", 10 * s + 5 * q), ("Chest", 10 * s + 5 * q), ("Head", 4 * s + 9 * q)):
+        for b, add in (("Spine", 10 * s + 3 * q), ("Chest", 10 * s + 3 * q), ("Head", 4 * s + 9 * q)):
             rot[b] = rot.get(b, []) + [(X, add)]
-        rot["Arm_R"] = rot["Arm_R"] + [(X, -12 * s)]          # keeps the fist on the ground, not under it
+        rot["Arm_R"] = rot["Arm_R"] + [(X, -46 * s)]     # the arm stops where the fist meets the ground IN FRONT (it used to drag back under the body)
         rot["Jaw"] = [(X, 12 + 10 * s + 8 * q)]
         rot["Tail1"] = [(X, -16 * q)]
         rot["Tail2"] = [(X, -12 * q)]
@@ -1304,7 +1304,7 @@ def creature_v3(name, P, target_h, geo, bm, bvh, rng, Hc, RH, face_zone, decal_z
             return s
         q = np.einsum("kij,kj->ki", RT, np.array(tuple(c)) - RC) / RS
         d = np.sort(np.sqrt((q * q).sum(1)))
-        return "Glow" if d[1] < P["crack_k"] else "Skin"
+        return "Glow" if (d[1] < P["crack_k"] and c.z > P.get("glow_min_z", -1.0)) else "Skin"
 
     add_body(geo, bm, slot3, lambda c, n: True, decal_zone)
     for b in BL:
@@ -1414,7 +1414,7 @@ def head_v4(geo, rng, Hc, RH):
             shade=[1.0 + 0.10 * (v.z - Hc.z) / rz + 0.05 * max(0.0, -(v.y - Hc.y) / ry) for v in V])   # painted top light, lighter face
     # lower jaw (Jaw bone): chunky tan underbite
     # (the jaw's top sits BELOW the painted mouth, so the paint is never hidden from the front or from above)
-    ellipsoid(geo, Hc + Vector((0, -0.16, -0.68)), 1.0, (0.60, 0.52, 0.16), "Belly", bone="Jaw", seg=14, rings=7)
+    ellipsoid(geo, Hc + Vector((0, -0.16, -0.70)), 1.0, (0.60, 0.52, 0.20), "Belly", bone="Jaw", seg=14, rings=7)
     for sx in (1, -1):         # two fat tusks standing on the jaw rim, up to the painted mouth corners
         ellipsoid(geo, Hc + Vector((sx * 0.37, -0.61, -0.50)), 1.0, (0.10, 0.09, 0.15), "Teeth", bone="Jaw", seg=8, rings=5)
     ellipsoid(geo, Hc + Vector((0, -0.16, -0.56)), 1.0, (0.42, 0.30, 0.10), "Mouth", bone="Head", seg=10, rings=5)
@@ -1507,16 +1507,17 @@ def adult_params():
             add((sx * (SX + 0.18), -0.64, 1.94), (0.5, 0.48, 0.46), "Arm" + sf, up=(sx * 0.6, -0.3, 0.6))
             # forearm column: elbow block (moss on top), a big mid block (pale on one arm), an inner block
             add((sx * (MX + 0.02), MY - 0.04, 1.5), (0.55, 0.52, 0.44), "Forearm" + sf, moss=0.55, up=(sx * 0.2, -0.4, 1))
-            add((sx * (FX - 0.05), FY + 0.0, 1.04), (0.55, 0.52, 0.4), "Forearm" + sf, up=(sx * 0.15, -0.7, 0.7))
+            add((sx * (FX - 0.05), FY + 0.0, 1.04), (0.55, 0.52, 0.4), "Forearm" + sf, up=(sx * 0.15, -0.7, 0.7),
+                slot="StoneGrey")
             add((sx * (MX - 0.24), MY + 0.22, 1.12), (0.38, 0.38, 0.36), "Forearm" + sf, up=(-sx * 0.6, 0.2, 0.6))
             # fist: a big pale front boulder, an outer boulder, three knuckles on the ground
-            add((sx * FX, FY - 0.14, 0.58), (0.6, 0.54, 0.56), "Fist" + sf, slot="SlateLight",
+            add((sx * FX, FY - 0.14, 0.6), (0.56, 0.5, 0.5), "Fist" + sf, slot="SlateLight",
                 up=(0, -0.8, 0.6))
             # v4: a filler mass between torso and upper arm (the bible's arm has no daylight)
             add((sx * (SX - 0.2), -0.72, 1.78), (0.36, 0.36, 0.4), "Arm" + sf, up=(-sx * 0.5, -0.4, 0.6))
             add((sx * (FX + 0.22), FY + 0.16, 0.5), (0.4, 0.4, 0.42), "Fist" + sf, up=(sx * 1, 0, 0.4))
             for dx in (-0.3, 0.0, 0.3):
-                add((sx * (FX + dx), FY - 0.46, 0.17), (0.19, 0.17, 0.17), "Fist" + sf, n=12, rim=False, up=(0, -0.5, 1))
+                add((sx * (FX + dx), FY - 0.48, 0.2), (0.25, 0.22, 0.2), "Fist" + sf, n=12, rim=False, up=(0, -0.5, 1))
             # hind leg: thigh, foot block, toes
             add((sx * (THX + 0.06), 1.05, 1.12), (0.42, 0.44, 0.42), "Thigh" + sf, moss=0.5)
             add((sx * (THX + 0.08), 0.9, 0.48), (0.4, 0.44, 0.34), "Foot" + sf, up=(0, -0.5, 1),
@@ -1602,7 +1603,7 @@ def adult_params():
         "unit": U, "balls": balls, "limbs": limbs, "voxel": 0.05, "body_tris": 2200, "bones": bones,
         "gap": 0.024, "crack_w": 0.02, "chamfer_m": 0.05, "design_h": 4.2,
         "head": HEADC, "head_r": 0.6, "muzzle": (0, HEADC[1] - 0.5, HEADC[2] - 0.3), "head_clear": 1.12, "belly": belly, "dmin": dmin,
-        "head_v4": True,
+        "head_v4": True, "glow_min_z": 0.8,     # no flat glow patches low between the legs (fit tool: extra cyan at 10-20 %)
         "samples": 16000, "plate_r": 1.0, "plate_thick": 0.4, "light_frac": light_frac, "moss": moss, "min_plate_z": 0.15,
         "belly_tiles": belly_tiles, "fist": (FX, FY, 0.52), "fist_plate_z": 0.85, "fist_plate_r": 0.44 * FR / 0.6,
         "knuckles": (-0.33, -0.11, 0.11, 0.33), "knuckle_fwd": 0.42, "knuckle_r": 0.15,
@@ -1712,7 +1713,7 @@ def hatch_params():
              (1.05, 0.42, 1), (1.4, 0.32, 0), (1.75, 0.3, 0), (2.05, 0.28, 0)]
     fans = [(0.24, 18, 0.82), (0.48, 36, 0.64)]
     face = face_kit(eye_r=0.15, eye_off={"x": 0.24, "y": -0.43, "z": 0.1, "muzzle": (0, -0.4, -0.16),
-                                         "nose_fwd": 0.3, "nose_up": 0.1, "jaw": (0, -0.04, -0.2),
+                                         "nose_fwd": 0.3, "nose_up": 0.03, "jaw": (0, -0.04, -0.2),
                                          "jaw_size": (0.24, 0.2, 0.08)},
                     brow=None, smile=(0.18, 0.31, -0.07, 0.07, 0.0), open_jaw=6, teeth=0)
     belly_tiles = [(x, z, 0.16, 0.09) for z in (1.2, 1.0, 0.8, 0.6) for x in (-0.17, 0.17)]
@@ -1727,7 +1728,7 @@ def hatch_params():
         "face": face, "crown": crown, "fans": fans, "crown_lean": 8.0, "crystal_r": 0.18,
         "spikes": [(0.62, 0.25, 0.26), (-0.62, -0.1, 0.26)],
         "tail_tip": ((0.2, 2.4, 0.25), (0.3, 0.6, 0.6), 0.4),
-        "boulders": boulders, "crystals": crystals, "crack_k": TUNE["crack_k"], "rim_d": TUNE["rim_d"] * 0.6,
+        "boulders": boulders, "crystals": crystals, "crack_k": TUNE["crack_k"] * 0.85, "rim_d": TUNE["rim_d"] * 0.6,
     }
 
 
