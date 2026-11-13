@@ -286,6 +286,7 @@ namespace CriticalMass.Runtime.View.Anim
             }
             if (flinch > 0f && m.HasClip(ArtMapping.Flinch)) m.Pose(ArtMapping.Flinch, fl, flinch * 0.6f, false);
             Dominant = dom;
+            _lockWalkW = walkW;
             bool wrote = m.Evaluate(true);
 
             if (_roarSoundPending)
@@ -295,6 +296,7 @@ namespace CriticalMass.Runtime.View.Anim
             }
 
             if (wrote) Procedural(m, w, k, dSim, flinch, isHatchling, drawn);
+            if (wrote) LockFeet(m, dSim);
 
             // Footfalls on the measured contacts of the Walk clip (the force bus makes the shake, dust and thud).
             float walkLen = m.ClipLength(ArtMapping.Walk);
@@ -322,6 +324,9 @@ namespace CriticalMass.Runtime.View.Anim
             _teleTotal = _lastTeleIn = 0;
             _lastWindup = _windupLen = 0;
             _lastHp = double.NaN;
+            _pinned[0] = _pinned[1] = false;
+            _pinW[0] = _pinW[1] = 0f;
+            _lockModel = null;
             _lastKo = 0;
             _lastState = KaijuState.Egg;
             _roarPending = _roarSoundPending = false;
@@ -343,6 +348,52 @@ namespace CriticalMass.Runtime.View.Anim
         /// Secondary motion on the evaluated pose (the graph rewrites every bone each frame, so nothing accumulates): the
         /// tail lags the turn, the neck and head look toward the target, a hit jerks the head back.
         /// </summary>
+        // ---- foot locking (fix/kaiju-alive-1, CI run 43493373067): the Kaiju's Walk is a heavy stomp whose planted foot
+        // barely sweeps back (the slide read ~1.0 u/u at every playback rate: the planted foot travelled with the body).
+        // The weight-bearing foot is pinned where it landed: its thigh is aimed at the pin (the rig's leg is Thigh -> Foot,
+        // one bone, so an aim is the whole IK), the correction capped at MaxLockDeg; it releases when the foot lifts or the
+        // pin falls behind by more than a stride, and fades out over LockFade so the swing does not pop.
+        public const float MaxLockDeg = 40f, LockFade = 0.12f;
+        readonly Vector3[] _pin = new Vector3[2];
+        readonly bool[] _pinned = new bool[2];
+        readonly float[] _pinW = new float[2];
+        readonly Quaternion[] _lastFix = { Quaternion.identity, Quaternion.identity };
+        ModelView _lockModel;
+        float _lockWalkW;
+
+        void LockFeet(ModelView m, double dSim)
+        {
+            if (_lockModel != m) { _lockModel = m; _pinned[0] = _pinned[1] = false; _pinW[0] = _pinW[1] = 0f; }
+            Transform tl = m.Bone("Thigh_L"), tr = m.Bone("Thigh_R"), fl = m.Bone("Foot_L"), fr = m.Bone("Foot_R");
+            if (tl == null || tr == null || fl == null || fr == null) return;
+            float rootY = m.Transform.position.y;
+            ModelSpec spec = m.Spec;
+            float h = (spec != null && spec.Height > 0 ? spec.Height : 5f) * Scale;
+            float yl = fl.position.y - rootY, yr = fr.position.y - rootY;
+            float band = 0.02f * h;   // double support: both feet within 2 % of the height of each other
+            for (int f = 0; f < 2; f++)
+            {
+                Transform thigh = f == 0 ? tl : tr, foot = f == 0 ? fl : fr;
+                float y = f == 0 ? yl : yr, other = f == 0 ? yr : yl;
+                bool bearing = _lockWalkW > 0.05f && y <= other + band;   // walking, and the lower foot (or double support)
+                Vector3 p = foot.position;
+                if (bearing && !_pinned[f]) { _pinned[f] = true; _pin[f] = p; }
+                if (!bearing) _pinned[f] = false;
+                if (_pinned[f])
+                {
+                    Vector3 off = new Vector3(_pin[f].x - p.x, 0f, _pin[f].z - p.z);
+                    if (off.magnitude > 0.35f * h) { _pin[f] = p; off = Vector3.zero; }   // fell a stride behind: re-plant
+                    _pinW[f] = Mathf.Min(1f, _pinW[f] + (float)dSim / LockFade);
+                    Vector3 hip = thigh.position;
+                    Vector3 from = p - hip, to = p + off - hip;
+                    Quaternion fix = Quaternion.RotateTowards(Quaternion.identity, Quaternion.FromToRotation(from, to), MaxLockDeg);
+                    _lastFix[f] = fix;
+                }
+                else _pinW[f] = Mathf.Max(0f, _pinW[f] - (float)dSim / LockFade);
+                if (_pinW[f] > 0f) thigh.rotation = Quaternion.Slerp(Quaternion.identity, _lastFix[f], _pinW[f]) * thigh.rotation;
+            }
+        }
+
         void Procedural(ModelView m, World w, Kaiju k, double dSim, float flinch, bool hatchling, Quaternion drawn)
         {
             Quaternion parent = m.Transform.parent != null ? m.Transform.parent.rotation : Quaternion.identity;
