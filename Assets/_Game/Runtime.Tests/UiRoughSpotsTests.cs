@@ -172,6 +172,18 @@ namespace CriticalMass.Runtime.Tests
         }
 
         [Test]
+        public void HudClassNameAndKaijuHeadlineFitOnOneLine()
+        {
+            if (Ui == null || Display == null) Assert.Ignore("fonts not loadable in this run");
+            // The HUD card's class name plate (112 px, best-fit 16..12, 2 px outline): the closer's capture walk cut DEMOLITIONS.
+            Assert.IsTrue(UiScale.FitsOneLine(Ui, "DEMOLITIONS", UiScale.TypeMin, 12, 112f, 2f), "DEMOLITIONS fits the HUD name plate");
+            // The hatch banner headline (plate width - 300, best-fit 48..30, 4 px outline).
+            foreach (string team in new[] { "AZURE", "CRIMSON", "NOBODY" })
+                Assert.IsTrue(UiScale.FitsOneLine(Display, CriticalMass.Runtime.View.KaijuMomentTracker.WordSidesWith + team, UiScale.TypeDisplay,
+                    UiScale.TypeHeading, CriticalMass.Runtime.Hud.Banner.Width - 300f, 4f), team);
+        }
+
+        [Test]
         public void ResultsTabAndButtonLabelsFitOnOneLine()
         {
             if (Display == null) Assert.Ignore("display font not loadable in this run");

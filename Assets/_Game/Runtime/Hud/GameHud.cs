@@ -293,10 +293,11 @@ namespace CriticalMass.Runtime.Hud
             _portraitFrame.RimPx = 3f;
             // v2: the illustrated class portrait (bible p15 player card), a class badge and the class name on a plate
             _portrait = Icon(_portraitFrame.transform, "Portrait", UiIcons.Portrait[0, 0], 5f, 1f, 106f, 106f);   // fills the card like p15
-            Shape(_portraitFrame.transform, "Name Plate", ShapeKind.RoundRect, 6f, 92f, 104f, 24f, Navy, -1f).RimPx = 0f;
+            // Closer (batch 4): the plate spans the card (was 104 px: DEMOLITIONS was cut); the name best-fits down to 12 px.
+            Shape(_portraitFrame.transform, "Name Plate", ShapeKind.RoundRect, 2f, 92f, 112f, 24f, Navy, -1f).RimPx = 0f;
             _classBadge = Icon(_portraitFrame.transform, "Class Badge", UiIcons.ClassBadge[0, 0], -6f, -6f, 36f, 36f);
-            _className = CriticalMass.Runtime.Menu.MenuUi.Fit(Label(_portraitFrame.transform, "Class Name", CMTokens.Ui, UiScale.TypeMin, Cream, TextAnchor.MiddleCenter, 6f, 92f, 104f, 24f,
-                "WARRIOR", 2f), 15);
+            _className = CriticalMass.Runtime.Menu.MenuUi.Fit(Label(_portraitFrame.transform, "Class Name", CMTokens.Ui, UiScale.TypeMin, Cream, TextAnchor.MiddleCenter, 2f, 92f, 112f, 24f,
+                "WARRIOR", 2f), 12);
 
             Shape(c, "Health Plate", ShapeKind.RoundRect, 124f, 22f, 252f, 90f, Panel, 14f);
             for (int i = 0; i < Hearts; i++)

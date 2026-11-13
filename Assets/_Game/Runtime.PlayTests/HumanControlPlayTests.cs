@@ -190,7 +190,7 @@ namespace CriticalMass.Runtime.PlayTests
 
         /// <summary>
         /// The player has the fighter: not on autopilot, not spectating, the guard sees a human match with no lockout, and
-        /// W on the keyboard and then the left stick each carry actor 0 up the screen.
+        /// W on the keyboard carries actor 0 up the screen and then the left stick carries it back down.
         /// </summary>
         IEnumerator AssertPlayerMovesFighter(string where)
         {
@@ -222,7 +222,10 @@ namespace CriticalMass.Runtime.PlayTests
             yield return Until(() => w.Actors[0].Alive, 10f, where + ": actor 0 down before the stick check");
             x0 = w.X[0];
             z0 = w.Z[0];
-            InputSystem.QueueStateEvent(_pad, new GamepadState { leftStick = new Vector2(0f, 1f) });
+            // Closer (batch 4): the stick pushes DOWN the screen, back the way W went. Every call of this check walked the
+            // fighter up twice, so the third call (Play again > pause > resume) pushed it into its base wall: Move read
+            // (0, 1) from the stick and the fighter, blocked, travelled 0.0 u.
+            InputSystem.QueueStateEvent(_pad, new GamepadState { leftStick = new Vector2(0f, -1f) });
             yield return Real(HoldSeconds * 0.5f);
             Vector2 heldMove = map["Move"].ReadValue<Vector2>();
             string heldDevice = map["Move"].activeControl != null ? map["Move"].activeControl.path : "none";
@@ -230,7 +233,7 @@ namespace CriticalMass.Runtime.PlayTests
             InputSystem.QueueStateEvent(_pad, new GamepadState());
             yield return null;
             Assert.IsFalse(d.HumanAutopilot, where + ": autopilot while the stick was pushed");
-            Assert.Greater(TravelUp(w, x0, z0), MinTravel, where + ": the left stick did not move the fighter up the screen" +
+            Assert.Greater(-TravelUp(w, x0, z0), MinTravel, where + ": the left stick did not move the fighter down the screen" +
                 $" (Move read {heldMove} from {heldDevice}; pads {Gamepad.all.Count}, current {(Gamepad.current == _pad ? "test pad" : "other")};" +
                 $" stand-up {w.Actors[0].StandUp}, stun {w.Actors[0].HitStunTicks}, alive {w.Actors[0].Alive})");
             Assert.AreEqual(0, guard.LockoutsReported, where + ": the lockout watchdog fired");
@@ -615,8 +618,11 @@ namespace CriticalMass.Runtime.PlayTests
             FlowDirector fd = FlowDirector.Current;
             // Integration batch 4: the home lobby (#60): PLAY opens the mode cards; QUICK then class select and READY.
             yield return Until(() => fd.MainMenu.IsVisible, 5f, "back to the home lobby");
-            yield return Press(fd.MainMenu.PlayItem);
-            yield return Until(() => fd.Modes.IsVisible, 5f, "PLAY opens the mode cards");
+            // Closer (batch 4): after a Spectate match the primary button is PLAY AGAIN (Spectate again, one press, by
+            // design: PlayModes.Offer), which reloaded the scene under the test; MODES is the way to a different mode.
+            Assert.IsTrue(PlayModes.Offer().PlayAgain, "home offers PLAY AGAIN after the Spectate match");
+            yield return Press(fd.MainMenu.ChangeModeItem);
+            yield return Until(() => fd.Modes.IsVisible, 5f, "MODES opens the mode cards");
             yield return Press(fd.Modes.Card(MatchMode.Quick));
             yield return ConfirmClassThenReady();
             Assert.IsFalse(SpectatorMode.SpectateNextMatch, "PLAY never carries Spectate into the next match");

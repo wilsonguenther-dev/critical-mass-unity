@@ -156,8 +156,16 @@ namespace CriticalMass.Runtime.View.Anim
         public static float Envelope(double age, double clipTime, double length, double windupSeconds)
         {
             if (clipTime >= length - 1e-4) return 0f;
-            double fin = windupSeconds > 1e-9 ? Math.Min(FadeIn, windupSeconds * 0.5) : 0.02;
-            double a = fin <= 0 ? 1 : Math.Min(1, age / fin);
+            double a;
+            if (windupSeconds > 1e-9)
+            {
+                // Closer (batch 4): with a wind-up the clip fades in over the whole wind-up, smoothstep (slow at both ends).
+                // A 0.05 s linear fade snapped the two-hand grips (Farmer slice, Miner chop: their first frame is far from
+                // the base pose) so fast that the hand peaked on the press tick, 5 ticks before the hit.
+                double s = Math.Min(1, age / windupSeconds);
+                a = s * s * (3 - 2 * s);
+            }
+            else a = Math.Min(1, age / 0.02);
             double b = Math.Min(1, (length - clipTime) / FadeOut);
             return (float)Math.Max(0, Math.Min(a, b));
         }

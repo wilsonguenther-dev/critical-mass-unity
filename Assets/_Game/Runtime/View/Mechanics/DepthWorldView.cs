@@ -114,7 +114,9 @@ namespace CriticalMass.Runtime.View.Mechanics
             Feed.Read(w);
         }
 
-        void LateUpdate()
+        void LateUpdate() { long c = CriticalMass.Runtime.Game.FrameCost.Begin(); LateUpdateBody(); CriticalMass.Runtime.Game.FrameCost.End(CriticalMass.Runtime.Game.FrameCost.Slot.DepthView, c); }
+
+        void LateUpdateBody()
         {
             if (_driver == null || _driver.World == null) return;
             if (_driver.World != _world) { _world = _driver.World; Feed.Reset(); }

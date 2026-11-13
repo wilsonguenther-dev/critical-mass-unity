@@ -99,6 +99,9 @@ namespace CriticalMass.Runtime.View.Dressing
         /// <summary>Kit chunks (16 x 16 cells, sky separate) the view built.</summary>
         public int ChunkCount => _groups.Count;
 
+        /// <summary>Wall time of the last whole-world build (the match-start hitch's biggest part), ms.</summary>
+        public double LastBuildMs { get; private set; }
+
         private readonly List<Material> _hillMats = new List<Material>();
         private readonly Dictionary<Material, Material> _swayMats = new Dictionary<Material, Material>();
 
@@ -252,7 +255,11 @@ namespace CriticalMass.Runtime.View.Dressing
             Sim.Core.World w = _driver.World;
             if (w != _world || w.Map != _map)
             {
+                var sw = System.Diagnostics.Stopwatch.StartNew();
                 Build(w);
+                LastBuildMs = sw.Elapsed.TotalMilliseconds;
+                if (!Application.isEditor)
+                    Debug.Log($"[CM.Load] world art built in {LastBuildMs:0} ms: {Renderers} renderers, {Triangles} triangles, quality {_builtQuality}");
                 return;
             }
             if (Plan == null) return;
@@ -743,7 +750,7 @@ namespace CriticalMass.Runtime.View.Dressing
         private sealed class MeshData
         {
             public Vector3[] V, N;
-            public Color[] C;
+            public Color32[] C;   // closer: 4 bytes a vertex in the combined groups, not 16 (glTF colours are 0..1)
             public Vector2[] UV;
             public List<Vector3> UV2 = new List<Vector3>(), UV3 = new List<Vector3>();
             public int[][] Subs;
@@ -794,7 +801,7 @@ namespace CriticalMass.Runtime.View.Dressing
                 _meshData[mesh] = null;
                 return null;
             }
-            d = new MeshData { V = mesh.vertices, N = mesh.normals, C = mesh.colors, UV = mesh.uv, Subs = new int[mesh.subMeshCount][] };
+            d = new MeshData { V = mesh.vertices, N = mesh.normals, C = mesh.colors32, UV = mesh.uv, Subs = new int[mesh.subMeshCount][] };
             d.Min = mesh.bounds.min;
             d.Max = mesh.bounds.max;
             mesh.GetUVs(2, d.UV2);
@@ -810,16 +817,20 @@ namespace CriticalMass.Runtime.View.Dressing
         {
             // UV5 only on groups whose material reads it (the sway clones): still groups carry no extra channel.
             bool swayMat = mat != null && mat.HasProperty("_SwayOn") && mat.GetFloat("_SwayOn") > 0.5f;
-            var uv5 = swayMat ? new List<Vector4>() : null;
+            // Closer (batch 4): sized up front (the lists regrew a dozen times per group: part of the match-start hitch).
+            int indices = 0;
+            foreach (var part in parts) indices += part.d.Subs[part.sub].Length;
+            int verts = indices / 2 + 16;
+            var uv5 = swayMat ? new List<Vector4>(verts) : null;
             bool sways = false;
-            var v = new List<Vector3>();
-            var n = new List<Vector3>();
-            var c = new List<Color>();
-            var uv = new List<Vector2>();
-            var uv2 = new List<Vector3>();
-            var uv3 = new List<Vector3>();
-            var tri = new List<int>();
-            var map = new Dictionary<int, int>();
+            var v = new List<Vector3>(verts);
+            var n = new List<Vector3>(verts);
+            var c = new List<Color32>(verts);
+            var uv = new List<Vector2>(verts);
+            var uv2 = new List<Vector3>(verts);
+            var uv3 = new List<Vector3>(verts);
+            var tri = new List<int>(indices);
+            var map = new Dictionary<int, int>(1024);
             foreach (var (d, sub, m, sw) in parts)
             {
                 Matrix4x4 nm = m.inverse.transpose;
@@ -832,7 +843,7 @@ namespace CriticalMass.Runtime.View.Dressing
                         map[i] = j;
                         v.Add(m.MultiplyPoint3x4(d.V[i]));
                         n.Add(d.N.Length > i ? nm.MultiplyVector(d.N[i]).normalized : Vector3.up);
-                        c.Add(d.C.Length > i ? d.C[i] : Color.white);
+                        c.Add(d.C.Length > i ? d.C[i] : (Color32)Color.white);
                         uv.Add(d.UV.Length > i ? d.UV[i] : Vector2.zero);
                         uv2.Add(d.UV2.Count > i && d.UV2[i].sqrMagnitude > 0.25f ? nm.MultiplyVector(d.UV2[i]).normalized : Vector3.zero);
                         uv3.Add(d.UV3.Count > i ? nm.MultiplyVector(d.UV3[i]).normalized : n[j]);
