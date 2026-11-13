@@ -656,7 +656,6 @@ namespace CriticalMass.Runtime.Hud.Interact
             if (_root == null) return;
             _viewDirty = false;
             ApplyView();
-            float k = _fit * _zoom;
             if (_world != null)
             {
                 MapDef map = _world.Map;
