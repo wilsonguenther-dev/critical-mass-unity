@@ -282,6 +282,11 @@ namespace CriticalMass.Runtime.View.Affordance
             GhostValid = false;
             bool hudOn = _hud == null || (_hud.Canvas != null && _hud.Canvas.enabled);
             if (_canvas != null && _canvas.enabled != hudOn) _canvas.enabled = hudOn;
+            if (_canvas != null)
+            {
+                float sc = HudLayout.Scale(Screen.width, Screen.height);
+                if (sc > 0f && Mathf.Abs(_canvas.scaleFactor - sc) > 1e-4f) _canvas.scaleFactor = sc;
+            }
             double now = Time.unscaledTimeAsDouble;
             UnityEngine.Camera cam = UnityEngine.Camera.main;
             if (w == null || w.Map == null || CriticalMass.Runtime.Flow.GameFlow.MenuIdle)

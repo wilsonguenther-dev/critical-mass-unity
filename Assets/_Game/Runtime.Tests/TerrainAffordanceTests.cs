@@ -210,7 +210,7 @@ namespace CriticalMass.Runtime.Tests
             var scan = new AffordanceScan();
             Assert.IsTrue(FindSpot(w, scan, s => s.Primary.Valid), "a diggable spot");
             // Full carry: hands full, and the scan shows no dig markers.
-            w.Terraform.Carried[Me] = Terraform.CarryMax(w.Config);
+            w.Terraform.Carried[Me] = (byte)Terraform.CarryMax(w.Config);
             scan.Scan(w, Me, false, double.NaN, double.NaN, false);
             Assert.IsFalse(scan.Primary.Valid);
             Assert.AreEqual(AffWords.HandsFull, scan.Primary.Why);
