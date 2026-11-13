@@ -125,3 +125,23 @@ repo; nothing in this folder should be committed from a render run.
 - **Team colour** where the bible draws it only: compact neck scarf with one tail, narrow tabard, small chips on the
   pauldrons and three rim stones, a teal ring and centre on an iron shield boss, the glowing cleaver edge.
 - **Stone** warm #C9B0A0 with stronger baked value steps (`STONE_STEPS`: +12 % tops, -30 % undersides).
+
+## v6 (2026-11-12): painted finish as a shared kit step, scarf, chest, outline, hands, cleaver
+- **`cm_art/finish.py` `painted_finish(bm, col, kind, lco=None, skip=None, seed=606, params=None)`**: bakes the
+  bible's painted finish into vertex colour (no textures). Per-material top light, AO in creases and under overlaps,
+  crisp highlights on upper convex edges of stone/metal/leather, stone chips and crack bands, wood grain bands
+  (part-local x), brass hot spot toward the key light and darker rim, cloth fold shading; every factor clamped to
+  [0.62, 1.22] of the authored colour so swatches stay in range. `kind` is a per-vertex int layer
+  (`finish.kind_of(colour_name)`, map in `finish.COLOUR_KIND`, extend it per class), `lco` an optional part-local
+  position layer (grain, folds), `skip` an int layer of vertices to leave alone (face skin). Per-kind values in
+  `finish.DEFAULTS`; override with `params={"stone": {"chips": 0.25}}`. Returns per-effect vertex counts.
+- **Using it from another class script:** build parts with `kit.Builder.add` (kind and local position are recorded
+  automatically from the colour name) and call `Builder.finalize(coll, mat, finish_params=None, seed=...)`; it runs
+  `painted_finish` per object (it replaced the plain crevice bake). Scripts with their own bmesh: create the `kind`
+  (int) and `lco` (float_vector) vertex layers, fill them when adding parts, then call `finish.painted_finish`.
+- Grid-top shield planks (`plank`) give the grain vertices; the scarf is two folded neck rolls (`loop_tube`) with a
+  chest fold, knot and one tail; the cream panel is smaller; fingerless gloves with bare fingers; a notched cleaver
+  with a glowing band on both faces of the edge; preview outline one step lighter (0.0135 m bible, 2.5 px game) and
+  half weight on hands and head skin (`outline_w` 0.5, Blender preview only; Unity's sidecar is binary).
+- **One Blender process per run:** `run_all.py -- plan.json` chains build, verify and every render (machine rule:
+  at most one Blender launch per 4 minutes); comparisons run afterwards in plain Python.
