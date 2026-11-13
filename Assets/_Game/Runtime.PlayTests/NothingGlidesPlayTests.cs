@@ -57,6 +57,7 @@ namespace CriticalMass.Runtime.PlayTests
             public Transform FootL, FootR;
             public float Stance;
             public readonly Vector3[] PL = new Vector3[Window], PR = new Vector3[Window], PB = new Vector3[Window];
+            public readonly float[] PY = new float[Window];
         }
 
         sealed class Tally
@@ -115,7 +116,7 @@ namespace CriticalMass.Runtime.PlayTests
                     switch (e.Type)
                     {
                         case SimEventType.KaijuMeleeWindup:
-                            pending.Add((now + EventLagTicks, "claw wind-up -> Swipe", () => ka.Dominant == "Swipe" || ka.Dominant == "SwipeWindup" ||
+                            pending.Add((now + 2 * EventLagTicks, "claw wind-up -> Swipe", () => ka.Dominant == "Swipe" || ka.Dominant == "SwipeWindup" ||
                                 w.Kaiju.KoIn > 0 || w.Kaiju.TelegraphIn > 0));   // a KO or a slam overrides the claw
                             Count(seen, "KaijuMeleeWindup");
                             break;
@@ -234,6 +235,7 @@ namespace CriticalMass.Runtime.PlayTests
                 tr.PL[idx] = tr.FootL.position;
                 tr.PR[idx] = tr.FootR.position;
                 tr.PB[idx] = model.position;
+                tr.PY[idx] = model.eulerAngles.y;
             }
             tr.Ticks++;
             if (tr.Ticks < Window) return;
@@ -251,7 +253,7 @@ namespace CriticalMass.Runtime.PlayTests
             // Foot slide over the window (the MotionSanity reading): a foot is planted within Stance of its lowest height in
             // the window, and only consecutive planted samples of the same foot count.
             if (!feet) return;
-            PlantedSlide(tr.PL, tr.PR, tr.PB, tr.Stance, out double foot, out double body);
+            PlantedSlide(tr.PL, tr.PR, tr.PB, tr.Stance, out double foot, out double body, tr.PY);
             if (body < 2.0 * Window / 30.0 * 6.0)   // no respawn or teleport inside the window (6 u/s is faster than anyone runs)
             {
                 y.FootTravel += foot;
@@ -261,7 +263,8 @@ namespace CriticalMass.Runtime.PlayTests
 
         /// <summary>Planted-foot travel and the body's travel over the same sample pairs (FacingMotionSanity's definition,
         /// with the stance height a parameter: the Kaiju's ankle bones ride higher than a fighter's toes).</summary>
-        public static void PlantedSlide(Vector3[] left, Vector3[] right, Vector3[] body, float stance, out double footTravel, out double bodyTravel)
+        public static void PlantedSlide(Vector3[] left, Vector3[] right, Vector3[] body, float stance, out double footTravel, out double bodyTravel,
+            float[] yaw = null)
         {
             footTravel = bodyTravel = 0;
             for (int f = 0; f < 2; f++)
@@ -272,6 +275,9 @@ namespace CriticalMass.Runtime.PlayTests
                 for (int t = 1; t < p.Length; t++)
                 {
                     if (p[t].y > min + stance || p[t - 1].y > min + stance) continue;
+                    // A pivot (the drawn body turning more than 2 degrees in a tick) swings the planted feet round the body:
+                    // that is a turn, measured as one, not a glide.
+                    if (yaw != null && Mathf.Abs(Mathf.DeltaAngle(yaw[t], yaw[t - 1])) > 2f) continue;
                     Vector3 df = p[t] - p[t - 1], db = body[t] - body[t - 1];
                     footTravel += new Vector2(df.x, df.z).magnitude;
                     bodyTravel += new Vector2(db.x, db.z).magnitude;

@@ -173,7 +173,8 @@ namespace CriticalMass.Runtime.View.Anim
             double turnSpeed = Math.Abs(_yawRate) * Math.PI / 180.0 * (isHatchling ? 0.5 : 1.0);
             double stepSpeed = Math.Max(speed, turnSpeed);
             _idleT += dSim * (isHatchling ? 1.25 : 1.0);
-            double walkRate = Math.Max(0.4, Math.Min(2.2, stepSpeed / Math.Max(1e-3, me.WalkSpeed * s)));
+            // Cap 3.2: the adult's Walk plants at 0.91 u/s at full size (CI run 4) and it moves at up to 2.6 u/s; a 2.2 cap slid.
+            double walkRate = Math.Max(0.4, Math.Min(3.2, stepSpeed / Math.Max(1e-3, me.WalkSpeed * s)));
             WalkRate = walkRate;
             LastWalkSpeed = me.WalkSpeed;
             _prevWalkT = _walkT;
