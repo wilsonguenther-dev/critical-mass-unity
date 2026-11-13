@@ -1,12 +1,26 @@
 #!/usr/bin/env bash
-# Build the macOS player to Builds/macOS/CriticalMass.app via CriticalMass.Editor.Build.MacOS.
+# Build the macOS player via CriticalMass.Editor.Build.MacOS (default Builds/macOS/CriticalMass.app in THIS checkout).
+#   tools/unity-build-mac.sh [--output PATH] [--development]
+# PATH is relative to the checkout (or absolute). --development builds a development player (profiler markers for
+# the F3 overlay and the autoplay report, DG-05). Hard limit: CM_BUILD_TIMEOUT seconds (default 1800), then exit 142.
 set -euo pipefail
+OUT='Builds/macOS/CriticalMass.app'
+DEV=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --output) OUT="${2:?--output needs a path}"; shift 2 ;;
+    --development) DEV=(-development); shift ;;
+    *) echo "usage: unity-build-mac.sh [--output PATH] [--development]" >&2; exit 64 ;;
+  esac
+done
 source "$(dirname "${BASH_SOURCE[0]}")/_unity-env.sh"
-LOG="$ROOT/Logs/build-mac.log"
+LOG="${CM_BUILD_LOG:-$ROOT/Logs/build-mac.log}"
+case "$OUT" in /*) ABS="$OUT" ;; *) ABS="$ROOT/$OUT" ;; esac
 
 set +e
-"$UNITY" -batchmode -nographics -projectPath "$ROOT" -buildTarget osxuniversal \
-  -executeMethod CriticalMass.Editor.Build.MacOS -logFile "$LOG" -quit
+perl -e 'alarm shift; exec @ARGV' "${CM_BUILD_TIMEOUT:-1800}" \
+  "$UNITY" -batchmode -nographics -projectPath "$ROOT" -buildTarget osxuniversal \
+  -executeMethod CriticalMass.Editor.Build.MacOS -buildOutput "$ABS" ${DEV[@]+"${DEV[@]}"} -logFile "$LOG" -quit
 code=$?
 set -e
 
@@ -14,8 +28,8 @@ if [[ $code -ne 0 ]]; then
   echo "unity-build-mac: FAILED, Unity exit code $code (log: $LOG)" >&2
   exit "$code"
 fi
-if [[ ! -d "$ROOT/Builds/macOS/CriticalMass.app" ]]; then
-  echo "unity-build-mac: FAILED, Builds/macOS/CriticalMass.app missing (log: $LOG)" >&2
+if [[ ! -d "$ABS" ]]; then
+  echo "unity-build-mac: FAILED, $ABS missing (log: $LOG)" >&2
   exit 1
 fi
-echo "unity-build-mac: OK -> $ROOT/Builds/macOS/CriticalMass.app"
+echo "unity-build-mac: OK -> $ABS"
