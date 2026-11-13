@@ -193,6 +193,27 @@ namespace CriticalMass.Editor.Flow
             SimDriverBehaviour drv = Driver;
             HumanInputSource src = drv.GetComponent<HumanInputSource>();
             Note($"match: seed {W.Opts.Seed}, actors {W.ActorCount}, class {W.Actors[0].Cls}, enemy bots {W.Opts.BotDifficulty}");
+            // Real-input control check (owner's batch 2 report): a keyboard device and a queued W through the Input System.
+            {
+                double rt = EditorApplication.timeSinceStartup + 30;
+                yield return () => (W.Match.Phase == MatchPhase.Playing && W.Actors[0].Alive) || EditorApplication.timeSinceStartup > rt;
+                var ins = UnityEngine.InputSystem.InputSystem.settings;
+                ins.backgroundBehavior = UnityEngine.InputSystem.InputSettings.BackgroundBehavior.IgnoreFocus;
+                ins.editorInputBehaviorInPlayMode = UnityEngine.InputSystem.InputSettings.EditorInputBehaviorInPlayMode.AllDeviceInputAlwaysGoesToGameView;
+                var kb = UnityEngine.InputSystem.InputSystem.AddDevice<UnityEngine.InputSystem.Keyboard>();
+                yield return Seconds(0.1);
+                bool autoBefore = drv.HumanAutopilot;
+                double x0 = W.X[0], z0 = W.Z[0];
+                UnityEngine.InputSystem.InputSystem.QueueStateEvent(kb, new UnityEngine.InputSystem.LowLevel.KeyboardState(UnityEngine.InputSystem.Key.W));
+                yield return Seconds(1.0);
+                double along = (W.X[0] - x0) * HumanInputState.ScreenUpX + (W.Z[0] - z0) * HumanInputState.ScreenUpZ;
+                var pres = UnityEngine.Object.FindAnyObjectByType<CriticalMass.Runtime.Spectator.PlayerPresence>();
+                Note($"REAL INPUT: autopilot before {autoBefore}, after 1 s of W: autopilot {drv.HumanAutopilot}, banner {(pres != null && pres.BannerVisible)}, moved {along:0.00} u screen-up -> {(!drv.HumanAutopilot && along > 0.3 ? "PASS" : "FAIL")}");
+                Shot("04b-real-input-after-W");
+                UnityEngine.InputSystem.InputSystem.QueueStateEvent(kb, new UnityEngine.InputSystem.LowLevel.KeyboardState());
+                yield return Seconds(0.1);
+                UnityEngine.InputSystem.InputSystem.RemoveDevice(kb);
+            }
             drv.HumanAutopilot = false;
             drv.TimeScale = 0;
             if (src != null) { src.enabled = false; src.State.Reset(); }
