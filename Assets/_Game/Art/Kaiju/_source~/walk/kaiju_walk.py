@@ -377,11 +377,12 @@ def render_sheets(rig, meshes, act, tracks, fps, fwd, right, vU, tag):
             tk = cycle * k / 8.0
             body = fwd * (V_DESIGN * tk)
             ft = rate * tk
-            rig.matrix_world = Matrix.Translation(body) @ M0
-            # the clip is sampled at frame f0 + ft*fps: evaluate the action at that (fractional) frame
+            # the clip is sampled at frame f0 + ft*fps: evaluate the action at that (fractional) frame, THEN place the
+            # body (the imported takes key the armature object too, so frame_set resets its transform)
             f0, _ = frames_of(act)
             fr = f0 + (ft % L) * fps
             sc.frame_set(int(math.floor(fr)), subframe=fr - math.floor(fr))
+            rig.matrix_world = Matrix.Translation(body) @ M0
             bpy.context.view_layer.update()
             tmp = []
             cols = {"soleL": (0.95, 0.15, 0.12), "soleR": (0.15, 0.35, 0.98), "knuckL": (0.98, 0.85, 0.1),
@@ -564,10 +565,10 @@ def lat(p):
 
 # Gait: lateral sequence, touchdown phases. Hind duty > 0.5 so a hind foot is always down (the lower-foot rule).
 PH = {"LH": 0.0, "LF": 0.25, "RH": 0.5, "RF": 0.75}
-BETA_H, BETA_F = 0.58, 0.64
+BETA_H, BETA_F = 0.55, 0.62
 LIFT_H, LIFT_F = 0.42, 0.46
-DROP, BOB = 0.30, 0.055
-CENTRE_H = {s: along(rest["hip" + s]) + 0.12 for s in ("_L", "_R")}
+DROP, BOB = 0.33, 0.065
+CENTRE_H = {s: along(rest["hip" + s]) + 0.05 for s in ("_L", "_R")}
 CENTRE_F = {s: along(rest["knu" + s]) - 0.15 for s in ("_L", "_R")}
 
 
@@ -595,7 +596,7 @@ def body_offsets(u):
     """Hips offset (world vector) and rotations (axis, deg) list for the body bones."""
     p = math.tau * u
     bob = -DROP - BOB * math.cos(2 * p - math.tau * 2 * 0.06)       # lowest just after each hind plant (u .06, .56)
-    impact = sum(-0.03 * math.exp(-((u - ph) % 1.0) / 0.035) for ph in (PH["LH"], PH["RH"]))
+    impact = sum(-0.045 * math.exp(-((u - ph) % 1.0) / 0.035) for ph in (PH["LH"], PH["RH"]))
     sway = 0.07 * math.sin(p - 0.4)                                  # over the left hind while it bears (u 0 - .5)
     surge = 0.03 * math.sin(2 * p - 0.9)
     off = UP * (bob + impact) - right * sway + fwd * surge
@@ -720,7 +721,7 @@ fps = sc.render.fps / sc.render.fps_base
 best = None
 for S in [x * 0.1 for x in range(40, 14, -1)]:
     w = max(pose_frame(k / 16.0, S, None)[0] for k in range(16))
-    if w <= 0.96:
+    if w <= 0.97:
         best = S
         break
 S0 = best or 1.6
@@ -822,7 +823,7 @@ for k, a in acts.items():
             q = pb.matrix.to_quaternion()
             if pb.name not in base:
                 base[pb.name] = q
-            rng[pb.name] = max(rng.get(pb.name, 0.0), math.degrees(base[pb.name].rotation_difference(q).angle))
+            rng[pb.name] = max(rng.get(pb.name, 0.0), math.degrees(2 * math.acos(min(1.0, abs(base[pb.name].dot(q))))))
     top = sorted(rng.items(), key=lambda kv: -kv[1])[:3]
     motion[k] = [(n, round(v, 1)) for n, v in top]
 ver["motion_deg"] = motion
