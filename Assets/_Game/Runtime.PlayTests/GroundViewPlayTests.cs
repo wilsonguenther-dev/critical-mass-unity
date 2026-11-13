@@ -5,7 +5,6 @@ using CriticalMass.Runtime.Menu;
 using CriticalMass.Runtime.Spectator;
 using CriticalMass.Sim.Core;
 using NUnit.Framework;
-using Unity.Cinemachine;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
@@ -55,6 +54,9 @@ namespace CriticalMass.Runtime.PlayTests
             _driver = null;
         }
 
+        /// <summary>The CinemachineBrain (this assembly does not reference Cinemachine: looked up by type name).</summary>
+        static Behaviour Brain(UnityEngine.Camera cam) => (Behaviour)cam.GetComponent("CinemachineBrain");
+
         [UnityTest]
         public IEnumerator TheHighViewIsTheDefaultAndGroundViewIsOff()
         {
@@ -64,7 +66,7 @@ namespace CriticalMass.Runtime.PlayTests
             Assert.AreEqual(GroundViewMode.Off, g.Mode);
             Assert.IsFalse(GameSettings.GroundCamera);
             UnityEngine.Camera cam = UnityEngine.Camera.main;
-            Assert.IsTrue(cam.GetComponent<CinemachineBrain>().enabled, "the brain drives the high camera");
+            Assert.IsTrue(Brain(cam).enabled, "the brain drives the high camera");
             Assert.AreEqual(GameplayCamera.FovDeg, cam.fieldOfView, 0.01);
         }
 
@@ -103,7 +105,7 @@ namespace CriticalMass.Runtime.PlayTests
             }
             Assert.Greater(frames, 100);
             Assert.Less(overHead, frames / 2, "the over-the-head fallback is the exception, not the shot");
-            Assert.IsFalse(cam.GetComponent<CinemachineBrain>().enabled, "ground view owns the camera");
+            Assert.IsFalse(Brain(cam).enabled, "ground view owns the camera");
             Assert.AreEqual(GroundCamera.FovDeg, cam.fieldOfView, 0.01);
 
             // Off again: the brain and the high lens come back.
@@ -111,7 +113,7 @@ namespace CriticalMass.Runtime.PlayTests
             yield return null;
             yield return null;
             Assert.AreEqual(GroundViewMode.Off, g.Mode);
-            Assert.IsTrue(cam.GetComponent<CinemachineBrain>().enabled);
+            Assert.IsTrue(Brain(cam).enabled);
             Assert.AreEqual(GameplayCamera.FovDeg, cam.fieldOfView, 0.01);
         }
 
