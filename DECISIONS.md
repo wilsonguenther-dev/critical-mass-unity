@@ -1159,3 +1159,101 @@ both of Travis's words a button on the bindings already on main:
    share; random line with curve top 160: 0.68, 250: 0.51, **800 (shipped): 0.30**, 1200: 0.23 (CM-34 band 0.10 to 0.50).
 3. The HUD's instability bar (Runtime/Hud/HudState.cs line 95) still draws against BerserkThreshold; with the rule on, the
    view should hide the line (it is a secret roll) or show the √ chance instead. Not changed here (rules lane only).
+
+## U-063 Class roles made real: only Farmers feed the egg, only raiders carry corruption, everyone else hands off or escorts (our rule) (2026-11-13T04:22:24Z)
+
+**Source.** Our rule. No branch of the oracle restricts who feeds. The owner after playing: "the warriors are feeding the
+eggs, it's not even proper". Travis names the classes and their jobs, not who may feed.
+0. **The classic switch.** Every rule of U-063..U-068 sits behind `GameConfig.Depth.Classic`. `CreateBrowser5v5()` sets it
+   true (the game as it was: the DG-21 golden hashes and every older test are unchanged); `CreateDefault()`, which the game
+   runs, leaves the rules on. Each rule also has its own `Enabled`. Numbers: `Sim/Config/DepthConfig.cs`, one block per rule.
+1. **Feed.** Only a class in `Roles.MayFeed` (the Farmer) hands plant, meat, wood or water to the egg. Any class may gather
+   and carry it; a carrier that may not feed presses interact beside an allied Farmer to hand it over (`Handoff` event) or
+   banks it at its base (U-064). At the shrine it keeps its load and gets one `DeliverRefused` event per 45 ticks.
+2. **Corrupt.** Only Warrior, Miner and Demolitions (`Roles.MayCorrupt`) gather, carry and deliver corruption.
+3. **Bots obey.** Lineup with the rules on (`Roles.ClassMix`), at 16: 5 Warriors, 4 Farmers, 2 Miners, 2 Demolitions,
+   1 Builder, 2 Healers. Only Farmers gather and deliver; only raiders run corruption; an egg-duty bot that may do neither
+   escorts the nearest allied carrier (`AiState.Escort`) and still intercepts enemy carriers.
+4. **Measured** (seed 7, 16v16, first 3 minutes, all rules on): 37 feed events, all by Farmers; 46 and 52 units delivered;
+   1 unit of corruption (bots rarely raid with the rule on: see the owner question in the PR).
+
+## U-064 Biomass sources as built for DG-42: wood groves and water springs, a team stock at the base, supply bots (our rule) (2026-11-13T04:22:24Z)
+
+**Source.** Our rule from Travis 2026-11-06, "Biomass sources / Meat / Wood / Water / Corruption". The browser has plant,
+meat and corruption only.
+1. **On the map.** 6 wood groves and 5 water springs, mirrored, on open floor both pads can walk to (`Sources.Place`).
+   Hold interact beside one to gather: class gather time x the class scale (Builder and Miner chop in half the time, the
+   Healer draws water in two thirds). A hit restarts the gather. Wood: 4 charges, one back per 20 s. Water: 3, one per 15 s.
+2. **Carry.** `CarryKind.Wood` / `Water` (appended) ride in the class cargo, one kind at a time.
+3. **Spend, two ways.** Feed: wood 7 allegiance a unit, water 4 and each unit cools the egg by 3 instability (never below
+   0, never after the berserk lock). Bank: a press of interact within 4.5 of the own pad puts the load in the team stock
+   (wood, water, food). Banked wood pays Builder pieces first (U-060) and pays upgrades (U-065) and bridge repairs (U-068);
+   a Farmer with empty hands takes food back out.
+4. **Bots.** Before the hatch floor(team x 0.125) bots of Builder, Miner, Demolitions run supply (16: 2 a team, 5: none).
+5. **Measured** (seed 7, 16v16, 3 minutes): 30 wood and 8 water gathered, 38 units banked, at most 2 supply bots a team.
+
+## U-065 Base stations: live class switching at the base (CM-54 ported into the CM-84 markers) and Builder-bought class upgrades (CM-39 ladder ported, paid our way) (2026-11-13T04:22:24Z)
+
+**Source.** Ported: cm/CM-54 (switch cooldown 150 ticks, `classSwitches` counter, 'classSwitch' event codes Accepted 0 /
+Cooldown 1 / Alive 2) and cm/CM-39 `upgrade.ts` (linear ladder, cost 3 then 5, +15% then +30% max HP, refusal codes -2
+max level and -3 cannot pay). Ours: switching while alive, team-wide class levels, paying in wood and water at the base.
+Travis: "Builder / Build class upgrades with biomass".
+1. **Station.** Each team's station is its base zone (4.5 of the pad). Names in `StationNames`.
+2. **Live switch.** A class pick by a living, grounded actor in its station changes its class at once: load banked (or
+   dropped), health share kept, ability locked 3 s, 150 ticks before the next switch. Away from the station the pick is
+   refused (`ClassSwitch` code Alive), as in CM-54. A dead actor's pick queues for the respawn, now with the cooldown.
+3. **Upgrades.** A living Builder in its station sends `InputFrame.StationBuy` = class index + 1: that class's level rises
+   for the whole team for the match. Level 2: 3 wood + 1 water, +15% max HP. Level 3: 5 wood + 2 water, +30%. Living
+   members gain the HP at once; later respawns start with it. One `Upgrade` event per attempt (new level or a refusal code).
+4. **Bots.** A Builder bot in its station buys the affordable level for the class with most living teammates. Bots do not switch.
+5. **Measured** (seed 7, 16v16, about 4 minutes): 10 upgrades bought by bots across both teams from 33 wood and 13 water.
+
+## U-066 Pickups and drops: coins from knock-outs and map piles, Haste / Might / Ward with counters, a seed-fixed spawner (our rule) (2026-11-13T04:22:24Z)
+
+**Source.** Our rule for DG-39 (the owner: "the skill points, the coins collected, drop item, everything"). Not in the browser.
+1. **Coins.** A knocked-out actor leaves 3 coins where it fell for 20 s, for anyone. 10 map piles of 5 (mirrored spots),
+   back 30 s after being taken. Walking over adds to `Actor.CoinsPicked` (Runtime's MatchRewardTracker marker reads it).
+2. **Power-ups**, one at a time per actor. HASTE: move x 1.3 for 10 s; a Farmer's roots strip it. MIGHT: melee x 1.5 for
+   10 s; shields still cut it. WARD: soaks the next 60 damage for 15 s; any explosion goes through and breaks it. A
+   knocked-out carrier drops its power-up with the time left (2 s or more) for 15 s.
+3. **Spawner.** From 20 s, every 45 s, one power-up on one of 4 centre-line spots, chosen by a stateless hash of the seed
+   (never the shared RNG), announced 5 s before it can be taken, gone 30 s later. Fixed pool of 96; the oldest drop is recycled.
+4. **Bots** take what they walk over and go for a power-up within 9 units in line of sight.
+5. **Measured** (seed 7, 16v16, 3 minutes): 445 coins picked up, 4 power-ups spawned, 3 taken, 0 pool recycles.
+
+## U-067 Pings the bots answer, bots that call their own, named bots with play styles (our rule, to the HUD lane's spec) (2026-11-13T04:22:24Z)
+
+**Source.** Our rule: the unbuilt half of DG-21, written to the spec in `Runtime/Hud/Interact/Pings.cs`. Not in the browser.
+1. **Input.** `InputFrame.PingKind` = call + 1 (Attack 0, On my way 1, Defend 2, Help 3: the HUD's wheel order) with
+   `PingX` / `PingZ`, for one tick. The sim accepts 3 per actor per 150 ticks (`Ping` event) and refuses the rest (`PingRefused`).
+2. **Who answers.** Living bots of the caller's team within 40 units, nearest first, at most 3 for Attack and Defend, 2
+   for Help, none for On my way. Never a bot that carries something, already has an order, or holds the hill with fewer
+   than 2 teammates on it; a class with no weapon never answers Attack or Help. Each answer pushes `PingAnswered`.
+3. **What they do.** Attack: fight the nearest enemy within 8 of the ping, else walk there; over when the spot is clear or
+   after 12 s. Defend: hold within 5 of the ping for 12 s. Help: go to the caller and fight its last attacker for 8 s.
+   A bot below the retreat line drops the order. Obeyed on the ping's own tick (`AiState.Order`).
+4. **Bots call too.** Under 35% health with an enemy on it: Help. Fighting an enemy carrier before the hatch: Attack.
+   One call per bot per 20 s, one per team per 8 s, one answerer per bot call.
+5. **Names and styles.** `BotNames.NameOf(world, id)`: 37 names, unique in a match, fixed by seed and slot.
+   `BotNames.StyleOf`: Brawler, Guard, Harvester, Sapper, from the class (40% of Warriors are Guards). A style scales how
+   readily the bot fights (1.15 / 0.95 / 0.8 / 1) and which calls it answers first.
+6. **Measured** (seed 7, 16v16, 3 minutes): bots made 36 Help and 3 Attack calls, 39 answers; a player's Attack ping drew
+   3 answers on its tick; same seed and same ping ticks give the same world hash.
+
+## U-068 Map events: contested supply drop, egg exposed, bridge collapse and Builder repair (our rule) (2026-11-13T04:22:24Z)
+
+**Source.** Our rule. Not in the browser.
+1. **Schedule.** First event at 50 s, one every 60 s. The three kinds rotate from a start fixed by the seed (stateless
+   hash). A kind that cannot run (egg hatched, a bridge already down, no safe span) becomes a supply drop.
+2. **Supply drop.** Announced 8 s ahead on a centre-line spot, then lands. A team claims it by standing within 2.5 for 3 s
+   with no enemy there (contested: nobody's clock runs). Reward: 4 wood and 2 water to the team stock, 10 coins to the
+   claimer, a power-up on the spot. Gone after 30 s unclaimed.
+3. **Egg exposed.** For 20 s every delivery, food or corruption, counts double toward allegiance. Ends at the hatch.
+4. **Bridge collapse.** One span is announced 8 s ahead, then its middle third falls; anyone on it falls and climbs out
+   unhurt (the DG-09 fall rule). Never a span whose loss cuts a base from the hill or the shrine (the CM-30 route guard,
+   re-checked at the collapse). A Builder holding interact within 3 of a broken end for 3 s rebuilds it for 2 wood from
+   the team stock; otherwise it rebuilds itself after 45 s. Bots do not repair (the timer does).
+5. **Events.** SupplyDropIncoming / Landed / Contest / Claimed / Expired, EggExposed / EggExposedEnded, BridgeWarning /
+   BridgeCollapsed / BridgeRepaired, each with a position. Announcer lines in `MapEventNames`.
+6. **Measured** (seed 7, 16v16, 4 minutes): 4 events, 1 drop claimed by bots, 1 egg window, 2 bridges down, 1 back; both
+   pads still reach the hill at the end. All 16 event numbers find a span that passes the route guard.
