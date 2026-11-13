@@ -147,6 +147,8 @@ namespace CriticalMass.Runtime.Game
         public static MomentRecorder Current { get; private set; }
         /// <summary>Raised on the main thread with the saved file's full path.</summary>
         public static event Action<string> PhotoSaved;
+        /// <summary>The results screen's highlights page is on show: F12 saves the three-still card (2026-11-12).</summary>
+        public static bool HighlightsPageOpen;
 
         readonly MomentLog _log = new MomentLog();
         readonly Texture2D[] _pool = new Texture2D[MaxStills];
@@ -246,7 +248,7 @@ namespace CriticalMass.Runtime.Game
             bool menuOpen = _menu != null && _menu.IsOpen;
             if (kb != null && kb.f12Key.wasPressedThisFrame && !menuOpen)
             {
-                if (ResultsHighlights.IsOpen) SaveHighlightsCard();
+                if (ResultsHighlights.IsOpen || HighlightsPageOpen) SaveHighlightsCard();
                 else SavePhoto();
             }
             FlushPhotoResult();
@@ -299,20 +301,29 @@ namespace CriticalMass.Runtime.Game
         IEnumerator CaptureStill()
         {
             yield return Eof;
-            if (!EnsureRt(ref _screenRt, Screen.width, Screen.height) || !EnsureRt(ref _smallRt, StillWidth, StillHeight))
+            // 2026-11-12: when the game camera renders into a texture (the capture walk, an offscreen run) the back buffer
+            // holds nothing, which is why batch 2's highlights said NO PICTURE: take the still from that texture instead.
+            UnityEngine.Camera cam = UnityEngine.Camera.main;
+            RenderTexture src = cam != null ? cam.targetTexture : null;
+            bool fromCamera = src != null && src.IsCreated();
+            if ((!fromCamera && !EnsureRt(ref _screenRt, Screen.width, Screen.height)) || !EnsureRt(ref _smallRt, StillWidth, StillHeight))
             {
                 AbortStill();
                 yield break;
             }
-            ScreenCapture.CaptureScreenshotIntoRenderTexture(_screenRt);
+            if (!fromCamera)
+            {
+                ScreenCapture.CaptureScreenshotIntoRenderTexture(_screenRt);
+                src = _screenRt;
+            }
             // Crop the centre to 16:9 and scale down in one blit (flipped where the copy comes out upside down).
-            float aspect = (float)_screenRt.width / _screenRt.height, want = (float)StillWidth / StillHeight;
+            float aspect = (float)src.width / src.height, want = (float)StillWidth / StillHeight;
             float sx = 1f, sy = 1f;
             if (aspect > want) sx = want / aspect;
             else sy = aspect / want;
             float ox = (1f - sx) * 0.5f, oy = (1f - sy) * 0.5f;
-            if (FlipScreenCapture) Graphics.Blit(_screenRt, _smallRt, new Vector2(sx, -sy), new Vector2(ox, oy + sy));
-            else Graphics.Blit(_screenRt, _smallRt, new Vector2(sx, sy), new Vector2(ox, oy));
+            if (FlipScreenCapture && !fromCamera) Graphics.Blit(src, _smallRt, new Vector2(sx, -sy), new Vector2(ox, oy + sy));
+            else Graphics.Blit(src, _smallRt, new Vector2(sx, sy), new Vector2(ox, oy));
             AsyncGPUReadback.Request(_smallRt, 0, TextureFormat.RGBA32, _onStill);
         }
 

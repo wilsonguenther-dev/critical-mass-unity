@@ -98,8 +98,38 @@ namespace CriticalMass.Runtime.Hud
             sr.sizeDelta = new Vector2(900f, 40f);
             sr.anchoredPosition = new Vector2(0f, -350f);
             sub.text = "16 v 16. Hold the hill. Turn the Kaiju.";
+            // 2026-11-12 (UI rough spots): the match behind the title is a live bot match; say so, quietly, in the
+            // bottom-left safe corner, so nobody takes it for their own game running itself.
+            BuildLiveTag(root);
             if (Hud != null && Hud.Canvas != null) Hud.Canvas.enabled = false;
             UpdateScale();
+        }
+
+        public const string LiveTagText = "LIVE BOT MATCH  ·  16 V 16, PLAYING BEHIND THE TITLE";
+        public Text LiveTag { get; private set; }
+
+        void BuildLiveTag(RectTransform root)
+        {
+            var dot = new GameObject("Live Dot", typeof(RectTransform)).AddComponent<VectorShape>();
+            dot.gameObject.layer = 5;
+            dot.transform.SetParent(root, false);
+            dot.Kind = ShapeKind.Circle;
+            dot.FillColor = CMTokens.Crimson.Color;
+            dot.OutlinePx = 2f;
+            dot.RimPx = 0f;
+            dot.raycastTarget = false;
+            RectTransform dr = dot.rectTransform;
+            dr.anchorMin = dr.anchorMax = new Vector2(0f, 0f);
+            dr.pivot = new Vector2(0f, 0.5f);
+            dr.sizeDelta = new Vector2(14f, 14f);
+            dr.anchoredPosition = new Vector2(UiScale.SafeMargin, UiScale.SafeMargin + 15f);
+            LiveTag = HudText.Make(root, "Live Tag", CMTokens.Ui, UiScale.TypeSmall, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft, 2f);
+            RectTransform lt = LiveTag.rectTransform;
+            lt.anchorMin = lt.anchorMax = new Vector2(0f, 0f);
+            lt.pivot = new Vector2(0f, 0.5f);
+            lt.sizeDelta = new Vector2(820f, 30f);
+            lt.anchoredPosition = new Vector2(UiScale.SafeMargin + 24f, UiScale.SafeMargin + 15f);
+            LiveTag.text = LiveTagText;
         }
 
         static void Stretch(RectTransform rt)

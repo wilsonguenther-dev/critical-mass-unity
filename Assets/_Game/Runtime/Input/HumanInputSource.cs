@@ -126,7 +126,9 @@ namespace CriticalMass.Runtime.Input
             if (_switchDigPlace != null)
             {
                 bool active = Mathf.Abs(_switchDigPlace.ReadValue<float>()) > 0.5f;
-                if (active && !_switchWasActive) State.SwitchDigPlace();
+                // 2026-11-12: the wheel (and its bumpers) zoom the full map while it is open and the spectator camera
+                // while spectating; only in play does it switch dig / place (InputContext).
+                if (active && !_switchWasActive && InputContext.DigSwitchOwnsWheel(InputContext.Current)) State.SwitchDigPlace();
                 _switchWasActive = active;
             }
             bool fromKeys = m.sqrMagnitude > 0f && _move.activeControl != null && _move.activeControl.device is Keyboard;

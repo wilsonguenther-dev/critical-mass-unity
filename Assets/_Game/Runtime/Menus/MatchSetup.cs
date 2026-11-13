@@ -35,6 +35,8 @@ namespace CriticalMass.Runtime.Menus
             PrefPace = "cm.flow.setup.pace", PrefBots = "cm.flow.setup.bots";
 
         public const float CardW = 250f, CardH = 350f, CardGap = 16f, CardsY = 470f;
+        /// <summary>Inner padding of the class name on a card (the layout test measures names against CardW - 2 * NamePad).</summary>
+        public const float NamePad = 10f;
 
         /// <summary>Back goes to the results (Change class) instead of the main menu.</summary>
         public bool FromResults;
@@ -107,15 +109,15 @@ namespace CriticalMass.Runtime.Menus
             card.Submitted = () => OpenClassDetail(pick);
             _cards[i] = card;
             _portraits[i] = HudIcon.Make(card.transform, "Portrait", (CardW - 150f) * 0.5f, 20f, 150f, 150f);
-            Text name = MenuUi.Label(card.transform, "Name", CMTokens.Display, 30, Cream, TextAnchor.MiddleCenter, 0f, 180f, CardW, 44f,
-                FlowWords.ClassName(c), 3f);
-            name.resizeTextForBestFit = true;   // "DEMOLITIONS EXPERT" fits its card
-            name.resizeTextMinSize = 18;
-            name.resizeTextMaxSize = 30;
-            Text role = MenuUi.Label(card.transform, "Role", CMTokens.Ui, 22, Cream, TextAnchor.MiddleCenter, 10f, 226f, CardW - 20f, 32f,
-                FlowWords.ClassRole(c), 2f);
-            Text abil = MenuUi.Label(card.transform, "Abilities", CMTokens.Ui, 17, Cream, TextAnchor.MiddleCenter, 10f, 262f, CardW - 20f, 28f,
-                FlowWords.AbilityLine(c), 2f);
+            // 2026-11-12: best-fit never shrank this (the overflow was unbounded), so DEMOLITIONS EXPERT spilled past the
+            // card. MenuUi.Fit bounds it: one line when it fits, else two lines at a smaller size, inside the card's padding.
+            Text name = MenuUi.Label(card.transform, "Name", CMTokens.Display, UiScale.TypeHeading, Cream, TextAnchor.MiddleCenter,
+                NamePad, 174f, CardW - NamePad * 2f, 54f, FlowWords.ClassName(c), 3f);
+            MenuUi.Fit(name, UiScale.TypeSmall);
+            Text role = MenuUi.Fit(MenuUi.Label(card.transform, "Role", CMTokens.Ui, UiScale.TypeBody, Cream, TextAnchor.MiddleCenter, 10f, 230f,
+                CardW - 20f, 32f, FlowWords.ClassRole(c), 2f), UiScale.TypeMin);
+            Text abil = MenuUi.Fit(MenuUi.Label(card.transform, "Abilities", CMTokens.Ui, 17, Cream, TextAnchor.MiddleCenter, 10f, 264f,
+                CardW - 20f, 28f, FlowWords.AbilityLine(c), 2f), UiScale.TypeMin);
             _cardTexts[i] = new[] { name, role, abil };
             if (live)
             {

@@ -71,14 +71,15 @@ namespace CriticalMass.Runtime.Onboarding
 
             _card = MenuUi.Rt(space, "Card");
             MenuUi.Stretch(_card);
-            MenuUi.Panel(_card, "Panel", 610f, 290f, 700f, 400f);
-            MenuUi.Label(_card, "Title", CMTokens.Display, 56, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 610f, 320f, 700f, 80f,
+            // 2026-11-12: a bigger card (batch 1 called it a tiny modal); Escape or B answers Skip.
+            MenuUi.Panel(_card, "Panel", 540f, 260f, 840f, 460f);
+            MenuUi.Label(_card, "Title", CMTokens.Display, 56, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 540f, 292f, 840f, 84f,
                 MascotLines.Resolve(TrialText.OfferTitle), 4f);
-            MenuUi.Label(_card, "Sub", CMTokens.Ui, 24, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 610f, 400f, 700f, 40f,
+            MenuUi.Label(_card, "Sub", CMTokens.Ui, 24, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 580f, 380f, 760f, 44f,
                 MascotLines.Resolve(TrialText.OfferSub), 2f);
-            _play = MenuUi.Item(_card, "Play", 670f, 470f, 580f, 72f, MascotLines.Resolve(TrialText.OfferPlay), MenuItem.Kind.Button, 28,
+            _play = MenuUi.Item(_card, "Play", 600f, 456f, 720f, 80f, MascotLines.Resolve(TrialText.OfferPlay), MenuItem.Kind.Button, 28,
                 true, CMTokens.Display);
-            _skip = MenuUi.Item(_card, "Skip", 670f, 560f, 580f, 64f, MascotLines.Resolve(TrialText.OfferSkip), MenuItem.Kind.Button, 22,
+            _skip = MenuUi.Item(_card, "Skip", 600f, 556f, 720f, 72f, MascotLines.Resolve(TrialText.OfferSkip), MenuItem.Kind.Button, 26,
                 true);
             _play.Submitted = OnPlay;
             _skip.Submitted = OnSkip;
@@ -125,6 +126,12 @@ namespace CriticalMass.Runtime.Onboarding
             // Keep a focus for the keyboard and controller if the mouse cleared it.
             EventSystem es = EventSystem.current;
             if (es != null && es.currentSelectedGameObject == null) es.SetSelectedGameObject(_play.gameObject);
+            // Every screen closes with Escape or B: here that is Skip (the player knows how to play).
+            UnityEngine.InputSystem.Keyboard kb = UnityEngine.InputSystem.Keyboard.current;
+            UnityEngine.InputSystem.Gamepad pad = UnityEngine.InputSystem.Gamepad.current;
+            if (Time.unscaledTime >= MenuItem.SubmitBlockedUntil &&
+                ((kb != null && kb.escapeKey.wasPressedThisFrame) || (pad != null && pad.buttonEast.wasPressedThisFrame)))
+                OnSkip();
         }
 
         void OnPlay()
