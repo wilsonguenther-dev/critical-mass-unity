@@ -21,7 +21,7 @@ offline here and stored at half size: they are blurred anyway, so they cost a qu
 
 Usage: python3 build_story_layers.py [--pdf PATH]   -> Assets/_Game/Resources/Story/*.png
 """
-import argparse, glob, math, os, subprocess, sys, tempfile
+import argparse, glob, math, os, shutil, subprocess, sys, tempfile
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
 from scipy import ndimage
@@ -530,6 +530,12 @@ def main():
     ap = argparse.ArgumentParser(); ap.add_argument("--pdf", default=PDF); args = ap.parse_args()
     if not os.path.exists(args.pdf): sys.exit("bible PDF not found: " + args.pdf)
     pages = extract_pages(args.pdf)
+    try:
+        build(pages)
+    finally:
+        shutil.rmtree(os.path.dirname(next(iter(pages.values()))), ignore_errors=True)   # the extracted rasters are temporary
+
+def build(pages):
     for f in glob.glob(os.path.join(OUT, "*.png")): os.remove(f)
 
     # ---- real art: paintings
