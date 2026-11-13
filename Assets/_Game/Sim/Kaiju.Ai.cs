@@ -227,19 +227,55 @@ namespace CriticalMass.Sim.Core
             int steps = big > MaxSubstep ? (int)Math.Ceiling(big / MaxSubstep) : 1;
             double sx = dx / steps;
             double sz = dz / steps;
+            bool guard = Phys.On(w, w.Config.Physics.SolidKaiju);
             for (int s = 0; s < steps; s++)
             {
+                double px = k.X;
+                double pz = k.Z;
                 k.X += sx;
                 k.Z += sz;
                 ResolveCircle(w);
                 ClampToBounds(w);
+                // DG-86: a concave corner the 4-pass push-out cannot resolve for the wider collider: stay put this sub-step.
+                if (guard && !CircleClear(w))
+                {
+                    k.X = px;
+                    k.Z = pz;
+                }
             }
         }
 
         /// <summary>DG-86: move the Kaiju by (dx, dz) through its wall collider (a fighter wedged against a wall holds it back).</summary>
         internal static void ShoveKaiju(World w, double dx, double dz)
         {
+            Kaiju k = w.Kaiju;
+            double x0 = k.X;
+            double z0 = k.Z;
             MoveKaiju(w, dx, dz);
+            if (!CircleClear(w))
+            {
+                k.X = x0; // a corner the collider cannot resolve: the body does not give way
+                k.Z = z0;
+            }
+        }
+
+        /// <summary>DG-86: true when the Kaiju's wall collider (GridR) overlaps no blocked cell.</summary>
+        public static bool CircleClear(World w)
+        {
+            Kaiju k = w.Kaiju;
+            MapDef map = w.Map;
+            double r = GridR(w) - 1e-3;
+            for (int gz = JsMath.FloorToInt(k.Z - r); gz <= JsMath.FloorToInt(k.Z + r); gz++)
+            {
+                for (int gx = JsMath.FloorToInt(k.X - r); gx <= JsMath.FloorToInt(k.X + r); gx++)
+                {
+                    if (MapGrid.IsWalkable(map, gx, gz)) continue;
+                    double nx = k.X < gx ? gx : (k.X > gx + 1 ? gx + 1.0 : k.X);
+                    double nz = k.Z < gz ? gz : (k.Z > gz + 1 ? gz + 1.0 : k.Z);
+                    if ((k.X - nx) * (k.X - nx) + (k.Z - nz) * (k.Z - nz) < r * r) return false;
+                }
+            }
+            return true;
         }
 
         /// <summary>Walk toward (gx, gz) over the clearance flow field at kaiju.moveSpeed.</summary>

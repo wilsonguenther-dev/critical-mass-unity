@@ -764,7 +764,8 @@ namespace CriticalMass.Sim.Tests
             {
                 for (int cx = JsMath.FloorToInt(k.X - r); cx <= JsMath.FloorToInt(k.X + r); cx++)
                 {
-                    if (MapGrid.IsWalkable(w.Map, cx, cz)) continue;
+                    // The list's check: Wall cells (a barricade dropped or a cell dug beside a standing Kaiju is a separate rule).
+                    if (!MapGrid.InBounds(w.Map, cx, cz) || w.Map.Cells[cz * w.Map.Width + cx] != Cell.Wall) continue;
                     double nx = Math.Max(cx, Math.Min(k.X, cx + 1));
                     double nz = Math.Max(cz, Math.Min(k.Z, cz + 1));
                     if ((k.X - nx) * (k.X - nx) + (k.Z - nz) * (k.Z - nz) < r * r) return false;
@@ -801,6 +802,117 @@ namespace CriticalMass.Sim.Tests
                 Assert.IsTrue(KaijuClearOfWalls(w), "tick " + t + " kaiju at " + k.X + "," + k.Z);
             }
             Assert.AreEqual(0, worst, "living actor centres inside the Kaiju body");
+        }
+        // ------------------------------------------------------------------ DG-97 crowds that settle
+
+        private static World Crowd(Action<GameConfig> tweak = null)
+        {
+            GameConfig cfg = GameConfig.CreateBrowser5v5();
+            tweak?.Invoke(cfg);
+            World w = World.CreateWorld(new WorldOptions { Seed = 9, TeamSize = 16, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = cfg });
+            for (int i = 0; i < w.ActorCount; i++)
+            {
+                double a = i * 2.39996, rad = 2.0 * Math.Sqrt((i + 0.5) / w.ActorCount);
+                Place(w, i, HillX + rad * Math.Cos(a), HillZ + rad * Math.Sin(a));
+                w.Actors[i].SpawnProtect = 1000; // no fights
+            }
+            return w;
+        }
+
+        private static double WorstOverlap(World w)
+        {
+            double worst = 0;
+            for (int i = 0; i < w.ActorCount; i++)
+                for (int j = i + 1; j < w.ActorCount; j++)
+                {
+                    double rr = Collide.ActorRadius(w, i) + Collide.ActorRadius(w, j);
+                    double d = Math.Sqrt((w.X[i] - w.X[j]) * (w.X[i] - w.X[j]) + (w.Z[i] - w.Z[j]) * (w.Z[i] - w.Z[j]));
+                    worst = Math.Max(worst, rr - d);
+                }
+            return worst;
+        }
+
+        [Test]
+        public void DG97ThirtyTwoActorsInA4UnitDiscSettleUnder005OverlapIn30TicksWithNoSeparationMoveOver02()
+        {
+            World w = Crowd();
+            double start = WorstOverlap(w);
+            Assert.Greater(start, 0.3, "the disc starts crowded");
+            double biggest = 0;
+            for (int t = 0; t < 30; t++)
+            {
+                Idle(w);
+                SimStep.Step(w);
+                for (int i = 0; i < w.ActorCount; i++)
+                    biggest = Math.Max(biggest, Math.Sqrt((w.X[i] - w.PrevX[i]) * (w.X[i] - w.PrevX[i]) + (w.Z[i] - w.PrevZ[i]) * (w.Z[i] - w.PrevZ[i])));
+            }
+            Console.WriteLine("{\"item\":\"DG-97\",\"startOverlap\":" + start.ToString("0.000") + ",\"after30\":" + WorstOverlap(w).ToString("0.0000") + ",\"biggestStep\":" + biggest.ToString("0.000") + "}");
+            Assert.Less(WorstOverlap(w), 0.05);
+            Assert.LessOrEqual(biggest, 0.2);
+        }
+
+        [Test]
+        public void DG97ShufflingWhichIdStandsWhereGivesTheSamePositions()
+        {
+            World a = Crowd();
+            World b = Crowd();
+            // Swap the spots of same-team, same-class pairs in b: the physics is identical, only the id order differs.
+            var swapped = new int[a.ActorCount];
+            for (int i = 0; i < a.ActorCount; i++) swapped[i] = i;
+            for (int i = 0; i < a.ActorCount; i++)
+            {
+                if (swapped[i] != i) continue;
+                for (int j = a.ActorCount - 1; j > i; j--)
+                {
+                    if (swapped[j] != j || a.Actors[j].Team != a.Actors[i].Team || a.Actors[j].Cls != a.Actors[i].Cls) continue;
+                    swapped[i] = j;
+                    swapped[j] = i;
+                    break;
+                }
+            }
+            for (int i = 0; i < a.ActorCount; i++) Place(b, i, a.X[swapped[i]], a.Z[swapped[i]]);
+            for (int i = 0; i < b.ActorCount; i++) b.Actors[i].SpawnProtect = 1000;
+            for (int t = 0; t < 30; t++)
+            {
+                Idle(a);
+                Idle(b);
+                SimStep.Step(a);
+                SimStep.Step(b);
+            }
+            for (int i = 0; i < a.ActorCount; i++)
+            {
+                Assert.AreEqual(a.X[swapped[i]], b.X[i], 1e-4, "x of " + i);
+                Assert.AreEqual(a.Z[swapped[i]], b.Z[i], 1e-4, "z of " + i);
+            }
+        }
+
+        [Test]
+        public void DG97AnActorClippingALoneWallCornerBy01SlidesPastItAndOneOverlapping05Stops()
+        {
+            foreach (double clip in new[] { 0.1, 0.5 })
+            {
+                World w = Make();
+                ParkOthers(w, 2);
+                int cx = (int)HillX + 3, cz = (int)HillZ;
+                MapGrid.SetCell(w, cx, cz, Cell.Wall);
+                double r = w.Config.Class(ClassId.Farmer).Radius;
+                Place(w, 2, cx - 3, cz - r + clip);
+                double x0 = w.X[2];
+                int passed = -1;
+                for (int t = 0; t < 60; t++)
+                {
+                    Input(w, 2, double.NaN, double.NaN, false, 1, 0);
+                    SimStep.Step(w);
+                    if (passed < 0 && w.X[2] - r > cx + 1) passed = t;
+                }
+                double free = w.Config.Class(ClassId.Farmer).MoveSpeed * 60 / w.Config.SimHz;
+                if (clip < 0.25)
+                {
+                    Assert.GreaterOrEqual(passed, 0, "it passed the corner");
+                    Assert.Greater(w.X[2] - x0, 0.75 * free * 0.9, "little x progress lost");
+                }
+                else Assert.Less(w.X[2] + r, cx + 1e-3, "a 0.5 overlap still stops");
+            }
         }
     }
 }
