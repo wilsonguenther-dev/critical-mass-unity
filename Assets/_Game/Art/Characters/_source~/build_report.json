@@ -1,8 +1,8 @@
 {
  "objects": {
   "Warrior_Body": {
-   "triangles": 9380,
-   "vertices": 4902,
+   "triangles": 9506,
+   "vertices": 4967,
    "materials": [
     "CM_Toon"
    ],
@@ -65,7 +65,8 @@
   "upperleg.r"
  ],
  "face_normal_verts": 492,
- "triangles_total": 11844,
- "rest_height_m": 1.9986,
+ "outline_unlined_verts": 489,
+ "triangles_total": 11970,
+ "rest_height_m": 2.0024,
  "rest_min_z": -0.0016
 }

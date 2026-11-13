@@ -182,6 +182,9 @@ def add_outline(ob, width, mat=None):
     sol.use_rim = False
     sol.use_even_offset = True
     sol.material_offset = len(ob.data.materials) - 1
+    if ob.vertex_groups.get("outline_w"):        # v5: per-vertex outline weight (0 = no hull), as Unity's UV4.x
+        sol.vertex_group = "outline_w"
+        sol.thickness_vertex_group = 0.0
     return sol
 
 

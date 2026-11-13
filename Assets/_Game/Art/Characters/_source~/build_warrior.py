@@ -34,6 +34,7 @@ OUT_BLEND = os.path.join(HERE, "warrior.blend")
 OUT_FBX = os.path.join(os.path.dirname(HERE), "Warrior.fbx")
 OUT_FACE = os.path.join(os.path.dirname(HERE), "Warrior_Face.png")   # 256 x 256 painted face decal (Unity imports it)
 OUT_JOINTS = os.path.join(HERE, "rig_kaykit41.json")
+OUT_OUTLINE_W = os.path.join(os.path.dirname(HERE), "Warrior_OutlineW.json")   # v5 sidecar: unlined hair vertices
 OUT_REPORT = os.path.join(HERE, "build_report.json")
 DISPLAY_ACTION, DISPLAY_FRAME = "Idle", 1
 
@@ -44,13 +45,13 @@ M = kit.mat_from
 
 
 STONE_STEPS = (0.12, 0.30)     # v4: stone reads as form under the flat toon shader: light top, mid, dark underside
-HAIR_STEPS = (0.14, 0.22)
+HAIR_STEPS = (0.18, 0.28)      # v5: a clearly lighter top plane and darker underside on the locks
 
 
 # v4: head and hair are modelled at "design size" and then scaled about the chin (smaller head, 3-head proportion as the
 # bible draws it); the topknot is lifted after the scale so the figure stays 2.0 u tall. face.paint uses the same map.
 HEAD_SCALE = (0.90, 0.90, (0.0, -0.02, 1.27))      # xy factor, z factor, pivot
-TOPKNOT_LIFT = 0.07
+TOPKNOT_LIFT = 0.09
 
 
 def head_space():
@@ -247,52 +248,101 @@ def build_head():
 
 
 def build_hair():
-    """v4 hair (bible p06): warm dark brown, a soft rounded volume of big swept clumps. The fringe parts near the
-    middle and sweeps out to both temples (tips point down and outward, ending above the brows); temple locks frame
-    the face in front of the ears; the back is a full round crown with nape spikes; a tall spiky topknot fans up from
-    a brass tie on top of the head."""
+    """v5 hair (bible p06): a few BIG soft chunky locks instead of thin shards. A fat swept fringe that overlaps the
+    forehead down to the brows, round locks curling out at the temples in front of the ears, a full round crown and
+    nape, and a tall full topknot of six thick leaf-shaped locks fanning from a wide brass band. Warm brown with a
+    lighter top plane and a darker underside (HAIR_STEPS + gradient). Interior hull lines are switched off per vertex
+    (outline_w, see outline_weights) so lock overlaps do not read as black cracks."""
     H = "head"
-    add(BODY, B.sphere((0.262, 0.248, 0.168), 16, 10), "hair", H, "hair", m=M((0, 0.03, 1.62)), grad=0.22)
-    add(BODY, B.sphere((0.245, 0.200, 0.210), 14, 9), "hair", H, "hair", m=M((0, 0.10, 1.49)), grad=0.22)
-    SP = (0.95, 1.0, 0.70, 0.30)          # clump profile: full at the root, soft swell, pointed tip
+    add(BODY, B.sphere((0.268, 0.255, 0.175), 16, 10), "hair", H, "hair", m=M((0, 0.03, 1.62)), grad=0.24)
+    add(BODY, B.sphere((0.255, 0.210, 0.220), 14, 9), "hair", H, "hair", m=M((0, 0.10, 1.49)), grad=0.24)
+    FP = (1.0, 1.10, 0.86, 0.46)              # chunky lock: full, swelling, then a clear point
     F = (0, -1, 0.35)
     C = [  # (base, control, tip, width, thickness, up)
-        # fringe: two big swept clumps from the part, outer clumps sweeping to the temples, one small centre lock
-        ((-0.03, -0.10, 1.765), (-0.08, -0.27, 1.715), (-0.16, -0.235, 1.575), 0.19, 0.075, F),
-        ((0.04, -0.10, 1.765), (0.10, -0.27, 1.715), (0.18, -0.23, 1.580), 0.18, 0.075, F),
-        ((-0.13, -0.07, 1.755), (-0.24, -0.23, 1.695), (-0.31, -0.16, 1.570), 0.17, 0.075, F),
-        ((0.14, -0.07, 1.755), (0.25, -0.23, 1.695), (0.32, -0.15, 1.575), 0.17, 0.075, F),
-        ((0.00, -0.12, 1.755), (0.01, -0.275, 1.695), (0.035, -0.24, 1.600), 0.14, 0.075, F),
-        # temple locks in front of the ears
-        ((0.19, -0.04, 1.71), (0.30, -0.11, 1.64), (0.32, -0.13, 1.535), 0.14, 0.07, (1, 0, 0.2)),
-        ((-0.19, -0.04, 1.71), (-0.30, -0.11, 1.64), (-0.32, -0.13, 1.535), 0.14, 0.07, (-1, 0, 0.2)),
-        # sides behind the ears
-        ((0.21, 0.13, 1.70), (0.32, 0.20, 1.63), (0.34, 0.20, 1.50), 0.17, 0.085, (1, 0.6, 0)),
-        ((-0.21, 0.13, 1.70), (-0.32, 0.20, 1.63), (-0.34, 0.20, 1.50), 0.17, 0.085, (-1, 0.6, 0)),
-        # nape
-        ((0.10, 0.22, 1.62), (0.15, 0.34, 1.50), (0.16, 0.34, 1.35), 0.17, 0.085, (0.3, 1, 0)),
-        ((-0.10, 0.22, 1.62), (-0.15, 0.34, 1.50), (-0.17, 0.33, 1.35), 0.17, 0.085, (-0.3, 1, 0)),
-        ((0.0, 0.25, 1.64), (0.0, 0.37, 1.52), (0.01, 0.36, 1.33), 0.17, 0.085, (0, 1, 0)),
-        # back of the crown
-        ((0.10, 0.17, 1.74), (0.14, 0.36, 1.71), (0.16, 0.43, 1.60), 0.17, 0.085, (0.2, 1, 0.3)),
-        ((-0.10, 0.17, 1.74), (-0.14, 0.36, 1.71), (-0.17, 0.42, 1.59), 0.17, 0.085, (-0.2, 1, 0.3)),
+        # fringe: one big lock sweeping across the forehead to the character's right, one to the left, two outer locks
+        ((0.06, -0.12, 1.775), (-0.06, -0.30, 1.720), (-0.17, -0.255, 1.555), 0.26, 0.095, F),
+        ((0.08, -0.10, 1.770), (0.17, -0.29, 1.700), (0.22, -0.235, 1.565), 0.22, 0.09, F),
+        ((-0.12, -0.06, 1.765), (-0.25, -0.24, 1.690), (-0.30, -0.17, 1.565), 0.20, 0.09, F),
+        ((0.17, -0.05, 1.755), (0.28, -0.21, 1.680), (0.31, -0.14, 1.570), 0.18, 0.085, F),
+        # round locks curling out at the temples, in front of the ears
+        ((0.20, -0.06, 1.69), (0.33, -0.12, 1.62), (0.37, -0.06, 1.53), 0.16, 0.10, (1, 0, 0.2)),
+        ((-0.20, -0.06, 1.69), (-0.33, -0.12, 1.62), (-0.37, -0.06, 1.53), 0.16, 0.10, (-1, 0, 0.2)),
+        # behind the ears
+        ((0.21, 0.12, 1.70), (0.32, 0.19, 1.62), (0.33, 0.20, 1.48), 0.20, 0.13, (1, 0.6, 0)),
+        ((-0.21, 0.12, 1.70), (-0.32, 0.19, 1.62), (-0.33, 0.20, 1.48), 0.20, 0.13, (-1, 0.6, 0)),
+        # nape and back of the crown
+        ((0.08, 0.22, 1.62), (0.13, 0.34, 1.50), (0.14, 0.33, 1.36), 0.20, 0.13, (0.3, 1, 0)),
+        ((-0.08, 0.22, 1.62), (-0.13, 0.34, 1.50), (-0.14, 0.33, 1.36), 0.20, 0.13, (-0.3, 1, 0)),
+        ((0.09, 0.17, 1.74), (0.13, 0.35, 1.71), (0.15, 0.42, 1.60), 0.20, 0.12, (0.2, 1, 0.3)),
+        ((-0.09, 0.17, 1.74), (-0.13, 0.35, 1.71), (-0.15, 0.42, 1.60), 0.20, 0.12, (-0.2, 1, 0.3)),
     ]
     for p0, p1, p2, w, t, up in C:
-        add(BODY, B.clump(p0, p1, p2, w, t, 6, up=up, prof=SP), "hair", H, "hair", grad=0.30)
+        add(BODY, B.clump(p0, p1, p2, w, t, 6, up=up, prof=FP), "hair", H, "hair", grad=0.32)
+    for sx in (1, -1, 0):     # crown locks flowing from the topknot toward the temples (seen from the high camera)
+        add(BODY, B.clump((0.0, 0.07, 1.80), (0.13 * sx, -0.06, 1.81), (0.23 * sx, -0.12, 1.73) if sx else
+                          (0.02, -0.17, 1.76), 0.20, 0.08, 6, up=(0, 0, 1), prof=FP), "hair", H, "hair", grad=0.32)
     T = "topknot"
-    add(BODY, B.sphere((0.095, 0.095, 0.075), 12, 8), "hair", H, T, m=M((0, 0.10, 1.775)), grad=0.22)
-    add(BODY, B.torus(0.068, 0.030, 16, 6), "brass", H, T, m=M((0, 0.10, 1.810), (-10, 0, 0)))
-    b = (0.0, 0.10, 1.84)
-    tuft = [  # a tall spiky fan from the brass tie: up-left, two tall middle spikes, up-right, out right, back
-            ((-0.03, 0.10, 1.83), (-0.07, 0.08, 1.930), (-0.14, 0.10, 1.975), 0.15, 0.075, (0, -1, 0)),
-            ((-0.01, 0.10, 1.84), (-0.02, 0.07, 1.960), (-0.04, 0.07, 2.000), 0.16, 0.08, (0, -1, 0)),
-            ((0.01, 0.10, 1.84), (0.04, 0.07, 1.965), (0.08, 0.07, 2.000), 0.17, 0.085, (0, -1, 0)),
-            ((0.03, 0.10, 1.84), (0.10, 0.08, 1.950), (0.17, 0.09, 1.975), 0.15, 0.08, (0, -1, 0)),
-            ((0.04, 0.10, 1.83), (0.15, 0.11, 1.910), (0.24, 0.13, 1.925), 0.13, 0.07, (0, -1, 0.1)),
-            ((0.05, 0.11, 1.82), (0.17, 0.14, 1.860), (0.28, 0.17, 1.840), 0.11, 0.06, (0, -1, 0.2)),
-            ((0.00, 0.12, 1.83), (0.01, 0.24, 1.925), (0.03, 0.33, 1.895), 0.13, 0.07, (0, 0, 1))]
-    for p0, p1, p2, w, t, up in tuft:
-        add(BODY, B.clump(p0, p1, p2, w, t, 7, up=up, prof=SP), "hair", H, T, grad=0.30)
+    add(BODY, B.sphere((0.09, 0.09, 0.06), 12, 8), "hair", H, T, m=M((0, 0.10, 1.765)), grad=0.24)
+    add(BODY, B.cyl((0, 0.10, 1.752), (0, 0.10, 1.822), 0.092, 0.086, 18), "brass", H, T)     # wide brass band
+    add(BODY, B.torus(0.090, 0.007, 18, 4), groove("brass"), H, T, m=M((0, 0.10, 1.787)))
+    LP = (0.55, 0.95, 1.05, 0.85, 0.55, 0.28)       # leaf: narrow root, full middle, long pointed tip
+    b = (0.0, 0.10, 1.815)
+    tuft = [((-0.12, 0.08, 1.880), (-0.26, 0.10, 1.905), 0.17, 0.075, (0, -1, 0)),
+            ((-0.06, 0.07, 1.930), (-0.13, 0.07, 1.975), 0.18, 0.08, (0, -1, 0)),
+            ((0.02, 0.07, 1.950), (0.03, 0.06, 1.982), 0.18, 0.08, (0, -1, 0)),
+            ((0.09, 0.08, 1.930), (0.17, 0.08, 1.972), 0.18, 0.08, (0, -1, 0)),
+            ((0.15, 0.10, 1.880), (0.29, 0.13, 1.895), 0.16, 0.075, (0, -1, 0.2)),
+            ((0.01, 0.25, 1.880), (0.04, 0.34, 1.840), 0.16, 0.075, (0, 0, 1))]
+    for p1, p2, w, t, up in tuft:
+        add(BODY, B.clump(b, p1, p2, w, t, 6, up=up, prof=LP), "hair", H, T, grad=0.32)
+
+
+def outline_weights(ob, hair_feats=("feat_hair", "feat_topknot")):
+    """v5: per-vertex outline weight (Blender group outline_w, 1 lined / 0 unlined; Unity bakes it into UV4.x from the
+    Warrior_OutlineW.json sidecar). A hair vertex is unlined when, for the views where it lies on a silhouette edge
+    (front and the four 55-degree gameplay yaws), what sits right behind it is other hair: its hull would only draw an
+    interior crack between locks. Hair edges against skin or empty space keep their line."""
+    import bmesh as _bm
+    from mathutils.bvhtree import BVHTree
+    me = ob.data
+    gids = {ob.vertex_groups[n].index for n in hair_feats if n in ob.vertex_groups}
+    hair = [any(e.group in gids for e in v.groups) for v in me.vertices]
+    bm = _bm.new()
+    bm.from_mesh(me)
+    bm.verts.ensure_lookup_table()
+    _bm.ops.delete(bm, geom=[f for f in bm.faces if not all(hair[v.index] for v in f.verts)], context="FACES_ONLY")
+    tree = BVHTree.FromBMesh(bm)
+    bm.free()
+    c55, s55 = math.cos(math.radians(55)), math.sin(math.radians(55))
+    views = [Vector((0, 1, 0))] + [Vector((math.sin(a) * c55, math.cos(a) * c55, -s55)).normalized()
+                                   for a in (math.radians(y) for y in (45, 135, 225, 315))]
+    g = ob.vertex_groups.new(name="outline_w")
+    g.add(list(range(len(me.vertices))), 1.0, "REPLACE")
+    unlined = []
+    for v in me.vertices:
+        if not hair[v.index]:
+            continue
+        n = v.normal
+        edge = [d for d in views if abs(n.dot(d)) < 0.45]
+        if not edge:
+            continue
+        hits = sum(1 for d in edge if tree.ray_cast(v.co + n * 0.03, d, 0.6)[0] is not None)
+        if hits >= 0.6 * len(edge):
+            unlined.append(v.index)
+    g.add(unlined, 0.0, "REPLACE")
+    return unlined
+
+
+def write_outline_sidecar(ob, idx, path):
+    """Same format as critical-mass-unity tools/art/outline_weights.py: rest positions of unlined vertices, unity(x,z,y)."""
+    pts = []
+    for i in idx:
+        co = ob.data.vertices[i].co
+        pts += [round(co.x, 5), round(co.z, 5), round(co.y, 5)]
+    with open(path, "w") as f:
+        json.dump({"source": "warrior.blend", "group": "outline_w", "axes": "unity(x,z,y)",
+                   "meshes": [{"name": ob.name, "vertices": len(ob.data.vertices), "unlined": pts}]}, f,
+                  separators=(",", ":"))
 
 
 def soften_face_normals(ob, blend=0.85):
@@ -514,6 +564,8 @@ def main():
     coll.objects.link(arm)
     objs = B.finalize(coll, mat)
     face_verts = soften_face_normals(objs[BODY])
+    unlined = outline_weights(objs[BODY])
+    write_outline_sidecar(objs[BODY], unlined, OUT_OUTLINE_W)
 
     # leave the source scene showing the display pose (the FBX is written in rest pose regardless)
     arm.animation_data_create()
@@ -521,7 +573,7 @@ def main():
     scene.frame_set(DISPLAY_FRAME)
 
     report = {"objects": {}, "bones": len(arm.data.bones), "display_pose": [DISPLAY_ACTION, DISPLAY_FRAME],
-              "idle_attitude_bones": baked, "face_normal_verts": face_verts}
+              "idle_attitude_bones": baked, "face_normal_verts": face_verts, "outline_unlined_verts": len(unlined)}
     total = 0
     for name, ob in objs.items():
         tris = sum(len(p.vertices) - 2 for p in ob.data.polygons)
