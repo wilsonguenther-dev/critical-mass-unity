@@ -44,7 +44,7 @@ namespace CriticalMass.Runtime.Audio
     /// loop, 1.5 dB louder) at one minute left, and a victory, defeat or draw sting at the match end (from the human's
     /// side), after which the title loop returns quietly under the results. The music ducks under announcer lines and
     /// while the pause menu is open. View only: it reads the match and never writes it. Clips: Resources CMMusic/ and
-    /// CMStings/ (Assets/_Game/Audio/Music, credits in Assets/_Game/Audio/CREDITS.md).
+    /// CMStings/ (Assets/_Game/Audio/Music, credits in Assets/_Game/Audio/Resources/CREDITS.md).
     /// <para>Public API: <see cref="SetMenuMusic"/> (game-flow menus: title music without a match),
     /// <see cref="CurrentState"/>, <see cref="StateChanged"/>, <see cref="Duck"/>, <see cref="Decide"/>.</para>
     /// </summary>
