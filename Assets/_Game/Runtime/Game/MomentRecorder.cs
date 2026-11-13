@@ -133,7 +133,15 @@ namespace CriticalMass.Runtime.Game
         /// The screen copy comes out upside down where the graphics API's texture origin is the top (Metal, Direct3D);
         /// the recorder flips it there. Exposed so the integrator can correct it in one place if a capture reads wrong.
         /// </summary>
-        public static bool FlipScreenCapture = SystemInfo.graphicsUVStartsAtTop;
+        public static bool FlipScreenCapture
+        {
+            // Integration batch 2: read on first use. As a static field initialiser Unity threw "not allowed to be called
+            // from a MonoBehaviour constructor" when the component was added, which failed every PlayMode test.
+            get => _flip ?? (_flip = SystemInfo.graphicsUVStartsAtTop).Value;
+            set => _flip = value;
+        }
+
+        static bool? _flip;
 
         /// <summary>The recorder of the running game (null when none).</summary>
         public static MomentRecorder Current { get; private set; }
