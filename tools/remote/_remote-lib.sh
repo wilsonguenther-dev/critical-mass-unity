@@ -8,7 +8,7 @@ SSH_OPTS=(-o BatchMode=yes -o ConnectTimeout=15 -o ServerAliveInterval=20 -o Ser
 REMOTE_JOB=""
 
 rssh() { ssh "${SSH_OPTS[@]}" "$REMOTE_USER@$REMOTE_HOST" "$@"; }
-rsync_to() { rsync -a -e "ssh ${SSH_OPTS[*]}" "$@"; }
+rsync_to() { rsync -a --partial -z -e "ssh ${SSH_OPTS[*]}" "$@"; }
 
 remote_preflight() {  # reachable, ~/cm-remote exists, the runner is current
   rssh 'mkdir -p ~/cm-remote/bin ~/cm-remote/builds ~/cm-remote/runs ~/cm-remote/work' 2>/dev/null \
