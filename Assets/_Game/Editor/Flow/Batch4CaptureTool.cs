@@ -35,7 +35,7 @@ namespace CriticalMass.Editor.Flow
     /// </summary>
     public static class Batch4CaptureTool
     {
-        const int Width = 1920, Height = 1080, MaxFrames = 40000;
+        const int Width = 1920, Height = 1080, MaxFrames = 120000;
         static string _out;
         static int _frames, _shots, _wanted;
         static IEnumerator<Func<bool>> _walk;
@@ -74,6 +74,20 @@ namespace CriticalMass.Editor.Flow
         {
             double until = EditorApplication.timeSinceStartup + s;
             return () => EditorApplication.timeSinceStartup >= until;
+        }
+
+        /// <summary>Waits for the takeover to end, at most s wall seconds (noted; the walk goes on either way).</summary>
+        static Func<bool> MomentEndsOrTimesOut(double s)
+        {
+            double until = EditorApplication.timeSinceStartup + s;
+            return () =>
+            {
+                if (!CriticalMass.Runtime.View.Moments.BigMoments.IsPlaying) return true;
+                if (EditorApplication.timeSinceStartup < until) return false;
+                Note($"big moment still playing after {s:0} s: {MomentNow()}; stopped");
+                CriticalMass.Runtime.View.Moments.BigMoments.StopAll();
+                return true;
+            };
         }
 
         static void Note(string s)
@@ -365,6 +379,14 @@ namespace CriticalMass.Editor.Flow
                 Shot("18-map-event-banner");
             }
 
+            // Finisher: the full map (legend rows, depth legend, one-line key hints under the map frame).
+            CriticalMass.Runtime.Hud.Interact.FullMap.Show();
+            yield return Seconds(0.6);
+            Note($"full map: open {CriticalMass.Runtime.Hud.Interact.FullMap.IsOpen}");
+            Shot("18b-full-map");
+            CriticalMass.Runtime.Hud.Interact.FullMap.Hide();
+            yield return StepFrames(6);
+
             // Physics: a wind-up and a hit with stagger on an enemy in front.
             {
                 Teleport(0, sx, sz);
@@ -481,12 +503,12 @@ namespace CriticalMass.Editor.Flow
             yield return Seconds(0.45);
             Note($"big moment: {MomentNow()}, portrait {CriticalMass.Runtime.View.Moments.BigMoments.LastPortraitSource}");
             Shot("27a-big-moment-portrait");
-            yield return () => !CriticalMass.Runtime.View.Moments.BigMoments.IsPlaying;
+            yield return MomentEndsOrTimesOut(6);
             CriticalMass.Runtime.View.Moments.BigMoments.Play(CriticalMass.Runtime.View.Moments.MomentId.KaijuDown);
             yield return Seconds(0.45);
             Note($"big moment: {MomentNow()}, portrait {CriticalMass.Runtime.View.Moments.BigMoments.LastPortraitSource}");
             Shot("27b-big-moment-kaiju");
-            yield return () => !CriticalMass.Runtime.View.Moments.BigMoments.IsPlaying;
+            yield return MomentEndsOrTimesOut(6);
             CriticalMass.Runtime.View.Moments.BigMomentsSettings.ModeOverride = CriticalMass.Runtime.View.Moments.BigMomentsMode.Off;
             CriticalMass.Runtime.View.Moments.BigMoments.StopAll();
 
