@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using CriticalMass.Sim.Bots;
 using CriticalMass.Sim.Config;
 using CriticalMass.Sim.Core;
 using CriticalMass.Sim.Grid;
@@ -360,6 +361,119 @@ namespace CriticalMass.Sim.Tests
                 }
             }
             NoneBad(bad);
+        }
+
+        /// <summary>
+        /// DG-02 field report (owner, 2026-11-12: "I got stuck" on the last planks at the far end of the long bridge):
+        /// every span, both directions, three lateral offsets, input held along the axis: the body walks off the far
+        /// mouth onto island ground (FLOOR, 1.5 u past the chasm) within the time budget, never stalls 0.1 s, never
+        /// stands where ActorFits fails.
+        /// </summary>
+        [Test]
+        public void DG02EveryBridgeBothDirectionsAndOffBothEndsReachesGroundBeyondTheMouth()
+        {
+            var bad = new List<string>();
+            double edge = HalfWidth - R;
+            for (int s = 0; s < BridgeSpans.All.Count; s++)
+            {
+                BridgeSpan fwd = BridgeSpans.All[s];
+                for (int dir = 0; dir < 2; dir++)
+                {
+                    BridgeSpan sp = dir == 0 ? fwd : new BridgeSpan
+                    {
+                        X0 = fwd.X1, Z0 = fwd.Z1, X1 = fwd.X0, Z1 = fwd.Z0, Ux = -fwd.Ux, Uz = -fwd.Uz, Len = fwd.Len,
+                        H0 = fwd.H1, H1 = fwd.H0, Diagonal = fwd.Diagonal,
+                    };
+                    if (!Chasm(World0.Map, sp, out double enter, out double exit)) continue;
+                    double goal = exit + 1.5;
+                    foreach (double f in new[] { -0.8, 0, 0.8 })
+                    {
+                        string tag = Label(s) + (dir == 0 ? " forward" : " backward") + " offset " + f;
+                        if (!StartAt(World0, sp, enter, f * edge, out P p))
+                        {
+                            bad.Add(tag + ": no fitting start");
+                            continue;
+                        }
+                        int budget = (int)Math.Ceiling(TimeSlack * (goal - BridgeSpans.Along(sp, p.X, p.Z)) / MoveSpeed * SimHz) + (int)SimHz;
+                        Run run = Cross(sp, p.X, p.Z, sp.Ux, sp.Uz, goal, budget);
+                        Report(bad, tag, run, budget, true);
+                        if (run.Arrived && MapGrid.CellAt(World0.Map, run.X, run.Z) != Cell.Floor) bad.Add(tag + ": ended on cell " + MapGrid.CellAt(World0.Map, run.X, run.Z) + ", not island ground");
+                    }
+                }
+            }
+            NoneBad(bad);
+        }
+
+        /// <summary>
+        /// DG-02 field report: in a 16v16 bot match (actor 0 on autopilot) no body holding move input for 2 s ends that
+        /// window within 0.05 u of where it began while no enemy is in contact, on or beside a bridge (a BRIDGE cell
+        /// within 2 cells). Counts of every stuck window (anywhere) are printed for the report.
+        /// </summary>
+        [Test]
+        public void DG02NoBotIsStuckAtABridgeIn16v16()
+        {
+            World w = World.CreateWorld(new WorldOptions
+            {
+                Seed = 1337, TeamSize = 16, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = GameConfig.CreateBrowser5v5(),
+            });
+            InputFrame scratch = SimInput.EmptyInput();
+            const int Window = 60;
+            int n = w.ActorCount;
+            var held = new int[n];
+            var ax = new double[n];
+            var az = new double[n];
+            int stuckAll = 0, stuckBridge = 0;
+            string first = "";
+            for (int t = 0; t < 3600 && w.Match.Phase != MatchPhase.Ended; t++)
+            {
+                MatchTick.Advance(w, null, scratch);
+                for (int i = 0; i < n; i++)
+                {
+                    Actor a = w.Actors[i];
+                    InputFrame inp = w.Inputs[i];
+                    bool moving = a.Alive && a.StandUp <= 0 && inp.MoveX * inp.MoveX + inp.MoveZ * inp.MoveZ > 0.25 && !EnemyTouching(w, i);
+                    if (!moving)
+                    {
+                        held[i] = 0;
+                        continue;
+                    }
+                    if (held[i] == 0)
+                    {
+                        ax[i] = w.X[i];
+                        az[i] = w.Z[i];
+                    }
+                    if (++held[i] < Window) continue;
+                    held[i] = 0;
+                    if (BridgeSpans.Hypot(w.X[i] - ax[i], w.Z[i] - az[i]) >= 0.05) continue;
+                    stuckAll++;
+                    if (!NearBridge(w.Map, w.X[i], w.Z[i])) continue;
+                    stuckBridge++;
+                    if (first.Length == 0) first = "t=" + w.Tick + " id=" + i + " x=" + w.X[i].ToString("R") + " z=" + w.Z[i].ToString("R");
+                }
+            }
+            Console.WriteLine("DG-02 stuck windows (2 s, input held, no enemy contact): " + stuckAll + " anywhere, " + stuckBridge + " at a bridge " + first);
+            Assert.AreEqual(0, stuckBridge, first);
+        }
+
+        private static bool EnemyTouching(World w, int i)
+        {
+            for (int j = 0; j < w.ActorCount; j++)
+            {
+                if (j == i || !w.Actors[j].Alive || w.Actors[j].Team == w.Actors[i].Team) continue;
+                double rr = Collide.ActorRadius(w, i) + Collide.ActorRadius(w, j) + 0.2;
+                double dx = w.X[j] - w.X[i], dz = w.Z[j] - w.Z[i];
+                if (dx * dx + dz * dz < rr * rr) return true;
+            }
+            return false;
+        }
+
+        private static bool NearBridge(MapDef map, double x, double z)
+        {
+            int cx = (int)Math.Floor(x), cz = (int)Math.Floor(z);
+            for (int dz = -2; dz <= 2; dz++)
+                for (int dx = -2; dx <= 2; dx++)
+                    if (MapGrid.InBounds(map, cx + dx, cz + dz) && map.Cells[(cz + dz) * map.Width + cx + dx] == Cell.Bridge) return true;
+            return false;
         }
     }
 }
