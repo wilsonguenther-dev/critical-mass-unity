@@ -832,7 +832,7 @@ def shot_hill(cv, t, cam, cn):
 
 
 def cam_choice(t):
-    x = K(t, [(23.25, -250), (25.80, -290), (26.07, 250, 'inOutCubic'), (28.50, 290)])
+    x = K(t, [(23.25, -250), (25.80, -290), (26.07, -40, 'inOutCubic'), (28.50, 0)])
     return Cam(x, -20, 1.10, shake_at(t))
 
 
@@ -857,7 +857,23 @@ def shot_choice(cv, t, cam, cn):
     layer(cv, cam, cn, L('corruption.png'), 600 - creep, -330, 720, 0.75)
     layer(cv, cam, cn, L('biomass.png'), -300, -300, 520, 0.72, gain=1.0 + 0.12 * feed)
     sway = 1 + 0.01 * math.sin(2 * math.pi * 0.4 * t)
-    lh(cv, cam, cn, L('farmer_feed.png'), -690, -440, 470 * sway, 0.9)
+    back = K(t, [(26.0, 0.0), (26.5, 60, 'outCubic')])          # the Farmer recoils as the corruption reaches the egg
+    lh(cv, cam, cn, L('farmer_feed.png'), -600 - back, -440, 470 * sway, 0.9)
+    if t > 25.95:
+        # the corruption acts on the egg: violet thorn-light crawls from the crystals up into the shell
+        r = np.random.default_rng(11)
+        reach = K(t, [(25.95, 0.0), (27.2, 1.0, 'outCubic')])
+        for i in range(18):
+            ph = r.uniform(0, 1)
+            u = ((t - 25.95) * 0.8 + ph) % 1.0
+            u = min(u, reach)
+            sx, sy = 470 - creep + r.uniform(-60, 60), -230 + r.uniform(-40, 40)
+            x = sx + (CHOICE_EGG[0] + 60 - sx) * ease('inOutSine', u)
+            y = sy + (CHOICE_EGG[1] - 40 - sy) * u + 50 * math.sin(math.pi * u) * (1 if i % 2 else -0.4)
+            px, py, _ = cam.place(x, y, 1, 0.7)
+            dot(cv, px, py, 64, (0.72, 0.3, 1.0), 1.0 * math.sin(math.pi * max(0.05, u)))
+            dot(cv, px, py, 22, (0.95, 0.8, 1.0), 0.9 * math.sin(math.pi * max(0.05, u)))
+        dot(cv, ex + ew * 0.18, ey, ew * 1.3, (0.7, 0.3, 1.0), 0.55 * reach * flick)
     if 23.8 < t < 25.4:
         r = np.random.default_rng(3)
         for i in range(14):
@@ -981,13 +997,13 @@ def draw_raw(cv, img, cx, cy, rot=0.0, alpha=1.0, blur=None):
 
 
 def cam_kaiju(t):
-    y = K(t, [(32.25, -520), (34.40, 160, 'outCubic'), (40.50, 200)])
+    y = K(t, [(32.25, -520), (34.40, 30, 'outCubic'), (40.50, 70)])
     z = K(t, [(32.25, 1.00), (34.50, 1.00), (36.00, 1.06, 'outCubic'), (40.50, 1.08)])
     return Cam(K(t, [(32.25, 10), (40.5, -25)]), y, z, shake_at(t))
 
 
 KAIJU_STATES = ('neutral', 'azure', 'crimson', 'violet')
-KX = 250
+KX = 300
 
 
 def shot_kaiju(cv, t, cam, cn):
@@ -1006,7 +1022,7 @@ def shot_kaiju(cv, t, cam, cn):
     layer(cv, cam, cn, RAYS, -80, 300, 2200, 0.2, alpha=0.22, add=True, tint=(0.8, 0.8, 1.0))
     debris(cv, cam, t, 34.65, 36.2, 77, d0=0.55, region=(-800, 800), tint=(0.55, 0.56, 0.66), n=6, size=(40, 90),
            top=900)
-    feet, height = -760, 1250
+    feet, height = -440, 940
     az = K(t, [(35.25, 0.0), (35.45, 1.0, 'outCubic')])
     cr = K(t, [(36.00, 0.0), (36.20, 1.0, 'outCubic')])
     vi = K(t, [(37.50, 0.0), (37.66, 1.0, 'outCubic')])
@@ -1046,12 +1062,12 @@ def cam_hero(t):
 def shot_hero(cv, t, cam, cn):
     layer(cv, cam, cn, L('hero.jpg'), 0, 20, 2400, 0.4)
     rise = K(t, [(40.5, -70), (42.45, -50), (43.4, 0, 'inOutCubic'), (DUR, 10)])
-    name = L('kaiju_neutral.png')
-    h = 900 * (1 + 0.015 * math.sin(2 * math.pi * 0.3 * (t - 40.5)))
+    name = L('kaiju_hero_neutral.png')
+    h = 820 * (1 + 0.015 * math.sin(2 * math.pi * 0.3 * (t - 40.5)))
     w = h / tex_aspect(name)
-    x, feet = 610, -640
+    x, feet = 600, -600
     haze = (1.0, 0.84, 0.66)
-    layer(cv, cam, cn, L('kaiju_neutral_glow.png'), x, feet + rise + h / 2, w, 0.3, alpha=0.45 + 0.15 * math.sin(t * 3),
+    layer(cv, cam, cn, L('kaiju_hero_neutral_glow.png'), x, feet + rise + h / 2, w, 0.3, alpha=0.45 + 0.15 * math.sin(t * 3),
           add=True, tint=(1.0, 0.9, 0.55))
     layer(cv, cam, cn, name, x, feet + rise + h / 2, w, 0.3, tint=haze)
     layer(cv, cam, cn, name, x, feet + rise + h / 2, w, 0.3, alpha=0.18, add=True, tint=(0.55, 0.4, 0.25))   # air between

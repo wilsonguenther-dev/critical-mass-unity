@@ -120,7 +120,7 @@ KAIJU_HUES = dict(azure=(203.0, 1.0), crimson=(352.0, 1.35), violet=(278.0, 1.0)
 def seam_mask(rgba):
     h = hsv(rgba[..., :3])
     H, S, V = h[..., 0], h[..., 1], h[..., 2]
-    w = np.clip(1 - np.abs(H - 82) / 36.0, 0, 1) * np.clip((S - 0.35) / 0.2, 0, 1) * np.clip((V - 0.35) / 0.2, 0, 1)
+    w = np.clip(1 - np.abs(H - 82) / 36.0, 0, 1) * np.clip((S - 0.5) / 0.2, 0, 1) * np.clip((V - 0.6) / 0.2, 0, 1)
     return cv2.GaussianBlur(w, (0, 0), 0.8) * rgba[..., 3]
 
 
@@ -182,7 +182,9 @@ JOBS = {
     'clouds-day2': ('key', 'clouds_day.png', 'magenta'),
     'egg': ('key', 'egg.png', 'magenta'),
     'hatchling-burst': ('key', 'hatchling.png', 'magenta'),
-    'kaiju-roar': ('kaiju', 'kaiju'),
+    'kaiju2-roar-a': ('kaiju', 'kaiju'),
+    'kaiju2-roar-b': ('kaiju', 'kaiju_b'),
+    'kaiju2-stand-c': ('kaiju', 'kaiju_hero'),
     'ch-warrior-charge': ('char', 'warrior_charge'),
     'ch-warrior-stand': ('char', 'warrior_stand'),
     'ch-farmer-stand': ('char', 'farmer_stand'),
