@@ -75,6 +75,35 @@ namespace CriticalMass.Runtime.Tests
         }
 
         [Test]
+        public void ThePryBarIsAForearmLongHookedIronBarOfFourBoxes()
+        {
+            // fix/light-weapons-3: the tinted mallet read as a small blob; the stand-in is now its own bar.
+            Mesh m = WeaponProps.PryBarMesh();
+            Assert.AreSame(m, WeaponProps.PryBarMesh(), "built once, shared");
+            Assert.AreNotSame(WeaponProps.MalletMesh(), m, "no longer the mallet shape");
+            Assert.AreEqual(WeaponProps.PryBarBoxes * 12, m.triangles.Length / 3, "four boxes, 48 triangles");
+            Bounds b = m.bounds;
+            Assert.AreEqual(WeaponProps.PryBarLength, b.max.y, 0.08f, "about forearm length along the grip axis");
+            Assert.Greater(b.size.z, WeaponProps.PryBarThick * 2f, "the hooked end sticks out to one side");
+            Assert.Less(b.size.x, WeaponProps.PryBarThick * 2f, "a bar, not a head");
+            var root = new GameObject("hand");
+            Transform prop = WeaponProps.Attach(root.transform, HeldWeapon.PryBarStandIn, TeamId.Azure, null);
+            Assert.AreSame(m, prop.GetComponent<MeshFilter>().sharedMesh);
+            Object.DestroyImmediate(root);
+        }
+
+        [Test]
+        public void TheWeaponCaptureKeepsItsDummyPassiveAndTheBannerOff()
+        {
+            // fix/light-weapons-3: the dummy hit back (the attacker flashed white) and the start banner covered the shots.
+            string src = System.IO.File.ReadAllText(System.IO.Path.Combine(Application.dataPath, "_Game/Runtime/View/Anim/WeaponCapture.cs"));
+            StringAssert.Contains("KeepDummyPassive(w);", src);
+            StringAssert.Contains("FirstMinutes.StartBannerOff = true", src);
+            StringAssert.Contains("Banner.ClearAll()", src);
+            StringAssert.Contains("if (!FirstMinutes.StartBannerOff)", System.IO.File.ReadAllText(System.IO.Path.Combine(Application.dataPath, "_Game/Runtime/Hud/YouMarker.cs")));
+        }
+
+        [Test]
         public void TheAttackSlotNamesTheWeapon()
         {
             Assert.AreEqual("MALLET", GameHud.AttackName((int)ClassId.Builder, false));

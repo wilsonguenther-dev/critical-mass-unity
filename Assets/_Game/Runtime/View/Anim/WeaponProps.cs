@@ -152,8 +152,47 @@ namespace CriticalMass.Runtime.View.Anim
 
         static GameObject MakeMallet() => MeshObject(PropName + " (Mallet)", MalletMesh(), ToonMaterials.Prop(MalletWoodHex, false));
 
-        /// <summary>STAND-IN until a pry-bar model exists: the mallet shape in dark iron.</summary>
-        static GameObject MakeStandInPryBar() => MeshObject(PropName + " (Pry Bar STAND-IN)", MalletMesh(), ToonMaterials.Prop(PryBarIronHex, false));
+        /// <summary>STAND-IN until a pry-bar model exists: a dark-iron bar built from boxes (PryBarMesh).</summary>
+        static GameObject MakeStandInPryBar() => MeshObject(PropName + " (Pry Bar STAND-IN)", PryBarMesh(), ToonMaterials.Prop(PryBarIronHex, false));
+
+        /// <summary>fix/light-weapons-3: pry bar length (about a forearm), shaft thickness and box count.</summary>
+        public const float PryBarLength = 0.6f, PryBarThick = 0.06f;
+        public const int PryBarBoxes = 4;
+        static Mesh _pryBarMesh;
+
+        /// <summary>
+        /// fix/light-weapons-3: the stand-in pry bar (the tinted mallet read as a small blob in the hand). Four boxes from
+        /// Unity's cube (12 triangles each, 48 in all), built once and shared: a straight square shaft along +Y from 0 to
+        /// 0.82 L (the hand grips it GripFromEnd up from the bottom), a bend tilted 40 degrees forward at the top, a claw tip
+        /// hooking back down, and a flat chisel foot at the bottom. Handle convention as the mallet (socket +Y), so the
+        /// grip and the swing are unchanged.
+        /// </summary>
+        public static Mesh PryBarMesh()
+        {
+            if (_pryBarMesh != null) return _pryBarMesh;
+            Mesh cube = PrimitiveMesh(PrimitiveType.Cube);
+            float L = PryBarLength, T = PryBarThick, shaft = L * 0.82f;
+            var parts = new CombineInstance[PryBarBoxes];
+            parts[0] = new CombineInstance { mesh = cube, transform = Matrix4x4.TRS(new Vector3(0f, shaft * 0.5f, 0f), Quaternion.identity, new Vector3(T, shaft, T)) };
+            // The bend: a short length leaning forward (+Z) from the shaft's top.
+            float bend = L * 0.2f;
+            Quaternion lean = Quaternion.Euler(40f, 0f, 0f);
+            Vector3 bendBase = new Vector3(0f, shaft - T * 0.3f, 0f);
+            Vector3 bendMid = bendBase + lean * new Vector3(0f, bend * 0.5f, 0f);
+            Vector3 bendTop = bendBase + lean * new Vector3(0f, bend, 0f);
+            parts[1] = new CombineInstance { mesh = cube, transform = Matrix4x4.TRS(bendMid, lean, new Vector3(T, bend, T)) };
+            // The claw: hooks back down and forward from the bend's end, a little thinner and flattened.
+            Quaternion hook = Quaternion.Euler(150f, 0f, 0f);
+            float claw = L * 0.14f;
+            parts[2] = new CombineInstance { mesh = cube, transform = Matrix4x4.TRS(bendTop + hook * new Vector3(0f, claw * 0.5f, 0f), hook, new Vector3(T * 1.25f, claw, T * 0.7f)) };
+            // The chisel foot: a flat wedge-like block at the bottom end.
+            parts[3] = new CombineInstance { mesh = cube, transform = Matrix4x4.TRS(new Vector3(0f, -T * 0.4f, T * 0.15f), Quaternion.Euler(-12f, 0f, 0f), new Vector3(T * 1.4f, T * 1.2f, T * 0.6f)) };
+            var m = new Mesh { name = "LightWeapon_PryBarStandIn" };
+            m.CombineMeshes(parts, true, true);
+            m.RecalculateBounds();
+            _pryBarMesh = m;
+            return m;
+        }
 
         /// <summary>The authored Healer_Lantern_Prop on the team material, hung from the hand; a small brass block if the catalog lacks it.</summary>
         static GameObject MakeLantern(ArtCatalog catalog, TeamId team)

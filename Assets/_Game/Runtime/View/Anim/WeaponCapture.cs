@@ -99,6 +99,21 @@ namespace CriticalMass.Runtime.View.Anim
             w.Z[id] = w.PrevZ[id] = z;
         }
 
+        /// <summary>
+        /// fix/light-weapons-3: the dummy is a live enemy bot and it hit back, so the attacker took a hit and showed the hit
+        /// flash (a white silhouette) in the wind-up and contact shots. Before every tick its swing and ability are held on
+        /// cooldown and any wind-up is dropped, so only our fighter swings. Capture only: a match never runs this.
+        /// </summary>
+        void KeepDummyPassive(World w)
+        {
+            if (_dummy < 0 || _dummy >= w.ActorCount) return;
+            Actor d = w.Actors[_dummy];
+            d.AttackCd = Math.Max(d.AttackCd, 1.0);
+            d.AbilityCd = Math.Max(d.AbilityCd, 1.0);
+            d.AbilityActive = 0;
+            d.SwingWindup = 0;
+        }
+
         void Step(int n)
         {
             World w = _driver.World;
@@ -107,6 +122,7 @@ namespace CriticalMass.Runtime.View.Anim
             for (int t = 0; t < n; t++)
             {
                 _driver.HumanAutopilot = false;
+                KeepDummyPassive(w);
                 _driver.StepTicks(1);
                 if (_holdDummy && _dummy >= 0 && w.Actors[_dummy].Alive) Put(w, _dummy, _dummyX, _dummyZ);
             }
@@ -139,6 +155,9 @@ namespace CriticalMass.Runtime.View.Anim
         {
             World w = _driver.World;
             World.ResetWorld(w, new WorldOptions { Seed = 1337, TeamSize = 16, HumanTeam = TeamId.Azure, HumanClass = cls, Config = _driver.Config });
+            // fix/light-weapons-3: no "YOU ARE AZURE" start banner over the close-ups.
+            CriticalMass.Runtime.Hud.FirstMinutes.StartBannerOff = true;
+            CriticalMass.Runtime.Hud.Banner.ClearAll();
             _driver.TimeScale = 0;
             AutoplayArgs.ClockHeld = true;
             _holdDummy = false;
@@ -191,6 +210,7 @@ namespace CriticalMass.Runtime.View.Anim
 
         IEnumerator Shot(string name, Vector3 focus, bool wideToo)
         {
+            CriticalMass.Runtime.Hud.Banner.ClearAll();
             yield return null;
             yield return new WaitForEndOfFrame();
             if (wideToo) ScreenCapture.CaptureScreenshot(Path.Combine(GamePaths.DataDir, Prefix + name + "-wide.png"));
