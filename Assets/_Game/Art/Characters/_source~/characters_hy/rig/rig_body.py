@@ -368,19 +368,22 @@ try:
     dom = W.argmax(1)
     locked = np.zeros(nv, bool)
     # head top rigid
-    rig_head = (P[:, 2] > J['head'].z + 0.06 * H) & np.isin(dom, [bi['head'], bi['chest'], bi['spine']])
-    W[rig_head] = 0; W[rig_head, bi['head']] = 1; locked |= rig_head
     # back pack rigid on the chest: well behind the chest joint, between the hips and the head top, not an arm
     # rig-builder-2: everything carried behind the back (ladder, pack, wings) is ONE rigid piece on the chest: any vertex
     # behind the back plane above the hips that is not on an arm (the ladder took shoulder weight and fanned out in Attack)
     back = (P[:, 1] > J['chest'].y + 0.05 * H) & (P[:, 2] > J['hips'].z)
     headc = np.array([0.0, J['head'].y, (J['head'].z + J['_headtop'].z) / 2])
     back &= np.linalg.norm(P - headc, axis=1) > 0.65 * (J['_headtop'].z - J['head'].z)   # hair buns stay on the head
-    for s in SIDES:
-        pts_ = [J[f'upperarm.{s}'], J[f'lowerarm.{s}'], J[f'wrist.{s}'], J[f'hand.{s}']]
-        d_ = np.min([seg_dist(P, pts_[i], pts_[i + 1])[0] for i in range(3)], axis=0)
-        back &= d_ > 0.05 * H
+    # rig-builder-2 (owner's look 2): NO arm exception, and the head-top rule runs after this and skips the pack: the
+    # ladder's top rail above the head was taken by the head rule, so the ladder fanned between head and chest in Attack.
     W[back] = 0; W[back, bi['chest']] = 1; locked |= back
+    rig_head = (P[:, 2] > J['head'].z + 0.06 * H) & np.isin(dom, [bi['head'], bi['chest'], bi['spine']]) & ~back
+    W[rig_head] = 0; W[rig_head, bi['head']] = 1; locked |= rig_head
+    # rig-healer-1: a cloth panel hanging behind the legs to the floor rides the hips (joint file "_flap_y": metres behind)
+    if '_flap_y' in J:
+        flap = (P[:, 1] > J['_flap_y'].y) & (P[:, 2] < J['hips'].z) & ~locked
+        W[flap] = 0; W[flap, bi['hips']] = 1; locked |= flap
+        REP['flap_on_hips'] = int(flap.sum())
     # arm weights only near the arm: an A-pose hand hangs beside the belt (the Builder's rope coil, pouches), and the
     # proxy heat let the arm carry them. Arm-chain weight on a vertex farther than ARM_R from its arm's bone chain goes to
     # the torso and legs it already had (or the hips).
