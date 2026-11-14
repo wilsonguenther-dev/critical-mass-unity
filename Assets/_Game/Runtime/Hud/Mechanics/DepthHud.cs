@@ -66,7 +66,11 @@ namespace CriticalMass.Runtime.Hud.Mechanics
         RectTransform _event;
         Text _eventWord, _eventTime;
         VectorShape _eventFill;
-        const float EventW = 560f, EventH = 38f;
+        public const float EventW = 560f, EventH = 38f;
+        /// <summary>The pill clock's box (right aligned) and the pill word's size range (hud-overlaps-1: below the floor
+        /// the word is cut with an ellipsis, HudText.SetOneLine, so it can never run under the clock).</summary>
+        public const float ClockX = EventW - 90f, ClockW = 76f, WordX = 14f;
+        public const int WordMax = 17, WordFloor = 11;
         /// <summary>The pill word's width: from x 14 to 10 px before the clock (x EventW - 90).</summary>
         public const float WordW = EventW - 90f - 10f - 14f;
 
@@ -229,8 +233,8 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             _eventFill.OutlinePx = 0f;
             // hud-art-1: the word ends 10 px short of the clock and shrinks to fit (SetOneLine). Best fit never worked here:
             // Unity ignores it while the text overflows horizontally, so the egg line ran under the clock.
-            _eventWord = MenuUi.Label(_event, "Word", CMTokens.Display, 17, cream, TextAnchor.MiddleLeft, 14f, 0f, WordW, EventH, "", 2.5f);
-            _eventTime = MenuUi.Label(_event, "Time", CMTokens.Mono, 20, cream, TextAnchor.MiddleRight, EventW - 90f, 0f, 76f, EventH, "", 2.5f);
+            _eventWord = MenuUi.Label(_event, "Word", CMTokens.Display, 17, cream, TextAnchor.MiddleLeft, WordX, 0f, WordW, EventH, "", 2.5f);
+            _eventTime = MenuUi.Label(_event, "Time", CMTokens.Mono, 20, cream, TextAnchor.MiddleRight, ClockX, 0f, ClockW, EventH, "", 2.5f);
             _event.gameObject.SetActive(false);
 
             // interact prompt: lower centre (key chip, words, a progress ring for gathering or the bridge repair)
@@ -502,7 +506,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             bool show = word != null && !HudZones.Blocked(HudZone.Callout, HudPriority.Tip);   // owner walk 1: lane resident
             if (_event.gameObject.activeSelf != show) _event.gameObject.SetActive(show);
             if (!show) return;
-            HudText.SetOneLine(_eventWord, word, 17, 11);
+            HudText.SetOneLine(_eventWord, word, WordMax, WordFloor);
             int secs = StationRules.Seconds(ticksLeft, w.Config.SimHz);
             HudText.Set(_eventTime, Clock[Mathf.Clamp(secs, 0, Clock.Length - 1)]);
             float frac = Mathf.Clamp01((float)ticksLeft / Math.Max(1, span));

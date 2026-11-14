@@ -100,20 +100,10 @@ namespace CriticalMass.Runtime.Tests
         [Test]
         public void FaceDecalsOutlineWeightsFarmerSwapAndBerserkReachTheMaterials()
         {
-            // HY classes (ModelSpec.VertexColourFace) paint the face in vertex colour: no decal, no UV4 weights.
-            ModelSpec warriorSpec = ArtMapping.Spec(ArtMapping.Warrior);
-            Material w = ArtMaterials.ForTeam(warriorSpec, TeamId.Azure);
-            if (warriorSpec.VertexColourFace)
-            {
-                Assert.AreEqual(0f, w.GetFloat("_DecalOn"), "HY Warrior: the face is in the vertex colour");
-                Assert.AreEqual(0f, w.GetFloat("_OutlineWeightUV4"), "HY Warrior: every vertex lined");
-            }
-            else
-            {
-                Assert.AreEqual(1f, w.GetFloat("_DecalOn"), "Warrior face decal mixed over the body");
-                Assert.IsNotNull(w.GetTexture("_FaceTex"), "Warrior_Face.png from the catalog");
-                Assert.AreEqual(1f, w.GetFloat("_OutlineWeightUV4"), "Warrior reads its UV4 outline weights");
-            }
+            Material w = ArtMaterials.ForTeam(ArtMapping.Spec(ArtMapping.Warrior), TeamId.Azure);
+            Assert.AreEqual(1f, w.GetFloat("_DecalOn"), "Warrior face decal mixed over the body");
+            Assert.IsNotNull(w.GetTexture("_FaceTex"), "Warrior_Face.png from the catalog");
+            Assert.AreEqual(1f, w.GetFloat("_OutlineWeightUV4"), "Warrior reads its UV4 outline weights");
 
             Material f = ArtMaterials.ForTeam(ArtMapping.Spec(ArtMapping.Farmer), TeamId.Crimson);
             Near(ArtMaterials.Hex("#4999A5"), f.GetColor("_DefaultCloth"));
@@ -123,16 +113,12 @@ namespace CriticalMass.Runtime.Tests
             Assert.AreEqual(hyFarmer ? 0f : 1f, f.GetFloat("_OutlineWeightUV4"), "Farmer face unlined through UV4 (outline_w sidecar); HY: all lined");
 
             ModelSpec minerSpec = ArtMapping.Spec(ArtMapping.Miner);
-            Material miner = ArtMaterials.ForTeam(minerSpec, TeamId.Azure);
+            Material miner = ArtMaterials.ForTeam(minerSpec, TeamId.Azure), face = ArtMaterials.Face(minerSpec, miner);
             Assert.AreEqual(0f, miner.GetFloat("_DecalOn"), "the Miner body slot carries no decal");
-            if (!minerSpec.VertexColourFace)
-            {
-                Material face = ArtMaterials.Face(minerSpec, miner);
-                Assert.IsNotNull(face, "the Miner's CM_FaceDecal slot has its own material");
-                Assert.AreEqual(1f, face.GetFloat("_DecalOn"));
-                Assert.IsFalse(face.GetShaderPassEnabled("SRPDefaultUnlit"), "per-material outline suppression on the Miner face");
-                Assert.AreSame(face, ArtMaterials.Face(minerSpec, miner), "one face material per body material");
-            }
+            Assert.IsNotNull(face, "the Miner's CM_FaceDecal slot has its own material");
+            Assert.AreEqual(1f, face.GetFloat("_DecalOn"));
+            Assert.IsFalse(face.GetShaderPassEnabled("SRPDefaultUnlit"), "per-material outline suppression on the Miner face");
+            Assert.AreSame(face, ArtMaterials.Face(minerSpec, miner), "one face material per body material");
 
             ModelSpec adult = ArtMapping.Spec(ArtMapping.KaijuAdult);
             Assert.AreEqual(1f, ArtMaterials.ForGlow(adult, ArtMapping.GlowBerserk).GetFloat("_Berserk"), "berserk darkens the plates");

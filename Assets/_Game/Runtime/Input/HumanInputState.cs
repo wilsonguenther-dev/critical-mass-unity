@@ -28,27 +28,40 @@ namespace CriticalMass.Runtime.Input
         /// <summary>The bound game buttons (U-006 Controls table).</summary>
         public enum HumanButton { Jump, Attack, Ability, Interact, DigPlace, Pause, Scoreboard }
 
-        // Fixed screen -> world basis for the camera yaw (45 degrees: up = (-1, -1)/sqrt2, right = (1, -1)/sqrt2).
-        static readonly double Yaw = new RenderConfig().CameraYawDeg * Math.PI / 180;
-
-        /// <summary>World XZ direction of "screen up": the camera forward projected on the ground.</summary>
-        public static readonly double ScreenUpX = -Math.Sin(Yaw);
-        public static readonly double ScreenUpZ = -Math.Cos(Yaw);
-        /// <summary>World XZ direction of "screen right": forward x world up.</summary>
-        public static readonly double ScreenRightX = -ScreenUpZ;
-        public static readonly double ScreenRightZ = ScreenUpX;
-
-        // Easy movement "Keys follow the map": the grid axis nearest screen up (ties turn clockwise on screen, so at
-        // today's yaw 45 W goes sim -Z, up-right on screen, and D goes sim +X, toward the Crimson base, down-right).
-        static readonly int KeyAxis = NearestAxis(ScreenUpX, ScreenUpZ);
+        // Screen -> world basis for the camera heading on screen (CameraHeading.Active: 135 creator's angle by default, 45
+        // classic: up = (-1, -1)/sqrt2, right = (1, -1)/sqrt2). Recomputed only when the heading changes.
+        static int _ver = -1;
+        static double _h = double.NaN, _upX, _upZ, _mapUpX, _mapUpZ;
         static readonly double[] AxisX = { 1, 0, -1, 0 };
         static readonly double[] AxisZ = { 0, 1, 0, -1 };
+
+        static void Sync()
+        {
+            double h = CriticalMass.Runtime.Camera.CameraHeading.Active;
+            if (h == _h && _ver == CriticalMass.Runtime.Camera.CameraHeading.Version) return;
+            _h = h;
+            _ver = CriticalMass.Runtime.Camera.CameraHeading.Version;
+            double yaw = h * Math.PI / 180;
+            _upX = -Math.Sin(yaw);
+            _upZ = -Math.Cos(yaw);
+            // Easy movement "Keys follow the map": the grid axis nearest screen up (ties turn clockwise on screen).
+            int k = NearestAxis(_upX, _upZ);
+            _mapUpX = AxisX[k];
+            _mapUpZ = AxisZ[k];
+        }
+
+        /// <summary>World XZ direction of "screen up": the camera forward projected on the ground.</summary>
+        public static double ScreenUpX { get { Sync(); return _upX; } }
+        public static double ScreenUpZ { get { Sync(); return _upZ; } }
+        /// <summary>World XZ direction of "screen right": forward x world up.</summary>
+        public static double ScreenRightX => -ScreenUpZ;
+        public static double ScreenRightZ => ScreenUpX;
         /// <summary>World XZ direction of the "up" key while KeysFollowMap is on (a sim grid axis).</summary>
-        public static readonly double MapUpX = AxisX[KeyAxis];
-        public static readonly double MapUpZ = AxisZ[KeyAxis];
+        public static double MapUpX { get { Sync(); return _mapUpX; } }
+        public static double MapUpZ { get { Sync(); return _mapUpZ; } }
         /// <summary>World XZ direction of the "right" key while KeysFollowMap is on.</summary>
-        public static readonly double MapRightX = -MapUpZ;
-        public static readonly double MapRightZ = MapUpX;
+        public static double MapRightX => -MapUpZ;
+        public static double MapRightZ => MapUpX;
 
         static int NearestAxis(double x, double z)
         {

@@ -109,6 +109,36 @@ namespace CriticalMass.Editor.Art
         }
     }
 
+    /// <summary>
+    /// rigs-2 (2026-11-13): when the committed catalog no longer matches the specs (a class's ClipSource now points at its
+    /// own baked pack), rebuild it once the editor is idle after load, so tests and builds play what ArtMapping says.
+    /// Idempotent: a matching catalog is left alone and nothing is saved.
+    /// </summary>
+    [InitializeOnLoad]
+    static class ArtCatalogFreshness
+    {
+        static ArtCatalogFreshness() { EditorApplication.delayCall += Check; }
+
+        static void Check()
+        {
+            ArtCatalog cat = AssetDatabase.LoadAssetAtPath<ArtCatalog>(ArtCatalog.AssetPath);
+            if (cat == null) return;
+            foreach (ModelSpec spec in ArtMapping.Models)
+            {
+                if (!spec.Rigged || spec.ClipSource == null) continue;
+                ArtEntry e = cat.Find(spec.Key);
+                AnimationClip c = e != null && e.Clips != null && e.Clips.Length > 0 ? e.Clips[0] : null;
+                if (c == null || AssetDatabase.GetAssetPath(c) == spec.ClipSource) continue;
+                if (AssetDatabase.LoadAllAssetsAtPath(spec.ClipSource).OfType<AnimationClip>().Any())
+                {
+                    Debug.Log($"[ArtCatalog] {spec.Key} plays {spec.ClipSource} now: rebuilding the catalog");
+                    ArtCatalogBuilder.Build();
+                }
+                return;
+            }
+        }
+    }
+
     /// <summary>Batch entry for tools/art-sync.sh: force re-import of every FBX under Assets/_Game/Art, then rebuild the catalog.</summary>
     public static class ArtSync
     {

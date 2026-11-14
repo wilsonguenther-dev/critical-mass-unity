@@ -60,20 +60,13 @@ real_file() {
     *) [[ "$(head -c 40 "$1")" != "version https://git-lfs.github.com/spec/v1"* ]] ;;
   esac
 }
-# HY swaps (art/characters-hy, art/characters-hy-rig, 2026-11-13): these model files are the Tencent HY exports built in
-# this repo (Assets/_Game/Art/Characters/_source~/characters_hy, rig pass rig_hy.py), not the LOD pin's. The pin's copy
-# is the pre-HY fallback, kept in each folder's _fallback~; never copy it over the swap. The HY Kaiju adult is still staged
-# (Kaiju/_hy~, its own refit rig and clips baked from Kaiju.blend), so the pin's Kaiju_Adult.fbx is still the shipped one.
-HY_KEEP=" Characters/Warrior.fbx Farmer/Farmer.fbx "
 copy_art() {
   local src="$1" dst_dir="$2" pinned="$3"
   [[ -f "$src" ]] || { echo "art-sync: MISSING $src" >&2; return 1; }
   real_file "$src" || { echo "art-sync: $src is not a real file (LFS pointer not smudged?)" >&2; return 1; }
   mkdir -p "$dst_dir"
   printf '%s\t%s\t%s\t%s\n' "$(basename "$src")" "$(shasum -a 256 "$src" | cut -c1-16)" "$pinned" "${src#"$PIN_TMP"/}" >> "$SOURCES.tmp"
-  if [[ "$HY_KEEP" == *" $(basename "$dst_dir")/$(basename "$src") "* ]]; then
-    echo "art-sync: kept the HY swap $(basename "$dst_dir")/$(basename "$src") (the pin's copy is the _fallback~)"
-  elif ! cmp -s "$src" "$dst_dir/$(basename "$src")"; then
+  if ! cmp -s "$src" "$dst_dir/$(basename "$src")"; then
     cp "$src" "$dst_dir/"
     echo "art-sync: updated $(basename "$src") <- ${src#"$PIN_TMP"/}"
   fi

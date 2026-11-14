@@ -42,10 +42,9 @@ namespace CriticalMass.Runtime.Tests
             Assert.IsNotNull(spec, key);
             Assert.IsTrue(spec.Rigged, key + " rigged");
             Assert.AreEqual(41, spec.Bones, key + " KayKit rig");
-            // rigs-2: the shared KayKit pack, or the class's own pack baked from it with foot IK (bake_clips.py).
             Assert.That(spec.ClipSource == "Assets/_Game/Art/Characters/KayKit_Clips.fbx"
                 || spec.ClipSource == System.IO.Path.GetDirectoryName(spec.AssetPath).Replace('\\', '/') + "/" + key + "_Clips.fbx",
-                key + " clip source: " + spec.ClipSource);
+                key + " clip source: " + spec.ClipSource);   // rigs-2: or the class's own pack baked with foot IK
             Assert.IsTrue(spec.FaceTexture != null || spec.VertexColourFace, key + " face decal (or an HY vertex-colour face)");
             Assert.AreEqual(180f, spec.ArtYawDeg, key + ": every class FBX arrives facing the root's -Z (the per-model 180 degree correction)");
             Assert.AreEqual(4, spec.Meshes.Length, key + ": Hero, LOD0, LOD1, Shadow");

@@ -115,12 +115,12 @@ namespace CriticalMass.Runtime.Hud.Interact
         public MapHoverKind HoverKind { get; private set; }
         public int HoverIndex { get; private set; } = -1;
 
-        static readonly string[] ClassUpper = { "WARRIOR", "FARMER", "MINER", "DEMOLITIONS", "BUILDER" };
+        static readonly string[] ClassUpper = CriticalMass.Runtime.Hud.GameHud.ClassNames;   // all six (a Healer read BUILDER)
         static readonly string[,] ClassTeam = BuildClassTeam();
         static readonly string[] Metres = BuildTable(1000, "m");
         static readonly string[] Seconds = BuildTable(100, "s");
         static readonly string[] PlaceUpper = BuildPlaceUpper();
-        static readonly string[] RespawnClass = { "RESPAWNING · WARRIOR", "RESPAWNING · FARMER", "RESPAWNING · MINER", "RESPAWNING · DEMOLITIONS", "RESPAWNING · BUILDER" };
+        static readonly string[] RespawnClass = Array.ConvertAll(ClassUpper, n => "RESPAWNING · " + n);
 
         static string[,] BuildClassTeam()
         {
@@ -395,7 +395,7 @@ namespace CriticalMass.Runtime.Hud.Interact
             _hudTexture = hudTexture;
             if (_tex == null)
             {
-                _tex = Resources.Load<Texture2D>("UI/Minimap/minimap@8x");
+                _tex = Ui.MinimapGeometry.Texture(8);
                 if (_tex == null) _tex = Resources.Load<Texture2D>("UI/Minimap/minimap@4x");
             }
             _image.texture = _tex;

@@ -1341,7 +1341,9 @@ namespace CriticalMass.Runtime.Menu
                 Stepper(tab, 5, "TIME OF DAY", () => View.Atmosphere.TimeOfDaySettings.Label(View.Atmosphere.TimeOfDaySettings.Choice),
                     View.Atmosphere.TimeOfDaySettings.Step),
                 // feat/ground-camera: play from behind the fighter (experimental); F5 / double-tap View flips it in a match.
-                Stepper(tab, 6, "CAMERA", () => GameSettings.GroundCamera ? "GROUND (EXPERIMENTAL)" : "HIGH", d => GameSettings.GroundCamera = !GameSettings.GroundCamera),
+                // feat/camera-creator-angle: the high camera's heading (creator's angle, red base bottom-left, or the classic
+                // diamond; applies from the next match) and the experimental ground camera, in one cycle.
+                Stepper(tab, 6, "CAMERA", CameraText, StepCamera),
             };
             MenuItem watch = MenuUi.Item(tab, "Watch Intro", ContentX, ContentY + GameTabLines * (LineH + LineGap) + 12f, 420f, 56f,
                 "WATCH INTRO", MenuItem.Kind.Button, UiScale.TypeBody, true, CMTokens.Display);
@@ -1381,6 +1383,18 @@ namespace CriticalMass.Runtime.Menu
         // batch 7: 7 lines (colour-blind, subtitles, time of day, camera); the three buttons sit 68 apart so Problem Report
         // ends at y 1000, inside the panel (PanelY 140 + PanelH 870 = 1010).
         const int GameTabLines = 7;
+
+        /// <summary>CAMERA line: HIGH: CREATOR ANGLE / HIGH: CLASSIC DIAMOND (default until CameraHeading.CreatorAngleIsDefault) / GROUND (EXPERIMENTAL).</summary>
+        static string CameraText() => GameSettings.GroundCamera ? "GROUND (EXPERIMENTAL)"
+            : CriticalMass.Runtime.Camera.CameraHeading.ClassicChosen ? "HIGH: CLASSIC DIAMOND" : "HIGH: CREATOR ANGLE";
+
+        static void StepCamera(int d)
+        {
+            int i = GameSettings.GroundCamera ? 2 : CriticalMass.Runtime.Camera.CameraHeading.ClassicChosen ? 1 : 0;
+            i = ((i + (d >= 0 ? 1 : -1)) % 3 + 3) % 3;
+            GameSettings.GroundCamera = i == 2;
+            if (i < 2) CriticalMass.Runtime.Camera.CameraHeading.ClassicChosen = i == 1;
+        }
 
         /// <summary>Settings > WATCH INTRO: closes the menu and plays the story intro (on the title, Home or setup; never over a
         /// live match, where the menu says so instead).</summary>
@@ -1439,10 +1453,13 @@ namespace CriticalMass.Runtime.Menu
             }
         }
 
-        public void Note(RectTransform tab, int line, string text)
+        public void Note(RectTransform tab, int line, string text) => Note(tab, line, text, LineW);
+
+        /// <summary>A note of a given width (batch 8: the WORLD tab's note shares its row with the reset button).</summary>
+        public void Note(RectTransform tab, int line, string text, float width)
         {
             MenuUi.Label(tab, "Note", CMTokens.Ui, UiScale.TypeSmall, CMTokens.WithAlpha(Cream, 0.8f), TextAnchor.MiddleLeft, ContentX + 8f,
-                ContentY + line * (LineH + LineGap) + 10f, LineW, 36f, text, 2f);
+                ContentY + line * (LineH + LineGap) + 10f, width, 36f, text, 2f);
         }
 
         public MenuItem Slider(RectTransform tab, int line, string label, Func<float> get, Action<float> set)

@@ -622,7 +622,7 @@ namespace CriticalMass.Runtime.Hud.Interact
             Card.Open("kaiju", egg ? "THE KAIJU EGG" : "THE KAIJU", sub, lines, CardHint);
         }
 
-        static readonly string[] ClassUpper = { "WARRIOR", "FARMER", "MINER", "DEMOLITIONS", "BUILDER" };
+        static readonly string[] ClassUpper = CriticalMass.Runtime.Hud.GameHud.ClassNames;   // all six (a Healer read BUILDER)
 
         void AbilityCard()
         {
