@@ -228,6 +228,9 @@ namespace CriticalMass.Sim.Tests.Net
                 Assert.IsFalse(rig.Sessions[0].SlotIsBot(i), "nobody was handed to a bot");
             }
             for (int i = 1; i < rig.Sessions.Count; i++) AssertSameHashes(rig, 0, i, 6);
+            int maxLead = 0;
+            foreach (LockstepSession ss in rig.Sessions) maxLead = Math.Max(maxLead, ss.Lead);
+            TestContext.WriteLine($"32 humans: 240 ticks took {rig.Now} ms of clock, host late inputs {rig.Sessions[0].LateInputs}, max lead {maxLead}, host stepped {rig.Sessions[0].Stepped}");
             TestContext.WriteLine($"32 humans, 240 ticks: host sent {rig.Sessions[0].BytesSent} B, a client {rig.Sessions[7].BytesSent} B, " +
                                   $"stall host {rig.Sessions[0].StallMs} ms, packets {rig.Net.Sent}, dropped {rig.Net.Dropped}");
         }
