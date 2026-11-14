@@ -20,7 +20,10 @@ namespace CriticalMass.Runtime.Tests
     public sealed class ArtPoseTests
     {
         const float MinArmSwingDeg = 5f;           // upper-arm swing over the walk (KayKit's pack swings far more)
-        const float MaxIdleWidthToHeight = 0.8f;   // front silhouette width over height in idle (the shipped classes: about 0.5)
+        // Front silhouette width over height in idle, props included. The shipped KayKit-model classes measure 0.89 to 0.94
+        // (GitHub run 43620997459: arms down, sword, shield, tools out at the sides); the HY Farmer's first pack, staff
+        // level at shoulder height, 1.28. A T-pose is caught by the wrist drop below.
+        const float MaxIdleWidthToHeight = 1.0f;
         const float MinWristDropToHeight = 0.08f;  // idle wrists below the shoulders (a T-pose is 0)
 
         static ClassId[] Classes() => (ClassId[])Enum.GetValues(typeof(ClassId));
