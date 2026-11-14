@@ -24,6 +24,11 @@ from mathutils import Vector, Matrix, Quaternion
 argv = sys.argv[sys.argv.index("--") + 1:]
 OUT, REPO = argv[0], argv[1]
 CLS = argv[2] if len(argv) > 2 else "Farmer"
+# Stance: the rest ankles' sideways offset from the hips centre is scaled by this (1 = the class's own hip width). The
+# Farmer's hip joints sit at +-0.194 m on 0.27 m legs (KayKit: +-0.171 on 0.37), so her feet read splayed; 0.85 brings
+# her ankles to +-0.165 (about KayKit's width), 6 degrees of inward leg tilt, boots 0.074 m apart at rest.
+STANCE = {"Farmer": 0.85}.get(CLS, 1.0)
+MIN_SEP = {}
 FBX = {"Farmer": "Assets/_Game/Art/Farmer/Farmer.fbx", "Miner": "Assets/_Game/Art/Miner/_hy~/Miner.fbx"}[CLS]
 CLIPS = "Assets/_Game/Art/Characters/KayKit_Clips.fbx"
 GROUND_SPEED = {}   # clip -> KayKit ground speed (m/s), from Resources/Anim/clip_facts.json
@@ -218,6 +223,9 @@ def kk_back_dir(act, f0, f1):
     return acc.normalized() if acc.length > 1e-6 else None
 
 
+ZPRE, PL, KUP = {}, {}, {}
+
+
 def bake_action(clip, act):
     assign(kk, act)
     f0, f1 = int(act.frame_range[0]), int(act.frame_range[1])
@@ -250,6 +258,7 @@ def bake_action(clip, act):
             dk = K["A" + s] - K0["A" + s]
             # Foot motion scales with the legs (an unscaled swing lift was tried: Walk's lowest foot rose to 0.043).
             A = F0["A" + s] + dk * RATIO + Vector((0, 0, LIFT))
+            A.x -= (F0["A" + s].x - F0["hips"].x) * (1.0 - STANCE)
             planted = (K["A" + s].z - K0["A" + s].z) < PLANT * leg_k
             if planted and bdir is not None:
                 if anchor[s] is None:
@@ -259,12 +268,23 @@ def bake_action(clip, act):
             elif not planted:
                 anchor[s] = None
             z = sole_z(s, A, R)
+            ZPRE[s], PL[s], KUP[s] = z, planted, K["A" + s].z - K0["A" + s].z
             if planted:
                 A.z -= z
             elif z < 0:
                 A.z -= z
             contact[s].append(bool(planted))
             targets[s], rots[s] = A, R
+        # Double support: both planted soles pinned to z 0 tied the two ankles (gap 0.000), and the game's facing read
+        # (SanityRig.TryFront: the foot with the lower ankle) then took the trailing foot, toes 112 degrees off in
+        # StrafeR at the loop seam, "turned around" (Warrior, 2 of 20 frames; KayKit 0). The foot whose KayKit ankle is
+        # higher keeps its own sole height (never below ground), as on KayKit.
+        if PL["l"] and PL["r"]:
+            hi = max(SIDES, key=lambda q: KUP[q])
+            if ZPRE[hi] > 0:
+                targets[hi].z += ZPRE[hi]
+        sep = abs(targets["l"].x - targets["r"].x)
+        MIN_SEP[clip] = min(MIN_SEP.get(clip, 9.0), sep)
         lowered_frame = 0.0
         for it in range(3):
             hp = faP["hips"]
@@ -347,6 +367,9 @@ for m in arm_mods:
     m.show_viewport = True
 log("baked", len(baked), "of", len(acts))
 REP["hips_lowered_max"] = {c: round(v, 4) for c, v in lows.items() if v > 0}
+REP["stance"] = STANCE
+REP["min_ankle_separation"] = {c: round(v, 4) for c, v in MIN_SEP.items()}
+log("stance", STANCE, "min ankle separation", {c: REP["min_ankle_separation"][c] for c in ("Idle", "Walk", "Run", "StrafeL", "StrafeR", "Attack") if c in MIN_SEP})
 
 # ---------------------------------------------------------------- measure
 dg = bpy.context.evaluated_depsgraph_get()
