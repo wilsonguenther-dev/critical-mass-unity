@@ -14,7 +14,7 @@ namespace CriticalMass.Runtime.Game
     /// -creatorGrab (automation only, with -shots -shotTick T): the creator's camera-orientation grabs. From tick T the
     /// clock is held and the sim steps one tick at a time until actor 0 stands on the hill (a pure function of the world,
     /// so the same seed lands on the same tick whatever the camera yaw), then four stills are written:
-    /// shot-grab-normal-hud / -normal-clean (the gameplay camera on the player) and shot-grab-wide-hud / -wide-clean (the
+    /// shot-grab-M-normal-hud / -normal-clean (the gameplay camera on the player) and shot-grab-M-wide-hud / -wide-clean (M = 1, 2: the second moment the next on-hill tick 600 ticks later) (the
     /// same rotation pulled back until both bases and the hill fit). "hud" keeps the match HUD and kill feed but hides
     /// banners, cut-ins, toasts, captions, prompts and the automation plate; "clean" hides every canvas. Changes when
     /// ticks run, never what they compute; the camera and canvases are restored afterwards.
@@ -26,7 +26,9 @@ namespace CriticalMass.Runtime.Game
         static readonly string[] Names = { "normal-hud", "normal-clean", "wide-hud", "wide-clean" };
 
         readonly SimDriverBehaviour _driver;
-        readonly List<Canvas> _hidden = new List<Canvas>();
+        readonly List<GameObject> _hidden = new List<GameObject>();
+        const int Moments = 2, MomentGap = 600;
+        int _moment, _momentStart = 1;
         Behaviour _brain;
         float _fov, _far;
         bool _sought;
@@ -40,10 +42,12 @@ namespace CriticalMass.Runtime.Game
         public bool Step(int n)
         {
             World w = _driver.World;
+            n -= _momentStart - 1;
             if (!_sought)
             {
                 _sought = true;
                 int k = 0;
+                if (_moment > 0) { _driver.StepTicks(MomentGap); }
                 while (k < SeekLimit && !OnHill(w)) { _driver.StepTicks(1); k++; }
                 Debug.Log($"[CM.Grab] tick {w.Tick} (stepped {k}{(k >= SeekLimit ? ", limit: player not on the hill" : "")}) yaw {_driver.Config.Render.CameraYawDeg}");
                 UnityEngine.Camera c0 = UnityEngine.Camera.main;
@@ -55,18 +59,22 @@ namespace CriticalMass.Runtime.Game
             if (phase >= Names.Length)
             {
                 Restore();
-                return true;
+                if (++_moment >= Moments) return true;
+                _sought = false;
+                _momentStart += n;
+                return false;
             }
             UnityEngine.Camera cam = UnityEngine.Camera.main;
             if (cam == null) return false;
             BigMoments.StopAll();
             Banner.Hide();
+            if (f == 0) { foreach (GameObject g in _hidden) if (g != null) g.SetActive(true); _hidden.Clear(); }
             Canvases(phase % 2 == 1);
             if (_brain != null) _brain.enabled = false;
             Place(cam, w, phase >= 2);
             if (f == ShotAt)
             {
-                string path = Path.Combine(GamePaths.DataDir, "shot-grab-" + Names[phase] + ".png");
+                string path = Path.Combine(GamePaths.DataDir, "shot-grab-" + (_moment + 1) + "-" + Names[phase] + ".png");
                 ScreenCapture.CaptureScreenshot(path);
                 Debug.Log($"[CM.Grab] {path} cam {cam.transform.position} fov {cam.fieldOfView:F1}");
             }
@@ -89,10 +97,12 @@ namespace CriticalMass.Runtime.Game
             foreach (Canvas c in UnityEngine.Object.FindObjectsByType<Canvas>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
             {
                 if (!c.isRootCanvas) continue;
-                bool keep = !clean && (c == hud || c.gameObject.name.IndexOf("Feed", StringComparison.OrdinalIgnoreCase) >= 0);
-                if (c.enabled == keep) continue;
-                if (!keep && !_hidden.Contains(c)) _hidden.Add(c);
-                c.enabled = keep;
+                // Deactivate the canvas object (its owner sits on the parent and keeps running): feeds and captions
+                // set canvas.enabled themselves every frame, so enabled = false does not stick.
+                bool keep = !clean && (c == hud || c.gameObject.name == "Kill Feed Canvas");
+                if (keep) continue;
+                _hidden.Add(c.gameObject);
+                c.gameObject.SetActive(false);
             }
         }
 
@@ -151,7 +161,7 @@ namespace CriticalMass.Runtime.Game
 
         void Restore()
         {
-            foreach (Canvas c in _hidden) if (c != null) c.enabled = true;
+            foreach (GameObject g in _hidden) if (g != null) g.SetActive(true);
             _hidden.Clear();
             UnityEngine.Camera cam = UnityEngine.Camera.main;
             if (cam != null) { cam.fieldOfView = _fov; cam.farClipPlane = _far; }
