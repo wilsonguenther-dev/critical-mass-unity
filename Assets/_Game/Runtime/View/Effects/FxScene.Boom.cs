@@ -112,6 +112,15 @@ namespace CriticalMass.Runtime.View.Effects
             return false;
         }
 
+        /// <summary>smoke-look-1 capture (-smokeShots): clears every effect, then starts one explosion that is already
+        /// ageSeconds old at sim time now (view only; the sim never hears of it).</summary>
+        public void PreviewExplosion(double now, double ageSeconds, double x, double z, float R, ExplosionKind kind, World w)
+        {
+            Clear();
+            _lastFlash = double.NegativeInfinity;
+            SpawnExplosion(now - S(ageSeconds), x, z, R, kind, 7331u, w);
+        }
+
         private void SpawnExplosion(double t, double x, double z, float R, ExplosionKind kind, uint seed, World w)
         {
             double h = Ground(x, z);
@@ -159,7 +168,7 @@ namespace CriticalMass.Runtime.View.Effects
                 {
                     float a = (k + R01(seed, (uint)k + 70)) / 8f * Mathf.PI * 2f;
                     Vector3 p = c + new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)) * (0.6f * R) + up * 0.2f;
-                    AddPuff(t + S(0.02 * (k % 3)), p, seed, (uint)(k + 70), 0.5f + 0.1f * R, kind == ExplosionKind.Mine ? DirtLight : DustMid, 1);
+                    AddPuff(t + S(0.02 * (k % 3)), p, seed, (uint)(k + 70), Mathf.Min(0.5f + 0.1f * R, BlastPuffMax), kind == ExplosionKind.Mine ? DirtLight : DustMid, 1);
                 }
                 if (fire && IsGround(x, z)) AddMark(t, c, 0.95f * R, 1, seed, S(0.06), S(14.0));
             }
@@ -294,6 +303,33 @@ namespace CriticalMass.Runtime.View.Effects
         /// <summary>follow-camera-4: the smoke column in the low views lives this share of its time and rises this share
         /// of its height (a flatter, shorter column that clears the fight sooner).</summary>
         public const double LowSmokeLife = 0.6;
+
+        /// <summary>smoke-look-1: the drawn fireball, lobes and smoke size with the blast radius only up to this many u
+        /// (fighters stand about 2.1 u tall); the ground ring and glow still show the full radius.</summary>
+        public const float BoomVisualMax = 1.6f;
+        /// <summary>smoke-look-1: the ring of dust puffs at a blast never grows past this size, whatever the radius.</summary>
+        public const float BlastPuffMax = 0.8f;
+        /// <summary>smoke-look-1: smoke puffs per explosion, the largest birth radius, how much a puff grows, its peak
+        /// alpha, its life and the stagger between births (seconds at normal speed).</summary>
+        public const int SmokePuffs = 8;
+        public const float SmokeBirthMax = 0.55f, SmokeGrow = 1.5f, SmokeAlpha = 0.45f;
+        public const double SmokeStart = 0.04, SmokeStagger = 0.065, SmokeLife = 1.0;
+        /// <summary>The time the last puff is gone (s): 1.495.</summary>
+        public const double SmokeEnd = SmokeStart + SmokeStagger * (SmokePuffs - 1) + SmokeLife;
+        static readonly Vector3 SmokeWind = new Vector3(0.6f, 0f, 0.25f);
+
+        /// <summary>A puff's radius at birth for a blast of radius R (pure; tests).</summary>
+        public static float SmokeBirthRadius(float R) => Mathf.Min(0.32f + 0.06f * Mathf.Max(0f, R), SmokeBirthMax);
+        /// <summary>A puff's radius at life fraction u (pure; tests): from birth to SmokeGrow times birth.</summary>
+        public static float SmokeRadius(float R, float u) => SmokeBirthRadius(R) * (1f + (SmokeGrow - 1f) * Mathf.Sqrt(Mathf.Clamp01(u)));
+        /// <summary>A puff's alpha at life fraction u (pure; tests): a quick fade-in, then thinning to nothing.</summary>
+        public static float SmokeAlphaAt(float u)
+        {
+            u = Mathf.Clamp01(u);
+            return SmokeAlpha * Mathf.Min(1f, u / 0.1f) * (1f - u);
+        }
+        /// <summary>Bounding radius of the whole smoke for the low-view group test (pure; tests).</summary>
+        public static float SmokeBound(float R) => 0.6f * Mathf.Min(R, BoomVisualMax) + 2.2f;
         public const float LowSmokeRise = 0.6f;
 
         private void BuildBoomAir(double now, FxMeshBuilder air, Vector3 camRight, Vector3 camUp)
@@ -305,7 +341,7 @@ namespace CriticalMass.Runtime.View.Effects
                 ref Explosion ex = ref _booms[i];
                 double age = now - ex.Born;
                 if (age < 0 || age >= life) continue;
-                float R = ex.R;
+                float R = Mathf.Min(ex.R, BoomVisualMax);   // smoke-look-1: the air parts stop growing past BoomVisualMax
                 bool fire = HasFire(ex.Kind);
                 Vector3 c = ex.P + toCam * 0.4f;
 
@@ -365,28 +401,33 @@ namespace CriticalMass.Runtime.View.Effects
                 air.EndGroup();
                 }
 
-                // Smoke column: six stacked puffs rising and drifting, stepped greys (dust tones without fire).
-                // follow-camera-4: in the low views the column is one volume group (tighter screen cap, see-through over
-                // the fight), lives LowSmokeLife as long and rises LowSmokeRise as high; top-down unchanged.
+                // smoke-look-1: the smoke is SmokePuffs small soft puffs, born staggered around the blast, each well under a
+                // fighter's height across (SmokeBirthRadius), growing a little, rising, drifting with a light wind and
+                // thinning out (SmokeAlphaAt, never above SmokeAlpha) within SmokeLife; all gone by SmokeEnd. Flat stepped
+                // tones: a faint wider halo (the soft edge), the body, and a lighter cap. No navy rim, no single big ball.
+                // follow-camera-4 low views: one volume group (screen cap, see-through over the fight), shorter and lower.
                 bool low = CriticalMass.Runtime.Camera.ViewCull.On;
-                if (!air.BeginGroup(ex.P + Vector3.up * (2.0f * R * (low ? LowSmokeRise : 1f)), 2.4f * R, CriticalMass.Runtime.Camera.FxLook.Volume, ex.P)) continue;
-                Color32 sm = fire ? SmokeMid : DustMid, sl = fire ? SmokeLight : DustLight, sd = fire ? SmokeDark : DustDark;
-                double colLife = S(fire ? 2.2 : 1.6) * (low ? LowSmokeLife : 1.0);
-                for (int j = 0; j < 6; j++)
+                float riseK = low ? LowSmokeRise : 1f;
+                if (age >= S(SmokeEnd)) continue;
+                if (!air.BeginGroup(ex.P + Vector3.up * (1.2f * riseK + 0.3f), SmokeBound(R), CriticalMass.Runtime.Camera.FxLook.Volume, ex.P)) continue;
+                Color32 sm = fire ? SmokeMid : DustMid, sl = fire ? SmokeLight : DustLight;
+                double puffLife = S(SmokeLife) * (low ? LowSmokeLife : 1.0);
+                for (int j = 0; j < SmokePuffs; j++)
                 {
-                    double born = S(0.15 + 0.12 * j);
-                    double pa = age - born;
-                    if (pa < 0 || pa >= colLife) continue;
-                    float u = (float)(pa / colLife);
-                    float rise = (1f - (1f - u) * (1f - u)) * (low ? LowSmokeRise : 1f);
-                    float drift = (R01(ex.Seed, (uint)j + 640) - 0.5f) * R * 0.8f;
-                    Vector3 p = ex.P + toCam * 0.2f + Vector3.up * (0.5f * R + (1.2f + 0.35f * j) * R * rise) + camRight * (drift * rise);
-                    float sz = R * (0.38f + 0.08f * j) * (0.6f + 0.6f * Mathf.Sqrt(u)) * (fire ? 1f : 0.85f);
-                    float fade = u < 0.6f ? 1f : 1f - (u - 0.6f) / 0.4f;
-                    air.Blob(p, camRight, camUp, sz + 0.05f, null, 10, j, A(Navy, fade * 0.7f));
-                    air.Blob(p, camRight, camUp, sz, null, 10, j, A(sm, fade));
-                    air.Blob(p + (camUp - camRight) * (sz * 0.28f), camRight, camUp, sz * 0.55f, null, 8, 0, A(sl, fade));
-                    air.Blob(p - (camUp - camRight * 0.4f) * (sz * 0.3f), camRight, camUp, sz * 0.45f, null, 8, 0, A(sd, fade * 0.85f));
+                    double pa = age - S(SmokeStart + SmokeStagger * j);
+                    if (pa < 0 || pa >= puffLife) continue;
+                    float u = (float)(pa / puffLife);
+                    float rise = (1f - (1f - u) * (1f - u)) * riseK;
+                    float ang = (j + R01(ex.Seed, (uint)j + 640)) / SmokePuffs * Mathf.PI * 2f;
+                    float spread = R * (0.25f + 0.3f * R01(ex.Seed, (uint)j + 650));
+                    Vector3 start = ex.P + new Vector3(Mathf.Cos(ang), 0f, Mathf.Sin(ang)) * spread;
+                    Vector3 p = start + Vector3.up * (0.35f + (1.3f + 0.6f * R01(ex.Seed, (uint)j + 660)) * rise)
+                        + SmokeWind * (0.6f * u) + new Vector3(Mathf.Cos(ang), 0f, Mathf.Sin(ang)) * (0.3f * rise) + toCam * 0.15f;
+                    float sz = SmokeRadius(R, u) * (0.85f + 0.3f * R01(ex.Seed, (uint)j + 670));
+                    float al = SmokeAlphaAt(u);
+                    air.Blob(p, camRight, camUp, sz * 1.22f, null, 8, j, A(sm, al * 0.4f));
+                    air.Blob(p, camRight, camUp, sz, null, 8, j + 0.4f, A(sm, al));
+                    air.Blob(p + (camUp - camRight) * (sz * 0.25f), camRight, camUp, sz * 0.5f, null, 8, 0, A(sl, al * 0.6f));
                 }
                 air.EndGroup();
             }
