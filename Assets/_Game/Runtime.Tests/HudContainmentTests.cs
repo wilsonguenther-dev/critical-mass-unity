@@ -1,8 +1,10 @@
 using System.Collections.Generic;
+using CriticalMass.Runtime.Game;
 using CriticalMass.Runtime.Hud;
 using CriticalMass.Runtime.Hud.Style;
 using CriticalMass.Runtime.Hud.Ui;
 using CriticalMass.Runtime.Menu;
+using CriticalMass.Runtime.Menus;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.UI;
@@ -58,13 +60,45 @@ namespace CriticalMass.Runtime.Tests
                 "Banners up. The hill is open. Azure takes the lead, and Crimson has the Kaiju on their side.");
             yield return new Spec("sound caption", ui, 20, 14, HudZones.CaptionW - 24f, HudZones.CaptionH, "Supply drop landed on the far bridge >");
             yield return new Spec("interact prompt words", ui, 20, 12, 370f, 50f, "HOLD RIGHT CLICK  REPAIR THE FALLEN BRIDGE", 2);
-            yield return new Spec("prompt pill main line (widest pill)", disp, UiScale.TypeBody, 14, 720f - 28f, 40f, "HOLD RIGHT CLICK  BUILD BRIDGE (12)");
-            yield return new Spec("prompt pill detail", ui, UiScale.TypeMin, 12, 720f - 28f, 22f, "bank empty  ·  too far 2.0 s");
+            yield return new Spec("prompt pill main line (widest pill)", disp, UiScale.TypeBody, 14, 720f - 28f, CriticalMass.Runtime.View.Affordance.TerrainAffordanceView.LineH, "HOLD RIGHT CLICK  BUILD BRIDGE (12)");
+            yield return new Spec("prompt pill detail", ui, UiScale.TypeMin, 12, 720f - 28f, CriticalMass.Runtime.View.Affordance.TerrainAffordanceView.DetailH, "bank empty  ·  too far 2.0 s");
             yield return new Spec("stock word", ui, 13, 9, 40f, 38f, "WATER");
             yield return new Spec("power-up counter", ui, 13, 9, 250f, 26f, "Counter: a Warrior's shield stops it");
             // menus (settings rows, tabs, class cards)
-            yield return new Spec("settings row label", disp, UiScale.TypeButton, 20, 600f, PauseMenu.LineH, "COLOUR-BLIND TEAMS");
-            yield return new Spec("settings row value", disp, UiScale.TypeButton, 20, 360f, PauseMenu.LineH, "THIRD PERSON, AUTO FOLLOW");
+            // settings rows (hud-containment-2): the label column and the value column, the longest words of every tab
+            float lw = PauseMenu.ColLabelW, vw = PauseMenu.ColValueW, lh = PauseMenu.LineH;
+            foreach (string s in new[] { "SAVE POWER IN BACKGROUND", "MUTE WHEN IN BACKGROUND", "PLAY INTRO AT LAUNCH", "COLOUR-BLIND TEAMS",
+                         "LOOK SENSITIVITY", "FIELD OF VIEW", "CAMERA FOLLOW", "GORE", "CAMERA" })
+                yield return new Spec("settings row label", disp, UiScale.TypeButton, UiScale.TypeMin, lw, lh, s);
+            foreach (string s in new[] { "MANUAL, MOUSE OR STICK", "THIRD PERSON, AUTO FOLLOW", "AUTO, BEHIND YOU", "MANUAL, INVERT Y", "BLUE / AMBER",
+                         "FIRST PERSON", "THIRD PERSON", "120 DEGREES", "3.00x" })
+                yield return new Spec("settings row value", ui, UiScale.TypeButton, UiScale.TypeMin, vw, lh, s);
+            foreach (CriticalMass.Runtime.View.Effects.GoreLevel g in (CriticalMass.Runtime.View.Effects.GoreLevel[])System.Enum.GetValues(typeof(CriticalMass.Runtime.View.Effects.GoreLevel)))
+                yield return new Spec("settings row value (gore)", ui, UiScale.TypeButton, UiScale.TypeMin, vw, lh, CriticalMass.Runtime.View.Effects.GoreGate.Label(g));
+
+            // hud-containment-2: the remaining label groups, every string written out or read from its table
+            // kill feed: a name each side of the attack icon (132 and 136 px)
+            foreach (string s in KillWords.ClassUpper)
+                yield return new Spec("kill feed name", ui, UiScale.TypeBody, ContainedText.FloorFor(UiScale.TypeBody), 132f, KillFeed.LineH, s);
+            yield return new Spec("kill feed name", ui, UiScale.TypeBody, ContainedText.FloorFor(UiScale.TypeBody), 132f, KillFeed.LineH, KillWords.Kaiju);
+            // achievement toast: the title and the rule line, every achievement
+            foreach (AchievementDef a in Achievements.All)
+            {
+                yield return new Spec("achievement title", disp, UiScale.TypeButton, ContainedText.FloorFor(UiScale.TypeButton), 480f, 36f, a.Title.ToUpperInvariant());
+                yield return new Spec("achievement rule", ui, UiScale.TypeSmall, ContainedText.FloorFor(UiScale.TypeSmall), 480f, 24f, a.Description);
+            }
+            // loading screen: the step line for every step
+            foreach (LoadStep st in (LoadStep[])System.Enum.GetValues(typeof(LoadStep)))
+                yield return new Spec("loading step line", ui, UiScale.TypeBody, ContainedText.FloorFor(UiScale.TypeBody), 900f, 34f, LoadingScreen.StepLine(st, 59.9f));
+            // camera notices (the toast lane, one line)
+            foreach (string s in new[] { "VIEW: THIRD PERSON", "VIEW: FIRST PERSON", "VIEW: TOP-DOWN", "AUTO-DIRECTOR OFF", "AUTO-DIRECTOR ON", "GROUND VIEW", "HIGH VIEW" })
+                yield return new Spec("camera notice", ui, 26, 16, HudZones.ColumnW - 24f, 40f, s, 1);
+            // the HUD slot names under the three buttons at the shared floor size (one line, the widest box a slot gets)
+            foreach (string s in new[] { CriticalMass.Sim.Core.LightWeapons.BuilderName, CriticalMass.Sim.Core.LightWeapons.HealerName, CriticalMass.Sim.Core.LightWeapons.DemolitionsName, GameHud.MinerAbility, "CORRUPTION", "BIOMASS" })
+                yield return new Spec("slot name", ui, HudLayout.AbilityNameMax, HudLayout.AbilityNameFloor, HudLayout.AbilityPitch - HudLayout.AbilityNameGap, GameHud.AbilityNameH, s, 1);
+            // the prompt pill: two actions share one line in the reserved lane (as wide as the bottom band)
+            yield return new Spec("prompt pill, two actions", disp, UiScale.TypeBody, 14, HudZones.BottomBandW - 28f, CriticalMass.Runtime.View.Affordance.TerrainAffordanceView.LineH,
+                "HOLD RIGHT CLICK  BUILD BRIDGE (12)" + CriticalMass.Runtime.View.Affordance.TerrainAffordanceView.ActionJoin + "SPACE  BUILD LADDER (12)", 1);
             yield return new Spec("settings tab (8 tabs)", disp, 22, 15, 1060f / 8f - 14f, 60f, "CONTROLS");
             yield return new Spec("class card name", disp, 36, 20, 300f, 48f, "DEMOLITIONS EXPERT");
         }
@@ -172,7 +206,7 @@ namespace CriticalMass.Runtime.Tests
                 float k = HudLayout.Scale(sh.x, sh.y);
                 var canvas = new Vector2(sh.x / k, sh.y / k);
                 float w = Mathf.Min(CriticalMass.Runtime.View.Affordance.TerrainAffordanceView.MaxPillW, canvas.x - 2f * HudLayout.Margin);
-                var size = new Vector2(w, 2f + 2f * CriticalMass.Runtime.View.Affordance.TerrainAffordanceView.LineH + CriticalMass.Runtime.View.Affordance.TerrainAffordanceView.DetailH);
+                var size = new Vector2(w, 2f + CriticalMass.Runtime.View.Affordance.TerrainAffordanceView.LineH + CriticalMass.Runtime.View.Affordance.TerrainAffordanceView.DetailH);
                 foreach (Vector2 want in new[] { new Vector2(0f, 0f), new Vector2(canvas.x, canvas.y), new Vector2(canvas.x * 0.5f, canvas.y * 0.5f), new Vector2(-50f, canvas.y + 50f) })
                 {
                     Vector2 p = CriticalMass.Runtime.View.Affordance.TerrainAffordanceView.ClampPill(want, size, canvas);

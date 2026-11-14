@@ -1507,11 +1507,12 @@ namespace CriticalMass.Runtime.Menu
         {
             float y = ContentY + line * (LineH + LineGap);
             MenuItem it = MenuUi.Item(tab, label, ContentX, y, LineW, LineH, label, MenuItem.Kind.Slider, UiScale.TypeButton, false, CMTokens.Display);
-            VectorShape bar = MenuUi.Shape(it.transform, "Bar", ShapeKind.RoundRect, 440f, 18f, 660f, 28f, CMTokens.Biomass.Color, -1f);
+            LabelColumn(it);
+            VectorShape bar = MenuUi.Shape(it.transform, "Bar", ShapeKind.RoundRect, ColBarX, 18f, ColBarW, 28f, CMTokens.Biomass.Color, -1f);
             bar.EmptyColor = CMTokens.MeterEmpty.Color;
             bar.RimPx = 0f;
             it.Bar = bar;
-            it.Value = MenuUi.Label(it.transform, "Value", CMTokens.Mono, UiScale.TypeBody, MenuItem.IdleText, TextAnchor.MiddleRight, LineW - 160f, 0f, 140f, LineH, "", 2f);
+            it.Value = MenuUi.Label(it.transform, "Value", CMTokens.Mono, UiScale.TypeBody, MenuItem.IdleText, TextAnchor.MiddleRight, LineW - 20f - ColNumberW, 0f, ColNumberW, LineH, "", 2f);   // numbers right-aligned in a fixed slot
             Action refresh = () =>
             {
                 float v = get();
@@ -1532,13 +1533,29 @@ namespace CriticalMass.Runtime.Menu
             return it;
         }
 
+        // ---- settings row columns (hud-containment-2), the same in every tab: the label column, the "<" arrow, the value
+        // column, the ">" arrow (steppers) or the bar and the number (sliders). The row label used to span the whole row,
+        // so a long one ("PLAY INTRO AT LAUNCH") ran under the "<" arrow. Now it lives in its column: it wraps to a
+        // second line, shrinks, then ends with an ellipsis (TextFit).
+        public const float ColLabelX = 18f, ColLabelW = 386f, ColArrowLX = 420f, ColArrowW = 40f, ColValueX = 460f, ColValueW = 640f,
+            ColArrowRX = ColValueX + ColValueW, ColBarX = 440f, ColBarW = 660f, ColNumberW = 140f;
+
+        /// <summary>Puts a row's own label into the label column.</summary>
+        static void LabelColumn(MenuItem it)
+        {
+            if (it == null || it.Label == null) return;
+            MenuUi.Place(it.Label.rectTransform, ColLabelX, 0f, ColLabelW, LineH);
+            MenuUi.Fit(it.Label, UiScale.TypeMin);
+        }
+
         public MenuItem Stepper(RectTransform tab, int line, string label, Func<string> text, Action<int> step)
         {
             float y = ContentY + line * (LineH + LineGap);
             MenuItem it = MenuUi.Item(tab, label, ContentX, y, LineW, LineH, label, MenuItem.Kind.Stepper, UiScale.TypeButton, false, CMTokens.Display);
-            it.Value = MenuUi.Fit(MenuUi.Label(it.transform, "Value", CMTokens.Ui, UiScale.TypeButton, MenuItem.IdleText, TextAnchor.MiddleCenter, 460f, 0f, 640f, LineH, "", 2f), 26);
-            MenuUi.Label(it.transform, "Left", CMTokens.Display, UiScale.TypeButton, Brass, TextAnchor.MiddleCenter, 420f, 0f, 40f, LineH, "<", 2f);
-            MenuUi.Label(it.transform, "Right", CMTokens.Display, UiScale.TypeButton, Brass, TextAnchor.MiddleCenter, 1100f, 0f, 40f, LineH, ">", 2f);
+            LabelColumn(it);
+            it.Value = MenuUi.Fit(MenuUi.Label(it.transform, "Value", CMTokens.Ui, UiScale.TypeButton, MenuItem.IdleText, TextAnchor.MiddleCenter, ColValueX, 0f, ColValueW, LineH, "", 2f), UiScale.TypeMin);
+            MenuUi.Label(it.transform, "Left", CMTokens.Display, UiScale.TypeButton, Brass, TextAnchor.MiddleCenter, ColArrowLX, 0f, ColArrowW, LineH, "<", 2f);
+            MenuUi.Label(it.transform, "Right", CMTokens.Display, UiScale.TypeButton, Brass, TextAnchor.MiddleCenter, ColArrowRX, 0f, ColArrowW, LineH, ">", 2f);
             Action refresh = () => HudText.Set(it.Value, text());
             it.Stepped = d =>
             {

@@ -731,7 +731,24 @@ namespace CriticalMass.Runtime.View.Affordance
         }
 
         /// <summary>hud-containment-1 prompt pill sizes: one main line, the detail line, the widest pill.</summary>
-        public const float LineH = 40f, DetailH = 22f, MaxPillW = 720f, MinPillW = 180f;
+        public const float LineH = 36f, DetailH = 20f, MaxPillW = 720f, MinPillW = 180f;
+        /// <summary>The joiner when two actions share the pill's one line (hud-containment-2: one row, the reserved lane).</summary>
+        public const string ActionJoin = "   \u00b7   ";
+
+        /// <summary>The pill's place in its reserved lane (HudZones.PromptLane), in canvas units, x = centre, y = bottom
+        /// (bottom-left origin). It follows the target sideways only and never leaves the lane.</summary>
+        public static Vector2 LanePill(float wantX, Vector2 size, Vector2 canvasPx, float scale)
+        {
+            float sc = scale > 0f ? scale : 1f;
+            Rect lane = HudZones.PromptLanePixels(canvasPx.x, canvasPx.y);   // device px, top-left origin
+            float l = lane.x / sc, r = lane.xMax / sc, bottom = (canvasPx.y - lane.yMax) / sc;
+            float x = size.x >= r - l ? (l + r) * 0.5f : Mathf.Clamp(wantX, l + size.x * 0.5f, r - size.x * 0.5f);
+            return new Vector2(x, bottom);
+        }
+
+        /// <summary>The widest the pill may be on this canvas (the lane's width), in canvas units.</summary>
+        public static float LaneWidth(Vector2 canvasPx, float scale) =>
+            HudZones.PromptLanePixels(canvasPx.x, canvasPx.y).width / (scale > 0f ? scale : 1f);
 
         /// <summary>The main words of a prompt: key and verb ("HOLD E  GATHER", "F  PLACE BLOCK (3)").</summary>
         public static string Main(AffTarget t, ControlDevice device) =>
@@ -782,7 +799,7 @@ namespace CriticalMass.Runtime.View.Affordance
                 string a = Main(Scan.Primary, dev), b = Main(Scan.Secondary, dev);
                 string da = Detail(Scan.Primary), db = Detail(Scan.Secondary);
                 string detail = da.Length > 0 && db.Length > 0 ? da + "  ·  " + db : da.Length > 0 ? da : db;
-                _prompt = b.Length > 0 ? a + "\n" + b : a;
+                _prompt = b.Length > 0 ? a + ActionJoin + b : a;
                 // hud-containment-1: measure at full size, grow the pill to the words up to the safe width, then the
                 // label's rule (ContainedText) shrinks and ends with an ellipsis inside it.
                 _label.fontSize = UiScale.TypeBody;
@@ -793,10 +810,10 @@ namespace CriticalMass.Runtime.View.Affordance
                 _promptDetail = detail;
                 float dw = detail.Length > 0 ? ContainedText.NaturalWidth(_detail) : 0f;
                 float sc0 = _canvas.scaleFactor > 0 ? _canvas.scaleFactor : 1f;
-                float safeW = Mathf.Max(MinPillW, _canvas.pixelRect.width / sc0 - 2f * HudLayout.Margin);
-                float lines = b.Length > 0 ? 2f : 1f;
-                float h = 2f + lines * LineH + (detail.Length > 0 ? DetailH : 0f);
-                _chip.sizeDelta = new Vector2(Mathf.Clamp(Mathf.Max(pw, dw) + 40f, MinPillW, Mathf.Min(MaxPillW, safeW)), h);
+                float laneW = Mathf.Max(MinPillW, LaneWidth(_canvas.pixelRect.size, sc0));
+                float h = 2f + LineH + (detail.Length > 0 ? DetailH : 0f);   // one action row + the reason: fits PromptLaneH
+                _chip.sizeDelta = new Vector2(Mathf.Clamp(Mathf.Max(pw, dw) + 40f, MinPillW, laneW), h);
+                ContainedText.Of(_label)?.Configure(UiScale.TypeBody, ContainedText.FloorFor(UiScale.TypeBody), 1);
                 RectTransform lr = _label.rectTransform;
                 lr.offsetMin = new Vector2(14f, 4f + (detail.Length > 0 ? DetailH : 0f));
                 lr.offsetMax = new Vector2(-14f, -4f);
@@ -808,8 +825,7 @@ namespace CriticalMass.Runtime.View.Affordance
             if (OnScreen(cam, p, out Vector2 sp))
             {
                 float sc = _canvas.scaleFactor > 0 ? _canvas.scaleFactor : 1f;
-                Vector2 cv = new Vector2(_canvas.pixelRect.width / sc, _canvas.pixelRect.height / sc);
-                _chip.anchoredPosition = ClampPill(new Vector2(sp.x / sc, sp.y / sc + 18f), _chip.sizeDelta, cv);
+                _chip.anchoredPosition = LanePill(sp.x / sc, _chip.sizeDelta, _canvas.pixelRect.size, sc);
             }
             if (!_chip.gameObject.activeSelf) _chip.gameObject.SetActive(true);
             _promptShown = true;
