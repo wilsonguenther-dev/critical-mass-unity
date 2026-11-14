@@ -162,6 +162,8 @@ mw = np.array(hero.matrix_world)
 wco = co @ mw[:3, :3].T + mw[:3, 3]
 FOOTV = {s: np.array([i for i in range(nv) if vg.get(dom[i], "") in ("foot." + s, "toes." + s)]) for s in SIDES}
 SOLEV = {s: np.array([i for i in range(nv) if vg.get(dom[i], "") == "foot." + s]) for s in SIDES}
+if NEW_BODY:   # rig-batch-b: the toes stay rigid on the foot (see the copy loop), so the boot tips count as sole
+    SOLEV = {s: np.array([i for i in range(nv) if vg.get(dom[i], "") in ("foot." + s, "toes." + s)]) for s in SIDES}
 LIFT = -float(min(wco[FOOTV[s]][:, 2].min() for s in SIDES))
 # rig-warrior-1: the motion scale is the hip height above the soles against KayKit's (0.519 m, its bind), not the
 # hip-to-ankle chain: after the Warrior's shins were lengthened (ankles at KayKit's height inside his boots) the chain
@@ -299,7 +301,7 @@ if NEW_BODY and "Idle" in acts and "handslot.r" in faP and "hand.r" in faP:
 
 
 FOOTREF = {}
-if NEW_BODY and "Idle" in acts:
+if False and NEW_BODY and "Idle" in acts:   # tried 2026-11-14 run 43637xxx: toe yaw read -137 degrees in Walk; off
     assign(kk, acts["Idle"]); scene.frame_set(int(acts["Idle"].frame_range[0])); upd()
     FOOTREF = {s: (kk.matrix_world @ kkP["foot." + s].matrix).to_3x3().normalized().inverted() for s in SIDES}
     assign(kk, None); upd()
