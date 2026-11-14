@@ -20,6 +20,7 @@ namespace CriticalMass.Sim.Tests
             GameConfig cfg = GameConfig.CreateDefault();
             cfg.Physics.KaijuNavGuard = guard;
             cfg.Physics.BotWideLine = guard;
+            cfg.Physics.BotCalmSteer = guard;
             return World.CreateWorld(new WorldOptions
             {
                 Seed = seed,
@@ -160,6 +161,7 @@ namespace CriticalMass.Sim.Tests
                         GameConfig cfg = GameConfig.CreateDefault();
                         cfg.Physics.KaijuNavGuard = guard;
                         cfg.Physics.BotWideLine = guard;
+                        cfg.Physics.BotCalmSteer = guard;
                         cfg.HatchSeconds = hatch;
                         World w = World.CreateWorld(new WorldOptions
                         {
@@ -193,6 +195,31 @@ namespace CriticalMass.Sim.Tests
             }
             Console.WriteLine("{\"item\":\"shiver soak total\",\"before\":" + before + ",\"after\":" + after + "}");
             Assert.AreEqual(0, after, "no actor or Kaiju may shiver, dither or sit pressed while wanting to move (lines above)");
+        }
+
+        /// <summary>
+        /// fix/movement-shiver-2: the always-run gate (not Slow). Two minutes of a 16v16 bot match on the game's rules with the
+        /// Kaiju out from 0:30, so the hill crowd, the Healer duels and the Kaiju on the hill all happen. Every flag is printed
+        /// as its [CM.Shiver] line; any flag fails.
+        /// </summary>
+        [Test]
+        public void NoShiverInTwoMinutesOfA16v16BotMatchWithTheKaijuOut()
+        {
+            GameConfig cfg = GameConfig.CreateDefault();
+            cfg.HatchSeconds = 30;
+            World w = World.CreateWorld(new WorldOptions { Seed = 7, TeamSize = 16, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = cfg });
+            var watch = new ShiverWatch();
+            InputFrame scratch = SimInput.EmptyInput();
+            for (int t = 0; t < 3600 && w.Match.Phase != MatchPhase.Ended; t++)
+            {
+                MatchTick.Advance(w, null, scratch);
+                watch.Observe(w);
+            }
+            int shown = 0;
+            foreach (ShiverFlag f in watch.Flags) if (shown++ < 60) Console.WriteLine(ShiverWatch.Format(f));
+            Console.WriteLine("{\"item\":\"shiver gate\",\"flags\":" + watch.Count + ",\"dither\":" + watch.CountByKind[0] +
+                              ",\"reversals\":" + watch.CountByKind[1] + ",\"pressed\":" + watch.CountByKind[2] + "}");
+            Assert.AreEqual(0, watch.Count, "no actor or Kaiju may shiver, dither or sit pressed while wanting to move (lines above)");
         }
 
         [Test]

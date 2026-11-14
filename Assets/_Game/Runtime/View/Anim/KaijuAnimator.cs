@@ -161,15 +161,10 @@ namespace CriticalMass.Runtime.View.Anim
 
             // Drawn yaw: a fast spring toward the sim facing, rate-limited (the sim snaps its facing toward a target).
             double target = facing.eulerAngles.y;
-            // fix/movement-shiver-1: walking (not winding up, slamming or knocked out), the drawn body faces the way the sim
-            // position actually went this tick, never a steering vector the walls refused; a heading error under
-            // YawDeadZoneDeg is not chased, so a small sideways shove does not twitch the body.
-            double velX = k.X - k.PrevX, velZ = k.Z - k.PrevZ;
-            // Only a forward-ish motion (within 100 degrees of the sim facing) steers it: a shove backwards by the crowd does not
-            // spin the body round to face where it was pushed.
-            if (!telegraph && k.MeleeWindupIn <= 0 && k.KoIn <= 0 && speed > WalkYawMinSpeed &&
-                (velX * Math.Cos(k.Facing) + velZ * Math.Sin(k.Facing)) > -0.17 * Math.Sqrt(velX * velX + velZ * velZ))
-                target = SimSpace.YawDeg(Math.Atan2(velZ, velX));
+            // fix/movement-shiver-2: the drawn yaw follows the sim facing again. Round 1 steered it by the position change each
+            // tick, which includes the crowd's shoves on a standing Kaiju (the hill), so the body twitched toward every push:
+            // 27 "view Kaiju yaw reversed" lines in the live matches. The sim facing is now the way its own walk went (shoves
+            // excluded) or toward its target, so it is the steady signal. The dead zone below stays.
             if (double.IsNaN(_yaw)) { _yaw = target; _yawRate = 0; }
             double yawStep = 0;
             if (dSim > 0)

@@ -199,6 +199,92 @@ namespace CriticalMass.Sim.Bots
             return FirstBlockedCell(map, x0 + ox, z0 + oz, ex + ox, ez + oz) < 0 && FirstBlockedCell(map, x0 - ox, z0 - oz, ex - ox, ez - oz) < 0;
         }
 
+        /// <summary>
+        /// fix/movement-shiver-2: hold the hill post. Settles inside an arrival radius that grows by BotPostArrivePerAlly for each
+        /// ally within SeparationRadius (capped at BotPostArriveMax), and walks back only once pushed BotPostRelease past it.
+        /// The old fixed 0.5 stop with the separation push on top made a crowded holder step out, walk back, step out.
+        /// </summary>
+        private static void HoldPost(World w, BotsState st, int id, double x, double z, int[] mates)
+        {
+            PhysicsConfig pc = w.Config.Physics;
+            TeamId team = w.Actors[id].Team;
+            int cnt = SpatialHash.QueryCircle(w.Hash, x, z, SeparationRadius, mates);
+            int allies = 0;
+            for (int k = 0; k < cnt; k++)
+            {
+                int j = mates[k];
+                if (j == id || j >= w.ActorCount || !w.Actors[j].Alive || w.Actors[j].Team != team) continue;
+                double ax = w.X[j] - x;
+                double az = w.Z[j] - z;
+                if (ax * ax + az * az <= SeparationRadius * SeparationRadius) allies++;
+            }
+            double arrive = Math.Min(pc.BotPostArriveMax, pc.BotPostArrive + pc.BotPostArrivePerAlly * allies);
+            double dx = st.PostX[id] - x;
+            double dz = st.PostZ[id] - z;
+            double d2 = dx * dx + dz * dz;
+            double release = arrive + pc.BotPostRelease;
+            if (st.Settled[id] != 0 && d2 > release * release) st.Settled[id] = 0;
+            else if (st.Settled[id] == 0 && d2 <= arrive * arrive) st.Settled[id] = 1;
+            if (st.Settled[id] != 0)
+            {
+                Mv.X = 0;
+                Mv.Z = 0;
+            }
+            else Toward(w, id, st.PostX[id], st.PostZ[id], 0);
+        }
+
+        /// <summary>
+        /// fix/movement-shiver-2: fight steering with hysteresis. (1) Straight line or route: straight needs the whole body to fit
+        /// along the line (WideLineClear) to start, and is left only when the centre line itself is blocked; either choice is held
+        /// BotModeHoldSeconds. (2) The circle-strafe band is entered at reach with a clear line of hit and left only beyond reach +
+        /// BotReachSlack. (3) The strafe is steered from the target's real position; the wind-up lead (tx, tz) stays on the aim and
+        /// the straight chase. Same play style: same strafe side by id parity, same 0.7 x reach keep distance, same pull.
+        /// </summary>
+        private static void FightCalm(World w, BotsState st, int id, int t, double tx, double tz, double reach, InputFrame output)
+        {
+            GameConfig cfg = w.Config;
+            PhysicsConfig pc = cfg.Physics;
+            MapDef map = w.Map;
+            ClassConfig cc = cfg.Class(w.Actors[id].Cls);
+            double x = w.X[id];
+            double z = w.Z[id];
+            double rx = t == BotsState.TargetKaiju ? w.Kaiju.X : w.X[t];
+            double rz = t == BotsState.TargetKaiju ? w.Kaiju.Z : w.Z[t];
+            double now = w.Match.Time;
+            byte mode = st.FightMode[id];
+            if (mode == 0 || now >= st.FightModeUntil[id])
+            {
+                bool straight = mode == 1 ? FirstBlockedCell(map, x, z, rx, rz) < 0 : WideLineClear(map, x, z, rx, rz, cc.Radius * 0.9, reach);
+                byte next = straight ? (byte)1 : (byte)2;
+                if (next != mode)
+                {
+                    st.FightMode[id] = next;
+                    st.FightModeUntil[id] = now + pc.BotModeHoldSeconds;
+                    mode = next;
+                }
+            }
+            bool hitLine = !Phys.On(w, pc.WallsBlockHits) || SegmentClear.Clear(map, x, z, rx, rz);
+            double dx = rx - x;
+            double dz = rz - z;
+            double d2 = dx * dx + dz * dz;
+            double band = st.InReach[id] != 0 ? reach + pc.BotReachSlack : reach;
+            bool inBand = d2 <= band * band && (st.InReach[id] != 0 || hitLine);
+            st.InReach[id] = inBand ? (byte)1 : (byte)0;
+            if (inBand)
+            {
+                output.Attack = hitLine && InArc(w, id, tx, tz);
+                double d = Math.Sqrt(d2);
+                if (d == 0 || double.IsNaN(d)) d = 1;
+                double side = (id & 1) == 0 ? 1 : -1;
+                double want = reach * 0.7;
+                double pull = (d - want) / reach;
+                Mv.X = (-dz / d) * side * 0.6 + (dx / d) * pull;
+                Mv.Z = (dx / d) * side * 0.6 + (dz / d) * pull;
+            }
+            else if (mode == 1) Toward(w, id, tx, tz, 0);
+            else Follow(w, st, id, st.Role[id] == BotsState.RoleKaiju ? BotFields.FieldShrine : BotFields.FieldHill);
+        }
+
         private static bool Toward(World w, int id, double tx, double tz, double stopDist)
         {
             double dx = tx - w.X[id];
@@ -293,13 +379,22 @@ namespace CriticalMass.Sim.Bots
             if (Mates.Length < capacity) Mates = new int[capacity];
             int[] mates = Mates;
 
+            // fix/movement-shiver-2 (BotCalmSteer): the hysteresis latches belong to one state; leaving it clears them.
+            bool calm = Phys.On(w, cfg.Physics.BotCalmSteer);
+            if (a.AiState != AiState.HoldHill) st.Settled[id] = 0;
+            if (a.AiState != AiState.Fight)
+            {
+                st.FightMode[id] = 0;
+                st.InReach[id] = 0;
+            }
             switch (a.AiState)
             {
                 case AiState.Unstick:
                     Toward(w, id, st.UnstickX[id], st.UnstickZ[id], 0.2);
                     break;
                 case AiState.HoldHill:
-                    Toward(w, id, st.PostX[id], st.PostZ[id], 0.5);
+                    if (calm) HoldPost(w, st, id, x, z, mates);
+                    else Toward(w, id, st.PostX[id], st.PostZ[id], 0.5);
                     break;
                 case AiState.Fight:
                 {
@@ -346,6 +441,11 @@ namespace CriticalMass.Sim.Bots
                     // and the straight line counts only when the whole body fits along it (no route / line flip at a wall end).
                     bool wide = Phys.On(w, cfg.Physics.BotWideLine);
                     bool seen = !wide || !Phys.On(w, cfg.Physics.WallsBlockHits) || SegmentClear.Clear(map, x, z, tx, tz);
+                    if (calm)
+                    {
+                        FightCalm(w, st, id, t, tx, tz, reach, output);
+                        break;
+                    }
                     if (d2 <= reach * reach && seen)
                     {
                         output.Attack = InArc(w, id, tx, tz);
@@ -630,6 +730,8 @@ namespace CriticalMass.Sim.Bots
                 }
             }
 
+            // fix/movement-shiver-2: did the bot want to go somewhere, before the separation push is added?
+            bool intent = Mv.X * Mv.X + Mv.Z * Mv.Z > 1e-8;
             if (separate)
             {
                 int cnt = SpatialHash.QueryCircle(w.Hash, x, z, SeparationRadius, mates);
@@ -661,7 +763,22 @@ namespace CriticalMass.Sim.Bots
             }
 
             ml = Mv.X * Mv.X + Mv.Z * Mv.Z;
-            if (ml > 1e-4)
+            if (calm && !intent)
+            {
+                // fix/movement-shiver-2: a separation-only push (a settled holder, a bot at its stop) keeps its size: the old
+                // code blew any push over 0.01 up to a full-speed step, so two allies nudging each other stepped back and forth
+                // at full speed every tick. Under BotMoveDeadzone it is dropped. Not a wish to move (WantMove stays 0), so the
+                // stuck detector does not send a jostled holder on an unstick walk.
+                double dzn = cfg.Physics.BotMoveDeadzone;
+                if (ml >= dzn * dzn)
+                {
+                    double m = Math.Sqrt(ml);
+                    double sc = m > 1 ? 1 / m : 1;
+                    output.MoveX = Mv.X * sc;
+                    output.MoveZ = Mv.Z * sc;
+                }
+            }
+            else if (ml > 1e-4)
             {
                 double inv = 1 / Math.Sqrt(ml);
                 double ox = Mv.X * inv;

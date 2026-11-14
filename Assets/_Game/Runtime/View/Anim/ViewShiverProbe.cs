@@ -9,8 +9,8 @@ namespace CriticalMass.Runtime.View.Anim
     /// fix/movement-shiver-1, the view half of the "no shiver" detector: watches one drawn quantity (a yaw in degrees, or a
     /// drawn ground position) frame by frame and counts direction reversals (the change this frame against the last real
     /// change: opposite sign for a yaw, more than 120 degrees apart for a position). More than MaxReversals in one
-    /// WindowSeconds window of sim time is a flag: one `[CM.Shiver] view ...` log line (editor, development builds and
-    /// automation runs only, at most LogCap lines). No allocation except the log line.
+    /// WindowSeconds window of sim time is a flag: one `[CM.Shiver] view ...` log line (automation runs or -shiverLog only,
+    /// at most LogCap lines; the count is always kept). No allocation except the log line.
     /// </summary>
     public sealed class ViewShiverProbe
     {
@@ -67,7 +67,7 @@ namespace CriticalMass.Runtime.View.Anim
             if (_rev > MaxReversals)
             {
                 Flags++;
-                if (_logOn < 0) _logOn = Application.isEditor || Debug.isDebugBuild || AutoplayArgs.Current.Autoplay ? 1 : 0;
+                if (_logOn < 0) _logOn = SimDriverBehaviour.ShiverLogWanted() ? 1 : 0;   // automation or -shiverLog only (see there)
                 if (_logOn == 1 && _logged < LogCap)
                 {
                     _logged++;

@@ -123,6 +123,20 @@ namespace CriticalMass.Sim.Config
         /// the straight-line / route choice does not flip every tick at a wall end; and they do not strafe and swing at a target
         /// inside reach but behind a wall.</summary>
         public bool BotWideLine = true;
+        /// <summary>fix/movement-shiver-2: bot steering with hysteresis. Straight line or route is a choice held at least
+        /// BotModeHoldSeconds (straight needs the whole body to fit, it is left only when the centre line is blocked); the
+        /// circle-strafe band is entered at reach and left at reach + BotReachSlack; strafing steers from the target's real
+        /// position (the wind-up lead stays on the aim only); a bot settles on its hill post inside an arrival radius that grows
+        /// with the allies crowding it and only walks back when pushed BotPostRelease past it; a separation-only push keeps its
+        /// size (it is no longer blown up to a full-speed step) and one under BotMoveDeadzone is dropped.</summary>
+        public bool BotCalmSteer = true;
+        public double BotModeHoldSeconds = 0.5;
+        public double BotReachSlack = 0.4;
+        public double BotPostArrive = 0.5;
+        public double BotPostArrivePerAlly = 0.35;
+        public double BotPostArriveMax = 1.6;
+        public double BotPostRelease = 0.8;
+        public double BotMoveDeadzone = 0.15;
 
         // ---- DG-97 / OD-9 crowds
         /// <summary>Order-free relaxed separation: pushes accumulated, Iterations passes at Relax, capped per tick (mass split off:

@@ -530,6 +530,10 @@ namespace CriticalMass.Sim.Core
             double ez = gz - k.Z;
             if (ex * ex + ez * ez > stop * stop) WalkToward(w, gx, gz, dt);
             else if (t >= 0) k.Facing = JsMath.Atan2(ez, ex);
+            // fix/movement-shiver-2: close to its target (claw reach + 1.5) it faces the target on walking ticks too. A fighter
+            // circling at the chase stop made it walk one tick (facing its path cell) and stand the next (facing the fighter):
+            // the facing swung between the two every tick on the hill.
+            if (guard && t >= 0 && ex * ex + ez * ez <= (kc.MeleeRange + 1.5) * (kc.MeleeRange + 1.5)) k.Facing = JsMath.Atan2(ez, ex);
 
             // fix/movement-shiver-1: give a target up after KaijuGiveUpSeconds without progress (net move under
             // KaijuProgressRadius while not in claw reach of it with a clear line); it is skipped for KaijuIgnoreSeconds.

@@ -70,7 +70,23 @@ namespace CriticalMass.Runtime.Game
         /// runs only; read-only on the World). Each flag is one `[CM.Shiver]` log line for the play-test logs.</summary>
         private readonly ShiverWatch _shiver = new ShiverWatch();
         private static int _shiverLogOn = -1;   // read on the first tick (Unity calls are not allowed in a static initializer)
+
+        /// <summary>fix/movement-shiver-2: flags the live detector raised since boot (read by captures and play-tests).</summary>
+        public static int ShiverFlags { get; private set; }
+
+        /// <summary>
+        /// fix/movement-shiver-2: `[CM.Shiver]` lines go to the player log only on automation runs (-autoplay) or with
+        /// -shiverLog. Round 1 also logged in the editor, and the PlayMode test runner fails a test on any log line it was not
+        /// told to expect (six unrelated tests went red). The dedicated Sim tests (MovementShiverTests) are the gate.
+        /// </summary>
+        public static bool ShiverLogWanted()
+        {
+            if (AutoplayArgs.Current.Autoplay) return true;
+            foreach (string arg in Environment.GetCommandLineArgs()) if (arg == "-shiverLog") return true;
+            return false;
+        }
         private World _shiverWorld;
+        private static bool _shiverLogLines;
         private int _shiverLogged;
         private const int ShiverLogCap = 200;
         private readonly InputFrame _neutral = SimInput.EmptyInput();
@@ -168,7 +184,8 @@ namespace CriticalMass.Runtime.Game
             int before = _shiver.Flags.Count;
             _shiver.Observe(World);
             for (int i = before; i < _shiver.Flags.Count && _shiverLogged < ShiverLogCap; i++, _shiverLogged++)
-                Debug.Log(ShiverWatch.Format(_shiver.Flags[i]));
+                if (_shiverLogLines) Debug.Log(ShiverWatch.Format(_shiver.Flags[i]));
+            ShiverFlags += _shiver.NewThisTick;
         }
 
         private void Tick(HumanInputSource input)
@@ -190,7 +207,11 @@ namespace CriticalMass.Runtime.Game
             long lt = CriticalMass.Runtime.Game.LoadTimer.WatchingTicks ? CriticalMass.Runtime.Game.LoadTimer.Now() : 0;   // perf/start-hitch-1: the first ticks after a load, timed
             MatchTick.Advance(World, HumanAutopilot ? null : _humanFrame, _scratch);
             if (lt != 0) CriticalMass.Runtime.Game.LoadTimer.TickDone(lt);
-            if (_shiverLogOn < 0) _shiverLogOn = Application.isEditor || Debug.isDebugBuild || AutoplayArgs.Current.Autoplay ? 1 : 0;
+            if (_shiverLogOn < 0)
+            {
+                _shiverLogLines = ShiverLogWanted();
+                _shiverLogOn = _shiverLogLines || Application.isEditor || Debug.isDebugBuild ? 1 : 0;
+            }
             if (_shiverLogOn == 1) WatchShiver();
             FrameCost.Exit(FrameCost.Slot.Sim, c0);
             FrameCost.FrameTicks++;
