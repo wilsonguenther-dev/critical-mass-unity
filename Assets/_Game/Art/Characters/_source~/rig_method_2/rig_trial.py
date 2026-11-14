@@ -109,7 +109,30 @@ meshes = [o for o in objs if o.type == 'MESH']
 hero = [o for o in meshes if 'hero' in o.name.lower()] or meshes
 body = next((o for o in hero if 'body' in o.name.lower()), max(hero, key=lambda o: len(o.data.vertices)))
 props = [o for o in hero if o is not body]
-log('class', CLASS_FBX, 'body', body.name, 'props', [p.name for p in props], 'template bones', len(template_names))
+# props welded into the Hero mesh but skinned 100% to a hand slot: split them off as their own objects
+def split_mask(ob, mask, name):
+    me2 = ob.data.copy()
+    bm = bmesh.new(); bm.from_mesh(me2); bm.verts.ensure_lookup_table()
+    bmesh.ops.delete(bm, geom=[v for v in bm.verts if not mask[v.index]], context='VERTS')
+    bm.to_mesh(me2); bm.free()
+    o2 = bpy.data.objects.new(name, me2); scene.collection.objects.link(o2); o2.matrix_world = ob.matrix_world.copy()
+    bm = bmesh.new(); bm.from_mesh(ob.data); bm.verts.ensure_lookup_table()
+    bmesh.ops.delete(bm, geom=[v for v in bm.verts if mask[v.index]], context='VERTS')
+    bm.to_mesh(ob.data); bm.free()
+    return o2
+
+
+for gname in [g.name for g in body.vertex_groups if g.name.startswith('handslot')]:
+    gidx = body.vertex_groups[gname].index
+    mask = np.zeros(len(body.data.vertices), bool)
+    for v in body.data.vertices:
+        for g in v.groups:
+            if g.group == gidx and g.weight > 0.5:
+                mask[v.index] = True
+    if mask.sum() > 20:
+        props.append(split_mask(body, mask, 'Prop_' + gname))
+        log('split prop', gname, int(mask.sum()), 'vertices')
+log('class', CLASS_FBX, 'body', body.name, len(body.data.vertices), 'verts', 'props', [p.name for p in props], 'template bones', len(template_names))
 for o in [body] + props:
     mw = o.matrix_world.copy()
     for m in list(o.modifiers):

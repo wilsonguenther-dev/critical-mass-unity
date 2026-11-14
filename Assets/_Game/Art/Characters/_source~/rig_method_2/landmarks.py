@@ -259,6 +259,9 @@ def finger_chains(V, F, hv, wr, hdir, hl, sg, H, notes, side):
         return np.linalg.norm(r - (r @ hdir) * hdir)
     mode = 'five' if len(chains) >= 5 else ('partial' if len(chains) >= 3 else ('mitt' if len(chains) == 2 else 'fist'))
     out = {'mode': mode, 'cut': float(cut), 'pieces': len(chains)}
+    if len(chains) == 0:
+        chains = [{'base': wr + hdir * 0.4 * hl, 'tip': wr + hdir * hl, 'n': int(hv.sum()), 'vids': np.nonzero(hv)[0]}]
+        notes.append(f'hand {side}: no pieces past the cuts; the whole hand is one block')
     if len(chains) == 1:
         # one piece: a fist or a mitt with the thumb fused; place a thumb on the front (-Y) side, mitten ahead
         ch = chains[0]
