@@ -201,6 +201,7 @@ namespace CriticalMass.Sim.Tests
             // PhysicsOnly: the physics lane on, depth off (the test config). Re-pinned 2026-11-12 for U-071 (allies pass head-on).
             // Full: everything on (the game's default rules). Re-pinned 2026-11-13 for U-074..U-078, then for bridge collapse off by
             // default (Classic and PhysicsOnly unchanged both times: depth rules are off in them).
+            var wrong = new System.Collections.Generic.List<string>();
             foreach (RulesProfile p in new[] { RulesProfile.Classic, RulesProfile.PhysicsOnly, RulesProfile.Full })
             {
                 Action<GameConfig> t = c => c.ApplyRules(p);
@@ -208,9 +209,11 @@ namespace CriticalMass.Sim.Tests
                 ulong b = MatchHash.Run(42, 5, 14500, ClassId.Warrior, null, t);
                 Console.WriteLine("{\"item\":\"rules-combined golden\",\"profile\":\"" + p + "\",\"16v16seed1\":\"0x" + a.ToString("X16") + "\",\"5v5seed42\":\"0x" + b.ToString("X16") + "\"}");
                 Assert.AreEqual(a, MatchHash.Run(1, 16, 3600, ClassId.Warrior, null, t), p + ": same seed, same hash");
-                Assert.AreEqual(Golden[(int)p, 0], a, p + ": 16v16 seed 1, 2:00");
-                Assert.AreEqual(Golden[(int)p, 1], b, p + ": 5v5 seed 42, whole match");
+                // integration batch 10: every profile prints its line before any golden fails, so one run re-pins every row
+                if (Golden[(int)p, 0] != a) wrong.Add(p + ": 16v16 seed 1, 2:00: expected 0x" + Golden[(int)p, 0].ToString("X16") + " but was 0x" + a.ToString("X16"));
+                if (Golden[(int)p, 1] != b) wrong.Add(p + ": 5v5 seed 42, whole match: expected 0x" + Golden[(int)p, 1].ToString("X16") + " but was 0x" + b.ToString("X16"));
             }
+            Assert.IsEmpty(wrong, string.Join("\n", wrong));
             Assert.AreEqual(MatchHash.Run(1, 16, 3600, ClassId.Warrior), Golden[(int)RulesProfile.PhysicsOnly, 0], "CreateBrowser5v5 is the PhysicsOnly profile");
         }
 
