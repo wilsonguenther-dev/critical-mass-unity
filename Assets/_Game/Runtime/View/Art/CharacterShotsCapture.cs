@@ -217,6 +217,9 @@ namespace CriticalMass.Runtime.View.Art
             var r = go.GetComponent<Renderer>();
             if (r == null) return;
             r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            // The primitive's built-in default material is stripped from player builds (the floor drew magenta in the
+            // installed game): use the game's own placeholder material (Resources, always in the build), one per colour.
+            r.sharedMaterial = PlaceholderMaterials.Get("#" + ColorUtility.ToHtmlStringRGB(c));
             var block = new MaterialPropertyBlock();
             block.SetColor("_BaseColor", c);
             block.SetColor("_Color", c);
