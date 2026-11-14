@@ -191,6 +191,15 @@ namespace CriticalMass.Runtime.View.Anim
         {
             if (clip == null) return -1;
             if (_extremes.TryGetValue(clip, out double cached)) return cached;
+            double result = ExtremeNow(m, clip, contact);
+            _extremes[clip] = result;
+            return result;
+        }
+
+        /// <summary>fix/hit-feel-7: MeasureExtreme without the per-clip cache (the animator keeps one per model and clip).</summary>
+        public static double ExtremeNow(ModelView m, string clip, double contact)
+        {
+            if (clip == null) return -1;
             double result = -1;
             Transform hand = m != null ? (m.Bone("handslot.r") ?? m.Bone("hand.r")) : null;
             if (hand != null && contact > 1e-3)
@@ -213,7 +222,6 @@ namespace CriticalMass.Runtime.View.Anim
                     if (best < 1e-6) result = -1;
                 }
             }
-            _extremes[clip] = result;
             return result;
         }
 

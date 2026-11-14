@@ -81,8 +81,16 @@ namespace CriticalMass.Runtime.View.Anim
         /// The weapon tip in the weapon hand's local space: a light-weapon prop under the hand (its own readable mesh), else
         /// the WeaponTip measured at import, else the hand itself (no weapon). Allocates (vertex read): once per fighter.
         /// </summary>
-        public static Vector3 TipLocal(ModelView m, out Transform hand, out string source)
+        public static Vector3 TipLocal(ModelView m, out Transform hand, out string source) => Ends(m, out hand, out _, out source);
+
+        /// <summary>
+        /// fix/hit-feel-7: both far ends of the held weapon in the hand's local space: the return value is the farthest
+        /// point from the hand, `other` the farthest on the opposite side of the hand (Vector3.zero: none). Which one
+        /// strikes is decided on the contact pose (the one further forward: ActorAnimator.MeasureReach).
+        /// </summary>
+        public static Vector3 Ends(ModelView m, out Transform hand, out Vector3 other, out string source)
         {
+            other = Vector3.zero;
             source = "hand (no weapon measured)";
             hand = m != null ? (m.Bone(WeaponProps.HandBone) ?? m.Bone(WeaponProps.HandBoneFallback)) : null;
             if (hand == null) return Vector3.zero;
@@ -104,7 +112,24 @@ namespace CriticalMass.Runtime.View.Anim
                         if (dd > bestD) { bestD = dd; best = p; }
                     }
                 }
-                if (bestD >= 0f) { source = "prop " + prop.name; return best; }
+                if (bestD >= 0f)
+                {
+                    source = "prop " + prop.name;
+                    float od = 0.04f;   // a prop's other end counts past 0.2 u from the hand
+                    Vector3 ax = best.normalized;
+                    foreach (MeshFilter mf in prop.GetComponentsInChildren<MeshFilter>())
+                    {
+                        Mesh mesh = mf.sharedMesh;
+                        if (mesh == null || !mesh.isReadable) continue;
+                        Vector3[] v = mesh.vertices;
+                        for (int k = 0; k < v.Length; k++)
+                        {
+                            Vector3 p = hand.InverseTransformPoint(mf.transform.TransformPoint(v[k]));
+                            if (Vector3.Dot(p, ax) < 0f && p.sqrMagnitude > od) { od = p.sqrMagnitude; other = p; }
+                        }
+                    }
+                    return best;
+                }
             }
             WeaponTip tip = m.Root != null ? m.Root.GetComponentInChildren<WeaponTip>(true) : null;
             if (tip != null && tip.Distance > 0f)
@@ -113,6 +138,7 @@ namespace CriticalMass.Runtime.View.Anim
                 if (b != null)
                 {
                     source = "import (" + tip.Vertices + " weapon vertices on " + tip.Bone + ")";
+                    if (tip.OtherDistance > 0f) other = hand.InverseTransformPoint(b.TransformPoint(tip.OtherEnd));
                     return hand.InverseTransformPoint(b.TransformPoint(tip.Local));
                 }
             }
