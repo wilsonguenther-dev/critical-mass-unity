@@ -294,6 +294,8 @@ namespace CriticalMass.Runtime.View.Atmosphere
         public int Applied { get; private set; }
 
         SimDriverBehaviour _driver;
+        /// <summary>World horizon 1: the sky's zenith colour for CM/WorldHorizon (xyz linear, w 1 when set).</summary>
+        static readonly int ZenithId = Shader.PropertyToID("_CMTodZenith");
         Light _sun;
         TimeOfDayPreset _from;
         float _blend = 1f;
@@ -311,7 +313,7 @@ namespace CriticalMass.Runtime.View.Atmosphere
         /// <summary>Every global back to 0, which the shaders read as Day.</summary>
         public static void ClearGlobals()
         {
-            foreach (int id in new[] { KeyId, ShadeId, AmbientId, RimId, FogId, VoidId, SkyId, MoonId }) Shader.SetGlobalVector(id, Vector4.zero);
+            foreach (int id in new[] { KeyId, ShadeId, AmbientId, RimId, FogId, VoidId, SkyId, MoonId, ZenithId }) Shader.SetGlobalVector(id, Vector4.zero);
             Shader.SetGlobalVector(AmbientLifeId, new Vector4(1f, 0f, 0f, 0f));
         }
 
@@ -369,6 +371,9 @@ namespace CriticalMass.Runtime.View.Atmosphere
             Shader.SetGlobalVector(FogId, new Vector4(fog.r, fog.g, fog.b, p.FogMix));
             Shader.SetGlobalVector(VoidId, new Vector4(v.r, v.g, v.b, p.VoidAmount));
             Shader.SetGlobalVector(SkyId, new Vector4(p.Stars, p.Moon, p.GlowBoost, Time.time));
+            // The eye-level sky's zenith: the preset's background, deepened toward the void colour at dusk and night.
+            Color zen = Color.Lerp(p.Background, p.Void, p.VoidAmount * 0.45f * Mathf.Clamp01(p.FogMix)).linear;
+            Shader.SetGlobalVector(ZenithId, new Vector4(zen.r, zen.g, zen.b, 1f));
             float motion = CriticalMass.Runtime.Menu.GameSettings.ReducedMotion ? 0.35f : 1f;
             Shader.SetGlobalVector(AmbientLifeId, new Vector4(motion, p.Fireflies, p.LightPools, p.CreatureGlow));
 

@@ -8,7 +8,7 @@ namespace CriticalMass.Runtime.Menu
     /// <summary>
     /// The player's settings, stored in PlayerPrefs (kept between launches), read by the settings page and by any system
     /// that honours them. View side only: nothing here reaches the sim.
-    /// <para>Keys other code may read directly: cm.blood (int, 1 = blood on, default 1), cm.shake (camera shake on/off, mirrors cm.access.shake, default off),
+    /// <para>Keys other code may read directly: cm.gore (int, GORE intensity: 2 Full = default, 1 Reduced, 0 Off; View.Effects.GoreGate is the one switch every gore path asks), cm.blood (int, legacy blood on/off: 0 maps to GORE Off), cm.shake (camera shake on/off, mirrors cm.access.shake, default off),
     /// cm.damagenumbers (default 1). Volumes are linear 0..1; the AudioMixer (Resources/Audio/CMMixer) gets them as dB on
     /// the exposed parameters MasterVolume, MusicVolume and EffectsVolume. Without the mixer, master volume falls back to
     /// AudioListener.volume.</para>
@@ -43,6 +43,8 @@ namespace CriticalMass.Runtime.Menu
         public const string ReduceMotionKey = "cm.reducedMotion";   // one key: StoryIntro, AttractMode, big moments and world reactions read it too
         public const string DamageNumbersKey = "cm.damagenumbers";
         public const string BloodKey = "cm.blood";
+        /// <summary>GORE intensity (2 Full, the default; 1 Reduced; 0 Off).</summary>
+        public const string GoreKey = "cm.gore";
         /// <summary>Frame-rate limit: 30, 60 or 120 frames per second, or 0 = the display's refresh rate (default 60).</summary>
         public const string FpsCapKey = "cm.fpsCap";
         /// <summary>"Save power in background": 15 fps while the game is not the front window: 1 on, 0 off (default, DG-51).</summary>
@@ -53,6 +55,10 @@ namespace CriticalMass.Runtime.Menu
         public const string KeysFollowMapKey = "cm.keysFollowMap";
         /// <summary>feat/ground-camera: CAMERA HIGH (default) or GROUND (experimental, play from behind the fighter).</summary>
         public const string GroundCameraKey = "cm.camera.ground";
+        // feat/follow-camera-1: the play view (0 top-down, 1 third person, 2 first person), the follow mode (auto behind the
+        // player by default, or manual orbit by mouse / right stick), its sensitivity (x100) and the low views' field of view.
+        public const string CameraViewKey = "cm.camera.view", CameraManualKey = "cm.camera.manual",
+            CameraSensKey = "cm.camera.sens", CameraFovKey = "cm.camera.fov", CameraInvertYKey = "cm.camera.invertY";
         /// <summary>DG-53: the settings format version, so a later build can migrate or reset stored keys safely.</summary>
         public const string PrefsVersionKey = "cm.prefsVersion";
         public const int PrefsVersion = 1;
@@ -63,7 +69,7 @@ namespace CriticalMass.Runtime.Menu
         public static readonly string[] AllKeys =
         {
             MasterKey, MusicKey, EffectsKey, MuteMusicKey, MuteEffectsKey, MuteInBackgroundKey, ColourBlindTeamsKey, WidthKey, HeightKey, FullScreenKey, VSyncKey, QualityKey, ShakeKey,
-            DamageNumbersKey, BloodKey, FpsCapKey, BgThrottleKey, MoveAssistKey, KeysFollowMapKey, GroundCameraKey, "cm.camera.heading", PrefsVersionKey,
+            DamageNumbersKey, BloodKey, GoreKey, FpsCapKey, BgThrottleKey, MoveAssistKey, KeysFollowMapKey, GroundCameraKey, "cm.camera.heading", CameraViewKey, CameraManualKey, CameraSensKey, CameraFovKey, CameraInvertYKey, PrefsVersionKey,
             ShakeScaleKey, ReduceFlashingKey, ReduceMotionKey, IntroAtLaunchKey, IntroSubtitlesKey,
         };
 
@@ -157,8 +163,31 @@ namespace CriticalMass.Runtime.Menu
         public static bool ReducedMotion { get => ReduceMotion; set => ReduceMotion = value; }
         /// <summary>Floating damage numbers shown.</summary>
         public static bool DamageNumbers { get => GetB(DamageNumbersKey, true); set => SetB(DamageNumbersKey, value); }
-        /// <summary>Blood effects on (PlayerPrefs cm.blood, default on).</summary>
-        public static bool Blood { get => GetB(BloodKey, true); set => SetB(BloodKey, value); }
+        /// <summary>Blood effects on: any GORE level but Off (older callers; setting it picks GORE Full or Off).</summary>
+        public static bool Blood
+        {
+            get => Gore != global::CriticalMass.Runtime.View.Effects.GoreLevel.Off;
+            set { SetB(BloodKey, value); Gore = value ? global::CriticalMass.Runtime.View.Effects.GoreLevel.Full : global::CriticalMass.Runtime.View.Effects.GoreLevel.Off; }
+        }
+
+        /// <summary>
+        /// GORE intensity (PlayerPrefs cm.gore; owner 2026-11-14: Full is the default, Reduced and Off are the art lead's
+        /// family-friendly options). A player who had turned the old BLOOD switch off (cm.blood 0) starts at Off. A default
+        /// is not written until changed. Read through View.Effects.GoreGate.Current; CombatFx applies a change live.
+        /// </summary>
+        public static global::CriticalMass.Runtime.View.Effects.GoreLevel Gore
+        {
+            get
+            {
+                if (PlayerPrefs.HasKey(GoreKey))
+                {
+                    int v = PlayerPrefs.GetInt(GoreKey, 2);
+                    return v <= 0 ? global::CriticalMass.Runtime.View.Effects.GoreLevel.Off : v == 1 ? global::CriticalMass.Runtime.View.Effects.GoreLevel.Reduced : global::CriticalMass.Runtime.View.Effects.GoreLevel.Full;
+                }
+                return PlayerPrefs.HasKey(BloodKey) && PlayerPrefs.GetInt(BloodKey, 1) == 0 ? global::CriticalMass.Runtime.View.Effects.GoreLevel.Off : global::CriticalMass.Runtime.View.Effects.GoreLevel.Full;
+            }
+            set { PlayerPrefs.SetInt(GoreKey, (int)value); PlayerPrefs.Save(); }
+        }
         /// <summary>
         /// "Movement assist" (cm.moveAssist, default on): one direction key follows a bridge it points along (within 50
         /// degrees) and a blocked move slides along corners and rails (Input.MoveAssist).
@@ -169,9 +198,46 @@ namespace CriticalMass.Runtime.Menu
         /// of screen up, left, down and right. The controller stick stays screen-relative.
         /// </summary>
         public static bool KeysFollowMap { get => GetB(KeysFollowMapKey, false); set => SetB(KeysFollowMapKey, value); }
-        /// <summary>Settings, Game, CAMERA: false = HIGH (default), true = GROUND (experimental): the local player plays from the
-        /// low third-person ground view (Camera.GroundView). Kept between launches.</summary>
+        /// <summary>A low view (third or first person) is chosen: the "low view on" switch, kept for the ground view's
+        /// callers and older saves. Turning it on brings back the last low view (third person if none was chosen).</summary>
         public static bool GroundCamera { get => GetB(GroundCameraKey, false); set => SetB(GroundCameraKey, value); }
+
+        /// <summary>The play view. An older save with only the ground-camera switch on reads as third person.</summary>
+        public static CriticalMass.Runtime.Camera.CameraView CameraView
+        {
+            get
+            {
+                // The ground-camera key stays the "low view on" switch (older saves and tests use it); the view key says which.
+                if (!GetB(GroundCameraKey, false)) return CriticalMass.Runtime.Camera.CameraView.TopDown;
+                return PlayerPrefs.GetInt(CameraViewKey, 1) == 2 ? CriticalMass.Runtime.Camera.CameraView.FirstPerson : CriticalMass.Runtime.Camera.CameraView.ThirdPerson;
+            }
+            set
+            {
+                if (value != CriticalMass.Runtime.Camera.CameraView.TopDown) PlayerPrefs.SetInt(CameraViewKey, (int)value);
+                SetB(GroundCameraKey, value != CriticalMass.Runtime.Camera.CameraView.TopDown);
+            }
+        }
+
+        /// <summary>Manual camera (off by default): the mouse or right stick orbits the low views' camera.</summary>
+        public static bool CameraManual { get => GetB(CameraManualKey, false); set => SetB(CameraManualKey, value); }
+
+        /// <summary>Manual orbit: mouse / stick up looks down (off by default).</summary>
+        public static bool CameraInvertY { get => GetB(CameraInvertYKey, false); set => SetB(CameraInvertYKey, value); }
+
+        /// <summary>Manual orbit sensitivity, 0.25 to 3 (default 1).</summary>
+        public static float CameraSensitivity
+        {
+            get => Mathf.Clamp(PlayerPrefs.GetInt(CameraSensKey, 100), 25, 300) / 100f;
+            set { PlayerPrefs.SetInt(CameraSensKey, Mathf.Clamp(Mathf.RoundToInt(value * 100f), 25, 300)); PlayerPrefs.Save(); }
+        }
+
+        /// <summary>Field of view of the third- and first-person views (degrees, 50 to 90, default 65).</summary>
+        public static int CameraFov
+        {
+            get => Mathf.Clamp(PlayerPrefs.GetInt(CameraFovKey, CriticalMass.Runtime.Camera.FollowCamera.FovDefault),
+                CriticalMass.Runtime.Camera.FollowCamera.FovMin, CriticalMass.Runtime.Camera.FollowCamera.FovMax);
+            set { PlayerPrefs.SetInt(CameraFovKey, Mathf.Clamp(value, CriticalMass.Runtime.Camera.FollowCamera.FovMin, CriticalMass.Runtime.Camera.FollowCamera.FovMax)); PlayerPrefs.Save(); }
+        }
 
         // ---- video ----
         /// <summary>The frame-rate limit choices in screen order (FramePolicy.CapChoices): 30, 60, 120, 144, 0 = OFF (locked to

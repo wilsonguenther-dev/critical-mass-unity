@@ -373,11 +373,18 @@ namespace CriticalMass.Runtime.Hud
         public const string MinerAbility = "BARRICADE";
         static readonly string[] AttackNames =
         {
-            "ATTACK", "ATTACK", "ATTACK", "NO SWORD", "ATTACK", CriticalMass.Sim.Core.HealerNames.Mend,   // Demolitions: TNT is on Dig / place
+            // feat/light-weapons-1: the Demolitions slot names her pry bar (was NO SWORD), the Builder's his mallet; the
+            // Healer's press still MENDS first (the lantern swings only when nobody can be mended). TNT is on Dig / place.
+            "ATTACK", "ATTACK", "ATTACK", CriticalMass.Sim.Core.LightWeapons.DemolitionsName, CriticalMass.Sim.Core.LightWeapons.BuilderName,
+            CriticalMass.Sim.Core.HealerNames.Mend,
         };
 
         /// <summary>The icon row for a class: the Healer has no icon art yet and borrows the Farmer's (support) row.</summary>
         static int IconRow(int cls) => cls >= UiIcons.Classes.Length ? 1 : cls;
+
+        /// <summary>feat/light-weapons-1 placeholder: the Demolitions attack slot borrows the Builder's hammer icon (existing
+        /// art) until a pry-bar icon is drawn; every other class keeps its own row.</summary>
+        static int AttackIconRow(int cls) => cls == (int)ClassId.Demolitions && (int)ClassId.Builder < UiIcons.Classes.Length ? (int)ClassId.Builder : IconRow(cls);
 
         // ---------------------------------------------------------------- minimap
 
@@ -774,7 +781,7 @@ namespace CriticalMass.Runtime.Hud
             }
 
             // buttons: attack (LMB), class ability (RMB), carry (E)
-            ApplyButton(_buttons[0], s.AttackCd01, 0f, UiIcons.Attack[iconRow, team], AttackNames[cls], dt);
+            ApplyButton(_buttons[0], s.AttackCd01, 0f, UiIcons.Attack[AttackIconRow(cls), team], AttackNames[cls], dt);
             ApplyButton(_buttons[1], s.AbilityCd01, s.AbilityCdSeconds, UiIcons.Ability[iconRow, team], AbilityNames[cls], dt);
             ApplyDenied(_buttons[1], dt);
             AbilityButton carry = _buttons[2];

@@ -239,6 +239,8 @@ namespace CriticalMass.Runtime.View
             _lodCut = CrowdCutNow(w, map, a);
             int models = 0;
             Anim.AnimLod.BeginFrame();
+            // feat/follow-camera-1: frustum and distance culling for the low views, and the drawn / culled / triangle counts.
+            CriticalMass.Runtime.Camera.ViewCull.Begin(_cam, CriticalMass.Runtime.Camera.GroundView.LodActive);
 
             for (int i = 0; i < _actors.Length; i++) models += SyncActor(i, w, cfg, map, a, simTime, dSim) ? 1 : 0;
             models += SyncKaiju(w, cfg, map, a, simTime, dSim);
@@ -256,6 +258,8 @@ namespace CriticalMass.Runtime.View
 
         /// <summary>feat/ground-camera: horizontal radius around the low camera inside which other fighters are not drawn.</summary>
         public const float NearLensMetres = 1.6f;
+        /// <summary>feat/follow-camera-1: half-width of the camera-to-player line inside which other fighters are not drawn.</summary>
+        public const float CorridorMetres = 0.7f;
 
         private bool NearLens(double x, double h, double z)
         {
@@ -324,6 +328,22 @@ namespace CriticalMass.Runtime.View
                 m.SetActive(false);
                 return false;
             }
+            if (CriticalMass.Runtime.Camera.GroundView.LodActive)
+            {
+                // feat/follow-camera-1: first person hides your own body (the lens sits in its head); any other fighter
+                // standing on the line from the camera to you is not drawn, so you never lose your character behind one;
+                // fighters outside the view or beyond the draw distance are not posed or drawn (their effects skip too).
+                Vector3 at = SimSpace.ToWorld(x, h, z);
+                bool hide = (i == 0 && CriticalMass.Runtime.Camera.GroundView.HideSelf)
+                    || (i != _lodSelf && CriticalMass.Runtime.Camera.ViewCull.InCorridor(_camPos, _targetPos, at, CorridorMetres));
+                bool culled = !hide && i != _lodSelf && !CriticalMass.Runtime.Camera.ViewCull.Visible(at, 1.5f, 2.6f);
+                if (hide || culled)
+                {
+                    if (culled) CriticalMass.Runtime.Camera.ViewCull.FightersCulled++;
+                    m.SetActive(false);
+                    return false;
+                }
+            }
             m.SetActive(true);
             m.ApplyTier();
             QualityRow row = QualityTable.Current;
@@ -335,6 +355,8 @@ namespace CriticalMass.Runtime.View
             // Animation pass: clips, timing, facing spring, squash and the level of detail live in Anim.ActorAnimator.
             slot.Anim.Pose(m, w, cfg, i, a, simTime, dSim, basePos, _fx, hasFx, in fx, ref _poseState);
             PostPose(i, m, in _poseState);
+            CriticalMass.Runtime.Camera.ViewCull.FightersDrawn++;
+            if (CriticalMass.Runtime.Camera.ViewCull.SampleFrame) CriticalMass.Runtime.Camera.ViewCull.FighterTriangles += CriticalMass.Runtime.Camera.ViewCull.Triangles(m.Renderers);
             return true;
         }
 

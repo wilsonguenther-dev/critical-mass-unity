@@ -1320,10 +1320,14 @@ namespace CriticalMass.Runtime.Menu
                 Stepper(tab, 4, "FRAME RATE LIMIT", FpsCapText, StepFpsCap),
                 Stepper(tab, 5, "SAVE POWER IN BACKGROUND", () => GameSettings.BackgroundThrottle ? "ON" : "OFF",
                     d => GameSettings.BackgroundThrottle = !GameSettings.BackgroundThrottle),
+                // feat/follow-camera-1: the third- and first-person views' follow, look sensitivity and lens.
+                Stepper(tab, 6, "CAMERA FOLLOW", FollowText, StepFollow),
+                Stepper(tab, 7, "LOOK SENSITIVITY", SensText, StepSens),
+                Stepper(tab, 8, "FIELD OF VIEW", FovText, StepFov),
             };
             // DG-62: the safe-start notice lives here, neutral, never on the title screen.
             string safe = CriticalMass.Runtime.Game.FrameGovernor.SafeNotice;
-            Note(tab, 6, safe ?? (GameSettings.CanChangeWindow ? "Changes apply at once and are kept for the next launch." :
+            Note(tab, 9, safe ?? (GameSettings.CanChangeWindow ? "Changes apply at once and are kept for the next launch." :
                 "Video settings are saved here and apply in the built game."));
             ChainInTab(items);
             return tab.gameObject;
@@ -1337,7 +1341,8 @@ namespace CriticalMass.Runtime.Menu
             {
                 // Camera shake, reduce flashing and reduce motion live on the ACCESS tab (one source of truth, SettingsExtras).
                 Stepper(tab, 0, "DAMAGE NUMBERS", () => GameSettings.DamageNumbers ? "ON" : "OFF", d => GameSettings.DamageNumbers = !GameSettings.DamageNumbers),
-                Stepper(tab, 1, "BLOOD", () => GameSettings.Blood ? "ON" : "OFF", d => GameSettings.Blood = !GameSettings.Blood),
+                // Owner, 2026-11-14: GORE intensity FULL (default) / REDUCED / OFF, one switch (View.Effects.GoreGate), live in a match.
+                Stepper(tab, 1, "GORE", () => global::CriticalMass.Runtime.View.Effects.GoreGate.Label(GameSettings.Gore), d => GameSettings.Gore = global::CriticalMass.Runtime.View.Effects.GoreGate.Step(GameSettings.Gore, d)),
                 // Owner, 2026-11-13: the story intro plays at every launch; this turns that off, WATCH INTRO plays it now.
                 Stepper(tab, 2, "PLAY INTRO AT LAUNCH", () => GameSettings.IntroAtLaunch ? "ON" : "OFF", d => GameSettings.IntroAtLaunch = !GameSettings.IntroAtLaunch),
                 // controls-1 round 2: blue / amber teams for colour-blind players (HUD, rings, team text).
@@ -1390,17 +1395,47 @@ namespace CriticalMass.Runtime.Menu
         // ends at y 1000, inside the panel (PanelY 140 + PanelH 870 = 1010).
         const int GameTabLines = 7;
 
-        /// <summary>CAMERA line: HIGH: CREATOR ANGLE / HIGH: CLASSIC DIAMOND (default until CameraHeading.CreatorAngleIsDefault) / GROUND (EXPERIMENTAL).</summary>
-        static string CameraText() => GameSettings.GroundCamera ? "GROUND (EXPERIMENTAL)"
-            : CriticalMass.Runtime.Camera.CameraHeading.ClassicChosen ? "HIGH: CLASSIC DIAMOND" : "HIGH: CREATOR ANGLE";
-
-        static void StepCamera(int d)
+        /// <summary>CAMERA line (feat/follow-camera-1): TOP-DOWN: CREATOR ANGLE / TOP-DOWN: CLASSIC DIAMOND / THIRD PERSON /
+        /// FIRST PERSON. F5 in a match cycles TOP-DOWN, THIRD PERSON, FIRST PERSON (the top-down heading is kept).</summary>
+        public static string CameraText() => CameraIndex() switch
         {
-            int i = GameSettings.GroundCamera ? 2 : CriticalMass.Runtime.Camera.CameraHeading.ClassicChosen ? 1 : 0;
-            i = ((i + (d >= 0 ? 1 : -1)) % 3 + 3) % 3;
-            GameSettings.GroundCamera = i == 2;
+            3 => "FIRST PERSON",
+            2 => "THIRD PERSON",
+            1 => "TOP-DOWN: CLASSIC DIAMOND",
+            _ => "TOP-DOWN: CREATOR ANGLE",
+        };
+
+        static int CameraIndex()
+        {
+            CriticalMass.Runtime.Camera.CameraView v = GameSettings.CameraView;
+            if (v == CriticalMass.Runtime.Camera.CameraView.FirstPerson) return 3;
+            if (v == CriticalMass.Runtime.Camera.CameraView.ThirdPerson) return 2;
+            return CriticalMass.Runtime.Camera.CameraHeading.ClassicChosen ? 1 : 0;
+        }
+
+        public static void StepCamera(int d)
+        {
+            int i = ((CameraIndex() + (d >= 0 ? 1 : -1)) % 4 + 4) % 4;
+            GameSettings.CameraView = i == 3 ? CriticalMass.Runtime.Camera.CameraView.FirstPerson
+                : i == 2 ? CriticalMass.Runtime.Camera.CameraView.ThirdPerson : CriticalMass.Runtime.Camera.CameraView.TopDown;
             if (i < 2) CriticalMass.Runtime.Camera.CameraHeading.ClassicChosen = i == 1;
         }
+
+        /// <summary>CAMERA FOLLOW line (Video tab): AUTO (default) / MANUAL / MANUAL, INVERT Y, for the third- and first-person views.</summary>
+        public static string FollowText() => !GameSettings.CameraManual ? "AUTO, BEHIND YOU" : GameSettings.CameraInvertY ? "MANUAL, INVERT Y" : "MANUAL, MOUSE OR STICK";
+
+        public static void StepFollow(int d)
+        {
+            int i = !GameSettings.CameraManual ? 0 : GameSettings.CameraInvertY ? 2 : 1;
+            i = ((i + (d >= 0 ? 1 : -1)) % 3 + 3) % 3;
+            GameSettings.CameraManual = i > 0;
+            if (i > 0) GameSettings.CameraInvertY = i == 2;
+        }
+
+        static string SensText() => GameSettings.CameraSensitivity.ToString("0.00") + "x";
+        static void StepSens(int d) => GameSettings.CameraSensitivity = Mathf.Clamp(GameSettings.CameraSensitivity + (d >= 0 ? 0.25f : -0.25f), 0.25f, 3f);
+        static string FovText() => GameSettings.CameraFov + " DEGREES";
+        static void StepFov(int d) => GameSettings.CameraFov = GameSettings.CameraFov + (d >= 0 ? 1 : -1) * CriticalMass.Runtime.Camera.FollowCamera.FovStep;
 
         /// <summary>Settings > WATCH INTRO: closes the menu and plays the story intro (on the title, Home or setup; never over a
         /// live match, where the menu says so instead).</summary>

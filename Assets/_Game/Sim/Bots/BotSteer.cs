@@ -661,6 +661,9 @@ namespace CriticalMass.Sim.Bots
                 st.WantMove[id] = 1;
             }
 
+            // feat/light-weapons-1: a Demolitions or Healer bot swings its light weapon only at close range (a Healer's press
+            // that would mend is kept); every other class, and the rule off, is unchanged.
+            if (output.Attack && !LightWeapons.BotKeepsPress(w, id, aimX, aimZ)) output.Attack = false;
             // DG-21 hesitation: an Easy bot holds its swing in SwingHesitation of 1/3-second windows (never for Normal).
             if (output.Attack && BotSkill.HoldsSwing(w, id)) output.Attack = false;
             // Sim-physics lane (DG-84 / DG-85): a Hard bot steps out of a telegraphed claw cone or slam ring, and jumps a slam.

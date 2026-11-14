@@ -77,7 +77,7 @@ namespace CriticalMass.Sim.Core
     /// <summary>
     /// DG-40 Healer (U-061; the oracle has no Healer: its only corruption removal is the CM-36 shrine cleanse and its only
     /// heal the CM-37 fountain). Travis 2026-11-06: "Healer / Heal / Remove corruption". Art direction: an armoured battle
-    /// healer with wings and no sword; she heals and supports, she never deals damage.
+    /// healer with wings and no sword; she heals and supports first (feat/light-weapons-1: her lantern, LightWeapons in Combat.cs, swings only when no hurt ally can be mended).
     /// <para>MEND (attack press, class AttackCooldown 0.8 s): the hurt living ally (not herself) within MendRange of her that is
     /// nearest the aim point (no aim: nearest her), lowest id on a tie, gets MendHeal HP (capped at its max). No hurt ally in
     /// range: nothing happens and no cooldown is spent. Mending does not end her spawn protection (it is not an attack).</para>
