@@ -163,6 +163,12 @@ namespace CriticalMass.Net
         private double _acc;
         private long _startMs = -1;
 
+        /// <summary>Above this many humans every machine sends half as often (see the constructor).</summary>
+        public const int BigRoomHumans = 16;
+        private readonly int _sendEveryMs;
+        /// <summary>How often this machine sends new inputs or bundles, in ms.</summary>
+        public int SendEveryMs => _sendEveryMs;
+
         public LockstepSession(ITransport transport, MatchSetup setup, GameConfig cfg, LockstepOptions options = null)
         {
             _t = transport ?? throw new ArgumentNullException(nameof(transport));
@@ -176,6 +182,9 @@ namespace CriticalMass.Net
             // Wall milliseconds per tick: the match pace (sim ticks per wall second / SimHz) speeds the clock, never the rules.
             _tickMs = 1000.0 / (cfg.SimHz * WallPace(setup, cfg));
             _maxLead = Math.Max(2, (int)Math.Ceiling(_o.MaxLeadMs / _tickMs));
+            // A big room sends half as often (two ticks per packet): the relay's room object sees one message per human per
+            // send, and 32 humans x 33 a second would sit at its 1,000 a second soft limit. 17+ humans: 66 ms, 32 x 15 = 480/s.
+            _sendEveryMs = setup.Humans.Length > BigRoomHumans ? Math.Max(_o.SendEveryMs, 2 * _o.SendEveryMs) : _o.SendEveryMs;
             _h = setup.Humans.Length;
             _bundleSize = _h * (1 + InputCodec.Size);
             _bundles = new byte[Window * _bundleSize];
@@ -615,7 +624,7 @@ namespace CriticalMass.Net
         {
             int from = _t.Reliable ? _sentInput + 1 : _hostAckedInput + 1;
             bool news = _mineThrough >= from || Status == LockstepStatus.Desynced;
-            if (now - _lastSendHost < (news ? _o.SendEveryMs : _o.KeepAliveMs)) return;
+            if (now - _lastSendHost < (news ? _sendEveryMs : _o.KeepAliveMs)) return;
             int count = Math.Max(0, Math.Min(_mineThrough - from + 1, 64));
             var w = new WireWriter(_pkt);
             w.U8(MsgInputs);
@@ -651,7 +660,7 @@ namespace CriticalMass.Net
                 // One broadcast carries every new bundle to everyone (relay messages cost; acks are not needed on TCP).
                 int from = _sentBundle[0] + 1;
                 bool news = _producedThrough >= from || Status == LockstepStatus.Desynced;
-                if (now - _lastSendTo[0] < (news ? _o.SendEveryMs : _o.KeepAliveMs)) return;
+                if (now - _lastSendTo[0] < (news ? _sendEveryMs : _o.KeepAliveMs)) return;
                 int count = Math.Max(0, Math.Min(_producedThrough - from + 1, maxPer));
                 int len = BuildBundles(from, count, -1);
                 if (len <= 0) return;
@@ -666,7 +675,7 @@ namespace CriticalMass.Net
                 if (_gone[k]) continue;
                 int from = _ackedBundle[k] + 1;
                 bool news = _producedThrough >= from || Status == LockstepStatus.Desynced;
-                if (now - _lastSendTo[k] < (news ? _o.SendEveryMs : _o.KeepAliveMs)) continue;
+                if (now - _lastSendTo[k] < (news ? _sendEveryMs : _o.KeepAliveMs)) continue;
                 int count = Math.Max(0, Math.Min(_producedThrough - from + 1, maxPer));
                 int len = BuildBundles(from, count, _inThrough[k]);
                 if (len <= 0) continue;

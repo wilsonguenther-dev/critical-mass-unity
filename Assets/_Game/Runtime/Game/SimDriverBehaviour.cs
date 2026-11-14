@@ -103,6 +103,8 @@ namespace CriticalMass.Runtime.Game
                 Online.OnlineMatch.Ticked += ForwardTicked;
                 Online.OnlineMatch.LocalInput = FillOnline;
                 gameObject.AddComponent<Online.OnlineMatchOverlay>();
+                Online.OnlineChatHud.Lane = CriticalMass.Runtime.Hud.HudZones.Chat;   // the match HUD's own chat lane
+                Online.OnlineChatHud.Visible = true;
                 return;
             }
             World = World.CreateWorld(req != null ? req.ToWorldOptions(cfg) : new WorldOptions
@@ -153,7 +155,8 @@ namespace CriticalMass.Runtime.Game
         private void FillOnline(InputFrame into)
         {
             HumanInputSource input = InputSource;
-            if (input != null && !input.State.Paused) input.State.Fill(into);
+            // Typing a chat line: neutral inputs, so letters never move the fighter.
+            if (input != null && !input.State.Paused && !Online.OnlineChatHud.Typing) input.State.Fill(into);
             else
             {
                 into.CopyFrom(_neutral);
@@ -165,6 +168,7 @@ namespace CriticalMass.Runtime.Game
         private void OnDestroy()
         {
             if (_online == null) return;
+            Online.OnlineChatHud.Visible = false;
             Online.OnlineMatch.Ticked -= ForwardTicked;
             if (Online.OnlineMatch.LocalInput == (Action<InputFrame>)FillOnline) Online.OnlineMatch.LocalInput = null;
             // Leaving the match scene (results, menu, quit) leaves the room.

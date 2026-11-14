@@ -156,6 +156,7 @@ namespace CriticalMass.Runtime.Online
 
         public static void Ensure()
         {
+            OnlineChatHud.Ensure();
             if (_one != null) return;
             var go = new GameObject("Online Runner");
             DontDestroyOnLoad(go);

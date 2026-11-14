@@ -29,7 +29,8 @@ namespace CriticalMass.Sim.Tests.Net
         {
             var rig = new Rig { Net = new LoopbackNetwork(netSeed, delayMs, jitterMs, loss) };
             var teams = new TeamId[humans];
-            for (int i = 0; i < humans; i++) teams[i] = i == 1 ? TeamId.Crimson : TeamId.Azure;
+            // Peers 0 and 2 Azure, 1 Crimson (the small tests); from peer 3 on they alternate, so 32 humans fill both teams.
+            for (int i = 0; i < humans; i++) teams[i] = i == 1 || (i >= 3 && i % 2 == 1) ? TeamId.Crimson : TeamId.Azure;
             var actors = new int[humans];
             Assert.IsTrue(MatchSetup.AssignActors(teamSize, TeamId.Azure, teams, actors));
             // Pace 1: 30 ticks per wall second, so the millisecond numbers in these tests read as 33 ms ticks.
@@ -39,7 +40,7 @@ namespace CriticalMass.Sim.Tests.Net
             for (int i = 0; i < humans; i++)
             {
                 transports[i] = rig.Net.CreatePeer();
-                setup.Humans[i] = new HumanSlot { Peer = transports[i].LocalPeer, Actor = actors[i], Class = i == 1 ? ClassId.Miner : ClassId.Warrior, Name = "P" + i };
+                setup.Humans[i] = new HumanSlot { Peer = transports[i].LocalPeer, Actor = actors[i], Class = teams[i] == TeamId.Crimson ? ClassId.Miner : ClassId.Warrior, Name = "P" + i };
             }
             for (int i = 0; i < humans; i++)
             {
@@ -212,6 +213,23 @@ namespace CriticalMass.Sim.Tests.Net
             TestContext.WriteLine($"lead host {rig.Sessions[0].Lead} client {rig.Sessions[1].Lead}; late host {rig.Sessions[0].LateInputs} client {rig.Sessions[1].LateInputs}; " +
                                   $"stall host {rig.Sessions[0].StallMs} ms client {rig.Sessions[1].StallMs} ms; bytes host {rig.Sessions[0].BytesSent} client {rig.Sessions[1].BytesSent}; " +
                                   $"sent {rig.Net.Sent} dropped {rig.Net.Dropped}");
+        }
+
+        [Test]
+        public void ThirtyTwoHumansInOneRoomStayIdenticalAndSendAtTheBigRoomRate()
+        {
+            Rig rig = Make(32, 16, 60, 20, 0.01, null, 33);
+            Assert.AreEqual(2 * new LockstepOptions().SendEveryMs, rig.Sessions[5].SendEveryMs, "a 32-human room sends half as often");
+            Run(rig, 240, 60000);
+            for (int i = 0; i < rig.Sessions.Count; i++)
+            {
+                Assert.AreEqual(LockstepStatus.Running, rig.Sessions[i].Status, "peer " + i);
+                Assert.GreaterOrEqual(rig.Sessions[i].Stepped, 240, "peer " + i + " kept up");
+                Assert.IsFalse(rig.Sessions[0].SlotIsBot(i), "nobody was handed to a bot");
+            }
+            for (int i = 1; i < rig.Sessions.Count; i++) AssertSameHashes(rig, 0, i, 6);
+            TestContext.WriteLine($"32 humans, 240 ticks: host sent {rig.Sessions[0].BytesSent} B, a client {rig.Sessions[7].BytesSent} B, " +
+                                  $"stall host {rig.Sessions[0].StallMs} ms, packets {rig.Net.Sent}, dropped {rig.Net.Dropped}");
         }
 
         [Test, Category("Slow")]

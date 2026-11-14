@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using CriticalMass.Net;
 using CriticalMass.Net.Relay;
 using CriticalMass.Runtime.Flow;
+using CriticalMass.Runtime.Hud;
 using CriticalMass.Runtime.Hud.Style;
 using CriticalMass.Runtime.Hud.Ui;
 using CriticalMass.Runtime.Menu;
@@ -72,6 +73,7 @@ namespace CriticalMass.Runtime.Online
 
         void Close()
         {
+            OnlineChatHud.Visible = false;
             Hide();
             StopTyping();
             Action a = _onClosed;
@@ -86,7 +88,7 @@ namespace CriticalMass.Runtime.Online
             _sub = MenuUi.Label(space, "Sub", CMTokens.Ui, UiScale.TypeBody, CMTokens.WithAlpha(Cream, 0.85f), TextAnchor.MiddleLeft, X0, 122f, 1500f, 34f,
                 "Play one match with friends on other computers. Bots fill every empty seat.", 2f);
             MenuUi.Contain(_sub, 1);
-            _status = MenuUi.Label(space, "Status", CMTokens.Ui, UiScale.TypeBody, Brass, TextAnchor.UpperLeft, X0, 760f, 1100f, 80f, "", 2f);
+            _status = MenuUi.Label(space, "Status", CMTokens.Ui, UiScale.TypeBody, Brass, TextAnchor.UpperLeft, X0, 772f, 1100f, 80f, "", 2f);
             _status.horizontalOverflow = HorizontalWrapMode.Wrap;
             MenuUi.Contain(_status, 2);
 
@@ -148,6 +150,11 @@ namespace CriticalMass.Runtime.Online
             if (p == Page.Join) StartTyping(); else StopTyping();
             if (p == Page.Join) { _typed = ""; ShowCode(); }
             if (p == Page.Room) { _shownVersion = -1; RefreshRoom(); }
+            // Chat lives in the room page's right column, under START / READY (its own box; the match moves it to its HUD lane).
+            OnlineChatHud.Lane = new Rect(ColR, RowY + 356f, ColRW, HudZones.ChatLines * HudZones.ChatLineH + 6f + HudZones.ChatInputH);
+            OnlineChatHud.Visible = p == Page.Room;
+            HudText.Set(_sub, p == Page.Room ? "Y chats to everyone, Shift + Y to your team. Bots fill every empty seat."
+                : "Play one match with friends on other computers. Bots fill every empty seat.");
             if (p == Page.Home) SetStatus(OnlineConfig.Configured ? "" : "Online play is not switched on in this build yet.");
             HudText.Set(_title, p == Page.Room ? (OnlineMatch.Host != null ? "YOUR ROOM" : "ROOM") : p == Page.Join ? "JOIN A ROOM" : p == Page.Busy ? "CONNECTING..." : "PLAY ONLINE");
             MenuItem focus = p == Page.Home ? _create : p == Page.Join ? _joinGo : p == Page.Room ? (OnlineMatch.Host != null ? _start : _ready) : null;
