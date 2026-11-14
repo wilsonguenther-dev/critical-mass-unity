@@ -30,6 +30,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with: { lfs: false, sparse-checkout: 'Assets/_Game/Art/_gen2~/mv', sparse-checkout-cone-mode: false }
+      - name: LFS inputs (this folder only)
+        run: git lfs pull --include "Assets/_Game/Art/_gen2~/mv/inputs/**" && file Assets/_Game/Art/_gen2~/mv/inputs/builder/front.png
       - uses: actions/setup-python@v5
         with: { python-version: '3.11' }
       - name: Install (CPU torch, model code pinned)

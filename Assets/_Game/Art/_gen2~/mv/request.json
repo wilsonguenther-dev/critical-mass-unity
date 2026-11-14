@@ -66,5 +66,8 @@
 "octree": 320,
 "views": "front,left,back"
 }
+],
+"rev": [
+2
 ]
 }
