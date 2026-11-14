@@ -154,6 +154,9 @@ namespace CriticalMass.Runtime.Audio.Sound
                     int k = (int)c;
                     int cue = k >= 0 && k < cues.Length ? cues[k] : cues[cues.Length - 1];
                     Emit(sink, cue, w, w.X[a], w.Z[a], ownA, false, 1f, Weight(c), a);
+                    // feat/hit-feel-1: an effort voice on every other swing of an actor (deterministic, no RNG).
+                    if (_effortCue == -2) _effortCue = SoundTable.IndexOf("effort");
+                    if (_effortCue >= 0 && EffortOn(a, w.Tick)) Emit(sink, _effortCue, w, w.X[a], w.Z[a], ownA, false, 0.9f, Weight(c), a);
                     return;
                 }
                 case Pick.Bio:
@@ -268,6 +271,11 @@ namespace CriticalMass.Runtime.Audio.Sound
             }
         }
 
+        int _effortCue = -2;
+
+        /// <summary>feat/hit-feel-1: does this swing (actor, press tick) voice an effort? About every other swing, spread by actor.</summary>
+        public static bool EffortOn(int actor, int tick) => ((uint)(actor * 7 + tick) & 1u) == 0;
+
         private void Hit(SimEvent ev, World w, ISoundSink sink, int[] cues, bool death)
         {
             int t = ev.A;
@@ -300,6 +308,8 @@ namespace CriticalMass.Runtime.Audio.Sound
                 else if (w.Actors[t].Cls == ClassId.Warrior) cue = tier >= 2 ? cues[2] : cues[3];
                 else cue = cues[tier >= 2 ? 2 : tier == 1 ? 1 : 0];
                 Emit(sink, cue, w, ev.X, ev.Z, own, threat, 1f, 1f, t);
+                // feat/hit-feel-1: the victim's pain voice, pitched by body (Weight) with the cue's own jitter.
+                if (cues.Length > 8) Emit(sink, cues[8], w, ev.X, ev.Z, own, threat, 1f, SoundFeed.Weight(w.Actors[t].Cls), t);
             }
             if (tier >= 1) Emit(sink, cues[7], w, ev.X, ev.Z, t == 0, false, 0.85f, SoundFeed.Weight(w.Actors[t].Cls), t);
         }

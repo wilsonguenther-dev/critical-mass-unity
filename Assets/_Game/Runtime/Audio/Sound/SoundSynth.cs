@@ -276,6 +276,14 @@ namespace CriticalMass.Runtime.Audio.Sound
             R("whoosh_heavy", 0.34f, 0f, L(Nz, 0, 0.32f, 1, 1, 0.12f, 0.08f, 1f, 500, 2600, 150), L(Si, 0, 0.3f, 140, 70, 0.1f, 0.1f, 0.15f)),
             R("whoosh_mid", 0.28f, 0f, L(Nz, 0, 0.26f, 1, 1, 0.09f, 0.06f, 1f, 800, 3500, 250)),
             R("whoosh_light", 0.22f, 0f, L(Nz, 0, 0.2f, 1, 1, 0.07f, 0.05f, 1f, 1200, 5000, 400)),
+            // feat/hit-feel-1: non-speech voice. Pain: a voiced buzz (saw) falling in pitch through a closing low-pass (the
+            // vowel), rough with a little tremolo, over a breath of band noise. Three shapes: a mid "uh", a short high yelp,
+            // a low groan. Effort: a short rising "hup" and a breathy "hah" on the swing. Built here, nothing recorded.
+            R("pain_a", 0.32f, 0.9f, L(Sw, 0, 0.28f, 210, 140, 0.012f, 0.12f, 0.7f, 1400, 600, 120, 0, 0, 0.25f, 38), L(Nz, 0, 0.22f, 1, 1, 0.01f, 0.08f, 0.22f, 1800, 700, 400)),
+            R("pain_b", 0.24f, 0.9f, L(Sw, 0, 0.2f, 270, 190, 0.008f, 0.08f, 0.7f, 1900, 800, 150, 0.04f, 6f, 0.2f, 45), L(Nz, 0, 0.16f, 1, 1, 0.006f, 0.06f, 0.2f, 2200, 900, 500)),
+            R("pain_c", 0.46f, 0.8f, L(Sw, 0, 0.42f, 150, 105, 0.02f, 0.2f, 0.75f, 1100, 450, 90, 0, 0, 0.3f, 30), L(Tr, 0, 0.4f, 300, 210, 0.02f, 0.18f, 0.25f), L(Nz, 0, 0.3f, 1, 1, 0.02f, 0.1f, 0.18f, 1300, 500, 300)),
+            R("effort_a", 0.18f, 0.7f, L(Sw, 0, 0.16f, 170, 215, 0.01f, 0.06f, 0.55f, 1300, 900, 140, 0, 0, 0.15f, 40), L(Nz, 0, 0.12f, 1, 1, 0.005f, 0.05f, 0.28f, 2500, 1200, 600)),
+            R("effort_b", 0.22f, 0.6f, L(Nz, 0, 0.1f, 1, 1, 0.01f, 0.05f, 0.35f, 3000, 1500, 700), L(Sw, 0.05f, 0.15f, 190, 160, 0.01f, 0.07f, 0.5f, 1500, 700, 140, 0, 0, 0.2f, 35)),
             R("grunt", 0.2f, 0.8f, L(Nz, 0, 0.18f, 1, 1, 0.01f, 0.06f, 0.8f, 900, 500, 200), L(Sw, 0, 0.16f, 150, 110, 0.01f, 0.05f, 0.25f, 700)),
             R("jump", 0.14f, 0f, L(Nz, 0, 0.12f, 1, 1, 0.005f, 0.04f, 0.6f, 2000, 800, 300), L(Si, 0, 0.1f, 220, 330, 0.005f, 0.04f, 0.2f)),
             R("land_light", 0.18f, 0f, L(Si, 0, 0.15f, 120, 60, 0.002f, 0.04f, 1f), L(Nz, 0, 0.1f, 1, 1, 0.001f, 0.03f, 0.5f, 1500, 400)),
