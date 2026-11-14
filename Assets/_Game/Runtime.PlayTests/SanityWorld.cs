@@ -109,7 +109,24 @@ namespace CriticalMass.Runtime.PlayTests
             }
             if (settleSeconds > 0) Driver.StepTicks((int)Math.Ceiling(settleSeconds * Cfg.SimHz));
             yield return null;
+            // fix/builder-strafe-1: since perf/start-hitch-1 (57b693f) ActorViews builds its spare fighter models two per
+            // frame after the load instead of all in Start, so spares built after the Sync below kept the game's
+            // AnimatorCullingMode.CullCompletely. Under -nographics nothing is ever visible, so a fighter that respawned into
+            // a late spare was never evaluated again (FacingSanity, Builder actor 29: "evaluated 3, skipped 19": stale legs
+            // from its last Run pose under a StrafeR blend, 45 degrees off). The sim clock is stopped here, so waiting for
+            // the spares changes no tick.
+            for (int f = 0; f < 240 && Views.SparesPending; f++) yield return null;
             Sync();
+        }
+
+        /// <summary>
+        /// Every fighter Animator always animates (test-only; see Sync). Sampling loops that step the driver themselves
+        /// call it before yielding the frame, so a model the views built since the last Sync is evaluated too.
+        /// </summary>
+        public static void AnimateAll()
+        {
+            foreach (Animator a in Object.FindObjectsByType<Animator>(FindObjectsSortMode.None))
+                if (a.cullingMode != AnimatorCullingMode.AlwaysAnimate) a.cullingMode = AnimatorCullingMode.AlwaysAnimate;
         }
 
         /// <summary>Back to the flow's first-boot state (QueueMatch changed it); call from every TearDown.</summary>
@@ -131,8 +148,7 @@ namespace CriticalMass.Runtime.PlayTests
         public void Sync()
         {
             Views.Sync(0f);
-            foreach (Animator a in Object.FindObjectsByType<Animator>(FindObjectsSortMode.None))
-                if (a.cullingMode != AnimatorCullingMode.AlwaysAnimate) a.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+            AnimateAll();
             Views.Sync(0f);
         }
 
