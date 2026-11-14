@@ -291,6 +291,11 @@ namespace CriticalMass.Runtime.View.Effects
             }
         }
 
+        /// <summary>follow-camera-4: the smoke column in the low views lives this share of its time and rises this share
+        /// of its height (a flatter, shorter column that clears the fight sooner).</summary>
+        public const double LowSmokeLife = 0.6;
+        public const float LowSmokeRise = 0.6f;
+
         private void BuildBoomAir(double now, FxMeshBuilder air, Vector3 camRight, Vector3 camUp)
         {
             Vector3 toCam = -Vector3.Cross(camRight, camUp);
@@ -304,6 +309,9 @@ namespace CriticalMass.Runtime.View.Effects
                 bool fire = HasFire(ex.Kind);
                 Vector3 c = ex.P + toCam * 0.4f;
 
+                // follow-camera-4: the glow, fireball and lobes are one flash group (low views cap its size on screen).
+                if (air.BeginGroup(c + Vector3.up * (0.95f * R), 2.0f * R, CriticalMass.Runtime.Camera.FxLook.Flash, ex.P))
+                {
                 // Glow billboard (additive) and the two-frame white core.
                 if (fire && age < S(0.14))
                 {
@@ -354,16 +362,23 @@ namespace CriticalMass.Runtime.View.Effects
                     }
                 }
 
+                air.EndGroup();
+                }
+
                 // Smoke column: six stacked puffs rising and drifting, stepped greys (dust tones without fire).
+                // follow-camera-4: in the low views the column is one volume group (tighter screen cap, see-through over
+                // the fight), lives LowSmokeLife as long and rises LowSmokeRise as high; top-down unchanged.
+                bool low = CriticalMass.Runtime.Camera.ViewCull.On;
+                if (!air.BeginGroup(ex.P + Vector3.up * (2.0f * R * (low ? LowSmokeRise : 1f)), 2.4f * R, CriticalMass.Runtime.Camera.FxLook.Volume, ex.P)) continue;
                 Color32 sm = fire ? SmokeMid : DustMid, sl = fire ? SmokeLight : DustLight, sd = fire ? SmokeDark : DustDark;
-                double colLife = S(fire ? 2.2 : 1.6);
+                double colLife = S(fire ? 2.2 : 1.6) * (low ? LowSmokeLife : 1.0);
                 for (int j = 0; j < 6; j++)
                 {
                     double born = S(0.15 + 0.12 * j);
                     double pa = age - born;
                     if (pa < 0 || pa >= colLife) continue;
                     float u = (float)(pa / colLife);
-                    float rise = 1f - (1f - u) * (1f - u);
+                    float rise = (1f - (1f - u) * (1f - u)) * (low ? LowSmokeRise : 1f);
                     float drift = (R01(ex.Seed, (uint)j + 640) - 0.5f) * R * 0.8f;
                     Vector3 p = ex.P + toCam * 0.2f + Vector3.up * (0.5f * R + (1.2f + 0.35f * j) * R * rise) + camRight * (drift * rise);
                     float sz = R * (0.38f + 0.08f * j) * (0.6f + 0.6f * Mathf.Sqrt(u)) * (fire ? 1f : 0.85f);
@@ -373,6 +388,7 @@ namespace CriticalMass.Runtime.View.Effects
                     air.Blob(p + (camUp - camRight) * (sz * 0.28f), camRight, camUp, sz * 0.55f, null, 8, 0, A(sl, fade));
                     air.Blob(p - (camUp - camRight * 0.4f) * (sz * 0.3f), camRight, camUp, sz * 0.45f, null, 8, 0, A(sd, fade * 0.85f));
                 }
+                air.EndGroup();
             }
         }
     }

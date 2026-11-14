@@ -7,6 +7,10 @@ namespace CriticalMass.Runtime.Camera
     /// <summary>The three play views; F5 (the "Camera view" action) cycles them in a match.</summary>
     public enum CameraView { TopDown = 0, ThirdPerson = 1, FirstPerson = 2 }
 
+    /// <summary>follow-camera-4: how a composed effect is treated in the low views. Flash = fireballs and bursts (size
+    /// cap); Volume = smoke and dust columns (tighter size cap, softened near the sight line to the fight).</summary>
+    public enum FxLook { Flash = 0, Volume = 1 }
+
     /// <summary>
     /// feat/follow-camera-1 (owner 2026-11-14: "make it more like GTA where it's like above their head ... the camera does not
     /// follow and point where they're at. Can we make that happen automatically please ... and manually too in the
@@ -270,6 +274,7 @@ namespace CriticalMass.Runtime.Camera
             _on = on && cam != null;
             if (!_on) return;
             _cam = cam.transform.position;
+            _camFwd = cam.transform.forward;
             GeometryUtility.CalculateFrustumPlanes(cam, Planes);
         }
 
@@ -287,6 +292,52 @@ namespace CriticalMass.Runtime.Camera
         /// third of the 65-degree lens's height across).</summary>
         public const float MaxScreenTan = 0.18f;
         public static int FxNearCulled, FxShrunk, LastFxNearCulled, LastFxShrunk;
+
+        // ---- follow-camera-4: composed effects (FxMeshBuilder.BeginGroup)
+
+        /// <summary>Screen caps (radius / distance) for a whole flash and a whole smoke column in the low views.</summary>
+        public const float FlashScreenTan = 0.12f, VolumeScreenTan = 0.14f;
+        /// <summary>Alpha in the low views: smoke VolumeAlpha anywhere; smoke or a flash that overlaps the fight on screen
+        /// (the followed fighter in third person, the middle of the view in first person) and is not behind it: VolumeOverFight.</summary>
+        public const float VolumeAlpha = 0.7f, VolumeOverFight = 0.25f;
+        /// <summary>Angular margin (radians, about 8 degrees) around the fight that counts as overlapping.</summary>
+        public const float FightMargin = 0.14f;
+        public static int FxSoftened, LastFxSoftened;
+        static Vector3 _camFwd = Vector3.forward;
+
+        /// <summary>
+        /// One decision for a composed effect at centre c, radius r (pure but for the counters; tests): false = not drawn
+        /// (out of view, past the distance, at the lens); k = scale about c (lens fade-in and the look's screen cap); a =
+        /// vertex alpha (Volume only). No low view: true, 1, 1.
+        /// </summary>
+        public static bool FxGroup(Vector3 c, float r, FxLook look, out float k, out float a)
+        {
+            k = 1f; a = 1f;
+            if (!_on) return true;
+            if (!FxVisible(c, r)) return false;
+            Vector3 toC = c - _cam;
+            float d = toC.magnitude;
+            float edge = d - r * 0.5f;   // r bounds the whole group; its pieces fill about the inner half
+            if (edge < NearCull) { FxNearCulled++; return false; }
+            if (edge < NearFade) k = (edge - NearCull) / (NearFade - NearCull);
+            float cap = (look == FxLook.Volume ? VolumeScreenTan : FlashScreenTan) * d;
+            if (r * k > cap) k = cap / r;
+            if (k < 1f) FxShrunk++;
+            if (look == FxLook.Volume) { a = VolumeAlpha; FxSoftened++; }
+            Vector3 fight = _lineOn ? _lineTo - _cam : _camFwd * 6f;
+            float fd = fight.magnitude;
+            if (fd > 1e-3f && d > 1e-3f && d < fd + r * k)
+            {
+                float cos = Vector3.Dot(toC, fight) / (d * fd);
+                float sep = Mathf.Acos(Mathf.Clamp(cos, -1f, 1f));
+                if (sep < Mathf.Atan2(r * k, d) + FightMargin)
+                {
+                    if (a == 1f) FxSoftened++;
+                    a = VolumeOverFight;   // a flash or smoke in front of the fight: see-through, not popped away
+                }
+            }
+            return true;
+        }
         static Vector3 _lineTo;
         static bool _lineOn;
 
@@ -371,8 +422,8 @@ namespace CriticalMass.Runtime.Camera
         {
             LastDrawn = FightersDrawn; LastCulled = FightersCulled; LastTriangles = FighterTriangles;
             LastFxDrawn = FxDrawn; LastFxCulled = FxCulled; LastRubbleCulled = RubbleCulled;
-            LastFxNearCulled = FxNearCulled; LastFxShrunk = FxShrunk;
-            FxDrawn = FxCulled = RubbleCulled = FxNearCulled = FxShrunk = 0;
+            LastFxNearCulled = FxNearCulled; LastFxShrunk = FxShrunk; LastFxSoftened = FxSoftened;
+            FxDrawn = FxCulled = RubbleCulled = FxNearCulled = FxShrunk = FxSoftened = 0;
             if (_lastWasSample) SampledTriangles = FighterTriangles;
             _lastWasSample = SampleFrame;
             FightersDrawn = FightersCulled = FighterTriangles = 0;

@@ -67,8 +67,41 @@ namespace CriticalMass.Runtime.View.Effects
             Mesh.bounds = new Bounds(Vector3.zero, new Vector3(10000f, 10000f, 10000f));
         }
 
+        // follow-camera-4: one decision for a whole composed effect (a smoke column, a fireball). Every primitive inside
+        // BeginGroup / EndGroup scales about the group's centre by one factor, so rims and fills keep their proportions,
+        // and every vertex takes the group's alpha. Low views only (ViewCull.FxGroup); top-down: always 1 and 1.
+        bool _grp;
+        Vector3 _gc;
+        float _gk = 1f, _ga = 1f;
+
+        /// <summary>Opens a group tested at centre c with overall radius r, scaling about anchor (the effect's base, so a
+        /// shrunk column stays on the ground). False = the whole group is not drawn (skip it; no EndGroup needed).
+        /// look: FxLook.Flash caps the size, FxLook.Volume caps tighter and softens.</summary>
+        public bool BeginGroup(Vector3 c, float r, CriticalMass.Runtime.Camera.FxLook look, Vector3 anchor)
+        {
+            _grp = false; _gk = 1f; _ga = 1f;
+            if (!ViewCulled) return true;
+            if (!CriticalMass.Runtime.Camera.ViewCull.FxGroup(c, r, look, out float k, out float a)) return false;
+            _grp = true; _gc = anchor; _gk = k; _ga = a;
+            return true;
+        }
+
+        public void EndGroup()
+        {
+            _grp = false; _gk = 1f; _ga = 1f;
+        }
+
+        /// <summary>Inside a group: moves c toward the group centre by the group factor (true = in a group).</summary>
+        bool Grouped(ref Vector3 c)
+        {
+            if (!_grp) return false;
+            c = _gc + (c - _gc) * _gk;
+            return true;
+        }
+
         public void Clear()
         {
+            _grp = false; _gk = 1f; _ga = 1f;
             VertCount = 0;
             IndexCount = 0;
             Dropped = 0;
@@ -84,6 +117,7 @@ namespace CriticalMass.Runtime.View.Effects
 
         public int V(Vector3 p, Color32 c)
         {
+            if (_ga < 1f) c.a = (byte)(c.a * _ga);   // follow-camera-4: a softened group (smoke in the low views)
             _v[VertCount].Pos = p;
             _v[VertCount].Col = c;
             _v[VertCount].Ext = new Color32(Add, 0, 0, 0);
@@ -113,7 +147,8 @@ namespace CriticalMass.Runtime.View.Effects
         /// <summary>A filled polygon (fan) of n points at radius r(k) given by radii[] (or r when radii is null).</summary>
         public void Blob(Vector3 c, Vector3 right, Vector3 up, float r, float[] radii, int n, float rot, Color32 col)
         {
-            if (ViewCulled) { float fk = CriticalMass.Runtime.Camera.ViewCull.FxScale(c, r, NearFade); if (fk <= 0f) return; r *= fk; }
+            if (Grouped(ref c)) { r *= _gk; }
+            else if (ViewCulled) { float fk = CriticalMass.Runtime.Camera.ViewCull.FxScale(c, r, NearFade); if (fk <= 0f) return; r *= fk; }
             if (!Room(n + 1, n * 3)) return;
             int centre = V(c, col);
             for (int k = 0; k < n; k++)
@@ -128,7 +163,8 @@ namespace CriticalMass.Runtime.View.Effects
         /// <summary>A star with `points` spikes: outer radius r, inner radius r * inner.</summary>
         public void Star(Vector3 c, Vector3 right, Vector3 up, float r, float inner, int points, float rot, Color32 col)
         {
-            if (ViewCulled) { float fk = CriticalMass.Runtime.Camera.ViewCull.FxScale(c, r, NearFade); if (fk <= 0f) return; r *= fk; }
+            if (Grouped(ref c)) { r *= _gk; }
+            else if (ViewCulled) { float fk = CriticalMass.Runtime.Camera.ViewCull.FxScale(c, r, NearFade); if (fk <= 0f) return; r *= fk; }
             int n = points * 2;
             if (!Room(n + 1, n * 3)) return;
             int centre = V(c, col);
@@ -150,7 +186,8 @@ namespace CriticalMass.Runtime.View.Effects
         /// <summary>Annulus with an inner and an outer colour (alpha ramps for trails).</summary>
         public void Ring(Vector3 c, Vector3 right, Vector3 up, float r0, float r1, float a0, float a1, int seg, Color32 inner, Color32 outer)
         {
-            if (ViewCulled) { float fk = CriticalMass.Runtime.Camera.ViewCull.FxScale(c, r1, NearFade); if (fk <= 0f) return; r0 *= fk; r1 *= fk; }
+            if (Grouped(ref c)) { r0 *= _gk; r1 *= _gk; }
+            else if (ViewCulled) { float fk = CriticalMass.Runtime.Camera.ViewCull.FxScale(c, r1, NearFade); if (fk <= 0f) return; r0 *= fk; r1 *= fk; }
             if (seg < 1 || r1 <= r0) return;
             if (!Room((seg + 1) * 2, seg * 6)) return;
             int start = VertCount;
@@ -172,7 +209,8 @@ namespace CriticalMass.Runtime.View.Effects
         /// <summary>A crescent (swing trail): the band's half-width tapers from 0 at a0 to `w` at a1 (the blade end).</summary>
         public void Crescent(Vector3 c, Vector3 right, Vector3 up, float r, float w, float a0, float a1, int seg, Color32 tail, Color32 head)
         {
-            if (ViewCulled) { float fk = CriticalMass.Runtime.Camera.ViewCull.FxScale(c, r + w, NearFade); if (fk <= 0f) return; r *= fk; w *= fk; }
+            if (Grouped(ref c)) { r *= _gk; w *= _gk; }
+            else if (ViewCulled) { float fk = CriticalMass.Runtime.Camera.ViewCull.FxScale(c, r + w, NearFade); if (fk <= 0f) return; r *= fk; w *= fk; }
             if (seg < 1) return;
             if (!Room((seg + 1) * 2, seg * 6)) return;
             int start = VertCount;
@@ -197,7 +235,8 @@ namespace CriticalMass.Runtime.View.Effects
         /// <summary>A quad from a centre, half extents along two axes.</summary>
         public void Quad(Vector3 c, Vector3 halfRight, Vector3 halfUp, Color32 bottom, Color32 top)
         {
-            if (ViewCulled) { float fk = CriticalMass.Runtime.Camera.ViewCull.FxScale(c, Mathf.Max(halfRight.magnitude, halfUp.magnitude), NearFade); if (fk <= 0f) return; halfRight *= fk; halfUp *= fk; }
+            if (Grouped(ref c)) { halfRight *= _gk; halfUp *= _gk; }
+            else if (ViewCulled) { float fk = CriticalMass.Runtime.Camera.ViewCull.FxScale(c, Mathf.Max(halfRight.magnitude, halfUp.magnitude), NearFade); if (fk <= 0f) return; halfRight *= fk; halfUp *= fk; }
             if (!Room(4, 6)) return;
             int s = V(c - halfRight - halfUp, bottom);
             V(c + halfRight - halfUp, bottom);
@@ -220,7 +259,8 @@ namespace CriticalMass.Runtime.View.Effects
         /// </summary>
         public void Chunk(Vector3 c, Quaternion rot, Vector3 half, float outline, Color32 light, Color32 mid, Color32 dark, Color32 navy)
         {
-            if (ViewCulled) { float fk = CriticalMass.Runtime.Camera.ViewCull.FxScale(c, half.magnitude + outline, NearFade); if (fk <= 0f) return; half *= fk; outline *= fk; }
+            if (Grouped(ref c)) { half *= _gk; outline *= _gk; }
+            else if (ViewCulled) { float fk = CriticalMass.Runtime.Camera.ViewCull.FxScale(c, half.magnitude + outline, NearFade); if (fk <= 0f) return; half *= fk; outline *= fk; }
             if (!Room(48, 72)) return;
             AddBox(c, rot, half + Vector3.one * outline, navy, navy, navy, true);
             AddBox(c, rot, half, light, mid, dark, false);
@@ -232,7 +272,8 @@ namespace CriticalMass.Runtime.View.Effects
         /// </summary>
         public void Bone(Vector3 c, Quaternion rot, float half, float thick, float outline, Color32 light, Color32 mid, Color32 dark, Color32 navy)
         {
-            if (ViewCulled) { float fk = CriticalMass.Runtime.Camera.ViewCull.FxScale(c, half + thick + outline, NearFade); if (fk <= 0f) return; half *= fk; thick *= fk; outline *= fk; }
+            if (Grouped(ref c)) { half *= _gk; thick *= _gk; outline *= _gk; }
+            else if (ViewCulled) { float fk = CriticalMass.Runtime.Camera.ViewCull.FxScale(c, half + thick + outline, NearFade); if (fk <= 0f) return; half *= fk; thick *= fk; outline *= fk; }
             if (!Room(144, 216)) return;
             Vector3 ax = rot * Vector3.right;
             var shaft = new Vector3(half, thick, thick);

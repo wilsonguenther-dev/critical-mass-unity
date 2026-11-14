@@ -71,7 +71,7 @@ namespace CriticalMass.Runtime.Camera
         {
             string path = Path.Combine(Dir, "shot-follow-" + name + ".png");
             ScreenCapture.CaptureScreenshot(path);
-            Debug.Log($"[CM.Follow] {path} {note} view={GroundView.ActiveView} yaw={View.Follow.Yaw:F0} pitch={View.Follow.Pitch:F0} dist={View.Follow.Dist:F2} drawn={ViewCull.LastDrawn} culled={ViewCull.LastCulled} fxNearCulled={ViewCull.LastFxNearCulled} fxShrunk={ViewCull.LastFxShrunk} aim={(GroundView.AimAt.HasValue ? "on" : "off")}");
+            Debug.Log($"[CM.Follow] {path} {note} view={GroundView.ActiveView} yaw={View.Follow.Yaw:F0} pitch={View.Follow.Pitch:F0} dist={View.Follow.Dist:F2} drawn={ViewCull.LastDrawn} culled={ViewCull.LastCulled} fxNearCulled={ViewCull.LastFxNearCulled} fxShrunk={ViewCull.LastFxShrunk} fxSoftened={ViewCull.LastFxSoftened} aim={(GroundView.AimAt.HasValue ? "on" : "off")}");
         }
 
         void Update()
