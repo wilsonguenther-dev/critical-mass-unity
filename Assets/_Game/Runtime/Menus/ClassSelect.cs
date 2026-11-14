@@ -491,6 +491,7 @@ namespace CriticalMass.Runtime.Menus
 
         void Update()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Upd(this);
             FindGame();
             if (Mode != SelectMode.Setup)
             {

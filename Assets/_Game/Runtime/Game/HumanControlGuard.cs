@@ -134,6 +134,7 @@ namespace CriticalMass.Runtime.Game
 
         void Update()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Upd(this);
             if (Input == null) Input = GetComponent<HumanInputSource>();
             UpdatePlate();
             World w = Driver != null ? Driver.World : null;

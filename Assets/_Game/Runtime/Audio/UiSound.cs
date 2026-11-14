@@ -282,6 +282,7 @@ namespace CriticalMass.Runtime.Audio
 
         void LateUpdate()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Late(this);
             BindNew();
             WatchPauseMenu();
         }

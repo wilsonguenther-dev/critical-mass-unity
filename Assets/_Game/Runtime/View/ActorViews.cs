@@ -20,6 +20,7 @@ namespace CriticalMass.Runtime.View
     /// Runtime/View/Anim (ActorAnimator, KaijuAnimator); this class places models and calls them, then PostPose (contract C3). Every Sim-to-Unity position goes through SimSpace (O-13). No Unity physics.
     /// Reads the Sim only; never writes it. Model instances are pooled per model and never destroyed during play.
     /// </summary>
+    [DefaultExecutionOrder(-100)]   // online-offline-cost-1: bodies placed from the sim before the camera follow and everything that reads them
     public sealed class ActorViews : MonoBehaviour
     {
         /// <summary>The human's capsule is this much wider in X and Z (grey-box only).</summary>
@@ -238,7 +239,7 @@ namespace CriticalMass.Runtime.View
             s.Push(m);
         }
 
-        private void LateUpdate() { if (CriticalMass.Runtime.Hud.TitleBackdrop.Frozen) return; var c = CriticalMass.Runtime.Game.FrameCost.Enter(); TrickleSpares(); Sync(Time.deltaTime); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.ActorViews, c); }
+        private void LateUpdate() { using var __ab = CriticalMass.Runtime.Game.AllocBy.Late(this); if (CriticalMass.Runtime.Hud.TitleBackdrop.Frozen) return; var c = CriticalMass.Runtime.Game.FrameCost.Enter(); TrickleSpares(); Sync(Time.deltaTime); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.ActorViews, c); }
 
         /// <summary>
         /// Contract C3 (DG-71): called once per drawn actor (and the Kaiju, actor -2) after its pose is evaluated and before

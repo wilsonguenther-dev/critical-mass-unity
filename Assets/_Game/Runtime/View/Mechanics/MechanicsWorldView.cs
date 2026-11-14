@@ -19,6 +19,7 @@ namespace CriticalMass.Runtime.View.Mechanics
     /// the slam's falloff and safe edge, and the dodge pop. Craters are the chunk mesh's (Terraform event, GridVersion).
     /// Reads the sim only; installs itself on the driver (MechanicsWorldViewInstaller), so no shared file changes.
     /// </summary>
+    [DefaultExecutionOrder(160)]   // online-offline-cost-1: reads this frame's camera: after CinemachineBrain (100) and CameraShake (150), before GameHud's layout (200)
     public sealed class MechanicsWorldView : MonoBehaviour
     {
         public const int GroundVerts = 14000, SolidVerts = 26000, AirVerts = 6000;
@@ -128,7 +129,7 @@ namespace CriticalMass.Runtime.View.Mechanics
             Feed.Read(w);
         }
 
-        void LateUpdate() { var c = CriticalMass.Runtime.Game.FrameCost.Enter(); LateUpdateBody(); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.MechanicsView, c); }
+        void LateUpdate() { using var __ab = CriticalMass.Runtime.Game.AllocBy.Late(this); var c = CriticalMass.Runtime.Game.FrameCost.Enter(); LateUpdateBody(); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.MechanicsView, c); }
 
         void LateUpdateBody()
         {
@@ -641,6 +642,7 @@ namespace CriticalMass.Runtime.View.Mechanics
 
         void Update()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Upd(this);
             if (_driver != null) return;
             if (--_wait > 0) return;
             _wait = SearchEveryFrames;

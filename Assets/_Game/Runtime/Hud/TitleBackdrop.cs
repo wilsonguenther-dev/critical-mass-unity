@@ -58,6 +58,7 @@ namespace CriticalMass.Runtime.Hud
 
         void Update()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Upd(this);
             _age += Time.unscaledDeltaTime;
             bool hidden = Canvas == null || !Canvas.isActiveAndEnabled;
             bool want = ShouldFreeze(Enabled && !Application.isEditor, FrameGovernor.IdleTitle, hidden, _age, View.Dressing.WorldView.Building, _failed);

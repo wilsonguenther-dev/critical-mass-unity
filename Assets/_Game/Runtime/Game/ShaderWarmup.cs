@@ -97,6 +97,7 @@ namespace CriticalMass.Runtime.Game
 
         void Update()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Upd(this);
             if (Done || _warm == null) return;
             _titleCheck -= Time.unscaledDeltaTime;
             if (_titleCheck <= 0f)

@@ -323,6 +323,7 @@ namespace CriticalMass.Runtime.Menu
 
         void Update()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Upd(this);
             if (Input == null) return;
             if (Input.PauseHandler == null) Input.PauseHandler = OnPausePressed;
             ControlBindings.Sample();

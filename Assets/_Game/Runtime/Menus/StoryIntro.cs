@@ -807,6 +807,7 @@ namespace CriticalMass.Runtime.Menus
 
         void Update()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Upd(this);
             OverlayGuard.Tick();
             if (_film != null && _film.Fading) _film.Tick(Mathf.Min((float)MaxFrameDt, Time.unscaledDeltaTime));
             if (_worldRamp < IntroFilm.WorldGainRampSeconds && !_playing)

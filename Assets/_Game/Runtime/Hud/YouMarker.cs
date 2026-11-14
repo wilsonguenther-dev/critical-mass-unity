@@ -188,6 +188,7 @@ namespace CriticalMass.Runtime.Hud
 
         void LateUpdate()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Late(this);
             if (_root == null) return;
             World w = _driver != null ? _driver.World : null;
             int me = HudBinder.LocalActor;

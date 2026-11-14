@@ -163,6 +163,7 @@ namespace CriticalMass.Runtime.Input
 
         private void Update()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Upd(this);
             if (_map == null) return;
             var m = _move.ReadValue<Vector2>();
             bool padMove = m.sqrMagnitude > 0f && _move.activeControl != null && _move.activeControl.device is Gamepad;

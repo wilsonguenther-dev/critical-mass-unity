@@ -42,6 +42,7 @@ namespace CriticalMass.Runtime.Hud
 
         void Update()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Upd(this);
             float now = Time.unscaledTime;
             if (now < _nextRefresh) return;
             _nextRefresh = now + (float)(1.0 / RefreshHz);

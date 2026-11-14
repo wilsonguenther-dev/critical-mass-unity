@@ -181,6 +181,7 @@ namespace CriticalMass.Runtime.Hud
     /// origin yet: DG-01 can call Show / Hide directly).</para>
     /// </summary>
     [Flow.GameOverlay(Order = 50)]   // installed by GameBootstrap through the DG-01 overlay registry
+    [DefaultExecutionOrder(160)]   // online-offline-cost-1: reads this frame's camera: after CinemachineBrain (100) and CameraShake (150), before GameHud's layout (200)
     public sealed class Banner : MonoBehaviour
     {
         /// <summary>Reference layout (1920 x 1080 units): centre of the banner below the match cluster.</summary>
@@ -305,6 +306,7 @@ namespace CriticalMass.Runtime.Hud
 
         private void LateUpdate()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Late(this);
             double now = Now();
             if (Hold != null && Hold())
             {

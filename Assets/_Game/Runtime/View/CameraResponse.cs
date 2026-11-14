@@ -79,6 +79,7 @@ namespace CriticalMass.Runtime.View.Reactions
 
         private void Update()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Upd(this);
             WorldForceBus bus = WorldForceBus.Active;
             if (bus != _subscribed)
             {

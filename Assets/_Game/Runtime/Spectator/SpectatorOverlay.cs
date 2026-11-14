@@ -175,6 +175,7 @@ namespace CriticalMass.Runtime.Spectator
 
         void LateUpdate()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Late(this);
             if (Mode == null) Mode = GetComponent<SpectatorMode>();
             if (_driver == null)
             {

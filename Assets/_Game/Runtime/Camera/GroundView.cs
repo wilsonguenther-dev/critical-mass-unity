@@ -254,6 +254,7 @@ namespace CriticalMass.Runtime.Camera
 
         void LateUpdate()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Late(this);
             var cost = FrameCost.Enter();
             try { Frame(); }
             finally { FrameCost.Exit(FrameCost.Slot.Camera, cost); }
@@ -676,6 +677,7 @@ namespace CriticalMass.Runtime.Camera
 
         void Update()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Upd(this);
             // The minimal layout follows the mode (Watch hides two panels, Play shows them), checked once a frame.
             GameHud hud = Driver != null ? Driver.GetComponent<GameHud>() : null;
             if (hud == null || hud.Clusters == null) return;

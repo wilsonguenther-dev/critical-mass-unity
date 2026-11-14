@@ -202,6 +202,7 @@ namespace CriticalMass.Runtime.Game
 
         private void Update()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Upd(this);
             // online-rooms-3: while an online match runs (or the game is a hidden online test peer) no other world ticks:
             // the online session is the only thing stepping the Sim.
             if (_online == null && LocalSeat.OnlineLive) return;   // online-offline-cost-1: one plain bool; offline never touches the online types

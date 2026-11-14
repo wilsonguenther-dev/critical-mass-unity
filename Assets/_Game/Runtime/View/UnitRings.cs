@@ -23,6 +23,7 @@ namespace CriticalMass.Runtime.View
     /// Reads the Sim only (O-13 positions through SimSpace, ground through GroundHeight); never writes it. Installs itself
     /// next to the sim driver (UnitRingsInstaller), so no shared file changes.
     /// </summary>
+    [DefaultExecutionOrder(160)]   // online-offline-cost-1: reads this frame's camera: after CinemachineBrain (100) and CameraShake (150), before GameHud's layout (200)
     public sealed class UnitRings : MonoBehaviour
     {
         /// <summary>Ring styles, written to the shader as uv1.x.</summary>
@@ -84,7 +85,7 @@ namespace CriticalMass.Runtime.View
             else enabled = false;
         }
 
-        private void LateUpdate() { var cost = CriticalMass.Runtime.Game.FrameCost.Enter(); LateUpdateCost(); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.Rings, cost); }
+        private void LateUpdate() { using var __ab = CriticalMass.Runtime.Game.AllocBy.Late(this); var cost = CriticalMass.Runtime.Game.FrameCost.Enter(); LateUpdateCost(); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.Rings, cost); }
 
         void LateUpdateCost()
         {
@@ -291,6 +292,7 @@ namespace CriticalMass.Runtime.View
 
         private void Update()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Upd(this);
             if (_driver != null) return;
             if (--_wait > 0) return;
             _wait = SearchEveryFrames;

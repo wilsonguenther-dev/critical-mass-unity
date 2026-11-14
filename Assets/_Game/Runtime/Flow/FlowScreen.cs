@@ -226,6 +226,7 @@ namespace CriticalMass.Runtime.Flow
 
         protected virtual void Update()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Upd(this);
             if (!IsVisible)
             {
                 if (!_hiding) return;

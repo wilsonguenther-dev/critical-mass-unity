@@ -61,7 +61,7 @@ namespace CriticalMass.Runtime.Codex
         public bool UserScale;
         Canvas _canvas;
 
-        void LateUpdate() => Apply();
+        void LateUpdate() { using var __ab = CriticalMass.Runtime.Game.AllocBy.Late(this); Apply(); }
 
         public void Apply()
         {
@@ -150,6 +150,7 @@ namespace CriticalMass.Runtime.Codex
 
         void Update()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Upd(this);
             if (!_showing) return;
             _age += Time.unscaledDeltaTime;
             float a = Mathf.Min(1f, _age / FadeSeconds);

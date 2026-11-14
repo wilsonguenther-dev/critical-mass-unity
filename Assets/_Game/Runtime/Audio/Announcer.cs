@@ -555,7 +555,7 @@ namespace CriticalMass.Runtime.Audio
 #endif
         }
 
-        void Update() { var cost = CriticalMass.Runtime.Game.FrameCost.Enter(); UpdateCost(); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.Sound, cost); }
+        void Update() { using var __ab = CriticalMass.Runtime.Game.AllocBy.Upd(this); var cost = CriticalMass.Runtime.Game.FrameCost.Enter(); UpdateCost(); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.Sound, cost); }
 
         void UpdateCost()
         {

@@ -71,6 +71,7 @@ namespace CriticalMass.Runtime.Secrets
 
         void Update()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Upd(this);
             _t += Time.unscaledDeltaTime;
             float rock = 0f, armL = 0f, armR = 0f, bodyLift = 0f, footL = 0f, footR = 0f;
             bool blink = false;

@@ -50,6 +50,7 @@ namespace CriticalMass.Runtime.Online
 
         void Update()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Upd(this);
             if (_relay == null) return;
             long now = OnlineMatch.NowMs;
             _relay.Advance(now);

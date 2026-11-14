@@ -29,6 +29,7 @@ namespace CriticalMass.Runtime.View.Moments
     /// <see cref="IsPlaying"/>, <see cref="Started"/>, <see cref="Ended"/>; settings in <see cref="BigMomentsSettings"/>.</para>
     /// </summary>
     [Flow.GameOverlay(Order = 53, Scope = Flow.OverlayScope.MatchOnly)]
+    [DefaultExecutionOrder(160)]   // online-offline-cost-1: reads this frame's camera: after CinemachineBrain (100) and CameraShake (150), before GameHud's layout (200)
     public sealed class BigMoments : MonoBehaviour
     {
         public const int SortingOrder = 34, GradeSortingOrder = 8;
@@ -243,7 +244,7 @@ namespace CriticalMass.Runtime.View.Moments
             _queue.Force(req, scale, _clock);
         }
 
-        private void LateUpdate() { var cost = CriticalMass.Runtime.Game.FrameCost.Enter(); LateUpdateCost(); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.BigMoments, cost); }
+        private void LateUpdate() { using var __ab = CriticalMass.Runtime.Game.AllocBy.Late(this); var cost = CriticalMass.Runtime.Game.FrameCost.Enter(); LateUpdateCost(); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.BigMoments, cost); }
 
         void LateUpdateCost()
         {

@@ -9,6 +9,6 @@ namespace CriticalMass.Runtime.Camera
     [DefaultExecutionOrder(-1000)]
     public sealed class CameraShakeReset : MonoBehaviour
     {
-        void Update() => CameraShake.Reset();
+        void Update() { using var __ab = CriticalMass.Runtime.Game.AllocBy.Upd(this); CameraShake.Reset(); }
     }
 }

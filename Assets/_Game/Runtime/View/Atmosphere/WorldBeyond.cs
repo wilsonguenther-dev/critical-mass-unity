@@ -860,6 +860,7 @@ namespace CriticalMass.Runtime.View.Atmosphere
 
         void LateUpdate()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Late(this);
             if (_driver == null)
             {
                 _driver = GetComponent<SimDriverBehaviour>();

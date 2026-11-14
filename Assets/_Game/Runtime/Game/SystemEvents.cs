@@ -132,6 +132,7 @@ namespace CriticalMass.Runtime.Game
 
         void Update()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Upd(this);
             ApplyPending();
             if (Notice == ControllerNotice && Gamepad.all.Count > 0) Notice = null;
             float now = Time.realtimeSinceStartup;

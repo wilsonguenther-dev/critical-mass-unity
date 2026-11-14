@@ -35,6 +35,7 @@ namespace CriticalMass.Runtime.Hud.Interact
     /// when it lands this class can take [GameOverlay(Scope = OverlayScope.MatchOnly)] instead of the installer).
     /// </summary>
     [CriticalMass.Runtime.Flow.GameOverlay(Order = 58, Scope = CriticalMass.Runtime.Flow.OverlayScope.MatchOnly)]   // installed once by GameBootstrap through the overlay registry
+    [DefaultExecutionOrder(160)]   // online-offline-cost-1: reads this frame's camera: after CinemachineBrain (100) and CameraShake (150), before GameHud's layout (200)
     public sealed class HudInteract : MonoBehaviour
     {
         public const int SortingOrder = 14;
@@ -168,6 +169,7 @@ namespace CriticalMass.Runtime.Hud.Interact
 
         void Update()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Upd(this);
             if (!_built) return;
             World w = Driver != null ? Driver.World : null;
             InteractUi.UpdateScale(Canvas);
@@ -244,7 +246,7 @@ namespace CriticalMass.Runtime.Hud.Interact
             Map.Tick(w, Me, now);
         }
 
-        void LateUpdate() { var cost = CriticalMass.Runtime.Game.FrameCost.Enter(); LateUpdateCost(); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.HudInteract, cost); }
+        void LateUpdate() { using var __ab = CriticalMass.Runtime.Game.AllocBy.Late(this); var cost = CriticalMass.Runtime.Game.FrameCost.Enter(); LateUpdateCost(); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.HudInteract, cost); }
 
         void LateUpdateCost()
         {

@@ -422,6 +422,7 @@ namespace CriticalMass.Runtime.Flow
 
         void Update()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Upd(this);
             UpdateFade();
             if (Driver == null || Driver.World == null || _loadPath != null) return;
             FlowState st = GameFlow.State;
@@ -498,6 +499,7 @@ namespace CriticalMass.Runtime.Flow
 
         void LateUpdate()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Late(this);
             if (_titleNext)
             {
                 _titleNext = false;

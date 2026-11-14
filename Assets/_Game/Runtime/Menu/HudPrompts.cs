@@ -89,6 +89,7 @@ namespace CriticalMass.Runtime.Menu
 
         void LateUpdate()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Late(this);
             ControlBindings.Sample();
             PatchLookHint();
             if (!_found)

@@ -152,6 +152,7 @@ namespace CriticalMass.Runtime.Onboarding
 
         void Update()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Upd(this);
             if (Runner == null || Driver == null || Driver.World == null) return;
             World w = Driver.World;
             HumanInputSource input = Driver.GetComponent<HumanInputSource>();

@@ -25,6 +25,7 @@ namespace CriticalMass.Runtime.Hud
     /// Visible only while the HUD canvas is (the title screen hides it). Read-only on the sim.
     /// </summary>
     [CriticalMass.Runtime.Flow.GameOverlay(Order = 53, Scope = CriticalMass.Runtime.Flow.OverlayScope.MatchOnly)]   // installed once by GameBootstrap through the overlay registry
+    [DefaultExecutionOrder(160)]   // online-offline-cost-1: reads this frame's camera: after CinemachineBrain (100) and CameraShake (150), before GameHud's layout (200)
     public sealed class ProgressionHud : MonoBehaviour
     {
         public static ProgressionHud Instance { get; private set; }
@@ -115,6 +116,7 @@ namespace CriticalMass.Runtime.Hud
 
         void LateUpdate()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Late(this);
             if (_canvas == null) return;
             bool hudOn = _hud != null && _hud.Canvas != null && _hud.Canvas.enabled;
             if (_canvas.enabled != hudOn) _canvas.enabled = hudOn;

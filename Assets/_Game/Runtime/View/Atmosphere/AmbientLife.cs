@@ -486,6 +486,7 @@ namespace CriticalMass.Runtime.View.Atmosphere
 
         void LateUpdate()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Late(this);
             Clock = ClockOverride ?? Clock + Time.unscaledDeltaTime * (CriticalMass.Runtime.Menu.GameSettings.ReducedMotion ? 0.35f : 1f);
             Shader.SetGlobalFloat(ClockId, Clock);
             if (_driver == null)

@@ -22,6 +22,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
     /// down, and the minimap and full map markers for ladders, bridges, your team's mines, drops and TNT, with legend rows.
     /// View only; never writes the sim. Added to the driver by MechanicsWorldViewInstaller.
     /// </summary>
+    [DefaultExecutionOrder(160)]   // online-offline-cost-1: reads this frame's camera: after CinemachineBrain (100) and CameraShake (150), before GameHud's layout (200)
     public sealed class MechanicsHud : MonoBehaviour
     {
         public const int SortingOrder = 13;
@@ -248,7 +249,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             HudKeepOut.Add(_recap);   // integration batch 5: name tags keep off the recap (BROOK drew through it)
         }
 
-        void LateUpdate() { var cost = CriticalMass.Runtime.Game.FrameCost.Enter(); LateUpdateCost(); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.NameTags, cost); }
+        void LateUpdate() { using var __ab = CriticalMass.Runtime.Game.AllocBy.Late(this); var cost = CriticalMass.Runtime.Game.FrameCost.Enter(); LateUpdateCost(); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.NameTags, cost); }
 
         void LateUpdateCost()
         {

@@ -72,6 +72,7 @@ namespace CriticalMass.Runtime.Online
 
         void Update()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Upd(this);
             if (_session == null || _canvas == null) return;
             LockstepStatus st = _session.Status;
             if (st != _shown)

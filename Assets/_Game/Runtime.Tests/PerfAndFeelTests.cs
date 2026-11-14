@@ -420,6 +420,36 @@ namespace CriticalMass.Runtime.Tests
             Assert.Greater(shake.order, 100);
         }
 
+        [Test]
+        public void TheFrameOrderIsExplicitBodiesThenFollowThenBrainThenProjectorsThenHud()
+        {
+            // online-offline-cost-1: no script that reads the camera is left at the undefined default order 0, where a new
+            // assembly can reshuffle it against the others. CinemachineBrain runs at 100 (its package meta).
+            int Order(Type t)
+            {
+                var a = (DefaultExecutionOrder)Attribute.GetCustomAttribute(t, typeof(DefaultExecutionOrder));
+                Assert.IsNotNull(a, t.Name + " needs an explicit DefaultExecutionOrder");
+                return a.order;
+            }
+            int bodies = Order(typeof(CriticalMass.Runtime.View.ActorViews));
+            int follow = Order(typeof(CriticalMass.Runtime.Camera.CameraFollowTarget));
+            int shake = Order(typeof(CameraShake));
+            int hud = Order(typeof(GameHud));
+            Assert.Less(bodies, follow);
+            Assert.Less(follow, 100, "the follow target before the brain moves the camera");
+            Type[] projectors =
+            {
+                typeof(CriticalMass.Runtime.Camera.SeeThrough), typeof(CriticalMass.Runtime.Hud.TerrainPrompt), typeof(CriticalMass.Runtime.Hud.KillFeed),
+                typeof(CriticalMass.Runtime.Hud.Banner), typeof(CriticalMass.Runtime.View.UnitRings),
+            };
+            foreach (Type t in projectors)
+            {
+                int o = Order(t);
+                Assert.Greater(o, shake, t.Name + " reads this frame's (shaken) camera");
+                Assert.Less(o, hud, t.Name + " before the HUD lays out");
+            }
+        }
+
         // ---------------------------------------------------------------- perf report
 
         [Test]

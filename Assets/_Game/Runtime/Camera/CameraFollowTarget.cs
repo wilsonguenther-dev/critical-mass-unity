@@ -20,6 +20,7 @@ namespace CriticalMass.Runtime.Camera
     /// pointer aim into <see cref="CameraFollow"/> (CameraRig.tsx follow plus the U-005 amendment of 2026-11-12) and
     /// places itself at the resulting look target. <see cref="SetOverride"/> frames a fixed point instead (capture tool).
     /// </summary>
+    [DefaultExecutionOrder(95)]   // online-offline-cost-1: the follow target is set last, just before CinemachineBrain (100, its package meta) moves the camera
     public sealed class CameraFollowTarget : MonoBehaviour
     {
         public SimDriverBehaviour Driver;
@@ -65,7 +66,7 @@ namespace CriticalMass.Runtime.Camera
         /// <summary>Back to following the human; the spring flies home.</summary>
         public void ClearOverride() => _override = false;
 
-        private void LateUpdate() { var cost = CriticalMass.Runtime.Game.FrameCost.Enter(); LateUpdateCost(); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.Camera, cost); }
+        private void LateUpdate() { using var __ab = CriticalMass.Runtime.Game.AllocBy.Late(this); var cost = CriticalMass.Runtime.Game.FrameCost.Enter(); LateUpdateCost(); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.Camera, cost); }
 
         void LateUpdateCost()
         {
