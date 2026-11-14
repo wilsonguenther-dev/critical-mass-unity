@@ -13,5 +13,12 @@ namespace CriticalMass.Runtime
         public static void Set(int actor) => Actor = actor < 0 ? 0 : actor;
 
         public static void Reset() => Actor = 0;
+
+        /// <summary>
+        /// online-offline-cost-1: true only while an online match runs (or in a hidden online test peer). The offline
+        /// SimDriver reads this one plain bool per frame instead of reaching into the online types, so an offline match
+        /// never loads or touches anything online. Set by OnlineMatch and OnlineHeadless; never read by the Sim.
+        /// </summary>
+        public static bool OnlineLive;
     }
 }

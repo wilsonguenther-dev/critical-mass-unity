@@ -108,7 +108,7 @@ namespace CriticalMass.Runtime.Input
                 {
                     // online-rooms-2: while a chat line is being typed (and on the frame Escape or Enter closes it) the keyboard
                     // belongs to the chat box: no pause menu, no scoreboard, no jump; the fighter gets neutral input meanwhile.
-                    if (Online.OnlineChatHud.EatsKeys && ctx.control != null && ctx.control.device is Keyboard) return;
+                    if (LocalSeat.OnlineLive && Online.OnlineChatHud.EatsKeys && ctx.control != null && ctx.control.device is Keyboard) return;
                     if (b == B.Pause && PauseHandler != null && PauseHandler()) return;
                     // controls-1: a keyboard attack or ability key may hand the aim to the keys; any named key sets the hand.
                     if (ctx.control != null && ctx.control.device is Keyboard)
