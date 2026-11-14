@@ -38,6 +38,102 @@ namespace CriticalMass.Runtime.Hud.Ui
 
         static readonly Dictionary<(string, int, int, int, int, int, int), Fitted> Cache = new Dictionary<(string, int, int, int, int, int, int), Fitted>();
 
+        // ---- measuring (fix/hud-containment-3). The rule measures with its own TextGenerator and its own word wrap, not
+        // Text.preferredWidth / preferredHeight: on the headless test runner the wrapped height came back too small, so
+        // the rule "fit" a 100-character line in a 200 x 50 box and the test proved nothing. One line's width comes from
+        // the generator at the label's settings; when a font gives no metrics at all (no graphics device), from a
+        // per-character advance table, so the rule still runs and still cuts. Wrapped height = greedy word wrap at the
+        // box width x the font's line height. Only runs when a label's words, box or size change (cached by Apply).
+        static readonly TextGenerator Gen = new TextGenerator(256);
+
+        /// <summary>One line's width of s on t's font and style at a size (the widest line when s holds line breaks).</summary>
+        public static float WidthOf(Text t, string s, int size)
+        {
+            if (t == null || string.IsNullOrEmpty(s)) return 0f;
+            float w = 0f;
+            if (t.font != null)
+            {
+                TextGenerationSettings st = t.GetGenerationSettings(Vector2.zero);
+                st.fontSize = size;
+                st.scaleFactor = 1f;
+                st.resizeTextForBestFit = false;
+                st.horizontalOverflow = HorizontalWrapMode.Overflow;
+                st.verticalOverflow = VerticalWrapMode.Overflow;
+                st.generateOutOfBounds = true;
+                w = Gen.GetPreferredWidth(s, st);
+            }
+            return w > 0f || !HasInk(s) ? w : Estimate(s, size);
+        }
+
+        /// <summary>One line's height on t's font at a size (the font's line height, else 1.17 x the size), with its spacing.</summary>
+        public static float LineHeightOf(Text t, int size)
+        {
+            Font f = t != null ? t.font : null;
+            float lh = f != null && f.fontSize > 0 && f.lineHeight > 0 ? f.lineHeight * size / f.fontSize : size * 1.17f;
+            if (lh < size) lh = size * 1.17f;   // a font with no metrics reports a tiny line height
+            return lh * (t != null && t.lineSpacing > 0f ? t.lineSpacing : 1f);
+        }
+
+        /// <summary>The height s takes on t at a size: wrapped at width w (greedy, at spaces) or one line per line break.</summary>
+        public static float HeightOf(Text t, string s, int size, float w, bool wrap)
+        {
+            if (string.IsNullOrEmpty(s)) return 0f;
+            int lines = 0, start = 0;
+            for (int i = 0; i <= s.Length; i++)
+            {
+                if (i < s.Length && s[i] != '\n') continue;
+                lines += wrap ? WrappedLines(t, s.Substring(start, i - start), size, w) : 1;
+                start = i + 1;
+            }
+            return lines * LineHeightOf(t, size);
+        }
+
+        static int WrappedLines(Text t, string para, int size, float w)
+        {
+            if (para.Length == 0 || w <= 1f) return 1;
+            int lines = 0, i = 0;
+            string line = null;
+            while (i < para.Length)
+            {
+                while (i < para.Length && para[i] == ' ') i++;
+                int j = i;
+                while (j < para.Length && para[j] != ' ') j++;
+                if (j == i) break;
+                string word = para.Substring(i, j - i);
+                i = j;
+                if (line != null)
+                {
+                    string cand = line + " " + word;
+                    if (WidthOf(t, cand, size) <= w + 0.5f) { line = cand; continue; }
+                }
+                float ww = WidthOf(t, word, size);   // the word starts a new line
+                if (ww <= w + 0.5f) { lines++; line = word; }
+                else { lines += Mathf.CeilToInt(ww / w); line = null; }   // broken mid-word; the next word starts a new line
+            }
+            return Mathf.Max(1, lines);
+        }
+
+        static bool HasInk(string s)
+        {
+            for (int i = 0; i < s.Length; i++) if (!char.IsWhiteSpace(s[i])) return true;
+            return false;
+        }
+
+        /// <summary>Advance estimate when a font gives no metrics (headless runner): em fractions per character class.</summary>
+        static float Estimate(string s, int size)
+        {
+            float line = 0f, best = 0f;
+            for (int i = 0; i < s.Length; i++)
+            {
+                char c = s[i];
+                if (c == '\n') { best = Mathf.Max(best, line); line = 0f; continue; }
+                float em = c == ' ' ? 0.28f : "iIl.,:;'|!".IndexOf(c) >= 0 ? 0.3f : "MW@".IndexOf(c) >= 0 ? 0.86f
+                    : char.IsUpper(c) || char.IsDigit(c) ? 0.64f : char.IsLower(c) ? 0.52f : 0.58f;
+                line += em * size;
+            }
+            return Mathf.Max(best, line);
+        }
+
         /// <summary>Lines a box of this height allows at a size (at least 1; a one-line chip stays one line).</summary>
         public static int LinesFor(float boxH, int size) => Mathf.Max(1, Mathf.FloorToInt(boxH / (Mathf.Max(1, size) * 1.17f)));
 
@@ -83,11 +179,11 @@ namespace CriticalMass.Runtime.Hud.Ui
             {
                 t.fontSize = size;
                 SetMode(t, false);
-                if (t.preferredWidth <= w + 0.5f) { f.Size = size; return f; }
+                if (WidthOf(t, s, size) <= w + 0.5f && HeightOf(t, s, size, w, false) <= h + Mathf.Max(6f, size * 0.5f)) { f.Size = size; return f; }
                 if (maxLines >= 2 && LinesFor(h, size) >= 2 && s.IndexOf(' ') > 0)
                 {
-                    SetMode(t, true);   // preferredHeight with wrap measures at the box width
-                    if (t.preferredHeight <= h + 0.5f && !CutsAWord(t, s, w)) { f.Size = size; f.Wrap = true; return f; }
+                    SetMode(t, true);
+                    if (HeightOf(t, s, size, w, true) <= h + 0.5f && !CutsAWord(t, s, w)) { f.Size = size; f.Wrap = true; return f; }
                 }
             }
             // at the floor: one line (or two) ending with an ellipsis
@@ -104,26 +200,18 @@ namespace CriticalMass.Runtime.Hud.Ui
         static bool CutsAWord(Text t, string s, float w)
         {
             int start = 0;
-            string keep = t.text;
-            HorizontalWrapMode mode = t.horizontalOverflow;
-            t.horizontalOverflow = HorizontalWrapMode.Overflow;
             bool bad = false;
             for (int i = 0; i <= s.Length && !bad; i++)
             {
-                if (i < s.Length && s[i] != ' ') continue;
-                if (i - start > 0)
-                {
-                    t.text = s.Substring(start, i - start);
-                    if (t.preferredWidth > w + 0.5f) bad = true;
-                }
+                if (i < s.Length && s[i] != ' ' && s[i] != '\n') continue;
+                if (i - start > 0 && WidthOf(t, s.Substring(start, i - start), t.fontSize) > w + 0.5f) bad = true;
                 start = i + 1;
             }
-            t.text = keep;
-            t.horizontalOverflow = mode;
             return bad;
         }
 
-        static bool Fits(Text t, float w, float h, bool wrap) => wrap ? t.preferredHeight <= h + 0.5f : t.preferredWidth <= w + 0.5f;
+        static bool Fits(Text t, float w, float h, bool wrap) =>
+            wrap ? HeightOf(t, t.text, t.fontSize, w, true) <= h + 0.5f : WidthOf(t, t.text, t.fontSize) <= w + 0.5f;
 
         /// <summary>The longest start of s plus an ellipsis that fits; a word end is preferred, else any character.</summary>
         static string Cut(Text t, string s, float w, float h, bool wrap)
@@ -175,8 +263,8 @@ namespace CriticalMass.Runtime.Hud.Ui
         {
             if (t == null || string.IsNullOrEmpty(t.text)) return true;
             Rect r = t.rectTransform.rect;
-            if (t.horizontalOverflow == HorizontalWrapMode.Wrap) return t.preferredHeight <= r.height + 0.5f;
-            return t.preferredWidth <= r.width + 0.5f && t.preferredHeight <= r.height + Mathf.Max(6f, t.fontSize * 0.5f);
+            if (t.horizontalOverflow == HorizontalWrapMode.Wrap) return HeightOf(t, t.text, t.fontSize, r.width, true) <= r.height + 0.5f;
+            return WidthOf(t, t.text, t.fontSize) <= r.width + 0.5f && HeightOf(t, t.text, t.fontSize, r.width, false) <= r.height + Mathf.Max(6f, t.fontSize * 0.5f);
         }
     }
 
@@ -298,7 +386,7 @@ namespace CriticalMass.Runtime.Hud.Ui
         public static float NaturalWidth(Text t)
         {
             ContainedText c = Of(t);
-            if (c == null) return t.preferredWidth;
+            if (c == null) return TextFit.WidthOf(t, t.text, t.fontSize);
             string full = c._shown != null && t.text == c._shown ? c.Source : t.text;
             c.Paused = true;
             HorizontalWrapMode mode = t.horizontalOverflow;
@@ -306,7 +394,7 @@ namespace CriticalMass.Runtime.Hud.Ui
             {
                 if (t.text != full) t.text = full;
                 t.horizontalOverflow = HorizontalWrapMode.Overflow;
-                float w = t.preferredWidth;
+                float w = TextFit.WidthOf(t, full, t.fontSize);
                 t.horizontalOverflow = mode;
                 return w;
             }

@@ -65,8 +65,10 @@ namespace CriticalMass.Runtime.Hud
         /// <summary>Top of the centre lane: 12 px under the top band (the hill word ends at 130).</summary>
         public const float AlertTop = 148f;
         public const float CalloutTop = AlertTop, CalloutH = 188f;
-        /// <summary>The centre lane: Banner (1032 wide plus its two discs) and the 1040 autopilot banner, clear of the feed.</summary>
-        public static readonly Rect Callout = new Rect(404f, CalloutTop, 1092f, CalloutH);
+        /// <summary>The centre lane: Banner (1032 wide plus its two discs) and the 1040 autopilot banner, clear of the feed.
+        /// fix/hud-containment-3: 1090 wide (ends at 1494, the banner's badge disc edge), 2 px clear of the feed at 1496; at
+        /// 1092 the two edges met exactly and the 4:3 shape (scale 0.5333) rounded them into each other.</summary>
+        public static readonly Rect Callout = new Rect(404f, CalloutTop, 1090f, CalloutH);
         public const float ColumnW = 600f;
         public static readonly Rect Feed = new Rect(RefW - M - 400f, 136f, 400f, 46f * 5);
         public static readonly Rect Stinger = new Rect(RefW - M - 560f, 380f, 560f, 140f);
@@ -81,7 +83,7 @@ namespace CriticalMass.Runtime.Hud
         // ---- owner walk 1: the named pieces that used to pick their own spots (every one is checked by the collision test) ----
         /// <summary>Top of the centre lane's residents: the job line, the team stock and the map-event bar sit here.</summary>
         public const float JobY = 140f, JobW = 760f, JobH = 40f;
-        public const float StockY = 188f, StockW = 342f, StockH = 40f;
+        public const float StockY = 188f, StockH = 40f, StockChipW = 150f, StockChipGap = 10f, StockW = 3f * StockChipW + 2f * StockChipGap;   // fix/hud-containment-3: 470 (was 342; WATER clipped)
         public const float EventY = 236f, EventW = 560f, EventH = 38f;
         /// <summary>
         /// The job line, stock and event bar live INSIDE the centre lane (the lane's lowest-priority residents): they show
@@ -115,6 +117,24 @@ namespace CriticalMass.Runtime.Hud
         public const float PromptW = 520f, PromptH = 50f;
         public static Rect Prompt => new Rect((RefW - PromptW) * 0.5f, Lower.yMax + PromptGap, PromptW, PromptH);
         public const float PromptGap = 6f;
+        /// <summary>The terrain prompt pill's reserved lane (hud-containment-2): one row under the lower lane and above the
+        /// captions, as wide as the bottom band. The pill follows its target only sideways inside this row, so it never
+        /// passes over the player card, the minimap, the kit, the feeds or the lower lane (it used to ride the target
+        /// anywhere on screen). Anchored bottom-centre: on a taller screen the lower lane (centre-anchored) moves away.</summary>
+        public const float PromptLaneH = 58f;
+        static int _promptRowFrame = int.MinValue;
+        /// <summary>The station prompt is up this frame: the terrain pill, which shares the prompt row, steps back.</summary>
+        public static void HoldPromptRow() => _promptRowFrame = Frame;
+        /// <summary>The station prompt held the prompt row this frame or the last.</summary>
+        public static bool PromptRowHeld => _promptRowFrame >= Frame - 1;
+        public static Rect PromptLane => new Rect((RefW - BottomBandW) * 0.5f, Lower.yMax + PromptGap, BottomBandW, PromptLaneH);
+        /// <summary>The pill lane on a w x h screen in device pixels (top-left origin), bottom-centre anchored.</summary>
+        public static Rect PromptLanePixels(float w, float h)
+        {
+            float s = HudLayout.Scale(w, h);
+            Rect r = PromptLane;
+            return new Rect(0.5f * w + (r.x - RefW * 0.5f) * s, h + (r.y - RefH) * s, r.width * s, r.height * s);
+        }
 
         // ---- centre-bottom lane (hud-containment-1), bottom up: announcer subtitles, sound captions (two at most, a queue
         // behind them), the interact prompt. All centred on the screen and no wider than the free band between the player
@@ -124,7 +144,7 @@ namespace CriticalMass.Runtime.Hud
         public static float BottomBandW => 2f * Mathf.Min(RefW * 0.5f - (PlayerCard.xMax + ColumnGap), (Minimap.x - ColumnGap) - RefW * 0.5f);
         public const float SubtitleH = 60f, CaptionH = 40f, CaptionW = 440f, CaptionGap = 6f;
         public const int CaptionLines = 2;
-        public static Rect Subtitles => new Rect((RefW - BottomBandW) * 0.5f, RefH - M - SubtitleH - 4f, BottomBandW, SubtitleH);
+        public static Rect Subtitles => new Rect((RefW - BottomBandW) * 0.5f, RefH - M - SubtitleH, BottomBandW, SubtitleH);
         /// <summary>Caption line k (0 = lowest), just above the subtitles.</summary>
         public static Rect Caption(int k) => new Rect((RefW - CaptionW) * 0.5f, Subtitles.y - (k + 1) * (CaptionH + CaptionGap), CaptionW, CaptionH);
 
@@ -169,7 +189,9 @@ namespace CriticalMass.Runtime.Hud
                 new Piece("ping feed", PingFeed, HudZone.Guide, false),
                 new Piece("intro line (you are the ...)", Lower, HudZone.Lower, false),
                 new Piece("death recap (centre lane, Recap priority)", new Rect((RefW - DeathRecap.CardW) * 0.5f, DeathRecap.TopY, DeathRecap.CardW, DeathRecap.CardH), HudZone.Callout, true),
-                new Piece("interact prompt", Prompt, HudZone.Lower, false),
+                // The station prompt and the terrain pill share the prompt row, one at a time (the pill yields: TerrainAffordanceView).
+                new Piece("interact prompt", Prompt, HudZone.Lower, true),
+                new Piece("terrain prompt pill lane", PromptLane, HudZone.Lower, true),
                 new Piece("hit recap (under the death recap)", Mechanics.MechanicsHud.RecapRect, HudZone.Callout, false),
             };
         }
@@ -258,6 +280,7 @@ namespace CriticalMass.Runtime.Hud
         public static void Clear()
         {
             for (int i = 0; i < _held.Length; i++) _held[i] = int.MinValue;
+            _promptRowFrame = int.MinValue;
         }
     }
 }
