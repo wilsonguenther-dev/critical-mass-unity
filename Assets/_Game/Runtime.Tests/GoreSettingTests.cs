@@ -184,12 +184,13 @@ namespace CriticalMass.Runtime.Tests
         }
 
         /// <summary>fix/gore-reduced-1: on a knock-out, Reduced shows something Off does not: blood drops in the air (half
-        /// Full's count, gone on landing, no ground stain). Off shows only the warm-white stars, with no blood piece at all.</summary>
+        /// Full's count) that land as small red splats and fade (never stamped, no pool). Off shows only the warm-white
+        /// stars, with no blood piece at all.</summary>
         [Test]
         public void AKnockOutAtReducedShowsBloodInTheAirAndOffShowsStarsOnly()
         {
             GameConfig cfg = GameConfig.CreateDefault();
-            int[] airborne = new int[3], stars = new int[3], spawns = new int[3];
+            int[] airborne = new int[3], stars = new int[3], spawns = new int[3], splats = new int[3], left = new int[3], pools = new int[3];
             GoreLevel[] levels = { GoreLevel.Full, GoreLevel.Reduced, GoreLevel.Off };
             for (int li = 0; li < 3; li++)
             {
@@ -208,10 +209,17 @@ namespace CriticalMass.Runtime.Tests
                     stars[li] = Math.Max(stars[li], scene.SparkCount(now));
                 }
                 spawns[li] = scene.GoreSpawns(GorePiece.BloodDroplet);
+                splats[li] = scene.GoreSpawns(GorePiece.BloodSplat);
+                pools[li] = scene.GoreSpawns(GorePiece.KnockOutPool);
+                left[li] = scene.DecalCount(t + scene.S(5.0));
             }
             Assert.Greater(airborne[1], 0, "Reduced: a knock-out throws blood drops into the air");
             Assert.Greater(spawns[1], 0, "Reduced: knock-out drops spawn");
             Assert.Less(spawns[1], spawns[0], "Reduced: fewer drops than Full");
+            Assert.Greater(splats[1], 0, "Reduced: the knock-out drops land as splats");
+            Assert.AreEqual(0, pools[1], "Reduced: no pool");
+            Assert.AreEqual(0, left[1], "Reduced: the splats fade (gone within about 4 s wall)");
+            Assert.AreEqual(0, splats[2], "Off: no splats");
             Assert.AreEqual(0, airborne[2], "Off: no blood in the air");
             Assert.AreEqual(0, spawns[2], "Off: no blood drops");
             Assert.Greater(stars[2], 0, "Off: the knock-out shows stars instead");

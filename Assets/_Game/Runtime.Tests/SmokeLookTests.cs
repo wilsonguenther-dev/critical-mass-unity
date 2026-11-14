@@ -103,7 +103,13 @@ namespace CriticalMass.Runtime.Tests
             Assert.Less(GoreGate.SizeScale(GoreLevel.Reduced), 1f, "smaller at Reduced");
             // cand5-reds-1: Full keeps the knock-out drop splats, in the pool's red and small; below Full none.
             Assert.IsTrue(FxScene.LandsAsSplat(true, GoreLevel.Full), "Full: knock-out drops still splat (nothing taken out)");
-            Assert.IsFalse(FxScene.LandsAsSplat(true, GoreLevel.Reduced), "Reduced: no knock-out ground stain");
+            // fix/gore-reduced-1: Reduced keeps the knock-out drop splats, red, 0.7 of Full's size, fading, never stamped, no pool.
+            Assert.IsTrue(FxScene.LandsAsSplat(true, GoreLevel.Reduced), "Reduced: knock-out drops splat too");
+            Assert.AreEqual(0.7f, GoreGate.SizeScale(GoreLevel.Reduced), 1e-4f, "Reduced splats are 0.7 of Full's size");
+            Assert.Less(GoreGate.LifeScale(GoreLevel.Reduced), 1f, "Reduced splats fade sooner (the ordinary Reduced fade)");
+            Assert.IsTrue(GoreGate.Allows(GorePiece.BloodSplat, GoreLevel.Reduced), "the Reduced splat is a plain blood splat");
+            Assert.IsFalse(GoreGate.Allows(GorePiece.GroundStain, GoreLevel.Reduced), "Reduced: never stamped into the ground");
+            Assert.IsFalse(GoreGate.Allows(GorePiece.KnockOutPool, GoreLevel.Reduced), "Reduced: no pool");
             Assert.IsFalse(FxScene.LandsAsSplat(true, GoreLevel.Off), "Off: nothing");
             Assert.IsTrue(FxScene.LandsAsSplat(false, GoreLevel.Full), "ordinary hit drops still splat");
             Assert.IsTrue(FxScene.SplatIsPoolRed(FxScene.KindPoolRed, 0), "knock-out drop splats draw and stamp in the pool's red");
