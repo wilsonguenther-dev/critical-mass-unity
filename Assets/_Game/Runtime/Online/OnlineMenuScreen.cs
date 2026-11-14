@@ -94,9 +94,10 @@ namespace CriticalMass.Runtime.Online
         protected override void BuildContent(RectTransform space)
         {
             // A dim scrim over the attract match, then one navy panel; every element sits in its OnlineLayout region.
-            VectorShape scrim = MenuUi.Shape(space, "Scrim", ShapeKind.Rect, -2000f, -2000f, OnlineLayout.RefW + 4000f, OnlineLayout.RefH + 4000f,
+            VectorShape scrim = MenuUi.Shape(space, "Scrim", ShapeKind.RoundRect, -2000f, -2000f, OnlineLayout.RefW + 4000f, OnlineLayout.RefH + 4000f,
                 CMTokens.WithAlpha(CMTokens.VoidNavy.Color, 0.62f), 0f);
-            scrim.raycastTarget = false;
+            scrim.OutlinePx = 0f;
+            scrim.RimPx = 0f;
             Rect P = OnlineLayout.Panel;
             MenuUi.Panel(space, "Panel", P.x, P.y, P.width, P.height);
             _title = L(space, "Title", OnlineLayout.Title, CMTokens.Display, UiScale.TypeDisplay, Cream, TextAnchor.MiddleLeft, "PLAY ONLINE", 1);
