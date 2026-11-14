@@ -267,7 +267,10 @@ def bake_action(clip, act):
         Hd = F0["hips"] + (K["hips"] - K0["hips"]) * RATIO + Vector((0, 0, LIFT))
         targets, rots = {}, {}
         for s in SIDES:
-            R = K["R" + s] @ K0["R" + s].inverted() @ TOEFIX[s] @ F0["R" + s]
+            # The foot keeps the world rotation the clip gives it through the full-local copy (as on KayKit). The old
+            # delta from the pack's rest (+ TOEFIX) was measured against a pose, not the bind: the Warrior's planted
+            # right foot in StrafeR pointed 112 degrees off and the game read him "turned around".
+            R = (fa.matrix_world @ faP[LEG(s)[2]].matrix).to_3x3().normalized()
             dk = K["A" + s] - K0["A" + s]
             # Foot motion scales with the legs (an unscaled swing lift was tried: Walk's lowest foot rose to 0.043).
             A = F0["A" + s] + dk * RATIO + Vector((0, 0, LIFT))
