@@ -37,6 +37,9 @@ namespace CriticalMass.Runtime.Game
         /// </summary>
         public static bool CaptureMode;
 
+        /// <summary>Capture fixture (feat/skill-effects-1, -skillShots only): when set, actor 0's frame each tick is a copy of it.</summary>
+        public static InputFrame ScriptedHumanFrame;
+
         /// <summary>This driver woke in capture mode (actor 0 on autopilot by design; HumanControlGuard leaves it alone).</summary>
         public bool CreatedInCaptureMode { get; private set; }
 
@@ -153,6 +156,9 @@ namespace CriticalMass.Runtime.Game
                 _humanFrame.AimX = double.NaN;
                 _humanFrame.AimZ = double.NaN;
             }
+            // feat/skill-effects-1: the -skillShots director (View/Skills/SkillCapture.cs) presses skills through the real input
+            // path. Null in normal play.
+            if (ScriptedHumanFrame != null) _humanFrame.CopyFrom(ScriptedHumanFrame);
             // Physics audit M7 / DG-101: count ability presses the sim will refuse (read-only on the World) for the HUD's cue.
             if (input != null && !HumanAutopilot) AbilityDenial.Observe(_humanFrame.Ability, World, 0, _dt);
             FrameCost.Mark c0 = FrameCost.Enter();

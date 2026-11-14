@@ -20,11 +20,13 @@ namespace CriticalMass.Runtime.Menu
         public const string ShakeKey = "cm.world.shake";
         public const string ParticlesKey = "cm.world.particles";
         public const string HintsKey = "cm.world.hints";
+        /// <summary>feat/skill-effects-1: the class skill tells (SkillFxView), on by default.</summary>
+        public const string SkillFxKey = "cm.world.skillfx";
         /// <summary>Per class: matches started with the first-minute hint shown (cm.world.hintSeen.&lt;class index&gt;).</summary>
         public const string HintSeenPrefix = "cm.world.hintSeen.";
         public const string TabName = "WORLD";
 
-        public static readonly string[] AllKeys = { PromptsKey, OutlineKey, MarkersKey, ProgressKey, ShakeKey, ParticlesKey, HintsKey };
+        public static readonly string[] AllKeys = { PromptsKey, OutlineKey, MarkersKey, ProgressKey, ShakeKey, ParticlesKey, HintsKey, SkillFxKey };
 
         /// <summary>Hint levels (HintsKey).</summary>
         public const int HintsOff = 0, HintsFirstMatches = 1, HintsAlways = 2;
@@ -45,6 +47,8 @@ namespace CriticalMass.Runtime.Menu
         public static bool Shake { get => GetB(ShakeKey, true); set => SetB(ShakeKey, value); }
         /// <summary>Hit flash, chips and dust (the flash also obeys Reduce flashing).</summary>
         public static bool Particles { get => GetB(ParticlesKey, true); set => SetB(ParticlesKey, value); }
+        /// <summary>Skill wind-ups, effects and marks (Root Seeds, Shield Up, heals, Purify, dig and place, TNT bundle).</summary>
+        public static bool SkillEffects { get => GetB(SkillFxKey, true); set => SetB(SkillFxKey, value); }
         /// <summary>HintsOff, HintsFirstMatches (default) or HintsAlways.</summary>
         public static int Hints
         {
@@ -78,7 +82,7 @@ namespace CriticalMass.Runtime.Menu
 
         static string OnOff(bool b) => b ? "ON" : "OFF";
 
-        /// <summary>The WORLD tab: seven lines, a reset button and a note.</summary>
+        /// <summary>The WORLD tab: eight lines, a reset button and a note.</summary>
         public static List<MenuItem> BuildTab(PauseMenu menu, RectTransform tab)
         {
             var items = new List<MenuItem>
@@ -90,6 +94,7 @@ namespace CriticalMass.Runtime.Menu
                 menu.Stepper(tab, 4, "OBJECT SHAKE", () => OnOff(Shake), d => Shake = !Shake),
                 menu.Stepper(tab, 5, "HIT PARTICLES", () => OnOff(Particles), d => Particles = !Particles),
                 menu.Stepper(tab, 6, "CLASS HINTS", () => HintsLabel(Hints), d => Hints = (Hints + (d >= 0 ? 1 : 2)) % 3),
+                menu.Stepper(tab, 7, "SKILL EFFECTS", () => OnOff(SkillEffects), d => SkillEffects = !SkillEffects),
             };
             float y = PauseMenu.ContentY + items.Count * (PauseMenu.LineH + PauseMenu.LineGap) + 10f;
             MenuItem reset = MenuUi.Item(tab, "Reset World Feedback", PauseMenu.ContentX, y, 460f, 56f, "RESET THESE OPTIONS",
