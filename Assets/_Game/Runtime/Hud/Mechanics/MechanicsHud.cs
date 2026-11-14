@@ -96,17 +96,23 @@ namespace CriticalMass.Runtime.Hud.Mechanics
 
         static readonly string[] BankLine = BuildBankLines();
 
+        /// <summary>first-minutes-1: the class card's build-row note for n team wood ("WOOD 2"; tests).</summary>
+        public static string WoodNote(int n) => Whole[Mathf.Clamp(n, 0, Whole.Length - 1)];
+
+        /// <summary>first-minutes-1: the kit footer for n team wood ("TEAM WOOD 2  LADDER 1, BRIDGE 2"; tests).</summary>
+        public static string TeamWoodLine(int n) => BankLine[Mathf.Clamp(n, 0, BankLine.Length - 1)];
+
         static string[] BuildWhole()
         {
             var a = new string[200];
-            for (int i = 0; i < a.Length; i++) a[i] = "BANK " + i.ToString(CultureInfo.InvariantCulture);
+            for (int i = 0; i < a.Length; i++) a[i] = BuilderBank.RowWord + " " + i.ToString(CultureInfo.InvariantCulture);   // first-minutes-1: one wood word (was "BANK n")
             return a;
         }
 
         static string[] BuildBankLines()
         {
             var a = new string[200];
-            for (int i = 0; i < a.Length; i++) a[i] = "TEAM BANK " + i.ToString(CultureInfo.InvariantCulture) + "  LADDER 1, BRIDGE 2";
+            for (int i = 0; i < a.Length; i++) a[i] = BuilderBank.WoodWord + " " + i.ToString(CultureInfo.InvariantCulture) + "  LADDER 1, BRIDGE 2";   // first-minutes-1 (was "TEAM BANK n")
             return a;
         }
 
