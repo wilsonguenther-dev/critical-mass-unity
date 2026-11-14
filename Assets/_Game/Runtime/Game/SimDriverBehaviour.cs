@@ -76,6 +76,7 @@ namespace CriticalMass.Runtime.Game
         private void Awake()
         {
             GameConfig cfg = GameConfig.CreateDefault();
+            AutoplayArgs.ApplyCameraYaw(cfg);   // -cameraYaw: automation runs only
             Config = cfg;
             Flow.MatchRequest req = NextMatch;
             NextMatch = null;
@@ -123,7 +124,9 @@ namespace CriticalMass.Runtime.Game
             double unscaled = capture > 0f ? capture : Time.unscaledDeltaTime;
             FrameDt = Math.Min(unscaled, MaxFrameDt);
             HumanInputSource input = InputSource;
-            bool paused = input != null && input.State.Paused;
+            // perf-smooth-1: no tick while the world art is still building over frames (a player's match start, behind the
+            // loading screen): the match starts from the same state, only later in wall time.
+            bool paused = (input != null && input.State.Paused) || View.Dressing.WorldView.Building;
             // DG-60: after a hitch at most SimClock.TickCap ticks run this frame and the rest of the backlog is dropped
             // (counted), so one slow frame never makes the next one slow too. Same inputs per tick: determinism holds.
             int ticks = _clock.Advance(unscaled, TimeScale, _dt, paused);
@@ -152,12 +155,13 @@ namespace CriticalMass.Runtime.Game
             }
             // Physics audit M7 / DG-101: count ability presses the sim will refuse (read-only on the World) for the HUD's cue.
             if (input != null && !HumanAutopilot) AbilityDenial.Observe(_humanFrame.Ability, World, 0, _dt);
-            long c0 = FrameCost.Begin();
+            FrameCost.Mark c0 = FrameCost.Enter();
             MatchTick.Advance(World, HumanAutopilot ? null : _humanFrame, _scratch);
-            FrameCost.End(FrameCost.Slot.Sim, c0);
-            c0 = FrameCost.Begin();
+            FrameCost.Exit(FrameCost.Slot.Sim, c0);
+            FrameCost.FrameTicks++;
+            c0 = FrameCost.Enter();
             Ticked?.Invoke(World);
-            FrameCost.End(FrameCost.Slot.Feeds, c0);
+            FrameCost.Exit(FrameCost.Slot.Feeds, c0);
         }
     }
 }

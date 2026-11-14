@@ -76,7 +76,18 @@ namespace CriticalMass.Runtime.Hud.Style
         public static readonly Swatch StoneInk = new Swatch("Stone Ink", "#9A9DAE", "polish pass 1: Stone lifted to 4.90 : 1 on Panel Navy");
 
         /// <summary>A team's colour for TEXT on the navy panels (Azure as is, Crimson lifted).</summary>
-        public static Color TeamInk(TeamId t) => t == TeamId.Azure ? Azure.Color : CrimsonInk.Color;
+        public static Color TeamInk(TeamId t) => ColourBlindTeams ? Team(t) : t == TeamId.Azure ? Azure.Color : CrimsonInk.Color;
+
+        // ---- controls-1 round 2: the colour-blind team palette (Settings, Accessibility, COLOUR-BLIND TEAMS) ----
+        // A blue / amber pair: amber and blue stay apart under all three colour-vision deficiencies (red-weak, green-weak,
+        // blue-weak), where the bible's cyan / coral pair is weakest for red-weak players. Both read at 4.5 : 1 or better on
+        // Panel Navy and Void Navy, so they double as text inks. Numbers: ControlPresetsTests (Machado 2009 simulation, CIE
+        // Lab distance, WCAG contrast). The rings keep their shape cue as well: allies solid, enemies dashed, yours ticked.
+        public static readonly Swatch AzureColourSafe = new Swatch("Azure (colour-blind)", "#3D9BFF", "controls-1: blue of the blue / amber pair");
+        public static readonly Swatch CrimsonColourSafe = new Swatch("Crimson (colour-blind)", "#FFB000", "controls-1: amber of the blue / amber pair");
+
+        /// <summary>The colour-blind team palette is on (GameSettings.ColourBlindTeams keeps it in step with the setting).</summary>
+        public static bool ColourBlindTeams { get; set; }
 
         /// <summary>Every token, bible first (order is the p05 order).</summary>
         public static readonly Swatch[] All =
@@ -101,7 +112,9 @@ namespace CriticalMass.Runtime.Hud.Style
         /// <summary>Warm Cream inner rim in px at 1080p.</summary>
         public const float RimPx = 2f;
 
-        public static Color Team(TeamId t) => t == TeamId.Azure ? Azure.Color : Crimson.Color;
+        public static Color Team(TeamId t) => ColourBlindTeams
+            ? (t == TeamId.Azure ? AzureColourSafe.Color : CrimsonColourSafe.Color)
+            : (t == TeamId.Azure ? Azure.Color : Crimson.Color);
 
         public static Color ParseHex(string hex)
         {

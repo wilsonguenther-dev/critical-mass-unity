@@ -118,7 +118,7 @@ namespace CriticalMass.Runtime.PlayTests
         {
             _menu.Pause();
             yield return null;
-            Assert.AreEqual(5, _menu.TabCount, "the ACCESS tab follows the four built-in tabs");
+            Assert.AreEqual(6, _menu.TabCount, "ACCESS follows the four built-in tabs, then WORLD (feat/terrain-affordances)");
             _menu.ShowSettings((PauseMenu.Tab)4);
             yield return null;
             Item("HIDE NAMES").Stepped(1);
@@ -234,6 +234,27 @@ namespace CriticalMass.Runtime.PlayTests
         [UnityTest]
         public IEnumerator HoldingTheHillAloneShowsTheSecretLine()
         {
+            yield return HoldTheHillAloneAndCheckTheCaption();
+        }
+
+        [UnityTest]
+        public IEnumerator HoldingTheHillAloneInsideTheAnnouncerCooldownStillShowsTheSecretLine()
+        {
+            // The window that made the first test flaky, pinned: the secret fires after another line has finished speaking
+            // but inside its 6 s cooldown. On CI the boot's MatchStart line put the secret there on some runners only (how
+            // fast the runner reached the hill decided it); the line was handed over, waited out the cooldown, aged out
+            // after 2 s and was never said or captioned.
+            Assert.IsNotNull(Announcer.Instance, "the announcer is installed");
+            Announcer.ForceLine(AnnouncerTrigger.HillContested);
+            float until = Time.realtimeSinceStartup + 10f;
+            while (Announcer.IsSpeaking && Time.realtimeSinceStartup < until) yield return null;
+            Assert.IsFalse(Announcer.IsSpeaking, "the forced line finished");
+            Assert.IsFalse(Announcer.Instance.Queue.CooledDown(Time.unscaledTimeAsDouble), "still inside its cooldown");
+            yield return HoldTheHillAloneAndCheckTheCaption();
+        }
+
+        IEnumerator HoldTheHillAloneAndCheckTheCaption()
+        {
             SecretWatcher watcher = _driver.GetComponent<SecretWatcher>();
             Assert.IsNotNull(watcher);
             string spoken = null;
@@ -257,14 +278,17 @@ namespace CriticalMass.Runtime.PlayTests
                     yield return null;
                 }
                 Assert.AreEqual(SecretWatcher.HillAloneLine, spoken);
-                // One caption only (batch 4): the announcer subtitles the line when it was free to take it, else the
-                // secret's own caption bar shows it (a busy announcer would let a queued low-priority line age out).
+                // One caption only (batch 4): the announcer subtitles the line when it was free to take it (it starts in the
+                // same frame, SayIfFree), else the secret's own caption bar shows it at once. Both are decided in the frame
+                // the secret fires, whatever the announcer was doing, so neither depends on how fast the runner is.
                 Assert.IsTrue(SettingsExtras.Subtitles, "subtitles are on by default");
                 bool bar = CaptionBar.IsShowing && CaptionBar.Current == LoreText.Announcer("an-22");
-                // The announcer starts its line on its next Update; wait by wall clock (batch-mode frames are about 1 ms).
-                float until = Time.realtimeSinceStartup + (bar ? 2.5f : 3f);
-                while (!heard && Time.realtimeSinceStartup < until) yield return null;
-                Assert.IsTrue(bar || heard, "the hill line is captioned: caption bar or announcer subtitle");
+                Assert.IsTrue(bar || heard, "the hill line is captioned at once: caption bar or announcer subtitle");
+                if (heard) Assert.AreEqual(AnnouncerLines.For(AnnouncerTrigger.SecretHillAlone).Text, Announcer.CurrentText,
+                    "the announcer subtitle shows the hill line");
+                // Never both: when the bar showed, the line was not handed over, so the announcer never says it later.
+                float until = Time.realtimeSinceStartup + 2.5f;
+                while (bar && !heard && Time.realtimeSinceStartup < until) yield return null;
                 Assert.IsFalse(bar && heard, "never both captions");
             }
             finally

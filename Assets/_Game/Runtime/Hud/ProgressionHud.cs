@@ -76,11 +76,11 @@ namespace CriticalMass.Runtime.Hud
             _root = (RectTransform)go.transform;
 
             // Coin chip: bottom-left, 12 px above the player card (HudLayout Player cluster).
-            _chip = MenuUi.Rt(_root, "Coin Chip");
+            _chip = MenuUi.Rt(FeedUi.SafeRoot(_root), "Coin Chip");   // owner walk 1: inside the safe area
             _chip.anchorMin = _chip.anchorMax = Vector2.zero;
             _chip.pivot = Vector2.zero;
             _chip.sizeDelta = new Vector2(ChipW, ChipH);
-            _chip.anchoredPosition = new Vector2(HudLayout.Margin, HudLayout.Margin + HudLayout.PlayerSize.y + 12f);
+            _chip.anchoredPosition = new Vector2(HudZones.CoinChip.x, HudLayout.RefH - HudZones.CoinChip.yMax);
             VectorShape body = MenuUi.Shape(_chip, "Body", ShapeKind.RoundRect, 0f, 0f, ChipW, ChipH, CMTokens.PanelNavy.Color, -1f);
             body.OutlinePx = 3f;
             body.RimPx = 2f;
@@ -133,6 +133,10 @@ namespace CriticalMass.Runtime.Hud
             float sc = t >= 0f && t < 1f ? 1f + 0.12f * (1f - ProgressionUi.EaseOut(t)) : 1f;
             Vector3 want = new Vector3(sc, sc, 1f);
             if (_chip.localScale != want) _chip.localScale = want;
+            // Integration batch 5: one coin readout in a match. The match coin counter above the minimap wins; the chip
+            // shows when the match has no coin pickups.
+            bool chipOn = Mechanics.DepthHud.Instance == null || !Mechanics.DepthHud.Instance.CoinsShown;
+            if (_chip.gameObject.activeSelf != chipOn) _chip.gameObject.SetActive(chipOn);
 
             PlacePortraitHit();
         }
@@ -146,9 +150,9 @@ namespace CriticalMass.Runtime.Hud
             Keyboard kb = Keyboard.current;
             Gamepad pad = Gamepad.current;
             bool paused = _input != null && _input.State.Paused;
-            bool key = kb != null && kb.cKey.wasPressedThisFrame;
+            bool key = kb != null && kb.pKey.wasPressedThisFrame;   // controls-1: P (C is the arrow hand's jump)
             // D-pad up navigates the pause menu while paused; it opens the panel only in play.
-            // Integration batch 2: D-pad up is the Map action (full map) and a spectator objective; the panel opens with C
+            // Integration batch 2: D-pad up is the Map action (full map) and a spectator objective; the panel opens with P (controls-1; was C)
             // or a click on the HUD portrait, and closes with B.
             bool padKey = false, padClose = false;
             if (key || padKey || padClose) CharacterPanel.Toggle();

@@ -18,6 +18,9 @@ namespace CriticalMass.Runtime.Menus
     /// the same config, team size and class the match is created from; rosters do not depend on the seed), and nothing
     /// claims other people are online. START NOW (focused) or Enter / A skips the wait; Back / Escape / B goes back one
     /// level (class select, the mode cards or home, wherever the launch came from).
+    /// Arena night life 1 (2026-11-13): a TIME button between BACK and START NOW picks the map's time of day (Day, Dusk,
+    /// Night, Random; the same setting as Settings, Game tab); the world behind the screen changes at once and a pick
+    /// restarts the countdown so the player sees it before the match starts.
     /// </summary>
     public sealed class ReadyScreen : FlowScreen
     {
@@ -41,10 +44,11 @@ namespace CriticalMass.Runtime.Menus
         readonly Text[,] _names = new Text[2, MaxRows], _classes = new Text[2, MaxRows], _tags = new Text[2, MaxRows];
         readonly string[,] _iconNames = new string[2, MaxRows];
         readonly ClassId[] _roster = new ClassId[MaxRows];
-        MenuItem _start, _back;
+        MenuItem _start, _back, _time;
 
         public MenuItem StartItem => _start;
         public MenuItem BackItem => _back;
+        public MenuItem TimeItem => _time;
         public PlayLaunch Launch => _launch;
         /// <summary>Rows shown per team (the team size).</summary>
         public int RowsPerSide => _rowsPerSide;
@@ -84,8 +88,10 @@ namespace CriticalMass.Runtime.Menus
             _start = Button(space, "Start Now", RightX + PanelW - 340f, 890f, 340f, 84f, "START NOW", StartNow, UiScale.TypeLead);
             _start.Body.RimPx = 4f;
             _start.Body.SetRim(Brass);
-            _start.navigation = new Navigation { mode = Navigation.Mode.Explicit, selectOnLeft = _back, selectOnRight = _back };
-            _back.navigation = new Navigation { mode = Navigation.Mode.Explicit, selectOnLeft = _start, selectOnRight = _start };
+            _time = Button(space, "Time Of Day", 740f, 890f, 440f, 84f, TimeText(), CycleTime, UiScale.TypeButton);
+            _start.navigation = new Navigation { mode = Navigation.Mode.Explicit, selectOnLeft = _time, selectOnRight = _back };
+            _time.navigation = new Navigation { mode = Navigation.Mode.Explicit, selectOnLeft = _back, selectOnRight = _start };
+            _back.navigation = new Navigation { mode = Navigation.Mode.Explicit, selectOnLeft = _start, selectOnRight = _time };
             DefaultFocus = _start;
         }
 
@@ -96,7 +102,8 @@ namespace CriticalMass.Runtime.Menus
             _rowGroups[side, i] = row.gameObject.AddComponent<CanvasGroup>();
             _rows[side, i] = row;
             _icons[side, i] = HudIcon.Make(row, "Portrait", 0f, 0f, 30f, 30f);
-            _names[side, i] = MenuUi.Label(row, "Name", CMTokens.Display, UiScale.TypeBody, Cream, TextAnchor.MiddleLeft, 44f, 0f, 300f, 30f, "", 2f);
+            // owner walk 1: the name starts clear of the portrait (its first letter sat under the face)
+            _names[side, i] = MenuUi.Label(row, "Name", CMTokens.Display, UiScale.TypeBody, Cream, TextAnchor.MiddleLeft, 58f, 0f, 290f, 30f, "", 2f);
             _classes[side, i] = MenuUi.Label(row, "Class", CMTokens.Ui, UiScale.TypeSmall, CMTokens.WithAlpha(Cream, 0.8f), TextAnchor.MiddleLeft, 356f, 0f, 200f, 30f, "", 2f);
             _tags[side, i] = MenuUi.Label(row, "Tag", CMTokens.Ui, UiScale.TypeSmall, Brass, TextAnchor.MiddleRight, PanelW - 48f - 130f, 0f, 130f, 30f, "", 2f);
             row.gameObject.SetActive(false);
@@ -121,8 +128,7 @@ namespace CriticalMass.Runtime.Menus
             if (launch.Seed == 0) launch.Seed = GameFlow.NewSeed();
 
             HudText.Set(_title, launch.Rematch ? "REMATCH READY" : watching ? "MATCH READY TO WATCH" : "MATCH READY");
-            HudText.Set(_sub, (c.Mode == MatchMode.Custom ? "CUSTOM MATCH" : info.Title) + "   ·   " + PlayModes.MapName + "   ·   " +
-                PlayModes.SizeLabel(n) + "   ·   " + MatchSpeed.Label(MatchSpeed.FromPace(c.Pace)));
+            RefreshSub();
             HudText.Set(_objective, Objective(c.Mode));
             HudText.Set(_footer, Footer(launch, watching));
 
@@ -160,6 +166,33 @@ namespace CriticalMass.Runtime.Menus
                     _rowGroups[side, i].alpha = 0f;
                 }
             }
+        }
+
+        /// <summary>Mode, map, time of day, size and speed in one line.</summary>
+        void RefreshSub()
+        {
+            if (_launch == null || _sub == null) return;
+            MatchSetupChoice c = _launch.Choice;
+            if (_cfg == null) _cfg = GameConfig.CreateDefault();
+            int n = Mathf.Min(MaxRows, World.ClampTeamSize(_cfg, c.TeamSize));
+            HudText.Set(_sub, (c.Mode == MatchMode.Custom ? "CUSTOM MATCH" : PlayModes.Info(c.Mode).Title) + "   ·   " + PlayModes.MapName + "   ·   " +
+                View.Atmosphere.TimeOfDaySettings.Label(View.Atmosphere.TimeOfDaySettings.Choice) + "   ·   " +
+                PlayModes.SizeLabel(n) + "   ·   " + MatchSpeed.Label(MatchSpeed.FromPace(c.Pace)));
+        }
+
+        static string TimeText() => "TIME:  " + View.Atmosphere.TimeOfDaySettings.Label(View.Atmosphere.TimeOfDaySettings.Choice);
+
+        /// <summary>TIME button: the next time of day; the countdown starts again so the player sees the map first.</summary>
+        public void CycleTime()
+        {
+            if (_launched) return;
+            View.Atmosphere.TimeOfDaySettings.Step(1);
+            if (_time != null && _time.Label != null) HudText.Set(_time.Label, TimeText());
+            RefreshSub();
+            float revealed = Time.unscaledTime - RevealEnd - 0.06f;
+            if (_shownAt < revealed) _shownAt = revealed;
+            HudText.Set(_count, "");
+            HudText.Set(_countLabel, "");
         }
 
         static void SetRowText(Text t, string s, float h, int size)

@@ -50,6 +50,9 @@ namespace CriticalMass.Runtime.Audio.Sound
         public const string ClipFolder = "CMSfx";
         /// <summary>World sounds behind the title screen (the attract match) play at this gain.</summary>
         public const float TitleGain = 0.5f;
+        /// <summary>Story film: while the intro plays, the backdrop match's world sounds and wind sit under the film at this
+        /// gain (1 = untouched). Set by StoryIntro; view only.</summary>
+        public static float FilmWorldGain = 1f;
         /// <summary>The sub layer's gain while camera shake is on (it adds to the shake instead of replacing it).</summary>
         public const float SubWithShake = 0.55f;
 
@@ -273,6 +276,14 @@ namespace CriticalMass.Runtime.Audio.Sound
             return cue >= 0 && Instance != null && Instance.PlayCue(cue, simX, simZ, own, false, 1f, 1f, 0);
         }
 
+        /// <summary>fix/kaiju-alive-1: a cue at a sim position with a gain and pitch scale (the hatchling's higher, quieter
+        /// roar, the berserk's lower one). Same distance rules as every world cue. False when refused or unknown.</summary>
+        public static bool PlayCueAt(string id, double simX, double simZ, float gain, float pitch)
+        {
+            int cue = SoundTable.IndexOf(id);
+            return cue >= 0 && Instance != null && Instance.PlayCue(cue, simX, simZ, false, false, gain, pitch, 0);
+        }
+
         // ---- big moments (IBigMomentsAudio)
         public void OnTakeover(MomentId id, float seconds, bool playerOwned)
         {
@@ -463,7 +474,7 @@ namespace CriticalMass.Runtime.Audio.Sound
             _cursor[cue] = idx;
             AudioClip clip = clips[idx];
             double now = Time.unscaledTimeAsDouble;
-            float worldGain = _title && !uiBus ? TitleGain : 1f;
+            float worldGain = (_title && !uiBus ? TitleGain : 1f) * (uiBus ? 1f : FilmWorldGain);
             float gain = Mathf.Clamp01(c.Gain * gainScale * g * (1f + vj) * worldGain * (own ? 1.1f : 1f));
 
             _plan.BeginFrame(Time.frameCount);
@@ -533,7 +544,7 @@ namespace CriticalMass.Runtime.Audio.Sound
 
         // ------------------------------------------------------------------ per frame (mixing only: no allocation)
 
-        private void LateUpdate() { long c = CriticalMass.Runtime.Game.FrameCost.Begin(); LateUpdateBody(); CriticalMass.Runtime.Game.FrameCost.End(CriticalMass.Runtime.Game.FrameCost.Slot.Sound, c); }
+        private void LateUpdate() { var c = CriticalMass.Runtime.Game.FrameCost.Enter(); LateUpdateBody(); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.Sound, c); }
 
         private void LateUpdateBody()
         {
@@ -638,7 +649,7 @@ namespace CriticalMass.Runtime.Audio.Sound
             bool world = w != null && !_paused;
             int windCue = SoundTable.EdgeCue(SoundEdge.Wind), waterCue = SoundTable.EdgeCue(SoundEdge.Water);
             // Wind: always under the world.
-            Loop(_wind, windCue, world, SoundTable.Cue(windCue).Gain * _duckAmb * (_title ? 0.7f : 1f), 0f);
+            Loop(_wind, windCue, world, SoundTable.Cue(windCue).Gain * _duckAmb * (_title ? 0.7f : 1f) * FilmWorldGain, 0f);
             // Water: the nearest waterfall.
             float wg = 0f, wp = 0f;
             if (world && _fallCount > 0)

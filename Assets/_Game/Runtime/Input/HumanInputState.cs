@@ -63,6 +63,9 @@ namespace CriticalMass.Runtime.Input
         bool _scoreboardHeld;
         bool _interactHeld;
         bool _attackHeld;
+        // controls-1 (hygiene): a press held through a death is ignored after the respawn until it is let go.
+        bool _attackHoldOff;
+        bool _aliveSeen, _wasAlive;
         bool _attackLatch;
         bool _abilityLatch;
         bool _terraformLatch;
@@ -107,6 +110,42 @@ namespace CriticalMass.Runtime.Input
         /// </summary>
         public bool KeysFollowMap { get; set; }
 
+        // feat/ground-camera: camera-relative movement for the experimental ground camera (GroundView). While set, the move
+        // keys and the stick go through this basis instead of the fixed screen one; Fill still writes a world-space move.
+        bool _basisOn;
+        double _bUpX, _bUpZ, _bRightX, _bRightZ;
+
+        /// <summary>
+        /// The ground camera's facing as the move basis (sim XZ, unit vectors): up = the camera forward on the ground, right
+        /// = its right. KeysFollowMap does not apply under it. The sim input is unchanged in kind: InputFrame.MoveX / MoveZ.
+        /// </summary>
+        public void SetCameraBasis(double upX, double upZ, double rightX, double rightZ)
+        {
+            _basisOn = true;
+            _bUpX = upX;
+            _bUpZ = upZ;
+            _bRightX = rightX;
+            _bRightZ = rightZ;
+        }
+
+        /// <summary>Back to the fixed screen basis (the high camera).</summary>
+        public void ClearCameraBasis() => _basisOn = false;
+
+        /// <summary>True while SetCameraBasis is in force.</summary>
+        public bool CameraBasisActive => _basisOn;
+
+        void Basis(out double rx, out double rz, out double ux, out double uz)
+        {
+            if (_basisOn)
+            {
+                rx = _bRightX; rz = _bRightZ; ux = _bUpX; uz = _bUpZ;
+                return;
+            }
+            bool map = _moveFromKeys && KeysFollowMap;
+            rx = map ? MapRightX : ScreenRightX; rz = map ? MapRightZ : ScreenRightZ;
+            ux = map ? MapUpX : ScreenUpX; uz = map ? MapUpZ : ScreenUpZ;
+        }
+
         /// <summary>The world whose actor 0 the assists read (position, collision); null = no assist, no pointer walk.</summary>
         public void BindWorld(World w) => _world = w;
 
@@ -140,6 +179,9 @@ namespace CriticalMass.Runtime.Input
             _scoreboardHeld = false;
             _interactHeld = false;
             _attackHeld = false;
+            _attackHoldOff = false;
+            _aliveSeen = false;
+            _wasAlive = false;
             _attackLatch = false;
             _abilityLatch = false;
             _terraformLatch = false;
@@ -175,6 +217,8 @@ namespace CriticalMass.Runtime.Input
                     if (!repeat) _jumpLatch = true;
                     break;
                 case HumanButton.Attack:
+                    if (repeat && _attackHoldOff) break;
+                    _attackHoldOff = false;
                     _attackHeld = true;
                     if (!repeat) _attackLatch = true;
                     break;
@@ -209,6 +253,7 @@ namespace CriticalMass.Runtime.Input
             {
                 case HumanButton.Attack:
                     _attackHeld = false;
+                    _attackHoldOff = false;
                     break;
                 case HumanButton.Interact:
                     _interactHeld = false;
@@ -228,6 +273,18 @@ namespace CriticalMass.Runtime.Input
             _moveRight = right;
             _moveUp = up;
             _moveFromKeys = fromKeys;
+        }
+
+        /// <summary>
+        /// controls-1: the move intent as a sim XZ direction through the same basis Fill uses (screen, or the map grid for
+        /// keys with KeysFollowMap), before lane assist and corner sliding; (0, 0) when nothing moves. Keyboard aim reads it so
+        /// the fighter faces the way the keys send it. Read-only: never changes what Fill writes.
+        /// </summary>
+        public void MoveDirection(out double x, out double z)
+        {
+            Basis(out double rx, out double rz, out double ux, out double uz);
+            x = _moveRight * rx + _moveUp * ux;
+            z = _moveRight * rz + _moveUp * uz;
         }
 
         /// <summary>The pointer's aim point on the ground in sim world space (the raycast is HumanInputSource's).</summary>
@@ -259,6 +316,7 @@ namespace CriticalMass.Runtime.Input
             _scoreboardHeld = false;
             _interactHeld = false;
             _attackHeld = false;
+            _attackHoldOff = false;
             _attackLatch = false;
             _abilityLatch = false;
             _terraformLatch = false;
@@ -285,6 +343,28 @@ namespace CriticalMass.Runtime.Input
                 }
             }
         }
+
+        /// <summary>
+        /// controls-1 (hygiene, owner veteran pass): the actor came back to life. An attack held (or mashed) through the death
+        /// does not swing on the first moment of the new life: the hold is dropped until the key is let go and pressed
+        /// again, and every latch and buffered press queued while dead is dropped. Presentation only (the frames the sim
+        /// receives), so the sim is unchanged. Called by Fill on the dead-to-alive edge of BufferActor.
+        /// </summary>
+        public void HoldOffAfterRespawn()
+        {
+            if (_attackHeld) _attackHoldOff = true;
+            _attackHeld = false;
+            _attackLatch = false;
+            _abilityLatch = false;
+            _terraformLatch = false;
+            _switchLatch = false;
+            _jumpLatch = false;
+            _attackBuffer.Clear();
+            _abilityBuffer.Clear();
+        }
+
+        /// <summary>True while a hold from before the respawn is being ignored.</summary>
+        public bool AttackHeldOff => _attackHoldOff;
 
         /// <summary>Fill actor 0's frame for one sim step and consume the latches and the queued class pick.</summary>
         public void Fill(InputFrame output)
@@ -324,6 +404,13 @@ namespace CriticalMass.Runtime.Input
             World bw = BufferWorld;
             bool canBuffer = bw != null && bw.Config != null;
             int early = canBuffer ? InputBuffer.MaxEarlyTicks(bw.Config.SimHz) : 0;
+            if (bw != null && BufferActor >= 0 && BufferActor < bw.ActorCount)
+            {
+                bool alive = bw.Actors[BufferActor].Alive;
+                if (_aliveSeen && alive && !_wasAlive) HoldOffAfterRespawn();
+                _wasAlive = alive;
+                _aliveSeen = true;
+            }
             bool attackNow = _attackBuffer.Step(_attackLatch, canBuffer, canBuffer && InputReadiness.Attack(bw, BufferActor), early);
             output.Attack = _attackHeld || attackNow;
             _attackLatch = false;
@@ -347,6 +434,25 @@ namespace CriticalMass.Runtime.Input
         /// basis for keys with KeysFollowMap), else pointer walking while its button is held; then, with MovementAssist
         /// and a bound world, lane assist for a single key and corner sliding (MoveAssist).
         /// </summary>
+        /// <summary>
+        /// True within a bridge's deck band plus one unit, from 1.5 u before its start to 1.5 u after its end: where corner
+        /// slide stays off (EasyMovementTests.CornerSlideIsOffNearBridges...: with it on there, 148 of 3504 Sim crossings
+        /// stall; with it off, none).
+        /// </summary>
+        public static bool NearBridge(double x, double z)
+        {
+            var all = CriticalMass.Sim.Maps.BridgeSpans.All;
+            double reach = CriticalMass.Sim.Maps.SkybreakBasinMap.BridgeHalfWidth + 1.0;
+            for (int i = 0; i < all.Count; i++)
+            {
+                CriticalMass.Sim.Maps.BridgeSpan sp = all[i];
+                double a = CriticalMass.Sim.Maps.BridgeSpans.Along(sp, x, z);
+                if (a < -1.5 || a > sp.Len + 1.5) continue;
+                if (Math.Abs(CriticalMass.Sim.Maps.BridgeSpans.Lateral(sp, x, z)) <= reach) return true;
+            }
+            return false;
+        }
+
         void WorldMove(out double mx, out double mz)
         {
             mx = 0;
@@ -355,9 +461,7 @@ namespace CriticalMass.Runtime.Input
             bool human = w != null && w.ActorCount > 0 && w.Actors[0].Alive;
             if (_moveRight != 0 || _moveUp != 0)
             {
-                bool map = _moveFromKeys && KeysFollowMap;
-                double rx = map ? MapRightX : ScreenRightX, rz = map ? MapRightZ : ScreenRightZ;
-                double ux = map ? MapUpX : ScreenUpX, uz = map ? MapUpZ : ScreenUpZ;
+                Basis(out double rx, out double rz, out double ux, out double uz);
                 mx = _moveRight * rx + _moveUp * ux;
                 mz = _moveRight * rz + _moveUp * uz;
                 double len2 = mx * mx + mz * mz;
@@ -381,7 +485,10 @@ namespace CriticalMass.Runtime.Input
                 if (!MoveAssist.PointerMove(w.X[0], w.Z[0], _walkX, _walkZ, out mx, out mz)) return;
             }
             else return;
-            if (human && MovementAssist && MoveAssist.CornerSlide(w, 0, mx, mz, out double sx, out double sz))
+            // Creator acceptance (bridge travel): on and around a bridge the sim's own rail rule (Collide.RailFirst, DG-02)
+            // carries a body walking up to 60 degrees off the axis; the input layer's corner slide must not turn the move
+            // away from the span there first (the creator's "fighting the keys" on diagonal bridges).
+            if (human && MovementAssist && !NearBridge(w.X[0], w.Z[0]) && MoveAssist.CornerSlide(w, 0, mx, mz, out double sx, out double sz))
             {
                 mx = sx;
                 mz = sz;

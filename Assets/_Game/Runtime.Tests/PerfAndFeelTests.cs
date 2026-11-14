@@ -67,6 +67,36 @@ namespace CriticalMass.Runtime.Tests
         }
 
         [Test]
+        public void CrowdBudgetKeepsOnlyTheNearestFightersAtLod0()
+        {
+            // perf-60hz-32p: 31 others on screen at the hill; Medium keeps 10 at LOD0, High 16, Low none.
+            QualityRow low = QualityTable.For(FramePolicy.LevelLow), med = QualityTable.For(FramePolicy.LevelMedium),
+                high = QualityTable.For(FramePolicy.LevelHigh);
+            Assert.AreEqual(QualityTable.MediumLod0Budget, med.Lod0Budget);
+            Assert.AreEqual(QualityTable.HighLod0Budget, high.Lod0Budget);
+            var d = new float[31];
+            for (int i = 0; i < d.Length; i++) d[i] = 30f - i * 0.9f;   // 30 m down to 3 m, unsorted order
+            float cut = AnimLod.CrowdCut((float[])d.Clone(), d.Length, med.Lod0Budget);
+            int lod0 = 0;
+            foreach (float x in d) lod0 += AnimLod.PickLod(false, x, cut, med) == 0 ? 1 : 0;
+            Assert.AreEqual(med.Lod0Budget, lod0, "Medium: exactly the budget at LOD0 when more are within 25 m");
+            cut = AnimLod.CrowdCut((float[])d.Clone(), d.Length, high.Lod0Budget);
+            lod0 = 0;
+            foreach (float x in d) lod0 += AnimLod.PickLod(false, x, cut, high) == 0 ? 1 : 0;
+            Assert.AreEqual(high.Lod0Budget, lod0);
+            Assert.AreEqual(0, AnimLod.PickLod(true, 40f, float.NegativeInfinity, med), "your own fighter is always LOD0");
+            Assert.AreEqual(float.PositiveInfinity, AnimLod.CrowdCut(new float[4], 4, 10), "a small crowd is not cut");
+            Assert.AreEqual(1, AnimLod.PickLod(false, 2f, AnimLod.CrowdCut(new float[4], 4, 0), low));
+        }
+
+        [Test]
+        public void StressHillFlagParsesAndIsOffByDefault()
+        {
+            Assert.IsFalse(AutoplayArgs.Parse(new[] { "-autoplay" }).StressHill);
+            Assert.IsTrue(AutoplayArgs.Parse(new[] { "-autoplay", "-stressHill" }).StressHill);
+        }
+
+        [Test]
         public void AnimationCullsOffScreenAndThrottlesDistantFighters()
         {
             QualityRow high = QualityTable.For(FramePolicy.LevelHigh);
@@ -408,6 +438,55 @@ namespace CriticalMass.Runtime.Tests
             Assert.IsFalse(RenderBudget.SunCasts(true, QualityTable.For(FramePolicy.LevelHigh)), "title");
             Assert.IsFalse(RenderBudget.SunCasts(false, QualityTable.For(FramePolicy.LevelLow)), "Low");
             Assert.IsTrue(RenderBudget.SunCasts(false, QualityTable.For(FramePolicy.LevelMedium)));
+        }
+
+        [Test]
+        public void TitleBackdropFreezesOnlyOnTheSettledIdleTitle()
+        {
+            float s = TitleBackdrop.SettleSeconds;
+            Assert.IsTrue(TitleBackdrop.ShouldFreeze(true, true, false, s, false, false));
+            Assert.IsFalse(TitleBackdrop.ShouldFreeze(true, true, false, s - 0.1f, false, false), "the backdrop is still building");
+            Assert.IsFalse(TitleBackdrop.ShouldFreeze(true, false, false, s + 9, false, false), "attract tour, story film or a match");
+            Assert.IsFalse(TitleBackdrop.ShouldFreeze(true, true, true, s + 9, false, false), "title dismissed");
+            Assert.IsFalse(TitleBackdrop.ShouldFreeze(true, true, false, s + 9, true, false), "world still building");
+            Assert.IsFalse(TitleBackdrop.ShouldFreeze(true, true, false, s + 9, false, true), "the pipeline refused the still");
+            Assert.IsFalse(TitleBackdrop.ShouldFreeze(false, true, false, s + 9, false, false), "switched off");
+        }
+
+        [Test]
+        public void TitleBackdropDriftStaysInsideItsMarginAndStartsAtRest()
+        {
+            Assert.AreEqual(Vector2.zero, TitleBackdrop.Drift(0f));
+            float margin = (TitleBackdrop.DriftScale - 1f) / 2f;
+            float maxStep = 0f;
+            Vector2 prev = TitleBackdrop.Drift(0f);
+            for (float t = 0f; t < TitleBackdrop.DriftPeriodSeconds * 2f; t += 1f / 60f)
+            {
+                Vector2 d = TitleBackdrop.Drift(t);
+                Assert.LessOrEqual(Mathf.Abs(d.x), margin, "the still's edge never shows (x)");
+                Assert.LessOrEqual(Mathf.Abs(d.y), margin, "the still's edge never shows (y)");
+                maxStep = Mathf.Max(maxStep, (d - prev).magnitude);
+                prev = d;
+            }
+            Assert.Greater(Mathf.Abs(TitleBackdrop.Drift(TitleBackdrop.DriftPeriodSeconds / 4f).x), 0.01f, "it moves");
+            Assert.Less(maxStep, 0.0005f, "slow: under 0.05% of the screen per frame");
+        }
+
+        [Test]
+        public void LoadingScreenFadesOnlyAfterCalmFramesOrItsBound()
+        {
+            int calm = 0;
+            calm = CriticalMass.Runtime.Menus.LoadingScreen.CalmFrames(calm, 0.30f);   // the scene activation frame
+            Assert.AreEqual(0, calm);
+            for (int i = 0; i < CriticalMass.Runtime.Menus.LoadingScreen.SettleFrames - 1; i++)
+                calm = CriticalMass.Runtime.Menus.LoadingScreen.CalmFrames(calm, 1f / 60f);
+            Assert.IsFalse(CriticalMass.Runtime.Menus.LoadingScreen.Settled(calm, 0.2f), "one calm frame short");
+            int spiked = CriticalMass.Runtime.Menus.LoadingScreen.CalmFrames(calm, 0.051f);
+            Assert.AreEqual(0, spiked, "a frame over 50 ms starts the count again");
+            calm = CriticalMass.Runtime.Menus.LoadingScreen.CalmFrames(calm, 0.05f);
+            Assert.IsTrue(CriticalMass.Runtime.Menus.LoadingScreen.Settled(calm, 0.2f));
+            Assert.IsTrue(CriticalMass.Runtime.Menus.LoadingScreen.Settled(0, CriticalMass.Runtime.Menus.LoadingScreen.SettleWaitSeconds),
+                "a throttled window never holds the screen up");
         }
     }
 }

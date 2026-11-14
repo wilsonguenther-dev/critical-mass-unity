@@ -30,7 +30,9 @@ namespace CriticalMass.Runtime.Flow
         /// <summary>Top of the key-hint line: inside the HUD's 24 px edge margin at the bottom of the 1080 space.</summary>
         public const float HintY = HudLayout.RefH - HudLayout.Margin - 36f;
         /// <summary>A press that opened a screen must not also press its focused button.</summary>
-        public const float SubmitGuardSeconds = 0.15f;
+        /// <para>Owner walk 1: 0.3 s (was 0.15), longer than a double-click, so a double-click on a mode card opens class select
+        /// and never also picks the class under the pointer.</para>
+        public const float SubmitGuardSeconds = 0.3f;
 
         public Canvas Canvas { get; private set; }
         public bool IsVisible { get; private set; }
@@ -245,11 +247,25 @@ namespace CriticalMass.Runtime.Flow
             // Focus is always visible: put it back when the mouse clicked empty space or the item went away.
             MenuItem f = Focused;
             if (f != null && f.IsInteractable() && f.isActiveAndEnabled) _lastFocus = f;
-            else Focus(_lastFocus);
+            else if (!OwnSelectableFocused()) Focus(_lastFocus);
 
             Gamepad pad = Gamepad.current;
             if (pad != null && pad.buttonEast.wasPressedThisFrame && Time.unscaledTime >= MenuItem.SubmitBlockedUntil) Back();
             else Tick();
+        }
+
+        /// <summary>
+        /// Integration batch 5: a focused control of this screen that is not a MenuItem (the Home fighter, a FighterHotspot)
+        /// keeps the focus. The focus keeper used to hand it straight back to the last menu item every frame, so keyboard and
+        /// controller focus never reached the fighter and its ring and CUSTOMISE chip never showed.
+        /// </summary>
+        bool OwnSelectableFocused()
+        {
+            EventSystem es = EventSystem.current;
+            GameObject sel = es != null ? es.currentSelectedGameObject : null;
+            if (sel == null || Canvas == null || !sel.transform.IsChildOf(Canvas.transform)) return false;
+            UnityEngine.UI.Selectable s = sel.GetComponent<UnityEngine.UI.Selectable>();
+            return s != null && s.IsInteractable() && s.isActiveAndEnabled;
         }
 
         /// <summary>Per-frame work while visible.</summary>

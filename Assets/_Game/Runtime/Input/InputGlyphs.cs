@@ -79,7 +79,7 @@ namespace CriticalMass.Runtime.Input
         public static readonly string[] PlayerActions =
         {
             "Move", "Aim", "Point", "Attack", "Ability", "Jump", "Interact", "DigPlace", "SwitchDigPlace", "Scoreboard", "Pause",
-            "Map", "Ping", "HudCursor", "MinimapZoom",
+            "Map", "Ping", "HudCursor", "MinimapZoom", "LockFacing", "ShowTerrain",
         };
 
         /// <summary>Abbreviations the owner could not read; no user-facing string may contain them as a word.</summary>
@@ -99,14 +99,19 @@ namespace CriticalMass.Runtime.Input
         public static GlyphSpec ForAction(string action) => ForAction(action, ControlBindings.ActiveDevice);
 
         /// <summary>
-        /// The prompt for an action's current binding on a device (ordinal: the n-th plain binding in the device's group).
+        /// The prompt for an action's current binding on a device (ordinal: the n-th plain binding in the device's group;
+        /// controls-1: the default -1 = the binding a prompt should name, ControlBindings.PromptBindingIndex, so a keyboard
+        /// player sees J or Z for Attack, never Left click).
         /// Move on the keyboard is one wide keycap with the four bound keys ("WASD"); with no plain binding the first
         /// composite part of the device's group is used (Shoulders: LB). Unknown action or no binding: Empty.
         /// </summary>
-        public static GlyphSpec ForAction(string action, ControlDevice device, int ordinal = 0)
+        public static GlyphSpec ForAction(string action, ControlDevice device, int ordinal = -1)
         {
             if (string.IsNullOrEmpty(action)) return GlyphSpec.Empty;
             if (action == "Move" && device == ControlDevice.KeyboardMouse) return MoveKeys();
+            // controls-1: keyboard only, the aim is the move direction (the move keys), never the mouse.
+            if ((action == "Aim" || action == "Point") && device == ControlDevice.KeyboardMouse && ordinal < 0 && ControlBindings.KeyboardOnly)
+                return MoveKeys();
             if (action == "Point" && device == ControlDevice.Gamepad) action = "Aim";
             if (action == "Aim" && device == ControlDevice.KeyboardMouse) action = "Point";
             InputAction a = Find(action);
@@ -138,8 +143,8 @@ namespace CriticalMass.Runtime.Input
             int n = 0;
             for (int k = 0; k < MoveParts.Length && n < output.Length; k++)
             {
-                string p = a != null ? PartPath(a, "WASD", MoveParts[k]) : null;
-                output[n++] = ForPath(p ?? MoveDefaults[k]);
+                string p = a != null ? PartPath(a, ControlBindings.HandName(ControlBindings.Hand), MoveParts[k]) : null;
+                output[n++] = ForPath(p ?? (ControlBindings.Hand == KeyboardHand.Arrows ? ArrowDefaults[k] : MoveDefaults[k]));
             }
             return n;
         }
@@ -148,21 +153,35 @@ namespace CriticalMass.Runtime.Input
         public static string MoveWords(ControlDevice device)
         {
             if (device == ControlDevice.Gamepad) return ForAction("Move", ControlDevice.Gamepad).Words;
-            return MoveKeys().Words + " or the arrow keys";
+            return MoveKeys(KeyboardHand.Wasd).Words + " or the arrow keys";
         }
 
         static readonly string[] MoveParts = { "up", "left", "down", "right" };
         static readonly string[] MoveDefaults = { "<Keyboard>/w", "<Keyboard>/a", "<Keyboard>/s", "<Keyboard>/d" };
 
-        static GlyphSpec MoveKeys()
+        static readonly string[] ArrowDefaults = { "<Keyboard>/upArrow", "<Keyboard>/leftArrow", "<Keyboard>/downArrow", "<Keyboard>/rightArrow" };
+
+        static GlyphSpec MoveKeys() => MoveKeys(ControlBindings.Hand);
+
+        /// <summary>Move as one wide keycap for a hand position: "WASD", or the arrows ("Arrow keys").</summary>
+        static GlyphSpec MoveKeys(KeyboardHand hand)
         {
             InputAction a = Find("Move");
+            if (hand == KeyboardHand.Arrows)
+            {
+                bool defaults = true;
+                for (int k = 0; k < MoveParts.Length && a != null; k++)
+                    if (!string.Equals(PartPath(a, ControlBindings.ArrowsHand, MoveParts[k]), ArrowDefaults[k], StringComparison.OrdinalIgnoreCase)) defaults = false;
+                if (defaults) return new GlyphSpec(GlyphKind.Key, GlyphMark.None, "ARROWS", "Arrow keys", Cream);
+            }
+            string comp = ControlBindings.HandName(hand);
+            string[] fallback = hand == KeyboardHand.Arrows ? ArrowDefaults : MoveDefaults;
             var caps = new string[MoveParts.Length];
             bool single = true;
             for (int k = 0; k < MoveParts.Length; k++)
             {
-                string p = a != null ? PartPath(a, "WASD", MoveParts[k]) : null;
-                GlyphSpec g = ForPath(p ?? MoveDefaults[k]);
+                string p = a != null ? PartPath(a, comp, MoveParts[k]) : null;
+                GlyphSpec g = ForPath(p ?? fallback[k]);
                 caps[k] = g.Cap ?? g.Words;
                 if (caps[k].Length > 1) single = false;
             }
@@ -181,7 +200,8 @@ namespace CriticalMass.Runtime.Input
         public static string PathFor(InputAction action, ControlDevice device, int ordinal = 0)
         {
             if (action == null) return null;
-            int i = ControlBindings.FindBindingIndex(action, new RebindSlot(action.name, device, ordinal));
+            int i = ordinal < 0 ? ControlBindings.PromptBindingIndex(action, device)
+                : ControlBindings.FindBindingIndex(action, new RebindSlot(action.name, device, ordinal));
             if (i >= 0) return action.bindings[i].effectivePath;
             string group = ControlBindings.Group(device);
             var bs = action.bindings;
@@ -220,6 +240,8 @@ namespace CriticalMass.Runtime.Input
                 case "Ping": return pad ? "<Gamepad>/dpad/left" : "<Keyboard>/g";
                 case "HudCursor": return pad ? "<Gamepad>/dpad/down" : "<Keyboard>/leftAlt";
                 case "MinimapZoom": return pad ? "<Gamepad>/dpad/right" : "<Keyboard>/n";
+                case "LockFacing": return pad ? "<Gamepad>/rightStick" : "<Keyboard>/l";
+                case "ShowTerrain": return pad ? "<Gamepad>/rightStickPress" : "<Keyboard>/q";
             }
             return null;
         }
@@ -288,6 +310,10 @@ namespace CriticalMass.Runtime.Input
                 case "rightAlt":
                 case "alt": return Key("Alt", "Alt");
                 case "backquote": return Key("`", "Backquote");
+                case "slash": return Key("/", "Slash");
+                case "period": return Key(".", "Period");
+                case "comma": return Key(",", "Comma");
+                case "semicolon": return Key(";", "Semicolon");
                 case "minus": return Key("-", "Minus");
                 case "equals": return Key("=", "Equals");
                 case "leftBracket": return Key("[", "Left bracket");
@@ -304,8 +330,40 @@ namespace CriticalMass.Runtime.Input
 
         static GlyphSpec Key(string cap, string words) => new GlyphSpec(GlyphKind.Key, GlyphMark.None, cap, words, Cream);
 
-        static GlyphSpec Pad(string control, string path)
+        // controls-1: the shape family's face colours (cross blue, circle red, square pink, triangle green).
+        public static readonly Color FaceCross = new Color32(0x7C, 0xB2, 0xE8, 0xFF);
+        public static readonly Color FaceCircle = new Color32(0xE2, 0x57, 0x4C, 0xFF);
+        public static readonly Color FaceSquare = new Color32(0xD8, 0x8C, 0xC8, 0xFF);
+        public static readonly Color FaceTriangle = new Color32(0x4C, 0xC2, 0xA4, 0xFF);
+
+        /// <summary>The glyph of a controller control for the connected family (ControllerSettings.CurrentFamily).</summary>
+        static GlyphSpec Pad(string control, string path) => Pad(control, path, ControllerSettings.CurrentFamily);
+
+        /// <summary>
+        /// controls-1: the glyph of a controller control in a family: the shape family draws cross, circle, square and
+        /// triangle (L1 R1 L2 R2, L3 R3, Options, Create), every other controller A B X Y (LB RB LT RT, Menu, View).
+        /// Never a brand name: the family only changes labels and colours.
+        /// </summary>
+        public static GlyphSpec Pad(string control, string path, PadFamily family)
         {
+            if (family == PadFamily.PlayStation)
+            {
+                switch (control)
+                {
+                    case "buttonSouth": return new GlyphSpec(GlyphKind.FaceButton, GlyphMark.None, "\u00D7", "Cross button", FaceCross);
+                    case "buttonEast": return new GlyphSpec(GlyphKind.FaceButton, GlyphMark.None, "\u25CB", "Circle button", FaceCircle);
+                    case "buttonWest": return new GlyphSpec(GlyphKind.FaceButton, GlyphMark.None, "\u25A1", "Square button", FaceSquare);
+                    case "buttonNorth": return new GlyphSpec(GlyphKind.FaceButton, GlyphMark.None, "\u25B3", "Triangle button", FaceTriangle);
+                    case "leftShoulder": return new GlyphSpec(GlyphKind.Bumper, GlyphMark.Left, "L1", "L1 button", Stone);
+                    case "rightShoulder": return new GlyphSpec(GlyphKind.Bumper, GlyphMark.Right, "R1", "R1 button", Stone);
+                    case "leftTrigger": return new GlyphSpec(GlyphKind.Trigger, GlyphMark.Left, "L2", "L2 trigger", Stone);
+                    case "rightTrigger": return new GlyphSpec(GlyphKind.Trigger, GlyphMark.Right, "R2", "R2 trigger", Stone);
+                    case "leftStickPress": return new GlyphSpec(GlyphKind.Stick, GlyphMark.Press, "L3", "Press the left stick (L3)", Stone);
+                    case "rightStickPress": return new GlyphSpec(GlyphKind.Stick, GlyphMark.Press, "R3", "Press the right stick (R3)", Stone);
+                    case "start": return new GlyphSpec(GlyphKind.SmallButton, GlyphMark.None, "Options", "Options button", Stone);
+                    case "select": return new GlyphSpec(GlyphKind.SmallButton, GlyphMark.None, "Create", "Create or Share button", Stone);
+                }
+            }
             switch (control)
             {
                 case "buttonSouth": return new GlyphSpec(GlyphKind.FaceButton, GlyphMark.None, "A", "A button", FaceA);

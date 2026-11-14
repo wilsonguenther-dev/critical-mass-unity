@@ -65,6 +65,13 @@ namespace CriticalMass.Runtime.Hud
             Clusters[(int)HudCluster.Kaiju] = Cluster(HudCluster.Kaiju);
             Clusters[(int)HudCluster.Player] = Cluster(HudCluster.Player);
             Clusters[(int)HudCluster.Minimap] = Cluster(HudCluster.Minimap);
+            // Owner walk 1: the four clusters sit in the safe area (the camera notch of a full-screen MacBook, overscan).
+            RectTransform safe = FeedUi.SafeRoot(Root);
+            for (int i = 0; i < Clusters.Length; i++)
+            {
+                Clusters[i].SetParent(safe, false);
+                HudKeepOut.Add(Clusters[i]);   // world labels and edge pointers keep off the panels
+            }
             BuildMatch(Clusters[0]);
             BuildKaiju(Clusters[1]);
             BuildPlayer(Clusters[2]);
@@ -226,6 +233,8 @@ namespace CriticalMass.Runtime.Hud
         // ---------------------------------------------------------------- 02 KAIJU
 
         const int MeterSegments = 8;
+        /// <summary>hud-art-1: the egg badge shows the cracking egg in the last seconds before the hatch.</summary>
+        public const double CrackSeconds = 30.0;
         const int RagePips = 5;
         HudIcon _kaijuHead;
         VectorShape _eggFrame;
@@ -602,7 +611,9 @@ namespace CriticalMass.Runtime.Hud
 
         // ---------------------------------------------------------------- update
 
-        void LateUpdate()
+        void LateUpdate() { var cost = CriticalMass.Runtime.Game.FrameCost.Enter(); LateUpdateCost(); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.Hud, cost); }
+
+        void LateUpdateCost()
         {
             if (Driver == null) Driver = GetComponent<SimDriverBehaviour>();
             if (Driver == null || Driver.World == null || Root == null) return;
@@ -664,6 +675,16 @@ namespace CriticalMass.Runtime.Hud
         static string HillWord(HillState h) =>
             h == HillState.Azure ? "AZURE HOLDS" : h == HillState.Crimson ? "CRIMSON HOLDS" : h == HillState.Contested ? "CONTESTED" : "NEUTRAL";
 
+        static readonly Color[] RageColour = BuildRageColours();
+
+        static Color[] BuildRageColours()
+        {
+            var a = new Color[RagePips];
+            Color hot = CMTokens.ParseHex(CriticalMass.Runtime.View.Art.ArtMapping.GlowBerserk);
+            for (int i = 0; i < RagePips; i++) a[i] = Color.Lerp(CMTokens.Meat.Color, hot, i / (float)(RagePips - 1));
+            return a;
+        }
+
         static readonly string[] HatchWords = BuildHatchWords();
 
         static string[] BuildHatchWords()
@@ -684,7 +705,8 @@ namespace CriticalMass.Runtime.Hud
             for (int i = 0; i < MeterSegments; i++) _segments[i].SetFill(i < lit ? litColour : Empty);
             HudText.Set(_kaijuNumber, NumberCache.Int(Mathf.RoundToInt(s.KaijuMeter01 * 100f)));
             int rage = Mathf.FloorToInt(s.Instability01 * RagePips + 1e-4f);
-            for (int i = 0; i < RagePips; i++) _rage[i].SetFill(i < rage ? CMTokens.Meat.Color : Empty);
+            // hud-art-1: the rage pips heat from meat orange toward the berserk magenta as the egg nears berserk
+            for (int i = 0; i < RagePips; i++) _rage[i].SetFill(i < rage ? RageColour[i] : Empty);
             string word = egg ? HatchWords[Math.Min(600, (int)Math.Ceiling(s.UntilHatch - 1e-6))] :
                 s.Kaiju == KaijuState.Azure ? "AZURE" : s.Kaiju == KaijuState.Crimson ? "CRIMSON" :
                 s.Kaiju == KaijuState.Berserk ? "BERSERK" : "NEUTRAL";
@@ -695,7 +717,7 @@ namespace CriticalMass.Runtime.Hud
         /// <summary>Egg before the hatch; the wild (neutral) Kaiju is the hatchling of bible p10; once a team turns it
         /// (or it goes berserk) the adult head in that state's colours (p10 azure / crimson / berserk adult).</summary>
         static string KaijuIcon(HudState s, bool egg) =>
-            egg ? UiIcons.Egg : s.Kaiju == KaijuState.Azure ? UiIcons.Adult[1] : s.Kaiju == KaijuState.Crimson ? UiIcons.Adult[2] :
+            egg ? (s.UntilHatch <= CrackSeconds ? UiIcons.EggCracking : UiIcons.Egg) : s.Kaiju == KaijuState.Azure ? UiIcons.Adult[1] : s.Kaiju == KaijuState.Crimson ? UiIcons.Adult[2] :
             s.Kaiju == KaijuState.Berserk ? UiIcons.Adult[3] : UiIcons.Hatchling;
 
         static Color KaijuColour(KaijuState k) =>
@@ -980,6 +1002,7 @@ namespace CriticalMass.Runtime.Hud
             float kx = Mathf.Abs(d.x) > 1e-4f ? (c.x - pad) / Mathf.Abs(d.x) : float.MaxValue;
             float ky = Mathf.Abs(d.y) > 1e-4f ? (c.y - pad) / Mathf.Abs(d.y) : float.MaxValue;
             Vector2 pos = c + d * Mathf.Min(kx, ky);
+            pos = HudKeepOut.PushOut(pos, c.y, 36f * scale);   // owner walk 1: never on a HUD panel (the clock band, Kaiju panel, feed)
             p.anchoredPosition = pos / scale;
             _ptrArrow[i].localRotation = Quaternion.Euler(0, 0, Mathf.Atan2(d.y, d.x) * Mathf.Rad2Deg);
             double dx = tx - s.PlayerX, dz = tz - s.PlayerZ;
@@ -995,7 +1018,7 @@ namespace CriticalMass.Runtime.Hud
 
         void ApplyDeath(World w, HudState s)
         {
-            bool dead = s.HasPlayer && !s.Alive && !s.Ended;
+            bool dead = s.HasPlayer && !s.Alive && !s.Ended && !(CriticalMass.Runtime.Flow.GameFlow.State == CriticalMass.Runtime.Flow.FlowState.Results);   // batch 5: the results screen hides the death layer
             if (dead && _wasAlive && s.HasPlayer)
                 _koWorld = SimSpace.ToWorld(s.PlayerX, GroundHeight.At(w.Map, s.PlayerX, s.PlayerZ) + 0.05, s.PlayerZ);
             _wasAlive = !dead;

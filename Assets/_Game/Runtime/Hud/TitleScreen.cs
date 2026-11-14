@@ -38,7 +38,10 @@ namespace CriticalMass.Runtime.Hud
         public MenuItem MainMenuItem => _toMenu;
         /// <summary>QUICK DEMO, the middle sticker.</summary>
         public MenuItem DemoItem => _demo;
-        MenuItem _playNow, _toMenu, _demo;
+        /// <summary>WATCH INTRO, top right: replays the story intro over the frozen title (story intro 2).</summary>
+        public MenuItem WatchIntroItem => _watch;
+        public const float WatchX = 1920f - 48f - 300f, WatchY = 40f, WatchW = 300f, WatchH = 60f;
+        MenuItem _playNow, _toMenu, _demo, _watch;
         float _t;
 
         public static TitleScreen Show(GameObject host, GameHud hud)
@@ -61,6 +64,8 @@ namespace CriticalMass.Runtime.Hud
             _canvas.worldCamera = cam;
             _canvas.planeDistance = cam != null ? Mathf.Max(0.45f, cam.nearClipPlane * 1.4f) : 0.45f;
             var root = (RectTransform)go.transform;
+            // perf-title-start: after the backdrop settles, it becomes a drifting still and its match pauses.
+            go.AddComponent<TitleBackdrop>().Canvas = _canvas;
 
             var wash = new GameObject("Wash", typeof(RectTransform)).AddComponent<ScreenVignette>();
             wash.gameObject.layer = 5;
@@ -123,9 +128,15 @@ namespace CriticalMass.Runtime.Hud
             _toMenu.Body.Radius = 18f;
             _toMenu.Body.RimPx = 3f;
             _toMenu.Submitted = Hide;
-            _playNow.navigation = new Navigation { mode = Navigation.Mode.Explicit, selectOnRight = _demo, selectOnLeft = _toMenu };
-            _demo.navigation = new Navigation { mode = Navigation.Mode.Explicit, selectOnLeft = _playNow, selectOnRight = _toMenu };
-            _toMenu.navigation = new Navigation { mode = Navigation.Mode.Explicit, selectOnLeft = _demo, selectOnRight = _playNow };
+            _watch = MenuUi.Item(sp, "Watch Intro", WatchX, WatchY, WatchW, WatchH, "WATCH INTRO", MenuItem.Kind.Button, UiScale.TypeButton, true,
+                CMTokens.Display);
+            _watch.Body.Radius = 14f;
+            _watch.Body.RimPx = 2f;
+            _watch.Submitted = PressWatchIntro;
+            _playNow.navigation = new Navigation { mode = Navigation.Mode.Explicit, selectOnRight = _demo, selectOnLeft = _toMenu, selectOnUp = _watch };
+            _demo.navigation = new Navigation { mode = Navigation.Mode.Explicit, selectOnLeft = _playNow, selectOnRight = _toMenu, selectOnUp = _watch };
+            _toMenu.navigation = new Navigation { mode = Navigation.Mode.Explicit, selectOnLeft = _demo, selectOnRight = _playNow, selectOnUp = _watch };
+            _watch.navigation = new Navigation { mode = Navigation.Mode.Explicit, selectOnDown = _playNow };
             PauseMenu.EnsureEventSystem(transform);
             if (EventSystem.current != null) EventSystem.current.SetSelectedGameObject(_playNow.gameObject);
 
@@ -183,16 +194,21 @@ namespace CriticalMass.Runtime.Hud
         }
 
         /// <summary>Canvas scale and logo resolution for the camera's current pixel size.</summary>
+        string _logoTier;
+
         public void UpdateScale()
         {
             UnityEngine.Camera cam = _canvas.worldCamera;
             float w = cam != null ? cam.pixelWidth : Screen.width, h = cam != null ? cam.pixelHeight : Screen.height;
             if (w < 1 || h < 1) return;
-            _canvas.scaleFactor = HudLayout.Scale(w, h);
+            float sf = HudLayout.Scale(w, h);
+            if (Mathf.Abs(_canvas.scaleFactor - sf) > 1e-4f) _canvas.scaleFactor = sf;   // a set re-lays the whole canvas
             string tier = _canvas.scaleFactor <= 1.01f ? "1x" : _canvas.scaleFactor <= 2.01f ? "2x" : "4x";
-            string want = "critical-mass-bible-logo@" + tier;
-            if (_logo.texture == null || _logo.texture.name != want)
+            // perf-60hz-32p: compare the tier, not texture.name (a native string copy every frame on the title).
+            if (_logo.texture == null || _logoTier != tier)
             {
+                _logoTier = tier;
+                string want = "critical-mass-bible-logo@" + tier;
                 _logo.texture = Resources.Load<Texture2D>("UI/Logo/" + want);
                 _glow.texture = Resources.Load<Texture2D>("UI/Logo/critical-mass-bible-logo-glow@" + tier);
             }
@@ -210,12 +226,13 @@ namespace CriticalMass.Runtime.Hud
             // Keep a focus for the keyboard and controller if the mouse cleared it.
             EventSystem es = EventSystem.current;
             GameObject sel = es != null ? es.currentSelectedGameObject : null;
-            if (es != null && sel != _playNow.gameObject && sel != _toMenu.gameObject && sel != _demo.gameObject)
+            if (es != null && sel != _playNow.gameObject && sel != _toMenu.gameObject && sel != _demo.gameObject && sel != _watch.gameObject)
                 es.SetSelectedGameObject(_playNow.gameObject);
             if (Confirm())
             {
                 if (sel == _toMenu.gameObject) Hide();
                 else if (sel == _demo.gameObject) PressDemo();
+                else if (sel == _watch.gameObject) PressWatchIntro();
                 else PressPlayNow();
             }
             else if (BackPressed()) Hide();
@@ -275,6 +292,13 @@ namespace CriticalMass.Runtime.Hud
             if (_canvas != null) Destroy(_canvas.gameObject);
             Destroy(this);
             Flow.PlayFlow.StartDemo();
+        }
+
+        /// <summary>WATCH INTRO: the story intro plays over the title (frozen underneath) and dissolves back into it.</summary>
+        public void PressWatchIntro()
+        {
+            if (_hidden || Menus.StoryIntro.IsPlaying) return;   // Enter reaches both Confirm and the button's submit
+            Menus.StoryIntro.Play();
         }
 
         /// <summary>View-only idle motion: a slow bob and the egg's seam glow breathing (no flashing, below 0.5 Hz).</summary>

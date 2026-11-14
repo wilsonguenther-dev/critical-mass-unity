@@ -15,6 +15,8 @@ namespace CriticalMass.Sim.Tests
     {
         private static GameConfig Cfg => DepthKit.Cfg();
 
+        /// <summary>The U-068 rotation with bridge collapse switched back on (it is off by default since 2026-11-13).</summary>
+        private static GameConfig WithCollapse => DepthKit.Cfg(d => d.Events.BridgeCollapse = true);
         private static GameConfig NoSchedule => DepthKit.Cfg(d => d.Events.FirstEventTicks = 1e8);
 
         [Test]
@@ -22,7 +24,7 @@ namespace CriticalMass.Sim.Tests
         {
             string Run(int seed)
             {
-                World w = DepthKit.Field(Cfg, ClassId.Warrior, 20, 40, seed);
+                World w = DepthKit.Field(WithCollapse, ClassId.Warrior, 20, 40, seed);
                 var sb = new System.Text.StringBuilder();
                 int head = w.EventHead;
                 for (int s = 0; s < 3; s++)
@@ -207,6 +209,32 @@ namespace CriticalMass.Sim.Tests
             Console.WriteLine("{\"item\":\"U-068\",\"events\":" + d.EventIndex + ",\"dropsClaimed\":" + d.DropsClaimed + ",\"eggWindows\":" + d.EggWindows + ",\"bridgesDown\":" + d.BridgesCollapsed + ",\"bridgesBack\":" + d.BridgesRepaired + ",\"falls\":" + falls + "}");
             Assert.GreaterOrEqual(d.EventIndex, 3);
             Assert.IsTrue(Terraform.PadsReachHill(w.Map));
+        }
+
+        /// <summary>
+        /// 2026-11-13 ("the bridges have random holes"): by default no scheduled event breaks a bridge. A 16v16 bot match of
+        /// 4 minutes (four events, so the bridge turn comes up) has no BridgeWarning or BridgeCollapsed, no span is
+        /// warned or broken at the end (digs and blasts may still change bridge cells; that is not an event); the
+        /// bridge turn is a quiet minute, the other kinds still run. Start(KindBridge) still works for the rule's tests.
+        /// </summary>
+        [Test]
+        public void ByDefaultNoScheduledEventBreaksABridgeTheBridgeTurnIsAQuietMinute()
+        {
+            Assert.IsFalse(GameConfig.CreateDefault().Depth.Events.BridgeCollapse, "off in the game's default config");
+            World w = DepthKit.Make(Cfg, ClassId.Warrior, 7, 16);
+            int warn = 0, down = 0, drops = 0;
+            DepthKit.RunBots(w, 7200, e =>
+            {
+                if (e.Type == SimEventType.BridgeWarning) warn++;
+                if (e.Type == SimEventType.BridgeCollapsed) down++;
+                if (e.Type == SimEventType.SupplyDropIncoming) drops++;
+            });
+            Assert.GreaterOrEqual(w.Depth.EventIndex, 4, "the schedule ran (four events cover the three-kind rotation)");
+            Assert.AreEqual(0, warn, "no bridge warning");
+            Assert.AreEqual(0, down, "no bridge collapse");
+            Assert.AreEqual(0, w.Depth.BridgesCollapsed);
+            Assert.AreEqual(MapEvents.BridgeNone, w.Depth.BridgeState, "no span warned or broken at the end");
+            Assert.Greater(drops, 0, "the other kinds still run (a supply drop came)");
         }
     }
 }

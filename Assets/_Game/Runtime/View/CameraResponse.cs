@@ -153,7 +153,7 @@ namespace CriticalMass.Runtime.View.Reactions
             float ms = Mathf.Lerp(60f, 180f, felt);
             _rumbleUntil = Mathf.Max(_rumbleUntil, Time.unscaledTime + ms / 1000f);
             Gamepad pad = Gamepad.current;
-            if (pad == null) return;
+            if (pad == null || !CriticalMass.Runtime.Input.ControllerSettings.Vibration) return;   // controls-1: Settings, Controller, Vibration
             float scale = ReactionBudget.MotionScale < 1f ? 0.5f : 1f;
             pad.SetMotorSpeeds(Mathf.Clamp01(felt) * scale, (big ? 0.35f : 0.6f) * felt * scale);
             _rumbling = true;

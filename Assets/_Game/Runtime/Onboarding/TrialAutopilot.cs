@@ -135,6 +135,28 @@ namespace CriticalMass.Runtime.Onboarding
                 case TrialGoal.Dig:
                     frame.Terraform = (w.Tick & 15) == 0;
                     return;
+                case TrialGoal.Topple:
+                {
+                    // Creator acceptance: stand on the side opposite the ramp direction and swing at the pillar (it falls
+                    // away from the attacker, so this always makes the ramp).
+                    int k = TrialChecks.PillarFor(w, a.Team);
+                    if (k < 0) return;
+                    DecorationDef d = w.Map.Decorations[k];
+                    double bx = d.Cx + 0.5, bz = d.Cz + 0.5;
+                    double sx = bx - d.Ramp.Dx * 1.5, sz = bz - d.Ramp.Dz * 1.5;
+                    if (TrialChecks.Dist2(px, pz, sx, sz) > 0.6 * 0.6) WalkTo(w, sx, sz, 0, frame);
+                    else
+                    {
+                        frame.AimX = bx;
+                        frame.AimZ = bz;
+                        frame.Attack = true;
+                    }
+                    return;
+                }
+                case TrialGoal.ReachTarget:
+                case TrialGoal.CrossBridge:
+                    if (has) WalkTo(w, tx, tz, 0, frame);
+                    return;
                 case TrialGoal.Place:
                     if (!has) return;
                     if (TrialChecks.Dist2(px, pz, tx, tz) > 1.5 * 1.5) WalkTo(w, tx, tz, 1.2, frame);

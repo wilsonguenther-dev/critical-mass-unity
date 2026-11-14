@@ -41,6 +41,13 @@ namespace CriticalMass.Runtime.View.Effects
         // ---- palette (sRGB; three flat tone steps per material, Void Navy outline) ----
         public static readonly Color32 Navy = new Color32(24, 35, 59, 255);
         public static readonly Color32 BloodLight = new Color32(214, 52, 60, 255), BloodMid = new Color32(150, 18, 34, 255), BloodDark = new Color32(88, 8, 20, 255);
+        // World around arena 1 (2026-11-13): marks left ON THE GROUND by hits and knock-outs (splats, drips, the stamped
+        // paint) are a neutral dark ink, not red. Red ground paint read as "Crimson team" under every fight, which breaks
+        // the bible's reserved-hue rule (art direction 2026-11-12: ground decals for hits and knock-outs are neutral marks
+        // in Void Navy, never red, never Azure or Crimson). Low chroma (under 0.03 OKLab), hue of Void Navy, drawn at
+        // GroundInkAlpha so the ground shows through and the marks stay quieter than the fighters.
+        public static readonly Color32 GroundInkLight = new Color32(104, 104, 118, 255), GroundInkMid = new Color32(64, 66, 82, 255), GroundInkDark = new Color32(38, 42, 58, 255);
+        public const float GroundInkAlpha = 0.72f;
         public static readonly Color32 SparkWhite = new Color32(255, 251, 236, 255), SparkYellow = new Color32(255, 214, 72, 255), SparkOrange = new Color32(255, 150, 40, 255);
         public static readonly Color32 Steel = new Color32(196, 210, 226, 255);
         public static readonly Color32 DustLight = new Color32(247, 240, 229, 255), DustMid = new Color32(214, 202, 184, 255), DustDark = new Color32(158, 146, 132, 255);
@@ -928,7 +935,9 @@ namespace CriticalMass.Runtime.View.Effects
             if (k.TelegraphIn > 0)
             {
                 float R = (float)_cfg.Kaiju.SlamRadius;
-                float p = 1f - (float)(k.TelegraphIn / _cfg.Kaiju.SlamTelegraphSeconds);
+                // fix/kaiju-alive-1: the fill runs over the sim's real telegraph (floored to KaijuSlamMinRealSeconds at the
+                // pace), not the config's 1.2 s: at pace 2 the disc stayed empty for the first quarter of the warning.
+                float p = Mathf.Clamp01(1f - (float)(k.TelegraphIn / Telegraphs.SlamTotalSim(w)));
                 double h = Ground(k.TelegraphX, k.TelegraphZ);
                 Vector3 c = W(k.TelegraphX, h + 0.04, k.TelegraphZ);
                 float pulse = 0.75f + 0.25f * (FeelGate.Pulse(now, PaceNow, SlamPulseHz) * 2f - 1f) * (FeelGate.ReduceFlashing ? 0.4f : 1f);
@@ -941,6 +950,14 @@ namespace CriticalMass.Runtime.View.Effects
                     float a = s * Mathf.PI / 4f + (float)now * 0.6f;
                     ground.Ring(c, gr, gu, R * p - 0.12f, R * p + 0.02f, a, a + 0.42f, 6, A(Navy, 0.6f));
                 }
+                // feat/ground-camera: from a low camera a ground ring is a thin line; a fading wall on the hitbox edge keeps
+                // the slam readable at a grazing angle (the shape stays the hitbox: radius R exactly).
+                if (CriticalMass.Runtime.Camera.GroundView.IsActive) Fence(air, c, R, 0f, Mathf.PI * 2f, 40, 1.6f, A(WarnHot, 0.55f * pulse));
+            }
+            if (k.MeleeWindupIn > 0 && CriticalMass.Runtime.Camera.GroundView.IsActive)
+            {
+                double kx = k.PrevX + (k.X - k.PrevX) * Alpha, kz = k.PrevZ + (k.Z - k.PrevZ) * Alpha;
+                Fence(air, W(kx, Ground(kx, kz) + 0.05, kz), (float)(_cfg.Kaiju.MeleeRange + Kaiju.MeleeLeash), 0f, Mathf.PI * 2f, 36, 1.0f, A(WarnHot, 0.4f));
             }
             if (k.MeleeWindupIn > 0) DrawMeleeTelegraph(w, ground, now);
             else DrawPreWarnings(w, ground);
@@ -981,7 +998,8 @@ namespace CriticalMass.Runtime.View.Effects
             Kaiju k = w.Kaiju;
             Vector3 gr = Vector3.right, gu = Vector3.forward;
             float reach = (float)(_cfg.Kaiju.MeleeRange + Kaiju.MeleeLeash);
-            float p = Telegraphs.MeleeProgress(k.MeleeWindupIn, _cfg.Kaiju.MeleeWindupTicks, Alpha);
+            // fix/kaiju-alive-1: over the wind-up's real length (MeleeWindupLen, floored to 0.45 real s), not the config's 11 ticks.
+            float p = Telegraphs.MeleeProgress(k.MeleeWindupIn, k.MeleeWindupLen > 0 ? k.MeleeWindupLen : _cfg.Kaiju.MeleeWindupTicks, Alpha);
             float pulse = 0.7f + 0.3f * FeelGate.Pulse(now, PaceNow, MeleePulseHz) * (FeelGate.ReduceFlashing ? 0.4f : 1f);
             double kx = k.PrevX + (k.X - k.PrevX) * Alpha, kz = k.PrevZ + (k.Z - k.PrevZ) * Alpha;
             Vector3 c = W(kx, Ground(kx, kz) + 0.05, kz);
@@ -1030,6 +1048,25 @@ namespace CriticalMass.Runtime.View.Effects
                     float a = s * Mathf.PI / 8f;
                     ground.Ring(c, gr, gu, R - 0.1f, R + 0.02f, a, a + 0.26f, 4, A(WarnHot, 0.32f));
                 }
+            }
+        }
+
+        /// <summary>
+        /// feat/ground-camera: a vertical band standing on a ground circle (centre c, radius r, angles a0..a1), colour at the
+        /// foot fading to clear at height h: the telegraph's vertical element for the low ground camera.
+        /// </summary>
+        private static void Fence(FxMeshBuilder b, Vector3 c, float r, float a0, float a1, int seg, float h, Color32 col)
+        {
+            Color32 top = col;
+            top.a = 0;
+            float step = (a1 - a0) / seg;
+            for (int i = 0; i < seg; i++)
+            {
+                float a = a0 + (i + 0.5f) * step;
+                Vector3 radial = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a));
+                Vector3 tangent = new Vector3(-Mathf.Sin(a), 0f, Mathf.Cos(a));
+                Vector3 mid = c + radial * r + Vector3.up * (h * 0.5f);
+                b.Quad(mid, tangent * (r * step * 0.5f * 1.02f), Vector3.up * (h * 0.5f), col, top);
             }
         }
 

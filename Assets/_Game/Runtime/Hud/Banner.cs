@@ -270,7 +270,7 @@ namespace CriticalMass.Runtime.Hud
             _group.interactable = false;
             _group.blocksRaycasts = false;
 
-            _root = Rect(go.transform, "Banner", new Vector2(0.5f, 1f), new Vector2(0f, -CentreFromTop), new Vector2(Width, Height));
+            _root = Rect(FeedUi.SafeRoot(go.transform), "Banner", new Vector2(0.5f, 1f), new Vector2(0f, -CentreFromTop), new Vector2(Width, Height));
             for (int i = 0; i < _shards.Length; i++)
             {
                 _shards[i] = Shape(_root, "Shard " + i, ShapeKind.Diamond, ShardAt[i], new Vector2(i % 2 == 0 ? 34f : 24f, i % 2 == 0 ? 52f : 38f), CMTokens.Corruption.Color);
@@ -299,6 +299,7 @@ namespace CriticalMass.Runtime.Hud
             _headlineOutline = _headline.GetComponent<TextOutline>();
             _reason = HudText.Make(_root, "Reason", CMTokens.Ui, UiScale.TypeButton, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 2.5f);
             Centre(_reason.rectTransform, new Vector2(20f, -36f), new Vector2(Width - 300f, 36f));
+            CriticalMass.Runtime.Menu.MenuUi.Fit(_reason, 18);   // owner walk 1: a long reason shrinks to one line instead of spilling past the plate
             go.SetActive(false);
         }
 

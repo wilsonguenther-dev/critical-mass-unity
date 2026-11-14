@@ -58,6 +58,9 @@ namespace CriticalMass.Runtime.Audio
         public const float LiftGain = 1f;
         public const float ResultsGain = 0.5f;
         public const float DuckGain = 0.55f;
+        /// <summary>Story film mix, set by StoryIntro while the intro plays (defaults leave the music untouched): the music bed
+        /// level under the film and how deep the narration duck goes.</summary>
+        public static float FilmBed = 1f, FilmDuck = DuckGain;
         public const float PauseGain = 0.5f;
         public const double FinalMinuteSeconds = 60;
 
@@ -180,7 +183,9 @@ namespace CriticalMass.Runtime.Audio
             _lookupFrames = 0;
         }
 
-        void Update()
+        void Update() { var cost = CriticalMass.Runtime.Game.FrameCost.Enter(); UpdateCost(); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.Sound, cost); }
+
+        void UpdateCost()
         {
             float now = Time.unscaledTime;
             float dt = Mathf.Min(Time.unscaledDeltaTime, 0.1f);
@@ -209,7 +214,7 @@ namespace CriticalMass.Runtime.Audio
             // Gain: smooth toward the state's gain, the voice duck and the pause duck (attack 0.15 s, release 0.4 s).
             float target = GainFor(_state, w);
             _gain = Mathf.MoveTowards(_gain, target, dt / 0.6f);
-            float duckTarget = (now < _duckUntil ? DuckGain : 1f) * (paused ? PauseGain : 1f);
+            float duckTarget = (now < _duckUntil ? FilmDuck : 1f) * FilmBed * (paused ? PauseGain : 1f);
             float rate = duckTarget < _duck ? dt / 0.15f : dt / 0.4f;
             _duck = Mathf.MoveTowards(_duck, duckTarget, rate);
 
@@ -259,6 +264,24 @@ namespace CriticalMass.Runtime.Audio
                     break;
             }
             StateChanged?.Invoke(prev, next);
+        }
+
+        /// <summary>Story intro 3: the intro film's own soundtrack crossfades into music-title.ogg over its last 1.5 s at
+        /// exactly the level the title plays it; on the film's last frame this continues the title loop from the same sample
+        /// offset at full level, so the hand-off has no seam, no dip and no pop. Outside the title (a replay from a match's
+        /// pause menu) it only restores the music bed.</summary>
+        public static void ResumeTitleAt(float seconds)
+        {
+            FilmBed = 1f;
+            MusicDirector m = Instance;
+            if (m == null) return;
+            AudioSource cur = m._loops[m._cur];
+            AudioClip title = m._tracks[(int)MusicState.Title];
+            bool settled = Time.unscaledTime - m._fadeStart >= m._fadeLen;
+            if (title == null || cur.clip != title || !cur.isPlaying || !settled) return;
+            cur.time = Mathf.Repeat(Mathf.Max(0f, seconds), title.length);
+            m._duck = Time.unscaledTime < _duckUntil ? FilmDuck : 1f;
+            cur.volume = m._gain * m._duck;
         }
 
         /// <summary>Crossfades to clip (null = fade to silence). The same clip already playing just keeps playing.</summary>

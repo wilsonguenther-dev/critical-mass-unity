@@ -293,8 +293,8 @@ namespace CriticalMass.Runtime.View.Effects
                 float fade = (float)Math.Min(1.0, (life - age) / (life * 0.3));
                 Vector3 c = d.P + Vector3.up * 0.032f;
                 float grow = Mathf.Clamp01((float)(age / S(0.05)));
-                ground.Blob(c, gr, gu, d.Size * grow + 0.022f, null, 6, d.Seed * 0.01f, A(Navy, fade * 0.9f));
-                ground.Blob(c, gr, gu, d.Size * grow, null, 6, d.Seed * 0.01f, A(BloodMid, fade));
+                ground.Blob(c, gr, gu, d.Size * grow + 0.022f, null, 6, d.Seed * 0.01f, A(Navy, fade * 0.55f));
+                ground.Blob(c, gr, gu, d.Size * grow, null, 6, d.Seed * 0.01f, A(GroundInkMid, fade * GroundInkAlpha));
             }
         }
 
@@ -326,12 +326,12 @@ namespace CriticalMass.Runtime.View.Effects
 
         private void Dot(FxMeshBuilder g, Vector3 p, Vector3 gr, Vector3 gu, float r, float fade)
         {
-            g.Blob(p, gr, gu, r + 0.025f, null, 7, 0, A(Navy, fade * 0.9f));
-            g.Blob(p, gr, gu, r, null, 7, 0, A(BloodMid, fade));
+            g.Blob(p, gr, gu, r + 0.025f, null, 7, 0, A(Navy, fade * 0.55f));
+            g.Blob(p, gr, gu, r, null, 7, 0, A(GroundInkMid, fade * GroundInkAlpha));
         }
 
         /// <summary>
-        /// The seven splat shapes, every one outlined in navy with mid, dark and light reds (at most 130 vertices):
+        /// The seven splat shapes, every one outlined in navy with mid, dark and light ground ink (at most 130 vertices):
         /// 0 round splat with satellites, 1 teardrop streak along the flight, 2 crown (spiky), 3 cluster of three lobes,
         /// 4 smear (a dragged stroke with round ends), 5 spatter fan, 6 the knock-out pool (big lobed puddle).
         /// </summary>
@@ -341,7 +341,8 @@ namespace CriticalMass.Runtime.View.Effects
             Vector3 dv = gr * Mathf.Cos(d.DirA) + gu * Mathf.Sin(d.DirA);
             Vector3 pv = gr * -Mathf.Sin(d.DirA) + gu * Mathf.Cos(d.DirA);
             uint sd = d.Seed;
-            Color32 navy = A(Navy, fade * 0.9f), mid = A(BloodMid, fade), dark = A(BloodDark, fade), light = A(BloodLight, fade);
+            // Neutral ground ink (world around arena 1), never a team hue.
+            Color32 navy = A(Navy, fade * 0.55f), mid = A(GroundInkMid, fade * GroundInkAlpha), dark = A(GroundInkDark, fade * GroundInkAlpha), light = A(GroundInkLight, fade * GroundInkAlpha);
             switch (d.Shape)
             {
                 case 1:

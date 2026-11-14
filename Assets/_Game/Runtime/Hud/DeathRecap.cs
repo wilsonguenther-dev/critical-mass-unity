@@ -16,7 +16,13 @@ namespace CriticalMass.Runtime.Hud
     /// </summary>
     public sealed class DeathRecap : MonoBehaviour
     {
-        public const float CardW = 820f, CardH = 156f, OffsetY = -190f, PopSeconds = 0.2f;
+        public const float CardW = 820f, CardH = 156f, PopSeconds = 0.2f;
+        /// <summary>
+        /// Owner walk 1: the card's top, reference px. It lives in the centre lane under the clock (it takes the lane at Recap
+        /// priority, so a banner waits and the job line steps back). It used to sit in the lower lane, where the respawn
+        /// class tiles drew straight over it.
+        /// </summary>
+        public const float TopY = HudZones.CalloutTop + (HudZones.CalloutH - CardH) * 0.5f;
 
         public Canvas Canvas { get; private set; }
         public bool IsOpen { get; private set; }
@@ -47,7 +53,7 @@ namespace CriticalMass.Runtime.Hud
             if (Canvas != null) return;
             KillWords.Init(null);
             Canvas = FeedUi.MakeCanvas(transform, "Death Recap Canvas", 12);
-            _card = FeedUi.Anchored(Canvas.transform, "Death Recap", new Vector2(0.5f, 0.5f), 0f, OffsetY, CardW, CardH);
+            _card = FeedUi.Anchored(Canvas.transform, "Death Recap", new Vector2(0.5f, 1f), 0f, -TopY, CardW, CardH);
             _group = _card.gameObject.AddComponent<CanvasGroup>();
             _group.blocksRaycasts = false;
             _group.interactable = false;
@@ -101,7 +107,7 @@ namespace CriticalMass.Runtime.Hud
             bool hide = _log == null || _log.Suppressed;
             if (Canvas.enabled == hide) Canvas.enabled = !hide;
             if (!IsOpen) return;
-            if (!hide) HudZones.Hold(HudZone.Lower, HudPriority.Recap);
+            if (!hide) HudZones.Hold(HudZone.Callout, HudPriority.Recap);
             World w = _log != null && _log.Driver != null ? _log.Driver.World : null;
             int local = _log != null ? _log.LocalActor : HudBinder.LocalActor;
             if (w != null && (w.Match.Phase == MatchPhase.Ended || (local < w.ActorCount && w.Actors[local].Alive))) { Hide(); return; }

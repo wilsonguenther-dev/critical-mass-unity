@@ -28,6 +28,16 @@ namespace CriticalMass.Runtime.Input
     /// Update samples the devices BEFORE SimDriverBehaviour.Update steps the sim in the same frame, so a key press reaches
     /// the next tick with no extra frame of delay (the two scripts had the same order, which Unity leaves unspecified).</para>
     /// </summary>
+    /// <para>controls-1 (owner, 2026-11-13): three live schemes, last device wins, no setting. Keyboard only: Attack J / Z,
+    /// ability K / X, jump SPACE / C (the left hand on W A S D, or the right hand on the arrows) and the fighter faces where
+    /// it moves (AimResolver.Mode.Keys: last facing kept standing still, LockFacing L / L SHIFT holds it to strafe, target
+    /// assist toward the nearest enemy in a 30 degree cone within 7 units). The mouse takes the aim back the moment it
+    /// moves or clicks; a keyboard attack or ability key with the mouse resting ControlBindings.MouseIdleSeconds hands it
+    /// to the keys again. A controller stick takes it as before. Walk to pointer only acts while the mouse aims, lock
+    /// facing only while the keys aim, so the two may share L SHIFT. Every result reaches the sim as an aim point
+    /// (State.SetAim), so the sim input path is unchanged.</para>
+    /// <para>Controller settings (ControllerSettings: dead zone, sensitivity, invert aim Y) shape the stick values here,
+    /// view side, before they become a move intent or an aim direction.</para>
     [DefaultExecutionOrder(-100)]
     public sealed class HumanInputSource : MonoBehaviour
     {
@@ -44,6 +54,14 @@ namespace CriticalMass.Runtime.Input
         private InputAction _point;
         private InputAction _aim;
         private InputAction _walk;
+        private InputAction _lock;
+        private bool _keyAimPressed;
+        private bool _wasAlive;
+        private double[] _enemyX = new double[64];
+        private double[] _enemyZ = new double[64];
+
+        /// <summary>LockFacing is held and the keys aim (tests).</summary>
+        public bool FacingLocked { get; private set; }
 
         /// <summary>Which device aims and the controller aim point (view side).</summary>
         public AimResolver Aim { get; } = new AimResolver();
@@ -71,6 +89,14 @@ namespace CriticalMass.Runtime.Input
             _switchDigPlace = map.FindAction("SwitchDigPlace");
             _switchWasActive = false;
             _walk = map.FindAction("MoveToPointer", false);
+            _lock = map.FindAction("LockFacing", false);
+            _keyAimPressed = false;
+            // controls-1: the match starts with the scheme the player used last (keyboard only until the mouse is used).
+            // Every match starts in the remembered layout's scheme (keys and mouse when none was picked).
+            ControlPresets.StartOfMatch();
+            ControlScheme scheme = ControlBindings.ActiveScheme;
+            Aim.SetMode(scheme == ControlScheme.Gamepad ? AimResolver.Mode.Stick
+                : scheme == ControlScheme.Keyboard ? AimResolver.Mode.Keys : AimResolver.Mode.Pointer);
             ReadSettings();
             GameSettings.Changed += ReadSettings;
             for (int i = 0; i < ButtonActions.Length; i++)
@@ -78,9 +104,22 @@ namespace CriticalMass.Runtime.Input
                 B b = Buttons[i];
                 InputAction a = map[ButtonActions[i]];
                 _actions[i] = a;
-                _started[i] = _ =>
+                _started[i] = ctx =>
                 {
                     if (b == B.Pause && PauseHandler != null && PauseHandler()) return;
+                    // controls-1: a keyboard attack or ability key may hand the aim to the keys; any named key sets the hand.
+                    if (ctx.control != null && ctx.control.device is Keyboard)
+                    {
+                        if (b == B.Attack || b == B.Ability) _keyAimPressed = true;
+                        KeyboardHand? hand = ControlBindings.HandOf(ctx.action, ctx.control);
+                        if (hand.HasValue) ControlBindings.SetHand(hand.Value);
+                    }
+                    else if (ctx.control != null && ctx.control.device is Mouse && (b == B.Attack || b == B.Ability))
+                    {
+                        // A click aims with the mouse at once, even when the press lands in a frame Sample does not see.
+                        ControlBindings.NoteMouseUsed();
+                        Aim.NotePointer();
+                    }
                     State.ButtonDown(b);
                 };
                 _canceled[i] = _ => State.ButtonUp(b);
@@ -115,12 +154,16 @@ namespace CriticalMass.Runtime.Input
             _aim = null;
             _switchDigPlace = null;
             _walk = null;
+            _lock = null;
+            FacingLocked = false;
         }
 
         private void Update()
         {
             if (_map == null) return;
             var m = _move.ReadValue<Vector2>();
+            bool padMove = m.sqrMagnitude > 0f && _move.activeControl != null && _move.activeControl.device is Gamepad;
+            if (padMove) m = ControllerSettings.ShapeMove(m);
             // DG-09 (U-053): a wheel notch or a bumper press flips the miner's dig / place mode. The axis goes non-zero for a
             // scroll frame or while a bumper is held; only the rising edge counts, so a held bumper switches once.
             if (_switchDigPlace != null)
@@ -133,24 +176,84 @@ namespace CriticalMass.Runtime.Input
             }
             bool fromKeys = m.sqrMagnitude > 0f && _move.activeControl != null && _move.activeControl.device is Keyboard;
             State.SetMove(m.x, m.y, fromKeys);
-            bool walk = _walk != null && _walk.IsPressed();
-            State.SetPointerWalk(walk);
+            bool arrowsMove = false;
+            if (fromKeys)
+            {
+                KeyboardHand? hand = ControlBindings.HandOf(_move, _move.activeControl);
+                if (hand.HasValue) ControlBindings.SetHand(hand.Value);
+                // controls-1 (owner 2026-11-13): moving on the arrows means the right hand is on the arrows, not the mouse,
+                // so the prompts and the tutorial switch to Z X C at once (not after the first attack). Not in the
+                // LEFT-HANDED layout, where the mouse is in the left hand while the right hand moves on the arrows.
+                arrowsMove = hand == KeyboardHand.Arrows && !ControlPresets.LeftHandedActive;
+            }
 
-            // Which device aims: the one used last (mouse movement or click vs a controller stick).
+            // Which device aims: the one used last (mouse movement or click, a controller stick, or a keyboard attack key
+            // with the mouse resting).
             ControlBindings.Sample();
-            Vector2 stick = _aim != null ? _aim.ReadValue<Vector2>() : Vector2.zero;
-            bool moveByPad = m.sqrMagnitude > 0f && _move.activeControl != null && _move.activeControl.device is Gamepad;
+            Vector2 stick = _aim != null ? ControllerSettings.ShapeAim(_aim.ReadValue<Vector2>()) : Vector2.zero;
+            bool moveByPad = padMove;
+            bool keyAim = _keyAimPressed || (_lock != null && _lock.WasPressedThisFrame() && _lock.activeControl != null &&
+                                             _lock.activeControl.device is Keyboard && !(_walk != null && _walk.IsPressed() && Aim.Current == AimResolver.Mode.Pointer));
+            _keyAimPressed = false;
             if (stick.sqrMagnitude > 0f || moveByPad) Aim.NoteStick();
             else if (Mouse.current != null && ControlBindings.MouseUsed(Mouse.current)) Aim.NotePointer();
+            else if ((keyAim || (arrowsMove && Aim.Current == AimResolver.Mode.Pointer)) && ControlBindings.MouseIdleFor >= ControlBindings.MouseIdleSeconds)
+            {
+                Aim.NoteKeys();
+                ControlBindings.SetKeyboardOnly(true);
+            }
+            else if (fromKeys && Aim.Current == AimResolver.Mode.Stick)
+            {
+                // Back from the controller to the keys: the keyboard scheme the player had before.
+                Aim.SetMode(ControlBindings.KeyboardOnly ? AimResolver.Mode.Keys : AimResolver.Mode.Pointer);
+            }
+
+            // Walk to pointer acts only while the mouse aims (it shares L SHIFT with lock facing, which acts only while
+            // the keys aim).
+            bool walk = _walk != null && _walk.IsPressed() && Aim.Current == AimResolver.Mode.Pointer;
+            State.SetPointerWalk(walk);
+            FacingLocked = _lock != null && _lock.IsPressed() && Aim.Current == AimResolver.Mode.Keys;
 
             if (_driver == null) _driver = GetComponent<SimDriverBehaviour>();
             World w = _driver != null ? _driver.World : null;
             State.BindWorld(w);
+            // feat/ground-camera (experimental CAMERA: GROUND): the keys and the left stick move relative to the ground camera,
+            // and the aim is the point ahead along its facing at the reticle's ground distance. Same InputFrame fields as
+            // ever (a world-space move and a ground aim point): no Sim change, determinism untouched.
+            if (CriticalMass.Runtime.Camera.GroundView.PlayActive && w != null && w.ActorCount > 0)
+            {
+                CriticalMass.Runtime.Camera.GroundCamera.Basis(CriticalMass.Runtime.Camera.GroundView.PlayYaw,
+                    out double gux, out double guz, out double grx, out double grz);
+                State.SetCameraBasis(gux, guz, grx, grz);
+                State.SetPointerWalk(false);
+                State.ClearWalkTarget();
+                FacingLocked = false;
+                if (CriticalMass.Runtime.Camera.GroundView.TryPlayAim(w, out double gax, out double gaz)) State.SetAim(gax, gaz);
+                else State.ClearAim();
+                return;
+            }
+            State.ClearCameraBasis();
             // UnityEngine.Camera spelled out: CriticalMass.Runtime.Camera (F-08b) is a namespace and would shadow it.
             UnityEngine.Camera cam = UnityEngine.Camera.main;
             // Pointer walking reads the cursor's ground point whichever device aims.
             if (walk && Mouse.current != null && cam != null && PointerGround(cam, w, out double wx, out double wz)) State.SetWalkTarget(wx, wz);
             else State.ClearWalkTarget();
+            if (Aim.Current == AimResolver.Mode.Keys)
+            {
+                if (w != null && w.ActorCount > 0)
+                {
+                    // A respawn faces the hill (Respawn.cs); the keyboard facing starts again from there.
+                    bool alive = w.Actors[0].Alive;
+                    if (alive && !_wasAlive) Aim.ForgetKeysDirection();
+                    _wasAlive = alive;
+                    State.MoveDirection(out double dx, out double dz);
+                    int n = CollectEnemies(w);
+                    Aim.ResolveKeys(dx, dz, w.X[0], w.Z[0], w.Actors[0].Facing, FacingLocked, _enemyX, _enemyZ, n, out double kx, out double kz);
+                    State.SetAim(kx, kz);
+                }
+                else State.ClearAim();
+                return;
+            }
             if (Aim.Current == AimResolver.Mode.Stick)
             {
                 if (w != null && w.ActorCount > 0 && Aim.ResolveStick(stick.x, stick.y, m.x, m.y, w.X[0], w.Z[0], out double ax, out double az))
@@ -166,6 +269,27 @@ namespace CriticalMass.Runtime.Input
             }
             if (PointerGround(cam, w, out double sx, out double sz)) State.SetAim(sx, sz);
             else State.ClearAim();
+        }
+
+        /// <summary>Living actors of the other team, positions copied for the keyboard target assist (read-only).</summary>
+        private int CollectEnemies(World w)
+        {
+            if (_enemyX.Length < w.ActorCount)
+            {
+                _enemyX = new double[w.ActorCount];
+                _enemyZ = new double[w.ActorCount];
+            }
+            var me = w.Actors[0].Team;
+            int n = 0;
+            for (int i = 1; i < w.ActorCount; i++)
+            {
+                var a = w.Actors[i];
+                if (a == null || !a.Alive || a.Team == me) continue;
+                _enemyX[n] = w.X[i];
+                _enemyZ[n] = w.Z[i];
+                n++;
+            }
+            return n;
         }
 
         /// <summary>The sim ground point under the pointer (false when the ray misses).</summary>

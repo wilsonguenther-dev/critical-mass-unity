@@ -16,46 +16,56 @@ using UnityEngine.UI;
 namespace CriticalMass.Runtime.Menus
 {
     /// <summary>
-    /// The one-screen controls card (DG-14): every game action with its key glyphs, read from the CURRENT bindings (after
-    /// rebinding) through ControlBindings, for the device used last (keyboard and mouse, or controller), with the line
-    /// "Change these in Settings, Controls" under it. A widget: the loading screen embeds one, ControlsCardScreen shows
-    /// one on its own. It redraws only when the device or a binding changes (events), never per frame.
+    /// The controls card (DG-14; controls-1 three schemes): every game action with its keys, read from the CURRENT bindings
+    /// (after rebinding) through ControlBindings. Wide (w &gt;= 1100, the Controls screen): one table with a column per way
+    /// to play: KEYBOARD with the left hand on W A S D, KEYBOARD with the right hand on the arrows, KEYBOARD AND MOUSE, and
+    /// CONTROLLER, the column in use lit in brass. Narrow (the loading screen): the scheme in use only, two chips a line.
+    /// "Change these in Settings, Controls" under it. Redraws only when the device or a binding changes (events).
     /// </summary>
     public sealed class ControlsCard
     {
         public const string Footer = "Change these in Settings, Controls";
+        public const float WideMin = 1100f;
 
-        /// <summary>One card line: a label and the ControlBindings rows whose slots it shows (Move merges four rows).</summary>
+        /// <summary>The table's columns (wide card) in screen order.</summary>
+        public enum Col { Wasd = 0, Arrows = 1, Mouse = 2, Pad = 3 }
+        public static readonly string[] ColHeads = { "KEYS: W A S D HAND", "KEYS: ARROW HAND", "KEYS AND MOUSE", "CONTROLLER" };
+
         sealed class Line
         {
             public string Label;
             public int[] Rows;
             public Text Name;
-            public readonly Text[] Keys = new Text[2];
-            public readonly VectorShape[] Chips = new VectorShape[2];
+            public readonly Text[] Keys = new Text[4];
+            public readonly VectorShape[] Chips = new VectorShape[4];
         }
 
         public readonly RectTransform Root;
         public readonly VectorShape Body;
         public ControlDevice Device { get; private set; }
+        public ControlScheme Scheme { get; private set; }
+        public bool Wide { get; }
         readonly List<Line> _lines = new List<Line>();
+        readonly Text[] _heads = new Text[4];
         Text _device;
-        readonly float _chipW;
 
         static Color Navy => CMTokens.VoidNavy.Color;
         static Color Cream => CMTokens.WarmCream.Color;
         static Color Brass => CMTokens.ToolBrass.Color;
 
-        ControlsCard(RectTransform root, VectorShape body, float chipW)
+        ControlsCard(RectTransform root, VectorShape body, bool wide)
         {
             Root = root;
             Body = body;
-            _chipW = chipW;
+            Wide = wide;
         }
 
-        /// <summary>Card lines in screen order: label and the indices into ControlBindings.Rows.</summary>
+        /// <summary>Card lines in screen order (labels of ControlBindings.Rows; Move merges the four move rows).</summary>
         public static readonly string[] LineLabels =
-            { "Move", "Aim", "Attack", "Class ability", "Jump", "Interact / carry", "Dig / place", "Switch dig / place", "Scoreboard", "Pause menu" };
+        {
+            "Move", "Aim", "Lock facing (hold)", "Attack", "Class ability", "Jump", "Interact / carry", "Dig / place",
+            "Switch dig / place", "Ping wheel", "Scoreboard", "Full map", "Base station", "Pause menu",
+        };
 
         static int[] RowsFor(string label)
         {
@@ -69,140 +79,227 @@ namespace CriticalMass.Runtime.Menus
             return -1;
         }
 
-        /// <summary>Builds a card at (x, y) from parent's top-left (1920x1080 reference units); two columns when w &gt;= 900.</summary>
+        /// <summary>Builds a card at (x, y) from parent's top-left (1920x1080 reference units); the table when w &gt;= WideMin.</summary>
         public static ControlsCard Build(Transform parent, float x, float y, float w, float h, string name = "Controls Card")
         {
             VectorShape body = MenuUi.Panel(parent, name, x, y, w, h);
-            bool two = w >= 900f;
-            float pad = 32f, colGap = 40f;
-            float colW = two ? (w - pad * 2f - colGap) * 0.5f : w - pad * 2f;
-            float chipW = Mathf.Min(150f, (colW - 210f - 10f) * 0.5f);
-            var card = new ControlsCard(body.rectTransform, body, chipW);
+            bool wide = w >= WideMin;
+            float pad = 32f;
+            var card = new ControlsCard(body.rectTransform, body, wide);
             RectTransform rt = body.rectTransform;
-            MenuUi.Label(rt, "Title", CMTokens.Display, two ? 44 : 34, Cream, TextAnchor.MiddleLeft, pad, 22f, w * 0.5f, 56f, "CONTROLS", 4f);
-            card._device = MenuUi.Label(rt, "Device", CMTokens.Ui, two ? 22 : 18, Brass, TextAnchor.MiddleRight, w * 0.45f, 22f, w * 0.55f - pad, 56f, "", 2f);
-            VectorShape rule = MenuUi.Shape(rt, "Rule", ShapeKind.RoundRect, pad, 86f, w - pad * 2f, 4f, CMTokens.WithAlpha(Cream, 0.35f), 2f);
+            MenuUi.Label(rt, "Title", CMTokens.Display, wide ? 40 : 34, Cream, TextAnchor.MiddleLeft, pad, 18f, w * 0.5f, 52f, "CONTROLS", 4f);
+            card._device = MenuUi.Label(rt, "Device", CMTokens.Ui, wide ? 20 : 18, Brass, TextAnchor.MiddleRight, w * 0.4f, 18f, w * 0.6f - pad, 52f, "", 2f);
+            VectorShape rule = MenuUi.Shape(rt, "Rule", ShapeKind.RoundRect, pad, 76f, w - pad * 2f, 4f, CMTokens.WithAlpha(Cream, 0.35f), 2f);
             rule.OutlinePx = 0f;
             rule.RimPx = 0f;
 
-            int perCol = two ? (LineLabels.Length + 1) / 2 : LineLabels.Length;
-            float top = 104f, bottom = h - 64f;
-            float lineH = Mathf.Min(58f, (bottom - top) / perCol);
+            int cols = wide ? 4 : 2;
+            float labelW = wide ? 250f : 210f, gap = 10f;
+            float chipW = (w - pad * 2f - labelW - gap * (cols - 1)) / cols;
+            float top = wide ? 128f : 92f, bottom = h - 60f;
+            if (wide)
+            {
+                for (int c = 0; c < 4; c++)
+                {
+                    card._heads[c] = MenuUi.Label(rt, "Head " + c, CMTokens.Ui, 17, Cream, TextAnchor.MiddleCenter, pad + labelW + c * (chipW + gap), 86f,
+                        chipW, 34f, ColHeads[c], 2f);
+                    ClassCard.Fit(card._heads[c], 11);
+                }
+            }
+            float lineH = Mathf.Min(52f, (bottom - top) / LineLabels.Length);
             for (int i = 0; i < LineLabels.Length; i++)
             {
-                int col = two ? i / perCol : 0, row = two ? i % perCol : i;
-                float lx = pad + col * (colW + colGap), ly = top + row * lineH;
+                float ly = top + i * lineH;
                 var line = new Line { Label = LineLabels[i], Rows = RowsFor(LineLabels[i]) };
-                line.Name = MenuUi.Label(rt, "Line " + line.Label, CMTokens.Ui, lineH >= 50f ? 24 : 20, Cream, TextAnchor.MiddleLeft, lx, ly, 210f, lineH - 8f,
+                line.Name = MenuUi.Label(rt, "Line " + line.Label, CMTokens.Ui, lineH >= 44f ? 22 : 18, Cream, TextAnchor.MiddleLeft, pad, ly, labelW, lineH - 4f,
                     line.Label.ToUpperInvariant(), 2f);
-                for (int k = 0; k < 2; k++)
+                ClassCard.Fit(line.Name, 12);
+                for (int k = 0; k < cols; k++)
                 {
-                    float cx = lx + colW - (2 - k) * chipW - (1 - k) * 10f;
-                    VectorShape chip = MenuUi.Shape(rt, $"Chip {line.Label} {k}", ShapeKind.RoundRect, cx, ly + 4f, chipW, lineH - 16f, Navy, 8f);
+                    float cx = pad + labelW + k * (chipW + gap);
+                    VectorShape chip = MenuUi.Shape(rt, $"Chip {line.Label} {k}", ShapeKind.RoundRect, cx, ly + 2f, chipW, lineH - 6f, Navy, 8f);
                     chip.OutlinePx = 2f;
                     chip.RimPx = 2f;
                     line.Chips[k] = chip;
-                    line.Keys[k] = MenuUi.Label(chip.transform, "Key", CMTokens.Mono, lineH >= 50f ? 20 : 17, Cream, TextAnchor.MiddleCenter, 0f, 0f, chipW, lineH - 16f, "", 0f);
-                    ClassCard.Fit(line.Keys[k], 11);
+                    line.Keys[k] = MenuUi.Label(chip.transform, "Key", CMTokens.Mono, lineH >= 44f ? 19 : 16, Cream, TextAnchor.MiddleCenter, 0f, 0f, chipW, lineH - 6f, "", 0f);
+                    ClassCard.Fit(line.Keys[k], 10);
                 }
                 card._lines.Add(line);
             }
-            MenuUi.Label(rt, "Footer", CMTokens.Ui, two ? 22 : 18, CMTokens.WithAlpha(Cream, 0.9f), TextAnchor.MiddleCenter, pad, h - 56f, w - pad * 2f, 40f, Footer, 2f);
+            MenuUi.Label(rt, "Footer", CMTokens.Ui, wide ? 20 : 18, CMTokens.WithAlpha(Cream, 0.9f), TextAnchor.MiddleCenter, pad, h - 52f, w - pad * 2f, 40f, Footer, 2f);
             card.Refresh(ControlBindings.ActiveDevice);
             return card;
         }
 
-        /// <summary>Redraws every glyph for a device from the current bindings.</summary>
+        /// <summary>Redraws every key from the current bindings for the scheme in use (ControlBindings.ActiveScheme).</summary>
         public void Refresh(ControlDevice device)
         {
             Device = device;
-            HudText.Set(_device, device == ControlDevice.Gamepad ? "CONTROLLER" : "KEYBOARD AND MOUSE");
+            Scheme = device == ControlDevice.Gamepad ? ControlScheme.Gamepad : ControlBindings.KeyboardOnly ? ControlScheme.Keyboard : ControlScheme.KeyboardMouse;
+            HudText.Set(_device, Scheme == ControlScheme.Gamepad ? "IN USE: CONTROLLER" : Scheme == ControlScheme.Keyboard ? "IN USE: KEYBOARD" : "IN USE: KEYBOARD AND MOUSE");
             InputActionMap map = ControlBindings.Map(InputSystem.actions);
+            int lit = ActiveCol(Scheme);
+            for (int c = 0; Wide && c < 4; c++)
+                if (_heads[c] != null) _heads[c].color = c == lit ? Brass : CMTokens.WithAlpha(Cream, 0.75f);
             for (int i = 0; i < _lines.Count; i++)
             {
                 Line l = _lines[i];
-                string a, b;
-                Glyphs(map, l, device, out a, out b);
-                SetChip(l, 0, a);
-                SetChip(l, 1, b);
+                if (Wide)
+                {
+                    for (int c = 0; c < 4; c++)
+                    {
+                        string t = CellText(map, l.Label, l.Rows, (Col)c);
+                        SetChip(l, c, t.Length == 0 ? "-" : t);
+                        l.Chips[c].OutlinePx = c == lit ? 3f : 2f;
+                        l.Keys[c].color = c == lit ? Cream : CMTokens.WithAlpha(Cream, 0.8f);
+                    }
+                }
+                else
+                {
+                    string[] parts = Split(CellText(map, l.Label, l.Rows, (Col)ActiveCol(Scheme)));
+                    SetChip(l, 0, parts.Length > 0 ? parts[0] : "");
+                    SetChip(l, 1, parts.Length > 1 ? parts[1] : "");
+                }
             }
         }
+
+        static string[] Split(string s) => string.IsNullOrEmpty(s) ? new string[0] : s.Split(new[] { " / " }, StringSplitOptions.RemoveEmptyEntries);
+
+        /// <summary>The column of a scheme (keyboard only lights the hand position in use).</summary>
+        public static int ActiveCol(ControlScheme s) =>
+            s == ControlScheme.Gamepad ? (int)Col.Pad : s == ControlScheme.KeyboardMouse ? (int)Col.Mouse
+            : ControlBindings.Hand == KeyboardHand.Arrows ? (int)Col.Arrows : (int)Col.Wasd;
 
         void SetChip(Line l, int k, string text)
         {
             bool on = !string.IsNullOrEmpty(text);
-            // A single glyph sits in the right-hand chip so every key column lines up.
-            int slot = k;
             if (l.Chips[k].gameObject.activeSelf != on) l.Chips[k].gameObject.SetActive(on);
-            if (on) HudText.Set(l.Keys[slot], text);
+            if (on) HudText.Set(l.Keys[k], text);
         }
 
-        /// <summary>The glyph text(s) of a line on a device ("" = none). Public through Describe for tests.</summary>
-        static void Glyphs(InputActionMap map, Line l, ControlDevice device, out string first, out string second)
+        /// <summary>
+        /// The text of one table cell ("" = none). Keyboard hand columns: the slots of that column, else the shared key
+        /// (a keyboard binding that names no hand) so every action shows a key in both hand positions. Keys and mouse: the
+        /// mouse slot, else the left-hand key. Controller: its slots joined with " / ".
+        /// </summary>
+        static string CellText(InputActionMap map, string label, int[] rows, Col col)
         {
-            first = second = "";
-            if (map == null) return;
-            if (l.Label == "Move")
+            if (map == null || rows.Length == 0 || rows[0] < 0) return "";
+            if (label == "Move")
             {
-                if (device == ControlDevice.Gamepad)
-                {
-                    first = SlotText(map, l.Rows[4], device, 0);
-                    return;
-                }
-                first = Join(map, l.Rows, device, 0);
-                second = Join(map, l.Rows, device, 1);
-                if (second == "UP LEFT DOWN RIGHT") second = "ARROWS";
-                return;
+                if (col == Col.Pad) return SlotsText(map, rows[4], ControlDevice.Gamepad, SlotColumn.Auto);
+                string wasd = JoinMove(map, rows, SlotColumn.Wasd), arrows = JoinMove(map, rows, SlotColumn.Arrows);
+                if (arrows == "UP LEFT DOWN RIGHT") arrows = "ARROWS";
+                if (col == Col.Wasd) return wasd;
+                if (col == Col.Arrows) return arrows;
+                return wasd.Length == 0 ? arrows : arrows.Length == 0 ? wasd : wasd + " / " + arrows;
             }
-            first = SlotText(map, l.Rows[0], device, 0);
-            second = SlotText(map, l.Rows[0], device, 1);
-            if (second == first) second = "";
+            if (label == "Aim")
+            {
+                if (col == Col.Pad) return SlotsText(map, rows[0], ControlDevice.Gamepad, SlotColumn.Auto);
+                if (col == Col.Mouse) return "MOUSE";
+                return "FACES WHERE YOU MOVE";
+            }
+            if (label == "Lock facing (hold)")
+            {
+                if (col == Col.Pad) return "R STICK";
+                if (col == Col.Mouse) return "";
+            }
+            switch (col)
+            {
+                case Col.Pad: return SlotsText(map, rows[0], ControlDevice.Gamepad, SlotColumn.Auto);
+                case Col.Mouse:
+                {
+                    string m = SlotsText(map, rows[0], ControlDevice.KeyboardMouse, SlotColumn.Mouse);
+                    return m.Length > 0 ? m : HandText(map, rows[0], SlotColumn.Wasd);
+                }
+                case Col.Arrows: return HandText(map, rows[0], SlotColumn.Arrows);
+                default: return HandText(map, rows[0], SlotColumn.Wasd);
+            }
         }
 
-        static string Join(InputActionMap map, int[] rows, ControlDevice device, int slot)
+        static string HandText(InputActionMap map, int row, SlotColumn hand)
+        {
+            string t = SlotsText(map, row, ControlDevice.KeyboardMouse, hand);
+            if (t.Length > 0) return t;
+            // A shared key (no hand name) serves both hand positions.
+            ControlRow r = ControlBindings.Rows[row];
+            for (int k = 0; k < r.Keyboard.Length; k++)
+            {
+                // A shared key in the mouse column (E, F) serves the hand positions too; mouse buttons are skipped below.
+                RebindSlot s = r.Keyboard[k];
+                InputAction a = map.FindAction(s.Action, false);
+                int idx = ControlBindings.FindBindingIndex(a, s);
+                if (idx < 0 || !string.IsNullOrEmpty(a.bindings[idx].name)) continue;
+                string path = a.bindings[idx].effectivePath ?? "";
+                if (!path.StartsWith("<Keyboard>", StringComparison.OrdinalIgnoreCase)) continue;
+                return ControlBindings.Display(a, idx);
+            }
+            return "";
+        }
+
+        static string JoinMove(InputActionMap map, int[] rows, SlotColumn hand)
         {
             string s = "";
             for (int i = 0; i < 4; i++)
             {
-                string t = SlotText(map, rows[i], device, slot);
+                string t = SlotsText(map, rows[i], ControlDevice.KeyboardMouse, hand);
                 if (t.Length == 0) return "";
                 s = s.Length == 0 ? t : s + " " + t;
             }
             return s;
         }
 
-        static string SlotText(InputActionMap map, int row, ControlDevice device, int slot)
+        /// <summary>The slots of a row on a device in one column (Auto = every slot of the device), joined with " / ".</summary>
+        static string SlotsText(InputActionMap map, int row, ControlDevice device, SlotColumn column)
         {
             if (row < 0 || row >= ControlBindings.Rows.Length) return "";
             ControlRow r = ControlBindings.Rows[row];
             RebindSlot[] set = device == ControlDevice.Gamepad ? r.Gamepad : r.Keyboard;
-            if (slot >= set.Length) return "";
-            InputAction a = map.FindAction(set[slot].Action, false);
-            int idx = ControlBindings.FindBindingIndex(a, set[slot]);
-            if (idx < 0) return "";
-            string t = ControlBindings.Display(a, idx);
-            return t == "-" ? "" : t;
+            string s = "";
+            for (int k = 0; k < set.Length; k++)
+            {
+                if (column != SlotColumn.Auto && set[k].Column != column) continue;
+                InputAction a = map.FindAction(set[k].Action, false);
+                int idx = ControlBindings.FindBindingIndex(a, set[k]);
+                if (idx < 0) continue;
+                string t = ControlBindings.Display(a, idx);
+                if (t == "-" || t.Length == 0 || s == t || s.EndsWith(" / " + t, StringComparison.Ordinal)) continue;
+                s = s.Length == 0 ? t : s + " / " + t;
+            }
+            return s;
         }
 
-        /// <summary>What the card shows on a device: one "LABEL: KEY / KEY" string per line (tests, captures).</summary>
-        public static List<string> Describe(ControlDevice device)
+        /// <summary>What the card shows for a device: KeyboardMouse = the keys and mouse column, Gamepad = the controller column.</summary>
+        public static List<string> Describe(ControlDevice device) =>
+            Describe(device == ControlDevice.Gamepad ? Col.Pad : Col.Mouse);
+
+        /// <summary>One "LABEL: KEY / KEY" string per line for a column (tests, captures, the PR's bindings table).</summary>
+        public static List<string> Describe(Col col)
         {
             var result = new List<string>();
             InputActionMap map = ControlBindings.Map(InputSystem.actions);
             for (int i = 0; i < LineLabels.Length; i++)
             {
-                var l = new Line { Label = LineLabels[i], Rows = RowsFor(LineLabels[i]) };
-                Glyphs(map, l, device, out string a, out string b);
-                result.Add(l.Label + ": " + a + (b.Length > 0 ? " / " + b : ""));
+                string t = CellText(map, LineLabels[i], RowsFor(LineLabels[i]), col);
+                result.Add(LineLabels[i] + ": " + t);
             }
             return result;
         }
 
-        /// <summary>The glyph shown on a line's chip k for the card's current device ("" when hidden). Tests.</summary>
+        /// <summary>
+        /// The k-th key shown on a line for the card's scheme in use ("" when none): the in-use column's text split on " / "
+        /// (wide card), or chip k (narrow card). Tests.
+        /// </summary>
         public string Shown(string label, int k)
         {
             for (int i = 0; i < _lines.Count; i++)
-                if (_lines[i].Label == label) return _lines[i].Chips[k].gameObject.activeSelf ? _lines[i].Keys[k].text : "";
+            {
+                if (_lines[i].Label != label) continue;
+                if (!Wide) return _lines[i].Chips[k].gameObject.activeSelf ? _lines[i].Keys[k].text : "";
+                string[] parts = Split(_lines[i].Keys[ActiveCol(Scheme)].text);
+                return k < parts.Length ? parts[k] : "";
+            }
             return "";
         }
     }
@@ -215,6 +312,11 @@ namespace CriticalMass.Runtime.Menus
     /// with the focus; Escape / Start / B close it (while the pause menu is open, PauseMenu forwards those presses).
     /// Follows the device used last and every rebind live. Screen Space - Camera canvas, sorting order 45 (above the
     /// pause menu's 40).
+    /// <para>controls-1: two pages, ALL CONTROLS (the three-scheme table) and CONTROLLER (the connected controller and its
+    /// button layout, stick dead zone, stick sensitivity, invert aim, vibration, CHANGE BUTTONS into Settings, Controls,
+    /// and the steps to connect a controller by Bluetooth or USB). Keyboard: arrows or W A S D move the focus, ENTER or
+    /// SPACE press, LEFT / RIGHT change a setting, TAB switches the page, ESC goes back; controller: d-pad or stick, A, B,
+    /// LB / RB for the page.</para>
     /// </summary>
     [CriticalMass.Runtime.Flow.GameOverlay(Order = 31, Scope = CriticalMass.Runtime.Flow.OverlayScope.Always)]   // installed once by GameBootstrap through the overlay registry
     public sealed class ControlsCardScreen : MonoBehaviour
@@ -244,7 +346,17 @@ namespace CriticalMass.Runtime.Menus
         CanvasGroup _group;
         Image _wash;
         MenuItem _back;
+        MenuItem _tabAll, _tabPad;
+        readonly List<MenuItem> _presetItems = new List<MenuItem>();
+        Text _presetLine;
+        RectTransform _padPage;
+        Text _padTitle, _padLayout, _padHelp;
+        readonly List<MenuItem> _padItems = new List<MenuItem>();
+        readonly List<Action> _padRefresh = new List<Action>();
         Text _hint;
+
+        /// <summary>The page shown: false = ALL CONTROLS, true = CONTROLLER.</summary>
+        public bool ControllerPage { get; private set; }
         VectorShape _timer;
         float _openedAt, _alpha;
         Action _onClosed;
@@ -304,12 +416,14 @@ namespace CriticalMass.Runtime.Menus
             if (_instance == null) _instance = this;
             ControlBindings.ActiveDeviceChanged += OnDevice;
             ControlBindings.BindingsChanged += OnBindings;
+            InputSystem.onDeviceChange += OnPadChange;
         }
 
         void OnDisable()
         {
             ControlBindings.ActiveDeviceChanged -= OnDevice;
             ControlBindings.BindingsChanged -= OnBindings;
+            InputSystem.onDeviceChange -= OnPadChange;
         }
 
         void OnDestroy()
@@ -318,7 +432,15 @@ namespace CriticalMass.Runtime.Menus
         }
 
         void OnDevice(ControlDevice d) => _dirty = true;
-        void OnBindings() => _dirty = true;
+        void OnBindings()
+        {
+            _dirty = true;
+            RefreshPresetLine();
+        }
+        void OnPadChange(InputDevice d, InputDeviceChange c)
+        {
+            if (d is Gamepad) _dirty = true;
+        }
 
         void Build()
         {
@@ -343,18 +465,266 @@ namespace CriticalMass.Runtime.Menus
             _space.pivot = new Vector2(0.5f, 0.5f);
             _space.sizeDelta = new Vector2(HudLayout.RefW, HudLayout.RefH);
 
-            const float w = 1240f, h = 640f, x = (1920f - w) * 0.5f, y = 150f;
+            const float w = 1400f, h = 720f, x = (1920f - w) * 0.5f, y = 130f;
             Card = ControlsCard.Build(_space, x, y, w, h);
-            _back = MenuUi.Item(_space, "Back", (1920f - 320f) * 0.5f, y + h + 30f, 320f, 72f, "BACK", MenuItem.Kind.Button, UiScale.TypeHeading, true, CMTokens.Display);
+            _back = MenuUi.Item(_space, "Back", (1920f - 320f) * 0.5f, y + h + 24f, 320f, 64f, "BACK", MenuItem.Kind.Button, UiScale.TypeHeading, true, CMTokens.Display);
             _back.Body.Radius = 16f;
             _back.Submitted = Close;
-            _back.navigation = new Navigation { mode = Navigation.Mode.None };
+            _tabAll = MenuUi.Item(_space, "Tab All Controls", x, y - 64f, 300f, 52f, "ALL CONTROLS", MenuItem.Kind.Button, UiScale.TypeBody, true, CMTokens.Display);
+            _tabAll.Submitted = () => SetPage(false);
+            _tabPad = MenuUi.Item(_space, "Tab Controller", x + 316f, y - 64f, 300f, 52f, "CONTROLLER", MenuItem.Kind.Button, UiScale.TypeBody, true, CMTokens.Display);
+            _tabPad.Submitted = () => SetPage(true);
+            BuildPresets(x, y, w);
+            BuildControllerPage(x, y, w, h);
+            WireNavigation();
             _hint = MenuUi.Label(_space, "Hint", CMTokens.Ui, UiScale.TypeSmall, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 260f, 1020f, 1400f, 36f, "", 2f);
             _timer = MenuUi.Shape(_space, "Timer", ShapeKind.RoundRect, x + 32f, y + h - 10f, w - 64f, 6f, CMTokens.ToolBrass.Color, -1f);
             _timer.EmptyColor = CMTokens.WithAlpha(CMTokens.MeterEmpty.Color, 0.8f);
             _timer.OutlinePx = 0f;
             _timer.RimPx = 0f;
             Canvas.enabled = false;
+        }
+
+        // ---- controls-1 round 2: named keyboard layouts (owner 2026-11-13) ----
+
+        void BuildPresets(float x, float y, float w)
+        {
+            float px = x + 632f, rowW = w - 632f, gap = 8f;
+            float pw = (rowW - gap * (ControlPresets.All.Length - 1)) / ControlPresets.All.Length;
+            _presetLine = MenuUi.Label(_space, "Layout Line", CMTokens.Ui, UiScale.TypeSmall, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft, x, y - 108f, w, 36f, "", 2f);
+            ClassCard.Fit(_presetLine, 11);
+            for (int i = 0; i < ControlPresets.All.Length; i++)
+            {
+                ControlPreset p = ControlPresets.All[i];
+                MenuItem it = MenuUi.Item(_space, "Preset " + p, px + i * (pw + gap), y - 64f, pw, 52f, ControlPresets.Title(p), MenuItem.Kind.Button, UiScale.TypeSmall, true, CMTokens.Display);
+                ClassCard.Fit(it.Label, 11);
+                it.Submitted = () => ApplyPreset(p);
+                _presetItems.Add(it);
+            }
+            RefreshPresetLine();
+        }
+
+        /// <summary>One press: the layout's keys, saved; the table and every prompt redraw (BindingsChanged).</summary>
+        public void ApplyPreset(ControlPreset p)
+        {
+            ControlPresets.Apply(InputSystem.actions, p);
+            RefreshPresetLine();
+            _dirty = true;
+        }
+
+        /// <summary>The layout in use, in words: a preset, or CUSTOM once a key was changed on top of it.</summary>
+        public static string PresetLineText(InputActionAsset asset)
+        {
+            ControlPreset? c = asset != null ? ControlPresets.Current(asset) : null;
+            if (c.HasValue) return "LAYOUT: " + ControlPresets.Title(c.Value) + ".  " + ControlPresets.Summary(c.Value);
+            bool custom = false;
+            InputActionMap map = asset != null ? ControlBindings.Map(asset) : null;
+            if (map != null)
+                foreach (InputBinding bd in map.bindings)
+                    if (bd.overridePath != null) custom = true;
+            return custom ? "LAYOUT: CUSTOM (your own keys). Pick a layout to start again from it, or change single keys in Settings, Controls."
+                : "LAYOUT: ALL THREE AT ONCE. Arrows + Z X C, WASD + J K L and WASD + mouse all work; prompts follow the keys you press.";
+        }
+
+        void RefreshPresetLine()
+        {
+            if (_presetLine != null) HudText.Set(_presetLine, PresetLineText(InputSystem.actions));
+        }
+
+        // ---- controls-1: the CONTROLLER page ----
+
+        void BuildControllerPage(float x, float y, float w, float h)
+        {
+            VectorShape body = MenuUi.Panel(_space, "Controller Page", x, y, w, h);
+            _padPage = body.rectTransform;
+            Color cream = CMTokens.WarmCream.Color, brass = CMTokens.ToolBrass.Color;
+            MenuUi.Label(_padPage, "Title", CMTokens.Display, 40, cream, TextAnchor.MiddleLeft, 32f, 18f, w * 0.5f, 52f, "CONTROLLER", 4f);
+            _padTitle = MenuUi.Label(_padPage, "Detected", CMTokens.Ui, 20, brass, TextAnchor.MiddleRight, w * 0.35f, 18f, w * 0.65f - 32f, 52f, "", 2f);
+            ClassCard.Fit(_padTitle, 12);
+            // The layout diagram: every controller control and what it does, left half of the pad then right half.
+            MenuUi.Label(_padPage, "Layout Head", CMTokens.Ui, 20, brass, TextAnchor.MiddleLeft, 32f, 86f, 620f, 32f, "BUTTON LAYOUT", 2f);
+            _padLayout = MenuUi.Label(_padPage, "Layout", CMTokens.Mono, 18, cream, TextAnchor.UpperLeft, 32f, 122f, 620f, 380f, "", 0f);
+            // Settings, right column.
+            float sx = 690f, sw = w - sx - 32f, sy = 86f;
+            MenuUi.Label(_padPage, "Settings Head", CMTokens.Ui, 20, brass, TextAnchor.MiddleLeft, sx, sy, sw, 32f, "SETTINGS", 2f);
+            sy += 40f;
+            AddCycle("Dead Zone", sx, sy, sw, () => "STICK DEAD ZONE   " + ControllerSettings.DeadZoneNames[ControllerSettings.DeadZoneIndex],
+                d => ControllerSettings.DeadZoneIndex = Wrap(ControllerSettings.DeadZoneIndex + d, ControllerSettings.DeadZones.Length));
+            sy += 58f;
+            AddCycle("Sensitivity", sx, sy, sw, () => "STICK SENSITIVITY   " + ControllerSettings.SensitivityNames[ControllerSettings.SensitivityIndex],
+                d => ControllerSettings.SensitivityIndex = Wrap(ControllerSettings.SensitivityIndex + d, ControllerSettings.Curves.Length));
+            sy += 58f;
+            AddCycle("Invert", sx, sy, sw, () => "INVERT AIM UP / DOWN   " + (ControllerSettings.InvertAimY ? "ON" : "OFF"),
+                d => ControllerSettings.InvertAimY = !ControllerSettings.InvertAimY);
+            sy += 58f;
+            AddCycle("Vibration", sx, sy, sw, () => "VIBRATION   " + (ControllerSettings.Vibration ? "ON" : "OFF"),
+                d => ControllerSettings.Vibration = !ControllerSettings.Vibration);
+            sy += 58f;
+            MenuItem rebind = MenuUi.Item(_padPage, "Change Buttons", sx, sy, sw * 0.5f - 6f, 48f, "CHANGE BUTTONS", MenuItem.Kind.Button, UiScale.TypeSmall, true, CMTokens.Display);
+            rebind.Submitted = OpenRebinding;
+            _padItems.Add(rebind);
+            MenuItem reset = MenuUi.Item(_padPage, "Reset Controller", sx + sw * 0.5f + 6f, sy, sw * 0.5f - 6f, 48f, "RESET SETTINGS", MenuItem.Kind.Button, UiScale.TypeSmall, true, CMTokens.Display);
+            reset.Submitted = () =>
+            {
+                ControllerSettings.ResetAll();
+                RefreshControllerPage();
+            };
+            _padItems.Add(reset);
+            // Connect a controller (the full steps: docs/CONTROLLERS.md).
+            MenuUi.Label(_padPage, "Help Head", CMTokens.Ui, 20, brass, TextAnchor.MiddleLeft, 32f, 510f, w - 64f, 32f, "CONNECT A CONTROLLER", 2f);
+            _padHelp = MenuUi.Label(_padPage, "Help", CMTokens.Ui, 17, cream, TextAnchor.UpperLeft, 32f, 546f, w - 64f, h - 560f, ConnectHelp, 0f);
+            ClassCard.Fit(_padHelp, 11);
+            _padPage.gameObject.SetActive(false);
+        }
+
+        /// <summary>The help panel's plain steps (no brand names; the button names are on the controllers themselves).</summary>
+        public const string ConnectHelp =
+            "USB: plug the controller in; it works at once.\n" +
+            "Bluetooth, A B X Y controller: hold the pairing button on its top edge until the centre light flashes fast. " +
+            "Cross / circle controller: hold the small Create (or Share) button and the centre button together until the light bar flashes.\n" +
+            "Mac: System Settings, Bluetooth, then Connect next to the controller.   Windows: Settings, Bluetooth and devices, Add device, Bluetooth.\n" +
+            "Unplug or switch off mid-match and the game pauses; connect again and it carries on.";
+
+        static int Wrap(int v, int n) => ((v % n) + n) % n;
+
+        void AddCycle(string name, float x, float y, float w, Func<string> text, Action<int> change)
+        {
+            MenuItem it = MenuUi.Item(_padPage, name, x, y, w, 48f, "", MenuItem.Kind.Stepper, UiScale.TypeSmall, false, CMTokens.Display);
+            Action refresh = () => HudText.Set(it.Label, text());
+            it.Submitted = () =>
+            {
+                change(1);
+                refresh();
+            };
+            it.Stepped = d =>
+            {
+                change(d >= 0 ? 1 : -1);
+                refresh();
+            };
+            _padItems.Add(it);
+            _padRefresh.Add(refresh);
+            refresh();
+        }
+
+        void OpenRebinding()
+        {
+            PauseMenu pm = FindAnyObjectByType<PauseMenu>();
+            Close();
+            if (pm != null)
+            {
+                if (!pm.IsOpen) pm.Pause();
+                pm.ShowSettings(PauseMenu.Tab.Controls);
+            }
+        }
+
+        /// <summary>The controller page's detected-controller line, layout diagram and setting labels from the live state.</summary>
+        public void RefreshControllerPage()
+        {
+            if (_padPage == null) return;
+            Gamepad pad = Gamepad.current;
+            int n = Gamepad.all.Count;
+            HudText.Set(_padTitle, ControllerSettings.Describe(pad) + (n > 1 ? $"   ({n} connected)" : ""));
+            HudText.Set(_padLayout, LayoutText());
+            for (int i = 0; i < _padRefresh.Count; i++) _padRefresh[i]();
+        }
+
+        /// <summary>One line per controller control: its label in the connected family and the actions on it.</summary>
+        public static string LayoutText()
+        {
+            InputActionMap map = ControlBindings.Map(InputSystem.actions);
+            string[] controls =
+            {
+                "leftTrigger", "leftShoulder", "leftStick", "leftStickPress", "dpad/up", "dpad/left", "dpad/down", "dpad/right", "select",
+                "rightTrigger", "rightShoulder", "rightStick", "rightStickPress", "buttonSouth", "buttonEast", "buttonWest", "buttonNorth", "start",
+            };
+            var sb = new System.Text.StringBuilder();
+            for (int c = 0; c < controls.Length; c++)
+            {
+                string path = "<Gamepad>/" + controls[c];
+                var names = new List<string>();
+                if (map != null)
+                    foreach (InputAction a in map.actions)
+                        foreach (InputBinding b in a.bindings)
+                            if (!b.isComposite && string.Equals(b.effectivePath, path, StringComparison.OrdinalIgnoreCase) && !names.Contains(Verb(a.name))) names.Add(Verb(a.name));
+                if (controls[c] == "rightStick" && !names.Contains("Aim")) names.Add("Aim");
+                if (controls[c] == "buttonSouth") names.Add("Menus: confirm");
+                if (controls[c] == "buttonEast") names.Add("Menus: back");
+                string key = ControlBindings.DisplayPath(path);
+                sb.Append(key.PadRight(12)).Append(names.Count > 0 ? string.Join(", ", names) : "-").Append('\n');
+            }
+            return sb.ToString();
+        }
+
+        static string Verb(string action)
+        {
+            switch (action)
+            {
+                case "DigPlace": return "Dig / place";
+                case "SwitchDigPlace": return "Switch dig / place";
+                case "OpenStation": return "Base station";
+                case "HudCursor": return "HUD cursor";
+                case "MinimapZoom": return "Minimap zoom";
+                case "ShowTerrain": return "Show usable terrain";
+                case "Ability": return "Class ability";
+                case "Interact": return "Interact / carry";
+                case "Move": return "Move";
+                default: return action;
+            }
+        }
+
+        /// <summary>Shows a page and moves the focus onto its tab.</summary>
+        public void SetPage(bool controller)
+        {
+            Build();
+            ControllerPage = controller;
+            Card.Root.gameObject.SetActive(!controller);
+            _padPage.gameObject.SetActive(controller);
+            ShowPresets(!controller && Mode == CardMode.Modal);
+            if (controller) RefreshControllerPage();
+            WireNavigation();
+            UpdateHint();
+            EventSystem es = EventSystem.current;
+            if (es != null && Mode == CardMode.Modal) es.SetSelectedGameObject((controller ? _tabPad : _tabAll).gameObject);
+        }
+
+        void ShowPresets(bool on)
+        {
+            for (int i = 0; i < _presetItems.Count; i++)
+                if (_presetItems[i].gameObject.activeSelf != on) _presetItems[i].gameObject.SetActive(on);
+            if (_presetLine != null && _presetLine.gameObject.activeSelf != on) _presetLine.gameObject.SetActive(on);
+            if (on) RefreshPresetLine();
+        }
+
+        /// <summary>Explicit focus order: the two tabs, the page's items (controller page), BACK; nothing is mouse-only.</summary>
+        void WireNavigation()
+        {
+            if (_back == null) return;
+            var order = new List<Selectable> { _tabAll };
+            if (ControllerPage) order.AddRange(_padItems);
+            order.Add(_back);
+            Selectable firstBelow = order.Count > 1 ? order[1] : _back;
+            _tabAll.navigation = new Navigation { mode = Navigation.Mode.Explicit, selectOnRight = _tabPad, selectOnDown = firstBelow, selectOnUp = _back };
+            bool presets = !ControllerPage && _presetItems.Count > 0 && _presetItems[0].gameObject.activeInHierarchy;
+            _tabPad.navigation = new Navigation { mode = Navigation.Mode.Explicit, selectOnLeft = _tabAll, selectOnRight = presets ? _presetItems[0] : null, selectOnDown = firstBelow, selectOnUp = _back };
+            // The layout buttons continue the tab row: left and right walk it, down goes to the page, up to BACK.
+            for (int i = 0; i < _presetItems.Count; i++)
+                _presetItems[i].navigation = new Navigation
+                {
+                    mode = Navigation.Mode.Explicit,
+                    selectOnLeft = i == 0 ? (Selectable)_tabPad : _presetItems[i - 1],
+                    selectOnRight = i + 1 < _presetItems.Count ? _presetItems[i + 1] : null,
+                    selectOnDown = firstBelow,
+                    selectOnUp = _back,
+                };
+            for (int i = 1; i < order.Count; i++)
+            {
+                Selectable up = order[i - 1] == _tabAll ? (ControllerPage ? (Selectable)_tabPad : _tabAll) : order[i - 1];
+                Selectable down = i + 1 < order.Count ? order[i + 1] : (ControllerPage ? (Selectable)_tabPad : _tabAll);
+                // The two buttons sharing a row (CHANGE BUTTONS, RESET SETTINGS) also reach each other sideways.
+                var n = new Navigation { mode = Navigation.Mode.Explicit, selectOnUp = up, selectOnDown = down };
+                if (order[i] is MenuItem mi && mi.ItemKind == MenuItem.Kind.Stepper) { n.selectOnLeft = null; n.selectOnRight = null; }
+                order[i].navigation = n;
+            }
         }
 
         void AttachCamera()
@@ -399,6 +769,11 @@ namespace CriticalMass.Runtime.Menus
             _group.blocksRaycasts = modal;
             _group.interactable = modal;
             _back.gameObject.SetActive(modal);
+            _tabAll.gameObject.SetActive(modal);
+            _tabPad.gameObject.SetActive(modal);
+            ShowPresets(modal && !ControllerPage);
+            WireNavigation();
+            if (!modal && ControllerPage) SetPage(false);
             _timer.gameObject.SetActive(!modal);
             _timer.Fill01 = 1f;
             _dirty = true;
@@ -415,6 +790,8 @@ namespace CriticalMass.Runtime.Menus
                     es.SetSelectedGameObject(null);
                     _back.Select();
                 }
+                // controls-1: the controller page opens first when the player is on a controller.
+                if (ControlBindings.ActiveDevice == ControlDevice.Gamepad && !ControllerPage) SetPage(true);
             }
         }
 
@@ -444,7 +821,7 @@ namespace CriticalMass.Runtime.Menus
             if (_hint == null) return;
             bool pad = ControlBindings.ActiveDevice == ControlDevice.Gamepad;
             string s = Mode == CardMode.FirstTime ? (pad ? "PRESS ANY BUTTON TO PLAY" : "PRESS ANY KEY TO PLAY")
-                : pad ? "A OR B BACK" : "ENTER OR ESC BACK";
+                : pad ? "A SELECT   ·   LB / RB PAGE   ·   B BACK" : "ENTER SELECT   ·   TAB PAGE   ·   ESC BACK";
             HudText.Set(_hint, s);
         }
 
@@ -461,6 +838,7 @@ namespace CriticalMass.Runtime.Menus
             {
                 _dirty = false;
                 Card.Refresh(ControlBindings.ActiveDevice);
+                if (ControllerPage) RefreshControllerPage();
                 UpdateHint();
             }
             float age = Time.unscaledTime - _openedAt;
@@ -474,9 +852,12 @@ namespace CriticalMass.Runtime.Menus
                 return;
             }
             // Modal: Escape / Start / B close, unless the open pause menu owns those presses (it forwards them).
-            if (PauseOwnsInput()) return;
             Keyboard kb = Keyboard.current;
             Gamepad gp = Gamepad.current;
+            // controls-1: TAB, LB or RB switch the page (also while the pause menu owns Escape).
+            if ((kb != null && kb.tabKey.wasPressedThisFrame) || (gp != null && (gp.leftShoulder.wasPressedThisFrame || gp.rightShoulder.wasPressedThisFrame)))
+                SetPage(!ControllerPage);
+            if (PauseOwnsInput()) return;
             if ((kb != null && kb.escapeKey.wasPressedThisFrame) || (gp != null && (gp.buttonEast.wasPressedThisFrame || gp.startButton.wasPressedThisFrame)))
                 Close();
             else if (EventSystem.current != null && EventSystem.current.currentSelectedGameObject == null && AnyNavigation()) _back.Select();
@@ -500,7 +881,8 @@ namespace CriticalMass.Runtime.Menus
         static bool AnyNavigation()
         {
             Keyboard kb = Keyboard.current;
-            if (kb != null && (kb.tabKey.wasPressedThisFrame || kb.upArrowKey.wasPressedThisFrame || kb.downArrowKey.wasPressedThisFrame)) return true;
+            if (kb != null && (kb.upArrowKey.wasPressedThisFrame || kb.downArrowKey.wasPressedThisFrame ||
+                               kb.wKey.wasPressedThisFrame || kb.sKey.wasPressedThisFrame)) return true;
             Gamepad gp = Gamepad.current;
             return gp != null && (gp.dpad.up.wasPressedThisFrame || gp.dpad.down.wasPressedThisFrame);
         }

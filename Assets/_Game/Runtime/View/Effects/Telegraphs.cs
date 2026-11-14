@@ -45,6 +45,12 @@ namespace CriticalMass.Runtime.View.Effects
         public static double ClawWarningSeconds(GameConfig cfg, double pace) => ClawWindupSeconds(cfg, pace) + (pace > 0 ? ClawLeadSim(cfg, pace) / pace : 0);
         public static double SlamWarningSeconds(GameConfig cfg, double pace) => SlamWindupSeconds(cfg, pace) + (pace > 0 ? SlamLeadSim(cfg, pace) / pace : 0);
 
+        /// <summary>fix/kaiju-alive-1: the slam telegraph's length in sim seconds exactly as Kaiju.KaijuSystem sets TelegraphIn
+        /// (World.Dur.SlamTelegraph, floored to the real-time minimum, with the sim-physics lane on; the config's seconds in
+        /// Classic).</summary>
+        public static double SlamTotalSim(World w) =>
+            Phys.On(w, true) ? Math.Max(1e-3, w.Dur.SlamTelegraph / w.Config.SimHz) : Math.Max(1e-3, w.Config.Kaiju.SlamTelegraphSeconds);
+
         /// <summary>The claw wind-up's fill 0..1, smooth between ticks (windupIn counts down to 0 on the resolve tick).</summary>
         public static float MeleeProgress(int windupIn, double windupTicks, double alpha)
         {

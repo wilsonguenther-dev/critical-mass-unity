@@ -78,6 +78,72 @@ namespace CriticalMass.Runtime.Hud
         public static Rect PlayerCard => HudLayout.RefRect(HudCluster.Player);
         public static Rect Minimap => HudLayout.RefRect(HudCluster.Minimap);
 
+        // ---- owner walk 1: the named pieces that used to pick their own spots (every one is checked by the collision test) ----
+        /// <summary>Top of the centre lane's residents: the job line, the team stock and the map-event bar sit here.</summary>
+        public const float JobY = 140f, JobW = 760f, JobH = 40f;
+        public const float StockY = 188f, StockW = 342f, StockH = 40f;
+        public const float EventY = 236f, EventW = 560f, EventH = 38f;
+        /// <summary>
+        /// The job line, stock and event bar live INSIDE the centre lane (the lane's lowest-priority residents): they show
+        /// while nothing else holds the lane and step back for the banner, the Kaiju callout, the autopilot banner and the
+        /// takeovers (they used to stay under the banner and peek out above it).
+        /// </summary>
+        public static readonly Rect Job = new Rect((RefW - JobW) * 0.5f, JobY, JobW, EventY + EventH - JobY);
+        /// <summary>Coin counter: right column, 12 px above the minimap frame (it used to sit on the minimap's top edge).</summary>
+        public const float CoinsW = 168f, CoinsH = 52f, PowerW = 330f, PowerH = 68f, ColumnGap = 12f;
+        public static Rect Coins => new Rect(RefW - M - CoinsW, Minimap.y - ColumnGap - CoinsH, CoinsW, CoinsH);
+        /// <summary>Power-up timer: left of the coin counter, bottoms aligned.</summary>
+        public static Rect Power => new Rect(Coins.x - ColumnGap - PowerW, Minimap.y - ColumnGap - PowerH, PowerW, PowerH);
+        /// <summary>The coin chip of the match rewards: left column, 12 px above the player card.</summary>
+        public const float CoinChipW = 168f, CoinChipH = 46f;
+        public static Rect CoinChip => new Rect(M, PlayerCard.y - ColumnGap - CoinChipH, CoinChipW, CoinChipH);
+        /// <summary>The ping / team line feed: left column, above the coin chip (four 30 px lines, newest at the bottom).</summary>
+        public const float PingLineH = 30f, PingLineW = 520f;
+        public static Rect PingFeed => new Rect(28f, CoinChip.y - ColumnGap - 4 * PingLineH, PingLineW, 4 * PingLineH);
+        /// <summary>The ping feed's bottom, px from the bottom of the reference space (its lines are anchored bottom-left).</summary>
+        public static float PingFeedBottom => RefH - PingFeed.yMax;
+
+        /// <summary>The interact prompt ("B Base station"): 12 px under the lower lane (it sat inside it, under the intro line).</summary>
+        public const float PromptW = 520f, PromptH = 50f;
+        public static Rect Prompt => new Rect((RefW - PromptW) * 0.5f, Lower.yMax + ColumnGap, PromptW, PromptH);
+
+        /// <summary>A named HUD piece for the collision test: its rect (reference px, top-left origin) and its lane.</summary>
+        public struct Piece
+        {
+            public string Name;
+            public Rect Rect;
+            /// <summary>Pieces in the same shared lane are never drawn together (the arbiter), so they may overlap.</summary>
+            public HudZone Lane;
+            public bool Shared;
+            public Piece(string n, Rect r, HudZone lane, bool shared) { Name = n; Rect = r; Lane = lane; Shared = shared; }
+        }
+
+        /// <summary>Every always-on and optional piece of the match HUD (owner walk 1's single layout table).</summary>
+        public static Piece[] Pieces()
+        {
+            Rect kaiju = HudLayout.RefRect(HudCluster.Kaiju), match = HudLayout.RefRect(HudCluster.Match);
+            return new[]
+            {
+                new Piece("match cluster (clock, scores, hill)", match, HudZone.TopBand, false),
+                new Piece("kaiju cluster (egg, rage, hatch timer)", kaiju, HudZone.TopBand, false),
+                new Piece("job line + stock + event bar", Job, HudZone.Callout, true),
+                new Piece("banner / autopilot / callout lane", Callout, HudZone.Callout, true),
+                new Piece("kill feed (5 lines)", new Rect(RefW - KillFeed.Right - KillFeed.LineW, KillFeed.Top, KillFeed.LineW, KillFeed.Pitch * KillFeed.Lines), HudZone.Feed, false),
+                new Piece("stingers", Stinger, HudZone.Stinger, false),
+                new Piece("achievement toast", Toast, HudZone.Toast, false),
+                new Piece("power-up timer", Power, HudZone.Minimap, false),
+                new Piece("coin counter", Coins, HudZone.Minimap, false),
+                new Piece("minimap", Minimap, HudZone.Minimap, false),
+                new Piece("player card", PlayerCard, HudZone.PlayerCard, false),
+                new Piece("coin chip", CoinChip, HudZone.PlayerCard, false),
+                new Piece("ping feed", PingFeed, HudZone.Guide, false),
+                new Piece("intro line (you are the ...)", Lower, HudZone.Lower, false),
+                new Piece("death recap (centre lane, Recap priority)", new Rect((RefW - DeathRecap.CardW) * 0.5f, DeathRecap.TopY, DeathRecap.CardW, DeathRecap.CardH), HudZone.Callout, true),
+                new Piece("interact prompt", Prompt, HudZone.Lower, false),
+                new Piece("hit recap (under the death recap)", Mechanics.MechanicsHud.RecapRect, HudZone.Callout, false),
+            };
+        }
+
         /// <summary>The rect of a zone.</summary>
         public static Rect Of(HudZone z)
         {

@@ -18,6 +18,11 @@ namespace CriticalMass.Runtime.Menu
         public const string MasterKey = "cm.audio.master";
         public const string MusicKey = "cm.audio.music";
         public const string EffectsKey = "cm.audio.effects";
+        // controls-1 round 2 (veteran hygiene): mutes next to the sliders, and silence while the window is in the background.
+        public const string MuteMusicKey = "cm.audio.muteMusic";
+        public const string MuteEffectsKey = "cm.audio.muteEffects";
+        public const string MuteInBackgroundKey = "cm.audio.muteInBackground";
+        public const string ColourBlindTeamsKey = "cm.access.colourBlindTeams";
         public const string WidthKey = "cm.video.width";
         public const string HeightKey = "cm.video.height";
         public const string FullScreenKey = "cm.video.fullscreen";
@@ -30,6 +35,10 @@ namespace CriticalMass.Runtime.Menu
         public const string ShakeScaleKey = "cm.access.shake";
         /// <summary>Reduce flashing (1 on, default 0): hit flash as a light tint, a steady damage edge, pulses at 2 Hz or less.</summary>
         public const string ReduceFlashingKey = "cm.access.reduceFlashing";
+        /// <summary>Story intro at every launch, before the title (owner, 2026-11-13: default on; Settings turns it off).</summary>
+        public const string IntroAtLaunchKey = "cm.story.atLaunch";
+        /// <summary>Story intro 3: the intro film's subtitles (drawn by the engine under the picture), on by default.</summary>
+        public const string IntroSubtitlesKey = "cm.story.subtitles";
         /// <summary>Reduce motion (1 on, default 0): no camera shake, no combat zoom, no Kaiju spotlight.</summary>
         public const string ReduceMotionKey = "cm.reducedMotion";   // one key: StoryIntro, AttractMode, big moments and world reactions read it too
         public const string DamageNumbersKey = "cm.damagenumbers";
@@ -42,6 +51,8 @@ namespace CriticalMass.Runtime.Menu
         public const string MoveAssistKey = "cm.moveAssist";
         /// <summary>Easy movement: direction keys follow the map's grid instead of the screen, 1 on, 0 off (default).</summary>
         public const string KeysFollowMapKey = "cm.keysFollowMap";
+        /// <summary>feat/ground-camera: CAMERA HIGH (default) or GROUND (experimental, play from behind the fighter).</summary>
+        public const string GroundCameraKey = "cm.camera.ground";
         /// <summary>DG-53: the settings format version, so a later build can migrate or reset stored keys safely.</summary>
         public const string PrefsVersionKey = "cm.prefsVersion";
         public const int PrefsVersion = 1;
@@ -51,9 +62,9 @@ namespace CriticalMass.Runtime.Menu
         /// <summary>Every key this class writes (tests back these up and restore them).</summary>
         public static readonly string[] AllKeys =
         {
-            MasterKey, MusicKey, EffectsKey, WidthKey, HeightKey, FullScreenKey, VSyncKey, QualityKey, ShakeKey,
-            DamageNumbersKey, BloodKey, FpsCapKey, BgThrottleKey, MoveAssistKey, KeysFollowMapKey, PrefsVersionKey,
-            ShakeScaleKey, ReduceFlashingKey, ReduceMotionKey,
+            MasterKey, MusicKey, EffectsKey, MuteMusicKey, MuteEffectsKey, MuteInBackgroundKey, ColourBlindTeamsKey, WidthKey, HeightKey, FullScreenKey, VSyncKey, QualityKey, ShakeKey,
+            DamageNumbersKey, BloodKey, FpsCapKey, BgThrottleKey, MoveAssistKey, KeysFollowMapKey, GroundCameraKey, PrefsVersionKey,
+            ShakeScaleKey, ReduceFlashingKey, ReduceMotionKey, IntroAtLaunchKey, IntroSubtitlesKey,
         };
 
         public const string MixerResource = "Audio/CMMixer";
@@ -68,6 +79,47 @@ namespace CriticalMass.Runtime.Menu
         public static float MasterVolume { get => GetF(MasterKey, 1f); set { SetF(MasterKey, Mathf.Clamp01(value)); ApplyAudio(); } }
         public static float MusicVolume { get => GetF(MusicKey, 0.8f); set { SetF(MusicKey, Mathf.Clamp01(value)); ApplyAudio(); } }
         public static float EffectsVolume { get => GetF(EffectsKey, 1f); set { SetF(EffectsKey, Mathf.Clamp01(value)); ApplyAudio(); } }
+        /// <summary>Music muted, the slider kept (PlayerPrefs cm.audio.muteMusic, default off).</summary>
+        public static bool MuteMusic { get => GetB(MuteMusicKey, false); set { SetB(MuteMusicKey, value); ApplyAudio(); } }
+        /// <summary>Sound effects muted, the slider kept (PlayerPrefs cm.audio.muteEffects, default off).</summary>
+        public static bool MuteEffects { get => GetB(MuteEffectsKey, false); set { SetB(MuteEffectsKey, value); ApplyAudio(); } }
+        /// <summary>Everything silent while another window has the focus (PlayerPrefs cm.audio.muteInBackground, default off).</summary>
+        public static bool MuteInBackground { get => GetB(MuteInBackgroundKey, false); set { SetB(MuteInBackgroundKey, value); ApplyAudio(); } }
+
+        /// <summary>
+        /// The colour-blind team palette (blue / amber instead of cyan / coral) on HUD, rings and team text (PlayerPrefs
+        /// cm.access.colourBlindTeams, default off). Mirrored into CMTokens.ColourBlindTeams, which every view reads.
+        /// </summary>
+        public static bool ColourBlindTeams
+        {
+            get => GetB(ColourBlindTeamsKey, false);
+            set
+            {
+                SetB(ColourBlindTeamsKey, value);
+                CriticalMass.Runtime.Hud.Style.CMTokens.ColourBlindTeams = value;
+            }
+        }
+
+        static bool _appFocused = true;
+
+        /// <summary>The window gained or lost the focus (CursorAutoHide reports it each frame); re-applies the mix on a change.</summary>
+        public static void SetAppFocused(bool focused)
+        {
+            if (_appFocused == focused) return;
+            _appFocused = focused;
+            ApplyAudio();
+        }
+
+        /// <summary>
+        /// The linear volumes actually played: the sliders, with the two mutes and the background mute applied. Pure, so the
+        /// tests pin it without a mixer.
+        /// </summary>
+        public static (float master, float music, float effects) Mix(float master, float music, float effects,
+            bool muteMusic, bool muteEffects, bool muteInBackground, bool focused)
+        {
+            if (muteInBackground && !focused) master = 0f;
+            return (Mathf.Clamp01(master), muteMusic ? 0f : Mathf.Clamp01(music), muteEffects ? 0f : Mathf.Clamp01(effects));
+        }
 
         // ---- game ----
         /// <summary>Camera shake allowed: ShakeScale above 0 (cm.shake is kept in step for older readers).</summary>
@@ -99,6 +151,8 @@ namespace CriticalMass.Runtime.Menu
 
         public static bool ReduceFlashing { get => GetB(ReduceFlashingKey, false); set => SetB(ReduceFlashingKey, value); }
         public static bool ReduceMotion { get => GetB(ReduceMotionKey, false); set => SetB(ReduceMotionKey, value); }
+        public static bool IntroAtLaunch { get => GetB(IntroAtLaunchKey, true); set => SetB(IntroAtLaunchKey, value); }
+        public static bool IntroSubtitles { get => GetB(IntroSubtitlesKey, true); set => SetB(IntroSubtitlesKey, value); }
         /// <summary>Same setting as ReduceMotion (world reactions' name): sway, springs, launches and the edge flash at 25%.</summary>
         public static bool ReducedMotion { get => ReduceMotion; set => ReduceMotion = value; }
         /// <summary>Floating damage numbers shown.</summary>
@@ -115,14 +169,18 @@ namespace CriticalMass.Runtime.Menu
         /// of screen up, left, down and right. The controller stick stays screen-relative.
         /// </summary>
         public static bool KeysFollowMap { get => GetB(KeysFollowMapKey, false); set => SetB(KeysFollowMapKey, value); }
+        /// <summary>Settings, Game, CAMERA: false = HIGH (default), true = GROUND (experimental): the local player plays from the
+        /// low third-person ground view (Camera.GroundView). Kept between launches.</summary>
+        public static bool GroundCamera { get => GetB(GroundCameraKey, false); set => SetB(GroundCameraKey, value); }
 
         // ---- video ----
-        /// <summary>The frame-rate limit choices in screen order; 0 = the display's refresh rate.</summary>
-        public static readonly int[] FpsCapOptions = { 30, 60, 120, 0 };
-        public const int DefaultFpsCap = 60;
+        /// <summary>The frame-rate limit choices in screen order (FramePolicy.CapChoices): 30, 60, 120, 144, 0 = OFF (locked to
+        /// the display), -1 = UNLIMITED (vsync off).</summary>
+        public static readonly int[] FpsCapOptions = CriticalMass.Runtime.Game.FramePolicy.CapChoices;
+        public const int DefaultFpsCap = CriticalMass.Runtime.Game.FramePolicy.DefaultCap;   // perf-smooth-1: OFF (vsync, one frame per refresh)
 
         /// <summary>
-        /// Frame-rate limit (cm.fpsCap): 30, 60, 120, or 0 for the display's refresh rate; default 60. Stored here; FrameGovernor
+        /// Frame-rate limit (cm.fpsCap): 30, 60, 120, 144, 0 (off: the display's refresh rate) or -1 (unlimited); default 60. Stored here; FrameGovernor
         /// applies it (Reapply on save).
         /// </summary>
         public static int FpsCap
@@ -144,6 +202,15 @@ namespace CriticalMass.Runtime.Menu
         public static bool BackgroundThrottle { get => GetB(BgThrottleKey, false); set { SetB(BgThrottleKey, value); CriticalMass.Runtime.Game.FrameGovernor.Reapply(); } }
 
         public static bool FullScreen { get => GetB(FullScreenKey, true); set { SetB(FullScreenKey, value); ApplyVideo(); } }
+
+        /// <summary>
+        /// polish-audit-1: stores the window mode the player picked outside Settings (Alt+Enter, the OS full-screen
+        /// control) without re-applying video, so Settings and the next launch agree with the screen (FrameGovernor).
+        /// </summary>
+        public static void RememberFullScreen(bool full)
+        {
+            if (GetB(FullScreenKey, true) != full) SetB(FullScreenKey, full);
+        }
         public static bool VSync { get => GetB(VSyncKey, true); set { SetB(VSyncKey, value); ApplyVideo(); } }
 
         /// <summary>Quality level index (QualitySettings.names); -1 = the project's default level.</summary>
@@ -224,14 +291,15 @@ namespace CriticalMass.Runtime.Menu
         {
             if (!Application.isPlaying) return;   // edit mode (tests): never touch the mixer asset or the editor's listener
             AudioMixer m = Mixer;
+            (float master, float music, float effects) = Mix(MasterVolume, MusicVolume, EffectsVolume, MuteMusic, MuteEffects, MuteInBackground, _appFocused);
             if (m != null)
             {
-                m.SetFloat(MasterParam, ToDecibels(MasterVolume));
-                m.SetFloat(MusicParam, ToDecibels(MusicVolume));
-                m.SetFloat(EffectsParam, ToDecibels(EffectsVolume));
+                m.SetFloat(MasterParam, ToDecibels(master));
+                m.SetFloat(MusicParam, ToDecibels(music));
+                m.SetFloat(EffectsParam, ToDecibels(effects));
                 AudioListener.volume = 1f;
             }
-            else AudioListener.volume = MasterVolume;
+            else AudioListener.volume = master;
         }
 
         /// <summary>True where the window may be changed (player builds; never the editor, batch mode or tests).</summary>
@@ -265,6 +333,7 @@ namespace CriticalMass.Runtime.Menu
         /// <summary>Applies every stored setting (boot).</summary>
         public static void ApplyAll()
         {
+            CriticalMass.Runtime.Hud.Style.CMTokens.ColourBlindTeams = ColourBlindTeams;
             ApplyAudio();
             ApplyVideo();
         }

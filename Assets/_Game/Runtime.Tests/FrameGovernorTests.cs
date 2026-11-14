@@ -9,15 +9,23 @@ namespace CriticalMass.Runtime.Tests
     /// <summary>DG-05 crash safety: frame cap, safe start, atomic files, the error-loop guard and the asset flags (pure parts).</summary>
     public sealed class FrameGovernorTests
     {
+
         [Test]
-        public void CapUsesVsyncWhenItDividesTheDisplayElseATargetFrameRate()
+        public void CapIsAlwaysVsyncLockedAtTheNearestRateAtOrAboveTheCap()
         {
             Assert.AreEqual((1, -1), FrameGovernor.FrameSettings(60, 60));
             Assert.AreEqual((2, -1), FrameGovernor.FrameSettings(60, 120));
             Assert.AreEqual((1, -1), FrameGovernor.FrameSettings(120, 120));
             Assert.AreEqual((2, -1), FrameGovernor.FrameSettings(30, 60));
-            Assert.AreEqual((0, 60), FrameGovernor.FrameSettings(60, 144), "144/60 does not divide: target 60 instead");
-            Assert.AreEqual((0, 120), FrameGovernor.FrameSettings(120, 60), "a cap above the display cannot be vsync-locked");
+            Assert.AreEqual((2, -1), FrameGovernor.FrameSettings(60, 144), "perf-smooth-1: 72 Hz on a 144 Hz panel, locked, no tearing");
+            Assert.AreEqual((2, -1), FrameGovernor.FrameSettings(60, 165), "82.5 Hz on 165");
+            Assert.AreEqual((1, -1), FrameGovernor.FrameSettings(60, 75), "75 on 75");
+            Assert.AreEqual((1, -1), FrameGovernor.FrameSettings(144, 144));
+            Assert.AreEqual((1, -1), FrameGovernor.FrameSettings(144, 120), "a cap above the display runs at the display rate");
+            Assert.AreEqual((1, -1), FrameGovernor.FrameSettings(120, 60), "a cap above the display runs at the display rate");
+            Assert.AreEqual((1, -1), FrameGovernor.FrameSettings(120, 144));
+            Assert.AreEqual((4, -1), FrameGovernor.FrameSettings(30, 240), "never more than 4");
+            Assert.AreEqual((0, -1), FrameGovernor.FrameSettings(FramePolicy.Unlimited, 144), "UNLIMITED: vsync off, no target");
             Assert.AreEqual((1, -1), FrameGovernor.FrameSettings(0, 144), "0 = display rate");
             Assert.AreEqual((1, -1), FrameGovernor.FrameSettings(60, double.NaN), "unknown refresh counts as 60 Hz");
             Assert.AreEqual((1, -1), FrameGovernor.FrameSettings(60, 59.94));
@@ -26,8 +34,17 @@ namespace CriticalMass.Runtime.Tests
         [Test]
         public void PrefsAreSanitisedAndMenusNeverExceedSixty()
         {
-            Assert.AreEqual(60, FrameGovernor.SanitiseCap(999));
-            Assert.AreEqual(60, FrameGovernor.SanitiseCap(-1));
+            Assert.AreEqual(FramePolicy.DefaultCap, FrameGovernor.SanitiseCap(999));
+            Assert.AreEqual(FramePolicy.DefaultCap, FrameGovernor.SanitiseCap(-2));
+            Assert.AreEqual(0, FramePolicy.DefaultCap, "perf-smooth-1: default OFF = vsync on, one frame per refresh");
+            Assert.AreEqual(FramePolicy.Unlimited, FrameGovernor.SanitiseCap(-1), "perf-smooth-1: UNLIMITED is a choice");
+            Assert.AreEqual(144, FrameGovernor.SanitiseCap(144));
+            Assert.AreEqual(60, FrameGovernor.EffectiveCap(FramePolicy.Unlimited, true), "menus never unlimited");
+            Assert.AreEqual(60, FramePolicy.BackgroundCap(FramePolicy.Unlimited, false), "unfocused never unbounded");
+            Assert.AreEqual(FramePolicy.TitleCap, FramePolicy.TitleCapFor(FramePolicy.Unlimited));
+            Assert.AreEqual(20, FramePolicy.TitleCap, "perf-60hz-32p: idle title at 20 fps (idle CPU budget)");
+            Assert.AreEqual((3, -1), FrameGovernor.FrameSettings(FramePolicy.TitleCap, 60), "vsync 3 on a 60 Hz panel");
+            Assert.AreEqual(60, FramePolicy.EffectiveCap(FramePolicy.Unlimited, false, true), "battery caps unlimited at 60");
             Assert.AreEqual(30, FrameGovernor.SanitiseCap(30));
             Assert.AreEqual(0, FrameGovernor.SanitiseCap(0));
             Assert.AreEqual(60, FrameGovernor.EffectiveCap(120, true));
@@ -132,6 +149,21 @@ namespace CriticalMass.Runtime.Tests
             Assert.IsFalse(PerfOverlay.FlagTexture(3840, 2160, false, true));
             Assert.AreEqual(1024L * 1024 * 4, PerfOverlay.TextureBytes(1024, 1024, GraphicsFormat.R8G8B8A8_SRGB, 1, 1));
             Assert.AreEqual(1024L * 1024 * 4 * 4 / 3, PerfOverlay.TextureBytes(1024, 1024, GraphicsFormat.R8G8B8A8_SRGB, 11, 1));
+        }
+
+        [Test]
+        public void TitleCapTripCanNeverCarryTheTimerIntoTheMatch()
+        {
+            // c378cac: 60 fps against the title's vsync-3 cap of 20 trips the guard; the match's cap is judged afresh.
+            var t = new TimedCapGuard();
+            for (int i = 0; i < 300; i++) t.Feed(1.0 / 60, FramePolicy.TitleCap, true, 60);
+            Assert.IsTrue(t.ForceTimed, "60 fps against a vsync-3 cap of 20: not holding");
+            t.Feed(1.0 / 60, 0, true, 60);
+            Assert.IsFalse(t.ForceTimed, "the match's cap is judged afresh");
+            Assert.AreEqual((1, -1), t.Settings(0, 60));
+            // and a smooth match after the title never trips it again
+            for (int i = 0; i < 1200; i++) t.Feed(1.0 / 60, 0, true, 60);
+            Assert.IsFalse(t.ForceTimed);
         }
     }
 }

@@ -1,3 +1,4 @@
+using System;
 using CriticalMass.Runtime.Game;
 using CriticalMass.Runtime.Input;
 using CriticalMass.Sim.Config;
@@ -23,7 +24,8 @@ namespace CriticalMass.Runtime.Camera
     {
         public SimDriverBehaviour Driver;
 
-        private readonly CameraFollow _follow = new CameraFollow(HumanInputState.ScreenUpX, HumanInputState.ScreenUpZ);
+        private CameraFollow _follow = new CameraFollow(HumanInputState.ScreenUpX, HumanInputState.ScreenUpZ);
+        private bool _yawChecked;
         private HumanInputSource _input;
         private bool _override;
         private double _ox, _oz;
@@ -63,17 +65,34 @@ namespace CriticalMass.Runtime.Camera
         /// <summary>Back to following the human; the spring flies home.</summary>
         public void ClearOverride() => _override = false;
 
-        private void LateUpdate()
+        private void LateUpdate() { var cost = CriticalMass.Runtime.Game.FrameCost.Enter(); LateUpdateCost(); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.Camera, cost); }
+
+        void LateUpdateCost()
         {
             if (Driver == null) return;
             World w = Driver.World;
             if (w == null || w.ActorCount <= 0) return;
 
+            // feat/ground-camera: a -cameraYaw run (automation only) turns the camera; the 2 u screen-up offset must turn
+            // with it, or the player sits off centre in the yaw-0 grab. The default yaw 45 keeps the static basis exactly.
+            if (!_yawChecked)
+            {
+                _yawChecked = true;
+                double yaw = Driver.Config.Render.CameraYawDeg;
+                if (Math.Abs(yaw - 45) > 1e-9)
+                {
+                    GroundCamera.Basis(360 - yaw, out double ux, out double uz, out _, out _);
+                    _follow = new CameraFollow(ux, uz);
+                }
+            }
             double a = Driver.Alpha;
             MapDef map = w.Map;
             BoundsDef b = map.Bounds;
             double inset = Driver.Config.Render.CameraBoundsInset;
             if (_input == null) _input = Driver.GetComponent<HumanInputSource>();
+            // perf-60hz-32p stress scene (-stressHill with -autoplay): the camera stays on the hill, where ActorViews draws everyone.
+            if (CriticalMass.Runtime.Game.AutoplayArgs.Current.Autoplay && CriticalMass.Runtime.Game.AutoplayArgs.Current.StressHill && !_override)
+                SetOverride(map.Hill.X, map.Hill.Z);
 
             var f = new CameraFollowInput
             {

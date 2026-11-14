@@ -133,6 +133,19 @@ namespace CriticalMass.Runtime.Tests
         }
 
         [Test]
+        public void TheQueueSaysWhenALineHandedOverNowCouldStartNow()
+        {
+            // The hill secret is only handed to the announcer when it will really be said; inside the cooldown it would
+            // age out unheard, so the secret shows its own caption instead (Announcer.Free reads CooledDown).
+            var q = new AnnouncerQueue();
+            Assert.IsTrue(q.CooledDown(0));
+            q.Enqueue(AnnouncerTrigger.HillTaken, 10);
+            Assert.IsTrue(q.TryNext(10, out _));
+            Assert.IsFalse(q.CooledDown(12));
+            Assert.IsTrue(q.CooledDown(10 + AnnouncerQueue.CooldownSeconds));
+        }
+
+        [Test]
         public void BurstPlaysOneAndDropsLinesOlderThanTwoSeconds()
         {
             var q = new AnnouncerQueue();

@@ -101,6 +101,9 @@ namespace CriticalMass.Runtime.Tests
             {
                 foreach (Text t in s.Canvas.GetComponentsInChildren<Text>(true))
                 {
+                    // Integration batch 5: keycap letters are glyph art sized from the glyph's height (InputGlyphView.CapScale),
+                    // not menu lines (the Home fighter's ENTER CUSTOMISE chip is the first screen to build one in this test).
+                    if (t.GetComponentInParent<InputGlyphView>(true) != null) continue;
                     int size = t.resizeTextForBestFit ? t.resizeTextMaxSize : t.fontSize;
                     if (s.TextScale != null && Mathf.Abs(s.TextScale.Applied - 1f) > 1e-3f) continue;
                     CollectionAssert.Contains(UiScale.TypeSteps, size, $"{name}: {Path(t.transform)} is {size} px, off the type scale");
@@ -343,7 +346,7 @@ namespace CriticalMass.Runtime.Tests
                 AchievementToast.ToastW, AchievementToast.ToastH), HudZone.Toast);
             AssertIn("mascot (upper)", new Rect(MascotGuide.Margin, MascotGuide.UpperY, MascotGuide.PanelW, MascotGuide.PanelH), HudZone.Guide);
             AssertIn("mascot (lower)", new Rect(MascotGuide.Margin, MascotGuide.LowerY, MascotGuide.PanelW, MascotGuide.PanelH), HudZone.Guide);
-            AssertIn("death recap", new Rect(960f - DeathRecap.CardW * 0.5f, 540f - DeathRecap.OffsetY - DeathRecap.CardH * 0.5f, DeathRecap.CardW, DeathRecap.CardH), HudZone.Lower);
+            AssertIn("death recap", new Rect(960f - DeathRecap.CardW * 0.5f, DeathRecap.TopY, DeathRecap.CardW, DeathRecap.CardH), HudZone.Callout);   // owner walk 1: centre lane
             AssertIn("you are the ... line", new Rect(960f - PlayerPresence.IntroW * 0.5f, 1080f - 250f - 120f, PlayerPresence.IntroW, 120f), HudZone.Lower);
         }
 

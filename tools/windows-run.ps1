@@ -3,8 +3,9 @@
 # Pass A (logic): -batchmode -nographics autoplay match; Pass B (graphics): a real Direct3D 11 window at 1280x720 for one
 # autoplay match with screenshots at the title and mid-match. Uses its own data folder (never your settings). At the end
 # it prints PASS or FAIL per pass and leaves CriticalMass-windows-test-<time>.zip on your Desktop: send that zip back.
-# Exit code: 0 when both passes pass. Optional: -Quick (Pass B only, 4x speed), -SkipB (Pass A only, the CI logic run).
-param([switch]$Quick, [switch]$SkipB, [string]$Exe = ".\CriticalMass.exe")
+# Exit code: 0 when both passes pass. Optional: -Quick (Pass B only, 4x speed), -SkipB (Pass A only, the CI logic run),
+# -Trace (Pass B also records the Direct3D 11 shader warm-up states to test-<time>\data-b\traces, ShaderWarmup / DG-59).
+param([switch]$Quick, [switch]$SkipB, [switch]$Trace, [string]$Exe = ".\CriticalMass.exe")
 $ErrorActionPreference = "Stop"
 if (-not (Test-Path $Exe)) { Write-Host "CriticalMass.exe is not in this folder. Run this from the unzipped game folder."; exit 66 }
 $stamp = (Get-Date).ToUniversalTime().ToString("yyyyMMdd-HHmmss")
@@ -33,7 +34,9 @@ if (-not $Quick) {
 if (-not $SkipB) {
   $speed = if ($Quick) { '4' } else { '2' }
   Write-Host "Pass B: a real game window for one match (leave it alone; about 4 to 8 minutes)..."
-  $b = Start-Process $Exe -ArgumentList '-force-d3d11','-screen-fullscreen','0','-screen-width','1280','-screen-height','720','-autoplay','-quitAfterMatch','-autoplaySpeed',$speed,'-shots','-dataDir',"$out\data-b",'-logFile',"$out\Player-B.log",'-perfLog',"$out\perf-B.json" -Wait -PassThru
+  $argsB = @('-force-d3d11','-screen-fullscreen','0','-screen-width','1280','-screen-height','720','-autoplay','-quitAfterMatch','-autoplaySpeed',$speed,'-shots','-dataDir',"$out\data-b",'-logFile',"$out\Player-B.log",'-perfLog',"$out\perf-B.json")
+  if ($Trace) { $argsB += '-traceStates' }
+  $b = Start-Process $Exe -ArgumentList $argsB -Wait -PassThru
   $codes.B = $b.ExitCode
   $results.B = Check-Log "$out\Player-B.log" $true
   foreach ($s in 'shot-title.png','shot-mid.png') { if (-not (Test-Path "$out\data-b\$s")) { $results.B += ", missing $s" } }

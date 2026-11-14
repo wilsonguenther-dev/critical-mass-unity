@@ -44,6 +44,7 @@ namespace CriticalMass.Runtime.View
         private readonly Dictionary<(int, string), string> _names = new Dictionary<(int, string), string>();
         private UnityEngine.Camera _cam;
         private Vector3 _camPos, _targetPos;
+        private int _lodSelf;
 
         private SimDriverBehaviour _driver;
         private ArtCatalog _catalog;
@@ -194,7 +195,7 @@ namespace CriticalMass.Runtime.View
             s.Push(m);
         }
 
-        private void LateUpdate() { long c = CriticalMass.Runtime.Game.FrameCost.Begin(); Sync(Time.deltaTime); CriticalMass.Runtime.Game.FrameCost.End(CriticalMass.Runtime.Game.FrameCost.Slot.ActorViews, c); }
+        private void LateUpdate() { if (CriticalMass.Runtime.Hud.TitleBackdrop.Frozen) return; var c = CriticalMass.Runtime.Game.FrameCost.Enter(); Sync(Time.deltaTime); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.ActorViews, c); }
 
         /// <summary>
         /// Contract C3 (DG-71): called once per drawn actor (and the Kaiju, actor -2) after its pose is evaluated and before
@@ -229,7 +230,13 @@ namespace CriticalMass.Runtime.View
             if (_cam == null || !_cam.isActiveAndEnabled) _cam = UnityEngine.Camera.main;
             _camPos = _cam != null ? _cam.transform.position : Vector3.zero;
             // Contract C4: LOD by distance to the camera target (the local player, whom the camera follows).
-            if (w.ActorCount > 0 && w.Actors[0].Alive) _targetPos = SimSpace.ToWorld(Lerp(w.PrevX[0], w.X[0], a), 0, Lerp(w.PrevZ[0], w.Z[0], a));
+            // feat/ground-camera: a low camera follows another body (spectating, knocked out): LOD by distance to it, and it
+            // counts as "self" (always LOD0), so the rule holds from that angle too.
+            _lodSelf = CriticalMass.Runtime.Camera.GroundView.LodActive ? CriticalMass.Runtime.Camera.GroundView.LodSelf : 0;
+            if (CriticalMass.Runtime.Camera.GroundView.LodActive) _targetPos = CriticalMass.Runtime.Camera.GroundView.LodAnchor;
+            else if (w.ActorCount > 0 && w.Actors[0].Alive) _targetPos = SimSpace.ToWorld(Lerp(w.PrevX[0], w.X[0], a), 0, Lerp(w.PrevZ[0], w.Z[0], a));
+            if (_stressHill) _targetPos = SimSpace.ToWorld(map.Hill.X, 0, map.Hill.Z);
+            _lodCut = CrowdCutNow(w, map, a);
             int models = 0;
             Anim.AnimLod.BeginFrame();
 
@@ -245,6 +252,16 @@ namespace CriticalMass.Runtime.View
             _hill.localRotation = Quaternion.identity;
             _hill.localScale = new Vector3(d, HillThickness, d);
             ActiveModelCount = models;
+        }
+
+        /// <summary>feat/ground-camera: horizontal radius around the low camera inside which other fighters are not drawn.</summary>
+        public const float NearLensMetres = 1.6f;
+
+        private bool NearLens(double x, double h, double z)
+        {
+            Vector3 p = SimSpace.ToWorld(x, h, z);
+            float dx = p.x - _camPos.x, dz = p.z - _camPos.z;
+            return dx * dx + dz * dz < NearLensMetres * NearLensMetres && _camPos.y < p.y + 2.6f;
         }
 
         private bool SyncActor(int i, World w, GameConfig cfg, MapDef map, double a, double simTime, double dSim)
@@ -281,6 +298,7 @@ namespace CriticalMass.Runtime.View
 
             double x = hasFx && fx.Corpse ? fx.CorpseX : Lerp(w.PrevX[i], w.X[i], a);
             double z = hasFx && fx.Corpse ? fx.CorpseZ : Lerp(w.PrevZ[i], w.Z[i], a);
+            if (_stressHill) StressPlace(map.Hill, i, ref x, ref z);
             double h = GroundHeight(map, x, z);
             Quaternion facing = Quaternion.Euler(0f, SimSpace.YawDeg(actor.Facing), 0f);
             if (hasFx) facing = fx.Lean * facing;
@@ -299,10 +317,17 @@ namespace CriticalMass.Runtime.View
             }
 
             ModelView m = slot.Model;
+            // feat/ground-camera: from the low camera a fighter standing at the lens fills a third of the frame and hides the
+            // shot; bodies within NearLensMetres of the camera (horizontally, other than the followed one) are not drawn.
+            if (CriticalMass.Runtime.Camera.GroundView.LodActive && i != _lodSelf && NearLens(x, h, z))
+            {
+                m.SetActive(false);
+                return false;
+            }
             m.SetActive(true);
             m.ApplyTier();
             QualityRow row = QualityTable.Current;
-            m.SetLod(AnimLod.PickLod(i == 0, Vector3.Distance(SimSpace.ToWorld(x, 0, z), _targetPos), row));
+            m.SetLod(AnimLod.PickLod(i == _lodSelf, Vector3.Distance(SimSpace.ToWorld(x, 0, z), _targetPos), _lodCut, row));
             Vector3 basePos = SimSpace.ToWorld(x, h, z);
             m.Transform.localPosition = basePos + (hasFx ? fx.Nudge : Vector3.zero) + JumpLift.Offset(w, map, i, a, x, z); // DG-02 jump arc
             Material teamMat = ArtMaterials.ForTeam(m.Spec, actor.Team);
@@ -311,6 +336,42 @@ namespace CriticalMass.Runtime.View
             slot.Anim.Pose(m, w, cfg, i, a, simTime, dSim, basePos, _fx, hasFx, in fx, ref _poseState);
             PostPose(i, m, in _poseState);
             return true;
+        }
+
+        private float _lodCut = float.PositiveInfinity;
+        private float[] _lodScratch = new float[64];
+
+        /// <summary>perf-60hz-32p crowd budget: the LOD0 cut distance this frame (the row's Lod0Budget-th nearest fighter
+        /// other than your own, by the same drawn position and target SyncActor uses).</summary>
+        private float CrowdCutNow(World w, MapDef map, double a)
+        {
+            int budget = QualityTable.Current.Lod0Budget;
+            if (budget < 0) return float.PositiveInfinity;
+            if (_lodScratch.Length < w.ActorCount) _lodScratch = new float[w.ActorCount];
+            int n = 0;
+            for (int i = 1; i < w.ActorCount && i < _actors.Length; i++)
+            {
+                if (!w.Actors[i].Alive) continue;
+                double x = Lerp(w.PrevX[i], w.X[i], a), z = Lerp(w.PrevZ[i], w.Z[i], a);
+                if (_stressHill) StressPlace(map.Hill, i, ref x, ref z);
+                _lodScratch[n++] = Vector3.Distance(SimSpace.ToWorld(x, 0, z), _targetPos);
+            }
+            return AnimLod.CrowdCut(_lodScratch, n, budget);
+        }
+
+        /// <summary>perf-60hz-32p (-stressHill, automation only): read once; the stress scene draws every fighter at the hill.</summary>
+        private static readonly bool _stressHill = AutoplayArgs.Current.Autoplay && AutoplayArgs.Current.StressHill;
+
+        /// <summary>The stress scene's drawn spot (view only): a fighter farther than StressRadius from the hill is drawn on a
+        /// ring 2 to 9 m out along its own bearing (spread by actor index), so all 32 stand on screen and keep animating.</summary>
+        internal static void StressPlace(HillDef hill, int i, ref double x, ref double z)
+        {
+            const double StressRadius = 9.0;
+            double dx = x - hill.X, dz = z - hill.Z, d = Math.Sqrt(dx * dx + dz * dz);
+            if (d <= StressRadius) return;
+            double r = 2.0 + 7.0 * ((i * 37) % 32) / 31.0;
+            x = hill.X + dx / d * r;
+            z = hill.Z + dz / d * r;
         }
 
         private int SyncKaiju(World w, GameConfig cfg, MapDef map, double a, double simTime, double dSim)
@@ -399,7 +460,17 @@ namespace CriticalMass.Runtime.View
             SetActive(_spikes, spikes);
             if (spikes)
             {
-                _spikes.Transform.localPosition = SimSpace.ToWorld(k.TelegraphX, GroundHeight(map, k.TelegraphX, k.TelegraphZ), k.TelegraphZ);
+                // fix/kaiju-alive-1 (nothing-glides audit): the spikes were a static mesh popped in for the whole telegraph.
+                // They now push up out of the ground over the wind-up (eased, overshoot near the end), turn slowly, and
+                // tremble in the last quarter before the slam lands. View only; the ring on the ground stays the hitbox.
+                double tTotal = Effects.Telegraphs.SlamTotalSim(w);
+                float u = Mathf.Clamp01(1f - (float)(k.TelegraphIn / tTotal));
+                float rise = u < 0.85f ? Mathf.SmoothStep(0f, 1.08f, u / 0.85f) : Mathf.Lerp(1.08f, 1f, (u - 0.85f) / 0.15f);
+                float shake = u > 0.75f ? 0.04f * Mathf.Sin((float)(simTime * 70.0)) * (u - 0.75f) * 4f : 0f;
+                Vector3 basePos = SimSpace.ToWorld(k.TelegraphX, GroundHeight(map, k.TelegraphX, k.TelegraphZ), k.TelegraphZ);
+                _spikes.Transform.localPosition = basePos + new Vector3(shake, -0.6f * (1f - rise), -shake);
+                _spikes.Transform.localScale = Vector3.Scale(_spikes.BaseScale, new Vector3(1f, Mathf.Max(0.05f, rise), 1f));
+                _spikes.SetFacing(Quaternion.Euler(0f, (float)(simTime * 25.0) % 360f, 0f));
                 _spikes.SetMaterial(ArtMaterials.ForGlow(_spikes.Spec, ArtMapping.KaijuGlow(k.State)));
                 count++;
             }
@@ -463,10 +534,11 @@ namespace CriticalMass.Runtime.View
                 m.Transform.localPosition = SimSpace.ToWorld(x, GroundHeight(map, x, z), z);
                 m.Transform.localRotation = Quaternion.identity;
                 string state = ArtMapping.BarricadeState(b.Hp, cfg.Abilities.MinerBarricade.MaxHp);
-                foreach (Renderer r in m.Renderers)
+                for (int k = 0; k < m.Renderers.Length; k++)
                 {
-                    bool show = r.name == state;
-                    if (r.enabled != show) r.enabled = show;
+                    Renderer r = m.Renderers[k];
+                    bool show = m.RendererNames[k] == state;   // cached names: Object.name allocates on every read
+                    if (r != null && r.enabled != show) r.enabled = show;
                 }
                 m.SetMaterial(ArtMaterials.ForTeam(m.Spec, b.Team));
             }

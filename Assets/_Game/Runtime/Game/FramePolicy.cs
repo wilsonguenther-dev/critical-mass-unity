@@ -13,11 +13,17 @@ namespace CriticalMass.Runtime.Game
         // Quality level indices in ProjectSettings/QualitySettings.asset (Very Low, Low, Medium, High, Very High, Ultra).
         public const int LevelVeryLow = 0, LevelLow = 1, LevelMedium = 2, LevelHigh = 3;
 
-        public const int DefaultCap = 60;
+        /// <summary>perf-smooth-1: the default limit is OFF, i.e. vsync on and one frame per display refresh (60 on a 60 Hz
+        /// screen, 120 on a 120 Hz one). A 60 cap on a 120 Hz screen means vsync every 2 refreshes, and on this Mac 87% of
+        /// the frames over 33 ms were that 2-refresh slot holding a slightly late frame for a whole extra 60 Hz frame
+        /// (3.7% of frames at High; locked to the display: 0.02%). The 30/60/120/144 choices keep the whole-divisor rule.</summary>
+        public const int DefaultCap = 0;
         public const int MenuCap = 60;
         public const int BatteryMenuCap = 30;
-        /// <summary>The title screen (a backdrop match behind it) at 30 fps: idle CPU budget (smoke measured 36.7% at 60).</summary>
-        public const int TitleCap = 30;
+        /// <summary>The idle title screen (a live 16v16 backdrop match behind the logo): 20 fps (vsync 3 on 60 Hz). perf-60hz-32p:
+        /// at 30 it cost 59 to 61% of a core on the 8 GB M1 Air against the 35% idle budget (main thread 27%, render thread
+        /// 15%, job workers and audio the rest). The story film and the attract tour over the title keep the menu rate.</summary>
+        public const int TitleCap = 20;
         public const int BatteryMatchCap = 60;
         public const int SavePowerBackgroundFps = 15;
         public const int MinBackgroundFps = 30;
@@ -36,22 +42,38 @@ namespace CriticalMass.Runtime.Game
         /// <summary>A long frame (seconds) that counts the session as unclean: Windows resets a GPU that stalls 2 s (TDR).</summary>
         public const double GpuStallSeconds = 1.5;
 
-        /// <summary>vSyncCount and targetFrameRate for a cap (0 = display rate) on a display of refreshHz.</summary>
+        /// <summary>perf-smooth-1: the "Unlimited" frame-rate choice (vsync off, no target).</summary>
+        public const int Unlimited = -1;
+
+        /// <summary>The frame-rate limit choices (cm.fpsCap) in screen order: 0 = OFF (no limit, locked to the display by
+        /// vsync), Unlimited = vsync off with no target.</summary>
+        public static readonly int[] CapChoices = { 30, 60, 120, 144, 0, Unlimited };
+
+        /// <summary>
+        /// vSyncCount and targetFrameRate for a cap (0 = display rate, Unlimited = none) on a display of refreshHz, vsync on.
+        /// perf-smooth-1 rule: always vsync-locked (no tearing, even frame spacing), at the display rate divided by the
+        /// largest whole number that keeps the rate at or above the cap (1 to 4): 60 on 60 and 120 Hz, 72 on 144 Hz, 82.5 on
+        /// 165 Hz, 75 on 75 Hz; a cap above the display runs at the display rate. The old timed cap (vsync off, target 60 on
+        /// 144 Hz) tore and paced unevenly on fixed-refresh panels.
+        /// </summary>
         public static (int vSync, int target) FrameSettings(int cap, double refreshHz)
         {
+            if (cap == Unlimited) return (0, -1);
             if (cap <= 0) return (1, -1);
             if (double.IsNaN(refreshHz) || refreshHz < 20) refreshHz = 60;
-            int n = (int)Math.Round(refreshHz / cap);
-            if (n >= 1 && n <= 4 && Math.Abs(refreshHz / n - cap) <= cap * 0.1) return (n, -1);
-            return (0, cap);
+            int n = (int)Math.Floor(refreshHz / cap + 0.02);
+            return (Math.Max(1, Math.Min(4, n)), -1);
         }
 
-        /// <summary>A cap read from PlayerPrefs: one of 30, 60, 120, 0; anything else is 60.</summary>
-        public static int SanitiseCap(int v) => v == 30 || v == 60 || v == 120 || v == 0 ? v : DefaultCap;
+        /// <summary>A cap read from PlayerPrefs: one of CapChoices; anything else is 60.</summary>
+        public static int SanitiseCap(int v) => Array.IndexOf(CapChoices, v) >= 0 ? v : DefaultCap;
 
-        /// <summary>The cap in force: title, pause and menus never above 60 (0 counts as above).</summary>
+        /// <summary>true for "no limit" choices (0 and Unlimited): menus, battery and the title count them as above any cap.</summary>
+        static bool NoLimit(int cap) => cap == 0 || cap == Unlimited;
+
+        /// <summary>The cap in force: title, pause and menus never above 60 (0 and Unlimited count as above).</summary>
         public static int EffectiveCap(int prefCap, bool menuLike) =>
-            menuLike && (prefCap == 0 || prefCap > MenuCap) ? MenuCap : prefCap;
+            menuLike && (NoLimit(prefCap) || prefCap > MenuCap) ? MenuCap : prefCap;
 
         /// <summary>DG-49: on battery, menus at 30 and matches at 60 or below.</summary>
         public static int EffectiveCap(int prefCap, bool menuLike, bool onBattery)
@@ -59,17 +81,18 @@ namespace CriticalMass.Runtime.Game
             int cap = EffectiveCap(prefCap, menuLike);
             if (!onBattery) return cap;
             int limit = menuLike ? BatteryMenuCap : BatteryMatchCap;
-            return cap == 0 || cap > limit ? limit : cap;
+            return NoLimit(cap) || cap > limit ? limit : cap;
         }
 
         /// <summary>The title screen's cap: never above TitleCap (0 = display rate counts as above).</summary>
-        public static int TitleCapFor(int cap) => cap == 0 || cap > TitleCap ? TitleCap : cap;
+        public static int TitleCapFor(int cap) => NoLimit(cap) || cap > TitleCap ? TitleCap : cap;
 
         /// <summary>DG-51: unfocused, keep the normal cap (never below 30); "save power in background" brings back 15.</summary>
         public static int BackgroundCap(int foregroundCap, bool savePower)
         {
             if (savePower) return SavePowerBackgroundFps;
             if (foregroundCap == 0) return foregroundCap;
+            if (foregroundCap == Unlimited) return MenuCap;   // unfocused never runs unbounded
             return Math.Max(MinBackgroundFps, foregroundCap);
         }
 
@@ -139,6 +162,33 @@ namespace CriticalMass.Runtime.Game
         }
 
         /// <summary>
+        /// polish-audit-1: the window size after the player (or the OS) switched a full-screen window to a window with
+        /// Alt+Enter or the title-bar control. The engine keeps the full display size, so the window's title bar and edges
+        /// sit under the taskbar or off the screen; the game sizes it to a 16:9 window of about two thirds of the display
+        /// (never under 1280x720 unless the display is smaller, never larger than the display). A window that is already
+        /// clearly smaller than the display is left alone: (0, 0) means "keep it".
+        /// </summary>
+        public static (int w, int h) WindowAfterExternalToggle(int w, int h, int nativeW, int nativeH)
+        {
+            if (nativeW <= 0 || nativeH <= 0) return (0, 0);
+            if (w < nativeW * 0.9 || h < nativeH * 0.9) return (0, 0);
+            double tw = nativeW * 2.0 / 3.0, th = tw * 9.0 / 16.0;
+            if (th > nativeH * 2.0 / 3.0) { th = nativeH * 2.0 / 3.0; tw = th * 16.0 / 9.0; }
+            if (tw < 1280) { tw = 1280; th = 720; }
+            (int cw, int ch) = ClampToNative((int)Math.Round(tw), (int)Math.Round(th), nativeW, nativeH);
+            return (cw, ch);
+        }
+
+        /// <summary>
+        /// polish-audit-1: true when the window mode changed without the game asking for it (Alt+Enter, the macOS
+        /// full-screen control): the stored "Display" setting must follow, or Settings shows FULL SCREEN over a window and
+        /// the next launch silently undoes the player's choice. A change the game itself requested within the last
+        /// 3 seconds (RequestWindow) is not external.
+        /// </summary>
+        public static bool IsExternalModeChange(bool modeChanged, bool requestedThisMode, double secondsSinceRequest) =>
+            modeChanged && !(requestedThisMode && secondsSinceRequest >= 0 && secondsSinceRequest <= 3.0);
+
+        /// <summary>
         /// DG-62 safe-mode policy: safe only when the unclean run lasted under 60 s (a crash at startup) or after two unclean
         /// runs in a row (uncleanStreak counts the previous run). -safe always wins.
         /// </summary>
@@ -173,48 +223,96 @@ namespace CriticalMass.Runtime.Game
     /// <summary>
     /// DG-49 safety net: when the measured frame rate stays above 1.5 times the cap for 2 s while vsync is meant to hold it
     /// (display asleep, window hidden, a panel that ignores vSyncCount 2), switch to a timed cap (vsync off, target = cap).
+    /// perf-60hz-32p: the display-rate default (cap 0) is covered too (its cap is the refresh rate; batch 6 left it
+    /// unguarded), and so is the opposite failure: vsync presents that stall for the drawable timeout (about 1 s: a sleeping
+    /// or occluded display; the Air ran 50 such frames a minute with its panel off). StallFrames frames of StallSeconds or
+    /// more inside StallWindowSeconds while vsync is on switch to the timed cap as well.
     /// </summary>
     public sealed class TimedCapGuard
     {
+        /// <summary>The drawable-timeout signature: a vsync frame of 0.9 to 1.25 s (CAMetalLayer gives up after about 1 s).
+        /// Loading frames are not in that band five times in 20 s.</summary>
+        public const double StallSeconds = 0.9, StallMaxSeconds = 1.25;
+        public const int StallFrames = 5;
+        public const double StallWindowSeconds = 20.0;
         double _age;
         int _frames;
-        int _cap = -1;
+        int _cap = -2;
+        double _stallAge;
+        int _stalls;
 
         /// <summary>true once the timed cap took over (until Reset).</summary>
         public bool ForceTimed { get; private set; }
 
+        /// <summary>Why the timed cap took over ("" while it has not).</summary>
+        public string Why { get; private set; } = "";
+
         public void Reset()
         {
             ForceTimed = false;
+            Why = "";
             _age = 0;
             _frames = 0;
+            _stallAge = 0;
+            _stalls = 0;
         }
 
-        /// <summary>One frame of dt seconds at this cap; vsyncActive: vsync is what holds the cap now.</summary>
-        public void Feed(double dt, int cap, bool vsyncActive)
+        /// <summary>One frame of dt seconds at this cap; vsyncActive: vsync is what holds the cap now; refreshHz: the display.</summary>
+        public void Feed(double dt, int cap, bool vsyncActive, double refreshHz = 60)
         {
             if (cap != _cap)
             {
+                // perf-60hz-32p: a new cap is judged afresh. The timed cap used to stick across caps: on the Air the 20 fps
+                // title (vsync 3, hidden window) tripped it and the whole match then ran on a 60 timer (5.6% of frames at
+                // 33 ms or more against 0.16% on vsync 1).
                 _cap = cap;
+                ForceTimed = false;
+                Why = "";
                 _age = 0;
                 _frames = 0;
+                _stallAge = 0;
+                _stalls = 0;
             }
-            if (cap <= 0 || ForceTimed) return;
+            if (cap < 0 || ForceTimed) return;
+            if (double.IsNaN(refreshHz) || refreshHz < 20) refreshHz = 60;
+            double rate = cap > 0 ? cap : refreshHz;
+            if (vsyncActive)
+            {
+                _stallAge += Math.Max(0, dt);
+                if (dt >= StallSeconds && dt <= StallMaxSeconds) _stalls++;
+                if (_stalls >= StallFrames)
+                {
+                    ForceTimed = true;
+                    Why = "vsync presents stalled (" + _stalls + " frames of about 1 s: display asleep or window occluded)";
+                    return;
+                }
+                if (_stallAge >= StallWindowSeconds)
+                {
+                    _stallAge = 0;
+                    _stalls = 0;
+                }
+            }
             _age += Math.Max(0, dt);
             _frames++;
             if (_age < FramePolicy.TimedCapWindowSeconds) return;
             double fps = _frames / _age;
-            if (vsyncActive && fps > cap * FramePolicy.TimedCapRatio) ForceTimed = true;
+            if (vsyncActive && fps > rate * FramePolicy.TimedCapRatio)
+            {
+                ForceTimed = true;
+                Why = "vsync not holding (" + Math.Round(fps) + " fps against " + Math.Round(rate) + ")";
+            }
             _age = 0;
             _frames = 0;
         }
 
-        /// <summary>The frame settings for a cap with the guard applied.</summary>
+        /// <summary>The frame settings for a cap with the guard applied (cap 0 timed at the display rate).</summary>
         public (int vSync, int target) Settings(int cap, double refreshHz)
         {
             (int v, int t) = FramePolicy.FrameSettings(cap, refreshHz);
-            if (ForceTimed && cap > 0) return (0, cap);
-            return (v, t);
+            if (!ForceTimed || cap < 0) return (v, t);
+            if (cap > 0) return (0, cap);
+            if (double.IsNaN(refreshHz) || refreshHz < 20) refreshHz = 60;
+            return (0, (int)Math.Round(refreshHz));
         }
     }
 

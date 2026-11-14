@@ -108,17 +108,24 @@ namespace CriticalMass.Runtime.Flow
             new MenuEntry { Id = Settings, Label = "SETTINGS", Order = 40, Builtin = true },
             new MenuEntry { Id = Spectate, Label = "SPECTATE", Order = 15, Builtin = true },
             new MenuEntry { Id = Codex, Label = "CODEX", Order = 50, Builtin = true },
+            new MenuEntry { Id = Intro, Label = "WATCH INTRO", Order = 55, Builtin = true },
             new MenuEntry { Id = Credits, Label = "CREDITS", Order = 60 },
             new MenuEntry { Id = Quit, Label = "QUIT", Order = 90, Builtin = true },
         };
 
         public const string Controls = "controls";
+        /// <summary>Story intro 2: replay the story intro (StoryIntro.Play) from the home screen.</summary>
+        public const string Intro = "intro";
         /// <summary>The first line: one press into a match with the last class and settings (Flow.PlayNow).</summary>
         public const string PlayNow = "playnow";
         /// <summary>Integration batch 2: watch a match (match setup opens on SPECTATE).</summary>
         public const string Spectate = "spectate";
 
         static List<Type> _types;
+        /// <summary>perf-title-start: the last InstallOverlays' total and its slowest overlay (the [CM.Load] boot line).</summary>
+        public static double LastInstallMs { get; private set; }
+        public static double SlowestMs { get; private set; }
+        public static string Slowest { get; private set; } = "";
         static bool _tutorialScanned;
         static MethodInfo _tutorial;
 
@@ -246,6 +253,7 @@ namespace CriticalMass.Runtime.Flow
         /// <summary>Adds every registered overlay in scope to game (once each); returns how many were added.</summary>
         public static int InstallOverlays(GameObject game)
         {
+            LastInstallMs = 0; SlowestMs = 0; Slowest = "";
             if (game == null) return 0;
             int added = 0;
             List<Type> types = OverlayTypes();
@@ -254,6 +262,7 @@ namespace CriticalMass.Runtime.Flow
                 Type t = types[i];
                 GameOverlayAttribute a = t.GetCustomAttribute<GameOverlayAttribute>(false);
                 if (!InScope(a.Scope, GameFlow.State) || game.GetComponent(t) != null) continue;
+                long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
                 try
                 {
                     game.AddComponent(t);
@@ -264,6 +273,9 @@ namespace CriticalMass.Runtime.Flow
                     // One broken overlay must never stop the game from building.
                     Debug.LogException(e);
                 }
+                double ms = (System.Diagnostics.Stopwatch.GetTimestamp() - t0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+                LastInstallMs += ms;
+                if (ms > SlowestMs) { SlowestMs = ms; Slowest = t.Name; }
             }
             return added;
         }

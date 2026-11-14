@@ -23,12 +23,18 @@ namespace CriticalMass.Runtime.View.Art
     {
         /// <summary>The first bone of the upper-body layer's mask (it and every transform under it).</summary>
         public const string UpperBodyRootBone = "spine";
+        /// <summary>The Kaiju rig's upper-body root and the clips it layers over its walk (fix/kaiju-alive-1).</summary>
+        public const string KaijuUpperBodyRootBone = "Spine";
+        public static readonly string[] KaijuUpperBodyClips = { ArtMapping.Swipe, ArtMapping.Roar };
 
         public readonly ArtEntry Entry;
         public readonly ModelSpec Spec;
         public readonly GameObject Root;
         public readonly Transform Transform;
         public readonly Renderer[] Renderers;
+
+        /// <summary>perf-smooth-1: each renderer's object name, read once (Object.name makes a new string on every read).</summary>
+        public readonly string[] RendererNames;
 
         private readonly Animator _animator;
         private PlayableGraph _graph;
@@ -125,6 +131,8 @@ namespace CriticalMass.Runtime.View.Art
             // fix/model-scale: the base size is stored once, from the imported prefab, before anything poses the model.
             BaseScale = Transform.localScale;
             Renderers = Root.GetComponentsInChildren<Renderer>(true);
+            RendererNames = new string[Renderers.Length];
+            for (int i = 0; i < Renderers.Length; i++) RendererNames[i] = Renderers[i].name;
             _slots = new Material[Renderers.Length][];
             _roles = new FighterLod.Role[Renderers.Length];
             _isBody = new bool[Renderers.Length];
@@ -144,6 +152,13 @@ namespace CriticalMass.Runtime.View.Art
                 if (r is SkinnedMeshRenderer smr) smr.updateWhenOffscreen = false;
             }
             Lod = Root.GetComponentInChildren<LODGroup>(true);
+            // fix/fighters-always-visible (2026-11-13): the game is the ONE owner of which LOD draws. The importer's LODGroup
+            // (built from the _LOD0/_LOD1 names, screen heights 0.25 / 0.01) picked LOD1 at the gameplay camera's distance
+            // while AnimLod.PickLod had LOD0 on (your fighter, everyone within 25 u): LOD0 was culled by the group, LOD1 was
+            // disabled by us, so the fighter drew nothing but its ring, name tag and shadow proxy. ForceLOD was meant to tie
+            // them together but it does not survive the pool (deactivate, reactivate) and SetLod skipped re-forcing an
+            // unchanged LOD. A disabled LODGroup culls nothing; ApplyDraws switches the renderers directly.
+            if (Lod != null) Lod.enabled = false;
             ApplyTier();
             SetLod(0);
 
@@ -175,10 +190,14 @@ namespace CriticalMass.Runtime.View.Art
                 _index[c.name] = i;
             }
 
-            Transform spine = Spec != null && Spec.Kind == ArtKind.Character ? FindDeep(Transform, UpperBodyRootBone) : null;
+            // fix/kaiju-alive-1: the Kaiju gets the upper layer too (its "Spine" subtree: torso, arms, neck, head; the legs and
+            // tail hang off Hips), so a claw or a roar plays over a walking stride instead of freezing the legs mid-step.
+            bool kaijuUpper = Spec != null && Spec.Kind == ArtKind.Kaiju && Spec.Key != ArtMapping.KaijuEgg;
+            Transform spine = Spec != null && Spec.Kind == ArtKind.Character ? FindDeep(Transform, UpperBodyRootBone)
+                : kaijuUpper ? FindDeep(Transform, KaijuUpperBodyRootBone) : null;
             int upperCount = 0;
             if (spine != null)
-                foreach (string u in ArtMapping.UpperBodyClips)
+                foreach (string u in kaijuUpper ? KaijuUpperBodyClips : ArtMapping.UpperBodyClips)
                     if (_index.ContainsKey(u)) _upperIndex[u] = upperCount++;
             _hasUpper = upperCount > 0;
             if (!_hasUpper)
@@ -289,7 +308,11 @@ namespace CriticalMass.Runtime.View.Art
         {
             if (Root.activeSelf == on) return;
             Root.SetActive(on);
-            if (on) _justActivated = true;
+            if (!on) return;
+            _justActivated = true;
+            // A pooled model comes back exactly as the game last chose (fix/fighters-always-visible): no LODGroup decides.
+            if (Lod != null && Lod.enabled) Lod.enabled = false;
+            if (_hasLod0 || _hasLod1) ApplyDraws();
         }
 
         /// <summary>
@@ -325,16 +348,16 @@ namespace CriticalMass.Runtime.View.Art
         }
 
         /// <summary>
-        /// Draws LOD 0 or 1 (contract C4; AnimLod.PickLod decides). Drives the importer's LODGroup when there is one, else
-        /// switches the renderers. A model without a LOD chain ignores the call (its meshes are LOD0 at every distance).
+        /// Draws LOD 0 or 1 (contract C4; AnimLod.PickLod decides) by switching the renderers; the importer's LODGroup is
+        /// kept disabled (fix/fighters-always-visible). A model without a LOD chain ignores the call (its meshes are LOD0 at
+        /// every distance).
         /// </summary>
         public void SetLod(int lod)
         {
             lod = lod <= 0 ? 0 : 1;
             if (lod == _lod) return;
             _lod = lod;
-            if (!_hasLod1 && !_hasLod0 && Lod == null) return;
-            if (Lod != null && !_hero) Lod.ForceLOD(lod);
+            if (!_hasLod1 && !_hasLod0) return;
             ApplyDraws();
         }
 
@@ -346,7 +369,7 @@ namespace CriticalMass.Runtime.View.Art
         {
             if (on == _hero) return;
             _hero = on;
-            if (Lod != null) Lod.enabled = !on;
+            if (Lod != null && Lod.enabled) Lod.enabled = false;   // never re-enabled: see the constructor
             _tierApplied = int.MinValue;
             ApplyTier();
             ApplyDraws();
@@ -512,8 +535,16 @@ namespace CriticalMass.Runtime.View.Art
         public void Dispose()
         {
             if (_graph.IsValid()) _graph.Destroy();
-            if (_mask != null) Object.Destroy(_mask);
-            if (Root != null) Object.Destroy(Root);
+            if (_mask != null) Kill(_mask);
+            if (Root != null) Kill(Root);
+        }
+
+        /// <summary>Integration batch 5: Destroy in play, DestroyImmediate in edit mode (the Barracks class chips swap the
+        /// preview model in EditMode tests; Destroy there logs an error and leaks the model).</summary>
+        static void Kill(Object o)
+        {
+            if (Application.isPlaying) Object.Destroy(o);
+            else Object.DestroyImmediate(o);
         }
     }
 }

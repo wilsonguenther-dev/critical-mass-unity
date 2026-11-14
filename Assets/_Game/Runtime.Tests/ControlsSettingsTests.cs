@@ -182,7 +182,11 @@ namespace CriticalMass.Runtime.Tests
             Assert.AreEqual("UP", ControlBindings.DisplayPath("<Keyboard>/upArrow"));
             Assert.AreEqual("E", ControlBindings.DisplayPath("<Keyboard>/e"));
             Assert.AreEqual("SPACE", ControlBindings.DisplayPath("<Keyboard>/space"));
-            Assert.AreEqual("LEFT CLICK", ControlBindings.PromptLabel(A("Attack"), ControlDevice.KeyboardMouse));
+            // controls-1: with the mouse in use the prompt names the click; keyboard only, the key (ControlSchemesTests).
+            bool kbOnly = ControlBindings.KeyboardOnly;
+            ControlBindings.SetKeyboardOnly(false);
+            try { Assert.AreEqual("LEFT CLICK", ControlBindings.PromptLabel(A("Attack"), ControlDevice.KeyboardMouse)); }
+            finally { ControlBindings.SetKeyboardOnly(kbOnly); }
             Assert.AreEqual("RT", ControlBindings.PromptLabel(A("Attack"), ControlDevice.Gamepad));
             Assert.AreEqual("LT", ControlBindings.PromptLabel(A("Ability"), ControlDevice.Gamepad));
             Assert.AreEqual("X", ControlBindings.PromptLabel(A("Interact"), ControlDevice.Gamepad));
@@ -286,18 +290,25 @@ namespace CriticalMass.Runtime.Tests
         {
             PlayerPrefs.DeleteKey("cm.fpsCap");
             PlayerPrefs.DeleteKey("cm.bgThrottle");
-            Assert.AreEqual(60, GameSettings.FpsCap, "default 60");
+            Assert.AreEqual(0, GameSettings.FpsCap, "perf-smooth-1: default OFF (vsync on, locked to the display)");
             Assert.IsFalse(GameSettings.BackgroundThrottle, "default off: save power in background (DG-51)");
-            CollectionAssert.AreEqual(new[] { 30, 60, 120, 0 }, GameSettings.FpsCapOptions);
+            CollectionAssert.AreEqual(new[] { 30, 60, 120, 144, 0, -1 }, GameSettings.FpsCapOptions);
+            Assert.AreEqual("OFF", PauseMenu.FpsCapText());
+            GameSettings.FpsCap = 60;
             Assert.AreEqual("60 FPS", PauseMenu.FpsCapText());
 
             GameSettings.FpsCap = 120;
             Assert.AreEqual(120, PlayerPrefs.GetInt("cm.fpsCap"));
             GameSettings.FpsCap = 0;
             Assert.AreEqual(0, PlayerPrefs.GetInt("cm.fpsCap"));
-            Assert.AreEqual("DISPLAY RATE", PauseMenu.FpsCapText());
+            Assert.AreEqual("OFF", PauseMenu.FpsCapText());
+            GameSettings.FpsCap = 144;
+            Assert.AreEqual("144 FPS", PauseMenu.FpsCapText());
+            GameSettings.FpsCap = -1;
+            Assert.AreEqual(-1, PlayerPrefs.GetInt("cm.fpsCap"));
+            Assert.AreEqual("UNLIMITED", PauseMenu.FpsCapText());
             GameSettings.FpsCap = 45;   // not a choice: back to the default
-            Assert.AreEqual(60, PlayerPrefs.GetInt("cm.fpsCap"));
+            Assert.AreEqual(0, PlayerPrefs.GetInt("cm.fpsCap"));
             GameSettings.BackgroundThrottle = false;
             Assert.AreEqual(0, PlayerPrefs.GetInt("cm.bgThrottle", 1));
         }
