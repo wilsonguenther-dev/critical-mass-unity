@@ -191,7 +191,8 @@ namespace CriticalMass.Runtime.View.Anim
             int press = w.Actors[0].SwingTick > 0 ? w.Actors[0].SwingTick : w.Tick - 1;
             int windup = w.Actors[0].SwingWindup;
             int damageTick = -1;
-            double facingErr = 0, lungePeak = 0;
+            double facingErr = 0, lungePeak = 0, handReach = double.NaN, surface = double.NaN;
+            ActorViews views = _driver.GetComponent<ActorViews>();
             var side = new Texture2D(FrameW * Frames, FrameH, TextureFormat.RGB24, false);
             var game = new Texture2D(FrameW * Frames, FrameH, TextureFormat.RGB24, false);
             for (int f = 0; f < Frames; f++)
@@ -209,6 +210,13 @@ namespace CriticalMass.Runtime.View.Anim
                 bool contact = damageTick == w.Tick;
                 RenderInto(side, f, focus, true, contact);
                 RenderInto(game, f, focus, false, contact);
+                if (contact)
+                {
+                    // feat/hit-feel-2: weapon-hand reach at the contact frame, along the line to the dummy, from the drawn body.
+                    handReach = HandReach(views, w);
+                    double ddx = w.X[_dummy] - w.X[0], ddz = w.Z[_dummy] - w.Z[0];
+                    surface = Math.Sqrt(ddx * ddx + ddz * ddz) - w.Config.Class(w.Actors[_dummy].Cls).Radius;
+                }
                 Step(1);
             }
             Write(side, Prefix + n + "-side.png");
@@ -226,7 +234,27 @@ namespace CriticalMass.Runtime.View.Anim
                 (damageTick < 0 ? "?" : (damageTick - press).ToString()) + " (expected +" + windup + ", sim offset " + simOff +
                 "), view contact offset " + viewOffMs.ToString("0") + " ms (+0..33 ms render interpolation), facing error " +
                 facingErr.ToString("0") + " deg, lunge peak " + lungePeak.ToString("0.00") + " u, reaction " + r.Clip + " " + r.Layer +
-                ", hit " + (hp0 - w.Actors[_dummy].Hp).ToString("0.#"));
+                ", hit " + (hp0 - w.Actors[_dummy].Hp).ToString("0.#") +
+                "; reach: weapon hand " + handReach.ToString("0.00") + " u at contact (incl. step-in), view reach table " +
+                HitFeel.ViewReach(cls).ToString("0.00") + " u, sim range " + LightWeaponView.Range(w.Config, cls).ToString("0.00") +
+                " u, target body surface " + surface.ToString("0.00") + " u; flinch " + HitFeel.FlinchLeanDeg(hp0 - w.Actors[_dummy].Hp).ToString("0") +
+                " deg, shift " + HitFeel.FlinchShift(hp0 - w.Actors[_dummy].Hp).ToString("0.00") + " u, stagger " +
+                HitFeel.StaggerStep(0.1, hp0 - w.Actors[_dummy].Hp).ToString("0.00") + " u");
+        }
+
+        /// <summary>Horizontal distance from actor 0's drawn root to its weapon hand along the line to the dummy (NaN: no rig).</summary>
+        double HandReach(ActorViews views, World w)
+        {
+            ModelView m = views != null ? views.ModelOf(0) : null;
+            if (m == null) return double.NaN;
+            Transform hand = m.Bone(WeaponProps.HandBone) ?? m.Bone(WeaponProps.HandBoneFallback);
+            if (hand == null) return double.NaN;
+            Vector3 dir = SimSpace.ToWorld(w.X[_dummy] - w.X[0], 0, w.Z[_dummy] - w.Z[0]);
+            dir.y = 0f;
+            if (dir.sqrMagnitude < 1e-6f) return double.NaN;
+            Vector3 off = hand.position - m.Transform.position;
+            off.y = 0f;
+            return Vector3.Dot(off, dir.normalized);
         }
 
         void RenderInto(Texture2D strip, int f, Vector3 focus, bool sideView, bool contact)

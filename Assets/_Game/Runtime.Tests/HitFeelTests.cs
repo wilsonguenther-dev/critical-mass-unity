@@ -163,5 +163,70 @@ namespace CriticalMass.Runtime.Tests
                 Assert.Less(d, r + 0.3, cls + ": the swing can land");
             }
         }
+            // ---------------------------------------------------------------- feat/hit-feel-2
+
+        [Test]
+        public void TheWindupSnapsToItsExtremeHoldsThenStrikesOnTheTick()
+        {
+            const double hz = 30;
+            foreach (ClassId cls in All)
+                for (int windup = 2; windup <= 8; windup++)
+                {
+                    string clip = ArtMapping.ClassClips(cls).Attack ?? ArtMapping.Attack;
+                    double c = ClipFacts.Contact(clip, 0.567f), w = windup / hz, e = AttackTiming.Extreme(c);
+                    double snap = Math.Min(AttackTiming.AnticipationSeconds, w * 0.5), strike = Math.Min(AttackTiming.StrikeSeconds, w * 0.4);
+                    Assert.LessOrEqual(snap, 2.0 / 30 + 1e-9, "anticipation in 2 frames at most");
+                    Assert.AreEqual(e, AttackTiming.CraftTime(snap, c, w), 1e-9, $"{cls} W={windup}: at the wind-up extreme");
+                    Assert.AreEqual(e, AttackTiming.CraftTime(w - strike, c, w), 1e-9, $"{cls}: extreme held until the strike");
+                    Assert.AreEqual(c, AttackTiming.ClipTime(w, c, 2, w), 1e-9, $"{cls}: contact on the damage tick");
+                    Assert.AreEqual(c + 0.1, AttackTiming.ClipTime(w + 0.1, c, 2, w), 1e-9, $"{cls}: follow-through at normal speed");
+                    Assert.AreEqual(1f, AttackTiming.Envelope(snap, AttackTiming.CraftTime(snap, c, w), 2, w), 1e-6f, "the pose is fully in for the extreme");
+                }
+            Assert.AreEqual(4.0 / 30 - AttackTiming.StrikeSeconds, HitFeel.SmearDelay(4.0 / 30), 1e-9, "the smear starts with the strike");
+            Assert.AreEqual(0, HitFeel.SmearDelay(0.01), 1e-9);
+        }
+
+        [Test]
+        public void TheStepInClosesTheReachGapButNeverEntersTheBody()
+        {
+            GameConfig cfg = GameConfig.CreateDefault();
+            foreach (ClassId cls in All)
+            {
+                double range = LightWeaponView.Range(cfg, cls), reach = HitFeel.ViewReach(cls), rA = 0.45, rT = 0.45;
+                for (double d = rA + rT + 0.05; d <= range + rT; d += 0.05)
+                {
+                    double step = HitFeel.StepPeak(d, reach, rA, rT);
+                    Assert.LessOrEqual(step, d - rA - rT - HitFeel.BodyGap + 1e-9, $"{cls} at {d:0.00}: never into the body");
+                    Assert.LessOrEqual(step, HitFeel.ReachStepMax + 1e-9);
+                    if (d - rT - reach <= HitFeel.ReachStepMax - 0.05 && d - rA - rT - HitFeel.BodyGap >= d - rT - reach + 0.05)
+                        Assert.GreaterOrEqual(reach + step, d - rT - 1e-9, $"{cls} at {d:0.00}: the weapon reaches the body");
+                }
+            }
+        }
+
+        [Test]
+        public void FlinchesAreBigEnoughToSeeAndScaleWithDamage()
+        {
+            Assert.AreEqual(8, HitFeel.FlinchLeanDeg(0), 1e-9);
+            Assert.AreEqual(24, HitFeel.FlinchLeanDeg(30), 1e-9);
+            Assert.Greater(HitFeel.FlinchLeanDeg(16), HitFeel.FlinchLeanDeg(8), "more damage, more lean");
+            Assert.GreaterOrEqual(HitFeel.FlinchLeanDeg(8), 12, "even the lantern's 8 leans 12 degrees");
+            Assert.Greater(HitFeel.FlinchShift(22), HitFeel.FlinchShift(9));
+            Assert.AreEqual(0, HitFeel.StaggerStep(0.1, 9), 1e-9, "a light tap does not stagger");
+            Assert.Greater(HitFeel.StaggerStep(0.1, 16), 0.15, "a mid hit staggers a visible step");
+            Assert.Greater(HitFeel.StaggerStep(0.1, 30), HitFeel.StaggerStep(0.1, 16));
+            Assert.AreEqual(0, HitFeel.StaggerStep(0.45, 30), 1e-9, "absorbed by 0.45 s");
+        }
+
+        [Test]
+        public void TheLocalHitNudgeIsOnByDefaultAndRespectsTheSettingAndReduceMotion()
+        {
+            Assert.AreEqual(CriticalMass.Runtime.Camera.CameraShake.DefaultNudgeScale, CriticalMass.Runtime.Camera.CameraShake.NudgeScale(false, false, 0f), "fresh install: on, low");
+            Assert.AreEqual(0f, CriticalMass.Runtime.Camera.CameraShake.NudgeScale(false, true, 0f), "the player turned shake off: off");
+            Assert.AreEqual(0.5f, CriticalMass.Runtime.Camera.CameraShake.NudgeScale(false, true, 0.5f));
+            Assert.AreEqual(0f, CriticalMass.Runtime.Camera.CameraShake.NudgeScale(true, false, 1f), "reduce motion: off");
+            float t = HitFeel.NudgeOnLocal * CriticalMass.Runtime.Camera.CameraShake.DefaultNudgeScale;
+            Assert.Less(t * t * CriticalMass.Runtime.Camera.CameraShake.MaxOffset, 0.05f, "low: a few centimetres");
+        }
     }
 }

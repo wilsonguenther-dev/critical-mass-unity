@@ -134,6 +134,10 @@ namespace CriticalMass.Runtime.View.Anim
             if (windupSeconds > 1e-9)
             {
                 if (age >= windupSeconds) return Math.Min(length, contact + (age - windupSeconds));
+                // feat/hit-feel-2 (fast-attack craft): snap to the clip's wind-up extreme in 2 frames, hold it, then the strike
+                // (extreme to contact) on the last frames before the damage tick. The old map played the whole clip
+                // anticipation 4 to 7 times fast and cubic-eased, so the arm sat near the ready pose and no swing read.
+                if (FastCraft) return CraftTime(age, contact, windupSeconds);
                 // Integration batch 4: 0..contact over the wind-up, eased in (cubic), so the weapon hand is fastest on the
                 // tick the sim resolves the hit (AttackContact): the last wind-up tick plays the strike, the early ones the
                 // ready pose (which is why it starts at clip time 0: the fade-in from the base pose stays small). A linear
@@ -143,6 +147,31 @@ namespace CriticalMass.Runtime.View.Anim
             }
             double start = Math.Max(0, contact - ParityLeadFrames / 30.0);
             return Math.Min(length, start + age);
+        }
+
+        /// <summary>feat/hit-feel-2: the fast-attack wind-up (on). Off restores the eased map (tests, comparisons).</summary>
+        public static bool FastCraft = true;
+        /// <summary>
+        /// feat/hit-feel-2: clip seconds before contact that are the strike (the wind-up extreme is contact minus this),
+        /// the wall of the snap into the extreme (2 frames at 30 fps) and the longest strike before the damage tick.
+        /// </summary>
+        public const double StrikeClipSeconds = 0.12, AnticipationSeconds = 2.0 / 30.0, StrikeSeconds = 1.5 / 30.0;
+
+        /// <summary>The clip's wind-up extreme (the pose held before the strike), clip seconds.</summary>
+        public static double Extreme(double contact) => Math.Max(0, contact - StrikeClipSeconds);
+
+        /// <summary>
+        /// Fast-attack wind-up clip time for age in [0, W): ease into the extreme over min(AnticipationSeconds, W/2), hold
+        /// it, then extreme to contact linearly over the last min(StrikeSeconds, 0.4 W) (the strike lands on the tick).
+        /// </summary>
+        public static double CraftTime(double age, double contact, double windupSeconds)
+        {
+            double e = Extreme(contact), snap = Math.Min(AnticipationSeconds, windupSeconds * 0.5);
+            double strike = Math.Min(StrikeSeconds, windupSeconds * 0.4), holdEnd = windupSeconds - strike;
+            if (age <= 0) return 0;
+            if (age < snap) { double s = age / snap; return e * s * s * (3 - 2 * s); }
+            if (age < holdEnd) return e;
+            return e + (contact - e) * Math.Min(1, (age - holdEnd) / strike);
         }
 
         /// <summary>The sim seconds after the press at which the contact frame is drawn (W seconds, or the parity lead).</summary>
@@ -162,7 +191,8 @@ namespace CriticalMass.Runtime.View.Anim
                 // Closer (batch 4): with a wind-up the clip fades in over the whole wind-up, smoothstep (slow at both ends).
                 // A 0.05 s linear fade snapped the two-hand grips (Farmer slice, Miner chop: their first frame is far from
                 // the base pose) so fast that the hand peaked on the press tick, 5 ticks before the hit.
-                double s = Math.Min(1, age / windupSeconds);
+                // feat/hit-feel-2: with the fast craft the pose is fully in by the end of the snap, so the extreme reads.
+                double s = Math.Min(1, age / (FastCraft ? Math.Min(AnticipationSeconds, windupSeconds * 0.5) : windupSeconds));
                 a = s * s * (3 - 2 * s);
             }
             else a = Math.Min(1, age / 0.02);
