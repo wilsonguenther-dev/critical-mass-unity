@@ -319,8 +319,9 @@ namespace CriticalMass.Runtime.View.Art
                 Meshes = new[] { "Demolitions_Hero", "Demolitions_LOD0", "Demolitions_LOD1", "Demolitions_Shadow" }, MaskCodes = new[] { 0, 6, 8 },
                 OutlinePx = CharacterHullPx, Rim = 0.6f, Authored = MinerAzure, Crimson = MinerCrimson, Height = 2.0f,
                 FaceTexture = "Assets/_Game/Art/Demolitions/DemolitionsFace.png", FaceSlot = 1, ArtYawDeg = 180f },
-            // rig-builder-1 (2026-11-14): the generated Builder body (octree shell, LOD budgets 22k/4k/1.4k/0.75k) on the shared
-            // skeleton names plus 15 finger bones per hand (41 + 30 = 71), weights from a voxel proxy (rig_body.py), clips
+            // rig-builder-1 (2026-11-14): the generated Builder body (octree shell; Hero 21.6k, LOD0 3.9k, LOD1 and Shadow 1.3k
+            // tris) on the shared 41 skeleton names, whole-hand weights (his fingers merge at this budget), weights from a
+            // voxel proxy (rig_body.py), clips
             // baked per class with foot IK (Builder_Clips.fbx, bake_clips.py; hip-height ratio = StrideScale). Empty hands:
             // the game hangs the mallet on handslot.r, held upright at idle. Face painted in the vertex colour. Pre-batch-b
             // files: Builder/_fallback~.
@@ -329,7 +330,7 @@ namespace CriticalMass.Runtime.View.Art
                 Meshes = new[] { "Builder_Hero", "Builder_LOD0", "Builder_LOD1", "Builder_Shadow" }, MaskCodes = new[] { 0, 8 },
                 // Height: the Hero mesh's bind-pose top is the ladder corner on his back (2.33 m; cap crown about 2.26).
                 OutlinePx = CharacterHullPx, Rim = 0.6f, Authored = BuilderAzure, Crimson = BuilderCrimson, Height = 2.33f,
-                VertexColourFace = true, StrideScale = 1.354f, ArtYawDeg = 180f },
+                VertexColourFace = true, StrideScale = 1.31f, ArtYawDeg = 180f },
             new ModelSpec { Key = Healer, AssetPath = "Assets/_Game/Art/Healer/Healer.fbx", Kind = ArtKind.Character, Rigged = true,
                 Bones = 41, ClipSource = "Assets/_Game/Art/Characters/KayKit_Clips.fbx",
                 Meshes = new[] { "Healer_Hero", "Healer_LOD0", "Healer_LOD1", "Healer_Shadow" }, MaskCodes = new[] { 0, 6, 8 },
