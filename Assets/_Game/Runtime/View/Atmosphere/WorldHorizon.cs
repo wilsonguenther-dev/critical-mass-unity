@@ -14,17 +14,26 @@ namespace CriticalMass.Runtime.View.Atmosphere
     {
         /// <summary>Segments around the sky dome; silhouettes in the near, mid and far band; cloud cards per near/mid band.</summary>
         public readonly int DomeSegments, Near, Mid, Far, CloudsPerBand;
+        /// <summary>World horizon 2: bird / lantern-glider flocks, distant lights, high cloud streaks, hanging vines and
+        /// chains under the near and mid islands, and the one far creature (the Kaiju's kin over the island of the bones).</summary>
+        public readonly int Flocks, Lights, HighClouds;
+        public readonly bool Vines, Creature;
 
         public WorldHorizonBudget(int domeSegments, int near, int mid, int far, int cloudsPerBand)
+            : this(domeSegments, near, mid, far, cloudsPerBand, 0, 0, 0, false, false) { }
+
+        public WorldHorizonBudget(int domeSegments, int near, int mid, int far, int cloudsPerBand, int flocks, int lights, int highClouds,
+            bool vines, bool creature)
         {
             DomeSegments = domeSegments; Near = near; Mid = mid; Far = far; CloudsPerBand = cloudsPerBand;
+            Flocks = flocks; Lights = lights; HighClouds = highClouds; Vines = vines; Creature = creature;
         }
 
         public static WorldHorizonBudget For(int level)
         {
-            if (level <= FramePolicy.LevelLow) return new WorldHorizonBudget(12, 0, 10, 0, 0);
-            if (level == FramePolicy.LevelMedium) return new WorldHorizonBudget(16, 12, 0, 14, 6);
-            return new WorldHorizonBudget(20, 14, 16, 20, 8);
+            if (level <= FramePolicy.LevelLow) return new WorldHorizonBudget(12, 0, 10, 0, 0, 0, 0, 0, false, true);
+            if (level == FramePolicy.LevelMedium) return new WorldHorizonBudget(16, 12, 0, 14, 6, 2, 10, 4, true, true);
+            return new WorldHorizonBudget(20, 14, 16, 20, 8, 3, 16, 6, true, true);
         }
 
         /// <summary>Bands that carry silhouettes.</summary>
@@ -35,7 +44,9 @@ namespace CriticalMass.Runtime.View.Atmosphere
         /// <summary>New texture memory: none. Colour is vertex colour plus the shader's sky maths.</summary>
         public const int TextureBytes = 0;
         /// <summary>The ceiling the tests hold every tier to, and the ceiling for one silhouette.</summary>
-        public const int MaxTriangles = 2000, MaxPieceTriangles = 100;
+        public const int MaxTriangles = 3000, MaxPieceTriangles = 100;
+        /// <summary>The far creature is the one piece over 100 triangles.</summary>
+        public const int MaxCreatureTriangles = 300;
     }
 
     /// <summary>
@@ -43,19 +54,27 @@ namespace CriticalMass.Runtime.View.Atmosphere
     /// shader and pins depth to the far plane, so it is a skybox that never clips and never covers the arena). COLOR: rgb
     /// the tone (sRGB), a the air in front of it (0 none .. 1 all horizon colour). UV0: x how much the piece follows the
     /// camera (1 = infinitely far; 0.9 = slides a tenth of the camera's travel: parallax), y kind (0 dome, 1 silhouette,
-    /// 2 cloud card, 3 self-lit glow). Index order is draw order (no depth write): dome, far band, mid band, near band.
+    /// 2 cloud card, 3 self-lit glow; world horizon 2: 4 waterfall (UV1.x 0 at the lip .. 1 at the foot, foam bands scroll
+    /// down), 5 vine or chain (sways by UV2.x, phase UV1.w), 6 distant light (dark by day, lit at dusk and night, twinkle
+    /// phase UV1.w), 7 flyer, 8 the far creature (both circle the pivot UV1.xyz at UV2.y radians a second, wing vertices
+    /// flap by UV2.x at UV2.z radians a second with phase UV1.w; UV2.w 0 day only (birds roost), 1 night only (lantern
+    /// gliders, self-lit), 2 always). Index order is draw order (no depth write): dome, high streaks, far band, the island
+    /// of the bones and its creature, mid band, near band, flocks.
     /// </summary>
     public sealed class HorizonMesh
     {
         public readonly List<Vector3> V = new List<Vector3>();
         public readonly List<Color> C = new List<Color>();
         public readonly List<Vector2> U = new List<Vector2>();
+        public readonly List<Vector4> U1 = new List<Vector4>(), U2 = new List<Vector4>();
         public readonly List<int> T = new List<int>();
         public int Tris => T.Count / 3;
 
-        public int Add(Vector3 p, Color c, float follow, float kind)
+        public int Add(Vector3 p, Color c, float follow, float kind) => Add(p, c, follow, kind, Vector4.zero, Vector4.zero);
+
+        public int Add(Vector3 p, Color c, float follow, float kind, Vector4 u1, Vector4 u2)
         {
-            V.Add(p); C.Add(c); U.Add(new Vector2(follow, kind));
+            V.Add(p); C.Add(c); U.Add(new Vector2(follow, kind)); U1.Add(u1); U2.Add(u2);
             return V.Count - 1;
         }
 
@@ -68,7 +87,7 @@ namespace CriticalMass.Runtime.View.Atmosphere
     {
         public int Band;          // 0 near, 1 mid, 2 far
         public float AzimuthDeg;  // from east toward north
-        public string Kind;       // island, spire, tower, columns, falls, shard, cloud
+        public string Kind;       // island, spire, tower, columns, falls, shard, cloud, streak, bones, creature, flock
         public int Triangles;
     }
 
@@ -110,10 +129,33 @@ namespace CriticalMass.Runtime.View.Atmosphere
             var pieces = new List<HorizonPiece>();
             Dome(m, b.DomeSegments);
             uint s = Seed;
+            uint ws = Seed ^ 0x9E37u;   // world horizon 2 draws from its own stream: the pass 1 layout stays as it was
+            for (int k = 0; k < b.HighClouds; k++)
+            {
+                float az = Mathf.Repeat(40f + k * 360f / b.HighClouds + 25f * R(ref ws), 360f);
+                int t0 = m.Tris;
+                Streak(m, az, 11f + 14f * R(ref ws), 14f + 16f * R(ref ws));
+                pieces.Add(new HorizonPiece { Band = 2, AzimuthDeg = az, Kind = "streak", Triangles = m.Tris - t0 });
+            }
+            int lights = b.Lights;
             // Back to front: far, mid, near (no depth write; the index order is the paint order).
             int[] counts = { b.Near, b.Mid, b.Far };
             for (int band = 2; band >= 0; band--)
             {
+                if (band == 1)
+                {
+                    // After the far band, before the mid band (paint order): the island of the old Kaiju's bones (north of
+                    // the shrine, WORLD.md) and the creature circling it. On every level.
+                    int t0 = m.Tris;
+                    Bones(m, Bands[2], BonesAzimuth);
+                    pieces.Add(new HorizonPiece { Band = 2, AzimuthDeg = BonesAzimuth, Kind = "bones", Triangles = m.Tris - t0 });
+                    if (b.Creature)
+                    {
+                        t0 = m.Tris;
+                        Creature(m, Bands[2].Follow, BonesAzimuth);
+                        pieces.Add(new HorizonPiece { Band = 2, AzimuthDeg = BonesAzimuth, Kind = "creature", Triangles = m.Tris - t0 });
+                    }
+                }
                 int n = counts[band];
                 if (n <= 0) continue;
                 BandSpec bs = Bands[band];
@@ -126,7 +168,7 @@ namespace CriticalMass.Runtime.View.Atmosphere
                     int t0 = m.Tris;
                     // One piece in three carries its direction's accent, and every direction gets at least one per band.
                     int sector = Sector(az);
-                    string kind = Piece(m, bs, band, az, k, k % 3 == 0 || !done[sector], ref s);
+                    string kind = Piece(m, bs, band, az, k, k % 3 == 0 || !done[sector], ref s, b.Vines, ref lights, ref ws);
                     if (kind != "island" && kind != "spire") done[sector] = true;
                     pieces.Add(new HorizonPiece { Band = band, AzimuthDeg = az, Kind = kind, Triangles = m.Tris - t0 });
                 }
@@ -138,6 +180,13 @@ namespace CriticalMass.Runtime.View.Atmosphere
                         Cloud(m, bs, az, 2.2f + 2.6f * R(ref s), -0.4f - 0.9f * R(ref s));
                         pieces.Add(new HorizonPiece { Band = band, AzimuthDeg = az, Kind = "cloud", Triangles = m.Tris - t0 });
                     }
+            }
+            for (int k = 0; k < b.Flocks; k++)
+            {
+                float az = Mathf.Repeat(70f + k * 137.5f + 20f * R(ref ws), 360f);
+                int t0 = m.Tris;
+                Flock(m, az, k % 2 == 1, ref ws);
+                pieces.Add(new HorizonPiece { Band = 0, AzimuthDeg = az, Kind = "flock", Triangles = m.Tris - t0 });
             }
             return pieces;
         }
@@ -181,7 +230,7 @@ namespace CriticalMass.Runtime.View.Atmosphere
             return "shard";
         }
 
-        static string Piece(HorizonMesh m, BandSpec bs, int band, float az, int k, bool accentWanted, ref uint s)
+        static string Piece(HorizonMesh m, BandSpec bs, int band, float az, int k, bool accentWanted, ref uint s, bool vines, ref int lights, ref uint ws)
         {
             float a = az * Mathf.Deg2Rad;
             var radial = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a));
@@ -199,10 +248,36 @@ namespace CriticalMass.Runtime.View.Atmosphere
                 Spire(m, bs, radial * D, right, w * 0.22f, yTop + w * (0.5f + 0.4f * R(ref s)), yTop - depth * 0.8f, haze);
                 return "spire";
             }
-            float t = Mathf.Max(0.6f, w * 0.035f);
+            // World horizon 2 variants (own stream): twin needles in the near and mid bands, thick-cliffed mesas far out.
+            if (band < 2 && k % 7 == 3)
+            {
+                Spire(m, bs, radial * D - right * w * 0.12f, right, w * 0.16f, yTop + w * 0.55f, yTop - depth * 0.7f, haze);
+                Spire(m, bs, radial * D + right * w * 0.14f, right, w * 0.12f, yTop + w * 0.38f, yTop - depth * 0.6f, haze);
+                return "spire";
+            }
+            float t = Mathf.Max(0.6f, w * (band == 2 && k % 4 == 1 ? 0.11f : 0.035f));
             Island(m, bs, radial * D, right, w, yTop, t, depth, haze, ref s);
+            if (vines && band < 2 && R(ref ws) < 0.6f) Vines(m, bs, radial * D, right, w, yTop - t, depth, haze, R(ref ws) < 0.3f, ref ws);
+            if (lights > 0 && band < 2 && (k % 2 == 0 || Accent(az) == "tower"))
+            {
+                for (int j = 0; j < 2 && lights > 0; j++, lights--)
+                    Lamp(m, bs.Follow, radial * D + right * ((R(ref ws) - 0.5f) * w * 0.5f) + Vector3.up * (yTop + D * 0.002f + j * D * 0.004f),
+                        right, D * 0.0035f, haze * 0.6f, R(ref ws) * 6.28f);
+            }
             // The far band only takes towers and columns (they still read at 400 u); falls and shards are near and mid.
-            if (!accentWanted) return "island";
+            if (!accentWanted)
+            {
+                // A natural rock arch on some plain near-band islands.
+                if (band == 0 && R(ref ws) < 0.35f)
+                {
+                    Vector3 af = radial * D + right * ((R(ref ws) - 0.5f) * w * 0.3f) + Vector3.up * (yTop - t * 0.3f);
+                    Color rk = bs.Rock;
+                    Rect(m, bs.Follow, af - right * w * 0.09f, right, w * 0.025f, w * 0.16f, rk, haze, 1f);
+                    Rect(m, bs.Follow, af + right * w * 0.09f, right, w * 0.025f, w * 0.13f, rk, haze, 1f);
+                    Rect(m, bs.Follow, af - right * w * 0.005f + Vector3.up * w * 0.12f, right, w * 0.12f, w * 0.045f, rk, haze, 1f);
+                }
+                return "island";
+            }
             string accent = Accent(az);
             float x = (R(ref s) - 0.5f) * w * 0.4f;
             Vector3 foot = radial * D + right * x + Vector3.up * (yTop - t * 0.5f);
@@ -223,8 +298,8 @@ namespace CriticalMass.Runtime.View.Atmosphere
                     break;
                 case "falls":
                     if (band == 2) return "island";
-                    // A white ribbon from the lip down into the cloud sea, a little below the horizon.
-                    Rect(m, bs.Follow, foot + Vector3.down * (yTop + D * 0.03f), right, w * 0.035f, yTop + D * 0.03f, Foam, haze * 0.8f, 1f);
+                    // A white ribbon from the lip down into the cloud sea, a little below the horizon, foam bands running down.
+                    Falls(m, bs.Follow, foot, right, w * 0.035f, yTop + D * 0.03f, haze * 0.8f);
                     break;
                 default:
                     if (band == 2) return "island";
@@ -323,6 +398,216 @@ namespace CriticalMass.Runtime.View.Atmosphere
             m.Tri(c, ring[5], ring[0]);
         }
 
+        // ------------------------------------------------------------------------------------------- world horizon 2
+
+        /// <summary>Azimuth of the island of the bones (from east toward north): north of the shrine, a little west.</summary>
+        public const float BonesAzimuth = 97f;
+        /// <summary>The creature: distance of its orbit's centre, orbit radius, height, wingspan (u), seconds a turn and a beat.</summary>
+        public const float CreatureDist = 410f, CreatureOrbit = 50f, CreatureHeight = 66f, CreatureSpan = 40f, CreatureTurnS = 90f, CreatureBeatS = 6f;
+
+        static readonly Color Bone = BeyondMesh.Hex("#D8CFBC"), Vine = BeyondMesh.Hex("#5E7A4A"), Iron = BeyondMesh.Hex("#3E4450"),
+            Lantern = BeyondMesh.Hex("#FFC36B"), Dusk = BeyondMesh.Hex("#3C4F7A"), Bird = BeyondMesh.Hex("#3A3F4C"),
+            Hide = BeyondMesh.Hex("#2F3442"), HideDark = BeyondMesh.Hex("#232733"), Wing = BeyondMesh.Hex("#3B3448");
+
+        /// <summary>The waterfall: a ribbon in two drops that widens into mist (4 triangles), UV1.x runs down it.</summary>
+        static void Falls(HorizonMesh m, float follow, Vector3 lip, Vector3 right, float halfW, float h, float haze)
+        {
+            var c = new Color(Foam.r, Foam.g, Foam.b, haze);
+            float[] ys = { 0f, 0.55f, 1f };
+            float[] ws = { 1f, 1.25f, 2.2f };
+            var l = new int[3]; var r = new int[3];
+            for (int i = 0; i < 3; i++)
+            {
+                Vector3 p = lip + Vector3.down * (h * ys[i]);
+                var u1 = new Vector4(ys[i] * 4f, 0f, 0f, 0f);
+                l[i] = m.Add(p - right * halfW * ws[i], c, follow, 4f, u1, Vector4.zero);
+                r[i] = m.Add(p + right * halfW * ws[i], c, follow, 4f, u1, Vector4.zero);
+            }
+            for (int i = 0; i < 2; i++) m.Quad(l[i], r[i], r[i + 1], l[i + 1]);
+        }
+
+        /// <summary>Two or three hanging strands (roots, or a snapped chain one time in three) under an island (4 triangles each).</summary>
+        static void Vines(HorizonMesh m, BandSpec bs, Vector3 centre, Vector3 right, float w, float yUnder, float depth, float haze, bool chain, ref uint ws)
+        {
+            int n = 2 + (R(ref ws) < 0.5f ? 1 : 0);
+            Color col = chain ? Iron : Vine;
+            var c = new Color(col.r, col.g, col.b, haze);
+            for (int k = 0; k < n; k++)
+            {
+                float x = (R(ref ws) - 0.5f) * w * 0.55f, len = depth * (0.6f + 0.8f * R(ref ws)), hw = Mathf.Max(0.25f, w * 0.006f) * (chain ? 1.4f : 1f);
+                float ph = R(ref ws) * 6.28f;
+                Vector3 top = centre + right * x + Vector3.up * (yUnder - depth * 0.15f * (1f - Mathf.Abs(x) / (w * 0.3f)));
+                int pl = -1, pr = -1;
+                for (int j = 0; j <= 2; j++)
+                {
+                    float f = j / 2f;
+                    var u2 = new Vector4(len * 0.06f * f * f, 0f, 0f, 0f);
+                    var u1 = new Vector4(0f, 0f, 0f, ph);
+                    Vector3 p = top + Vector3.down * (len * f);
+                    float hh = hw * (1f - 0.5f * f);
+                    int a = m.Add(p - right * hh, c, bs.Follow, 5f, u1, u2), b = m.Add(p + right * hh, c, bs.Follow, 5f, u1, u2);
+                    if (pl >= 0) m.Quad(pl, pr, b, a);
+                    pl = a; pr = b;
+                }
+            }
+        }
+
+        /// <summary>A distant light (a window, a hamlet's lamp): a small diamond, dark by day, lit at dusk and night (2 triangles).</summary>
+        static void Lamp(HorizonMesh m, float follow, Vector3 p, Vector3 right, float r, float haze, float phase)
+        {
+            var c = new Color(Lantern.r, Lantern.g, Lantern.b, haze);
+            var u1 = new Vector4(0f, 0f, 0f, phase);
+            int a = m.Add(p - right * r, c, follow, 6f, u1, Vector4.zero), b = m.Add(p + Vector3.up * r * 1.3f, c, follow, 6f, u1, Vector4.zero);
+            int d = m.Add(p + right * r, c, follow, 6f, u1, Vector4.zero), e = m.Add(p + Vector3.down * r * 1.3f, c, follow, 6f, u1, Vector4.zero);
+            m.Quad(a, b, d, e);
+        }
+
+        /// <summary>A high, thin cloud streak (a lens, 4 triangles) that takes the time-of-day cloud tones and drifts with the banks.</summary>
+        static void Streak(HorizonMesh m, float az, float elevDeg, float widthDeg)
+        {
+            float a = az * Mathf.Deg2Rad, D = 900f;
+            var radial = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a));
+            var right = new Vector3(-Mathf.Sin(a), 0f, Mathf.Cos(a));
+            Vector3 c0 = radial * (D * Mathf.Cos(elevDeg * Mathf.Deg2Rad)) + Vector3.up * (D * Mathf.Sin(elevDeg * Mathf.Deg2Rad));
+            float hw = D * widthDeg * Mathf.Deg2Rad * 0.5f, hh = hw * 0.06f;
+            const float haze = 0.45f;
+            int l = m.Add(c0 - right * hw, new Color(0.6f, 0f, 0f, haze), 1f, 2f), r = m.Add(c0 + right * hw, new Color(0.6f, 0f, 0f, haze), 1f, 2f);
+            int t0 = m.Add(c0 - right * hw * 0.3f + Vector3.up * hh, new Color(1f, 0f, 0f, haze), 1f, 2f);
+            int t1 = m.Add(c0 + right * hw * 0.35f + Vector3.up * hh * 0.8f, new Color(1f, 0f, 0f, haze), 1f, 2f);
+            int b0 = m.Add(c0 + Vector3.down * hh * 0.5f, new Color(0.3f, 0f, 0f, haze), 1f, 2f);
+            m.Tri(l, t0, b0); m.Tri(t0, t1, b0); m.Tri(t1, r, b0); m.Tri(l, b0, r);
+        }
+
+        /// <summary>The island of the bones (WORLD.md): a far island with five rib arcs, a spine and the flat underbite skull.</summary>
+        static void Bones(HorizonMesh m, BandSpec bs, float az)
+        {
+            float a = az * Mathf.Deg2Rad, D = CreatureDist;
+            var radial = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a));
+            var right = new Vector3(-Mathf.Sin(a), 0f, Mathf.Cos(a));
+            float w = D * 12f * Mathf.Deg2Rad, yTop = D * Mathf.Tan(0.7f * Mathf.Deg2Rad);
+            uint s = Seed ^ 0xB0E5u;
+            Island(m, bs, radial * D, right, w, yTop, w * 0.05f, w * 0.35f, bs.Haze, ref s);
+            Vector3 foot = radial * D + Vector3.up * yTop;
+            for (int i = 0; i < 5; i++)
+            {
+                float x = (i - 2.4f) * w * 0.07f, h = w * (0.16f - 0.018f * Mathf.Abs(i - 1.6f));
+                TriUp(m, bs.Follow, foot + right * x, right, w * 0.012f, h, Bone, bs.Haze, 1f);
+                TriUp(m, bs.Follow, foot + right * (x + w * 0.03f), right, w * 0.008f, h * 0.8f, Bone, bs.Haze, 1f);
+            }
+            Rect(m, bs.Follow, foot + right * (-w * 0.05f), right, w * 0.2f, w * 0.012f, Bone, bs.Haze, 1f);
+            // The skull: a flat wedge with the lower jaw jutting past the upper (the underbite), lying on its side.
+            Vector3 sk = foot + right * (w * 0.24f);
+            var c = new Color(Bone.r, Bone.g, Bone.b, bs.Haze);
+            int s0 = m.Add(sk, c, bs.Follow, 1f), s1 = m.Add(sk + right * w * 0.09f, c, bs.Follow, 1f), s2 = m.Add(sk + right * w * 0.02f + Vector3.up * w * 0.06f, c, bs.Follow, 1f);
+            int j0 = m.Add(sk + right * w * 0.02f, c, bs.Follow, 1f), j1 = m.Add(sk + right * w * 0.115f + Vector3.up * w * 0.012f, c, bs.Follow, 1f);
+            m.Tri(s0, s2, s1); m.Tri(j0, s1, j1);
+        }
+
+        /// <summary>
+        /// The creature (an original design: the Kaiju's kin, WORLD.md): a winged beast with a long neck, a wedge head with
+        /// the family's underbite, wide fingered wings with a scalloped trailing edge, a long tail with a forked sky-glass
+        /// tip and a sky-glass ridge down its back that glows faintly at night. It circles the island of the bones far out
+        /// (CreatureOrbit u round a centre CreatureDist u away, one turn in CreatureTurnS s, a slow beat every CreatureBeatS
+        /// s), banked into the turn, a hazed dark silhouette. Never interacts: it is a part of the sky. 82 triangles.
+        /// </summary>
+        static void Creature(HorizonMesh m, float follow, float az)
+        {
+            float a = az * Mathf.Deg2Rad;
+            Vector3 pivot = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)) * CreatureDist + Vector3.up * CreatureHeight;
+            // At rest (time 0) it sits on the near side of its orbit, flying across the view.
+            Vector3 radial = -new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a));
+            Vector3 fwd = new Vector3(-radial.z, 0f, radial.x), rightW = Vector3.Cross(Vector3.up, fwd);
+            Vector3 c0 = pivot + radial * CreatureOrbit;
+            float k = CreatureSpan / 40f, bank = 28f * Mathf.Deg2Rad, cb = Mathf.Cos(bank), sb = Mathf.Sin(bank);
+            float speed = 2f * Mathf.PI / CreatureTurnS, beat = 2f * Mathf.PI / CreatureBeatS;
+            const float haze = 0.6f;
+            int P(float x, float y, float z, Color col, float flap)
+            {
+                // Banked into the turn: local +x points away from the orbit's centre, so the inner (-x) wing drops.
+                Vector3 p = c0 + rightW * (x * k * cb) + Vector3.up * ((y + x * sb) * k) + fwd * (z * k);
+                return m.Add(p, new Color(col.r, col.g, col.b, haze), follow, 8f, new Vector4(pivot.x, pivot.y, pivot.z, 0f),
+                    new Vector4(flap * 6f * k, speed, beat, 2f));
+            }
+            for (int side = -1; side <= 1; side += 2)
+            {
+                float sd = side;
+                float Fl(float x) => Mathf.Clamp01((Mathf.Abs(x) - 2f) / 18f);
+                // Membrane, a fan from the wrist (star-shaped, so the fan is exact).
+                float[,] e = { { 2.2f, 3f }, { 9f, 5f }, { 14f, 3f }, { 20f, 1.5f }, { 18f, -1f }, { 17.5f, -4f }, { 15f, -4.5f }, { 13f, -7f }, { 7f, -3.5f }, { 2f, -2f } };
+                var idx = new int[10];
+                for (int i = 0; i < 10; i++) idx[i] = P(sd * e[i, 0], 0f, e[i, 1], Wing, Fl(e[i, 0]));
+                int wrist = idx[2];
+                for (int i = 3; i < 10; i++) m.Tri(wrist, idx[i], i + 1 < 10 ? idx[i + 1] : idx[0]);
+                m.Tri(wrist, idx[0], idx[1]);
+                // Arm and finger bones: thin dark spars over the membrane (a hair above it).
+                float[,] bones = { { 2.2f, 3f, 9f, 5f }, { 9f, 5f, 14f, 3f }, { 14f, 3f, 20f, 1.5f }, { 14f, 3f, 17.5f, -4f }, { 14f, 3f, 13f, -7f } };
+                for (int i = 0; i < 5; i++)
+                {
+                    float x0 = bones[i, 0], z0 = bones[i, 1], x1 = bones[i, 2], z1 = bones[i, 3], hw = i < 2 ? 0.45f : 0.25f;
+                    float dx = x1 - x0, dz = z1 - z0, l = Mathf.Sqrt(dx * dx + dz * dz), nx = -dz / l * hw, nz = dx / l * hw;
+                    int b0 = P(sd * (x0 + nx), 0.05f, z0 + nz, HideDark, Fl(x0)), b1 = P(sd * (x0 - nx), 0.05f, z0 - nz, HideDark, Fl(x0));
+                    int b2 = P(sd * (x1 - nx), 0.05f, z1 - nz, HideDark, Fl(x1)), b3 = P(sd * (x1 + nx), 0.05f, z1 + nz, HideDark, Fl(x1));
+                    m.Quad(b0, b1, b2, b3);
+                }
+                // A horn swept back from the head, a tucked hind leg.
+                m.Tri(P(sd * 0.9f, 0.2f, 13.2f, HideDark, 0f), P(sd * 1.1f, 0.4f, 13.8f, HideDark, 0f), P(sd * 2.0f, 0.6f, 11.4f, HideDark, 0f));
+                m.Tri(P(sd * 1.2f, -0.2f, -4.5f, HideDark, 0f), P(sd * 1.6f, -0.3f, -3.0f, HideDark, 0f), P(sd * 1.3f, -0.8f, -7.5f, HideDark, 0f));
+            }
+            // Body: a fan round its centre.
+            float[,] body = { { 0f, 6f }, { 1.6f, 4.5f }, { 2.4f, 1f }, { 2.2f, -2.5f }, { 1.3f, -5f }, { 0f, -6f }, { -1.3f, -5f }, { -2.2f, -2.5f }, { -2.4f, 1f }, { -1.6f, 4.5f } };
+            int bc = P(0f, 0.3f, 0f, Hide, 0f);
+            for (int i = 0; i < 10; i++) m.Tri(bc, P(body[i, 0], 0f, body[i, 1], Hide, 0f), P(body[(i + 1) % 10, 0], 0f, body[(i + 1) % 10, 1], Hide, 0f));
+            // Neck (3 segments, a gentle S), head, and the jutting lower jaw.
+            float[] nz2 = { 6f, 8.5f, 11f, 13f }, nxo = { 0f, 0.4f, 0.2f, -0.1f }, nw = { 1.1f, 0.85f, 0.7f, 0.75f };
+            for (int i = 0; i < 3; i++)
+                m.Quad(P(nxo[i] - nw[i], 0f, nz2[i], Hide, 0f), P(nxo[i] + nw[i], 0f, nz2[i], Hide, 0f),
+                    P(nxo[i + 1] + nw[i + 1], 0f, nz2[i + 1], Hide, 0f), P(nxo[i + 1] - nw[i + 1], 0f, nz2[i + 1], Hide, 0f));
+            m.Quad(P(-1.1f, 0.1f, 13f, Hide, 0f), P(1.0f, 0.1f, 13f, Hide, 0f), P(0.5f, 0.1f, 15.8f, Hide, 0f), P(-0.6f, 0.1f, 15.8f, Hide, 0f));
+            m.Quad(P(-0.9f, -0.4f, 13.3f, HideDark, 0f), P(0.8f, -0.4f, 13.3f, HideDark, 0f), P(0.75f, -0.5f, 16.7f, HideDark, 0f), P(-0.85f, -0.5f, 16.7f, HideDark, 0f));
+            // Tail: five segments tapering, swinging a little, then the forked sky-glass tip.
+            float[] tz = { -6f, -9f, -12f, -15f, -18f, -20.5f }, tx = { 0f, 0.5f, 1.1f, 1.2f, 0.6f, -0.3f }, tw = { 1.1f, 0.9f, 0.7f, 0.5f, 0.35f, 0.25f };
+            for (int i = 0; i < 5; i++)
+                m.Quad(P(tx[i] - tw[i], 0f, tz[i], Hide, 0f), P(tx[i] + tw[i], 0f, tz[i], Hide, 0f),
+                    P(tx[i + 1] + tw[i + 1], 0f, tz[i + 1], Hide, 0f), P(tx[i + 1] - tw[i + 1], 0f, tz[i + 1], Hide, 0f));
+            m.Tri(P(-0.55f, 0f, -20.5f, Glass, 0f), P(-1.6f, 0f, -23.2f, Glass, 0f), P(-0.1f, 0f, -21.5f, Glass, 0f));
+            m.Tri(P(-0.05f, 0f, -20.5f, Glass, 0f), P(0.9f, 0f, -23.0f, Glass, 0f), P(-0.3f, 0f, -21.8f, Glass, 0f));
+            // The sky-glass ridge: a row of upright shards from the crown to the tail (the family's crystal back).
+            float[] rz = { 12.5f, 10f, 7.5f, 4.5f, 1.5f, -1.5f, -4.5f, -8f, -11.5f, -15f }, rh = { 1.0f, 1.2f, 1.5f, 2.0f, 2.2f, 2.0f, 1.7f, 1.3f, 1.0f, 0.7f };
+            for (int i = 0; i < rz.Length; i++)
+            {
+                float x = i < 3 ? nxo[Mathf.Min(i + 1, 3)] * 0.5f : (i >= 7 ? tx[Mathf.Min(i - 6, 5)] : 0f);
+                m.Tri(P(x, 0.2f, rz[i] + 0.9f, Glass, 0f), P(x, 0.2f, rz[i] - 0.9f, Glass, 0f), P(x, 0.2f + rh[i], rz[i] - 0.5f, Glass, 0f));
+            }
+        }
+
+        /// <summary>A flock: six small fliers circling a point 160 to 220 u out (2 triangles each). By day birds (dark,
+        /// roost at night); a night flock is lantern gliders, dusk-blue with a warm light under each (WORLD.md).</summary>
+        static void Flock(HorizonMesh m, float az, bool lanterns, ref uint ws)
+        {
+            float a = az * Mathf.Deg2Rad, D = 160f + 60f * R(ref ws);
+            Vector3 pivot = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)) * D + Vector3.up * (D * Mathf.Tan((6f + 6f * R(ref ws)) * Mathf.Deg2Rad));
+            float speed = (R(ref ws) < 0.5f ? 1f : -1f) * (2f * Mathf.PI / (40f + 30f * R(ref ws)));
+            const float haze = 0.35f, follow = 0.9f;
+            for (int i = 0; i < 6; i++)
+            {
+                float oa = R(ref ws) * Mathf.PI * 2f, orad = 6f + 10f * R(ref ws);
+                Vector3 c0 = pivot + new Vector3(Mathf.Cos(oa) * orad, (R(ref ws) - 0.5f) * 4f, Mathf.Sin(oa) * orad);
+                Vector3 f = new Vector3(-Mathf.Sin(oa), 0f, Mathf.Cos(oa)) * Mathf.Sign(speed), rt = Vector3.Cross(Vector3.up, f);
+                float span = lanterns ? 1.6f : 1.3f, ph = R(ref ws) * 6.28f;
+                Color body = lanterns ? Lantern : Bird, tip = lanterns ? Dusk : Bird;
+                var u1 = new Vector4(pivot.x, pivot.y, pivot.z, ph);
+                var still = new Vector4(0f, speed, 7f, lanterns ? 1f : 0f);
+                var flap = new Vector4(0.7f * span, speed, 7f, lanterns ? 1f : 0f);
+                if (lanterns) { flap.z = 3f; still.z = 3f; }
+                int nose = m.Add(c0 + f * 0.5f, new Color(body.r, body.g, body.b, haze), follow, 7f, u1, still);
+                int tail = m.Add(c0 - f * 0.4f, new Color(body.r, body.g, body.b, haze), follow, 7f, u1, still);
+                int lt = m.Add(c0 - rt * span - f * 0.2f, new Color(tip.r, tip.g, tip.b, haze), follow, 7f, u1, flap);
+                int rtp = m.Add(c0 + rt * span - f * 0.2f, new Color(tip.r, tip.g, tip.b, haze), follow, 7f, u1, flap);
+                m.Tri(nose, tail, lt);
+                m.Tri(nose, rtp, tail);
+            }
+        }
+
         /// <summary>The mesh: bounds set huge (the shader places it around the camera), uploaded and made no longer readable.</summary>
         public static Mesh ToMesh(HorizonMesh h)
         {
@@ -330,6 +615,8 @@ namespace CriticalMass.Runtime.View.Atmosphere
             mesh.SetVertices(h.V);
             mesh.SetColors(h.C);
             mesh.SetUVs(0, h.U);
+            mesh.SetUVs(1, h.U1);
+            mesh.SetUVs(2, h.U2);
             mesh.SetTriangles(h.T, 0, false);
             mesh.bounds = new Bounds(Vector3.zero, Vector3.one * 100000f);
             mesh.UploadMeshData(true);
