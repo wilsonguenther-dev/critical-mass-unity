@@ -601,6 +601,7 @@ ZPRE, PL, KUP = {}, {}, {}
 TOE_ABS = CLS in ("Builder", "Healer") and os.environ.get("BAKE_TOE_ABS", "1") == "1"   # rig-healer-3: the anchor fix needs it
 TOE_LOG = {}
 IDLE_TOE = {}
+RUN_LEAN_KEEP = {"Healer": 0.5}.get(CLS)
 ORDER_CLIPS = {"Walk", "WalkBack", "Run", "RunBack", "StrafeL", "StrafeR"}
 ORDER_GAP = 0.004
 
@@ -646,6 +647,10 @@ def bake_action(clip, act):
             q_ = RESTFIX[pb.name] @ q_
             if clip in HOLD_CLIPS and pb.name in HOLD_REF:
                 q_ = HOLD_REF[pb.name].slerp(q_, HOLD_KEEP)
+            if RUN_LEAN_KEEP is not None and clip in ("Run", "RunBack") and pb.name in ("hips", "spine", "chest"):
+                # rig-healer-3: the Healer pitched far forward in the run (big head and buns over KayKit's lean): the hips,
+                # spine and chest keep RUN_LEAN_KEEP of their turn from the bind; the foot IK still plants the feet.
+                q_ = Quaternion().slerp(q_, RUN_LEAN_KEEP)
             pb.matrix_basis = Matrix.LocRotScale(l_, q_, s_)
         upd()
         attack_gain(clip, gain_q0)
