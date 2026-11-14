@@ -43,7 +43,10 @@ namespace CriticalMass.Runtime.View.Mechanics
         static readonly Color32 Gold = new Color32(255, 206, 84, 255), GoldDark = new Color32(196, 140, 40, 255), Seam = CMTokens.EggSeam.Color;
         static readonly Color32 Crate = new Color32(186, 140, 84, 255), CrateDark = new Color32(122, 88, 52, 255), Hatch = new Color32(236, 72, 56, 255);
 
-        void Start()
+        // perf/start-hitch-1: timed for the scene-start report (LoadTimer).
+        void Start() { long t0 = CriticalMass.Runtime.Game.LoadTimer.Now(); StartBody(); CriticalMass.Runtime.Game.LoadTimer.Part("DepthWorldView.Start", t0); }
+
+        void StartBody()
         {
             _driver = GetComponent<SimDriverBehaviour>();
             if (_driver == null || _driver.World == null) { enabled = false; return; }

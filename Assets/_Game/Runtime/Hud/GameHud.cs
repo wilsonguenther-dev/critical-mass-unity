@@ -48,7 +48,9 @@ namespace CriticalMass.Runtime.Hud
         public void Build()
         {
             if (Root != null) return;
+            long tg = LoadTimer.Now();
             CMTokens.PushShaderGlobals();
+            LoadTimer.Part("hud globals", tg);
             var go = new GameObject("HUD Canvas", typeof(RectTransform));
             go.layer = 5; // UI
             go.transform.SetParent(transform, false);
@@ -60,7 +62,11 @@ namespace CriticalMass.Runtime.Hud
             Root = (RectTransform)go.transform;
             AttachCamera();
 
+            // perf/start-hitch-1: the cold boot spends about 970 ms in this build (19 ms on a reload); name its stages.
+            long t0 = LoadTimer.Now();
             BuildWorldLayer();
+            LoadTimer.Part("hud world layer", t0);
+            t0 = LoadTimer.Now();
             Clusters[(int)HudCluster.Match] = Cluster(HudCluster.Match);
             Clusters[(int)HudCluster.Kaiju] = Cluster(HudCluster.Kaiju);
             Clusters[(int)HudCluster.Player] = Cluster(HudCluster.Player);
@@ -72,12 +78,23 @@ namespace CriticalMass.Runtime.Hud
                 Clusters[i].SetParent(safe, false);
                 HudKeepOut.Add(Clusters[i]);   // world labels and edge pointers keep off the panels
             }
+            LoadTimer.Part("hud clusters", t0);
+            t0 = LoadTimer.Now();
             BuildMatch(Clusters[0]);
+            LoadTimer.Part("hud match", t0);
+            t0 = LoadTimer.Now();
             BuildKaiju(Clusters[1]);
+            LoadTimer.Part("hud kaiju", t0);
+            t0 = LoadTimer.Now();
             BuildPlayer(Clusters[2]);
+            LoadTimer.Part("hud player", t0);
+            t0 = LoadTimer.Now();
             BuildMinimap(Clusters[3]);
+            LoadTimer.Part("hud minimap", t0);
+            t0 = LoadTimer.Now();
             BuildDeath();
             UpdateScale();
+            LoadTimer.Part("hud death and scale", t0);
         }
 
         void AttachCamera()

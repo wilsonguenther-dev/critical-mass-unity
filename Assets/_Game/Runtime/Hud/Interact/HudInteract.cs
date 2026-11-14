@@ -115,7 +115,7 @@ namespace CriticalMass.Runtime.Hud.Interact
             ItemHooks.ReleaseScoreboard();
         }
 
-        void Start() => Build();
+        void Start() { long t0 = CriticalMass.Runtime.Game.LoadTimer.Now(); Build(); CriticalMass.Runtime.Game.LoadTimer.Part("HudInteract.Start", t0); }   // perf/start-hitch-1
 
         /// <summary>Builds every widget once (hidden). Safe to call again.</summary>
         public void Build()

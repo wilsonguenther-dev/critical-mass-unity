@@ -46,6 +46,7 @@ namespace CriticalMass.Runtime.Flow
         float _resultsAt;
         string _loadPath;
         bool _loadIssued;
+        bool _worldReleased;
         float _fadeStart;
         float _fadeFrom, _fadeTo;
         Canvas _fadeCanvas;
@@ -381,8 +382,17 @@ namespace CriticalMass.Runtime.Flow
             if (_loadPath != null)
             {
                 if (_loadIssued) return;   // the load happens at the start of the next frame
+                // perf/start-hitch-1: the old world art (1262 renderers, about 1.5M triangles of combined meshes) is torn
+                // down one frame before the load, under the full fade, so its destroy is not part of the load frame.
+                if (!_worldReleased)
+                {
+                    _worldReleased = true;
+                    CriticalMass.Runtime.View.Dressing.WorldView.ReleaseAllForLoad();
+                    return;
+                }
                 _loadIssued = true;
                 _fadeInNext = true;
+                LoadTimer.LoadIssued();
                 SceneManager.LoadScene(_loadPath);
                 return;
             }

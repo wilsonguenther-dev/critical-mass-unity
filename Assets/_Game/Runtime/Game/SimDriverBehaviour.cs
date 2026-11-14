@@ -119,6 +119,7 @@ namespace CriticalMass.Runtime.Game
 
         private void Update()
         {
+            if (CriticalMass.Runtime.Game.LoadTimer.Armed) CriticalMass.Runtime.Game.LoadTimer.FirstUpdate();   // perf/start-hitch-1: every Start() of the load frame has run
             // fix/facing-frame-timing: a capture clock (Time.captureDeltaTime: movie capture, the sanity tests' fixed load
             // frames, the frame-rate tests' fake clocks) drives the sim too. Unity's capture clock does not touch
             // unscaledDeltaTime (documented), so the driver used to run on real frame time under it: the load frames
@@ -164,7 +165,9 @@ namespace CriticalMass.Runtime.Game
             // Physics audit M7 / DG-101: count ability presses the sim will refuse (read-only on the World) for the HUD's cue.
             if (input != null && !HumanAutopilot) AbilityDenial.Observe(_humanFrame.Ability, World, 0, _dt);
             FrameCost.Mark c0 = FrameCost.Enter();
+            long lt = CriticalMass.Runtime.Game.LoadTimer.WatchingTicks ? CriticalMass.Runtime.Game.LoadTimer.Now() : 0;   // perf/start-hitch-1: the first ticks after a load, timed
             MatchTick.Advance(World, HumanAutopilot ? null : _humanFrame, _scratch);
+            if (lt != 0) CriticalMass.Runtime.Game.LoadTimer.TickDone(lt);
             FrameCost.Exit(FrameCost.Slot.Sim, c0);
             FrameCost.FrameTicks++;
             c0 = FrameCost.Enter();

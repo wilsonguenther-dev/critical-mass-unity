@@ -91,8 +91,16 @@ namespace CriticalMass.Runtime.Hud
                 req.destination = _rt;
                 bool canvasOn = Canvas.enabled;
                 Canvas.enabled = false;   // the logo and menu are not baked into the still
+                // perf/start-hitch-1: the logo and prompt sit on nested canvases now; they stay out of the still too.
+                Canvas[] nested = Canvas.GetComponentsInChildren<Canvas>(false);
+                bool[] nestedOn = new bool[nested.Length];
+                for (int i = 0; i < nested.Length; i++) { nestedOn[i] = nested[i].enabled; if (nested[i] != Canvas) nested[i].enabled = false; }
                 try { RenderPipeline.SubmitRenderRequest(_cam, req); }
-                finally { Canvas.enabled = canvasOn; }
+                finally
+                {
+                    Canvas.enabled = canvasOn;
+                    for (int i = 0; i < nested.Length; i++) if (nested[i] != Canvas) nested[i].enabled = nestedOn[i];
+                }
             }
             catch (Exception e)
             {

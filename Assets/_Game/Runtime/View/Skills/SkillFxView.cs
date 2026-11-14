@@ -32,7 +32,10 @@ namespace CriticalMass.Runtime.View.Skills
         GameObject _groundGo, _solidGo, _airGo;
         bool _wasOff;
 
-        void Start()
+        // perf/start-hitch-1: timed for the scene-start report (LoadTimer).
+        void Start() { long t0 = CriticalMass.Runtime.Game.LoadTimer.Now(); StartBody(); CriticalMass.Runtime.Game.LoadTimer.Part("SkillFxView.Start", t0); }
+
+        void StartBody()
         {
             _driver = GetComponent<SimDriverBehaviour>();
             if (_driver == null || _driver.World == null) { enabled = false; return; }

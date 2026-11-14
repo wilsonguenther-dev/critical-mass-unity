@@ -176,7 +176,10 @@ namespace CriticalMass.Runtime.Audio
             if (Instance == this) Instance = null;
         }
 
-        void OnSceneLoaded(Scene s, LoadSceneMode mode)
+        // perf/start-hitch-1: timed for the scene-start report (LoadTimer).
+        void OnSceneLoaded(Scene s, LoadSceneMode mode) { long t0 = CriticalMass.Runtime.Game.LoadTimer.Now(); OnSceneLoadedBody(s, mode); CriticalMass.Runtime.Game.LoadTimer.Part("MusicDirector.SceneLoaded", t0); }
+
+        void OnSceneLoadedBody(Scene s, LoadSceneMode mode)
         {
             _driver = null;
             _input = null;

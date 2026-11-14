@@ -60,7 +60,10 @@ namespace CriticalMass.Runtime.View.Reactions
         public RenderTexture Texture => _a;
         public ReactionBudget Budget => _budget;
 
-        private void Start()
+        // perf/start-hitch-1: timed for the scene-start report (LoadTimer).
+        private void Start() { long t0 = CriticalMass.Runtime.Game.LoadTimer.Now(); StartBody(); CriticalMass.Runtime.Game.LoadTimer.Part("ForceField.Start", t0); }
+
+        private void StartBody()
         {
             _driver = GetComponent<SimDriverBehaviour>();
             _budget = ReactionBudget.Current;
