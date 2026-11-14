@@ -155,7 +155,7 @@ namespace CriticalMass.Runtime.Online
             OnlineChatHud.Visible = p == Page.Room;
             OnlineChatHud.Centred = true;
             HudText.Set(_sub, p == Page.Room ? "Y chats to everyone, Shift + Y to your team. Bots fill every empty seat."
-                : "Play one match with friends on other computers. Bots fill every empty seat.");
+                : "Play one match with friends on other computers. You play as " + ChatFilter.CleanName(PlayerName()) + " (change it in CHARACTER).");
             if (p == Page.Home) SetStatus(OnlineConfig.Configured ? "" : "Online play is not switched on in this build yet.");
             HudText.Set(_title, p == Page.Room ? (OnlineMatch.Host != null ? "YOUR ROOM" : "ROOM") : p == Page.Join ? "JOIN A ROOM" : p == Page.Busy ? "CONNECTING..." : "PLAY ONLINE");
             MenuItem focus = p == Page.Home ? _create : p == Page.Join ? _joinGo : p == Page.Room ? (OnlineMatch.Host != null ? _start : _ready) : null;
@@ -163,6 +163,24 @@ namespace CriticalMass.Runtime.Online
         }
 
         void SetStatus(string s) => HudText.Set(_status, s ?? "");
+
+        /// <summary>online-rooms-4, -onlineShots only: show a page as it would be, with a status line and a typed code.</summary>
+        public void CapturePage(string page, string status = null, string typed = null)
+        {
+            Page p = page == "join" ? Page.Join : page == "busy" ? Page.Busy : page == "room" ? Page.Room : Page.Home;
+            if (typed != null) { _typed = typed; ShowCode(); }
+            if (p == Page.Room) _shownVersion = -1;
+            Go(p);
+            if (p == Page.Room) RefreshRoom();
+            if (status != null) SetStatus(status);
+        }
+
+        /// <summary>online-rooms-4, -onlineShots only: the joiner's READY state for the capture.</summary>
+        public void CaptureReady(bool ready)
+        {
+            _myReady = ready;
+            HudText.Set(_ready.Label, ready ? "NOT READY" : "READY");
+        }
 
         // ---------------------------------------------------------------- create / join
 
@@ -253,7 +271,7 @@ namespace CriticalMass.Runtime.Online
             ChainVertical(host ? new List<MenuItem> { _team, _class, _start, _copy, _leave } : new List<MenuItem> { _team, _class, _ready, _leave });
             if (version == _shownVersion) return;
             _shownVersion = version;
-            HudText.Set(_roomCode, OnlineMatch.Code != null ? "ROOM  " + OnlineMatch.Code : "");
+            HudText.Set(_roomCode, OnlineMatch.Code != null ? "ROOM  " + Spaced(OnlineMatch.Code) : "");
             int shown = 0, count = members != null ? members.Count : 0;
             for (int i = 0; i < _rows.Length; i++)
             {
@@ -262,20 +280,30 @@ namespace CriticalMass.Runtime.Online
                 HudText.Set(_rows[i], m == null ? "" : Row(m, i == 0));
                 if (m != null) shown++;
             }
-            HudText.Set(_more, count > _rows.Length ? "and " + (count - _rows.Length) + " more" : "");
+            int readyCount = 0;
+            if (members != null) foreach (RoomMember rm in members) if (rm.Confirmed && rm.Ready) readyCount++;
+            int seats = 2 * (host ? OnlineMatch.Host.TeamSize : OnlineMatch.Client != null ? Math.Max(1, OnlineMatch.Client.TeamSize) : 16);
+            HudText.Set(_more, (count > _rows.Length ? "and " + (count - _rows.Length) + " more.   " : "") +
+                $"{shown} {(shown == 1 ? "PLAYER" : "PLAYERS")} IN THE ROOM, {readyCount} READY.   BOTS TAKE THE OTHER {Math.Max(0, seats - shown)} SEATS.");
             if (host)
             {
                 bool ok = OnlineMatch.Host.CanStart(out string why);
                 _start.interactable = ok;
                 HudText.Set(_startWhy, ok ? "Everyone is ready. Bots take the other seats." : why);
-                SetStatus(string.IsNullOrEmpty(OnlineMatch.Host.Notice) ? "Send the code to your friend. They choose JOIN ROOM and type it." : OnlineMatch.Host.Notice);
+                SetStatus(string.IsNullOrEmpty(OnlineMatch.Host.Notice) ? "Send the code to your friends. They choose JOIN ROOM and type it." : OnlineMatch.Host.Notice);
             }
             else if (OnlineMatch.Client != null)
             {
                 HudText.Set(_startWhy, "The host starts the match when everyone is ready.");
-                if (OnlineMatch.Client.Phase == RoomPhase.Lobby) SetStatus("You are in. Pick a team and a class, then press READY.");
+                if (OnlineMatch.Client.Phase == RoomPhase.Lobby)
+                    SetStatus(_myReady ? "You are ready. Waiting for the host to start the match." : "You are in. Pick a team and a class, then press READY.");
+                else if (OnlineMatch.Client.Phase == RoomPhase.Connecting || OnlineMatch.Retrying || OnlineMatch.WillRetry)
+                    SetStatus("Connecting to room " + Spaced(OnlineMatch.Code) + "...");
             }
         }
+
+        /// <summary>K7Q2PF as "K7Q 2PF": easier to read aloud and to type from a text message (typing accepts either).</summary>
+        public static string Spaced(string code) => code != null && code.Length == 6 ? code.Substring(0, 3) + " " + code.Substring(3) : code;
 
         static string Row(RoomMember m, bool isHost)
         {
@@ -307,7 +335,7 @@ namespace CriticalMass.Runtime.Online
             }
             if (_page == Page.Room)
             {
-                if (OnlineMatch.Client != null && OnlineMatch.Client.Phase == RoomPhase.Closed)
+                if (OnlineMatch.Client != null && OnlineMatch.Client.Phase == RoomPhase.Closed && !OnlineMatch.Retrying && !OnlineMatch.WillRetry)
                 {
                     string why = OnlineMatch.Client.Error;
                     OnlineMatch.Leave();
