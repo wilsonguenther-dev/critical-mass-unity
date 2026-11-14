@@ -1,3 +1,4 @@
+using CriticalMass.Runtime.Hud.Style;
 using UnityEngine;
 
 namespace CriticalMass.Runtime.Online
@@ -18,9 +19,9 @@ namespace CriticalMass.Runtime.Online
 
         // Regions (inside Panel, 24 px gutters).
         public static readonly Rect Header = new Rect(140f, 78f, 1640f, 118f);
-        public static readonly Rect List = new Rect(140f, 216f, 1060f, 590f);
-        public static readonly Rect Controls = new Rect(1228f, 216f, 552f, 300f);
-        public static readonly Rect Chat = new Rect(1228f, 536f, 552f, 270f);
+        public static readonly Rect List = new Rect(140f, 216f, 1152f, 590f);   // online-rooms-6: wider, so 32 rows of five columns fit
+        public static readonly Rect Controls = new Rect(1316f, 216f, 464f, 300f);
+        public static readonly Rect Chat = new Rect(1316f, 536f, 464f, 270f);
         public static readonly Rect Status = new Rect(140f, 826f, 1640f, 58f);
         public static readonly Rect Footer = new Rect(140f, 900f, 1640f, 84f);
 
@@ -31,38 +32,64 @@ namespace CriticalMass.Runtime.Online
         public static readonly Rect Copy = new Rect(1510f, 84f, 270f, 56f);
         public static readonly Rect Count = new Rect(1200f, 148f, 580f, 40f);
 
-        // Player table: two columns of 16 rows (the second column fills from the 17th player).
-        public const int RowsPerColumn = 16, MaxRows = 2 * RowsPerColumn;
-        public const float RowH = 34f, TableHeadH = 30f, ColumnGap = 20f;
-        public static float ColumnW => (List.width - ColumnGap) * 0.5f;
-        /// <summary>Cell widths inside one table column: name, team, class, ready, ping.</summary>
-        public static readonly float[] Cells = { 168f, 92f, 108f, 102f, 50f };
+        // Player table. online-rooms-6: one column using the whole table width up to 16 players; two columns of 16 rows
+        // (the second fills from the 17th player) only above that. Every column has a fixed x and width inside its row:
+        // the name is left-aligned and takes what is left (ellipsised at its width), then team, class, state, and the
+        // ping right-aligned. One font size for the whole table from the type scale: TypeSmall in one column, TypeMin
+        // (the scale's minimum, never smaller) in two. The fixed widths are at TypeMin and grow with the size.
+        public const int RowsPerColumn = 16, MaxRows = 2 * RowsPerColumn, CellCount = 5;
+        public const int CellName = 0, CellTeam = 1, CellClass = 2, CellState = 3, CellPing = 4;
+        public const float RowH = 34f, TableHeadH = 30f, ColumnGap = 20f, CellPad = 6f, CellGap = 10f;
+        static readonly float[] FixedAtMin = { 0f, 80f, 116f, 96f, 62f };   // team, class, state, ping (the name takes the rest)
 
-        public static Rect Row(int i)
+        public static bool TwoColumns(int players) => players > RowsPerColumn;
+
+        public static float ColumnW(bool two) => two ? (List.width - ColumnGap) * 0.5f : List.width;
+
+        public static int RowSize(bool two) => two ? UiScale.TypeMin : UiScale.TypeSmall;
+
+        public static TextAnchor CellAnchor(int c) => c == CellPing ? TextAnchor.MiddleRight : TextAnchor.MiddleLeft;
+
+        public static Rect Row(int i, bool two)
         {
-            int col = i / RowsPerColumn, row = i % RowsPerColumn;
-            return new Rect(List.x + col * (ColumnW + ColumnGap), List.y + TableHeadH + row * RowH, ColumnW, RowH);
+            int col = two ? i / RowsPerColumn : 0, row = two ? i % RowsPerColumn : i;
+            float w = ColumnW(two);
+            return new Rect(List.x + col * (w + ColumnGap), List.y + TableHeadH + row * RowH, w, RowH);
         }
 
-        public static Rect Cell(int i, int c)
+        /// <summary>The two-column row (the 32-player layout; tests and the 32nd row).</summary>
+        public static Rect Row(int i) => Row(i, true);
+
+        static float CellWidth(int c, bool two)
         {
-            Rect r = Row(i);
-            float x = r.x;
-            for (int k = 0; k < c; k++) x += Cells[k];
-            return new Rect(x, r.y, Cells[c], r.height - 4f);
+            float k = RowSize(two) / (float)UiScale.TypeMin;
+            if (c != CellName) return FixedAtMin[c] * k;
+            float fixedSum = 0f;
+            for (int f = 1; f < CellCount; f++) fixedSum += FixedAtMin[f] * k;
+            return ColumnW(two) - 2f * CellPad - (CellCount - 1) * CellGap - fixedSum;
         }
 
-        public static Rect HeadCell(int col, int c)
+        public static Rect Cell(int i, int c, bool two)
         {
-            Rect r = Cell(col * RowsPerColumn, c);
+            Rect r = Row(i, two);
+            float x = r.x + CellPad;
+            for (int k = 0; k < c; k++) x += CellWidth(k, two) + CellGap;
+            return new Rect(x, r.y, CellWidth(c, two), r.height - 4f);
+        }
+
+        public static Rect Cell(int i, int c) => Cell(i, c, true);
+
+        public static Rect HeadCell(int col, int c, bool two)
+        {
+            Rect r = Cell(col * RowsPerColumn, c, two);
             return new Rect(r.x, List.y, r.width, TableHeadH - 4f);
         }
 
         // Controls children.
-        public static readonly Rect Team = new Rect(1228f, 216f, 552f, 64f);
-        public static readonly Rect Class = new Rect(1228f, 292f, 552f, 64f);
-        public static readonly Rect StartButton = new Rect(1228f, 368f, 552f, 80f);
-        public static readonly Rect StartWhy = new Rect(1228f, 458f, 552f, 56f);
+        public static readonly Rect Team = new Rect(1316f, 216f, 464f, 64f);
+        public static readonly Rect Class = new Rect(1316f, 292f, 464f, 64f);
+        public static readonly Rect StartButton = new Rect(1316f, 368f, 464f, 80f);
+        public static readonly Rect StartWhy = new Rect(1316f, 458f, 464f, 56f);
 
         /// <summary>The chat text lane inside the chat box (OnlineChatHud draws here on the room screen).</summary>
         public static Rect ChatLane => new Rect(Chat.x + 14f, Chat.y + 12f, Chat.width - 28f, Chat.height - 24f);

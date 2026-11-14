@@ -85,7 +85,46 @@ namespace CriticalMass.Runtime.Online
         public static bool AnyOpen { get; private set; }
 
         const int NameMaxOnline = 12;
-        readonly Text[,] _cells = new Text[OnlineLayout.MaxRows, 5];
+        readonly Text[,] _cells = new Text[OnlineLayout.MaxRows, OnlineLayout.CellCount];
+        readonly Text[,] _heads = new Text[2, OnlineLayout.CellCount];
+        bool? _tableTwo;
+
+        /// <summary>
+        /// online-rooms-6: places the table for one column (up to 16 players, the whole width) or two (17 to 32), with one
+        /// fixed font size for every cell and head (no per-cell shrinking: a long name is cut with an ellipsis at its
+        /// column). The second column and its head exist only in the two-column layout.
+        /// </summary>
+        void LayTable(bool two)
+        {
+            if (_tableTwo == two) return;
+            _tableTwo = two;
+            int size = OnlineLayout.RowSize(two);
+            for (int col = 0; col < 2; col++)
+                for (int c = 0; c < OnlineLayout.CellCount; c++)
+                {
+                    bool on = col == 0 || two;
+                    Text h = _heads[col, c];
+                    h.gameObject.SetActive(on);
+                    if (on) Fix(h, OnlineLayout.HeadCell(col, c, two), size);
+                }
+            for (int i = 0; i < OnlineLayout.MaxRows; i++)
+            {
+                bool on = two || i < OnlineLayout.RowsPerColumn;
+                for (int c = 0; c < OnlineLayout.CellCount; c++)
+                {
+                    Text t = _cells[i, c];
+                    t.gameObject.SetActive(on);
+                    if (on) Fix(t, OnlineLayout.Cell(i, c, two), size);
+                }
+            }
+        }
+
+        static void Fix(Text t, Rect r, int size)
+        {
+            MenuUi.Place(t.rectTransform, r.x, r.y, r.width, r.height);
+            t.fontSize = size;
+            ContainedText.Attach(t, size, size, 1);   // one size; too long = the ellipsis, never a smaller font
+        }
         Text _count, _nameText;
         MenuItem _name, _paste;
         bool _naming;
@@ -137,11 +176,14 @@ namespace CriticalMass.Runtime.Online
             _count = L(_room, "Count", OnlineLayout.Count, CMTokens.Ui, UiScale.TypeBody, Brass, TextAnchor.MiddleRight, "", 1);
             string[] heads = { "PLAYER", "TEAM", "CLASS", "READY", "PING" };
             for (int col = 0; col < 2; col++)
-                for (int c = 0; c < 5; c++)
-                    L(_room, "Head " + col + c, OnlineLayout.HeadCell(col, c), CMTokens.Ui, UiScale.TypeMin, CMTokens.WithAlpha(Cream, 0.7f), TextAnchor.MiddleLeft, heads[c], 1);
+                for (int c = 0; c < OnlineLayout.CellCount; c++)
+                    _heads[col, c] = L(_room, "Head " + col + c, OnlineLayout.HeadCell(col, c, true), CMTokens.Ui, UiScale.TypeMin, CMTokens.WithAlpha(Cream, 0.7f),
+                        OnlineLayout.CellAnchor(c), heads[c], 1);
             for (int i = 0; i < OnlineLayout.MaxRows; i++)
-                for (int c = 0; c < 5; c++)
-                    _cells[i, c] = L(_room, "Cell " + i + "." + c, OnlineLayout.Cell(i, c), CMTokens.Ui, UiScale.TypeSmall, Cream, TextAnchor.MiddleLeft, "", 1);
+                for (int c = 0; c < OnlineLayout.CellCount; c++)
+                    _cells[i, c] = L(_room, "Cell " + i + "." + c, OnlineLayout.Cell(i, c, true), CMTokens.Ui, UiScale.TypeMin, Cream, OnlineLayout.CellAnchor(c), "", 1);
+            _tableTwo = null;
+            LayTable(false);
             _more = _count;
             _team = Stepper(_room, "Team", OnlineLayout.Team.x, OnlineLayout.Team.y, OnlineLayout.Team.width, OnlineLayout.Team.height, "TEAM",
                 () => _myTeam == TeamId.Azure ? "AZURE" : "CRIMSON", StepTeam, _refresh);
@@ -170,7 +212,7 @@ namespace CriticalMass.Runtime.Online
 
         protected override void OnShow() { base.OnShow(); AnyOpen = true; }
 
-        public override void Hide() { AnyOpen = false; base.Hide(); }
+        public override void Hide() { AnyOpen = false; OnlineChatHud.Visible = false; base.Hide(); }   // online-rooms-6: the room's chat box goes with the room screen
 
         void Go(Page p)
         {
@@ -369,6 +411,7 @@ namespace CriticalMass.Runtime.Online
             int shown = 0, count = members != null ? members.Count : 0, readyCount = 0;
             var confirmed = new List<RoomMember>(count);
             if (members != null) foreach (RoomMember rm in members) if (rm.Confirmed) confirmed.Add(rm);
+            LayTable(OnlineLayout.TwoColumns(confirmed.Count));
             for (int i = 0; i < OnlineLayout.MaxRows; i++)
             {
                 RoomMember m = i < confirmed.Count ? confirmed[i] : null;
