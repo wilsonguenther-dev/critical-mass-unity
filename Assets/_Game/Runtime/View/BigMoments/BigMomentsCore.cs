@@ -291,6 +291,8 @@ namespace CriticalMass.Runtime.View.Moments
         public double StartedAt;
         /// <summary>Shortened because it was the player's own moment in a tight fight.</summary>
         public bool Shortened;
+        /// <summary>fix/hit-feel-4: started by Force (gallery, captures, tests): a full-screen panel does not end it.</summary>
+        public bool Forced;
     }
 
     public enum OfferResult { Off, Cooldown, Queued, QueuedAsStinger, Full, Unknown }
@@ -449,10 +451,23 @@ namespace CriticalMass.Runtime.View.Moments
         /// on screen ends and nothing new starts; waiting moments wait (and go stale) until the panel closes.</summary>
         public bool Held;
 
+        // fix/hit-feel-4: when the hold began (-1: not held). Waiting moments do not age while a panel holds the screen,
+        // so a moment queued under the knock-out recap starts once the recap closes instead of going stale and being lost.
+        private double _heldAt = -1;
+
         public void Update(double now, bool bannerOpen)
         {
-            if (Held && Playing) { Playing = false; Version++; }
-            if (Held && StingerPlaying) { StingerPlaying = false; StingerVersion++; }
+            if (Held) { if (_heldAt < 0) _heldAt = now; }
+            else if (_heldAt >= 0)
+            {
+                double d = Math.Max(0, now - _heldAt);
+                for (int i = 0; i < _count; i++) _waitSince[i] += d;
+                for (int i = 0; i < _stingCount; i++) _stingSince[i] += d;
+                _heldAt = -1;
+            }
+            // A forced moment (gallery, captures, tests) plays through a panel; a natural one ends under it.
+            if (Held && Playing && !Current.Forced) { Playing = false; Version++; }
+            if (Held && StingerPlaying && !CurrentStinger.Forced) { StingerPlaying = false; StingerVersion++; }
             if (Playing && now >= Current.StartedAt + Current.Seconds)
             {
                 Playing = false;
@@ -464,11 +479,11 @@ namespace CriticalMass.Runtime.View.Moments
                 StingerVersion++;
             }
 
-            for (int i = _count - 1; i >= 0; i--)
+            for (int i = _count - 1; i >= 0 && !Held; i--)
             {
                 if (!MomentRecipes.Get(_waitMoment[i].Request.Id).NeverStale && now - _waitSince[i] > WaitTimeout) RemoveAt(i);
             }
-            for (int i = _stingCount - 1; i >= 0; i--)
+            for (int i = _stingCount - 1; i >= 0 && !Held; i--)
             {
                 if (now - _stingSince[i] <= StingerWaitTimeout) continue;
                 for (int k = i; k < _stingCount - 1; k++)
@@ -541,7 +556,7 @@ namespace CriticalMass.Runtime.View.Moments
         {
             MomentRecipe recipe = MomentRecipes.Get(r.Id);
             if (recipe == null) return;
-            var m = new ActiveMoment { Request = r, Scale = scale, StartedAt = now };
+            var m = new ActiveMoment { Request = r, Scale = scale, StartedAt = now, Forced = true };
             if (scale == MomentScale.Takeover)
             {
                 m.Seconds = TakeoverSeconds(recipe, false);

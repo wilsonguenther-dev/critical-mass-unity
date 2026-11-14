@@ -96,6 +96,26 @@ namespace CriticalMass.Runtime.Tests
             Assert.IsTrue(BigMoments.FullPanelUp(true), "pause counts as a full panel");
         }
 
+        /// <summary>fix/hit-feel-4: a forced moment plays over a panel; a queued one waits out a long recap, not lost.</summary>
+        [Test]
+        public void AForcedMomentPlaysOverAPanelAndAQueuedOneWaitsOutTheRecap()
+        {
+            var q = new MomentQueue();
+            q.Held = true;
+            q.Force(Req(MomentId.AtTheWire), MomentScale.Takeover, 0);
+            q.Update(0.1, false);
+            Assert.IsTrue(q.Playing, "the gallery, captures and tests play through the recap");
+
+            var w = new MomentQueue();
+            Assert.AreEqual(OfferResult.Queued, w.Offer(Req(MomentId.OpeningStrike), 0, BigMomentsMode.Full, false));
+            w.Held = true;
+            for (double t = 0; t <= MomentQueue.WaitTimeout * 3; t += 0.1) w.Update(t, false);
+            Assert.IsFalse(w.Playing, "nothing natural starts over the recap");
+            w.Held = false;
+            w.Update(MomentQueue.WaitTimeout * 3 + 0.1, false);
+            Assert.IsTrue(w.Playing, "the queued moment starts when the recap closes (it did not go stale under it)");
+        }
+
         [Test]
         public void TakeoverPlaysForItsLengthThenEnds()
         {

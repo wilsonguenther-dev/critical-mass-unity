@@ -186,7 +186,10 @@ namespace CriticalMass.Runtime.View.Anim
             // ---- facing (DG-89)
             // feat/hit-feel-1: through a swing the body turns to the enemy it swings at (HitFeel.Facing; the sim's Facing otherwise).
             // fix/hit-feel-3: a fighter in a hit reaction (staggered) is never turned; it keeps the sim's facing.
-            double target = SimSpace.YawDeg(_hasReact ? actor.Facing : HitFeel.Facing(w, i, alpha));
+            // fix/hit-feel-4: nor is a moving one (half the locomotion move weight or more): the legs run along the sim
+            // facing, so turning the body to the target there only ever fights the movement facing.
+            bool turnable = !_hasReact && Locomotion.MoveWeight(_speed) < 0.5f;
+            double target = SimSpace.YawDeg(turnable ? HitFeel.Facing(w, i, alpha) : actor.Facing);
             if (corpse)
             {
                 if (!_wasCorpse) LatchDeath(m, actor, feed, i, target);
@@ -239,6 +242,7 @@ namespace CriticalMass.Runtime.View.Anim
             bool upperAllowed = !corpse;
             _warp = 0;
             _legYaw = 0f;
+            _heavyUpper = 0f;   // fix/hit-feel-4: PoseGround sets it; air, stand-up and the end screen do not
 
             if (corpse)
             {
@@ -352,6 +356,8 @@ namespace CriticalMass.Runtime.View.Anim
 
         // ------------------------------------------------------------------ ground: locomotion, heavy hits, gather, idle
 
+        float _heavyUpper;   // fix/hit-feel-4: the moving share of a whole-body reaction, drawn on the upper body
+
         float PoseGround(ModelView m, Actor actor, GameConfig cfg, double simTime, double loopDt, bool air, ref Vector3 scale)
         {
             double speed = _speed;
@@ -394,10 +400,16 @@ namespace CriticalMass.Runtime.View.Anim
             // Heavy-hit stagger on the full body (light and blocked hits are on the upper layer).
             float heavy = 0f;
             double hitT = 0;
+            _heavyUpper = 0f;
             if (_hasReact && _react.Layer == ReactionLayer.FullBody && m.HasClip(_react.Clip))
             {
                 hitT = _hitAgeForPose;
                 heavy = _react.Weight * HitReactions.Decay(hitT, m.ClipLength(_react.Clip));
+                // fix/hit-feel-4 (FacingSanityPlayTests, Healer: HitHeavy at 0.43 twisted a running fighter's hips 21
+                // degrees and the toes 166 off): a whole-body reaction fades off the legs as the fighter moves; PoseUpper
+                // plays the moving share on the arms and chest instead (_heavyUpper).
+                _heavyUpper = heavy * move;
+                heavy *= 1f - move;
                 if (hitT < 0.067) scale = new Vector3(scale.x * 1.05f, scale.y, scale.z * 1.05f);
             }
 
@@ -618,6 +630,14 @@ namespace CriticalMass.Runtime.View.Anim
                     {
                         float hw = _react.Weight * decay * (1f - 0.5f * Mathf.Clamp01(actW));
                         if (m.PoseUpper(clip, ht, hw, false, 0)) sum += hw;
+                    }
+                    else if (_heavyUpper > 0f)
+                    {
+                        // fix/hit-feel-4: a moving fighter's whole-body reaction, on the arms and chest only (never the
+                        // full-body fallback, which would put it back on the legs).
+                        string uc = m.OnUpperLayer(_react.Clip) ? _react.Clip : m.OnUpperLayer(ArtMapping.Hit) ? ArtMapping.Hit : null;
+                        float hw = _heavyUpper * (1f - 0.5f * Mathf.Clamp01(actW));
+                        if (uc != null && m.PoseUpper(uc, ht, hw, false, 0)) sum += hw;
                     }
                 }
             }
