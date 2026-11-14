@@ -34,6 +34,9 @@ namespace CriticalMass.Net
         public int BacklogTicks = 6;
     }
 
+    /// <summary>Receives a transport event the lockstep layer does not own (room and chat messages, type 20 and up).</summary>
+    public delegate void TransportEventHandler(ref TransportEvent ev, long nowMs);
+
     /// <summary>Fills one human's input for a tick on this machine (keyboard and mouse, a gamepad, or the autoplay pilot).</summary>
     public delegate void LocalInputSampler(World w, int actor, int tick, InputFrame into);
 
@@ -90,6 +93,8 @@ namespace CriticalMass.Net
         /// <summary>Test seam: may edit the decoded frames of a tick before it is applied (proves desync detection).</summary>
         public Action<int, InputFrame[]> TestTamper;
         /// <summary>Host: the START packet, resent to every human not heard from yet (it may have been lost).</summary>
+        /// <summary>Gets every packet of type 20 and up (chat): kept apart from the inputs, so it can never change the match.</summary>
+        public TransportEventHandler Other;
         public byte[] StartPacket;
         public int StartPacketLength;
 
@@ -280,6 +285,7 @@ namespace CriticalMass.Net
             int type = ev.Data[0];
             if (IsHost && type == MsgInputs) ReadInputs(ev.From, ev.Data, ev.Length, nowMs);
             else if (!IsHost && type == MsgBundles && ev.From == Peers.Host) ReadBundles(ev.Data, ev.Length, nowMs);
+            else if (type >= 20) Other?.Invoke(ref ev, nowMs);
         }
 
         // ---------------------------------------------------------------- local input

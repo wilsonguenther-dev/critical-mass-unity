@@ -20,7 +20,7 @@ namespace CriticalMass.Sim.Tests.Net
             Assert.AreEqual(RoomPhase.Lobby, client.Phase);
             Assert.AreEqual(2, client.Members.Count);
             Assert.IsFalse(host.CanStart(out string why));
-            StringAssert.Contains("Jeisil", why);
+            StringAssert.Contains("JEISIL", why);
             client.SetPick(TeamId.Crimson, ClassId.Miner);
             client.SetReady(true);
             for (long end = now + 3000; now < end; now += 10) { net.Advance(now); host.Update(now); client.Update(now); }

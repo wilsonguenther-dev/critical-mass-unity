@@ -38,15 +38,9 @@ namespace CriticalMass.Net
         public const int Hello = 20, State = 21, Pick = 22, Ready = 23, Reject = 24, Start = 25, Ping = 26, Pong = 27;
         public const int NameMax = 16, BuildMax = 40, TextMax = 120;
 
-        public static string CleanName(string s)
-        {
-            s = (s ?? "").Trim();
-            var cs = new System.Text.StringBuilder(NameMax);
-            foreach (char c in s)
-            {
-                if (cs.Length >= NameMax) break;
-                if (c >= 32 && c < 127) cs.Append(c);
-            }
+        /// <summary>Display names follow the chat rules (letters, digits, space, '-' and '_'; filtered; at most 16).</summary>
+        public static string CleanName(string s) => ChatFilter.CleanName(s);
+    }
             return cs.Length > 0 ? cs.ToString() : "Player";
         }
     }
@@ -67,6 +61,8 @@ namespace CriticalMass.Net
         /// <summary>Bumps on every change of the member list (the screen redraws when it changes).</summary>
         public int Version { get; private set; }
         public LockstepSession Session { get; private set; }
+        /// <summary>Room and match chat (the host routes and checks every line).</summary>
+        public readonly ChatChannel Chat;
 
         private readonly ITransport _t;
         private readonly GameConfig _cfg;
@@ -82,6 +78,17 @@ namespace CriticalMass.Net
             _build = build ?? "";
             TeamSize = cfg.TeamSize;
             Members.Add(new RoomMember { Peer = Peers.Host, Name = RoomMsg.CleanName(hostName), Ready = true, Confirmed = true });
+            Chat = new ChatChannel(transport)
+            {
+                NameOf = p => Find(p)?.Name ?? "PLAYER",
+                TeamOf = p => (int)(Find(p)?.Team ?? TeamId.Azure),
+                PeersInRoom = ConfirmedPeers,
+            };
+        }
+
+        private IEnumerable<int> ConfirmedPeers()
+        {
+            foreach (RoomMember m in Members) if (m.Confirmed) yield return m.Peer;
         }
 
         public RoomMember Find(int peer)
@@ -154,7 +161,12 @@ namespace CriticalMass.Net
                     return;
                 case TransportEventKind.PeerLeft:
                     RoomMember gone = Find(ev.From);
-                    if (gone != null) { Members.Remove(gone); Changed(gone.Confirmed ? gone.Name + " left the room." : ""); }
+                    if (gone != null)
+                    {
+                        Members.Remove(gone);
+                        Changed(gone.Confirmed ? gone.Name + " left the room." : "");
+                        if (gone.Confirmed) Chat.Notice(gone.Name + " left.", now);
+                    }
                     return;
                 case TransportEventKind.Data:
                     break;
@@ -163,6 +175,7 @@ namespace CriticalMass.Net
             }
             RoomMember m = Find(ev.From);
             if (m == null || ev.Data == null || ev.Length < 1) return;
+            if (ev.Data[0] == ChatChannel.Msg) { if (m.Confirmed) Chat.Handle(ref ev, now); return; }
             var r = new WireReader(ev.Data, 1, ev.Length);
             switch (ev.Data[0])
             {
@@ -182,6 +195,7 @@ namespace CriticalMass.Net
                     m.Name = RoomMsg.CleanName(name);
                     m.Confirmed = true;
                     Changed(m.Name + " joined.");
+                    Chat.Notice(m.Name + " joined.", now);
                     return;
                 }
                 case RoomMsg.Pick:
@@ -286,7 +300,7 @@ namespace CriticalMass.Net
             if (w.Overflow) return null;
             _t.Send(Peers.Broadcast, w.Buf, w.Pos);
             (_t as ILockableTransport)?.Lock();
-            Session = new LockstepSession(_t, setup, _cfg, options) { StartPacket = w.Buf, StartPacketLength = w.Pos };
+            Session = new LockstepSession(_t, setup, _cfg, options) { StartPacket = w.Buf, StartPacketLength = w.Pos, Other = Chat.Handle };
             Phase = RoomPhase.InMatch;
             return Session;
         }
@@ -306,6 +320,8 @@ namespace CriticalMass.Net
         /// <summary>Raised once when the match begins (the screen switches to the game).</summary>
         public Action<LockstepSession> Started;
         public LockstepOptions Options;
+        /// <summary>Room and match chat (lines arrive from the host, already checked).</summary>
+        public readonly ChatChannel Chat;
 
         private readonly ITransport _t;
         private readonly GameConfig _cfg;
@@ -324,6 +340,7 @@ namespace CriticalMass.Net
             _cfg = cfg;
             _name = RoomMsg.CleanName(name);
             _build = build ?? "";
+            Chat = new ChatChannel(transport);
         }
 
         public RoomMember Me
@@ -398,6 +415,7 @@ namespace CriticalMass.Net
                 default: return;
             }
             if (ev.From != Peers.Host || ev.Data == null || ev.Length < 1) return;
+            if (ev.Data[0] == ChatChannel.Msg) { Chat.Handle(ref ev, now); return; }
             var r = new WireReader(ev.Data, 1, ev.Length);
             switch (ev.Data[0])
             {
@@ -452,7 +470,7 @@ namespace CriticalMass.Net
                     MatchSetup setup = MatchSetup.Read(ref r, _cfg);
                     if (setup == null) { Fail("The host sent a match this game cannot play."); return; }
                     if (setup.SlotOfPeer(_t.LocalPeer) < 0) { Fail("The match started without you."); return; }
-                    Session = new LockstepSession(_t, setup, _cfg, Options);
+                    Session = new LockstepSession(_t, setup, _cfg, Options) { Other = Chat.Handle };
                     Phase = RoomPhase.InMatch;
                     Version++;
                     Started?.Invoke(Session);
