@@ -808,7 +808,7 @@ namespace CriticalMass.Runtime.Camera
             if (w == null || hud == null || hud.Clusters == null || hud.Canvas == null) return;
             RectTransform c = hud.Clusters[(int)HudCluster.Minimap];
             if (c == null || !c.gameObject.activeInHierarchy) return;
-            CriticalMass.Runtime.Hud.Ui.MinimapProjection proj = CriticalMass.Runtime.Hud.Ui.MinimapGround.Projection;
+            CriticalMass.Runtime.Hud.Ui.MinimapProjection proj = CriticalMass.Runtime.Hud.Ui.MinimapGeometry.Projection;
             if (proj == null || proj.Width <= 0 || proj.Height <= 0) return;
             c.GetWorldCorners(_corners);
             UnityEngine.Camera uiCam = hud.Canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : hud.Canvas.worldCamera;

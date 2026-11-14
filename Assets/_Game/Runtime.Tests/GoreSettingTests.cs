@@ -3,6 +3,7 @@ using CriticalMass.Runtime.Menu;
 using CriticalMass.Runtime.View.Effects;
 using CriticalMass.Sim.Config;
 using CriticalMass.Sim.Core;
+using CriticalMass.Sim.Grid;
 using NUnit.Framework;
 using UnityEngine;
 
