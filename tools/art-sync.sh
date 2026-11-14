@@ -146,7 +146,10 @@ done
 # design line (tools/art/kaiju_walk.sig) changes.
 python3 -I "$ROOT/tools/art/fbx_transplant_clips.py" "$K_DIR/Kaiju_Adult.fbx" "$PIN_TMP/adult/Kaiju_Adult.fbx" "$PIN_TMP/Kaiju_Adult.alive.fbx" > /dev/null \
   || { echo "art-sync: clip transplant failed for Kaiju_Adult.fbx" >&2; exit 1; }
-if [[ $RUN_BLENDER -eq 1 ]]; then
+# rig-kaiju-2 (2026-11-14): the green-crystal adult replaced this build (Art/Kaiju/_rig2~/kr2_build.py on GitHub Blender);
+# while that source is in the repo the committed Kaiju_Adult.fbx is kept and the old walk build is skipped.
+if [[ $RUN_BLENDER -eq 1 && -f "$ART/Kaiju/_rig2~/kr2_build.py" ]]; then echo "art-sync: Kaiju_Adult.fbx kept (green-crystal rig, _rig2~)"; fi
+if [[ $RUN_BLENDER -eq 1 && ! -f "$ART/Kaiju/_rig2~/kr2_build.py" ]]; then
   BLW="${BLENDER:-$(command -v blender || true)}"
   [[ -n "$BLW" ]] || { echo "art-sync: Blender not found for the Kaiju walk build (or pass --no-blender)" >&2; exit 1; }
   CM_HEAVY_TIMEOUT=600 "$CM_HEAVY" blender "$BLW" -b --factory-startup --python "$ART/Kaiju/_source~/walk/kaiju_walk.py" -- \

@@ -64,7 +64,9 @@ namespace CriticalMass.Runtime.View.Art
             int feet = 0;
             foreach (string side in new[] { "l", "r" })
             {
-                Transform foot = FindDeep(root, "foot." + side), toes = FindDeep(root, "toes." + side);
+                // KayKit names (foot.l / toes.l) or the Kaiju rigs' (Foot_L / Toes_L, rig-kaiju-2).
+                Transform foot = FindDeep(root, "foot." + side) ?? FindDeep(root, "foot_" + side),
+                    toes = FindDeep(root, "toes." + side) ?? FindDeep(root, "toes_" + side);
                 if (foot == null || toes == null) continue;
                 Vector3 d = toRoot.MultiplyVector(toes.position - foot.position);
                 d.y = 0f;

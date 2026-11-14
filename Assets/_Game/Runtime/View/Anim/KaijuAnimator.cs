@@ -36,6 +36,11 @@ namespace CriticalMass.Runtime.View.Anim
         /// <summary>Procedural limits (degrees) and the yaw spring (1/s). The adult turns at most TurnRateDeg per second.</summary>
         public const float LookMaxDeg = 40f, LeanMaxDeg = 7f, TailMaxDeg = 28f, HitHeadDeg = 12f;
         public const double YawOmega = 18.0, TurnRateDeg = 360.0, HatchlingTurnRateDeg = 540.0, HeadLeadSeconds = 0.12;
+        /// <summary>rig-kaiju-2: a model with a vertex-colour face (no expression atlases) shows anger with the jaw (a snarl
+        /// of SnarlDeg) and a head dip of AngerHeadDeg while it telegraphs a slam, winds up a claw or is berserk.</summary>
+        public const float SnarlDeg = 14f, AngerHeadDeg = 5f;
+        /// <summary>The snarl, 0 to 1 (tests and captures).</summary>
+        public float Anger => (float)_anger;
 
         sealed class Measured
         {
@@ -61,7 +66,7 @@ namespace CriticalMass.Runtime.View.Anim
         ModelView _lastModel;
         int _lastTick = -1;
         // procedural state
-        double _yaw = double.NaN, _yawRate, _lean, _tail, _look;
+        double _yaw = double.NaN, _yawRate, _lean, _tail, _look, _anger;
 
         /// <summary>Measured walk ground speed of a model (u/s at rate 1), for tests and the capture report.</summary>
         public double WalkSpeedOf(ModelView m) => m != null && _measured.TryGetValue(m, out Measured r) ? r.WalkSpeed : FallbackWalkSpeed;
@@ -431,6 +436,21 @@ namespace CriticalMass.Runtime.View.Anim
             Turn(m.Bone("Tail3"), up, _tail * 0.35);
             Turn(m.Bone("Neck"), up, _look * 0.4);
             Turn(m.Bone("Head"), up, _look * 0.6);
+            // rig-kaiju-2: no face atlases on the green-crystal adult, so anger is the jaw and the head (view only).
+            ModelSpec spec = m.Spec;
+            if (spec != null && spec.VertexColourFace)
+            {
+                double angerTarget = k.KoIn > 0 ? 0 : (k.TelegraphIn > 0 || k.MeleeWindupIn > 0 || k.State == KaijuState.Berserk) ? 1 : 0;
+                if (dSim > 0) _anger += (angerTarget - _anger) * (1 - Math.Exp(-8 * dSim));
+                if (_anger > 1e-3)
+                {
+                    Vector3 side = parent * (drawn * Vector3.right);
+                    Transform jaw = m.Bone("Jaw"), head = m.Bone("Head");
+                    if (jaw != null) jaw.rotation = Quaternion.AngleAxis(SnarlDeg * (float)_anger, side) * jaw.rotation;
+                    if (head != null) head.rotation = Quaternion.AngleAxis(AngerHeadDeg * (float)_anger, side) * head.rotation;
+                }
+            }
+            else _anger = 0;
             if (flinch > 0f)
             {
                 Transform head = m.Bone("Head");
