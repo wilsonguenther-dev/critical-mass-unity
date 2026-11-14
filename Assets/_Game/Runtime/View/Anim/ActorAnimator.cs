@@ -669,6 +669,7 @@ namespace CriticalMass.Runtime.View.Anim
         bool _reachMeasured;
         Vector3 _tipLocal;
         Transform _tipHand;
+        ModelView _tipModel;
 
         /// <summary>
         /// fix/hit-feel-5: once per fighter, before this frame's pose: pose the attack clip at its contact frame and measure
@@ -678,6 +679,7 @@ namespace CriticalMass.Runtime.View.Anim
         void MeasureReach(ModelView m, ClassId cls, string clip)
         {
             _reachMeasured = true;
+            _tipModel = m;
             _tipLocal = HitPose.TipLocal(m, out _tipHand, out _);
             Transform spine = m.Bone("spine");
             if (_tipHand == null || spine == null) return;
@@ -729,7 +731,9 @@ namespace CriticalMass.Runtime.View.Anim
             _actClip = clip;
             // fix/hit-feel-3: measured once per clip, here, before this frame's pose is built.
             _actExtreme = kind == 1 && clip != null ? AttackTiming.MeasureExtreme(m, clip, ClipFacts.Contact(clip, m.ClipLength(clip) * 0.5f)) : -1;
-            if (kind == 1 && clip != null && !_reachMeasured) MeasureReach(m, actor.Cls, clip);
+            // fix/hit-feel-6: measured again when the views gave this actor another model (a respawn into another class,
+            // the capture's next class); the cache kept the old, pooled model's hand.
+            if (kind == 1 && clip != null && (!_reachMeasured || _tipModel != m)) MeasureReach(m, actor.Cls, clip);
             _actStart = simTime - aa;
             _lastActW = 0f;
             _breakAt = -1;
