@@ -111,8 +111,10 @@ namespace CriticalMass.Runtime.View.Art
             }
             // Soles: the lowest foot-weighted bind vertex, in the model root's frame (rest equals bind for these models).
             float low = float.PositiveInfinity;
-            BoneWeight[] bw = hero.sharedMesh.boneWeights;
-            Vector3[] vs = hero.sharedMesh.vertices;
+            // A non-readable mesh throws on .vertices in Play mode and in players (batch 8: 136 PlayMode tests): no lift then.
+            bool readable = hero.sharedMesh.isReadable;
+            BoneWeight[] bw = readable ? hero.sharedMesh.boneWeights : new BoneWeight[0];
+            Vector3[] vs = readable ? hero.sharedMesh.vertices : new Vector3[0];
             Matrix4x4 toRoot = (modelRoot != null ? modelRoot.worldToLocalMatrix : Matrix4x4.identity) * hero.transform.localToWorldMatrix;
             for (int i = 0; i < vs.Length && i < bw.Length; i++)
             {
