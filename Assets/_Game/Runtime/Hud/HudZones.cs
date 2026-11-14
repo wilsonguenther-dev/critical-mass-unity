@@ -164,6 +164,20 @@ namespace CriticalMass.Runtime.Hud
             return Rect.MinMaxRect(Mathf.Min(a.x, b.x), Mathf.Min(a.y, b.y), Mathf.Max(a.x, b.x), Mathf.Max(a.y, b.y));
         }
 
+        /// <summary>fix/hud-containment-5: a world-anchored bar or label (the Kaiju health bar, the hill marker) slides down
+        /// off any HUD panel it would sit on (the top band, the job line, the stock chips), a step at a time. Returns true
+        /// when it had to move (callers dim it then). rt's anchoredPosition is y up.</summary>
+        public static bool SlideOffPanels(RectTransform rt, Canvas canvas, float step = 24f, int tries = 16)
+        {
+            bool moved = false;
+            for (int i = 0; i < tries && OverPanel(rt, canvas); i++)
+            {
+                rt.anchoredPosition -= new Vector2(0f, step);
+                moved = true;
+            }
+            return moved;
+        }
+
         /// <summary>A world label (rt on canvas) would draw over an active registered panel.</summary>
         public static bool OverPanel(RectTransform rt, Canvas canvas)
         {

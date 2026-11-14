@@ -558,6 +558,13 @@ namespace CriticalMass.Runtime.View
             else if (simNow >= _chipHoldUntil) _chip = Mathf.Max(shown, _chip - 0.6f * (float)dSim);
             if (!on) return;
             _bar.anchoredPosition = p / scale;
+            // fix/hud-containment-5 (owner: the bar and portrait sat under and touching the WOOD / WATER / FOOD chips):
+            // slide off the HUD's panels and dim while displaced
+            bool displaced = CriticalMass.Runtime.Hud.HudZones.SlideOffPanels(_bar, _worldCanvas);
+            CanvasGroup bg = _bar.GetComponent<CanvasGroup>();
+            if (bg == null) bg = _bar.gameObject.AddComponent<CanvasGroup>();
+            float ba = displaced ? 0.7f : 1f;
+            if (Mathf.Abs(bg.alpha - ba) > 1e-3f) bg.alpha = ba;
             Color c = ko ? CMTokens.Stone.Color : KaijuColour(k.State);
             _barFill.SetFill(c);
             _barFill.Fill01 = shown;

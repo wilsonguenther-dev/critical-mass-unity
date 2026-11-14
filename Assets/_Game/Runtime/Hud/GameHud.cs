@@ -1023,7 +1023,10 @@ namespace CriticalMass.Runtime.Hud
             _hillMarker.transform.parent.gameObject.SetActive(hillOn);
             if (hillOn)
             {
-                ((RectTransform)_hillMarker.transform.parent).anchoredPosition = hp / scale;
+                var hm = (RectTransform)_hillMarker.transform.parent;
+                hm.anchoredPosition = hp / scale;
+                // fix/hud-containment-5 (owner: "CRIMSON" over the hill bar and CRIMSON HOLDS): off the top band and its stack
+                HudZones.SlideOffPanels(hm, Canvas);
                 _hillMarker.SetFill(HillColour(s.Hill));
                 HudText.Set(_hillMarkerWord, s.Hill == HillState.Contested ? "CONTESTED" : s.Hill == HillState.Neutral ? "NEUTRAL" :
                     s.Hill == HillState.Azure ? "AZURE" : "CRIMSON");
