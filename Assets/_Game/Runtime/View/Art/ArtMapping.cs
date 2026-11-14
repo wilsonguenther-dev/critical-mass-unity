@@ -325,11 +325,15 @@ namespace CriticalMass.Runtime.View.Art
                 // Height: the Hero mesh's bind-pose top is the ladder corner on his back (2.329 m in the FBX; cap crown 1.895).
                 OutlinePx = CharacterHullPx, Rim = 0.6f, Authored = BuilderAzure, Crimson = BuilderCrimson, Height = 2.33f,
                 FaceTexture = "Assets/_Game/Art/Builder/BuilderFace.png", FaceSlot = 1, ArtYawDeg = 180f, HeldWeaponInMesh = true },
+            // rig-healer-1 (2026-11-14): the generated Healer body (octree shell; Hero 21.6k, LOD0 3.9k, LOD1 1.5k, Shadow 0.7k
+            // tris) on the shared 41 skeleton names, whole-hand weights, leaf wings rigid on the chest (rig_body.py), clips baked
+            // per class with foot IK (Healer_Clips.fbx; hip-height ratio = StrideScale). Empty hands: the game hangs the
+            // lantern on handslot.r. Face in the vertex colour; no glow code (6) in this body. Pre-batch-b: Healer/_fallback~.
             new ModelSpec { Key = Healer, AssetPath = "Assets/_Game/Art/Healer/Healer.fbx", Kind = ArtKind.Character, Rigged = true,
-                Bones = 41, ClipSource = "Assets/_Game/Art/Characters/KayKit_Clips.fbx",
-                Meshes = new[] { "Healer_Hero", "Healer_LOD0", "Healer_LOD1", "Healer_Shadow" }, MaskCodes = new[] { 0, 6, 8 },
+                Bones = 41, ClipSource = "Assets/_Game/Art/Healer/Healer_Clips.fbx",
+                Meshes = new[] { "Healer_Hero", "Healer_LOD0", "Healer_LOD1", "Healer_Shadow" }, MaskCodes = new[] { 0, 8 },
                 OutlinePx = CharacterHullPx, Rim = 0.6f, Authored = MinerAzure, Crimson = MinerCrimson, Height = 2.0f,
-                FaceTexture = "Assets/_Game/Art/Healer/HealerFace.png", FaceSlot = 1, ArtYawDeg = 180f, HeldWeaponInMesh = true },
+                VertexColourFace = true, StrideScale = 1.194f, ArtYawDeg = 180f },
             new ModelSpec { Key = DemolitionsProps, AssetPath = "Assets/_Game/Art/Demolitions/DemolitionsProps.fbx", Kind = ArtKind.Prop,
                 Meshes = new[] { MineBuried, MineArmed, MineOwnerRing, MineTriggered, TntFlight, CraterRim, Explosion },
                 OutlinePx = 2.5f, Authored = MinerAzure, Crimson = MinerCrimson },
