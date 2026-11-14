@@ -390,6 +390,11 @@ namespace CriticalMass.Runtime.View
             World w = Driver != null ? Driver.World : null;
             if (w == null) return;
             if (_worldCanvas == null) Build();
+            if (Time.frameCount % 60 == 3)   // fix/hud-containment-5: the HUD finish tokens on the bar and callout too
+            {
+                CriticalMass.Runtime.Hud.Ui.HudStyle.Sweep(_worldCanvas.transform);
+                if (_calloutCanvas != null) CriticalMass.Runtime.Hud.Ui.HudStyle.Sweep(_calloutCanvas.transform);
+            }
             UnityEngine.Camera cam = UnityEngine.Camera.main;
             if (cam == null) return;
             float scale = FitCanvas(_worldCanvas, cam);

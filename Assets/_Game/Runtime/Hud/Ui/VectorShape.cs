@@ -31,6 +31,9 @@ namespace CriticalMass.Runtime.Hud.Ui
         /// <summary>fix/hud-containment-5: a Pie drawn as a disc (its rays stop at the inscribed circle) instead of a square
         /// wipe. The class kit's cooldown is round: at full it was a blank tan square where the icon belongs.</summary>
         public bool RoundPie;
+        /// <summary>fix/hud-containment-5: drop shadow under the shape (HudStyle.ShadowY px down, HudStyle.ShadowColor); 0 = none.</summary>
+        public float ShadowPx;
+        static readonly List<Vector2> Shadow = new List<Vector2>(256);
         public Color OutlineColor = CMTokens.VoidNavy.Color;
         public Color RimColor = CMTokens.WarmCream.Color;
         float _fill01 = 1f;
@@ -89,6 +92,12 @@ namespace CriticalMass.Runtime.Hud.Ui
             }
 
             Vector2 centre = BuildOutline(Kind, r, Radius, Outer);
+            if (ShadowPx > 0f)
+            {
+                Shadow.Clear();
+                for (int i = 0; i < Outer.Count; i++) Shadow.Add(Outer[i] + new Vector2(0f, -ShadowPx));
+                Fan(vh, Shadow, centre + new Vector2(0f, -ShadowPx), HudStyle.ShadowColor * new Color(1f, 1f, 1f, tint.a));
+            }
             float maxInset = Mathf.Min(r.width, r.height) * 0.32f;
             float o = Mathf.Min(OutlinePx, maxInset);
             float rim = Mathf.Min(RimPx, Mathf.Max(0, maxInset - o));

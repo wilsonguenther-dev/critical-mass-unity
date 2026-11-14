@@ -659,6 +659,8 @@ namespace CriticalMass.Runtime.Hud
         {
             if (Driver == null) Driver = GetComponent<SimDriverBehaviour>();
             if (Driver == null || Driver.World == null || Root == null) return;
+            // fix/hud-containment-5: one finish (HudStyle tokens) for every panel, pill and chip, built here or later
+            if (Time.frameCount % 60 == 2) HudStyle.Sweep(transform);   // the HUD object: its canvas and the feed, toast and ping canvases under it
             AttachCamera();
             UpdateScale();
             Refresh(Driver.World, Time.unscaledDeltaTime);
