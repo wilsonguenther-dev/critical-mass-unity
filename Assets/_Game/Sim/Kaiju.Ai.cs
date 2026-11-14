@@ -170,7 +170,7 @@ namespace CriticalMass.Sim.Core
         {
             Kaiju k = w.Kaiju;
             MapDef map = w.Map;
-            double r = GridR(w);
+            double r = WallR(w);
             double r2 = r * r;
             for (int iter = 0; iter < 4; iter++)
             {
@@ -221,7 +221,7 @@ namespace CriticalMass.Sim.Core
         {
             Kaiju k = w.Kaiju;
             BoundsDef b = w.Map.Bounds;
-            double r = GridR(w);
+            double r = WallR(w);
             if (k.X < b.MinX + r) k.X = b.MinX + r;
             else if (k.X > b.MaxX - r) k.X = b.MaxX - r;
             if (k.Z < b.MinZ + r) k.Z = b.MinZ + r;
@@ -274,12 +274,72 @@ namespace CriticalMass.Sim.Core
             }
         }
 
-        /// <summary>DG-86: true when the Kaiju's wall collider (GridR) overlaps no blocked cell.</summary>
-        public static bool CircleClear(World w)
+        /// <summary>DG-86: true when the Kaiju's wall collider (WallR) overlaps no blocked cell.</summary>
+        public static bool CircleClear(World w) => CircleClearAt(w, WallR(w));
+
+        /// <summary>feat/kaiju-bridges-1: the live wall collider radius: GridR, or the squeezed radius on and near a bridge.</summary>
+        public static double WallR(World w)
+        {
+            double full = GridR(w);
+            if (!SqueezeOn(w)) return full;
+            double r = w.KaijuNav.WallR;
+            return r > 0 && r < full ? r : full;
+        }
+
+        /// <summary>
+        /// feat/kaiju-bridges-1: squeeze the wall collider to KaijuSqueezeRadius while a squeeze cell (a bridge cell it fits only
+        /// squeezed) is within reach of its body, so it can step onto the bridge; shrinking never overlaps a wall. Away from them it
+        /// grows back at KaijuUnsqueezeRate, and only by as much as fits, so it is never pushed out with a pop.
+        /// </summary>
+        private static void UpdateWallR(World w, double dt)
+        {
+            Kaiju k = w.Kaiju;
+            KaijuNav nav = w.KaijuNav;
+            PhysicsConfig pc = w.Config.Physics;
+            double full = GridR(w);
+            if (nav.WallR <= 0) nav.WallR = full;
+            RefreshClearance(w);
+            MapDef map = w.Map;
+            int reach = (int)Math.Ceiling(full) + 1;
+            int kx = JsMath.FloorToInt(k.X);
+            int kz = JsMath.FloorToInt(k.Z);
+            bool near = false;
+            for (int dz = -reach; dz <= reach && !near; dz++)
+                for (int dx = -reach; dx <= reach; dx++)
+                {
+                    int x = kx + dx, z = kz + dz;
+                    if (MapGrid.InBounds(map, x, z) && nav.Squeeze[z * map.Width + x] != 0) { near = true; break; }
+                }
+            if (near)
+            {
+                nav.WallR = Math.Min(nav.WallR, pc.KaijuSqueezeRadius);
+                return;
+            }
+            if (nav.WallR >= full) return;
+            double grown = JsMath.F32(Math.Min(full, nav.WallR + pc.KaijuUnsqueezeRate * dt));
+            if (CircleClearAt(w, grown)) nav.WallR = grown;
+        }
+
+        /// <summary>
+        /// feat/kaiju-bridges-1, for the view only (no Sim meaning): 0 = full wall collider, 1 = fully squeezed onto a bridge.
+        /// The animator tucks the arms and narrows the stance by it so the wide-stance model does not stand on air.
+        /// </summary>
+        public static double SqueezeAmount(World w)
+        {
+            if (!SqueezeOn(w)) return 0;
+            double full = GridR(w);
+            double sr = w.Config.Physics.KaijuSqueezeRadius;
+            if (full - sr < 1e-6) return 0;
+            double a = (full - WallR(w)) / (full - sr);
+            return a < 0 ? 0 : (a > 1 ? 1 : a);
+        }
+
+        /// <summary>True when a wall collider of radius `radius` at the Kaiju overlaps no blocked cell.</summary>
+        private static bool CircleClearAt(World w, double radius)
         {
             Kaiju k = w.Kaiju;
             MapDef map = w.Map;
-            double r = GridR(w) - 1e-3;
+            double r = radius - 1e-3;
             for (int gz = JsMath.FloorToInt(k.Z - r); gz <= JsMath.FloorToInt(k.Z + r); gz++)
             {
                 for (int gx = JsMath.FloorToInt(k.X - r); gx <= JsMath.FloorToInt(k.X + r); gx++)
@@ -446,6 +506,7 @@ namespace CriticalMass.Sim.Core
             bool guard = Phys.On(w, pc.KaijuNavGuard);
             bool seen = guard && Phys.On(w, pc.WallsBlockHits);
             if (guard) for (int id = 0; id < n; id++) if (nav.Ignore[id] > 0) nav.Ignore[id] = Combat.TickDown(nav.Ignore[id], dt);
+            if (SqueezeOn(w)) UpdateWallR(w, dt);
 
             if (k.KoIn > 0)
             {
