@@ -60,6 +60,7 @@ namespace CriticalMass.Runtime.Hud
             AttackCd01 = o.AttackCd01; AbilityCd01 = o.AbilityCd01; AbilityCdSeconds = o.AbilityCdSeconds;
             Carry = o.Carry; CarryAmount = o.CarryAmount; RespawnIn = o.RespawnIn; PlayerX = o.PlayerX; PlayerZ = o.PlayerZ;
             Kills = o.Kills; Deaths = o.Deaths;
+            HealerLantern = o.HealerLantern;
         }
     }
 
@@ -67,6 +68,10 @@ namespace CriticalMass.Runtime.Hud
     public static class HudBinder
     {
         /// <summary>The local player's actor id (actor 0 is the human, SimDriverBehaviour / HumanInputSource).</summary>
+        /// <summary>feat/light-weapons-2: a Healer whose attack press would swing the lantern now (nobody hurt to mend in
+        /// range); the attack slot then reads LANTERN instead of MEND.</summary>
+        public bool HealerLantern;
+
         public const int LocalActor = 0;
 
         public static void Read(World w, int localId, HudState s)
@@ -108,7 +113,13 @@ namespace CriticalMass.Runtime.Hud
             s.Alive = a.Alive;
             s.Hp = (float)Math.Max(0, a.Hp);
             s.MaxHp = (float)a.MaxHp;
-            s.AttackCd01 = cc.AttackCooldown > 0 ? Clamp01((float)(a.AttackCd / cc.AttackCooldown)) : 0f;
+            // feat/light-weapons-2: a light-weapon swing sets its own cooldown; the slot sweeps over that length.
+            LightWeapon lw = LightWeapons.Of(w, a.Cls);
+            double atkCd = lw != null && a.Cls != ClassId.Healer ? lw.CooldownSeconds : cc.AttackCooldown;
+            s.AttackCd01 = atkCd > 0 ? Clamp01((float)(a.AttackCd / atkCd)) : 0f;
+            bool aim = localId < w.HasAim.Length && w.HasAim[localId] == 1;
+            s.HealerLantern = a.Cls == ClassId.Healer && lw != null && a.Alive
+                && Healer.MendTarget(w, localId, aim ? w.Inputs[localId].AimX : double.NaN, aim ? w.Inputs[localId].AimZ : double.NaN) < 0;
             s.AbilityCd01 = cc.AbilityCooldown > 0 ? Clamp01((float)(a.AbilityCd / cc.AbilityCooldown)) : 0f;
             s.AbilityCdSeconds = (float)Math.Max(0, a.AbilityCd);
             s.Carry = a.Carry;

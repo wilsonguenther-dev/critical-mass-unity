@@ -781,23 +781,41 @@ namespace CriticalMass.Runtime.Hud
             }
 
             // buttons: attack (LMB), class ability (RMB), carry (E)
-            ApplyButton(_buttons[0], s.AttackCd01, 0f, UiIcons.Attack[AttackIconRow(cls), team], AttackNames[cls], dt);
+            string attackName = AttackName(cls, s.HealerLantern);
+            ApplyButton(_buttons[0], s.AttackCd01, 0f, UiIcons.Attack[AttackIconRow(cls), team], attackName, dt);
             ApplyButton(_buttons[1], s.AbilityCd01, s.AbilityCdSeconds, UiIcons.Ability[iconRow, team], AbilityNames[cls], dt);
             ApplyDenied(_buttons[1], dt);
             AbilityButton carry = _buttons[2];
             carry.Icon.Set(s.Carry == CarryKind.Corruption ? UiIcons.Corruption : s.Carry == CarryKind.Biomass ? UiIcons.Biomass :
                 UiIcons.CarryEmpty, _tier);
             HudText.Set(carry.Count, s.CarryAmount > 0 ? NumberCache.Int(s.CarryAmount) : "");
-            ApplyNames(AttackNames[cls], AbilityNames[cls], CarryWord(s.Carry));
+            ApplyNames(attackName, AbilityNames[cls], CarryWord(s.Carry));
+        }
+
+        /// <summary>feat/light-weapons-2: the attack slot's word. The Healer's reads LANTERN while her press would swing the
+        /// lantern (nobody hurt in mend range) and MEND otherwise; every other class has one fixed word.</summary>
+        public static string AttackName(int cls, bool healerLantern)
+        {
+            if (cls < 0 || cls >= AttackNames.Length) return "ATTACK";
+            return cls == (int)ClassId.Healer && healerLantern ? CriticalMass.Sim.Core.LightWeapons.HealerName : AttackNames[cls];
         }
 
         /// <summary>The carry button's name for what the player holds.</summary>
         public static string CarryWord(CarryKind k) => k == CarryKind.Corruption ? "CORRUPTION" : k == CarryKind.Biomass ? "BIOMASS" : "CARRY";
 
+        /// <summary>Every word the attack slot can show: the class words plus the Healer's LANTERN (feat/light-weapons-2).</summary>
+        static string[] AttackSlotNames()
+        {
+            var a = new string[AttackNames.Length + 1];
+            Array.Copy(AttackNames, a, AttackNames.Length);
+            a[AttackNames.Length] = CriticalMass.Sim.Core.LightWeapons.HealerName;
+            return a;
+        }
+
         /// <summary>Every name the attack, ability and carry buttons can show, per slot (for the layout tests).</summary>
         public static string[][] AbilitySlotNames() => new[]
         {
-            (string[])AttackNames.Clone(), (string[])AbilityNames.Clone(), new[] { CarryWord(CarryKind.None), CarryWord(CarryKind.Corruption), CarryWord(CarryKind.Biomass) },
+            AttackSlotNames(), (string[])AbilityNames.Clone(), new[] { CarryWord(CarryKind.None), CarryWord(CarryKind.Corruption), CarryWord(CarryKind.Biomass) },
         };
 
         public const float AbilityNameY = -20f, AbilityNameH = 22f;
