@@ -386,7 +386,9 @@ try:
             W[np.ix_(far, cols)] = 0
             empty = W[far].sum(1) < 1e-6
             idx = np.nonzero(far)[0][empty]
-            W[idx, bi['hips']] = 1
+            hi = P[idx, 2] > J['chest'].z
+            W[idx[hi], bi['chest']] = 1      # wings, a pack edge: ride the chest
+            W[idx[~hi], bi['hips']] = 1      # a rope coil, belt pouches: ride the hips
             moved_arm += int(far.sum())
     REP['rigid'] = {'head_top': int(rig_head.sum()), 'back_pack': int(back.sum()), 'off_arm_vertices_reweighted': moved_arm}
     label = np.full(nv, -1)
