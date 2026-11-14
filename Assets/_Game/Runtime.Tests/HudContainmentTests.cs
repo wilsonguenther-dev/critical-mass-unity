@@ -251,6 +251,52 @@ namespace CriticalMass.Runtime.Tests
             finally { Object.DestroyImmediate(root); }
         }
 
+        /// <summary>polish-3 (owner: HUD items "not respecting each other's time on screen"; a "Hill lost" pill sat above
+        /// the banner "The hill is contested."): hill news shows once. While the banner owns the hill news, no hill caption
+        /// pill; other pills (healing wings, mine armed, distant explosion) are untouched; a fading pill never leaves a ghost.</summary>
+        [Test]
+        public void HillNewsShowsOnceAndAFadedPillLeavesNoGhost()
+        {
+            Assert.IsTrue(CriticalMass.Runtime.Audio.Announcer.IsHillTrigger(CriticalMass.Runtime.Audio.AnnouncerTrigger.HillContested));
+            Assert.IsTrue(CriticalMass.Runtime.Audio.Announcer.IsHillTrigger(CriticalMass.Runtime.Audio.AnnouncerTrigger.HillLost));
+            Assert.IsTrue(CriticalMass.Runtime.Audio.Announcer.IsHillTrigger(CriticalMass.Runtime.Audio.AnnouncerTrigger.HillTaken));
+            Assert.IsTrue(CriticalMass.Runtime.Audio.Announcer.IsHillTrigger(CriticalMass.Runtime.Audio.AnnouncerTrigger.HillTakenByEnemy));
+            Assert.IsFalse(CriticalMass.Runtime.Audio.Announcer.IsHillTrigger(CriticalMass.Runtime.Audio.AnnouncerTrigger.FinalMinute));
+
+            // every hill-state caption in the sound table is in the hill family, and every other caption is not
+            int hill = 0, other = 0;
+            foreach (var c in CriticalMass.Runtime.Audio.Sound.SoundTable.Cues)
+            {
+                if (c.Caption == null) continue;
+                string id = c.Id ?? string.Empty;
+                int us = id.IndexOf('_');
+                string fam = us > 0 ? id.Substring(0, us) : id;
+                bool isHill = id == "hill_captured" || id == "hill_lost" || id == "hill_contested";
+                Assert.AreEqual(isHill, CriticalMass.Runtime.Audio.Sound.SoundCaptions.YieldsToBanner(fam, true), id);
+                Assert.IsFalse(CriticalMass.Runtime.Audio.Sound.SoundCaptions.YieldsToBanner(fam, false), id + " shows when the banner is quiet");
+                if (isHill) hill++; else other++;
+            }
+            Assert.AreEqual(3, hill, "captured, lost, contested");
+            Assert.Greater(other, 2, "healing wings, mine armed, distant explosion keep their pills");
+
+            // the fade: zero before and after, full in the middle, and never a faint outline at the very ends
+            const float start = 10f, until = 10f + CriticalMass.Runtime.Audio.Sound.SoundCaptions.Life;
+            Assert.AreEqual(0f, CriticalMass.Runtime.Audio.Sound.SoundCaptions.AlphaAt(9f, start, until));
+            Assert.AreEqual(1f, CriticalMass.Runtime.Audio.Sound.SoundCaptions.AlphaAt(11f, start, until));
+            Assert.AreEqual(0f, CriticalMass.Runtime.Audio.Sound.SoundCaptions.AlphaAt(until, start, until));
+            Assert.AreEqual(0f, CriticalMass.Runtime.Audio.Sound.SoundCaptions.AlphaAt(until - 0.001f, start, until), "no ghost at the tail");
+            Assert.AreEqual(0f, CriticalMass.Runtime.Audio.Sound.SoundCaptions.AlphaAt(start + 0.001f, start, until), "no ghost at the head");
+        }
+
+        /// <summary>polish-3 (respawn capture: an empty "KNOCKED OUT" box under the knock-out card): no empty boxes.</summary>
+        [Test]
+        public void TheHitRecapBoxNeverShowsEmpty()
+        {
+            Assert.IsFalse(CriticalMass.Runtime.Hud.Mechanics.MechanicsHud.RecapShows(true, 0), "knocked out with no hits listed: hidden");
+            Assert.IsTrue(CriticalMass.Runtime.Hud.Mechanics.MechanicsHud.RecapShows(true, 1));
+            Assert.IsFalse(CriticalMass.Runtime.Hud.Mechanics.MechanicsHud.RecapShows(false, 3), "alive: hidden");
+        }
+
         [Test]
         public void TheStressCaptureFlagIsReadAndPadsByThirtyPercent()
         {

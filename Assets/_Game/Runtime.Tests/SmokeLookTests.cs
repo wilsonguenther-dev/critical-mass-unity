@@ -55,6 +55,37 @@ namespace CriticalMass.Runtime.Tests
             Assert.AreEqual(FxScene.SmokeBound(FxScene.BoomVisualMax), FxScene.SmokeBound(8f), 1e-5f, "the Kaiju slam is not bigger");
         }
 
+        /// <summary>polish-3 (owner: the TNT fireball read as "a bunch of orange balloons"): one soft blast, at most four
+        /// merged lobes, no wider than about one and a half fighters, gone by 0.6 s, cheaper than the old balls.</summary>
+        [Test]
+        public void TheFireballIsOneSoftMergedBlastGoneBySixTenths()
+        {
+            Assert.LessOrEqual(FxScene.FireballLobes, 4, "at most three or four lobes");
+            Assert.Greater(FxScene.FireballLobeOverlap, 0.5f, "neighbouring lobes overlap by more than half their radius");
+            Assert.LessOrEqual(FxScene.FireballEnd, 0.6 + 1e-9, "gone by 0.6 s");
+            foreach (float R in Radii)
+            {
+                float widest = 0f;
+                for (int k = 0; k <= 60; k++)
+                {
+                    float t = k * 0.01f;
+                    widest = UnityEngine.Mathf.Max(widest, FxScene.FireballCoreRadius(R, t) * FxScene.FireballHalfK);
+                }
+                Assert.LessOrEqual(2f * widest, 1.5f * FighterHeight * 0.75f, $"R {R}: about one and a half fighters across at most");
+                Assert.Greater(widest, 0.2f, $"R {R}: still a real blast");
+                Assert.AreEqual(0f, FxScene.FireballCoreRadius(R, 0.6f), 1e-6f);
+                Assert.Greater(FxScene.FireballCoreRadius(R, 0.12f), 2f * FxScene.FireballCoreRadius(R, 0f) - 1e-5f, "scales up fast");
+            }
+            Assert.AreEqual(1f, FxScene.FireballAlpha(0.2f), 1e-6f);
+            Assert.Less(FxScene.FireballAlpha(0.5f), FxScene.FireballAlpha(0.4f), "fades");
+            Assert.AreEqual(0f, FxScene.FireballAlpha(0.6f), 1e-6f);
+            Assert.Less(FxScene.FireballYellowK(0.4f), FxScene.FireballYellowK(0.05f), "the yellow heart shrinks first");
+            // cost: (core + lobes) x 3 layers + the yellow heart, against the old 4 fireball blobs + 7 lobes x 3 blobs
+            int newVerts = 3 * ((12 + 1) + FxScene.FireballLobes * (10 + 1)) + (12 + 1);
+            int oldVerts = 4 * (12 + 1) + 7 * ((9 + 1) + (9 + 1) + (7 + 1));
+            Assert.LessOrEqual(newVerts, oldVerts);
+        }
+
         [Test]
         public void TheSmokeCostsNoMoreThanTheOldColumn()
         {

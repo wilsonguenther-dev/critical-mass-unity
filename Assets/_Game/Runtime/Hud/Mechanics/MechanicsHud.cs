@@ -489,8 +489,18 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             bool down = !w.Actors[me].Alive;
             if (down && !_recapOpen) OpenRecap(view.Feed, w);
             if (!down && _recapOpen) _recapOpen = false;
-            if (_recap.gameObject.activeSelf != _recapOpen) _recap.gameObject.SetActive(_recapOpen);
+            // polish-3 (respawn capture: an EMPTY "KNOCKED OUT" box under the "Knocked out by ..." card): with no hits to
+            // list (a fall, a forced knock-out) the box had only its title, and the card above already says how it
+            // happened. It shows only when it has rows: no empty boxes.
+            bool show = RecapShows(_recapOpen, RecapRowsShown);
+            if (_recap.gameObject.activeSelf != show) _recap.gameObject.SetActive(show);
         }
+
+        /// <summary>polish-3: hit rows in the open recap (0 keeps the box hidden).</summary>
+        public int RecapRowsShown { get; private set; }
+
+        /// <summary>polish-3: the recap box shows only with at least one hit row (pure; tests).</summary>
+        public static bool RecapShows(bool open, int rows) => open && rows > 0;
 
         /// <summary>Fills the recap from the newest hits (allocates once per knock-out).</summary>
         void OpenRecap(MechFeed f, World w)
@@ -504,7 +514,8 @@ namespace CriticalMass.Runtime.Hud.Mechanics
                 HudText.Set(_recapRows[i], RecapLine(h));
                 _recapRows[i].color = i == 0 ? CMTokens.ToolBrass.Color : CMTokens.WarmCream.Color;
             }
-            HudText.Set(_recapHead, n > 0 ? "YOU WERE HIT BY" : "KNOCKED OUT");
+            HudText.Set(_recapHead, "YOU WERE HIT BY");
+            RecapRowsShown = n;
         }
 
         /// <summary>One recap line: "TNT  from CRIMSON DEMOLITIONS  55" (KO on the finishing blow).</summary>

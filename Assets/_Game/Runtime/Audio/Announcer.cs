@@ -435,6 +435,28 @@ namespace CriticalMass.Runtime.Audio
             && Instance._queue.CooledDown(Time.unscaledTimeAsDouble);
 
         public static bool IsSpeaking => Instance != null && Instance._lineEnds > Time.unscaledTime;
+        /// <summary>polish-3: the four hill-state lines (taken, taken by the enemy, lost, contested).</summary>
+        public static bool IsHillTrigger(AnnouncerTrigger t) =>
+            t == AnnouncerTrigger.HillTaken || t == AnnouncerTrigger.HillTakenByEnemy || t == AnnouncerTrigger.HillLost || t == AnnouncerTrigger.HillContested;
+
+        /// <summary>polish-3 (owner: HUD items "not respecting each other's time on screen"): true while the big subtitle
+        /// banner is saying a hill-state line, or one starts next frame. The sound-caption pill then stays off the hill
+        /// news, so "Hill lost" never sits above "The hill is contested."</summary>
+        public static bool OwnsHillNews
+        {
+            get
+            {
+                if (Instance == null || !SubtitlesEnabled) return false;
+                if (IsSpeaking && Instance._current != null && IsHillTrigger(Instance._current.Trigger)) return true;
+                // A queued hill line counts only when it starts on the next frame (free and cooled down); one stuck behind
+                // the cooldown may age out unsaid, and then the pill must carry the news.
+                AnnouncerQueue q = Instance._queue;
+                if (IsSpeaking || !q.CooledDown(Time.unscaledTimeAsDouble)) return false;
+                return q.IsPending(AnnouncerTrigger.HillTaken) || q.IsPending(AnnouncerTrigger.HillTakenByEnemy)
+                    || q.IsPending(AnnouncerTrigger.HillLost) || q.IsPending(AnnouncerTrigger.HillContested);
+            }
+        }
+
         /// <summary>The subtitle on screen ("" when none).</summary>
         public static string CurrentText => Instance != null && IsSpeaking && Instance._current != null ? Instance._current.Text : string.Empty;
 
