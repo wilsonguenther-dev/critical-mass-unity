@@ -199,7 +199,10 @@ namespace CriticalMass.Runtime.View.Anim
 
             // ---- actions: AnimAction resets to 0 on the press tick of an attack or an ability
             double aa = actor.AnimAction;
-            if (!corpse && aa + 1e-9 < _lastAnimAction && (actor.AttackCd > 0 || actor.AbilityCd > 0)) BeginAction(m, actor, cfg, simTime);
+            // feat/skill-effects-1: TNT and Purify reset AnimAction without the cooldowns above, so they played no clip; the
+            // skill lane's cue (Throw, Cast, set on the skill's event tick) starts one. Root Seeds' cue swaps Cast for Throw.
+            string cue = CriticalMass.Runtime.View.Skills.SkillAnimCues.FreshClip(i, w.Tick);
+            if (!corpse && aa + 1e-9 < _lastAnimAction && (actor.AttackCd > 0 || actor.AbilityCd > 0 || cue != null)) BeginAction(m, actor, cfg, simTime, cue);
             _lastAnimAction = aa;
 
             // ---- hits
@@ -611,7 +614,7 @@ namespace CriticalMass.Runtime.View.Anim
         string _terraClip;
         double _terraAt;
 
-        void BeginAction(ModelView m, Actor actor, GameConfig cfg, double simTime)
+        void BeginAction(ModelView m, Actor actor, GameConfig cfg, double simTime, string cue = null)
         {
             ClassConfig cc = cfg.Class(actor.Cls);
             double aa = actor.AnimAction;
@@ -620,6 +623,8 @@ namespace CriticalMass.Runtime.View.Anim
             byte kind = attack ? (byte)1 : ability ? (byte)2 : actor.AttackCd > 0 ? (byte)1 : (byte)2;
             string clip = kind == 1 ? AttackTiming.AttackClip(m, actor.Cls) : AttackTiming.AbilityClip(m, actor.Cls);
             if (clip != null && !m.HasClip(clip)) clip = null;
+            // a skill cue (not a melee press this tick) plays its own clip on the ability timing
+            if (cue != null && !attack && m.HasClip(cue)) { clip = cue; kind = 2; }
             if (_actClip != null && _lastActW > 0f)
             {
                 _prevClip = _actClip;
