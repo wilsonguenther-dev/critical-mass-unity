@@ -49,7 +49,7 @@ namespace CriticalMass.Runtime.View.Dressing
 
         /// <summary>True when the dressed world draws cell i of its current type.</summary>
         public static bool Draws(int i, byte currentType) =>
-            _dressed != null && i >= 0 && i < _dressed.Length && _dressed[i] && _dressedTypes[i] == currentType;
+            _dressed != null && i >= 0 && i < _dressed.Length && _dressed[i] && CriticalMass.Runtime.View.WallDamage.DamageLook.DressedStillCovers(_dressedTypes[i], currentType);
 
         /// <summary>The plan the view drew (tests and the capture read it).</summary>
         public WorldPlan Plan { get; private set; }
@@ -67,6 +67,9 @@ namespace CriticalMass.Runtime.View.Dressing
         private readonly Dictionary<Mesh, MeshData> _meshData = new Dictionary<Mesh, MeshData>();
         private readonly Dictionary<int, GameObject> _groundChunks = new Dictionary<int, GameObject>();
         private readonly List<(WorldBreakable b, MeshFilter mf, string state)> _breakables = new List<(WorldBreakable, MeshFilter, string)>();
+        /// <summary>wall-damage-1: per-cell pieces of each breakable section (null = the old whole-section swap), and their materials.</summary>
+        private readonly List<CriticalMass.Runtime.View.WallDamage.BreakableCellSet> _cellSets = new List<CriticalMass.Runtime.View.WallDamage.BreakableCellSet>();
+        private readonly List<Material[]> _cellMats = new List<Material[]>();
         private Material _ground;
         private Texture2D _field;
         private readonly Dictionary<int, Chunk> _groups = new Dictionary<int, Chunk>();
@@ -265,6 +268,7 @@ namespace CriticalMass.Runtime.View.Dressing
             if (_driver == null || _driver.World == null) return;
             Sim.Core.World w = _driver.World;
             CriticalMass.Runtime.Game.FrameRecorder.Loading = false;
+            CriticalMass.Runtime.View.WallDamage.BreakableCellSet.TickShake(w);
             if (_building == null && (w != _world || w.Map != _map))
             {
                 _replanning = null;   // a new world: a running re-plan of the old one is dropped (Clear destroys its objects)
@@ -761,6 +765,9 @@ namespace CriticalMass.Runtime.View.Dressing
             _builtQuality = -1;
             for (int l = 0; l < SceneryLod.Levels; l++) TrianglesAtLevel[l] = ChunksAtLevel[l] = 0;
             _breakables.Clear();
+            _cellSets.Clear();
+            _cellMats.Clear();
+            CriticalMass.Runtime.View.WallDamage.BreakableCellSet.ClearAll();
             _groups.Clear();
 
             _hillShown = (HillState)(-1);
@@ -907,6 +914,17 @@ namespace CriticalMass.Runtime.View.Dressing
                 var mf = go.AddComponent<MeshFilter>();
                 go.AddComponent<MeshRenderer>();
                 _breakables.Add((b, mf, null));
+                // wall-damage-1: one piece per Sim cell, cut from the authored intact / cracked / destroyed models.
+                CriticalMass.Runtime.View.WallDamage.BreakableCellSet set = null;
+                Material[] cellMats = null;
+                if (_map != null)
+                {
+                    Mesh bmI = StateMesh(b.Family + "intact", out cellMats), bmC = StateMesh(b.Family + "cracked", out _), bmD = StateMesh(b.Family + "destroyed", out _);
+                    if (cellMats != null) for (int q = 0; q < cellMats.Length; q++) cellMats[q] = Resolve(cellMats[q], b.Team);
+                    set = CriticalMass.Runtime.View.WallDamage.BreakableCellSet.TryBuild(b.Cells, _map.Width, bmI, bmC, bmD, go.transform, _map.Cells.Length);
+                }
+                _cellSets.Add(set);
+                _cellMats.Add(cellMats);
                 if (_breakables.Count % 16 == 0)
                 {
                     _buildDone++;
@@ -932,12 +950,36 @@ namespace CriticalMass.Runtime.View.Dressing
         /// <summary>Tests: slice the build in the editor too (the editor and PlayMode tests build in one frame otherwise).</summary>
         public static bool SliceInEditor;
 
+        /// <summary>The level-0 mesh of a bases piece and a copy of its materials (null when the catalog lacks it).</summary>
+        private Mesh StateMesh(string piece, out Material[] mats)
+        {
+            mats = null;
+            GameObject model = _catalog != null ? _catalog.Find(piece) : null;
+            MeshFilter src = model != null ? model.GetComponentInChildren<MeshFilter>(true) : null;
+            MeshRenderer sr = src != null ? src.GetComponent<MeshRenderer>() : null;
+            if (sr != null) mats = sr.sharedMaterials;
+            return src != null ? src.sharedMesh : null;
+        }
+
         private void SyncBreakables()
         {
             byte[] cells = _map.Cells;
             for (int k = 0; k < _breakables.Count; k++)
             {
                 var (b, mf, state) = _breakables[k];
+                // wall-damage-1: a section cut into cells draws each cell from its own type (never the whole-section rule).
+                CriticalMass.Runtime.View.WallDamage.BreakableCellSet set = k < _cellSets.Count ? _cellSets[k] : null;
+                if (set != null && _driver != null && _driver.World != null && _driver.World.Map == _map)
+                {
+                    bool first = state != "cells";
+                    if (first)
+                    {
+                        mf.sharedMesh = null;
+                        _breakables[k] = (b, mf, "cells");
+                    }
+                    set.Sync(_driver.World, _cellMats[k], first);
+                    continue;
+                }
                 int intact = 0, cracked = 0, destroyed = 0;
                 foreach (int i in b.Cells)
                 {
