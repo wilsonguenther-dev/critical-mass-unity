@@ -39,7 +39,7 @@ namespace CriticalMass.Runtime.Online
             if (!wanted || !headless) return;
             Active = true;
             Application.runInBackground = true;
-            if (Application.isBatchMode) Application.targetFrameRate = 200;   // the peer steps once a frame: keep frames short
+            CriticalMass.Runtime.Game.FrameGovernor.SetHeadlessPeerFrameRate(200);   // the peer steps once a frame: keep frames short
             HeadlessPeer peer = HeadlessPeer.FromArgs(args, OnlineConfig.RelayUrl);
             peer.Build = OnlineConfig.Build;
             peer.Log = s => Debug.Log("[online] " + s);
