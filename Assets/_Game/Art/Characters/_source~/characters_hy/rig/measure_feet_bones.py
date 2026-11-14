@@ -81,6 +81,9 @@ for spec in PACKS:
                 ang = math.degrees(math.atan2(d.x * FWD.y - d.y * FWD.x, d.dot(FWD))) if d.length > 1e-6 else 0.0
                 gaps.append(abs(P("foot.l").z - P("foot.r").z))
                 if abs(ang) > 90: bad_f.append((f, q, round(ang), round(gaps[-1], 3)))
+                if cn == "StrafeR" and f >= f1 - 5:
+                    hd = lambda q_: round(math.degrees(math.atan2(*(lambda d_: (d_.x * FWD.y - d_.y * FWD.x, d_.dot(FWD)))((P("toes." + q_) - P("foot." + q_)).to_2d()))))
+                    print("[trace]", cls, cn, f, "ankle z l %.4f r %.4f" % (P("foot.l").z, P("foot.r").z), "heading l", hd("l"), "r", hd("r"), flush=True)
             FACE[cls + " " + cn] = (len(bad_f), f1 - f0 + 1)
             print("[facing]", cls, cn, "turned-around frames", len(bad_f), "of", f1 - f0 + 1, bad_f[:6], flush=True)
         # Arms as the game reads them (the pack's own armature, absolute local rotations): wrist drop below the
