@@ -315,10 +315,30 @@ try:
                 u, inv, cnt = np.unique(key, axis=0, return_inverse=True, return_counts=True)
                 ref_face = int(np.nonzero(behind)[0][np.nonzero(inv.ravel() == cnt.argmax())[0][0]])
             bm = bmesh.new(); bm.from_mesh(me); bm.faces.ensure_lookup_table()
-            lay = bm.loops.layers.color.get('Col') or bm.loops.layers.float_color.get('Col')
+            lay = None   # run 1: the FBX layer is not always named 'Col'; the cap stayed uncoloured (pale grey)
+            for _ls in (bm.loops.layers.color, bm.loops.layers.float_color):
+                if lay is None and len(_ls):
+                    lay = _ls.get(a.name) if a is not None and _ls.get(a.name) is not None else _ls.active or _ls.values()[0]
             ref_col = None
             if lay is not None and ref_face is not None:
                 ref_col = bm.faces[ref_face].loops[0][lay].copy() if hasattr(bm.faces[ref_face].loops[0][lay], 'copy') else tuple(bm.faces[ref_face].loops[0][lay])
+            # run 2: grow from the band through connected faces that are strip-like (not dress, not wing, behind the
+            # strip's front line less "grow_margin", below "grow_z", inside the half width): run 1 left its far edge hanging.
+            gm = sdo.get('grow_margin', 0.03); gz = sdo.get('grow_z', 1.05)
+            yline = yt + (yb - yt) * np.clip((zt - ctr[:, 2]) / (zt - zb), 0, 1)
+            cand = ~dress & ~wing & (np.abs(ctr[:, 0]) < sdo['half_x']) & (ctr[:, 2] < gz) & (ctr[:, 1] > yline - gm) & low_ok
+            grown = sel.copy(); front = list(np.nonzero(sel)[0])
+            while front:
+                nxt = []
+                for fi in front:
+                    for e in bm.faces[int(fi)].edges:
+                        for nf in e.link_faces:
+                            j = nf.index
+                            if not grown[j] and cand[j]:
+                                grown[j] = True; nxt.append(j)
+                front = nxt
+            REP.setdefault('strip_grown', {})[lv] = int(grown.sum() - sel.sum())
+            sel = grown
             kill = [bm.faces[i] for i in np.nonzero(sel)[0]]
             edges = {e for f in kill for e in f.edges}
             bmesh.ops.delete(bm, geom=kill, context='FACES')

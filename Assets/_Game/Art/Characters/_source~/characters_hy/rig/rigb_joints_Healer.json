@@ -150,11 +150,13 @@
    0.3,
    0.02
   ],
-  "thick": 0.045,
-  "half_x": 0.22,
+  "thick": 0.065,
+  "half_x": 0.26,
   "hem": 0.37,
   "leg_r": 0.17,
-  "dress_b": 0.05
+  "dress_b": 0.05,
+  "grow_margin": 0.03,
+  "grow_z": 1.05
  },
  "_face_feat": {
   "_note": "rig-healer-3: eyes (teal) and brows in the face box painted dark teal, code 0",
