@@ -354,7 +354,7 @@ def foot_heights():
 
 
 meas = {}
-for clip in ("Idle", "Walk", "Run"):
+for clip in ("Idle", "Walk", "Run", "StrafeL", "StrafeR"):
     if clip not in baked:
         meas[clip] = "not baked"
         continue
