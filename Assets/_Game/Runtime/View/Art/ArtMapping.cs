@@ -305,7 +305,10 @@ namespace CriticalMass.Runtime.View.Art
             new ModelSpec { Key = Miner, AssetPath = "Assets/_Game/Art/Miner/Miner.fbx", Kind = ArtKind.Character, Rigged = true,
                 Bones = 41, ClipSource = "Assets/_Game/Art/Miner/Miner_Clips.fbx",
                 Meshes = new[] { "Miner_Hero", "Miner_LOD0", "Miner_LOD1", "Miner_Shadow" }, MaskCodes = new[] { 0, 6, 8 },
-                OutlinePx = CharacterHullPx, Rim = 0.6f, Authored = MinerAzure, Crimson = MinerCrimson, Height = 2.0f,
+                // Height: the Hero mesh's bind-pose bounds, 2.127 m: the pick head raised in his right hand (2.115) above the
+                // helmet. rig-miner-3 scaled the whole rig by 0.9831 so his BODY (soles to helmet top, crest and pick left out)
+                // is 2.0 m; the crest tops out at 2.07.
+                OutlinePx = CharacterHullPx, Rim = 0.6f, Authored = MinerAzure, Crimson = MinerCrimson, Height = 2.13f,
                 VertexColourFace = true, StrideScale = 0.809f, ArtYawDeg = 180f },   // rig-miner-1: HY Miner (art/characters-hy-rig), whole rig lifted 0.10 m (lift_rig_fbx.py), own clips baked with foot IK (Miner_Clips.fbx, bake_clips.py, leg ratio 0.809); pre-HY: FaceTexture MinerFace.png, FaceSlot 1, KayKit_Clips.fbx (Miner/_fallback~)
             new ModelSpec { Key = Farmer, AssetPath = "Assets/_Game/Art/Farmer/Farmer.fbx", Kind = ArtKind.Character, Rigged = true,
                 Bones = 41, ClipSource = "Assets/_Game/Art/Farmer/Farmer_Clips.fbx",
