@@ -115,6 +115,19 @@ namespace CriticalMass.Runtime.Hud
         public const float PromptW = 520f, PromptH = 50f;
         public static Rect Prompt => new Rect((RefW - PromptW) * 0.5f, Lower.yMax + PromptGap, PromptW, PromptH);
         public const float PromptGap = 6f;
+        /// <summary>The terrain prompt pill's reserved lane (hud-containment-2): one row under the lower lane and above the
+        /// captions, as wide as the bottom band. The pill follows its target only sideways inside this row, so it never
+        /// passes over the player card, the minimap, the kit, the feeds or the lower lane (it used to ride the target
+        /// anywhere on screen). Anchored bottom-centre: on a taller screen the lower lane (centre-anchored) moves away.</summary>
+        public const float PromptLaneH = 58f;
+        public static Rect PromptLane => new Rect((RefW - BottomBandW) * 0.5f, Lower.yMax + PromptGap, BottomBandW, PromptLaneH);
+        /// <summary>The pill lane on a w x h screen in device pixels (top-left origin), bottom-centre anchored.</summary>
+        public static Rect PromptLanePixels(float w, float h)
+        {
+            float s = HudLayout.Scale(w, h);
+            Rect r = PromptLane;
+            return new Rect(0.5f * w + (r.x - RefW * 0.5f) * s, h + (r.y - RefH) * s, r.width * s, r.height * s);
+        }
 
         // ---- centre-bottom lane (hud-containment-1), bottom up: announcer subtitles, sound captions (two at most, a queue
         // behind them), the interact prompt. All centred on the screen and no wider than the free band between the player
@@ -124,7 +137,7 @@ namespace CriticalMass.Runtime.Hud
         public static float BottomBandW => 2f * Mathf.Min(RefW * 0.5f - (PlayerCard.xMax + ColumnGap), (Minimap.x - ColumnGap) - RefW * 0.5f);
         public const float SubtitleH = 60f, CaptionH = 40f, CaptionW = 440f, CaptionGap = 6f;
         public const int CaptionLines = 2;
-        public static Rect Subtitles => new Rect((RefW - BottomBandW) * 0.5f, RefH - M - SubtitleH - 4f, BottomBandW, SubtitleH);
+        public static Rect Subtitles => new Rect((RefW - BottomBandW) * 0.5f, RefH - M - SubtitleH, BottomBandW, SubtitleH);
         /// <summary>Caption line k (0 = lowest), just above the subtitles.</summary>
         public static Rect Caption(int k) => new Rect((RefW - CaptionW) * 0.5f, Subtitles.y - (k + 1) * (CaptionH + CaptionGap), CaptionW, CaptionH);
 
@@ -170,6 +183,7 @@ namespace CriticalMass.Runtime.Hud
                 new Piece("intro line (you are the ...)", Lower, HudZone.Lower, false),
                 new Piece("death recap (centre lane, Recap priority)", new Rect((RefW - DeathRecap.CardW) * 0.5f, DeathRecap.TopY, DeathRecap.CardW, DeathRecap.CardH), HudZone.Callout, true),
                 new Piece("interact prompt", Prompt, HudZone.Lower, false),
+                new Piece("terrain prompt pill lane", PromptLane, HudZone.Lower, false),
                 new Piece("hit recap (under the death recap)", Mechanics.MechanicsHud.RecapRect, HudZone.Callout, false),
             };
         }
