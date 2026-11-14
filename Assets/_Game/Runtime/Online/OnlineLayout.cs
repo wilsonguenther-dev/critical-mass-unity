@@ -1,5 +1,7 @@
 using CriticalMass.Runtime.Hud.Style;
+using CriticalMass.Runtime.Hud.Ui;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace CriticalMass.Runtime.Online
 {
@@ -36,13 +38,81 @@ namespace CriticalMass.Runtime.Online
         // (the second fills from the 17th player) only above that. Every column has a fixed x and width inside its row:
         // the name is left-aligned and takes what is left (ellipsised at its width), then team, class, state, and the
         // ping right-aligned. One font size for the whole table from the type scale: TypeSmall in one column, TypeMin
-        // (the scale's minimum, never smaller) in two. The fixed widths are at TypeMin and grow with the size.
+        // (the scale's minimum, never smaller) in two. The fixed widths come from the texts (online-rooms-8).
         public const int RowsPerColumn = 16, MaxRows = 2 * RowsPerColumn, CellCount = 5;
         public const int CellName = 0, CellTeam = 1, CellClass = 2, CellState = 3, CellPing = 4;
         public const float RowH = 34f, TableHeadH = 30f, ColumnGap = 20f, CellPad = 6f, CellGap = 8f;
-        // online-rooms-7: class 116 -> 124 so DEMOLITIONS (78 px at TypeMin on 1280 x 720) fits with about 4.7 px to spare, never cut;
-        // the 8 u come from the gutters (CellGap 10 -> 8), so the name column keeps its 160 u in two columns.
-        static readonly float[] FixedAtMin = { 0f, 80f, 124f, 96f, 62f };   // team, class, state, ping (the name takes the rest)
+        // online-rooms-8: every fixed column is as wide as its own widest possible text (Widest, headers included) measured
+        // on the table's font at the smallest screen (1280 x 720, the font drawn at its rounded size there), plus SparePx;
+        // the name takes what is left and is the one cell allowed an ellipsis. MeasureWith does it on the real font (the
+        // room screen at build, the tests); until then the fallback below holds the same rule measured off line on Nunito
+        // Sans ExtraBold at 11 px (CRIMSON 53, DEMOLITIONS 78, NOT READY 66, 999 MS 41 px; 2-column name 148 u = 98.7 px,
+        // where a 12-character name such as SHAYDENCALEB is 92 px).
+        public const float SparePx = 2f, RoundingPx = 0.5f, SmallestW = 1280f, SmallestH = 720f;
+
+        /// <summary>Every text a column can show (its head first). The name column lists only its head: the name takes the rest.</summary>
+        public static readonly string[][] Widest =
+        {
+            new[] { "PLAYER" },
+            new[] { "TEAM", "CRIMSON", "AZURE" },
+            ClassTexts(),
+            new[] { "READY", "NOT READY", "HOST" },
+            new[] { "PING", "999 MS" },
+        };
+
+        /// <summary>The ping column's longest value: pings above this show as this.</summary>
+        public const int MaxPingShown = 999;
+
+        static string[] ClassTexts()
+        {
+            var list = new System.Collections.Generic.List<string> { "CLASS" };
+            foreach (string n in System.Enum.GetNames(typeof(CriticalMass.Sim.Config.ClassId))) list.Add(n.ToUpperInvariant());
+            return list.ToArray();
+        }
+
+        static readonly float[] FallbackMin = { 0f, 84f, 121f, 103f, 66f };
+        static float[] _fixedMin = FallbackMin, _fixedSmall = Scaled(FallbackMin, UiScale.TypeSmall / (float)UiScale.TypeMin);
+
+        /// <summary>True once MeasureWith has sized the columns on the real font.</summary>
+        public static bool Measured { get; private set; }
+
+        static float[] Scaled(float[] a, float k)
+        {
+            var r = new float[a.Length];
+            for (int i = 0; i < a.Length; i++) r[i] = Mathf.Ceil(a[i] * k);
+            return r;
+        }
+
+        /// <summary>Sizes every fixed column from probe's font (a Text outside any canvas, so it measures plain pixels).</summary>
+        public static void MeasureWith(Text probe)
+        {
+            if (probe == null || probe.font == null) return;
+            _fixedMin = MeasureAt(probe, UiScale.TypeMin);
+            _fixedSmall = MeasureAt(probe, UiScale.TypeSmall);
+            Measured = true;
+        }
+
+        /// <summary>Back to the off-line fallback (tests).</summary>
+        public static void ResetMeasure()
+        {
+            _fixedMin = FallbackMin;
+            _fixedSmall = Scaled(FallbackMin, UiScale.TypeSmall / (float)UiScale.TypeMin);
+            Measured = false;
+        }
+
+        static float[] MeasureAt(Text probe, int size)
+        {
+            float s = Mathf.Min(SmallestW / RefW, SmallestH / RefH);
+            int drawn = Mathf.Max(1, Mathf.RoundToInt(size * s));
+            var r = new float[CellCount];
+            for (int c = 1; c < CellCount; c++)
+            {
+                float widest = 0f;
+                foreach (string t in Widest[c]) widest = Mathf.Max(widest, TextFit.WidthOf(probe, t, drawn));
+                r[c] = Mathf.Ceil((widest + SparePx + RoundingPx) / s);   // + half a pixel so float rounding never lands on the limit
+            }
+            return r;
+        }
 
         public static bool TwoColumns(int players) => players > RowsPerColumn;
 
@@ -64,10 +134,10 @@ namespace CriticalMass.Runtime.Online
 
         static float CellWidth(int c, bool two)
         {
-            float k = RowSize(two) / (float)UiScale.TypeMin;
-            if (c != CellName) return FixedAtMin[c] * k;
+            float[] fixedW = two ? _fixedMin : _fixedSmall;
+            if (c != CellName) return fixedW[c];
             float fixedSum = 0f;
-            for (int f = 1; f < CellCount; f++) fixedSum += FixedAtMin[f] * k;
+            for (int f = 1; f < CellCount; f++) fixedSum += fixedW[f];
             return ColumnW(two) - 2f * CellPad - (CellCount - 1) * CellGap - fixedSum;
         }
 
