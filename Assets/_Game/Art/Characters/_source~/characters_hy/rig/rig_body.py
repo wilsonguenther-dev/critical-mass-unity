@@ -126,10 +126,16 @@ try:
         return P_, rear, comp == main_
 
     if _pull:
+        # The piece is first centred behind the spine (x), then moved forward until its nearest point over the TORSO
+        # (|x| < 0.2 m, so a hanging arm in front of an off-centre piece does not stop it) sits _pull inside the back.
+        # A round piece centred this way curves away from the arms on both sides.
         P_, rear, body_ = rear_parts(hero)
         if rear.any():
+            R0 = P_[rear]
+            lo, hi = R0.min(0) - 0.01, R0.max(0) + 0.01
+            dx = -0.5 * (R0[:, 0].min() + R0[:, 0].max())
             cell = 0.02
-            B = P_[body_]; R_ = P_[rear]
+            B = P_[body_ & (np.abs(P_[:, 0]) < 0.2)]; R_ = R0 + np.array([dx, 0, 0])
             kb = np.floor(B[:, [0, 2]] / cell).astype(int); kr = np.floor(R_[:, [0, 2]] / cell).astype(int)
             back = {}
             for (i_, j_), y_ in zip(map(tuple, kb), B[:, 1]):
@@ -138,10 +144,15 @@ try:
             gaps = [y_ - back[(i_, j_)] for (i_, j_), y_ in zip(map(tuple, kr), R_[:, 1]) if (i_, j_) in back]
             gap = float(min(gaps)) if gaps else 0.0
             shift = gap + float(_pull)
-            REP['rear_pull'] = {'gap_m': round(gap, 4), 'shift_m': round(shift, 4), 'levels': {}}
+            REP['rear_pull'] = {'gap_m': round(gap, 4), 'shift_y_m': round(shift, 4), 'shift_x_m': round(float(dx), 4), 'levels': {}}
             for lv, o in LV.items():
-                Pl, rl, _ = rear_parts(o) if o is not hero else (P_, rear, body_)
-                co = Pl.copy(); co[rl, 1] -= shift
+                if o is hero:
+                    Pl, rl = P_, rear
+                else:
+                    Pl, rl, _ = rear_parts(o)
+                    if not rl.any():   # the piece merged into the body at this level (vertex clustering): take its box
+                        rl = np.all((Pl >= lo) & (Pl <= hi), axis=1)
+                co = Pl.copy(); co[rl, 1] -= shift; co[rl, 0] += dx
                 o.data.vertices.foreach_set('co', co.ravel()); o.data.update()
                 REP['rear_pull']['levels'][lv] = int(rl.sum())
             log('rear piece pulled forward', REP['rear_pull'])
