@@ -107,7 +107,8 @@ namespace CriticalMass.Runtime.View.Effects
         /// </summary>
         public double HoldFor(byte tier)
         {
-            double wall = tier == 0 ? 0.03 : tier == 1 ? 0.065 : 0.11;
+            // feat/hit-feel-1: 45 / 60 / 70 ms on both fighters (was 30 victim-only / 65 / 110), none with reduce motion.
+            double wall = Anim.HitFeel.HoldWallSeconds(tier, FeelGate.ReduceMotion);
             return _scene != null ? _scene.S(wall) : wall * 2;
         }
         /// <summary>White flash length, sim seconds: about 2.5 frames at 60 fps; at GORE Off the whole-silhouette flash is the
@@ -339,6 +340,8 @@ namespace CriticalMass.Runtime.View.Effects
         {
             if (w.ActorCount == 0 || FeelGate.ShakeScale <= 0f) return;
             float amount = ShakeAmount(e.Kind, e.A == 0, e.Value, DistanceToLocal(w, e.X, e.Z), w.Config.Kaiju.SlamRadius);
+            // feat/hit-feel-1: a small nudge for every hit on or by the local player (still under the shake setting).
+            if (e.Kind == FxKind.Hit) amount = Mathf.Max(amount, Anim.HitFeel.Nudge(e.A == 0, e.B == 0));
             if (amount > 0f) CriticalMass.Runtime.Camera.CameraShake.Impulse(amount);
         }
 

@@ -129,6 +129,11 @@ namespace CriticalMass.Runtime.Audio.Sound
             C("kaiju_melee", F("impactPunch_heavy_002"), null, 0.8f, 0.8f, 0.05f, 2, 0.1f, 70, Far),
             C("kaiju_hurt", null, S("kaiju_hurt"), 0.55f, 1f, 0.08f, 3, 0.06f, 35, Far),
             C("grunt", null, S("grunt"), 0.35f, 1f, 0.12f, 2, 0.2f, 20, Near),
+            // feat/hit-feel-1: the voice. Pain on every melee hit taken, effort on every other swing. Near range (far fights stay
+            // quiet), 3 and 2 voices at most, pitch jitter 10% on top of the body pitch (SoundFeed.Weight): a brawl is a few
+            // voices, the nearest and your own first, never a wall.
+            C("pain", null, S("pain_a", "pain_b", "pain_c"), 0.42f, 1f, 0.1f, 3, 0.12f, 28, Near),
+            C("effort", null, S("effort_a", "effort_b"), 0.3f, 1f, 0.1f, 2, 0.15f, 18, Near),
             C("death", F("impactSoft_heavy_000", "impactSoft_heavy_001"), null, 0.6f, 1f, 0.08f, 3, 0.1f, 50, Mid, layer: "death_ko", layerGain: 0.55f),
             C("death_ko", null, S("death_ko"), 0.5f, 1f, 0.06f, 3, 0.1f, 45, Mid),
             C("respawn", F("maximize_003"), null, 0.4f, 1f, 0.03f, 2, 0.2f, 20, Near),
@@ -250,7 +255,7 @@ namespace CriticalMass.Runtime.Audio.Sound
         /// <summary>Every sim event type. Silence rows say what covers them.</summary>
         public static readonly SimRoute[] Sim =
         {
-            R(SimEventType.Hit, Pick.Hit, "hit_flesh_light", "hit_flesh_heavy", "hit_flesh_crit", "hit_armor", "block_shield", "block_heavy", "kaiju_melee", "grunt"),
+            R(SimEventType.Hit, Pick.Hit, "hit_flesh_light", "hit_flesh_heavy", "hit_flesh_crit", "hit_armor", "block_shield", "block_heavy", "kaiju_melee", "grunt", "pain"),
             R(SimEventType.Death, Pick.Death, "death", "hit_flesh_crit", "kaiju_melee"),
             R(SimEventType.Respawn, Pick.Fixed, "respawn"),
             R(SimEventType.Gather, Pick.Fixed, "gather_done"),
