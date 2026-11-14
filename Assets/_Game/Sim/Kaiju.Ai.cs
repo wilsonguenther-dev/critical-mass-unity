@@ -14,7 +14,7 @@ namespace CriticalMass.Sim.Core
         }
 
         /// <summary>Hostile, living, unprotected actors within `r` of (x, z).</summary>
-        private static int CountHostilesWithin(World w, double x, double z, double r)
+        private static int CountHostilesWithin(World w, double x, double z, double r, bool seen = false)
         {
             int n = w.ActorCount;
             double r2 = r * r;
@@ -25,7 +25,10 @@ namespace CriticalMass.Sim.Core
                 if (!a.Alive || a.SpawnProtect > 0 || !KaijuHostileTo(w, id)) continue;
                 double dx = w.X[id] - x;
                 double dz = w.Z[id] - z;
-                if (dx * dx + dz * dz <= r2) c++;
+                if (dx * dx + dz * dz > r2) continue;
+                // fix/movement-shiver-1: with `seen`, a fighter behind a wall does not count (the shockwave would not reach it).
+                if (seen && !SegmentClear.Clear(w.Map, x, z, w.X[id], w.Z[id])) continue;
+                c++;
             }
             return c;
         }
@@ -311,6 +314,13 @@ namespace CriticalMass.Sim.Core
                 goalCx = -1;
                 goalCz = -1;
             }
+            // fix/movement-shiver-1: the target has no cell the body fits in nearby: hold, face it, let the give-up rule act.
+            bool guard = Phys.On(w, w.Config.Physics.KaijuNavGuard);
+            if (guard && goalCx < 0)
+            {
+                k.Facing = JsMath.Atan2(gz - k.Z, gx - k.X);
+                return;
+            }
             bool goalMoved = goalCx != nav.GoalCx || goalCz != nav.GoalCz;
             if (goalCx >= 0 && (nav.FieldWallVersion != w.WallVersion || nav.GoalCx < 0 || (goalMoved && nav.RepathIn <= 0)))
             {
@@ -358,14 +368,47 @@ namespace CriticalMass.Sim.Core
                         az = backCz + 0.5;
                     }
                 }
+                else if (guard)
+                {
+                    ax = nav.GoalCx + 0.5;
+                    az = nav.GoalCz + 0.5;
+                }
+            }
+            else if (guard && nav.GoalCx >= 0 && !(JsMath.FloorToInt(gx) == nav.GoalCx && JsMath.FloorToInt(gz) == nav.GoalCz))
+            {
+                // fix/movement-shiver-1 (the shiver at the bridge mouth): in the goal cell but the target stands where the body
+                // does not fit. The old code walked straight at it; the collider pushed the body back out of the cell, the field
+                // steered it back in, and it flipped direction every tick. Now it settles on the goal cell's centre and holds.
+                ax = nav.GoalCx + 0.5;
+                az = nav.GoalCz + 0.5;
+                double hx = ax - k.X;
+                double hz = az - k.Z;
+                if (hx * hx + hz * hz < HoldEps * HoldEps)
+                {
+                    k.Facing = JsMath.Atan2(gz - k.Z, gx - k.X);
+                    return;
+                }
             }
             double ddx = ax - k.X;
             double ddz = az - k.Z;
             double len = Math.Sqrt(ddx * ddx + ddz * ddz);
             if (len < 1e-6) return;
             double stepLen = w.Config.Kaiju.MoveSpeed * dt;
+            if (guard && len < stepLen) stepLen = len; // arrive on the point, do not overshoot and come back
+            double x0 = k.X;
+            double z0 = k.Z;
             MoveKaiju(w, (ddx / len) * stepLen, (ddz / len) * stepLen);
-            k.Facing = JsMath.Atan2(ddz, ddx);
+            if (!guard)
+            {
+                k.Facing = JsMath.Atan2(ddz, ddx);
+                return;
+            }
+            // fix/movement-shiver-1: face the way the body actually went; pressed against a wall, face the target (a steady
+            // direction) instead of the steering vector the collider just refused.
+            double mx = k.X - x0;
+            double mz = k.Z - z0;
+            if (mx * mx + mz * mz >= (0.25 * stepLen) * (0.25 * stepLen)) k.Facing = JsMath.Atan2(mz, mx);
+            else k.Facing = JsMath.Atan2(gz - k.Z, gx - k.X);
         }
 
         /// <summary>One step of the Kaiju: hatch, KO, target choice, slam, pathing and the melee wind-up.</summary>
@@ -399,6 +442,10 @@ namespace CriticalMass.Sim.Core
             k.SlamCd = Combat.TickDown(k.SlamCd, dt);
             nav.RepathIn = Combat.TickDown(nav.RepathIn, dt);
             nav.RetargetIn = Combat.TickDown(nav.RetargetIn, dt);
+            PhysicsConfig pc = cfg.Physics;
+            bool guard = Phys.On(w, pc.KaijuNavGuard);
+            bool seen = guard && Phys.On(w, pc.WallsBlockHits);
+            if (guard) for (int id = 0; id < n; id++) if (nav.Ignore[id] > 0) nav.Ignore[id] = Combat.TickDown(nav.Ignore[id], dt);
 
             if (k.KoIn > 0)
             {
@@ -438,7 +485,7 @@ namespace CriticalMass.Sim.Core
                 if (nav.RetargetIn <= 0) nav.RetargetIn = KaijuRetargetSeconds;
             }
 
-            if (k.SlamCd <= 0 && CountHostilesWithin(w, k.X, k.Z, kc.SlamRadius) >= 2)
+            if (k.SlamCd <= 0 && CountHostilesWithin(w, k.X, k.Z, kc.SlamRadius, seen) >= 2)
             {
                 k.TelegraphX = k.X;
                 k.TelegraphZ = k.Z;
@@ -484,12 +531,48 @@ namespace CriticalMass.Sim.Core
             if (ex * ex + ez * ez > stop * stop) WalkToward(w, gx, gz, dt);
             else if (t >= 0) k.Facing = JsMath.Atan2(ez, ex);
 
+            // fix/movement-shiver-1: give a target up after KaijuGiveUpSeconds without progress (net move under
+            // KaijuProgressRadius while not in claw reach of it with a clear line); it is skipped for KaijuIgnoreSeconds.
+            if (guard)
+            {
+                double mx = k.X - nav.ProgressX;
+                double mz = k.Z - nav.ProgressZ;
+                bool striking = false;
+                if (t >= 0)
+                {
+                    double sx = w.X[t] - k.X;
+                    double sz = w.Z[t] - k.Z;
+                    striking = sx * sx + sz * sz <= kc.MeleeRange * kc.MeleeRange && (!seen || SegmentClear.Clear(w.Map, k.X, k.Z, w.X[t], w.Z[t]));
+                }
+                if (t < 0 || striking || mx * mx + mz * mz >= pc.KaijuProgressRadius * pc.KaijuProgressRadius)
+                {
+                    nav.ProgressX = k.X;
+                    nav.ProgressZ = k.Z;
+                    nav.NoProgress = 0;
+                }
+                else
+                {
+                    nav.NoProgress += dt;
+                    if (nav.NoProgress >= pc.KaijuGiveUpSeconds)
+                    {
+                        nav.Ignore[t] = pc.KaijuIgnoreSeconds;
+                        k.TargetId = -1;
+                        nav.RetargetIn = 0;
+                        nav.ProgressX = k.X;
+                        nav.ProgressZ = k.Z;
+                        nav.NoProgress = 0;
+                        return;
+                    }
+                }
+            }
+
             // Melee (CM-26): start the wind-up; the hit lands meleeWindupTicks later (ResolveMelee).
             if (t >= 0 && k.MeleeCd <= 0)
             {
                 double dx = w.X[t] - k.X;
                 double dz = w.Z[t] - k.Z;
-                if (dx * dx + dz * dz <= kc.MeleeRange * kc.MeleeRange)
+                // fix/movement-shiver-1: no swing at a fighter behind a wall (the claw would be blocked: a whiff every 1.6 s).
+                if (dx * dx + dz * dz <= kc.MeleeRange * kc.MeleeRange && (!seen || SegmentClear.Clear(w.Map, k.X, k.Z, w.X[t], w.Z[t])))
                 {
                     k.Facing = JsMath.Atan2(dz, dx);
                     k.MeleeWindupIn = w.Dur.KaijuClawWindup;
