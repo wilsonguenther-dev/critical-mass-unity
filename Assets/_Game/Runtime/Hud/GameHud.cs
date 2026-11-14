@@ -235,12 +235,17 @@ namespace CriticalMass.Runtime.Hud
         const int MeterSegments = 8;
         /// <summary>hud-art-1: the egg badge shows the cracking egg in the last seconds before the hatch.</summary>
         public const double CrackSeconds = 30.0;
-        const int RagePips = 5;
+        public const int RagePips = 5;
         HudIcon _kaijuHead;
         VectorShape _eggFrame;
         Text _kaijuWord, _kaijuNumber;
         readonly VectorShape[] _segments = new VectorShape[MeterSegments];
         readonly VectorShape[] _rage = new VectorShape[RagePips];
+
+        /// <summary>The Kaiju word (hatch timer or allegiance) sits between the last rage pip and the panel edge.</summary>
+        public const float KaijuWordX = RagePipX0 + RagePips * RagePipPitch + 4f, KaijuWordRight = 338f;
+        public const float RagePipX0 = 136f, RagePipPitch = 22f;
+        public const int KaijuWordMax = UiScale.TypeSmall, KaijuWordFloor = 12;
 
         void BuildKaiju(RectTransform c)
         {
@@ -260,12 +265,14 @@ namespace CriticalMass.Runtime.Hud
             CriticalMass.Runtime.Menu.MenuUi.Fit(Label(c, "Rage Label", CMTokens.Ui, UiScale.TypeMin, Cream, TextAnchor.MiddleLeft, 92f, 60f, 44f, 22f, "RAGE", 2f), 13);
             for (int i = 0; i < RagePips; i++)
             {
-                VectorShape p = Shape(c, "Rage " + i, ShapeKind.TriangleDown, 136f + i * 22f, 62f, 20f, 16f, Empty);
+                VectorShape p = Shape(c, "Rage " + i, ShapeKind.TriangleDown, RagePipX0 + i * RagePipPitch, 62f, 20f, 16f, Empty);
                 p.OutlinePx = 2f;
                 p.RimPx = 0f;
                 _rage[i] = p;
             }
-            _kaijuWord = Label(c, "Kaiju Word", CMTokens.Ui, UiScale.TypeSmall, Cream, TextAnchor.MiddleRight, 214f, 60f, 124f, 28f, "EGG");
+            // hud-overlaps-1: the word's box starts after the last rage pip (it began at x 214 and "HATCH 10:00", right
+            // aligned, ran over the pips); the word shrinks to fit and is cut with an ellipsis below the floor.
+            _kaijuWord = Label(c, "Kaiju Word", CMTokens.Ui, UiScale.TypeSmall, Cream, TextAnchor.MiddleRight, KaijuWordX, 60f, KaijuWordRight - KaijuWordX, 28f, "EGG");
         }
 
         // ---------------------------------------------------------------- 03 PLAYER
@@ -328,7 +335,7 @@ namespace CriticalMass.Runtime.Hud
             string[] keys = { "", "", "" };   // drawn by HudPrompts through InputGlyphs (never a literal key name);   // U-006 / U-020: attack, class ability, carry/interact
             for (int i = 0; i < 3; i++)
             {
-                float bx = 392f + i * 84f;
+                float bx = HudLayout.AbilityX0 + i * HudLayout.AbilityPitch;
                 var b = new AbilityButton();
                 b.Body = Shape(c, "Ability " + i, ShapeKind.RoundRect, bx, 6f, HudLayout.AbilityButton, HudLayout.AbilityButton, Panel, 16f);
                 b.Rt = b.Body.rectTransform;
@@ -339,7 +346,9 @@ namespace CriticalMass.Runtime.Hud
                 b.Count = Label(b.Body.transform, "Count", CMTokens.Mono, UiScale.TypeBody, Cream, TextAnchor.MiddleRight, 34f, 44f, 38f, 28f, "", 3f);
                 Shape(c, "Key " + i, ShapeKind.RoundRect, bx + 14f, 86f, 48f, 28f, Navy, -1f).RimColor = Cream;
                 CriticalMass.Runtime.Menu.MenuUi.Fit(Label(c, "Key Label " + i, CMTokens.Ui, UiScale.TypeMin, Cream, TextAnchor.MiddleCenter, bx + 14f, 86f, 48f, 28f, keys[i], 0f), 15);
-                b.Name = CriticalMass.Runtime.Menu.MenuUi.Fit(Label(c, "Ability Name " + i, CMTokens.Ui, UiScale.TypeMin, Cream, TextAnchor.MiddleCenter, bx - 14f, -20f, 104f, 22f, "", 2f), 15);
+                // hud-overlaps-1: one line, measured and laid out with its neighbours (LayoutAbilityNames); was a
+                // 104 px best-fit box on the 84 px pitch, so wide neighbours overlapped.
+                b.Name = Label(c, "Ability Name " + i, CMTokens.Ui, HudLayout.AbilityNameMax, Cream, TextAnchor.MiddleCenter, bx, AbilityNameY, HudLayout.AbilityButton, AbilityNameH, "", 2f);
                 _buttons[i] = b;
             }
             bool showNames = PlayerPrefs.GetInt(MatchesPlayedKey, 0) < AbilityNameMatches;
@@ -347,16 +356,21 @@ namespace CriticalMass.Runtime.Hud
         }
 
         // Six classes (batch 3): names of the new ones come from the sim's name tables (DemolitionsNames, BuilderNames, HealerNames).
-        static readonly string[] ClassNames =
+        /// <summary>The six class names as the HUD shows them; the info cards and the full map read this list too
+        /// (skills-and-walls-audit-1: their own five-name copies clamped a Healer to BUILDER).</summary>
+        public static readonly string[] ClassNames =
         {
             "WARRIOR", "FARMER", "MINER", CriticalMass.Sim.Core.DemolitionsNames.ClassName, CriticalMass.Sim.Core.BuilderNames.ClassName,
             CriticalMass.Sim.Core.HealerNames.ClassName,
         };
         static readonly string[] AbilityNames =
         {
-            "SHIELD", "ROOTS", "WALL BREAK", CriticalMass.Sim.Core.DemolitionsNames.Mine, CriticalMass.Sim.Core.BuilderNames.Build,
+            "SHIELD", "ROOTS", MinerAbility, CriticalMass.Sim.Core.DemolitionsNames.Mine, CriticalMass.Sim.Core.BuilderNames.Build,
             CriticalMass.Sim.Core.HealerNames.Pulse,
         };
+        /// <summary>skills-and-walls-audit-1: the Miner's Space skill places a barricade (Barricades.cs); breaking walls is
+        /// his normal swing. The HUD said WALL BREAK.</summary>
+        public const string MinerAbility = "BARRICADE";
         static readonly string[] AttackNames =
         {
             "ATTACK", "ATTACK", "ATTACK", "NO SWORD", "ATTACK", CriticalMass.Sim.Core.HealerNames.Mend,   // Demolitions: TNT is on Dig / place
@@ -710,7 +724,7 @@ namespace CriticalMass.Runtime.Hud
             string word = egg ? HatchWords[Math.Min(600, (int)Math.Ceiling(s.UntilHatch - 1e-6))] :
                 s.Kaiju == KaijuState.Azure ? "AZURE" : s.Kaiju == KaijuState.Crimson ? "CRIMSON" :
                 s.Kaiju == KaijuState.Berserk ? "BERSERK" : "NEUTRAL";
-            HudText.Set(_kaijuWord, word);
+            HudText.SetOneLine(_kaijuWord, word, KaijuWordMax, KaijuWordFloor);
             _kaijuWord.color = egg || s.Kaiju == KaijuState.Neutral ? Cream : state;
         }
 
@@ -767,7 +781,57 @@ namespace CriticalMass.Runtime.Hud
             carry.Icon.Set(s.Carry == CarryKind.Corruption ? UiIcons.Corruption : s.Carry == CarryKind.Biomass ? UiIcons.Biomass :
                 UiIcons.CarryEmpty, _tier);
             HudText.Set(carry.Count, s.CarryAmount > 0 ? NumberCache.Int(s.CarryAmount) : "");
-            HudText.Set(carry.Name, s.Carry == CarryKind.Corruption ? "CORRUPTION" : s.Carry == CarryKind.Biomass ? "BIOMASS" : "CARRY");
+            ApplyNames(AttackNames[cls], AbilityNames[cls], CarryWord(s.Carry));
+        }
+
+        /// <summary>The carry button's name for what the player holds.</summary>
+        public static string CarryWord(CarryKind k) => k == CarryKind.Corruption ? "CORRUPTION" : k == CarryKind.Biomass ? "BIOMASS" : "CARRY";
+
+        /// <summary>Every name the attack, ability and carry buttons can show, per slot (for the layout tests).</summary>
+        public static string[][] AbilitySlotNames() => new[]
+        {
+            (string[])AttackNames.Clone(), (string[])AbilityNames.Clone(), new[] { CarryWord(CarryKind.None), CarryWord(CarryKind.Corruption), CarryWord(CarryKind.Biomass) },
+        };
+
+        public const float AbilityNameY = -20f, AbilityNameH = 22f;
+        readonly string[] _namesShown = new string[3];
+        readonly Text[] _nameLabels = new Text[3];
+        readonly float[] _nameW = new float[3], _nameX = new float[3], _nameBox = new float[3];
+
+        void ApplyNames(string attack, string ability, string carry)
+        {
+            if (attack == _namesShown[0] && ability == _namesShown[1] && carry == _namesShown[2]) return;   // measure only on change
+            _namesShown[0] = attack;
+            _namesShown[1] = ability;
+            _namesShown[2] = carry;
+            for (int i = 0; i < 3; i++) _nameLabels[i] = _buttons[i].Name;
+            LayoutAbilityNameTexts(_nameLabels, _namesShown, _nameW, _nameX, _nameBox);
+        }
+
+        /// <summary>
+        /// hud-overlaps-1: measures the three names at full size, lets HudLayout pick one shared size and a box per name
+        /// that keeps a gap to its neighbours (centred on its button where it can), places the boxes and cuts a name that still does not
+        /// fit with an ellipsis. Public so the EditMode layout test runs the same code on real labels.
+        /// </summary>
+        public static int LayoutAbilityNameTexts(Text[] labels, string[] names, float[] widths, float[] lefts, float[] boxes)
+        {
+            for (int i = 0; i < labels.Length; i++)
+            {
+                string n = names[i] ?? string.Empty;
+                labels[i].resizeTextForBestFit = false;
+                labels[i].horizontalOverflow = HorizontalWrapMode.Overflow;
+                labels[i].fontSize = HudLayout.AbilityNameMax;
+                labels[i].text = n;
+                widths[i] = n.Length == 0 ? 0f : labels[i].preferredWidth;
+            }
+            int size = HudLayout.LayoutAbilityNames(widths, lefts, boxes);
+            for (int i = 0; i < labels.Length; i++)
+            {
+                labels[i].fontSize = size;
+                Place(labels[i].rectTransform, lefts[i], AbilityNameY, boxes[i], AbilityNameH);
+                HudText.FitWithEllipsis(labels[i], names[i], boxes[i]);
+            }
+            return size;
         }
 
         void ApplyButton(AbilityButton b, float cd01, float seconds, string icon, string name, float dt)
@@ -776,7 +840,6 @@ namespace CriticalMass.Runtime.Hud
             b.Sweep.Fill01 = cd01;
             b.Icon.Set(icon, _tier);
             HudText.Set(b.Seconds, cooling && seconds >= 1f ? NumberCache.Int(Mathf.CeilToInt(seconds)) : "");
-            HudText.Set(b.Name, name);
             if (b.WasCooling && !cooling) b.Flash = 0.3f;
             b.WasCooling = cooling;
             b.Flash = Mathf.Max(0, b.Flash - dt);

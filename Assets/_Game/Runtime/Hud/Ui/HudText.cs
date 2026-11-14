@@ -81,17 +81,45 @@ namespace CriticalMass.Runtime.Hud.Ui
             if (!t.resizeTextForBestFit && t.horizontalOverflow == HorizontalWrapMode.Overflow && t.text == s) return;
             t.resizeTextForBestFit = false;
             t.horizontalOverflow = HorizontalWrapMode.Overflow;
-            t.text = s;
             float w = t.rectTransform.rect.width;
             var key = (s, max, min, Mathf.RoundToInt(w), t.font != null ? t.font.GetInstanceID() : 0);
-            if (OneLineSizes.TryGetValue(key, out int known)) { t.fontSize = known; return; }   // no layout pass, no allocation
+            if (OneLineSizes.TryGetValue(key, out var known))   // no layout pass, no allocation
+            {
+                if (t.fontSize != known.Item1) t.fontSize = known.Item1;
+                Set(t, known.Item2);   // the line as fitted (cut with an ellipsis when even the floor was too wide)
+                return;
+            }
+            t.text = s;
             int size = max;
             t.fontSize = size;
             if (w > 1f) while (size > min && t.preferredWidth > w) t.fontSize = --size;
-            OneLineSizes[key] = size;
+            // hud-overlaps-1: at the floor a line that still does not fit is cut with an ellipsis instead of running
+            // past its box (the map-event pill ran under its clock: "EVERY DELIVERY COUNTS DOUB0:10").
+            string shown = w > 1f ? FitWithEllipsis(t, s, w) : s;
+            OneLineSizes[key] = (size, shown);
         }
 
-        static readonly Dictionary<(string, int, int, int, int), int> OneLineSizes = new Dictionary<(string, int, int, int, int), int>();
+        static readonly Dictionary<(string, int, int, int, int), (int, string)> OneLineSizes = new Dictionary<(string, int, int, int, int), (int, string)>();
+
+        /// <summary>
+        /// At the label's current size: sets s if it fits width w, else the longest start of s plus an ellipsis that
+        /// fits (hud-overlaps-1). Returns the text set. Measures, so call it only when the text or the box changes.
+        /// </summary>
+        public static string FitWithEllipsis(Text t, string s, float w)
+        {
+            if (s == null) s = string.Empty;
+            t.text = s;
+            if (s.Length == 0 || t.preferredWidth <= w + 0.5f) return s;
+            string dots = t.font != null && t.font.HasCharacter('…') ? "…" : "...";
+            for (int n = s.Length - 1; n > 0; n--)
+            {
+                string cut = s.Substring(0, n).TrimEnd() + dots;
+                t.text = cut;
+                if (t.preferredWidth <= w + 0.5f) return cut;
+            }
+            t.text = dots;
+            return dots;
+        }
 
         /// <summary>Sets text only when it changed (no mesh rebuild, no allocation on equal strings).</summary>
         public static void Set(Text t, string s)
