@@ -531,6 +531,55 @@ namespace CriticalMass.Sim.Tests
             Assert.AreEqual(0, Kaiju.SqueezeAmount(w), 1e-6);
         }
 
+        /// <summary>
+        /// fix/kaiju-hill-1 (two Air matches on b4310e9, seeds 1337 and 4242: 0.0 s inside the hill radius, parked 9 to 16 m east of
+        /// the hill, idle with no target 330 s to 390 s): over a whole seeded 16v16 match on the game's rules, the hatched Kaiju is
+        /// inside the hill radius for more than 20 s, and it never stands still with no target for more than 5 s while off the hill
+        /// (on the hill with no enemy near is holding it; Neutral at home and knocked out are excluded). Its position is printed
+        /// every 30 s, as the Air run logged it.
+        /// </summary>
+        [TestCase(1337)]
+        [TestCase(4242, Category = "Slow")]
+        public void InAWholeMatchTheKaijuGetsOntoTheHillAndNeverIdlesOffItWithNoTarget(int seed)
+        {
+            GameConfig cfg = GameConfig.CreateDefault();
+            World w = World.CreateWorld(new WorldOptions { Seed = seed, TeamSize = 16, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = cfg });
+            InputFrame scratch = SimInput.EmptyInput();
+            HillDef hill = w.Map.Hill;
+            double hz = cfg.SimHz, dt = 1.0 / hz;
+            double onHill = 0, still = 0, worstStill = 0, worstAt = 0, ax = double.NaN, az = 0;
+            int maxTicks = (int)(hz * 60 * 30);
+            for (int t = 0; t < maxTicks && w.Match.Phase != MatchPhase.Ended; t++)
+            {
+                MatchTick.Advance(w, null, scratch);
+                Kaiju k = w.Kaiju;
+                if (!w.Match.Hatched || k.State == KaijuState.Egg) continue;
+                double hx = k.X - hill.X, hzz = k.Z - hill.Z;
+                bool inHill = hx * hx + hzz * hzz <= hill.R * hill.R;
+                if (inHill) onHill += dt;
+                if (w.Tick % (int)(hz * 30) == 0)
+                    Console.WriteLine("{\"item\":\"kaiju 30s\",\"seed\":" + seed + ",\"t\":" + w.Match.Time.ToString("F0") + ",\"at\":\"" +
+                                      k.X.ToString("F1") + "," + k.Z.ToString("F1") + "\",\"target\":" + k.TargetId + ",\"state\":\"" + k.State +
+                                      "\",\"onHillS\":" + onHill.ToString("F1") + "}");
+                bool idleCase = k.TargetId < 0 && k.State != KaijuState.Neutral && k.KoIn <= 0 && !inHill && k.MeleeCd <= 0; // clawing a barricade is not idle
+                if (idleCase && !double.IsNaN(ax) && (k.X - ax) * (k.X - ax) + (k.Z - az) * (k.Z - az) <= 0.3 * 0.3)
+                {
+                    still += dt;
+                    if (still > worstStill) { worstStill = still; worstAt = w.Match.Time; }
+                }
+                else
+                {
+                    still = 0;
+                    ax = k.X;
+                    az = k.Z;
+                }
+            }
+            Console.WriteLine("{\"item\":\"kaiju hill\",\"seed\":" + seed + ",\"onHillS\":" + onHill.ToString("F1") + ",\"worstIdleOffHillS\":" +
+                              worstStill.ToString("F1") + ",\"worstIdleEndsAt\":" + worstAt.ToString("F0") + "}");
+            Assert.Greater(onHill, 20.0, "the Kaiju spends more than 20 s inside the hill radius over the match");
+            Assert.LessOrEqual(worstStill, 5.0, "it never stands still off the hill with no target for more than 5 s");
+        }
+
         [Test]
         public void TheDetectorFlagsABackAndForthActorAndNotAWalker()
         {

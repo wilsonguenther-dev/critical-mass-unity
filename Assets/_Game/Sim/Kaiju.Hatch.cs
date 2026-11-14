@@ -350,6 +350,8 @@ namespace CriticalMass.Sim.Core
             nav.ProgressZ = z;
             nav.NoProgress = 0;
             Array.Fill(nav.Ignore, 0.0);
+            nav.SiegeCx = nav.SiegeCz = nav.StandCx = nav.StandCz = -1;
+            nav.SiegeIn = 0;
             World.PushEvent(w, SimEventType.Hatch, -1, -1, x, z, HatchCode(state));
         }
 
