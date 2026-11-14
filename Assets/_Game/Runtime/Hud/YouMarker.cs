@@ -209,7 +209,11 @@ namespace CriticalMass.Runtime.Hud
             if (!_bannerShown)
             {
                 _bannerShown = true;
-                if (!FirstMinutes.StartBannerOff && !FirstMinutes.StagedCapture) Banner.Show(FirstMinutes.StartBanner(a.Team));   // light-weapons-3 + hud-containment-4
+                bool stagedCapture = FirstMinutes.StagedCapture;   // hud-containment-4: close-up captures keep the banner off too
+                if (!FirstMinutes.StartBannerOff)
+                {
+                    if (!stagedCapture) Banner.Show(FirstMinutes.StartBanner(a.Team));
+                }
             }
             if (FirstMinutes.Respawned(_wasAlive, a.Alive)) { _since = w.Match.Time; _lastTick = -1; }
             _wasAlive = a.Alive;

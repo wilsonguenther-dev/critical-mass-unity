@@ -204,6 +204,9 @@ namespace CriticalMass.Runtime.Tests
                 "View/Affordance/WorldReactionsCore.cs",
                 // feat/skill-effects-1: the skill tells decode their own events (Ability, Purify, heals, Terraform, shield hits)
                 "View/Skills/SkillFxCore.cs",
+                // integration batch 10 (fix/gore-proof-1): CombatFx reads only EventHead to spot a world reset (never decodes
+                // an event); GoreShots is a capture-only director that finds its own Hit and Death moments
+                "View/Effects/CombatFx.cs", "View/Effects/GoreShots.cs",
             };
             var readers = Directory.GetFiles(root, "*.cs", SearchOption.AllDirectories)
                 .Where(f => Regex.IsMatch(File.ReadAllText(f), @"\.EventHead\b"))
