@@ -182,6 +182,9 @@ namespace CriticalMass.Runtime.Online
             for (int i = 0; i < OnlineLayout.MaxRows; i++)
                 for (int c = 0; c < OnlineLayout.CellCount; c++)
                     _cells[i, c] = L(_room, "Cell " + i + "." + c, OnlineLayout.Cell(i, c, true), CMTokens.Ui, UiScale.TypeMin, Cream, OnlineLayout.CellAnchor(c), "", 1);
+            var probeRoot = new GameObject("Online Table Probe");   // online-rooms-8: columns sized on the real font
+            try { OnlineLayout.MeasureWith(HudText.Make(probeRoot.transform, "Probe", CMTokens.Ui, UiScale.TypeMin, Color.white, TextAnchor.MiddleLeft, 2f)); }
+            finally { if (Application.isPlaying) Destroy(probeRoot); else DestroyImmediate(probeRoot); }
             _tableTwo = null;
             LayTable(false);
             _more = _count;
@@ -423,7 +426,7 @@ namespace CriticalMass.Runtime.Online
                 HudText.Set(_cells[i, 2], m == null ? "" : m.Class.ToString().ToUpperInvariant());
                 HudText.Set(_cells[i, 3], m == null ? "" : isHostRow ? "HOST" : m.Ready ? "READY" : "NOT READY");
                 _cells[i, 3].color = m != null && !isHostRow && !m.Ready ? CMTokens.WithAlpha(Cream, 0.6f) : Brass;
-                HudText.Set(_cells[i, 4], m == null || isHostRow ? "" : m.PingMs + " MS");
+                HudText.Set(_cells[i, 4], m == null || isHostRow ? "" : Math.Min(OnlineLayout.MaxPingShown, m.PingMs) + " MS");
             }
             int seats = 2 * (host ? OnlineMatch.Host.TeamSize : OnlineMatch.Client != null ? Math.Max(1, OnlineMatch.Client.TeamSize) : 16);
             HudText.Set(_count, $"{readyCount} OF {shown} READY   ·   {Math.Max(0, seats - shown)} BOTS");
