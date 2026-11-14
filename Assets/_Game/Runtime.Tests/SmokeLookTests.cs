@@ -101,6 +101,9 @@ namespace CriticalMass.Runtime.Tests
             float reach = FxScene.KnockOutPoolSize * FxScene.KnockOutPoolReach;
             Assert.LessOrEqual(2f * reach, 1.25f, "about one fighter's footprint across at Full");
             Assert.Less(GoreGate.SizeScale(GoreLevel.Reduced), 1f, "smaller at Reduced");
+            Assert.IsFalse(FxScene.LandsAsSplat(true), "a knock-out's drops leave no smear: the pool is its only stain");
+            Assert.IsTrue(FxScene.LandsAsSplat(false), "ordinary hit drops still splat");
+            Assert.IsFalse(GoreGate.Allows(GorePiece.KnockOutPool, GoreLevel.Off), "no pool at Off");
 
             Assert.LessOrEqual(FxScene.PopPuffSize, 0.25f);
             Assert.LessOrEqual(FxScene.PopPuffHeight, 0.2f, "at the feet, below a standing fighter's body");

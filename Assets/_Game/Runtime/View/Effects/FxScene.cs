@@ -59,6 +59,13 @@ namespace CriticalMass.Runtime.View.Effects
         public const float KnockOutPoolSize = 0.45f, KnockOutPoolReach = 1.33f;
         /// <summary>polish-5 (the knock-out poof covered the standing fighter): the poof is a few small soft puffs at the
         /// downed fighter's feet, low and slow, gone in about 0.3 s, no navy outline.</summary>
+        /// <summary>cand5-reds-1: a knock-out's 14 big drops fly but leave no splat where they land. They used to land as
+        /// splats up to 0.68 u across in dark ground ink, strung 2 to 6 u along the hit, and were stamped into the ground
+        /// paint: the wide grey-brown smear beside the pop (sheet-gore-5b38dff, row knockout-pop). The knock-out's only
+        /// stain is now its pool (shape 6): about one footprint at Full, none at Reduced or Off (GoreGate: no ground
+        /// build-up below Full). Ordinary hit drops still splat.</summary>
+        public static bool LandsAsSplat(bool knockOutDrop) => !knockOutDrop;
+
         public const int PopPuffs = 4;
         public const float PopPuffSize = 0.2f, PopPuffHeight = 0.12f;
         public const byte PuffPop = 8;
@@ -666,6 +673,7 @@ namespace CriticalMass.Runtime.View.Effects
                 ref Droplet d = ref _drops[i];
                 if (d.Landed || now < d.Born + d.TLand) continue;
                 d.Landed = true;
+                if (!LandsAsSplat(d.Pool)) continue;
                 Vector3 p = d.P0 + d.V * d.TLand;
                 double sx = p.x, sz = -p.z;
                 if (!SurfaceTop(sx, sz, out double top)) continue;
