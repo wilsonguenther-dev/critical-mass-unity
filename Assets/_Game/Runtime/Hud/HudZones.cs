@@ -83,7 +83,7 @@ namespace CriticalMass.Runtime.Hud
         // ---- owner walk 1: the named pieces that used to pick their own spots (every one is checked by the collision test) ----
         /// <summary>Top of the centre lane's residents: the job line, the team stock and the map-event bar sit here.</summary>
         public const float JobY = 140f, JobW = 760f, JobH = 40f;
-        public const float StockY = 188f, StockW = 342f, StockH = 40f;
+        public const float StockY = 188f, StockH = 40f, StockChipW = 150f, StockChipGap = 10f, StockW = 3f * StockChipW + 2f * StockChipGap;   // fix/hud-containment-3: 470 (was 342; WATER clipped)
         public const float EventY = 236f, EventW = 560f, EventH = 38f;
         /// <summary>
         /// The job line, stock and event bar live INSIDE the centre lane (the lane's lowest-priority residents): they show

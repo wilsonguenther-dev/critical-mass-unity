@@ -365,6 +365,27 @@ namespace CriticalMass.Runtime.Tests
             }
         }
 
+        // ---------------------------------------------------------------- fix/hud-containment-3: ping markers off the corners
+
+        [Test]
+        public void APingMarkerNeverSitsOnThePlayerCardTheKitOrTheMinimap()
+        {
+            foreach (Vector2 s in Shapes)
+            {
+                float k = HudLayout.Scale(s.x, s.y);
+                var r = new Rect(-s.x / k * 0.5f, -s.y / k * 0.5f, s.x / k, s.y / k);   // a centred root in reference units
+                Rect left = new Rect(r.xMin, r.yMin, Mathf.Max(HudZones.PlayerCard.xMax, HudZones.Kit.xMax), HudLayout.RefH - HudZones.Kit.y);
+                Rect right = new Rect(r.xMax - (HudLayout.RefW - HudZones.Minimap.x), r.yMin, HudLayout.RefW - HudZones.Minimap.x, HudLayout.RefH - HudZones.Minimap.y);
+                foreach (Vector2 p in new[] { new Vector2(left.x + 40f, left.y + 40f), new Vector2(left.xMax - 2f, left.yMax - 2f), new Vector2(right.x + 2f, right.y + 2f), new Vector2(right.xMax - 30f, right.center.y) })
+                {
+                    Vector2 q = CriticalMass.Runtime.Hud.Interact.PingMarkers.OffPanels(p, r);
+                    Assert.IsFalse(left.Contains(q) || right.Contains(q), s + ": a marker at " + p + " stays on a corner panel at " + q);
+                }
+                Vector2 mid = new Vector2(0f, 0f);
+                Assert.AreEqual(mid, CriticalMass.Runtime.Hud.Interact.PingMarkers.OffPanels(mid, r), "a marker in the open stays put");
+            }
+        }
+
         // ---------------------------------------------------------------- 6. the light weapon names in the attack slot
 
         [Test]

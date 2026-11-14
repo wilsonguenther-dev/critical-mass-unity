@@ -50,6 +50,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
         RectTransform _obj, _prompt;
         Text _objText, _promptText, _promptKey;
         VectorShape _promptPanel, _promptPie, _promptKeyChip;
+        InputGlyphView _promptGlyph;
         string _promptAction;
         string _refusal;
         float _refusalUntil = -9f;
@@ -206,8 +207,9 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             for (int k = 0; k < 3; k++)
             {
                 RectTransform chip = MenuUi.Rt(_stock, "Chip " + k);
-                MenuUi.Place(chip, k * 118f, 0f, 106f, 40f);
-                Chip(chip, "Panel", ShapeKind.RoundRect, 0f, 0f, 106f, 40f, CMTokens.WithAlpha(panel, 0.92f), 12f);
+                // fix/hud-containment-3 (walk: WATER clipped): 150 px chips, the word and the count in their own columns
+                MenuUi.Place(chip, k * (HudZones.StockChipW + HudZones.StockChipGap), 0f, HudZones.StockChipW, 40f);
+                Chip(chip, "Panel", ShapeKind.RoundRect, 0f, 0f, HudZones.StockChipW, 40f, CMTokens.WithAlpha(panel, 0.92f), 12f);
                 // hud-art-1: the painted resource icon (UI/Icons/res-*), the vector chip only when the file is missing
                 Texture2D tex = UiIcons.Get(UiIcons.Stock[k], 2);
                 if (tex != null)
@@ -218,9 +220,9 @@ namespace CriticalMass.Runtime.Hud.Mechanics
                     MenuUi.Place(ri.rectTransform, 6f, 4f, 32f, 32f);
                 }
                 else Chip(chip, "Icon", icons[k], 10f, 9f, 22f, 22f, cols[k], 4f);
-                MenuUi.Fit(MenuUi.Label(chip, "Word", CMTokens.Ui, 13, CMTokens.WithAlpha(cream, 0.85f), TextAnchor.MiddleLeft, 38f, 1f, 40f, 38f,
+                MenuUi.Fit(MenuUi.Label(chip, "Word", CMTokens.Ui, 13, CMTokens.WithAlpha(cream, 0.85f), TextAnchor.MiddleLeft, 42f, 1f, 58f, 38f,
                     k == 0 ? DepthWords.Wood : k == 1 ? DepthWords.Water : DepthWords.Food, 1.5f), 9);   // hud-containment-1: "WATER" ran under its count
-                _stockNum[k] = MenuUi.Label(chip, "Count", CMTokens.Mono, 22, cream, TextAnchor.MiddleRight, 60f, 0f, 38f, 40f, "0", 2f);
+                _stockNum[k] = MenuUi.Label(chip, "Count", CMTokens.Mono, 22, cream, TextAnchor.MiddleRight, 102f, 0f, HudZones.StockChipW - 108f, 40f, "0", 2f);
                 _stockChip[k] = chip;
             }
             _stock.gameObject.SetActive(false);
@@ -252,6 +254,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             _promptKey.resizeTextMinSize = 9;
             _promptKey.resizeTextMaxSize = 15;
             MenuUi.Contain(_promptKey, 1);
+            _promptGlyph = CriticalMass.Runtime.Menu.HudPrompts.PlateGlyph(_promptKeyChip.transform);   // fix/hud-containment-3: one key-hint style
             _promptText = MenuUi.Label(_prompt, "Words", CMTokens.Ui, 20, cream, TextAnchor.MiddleLeft, 96f, 0f, 370f, 50f, "", 2f);
             _promptText.resizeTextMinSize = 12;
             _promptText.resizeTextMaxSize = 20;
@@ -450,7 +453,9 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             {
                 _glyphDirty = false;
                 string k = keyOn ? InputGlyphs.Words(action) : string.Empty;
-                HudText.Set(_promptKey, string.IsNullOrEmpty(k) || k == "-" ? string.Empty : k.ToUpperInvariant());
+                bool has = !string.IsNullOrEmpty(k) && k != "-";
+                CriticalMass.Runtime.Menu.HudPrompts.SetPlate(_promptGlyph, _promptKey, has ? action : null, ControlBindings.ActiveDevice);
+                HudText.Set(_promptKey, has ? k.ToUpperInvariant() : string.Empty);
             }
         }
 

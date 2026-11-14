@@ -145,7 +145,10 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             // class kit: above the player cluster (bottom left)
             // hud-containment-1: the kit has its own slot in the left stack (HudZones.Kit) and is sized to its rows (KitHeight)
             float kitH = HudZones.KitMaxH;
-            _kit = MenuUi.Rt(_space, "Class Kit");
+            // fix/hud-containment-3 (walk: team calls drew inside the TEAM BUILD BANK box): the kit sits in the same
+            // bottom-left safe frame as the ping feed and the player card; in the centred space it rose 60 px on a 16:10
+            // screen and met the ping feed, which is anchored to the bottom.
+            _kit = MenuUi.Rt(FeedUi.SafeRoot(_root), "Class Kit");
             MenuUi.Place(_kit, KitX, HudZones.Kit.y, KitW, kitH);
             _kitPanel = MenuUi.Panel(_kit, "Panel", 0f, 0f, KitW, kitH);
             _kitTitle = MenuUi.Fit(MenuUi.Label(_kit, "Title", CMTokens.Display, UiScale.TypeSmall, brass, TextAnchor.MiddleLeft, 18f, 8f, KitW - 36f, 28f, "", 2f), 13);
@@ -173,6 +176,8 @@ namespace CriticalMass.Runtime.Hud.Mechanics
                 keyChip.RimColor = cream;
                 keyChip.RimPx = 2f;
                 _rowKey[r] = MenuUi.Fit(MenuUi.Label(keyChip.transform, "Key", CMTokens.Ui, UiScale.TypeMin, cream, TextAnchor.MiddleCenter, 0f, 0f, 68f, 30f, "", 2f), 14);
+                _rowKeyChip[r] = keyChip;
+                _rowGlyph[r] = HudPrompts.PlateGlyph(keyChip.transform);   // fix/hud-containment-3: the ability plates' glyph style
                 _rowKey[r].resizeTextMinSize = 9;
                 _rowKey[r].resizeTextMaxSize = 14;
                 MenuUi.Contain(_rowKey[r], 2);   // "RIGHT CLICK" wraps inside its key chip
@@ -264,7 +269,8 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             Actor a = w.Actors[me];
             int rows = ClassKit.RowCount(a.Cls);
             bool teamBank = rows == 0 && BuilderBank.TeamHasBuilder(w, a.Team);
-            bool show = (rows > 0 || teamBank) && a.Alive;
+            // fix/hud-containment-3: an empty team bank is no box at all (it was a panel saying the bank is empty)
+            bool show = (rows > 0 || (teamBank && BuilderBank.Whole(w, a.Team) > 0)) && a.Alive;
             if (_kit.gameObject.activeSelf != show) _kit.gameObject.SetActive(show);
             if (!show) return;
             int cls = (int)a.Cls;
@@ -308,6 +314,9 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             if (_glyphDirty) RefreshGlyphs();
         }
 
+        readonly VectorShape[] _rowKeyChip = new VectorShape[2];
+        readonly InputGlyphView[] _rowGlyph = new InputGlyphView[2];
+
         int _kitRows = -1;
         bool _kitBank;
 
@@ -322,7 +331,10 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             _kitBank = bank;
             float h = KitHeight(rows, bank);
             Rect slot = HudZones.Kit;
-            MenuUi.Place(_kit, slot.x, slot.yMax - h, KitW, h);
+            _kit.anchorMin = _kit.anchorMax = Vector2.zero;   // bottom-left, like the player card and the ping feed
+            _kit.pivot = Vector2.zero;
+            _kit.sizeDelta = new Vector2(KitW, h);
+            _kit.anchoredPosition = new Vector2(slot.x, HudLayout.RefH - slot.yMax);
             MenuUi.Place(_kitPanel.rectTransform, 0f, 0f, KitW, h);
             MenuUi.Place(_bank.rectTransform, 18f, 44f + rows * RowH - 2f, KitW - 36f, 28f);
             // rows keep their place under the title: they are children of _kit, placed from its top
@@ -350,6 +362,12 @@ namespace CriticalMass.Runtime.Hud.Mechanics
                 string words = string.IsNullOrEmpty(action) ? string.Empty : InputGlyphs.Words(action);
                 _rowKeyWord[r] = string.IsNullOrEmpty(words) || words == "-" ? string.Empty : words.ToUpperInvariant();
                 HudText.Set(_rowKey[r], _rowKeyWord[r]);
+                // fix/hud-containment-3: one key-hint style: the drawn glyph on the plate, the plate widened to the left for it
+                float cw = HudPrompts.SetPlate(_rowGlyph[r], _rowKey[r], _rowKeyWord[r].Length > 0 ? action : null, ControlBindings.ActiveDevice);
+                if (_rowKeyWord[r].Length == 0) HudText.Set(_rowKey[r], string.Empty);
+                cw = Mathf.Max(68f, cw);
+                RectTransform kc = _rowKeyChip[r].rectTransform;
+                if (Mathf.Abs(kc.sizeDelta.x - cw) > 0.5f) MenuUi.Place(kc, KitW - 24f - cw, 42f + r * RowH + 9f, cw, 30f);
             }
             string jump = InputGlyphs.Words("Jump");
             HudText.Set(_jumpText, "JUMP IT  " + (string.IsNullOrEmpty(jump) ? "SPACE" : jump.ToUpperInvariant()));
