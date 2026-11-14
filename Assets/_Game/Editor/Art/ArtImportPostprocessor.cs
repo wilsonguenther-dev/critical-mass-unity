@@ -34,7 +34,8 @@ namespace CriticalMass.Editor.Art
         public const string ArtMaterialPath = "Assets/_Game/Resources/Toon/CMToonArt.mat";
 
         /// <summary>Bump when the contract changes: Unity re-imports every model this postprocessor touches.</summary>
-        public override uint GetVersion() => 16;   // 16: batch 8 reverted the HY Warrior rig (#86), importer back to the pre-#86 rules; 10: wall-damage-1, the Miner barricade imports readable
+        public override uint GetVersion() => 17;   // 17: fix/hit-feel-5 measures each character's weapon tip (WeaponTip)
+        // was 16;   // 16: batch 8 reverted the HY Warrior rig (#86), importer back to the pre-#86 rules; 10: wall-damage-1, the Miner barricade imports readable
 
         public static bool IsArt(string path) =>
             path.StartsWith(ArtRoot, StringComparison.Ordinal) && path.EndsWith(".fbx", StringComparison.OrdinalIgnoreCase);
@@ -284,6 +285,56 @@ namespace CriticalMass.Editor.Art
             return bar >= 0 ? take.Substring(bar + 1) : take;
         }
 
+        /// <summary>
+        /// fix/hit-feel-5: the held weapon's tip, measured while the vertices are still on the CPU (characters import
+        /// without a CPU copy): of the skinned vertices bound at least 90% to the weapon hand ("handslot.r" or "hand.r"),
+        /// the one farthest from "handslot.r", in that bone's local space at the import (bind) pose. Written on the model
+        /// root as a WeaponTip; distance 0 when the hand holds nothing.
+        /// </summary>
+        private static void MeasureWeaponTip(GameObject root)
+        {
+            Transform slot = null, hand = null;
+            foreach (Transform t in root.GetComponentsInChildren<Transform>(true))
+            {
+                if (t.name == "handslot.r") slot = t;
+                else if (t.name == "hand.r") hand = t;
+            }
+            Transform at = slot != null ? slot : hand;
+            if (at == null) return;
+            Vector3 best = Vector3.zero;
+            float bestD = 0f;
+            int count = 0;
+            foreach (SkinnedMeshRenderer smr in root.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+            {
+                Mesh mesh = smr.sharedMesh;
+                Transform[] bones = smr.bones;
+                if (mesh == null || bones == null) continue;
+                var weaponBones = new HashSet<int>();
+                for (int b = 0; b < bones.Length; b++)
+                    if (bones[b] != null && (bones[b] == slot || bones[b] == hand)) weaponBones.Add(b);
+                if (weaponBones.Count == 0) continue;
+                Vector3[] v = mesh.vertices;
+                BoneWeight[] bw = mesh.boneWeights;
+                if (bw == null || bw.Length != v.Length) continue;
+                Matrix4x4 toWorld = smr.transform.localToWorldMatrix;
+                for (int k = 0; k < v.Length; k++)
+                {
+                    if (!weaponBones.Contains(bw[k].boneIndex0) || bw[k].weight0 < 0.9f) continue;
+                    Vector3 p = at.InverseTransformPoint(toWorld.MultiplyPoint3x4(v[k]));
+                    count++;
+                    float d = p.magnitude;
+                    if (d > bestD) { bestD = d; best = p; }
+                }
+            }
+            var tip = root.GetComponent<WeaponTip>();
+            if (tip == null) tip = root.AddComponent<WeaponTip>();
+            tip.Bone = at.name;
+            // a bare hand's own vertices reach about 0.15 u from the slot: no weapon below that
+            tip.Distance = bestD > 0.2f ? bestD : 0f;
+            tip.Local = bestD > 0.2f ? best : Vector3.zero;
+            tip.Vertices = count;
+        }
+
         private void OnPostprocessModel(GameObject root)
         {
             if (!IsArt(assetPath)) return;
@@ -309,6 +360,7 @@ namespace CriticalMass.Editor.Art
             }
             ModelSpec spec = SpecFor(assetPath);
             if (spec != null && spec.BakesOutlineWeights) BakeOutlineWeights(root, spec);
+            if (spec != null && spec.Rigged && spec.Kind == ArtKind.Character) MeasureWeaponTip(root);
             // Smoothed hull directions in the (skinned) tangent channel: no torn hull or inner crease lines on the
             // bevelled characters and Kaiju at the gameplay camera (CM/Toon _OutlineSource 3).
             if (spec != null && spec.Rigged && spec.OutlinePx > 0f)

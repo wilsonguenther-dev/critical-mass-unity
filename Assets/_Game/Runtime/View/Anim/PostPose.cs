@@ -37,6 +37,9 @@ namespace CriticalMass.Runtime.View.Anim
         /// <summary>0 none, 1 attack, 2 ability; and sim seconds since it began.</summary>
         public byte ActionKind;
         public double ActionAge;
+        /// <summary>fix/hit-feel-5: the strike lean toward the target this frame (degrees, upper body only) and its world direction.</summary>
+        public float StrikeLeanDeg;
+        public Vector3 StrikeDir;
     }
 
     /// <summary>

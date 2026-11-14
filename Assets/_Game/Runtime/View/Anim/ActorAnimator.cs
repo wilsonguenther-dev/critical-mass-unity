@@ -306,6 +306,19 @@ namespace CriticalMass.Runtime.View.Anim
             Quaternion rot = Quaternion.Euler(0f, (float)_yaw + twist, 0f) * Quaternion.Euler(_pitch, 0f, _roll);
             if (hasFx) rot = fx.Lean * rot;
             m.SetFacing(rot);
+            // fix/hit-feel-5: a brief squash along the blow (80 ms, at most 7%), a little lower and wider across it; the
+            // model scale owner below still composes and clamps it.
+            if (hasFx && !corpse && feed != null && i < feed.HitDirX.Length)
+            {
+                float sq = HitPose.Squash(fx.HitT);
+                if (sq > 0f)
+                {
+                    Vector3 hd = Quaternion.Inverse(rot) * SimSpace.ToWorld(feed.HitDirX[i], 0, feed.HitDirZ[i]);
+                    float ax = Mathf.Abs(hd.x), az = Mathf.Abs(hd.z), n = Mathf.Max(1e-4f, ax + az);
+                    ax /= n; az /= n;
+                    scale = Vector3.Scale(scale, new Vector3(1f + sq * (0.5f - 1.5f * ax), 1f - sq * 0.4f, 1f + sq * (0.5f - 1.5f * az)));
+                }
+            }
             // fix/model-scale: scale above is the effect factor, rebuilt from 1 this frame; the one owner composes and clamps it.
             m.Transform.localScale = ModelScale.Compose(m.BaseScale, scale, m.AssignedName);
 
@@ -348,6 +361,13 @@ namespace CriticalMass.Runtime.View.Anim
             state.HitTier = _hasReact ? _react.Tier : HitTier.Light;
             state.HitDir = feed != null && i < feed.HitDirX.Length ? SimSpace.ToWorld(feed.HitDirX[i], 0, feed.HitDirZ[i]) : Vector3.zero;
             state.ActionKind = _kind;
+            state.StrikeLeanDeg = 0f;
+            state.StrikeDir = Vector3.zero;
+            if (!corpse && _kind == 1 && _actClip != null && HitFeel.StrikeLean(w, i, alpha, out double leanDeg, out double ldx, out double ldz))
+            {
+                state.StrikeLeanDeg = (float)leanDeg;
+                state.StrikeDir = SimSpace.ToWorld(ldx, 0, ldz);
+            }
             state.ActionAge = _actClip != null ? simTime - _actStart : 1e9;
             return evaluated;
         }
@@ -645,6 +665,34 @@ namespace CriticalMass.Runtime.View.Anim
         }
 
         double _actAge;
+        // fix/hit-feel-5: the weapon tip (hand-local) and whether this fighter's contact reach has been measured.
+        bool _reachMeasured;
+        Vector3 _tipLocal;
+        Transform _tipHand;
+
+        /// <summary>
+        /// fix/hit-feel-5: once per fighter, before this frame's pose: pose the attack clip at its contact frame and measure
+        /// where the weapon TIP is (HitPose.TipLocal): its horizontal reach from the root and its height above the spine.
+        /// Feeds HitFeel.MeasuredReach (the step-in) and MeasuredLever (the strike lean).
+        /// </summary>
+        void MeasureReach(ModelView m, ClassId cls, string clip)
+        {
+            _reachMeasured = true;
+            _tipLocal = HitPose.TipLocal(m, out _tipHand, out _);
+            Transform spine = m.Bone("spine");
+            if (_tipHand == null || spine == null) return;
+            m.BeginPose();
+            m.Pose(clip, ClipFacts.Contact(clip, m.ClipLength(clip) * 0.5f), 1f, false);
+            if (!m.Evaluate(true)) return;
+            Vector3 tip = _tipHand.TransformPoint(_tipLocal), root = m.Transform.position;
+            Vector3 flat = tip - root;
+            flat.y = 0f;
+            HitFeel.SetMeasured(cls, flat.magnitude, tip.y - spine.position.y);
+        }
+
+        /// <summary>The weapon tip in world space now (capture; Vector3.zero before the first swing).</summary>
+        public Vector3 TipWorld => _tipHand != null ? _tipHand.TransformPoint(_tipLocal) : Vector3.zero;
+        public bool HasTip => _tipHand != null;
         double _actExtreme = -1;   // fix/hit-feel-3: the attack clip's measured wind-up extreme
         int _lastCarried = -1;
         string _terraClip;
@@ -681,6 +729,7 @@ namespace CriticalMass.Runtime.View.Anim
             _actClip = clip;
             // fix/hit-feel-3: measured once per clip, here, before this frame's pose is built.
             _actExtreme = kind == 1 && clip != null ? AttackTiming.MeasureExtreme(m, clip, ClipFacts.Contact(clip, m.ClipLength(clip) * 0.5f)) : -1;
+            if (kind == 1 && clip != null && !_reachMeasured) MeasureReach(m, actor.Cls, clip);
             _actStart = simTime - aa;
             _lastActW = 0f;
             _breakAt = -1;

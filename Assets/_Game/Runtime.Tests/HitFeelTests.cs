@@ -121,6 +121,50 @@ namespace CriticalMass.Runtime.Tests
                     Assert.LessOrEqual(HitFeel.FlinchShift(dmg) + HitFeel.StaggerStep(t, dmg), 0.32, $"dmg {dmg} at {t:0.00} s (before the clamp)");
         }
 
+        // ---------------------------------------------------------------- fix/hit-feel-5
+
+        [Test]
+        public void TheStrikeLeanClosesTheGapUpTo18Degrees()
+        {
+            Assert.AreEqual(0, HitPose.StrikeLeanDeg(0, 0.5), 1e-9, "no gap, no lean");
+            Assert.AreEqual(0, HitPose.StrikeLeanDeg(-0.2, 0.5), 1e-9, "tip already in the body");
+            double deg = HitPose.StrikeLeanDeg(0.1, 0.5);
+            Assert.AreEqual(0.1, HitPose.LeanGain(deg, 0.5), 1e-9, "the lean covers exactly the gap");
+            Assert.AreEqual(HitPose.MaxStrikeLeanDeg, HitPose.StrikeLeanDeg(5, 0.5), 1e-9, "capped");
+            Assert.LessOrEqual(HitPose.MaxStrikeLeanDeg, 25, "below the upright limit even if it were on the root (it is not)");
+        }
+
+        [Test]
+        public void TheMeasuredTipReachReplacesTheEstimate()
+        {
+            try
+            {
+                Assert.AreEqual(HitFeel.EstimatedReach(ClassId.Warrior), HitFeel.ViewReach(ClassId.Warrior), 1e-9);
+                HitFeel.SetMeasured(ClassId.Warrior, 1.42, 0.6);
+                Assert.AreEqual(1.42, HitFeel.ViewReach(ClassId.Warrior), 1e-9, "the rig's own number wins");
+                HitFeel.SetMeasured(ClassId.Miner, 0.01, 0.6);
+                Assert.AreEqual(HitFeel.EstimatedReach(ClassId.Miner), HitFeel.ViewReach(ClassId.Miner), 1e-9, "a failed measure is ignored");
+            }
+            finally { Array.Clear(HitFeel.MeasuredReach, 0, HitFeel.MeasuredReach.Length); Array.Clear(HitFeel.MeasuredLever, 0, HitFeel.MeasuredLever.Length); }
+        }
+
+        [Test]
+        public void TheReactionReadsOnTheUpperBodyForEveryTier()
+        {
+            foreach (HitTier t in new[] { HitTier.Light, HitTier.Heavy, HitTier.Critical })
+            {
+                Assert.GreaterOrEqual(HitPose.RecoilDeg(t), 12f, t + ": a visible recoil even for the lightest hit");
+                Assert.LessOrEqual(HitPose.RecoilDeg(t) + HitPose.HeadSnapDeg(t), 55f, t + ": the head stays well above the hips");
+            }
+            Assert.Greater(HitPose.RecoilDeg(HitTier.Critical), HitPose.RecoilDeg(HitTier.Light));
+            Assert.AreEqual(0f, HitPose.RecoilEnv(-0.01));
+            Assert.AreEqual(1f, HitPose.RecoilEnv(HitPose.RecoilOut), 1e-5f, "out in 50 ms");
+            Assert.AreEqual(0f, HitPose.RecoilEnv(HitPose.RecoilBack), "back by 0.3 s");
+            Assert.Greater(HitPose.Squash(0.04), 0.06f);
+            Assert.LessOrEqual(HitPose.Squash(0.04), (float)HitPose.SquashMax + 1e-6f, "inside the 0.7 to 1.4 height test");
+            Assert.AreEqual(0f, HitPose.Squash(HitPose.SquashSeconds));
+        }
+
         [Test]
         public void TheLungePeaksOnContactAndIsAbsorbed()
         {
