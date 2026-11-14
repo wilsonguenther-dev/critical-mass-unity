@@ -113,6 +113,8 @@ def plant_n(clip):
         return PLANT_RUN
     return PLANT_N
 MAX_LOWER = 0.12       # hips never come down more than this to reach a target (DeathB-style clips keep FK reach)
+LOWER_PARTIAL = CLS == "Builder"
+MAX_LOWER_CLS = float(os.environ.get("BAKE_MAX_LOWER", "0.16")) if LOWER_PARTIAL else MAX_LOWER
 LEG = lambda s: ("upperleg." + s, "lowerleg." + s, "foot." + s, "toes." + s)
 W = lambda arm, p: arm.matrix_world @ p
 
@@ -714,7 +716,14 @@ def bake_action(clip, act):
             for s in SIDES:
                 U = W(fa, faP["upperleg." + s].head)
                 short = max(short, (targets[s] - U).length - 0.995 * (Lt[s] + Ls[s]))
-            if short <= 1e-5 or lowered_frame + short > MAX_LOWER:
+            if LOWER_PARTIAL and short > 1e-5 and lowered_frame + short > MAX_LOWER_CLS:
+                # rig-builder-3: a target out of reach by more than the cap still takes the hips down to the cap (the
+                # old rule then did not lower them at all: the Builder's run toe-off fell 21% short of the anchored
+                # stance, and the game read that as skating)
+                short = MAX_LOWER_CLS - lowered_frame
+                if short <= 1e-5:
+                    break
+            elif short <= 1e-5 or lowered_frame + short > MAX_LOWER:
                 break
             lowered_frame += short
             Hd = Hd - Vector((0, 0, short + 1e-4))
