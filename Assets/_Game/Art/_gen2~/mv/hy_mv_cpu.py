@@ -18,7 +18,11 @@ log["t_load"] = round(time.time() - t0, 1); print(json.dumps(log), flush=True)
 mesh = pipe(image=imgs, num_inference_steps=5, octree_resolution=octree, num_chunks=20000,
             generator=torch.manual_seed(seed), output_type="trimesh")[0]
 log["t_gen"] = round(time.time() - t0, 1)
-mesh = FloaterRemover()(mesh); mesh = DegenerateFaceRemover()(mesh)
+mesh.export(os.path.join(out, f"{char}_s{seed}_raw.glb"))
+try:
+    mesh = DegenerateFaceRemover()(FloaterRemover()(mesh))
+except Exception as ex:
+    log["postprocess_error"] = f"{type(ex).__name__}: {ex}"[:200]
 mesh.export(os.path.join(out, f"{char}_s{seed}.glb"))
 log.update(faces=int(len(mesh.faces)), verts=int(len(mesh.vertices)), t_total=round(time.time() - t0, 1),
            peak_rss_gb=round(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1e6, 2))
