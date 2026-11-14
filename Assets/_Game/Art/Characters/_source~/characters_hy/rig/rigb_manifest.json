@@ -59,7 +59,20 @@
    "_note": "rig-batch-b: octree depth 9 closes every sheet into one skin, a 4 mm voxel rebuild of that closed skin makes it 2-manifold, then collapse to the LOD budgets",
    "octree": 9,
    "voxel_after": 0.004,
-   "_note2": "rig-demolitions-1: LOD1 1300 (the first clean landed 1,489 at 1400)"
+   "_note2": "rig-demolitions-1: LOD1 1300 (the first clean landed 1,489 at 1400)",
+   "face_features": {
+    "box": [
+     -0.12,
+     0.12,
+     -0.4,
+     -0.02,
+     1.36,
+     1.66
+    ],
+    "rel": 0.5,
+    "colour": "#33241E",
+    "_note": "rig-demolitions-1: eyes and brows restored from the raw colours (ArtImportTests painted-face test)"
+   }
   }
  ]
 }
