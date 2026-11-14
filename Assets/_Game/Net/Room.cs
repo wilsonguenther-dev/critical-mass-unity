@@ -9,7 +9,7 @@ namespace CriticalMass.Net
     public static class NetVersion
     {
         /// <summary>Bumps whenever any packet layout or the lockstep rules change.</summary>
-        public const int Protocol = 1;
+        public const int Protocol = 2;   // 2: the start message carries the config and tick 0 fingerprints
     }
 
     /// <summary>A transport that can close its room to newcomers (the relay does; the loopback does not need to).</summary>
@@ -291,13 +291,20 @@ namespace CriticalMass.Net
             };
             for (int i = 0; i < n; i++)
                 setup.Humans[i] = new HumanSlot { Peer = Members[i].Peer, Actor = actors[i], Class = Members[i].Class, Name = Members[i].Name };
+            // online-rooms-3: the match is built from the setup and a fresh default config only (never a config object an
+            // earlier match or the offline game touched). The host builds first, then sends what it built from: the config
+            // fingerprint and its tick 0 world fingerprint ride in the start message, and a client that differs refuses.
+            Session = new LockstepSession(_t, setup, GameConfig.CreateDefault(), options) { Other = Chat.Handle };
+            setup.ConfigHash = Session.MyConfigHash;
+            setup.WorldHash0 = Session.MyWorldHash0;
             var w = new WireWriter(new byte[Peers.MaxPacket]);
             w.U8(RoomMsg.Start);
             setup.Write(ref w);
-            if (w.Overflow) return null;
+            if (w.Overflow) { Session = null; return null; }
             _t.Send(Peers.Broadcast, w.Buf, w.Pos);
             (_t as ILockableTransport)?.Lock();
-            Session = new LockstepSession(_t, setup, _cfg, options) { StartPacket = w.Buf, StartPacketLength = w.Pos, Other = Chat.Handle };
+            Session.StartPacket = w.Buf;
+            Session.StartPacketLength = w.Pos;
             Phase = RoomPhase.InMatch;
             return Session;
         }
@@ -467,7 +474,7 @@ namespace CriticalMass.Net
                     MatchSetup setup = MatchSetup.Read(ref r, _cfg);
                     if (setup == null) { Fail("The host sent a match this game cannot play."); return; }
                     if (setup.SlotOfPeer(_t.LocalPeer) < 0) { Fail("The match started without you."); return; }
-                    Session = new LockstepSession(_t, setup, _cfg, Options) { Other = Chat.Handle };
+                    Session = new LockstepSession(_t, setup, GameConfig.CreateDefault(), Options) { Other = Chat.Handle };
                     Phase = RoomPhase.InMatch;
                     Version++;
                     Started?.Invoke(Session);

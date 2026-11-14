@@ -32,6 +32,7 @@ export const REASON = {
   BAD_VERSION: 8,   // the game is a different network version
   BAD_REQUEST: 9,   // malformed message
   EXPIRED: 10,      // the room outlived MAX_ROOM_MS
+  HOST_NOT_READY: 11, // the room exists (POST /rooms) but the host's game has not connected yet: ask again shortly
 };
 
 export const PROTOCOL_VERSION = 1;

@@ -80,7 +80,8 @@ namespace CriticalMass.Runtime.Online
                 switch (st)
                 {
                     case LockstepStatus.Desynced:
-                        Show("MATCH STOPPED", "The two games stopped agreeing about the match (at moment " + _session.DesyncTick +
+                        if (_session.SetupMismatch != null) Show("CANNOT START", _session.SetupMismatch);
+                        else Show("MATCH STOPPED", "The two games stopped agreeing about the match (at moment " + _session.DesyncTick +
                             "), so it cannot go on fairly. This is a bug on our side, not your connection.");
                         break;
                     case LockstepStatus.HostLeft:

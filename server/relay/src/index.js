@@ -83,7 +83,9 @@ export class Room extends DurableObject {
     if (!meta || Date.now() - meta.created > MAX_ROOM_MS) return reject(REASON.NOT_FOUND);
     const sockets = this.ctx.getWebSockets();
     const isHost = url.searchParams.get("key") === meta.key && !sockets.some((s) => this.peerOf(s) === HOST);
-    if (!isHost && !meta.hostSeen) return reject(REASON.NOT_FOUND);
+    // The room exists from the POST that made it; a joiner who is quicker than the host's game hears "not ready yet"
+    // (the game asks again) instead of "no such room".
+    if (!isHost && !meta.hostSeen) return reject(REASON.HOST_NOT_READY);
     if (!isHost && meta.locked) return reject(REASON.STARTED);
     if (sockets.length >= MAX_PEERS) return reject(REASON.FULL);
     let peer = HOST;

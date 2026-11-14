@@ -39,6 +39,11 @@ namespace CriticalMass.Net
         }
 
         /// <summary>The world options every machine creates the match from (identical bytes in, identical world out).</summary>
+        /// <summary>online-rooms-3: the host's ConfigHash.Of(config) before its world was built (0 = not checked).</summary>
+        public ulong ConfigHash;
+        /// <summary>online-rooms-3: the host's StateHash.Of(world) right after it was built, tick 0 (0 = not checked).</summary>
+        public ulong WorldHash0;
+
         public WorldOptions ToWorldOptions(GameConfig cfg)
         {
             int extra = Humans.Length > 0 ? Humans.Length - 1 : 0;
@@ -98,6 +103,8 @@ namespace CriticalMass.Net
                 w.U8((int)Humans[i].Class);
                 w.Str(Humans[i].Name, 16);
             }
+            w.U64(ConfigHash);
+            w.U64(WorldHash0);
         }
 
         /// <summary>Reads and validates a setup; null if anything is out of range (a hostile or broken host).</summary>
@@ -131,6 +138,8 @@ namespace CriticalMass.Net
                 if (s.Humans[i].Actor >= 2 * s.TeamSize) return null;
                 for (int j = 0; j < i; j++) if (s.Humans[j].Actor == s.Humans[i].Actor || s.Humans[j].Peer == s.Humans[i].Peer) return null;
             }
+            s.ConfigHash = r.U64();
+            s.WorldHash0 = r.U64();
             if (r.Bad || s.Humans[0].Actor != 0 || s.Humans[0].Peer != Peers.Host) return null;
             return s;
         }

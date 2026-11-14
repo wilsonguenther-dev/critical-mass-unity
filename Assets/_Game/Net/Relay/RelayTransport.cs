@@ -27,6 +27,7 @@ namespace CriticalMass.Net.Relay
         private volatile int _localPeer = -1;
         private volatile bool _closed;
         private string _closingReason;
+        private Task _runTask;
 
         public int LocalPeer => _localPeer;
         public bool Reliable => true;
@@ -74,7 +75,7 @@ namespace CriticalMass.Net.Relay
             if (ws.StartsWith("https://", StringComparison.OrdinalIgnoreCase)) ws = "wss://" + ws.Substring(8);
             else if (ws.StartsWith("http://", StringComparison.OrdinalIgnoreCase)) ws = "ws://" + ws.Substring(7);
             string url = ws + "/rooms/" + code + "/ws?v=" + ProtocolVersion + (string.IsNullOrEmpty(hostKey) ? "" : "&key=" + Uri.EscapeDataString(hostKey));
-            _ = Task.Run(() => t.Run(new Uri(url)));
+            t._runTask = Task.Run(() => t.Run(new Uri(url)));
             return t;
         }
 
@@ -104,6 +105,21 @@ namespace CriticalMass.Net.Relay
             _closed = true;
             try { _ws.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "bye", CancellationToken.None); } catch (Exception) { }
             _cts.CancelAfter(2000);
+        }
+
+        /// <summary>online-rooms-3: after Close, wait up to ms for the socket's background work to finish (so a quitting
+        /// player never kills it mid-call). True when it finished.</summary>
+        public bool WaitClosed(int ms)
+        {
+            try { return _runTask == null || _runTask.Wait(ms); } catch (Exception) { return true; }
+        }
+
+        /// <summary>online-rooms-3, tests only: drop the connection with no goodbye, like a pulled cable or a crashed game.</summary>
+        public void Abort()
+        {
+            _closed = true;
+            try { _ws.Abort(); } catch (Exception) { }
+            try { _cts.Cancel(); } catch (Exception) { }
         }
 
         public void Dispose()
@@ -220,11 +236,17 @@ namespace CriticalMass.Net.Relay
         }
 
         /// <summary>One plain sentence for each reason the relay gives (server/relay/src/protocol.js REASON).</summary>
+        public const string NotFoundText = "There is no room with that code. Check the code and try again.";
+        public const string HostNotReadyText = "The host's room is still opening.";
+
+        /// <summary>online-rooms-3: worth asking again in a moment (the host's game may not have connected yet).</summary>
+        public static bool IsRetryable(string reason) => reason == NotFoundText || reason == HostNotReadyText;
+
         public static string ReasonText(int code)
         {
             switch (code)
             {
-                case 1: return "There is no room with that code. Check the code and try again.";
+                case 1: return NotFoundText;
                 case 2: return "That room is full.";
                 case 3: return "That room's match has already started.";
                 case 4: return "The host closed the room.";
@@ -233,6 +255,7 @@ namespace CriticalMass.Net.Relay
                 case 8: return "This game is a different version from the room service. Update the game.";
                 case 9: return "The room service did not understand this game.";
                 case 10: return "The room reached its four-hour limit and closed.";
+                case 11: return HostNotReadyText;
                 default: return "The room closed.";
             }
         }

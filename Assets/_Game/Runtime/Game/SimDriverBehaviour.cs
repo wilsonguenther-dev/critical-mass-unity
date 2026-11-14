@@ -178,6 +178,9 @@ namespace CriticalMass.Runtime.Game
 
         private void Update()
         {
+            // online-rooms-3: while an online match runs (or the game is a hidden online test peer) no other world ticks:
+            // the online session is the only thing stepping the Sim.
+            if (_online == null && (Online.OnlineMatch.Session != null || Online.OnlineHeadless.Active)) return;
             if (_online != null)
             {
                 float cd = Time.captureDeltaTime;
@@ -233,7 +236,7 @@ namespace CriticalMass.Runtime.Game
             if (input != null && !HumanAutopilot) AbilityDenial.Observe(_humanFrame.Ability, World, LocalSeat.Actor, _dt);
             FrameCost.Mark c0 = FrameCost.Enter();
             long lt = CriticalMass.Runtime.Game.LoadTimer.WatchingTicks ? CriticalMass.Runtime.Game.LoadTimer.Now() : 0;   // perf/start-hitch-1: the first ticks after a load, timed
-            MatchTick.Advance(World, HumanAutopilot ? null : _humanFrame, _scratch);
+            using (CriticalMass.Net.SimThreadGuard.Enter()) MatchTick.Advance(World, HumanAutopilot ? null : _humanFrame, _scratch);
             if (lt != 0) CriticalMass.Runtime.Game.LoadTimer.TickDone(lt);
             FrameCost.Exit(FrameCost.Slot.Sim, c0);
             FrameCost.FrameTicks++;

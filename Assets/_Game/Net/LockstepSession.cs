@@ -74,6 +74,12 @@ namespace CriticalMass.Net
         public int LateInputs { get; private set; }
         /// <summary>Milliseconds this machine waited for the network (stalls).</summary>
         public long StallMs { get; private set; }
+        /// <summary>online-rooms-3: ConfigHash.Of the config this machine built the world from.</summary>
+        public ulong MyConfigHash { get; }
+        /// <summary>online-rooms-3: StateHash.Of the world right after it was built (tick 0).</summary>
+        public ulong MyWorldHash0 { get; }
+        /// <summary>online-rooms-3: set when this machine's setup differs from the host's (then Status is Desynced at tick 0).</summary>
+        public string SetupMismatch { get; private set; }
         private long _stallSeen;
         public long BytesSent { get; private set; }
         /// <summary>The transport's reason when our own connection closed (plain words), else null.</summary>
@@ -179,7 +185,16 @@ namespace CriticalMass.Net
             LocalSlot = setup.SlotOfPeer(transport.LocalPeer);
             if (LocalSlot < 0) throw new ArgumentException("this peer has no seat in the match setup", nameof(setup));
             LocalActor = setup.Humans[LocalSlot].Actor;
+            // online-rooms-3: what this machine builds the match from, fingerprinted before and right after the world exists,
+            // so a different setup is reported as that (tick 0) instead of as a simulation drift at tick 30.
+            MyConfigHash = ConfigHash.Of(cfg);
             World = World.CreateWorld(setup.ToWorldOptions(cfg));
+            MyWorldHash0 = StateHash.Of(World);
+            if (setup.ConfigHash != 0 && setup.ConfigHash != MyConfigHash)
+                SetupMismatch = $"This game's match rules differ from the host's (rules 0x{MyConfigHash:X16}, host 0x{setup.ConfigHash:X16}). Both players need the same version.";
+            else if (setup.WorldHash0 != 0 && setup.WorldHash0 != MyWorldHash0)
+                SetupMismatch = $"This game built a different starting arena from the host's (0x{MyWorldHash0:X16}, host 0x{setup.WorldHash0:X16}).";
+            if (SetupMismatch != null) { Status = LockstepStatus.Desynced; DesyncTick = 0; }
             // Wall milliseconds per tick: the match pace (sim ticks per wall second / SimHz) speeds the clock, never the rules.
             _tickMs = 1000.0 / (cfg.SimHz * WallPace(setup, cfg));
             _maxLead = Math.Max(2, (int)Math.Ceiling(_o.MaxLeadMs / _tickMs));
@@ -531,9 +546,10 @@ namespace CriticalMass.Net
             TestTamper?.Invoke(s, _frames);
             // This machine's next input goes Lead ticks ahead of the tick being stepped.
             GenerateLocal(s + Lead, false);
-            MatchTick.AdvanceHumans(World, _frames, _scratch);
+            using (SimThreadGuard.Enter()) MatchTick.AdvanceHumans(World, _frames, _scratch);
             Stepped = s + 1;
-            if (World.Tick % Setup.HashEvery == 0) RecordHash(World.Tick, StateHash.Of(World));
+            // Tick 1 too: a mismatch there means the first inputs or the first step differ, not a slow drift.
+            if (World.Tick % Setup.HashEvery == 0 || World.Tick == 1) RecordHash(World.Tick, StateHash.Of(World));
             Ticked?.Invoke(World);
             if (World.Match.Phase == MatchPhase.Ended) Status = LockstepStatus.Ended;
         }
@@ -545,6 +561,9 @@ namespace CriticalMass.Net
         }
 
         // ---------------------------------------------------------------- hashes and desync
+
+        /// <summary>The tick 0 fingerprint, for logs (it is checked through the start message, not exchanged).</summary>
+        public ulong WorldHashAtStart => MyWorldHash0;
 
         private void RecordHash(int tick, ulong h)
         {
