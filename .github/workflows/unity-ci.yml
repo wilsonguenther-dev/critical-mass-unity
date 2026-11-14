@@ -256,7 +256,7 @@ jobs:
           buildMethod: ${{ matrix.method }}
           versioning: None
           allowDirtyBuild: true
-          customParameters: -buildCommit ${{ steps.stamp.outputs.sha }} -buildCount ${{ steps.stamp.outputs.count }}
+          customParameters: -buildCommit ${{ steps.stamp.outputs.sha }} -buildCount ${{ steps.stamp.outputs.count }} -development
       - name: Pack the player (tar keeps the macOS app's permissions)
         if: steps.want.outputs.run == 'true'
         run: sudo tar -C "${{ matrix.out }}" -czf "player-${{ matrix.target }}.tgz" .
