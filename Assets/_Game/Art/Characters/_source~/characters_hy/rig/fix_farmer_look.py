@@ -7,11 +7,11 @@ FBX itself. The skeleton is not touched, so Farmer_Clips.fbx (bake_clips.py) sta
      Azure cloth hue at the same brightness (the shader swaps hue and keeps the brightness ratio).
   2. STAFF. The staff is a rigid island on handslot.r, 2.03 m long, with the grip 0.52 m from one end, so after the arm
      drops 1.5 m of it runs up the forearm line through her body; its dark slate shaft (#2E2D3B) reads as a thin dark
-     (and, with the Crimson rim, red) line. It is recentred on the grip and shortened to 0.72 of its length along its
-     own axis, and the shaft is recoloured light wood at the same relative values (its code-8 team accents are kept).
-  3. FACE. The HY Farmer has no face decal and no painted features: skin, but no eyes or mouth. Two dark oval eyes
-     with a white highlight and a small mouth are added as tiny closed shells on the face surface (found by rays from
-     the front), weighted fully to the head, in Hero, LOD0 and LOD1 (fewer segments on the lower levels).
+     (and, with the Crimson rim, red) line. It is recentred on the grip along its own axis (shape and length kept: a 0.72
+     shortening squashed the crook), and the shaft is recoloured light wood at the same relative values (its code-8 team accents are kept).
+  3. FACE. Checked, not changed: the first run (GitHub 43610826584) rendered her face; eyes, brows and mouth are painted
+     in the vertex colour on Hero and LOD0 (dark brown, which is why a near-black colour scan missed them). The face
+     shell code stays behind ADD_FACE = False for a model that has none.
 
 Writes <out>/Farmer.fbx (same objects, names, bones and export recipe as the class FBX), renders of the head and
 the whole body before and after, and <out>/fix_farmer_report.json. Usage: blender -b --python fix_farmer_look.py --
@@ -34,7 +34,8 @@ WOOD = (0xA8 / 255, 0x76 / 255, 0x45 / 255)
 EYE = (0x24 / 255, 0x17 / 255, 0x12 / 255)
 SHINE = (1.0, 1.0, 1.0)
 MOUTH = (0x6E / 255, 0x2C / 255, 0x2A / 255)
-STAFF_SCALE = 0.72
+STAFF_SCALE = 1.0      # run 43610826584: 0.72 squashed the crook into a whip shape; recentre only
+ADD_FACE = False       # run 43610826584: the HY Farmer HAS a face painted in vertex colour (eyes, brows, mouth)
 
 
 def log(*a):
@@ -263,7 +264,7 @@ for name, ob in meshes.items():
                           axis=[round(float(x), 3) for x in ax])
     me.update()
     # 3: face shells (not on the shadow proxy)
-    if name != "Farmer_Shadow":
+    if ADD_FACE and name != "Farmer_Shadow":
         segs, rings = {"Farmer_Hero": (12, 8), "Farmer_LOD0": (8, 6), "Farmer_LOD1": (6, 4)}.get(name, (6, 4))
         t, bmt = bvh_of(ob)
         bm = bmesh.new()
