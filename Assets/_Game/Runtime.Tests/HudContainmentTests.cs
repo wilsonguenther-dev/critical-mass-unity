@@ -50,7 +50,7 @@ namespace CriticalMass.Runtime.Tests
             yield return new Spec("kit skill name", ui, UiScale.TypeSmall, 12, 154f, 26f, "HEALING WINGS");
             yield return new Spec("kit skill note", ui, UiScale.TypeMin, 11, 154f, 20f, "GO TO THE EGG");
             yield return new Spec("kit key chip", ui, 14, 9, 68f, 30f, "RIGHT CLICK", 2);
-            yield return new Spec("kit bank line", ui, UiScale.TypeMin, 11, HudZones.KitW - 36f, 28f, "TEAM BANK 199  LADDER 1, BRIDGE 2");
+            yield return new Spec("kit bank line", ui, UiScale.TypeMin, 11, HudZones.KitW - 36f, 28f, "TEAM WOOD 199  LADDER 1, BRIDGE 2");
             yield return new Spec("ping line", ui, UiScale.TypeSmall, 12, 488f, HudZones.PingLineH, "Demolitions: Too many pings: wait 6 s");
             // automated-run plate
             yield return new Spec("automated-run plate", ui, UiScale.TypeSmall, 13, plate.width - 24f, plate.height - 12f,

@@ -472,7 +472,9 @@ namespace CriticalMass.Runtime.View.Affordance
                 Ghost(w, id, p, plan == 0, dx, dz);
                 int kind = plan == 0 ? BuiltPieces.LastPlanKind : 0;
                 p.Verb = kind == BuiltPieces.Ladder ? "BUILD LADDER" : kind == BuiltPieces.Bridge ? "BUILD BRIDGE" : "BUILD";
-                p.Count = (int)Math.Floor(Math.Max(0, BuiltPieces.Bank(w, a.Team)));
+                // first-minutes-1 (walk 1 #6): no count here. The team wood number (BuilderBank.Whole) is shown on the TEAM WOOD
+                // line and the class card; "BUILD BRIDGE (2)" read as a price and was a fourth wood count.
+                p.Count = -1;
                 if (a.StandUp > 0) Refuse(p, AffWords.GettingUp);
                 else if (why != 0) Refuse(p, BuilderWhy(why));
                 else if (a.AbilityCd > 0) { Refuse(p, AffWords.Wait); p.WaitSeconds = a.AbilityCd; }
