@@ -223,6 +223,9 @@ def kk_back_dir(act, f0, f1):
     return acc.normalized() if acc.length > 1e-6 else None
 
 
+ZPRE, PL, KUP = {}, {}, {}
+
+
 def bake_action(clip, act):
     assign(kk, act)
     f0, f1 = int(act.frame_range[0]), int(act.frame_range[1])
@@ -265,12 +268,21 @@ def bake_action(clip, act):
             elif not planted:
                 anchor[s] = None
             z = sole_z(s, A, R)
+            ZPRE[s], PL[s], KUP[s] = z, planted, K["A" + s].z - K0["A" + s].z
             if planted:
                 A.z -= z
             elif z < 0:
                 A.z -= z
             contact[s].append(bool(planted))
             targets[s], rots[s] = A, R
+        # Double support: both planted soles pinned to z 0 tied the two ankles (gap 0.000), and the game's facing read
+        # (SanityRig.TryFront: the foot with the lower ankle) then took the trailing foot, toes 112 degrees off in
+        # StrafeR at the loop seam, "turned around" (Warrior, 2 of 20 frames; KayKit 0). The foot whose KayKit ankle is
+        # higher keeps its own sole height (never below ground), as on KayKit.
+        if PL["l"] and PL["r"]:
+            hi = max(SIDES, key=lambda q: KUP[q])
+            if ZPRE[hi] > 0:
+                targets[hi].z += ZPRE[hi]
         sep = abs(targets["l"].x - targets["r"].x)
         MIN_SEP[clip] = min(MIN_SEP.get(clip, 9.0), sep)
         lowered_frame = 0.0
