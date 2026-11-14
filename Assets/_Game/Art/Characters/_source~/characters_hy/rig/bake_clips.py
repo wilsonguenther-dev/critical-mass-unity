@@ -325,15 +325,17 @@ if TIP_CLEAR:
         rest(fa)
         _M = fa.matrix_world @ faP["handslot.r"].matrix
         _p = wco[np.array(_hs)]
-        _far = _p[np.argmin(_p[:, 2])]          # the lowest prop vertex at rest = the tip that hangs down
-        TIP_LOCAL = _M.inverted() @ Vector(_far.tolist())
-        log("tip clearance on", len(_hs), "prop vertices, tip at rest", [round(v, 3) for v in _far])
+        _Mi = np.array(_M.inverted())
+        TIP_LOCAL = _p @ _Mi[:3, :3].T + _Mi[:3, 3]   # every prop vertex in the slot's frame; the lowest one is checked
+        log("tip clearance on", len(_hs), "prop vertices")
     else:
         log("tip clearance: no prop on handslot.r (", len(_hs), "vertices)")
 
 
 def tip_world():
-    return (fa.matrix_world @ faP["handslot.r"].matrix) @ TIP_LOCAL
+    M = np.array(fa.matrix_world @ faP["handslot.r"].matrix)
+    p = TIP_LOCAL @ M[:3, :3].T + M[:3, 3]
+    return Vector(p[np.argmin(p[:, 2])].tolist())
 
 
 def clear_tip(clip):
