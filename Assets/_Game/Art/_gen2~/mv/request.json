@@ -4,70 +4,78 @@
 "char": "builder",
 "seed": 1234,
 "octree": 320,
-"views": "front,left,back"
+"views": "front,left,back",
+"rev": 3
 },
 {
 "char": "healer",
 "seed": 1234,
 "octree": 320,
-"views": "front,left,back"
+"views": "front,left,back",
+"rev": 3
 },
 {
 "char": "demolitions",
 "seed": 1234,
 "octree": 320,
-"views": "front,left,back"
+"views": "front,left,back",
+"rev": 3
 },
 {
 "char": "kaiju_hatchling",
 "seed": 1234,
 "octree": 320,
-"views": "front,left,back"
+"views": "front,left,back",
+"rev": 3
 },
 {
 "char": "kaiju_adult",
 "seed": 1234,
 "octree": 320,
-"views": "front,left,back"
+"views": "front,left,back",
+"rev": 3
 },
 {
 "char": "farmer",
 "seed": 1234,
 "octree": 320,
-"views": "front,left,back"
+"views": "front,left,back",
+"rev": 3
 },
 {
 "char": "miner",
 "seed": 1234,
 "octree": 320,
-"views": "front,left,back"
+"views": "front,left,back",
+"rev": 3
 },
 {
 "char": "warrior",
 "seed": 1234,
 "octree": 320,
-"views": "front,left,back"
+"views": "front,left,back",
+"rev": 3
 },
 {
 "char": "builder",
 "seed": 77,
 "octree": 320,
-"views": "front,left,back"
+"views": "front,left,back",
+"rev": 3
 },
 {
 "char": "healer",
 "seed": 77,
 "octree": 320,
-"views": "front,left,back"
+"views": "front,left,back",
+"rev": 3
 },
 {
 "char": "demolitions",
 "seed": 77,
 "octree": 320,
-"views": "front,left,back"
+"views": "front,left,back",
+"rev": 3
 }
-],
-"rev": [
-2
 ]
 }
