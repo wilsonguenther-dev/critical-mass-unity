@@ -113,7 +113,7 @@ namespace CriticalMass.Runtime.Hud.Ui
             t.gameObject.SetActive(true);
             t.fontSize = _fontSize;
             HudText.Set(t, s);
-            float w = Mathf.Ceil(t.preferredWidth) + 4f;
+            float w = Mathf.Ceil(ContainedText.NaturalWidth(t)) + 4f;
             t.rectTransform.sizeDelta = new Vector2(w, Mathf.Max(_glyphH, _fontSize * 1.4f));
             Push(t.rectTransform, 6f);
             if (_plain.Length > 0) _plain.Append(' ');

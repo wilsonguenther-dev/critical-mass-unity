@@ -104,7 +104,9 @@ namespace CriticalMass.Runtime.Tests
                     // Integration batch 5: keycap letters are glyph art sized from the glyph's height (InputGlyphView.CapScale),
                     // not menu lines (the Home fighter's ENTER CUSTOMISE chip is the first screen to build one in this test).
                     if (t.GetComponentInParent<InputGlyphView>(true) != null) continue;
-                    int size = t.resizeTextForBestFit ? t.resizeTextMaxSize : t.fontSize;
+                    // hud-containment-1: a contained label is built at its top size and may shrink under the one rule
+                    CriticalMass.Runtime.Hud.Ui.ContainedText ct = CriticalMass.Runtime.Hud.Ui.ContainedText.Of(t);
+                    int size = ct != null ? ct.MaxSize : t.resizeTextForBestFit ? t.resizeTextMaxSize : t.fontSize;
                     if (s.TextScale != null && Mathf.Abs(s.TextScale.Applied - 1f) > 1e-3f) continue;
                     CollectionAssert.Contains(UiScale.TypeSteps, size, $"{name}: {Path(t.transform)} is {size} px, off the type scale");
                 }
@@ -409,8 +411,9 @@ namespace CriticalMass.Runtime.Tests
                 {
                     // The key-hint glyph strip is built on first show and sized by PromptStrip itself.
                     if (string.IsNullOrEmpty(t.text) || Path(t.transform).Contains("Hint Prompts")) continue;
-                    Assert.IsTrue(t.resizeTextForBestFit, $"{name}: {Path(t.transform)} must best-fit inside its box at 130 %");
-                    Assert.AreEqual(VerticalWrapMode.Truncate, t.verticalOverflow, $"{name}: {Path(t.transform)} is bounded");
+                    // hud-containment-1: every label lives under the one text rule (TextFit) instead of Unity's best fit
+                    Assert.IsNotNull(CriticalMass.Runtime.Hud.Ui.ContainedText.Of(t), $"{name}: {Path(t.transform)} must be contained at 130 %");
+                    Assert.IsTrue(CriticalMass.Runtime.Hud.Ui.TextFit.Contained(t), $"{name}: {Path(t.transform)} '{t.text}' stays inside its box at 130 %");
                 }
                 s.TextScale.Apply(1f);
             });

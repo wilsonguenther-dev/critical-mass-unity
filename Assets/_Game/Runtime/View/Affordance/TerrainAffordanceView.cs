@@ -788,10 +788,10 @@ namespace CriticalMass.Runtime.View.Affordance
                 _label.fontSize = UiScale.TypeBody;
                 _label.horizontalOverflow = HorizontalWrapMode.Overflow;
                 _label.text = _prompt;
-                float pw = _label.preferredWidth;
+                float pw = ContainedText.NaturalWidth(_label);
                 _detail.text = detail;
                 _promptDetail = detail;
-                float dw = detail.Length > 0 ? _detail.preferredWidth : 0f;
+                float dw = detail.Length > 0 ? ContainedText.NaturalWidth(_detail) : 0f;
                 float sc0 = _canvas.scaleFactor > 0 ? _canvas.scaleFactor : 1f;
                 float safeW = Mathf.Max(MinPillW, _canvas.pixelRect.width / sc0 - 2f * HudLayout.Margin);
                 float lines = b.Length > 0 ? 2f : 1f;

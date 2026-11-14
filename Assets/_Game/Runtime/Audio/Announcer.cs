@@ -593,7 +593,7 @@ namespace CriticalMass.Runtime.Audio
                 // hud-containment-1: the box grows to the words up to the bottom band's width, then the line wraps to two,
                 // shrinks to 16 px and ends with an ellipsis (ContainedText); centred, it never reaches the player card.
                 _text.fontSize = UiScale.TypeButton;
-                float w = Mathf.Clamp(_text.preferredWidth + 72f, Mathf.Min(360f, MaxWidth), MaxWidth);
+                float w = Mathf.Clamp(CriticalMass.Runtime.Hud.Ui.ContainedText.NaturalWidth(_text) + 72f, Mathf.Min(360f, MaxWidth), MaxWidth);
                 MenuUi.Place(_panel.rectTransform, (HudLayout.RefW - w) * 0.5f, SubtitleY, w, SubtitleH);
                 MenuUi.Place(_text.rectTransform, 16f, 0f, w - 32f, SubtitleH);
             }

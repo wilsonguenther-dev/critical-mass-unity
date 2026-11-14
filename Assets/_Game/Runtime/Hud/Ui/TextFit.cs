@@ -288,9 +288,36 @@ namespace CriticalMass.Runtime.Hud.Ui
             if (!_hooked) { Canvas.preWillRenderCanvases += Flush; _hooked = true; }
         }
 
+        /// <summary>While true the rule waits (a caller measuring the full words to size the box).</summary>
+        public bool Paused;
+
+        /// <summary>
+        /// The one-line width of a label's full words at its current size, ignoring any cut (for code that sizes a box to
+        /// its words: the box grows first, then the rule fits what is left). Leaves the full words on the label.
+        /// </summary>
+        public static float NaturalWidth(Text t)
+        {
+            ContainedText c = Of(t);
+            if (c == null) return t.preferredWidth;
+            string full = c._shown != null && t.text == c._shown ? c.Source : t.text;
+            c.Paused = true;
+            HorizontalWrapMode mode = t.horizontalOverflow;
+            try
+            {
+                if (t.text != full) t.text = full;
+                t.horizontalOverflow = HorizontalWrapMode.Overflow;
+                float w = t.preferredWidth;
+                t.horizontalOverflow = mode;
+                return w;
+            }
+            finally { c.Paused = false; c.Source = full; c._shown = null; if (Application.isPlaying) c.MarkDirty(); }   // edit mode: the caller sizes the box to the full words
+        }
+
         void MarkDirty()
         {
-            if (_applying) return;
+            if (_applying || Paused) return;
+            // Edit mode (layout tests, capture tools) has no canvas render loop: apply at once so reads see the rule's result.
+            if (!Application.isPlaying) { ApplyNow(); return; }
             if (!Dirty.Contains(this)) Dirty.Add(this);
         }
 
