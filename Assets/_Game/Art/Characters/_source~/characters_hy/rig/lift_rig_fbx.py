@@ -3,9 +3,10 @@
 legs are longer once straightened, which fails ArtImportTests.IsTheBibleHeightWithItsFeetOnTheGround (0.10 limit).
 Moving mesh and skeleton together keeps the skin binding exact; the per-class clip bake (bake_clips.py) then measures
 the new rest soles and grounds every clip from there. Edits: every mesh's Vertices y += D (mesh nodes are at the root
-with identity transforms, checked), the root armature node's Lcl Translation y += D, every Cluster TransformLink
+with identity transforms, checked), the root bone's (hips) Lcl Translation y += D (its local Y is the file's up, as its
+rest value 0.406 equals its bind link), every Cluster TransformLink
 translation y += D with Transform = inverse(TransformLink) (checked equal before), every bind-pose PoseNode matrix of a
-bone or the armature node translated by D. Nodes, names, normals, UVs, colours and weights stay as they were.
+bone translated by D. Nodes, names, normals, UVs, colours and weights stay as they were.
 Usage: python3 lift_rig_fbx.py <in.fbx> <out.fbx> <D>
 """
 import sys, os, struct, json, collections
@@ -32,17 +33,20 @@ def main(src, dst, d):
             typ, mid = val(k.props[2]), val(k.props[0])
             if typ == "Mesh":
                 assert parent.get(mid) == 0, "mesh not at the root"
-            if typ in ("LimbNode", "Null"):
+            if typ == "LimbNode":
                 moved_nodes.add(mid)
-            if typ == "Null" and parent.get(mid) == 0:
+            # the root BONE (hips) carries the lift; moving the armature node instead lifts twice in Blender's importer,
+            # which builds bone rests from the cluster links under the armature object (GitHub Blender run 43612974373)
+            pid = parent.get(mid)
+            if typ == "LimbNode" and pid in byid and val(byid[pid].props[2]) == "Null":
                 p70 = child(k, "Properties70")
                 lt = next((q for q in p70.kids if val(q.props[0]) == "Lcl Translation"), None)
                 if lt is None:   # Blender writes no entry for a zero translation: add one (FBX 7.x Properties70 P record)
                     S = lambda t: b"S" + struct.pack("<I", len(t)) + t.encode()
                     lt = Node("P", [S("Lcl Translation"), S("Lcl Translation"), S(""), S("A"),
                                     b"D" + struct.pack("<d", 0.0), b"D" + struct.pack("<d", 0.0), b"D" + struct.pack("<d", 0.0)], [], False)
-                    p70.kids.append(lt); rep["armature_lcl_added"] += 1
-                y = val(lt.props[5]); lt.props[5] = b"D" + struct.pack("<d", y + d); rep["armature_lcl"] += 1
+                    p70.kids.append(lt); rep["root_bone_lcl_added"] += 1
+                y = val(lt.props[5]); lt.props[5] = b"D" + struct.pack("<d", y + d); rep["root_bone_lcl"] += 1
         elif k.name == "Geometry" and val(k.props[2]) == "Mesh":
             vn = child(k, "Vertices"); V = val(vn.props[0]).reshape(-1, 3); V[:, 1] += d
             vn.props[0] = enc_array("d", V.reshape(-1)); rep["meshes"] += 1
