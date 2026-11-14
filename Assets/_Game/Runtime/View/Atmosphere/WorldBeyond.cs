@@ -23,19 +23,23 @@ namespace CriticalMass.Runtime.View.Atmosphere
         /// <summary>Horizon silhouettes all the way round, 70 to 150 u out on the cloud sea, so the low ground camera never
         /// looks at an empty horizon (the gameplay camera never sees them).</summary>
         public readonly int Horizon;
+        /// <summary>World horizon 1: share (percent) of the play island's rim edges that get a drooping grass fringe (every
+        /// third of them also a hanging rock), for the low camera; the eye-level landmarks (0 none, 1 coarse, 2 full).</summary>
+        public readonly int RimFringePercent, Landmarks;
 
-        public WorldBeyondBudget(int segments, int nearIslets, int farIslets, int rootsPerIslet, int rimRootPercent, bool massifs, bool trees, bool underCrystals, bool ink, int horizon = 0)
+        public WorldBeyondBudget(int segments, int nearIslets, int farIslets, int rootsPerIslet, int rimRootPercent, bool massifs, bool trees, bool underCrystals, bool ink, int horizon = 0, int rimFringePercent = 0, int landmarks = 0)
         {
             Horizon = horizon;
+            RimFringePercent = rimFringePercent; Landmarks = landmarks;
             Segments = segments; NearIslets = nearIslets; FarIslets = farIslets; RootsPerIslet = rootsPerIslet; RimRootPercent = rimRootPercent;
             Massifs = massifs; Trees = trees; UnderCrystals = underCrystals; Ink = ink;
         }
 
         public static WorldBeyondBudget For(int level)
         {
-            if (level <= FramePolicy.LevelLow) return new WorldBeyondBudget(6, 0, 0, 0, 0, false, false, false, false, 6);
-            if (level == FramePolicy.LevelMedium) return new WorldBeyondBudget(8, 6, 8, 2, 18, false, true, false, true, 10);
-            return new WorldBeyondBudget(10, 10, 18, 4, 40, true, true, true, true, 16);
+            if (level <= FramePolicy.LevelLow) return new WorldBeyondBudget(6, 0, 0, 0, 0, false, false, false, false, 6, 0, 1);
+            if (level == FramePolicy.LevelMedium) return new WorldBeyondBudget(8, 6, 8, 2, 18, false, true, false, true, 10, 15, 2);
+            return new WorldBeyondBudget(10, 10, 18, 4, 40, true, true, true, true, 16, 30, 2);
         }
 
         /// <summary>Draw calls: the fill, plus the ink line when on.</summary>
@@ -325,6 +329,25 @@ namespace CriticalMass.Runtime.View.Atmosphere
             }
             Tube(path, radius, radius * 0.25f, WorldBeyondLayout.R(ref s) < 0.5f ? Wood : WoodDark, 3, 2f, 0f, 1f);
             return path[4];
+        }
+
+        /// <summary>A drooping grass fringe over a rim edge p0..p1 (world horizon 1): three teeth hanging out and down over
+        /// the lip, the tips sway a few centimetres. Flat, double-sided (the shader draws both faces), three triangles.</summary>
+        public void Fringe(Vector3 p0, Vector3 p1, Vector3 outward, float len, uint seed)
+        {
+            uint s = seed | 1u;
+            Vector3 o = outward.normalized;
+            Vector3 n = (o + Vector3.up).normalized;
+            for (int k = 0; k < 3; k++)
+            {
+                Vector3 a = Vector3.Lerp(p0, p1, k / 3f) + o * 0.04f + Vector3.up * 0.03f;
+                Vector3 b = Vector3.Lerp(p0, p1, (k + 1) / 3f) + o * 0.04f + Vector3.up * 0.03f;
+                float l = len * (0.7f + 0.6f * WorldBeyondLayout.R(ref s));
+                Vector3 tip = (a + b) * 0.5f + o * (l * 0.45f) + Vector3.down * l;
+                Color col = k == 1 ? Grass : GrassDark;
+                int ia = Add(a, n, col), ib = Add(b, n, col), it = Add(tip, o, col, 0f, 0.35f);
+                Tri(ia, it, ib);
+            }
         }
 
         /// <summary>Two stacked cones on a short trunk: a round toon tree seen from far.</summary>
@@ -623,6 +646,82 @@ namespace CriticalMass.Runtime.View.Atmosphere
                 m.Team = 0f;
             }
 
+            // ---------------- eye-level landmarks (world horizon 1): one tall shape per direction ----------------
+            // For the third- and first-person cameras: from the hill and from each base something rises above eye level in
+            // every direction and tells the player which way they face. West, behind Azure: the Shield Spire, the
+            // Shieldholds' great tower under a teal roof with the shield disc facing the arena. East, behind Crimson: the
+            // Cinder Crown, a ring of basalt columns with ember tips, tallest on the arena side. North, past the shrine: the
+            // Falls Spire, a rock column whose spring falls off its top into the cloud sea. South: the Shard, sky-glass grown
+            // into a spire that glows at night. All proposals of the world note. 55 to 60 u past the map, so the top-down
+            // camera never frames them (it sees about 16 u past an edge); the distance haze sets them back (about 40 to 50 %).
+            if (b.Landmarks > 0)
+            {
+                bool full = b.Landmarks > 1;
+                int ls = full ? 8 : 6;
+                m.Band = 0.3f;
+                {
+                    m.Team = 1f;
+                    var c = new Vector3(-58f, -3.5f, -H * 0.5f);
+                    m.Islet(c, 8f, 10f, ls, 701u, full ? 2 : 0, full, BeyondMesh.Hex("#9FB98A"));
+                    m.Tower(c, 2.4f, 24f, ls, 702u, BeyondMesh.WallStone, BeyondMesh.WallCap, BeyondMesh.AzureRoof, false, BeyondMesh.AzureGlow, true);
+                    if (full) m.Tower(c + new Vector3(2.8f, 0f, 3.4f), 1.4f, 13f, 7, 703u, BeyondMesh.WallStone, BeyondMesh.WallCap, BeyondMesh.AzureRoof, false, BeyondMesh.AzureGlow, true);
+                    m.Cone(c + new Vector3(2.5f, 15f, 0f), 3.0f, 0.5f, full ? 12 : 8, BeyondMesh.WallStone, BeyondMesh.WallStone, Vector3.right);
+                    m.Cone(c + new Vector3(2.95f, 15f, 0f), 1.0f, 0.4f, 8, BeyondMesh.AzureGlow, BeyondMesh.AzureGlow, Vector3.right);
+                    f.Add(new BeyondFeature { Name = "landmark shield spire", Centre = c, Radius = 8.4f, Band = 1 });
+                    m.Team = 0f;
+                }
+                {
+                    m.Team = 2f;
+                    var c = new Vector3(W + 58f, -3.5f, -H * 0.5f + 4f);
+                    m.Islet(c, 8.5f, 10f, ls, 711u, full ? 2 : 0, false, BeyondMesh.Hex("#A9A57C"));
+                    uint cs = 712u;
+                    int cols = full ? 7 : 5;
+                    for (int k = 0; k < cols; k++)
+                    {
+                        float a = k * Mathf.PI * 2f / cols + 0.4f;
+                        Vector3 at = c + new Vector3(Mathf.Cos(a) * 3.2f, 0f, Mathf.Sin(a) * 3.2f);
+                        float h = 10f + 12f * (0.5f - 0.5f * Mathf.Cos(a)) + 2f * R(ref cs);
+                        m.Lathe(at, new[] { h, h - 0.4f, 0f }, new[] { 0.95f, 1.15f, 1.3f }, new[] { BeyondMesh.BasaltCap, BeyondMesh.Basalt, BeyondMesh.Basalt },
+                                6, 713u + (uint)k, 0.03f, true, 0f, BeyondMesh.Basalt);
+                        m.Spike(at + Vector3.up * (h + 0.05f), Vector3.up, 1.6f, 0.45f, BeyondMesh.Ember);
+                    }
+                    if (full)
+                        for (int k = 0; k < 3; k++)
+                            m.Tree(c + new Vector3(-5.2f + k * 1.2f, 0f, -3f + k * 2.6f), 2.4f, BeyondMesh.EmberLeaf, BeyondMesh.Hex("#9C4A2E"), 1f);
+                    f.Add(new BeyondFeature { Name = "landmark cinder crown", Centre = c, Radius = 8.9f, Band = 1 });
+                    m.Team = 0f;
+                }
+                {
+                    var c = new Vector3(W * 0.5f - 6f, -3f, 62f);
+                    m.Islet(c, 7.5f, 9f, ls, 721u, full ? 3 : 0, full);
+                    Vector3 col = c + new Vector3(0f, 0f, -4.8f);
+                    m.Lathe(col + Vector3.up * 20f, new[] { 0f, -0.6f, -6f, -14f, -20f }, new[] { 3.2f, 3.5f, 3.0f, 3.4f, 3.9f },
+                            new[] { BeyondMesh.Grass, BeyondMesh.GrassDark, BeyondMesh.Rock, BeyondMesh.RockBand, BeyondMesh.Rock }, ls + 1, 722u, 0.12f, true, -20.4f, BeyondMesh.RockDark);
+                    m.Box(col + new Vector3(0f, 20.05f, -0.8f), new Vector3(2.6f, 0.12f, 2.2f), 0f, BeyondMesh.Water, BeyondMesh.Water);
+                    m.Fall(col + new Vector3(0f, 19.9f, -3.9f), new Vector3(0f, 0f, -1f), Vector3.right, 1.8f, -11.5f, full ? 10 : 5);
+                    if (full)
+                    {
+                        m.Tree(col + new Vector3(-1.4f, 20f, 1.0f), 3.2f, BeyondMesh.Leaf, BeyondMesh.LeafDark);
+                        m.Tree(col + new Vector3(1.6f, 20f, 0.6f), 2.4f, BeyondMesh.Leaf, BeyondMesh.LeafDark);
+                    }
+                    f.Add(new BeyondFeature { Name = "landmark falls spire", Centre = c, Radius = 10.2f, Band = 1 });
+                }
+                {
+                    var c = new Vector3(W * 0.5f + 8f, -3f, -H - 58f);
+                    m.Islet(c, 7f, 9f, ls, 731u, full ? 2 : 0, true);
+                    m.Spike(c + new Vector3(0f, -0.4f, 0f), new Vector3(0.05f, 1f, 0.08f), 22f, 1.7f, BeyondMesh.SkyGlass);
+                    m.Spike(c + new Vector3(2.6f, -0.2f, 1.0f), new Vector3(0.32f, 1f, 0.12f), 13f, 1.05f, BeyondMesh.SkyGlass);
+                    m.Spike(c + new Vector3(-2.3f, -0.2f, -1.1f), new Vector3(-0.36f, 1f, -0.18f), 10f, 0.9f, BeyondMesh.SkyGlass);
+                    if (full)
+                    {
+                        m.Spike(c + new Vector3(0.6f, -0.2f, 2.8f), new Vector3(0.1f, 1f, 0.42f), 7f, 0.65f, BeyondMesh.SkyGlass);
+                        m.Spike(c + new Vector3(-1.2f, -0.2f, 2.2f), new Vector3(-0.2f, 1f, 0.3f), 5f, 0.5f, BeyondMesh.SkyGlass);
+                    }
+                    f.Add(new BeyondFeature { Name = "landmark shard spire", Centre = c, Radius = 7.4f, Band = 1 });
+                }
+                m.Band = 0f;
+            }
+
             // ---------------- the horizon ring (band 1): low flat silhouettes on the cloud sea all the way round ----------------
             // For the ground camera (1.3 u pivot, 3 u behind a fighter, any yaw, 600 u far clip): wherever it looks, the horizon
             // has land on it, deep in the haze (the shader's distance fade) so nothing reads sharp or pops. Own seed, so the
@@ -666,6 +765,32 @@ namespace CriticalMass.Runtime.View.Atmosphere
                 }
                 f.Add(new BeyondFeature { Name = "rim roots x" + placed, Centre = new Vector3(W * 0.5f, -1.5f, -H * 0.5f), Radius = 0f, Band = 3 });
             }
+            // World horizon 1: grass drooping over the lip and, on every third such edge, a rock hanging under it. Only a
+            // low camera at an edge sees them; from the top-down camera they are a thin fringe along the cliff tops.
+            if (rim != null && b.RimFringePercent > 0)
+            {
+                int tufts = 0;
+                for (int i = 0; i < rim.Count; i++)
+                {
+                    WorldEdge e = rim[i];
+                    if (e.Bridge) continue;
+                    uint h = (uint)(i * 2246822519u) ^ 0x85EBCA6Bu;
+                    if ((int)(R(ref h) * 100f) >= b.RimFringePercent) continue;
+                    var n = new Vector3((float)e.Nx, 0f, (float)-e.Nz);
+                    if (n.sqrMagnitude < 1e-6f) continue;
+                    n.Normalize();
+                    var p0 = new Vector3((float)e.Px, (float)e.H, (float)-e.Pz);
+                    var p1 = new Vector3((float)e.Qx, (float)e.H, (float)-e.Qz);
+                    m.Fringe(p0, p1, n, 0.22f + 0.18f * R(ref h), h);
+                    if (tufts % 3 == 0)
+                    {
+                        Vector3 at = Vector3.Lerp(p0, p1, 0.3f + 0.4f * R(ref h)) + n * 0.12f + Vector3.down * (0.5f + 0.4f * R(ref h));
+                        m.Spike(at, new Vector3(n.x * 0.15f, -1f, n.z * 0.15f), 0.9f + 1.3f * R(ref h), 0.22f, R(ref h) < 0.5f ? BeyondMesh.RockBand : BeyondMesh.RockDark);
+                    }
+                    tufts++;
+                }
+                f.Add(new BeyondFeature { Name = "rim fringe x" + tufts, Centre = new Vector3(W * 0.5f, -0.5f, -H * 0.5f), Radius = 0f, Band = 3 });
+            }
             // Drips also from the near islets' roots: their tips are not tracked one by one; a few points under the landmarks.
             if (rootTips != null && !low)
                 foreach (BeyondFeature x in f)
@@ -701,13 +826,17 @@ namespace CriticalMass.Runtime.View.Atmosphere
         CriticalMass.Sim.Core.World _builtWorld, _waitWorld;
         int _builtLevel = -1, _waitFrames;
         GameObject _root;
-        Mesh _mesh;
-        Material _mat;
+        Mesh _mesh, _hMesh;
+        Material _mat, _hMat;
+        static readonly int CentreId = Shader.PropertyToID("_Centre");
 
         public int Triangles { get; private set; }
         public int Draws { get; private set; }
         public int Features { get; private set; }
         public int Builds { get; private set; }
+        /// <summary>World horizon 1: the eye-level sky and far silhouettes (one draw, no texture); 0 when it could not load.</summary>
+        public int HorizonTriangles { get; private set; }
+        public int HorizonDraws { get; private set; }
         public IReadOnlyList<BeyondFeature> LastFeatures => _features;
         readonly List<BeyondFeature> _features = new List<BeyondFeature>();
 
@@ -722,6 +851,7 @@ namespace CriticalMass.Runtime.View.Atmosphere
         {
             Clear();
             if (_mat != null) Destroy(_mat);
+            if (_hMat != null) Destroy(_hMat);
         }
 
         void LateUpdate()
@@ -744,6 +874,8 @@ namespace CriticalMass.Runtime.View.Atmosphere
         {
             if (_mesh != null) Destroy(_mesh);
             _mesh = null;
+            if (_hMesh != null) Destroy(_hMesh);
+            _hMesh = null;
             if (_root != null) Destroy(_root);
             _root = null;
         }
@@ -780,7 +912,43 @@ namespace CriticalMass.Runtime.View.Atmosphere
             r.allowOcclusionWhenDynamic = false;
             Triangles = m.Tris * (b.Ink ? 2 : 1);
             Draws = b.Draws;
+            BuildHorizon(level, w.Map.Width, w.Map.Height);
             _root.SetActive(Shown);
+        }
+
+        /// <summary>
+        /// World horizon 1: the sky, the cloud sea and the far silhouettes for eye-level cameras, ONE mesh and ONE draw on
+        /// CM/WorldHorizon, a child of the world-beyond root (hidden with it). The shader places it around the camera and
+        /// collapses it for the top-down, minimap and close-up cameras, so they pay one empty draw call and no pixels.
+        /// No shadows, no probes, no collider, no texture, nothing per frame on the CPU.
+        /// </summary>
+        void BuildHorizon(int level, float mapW, float mapH)
+        {
+            HorizonTriangles = 0;
+            HorizonDraws = 0;
+            if (_hMat == null)
+            {
+                Shader sh = Resources.Load<Shader>("CMWorldHorizon");
+                if (sh == null) sh = Shader.Find("CM/WorldHorizon");
+                if (sh == null) return;
+                _hMat = new Material(sh) { name = "World Horizon" };
+            }
+            _hMat.SetVector(CentreId, new Vector4(mapW * 0.5f, 0f, -mapH * 0.5f, 0f));
+            var hm = new HorizonMesh();
+            WorldHorizonLayout.Build(hm, WorldHorizonBudget.For(level));
+            _hMesh = WorldHorizonLayout.ToMesh(hm);
+            var go = new GameObject("World Horizon");
+            go.transform.SetParent(_root.transform, false);
+            go.AddComponent<MeshFilter>().sharedMesh = _hMesh;
+            var r = go.AddComponent<MeshRenderer>();
+            r.sharedMaterial = _hMat;
+            r.shadowCastingMode = ShadowCastingMode.Off;
+            r.receiveShadows = false;
+            r.lightProbeUsage = LightProbeUsage.Off;
+            r.reflectionProbeUsage = ReflectionProbeUsage.Off;
+            r.allowOcclusionWhenDynamic = false;
+            HorizonTriangles = hm.Tris;
+            HorizonDraws = WorldHorizonBudget.Draws;
         }
 
         public static Mesh ToMesh(BeyondMesh m)
