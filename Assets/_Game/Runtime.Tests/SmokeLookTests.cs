@@ -86,6 +86,36 @@ namespace CriticalMass.Runtime.Tests
             Assert.LessOrEqual(newVerts, oldVerts);
         }
 
+        /// <summary>polish-5 (candidate-2 sheets): the Full knock-out stain is dark red and about one fighter's footprint;
+        /// the knock-out poof is small and low at the feet and short; the TNT scorch is a third smaller, warm grey-brown at
+        /// about 60% and fades out within a few seconds.</summary>
+        [Test]
+        public void KnockOutStainPoofAndScorchReadRightAndStaySmall()
+        {
+            foreach (UnityEngine.Color32 c in new[] { FxScene.PoolLight, FxScene.PoolMid, FxScene.PoolDark })
+            {
+                Assert.Greater(c.r, 2 * c.g, $"{c} reads red, not black or brown");
+                Assert.Greater(c.r, 2 * c.b, $"{c} reads red");
+                Assert.Less(c.r, 200, $"{c} is a dark blood red, far from the bright Crimson team hue");
+            }
+            float reach = FxScene.KnockOutPoolSize * FxScene.KnockOutPoolReach;
+            Assert.LessOrEqual(2f * reach, 1.25f, "about one fighter's footprint across at Full");
+            Assert.Less(GoreGate.SizeScale(GoreLevel.Reduced), 1f, "smaller at Reduced");
+
+            Assert.LessOrEqual(FxScene.PopPuffSize, 0.25f);
+            Assert.LessOrEqual(FxScene.PopPuffHeight, 0.2f, "at the feet, below a standing fighter's body");
+            Assert.LessOrEqual(0.42 * 1.2 * FxScene.PopLifeScale, 0.36, "gone in about 0.3 s");
+
+            Assert.LessOrEqual(FxScene.ScorchSizeK, 0.95f * 0.67f + 1e-4f, "a third smaller than before");
+            Assert.LessOrEqual(FxScene.ScorchAlpha, 0.6f + 1e-6f);
+            Assert.LessOrEqual(FxScene.ScorchLife, 6.0, "fades out within a few seconds");
+            foreach (UnityEngine.Color32 c in new[] { FxScene.ScorchWarm, FxScene.ScorchWarmDeep })
+            {
+                Assert.Greater(c.r, c.b, $"{c} is warm");
+                Assert.Greater(c.r + c.g + c.b, 120, $"{c} is not near black");
+            }
+        }
+
         [Test]
         public void TheSmokeCostsNoMoreThanTheOldColumn()
         {

@@ -48,6 +48,21 @@ namespace CriticalMass.Runtime.View.Effects
         // GroundInkAlpha so the ground shows through and the marks stay quieter than the fighters.
         public static readonly Color32 GroundInkLight = new Color32(104, 104, 118, 255), GroundInkMid = new Color32(64, 66, 82, 255), GroundInkDark = new Color32(38, 42, 58, 255);
         public const float GroundInkAlpha = 0.72f;
+        /// <summary>polish-5 (candidate-2 gore sheets: the Full knock-out stain was a big near-black patch that read as oil
+        /// or scorch): the knock-out pool alone is a dark blood red, clearly red on tan stone and green grass; every other
+        /// ground mark keeps the neutral ink above. Far from the Crimson team hue (much darker).</summary>
+        public static readonly Color32 PoolLight = new Color32(150, 34, 40, 255), PoolMid = new Color32(112, 16, 26, 255), PoolDark = new Color32(76, 8, 18, 255);
+        public const float PoolAlpha = 0.82f;
+        /// <summary>polish-5: the pool's base size (was 1.25: about 3.2 u across with its lobes). Its widest reach is
+        /// KnockOutPoolReach x size, about one fighter's footprint (1.2 u across) at Full; Reduced scales it by 0.7; Off
+        /// draws none (GoreGate).</summary>
+        public const float KnockOutPoolSize = 0.45f, KnockOutPoolReach = 1.33f;
+        /// <summary>polish-5 (the knock-out poof covered the standing fighter): the poof is a few small soft puffs at the
+        /// downed fighter's feet, low and slow, gone in about 0.3 s, no navy outline.</summary>
+        public const int PopPuffs = 4;
+        public const float PopPuffSize = 0.2f, PopPuffHeight = 0.12f;
+        public const byte PuffPop = 8;
+        public const double PopLifeScale = 0.7;
         public static readonly Color32 SparkWhite = new Color32(255, 251, 236, 255), SparkYellow = new Color32(255, 214, 72, 255), SparkOrange = new Color32(255, 150, 40, 255);
         public static readonly Color32 Steel = new Color32(196, 210, 226, 255);
         public static readonly Color32 DustLight = new Color32(247, 240, 229, 255), DustMid = new Color32(214, 202, 184, 255), DustDark = new Color32(158, 146, 132, 255);
@@ -515,7 +530,7 @@ namespace CriticalMass.Runtime.View.Effects
                 if (death)
                 {
                     if (SurfaceTop(e.X, e.Z, out double py))
-                        AddDecal(t, W(e.X + e.DirX * 0.25, py, e.Z + e.DirZ * 0.25), 1.25f, 1, 6, seed, e.DirX, e.DirZ, S(1.0));
+                        AddDecal(t, W(e.X + e.DirX * 0.25, py, e.Z + e.DirZ * 0.25), KnockOutPoolSize, 1, 6, seed, e.DirX, e.DirZ, S(1.0));
                     if (GibWorthy(ref e, w)) AddGibs(t, e.X, e.Z, h, seed, e.DirX, e.DirZ);
                 }
             }
@@ -528,10 +543,10 @@ namespace CriticalMass.Runtime.View.Effects
             {
                 // The corpse pops out with a puff when CombatFx stops showing it (CorpseSeconds after the death).
                 double pop = t + CorpseSeconds;
-                Vector3 p = W(e.X, h + 0.5, e.Z);
-                for (int k = 0; k < 7; k++) AddPuff(pop, p, seed, (uint)(k + 40), 0.42f, DustLight, 0);
+                Vector3 p = W(e.X, h + PopPuffHeight, e.Z);   // polish-5: at the feet, small, low, soft and short
+                for (int k = 0; k < PopPuffs; k++) AddPuff(pop, p, seed, (uint)(k + 40), PopPuffSize, DustLight, PuffPop);
                 // GORE Off: the poof sparkles (eight warm-white stars), so a knock-out ends clean with nothing left behind.
-                if (Gore == GoreLevel.Off) for (int k = 0; k < 8; k++) AddSpark(pop, p + Vector3.up * 0.3f, 0, 0, seed, (uint)(k + 80), 1);
+                if (Gore == GoreLevel.Off) for (int k = 0; k < 8; k++) AddSpark(pop, p + Vector3.up * 0.15f, 0, 0, seed, (uint)(k + 80), 1);
             }
         }
 
@@ -610,11 +625,12 @@ namespace CriticalMass.Runtime.View.Effects
             var v = new Vector3(Mathf.Cos(a) * sp, 0.6f + R01(seed, k * 3 + 102) * 0.9f, Mathf.Sin(a) * sp);
             if (kind == 2 && (dirX != 0 || dirZ != 0)) v = W(dirX, 0, dirZ) * (1.6f + R01(seed, k + 105) * 1.4f) + v * 0.45f; // knock-back: blown along the hit
             if (kind == 3) v *= 0.5f; // plank dust: short and low
+            if (kind == PuffPop) v = new Vector3(v.x * 0.3f, 0.12f, v.z * 0.3f); // polish-5: the knock-out poof stays at the feet
             f.V = v;
             f.Size = size * (0.7f + 0.6f * R01(seed, k * 3 + 103));
             f.Col = col;
             f.Kind = kind;
-            f.Life = PuffLife * (0.8 + 0.4 * R01(seed, k + 104)) * (kind == 5 ? 2.2 : 1.0);
+            f.Life = PuffLife * (0.8 + 0.4 * R01(seed, k + 104)) * (kind == 5 ? 2.2 : kind == PuffPop ? PopLifeScale : 1.0);
         }
 
         /// <summary>kind 1 white-yellow hit spark, 2 steel block spark, 3 biomass mote, 5 ember, 6 water drop, 7 grit.</summary>
@@ -790,7 +806,8 @@ namespace CriticalMass.Runtime.View.Effects
                 float fade = 1f - t * t;
                 Color32 hi = f.Kind == 3 ? WoodLight : f.Kind == 4 ? WaterLight : f.Kind == 5 ? SmokeLight : DustLight;
                 Color32 lo = f.Kind == 3 ? WoodDark : f.Kind == 4 ? WaterMid : f.Kind == 5 ? SmokeDark : DustDark;
-                air.Blob(p, camRight, camUp, sz + 0.05f, null, 9, 0, A(Navy, fade * 0.85f));
+                if (f.Kind == PuffPop) fade *= 0.75f;   // polish-5: soft, never a hard white disc
+                else air.Blob(p, camRight, camUp, sz + 0.05f, null, 9, 0, A(Navy, fade * 0.85f));
                 air.Blob(p, camRight, camUp, sz, null, 9, 0, A(f.Col, fade));
                 air.Blob(p + (camUp - camRight) * sz * 0.25f, camRight, camUp, sz * 0.55f, null, 8, 0, A(hi, fade));
                 air.Blob(p - (camUp - camRight * 0.4f) * sz * 0.3f, camRight, camUp, sz * 0.45f, null, 8, 0, A(lo, fade * 0.8f));

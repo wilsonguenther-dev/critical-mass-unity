@@ -164,13 +164,17 @@ namespace CriticalMass.Runtime.View.Effects
                 int embers = kind == ExplosionKind.Mine ? 5 : fire ? 8 : 0;
                 for (int k = 0; k < embers; k++) AddSpark(t + S(0.04), c + up * (0.6f * R), 0, 0, seed, (uint)(k + 30), 5);
                 if (kind == ExplosionKind.Mine) for (int k = 0; k < 6; k++) AddSpark(t, c + up * 0.2f, 0, 0, seed, (uint)(k + 50), 7);
-                for (int k = 0; k < 8; k++)
+                // polish-5 (candidate-2 smoke sheet: at 0.1 s a ring of about eight separate outlined puffs sat round the TNT
+                // flash, the old "balloons" for a moment): a fire blast opens as ONE flash plus the soft expanding dust ring
+                // above (and the soft smoke puffs, born staggered, in BuildBoomAir); the outlined puff ring is for wall
+                // breaks only. Fewer puffs than before: inside the puff budget.
+                for (int k = 0; k < 8 && !fire; k++)
                 {
                     float a = (k + R01(seed, (uint)k + 70)) / 8f * Mathf.PI * 2f;
                     Vector3 p = c + new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)) * (0.6f * R) + up * 0.2f;
                     AddPuff(t + S(0.02 * (k % 3)), p, seed, (uint)(k + 70), Mathf.Min(0.5f + 0.1f * R, BlastPuffMax), kind == ExplosionKind.Mine ? DirtLight : DustMid, 1);
                 }
-                if (fire && IsGround(x, z)) AddMark(t, c, 0.95f * R, 1, seed, S(0.06), S(14.0));
+                if (fire && IsGround(x, z)) AddMark(t, c, ScorchSizeK * R, 1, seed, S(0.06), S(ScorchLife));
             }
             GibRecentDeaths(t, x, z, R * 1.3);
             RustleArea(x, z, 1.6 * R, t, seed);
@@ -192,7 +196,10 @@ namespace CriticalMass.Runtime.View.Effects
                 Vector3 c = m.P + Vector3.up * lift;
                 float s = m.Size * grow;
                 // Cracks and scorch go to the ground paint once still; corruption puddles animate, so they stay here.
-                bool still = m.Kind <= 1 && age >= m.Grow && fade >= 1f;
+                // polish-5: the TNT scorch fades over its last ScorchFadeShare of life and is never stamped into the
+                // ground paint (a stamped mark lingers for good: the bridge looked like a hole); slam cracks still stamp.
+                if (m.Kind == 1) fade = (float)Math.Min(1.0, (m.Life - age) / (m.Life * ScorchFadeShare));
+                bool still = m.Kind == 0 && age >= m.Grow && fade >= 1f;
                 int before = _markStamp[i];
                 if (PaintedAway(ref _markStamp[i], m.P, still)) continue;
                 if (before == -1 && _markStamp[i] >= 0)
@@ -239,7 +246,8 @@ namespace CriticalMass.Runtime.View.Effects
         private void DrawScorch(FxMeshBuilder g, Vector3 c, float s, float rot, uint seed, float fade)
         {
             Vector3 gr = Vector3.right, gu = Vector3.forward;
-            Color32 outer = A(ScorchOuter, fade * 0.62f), inner = A(ScorchInner, fade * 0.78f);
+            // polish-5: dark warm grey-brown at about 60% (was near-black soot up to 90%), so it reads as a burn, not a hole.
+            Color32 outer = A(ScorchWarm, fade * ScorchAlpha * 0.85f), inner = A(ScorchWarmDeep, fade * ScorchAlpha);
             for (int k = 0; k < 10; k++)
             {
                 float a = rot + k * Mathf.PI * 0.2f + (R01(seed, (uint)k + 400) - 0.5f) * 0.3f;
@@ -252,7 +260,7 @@ namespace CriticalMass.Runtime.View.Effects
             g.Blob(c, gr, gu, s, _radii, 14, rot, outer);
             Lobes(seed, 440, 12, 0.8f, 1.1f);
             g.Blob(c, gr, gu, s * 0.55f, _radii, 12, rot + 0.6f, inner);
-            g.Blob(c, gr, gu, s * 0.24f, null, 8, 0, A(ScorchInner, fade * 0.9f));
+            g.Blob(c, gr, gu, s * 0.24f, null, 8, 0, A(ScorchWarmDeep, fade * ScorchAlpha));
         }
 
         /// <summary>
@@ -340,6 +348,12 @@ namespace CriticalMass.Runtime.View.Effects
 
         /// <summary>The yellow heart as a share of the core radius at age t (pure; tests): big at the flash, shrinking first.</summary>
         public static float FireballYellowK(float t) => Mathf.Max(0f, 0.6f - 1.1f * Mathf.Max(0f, t - 0.08f));
+
+        /// <summary>polish-5: the TNT scorch: size per blast radius (was 0.95: about 4 m across with its rays), life (was 14 s,
+        /// then stamped for good), the share of life it fades over, its peak opacity and its warm grey-brown tones.</summary>
+        public const float ScorchSizeK = 0.63f, ScorchAlpha = 0.6f;
+        public const double ScorchLife = 5.0, ScorchFadeShare = 0.6;
+        public static readonly Color32 ScorchWarm = new Color32(92, 76, 64, 255), ScorchWarmDeep = new Color32(70, 56, 46, 255);
 
         /// <summary>follow-camera-4: the smoke column in the low views lives this share of its time and rises this share
         /// of its height (a flatter, shorter column that clears the fight sooner).</summary>
