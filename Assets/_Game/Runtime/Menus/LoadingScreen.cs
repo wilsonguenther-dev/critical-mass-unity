@@ -232,10 +232,15 @@ namespace CriticalMass.Runtime.Menus
         /// <summary>The WarmUp step: lets the camera draw the new world WarmUpFrames times behind the screen.</summary>
         public static IEnumerator WarmUp()
         {
-            for (int f = 1; f <= WarmUpFrames; f++)
+            // first-run-warm-1: also the first-run warm-up (whole-map render, each explosion once, audio, glyphs), bounded by
+            // FirstRunWarm.BudgetSeconds; the bar follows it.
+            Hud.Style.GlyphWarmup.WarmScene();
+            FirstRunWarm.Begin();
+            float t0 = Time.unscaledTime;
+            for (int f = 1; f <= WarmUpFrames || (!FirstRunWarm.Done && Time.unscaledTime - t0 < WarmUpWaitSeconds); f++)
             {
                 yield return null;
-                Report(LoadStep.WarmUp, (float)f / WarmUpFrames);
+                Report(LoadStep.WarmUp, Mathf.Min((float)f / WarmUpFrames, FirstRunWarm.Done ? 1f : FirstRunWarm.Progress));
             }
         }
 
@@ -506,10 +511,10 @@ namespace CriticalMass.Runtime.Menus
                     if (_finish) break;
                     _warmFrames++;
                     // perf/fullscreen-cost-1: draw the HUD's letters into the font textures behind the screen, not in the match.
-                    if (_warmFrames == 1) Hud.Style.GlyphWarmup.WarmScene();
-                    Report(LoadStep.WarmUp, Mathf.Min((float)_warmFrames / WarmUpFrames, ShaderWarmup.Done ? 1f : 0.95f));
-                    // perf-smooth-1: also wait for the shipped shader/PSO warm-up (bounded: never more than WarmUpWaitSeconds).
-                    if (_warmFrames >= WarmUpFrames && (ShaderWarmup.Done || Time.unscaledTime - _stepStart > WarmUpWaitSeconds)) Finish();
+                    if (_warmFrames == 1) { Hud.Style.GlyphWarmup.WarmScene(); FirstRunWarm.Begin(); }   // first-run-warm-1
+                    Report(LoadStep.WarmUp, Mathf.Min(Mathf.Min((float)_warmFrames / WarmUpFrames, ShaderWarmup.Done ? 1f : 0.95f), FirstRunWarm.Done ? 1f : FirstRunWarm.Progress));
+                    // perf-smooth-1: also wait for the shipped shader/PSO warm-up and the first-run warm-up (bounded: never more than WarmUpWaitSeconds).
+                    if (_warmFrames >= WarmUpFrames && ((ShaderWarmup.Done && FirstRunWarm.Done) || Time.unscaledTime - _stepStart > WarmUpWaitSeconds)) Finish();
                     break;
             }
         }

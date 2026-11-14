@@ -24,6 +24,9 @@ namespace CriticalMass.Runtime.Game
         /// <summary>perf-smooth-1: behind an opaque loading screen nothing is drawn that a hitch could spoil: warm faster.</summary>
         public const int PerFrameLoading = 32;
 
+        /// <summary>first-run-warm-1: the -traceStates trace while it runs (FirstRunWarm's counter reads it), else null.</summary>
+        public static GraphicsStateCollection ActiveTrace { get; private set; }
+
         /// <summary>true once the shipped collection for this API is fully warmed (or there is none).</summary>
         public static bool Done { get; private set; }
 
@@ -58,6 +61,7 @@ namespace CriticalMass.Runtime.Game
                     _trace = new GraphicsStateCollection();
                     _trace.BeginTrace();
                     _tracing = true;
+                    ActiveTrace = _trace;
                     Application.quitting += SaveTrace;
                     Debug.Log("[CM.Warmup] tracing shader variants and graphics states for " + SystemInfo.graphicsDeviceType);
                 }
@@ -82,6 +86,7 @@ namespace CriticalMass.Runtime.Game
             try
             {
                 _trace.EndTrace();
+                ActiveTrace = null;
                 string dir = Path.Combine(GamePaths.DataDir, "traces");
                 Directory.CreateDirectory(dir);
                 string path = Path.Combine(dir, FileFor(SystemInfo.graphicsDeviceType));
