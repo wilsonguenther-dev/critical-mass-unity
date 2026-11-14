@@ -484,7 +484,11 @@ namespace CriticalMass.Runtime.Hud.Interact
             if (_mask != null) _area.anchoredPosition = Vector2.zero;
             ScaleMarkers(1f);
             RawImage img = _area.GetComponent<RawImage>();
-            if (img != null && _hud != null) img.texture = Ui.MinimapGeometry.Texture(_hud.MapTier);
+            if (img != null && _hud != null)
+            {
+                Texture2D tex = Ui.MinimapGeometry.Texture(_hud.MapTier);   // polish-3: null while still baking; keep what is shown
+                if (tex != null) img.texture = tex;
+            }
             _zoomTex = null;
         }
 

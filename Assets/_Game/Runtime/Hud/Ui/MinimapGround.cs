@@ -37,21 +37,84 @@ namespace CriticalMass.Runtime.Hud.Ui
 
         /// <summary>
         /// The minimap image at a tier for the heading on screen: the baked Resources image at the baked heading, otherwise
-        /// baked here once per tier with the same MinimapBake the editor uses (cached; a one-off cost the first time a tier
-        /// is drawn).
+        /// baked here once per tier with the same MinimapBake the editor uses (cached).
+        /// polish-3 (boot timing: "hud minimap" took 959 of the 973 ms HUD build, boot to title 8.8 s): the creator heading
+        /// (135) is not the baked heading (45), so every boot ran the full 3x3-supersampled bake on the main thread. The bake
+        /// is pure C# (no Unity calls; MapDef, Color maths), so it now runs on a worker thread, started at HUD build and
+        /// finished long before the first match; this returns null until it is ready (callers keep the image hidden and
+        /// ask again next frame), then turns the pixels into a texture once on the main thread (SetPixels32 + one Apply).
+        /// Same pixels as before, so the minimap looks the same in the match. <see cref="TextureNow"/> waits for it.
         /// </summary>
-        public static UnityEngine.Texture2D Texture(int tier)
+        public static UnityEngine.Texture2D Texture(int tier) => Get(tier, false);
+
+        /// <summary>The minimap image at a tier, baking on this thread if needed (tools and tests).</summary>
+        public static UnityEngine.Texture2D TextureNow(int tier) => Get(tier, true);
+
+        /// <summary>A worker bake in flight: the heading and tier it is for, and its pixels when done.</summary>
+        sealed class Pending
+        {
+            public double Yaw;
+            public int Tier, W, H;
+            public Color32[] Px;
+            public Exception Error;
+            public bool Queued;
+            public volatile bool Done;
+        }
+        static readonly System.Collections.Generic.Dictionary<int, Pending> _pending = new System.Collections.Generic.Dictionary<int, Pending>();
+
+        static UnityEngine.Texture2D Get(int tier, bool wait)
         {
             double y = CriticalMass.Runtime.Camera.CameraHeading.Active;
             if (Math.Abs(y - BakedYaw) < 1e-6) return UnityEngine.Resources.Load<UnityEngine.Texture2D>("UI/Minimap/minimap@" + tier + "x");
-            if (y != _texYaw) { _runtime.Clear(); _texYaw = y; }
+            if (y != _texYaw) { _runtime.Clear(); _pending.Clear(); _texYaw = y; }
             if (_runtime.TryGetValue(tier, out UnityEngine.Texture2D t) && t != null) return t;
-            var bake = new MinimapBake(BakedMap, y);
-            Color32[] px = bake.Render(tier, out int w, out int h);
-            t = MinimapBake.ToTexture(px, w, h);
+            if (!_pending.TryGetValue(tier, out Pending job))
+            {
+                job = new Pending { Yaw = y, Tier = tier };
+                _pending[tier] = job;
+                if (!wait)
+                {
+                    MapDef map = BakedMap;   // built here, on the main thread, before the worker reads it
+                    Pending j = job;
+                    try
+                    {
+                        System.Threading.ThreadPool.QueueUserWorkItem(_ => Bake(j, map));
+                        job.Queued = true;
+                    }
+                    catch (Exception e) { job.Error = e; job.Done = true; }
+                }
+            }
+            if (!job.Done)
+            {
+                if (!wait) return null;
+                if (!job.Queued) Bake(job, BakedMap);   // not started on a worker: bake here
+                else while (!job.Done) System.Threading.Thread.Sleep(1);
+            }
+            _pending.Remove(tier);
+            if (job.Px == null)
+            {
+                // the worker failed (should not happen): bake here so the minimap is never missing
+                if (job.Error != null) UnityEngine.Debug.LogWarning("[Minimap] worker bake failed, baking on the main thread: " + job.Error.Message);
+                var again = new Pending { Yaw = y, Tier = tier };
+                Bake(again, BakedMap);
+                job = again;
+                if (job.Px == null) return null;
+            }
+            t = MinimapBake.ToTexture(job.Px, job.W, job.H);
             t.name = "minimap@" + tier + "x (" + y.ToString("F0", System.Globalization.CultureInfo.InvariantCulture) + ")";
             _runtime[tier] = t;
             return t;
+        }
+
+        static void Bake(Pending job, MapDef map)
+        {
+            try
+            {
+                var bake = new MinimapBake(map, job.Yaw);
+                job.Px = bake.Render(job.Tier, out job.W, out job.H);
+            }
+            catch (Exception e) { job.Error = e; }
+            finally { job.Done = true; }
         }
 
         /// <summary>Texture tier for a canvas scale: 1x up to 1080p (drawn 1:1), 2x up to 4K, else 4x.</summary>
