@@ -371,7 +371,24 @@ try:
     back = (P[:, 1] > J['chest'].y + 0.10 * H) & (P[:, 2] > J['hips'].z) & (P[:, 2] < J['_headtop'].z)
     back &= np.abs(P[:, 0]) < max(abs(J['upperarm.l'].x), abs(J['upperarm.r'].x)) + 0.05 * H
     W[back] = 0; W[back, bi['chest']] = 1; locked |= back
-    REP['rigid'] = {'head_top': int(rig_head.sum()), 'back_pack': int(back.sum())}
+    # arm weights only near the arm: an A-pose hand hangs beside the belt (the Builder's rope coil, pouches), and the
+    # proxy heat let the arm carry them. Arm-chain weight on a vertex farther than ARM_R from its arm's bone chain goes to
+    # the torso and legs it already had (or the hips).
+    ARM_R = 0.075 * H
+    moved_arm = 0
+    for s in SIDES:
+        cols = [bi[n] for n in (f'upperarm.{s}', f'lowerarm.{s}', f'wrist.{s}', f'hand.{s}') if n in bi]
+        cols += [bi[n] for n in DEF if n.endswith('.' + s) and n.split('_0')[0] in FING]
+        pts = [J[f'upperarm.{s}'], J[f'lowerarm.{s}'], J[f'wrist.{s}'], J[f'hand.{s}'], handtip[s]]
+        d = np.min([seg_dist(P, pts[i], pts[i + 1])[0] for i in range(4)], axis=0)
+        far = (d > ARM_R) & (W[:, cols].sum(1) > 0) & ~locked
+        if far.any():
+            W[np.ix_(far, cols)] = 0
+            empty = W[far].sum(1) < 1e-6
+            idx = np.nonzero(far)[0][empty]
+            W[idx, bi['hips']] = 1
+            moved_arm += int(far.sum())
+    REP['rigid'] = {'head_top': int(rig_head.sum()), 'back_pack': int(back.sum()), 'off_arm_vertices_reweighted': moved_arm}
     label = np.full(nv, -1)
     cut_faces = 0
     if FINGERS:
