@@ -340,10 +340,12 @@ namespace CriticalMass.Runtime.View.Effects
             }
         }
 
+        private bool _splatRed;   // set by DrawSplat for its Dot calls (cand5-reds-1)
+
         private void Dot(FxMeshBuilder g, Vector3 p, Vector3 gr, Vector3 gu, float r, float fade)
         {
-            g.Blob(p, gr, gu, r + 0.025f, null, 7, 0, A(Navy, fade * 0.55f));
-            g.Blob(p, gr, gu, r, null, 7, 0, A(GroundInkMid, fade * GroundInkAlpha));
+            g.Blob(p, gr, gu, r + 0.025f, null, 7, 0, _splatRed ? A(PoolDark, fade * 0.6f) : A(Navy, fade * 0.55f));
+            g.Blob(p, gr, gu, r, null, 7, 0, _splatRed ? A(PoolMid, fade * PoolAlpha) : A(GroundInkMid, fade * GroundInkAlpha));
         }
 
         /// <summary>
@@ -359,9 +361,11 @@ namespace CriticalMass.Runtime.View.Effects
             uint sd = d.Seed;
             // Neutral ground ink (world around arena 1), never a team hue.
             Color32 navy = A(Navy, fade * 0.55f), mid = A(GroundInkMid, fade * GroundInkAlpha), dark = A(GroundInkDark, fade * GroundInkAlpha), light = A(GroundInkLight, fade * GroundInkAlpha);
-            if (d.Shape == 6)
+            _splatRed = SplatIsPoolRed(d.Kind, d.Shape);
+            if (_splatRed)
             {
                 // polish-5: the knock-out pool is dark blood red (see PoolMid); its rim a darker red, not navy.
+                // cand5-reds-1: the knock-out drop splats (kind KindPoolRed) too, in the ground and in the stamp.
                 navy = A(PoolDark, fade * 0.6f);
                 mid = A(PoolMid, fade * PoolAlpha);
                 dark = A(PoolDark, fade * PoolAlpha);

@@ -59,12 +59,18 @@ namespace CriticalMass.Runtime.View.Effects
         public const float KnockOutPoolSize = 0.45f, KnockOutPoolReach = 1.33f;
         /// <summary>polish-5 (the knock-out poof covered the standing fighter): the poof is a few small soft puffs at the
         /// downed fighter's feet, low and slow, gone in about 0.3 s, no navy outline.</summary>
-        /// <summary>cand5-reds-1: a knock-out's 14 big drops fly but leave no splat where they land. They used to land as
-        /// splats up to 0.68 u across in dark ground ink, strung 2 to 6 u along the hit, and were stamped into the ground
-        /// paint: the wide grey-brown smear beside the pop (sheet-gore-5b38dff, row knockout-pop). The knock-out's only
-        /// stain is now its pool (shape 6): about one footprint at Full, none at Reduced or Off (GoreGate: no ground
-        /// build-up below Full). Ordinary hit drops still splat.</summary>
-        public static bool LandsAsSplat(bool knockOutDrop) => !knockOutDrop;
+        /// <summary>cand5-reds-1: a knock-out's 14 big drops used to land as splats of size 0.43 to 0.68 in the dark
+        /// grey-brown ground ink, strung 2 to 6 u along the hit, and were stamped into the ground paint in that ink: the
+        /// grey-brown smear beside the pop (sheet-gore-5b38dff, row knockout-pop). At Full they still land (nothing is taken
+        /// out of Full) but in the pool's dark blood red (kind KindPoolRed, stamped red too) and capped at
+        /// KnockOutDropSplatMax. Below Full they leave no ground stain (GoreGate: no ground build-up below Full).</summary>
+        public static bool LandsAsSplat(bool knockOutDrop, GoreLevel gore) => !knockOutDrop || gore == GoreLevel.Full;
+
+        /// <summary>Decal kind drawn (and stamped) in the pool's dark blood red: the pool and the knock-out drop splats.</summary>
+        public const byte KindPoolRed = 1;
+        public const float KnockOutDropSplatMax = 0.35f, KnockOutDropSplatK = 1.8f;
+        public static float KnockOutDropSplatSize(float dropSize) => Mathf.Min(dropSize * KnockOutDropSplatK, KnockOutDropSplatMax);
+        public static bool SplatIsPoolRed(byte kind, byte shape) => shape == 6 || kind == KindPoolRed;
 
         public const int PopPuffs = 4;
         public const float PopPuffSize = 0.2f, PopPuffHeight = 0.12f;
@@ -673,7 +679,7 @@ namespace CriticalMass.Runtime.View.Effects
                 ref Droplet d = ref _drops[i];
                 if (d.Landed || now < d.Born + d.TLand) continue;
                 d.Landed = true;
-                if (!LandsAsSplat(d.Pool)) continue;
+                if (!LandsAsSplat(d.Pool, Gore)) continue;
                 Vector3 p = d.P0 + d.V * d.TLand;
                 double sx = p.x, sz = -p.z;
                 if (!SurfaceTop(sx, sz, out double top)) continue;
@@ -681,7 +687,9 @@ namespace CriticalMass.Runtime.View.Effects
                 uint seed = Hash((uint)i, (uint)(d.Born * 1000), 3u);
                 // Six splat shapes for flying drops; the pool shape (6) is the knock-out's own.
                 byte shape = (byte)(Hash(seed, 5u, 9u) % 6u);
-                AddDecal(d.Born + d.TLand, p, d.Size * (d.Pool ? 3.6f : 3.0f), 0, shape, seed, d.DirX, d.DirZ, S(0.05));
+                // cand5-reds-1: a knock-out drop lands as a small splat in the pool's dark blood red (kind KindPoolRed), capped.
+                if (d.Pool) AddDecal(d.Born + d.TLand, p, KnockOutDropSplatSize(d.Size), KindPoolRed, shape, seed, d.DirX, d.DirZ, S(0.05));
+                else AddDecal(d.Born + d.TLand, p, d.Size * 3.0f, 0, shape, seed, d.DirX, d.DirZ, S(0.05));
             }
             AdvanceSolids(now);
         }
