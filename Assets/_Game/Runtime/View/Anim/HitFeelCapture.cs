@@ -28,7 +28,10 @@ namespace CriticalMass.Runtime.View.Anim
         public const int Frames = 10, FrameW = 480, FrameH = 360;
         public const float GameDistance = 7f, SideDistance = 5.5f, SideHeight = 0.35f;
         float _sideSign = 1f, _sideLift;   // fix/hit-feel-5: which side the side camera stands on (world z sign) and its lift
-        int _failed;   // fix/hit-feel-6: classes whose pair was not drawn where staged or whose tip gap was not measured
+        int _failed;
+        public const float ChestHeight = 1.2f, CamGroundClear = 0.5f, FrameCentre = 0.6f;
+        Vector3 _sideCamPos;
+        Quaternion _sideCamRot = Quaternion.identity;   // fix/hit-feel-6: classes whose pair was not drawn where staged or whose tip gap was not measured
         const double MaxGap = 2.0, MaxDrawnOff = 0.5;
         static readonly ClassId[] Classes = { ClassId.Warrior, ClassId.Farmer, ClassId.Miner, ClassId.Demolitions, ClassId.Builder, ClassId.Healer };
 
@@ -199,8 +202,13 @@ namespace CriticalMass.Runtime.View.Anim
                 yield return new WaitForEndOfFrame();
                 if (DrawnAtPair(views0, w, n, out _, quiet: true)) break;
             }
-            if (!DrawnAtPair(views0, w, n, out Vector3 drawnMid)) { _failed++; }
-            else focus = new Vector3(drawnMid.x, focus.y, drawnMid.z);
+            bool drawnOk = DrawnAtPair(views0, w, n, out Vector3 drawnMid);
+            if (!drawnOk) _failed++;
+            // fix/hit-feel-7: frame from the LIVE pair: its drawn midpoint at fighter chest height (the drawn ground can sit
+            // above the sim's GroundHeight: the camera then stood under the island and saw its underside and the void).
+            Vector3 feet = drawnOk ? drawnMid : SimSpace.ToWorld(fx0, g0, z);
+            focus = new Vector3(feet.x, feet.y + ChestHeight, feet.z);
+            if (!PlaceSideCamera(w, n, focus, feet, fx0, z)) _failed++;
 
             double hp0 = w.Actors[_dummy].Hp, hz = w.Config.SimHz;
             _frame.Attack = true;
@@ -247,6 +255,7 @@ namespace CriticalMass.Runtime.View.Anim
                 }
                 Step(1);
             }
+            SwingTable(views, w, n, cls);
             Write(side, Prefix + n + "-side.png");
             Write(game, Prefix + n + "-game.png");
             Destroy(side);
@@ -279,6 +288,10 @@ namespace CriticalMass.Runtime.View.Anim
             double cover = reach + HitFeel.MaxViewOffset + HitPose.LeanGain(HitPose.MaxStrikeLeanDeg, lever > 0 ? lever : 0.5);
             double range = LightWeaponView.Range(w.Config, cls);
             HitTier tier = r.Tier;
+            Log(n + ": tip gap verdict " + ((surface - tipAhead) <= 0.15 ? "OK (within 0.15 u or overlapping)" : "OVER 0.15 u") + ", striking end " +
+                (views != null && views.AnimatorOf(0) != null ? views.AnimatorOf(0).StrikingEnd + ", view contact " +
+                views.AnimatorOf(0).ViewContactNow.ToString("0.000") + " s (fact " +
+                views.AnimatorOf(0).FactContact.ToString("0.000") + " s)" : "?"));
             Log(n + ": tip gap to surface " + (surface - tipAhead).ToString("0.00") + " u (tip " + tipAhead.ToString("0.00") +
                 " u ahead of the sim position, surface " + surface.ToString("0.00") + " u; tip from " + tipSrc + "); contact tip reach " +
                 reach.ToString("0.00") + (HitFeel.MeasuredReach[ci] > 0 ? " u measured" : " u ESTIMATE (not measured)") +
@@ -288,6 +301,100 @@ namespace CriticalMass.Runtime.View.Anim
                 "; reaction recoil " + HitPose.RecoilDeg(tier).ToString("0") + " deg, head snap " + HitPose.HeadSnapDeg(tier).ToString("0") +
                 " deg, squash " + (HitPose.SquashMax * 100).ToString("0") + "% for " + (HitPose.SquashSeconds * 1000).ToString("0") +
                 " ms; side camera on the " + (_sideSign > 0 ? "-z" : "+z") + " side, lift " + _sideLift.ToString("0.00") + " u");
+        }
+
+        /// <summary>
+        /// fix/hit-feel-7: the side camera for this class, from the live pair: SideDistance off the pair on the open side
+        /// (PickSide), at chest height plus SideHeight, and at least CamGroundClear above the drawn ground at its own spot
+        /// (the sim ground there plus the pair's drawn-minus-sim offset). Logs "side cam pos/fwd/mid" and fails the class
+        /// loudly unless the pair's midpoint projects inside the central FrameCentre of the frame.
+        /// </summary>
+        bool PlaceSideCamera(World w, string n, Vector3 focus, Vector3 feet, double simX, double simZ)
+        {
+            Vector3 pos = focus + new Vector3(0f, SideHeight, -SideDistance * _sideSign);
+            double offset = feet.y - GroundHeight.At(w.Map, simX, simZ);
+            float groundAtCam = (float)(GroundHeight.At(w.Map, pos.x, -pos.z) + offset);
+            if (pos.y < groundAtCam + CamGroundClear) pos.y = groundAtCam + CamGroundClear;
+            _sideCamPos = pos;
+            _sideCamRot = Quaternion.LookRotation(focus - pos, Vector3.up);
+            Vector3 vp = new Vector3(float.NaN, float.NaN, float.NaN);
+            UnityEngine.Camera cam = UnityEngine.Camera.main;
+            if (cam != null)
+            {
+                Transform t = cam.transform;
+                Vector3 p0 = t.position;
+                Quaternion r0 = t.rotation;
+                float near = cam.nearClipPlane, far = cam.farClipPlane, fov = cam.fieldOfView;
+                bool ortho = cam.orthographic;
+                float aspect = cam.aspect;
+                try
+                {
+                    t.position = _sideCamPos;
+                    t.rotation = _sideCamRot;
+                    cam.orthographic = false;
+                    cam.fieldOfView = 40f;
+                    cam.nearClipPlane = 0.1f;
+                    cam.farClipPlane = 200f;
+                    cam.aspect = (float)FrameW / FrameH;
+                    vp = cam.WorldToViewportPoint(focus);
+                }
+                finally
+                {
+                    t.position = p0;
+                    t.rotation = r0;
+                    cam.orthographic = ortho;
+                    cam.fieldOfView = fov;
+                    cam.nearClipPlane = near;
+                    cam.farClipPlane = far;
+                    cam.aspect = aspect;
+                }
+            }
+            Vector3 fwd = _sideCamRot * Vector3.forward;
+            float m = (1f - FrameCentre) * 0.5f;
+            bool inside = vp.z > 0f && vp.x >= m && vp.x <= 1f - m && vp.y >= m && vp.y <= 1f - m;
+            Log(n + ": side cam pos " + pos.ToString("F2") + " fwd " + fwd.ToString("F2") + " mid " + focus.ToString("F2") +
+                " (drawn ground at the pair " + feet.y.ToString("0.00") + ", sim ground offset " + offset.ToString("0.00") +
+                ", ground at the camera " + groundAtCam.ToString("0.00") + "), pair at viewport " + vp.x.ToString("0.00") + ", " +
+                vp.y.ToString("0.00") + (inside ? ": inside the central 60%" : ""));
+            if (!inside) Log(n + ": FAILED: the side camera does not have the pair in the central 60% of its frame");
+            return inside;
+        }
+
+        /// <summary>
+        /// fix/hit-feel-7: the striking weapon end's forward distance (along the line to the dummy, from the attacker's
+        /// drawn root) through the whole attack clip, 25 samples, with the fact-table contact (C) and the view contact the
+        /// damage tick shows (V) marked. Runs after the strips (it poses the live model by hand).
+        /// </summary>
+        void SwingTable(ActorViews views, World w, string n, ClassId cls)
+        {
+            ModelView mv = views != null ? views.ModelOf(0) : null;
+            ActorAnimator anim = views != null ? views.AnimatorOf(0) : null;
+            if (mv == null || anim == null || anim.TipHand == null) { Log(n + ": swing table: no measured tip"); return; }
+            string clip = AttackTiming.AttackClip(mv, cls);
+            float len = clip != null ? mv.ClipLength(clip) : 0f;
+            if (len <= 0f) { Log(n + ": swing table: no attack clip"); return; }
+            double fact = ClipFacts.Contact(clip, len * 0.5f), view = anim.ViewContact(clip, fact);
+            Vector3 dir = SimSpace.ToWorld(w.X[_dummy] - w.X[0], 0, w.Z[_dummy] - w.Z[0]);
+            dir.y = 0f;
+            dir.Normalize();
+            var sb = new System.Text.StringBuilder();
+            sb.Append(n).Append(": swing table (clip ").Append(clip).Append(", striking end ").Append(anim.StrikingEnd)
+              .Append(", C contact ").Append(fact.ToString("0.000")).Append(" s, V view contact ").Append(view.ToString("0.000")).Append(" s):");
+            double bestF = double.NegativeInfinity, bestT = 0;
+            const int samples = 24;
+            for (int k = 0; k <= samples; k++)
+            {
+                double t = len * k / samples;
+                mv.BeginPose();
+                mv.Pose(clip, t, 1f, false);
+                if (!mv.Evaluate(true)) break;
+                double f = Vector3.Dot(anim.TipHand.TransformPoint(anim.TipLocalNow) - mv.Transform.position, dir);
+                if (f > bestF) { bestF = f; bestT = t; }
+                bool atC = Math.Abs(t - fact) <= len / samples * 0.5, atV = Math.Abs(t - view) <= len / samples * 0.5;
+                sb.Append(' ').Append(t.ToString("0.00")).Append(atC ? "C" : "").Append(atV ? "V" : "").Append('=').Append(f.ToString("0.00"));
+            }
+            sb.Append("; furthest forward ").Append(bestF.ToString("0.00")).Append(" u at ").Append(bestT.ToString("0.000")).Append(" s");
+            Log(sb.ToString());
         }
 
         /// <summary>
@@ -399,8 +506,8 @@ namespace CriticalMass.Runtime.View.Anim
                 if (sideView)
                 {
                     // Across the swing (the swing runs along world +x): a level camera on the -z side.
-                    t.position = focus + new Vector3(0f, SideHeight + _sideLift, -SideDistance * _sideSign);
-                    t.rotation = Quaternion.LookRotation(focus - t.position, Vector3.up);
+                    t.position = _sideCamPos;   // fix/hit-feel-7: placed and checked per class by PlaceSideCamera
+                    t.rotation = _sideCamRot;
                     cam.orthographic = false;
                     cam.fieldOfView = 40f;
                     cam.nearClipPlane = 0.1f;
