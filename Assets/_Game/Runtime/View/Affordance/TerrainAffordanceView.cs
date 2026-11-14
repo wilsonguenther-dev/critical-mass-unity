@@ -46,7 +46,7 @@ namespace CriticalMass.Runtime.View.Affordance
         public const int MarkerCapCrowd = 40, MarkerCapAll = AffordanceScan.MaxMarkers;
         public const string ShaderResource = "Affordance/CMAffordance";
         public const string ShowAction = "ShowTerrain";
-        public const int LocalActor = HudBinder.LocalActor;
+        public static int LocalActor => HudBinder.LocalActor;   // online-rooms-2: was const
         /// <summary>Marker opacity at rest (out of reach) and in reach.</summary>
         public const float QuietAlpha = 0.26f, ReachAlpha = 0.78f;
         /// <summary>Ground lift of markers (under the unit rings at 0.075 u, over the floor).</summary>

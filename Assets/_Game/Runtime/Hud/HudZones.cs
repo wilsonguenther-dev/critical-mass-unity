@@ -29,6 +29,8 @@ namespace CriticalMass.Runtime.Hud
         PlayerCard,
         /// <summary>Bottom-right minimap (bible p15 cluster 04).</summary>
         Minimap,
+        /// <summary>online-rooms-2: top-left, under the automated-run plate and left of the centre lane: online chat (online matches only).</summary>
+        Chat,
     }
 
     /// <summary>Who wins a shared zone when two things want it in the same frame. Higher value wins.</summary>
@@ -229,6 +231,14 @@ namespace CriticalMass.Runtime.Hud
         /// player card (it was a 1240 px strip over the player card, the subtitles and the minimap).</summary>
         public static Rect AutomationPlate => new Rect(M, 8f, HudLayout.RefRect(HudCluster.Match).x - M - ColumnGap, 92f);
 
+        /// <summary>
+        /// online-rooms-2: the online chat lane: the last ChatLines lines plus the typing line, top-left between the
+        /// automated-run plate (above), the centre callout lane (right) and the mascot's column (below).
+        /// </summary>
+        public const int ChatLines = 5;
+        public const float ChatLineH = 32f, ChatInputH = 38f;
+        public static Rect Chat => new Rect(M, AutomationPlate.yMax + 8f, Callout.x - M - 20f, ChatLines * ChatLineH + 6f + ChatInputH);
+
         /// <summary>A named HUD piece for the collision test: its rect (reference px, top-left origin) and its lane.</summary>
         public struct Piece
         {
@@ -270,6 +280,7 @@ namespace CriticalMass.Runtime.Hud
                 new Piece("interact prompt", Prompt, HudZone.Lower, true),
                 new Piece("terrain prompt pill lane", PromptLane, HudZone.Lower, true),
                 new Piece("hit recap (under the death recap)", Mechanics.MechanicsHud.RecapRect, HudZone.Callout, false),
+                new Piece("online chat (5 lines + typing line)", Chat, HudZone.Chat, false),
             };
         }
 

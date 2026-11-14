@@ -18,7 +18,7 @@ if [[ -z "$NUNIT" ]]; then NUNIT="$(ls "$HOME"/critical-mass-unity/Library/Packa
 DEFINES="$(sed -n '/scriptingDefineSymbols:/,/^  [a-zA-Z]/{s/^ *Standalone: *//p;}' "$ROOT/ProjectSettings/ProjectSettings.asset" | head -1 | tr -d '\r')"
 OUT="$(mktemp -d "${TMPDIR:-/tmp}/cm-sim-tests.XXXXXX")"; trap 'rm -rf "$OUT"' EXIT
 cp "$NUNIT" "$OUT/"
-find "$ROOT/Assets/_Game/Sim" "$ROOT/Assets/_Game/Sim.Tests" -name '*.cs' -not -path '*~/*' > "$OUT/files.txt"
+find "$ROOT/Assets/_Game/Sim" "$ROOT/Assets/_Game/Net" "$ROOT/Assets/_Game/Sim.Tests" -name '*.cs' -not -path '*~/*' > "$OUT/files.txt"
 "$S/NetCoreRuntime/dotnet" "$S/DotNetSdkRoslyn/csc.dll" -nologo -nostdlib -noconfig -langversion:9 -nowarn:1591,0618 \
   "-define:UNITY_INCLUDE_TESTS;${DEFINES}" -r:"$API/mscorlib.dll" -r:"$API/System.dll" -r:"$API/System.Core.dll" \
   -r:"$API/Facades/netstandard.dll" -r:"$API/Facades/System.Runtime.dll" -r:"$OUT/nunit.framework.dll" \

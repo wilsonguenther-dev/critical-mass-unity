@@ -477,7 +477,7 @@ namespace CriticalMass.Runtime.Input
             mx = 0;
             mz = 0;
             World w = _world;
-            bool human = w != null && w.ActorCount > 0 && w.Actors[0].Alive;
+            bool human = w != null && w.ActorCount > 0 && w.Actors[LocalSeat.Actor].Alive;
             if (_moveRight != 0 || _moveUp != 0)
             {
                 Basis(out double rx, out double rz, out double ux, out double uz);
@@ -492,7 +492,7 @@ namespace CriticalMass.Runtime.Input
                 }
                 // One direction key alone (never two keys, never the stick): follow the lane it points along.
                 bool singleKey = _moveFromKeys && (_moveRight != 0) != (_moveUp != 0);
-                if (human && MovementAssist && singleKey && MoveAssist.LaneSteer(w.X[0], w.Z[0], mx, mz, out double lx, out double lz))
+                if (human && MovementAssist && singleKey && MoveAssist.LaneSteer(w.X[LocalSeat.Actor], w.Z[LocalSeat.Actor], mx, mz, out double lx, out double lz))
                 {
                     double m = Math.Sqrt(mx * mx + mz * mz);
                     mx = lx * m;
@@ -501,13 +501,13 @@ namespace CriticalMass.Runtime.Input
             }
             else if (human && _walkHeld && _hasWalkTarget)
             {
-                if (!MoveAssist.PointerMove(w.X[0], w.Z[0], _walkX, _walkZ, out mx, out mz)) return;
+                if (!MoveAssist.PointerMove(w.X[LocalSeat.Actor], w.Z[LocalSeat.Actor], _walkX, _walkZ, out mx, out mz)) return;
             }
             else return;
             // Creator acceptance (bridge travel): on and around a bridge the sim's own rail rule (Collide.RailFirst, DG-02)
             // carries a body walking up to 60 degrees off the axis; the input layer's corner slide must not turn the move
             // away from the span there first (the creator's "fighting the keys" on diagonal bridges).
-            if (human && MovementAssist && !NearBridge(w.X[0], w.Z[0]) && MoveAssist.CornerSlide(w, 0, mx, mz, out double sx, out double sz))
+            if (human && MovementAssist && !NearBridge(w.X[LocalSeat.Actor], w.Z[LocalSeat.Actor]) && MoveAssist.CornerSlide(w, LocalSeat.Actor, mx, mz, out double sx, out double sz))
             {
                 mx = sx;
                 mz = sz;

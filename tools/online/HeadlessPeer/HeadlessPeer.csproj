@@ -1,0 +1,19 @@
+<!-- online-rooms-2: the online peer with no Unity and no screen (CriticalMass.Sim plus CriticalMass.Net plus Program.cs).
+     Build: dotnet build tools/online/HeadlessPeer -c Release. Run and flags: see tools/online/README.md.
+     Runs on any machine or GitHub runner with a .NET 8 SDK. -->
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <RollForward>Major</RollForward>
+    <AssemblyName>cm-online-peer</AssemblyName>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../ci/Net/Net.csproj" />
+    <ProjectReference Include="../../ci/Sim/Sim.csproj" />
+  </ItemGroup>
+</Project>

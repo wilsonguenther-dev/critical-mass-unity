@@ -154,7 +154,7 @@ namespace CriticalMass.Runtime.Spectator
             bool tool = HumanControlGuard.ToolWorld(Driver);
             bool spectating = SpectatorMode.IsSpectating;
             bool paused = Input != null && Input.State.Paused;
-            bool alive = w.Actors[0].Alive;
+            bool alive = w.Actors[LocalSeat.Actor].Alive;
 
             // Spawn and respawn: a new world, or actor 0 back on its feet.
             if (w.Epoch != _epoch)
@@ -354,7 +354,7 @@ namespace CriticalMass.Runtime.Spectator
 
         void BuildIntro(World w)
         {
-            Actor a = w.Actors[0];
+            Actor a = w.Actors[LocalSeat.Actor];
             HudText.Set(_introTitle, "YOU ARE THE " + SpectatorOverlay.ActorName(a.Team, a.Cls));
             _introTitle.color = CMTokens.TeamInk(a.Team);
             BuildIntroPrompt(ControlBindings.ActiveDevice);
@@ -389,8 +389,8 @@ namespace CriticalMass.Runtime.Spectator
             UnityEngine.Camera cam = _canvas.worldCamera != null ? _canvas.worldCamera : UnityEngine.Camera.main;
             if (cam == null) return;
             double a = Driver.Alpha;
-            double x = w.PrevX[0] + (w.X[0] - w.PrevX[0]) * a;
-            double z = w.PrevZ[0] + (w.Z[0] - w.PrevZ[0]) * a;
+            double x = w.PrevX[LocalSeat.Actor] + (w.X[LocalSeat.Actor] - w.PrevX[LocalSeat.Actor]) * a;
+            double z = w.PrevZ[LocalSeat.Actor] + (w.Z[LocalSeat.Actor] - w.PrevZ[LocalSeat.Actor]) * a;
             double y = GroundHeight.At(w.Map, x, z) + MarkerHeight;
             Vector3 sp = cam.WorldToScreenPoint(SimSpace.ToWorld(x, y, z));
             if (sp.z <= 0f)

@@ -3,6 +3,7 @@
     "rootNamespace": "CriticalMass.Runtime",
     "references": [
         "CriticalMass.Sim",
+        "CriticalMass.Net",
         "Unity.InputSystem",
         "Unity.Cinemachine",
         "Unity.RenderPipelines.Universal.Runtime",

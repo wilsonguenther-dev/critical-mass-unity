@@ -200,7 +200,7 @@ namespace CriticalMass.Runtime.Menu
         Actor LocalActor()
         {
             World w = _driver != null ? _driver.World : null;
-            return w != null && w.ActorCount > 0 ? w.Actors[0] : null;
+            return w != null && w.ActorCount > 0 ? w.Actors[LocalSeat.Actor] : null;
         }
 
         TeamId ShownTeam

@@ -20,7 +20,7 @@ namespace CriticalMass.Runtime.Progression
     public sealed class MatchRewardTracker : MonoBehaviour
     {
         /// <summary>The local (human) actor id; the sim puts the human at 0.</summary>
-        public const int LocalActor = 0;
+        public static int LocalActor => LocalSeat.Actor;   // online-rooms-2: was const 0
 
         /// <summary>Raised once per finished match after the profile is updated and saved.</summary>
         public static event Action<MatchRewards> RewardsReady;

@@ -277,7 +277,7 @@ namespace CriticalMass.Runtime.View
             // counts as "self" (always LOD0), so the rule holds from that angle too.
             _lodSelf = CriticalMass.Runtime.Camera.GroundView.LodActive ? CriticalMass.Runtime.Camera.GroundView.LodSelf : 0;
             if (CriticalMass.Runtime.Camera.GroundView.LodActive) _targetPos = CriticalMass.Runtime.Camera.GroundView.LodAnchor;
-            else if (w.ActorCount > 0 && w.Actors[0].Alive) _targetPos = SimSpace.ToWorld(Lerp(w.PrevX[0], w.X[0], a), 0, Lerp(w.PrevZ[0], w.Z[0], a));
+            else if (w.ActorCount > 0 && w.Actors[LocalSeat.Actor].Alive) _targetPos = SimSpace.ToWorld(Lerp(w.PrevX[LocalSeat.Actor], w.X[LocalSeat.Actor], a), 0, Lerp(w.PrevZ[LocalSeat.Actor], w.Z[LocalSeat.Actor], a));
             if (_stressHill) _targetPos = SimSpace.ToWorld(map.Hill.X, 0, map.Hill.Z);
             _lowView = CriticalMass.Runtime.Camera.GroundView.ActiveView != CriticalMass.Runtime.Camera.CameraView.TopDown;
             _lodCut = CrowdCutNow(w, map, a);

@@ -19,7 +19,7 @@ namespace CriticalMass.Runtime.View.Moments
     /// </summary>
     public sealed class MomentTriggers
     {
-        public const int LocalActor = 0;
+        public static int LocalActor => LocalSeat.Actor;   // online-rooms-2: was const 0
         /// <summary>Kills within this many sim seconds chain into a multi-kill (the announcer's window too).</summary>
         public const double MultiKillWindow = 4.0;
         public const int WildfireStreak = 5;

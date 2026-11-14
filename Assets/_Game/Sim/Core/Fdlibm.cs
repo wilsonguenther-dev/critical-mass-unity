@@ -1311,5 +1311,70 @@ namespace CriticalMass.Sim.Core
                 }
             }
         }
+            // ---- asin (fdlibm e_asin.c, as V8's ieee754::asin), online-rooms-2 ----
+        // Plain IEEE + - * / and sqrt only (all correctly rounded on x64 and arm64, never contracted to FMA by Mono or
+        // RyuJIT), so the result is the same bits on Mac arm64, Mac Intel and Windows x64. System.Math.Asin came from the
+        // platform C library (macOS libm, the Windows CRT, glibc), which are not required to agree in the last bit.
+        private static readonly double AsPio2Hi = BitConverter.Int64BitsToDouble(0x3FF921FB54442D18L);
+        private static readonly double AsPio2Lo = BitConverter.Int64BitsToDouble(0x3C91A62633145C07L);
+        private static readonly double AsPio4Hi = BitConverter.Int64BitsToDouble(0x3FE921FB54442D18L);
+        private static readonly double AsPS0 = BitConverter.Int64BitsToDouble(0x3FC5555555555555L);
+        private static readonly double AsPS1 = BitConverter.Int64BitsToDouble(unchecked((long)0xBFD4D61203EB6F7DUL));
+        private static readonly double AsPS2 = BitConverter.Int64BitsToDouble(0x3FC9C1550E884455L);
+        private static readonly double AsPS3 = BitConverter.Int64BitsToDouble(unchecked((long)0xBFA48228B5688F3BUL));
+        private static readonly double AsPS4 = BitConverter.Int64BitsToDouble(0x3F49EFE07501B288L);
+        private static readonly double AsPS5 = BitConverter.Int64BitsToDouble(0x3F023DE10DFDF709L);
+        private static readonly double AsQS1 = BitConverter.Int64BitsToDouble(unchecked((long)0xC0033A271C8A2D4BUL));
+        private static readonly double AsQS2 = BitConverter.Int64BitsToDouble(0x40002AE59C598AC8L);
+        private static readonly double AsQS3 = BitConverter.Int64BitsToDouble(unchecked((long)0xBFE6066C1B8D0159UL));
+        private static readonly double AsQS4 = BitConverter.Int64BitsToDouble(0x3FB3B8C5B12E9282L);
+
+        public static double Asin(double x)
+        {
+            int hx = GetHighWord(x);
+            int ix = hx & 0x7fffffff;
+            double t = 0, w, p, q, c, r, s;
+            if (ix >= 0x3ff00000)
+            {
+                // |x| >= 1: +-pi/2 at exactly +-1, NaN beyond.
+                if (((ix - 0x3ff00000) | (int)GetLowWord(x)) == 0) return x * AsPio2Hi + x * AsPio2Lo;
+                return (x - x) / (x - x);
+            }
+            if (ix < 0x3fe00000)
+            {
+                // |x| < 0.5
+                if (ix < 0x3e400000)
+                {
+                    if (1e300 + x > 1.0) return x;   // |x| < 2^-27: asin(x) = x
+                }
+                else t = x * x;
+                p = t * (AsPS0 + t * (AsPS1 + t * (AsPS2 + t * (AsPS3 + t * (AsPS4 + t * AsPS5)))));
+                q = 1.0 + t * (AsQS1 + t * (AsQS2 + t * (AsQS3 + t * AsQS4)));
+                w = p / q;
+                return x + x * w;
+            }
+            // 0.5 <= |x| < 1
+            w = 1.0 - Math.Abs(x);
+            t = w * 0.5;
+            p = t * (AsPS0 + t * (AsPS1 + t * (AsPS2 + t * (AsPS3 + t * (AsPS4 + t * AsPS5)))));
+            q = 1.0 + t * (AsQS1 + t * (AsQS2 + t * (AsQS3 + t * AsQS4)));
+            s = Math.Sqrt(t);
+            if (ix >= 0x3FEF3333)
+            {
+                // |x| > 0.975
+                w = p / q;
+                t = AsPio2Hi - (2.0 * (s + s * w) - AsPio2Lo);
+            }
+            else
+            {
+                w = InsertWords(GetHighWord(s), 0u);   // s with its low word cleared
+                c = (t - w * w) / (s + w);
+                r = p / q;
+                p = 2.0 * s * r - (AsPio2Lo - 2.0 * c);
+                q = AsPio4Hi - 2.0 * w;
+                t = AsPio4Hi - (p - q);
+            }
+            return hx > 0 ? t : -t;
+        }
     }
 }
