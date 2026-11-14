@@ -41,6 +41,7 @@ while [[ $# -gt 0 ]]; do
     --camera-yaw) CAMYAW="$2"; shift 2 ;;
     --extra) EXTRA="$2"; shift 2 ;;
     --player-args) PLAYERARGS="$2"; shift 2 ;;
+    --no-autoplay) NOAUTO=1; shift ;;   # no -autoplay group (for -flowShots, which walks the real screens)
     --profile) PROFILE="${2:?}"; shift 2 ;;
     --width) W="${2:?}"; shift 2 ;;
     --height) H="${2:?}"; shift 2 ;;
@@ -77,7 +78,7 @@ rsync_to --delete "$APP" "$REMOTE_USER@$REMOTE_HOST:cm-remote/builds/$COMMIT/" \
 FPS=(); [[ "$PROFILE" == floor ]] && FPS=(--fps-cap 30)
 ARGS=(--build "builds/$COMMIT" --matches "$MATCHES" --title-seconds "$TITLE_S" --timeout "$TIMEOUT"
       --quality "$QUALITY" --width "$W" --height "$H" --keep "$KEEP" --lock-wait "$LOCK_WAIT"
-      ${SPEED:+--speed "$SPEED"} ${NOVSYNC:+--novsync} ${CAMYAW:+--camera-yaw "$CAMYAW"} ${EXTRA:+--extra "$EXTRA"} ${PLAYERARGS:+--player-args "$PLAYERARGS"} ${FPS[@]+"${FPS[@]}"})
+      ${SPEED:+--speed "$SPEED"} ${NOVSYNC:+--novsync} ${CAMYAW:+--camera-yaw "$CAMYAW"} ${EXTRA:+--extra "$EXTRA"} ${PLAYERARGS:+--player-args "$PLAYERARGS"} ${NOAUTO:+--no-autoplay} ${FPS[@]+"${FPS[@]}"})
 [[ "$MODE" == captures ]] && ARGS+=(--shots)
 [[ -n "${AFF:-}" ]] && ARGS+=(--affordance-shots)
 MAX=$((LOCK_WAIT + MATCHES * (TIMEOUT + 60) + 300))
