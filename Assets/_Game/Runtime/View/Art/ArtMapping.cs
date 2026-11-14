@@ -315,10 +315,10 @@ namespace CriticalMass.Runtime.View.Art
                 OutlinePx = CharacterHullPx, Rim = 0.6f, Authored = MinerAzure, Crimson = MinerCrimson, Height = 2.0f,
                 FaceTexture = "Assets/_Game/Art/Miner/MinerFace.png", FaceSlot = 1, ArtYawDeg = 180f },
             new ModelSpec { Key = Farmer, AssetPath = "Assets/_Game/Art/Farmer/Farmer.fbx", Kind = ArtKind.Character, Rigged = true,
-                Bones = 41, ClipSource = "Assets/_Game/Art/Characters/KayKit_Clips.fbx",
+                Bones = 41, ClipSource = "Assets/_Game/Art/Farmer/Farmer_Clips.fbx",
                 Meshes = new[] { "Farmer_Hero", "Farmer_LOD0", "Farmer_LOD1", "Farmer_Shadow" }, MaskCodes = new[] { 0, 2, 8 },
                 OutlinePx = CharacterHullPx, Rim = 0.6f, Authored = FarmerAzure, Crimson = FarmerCrimson, Height = 2.0f,
-                OutlineWeights = "Assets/_Game/Art/Farmer/Farmer_OutlineW.json", FaceTexture = "Assets/_Game/Art/Farmer/Farmer_Face.png", ArtYawDeg = 180f },
+                VertexColourFace = true, StrideScale = 0.731f, ArtYawDeg = 180f },   // rigs-2 (leg ratio 0.731, bake_clips.py): clips baked per class with foot IK (Farmer_Clips.fbx, bake_clips.py). HY (2026-11-13; legs 0.267 vs KayKit 0.374 hip to ankle); pre-HY: OutlineWeights Farmer_OutlineW.json + FaceTexture Farmer_Face.png (Farmer/_fallback~)
             // Art landing (2026-11-12): the three new classes, LOD files from art/fighter-lods d536d30 (weapons folded into
             // every level). Each body carries CM_Toon plus CM_FaceDecal on slot 1, the Miner's decal method (class READMEs).
             new ModelSpec { Key = Demolitions, AssetPath = "Assets/_Game/Art/Demolitions/Demolitions.fbx", Kind = ArtKind.Character, Rigged = true,

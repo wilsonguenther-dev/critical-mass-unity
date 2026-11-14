@@ -182,9 +182,9 @@ namespace CriticalMass.Runtime.Tests
         public const float MaxGroundError = 0.03f;
         public const float MaxClipSlide = 0.3f;
 
-        // Explicit (rigs-2, 2026-11-13): a measure, run on demand. Last run 43553165928: Warrior Walk lowest foot vertex
-        // -0.017..0.033 m (target 0.03; Idle and Run contact inside). The HY Farmer (art/characters-hy-rig-farmer) floats
-        // 0.12..0.19 m in Walk, so it is not swapped here.
+        // Explicit (rigs-2, 2026-11-13): a measure, run on demand. Run 43555799572: Farmer (baked clips) Idle -0.006..0.000,
+        // Walk lowest foot per frame -0.017..0.021 and slide 0.295, Run contact -0.011 and slide 0.043, all inside;
+        // Warrior Walk -0.017..0.033 m (target 0.03).
         [Test, Explicit("rigs-2 measure; Warrior Walk 0.033 m vs 0.03 target; see REPORT characters-hy-rig-1")]
         public void FeetStayOnTheGroundAndPlantedFeetHoldUnderTheSharedClips()
         {
@@ -211,7 +211,7 @@ namespace CriticalMass.Runtime.Tests
                     if (hero == null || hips == null || tl == null || tr == null) { bad.Add(key + ": no Hero/hips/toes"); continue; }
                     Vector3 hipsRest = hips.localPosition;
                     bool hy = key != ArtMapping.Builder;
-                    bool[] foot = FootMask(hero);
+                    bool[] foot = FootMask(hero), footL = FootMask(hero, ".l"), footR = FootMask(hero, ".r");
                     if (key == ArtMapping.Builder) { kkPelvis = BindRetarget.PelvisOf(hips); foreach (Transform t in go.GetComponentsInChildren<Transform>(true)) kkRest[t.name] = t.localRotation; }
                     Vector3 pel = BindRetarget.PelvisOf(hips);
                     BindRetarget rt = spec.RetargetToBind ? BindRetarget.Create(hero, spec.StrideScale, ArtMapping.KaykitDeformBoneNames, kkPelvis, go.transform, kkRest) : null;
@@ -219,9 +219,13 @@ namespace CriticalMass.Runtime.Tests
                     rep.Append($"{key}: rest lowest foot vertex {restLow:0.000}, hips rest {hipsRest.y:0.000}, pelvis in hips frame {pel.x:0.000},{pel.y:0.000},{pel.z:0.000}, retarget {(rt != null ? $"on (largest bone correction {rt.MaxFixDeg:0.0} deg, ground lift {rt.GroundLift:0.000})" : "off")}\n");
                     foreach (string c in new[] { ArtMapping.Idle, ArtMapping.Walk, ArtMapping.Run })
                     {
-                        AnimationClip clip = e.Clip(c);
+                        // The clip the model plays: from its ClipSource as imported (a per-class bake is read even before the
+                        // catalog is rebuilt), else the catalog's.
+                        AnimationClip clip = AssetDatabase.LoadAllAssetsAtPath(spec.ClipSource ?? spec.AssetPath).OfType<AnimationClip>()
+                            .FirstOrDefault(x => x.name == c && !x.name.StartsWith("__preview__")) ?? e.Clip(c);
                         if (clip == null) { bad.Add($"{key} {c}: no clip"); continue; }
                         const int N = 97;
+                        float[] lowL = new float[N + 1], lowR = new float[N + 1];
                         float lo = float.MaxValue, hi = float.MinValue, loR = float.MaxValue, hiR = float.MinValue;
                         var pl = new Vector3[N + 1]; var pr = new Vector3[N + 1];
                         for (int k = 0; k <= N; k++)
@@ -235,10 +239,14 @@ namespace CriticalMass.Runtime.Tests
                                 y = LowestY(go.transform, hero, foot);
                                 loR = Mathf.Min(loR, y); hiR = Mathf.Max(hiR, y);
                             }
+                            lowL[k] = LowestY(go.transform, hero, footL); lowR[k] = LowestY(go.transform, hero, footR);
                             pl[k] = go.transform.InverseTransformPoint(tl.position);
                             pr[k] = go.transform.InverseTransformPoint(tr.position);
                         }
                         float gLo = rt != null ? loR : lo, gHi = rt != null ? hiR : hi;
+                        float sink = Mathf.Min(lowL.Min(), lowR.Min());
+                        rep.Append($"  {c} per frame, left foot: {string.Join(" ", lowL.Select(x => x.ToString("0.000")))}\n  {c} per frame, right foot: {string.Join(" ", lowR.Select(x => x.ToString("0.000")))}\n");
+                        if (hy && sink < -MaxGroundError) bad.Add($"{key} {c}: a foot sinks {-sink:0.000} into the ground");
                         string line = $"  {c} ({clip.length:0.00} s): lowest foot vertex per frame, as played {gLo:0.000}..{gHi:0.000}" + (rt != null ? $" (without retarget {lo:0.000}..{hi:0.000})" : "");
                         // Idle and Walk always have a foot down: every frame's lowest foot vertex is on the ground. Run has a
                         // flight phase, so only its contact (the lowest frame) must be on the ground.
@@ -260,7 +268,7 @@ namespace CriticalMass.Runtime.Tests
             Assert.IsEmpty(bad, string.Join("\n", bad) + "\n---\n" + rep);
         }
 
-        static bool[] FootMask(SkinnedMeshRenderer r)
+        static bool[] FootMask(SkinnedMeshRenderer r, string side = "")
         {
             BoneWeight[] w = r.sharedMesh.boneWeights;
             Transform[] bones = r.bones;
@@ -268,7 +276,7 @@ namespace CriticalMass.Runtime.Tests
             for (int i = 0; i < w.Length; i++)
             {
                 Transform b = w[i].boneIndex0 >= 0 && w[i].boneIndex0 < bones.Length ? bones[w[i].boneIndex0] : null;
-                mask[i] = b != null && (b.name.StartsWith("foot.") || b.name.StartsWith("toes."));
+                mask[i] = b != null && (b.name.StartsWith("foot.") || b.name.StartsWith("toes.")) && b.name.EndsWith(side);
             }
             return mask;
         }
