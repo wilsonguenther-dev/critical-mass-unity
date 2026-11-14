@@ -21,7 +21,7 @@ namespace CriticalMass.Runtime.Game
     /// </summary>
     public sealed class CreatorGrab
     {
-        public const string Flag = "-creatorGrab";
+        public const string Flag = "-creatorgrab";   // lower case: HasAutomationFlag compares lowered args
         const int SeekLimit = 3600, PhaseFrames = 12, ShotAt = 8;
         static readonly string[] Names = { "normal-hud", "normal-clean", "wide-hud", "wide-clean" };
 
