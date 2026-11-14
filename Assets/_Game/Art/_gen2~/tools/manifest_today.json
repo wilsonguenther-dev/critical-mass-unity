@@ -1,0 +1,218 @@
+[
+{
+"label": "game_warrior",
+"path": "repo:Assets/_Game/Art/Characters/Warrior.fbx",
+"views": [
+"front",
+"tq",
+"game"
+]
+},
+{
+"label": "game_farmer",
+"path": "repo:Assets/_Game/Art/Farmer/Farmer.fbx",
+"views": [
+"front",
+"tq",
+"game"
+]
+},
+{
+"label": "game_miner",
+"path": "repo:Assets/_Game/Art/Miner/Miner.fbx",
+"views": [
+"front",
+"tq",
+"game"
+]
+},
+{
+"label": "game_demolitions",
+"path": "repo:Assets/_Game/Art/Demolitions/Demolitions.fbx",
+"views": [
+"front",
+"tq",
+"game"
+]
+},
+{
+"label": "game_builder",
+"path": "repo:Assets/_Game/Art/Builder/Builder.fbx",
+"views": [
+"front",
+"tq",
+"game"
+]
+},
+{
+"label": "game_healer",
+"path": "repo:Assets/_Game/Art/Healer/Healer.fbx",
+"views": [
+"front",
+"tq",
+"game"
+]
+},
+{
+"label": "game_kaiju_adult",
+"path": "repo:Assets/_Game/Art/Kaiju/Kaiju_Adult.fbx",
+"views": [
+"front",
+"tq",
+"game"
+]
+},
+{
+"label": "game_hatchling",
+"path": "repo:Assets/_Game/Art/Kaiju/Kaiju_Hatchling.fbx",
+"views": [
+"front",
+"tq",
+"game"
+]
+},
+{
+"label": "game_egg",
+"path": "repo:Assets/_Game/Art/Kaiju/Kaiju_Egg.fbx",
+"views": [
+"front",
+"tq",
+"game"
+]
+},
+{
+"label": "game_demo_props",
+"path": "repo:Assets/_Game/Art/Demolitions/DemolitionsProps.fbx",
+"views": [
+"front",
+"tq",
+"game"
+]
+},
+{
+"label": "game_healer_props",
+"path": "repo:Assets/_Game/Art/Healer/HealerProps.fbx",
+"views": [
+"front",
+"tq",
+"game"
+]
+},
+{
+"label": "hy_warrior",
+"path": "in:body-1-pro31-mv.glb",
+"views": [
+"front",
+"tq",
+"game"
+]
+},
+{
+"label": "hy_farmer",
+"path": "in:body-pro31-mv-f55a74d6-d26f-4e99-9561-264b5e4696a6_0.glb",
+"views": [
+"front",
+"tq",
+"game"
+]
+},
+{
+"label": "hy_miner",
+"path": "in:body-pro31-mv-86047937-ce04-4e39-9e59-b8856df24681_0.glb",
+"views": [
+"front",
+"tq",
+"game"
+]
+},
+{
+"label": "hy_kaiju",
+"path": "in:body-pro31-mv-7441c18c-d59e-4d40-ac41-5c1bdc2d4bc8_0.glb",
+"views": [
+"front",
+"tq",
+"game"
+]
+},
+{
+"label": "tr_builder",
+"path": "in:builder-body-three-quarter_200k.glb",
+"views": [
+"front",
+"tq",
+"game"
+]
+},
+{
+"label": "tr_healer",
+"path": "in:healer-body-three-quarter_200k.glb",
+"views": [
+"front",
+"tq",
+"game"
+]
+},
+{
+"label": "tr_demolitions",
+"path": "in:demolitions-body-three-quarter_200k.glb",
+"views": [
+"front",
+"tq",
+"game"
+]
+},
+{
+"label": "tr_hatchling",
+"path": "in:kaiju_hatchling-body-front_200k.glb",
+"views": [
+"front",
+"tq",
+"game"
+]
+},
+{
+"label": "hy_staff",
+"path": "in:staff-express-235da637-de7a-4154-863e-01933bb9312c_0.glb",
+"views": [
+"front",
+"tq",
+"game"
+]
+},
+{
+"label": "hy_pick",
+"path": "in:pick-hammer-express-4279b25d-619a-492c-b3f2-5b8f2c8bb2dd_0.glb",
+"views": [
+"front",
+"tq",
+"game"
+]
+},
+{
+"label": "tr_mallet",
+"path": "in:builder-mallet_200k.glb",
+"views": [
+"front",
+"tq",
+"game"
+]
+},
+{
+"label": "tr_lantern",
+"path": "in:healer-lantern_200k.glb",
+"views": [
+"front",
+"tq",
+"game"
+]
+},
+{
+"label": "tr_dynamite",
+"path": "in:demolitions-dynamite_200k.glb",
+"views": [
+"front",
+"tq",
+"game"
+]
+}
+]
