@@ -39,6 +39,18 @@ namespace CriticalMass.Runtime.Menus
         public const float WarmUpWaitSeconds = 4f;
         /// <summary>A watched boot step that never reports is completed after this (the screen never hangs).</summary>
         public const float StepTimeoutSeconds = 6f;
+        /// <summary>perf-title-start: the screen fades only after SettleFrames frames in a row of at most
+        /// SettleFrameSeconds each (the scene activation, the first draws and the build's garbage stay behind it), or
+        /// SettleWaitSeconds after Finish at the latest (a hidden or throttled window never holds the screen up).</summary>
+        public const int SettleFrames = 8;
+        public const float SettleFrameSeconds = 0.05f;
+        public const float SettleWaitSeconds = 1.5f;
+
+        /// <summary>Consecutive calm frames after this frame (pure; tests).</summary>
+        public static int CalmFrames(int calm, float dtSeconds) => dtSeconds <= SettleFrameSeconds ? calm + 1 : 0;
+        /// <summary>Whether the screen may start its fade (pure; tests).</summary>
+        public static bool Settled(int calmFrames, float secondsSinceFinish) =>
+            calmFrames >= SettleFrames || secondsSinceFinish >= SettleWaitSeconds;
 
         /// <summary>Share of the bar per step (sums to 1).</summary>
         public static readonly float[] Weights = { 0.35f, 0.3f, 0.2f, 0.15f };
@@ -147,6 +159,8 @@ namespace CriticalMass.Runtime.Menus
         readonly float[] _frac = new float[4];
         float _stepStart;
         int _warmFrames;
+        int _calm;
+        float _finishAt;
         Action _onHidden;
         CanvasGroup _group;
         RawImage _art;
@@ -190,6 +204,7 @@ namespace CriticalMass.Runtime.Menus
                 return;
             }
             for (int i = 0; i < 4; i++) _instance.SetStep((LoadStep)i, 1f);
+            if (!_instance._finish) _instance._finishAt = Time.unscaledTime;
             _instance._finish = true;
             _instance._onHidden = onHidden;
         }
@@ -276,6 +291,7 @@ namespace CriticalMass.Runtime.Menus
             SpeedLine = string.Empty;
             HudText.Set(_speed, SpeedLine);
             _warmFrames = 0;
+            _calm = 0;
             CurrentStep = LoadStep.World;
             _bar.Fill01 = 0f;
             _group.alpha = 1f;
@@ -435,7 +451,8 @@ namespace CriticalMass.Runtime.Menus
                 _bar.Fill01 = Shown;
                 HudText.Set(_pct, NumberCache.Int(Mathf.FloorToInt(Shown * 100f + 1e-3f)) + "%");
             }
-            if (_finish && Shown >= 0.999f && OpenSeconds >= _minSeconds)
+            _calm = CalmFrames(_calm, Time.unscaledDeltaTime);
+            if (_finish && Shown >= 0.999f && OpenSeconds >= _minSeconds && Settled(_calm, Time.unscaledTime - _finishAt))
             {
                 _open = false;
                 _closing = true;

@@ -122,6 +122,10 @@ namespace CriticalMass.Runtime.Flow
         public const string Spectate = "spectate";
 
         static List<Type> _types;
+        /// <summary>perf-title-start: the last InstallOverlays' total and its slowest overlay (the [CM.Load] boot line).</summary>
+        public static double LastInstallMs { get; private set; }
+        public static double SlowestMs { get; private set; }
+        public static string Slowest { get; private set; } = "";
         static bool _tutorialScanned;
         static MethodInfo _tutorial;
 
@@ -249,6 +253,7 @@ namespace CriticalMass.Runtime.Flow
         /// <summary>Adds every registered overlay in scope to game (once each); returns how many were added.</summary>
         public static int InstallOverlays(GameObject game)
         {
+            LastInstallMs = 0; SlowestMs = 0; Slowest = "";
             if (game == null) return 0;
             int added = 0;
             List<Type> types = OverlayTypes();
@@ -257,6 +262,7 @@ namespace CriticalMass.Runtime.Flow
                 Type t = types[i];
                 GameOverlayAttribute a = t.GetCustomAttribute<GameOverlayAttribute>(false);
                 if (!InScope(a.Scope, GameFlow.State) || game.GetComponent(t) != null) continue;
+                long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
                 try
                 {
                     game.AddComponent(t);
@@ -267,6 +273,9 @@ namespace CriticalMass.Runtime.Flow
                     // One broken overlay must never stop the game from building.
                     Debug.LogException(e);
                 }
+                double ms = (System.Diagnostics.Stopwatch.GetTimestamp() - t0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+                LastInstallMs += ms;
+                if (ms > SlowestMs) { SlowestMs = ms; Slowest = t.Name; }
             }
             return added;
         }

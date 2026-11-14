@@ -43,9 +43,9 @@ namespace CriticalMass.Runtime.Hud.Ui
         // ---- names, built once so the per-frame HUD never concatenates strings
 
         public static readonly string[] Teams = { "azure", "crimson" };
-        public static readonly string[] Classes = { "warrior", "farmer", "miner", "demolitions", "builder" };
-        /// <summary>Icon rows by ClassId: the Healer (DG-40) borrows the Farmer's support icons until its own art lands.</summary>
-        static readonly string[] GridClasses = { "warrior", "farmer", "miner", "demolitions", "builder", "farmer" };
+        public static readonly string[] Classes = { "warrior", "farmer", "miner", "demolitions", "builder", "healer" };
+        /// <summary>Icon rows by ClassId (hud-art-1: the Healer has its own portrait, attack, ability and class icons).</summary>
+        static readonly string[] GridClasses = { "warrior", "farmer", "miner", "demolitions", "builder", "healer" };
         public static readonly string[] Crest = { "crest-azure", "crest-crimson" };
         public static readonly string[] Banner = { "map-banner-azure", "map-banner-crimson" };
         public static readonly string[] Heart = { "heart-azure", "heart-crimson" };
@@ -57,6 +57,13 @@ namespace CriticalMass.Runtime.Hud.Ui
         public const string Biomass = "carry-biomass", Corruption = "carry-corruption", CarryEmpty = "carry-empty";
         public const string Crown = "crown", MapCrown = "map-crown", Egg = "kaiju-egg", MapEgg = "map-egg", You = "map-you";
         public const string Hatchling = "kaiju-hatchling";
+        /// <summary>hud-art-1: the egg in its last seconds before the hatch (GameHud.CrackSeconds).</summary>
+        public const string EggCracking = "kaiju-egg-cracking";
+        /// <summary>hud-art-1: resource icons (coin chip, team stock).</summary>
+        public const string Coin = "res-coin", Wood = "res-wood", Water = "res-water", Food = "res-food";
+        public static readonly string[] Stock = { Wood, Water, Food };
+        /// <summary>hud-art-1: power-up icons by PickupKind - 1 (Haste, Might, Ward).</summary>
+        public static readonly string[] Items = { "item-haste", "item-might", "item-ward" };
         public static readonly string[] Adult = { "kaiju-adult-neutral", "kaiju-adult-azure", "kaiju-adult-crimson", "kaiju-adult-berserk" };
 
         static string[,] Grid(string prefix)
@@ -79,6 +86,9 @@ namespace CriticalMass.Runtime.Hud.Ui
                 foreach (string s in g) yield return s;
             yield return Biomass; yield return Corruption; yield return CarryEmpty;
             yield return Crown; yield return MapCrown; yield return Egg; yield return MapEgg; yield return You; yield return Hatchling;
+            yield return EggCracking; yield return Coin;
+            foreach (string s in Stock) yield return s;
+            foreach (string s in Items) yield return s;
             foreach (string s in Adult) yield return s;
         }
     }

@@ -50,23 +50,46 @@ namespace CriticalMass.Runtime.Tests
             Assert.AreEqual(baked.Shrine.Z, w.Map.Shrine.Z);
         }
 
+        /// <summary>
+        /// hud-art-1: the minimap is the real arena (an orthographic render of the generated world, toon-simplified), so it is
+        /// checked against the sim map instead of pixel-compared with the sim drawing: wherever the sim map says land or sky
+        /// (with a uniform neighbourhood), the image must agree on at least 90 % of those pixels. A changed map, a moved island
+        /// or a wrong projection drops this well below the bar.
+        /// </summary>
         [Test]
-        public void BakedImageMatchesTheSimMap()
+        public void BakedImageIsTheRealArenaOnTheSimMap()
         {
             Color32[] png = LoadTopDown(Png1x, out int w, out int h);
-            Color32[] now = Bake.Render(1, out int rw, out int rh);
-            Assert.AreEqual(rw, w, "width: re-run Critical Mass > Bake Minimap");
-            Assert.AreEqual(rh, h, "height: re-run Critical Mass > Bake Minimap");
-            int same = 0, worst = 0;
-            for (int i = 0; i < png.Length; i++)
+            MinimapProjection p = Bake.Proj;
+            Assert.AreEqual(p.Width, w, "width: re-render the minimap (HudArtCaptureTool + minimap_world.py)");
+            Assert.AreEqual(p.Height, h, "height");
+            int checkedPx = 0, agree = 0, landPx = 0;
+            double k = 1.0 / MinimapProjection.PxPerUnit;
+            bool Land(double pxX, double pxY)
             {
-                int d = Mathf.Max(Mathf.Abs(png[i].r - now[i].r), Mathf.Max(Mathf.Abs(png[i].g - now[i].g), Mathf.Abs(png[i].b - now[i].b)));
-                if (d == 0) same++;
-                if (d > worst) worst = d;
+                double u = p.U0 + pxX * k, v = p.V0 + pxY * k;
+                Bake.Shade(u * p.Rx + v * p.Dx, u * p.Rz + v * p.Dz, 1, out MinimapClass c);
+                return c != MinimapClass.Void && c != MinimapClass.Outline && c != MinimapClass.Cliff && c != MinimapClass.Underside &&
+                       c != MinimapClass.Coast;
             }
-            TestContext.WriteLine($"minimap@1x {w}x{h}: {same}/{png.Length} pixels identical, worst channel diff {worst}");
-            Assert.GreaterOrEqual(same, (int)(png.Length * 0.999), "the committed minimap drifted from the map: re-run Critical Mass > Bake Minimap");
-            Assert.LessOrEqual(worst, 2);
+            for (int j = 2; j < h - 2; j++)
+                for (int i = 2; i < w - 2; i++)
+                {
+                    bool land = Land(i + 0.5, j + 0.5);
+                    if (Land(i - 1.5, j + 0.5) != land || Land(i + 2.5, j + 0.5) != land || Land(i + 0.5, j - 1.5) != land ||
+                        Land(i + 0.5, j + 2.5) != land) continue;
+                    Color32 c = png[j * w + i];
+                    float lum = 0.299f * c.r + 0.587f * c.g + 0.114f * c.b;
+                    bool drawnLand = lum > 100f;
+                    checkedPx++;
+                    if (land) landPx++;
+                    if (drawnLand == land) agree++;
+                }
+            float share = (float)agree / Mathf.Max(1, checkedPx);
+            TestContext.WriteLine($"minimap@1x {w}x{h}: {agree}/{checkedPx} uniform pixels agree with the sim map ({share:P1}), {landPx} land");
+            Assert.Greater(checkedPx, 10000);
+            Assert.Greater(landPx, 3000);
+            Assert.GreaterOrEqual(share, 0.90f, "the minimap no longer matches the arena on the sim map");
             foreach (int tier in new[] { 2, 4 })
             {
                 LoadTopDown($"Assets/_Game/Resources/UI/Minimap/minimap@{tier}x.png", out int tw, out int th);

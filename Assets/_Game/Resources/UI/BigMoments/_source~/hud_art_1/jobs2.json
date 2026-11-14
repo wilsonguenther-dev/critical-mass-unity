@@ -1,0 +1,51 @@
+[
+ {
+  "name": "cut2-farmer-azure",
+  "model": "gemini-3-pro-image",
+  "aspect": "1:1",
+  "size": "2K",
+  "refs": [
+   "/Users/wilsonguenther/cm-wt-hud-art-1/Assets/_Game/Resources/UI/BigMoments/_source~/hud_art_1/refs/farmer-ingame-idle-run.jpg",
+   "/Users/wilsonguenther/cm-wt-hud-art-1/Assets/_Game/Resources/UI/BigMoments/_source~/hud_art_1/refs/farmer-ingame-rest.jpg",
+   "/Users/wilsonguenther/cm-wt-hud-art-1/Assets/_Game/Resources/UI/BigMoments/_source~/hud_art_1/refs/style-3d.jpg"
+  ],
+  "prompt": "Reference images: the first two show our farmer character exactly as she appears in the game today (3D model: brown curly hair in a high bun, brass goggles pushed up on her head, cream work jacket with rolled sleeves, navy overalls with a brown tool belt and pouches, brown boots with cream cuffs, and a big moss-green backpack sprayer tank holding glowing lime-green seed orbs, with curved steel sickle blades rising over her shoulders and a dark hose ending in a nozzle wand); the last image shows our 3D game render style (rendering only, not the character). Create a dynamic action pose for a fighting-game style special-move cut-in: the farmer leaps forward, swinging the hose wand in a wide arc, a burst of lime-green seed spray (#B8E833) flying out of the nozzle, hair bun bouncing, fierce determined grin; the backpack tank with its green orbs and sickle blades must be clearly visible. Teal-cyan (#16C7D9) accents on her scarf and trims. The result must look like a real-time 3D render from our stylised 3D game, NOT a flat 2D cartoon drawing: solid 3D volumes with hand-painted texture detail (wood grain, worn metal, cloth folds, stone chips), soft toon shading in three value steps with gentle painted gradients inside each step, a soft ambient-occlusion darkening in creases, a thin warm rim light, light from the upper left, and a crisp dark navy (#18233B) outline of even width around the whole silhouette (like an inverted-hull outline in a game engine), chunky toy-like proportions exactly like the references. Match the design of the in-game character exactly (face, hair, costume, colours, proportions, prop); match the rendering style of the 3D render reference. Full body, three-quarter view, body turned toward the right side of the image, the whole figure inside the frame with a clear margin on every side (head, hands, prop and feet never touch or leave the edge), figure about 86% of the image height. Background: perfectly flat pure white (#FFFFFF), no floor, no cast shadow, no gradient, no glow, no particles, no speed lines, no text, no border, no frame."
+ },
+ {
+  "name": "cut2-healer-azure",
+  "model": "gemini-3-pro-image",
+  "aspect": "1:1",
+  "size": "2K",
+  "refs": [
+   "/Users/wilsonguenther/cm-wt-hud-art-1/Assets/_Game/Resources/UI/BigMoments/_source~/hud_art_1/refs/healer-ingame-3q.jpg",
+   "/Users/wilsonguenther/cm-wt-hud-art-1/Assets/_Game/Resources/UI/BigMoments/_source~/hud_art_1/refs/healer-ingame-front.jpg",
+   "/Users/wilsonguenther/cm-wt-hud-art-1/Assets/_Game/Resources/UI/BigMoments/_source~/hud_art_1/refs/style-3d.jpg"
+  ],
+  "prompt": "Reference images: the first two show our healer character exactly as she appears in the game today (3D model: warm brown skin, big round green eyes, white hair gathered under a white hood with a little sprout on top, a pair of large bright green leaf wings on her back, navy robe with a cream-white apron bearing a round green leaf emblem, brown leather shoulder and arm guards, and a brass lantern held in one hand); the last image shows our 3D game render style (rendering only, not the character). Create a dynamic action pose for a fighting-game style special-move cut-in: the healer steps forward raising the glowing lantern high, the other hand open releasing a soft mint-green healing spark, leaf wings spread, kind but determined smile. Keep her warm brown skin tone and white hood exactly. Teal-cyan (#16C7D9) accents on the trims. The result must look like a real-time 3D render from our stylised 3D game, NOT a flat 2D cartoon drawing: solid 3D volumes with hand-painted texture detail (wood grain, worn metal, cloth folds, stone chips), soft toon shading in three value steps with gentle painted gradients inside each step, a soft ambient-occlusion darkening in creases, a thin warm rim light, light from the upper left, and a crisp dark navy (#18233B) outline of even width around the whole silhouette (like an inverted-hull outline in a game engine), chunky toy-like proportions exactly like the references. Match the design of the in-game character exactly (face, hair, costume, colours, proportions, prop); match the rendering style of the 3D render reference. Full body, three-quarter view, body turned toward the right side of the image, the whole figure inside the frame with a clear margin on every side (head, hands, prop and feet never touch or leave the edge), figure about 86% of the image height. Background: perfectly flat pure white (#FFFFFF), no floor, no cast shadow, no gradient, no glow, no particles, no speed lines, no text, no border, no frame."
+ },
+ {
+  "name": "kaiju2-neutral",
+  "model": "gemini-3-pro-image",
+  "aspect": "1:1",
+  "size": "2K",
+  "refs": [
+   "/Users/wilsonguenther/cm-wt-hud-art-1/Assets/_Game/Resources/UI/BigMoments/_source~/hud_art_1/refs/kaiju-ingame-3q.jpg",
+   "/Users/wilsonguenther/cm-wt-hud-art-1/Assets/_Game/Resources/UI/BigMoments/_source~/hud_art_1/refs/kaiju-ingame-roar.jpg",
+   "/Users/wilsonguenther/cm-wt-hud-art-1/Assets/_Game/Resources/UI/BigMoments/_source~/hud_art_1/refs/kaiju-ingame-face.jpg",
+   "/Users/wilsonguenther/cm-wt-hud-art-1/Assets/_Game/Resources/UI/BigMoments/_source~/hud_art_1/refs/style-3d.jpg"
+  ],
+  "prompt": "Reference images: the first three show our Kaiju exactly as it appears in the game today (3D model: a chunky, round boulder-built creature with dark navy-slate rock body plates, lime-green moss patches on the shoulders, knees and fists, big grey stone fists and feet, a cream ribbed belly plate, a big round navy head with large friendly cartoon eyes with green irises, heavy brows and two small white tusks, a crest of tall crystal spikes along its back, and a short spiky tail); the last image shows our 3D game render style (rendering only, not the character). Create the Kaiju for a full-screen dramatic cut-in: it lunges toward the viewer, both stone fists raised, mouth open in a mighty roar showing its tusks, brows angry; its back crystal crest glows lime green (#B8E833). Keep its design exactly: the round head and big eyes, the boulder body, the navy rock, the moss, the cream belly, the stone fists. It must look like our Kaiju, not a dinosaur, not a gorilla, not any existing movie monster. The result must look like a real-time 3D render from our stylised 3D game, NOT a flat 2D cartoon drawing: solid 3D volumes with hand-painted texture detail (wood grain, worn metal, cloth folds, stone chips), soft toon shading in three value steps with gentle painted gradients inside each step, a soft ambient-occlusion darkening in creases, a thin warm rim light, light from the upper left, and a crisp dark navy (#18233B) outline of even width around the whole silhouette (like an inverted-hull outline in a game engine), chunky toy-like proportions exactly like the references. Match the design of the in-game character exactly (face, hair, costume, colours, proportions, prop); match the rendering style of the 3D render reference. Full body, three-quarter view, body turned toward the right side of the image, the whole figure inside the frame with a clear margin on every side (head, hands, prop and feet never touch or leave the edge), figure about 86% of the image height. Background: perfectly flat pure white (#FFFFFF), no floor, no cast shadow, no gradient, no glow, no particles, no speed lines, no text, no border, no frame."
+ },
+ {
+  "name": "sheet2-busts",
+  "model": "gemini-3-pro-image",
+  "aspect": "16:9",
+  "size": "2K",
+  "refs": [
+   "/Users/wilsonguenther/cm-wt-hud-art-1/Assets/_Game/Resources/UI/BigMoments/_source~/hud_art_1/refs/farmer-ingame-idle-run.jpg",
+   "/Users/wilsonguenther/cm-wt-hud-art-1/Assets/_Game/Resources/UI/BigMoments/_source~/hud_art_1/refs/healer-ingame-3q.jpg",
+   "/Users/wilsonguenther/cm-wt-hud-art-1/Assets/_Game/Resources/UI/BigMoments/_source~/hud_art_1/refs/kaiju-ingame-3q.jpg"
+  ],
+  "prompt": "Three head-and-shoulders portraits for HUD icons, side by side in one row, from left to right: the farmer of the first reference (brown curly hair bun, brass goggles on her head, cream jacket, a sickle blade and green seed orb of her backpack visible over one shoulder), the healer of the second reference (warm brown skin, green eyes, white hood with a little sprout, green leaf wing tips behind her shoulders), and the Kaiju of the third reference (round navy head with large friendly eyes with green irises, heavy brows, two small tusks, lime moss on the shoulders, crystal crest behind its head glowing lime #B8E833). Each faces three-quarter to the right with a confident expression, cut off cleanly at mid-chest, with a teal-cyan (#16C7D9) scarf on the farmer and healer. Keep every design exactly like its reference. Style: our stylised 3D game look (hand-painted 3D render, soft toon shading in three value steps, light from the upper left, a bold dark navy (#18233B) outline of even width around every object), chunky readable shapes that stay clear when shown at 40 pixels. Background perfectly flat pure white (#FFFFFF), no shadows, no glow halos, no text, no labels, no numbers, no frames, no circles or tiles behind the objects. Each item sits centred in its own cell of an invisible grid with wide white space between items; items never touch."
+ }
+]

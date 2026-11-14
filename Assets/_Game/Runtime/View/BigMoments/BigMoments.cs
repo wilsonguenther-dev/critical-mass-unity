@@ -34,7 +34,11 @@ namespace CriticalMass.Runtime.View.Moments
         public const int SortingOrder = 34, GradeSortingOrder = 8;
         public const float RefW = 1920f, RefH = 1080f;
         public const float BandLength = 2900f, BandThick = 330f, DiagonalDeg = -11f;
-        public const float PortraitSize = 660f, TitleW = 1080f, TitleH = 270f;
+        public const float PortraitSize = 780f, TitleW = 1080f, TitleH = 270f;
+        /// <summary>hud-art-1: the cut-out's navy drop shadow, canvas px (mirrored for the right-hand entry).</summary>
+        public const float ShadowDx = 22f, ShadowDy = -16f;
+        /// <summary>hud-art-1: entry (back-out ease) and exit (ease-in) of the character, wall seconds.</summary>
+        public const float PortraitIn = 0.30f, PortraitOut = 0.26f;
         public const float StingerW = 560f, StingerH = 140f, StingerTop = 380f, StingerRight = 24f;
         public const int Sparks = 12, Rings = 3;
         public const float SlowMotionFactor = 0.35f, SlowMotionTail = 0.35f;
@@ -72,6 +76,7 @@ namespace CriticalMass.Runtime.View.Moments
         private CanvasGroup _group, _stingerGroup;
         private RectTransform _root, _band, _portraitRt, _titleRt, _stinger, _auraRt;
         private RawImage _freeze, _dim, _speed, _bandFill, _bandLines, _burst, _portrait, _mask, _plate, _flash, _edge, _grade;
+        private RawImage _portraitShadow, _plateAccent;
         private readonly RawImage[] _cracks = new RawImage[4];
         private readonly RawImage[] _rings = new RawImage[Rings];
         private readonly RawImage[] _sparks = new RawImage[Sparks];
@@ -109,6 +114,26 @@ namespace CriticalMass.Runtime.View.Moments
             if (Instance == null) return;
             Instance.Force(id, scale);
         }
+
+        /// <summary>
+        /// hud-art-1: plays a recipe with an explicit class, team and Kaiju state (captures and the art review walk play
+        /// every class card for both teams and every Kaiju state without staging a fight).
+        /// </summary>
+        public static void Play(MomentId id, ClassId cls, TeamId team, KaijuState kaiju, MomentScale scale = MomentScale.Takeover)
+        {
+            if (Instance == null) return;
+            Instance._override = true;
+            Instance._overrideCls = cls;
+            Instance._overrideTeam = team;
+            Instance._overrideKaiju = kaiju;
+            try { Instance.Force(id, scale); }
+            finally { Instance._override = false; }
+        }
+
+        private bool _override;
+        private ClassId _overrideCls;
+        private TeamId _overrideTeam;
+        private KaijuState _overrideKaiju;
 
         /// <summary>Plays every recipe in turn (and the three streak stingers), one after another.</summary>
         public static void PlayGallery()
@@ -209,6 +234,12 @@ namespace CriticalMass.Runtime.View.Moments
                 }
             }
             if (r.Art == MomentArtKind.Kaiju && id == MomentId.Berserk) req.Kaiju = KaijuState.Berserk;
+            if (_override)
+            {
+                req.Cls = _overrideCls;
+                req.Team = _overrideTeam;
+                req.Kaiju = _overrideKaiju;
+            }
             _queue.Force(req, scale, _clock);
         }
 
@@ -362,7 +393,7 @@ namespace CriticalMass.Runtime.View.Moments
         {
             if (r.Art == MomentArtKind.Kaiju || r.Id == MomentId.Quake)
             {
-                if (q.Kaiju == KaijuState.Berserk) return CMTokens.Corruption.Color;
+                if (q.Kaiju == KaijuState.Berserk) return CMTokens.ParseHex(ArtMapping.GlowBerserk);   // hud-art-1: the art's own berserk glow
                 if (q.Kaiju == KaijuState.Azure) return CMTokens.Azure.Color;
                 if (q.Kaiju == KaijuState.Crimson) return CMTokens.Crimson.Color;
                 return CMTokens.ParseHex(ArtMapping.GlowNeutral);
@@ -412,12 +443,19 @@ namespace CriticalMass.Runtime.View.Moments
                 _portraitShape.SetFill(_accent);
             }
             _portrait.texture = tex;
+            // hud-art-1: a true cut-out (bm-portrait / bm-kaiju image or the live model) gets the navy drop shadow and breaks out
+            // of the band; a legacy 16:9 painting keeps its old square crop and no shadow
+            bool cutOut = tex != null && src != PortraitSource.Painted && src != PortraitSource.HudIcon;
+            _portraitShadow.gameObject.SetActive(cutOut);
+            _portraitShadow.texture = tex;
             // mirror for the right-hand entry (portraits are painted facing right)
             Rect crop = src == PortraitSource.Painted ? MomentArt.PaintedCrop(tex) : new Rect(0f, 0f, 1f, 1f);
             Rect uv = _fromRight ? new Rect(crop.xMax, 0f, -crop.width, 1f) : crop;
             LastPortraitSource = src;
             _portrait.uvRect = uv;
             _mask.uvRect = uv;
+            _portraitShadow.uvRect = uv;
+            _portraitShadow.rectTransform.anchoredPosition = new Vector2(_fromRight ? -ShadowDx : ShadowDx, ShadowDy);
         }
 
         /// <summary>The source the last takeover's portrait used (tests, the capture walk's log).</summary>
@@ -439,6 +477,14 @@ namespace CriticalMass.Runtime.View.Moments
             Texture2D plate = MomentArt.Load(MomentArt.PlateName(r.Plate));
             _plate.gameObject.SetActive(plate != null);
             _plateShape.gameObject.SetActive(plate == null);
+            Texture2D accentBar = MomentArt.Load(MomentArt.PlateAccent);
+            _plateAccent.gameObject.SetActive(plate != null && accentBar != null);
+            if (accentBar != null)
+            {
+                _plateAccent.texture = accentBar;
+                _plateAccent.color = _accent;
+                _plateAccent.uvRect = _fromRight ? new Rect(1f, 0f, -1f, 1f) : new Rect(0f, 0f, 1f, 1f);
+            }
             if (plate != null)
             {
                 _plate.texture = plate;
@@ -524,7 +570,7 @@ namespace CriticalMass.Runtime.View.Moments
                 _band.anchoredPosition = new Vector2(x, end ? 40f : 0f);
                 float a = motion ? 1f : enter * (1f - exit);
                 _bandFill.color = CMTokens.WithAlpha(_accent, a);
-                _bandLines.color = CMTokens.WithAlpha(CMTokens.WarmCream.Color, 0.45f * a);
+                _bandLines.color = CMTokens.WithAlpha(CMTokens.WarmCream.Color, 0.22f * a);
                 if (motion)
                 {
                     Rect uv = _bandLines.uvRect;
@@ -535,12 +581,19 @@ namespace CriticalMass.Runtime.View.Moments
 
             if (_portraitRt.gameObject.activeSelf)
             {
-                float pe = Ease(Mathf.Clamp01((tb - 0.06f) / 0.2f));
-                float baseX = side * 520f;
-                float x = motion ? baseX + side * Mathf.Lerp(700f, 0f, pe) - side * 40f * Mathf.Clamp01(tb / S) : baseX;
-                _portraitRt.anchoredPosition = new Vector2(x, end ? 60f : 30f);
-                float a = motion ? (pe > 0f ? 1f : 0f) : pe * (1f - exit);
+                // hud-art-1: the character springs in from its side (back-out ease, a small overshoot), drifts while it holds, then
+                // leaves the way the band leaves (ease-in) in the last PortraitOut seconds; the drop shadow follows it
+                float pIn = Mathf.Clamp01((tb - 0.04f) / PortraitIn);
+                float pe = BackOut(pIn);
+                float po = EaseIn(Mathf.Clamp01(1f - outIn / PortraitOut));
+                float baseX = side * 500f;
+                float x = motion ? baseX + side * Mathf.LerpUnclamped(760f, 0f, pe) - side * 40f * Mathf.Clamp01(tb / S) - side * 1100f * po : baseX;
+                _portraitRt.anchoredPosition = new Vector2(x, end ? 60f : 40f);
+                float sc = motion ? Mathf.Lerp(1.08f, 1f, Ease(pIn)) : 1f;
+                _portraitRt.localScale = new Vector3(sc, sc, 1f);
+                float a = motion ? (pIn > 0f ? 1f : 0f) : Ease(pIn) * (1f - exit);
                 _portrait.color = new Color(1f, 1f, 1f, a);
+                if (_portraitShadow.gameObject.activeSelf) _portraitShadow.color = CMTokens.WithAlpha(CMTokens.VoidNavy.Color, 0.55f * a);
                 if (_mask.gameObject.activeSelf) _mask.color = CMTokens.WithAlpha(CMTokens.Team(m.Request.Team), a);
                 if (_model != null && _model.Rendering) _model.Pose(Mathf.Clamp01(t / S), motion);
             }
@@ -577,7 +630,8 @@ namespace CriticalMass.Runtime.View.Moments
             if (_edge.gameObject.activeSelf)
             {
                 // a slow breathe (well under 3 Hz), still with reduced motion
-                float pulse = motion ? 0.6f + 0.2f * Mathf.Sin(t * Mathf.PI * 2f * 1.5f) : 0.6f;
+                // hud-art-1: a frame, not a wash (the owner's captures were flooded with the accent at 0.6..0.8)
+                float pulse = motion ? 0.26f + 0.08f * Mathf.Sin(t * Mathf.PI * 2f * 1.5f) : 0.26f;
                 _edge.color = CMTokens.WithAlpha(_accent, pulse * Mathf.Clamp01(tb / 0.12f));
             }
 
@@ -589,6 +643,7 @@ namespace CriticalMass.Runtime.View.Moments
             _title.color = CMTokens.WithAlpha(CMTokens.WarmCream.Color, a);
             _subtitle.color = CMTokens.WithAlpha(CMTokens.WarmCream.Color, a);
             if (_plate.gameObject.activeSelf) _plate.color = CMTokens.WithAlpha(CMTokens.VoidNavy.Color, a);
+            if (_plateAccent.gameObject.activeSelf) _plateAccent.color = CMTokens.WithAlpha(_accent, a);
             if (_plateShape.gameObject.activeSelf) _plateShape.SetFill(CMTokens.WithAlpha(CMTokens.VoidNavy.Color, a));
         }
 
@@ -817,6 +872,22 @@ namespace CriticalMass.Runtime.View.Moments
             }
         }
 
+        /// <summary>hud-art-1: back-out (overshoot about 8 %, then settle) for the character's entry.</summary>
+        public static float BackOut(float t)
+        {
+            t = Mathf.Clamp01(t);
+            const float c1 = 1.2f, c3 = c1 + 1f;
+            float u = t - 1f;
+            return 1f + c3 * u * u * u + c1 * u * u;
+        }
+
+        /// <summary>hud-art-1: ease-in (cubic) for exits.</summary>
+        public static float EaseIn(float t)
+        {
+            t = Mathf.Clamp01(t);
+            return t * t * t;
+        }
+
         private static float Ease(float t)
         {
             t = Mathf.Clamp01(t);
@@ -932,6 +1003,9 @@ namespace CriticalMass.Runtime.View.Moments
             _portraitRt = Rt(_root, "Portrait");
             Centre(_portraitRt, Vector2.zero, new Vector2(PortraitSize, PortraitSize));
             _portraitShape = MenuShape(_portraitRt, "Portrait Shape", ShapeKind.Shield, new Vector2(PortraitSize * 0.55f, PortraitSize * 0.7f));
+            _portraitShadow = Raw(_portraitRt, "Portrait Shadow", null, CMTokens.WithAlpha(CMTokens.VoidNavy.Color, 0.55f));
+            Stretch(_portraitShadow.rectTransform);
+            _portraitShadow.gameObject.SetActive(false);
             _portrait = Raw(_portraitRt, "Portrait Image", null, Color.white);
             Stretch(_portrait.rectTransform);
             _mask = Raw(_portraitRt, "Portrait Team Mask", null, Color.white);
@@ -943,6 +1017,9 @@ namespace CriticalMass.Runtime.View.Moments
             _plateShape.Radius = 30f;
             _plate = Raw(_titleRt, "Plate", null, Color.white);
             Stretch(_plate.rectTransform);
+            _plateAccent = Raw(_titleRt, "Plate Accent", null, Color.white);
+            Stretch(_plateAccent.rectTransform);
+            _plateAccent.gameObject.SetActive(false);
             _title = CriticalMass.Runtime.Menu.MenuUi.Fit(HudText.Make(_titleRt, "Title Text", CMTokens.Display, UiScale.TypeHero, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 5f), 96);
             Centre(_title.rectTransform, new Vector2(0f, 14f), new Vector2(TitleW * 0.8f, 120f));
             _title.resizeTextForBestFit = true;

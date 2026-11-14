@@ -78,6 +78,25 @@ namespace CriticalMass.Runtime.Menu
                 Color.Lerp(CMTokens.ToolBrass.Color, CMTokens.VoidNavy.Color, 0.28f), 0f);
             i.OutlinePx = 0f;
             i.RimPx = 0f;
+            // hud-art-1: the painted coin (UI/Icons/res-coin) over the vector glyph, which stays as the fallback
+            Texture2D tex = CriticalMass.Runtime.Hud.Ui.UiIcons.Get(CriticalMass.Runtime.Hud.Ui.UiIcons.Coin, size > 36f ? 4 : 2);
+            if (tex != null)
+            {
+                outer.SetFill(new Color(0f, 0f, 0f, 0f));
+                outer.OutlinePx = 0f;
+                i.SetFill(new Color(0f, 0f, 0f, 0f));
+                var go = new GameObject("Painted", typeof(RectTransform));
+                go.layer = outer.gameObject.layer;
+                go.transform.SetParent(outer.transform, false);
+                RawImage ri = go.AddComponent<RawImage>();
+                ri.texture = tex;
+                ri.raycastTarget = false;
+                RectTransform rt = ri.rectTransform;
+                rt.anchorMin = Vector2.zero;
+                rt.anchorMax = Vector2.one;
+                rt.offsetMin = new Vector2(-size * 0.08f, -size * 0.08f);
+                rt.offsetMax = new Vector2(size * 0.08f, size * 0.08f);
+            }
             return outer;
         }
 

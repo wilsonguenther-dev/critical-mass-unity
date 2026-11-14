@@ -39,7 +39,7 @@ namespace CriticalMass.Runtime.Game
     ///   -creatorGrab (with -shots -shotTick T) from T, the first tick actor 0 is on the hill: shot-grab-{normal,wide}-{hud,clean}.png
     ///   -shotTick T (with -shots) the clock stops at sim tick T exactly and shot-moment.png is written (same seed + tick = same frame)
     ///   -groundView / -groundShots  ground view while watching (feat/ground-camera); -groundShots adds the capture tour
-    ///   -shots                   screenshots shot-title.png, shot-start.png (3 s of match time), shot-mid.png and shot-kaiju-1..6.png (Kaiju walk strip after the hatch) into the data folder (Windows graphics run)
+    ///   -shots                   screenshots shot-title.png, shot-start.png (3 s of match time), shot-mid.png, shot-farmer-1..4.png (Farmer walk strip at 30 s) and shot-kaiju-1..6.png (Kaiju walk strip after the hatch) into the data folder (Windows graphics run)
     ///   -traceStates             record shader states for warm-up (ShaderWarmup); -exportReport, -diag: SupportReport
     /// DG-63: the crash log is written by CrashLog (bounded queue, one background writer, 20 lines per second, repeat keys
     /// with digits and hex as "#"); Exceptions and Errors both count. A stack in the sim or the match driver ends the match
@@ -199,6 +199,36 @@ namespace CriticalMass.Runtime.Game
             Debug.Log($"{LogTag} -cameraYaw: gameplay camera yaw {y.ToString("F1", CultureInfo.InvariantCulture)} deg (default 45)");
         }
 
+        /// <summary>-shots, batch 7: from 30 s of match time the camera is held on a living Farmer that is moving (not actor 0),
+        /// and after 1 s four shots 0.15 s apart are written as shot-farmer-1..4.png (ground contact and foot skating check),
+        /// each logged with the Farmer's position; then the camera goes back to the player.</summary>
+        void FarmerStrip(double now)
+        {
+            World w = _driver.World;
+            if (_kaijuCam == null) _kaijuCam = FindAnyObjectByType<Camera.CameraFollowTarget>();
+            if (_kaijuCam == null) { _farmerShots = 4; return; }
+            if (_farmerId < 0 || !w.Actors[_farmerId].Alive)
+            {
+                _farmerId = -1;
+                for (int i = 1; i < w.ActorCount; i++)
+                {
+                    double dx = w.X[i] - w.PrevX[i], dz = w.Z[i] - w.PrevZ[i];
+                    if (w.Actors[i].Alive && w.Actors[i].Cls == ClassId.Farmer && dx * dx + dz * dz > 1e-6) { _farmerId = i; break; }
+                }
+                if (_farmerId < 0) return;
+                _farmerFrom = now;
+                _farmerShots = 0;
+            }
+            _kaijuCam.SetOverride(w.X[_farmerId], w.Z[_farmerId]);
+            if (now - _farmerFrom < 1.0 || now < _farmerNextShot) return;
+            _farmerShots++;
+            _farmerNextShot = now + 0.15;
+            ScreenCapture.CaptureScreenshot(Path.Combine(GamePaths.DataDir, "shot-farmer-" + _farmerShots + ".png"));
+            Debug.Log($"{LogTag} shot-farmer-{_farmerShots}: tick {w.Tick}, actor {_farmerId} at " +
+                      $"({w.X[_farmerId].ToString("F2", CultureInfo.InvariantCulture)}, {w.Z[_farmerId].ToString("F2", CultureInfo.InvariantCulture)})");
+            if (_farmerShots >= 4) _kaijuCam.ClearOverride();
+        }
+
         /// <summary>-shots, batch 7: 4 s after the Kaiju hatches the camera is held on it (CameraFollowTarget.SetOverride every
         /// frame) and 1.5 s later six shots 0.25 s apart are written as shot-kaiju-1..6.png, each logged with the Kaiju's sim
         /// position so a reader can tell it walked; then the camera goes back to the player.</summary>
@@ -275,6 +305,8 @@ namespace CriticalMass.Runtime.Game
         bool _titleSeen, _recording, _ended, _quitting, _timedOut, _hangDone, _shotTitle, _shotStart, _shotMid;
         // batch 7: Kaiju walk strip under -shots (camera held on the walking Kaiju, 6 shots 0.25 s apart).
         double _kaijuHatchAt = -1, _kaijuNextShot; int _kaijuShots; Camera.CameraFollowTarget _kaijuCam;
+        // batch 7: Farmer walk strip under -shots (camera held on a moving Farmer from 30 s of match time, 4 shots 0.15 s apart).
+        int _farmerId = -1, _farmerShots; double _farmerFrom, _farmerNextShot;
         double _titleAt = -1, _matchStart, _endAt, _firstTitleAt = -1;
         bool _costReset;
         int _exceptionsAtStart, _match = 1, _reloadFrame = -1;
@@ -552,6 +584,7 @@ namespace CriticalMass.Runtime.Game
                 ScreenCapture.CaptureScreenshot(Path.Combine(GamePaths.DataDir, "shot-start.png"));
             }
             if (o.Shots && _kaijuShots < 6 && _recording && _driver != null && _driver.World != null) KaijuStrip(now);
+            if (o.Shots && _farmerShots < 4 && _kaijuHatchAt < 0 && _recording && _driver != null && _driver.World != null && _driver.World.Match.Time > 30) FarmerStrip(now);
             if (o.Shots && !_shotMid && _recording && _driver != null && _driver.World != null && _driver.World.Match.Time > 60)
             if (o.Shots && o.ShotTick > 0 && !_shotMid && _recording && _driver != null && _driver.World != null)
             {

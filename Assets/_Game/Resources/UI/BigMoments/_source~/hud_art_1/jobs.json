@@ -1,0 +1,208 @@
+[
+ {
+  "name": "cut-warrior-azure",
+  "model": "gemini-3-pro-image",
+  "aspect": "1:1",
+  "size": "2K",
+  "refs": [
+   "/Users/wilsonguenther/critical-mass-unity-art-turnarounds/Assets/_Game/Art/Characters/_source~/warrior_v8/turnaround/warrior-v8-front-2k.jpg",
+   "/Users/wilsonguenther/Obsidian/Wilson-Brain/Projects/Kaiju-Demo/unity-port/warrior-v8/props.jpg",
+   "/Users/wilsonguenther/cm-wt-hud-art-1/Assets/_Game/Resources/UI/BigMoments/_source~/hud_art_1/refs/style-3d.jpg"
+  ],
+  "prompt": "Reference images: the first images are the approved design turnaround of our warrior character and its hand-held prop; the last image shows our 3D game render style. Create a dynamic action pose for a fighting-game style special-move cut-in: the warrior is raising the stone-blue cleaver high for a downward chop, round wooden shield braced forward, mouth open in a battle shout. Keep the team colour exactly as the turnaround shows it: teal-cyan (#16C7D9) on the scarf, sash, gems and trims. The result must look like a real-time 3D render from our stylised 3D game, NOT a flat 2D cartoon drawing: solid 3D volumes with hand-painted texture detail (wood grain, worn metal, cloth folds, stone chips), soft toon shading in three value steps with gentle painted gradients inside each step, a soft ambient-occlusion darkening in creases, a thin warm rim light, light from the upper left, and a crisp dark navy (#18233B) outline of even width around the whole silhouette (like an inverted-hull outline in a game engine), chunky toy-like proportions exactly like the references. Match the design of the turnaround exactly (face, hair, costume, colours, proportions, prop); match the rendering style of the 3D render reference. Full body, three-quarter view, body turned toward the right side of the image, the whole figure inside the frame with a clear margin on every side (head, hands, prop and feet never touch or leave the edge), figure about 86% of the image height. Background: perfectly flat pure white (#FFFFFF), no floor, no cast shadow, no gradient, no glow, no particles, no speed lines, no text, no border, no frame."
+ },
+ {
+  "name": "cut-warrior-crimson",
+  "model": "gemini-3-pro-image",
+  "aspect": "1:1",
+  "size": "2K",
+  "refs": [
+   "/Users/wilsonguenther/critical-mass-unity-art-turnarounds/Assets/_Game/Art/Characters/_source~/warrior_v8/turnaround/warrior-v8-front-2k.jpg",
+   "/Users/wilsonguenther/Obsidian/Wilson-Brain/Projects/Kaiju-Demo/unity-port/warrior-v8/props.jpg",
+   "/Users/wilsonguenther/cm-wt-hud-art-1/Assets/_Game/Resources/UI/BigMoments/_source~/hud_art_1/refs/style-3d.jpg"
+  ],
+  "prompt": "Reference images: the first images are the approved design turnaround of our warrior character and its hand-held prop; the last image shows our 3D game render style. Create a dynamic action pose for a fighting-game style special-move cut-in: the warrior is raising the stone-blue cleaver high for a downward chop, round wooden shield braced forward, mouth open in a battle shout. Team change: every teal-cyan team accent of the turnaround (scarf, sash, gems, trims, glow) becomes crimson red (#FF5A5F). Everything else (skin, hair, leather, metal, cloth) stays identical to the turnaround. The result must look like a real-time 3D render from our stylised 3D game, NOT a flat 2D cartoon drawing: solid 3D volumes with hand-painted texture detail (wood grain, worn metal, cloth folds, stone chips), soft toon shading in three value steps with gentle painted gradients inside each step, a soft ambient-occlusion darkening in creases, a thin warm rim light, light from the upper left, and a crisp dark navy (#18233B) outline of even width around the whole silhouette (like an inverted-hull outline in a game engine), chunky toy-like proportions exactly like the references. Match the design of the turnaround exactly (face, hair, costume, colours, proportions, prop); match the rendering style of the 3D render reference. Full body, three-quarter view, body turned toward the right side of the image, the whole figure inside the frame with a clear margin on every side (head, hands, prop and feet never touch or leave the edge), figure about 86% of the image height. Background: perfectly flat pure white (#FFFFFF), no floor, no cast shadow, no gradient, no glow, no particles, no speed lines, no text, no border, no frame."
+ },
+ {
+  "name": "cut-farmer-azure",
+  "model": "gemini-3-pro-image",
+  "aspect": "1:1",
+  "size": "2K",
+  "refs": [
+   "/Users/wilsonguenther/critical-mass-unity-art-turnarounds/Assets/_Game/Art/Characters/_source~/turnarounds_v1/turnaround/farmer/farmer-three-quarter-2k.jpg",
+   "/Users/wilsonguenther/critical-mass-unity-art-turnarounds/Assets/_Game/Art/Characters/_source~/turnarounds_v1/turnaround/farmer/farmer-front-2k.jpg",
+   "/Users/wilsonguenther/critical-mass-unity-art-turnarounds/Assets/_Game/Art/Characters/_source~/turnarounds_v1/turnaround/farmer/farmer-prop-staff-2k.jpg",
+   "/Users/wilsonguenther/cm-wt-hud-art-1/Assets/_Game/Resources/UI/BigMoments/_source~/hud_art_1/refs/style-3d.jpg"
+  ],
+  "prompt": "Reference images: the first images are the approved design turnaround of our farmer character and its hand-held prop; the last image shows our 3D game render style. Create a dynamic action pose for a fighting-game style special-move cut-in: the farmer is leaping forward mid-attack, both hands on her staff (exactly the simple wooden staff of the prop reference image, no blade, no hose) sweeping it down diagonally across her body in a powerful hooking strike, hair and scarf flying back, knees bent, fierce determined grin; a dynamic, off-balance action pose, not standing still. Keep the team colour exactly as the turnaround shows it: teal-cyan (#16C7D9) on the scarf, sash, gems and trims. The result must look like a real-time 3D render from our stylised 3D game, NOT a flat 2D cartoon drawing: solid 3D volumes with hand-painted texture detail (wood grain, worn metal, cloth folds, stone chips), soft toon shading in three value steps with gentle painted gradients inside each step, a soft ambient-occlusion darkening in creases, a thin warm rim light, light from the upper left, and a crisp dark navy (#18233B) outline of even width around the whole silhouette (like an inverted-hull outline in a game engine), chunky toy-like proportions exactly like the references. Match the design of the turnaround exactly (face, hair, costume, colours, proportions, prop); match the rendering style of the 3D render reference. Full body, three-quarter view, body turned toward the right side of the image, the whole figure inside the frame with a clear margin on every side (head, hands, prop and feet never touch or leave the edge), figure about 86% of the image height. Background: perfectly flat pure white (#FFFFFF), no floor, no cast shadow, no gradient, no glow, no particles, no speed lines, no text, no border, no frame."
+ },
+ {
+  "name": "cut-farmer-crimson",
+  "model": "gemini-3-pro-image",
+  "aspect": "1:1",
+  "size": "2K",
+  "refs": [
+   "/Users/wilsonguenther/critical-mass-unity-art-turnarounds/Assets/_Game/Art/Characters/_source~/turnarounds_v1/turnaround/farmer/farmer-three-quarter-2k.jpg",
+   "/Users/wilsonguenther/critical-mass-unity-art-turnarounds/Assets/_Game/Art/Characters/_source~/turnarounds_v1/turnaround/farmer/farmer-front-2k.jpg",
+   "/Users/wilsonguenther/critical-mass-unity-art-turnarounds/Assets/_Game/Art/Characters/_source~/turnarounds_v1/turnaround/farmer/farmer-prop-staff-2k.jpg",
+   "/Users/wilsonguenther/cm-wt-hud-art-1/Assets/_Game/Resources/UI/BigMoments/_source~/hud_art_1/refs/style-3d.jpg"
+  ],
+  "prompt": "Reference images: the first images are the approved design turnaround of our farmer character and its hand-held prop; the last image shows our 3D game render style. Create a dynamic action pose for a fighting-game style special-move cut-in: the farmer is leaping forward mid-attack, both hands on her staff (exactly the simple wooden staff of the prop reference image, no blade, no hose) sweeping it down diagonally across her body in a powerful hooking strike, hair and scarf flying back, knees bent, fierce determined grin; a dynamic, off-balance action pose, not standing still. Team change: every teal-cyan team accent of the turnaround (scarf, sash, gems, trims, glow) becomes crimson red (#FF5A5F). Everything else (skin, hair, leather, metal, cloth) stays identical to the turnaround. The result must look like a real-time 3D render from our stylised 3D game, NOT a flat 2D cartoon drawing: solid 3D volumes with hand-painted texture detail (wood grain, worn metal, cloth folds, stone chips), soft toon shading in three value steps with gentle painted gradients inside each step, a soft ambient-occlusion darkening in creases, a thin warm rim light, light from the upper left, and a crisp dark navy (#18233B) outline of even width around the whole silhouette (like an inverted-hull outline in a game engine), chunky toy-like proportions exactly like the references. Match the design of the turnaround exactly (face, hair, costume, colours, proportions, prop); match the rendering style of the 3D render reference. Full body, three-quarter view, body turned toward the right side of the image, the whole figure inside the frame with a clear margin on every side (head, hands, prop and feet never touch or leave the edge), figure about 86% of the image height. Background: perfectly flat pure white (#FFFFFF), no floor, no cast shadow, no gradient, no glow, no particles, no speed lines, no text, no border, no frame."
+ },
+ {
+  "name": "cut-miner-azure",
+  "model": "gemini-3-pro-image",
+  "aspect": "1:1",
+  "size": "2K",
+  "refs": [
+   "/Users/wilsonguenther/critical-mass-unity-art-turnarounds/Assets/_Game/Art/Characters/_source~/turnarounds_v1/turnaround/miner/miner-three-quarter-2k.jpg",
+   "/Users/wilsonguenther/critical-mass-unity-art-turnarounds/Assets/_Game/Art/Characters/_source~/turnarounds_v1/turnaround/miner/miner-front-2k.jpg",
+   "/Users/wilsonguenther/critical-mass-unity-art-turnarounds/Assets/_Game/Art/Characters/_source~/turnarounds_v1/turnaround/miner/miner-prop-pick-hammer-2k.jpg",
+   "/Users/wilsonguenther/cm-wt-hud-art-1/Assets/_Game/Resources/UI/BigMoments/_source~/hud_art_1/refs/style-3d.jpg"
+  ],
+  "prompt": "Reference images: the first images are the approved design turnaround of our miner character and its hand-held prop; the last image shows our 3D game render style. Create a dynamic action pose for a fighting-game style special-move cut-in: the miner is lifting the pick-hammer high over the shoulder about to smash it down, knees bent, gritted teeth. Keep the team colour exactly as the turnaround shows it: teal-cyan (#16C7D9) on the scarf, sash, gems and trims. The result must look like a real-time 3D render from our stylised 3D game, NOT a flat 2D cartoon drawing: solid 3D volumes with hand-painted texture detail (wood grain, worn metal, cloth folds, stone chips), soft toon shading in three value steps with gentle painted gradients inside each step, a soft ambient-occlusion darkening in creases, a thin warm rim light, light from the upper left, and a crisp dark navy (#18233B) outline of even width around the whole silhouette (like an inverted-hull outline in a game engine), chunky toy-like proportions exactly like the references. Match the design of the turnaround exactly (face, hair, costume, colours, proportions, prop); match the rendering style of the 3D render reference. Full body, three-quarter view, body turned toward the right side of the image, the whole figure inside the frame with a clear margin on every side (head, hands, prop and feet never touch or leave the edge), figure about 86% of the image height. Background: perfectly flat pure white (#FFFFFF), no floor, no cast shadow, no gradient, no glow, no particles, no speed lines, no text, no border, no frame."
+ },
+ {
+  "name": "cut-miner-crimson",
+  "model": "gemini-3-pro-image",
+  "aspect": "1:1",
+  "size": "2K",
+  "refs": [
+   "/Users/wilsonguenther/critical-mass-unity-art-turnarounds/Assets/_Game/Art/Characters/_source~/turnarounds_v1/turnaround/miner/miner-three-quarter-2k.jpg",
+   "/Users/wilsonguenther/critical-mass-unity-art-turnarounds/Assets/_Game/Art/Characters/_source~/turnarounds_v1/turnaround/miner/miner-front-2k.jpg",
+   "/Users/wilsonguenther/critical-mass-unity-art-turnarounds/Assets/_Game/Art/Characters/_source~/turnarounds_v1/turnaround/miner/miner-prop-pick-hammer-2k.jpg",
+   "/Users/wilsonguenther/cm-wt-hud-art-1/Assets/_Game/Resources/UI/BigMoments/_source~/hud_art_1/refs/style-3d.jpg"
+  ],
+  "prompt": "Reference images: the first images are the approved design turnaround of our miner character and its hand-held prop; the last image shows our 3D game render style. Create a dynamic action pose for a fighting-game style special-move cut-in: the miner is lifting the pick-hammer high over the shoulder about to smash it down, knees bent, gritted teeth. Team change: every teal-cyan team accent of the turnaround (scarf, sash, gems, trims, glow) becomes crimson red (#FF5A5F). Everything else (skin, hair, leather, metal, cloth) stays identical to the turnaround. The result must look like a real-time 3D render from our stylised 3D game, NOT a flat 2D cartoon drawing: solid 3D volumes with hand-painted texture detail (wood grain, worn metal, cloth folds, stone chips), soft toon shading in three value steps with gentle painted gradients inside each step, a soft ambient-occlusion darkening in creases, a thin warm rim light, light from the upper left, and a crisp dark navy (#18233B) outline of even width around the whole silhouette (like an inverted-hull outline in a game engine), chunky toy-like proportions exactly like the references. Match the design of the turnaround exactly (face, hair, costume, colours, proportions, prop); match the rendering style of the 3D render reference. Full body, three-quarter view, body turned toward the right side of the image, the whole figure inside the frame with a clear margin on every side (head, hands, prop and feet never touch or leave the edge), figure about 86% of the image height. Background: perfectly flat pure white (#FFFFFF), no floor, no cast shadow, no gradient, no glow, no particles, no speed lines, no text, no border, no frame."
+ },
+ {
+  "name": "cut-demolitions-azure",
+  "model": "gemini-3-pro-image",
+  "aspect": "1:1",
+  "size": "2K",
+  "refs": [
+   "/Users/wilsonguenther/critical-mass-unity-art-turnarounds/Assets/_Game/Art/Characters/_source~/turnarounds_v1/turnaround/demolitions/demolitions-three-quarter-2k.jpg",
+   "/Users/wilsonguenther/critical-mass-unity-art-turnarounds/Assets/_Game/Art/Characters/_source~/turnarounds_v1/turnaround/demolitions/demolitions-front-2k.jpg",
+   "/Users/wilsonguenther/critical-mass-unity-art-turnarounds/Assets/_Game/Art/Characters/_source~/turnarounds_v1/turnaround/demolitions/demolitions-prop-dynamite-2k.jpg",
+   "/Users/wilsonguenther/cm-wt-hud-art-1/Assets/_Game/Resources/UI/BigMoments/_source~/hud_art_1/refs/style-3d.jpg"
+  ],
+  "prompt": "Reference images: the first images are the approved design turnaround of our demolitions character and its hand-held prop; the last image shows our 3D game render style. Create a dynamic action pose for a fighting-game style special-move cut-in: the demolitions is holding a lit dynamite bundle up in one raised hand ready to throw, other fist clenched, wild cheeky grin, barrel on her back. Keep the team colour exactly as the turnaround shows it: teal-cyan (#16C7D9) on the scarf, sash, gems and trims. The result must look like a real-time 3D render from our stylised 3D game, NOT a flat 2D cartoon drawing: solid 3D volumes with hand-painted texture detail (wood grain, worn metal, cloth folds, stone chips), soft toon shading in three value steps with gentle painted gradients inside each step, a soft ambient-occlusion darkening in creases, a thin warm rim light, light from the upper left, and a crisp dark navy (#18233B) outline of even width around the whole silhouette (like an inverted-hull outline in a game engine), chunky toy-like proportions exactly like the references. Match the design of the turnaround exactly (face, hair, costume, colours, proportions, prop); match the rendering style of the 3D render reference. Full body, three-quarter view, body turned toward the right side of the image, the whole figure inside the frame with a clear margin on every side (head, hands, prop and feet never touch or leave the edge), figure about 86% of the image height. Background: perfectly flat pure white (#FFFFFF), no floor, no cast shadow, no gradient, no glow, no particles, no speed lines, no text, no border, no frame."
+ },
+ {
+  "name": "cut-demolitions-crimson",
+  "model": "gemini-3-pro-image",
+  "aspect": "1:1",
+  "size": "2K",
+  "refs": [
+   "/Users/wilsonguenther/critical-mass-unity-art-turnarounds/Assets/_Game/Art/Characters/_source~/turnarounds_v1/turnaround/demolitions/demolitions-three-quarter-2k.jpg",
+   "/Users/wilsonguenther/critical-mass-unity-art-turnarounds/Assets/_Game/Art/Characters/_source~/turnarounds_v1/turnaround/demolitions/demolitions-front-2k.jpg",
+   "/Users/wilsonguenther/critical-mass-unity-art-turnarounds/Assets/_Game/Art/Characters/_source~/turnarounds_v1/turnaround/demolitions/demolitions-prop-dynamite-2k.jpg",
+   "/Users/wilsonguenther/cm-wt-hud-art-1/Assets/_Game/Resources/UI/BigMoments/_source~/hud_art_1/refs/style-3d.jpg"
+  ],
+  "prompt": "Reference images: the first images are the approved design turnaround of our demolitions character and its hand-held prop; the last image shows our 3D game render style. Create a dynamic action pose for a fighting-game style special-move cut-in: the demolitions is holding a lit dynamite bundle up in one raised hand ready to throw, other fist clenched, wild cheeky grin, barrel on her back. Team change: every teal-cyan team accent of the turnaround (scarf, sash, gems, trims, glow) becomes crimson red (#FF5A5F). Everything else (skin, hair, leather, metal, cloth) stays identical to the turnaround. The result must look like a real-time 3D render from our stylised 3D game, NOT a flat 2D cartoon drawing: solid 3D volumes with hand-painted texture detail (wood grain, worn metal, cloth folds, stone chips), soft toon shading in three value steps with gentle painted gradients inside each step, a soft ambient-occlusion darkening in creases, a thin warm rim light, light from the upper left, and a crisp dark navy (#18233B) outline of even width around the whole silhouette (like an inverted-hull outline in a game engine), chunky toy-like proportions exactly like the references. Match the design of the turnaround exactly (face, hair, costume, colours, proportions, prop); match the rendering style of the 3D render reference. Full body, three-quarter view, body turned toward the right side of the image, the whole figure inside the frame with a clear margin on every side (head, hands, prop and feet never touch or leave the edge), figure about 86% of the image height. Background: perfectly flat pure white (#FFFFFF), no floor, no cast shadow, no gradient, no glow, no particles, no speed lines, no text, no border, no frame."
+ },
+ {
+  "name": "cut-builder-azure",
+  "model": "gemini-3-pro-image",
+  "aspect": "1:1",
+  "size": "2K",
+  "refs": [
+   "/Users/wilsonguenther/critical-mass-unity-art-turnarounds/Assets/_Game/Art/Characters/_source~/turnarounds_v1/turnaround/builder/builder-three-quarter-2k.jpg",
+   "/Users/wilsonguenther/critical-mass-unity-art-turnarounds/Assets/_Game/Art/Characters/_source~/turnarounds_v1/turnaround/builder/builder-front-2k.jpg",
+   "/Users/wilsonguenther/critical-mass-unity-art-turnarounds/Assets/_Game/Art/Characters/_source~/turnarounds_v1/turnaround/builder/builder-prop-mallet-2k.jpg",
+   "/Users/wilsonguenther/cm-wt-hud-art-1/Assets/_Game/Resources/UI/BigMoments/_source~/hud_art_1/refs/style-3d.jpg"
+  ],
+  "prompt": "Reference images: the first images are the approved design turnaround of our builder character and its hand-held prop; the last image shows our 3D game render style. Create a dynamic action pose for a fighting-game style special-move cut-in: the builder is swinging the big wooden mallet up over the shoulder mid-strike, wide stance, confident shout. Keep the team colour exactly as the turnaround shows it: teal-cyan (#16C7D9) on the scarf, sash, gems and trims. The result must look like a real-time 3D render from our stylised 3D game, NOT a flat 2D cartoon drawing: solid 3D volumes with hand-painted texture detail (wood grain, worn metal, cloth folds, stone chips), soft toon shading in three value steps with gentle painted gradients inside each step, a soft ambient-occlusion darkening in creases, a thin warm rim light, light from the upper left, and a crisp dark navy (#18233B) outline of even width around the whole silhouette (like an inverted-hull outline in a game engine), chunky toy-like proportions exactly like the references. Match the design of the turnaround exactly (face, hair, costume, colours, proportions, prop); match the rendering style of the 3D render reference. Full body, three-quarter view, body turned toward the right side of the image, the whole figure inside the frame with a clear margin on every side (head, hands, prop and feet never touch or leave the edge), figure about 86% of the image height. Background: perfectly flat pure white (#FFFFFF), no floor, no cast shadow, no gradient, no glow, no particles, no speed lines, no text, no border, no frame."
+ },
+ {
+  "name": "cut-builder-crimson",
+  "model": "gemini-3-pro-image",
+  "aspect": "1:1",
+  "size": "2K",
+  "refs": [
+   "/Users/wilsonguenther/critical-mass-unity-art-turnarounds/Assets/_Game/Art/Characters/_source~/turnarounds_v1/turnaround/builder/builder-three-quarter-2k.jpg",
+   "/Users/wilsonguenther/critical-mass-unity-art-turnarounds/Assets/_Game/Art/Characters/_source~/turnarounds_v1/turnaround/builder/builder-front-2k.jpg",
+   "/Users/wilsonguenther/critical-mass-unity-art-turnarounds/Assets/_Game/Art/Characters/_source~/turnarounds_v1/turnaround/builder/builder-prop-mallet-2k.jpg",
+   "/Users/wilsonguenther/cm-wt-hud-art-1/Assets/_Game/Resources/UI/BigMoments/_source~/hud_art_1/refs/style-3d.jpg"
+  ],
+  "prompt": "Reference images: the first images are the approved design turnaround of our builder character and its hand-held prop; the last image shows our 3D game render style. Create a dynamic action pose for a fighting-game style special-move cut-in: the builder is swinging the big wooden mallet up over the shoulder mid-strike, wide stance, confident shout. Team change: every teal-cyan team accent of the turnaround (scarf, sash, gems, trims, glow) becomes crimson red (#FF5A5F). Everything else (skin, hair, leather, metal, cloth) stays identical to the turnaround. The result must look like a real-time 3D render from our stylised 3D game, NOT a flat 2D cartoon drawing: solid 3D volumes with hand-painted texture detail (wood grain, worn metal, cloth folds, stone chips), soft toon shading in three value steps with gentle painted gradients inside each step, a soft ambient-occlusion darkening in creases, a thin warm rim light, light from the upper left, and a crisp dark navy (#18233B) outline of even width around the whole silhouette (like an inverted-hull outline in a game engine), chunky toy-like proportions exactly like the references. Match the design of the turnaround exactly (face, hair, costume, colours, proportions, prop); match the rendering style of the 3D render reference. Full body, three-quarter view, body turned toward the right side of the image, the whole figure inside the frame with a clear margin on every side (head, hands, prop and feet never touch or leave the edge), figure about 86% of the image height. Background: perfectly flat pure white (#FFFFFF), no floor, no cast shadow, no gradient, no glow, no particles, no speed lines, no text, no border, no frame."
+ },
+ {
+  "name": "cut-healer-azure",
+  "model": "gemini-3-pro-image",
+  "aspect": "1:1",
+  "size": "2K",
+  "refs": [
+   "/Users/wilsonguenther/critical-mass-unity-art-turnarounds/Assets/_Game/Art/Characters/_source~/turnarounds_v1/turnaround/healer/healer-three-quarter-2k.jpg",
+   "/Users/wilsonguenther/critical-mass-unity-art-turnarounds/Assets/_Game/Art/Characters/_source~/turnarounds_v1/turnaround/healer/healer-front-2k.jpg",
+   "/Users/wilsonguenther/critical-mass-unity-art-turnarounds/Assets/_Game/Art/Characters/_source~/turnarounds_v1/turnaround/healer/healer-prop-lantern-2k.jpg",
+   "/Users/wilsonguenther/cm-wt-hud-art-1/Assets/_Game/Resources/UI/BigMoments/_source~/hud_art_1/refs/style-3d.jpg"
+  ],
+  "prompt": "Reference images: the first images are the approved design turnaround of our healer character and its hand-held prop; the last image shows our 3D game render style. Create a dynamic action pose for a fighting-game style special-move cut-in: the healer is holding the lantern high in one hand and stretching the other hand forward, leaf wings spread wide, calm focused expression. Keep the team colour exactly as the turnaround shows it: teal-cyan (#16C7D9) on the scarf, sash, gems and trims. The result must look like a real-time 3D render from our stylised 3D game, NOT a flat 2D cartoon drawing: solid 3D volumes with hand-painted texture detail (wood grain, worn metal, cloth folds, stone chips), soft toon shading in three value steps with gentle painted gradients inside each step, a soft ambient-occlusion darkening in creases, a thin warm rim light, light from the upper left, and a crisp dark navy (#18233B) outline of even width around the whole silhouette (like an inverted-hull outline in a game engine), chunky toy-like proportions exactly like the references. Match the design of the turnaround exactly (face, hair, costume, colours, proportions, prop); match the rendering style of the 3D render reference. Full body, three-quarter view, body turned toward the right side of the image, the whole figure inside the frame with a clear margin on every side (head, hands, prop and feet never touch or leave the edge), figure about 86% of the image height. Background: perfectly flat pure white (#FFFFFF), no floor, no cast shadow, no gradient, no glow, no particles, no speed lines, no text, no border, no frame."
+ },
+ {
+  "name": "cut-healer-crimson",
+  "model": "gemini-3-pro-image",
+  "aspect": "1:1",
+  "size": "2K",
+  "refs": [
+   "/Users/wilsonguenther/critical-mass-unity-art-turnarounds/Assets/_Game/Art/Characters/_source~/turnarounds_v1/turnaround/healer/healer-three-quarter-2k.jpg",
+   "/Users/wilsonguenther/critical-mass-unity-art-turnarounds/Assets/_Game/Art/Characters/_source~/turnarounds_v1/turnaround/healer/healer-front-2k.jpg",
+   "/Users/wilsonguenther/critical-mass-unity-art-turnarounds/Assets/_Game/Art/Characters/_source~/turnarounds_v1/turnaround/healer/healer-prop-lantern-2k.jpg",
+   "/Users/wilsonguenther/cm-wt-hud-art-1/Assets/_Game/Resources/UI/BigMoments/_source~/hud_art_1/refs/style-3d.jpg"
+  ],
+  "prompt": "Reference images: the first images are the approved design turnaround of our healer character and its hand-held prop; the last image shows our 3D game render style. Create a dynamic action pose for a fighting-game style special-move cut-in: the healer is holding the lantern high in one hand and stretching the other hand forward, leaf wings spread wide, calm focused expression. Team change: every teal-cyan team accent of the turnaround (scarf, sash, gems, trims, glow) becomes crimson red (#FF5A5F). Everything else (skin, hair, leather, metal, cloth) stays identical to the turnaround. The result must look like a real-time 3D render from our stylised 3D game, NOT a flat 2D cartoon drawing: solid 3D volumes with hand-painted texture detail (wood grain, worn metal, cloth folds, stone chips), soft toon shading in three value steps with gentle painted gradients inside each step, a soft ambient-occlusion darkening in creases, a thin warm rim light, light from the upper left, and a crisp dark navy (#18233B) outline of even width around the whole silhouette (like an inverted-hull outline in a game engine), chunky toy-like proportions exactly like the references. Match the design of the turnaround exactly (face, hair, costume, colours, proportions, prop); match the rendering style of the 3D render reference. Full body, three-quarter view, body turned toward the right side of the image, the whole figure inside the frame with a clear margin on every side (head, hands, prop and feet never touch or leave the edge), figure about 86% of the image height. Background: perfectly flat pure white (#FFFFFF), no floor, no cast shadow, no gradient, no glow, no particles, no speed lines, no text, no border, no frame."
+ },
+ {
+  "name": "kaiju-neutral",
+  "model": "gemini-3-pro-image",
+  "aspect": "1:1",
+  "size": "2K",
+  "refs": [
+   "/Users/wilsonguenther/critical-mass-unity-art-turnarounds/Assets/_Game/Art/Characters/_source~/turnarounds_v1/turnaround/kaiju_adult/kaiju_adult-three-quarter-2k.jpg",
+   "/Users/wilsonguenther/critical-mass-unity-art-turnarounds/Assets/_Game/Art/Characters/_source~/turnarounds_v1/turnaround/kaiju_adult/kaiju_adult-front-2k.jpg",
+   "/Users/wilsonguenther/cm-wt-hud-art-1/Assets/_Game/Resources/UI/BigMoments/_source~/hud_art_1/refs/kaiju-base.png",
+   "/Users/wilsonguenther/cm-wt-hud-art-1/Assets/_Game/Resources/UI/BigMoments/_source~/hud_art_1/refs/style-3d.jpg"
+  ],
+  "prompt": "Reference images: the first two are the approved design turnaround of our Kaiju (a stocky rock-plated creature with crystal spikes along its back and tail); the last shows our 3D game render style (use it for the rendering only, not the character); the image before the style image is the same Kaiju already rendered in our style: keep that exact creature, rendering and proportions. Create the Kaiju for a full-screen dramatic cut-in: it is lunging toward the viewer with both arms spread wide and claws open, head thrust forward, jaws wide open in a mighty roar; it fills the frame; its crystals and the cracks between its rock plates glow lime green (#B8E833). Keep its design exactly: body shape, plate pattern, tan belly, crystal spikes, tail. The result must look like a real-time 3D render from our stylised 3D game, NOT a flat 2D cartoon drawing: solid 3D volumes with hand-painted texture detail (wood grain, worn metal, cloth folds, stone chips), soft toon shading in three value steps with gentle painted gradients inside each step, a soft ambient-occlusion darkening in creases, a thin warm rim light, light from the upper left, and a crisp dark navy (#18233B) outline of even width around the whole silhouette (like an inverted-hull outline in a game engine), chunky toy-like proportions exactly like the references. Match the design of the turnaround exactly (face, hair, costume, colours, proportions, prop); match the rendering style of the 3D render reference. Full body, three-quarter view, body turned toward the right side of the image, the whole figure inside the frame with a clear margin on every side (head, hands, prop and feet never touch or leave the edge), figure about 86% of the image height. Background: perfectly flat pure white (#FFFFFF), no floor, no cast shadow, no gradient, no glow, no particles, no speed lines, no text, no border, no frame."
+ },
+ {
+  "name": "kaiju-azure",
+  "model": "gemini-3-pro-image",
+  "aspect": "1:1",
+  "size": "2K",
+  "refs": [
+   "/Users/wilsonguenther/critical-mass-unity-art-turnarounds/Assets/_Game/Art/Characters/_source~/turnarounds_v1/turnaround/kaiju_adult/kaiju_adult-three-quarter-2k.jpg",
+   "/Users/wilsonguenther/critical-mass-unity-art-turnarounds/Assets/_Game/Art/Characters/_source~/turnarounds_v1/turnaround/kaiju_adult/kaiju_adult-front-2k.jpg",
+   "/Users/wilsonguenther/cm-wt-hud-art-1/Assets/_Game/Resources/UI/BigMoments/_source~/hud_art_1/refs/kaiju-base.png",
+   "/Users/wilsonguenther/cm-wt-hud-art-1/Assets/_Game/Resources/UI/BigMoments/_source~/hud_art_1/refs/style-3d.jpg"
+  ],
+  "prompt": "Reference images: the first two are the approved design turnaround of our Kaiju (a stocky rock-plated creature with crystal spikes along its back and tail); the last shows our 3D game render style (use it for the rendering only, not the character); the image before the style image is the same Kaiju already rendered in our style: keep that exact creature, rendering and proportions. Create the Kaiju for a full-screen dramatic cut-in: it is leaning forward on one fist, head turned toward the viewer, roaring a loyal battle roar; its crystals and the cracks between its rock plates now glow bright cyan (#13F1F4), the colour of the team it has sided with. Keep its design exactly: body shape, plate pattern, tan belly, crystal spikes, tail. The result must look like a real-time 3D render from our stylised 3D game, NOT a flat 2D cartoon drawing: solid 3D volumes with hand-painted texture detail (wood grain, worn metal, cloth folds, stone chips), soft toon shading in three value steps with gentle painted gradients inside each step, a soft ambient-occlusion darkening in creases, a thin warm rim light, light from the upper left, and a crisp dark navy (#18233B) outline of even width around the whole silhouette (like an inverted-hull outline in a game engine), chunky toy-like proportions exactly like the references. Match the design of the turnaround exactly (face, hair, costume, colours, proportions, prop); match the rendering style of the 3D render reference. Full body, three-quarter view, body turned toward the right side of the image, the whole figure inside the frame with a clear margin on every side (head, hands, prop and feet never touch or leave the edge), figure about 86% of the image height. Background: perfectly flat pure white (#FFFFFF), no floor, no cast shadow, no gradient, no glow, no particles, no speed lines, no text, no border, no frame."
+ },
+ {
+  "name": "kaiju-crimson",
+  "model": "gemini-3-pro-image",
+  "aspect": "1:1",
+  "size": "2K",
+  "refs": [
+   "/Users/wilsonguenther/critical-mass-unity-art-turnarounds/Assets/_Game/Art/Characters/_source~/turnarounds_v1/turnaround/kaiju_adult/kaiju_adult-three-quarter-2k.jpg",
+   "/Users/wilsonguenther/critical-mass-unity-art-turnarounds/Assets/_Game/Art/Characters/_source~/turnarounds_v1/turnaround/kaiju_adult/kaiju_adult-front-2k.jpg",
+   "/Users/wilsonguenther/cm-wt-hud-art-1/Assets/_Game/Resources/UI/BigMoments/_source~/hud_art_1/refs/kaiju-base.png",
+   "/Users/wilsonguenther/cm-wt-hud-art-1/Assets/_Game/Resources/UI/BigMoments/_source~/hud_art_1/refs/style-3d.jpg"
+  ],
+  "prompt": "Reference images: the first two are the approved design turnaround of our Kaiju (a stocky rock-plated creature with crystal spikes along its back and tail); the last shows our 3D game render style (use it for the rendering only, not the character); the image before the style image is the same Kaiju already rendered in our style: keep that exact creature, rendering and proportions. Create the Kaiju for a full-screen dramatic cut-in: it is leaning forward on one fist, head turned toward the viewer, roaring a loyal battle roar; its crystals and the cracks between its rock plates now glow warm crimson red (#F2563F), the colour of the team it has sided with. Keep its design exactly: body shape, plate pattern, tan belly, crystal spikes, tail. The result must look like a real-time 3D render from our stylised 3D game, NOT a flat 2D cartoon drawing: solid 3D volumes with hand-painted texture detail (wood grain, worn metal, cloth folds, stone chips), soft toon shading in three value steps with gentle painted gradients inside each step, a soft ambient-occlusion darkening in creases, a thin warm rim light, light from the upper left, and a crisp dark navy (#18233B) outline of even width around the whole silhouette (like an inverted-hull outline in a game engine), chunky toy-like proportions exactly like the references. Match the design of the turnaround exactly (face, hair, costume, colours, proportions, prop); match the rendering style of the 3D render reference. Full body, three-quarter view, body turned toward the right side of the image, the whole figure inside the frame with a clear margin on every side (head, hands, prop and feet never touch or leave the edge), figure about 86% of the image height. Background: perfectly flat pure white (#FFFFFF), no floor, no cast shadow, no gradient, no glow, no particles, no speed lines, no text, no border, no frame."
+ },
+ {
+  "name": "kaiju-berserk",
+  "model": "gemini-3-pro-image",
+  "aspect": "1:1",
+  "size": "2K",
+  "refs": [
+   "/Users/wilsonguenther/critical-mass-unity-art-turnarounds/Assets/_Game/Art/Characters/_source~/turnarounds_v1/turnaround/kaiju_adult/kaiju_adult-three-quarter-2k.jpg",
+   "/Users/wilsonguenther/critical-mass-unity-art-turnarounds/Assets/_Game/Art/Characters/_source~/turnarounds_v1/turnaround/kaiju_adult/kaiju_adult-front-2k.jpg",
+   "/Users/wilsonguenther/cm-wt-hud-art-1/Assets/_Game/Resources/UI/BigMoments/_source~/hud_art_1/refs/kaiju-base.png",
+   "/Users/wilsonguenther/cm-wt-hud-art-1/Assets/_Game/Resources/UI/BigMoments/_source~/hud_art_1/refs/style-3d.jpg"
+  ],
+  "prompt": "Reference images: the first two are the approved design turnaround of our Kaiju (a stocky rock-plated creature with crystal spikes along its back and tail); the last shows our 3D game render style (use it for the rendering only, not the character); the image before the style image is the same Kaiju already rendered in our style: keep that exact creature, rendering and proportions. Create the Kaiju for a full-screen dramatic cut-in: it is the exact same creature and the same body proportions as the image before the style image (same olive skin, tan belly, grey rock plates, crystal crest), now hunched lower and angrier, arms spread wide with claws open, jaws wide open in a furious berserk roar; corrupted: its crystals and the cracks between its rock plates glow hot magenta (#EE2CC0), its eyes burn magenta, a few rock plates are cracked. Keep its design exactly: body shape, plate pattern, tan belly, crystal spikes, tail. The result must look like a real-time 3D render from our stylised 3D game, NOT a flat 2D cartoon drawing: solid 3D volumes with hand-painted texture detail (wood grain, worn metal, cloth folds, stone chips), soft toon shading in three value steps with gentle painted gradients inside each step, a soft ambient-occlusion darkening in creases, a thin warm rim light, light from the upper left, and a crisp dark navy (#18233B) outline of even width around the whole silhouette (like an inverted-hull outline in a game engine), chunky toy-like proportions exactly like the references. Match the design of the turnaround exactly (face, hair, costume, colours, proportions, prop); match the rendering style of the 3D render reference. Full body, three-quarter view, body turned toward the right side of the image, the whole figure inside the frame with a clear margin on every side (head, hands, prop and feet never touch or leave the edge), figure about 86% of the image height. Background: perfectly flat pure white (#FFFFFF), no floor, no cast shadow, no gradient, no glow, no particles, no speed lines, no text, no border, no frame."
+ }
+]
