@@ -186,9 +186,23 @@ namespace CriticalMass.Runtime.Camera
         }
     }
 
+    /// <summary>
+    /// feat/follow-camera-1: the follow's shape. Unset (default) = the ground view's own numbers (GroundCamera.Distance,
+    /// PivotHeight, Shoulder, pitch limits); the third-person and first-person views pass theirs (FollowCamera).
+    /// </summary>
+    public struct GroundRig
+    {
+        public bool Set;
+        /// <summary>First person: the camera sits at the pivot (the eyes), a little ahead along the view; no pull-in.</summary>
+        public bool FirstPerson;
+        public double Distance, PivotHeight, Shoulder, MinPitch, MaxPitch;
+    }
+
     /// <summary>One frame's inputs to <see cref="GroundFollow.Step"/>.</summary>
     public struct GroundFollowInput
     {
+        /// <summary>The follow's shape (unset: the ground view's).</summary>
+        public GroundRig Rig;
         public double Dt;
         /// <summary>The followed body in sim space and the ground under it.</summary>
         public double TargetX, TargetZ, GroundY;
@@ -237,13 +251,20 @@ namespace CriticalMass.Runtime.Camera
 
         public void SetYaw(double yaw) => Yaw = GroundCamera.Normalize(yaw);
         public void SetPitch(double p) => Pitch = Clamp(p, GroundCamera.MinPitchDeg, GroundCamera.MaxPitchDeg);
+        /// <summary>Pitch within explicit limits (the follow views' wider ranges).</summary>
+        public void SetPitch(double p, double lo, double hi) => Pitch = Clamp(p, lo, hi);
         /// <summary>Counts as a manual orbit now: auto yaw waits OrbitHoldSeconds before it swings back.</summary>
         public void HoldAuto() => _sinceOrbit = 0;
 
         public void Step(in GroundFollowInput f)
         {
             double dt = f.Dt > 0 ? f.Dt : 0;
-            double gx = f.TargetX, gy = f.GroundY + GroundCamera.PivotHeight + f.PivotLift, gz = f.TargetZ;
+            bool rig = f.Rig.Set;
+            double pivotH = rig ? f.Rig.PivotHeight : GroundCamera.PivotHeight;
+            double minP = rig ? f.Rig.MinPitch : GroundCamera.MinPitchDeg, maxP = rig ? f.Rig.MaxPitch : GroundCamera.MaxPitchDeg;
+            double shoulder = rig ? f.Rig.Shoulder : GroundCamera.Shoulder;
+            double baseDist = rig ? f.Rig.Distance : GroundCamera.Distance;
+            double gx = f.TargetX, gy = f.GroundY + pivotH + f.PivotLift, gz = f.TargetZ;
             bool snap = f.Snap || !_placed;
             if (snap)
             {
@@ -263,7 +284,7 @@ namespace CriticalMass.Runtime.Camera
             if (orbiting) _sinceOrbit = 0;
             else _sinceOrbit += dt;
             Yaw = GroundCamera.Normalize(Yaw + f.OrbitYaw);
-            Pitch = Clamp(Pitch + f.OrbitPitch, GroundCamera.MinPitchDeg, GroundCamera.MaxPitchDeg);
+            Pitch = Clamp(Pitch + f.OrbitPitch, minP, maxP);
             if (f.AutoYaw)
             {
                 if (snap) Yaw = GroundCamera.Normalize(f.WantYaw);
@@ -281,15 +302,25 @@ namespace CriticalMass.Runtime.Camera
             double pr = Pitch * Math.PI / 180;
             double cp = Math.Cos(pr), sp = Math.Sin(pr);
             double fx = ux * cp, fy = -sp, fz = uz * cp;
-            double ox = _px.X + rx * GroundCamera.Shoulder, oy = _py.X, oz = _pz.X + rz * GroundCamera.Shoulder;
+            if (rig && f.Rig.FirstPerson)
+            {
+                // The eyes: the pivot a little ahead along the ground facing (the hidden body never fills the lens).
+                CamX = _px.X + ux * FollowCamera.EyeForward;
+                CamY = _py.X;
+                CamZ = _pz.X + uz * FollowCamera.EyeForward;
+                Dist = Allowed = 0;
+                OverHead = false;
+                return;
+            }
+            double ox = _px.X + rx * shoulder, oy = _py.X, oz = _pz.X + rz * shoulder;
             // The shoulder offset itself must not sit inside a wall: shrink it first (pivot to shoulder segment).
-            double sh = GroundCollision.Resolve(f.Map, _px.X, _py.X, _pz.X, rx, 0, rz, GroundCamera.Shoulder, f.Cylinders, f.CylinderCount);
-            if (sh < GroundCamera.Shoulder)
+            double sh = shoulder > 0 ? GroundCollision.Resolve(f.Map, _px.X, _py.X, _pz.X, rx, 0, rz, shoulder, f.Cylinders, f.CylinderCount) : 0;
+            if (sh < shoulder)
             {
                 ox = _px.X + rx * sh;
                 oz = _pz.X + rz * sh;
             }
-            double want = GroundCamera.Distance + f.ExtraDistance;
+            double want = baseDist + f.ExtraDistance;
             double allowed = GroundCollision.Resolve(f.Map, ox, oy, oz, -fx, -fy, -fz, want, f.Cylinders, f.CylinderCount);
             Allowed = allowed;
             if (snap || allowed < Dist) Dist = allowed;

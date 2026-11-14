@@ -59,12 +59,21 @@ namespace CriticalMass.Runtime.Camera
         public static bool PlayActive => Current != null && Current.Mode == GroundViewMode.Play;
         /// <summary>True while ground view drives the camera.</summary>
         public static bool IsActive => Current != null && Current.Mode != GroundViewMode.Off;
-        /// <summary>The camera yaw while playing (Unity degrees).</summary>
-        public static double PlayYaw => Current != null ? Current._follow.Yaw : 315;
+        /// <summary>The yaw the keys and the left stick move relative to (the follow views hold it while a move is held;
+        /// InputLatch), and the camera's own yaw otherwise.</summary>
+        public static double PlayYaw => Current != null ? Current._inputYaw : 315;
         /// <summary>LOD contract C4 from this camera: fighters pick LOD0 by distance to the followed body, which counts as "self".</summary>
         public static bool LodActive => IsActive && Current._lodValid;
         public static Vector3 LodAnchor => Current != null ? Current._lodAnchor : Vector3.zero;
         public static int LodSelf => Current != null ? Current._lodSelf : 0;
+        /// <summary>feat/follow-camera-1: the view the local player plays in now (TopDown when the high camera drives).</summary>
+        public static CameraView ActiveView => PlayActive ? Current._view : CameraView.TopDown;
+        /// <summary>First person: the local player's own body is not drawn (ActorViews reads it).</summary>
+        public static bool HideSelf => PlayActive && Current._view == CameraView.FirstPerson;
+        /// <summary>Capture runs only (FollowCameraShots): the view to use instead of the setting, and play from it even
+        /// while the autopilot drives actor 0.</summary>
+        public static CameraView? ViewOverride;
+        public static bool ForcePlay;
 
         public SimDriverBehaviour Driver;
         public GroundViewMode Mode { get; private set; }
@@ -98,13 +107,26 @@ namespace CriticalMass.Runtime.Camera
         Vector3 _lodAnchor;
         int _lodSelf;
         double _aimDistance = GroundCamera.AimDistance;
+        readonly YawFollow _yawFollow = new YawFollow();
+        readonly InputLatch _latch = new InputLatch();
+        double _inputYaw = 315;
+        float _sens = 1f;
+        bool _invertY;
+        CameraView _view = CameraView.ThirdPerson, _lineView = (CameraView)(-1);
+        bool _lineManual;
+        string _playLine = "";
+        double _sinceLook = 999;
+        float _fov = FollowCamera.FovDefault;
+        bool _manual;
+        static readonly int[] HudPanels = { (int)HudCluster.Minimap, (int)HudCluster.Kaiju };
+        readonly Vector3[] _corners = new Vector3[4];
         readonly bool[] _hidClusters = new bool[4];
         float _toastUntil;
         string _toast;
         bool _cursorLocked;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        static void ResetStatics() => Current = null;
+        static void ResetStatics() { Current = null; ViewOverride = null; ForcePlay = false; }
 
         void Awake() => Current = this;
 
@@ -114,6 +136,8 @@ namespace CriticalMass.Runtime.Camera
             if (AutoplayArgs.HasAutomationFlag("-groundview") || AutoplayArgs.HasAutomationFlag("-groundshots")) WatchGround = true;
             if (AutoplayArgs.HasAutomationFlag("-groundshots") && GetComponent<GroundViewShots>() == null)
                 gameObject.AddComponent<GroundViewShots>().View = this;
+            if (AutoplayArgs.HasAutomationFlag(FollowCameraShots.Flag) && GetComponent<FollowCameraShots>() == null)
+                gameObject.AddComponent<FollowCameraShots>().View = this;
         }
 
         void OnDestroy()
@@ -134,8 +158,10 @@ namespace CriticalMass.Runtime.Camera
             }
             else
             {
-                GameSettings.GroundCamera = !GameSettings.GroundCamera;
-                Toast(GameSettings.GroundCamera ? "CAMERA: GROUND (EXPERIMENTAL)" : "CAMERA: HIGH");
+                // feat/follow-camera-1: playing, F5 cycles TOP-DOWN, THIRD PERSON, FIRST PERSON (Settings, Game, CAMERA too).
+                CameraView next = FollowCamera.Next(ChosenView());
+                if (ViewOverride.HasValue) ViewOverride = next; else GameSettings.CameraView = next;
+                Toast(next == CameraView.ThirdPerson ? "VIEW: THIRD PERSON" : next == CameraView.FirstPerson ? "VIEW: FIRST PERSON" : "VIEW: TOP-DOWN");
             }
         }
 
@@ -199,11 +225,13 @@ namespace CriticalMass.Runtime.Camera
             return SpectatorMode.IsSpectating || !w.Actors[0].Alive || Driver.HumanAutopilot;
         }
 
+        static CameraView ChosenView() => ViewOverride ?? GameSettings.CameraView;
+
         bool PlayAllowedNow()
         {
-            if (!InMatch() || !GameSettings.GroundCamera) return false;
+            if (!InMatch() || ChosenView() == CameraView.TopDown) return false;
             World w = Driver.World;
-            return w.Match.Phase != MatchPhase.Ended && !SpectatorMode.IsSpectating && !Driver.HumanAutopilot && w.Actors[0].Alive;
+            return w.Match.Phase != MatchPhase.Ended && !SpectatorMode.IsSpectating && (!Driver.HumanAutopilot || ForcePlay) && w.Actors[0].Alive;
         }
 
         GroundViewMode WantMode()
@@ -274,9 +302,15 @@ namespace CriticalMass.Runtime.Camera
 
             // Orbit / look input.
             ReadLook(paused, dt, out double orbitYaw, out double orbitPitch);
-            // feat/camera-creator-angle: playing from the ground starts facing the high camera's heading, so screen up stays the
-            // same direction across F5 (the creator's angle by default).
-            if (snap && Mode == GroundViewMode.Play) _follow.SetYaw(CameraHeading.UnityYaw(Driver.Config.Render.CameraYawDeg));
+            GroundRig rig = default;
+            if (Mode == GroundViewMode.Play)
+            {
+                CameraView v = ChosenView();
+                if (v != _view) { _view = v; snap = true; }
+                rig = _view == CameraView.FirstPerson ? FollowCamera.FirstRig : FollowCamera.ThirdRig;
+                PlayFollow(w, target, facing, paused ? 0 : dt, snap, orbitYaw, orbitPitch, rig, ref tx, ref tz);
+                orbitYaw = orbitPitch = 0;   // PlayFollow owns the yaw and pitch
+            }
 
             GatherCylinders(w, tx, tz, target);
             var f = new GroundFollowInput
@@ -289,6 +323,7 @@ namespace CriticalMass.Runtime.Camera
                 ExtraDistance = extra,
                 WantYaw = GroundCamera.YawOfFacing(facing),
                 AutoYaw = Mode == GroundViewMode.Watch,
+                Rig = rig,
                 OrbitYaw = orbitYaw,
                 OrbitPitch = orbitPitch,
                 Snap = snap,
@@ -297,6 +332,7 @@ namespace CriticalMass.Runtime.Camera
                 CylinderCount = _cylCount,
             };
             _follow.Step(f);
+            if (Mode != GroundViewMode.Play) _inputYaw = _follow.Yaw;
             ApplyCamera();
 
             _lodValid = true;
@@ -304,6 +340,56 @@ namespace CriticalMass.Runtime.Camera
             _lodSelf = target >= 0 ? target : -1;
             if (Mode == GroundViewMode.Play) UpdateAimDistance(w);
             UpdateCursor(paused);
+        }
+
+        /// <summary>
+        /// feat/follow-camera-1: the third / first person yaw and pitch. Auto (default): the yaw follows the character's
+        /// travel direction (its facing when standing) on YawFollow's critically damped spring after a short delay, and the
+        /// pitch eases to the view's own. Manual (Settings, Video, CAMERA FOLLOW): the mouse or right stick orbits; after
+        /// RecenterSeconds without look input, or a middle click, it re-centres behind. Third person also looks a little
+        /// ahead along the travel (none under reduce motion).
+        /// </summary>
+        void PlayFollow(World w, int id, double facing, double dt, bool snap, double orbitYaw, double orbitPitch, GroundRig rig, ref double tx, ref double tz)
+        {
+            double hz = w.Config.SimHz > 0 ? w.Config.SimHz : 30;
+            double vx = (w.X[id] - w.PrevX[id]) * hz, vz = (w.Z[id] - w.PrevZ[id]) * hz;
+            bool moving = vx * vx + vz * vz > FollowCamera.MovingSpeed * FollowCamera.MovingSpeed;
+            double behind = moving ? GroundCamera.YawToward(0, 0, vx, vz, GroundCamera.YawOfFacing(facing)) : GroundCamera.YawOfFacing(facing);
+            bool reduce = CriticalMass.Runtime.View.Effects.FeelGate.ReduceMotion;
+            double defPitch = rig.FirstPerson ? FollowCamera.FirstPitch : FollowCamera.ThirdPitch;
+            if (snap)
+            {
+                _yawFollow.Reset(GroundCamera.YawOfFacing(facing));
+                _follow.SetPitch(defPitch, rig.MinPitch, rig.MaxPitch);
+                _sinceLook = 999;
+            }
+            Mouse mouse = Mouse.current;
+            if (mouse != null && mouse.middleButton.wasPressedThisFrame) { _yawFollow.Recenter(behind); _sinceLook = 999; }
+            bool looked = _manual && (Math.Abs(orbitYaw) > 1e-6 || Math.Abs(orbitPitch) > 1e-6);
+            if (looked)
+            {
+                _sinceLook = 0;
+                _yawFollow.Reset(_follow.Yaw + orbitYaw);
+                _follow.SetPitch(_follow.Pitch + orbitPitch, rig.MinPitch, rig.MaxPitch);
+            }
+            else
+            {
+                _sinceLook += dt;
+                if (!_manual || _sinceLook >= FollowCamera.RecenterSeconds)
+                {
+                    _yawFollow.Step(dt, behind, reduce);
+                    if (dt > 0) _follow.SetPitch(_follow.Pitch + (defPitch - _follow.Pitch) * (1 - Math.Exp(-dt / 0.4)), rig.MinPitch, rig.MaxPitch);
+                }
+            }
+            _follow.SetYaw(_yawFollow.Yaw);
+            bool held = _input != null && _input.State.MoveHeld;
+            _inputYaw = snap ? _follow.Yaw : _latch.Step(held, looked, _follow.Yaw);
+            if (!rig.FirstPerson)
+            {
+                FollowCamera.Lead(vx, vz, reduce, out double lx, out double lz);
+                tx += lx;
+                tz += lz;
+            }
         }
 
         int WatchTarget(World w, double dt)
@@ -386,11 +472,33 @@ namespace CriticalMass.Runtime.Camera
             Mouse mouse = Mouse.current;
             Gamepad pad = Gamepad.current;
             bool play = Mode == GroundViewMode.Play;
+            // feat/follow-camera-1: playing, the look input only orbits in manual mode (auto follow owns the yaw otherwise).
+            if (Time.frameCount % 30 == 0 || ActiveFrames <= 1)
+            {
+                _manual = GameSettings.CameraManual;
+                _fov = GameSettings.CameraFov;
+                _sens = GameSettings.CameraSensitivity;
+                _invertY = GameSettings.CameraInvertY;
+            }
+            if (play && !_manual) return;
+            float sens = play ? _sens : 1f;
             if (mouse != null && (play ? _cursorLocked : mouse.rightButton.isPressed))
             {
                 Vector2 d = mouse.delta.ReadValue();
-                yaw += d.x * MouseDegPerPx;
-                pitch -= d.y * MouseDegPerPx * (ControllerSettings.InvertAimY ? -1f : 1f);
+                yaw += d.x * MouseDegPerPx * sens;
+                pitch -= d.y * MouseDegPerPx * sens * ((play ? _invertY : ControllerSettings.InvertAimY) ? -1f : 1f);
+            }
+            if (pad != null && play)
+            {
+                Vector2 s0 = pad.rightStick.ReadValue();
+                float m0 = s0.magnitude;
+                if (m0 > 0.2f)
+                {
+                    float k0 = Mathf.Clamp01((m0 - 0.2f) / 0.8f) / m0 * sens;
+                    yaw += s0.x * k0 * StickYawDegPerSec * dt;
+                    pitch -= s0.y * k0 * StickPitchDegPerSec * dt * (_invertY ? -1f : 1f);
+                }
+                return;
             }
             if (pad != null)
             {
@@ -497,7 +605,8 @@ namespace CriticalMass.Runtime.Camera
             }
             Vector3 pos = SimSpace.ToWorld(_follow.CamX, _follow.CamY, _follow.CamZ);
             _cam.transform.SetPositionAndRotation(pos, Quaternion.Euler((float)_follow.Pitch, (float)_follow.Yaw, 0f));
-            if (_cam.fieldOfView != GroundCamera.FovDeg) _cam.fieldOfView = GroundCamera.FovDeg;
+            float fov = Mode == GroundViewMode.Play ? _fov : GroundCamera.FovDeg;
+            if (_cam.fieldOfView != fov) _cam.fieldOfView = fov;
             if (_cam.nearClipPlane != GroundCamera.NearClip) _cam.nearClipPlane = GroundCamera.NearClip;
             if (_cam.farClipPlane != GroundCamera.FarClip) _cam.farClipPlane = GroundCamera.FarClip;
             if (_backdrop != null) _backdrop.Place(pos);
@@ -508,8 +617,7 @@ namespace CriticalMass.Runtime.Camera
         {
             GameHud hud = Driver != null ? Driver.GetComponent<GameHud>() : null;
             if (hud == null || hud.Clusters == null) return;
-            int[] which = { (int)HudCluster.Minimap, (int)HudCluster.Kaiju };
-            foreach (int i in which)
+            foreach (int i in HudPanels)
             {
                 RectTransform c = hud.Clusters[i];
                 if (c == null) continue;
@@ -530,8 +638,7 @@ namespace CriticalMass.Runtime.Camera
             GameHud hud = Driver != null ? Driver.GetComponent<GameHud>() : null;
             if (hud == null || hud.Clusters == null) return;
             bool hide = Mode == GroundViewMode.Watch;
-            int[] which = { (int)HudCluster.Minimap, (int)HudCluster.Kaiju };
-            foreach (int i in which)
+            foreach (int i in HudPanels)
             {
                 RectTransform c = hud.Clusters[i];
                 if (c == null) continue;
@@ -652,7 +759,18 @@ namespace CriticalMass.Runtime.Camera
         }
 
         static readonly string WatchLine = "GROUND VIEW   F5 HIGH VIEW   Q / E NEXT   RIGHT DRAG ORBIT   F6 DIRECTOR";
-        static readonly string PlayLine = "GROUND CAMERA (EXPERIMENTAL)   F5 HIGH CAMERA";
+
+        /// <summary>The play hint, rebuilt only when the view or the follow mode changes (no per-frame strings).</summary>
+        string PlayHint()
+        {
+            if (_lineView == _view && _lineManual == _manual) return _playLine;
+            _lineView = _view;
+            _lineManual = _manual;
+            string next = FollowCamera.Label(FollowCamera.Next(_view));
+            _playLine = FollowCamera.Label(_view) + (_manual ? "   MOUSE LOOK   MIDDLE CLICK RE-CENTRE" : "   AUTO FOLLOW")
+                + "   F5 " + next;
+            return _playLine;
+        }
 
         void OnGUI()
         {
@@ -666,16 +784,89 @@ namespace CriticalMass.Runtime.Camera
             Color old = GUI.color;
             // Mode line at the bottom centre, quiet (it never covers the fight).
             GUI.color = new Color(1f, 0.97f, 0.88f, 0.75f);
-            string line = Mode == GroundViewMode.Play ? PlayLine : WatchLine;
-            if (!(GetComponent<GroundViewShots>() != null)) GUI.Label(new Rect(0, Screen.height - 40 * s, Screen.width, 28 * s), line, _style);
+            string line = Mode == GroundViewMode.Play ? PlayHint() : WatchLine;
+            if (GetComponent<GroundViewShots>() == null && GetComponent<FollowCameraShots>() == null) GUI.Label(new Rect(0, Screen.height - 40 * s, Screen.width, 28 * s), line, _style);
             if (_toast != null && Time.unscaledTime < _toastUntil)
             {
                 GUI.color = new Color(1f, 0.85f, 0.45f, 1f);
                 _style.fontSize = Mathf.RoundToInt(26 * s);
                 GUI.Label(new Rect(0, Screen.height * 0.22f, Screen.width, 40 * s), _toast, _style);
             }
-            if (Mode == GroundViewMode.Play) DrawPlayAids(s);
+            if (Mode == GroundViewMode.Play) { DrawAimTrail(s); DrawPlayAids(s); DrawViewCone(s); }
             GUI.color = old;
+        }
+
+        /// <summary>
+        /// feat/follow-camera-1: the minimap stays fixed (the baked island picture, the markers and the click-to-ping maths
+        /// all assume its heading), and a soft view cone at the player's marker shows where the low camera looks. Drawn
+        /// with the reticle's dot texture (no new texture, no allocation).
+        /// </summary>
+        void DrawViewCone(float s)
+        {
+            World w = Driver != null ? Driver.World : null;
+            GameHud hud = Driver != null ? Driver.GetComponent<GameHud>() : null;
+            if (w == null || hud == null || hud.Clusters == null || hud.Canvas == null) return;
+            RectTransform c = hud.Clusters[(int)HudCluster.Minimap];
+            if (c == null || !c.gameObject.activeInHierarchy) return;
+            CriticalMass.Runtime.Hud.Ui.MinimapProjection proj = CriticalMass.Runtime.Hud.Ui.MinimapGround.Projection;
+            if (proj == null || proj.Width <= 0 || proj.Height <= 0) return;
+            c.GetWorldCorners(_corners);
+            UnityEngine.Camera uiCam = hud.Canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : hud.Canvas.worldCamera;
+            Vector2 bl = RectTransformUtility.WorldToScreenPoint(uiCam, _corners[0]);
+            Vector2 tr = RectTransformUtility.WorldToScreenPoint(uiCam, _corners[2]);
+            float fw = (tr.x - bl.x), fh = (tr.y - bl.y);
+            if (fw < 8f || fh < 8f) return;
+            // The map image sits inside the frame (HudLayout.MinimapFrame on each side of the reference size).
+            float kx = fw / HudLayout.MinimapSize.x, ky = fh / HudLayout.MinimapSize.y;
+            float left = bl.x + HudLayout.MinimapFrame * kx, top = Screen.height - tr.y + HudLayout.MinimapFrame * ky;
+            float iw = fw - 2f * HudLayout.MinimapFrame * kx, ih = fh - 2f * HudLayout.MinimapFrame * ky;
+            Vector2 px = proj.ToPixel(w.X[0], w.Z[0]);
+            Vector2 at = new Vector2(left + px.x / proj.Width * iw, top + px.y / proj.Height * ih);
+            GroundCamera.Basis(_follow.Yaw, out double ux, out double uz, out _, out _);
+            Vector2 dir = new Vector2((float)proj.U(ux, uz), (float)proj.V(ux, uz));
+            if (dir.sqrMagnitude < 1e-6f) return;
+            dir.Normalize();
+            Vector2 side = new Vector2(-dir.y, dir.x);
+            float half = Mathf.Tan(_fov * 0.5f * Mathf.Deg2Rad);
+            GUI.color = new Color(1f, 0.96f, 0.86f, 0.22f);
+            for (int i = 1; i <= 7; i++)
+            {
+                float d = i * 4.5f * s, r = Mathf.Max(1.5f * s, d * half * 0.55f);
+                Vector2 p = at + dir * d;
+                for (int j = -1; j <= 1; j++)
+                {
+                    Vector2 q = p + side * (j * d * half * 0.6f);
+                    GUI.DrawTexture(new Rect(q.x - r * 0.5f, q.y - r * 0.5f, r, r), Dot());
+                }
+            }
+        }
+
+        /// <summary>
+        /// feat/follow-camera-1: where skills and shots go, on the ground in front of the character: a dotted trail from his
+        /// feet to the aim point the sim gets (TryPlayAim), the dots smaller with distance, a larger dot at the end. Points
+        /// behind the lens are skipped (first person starts the trail below the screen). No texture or mesh added.
+        /// </summary>
+        void DrawAimTrail(float s)
+        {
+            World w = Driver != null ? Driver.World : null;
+            if (w == null || _cam == null || !TryPlayAim(w, out double ax, out double az)) return;
+            double a = Driver.Alpha;
+            double px = w.PrevX[0] + (w.X[0] - w.PrevX[0]) * a, pz = w.PrevZ[0] + (w.Z[0] - w.PrevZ[0]) * a;
+            const int n = 9;
+            for (int k = 2; k <= n; k++)
+            {
+                double t = k / (double)n;
+                double x = px + (ax - px) * t, z = pz + (az - pz) * t;
+                Vector3 g = SimSpace.ToWorld(x, GroundHeight.At(w.Map, x, z) + 0.06, z);
+                Vector3 sp = _cam.WorldToScreenPoint(g);
+                if (sp.z <= 0.2f) continue;
+                float size = Mathf.Clamp(60f / sp.z, 3f, 14f) * s * (k == n ? 1.8f : 1f);
+                float gy = Screen.height - sp.y;
+                GUI.color = new Color(0.06f, 0.08f, 0.16f, 0.45f);
+                GUI.DrawTexture(new Rect(sp.x - size * 0.65f, gy - size * 0.65f, size * 1.3f, size * 1.3f), Dot());
+                GUI.color = new Color(1f, 0.96f, 0.86f, k == n ? 0.9f : 0.6f);
+                GUI.DrawTexture(new Rect(sp.x - size * 0.5f, gy - size * 0.5f, size, size), Dot());
+            }
         }
 
         void DrawPlayAids(float s)

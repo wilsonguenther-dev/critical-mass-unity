@@ -281,6 +281,9 @@ namespace CriticalMass.Runtime.Input
         /// The move intent in screen axes (right, up), each -1..1 (WASD composite or the left stick). fromKeys = it came
         /// from direction keys (KeysFollowMap and lane assist apply to keys only).
         /// </summary>
+        /// <summary>feat/follow-camera-1: a move key or the left stick is held (the follow views latch their input basis).</summary>
+        public bool MoveHeld => _moveRight * _moveRight + _moveUp * _moveUp > 0.01;
+
         public void SetMove(double right, double up, bool fromKeys = false)
         {
             _moveRight = right;
