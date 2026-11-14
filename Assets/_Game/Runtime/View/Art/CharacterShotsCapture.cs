@@ -265,6 +265,44 @@ namespace CriticalMass.Runtime.View.Art
             return b;
         }
 
+        /// <summary>Idle feet check (integration batch 10, Miner hold): lowest skinned vertex above the stage floor, and for
+        /// each foot/toe/ankle bone its height and the pitch towards its first child (negative = pointing down).</summary>
+        static string FeetReport(ModelView m)
+        {
+            var sb = new StringBuilder();
+            float low = float.MaxValue;
+            var baked = new Mesh();
+            try
+            {
+                foreach (Renderer r in m.Renderers)
+                {
+                    if (r == null || !r.enabled || !r.gameObject.activeInHierarchy) continue;
+                    if (r.name.EndsWith("_Shadow", StringComparison.Ordinal)) continue;
+                    if (!(r is SkinnedMeshRenderer smr)) continue;
+                    smr.BakeMesh(baked, true);
+                    Matrix4x4 w = Matrix4x4.TRS(smr.transform.position, smr.transform.rotation, Vector3.one);
+                    foreach (Vector3 v in baked.vertices) low = Mathf.Min(low, w.MultiplyPoint3x4(v).y);
+                }
+            }
+            catch (Exception ex) { sb.Append("lowest vertex: not measured (").Append(ex.GetType().Name).Append(")"); }
+            finally { Object.Destroy(baked); }
+            if (low < float.MaxValue) sb.Append($"lowest skinned vertex {(low - Stage.y):F3} u above the floor");
+            foreach (Transform t in m.Transform.GetComponentsInChildren<Transform>(true))
+            {
+                string n = t.name.ToLowerInvariant();
+                if (!(n.Contains("foot") || n.Contains("toe") || n.Contains("ankle"))) continue;
+                if (t.GetComponent<Renderer>() != null) continue;
+                sb.Append($"; {t.name} y {(t.position.y - Stage.y):F3}");
+                if (t.childCount > 0)
+                {
+                    Vector3 d = t.GetChild(0).position - t.position;
+                    if (d.sqrMagnitude > 1e-8f)
+                        sb.Append($" pitch to {t.GetChild(0).name} {Mathf.Asin(Mathf.Clamp(d.y / d.magnitude, -1f, 1f)) * Mathf.Rad2Deg:F1} deg");
+                }
+            }
+            return sb.ToString();
+        }
+
         static string ClipReport(ArtEntry e, ArtEntry kay, ModelSpec spec)
         {
             var sb = new StringBuilder();
@@ -316,6 +354,7 @@ namespace CriticalMass.Runtime.View.Art
             float h = Mathf.Max(0.5f, hb.max.y - Stage.y);
             Log($"{s.Name} {teamName}: model {spec.AssetPath} (prefab {e.Model.name}), face decal {(e.Face != null ? e.Face.name : spec.VertexColourFace ? "none (vertex-colour face)" : "none")}, " +
                 $"scale {m.BaseScale.y:F3}, art yaw {spec.ArtYawDeg:F0}, idle height Hero {h:F3} u / LOD0 {(lb.max.y - Stage.y):F3} u, width {hb.size.x:F2} u; " + ClipReport(e, kay, spec));
+            Log($"{s.Name} {teamName} idle feet (LOD0, idle t=0): " + FeetReport(m));
 
             // ---- stills: front, right, back, left, three-quarter; close (Hero) on top, gameplay (LOD0) below
             string[] views = { "front", "right", "back", "left", "threequarter" };
