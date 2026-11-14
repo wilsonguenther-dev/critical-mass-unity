@@ -21,7 +21,7 @@ namespace CriticalMass.Runtime.Camera
         /// THE ONE LINE THAT FLIPS THE DEFAULT: false keeps today's classic diamond until the owner has seen the creator's
         /// angle (batch 8, 2026-11-13); true makes the creator's angle the default. Either way both are in Settings, Game, CAMERA.
         /// </summary>
-        public const bool CreatorAngleIsDefault = false;
+        public const bool CreatorAngleIsDefault = true;
 
         /// <summary>Tests pin a heading here (SetUpFixture: legacy tests describe the classic 45).</summary>
         public static double? Pin;
