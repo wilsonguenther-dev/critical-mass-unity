@@ -505,6 +505,8 @@ namespace CriticalMass.Runtime.Menus
                 default:
                     if (_finish) break;
                     _warmFrames++;
+                    // perf/fullscreen-cost-1: draw the HUD's letters into the font textures behind the screen, not in the match.
+                    if (_warmFrames == 1) Hud.Style.GlyphWarmup.WarmScene();
                     Report(LoadStep.WarmUp, Mathf.Min((float)_warmFrames / WarmUpFrames, ShaderWarmup.Done ? 1f : 0.95f));
                     // perf-smooth-1: also wait for the shipped shader/PSO warm-up (bounded: never more than WarmUpWaitSeconds).
                     if (_warmFrames >= WarmUpFrames && (ShaderWarmup.Done || Time.unscaledTime - _stepStart > WarmUpWaitSeconds)) Finish();

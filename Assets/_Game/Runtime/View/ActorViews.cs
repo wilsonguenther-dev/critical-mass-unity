@@ -177,6 +177,24 @@ namespace CriticalMass.Runtime.View
             return m;
         }
 
+        /// <summary>
+        /// perf/fullscreen-cost-1: new fighter models built per frame. The walk saw one 80 ms frame at match start where all
+        /// 32 rigs were instantiated at once (and the 449 ms start frame carried 14 ms of them). Pooled models are free;
+        /// beyond this many new ones a fighter waits a frame (drawn as nothing, never as the capsule), the local player
+        /// first. 32 fighters are all built within 6 frames, behind the loading screen in a normal match.
+        /// </summary>
+        public const int NewModelsPerFrame = 6;
+        int _newModelsLeft;
+
+        /// <summary>True when a model for key can be had this frame (one waits in the pool, or the build budget allows one).</summary>
+        private bool CanTake(string key)
+        {
+            if (_pool.TryGetValue(key, out Stack<ModelView> s) && s.Count > 0) return true;
+            if (_newModelsLeft <= 0) return false;
+            _newModelsLeft--;
+            return true;
+        }
+
         private ModelView Take(string key, string objectName)
         {
             if (_pool.TryGetValue(key, out Stack<ModelView> s) && s.Count > 0)
@@ -244,6 +262,7 @@ namespace CriticalMass.Runtime.View
             if (_stressHill) _targetPos = SimSpace.ToWorld(map.Hill.X, 0, map.Hill.Z);
             _lodCut = CrowdCutNow(w, map, a);
             int models = 0;
+            _newModelsLeft = NewModelsPerFrame;
             Anim.AnimLod.BeginFrame();
             // feat/follow-camera-1: frustum and distance culling for the low views, and the drawn / culled / triangle counts.
             CriticalMass.Runtime.Camera.ViewCull.Begin(_cam, CriticalMass.Runtime.Camera.GroundView.LodActive);
@@ -293,6 +312,11 @@ namespace CriticalMass.Runtime.View
             }
             if (alive && key != null && slot.Model == null)
             {
+                if (!CanTake(key))
+                {
+                    if (slot.Capsule != null && slot.Capsule.gameObject.activeSelf) slot.Capsule.gameObject.SetActive(false);
+                    return false;
+                }
                 slot.Model = Take(key, ActorName(i, key));
                 slot.Anim.Reset();
             }
