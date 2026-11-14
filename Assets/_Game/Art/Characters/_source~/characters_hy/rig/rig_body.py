@@ -96,6 +96,56 @@ try:
         o.name = o.data.name = f'{CLS}_{lv}'
     hero = LV['Hero']
 
+    # rig-demolitions-1: '_opts': {'pull_rear_parts_flush': overlap_m}: a separate piece behind the body (the Demolitions
+    # barrel hung about 0.1 m behind her back in the generated model) moves forward (-Y) on every level until its nearest
+    # point sits overlap_m inside the body's back surface. The shift is measured on the Hero and applied to every level.
+    _jf0 = os.path.join(HERE, f'rigb_joints_{CLS}.json')
+    _pull = json.load(open(_jf0)).get('_opts', {}).get('pull_rear_parts_flush') if os.path.exists(_jf0) else None
+
+    def rear_parts(ob):
+        bm_ = bmesh.new(); bm_.from_mesh(ob.data); bm_.verts.ensure_lookup_table()
+        n_ = len(bm_.verts); comp = np.full(n_, -1); nc = 0
+        for v0 in bm_.verts:
+            if comp[v0.index] >= 0:
+                continue
+            comp[v0.index] = nc; st_ = [v0]
+            while st_:
+                v_ = st_.pop()
+                for e_ in v_.link_edges:
+                    o_ = e_.other_vert(v_)
+                    if comp[o_.index] < 0:
+                        comp[o_.index] = nc; st_.append(o_)
+            nc += 1
+        bm_.free()
+        P_ = verts(ob); main_ = np.bincount(comp).argmax()
+        rear = np.zeros(n_, bool)
+        for k_ in range(nc):
+            sel_ = comp == k_
+            if k_ != main_ and sel_.sum() > 50 and P_[sel_, 1].mean() > P_[comp == main_, 1].mean() + 0.15:
+                rear |= sel_
+        return P_, rear, comp == main_
+
+    if _pull:
+        P_, rear, body_ = rear_parts(hero)
+        if rear.any():
+            cell = 0.02
+            B = P_[body_]; R_ = P_[rear]
+            kb = np.floor(B[:, [0, 2]] / cell).astype(int); kr = np.floor(R_[:, [0, 2]] / cell).astype(int)
+            back = {}
+            for (i_, j_), y_ in zip(map(tuple, kb), B[:, 1]):
+                if y_ > back.get((i_, j_), -9):
+                    back[(i_, j_)] = y_
+            gaps = [y_ - back[(i_, j_)] for (i_, j_), y_ in zip(map(tuple, kr), R_[:, 1]) if (i_, j_) in back]
+            gap = float(min(gaps)) if gaps else 0.0
+            shift = gap + float(_pull)
+            REP['rear_pull'] = {'gap_m': round(gap, 4), 'shift_m': round(shift, 4), 'levels': {}}
+            for lv, o in LV.items():
+                Pl, rl, _ = rear_parts(o) if o is not hero else (P_, rear, body_)
+                co = Pl.copy(); co[rl, 1] -= shift
+                o.data.vertices.foreach_set('co', co.ravel()); o.data.update()
+                REP['rear_pull']['levels'][lv] = int(rl.sum())
+            log('rear piece pulled forward', REP['rear_pull'])
+
     def measure_sheet(tag):
         """Front and side orthographic renders of the Hero with a 0.1 m grid behind (red every 0.5 m) to read joints."""
         sc = bpy.context.scene
