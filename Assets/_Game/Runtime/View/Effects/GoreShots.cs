@@ -231,9 +231,9 @@ namespace CriticalMass.Runtime.View.Effects
                 bool ok;
                 switch (_want)
                 {
-                    case Scene.Hit: ok = hit && e.A == 0 && e.B >= 0; break;
+                    case Scene.Hit: ok = _staged ? hit && e.A == _target : hit && e.A == 0 && e.B >= 0; break;
                     case Scene.Knockout:
-                    case Scene.KnockoutPop: ok = death && e.B >= 0; break;
+                    case Scene.KnockoutPop: ok = _staged ? death && e.A == _target : death && e.B >= 0; break;
                     case Scene.KaijuHit: ok = (hit || death) && e.B == Damage.KaijuSource; break;
                     default: ok = hit && Crowd(w, e.X, e.Z) >= 10; break;
                 }
@@ -263,8 +263,82 @@ namespace CriticalMass.Runtime.View.Effects
         {
             for (int t = 0; t < n; t++)
             {
-                _driver.HumanAutopilot = true;
+                _driver.HumanAutopilot = SimDriverBehaviour.ScriptedHumanFrame == null;
                 _driver.StepTicks(1);
+            }
+        }
+
+        // ---- polish-4 staging (third try: the live-fight close-ups were a crowd mash and the HUD still showed) ----
+        /// <summary>polish-4: shots are taken this long after the hit (s), so the hit star and white flash have faded and the
+        /// blood has landed; side camera height and distance from the pair (u); the wide hill-fight frame's distance.</summary>
+        public const double AfterHitSeconds = 0.45;
+        public const float SideUp = 2.6f, SideBack = 6.2f, WideDistance = 14f;
+        readonly InputFrame _frame = SimInput.EmptyInput();
+        int _target = -1;
+        double[] _benchX, _benchZ;
+        bool _staged;
+
+        static bool Floor(World w, double x, double z)
+        {
+            CriticalMass.Sim.Grid.MapDef m = w.Map;
+            int cx = (int)Math.Floor(x), cz = (int)Math.Floor(z);
+            if (cx < 0 || cz < 0 || cx >= m.Width || cz >= m.Height) return false;
+            return m.Cells[cz * m.Width + cx] == Cell.Floor;
+        }
+
+        static void Put(World w, int id, double x, double z)
+        {
+            w.X[id] = w.PrevX[id] = x;
+            w.Z[id] = w.PrevZ[id] = z;
+        }
+
+        /// <summary>Flat open floor (a 5 x 3 cell patch) farthest from every fighter, away from the hill.</summary>
+        static bool Spot(World w, out double bx, out double bz)
+        {
+            CriticalMass.Sim.Grid.MapDef m = w.Map;
+            double mx = m.Width * 0.5, mz = m.Height * 0.5, best = -1;
+            bx = w.X[0]; bz = w.Z[0];
+            for (int cz = 4; cz < m.Height - 4; cz += 2)
+                for (int cx = 4; cx < m.Width - 4; cx += 2)
+                {
+                    double x = cx + 0.5, z = cz + 0.5, hx = x - mx, hz = z - mz;
+                    if (hx * hx + hz * hz < 81) continue;
+                    bool ok = true;
+                    for (int dz = -1; dz <= 1 && ok; dz++)
+                        for (int dx = -2; dx <= 3 && ok; dx++) ok = Floor(w, x + dx, z + dz);
+                    if (!ok) continue;
+                    double clear = double.MaxValue;
+                    for (int i = 1; i < w.ActorCount; i++)
+                    {
+                        double ax = w.X[i] - x, az = w.Z[i] - z, d2 = ax * ax + az * az;
+                        if (d2 < clear) clear = d2;
+                    }
+                    if (clear <= best) continue;
+                    best = clear; bx = x; bz = z;
+                }
+            return best >= 0;
+        }
+
+        /// <summary>Staged step: actor 0 plays the scripted frame, everyone but the pair is held on its bench spot, the
+        /// target stands still and never swings back.</summary>
+        void StepStaged(int n)
+        {
+            World w = _driver.World;
+            for (int t = 0; t < n; t++)
+            {
+                _driver.HumanAutopilot = false;
+                if (_target >= 0)
+                {
+                    Actor d = w.Actors[_target];
+                    d.AttackCd = Math.Max(d.AttackCd, 1.0);
+                    d.AbilityCd = Math.Max(d.AbilityCd, 1.0);
+                    d.AbilityActive = 0;
+                    d.SwingWindup = 0;
+                }
+                _driver.StepTicks(1);
+                if (_benchX != null)
+                    for (int i = 1; i < w.ActorCount && i < _benchX.Length; i++)
+                        if (i != _target && w.Actors[i].Alive) Put(w, i, _benchX[i], _benchZ[i]);
             }
         }
 
@@ -274,6 +348,8 @@ namespace CriticalMass.Runtime.View.Effects
             if (lv == 0) _sceneSet = false;
             World w = _driver.World;
             World.ResetWorld(w, new WorldOptions { Seed = Seed, TeamSize = 16, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = _driver.Config });
+            CriticalMass.Runtime.Hud.FirstMinutes.StartBannerOff = true;   // as -hitFeelShots: no start banner on a restage
+            CriticalMass.Runtime.Hud.Banner.ClearAll();
             AutoplayArgs.ClockHeld = true;
             _driver.TimeScale = 0;
             GoreGate.Override = level;
@@ -281,50 +357,108 @@ namespace CriticalMass.Runtime.View.Effects
             var paint = FindAnyObjectByType<CriticalMass.Runtime.View.Reactions.GroundPaint>();
             if (paint != null) paint.ClearAll();
             _fx.Scene.Clear();
+            _staged = sc == Scene.Hit || sc == Scene.Knockout || sc == Scene.KnockoutPop;
+            _target = -1;
+            _benchX = null;
+            _frame.CopyFrom(SimInput.EmptyInput());
+            _frame.AimX = double.NaN;
+            _frame.AimZ = double.NaN;
+            SimDriverBehaviour.ScriptedHumanFrame = _staged ? _frame : null;
             Step(1);                       // CombatFx sees the clock go back here and drops the old world's effects
             _fx.Scene.Clear();
             _fx.Scene.ResetGoreCounts();
             bool kaiju = sc == Scene.KaijuHit;
             w.ForceHatch = kaiju;
             _want = sc;
-            _minTick = sc == Scene.HillFight ? (int)(30 * w.Config.SimHz) : (int)(10 * w.Config.SimHz);
             _found = false;
-            _head = w.EventHead;
-            int limit = (int)(240 * w.Config.SimHz), stepped = 0;
-            while (!_found && stepped < limit && w.Match.Phase == MatchPhase.Playing)
+            int stepped = 0;
+            Vector3 focus;
+            Quaternion rot;
+            float dist;
+            if (_staged)
             {
-                if (kaiju && w.Kaiju.State != KaijuState.Egg) SkillCapture.Gather(w);
-                Step(1);
-                stepped++;
-                if (stepped % 300 == 0) { CriticalMass.Runtime.View.Moments.BigMoments.StopAll(); yield return null; }
+                // ONE attacker (YOU, Azure Warrior) and ONE target (the first Crimson fighter) on clear flat ground; every
+                // other fighter benched on its spawn spot (held there every tick, far from the pair).
+                StepStaged(2);
+                if (!Spot(w, out double x, out double z)) Log("scene=" + name + " no open spot; staging at the spawn");
+                _benchX = new double[w.ActorCount];
+                _benchZ = new double[w.ActorCount];
+                for (int i = 0; i < w.ActorCount; i++) { _benchX[i] = w.X[i]; _benchZ[i] = w.Z[i]; }
+                for (int i = 1; i < w.ActorCount; i++)
+                    if (w.Actors[i].Alive && w.Actors[i].Team != w.Actors[0].Team) { _target = i; break; }
+                if (_target < 0) { Log("scene=" + name + " NOT FOUND: no target"); yield break; }
+                double tx = x + 1.1, tz = z;
+                Put(w, 0, x, z);
+                Put(w, _target, tx, tz);
+                w.Actors[0].Facing = 0;
+                w.Actors[_target].Facing = Math.PI;
+                w.Actors[0].SpawnProtect = 0;
+                w.Actors[_target].SpawnProtect = 0;
+                w.Actors[0].AttackCd = 0;
+                if (sc != Scene.Hit) w.Actors[_target].Hp = Math.Min(w.Actors[_target].Hp, 1.0);   // the blow knocks out
+                _frame.AimX = tx;
+                _frame.AimZ = tz;
+                StepStaged(3);
+                _fx.Scene.Clear();
+                _fx.Scene.ResetGoreCounts();
+                _head = w.EventHead;
+                _minTick = 0;
+                int limit = (int)(4 * w.Config.SimHz);
+                while (!_found && stepped < limit)
+                {
+                    _frame.Attack = (stepped % 2) == 0;   // press, release, press: the first landed blow is the shot
+                    StepStaged(1);
+                    if (_target >= 0 && w.Actors[_target].Alive) Put(w, _target, tx, tz);
+                    stepped++;
+                }
+                _frame.Attack = false;
+                double gy = GroundHeight.At(w.Map, x + 0.55, z);
+                Vector3 mid = SimSpace.ToWorld(x + 0.55, gy + 0.7, z);
+                Vector3 offset = SimSpace.ToWorld(0, SideUp, -SideBack) - SimSpace.ToWorld(0, 0, 0);
+                rot = Quaternion.LookRotation(-offset, Vector3.up);
+                dist = offset.magnitude;
+                focus = mid;
+            }
+            else
+            {
+                _head = w.EventHead;
+                _minTick = sc == Scene.HillFight ? (int)(30 * w.Config.SimHz) : (int)(10 * w.Config.SimHz);
+                int limit = (int)(240 * w.Config.SimHz);
+                while (!_found && stepped < limit && w.Match.Phase == MatchPhase.Playing)
+                {
+                    if (kaiju && w.Kaiju.State != KaijuState.Egg) SkillCapture.Gather(w);
+                    Step(1);
+                    stepped++;
+                    if (stepped % 300 == 0) { CriticalMass.Runtime.View.Moments.BigMoments.StopAll(); yield return null; }
+                }
+                UnityEngine.Camera c0 = UnityEngine.Camera.main;
+                rot = c0 != null ? c0.transform.rotation : Quaternion.identity;
+                dist = sc == Scene.HillFight ? WideDistance : 8f;
+                focus = kaiju ? SkillCapture.KaijuFocus(w) : SimSpace.ToWorld(_fxX, 0, _fxZ) + Vector3.up * FocusLift;
             }
             w.ForceHatch = false;
             if (!_found)
             {
                 Log("level=" + lvName + " scene=" + name + " NOT FOUND after " + stepped + " ticks");
+                SimDriverBehaviour.ScriptedHumanFrame = null;
                 yield break;
             }
             int foundTick = w.Tick;
             int after = sc == Scene.KnockoutPop
                 ? (int)Math.Ceiling((_fx.Scene.CorpseSeconds + _fx.Scene.PopSeconds * 0.4) * w.Config.SimHz)
-                : sc == Scene.Knockout ? 4 : sc == Scene.HillFight ? 3 : 2;
-            Step(after);
-            Vector3 focus = kaiju ? SkillCapture.KaijuFocus(w) : SimSpace.ToWorld(_fxX, 0, _fxZ) + Vector3.up * FocusLift;
-            CriticalMass.Runtime.View.Moments.BigMoments.StopAll();   // polish-3: no cut-in over the shot
+                : (int)Math.Ceiling(AfterHitSeconds * w.Config.SimHz);
+            if (_staged) StepStaged(after); else Step(after);
+            SimDriverBehaviour.ScriptedHumanFrame = null;
+            CriticalMass.Runtime.View.Moments.BigMoments.StopAll();
+            CriticalMass.Runtime.Hud.Banner.ClearAll();
             yield return null;
             yield return null;             // the views and the effect meshes rebuild at the held clock
             yield return new WaitForEndOfFrame();
             Texture2D full = ScreenCapture.CaptureScreenshotAsTexture();   // the full screen keeps the HUD and the damage edge
-            // polish-3: identical framing across the three levels (the sim is the same fight; this pins the camera too)
-            UnityEngine.Camera mc = UnityEngine.Camera.main;
-            if (!_sceneSet) { _sceneRot = mc != null ? mc.transform.rotation : Quaternion.identity; _sceneFocus = focus; _sceneSet = true; }
+            // identical framing for FULL, REDUCED and OFF: the first level's camera is reused (same seed, same tick)
+            if (!_sceneSet) { _sceneRot = rot; _sceneFocus = focus; _sceneDist = dist; _sceneSet = true; }
             float drift = Vector3.Distance(focus, _sceneFocus);
-            HideHud();
-            yield return null;
-            yield return new WaitForEndOfFrame();
-            Texture2D tile = Close(_sceneFocus, _sceneRot);
-            int hidden = _hiddenHud.Count;
-            ShowHud();
+            Texture2D tile = Close(_sceneFocus, _sceneRot, _sceneDist, out int uiHidden, out int uiStillOn);
             holder[0] = tile;
             File.WriteAllBytes(Path.Combine(_dir, "gore-" + lvName + "-" + name + "-full.png"), full.EncodeToPNG());
             if (tile != null) File.WriteAllBytes(Path.Combine(_dir, "gore-" + lvName + "-" + name + ".png"), tile.EncodeToPNG());
@@ -342,12 +476,14 @@ namespace CriticalMass.Runtime.View.Effects
             }
             bool flash = _fx.Pose(_foundA, out ActorPoseFx pf) && pf.Flash;
             var line = new StringBuilder();
-            line.Append("level=").Append(lvName).Append(" scene=").Append(name).Append(" tick=").Append(foundTick).Append('+').Append(after)
+            line.Append("level=").Append(lvName).Append(" scene=").Append(name).Append(_staged ? " staged=1v1" : " staged=live")
+                .Append(" tick=").Append(foundTick).Append('+').Append(after)
                 .Append(" victim=").Append(_foundA).Append(" by=").Append(_foundB)
                 .Append(" goreSpawned=").Append(total).Append(" (").Append(pieces.Length > 0 ? pieces.ToString().Trim() : "none").Append(')')
                 .Append(" flash=").Append(flash).Append(" sparks=").Append(s.SparkCount(now)).Append(" blood=").Append(s.BloodCount(now))
                 .Append(" splats=").Append(s.DecalCount(now)).Append(" gibs=").Append(s.GibCount(now))
-                .Append(" hudHidden=").Append(hidden).Append(" focusDrift=").Append(F(drift, "0.000"));
+                .Append(" uiHidden=").Append(uiHidden).Append(" uiStillOn=").Append(uiStillOn).Append(uiStillOn == 0 ? " (ok)" : " (UI LEAK)")
+                .Append(" focusDrift=").Append(F(drift, "0.000"));
             if (tile != null)
             {
                 Color32[] px = tile.GetPixels32();
@@ -361,22 +497,42 @@ namespace CriticalMass.Runtime.View.Effects
                 .Append(" edgeRedShare=").Append(F(Share(fp, full.width, full.height, BloodRed, 0.06f)));
             Log(line.ToString());
             Destroy(full);
+            _target = -1;
+            _benchX = null;
         }
 
-        Texture2D Close(Vector3 focus, Quaternion r)
+        float _sceneDist;
+
+        /// <summary>polish-4: the close-up render with NO UI at all: every Canvas in the scene (root or nested, any mode;
+        /// polish-3 hid only root canvases, and nested HUD canvases kept drawing) is disabled in the same call as the render,
+        /// so no script can turn one back on in between, and the UI layer is culled from the camera as well. uiStillOn
+        /// counts canvases still enabled at the render (must be 0).</summary>
+        Texture2D Close(Vector3 focus, Quaternion r, float dist, out int hidden, out int stillOn)
         {
+            hidden = 0;
+            stillOn = 0;
             UnityEngine.Camera cam = UnityEngine.Camera.main;
             if (cam == null) return null;
             Transform t = cam.transform;
             Vector3 p = t.position;
             Quaternion r0 = t.rotation;
+            int mask = cam.cullingMask;
             RenderTexture old = cam.targetTexture, prev = RenderTexture.active;
             RenderTexture rt = RenderTexture.GetTemporary(TileW, TileH, 24);
+            Canvas[] canvases = FindObjectsByType<Canvas>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+            bool[] was = new bool[canvases.Length];
             Texture2D tex = null;
             try
             {
+                for (int k = 0; k < canvases.Length; k++)
+                {
+                    was[k] = canvases[k].enabled;
+                    if (was[k]) { canvases[k].enabled = false; hidden++; }
+                }
+                foreach (Canvas c in canvases) if (c != null && c.enabled) stillOn++;
+                cam.cullingMask = mask & ~(1 << 5);   // the UI layer
                 t.rotation = r;
-                t.position = focus - r * Vector3.forward * CloseDistance;
+                t.position = focus - r * Vector3.forward * dist;
                 _fx.Rebuild(t.right, t.up);
                 cam.targetTexture = rt;
                 cam.Render();
@@ -388,6 +544,8 @@ namespace CriticalMass.Runtime.View.Effects
             catch (Exception ex) { Log("close-up failed: " + ex.Message); }
             finally
             {
+                for (int k = 0; k < canvases.Length; k++) if (canvases[k] != null && was[k]) canvases[k].enabled = true;
+                cam.cullingMask = mask;
                 cam.targetTexture = old;
                 RenderTexture.active = prev;
                 t.position = p;
@@ -395,6 +553,36 @@ namespace CriticalMass.Runtime.View.Effects
                 RenderTexture.ReleaseTemporary(rt);
             }
             return tex;
+        }
+
+        // 3x5 pixel letters for the column labels (FULL, REDUCED, OFF), one row of bits per line, top first.
+        static readonly System.Collections.Generic.Dictionary<char, string> Glyph = new System.Collections.Generic.Dictionary<char, string>
+        {
+            { 'F', "111100110100100" }, { 'U', "101101101101111" }, { 'L', "100100100100111" }, { 'R', "110101110101101" },
+            { 'E', "111100110100111" }, { 'D', "110101101101110" }, { 'C', "111100100100111" }, { 'O', "111101101101111" },
+        };
+
+        /// <summary>Writes a label in chunky cream pixels at the top left of a tile on the sheet.</summary>
+        static void Label(Texture2D sheet, int x0, string text)
+        {
+            const int px = 6;
+            int y0 = sheet.height - 14 - 5 * px;
+            var bg = new Color32(24, 35, 59, 255);
+            var fg = new Color32(255, 240, 214, 255);
+            int w = text.Length * 4 * px + 2 * px;
+            for (int y = y0 - px; y < y0 + 6 * px; y++)
+                for (int x = x0 + 8; x < x0 + 8 + w; x++) sheet.SetPixel(x, y, bg);
+            for (int i = 0; i < text.Length; i++)
+            {
+                if (!Glyph.TryGetValue(text[i], out string g)) continue;
+                for (int row = 0; row < 5; row++)
+                    for (int col = 0; col < 3; col++)
+                    {
+                        if (g[row * 3 + col] != '1') continue;
+                        int bx = x0 + 8 + px + (i * 4 + col) * px, by = y0 + (4 - row) * px;
+                        for (int yy = 0; yy < px; yy++) for (int xx = 0; xx < px; xx++) sheet.SetPixel(bx + xx, by + yy, fg);
+                    }
+            }
         }
 
         void Sheet(string scene, Texture2D[] tiles)
@@ -406,6 +594,8 @@ namespace CriticalMass.Runtime.View.Effects
             sheet.SetPixels32(fill);
             for (int i = 0; i < tiles.Length; i++)
                 if (tiles[i] != null) sheet.SetPixels32(i * (TileW + gap), 0, TileW, TileH, tiles[i].GetPixels32());
+            string[] names = { "FULL", "REDUCED", "OFF" };   // polish-4: each column says its level
+            for (int i = 0; i < tiles.Length && i < names.Length; i++) Label(sheet, i * (TileW + gap), names[i]);
             sheet.Apply();
             File.WriteAllBytes(Path.Combine(_dir, "gore-sheet-" + scene + ".png"), sheet.EncodeToPNG());
             Destroy(sheet);
