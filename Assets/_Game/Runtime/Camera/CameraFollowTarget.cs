@@ -97,8 +97,8 @@ namespace CriticalMass.Runtime.Camera
             var f = new CameraFollowInput
             {
                 Dt = Driver.FrameDt,
-                HumanX = w.PrevX[0] + (w.X[0] - w.PrevX[0]) * a,
-                HumanZ = w.PrevZ[0] + (w.Z[0] - w.PrevZ[0]) * a,
+                HumanX = w.PrevX[LocalSeat.Actor] + (w.X[LocalSeat.Actor] - w.PrevX[LocalSeat.Actor]) * a,
+                HumanZ = w.PrevZ[LocalSeat.Actor] + (w.Z[LocalSeat.Actor] - w.PrevZ[LocalSeat.Actor]) * a,
                 MinX = b.MinX + inset,
                 MaxX = b.MaxX - inset,
                 MinZ = b.MinZ + inset,
@@ -168,7 +168,7 @@ namespace CriticalMass.Runtime.Camera
         public static int EnemiesNear(World w, double hx, double hz)
         {
             if (w == null || w.ActorCount <= 0) return 0;
-            TeamId team = w.Actors[0].Team;
+            TeamId team = w.Actors[LocalSeat.Actor].Team;
             double r2 = CameraDirector.CombatRadius * CameraDirector.CombatRadius;
             int n = 0;
             for (int i = 1; i < w.ActorCount; i++)

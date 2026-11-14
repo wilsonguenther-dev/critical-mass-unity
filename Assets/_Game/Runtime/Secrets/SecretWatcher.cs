@@ -102,7 +102,7 @@ namespace CriticalMass.Runtime.Secrets
 
         void UpdateCrown(World w)
         {
-            const int me = HudBinder.LocalActor;
+            int me = HudBinder.LocalActor;
             if (_crownSpawned && _crown != null && _crown.activeSelf)
             {
                 _crown.transform.rotation = Quaternion.Euler(0f, Time.time * 40f, 0f);

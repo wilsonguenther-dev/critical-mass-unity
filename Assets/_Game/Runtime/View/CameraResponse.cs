@@ -102,8 +102,8 @@ namespace CriticalMass.Runtime.View.Reactions
         public void OnForce(ref WorldForce f)
         {
             World w = _driver != null ? _driver.World : null;
-            if (w == null || w.ActorCount == 0 || !w.Actors[0].Alive) return;
-            float felt = Felt(in f, w.X[0], w.Z[0]);
+            if (w == null || w.ActorCount == 0 || !w.Actors[LocalSeat.Actor].Alive) return;
+            float felt = Felt(in f, w.X[LocalSeat.Actor], w.Z[LocalSeat.Actor]);
             if (felt <= 0f) return;
             Vector3 src = SimSpace.ToWorld(f.X, f.Y, f.Z);
             if (felt >= RumbleThreshold) Rumble(felt, f.Source == ForceSource.KaijuSlam || f.Source == ForceSource.Explosion);
@@ -125,7 +125,7 @@ namespace CriticalMass.Runtime.View.Reactions
             }
             else
             {
-                Vector3 me = SimSpace.ToWorld(w.X[0], 0, w.Z[0]);
+                Vector3 me = SimSpace.ToWorld(w.X[LocalSeat.Actor], 0, w.Z[LocalSeat.Actor]);
                 dir = new Vector2(src.x - me.x, src.z - me.z);
             }
             float scale = 0.55f * felt * ReactionBudget.MotionScale;

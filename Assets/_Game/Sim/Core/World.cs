@@ -341,6 +341,46 @@ namespace CriticalMass.Sim.Core
         /// <summary>Module-scope scratch for init (never touched by step); grown to TeamSizeMax on first use.</summary>
         private static ClassId[] RosterScratch = new ClassId[0];
 
+        /// <summary>online-rooms-2: true when id is one of the room's extra human actors (never in single player).</summary>
+        public static bool IsExtraHuman(WorldOptions opts, int id)
+        {
+            int[] xs = opts.ExtraHumans;
+            if (xs == null || id == 0) return false;
+            for (int i = 0; i < xs.Length; i++) if (xs[i] == id) return true;
+            return false;
+        }
+
+        /// <summary>
+        /// online-rooms-2: an extra human's room class pick, applied to the built roster of team index team (0 = HumanTeam,
+        /// ids 0..n-1; 1 = the other team, ids n..2n-1). The pick swaps with the nearest later teammate of that class, so the
+        /// team's class mix stays the roster's; when no teammate has it, the slot simply takes it. Deterministic: the same
+        /// options give the same roster on every machine. No-op without ExtraHumans.
+        /// </summary>
+        private static void ApplyExtraHumanClasses(WorldOptions opts, int team, int n, ClassId[] roster)
+        {
+            int[] xs = opts.ExtraHumans;
+            ClassId[] cs = opts.ExtraHumanClasses;
+            if (xs == null || cs == null) return;
+            for (int i = 0; i < xs.Length && i < cs.Length; i++)
+            {
+                int id = xs[i];
+                if (id <= 0 || id / n != team || id >= 2 * n) continue;
+                int slot = id - team * n;
+                ClassId want = cs[i];
+                if (roster[slot] == want) continue;
+                int swap = -1;
+                for (int k = 0; k < n && swap < 0; k++)
+                {
+                    int j = (slot + 1 + k) % n;
+                    int jid = team * n + j;
+                    if (jid == 0 || IsExtraHuman(opts, jid)) continue;   // never take a human's class away
+                    if (roster[j] == want) swap = j;
+                }
+                if (swap >= 0) roster[swap] = roster[slot];
+                roster[slot] = want;
+            }
+        }
+
         /// <summary>(Re)initialise every piece of match state in place. Shared by CreateWorld and ResetWorld.</summary>
         private static void InitWorld(World world, WorldOptions opts)
         {
@@ -353,6 +393,8 @@ namespace CriticalMass.Sim.Core
             world.Opts.BotDifficulty = opts.BotDifficulty; // DG-21
             world.Opts.AllyBotDifficulty = opts.AllyBotDifficulty;
             world.Opts.Pace = opts.Pace; // sim-physics lane (OD-1)
+            world.Opts.ExtraHumans = opts.ExtraHumans != null ? (int[])opts.ExtraHumans.Clone() : null;   // online-rooms-2
+            world.Opts.ExtraHumanClasses = opts.ExtraHumanClasses != null ? (ClassId[])opts.ExtraHumanClasses.Clone() : null;
             world.Dur.Derive(world.Config, Durations.PaceOf(opts, world.Config)); // DG-68
             Rng.SeedRng(world.Rng, unchecked((uint)opts.Seed));
             world.Tick = 0;
@@ -378,6 +420,7 @@ namespace CriticalMass.Sim.Core
             {
                 TeamId teamId = team == 0 ? opts.HumanTeam : OtherTeam(opts.HumanTeam);
                 BuildRoster(cfg, n, team == 0 ? opts.HumanClass : (ClassId?)null, RosterScratch);
+                ApplyExtraHumanClasses(opts, team, n, RosterScratch);   // online-rooms-2: no-op in single player
                 for (int slot = 0; slot < n; slot++)
                 {
                     int id = team * n + slot;
@@ -387,7 +430,7 @@ namespace CriticalMass.Sim.Core
                     ResetActorFields(a);
                     a.Team = teamId;
                     a.Cls = cls;
-                    a.IsHuman = id == 0;
+                    a.IsHuman = id == 0 || IsExtraHuman(opts, id);   // online-rooms-2: extra humans only in an online room
                     a.Alive = true;
                     a.Hp = cc.MaxHp;
                     a.MaxHp = cc.MaxHp;
@@ -668,6 +711,8 @@ namespace CriticalMass.Sim.Core
                     BotDifficulty = opts.BotDifficulty,
                     AllyBotDifficulty = opts.AllyBotDifficulty,
                     Pace = opts.Pace,
+                    ExtraHumans = opts.ExtraHumans != null ? (int[])opts.ExtraHumans.Clone() : null,
+                    ExtraHumanClasses = opts.ExtraHumanClasses != null ? (ClassId[])opts.ExtraHumanClasses.Clone() : null,
                 },
                 Config = cfg,
                 Rng = Rng.CreateRng(unchecked((uint)opts.Seed)),

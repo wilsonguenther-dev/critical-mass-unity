@@ -3,6 +3,7 @@
     "rootNamespace": "CriticalMass.Sim.Tests",
     "references": [
         "CriticalMass.Sim",
+        "CriticalMass.Net",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
     ],

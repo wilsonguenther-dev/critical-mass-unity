@@ -469,7 +469,7 @@ namespace CriticalMass.Runtime.Menus
 
         string ActorName(int id)
         {
-            if (id == 0) return "YOU";
+            if (id == LocalSeat.Actor) return "YOU";
             ActorStats a = _stats.Actors[id];
             int slot = _world != null ? World.TeamSlot(_world, id) : id;
             return FlowWords.ClassName(a.Cls) + " " + (slot + 1).ToString(CultureInfo.InvariantCulture);
@@ -499,7 +499,7 @@ namespace CriticalMass.Runtime.Menus
 
             if (_stats.ActorCount > 0)
             {
-                ActorStats me = _stats.Actors[0];
+                ActorStats me = _stats.Actors[LocalSeat.Actor];
                 _youPortrait.Set(UiIcons.Portrait[(int)me.Cls, (int)me.Team], _tier);
                 HudText.Set(_youName, FlowWords.ClassName(me.Cls) + "\n" + (me.Team == TeamId.Azure ? "AZURE" : "CRIMSON"));
                 _youName.color = CMTokens.TeamInk(me.Team);
@@ -525,7 +525,7 @@ namespace CriticalMass.Runtime.Menus
                 ActorStats a = _stats.Actors[id];
                 _mvpPortrait[t].Set(UiIcons.Portrait[(int)a.Cls, t], _tier);
                 HudText.Set(_mvpName[t], ActorName(id));
-                _mvpName[t].color = id == 0 ? Brass : Cream;
+                _mvpName[t].color = id == LocalSeat.Actor ? Brass : Cream;
                 HudText.Set(_mvpLine[t], a.Kills + " KO  ·  " + I(a.HillSeconds) + " s HILL  ·  " + a.Biomass + " BIOMASS");
                 HudText.Set(_mvpPoints[t], a.Points.ToString(CultureInfo.InvariantCulture) + " PTS");
             }

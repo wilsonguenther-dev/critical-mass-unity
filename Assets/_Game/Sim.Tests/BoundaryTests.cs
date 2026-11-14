@@ -36,6 +36,8 @@ namespace CriticalMass.Sim.Tests
         {
             new KeyValuePair<string, Regex>("Math.Sin/Cos/Atan2/Exp", new Regex(@"\bMath\.(Sin|Cos|Atan2|Exp)\s*\(")),
             new KeyValuePair<string, Regex>("MathF.Sin/Cos/Atan2/Exp", new Regex(@"\bMathF\.(Sin|Cos|Atan2|Exp)\s*\(")),
+            // online-rooms-2: every other platform transcendental too (C library results differ between macOS and Windows).
+            new KeyValuePair<string, Regex>("Math.Asin/Acos/Atan/Tan/Log/Cbrt/hyperbolic", new Regex(@"\bMathF?\.(Asin|Acos|Atan|Tan|Log|Log10|Log2|Cbrt|Sinh|Cosh|Tanh|Asinh|Acosh|Atanh)\s*\(")),
             new KeyValuePair<string, Regex>("using static System.Math", new Regex(@"using\s+static\s+System\.Math\b")),
             // U-049: fused multiply-add only at node's fused sites, inside Fdlibm.cs (its software Fma); never
             // System.Math's (absent at this API level) and never anywhere else in the Sim.

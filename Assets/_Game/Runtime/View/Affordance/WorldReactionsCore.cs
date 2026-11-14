@@ -64,7 +64,7 @@ namespace CriticalMass.Runtime.View.Affordance
         /// <summary>Counters for tests and the report.</summary>
         public int Hits, Breaks, Builds;
 
-        public int LocalActor = 0;
+        public int LocalActor = LocalSeat.Actor;
 
         /// <summary>wall-damage-1: the reactions the game view reads (the damage looks shake from its pulses).</summary>
         public static WorldReactions Current;

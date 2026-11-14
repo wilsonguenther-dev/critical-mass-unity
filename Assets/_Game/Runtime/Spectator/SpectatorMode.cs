@@ -128,7 +128,7 @@ namespace CriticalMass.Runtime.Spectator
             World w = m != null && m.Driver != null ? m.Driver.World : null;
             if (ClassSwitch.HasPending) return ClassSwitch.Pending;
             if (w == null || w.ActorCount <= 0) return ClassId.Warrior;
-            Actor a = w.Actors[0];
+            Actor a = w.Actors[LocalSeat.Actor];
             return a.PendingClass ?? a.Cls;
         }
 
@@ -143,7 +143,7 @@ namespace CriticalMass.Runtime.Spectator
             RejoinPending = false;
             Driver.HumanAutopilot = true;
             _baseTimeScale = Driver.TimeScale;
-            Rig.Reset(w, 0);
+            Rig.Reset(w, LocalSeat.Actor);
             FindCamera();
             SaveCamera();
             SetPlayerCluster(false);
@@ -159,7 +159,7 @@ namespace CriticalMass.Runtime.Spectator
             if (!Active) return false;
             SpectateNextMatch = false;
             World w = Driver != null ? Driver.World : null;
-            bool standing = w != null && w.ActorCount > 0 && w.Actors[0].Alive;
+            bool standing = w != null && w.ActorCount > 0 && w.Actors[LocalSeat.Actor].Alive;
             // Hand actor 0 back to the human input now (a down actor ignores input; a class pick reaches the sim).
             if (Driver != null) Driver.HumanAutopilot = false;
             if (Input != null) Input.State.Blur();
@@ -202,7 +202,7 @@ namespace CriticalMass.Runtime.Spectator
 
             // Nothing may leave actor 0 to the human input while spectating (rejoin pending excepted).
             if (!RejoinPending && !Driver.HumanAutopilot) Driver.HumanAutopilot = true;
-            if (RejoinPending && w.ActorCount > 0 && w.Actors[0].Alive)
+            if (RejoinPending && w.ActorCount > 0 && w.Actors[LocalSeat.Actor].Alive)
             {
                 Exit();
                 return;

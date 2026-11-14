@@ -1,0 +1,137 @@
+# online-rooms-2: the online room end to end with no Unity and no account.
+# Job "local-relay": starts the room relay (server/relay) on the runner itself with `wrangler dev` (a local copy of the
+# Worker and its Durable Object; no Cloudflare login), then two console peers (tools/online/HeadlessPeer: the game's own
+# Sim and lockstep code) host and join a room by code over real WebSockets, play 1800 ticks with autopilot humans and
+# write per-tick fingerprints; the job fails if one fingerprint differs.
+# Job "cross-os" (manual, after the relay is deployed): host on Windows, joiner on macOS, through the deployed relay
+# (repository variable CM_RELAY_URL), so the two runtimes and two operating systems must agree bit for bit.
+name: online-smoke
+on:
+  push:
+    branches: ['feat/online-rooms-*', 'ci/**']
+    paths:
+      - 'Assets/_Game/Net/**'
+      - 'Assets/_Game/Sim/**'
+      - 'server/relay/**'
+      - 'tools/online/**'
+      - '.github/workflows/online-smoke.yml'
+  workflow_dispatch:
+    inputs:
+      cross_os:
+        description: "also run host on Windows and joiner on macOS through the deployed relay (needs vars.CM_RELAY_URL)"
+        type: boolean
+        default: false
+      ticks:
+        description: "ticks to play"
+        default: '1800'
+permissions:
+  contents: read
+concurrency:
+  group: online-smoke-${{ github.ref }}
+  cancel-in-progress: true
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: 1
+  DOTNET_NOLOGO: 1
+  WRANGLER_SEND_METRICS: 'false'
+jobs:
+  local-relay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with: { lfs: false }
+      - uses: actions/setup-dotnet@v4
+        with: { dotnet-version: '8.0.x' }
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - name: Relay unit tests
+        working-directory: server/relay
+        run: node --test test/protocol.test.js
+      - name: Build the console peer
+        run: dotnet build tools/online/HeadlessPeer -c Release -nologo -clp:ErrorsOnly
+      - name: Start the relay locally
+        working-directory: server/relay
+        run: |
+          npx --yes wrangler@4 dev --local --port 8787 --ip 127.0.0.1 > "$RUNNER_TEMP/relay.log" 2>&1 &
+          for i in $(seq 1 90); do curl -sf http://127.0.0.1:8787/health && break; sleep 2; done
+          curl -sf http://127.0.0.1:8787/health || { cat "$RUNNER_TEMP/relay.log"; exit 1; }
+      - name: Host and join a room, play, compare fingerprints
+        run: |
+          set -u
+          T="${{ inputs.ticks || '1800' }}"
+          P=tools/online/HeadlessPeer/bin/Release/net8.0/cm-online-peer.dll
+          R=http://127.0.0.1:8787
+          mkdir -p out
+          dotnet $P -host -relay $R -humans 2 -ticks $T -teamsize 16 -name Host -hash-log out/host.txt -code-out out/code.txt -timeout 600 -lobby 120 > out/host.log 2>&1 &
+          HP=$!
+          # code.txt is written only once the host's own connection is in the room ("ROOM READY"), so the joiner never races it.
+          for i in $(seq 1 60); do [ -s out/code.txt ] && break; sleep 1; done
+          CODE=$(cat out/code.txt)
+          echo "room code $CODE"
+          dotnet $P -join "$CODE" -relay $R -ticks $T -name Joiner -team crimson -class Miner -hash-log out/join.txt -timeout 600 > out/join.log 2>&1
+          JC=$?
+          wait $HP; HC=$?
+          cat out/host.log out/join.log
+          echo "host exit $HC, joiner exit $JC"
+          python3 tools/online/compare-hashes.py out/host.txt out/join.txt --min $(( T / 30 - 2 ))
+          [ $HC -eq 0 ] && [ $JC -eq 0 ]
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: online-smoke-local
+          path: |
+            out/
+            ${{ runner.temp }}/relay.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+  cross-os-room:
+    if: ${{ inputs.cross_os && vars.CM_RELAY_URL != '' }}
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.make.outputs.code }}
+      key: ${{ steps.make.outputs.key }}
+    steps:
+      - id: make
+        run: |
+          J=$(curl -sf -X POST "${{ vars.CM_RELAY_URL }}/rooms")
+          echo "code=$(echo "$J" | python3 -c 'import sys,json;print(json.load(sys.stdin)["code"])')" >> "$GITHUB_OUTPUT"
+          echo "key=$(echo "$J" | python3 -c 'import sys,json;print(json.load(sys.stdin)["key"])')" >> "$GITHUB_OUTPUT"
+  cross-os:
+    needs: cross-os-room
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-latest, role: host }
+          - { os: macos-latest, role: join }
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with: { lfs: false }
+      - uses: actions/setup-dotnet@v4
+        with: { dotnet-version: '8.0.x' }
+      - name: Play
+        shell: bash
+        run: |
+          dotnet build tools/online/HeadlessPeer -c Release -nologo -clp:ErrorsOnly
+          P=tools/online/HeadlessPeer/bin/Release/net8.0/cm-online-peer.dll
+          T="${{ inputs.ticks || '1800' }}"
+          if [ "${{ matrix.role }}" = host ]; then
+            dotnet $P -host -code "${{ needs.cross-os-room.outputs.code }}" -key "${{ needs.cross-os-room.outputs.key }}" -relay "${{ vars.CM_RELAY_URL }}" -humans 2 -ticks $T -hash-log hashes.txt -lobby 300 -timeout 900 -timeout 900
+          else
+            sleep 20
+            dotnet $P -join "${{ needs.cross-os-room.outputs.code }}" -relay "${{ vars.CM_RELAY_URL }}" -ticks $T -team crimson -hash-log hashes.txt -timeout 900 -join-tries 40
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: 'hashes-${{ matrix.role }}', path: hashes.txt }
+  cross-os-compare:
+    needs: cross-os
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { lfs: false, sparse-checkout: tools/online }
+      - uses: actions/download-artifact@v4
+      - run: python3 tools/online/compare-hashes.py hashes-host/hashes.txt hashes-join/hashes.txt --min 50

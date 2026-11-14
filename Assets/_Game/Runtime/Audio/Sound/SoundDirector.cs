@@ -301,7 +301,7 @@ namespace CriticalMass.Runtime.Audio.Sound
             World w = _driver != null ? _driver.World : null;
             if (w == null || f.Actor < 0 || f.Actor >= w.ActorCount) return;
             SimSpace.ToSim(f.Position, out double x, out double z);
-            bool own = f.Actor == 0;
+            bool own = f.Actor == LocalSeat.Actor;
             if (!own)
             {
                 float dx = (float)x - _lx, dz = (float)z - _lz;
@@ -354,11 +354,11 @@ namespace CriticalMass.Runtime.Audio.Sound
             if (cue >= 0)
             {
                 bool corpse = f.Actor >= 0 && f.Actor < w.ActorCount && !w.Actors[f.Actor].Alive;
-                if (pick != Pick.CorpseOnly || corpse) PlayCue(cue, f.X, f.Z, f.Actor == 0, false, 1f, 1f, f.Tick);
+                if (pick != Pick.CorpseOnly || corpse) PlayCue(cue, f.X, f.Z, f.Actor == LocalSeat.Actor, false, 1f, 1f, f.Tick);
             }
             int sub = SoundTable.ForceSub(f.Source);
             if (sub < 0 || w.ActorCount == 0) return;
-            float felt = CameraResponse.Felt(in f, w.X[0], w.Z[0]);
+            float felt = CameraResponse.Felt(in f, w.X[LocalSeat.Actor], w.Z[LocalSeat.Actor]);
             bool shakeOff = FeelGate.ShakeScale <= 0f;
             if (felt >= (shakeOff ? CameraResponse.BassThreshold : CameraResponse.BassThreshold * 1.6f)) PlaySub(sub, felt, shakeOff);
         }
@@ -639,8 +639,8 @@ namespace CriticalMass.Runtime.Audio.Sound
             }
             else if (w != null && w.ActorCount > 0)
             {
-                _lx = (float)w.X[0];
-                _lz = (float)w.Z[0];
+                _lx = (float)w.X[LocalSeat.Actor];
+                _lz = (float)w.Z[LocalSeat.Actor];
             }
         }
 
