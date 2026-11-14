@@ -135,6 +135,25 @@ namespace CriticalMass.Sim.Config
         public int KaijuSqueezeHalo = 2;
         /// <summary>Metres per second the wall collider grows back to KaijuGridRadius on wide ground.</summary>
         public double KaijuUnsqueezeRate = 1.0;
+
+        // ---- fix/kaiju-hill-1 (two Air matches 2026-11-14: 0.0 s inside the hill radius, parked east of the ring, idle 60 s)
+        /// <summary>The Kaiju gets onto the hill. Miners holding the hill drop barricades in the ring's gaps, and one barricade
+        /// closes a gap to its 1.1 m body (the east gap is two body cells wide) while fighters still slip past, so the hill was cut
+        /// off from it: every fighter there was skipped as unreachable and, with no target, it stood at its own cell. Now its claw
+        /// and slam break barricades (KaijuBarricadeDamage per hit, any team: a wall of crates does not stop it), and with no target
+        /// while the hill is cut off it walks to the nearest barricade in the way and claws it; with none, it walks to the reachable
+        /// cell closest to the hill.</summary>
+        public bool KaijuHillSiege = true;
+        public double KaijuBarricadeDamage = 60;
+        /// <summary>Barricades this far (metres) from the hill centre count as "in the way" (the ring is at 10.5).</summary>
+        public double KaijuSiegeRadius = 13;
+        /// <summary>fix/kaiju-hill-1 round 2 (run 43648485298: 0.0 s on the hill with the ring open; every 30 s sample had a target
+        /// on the east approach): target choice had no range, so an owned Kaiju always chased the nearest enemy anywhere, and the
+        /// enemy stream from the base over the east bridge kept it at the east gap. An owned (not Berserk) Kaiju now adds
+        /// KaijuHillPull x (the target's distance beyond the hill radius) to a target's score: it guards the hill and fights what
+        /// comes onto it. A fighter that hit it in the last KaijuHitMemorySeconds is exempt, so it still punishes an attacker anywhere.</summary>
+        public double KaijuHillPull = 1.5;
+        public double KaijuHitMemorySeconds = 4;
         /// <summary>fix/movement-shiver-2: bot steering with hysteresis. Straight line or route is a choice held at least
         /// BotModeHoldSeconds (straight needs the whole body to fit, it is left only when the centre line is blocked); the
         /// circle-strafe band is entered at reach and left at reach + BotReachSlack; strafing steers from the target's real
