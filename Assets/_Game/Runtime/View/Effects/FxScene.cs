@@ -63,8 +63,10 @@ namespace CriticalMass.Runtime.View.Effects
         /// grey-brown ground ink, strung 2 to 6 u along the hit, and were stamped into the ground paint in that ink: the
         /// grey-brown smear beside the pop (sheet-gore-5b38dff, row knockout-pop). At Full they still land (nothing is taken
         /// out of Full) but in the pool's dark blood red (kind KindPoolRed, stamped red too) and capped at
-        /// KnockOutDropSplatMax. Below Full they leave no ground stain (GoreGate: no ground build-up below Full).</summary>
-        public static bool LandsAsSplat(bool knockOutDrop, GoreLevel gore) => !knockOutDrop || gore == GoreLevel.Full;
+        /// KnockOutDropSplatMax. fix/gore-reduced-1: at Reduced they land as the same red splats at 0.7 of Full's size
+        /// (GoreGate.SizeScale, applied in AddDecal) with the ordinary Reduced fade (GoreGate.LifeScale), never stamped
+        /// (GroundStain is Full only) and with no pool (KnockOutPool is Full only). Off throws no drops at all.</summary>
+        public static bool LandsAsSplat(bool knockOutDrop, GoreLevel gore) => !knockOutDrop || gore != GoreLevel.Off;
 
         /// <summary>Decal kind drawn (and stamped) in the pool's dark blood red: the pool and the knock-out drop splats.</summary>
         public const byte KindPoolRed = 1;
