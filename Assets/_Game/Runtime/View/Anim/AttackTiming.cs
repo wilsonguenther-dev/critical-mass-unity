@@ -3,6 +3,7 @@ using System.Reflection;
 using CriticalMass.Runtime.View.Art;
 using CriticalMass.Sim.Config;
 using CriticalMass.Sim.Core;
+using UnityEngine;
 
 namespace CriticalMass.Runtime.View.Anim
 {
@@ -128,20 +129,21 @@ namespace CriticalMass.Runtime.View.Anim
         /// W > 0: 0..c over the wind-up, then c..L at rate 1. W = 0: starts ParityLeadFrames before c at rate 1, so the
         /// contact frame is shown within 2 frames of the damage tick (the hit cannot land before the swing).
         /// </summary>
-        public static double ClipTime(double age, double contact, double length, double windupSeconds)
+        public static double ClipTime(double age, double contact, double length, double windupSeconds) =>
+            ClipTime(age, contact, length, windupSeconds, -1);
+
+        /// <summary>ClipTime with the clip's measured wind-up extreme (clip seconds; below 0: the estimate, Extreme).</summary>
+        public static double ClipTime(double age, double contact, double length, double windupSeconds, double extreme)
         {
             if (age < 0) age = 0;
             if (windupSeconds > 1e-9)
             {
                 if (age >= windupSeconds) return Math.Min(length, contact + (age - windupSeconds));
-                // feat/hit-feel-2 (fast-attack craft): snap to the clip's wind-up extreme in 2 frames, hold it, then the strike
-                // (extreme to contact) on the last frames before the damage tick. The old map played the whole clip
-                // anticipation 4 to 7 times fast and cubic-eased, so the arm sat near the ready pose and no swing read.
-                if (FastCraft) return CraftTime(age, contact, windupSeconds);
-                // Integration batch 4: 0..contact over the wind-up, eased in (cubic), so the weapon hand is fastest on the
-                // tick the sim resolves the hit (AttackContact): the last wind-up tick plays the strike, the early ones the
-                // ready pose (which is why it starts at clip time 0: the fade-in from the base pose stays small). A linear
-                // map peaked the hand mid wind-up; a late start (the strike only) peaked it on the fade-in.
+                // fix/hit-feel-3 (fast-attack craft, corrected): ease to the clip's MEASURED wind-up extreme, hold it, and play
+                // the whole strike (extreme to contact) inside the last tick before the damage tick, so the weapon hand is
+                // fastest exactly on that tick. hit-feel-2 snapped in 2 frames and struck over 1.5: the snap out-ran the
+                // strike and the hand peaked 4 to 5 ticks early (AnimationPassPlayTests.TheWeaponConnectsOnTheDamageTick).
+                if (FastCraft) return CraftTime(age, contact, windupSeconds, extreme);
                 double s = age / windupSeconds;
                 return contact * s * s * s;
             }
@@ -149,30 +151,74 @@ namespace CriticalMass.Runtime.View.Anim
             return Math.Min(length, start + age);
         }
 
-        /// <summary>feat/hit-feel-2: the fast-attack wind-up (on). Off restores the eased map (tests, comparisons).</summary>
+        /// <summary>The fast-attack wind-up (on). Off restores the eased cubic map.</summary>
         public static bool FastCraft = true;
         /// <summary>
-        /// feat/hit-feel-2: clip seconds before contact that are the strike (the wind-up extreme is contact minus this),
-        /// the wall of the snap into the extreme (2 frames at 30 fps) and the longest strike before the damage tick.
+        /// Estimated extreme (contact minus StrikeClipSeconds) when a clip cannot be measured; the ease into the extreme
+        /// (at most AnticipationSeconds: 4 sim ticks, 2 frames at the default pace 2) and the strike (one sim tick at 30 Hz).
         /// </summary>
-        public const double StrikeClipSeconds = 0.12, AnticipationSeconds = 2.0 / 30.0, StrikeSeconds = 1.5 / 30.0;
+        public const double StrikeClipSeconds = 0.25, AnticipationSeconds = 4.0 / 30.0, StrikeSeconds = 1.0 / 30.0;
 
-        /// <summary>The clip's wind-up extreme (the pose held before the strike), clip seconds.</summary>
+        /// <summary>The estimated wind-up extreme, clip seconds.</summary>
         public static double Extreme(double contact) => Math.Max(0, contact - StrikeClipSeconds);
 
         /// <summary>
-        /// Fast-attack wind-up clip time for age in [0, W): ease into the extreme over min(AnticipationSeconds, W/2), hold
-        /// it, then extreme to contact linearly over the last min(StrikeSeconds, 0.4 W) (the strike lands on the tick).
+        /// Fast-attack wind-up clip time for age in [0, W): the strike is the last min(StrikeSeconds, 0.4 W); before it,
+        /// ease (smoothstep) from 0 to the extreme over min(AnticipationSeconds, the time before the strike), then hold.
+        /// The strike runs extreme to contact linearly and ends exactly on the damage tick.
         /// </summary>
-        public static double CraftTime(double age, double contact, double windupSeconds)
+        public static double CraftTime(double age, double contact, double windupSeconds, double extreme = -1)
         {
-            double e = Extreme(contact), snap = Math.Min(AnticipationSeconds, windupSeconds * 0.5);
+            double e = extreme >= 0 && extreme <= contact ? extreme : Extreme(contact);
             double strike = Math.Min(StrikeSeconds, windupSeconds * 0.4), holdEnd = windupSeconds - strike;
+            double ease = Math.Min(AnticipationSeconds, holdEnd);
             if (age <= 0) return 0;
-            if (age < snap) { double s = age / snap; return e * s * s * (3 - 2 * s); }
+            if (age < ease) { double s = age / ease; return e * s * s * (3 - 2 * s); }
             if (age < holdEnd) return e;
             return e + (contact - e) * Math.Min(1, (age - holdEnd) / strike);
         }
+
+        static readonly System.Collections.Generic.Dictionary<string, double> _extremes = new System.Collections.Generic.Dictionary<string, double>();
+        public const int ExtremeSamples = 24;
+
+        /// <summary>
+        /// fix/hit-feel-3: the clip's wind-up extreme MEASURED on the rig: of ExtremeSamples clip times in [0, contact], the
+        /// one where the weapon hand (handslot.r, else hand.r, model space) is farthest from where it is at contact. So the
+        /// strike (extreme to contact) is the longest hand path the clip has before the hit. Measured once per clip name
+        /// (the shared clips are shared across rigs), before this frame's pose is built; -1 when it cannot be measured.
+        /// </summary>
+        public static double MeasureExtreme(ModelView m, string clip, double contact)
+        {
+            if (clip == null) return -1;
+            if (_extremes.TryGetValue(clip, out double cached)) return cached;
+            double result = -1;
+            Transform hand = m != null ? (m.Bone("handslot.r") ?? m.Bone("hand.r")) : null;
+            if (hand != null && contact > 1e-3)
+            {
+                m.BeginPose();
+                m.Pose(clip, contact, 1f, false);
+                if (m.Evaluate(true))
+                {
+                    Vector3 hc = m.Transform.InverseTransformPoint(hand.position);
+                    double best = -1;
+                    for (int k = 0; k < ExtremeSamples; k++)
+                    {
+                        double t = contact * k / ExtremeSamples;
+                        m.BeginPose();
+                        m.Pose(clip, t, 1f, false);
+                        if (!m.Evaluate(true)) { best = -1; break; }
+                        double d = (m.Transform.InverseTransformPoint(hand.position) - hc).sqrMagnitude;
+                        if (d > best) { best = d; result = t; }
+                    }
+                    if (best < 1e-6) result = -1;
+                }
+            }
+            _extremes[clip] = result;
+            return result;
+        }
+
+        /// <summary>Tests: forget the measured extremes.</summary>
+        public static void ResetExtremes() => _extremes.Clear();
 
         /// <summary>The sim seconds after the press at which the contact frame is drawn (W seconds, or the parity lead).</summary>
         public static double ContactAge(double contact, double windupSeconds) =>
@@ -191,8 +237,7 @@ namespace CriticalMass.Runtime.View.Anim
                 // Closer (batch 4): with a wind-up the clip fades in over the whole wind-up, smoothstep (slow at both ends).
                 // A 0.05 s linear fade snapped the two-hand grips (Farmer slice, Miner chop: their first frame is far from
                 // the base pose) so fast that the hand peaked on the press tick, 5 ticks before the hit.
-                // feat/hit-feel-2: with the fast craft the pose is fully in by the end of the snap, so the extreme reads.
-                double s = Math.Min(1, age / (FastCraft ? Math.Min(AnticipationSeconds, windupSeconds * 0.5) : windupSeconds));
+                double s = Math.Min(1, age / windupSeconds);   // fix/hit-feel-3: back to the whole wind-up (a fast fade-in out-ran the strike)
                 a = s * s * (3 - 2 * s);
             }
             else a = Math.Min(1, age / 0.02);

@@ -31,6 +31,22 @@ namespace CriticalMass.Runtime.View.Anim
         public const double FacingHold = 0.18;
         /// <summary>Extra reach (u) and extra arc (degrees each side) when picking the enemy to face.</summary>
         public const double FaceReachSlack = 0.6, FaceArcSlackDeg = 25;
+        /// <summary>fix/hit-feel-3: the most the swing may turn the body off the sim facing (degrees).</summary>
+        public const double FaceConeDeg = 20;
+        /// <summary>
+        /// fix/hit-feel-3: the most the drawn body may sit off its sim position horizontally (step-in, flinch and stagger
+        /// together), so the ring and the placement test (0.35 u) still hold.
+        /// </summary>
+        public const float MaxViewOffset = 0.25f;
+
+        /// <summary>Clamps the horizontal part of a view offset to MaxViewOffset (vertical untouched; pure).</summary>
+        public static Vector3 ClampOffset(Vector3 v)
+        {
+            float h = Mathf.Sqrt(v.x * v.x + v.z * v.z);
+            if (h <= MaxViewOffset) return v;
+            float k = MaxViewOffset / h;
+            return new Vector3(v.x * k, v.y, v.z * k);
+        }
         /// <summary>Hit-stop in wall seconds per tier (light, heavy, critical or finishing).</summary>
         public const double HoldLight = 0.045, HoldHeavy = 0.06, HoldCritical = 0.07;
         /// <summary>Camera nudge (trauma before the shake setting's scale) for a hit on, and by, the local player.</summary>
@@ -58,7 +74,7 @@ namespace CriticalMass.Runtime.View.Anim
         }
 
         /// <summary>Most the step-in may move to close a reach gap (u), and the room always left between the two bodies.</summary>
-        public const double ReachStepMax = 0.5, BodyGap = 0.05;
+        public const double ReachStepMax = 0.25, BodyGap = 0.05;   // fix/hit-feel-3: was 0.5 (models drawn 0.43 u off)
 
         /// <summary>
         /// Peak step-in (u) for a target `dist` away: enough that the weapon (reach) meets the target's body surface
@@ -78,11 +94,11 @@ namespace CriticalMass.Runtime.View.Anim
         /// <summary>Damage share 0..1 for reactions (30 damage = full).</summary>
         static double Dmg01(double dmg) => Math.Max(0, Math.Min(1, dmg / 30));
 
-        /// <summary>Flinch lean away from the blow at full envelope: 8 degrees plus 16 x damage share (8 to 24).</summary>
-        public static double FlinchLeanDeg(double dmg) => 8 + 16 * Dmg01(dmg);
+        /// <summary>Flinch lean away from the blow at full envelope: 6 degrees plus 7 x damage share (6 to 13).</summary>
+        public static double FlinchLeanDeg(double dmg) => 6 + 7 * Dmg01(dmg);   // fix/hit-feel-3: 6 to 13 (24 tipped the body box to 1.5x tall)
 
-        /// <summary>Flinch shift along the blow at full envelope (u): 0.08 plus 0.14 x damage share.</summary>
-        public static double FlinchShift(double dmg) => 0.08 + 0.14 * Dmg01(dmg);
+        /// <summary>Flinch shift along the blow at full envelope (u): 0.07 plus 0.07 x damage share.</summary>
+        public static double FlinchShift(double dmg) => 0.07 + 0.07 * Dmg01(dmg);
 
         /// <summary>Damage from which a hit also staggers (a step back along the blow).</summary>
         public const double StaggerFrom = 12;
@@ -94,7 +110,7 @@ namespace CriticalMass.Runtime.View.Anim
         public static double StaggerStep(double t, double dmg)
         {
             if (dmg < StaggerFrom || t < 0 || t >= 0.45) return 0;
-            double amp = 0.18 + 0.14 * Dmg01(dmg);
+            double amp = 0.1 + 0.06 * Dmg01(dmg);
             if (t < 0.08) { double s = t / 0.08; return amp * s * (2 - s); }
             if (t < 0.2) return amp;
             double r = (t - 0.2) / 0.25;
@@ -180,8 +196,14 @@ namespace CriticalMass.Runtime.View.Anim
             double age = SwingAge(a, w.Tick, alpha, hz);
             double windup = Math.Max(0, a.SwingWindup) / hz;
             if (!a.Alive || age < 0 || age > windup + FacingHold) return a.Facing;
+            // fix/hit-feel-3: turn only toward a target inside FaceConeDeg of the sim facing (the facing test allows 30), and
+            // otherwise keep the sim facing (hit-feel-1 fell back to SwingFacing, which fought the movement facing).
             int t = SwingTarget(w, i);
-            return t >= 0 ? Math.Atan2(w.Z[t] - w.Z[i], w.X[t] - w.X[i]) : a.SwingFacing;
+            if (t < 0) return a.Facing;
+            double want = Math.Atan2(w.Z[t] - w.Z[i], w.X[t] - w.X[i]);
+            double d = want - a.Facing;
+            d = Math.Atan2(Math.Sin(d), Math.Cos(d));
+            return Math.Abs(d) <= FaceConeDeg * Math.PI / 180 ? want : a.Facing;
         }
 
         /// <summary>

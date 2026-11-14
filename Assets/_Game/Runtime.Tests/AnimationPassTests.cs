@@ -361,13 +361,13 @@ namespace CriticalMass.Runtime.Tests
                 double ws = windupTicks / hz;
                 Assert.AreEqual(ws, contactAge, 1e-9, c + " contact age = W");
                 Assert.AreEqual(0, AttackTiming.ClipTime(0, contact, len, ws), 1e-9, c + " starts at clip time 0");
-                // feat/hit-feel-2 (fast-attack craft): the wind-up extreme is reached within the 2-frame snap and held; the
-                // strike (extreme to contact) is the last stretch before the damage tick.
-                double extreme = AttackTiming.Extreme(contact), snap = Math.Min(AttackTiming.AnticipationSeconds, ws * 0.5);
-                Assert.AreEqual(extreme, AttackTiming.ClipTime(snap, contact, len, ws), 1e-9, c + " at the wind-up extreme after the snap");
+                // fix/hit-feel-3 (fast-attack craft): ease into the wind-up extreme, hold it, and play the whole strike
+                // (extreme to contact) in the last tick before the damage tick, so the weapon hand is fastest on that tick.
+                double extreme = AttackTiming.Extreme(contact), strike = Math.Min(AttackTiming.StrikeSeconds, ws * 0.4);
+                double ease = Math.Min(AttackTiming.AnticipationSeconds, ws - strike);
+                Assert.AreEqual(extreme, AttackTiming.ClipTime(ease, contact, len, ws), 1e-9, c + " at the wind-up extreme after the ease");
+                Assert.AreEqual(extreme, AttackTiming.ClipTime(ws - strike, contact, len, ws), 1e-9, c + " held until the strike");
                 Assert.Less(AttackTiming.ClipTime(ws - 1e-4, contact, len, ws), contact, c + " the strike ends on the tick, not before");
-                Assert.GreaterOrEqual(AttackTiming.ClipTime(ws - Math.Min(AttackTiming.StrikeSeconds, ws * 0.4), contact, len, ws), extreme - 1e-9,
-                    c + " the strike starts from the extreme");
                 Assert.AreEqual(contact, AttackTiming.ClipTime(ws, contact, len, ws), 1e-9, c + " contact exactly on tick T + W");
                 double prev = -1;
                 for (double age = 0; age < 2; age += 1 / 60.0)
