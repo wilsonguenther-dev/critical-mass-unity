@@ -830,8 +830,8 @@ namespace CriticalMass.Runtime.View.Atmosphere
         CriticalMass.Sim.Core.World _builtWorld, _waitWorld;
         int _builtLevel = -1, _waitFrames;
         GameObject _root;
-        Mesh _mesh, _hMesh;
-        Material _mat, _hMat;
+        Mesh _mesh, _hMesh, _wMesh;
+        Material _mat, _hMat, _wMat;
         static readonly int CentreId = Shader.PropertyToID("_Centre");
 
         public int Triangles { get; private set; }
@@ -841,6 +841,10 @@ namespace CriticalMass.Runtime.View.Atmosphere
         /// <summary>World horizon 1: the eye-level sky and far silhouettes (one draw, no texture); 0 when it could not load.</summary>
         public int HorizonTriangles { get; private set; }
         public int HorizonDraws { get; private set; }
+        /// <summary>World horizon 2: the wall architecture overlay (one draw, no texture); 0 when it could not load.</summary>
+        public int WallTriangles { get; private set; }
+        public int WallDraws { get; private set; }
+        public WallArchReport WallReport { get; private set; }
         public IReadOnlyList<BeyondFeature> LastFeatures => _features;
         readonly List<BeyondFeature> _features = new List<BeyondFeature>();
 
@@ -856,6 +860,7 @@ namespace CriticalMass.Runtime.View.Atmosphere
             Clear();
             if (_mat != null) Destroy(_mat);
             if (_hMat != null) Destroy(_hMat);
+            if (_wMat != null) Destroy(_wMat);
         }
 
         void LateUpdate()
@@ -880,6 +885,8 @@ namespace CriticalMass.Runtime.View.Atmosphere
             _mesh = null;
             if (_hMesh != null) Destroy(_hMesh);
             _hMesh = null;
+            if (_wMesh != null) Destroy(_wMesh);
+            _wMesh = null;
             if (_root != null) Destroy(_root);
             _root = null;
         }
@@ -917,6 +924,7 @@ namespace CriticalMass.Runtime.View.Atmosphere
             Triangles = m.Tris * (b.Ink ? 2 : 1);
             Draws = b.Draws;
             BuildHorizon(level, w.Map.Width, w.Map.Height);
+            BuildWalls(w.Map, level);
             _root.SetActive(Shown);
         }
 
@@ -954,6 +962,44 @@ namespace CriticalMass.Runtime.View.Atmosphere
             HorizonTriangles = hm.Tris;
             HorizonDraws = WorldHorizonBudget.Draws;
         }
+
+        /// <summary>
+        /// World horizon 2: the wall architecture (coping, merlons, courses, buttresses, towers, gate arches, banners,
+        /// torches, bridge ropes, the hill's beacon and each base's keep) as ONE mesh and ONE draw on CM/WallDress, a
+        /// child of the world-beyond root. View only: no collider, no shadow caster, no texture, nothing per frame on the
+        /// CPU. The eye-level height is added in the vertex shader only for low views, so the top-down view is unchanged.
+        /// </summary>
+        void BuildWalls(CriticalMass.Sim.Grid.MapDef map, int level)
+        {
+            WallTriangles = 0;
+            WallDraws = 0;
+            WallReport = null;
+            if (_wMat == null)
+            {
+                Shader sh = Resources.Load<Shader>("CMWallDress");
+                if (sh == null) sh = Shader.Find("CM/WallDress");
+                if (sh == null) return;
+                _wMat = new Material(sh) { name = "Wall Architecture" };
+                _wMat.SetFloat(MaxRiseId, WallArchBudget.MaxRise);
+            }
+            var am = new ArchMesh();
+            WallReport = WallArchitectureLayout.Build(am, map, WallArchBudget.For(level));
+            _wMesh = WallArchitectureLayout.ToMesh(am);
+            var go = new GameObject("Wall Architecture");
+            go.transform.SetParent(_root.transform, false);
+            go.AddComponent<MeshFilter>().sharedMesh = _wMesh;
+            var r = go.AddComponent<MeshRenderer>();
+            r.sharedMaterial = _wMat;
+            r.shadowCastingMode = ShadowCastingMode.Off;
+            r.receiveShadows = true;
+            r.lightProbeUsage = LightProbeUsage.Off;
+            r.reflectionProbeUsage = ReflectionProbeUsage.Off;
+            r.allowOcclusionWhenDynamic = false;
+            WallTriangles = am.Tris;
+            WallDraws = WallArchBudget.Draws;
+        }
+
+        static readonly int MaxRiseId = Shader.PropertyToID("_MaxRise");
 
         public static Mesh ToMesh(BeyondMesh m)
         {

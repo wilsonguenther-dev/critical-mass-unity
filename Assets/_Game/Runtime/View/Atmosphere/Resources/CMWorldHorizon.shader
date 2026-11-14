@@ -66,6 +66,8 @@ Shader "CM/WorldHorizon"
                 float4 positionOS : POSITION;
                 half4  color      : COLOR;
                 float2 uv0        : TEXCOORD0;
+                float4 uv1        : TEXCOORD1;   // world horizon 2: pivot / phase / ribbon coordinate (see WorldHorizon.cs)
+                float4 uv2        : TEXCOORD2;   // flap amplitude, orbit speed, beat, visibility (0 day, 1 night, 2 always)
             };
 
             struct V
@@ -74,6 +76,7 @@ Shader "CM/WorldHorizon"
                 float3 dir        : TEXCOORD0;
                 half4  color      : COLOR;
                 nointerpolation float kind : TEXCOORD1;
+                float3 fx         : TEXCOORD2;   // ribbon coordinate, flyer visibility, twinkle phase
             };
 
             V Vert(A i)
@@ -82,6 +85,26 @@ Shader "CM/WorldHorizon"
                 float3 cam = _WorldSpaceCameraPos;
                 float3 rel = i.positionOS.xyz;
                 float follow = i.uv0.x, kind = i.uv0.y;
+                // World horizon 2 motion, all in the vertex shader (no CPU per frame).
+                float t = _CMAmbientTime;
+                if (kind > 4.5 && kind < 5.5)
+                {
+                    // Vines and chains sway from their island.
+                    rel.x += i.uv2.x * sin(t * 0.7 + i.uv1.w);
+                    rel.z += i.uv2.x * 0.6 * cos(t * 0.53 + i.uv1.w);
+                }
+                else if (kind > 6.5)
+                {
+                    // Flyers and the far creature circle their pivot and beat their wings; birds roost at night and the
+                    // lantern gliders only fly at dusk's end and night (an unseen flyer folds to its pivot: no pixels).
+                    float night = saturate((_CMAmbient.w - 0.6) / 0.3);
+                    float vis = i.uv2.w < 0.5 ? 1.0 - night : (i.uv2.w < 1.5 ? night : 1.0);
+                    float a = t * i.uv2.y, sa = sin(a), ca = cos(a);
+                    float2 d = rel.xz - i.uv1.xz;
+                    rel.xz = i.uv1.xz + float2(ca * d.x - sa * d.y, sa * d.x + ca * d.y);
+                    rel.y += i.uv2.x * sin(t * i.uv2.z + i.uv1.w);
+                    if (vis < 0.5) rel = i.uv1.xyz;
+                }
                 // Parallax: a band that follows 0.9 of the camera slides a tenth of its travel from the arena centre.
                 rel.xz -= (cam.xz - _Centre.xz) * (1.0 - follow);
                 if (kind > 1.5 && kind < 2.5)
@@ -106,6 +129,7 @@ Shader "CM/WorldHorizon"
                 o.dir = rel;
                 o.color = i.color;
                 o.kind = kind;
+                o.fx = float3(i.uv1.x, i.uv2.w, i.uv1.w);
                 return o;
             }
 
@@ -246,7 +270,28 @@ Shader "CM/WorldHorizon"
                     {
                         half3 tone = SRGBToLinear(i.color.rgb);
                         col = CMTodGrade(tone, 0.5h, 0.0h);
-                        if (i.kind > 2.5) col = lerp(col, tone, 0.35h + 0.6h * (half)saturate(_CMAmbient.w));
+                        if (i.kind > 2.5 && i.kind < 3.5) col = lerp(col, tone, 0.35h + 0.6h * (half)saturate(_CMAmbient.w));
+                        else if (i.kind > 3.5 && i.kind < 4.5)
+                        {
+                            // Waterfall: foam bands running down the ribbon.
+                            half st = (half)step(0.5, frac(i.fx.x * 1.8 - _CMAmbientTime * 0.35));
+                            col = CMTodGrade(tone * (0.86h + 0.14h * st), 0.8h, 0.0h);
+                        }
+                        else if (i.kind > 5.5 && i.kind < 6.5)
+                        {
+                            // Distant light: a dark window by day, lit at dusk and night, a slow twinkle, less air in front.
+                            half on = (half)smoothstep(0.2, 0.7, _CMAmbient.w);
+                            half tw = 0.85h + 0.15h * (half)sin(_CMAmbientTime * 1.7 + i.fx.z);
+                            col = lerp(CMTodGrade(tone * 0.25h, 0.5h, 0.0h), tone * 1.3h * tw, on);
+                            haze *= 1.0h - 0.6h * on;
+                        }
+                        else if (i.kind > 6.5)
+                        {
+                            col = CMTodGrade(tone, 0.4h, 0.0h);
+                            if (i.fx.y > 0.5 && i.fx.y < 1.5) col = tone;   // lantern gliders carry their own light
+                            if (i.kind > 7.5 && max(tone.r, max(tone.g, tone.b)) > 0.5)   // the creature's sky-glass ridge
+                                col = lerp(col, tone, 0.3h + 0.6h * (half)saturate(_CMAmbient.w));
+                        }
                     }
                     col = lerp(col, air, haze);
                 }
