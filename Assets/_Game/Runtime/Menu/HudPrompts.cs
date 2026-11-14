@@ -118,6 +118,31 @@ namespace CriticalMass.Runtime.Menu
             }
         }
 
+        /// <summary>
+        /// fix/hud-containment-3 (walk: mixed key-hint styles): the ONE key-hint style, for any key plate on the HUD. A drawn
+        /// glyph centred on a navy plate, like the three ability plates; the label keeps the plain words, hidden.
+        /// </summary>
+        public static InputGlyphView PlateGlyph(Transform plate)
+        {
+            InputGlyphView v = InputGlyphView.Make(plate, "Prompt Glyph", PlateGlyphH);
+            RectTransform rt = v.Rect;
+            rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.anchoredPosition = Vector2.zero;
+            return v;
+        }
+
+        /// <summary>Shows an action's glyph on a plate (the words stay in the hidden label). Returns the plate width it needs.</summary>
+        public static float SetPlate(InputGlyphView glyph, Text label, string action, ControlDevice device)
+        {
+            bool on = !string.IsNullOrEmpty(action);
+            if (glyph != null && glyph.gameObject.activeSelf != on) glyph.gameObject.SetActive(on);
+            if (!on) { if (label != null) label.enabled = true; return PlateMinW; }
+            GlyphSpec g = InputGlyphs.ForAction(action, device);
+            if (label != null) { HudText.Set(label, g.Words); label.enabled = glyph == null; }
+            return glyph != null ? Mathf.Max(PlateMinW, glyph.Set(g) + 12f) : PlateMinW;
+        }
+
         /// <summary>Writes the prompts for a device now (glyphs on the plates, plain words in the hidden labels).</summary>
         public void Apply(ControlDevice device)
         {
