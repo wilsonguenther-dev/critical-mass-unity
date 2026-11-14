@@ -69,6 +69,54 @@ def mir(p):
     return (-p[0], p[1], p[2])
 
 
+# ------------------------------------------------------------------------------------------------ 0. today's adult footprint
+def footprint_of_imported():
+    """Width (x extent, m) of the Hero mesh without tail vertices: all, low (z < 1.2: fists and feet), feet only."""
+    res = {}
+    for o in bpy.context.scene.objects:
+        if o.type != 'MESH' or not o.name.startswith('Kaiju_Hero'):
+            continue
+        dg = bpy.context.evaluated_depsgraph_get(); ev = o.evaluated_get(dg); me = ev.to_mesh()
+        X = np.array([o.matrix_world @ v.co for v in me.vertices]); ev.to_mesh_clear()
+        gi = {g.index: g.name for g in o.vertex_groups}
+        dom = []
+        for v in o.data.vertices:
+            gs = sorted(v.groups, key=lambda g: -g.weight)
+            dom.append(gi[gs[0].group] if gs else '')
+        dom = np.array(dom)
+        keep = np.array([not d.startswith('Tail') for d in dom])
+        low = keep & (X[:, 2] < 1.2)
+        feet = np.array([d.startswith('Foot') or d.startswith('Shin') or d.startswith('Toes') for d in dom])
+        res = {'all': round(float(np.ptp(X[keep, 0])), 3), 'low': round(float(np.ptp(X[low, 0])), 3),
+               'low_half_max': round(float(np.abs(X[low, 0] - np.median(X[keep, 0])).max()), 3),
+               'feet': round(float(np.ptp(X[feet, 0])), 3) if feet.any() else None, 'height': round(float(np.ptp(X[:, 2])), 3)}
+    return res
+
+
+C.clear()
+OLD_FBX = os.path.join(HERE, '..', '_fallback~', 'Kaiju_Adult.fbx')
+REP['old_footprint'] = None
+if os.path.exists(OLD_FBX):
+    bpy.ops.import_scene.fbx(filepath=OLD_FBX, use_anim=True)
+    for o in bpy.context.scene.objects:
+        if o.type == 'ARMATURE':
+            o.data.pose_position = 'REST'
+    bpy.context.view_layer.update()
+    REP['old_footprint'] = {'rest': footprint_of_imported()}
+    for o in bpy.context.scene.objects:
+        if o.type == 'ARMATURE':
+            o.data.pose_position = 'POSE'
+            idle = next((a for a in bpy.data.actions if a.name.endswith('Idle')), None)
+            if idle and o.animation_data:
+                o.animation_data.action = idle
+                try:
+                    o.animation_data.action_slot = idle.slots[0]
+                except Exception:
+                    pass
+    bpy.context.scene.frame_set(1)
+    REP['old_footprint']['idle'] = footprint_of_imported()
+    log('old adult footprint', REP['old_footprint'])
+
 # ------------------------------------------------------------------------------------------------ 1. import, recentre
 C.clear()
 sc = bpy.context.scene
@@ -82,6 +130,13 @@ LV = ['Hero', 'LOD0', 'LOD1', 'Shadow']
 REP['input_tris'] = {lv: int(len(C.tris(obs[lv]))) for lv in LV}
 V0 = C.verts(obs['Hero'])
 REP['recentred_bbox'] = [V0.min(0).round(3).tolist(), V0.max(0).round(3).tolist()]
+_low = (V0[:, 2] < 1.2) & (V0[:, 1] < 1.0)
+NEW_LOW_HALF = float(np.abs(V0[_low, 0]).max())
+OLD_LOW_HALF = (REP['old_footprint'] or {}).get('idle', {}).get('low_half_max') or NEW_LOW_HALF
+# keep the planted fists no wider than today's adult (bridges): pull them in by the difference (at most 0.7 m)
+FIST_IN = max(0.0, min(0.7, NEW_LOW_HALF - OLD_LOW_HALF))
+REP['footprint'] = {'new_rest_low_half': round(NEW_LOW_HALF, 3), 'old_idle_low_half': round(OLD_LOW_HALF, 3), 'fist_in': round(FIST_IN, 3)}
+log('footprint', REP['footprint'])
 log('imported', REP['input_tris'], 'bbox', REP['recentred_bbox'])
 
 # ------------------------------------------------------------------------------------------------ 2. skeleton
@@ -145,13 +200,17 @@ def code_of(col):
 
 def dorsal_profile(V, col):
     """Max z of non-glow (plate) vertices near the midline per 0.12 m y-bin."""
-    code = code_of(col)
-    m = (code != 6) & (np.abs(V[:, 0]) < 0.7)
+    lum = col[:, :3] @ np.array([0.3, 0.59, 0.11])
+    m = (lum < 0.2) & (np.abs(V[:, 0]) < 0.7)
     bins = {}
     for y, z in zip(V[m, 1], V[m, 2]):
         k = int(math.floor(y / 0.12))
         bins[k] = max(bins.get(k, -1), z)
     return bins
+
+
+def greenish(col):
+    return (col[:, 1] > col[:, 0] * 1.15) & (col[:, 1] > col[:, 2] * 1.6) & (col[:, 1] > 0.12)
 
 
 def plate_top(bins, y):
@@ -167,12 +226,12 @@ codeH = code_of(CH)
 CRYS = []      # (name, head, tail, parent)
 for i, y in enumerate(CRYSTAL_Y):
     top = plate_top(BINS, y)
-    m = (codeH == 6) & (np.abs(VH[:, 0]) < 0.8) & (np.abs(VH[:, 1] - y) < 0.22) & (VH[:, 2] > top - 0.1)
+    m = greenish(CH) & (np.abs(VH[:, 0]) < 0.8) & (np.abs(VH[:, 1] - y) < 0.22) & (VH[:, 2] > top + 0.02)
     if m.sum() < 5:
         log('crystal cluster', i, 'empty at y', y); continue
     P = VH[m]
     tip = P[np.argmax(P[:, 2])]
-    base = np.array([np.median(P[:, 0]), np.median(P[:, 1]), top - 0.05])
+    base = np.array([np.median(P[:, 0]), np.median(P[:, 1]), top])
     CRYS.append((f'Crystal{i + 1}', tuple(base), tuple(tip), int(m.sum())))
 REP['crystals'] = [(n, np.round(h, 2).tolist(), np.round(t, 2).tolist(), c) for n, h, t, c in CRYS]
 log('crystal clusters', REP['crystals'])
@@ -453,13 +512,14 @@ def weights_for(ob, lv):
     bins = dorsal_profile(V, col)
     cr_names = [c[0] for c in CRYS]
     cr_y = np.array([REST[n][0][1] for n in cr_names]) if cr_names else np.zeros(0)
-    for i in np.where(code == 6)[0]:
+    gr = greenish(col)
+    for i in np.where(gr)[0]:
         x, y, z = V[i]
-        if abs(x) < 0.8 and len(cr_y) and y < 1.3 and z > plate_top(bins, y) - 0.1 and not jawm[i]:
+        if abs(x) < 0.8 and len(cr_y) and y < 1.3 and z > plate_top(bins, y) + 0.02 and not jawm[i]:
             k = int(np.argmin(np.abs(cr_y - y)))
             W[i] = 0; W[i, BI[cr_names[k]]] = 1; fixed[i] = True; nC += 1
     tail_cols = [BI[n] for n in DEF if PART[n] == 'tail']
-    tailrows = np.where((part == 'tail') & (code == 6))[0]
+    tailrows = np.where((part == 'tail') & gr & (V[:, 2] > 0.35))[0]
     for i in tailrows:
         j = tail_cols[int(np.argmax(W[i, tail_cols]))]
         W[i] = 0; W[i, j] = 1; fixed[i] = True
@@ -579,33 +639,40 @@ def build_extras(lv):
     bmesh.ops.reverse_faces(bm, faces=bm.faces)
     parts.append(part_obj(f'Pouch_{lv}', bm, hexc('#2A1012', 0), jaw_split_weight))
     # teeth: short cones just behind the rims (upper on the head pointing down, lower on the jaw pointing up)
-    def teeth(rim, down, bone_name, count):
+    def teeth(rim, down, bone_name, fracs, rad, dep):
         if len(rim) < 3:
             return None
         R = sorted(rim, key=lambda c: math.atan2(c.x, -(c.y - LIP['hinge_y'])))
-        pick = [R[int(round(i * (len(R) - 1) / (count - 1)))] for i in range(count)]
+        pick = [R[int(round(f * (len(R) - 1)))] for f in fracs]
         bm = bmesh.new()
         for c in pick:
             inward = Vector((-c.x, LIP['hinge_y'] - c.y, 0)); inward.z = 0
             inward = inward.normalized() * 0.035 if inward.length > 1e-6 else Vector()
             base = c + inward
-            r = bmesh.ops.create_cone(bm, cap_ends=True, segments=4, radius1=0.028, radius2=0.0, depth=0.07)
+            r = bmesh.ops.create_cone(bm, cap_ends=True, segments=5, radius1=rad, radius2=rad * 0.45, depth=dep)
             for v in r['verts']:
-                z = (-v.co.z - 0.035) if down else (v.co.z + 0.035)
+                z = (-v.co.z - dep / 2) if down else (v.co.z + dep / 2)
                 v.co = Vector((v.co.x, v.co.y, z)) + base
         return part_obj(f'Teeth_{bone_name}_{lv}', bm, hexc('#DCD3B8', 0), lambda p: [(bone_name, 1.0)])
-    t1 = teeth(m['rim_up'], True, 'Head', 10)
-    t2 = teeth(m['rim_lo'], False, 'Jaw', 8)
+    # goofy, not predatory: four stubby upper nubs and two little lower tusks (cartoon direction, art lead 2026-11-14)
+    t1 = teeth(m['rim_up'], True, 'Head', (0.22, 0.4, 0.6, 0.78), 0.042, 0.06)
+    t2 = teeth(m['rim_lo'], False, 'Jaw', (0.3, 0.7), 0.05, 0.09)
     parts += [t for t in (t1, t2) if t]
     # eyes: two small glow gems set into the brow shadow (glow code 6 = allegiance colour; magenta when berserk)
     bm = bmesh.new()
     for sx in (1, -1):
         guess = Vector((0.28 * sx, -1.70, 2.88))
         loc, nrm, idx, d = bvh.find_nearest(guess)
-        r = bmesh.ops.create_icosphere(bm, subdivisions=1, radius=0.065)
+        r = bmesh.ops.create_icosphere(bm, subdivisions=1, radius=0.085)
         for v in r['verts']:
             v.co = Vector((v.co.x, v.co.y * 0.6, v.co.z * 0.8)) + loc + nrm * 0.01
     parts.append(part_obj(f'Eyes_{lv}', bm, hexc('#C9F632', 6), lambda p: [('Head', 1.0)]))
+    if lv == 'Hero':
+        # a 1 mm triangle on the ground under the belly, weighted to Root, so every exported bone is a skin bone
+        bm = bmesh.new()
+        vs = [bm.verts.new(c) for c in ((0, 0, 0.001), (0.001, 0, 0.001), (0, 0.001, 0.001))]
+        bm.faces.new(vs)
+        parts.append(part_obj('RootAnchor', bm, hexc('#2A1012', 0), lambda p: [('Root', 1.0)]))
     # join into the level mesh
     with bpy.context.temp_override(active_object=ob, object=ob, selected_objects=[ob] + parts, selected_editable_objects=[ob] + parts):
         bpy.ops.object.join()
@@ -760,6 +827,8 @@ def keyed(keys, t, fn=ease):
 
 HEEL = {s: Vector(J['heel_L'] if s == 'L' else mir(J['heel_L'])) for s in 'LR'}
 KNU = {s: Vector(J['knuck_L'][1] if s == 'L' else mir(J['knuck_L'][1])) for s in 'LR'}
+for _s in 'LR':     # planted fists pulled in to today's footprint (bridges); the bind pose keeps the art's width
+    KNU[_s].x -= FIST_IN * (1 if _s == 'L' else -1)
 FIST_PLANT_Z = KNU['L'].z - 0.12
 
 
@@ -846,13 +915,16 @@ def base_pose():
 @clip('Idle', 90, loop=True)
 def idle(t, T):
     p = base_pose()
+    # slightly dopey: big slow breaths, a lazy head tilt from side to side, mouth hanging a little open
     b = math.sin(2 * math.pi * t / T * 2)            # two breaths per loop
-    p.loc['Hips'] = (0, 0, 0.03 * b)
-    spine_bend(p, x=-2.5 * b)
-    look = 9 * math.sin(2 * math.pi * t / T)
-    p.q['Neck'] = arot('Neck', 2 * b, 0, look * 0.4)
-    p.q['Head'] = arot('Head', -1.5 * b, 0, look * 0.6)
-    p.q['Jaw'] = arot('Jaw', 2.0 + 2.0 * (b * 0.5 + 0.5))
+    w = 2 * math.pi * t / T
+    p.loc['Hips'] = (0, 0, 0.05 * b)
+    spine_bend(p, x=-4.0 * b)
+    look = 10 * math.sin(w)
+    tilt = 8 * math.sin(w + 0.9)
+    p.q['Neck'] = arot('Neck', 3 * b, 0, look * 0.4)
+    p.q['Head'] = arot('Head', -2.5 * b, tilt, look * 0.6)
+    p.q['Jaw'] = arot('Jaw', 6.0 + 3.0 * (b * 0.5 + 0.5))
     tail_wave(p, t, 5, 2, T / 2)
     for s in 'LR':
         p.q[f'Shoulder_{s}'] = arot(f'Shoulder_{s}', 0, (1 if s == 'L' else -1) * 1.5 * b, 0)
@@ -896,18 +968,19 @@ def walk(t, T):
             p.end[f'Fist_{s}'] = (0 if st else -20 * math.sin(math.pi * (u - DUTY) / (1 - DUTY)), 0, 0)
     w2 = 2 * math.pi * ph
     # body: drop on each hind plant, weight over the stance side, hips yaw with the hind legs, chest counter-yaw
-    bob = -0.07 * (0.5 + 0.5 * math.cos(2 * w2 - 0.6))
+    # bouncy, waddling weight (cartoon direction): a deep drop on each hind plant, a big roll over the stance side
+    bob = -0.12 * (0.5 + 0.5 * math.cos(2 * w2 - 0.6))
     side = math.sin(w2 + 0.4)
-    p.loc['Hips'] = (0.07 * side, 0, bob)
-    p.q['Hips'] = arot('Hips', 1.5 * math.cos(2 * w2), -3.0 * side, 4.0 * math.sin(w2))
+    p.loc['Hips'] = (0.09 * side, 0, bob)
+    p.q['Hips'] = arot('Hips', 2.0 * math.cos(2 * w2), -5.0 * side, 5.0 * math.sin(w2))
     spine_bend(p, x=2.0 * math.cos(2 * w2 + 0.8), y=2.0 * side, z=-7.0 * math.sin(w2 + 0.3))
     for s in 'LR':
         sx = 1 if s == 'L' else -1
         p.q[f'Shoulder_{s}'] = arot(f'Shoulder_{s}', 0, 0, 3.0 * math.sin(w2 + (0 if s == 'L' else math.pi)))
     # head steadied: counter the chest yaw and the bob
-    p.q['Neck'] = arot('Neck', -2.0 * math.cos(2 * w2 + 1.0), 0, 2.5 * math.sin(w2 + 0.3))
-    p.q['Head'] = arot('Head', -1.5 * math.cos(2 * w2 + 1.2), 0, 1.5 * math.sin(w2 + 0.3))
-    p.q['Jaw'] = arot('Jaw', 2.0)
+    p.q['Neck'] = arot('Neck', 3.0 * math.cos(2 * w2 - 1.6), 0, 2.5 * math.sin(w2 + 0.3))
+    p.q['Head'] = arot('Head', 3.0 * math.cos(2 * w2 - 2.2), 3.0 * side, 1.5 * math.sin(w2 + 0.3))   # head bobs a beat late
+    p.q['Jaw'] = arot('Jaw', 6.0 + 3.0 * (0.5 + 0.5 * math.cos(2 * w2 - 2.6)))                       # jaw flaps on the plants
     # tail counter-sways the hips yaw, with lag down the chain
     tail_wave(p, t, 7.0, 3.0, T, lag=0.1)
     return p
@@ -915,15 +988,15 @@ def walk(t, T):
 
 def windup_pose(p, u):
     """Rear up, both arms overhead (u 0..1)."""
-    p.loc['Hips'] = (0, 0.18 * u, 0.22 * u)
-    spine_bend(p, x=-28 * u)
+    p.loc['Hips'] = (0, 0.18 * u, 0.30 * u)          # stretch: up on its toes
+    spine_bend(p, x=-24 * u)
     p.q['Neck'] = arot('Neck', 6 * u)
     p.q['Head'] = arot('Head', -10 * u)
     p.q['Jaw'] = arot('Jaw', 2 + 16 * u)
     for s in 'LR':
         sx = 1 if s == 'L' else -1
         rest = Vector((KNU[s].x, KNU[s].y, FIST_PLANT_Z)) + WRIST_OFF[s]
-        top = Vector((0.75 * sx, 0.15, 5.1))
+        top = Vector((0.8 * sx, -0.35, 4.65))
         p.ik[f'arm_{s}'] = (rest.lerp(top, u) + Vector((0.5 * sx, -0.6, 0)) * math.sin(math.pi * u), Vector((2.2 * sx, 1.5, 3.5)))
         p.end[f'Fist_{s}'] = (-120 * u, 0, 0)
 
@@ -935,7 +1008,7 @@ def slam_windup(t, T):
     windup_pose(p, u)
     tr = math.sin(2 * math.pi * t * 9) * 0.6 * max(0.0, (t / T - 0.7) / 0.3)
     p.q['Chest'] = arot('Chest', -28 * 0.25 * u + tr, 0, tr)
-    tail_wave(p, t, 3, 6 * u, 1.0, base_pitch=-6 * u)
+    tail_wave(p, t, 3, 6 * u, 1.0, base_pitch=8 * u)
     return p
 
 
@@ -959,8 +1032,9 @@ def slam(t, T):
     if hit > 0:
         hb = min(1.0, hit)
         shake = math.sin(f * 2.2) * 0.04 * max(0.0, 1 - abs(f - SLAM_HIT - 2) / 6)
-        p.loc['Hips'] = tuple(lerp(a, b, hb) for a, b in zip(p.loc.get('Hips', (0, 0, 0)), (0, -0.12, -0.18 + shake)))
-        spine_bend(p, x=lerp(-28 * (1 - hb) if f <= SLAM_HIT else 0, 22, hb))
+        # squash: the body drops hard and folds forward on the impact, then springs back
+        p.loc['Hips'] = tuple(lerp(a, b, hb) for a, b in zip(p.loc.get('Hips', (0, 0, 0)), (0, -0.12, -0.32 + shake)))
+        spine_bend(p, x=lerp(-24 * (1 - hb) if f <= SLAM_HIT else 0, 28, hb))
         p.q['Neck'] = arot('Neck', lerp(6, 14, hb)); p.q['Head'] = arot('Head', lerp(-10, -14, hb))
         p.q['Jaw'] = arot('Jaw', lerp(18, 26, hb) if f < 20 else lerp(2, 26, hb))
         for s in 'LR':
@@ -1028,7 +1102,7 @@ def roar(t, T):
         k = Vector((KNU[s].x + 0.25 * sx * up, KNU[s].y - 0.1 * up, FIST_PLANT_Z + 0.35 * up))
         p.ik[f'arm_{s}'] = (k + WRIST_OFF[s], k + WRIST_OFF[s] + Vector((0.8 * sx, 2.0, 0.8)))
         p.end[f'Fist_{s}'] = (-15 * up, 0, 0)
-    tail_wave(p, t, 4 + 4 * up, 8 * up, 0.5, base_pitch=-8 * up)
+    tail_wave(p, t, 4 + 4 * up, 8 * up, 0.5, base_pitch=10 * up)
     return p
 
 
@@ -1054,7 +1128,7 @@ def berserk(t, T):
             tgt = hitc.lerp(back, ease((u - 0.4) / 0.6))
         p.ik[f'arm_{s}'] = (tgt, tgt + Vector((1.6 * sx, 1.6, -0.4)))
         p.end[f'Fist_{s}'] = (80, 0, 0)
-    tail_wave(p, t, 9, 6, 1.0, base_pitch=-6)
+    tail_wave(p, t, 9, 6, 1.0, base_pitch=8)
     return p
 
 
@@ -1111,7 +1185,7 @@ for name, (N, loop, fn) in CLIPS.items():
     for f in range(frames):
         t = (f % N) / FPS if loop else f / FPS
         poses.append(fn(t, T))
-    crystal_springs(poses, loop, gain=1.6 if name in ('Walk', 'Slam', 'Berserk', 'Roar', 'KO') else 1.0)
+    crystal_springs(poses, loop, gain=2.0 if name in ('Walk', 'Slam', 'Berserk', 'Roar', 'KO') else 1.3)
     mats = [fk(p) for p in poses]
     act = bpy.data.actions.new(name); act.use_fake_user = True
     slot = act.slots.new(id_type='OBJECT', name=arm.name)
@@ -1174,6 +1248,9 @@ for name, (N, loop, fn) in CLIPS.items():
         CLIP_FACTS[name]['stride_m'] = round(STRIDE, 3)
     log('clip', name, CLIP_FACTS[name])
 REP['clips'] = CLIP_FACTS
+for _nm in ('Idle', 'Walk'):
+    _p = CLIPS[_nm][2](0.0, CLIPS[_nm][0] / FPS); _M = fk(_p)
+    REP.setdefault('new_fists_x', {})[_nm] = [round(_M['Fist_L'].translation.x, 3), round(_M['Fist_R'].translation.x, 3)]
 for o in obs.values():
     o.modifiers['Armature'].show_viewport = True
 save()
@@ -1372,6 +1449,25 @@ for o in bpy.context.scene.objects:
 for a in bpy.data.actions:
     ver['actions'][a.name] = list(a.frame_range)
 REP['verify'] = ver
+try:
+    arms = [o for o in bpy.context.scene.objects if o.type == 'ARMATURE']
+    for o in arms:
+        o.data.pose_position = 'REST'
+    bpy.context.view_layer.update()
+    REP['new_footprint'] = {'rest': footprint_of_imported()}
+    for o in arms:
+        o.data.pose_position = 'POSE'
+        idle = next((a for a in bpy.data.actions if a.name.endswith('Idle')), None)
+        o.animation_data_create().action = idle
+        try:
+            o.animation_data.action_slot = idle.slots[0]
+        except Exception:
+            pass
+    bpy.context.scene.frame_set(1)
+    REP['new_footprint']['idle'] = footprint_of_imported()
+    log('new adult footprint', REP['new_footprint'])
+except Exception as ex:
+    log('new footprint failed', ex)
 log('verify', json.dumps(ver)[:1500])
 REP['seconds'] = round(time.time() - T0, 1)
 save()
