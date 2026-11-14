@@ -361,11 +361,13 @@ namespace CriticalMass.Runtime.Tests
                 double ws = windupTicks / hz;
                 Assert.AreEqual(ws, contactAge, 1e-9, c + " contact age = W");
                 Assert.AreEqual(0, AttackTiming.ClipTime(0, contact, len, ws), 1e-9, c + " starts at clip time 0");
-                // The clip advances most on the last wind-up tick: the hand is fastest when the hit resolves.
-                double last = AttackTiming.ClipTime(ws, contact, len, ws) - AttackTiming.ClipTime(ws - 1 / hz, contact, len, ws);
-                for (int k = 1; k < windupTicks; k++)
-                    Assert.Less(AttackTiming.ClipTime(k / hz, contact, len, ws) - AttackTiming.ClipTime((k - 1) / hz, contact, len, ws), last,
-                        c + " wind-up tick " + k + " moves less than the contact tick");
+                // feat/hit-feel-2 (fast-attack craft): the wind-up extreme is reached within the 2-frame snap and held; the
+                // strike (extreme to contact) is the last stretch before the damage tick.
+                double extreme = AttackTiming.Extreme(contact), snap = Math.Min(AttackTiming.AnticipationSeconds, ws * 0.5);
+                Assert.AreEqual(extreme, AttackTiming.ClipTime(snap, contact, len, ws), 1e-9, c + " at the wind-up extreme after the snap");
+                Assert.Less(AttackTiming.ClipTime(ws - 1e-4, contact, len, ws), contact, c + " the strike ends on the tick, not before");
+                Assert.GreaterOrEqual(AttackTiming.ClipTime(ws - Math.Min(AttackTiming.StrikeSeconds, ws * 0.4), contact, len, ws), extreme - 1e-9,
+                    c + " the strike starts from the extreme");
                 Assert.AreEqual(contact, AttackTiming.ClipTime(ws, contact, len, ws), 1e-9, c + " contact exactly on tick T + W");
                 double prev = -1;
                 for (double age = 0; age < 2; age += 1 / 60.0)

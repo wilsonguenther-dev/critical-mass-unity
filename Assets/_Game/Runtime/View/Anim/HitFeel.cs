@@ -33,7 +33,72 @@ namespace CriticalMass.Runtime.View.Anim
         /// <summary>Hit-stop in wall seconds per tier (light, heavy, critical or finishing).</summary>
         public const double HoldLight = 0.045, HoldHeavy = 0.06, HoldCritical = 0.07;
         /// <summary>Camera nudge (trauma before the shake setting's scale) for a hit on, and by, the local player.</summary>
-        public const float NudgeOnLocal = 0.18f, NudgeByLocal = 0.1f;
+        public const float NudgeOnLocal = 0.45f, NudgeByLocal = 0.3f;   // feat/hit-feel-2: trauma is squared (0.45 at scale 0.7 = 0.032 u)
+
+        // ---------------------------------------------------------------- feat/hit-feel-2
+
+        /// <summary>
+        /// Weapon reach at the contact frame per class (u from the body centre along the swing: hand forward plus the
+        /// weapon), ESTIMATED from the rigs and props; HitFeelCapture logs the measured hand reach per class to replace
+        /// these. Sim ranges: Warrior 1.7, Farmer 1.4, Miner 1.5, Builder 1.5, Demolitions 1.3, Healer 1.2.
+        /// </summary>
+        public static double ViewReach(ClassId cls)
+        {
+            switch (cls)
+            {
+                case ClassId.Warrior: return 1.3;      // one-hand slice, sword
+                case ClassId.Farmer: return 1.25;      // two-hand slice, long tool
+                case ClassId.Miner: return 1.15;       // two-hand chop, pick
+                case ClassId.Builder: return 1.05;     // one-hand chop, mallet 0.62
+                case ClassId.Demolitions: return 1.05; // one-hand chop, pry bar 0.6
+                case ClassId.Healer: return 0.8;       // one-hand swing, lantern hangs 0.42
+                default: return 1.0;
+            }
+        }
+
+        /// <summary>Most the step-in may move to close a reach gap (u), and the room always left between the two bodies.</summary>
+        public const double ReachStepMax = 0.5, BodyGap = 0.05;
+
+        /// <summary>
+        /// Peak step-in (u) for a target `dist` away: enough that the weapon (reach) meets the target's body surface
+        /// (dist - targetRadius), at least LungeMax for feel, at most ReachStepMax, and never into the target's body.
+        /// </summary>
+        public static double StepPeak(double dist, double reach, double selfRadius, double targetRadius)
+        {
+            double need = dist - targetRadius - reach;
+            double want = Math.Min(ReachStepMax, Math.Max(LungeMax, need + 0.05));
+            double room = dist - selfRadius - targetRadius - BodyGap;
+            return Math.Max(0, Math.Min(want, room));
+        }
+
+        /// <summary>Sim seconds after the press at which the weapon smear starts: with the strike, AttackTiming.StrikeSeconds before contact.</summary>
+        public static double SmearDelay(double windupSeconds) => Math.Max(0, windupSeconds - AttackTiming.StrikeSeconds);
+
+        /// <summary>Damage share 0..1 for reactions (30 damage = full).</summary>
+        static double Dmg01(double dmg) => Math.Max(0, Math.Min(1, dmg / 30));
+
+        /// <summary>Flinch lean away from the blow at full envelope: 8 degrees plus 16 x damage share (8 to 24).</summary>
+        public static double FlinchLeanDeg(double dmg) => 8 + 16 * Dmg01(dmg);
+
+        /// <summary>Flinch shift along the blow at full envelope (u): 0.08 plus 0.14 x damage share.</summary>
+        public static double FlinchShift(double dmg) => 0.08 + 0.14 * Dmg01(dmg);
+
+        /// <summary>Damage from which a hit also staggers (a step back along the blow).</summary>
+        public const double StaggerFrom = 12;
+
+        /// <summary>
+        /// Stagger step (u along the blow) `t` wall seconds after a hit of dmg: none below StaggerFrom; 0.18 to 0.32 u by
+        /// damage, out over 0.08 s, held to 0.2 s, back by 0.45 s (the view absorbs it; the sim's shove is separate).
+        /// </summary>
+        public static double StaggerStep(double t, double dmg)
+        {
+            if (dmg < StaggerFrom || t < 0 || t >= 0.45) return 0;
+            double amp = 0.18 + 0.14 * Dmg01(dmg);
+            if (t < 0.08) { double s = t / 0.08; return amp * s * (2 - s); }
+            if (t < 0.2) return amp;
+            double r = (t - 0.2) / 0.25;
+            return amp * (1 - r * r * (3 - 2 * r));
+        }
 
         /// <summary>Hit-stop for a tier, wall seconds; 0 under reduce motion.</summary>
         public static double HoldWallSeconds(byte tier, bool reduceMotion) =>
@@ -120,7 +185,7 @@ namespace CriticalMass.Runtime.View.Anim
 
         /// <summary>
         /// The drawn lunge offset (world, Unity XZ) for actor i now: toward its swing target (or along SwingFacing), the
-        /// peak capped to LungeMax and to LungeGapShare of the gap left between the two bodies. Zero outside a swing.
+        /// peak from StepPeak (the weapon reaches the target's body, never into it; feat/hit-feel-2). Zero outside a swing.
         /// </summary>
         public static Vector3 Lunge(World w, int i, double alpha)
         {
@@ -139,8 +204,8 @@ namespace CriticalMass.Runtime.View.Anim
             {
                 double dx = w.X[t] - w.X[i], dz = w.Z[t] - w.Z[i], d = Math.Sqrt(dx * dx + dz * dz);
                 if (d > 1e-6) { dirX = dx / d; dirZ = dz / d; }
-                double gap = d - w.Config.Class(a.Cls).Radius - w.Config.Class(w.Actors[t].Cls).Radius;
-                peak = Math.Min(peak, Math.Max(0, gap) * LungeGapShare);
+                // feat/hit-feel-2: step in far enough that the weapon reaches the target's body (ViewReach), never into it.
+                peak = StepPeak(d, ViewReach(a.Cls), w.Config.Class(a.Cls).Radius, w.Config.Class(w.Actors[t].Cls).Radius);
             }
             double m = peak * k;
             return SimSpace.ToWorld(dirX * m, 0, dirZ * m);

@@ -48,6 +48,26 @@ namespace CriticalMass.Runtime.Camera
             _instance._trauma = Mathf.Min(1f, _instance._trauma + amount * s);
         }
 
+        /// <summary>feat/hit-feel-2: nudge strength before the player has touched the shake setting (a fresh install).</summary>
+        public const float DefaultNudgeScale = 0.7f;
+
+        /// <summary>
+        /// feat/hit-feel-2: the scale a hit nudge uses: 0 with reduce motion; the shake setting once the player has set it
+        /// (so "off" really is off); DefaultNudgeScale on a fresh install, where full shake stays off (pure; tests).
+        /// </summary>
+        public static float NudgeScale(bool reduceMotion, bool settingChosen, float shakeScale) =>
+            reduceMotion ? 0f : settingChosen ? shakeScale : DefaultNudgeScale;
+
+        /// <summary>feat/hit-feel-2: a small camera nudge for a hit on or by the local player (see NudgeScale).</summary>
+        public static void Nudge(float amount)
+        {
+            if (_instance == null || amount <= 0f) return;
+            bool chosen = PlayerPrefs.HasKey(CriticalMass.Runtime.Menu.GameSettings.ShakeScaleKey) || PlayerPrefs.HasKey(CriticalMass.Runtime.Menu.GameSettings.ShakeKey);
+            float s = NudgeScale(FeelGate.ReduceMotion, chosen, FeelGate.ShakeScale);
+            if (s <= 0f) return;
+            _instance._trauma = Mathf.Min(1f, _instance._trauma + amount * s);
+        }
+
         /// <summary>Offset for a trauma and a noise time (pure; tests): length at most trauma squared x MaxOffset x sqrt 2.</summary>
         public static Vector2 Offset(float trauma, float t)
         {

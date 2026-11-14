@@ -587,7 +587,10 @@ namespace CriticalMass.Runtime.View.Effects
         {
             ref Trail tr = ref _trails[_nt++ % MaxTrails];
             double h = Ground(e.X, e.Z);
-            tr.Born = t;
+            // feat/hit-feel-2: the smear starts with the strike (the last frames of the wind-up), not on the press, so the arc
+            // sweeps through the contact instead of before it.
+            double windup = e.A >= 0 && e.A < w.ActorCount ? System.Math.Max(0, w.Actors[e.A].SwingWindup) / w.Config.SimHz : 0;
+            tr.Born = t + S(CriticalMass.Runtime.View.Anim.HitFeel.SmearDelay(windup));
             tr.P = W(e.X, h, e.Z);
             tr.Facing = (float)Math.Atan2(e.DirZ, e.DirX);
             // feat/light-weapons-2: a light weapon draws its own short arc (its reach and width, not the class row's).
