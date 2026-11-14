@@ -101,6 +101,16 @@ namespace CriticalMass.Runtime.Tests
             float reach = FxScene.KnockOutPoolSize * FxScene.KnockOutPoolReach;
             Assert.LessOrEqual(2f * reach, 1.25f, "about one fighter's footprint across at Full");
             Assert.Less(GoreGate.SizeScale(GoreLevel.Reduced), 1f, "smaller at Reduced");
+            // cand5-reds-1: Full keeps the knock-out drop splats, in the pool's red and small; below Full none.
+            Assert.IsTrue(FxScene.LandsAsSplat(true, GoreLevel.Full), "Full: knock-out drops still splat (nothing taken out)");
+            Assert.IsFalse(FxScene.LandsAsSplat(true, GoreLevel.Reduced), "Reduced: no knock-out ground stain");
+            Assert.IsFalse(FxScene.LandsAsSplat(true, GoreLevel.Off), "Off: nothing");
+            Assert.IsTrue(FxScene.LandsAsSplat(false, GoreLevel.Full), "ordinary hit drops still splat");
+            Assert.IsTrue(FxScene.SplatIsPoolRed(FxScene.KindPoolRed, 0), "knock-out drop splats draw and stamp in the pool's red");
+            Assert.IsFalse(FxScene.SplatIsPoolRed(0, 0), "ordinary splats keep the ground ink");
+            Assert.LessOrEqual(FxScene.KnockOutDropSplatSize(0.19f), 0.35f + 1e-6f, "the biggest knock-out drop splat is capped");
+            Assert.LessOrEqual(FxScene.KnockOutDropSplatMax, 0.35f + 1e-6f);
+            Assert.IsFalse(GoreGate.Allows(GorePiece.KnockOutPool, GoreLevel.Off), "no pool at Off");
 
             Assert.LessOrEqual(FxScene.PopPuffSize, 0.25f);
             Assert.LessOrEqual(FxScene.PopPuffHeight, 0.2f, "at the feet, below a standing fighter's body");

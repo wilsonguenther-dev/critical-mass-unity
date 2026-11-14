@@ -153,6 +153,8 @@ namespace CriticalMass.Runtime.Tests
             Assert.Greater(full.Scene.GoreSpawns(GorePiece.GibBone), 0, "bones from the blast knock-out");
             Assert.Greater(full.Scene.GoreSpawns(GorePiece.BloodDrip), 0, "drips behind the hurt fighter");
             Assert.Greater(full.Scene.DecalCount(full.T + 3.0), 0, "splats stay on the ground");
+            // cand5-reds-1: at Full the knock-out drops still splat (drawn in the pool's red, capped size: SmokeLookTests).
+            Assert.Greater(full.Scene.GoreSpawns(GorePiece.BloodSplat), 0, "Full: drops, knock-out drops included, splat");
             var fresh = new FxScene(cfg, NewWorld(cfg).Map);
             Assert.AreEqual(GoreLevel.Full, fresh.Gore, "a scene starts at Full");
         }
