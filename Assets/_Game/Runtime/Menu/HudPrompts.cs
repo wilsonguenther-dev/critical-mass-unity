@@ -64,7 +64,27 @@ namespace CriticalMass.Runtime.Menu
             ControlBindings.BindingsChanged -= MarkDirty;
         }
 
-        void OnDevice(ControlDevice d) => _dirty = true;
+        // fix/hud-containment-5 (owner shots: Z / X / V in one, mouse / mouse / E in the next): that is the scheme switch
+        // working (touching the mouse hands prompts to the mouse; a key with the mouse resting hands them back). A player
+        // who mixes both flipped the plates every half second, so a scheme change redraws the plates only after it has held
+        // SchemeSettleSeconds, and a redraw holds at least SchemeHoldSeconds before the next one.
+        public const float SchemeSettleSeconds = 0.4f, SchemeHoldSeconds = 2f;
+        float _schemeSince = float.NegativeInfinity, _lastSchemeDraw = float.NegativeInfinity;
+        ControlScheme _drawnScheme;
+        bool _schemeDrawn, _schemePending;
+
+        void OnDevice(ControlDevice d)
+        {
+            // the controller, the first draw, a hand change (same scheme) and edit-mode tests redraw at once
+            if (!_schemeDrawn || !Application.isPlaying || d == ControlDevice.Gamepad || _drawnScheme == ControlScheme.Gamepad ||
+                ControlBindings.ActiveScheme == _drawnScheme) { _dirty = true; return; }
+            _schemePending = true;
+            _schemeSince = Time.unscaledTime;
+        }
+
+        /// <summary>A pending scheme change is drawn once it has settled and the last redraw has held (no flicker).</summary>
+        public static bool SchemeRedrawDue(float now, float since, float lastDraw) =>
+            now - since >= SchemeSettleSeconds && now - lastDraw >= SchemeHoldSeconds;
         void MarkDirty() => _dirty = true;
 
         void LateUpdate()
@@ -78,9 +98,17 @@ namespace CriticalMass.Runtime.Menu
                 Find();
                 if (!_found) return;
             }
+            if (_schemePending && SchemeRedrawDue(Time.unscaledTime, _schemeSince, _lastSchemeDraw))
+            {
+                _schemePending = false;
+                if (ControlBindings.ActiveScheme != _drawnScheme) _dirty = true;
+            }
             if (!_dirty) return;
             _dirty = false;
             Apply(ControlBindings.ActiveDevice);
+            if (!_schemeDrawn || ControlBindings.ActiveScheme != _drawnScheme) _lastSchemeDraw = Time.unscaledTime;
+            _drawnScheme = ControlBindings.ActiveScheme;
+            _schemeDrawn = true;
         }
 
         void Find()
