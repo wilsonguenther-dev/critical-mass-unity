@@ -456,5 +456,35 @@ namespace CriticalMass.Runtime.Tests
             t.text = label;
             return b;
         }
+
+        // ---------------------------------------------------------------- online-rooms-6: lines and the loading screen
+
+        [Test]
+        public void TheOpeningLineTriggeredUnderTheLoadingScreenWaitsAndPlaysWhenTheMatchIsShown()
+        {
+            Assert.AreEqual(Announcer.Gate.Hold, Announcer.GateFor(false, false, true), "a match behind the loading screen holds its lines");
+            var q = new AnnouncerQueue();
+            Assert.IsTrue(q.Enqueue(AnnouncerTrigger.MatchStart, 0.0));
+            for (double t = 0.0; t <= 10.0; t += 0.25) q.Hold(t);   // a 10 s load, far past MaxAgeSeconds
+            Assert.AreEqual(1, q.Pending, "still waiting when the loading screen closes");
+            Assert.AreEqual(Announcer.Gate.Live, Announcer.GateFor(false, true, true));
+            Assert.IsTrue(q.TryNext(10.25, out AnnouncerLine line), "plays as soon as the view is live");
+            Assert.AreEqual(AnnouncerTrigger.MatchStart, line.Trigger);
+            Assert.AreEqual(0, q.Dropped, "nothing expired while held");
+        }
+
+        [Test]
+        public void TheAttractMatchBehindTheTitleAndMenusIsDroppedNotQueued()
+        {
+            Assert.AreEqual(Announcer.Gate.Drop, Announcer.GateFor(true, false, false), "title backdrop");
+            Assert.AreEqual(Announcer.Gate.Drop, Announcer.GateFor(true, true, true), "the attract driver never speaks, whatever the flow says");
+            Assert.AreEqual(Announcer.Gate.Drop, Announcer.GateFor(false, false, false), "menus, setup, results");
+            // Dropped lines are not kept for later: the queue the attract match fed is empty when a real match goes live.
+            var q = new AnnouncerQueue();
+            q.Enqueue(AnnouncerTrigger.MatchStart, 0.0);
+            q.Clear();   // what Announcer does under Gate.Drop
+            Assert.AreEqual(0, q.Pending);
+            Assert.IsFalse(q.TryNext(20.0, out _), "no attract line plays once the real match is shown");
+        }
     }
 }
