@@ -47,6 +47,8 @@ namespace CriticalMass.Runtime.View.Mechanics
             public Bounds Bounds;
             public Material Azure, Crimson;
             public float TopSign = -1f;
+            public int Kind;
+            public bool Cuttable, CutTried;
             public int StageCount => Stages != null ? Stages.Length : 1;
             public Material For(TeamId t) => t == TeamId.Azure ? Azure : Crimson;
         }
@@ -84,9 +86,7 @@ namespace CriticalMass.Runtime.View.Mechanics
         {
             if (Active == this) Active = null;
             RestoreAllBarricades();
-            foreach (Model m in new[] { _ladder, _bridge, _barricade })
-                if (m != null && m.Stages != null)
-                    foreach (Mesh s in m.Stages) if (s != null) Destroy(s);
+            // the cut meshes live in CutCache (made once per process, shared by every world): nothing to destroy here
         }
 
         float Now => Time.unscaledTime;
@@ -135,11 +135,58 @@ namespace CriticalMass.Runtime.View.Mechanics
             };
             // the root's own import scale (ModelView keeps it as BaseScale)
             m.Local = Matrix4x4.Scale(e.Model.transform.localScale) * m.Local;
-            if (split && m.Whole.isReadable) Cut(m, kind);
+            m.Kind = kind;
+            m.Cuttable = split && m.Whole.isReadable;
+            if (m.Cuttable && kind == StagedBuildCore.KindLadder) m.TopSign = LadderTopSign(m.Whole, m.Bounds);
             return m;
         }
 
         /// <summary>Cuts a readable mesh into stage meshes (StagedBuildCore.Partition), keeping every vertex stream.</summary>
+        /// <summary>
+        /// The cut stage meshes per source mesh, made on the first staged build that needs them and kept for the process,
+        /// so world rebuilds never add meshes (TechHardeningPlayTests) and nothing is cut while no build plays.
+        /// </summary>
+        static readonly Dictionary<Mesh, Mesh[]> CutCache = new Dictionary<Mesh, Mesh[]>();
+        static readonly Dictionary<Mesh, Vector3[]> CutCentres = new Dictionary<Mesh, Vector3[]>();
+
+        static void EnsureCut(Model m)
+        {
+            if (m == null || m.CutTried) return;
+            m.CutTried = true;
+            if (!m.Cuttable) return;
+            if (CutCache.TryGetValue(m.Whole, out Mesh[] cached) && Alive(cached))
+            {
+                m.Stages = cached;
+                m.StageCenter = CutCentres[m.Whole];
+                return;
+            }
+            Cut(m, m.Kind);
+            CutCache[m.Whole] = m.Stages;
+            CutCentres[m.Whole] = m.StageCenter;
+        }
+
+        /// <summary>False when a cached cut was destroyed (domain reload off: an earlier play session's meshes).</summary>
+        static bool Alive(Mesh[] stages)
+        {
+            if (stages == null) return true;
+            foreach (Mesh s in stages) if (s == null) return false;
+            return true;
+        }
+
+        /// <summary>Which way the ladder climbs (art +Z or -Z): the mean z of its top verts against its foot verts.</summary>
+        static float LadderTopSign(Mesh mesh, Bounds b)
+        {
+            var v = new List<Vector3>();
+            mesh.GetVertices(v);
+            float top = b.max.y, zt = 0f, zb = 0f; int nt = 0, nb = 0;
+            for (int i = 0; i < v.Count; i++)
+            {
+                if (v[i].y > top * 0.85f) { zt += v[i].z; nt++; }
+                else if (v[i].y < top * 0.15f) { zb += v[i].z; nb++; }
+            }
+            return nt > 0 && nb > 0 && zt / nt > zb / nb ? 1f : -1f;
+        }
+
         static void Cut(Model m, int kind)
         {
             Mesh src = m.Whole;
@@ -158,17 +205,6 @@ namespace CriticalMass.Runtime.View.Mechanics
                 src.GetTriangles(tmp, s);
                 all.AddRange(tmp);
                 for (int i = 0; i < tmp.Count / 3; i++) triSub.Add(s);
-            }
-            // which way the ladder climbs (art +Z or -Z): the mean z of its top verts against its foot verts
-            if (kind == StagedBuildCore.KindLadder && v.Count > 0)
-            {
-                float top = m.Bounds.max.y, zt = 0f, zb = 0f; int nt = 0, nb = 0;
-                for (int i = 0; i < v.Count; i++)
-                {
-                    if (v[i].y > top * 0.85f) { zt += v[i].z; nt++; }
-                    else if (v[i].y < top * 0.15f) { zb += v[i].z; nb++; }
-                }
-                if (nt > 0 && nb > 0) m.TopSign = zt / nt < zb / nb ? -1f : 1f;
             }
             var triStage = new int[all.Count / 3];
             int stages = StagedBuildCore.Partition(v, all, kind, StagedBuildCore.MaxStages, triStage);
@@ -222,7 +258,7 @@ namespace CriticalMass.Runtime.View.Mechanics
             if (_observedFrame == Time.frameCount) return;
             _observedFrame = Time.frameCount;
             EnsureLoaded();
-            Tracker.Observe(w, Now, AnimationsOn, 0, _barricade != null ? _barricade.StageCount : 1);
+            Tracker.Observe(w, Now, AnimationsOn, 0, 0);
         }
 
         void LateUpdate()
@@ -252,12 +288,11 @@ namespace CriticalMass.Runtime.View.Mechanics
             if (m == null) return false;
             float t = float.MaxValue;
             bool reduce = ReduceMotion;
-            int stages = m.StageCount;
             int groups = p.Kind == BuiltPieces.Bridge ? BridgeSegments(m, len) : 2;
             if (slot >= 0 && slot < Tracker.Pieces.Length && Tracker.Pieces[slot].On)
             {
                 ref StagedBuildCore.Seq s = ref Tracker.Pieces[slot];
-                if (s.Arrivals <= 0) { s.Arrivals = groups * stages; s.Dur = StagedBuildCore.Duration(s.Arrivals); }
+                if (s.Arrivals <= 0) { EnsureCut(m); s.Arrivals = groups * m.StageCount; s.Dur = StagedBuildCore.Duration(s.Arrivals); }
                 t = Now - s.Start;
                 if (StagedBuildCore.Done(t, s.Dur)) s.On = false;
                 else
@@ -272,6 +307,7 @@ namespace CriticalMass.Runtime.View.Mechanics
                 }
             }
             if (hidden && !sequencing) return true;
+            int stages = m.StageCount;
             Material mat = m.For(p.Team);
             Quaternion q = Quaternion.LookRotation(along, Vector3.up);
             Vector3 across = Vector3.Cross(Vector3.up, along);
@@ -427,6 +463,12 @@ namespace CriticalMass.Runtime.View.Mechanics
             for (int i = 0; i < seqs.Length; i++)
             {
                 ref StagedBuildCore.Seq s = ref seqs[i];
+                if (s.On && _barricade != null && s.Arrivals <= 0)
+                {
+                    EnsureCut(_barricade);
+                    s.Arrivals = _barricade.StageCount;
+                    s.Dur = StagedBuildCore.Duration(s.Arrivals);
+                }
                 float t = Now - s.Start;
                 if (!s.On || _barricade == null || StagedBuildCore.Done(t, s.Dur))
                 {
