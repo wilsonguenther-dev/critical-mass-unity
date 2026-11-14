@@ -42,10 +42,8 @@ namespace CriticalMass.Runtime.Tests
             Assert.IsNotNull(spec, key);
             Assert.IsTrue(spec.Rigged, key + " rigged");
             Assert.AreEqual(41, spec.Bones, key + " KayKit rig");
-            Assert.That(spec.ClipSource == "Assets/_Game/Art/Characters/KayKit_Clips.fbx"
-                || spec.ClipSource == System.IO.Path.GetDirectoryName(spec.AssetPath).Replace('\\', '/') + "/" + key + "_Clips.fbx",
-                key + " clip source: " + spec.ClipSource);   // rigs-2: or the class's own pack baked with foot IK
-            Assert.IsTrue(spec.FaceTexture != null || spec.VertexColourFace, key + " face decal (or an HY vertex-colour face)");
+            Assert.AreEqual("Assets/_Game/Art/Characters/KayKit_Clips.fbx", spec.ClipSource, key + " clip source");
+            Assert.IsNotNull(spec.FaceTexture, key + " face decal");   // integration/batch-10: the HY Farmer is out; every class has its decal again
             Assert.AreEqual(180f, spec.ArtYawDeg, key + ": every class FBX arrives facing the root's -Z (the per-model 180 degree correction)");
             Assert.AreEqual(4, spec.Meshes.Length, key + ": Hero, LOD0, LOD1, Shadow");
             Assert.AreEqual(key + FighterLod.HeroSuffix, spec.Meshes[0], key + ": the Hero mesh is measured first");
@@ -163,7 +161,7 @@ namespace CriticalMass.Runtime.Tests
             string key = ArtMapping.ClassModel(cls);
             ArtEntry e = Catalog().Find(key);
             Assert.IsNotNull(e, key + " not in the catalog (import, then ProjectSetup.Apply)");
-            if (!ArtMapping.Spec(key).VertexColourFace) Assert.IsNotNull(e.Face, key + " face texture");
+            Assert.IsNotNull(e.Face, key + " face texture");
             ArtMapping.ClassClipSet c = ArtMapping.ClassClips(cls);
             foreach (string clip in new[] { ArtMapping.Idle, ArtMapping.Walk, ArtMapping.Run, c.Attack, c.Gather })
                 Assert.IsNotNull(e.Clip(clip), key + " clip " + clip + " (KayKit_Clips.fbx must carry the animation pass clips)");
