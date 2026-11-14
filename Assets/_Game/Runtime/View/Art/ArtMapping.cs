@@ -292,10 +292,10 @@ namespace CriticalMass.Runtime.View.Art
         public static readonly ModelSpec[] Models =
         {
             new ModelSpec { Key = Warrior, AssetPath = "Assets/_Game/Art/Characters/Warrior.fbx", Kind = ArtKind.Character, Rigged = true,
-                Bones = 41, ClipSource = "Assets/_Game/Art/Characters/KayKit_Clips.fbx",
+                Bones = 41, ClipSource = "Assets/_Game/Art/Characters/Warrior_Clips.fbx",
                 Meshes = new[] { "Warrior_Hero", "Warrior_LOD0", "Warrior_LOD1", "Warrior_Shadow" }, MaskCodes = new[] { 0, 6, 8 },
                 OutlinePx = CharacterHullPx, Rim = 0.6f, Authored = WarriorAzure, Crimson = WarriorCrimson, Height = 2.0f,
-                FaceTexture = "Assets/_Game/Art/Characters/Warrior_Face.png", ArtYawDeg = 180f },
+                VertexColourFace = true, StrideScale = 1.118f, ArtYawDeg = 180f },   // rig-warrior-1: HY Warrior (art/characters-hy-rig ef9d2eb, shins +0.06 m so the ankles sit at KayKit height above his soles; StrideScale = the bake motion scale, hip height over KayKit 0.519 m) on its own clips baked with foot IK (Warrior_Clips.fbx, bake_clips.py); pre-HY: FaceTexture Warrior_Face.png, KayKit_Clips.fbx (Characters/_fallback~)
             new ModelSpec { Key = Miner, AssetPath = "Assets/_Game/Art/Miner/Miner.fbx", Kind = ArtKind.Character, Rigged = true,
                 Bones = 41, ClipSource = "Assets/_Game/Art/Characters/KayKit_Clips.fbx",
                 Meshes = new[] { "Miner_Hero", "Miner_LOD0", "Miner_LOD1", "Miner_Shadow" }, MaskCodes = new[] { 0, 6, 8 },

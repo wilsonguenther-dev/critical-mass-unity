@@ -203,9 +203,16 @@ namespace CriticalMass.Runtime.Tests
 
         /// <summary>The Miner's decal is its own material slot (CM_FaceDecal): that submesh is the painted face.</summary>
         [Test]
-        public void TheMinerFaceSlotIsTheDecalSubmesh()
+        public void TheMinerFaceIsItsDecalSubmeshOrPaintedInVertexColour()
         {
             ModelSpec spec = ArtMapping.Spec(ArtMapping.Miner);
+            if (spec.VertexColourFace)
+            {
+                // HY Miner: one slot, the face painted in the body's vertex colour (skin, eyes, brows), never team-swapped.
+                Assert.AreEqual(1, BodyMesh(spec).subMeshCount, "HY Miner_Hero: CM_Toon only (no CM_FaceDecal)");
+                HyFacesArePaintedInVertexColourAndNeverTeamSwapped(ArtMapping.Miner);
+                return;
+            }
             Mesh mesh = BodyMesh(spec);
             Assert.AreEqual(2, mesh.subMeshCount, "Miner_Body: CM_Toon + CM_FaceDecal");
             Texture2D decal = ReadPng(spec.FaceTexture);
@@ -225,6 +232,61 @@ namespace CriticalMass.Runtime.Tests
             Assert.Greater(painted, 40, "the decal paints the face slot");
             Object.DestroyImmediate(decal);
         }
+
+        static IEnumerable<string> PaintedFaceKeys() => ArtMapping.Models.Where(m => m.VertexColourFace).Select(m => m.Key);
+
+        /// <summary>
+        /// HY classes paint the face in vertex colour (ModelSpec.VertexColourFace). On the Hero mesh's head (the vertices the
+        /// head bone carries), the half with the skin is the face; it carries dark features (eyes, brows, mouth) inside the
+        /// skin, clearly darker than it; neither the skin nor the features is a team-swapped or glowing mask code (8, 5, 6),
+        /// so the face reads the same on both teams; and there is no decal texture, no decal slot, one material.
+        /// </summary>
+        [TestCaseSource(nameof(PaintedFaceKeys))]
+        public void HyFacesArePaintedInVertexColourAndNeverTeamSwapped(string key)
+        {
+            ModelSpec spec = ArtMapping.Spec(key);
+            Assert.IsNull(spec.FaceTexture, key + ": a painted face has no decal texture");
+            Assert.Less(spec.FaceSlot, 0, key + ": and no decal slot");
+            SkinnedMeshRenderer smr = Model(spec).GetComponentsInChildren<SkinnedMeshRenderer>(true).FirstOrDefault(r => r.name == spec.Meshes[0]);
+            Assert.IsNotNull(smr, spec.Meshes[0] + " is skinned");
+            Mesh mesh = smr.sharedMesh;
+            Assert.AreEqual(1, mesh.subMeshCount, key + ": one material slot (the face is in the body's vertex colour)");
+            int head = System.Array.FindIndex(smr.bones, b => b != null && b.name == "head");
+            Assert.GreaterOrEqual(head, 0, key + ": head bone");
+            Vector3[] v = mesh.vertices;
+            Color[] c = mesh.colors;
+            BoneWeight[] bw = mesh.boneWeights;
+            Assert.AreEqual(v.Length, c.Length, key + ": vertex colours on every vertex");
+            Assert.AreEqual(v.Length, bw.Length, key + ": bone weights on every vertex");
+            var onHead = new List<int>();
+            for (int i = 0; i < v.Length; i++)
+                if (HeadWeight(bw[i], head) > 0.5f) onHead.Add(i);
+            Assert.Greater(onHead.Count, 100, key + ": the head bone carries the head");
+            float cz = onHead.Average(i => v[i].z);
+            int skinFront = onHead.Count(i => v[i].z > cz && IsSkin(c[i])), skinBack = onHead.Count(i => v[i].z <= cz && IsSkin(c[i]));
+            bool front = skinFront >= skinBack;   // the face is the half of the head with the most skin (no axis assumed)
+            List<int> half = onHead.Where(i => (v[i].z > cz) == front).ToList();
+            List<int> skin = half.Where(i => IsSkin(c[i])).ToList();
+            Assert.Greater(skin.Count, 50, key + ": skin painted on the face");
+            float x0 = skin.Min(i => v[i].x), x1 = skin.Max(i => v[i].x), y0 = skin.Min(i => v[i].y), y1 = skin.Max(i => v[i].y);
+            List<int> features = half.Where(i => Luma(c[i]) < 0.25f && v[i].x > x0 && v[i].x < x1 && v[i].y > y0 && v[i].y < y1).ToList();
+            Assert.Greater(features.Count, 10, key + ": dark features (eyes, brows) painted inside the skin of the face");
+            float contrast = skin.Average(i => Luma(c[i])) - features.Average(i => Luma(c[i]));
+            Assert.Greater(contrast, 0.3f, key + ": the features read against the skin");
+            foreach (int i in skin.Concat(features))
+            {
+                int code = Mathf.RoundToInt(c[i].a * 8f);
+                Assert.IsFalse(code == 8 || code == 5 || code == 6, $"{key}: face vertex {i} has mask code {code} (team-swapped or glowing)");
+            }
+        }
+
+        static float HeadWeight(BoneWeight w, int head) =>
+            (w.boneIndex0 == head ? w.weight0 : 0f) + (w.boneIndex1 == head ? w.weight1 : 0f) +
+            (w.boneIndex2 == head ? w.weight2 : 0f) + (w.boneIndex3 == head ? w.weight3 : 0f);
+
+        static float Luma(Color c) => (c.r + c.g + c.b) / 3f;
+
+        static bool IsSkin(Color c) => c.r > 0.45f && c.r > c.g && c.g > c.b && c.r - c.b > 0.12f;
 
         /// <summary>The outline_w sidecar's JsonUtility form (tools/art/outline_weights.py).</summary>
         [System.Serializable] sealed class Sidecar
