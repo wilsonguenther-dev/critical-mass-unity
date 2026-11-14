@@ -92,8 +92,32 @@ namespace CriticalMass.Runtime.View.Effects
         private readonly MapDef _map;
         private readonly int _cap;
 
-        /// <summary>Blood on (the cm.blood setting): droplets, splats, pools, drips, gibs; off: neutral white-yellow sparks only.</summary>
-        public bool Blood = true;
+        /// <summary>
+        /// The GORE level in force (GoreGate; CombatFx sets it live from the setting). Full: today's droplets, splats,
+        /// pools, drips and gibs. Reduced: half the drops, smaller splats that fade in 4 s, no pool, drips, gibs or stamped
+        /// stains. Off: no gore piece at all, neutral sparks, a longer silhouette flash and a sparkle poof on a knock-out.
+        /// Every gore spawn goes through Allow(piece) and every gore draw through Shows(piece), at the source.
+        /// </summary>
+        public GoreLevel Gore = GoreLevel.Full;
+
+        /// <summary>Blood on = any GORE level but Off (older callers and tests; setting it picks Full or Off).</summary>
+        public bool Blood { get => Gore != GoreLevel.Off; set => Gore = value ? GoreLevel.Full : GoreLevel.Off; }
+
+        private readonly int[] _goreSpawns = new int[GoreGate.All.Length];
+
+        /// <summary>Gore pieces spawned by this scene so far, per registry entry (tests enumerate GoreGate.All with it).</summary>
+        public int GoreSpawns(GorePiece p) => _goreSpawns[(int)p];
+
+        /// <summary>Gate and count one gore spawn: false = the level in force does not allow it, so do not spawn it.</summary>
+        private bool Allow(GorePiece p)
+        {
+            if (!GoreGate.Allows(p, Gore)) return false;
+            _goreSpawns[(int)p]++;
+            return true;
+        }
+
+        /// <summary>May a gore piece already alive be drawn at the level in force (a change applies to what is on screen).</summary>
+        private bool Shows(GorePiece p) => GoreGate.Allows(p, Gore);
 
         /// <summary>The driver's interpolation alpha for this build (CombatFx sets it): blob shadows follow the drawn bodies.</summary>
         public double Alpha;
@@ -400,7 +424,8 @@ namespace CriticalMass.Runtime.View.Effects
         }
 
         /// <summary>How long a dead actor's body is shown (Death clip, a beat on the floor, then the pop), sim seconds.</summary>
-        public double CorpseSeconds => S(1.35);
+        // At GORE Off the body poofs out sooner (0.9 s wall: the longest death launch has landed by then).
+        public double CorpseSeconds => S(Gore == GoreLevel.Off ? 0.9 : 1.35);
         public double PopSeconds => S(0.14);
 
         /// <summary>Same tiers as CombatFeed.TierOf (hits decoded elsewhere carry their tier in FxEvent.Tier).</summary>
@@ -458,10 +483,11 @@ namespace CriticalMass.Runtime.View.Effects
             if (Blood)
             {
                 int n = death ? 14 : 2 + (int)Math.Min(6, e.Value / 6) + tier * 2;
+                if (Gore != GoreLevel.Full) n = Math.Max(1, (int)Math.Round(n * GoreGate.CountScale(Gore)));   // Reduced: half
                 float spread = tier == 0 ? 0.95f : tier == 1 ? 0.6f : 0.75f;
                 for (int k = 0; k < n; k++) AddDroplet(t, e, h, seed, (uint)k, death, spread, 1f);
                 // Mist: small fast drops straight down the hit line (the "spray").
-                for (int k = 0; k < tier; k++) AddDroplet(t, e, h, seed, (uint)(k + 40), false, 0.2f, 1.7f);
+                if (Gore == GoreLevel.Full) for (int k = 0; k < tier; k++) AddDroplet(t, e, h, seed, (uint)(k + 40), false, 0.2f, 1.7f);
                 if (death)
                 {
                     if (SurfaceTop(e.X, e.Z, out double py))
@@ -480,6 +506,8 @@ namespace CriticalMass.Runtime.View.Effects
                 double pop = t + CorpseSeconds;
                 Vector3 p = W(e.X, h + 0.5, e.Z);
                 for (int k = 0; k < 7; k++) AddPuff(pop, p, seed, (uint)(k + 40), 0.42f, DustLight, 0);
+                // GORE Off: the poof sparkles (eight warm-white stars), so a knock-out ends clean with nothing left behind.
+                if (Gore == GoreLevel.Off) for (int k = 0; k < 8; k++) AddSpark(pop, p + Vector3.up * 0.3f, 0, 0, seed, (uint)(k + 80), 1);
             }
         }
 
@@ -491,6 +519,7 @@ namespace CriticalMass.Runtime.View.Effects
 
         private void AddDroplet(double t, FxEvent e, double h, uint seed, uint k, bool big, float spreadRad, float speedMul)
         {
+            if (!Allow(GorePiece.BloodDroplet)) return;
             ref Droplet d = ref _drops[_nd++ % MaxDroplets];
             float spread = (R01(seed, k * 3 + 1) - 0.5f) * 2f * spreadRad;
             double dx = e.DirX * Math.Cos(spread) - e.DirZ * Math.Sin(spread);
@@ -513,10 +542,13 @@ namespace CriticalMass.Runtime.View.Effects
 
         private void AddDecal(double t, Vector3 p, float size, byte kind, byte shape, uint seed, double dirX, double dirZ, double grow, double life = -1)
         {
+            // Decals are blood only (scorch, cracks and corruption are Marks): shape 6 is the knock-out pool.
+            if (!Allow(shape == 6 ? GorePiece.KnockOutPool : GorePiece.BloodSplat)) return;
+            size *= GoreGate.SizeScale(Gore);
             _decalStamp[_ndc % MaxDecals] = -1;
             ref Decal d = ref _decals[_ndc++ % MaxDecals];
             d.Born = t; d.P = p; d.Size = size; d.Kind = kind; d.Shape = shape; d.Seed = seed; d.Grow = (float)grow;
-            d.Life = life > 0 ? life : DecalLife;
+            d.Life = (life > 0 ? life : DecalLife) * GoreGate.LifeScale(Gore);
             d.Rot = R01(seed, 11) * Mathf.PI * 2f;
             d.DirA = Mathf.Atan2((float)-dirZ, (float)dirX); // basis angle in the ground plane (right = +X, up = +Z world)
         }
@@ -670,8 +702,9 @@ namespace CriticalMass.Runtime.View.Effects
             BuildTrails(now, air, gr, gu);
             BuildBursts(now, air, camRight, camUp);
 
-            // Blood droplets in flight: teardrops stretched along their own velocity, navy rims.
-            for (int i = 0; i < MaxDroplets; i++)
+            // Blood droplets in flight: teardrops stretched along their own velocity, navy rims (GORE Full and Reduced).
+            bool drops = Shows(GorePiece.BloodDroplet);
+            for (int i = 0; i < MaxDroplets && drops; i++)
             {
                 ref Droplet d = ref _drops[i];
                 if (d.Landed) continue;

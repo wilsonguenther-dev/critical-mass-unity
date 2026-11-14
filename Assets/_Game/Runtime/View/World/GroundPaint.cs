@@ -137,6 +137,16 @@ namespace CriticalMass.Runtime.View.Reactions
         }
 
         /// <summary>Draw what the builder holds into the texture and run the quarter-second fade; Frame moves on.</summary>
+        /// <summary>Wipe everything painted so far (GORE dropping below Full clears the stamped blood stains at once).</summary>
+        public void ClearAll()
+        {
+            if (_rt == null) return;
+            var prev = RenderTexture.active;
+            RenderTexture.active = _rt;
+            GL.Clear(false, true, new Color(0, 0, 0, 0));
+            RenderTexture.active = prev;
+        }
+
         public void Flush()
         {
             if (_rt == null || _mat == null) return;

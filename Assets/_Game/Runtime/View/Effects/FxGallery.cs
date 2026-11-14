@@ -9,7 +9,7 @@ namespace CriticalMass.Runtime.View.Effects
     /// The effects gallery (development builds and the editor only): F6, or Effects.PlayGallery(), plays every effect in a
     /// row beside the local player, one every 1.1 s wall, so the integrator captures them all in one run. Steps are spawned
     /// into the scene directly (no sim event, no vignette, no pose hold) at the current sim tick. The last three steps
-    /// repeat the hit tiers with blood OFF to show the swap; the blood setting is restored afterwards.
+    /// repeat the hit tiers at GORE Off, then two at Reduced, to show the levels; the GORE level is restored afterwards.
     /// </summary>
     public sealed class FxGallery
     {
@@ -22,6 +22,7 @@ namespace CriticalMass.Runtime.View.Effects
             Splash, Landing, FootPuff, PlankDust, Rustle,
             BiomassGather, BiomassDeliver, CorruptionDeliver, CorruptionBubbles, Respawn,
             BloodOffLight, BloodOffHeavy, BloodOffFinisher,
+            GoreReducedHeavy, GoreReducedFinisher,
         }
 
         public static readonly Step[] Order = (Step[])System.Enum.GetValues(typeof(Step));
@@ -30,7 +31,7 @@ namespace CriticalMass.Runtime.View.Effects
         private readonly CombatAudio _audio;
         private double _start = double.NaN;
         private int _next;
-        private bool _bloodWas;
+        private GoreLevel _goreWas;
         private double _ox, _oz;
 
         public FxGallery(FxScene scene, CombatAudio audio)
@@ -45,10 +46,10 @@ namespace CriticalMass.Runtime.View.Effects
 
         public void Begin(double now, World w)
         {
-            if (Running) _scene.Blood = _bloodWas;
+            if (Running) _scene.Gore = _goreWas;
             _start = now;
             _next = 0;
-            _bloodWas = _scene.Blood;
+            _goreWas = _scene.Gore;
             _ox = w.ActorCount > 0 ? w.X[0] : w.Map.Width * 0.5;
             _oz = w.ActorCount > 0 ? w.Z[0] : w.Map.Height * 0.5;
         }
@@ -66,7 +67,7 @@ namespace CriticalMass.Runtime.View.Effects
             }
             if (_next >= Order.Length && now >= _start + Order.Length * gap)
             {
-                _scene.Blood = _bloodWas;
+                _scene.Gore = _goreWas;
                 _start = double.NaN;
                 return false;
             }
@@ -162,6 +163,8 @@ namespace CriticalMass.Runtime.View.Effects
                 case Step.BloodOffLight: _scene.Blood = false; Hit(w, x, z, 12, false, ClassId.Farmer); break;
                 case Step.BloodOffHeavy: _scene.Blood = false; Hit(w, x, z, 22, false, ClassId.Warrior); break;
                 case Step.BloodOffFinisher: _scene.Blood = false; Hit(w, x, z, 22, true, ClassId.Warrior); break;
+                case Step.GoreReducedHeavy: _scene.Gore = GoreLevel.Reduced; Hit(w, x, z, 22, false, ClassId.Warrior); break;
+                case Step.GoreReducedFinisher: _scene.Gore = GoreLevel.Reduced; Hit(w, x, z, 22, true, ClassId.Warrior); break;
             }
         }
 

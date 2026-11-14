@@ -423,7 +423,8 @@ namespace CriticalMass.Runtime.View.Dressing
                 {
                     string nm = V4Bones[H32(cx, cz, 224) % 3];
                     double lx = mx + nx * 0.35, lz = mz + nz * 0.35;
-                    if (far(nm, lx, lz))
+                    // GORE (2026-11-14): skull and ribs are Full only; the hash stream and every other placement stay the same.
+                    if ((nm == "env_kaiju_statue" || global::CriticalMass.Runtime.View.Effects.GoreGate.Allows(global::CriticalMass.Runtime.View.Effects.GorePiece.WorldBoneProp)) && far(nm, lx, lz))
                     {
                         placed[nm].Add(new[] { lx, lz });
                         o.Add(At(nm, lx, h - 0.12, lz, nm == "env_kaiju_statue" ? YawDir(nz, -nx) : H32(cx, cz, 225) % 360, "landmark"));
@@ -484,8 +485,8 @@ namespace CriticalMass.Runtime.View.Dressing
                 {
                     if (r < 14) o.Add(At(V4Trees[H32(cx, cz, 223) % 3], x, h, z, yaw, "tree"));
                     else if (r < 20) o.Add(At("env_bush_berry", x, h, z, yaw, "small_tall"));
-                    else if (r < 24 && far("env_kaiju_skull", x, z)) { placed["env_kaiju_skull"].Add(new[] { x, z }); o.Add(At("env_kaiju_skull", x, h, z, yaw, "landmark")); }
-                    else if (r < 29 && far("env_bone_ribs", x, z)) { placed["env_bone_ribs"].Add(new[] { x, z }); o.Add(At("env_bone_ribs", x, h, z, yaw, "dress_tall")); }
+                    else if (r < 24 && far("env_kaiju_skull", x, z)) { if (global::CriticalMass.Runtime.View.Effects.GoreGate.Allows(global::CriticalMass.Runtime.View.Effects.GorePiece.WorldBoneProp)) { placed["env_kaiju_skull"].Add(new[] { x, z }); o.Add(At("env_kaiju_skull", x, h, z, yaw, "landmark")); } }
+                    else if (r < 29 && far("env_bone_ribs", x, z)) { if (global::CriticalMass.Runtime.View.Effects.GoreGate.Allows(global::CriticalMass.Runtime.View.Effects.GorePiece.WorldBoneProp)) { placed["env_bone_ribs"].Add(new[] { x, z }); o.Add(At("env_bone_ribs", x, h, z, yaw, "dress_tall")); } }
                     else if (r < 31 && far("env_kaiju_statue", x, z))
                     {
                         placed["env_kaiju_statue"].Add(new[] { x, z });

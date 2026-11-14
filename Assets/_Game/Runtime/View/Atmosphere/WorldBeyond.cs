@@ -505,6 +505,9 @@ namespace CriticalMass.Runtime.View.Atmosphere
             {
                 Vector3 c = new Vector3(W * 0.5f + 4f, -4.6f, 13f);
                 m.Islet(c, 5.4f, 6.5f, seg, 61u, low ? 0 : b.RootsPerIslet, b.UnderCrystals, BeyondMesh.Hex("#B5B784"));
+                // GORE (2026-11-14): the skeleton (ribs, spine, skull) is Full only; the island stays at every level.
+                if (global::CriticalMass.Runtime.View.Effects.GoreGate.Allows(global::CriticalMass.Runtime.View.Effects.GorePiece.BeyondKaijuSkeleton))
+                {
                 Vector3 axis = new Vector3(1f, 0f, -0.35f).normalized, side = Vector3.Cross(Vector3.up, axis);
                 int ribs = low ? 3 : 5;
                 for (int k = 0; k < ribs; k++)
@@ -542,6 +545,7 @@ namespace CriticalMass.Runtime.View.Atmosphere
                 {
                     m.Box(head + side * sd * 0.5f + Vector3.up * 0.38f + axis * 0.2f, new Vector3(0.36f, 0.12f, 0.3f), yaw, BeyondMesh.Window, BeyondMesh.Window);
                     m.Spike(head + side * sd * 0.8f + axis * 0.75f + Vector3.down * 0.3f, axis + Vector3.up * 0.9f, 0.45f, 0.08f, BeyondMesh.Bone);
+                }
                 }
                 f.Add(new BeyondFeature { Name = "old kaiju remains", Centre = c, Radius = 5.6f, Band = 1 });
             }

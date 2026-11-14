@@ -11,6 +11,9 @@ namespace CriticalMass.Runtime.View.Effects
     /// Kaiju stomp or an explosion knock-out. Debris chunks live here too (they share the solid layer and the landing code:
     /// bounce once on ground, sink with a splash in water, drop into the void past the rim with a spray).
     /// Stylised, never anatomical: rounded lobes in three flat reds with a Void Navy rim, cubes and cartoon bones.
+    /// <para>GORE setting (2026-11-14): every spawn here asks Allow(piece) and every draw Shows(piece) (GoreGate): gibs,
+    /// drips, wall-top splats, the pool and stamped ground stains are Full only; splats are smaller and short-lived at
+    /// Reduced; nothing here exists at Off.</para>
     /// </summary>
     public sealed partial class FxScene
     {
@@ -152,6 +155,10 @@ namespace CriticalMass.Runtime.View.Effects
         {
             for (int i = 0; i < DeathMemory; i++)
                 if (_deaths[i].T == t && _deaths[i].X == x && _deaths[i].Z == z) _deaths[i].Gibbed = true;
+            // Body parts: GORE Full only (three meat cubes and two bones per body).
+            if (!Shows(GorePiece.GibMeat) || !Shows(GorePiece.GibBone)) return;
+            _goreSpawns[(int)GorePiece.GibMeat] += 3;
+            _goreSpawns[(int)GorePiece.GibBone] += 2;
             Vector3 bias = W(dirX, 0, dirZ) * 1.6f;
             Vector3 p = W(x, h + 0.8, z);
             for (int k = 0; k < 5; k++)
@@ -167,6 +174,7 @@ namespace CriticalMass.Runtime.View.Effects
         /// <summary>A drip of blood on the surface under a badly hurt actor (the trail behind them).</summary>
         private void AddDrip(double t, Vector3 p, uint seed)
         {
+            if (!Allow(GorePiece.BloodDrip)) return;
             ref Drip d = ref _drips[_ndr++ % MaxDrips];
             d.Born = t; d.P = p; d.Seed = seed;
             d.Size = 0.06f + R01(seed, 3) * 0.05f;
@@ -197,7 +205,7 @@ namespace CriticalMass.Runtime.View.Effects
                         AddSpark(tl, sp, 0, 0, seed, 2, 6);
                         AddSpark(tl, sp, 0, 0, seed, 3, 6);
                     }
-                    else if (pass == 1 && Blood && SurfaceTop(lx, lz, out double top))
+                    else if (pass == 1 && Allow(GorePiece.WallTopSplat) && SurfaceTop(lx, lz, out double top))
                     {
                         lp.y = (float)top;
                         AddDecal(tl, lp, 0.26f + c.Size, 0, (byte)(seed % 6u), seed, c.V.x, -c.V.z, S(0.05));
@@ -265,8 +273,8 @@ namespace CriticalMass.Runtime.View.Effects
                 }
                 solid.Chunk(p, rot, new Vector3(sz, sz * 0.8f, sz * 1.1f), 0.035f, l, m, dk, Navy);
             }
-            // Gibs: chunky meat cubes (48 verts) and cartoon bones (144 verts).
-            for (int i = 0; i < MaxGibs; i++)
+            // Gibs: chunky meat cubes (48 verts) and cartoon bones (144 verts). GORE Full only (hidden at once on a change).
+            for (int i = 0; i < MaxGibs && Shows(GorePiece.GibMeat); i++)
             {
                 ref Chunk c = ref _gibs[i];
                 double age = now - c.Born;
@@ -285,6 +293,7 @@ namespace CriticalMass.Runtime.View.Effects
         {
             Vector3 gr = Vector3.right, gu = Vector3.forward;
             double life = DripLife;
+            if (!Shows(GorePiece.BloodDrip)) return;
             for (int i = 0; i < MaxDrips; i++)
             {
                 ref Drip d = ref _drips[i];
@@ -312,13 +321,20 @@ namespace CriticalMass.Runtime.View.Effects
                 ref Decal d = ref _decals[i];
                 double age = now - d.Born;
                 if (age < 0 || age >= d.Life) continue;
+                if (!Shows(d.Shape == 6 ? GorePiece.KnockOutPool : GorePiece.BloodSplat)) continue;
                 float grow = d.Grow > 0 ? Mathf.Clamp01((float)(age / d.Grow)) : 1f;
                 grow = 1f - (1f - grow) * (1f - grow);
                 float fade = (float)Math.Min(1.0, (d.Life - age) / (d.Life * 0.3));
                 bool still = age >= d.Grow && fade >= 1f;
                 int before = _decalStamp[i];
-                if (PaintedAway(ref _decalStamp[i], d.P, still)) continue;
-                if (before == -1 && _decalStamp[i] >= 0) DrawSplat(Paint.Builder, d.P, d.Size, d, 1f); // stamped once
+                // Stamping into the ground paint is what makes stains build up where fights happen: GORE Full only.
+                bool stamp = Shows(GorePiece.GroundStain);
+                if (stamp && PaintedAway(ref _decalStamp[i], d.P, still)) continue;
+                if (stamp && before == -1 && _decalStamp[i] >= 0)
+                {
+                    _goreSpawns[(int)GorePiece.GroundStain]++;
+                    DrawSplat(Paint.Builder, d.P, d.Size, d, 1f); // stamped once
+                }
                 DrawSplat(ground, d.P + Vector3.up * lift, d.Size * grow, d, fade);
                 LastGroundMarks++;
             }

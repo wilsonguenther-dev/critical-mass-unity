@@ -33,11 +33,11 @@ namespace CriticalMass.Runtime.View.Effects
         public float Scale;
     }
 
-    /// <summary>The cm.blood setting (PlayerPrefs int, default 1 = on). The settings page writes it; effects re-read it each second.</summary>
+    /// <summary>Legacy blood on/off (cm.blood): on = any GORE level but Off. GoreGate is the one switch; CombatFx re-reads it live.</summary>
     public static class BloodSetting
     {
         public const string Key = "cm.blood";
-        public static bool Enabled => PlayerPrefs.GetInt(Key, 1) != 0;
+        public static bool Enabled => GoreGate.Current != GoreLevel.Off;
     }
 
     /// <summary>
@@ -110,8 +110,9 @@ namespace CriticalMass.Runtime.View.Effects
             double wall = tier == 0 ? 0.03 : tier == 1 ? 0.065 : 0.11;
             return _scene != null ? _scene.S(wall) : wall * 2;
         }
-        /// <summary>White flash length, sim seconds (about 2.5 frames at 60 fps).</summary>
-        public double FlashSeconds => _scene != null ? _scene.S(0.045) : 0.09;
+        /// <summary>White flash length, sim seconds: about 2.5 frames at 60 fps; at GORE Off the whole-silhouette flash is the
+        /// main hit read, so it holds about 0.1 s (warm white: never a team hue, never the heal glow's green).</summary>
+        public double FlashSeconds => _scene != null ? _scene.S(_scene.Gore == GoreLevel.Off ? 0.1 : 0.045) : 0.09;
 
         private void Awake()
         {
@@ -124,7 +125,7 @@ namespace CriticalMass.Runtime.View.Effects
             World w = _driver.World;
             GameConfig cfg = _driver.Config;
             _feed = new CombatFeed(World.ActorCapacity(cfg));
-            _scene = new FxScene(cfg, w.Map) { Blood = BloodSetting.Enabled };
+            _scene = new FxScene(cfg, w.Map) { Gore = GoreGate.Current };
             _audio = new CombatAudio(transform, cfg);
             _bus = new WorldForceBus(cfg.SimHz) { SimPerWall = _scene.S(1.0) };
             WorldForceBus.Active = _bus;
@@ -172,6 +173,8 @@ namespace CriticalMass.Runtime.View.Effects
             if (_bus != null) CriticalMass.Runtime.View.Anim.Footfalls.Unregister(_bus);
             foreach (Material m in _flash.Values) if (m != null) Destroy(m);
             foreach (Material m in _tint.Values) if (m != null) Destroy(m);
+            if (_vignetteRed != null) Destroy(_vignetteRed);
+            if (_vignetteNavy != null) Destroy(_vignetteNavy);
             _audio?.Dispose();
         }
 
@@ -260,7 +263,7 @@ namespace CriticalMass.Runtime.View.Effects
         /// Hook for the character view (ActorViews owner): lerp the weapon material's colour toward BloodMid by this.</summary>
         public float WeaponBlood(int i)
         {
-            if (_feed == null || !_scene.Blood || i < 0 || i >= _feed.LastDealtTick.Length) return 0f;
+            if (_feed == null || !GoreGate.Allows(GorePiece.WeaponBloodTint, _scene.Gore) || i < 0 || i >= _feed.LastDealtTick.Length) return 0f;
             double age = SimNow() - _feed.LastDealtTick[i] / _driver.Config.SimHz;
             return age < 0 ? 0f : Mathf.Clamp01(1f - (float)(age / _scene.S(2.5)));
         }
@@ -270,7 +273,7 @@ namespace CriticalMass.Runtime.View.Effects
         {
             get
             {
-                if (_feed == null || !_scene.Blood) return 0f;
+                if (_feed == null || !GoreGate.Allows(GorePiece.KaijuFistBloodTint, _scene.Gore)) return 0f;
                 double age = SimNow() - _feed.KaijuDealtTick / _driver.Config.SimHz;
                 return age < 0 ? 0f : Mathf.Clamp01(1f - (float)(age / _scene.S(2.5)));
             }
@@ -358,14 +361,32 @@ namespace CriticalMass.Runtime.View.Effects
             if (kb != null && kb.f6Key.wasPressedThisFrame) PlayGallery();
             galleryRunning = _gallery != null && _gallery.Update(now, _driver.World);
 #endif
-            if (++_frame % 60 == 0)
+            // GORE applies live (a few frames after the menu changes it); the gallery pins its own levels while it runs.
+            if (++_frame % 10 == 0 && !galleryRunning) ApplyGore(GoreGate.Current);
+            if (_frame % 60 == 0)
             {
-                if (!galleryRunning) _scene.Blood = BloodSetting.Enabled;
                 _shakeOn = false;   // integration batch 3: Camera.CameraShake (M11, FeelGate-scaled) is the one camera shake
                 if (!_scene.HasFoliage && _foliageTries < 20) FindFoliage();
             }
             _audio.Update(now, _driver.World);
             UpdateVignette(now);
+        }
+
+        /// <summary>
+        /// Put a GORE level in force now: the scene gates every spawn and draw by it; dropping below Full wipes the blood
+        /// already stamped into the ground paint (scorch and footprints there go too) and swaps the red damage vignette.
+        /// </summary>
+        public void ApplyGore(GoreLevel level)
+        {
+            if (_scene == null || level == _scene.Gore) return;
+            bool leftFull = _scene.Gore == GoreLevel.Full && level != GoreLevel.Full;
+            _scene.Gore = level;
+            if (leftFull)
+            {
+                var paint = FindAnyObjectByType<CriticalMass.Runtime.View.Reactions.GroundPaint>();
+                if (paint != null) paint.ClearAll();
+            }
+            if (_vignette != null) _vignette.texture = GoreGate.Allows(GorePiece.RedDamageVignette, level) ? _vignetteRed : _vignetteNavy;
         }
 
         private void OnBeginCamera(ScriptableRenderContext ctx, UnityEngine.Camera cam)
@@ -597,10 +618,21 @@ namespace CriticalMass.Runtime.View.Effects
 
         // ---- local player damage vignette ----
 
+        private Texture2D _vignetteRed, _vignetteNavy;
+
         private void BuildVignette()
         {
+            // Two 128 px textures made once (64 KB each): red for GORE Full and Reduced, Void Navy for Off.
+            _vignetteRed = VignetteTexture(FxScene.BloodDark, FxScene.BloodMid, "Fx Vignette");
+            _vignetteNavy = VignetteTexture(FxScene.Navy, FxScene.GroundInkDark, "Fx Vignette Navy");
+            Texture2D tex = GoreGate.Allows(GorePiece.RedDamageVignette, _scene.Gore) ? _vignetteRed : _vignetteNavy;
+            BuildVignetteCanvas(tex);
+        }
+
+        private static Texture2D VignetteTexture(Color32 outer, Color32 inner, string name)
+        {
             const int n = 128;
-            var tex = new Texture2D(n, n, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp, name = "Fx Vignette" };
+            var tex = new Texture2D(n, n, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp, name = name };
             var px = new Color32[n * n];
             for (int y = 0; y < n; y++)
             for (int x = 0; x < n; x++)
@@ -609,12 +641,17 @@ namespace CriticalMass.Runtime.View.Effects
                 float r = Mathf.Sqrt(u * u * 0.8f + v * v * 1.1f);
                 // Two hard steps (toon): an outer dark-red band and a thinner inner band.
                 float a = r > 1.02f ? 0.85f : r > 0.86f ? 0.55f : r > 0.76f ? 0.22f : 0f;
-                Color32 c = r > 1.02f ? FxScene.BloodDark : FxScene.BloodMid;
+                Color32 c = r > 1.02f ? outer : inner;
                 c.a = (byte)(a * 255);
                 px[y * n + x] = c;
             }
             tex.SetPixels32(px);
             tex.Apply(false, true);
+            return tex;
+        }
+
+        private void BuildVignetteCanvas(Texture2D tex)
+        {
             var go = new GameObject("Fx Vignette");
             go.transform.SetParent(transform, false);
             _vignetteCanvas = go.AddComponent<Canvas>();

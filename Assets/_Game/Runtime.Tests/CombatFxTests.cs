@@ -201,8 +201,12 @@ namespace CriticalMass.Runtime.Tests
         {
             bool had = PlayerPrefs.HasKey(BloodSetting.Key);
             int old = PlayerPrefs.GetInt(BloodSetting.Key, 1);
+            // GORE (cm.gore) wins over the legacy key when set: clear it for this test and put it back after.
+            bool hadGore = PlayerPrefs.HasKey(CriticalMass.Runtime.Menu.GameSettings.GoreKey);
+            int oldGore = PlayerPrefs.GetInt(CriticalMass.Runtime.Menu.GameSettings.GoreKey, 2);
             try
             {
+                PlayerPrefs.DeleteKey(CriticalMass.Runtime.Menu.GameSettings.GoreKey);
                 PlayerPrefs.DeleteKey(BloodSetting.Key);
                 Assert.IsTrue(BloodSetting.Enabled, "blood defaults to on");
                 PlayerPrefs.SetInt(BloodSetting.Key, 0);
@@ -236,6 +240,8 @@ namespace CriticalMass.Runtime.Tests
             {
                 if (had) PlayerPrefs.SetInt(BloodSetting.Key, old);
                 else PlayerPrefs.DeleteKey(BloodSetting.Key);
+                if (hadGore) PlayerPrefs.SetInt(CriticalMass.Runtime.Menu.GameSettings.GoreKey, oldGore);
+                else PlayerPrefs.DeleteKey(CriticalMass.Runtime.Menu.GameSettings.GoreKey);
             }
         }
 
