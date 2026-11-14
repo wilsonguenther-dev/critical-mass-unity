@@ -27,7 +27,13 @@ CriticalMass.app/Contents/MacOS/CriticalMass -batchmode -nographics -logFile joi
 All flags: `-onlineHost`, `-onlineJoin CODE`, `-onlineCode`, `-onlineKey`, `-onlineRelay URL`, `-onlineName`,
 `-onlineTeam azure|crimson`, `-onlineClass NAME`, `-onlineHumans N` (host starts when N are in and ready),
 `-onlineTicks N` (0 = whole match), `-onlineTeamSize`, `-onlineSeed`, `-onlinePace`, `-onlineHashLog FILE`,
-`-onlineCodeOut FILE`, `-onlineTimeout SECONDS`, `-onlineBuild`, `-onlineHeadless`.
+`-onlineCodeOut FILE` (written once the host is connected, "ROOM READY"), `-onlineTimeout SECONDS`,
+`-onlineLobby SECONDS` (host gives up if the room is not full and ready, default 180, exit 4), `-onlineJoinTries N`
+(joiner asks again 1.5 s apart while the room is not there yet, default 8), `-onlineChatAt TICK` and
+`-onlineChatText TEXT` (send a chat line; every received line is logged as ONLINE CHAT), `-onlineDropAt TICK` (drop off
+with no goodbye; the others log ONLINE TOBOT with the seat and tick), `-onlineBuild`, `-onlineHeadless`.
+The hash log starts with tick 0 (the world as built) and tick 1, then every 30th tick: a mismatch at 0 is a setup
+difference, at 1 the first inputs, later a simulation drift. The summary line ends with every peer's round trip.
 Exit codes: 0 ok, 2 desync, 3 room closed or host left, 4 timed out, 5 could not create or join.
 
 ## Two-machine plan

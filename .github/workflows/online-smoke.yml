@@ -62,8 +62,9 @@ jobs:
           P=tools/online/HeadlessPeer/bin/Release/net8.0/cm-online-peer.dll
           R=http://127.0.0.1:8787
           mkdir -p out
-          dotnet $P -host -relay $R -humans 2 -ticks $T -teamsize 16 -name Host -hash-log out/host.txt -code-out out/code.txt -timeout 600 > out/host.log 2>&1 &
+          dotnet $P -host -relay $R -humans 2 -ticks $T -teamsize 16 -name Host -hash-log out/host.txt -code-out out/code.txt -timeout 600 -lobby 120 > out/host.log 2>&1 &
           HP=$!
+          # code.txt is written only once the host's own connection is in the room ("ROOM READY"), so the joiner never races it.
           for i in $(seq 1 60); do [ -s out/code.txt ] && break; sleep 1; done
           CODE=$(cat out/code.txt)
           echo "room code $CODE"
@@ -118,10 +119,10 @@ jobs:
           P=tools/online/HeadlessPeer/bin/Release/net8.0/cm-online-peer.dll
           T="${{ inputs.ticks || '1800' }}"
           if [ "${{ matrix.role }}" = host ]; then
-            dotnet $P -host -code "${{ needs.cross-os-room.outputs.code }}" -key "${{ needs.cross-os-room.outputs.key }}" -relay "${{ vars.CM_RELAY_URL }}" -humans 2 -ticks $T -hash-log hashes.txt -timeout 900
+            dotnet $P -host -code "${{ needs.cross-os-room.outputs.code }}" -key "${{ needs.cross-os-room.outputs.key }}" -relay "${{ vars.CM_RELAY_URL }}" -humans 2 -ticks $T -hash-log hashes.txt -lobby 300 -timeout 900 -timeout 900
           else
             sleep 20
-            dotnet $P -join "${{ needs.cross-os-room.outputs.code }}" -relay "${{ vars.CM_RELAY_URL }}" -ticks $T -team crimson -hash-log hashes.txt -timeout 900
+            dotnet $P -join "${{ needs.cross-os-room.outputs.code }}" -relay "${{ vars.CM_RELAY_URL }}" -ticks $T -team crimson -hash-log hashes.txt -timeout 900 -join-tries 40
           fi
       - uses: actions/upload-artifact@v4
         if: always()
