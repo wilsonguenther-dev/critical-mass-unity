@@ -755,6 +755,16 @@ except Exception as e:
     log("render failed", repr(e))
 
 # ---------------------------------------------------------------- export <Cls>_Clips.fbx (armature + NLA takes)
+# rig-warrior-3: the game's ArtPoseTests idle read: Hero mesh at the first Idle frame, front width over height (limit 1.0)
+if "Idle" in baked:
+    assign(fa, baked["Idle"]); scene.frame_set(int(baked["Idle"].frame_range[0])); upd()
+    _eo = hero.evaluated_get(bpy.context.evaluated_depsgraph_get()); _me = _eo.to_mesh()
+    _c = np.empty(len(_me.vertices) * 3, np.float32); _me.vertices.foreach_get("co", _c); _eo.to_mesh_clear()
+    _c = _c.reshape(-1, 3) @ np.array(hero.matrix_world)[:3, :3].T + np.array(hero.matrix_world)[:3, 3]
+    _w, _h = float(np.ptp(_c[:, 0])), float(np.ptp(_c[:, 2]))
+    REP["idle_width_height"] = [round(_w, 4), round(_h, 4), round(_w / _h, 4)]
+    log("idle width / height (game limit 1.0)", REP["idle_width_height"])
+assign(fa, None)
 bpy.data.objects.remove(kk, do_unlink=True)
 bpy.data.objects.remove(hero, do_unlink=True)
 fa.name = "Rig"
@@ -777,15 +787,6 @@ for ob in list(scene.objects):
         ob.select_set(ob is fa)
 bpy.context.view_layer.objects.active = fa
 rest(fa)
-# rig-warrior-3: the game's ArtPoseTests idle read: Hero mesh at the first Idle frame, front width over height (limit 1.0)
-if "Idle" in baked:
-    assign(fa, baked["Idle"]); scene.frame_set(int(baked["Idle"].frame_range[0])); upd()
-    _eo = hero.evaluated_get(bpy.context.evaluated_depsgraph_get()); _me = _eo.to_mesh()
-    _c = np.empty(len(_me.vertices) * 3, np.float32); _me.vertices.foreach_get("co", _c); _eo.to_mesh_clear()
-    _c = _c.reshape(-1, 3) @ np.array(hero.matrix_world)[:3, :3].T + np.array(hero.matrix_world)[:3, 3]
-    _w, _h = float(np.ptp(_c[:, 0])), float(np.ptp(_c[:, 2]))
-    REP["idle_width_height"] = [round(_w, 4), round(_h, 4), round(_w / _h, 4)]
-    log("idle width / height (game limit 1.0)", REP["idle_width_height"])
 assign(fa, None)
 path = os.path.join(OUT, f"{CLS}_Clips.fbx")
 r = bpy.ops.export_scene.fbx(filepath=path, use_selection=True, object_types={"ARMATURE"}, apply_unit_scale=True,
