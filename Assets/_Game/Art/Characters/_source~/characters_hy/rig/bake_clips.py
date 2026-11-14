@@ -99,6 +99,8 @@ acts = {a.name.split("|")[-1]: a for a in kacts}
 log("fps", fps, "kk", kk.name, "class rig", fa.name, "clips", len(acts), sorted(acts)[:8])
 
 SIDES = ("l", "r")
+FLIGHT_CAP = 0.32      # metres: lowest foot/toe joint never above this (game limit 0.35 u at scale 1)
+CAPPED = {}   # rig-warrior-3: both restored (the cand4 merge dropped the definitions and kept the uses)
 PLANT = 0.025          # KayKit ankle within 2.5% of leg length of its rest height = planted
 MAX_LOWER = 0.12       # hips never come down more than this to reach a target (DeathB-style clips keep FK reach)
 LEG = lambda s: ("upperleg." + s, "lowerleg." + s, "foot." + s, "toes." + s)
