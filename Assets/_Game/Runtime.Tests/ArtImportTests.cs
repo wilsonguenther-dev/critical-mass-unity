@@ -37,7 +37,8 @@ namespace CriticalMass.Runtime.Tests
             Assert.IsTrue(mi.bakeAxisConversion, "bake axis conversion");
             Assert.IsFalse(mi.importCameras, "cameras");
             Assert.IsFalse(mi.importLights, "lights");
-            Assert.IsFalse(mi.isReadable, "read/write");
+            // feat/staged-building-1: the ladder, bridge and barricade are cut into parts at match start (CPU vertices)
+            Assert.AreEqual(CriticalMass.Runtime.View.Mechanics.StagedBuildCore.NeedsReadable(key), mi.isReadable, "read/write");
             Assert.AreEqual(ModelImporterNormals.Import, mi.importNormals, "normals");
             Assert.AreEqual(ModelImporterMaterialImportMode.None, mi.materialImportMode, "no imported materials");
             Assert.AreEqual(spec.Rigged ? ModelImporterAnimationType.Generic : ModelImporterAnimationType.None, mi.animationType, "rig");

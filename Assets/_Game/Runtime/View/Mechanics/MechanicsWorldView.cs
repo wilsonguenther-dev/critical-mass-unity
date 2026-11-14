@@ -1,6 +1,7 @@
 using System;
 using CriticalMass.Runtime.Game;
 using CriticalMass.Runtime.Hud.Style;
+using CriticalMass.Runtime.Menu;
 using CriticalMass.Runtime.View.Effects;
 using CriticalMass.Sim.Config;
 using CriticalMass.Sim.Core;
@@ -36,6 +37,7 @@ namespace CriticalMass.Runtime.View.Mechanics
         FxMeshBuilder _ground, _solid, _air;
         Material _groundMat, _solidMat, _airMat;
         GameObject _groundGo, _solidGo, _airGo;
+        StagedBuildView _staged;
 
         static readonly Color32 Navy = new Color32(24, 35, 59, 255);
         static readonly Color32 WoodLight = new Color32(214, 168, 108, 255), WoodMid = new Color32(170, 122, 70, 255), WoodDark = new Color32(112, 78, 44, 255);
@@ -140,7 +142,9 @@ namespace CriticalMass.Runtime.View.Mechanics
             int me = Feed.LocalActor;
             TeamId viewer = me >= 0 && me < w.ActorCount ? w.Actors[me].Team : TeamId.Azure;
             bool reduceFlash = FeelGate.ReduceFlashing;
+            if (_staged == null) _staged = GetComponent<StagedBuildView>();
             DrawPieces(w, alpha, reduceFlash);
+            DrawBuildExtras(camFwd);
             DrawMines(w, viewer, reduceFlash);
             DrawBombs(w, alpha);
             DrawSlam(w, alpha, me, reduceFlash);
@@ -214,6 +218,12 @@ namespace CriticalMass.Runtime.View.Mechanics
                 {
                     if (p.Carrier < 0 || p.Carrier >= w.ActorCount || !w.Actors[p.Carrier].Alive) continue;
                     Vector3 at = ActorPos(w, p.Carrier, alpha, 0f);
+                    // feat/staged-building-1: the authored carried ladder or bridge when the art is there
+                    if (_staged != null && _staged.DrawCarried(p, at, (float)w.Actors[p.Carrier].Facing, warn && blink < 0.5f && !reduceFlash))
+                    {
+                        Countdown(at + Vector3.up * 0.05f, 0.95f, 0.08f, left, ringCol, blink);
+                        continue;
+                    }
                     // a lashed bundle of planks over the carrier's head, and the life ring at the feet
                     Quaternion rot = Quaternion.Euler(0f, 30f, 0f);
                     for (int b = 0; b < 3; b++)
@@ -231,6 +241,15 @@ namespace CriticalMass.Runtime.View.Mechanics
                 Vector3 c = P(p.X, p.Z, 0.02f);
                 float len = Mathf.Max(0.5f, (float)p.HalfLen * 2f);
                 float half = (float)(pc.WidthCells * 0.5) - 0.12f;
+                // feat/staged-building-1: the authored ladder or rope bridge model, with its construction sequence; the
+                // procedural planks below stay as the fallback when the art is missing.
+                if (_staged != null && _staged.DrawPiece(w, k, p, c, along, len, (float)pc.WidthCells, warn && blink < 0.5f && !reduceFlash,
+                        out float buildProgress, out bool building))
+                {
+                    if (!building) Countdown(c + Vector3.up * 0.75f, 0.42f, 0.08f, left, ringCol, blink);
+                    else if (WorldFeedbackSettings.Progress) Countdown(c + Vector3.up * 0.75f, 0.42f, 0.05f, buildProgress, team, 1f);
+                    continue;
+                }
                 double popWall = Feed.Wall((w.Tick + alpha - p.PlacedTick) / hz);
                 float pop = popWall < 0.18 ? Mathf.Lerp(0.6f, 1f, (float)(popWall / 0.18)) : 1f;
                 Quaternion q = Quaternion.LookRotation(along, Vector3.up);
@@ -267,6 +286,42 @@ namespace CriticalMass.Runtime.View.Mechanics
                     _solid.Chunk(c + Vector3.up * (lift + 0.09f), q, new Vector3(0.1f, 0.03f, 0.1f), 0.02f, team, team, Mix(team, Navy, 0.4f), Navy);
                 }
                 Countdown(c + Vector3.up * 0.75f, 0.42f, 0.08f, left, ringCol, blink);
+            }
+        }
+
+        /// <summary>
+        /// feat/staged-building-1: the construction progress ring at a barricade being assembled (the HUD ring style: navy
+        /// track, team arc filling from 12 o'clock) and the dust puffs the staged build drops where pieces land.
+        /// </summary>
+        void DrawBuildExtras(Vector3 camFwd)
+        {
+            StagedBuildView sv = _staged;
+            if (sv == null) return;
+            if (WorldFeedbackSettings.Progress)
+                for (int i = 0; i < sv.Tracker.Barricades.Length; i++)
+                    if (sv.BarricadeProgress(i, out float prog, out Vector3 simAt, out TeamId team))
+                        Countdown(P(simAt.x, simAt.z, 0.03f), 0.62f, 0.05f, prog, CMTokens.Team(team), 1f);
+            Vector3 right = Vector3.Cross(Vector3.up, camFwd);
+            if (right.sqrMagnitude < 1e-6f) right = Vector3.right;
+            right.Normalize();
+            Vector3 up = Vector3.Cross(camFwd, right).normalized;
+            bool particles = WorldFeedbackSettings.Particles;
+            for (int i = 0; i < StagedBuildView.PuffCount; i++)
+            {
+                float age = sv.PuffAge(i);
+                if (age < 0f || age > StagedBuildView.PuffLife) continue;
+                float t = age / StagedBuildView.PuffLife, k = 1f - t;
+                StagedBuildView.Puff pf = sv.Puffs[i];
+                float r = pf.R * (0.5f + 0.8f * FeedEase(t));
+                _ground.Blob(pf.P + Vector3.up * 0.03f, Vector3.right, Vector3.forward, r, null, 14, 0f, A(DirtLight, 0.35f * k));
+                if (!particles) continue;
+                for (int j = 0; j < 3; j++)
+                {
+                    float ang = j * 2.094f + i;
+                    Vector3 off = new Vector3(Mathf.Cos(ang), 0f, Mathf.Sin(ang)) * (r * 0.7f) + Vector3.up * (0.12f + 0.35f * t);
+                    float sz = pf.R * 0.35f * (0.6f + 0.6f * t);
+                    _air.Quad(pf.P + off, right * sz, up * sz, A(Cream, 0.55f * k), A(Cream, 0.55f * k));
+                }
             }
         }
 
@@ -562,6 +617,7 @@ namespace CriticalMass.Runtime.View.Mechanics
             MechanicsWorldView v = driver.GetComponent<MechanicsWorldView>();
             if (v == null) v = driver.gameObject.AddComponent<MechanicsWorldView>();
             if (driver.GetComponent<MechanicsPoses>() == null) driver.gameObject.AddComponent<MechanicsPoses>();
+            if (driver.GetComponent<StagedBuildView>() == null) driver.gameObject.AddComponent<StagedBuildView>();
             if (driver.GetComponent<CriticalMass.Runtime.Hud.Mechanics.MechanicsHud>() == null) driver.gameObject.AddComponent<CriticalMass.Runtime.Hud.Mechanics.MechanicsHud>();
             if (driver.GetComponent<CriticalMass.Runtime.Hud.Mechanics.EmoteWheel>() == null) driver.gameObject.AddComponent<CriticalMass.Runtime.Hud.Mechanics.EmoteWheel>();
             // feat/mechanics-depth-view: jobs, sources, stations, pickups, pings, named bots, map events (U-063 to U-068).
