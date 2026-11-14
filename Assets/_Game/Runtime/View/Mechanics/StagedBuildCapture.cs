@@ -85,7 +85,7 @@ namespace CriticalMass.Runtime.View.Mechanics
             Application.Quit(0);
         }
 
-        Camera _close;
+        UnityEngine.Camera _close;
 
         /// <summary>
         /// A temporary camera framed close on the site: the gameplay camera's own rotation (whatever the heading is, the
@@ -94,12 +94,12 @@ namespace CriticalMass.Runtime.View.Mechanics
         /// </summary>
         void FrameClose(Vector3 site, float dist)
         {
-            Camera main = Camera.main;
+            UnityEngine.Camera main = UnityEngine.Camera.main;
             if (main == null || main == _close) { Log("no gameplay camera to copy; stills use the gameplay framing"); return; }
             if (_close == null)
             {
                 var go = new GameObject("BuildShots Close Camera");
-                _close = go.AddComponent<Camera>();
+                _close = go.AddComponent<UnityEngine.Camera>();
             }
             _close.CopyFrom(main);
             _close.depth = main.depth + 10f;
