@@ -57,7 +57,7 @@ namespace CriticalMass.Runtime.View.Mechanics
         /// <summary>True when this sim build sends its own stun events (DG-70).</summary>
         public static bool SimStuns => MechEvents.HitStunCode >= 0;
 
-        public int LocalActor = 0;
+        public int LocalActor = LocalSeat.Actor;
         public double Pace = 2;
 
         int _cursor = -1, _epoch = int.MinValue;

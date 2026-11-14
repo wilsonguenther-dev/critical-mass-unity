@@ -86,6 +86,28 @@ namespace CriticalMass.Runtime.Game
             Flow.MatchRequest req = NextMatch;
             NextMatch = null;
             Request = req;
+            // online-rooms-2: in an online room the lockstep session owns the world and its clock; this driver only shows
+            // it (the session ticks in OnlineRunner, inputs come from HumanInputSource through FillOnline).
+            CriticalMass.Net.LockstepSession online = Online.OnlineMatch.Session;
+            if (online != null && (req == null || !req.Backdrop))
+            {
+                _online = online;
+                World = _online.World;
+                World.Config.Render.CameraYawDeg = cfg.Render.CameraYawDeg;   // view-only setting; the Sim never reads Render
+                Config = World.Config;
+                TimeScale = CriticalMass.Net.LockstepSession.WallPace(_online.Setup, World.Config);
+                HumanAutopilot = false;
+                _dt = SimStep.Dt(Config);
+                Alpha = 0;
+                RuntimeCounters.Reset();
+                Online.OnlineMatch.Ticked += ForwardTicked;
+                Online.OnlineMatch.LocalInput = FillOnline;
+                gameObject.AddComponent<Online.OnlineMatchOverlay>();
+                Online.OnlineChatHud.Lane = CriticalMass.Runtime.Hud.HudZones.Chat;   // the match HUD's own chat lane
+                Online.OnlineChatHud.Centred = false;
+                Online.OnlineChatHud.Visible = true;
+                return;
+            }
             World = World.CreateWorld(req != null ? req.ToWorldOptions(cfg) : new WorldOptions
             {
                 Seed = cfg.Seed,
@@ -117,8 +139,55 @@ namespace CriticalMass.Runtime.Game
             }
         }
 
+        /// <summary>online-rooms-2: the lockstep session this driver shows (null in single player).</summary>
+        private CriticalMass.Net.LockstepSession _online;
+
+        /// <summary>online-rooms-2: true while this driver shows an online match (pace, pause and speed are the room's).</summary>
+        public bool IsOnline => _online != null;
+
+        private void ForwardTicked(World w)
+        {
+            if (w != World) return;
+            FrameCost.FrameTicks++;
+            Ticked?.Invoke(w);
+        }
+
+        /// <summary>online-rooms-2: this machine's player's frame for the next lockstep tick (neutral while a menu is open).</summary>
+        private void FillOnline(InputFrame into)
+        {
+            HumanInputSource input = InputSource;
+            // Typing a chat line: neutral inputs, so letters never move the fighter.
+            if (input != null && !input.State.Paused && !Online.OnlineChatHud.Typing) input.State.Fill(into);
+            else
+            {
+                into.CopyFrom(_neutral);
+                into.AimX = double.NaN;
+                into.AimZ = double.NaN;
+            }
+        }
+
+        private void OnDestroy()
+        {
+            if (_online == null) return;
+            Online.OnlineChatHud.Visible = false;
+            Online.OnlineMatch.Ticked -= ForwardTicked;
+            if (Online.OnlineMatch.LocalInput == (Action<InputFrame>)FillOnline) Online.OnlineMatch.LocalInput = null;
+            // Leaving the match scene (results, menu, quit) leaves the room.
+            if (Online.OnlineMatch.Session == _online) Online.OnlineMatch.Leave();
+        }
+
         private void Update()
         {
+            // online-rooms-3: while an online match runs (or the game is a hidden online test peer) no other world ticks:
+            // the online session is the only thing stepping the Sim.
+            if (_online == null && (Online.OnlineMatch.Session != null || Online.OnlineHeadless.Active)) return;
+            if (_online != null)
+            {
+                float cd = Time.captureDeltaTime;
+                FrameDt = Math.Min(cd > 0f ? cd : Time.unscaledDeltaTime, MaxFrameDt);
+                Alpha = _online.Alpha;   // the session ticks in OnlineRunner; never paused, never sped up
+                return;
+            }
             if (CriticalMass.Runtime.Game.LoadTimer.Armed) CriticalMass.Runtime.Game.LoadTimer.FirstUpdate();   // perf/start-hitch-1: every Start() of the load frame has run
             // fix/facing-frame-timing: a capture clock (Time.captureDeltaTime: movie capture, the sanity tests' fixed load
             // frames, the frame-rate tests' fake clocks) drives the sim too. Unity's capture clock does not touch
@@ -145,6 +214,7 @@ namespace CriticalMass.Runtime.Game
         /// <summary>Runs n ticks immediately (smoke test); the accumulator and Alpha are left as they are.</summary>
         public void StepTicks(int n)
         {
+            if (_online != null) return;   // online-rooms-2: only the lockstep session steps an online world
             HumanInputSource input = InputSource;
             for (int i = 0; i < n; i++) Tick(input);
         }
@@ -163,10 +233,10 @@ namespace CriticalMass.Runtime.Game
             // path. Null in normal play.
             if (ScriptedHumanFrame != null) _humanFrame.CopyFrom(ScriptedHumanFrame);
             // Physics audit M7 / DG-101: count ability presses the sim will refuse (read-only on the World) for the HUD's cue.
-            if (input != null && !HumanAutopilot) AbilityDenial.Observe(_humanFrame.Ability, World, 0, _dt);
+            if (input != null && !HumanAutopilot) AbilityDenial.Observe(_humanFrame.Ability, World, LocalSeat.Actor, _dt);
             FrameCost.Mark c0 = FrameCost.Enter();
             long lt = CriticalMass.Runtime.Game.LoadTimer.WatchingTicks ? CriticalMass.Runtime.Game.LoadTimer.Now() : 0;   // perf/start-hitch-1: the first ticks after a load, timed
-            MatchTick.Advance(World, HumanAutopilot ? null : _humanFrame, _scratch);
+            using (CriticalMass.Net.SimThreadGuard.Enter()) MatchTick.Advance(World, HumanAutopilot ? null : _humanFrame, _scratch);
             if (lt != 0) CriticalMass.Runtime.Game.LoadTimer.TickDone(lt);
             FrameCost.Exit(FrameCost.Slot.Sim, c0);
             FrameCost.FrameTicks++;

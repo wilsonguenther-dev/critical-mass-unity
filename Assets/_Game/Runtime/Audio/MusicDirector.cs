@@ -242,7 +242,7 @@ namespace CriticalMass.Runtime.Audio
                     if (w != null && !ReferenceEquals(w, _stingWorld))
                     {
                         _stingWorld = w;
-                        TeamId human = w.ActorCount > 0 ? w.Actors[0].Team : TeamId.Azure;
+                        TeamId human = w.ActorCount > 0 ? w.Actors[LocalSeat.Actor].Team : TeamId.Azure;
                         string id = StingFor(w.Match.Winner, human);
                         AudioClip c = id == "sting-victory" ? _victory : id == "sting-defeat" ? _defeat : id == "sting-draw" ? _draw : null;
                         if (c != null)

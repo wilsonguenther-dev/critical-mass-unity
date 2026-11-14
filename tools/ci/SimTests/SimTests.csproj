@@ -23,6 +23,8 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../Sim/Sim.csproj" />
+    <!-- online-rooms-2: the pure lockstep and room layer (Assets/_Game/Net), tested by Sim.Tests/Net. -->
+    <ProjectReference Include="../Net/Net.csproj" />
     <!-- Unity's com.unity.ext.nunit is a custom NUnit 3.5; 3.14 is the last 3.x and a superset of that API. -->
     <PackageReference Include="NUnit" Version="3.14.0" />
     <PackageReference Include="NUnitLite" Version="3.14.0" />

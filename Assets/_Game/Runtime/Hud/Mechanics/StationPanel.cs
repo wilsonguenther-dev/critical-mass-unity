@@ -204,7 +204,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             if (_buyAction == null) _buyAction = Action("StationBuy");
             InteractUi.UpdateScale(_canvas);
             if (_canvas.worldCamera == null) _canvas.worldCamera = UnityEngine.Camera.main;
-            const int me = 0;
+            int me = LocalSeat.Actor;
             bool paused = _human != null && _human.State.Paused;
             bool can = w != null && me < w.ActorCount && w.Match.Phase != MatchPhase.Ended && DepthRead.StationsOn(w) && DepthRead.InStation(w, me) && !paused;
             if (!can) { if (_open) SetOpen(false); return; }

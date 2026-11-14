@@ -388,7 +388,7 @@ namespace CriticalMass.Runtime.Menus
             Build();
             Mode = SelectMode.Respawn;
             World w = _driver.World;
-            Team = w.Actors[0].Team;
+            Team = w.Actors[LocalSeat.Actor].Team;
             Canvas.sortingOrder = RespawnSorting;
             Canvas.enabled = true;
             _wash.enabled = false;
@@ -445,7 +445,7 @@ namespace CriticalMass.Runtime.Menus
 
         // ---------------------------------------------------------------- respawn picks
 
-        static ClassId NextClass(World w) => w.Actors[0].PendingClass ?? w.Actors[0].Cls;
+        static ClassId NextClass(World w) => w.Actors[LocalSeat.Actor].PendingClass ?? w.Actors[LocalSeat.Actor].Cls;
 
         /// <summary>Respawn: queue cls for the next life (HumanInputState.QueueClassPick; the sim accepts it while dead).</summary>
         public void PickRespawn(ClassId cls)
@@ -486,7 +486,7 @@ namespace CriticalMass.Runtime.Menus
             if (w == null || w.ActorCount < 1 || w.Match.Phase == MatchPhase.Ended || CriticalMass.Runtime.Flow.GameFlow.State == CriticalMass.Runtime.Flow.FlowState.Results) return false;
             if (_driver.HumanAutopilot || _input.State.Paused || ControlsCardScreen.IsOpen || LoadingScreen.IsOpen) return false;
             if (_driver.GetComponent<TitleScreen>() != null) return false;
-            return !w.Actors[0].Alive;
+            return !w.Actors[LocalSeat.Actor].Alive;
         }
 
         void Update()

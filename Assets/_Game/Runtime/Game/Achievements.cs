@@ -84,7 +84,7 @@ namespace CriticalMass.Runtime.Game
         /// <summary>Raised once per lifetime unlock with the achievement's index.</summary>
         public event Action<int> Unlocked;
 
-        public int LocalActor = 0;
+        public int LocalActor = LocalSeat.Actor;
         /// <summary>The local player's team (the host sets it every frame from the world).</summary>
         public TeamId LocalTeam = TeamId.Azure;
 

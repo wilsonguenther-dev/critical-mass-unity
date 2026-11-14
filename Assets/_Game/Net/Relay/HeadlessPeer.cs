@@ -1,0 +1,317 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Text;
+using System.Threading;
+using CriticalMass.Sim.Config;
+using CriticalMass.Sim.Core;
+
+namespace CriticalMass.Net.Relay
+{
+    /// <summary>
+    /// A whole online peer with no screen: joins or hosts a room on the relay, readies up, plays the match with the
+    /// autoplay pilot as its human, and writes the fingerprint of tick 0, tick 1 and every 30th tick to a log ("tick hash"
+    /// per line) so a harness can compare machines line by line. Used by the console peer (tools/online/HeadlessPeer, no
+    /// Unity) and by the game's -onlineHost / -onlineJoin flags (Runtime/Online/OnlineHeadless.cs): the same code on both.
+    /// <para>online-rooms-3: driven by Begin() then Step(now) from ONE thread, the thread that owns the Sim (the game's main
+    /// thread; the Sim keeps static scratch buffers and must never be stepped from two threads at once, which is what made
+    /// the first game-to-game test drift at tick 30). Run() is the console loop around the same two calls.</para>
+    /// Exit codes: 0 the match ran to the end (or to Ticks, or this peer dropped itself on purpose), 2 desync or a setup
+    /// mismatch, 3 the room closed or the host left, 4 timed out (also: nobody joined the host in LobbySeconds), 5 could
+    /// not create or join.
+    /// </summary>
+    public sealed class HeadlessPeer
+    {
+        public string RelayUrl;
+        public bool Host;
+        public string Code;
+        public string Key;
+        public string Name = "Headless";
+        public TeamId Team = TeamId.Azure;
+        public ClassId Class = ClassId.Warrior;
+        /// <summary>Host: start once this many humans (the host included) are in and ready.</summary>
+        public int Humans = 2;
+        /// <summary>Stop after this many ticks (0 = the whole match).</summary>
+        public int Ticks;
+        public int TeamSize = 16;
+        public double Pace = 1;
+        public int Seed;
+        public string HashLogPath;
+        /// <summary>Host: the room code is written here once the host is connected ("room ready"), for a harness.</summary>
+        public string CodeOutPath;
+        public int TimeoutSeconds = 900;
+        /// <summary>Host: give up (exit 4) if the room is not full and ready this long after it opened.</summary>
+        public int LobbySeconds = 180;
+        /// <summary>Joiner: how many times to ask again when the room is not there yet (the host may still be connecting).</summary>
+        public int JoinTries = 8;
+        public int JoinRetryMs = 1500;
+        /// <summary>Send ChatText to everyone when the match reaches this tick (-1 = never).</summary>
+        public int ChatAt = -1;
+        public string ChatText = "hello from the headless peer";
+        /// <summary>Drop off the network with no goodbye at this tick (-1 = never), to test the bot handover.</summary>
+        public int DropAt = -1;
+        public string Build = "headless";
+        public Action<string> Log = Console.WriteLine;
+        /// <summary>Tests: use this in-process relay instead of the network (same rules as server/relay).</summary>
+        public LocalRelay Local;
+
+        public int ExitCode { get; private set; } = -1;
+        /// <summary>Every fingerprint so far (tick 0 first), for tests.</summary>
+        public IReadOnlyList<KeyValuePair<int, ulong>> Hashes => _hashes;
+
+        private GameConfig _cfg;
+        private ITransport _t;
+        private RoomHost _room;
+        private RoomClient _client;
+        private LockstepSession _session;
+        private readonly List<KeyValuePair<int, ulong>> _hashes = new List<KeyValuePair<int, ulong>>();
+        private AutoplayPilot _pilot;
+        private bool _picked, _readyLogged, _chatSent, _dropped;
+        private int _tries, _chatSeen;
+        private long _start, _deadline, _retryAt = -1, _lingerUntil = -1;
+
+        /// <summary>The console loop: Begin, then Step until done (one thread throughout).</summary>
+        public int Run()
+        {
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            if (!Begin(0)) return ExitCode;
+            while (true)
+            {
+                int? done = Step(clock.ElapsedMilliseconds);
+                if (done.HasValue) return done.Value;
+                Thread.Sleep(2);
+            }
+        }
+
+        /// <summary>Creates or joins the room. False (with ExitCode set) when that already failed.</summary>
+        public bool Begin(long now)
+        {
+            _cfg = GameConfig.CreateDefault();
+            _start = now;
+            _deadline = now + TimeoutSeconds * 1000L;
+            _pilot = new AutoplayPilot((uint)(Host ? 101 : 202) ^ (uint)(Name ?? "").Length);
+            try
+            {
+                if (Host && string.IsNullOrEmpty(Code))
+                {
+                    (string newCode, string hostKey) = Local != null ? Local.CreateRoom()
+                        : RelayTransport.CreateRoomAsync(RelayUrl, CancellationToken.None).GetAwaiter().GetResult();
+                    Code = newCode;
+                    Key = hostKey;
+                }
+                Code = RelayTransport.CleanCode(Code);
+                if (Code == null) return Fail(5, "that is not a room code");
+                if (Host) Log("ROOM CODE " + Code);
+                Connect();
+                return true;
+            }
+            catch (RoomException e) { return Fail(5, e.Message); }
+            catch (Exception e) { return Fail(5, e.ToString()); }
+        }
+
+        private void Connect()
+        {
+            _t = Local != null ? Local.Connect(Code, Host ? Key : null) : RelayTransport.Connect(RelayUrl, Code, Host ? Key : null);
+            if (Host)
+            {
+                _room = new RoomHost(_t, _cfg, Name, Build) { TeamSize = TeamSize, Pace = Pace };
+                return;
+            }
+            _client = new RoomClient(_t, _cfg, Name, Build);
+            _client.SetPick(Team, Class);
+            _client.SetReady(true);
+        }
+
+        /// <summary>One step: null while running, else the exit code (the transport is closed and the logs written).</summary>
+        public int? Step(long now)
+        {
+            if (ExitCode >= 0) return ExitCode;
+            try { return StepInner(now); }
+            catch (Exception e) { Fail(5, e.ToString()); return Finish(); }
+        }
+
+        private int? StepInner(long now)
+        {
+            if (_lingerUntil >= 0)
+            {
+                if (_room != null) _room.Update(now); else _client?.Update(now);
+                if (now < _lingerUntil) return null;
+                ExitCode = _session != null && _session.Status == LockstepStatus.Desynced ? 2 : 0;
+                return Finish();
+            }
+            if (now > _deadline) { Fail(4, "timed out after " + TimeoutSeconds + " s"); return Finish(); }
+            if (_retryAt >= 0)
+            {
+                if (now < _retryAt) return null;
+                _retryAt = -1;
+                Connect();
+            }
+            if (Host)
+            {
+                if (!_picked && _t.LocalPeer == Peers.Host)
+                {
+                    _room.SetLocalPick(Team, Class);
+                    _picked = true;
+                    Log("ROOM READY " + Code);
+                    if (!string.IsNullOrEmpty(CodeOutPath)) File.WriteAllText(CodeOutPath, Code + "\n");
+                }
+                _room.Update(now);
+                if (_session == null && _room.Members.Count >= Humans && _room.CanStart(out _))
+                {
+                    _session = _room.Start(now, null, Seed);
+                    if (_session != null) Hook(_session);
+                }
+                if (_session == null && _room.Phase == RoomPhase.Closed) { Fail(3, _room.Notice); return Finish(); }
+                if (_session == null && now - _start > LobbySeconds * 1000L)
+                {
+                    Fail(4, $"nobody joined: {_room.Members.Count} of {Humans} in the room after {LobbySeconds} s");
+                    return Finish();
+                }
+            }
+            else
+            {
+                _client.Update(now);
+                if (_client.Phase == RoomPhase.Closed)
+                {
+                    if (_client.Session == null && RelayTransport.IsRetryable(_client.Error) && ++_tries < JoinTries)
+                    {
+                        Log($"ONLINE RETRY {_tries} of {JoinTries - 1}: {_client.Error}");
+                        _t.Close();
+                        _retryAt = now + JoinRetryMs;
+                        return null;
+                    }
+                    Fail(_client.Session == null ? 5 : 3, _client.Error);
+                    return Finish();
+                }
+                if (_session == null && _client.Session != null) { _session = _client.Session; Hook(_session); }
+            }
+            ChatLog();
+            if (_session == null) return null;
+            if (_session.Status == LockstepStatus.Desynced)
+            {
+                Log(_session.SetupMismatch != null ? "ONLINE SETUP MISMATCH " + _session.SetupMismatch : "ONLINE DESYNC at tick " + _session.DesyncTick);
+                ExitCode = 2;
+                return Finish();
+            }
+            if (_session.Status == LockstepStatus.HostLeft) { Fail(3, _session.ClosedReason ?? "the host left"); return Finish(); }
+            if (ChatAt >= 0 && !_chatSent && _session.Stepped >= ChatAt)
+            {
+                _chatSent = true;
+                string why = Chat?.Say(ChatText, ChatScope.All, now);
+                Log("ONLINE CHAT SENT at tick " + _session.Stepped + (why != null ? " refused: " + why : ""));
+            }
+            if (DropAt >= 0 && _session.Stepped >= DropAt)
+            {
+                _dropped = true;
+                Log("ONLINE DROPPED on purpose at tick " + _session.Stepped);
+                (_t as RelayTransport)?.Abort();   // the local relay: simply never heard from again
+                ExitCode = 0;
+                return Finish();
+            }
+            if (_session.Status == LockstepStatus.Ended || (Ticks > 0 && _session.Stepped >= Ticks))
+            {
+                // Keep answering for two seconds so the others get the last bundles and fingerprints.
+                _lingerUntil = now + 2000;
+            }
+            return null;
+        }
+
+        private ChatChannel Chat => _room != null ? _room.Chat : _client?.Chat;
+
+        private void ChatLog()
+        {
+            ChatChannel ch = Chat;
+            if (ch == null) return;
+            IReadOnlyList<ChatLine> lines = ch.Lines;
+            // Lines are kept in a ring of ChatChannel.Keep; log everything new since the last look.
+            int total = ch.Version;
+            int fresh = Math.Min(total - _chatSeen, lines.Count);
+            for (int i = lines.Count - fresh; i < lines.Count; i++)
+                if (i >= 0) Log($"ONLINE CHAT {(lines[i].Scope == ChatScope.System ? "notice" : lines[i].From)}: {lines[i].Text}");
+            _chatSeen = total;
+        }
+
+        private void Hook(LockstepSession s)
+        {
+            s.Sampler = _pilot.Fill;
+            _hashes.Add(new KeyValuePair<int, ulong>(0, s.MyWorldHash0));
+            s.HashRecorded = (tick, h) => _hashes.Add(new KeyValuePair<int, ulong>(tick, h));
+            s.HumanToBot = (slot, actor, tick) => Log($"ONLINE TOBOT slot {slot} actor {actor} at tick {tick}");
+            Log($"ONLINE SETUP peer {_t.LocalPeer} actor {s.LocalActor} humans {s.Setup.Humans.Length} seed {s.Setup.Seed} " +
+                $"config 0x{s.MyConfigHash:X16} world0 0x{s.MyWorldHash0:X16} host config 0x{s.Setup.ConfigHash:X16} host world0 0x{s.Setup.WorldHash0:X16}");
+        }
+
+        private bool Fail(int code, string why)
+        {
+            Log("ONLINE ERROR " + why);
+            ExitCode = code;
+            return false;
+        }
+
+        private int Finish()
+        {
+            if (_session != null)
+                Log($"ONLINE SUMMARY peer {(_t != null ? _t.LocalPeer : -1)} actor {_session.LocalActor} ticks {_session.Stepped} final 0x{StateHash.Of(_session.World):X16} " +
+                    $"lead {_session.Lead} late {_session.LateInputs} stall {_session.StallMs} ms sent {_session.BytesSent} B status {_session.Status} pings {Pings()}");
+            if (!string.IsNullOrEmpty(HashLogPath))
+            {
+                var sb = new StringBuilder();
+                foreach (KeyValuePair<int, ulong> kv in _hashes) sb.Append(kv.Key).Append(' ').Append(kv.Value.ToString("X16")).Append('\n');
+                File.WriteAllText(HashLogPath, sb.ToString());
+            }
+            if (_t != null && !_dropped) { _t.Close(); (_t as RelayTransport)?.WaitClosed(1500); }
+            Log("ONLINE EXIT " + ExitCode);
+            return ExitCode;
+        }
+
+        /// <summary>"peer=ms" for everyone in the room, as the host measured it (round trip through the relay).</summary>
+        private string Pings()
+        {
+            IReadOnlyList<RoomMember> members = _room != null ? (IReadOnlyList<RoomMember>)_room.Members : _client?.Members;
+            if (members == null || members.Count == 0) return "none";
+            var sb = new StringBuilder();
+            foreach (RoomMember m in members) sb.Append(sb.Length > 0 ? "," : "").Append(m.Peer).Append('=').Append(m.PingMs).Append("ms");
+            return sb.ToString();
+        }
+
+        /// <summary>Reads the shared flags (the same names for the console peer and the game player).</summary>
+        public static HeadlessPeer FromArgs(string[] args, string defaultRelay)
+        {
+            var p = new HeadlessPeer { RelayUrl = Environment.GetEnvironmentVariable("CM_RELAY_URL") ?? defaultRelay };
+            for (int i = 0; i < args.Length; i++)
+            {
+                string a = args[i];
+                string next = i + 1 < args.Length ? args[i + 1] : null;
+                switch (a.TrimStart('-').ToLowerInvariant())
+                {
+                    case "onlinehost": case "host": p.Host = true; break;
+                    case "onlinejoin": case "join": p.Code = next; i++; break;
+                    case "onlinecode": case "code": p.Code = next; i++; break;
+                    case "onlinekey": case "key": p.Key = next; i++; break;
+                    case "onlinerelay": case "relay": p.RelayUrl = next; i++; break;
+                    case "onlinename": case "name": p.Name = next; i++; break;
+                    case "onlineteam": case "team": p.Team = (next ?? "").ToLowerInvariant().StartsWith("c") ? TeamId.Crimson : TeamId.Azure; i++; break;
+                    case "onlineclass": case "class":
+                        if (Enum.TryParse(next, true, out ClassId c)) p.Class = c;
+                        i++;
+                        break;
+                    case "onlinehumans": case "humans": int.TryParse(next, out p.Humans); i++; break;
+                    case "onlineticks": case "ticks": int.TryParse(next, out p.Ticks); i++; break;
+                    case "onlineteamsize": case "teamsize": int.TryParse(next, out p.TeamSize); i++; break;
+                    case "onlineseed": case "seed": int.TryParse(next, out p.Seed); i++; break;
+                    case "onlinepace": case "pace": double.TryParse(next, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out p.Pace); i++; break;
+                    case "onlinehashlog": case "hash-log": p.HashLogPath = next; i++; break;
+                    case "onlinecodeout": case "code-out": p.CodeOutPath = next; i++; break;
+                    case "onlinetimeout": case "timeout": int.TryParse(next, out p.TimeoutSeconds); i++; break;
+                    case "onlinelobby": case "lobby": int.TryParse(next, out p.LobbySeconds); i++; break;
+                    case "onlinejointries": case "join-tries": int.TryParse(next, out p.JoinTries); i++; break;
+                    case "onlinechatat": case "chat-at": int.TryParse(next, out p.ChatAt); i++; break;
+                    case "onlinechattext": case "chat-text": p.ChatText = next; i++; break;
+                    case "onlinedropat": case "drop-at": int.TryParse(next, out p.DropAt); i++; break;
+                    case "onlinebuild": case "build": p.Build = next; i++; break;
+                }
+            }
+            return p;
+        }
+    }
+}

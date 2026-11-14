@@ -1,0 +1,15 @@
+{
+  "name": "cm-rooms-relay",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Room relay for Critical Mass online rooms (Cloudflare Worker + Durable Object).",
+  "type": "module",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev",
+    "test": "node --test test/protocol.test.js"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}

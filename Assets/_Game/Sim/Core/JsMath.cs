@@ -37,5 +37,11 @@ namespace CriticalMass.Sim.Core
 
         /// <summary>JS exponential, bit-exact with node v24.11.1 (V8's fdlibm port, U-032).</summary>
         public static double Exp(double x) => Fdlibm.Exp(x);
+
+        /// <summary>
+        /// online-rooms-2: arcsine through fdlibm's e_asin.c (V8's algorithm) in plain IEEE arithmetic, the same bits on every
+        /// CPU. Replaces System.Math.Asin, which is the platform C library and may differ between macOS and Windows.
+        /// </summary>
+        public static double Asin(double x) => Fdlibm.Asin(x);
     }
 }

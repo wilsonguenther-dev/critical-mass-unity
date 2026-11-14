@@ -912,7 +912,7 @@ namespace CriticalMass.Runtime.Menus
             if (_driver == null || _driver.World == null || _input == null || _driver.HumanAutopilot) return;
             if (_driver.GetComponent<TitleScreen>() != null || _input.State.Paused || LoadingScreen.IsOpen || ClassSelect.IsOpen) return;
             CriticalMass.Sim.Core.World w = _driver.World;
-            if (w.Tick < 1 || w.ActorCount < 1 || !w.Actors[0].Alive) return;
+            if (w.Tick < 1 || w.ActorCount < 1 || !w.Actors[LocalSeat.Actor].Alive) return;
             ShowFirstTime();
         }
     }
