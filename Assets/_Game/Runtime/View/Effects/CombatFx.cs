@@ -323,7 +323,7 @@ namespace CriticalMass.Runtime.View.Effects
         {
             _bus?.OnFx(ref e, w);
             if (e.Kind == FxKind.Death && _launch != null && e.A >= 0 && e.A < _launch.Length) PlanLaunch(ref e, w);
-            if ((e.Kind == FxKind.Hit || e.Kind == FxKind.Death || e.Kind == FxKind.Block) && e.A == 0)
+            if ((e.Kind == FxKind.Hit || e.Kind == FxKind.Death || e.Kind == FxKind.Block) && e.A == LocalSeat.Actor)
             {
                 _vignetteAt = e.Tick / w.Config.SimHz;
                 _vignetteAmount = e.Kind == FxKind.Block ? 0.25 : Mathf.Clamp((float)(e.Value / 40.0), 0.3f, 0.95f);
@@ -338,13 +338,13 @@ namespace CriticalMass.Runtime.View.Effects
         private static void ShakeFor(ref FxEvent e, World w)
         {
             if (w.ActorCount == 0 || FeelGate.ShakeScale <= 0f) return;
-            float amount = ShakeAmount(e.Kind, e.A == 0, e.Value, DistanceToLocal(w, e.X, e.Z), w.Config.Kaiju.SlamRadius);
+            float amount = ShakeAmount(e.Kind, e.A == LocalSeat.Actor, e.Value, DistanceToLocal(w, e.X, e.Z), w.Config.Kaiju.SlamRadius);
             if (amount > 0f) CriticalMass.Runtime.Camera.CameraShake.Impulse(amount);
         }
 
         static double DistanceToLocal(World w, double x, double z)
         {
-            double dx = w.X[0] - x, dz = w.Z[0] - z;
+            double dx = w.X[LocalSeat.Actor] - x, dz = w.Z[LocalSeat.Actor] - z;
             return System.Math.Sqrt(dx * dx + dz * dz);
         }
 
@@ -458,7 +458,7 @@ namespace CriticalMass.Runtime.View.Effects
             World w = _driver.World;
             if (w.ActorCount == 0) return;
             double now = SimNow();
-            float tr = _scene.Trauma(now, w.X[0], w.Z[0]);
+            float tr = _scene.Trauma(now, w.X[LocalSeat.Actor], w.Z[LocalSeat.Actor]);
             if (tr <= 0.001f) return;
             // The ACCESS tab's CAMERA SHAKE amount (0..100) scales it; the bare on flag with no amount set is full strength.
             float amount = CriticalMass.Runtime.Menu.SettingsExtras.Shake01;

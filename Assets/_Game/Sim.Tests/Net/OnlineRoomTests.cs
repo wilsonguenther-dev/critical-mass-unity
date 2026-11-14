@@ -82,3 +82,19 @@ namespace CriticalMass.Sim.Tests.Net
         }
     }
 }
+
+namespace CriticalMass.Sim.Tests.Net
+{
+    public sealed class RelayCodeTests
+    {
+        [Test]
+        public void TypedRoomCodesAreCleanedAndJunkIsRefused()
+        {
+            Assert.AreEqual("K7Q2PF", CriticalMass.Net.Relay.RelayTransport.CleanCode(" k7q-2pf "));
+            Assert.IsNull(CriticalMass.Net.Relay.RelayTransport.CleanCode("K7Q2P"));
+            Assert.IsNull(CriticalMass.Net.Relay.RelayTransport.CleanCode("K7Q2P0"), "0 is not in the code alphabet");
+            Assert.IsNull(CriticalMass.Net.Relay.RelayTransport.CleanCode("../../x"));
+            for (int r = 0; r < 12; r++) Assert.IsFalse(string.IsNullOrEmpty(CriticalMass.Net.Relay.RelayTransport.ReasonText(r)));
+        }
+    }
+}

@@ -149,7 +149,7 @@ namespace CriticalMass.Runtime.Game
             bool spectating = SpectatorMode.IsSpectating;
             bool paused = Input != null && Input.State.Paused;
             bool playing = w.Match.Phase == MatchPhase.Playing;
-            bool alive = w.Actors[0].Alive;
+            bool alive = w.Actors[LocalSeat.Actor].Alive;
             bool trial = Onboarding.Trial.IsRunning;
             float now = Time.unscaledTime;
 

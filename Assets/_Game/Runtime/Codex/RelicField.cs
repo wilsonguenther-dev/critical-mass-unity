@@ -77,7 +77,7 @@ namespace CriticalMass.Runtime.Codex
 
         void Collect(World w)
         {
-            const int me = HudBinder.LocalActor;
+            int me = HudBinder.LocalActor;
             if (w.ActorCount <= me || !w.Actors[me].Alive) return;
             double px = w.X[me], pz = w.Z[me], r2 = PickupRadius * PickupRadius;
             for (int i = 0; i < _spots.Length; i++)

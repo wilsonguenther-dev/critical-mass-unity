@@ -196,7 +196,7 @@ namespace CriticalMass.Runtime.View.Reactions
                     if (t > 0f && t < 500f) { Vector3 p = r.GetPoint(t); return new Vector2(p.x, p.z); }
                 }
             }
-            if (w.ActorCount > 0) return new Vector2((float)w.X[0], (float)-w.Z[0]);
+            if (w.ActorCount > 0) return new Vector2((float)w.X[LocalSeat.Actor], (float)-w.Z[LocalSeat.Actor]);
             return Vector2.zero;
         }
 

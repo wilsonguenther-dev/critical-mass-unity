@@ -58,7 +58,7 @@ namespace CriticalMass.Runtime.Spectator
             if (!Menus.MatchSetup.Playable.Contains(cls)) return false;
             if (w != null && w.ActorCount > 0)
             {
-                Actor a = w.Actors[0];
+                Actor a = w.Actors[LocalSeat.Actor];
                 if (a.Cls == cls && a.PendingClass == null && a.Alive)
                 {
                     HasPending = false;
@@ -76,7 +76,7 @@ namespace CriticalMass.Runtime.Spectator
         public static void Tick(SimDriverBehaviour driver, HumanInputSource input)
         {
             if (!HasPending || driver == null || driver.World == null || driver.World.ActorCount <= 0) return;
-            Actor a = driver.World.Actors[0];
+            Actor a = driver.World.Actors[LocalSeat.Actor];
             if (a.Alive)
             {
                 if (a.Cls == _pending && a.PendingClass == null)

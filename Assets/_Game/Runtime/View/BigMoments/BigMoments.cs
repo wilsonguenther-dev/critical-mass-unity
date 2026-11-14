@@ -219,17 +219,17 @@ namespace CriticalMass.Runtime.View.Moments
             var req = new MomentRequest { Id = id, Actor = MomentTriggers.LocalActor, Victim = -1, PlayerOwned = true, Count = 3 };
             if (w != null && w.ActorCount > 0)
             {
-                req.Team = w.Actors[0].Team;
-                req.Cls = w.Actors[0].Cls;
+                req.Team = w.Actors[LocalSeat.Actor].Team;
+                req.Cls = w.Actors[LocalSeat.Actor].Cls;
                 req.Kaiju = w.Kaiju.State == KaijuState.Egg ? KaijuState.Neutral : w.Kaiju.State;
-                req.X = w.X[0];
-                req.Z = w.Z[0];
+                req.X = w.X[LocalSeat.Actor];
+                req.Z = w.Z[LocalSeat.Actor];
                 // a victim for the colour holes: the nearest enemy
                 double best = double.MaxValue;
                 for (int i = 1; i < w.ActorCount; i++)
                 {
                     if (w.Actors[i].Team == req.Team || !w.Actors[i].Alive) continue;
-                    double dx = w.X[i] - w.X[0], dz = w.Z[i] - w.Z[0], d = dx * dx + dz * dz;
+                    double dx = w.X[i] - w.X[LocalSeat.Actor], dz = w.Z[i] - w.Z[LocalSeat.Actor], d = dx * dx + dz * dz;
                     if (d < best) { best = d; req.Victim = i; }
                 }
             }
@@ -820,7 +820,7 @@ namespace CriticalMass.Runtime.View.Moments
             if (cam == null) return;
             // GameHud's death grade wants the opaque copy while the local player is dead: leave it on then
             World w = World;
-            bool dead = w != null && w.ActorCount > 0 && !w.Actors[0].Alive;
+            bool dead = w != null && w.ActorCount > 0 && !w.Actors[LocalSeat.Actor].Alive;
             UnityEngine.Rendering.Universal.CameraExtensions.GetUniversalAdditionalCameraData(cam).requiresColorTexture = dead;
         }
 

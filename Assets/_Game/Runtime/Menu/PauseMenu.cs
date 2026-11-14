@@ -562,7 +562,7 @@ namespace CriticalMass.Runtime.Menu
         public void ShowClassPicker()
         {
             World w = CurrentWorld();
-            TeamId team = w != null && w.ActorCount > 0 ? w.Actors[0].Team : TeamId.Azure;
+            TeamId team = w != null && w.ActorCount > 0 ? w.Actors[LocalSeat.Actor].Team : TeamId.Azure;
             if (ClassSwitch.ExternalPickerAvailable)
             {
                 _external = true;
@@ -643,7 +643,7 @@ namespace CriticalMass.Runtime.Menu
         TeamId OtherTeam()
         {
             World w = CurrentWorld();
-            TeamId mine = w != null && w.ActorCount > 0 ? w.Actors[0].Team : Flow.GameFlow.LastSetup.Team;
+            TeamId mine = w != null && w.ActorCount > 0 ? w.Actors[LocalSeat.Actor].Team : Flow.GameFlow.LastSetup.Team;
             return mine == TeamId.Azure ? TeamId.Crimson : TeamId.Azure;
         }
 

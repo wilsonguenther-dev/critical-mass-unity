@@ -295,7 +295,7 @@ namespace CriticalMass.Runtime.Audio
         {
             if (w == null) return;
             if (!ReferenceEquals(w, _world) || w.EventHead < _cursor) Reset(w);
-            TeamId me = w.ActorCount > 0 ? w.Actors[0].Team : TeamId.Azure;
+            TeamId me = w.ActorCount > 0 ? w.Actors[LocalSeat.Actor].Team : TeamId.Azure;
             MatchState m = w.Match;
             if (!_started)
             {
@@ -332,7 +332,7 @@ namespace CriticalMass.Runtime.Audio
                             _firstKoCalled = true;
                             q.Enqueue(AnnouncerTrigger.FirstKnockOut, now);
                         }
-                        if (e.B == 0 && e.A != 0)
+                        if (e.B == LocalSeat.Actor && e.A != LocalSeat.Actor)
                         {
                             _koCount = simNow - _lastKoAt <= MultiKoWindowSeconds ? _koCount + 1 : 1;
                             _lastKoAt = simNow;

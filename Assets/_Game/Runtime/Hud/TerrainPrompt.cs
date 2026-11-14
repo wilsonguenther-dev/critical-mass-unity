@@ -124,7 +124,7 @@ namespace CriticalMass.Runtime.Hud
         /// </summary>
         public static int StateKey(World w)
         {
-            const int me = 0;
+            int me = LocalSeat.Actor;
             if (w.ActorCount <= me || w.Match.Phase != MatchPhase.Playing) return -1;
             Actor a = w.Actors[me];
             if (!a.Alive) return -1;

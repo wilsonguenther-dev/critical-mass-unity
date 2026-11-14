@@ -71,7 +71,7 @@ namespace CriticalMass.Runtime.Hud
     public static class HudBinder
     {
         /// <summary>The local player's actor id (actor 0 is the human, SimDriverBehaviour / HumanInputSource).</summary>
-        public const int LocalActor = 0;
+        public static int LocalActor => LocalSeat.Actor;   // online-rooms-2: was const 0
 
         public static void Read(World w, int localId, HudState s)
         {

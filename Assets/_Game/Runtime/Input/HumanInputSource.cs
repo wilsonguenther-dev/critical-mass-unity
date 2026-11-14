@@ -243,12 +243,12 @@ namespace CriticalMass.Runtime.Input
                 if (w != null && w.ActorCount > 0)
                 {
                     // A respawn faces the hill (Respawn.cs); the keyboard facing starts again from there.
-                    bool alive = w.Actors[0].Alive;
+                    bool alive = w.Actors[LocalSeat.Actor].Alive;
                     if (alive && !_wasAlive) Aim.ForgetKeysDirection();
                     _wasAlive = alive;
                     State.MoveDirection(out double dx, out double dz);
                     int n = CollectEnemies(w);
-                    Aim.ResolveKeys(dx, dz, w.X[0], w.Z[0], w.Actors[0].Facing, FacingLocked, _enemyX, _enemyZ, n, out double kx, out double kz);
+                    Aim.ResolveKeys(dx, dz, w.X[LocalSeat.Actor], w.Z[LocalSeat.Actor], w.Actors[LocalSeat.Actor].Facing, FacingLocked, _enemyX, _enemyZ, n, out double kx, out double kz);
                     State.SetAim(kx, kz);
                 }
                 else State.ClearAim();
@@ -256,7 +256,7 @@ namespace CriticalMass.Runtime.Input
             }
             if (Aim.Current == AimResolver.Mode.Stick)
             {
-                if (w != null && w.ActorCount > 0 && Aim.ResolveStick(stick.x, stick.y, m.x, m.y, w.X[0], w.Z[0], out double ax, out double az))
+                if (w != null && w.ActorCount > 0 && Aim.ResolveStick(stick.x, stick.y, m.x, m.y, w.X[LocalSeat.Actor], w.Z[LocalSeat.Actor], out double ax, out double az))
                     State.SetAim(ax, az);
                 else State.ClearAim();
                 return;
@@ -279,7 +279,7 @@ namespace CriticalMass.Runtime.Input
                 _enemyX = new double[w.ActorCount];
                 _enemyZ = new double[w.ActorCount];
             }
-            var me = w.Actors[0].Team;
+            var me = w.Actors[LocalSeat.Actor].Team;
             int n = 0;
             for (int i = 1; i < w.ActorCount; i++)
             {
@@ -298,7 +298,7 @@ namespace CriticalMass.Runtime.Input
             Ray ray = cam.ScreenPointToRay(_point.ReadValue<Vector2>());
             // pickHumanAim (humanInput.ts:166): the plane at the ground height of actor 0's cell, not y = 0.
             MapDef map = w != null && w.ActorCount > 0 ? w.Map : null;
-            double hx = map != null ? w.X[0] : 0, hz = map != null ? w.Z[0] : 0;
+            double hx = map != null ? w.X[LocalSeat.Actor] : 0, hz = map != null ? w.Z[LocalSeat.Actor] : 0;
             return GroundHeight.TryAimPoint(ray, map, hx, hz, out sx, out sz);
         }
 

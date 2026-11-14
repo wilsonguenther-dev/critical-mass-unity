@@ -105,8 +105,8 @@ namespace CriticalMass.Runtime.Audio.Sound
             }
             if (w.ActorCount > 0)
             {
-                int meat = w.Actors[0].Alive ? w.Actors[0].CarryMeat : 0;
-                if (_meat >= 0 && meat > _meat) Emit(sink, SoundTable.EdgeCue(SoundEdge.MeatPickup), w, w.X[0], w.Z[0], true, false, 1f, 1f, 0);
+                int meat = w.Actors[LocalSeat.Actor].Alive ? w.Actors[LocalSeat.Actor].CarryMeat : 0;
+                if (_meat >= 0 && meat > _meat) Emit(sink, SoundTable.EdgeCue(SoundEdge.MeatPickup), w, w.X[LocalSeat.Actor], w.Z[LocalSeat.Actor], true, false, 1f, 1f, 0);
                 _meat = meat;
             }
             bool berserk = w.Kaiju != null && w.Kaiju.State == KaijuState.Berserk && w.Match.Phase != MatchPhase.Ended;
@@ -136,7 +136,7 @@ namespace CriticalMass.Runtime.Audio.Sound
         {
             int[] cues = SoundTable.SimCues(ev.Type, out Pick pick);
             if (pick == Pick.Silence || cues.Length == 0) { Silenced++; return; }
-            bool ownA = ev.A == 0;
+            bool ownA = ev.A == LocalSeat.Actor;
             switch (pick)
             {
                 case Pick.Fixed:
@@ -221,7 +221,7 @@ namespace CriticalMass.Runtime.Audio.Sound
 
         private void Fixed(SimEvent ev, World w, ISoundSink sink, int cue)
         {
-            bool ownA = ev.A == 0;
+            bool ownA = ev.A == LocalSeat.Actor;
             switch (ev.Type)
             {
                 case SimEventType.KaijuMeleeWindup:
@@ -246,14 +246,14 @@ namespace CriticalMass.Runtime.Audio.Sound
                     Emit(sink, cue, w, ev.X, ev.Z, ownA, !SameTeam(w, ev.A) && NearPlayer(w, ev.X, ev.Z), 1f, 1f, ev.A);
                     return;
                 case SimEventType.MineTriggered:
-                    Emit(sink, cue, w, ev.X, ev.Z, ownA || ev.B == 0, ownA, 1f, 1f, ev.A);
+                    Emit(sink, cue, w, ev.X, ev.Z, ownA || ev.B == LocalSeat.Actor, ownA, 1f, 1f, ev.A);
                     return;
                 case SimEventType.Heal:
                     // Fountain ticks: only your own (sixteen healing allies would hiss).
                     if (ownA) Emit(sink, cue, w, ev.X, ev.Z, true, false, 1f, 1f, 0);
                     return;
                 case SimEventType.HealLanded:
-                    Emit(sink, cue, w, ev.X, ev.Z, ownA || ev.B == 0, false, ownA ? 1.1f : 0.8f, 1f, ev.A);
+                    Emit(sink, cue, w, ev.X, ev.Z, ownA || ev.B == LocalSeat.Actor, false, ownA ? 1.1f : 0.8f, 1f, ev.A);
                     return;
                 case SimEventType.Gather:
                 case SimEventType.Respawn:
@@ -263,7 +263,7 @@ namespace CriticalMass.Runtime.Audio.Sound
                     Emit(sink, cue, w, ev.X, ev.Z, ownA, false, ownA ? 1f : 0.6f, 1f, ev.A);
                     return;
                 default:
-                    Emit(sink, cue, w, ev.X, ev.Z, ownA || ev.B == 0, false, 1f, 1f, ev.A);
+                    Emit(sink, cue, w, ev.X, ev.Z, ownA || ev.B == LocalSeat.Actor, false, 1f, 1f, ev.A);
                     return;
             }
         }
@@ -272,7 +272,7 @@ namespace CriticalMass.Runtime.Audio.Sound
         {
             int t = ev.A;
             if (t < 0 || t >= w.ActorCount) return;
-            bool own = t == 0 || ev.B == 0;
+            bool own = t == LocalSeat.Actor || ev.B == LocalSeat.Actor;
             bool threat = t == 0;
             byte tier = CombatFeed.TierOf(ev.Value, death);
             if (death)
@@ -310,7 +310,7 @@ namespace CriticalMass.Runtime.Audio.Sound
             int next = ev.A, prev = _hill;
             _hill = next;
             if (w.ActorCount == 0) return;
-            int mine = w.Actors[0].Team == TeamId.Azure ? 1 : 2;
+            int mine = w.Actors[LocalSeat.Actor].Team == TeamId.Azure ? 1 : 2;
             int cue;
             if (next == mine) cue = cues[0];
             else if (next == 3) cue = cues[2];
@@ -331,12 +331,12 @@ namespace CriticalMass.Runtime.Audio.Sound
 
         private static bool Within(World w, double x, double z, double r)
         {
-            if (w.ActorCount == 0 || !w.Actors[0].Alive) return false;
-            double dx = w.X[0] - x, dz = w.Z[0] - z;
+            if (w.ActorCount == 0 || !w.Actors[LocalSeat.Actor].Alive) return false;
+            double dx = w.X[LocalSeat.Actor] - x, dz = w.Z[LocalSeat.Actor] - z;
             return dx * dx + dz * dz <= r * r;
         }
 
-        private static bool SameTeam(World w, int a) => w.ActorCount > 0 && a >= 0 && a < w.ActorCount && w.Actors[a].Team == w.Actors[0].Team;
+        private static bool SameTeam(World w, int a) => w.ActorCount > 0 && a >= 0 && a < w.ActorCount && w.Actors[a].Team == w.Actors[LocalSeat.Actor].Team;
 
         private static int PieceKind(World w, int slot)
         {

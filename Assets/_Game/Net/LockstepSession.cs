@@ -72,6 +72,12 @@ namespace CriticalMass.Net
         /// <summary>Milliseconds this machine waited for the network (stalls).</summary>
         public long StallMs { get; private set; }
         public long BytesSent { get; private set; }
+        /// <summary>The transport's reason when our own connection closed (plain words), else null.</summary>
+        public string ClosedReason { get; private set; }
+        /// <summary>Milliseconds the network has kept this machine waiting right now (0 when ticking): the "waiting for" cue.</summary>
+        public long WaitingMs => _waitingSince >= 0 ? _nowMs - _waitingSince : 0;
+        /// <summary>Interpolation fraction for the view, 0..1, between the last tick and the next.</summary>
+        public double Alpha => _acc <= 0 ? 0 : (_acc >= _tickMs ? 1 : _acc / _tickMs);
 
         /// <summary>The local human's input source (null = neutral frames).</summary>
         public LocalInputSampler Sampler;
@@ -147,6 +153,7 @@ namespace CriticalMass.Net
 
         private long _lastNow = -1;
         private long _nowMs;
+        private long _waitingSince = -1;
         private long _leadUpMs = long.MinValue / 2;
         private double _acc;
         private long _startMs = -1;
@@ -261,7 +268,8 @@ namespace CriticalMass.Net
                     else if (ev.From == Peers.Host && Status == LockstepStatus.Running) Status = LockstepStatus.HostLeft;
                     return;
                 case TransportEventKind.Closed:
-                    if (!IsHost && Status == LockstepStatus.Running) Status = LockstepStatus.HostLeft;
+                    // Our own link is gone: for a client that is the host gone; for the host, everyone is gone.
+                    if (Status == LockstepStatus.Running) { Status = LockstepStatus.HostLeft; ClosedReason = ev.Reason; }
                     return;
                 case TransportEventKind.Data:
                     break;
@@ -469,7 +477,8 @@ namespace CriticalMass.Net
                 StepOne();
                 if (IsHost) Produce(now);
             }
-            if (waited) StallMs += (long)Math.Round(_tickMs);
+            if (waited) { StallMs += (long)Math.Round(_tickMs); if (_waitingSince < 0) _waitingSince = now; }
+            else if (Stepped > 0) _waitingSince = -1;
         }
 
         private void StepOne()

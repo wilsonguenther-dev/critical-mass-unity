@@ -148,6 +148,10 @@ namespace CriticalMass.Net
                         Changed("");
                     }
                     return;
+                case TransportEventKind.Closed:
+                    Phase = RoomPhase.Closed;
+                    Changed(string.IsNullOrEmpty(ev.Reason) ? "The connection to the room was lost." : ev.Reason);
+                    return;
                 case TransportEventKind.PeerLeft:
                     RoomMember gone = Find(ev.From);
                     if (gone != null) { Members.Remove(gone); Changed(gone.Confirmed ? gone.Name + " left the room." : ""); }

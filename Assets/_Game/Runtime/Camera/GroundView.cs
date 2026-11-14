@@ -228,7 +228,7 @@ namespace CriticalMass.Runtime.Camera
             if (!InMatch()) return false;
             World w = Driver.World;
             if (w.Match.Phase == MatchPhase.Ended) return false;
-            return SpectatorMode.IsSpectating || !w.Actors[0].Alive || Driver.HumanAutopilot;
+            return SpectatorMode.IsSpectating || !w.Actors[LocalSeat.Actor].Alive || Driver.HumanAutopilot;
         }
 
         static CameraView ChosenView() => ViewOverride ?? GameSettings.CameraView;
@@ -237,7 +237,7 @@ namespace CriticalMass.Runtime.Camera
         {
             if (!InMatch() || ChosenView() == CameraView.TopDown) return false;
             World w = Driver.World;
-            return w.Match.Phase != MatchPhase.Ended && !SpectatorMode.IsSpectating && (!Driver.HumanAutopilot || ForcePlay) && w.Actors[0].Alive;
+            return w.Match.Phase != MatchPhase.Ended && !SpectatorMode.IsSpectating && (!Driver.HumanAutopilot || ForcePlay) && w.Actors[LocalSeat.Actor].Alive;
         }
 
         GroundViewMode WantMode()
@@ -460,10 +460,10 @@ namespace CriticalMass.Runtime.Camera
             if (GroundDirector.Valid(w, Target)) return Target;
             // Nobody picked yet, or the followed body went down: the killer, then a team-mate, then anyone standing.
             int pick = -1;
-            int killer = w.Actors[0].LastAttacker;
-            if (!w.Actors[0].Alive && killer >= 0 && killer < w.ActorCount && w.Actors[killer].Alive) pick = killer;
+            int killer = w.Actors[LocalSeat.Actor].LastAttacker;
+            if (!w.Actors[LocalSeat.Actor].Alive && killer >= 0 && killer < w.ActorCount && w.Actors[killer].Alive) pick = killer;
             for (int i = 0; i < w.ActorCount && pick < 0; i++)
-                if (w.Actors[i].Alive && w.Actors[i].Team == w.Actors[0].Team) pick = i;
+                if (w.Actors[i].Alive && w.Actors[i].Team == w.Actors[LocalSeat.Actor].Team) pick = i;
             for (int i = 0; i < w.ActorCount && pick < 0; i++)
                 if (w.Actors[i].Alive) pick = i;
             if (pick >= 0) _director.Force(pick);
@@ -536,7 +536,7 @@ namespace CriticalMass.Runtime.Camera
         {
             if (_cam == null) return;
             Ray ray = _cam.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
-            double hx = w.X[0], hz = w.Z[0];
+            double hx = w.X[LocalSeat.Actor], hz = w.Z[LocalSeat.Actor];
             if (GroundHeight.TryAimPoint(ray, w.Map, hx, hz, out double sx, out double sz))
             {
                 double dx = sx - hx, dz = sz - hz;
@@ -553,7 +553,7 @@ namespace CriticalMass.Runtime.Camera
             ax = az = 0;
             GroundView g = Current;
             if (g == null || g.Mode != GroundViewMode.Play || w == null || w.ActorCount <= 0) return false;
-            GroundCamera.AimPoint(w.X[0], w.Z[0], g._follow.Yaw, g._aimDistance, out ax, out az);
+            GroundCamera.AimPoint(w.X[LocalSeat.Actor], w.Z[LocalSeat.Actor], g._follow.Yaw, g._aimDistance, out ax, out az);
             return true;
         }
 
@@ -861,7 +861,7 @@ namespace CriticalMass.Runtime.Camera
             float kx = fw / HudLayout.MinimapSize.x, ky = fh / HudLayout.MinimapSize.y;
             float left = bl.x + HudLayout.MinimapFrame * kx, top = Screen.height - tr.y + HudLayout.MinimapFrame * ky;
             float iw = fw - 2f * HudLayout.MinimapFrame * kx, ih = fh - 2f * HudLayout.MinimapFrame * ky;
-            Vector2 px = proj.ToPixel(w.X[0], w.Z[0]);
+            Vector2 px = proj.ToPixel(w.X[LocalSeat.Actor], w.Z[LocalSeat.Actor]);
             Vector2 at = new Vector2(left + px.x / proj.Width * iw, top + px.y / proj.Height * ih);
             GroundCamera.Basis(_follow.Yaw, out double ux, out double uz, out _, out _);
             Vector2 dir = new Vector2((float)proj.U(ux, uz), (float)proj.V(ux, uz));
@@ -892,7 +892,7 @@ namespace CriticalMass.Runtime.Camera
             World w = Driver != null ? Driver.World : null;
             if (w == null || _cam == null || !TryPlayAim(w, out double ax, out double az)) return;
             double a = Driver.Alpha;
-            double px = w.PrevX[0] + (w.X[0] - w.PrevX[0]) * a, pz = w.PrevZ[0] + (w.Z[0] - w.PrevZ[0]) * a;
+            double px = w.PrevX[LocalSeat.Actor] + (w.X[LocalSeat.Actor] - w.PrevX[LocalSeat.Actor]) * a, pz = w.PrevZ[LocalSeat.Actor] + (w.Z[LocalSeat.Actor] - w.PrevZ[LocalSeat.Actor]) * a;
             const int n = 9;
             for (int k = 2; k <= n; k++)
             {
@@ -922,14 +922,14 @@ namespace CriticalMass.Runtime.Camera
             GUI.DrawTexture(new Rect(c.x - 4 * s, c.y - 4 * s, 8 * s, 8 * s), Dot());
             // Off-screen threat ring: enemies within ThreatRange that the camera cannot see, as team-coloured pointers on a
             // ring around the reticle (behind the player = bottom of the ring).
-            TeamId me = w.Actors[0].Team;
+            TeamId me = w.Actors[LocalSeat.Actor].Team;
             float ring = Screen.height * 0.30f;
             GroundCamera.Basis(_follow.Yaw, out double ux, out double uz, out double rx, out double rz);
             for (int i = 1; i < w.ActorCount; i++)
             {
                 Actor a = w.Actors[i];
                 if (!a.Alive || a.Team == me) continue;
-                double dx = w.X[i] - w.X[0], dz = w.Z[i] - w.Z[0];
+                double dx = w.X[i] - w.X[LocalSeat.Actor], dz = w.Z[i] - w.Z[LocalSeat.Actor];
                 double d2 = dx * dx + dz * dz;
                 if (d2 > ThreatRange * ThreatRange) continue;
                 Vector3 vp = _cam.WorldToViewportPoint(SimSpace.ToWorld(w.X[i], GroundHeight.At(w.Map, w.X[i], w.Z[i]) + 1.0, w.Z[i]));
