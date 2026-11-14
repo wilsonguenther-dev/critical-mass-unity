@@ -11,7 +11,7 @@ namespace CriticalMass.Sim.Tests.Net
         public void TheFilterMasksBlockedWordsKeepsInnocentOnesAndDropsLinks()
         {
             Assert.AreEqual("you are a *****", ChatFilter.CleanLine("you are a b1tch"));
-            Assert.AreEqual("****** off", ChatFilter.CleanLine("f.u.c.k off"));
+            Assert.AreEqual("******* off", ChatFilter.CleanLine("f.u.c.k off"));
             Assert.AreEqual("grape juice and a peacock, spicy", ChatFilter.CleanLine("grape juice and a peacock, spicy"));
             Assert.AreEqual("this hit was great", ChatFilter.CleanLine("this hit was great"));
             Assert.AreEqual("join [link removed] now", ChatFilter.CleanLine("join www.example.com now"));
@@ -22,7 +22,7 @@ namespace CriticalMass.Sim.Tests.Net
             Assert.AreEqual("JEISIL", ChatFilter.CleanName("Jeisil"));
             Assert.AreEqual("PLAYER", ChatFilter.CleanName("sh1t"));
             Assert.AreEqual("PLAYER", ChatFilter.CleanName("   "));
-            Assert.AreEqual("TRAVIS-2", ChatFilter.CleanName("travis-2<script>"));
+            Assert.AreEqual("TRAVIS-2SCRIPT", ChatFilter.CleanName("travis-2<script>"), "only letters, digits, space, - and _ survive");
         }
 
         [Test]

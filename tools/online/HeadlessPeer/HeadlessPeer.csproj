@@ -1,6 +1,6 @@
-<!-- online-rooms-2: the online peer with no Unity and no screen (CriticalMass.Sim + CriticalMass.Net + this Program).
-     dotnet run -c Release -project tools/online/HeadlessPeer -- -host -relay URL -hash-log a.txt -code-out code.txt
-     Runs on any machine or GitHub runner with a .NET 8 SDK; see tools/online/README.md. -->
+<!-- online-rooms-2: the online peer with no Unity and no screen (CriticalMass.Sim plus CriticalMass.Net plus Program.cs).
+     Build: dotnet build tools/online/HeadlessPeer -c Release. Run and flags: see tools/online/README.md.
+     Runs on any machine or GitHub runner with a .NET 8 SDK. -->
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
