@@ -67,7 +67,9 @@ namespace CriticalMass.Runtime.Tests
         [Test]
         public void TheNewClassesUseTheirOwnClipsNotTheFallback()
         {
-            Assert.AreEqual(ArtMapping.Throw, ArtMapping.ClassClips(ClassId.Demolitions).Attack, "TNT throw");
+            // feat/light-weapons-1 (updated on purpose): the attack slot is the pry-bar swing on the shared Attack clip; the
+            // TNT throw keeps Throw through its skill cue.
+            Assert.AreEqual(ArtMapping.Attack, ArtMapping.ClassClips(ClassId.Demolitions).Attack, "pry-bar swing");
             Assert.AreEqual(ArtMapping.PickUp, ArtMapping.ClassClips(ClassId.Demolitions).Ability, "mine plant");
             Assert.AreEqual(ArtMapping.UseItem, ArtMapping.ClassClips(ClassId.Builder).Ability, "build");
             Assert.AreEqual(ArtMapping.Cast, ArtMapping.ClassClips(ClassId.Healer).Attack, "mend");

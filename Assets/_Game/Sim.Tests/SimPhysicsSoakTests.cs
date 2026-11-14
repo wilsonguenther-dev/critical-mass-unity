@@ -219,7 +219,11 @@ namespace CriticalMass.Sim.Tests
         {
             { 0x5C912AEED16BC302UL, 0x2980068FA0457CC2UL }, // Classic (DG-21, unchanged since the browser port)
             { 0x2BE070768E23B442UL, 0x8BCA67D3B8845532UL }, // PhysicsOnly (re-pinned 2026-11-12: U-071; 5v5 re-pinned 2026-11-13: fix/kaiju-alive-1 Kaiju hits stagger, throw at KaijuKnockScale 0.5, topple)
-            { 0xAA728D5DAF5451F4UL, 0xBF82793EEE8C78C8UL }, // Full (re-pinned 2026-11-13 integration batch 7: fix/bridge-holes MapEventsConfig.BridgeCollapse default false (16v16 and 5v5) plus fix/kaiju-alive-1 Kaiju hits stagger, throw at KaijuKnockScale 0.5, topple (5v5); before: 0x70C7D9F992CAC3CC / 0x8F3F947AE72E7815, U-074..U-078)
+            // feat/light-weapons-1 (2026-11-14): this Full row MUST be re-pinned ON PURPOSE in the one combined compile. The light
+            // weapons (DepthConfig.LightWeapons) change every Full match: Demolitions and Healer bots now swing at close range and
+            // every Builder / Demolitions / Healer hit shoves. Classic and PhysicsOnly do not move (depth rules are off there).
+            // Re-pin: copy the "rules-combined golden" Full line this test prints into the two values below.
+            { 0xAA728D5DAF5451F4UL, 0xBF82793EEE8C78C8UL }, // Full (PRE-light-weapons values; re-pinned 2026-11-13 integration batch 7: fix/bridge-holes MapEventsConfig.BridgeCollapse default false (16v16 and 5v5) plus fix/kaiju-alive-1 Kaiju hits stagger, throw at KaijuKnockScale 0.5, topple (5v5); before: 0x70C7D9F992CAC3CC / 0x8F3F947AE72E7815, U-074..U-078)
         };
     }
 }

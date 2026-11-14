@@ -202,7 +202,7 @@ namespace CriticalMass.Runtime.View.Anim
             // feat/skill-effects-1: TNT and Purify reset AnimAction without the cooldowns above, so they played no clip; the
             // skill lane's cue (Throw, Cast, set on the skill's event tick) starts one. Root Seeds' cue swaps Cast for Throw.
             string cue = CriticalMass.Runtime.View.Skills.SkillAnimCues.FreshClip(i, w.Tick);
-            if (!corpse && aa + 1e-9 < _lastAnimAction && (actor.AttackCd > 0 || actor.AbilityCd > 0 || cue != null)) BeginAction(m, actor, cfg, simTime, cue);
+            if (!corpse && aa + 1e-9 < _lastAnimAction && (actor.AttackCd > 0 || actor.AbilityCd > 0 || cue != null)) BeginAction(m, actor, cfg, simTime, cue, w.Tick);
             _lastAnimAction = aa;
 
             // ---- hits
@@ -615,14 +615,21 @@ namespace CriticalMass.Runtime.View.Anim
         string _terraClip;
         double _terraAt;
 
-        void BeginAction(ModelView m, Actor actor, GameConfig cfg, double simTime, string cue = null)
+        void BeginAction(ModelView m, Actor actor, GameConfig cfg, double simTime, string cue = null, int tick = int.MinValue)
         {
             ClassConfig cc = cfg.Class(actor.Cls);
             double aa = actor.AnimAction;
-            bool attack = actor.AttackCd > 0 && Math.Abs(actor.AttackCd + aa - cc.AttackCooldown) < 1e-3;
+            // feat/light-weapons-1: a light-weapon swing sets its own cooldown; the Healer's lantern swing (not her mend) is
+            // the press whose swing started on this action's tick, and plays the shared one-hand Attack clip instead of Cast.
+            LightWeapon lw = LightWeapons.On(cfg) ? LightWeapons.Row(cfg, actor.Cls) : null;
+            bool lightCd = lw != null && actor.AttackCd > 0 && Math.Abs(actor.AttackCd + aa - lw.CooldownSeconds) < 1e-3;
+            bool attack = actor.AttackCd > 0 && Math.Abs(actor.AttackCd + aa - cc.AttackCooldown) < 1e-3 || lightCd;
+            bool lantern = lightCd && actor.Cls == ClassId.Healer && tick != int.MinValue
+                && Math.Abs((tick - actor.SwingTick) / cfg.SimHz - aa) < 1.5 / cfg.SimHz;
             bool ability = actor.AbilityCd > 0 && Math.Abs(actor.AbilityCd + aa - cc.AbilityCooldown) < 1e-3;
             byte kind = attack ? (byte)1 : ability ? (byte)2 : actor.AttackCd > 0 ? (byte)1 : (byte)2;
             string clip = kind == 1 ? AttackTiming.AttackClip(m, actor.Cls) : AttackTiming.AbilityClip(m, actor.Cls);
+            if (lantern && kind == 1 && m.HasClip(ArtMapping.Attack)) clip = ArtMapping.Attack;
             if (clip != null && !m.HasClip(clip)) clip = null;
             // a skill cue (not a melee press this tick) plays its own clip on the ability timing
             if (cue != null && !attack && m.HasClip(cue)) { clip = cue; kind = 2; }

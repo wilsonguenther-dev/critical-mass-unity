@@ -24,10 +24,13 @@ namespace CriticalMass.Sim.Config
         public PingsConfig Pings = new PingsConfig();
         /// <summary>U-068: map events: supply drop, egg exposed, bridge collapse.</summary>
         public MapEventsConfig Events = new MapEventsConfig();
+        /// <summary>feat/light-weapons-1: the Builder's, Demolitions Expert's and Healer's light self-defence weapons.</summary>
+        public LightWeaponsConfig LightWeapons = new LightWeaponsConfig();
 
         public DepthConfig Clone()
         {
             var c = (DepthConfig)MemberwiseClone();
+            c.LightWeapons = LightWeapons.Clone();
             c.Roles = Roles.Clone();
             c.Sources = Sources.Clone();
             c.Stations = Stations.Clone();
@@ -346,6 +349,68 @@ namespace CriticalMass.Sim.Config
             c.ClassMix = (double[])ClassMix.Clone();
             c.SmallTeamClassMix = (double[])SmallTeamClassMix.Clone();
             c.HillSquadStyleRank = (double[])HillSquadStyleRank.Clone();
+            return c;
+        }
+    }
+
+    // =====================================================================================================================
+    // LIGHT WEAPONS (feat/light-weapons-1, 2026-11-14). Art lead's request, approved in principle by the owner: "the
+    // demolishing, healer, and builder all need ... some sort of weapon, nothing too strong like the warrior but something
+    // to defend them." EVERY number of the rule is in this block, for the owner and the mechanics owner to tune.
+    // Reference: the Warrior's Cleave is 22 damage every 0.7 s (about 31 damage per second), 1.7 u reach, 120 degrees.
+    // Recommended (cautious) option: Demolitions about 37% and Healer about 32% of the Warrior's damage per second, shorter
+    // reach, and a small shove that makes space rather than kills. The Builder keeps the swing he already had (the CM-56
+    // miner copy, about 76%); his row only adds the shove. Off (Enabled false, or DepthConfig.Classic) = the game before.
+    // =====================================================================================================================
+
+    /// <summary>One light weapon: a short blunt swing (tool-like, no blade) through the normal melee path.</summary>
+    public sealed class LightWeapon
+    {
+        /// <summary>Damage per hit (before the Might pickup).</summary>
+        public double Damage;
+        /// <summary>Reach from the wielder's centre (u); a target counts when its body edge is inside.</summary>
+        public double Range;
+        /// <summary>Full width of the swing arc (degrees).</summary>
+        public double ArcDeg;
+        /// <summary>Seconds between swings (the attack cooldown; the Healer shares it with her Mend).</summary>
+        public double CooldownSeconds;
+        /// <summary>Wind-up before contact and follow-through after it (real seconds at the pace; 0 with sim physics off).</summary>
+        public double WindupSeconds;
+        public double RecoverySeconds;
+        /// <summary>Push on every hit that lands (u travelled at mass 1; heavier classes move less). With fighter knockback
+        /// on, the normal damage knock counts toward it, so the total push is this, never more.</summary>
+        public double Shove;
+
+        public LightWeapon Clone() => (LightWeapon)MemberwiseClone();
+    }
+
+    /// <summary>feat/light-weapons-1: light self-defence weapons for the three support classes (LightWeapons.cs rules).</summary>
+    public sealed class LightWeaponsConfig
+    {
+        public bool Enabled = true;
+        /// <summary>Builder MALLET: today's swing unchanged (16 every 0.65 s, 1.5 u, 90 degrees), plus the shove.</summary>
+        public LightWeapon Builder = new LightWeapon
+        {
+            Damage = 16, Range = 1.5, ArcDeg = 90, CooldownSeconds = 0.65, WindupSeconds = 0.10, RecoverySeconds = 0.08, Shove = 0.5,
+        };
+        /// <summary>Demolitions PRY BAR (she had no attack): 9 every 0.75 s, 1.3 u, 90 degrees, a slightly slower wind-up.</summary>
+        public LightWeapon Demolitions = new LightWeapon
+        {
+            Damage = 9, Range = 1.3, ArcDeg = 90, CooldownSeconds = 0.75, WindupSeconds = 0.12, RecoverySeconds = 0.10, Shove = 0.5,
+        };
+        /// <summary>Healer LANTERN: 8 every 0.8 s, 1.2 u, 90 degrees, the biggest shove. Her attack press MENDS first; the
+        /// lantern swings only when no hurt ally is in mend range, and it shares her mend cooldown (every swing costs a mend).</summary>
+        public LightWeapon Healer = new LightWeapon
+        {
+            Damage = 8, Range = 1.2, ArcDeg = 90, CooldownSeconds = 0.8, WindupSeconds = 0.12, RecoverySeconds = 0.10, Shove = 0.6,
+        };
+
+        public LightWeaponsConfig Clone()
+        {
+            var c = (LightWeaponsConfig)MemberwiseClone();
+            c.Builder = Builder.Clone();
+            c.Demolitions = Demolitions.Clone();
+            c.Healer = Healer.Clone();
             return c;
         }
     }

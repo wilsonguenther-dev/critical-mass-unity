@@ -95,13 +95,13 @@
       "id": "Demolitions",
       "name": "Demolitions Expert",
       "role": "Rewrites the map.",
-      "bio": "Singed eyebrows, steady hands, and a backpack nobody stands next to. Carries no weapon. Has never needed one.",
+      "bio": "Singed eyebrows, steady hands, and a backpack nobody stands next to. Carries a pry bar for close calls.",
       "difficulty": 3,
       "abilities": [
         {
-          "input": "passive",
-          "name": "No Sword",
-          "text": "No regular attack. The mine and the TNT are your weapons.",
+          "input": "attack",
+          "name": "Pry Bar",
+          "text": "A short, light swing that shoves an enemy back a step. The mine and the TNT are your real weapons.",
           "cooldown": "",
           "needsRule": ""
         },
@@ -155,13 +155,13 @@
       "id": "Healer",
       "name": "Healer",
       "role": "Keeps the line standing.",
-      "bio": "Armour, wings and no sword. She never lands a blow, and the hill stays yours a little longer wherever she stands.",
+      "bio": "Armour, wings and a lantern. She would rather heal than hit, and the hill stays yours a little longer wherever she stands.",
       "difficulty": 2,
       "abilities": [
         {
           "input": "attack",
           "name": "Mend",
-          "text": "Heal the hurt ally nearest your aim within {cfg:mendRange} m for {cfg:mendHeal} health. No damage, ever.",
+          "text": "Heal the hurt ally nearest your aim within {cfg:mendRange} m for {cfg:mendHeal} health. Nobody to mend? Your lantern swings instead.",
           "cooldown": "",
           "needsRule": ""
         },

@@ -198,7 +198,9 @@ namespace CriticalMass.Runtime.View.Art
                 case ClassId.Warrior: return new ClassClipSet(AttackSlice, Block, Blocking, Gather, 1f);
                 case ClassId.Miner: return new ClassClipSet(Attack2HChop, UseItem, null, Attack2HChop, 0.7f);
                 case ClassId.Farmer: return new ClassClipSet(Attack2HSlice, Cast, null, PickUp, 1f);
-                case ClassId.Demolitions: return new ClassClipSet(Throw, PickUp, null, Gather, 1f);
+                // feat/light-weapons-1: her attack is the pry-bar swing on the shared one-hand Attack clip (the TNT throw plays
+                // Throw from its own skill cue, SkillAnimCues; it never used the attack slot's clip).
+                case ClassId.Demolitions: return new ClassClipSet(Attack, PickUp, null, Gather, 1f);
                 case ClassId.Builder: return new ClassClipSet(Attack, UseItem, null, Gather, 1f);
                 case ClassId.Healer: return new ClassClipSet(Cast, UseItem, null, Gather, 1f);
                 default: return new ClassClipSet(Attack, null, null, Gather, 1f);
