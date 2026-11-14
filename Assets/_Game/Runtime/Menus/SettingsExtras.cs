@@ -13,7 +13,7 @@ namespace CriticalMass.Runtime.Menu
     /// DG-30 streamer and accessibility options: hide names, clean HUD (H), subtitles, UI scale 80 to 130 %, reduce
     /// flashing (at most 3 flashes per second) and camera shake 0 to 100 (default 0). Stored in PlayerPrefs like
     /// GameSettings, shown as the ACCESS tab of the settings page (PauseMenu.AddTab, registered before the menu builds).
-    /// Blood on/off already lives on the Game tab (GameSettings.Blood). View side only: nothing here reaches the sim.
+    /// GORE intensity lives on the Game tab and is repeated here (GameSettings.Gore, the same key). View side only: nothing here reaches the sim.
     /// <para>Readers: the HUD scale and the clean HUD are applied here (AccessibilityApplier); names (scoreboard, kill
     /// feed, bot names), subtitles (announcer), flashes and shake are read by the systems that draw them, through the
     /// properties below and FlashLimiter.</para>
@@ -129,6 +129,8 @@ namespace CriticalMass.Runtime.Menu
                 // Big moments (screen takeovers): full, reduced (corner callouts only), off.
                 menu.Stepper(tab, 7, "BIG MOMENTS", () => View.Moments.BigMomentsSettings.Label(View.Moments.BigMomentsSettings.Mode),
                     d => View.Moments.BigMomentsSettings.Mode = View.Moments.BigMomentsSettings.Step(View.Moments.BigMomentsSettings.Mode, d)),
+                // Owner, 2026-11-14: GORE intensity (the Game tab's row, same setting): FULL default, REDUCED, OFF.
+                menu.Stepper(tab, 8, "GORE", () => global::CriticalMass.Runtime.View.Effects.GoreGate.Label(GameSettings.Gore), d => GameSettings.Gore = global::CriticalMass.Runtime.View.Effects.GoreGate.Step(GameSettings.Gore, d)),
             };
             float y = PauseMenu.ContentY + items.Count * (PauseMenu.LineH + PauseMenu.LineGap) + 10f;
             MenuItem reset = MenuUi.Item(tab, "Reset Access", PauseMenu.ContentX, y, 460f, 56f, "RESET THESE OPTIONS",
@@ -140,7 +142,7 @@ namespace CriticalMass.Runtime.Menu
                 menu.SetStatus("Streamer and accessibility options are back to their defaults.", false);
             };
             items.Add(reset);
-            menu.Note(tab, items.Count, "Press " + CleanHudKeyWords + " in a match to hide or show the HUD. Blood is on the Game tab.");
+            menu.Note(tab, items.Count, "Press " + CleanHudKeyWords + " in a match to hide or show the HUD. GORE is also on the Game tab.");
             return items;
         }
 
