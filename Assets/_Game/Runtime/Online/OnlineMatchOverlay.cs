@@ -101,6 +101,16 @@ namespace CriticalMass.Runtime.Online
             if (_panel.activeSelf && Time.unscaledTime - _endedAt > 0.6f && Pressed()) GameFlow.ReturnTo(FlowState.Menu);
         }
 
+        /// <summary>online-rooms-4, -onlineShots only: show the stopped panel (or the waiting strip) without a session.</summary>
+        public void Preview(string title, string body, string waiting = null)
+        {
+            if (_panel == null) return;
+            if (waiting != null) { _panel.SetActive(false); _strip.SetActive(true); HudText.Set(_stripText, waiting); return; }
+            Show(title, body);
+        }
+
+        public void ClearPreview() { if (_panel != null) { _panel.SetActive(false); _strip.SetActive(false); } }
+
         void Show(string title, string body)
         {
             _endedAt = Time.unscaledTime;

@@ -416,7 +416,7 @@ namespace CriticalMass.Runtime.Menu
             _settingsPage.SetActive(false);
             _classPage.SetActive(false);
             _confirmPage.SetActive(false);
-            HudText.Set(_title, "PAUSED");
+            HudText.Set(_title, Online.OnlineMatch.InMatch ? "MENU" : "PAUSED");   // online-rooms-4: an online match never pauses
             RefreshRootLabels();
             Select(_resume);
             UpdateHint();
@@ -868,8 +868,18 @@ namespace CriticalMass.Runtime.Menu
                 labels.Add(_extraDefs[e].Label);
                 acts.Add(() => ShowExtra(k));
             }
-            labels.AddRange(new[] { "RESTART MATCH", "QUIT TO TITLE", "QUIT GAME" });
-            acts.AddRange(new Action[] { RestartMatch, QuitToTitle, QuitGame });
+            // online-rooms-4: online there is no restart (it would start an offline match on this machine only); leaving
+            // hands this seat to a bot for everyone else.
+            if (Online.OnlineMatch.InMatch)
+            {
+                labels.AddRange(new[] { "QUIT TO TITLE", "QUIT GAME" });
+                acts.AddRange(new Action[] { QuitToTitle, QuitGame });
+            }
+            else
+            {
+                labels.AddRange(new[] { "RESTART MATCH", "QUIT TO TITLE", "QUIT GAME" });
+                acts.AddRange(new Action[] { RestartMatch, QuitToTitle, QuitGame });
+            }
             // The list stays centred in one panel: 10 lines at 72 px (PR #35's layout), tighter when extra pages add lines.
             int n = labels.Count;
             float stride = n <= 10 ? 72f : 66f, itemH = n <= 10 ? 62f : 58f;

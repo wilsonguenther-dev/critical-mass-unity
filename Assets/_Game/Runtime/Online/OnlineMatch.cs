@@ -55,7 +55,7 @@ namespace CriticalMass.Runtime.Online
     /// </summary>
     public static class OnlineMatch
     {
-        public static RelayTransport Transport { get; private set; }
+        public static ITransport Transport { get; private set; }
         public static RoomHost Host { get; private set; }
         public static RoomClient Client { get; private set; }
         public static LockstepSession Session { get; private set; }
@@ -70,7 +70,7 @@ namespace CriticalMass.Runtime.Online
         public static long NowMs => Clock.ElapsedMilliseconds;
         static readonly InputFrame Neutral = SimInput.EmptyInput();
 
-        public static void HostRoom(RelayTransport t, string code, string name)
+        public static void HostRoom(ITransport t, string code, string name)
         {
             Leave();
             Transport = t;
@@ -79,7 +79,7 @@ namespace CriticalMass.Runtime.Online
             OnlineRunner.Ensure();
         }
 
-        public static void JoinRoom(RelayTransport t, string code, string name)
+        public static void JoinRoom(ITransport t, string code, string name)
         {
             Leave();
             Transport = t;
@@ -99,6 +99,9 @@ namespace CriticalMass.Runtime.Online
         static int _joinTries;
         static long _retryAt = -1;
 
+        /// <summary>true inside an online match (the pause menu keeps the match running and offers no restart).</summary>
+        public static bool InMatch => Session != null;
+
         /// <summary>true while a join is being asked again (the room screen shows "Connecting" instead of the error).</summary>
         public static bool Retrying => _retryAt >= 0;
         /// <summary>true when the closed join is still going to be asked again on the next update.</summary>
@@ -107,7 +110,7 @@ namespace CriticalMass.Runtime.Online
 
         static void RetryJoin(long now)
         {
-            if (Client == null || Client.Session != null || Client.Phase != RoomPhase.Closed) return;
+            if (Client == null || Client.Session != null || Client.Phase != RoomPhase.Closed || !(Transport is RelayTransport)) return;
             if (_retryAt < 0)
             {
                 if (!RelayTransport.IsRetryable(Client.Error) || _joinTries >= JoinTries) return;
