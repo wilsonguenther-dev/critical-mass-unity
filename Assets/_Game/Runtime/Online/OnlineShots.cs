@@ -108,6 +108,16 @@ namespace CriticalMass.Runtime.Online
             yield return new WaitForSecondsRealtime(1.5f);
             yield return Shoot("lobby-chat", () => OnlineMatch.Host.Chat.Lines.Count >= 4);
 
+            // A full room: 32 people (two table columns), joins and leaves as chat notices.
+            AddFakes(24, code);
+            yield return WaitFor(() => Confirmed() >= 32, 15f);
+            foreach (RoomClient c in _fakes) c.SetReady(true);
+            yield return new WaitForSecondsRealtime(1.5f);
+            screen.CapturePage("room");
+            yield return Shoot("lobby-32-full", () => Confirmed() >= 32);
+            for (int i = _fakes.Count - 1; i >= 8; i--) { _fakeLinks[i].Close(); _fakes.RemoveAt(i); _fakeLinks.RemoveAt(i); }
+            yield return WaitFor(() => Confirmed() == 9, 8f);
+
             // The messages a player can meet, as the screens show them.
             screen.CapturePage("home", "Your game is a different version from the host's (1.0.509 vs 1.0.512). Both of you need the same update.");
             yield return Shoot("message-version-too-old", () => true);
@@ -117,12 +127,13 @@ namespace CriticalMass.Runtime.Online
             yield return Shoot("message-no-such-room", () => true);
             screen.CapturePage("room");
 
-            // The match overlay's strip and panels.
+            // The match overlay's strip and panels (match-only: shown without the room screen, as a player meets them).
+            screen.Hide();
             var overlay = new GameObject("Online Overlay Preview").AddComponent<OnlineMatchOverlay>();
             yield return null;
             overlay.Preview(null, null, "WAITING FOR A SLOW CONNECTION...");
             yield return Shoot("match-waiting-strip", () => true);
-            overlay.Preview("CANNOT START", "This game's match rules differ from the host's (rules 0x2AFB8BC8855D8085, host 0x11C0FFEE11C0FFEE). Both players need the same version.");
+            overlay.Preview("CANNOT START", "Your game's match rules differ from the host's. Both players need the same update.");
             yield return Shoot("match-cannot-start", () => true);
             overlay.Preview("MATCH ENDED", "The host left the match or lost their connection.");
             yield return Shoot("match-host-left", () => true);
@@ -158,7 +169,8 @@ namespace CriticalMass.Runtime.Online
             {
                 int k = _fakes.Count;
                 ITransport link = _relay.Connect(code, null);
-                var c = new RoomClient(link, GameConfig.CreateDefault(), FakeNames[k % FakeNames.Length], OnlineConfig.Build);
+                string fake = FakeNames[k % FakeNames.Length] + (k >= FakeNames.Length ? (k / FakeNames.Length + 1).ToString() : "");
+                var c = new RoomClient(link, GameConfig.CreateDefault(), fake, OnlineConfig.Build);
                 _fakeLinks.Add(link);
                 c.SetPick(k % 2 == 0 ? TeamId.Crimson : TeamId.Azure, ClassIds.All[k % ClassIds.All.Count]);
                 _fakes.Add(c);

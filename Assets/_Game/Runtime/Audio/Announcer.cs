@@ -567,7 +567,8 @@ namespace CriticalMass.Runtime.Audio
                 if (_driver != null) _input = _driver.GetComponent<HumanInputSource>();
             }
             bool paused = _input != null && _input.State.Paused;
-            bool title = _driver != null && _driver.TryGetComponent(out TitleScreen _);
+            // online-rooms-5: the online menus count as the title here: no announcer lines or subtitles over them.
+            bool title = (_driver != null && _driver.TryGetComponent(out TitleScreen _)) || Online.OnlineMenuScreen.AnyOpen;
 
             if (paused && _current != null)
             {
