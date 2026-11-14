@@ -207,7 +207,7 @@ namespace CriticalMass.Sim.Core
         /// <summary>DG-100 (S13): cosine of the arc half-angle widened by asin(min(1, r / d)) for a target of radius r at distance d.</summary>
         public static double WidenedCos(double halfRad, double r, double d)
         {
-            double a = halfRad + Math.Asin(Math.Min(1, r / d));
+            double a = halfRad + JsMath.Asin(Math.Min(1, r / d));
             return a >= Math.PI ? -1 : JsMath.Cos(a);
         }
 

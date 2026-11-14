@@ -1,0 +1,23 @@
+<!-- online-rooms-2: no-Unity compile of CriticalMass.Net (Assets/_Game/Net: lockstep, input codec, room protocol, loopback
+     network), the same way tools/ci/Sim/Sim.csproj compiles the Sim: .NET Standard 2.1, C# 9. Unity never sees this file. -->
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <AssemblyName>CriticalMass.Net</AssemblyName>
+    <RootNamespace>CriticalMass.Net</RootNamespace>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <DefineConstants>$(DefineConstants);$(CmDefines)</DefineConstants>
+    <NoWarn>$(NoWarn);1591;0618</NoWarn>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../../Assets/_Game/Net/**/*.cs" Exclude="../../../Assets/_Game/Net/**/*~/**" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Sim/Sim.csproj" />
+  </ItemGroup>
+</Project>
