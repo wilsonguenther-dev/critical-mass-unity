@@ -64,6 +64,7 @@ namespace CriticalMass.Runtime.Online
 
         void Update()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Upd(this);
             if (_quitting || _peer == null) return;
             int? done;
             try { done = _peer.Step(Clock.ElapsedMilliseconds); }

@@ -78,6 +78,7 @@ namespace CriticalMass.Runtime.Menu
 
         void Update()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Upd(this);
             if (_driver == null) _driver = GetComponent<SimDriverBehaviour>();
             if (_menu == null) _menu = GetComponent<PauseMenu>();
             World w = _driver != null ? _driver.World : null;

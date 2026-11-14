@@ -118,6 +118,7 @@ namespace CriticalMass.Runtime.View.WallDamage
 
         void Update()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Upd(this);
             if (_alive <= 0) return;
             double now = Time.unscaledTimeAsDouble;
             float dt = Mathf.Min(Time.unscaledDeltaTime, 0.05f);

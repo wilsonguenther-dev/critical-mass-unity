@@ -120,6 +120,7 @@ namespace CriticalMass.Runtime.Onboarding
 
         void Update()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Upd(this);
             UpdateScale();
             // A short view-only pop (200 ms).
             _t = Mathf.Min(1f, _t + Time.unscaledDeltaTime / 0.2f);

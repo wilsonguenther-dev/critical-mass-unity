@@ -256,6 +256,7 @@ namespace CriticalMass.Runtime.Hud
     /// [crest] KILLER [attack icon] [crest] VICTIM in team colours (crest shape as well as colour); lines that involve the
     /// local player sit on a Tool Brass plate. Pooled slots, fixed columns, no allocation per line. View only.
     /// </summary>
+    [DefaultExecutionOrder(160)]   // online-offline-cost-1: reads this frame's camera: after CinemachineBrain (100) and CameraShake (150), before GameHud's layout (200)
     public sealed class KillFeed : MonoBehaviour
     {
         public const int Lines = 5;
@@ -352,7 +353,7 @@ namespace CriticalMass.Runtime.Hud
             Subscribe();
         }
 
-        void LateUpdate() { var cost = CriticalMass.Runtime.Game.FrameCost.Enter(); LateUpdateCost(); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.KillFeed, cost); }
+        void LateUpdate() { using var __ab = CriticalMass.Runtime.Game.AllocBy.Late(this); var cost = CriticalMass.Runtime.Game.FrameCost.Enter(); LateUpdateCost(); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.KillFeed, cost); }
 
         void LateUpdateCost()
         {

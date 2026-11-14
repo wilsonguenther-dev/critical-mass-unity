@@ -96,6 +96,7 @@ namespace CriticalMass.Runtime.Codex
 
         void Update()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Upd(this);
             if (!_open) return;
             _age += Time.unscaledDeltaTime;
             Apply();

@@ -123,6 +123,7 @@ namespace CriticalMass.Runtime.Online
 
         void Update()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Upd(this);
             ChatChannel ch = Channel;
             bool show = Visible && ch != null && OnlineMatch.InRoom;
             if (_canvas.enabled != show) _canvas.enabled = show;

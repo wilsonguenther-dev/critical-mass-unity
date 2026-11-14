@@ -146,6 +146,7 @@ namespace CriticalMass.Runtime.Spectator
 
         void Update()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Upd(this);
             if (Driver == null) return;
             World w = Driver.World;
             if (w == null || w.ActorCount <= 0) return;

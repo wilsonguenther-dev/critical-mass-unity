@@ -65,6 +65,7 @@ namespace CriticalMass.Runtime.Progression
 
         void LateUpdate()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Late(this);
             World w = Driver != null ? Driver.World : null;
             if (w == null || w.ActorCount <= LocalActor) return;
             if (w.Epoch != _epoch) BeginMatch(w);

@@ -416,6 +416,7 @@ namespace CriticalMass.Runtime.Menus
 
         void Update()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Upd(this);
             if (!_open && !_closing) return;
             MenuCanvas.UpdateScale(Canvas);
             ControlBindings.Sample();

@@ -97,6 +97,7 @@ namespace CriticalMass.Runtime.Hud
 
         void LateUpdate()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Late(this);
             if (_log == null) Bind(GetComponent<CombatLog>());
             else Subscribe();
             if (CriticalMass.Runtime.Flow.GameFlow.MenuIdle) return;   // batch 4: hidden behind a menu over a backdrop match

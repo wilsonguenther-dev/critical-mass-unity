@@ -221,6 +221,7 @@ namespace CriticalMass.Runtime.Hud
 
         void Update()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Upd(this);
             UpdateScale();
             _t += Time.unscaledDeltaTime;
             Color c = _prompt.color;

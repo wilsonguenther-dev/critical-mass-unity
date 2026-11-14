@@ -13,6 +13,7 @@ namespace CriticalMass.Runtime.Camera
     /// [RS] TO LOOK AROUND" on a controller), shown once ever, ShowAtSimSeconds into the first match, for ShowSimSeconds
     /// or until the player looks. Remembered in PlayerPrefs (<see cref="PrefKey"/>). Fades in and out in 200 ms.
     /// </summary>
+    [DefaultExecutionOrder(160)]   // online-offline-cost-1: reads this frame's camera: after CinemachineBrain (100) and CameraShake (150), before GameHud's layout (200)
     public sealed class LookHint : MonoBehaviour
     {
         public const string PrefKey = "cm.hint.holdToLook";
@@ -112,6 +113,7 @@ namespace CriticalMass.Runtime.Camera
 
         private void LateUpdate()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Late(this);
             if (_done && !_shown) return;
             var w = Driver != null ? Driver.World : null;
             if (w == null) return;

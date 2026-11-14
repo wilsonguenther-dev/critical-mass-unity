@@ -25,6 +25,7 @@ namespace CriticalMass.Runtime.Hud
     /// Read-only on the sim. The text is rebuilt only when what it says changes (no per-frame allocation).
     /// </summary>
     [CriticalMass.Runtime.Flow.GameOverlay(Order = 54, Scope = CriticalMass.Runtime.Flow.OverlayScope.MatchOnly)]
+    [DefaultExecutionOrder(160)]   // online-offline-cost-1: reads this frame's camera: after CinemachineBrain (100) and CameraShake (150), before GameHud's layout (200)
     public sealed class TerrainPrompt : MonoBehaviour
     {
         /// <summary>World units from a pillar's base cell centre inside which the knock-down line shows.</summary>
@@ -103,6 +104,7 @@ namespace CriticalMass.Runtime.Hud
 
         void LateUpdate()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Late(this);
             if (_canvas == null) return;
             bool hudOn = _hud != null && _hud.Canvas != null && _hud.Canvas.enabled;
             if (_canvas.enabled != hudOn) _canvas.enabled = hudOn;

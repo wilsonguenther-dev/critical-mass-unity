@@ -174,6 +174,7 @@ namespace CriticalMass.Runtime.Onboarding
 
         void Update()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Upd(this);
             // A guided match asked for from the menus starts once the new match's world exists.
             if (Trial.PendingStart && GameFlow.State == FlowState.Match)
             {

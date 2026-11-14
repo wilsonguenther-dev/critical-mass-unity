@@ -60,6 +60,7 @@ namespace CriticalMass.Runtime.Camera
 
         void Update()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Upd(this);
             if (_done || View == null || View.Driver == null || View.Driver.World == null) return;
             World w = View.Driver.World;
             if (!_started)

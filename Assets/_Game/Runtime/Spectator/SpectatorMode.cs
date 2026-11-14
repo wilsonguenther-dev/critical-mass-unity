@@ -190,6 +190,7 @@ namespace CriticalMass.Runtime.Spectator
 
         void Update()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Upd(this);
             if (_pendingFromSetup)
             {
                 _pendingFromSetup = false;

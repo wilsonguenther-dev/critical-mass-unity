@@ -91,6 +91,7 @@ namespace CriticalMass.Runtime.Menus
 
         void Update()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Upd(this);
             ControlDevice d = ControlBindings.ActiveDevice;
             if (d != _device && ChipGlyphs != null)
             {

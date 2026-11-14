@@ -114,6 +114,7 @@ namespace CriticalMass.Runtime.View.Anim
         /// <summary>Hide the cargo of actors whose model was not posed this frame (pooled models move between actors).</summary>
         private void LateUpdate()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Late(this);
             if (_slots == null) return;
             int f = Time.frameCount;
             for (int i = 0; i < _slots.Length; i++)

@@ -33,6 +33,7 @@ namespace CriticalMass.Runtime.View.Dressing
     /// thinned by quality and only large pieces cast shadows. A quality change rebuilds the groups once. Still one material
     /// per combined mesh (SRP Batcher), UV5 sway data per vertex as before (LOD meshes keep the source bounds).
     /// </summary>
+    [DefaultExecutionOrder(160)]   // online-offline-cost-1: reads this frame's camera: after CinemachineBrain (100) and CameraShake (150), before GameHud's layout (200)
     public sealed class WorldView : MonoBehaviour
     {
         public const int ChunkSize = 16;
@@ -264,7 +265,7 @@ namespace CriticalMass.Runtime.View.Dressing
             if (_driver == null) _driver = FindAnyObjectByType<SimDriverBehaviour>();
         }
 
-        private void LateUpdate() { var cost = CriticalMass.Runtime.Game.FrameCost.Enter(); LateUpdateCost(); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.World, cost); }
+        private void LateUpdate() { using var __ab = CriticalMass.Runtime.Game.AllocBy.Late(this); var cost = CriticalMass.Runtime.Game.FrameCost.Enter(); LateUpdateCost(); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.World, cost); }
 
         void LateUpdateCost()
         {

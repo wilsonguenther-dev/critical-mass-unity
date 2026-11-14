@@ -50,7 +50,7 @@ namespace CriticalMass.Runtime.Game
         public static readonly string[] AutomationFlags =
         {
             "-autoplay", "-quitaftermatch", "-autoplaymatches", "-autoplayqualities", "-perflog", "-shots", "-simhashout",
-            "-capture", "-soak", "-tracestates", "-debughangseconds", "-automation", "-groundshots", "-followshots", "-smokeshots", "-flowshots", "-onlineshots", "-shottick",
+            "-capture", "-soak", "-tracestates", "-debughangseconds", "-automation", "-groundshots", "-followshots", "-smokeshots", "-flowshots", "-onlineshots", "-allocby", "-shottick",
         };
 
         /// <summary>True when this run must stay hidden: an automation flag is present and -showWindow is not (pure; tests).</summary>
@@ -102,6 +102,7 @@ namespace CriticalMass.Runtime.Game
         {
             void LateUpdate()
             {
+                using var __ab = CriticalMass.Runtime.Game.AllocBy.Late(this);
                 if (AudioListener.volume != _volume) AudioListener.volume = _volume;
                 if (Screen.fullScreenMode != FullScreenMode.Windowed)
                     Screen.SetResolution(Mathf.Max(640, Screen.width), Mathf.Max(360, Screen.height), FullScreenMode.Windowed);

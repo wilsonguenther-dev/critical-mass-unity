@@ -193,6 +193,7 @@ namespace CriticalMass.Runtime.Hud
 
         void LateUpdate()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Late(this);
             if (_log == null) _log = GetComponent<CombatLog>();
             int local = _log != null ? _log.LocalActor : HudBinder.LocalActor;
             World w = _log != null && _log.Driver != null ? _log.Driver.World : null;

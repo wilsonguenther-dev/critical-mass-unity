@@ -108,6 +108,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
 
         void Update()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Upd(this);
             if (!_bound)
             {
                 _bound = true;

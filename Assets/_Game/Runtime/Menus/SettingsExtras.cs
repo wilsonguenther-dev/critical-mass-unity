@@ -222,6 +222,7 @@ namespace CriticalMass.Runtime.Menu
 
         void LateUpdate()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Late(this);
             if (_hud == null) _hud = GetComponent<GameHud>();
             if (_input == null) _input = GetComponent<HumanInputSource>();
             bool title = GetComponent<TitleScreen>() != null;

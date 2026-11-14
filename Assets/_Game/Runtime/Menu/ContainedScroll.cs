@@ -71,6 +71,7 @@ namespace CriticalMass.Runtime.Menu
 
         void LateUpdate()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Late(this);
             EventSystem es = EventSystem.current;
             GameObject sel = es != null ? es.currentSelectedGameObject : null;
             if (sel == _last || Scroll == null || Scroll.content == null) return;

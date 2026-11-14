@@ -535,6 +535,7 @@ namespace CriticalMass.Runtime.Game
 
         void Update()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Upd(this);
             string stop = null;
             lock (CrashLock)
             {
