@@ -182,8 +182,25 @@ try:
     J = {k: Vector(v) for k, v in lmk['joints'].items()}
     for n in lmk['notes']:
         log('landmark:', n)
+    # rig-healer-2: the cloth strip hanging behind her legs is MODELLED down to the floor, so no weighting can keep it off
+    # the ground (healer-5 put it on the hips and it still lay between and behind her feet). Joint-file "_flap_hem"
+    # [half width x, -, hem z]: every vertex of the strip (behind "_flap_y", within the half width, below the hem) is
+    # folded up to end just under the hem, on every level. A short closed fold, no hole.
+    if '_flap_y' in J and '_flap_hem' in J:
+        hx, hy, hz = J['_flap_hem'].x, max(J['_flap_hem'].y, J['_flap_y'].y), J['_flap_hem'].z
+        fold = {}
+        for lv, o in LV.items():
+            A = verts(o)
+            sel = (A[:, 1] > hy) & (np.abs(A[:, 0]) < hx) & (A[:, 2] < hz)
+            A[sel, 2] = hz - (hz - A[sel, 2]) * 0.08
+            o.data.vertices.foreach_set('co', A.reshape(-1)); o.data.update()
+            fold[lv] = int(sel.sum())
+        V = verts(hero)
+        REP['flap_folded_to_hem'] = {'hem_z': round(hz, 3), 'half_width': round(hx, 3), 'behind_y': round(hy, 3), 'vertices': fold,
+                                     'lowest_z_behind': round(float(V[V[:, 1] > J['_flap_y'].y][:, 2].min()), 3)}
+        log('flap folded', REP['flap_folded_to_hem'])
     REP['joints'] = {k: [round(x, 4) for x in v] for k, v in J.items()}
-    REP['hands'] = {s: {k: v for k, v in h.items() if k != 'finger_vids'} for s, h in lmk['hands'].items()}
+    REP['hands'] ={s: {k: v for k, v in h.items() if k != 'finger_vids'} for s, h in lmk['hands'].items()}
     save()
 
     # ------------------------------------------------------------ 2. skeleton from the class's current rig
@@ -384,6 +401,24 @@ try:
         flap = (P[:, 1] > J['_flap_y'].y) & (P[:, 2] < J['hips'].z) & ~locked
         W[flap] = 0; W[flap, bi['hips']] = 1; locked |= flap
         REP['flap_on_hips'] = int(flap.sum())
+    # rig-healer-2: shins and boots hold their volume. Below the knee (and not the strip behind) a leg vertex is rigid
+    # on its side's foot up to just above the ankle, then blends over 8 cm into rigid on the lower leg. Heat weights
+    # had mixed hips, skirt and the other leg into her boots, which thinned and smeared them in the side walk.
+    if J.get('_rigid_shins') is not None:
+        flapz = (P[:, 1] > J['_flap_y'].y) if '_flap_y' in J else np.zeros(nv, bool)
+        shin = {}
+        for s in SIDES:
+            fx = J[f'foot.{s}'].x
+            sel = (np.sign(P[:, 0]) == np.sign(fx)) & (np.abs(P[:, 0]) > 0.03) & \
+                  (P[:, 2] < J[f'lowerleg.{s}'].z - J['_rigid_shins'].z) & ~flapz & ~locked & \
+                  ~((P[:, 2] > J[f'foot.{s}'].z + 0.08) & (P[:, 1] < J['_rigid_shins'].y))   # not the apron's front hem
+            t = np.clip((P[sel, 2] - (J[f'foot.{s}'].z - 0.01)) / 0.08, 0, 1)
+            W[sel] = 0
+            W[sel, bi[f'foot.{s}']] = 1 - t
+            W[sel, bi[f'lowerleg.{s}']] = t
+            locked |= sel
+            shin[s] = int(sel.sum())
+        REP['rigid_shins_boots'] = shin
     # arm weights only near the arm: an A-pose hand hangs beside the belt (the Builder's rope coil, pouches), and the
     # proxy heat let the arm carry them. Arm-chain weight on a vertex farther than ARM_R from its arm's bone chain goes to
     # the torso and legs it already had (or the hips).
