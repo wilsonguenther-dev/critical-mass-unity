@@ -267,7 +267,7 @@ namespace CriticalMass.Runtime.Tests
             foreach (AmbientCreature c in AmbientLayout.Creatures(AmbientBudget.For(High), 112, 72))
             {
                 Assert.LessOrEqual(c.Height, -1.5f, "every creature flies below the island tops");
-                if (c.Kind != 2) Assert.LessOrEqual(c.Height, -6f, "skyrays and loafers far below");
+                if (c.Kind < 2) Assert.LessOrEqual(c.Height, -6f, "skyrays and loafers far below");   // 2 birds, 3 night gliders fly higher, outside the island ring
                 Assert.Greater(Mathf.Abs(c.Speed), 0f);
                 Assert.Less(Mathf.Abs(c.Speed) * Mathf.Max(c.RadiusX, c.RadiusZ), 6f, "slow: under 6 u/s");
             }

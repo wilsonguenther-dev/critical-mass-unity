@@ -56,6 +56,27 @@ namespace CriticalMass.Runtime.Input
             return null;
         }
 
+        /// <summary>
+        /// feat/terrain-affordances: pairs that share a button because their contexts never overlap: on a controller, R3
+        /// opens the base station inside your own station ring (StationPanel) and, everywhere else, holding it shows all
+        /// usable terrain (TerrainAffordanceView ignores the hold while the station panel is open).
+        /// </summary>
+        static readonly string[][] ContextPairs = { new[] { "OpenStation", "ShowTerrain" } };
+
+        /// <summary>True when the two actions share a button by context (ContextPairs).</summary>
+        public static bool ContextShared(string a, string b)
+        {
+            for (int i = 0; i < ContextPairs.Length; i++)
+            {
+                string x = ContextPairs[i][0], y = ContextPairs[i][1];
+                if ((a == x && b == y) || (a == y && b == x)) return true;
+            }
+            return false;
+        }
+
+        /// <summary>One key may serve both actions: never in the same scheme, or never in the same context.</summary>
+        public static bool MayShareKey(string a, string b) => SchemeExclusive(a, b) || ContextShared(a, b);
+
         /// <summary>True when the two actions never act in the same scheme, so one key may serve both.</summary>
         public static bool SchemeExclusive(string a, string b)
         {
@@ -105,9 +126,17 @@ namespace CriticalMass.Runtime.Input
             if (action == null || !ActsIn(action.name, scheme)) return r;
             var bs = action.bindings;
             for (int i = 0; i < bs.Count; i++)
-                if (InScheme(bs[i], scheme) && !string.IsNullOrEmpty(bs[i].effectivePath)) r.Add(bs[i].effectivePath);
+                if (InScheme(bs[i], scheme) && !string.IsNullOrEmpty(bs[i].effectivePath))
+                    r.Add(IsDoubleTap(bs[i]) ? bs[i].effectivePath + DoubleTapSuffix : bs[i].effectivePath);
             return r;
         }
+
+        /// <summary>feat/ground-camera: a double-tap binding (MultiTap) is its own gesture, so it may share a button with a
+        /// press or hold (Camera view: double-tap View; Scoreboard: hold View).</summary>
+        public const string DoubleTapSuffix = " (double tap)";
+
+        public static bool IsDoubleTap(InputBinding b) =>
+            !string.IsNullOrEmpty(b.effectiveInteractions) && b.effectiveInteractions.IndexOf("MultiTap", StringComparison.OrdinalIgnoreCase) >= 0;
 
         /// <summary>Actions of the map with neither a binding nor an Equivalent in the scheme ("Action (scheme)").</summary>
         public static List<string> Missing(InputActionMap map, ControlScheme scheme)
@@ -139,7 +168,7 @@ namespace CriticalMass.Runtime.Input
                 {
                     if (owner.TryGetValue(p, out string o))
                     {
-                        if (o != a.name && !SchemeExclusive(o, a.name)) r.Add(p + ": " + o + " + " + a.name);
+                        if (o != a.name && !MayShareKey(o, a.name)) r.Add(p + ": " + o + " + " + a.name);
                     }
                     else owner[p] = a.name;
                 }

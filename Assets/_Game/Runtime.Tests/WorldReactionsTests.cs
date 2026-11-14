@@ -199,6 +199,9 @@ namespace CriticalMass.Runtime.Tests
                 "Spectator/SpectatorOverlay.cs", "View/BigMoments/MomentTriggers.cs",
                 // integration batch 4: the sound feed (#51) and the mechanics views (#50, #59) decode their own event types
                 "Audio/Sound/SoundFeed.cs", "View/Mechanics/DepthFeed.cs", "View/Mechanics/MechanicsFeed.cs",
+                // feat/terrain-affordances: the structure hit reactions decode their own events (WallBreak, ToppleHit,
+                // Terraform, pieces, barricades, bridge) that carry no WorldForce
+                "View/Affordance/WorldReactionsCore.cs",
             };
             var readers = Directory.GetFiles(root, "*.cs", SearchOption.AllDirectories)
                 .Where(f => Regex.IsMatch(File.ReadAllText(f), @"\.EventHead\b"))

@@ -181,6 +181,13 @@ namespace CriticalMass.Sim.Core
             return k >= 0 && k < m.Length ? m[k] : 1;
         }
 
+        /// <summary>SourceInReach's per-source rules without the reach (terrain-affordances view): charges left, cargo of that kind or none.</summary>
+        public static bool SourceTakes(Actor a, SourceNode s)
+        {
+            if (s.Charges <= 0) return false;
+            return !(a.Carry != CarryKind.None && a.CarryAmount > 0 && a.Carry != CarryOf(s.Kind));
+        }
+
         /// <summary>The source actor id can gather from right now, or -1 (in reach, charges left, cargo of that kind or none, room). Prefers the one it is working.</summary>
         public static int SourceInReach(World w, int id)
         {
@@ -194,8 +201,7 @@ namespace CriticalMass.Sim.Core
             for (int i = 0; i < list.Length; i++)
             {
                 SourceNode s = list[i];
-                if (s.Charges <= 0) continue;
-                if (a.Carry != CarryKind.None && a.CarryAmount > 0 && a.Carry != CarryOf(s.Kind)) continue;
+                if (!SourceTakes(a, s)) continue;
                 double dx = s.X - w.X[id];
                 double dz = s.Z - w.Z[id];
                 double d2 = dx * dx + dz * dz;

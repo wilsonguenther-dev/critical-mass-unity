@@ -233,6 +233,8 @@ namespace CriticalMass.Runtime.Hud
         // ---------------------------------------------------------------- 02 KAIJU
 
         const int MeterSegments = 8;
+        /// <summary>hud-art-1: the egg badge shows the cracking egg in the last seconds before the hatch.</summary>
+        public const double CrackSeconds = 30.0;
         const int RagePips = 5;
         HudIcon _kaijuHead;
         VectorShape _eggFrame;
@@ -673,6 +675,16 @@ namespace CriticalMass.Runtime.Hud
         static string HillWord(HillState h) =>
             h == HillState.Azure ? "AZURE HOLDS" : h == HillState.Crimson ? "CRIMSON HOLDS" : h == HillState.Contested ? "CONTESTED" : "NEUTRAL";
 
+        static readonly Color[] RageColour = BuildRageColours();
+
+        static Color[] BuildRageColours()
+        {
+            var a = new Color[RagePips];
+            Color hot = CMTokens.ParseHex(CriticalMass.Runtime.View.Art.ArtMapping.GlowBerserk);
+            for (int i = 0; i < RagePips; i++) a[i] = Color.Lerp(CMTokens.Meat.Color, hot, i / (float)(RagePips - 1));
+            return a;
+        }
+
         static readonly string[] HatchWords = BuildHatchWords();
 
         static string[] BuildHatchWords()
@@ -693,7 +705,8 @@ namespace CriticalMass.Runtime.Hud
             for (int i = 0; i < MeterSegments; i++) _segments[i].SetFill(i < lit ? litColour : Empty);
             HudText.Set(_kaijuNumber, NumberCache.Int(Mathf.RoundToInt(s.KaijuMeter01 * 100f)));
             int rage = Mathf.FloorToInt(s.Instability01 * RagePips + 1e-4f);
-            for (int i = 0; i < RagePips; i++) _rage[i].SetFill(i < rage ? CMTokens.Meat.Color : Empty);
+            // hud-art-1: the rage pips heat from meat orange toward the berserk magenta as the egg nears berserk
+            for (int i = 0; i < RagePips; i++) _rage[i].SetFill(i < rage ? RageColour[i] : Empty);
             string word = egg ? HatchWords[Math.Min(600, (int)Math.Ceiling(s.UntilHatch - 1e-6))] :
                 s.Kaiju == KaijuState.Azure ? "AZURE" : s.Kaiju == KaijuState.Crimson ? "CRIMSON" :
                 s.Kaiju == KaijuState.Berserk ? "BERSERK" : "NEUTRAL";
@@ -704,7 +717,7 @@ namespace CriticalMass.Runtime.Hud
         /// <summary>Egg before the hatch; the wild (neutral) Kaiju is the hatchling of bible p10; once a team turns it
         /// (or it goes berserk) the adult head in that state's colours (p10 azure / crimson / berserk adult).</summary>
         static string KaijuIcon(HudState s, bool egg) =>
-            egg ? UiIcons.Egg : s.Kaiju == KaijuState.Azure ? UiIcons.Adult[1] : s.Kaiju == KaijuState.Crimson ? UiIcons.Adult[2] :
+            egg ? (s.UntilHatch <= CrackSeconds ? UiIcons.EggCracking : UiIcons.Egg) : s.Kaiju == KaijuState.Azure ? UiIcons.Adult[1] : s.Kaiju == KaijuState.Crimson ? UiIcons.Adult[2] :
             s.Kaiju == KaijuState.Berserk ? UiIcons.Adult[3] : UiIcons.Hatchling;
 
         static Color KaijuColour(KaijuState k) =>

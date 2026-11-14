@@ -79,7 +79,7 @@ namespace CriticalMass.Runtime.Input
         public static readonly string[] PlayerActions =
         {
             "Move", "Aim", "Point", "Attack", "Ability", "Jump", "Interact", "DigPlace", "SwitchDigPlace", "Scoreboard", "Pause",
-            "Map", "Ping", "HudCursor", "MinimapZoom", "LockFacing",
+            "Map", "Ping", "HudCursor", "MinimapZoom", "LockFacing", "ShowTerrain",
         };
 
         /// <summary>Abbreviations the owner could not read; no user-facing string may contain them as a word.</summary>
@@ -241,6 +241,7 @@ namespace CriticalMass.Runtime.Input
                 case "HudCursor": return pad ? "<Gamepad>/dpad/down" : "<Keyboard>/leftAlt";
                 case "MinimapZoom": return pad ? "<Gamepad>/dpad/right" : "<Keyboard>/n";
                 case "LockFacing": return pad ? "<Gamepad>/rightStick" : "<Keyboard>/l";
+                case "ShowTerrain": return pad ? "<Gamepad>/rightStickPress" : "<Keyboard>/q";
             }
             return null;
         }

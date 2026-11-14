@@ -124,6 +124,9 @@ namespace CriticalMass.Runtime.Input
             new ControlRow("Switch dig / place", new[] { new RebindSlot("SwitchDigPlace", K, 0, rebindable: false, column: SlotColumn.Mouse),
                     new RebindSlot("SwitchDigPlace", K, 1, column: SlotColumn.Wasd), new RebindSlot("SwitchDigPlace", K, 2, column: SlotColumn.Arrows) },
                 new[] { new RebindSlot("SwitchDigPlace", G, 0, "Shoulders", "negative"), new RebindSlot("SwitchDigPlace", G, 0, "Shoulders", "positive") }),
+            // feat/terrain-affordances: hold to show everything your class can use nearby (Q, or O by J K L; R3 outside the base ring).
+            new ControlRow("Show usable terrain (hold)", new[] { new RebindSlot("ShowTerrain", K, 0, column: SlotColumn.Mouse), new RebindSlot("ShowTerrain", K, 1, column: SlotColumn.Wasd) },
+                new[] { new RebindSlot("ShowTerrain", G) }),
             new ControlRow("Scoreboard", new[] { new RebindSlot("Scoreboard", K) }, new[] { new RebindSlot("Scoreboard", G) }),
             new ControlRow("Full map", new[] { new RebindSlot("Map", K) }, new[] { new RebindSlot("Map", G) }),
             new ControlRow("Ping wheel", new[] { new RebindSlot("Ping", K), new RebindSlot("Ping", K, 1, column: SlotColumn.Mouse) }, new[] { new RebindSlot("Ping", G) }),
@@ -135,6 +138,8 @@ namespace CriticalMass.Runtime.Input
             new ControlRow("Emote wheel", new[] { new RebindSlot("Emote", K) }, new[] { new RebindSlot("Emote", G) }),
             new ControlRow("HUD cursor", new[] { new RebindSlot("HudCursor", K) }, new[] { new RebindSlot("HudCursor", G) }),
             new ControlRow("Minimap zoom", new[] { new RebindSlot("MinimapZoom", K) }, new[] { new RebindSlot("MinimapZoom", G) }),
+            // feat/ground-camera: high view / ground view (F5, double-tap View); playing, it flips Settings, Game, CAMERA.
+            new ControlRow("Camera view", new[] { new RebindSlot("CameraView", K) }, new[] { new RebindSlot("CameraView", G) }),
             new ControlRow("Pause menu", new[] { new RebindSlot("Pause", K) }, new[] { new RebindSlot("Pause", G) }),
         };
 
@@ -278,7 +283,9 @@ namespace CriticalMass.Runtime.Input
         public static string Display(InputAction action, int bindingIndex)
         {
             if (action == null || bindingIndex < 0 || bindingIndex >= action.bindings.Count) return "-";
-            return DisplayPath(action.bindings[bindingIndex].effectivePath);
+            InputBinding b = action.bindings[bindingIndex];
+            string text = DisplayPath(b.effectivePath);
+            return ControlSchemes.IsDoubleTap(b) ? "DOUBLE-TAP " + text : text;
         }
 
         /// <summary>The prompt text of an action on a device: its first binding in that device's group (HUD prompts).</summary>
@@ -374,9 +381,11 @@ namespace CriticalMass.Runtime.Input
                     if (other == action && i == bindingIndex) continue;
                     if (bs[i].isComposite) continue;
                     if (!string.Equals(bs[i].effectivePath, path, StringComparison.OrdinalIgnoreCase)) continue;
+                    // feat/ground-camera: a double tap and a press or hold of one button are different gestures.
+                    if (ControlSchemes.IsDoubleTap(bs[i]) != ControlSchemes.IsDoubleTap(me)) continue;
                     // controls-1: a pair that never shares a scheme (lock facing is keyboard-only play, walk to pointer
                     // needs the mouse) may share a key; HumanInputSource lets exactly one of them act (ControlSchemes).
-                    if (ControlSchemes.SchemeExclusive(action.name, other.name)) continue;
+                    if (ControlSchemes.MayShareKey(action.name, other.name)) continue;
                     bool shared = false;
                     for (int g = 0; g < myGroups.Length && !shared; g++) shared = InGroup(bs[i], myGroups[g]);
                     if (!shared) continue;

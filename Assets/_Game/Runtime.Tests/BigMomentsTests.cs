@@ -51,8 +51,13 @@ namespace CriticalMass.Runtime.Tests
                 Assert.IsNotNull(r, id.ToString());
                 Assert.IsFalse(string.IsNullOrEmpty(r.Title), id + " title");
                 float s = MomentQueue.TakeoverSeconds(r, false), sp = MomentQueue.TakeoverSeconds(r, true);
-                Assert.That(s, Is.InRange(0.6f, 1.4f), id + " takeover length");
-                Assert.That(sp, Is.InRange(0.6f, 1.4f), id + " shortened length");
+                Assert.That(s, Is.InRange(1.0f, 2.2f), id + " takeover length");
+                Assert.That(sp, Is.InRange(1.0f, 2.2f), id + " shortened length");
+                // hud-art-1: long enough to read; major moments 2.0..2.2 s, class cards and streaks 1.6..1.8 s
+                bool major = id == MomentId.Hatch || id == MomentId.Berserk || id == MomentId.AllegianceTurns || id == MomentId.Turnaround ||
+                             id == MomentId.AtTheWire || id == MomentId.Finisher;
+                if (r.Scale == MomentScale.Takeover)
+                    Assert.That(r.Seconds, major ? Is.InRange(MomentQueue.MajorMin, MomentQueue.MajorMax) : Is.InRange(MomentQueue.CardMin, MomentQueue.CardMax), id + " reading time");
                 Assert.LessOrEqual(sp, s);
             }
             Assert.AreEqual(18, MomentRecipes.Gallery().Length);   // batch 3: BLAST RADIUS and LIFELINE
@@ -130,7 +135,7 @@ namespace CriticalMass.Runtime.Tests
             Assert.AreEqual(OfferResult.Queued, q.Offer(Req(MomentId.BatteringRam, true), 30, BigMomentsMode.Full, true));
             q.Update(30, false);
             Assert.IsTrue(q.Current.Shortened);
-            Assert.AreEqual(Mathf.Clamp(1.0f * MomentQueue.PlayerShorten, 0.6f, 1.4f), q.Current.Seconds, 1e-4f);
+            Assert.AreEqual(Mathf.Clamp(MomentRecipes.Get(MomentId.BatteringRam).Seconds * MomentQueue.PlayerShorten, MomentQueue.MinSeconds, MomentQueue.MaxSeconds), q.Current.Seconds, 1e-4f);
         }
 
         [Test]

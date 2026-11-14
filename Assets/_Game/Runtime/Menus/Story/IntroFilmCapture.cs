@@ -4,6 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Text;
 using UnityEngine;
+using UnityEngine.Video;
 
 namespace CriticalMass.Runtime.Menus.Story
 {
@@ -68,6 +69,7 @@ namespace CriticalMass.Runtime.Menus.Story
             float start = -1f, end = -1f, wait = 0f;
             int idx = 0;
             bool skipped = false;
+            int probed = 0;
             string lastMode = "";
             while (true)
             {
@@ -104,7 +106,7 @@ namespace CriticalMass.Runtime.Menus.Story
                     Texture2D tex = ScreenCapture.CaptureScreenshotAsTexture();
                     File.WriteAllBytes(Path.Combine(_dir, "shot-" + idx.ToString("000") + ".jpg"), tex.EncodeToJPG(88));
                     Destroy(tex);
-                    log.AppendLine(Row(idx, start, mode, rec, ""));
+                    log.AppendLine(Row(idx, start, mode, rec, SoundProbe((float)StoryIntro.FilmClock, ref probed)));
                     idx++;
                 }
                 if (end < 0f && mode == "none" && el > 1f) { end = el; log.AppendLine(Row(-1, start, mode, rec, "intro ended")); }
@@ -119,6 +121,43 @@ namespace CriticalMass.Runtime.Menus.Story
             }
             Debug.Log("[intro capture] wrote " + idx + " shots to " + _dir);
             Application.Quit(0);
+        }
+
+        static readonly float[] _probeBuf = new float[2048];
+
+        /// <summary>batch 7 sound proof (the listener tap above can land on CM Audio's first AudioSource instead of the
+        /// listener, and then records that source's silence): main-thread samples of the real mix
+        /// (AudioListener.GetOutputData, both channels) and of the film's own AudioSource, as RMS in the event column
+        /// ("snd L=.. F=.."); at film clock 5, 20 and 40 s the same plus the film source's state go to Player.log.</summary>
+        static string SoundProbe(float clock, ref int probed)
+        {
+            float l = 0f, f = 0f;
+            AudioListener.GetOutputData(_probeBuf, 0); l = Mathf.Max(l, Rms(_probeBuf));
+            AudioListener.GetOutputData(_probeBuf, 1); l = Mathf.Max(l, Rms(_probeBuf));
+            AudioSource src = null;
+            foreach (VideoPlayer vp in FindObjectsByType<VideoPlayer>(FindObjectsSortMode.None))
+            {
+                src = vp.GetTargetAudioSource(0);
+                if (src != null) break;
+            }
+            if (src != null) { src.GetOutputData(_probeBuf, 0); f = Rms(_probeBuf); }
+            float[] marks = { 5f, 20f, 40f };
+            if (probed < marks.Length && clock >= marks[probed])
+            {
+                probed++;
+                Debug.Log(string.Format(CultureInfo.InvariantCulture,
+                    "[intro capture] sound at film {0:F1} s: mix rms {1:F4}, film source rms {2:F4}, source playing {3}, volume {4:F2}, mute {5}, group {6}, listener volume {7:F2}, listener paused {8}",
+                    clock, l, f, src != null && src.isPlaying, src != null ? src.volume : -1f, src != null && src.mute,
+                    src != null && src.outputAudioMixerGroup != null ? src.outputAudioMixerGroup.name : "none", AudioListener.volume, AudioListener.pause));
+            }
+            return string.Format(CultureInfo.InvariantCulture, "snd L={0:F4} F={1:F4}", l, f);
+        }
+
+        static float Rms(float[] b)
+        {
+            double sum = 0;
+            for (int i = 0; i < b.Length; i++) sum += b[i] * b[i];
+            return (float)Math.Sqrt(sum / b.Length);
         }
 
         static string Row(int idx, float start, string mode, IntroFilmAudioTap rec, string ev)

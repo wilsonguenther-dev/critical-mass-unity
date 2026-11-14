@@ -51,7 +51,7 @@ namespace CriticalMass.Runtime.View.Moments
 
     /// <summary>
     /// One big moment as data (a plain table, no asset needed; the integrator can retune numbers here). Seconds is the
-    /// takeover length before the 0.6..1.4 s clamp; the stinger length is fixed (MomentQueue.StingerSeconds).
+    /// takeover length before the 1.0..2.2 s clamp; the stinger length is fixed (MomentQueue.StingerSeconds).
     /// </summary>
     public sealed class MomentRecipe
     {
@@ -111,26 +111,26 @@ namespace CriticalMass.Runtime.View.Moments
                     Plate = plate, Art = art, FreezeSeconds = freeze, IgnoresGap = gap, PreemptsBanner = preempt, NeverStale = never,
                 };
             }
-            Add(MomentId.OpeningStrike, "OPENING STRIKE", MomentScale.Takeover, 40, 1.1f, 9999f, Impact, BandStyle.Diagonal, PlateKind.Takeover, MomentArtKind.Actor, 0.1f);
-            Add(MomentId.TwoDown, "TWO DOWN", MomentScale.Stinger, 20, 1.2f, 6f, Corner, BandStyle.Horizontal, PlateKind.Stinger, MomentArtKind.Actor);
-            Add(MomentId.ThreeDown, "THREE DOWN", MomentScale.Stinger, 22, 1.2f, 6f, Corner, BandStyle.Horizontal, PlateKind.Stinger, MomentArtKind.Actor);
-            Add(MomentId.Wildfire, "WILDFIRE", MomentScale.Stinger, 24, 1.2f, 20f, Corner, BandStyle.Horizontal, PlateKind.Stinger, MomentArtKind.Actor);
-            Add(MomentId.HillCleared, "HILL CLEARED", MomentScale.Takeover, 55, 1.1f, 45f, Impact, BandStyle.Diagonal, PlateKind.Takeover, MomentArtKind.Actor, 0.1f);
-            Add(MomentId.BatteringRam, "BATTERING RAM", MomentScale.Takeover, 45, 1.0f, 30f, Impact, BandStyle.Diagonal, PlateKind.Takeover, MomentArtKind.Actor, 0.12f);
-            Add(MomentId.Overcharged, "OVERCHARGED", MomentScale.Takeover, 35, 1.0f, 40f,
+            Add(MomentId.OpeningStrike, "OPENING STRIKE", MomentScale.Takeover, 40, 1.6f, 9999f, Impact, BandStyle.Diagonal, PlateKind.Takeover, MomentArtKind.Actor, 0.1f);
+            Add(MomentId.TwoDown, "TWO DOWN", MomentScale.Stinger, 20, 1.6f, 6f, Corner, BandStyle.Horizontal, PlateKind.Stinger, MomentArtKind.Actor);
+            Add(MomentId.ThreeDown, "THREE DOWN", MomentScale.Stinger, 22, 1.6f, 6f, Corner, BandStyle.Horizontal, PlateKind.Stinger, MomentArtKind.Actor);
+            Add(MomentId.Wildfire, "WILDFIRE", MomentScale.Stinger, 24, 1.6f, 20f, Corner, BandStyle.Horizontal, PlateKind.Stinger, MomentArtKind.Actor);
+            Add(MomentId.HillCleared, "HILL CLEARED", MomentScale.Takeover, 55, 1.8f, 45f, Impact, BandStyle.Diagonal, PlateKind.Takeover, MomentArtKind.Actor, 0.1f);
+            Add(MomentId.BatteringRam, "BATTERING RAM", MomentScale.Takeover, 45, 1.6f, 30f, Impact, BandStyle.Diagonal, PlateKind.Takeover, MomentArtKind.Actor, 0.12f);
+            Add(MomentId.Overcharged, "OVERCHARGED", MomentScale.Takeover, 35, 1.6f, 40f,
                 MomentLayers.Band | MomentLayers.Portrait | MomentLayers.Title | MomentLayers.Aura | MomentLayers.EdgeGlow | MomentLayers.Burst,
                 BandStyle.Horizontal, PlateKind.Takeover, MomentArtKind.Actor);
-            Add(MomentId.Hatch, "IT HATCHES", MomentScale.Takeover, 90, 1.4f, 9999f, KaijuL | MomentLayers.Burst, BandStyle.Horizontal, PlateKind.Kaiju, MomentArtKind.Kaiju, 0f, true, true, true);
-            Add(MomentId.AllegianceTurns, "ALLEGIANCE TURNS", MomentScale.Takeover, 75, 1.2f, 25f, KaijuL, BandStyle.Diagonal, PlateKind.Kaiju, MomentArtKind.Kaiju, 0f, false, true);
-            Add(MomentId.Berserk, "BERSERK", MomentScale.Takeover, 85, 1.3f, 60f, KaijuL | MomentLayers.Invert, BandStyle.Diagonal, PlateKind.Kaiju, MomentArtKind.Kaiju, 0f, true, true);
-            Add(MomentId.Quake, "QUAKE", MomentScale.Takeover, 65, 1.0f, 30f, KaijuL | MomentLayers.Freeze | MomentLayers.Grade, BandStyle.Diagonal, PlateKind.Kaiju, MomentArtKind.Kaiju, 0.12f);
-            Add(MomentId.KaijuDown, "KAIJU DOWN", MomentScale.Takeover, 60, 1.1f, 30f, Impact, BandStyle.Diagonal, PlateKind.Kaiju, MomentArtKind.Actor, 0.1f, false, true);
-            Add(MomentId.Turnaround, "TURNAROUND", MomentScale.Takeover, 98, 1.4f, 9999f, Hero | MomentLayers.EndFrame | MomentLayers.EdgeGlow, BandStyle.Horizontal, PlateKind.Finisher, MomentArtKind.Team, 0f, true, true, true);
-            Add(MomentId.AtTheWire, "AT THE WIRE", MomentScale.Takeover, 99, 1.4f, 9999f, Hero | MomentLayers.EndFrame | MomentLayers.EdgeGlow | MomentLayers.Invert, BandStyle.Horizontal, PlateKind.Finisher, MomentArtKind.Team, 0f, true, true, true);
-            Add(MomentId.MatchPoint, "MATCH POINT", MomentScale.Takeover, 70, 1.2f, 9999f, MomentLayers.Band | MomentLayers.Title | MomentLayers.SpeedLines | MomentLayers.EdgeGlow, BandStyle.Horizontal, PlateKind.Finisher, MomentArtKind.Team, 0f, true, false);
-            Add(MomentId.BlastRadius, "BLAST RADIUS", MomentScale.Takeover, 50, 1.0f, 30f, Impact, BandStyle.Diagonal, PlateKind.Takeover, MomentArtKind.Actor, 0.12f);
-            Add(MomentId.Lifeline, "LIFELINE", MomentScale.Stinger, 21, 1.2f, 15f, Corner, BandStyle.Horizontal, PlateKind.Stinger, MomentArtKind.Actor);
-            Add(MomentId.Finisher, "HILL TAKEN", MomentScale.Takeover, 97, 1.4f, 9999f, Hero | MomentLayers.EndFrame | MomentLayers.EdgeGlow, BandStyle.Horizontal, PlateKind.Finisher, MomentArtKind.Team, 0f, true, true, true);
+            Add(MomentId.Hatch, "IT HATCHES", MomentScale.Takeover, 90, 2.2f, 9999f, KaijuL | MomentLayers.Burst, BandStyle.Horizontal, PlateKind.Kaiju, MomentArtKind.Kaiju, 0f, true, true, true);
+            Add(MomentId.AllegianceTurns, "ALLEGIANCE TURNS", MomentScale.Takeover, 75, 2.0f, 25f, KaijuL, BandStyle.Diagonal, PlateKind.Kaiju, MomentArtKind.Kaiju, 0f, false, true);
+            Add(MomentId.Berserk, "BERSERK", MomentScale.Takeover, 85, 2.2f, 60f, KaijuL | MomentLayers.Invert, BandStyle.Diagonal, PlateKind.Kaiju, MomentArtKind.Kaiju, 0f, true, true);
+            Add(MomentId.Quake, "QUAKE", MomentScale.Takeover, 65, 1.6f, 30f, KaijuL | MomentLayers.Freeze | MomentLayers.Grade, BandStyle.Diagonal, PlateKind.Kaiju, MomentArtKind.Kaiju, 0.12f);
+            Add(MomentId.KaijuDown, "KAIJU DOWN", MomentScale.Takeover, 60, 1.8f, 30f, Impact, BandStyle.Diagonal, PlateKind.Kaiju, MomentArtKind.Actor, 0.1f, false, true);
+            Add(MomentId.Turnaround, "TURNAROUND", MomentScale.Takeover, 98, 2.2f, 9999f, Hero | MomentLayers.EndFrame | MomentLayers.EdgeGlow, BandStyle.Horizontal, PlateKind.Finisher, MomentArtKind.Team, 0f, true, true, true);
+            Add(MomentId.AtTheWire, "AT THE WIRE", MomentScale.Takeover, 99, 2.2f, 9999f, Hero | MomentLayers.EndFrame | MomentLayers.EdgeGlow | MomentLayers.Invert, BandStyle.Horizontal, PlateKind.Finisher, MomentArtKind.Team, 0f, true, true, true);
+            Add(MomentId.MatchPoint, "MATCH POINT", MomentScale.Takeover, 70, 1.8f, 9999f, MomentLayers.Band | MomentLayers.Title | MomentLayers.SpeedLines | MomentLayers.EdgeGlow, BandStyle.Horizontal, PlateKind.Finisher, MomentArtKind.Team, 0f, true, false);
+            Add(MomentId.BlastRadius, "BLAST RADIUS", MomentScale.Takeover, 50, 1.6f, 30f, Impact, BandStyle.Diagonal, PlateKind.Takeover, MomentArtKind.Actor, 0.12f);
+            Add(MomentId.Lifeline, "LIFELINE", MomentScale.Stinger, 21, 1.6f, 15f, Corner, BandStyle.Horizontal, PlateKind.Stinger, MomentArtKind.Actor);
+            Add(MomentId.Finisher, "HILL TAKEN", MomentScale.Takeover, 97, 2.2f, 9999f, Hero | MomentLayers.EndFrame | MomentLayers.EdgeGlow, BandStyle.Horizontal, PlateKind.Finisher, MomentArtKind.Team, 0f, true, true, true);
             return a;
         }
 
@@ -299,7 +299,7 @@ namespace CriticalMass.Runtime.View.Moments
     /// The one priority queue for every full-screen moment, plus the corner stinger slot (pure, testable, no allocation).
     /// Rules: per-type cooldowns; at most one full takeover per TakeoverGapSeconds (else it plays as a corner stinger, once-a-
     /// match beats excepted); a moment that is not the player's own while the player is in a tight fight plays as a stinger;
-    /// the player's own moment in a tight fight is shortened; takeovers last 0.6..1.4 s; stingers wait while a takeover
+    /// the player's own moment in a tight fight is shortened; takeovers last 1.0..2.2 s; stingers wait while a takeover
     /// plays; waiting moments go stale after WaitTimeout. Reduced mode turns every takeover into a stinger; off drops all.
     /// The clock is the director's visual clock (wall seconds, paused with the game); the sim never sees any of it.
     /// </summary>
@@ -307,7 +307,11 @@ namespace CriticalMass.Runtime.View.Moments
     {
         public const int Capacity = 6, StingerCapacity = 3;
         public const double TakeoverGapSeconds = 20, WaitTimeout = 3.0, StingerWaitTimeout = 4.0;
-        public const float MinSeconds = 0.6f, MaxSeconds = 1.4f, StingerSeconds = 1.2f, PlayerShorten = 0.65f;
+        // hud-art-1 (owner, 2026-11-13: a cut-in vanished before he could read or screenshot it): takeovers 1.0..2.2 s
+        // (major moments 2.0..2.2, class cards 1.6..1.8 unshortened), stingers 1.6 s.
+        public const float MinSeconds = 1.0f, MaxSeconds = 2.2f, StingerSeconds = 1.6f, PlayerShorten = 0.65f;
+        /// <summary>The unshortened length bands (tests hold every recipe to them).</summary>
+        public const float MajorMin = 2.0f, MajorMax = 2.2f, CardMin = 1.6f, CardMax = 1.8f;
 
         private readonly double[] _lastAt;
         private double _lastTakeoverAt = double.NegativeInfinity;
@@ -347,7 +351,7 @@ namespace CriticalMass.Runtime.View.Moments
             StingerPlaying = false;
         }
 
-        /// <summary>The takeover length for a recipe: clamped 0.6..1.4 s, shortened for the player's own tight-fight moment.</summary>
+        /// <summary>The takeover length for a recipe: clamped 1.0..2.2 s, shortened for the player's own tight-fight moment.</summary>
         public static float TakeoverSeconds(MomentRecipe r, bool shorten)
         {
             float s = r.Seconds * (shorten ? PlayerShorten : 1f);
@@ -604,6 +608,8 @@ namespace CriticalMass.Runtime.View.Moments
             EdgeGlow = "bm-edge-glow";
         public static readonly string[] Sheets = { SpeedRadial, SpeedBand, Burst, Band, CracksCorner, AuraRing, Spark, EdgeGlow };
         public static readonly string[] Plates = { "bm-title-plate", "bm-title-plate-impact", "bm-title-plate-ribbon", "bm-stinger-plate" };
+        /// <summary>hud-art-1: the accent bar and underline drawn over a takeover plate, tinted by the moment's accent.</summary>
+        public const string PlateAccent = "bm-title-plate-accent";
 
         /// <summary>Loads a texture by file name (no folder, no extension); null when missing. Tests replace it.</summary>
         public static Func<string, Texture2D> Loader = DefaultLoad;

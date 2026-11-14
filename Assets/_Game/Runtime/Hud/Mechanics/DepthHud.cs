@@ -67,6 +67,8 @@ namespace CriticalMass.Runtime.Hud.Mechanics
         Text _eventWord, _eventTime;
         VectorShape _eventFill;
         const float EventW = 560f, EventH = 38f;
+        /// <summary>The pill word's width: from x 14 to 10 px before the clock (x EventW - 90).</summary>
+        public const float WordW = EventW - 90f - 10f - 14f;
 
         // gather ring
         RectTransform _gather;
@@ -76,6 +78,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
         RectTransform _coins, _power;
         Text _coinNum, _powerName, _powerTime, _powerHint;
         VectorShape _powerIcon, _powerPie;
+        RawImage _powerArt;
         readonly RectTransform[] _coinFly = new RectTransform[Coins];
         int _powerKindShown = -1;
 
@@ -201,7 +204,16 @@ namespace CriticalMass.Runtime.Hud.Mechanics
                 RectTransform chip = MenuUi.Rt(_stock, "Chip " + k);
                 MenuUi.Place(chip, k * 118f, 0f, 106f, 40f);
                 Chip(chip, "Panel", ShapeKind.RoundRect, 0f, 0f, 106f, 40f, CMTokens.WithAlpha(panel, 0.92f), 12f);
-                Chip(chip, "Icon", icons[k], 10f, 9f, 22f, 22f, cols[k], 4f);
+                // hud-art-1: the painted resource icon (UI/Icons/res-*), the vector chip only when the file is missing
+                Texture2D tex = UiIcons.Get(UiIcons.Stock[k], 2);
+                if (tex != null)
+                {
+                    RawImage ri = MenuUi.Rt(chip, "Icon").gameObject.AddComponent<RawImage>();
+                    ri.texture = tex;
+                    ri.raycastTarget = false;
+                    MenuUi.Place(ri.rectTransform, 6f, 4f, 32f, 32f);
+                }
+                else Chip(chip, "Icon", icons[k], 10f, 9f, 22f, 22f, cols[k], 4f);
                 MenuUi.Label(chip, "Word", CMTokens.Ui, 13, CMTokens.WithAlpha(cream, 0.85f), TextAnchor.MiddleLeft, 38f, 1f, 40f, 38f,
                     k == 0 ? DepthWords.Wood : k == 1 ? DepthWords.Water : DepthWords.Food, 1.5f).resizeTextForBestFit = true;
                 _stockNum[k] = MenuUi.Label(chip, "Count", CMTokens.Mono, 22, cream, TextAnchor.MiddleRight, 60f, 0f, 38f, 40f, "0", 2f);
@@ -215,10 +227,9 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             Chip(_event, "Track", ShapeKind.RoundRect, 0f, 0f, EventW, EventH, CMTokens.WithAlpha(panel, 0.92f), 12f);
             _eventFill = Chip(_event, "Fill", ShapeKind.RoundRect, 3f, 3f, EventW - 6f, EventH - 6f, CMTokens.MeterOrange.Color, 10f);
             _eventFill.OutlinePx = 0f;
-            _eventWord = MenuUi.Label(_event, "Word", CMTokens.Display, 17, cream, TextAnchor.MiddleLeft, 14f, 0f, EventW - 100f, EventH, "", 2.5f);
-            _eventWord.resizeTextForBestFit = true;
-            _eventWord.resizeTextMinSize = 11;
-            _eventWord.resizeTextMaxSize = 17;
+            // hud-art-1: the word ends 10 px short of the clock and shrinks to fit (SetOneLine). Best fit never worked here:
+            // Unity ignores it while the text overflows horizontally, so the egg line ran under the clock.
+            _eventWord = MenuUi.Label(_event, "Word", CMTokens.Display, 17, cream, TextAnchor.MiddleLeft, 14f, 0f, WordW, EventH, "", 2.5f);
             _eventTime = MenuUi.Label(_event, "Time", CMTokens.Mono, 20, cream, TextAnchor.MiddleRight, EventW - 90f, 0f, 76f, EventH, "", 2.5f);
             _event.gameObject.SetActive(false);
 
@@ -279,6 +290,11 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             _powerPie.EmptyColor = CMTokens.MeterEmpty.Color;
             _powerIcon = Chip(_power, "Icon", ShapeKind.Shield, 20f, 20f, 28f, 28f, CMTokens.VoidNavy.Color, 4f);
             _powerIcon.OutlinePx = 0f;
+            // hud-art-1: the painted power-up icon over the timer pie (the vector glyph stays as the fallback)
+            _powerArt = MenuUi.Rt(_power, "Art").gameObject.AddComponent<RawImage>();
+            _powerArt.raycastTarget = false;
+            MenuUi.Place(_powerArt.rectTransform, 12f, 12f, 44f, 44f);
+            _powerArt.gameObject.SetActive(false);
             _powerName = MenuUi.Label(_power, "Name", CMTokens.Display, 22, cream, TextAnchor.MiddleLeft, 68f, 4f, 170f, 32f, "", 2.5f);
             _powerTime = MenuUi.Label(_power, "Time", CMTokens.Mono, 22, cream, TextAnchor.MiddleRight, 240f, 4f, 76f, 32f, "", 2f);
             _powerHint = MenuUi.Label(_power, "Counter", CMTokens.Ui, 13, CMTokens.WithAlpha(cream, 0.8f), TextAnchor.MiddleLeft, 68f, 36f, 250f, 26f, "", 1.5f);
@@ -467,7 +483,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
                 int ds = DepthRead.DropState(w, out _, out _, out int dtick);
                 int bs = DepthRead.BridgeState(w, out int btick, out _);
                 int egg = DepthRead.EggExposedUntil(w);
-                if (egg > w.Tick) { word = DepthWords.EggExposed; ticksLeft = egg - w.Tick; span = DepthRead.EggWindowTicks(w); col = CMTokens.EggSeam.Color; }
+                if (egg > w.Tick) { word = DepthWords.EggExposedPill; ticksLeft = egg - w.Tick; span = DepthRead.EggWindowTicks(w); col = CMTokens.EggSeam.Color; }
                 else if (ds == DepthRead.DropIncoming) { word = DepthWords.DropIncoming; ticksLeft = dtick - w.Tick; span = Math.Max(1, (int)(8 * w.Config.SimHz)); col = PowerTimers.Colour[0]; }
                 else if (ds == DepthRead.DropLanded)
                 {
@@ -486,7 +502,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             bool show = word != null && !HudZones.Blocked(HudZone.Callout, HudPriority.Tip);   // owner walk 1: lane resident
             if (_event.gameObject.activeSelf != show) _event.gameObject.SetActive(show);
             if (!show) return;
-            HudText.Set(_eventWord, word);
+            HudText.SetOneLine(_eventWord, word, 17, 11);
             int secs = StationRules.Seconds(ticksLeft, w.Config.SimHz);
             HudText.Set(_eventTime, Clock[Mathf.Clamp(secs, 0, Clock.Length - 1)]);
             float frac = Mathf.Clamp01((float)ticksLeft / Math.Max(1, span));
@@ -546,6 +562,10 @@ namespace CriticalMass.Runtime.Hud.Mechanics
                 _powerPie.SetFill(c);
                 _powerIcon.Kind = PowerTimers.Icon[kind];
                 _powerIcon.SetVerticesDirty();
+                Texture2D art = kind >= 1 && kind <= UiIcons.Items.Length ? UiIcons.Get(UiIcons.Items[kind - 1], 2) : null;
+                _powerArt.texture = art;
+                _powerArt.gameObject.SetActive(art != null);
+                _powerIcon.gameObject.SetActive(art == null);
                 HudText.Set(_powerName, DepthWords.Pickup(kind));
                 _powerName.color = c;
                 HudText.Set(_powerHint, DepthWords.Counter(kind));

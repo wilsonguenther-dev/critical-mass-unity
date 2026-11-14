@@ -3,7 +3,7 @@
 # leave the main Mac and its single heavy-job lock (~/bin/cm-heavy). See tools/remote/README.md.
 #   tools/remote-playtest.sh [--host HOST] [--app PATH.app] [--mode smoke|captures] [--quality High|Medium|Low]
 #                            [--matches N] [--out DIR] [--speed X] [--novsync] [--profile default|floor]
-#                            [--width W --height H] [--title-seconds S] [--timeout S] [--lock-wait S] [--keep N]
+#                            [--width W --height H] [--title-seconds S] [--timeout S] [--lock-wait S] [--keep N] [--affordance-shots]
 #                            [--extra "PLAYER FLAGS"]  (e.g. "-showWindow -autoplayPacing rule,timed60")
 # What it does: copies the .app (rsync, only changed files) to ~/cm-remote/builds/<build commit>/ on the box, starts
 # ~/cm-remote/bin/air-run.sh there detached (queue lock, mute for the run, caffeinate, settings isolation, the same
@@ -12,13 +12,15 @@
 # data/ (shots) back into OUT, deletes the run on the box, and judges it here with tools/demo-smoke.sh --summarise-only
 # (same budgets, tools/budgets.json; summary.json in OUT). Old builds on the box beyond the newest two are deleted.
 # --mode captures adds -shots: the player writes shot-title.png (title, 2 s in), shot-start.png (3 s of match time) and shot-mid.png (60 s),
-# copied to OUT/shots/. (Screen grabs from outside the game are not possible over ssh: macOS refuses screen recording.)
+# copied to OUT/shots/. --affordance-shots adds -affordanceShots: shot-afford-*.png, the terrain-affordance and world-feedback
+# frames (TerrainAffordanceView's AffordanceCapture). (Screen grabs from outside the game are not possible over ssh: macOS refuses screen recording.)
 # Defaults: host wilsons-macbook-air.local (or CM_REMOTE_HOST), app Builds/current or Builds/macOS of this checkout,
 # smoke, Medium, 1 match, 1920x1080 window, 12 s on the title, OUT Logs/remote/<utc>-<mode>-<quality>.
 # Exit: 0 pass, 1 fail (exceptions, budget over or not measured), 4 match timeout, 124 overall timeout, 75 queue wait
 # ran out, 66 no app, 67 box refused (battery or disk), 69 box unreachable, 64 usage.
 set -euo pipefail
 EXTRA=""    # --extra "FLAGS": more player flags, passed as they are (perf-60hz-32p)
+PLAYERARGS=""   # --player-args "..." extra player flags, word-split (e.g. "-seed 1337 -shotTick 4800", "-groundShots")
 CAMYAW=""   # --camera-yaw D: the player's -cameraYaw (builds from a81efe4+1 on; 0 = true north, 45 = default)
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$ROOT/tools/remote/_remote-lib.sh"
@@ -38,6 +40,7 @@ while [[ $# -gt 0 ]]; do
     --novsync) NOVSYNC=1; shift ;;
     --camera-yaw) CAMYAW="$2"; shift 2 ;;
     --extra) EXTRA="$2"; shift 2 ;;
+    --player-args) PLAYERARGS="$2"; shift 2 ;;
     --profile) PROFILE="${2:?}"; shift 2 ;;
     --width) W="${2:?}"; shift 2 ;;
     --height) H="${2:?}"; shift 2 ;;
@@ -45,6 +48,7 @@ while [[ $# -gt 0 ]]; do
     --timeout) TIMEOUT="${2:?}"; shift 2 ;;
     --lock-wait) LOCK_WAIT="${2:?}"; shift 2 ;;
     --keep) KEEP="${2:?}"; shift 2 ;;
+    --affordance-shots) AFF=1; shift ;;
     -h|--help) usage ;;
     *) echo "remote-playtest: unknown flag $1" >&2; usage ;;
   esac
@@ -73,8 +77,9 @@ rsync_to --delete "$APP" "$REMOTE_USER@$REMOTE_HOST:cm-remote/builds/$COMMIT/" \
 FPS=(); [[ "$PROFILE" == floor ]] && FPS=(--fps-cap 30)
 ARGS=(--build "builds/$COMMIT" --matches "$MATCHES" --title-seconds "$TITLE_S" --timeout "$TIMEOUT"
       --quality "$QUALITY" --width "$W" --height "$H" --keep "$KEEP" --lock-wait "$LOCK_WAIT"
-      ${SPEED:+--speed "$SPEED"} ${NOVSYNC:+--novsync} ${CAMYAW:+--camera-yaw "$CAMYAW"} ${EXTRA:+--extra "$EXTRA"} ${FPS[@]+"${FPS[@]}"})
+      ${SPEED:+--speed "$SPEED"} ${NOVSYNC:+--novsync} ${CAMYAW:+--camera-yaw "$CAMYAW"} ${EXTRA:+--extra "$EXTRA"} ${PLAYERARGS:+--player-args "$PLAYERARGS"} ${FPS[@]+"${FPS[@]}"})
 [[ "$MODE" == captures ]] && ARGS+=(--shots)
+[[ -n "${AFF:-}" ]] && ARGS+=(--affordance-shots)
 MAX=$((LOCK_WAIT + MATCHES * (TIMEOUT + 60) + 300))
 echo "remote-playtest: $MODE, $MATCHES match(es) at $QUALITY on $REMOTE_HOST, job $ID (limit ${MAX}s incl. queue)"
 remote_start "$ID" "$MAX" "${ARGS[@]}"

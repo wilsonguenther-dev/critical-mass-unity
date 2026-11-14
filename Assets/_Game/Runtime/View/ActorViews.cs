@@ -44,6 +44,7 @@ namespace CriticalMass.Runtime.View
         private readonly Dictionary<(int, string), string> _names = new Dictionary<(int, string), string>();
         private UnityEngine.Camera _cam;
         private Vector3 _camPos, _targetPos;
+        private int _lodSelf;
 
         private SimDriverBehaviour _driver;
         private ArtCatalog _catalog;
@@ -194,7 +195,7 @@ namespace CriticalMass.Runtime.View
             s.Push(m);
         }
 
-        private void LateUpdate() { var c = CriticalMass.Runtime.Game.FrameCost.Enter(); Sync(Time.deltaTime); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.ActorViews, c); }
+        private void LateUpdate() { if (CriticalMass.Runtime.Hud.TitleBackdrop.Frozen) return; var c = CriticalMass.Runtime.Game.FrameCost.Enter(); Sync(Time.deltaTime); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.ActorViews, c); }
 
         /// <summary>
         /// Contract C3 (DG-71): called once per drawn actor (and the Kaiju, actor -2) after its pose is evaluated and before
@@ -229,7 +230,11 @@ namespace CriticalMass.Runtime.View
             if (_cam == null || !_cam.isActiveAndEnabled) _cam = UnityEngine.Camera.main;
             _camPos = _cam != null ? _cam.transform.position : Vector3.zero;
             // Contract C4: LOD by distance to the camera target (the local player, whom the camera follows).
-            if (w.ActorCount > 0 && w.Actors[0].Alive) _targetPos = SimSpace.ToWorld(Lerp(w.PrevX[0], w.X[0], a), 0, Lerp(w.PrevZ[0], w.Z[0], a));
+            // feat/ground-camera: a low camera follows another body (spectating, knocked out): LOD by distance to it, and it
+            // counts as "self" (always LOD0), so the rule holds from that angle too.
+            _lodSelf = CriticalMass.Runtime.Camera.GroundView.LodActive ? CriticalMass.Runtime.Camera.GroundView.LodSelf : 0;
+            if (CriticalMass.Runtime.Camera.GroundView.LodActive) _targetPos = CriticalMass.Runtime.Camera.GroundView.LodAnchor;
+            else if (w.ActorCount > 0 && w.Actors[0].Alive) _targetPos = SimSpace.ToWorld(Lerp(w.PrevX[0], w.X[0], a), 0, Lerp(w.PrevZ[0], w.Z[0], a));
             if (_stressHill) _targetPos = SimSpace.ToWorld(map.Hill.X, 0, map.Hill.Z);
             _lodCut = CrowdCutNow(w, map, a);
             int models = 0;
@@ -247,6 +252,16 @@ namespace CriticalMass.Runtime.View
             _hill.localRotation = Quaternion.identity;
             _hill.localScale = new Vector3(d, HillThickness, d);
             ActiveModelCount = models;
+        }
+
+        /// <summary>feat/ground-camera: horizontal radius around the low camera inside which other fighters are not drawn.</summary>
+        public const float NearLensMetres = 1.6f;
+
+        private bool NearLens(double x, double h, double z)
+        {
+            Vector3 p = SimSpace.ToWorld(x, h, z);
+            float dx = p.x - _camPos.x, dz = p.z - _camPos.z;
+            return dx * dx + dz * dz < NearLensMetres * NearLensMetres && _camPos.y < p.y + 2.6f;
         }
 
         private bool SyncActor(int i, World w, GameConfig cfg, MapDef map, double a, double simTime, double dSim)
@@ -302,10 +317,17 @@ namespace CriticalMass.Runtime.View
             }
 
             ModelView m = slot.Model;
+            // feat/ground-camera: from the low camera a fighter standing at the lens fills a third of the frame and hides the
+            // shot; bodies within NearLensMetres of the camera (horizontally, other than the followed one) are not drawn.
+            if (CriticalMass.Runtime.Camera.GroundView.LodActive && i != _lodSelf && NearLens(x, h, z))
+            {
+                m.SetActive(false);
+                return false;
+            }
             m.SetActive(true);
             m.ApplyTier();
             QualityRow row = QualityTable.Current;
-            m.SetLod(AnimLod.PickLod(i == 0, Vector3.Distance(SimSpace.ToWorld(x, 0, z), _targetPos), _lodCut, row));
+            m.SetLod(AnimLod.PickLod(i == _lodSelf, Vector3.Distance(SimSpace.ToWorld(x, 0, z), _targetPos), _lodCut, row));
             Vector3 basePos = SimSpace.ToWorld(x, h, z);
             m.Transform.localPosition = basePos + (hasFx ? fx.Nudge : Vector3.zero) + JumpLift.Offset(w, map, i, a, x, z); // DG-02 jump arc
             Material teamMat = ArtMaterials.ForTeam(m.Spec, actor.Team);

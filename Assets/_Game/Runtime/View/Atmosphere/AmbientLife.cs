@@ -18,33 +18,45 @@ namespace CriticalMass.Runtime.View.Atmosphere
         public readonly int Skyrays, Loafers, Flocks, BirdsPerFlock, Clouds, Fireflies, MistPerFall, MaxFalls;
         /// <summary>1 every lantern gets a halo and a pool, 2 every second one, 0 none.</summary>
         public readonly int LanternStride;
+        /// <summary>World around arena 1: night gliders (they replace the day birds after dusk), cloud-sea banks with a
+        /// moonlit rim, wind streaks, far lightning in the cloud sea (night only), water drips from hanging roots.</summary>
+        public readonly int Gliders, Banks, Streaks, Bolts, Drips;
 
-        public AmbientBudget(int skyrays, int loafers, int flocks, int birdsPerFlock, int clouds, int fireflies, int mistPerFall, int maxFalls, int lanternStride)
+        public AmbientBudget(int skyrays, int loafers, int flocks, int birdsPerFlock, int clouds, int fireflies, int mistPerFall, int maxFalls, int lanternStride,
+                             int gliders = 0, int banks = 0, int streaks = 0, int bolts = 0, int drips = 0)
         {
             Skyrays = skyrays; Loafers = loafers; Flocks = flocks; BirdsPerFlock = birdsPerFlock; Clouds = clouds;
             Fireflies = fireflies; MistPerFall = mistPerFall; MaxFalls = maxFalls; LanternStride = lanternStride;
+            Gliders = gliders; Banks = banks; Streaks = streaks; Bolts = bolts; Drips = drips;
         }
 
         public const int MaxLanterns = 160;
 
         public static AmbientBudget For(int level)
         {
-            if (level <= FramePolicy.LevelLow) return new AmbientBudget(0, 0, 0, 0, 8, 0, 0, 0, 2);
-            if (level == FramePolicy.LevelMedium) return new AmbientBudget(3, 1, 2, 7, 16, 96, 3, 10, 1);
-            return new AmbientBudget(5, 2, 4, 7, 26, 192, 5, 14, 1);
+            if (level <= FramePolicy.LevelLow) return new AmbientBudget(0, 0, 0, 0, 8, 0, 0, 0, 2, 0, 4, 0, 0, 0);
+            if (level == FramePolicy.LevelMedium) return new AmbientBudget(3, 1, 2, 7, 16, 96, 3, 10, 1, 5, 6, 8, 3, 12);
+            return new AmbientBudget(5, 2, 4, 7, 26, 192, 5, 14, 1, 10, 10, 14, 5, 24);
         }
+
+        /// <summary>The same budget without the world-around-arena extras (before / after captures).</summary>
+        public AmbientBudget WithoutWorldExtras() =>
+            new AmbientBudget(Skyrays, Loafers, Flocks, BirdsPerFlock, Clouds, Fireflies, MistPerFall, MaxFalls, LanternStride);
 
         public int Birds => Flocks * BirdsPerFlock;
         public int Lanterns(int available) => LanternStride <= 0 ? 0 : Math.Min(MaxLanterns, (available + LanternStride - 1) / LanternStride);
+        /// <summary>Mist puffs at the foot of the world's own waterfall (one fall).</summary>
+        public int FallMist => Banks > 0 ? MistPerFall : 0;
 
         /// <summary>Triangles drawn at most (creature fill + ink hull, sprites x 2 per quad, two per lantern).</summary>
         public int Triangles(int lanternsAvailable) =>
-            2 * (Skyrays * AmbientMeshes.SkyrayTris + Loafers * AmbientMeshes.LoaferTris + Birds * AmbientMeshes.BirdTris) +
-            2 * (Clouds + Fireflies + MistPerFall * MaxFalls + 2 * Lanterns(lanternsAvailable));
+            2 * (Skyrays * AmbientMeshes.SkyrayTris + Loafers * AmbientMeshes.LoaferTris + Birds * AmbientMeshes.BirdTris + Gliders * AmbientMeshes.GliderTris) +
+            2 * (Clouds + Fireflies + MistPerFall * MaxFalls + 2 * Lanterns(lanternsAvailable) + Banks + Streaks + Bolts + Drips + FallMist);
 
         /// <summary>Draw calls: creature fill and ink (when any), the alpha sprites, the additive sprites (when any).</summary>
         public int Draws(int lanternsAvailable) =>
-            (Skyrays + Loafers + Birds > 0 ? 2 : 0) + (Clouds + MistPerFall * MaxFalls > 0 ? 1 : 0) + (Fireflies + Lanterns(lanternsAvailable) > 0 ? 1 : 0);
+            (Skyrays + Loafers + Birds + Gliders > 0 ? 2 : 0) + (Clouds + MistPerFall * MaxFalls + Banks + Streaks + Drips > 0 ? 1 : 0) +
+            (Fireflies + Lanterns(lanternsAvailable) + Bolts > 0 ? 1 : 0);
     }
 
     /// <summary>
@@ -56,7 +68,7 @@ namespace CriticalMass.Runtime.View.Atmosphere
     /// </summary>
     public static class AmbientMeshes
     {
-        public const int SkyrayTris = 55, LoaferTris = 120, BirdTris = 4;
+        public const int SkyrayTris = 55, LoaferTris = 120, BirdTris = 4, GliderTris = 12;
 
         public sealed class Part
         {
@@ -193,6 +205,32 @@ namespace CriticalMass.Runtime.View.Atmosphere
             return p;
         }
 
+        /// <summary>
+        /// Lantern glider (world around arena 1, original): the night flier that replaces the day birds. A swept crescent
+        /// wing of dusk blue, two long tail streamers and a warm lantern under the body (glow spot, lit at night), so at
+        /// night it reads as a drifting light with a dark wing over it. Wingspan 1.5, length 1.1. Both faces authored.
+        /// </summary>
+        public static Part Glider()
+        {
+            var p = new Part();
+            Color wing = Hex("#3E4A6E"), edge = Hex("#55638F"), lamp = Hex("#FFE3A0", 1f);
+            foreach (float up in new[] { 1f, -1f })
+            {
+                Vector3 n = up > 0 ? Vector3.up : Vector3.down;
+                int nose = p.Add(new Vector3(0f, 0.02f, 0.28f), n, wing), root = p.Add(new Vector3(0f, 0f, -0.18f), n, wing);
+                int rt = p.Add(new Vector3(0.75f, 0.06f, -0.36f), n, edge), ri = p.Add(new Vector3(0.26f, 0f, -0.12f), n, wing);
+                int lt = p.Add(new Vector3(-0.75f, 0.06f, -0.36f), n, edge), li = p.Add(new Vector3(-0.26f, 0f, -0.12f), n, wing);
+                if (up > 0) { p.Tri(nose, rt, ri); p.Tri(nose, ri, root); p.Tri(nose, root, li); p.Tri(nose, li, lt); }
+                else { p.Tri(nose, ri, rt); p.Tri(nose, root, ri); p.Tri(nose, li, root); p.Tri(nose, lt, li); }
+                int s0 = p.Add(new Vector3(0.05f, 0f, -0.16f), n, edge), s1 = p.Add(new Vector3(-0.05f, 0f, -0.16f), n, edge), st = p.Add(new Vector3(0f, -0.02f, -0.85f), n, edge);
+                if (up > 0) p.Tri(s0, s1, st); else p.Tri(s1, s0, st);
+            }
+            int a = p.Add(new Vector3(0f, -0.07f, 0.08f), Vector3.down, lamp), b = p.Add(new Vector3(0.08f, -0.07f, -0.03f), Vector3.down, lamp);
+            int c = p.Add(new Vector3(0f, -0.07f, -0.14f), Vector3.down, lamp), d = p.Add(new Vector3(-0.08f, -0.07f, -0.03f), Vector3.down, lamp);
+            p.Tri(a, c, b); p.Tri(a, d, c);
+            return p;
+        }
+
         /// <summary>Bird: a chevron of two wings (0.7 wingspan), dark slate so it reads as a silhouette.</summary>
         public static Part Bird()
         {
@@ -292,6 +330,59 @@ namespace CriticalMass.Runtime.View.Atmosphere
                     });
                 }
             }
+            // Night gliders: loose strings of five drifting slower than the birds, on the same outside ring.
+            int groups = (b.Gliders + 4) / 5;
+            for (int g = 0, made = 0; g < groups; g++)
+            {
+                float rx = mapW * (0.6f + 0.18f * R(ref s)), rz = mapH * (0.75f + 0.22f * R(ref s));
+                float speed = (g % 2 == 0 ? -1f : 1f) * 2.2f / ((rx + rz) * 0.5f), phase = R(ref s) * 6.2832f, h = -1.8f - 1.4f * R(ref s);
+                for (int i = 0; i < 5 && made < b.Gliders; i++, made++)
+                    o.Add(new AmbientCreature
+                    {
+                        Kind = 3, Seed = R(ref s), CentreX = cx, CentreZ = cz, RadiusX = rx, RadiusZ = rz, Height = h + (R(ref s) - 0.5f) * 0.8f,
+                        Speed = speed, Phase = phase, Scale = 0.9f + 0.3f * R(ref s),
+                        Offset = new Vector2((R(ref s) - 0.5f) * 2.4f, -i * 1.3f),
+                    });
+            }
+            return o;
+        }
+
+        /// <summary>World around arena 1: cloud-sea banks (kind 5), wind streaks (7) and far lightning (6), all in the void
+        /// below the island tops; drips (8) under hanging-root tips; mist (1) at the foot of the world's waterfall.</summary>
+        public static List<AmbientSprite> WorldExtras(in AmbientBudget b, int mapW, int mapH, IList<Vector3> rootTips, IList<Vector3> fallFeet)
+        {
+            var o = new List<AmbientSprite>();
+            uint s = (uint)Seed ^ 0xC10Du;
+            float minX = -60f, range = mapW + 120f;
+            for (int k = 0; k < b.Banks; k++)
+                o.Add(new AmbientSprite
+                {
+                    Kind = 5, Seed = R(ref s), Size = 9f + 8f * R(ref s),
+                    Anchor = new Vector3(minX + range * R(ref s), -9.2f - 1.1f * R(ref s), -(-45f + (mapH + 90f) * R(ref s))),
+                    Params = new Vector4(minX, range, 0.12f + 0.14f * R(ref s), 0f),
+                });
+            for (int k = 0; k < b.Streaks; k++)
+                o.Add(new AmbientSprite
+                {
+                    Kind = 7, Seed = R(ref s), Size = 2.5f + 3f * R(ref s),
+                    Anchor = new Vector3(minX + range * R(ref s), -1.8f - 4f * R(ref s), -(-30f + (mapH + 60f) * R(ref s))),
+                    Params = new Vector4(minX, range, 2.2f + 1.4f * R(ref s), 0f),
+                });
+            for (int k = 0; k < b.Bolts; k++)
+            {
+                // Far out in the cloud sea past the north, west and east edges.
+                float u = R(ref s);
+                float x = u < 0.33f ? -24f - 20f * R(ref s) : u < 0.66f ? mapW * R(ref s) : mapW + 24f + 20f * R(ref s);
+                float z = u < 0.33f || u >= 0.66f ? -mapH * R(ref s) : 24f + 18f * R(ref s);
+                o.Add(new AmbientSprite { Kind = 6, Seed = R(ref s), Size = 7f + 5f * R(ref s), Anchor = new Vector3(x, -9.7f, z) });
+            }
+            if (rootTips != null)
+                for (int k = 0; k < rootTips.Count && k < b.Drips; k++)
+                    o.Add(new AmbientSprite { Kind = 8, Seed = R(ref s), Size = 0.06f, Anchor = rootTips[k] });
+            if (fallFeet != null)
+                for (int f = 0; f < fallFeet.Count; f++)
+                    for (int k = 0; k < b.FallMist; k++)
+                        o.Add(new AmbientSprite { Kind = 1, Seed = (k + 0.5f) / Mathf.Max(1, b.FallMist), Size = 1.6f + 0.8f * R(ref s), Anchor = fallFeet[f] + new Vector3((R(ref s) - 0.5f) * 1.2f, 0f, (R(ref s) - 0.5f) * 1.2f) });
             return o;
         }
 
@@ -358,6 +449,7 @@ namespace CriticalMass.Runtime.View.Atmosphere
         int _builtLevel = -1;
         CriticalMass.Sim.Core.World _waitWorld;
         int _waitFrames;
+        bool _builtShown = true;
         GameObject _root;
         Material _creatureMat, _alphaMat, _addMat;
         readonly List<Mesh> _meshes = new List<Mesh>();
@@ -408,7 +500,7 @@ namespace CriticalMass.Runtime.View.Atmosphere
             // the sky still gets its life.
             if (_driver.World != _waitWorld) { _waitWorld = _driver.World; _waitFrames = 0; }
             if (_view != null && _view.Plan == null && ++_waitFrames < 120) return;
-            if (_driver.World == _builtWorld && RenderTier.Level == _builtLevel) return;
+            if (_driver.World == _builtWorld && RenderTier.Level == _builtLevel && WorldBeyond.Shown == _builtShown) return;
             Build(_driver.World, _view != null ? _view.Plan : null, RenderTier.Level);
         }
 
@@ -444,7 +536,9 @@ namespace CriticalMass.Runtime.View.Atmosphere
             if (_creatureMat == null) _creatureMat = Make("CMAmbientCreature", false);
             if (_alphaMat == null) _alphaMat = Make("CMAmbientSprite", false);
             if (_addMat == null) _addMat = Make("CMAmbientSprite", true);
+            _builtShown = WorldBeyond.Shown;
             AmbientBudget b = AmbientBudget.For(level);
+            if (!_builtShown) b = b.WithoutWorldExtras();
             int mapW = w.Map.Width, mapH = w.Map.Height;
 
             var trees = new List<Vector3>();
@@ -466,8 +560,15 @@ namespace CriticalMass.Runtime.View.Atmosphere
 
             var alpha = AmbientLayout.Clouds(b, mapW, mapH);
             var anchored = AmbientLayout.Anchored(b, trees, falls, heads, feet);
+            if (b.Banks + b.Streaks + b.Bolts + b.Drips > 0)
+            {
+                // The drip and mist anchors come from the world around the arena (same deterministic layout, scratch mesh).
+                var tips = new List<Vector3>(); var feetOfFalls = new List<Vector3>();
+                WorldBeyondLayout.Build(new BeyondMesh(), WorldBeyondBudget.For(level), mapW, mapH, plan != null ? plan.Rim : null, tips, feetOfFalls);
+                anchored.AddRange(AmbientLayout.WorldExtras(b, mapW, mapH, tips, feetOfFalls));
+            }
             var add = new List<AmbientSprite>();
-            foreach (AmbientSprite s in anchored) (s.Kind == 1 ? alpha : add).Add(s);
+            foreach (AmbientSprite s in anchored) (s.Kind == 1 || s.Kind == 5 || s.Kind == 7 || s.Kind == 8 ? alpha : add).Add(s);
             if (alpha.Count > 0 && _alphaMat != null) Layer("Clouds and Mist", SpriteMesh(alpha), _alphaMat);
             if (add.Count > 0 && _addMat != null) Layer("Night Lights", SpriteMesh(add), _addMat);
             Sprites = alpha.Count + add.Count;
@@ -495,12 +596,12 @@ namespace CriticalMass.Runtime.View.Atmosphere
 
         static Mesh CreatureMesh(List<AmbientCreature> cs)
         {
-            AmbientMeshes.Part skyray = AmbientMeshes.Skyray(), loafer = AmbientMeshes.Loafer(), bird = AmbientMeshes.Bird();
+            AmbientMeshes.Part skyray = AmbientMeshes.Skyray(), loafer = AmbientMeshes.Loafer(), bird = AmbientMeshes.Bird(), glider = AmbientMeshes.Glider();
             var v = new List<Vector3>(); var n = new List<Vector3>(); var col = new List<Color>(); var t = new List<int>();
             var u1 = new List<Vector4>(); var u2 = new List<Vector4>(); var u3 = new List<Vector4>();
             foreach (AmbientCreature c in cs)
             {
-                AmbientMeshes.Part p = c.Kind == 0 ? skyray : c.Kind == 1 ? loafer : bird;
+                AmbientMeshes.Part p = c.Kind == 0 ? skyray : c.Kind == 1 ? loafer : c.Kind == 3 ? glider : bird;
                 int base0 = v.Count;
                 for (int i = 0; i < p.V.Count; i++)
                 {
