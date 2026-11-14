@@ -336,6 +336,14 @@ def clean(e):
         ob, facts["octree_floaters"] = drop_floaters(ob, 0.02)
         facts["octree_tris_kept"] = tri_count(ob)
         print("GEN2 octree", name, facts["octree_tris"], facts["octree_floaters"])
+        if e.get("voxel_after"):   # the octree skin is closed but not always manifold (the collapse stalled at 103k on the
+            # Builder): a level-set rebuild of a CLOSED skin is safe and leaves a clean 2-manifold the collapse can reduce
+            md = ob.modifiers.new("vox2", "REMESH"); md.mode = "VOXEL"; md.voxel_size = float(e["voxel_after"])
+            md.adaptivity = 0.0; md.use_smooth_shade = False
+            sel_only([ob], ob); bpy.ops.object.modifier_apply(modifier=md.name)
+            ob, facts["voxel_after_floaters"] = drop_floaters(ob, 0.02)
+            facts["voxel_after_m"] = float(e["voxel_after"]); facts["voxel_after_tris"] = tri_count(ob)
+            print("GEN2 voxel_after", name, facts["voxel_after_tris"])
     lods = e.get("lods", {"Hero": 22000, "LOD0": 4000, "LOD1": 1400, "Shadow": 750})
     prefix = e.get("prefix", name)
     levels = {}; cols = {}

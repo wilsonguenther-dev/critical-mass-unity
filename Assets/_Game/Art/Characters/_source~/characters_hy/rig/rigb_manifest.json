@@ -15,8 +15,9 @@
     "Shadow": 750
    },
    "floater_frac": 0.002,
-   "_note": "rig-batch-b: octree remesh depth 10 (about 3 mm) to one closed skin, then collapse to the LOD budgets",
-   "octree": 10
+   "_note": "rig-batch-b: octree depth 9 closes every sheet into one skin, a 4 mm voxel rebuild of that closed skin makes it 2-manifold, then collapse to the LOD budgets",
+   "octree": 9,
+   "voxel_after": 0.004
   },
   {
    "name": "Healer",
@@ -36,8 +37,9 @@
    },
    "floater_frac": 0.002,
    "cloth_tol": 0.12,
-   "_note": "rig-batch-b: octree remesh depth 10 (about 3 mm) to one closed skin, then collapse to the LOD budgets",
-   "octree": 10
+   "_note": "rig-batch-b: octree depth 9 closes every sheet into one skin, a 4 mm voxel rebuild of that closed skin makes it 2-manifold, then collapse to the LOD budgets",
+   "octree": 9,
+   "voxel_after": 0.004
   },
   {
    "name": "Demolitions",
@@ -54,8 +56,9 @@
     "Shadow": 750
    },
    "floater_frac": 0.002,
-   "_note": "rig-batch-b: octree remesh depth 10 (about 3 mm) to one closed skin, then collapse to the LOD budgets",
-   "octree": 10
+   "_note": "rig-batch-b: octree depth 9 closes every sheet into one skin, a 4 mm voxel rebuild of that closed skin makes it 2-manifold, then collapse to the LOD budgets",
+   "octree": 9,
+   "voxel_after": 0.004
   }
  ]
 }
