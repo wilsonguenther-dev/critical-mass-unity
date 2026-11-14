@@ -1,0 +1,132 @@
+{
+ "_note": "rig-demolitions-1 2026-11-14: read by eye from measure_Demolitions_bind_front/side.png (0.1 m grid, 1000 px for 2.6 m, z = 1.25 + (500 - py)/384.6). Blender metres, faces -Y. Fingerless gloves: palm in the glove, wrist at the top of the palm.",
+ "_opts": {
+  "rigid_parts_on_chest": true,
+  "back_skips_head": true
+ },
+ "hips": [
+  0,
+  0.05,
+  0.74
+ ],
+ "spine": [
+  0,
+  0.05,
+  0.92
+ ],
+ "chest": [
+  0,
+  0.05,
+  1.12
+ ],
+ "head": [
+  0,
+  0.04,
+  1.36
+ ],
+ "_headtop": [
+  0,
+  0.05,
+  1.98
+ ],
+ "upperleg.l": [
+  0.15,
+  0.05,
+  0.66
+ ],
+ "lowerleg.l": [
+  0.19,
+  0.04,
+  0.42
+ ],
+ "foot.l": [
+  0.22,
+  0.08,
+  0.16
+ ],
+ "toes.l": [
+  0.23,
+  -0.1,
+  0.05
+ ],
+ "_toetip.l": [
+  0.23,
+  -0.23,
+  0.03
+ ],
+ "upperarm.l": [
+  0.27,
+  0.07,
+  1.17
+ ],
+ "lowerarm.l": [
+  0.43,
+  0.06,
+  0.965
+ ],
+ "wrist.l": [
+  0.565,
+  0.01,
+  0.84
+ ],
+ "hand.l": [
+  0.61,
+  -0.02,
+  0.745
+ ],
+ "handslot.l": [
+  0.645,
+  -0.03,
+  0.67
+ ],
+ "upperleg.r": [
+  -0.15,
+  0.05,
+  0.66
+ ],
+ "lowerleg.r": [
+  -0.19,
+  0.04,
+  0.42
+ ],
+ "foot.r": [
+  -0.22,
+  0.08,
+  0.16
+ ],
+ "toes.r": [
+  -0.23,
+  -0.1,
+  0.05
+ ],
+ "_toetip.r": [
+  -0.23,
+  -0.23,
+  0.03
+ ],
+ "upperarm.r": [
+  -0.27,
+  0.07,
+  1.17
+ ],
+ "lowerarm.r": [
+  -0.43,
+  0.06,
+  0.965
+ ],
+ "wrist.r": [
+  -0.565,
+  0.01,
+  0.84
+ ],
+ "hand.r": [
+  -0.61,
+  -0.02,
+  0.745
+ ],
+ "handslot.r": [
+  -0.645,
+  -0.03,
+  0.67
+ ]
+}

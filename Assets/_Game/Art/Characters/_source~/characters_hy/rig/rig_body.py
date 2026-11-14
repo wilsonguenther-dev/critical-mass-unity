@@ -30,6 +30,7 @@ if os.path.exists(os.path.join(REPO, _fb)):
     OLD = _fb   # the class's KayKit-joint model once the new body has replaced it
 os.makedirs(OUT, exist_ok=True)
 REP = {'class': CLS, 'src': SRC, 'old_rig': OLD, 'fingers': FINGERS, 'log': []}
+OPTS = {}   # from rigb_joints_<Cls>.json '_opts': rigid_parts_on_chest, back_skips_head
 
 
 def log(*a):
@@ -170,6 +171,7 @@ try:
     jf = os.path.join(HERE, f'rigb_joints_{CLS}.json')
     if os.path.exists(jf):
         ov = json.load(open(jf))
+        OPTS.update(ov.pop('_opts', {}))   # rig-demolitions-1: per-class weight options (not joints)
         seed = {s: [ov[k] for k in (f'upperarm.{s}', f'lowerarm.{s}', f'wrist.{s}')] for s in ('l', 'r')
                 if all(k in ov for k in (f'upperarm.{s}', f'lowerarm.{s}', f'wrist.{s}'))}
         if seed:
@@ -373,7 +375,35 @@ try:
     # back pack rigid on the chest: well behind the chest joint, between the hips and the head top, not an arm
     back = (P[:, 1] > J['chest'].y + 0.10 * H) & (P[:, 2] > J['hips'].z) & (P[:, 2] < J['_headtop'].z)
     back &= np.abs(P[:, 0]) < max(abs(J['upperarm.l'].x), abs(J['upperarm.r'].x)) + 0.05 * H
+    if OPTS.get('back_skips_head'):
+        back &= ~rig_head            # rig-demolitions-1: hair buns reach behind the chest line; they stay on the head
     W[back] = 0; W[back, bi['chest']] = 1; locked |= back
+    # rig-demolitions-1: a separate piece (not the largest connected part) whose centre is behind the chest rides the chest
+    # rigidly, whatever its size or height (the Demolitions barrel hangs behind her back without touching it and reaches
+    # past the arm line and below the hips joint).
+    parts_on_chest = [0, 0]
+    if OPTS.get('rigid_parts_on_chest'):
+        bm_ = bmesh.new(); bm_.from_mesh(hero.data); bm_.verts.ensure_lookup_table()
+        comp = np.full(nv, -1); nc = 0
+        for v0 in bm_.verts:
+            if comp[v0.index] >= 0:
+                continue
+            comp[v0.index] = nc; st_ = [v0]
+            while st_:
+                v_ = st_.pop()
+                for e_ in v_.link_edges:
+                    o_ = e_.other_vert(v_)
+                    if comp[o_.index] < 0:
+                        comp[o_.index] = nc; st_.append(o_)
+            nc += 1
+        bm_.free()
+        main_ = np.bincount(comp).argmax()
+        for k_ in range(nc):
+            sel_ = comp == k_
+            if k_ != main_ and P[sel_, 1].mean() > J['chest'].y + 0.05 * H:
+                W[sel_] = 0; W[sel_, bi['chest']] = 1; locked |= sel_
+                parts_on_chest[0] += 1; parts_on_chest[1] += int(sel_.sum())
+        log('separate parts', nc, 'held on the chest (parts, vertices)', parts_on_chest)
     # arm weights only near the arm: an A-pose hand hangs beside the belt (the Builder's rope coil, pouches), and the
     # proxy heat let the arm carry them. Arm-chain weight on a vertex farther than ARM_R from its arm's bone chain goes to
     # the torso and legs it already had (or the hips).
@@ -393,7 +423,8 @@ try:
             W[idx[hi], bi['chest']] = 1      # wings, a pack edge: ride the chest
             W[idx[~hi], bi['hips']] = 1      # a rope coil, belt pouches: ride the hips
             moved_arm += int(far.sum())
-    REP['rigid'] = {'head_top': int(rig_head.sum()), 'back_pack': int(back.sum()), 'off_arm_vertices_reweighted': moved_arm}
+    REP['rigid'] = {'head_top': int(rig_head.sum()), 'back_pack': int(back.sum()), 'off_arm_vertices_reweighted': moved_arm,
+                    'parts_on_chest': parts_on_chest}
     label = np.full(nv, -1)
     cut_faces = 0
     if FINGERS:

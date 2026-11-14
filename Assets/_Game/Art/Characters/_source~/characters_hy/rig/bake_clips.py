@@ -673,7 +673,7 @@ try:
     scene.display.shading.background_type = "VIEWPORT"
     scene.display.shading.background_color = (0.55, 0.6, 0.65)
     tiles = {}
-    SKILL = {"Builder": ("Attack", "UseItem"), "Healer": ("Cast", "UseItem"), "Demolitions": ("Throw", "PickUp")}.get(CLS, ())
+    SKILL = {"Builder": ("Attack", "UseItem"), "Healer": ("Cast", "UseItem"), "Demolitions": ("Attack", "PickUp")}.get(CLS, ())   # Demolitions attack = pry-bar swing on Attack (ArtMapping.ClassClips)
     # the game's light weapon (WeaponProps: handle along handslot.r +Y, 0.62 u, held 0.12 u from its end): a stand-in stick
     stick = None
     if NEW_BODY and "handslot.r" in fa.pose.bones:
