@@ -354,6 +354,70 @@ def clear_tip(clip):
     TIP_MIN[clip] = (min(TIP_MIN.get(clip, (9, 9))[0], before), min(TIP_MIN.get(clip, (9, 9))[1], tip_world().z))
 
 
+# rig-builder-2: new bodies hang their arms closer: each upper arm turns about the shoulder (constant, about the forward
+# axis) so that at the first Idle frame it is ARM_DOWN_DEG from straight down (KayKit's idle left the wide generated
+# torsos with arms out like a gorilla). The mallet swing reads stronger: in Attack the right arm's turn from its first
+# frame is scaled by ATTACK_GAIN.
+ARM_DOWN_DEG = 22.0
+ARM_ADD = {}
+ATTACK_GAIN = {"Attack": 1.8}
+
+
+def _ua_angle(s):
+    d = W(fa, faP["lowerarm." + s].head) - W(fa, faP["upperarm." + s].head)
+    return math.degrees(math.atan2(abs(d.x), -d.z)), d
+
+
+if NEW_BODY and "Idle" in acts:
+    copy_pose_only(acts["Idle"], int(acts["Idle"].frame_range[0]))
+    for s in SIDES:
+        a, d = _ua_angle(s)
+        sg = 1 if s == "l" else -1     # left arm is at +x: turning about -Y... sign measured below
+        ARM_ADD[s] = math.radians(a - ARM_DOWN_DEG)
+    REP["idle_upperarm_from_down_deg_before"] = {s: round(_ua_angle(s)[0], 1) for s in SIDES}
+    assign(kk, None); rest(fa)
+
+
+def arms_in(clip):
+    for s in SIDES:
+        ang = ARM_ADD.get(s, 0.0)
+        if abs(ang) < 1e-4:
+            continue
+        pb = faP["upperarm." + s]
+        piv = W(fa, pb.head)
+        # turn about the forward axis toward the body: left arm (+x) turns about +Y, right arm (-x) about -Y
+        ax = Vector((0, 1, 0)) if s == "l" else Vector((0, -1, 0))
+        rotate_about(fa, pb, piv, Quaternion(ax, ang))
+        upd()
+
+
+if NEW_BODY and ARM_ADD and CREL is not None:
+    # the slot turn is measured again with the arms brought in, so the mallet still stands upright at idle
+    copy_pose_only(acts["Idle"], int(acts["Idle"].frame_range[0]))
+    arms_in("Idle")
+    Mh = (fa.matrix_world @ faP["hand.r"].matrix).to_3x3().normalized()
+    Ms = (fa.matrix_world @ faP["handslot.r"].matrix).to_3x3().normalized()
+    CREL = Mh.inverted() @ (Ms.col[1].rotation_difference(Vector((0, 0, 1))).to_matrix() @ Ms)
+    REP["idle_upperarm_from_down_deg_after"] = {s: round(_ua_angle(s)[0], 1) for s in SIDES}
+    log("upper arms from straight down at idle", REP["idle_upperarm_from_down_deg_before"], "->", REP["idle_upperarm_from_down_deg_after"])
+    assign(kk, None); rest(fa)
+
+
+def attack_gain(clip, q0s):
+    g = ATTACK_GAIN.get(clip) if NEW_BODY else None
+    if not g:
+        return
+    for n in ("upperarm.r", "lowerarm.r"):
+        pb = faP[n]
+        l, q, sc = pb.matrix_basis.decompose()
+        if n not in q0s:
+            q0s[n] = q.copy()
+        dq = q @ q0s[n].inverted()
+        axis, ang = dq.to_axis_angle()
+        pb.matrix_basis = Matrix.LocRotScale(l, Quaternion(axis, ang * g) @ q0s[n], sc)
+    upd()
+
+
 def upright_idle(clip, f0):
     """Constant hips turn per idle clip that puts the head straight above the hips at its first frame."""
     if not IDLE_FLAT or clip not in IDLE_CLIPS:
@@ -410,6 +474,7 @@ def bake_action(clip, act):
     contact = {s: [] for s in SIDES}
     prev_v = {s: None for s in SIDES}
     lowered = 0.0
+    gain_q0 = {}
     for f in range(f0, f1 + 1):
         scene.frame_set(f)
         for pb in faP:
@@ -432,7 +497,10 @@ def bake_action(clip, act):
                 q_ = HOLD_REF[pb.name].slerp(q_, HOLD_KEEP)
             pb.matrix_basis = Matrix.LocRotScale(l_, q_, s_)
         upd()
+        attack_gain(clip, gain_q0)
         upright_idle(clip, f0)
+        if NEW_BODY:
+            arms_in(clip)
         K = snap(kk)
         Hd = F0["hips"] + (K["hips"] - K0["hips"]) * RATIO + Vector((0, 0, LIFT))
         targets, rots = {}, {}
