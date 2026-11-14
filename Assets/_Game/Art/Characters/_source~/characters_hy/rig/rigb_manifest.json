@@ -69,9 +69,10 @@
      1.36,
      1.66
     ],
-    "rel": 0.5,
+    "rel": 0.65,
     "colour": "#33241E",
-    "_note": "rig-demolitions-1: eyes and brows restored from the raw colours (ArtImportTests painted-face test)"
+    "_note": "rig-demolitions-1: eyes and brows restored from the raw colours (ArtImportTests painted-face test)",
+    "cool": 0.06
    }
   }
  ]

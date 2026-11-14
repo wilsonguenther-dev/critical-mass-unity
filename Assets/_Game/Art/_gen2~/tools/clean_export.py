@@ -379,16 +379,20 @@ def clean(e):
             # normalise, facing -Y) a face whose DARKEST raw sample (centre, corners, edge midpoints) is darker than
             # rel x the face's median skin brightness is painted the feature colour (code 0, never team-swapped).
             x0, x1, y0, y1, z0, z1 = ff["box"]
-            me = o.data; fi, lum = [], []
+            # The generated faces paint the eyes grey-blue and the brows mid brown (no near-black): a feature is a face whose
+            # darkest sample is below rel x the skin brightness (75th percentile of the mean) OR whose coolest sample has
+            # red - blue under `cool` (skin is warm, red well above blue; the eye paint is grey-blue).
+            me = o.data; fi, lum, mlum, warm = [], [], [], []
             for i, pg in enumerate(me.polygons):
                 c = pg.center
                 if not (x0 < c.x < x1 and y0 < c.y < y1 and z0 < c.z < z1):
                     continue
                 pts = [c] + [me.vertices[v].co for v in pg.vertices] + [c.lerp(me.vertices[v].co, 0.5) for v in pg.vertices]
-                fi.append(i); lum.append(min(float(np.mean(srccol[kd.find(q)[1]][:3])) for q in pts))
+                S = np.array([srccol[kd.find(q)[1]][:3] for q in pts])
+                fi.append(i); lum.append(float(S.mean(1).min())); mlum.append(float(S.mean())); warm.append(float((S[:, 0] - S[:, 2]).min()))
             if fi:
-                fi = np.array(fi); lum = np.array(lum); ref = float(np.median(lum))
-                dark = fi[lum < ff.get("rel", 0.6) * ref]
+                fi = np.array(fi); lum = np.array(lum); warm = np.array(warm); ref = float(np.percentile(mlum, 75))
+                dark = fi[(lum < ff.get("rel", 0.65) * ref) | (warm < ff.get("cool", 0.06))]
                 rgba[dark, :3] = hex2rgb(ff.get("colour", "#33241E")); rgba[dark, 3] = 0
                 facts.setdefault("face_features", {})[lv] = {"faces_in_box": int(len(fi)), "skin_ref": round(ref, 3),
                                                              "painted": int(len(dark))}
