@@ -18,6 +18,11 @@ namespace CriticalMass.Runtime.Menus.Story
     /// output (the AudioListener's mix, taken before the OS output, so a muted machine still records) to DIR/audio.wav.
     /// <c>-introSkipAt S</c> presses skip when the video clock reaches S seconds. The run keeps capturing for
     /// <c>-introCaptureTail S</c> seconds (default 4) after the intro ends (the hand-off into the title), then quits.</para>
+    /// <para>capture-gaps-1: <c>-introHandoff</c> adds the hand-off proof. From one second before IntroFilm.HandoffStart the
+    /// shots go to 10 a second (film to title dissolve); after the tail it presses Play Now from the title (the same call as
+    /// the title's button, Flow.PlayNow.Go), waits for the match, and writes match-0.jpg, match-1.jpg and match-3.jpg at
+    /// 0, 1 and 3 s of the match plus handoff.txt with the camera heading on screen (CameraHeading.Active), the chosen one
+    /// and whether it is the new default (CameraHeading.Creator, 135). The flow state at each step goes to the CSV.</para>
     /// </summary>
     public sealed class IntroFilmCapture : MonoBehaviour
     {
@@ -25,6 +30,17 @@ namespace CriticalMass.Runtime.Menus.Story
         static bool? _requested;
         static string _dir;
         static float _fps = 2f, _skipAt = -1f, _tail = 4f;
+        static bool _handoff;
+        /// <summary>Shots per second inside the hand-off window with -introHandoff.</summary>
+        public const float HandoffFps = 10f;
+        /// <summary>Seconds into the match at which -introHandoff writes match-N.jpg.</summary>
+        public static readonly float[] MatchShotSeconds = { 0f, 1f, 3f };
+
+        /// <summary>True when the film clock is inside the hand-off window (one second before the dissolve starts, onward).</summary>
+        public static bool InHandoffWindow(double filmClock) => filmClock >= IntroFilm.HandoffStart - 1.0;
+
+        /// <summary>Shot rate at a film clock: HandoffFps inside the window when the hand-off proof is on, else the base rate.</summary>
+        public static float RateAt(double filmClock, bool handoff, float baseFps) => handoff && InHandoffWindow(filmClock) ? Mathf.Max(baseFps, HandoffFps) : baseFps;
 
         /// <summary>True in a player started with -introCapture DIR.</summary>
         public static bool Requested
@@ -43,6 +59,7 @@ namespace CriticalMass.Runtime.Menus.Story
                     else if (k == "-introcapturefps" && Num(next, out float f) && f > 0f) { _fps = f; i++; }
                     else if (k == "-introskipat" && Num(next, out float s)) { _skipAt = s; i++; }
                     else if (k == "-introcapturetail" && Num(next, out float t) && t >= 0f) { _tail = t; i++; }
+                    else if (k == "-introhandoff") _handoff = true;
                 }
                 return _requested.Value;
             }
@@ -68,6 +85,7 @@ namespace CriticalMass.Runtime.Menus.Story
             IntroFilmAudioTap rec = null;
             float start = -1f, end = -1f, wait = 0f;
             int idx = 0;
+            float nextShot = 0f;
             bool skipped = false;
             int probed = 0;
             string lastMode = "";
@@ -101,8 +119,10 @@ namespace CriticalMass.Runtime.Menus.Story
                     skipped = true;
                     log.AppendLine(Row(-1, start, mode, rec, "skip"));
                 }
-                if (el >= idx / _fps)
+                if (el >= nextShot)
                 {
+                    // the film clock reads 0 once the film is done; the window then holds through the tail (the title fade-in)
+                    nextShot = el + 1f / RateAt(end >= 0f ? IntroFilm.Seconds : StoryIntro.FilmClock, _handoff, _fps);
                     Texture2D tex = ScreenCapture.CaptureScreenshotAsTexture();
                     File.WriteAllBytes(Path.Combine(_dir, "shot-" + idx.ToString("000") + ".jpg"), tex.EncodeToJPG(88));
                     Destroy(tex);
@@ -113,6 +133,7 @@ namespace CriticalMass.Runtime.Menus.Story
                 if (end >= 0f && el > end + _tail) break;
                 if (el > 70f) { log.AppendLine(Row(-1, start, mode, rec, "cap 70 s")); break; }
             }
+            if (_handoff) yield return MatchHandoff(log, start, rec);
             File.WriteAllText(Path.Combine(_dir, "capture.csv"), log.ToString());
             if (rec != null)
             {
@@ -121,6 +142,41 @@ namespace CriticalMass.Runtime.Menus.Story
             }
             Debug.Log("[intro capture] wrote " + idx + " shots to " + _dir);
             Application.Quit(0);
+        }
+
+        /// <summary>-introHandoff: Play Now from the title into a match; shots and the heading on screen at the match start.</summary>
+        IEnumerator MatchHandoff(StringBuilder log, float start, IntroFilmAudioTap rec)
+        {
+            var report = new StringBuilder("intro hand-off into a match\n");
+            float wait = 0f;
+            while (Flow.GameFlow.State != Flow.FlowState.Title && wait < 15f) { wait += Time.unscaledDeltaTime; yield return null; }
+            log.AppendLine(Row(-1, start, "flow", rec, "flow:" + Flow.GameFlow.State + " after " + wait.ToString("0.0", CultureInfo.InvariantCulture) + " s"));
+            report.AppendLine("title reached: " + (Flow.GameFlow.State == Flow.FlowState.Title) + " (state " + Flow.GameFlow.State + ")");
+            bool went = Flow.PlayNow.Go();
+            report.AppendLine("play now pressed: " + went);
+            log.AppendLine(Row(-1, start, "flow", rec, "play now " + went));
+            wait = 0f;
+            while ((Flow.GameFlow.State != Flow.FlowState.Match || FindAnyObjectByType<Game.SimDriverBehaviour>() == null) && wait < 30f)
+            { wait += Time.unscaledDeltaTime; yield return null; }
+            bool inMatch = Flow.GameFlow.State == Flow.FlowState.Match;
+            report.AppendLine("match reached: " + inMatch + " after " + wait.ToString("0.0", CultureInfo.InvariantCulture) + " s");
+            float m0 = Time.realtimeSinceStartup;
+            foreach (float at in MatchShotSeconds)
+            {
+                while (Time.realtimeSinceStartup - m0 < at) yield return null;
+                yield return new WaitForEndOfFrame();
+                Texture2D tex = ScreenCapture.CaptureScreenshotAsTexture();
+                File.WriteAllBytes(Path.Combine(_dir, "match-" + at.ToString("0", CultureInfo.InvariantCulture) + ".jpg"), tex.EncodeToJPG(88));
+                Destroy(tex);
+                UnityEngine.Camera cam = UnityEngine.Camera.main;
+                string yaw = cam != null ? cam.transform.eulerAngles.y.ToString("0.0", CultureInfo.InvariantCulture) : "none";
+                report.AppendLine("match-" + at.ToString("0", CultureInfo.InvariantCulture) + ": heading active " + Camera.CameraHeading.Active.ToString("0.#", CultureInfo.InvariantCulture)
+                    + ", chosen " + Camera.CameraHeading.Chosen.ToString("0.#", CultureInfo.InvariantCulture) + ", camera yaw " + yaw);
+            }
+            bool creator = Math.Abs(Camera.CameraHeading.Active - Camera.CameraHeading.Creator) < 0.5;
+            report.AppendLine("new default heading (" + Camera.CameraHeading.Creator + ") on screen: " + creator);
+            File.WriteAllText(Path.Combine(_dir, "handoff.txt"), report.ToString());
+            Debug.Log("[intro capture] hand-off: match " + inMatch + ", heading " + Camera.CameraHeading.Active + (creator ? " (new default)" : " (NOT the new default)"));
         }
 
         static readonly float[] _probeBuf = new float[2048];

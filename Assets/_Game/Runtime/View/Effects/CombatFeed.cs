@@ -237,7 +237,7 @@ namespace CriticalMass.Runtime.View.Effects
                     // A = attacker, Value = facing (radians). The swing effect starts at the attacker, along the real swing.
                     int s = ev.A;
                     if (s < 0 || s >= w.ActorCount) return false;
-                    Begin(FxKind.Swing, w, s, -1, w.X[s], w.Z[s], w.Config.Class(w.Actors[s].Cls).AttackArcDeg);
+                    Begin(FxKind.Swing, w, s, -1, w.X[s], w.Z[s], CriticalMass.Runtime.View.Anim.LightWeaponView.ArcDeg(w.Config, w.Actors[s].Cls)); // feat/light-weapons-2
                     _e.DirX = JsMath.Cos(ev.Value);
                     _e.DirZ = JsMath.Sin(ev.Value);
                     return true;

@@ -24,7 +24,8 @@ namespace CriticalMass.Runtime.View.WallDamage
     /// </summary>
     public static class MeshPieces
     {
-        public static readonly Color32 CrackColour = new Color32(0x1B, 0x22, 0x3A, 0xF0);
+        /// <summary>capture-gaps-1: fully opaque and a step darker (was 1B223A at F0), so the stroke holds against shaded stone.</summary>
+        public static readonly Color32 CrackColour = new Color32(0x12, 0x16, 0x28, 0xFF);
 
         static readonly List<Vector3> V = new List<Vector3>(), N = new List<Vector3>();
         static readonly List<Vector2> UV = new List<Vector2>();
@@ -292,7 +293,7 @@ namespace CriticalMass.Runtime.View.WallDamage
             }
             if (big.Count == 0 || maxArea <= 0f) return null;
             float size = piece.bounds.size.magnitude;
-            float seg = Mathf.Clamp(size * 0.16f, 0.12f, 0.42f), width = Mathf.Clamp(seg * 0.3f, 0.04f, 0.075f), lift = Mathf.Clamp(size * 0.005f, 0.006f, 0.015f);
+            float seg = Mathf.Clamp(size * 0.2f, DamageLook.CrackSegMin, DamageLook.CrackSegMax), width = Mathf.Clamp(seg * 0.4f, DamageLook.CrackWidthMin, DamageLook.CrackWidthMax), lift = Mathf.Clamp(size * 0.005f, 0.006f, 0.015f);
             V.Clear(); N.Clear(); UV.Clear(); C.Clear();
             var idx = new List<int>();
             for (int l = 0; l < lines; l++)

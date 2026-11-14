@@ -120,6 +120,10 @@ namespace CriticalMass.Runtime.Hud.Ui
         public static string FitWithEllipsis(Text t, string s, float w)
         {
             if (s == null) s = string.Empty;
+            // fix/hud-containment-3: a contained label takes the one rule (word-end ellipsis, measured at the drawn scale);
+            // cutting it here letter by letter re-ran the rule on every try and could leave a mid-word cut.
+            ContainedText c = ContainedText.Of(t);
+            if (c != null) { c.SetSource(s); return t.text; }
             t.text = s;
             if (s.Length == 0 || t.preferredWidth <= w + 0.5f) return s;
             string dots = t.font != null && t.font.HasCharacter('…') ? "…" : "...";

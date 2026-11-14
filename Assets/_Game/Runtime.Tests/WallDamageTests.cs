@@ -182,6 +182,47 @@ namespace CriticalMass.Runtime.Tests
             Object.DestroyImmediate(box);
         }
 
+        [Test]
+        public void TheCrackedStageReadsFromTheDefaultGameplayCamera()
+        {
+            // capture-gaps-1: three stages must read at gameplay distance (intact, cracked, broken).
+            float d = (float)CriticalMass.Runtime.Camera.GameplayCamera.Distance, fov = (float)CriticalMass.Runtime.Camera.GameplayCamera.FovDeg;
+            Assert.GreaterOrEqual(DamageLook.PixelsAt(2f * DamageLook.CrackWidthMin, d, fov, 1080), 10f, "the thinnest crack stroke is at least 10 px across at 1080p");
+            Assert.GreaterOrEqual(DamageLook.CrackLines(3), 16, "a cracked block carries many strokes");
+            Assert.GreaterOrEqual(BreakableCellSet.CrackedTint.a, 0x90, "a cracked block is clearly darker");
+            Assert.AreEqual(255, MeshPieces.CrackColour.a, "strokes are opaque");
+            Assert.GreaterOrEqual(DamageLook.CrackedLeanDeg, 9f, "a cracked block sits visibly askew");
+
+            // The baked strokes on a real block really are that wide: every strip quad is at least CrackWidthMin across.
+            World w = NewWorld();
+            Mesh box = Boxes(w.Map, new List<int> { 0 });
+            Mesh cracks = MeshPieces.CrackMesh(box, 7, 3);
+            Assert.IsNotNull(cracks);
+            Vector3[] v = cracks.vertices;
+            Assert.Greater(v.Length, 0);
+            float narrowest = float.MaxValue;
+            for (int q = 0; q + 3 < v.Length; q += 4)
+            {
+                float wide = Vector3.Distance(v[q], v[q + 1]);     // p - side to p + side: the stroke's full width at its start
+                if (wide < narrowest) narrowest = wide;
+            }
+            Assert.GreaterOrEqual(narrowest, DamageLook.CrackWidthMin * 0.7f * 2f * 0.99f, "the thinnest strip (a branch, 0.7 x) is still wide");
+            Object.DestroyImmediate(cracks);
+            Object.DestroyImmediate(box);
+        }
+
+        [Test]
+        public void TheBuildCaptureMinerStandsFarEnoughFromHisOwnBarricadeTile()
+        {
+            // capture-gaps-1: the barricade keep-out counts the Miner himself (Barricades: MinDistanceFromActor + his radius),
+            // so one cell (1.0 u) in front is always refused and two cells (2.0 u, StagedBuildCapture) is legal and in range.
+            GameConfig c = GameConfig.CreateDefault();
+            double keepOut = c.Abilities.MinerBarricade.MinDistanceFromActor + c.Class(ClassId.Miner).Radius;
+            Assert.Greater(keepOut, 1.0, "one cell is inside the Miner's own keep-out");
+            Assert.Less(keepOut, 2.0, "two cells clear it");
+            Assert.GreaterOrEqual(c.Abilities.MinerBarricade.PlaceRange, 2.0, "two cells is within reach");
+        }
+
         // ------------------------------------------------------------------ rubble
 
         [Test]

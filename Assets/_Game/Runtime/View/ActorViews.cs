@@ -62,6 +62,9 @@ namespace CriticalMass.Runtime.View
         private double _eggIdleT;
         private readonly Anim.KaijuAnimator _kaijuAnim = new Anim.KaijuAnimator();
         private Anim.CarryProp _carryProp;
+        /// <summary>feat/light-weapons-2: the light weapons in the hand (its own listener file).</summary>
+        private Anim.WeaponProps _weaponProps;
+        public Anim.WeaponProps WeaponProps => _weaponProps;
         private Anim.ActorPoseState _poseState;
 
         private Transform[] _nodes;
@@ -95,6 +98,8 @@ namespace CriticalMass.Runtime.View
             for (int i = 0; i < capacity; i++) _actors[i] = new CharSlot { Anim = new Anim.ActorAnimator(i) };
             _carryProp = new Anim.CarryProp(_catalog);
             Anim.PostPoseHooks.Register(_carryProp);
+            _weaponProps = new Anim.WeaponProps(_catalog);
+            Anim.PostPoseHooks.Register(_weaponProps);
             // DG-108: one model per class built before the first tick, so the match never instantiates mid-fight.
             foreach (ClassId c in ClassIds.All)
             {
@@ -148,6 +153,7 @@ namespace CriticalMass.Runtime.View
         private void OnDestroy()
         {
             if (_carryProp != null) Anim.PostPoseHooks.Unregister(_carryProp);
+            if (_weaponProps != null) Anim.PostPoseHooks.Unregister(_weaponProps);
             foreach (Stack<ModelView> s in _pool.Values) foreach (ModelView m in s) m.Dispose();
         }
 
@@ -169,6 +175,24 @@ namespace CriticalMass.Runtime.View
             var m = new ModelView(e, parent != null ? parent : transform, objectName);
             m.SetActive(false);
             return m;
+        }
+
+        /// <summary>
+        /// perf/fullscreen-cost-1: new fighter models built per frame. The walk saw one 80 ms frame at match start where all
+        /// 32 rigs were instantiated at once (and the 449 ms start frame carried 14 ms of them). Pooled models are free;
+        /// beyond this many new ones a fighter waits a frame (drawn as nothing, never as the capsule), the local player
+        /// first. 32 fighters are all built within 6 frames, behind the loading screen in a normal match.
+        /// </summary>
+        public const int NewModelsPerFrame = 6;
+        int _newModelsLeft;
+
+        /// <summary>True when a model for key can be had this frame (one waits in the pool, or the build budget allows one).</summary>
+        private bool CanTake(string key)
+        {
+            if (_pool.TryGetValue(key, out Stack<ModelView> s) && s.Count > 0) return true;
+            if (_newModelsLeft <= 0) return false;
+            _newModelsLeft--;
+            return true;
         }
 
         private ModelView Take(string key, string objectName)
@@ -236,8 +260,10 @@ namespace CriticalMass.Runtime.View
             if (CriticalMass.Runtime.Camera.GroundView.LodActive) _targetPos = CriticalMass.Runtime.Camera.GroundView.LodAnchor;
             else if (w.ActorCount > 0 && w.Actors[0].Alive) _targetPos = SimSpace.ToWorld(Lerp(w.PrevX[0], w.X[0], a), 0, Lerp(w.PrevZ[0], w.Z[0], a));
             if (_stressHill) _targetPos = SimSpace.ToWorld(map.Hill.X, 0, map.Hill.Z);
+            _lowView = CriticalMass.Runtime.Camera.GroundView.ActiveView != CriticalMass.Runtime.Camera.CameraView.TopDown;
             _lodCut = CrowdCutNow(w, map, a);
             int models = 0;
+            _newModelsLeft = NewModelsPerFrame;
             Anim.AnimLod.BeginFrame();
             // feat/follow-camera-1: frustum and distance culling for the low views, and the drawn / culled / triangle counts.
             CriticalMass.Runtime.Camera.ViewCull.Begin(_cam, CriticalMass.Runtime.Camera.GroundView.LodActive);
@@ -287,6 +313,11 @@ namespace CriticalMass.Runtime.View
             }
             if (alive && key != null && slot.Model == null)
             {
+                if (!CanTake(key))
+                {
+                    if (slot.Capsule != null && slot.Capsule.gameObject.activeSelf) slot.Capsule.gameObject.SetActive(false);
+                    return false;
+                }
                 slot.Model = Take(key, ActorName(i, key));
                 slot.Anim.Reset();
             }
@@ -330,12 +361,12 @@ namespace CriticalMass.Runtime.View
             }
             if (CriticalMass.Runtime.Camera.GroundView.LodActive)
             {
-                // feat/follow-camera-1: first person hides your own body (the lens sits in its head); any other fighter
-                // standing on the line from the camera to you is not drawn, so you never lose your character behind one;
-                // fighters outside the view or beyond the draw distance are not posed or drawn (their effects skip too).
+                // feat/follow-camera-1: first person hides your own body (the lens sits in its head); fighters outside the
+                // view or beyond the draw distance are not posed or drawn (their effects skip too). follow-camera-2: a
+                // fighter on the line from the camera to you is no longer hidden here: the toon shader dithers it
+                // (CMToonFadeClip, set by GroundView), so it reads as a ghost instead of vanishing.
                 Vector3 at = SimSpace.ToWorld(x, h, z);
-                bool hide = (i == 0 && CriticalMass.Runtime.Camera.GroundView.HideSelf)
-                    || (i != _lodSelf && CriticalMass.Runtime.Camera.ViewCull.InCorridor(_camPos, _targetPos, at, CorridorMetres));
+                bool hide = i == 0 && CriticalMass.Runtime.Camera.GroundView.HideSelf;
                 bool culled = !hide && i != _lodSelf && !CriticalMass.Runtime.Camera.ViewCull.Visible(at, 1.5f, 2.6f);
                 if (hide || culled)
                 {
@@ -347,7 +378,12 @@ namespace CriticalMass.Runtime.View
             m.SetActive(true);
             m.ApplyTier();
             QualityRow row = QualityTable.Current;
-            m.SetLod(AnimLod.PickLod(i == _lodSelf, Vector3.Distance(SimSpace.ToWorld(x, 0, z), _targetPos), _lodCut, row));
+            Vector3 lodAt = SimSpace.ToWorld(x, 0, z);
+            if (_lowView)   // follow-camera-3: low views pick by distance from the camera (FollowCamera.LowViewLod)
+                m.SetLod(CriticalMass.Runtime.Camera.FollowCamera.LowViewLod(i == _lodSelf, Vector3.Distance(lodAt, CriticalMass.Runtime.Camera.ViewCull.CamPos), Vector3.Distance(lodAt, _targetPos), _lodCut));
+            else
+                m.SetLod(AnimLod.PickLod(i == _lodSelf, Vector3.Distance(lodAt, _targetPos), _lodCut, row));
+            if (i == _lodSelf) SelfRim(m, _lowView && CriticalMass.Runtime.Camera.GroundView.ActiveView == CriticalMass.Runtime.Camera.CameraView.ThirdPerson);
             Vector3 basePos = SimSpace.ToWorld(x, h, z);
             m.Transform.localPosition = basePos + (hasFx ? fx.Nudge : Vector3.zero) + JumpLift.Offset(w, map, i, a, x, z); // DG-02 jump arc
             Material teamMat = ArtMaterials.ForTeam(m.Spec, actor.Team);
@@ -361,6 +397,35 @@ namespace CriticalMass.Runtime.View
         }
 
         private float _lodCut = float.PositiveInfinity;
+        private bool _lowView;
+
+        // follow-camera-3: a light rim on your own fighter in third person, so you read in a crowd. One shared property
+        // block on that model's renderers (outline colour and width); cleared when the view changes back. No new material,
+        // no extra pass (the toon outline pass already draws); costs that one model its batching only.
+        static readonly int OutlineColorId = Shader.PropertyToID("_OutlineColor"), OutlinePxId = Shader.PropertyToID("_OutlinePx");
+        public static readonly Color SelfRimColor = new Color(1f, 0.96f, 0.82f, 1f);
+        public const float SelfRimPx = 3.5f;
+        private MaterialPropertyBlock _rimBlock;
+        private ModelView _rimModel;
+
+        private void SelfRim(ModelView m, bool on)
+        {
+            if (on && _rimModel == m) return;
+            if (_rimModel != null)
+            {
+                for (int r = 0; r < _rimModel.Renderers.Length; r++) if (_rimModel.Renderers[r] != null) _rimModel.Renderers[r].SetPropertyBlock(null);
+                _rimModel = null;
+            }
+            if (!on) return;
+            if (_rimBlock == null)
+            {
+                _rimBlock = new MaterialPropertyBlock();
+                _rimBlock.SetColor(OutlineColorId, SelfRimColor);
+                _rimBlock.SetFloat(OutlinePxId, SelfRimPx);
+            }
+            for (int r = 0; r < m.Renderers.Length; r++) if (m.Renderers[r] != null) m.Renderers[r].SetPropertyBlock(_rimBlock);
+            _rimModel = m;
+        }
         private float[] _lodScratch = new float[64];
 
         /// <summary>perf-60hz-32p crowd budget: the LOD0 cut distance this frame (the row's Lod0Budget-th nearest fighter
@@ -368,6 +433,7 @@ namespace CriticalMass.Runtime.View
         private float CrowdCutNow(World w, MapDef map, double a)
         {
             int budget = QualityTable.Current.Lod0Budget;
+            if (_lowView) budget = budget < 0 ? CriticalMass.Runtime.Camera.FollowCamera.LowLod0Budget : Math.Min(budget, CriticalMass.Runtime.Camera.FollowCamera.LowLod0Budget);
             if (budget < 0) return float.PositiveInfinity;
             if (_lodScratch.Length < w.ActorCount) _lodScratch = new float[w.ActorCount];
             int n = 0;

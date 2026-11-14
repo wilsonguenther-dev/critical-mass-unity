@@ -209,8 +209,9 @@ namespace CriticalMass.Runtime.Menu
             if (t == null) return null;
             // hud-containment-1: the one text rule (TextFit) instead of Unity's best fit, which with wrap plus vertical
             // truncate dropped a line or cut a word in half. The box allows a second line when it is tall enough.
-            t.resizeTextMaxSize = Mathf.Max(t.fontSize, min);
-            t.resizeTextMinSize = Mathf.Min(min, t.fontSize);
+            int top = ContainedText.Of(t)?.MaxSize ?? t.fontSize;   // fix/hud-containment-3: the built size, not a shrunk one
+            t.resizeTextMaxSize = Mathf.Max(top, min);
+            t.resizeTextMinSize = Mathf.Min(min, top);
             t.resizeTextForBestFit = false;
             ContainedText.Attach(t, t.resizeTextMaxSize, t.resizeTextMinSize);
             return t;

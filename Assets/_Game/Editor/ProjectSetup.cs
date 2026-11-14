@@ -224,6 +224,13 @@ namespace CriticalMass.Editor
                 r.renderingMode = RenderingMode.Forward;
                 EditorUtility.SetDirty(r);
             }
+            // perf/fullscreen-cost-1: no forced intermediate colour target (and its full-screen copy to the screen every
+            // frame) at native scale; URP still makes one whenever something needs it (render scale, a colour copy).
+            if (r.intermediateTextureMode != IntermediateTextureMode.Auto)
+            {
+                r.intermediateTextureMode = IntermediateTextureMode.Auto;
+                EditorUtility.SetDirty(r);
+            }
             return r;
         }
 

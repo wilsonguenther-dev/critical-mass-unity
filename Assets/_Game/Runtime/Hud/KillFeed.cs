@@ -381,10 +381,43 @@ namespace CriticalMass.Runtime.Hud
             Push(e, local, w != null ? w.Kaiju.State : KaijuState.Neutral);
         }
 
-        /// <summary>Adds a knock-out line (newest on top, the oldest drops off).</summary>
+        // ---- lane cap and queue (hud-containment-2). Five lines show at most. A new line waits in a small queue while all
+        // five are younger than MinShowSeconds, so a burst of knock-outs no longer flicks lines past unread; when the queue
+        // is full the oldest waiting line is dropped (the newest news wins).
+        public const float MinShowSeconds = 1.2f;
+        public const int QueueCap = 6;
+        readonly CombatEvent[] _queueEvent = new CombatEvent[QueueCap];
+        readonly int[] _queueLocal = new int[QueueCap];
+        readonly KaijuState[] _queueKaiju = new KaijuState[QueueCap];
+        int _queueHead, _queueCount;
+        /// <summary>Lines waiting for a free row (tests and captures).</summary>
+        public int Queued => _queueCount;
+
+        bool RowFree()
+        {
+            Slot oldest = _slots[_order[Lines - 1]];
+            return !oldest.Active || oldest.Age >= MinShowSeconds;
+        }
+
+        /// <summary>Adds a knock-out line: newest on top; it waits in the queue while all five rows are still fresh.</summary>
         public void Push(CombatEvent e, int localActor, KaijuState kaiju)
         {
             if (Canvas == null) Build();
+            if (_queueCount > 0 || !RowFree())
+            {
+                if (_queueCount == QueueCap) { _queueHead = (_queueHead + 1) % QueueCap; _queueCount--; }
+                int at = (_queueHead + _queueCount) % QueueCap;
+                _queueEvent[at] = e;
+                _queueLocal[at] = localActor;
+                _queueKaiju[at] = kaiju;
+                _queueCount++;
+                return;
+            }
+            Show(e, localActor, kaiju);
+        }
+
+        void Show(CombatEvent e, int localActor, KaijuState kaiju)
+        {
             int slotIx = _order[Lines - 1];
             for (int r = Lines - 1; r > 0; r--) _order[r] = _order[r - 1];
             _order[0] = slotIx;
@@ -445,6 +478,13 @@ namespace CriticalMass.Runtime.Hud
         /// <summary>Ages, fades and slides the lines (dt = 0 holds them, as while paused).</summary>
         public void Tick(float dt)
         {
+            if (_queueCount > 0 && RowFree())
+            {
+                int at = _queueHead;
+                _queueHead = (_queueHead + 1) % QueueCap;
+                _queueCount--;
+                Show(_queueEvent[at], _queueLocal[at], _queueKaiju[at]);
+            }
             for (int r = 0; r < Lines; r++)
             {
                 Slot s = _slots[_order[r]];
@@ -470,6 +510,7 @@ namespace CriticalMass.Runtime.Hud
         /// <summary>Removes every line (a new match).</summary>
         public void Clear()
         {
+            _queueHead = _queueCount = 0;
             for (int i = 0; i < Lines; i++)
             {
                 _slots[i].Active = false;

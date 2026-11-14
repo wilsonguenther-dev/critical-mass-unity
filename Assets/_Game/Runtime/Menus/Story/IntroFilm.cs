@@ -19,6 +19,12 @@ namespace CriticalMass.Runtime.Menus.Story
     /// </summary>
     public static class IntroFilm
     {
+        /// <summary>
+        /// first-minutes-1 (walk 1 #10): bottom of the SPACE SKIP hint in reference pixels (1920 x 1080). It sat at 24 and drew
+        /// over the version stamp (PerfOverlay, bottom right); now it clears the stamp's whole line (PerfOverlay.VersionTopPx).
+        /// </summary>
+        public const float SkipBottomPx = 64f;
+
         public const string FileName = "Story/intro-film-1.mp4";
         public const string TableResource = "Story/intro-film";
         public const float Seconds = 1420f / 30f;              // 47.333 s
@@ -412,7 +418,7 @@ namespace CriticalMass.Runtime.Menus.Story
             _skip = HudText.Make(fade, "Skip", CMTokens.Display, UiScale.TypeBody, CMTokens.WarmCream.Color, TextAnchor.LowerRight, 2f);
             RectTransform krt = _skip.rectTransform;
             krt.anchorMin = krt.anchorMax = krt.pivot = new Vector2(1f, 0f);
-            krt.anchoredPosition = new Vector2(-40f, 24f);
+            krt.anchoredPosition = new Vector2(-40f, IntroFilm.SkipBottomPx);   // first-minutes-1 (walk 1 #10): above the version stamp
             krt.sizeDelta = new Vector2(500f, 40f);
             _skip.raycastTarget = false;
             _skip.enabled = false;

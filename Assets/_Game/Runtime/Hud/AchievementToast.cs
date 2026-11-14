@@ -240,6 +240,7 @@ namespace CriticalMass.Runtime.Hud
                 HudText.Set(_line, Achievements.All[_showing].Description);
                 _toast.gameObject.SetActive(true);
             }
+            HudZones.Hold(HudZone.Toast, HudPriority.Banner);   // hud-containment-2: notices wait behind the toast (ToastLane)
             _age += dt;
             float total = InSeconds + HoldSeconds + OutSeconds;
             if (_age >= total)

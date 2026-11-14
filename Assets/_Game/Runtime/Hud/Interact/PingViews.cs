@@ -155,6 +155,23 @@ namespace CriticalMass.Runtime.Hud.Interact
     /// </summary>
     public sealed class PingMarkers
     {
+        /// <summary>
+        /// fix/hud-containment-3: a world ping marker never sits on the bottom corners' panels. The left corner (player
+        /// card, class kit, coin chip: the left stack up to the kit's top) and the right corner (minimap) push the marker up
+        /// to just above them. local and r are in the marker root's units (reference px), r the root's rect.
+        /// </summary>
+        public static Vector2 OffPanels(Vector2 local, Rect r)
+        {
+            const float pad = 24f;
+            float leftRight = r.xMin + Mathf.Max(HudZones.PlayerCard.xMax, HudZones.Kit.xMax) + pad;
+            float leftTop = r.yMin + (HudLayout.RefH - HudZones.Kit.y) + pad;
+            if (local.x < leftRight && local.y < leftTop) local.y = leftTop;
+            float rightLeft = r.xMax - (HudLayout.RefW - HudZones.Minimap.x) - pad;
+            float rightTop = r.yMin + (HudLayout.RefH - HudZones.Minimap.y) + pad;
+            if (local.x > rightLeft && local.y < rightTop) local.y = rightTop;
+            return local;
+        }
+
         const int N = PingBook.Capacity;
         const float PopSeconds = 0.22f, EdgePad = 64f;
         readonly RectTransform[] _world = new RectTransform[N];
@@ -274,6 +291,7 @@ namespace CriticalMass.Runtime.Hud.Interact
                     local.y = Mathf.Clamp(local.y, r.yMin + EdgePad, r.yMax - EdgePad);
                     scale *= 0.8f;
                 }
+                local = OffPanels(local, r);   // fix/hud-containment-3 (walk: ping markers on the class card)
                 _world[i].anchoredPosition = local;
                 _world[i].localScale = new Vector3(scale, scale, 1f);
                 _worldGroup[i].alpha = a;

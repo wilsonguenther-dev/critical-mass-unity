@@ -7,7 +7,7 @@ namespace CriticalMass.Runtime.Camera
     /// The gameplay camera's heading (RenderConfig.CameraYawDeg for the match). The creator's angle (135, 2026-11-13: "rotate
     /// it so red base is bottom left", the eye travels up and to the right toward the Azure base) is the default; the
     /// classic diamond (45: Azure top-left, Crimson bottom-right) stays a setting so the two can be compared. Which one is
-    /// the default is CreatorAngleIsDefault (today: the classic diamond, until the owner signs off the creator's angle).
+    /// the default is CreatorAngleIsDefault (today: true, the creator's angle; set it false to make the classic diamond the default again).
     /// SimDriverBehaviour writes the chosen heading into the match config (an automation -cameraYaw still wins) and sets
     /// Active, which the screen-relative controls, the minimap and ground view read, so the screen, the stick and the
     /// minimap always agree. View only: the Sim never reads a heading.

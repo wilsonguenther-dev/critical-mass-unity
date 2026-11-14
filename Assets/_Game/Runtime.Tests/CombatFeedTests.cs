@@ -199,7 +199,7 @@ namespace CriticalMass.Runtime.Tests
             {
                 KillFeed feed = go.AddComponent<KillFeed>();
                 feed.Build();
-                for (int i = 0; i < 7; i++)
+                for (int i = 0; i < KillFeed.Lines; i++)
                 {
                     var e = new CombatEvent { Kind = CombatEventKind.Knockout, Actor = 17 + i, Other = 1, ActorTeam = TeamId.Crimson, OtherTeam = TeamId.Azure, OtherClass = ClassId.Miner, ActorClass = ClassId.Farmer };
                     feed.Push(e, 0, KaijuState.Egg);

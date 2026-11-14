@@ -25,6 +25,18 @@ namespace CriticalMass.Runtime.View.Skills
     /// 4-blast +1.7 s for TNT) and the peak also as the normal full screen (...-2-peak-wide.png). The Kaiju part forces the
     /// hatch (World.ForceHatch, the rules' own switch), stands the fighters next to it and shoots the claw wind-up and hit and
     /// the slam telegraph and slam. Every press logs "[CM.Skill] class-skill: FIRED" or "REFUSED (reason)".
+    /// <para>capture-gaps-1: five presses never fired on the open stage. Why, from the rules:
+    /// Miner barricade: the aimed tile must be at least MinDistanceFromActor (0.9) plus a body radius from EVERY actor, the
+    /// Miner himself included; the 1.8 u aim landed on a tile within 1.35 u of the Miner or of the enemy held 1.3 u ahead
+    /// (RefusedOccupied). Miner dig: the world-wide terrain gap (WallChangeTick + MinGapTicks) was still running a few ticks
+    /// after the reset (RefusedRate, -5), and the 1.2 u aim cell could touch the Miner's own circle or a held enemy (-3).
+    /// Miner place: the team terrain cooldown and the gap restart at the pre-dig, 23 ticks before the press (-5).
+    /// Builder build: a ladder or bridge needs a wall, cliff, gap or water edge ahead and a full bank; the open stage has
+    /// neither. Healer purify: needs corruption delivered (net units above 0) with the egg unhatched; a fresh match has none.
+    /// Now each of those skills is staged legally with the sim's own checks: the held fighters step 5 u behind, the Miner's aim
+    /// is searched around him (then across the map) until BarricadeRefusal or DigRefusal says 0, the terrain gap and team
+    /// cooldown are cleared before each terrain press (fixture, as after a long match), the Builder stands at a site where
+    /// BuildRefusal is 0 with a filled bank, and the Healer stage gets four corruption units delivered by the other team.</para>
     /// </summary>
     public sealed class SkillCapture : MonoBehaviour
     {
@@ -42,6 +54,7 @@ namespace CriticalMass.Runtime.View.Skills
         readonly double[] _heldX = new double[4], _heldZ = new double[4];
         int _heldCount;
         double _dirX = 1, _dirZ;
+        double _aimX = double.NaN, _aimZ = double.NaN;   // a legal aim found by StageLegal (NaN = the default reach ahead)
         bool _bots;
 
         void Start()
@@ -162,6 +175,7 @@ namespace CriticalMass.Runtime.View.Skills
             _driver.TimeScale = 0;
             AutoplayArgs.ClockHeld = true;
             _heldCount = 0;
+            _aimX = _aimZ = double.NaN;
             SimDriverBehaviour.ScriptedHumanFrame = Clear();
             Step(3);
             Place(w);
@@ -290,6 +304,7 @@ namespace CriticalMass.Runtime.View.Skills
 
         void Aim(World w, SkillVisual v)
         {
+            if (!double.IsNaN(_aimX)) { _frame.AimX = _aimX; _frame.AimZ = _aimZ; return; }
             double reach;
             switch (v.Id)
             {
@@ -333,12 +348,15 @@ namespace CriticalMass.Runtime.View.Skills
             World w = _driver.World;
             double hz = w.Config.SimHz;
             string n = cls.ToString().ToLowerInvariant() + "-" + v.Key;
+            if (NeedsLegalStage(v.Id)) StageLegal(w, v, n);
             if (v.Id == SkillId.MinerPlace)
             {
                 // place needs a carried block and a hole: dig the cell first (not shot), then switch to Place mode
                 Clear(); Aim(w, v);
+                OpenTerrainGap(w);
                 _frame.Terraform = true; Step(2); _frame.Terraform = false; Step(20);
                 _frame.TerraformSwitch = true; Step(1); _frame.TerraformSwitch = false; Step(2);
+                OpenTerrainGap(w);   // the dig restarted the gap and the team cooldown: clear them again for the place
                 Log(n + ": pre-dig terraform code " + _view.Core.LastTerraformCode);
             }
             if (v.Id == SkillId.HealerPurify)
@@ -388,6 +406,130 @@ namespace CriticalMass.Runtime.View.Skills
                 if (w.Tick < at) Step(at - w.Tick);
                 yield return Shot(n + "-4-blast", focus, false);
             }
+        }
+
+        static bool NeedsLegalStage(SkillId id) =>
+            id == SkillId.MinerBarricade || id == SkillId.MinerDig || id == SkillId.MinerPlace || id == SkillId.BuilderBuild || id == SkillId.HealerPurify;
+
+        /// <summary>Fixture: the terrain-change gap and both teams' terrain cooldowns long past (as after a long match).</summary>
+        static void OpenTerrainGap(World w)
+        {
+            w.WallChangeTick = w.Tick - 1000000;
+            int[] r = w.Terraform != null ? w.Terraform.TeamReadyTick : null;
+            if (r != null) for (int i = 0; i < r.Length; i++) r[i] = 0;
+        }
+
+        /// <summary>The held fighters step 5 u behind (or beside) actor 0, out of every placement and occupancy check.</summary>
+        void ClearCast(World w)
+        {
+            for (int k = 0; k < _heldCount; k++)
+            {
+                double back = 5 + k * 1.2;
+                double x = w.X[0] - _dirX * back, z = w.Z[0] - _dirZ * back;
+                if (!Floor(w, x, z)) { x = w.X[0] + _dirZ * back; z = w.Z[0] - _dirX * back; }
+                if (!Floor(w, x, z)) { x = w.X[0] - _dirZ * back; z = w.Z[0] + _dirX * back; }
+                if (!Floor(w, x, z)) continue;
+                _heldX[k] = x;
+                _heldZ[k] = z;
+                Put(w, _held[k], x, z);
+            }
+        }
+
+        /// <summary>A legal Miner aim from where actor 0 stands (16 directions, reach first), checked with the sim's own refusal.</summary>
+        bool MinerAim(World w, SkillId id)
+        {
+            double range = id == SkillId.MinerBarricade ? w.Config.Abilities.MinerBarricade.PlaceRange : w.Config.Abilities.MinerTerraform.Reach;
+            double facing = w.Actors[0].Facing;
+            for (int f = 0; f < 16; f++)
+            {
+                double a = f * Math.PI / 8, dx = Math.Cos(a), dz = Math.Sin(a);
+                for (int s = 0; s < 3; s++)
+                {
+                    double d = range * (1.0 - 0.2 * s);
+                    double ax = w.X[0] + dx * d, az = w.Z[0] + dz * d;
+                    w.Actors[0].Facing = Math.Atan2(dz, dx);
+                    int code;
+                    if (id == SkillId.MinerBarricade) code = Barricades.BarricadeRefusal(w, 0, ax, az);
+                    else code = Terraform.TargetCell(w, 0, ax, az, out int cx, out int cz) ? Terraform.DigRefusal(w, cx, cz) : Terraform.RefusedOutside;
+                    if (code != 0) continue;
+                    _dirX = dx; _dirZ = dz; _aimX = ax; _aimZ = az;
+                    return true;
+                }
+            }
+            w.Actors[0].Facing = facing;
+            return false;
+        }
+
+        /// <summary>A Builder site where BuildRefusal is 0 (the bank filled first), nearest the staged spot.</summary>
+        bool BuildSite(World w)
+        {
+            if (w.Builder != null && w.Builder.Spent != null)
+            {
+                int t = (int)w.Actors[0].Team;
+                w.Builder.Spent[t] = Math.Min(w.Builder.Spent[t], -20.0);   // fixture: enough material for any build
+            }
+            MapDef m = w.Map;
+            double ox = w.X[0], oz = w.Z[0], best = double.MaxValue;
+            int bx = -1, bz = 0, bd = 0;
+            int[] sx = { 1, -1, 0, 0 }, sz = { 0, 0, 1, -1 };
+            for (int cz = 1; cz < m.Height - 1; cz++)
+                for (int cx = 1; cx < m.Width - 1; cx++)
+                {
+                    if (m.Cells[cz * m.Width + cx] != Cell.Floor) continue;
+                    double ddx = cx + 0.5 - ox, ddz = cz + 0.5 - oz, d2 = ddx * ddx + ddz * ddz;
+                    if (d2 >= best) continue;
+                    for (int d = 0; d < 4; d++)
+                    {
+                        Put(w, 0, cx + 0.5, cz + 0.5);
+                        w.Actors[0].Facing = Math.Atan2(sz[d], sx[d]);
+                        if (BuiltPieces.BuildRefusal(w, 0, sx[d], sz[d]) != 0) continue;
+                        best = d2; bx = cx; bz = cz; bd = d;
+                        break;
+                    }
+                }
+            if (bx < 0) { Put(w, 0, ox, oz); return false; }
+            Put(w, 0, bx + 0.5, bz + 0.5);
+            _dirX = sx[bd]; _dirZ = sz[bd];
+            w.Actors[0].Facing = Math.Atan2(_dirZ, _dirX);
+            _aimX = bx + 0.5 + _dirX * 2.0;
+            _aimZ = bz + 0.5 + _dirZ * 2.0;
+            return true;
+        }
+
+        /// <summary>Stage the five skills that need more than open floor (see the class notes), with the sim's own checks.</summary>
+        void StageLegal(World w, SkillVisual v, string n)
+        {
+            OpenTerrainGap(w);
+            if (v.Id == SkillId.HealerPurify)
+            {
+                TeamId other = w.Actors[0].Team == TeamId.Azure ? TeamId.Crimson : TeamId.Azure;
+                if (!(Cleanse.NetCorruptionUnits(w) > 0)) w.Match.Delivered[(int)other].Corruption += 4;   // fixture
+                if (w.Healer != null && w.Healer.PurifyReadyTick != null && w.Healer.PurifyReadyTick.Length > 0) w.Healer.PurifyReadyTick[0] = 0;
+                Log(n + ": staged corruption net " + Cleanse.NetCorruptionUnits(w).ToString("0.0") + " units, cleanse open " + Cleanse.CleanseOpen(w)
+                    + " (phase " + w.Match.Phase + ")");
+                return;
+            }
+            if (v.Id == SkillId.BuilderBuild)
+            {
+                bool ok = BuildSite(w);
+                ClearCast(w);
+                Log(n + ": " + (ok ? "legal build site at (" + w.X[0].ToString("0.0") + ", " + w.Z[0].ToString("0.0") + ") step (" + _dirX + ", " + _dirZ + ")" : "no legal build site on the map"));
+                return;
+            }
+            ClearCast(w);
+            if (MinerAim(w, v.Id)) { Log(n + ": legal aim at the staged spot (" + _aimX.ToString("0.0") + ", " + _aimZ.ToString("0.0") + ")"); return; }
+            MapDef m = w.Map;
+            double mx = m.Width * 0.5, mz = m.Height * 0.5;
+            for (int cz = 3; cz < m.Height - 3; cz += 2)
+                for (int cx = 3; cx < m.Width - 3; cx += 2)
+                {
+                    double x = cx + 0.5, z = cz + 0.5;
+                    if ((x - mx) * (x - mx) + (z - mz) * (z - mz) < 81 || !Floor(w, x, z)) continue;
+                    Put(w, 0, x, z);
+                    ClearCast(w);
+                    if (MinerAim(w, v.Id)) { Log(n + ": legal aim from (" + x + ", " + z + ") at (" + _aimX.ToString("0.0") + ", " + _aimZ.ToString("0.0") + ")"); return; }
+                }
+            Log(n + ": no legal aim found on the map");
         }
 
         IEnumerator KaijuShots()

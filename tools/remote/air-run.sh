@@ -37,6 +37,7 @@ while [ $# -gt 0 ]; do
     --camera-yaw) CAMYAW="$2"; shift 2 ;;
     --extra) EXTRA="$2"; shift 2 ;;
     --player-args) PLAYERARGS="$2"; shift 2 ;;
+    --no-autoplay) NOAUTO=1; shift ;;   # integration/batch-10: screen walks (-flowShots) that must not get -autoplay; the capture quits itself
     --keep) KEEP="$2"; shift 2 ;;
     --exec) EXEC="$2"; shift 2 ;;
     --lock-wait) LOCK_WAIT="$2"; shift 2 ;;
@@ -124,6 +125,8 @@ osascript -e 'set volume output muted true' >/dev/null 2>&1
 if defaults export "$DOMAIN" "$RUN/prefs-before.plist" 2>/dev/null; then prefs=1; else prefs=0; fi
 LOG="$RUN/Player.log"; SAMPLES="$RUN/samples.tsv"
 LIMIT=$((MATCHES * (TIMEOUT + 60) + 120))
+AUTO=(-autoplay -quitAfterMatch -autoplayMatches "$MATCHES" -autoplayTitleSeconds "$TITLE_S" -autoplayTimeout "$TIMEOUT")
+[ -n "${NOAUTO:-}" ] && AUTO=()
 launch_ms=$(ms)
 others="$(pgrep -f 'Unity.app/Contents/MacOS/Unity|CriticalMass.app/Contents/MacOS' | tr '\n' ' ')"
 { echo "LAUNCH_MS=$launch_ms"; echo "MATCHES=$MATCHES"; echo "TITLE_S=$TITLE_S"; echo "NOVSYNC=${NOVSYNC:+-novsync}"
@@ -133,7 +136,7 @@ say "launch $(basename "$BUILD") matches=$MATCHES quality=${QUALITY:-default} ${
 # Started straight from this (ssh-born) shell: proven 2026-11-13 on macOS 26.3 that it gets a Metal device and a window
 # in the logged-in console session; no `open` or `launchctl asuser` needed (and exit codes survive).
 perl -e 'alarm shift; exec @ARGV' "$LIMIT" \
-  "$EXE" -autoplay -quitAfterMatch -autoplayMatches "$MATCHES" -autoplayTitleSeconds "$TITLE_S" -autoplayTimeout "$TIMEOUT" \
+  "$EXE" ${AUTO[@]+"${AUTO[@]}"} \
   ${SPEED:+-autoplaySpeed "$SPEED"} ${NOVSYNC:+-novsync} ${QUALITY:+-quality "$QUALITY"} ${SHOTS:+-shots} ${AFF:+-affordanceShots} ${FPSCAP:+-fpsCap "$FPSCAP"} ${CAMYAW:+-cameraYaw "$CAMYAW"} $EXTRA $PLAYERARGS \
   -dataDir "$RUN/data" -screen-fullscreen 0 -screen-width "$W" -screen-height "$H" -logFile "$LOG" -perfLog "$RUN/perf.json" \
   > "$RUN/stdout.txt" 2>&1 &

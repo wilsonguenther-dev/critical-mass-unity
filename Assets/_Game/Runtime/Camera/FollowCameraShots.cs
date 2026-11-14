@@ -49,6 +49,7 @@ namespace CriticalMass.Runtime.Camera
             if (_held) AutoplayArgs.ClockHeld = false;
             GroundView.ForcePlay = false;
             GroundView.ViewOverride = null;
+            GroundView.AimAt = null;
             if (_stats != null) { _stats.Dispose(); _stats = null; }
         }
 
@@ -70,7 +71,7 @@ namespace CriticalMass.Runtime.Camera
         {
             string path = Path.Combine(Dir, "shot-follow-" + name + ".png");
             ScreenCapture.CaptureScreenshot(path);
-            Debug.Log($"[CM.Follow] {path} {note} view={GroundView.ActiveView} yaw={View.Follow.Yaw:F0} pitch={View.Follow.Pitch:F0} dist={View.Follow.Dist:F2} drawn={ViewCull.LastDrawn} culled={ViewCull.LastCulled}");
+            Debug.Log($"[CM.Follow] {path} {note} view={GroundView.ActiveView} yaw={View.Follow.Yaw:F0} pitch={View.Follow.Pitch:F0} dist={View.Follow.Dist:F2} drawn={ViewCull.LastDrawn} culled={ViewCull.LastCulled} fxNearCulled={ViewCull.LastFxNearCulled} fxShrunk={ViewCull.LastFxShrunk} aim={(GroundView.AimAt.HasValue ? "on" : "off")}");
         }
 
         void Update()
@@ -165,6 +166,7 @@ namespace CriticalMass.Runtime.Camera
         void NextMoment(World w)
         {
             Hold(false);
+            GroundView.AimAt = null;
             _frame = -1;
             _moment++;
             _momentStart = w.Match.Time;
@@ -188,10 +190,15 @@ namespace CriticalMass.Runtime.Camera
                 case "turn": return speed > 1.5 && Math.Abs(GroundCamera.DeltaAngle(View.Follow.Yaw, GroundCamera.YawToward(0, 0, vx, vz, View.Follow.Yaw))) > 140;
                 case "hill-fight":
                 {
+                    // follow-camera-3: frame the fight. The follow faces the middle of the enemies within FightRadius
+                    // (GroundView.AimAt); the still is taken once the view is within AimTolerance of them.
+                    GroundView.AimAt = null;
                     HillDef h = w.Map.Hill;
                     double dx = w.X[0] - h.X, dz = w.Z[0] - h.Z;
                     if (dx * dx + dz * dz > (h.R + 2) * (h.R + 2)) return false;
-                    return EnemyWithin(w, 6);
+                    if (!EnemyCentre(w, FightRadius, out double ex, out double ez)) return false;
+                    GroundView.AimAt = new Vector2((float)ex, (float)ez);
+                    return Math.Abs(GroundCamera.DeltaAngle(View.Follow.Yaw, GroundCamera.YawToward(w.X[0], w.Z[0], ex, ez, 0))) < AimTolerance;
                 }
                 case "bridge":
                     foreach (BridgeSpan sp in BridgeSpans.All)
@@ -200,26 +207,39 @@ namespace CriticalMass.Runtime.Camera
                         if (along > sp.Len * 0.2 && along < sp.Len * 0.8 && Math.Abs(BridgeSpans.Lateral(sp, w.X[0], w.Z[0])) <= SkybreakBasinMap.BridgeHalfWidth) return true;
                     }
                     return false;
-                default:   // facing the Kaiju: hatched, within 45 u, and the view centre within 30 degrees of it
+                default:   // the Kaiju: hatched, within 45 u; the follow turns to face it, the still waits for the view
                 {
+                    GroundView.AimAt = null;
                     if (!GroundDirector.Valid(w, GroundDirector.KaijuTarget)) return false;
                     Kaiju kj = w.Kaiju;
                     double dx = kj.X - w.X[0], dz = kj.Z - w.Z[0];
                     if (dx * dx + dz * dz > 45 * 45) return false;
-                    return Math.Abs(GroundCamera.DeltaAngle(View.Follow.Yaw, GroundCamera.YawToward(w.X[0], w.Z[0], kj.X, kj.Z, 0))) < 30;
+                    GroundView.AimAt = new Vector2((float)kj.X, (float)kj.Z);
+                    return Math.Abs(GroundCamera.DeltaAngle(View.Follow.Yaw, GroundCamera.YawToward(w.X[0], w.Z[0], kj.X, kj.Z, 0))) < AimTolerance;
                 }
             }
         }
 
-        static bool EnemyWithin(World w, double r)
+        /// <summary>follow-camera-3: enemies within this many u count as the fight; the view must face them within
+        /// AimTolerance degrees before the fight and Kaiju stills are taken.</summary>
+        public const double FightRadius = 8, AimTolerance = 15;
+
+        /// <summary>The middle (sim x, z) of the living enemies within r of the local fighter; false when none.</summary>
+        public static bool EnemyCentre(World w, double r, out double cx, out double cz)
         {
+            cx = cz = 0;
+            int n = 0;
             for (int j = 1; j < w.ActorCount; j++)
             {
                 if (!w.Actors[j].Alive || w.Actors[j].Team == w.Actors[0].Team) continue;
                 double dx = w.X[j] - w.X[0], dz = w.Z[j] - w.Z[0];
-                if (dx * dx + dz * dz <= r * r) return true;
+                if (dx * dx + dz * dz > r * r) continue;
+                cx += w.X[j]; cz += w.Z[j]; n++;
             }
-            return false;
+            if (n == 0) return false;
+            cx /= n; cz /= n;
+            return true;
         }
+
     }
 }

@@ -283,6 +283,9 @@ namespace CriticalMass.Runtime.Input
         /// </summary>
         /// <summary>feat/follow-camera-1: a move key or the left stick is held (the follow views latch their input basis).</summary>
         public bool MoveHeld => _moveRight * _moveRight + _moveUp * _moveUp > 0.01;
+        /// <summary>follow-camera-2: the raw move intent in screen axes (the strafe hold reads it).</summary>
+        public double MoveRight => _moveRight;
+        public double MoveUp => _moveUp;
 
         public void SetMove(double right, double up, bool fromKeys = false)
         {

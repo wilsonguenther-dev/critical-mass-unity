@@ -594,6 +594,11 @@ namespace CriticalMass.Runtime.Hud
         public bool ShowBox, ShowVersion;
         public string Text = "";
         GUIStyle _box, _ver;
+
+        /// <summary>first-minutes-1: the version stamp's bottom margin and font size at 1080 px high (it scales with the height).</summary>
+        public const float VersionBottomPx = 18f, VersionFontPx = 18f;
+        /// <summary>first-minutes-1: top of the stamp's line at 1080 px high (one line of the font, with a generous line height).</summary>
+        public const float VersionTopPx = VersionBottomPx + VersionFontPx * 1.6f;
         Font _font;
 
         void OnGUI()
@@ -616,8 +621,8 @@ namespace CriticalMass.Runtime.Hud
             }
             if (ShowVersion && !ShowBox)
             {
-                _ver.fontSize = Mathf.RoundToInt(18 * s);
-                GUI.Label(new Rect(0, 0, Screen.width - 24 * s, Screen.height - 18 * s), BuildInfo.Label, _ver);
+                _ver.fontSize = Mathf.RoundToInt(VersionFontPx * s);
+                GUI.Label(new Rect(0, 0, Screen.width - 24 * s, Screen.height - VersionBottomPx * s), BuildInfo.Label, _ver);
             }
         }
     }

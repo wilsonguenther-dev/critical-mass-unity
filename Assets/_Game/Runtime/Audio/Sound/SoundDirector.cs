@@ -745,9 +745,16 @@ namespace CriticalMass.Runtime.Audio.Sound
     /// </summary>
     internal sealed class SoundCaptions
     {
-        /// <summary>hud-containment-1: two caption lines at most (HudZones.CaptionLines); a third stacked onto the interact
-        /// prompt. A new caption replaces the oldest.</summary>
-        public const int Lines = HudZones.CaptionLines;
+        /// <summary>fix/hud-containment-3 (walk: stacked captions; "Hill captured" up with "contested"): ONE caption at a
+        /// time on the lowest caption row. A caption of the same family (hill_captured / hill_contested / hill_lost) replaces
+        /// the one shown at once, past the repeat gap, so the words always match the hill now. A different caption waits
+        /// until the shown one has been up MinShow seconds (one waiting, the newest wins).</summary>
+        public const int Lines = 1;
+        public const float MinShow = 0.8f;
+        private readonly string[] _family;
+        private int _pendCue = -1;
+        private float _pendPan;
+        private Action<string> _pendRaised;
         public const float Life = 2.4f, RepeatGap = 4f, Fade = 0.15f, LineH = HudZones.CaptionH, LineW = HudZones.CaptionW, Gap = HudZones.CaptionGap;
 
         [Serializable] private sealed class Row { public string id; public string text; }
@@ -767,10 +774,14 @@ namespace CriticalMass.Runtime.Audio.Sound
             int n = SoundTable.Cues.Length;
             _words = new string[n][];
             _last = new float[n];
+            _family = new string[n];
             var overrides = LoadPack();
             for (int i = 0; i < n; i++)
             {
                 _last[i] = -100f;
+                string id = SoundTable.Cues[i].Id ?? string.Empty;
+                int us = id.IndexOf('_');
+                _family[i] = us > 0 ? id.Substring(0, us) : id;
                 string t = SoundTable.Cues[i].Caption;
                 if (t == null) continue;
                 if (overrides != null && overrides.TryGetValue(SoundTable.Cues[i].Id, out string o) && !string.IsNullOrEmpty(o)) t = o;
@@ -826,15 +837,25 @@ namespace CriticalMass.Runtime.Audio.Sound
         public void Show(int cue, float pan, float now, Action<string> raised)
         {
             if (cue < 0 || cue >= _words.Length || _words[cue] == null) return;
-            if (now - _last[cue] < RepeatGap) return;
             if (!Announcer.SubtitlesEnabled) return;
+            bool up = _until[0] > now && _cue[0] >= 0;
+            bool sameFamily = up && _cue[0] != cue && _family[_cue[0]] == _family[cue];
+            if (!sameFamily && now - _last[cue] < RepeatGap) return;
             _last[cue] = now;
-            int k = 0;
-            for (int i = 0; i < Lines; i++)
+            if (up && !sameFamily && now - _start[0] < MinShow)
             {
-                if (_until[i] <= now) { k = i; break; }
-                if (_until[i] < _until[k]) k = i;
+                _pendCue = cue;   // waits its turn; the newest waiting caption wins
+                _pendPan = pan;
+                _pendRaised = raised;
+                return;
             }
+            if (sameFamily && _pendCue >= 0 && _family[_pendCue] == _family[cue]) _pendCue = -1;
+            Place(cue, pan, now, raised);
+        }
+
+        private void Place(int cue, float pan, float now, Action<string> raised)
+        {
+            const int k = 0;
             string s = _words[cue][pan < -0.25f ? 0 : pan > 0.25f ? 2 : 1];
             HudText.Set(_text[k], s);
             _cue[k] = cue;
@@ -845,6 +866,13 @@ namespace CriticalMass.Runtime.Audio.Sound
 
         public void Update(float now, bool hidden)
         {
+            if (_pendCue >= 0 && (_until[0] <= now || now - _start[0] >= MinShow))
+            {
+                int c = _pendCue;
+                _pendCue = -1;
+                Place(c, _pendPan, now, _pendRaised);
+                _pendRaised = null;
+            }
             bool any = false;
             for (int k = 0; k < Lines; k++)
             {

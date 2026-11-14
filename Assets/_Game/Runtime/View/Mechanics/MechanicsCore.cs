@@ -583,7 +583,16 @@ namespace CriticalMass.Runtime.View.Mechanics
             return false;
         }
 
-        /// <summary>Whole biomass in the team bank (never below 0).</summary>
+        /// <summary>first-minutes-1: the one word every team wood display uses (top strip WOOD chip, kit footer, build prompt).</summary>
+        public const string WoodWord = "TEAM WOOD";
+        /// <summary>first-minutes-1: the short form on a class card row.</summary>
+        public const string RowWord = "WOOD";
+
+        /// <summary>
+        /// Whole biomass in the team bank (never below 0). first-minutes-1 (walk 1 #6): THE team wood number. The top strip's
+        /// WOOD chip, the class card, the kit footer and the build prompt all read this, so they can never disagree. It is
+        /// what a Builder can spend (BuiltPieces.Bank: the starting 2, plus delivered biomass, plus banked wood, minus spent).
+        /// </summary>
         public static int Whole(World w, TeamId team) => (int)Math.Floor(Math.Max(0, BuiltPieces.Bank(w, team)));
     }
 }

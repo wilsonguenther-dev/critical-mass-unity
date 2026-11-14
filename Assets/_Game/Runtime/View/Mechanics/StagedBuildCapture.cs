@@ -259,8 +259,11 @@ namespace CriticalMass.Runtime.View.Mechanics
                     if ((tx - sx) * (tx - sx) + (tz - sz) * (tz - sz) < 14 * 14) continue;
                     for (int d = 0; d < 4 && tries < 2; d++)
                     {
-                        int fx = cx - Dx[d], fz = cz - Dz[d];   // the Miner stands one cell before it, facing it
-                        if (m.Cells[fz * m.Width + fx] != Cell.Floor) continue;
+                        // capture-gaps-1: the Miner stands TWO cells before it (2.0 u = PlaceRange). One cell (1.0 u) put the tile
+                        // inside his own keep-out (MinDistanceFromActor 0.9 + his radius 0.45 = 1.35 u), so every tile was refused.
+                        int fx = cx - 2 * Dx[d], fz = cz - 2 * Dz[d];
+                        if (fx < 0 || fz < 0 || fx >= m.Width || fz >= m.Height) continue;
+                        if (m.Cells[fz * m.Width + fx] != Cell.Floor || m.Cells[(cz - Dz[d]) * m.Width + cx - Dx[d]] != Cell.Floor) continue;
                         Put(w, 0, fx + 0.5, fz + 0.5, FacingOf(Dx[d], Dz[d]));
                         if (Barricades.BarricadeRefusal(w, 0, tx, tz) != 0) continue;
                         tries++;
