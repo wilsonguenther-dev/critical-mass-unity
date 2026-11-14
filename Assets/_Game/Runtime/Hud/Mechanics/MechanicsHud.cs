@@ -302,8 +302,8 @@ namespace CriticalMass.Runtime.Hud.Mechanics
                 HudText.Set(_rowNote[r], row.Note ?? string.Empty);
                 HudText.Set(_rowCd[r], CdLabel(row.CdSeconds));
                 _rowPie[r].Fill01 = 1f - row.Cd01;
-                // fix/hud-containment-5: the row's icon (the class's attack or ability art; none for other actions, the round
-                // cooldown then stands alone). The Healer has her own art since hud-art (UiIcons.Ability row 5).
+                // fix/hud-containment-5: the row's icon (the class's ability art, or its class badge for a second skill), shown
+                // over the round cooldown once the skill is ready. The Healer has her own art since hud-art (UiIcons.Ability).
                 string icon = RowIcon(row.Action, (int)a.Cls, (int)a.Team);
                 if (_rowIcon[r].Name != icon) _rowIcon[r].Set(icon, 2);
                 bool showIcon = icon != null && row.Cd01 <= 0f;
@@ -358,13 +358,15 @@ namespace CriticalMass.Runtime.Hud.Mechanics
 
         readonly HudIcon[] _rowIcon = new HudIcon[2];
 
-        /// <summary>The painted icon for a kit row's action: the class's attack or ability art, else none.</summary>
+        /// <summary>The painted icon for a kit row's action: the class's attack or ability art, else its class badge.</summary>
         public static string RowIcon(string action, int cls, int team)
         {
+            if (cls < 0 || cls >= UiIcons.Classes.Length) cls = 1;   // as GameHud.IconRow
             int row = Mathf.Clamp(cls, 0, UiIcons.Ability.GetLength(0) - 1), t = Mathf.Clamp(team, 0, UiIcons.Ability.GetLength(1) - 1);
             if (action == "Ability") return UiIcons.Ability[row, t];
             if (action == "Attack") return UiIcons.Attack[Mathf.Clamp(cls, 0, UiIcons.Attack.GetLength(0) - 1), Mathf.Clamp(team, 0, UiIcons.Attack.GetLength(1) - 1)];
-            return null;
+            // a second skill with no art of its own (Purify, TNT, Carry) wears the class badge, never a blank square
+            return UiIcons.ClassBadge[Mathf.Clamp(cls, 0, UiIcons.ClassBadge.GetLength(0) - 1), Mathf.Clamp(team, 0, UiIcons.ClassBadge.GetLength(1) - 1)];
         }
 
         void SetRowActive(int r, bool on)
