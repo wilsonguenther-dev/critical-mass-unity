@@ -105,7 +105,7 @@ namespace CriticalMass.Runtime.Hud
             bool hide = _log == null || _log.Suppressed;
             if (Canvas.enabled == hide) Canvas.enabled = !hide;
             if (!IsOpen) return;
-            if (!hide) HudZones.Hold(HudZone.Callout, HudPriority.Recap);
+            if (!hide) { HudZones.Hold(HudZone.Callout, HudPriority.Recap); HudZones.HoldFullPanel(); }
             World w = _log != null && _log.Driver != null ? _log.Driver.World : null;
             int local = _log != null ? _log.LocalActor : HudBinder.LocalActor;
             if (w != null && (w.Match.Phase == MatchPhase.Ended || (local < w.ActorCount && w.Actors[local].Alive))) { Hide(); return; }

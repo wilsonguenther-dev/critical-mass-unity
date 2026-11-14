@@ -79,6 +79,24 @@ namespace CriticalMass.Runtime.Tests
         // ------------------------------------------------------------ queue
 
         [Test]
+        public void AMomentNeverPlaysOverAFullScreenPanel()
+        {
+            // fix/hud-containment-4 (by eye: OPENING STRIKE and HILL TAKEN over the knock-out recap and the results)
+            var q = new MomentQueue();
+            Assert.AreEqual(OfferResult.Queued, q.Offer(Req(MomentId.OpeningStrike), 0, BigMomentsMode.Full, false));
+            q.Held = true;   // the recap, results, pause or settings is up
+            q.Update(0, false);
+            Assert.IsFalse(q.Playing, "nothing starts over a full panel");
+            q.Held = false;
+            q.Update(0.1, false);
+            Assert.IsTrue(q.Playing, "it plays once the panel closes");
+            q.Held = true;
+            q.Update(0.2, false);
+            Assert.IsFalse(q.Playing, "a panel opening ends the moment on screen");
+            Assert.IsTrue(BigMoments.FullPanelUp(true), "pause counts as a full panel");
+        }
+
+        [Test]
         public void TakeoverPlaysForItsLengthThenEnds()
         {
             var q = new MomentQueue();

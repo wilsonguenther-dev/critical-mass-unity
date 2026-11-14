@@ -256,6 +256,7 @@ namespace CriticalMass.Runtime.View.Moments
             DebugKeys();
             if (_galleryAt >= 0) StepGallery(now);
 
+            _queue.Held = FullPanelUp(paused);   // fix/hud-containment-4: never over the recap, results, pause or settings
             _queue.Update(now, Banner.IsOpen);
             if (_seen != _queue.Version)
             {
@@ -278,6 +279,10 @@ namespace CriticalMass.Runtime.View.Moments
             if (_queue.StingerPlaying && _stinger != null) AnimateStinger(now);
             if (_slowed && now >= _slowUntil) RestoreSlowMotion();
         }
+
+        /// <summary>A full-screen panel is up: the knock-out recap, the results screen, or the pause menu and its settings.</summary>
+        public static bool FullPanelUp(bool paused) =>
+            paused || HudZones.FullPanelHeld || CriticalMass.Runtime.Flow.GameFlow.State == CriticalMass.Runtime.Flow.FlowState.Results;
 
         private void DebugKeys()
         {

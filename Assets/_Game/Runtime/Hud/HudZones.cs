@@ -122,7 +122,12 @@ namespace CriticalMass.Runtime.Hud
         /// passes over the player card, the minimap, the kit, the feeds or the lower lane (it used to ride the target
         /// anywhere on screen). Anchored bottom-centre: on a taller screen the lower lane (centre-anchored) moves away.</summary>
         public const float PromptLaneH = 58f;
-        static int _promptRowFrame = int.MinValue;
+        static int _promptRowFrame = int.MinValue, _fullPanelFrame = int.MinValue;
+        /// <summary>fix/hud-containment-4: a full panel (the knock-out recap) is up this frame. Moment banners, teammate
+        /// call bubbles and world name tags stay off it.</summary>
+        public static void HoldFullPanel() => _fullPanelFrame = Frame;
+        /// <summary>A full panel held the screen this frame or the last.</summary>
+        public static bool FullPanelHeld => _fullPanelFrame >= Frame - 1;
         /// <summary>The station prompt is up this frame: the terrain pill, which shares the prompt row, steps back.</summary>
         public static void HoldPromptRow() => _promptRowFrame = Frame;
         /// <summary>The station prompt held the prompt row this frame or the last.</summary>
@@ -281,6 +286,7 @@ namespace CriticalMass.Runtime.Hud
         {
             for (int i = 0; i < _held.Length; i++) _held[i] = int.MinValue;
             _promptRowFrame = int.MinValue;
+            _fullPanelFrame = int.MinValue;
         }
     }
 }

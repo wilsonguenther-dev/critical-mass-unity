@@ -445,8 +445,14 @@ namespace CriticalMass.Runtime.View.Moments
         /// Advance at now. bannerOpen: a centre banner is on screen (only recipes that preempt banners may start over it;
         /// the director then holds the banner).
         /// </summary>
+        /// <summary>fix/hud-containment-4: a full-screen panel is up (knock-out recap, results, pause or settings): the moment
+        /// on screen ends and nothing new starts; waiting moments wait (and go stale) until the panel closes.</summary>
+        public bool Held;
+
         public void Update(double now, bool bannerOpen)
         {
+            if (Held && Playing) { Playing = false; Version++; }
+            if (Held && StingerPlaying) { StingerPlaying = false; StingerVersion++; }
             if (Playing && now >= Current.StartedAt + Current.Seconds)
             {
                 Playing = false;
@@ -473,7 +479,7 @@ namespace CriticalMass.Runtime.View.Moments
                 _stingCount--;
             }
 
-            if (!Playing && _count > 0)
+            if (!Playing && _count > 0 && !Held)
             {
                 int best = -1;
                 for (int i = 0; i < _count; i++)
@@ -498,7 +504,7 @@ namespace CriticalMass.Runtime.View.Moments
                 }
             }
 
-            if (!Playing && !StingerPlaying && _stingCount > 0)
+            if (!Playing && !StingerPlaying && _stingCount > 0 && !Held)
             {
                 ActiveMoment s = _sting[0];
                 for (int k = 0; k < _stingCount - 1; k++)
