@@ -260,6 +260,60 @@ for clip, vn, n in ((ATTACK, 'front', 8), (ATTACK, 'side', 8), (ATTACK, 'side_l'
         tiles.append(shot(f'x_{clip}_{vn}_{k}'))
     save_row(f'{CLS}_U_{clip}_{vn}', tiles)
     REP.setdefault('strips', {})[f'{CLS}_U_{clip}_{vn}'] = fl
+# rig-builder-3: the game's planted-foot checks, on the toe JOINTS as Unity plays the clip (FacingMotionSanityPlayTests):
+# a toe is planted while within 0.03 u of its own lowest height; slide = toe travel over consecutive planted samples per
+# unit of body travel (gate 0.2); the planted toe's yaw (0 = straight ahead, + toward his left).
+try:
+    bk = json.load(open(os.path.join(OUT, f'bake_{CLS}.json')))
+    ratio_, gs_ = float(bk.get('ratio', 1.0)), bk.get('ground_speed', {})
+    fps_ = scene.render.fps / scene.render.fps_base
+    loco = {}
+    for clip in ('Run', 'Walk', 'StrafeL', 'StrafeR', 'RunBack', 'WalkBack'):
+        if clip not in acts or clip not in gs_:
+            continue
+        assign(ca, acts[clip])
+        f0_, f1_ = int(acts[clip].frame_range[0]), int(acts[clip].frame_range[1])
+        n_ = f1_ - f0_
+        smp = []
+        for cyc in range(3):
+            for k2 in range(2 * n_):
+                fr = f0_ + k2 * 0.5
+                scene.frame_set(int(fr), subframe=fr - int(fr)); upd()
+                rec_ = {}
+                for s in ('l', 'r'):
+                    t_ = fa.matrix_world @ fa.pose.bones['toes.' + s].head
+                    a_ = fa.matrix_world @ fa.pose.bones['foot.' + s].head
+                    rec_[s] = (t_.copy(), a_.copy())
+                smp.append(rec_)
+        dt_ = 0.5 / fps_
+        v_ = float(gs_[clip]) * ratio_
+        # travel direction: opposite to the planted toe's in-place motion
+        acc = Vector((0, 0, 0))
+        mins = {s: min(r[s][0].z for r in smp) for s in ('l', 'r')}
+        for i in range(1, len(smp)):
+            for s in ('l', 'r'):
+                if smp[i][s][0].z <= mins[s] + 0.03 and smp[i - 1][s][0].z <= mins[s] + 0.03:
+                    acc += smp[i][s][0] - smp[i - 1][s][0]
+        acc.z = 0
+        fwd = -acc.normalized() if acc.length > 1e-6 else Vector((0, -1, 0))
+        ft = bt = 0.0; pairs = 0; yaws = []
+        for s in ('l', 'r'):
+            for i in range(1, len(smp)):
+                if smp[i][s][0].z > mins[s] + 0.03 or smp[i - 1][s][0].z > mins[s] + 0.03:
+                    continue
+                d_ = (smp[i][s][0] - smp[i - 1][s][0]) + fwd * v_ * dt_
+                ft += math.hypot(d_.x, d_.y); bt += v_ * dt_; pairs += 1
+                td = smp[i][s][0] - smp[i][s][1]
+                yaws.append(math.degrees(math.atan2(td.x, -td.y)))
+        tz = {s: [round(r[s][0].z, 3) for r in smp[:2 * n_:2]] for s in ('l', 'r')}
+        loco[clip] = dict(slide=round(ft / bt, 3) if bt > 0 else None, planted_pairs=pairs, samples=len(smp),
+                          stance_frac=round(pairs / (2 * len(smp)), 3), travel_deg=round(math.degrees(math.atan2(fwd.x, -fwd.y)), 1),
+                          planted_toe_yaw_deg=[round(min(yaws), 1), round(sum(yaws) / len(yaws), 1), round(max(yaws), 1)] if yaws else None,
+                          toe_z_per_frame=tz, toe_min=[round(mins['l'], 3), round(mins['r'], 3)])
+    REP['loco_unity_way'] = loco
+except Exception as e_:
+    REP['loco_unity_way'] = 'failed ' + repr(e_)
+save()
 if ATTACK in acts:
     assign(ca, acts[ATTACK])
     f0_, f1_ = int(acts[ATTACK].frame_range[0]), int(acts[ATTACK].frame_range[1])

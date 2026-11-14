@@ -387,21 +387,44 @@ def _k(t, ease, **kw):
     return d
 
 
-_WIND = dict(hips_p=-4, hips_y=-5, spine_p=-5, spine_y=-6, chest_p=-6, chest_y=-6, head_p=8, uar=-165, lar=-50,
-             ual=-30, lal=-25, th=115, drop=0.02, back=0.0)
-_HIT = dict(hips_p=10, hips_y=3, spine_p=12, spine_y=3, chest_p=13, chest_y=2, head_p=-18, uar=-70, lar=-12,
-            ual=-40, lal=-30, th=-125, drop=0.10, back=0.03)
+_WIND = dict(hips_p=-4, hips_y=-5, spine_p=-5, spine_y=-6, chest_p=-6, chest_y=-6, head_p=8, uar=-176, lar=-28,
+             ual=-30, lal=-25, th=80, drop=0.02, back=0.0)
+_HIT = dict(hips_p=10, hips_y=3, spine_p=12, spine_y=3, chest_p=13, chest_y=2, head_p=-18, uar=-85, lar=-12,
+            ual=-40, lal=-30, th=-140, drop=0.07, back=0.03)
 MKEYS = [
     _k(0.0, "smooth"),
     _k(0.30, "smooth", **_WIND),                                                    # top of the wind-up
-    _k(0.34, "lin", **dict(_WIND, uar=-168, th=120)),                               # a short hold before the blow
+    _k(0.34, "lin", **dict(_WIND, uar=-179, th=86)),                               # a short hold before the blow
     _k(0.45, "in", hips_p=3, hips_y=0, spine_p=4, spine_y=1, chest_p=5, chest_y=1, head_p=-4, uar=-160, lar=-10,
        ual=-35, lal=-25, th=-15, drop=0.05, back=0.01),                             # mallet over the top
     _k(_CT, "lin", **_HIT),                                                         # contact (the clip's hit event)
-    _k(min(0.99, _CT + 0.09), "out", **dict(_HIT, drop=0.11, uar=-72, th=-120)),    # settle
+    _k(min(0.99, _CT + 0.09), "out", **dict(_HIT, drop=0.075, uar=-87, th=-135)),   # settle
     _k(1.0, "smooth"),
 ]
 MALLET_LOG = []
+# rig-builder-3: the ladder rides the chest, and KayKit's run twists the chest 28 degrees from the hips (the ladder swung
+# into a tangle in the side view). In locomotion the chest's turn about the vertical from the hips is damped by
+# TWIST_DAMP (taken out at the spine). The Builder only.
+TWIST_DAMP = {"Builder": 0.6}.get(CLS, 0.0)
+TWIST_LOG = {}
+
+
+def _yaw_from_rest(b):
+    Rw = (fa.matrix_world @ faP[b].matrix).to_3x3().normalized()
+    R0 = (fa.matrix_world @ fa.data.bones[b].matrix_local).to_3x3().normalized()
+    v = (Rw @ R0.inverted()) @ Vector((0, -1, 0))
+    return math.atan2(v.x, -v.y)
+
+
+def damp_twist(clip):
+    if not TWIST_DAMP or clip not in HOLD_CLIPS:
+        return
+    rel = _yaw_from_rest("chest") - _yaw_from_rest("hips")
+    rel = (rel + math.pi) % (2 * math.pi) - math.pi
+    pb = faP["spine"]
+    rotate_about(fa, pb, W(fa, pb.head), Quaternion((0, 0, 1), -TWIST_DAMP * rel))
+    upd()
+    TWIST_LOG[clip] = max(TWIST_LOG.get(clip, 0.0), round(abs(math.degrees(rel)), 1))
 
 
 def _ease(u, e):
@@ -555,6 +578,8 @@ def kk_back_dir(act, f0, f1):
 
 
 ZPRE, PL, KUP = {}, {}, {}
+TOE_ABS = CLS == "Builder" and os.environ.get("BAKE_TOE_ABS", "1") == "1"
+TOE_LOG = {}
 ORDER_CLIPS = {"Walk", "WalkBack", "Run", "RunBack", "StrafeL", "StrafeR"}
 ORDER_GAP = 0.004
 
@@ -599,6 +624,7 @@ def bake_action(clip, act):
         upd()
         attack_gain(clip, gain_q0)
         upright_idle(clip, f0)
+        damp_twist(clip)
         if NEW_BODY:
             arms_in(clip)
         m_drop, m_back = mallet_pose((f - f0) / max(1, f1 - f0)) if MAL else (0.0, 0.0)
@@ -622,7 +648,14 @@ def bake_action(clip, act):
             # run stance (the game saw 2 planted frame pairs, 0.27 u, under its 0.3 u floor).
             if NEW_BODY and clip in ORDER_CLIPS and (K["A" + s].z - K0["A" + s].z) < PLANT_N * leg_k:
                 fd = (K["R" + s] @ K0["R" + s].inverted()) @ Vector((0, -1, 0))
-                if fd.xy.length > 1e-4:
+                if TOE_ABS:
+                    # rig-builder-3: the planted toes point exactly where KayKit's toes point (its toe joint ahead of its
+                    # ankle, absolute yaw), not KayKit's foot turn from the pack's rest pose: the Builder's planted toes
+                    # read 45 degrees off the animator's leg yaw in a Run/StrafeL blend (FacingSanity, run 43639981260)
+                    yk = _toe_yaw(kk, s)
+                    R = Matrix.Rotation(yk - _yf[s], 3, 'Z') @ F0["R" + s]
+                    TOE_LOG.setdefault(clip, []).append(round(math.degrees(yk), 1))
+                elif fd.xy.length > 1e-4:
                     yaw = math.atan2(fd.y, fd.x) - math.atan2(-1.0, 0.0)
                     R = Matrix.Rotation(yaw, 3, 'Z') @ F0["R" + s]
             dk = K["A" + s] - K0["A" + s]
@@ -751,7 +784,10 @@ assign(kk, None)
 for m in arm_mods:
     m.show_viewport = True
 log("baked", len(baked), "of", len(acts))
-REP["mallet"] = dict(on=MALLET, contact_fraction=round(_CT, 4), wrist=MALLET_LOG[::4])
+REP["mallet"] = dict(on=MALLET, contact_fraction=round(_CT, 4), wrist=MALLET_LOG[::2])
+REP["ground_speed"] = GROUND_SPEED
+REP["twist_damp"] = dict(keep_out=TWIST_DAMP, chest_from_hips_max_deg_before=TWIST_LOG)
+REP["planted_toe_yaw_kaykit_deg"] = {c: [min(v), max(v)] for c, v in TOE_LOG.items()}
 
 
 # rig-builder-3: ladder diagnosis. (1) the back piece's weights as exported (islands of the Hero, the back region);
