@@ -1210,14 +1210,17 @@ namespace CriticalMass.Runtime.Menu
                 if (c == _rebindCell && _rebind != null) continue;
                 InputAction a = map != null ? map.FindAction(c.Slot.Action, false) : null;
                 int idx = ControlBindings.FindBindingIndex(a, c.Slot);
-                HudText.Set(c.Item.Label, ControlBindings.Display(a, idx));
+                float left = 0f;
                 if (c.Glyph != null)
                 {
                     string path = a != null && idx >= 0 ? a.bindings[idx].effectivePath : null;
                     GlyphSpec g = InputGlyphs.ForPath(path);
                     c.Glyph.gameObject.SetActive(!g.IsEmpty);
-                    if (!g.IsEmpty) c.Glyph.Set(g);
+                    if (!g.IsEmpty) { c.Glyph.Set(g); left = 8f + c.Glyph.GlyphWidth + 6f; }
                 }
+                // integration/batch-10: the words start after the glyph (a centred "DOUBLE-TAP VIEW" ran into the View cap).
+                MenuUi.Place(c.Item.Label.rectTransform, left, 0f, GridCellW - left, GridRowH);
+                HudText.Set(c.Item.Label, ControlBindings.Display(a, idx));
             }
         }
 
