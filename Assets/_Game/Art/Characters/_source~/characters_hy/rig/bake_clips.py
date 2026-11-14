@@ -235,6 +235,8 @@ def kk_back_dir(act, f0, f1):
 
 
 ZPRE, PL, KUP = {}, {}, {}
+ORDER_CLIPS = {"Walk", "WalkBack", "Run", "RunBack", "StrafeL", "StrafeR"}
+ORDER_GAP = 0.004
 
 
 def bake_action(clip, act):
@@ -285,14 +287,15 @@ def bake_action(clip, act):
                 A.z -= z
             contact[s].append(bool(planted))
             targets[s], rots[s] = A, R
-        # Double support: both planted soles pinned to z 0 tied the two ankles (gap 0.000), and the game's facing read
-        # (SanityRig.TryFront: the foot with the lower ankle) then took the trailing foot, toes 112 degrees off in
-        # StrafeR at the loop seam, "turned around" (Warrior, 2 of 20 frames; KayKit 0). The foot whose KayKit ankle is
-        # higher keeps its own sole height (never below ground), as on KayKit.
-        if PL["l"] and PL["r"]:
-            hi = max(SIDES, key=lambda q: KUP[q])
-            if ZPRE[hi] > 0:
-                targets[hi].z += ZPRE[hi]
+        # The game's facing read (SanityRig.TryFront) takes the foot with the LOWER ankle. Pinning planted soles to z 0
+        # flipped KayKit's ankle order on a few locomotion frames (Warrior StrafeR frame 18: 3 mm the other way, the
+        # trailing foot read, toes 112 degrees off, "turned around"; KayKit itself: no such frame). In locomotion, when
+        # KayKit has a clear lower ankle, the other ankle stays at least ORDER_GAP above it.
+        if clip in ORDER_CLIPS:
+            lo = min(SIDES, key=lambda q: K["A" + q].z)
+            hi = "r" if lo == "l" else "l"
+            if K["A" + hi].z - K["A" + lo].z > 0.002 and targets[hi].z < targets[lo].z + ORDER_GAP:
+                targets[hi].z = targets[lo].z + ORDER_GAP
         lowered_frame = 0.0
         for it in range(3):
             hp = faP["hips"]
