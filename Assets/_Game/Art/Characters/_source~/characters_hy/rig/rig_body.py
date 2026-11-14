@@ -633,6 +633,64 @@ try:
         REP.setdefault('weights_lods', {})[lv] = {'vertices': len(o.data.vertices), 'unweighted_fixed': zl,
                                                   'max_influences': int((Wl > 0).sum(1).max())}
     log('lod weights', REP.get('weights_lods'))
+    # rig-demolitions-1: eyes and brows as small added geometry on EVERY level (same shapes, never decimated away): each
+    # vertex is projected onto that level's skin from the front and lifted along the skin normal; 100 % on the head bone;
+    # dark brown, mask code 0 (never team-swapped); a tiny near-white highlight up and to the viewer's left on each eye.
+    FF = OPTS.get('face_features')
+    if FF:
+        from mathutils.bvhtree import BVHTree
+        hexc = lambda h: tuple(int(h.lstrip('#')[i:i + 2], 16) / 255.0 for i in (0, 2, 4))
+        dark_c, hi_c = hexc(FF.get('colour', '#33241E')), hexc(FF.get('highlight', '#F4F1EA'))
+        for lv, o in LV.items():
+            me = o.data
+            bvh = BVHTree.FromPolygons([v.co.copy() for v in me.vertices], [tuple(pg.vertices) for pg in me.polygons])
+            miss = [0]
+
+            def on_skin(x, z, lift):
+                hit = bvh.ray_cast(Vector((x, -2.0, z)), Vector((0, 1, 0)))
+                if hit[0] is None:
+                    miss[0] += 1; return Vector((x, -0.2, z))
+                n = hit[1] if hit[1].y < 0 else -hit[1]
+                return hit[0] + n * lift
+            polys = []   # (list of points, colour)
+            L = FF.get('lift', 0.0025); ns = int(FF.get('sides', 8))
+            for sx in (-1, 1):
+                ex, ez, ew, eh = sx * FF['eye_x'], FF['eye_z'], FF['eye_w'], FF['eye_h']
+                c0 = on_skin(ex, ez, L)
+                ring = [on_skin(ex + 0.5 * ew * math.cos(2 * math.pi * k / ns), ez + 0.5 * eh * math.sin(2 * math.pi * k / ns), L) for k in range(ns)]
+                for k in range(ns):
+                    polys.append(([c0, ring[k], ring[(k + 1) % ns]], dark_c))
+                hx, hz, hs = ex - 0.25 * ew, ez + 0.22 * eh, 0.3 * ew
+                polys.append(([on_skin(hx - hs / 2, hz - hs / 3, L + 0.001), on_skin(hx + hs / 2, hz - hs / 3, L + 0.001),
+                               on_skin(hx, hz + hs * 0.6, L + 0.001)], hi_c))
+                bx, bz, bw, bt, ar = sx * FF['brow_x'], FF['brow_z'], FF['brow_w'], FF['brow_t'], FF.get('arch', 0.005)
+                xs = [bx - bw / 2, bx, bx + bw / 2]
+                zb = [bz + ar * (1 - ((xx - bx) / (bw / 2)) ** 2) for xx in xs]
+                B_ = [on_skin(xs[i], zb[i], L) for i in range(3)]; T_ = [on_skin(xs[i], zb[i] + bt, L) for i in range(3)]
+                for i in range(2):
+                    polys.append(([B_[i], B_[i + 1], T_[i + 1], T_[i]], dark_c))
+            bm = bmesh.new(); bm.from_mesh(me)
+            nv0, nf0 = len(bm.verts), len(bm.faces)
+            for pts, col in polys:
+                bm.faces.new([bm.verts.new(pt) for pt in pts])
+            bm.to_mesh(me); bm.free(); me.update()
+            new_v = list(range(nv0, len(me.vertices)))
+            o.vertex_groups['head'].add(new_v, 1.0, 'REPLACE')
+            ca = me.color_attributes.active_color or (me.color_attributes[0] if len(me.color_attributes) else None)
+            if ca is None:
+                ca = me.color_attributes.new('Col', 'BYTE_COLOR', 'CORNER')
+            for k, (pts, col) in enumerate(polys):
+                pg = me.polygons[nf0 + k]
+                pg.material_index = 0
+                ids = list(pg.loop_indices) if ca.domain == 'CORNER' else list(pg.vertices)
+                for li in ids:
+                    try:
+                        ca.data[li].color_srgb = (col[0], col[1], col[2], 0.0)
+                    except Exception:
+                        ca.data[li].color = (col[0] ** 2.2, col[1] ** 2.2, col[2] ** 2.2, 0.0)
+            REP.setdefault('face_features', {})[lv] = {'tris_added': sum(len(pts) - 2 for pts, _ in polys), 'verts_added': len(new_v),
+                                                       'ray_misses': miss[0]}
+        log('face features', REP['face_features'])
     for o in LV.values():
         am = o.modifiers.new('Armature', 'ARMATURE'); am.object = rig
         o.parent = rig

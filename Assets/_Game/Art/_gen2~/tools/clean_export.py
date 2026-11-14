@@ -374,7 +374,22 @@ def clean(e):
     for lv, o in levels.items():
         lab = ((cols[lv][:, None, :] - pal[None]) ** 2).sum(-1).argmin(1)
         rgba = np.concatenate([pal[lab], (codes[lab] / 8.0)[:, None]], axis=1)
-        if ff and lv != "Shadow":
+        if ff and lv != "Shadow" and ff.get("mode") == "skin":
+            # rig-demolitions-1 (final): painting whole triangles cannot draw an eye at these densities. Every face triangle
+            # in the face box goes to clean skin (the brightest warm palette colour): all of the inner band, and outside
+            # it the grey or dark smears (the hood's brown stays). The eyes and brows are added as geometry (rig_body.py).
+            x0, x1, y0, y1, z0, z1 = ff["box"]; xi = ff.get("inner_x", 0.12)
+            warm_pal = [j for j in range(len(pal)) if pal[j][0] - pal[j][2] > 0.1]
+            skin_c = pal[max(warm_pal, key=lambda j: pal[j].mean())]
+            n_ = 0
+            for i, pg in enumerate(o.data.polygons):
+                c = pg.center
+                if x0 < c.x < x1 and y0 < c.y < y1 and z0 < c.z < z1:
+                    r_ = rgba[i]
+                    if abs(c.x) < xi or r_[0] - r_[2] < 0.06 or r_[:3].mean() < 0.5 * skin_c.mean():
+                        rgba[i, :3] = skin_c; rgba[i, 3] = 0; n_ += 1
+            facts.setdefault("face_features", {})[lv] = {"to_skin": n_, "skin": "#%02X%02X%02X" % tuple(int(round(x * 255)) for x in skin_c)}
+        elif ff and lv != "Shadow":
             # rig-demolitions-1: thin painted features (eyes, brows, mouth) are lost twice: the face colour is the MEAN of 5
             # samples and the k-means palette has no slot for a few dark faces. Inside the face box (metres, after
             # normalise, facing -Y) a face whose DARKEST raw sample (centre, corners, edge midpoints) is darker than

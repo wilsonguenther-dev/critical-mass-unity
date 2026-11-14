@@ -4,7 +4,23 @@
   "rigid_parts_on_chest": true,
   "back_skips_head": true,
   "pull_rear_parts_flush": 0.015,
-  "rear_tilt_deg": 15
+  "rear_tilt_deg": 15,
+  "face_features": {
+   "eye_x": 0.096,
+   "eye_z": 1.557,
+   "eye_w": 0.03,
+   "eye_h": 0.04,
+   "sides": 8,
+   "brow_x": 0.1,
+   "brow_z": 1.611,
+   "brow_w": 0.072,
+   "brow_t": 0.009,
+   "arch": 0.005,
+   "lift": 0.0025,
+   "colour": "#33241E",
+   "highlight": "#F4F1EA",
+   "_note": "eyes and brow positions read from the raw eye paint on the Hero close-up (face 0.33 m wide)"
+  }
  },
  "hips": [
   0,

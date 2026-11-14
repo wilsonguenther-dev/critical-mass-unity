@@ -61,19 +61,17 @@
    "voxel_after": 0.004,
    "_note2": "rig-demolitions-1: LOD1 1300 (the first clean landed 1,489 at 1400)",
    "face_features": {
+    "mode": "skin",
     "box": [
-     -0.12,
-     0.12,
+     -0.16,
+     0.16,
      -0.4,
      -0.02,
      1.36,
-     1.66
+     1.67
     ],
-    "rel": 0.6,
-    "colour": "#33241E",
-    "_note": "rig-demolitions-1: eyes and brows restored from the raw colours (ArtImportTests painted-face test)",
-    "cool": 0.04,
-    "follow": 0.4
+    "inner_x": 0.12,
+    "_note": "rig-demolitions-1: clean skin on the face; eyes and brows are added geometry (rigb_joints_Demolitions.json _opts.face_features)"
    }
   }
  ]
