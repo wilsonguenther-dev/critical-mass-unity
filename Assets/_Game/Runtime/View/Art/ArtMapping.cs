@@ -155,6 +155,10 @@ namespace CriticalMass.Runtime.View.Art
         /// <summary>Kaiju clips the Kaiju art branch adds (art/kaiju-blender, DG-91); used when present, else the old poses.</summary>
         public const string Swipe = "Swipe", SwipeWindup = "SwipeWindup", Flinch = "Flinch";
 
+        /// <summary>rig-kaiju-2: the green-crystal adult's bridge walk (same cycle and stride as Walk, fists tucked, stance
+        /// narrowed to about 1.6 m): blended over Walk by KaijuAnimator.Squeeze (feat/kaiju-bridges-1) once that lands.</summary>
+        public const string WalkSqueeze = "WalkSqueeze";
+
         /// <summary>The 24 clips beyond the original 8 that KayKit_Clips.fbx carries once build_kaykit_clips.py is re-run.</summary>
         public static readonly string[] KaykitExtraClips =
         {
@@ -165,7 +169,7 @@ namespace CriticalMass.Runtime.View.Art
         /// <summary>Clips that loop (Loop Time on import).</summary>
         public static readonly string[] LoopingClips =
         {
-            Idle, Walk, Run, Gather, Shake, Berserk, StrafeL, StrafeR, WalkBack, JumpAir, Blocking, Carry, IdleLook, SitIdle,
+            Idle, Walk, Run, Gather, Shake, Berserk, WalkSqueeze, StrafeL, StrafeR, WalkBack, JumpAir, Blocking, Carry, IdleLook, SitIdle,
         };
 
         /// <summary>

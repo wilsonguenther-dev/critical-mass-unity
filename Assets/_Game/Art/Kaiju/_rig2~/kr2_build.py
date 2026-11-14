@@ -986,6 +986,44 @@ def walk(t, T):
     return p
 
 
+SQ_FOOT_X, SQ_FIST_X, SQ_FIST_Y = 0.42, 0.50, -1.30
+
+
+@clip('WalkSqueeze', WALK_N, loop=True)
+def walk_squeeze(t, T):
+    """Bridge walk (blended over Walk by KaijuAnimator.Squeeze, feat/kaiju-bridges-1): same cycle and stride as Walk so the
+    two stay in step, but tiptoeing along a plank: fists tucked in front of the chest, elbows in, feet narrowed under the
+    body, body lowered, small careful steps up on the toes, head peering down, tail held straight out behind."""
+    p = Pose()
+    ph = t / T
+    for ch, off in PHASE.items():
+        s = ch[-1]; sx = 1 if s == 'L' else -1
+        u = (ph - off) % 1.0
+        if ch.startswith('leg'):
+            dy, dz, st = gait(u, 0.2)
+            c = Vector((SQ_FOOT_X * sx, HEEL[s].y + dy - 0.05, HEEL[s].z + dz + 0.06))
+            p.ik[ch] = (c, c + Vector((0.4 * sx, -2.0, 0.6)))
+            p.end[f'Foot_{s}'] = (16 if st else 16 + 14 * math.sin(math.pi * (u - DUTY) / (1 - DUTY)), 0, 0)   # on its toes
+        else:
+            dy, dz, st = gait(u, 0.3)
+            c = Vector((SQ_FIST_X * sx, SQ_FIST_Y + dy, FIST_PLANT_Z + dz))
+            p.ik[ch] = (c + WRIST_OFF[s], c + WRIST_OFF[s] + Vector((0.25 * sx, 2.0, 0.6)))
+            p.end[f'Fist_{s}'] = (-10 if st else -10 - 15 * math.sin(math.pi * (u - DUTY) / (1 - DUTY)), 0, 0)
+    w2 = 2 * math.pi * ph
+    side = math.sin(w2 + 0.4)
+    p.loc['Hips'] = (0.03 * side, 0, -0.24 - 0.05 * (0.5 + 0.5 * math.cos(2 * w2 - 0.6)))
+    p.q['Hips'] = arot('Hips', 4.0, -2.0 * side, 2.0 * math.sin(w2))
+    spine_bend(p, x=8.0 + 1.5 * math.cos(2 * w2 + 0.8), y=1.0 * side, z=-3.0 * math.sin(w2 + 0.3))
+    for s in 'LR':
+        sx = 1 if s == 'L' else -1
+        p.q[f'Shoulder_{s}'] = arot(f'Shoulder_{s}', 0, 0, -6.0 * sx)     # shoulders rolled in
+    p.q['Neck'] = arot('Neck', 6.0, 0, 6.0 * math.sin(w2 * 0.5))
+    p.q['Head'] = arot('Head', 8.0, 4.0 * math.sin(w2 * 0.5), 0)       # peering down at the plank, a nervous wobble
+    p.q['Jaw'] = arot('Jaw', 4.0)
+    tail_wave(p, t, 1.5, 1.0, T, lag=0.1, base_pitch=9.0)            # held up and straight behind
+    return p
+
+
 def windup_pose(p, u):
     """Rear up, both arms overhead (u 0..1)."""
     p.loc['Hips'] = (0, 0.18 * u, 0.30 * u)          # stretch: up on its toes
@@ -996,7 +1034,7 @@ def windup_pose(p, u):
     for s in 'LR':
         sx = 1 if s == 'L' else -1
         rest = Vector((KNU[s].x, KNU[s].y, FIST_PLANT_Z)) + WRIST_OFF[s]
-        top = Vector((0.8 * sx, -0.35, 4.65))
+        top = Vector((0.8 * sx, -0.6, 4.35))
         p.ik[f'arm_{s}'] = (rest.lerp(top, u) + Vector((0.5 * sx, -0.6, 0)) * math.sin(math.pi * u), Vector((2.2 * sx, 1.5, 3.5)))
         p.end[f'Fist_{s}'] = (-120 * u, 0, 0)
 
@@ -1248,7 +1286,7 @@ for name, (N, loop, fn) in CLIPS.items():
         CLIP_FACTS[name]['stride_m'] = round(STRIDE, 3)
     log('clip', name, CLIP_FACTS[name])
 REP['clips'] = CLIP_FACTS
-for _nm in ('Idle', 'Walk'):
+for _nm in ('Idle', 'Walk', 'WalkSqueeze'):
     _p = CLIPS[_nm][2](0.0, CLIPS[_nm][0] / FPS); _M = fk(_p)
     REP.setdefault('new_fists_x', {})[_nm] = [round(_M['Fist_L'].translation.x, 3), round(_M['Fist_R'].translation.x, 3)]
 for o in obs.values():
@@ -1385,7 +1423,7 @@ if not QUICK:
             fr = [0, 3, SLAM_HIT, 10, 20, N]
         elif name == 'Swipe':
             fr = [0, 8, 12, 15, 20, 30]
-        elif name == 'Walk':
+        elif name in ('Walk', 'WalkSqueeze'):
             fr = [0, 5, 10, 15, 20, 25]
         else:
             fr = [int(round(i * N / 5)) for i in range(6)]
@@ -1465,6 +1503,16 @@ try:
             pass
     bpy.context.scene.frame_set(1)
     REP['new_footprint']['idle'] = footprint_of_imported()
+    sq = next((a for a in bpy.data.actions if a.name.endswith('WalkSqueeze')), None)
+    if sq:
+        for o in arms:
+            o.animation_data.action = sq
+            try:
+                o.animation_data.action_slot = sq.slots[0]
+            except Exception:
+                pass
+        bpy.context.scene.frame_set(1)
+        REP['new_footprint']['squeeze'] = footprint_of_imported()
     log('new adult footprint', REP['new_footprint'])
 except Exception as ex:
     log('new footprint failed', ex)

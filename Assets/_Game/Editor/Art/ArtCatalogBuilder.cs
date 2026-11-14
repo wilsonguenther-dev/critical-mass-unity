@@ -123,6 +123,21 @@ namespace CriticalMass.Editor.Art
         {
             ArtCatalog cat = AssetDatabase.LoadAssetAtPath<ArtCatalog>(ArtCatalog.AssetPath);
             if (cat == null) return;
+            // rig-kaiju-2 (2026-11-14): a model re-exported with its own clips (a new clip, or its face atlases dropped)
+            // also makes the committed catalog stale: rebuild once so tests see what a player build ships.
+            foreach (ModelSpec spec in ArtMapping.Models)
+            {
+                if (!spec.Rigged || spec.ClipSource != null) continue;
+                ArtEntry e = cat.Find(spec.Key);
+                if (e == null) continue;
+                int own = ArtCatalogBuilder.Clips(spec.AssetPath).Length;
+                if (own > 0 && ((e.Clips?.Length ?? 0) != own || (e.Expressions?.Length ?? 0) != (spec.Expressions?.Length ?? 0)))
+                {
+                    Debug.Log($"[ArtCatalog] {spec.Key} clips or faces changed: rebuilding the catalog");
+                    ArtCatalogBuilder.Build();
+                    return;
+                }
+            }
             foreach (ModelSpec spec in ArtMapping.Models)
             {
                 if (!spec.Rigged || spec.ClipSource == null) continue;
