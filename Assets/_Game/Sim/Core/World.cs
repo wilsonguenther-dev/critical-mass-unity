@@ -45,6 +45,12 @@ namespace CriticalMass.Sim.Core
         public byte[] Squeeze;
         /// <summary>The Kaiju's live wall collider radius (KaijuGridRadius, down to KaijuSqueezeRadius on a bridge); 0 = not set.</summary>
         public double WallR;
+
+        // fix/kaiju-hill-1 (PhysicsConfig.KaijuHillSiege)
+        /// <summary>Barricade cell the Kaiju is breaking toward the hill (-1 none), the clear cell it claws from, and seconds until
+        /// the siege goal is picked again.</summary>
+        public int SiegeCx, SiegeCz, StandCx, StandCz;
+        public double SiegeIn;
     }
 
     /// <summary>CM-30 miner dig / place state (browser TerraformState), per-actor arrays at ActorCapacity.</summary>
@@ -567,6 +573,8 @@ namespace CriticalMass.Sim.Core
             nav.NoProgress = 0;
             Array.Fill(nav.Ignore, 0.0);
             nav.WallR = 0;
+            nav.SiegeCx = nav.SiegeCz = nav.StandCx = nav.StandCz = -1;
+            nav.SiegeIn = 0;
             nav.ClearGridVersion = -1; // the squeeze cells are rebuilt with the shadow grid
 
             MatchState m = world.Match;
@@ -827,6 +835,7 @@ namespace CriticalMass.Sim.Core
                     RegionQueue = new int[map.Width * map.Height],
                     Ignore = new double[cap],
                     Squeeze = new byte[map.Width * map.Height],
+                    SiegeCx = -1, SiegeCz = -1, StandCx = -1, StandCz = -1,
                 },
                 Match = BlankMatch(),
                 Events = events,
