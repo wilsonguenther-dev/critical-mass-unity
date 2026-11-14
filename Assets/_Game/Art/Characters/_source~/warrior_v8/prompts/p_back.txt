@@ -1,0 +1,8 @@
+The first image is a character model sheet for the "Warrior" from our game's art bible. The second image is an accepted FRONT VIEW modelling reference of this same Warrior in a neutral A-pose with empty hands. The third image is the art bible's own back view of the Warrior.
+
+Paint the SAME CHARACTER in EXACTLY the same neutral A-pose, outfit, proportions, colours and flat rendering style as the second image, but seen from a different angle: BACK VIEW: the character seen directly from behind, facing away from the viewer; show the back of the hair and top-knot, the scarf tails hanging down the back, the back of the pauldrons, belt and tabard, the backs of the boots.
+- Full body from the top of the hair to the soles of the boots, centred, small margin all round; the figure the same height in frame as in the second image.
+- Arms held straight down and out to the sides at about 35 degrees from the body, separated from the torso; hands open and empty; legs straight, feet slightly apart.
+- NO weapon, NO shield, nothing held, no effects.
+- Every design detail must match the second image and the bible sheet: spiky dark-brown hair with the brass-ringed top-knot, teal scarf, cream shirt with navy panels, carved grey stone pauldrons with teal crystals and brass discs, brown straps and belt with round brass buckle and pouches, teal tabard, cream trousers, navy knee guards with brass discs, brown gauntlets, brown boots with grey stone toe caps.
+- Flat, even, shadowless lighting; plain flat light grey background (#D9D9D9); no ground shadow, no text, no border. Orthographic feel, camera at chest height, no perspective distortion.

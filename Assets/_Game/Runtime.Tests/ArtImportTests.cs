@@ -206,6 +206,7 @@ namespace CriticalMass.Runtime.Tests
         public void TheMinerFaceSlotIsTheDecalSubmesh()
         {
             ModelSpec spec = ArtMapping.Spec(ArtMapping.Miner);
+            Assume.That(!spec.VertexColourFace, "the HY Miner paints its face in vertex colour (no decal slot)");
             Mesh mesh = BodyMesh(spec);
             Assert.AreEqual(2, mesh.subMeshCount, "Miner_Body: CM_Toon + CM_FaceDecal");
             Texture2D decal = ReadPng(spec.FaceTexture);

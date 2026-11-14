@@ -1,0 +1,9 @@
+The first image is a character model sheet for the "Warrior" from our game's art bible (painted stylised 3D-game concept art). The second image is a close crop of the same Warrior's front view.
+
+Paint THIS EXACT SAME CHARACTER, by the same painter, in the same rendering style, as a clean modelling reference for a 3D artist:
+- FRONT VIEW, facing the viewer straight on, full body from the top of the hair to the soles of the boots, centred, with a small margin all round.
+- Neutral relaxed A-POSE: both arms held straight down and out to the sides at about 35 degrees from the body, clearly separated from the torso and hips with background visible between arm and body; elbows nearly straight; both hands open and relaxed, fingers together, palms facing the thighs. Legs straight, feet slightly apart (about shoulder width), toes pointing forward. Standing upright, looking straight ahead, calm slight smile.
+- NO weapon, NO shield, nothing held in the hands, no effects, no glow trails, no debris.
+- Identical design to the sheet: same chunky heroic proportions (big head, broad shoulders, short sturdy legs), same spiky dark-brown hair with the tall top-knot tied with a brass ring, same face, same teal scarf, cream shirt with navy panels, grey carved-stone pauldrons with teal crystal inlays and brass rivet discs, brown leather straps and belt with the round brass buckle, teal tabard hanging from the belt, cream baggy trousers with navy knee guards and brass knee discs, brown leather gauntlets, heavy brown boots with grey stone toe caps. Same colours.
+- Flat, even, shadowless studio lighting; plain flat light grey background (#D9D9D9); no ground shadow, no text, no labels, no border.
+- Orthographic feel: no perspective distortion, camera at chest height.
