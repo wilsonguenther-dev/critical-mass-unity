@@ -48,13 +48,6 @@ namespace CriticalMass.Runtime.View.Art
         /// <summary>Body height in metres (bind-pose mesh bounds of Meshes[0]) the art reports, with tolerance HeightTolerance.</summary>
         public float Height;
         public const float HeightTolerance = 0.12f;
-        /// <summary>Leg length of this model's own joints over the KayKit skeleton's (hip to ankle), for models that
-        /// keep per-class joints under the shared KayKit clips (the HY swaps): the locomotion stride scales by it so the
-        /// planted foot holds. 1 for every model on the plain KayKit joints.</summary>
-        public float StrideScale = 1f;
-        /// <summary>The model's mesh is bound in a pose that differs from its armature rest (the HY Warrior: soles 0.061 below the root): the view retargets
-        /// the shared clips onto the bind pose (ModelView.BindRetarget), with the hips motion scaled by StrideScale.</summary>
-        public bool RetargetToBind;
         /// <summary>Painted face decal (PNG next to the FBX, UV0 of Meshes[0]), or null.</summary>
         public string FaceTexture;
         /// <summary>-1: the decal is mixed over the main material (every face that shows no face maps to a transparent
@@ -82,13 +75,6 @@ namespace CriticalMass.Runtime.View.Art
         /// is entry 0), or null. The view swaps the material's face texture per state (ArtMaterials.ForGlow).
         /// </summary>
         public string[] Expressions;
-        /// <summary>
-        /// HY models (Tencent HY 3D Global, art/characters-hy, 2026-11-13): the face is painted in the per-face vertex colour
-        /// of every LOD (the generated texture baked and colour-corrected toward the turnaround), not a decal. Such a model has
-        /// no FaceTexture, no decal slot and no outline sidecar; its UV0 sits on one transparent texel. The pre-HY FBX of the
-        /// class is kept in its folder's _fallback~ (restore: copy it back and revert this spec's line).
-        /// </summary>
-        public bool VertexColourFace;
         /// <summary>True when the importer bakes UV4.x outline weights (0 on the face) and the material reads them.</summary>
         public bool BakesOutlineWeights => OutlineWeights != null || (FaceTexture != null && FaceSlot < 0);
     }
@@ -105,12 +91,6 @@ namespace CriticalMass.Runtime.View.Art
         public const string Warrior = "Warrior";
         public const string Miner = "Miner";
         public const string Farmer = "Farmer";
-        /// <summary>The KayKit skeleton's deform bones (same list as the editor's clip postprocessor), for BindRetarget.</summary>
-        public static readonly HashSet<string> KaykitDeformBoneNames = new HashSet<string>(System.StringComparer.Ordinal)
-        {
-            "spine", "chest", "head", "upperarm.l", "lowerarm.l", "wrist.l", "hand.l", "upperarm.r", "lowerarm.r", "wrist.r", "hand.r",
-            "upperleg.l", "lowerleg.l", "foot.l", "toes.l", "upperleg.r", "lowerleg.r", "foot.r", "toes.r",
-        };
         public const string Demolitions = "Demolitions";
         public const string Builder = "Builder";
         public const string Healer = "Healer";
@@ -308,7 +288,7 @@ namespace CriticalMass.Runtime.View.Art
                 Bones = 41, ClipSource = "Assets/_Game/Art/Characters/KayKit_Clips.fbx",
                 Meshes = new[] { "Warrior_Hero", "Warrior_LOD0", "Warrior_LOD1", "Warrior_Shadow" }, MaskCodes = new[] { 0, 6, 8 },
                 OutlinePx = CharacterHullPx, Rim = 0.6f, Authored = WarriorAzure, Crimson = WarriorCrimson, Height = 2.0f,
-                VertexColourFace = true, RetargetToBind = true, ArtYawDeg = 180f },   // HY (2026-11-13); pre-HY: FaceTexture Warrior_Face.png
+                FaceTexture = "Assets/_Game/Art/Characters/Warrior_Face.png", ArtYawDeg = 180f },
             new ModelSpec { Key = Miner, AssetPath = "Assets/_Game/Art/Miner/Miner.fbx", Kind = ArtKind.Character, Rigged = true,
                 Bones = 41, ClipSource = "Assets/_Game/Art/Characters/KayKit_Clips.fbx",
                 Meshes = new[] { "Miner_Hero", "Miner_LOD0", "Miner_LOD1", "Miner_Shadow" }, MaskCodes = new[] { 0, 6, 8 },
