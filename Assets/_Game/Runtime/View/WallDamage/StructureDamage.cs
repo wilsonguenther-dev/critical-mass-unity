@@ -370,8 +370,32 @@ namespace CriticalMass.Runtime.View.WallDamage
 
         public static void ClearAll()
         {
+            // batch 8: the cut meshes (cell slices, their crack overlays, the break chunks) belong to the set: free them with it,
+            // or every world rebuild leaks them (TechHardeningPlayTests.TenWorldRebuildsEndWithTheSameMeshAndMaterialCounts).
+            foreach (BreakableCellSet set in _all)
+            {
+                if (set._byLook != null) foreach (MeshPiece[] ps in set._byLook) FreePieces(ps);
+                if (set._chunks != null) foreach (MeshPiece[] ps in set._chunks) FreePieces(ps);
+            }
             _all.Clear();
             System.Array.Clear(_byCell, 0, _byCell.Length);
+        }
+
+        static void FreePieces(MeshPiece[] ps)
+        {
+            if (ps == null) return;
+            foreach (MeshPiece p in ps)
+            {
+                if (p == null) continue;
+                FreeMesh(p.Mesh);
+                if (p.Cracks != null) foreach (Mesh m in p.Cracks) FreeMesh(m);
+            }
+        }
+
+        static void FreeMesh(Mesh m)
+        {
+            if (m == null) return;
+            if (Application.isPlaying) Object.Destroy(m); else Object.DestroyImmediate(m);
         }
 
         BreakableCellSet(int[] cells, MeshPiece[][] byLook, MeshPiece[][] chunks, Transform section)

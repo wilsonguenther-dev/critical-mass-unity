@@ -34,7 +34,7 @@ namespace CriticalMass.Editor.Art
         public const string ArtMaterialPath = "Assets/_Game/Resources/Toon/CMToonArt.mat";
 
         /// <summary>Bump when the contract changes: Unity re-imports every model this postprocessor touches.</summary>
-        public override uint GetVersion() => 13;   // 13: batch 8 merge of 10 (wall-damage-1, the Miner barricade imports readable) and 12 (KayKit deform-bone translations within 1% always dropped)
+        public override uint GetVersion() => 14;   // 14: deform-bone translations always dropped; 13: batch 8 merge of 10 (wall-damage-1, the Miner barricade imports readable) and 12 (KayKit deform-bone translations within 1% always dropped)
 
         public static bool IsArt(string path) =>
             path.StartsWith(ArtRoot, StringComparison.Ordinal) && path.EndsWith(".fbx", StringComparison.OrdinalIgnoreCase);
@@ -305,9 +305,12 @@ namespace CriticalMass.Editor.Art
                 {
                     AnimationCurve c = AnimationUtility.GetEditorCurve(clip, b);
                     if (c == null || c.length == 0) { same = false; break; }
-                    float tol = deform ? Math.Max(1e-4f, 0.01f * mag) : 1e-5f;   // deform: sub-1% jitter is round-off, not motion
-                    if (!IsConstant(c, tol)) { same = false; break; }
+                    // batch 8: a deform bone's translation is always dropped (each model keeps its own joint lengths). DeathB moved
+                    // upperleg.l by more than 1%, which kept that curve and pinned the HY Warrior's hip to the KayKit joint in the
+                    // death fall (HyCharacterSwapTests.KaykitClipsLeaveDeformBoneTranslationToEachModel).
                     if (deform) continue;
+                    float tol = 1e-5f;
+                    if (!IsConstant(c, tol)) { same = false; break; }
                     char axis = b.propertyName[b.propertyName.Length - 1];
                     float rest = axis == 'x' ? t.localPosition.x : axis == 'y' ? t.localPosition.y : t.localPosition.z;
                     if (Math.Abs(c.keys[0].value - rest) > 1e-4f) { same = false; break; }   // a held offset is motion: keep
