@@ -164,13 +164,11 @@ def decimated_copy(src, name, target):
         except Exception as ex:
             print("GEN2 apply failed", name, ex); ob.modifiers.remove(md)
         t1 = tri_count(ob); how.append(f"collapse {t}->{t1}")
-        if t1 > 0.9 * t:   # collapse stalled: rebuild a clean surface, then collapse again
-            md = ob.modifiers.new("vox", "REMESH"); md.mode = "VOXEL"
-            dims = ob.dimensions; area = sum(p.area for p in ob.data.polygons)
-            md.voxel_size = max(0.004, math.sqrt(area / (target * 6.0)))
-            md.use_smooth_shade = False
-            sel_only([ob], ob); bpy.ops.object.modifier_apply(modifier=md.name)
-            t1 = tri_count(ob); how.append(f"voxel {md.voxel_size:.4f} -> {t1}")
+        if t1 > 0.9 * t:   # collapse stalled on non-manifold edges (edges with 3+ faces): split them open, go on
+            bm = bmesh.new(); bm.from_mesh(ob.data)
+            nm = [e for e in bm.edges if len(e.link_faces) > 2]
+            bmesh.ops.split_edges(bm, edges=nm)
+            bm.to_mesh(ob.data); bm.free(); ob.data.update(); how.append(f"split {len(nm)} non-manifold edges")
         t = t1
     print("GEN2 decimate", name, t0, "->", t, how)
     bm = bmesh.new(); bm.from_mesh(ob.data)
