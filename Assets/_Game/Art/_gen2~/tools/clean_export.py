@@ -63,7 +63,14 @@ def import_join(path):
     sel_only(meshes, meshes[0])
     if len(meshes) > 1:
         bpy.ops.object.join()
-    return bpy.context.view_layer.objects.active
+    ob = bpy.context.view_layer.objects.active
+    bm = bmesh.new(); bm.from_mesh(ob.data)
+    ext = max((max(v.co[i] for v in bm.verts) - min(v.co[i] for v in bm.verts)) for i in range(3))
+    n0 = len(bm.verts)
+    bmesh.ops.remove_doubles(bm, verts=bm.verts[:], dist=ext * 2e-5)
+    bm.to_mesh(ob.data); bm.free(); ob.data.update()
+    print("GEN2 weld", n0, "->", len(ob.data.vertices))
+    return ob
 
 
 def drop_floaters(ob, frac):
@@ -145,18 +152,32 @@ def tri_count(ob):
 def decimated_copy(src, name, target):
     ob = src.copy(); ob.data = src.data.copy(); ob.name = ob.data.name = name
     bpy.context.scene.collection.objects.link(ob)
-    t = tri_count(ob)
-    for _ in range(3):
+    t0 = t = tri_count(ob); how = []
+    for _ in range(4):
         if t <= target:
             break
         md = ob.modifiers.new("dec", "DECIMATE"); md.decimate_type = "COLLAPSE"; md.ratio = max(1e-4, target / t * 0.98)
         md.use_collapse_triangulate = True
-        sel_only([ob], ob); bpy.ops.object.modifier_apply(modifier=md.name)
-        t = tri_count(ob)
+        sel_only([ob], ob)
+        try:
+            bpy.ops.object.modifier_apply(modifier=md.name)
+        except Exception as ex:
+            print("GEN2 apply failed", name, ex); ob.modifiers.remove(md)
+        t1 = tri_count(ob); how.append(f"collapse {t}->{t1}")
+        if t1 > 0.9 * t:   # collapse stalled: rebuild a clean surface, then collapse again
+            md = ob.modifiers.new("vox", "REMESH"); md.mode = "VOXEL"
+            dims = ob.dimensions; area = sum(p.area for p in ob.data.polygons)
+            md.voxel_size = max(0.004, math.sqrt(area / (target * 6.0)))
+            md.use_smooth_shade = False
+            sel_only([ob], ob); bpy.ops.object.modifier_apply(modifier=md.name)
+            t1 = tri_count(ob); how.append(f"voxel {md.voxel_size:.4f} -> {t1}")
+        t = t1
+    print("GEN2 decimate", name, t0, "->", t, how)
     bm = bmesh.new(); bm.from_mesh(ob.data)
     bmesh.ops.dissolve_degenerate(bm, dist=1e-6, edges=bm.edges[:])
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
     bm.to_mesh(ob.data); bm.free(); ob.data.update()
+    ob["gen2_decimate"] = "; ".join(how)
     return ob
 
 
@@ -330,7 +351,7 @@ def clean(e):
         except Exception:
             pass
         bb = np.array([o.matrix_world @ Vector(c) for c in o.bound_box])
-        facts["levels"][lv] = {"tris": tri_count(o), "verts": len(o.data.vertices),
+        facts["levels"][lv] = {"how": o.get("gen2_decimate", ""), "tris": tri_count(o), "verts": len(o.data.vertices),
                                "size_m": [round(float(x), 3) for x in bb.max(0) - bb.min(0)],
                                "min_z": round(float(bb[:, 2].min()), 4),
                                "faces_per_code": {str(int(k)): int((codes[lab] == k).sum()) for k in np.unique(codes[lab])}}
