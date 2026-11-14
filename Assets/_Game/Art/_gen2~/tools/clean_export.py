@@ -67,22 +67,26 @@ def import_join(path):
 
 
 def drop_floaters(ob, frac):
-    sel_only([ob], ob)
-    n0 = len(ob.data.vertices)
-    bpy.ops.object.mode_set(mode="EDIT"); bpy.ops.mesh.select_all(action="SELECT")
-    bpy.ops.mesh.separate(type="LOOSE"); bpy.ops.object.mode_set(mode="OBJECT")
-    parts = [o for o in bpy.context.scene.objects if o.type == "MESH"]
-    parts.sort(key=lambda o: -len(o.data.vertices))
-    keep = [parts[0]] + [o for o in parts[1:] if len(o.data.vertices) >= frac * n0]
-    dropped = 0
-    for o in parts:
-        if o not in keep:
-            dropped += len(o.data.vertices); bpy.data.objects.remove(o, do_unlink=True)
-    sel_only(keep, keep[0])
-    if len(keep) > 1:
-        bpy.ops.object.join()
-    ob = bpy.context.view_layer.objects.active
-    return ob, {"parts_kept": len(keep), "parts_dropped": len(parts) - len(keep), "verts_dropped": dropped}
+    """Delete loose parts under frac of the vertices (numpy label propagation; separate-by-loose is too slow when a
+    generated mesh has thousands of crumbs)."""
+    me = ob.data; n = len(me.vertices); ne = len(me.edges)
+    ed = np.empty(ne * 2, np.int64); me.edges.foreach_get("vertices", ed); ed = ed.reshape(-1, 2)
+    lab = np.arange(n)
+    for _ in range(400):
+        m = np.minimum(lab[ed[:, 0]], lab[ed[:, 1]])
+        old = lab.copy()
+        np.minimum.at(lab, ed[:, 0], m); np.minimum.at(lab, ed[:, 1], m)
+        lab = lab[lab]; lab = lab[lab]
+        if np.array_equal(lab, old):
+            break
+    roots, inv, cnt = np.unique(lab, return_inverse=True, return_counts=True)
+    keep_part = (cnt >= frac * n) | (cnt == cnt.max())
+    kill = ~keep_part[inv]
+    if kill.any():
+        bm = bmesh.new(); bm.from_mesh(me); bm.verts.ensure_lookup_table()
+        bmesh.ops.delete(bm, geom=[bm.verts[i] for i in np.nonzero(kill)[0]], context="VERTS")
+        bm.to_mesh(me); bm.free(); me.update()
+    return ob, {"parts_kept": int(keep_part.sum()), "parts_dropped": int((~keep_part).sum()), "verts_dropped": int(kill.sum())}
 
 
 def source_colours(ob):
@@ -241,6 +245,40 @@ def render(objs, label, views=("front", "tq", "game"), mode="VERTEX"):
         o.hide_render = h
 
 
+def load_rgba(path, flip=False):
+    im = bpy.data.images.load(path); W, H = im.size
+    px = np.empty(W * H * 4, np.float32); im.pixels.foreach_get(px); px = px.reshape(H, W, 4)
+    if flip:
+        px = px[:, ::-1]
+    ys, xs = np.where(px[:, :, 3] > 0.5)
+    return px, (xs.min(), xs.max(), ys.min(), ys.max())
+
+
+def project_colours(ob, co, views):
+    """Colour per vertex from the turnaround views by planar projection, weighted by how squarely the normal faces
+    each view: front (-Y), back (+Y), left side (+X, the 'left' image), right side (-X, the left image mirrored)."""
+    me = ob.data; n = len(me.vertices); nr = np.empty(n * 3); me.vertices.foreach_get("normal", nr); nr = nr.reshape(-1, 3)
+    lo, hi = co.min(0), co.max(0); ext = np.maximum(hi - lo, 1e-6)
+    acc = np.zeros((n, 3)); wsum = np.zeros(n)
+    spec = [("front", False, lambda: (co[:, 0] - lo[0]) / ext[0], np.maximum(0, -nr[:, 1])),
+            ("back", False, lambda: (hi[0] - co[:, 0]) / ext[0], np.maximum(0, nr[:, 1])),
+            ("left", False, lambda: (co[:, 1] - lo[1]) / ext[1], np.maximum(0, nr[:, 0])),
+            ("left", True, lambda: (hi[1] - co[:, 1]) / ext[1], np.maximum(0, -nr[:, 0]))]
+    vz = (co[:, 2] - lo[2]) / ext[2]
+    for key, flip, ufn, w in spec:
+        if key not in views:
+            continue
+        px, (x0, x1, y0, y1) = load_rgba(resolve(views[key]), flip)
+        u = ufn(); X = np.clip((x0 + u * (x1 - x0)).astype(int), 0, px.shape[1] - 1)
+        Y = np.clip((y0 + vz * (y1 - y0)).astype(int), 0, px.shape[0] - 1)
+        c = px[Y, X, :3].astype(np.float64); a = px[Y, X, 3]
+        w = (w ** 2) * (a > 0.5)
+        acc += c * w[:, None]; wsum += w
+    out = acc / np.maximum(wsum, 1e-6)[:, None]
+    out[wsum < 1e-6] = np.median(out[wsum >= 1e-6], axis=0) if (wsum >= 1e-6).any() else 0.6
+    return out
+
+
 def clean(e):
     name = e["name"]; kind = e.get("kind", "fighter")
     hold = os.path.join(OUT, "holding", e.get("dir", name)); os.makedirs(hold, exist_ok=True)
@@ -254,8 +292,11 @@ def clean(e):
         bm = bmesh.new(); bm.from_mesh(ob.data)
         bmesh.ops.delete(bm, geom=[v for v in bm.verts if v.co.z < zc], context="VERTS")
         bm.to_mesh(ob.data); bm.free(); ob.data.update(); facts["trimmed_below_frac"] = e["trim_below"]
-    srccol, facts["colour_source"] = source_colours(ob)
+    if not e.get("project"):
+        srccol, facts["colour_source"] = source_colours(ob)
     co, facts["scale_applied"] = normalise(ob, e["height"], e.get("yaw", 0))
+    if e.get("project"):
+        ob.data.update(); srccol = project_colours(ob, co, e["project"]); facts["colour_source"] = "projected from turnarounds"
     kd = kdtree.KDTree(len(co))
     for i, p in enumerate(co):
         kd.insert(p, i)
