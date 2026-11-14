@@ -1,9 +1,11 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Text;
 using CriticalMass.Runtime.Game;
+using CriticalMass.Runtime.View.Dressing;
 using UnityEngine;
 
 namespace CriticalMass.Runtime.View.Atmosphere
@@ -19,6 +21,11 @@ namespace CriticalMass.Runtime.View.Atmosphere
     ///   hz-edge-north-TIME.png, hz-edge-west-TIME.png   standing at an island edge, looking out and down over the rim;
     ///   hz-hill-west-TIME-nohorizon.png   the same hill frame with the new horizon hidden (before / after);
     ///   hz-topdown-TIME.png and hz-topdown-TIME-nohorizon.png   the gameplay camera, to prove the top-down look holds;
+    /// World horizon 2 adds eye-level frames of the wall architecture, picked from the built layout
+    /// (WorldBeyond.WallReport.Views): wa-wall-run (along the longest straight wall), wa-gate (at the first gate arch),
+    /// wa-keep-azure and wa-keep-crimson (each base's keep), wa-hill-beacon (the hill's ruined beacon), plus
+    /// hz-creature (from the hill, looking up at the far creature over the island of the bones), each Day, Dusk, Night,
+    /// and wa-*-nowalls frames of the wall run and the gate with the overlay hidden (before / after);
     /// and horizon-shots.txt with the costs per tier. Then it gives the camera back and resumes. Visual only.
     /// </summary>
     [DefaultExecutionOrder(10001)]
@@ -108,8 +115,16 @@ namespace CriticalMass.Runtime.View.Atmosphere
             float far0 = cam.farClipPlane, fov0 = cam.fieldOfView;
             cam.farClipPlane = Mathf.Max(far0, 600f);
             _hold = true;
-            foreach ((string name, float x, float z, float yaw, float down) f in Frames)
+            var frames = new List<(string name, float x, float z, float yaw, float down)>(Frames);
+            frames.Add(("creature", 56f, 36f, Mathf.Repeat(90f - WorldHorizonLayout.BonesAzimuth, 360f), -7f));
+            WorldBeyond wbw = WorldBeyond.Current;
+            if (wbw != null && wbw.WallReport != null)
+                foreach ((string name, float x, float z, float yaw, float down) v in wbw.WallReport.Views) frames.Add(("wa:" + v.name, v.x, v.z, v.yaw, v.down));
+            foreach ((string name0, float x, float z, float yaw, float down) f0 in frames)
             {
+                bool wall = f0.name0.StartsWith("wa:", StringComparison.Ordinal);
+                string prefix = wall ? "wa" : "hz";
+                (string name, float x, float z, float yaw, float down) f = (wall ? f0.name0.Substring(3) : f0.name0, f0.x, f0.z, f0.yaw, f0.down);
                 _pos = new Vector3(f.x, GroundY(f.x, -f.z) + Eye, -f.z);
                 _rot = Quaternion.Euler(f.down, f.yaw, 0f);
                 yield return new WaitForSecondsRealtime(0.4f);
@@ -117,8 +132,16 @@ namespace CriticalMass.Runtime.View.Atmosphere
                 {
                     SetTime(t);
                     yield return new WaitForSecondsRealtime(0.4f);
-                    Shot($"hz-{f.name}-{Name(t)}.png");
+                    Shot($"{prefix}-{f.name}-{Name(t)}.png");
                     yield return null;
+                    if (wall && (f.name == "wall-run" || f.name == "gate"))
+                    {
+                        SetWalls(false);
+                        yield return null;
+                        Shot($"{prefix}-{f.name}-{Name(t)}-nowalls.png");
+                        yield return null;
+                        SetWalls(true);
+                    }
                     if (f.name == "hill-west")
                     {
                         SetHorizon(false);
@@ -137,11 +160,23 @@ namespace CriticalMass.Runtime.View.Atmosphere
 
             WorldBeyond wb = WorldBeyond.Current;
             if (wb != null) Note($"quality {RenderTier.Level}: world beyond {wb.Triangles} triangles {wb.Draws} draws; horizon {wb.HorizonTriangles} triangles {wb.HorizonDraws} draw, 0 texture bytes");
+            if (wb != null && wb.WallReport != null)
+            {
+                WallArchReport r = wb.WallReport;
+                Note($"quality {RenderTier.Level}: wall architecture {wb.WallTriangles} triangles {wb.WallDraws} draw, 0 texture bytes; {r.WallCells} wall cells, {r.Merlons} merlons, {r.Towers} towers, {r.Buttresses} buttresses, {r.Gates} gates, {r.Banners} banners, {r.Torches} torches, {r.Keeps} keeps, {r.Pillars} pillars, {r.RopeCells} rope cells");
+                foreach (var v in r.Views) Note($"wall view {v.name}: sim ({v.x:0.0}, {v.z:0.0}) yaw {v.yaw:0} down {v.down:0}");
+            }
             foreach (int q in new[] { FramePolicy.LevelLow, FramePolicy.LevelMedium, FramePolicy.LevelHigh })
             {
                 var hm = new HorizonMesh();
                 WorldHorizonLayout.Build(hm, WorldHorizonBudget.For(q));
                 Note($"budget q{q}: horizon {hm.Tris} triangles, {hm.V.Count} vertices, {WorldHorizonBudget.Draws} draw");
+                if (drv.World != null && drv.World.Map != null)
+                {
+                    var am = new ArchMesh();
+                    WallArchitectureLayout.Build(am, drv.World.Map, WallArchBudget.For(q));
+                    Note($"budget q{q}: wall architecture {am.Tris} triangles, {am.V.Count} vertices, {WallArchBudget.Draws} draw");
+                }
             }
             Finish(drv, ts);
         }
@@ -163,6 +198,14 @@ namespace CriticalMass.Runtime.View.Atmosphere
             foreach (RaycastHit h in hits)
                 if (h.point.y > -3f && h.point.y < 12f && (float.IsNaN(best) || h.point.y > best)) best = h.point.y;
             return float.IsNaN(best) ? 2.8f : best;
+        }
+
+        static void SetWalls(bool on)
+        {
+            WorldBeyond wb = WorldBeyond.Current;
+            if (wb == null) return;
+            Transform t = FindDeep(wb.transform, "Wall Architecture");
+            if (t != null) t.gameObject.SetActive(on);
         }
 
         static void SetHorizon(bool on)

@@ -54,7 +54,7 @@ namespace CriticalMass.Runtime.Tests
                 WorldHorizonBudget b = WorldHorizonBudget.For(q);
                 Assert.LessOrEqual(m.Tris, WorldHorizonBudget.MaxTriangles, $"horizon triangles on level {q}");
                 foreach (HorizonPiece p in pieces)
-                    Assert.Less(p.Triangles, WorldHorizonBudget.MaxPieceTriangles, $"{p.Kind} at {p.AzimuthDeg:0} is a sub-100-triangle card");
+                    Assert.Less(p.Triangles, p.Kind == "creature" ? WorldHorizonBudget.MaxCreatureTriangles : WorldHorizonBudget.MaxPieceTriangles, $"{p.Kind} at {p.AzimuthDeg:0} is a sub-100-triangle card");
                 if (q <= FramePolicy.LevelLow) { low = m.Tris; Assert.AreEqual(1, b.Bands, "Low keeps one band"); }
                 else if (q == FramePolicy.LevelMedium) med = m.Tris;
                 else high = m.Tris;
@@ -74,6 +74,8 @@ namespace CriticalMass.Runtime.Tests
                 HorizonMesh m = Horizon(q, out _);
                 Assert.AreEqual(m.V.Count, m.C.Count);
                 Assert.AreEqual(m.V.Count, m.U.Count);
+                Assert.AreEqual(m.V.Count, m.U1.Count);
+                Assert.AreEqual(m.V.Count, m.U2.Count);
                 Assert.AreEqual(0, m.T.Count % 3);
                 foreach (int i in m.T) Assert.That(i, Is.InRange(0, m.V.Count - 1));
                 foreach (Vector3 v in m.V) Assert.IsFalse(float.IsNaN(v.x + v.y + v.z) || float.IsInfinity(v.x + v.y + v.z));
@@ -182,6 +184,38 @@ namespace CriticalMass.Runtime.Tests
                 foreach (BeyondFeature x in f) fringe |= x.Name.StartsWith("rim fringe");
                 Assert.AreEqual(q > FramePolicy.LevelLow, fringe, $"rim fringe on Medium and High only (level {q})");
             }
+        }
+
+        [Test]
+        public void HorizonTwoHasItsCreatureFlocksLightsAndMotionKinds()
+        {
+            foreach (int q in Levels)
+            {
+                var m = Horizon(q, out List<HorizonPiece> pieces);
+                int creatures = 0, bones = 0;
+                foreach (HorizonPiece p in pieces)
+                {
+                    if (p.Kind == "creature") { creatures++; Assert.AreEqual(WorldHorizonLayout.BonesAzimuth, p.AzimuthDeg, 1e-3f, "it circles the island of the bones"); }
+                    if (p.Kind == "bones") bones++;
+                }
+                Assert.AreEqual(1, creatures, $"exactly one far creature on level {q}");
+                Assert.AreEqual(1, bones, $"the island of the bones on level {q}");
+                TestContext.WriteLine($"horizon 2 level {q}: {m.Tris} triangles, {pieces.Count} pieces");
+            }
+            var hi = Horizon(FramePolicy.LevelHigh, out List<HorizonPiece> hp);
+            var kinds = new HashSet<float>();
+            foreach (Vector2 u in hi.U) kinds.Add(u.y);
+            foreach (float k in new[] { 4f, 5f, 6f, 7f, 8f }) Assert.IsTrue(kinds.Contains(k), $"kind {k} on the High horizon");
+            int flocks = 0, streaks = 0;
+            foreach (HorizonPiece p in hp) { if (p.Kind == "flock") flocks++; if (p.Kind == "streak") streaks++; }
+            Assert.AreEqual(WorldHorizonBudget.For(FramePolicy.LevelHigh).Flocks, flocks);
+            Assert.AreEqual(WorldHorizonBudget.For(FramePolicy.LevelHigh).HighClouds, streaks);
+            // The creature stays far: every vertex of it at least 300 u out, wings at most CreatureSpan wide.
+            for (int i = 0; i < hi.V.Count; i++)
+                if (hi.U[i].y > 7.5f) Assert.Greater(new Vector2(hi.V[i].x, hi.V[i].z).magnitude, 300f);
+            string s = File.ReadAllText(Path.Combine(Application.dataPath, "_Game/Runtime/View/Atmosphere/Resources/CMWorldHorizon.shader"));
+            StringAssert.Contains("TEXCOORD1", s); StringAssert.Contains("TEXCOORD2", s);
+            StringAssert.DoesNotContain("TEXTURE2D", s, "still no texture");
         }
     }
 }
