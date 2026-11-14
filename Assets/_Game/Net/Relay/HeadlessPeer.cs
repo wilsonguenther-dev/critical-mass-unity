@@ -189,7 +189,7 @@ namespace CriticalMass.Net.Relay
             if (_session == null) return null;
             if (_session.Status == LockstepStatus.Desynced)
             {
-                Log(_session.SetupMismatch != null ? "ONLINE SETUP MISMATCH " + _session.SetupMismatch : "ONLINE DESYNC at tick " + _session.DesyncTick);
+                Log(_session.SetupMismatch != null ? "ONLINE SETUP MISMATCH " + _session.SetupMismatch + " (" + _session.SetupMismatchDetail + ")" : "ONLINE DESYNC at tick " + _session.DesyncTick);
                 ExitCode = 2;
                 return Finish();
             }

@@ -20,7 +20,9 @@ namespace CriticalMass.Runtime.Online
     /// </summary>
     public sealed class OnlineChatHud : MonoBehaviour
     {
-        public const float FadeSeconds = 10f, FadeOut = 1.5f;
+        public const float FadeSeconds = 8f, FadeOut = 1.5f;
+        /// <summary>At most this many text lines on screen (wrapped lines count; oldest drop off the top).</summary>
+        public const int MaxLines = 5;
 
         /// <summary>true while the local player is typing a chat line.</summary>
         public static bool Typing { get; private set; }
@@ -39,8 +41,8 @@ namespace CriticalMass.Runtime.Online
         Canvas _canvas;
         RectTransform _lane, _root, _space;
         bool _placedCentred;
-        readonly Text[] _lines = new Text[HudZones.ChatLines];
-        readonly float[] _born = new float[HudZones.ChatLines];
+        Text _body;
+        float _born = -100f;
         Text _input;
         int _seenVersion = -1;
         Rect _placed;
@@ -78,12 +80,12 @@ namespace CriticalMass.Runtime.Online
             _lane = MenuUi.Rt(_root, "Lane");
             _lane.anchorMin = _lane.anchorMax = new Vector2(0f, 1f);
             _lane.pivot = new Vector2(0f, 1f);
-            for (int i = 0; i < _lines.Length; i++)
-            {
-                _lines[i] = MenuUi.Label(_lane, "Line " + i, CMTokens.Ui, UiScale.TypeSmall, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft,
-                    0f, i * HudZones.ChatLineH, 100f, HudZones.ChatLineH - 4f, "", 2f);
-                MenuUi.Contain(_lines[i], 1);
-            }
+            // online-rooms-5: one wrapped box (newest line at the bottom), so a long line wraps instead of running off.
+            _body = MenuUi.Label(_lane, "Lines", CMTokens.Ui, UiScale.TypeSmall, CMTokens.WarmCream.Color, TextAnchor.LowerLeft,
+                0f, 0f, 100f, 100f, "", 2f);
+            _body.horizontalOverflow = HorizontalWrapMode.Wrap;
+            _body.supportRichText = false;   // typed text is shown as typed; TextFit measures plain text
+            MenuUi.Contain(_body, MaxLines);
             _input = MenuUi.Label(_lane, "Typing", CMTokens.Ui, UiScale.TypeSmall, CMTokens.ToolBrass.Color, TextAnchor.MiddleLeft,
                 0f, HudZones.ChatLines * HudZones.ChatLineH + 6f, 100f, HudZones.ChatInputH, "", 2f);
             MenuUi.Contain(_input, 1);
@@ -96,13 +98,15 @@ namespace CriticalMass.Runtime.Online
             _placed = Lane;
             _placedCentred = Centred;
             _lane.SetParent(Centred ? _space : _root, false);
+            // Top-left anchored, top-left pivot: resizing never shifts the lane (the old centre pivot pushed it off the left edge).
             _lane.anchorMin = _lane.anchorMax = new Vector2(0f, 1f);
             _lane.pivot = new Vector2(0f, 1f);
             _lane.anchoredPosition = new Vector2(Lane.x, -Lane.y);
             _lane.sizeDelta = new Vector2(Lane.width, Lane.height);
-            float w = Lane.width;
-            for (int i = 0; i < _lines.Length; i++) _lines[i].rectTransform.sizeDelta = new Vector2(w, HudZones.ChatLineH - 4f);
-            _input.rectTransform.sizeDelta = new Vector2(w, HudZones.ChatInputH);
+            float bodyH = Lane.height - HudZones.ChatInputH - 6f;
+            MenuUi.Place(_body.rectTransform, 0f, 0f, Lane.width, bodyH);
+            MenuUi.Place(_input.rectTransform, 0f, bodyH + 6f, Lane.width, HudZones.ChatInputH);
+            _seenVersion = -1;
         }
 
         void Update()
@@ -125,31 +129,34 @@ namespace CriticalMass.Runtime.Online
                 else if (kb.enterKey.wasPressedThisFrame || kb.numpadEnterKey.wasPressedThisFrame) Send(ch);
                 else if (kb.backspaceKey.wasPressedThisFrame && _typed.Length > 0) { _typed = _typed.Substring(0, _typed.Length - 1); ShowTyped(); }
             }
-            float now = Time.unscaledTime;
-            for (int i = 0; i < _lines.Length; i++)
-            {
-                float age = now - _born[i];
-                float a = Typing ? 1f : age < FadeSeconds ? 1f : Mathf.Clamp01(1f - (age - FadeSeconds) / FadeOut);
-                Color c = _lines[i].color;
-                if (!Mathf.Approximately(c.a, a)) { c.a = a; _lines[i].color = c; }
-            }
+            float age = Time.unscaledTime - _born;
+            float alpha = Typing || OnlineMenuScreen.AnyOpen ? 1f : age < FadeSeconds ? 1f : Mathf.Clamp01(1f - (age - FadeSeconds) / FadeOut);
+            Color c = _body.color;
+            if (!Mathf.Approximately(c.a, alpha)) { c.a = alpha; _body.color = c; }
         }
 
+        /// <summary>The newest lines that fit MaxLines once wrapped (estimated from the lane width), oldest first.</summary>
         void Redraw(ChatChannel ch)
         {
             _seenVersion = ch.Version;
             var lines = ch.Lines;
-            int n = Mathf.Min(_lines.Length, lines.Count);
-            for (int i = 0; i < _lines.Length; i++)
+            float charW = UiScale.TypeSmall * 0.52f;
+            int perLine = Mathf.Max(12, (int)(_placed.width / charW));
+            var picked = new System.Collections.Generic.List<string>();
+            int used = 0;
+            for (int k = lines.Count - 1; k >= 0; k--)
             {
-                int k = lines.Count - n + i;
-                if (i >= n) { HudText.Set(_lines[i], ""); continue; }
                 ChatLine l = lines[k];
-                string s = l.Scope == ChatScope.System ? l.Text : (l.Scope == ChatScope.Team ? "[TEAM] " : "") + l.From + ": " + l.Text;
-                if (ContainedText.SourceOf(_lines[i]) != s) { HudText.Set(_lines[i], s); _born[i] = Time.unscaledTime; }
-                _lines[i].color = l.Scope == ChatScope.System ? CMTokens.ToolBrass.Color : CMTokens.WarmCream.Color;
+                string text = l.Scope == ChatScope.System ? l.Text : (l.Scope == ChatScope.Team ? "[TEAM] " : "") + l.From + ": " + l.Text;
+                int need = Mathf.Max(1, Mathf.CeilToInt(text.Length / (float)perLine));
+                if (used + need > MaxLines) break;
+                used += need;
+                picked.Insert(0, l.Scope == ChatScope.System ? "· " + text : text);
             }
+            HudText.Set(_body, string.Join("\n", picked));
+            _born = Time.unscaledTime;
         }
+
 
         void StartTyping()
         {

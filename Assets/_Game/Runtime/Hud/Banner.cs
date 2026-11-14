@@ -306,7 +306,8 @@ namespace CriticalMass.Runtime.Hud
         private void LateUpdate()
         {
             double now = Now();
-            if (Hold != null && Hold())
+            // online-rooms-5: no banner over the online menus (the attract match behind them is not news).
+            if ((Hold != null && Hold()) || Online.OnlineMenuScreen.AnyOpen)
             {
                 Queue.Postpone(now);
                 _wallVersion = -1;   // the wall clock restarts when the banner enters fresh after the takeover

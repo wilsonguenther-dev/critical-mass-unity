@@ -32,13 +32,11 @@ namespace CriticalMass.Runtime.Online
     {
         enum Page { Home, Join, Busy, Room }
 
-        const float X0 = 152f, ColR = 1300f, ColRW = 470f, RowY = 300f, RowH = 54f, Rows = 8;
 
         Action _onClosed;
         Page _page = Page.Home;
         RectTransform _home, _join, _room;
         Text _title, _sub, _status, _code, _roomCode, _more, _startWhy;
-        readonly Text[] _rows = new Text[(int)Rows];
         MenuItem _create, _joinBtn, _backHome, _joinGo, _backJoin, _copy, _team, _class, _ready, _start, _leave;
         readonly List<Action> _refresh = new List<Action>();
         string _typed = "";
@@ -73,6 +71,8 @@ namespace CriticalMass.Runtime.Online
 
         void Close()
         {
+            AnyOpen = false;
+            StopNaming(false);
             OnlineChatHud.Visible = false;
             Hide();
             StopTyping();
@@ -81,85 +81,179 @@ namespace CriticalMass.Runtime.Online
             a?.Invoke();
         }
 
+        /// <summary>online-rooms-5: true while the Play Online screen is up (the announcer and banners stay quiet).</summary>
+        public static bool AnyOpen { get; private set; }
+
+        const int NameMaxOnline = 12;
+        readonly Text[,] _cells = new Text[OnlineLayout.MaxRows, 5];
+        Text _count, _nameText;
+        MenuItem _name, _paste;
+        bool _naming;
+        string _nameTyped = "";
+
         protected override void BuildContent(RectTransform space)
         {
-            _title = MenuUi.Label(space, "Title", CMTokens.Display, UiScale.TypeDisplay, Cream, TextAnchor.MiddleLeft, X0, 52f, 1100f, 70f, "PLAY ONLINE", 4f);
-            MenuUi.Contain(_title, 1);
-            _sub = MenuUi.Label(space, "Sub", CMTokens.Ui, UiScale.TypeBody, CMTokens.WithAlpha(Cream, 0.85f), TextAnchor.MiddleLeft, X0, 122f, 1500f, 34f,
-                "Play one match with friends on other computers. Bots fill every empty seat.", 2f);
-            MenuUi.Contain(_sub, 1);
-            _status = MenuUi.Label(space, "Status", CMTokens.Ui, UiScale.TypeBody, Brass, TextAnchor.UpperLeft, X0, 772f, 1100f, 80f, "", 2f);
+            // A dim scrim over the attract match, then one navy panel; every element sits in its OnlineLayout region.
+            VectorShape scrim = MenuUi.Shape(space, "Scrim", ShapeKind.RoundRect, -2000f, -2000f, OnlineLayout.RefW + 4000f, OnlineLayout.RefH + 4000f,
+                CMTokens.WithAlpha(CMTokens.VoidNavy.Color, 0.62f), 0f);
+            scrim.OutlinePx = 0f;
+            scrim.RimPx = 0f;
+            Rect P = OnlineLayout.Panel;
+            MenuUi.Panel(space, "Panel", P.x, P.y, P.width, P.height);
+            _title = L(space, "Title", OnlineLayout.Title, CMTokens.Display, UiScale.TypeDisplay, Cream, TextAnchor.MiddleLeft, "PLAY ONLINE", 1);
+            _sub = L(space, "Sub", OnlineLayout.Sub, CMTokens.Ui, UiScale.TypeBody, CMTokens.WithAlpha(Cream, 0.85f), TextAnchor.MiddleLeft, "", 1);
+            _status = L(space, "Status", OnlineLayout.Status, CMTokens.Ui, UiScale.TypeBody, Brass, TextAnchor.MiddleLeft, "", 2);
             _status.horizontalOverflow = HorizontalWrapMode.Wrap;
-            MenuUi.Contain(_status, 2);
 
-            // Home
+            // Home: your name (chosen once, filtered), CREATE ROOM, JOIN ROOM, BACK.
             _home = MenuUi.Rt(space, "Home");
             MenuUi.Stretch(_home);
-            _create = Button(_home, "Create Room", X0, 220f, 620f, 96f, "CREATE ROOM", CreateRoom, UiScale.TypeHeading);
-            _joinBtn = Button(_home, "Join Room", X0, 336f, 620f, 96f, "JOIN ROOM", () => Go(Page.Join), UiScale.TypeHeading);
-            _backHome = Button(_home, "Back", X0, 870f, 300f, 84f, "BACK", Close, UiScale.TypeHeading);
-            ChainVertical(new List<MenuItem> { _create, _joinBtn, _backHome });
+            L(_home, "Name Label", OnlineLayout.NameLabel, CMTokens.Ui, UiScale.TypeSmall, CMTokens.WithAlpha(Cream, 0.85f), TextAnchor.MiddleLeft,
+                "YOUR NAME (OTHERS SEE IT)", 1);
+            _name = Btn(_home, "Name", OnlineLayout.NameBox, "", ToggleNaming, UiScale.TypeHeading);
+            _nameText = _name.Label;
+            _create = Btn(_home, "Create Room", OnlineLayout.CreateButton, "CREATE ROOM", CreateRoom, UiScale.TypeHeading);
+            _joinBtn = Btn(_home, "Join Room", OnlineLayout.JoinButton, "JOIN ROOM", () => Go(Page.Join), UiScale.TypeHeading);
+            _backHome = Btn(_home, "Back", OnlineLayout.Back, "BACK", Close, UiScale.TypeHeading);
+            ChainVertical(new List<MenuItem> { _name, _create, _joinBtn, _backHome });
 
-            // Join
+            // Join: the code, PASTE, JOIN, BACK.
             _join = MenuUi.Rt(space, "Join");
             MenuUi.Stretch(_join);
-            MenuUi.Label(_join, "Code Label", CMTokens.Ui, UiScale.TypeSmall, CMTokens.WithAlpha(Cream, 0.85f), TextAnchor.MiddleLeft, X0, 204f, 900f, 30f,
-                "ROOM CODE", 2f);
-            _code = MenuUi.Label(_join, "Code", CMTokens.Display, UiScale.TypeHero, Cream, TextAnchor.MiddleLeft, X0, 236f, 1000f, 130f, "", 6f);
-            MenuUi.Contain(_code, 1);
-            Text howto = MenuUi.Label(_join, "Code Hint", CMTokens.Ui, UiScale.TypeBody, CMTokens.WithAlpha(Cream, 0.85f), TextAnchor.MiddleLeft, X0, 380f, 1400f, 34f,
-                "Type the 6-character code your friend sees on their screen. Ctrl or Cmd + V pastes it.", 2f);
-            MenuUi.Contain(howto, 1);
-            _joinGo = Button(_join, "Join", X0, 440f, 420f, 90f, "JOIN", JoinTyped, UiScale.TypeHeading);
-            _backJoin = Button(_join, "Back", X0, 870f, 300f, 84f, "BACK", () => Go(Page.Home), UiScale.TypeHeading);
-            ChainVertical(new List<MenuItem> { _joinGo, _backJoin });
+            L(_join, "Code Label", OnlineLayout.CodeLabel, CMTokens.Ui, UiScale.TypeSmall, CMTokens.WithAlpha(Cream, 0.85f), TextAnchor.MiddleLeft, "ROOM CODE", 1);
+            _code = L(_join, "Code", OnlineLayout.CodeBig, CMTokens.Display, UiScale.TypeHero, Cream, TextAnchor.MiddleLeft, "", 1);
+            L(_join, "Code Hint", OnlineLayout.CodeHint, CMTokens.Ui, UiScale.TypeBody, CMTokens.WithAlpha(Cream, 0.85f), TextAnchor.MiddleLeft,
+                "Type the 6-character code from your friend's message, or press PASTE.", 1);
+            _paste = Btn(_join, "Paste", OnlineLayout.PasteButton, "PASTE", PasteCode, UiScale.TypeHeading);
+            _joinGo = Btn(_join, "Join", OnlineLayout.JoinGo, "JOIN", JoinTyped, UiScale.TypeHeading);
+            _backJoin = Btn(_join, "Back", OnlineLayout.Back, "BACK", () => Go(Page.Home), UiScale.TypeHeading);
+            ChainVertical(new List<MenuItem> { _paste, _joinGo, _backJoin });
 
-            // Room
+            // Room: header code + COPY CODE + count; the player table; TEAM, CLASS, START/READY; the chat box; LEAVE.
             _room = MenuUi.Rt(space, "Room");
             MenuUi.Stretch(_room);
-            _roomCode = MenuUi.Label(_room, "Room Code", CMTokens.Display, UiScale.TypeTitle, Cream, TextAnchor.MiddleLeft, X0, 186f, 760f, 90f, "", 4f);
-            MenuUi.Contain(_roomCode, 1);
-            _copy = Button(_room, "Copy Code", 940f, 196f, 300f, 74f, "COPY CODE", CopyCode, UiScale.TypeButton);
-            for (int i = 0; i < _rows.Length; i++)
-            {
-                _rows[i] = MenuUi.Label(_room, "Member " + i, CMTokens.Ui, UiScale.TypeBody, Cream, TextAnchor.MiddleLeft, X0, RowY + i * RowH, 1080f, RowH - 6f, "", 2f);
-                MenuUi.Contain(_rows[i], 1);
-            }
-            _more = MenuUi.Label(_room, "More", CMTokens.Ui, UiScale.TypeSmall, CMTokens.WithAlpha(Cream, 0.8f), TextAnchor.MiddleLeft, X0, RowY + Rows * RowH, 1080f, 30f, "", 2f);
-            MenuUi.Contain(_more, 1);
-            _team = Stepper(_room, "Team", ColR, RowY, ColRW, 72f, "TEAM", () => _myTeam == TeamId.Azure ? "AZURE" : "CRIMSON", StepTeam, _refresh);
-            _class = Stepper(_room, "Class", ColR, RowY + 90f, ColRW, 72f, "CLASS", () => _myClass.ToString().ToUpperInvariant(), StepClass, _refresh);
-            _ready = Button(_room, "Ready", ColR, RowY + 190f, ColRW, 84f, "READY", ToggleReady, UiScale.TypeHeading);
-            _start = Button(_room, "Start", ColR, RowY + 190f, ColRW, 84f, "START MATCH", StartMatch, UiScale.TypeHeading);
-            _startWhy = MenuUi.Label(_room, "Start Why", CMTokens.Ui, UiScale.TypeSmall, CMTokens.WithAlpha(Cream, 0.85f), TextAnchor.UpperLeft,
-                ColR, RowY + 286f, ColRW, 60f, "", 2f);
+            _roomCode = L(_room, "Room Code", OnlineLayout.Code, CMTokens.Display, UiScale.TypeTitle, Cream, TextAnchor.MiddleRight, "", 1);
+            _copy = Btn(_room, "Copy Code", OnlineLayout.Copy, "COPY CODE", CopyCode, UiScale.TypeButton);
+            _count = L(_room, "Count", OnlineLayout.Count, CMTokens.Ui, UiScale.TypeBody, Brass, TextAnchor.MiddleRight, "", 1);
+            string[] heads = { "PLAYER", "TEAM", "CLASS", "READY", "PING" };
+            for (int col = 0; col < 2; col++)
+                for (int c = 0; c < 5; c++)
+                    L(_room, "Head " + col + c, OnlineLayout.HeadCell(col, c), CMTokens.Ui, UiScale.TypeMin, CMTokens.WithAlpha(Cream, 0.7f), TextAnchor.MiddleLeft, heads[c], 1);
+            for (int i = 0; i < OnlineLayout.MaxRows; i++)
+                for (int c = 0; c < 5; c++)
+                    _cells[i, c] = L(_room, "Cell " + i + "." + c, OnlineLayout.Cell(i, c), CMTokens.Ui, UiScale.TypeSmall, Cream, TextAnchor.MiddleLeft, "", 1);
+            _more = _count;
+            _team = Stepper(_room, "Team", OnlineLayout.Team.x, OnlineLayout.Team.y, OnlineLayout.Team.width, OnlineLayout.Team.height, "TEAM",
+                () => _myTeam == TeamId.Azure ? "AZURE" : "CRIMSON", StepTeam, _refresh);
+            _class = Stepper(_room, "Class", OnlineLayout.Class.x, OnlineLayout.Class.y, OnlineLayout.Class.width, OnlineLayout.Class.height, "CLASS",
+                () => _myClass.ToString().ToUpperInvariant(), StepClass, _refresh);
+            _ready = Btn(_room, "Ready", OnlineLayout.StartButton, "READY", ToggleReady, UiScale.TypeHeading);
+            _start = Btn(_room, "Start", OnlineLayout.StartButton, "START MATCH", StartMatch, UiScale.TypeHeading);
+            _startWhy = L(_room, "Start Why", OnlineLayout.StartWhy, CMTokens.Ui, UiScale.TypeSmall, CMTokens.WithAlpha(Cream, 0.85f), TextAnchor.UpperLeft, "", 2);
             _startWhy.horizontalOverflow = HorizontalWrapMode.Wrap;
-            MenuUi.Contain(_startWhy, 2);
-            _leave = Button(_room, "Leave", X0, 870f, 300f, 84f, "LEAVE ROOM", Leave, UiScale.TypeHeading);
+            Rect ch = OnlineLayout.Chat;
+            VectorShape chatBox = MenuUi.Shape(_room, "Chat Box", ShapeKind.RoundRect, ch.x, ch.y, ch.width, ch.height, CMTokens.WithAlpha(CMTokens.VoidNavy.Color, 0.75f), 12f);
+            chatBox.OutlinePx = 2f;
+            _leave = Btn(_room, "Leave", OnlineLayout.Leave, "LEAVE ROOM", Leave, UiScale.TypeHeading);
             DefaultFocus = _create;
             Go(Page.Home);
         }
 
+        static Text L(Transform parent, string name, Rect r, Typeface face, int size, Color c, TextAnchor anchor, string text, int lines)
+        {
+            Text t = MenuUi.Label(parent, name, face, size, c, anchor, r.x, r.y, r.width, r.height, text, 2f);
+            MenuUi.Contain(t, lines);
+            return t;
+        }
+
+        static MenuItem Btn(Transform parent, string name, Rect r, string text, Action act, int size) => Button(parent, name, r.x, r.y, r.width, r.height, text, act, size);
+
+        protected override void OnShow() { base.OnShow(); AnyOpen = true; }
+
+        public override void Hide() { AnyOpen = false; base.Hide(); }
+
         void Go(Page p)
         {
             _page = p;
+            AnyOpen = true;
             if (_home == null) return;
             _home.gameObject.SetActive(p == Page.Home);
             _join.gameObject.SetActive(p == Page.Join);
             _room.gameObject.SetActive(p == Page.Room);
+            if (p != Page.Home) StopNaming(false);
             if (p == Page.Join) StartTyping(); else StopTyping();
             if (p == Page.Join) { _typed = ""; ShowCode(); }
             if (p == Page.Room) { _shownVersion = -1; RefreshRoom(); }
-            // Chat lives in the room page's right column, under START / READY (its own box; the match moves it to its HUD lane).
-            OnlineChatHud.Lane = new Rect(ColR, RowY + 356f, ColRW, HudZones.ChatLines * HudZones.ChatLineH + 6f + HudZones.ChatInputH);
+            if (p == Page.Home) ShowName();
+            // Chat lives in its own bordered box on the room page (the match moves it to the HUD lane).
+            OnlineChatHud.Lane = OnlineLayout.ChatLane;
             OnlineChatHud.Visible = p == Page.Room;
             OnlineChatHud.Centred = true;
             HudText.Set(_sub, p == Page.Room ? "Y chats to everyone, Shift + Y to your team. Bots fill every empty seat."
-                : "Play one match with friends on other computers. You play as " + ChatFilter.CleanName(PlayerName()) + " (change it in CHARACTER).");
+                : p == Page.Join ? "Join a friend's room with the code they sent you."
+                : "Play one match with friends on other computers. Bots fill every empty seat.");
             if (p == Page.Home) SetStatus(OnlineConfig.Configured ? "" : "Online play is not switched on in this build yet.");
             HudText.Set(_title, p == Page.Room ? (OnlineMatch.Host != null ? "YOUR ROOM" : "ROOM") : p == Page.Join ? "JOIN A ROOM" : p == Page.Busy ? "CONNECTING..." : "PLAY ONLINE");
             MenuItem focus = p == Page.Home ? _create : p == Page.Join ? _joinGo : p == Page.Room ? (OnlineMatch.Host != null ? _start : _ready) : null;
             if (focus != null) Focus(focus);
+        }
+
+        // ---------------------------------------------------------------- name (chosen once, filtered like chat)
+
+        void ShowName()
+        {
+            string n = _naming ? _nameTyped + "_" : ChatFilter.CleanName(PlayerName());
+            HudText.Set(_nameText, _naming ? n : n + "   (CHANGE)");
+        }
+
+        void ToggleNaming()
+        {
+            if (_naming) { StopNaming(true); return; }
+            if (Keyboard.current == null) return;
+            _naming = true;
+            _nameTyped = "";
+            Keyboard.current.onTextInput += OnNameChar;
+            if (UnityEngine.EventSystems.EventSystem.current != null) UnityEngine.EventSystems.EventSystem.current.sendNavigationEvents = false;
+            SetStatus("Type your name, then press ENTER (letters, numbers, - and _; up to 12).");
+            ShowName();
+        }
+
+        void OnNameChar(char c)
+        {
+            if (!_naming || char.IsControl(c) || _nameTyped.Length >= NameMaxOnline) return;
+            char u = char.ToUpperInvariant(c);
+            if ((u >= 'A' && u <= 'Z') || (u >= '0' && u <= '9') || u == '-' || u == '_' || (u == ' ' && _nameTyped.Length > 0)) { _nameTyped += u; ShowName(); }
+        }
+
+        void StopNaming(bool save)
+        {
+            if (!_naming) return;
+            _naming = false;
+            if (Keyboard.current != null) Keyboard.current.onTextInput -= OnNameChar;
+            if (UnityEngine.EventSystems.EventSystem.current != null) UnityEngine.EventSystems.EventSystem.current.sendNavigationEvents = true;
+            if (save && _nameTyped.Trim().Length > 0 && Profile.Current != null)
+            {
+                string clean = PlayerProfile.CleanName(_nameTyped.Trim());
+                if (clean == PlayerProfile.DefaultName && _nameTyped.Trim().ToUpperInvariant() != PlayerProfile.DefaultName)
+                    SetStatus("That name is not allowed. Pick another one.");
+                else
+                {
+                    Profile.Current.PlayerName = clean.Length > NameMaxOnline ? clean.Substring(0, NameMaxOnline).TrimEnd() : clean;
+                    Profile.Commit();
+                    SetStatus("Others will see you as " + Profile.Current.PlayerName + ".");
+                }
+            }
+            else if (!save) SetStatus("");
+            ShowName();
+        }
+
+        void PasteCode()
+        {
+            string pasted = RelayTransport.CleanCode(GUIUtility.systemCopyBuffer);
+            if (pasted == null) { SetStatus("The copied text is not a room code. Copy the 6-character code and try again."); return; }
+            _typed = pasted;
+            ShowCode();
+            SetStatus("Code pasted. Press JOIN.");
         }
 
         void SetStatus(string s) => HudText.Set(_status, s ?? "");
@@ -272,25 +366,33 @@ namespace CriticalMass.Runtime.Online
             if (version == _shownVersion) return;
             _shownVersion = version;
             HudText.Set(_roomCode, OnlineMatch.Code != null ? "ROOM  " + Spaced(OnlineMatch.Code) : "");
-            int shown = 0, count = members != null ? members.Count : 0;
-            for (int i = 0; i < _rows.Length; i++)
+            int shown = 0, count = members != null ? members.Count : 0, readyCount = 0;
+            var confirmed = new List<RoomMember>(count);
+            if (members != null) foreach (RoomMember rm in members) if (rm.Confirmed) confirmed.Add(rm);
+            for (int i = 0; i < OnlineLayout.MaxRows; i++)
             {
-                RoomMember m = members != null && i < count ? members[i] : null;
-                if (m != null && !m.Confirmed) m = null;
-                HudText.Set(_rows[i], m == null ? "" : Row(m, i == 0));
-                if (m != null) shown++;
+                RoomMember m = i < confirmed.Count ? confirmed[i] : null;
+                bool isHostRow = m != null && m.Peer == Peers.Host;
+                if (m != null) { shown++; if (m.Ready || isHostRow) readyCount++; }
+                HudText.Set(_cells[i, 0], m == null ? "" : ChatFilter.CleanName(m.Name));
+                HudText.Set(_cells[i, 1], m == null ? "" : m.Team == TeamId.Azure ? "AZURE" : "CRIMSON");
+                _cells[i, 1].color = m != null && m.Team == TeamId.Crimson ? CMTokens.CrimsonInk.Color : CMTokens.Azure.Color;
+                HudText.Set(_cells[i, 2], m == null ? "" : m.Class.ToString().ToUpperInvariant());
+                HudText.Set(_cells[i, 3], m == null ? "" : isHostRow ? "HOST" : m.Ready ? "READY" : "NOT READY");
+                _cells[i, 3].color = m != null && !isHostRow && !m.Ready ? CMTokens.WithAlpha(Cream, 0.6f) : Brass;
+                HudText.Set(_cells[i, 4], m == null || isHostRow ? "" : m.PingMs + " MS");
             }
-            int readyCount = 0;
-            if (members != null) foreach (RoomMember rm in members) if (rm.Confirmed && rm.Ready) readyCount++;
             int seats = 2 * (host ? OnlineMatch.Host.TeamSize : OnlineMatch.Client != null ? Math.Max(1, OnlineMatch.Client.TeamSize) : 16);
-            HudText.Set(_more, (count > _rows.Length ? "and " + (count - _rows.Length) + " more.   " : "") +
-                $"{shown} {(shown == 1 ? "PLAYER" : "PLAYERS")} IN THE ROOM, {readyCount} READY.   BOTS TAKE THE OTHER {Math.Max(0, seats - shown)} SEATS.");
+            HudText.Set(_count, $"{readyCount} OF {shown} READY   ·   {Math.Max(0, seats - shown)} BOTS");
             if (host)
             {
                 bool ok = OnlineMatch.Host.CanStart(out string why);
                 _start.interactable = ok;
                 HudText.Set(_startWhy, ok ? "Everyone is ready. Bots take the other seats." : why);
-                SetStatus(string.IsNullOrEmpty(OnlineMatch.Host.Notice) ? "Send the code to your friends. They choose JOIN ROOM and type it." : OnlineMatch.Host.Notice);
+                // Joins and leaves are chat notices (the chat box); the status line keeps the instruction or a real problem.
+                string notice = OnlineMatch.Host.Notice;
+                bool roster = string.IsNullOrEmpty(notice) || notice.EndsWith(" joined.") || notice.EndsWith(" left the room.");
+                SetStatus(roster ? "Send the code to your friends. They choose JOIN ROOM and type it." : notice);
             }
             else if (OnlineMatch.Client != null)
             {
@@ -352,8 +454,19 @@ namespace CriticalMass.Runtime.Online
                     return;
                 }
                 if (!OnlineMatch.InRoom) { Go(Page.Home); return; }
-                if (OnlineMatch.Session != null) { Hide(); return; }   // the match is loading
+                if (OnlineMatch.Session != null) { AnyOpen = false; Hide(); return; }   // the match is loading
                 RefreshRoom();
+            }
+            if (_naming)
+            {
+                Keyboard nk = Keyboard.current;
+                if (nk != null)
+                {
+                    if (nk.enterKey.wasPressedThisFrame || nk.numpadEnterKey.wasPressedThisFrame) StopNaming(true);
+                    else if (nk.escapeKey.wasPressedThisFrame) StopNaming(false);
+                    else if (nk.backspaceKey.wasPressedThisFrame && _nameTyped.Length > 0) { _nameTyped = _nameTyped.Substring(0, _nameTyped.Length - 1); ShowName(); }
+                }
+                return;
             }
             if (_page == Page.Join)
             {

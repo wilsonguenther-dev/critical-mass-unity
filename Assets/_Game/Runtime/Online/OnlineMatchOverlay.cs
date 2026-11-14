@@ -48,8 +48,10 @@ namespace CriticalMass.Runtime.Online
             space.pivot = new Vector2(0.5f, 0.5f);
             space.sizeDelta = new Vector2(HudLayout.RefW, HudLayout.RefH);
 
+            // online-rooms-5: the strip lives in the HUD's centre callout lane (HudZones.Callout) and holds it while shown,
+            // so the banner, lockout warning and Kaiju callout wait instead of drawing on top of it.
             float sx = (HudLayout.RefW - StripW) * 0.5f;
-            _strip = MenuUi.Panel(space, "Waiting Strip", sx, 150f, StripW, StripH).gameObject;
+            _strip = MenuUi.Panel(space, "Waiting Strip", sx, HudZones.CalloutTop, StripW, StripH).gameObject;
             _stripText = MenuUi.Label(_strip.transform, "Waiting", CMTokens.Ui, UiScale.TypeBody, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter,
                 24f, 8f, StripW - 48f, StripH - 16f, "", 2f);
             MenuUi.Contain(_stripText, 1);
@@ -80,7 +82,11 @@ namespace CriticalMass.Runtime.Online
                 switch (st)
                 {
                     case LockstepStatus.Desynced:
-                        if (_session.SetupMismatch != null) Show("CANNOT START", _session.SetupMismatch);
+                        if (_session.SetupMismatch != null)
+                        {
+                            Debug.LogWarning("[online] setup mismatch: " + _session.SetupMismatch + " (" + _session.SetupMismatchDetail + ")");
+                            Show("CANNOT START", _session.SetupMismatch);
+                        }
                         else Show("MATCH STOPPED", "The two games stopped agreeing about the match (at moment " + _session.DesyncTick +
                             "), so it cannot go on fairly. This is a bug on our side, not your connection.");
                         break;
@@ -98,6 +104,7 @@ namespace CriticalMass.Runtime.Online
                 _strip.SetActive(waiting);
                 if (waiting) HudText.Set(_stripText, _session.IsHost ? "WAITING FOR A SLOW CONNECTION..." : "WAITING FOR THE HOST...");
             }
+            if (_strip.activeSelf) HudZones.Hold(HudZone.Callout, HudPriority.Takeover);
             if (_panel.activeSelf && Time.unscaledTime - _endedAt > 0.6f && Pressed()) GameFlow.ReturnTo(FlowState.Menu);
         }
 

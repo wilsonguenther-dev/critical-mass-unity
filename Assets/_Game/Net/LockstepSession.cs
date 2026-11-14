@@ -80,6 +80,8 @@ namespace CriticalMass.Net
         public ulong MyWorldHash0 { get; }
         /// <summary>online-rooms-3: set when this machine's setup differs from the host's (then Status is Desynced at tick 0).</summary>
         public string SetupMismatch { get; private set; }
+        /// <summary>online-rooms-5: the fingerprints behind SetupMismatch, for logs only (never on screen).</summary>
+        public string SetupMismatchDetail { get; private set; }
         private long _stallSeen;
         public long BytesSent { get; private set; }
         /// <summary>The transport's reason when our own connection closed (plain words), else null.</summary>
@@ -190,10 +192,17 @@ namespace CriticalMass.Net
             MyConfigHash = ConfigHash.Of(cfg);
             World = World.CreateWorld(setup.ToWorldOptions(cfg));
             MyWorldHash0 = StateHash.Of(World);
+            // online-rooms-5: plain words on screen; the fingerprints go to SetupMismatchDetail (logs only).
             if (setup.ConfigHash != 0 && setup.ConfigHash != MyConfigHash)
-                SetupMismatch = $"This game's match rules differ from the host's (rules 0x{MyConfigHash:X16}, host 0x{setup.ConfigHash:X16}). Both players need the same version.";
+            {
+                SetupMismatch = "Your game's match rules differ from the host's. Both players need the same update.";
+                SetupMismatchDetail = $"rules 0x{MyConfigHash:X16}, host 0x{setup.ConfigHash:X16}";
+            }
             else if (setup.WorldHash0 != 0 && setup.WorldHash0 != MyWorldHash0)
-                SetupMismatch = $"This game built a different starting arena from the host's (0x{MyWorldHash0:X16}, host 0x{setup.WorldHash0:X16}).";
+            {
+                SetupMismatch = "Your game built a different arena from the host's. Both players need the same update.";
+                SetupMismatchDetail = $"arena 0x{MyWorldHash0:X16}, host 0x{setup.WorldHash0:X16}";
+            }
             if (SetupMismatch != null) { Status = LockstepStatus.Desynced; DesyncTick = 0; }
             // Wall milliseconds per tick: the match pace (sim ticks per wall second / SimHz) speeds the clock, never the rules.
             _tickMs = 1000.0 / (cfg.SimHz * WallPace(setup, cfg));
