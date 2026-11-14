@@ -27,6 +27,7 @@ namespace CriticalMass.Runtime.Tests
             public FxScene Scene;
             public double T;
             public int VertsAtOneSecond, ActiveAtOneSecond, ActiveAtThreeSeconds;
+            public double EffectSecondsFirstThree;   // live effects summed over the first 3 s (each 0.1 s sample x 0.1 s)
         }
 
         /// <summary>Every gore-producing path once: three hit tiers, a Kaiju claw, a knock-out inside a blast and a Kaiju slam,
@@ -76,6 +77,7 @@ namespace CriticalMass.Runtime.Tests
                     scene.Build(now, ww, Vector3.right, Vector3.up, g, a, s);
                     if (Math.Abs(now - (t + 1.0)) < 0.05) { run.VertsAtOneSecond = g.VertCount + a.VertCount + s.VertCount; run.ActiveAtOneSecond = scene.ActiveCount(now); }
                     if (Math.Abs(now - (t + 3.0)) < 0.05) run.ActiveAtThreeSeconds = scene.ActiveCount(now);
+                    if (now < t + 3.0 - 0.05) run.EffectSecondsFirstThree += scene.ActiveCount(now) * 0.1;
                     if (level == GoreLevel.Off) Assert.AreEqual(0, scene.BloodCount(now), $"GORE Off: a blood piece is alive at {now - t:0.0} s");
                 }
             }
@@ -167,11 +169,52 @@ namespace CriticalMass.Runtime.Tests
             Run red = Drive(GoreLevel.Reduced, cfg, NewWorld(cfg));
             Run off = Drive(GoreLevel.Off, cfg, NewWorld(cfg));
             Assert.Less(red.ActiveAtOneSecond, full.ActiveAtOneSecond, "Reduced: fewer live effects than Full");
-            Assert.Less(off.ActiveAtOneSecond, red.ActiveAtOneSecond, "Off: fewer live effects than Reduced");
+            // fix/gore-reduced-1: Off against Reduced is measured over the first 3 s, not at the 1 s instant. At 1 s Off's
+            // knock-out bodies pop (CorpseSeconds 0.9 at Off, 1.35 otherwise) and their sparkle stars (Off's replacement
+            // for blood) are alive, while Reduced's airborne knock-out drops have already landed and vanished (no ground
+            // stain from a knock-out below Full, cand5-reds-1). That instant only passed while those drops left splats.
+            // Over the window Reduced still shows more: its blood drops in the air and its short hit splats; Off shows
+            // short stars only. The knock-out difference itself: AKnockOutAtReducedShowsBloodInTheAirAndOffShowsStarsOnly.
+            Assert.Less(off.EffectSecondsFirstThree, red.EffectSecondsFirstThree, "Off: fewer live effects than Reduced over the first 3 s");
+            Assert.Less(red.EffectSecondsFirstThree, full.EffectSecondsFirstThree, "Reduced: fewer live effects than Full over the first 3 s");
             Assert.Less(red.ActiveAtThreeSeconds, full.ActiveAtThreeSeconds);
             Assert.Less(off.ActiveAtThreeSeconds, red.ActiveAtThreeSeconds);
             Assert.Less(red.VertsAtOneSecond, full.VertsAtOneSecond, "Reduced: fewer vertices than Full");
             Assert.Less(off.VertsAtOneSecond, full.VertsAtOneSecond, "Off: fewer vertices than Full");
+        }
+
+        /// <summary>fix/gore-reduced-1: on a knock-out, Reduced shows something Off does not: blood drops in the air (half
+        /// Full's count, gone on landing, no ground stain). Off shows only the warm-white stars, with no blood piece at all.</summary>
+        [Test]
+        public void AKnockOutAtReducedShowsBloodInTheAirAndOffShowsStarsOnly()
+        {
+            GameConfig cfg = GameConfig.CreateDefault();
+            int[] airborne = new int[3], stars = new int[3], spawns = new int[3];
+            GoreLevel[] levels = { GoreLevel.Full, GoreLevel.Reduced, GoreLevel.Off };
+            for (int li = 0; li < 3; li++)
+            {
+                World ww = NewWorld(cfg);
+                var scene = new FxScene(cfg, ww.Map) { Gore = levels[li] };
+                PadDef pad = ww.Map.Pads[0];
+                const int tick = 30;
+                ww.Tick = tick;
+                double t = tick / cfg.SimHz;
+                var ko = new FxEvent { Kind = FxKind.Death, Tick = tick, A = 4, B = 2, X = pad.X, Z = pad.Z, Value = 22, DirX = -1, Cls = ClassId.Warrior, Tier = 2, HasAttacker = true, AttCls = ClassId.Miner };
+                scene.OnFx(ref ko, ww);
+                for (double now = t; now < t + 3.0; now += 0.05)
+                {
+                    scene.Advance(now);
+                    airborne[li] = Math.Max(airborne[li], scene.BloodCount(now) - scene.DecalCount(now) - scene.DripCount(now) - scene.GibCount(now));
+                    stars[li] = Math.Max(stars[li], scene.SparkCount(now));
+                }
+                spawns[li] = scene.GoreSpawns(GorePiece.BloodDroplet);
+            }
+            Assert.Greater(airborne[1], 0, "Reduced: a knock-out throws blood drops into the air");
+            Assert.Greater(spawns[1], 0, "Reduced: knock-out drops spawn");
+            Assert.Less(spawns[1], spawns[0], "Reduced: fewer drops than Full");
+            Assert.AreEqual(0, airborne[2], "Off: no blood in the air");
+            Assert.AreEqual(0, spawns[2], "Off: no blood drops");
+            Assert.Greater(stars[2], 0, "Off: the knock-out shows stars instead");
         }
 
         [Test]
