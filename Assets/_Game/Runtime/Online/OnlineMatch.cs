@@ -18,7 +18,7 @@ namespace CriticalMass.Runtime.Online
     public static class OnlineConfig
     {
         /// <summary>The deployed relay, for example "https://cm-rooms.NAME.workers.dev" (empty until the owner deploys it).</summary>
-        public const string DefaultRelayUrl = "";
+        public const string DefaultRelayUrl = "https://cm-rooms.driviaclip.workers.dev";   // integration batch 10: the owner deployed it
 
         public static string RelayUrl
         {
