@@ -170,6 +170,7 @@ for o in [body] + props:
 old_heads = {k: shift @ v for k, v in old_heads.items()}
 V = verts(body)
 F = faces(body)
+np.save(os.path.join(OUT, 'body_V.npy'), V); np.save(os.path.join(OUT, 'body_F.npy'), F)
 Vw, Fw, inv_w = LM.weld(V, F)
 lmk = LM.find(Vw, Fw)
 if np.mean([lmk['joints']['_toetip.l'][1] - lmk['joints']['foot.l'][1]]) > 0:
@@ -178,6 +179,23 @@ if np.mean([lmk['joints']['_toetip.l'][1] - lmk['joints']['foot.l'][1]]) > 0:
     for o in [body] + props:
         o.data.transform(R)
     V = verts(body); Vw, Fw, inv_w = LM.weld(V, F); lmk = LM.find(Vw, Fw)
+# arms: if the automatic arm landmarks are missing or more than 0.12 m from the previous rig's joints, seed the
+# shoulder, elbow and wrist from that rig (hands and fingers are still found by geometry) and say so.
+seed = {}
+auto_arm = {}
+for s_ in ('l', 'r'):
+    jj = lmk['joints']
+    keys = (f'upperarm.{s_}', f'lowerarm.{s_}', f'wrist.{s_}')
+    if all(k in old_heads for k in keys):
+        d = [round((Vector(jj[k]) - old_heads[k]).length, 3) if k in jj else None for k in keys]
+        auto_arm[s_] = d
+        if any(x is None or x > 0.12 for x in d):
+            seed[s_] = [list(old_heads[k]) for k in keys]
+REP['auto_arm_distance_to_old_rig_m'] = auto_arm
+if seed:
+    log('arm landmarks seeded from the previous rig for sides', sorted(seed), 'auto distances', auto_arm)
+    lmk = LM.find(Vw, Fw, arm_seed=seed)
+REP['arm_seeded_sides'] = sorted(seed)
 H = lmk['height']
 J = {k: Vector(v) for k, v in lmk['joints'].items()}
 REP['landmarks'] = {'notes': lmk['notes'], 'joints': lmk['joints'], 'height': H,
@@ -243,11 +261,12 @@ for s, sg in SIDES:
     # palm normal: least-spread axis of the hand's vertices, pointing toward the body's midline
     hv = Vw[(Vw - np.array(wr)) @ np.array(hdir) > 0]
     hv = hv[np.linalg.norm(hv - np.array(J[f'handslot.{s}']), axis=1) < 0.12 * H]
-    n = Vector((-sg, 0, 0))
+    inward = Vector((0, J['hips'].y, J['hips'].z)) - Vector(J[f'handslot.{s}'])
+    n = inward.normalized()
     if len(hv) > 20:
         w, ev = np.linalg.eigh(np.cov((hv - hv.mean(0)).T))
         n = Vector(ev[:, 0])
-        if n.x * sg > 0:
+        if n.dot(inward) < 0:   # the palm faces the hips: down in a T-pose, inward in an A-pose
             n = -n
     n = (n - hdir * n.dot(hdir)).normalized()
     side_dir = hdir.cross(n).normalized()

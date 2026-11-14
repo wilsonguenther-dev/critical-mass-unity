@@ -90,7 +90,7 @@ def comps(nv, F):
         return components_np(nv, F)
 
 
-def find(V0, F0):
+def find(V0, F0, arm_seed=None):
     notes = []
     V, F, _ = weld(V0, F0)
     z0 = V[:, 2].min()
@@ -133,48 +133,62 @@ def find(V0, F0):
         L['toes.' + side] = np.array([ax, ay + 0.65 * (tipy - ay), z0 + 0.02 * H])
         L['_toetip.' + side] = np.array([ax, tipy, z0 + 0.02 * H])
 
-    # 3. arms: start at the hand (most lateral vertex between 20% and 52% H) and follow the arm's section upward
-    # until it merges with the torso (its inner edge jumps inward or its perimeter doubles): that level is the armpit.
+    # 3. arms (T-pose or A-pose): start at the hand (the most lateral vertex between 20% and 75% H, near the body's
+    # front-back middle so wings or packs are skipped) and follow the arm's section inward across planes x = const
+    # until it merges with the torso (perimeter doubles or height jumps): that is the arm root.
     hands = {}
+    ymid = np.median(V[:, 1])
     for side, sg in (('l', 1), ('r', -1)):
-        band = (V[:, 2] > z0 + 0.20 * H) & (V[:, 2] < z0 + 0.52 * H) & (np.sign(V[:, 0]) == sg)
-        i = np.argmax(np.where(band, V[:, 0] * sg, -1e9))
-        hc = V[i]
-        prev = None; track = []
-        zz = hc[2] + 0.05 * H   # start above the hand: spread fingers would read as a merge
-        while zz < z0 + 0.80 * H:
-            ls = [l for l in plane_loops(V, F, np.array([0, 0, zz]), Z) if l['c'][0] * sg > 0]
-            if prev is None:
-                ls = [l for l in ls if np.linalg.norm((l['c'] - hc)[:2]) < 0.14 * H]
-            else:
-                ls = [l for l in ls if np.linalg.norm((l['c'] - prev['c'])[:2]) < 0.06 * H]
-            if not ls:
-                break
-            l = min(ls, key=lambda q: np.linalg.norm((q['c'] - (prev['c'] if prev else hc))[:2]))
-            inner = l['min'][0] * sg if sg > 0 else -l['max'][0]
-            if prev is not None:
-                pin = prev['min'][0] * sg if sg > 0 else -prev['max'][0]
-                if inner < pin - 0.04 * H or l['per'] > 2.2 * prev['per'] or inner < 0.02 * H:
+        seed = (arm_seed or {}).get(side)
+        el = None
+        if seed is not None:
+            sh, el, wr_s = (np.array(x, float) for x in seed)
+            fa = (wr_s - el) / np.linalg.norm(wr_s - el)
+            cand = (np.linalg.norm(V - wr_s, axis=1) < 0.20 * H) & ((V - wr_s) @ fa > 0)
+            hc = V[cand][np.argmax((V[cand] - wr_s) @ fa)]
+            notes.append(f'arm {side}: joints from the seed (shoulder, elbow, wrist); hand found by geometry')
+        else:
+            side_ok = (np.sign(V[:, 0]) == sg) & (np.abs(V[:, 1] - ymid) < 0.08 * H)
+            bandA = side_ok & (V[:, 2] > z0 + 0.20 * H) & (V[:, 2] < z0 + 0.52 * H)
+            bandT = side_ok & (V[:, 2] > z0 + 0.40 * H) & (V[:, 2] < z0 + 0.75 * H)
+            iA = np.argmax(np.where(bandA, V[:, 0] * sg, -1e9)); iT = np.argmax(np.where(bandT, V[:, 0] * sg, -1e9))
+            tpose = V[iT, 0] * sg > 1.25 * V[iA, 0] * sg
+            hc = V[iT] if tpose else V[iA]
+            notes.append(f'arm {side}: {"T-pose" if tpose else "A-pose"} (lateral reach {V[iT, 0] * sg:.3f} m high band, {V[iA, 0] * sg:.3f} m low band)')
+            # march along the arm: cut perpendicular to the current arm direction, step toward the body, re-aim
+            d = np.array([sg * 0.15 * H, ymid, z0 + 0.62 * H]) - hc
+            d /= np.linalg.norm(d)
+            p = hc + d * 0.05 * H
+            prev = None; track = []; pers = []
+            for _ in range(400):
+                near = np.linalg.norm(V - p, axis=1) < 0.15 * H
+                ls = plane_loops(V, F, p, d, vmask=near)
+                ls = [l for l in ls if np.linalg.norm(l['c'] - p) < (0.06 if prev is not None else 0.10) * H]
+                if not ls:
                     break
-            track.append((zz, l)); prev = l
-            zz += 0.004 * H
-        if len(track) < 5:
-            notes.append(f'arm {side}: track failed'); continue
-        fr_t = (track[-1][0] - z0) / H
-        fr = min(max(fr_t, 0.45), 0.62)
-        if fr != fr_t:
-            notes.append(f'armpit {side}: tracked {fr_t:.3f} H, clamped to {fr:.3f} H (pads or crevices hide the armpit)')
-        l = min(track, key=lambda t: abs(t[0] - (z0 + fr * H)))[1]
-        inner = l['min'][0] if sg > 0 else l['max'][0]
-        outer = l['max'][0] if sg > 0 else l['min'][0]
-        sh = np.array([inner + 0.35 * (outer - inner), l['c'][1], z0 + fr * H + 0.045 * H])
+                l = min(ls, key=lambda q: np.linalg.norm(q['c'] - p))
+                if len(pers) >= 3 and l['per'] > 2.0 * np.median(pers[-3:]):
+                    break
+                if prev is not None:
+                    step = l['c'] - prev['c']
+                    if np.linalg.norm(step) > 1e-6:
+                        d = 0.8 * d + 0.2 * step / np.linalg.norm(step); d /= np.linalg.norm(d)
+                track.append((p.copy(), l)); prev = l; pers.append(l['per'])
+                p = l['c'] + d * 0.006 * H
+                if p[0] * sg < 0.05 * H:
+                    break
+            if len(track) < 5:
+                notes.append(f'arm {side}: track failed ({len(track)} sections)'); continue
+            l = track[-1][1]
+            sh = l['c'] + d * 0.02 * H
+            fr = (sh[2] - z0) / H
+            notes.append(f'arm root {side} at x {sh[0]:.3f}, {fr:.3f} H (arm followed {len(track)} sections in from the hand)')
         L['upperarm.' + side] = sh
-        notes.append(f'armpit {side} at {fr:.3f} H (arm followed {len(track)} sections up from the hand)')
         ax_ = hc - sh; alen = np.linalg.norm(ax_); ax_ /= alen
         # wrist: thinnest arm section between 55% and 92% of shoulder->hand, cut perpendicular to the arm
         best = None
         near = np.linalg.norm(np.cross(V - sh, ax_), axis=1) < 0.12 * H
-        for t in np.arange(0.55, 0.93, 0.01):
+        for t in (np.arange(0.55, 0.93, 0.01) if seed is None else []):
             p = sh + ax_ * alen * t
             ls = plane_loops(V, F, p, ax_, vmask=near & (np.linalg.norm(V - p, axis=1) < 0.10 * H))
             if not ls:
@@ -184,7 +198,9 @@ def find(V0, F0):
                 best = (t, per, p)
         wt = best[0] if best else 0.78
         # the hand region: beyond the wrist, near the hand
-        wr = sh + ax_ * alen * wt
+        wr = sh + ax_ * alen * wt if seed is None else wr_s
+        if seed is not None:
+            wt = float((wr - sh) @ ax_ / alen)
         hv = ((V - wr) @ ax_ > 0) & (np.linalg.norm(V - hc, axis=1) < 0.16 * H) & near
         hpts = V[hv]
         hcen = hpts.mean(0)
@@ -192,7 +208,7 @@ def find(V0, F0):
         tip = hpts[np.argmax((hpts - wr) @ hdir)]
         hl = (tip - wr) @ hdir
         L['wrist.' + side] = wr
-        L['lowerarm.' + side] = sh + (wr - sh) * 0.5 + np.array([0, 0.012 * H, 0])
+        L['lowerarm.' + side] = el if el is not None else sh + (wr - sh) * 0.5 + np.array([0, 0.012 * H, 0])
         L['hand.' + side] = wr + hdir * 0.08 * hl
         L['handslot.' + side] = wr + hdir * 0.45 * hl
         notes.append(f'wrist {side} at {wt:.2f} of shoulder-to-hand; hand length {hl:.3f} m')
