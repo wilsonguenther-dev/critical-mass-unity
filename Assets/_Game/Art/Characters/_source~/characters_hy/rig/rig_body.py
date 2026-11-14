@@ -374,6 +374,8 @@ try:
     # rig-builder-2: everything carried behind the back (ladder, pack, wings) is ONE rigid piece on the chest: any vertex
     # behind the back plane above the hips that is not on an arm (the ladder took shoulder weight and fanned out in Attack)
     back = (P[:, 1] > J['chest'].y + 0.05 * H) & (P[:, 2] > J['hips'].z)
+    headc = np.array([0.0, J['head'].y, (J['head'].z + J['_headtop'].z) / 2])
+    back &= np.linalg.norm(P - headc, axis=1) > 0.65 * (J['_headtop'].z - J['head'].z)   # hair buns stay on the head
     for s in SIDES:
         pts_ = [J[f'upperarm.{s}'], J[f'lowerarm.{s}'], J[f'wrist.{s}'], J[f'hand.{s}']]
         d_ = np.min([seg_dist(P, pts_[i], pts_[i + 1])[0] for i in range(3)], axis=0)
