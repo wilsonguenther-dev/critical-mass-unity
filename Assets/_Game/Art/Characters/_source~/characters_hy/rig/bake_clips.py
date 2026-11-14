@@ -580,14 +580,15 @@ def hold_slot():
     upd()
 
 
-def kk_back_dir(act, f0, f1):
+def kk_back_dir(act, f0, f1, thr=None):
     """Direction the KayKit planted feet move in the clip (opposite to travel), or None."""
+    thr = PLANT if thr is None else thr
     acc, prev = Vector((0, 0, 0)), {s: None for s in SIDES}
     for f in range(f0, f1 + 1):
         scene.frame_set(f)
         for s in SIDES:
             a = W(kk, kkP["foot." + s].head)
-            planted = (a.z - K0["A" + s].z) < PLANT * leg_k
+            planted = (a.z - K0["A" + s].z) < thr * leg_k
             if planted and prev[s] is not None:
                 acc += a - prev[s]
             prev[s] = a.copy() if planted else None
@@ -611,7 +612,12 @@ def bake_action(clip, act):
     # Planted feet hold: while planted, a foot moves backward at exactly the class's ground speed (KayKit speed x leg
     # ratio, the speed the game moves it at), so it does not slide on the ground.
     vg_ = GROUND_SPEED.get(clip, 0.0) * RATIO_H
-    bdir = kk_back_dir(act, f0, f1) if vg_ > 0 else None
+    # rig-builder-3: the direction is read with the same stance threshold the bake plants with. With KayKit's 2.5 % the
+    # run had NO planted frame, bdir was None and the Builder's planted foot was never anchored: it followed KayKit's
+    # foot x the ratio and moved back at 79 % of the ground speed (the game's 0.23 u/u skating read).
+    _thr = plant_n(clip) if (TOE_ABS and NEW_BODY and clip in ORDER_CLIPS) else None
+    bdir = kk_back_dir(act, f0, f1, _thr) if vg_ > 0 else None
+    REP.setdefault("anchor_dir", {})[clip] = None if bdir is None else [round(bdir.x, 3), round(bdir.y, 3)]
     anchor = {s: None for s in SIDES}
     rec = {n: [] for n in names}
     contact = {s: [] for s in SIDES}
