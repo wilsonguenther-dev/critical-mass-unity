@@ -100,6 +100,13 @@ namespace CriticalMass.Runtime.View.Anim
         /// <summary>Sim time of the last claw strike (wind-up ended) and of the last health loss (the flinch); -infinity before
         /// any. ActorViews reads them for the Kaiju face (angry while striking, hurt after a hit).</summary>
         public double LastStrikeAt => _strikeAt;
+
+        /// <summary>
+        /// feat/kaiju-bridges-1: 0..1, how squeezed the Kaiju is onto a narrow bridge (Kaiju.SqueezeAmount, eased over about
+        /// 0.25 s). For the art pass: tuck the arms and narrow the stance by it (the new model's feet are 2.5 to 3 m apart and a
+        /// diagonal bridge is about 2 to 2.6 m wide). View only: nothing in the Sim reads it.
+        /// </summary>
+        public float Squeeze { get; private set; }
         public double LastFlinchAt => _flinchAt;
         /// <summary>Sim time of the last roar (hatch, side, berserk); -infinity before any.</summary>
         public double LastRoarAt => _roarAt;
@@ -137,6 +144,7 @@ namespace CriticalMass.Runtime.View.Anim
             if (w.Tick < _lastTick) Reset();   // a new match (or a reset world): forget the last one's edges
             bool newTick = w.Tick != _lastTick;
             _lastTick = w.Tick;
+            Squeeze = Mathf.MoveTowards(Squeeze, (float)Kaiju.SqueezeAmount(w), Time.deltaTime * 4f);
             bool isHatchling = m == hatchling && hatchling != null;
 
             // Edges, once per sim tick.
