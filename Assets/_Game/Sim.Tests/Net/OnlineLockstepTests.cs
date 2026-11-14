@@ -32,7 +32,8 @@ namespace CriticalMass.Sim.Tests.Net
             for (int i = 0; i < humans; i++) teams[i] = i == 1 ? TeamId.Crimson : TeamId.Azure;
             var actors = new int[humans];
             Assert.IsTrue(MatchSetup.AssignActors(teamSize, TeamId.Azure, teams, actors));
-            var setup = new MatchSetup { Seed = 4242, TeamSize = teamSize, HostTeam = TeamId.Azure, InputDelay = 6, HashEvery = 30 };
+            // Pace 1: 30 ticks per wall second, so the millisecond numbers in these tests read as 33 ms ticks.
+            var setup = new MatchSetup { Seed = 4242, TeamSize = teamSize, HostTeam = TeamId.Azure, InputDelay = 6, HashEvery = 30, Pace = 1 };
             setup.Humans = new HumanSlot[humans];
             var transports = new LoopbackTransport[humans];
             for (int i = 0; i < humans; i++)

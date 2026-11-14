@@ -59,6 +59,8 @@ namespace CriticalMass.Net
     {
         public readonly List<RoomMember> Members = new List<RoomMember>();
         public int TeamSize = 16;
+        /// <summary>The match pace (0 = the game's default speed), the same for everyone in the room.</summary>
+        public double Pace;
         public RoomPhase Phase { get; private set; } = RoomPhase.Lobby;
         /// <summary>The last thing that happened, as one plain sentence for the room screen.</summary>
         public string Notice { get; private set; } = "";
@@ -260,14 +262,15 @@ namespace CriticalMass.Net
             if (!MatchSetup.AssignActors(TeamSize, Members[0].Team, teams, actors)) return null;
             int worst = 0;
             foreach (RoomMember m in Members) worst = Math.Max(worst, m.PingMs);
-            double tickMs = 1000.0 / _cfg.SimHz;
+            double tickMs = 1000.0 / (_cfg.SimHz * LockstepSession.WallPace(new MatchSetup { Pace = Pace }, _cfg));
             var setup = new MatchSetup
             {
                 Seed = seed != 0 ? seed : unchecked((int)(now * 2654435761L) ^ 0x5bd1e995),
                 TeamSize = TeamSize,
                 HostTeam = Members[0].Team,
-                // A round trip plus two ticks of slack, never under 3 (100 ms) or over 12 (400 ms); each client adapts after.
-                InputDelay = Math.Max(3, Math.Min(12, (int)Math.Ceiling(worst / tickMs) + 2)),
+                Pace = Pace,
+                // A round trip plus 60 ms of slack, at least 100 ms and at most 400 ms; each client adapts after.
+                InputDelay = Math.Max((int)Math.Ceiling(100 / tickMs), Math.Min((int)Math.Ceiling(400 / tickMs), (int)Math.Ceiling((worst + 60) / tickMs))),
                 HashEvery = 30,
                 Humans = new HumanSlot[n],
             };

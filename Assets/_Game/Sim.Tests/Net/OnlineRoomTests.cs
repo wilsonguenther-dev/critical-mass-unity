@@ -40,7 +40,8 @@ namespace CriticalMass.Sim.Tests.Net
             Assert.AreEqual(ClassId.Miner, cs.World.Actors[6].Cls);
             Assert.IsTrue(hs.World.Actors[6].IsHuman);
             Assert.AreEqual(hs.Setup.Seed, cs.Setup.Seed);
-            Assert.IsTrue(hs.TryGetHash(600, out ulong a) && cs.TryGetHash(600, out ulong b));
+            Assert.IsTrue(hs.TryGetHash(600, out ulong a), "host fingerprint at tick 600");
+            Assert.IsTrue(cs.TryGetHash(600, out ulong b), "client fingerprint at tick 600");
             Assert.AreEqual(a, b);
         }
 

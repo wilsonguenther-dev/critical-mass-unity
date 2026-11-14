@@ -28,8 +28,8 @@ namespace CriticalMass.Net
         /// <summary>At most one packet per peer this often while there is news, and a keep-alive this often without.</summary>
         public int SendEveryMs = 30;
         public int KeepAliveMs = 250;
-        /// <summary>Largest per-client input lead the adaptive delay may reach (ticks).</summary>
-        public int MaxLead = 20;
+        /// <summary>Largest per-client input lead the adaptive delay may reach, in milliseconds (converted to ticks at the match pace).</summary>
+        public int MaxLeadMs = 700;
         /// <summary>Ticks of wall-clock backlog the stepping clock keeps after a stall (catch-up burst cap).</summary>
         public int BacklogTicks = 6;
     }
@@ -90,6 +90,7 @@ namespace CriticalMass.Net
         private readonly ITransport _t;
         private readonly LockstepOptions _o;
         private readonly double _tickMs;
+        private readonly int _maxLead;
         private readonly int _h;
         private readonly int _bundleSize;
         private readonly InputFrame _scratch = SimInput.EmptyInput();
@@ -160,7 +161,9 @@ namespace CriticalMass.Net
             if (LocalSlot < 0) throw new ArgumentException("this peer has no seat in the match setup", nameof(setup));
             LocalActor = setup.Humans[LocalSlot].Actor;
             World = World.CreateWorld(setup.ToWorldOptions(cfg));
-            _tickMs = 1000.0 / cfg.SimHz;
+            // Wall milliseconds per tick: the match pace (sim ticks per wall second / SimHz) speeds the clock, never the rules.
+            _tickMs = 1000.0 / (cfg.SimHz * WallPace(setup, cfg));
+            _maxLead = Math.Max(2, (int)Math.Ceiling(_o.MaxLeadMs / _tickMs));
             _h = setup.Humans.Length;
             _bundleSize = _h * (1 + InputCodec.Size);
             _bundles = new byte[Window * _bundleSize];
@@ -202,6 +205,12 @@ namespace CriticalMass.Net
                 }
             }
         }
+
+        /// <summary>The match pace a setup runs at (0 = the config's default speed), as SimDriverBehaviour reads it.</summary>
+        public static double WallPace(MatchSetup s, GameConfig cfg) => s.Pace > 0 ? s.Pace : (cfg.DefaultSpeed > 0 ? cfg.DefaultSpeed : 1);
+
+        /// <summary>Wall milliseconds per tick.</summary>
+        public double TickMs => _tickMs;
 
         /// <summary>Hashes this machine has recorded, newest last: (world tick, hash).</summary>
         public int HashCount => Math.Min(_hashCount, HashKeep);
@@ -489,7 +498,7 @@ namespace CriticalMass.Net
                         // The host had to replace our input (it came too late): lead one tick more.
                         LateInputs++;
                         // One step up per half second: a burst of late ticks is one late episode, not ten.
-                        if (Lead < _o.MaxLead && _nowMs - _leadUpMs >= 500) { Lead++; _leadUpMs = _nowMs; }
+                        if (Lead < _maxLead && _nowMs - _leadUpMs >= 500) { Lead++; _leadUpMs = _nowMs; }
                     }
                 }
             }
