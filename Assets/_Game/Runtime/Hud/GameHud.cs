@@ -847,7 +847,9 @@ namespace CriticalMass.Runtime.Hud
                 labels[i].horizontalOverflow = HorizontalWrapMode.Overflow;
                 labels[i].fontSize = HudLayout.AbilityNameMax;
                 labels[i].text = n;
-                widths[i] = n.Length == 0 ? 0f : ContainedText.NaturalWidth(labels[i]);   // the full name, never a cut
+                // fix/hud-containment-3: the full name at the full size, measured by the rule's own measure (not the label's
+                // current state, which the rule may have shrunk and cut for its previous box)
+                widths[i] = n.Length == 0 ? 0f : TextFit.WidthOf(labels[i], n, HudLayout.AbilityNameMax);
             }
             int size = HudLayout.LayoutAbilityNames(widths, lefts, boxes);
             for (int i = 0; i < labels.Length; i++)

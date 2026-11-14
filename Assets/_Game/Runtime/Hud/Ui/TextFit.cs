@@ -433,7 +433,9 @@ namespace CriticalMass.Runtime.Hud.Ui
             {
                 if (t.text != full) t.text = full;
                 t.horizontalOverflow = HorizontalWrapMode.Overflow;
-                float w = TextFit.WidthOf(t, full, t.fontSize);
+                // fix/hud-containment-3: at the label's top size. Setting the words ran the rule, which may already have
+                // shrunk the label for its old box; measuring at that shrunk size made the new box too small and cut it.
+                float w = TextFit.WidthOf(t, full, Mathf.Max(t.fontSize, c.MaxSize));
                 t.horizontalOverflow = mode;
                 return w;
             }
