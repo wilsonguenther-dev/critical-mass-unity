@@ -27,6 +27,8 @@ namespace CriticalMass.Runtime.Hud
         public const int RingSegments = 40;
         /// <summary>Seconds the team banner holds (banner clock).</summary>
         public const double BannerHoldSeconds = 4.5;
+        /// <summary>fix/light-weapons-3: capture tools switch the start banner off (it covered the top of every close-up).</summary>
+        public static bool StartBannerOff;
 
         /// <summary>Marker size 0..1 for the sim seconds since the match start or the last respawn.</summary>
         public static float MarkerScale(float sinceSeconds)
@@ -176,7 +178,7 @@ namespace CriticalMass.Runtime.Hud
             if (!_bannerShown)
             {
                 _bannerShown = true;
-                Banner.Show(FirstMinutes.StartBanner(a.Team));
+                if (!FirstMinutes.StartBannerOff) Banner.Show(FirstMinutes.StartBanner(a.Team));
             }
             if (FirstMinutes.Respawned(_wasAlive, a.Alive)) { _since = w.Match.Time; _lastTick = -1; }
             _wasAlive = a.Alive;
