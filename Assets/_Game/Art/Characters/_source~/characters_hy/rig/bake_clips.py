@@ -125,6 +125,13 @@ F0 = snap(fa)
 Lt = {s: (F0["K" + s] - F0["U" + s]).length for s in SIDES}
 Ls = {s: (F0["A" + s] - F0["K" + s]).length for s in SIDES}
 leg_k = sum((K0["A" + s] - K0["U" + s]).length for s in SIDES) / 2
+# rig-warrior-1: the hips and ankle motion is measured from KayKit's BIND (its model FBX: hips 0.406 m, ankles at
+# +-0.171 m side, 0.145 m up, 0.019 m back; Blender axes), not from the pack armature's rest, which is a pose: measured from
+# that pose the Warrior's StrafeR crossing step put his lower foot 0.54 m from the hip, out of reach, and it hung level
+# with the other foot (the game read him turned around).
+log("pack rest hips", tuple(round(x, 3) for x in K0["hips"]), "ankles", tuple(round(x, 3) for x in K0["Al"]), tuple(round(x, 3) for x in K0["Ar"]))
+K0["hips"] = Vector((0.0, 0.0, 0.406))
+K0["Al"], K0["Ar"] = Vector((0.171, 0.019, 0.145)), Vector((-0.171, 0.019, 0.145))
 leg_f = sum((F0["A" + s] - F0["U" + s]).length for s in SIDES) / 2
 RATIO = leg_f / leg_k
 
@@ -357,7 +364,7 @@ def bake_action(clip, act):
             set_world(fa, hp, Matrix.Translation((0, 0, FLIGHT_CAP - lowj)) @ (fa.matrix_world @ hp.matrix))
             upd()
             CAPPED[clip] = max(CAPPED.get(clip, 0.0), lowj - FLIGHT_CAP)
-        if clip == "StrafeR" and CLS == "Warrior":
+        if clip == "StrafeR" and CLS == "Warrior" and f in (2, 10, 18):
             log("trace", f, "kk ankle z l %.3f r %.3f" % (K["Al"].z, K["Ar"].z), "target z l %.3f r %.3f" % (targets["l"].z, targets["r"].z),
                 "final z l %.3f r %.3f" % (W(fa, faP["foot.l"].head).z, W(fa, faP["foot.r"].head).z),
                 "planted", PL.get("l"), PL.get("r"), "hips z %.3f" % W(fa, faP["hips"].head).z, "upperleg z %.3f" % W(fa, faP["upperleg.l"].head).z)
