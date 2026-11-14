@@ -308,7 +308,7 @@ namespace CriticalMass.Runtime.View.Art
                 Bones = 41, ClipSource = "Assets/_Game/Art/Characters/KayKit_Clips.fbx",
                 Meshes = new[] { "Warrior_Hero", "Warrior_LOD0", "Warrior_LOD1", "Warrior_Shadow" }, MaskCodes = new[] { 0, 6, 8 },
                 OutlinePx = CharacterHullPx, Rim = 0.6f, Authored = WarriorAzure, Crimson = WarriorCrimson, Height = 2.0f,
-                VertexColourFace = true, ArtYawDeg = 180f },   // HY (2026-11-13); pre-HY: FaceTexture Warrior_Face.png
+                VertexColourFace = true, RetargetToBind = true, ArtYawDeg = 180f },   // HY (2026-11-13); pre-HY: FaceTexture Warrior_Face.png
             new ModelSpec { Key = Miner, AssetPath = "Assets/_Game/Art/Miner/Miner.fbx", Kind = ArtKind.Character, Rigged = true,
                 Bones = 41, ClipSource = "Assets/_Game/Art/Characters/KayKit_Clips.fbx",
                 Meshes = new[] { "Miner_Hero", "Miner_LOD0", "Miner_LOD1", "Miner_Shadow" }, MaskCodes = new[] { 0, 6, 8 },

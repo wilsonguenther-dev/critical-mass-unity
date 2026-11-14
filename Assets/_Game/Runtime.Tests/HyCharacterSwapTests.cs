@@ -191,6 +191,7 @@ namespace CriticalMass.Runtime.Tests
             keys.Insert(0, ArtMapping.Builder);   // KayKit-joint reference, first: its hips rest is the clips' rest
             var bad = new List<string>();
             var rep = new System.Text.StringBuilder();
+            Vector3 kkPelvis = Vector3.zero;
             foreach (string key in keys)
             {
                 ArtEntry e = cat.Find(key);
@@ -207,9 +208,11 @@ namespace CriticalMass.Runtime.Tests
                     Vector3 hipsRest = hips.localPosition;
                     bool hy = key != ArtMapping.Builder;
                     bool[] foot = FootMask(hero);
-                    BindRetarget rt = spec.RetargetToBind ? BindRetarget.Create(hero, spec.StrideScale, ArtMapping.KaykitDeformBoneNames) : null;
+                    if (key == ArtMapping.Builder) kkPelvis = BindRetarget.PelvisOf(hips);
+                    Vector3 pel = BindRetarget.PelvisOf(hips);
+                    BindRetarget rt = spec.RetargetToBind ? BindRetarget.Create(hero, spec.StrideScale, ArtMapping.KaykitDeformBoneNames, kkPelvis, go.transform) : null;
                     float restLow = LowestY(go.transform, hero, foot);
-                    rep.Append($"{key}: rest lowest foot vertex {restLow:0.000}, hips rest {hipsRest.y:0.000}, retarget {(rt != null ? $"on (largest bone correction {rt.MaxFixDeg:0.0} deg)" : "off")}\n");
+                    rep.Append($"{key}: rest lowest foot vertex {restLow:0.000}, hips rest {hipsRest.y:0.000}, pelvis in hips frame {pel.x:0.000},{pel.y:0.000},{pel.z:0.000}, retarget {(rt != null ? $"on (largest bone correction {rt.MaxFixDeg:0.0} deg, ground lift {rt.GroundLift:0.000})" : "off")}\n");
                     foreach (string c in new[] { ArtMapping.Idle, ArtMapping.Walk, ArtMapping.Run })
                     {
                         AnimationClip clip = e.Clip(c);

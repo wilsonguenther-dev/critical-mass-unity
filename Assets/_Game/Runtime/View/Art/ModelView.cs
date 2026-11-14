@@ -18,17 +18,46 @@ using UnityEngine.Playables;
         readonly Transform[] _bones;
         readonly Quaternion[] _fix;
         readonly Transform _hips;
-        readonly Vector3 _hipsBind, _hipsRest;
+        readonly Vector3 _hipsBind, _hipsRest, _pelvisF, _pelvisKk, _lift;
+        readonly Quaternion _hipsRot0;
         readonly float _ratio;
+        /// <summary>Lift (model units) that puts the bind-pose soles on the root (the HY Farmer's sit 0.091 below it).</summary>
+        public readonly float GroundLift;
         /// <summary>Largest per-bone correction in degrees (tests, diagnostics).</summary>
         public readonly float MaxFixDeg;
 
-        BindRetarget(Transform[] bones, Quaternion[] fix, Transform hips, Vector3 hipsBind, Vector3 hipsRest, float ratio, float maxDeg)
-        { _bones = bones; _fix = fix; _hips = hips; _hipsBind = hipsBind; _hipsRest = hipsRest; _ratio = ratio; MaxFixDeg = maxDeg; }
+        BindRetarget(Transform[] bones, Quaternion[] fix, Transform hips, Vector3 hipsBind, Vector3 hipsRest, float ratio, float maxDeg,
+            Vector3 pelvisF, Vector3 pelvisKk, Quaternion hipsRot0, Vector3 lift, float groundLift)
+        {
+            _bones = bones; _fix = fix; _hips = hips; _hipsBind = hipsBind; _hipsRest = hipsRest; _ratio = ratio; MaxFixDeg = maxDeg;
+            _pelvisF = pelvisF; _pelvisKk = pelvisKk; _hipsRot0 = hipsRot0; _lift = lift; GroundLift = groundLift;
+        }
+
+        /// <summary>Midpoint of the two upper-leg joints in the hips' frame (the pelvis the legs swing from), or zero.</summary>
+        public static Vector3 PelvisOf(Transform hips)
+        {
+            if (hips == null) return Vector3.zero;
+            Transform l = hips.Find("upperleg.l"), r = hips.Find("upperleg.r");
+            return l != null && r != null ? 0.5f * (l.localPosition + r.localPosition) : Vector3.zero;
+        }
+
+        static Vector3 _kkPelvis;
+        static bool _kkPelvisKnown;
+        /// <summary>The KayKit skeleton's pelvis in its hips frame, from a model on the plain KayKit joints (Builder).</summary>
+        public static Vector3 KaykitPelvis()
+        {
+            if (_kkPelvisKnown) return _kkPelvis;
+            _kkPelvisKnown = true;
+            ArtEntry e = ArtCatalog.Load()?.Find(ArtMapping.Builder);
+            if (e != null && e.Model != null)
+                foreach (Transform t in e.Model.GetComponentsInChildren<Transform>(true))
+                    if (t.name == "hips") { _kkPelvis = PelvisOf(t); break; }
+            return _kkPelvis;
+        }
 
         /// <summary>Build from a model still in its armature rest pose (before any clip is applied). Null when the hero
         /// renderer has no bind poses.</summary>
-        public static BindRetarget Create(SkinnedMeshRenderer hero, float legRatio, ICollection<string> deformBones)
+        public static BindRetarget Create(SkinnedMeshRenderer hero, float legRatio, ICollection<string> deformBones, Vector3 kkPelvis, Transform modelRoot)
         {
             if (hero == null || hero.sharedMesh == null) return null;
             Transform[] bones = hero.bones;
@@ -64,13 +93,36 @@ using UnityEngine.Playables;
                     hipsBind = new Vector3(pos.x, pos.y, pos.z);
                 }
             }
-            return new BindRetarget(list.ToArray(), fix.ToArray(), hips, hipsBind, hipsRest, legRatio > 0f ? legRatio : 1f, maxDeg);
+            // Soles: the lowest foot-weighted bind vertex, in the model root's frame (rest equals bind for these models).
+            float low = float.PositiveInfinity;
+            BoneWeight[] bw = hero.sharedMesh.boneWeights;
+            Vector3[] vs = hero.sharedMesh.vertices;
+            Matrix4x4 toRoot = (modelRoot != null ? modelRoot.worldToLocalMatrix : Matrix4x4.identity) * hero.transform.localToWorldMatrix;
+            for (int i = 0; i < vs.Length && i < bw.Length; i++)
+            {
+                int bi = bw[i].boneIndex0;
+                Transform fb = bi >= 0 && bi < bones.Length ? bones[bi] : null;
+                if (fb == null || !(fb.name.StartsWith("foot.") || fb.name.StartsWith("toes."))) continue;
+                low = Mathf.Min(low, toRoot.MultiplyPoint3x4(vs[i]).y);
+            }
+            float groundLift = float.IsInfinity(low) ? 0f : -low;
+            Vector3 lift = Vector3.zero;
+            if (hips != null && hips.parent != null && modelRoot != null)
+                lift = hips.parent.InverseTransformVector(modelRoot.TransformVector(Vector3.up * groundLift));
+            return new BindRetarget(list.ToArray(), fix.ToArray(), hips, hipsBind, hipsRest, legRatio > 0f ? legRatio : 1f, maxDeg,
+                PelvisOf(hips), kkPelvis, hips != null ? hips.localRotation : Quaternion.identity, lift, groundLift);
         }
 
         public void Apply()
         {
             for (int i = 0; i < _bones.Length; i++) _bones[i].localRotation = _fix[i] * _bones[i].localRotation;
-            if (_hips != null) _hips.localPosition = _hipsBind + (_hips.localPosition - _hipsRest) * _ratio;
+            if (_hips == null) return;
+            // The clip moves KayKit's pelvis; this class's pelvis follows that motion scaled by its leg ratio, and the hips
+            // turn about this class's own pelvis (its hips joint sits higher above the legs than KayKit's).
+            Quaternion q = _hips.localRotation;
+            Vector3 kk = _hips.localPosition + q * _pelvisKk - (_hipsRest + _hipsRot0 * _pelvisKk);
+            Vector3 pelvis = _hipsBind + _hipsRot0 * _pelvisF + kk * _ratio + _lift;
+            _hips.localPosition = pelvis - q * _pelvisF;
         }
     }
 
@@ -244,7 +296,7 @@ namespace CriticalMass.Runtime.View.Art
             if (n == 0) return;
             if (Spec != null && Spec.RetargetToBind && Spec.Meshes != null && Spec.Meshes.Length > 0)
                 foreach (SkinnedMeshRenderer r in Root.GetComponentsInChildren<SkinnedMeshRenderer>(true))
-                    if (r.name == Spec.Meshes[0]) { Retarget = BindRetarget.Create(r, Spec.StrideScale, ArtMapping.KaykitDeformBoneNames); break; }
+                    if (r.name == Spec.Meshes[0]) { Retarget = BindRetarget.Create(r, Spec.StrideScale, ArtMapping.KaykitDeformBoneNames, BindRetarget.KaykitPelvis(), Transform); break; }
 
             _animator = Root.GetComponent<Animator>();
             if (_animator == null) _animator = Root.AddComponent<Animator>();
