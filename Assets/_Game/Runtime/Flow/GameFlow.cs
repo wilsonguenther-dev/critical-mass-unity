@@ -141,6 +141,15 @@ namespace CriticalMass.Runtime.Flow
         public static FlowState State { get; private set; } = FlowState.Off;
 
         /// <summary>
+        /// online-rooms-6: true only while the player is looking at a live match: the flow is in the match (or off: tests
+        /// and capture tools), the loading screen is closed and no full-screen menu is up (main menu, setup, settings from
+        /// the menu and results are other flow states; the online screens set AnyOpen). Announcer toasts and HUD banners
+        /// show only then, never over a menu or the loading screen.
+        /// </summary>
+        public static bool LiveMatchView =>
+            (State == FlowState.Match || State == FlowState.Off) && !Menus.LoadingScreen.IsOpen && !Online.OnlineMenuScreen.AnyOpen;
+
+        /// <summary>
         /// Integration batch 4 (title idle CPU): true while a menu screen (title, menu, setup) shows over a backdrop match and
         /// no human match runs. The in-match HUD, the depth view and the ground paint skip their per-frame work then.
         /// </summary>

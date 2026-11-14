@@ -1,8 +1,12 @@
 using System.Collections.Generic;
 using CriticalMass.Runtime.Hud;
+using CriticalMass.Runtime.Hud.Style;
+using CriticalMass.Runtime.Hud.Ui;
+using CriticalMass.Runtime.Menu;
 using CriticalMass.Runtime.Online;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace CriticalMass.Runtime.Tests
 {
@@ -56,14 +60,15 @@ namespace CriticalMass.Runtime.Tests
         public void ThePlayerTableHoldsTheRoomWithoutTouchingAnythingElse(int players)
         {
             Assert.LessOrEqual(players, OnlineLayout.MaxRows);
+            bool two = OnlineLayout.TwoColumns(players);
             var cells = new List<Rect>();
             for (int i = 0; i < players; i++)
             {
-                Rect row = OnlineLayout.Row(i);
+                Rect row = OnlineLayout.Row(i, two);
                 Assert.IsTrue(Inside(row, OnlineLayout.List), $"row {i} leaves the list region");
-                for (int c = 0; c < OnlineLayout.Cells.Length; c++)
+                for (int c = 0; c < OnlineLayout.CellCount; c++)
                 {
-                    Rect cell = OnlineLayout.Cell(i, c);
+                    Rect cell = OnlineLayout.Cell(i, c, two);
                     Assert.IsTrue(Inside(cell, row), $"row {i} cell {c} leaves its row");
                     foreach (Rect other in cells) Assert.IsFalse(cell.Overlaps(other), $"row {i} cell {c} overlaps another cell");
                     cells.Add(cell);
@@ -71,6 +76,79 @@ namespace CriticalMass.Runtime.Tests
                 foreach (Rect r in new[] { OnlineLayout.Controls, OnlineLayout.Chat, OnlineLayout.Status, OnlineLayout.Header, OnlineLayout.Footer })
                     Assert.IsFalse(row.Overlaps(r), $"row {i} overlaps a region");
             }
+        }
+
+        [Test]
+        public void OneColumnUpTo16PlayersTwoAbove()
+        {
+            Assert.IsFalse(OnlineLayout.TwoColumns(1));
+            Assert.IsFalse(OnlineLayout.TwoColumns(16));
+            Assert.IsTrue(OnlineLayout.TwoColumns(17));
+            Assert.AreEqual(OnlineLayout.List.width, OnlineLayout.ColumnW(false), 0.01f, "one column uses the whole table width");
+            Assert.Greater(OnlineLayout.Cell(0, OnlineLayout.CellName, false).width, OnlineLayout.Cell(0, OnlineLayout.CellName, true).width);
+            Assert.GreaterOrEqual(OnlineLayout.RowSize(true), UiScale.TypeMin, "never below the type scale's minimum");
+            Assert.GreaterOrEqual(OnlineLayout.RowSize(false), OnlineLayout.RowSize(true));
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void ColumnsHaveGapsAndHeadsSitOverTheirColumns(bool two)
+        {
+            for (int col = 0; col < (two ? 2 : 1); col++)
+            {
+                int first = col * OnlineLayout.RowsPerColumn;
+                Rect row = OnlineLayout.Row(first, two);
+                for (int c = 0; c < OnlineLayout.CellCount; c++)
+                {
+                    Rect cell = OnlineLayout.Cell(first, c, two), head = OnlineLayout.HeadCell(col, c, two);
+                    Assert.Greater(cell.width, 0f, $"column {c} has a width");
+                    Assert.IsTrue(Inside(cell, row), $"column {c} stays in its row");
+                    Assert.AreEqual(cell.x, head.x, 0.01f, $"head {c} starts over its column");
+                    Assert.AreEqual(cell.width, head.width, 0.01f, $"head {c} is as wide as its column");
+                    if (c > 0)
+                        Assert.GreaterOrEqual(cell.xMin - OnlineLayout.Cell(first, c - 1, two).xMax, OnlineLayout.CellGap - 0.01f, $"a gap before column {c}");
+                }
+            }
+        }
+
+        /// <summary>
+        /// online-rooms-6: at 1280 x 720 (the font drawn at its rounded screen size, the conservative case) every cell's
+        /// widest text fits its column: a 12-character name, CRIMSON, the longest class, NOT READY and a 3-digit ping, and
+        /// every head, for 32 players (two columns) and 8 players (one column).
+        /// </summary>
+        [TestCase(32)]
+        [TestCase(8)]
+        public void EveryCellsWidestTextFitsItsColumn(int players)
+        {
+            bool two = OnlineLayout.TwoColumns(players);
+            const float w = 1280f, h = 720f;
+            float scale = Mathf.Min(w / OnlineLayout.RefW, h / OnlineLayout.RefH);
+            int drawn = Mathf.Max(1, Mathf.RoundToInt(OnlineLayout.RowSize(two) * scale));
+            string longestClass = "";
+            foreach (string n in System.Enum.GetNames(typeof(CriticalMass.Sim.Config.ClassId)))
+                if (n.Length > longestClass.Length) longestClass = n.ToUpperInvariant();
+            string[][] texts =
+            {
+                new[] { "SHAYDENCALEB", "PLAYER" },
+                new[] { "CRIMSON", "AZURE", "TEAM" },
+                new[] { longestClass, "CLASS" },
+                new[] { "NOT READY", "READY", "HOST" },
+                new[] { "999 MS", "PING" },
+            };
+            var root = new GameObject("Online Table Probe");
+            try
+            {
+                Text t = HudText.Make(root.transform, "Probe", CMTokens.Ui, drawn, Color.white, TextAnchor.MiddleLeft, 2f);
+                Assert.IsNotNull(t.font, "the font loads");
+                int last = players - 1;
+                for (int c = 0; c < OnlineLayout.CellCount; c++)
+                {
+                    float cellW = OnlineLayout.ToScreen(OnlineLayout.Cell(last, c, two), w, h).width;
+                    foreach (string s in texts[c])
+                        Assert.LessOrEqual(TextFit.WidthOf(t, s, drawn), cellW, $"{players} players: \"{s}\" fits column {c} at {w}x{h}");
+                }
+            }
+            finally { Object.DestroyImmediate(root); }
         }
 
         [Test]

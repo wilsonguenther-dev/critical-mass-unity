@@ -29,6 +29,15 @@ namespace CriticalMass.Runtime.Online
         bool _waitingShown;
         float _endedAt = -1f;
 
+        static OnlineMatchOverlay _live;
+
+        /// <summary>online-rooms-6: the stopped panel (CANNOT START, MATCH ENDED, host left) is up: nothing online draws behind it.</summary>
+        public static bool ModalUp => _live != null && _live._panel != null && _live._panel.activeSelf;
+
+        void OnEnable() => _live = this;
+
+        void OnDisable() { if (_live == this) _live = null; }
+
         void Start()
         {
             _session = OnlineMatch.Session;
