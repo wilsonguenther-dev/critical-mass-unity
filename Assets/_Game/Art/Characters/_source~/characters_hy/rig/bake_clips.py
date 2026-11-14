@@ -90,6 +90,8 @@ acts = {a.name.split("|")[-1]: a for a in kacts}
 log("fps", fps, "kk", kk.name, "class rig", fa.name, "clips", len(acts), sorted(acts)[:8])
 
 SIDES = ("l", "r")
+FLIGHT_CAP = 0.32      # metres: lowest foot/toe joint never above this (game limit 0.35 u at scale 1)
+CAPPED = {}
 PLANT = 0.025          # KayKit ankle within 2.5% of leg length of its rest height = planted
 MAX_LOWER = 0.12       # hips never come down more than this to reach a target (DeathB-style clips keep FK reach)
 LEG = lambda s: ("upperleg." + s, "lowerleg." + s, "foot." + s, "toes." + s)
@@ -306,6 +308,16 @@ def bake_action(clip, act):
             Ah = W(fa, faP[ft].head)
             set_world(fa, faP[ft], Matrix.LocRotScale(Ah, rots[s].to_quaternion(), F0["M" + s].to_scale()))
             upd()
+        # rig-warrior-1: the game's feet test fails a model whose LOWEST foot or toe joint is more than 0.35 u above the
+        # ground (GameplaySanityPlayTests). A run's flight frame scaled by a longer-legged class's ratio crossed it (HY
+        # Warrior Run frame 1: 0.392, the game saw 0.35-0.39). On such a frame the whole pose comes down rigidly (hips
+        # only) until that joint is at FLIGHT_CAP; frames under the cap are untouched.
+        lowj = min(W(fa, faP[b].head).z for b in ("foot.l", "foot.r", "toes.l", "toes.r") if b in faP)
+        if lowj > FLIGHT_CAP:
+            hp = faP["hips"]
+            set_world(fa, hp, Matrix.Translation((0, 0, FLIGHT_CAP - lowj)) @ (fa.matrix_world @ hp.matrix))
+            upd()
+            CAPPED[clip] = max(CAPPED.get(clip, 0.0), lowj - FLIGHT_CAP)
         for pb in faP:
             l, q, sc = pb.matrix_basis.decompose()
             if rec[pb.name] and Quaternion(rec[pb.name][-1][1]).dot(q) < 0:
@@ -348,6 +360,8 @@ for m in arm_mods:
     m.show_viewport = True
 log("baked", len(baked), "of", len(acts))
 REP["hips_lowered_max"] = {c: round(v, 4) for c, v in lows.items() if v > 0}
+REP["flight_capped_max"] = {c: round(v, 4) for c, v in CAPPED.items()}
+log("flight capped at", FLIGHT_CAP, REP["flight_capped_max"])
 
 # ---------------------------------------------------------------- measure
 dg = bpy.context.evaluated_depsgraph_get()
