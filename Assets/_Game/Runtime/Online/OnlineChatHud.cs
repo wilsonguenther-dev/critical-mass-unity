@@ -90,7 +90,17 @@ namespace CriticalMass.Runtime.Online
                 0f, HudZones.ChatLines * HudZones.ChatLineH + 6f, 100f, HudZones.ChatInputH, "", 2f);
             MenuUi.Contain(_input, 1);
             _placed = new Rect(-1, -1, 0, 0);
+            _lane.gameObject.AddComponent<RectMask2D>();   // online-rooms-6: nothing draws past the box's edges
         }
+
+        static bool PauseOpen()
+        {
+            if (_pause == null && Time.frameCount >= _pauseLookAt) { _pause = FindAnyObjectByType<PauseMenu>(); _pauseLookAt = Time.frameCount + 30; }
+            return _pause != null && _pause.IsOpen;
+        }
+
+        static PauseMenu _pause;
+        static int _pauseLookAt;
 
         void Place()
         {
@@ -112,7 +122,8 @@ namespace CriticalMass.Runtime.Online
         void Update()
         {
             ChatChannel ch = Channel;
-            bool show = Visible && ch != null && OnlineMatch.InRoom;
+            // online-rooms-6: never behind the match's stopped panel or the pause menu (nothing online outside a modal's panel).
+            bool show = Visible && ch != null && OnlineMatch.InRoom && !OnlineMatchOverlay.ModalUp && !PauseOpen();
             if (_canvas.enabled != show) _canvas.enabled = show;
             if (!show) { StopTyping(); return; }
             Place();
@@ -135,28 +146,34 @@ namespace CriticalMass.Runtime.Online
             if (!Mathf.Approximately(c.a, alpha)) { c.a = alpha; _body.color = c; }
         }
 
-        /// <summary>The newest lines that fit MaxLines once wrapped (estimated from the lane width), oldest first.</summary>
+        /// <summary>
+        /// The newest lines that fit the box, oldest first. online-rooms-6: each line's wrapped height is measured on the
+        /// box's own font and width (TextFit), and the oldest line is dropped whenever the next would not fit whole, so the
+        /// box shows only whole lines (it used to estimate the wrap, overflow its top edge and cut the oldest line in half).
+        /// </summary>
         void Redraw(ChatChannel ch)
         {
             _seenVersion = ch.Version;
             var lines = ch.Lines;
-            float charW = UiScale.TypeSmall * 0.52f;
-            int perLine = Mathf.Max(12, (int)(_placed.width / charW));
+            int size = UiScale.TypeSmall;
+            float width = Mathf.Max(40f, _placed.width);
+            float lineH = Mathf.Max(1f, TextFit.LineHeightOf(_body, size));
+            float bodyH = _placed.height - HudZones.ChatInputH - 6f;
+            int room = Mathf.Min(MaxLines, Mathf.Max(1, Mathf.FloorToInt(bodyH / lineH)));
             var picked = new System.Collections.Generic.List<string>();
             int used = 0;
             for (int k = lines.Count - 1; k >= 0; k--)
             {
                 ChatLine l = lines[k];
-                string text = l.Scope == ChatScope.System ? l.Text : (l.Scope == ChatScope.Team ? "[TEAM] " : "") + l.From + ": " + l.Text;
-                int need = Mathf.Max(1, Mathf.CeilToInt(text.Length / (float)perLine));
-                if (used + need > MaxLines) break;
+                string text = l.Scope == ChatScope.System ? "· " + l.Text : (l.Scope == ChatScope.Team ? "[TEAM] " : "") + l.From + ": " + l.Text;
+                int need = Mathf.Max(1, Mathf.RoundToInt(TextFit.HeightOf(_body, text, size, width, true) / lineH));
+                if (used + need > room) break;
                 used += need;
-                picked.Insert(0, l.Scope == ChatScope.System ? "· " + text : text);
+                picked.Insert(0, text);
             }
             HudText.Set(_body, string.Join("\n", picked));
             _born = Time.unscaledTime;
         }
-
 
         void StartTyping()
         {

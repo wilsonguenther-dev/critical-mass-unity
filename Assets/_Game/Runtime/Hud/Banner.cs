@@ -307,7 +307,8 @@ namespace CriticalMass.Runtime.Hud
         {
             double now = Now();
             // online-rooms-5: no banner over the online menus (the attract match behind them is not news).
-            if ((Hold != null && Hold()) || Online.OnlineMenuScreen.AnyOpen)
+            // online-rooms-6: banners only in a live match view (never over a menu or the loading screen).
+            if ((Hold != null && Hold()) || !Flow.GameFlow.LiveMatchView)
             {
                 Queue.Postpone(now);
                 _wallVersion = -1;   // the wall clock restarts when the banner enters fresh after the takeover
