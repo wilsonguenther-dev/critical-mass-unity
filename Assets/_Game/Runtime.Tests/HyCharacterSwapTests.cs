@@ -189,7 +189,6 @@ namespace CriticalMass.Runtime.Tests
             Assert.IsNotNull(cat, "no ArtCatalog in Resources");
             var keys = new List<string>(HyKeys().Where(k => ArtMapping.Spec(k) != null && ArtMapping.Spec(k).Kind == ArtKind.Character));
             keys.Insert(0, ArtMapping.Builder);   // KayKit-joint reference, first: its hips rest is the clips' rest
-            Vector3 kkHips = Vector3.zero;
             var bad = new List<string>();
             var rep = new System.Text.StringBuilder();
             foreach (string key in keys)
@@ -206,39 +205,44 @@ namespace CriticalMass.Runtime.Tests
                     Transform tr = go.GetComponentsInChildren<Transform>(true).FirstOrDefault(t => t.name == "toes.r");
                     if (hero == null || hips == null || tl == null || tr == null) { bad.Add(key + ": no Hero/hips/toes"); continue; }
                     Vector3 hipsRest = hips.localPosition;
-                    if (key == ArtMapping.Builder) kkHips = hipsRest;
-                    float ratio = spec.StrideScale > 0 ? spec.StrideScale : 1f;
-                    float restLow = LowestY(go.transform, hero);
-                    rep.Append($"{key}: rest lowest vertex {restLow:0.000}, hips rest local {hipsRest.x:0.000},{hipsRest.y:0.000},{hipsRest.z:0.000}, root scale {go.transform.lossyScale.y:0.###}\n");
+                    bool hy = key != ArtMapping.Builder;
+                    bool[] foot = FootMask(hero);
+                    BindRetarget rt = spec.RetargetToBind ? BindRetarget.Create(hero, spec.StrideScale, ArtMapping.KaykitDeformBoneNames) : null;
+                    float restLow = LowestY(go.transform, hero, foot);
+                    rep.Append($"{key}: rest lowest foot vertex {restLow:0.000}, hips rest {hipsRest.y:0.000}, retarget {(rt != null ? $"on (largest bone correction {rt.MaxFixDeg:0.0} deg)" : "off")}\n");
                     foreach (string c in new[] { ArtMapping.Idle, ArtMapping.Walk, ArtMapping.Run })
                     {
                         AnimationClip clip = e.Clip(c);
                         if (clip == null) { bad.Add($"{key} {c}: no clip"); continue; }
                         const int N = 97;
-                        float lo = float.MaxValue, hi = float.MinValue, loB = float.MaxValue, hiB = float.MinValue;
+                        float lo = float.MaxValue, hi = float.MinValue, loR = float.MaxValue, hiR = float.MinValue;
                         var pl = new Vector3[N + 1]; var pr = new Vector3[N + 1];
                         for (int k = 0; k <= N; k++)
                         {
                             clip.SampleAnimation(go, clip.length * k / N);
-                            float y = LowestY(go.transform, hero);
+                            float y = LowestY(go.transform, hero, foot);
                             lo = Mathf.Min(lo, y); hi = Mathf.Max(hi, y);
+                            if (rt != null)
+                            {
+                                rt.Apply();   // exactly what ModelView.Evaluate does in the game
+                                y = LowestY(go.transform, hero, foot);
+                                loR = Mathf.Min(loR, y); hiR = Mathf.Max(hiR, y);
+                            }
                             pl[k] = go.transform.InverseTransformPoint(tl.position);
                             pr[k] = go.transform.InverseTransformPoint(tr.position);
-                            hips.localPosition = hipsRest + (hips.localPosition - kkHips) * ratio;   // what-if: hips as a scaled delta
-                            float yB = LowestY(go.transform, hero);
-                            loB = Mathf.Min(loB, yB); hiB = Mathf.Max(hiB, yB);
                         }
-                        clip.SampleAnimation(go, 0f);
-                        Vector3 hips0 = hips.localPosition;
-                        float err = Mathf.Max(Mathf.Abs(lo), Mathf.Abs(hi));
-                        string line = $"  {c} ({clip.length:0.00} s): lowest vertex per frame {lo:0.000}..{hi:0.000} (worst |err| {err:0.000}), hips@0 {hips0.x:0.000},{hips0.y:0.000},{hips0.z:0.000}; hips as scaled delta: {loB:0.000}..{hiB:0.000}";
-                        if (err > MaxGroundError) bad.Add($"{key} {c}: feet off the ground by up to {err:0.000} (lowest vertex {lo:0.000}..{hi:0.000})");
+                        float gLo = rt != null ? loR : lo, gHi = rt != null ? hiR : hi;
+                        string line = $"  {c} ({clip.length:0.00} s): lowest foot vertex per frame, as played {gLo:0.000}..{gHi:0.000}" + (rt != null ? $" (without retarget {lo:0.000}..{hi:0.000})" : "");
+                        // Idle and Walk always have a foot down: every frame's lowest foot vertex is on the ground. Run has a
+                        // flight phase, so only its contact (the lowest frame) must be on the ground.
+                        float err = c == ArtMapping.Run ? Mathf.Abs(gLo) : Mathf.Max(Mathf.Abs(gLo), Mathf.Abs(gHi));
+                        if (hy && err > MaxGroundError) bad.Add($"{key} {c}: feet off the ground by up to {err:0.000} (lowest foot vertex {gLo:0.000}..{gHi:0.000})");
                         if (c != ArtMapping.Idle)
                         {
                             float v = ClipFacts.GroundSpeed(c, c == ArtMapping.Run ? 4.57f : 0.86f) * (spec.StrideScale > 0 ? spec.StrideScale : 1f);
                             float slide = Slide(pl, pr, clip.length, v, 8);
                             line += $", ground speed {v:0.00} m/s, planted slide {slide:0.000} u/u";
-                            if (slide > MaxClipSlide) bad.Add($"{key} {c}: planted foot slides {slide:0.000} u/u at {v:0.00} m/s");
+                            if (hy && slide > MaxClipSlide) bad.Add($"{key} {c}: planted foot slides {slide:0.000} u/u at {v:0.00} m/s");
                         }
                         rep.Append(line).Append('\n');
                     }
@@ -249,13 +253,27 @@ namespace CriticalMass.Runtime.Tests
             Assert.IsEmpty(bad, string.Join("\n", bad) + "\n---\n" + rep);
         }
 
-        static float LowestY(Transform root, SkinnedMeshRenderer r)
+        static bool[] FootMask(SkinnedMeshRenderer r)
+        {
+            BoneWeight[] w = r.sharedMesh.boneWeights;
+            Transform[] bones = r.bones;
+            var mask = new bool[w.Length];
+            for (int i = 0; i < w.Length; i++)
+            {
+                Transform b = w[i].boneIndex0 >= 0 && w[i].boneIndex0 < bones.Length ? bones[w[i].boneIndex0] : null;
+                mask[i] = b != null && (b.name.StartsWith("foot.") || b.name.StartsWith("toes."));
+            }
+            return mask;
+        }
+
+        static float LowestY(Transform root, SkinnedMeshRenderer r, bool[] mask)
         {
             var baked = new Mesh();
             r.BakeMesh(baked, true);
             Matrix4x4 m = root.worldToLocalMatrix * Matrix4x4.TRS(r.transform.position, r.transform.rotation, Vector3.one);
             float lo = float.MaxValue;
-            foreach (Vector3 v in baked.vertices) lo = Mathf.Min(lo, m.MultiplyPoint3x4(v).y);
+            Vector3[] vs = baked.vertices;
+            for (int i = 0; i < vs.Length; i++) if (mask == null || i >= mask.Length || mask[i]) lo = Mathf.Min(lo, m.MultiplyPoint3x4(vs[i]).y);
             UnityEngine.Object.DestroyImmediate(baked);
             return lo;
         }

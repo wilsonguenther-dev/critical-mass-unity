@@ -52,6 +52,9 @@ namespace CriticalMass.Runtime.View.Art
         /// keep per-class joints under the shared KayKit clips (the HY swaps): the locomotion stride scales by it so the
         /// planted foot holds. 1 for every model on the plain KayKit joints.</summary>
         public float StrideScale = 1f;
+        /// <summary>The model's mesh is bound in a pose that differs from its armature rest (HY Farmer): the view retargets
+        /// the shared clips onto the bind pose (ModelView.BindRetarget), with the hips motion scaled by StrideScale.</summary>
+        public bool RetargetToBind;
         /// <summary>Painted face decal (PNG next to the FBX, UV0 of Meshes[0]), or null.</summary>
         public string FaceTexture;
         /// <summary>-1: the decal is mixed over the main material (every face that shows no face maps to a transparent
@@ -102,6 +105,12 @@ namespace CriticalMass.Runtime.View.Art
         public const string Warrior = "Warrior";
         public const string Miner = "Miner";
         public const string Farmer = "Farmer";
+        /// <summary>The KayKit skeleton's deform bones (same list as the editor's clip postprocessor), for BindRetarget.</summary>
+        public static readonly HashSet<string> KaykitDeformBoneNames = new HashSet<string>(System.StringComparer.Ordinal)
+        {
+            "spine", "chest", "head", "upperarm.l", "lowerarm.l", "wrist.l", "hand.l", "upperarm.r", "lowerarm.r", "wrist.r", "hand.r",
+            "upperleg.l", "lowerleg.l", "foot.l", "toes.l", "upperleg.r", "lowerleg.r", "foot.r", "toes.r",
+        };
         public const string Demolitions = "Demolitions";
         public const string Builder = "Builder";
         public const string Healer = "Healer";
@@ -309,7 +318,7 @@ namespace CriticalMass.Runtime.View.Art
                 Bones = 41, ClipSource = "Assets/_Game/Art/Characters/KayKit_Clips.fbx",
                 Meshes = new[] { "Farmer_Hero", "Farmer_LOD0", "Farmer_LOD1", "Farmer_Shadow" }, MaskCodes = new[] { 0, 2, 8 },
                 OutlinePx = CharacterHullPx, Rim = 0.6f, Authored = FarmerAzure, Crimson = FarmerCrimson, Height = 2.0f,
-                VertexColourFace = true, StrideScale = 0.714f, ArtYawDeg = 180f },   // HY (2026-11-13; legs 0.267 vs KayKit 0.374 hip to ankle); pre-HY: OutlineWeights Farmer_OutlineW.json + FaceTexture Farmer_Face.png (Farmer/_fallback~)
+                VertexColourFace = true, StrideScale = 0.714f, RetargetToBind = true, ArtYawDeg = 180f },   // HY (2026-11-13; legs 0.267 vs KayKit 0.374 hip to ankle); pre-HY: OutlineWeights Farmer_OutlineW.json + FaceTexture Farmer_Face.png (Farmer/_fallback~)
             // Art landing (2026-11-12): the three new classes, LOD files from art/fighter-lods d536d30 (weapons folded into
             // every level). Each body carries CM_Toon plus CM_FaceDecal on slot 1, the Miner's decal method (class READMEs).
             new ModelSpec { Key = Demolitions, AssetPath = "Assets/_Game/Art/Demolitions/Demolitions.fbx", Kind = ArtKind.Character, Rigged = true,

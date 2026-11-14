@@ -4,6 +4,76 @@ using UnityEngine;
 using UnityEngine.Animations;
 using UnityEngine.Playables;
 
+    /// <summary>
+    /// rigs-2 (2026-11-13): per-class retarget of the shared KayKit clips onto a model whose BIND pose differs from its
+    /// armature rest (the HY Farmer: the mesh is bound in its own A-pose while the armature rest carries the KayKit joints).
+    /// Unity applies clip rotations as absolute local rotations, i.e. relative to the KayKit rest; Blender applies them
+    /// relative to each bone's rest. This turns each deform bone's animated rotation into "bind pose times the clip's
+    /// motion from the KayKit rest" (local = bind * rest^-1 * animated) and the hips translation into the bind position
+    /// plus the clip's hips motion scaled by the class's leg ratio. Applied after every graph evaluation; every bone it
+    /// touches is written by the graph on each evaluation, so it never compounds.
+    /// </summary>
+    public sealed class BindRetarget
+    {
+        readonly Transform[] _bones;
+        readonly Quaternion[] _fix;
+        readonly Transform _hips;
+        readonly Vector3 _hipsBind, _hipsRest;
+        readonly float _ratio;
+        /// <summary>Largest per-bone correction in degrees (tests, diagnostics).</summary>
+        public readonly float MaxFixDeg;
+
+        BindRetarget(Transform[] bones, Quaternion[] fix, Transform hips, Vector3 hipsBind, Vector3 hipsRest, float ratio, float maxDeg)
+        { _bones = bones; _fix = fix; _hips = hips; _hipsBind = hipsBind; _hipsRest = hipsRest; _ratio = ratio; MaxFixDeg = maxDeg; }
+
+        /// <summary>Build from a model still in its armature rest pose (before any clip is applied). Null when the hero
+        /// renderer has no bind poses.</summary>
+        public static BindRetarget Create(SkinnedMeshRenderer hero, float legRatio, ICollection<string> deformBones)
+        {
+            if (hero == null || hero.sharedMesh == null) return null;
+            Transform[] bones = hero.bones;
+            Matrix4x4[] bp = hero.sharedMesh.bindposes;
+            if (bones == null || bp == null || bp.Length != bones.Length) return null;
+            var world = new Dictionary<Transform, Matrix4x4>();
+            for (int i = 0; i < bones.Length; i++)
+                if (bones[i] != null) world[bones[i]] = hero.transform.localToWorldMatrix * bp[i].inverse;
+            var list = new List<Transform>();
+            var fix = new List<Quaternion>();
+            Transform hips = null;
+            Vector3 hipsBind = Vector3.zero, hipsRest = Vector3.zero;
+            float maxDeg = 0f;
+            foreach (KeyValuePair<Transform, Matrix4x4> kv in world)
+            {
+                Transform b = kv.Key;
+                bool isHips = b.name == "hips";
+                if (!isHips && !deformBones.Contains(b.name)) continue;
+                Transform p = b.parent;
+                if (p == null) continue;
+                Matrix4x4 pw = world.TryGetValue(p, out Matrix4x4 m) ? m : p.localToWorldMatrix;
+                Matrix4x4 local = pw.inverse * kv.Value;
+                Quaternion bindLocal = local.rotation;
+                Quaternion f = bindLocal * Quaternion.Inverse(b.localRotation);
+                maxDeg = Mathf.Max(maxDeg, Quaternion.Angle(Quaternion.identity, f));
+                list.Add(b);
+                fix.Add(f);
+                if (isHips)
+                {
+                    hips = b;
+                    hipsRest = b.localPosition;
+                    Vector4 pos = local.GetColumn(3);   // in the parent's local units (pw carries the parent's scale)
+                    hipsBind = new Vector3(pos.x, pos.y, pos.z);
+                }
+            }
+            return new BindRetarget(list.ToArray(), fix.ToArray(), hips, hipsBind, hipsRest, legRatio > 0f ? legRatio : 1f, maxDeg);
+        }
+
+        public void Apply()
+        {
+            for (int i = 0; i < _bones.Length; i++) _bones[i].localRotation = _fix[i] * _bones[i].localRotation;
+            if (_hips != null) _hips.localPosition = _hipsBind + (_hips.localPosition - _hipsRest) * _ratio;
+        }
+    }
+
 namespace CriticalMass.Runtime.View.Art
 {
     /// <summary>
@@ -120,6 +190,9 @@ namespace CriticalMass.Runtime.View.Art
         public int Evaluations { get; private set; }
         public int SkippedEvaluations { get; private set; }
 
+        /// <summary>Per-class clip retarget onto the bind pose (ModelSpec.RetargetToBind), or null.</summary>
+        public BindRetarget Retarget { get; private set; }
+
         public ModelView(ArtEntry entry, Transform parent, string name)
         {
             Entry = entry;
@@ -169,6 +242,9 @@ namespace CriticalMass.Runtime.View.Art
             _upperClips = new AnimationClipPlayable[0];
             _upperW = new float[0];
             if (n == 0) return;
+            if (Spec != null && Spec.RetargetToBind && Spec.Meshes != null && Spec.Meshes.Length > 0)
+                foreach (SkinnedMeshRenderer r in Root.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+                    if (r.name == Spec.Meshes[0]) { Retarget = BindRetarget.Create(r, Spec.StrideScale, ArtMapping.KaykitDeformBoneNames); break; }
 
             _animator = Root.GetComponent<Animator>();
             if (_animator == null) _animator = Root.AddComponent<Animator>();
@@ -499,6 +575,7 @@ namespace CriticalMass.Runtime.View.Art
             }
             if (!evaluateGraph) return false;
             _graph.Evaluate(0f);
+            Retarget?.Apply();
             return true;
         }
 
