@@ -785,7 +785,12 @@ namespace CriticalMass.Sim.Bots
             }
 
             ml = Mv.X * Mv.X + Mv.Z * Mv.Z;
-            if (calm && !intent)
+            // fix/movement-shiver-4: the calm push rule is for the two places it was made for, a settled hill holder and a
+            // fighter at its stop. Every other bot (a gatherer at its node, a carrier, an escort, an idle bot in a gap) keeps the
+            // old full-step separation, so it gets out of the way of a walker the way it did before batch 10.
+            bool calmPush = calm && !intent &&
+                            ((a.AiState == AiState.HoldHill && st.Settled[id] != 0) || a.AiState == AiState.Fight);
+            if (calmPush)
             {
                 // fix/movement-shiver-2: a separation-only push (a settled holder, a bot at its stop) keeps its size: the old
                 // code blew any push over 0.01 up to a full-speed step, so two allies nudging each other stepped back and forth

@@ -2,6 +2,7 @@ using System;
 using CriticalMass.Sim.Bots;
 using CriticalMass.Sim.Config;
 using CriticalMass.Sim.Core;
+using CriticalMass.Sim.Grid;
 using CriticalMass.Sim.Tests.Harness;
 using NUnit.Framework;
 
@@ -252,6 +253,101 @@ namespace CriticalMass.Sim.Tests
                 Assert.Greater(f.MoveX * f.MoveX + f.MoveZ * f.MoveZ, 0.25, "steps toward the hidden target, call " + k);
                 Assert.AreEqual(1, st.WantMove[bot], "and counts as wanting to move (the stuck detector can act)");
             }
+        }
+
+        /// <summary>Flow-field walker for actor 0 (as the trial autopilot walks): toward a ring of goals around (tx, tz).</summary>
+        private static FlowField WalkRing(World w, FlowField f, ref int goalKey, double tx, double tz, double ringR, InputFrame frame)
+        {
+            int key = (int)Math.Floor(tx) * 1000 + (int)Math.Floor(tz);
+            if (f == null || key != goalKey)
+            {
+                goalKey = key;
+                var goals = new PointXZ[12];
+                for (int i = 0; i < goals.Length; i++)
+                {
+                    double ang = i * (2 * Math.PI / goals.Length);
+                    goals[i] = new PointXZ(tx + Math.Cos(ang) * ringR, tz + Math.Sin(ang) * ringR);
+                }
+                f = FlowField.ComputeFlowField(w.Map, goals, f);
+            }
+            if (FlowField.SampleFlowDir(f, w.Map, w.X[0], w.Z[0], out double dx, out double dz))
+            {
+                frame.MoveX = dx;
+                frame.MoveZ = dz;
+            }
+            else
+            {
+                double ex = tx - w.X[0], ez = tz - w.Z[0], len = Math.Sqrt(ex * ex + ez * ez);
+                if (len > 1e-6) { frame.MoveX = ex / len; frame.MoveZ = ez / len; }
+            }
+            return f;
+        }
+
+        /// <summary>
+        /// fix/movement-shiver-4 (TrialTests: the autopilot stalled at the hill ring's west gap with gather Active on round 3):
+        /// a lone walker starting on the hill goes out through the ring to the nearest biomass node, gathers, and brings it to
+        /// the shrine, while the 5v5 bots play the match around it. Allies plugging a gap, or any bot freezing in the way,
+        /// fails it. Its health is refilled each tick so only bodies and steering are under test. Bound: 120 sim seconds.
+        /// </summary>
+        [TestCase(1337)]
+        [TestCase(7)]
+        public void ALoneWalkerGetsOffTheHillGathersAndDeliversThroughTheBotsWithin120S(int seed)
+        {
+            World w = NewWorld(true, 5, seed);
+            w.Config.HatchSeconds = 1e9; // the egg stays an egg: deliveries count (read live each tick)
+            InputFrame scratch = SimInput.EmptyInput();
+            InputFrame frame = SimInput.EmptyInput();
+            for (int t = 0; t < 600; t++) MatchTick.Advance(w, null, scratch); // 20 s: the bots spread out and take the hill
+            Pin(w, 0, w.Map.Hill.X + 0.5, w.Map.Hill.Z + 0.5);
+            FlowField field = null;
+            int goalKey = int.MinValue;
+            ClassConfig cc = w.Config.Class(w.Actors[0].Cls);
+            double start = w.Match.Time;
+            double before = w.Match.Delivered[(int)w.Actors[0].Team].Biomass;
+            bool gathered = false, delivered = false;
+            for (int t = 0; t < 120 * 30 && !delivered && w.Match.Phase != MatchPhase.Ended; t++)
+            {
+                if (w.Actors[0].Alive) w.Actors[0].Hp = w.Actors[0].MaxHp; // never knocked out: only bodies and steering are tested
+                frame.MoveX = frame.MoveZ = 0;
+                frame.Interact = false;
+                frame.AimX = frame.AimZ = double.NaN;
+                Actor a = w.Actors[0];
+                if (a.CarryAmount <= 0)
+                {
+                    int best = -1;
+                    double bd = double.PositiveInfinity;
+                    for (int i = 0; i < w.Nodes.Length; i++)
+                    {
+                        ResourceNode n = w.Nodes[i];
+                        if (n.Kind != NodeKind.Biomass || n.Charges <= 0) continue;
+                        double d = (n.X - w.X[0]) * (n.X - w.X[0]) + (n.Z - w.Z[0]) * (n.Z - w.Z[0]);
+                        if (d < bd) { bd = d; best = i; }
+                    }
+                    if (best >= 0)
+                    {
+                        ResourceNode n = w.Nodes[best];
+                        double r = w.Config.Resources.NodeInteractRange + cc.Radius - 0.3;
+                        if (bd > r * r) field = WalkRing(w, field, ref goalKey, n.X, n.Z, 1.0, frame);
+                        else frame.Interact = true;
+                    }
+                }
+                else
+                {
+                    gathered = true;
+                    ShrineDef sh = w.Map.Shrine;
+                    double r = w.Config.KaijuFeed.ShrineInteractRange - 0.4;
+                    double d = (sh.X - w.X[0]) * (sh.X - w.X[0]) + (sh.Z - w.Z[0]) * (sh.Z - w.Z[0]);
+                    if (d > r * r) field = WalkRing(w, field, ref goalKey, sh.X, sh.Z, 2.5, frame);
+                    else frame.Interact = true;
+                }
+                MatchTick.Advance(w, frame, scratch);
+                delivered = w.Match.Delivered[(int)w.Actors[0].Team].Biomass > before;
+            }
+            Console.WriteLine("{\"item\":\"lone walker\",\"seed\":" + seed + ",\"gathered\":" + (gathered ? "true" : "false") +
+                              ",\"delivered\":" + (delivered ? "true" : "false") + ",\"seconds\":" + (w.Match.Time - start).ToString("F1") +
+                              ",\"at\":\"" + w.X[0].ToString("F1") + "," + w.Z[0].ToString("F1") + "\"}");
+            Assert.IsTrue(gathered, "gathered within 120 s (stuck at " + w.X[0].ToString("F1") + ", " + w.Z[0].ToString("F1") + ")");
+            Assert.IsTrue(delivered, "delivered within 120 s (stuck at " + w.X[0].ToString("F1") + ", " + w.Z[0].ToString("F1") + ")");
         }
 
         [Test]

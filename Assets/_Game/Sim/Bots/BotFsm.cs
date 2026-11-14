@@ -108,6 +108,7 @@ namespace CriticalMass.Sim.Bots
         private static void Perceive(World w, BotsState st, int id, double fightRange, BotSkillConfig sk)
         {
             bool focus = sk != null && sk.FocusCarriers;
+            bool seeOnly = Phys.On(w, w.Config.Physics.BotCalmSteer) && Phys.On(w, w.Config.Physics.WallsBlockHits);
             double bestScore = double.PositiveInfinity;
             Actor a = w.Actors[id];
             double x = w.X[id];
@@ -140,6 +141,11 @@ namespace CriticalMass.Sim.Bots
                 if (d2 <= FightRange * FightRange) P.Within6++;
                 if (d2 <= UrgentRange * UrgentRange) P.Within3++;
                 if (d2 > fr2) continue;
+                // fix/movement-shiver-4 (BotCalmSteer): a fighter picks only an enemy it can see. Round 3 sent a fighter whose
+                // route gave no step straight at its target, so a target behind the hill ring wall kept bots pressed on the wall
+                // and in its gaps (the trial autopilot then sat in the west gap at (46, 41) and never reached its node). A hidden
+                // enemy still counts in the crowd numbers above.
+                if (seeOnly && !SegmentClear.Clear(w.Map, x, z, w.X[j], w.Z[j])) continue;
                 if (focus)
                 {
                     // DG-21 Hard: carriers and hurt enemies first (BotSkill.FocusScore), lowest id on a tie.
@@ -260,6 +266,7 @@ namespace CriticalMass.Sim.Bots
             int ccz = JsMath.FloorToInt(z);
             double tx = x;
             double tz = z;
+            bool calm = Phys.On(w, w.Config.Physics.BotCalmSteer);
             for (int tries = 0; tries < 12; tries++)
             {
                 double ang = Rng.NextFloat(st.Rng) * Math.PI * 2;
@@ -267,6 +274,9 @@ namespace CriticalMass.Sim.Bots
                 int cx = JsMath.FloorToInt(x + JsMath.Cos(ang) * r);
                 int cz = JsMath.FloorToInt(z + JsMath.Sin(ang) * r);
                 if ((cx == ccx && cz == ccz) || !MapGrid.IsWalkable(w.Map, cx, cz)) continue;
+                // fix/movement-shiver-4 (BotCalmSteer): only a spot it can walk to in a straight line. A walkable cell on the far
+                // side of a thin wall sent the unstick walk into the wall for its whole second (actor 28 Pressed at the ring).
+                if (calm && BotSteer.FirstBlockedCell(w.Map, x, z, cx + 0.5, cz + 0.5) >= 0) continue;
                 tx = cx + 0.5;
                 tz = cz + 0.5;
                 break;
