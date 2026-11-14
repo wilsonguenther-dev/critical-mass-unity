@@ -58,3 +58,6 @@ __pycache__/
 !/tools/ci/**/*.csproj
 /tools/ci/**/bin/
 /tools/ci/**/obj/
+
+# online-rooms-2: the console online peer is a real project file
+!tools/online/**/*.csproj

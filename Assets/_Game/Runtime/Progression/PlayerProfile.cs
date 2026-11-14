@@ -111,7 +111,7 @@ namespace CriticalMass.Runtime.Progression
             Loadouts = loadouts.ToArray();
         }
 
-        /// <summary>Upper-case letters, digits, space, '-' and '_'; at most MaxNameLength; empty = DefaultName.</summary>
+        /// <summary>Upper-case letters, digits, space, '-' and '_'; at most MaxNameLength; empty or a blocked word = DefaultName.</summary>
         public static string CleanName(string s)
         {
             if (string.IsNullOrEmpty(s)) return DefaultName;
@@ -126,7 +126,8 @@ namespace CriticalMass.Runtime.Progression
                 if (sb.Length >= MaxNameLength) break;
             }
             string r = sb.ToString().TrimEnd();
-            return r.Length == 0 ? DefaultName : r;
+            // online-rooms-2: the name other players see online, so it passes the same all-ages word filter as chat.
+            return r.Length == 0 || CriticalMass.Net.ChatFilter.ContainsBlocked(r) ? DefaultName : r;
         }
 
         public string ToJson() => JsonUtility.ToJson(this, true);

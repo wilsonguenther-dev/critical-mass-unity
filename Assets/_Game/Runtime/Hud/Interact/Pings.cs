@@ -176,7 +176,7 @@ namespace CriticalMass.Runtime.Hud.Interact
             // Mechanics depth (U-067): with the rules lane compiled in and on, the wheel WRITES the sim input
             // (InputFrame.PingKind = call + 1, PingX, PingZ for one tick); the book mirrors the sim's Ping event, the sim's
             // PingRefused puts the wait in the ping feed, and bots answer. Only the local human's pings go through the sim.
-            if (owner == 0 && View.Mechanics.DepthRead.PingsOn(w))
+            if (owner == LocalSeat.Actor && View.Mechanics.DepthRead.PingsOn(w))
                 return View.Mechanics.DepthInputLatch.QueuePing((int)kind, x, z);
             double now = w.Match.Time;
             int place = PingWords.NearestPlace(w, x, z);

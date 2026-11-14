@@ -21,7 +21,13 @@ namespace CriticalMass.Sim.Core
         }
 
         /// <summary>Knock velocity kept per tick at this SimHz.</summary>
-        public static double DecayPerTick(GameConfig c) => Math.Pow(c.Physics.KnockDecayPer30Hz, Durations.ReferenceHz / c.SimHz);
+        // online-rooms-2: at the shipped 30 Hz the exponent is exactly 1 and the decay is the config value itself, with no
+        // platform pow call at all (pow is the C library's and may differ in the last bit between macOS and Windows).
+        public static double DecayPerTick(GameConfig c)
+        {
+            double e = Durations.ReferenceHz / c.SimHz;
+            return e == 1.0 ? c.Physics.KnockDecayPer30Hz : Math.Pow(c.Physics.KnockDecayPer30Hz, e);
+        }
 
         /// <summary>The distance target actually travels for a knock of dist (u, mass 1) from (srcX, srcZ): / mass, x shield share from the front.</summary>
         public static double Effective(World w, int target, double dist, double srcX, double srcZ)

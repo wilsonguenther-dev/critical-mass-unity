@@ -105,12 +105,12 @@ namespace CriticalMass.Runtime.Camera
             UnityEngine.Camera cam = UnityEngine.Camera.main;
             bool covered = false;
             Vector3 chest = Vector3.zero;
-            if (w != null && w.ActorCount > 0 && cam != null && w.Actors[0].Alive)
+            if (w != null && w.ActorCount > 0 && cam != null && w.Actors[LocalSeat.Actor].Alive)
             {
                 MapDef map = w.Map;
                 double a = Driver.Alpha;
-                double px = w.PrevX[0] + (w.X[0] - w.PrevX[0]) * a;
-                double pz = w.PrevZ[0] + (w.Z[0] - w.PrevZ[0]) * a;
+                double px = w.PrevX[LocalSeat.Actor] + (w.X[LocalSeat.Actor] - w.PrevX[LocalSeat.Actor]) * a;
+                double pz = w.PrevZ[LocalSeat.Actor] + (w.Z[LocalSeat.Actor] - w.PrevZ[LocalSeat.Actor]) * a;
                 double py = GroundHeight.At(map, px, pz);
                 Vector3 cp = cam.transform.position;
                 SimSpace.ToSim(cp, out double cx, out double cz);
@@ -122,7 +122,7 @@ namespace CriticalMass.Runtime.Camera
                     Material m = SeeThroughMaterial;
                     if (m != null)
                     {
-                        m.SetColor(ColorId, CMTokens.Team(w.Actors[0].Team));
+                        m.SetColor(ColorId, CMTokens.Team(w.Actors[LocalSeat.Actor].Team));
                         m.SetColor(RimId, CMTokens.WarmCream.Color);
                     }
                 }

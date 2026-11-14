@@ -23,5 +23,13 @@ namespace CriticalMass.Sim.Core
         /// telegraph lasts its minimum on screen whatever the pace. The match setup passes its pace choice here.
         /// </summary>
         public double Pace;
+        /// <summary>
+        /// online-rooms-2: actor ids, other than actor 0, that a second, third... human plays (an online room). Null or empty =
+        /// single player exactly as before (actor 0 is the only IsHuman actor). Ids index the roster: the HumanTeam holds
+        /// ids 0..n-1, the other team n..2n-1. Ids outside the roster are ignored.
+        /// </summary>
+        public int[] ExtraHumans;
+        /// <summary>online-rooms-2: the class each ExtraHumans entry picked in the room (same length; missing = the roster's class).</summary>
+        public ClassId[] ExtraHumanClasses;
     }
 }

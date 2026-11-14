@@ -190,7 +190,7 @@ namespace CriticalMass.Runtime.Spectator
             if (w == null || w.ActorCount <= 0) return;
             bool watching = Mode != null && Mode.Active;
             bool paused = Mode != null && Mode.Input != null && Mode.Input.State.Paused;
-            bool down = !w.Actors[0].Alive;
+            bool down = !w.Actors[LocalSeat.Actor].Alive;
             bool offer = !watching && down && w.Match.Phase == MatchPhase.Playing && !paused && !SimDriverBehaviour.CaptureMode &&
                          GetComponent<TitleScreen>() == null && !(CriticalMass.Runtime.Flow.GameFlow.State == CriticalMass.Runtime.Flow.FlowState.Results);   // batch 5: never under the results
             if (!watching && !offer && _canvas == null) return;
@@ -372,7 +372,7 @@ namespace CriticalMass.Runtime.Spectator
                     _portrait.Set(UiIcons.Portrait[(int)a.Cls, t], _tier);
                     HudText.Set(_name, ActorName(a.Team, a.Cls));
                     _name.color = CMTokens.TeamInk(a.Team);
-                    HudText.Set(_sub, id == 0 ? "YOUR FIGHTER, ON AUTOPILOT" : a.Team == TeamId.Azure ? "AZURE TEAM" : "CRIMSON TEAM");
+                    HudText.Set(_sub, id == LocalSeat.Actor ? "YOUR FIGHTER, ON AUTOPILOT" : a.Team == TeamId.Azure ? "AZURE TEAM" : "CRIMSON TEAM");
                     _hpBar.SetFill(CMTokens.Team(a.Team));
                     _hpBar.gameObject.SetActive(true);
                 }

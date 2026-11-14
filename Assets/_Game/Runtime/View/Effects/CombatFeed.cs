@@ -175,7 +175,7 @@ namespace CriticalMass.Runtime.View.Effects
             bool valid = a >= 0 && a < w.ActorCount;
             _e.Team = valid ? w.Actors[a].Team : TeamId.Azure;
             _e.Cls = valid ? w.Actors[a].Cls : ClassId.Warrior;
-            _e.Local = a == 0 || b == 0;
+            _e.Local = a == LocalSeat.Actor || b == LocalSeat.Actor;
             _e.Cause = DamageCause.None;
         }
 
@@ -246,7 +246,7 @@ namespace CriticalMass.Runtime.View.Effects
                 case SimEventType.KaijuDamaged:
                     // (X, Z) = the contact point on the Kaiju toward the attacker (A), Value = damage dealt.
                     Begin(FxKind.KaijuHit, w, -1, -1, ev.X, ev.Z, ev.Value);
-                    _e.Local = ev.A == 0;
+                    _e.Local = ev.A == LocalSeat.Actor;
                     return true;
                 case SimEventType.Respawn:
                     if (ev.A >= 0 && ev.A < _capacity) DeathTick[ev.A] = int.MinValue / 2;
@@ -261,7 +261,7 @@ namespace CriticalMass.Runtime.View.Effects
                     return true;
                 case SimEventType.KaijuMeleeWindup:
                     Begin(FxKind.KaijuRoar, w, -1, ev.A, w.Kaiju.X, w.Kaiju.Z, ev.Value);
-                    _e.Local = ev.A == 0;
+                    _e.Local = ev.A == LocalSeat.Actor;
                     return true;
                 case SimEventType.KaijuKO:
                     Begin(FxKind.KaijuKO, w, -1, ev.B, ev.X, ev.Z, 0);
