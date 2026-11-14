@@ -297,7 +297,7 @@ def bake_action(clip, act):
         if clip in ORDER_CLIPS:
             lo = min(SIDES, key=lambda q: K["A" + q].z)
             hi = "r" if lo == "l" else "l"
-            if K["A" + hi].z - K["A" + lo].z > 0.002 and targets[hi].z < targets[lo].z + ORDER_GAP:
+            if K["A" + hi].z - K["A" + lo].z > 0.0005 and targets[hi].z < targets[lo].z + ORDER_GAP:
                 targets[hi].z = targets[lo].z + ORDER_GAP
         lowered_frame = 0.0
         for it in range(3):
