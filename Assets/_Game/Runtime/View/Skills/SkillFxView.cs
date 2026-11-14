@@ -39,6 +39,7 @@ namespace CriticalMass.Runtime.View.Skills
             _ground = new FxMeshBuilder("Skill Fx Ground", GroundVerts, GroundVerts * 3);
             _solid = new FxMeshBuilder("Skill Fx Solid", SolidVerts, SolidVerts * 2);
             _air = new FxMeshBuilder("Skill Fx Air", AirVerts, AirVerts * 3);
+            _ground.ViewCulled = _air.ViewCulled = _solid.ViewCulled = true;   // follow-camera-2: low-view culling
             Shader sh = UnityEngine.Resources.Load<Shader>("CMFxUnlit");
             if (sh == null) sh = Shader.Find("CM/FxUnlit");
             if (sh == null) { enabled = false; return; }

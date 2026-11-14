@@ -89,8 +89,42 @@ namespace CriticalMass.Runtime.Camera
             if (_islands != null) Destroy(_islands);
         }
 
-        /// <summary>Follows the camera (position only: the dome is a skybox).</summary>
-        public void Place(Vector3 cameraPos) => transform.SetPositionAndRotation(cameraPos, Quaternion.identity);
+        /// <summary>Follows the camera (position only: the dome is a skybox). follow-camera-2: every HorizonCheckFrames it
+        /// looks for the world's own eye-level horizon (feat/world-horizon-1's "World Horizon" under WorldBeyond); while that
+        /// is present this backdrop's sky, clouds and far islands stay off, so the two never draw over each other.</summary>
+        public void Place(Vector3 cameraPos)
+        {
+            transform.SetPositionAndRotation(cameraPos, Quaternion.identity);
+            if (Time.frameCount < _nextCheck) return;
+            _nextCheck = Time.frameCount + HorizonCheckFrames;
+            var wb = FindAnyObjectByType<CriticalMass.Runtime.View.Atmosphere.WorldBeyond>();
+            SetOwnSky(!HorizonPresent(wb != null ? wb.transform : null));
+        }
+
+        public const int HorizonCheckFrames = 60;
+        public const string HorizonName = "World Horizon";
+        int _nextCheck;
+
+        /// <summary>True while this backdrop draws its own sky (no world horizon found).</summary>
+        public bool OwnSky { get; private set; } = true;
+
+        public void SetOwnSky(bool on)
+        {
+            if (on == OwnSky) return;
+            OwnSky = on;
+            foreach (GameObject p in _parts)
+                if (p != null && p.activeSelf != on) p.SetActive(on);
+        }
+
+        /// <summary>The world's horizon is built and showing somewhere under root (pure over the hierarchy; tests).</summary>
+        public static bool HorizonPresent(Transform root)
+        {
+            if (root == null) return false;
+            if (root.name == HorizonName) return root.gameObject.activeInHierarchy;
+            for (int i = 0; i < root.childCount; i++)
+                if (HorizonPresent(root.GetChild(i))) return true;
+            return false;
+        }
 
         static Color Hex(string h) => ColorUtility.TryParseHtmlString(h, out Color c) ? c : Color.magenta;
 
