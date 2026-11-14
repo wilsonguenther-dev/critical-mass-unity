@@ -501,6 +501,13 @@ namespace CriticalMass.Runtime.View.Anim
 
         // ------------------------------------------------------------------ upper body
 
+        /// <summary>
+        /// fix/hit-feel-4: the share of an action clip kept this frame: 1 on the upper layer; for a clip that would play on
+        /// the full body, 1 - the locomotion move weight, so an action never turns or freezes a moving fighter's legs.
+        /// </summary>
+        float FullBodyActionKeep(ModelView m, string clip) =>
+            clip == null || m.OnUpperLayer(clip) ? 1f : 1f - Locomotion.MoveWeight(_speed);
+
         float PoseUpper(ModelView m, World w, Actor actor, GameConfig cfg, int i, double alpha, double simTime, double dSim,
             CombatFx combat, bool hasFx, in ActorPoseFx fx, ref float twist)
         {
@@ -530,6 +537,11 @@ namespace CriticalMass.Runtime.View.Anim
                 if (actW <= 0f && t >= len - 1e-4) _actClip = null;
                 else
                 {
+                    // fix/hit-feel-4 (FacingSanityPlayTests, Demolitions): an action clip that is not on the upper layer
+                    // (the mine-plant PickUp crouch) goes to the FULL body, at 3x weight, so on a moving fighter it took the
+                    // legs off the stride: toes 93 degrees off the leg yaw. A moving fighter keeps the legs: the clip fades
+                    // out with the move weight (full strength standing still, gone at a run).
+                    actW *= FullBodyActionKeep(m, _actClip);
                     m.PoseUpper(_actClip, t, actW, false, _slot);
                     _lastActTime = t;
                     _lastActW = actW;
@@ -540,7 +552,7 @@ namespace CriticalMass.Runtime.View.Anim
             double pf = simTime - _prevAt;
             if (_prevClip != null && pf >= 0 && pf < AttackTiming.Retrigger)
             {
-                float f = _prevW * (float)(1 - pf / AttackTiming.Retrigger);
+                float f = _prevW * (float)(1 - pf / AttackTiming.Retrigger) * FullBodyActionKeep(m, _prevClip);
                 m.PoseUpper(_prevClip, _prevLoop ? _prevTime + pf : Math.Min(_prevTime + pf, m.ClipLength(_prevClip)), f, _prevLoop, 1 - _slot);
                 sum += f;
                 actW = Math.Max(actW, f);

@@ -459,6 +459,12 @@ namespace CriticalMass.Runtime.View.Art
             return true;
         }
 
+        /// <summary>
+        /// fix/hit-feel-4: the clip is on the upper-body layer (arms and chest only). False means PoseUpper would play it on
+        /// the full body, legs included.
+        /// </summary>
+        public bool OnUpperLayer(string clip) => clip != null && _hasUpper && _upperIndex.ContainsKey(clip);
+
         /// <summary>The upper layer's strength this frame (0 legs-and-arms locomotion only, 1 arms fully the upper clips).</summary>
         public float UpperWeight
         {
