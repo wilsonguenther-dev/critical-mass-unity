@@ -516,6 +516,9 @@ namespace CriticalMass.Runtime.View.Dressing
         // ---------------------------------------------------------------------------------------------- bridges
 
         /// <summary>Rope rails on the bridges: a post every second cell along each open side, a sagging rope per cell.</summary>
+        /// <summary>cand5-reds-1: how far a free rope end stops inside its own bridge cell (u).</summary>
+        public const double RopeEndInset = 0.06;
+
         static void Ropes(ArchMesh m, MapDef map, Func<int, int, byte> T, Func<int, int, double> Y, WallArchReport rep)
         {
             for (int cz = 0; cz < map.Height; cz++)
@@ -533,10 +536,17 @@ namespace CriticalMass.Runtime.View.Dressing
                     for (int s = 0; s < 1; s++)
                     {
                         var n = new Vector3(Dx[d], 0, Dz[d]);
-                        int a = m.Add(px - ux * 0.5, y + 0.78, pz - uz * 0.5, n, Rope), b = m.Add(px, y + 0.71, pz, n, Rope);
-                        int c = m.Add(px + ux * 0.5, y + 0.78, pz + uz * 0.5, n, Rope);
-                        int a2 = m.Add(px - ux * 0.5, y + 0.82, pz - uz * 0.5, n, Rope), b2 = m.Add(px, y + 0.75, pz, n, Rope);
-                        int c2 = m.Add(px + ux * 0.5, y + 0.82, pz + uz * 0.5, n, Rope);
+                        // cand5-reds-1 (top-down test: a rope end at (70.00, 2.02, 10.08) hung over cell (70, 10), ground 0): a
+                        // rope reached exactly to its bridge cell's corner, so at the bridge's end it sat on the boundary of
+                        // the lower ground next door, 2 u over it. A rope end that is not met by the next bridge cell's rope
+                        // now stops RopeEndInset inside its own cell; ropes still join seamlessly along the bridge.
+                        int ix = (int)Math.Round(ux), iz = (int)Math.Round(uz);
+                        double lo = T(cx - ix, cz - iz) == Cell.Bridge ? 0.5 : 0.5 - RopeEndInset;
+                        double hi = T(cx + ix, cz + iz) == Cell.Bridge ? 0.5 : 0.5 - RopeEndInset;
+                        int a = m.Add(px - ux * lo, y + 0.78, pz - uz * lo, n, Rope), b = m.Add(px, y + 0.71, pz, n, Rope);
+                        int c = m.Add(px + ux * hi, y + 0.78, pz + uz * hi, n, Rope);
+                        int a2 = m.Add(px - ux * lo, y + 0.82, pz - uz * lo, n, Rope), b2 = m.Add(px, y + 0.75, pz, n, Rope);
+                        int c2 = m.Add(px + ux * hi, y + 0.82, pz + uz * hi, n, Rope);
                         if (s == 0) { m.Quad(a, a2, b2, b); m.Quad(b, b2, c2, c); }
                         else { m.Quad(a, b, b2, a2); m.Quad(b, c, c2, b2); }
                     }
