@@ -64,7 +64,7 @@ real_file() {
 # this repo (Assets/_Game/Art/Characters/_source~/characters_hy, rig pass rig_hy.py), not the LOD pin's. The pin's copy
 # is the pre-HY fallback, kept in each folder's _fallback~; never copy it over the swap. The HY Kaiju adult is still staged
 # (Kaiju/_hy~, its own refit rig and clips baked from Kaiju.blend), so the pin's Kaiju_Adult.fbx is still the shipped one.
-HY_KEEP=" Characters/Warrior.fbx Farmer/Farmer.fbx "
+HY_KEEP=" Characters/Warrior.fbx "
 copy_art() {
   local src="$1" dst_dir="$2" pinned="$3"
   [[ -f "$src" ]] || { echo "art-sync: MISSING $src" >&2; return 1; }
