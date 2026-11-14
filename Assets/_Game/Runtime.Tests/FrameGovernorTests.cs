@@ -150,5 +150,20 @@ namespace CriticalMass.Runtime.Tests
             Assert.AreEqual(1024L * 1024 * 4, PerfOverlay.TextureBytes(1024, 1024, GraphicsFormat.R8G8B8A8_SRGB, 1, 1));
             Assert.AreEqual(1024L * 1024 * 4 * 4 / 3, PerfOverlay.TextureBytes(1024, 1024, GraphicsFormat.R8G8B8A8_SRGB, 11, 1));
         }
+
+        [Test]
+        public void TitleCapTripCanNeverCarryTheTimerIntoTheMatch()
+        {
+            // c378cac: 60 fps against the title's vsync-3 cap of 20 trips the guard; the match's cap is judged afresh.
+            var t = new TimedCapGuard();
+            for (int i = 0; i < 300; i++) t.Feed(1.0 / 60, FramePolicy.TitleCap, true, 60);
+            Assert.IsTrue(t.ForceTimed, "60 fps against a vsync-3 cap of 20: not holding");
+            t.Feed(1.0 / 60, 0, true, 60);
+            Assert.IsFalse(t.ForceTimed, "the match's cap is judged afresh");
+            Assert.AreEqual((1, -1), t.Settings(0, 60));
+            // and a smooth match after the title never trips it again
+            for (int i = 0; i < 1200; i++) t.Feed(1.0 / 60, 0, true, 60);
+            Assert.IsFalse(t.ForceTimed);
+        }
     }
 }
