@@ -90,7 +90,7 @@ def comps(nv, F):
         return components_np(nv, F)
 
 
-def find(V0, F0, arm_seed=None):
+def find(V0, F0, arm_seed=None, force_pose=None):
     notes = []
     V, F, _ = weld(V0, F0)
     z0 = V[:, 2].min()
@@ -152,7 +152,7 @@ def find(V0, F0, arm_seed=None):
             bandA = side_ok & (V[:, 2] > z0 + 0.20 * H) & (V[:, 2] < z0 + 0.52 * H)
             bandT = side_ok & (V[:, 2] > z0 + 0.40 * H) & (V[:, 2] < z0 + 0.75 * H)
             iA = np.argmax(np.where(bandA, V[:, 0] * sg, -1e9)); iT = np.argmax(np.where(bandT, V[:, 0] * sg, -1e9))
-            tpose = V[iT, 0] * sg > 1.25 * V[iA, 0] * sg
+            tpose = V[iT, 0] * sg > 1.25 * V[iA, 0] * sg if force_pose is None else force_pose == 'T'
             hc = V[iT] if tpose else V[iA]
             notes.append(f'arm {side}: {"T-pose" if tpose else "A-pose"} (lateral reach {V[iT, 0] * sg:.3f} m high band, {V[iA, 0] * sg:.3f} m low band)')
             # march along the arm: cut perpendicular to the current arm direction, step toward the body, re-aim
