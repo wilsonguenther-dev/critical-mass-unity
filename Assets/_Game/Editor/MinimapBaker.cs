@@ -12,9 +12,11 @@ namespace CriticalMass.Editor
 {
     /// <summary>
     /// Bakes the minimap from the sim's own map (SkybreakBasinMap with the default config) at the gameplay camera's yaw:
-    /// Resources/UI/Minimap/minimap@1x/2x/4x.png plus minimap.json (projection). Deterministic; re-run after any map change.
-    /// The EditMode test MinimapTests.BakedImageMatchesTheSimMap re-renders the 1x in memory and fails if the committed PNG
-    /// drifted from the map. Batch: -executeMethod CriticalMass.Editor.MinimapBaker.BakeAll
+    /// minimap.json (projection) and the sim-drawn reference image Resources/UI/Minimap/_source~/minimap-sim-ref@1x/2x/4x.png.
+    /// hud-art-1 (2026-11-13): the SHIPPED minimap@Nx.png is no longer this drawing; it is the real arena, rendered straight down
+    /// by CriticalMass.Editor.Flow.HudArtCaptureTool on this same projection and toon-simplified by _source~/minimap_world.py
+    /// (which reads the base pads from the sim reference). MinimapTests.BakedImageIsTheRealArenaOnTheSimMap fails if that image
+    /// stops matching the sim map. Batch: -executeMethod CriticalMass.Editor.MinimapBaker.BakeAll
     /// </summary>
     public static class MinimapBaker
     {
@@ -32,7 +34,8 @@ namespace CriticalMass.Editor
             {
                 Color32[] px = bake.Render(tier, out int w, out int h);
                 Texture2D t = MinimapBake.ToTexture(px, w, h);
-                File.WriteAllBytes(Path.Combine(Dir, "minimap@" + tier + "x.png"), t.EncodeToPNG());
+                Directory.CreateDirectory(Path.Combine(Dir, "_source~"));
+                File.WriteAllBytes(Path.Combine(Dir, "_source~", "minimap-sim-ref@" + tier + "x.png"), t.EncodeToPNG());
                 Object.DestroyImmediate(t);
             }
             MinimapProjection p = bake.Proj;

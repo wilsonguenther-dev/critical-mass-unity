@@ -81,6 +81,11 @@ namespace CriticalMass.Runtime.View.Mechanics
         public static string DropIncoming = "SUPPLY DROP INCOMING", DropLanded = "SUPPLY DROP LANDED", DropClaimed = "SUPPLY DROP CLAIMED", DropContested = "CONTESTED";
         public static string ClaimedTheDrop = " claimed the supply drop";
         public static string EggExposed = "THE EGG IS EXPOSED. EVERY DELIVERY COUNTS DOUBLE.", EggSealed = "THE EGG HAS SEALED";
+        /// <summary>hud-art-1: the timer pill's short line for the egg window. The full sentence ran under the clock
+        /// ("EVERY DELIVERY COUNTS DOUB0:10"); the banner still says it in full.</summary>
+        public static string EggExposedPill = "EGG EXPOSED: 2X DELIVERIES";
+        /// <summary>The longest line the timer pill shows; longer lines shrink to fit and never reach the clock.</summary>
+        public const int PillMaxChars = 28;
         public static string BridgeWarning = "A BRIDGE IS GIVING WAY", BridgeCollapsed = "BRIDGE DOWN", BridgeRepaired = "BRIDGE REBUILT";
         public static string RepairPrompt = "Builder: hold interact to rebuild", RepairNeedWood = "Not enough wood in the team stock.";
         public static string RepairCost = "2 WOOD";
