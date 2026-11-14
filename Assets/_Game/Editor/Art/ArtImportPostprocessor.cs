@@ -47,7 +47,8 @@ namespace CriticalMass.Editor.Art
             if (!IsArt(assetPath)) return;
             var mi = (ModelImporter)assetImporter;
             ModelSpec spec = SpecFor(assetPath);
-            bool rigged = spec != null && spec.Rigged;
+            // rigs-2: a per-class baked clip pack (ModelSpec.ClipSource, e.g. Farmer/Farmer_Clips.fbx) imports as a rig too.
+            bool rigged = (spec != null && spec.Rigged) || ArtMapping.Models.Any(m => m.Rigged && m.ClipSource == assetPath);
 
             mi.globalScale = 1f;
             mi.useFileScale = true;
