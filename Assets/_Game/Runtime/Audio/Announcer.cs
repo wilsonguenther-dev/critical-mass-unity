@@ -233,6 +233,15 @@ namespace CriticalMass.Runtime.Audio
             _count = 0;
         }
 
+        /// <summary>
+        /// online-rooms-6: keeps every waiting line fresh while the match is about to be shown (the loading screen is up),
+        /// so the opening line ("Banners up. The hill is open.") is still waiting, not expired, when the view goes live.
+        /// </summary>
+        public void Hold(double now)
+        {
+            for (int i = 0; i < _count; i++) _at[i] = now;
+        }
+
         /// <summary>Forgets everything (a new match).</summary>
         public void Reset()
         {
@@ -403,6 +412,21 @@ namespace CriticalMass.Runtime.Audio
     /// </summary>
     public sealed class Announcer : MonoBehaviour
     {
+        /// <summary>online-rooms-6: what happens to a line triggered now.</summary>
+        public enum Gate
+        {
+            /// <summary>A live match view: the line plays (voice and subtitle together).</summary>
+            Live,
+            /// <summary>The match is about to be shown (loading screen up): the line waits and plays when the view goes live.</summary>
+            Hold,
+            /// <summary>The attract match behind the title or a menu, or results: the line is dropped, never queued.</summary>
+            Drop,
+        }
+
+        /// <summary>attract: the driver is the title's backdrop match; liveView: GameFlow.LiveMatchView; matchComing: the flow is in (or off for) a match.</summary>
+        public static Gate GateFor(bool attract, bool liveView, bool matchComing) =>
+            attract || !matchComing ? Gate.Drop : liveView ? Gate.Live : Gate.Hold;
+
         public const string SubtitlesKey = "cm.subtitles";
         public const string VoiceFolder = "CMVoice/";
         public const float SubtitleTailSeconds = 0.5f;
@@ -569,7 +593,10 @@ namespace CriticalMass.Runtime.Audio
             bool paused = _input != null && _input.State.Paused;
             // online-rooms-5: the online menus count as the title here: no announcer lines or subtitles over them.
             // online-rooms-6: and every full-screen menu and the loading screen (only a live match view speaks).
-            bool title = (_driver != null && _driver.TryGetComponent(out TitleScreen _)) || !Flow.GameFlow.LiveMatchView;
+            bool attract = _driver != null && _driver.TryGetComponent(out TitleScreen _);
+            Flow.FlowState fs = Flow.GameFlow.State;
+            Gate gate = GateFor(attract, Flow.GameFlow.LiveMatchView, fs == Flow.FlowState.Match || fs == Flow.FlowState.Off);
+            bool title = gate != Gate.Live;   // no subtitle unless the match is on screen
 
             if (paused && _current != null)
             {
@@ -586,15 +613,16 @@ namespace CriticalMass.Runtime.Audio
             }
 
             World w = _driver != null ? _driver.World : null;
-            if (w != null && !title)
+            if (w != null && gate != Gate.Drop)
             {
                 _decoder.Poll(w, _queue, now);
-                if (!paused && _queue.TryNext(now, out AnnouncerLine line)) Begin(line);
+                if (gate == Gate.Hold) _queue.Hold(now);   // online-rooms-6: the opening line waits for the loading screen
+                else if (!paused && _queue.TryNext(now, out AnnouncerLine line)) Begin(line);
             }
             else
             {
-                // Behind the title the bot match runs on; nothing it does is news yet.
-                if (title && w != null) _decoder.Reset(null);
+                // Behind the title (or a menu, or results) the bot match runs on; nothing it does is news: dropped, not queued.
+                if (gate == Gate.Drop && w != null) _decoder.Reset(null);
                 _queue.Clear();
             }
             UpdateSubtitle(now, paused || title);
