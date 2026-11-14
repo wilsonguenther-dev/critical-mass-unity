@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using CriticalMass.Sim.Config;
 using CriticalMass.Sim.Core;
 
 namespace CriticalMass.Sim.Bots
