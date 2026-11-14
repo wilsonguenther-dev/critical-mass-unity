@@ -1,6 +1,7 @@
 using System.IO;
 using CriticalMass.Runtime.Hud;
 using CriticalMass.Runtime.Hud.Mechanics;
+using CriticalMass.Runtime.Hud.Ui;
 using CriticalMass.Runtime.Input;
 using CriticalMass.Runtime.Menu;
 using CriticalMass.Runtime.Menus.Story;
