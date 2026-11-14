@@ -1,3 +1,4 @@
+using System;
 using CriticalMass.Runtime.Hud.Style;
 using CriticalMass.Sim.Config;
 using CriticalMass.Sim.Core;
@@ -16,7 +17,42 @@ namespace CriticalMass.Runtime.Hud.Ui
     public static class MinimapGeometry
     {
         public static readonly MapDef BakedMap = SkybreakBasinMap.BuildSkybreakBasin(GameConfig.CreateDefault());
-        public static readonly MinimapProjection Projection = MinimapProjection.For(BakedMap, GameConfig.CreateDefault().Render.CameraYawDeg);
+        /// <summary>The heading the minimap images in Resources were baked at (Editor/MinimapBaker, default config).</summary>
+        public static readonly double BakedYaw = GameConfig.CreateDefault().Render.CameraYawDeg;
+        static MinimapProjection _proj;
+        static double _projYaw = double.NaN;
+        static readonly System.Collections.Generic.Dictionary<int, UnityEngine.Texture2D> _runtime = new System.Collections.Generic.Dictionary<int, UnityEngine.Texture2D>();
+        static double _texYaw = double.NaN;
+
+        /// <summary>The minimap's mapping at the camera heading on screen (CameraHeading.Active), so the minimap matches it.</summary>
+        public static MinimapProjection Projection
+        {
+            get
+            {
+                double y = CriticalMass.Runtime.Camera.CameraHeading.Active;
+                if (_proj == null || y != _projYaw) { _proj = MinimapProjection.For(BakedMap, y); _projYaw = y; }
+                return _proj;
+            }
+        }
+
+        /// <summary>
+        /// The minimap image at a tier for the heading on screen: the baked Resources image at the baked heading, otherwise
+        /// baked here once per tier with the same MinimapBake the editor uses (cached; a one-off cost the first time a tier
+        /// is drawn).
+        /// </summary>
+        public static UnityEngine.Texture2D Texture(int tier)
+        {
+            double y = CriticalMass.Runtime.Camera.CameraHeading.Active;
+            if (Math.Abs(y - BakedYaw) < 1e-6) return UnityEngine.Resources.Load<UnityEngine.Texture2D>("UI/Minimap/minimap@" + tier + "x");
+            if (y != _texYaw) { _runtime.Clear(); _texYaw = y; }
+            if (_runtime.TryGetValue(tier, out UnityEngine.Texture2D t) && t != null) return t;
+            var bake = new MinimapBake(BakedMap, y);
+            Color32[] px = bake.Render(tier, out int w, out int h);
+            t = MinimapBake.ToTexture(px, w, h);
+            t.name = "minimap@" + tier + "x (" + y.ToString("F0", System.Globalization.CultureInfo.InvariantCulture) + ")";
+            _runtime[tier] = t;
+            return t;
+        }
 
         /// <summary>Texture tier for a canvas scale: 1x up to 1080p (drawn 1:1), 2x up to 4K, else 4x.</summary>
         public static int TierFor(float canvasScale) => canvasScale <= 1.01f ? 1 : canvasScale <= 2.01f ? 2 : 4;

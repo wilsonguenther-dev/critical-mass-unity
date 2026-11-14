@@ -274,7 +274,9 @@ namespace CriticalMass.Runtime.Camera
 
             // Orbit / look input.
             ReadLook(paused, dt, out double orbitYaw, out double orbitPitch);
-            if (snap && Mode == GroundViewMode.Play) _follow.SetYaw(GroundCamera.YawOfFacing(facing));
+            // feat/camera-creator-angle: playing from the ground starts facing the high camera's heading, so screen up stays the
+            // same direction across F5 (the creator's angle by default).
+            if (snap && Mode == GroundViewMode.Play) _follow.SetYaw(CameraHeading.UnityYaw(Driver.Config.Render.CameraYawDeg));
 
             GatherCylinders(w, tx, tz, target);
             var f = new GroundFollowInput

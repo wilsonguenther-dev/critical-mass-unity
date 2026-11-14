@@ -395,7 +395,7 @@ namespace CriticalMass.Runtime.Hud.Interact
             _hudTexture = hudTexture;
             if (_tex == null)
             {
-                _tex = Resources.Load<Texture2D>("UI/Minimap/minimap@8x");
+                _tex = Ui.MinimapGeometry.Texture(8);
                 if (_tex == null) _tex = Resources.Load<Texture2D>("UI/Minimap/minimap@4x");
             }
             _image.texture = _tex;

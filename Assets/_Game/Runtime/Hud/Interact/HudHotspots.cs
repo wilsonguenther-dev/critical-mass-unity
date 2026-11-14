@@ -484,7 +484,7 @@ namespace CriticalMass.Runtime.Hud.Interact
             if (_mask != null) _area.anchoredPosition = Vector2.zero;
             ScaleMarkers(1f);
             RawImage img = _area.GetComponent<RawImage>();
-            if (img != null && _hud != null) img.texture = Resources.Load<Texture2D>("UI/Minimap/minimap@" + _hud.MapTier + "x");
+            if (img != null && _hud != null) img.texture = Ui.MinimapGeometry.Texture(_hud.MapTier);
             _zoomTex = null;
         }
 
@@ -504,7 +504,7 @@ namespace CriticalMass.Runtime.Hud.Interact
             RawImage img = _area.GetComponent<RawImage>();
             if (img != null && _hud != null)
             {
-                if (_zoomTex == null) _zoomTex = Resources.Load<Texture2D>("UI/Minimap/minimap@" + Mathf.Min(4, _hud.MapTier * 2) + "x");
+                if (_zoomTex == null) _zoomTex = Ui.MinimapGeometry.Texture(Mathf.Min(4, _hud.MapTier * 2));
                 if (_zoomTex != null && img.texture != _zoomTex) img.texture = _zoomTex;
             }
         }
