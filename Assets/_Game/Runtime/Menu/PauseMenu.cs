@@ -918,6 +918,8 @@ namespace CriticalMass.Runtime.Menu
 
         public const float PanelX = 280f, PanelY = 140f, PanelW = 1360f, PanelH = 870f;
         public const float ContentX = PanelX + 40f, ContentY = PanelY + 110f;
+        /// <summary>The clipped area a settings tab scrolls in (hud-containment-1): under the tab row, above the status line.</summary>
+        public const float TabViewX = PanelX + 20f, TabViewTop = ContentY - 10f, TabViewW = PanelW - 40f, TabViewBottom = PanelY + PanelH - 78f;
 
         void BuildSettings(RectTransform space)
         {
@@ -950,6 +952,10 @@ namespace CriticalMass.Runtime.Menu
             _tabPages[2] = BuildVideo(page);
             _tabPages[3] = BuildGame(page);
             for (int e = 0; e < extraTabs.Count; e++) _tabPages[4 + e] = BuildExtraTab(page, extraTabs[e]);
+            // hud-containment-1: a tab taller than the panel scrolls inside it (above the status line), never past its edge
+            for (int i = 0; i < tabs; i++)
+                if (_tabPages[i] != null)
+                    ContainedScroll.Contain((RectTransform)_tabPages[i].transform, TabViewX, TabViewTop, TabViewW, TabViewBottom);
 
             _status = MenuUi.Label(page, "Status", CMTokens.Ui, UiScale.TypeBody, Brass, TextAnchor.MiddleLeft, ContentX, PanelY + PanelH - 70f,
                 900f, 40f, "", 2f);

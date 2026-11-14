@@ -686,11 +686,9 @@ namespace CriticalMass.Runtime.Menus
         /// "Demolitions Expert" in the wide display face.</summary>
         public static void Fit(Text t, int min)
         {
-            t.horizontalOverflow = HorizontalWrapMode.Wrap;
-            t.verticalOverflow = VerticalWrapMode.Truncate;
-            t.resizeTextForBestFit = true;
             t.resizeTextMaxSize = t.fontSize;
             t.resizeTextMinSize = Mathf.Min(min, t.fontSize);
+            MenuUi.Contain(t);   // hud-containment-1: the one text rule (wrap if the box allows, shrink, then ellipsis)
         }
 
         /// <summary>A key glyph chip: Void Navy fill, Warm Cream rim, mono text.</summary>

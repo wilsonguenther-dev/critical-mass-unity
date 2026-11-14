@@ -25,7 +25,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
     public sealed class MechanicsHud : MonoBehaviour
     {
         public const int SortingOrder = 13;
-        public const float KitX = 24f, KitW = 380f, RowH = 54f;
+        public const float KitX = HudZones.M, KitW = HudZones.KitW, RowH = 54f;
         public const int MaxPieces = 16, MaxMines = 16, MaxDrops = 24, MaxBombs = 8;
 
         public static MechanicsHud Instance { get; private set; }
@@ -143,12 +143,12 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             Color cream = CMTokens.WarmCream.Color, brass = CMTokens.ToolBrass.Color, navy = CMTokens.VoidNavy.Color;
 
             // class kit: above the player cluster (bottom left)
-            Rect player = HudLayout.RefRect(HudCluster.Player);
-            float kitH = 44f + 2f * RowH + 34f;
+            // hud-containment-1: the kit has its own slot in the left stack (HudZones.Kit) and is sized to its rows (KitHeight)
+            float kitH = HudZones.KitMaxH;
             _kit = MenuUi.Rt(_space, "Class Kit");
-            MenuUi.Place(_kit, KitX, player.y - 14f - kitH, KitW, kitH);
+            MenuUi.Place(_kit, KitX, HudZones.Kit.y, KitW, kitH);
             _kitPanel = MenuUi.Panel(_kit, "Panel", 0f, 0f, KitW, kitH);
-            _kitTitle = MenuUi.Label(_kit, "Title", CMTokens.Display, UiScale.TypeSmall, brass, TextAnchor.MiddleLeft, 18f, 8f, KitW - 36f, 28f, "", 2f);
+            _kitTitle = MenuUi.Fit(MenuUi.Label(_kit, "Title", CMTokens.Display, UiScale.TypeSmall, brass, TextAnchor.MiddleLeft, 18f, 8f, KitW - 36f, 28f, "", 2f), 13);
             for (int r = 0; r < 2; r++)
             {
                 float y = 42f + r * RowH;
@@ -160,11 +160,11 @@ namespace CriticalMass.Runtime.Hud.Mechanics
                 _rowPie[r].OutlinePx = 3f;
                 _rowPie[r].RimPx = 0f;
                 _rowCd[r] = MenuUi.Fit(MenuUi.Label(_kit, "Cd " + r, CMTokens.Mono, UiScale.TypeMin, cream, TextAnchor.MiddleCenter, 16f, y + 5f, 46f, 38f, "", 2f), 15);
-                _rowName[r] = MenuUi.Label(_kit, "Name " + r, CMTokens.Ui, UiScale.TypeSmall, cream, TextAnchor.MiddleLeft, 70f, y + 2f, 170f, 26f, "", 2f);
-                _rowNote[r] = MenuUi.Fit(MenuUi.Label(_kit, "Note " + r, CMTokens.Ui, UiScale.TypeMin, brass, TextAnchor.MiddleLeft, 70f, y + 26f, 170f, 20f, "", 2f), 14);
+                _rowName[r] = MenuUi.Fit(MenuUi.Label(_kit, "Name " + r, CMTokens.Ui, UiScale.TypeSmall, cream, TextAnchor.MiddleLeft, 70f, y + 2f, 154f, 26f, "", 2f), 12);
+                _rowNote[r] = MenuUi.Fit(MenuUi.Label(_kit, "Note " + r, CMTokens.Ui, UiScale.TypeMin, brass, TextAnchor.MiddleLeft, 70f, y + 26f, 154f, 20f, "", 2f), 11);
                 for (int p = 0; p < 3; p++)
                 {
-                    VectorShape pip = MenuUi.Shape(_kit, "Pip " + r + p, ShapeKind.Diamond, 236f + p * 20f, y + 15f, 16f, 18f, brass, 3f);
+                    VectorShape pip = MenuUi.Shape(_kit, "Pip " + r + p, ShapeKind.Diamond, 230f + p * 18f, y + 15f, 16f, 18f, brass, 3f);
                     pip.OutlinePx = 2f;
                     pip.RimPx = 0f;
                     _rowPip[r, p] = pip;
@@ -173,11 +173,11 @@ namespace CriticalMass.Runtime.Hud.Mechanics
                 keyChip.RimColor = cream;
                 keyChip.RimPx = 2f;
                 _rowKey[r] = MenuUi.Fit(MenuUi.Label(keyChip.transform, "Key", CMTokens.Ui, UiScale.TypeMin, cream, TextAnchor.MiddleCenter, 0f, 0f, 68f, 30f, "", 2f), 14);
-                _rowKey[r].resizeTextForBestFit = true;
                 _rowKey[r].resizeTextMinSize = 9;
                 _rowKey[r].resizeTextMaxSize = 14;
+                MenuUi.Contain(_rowKey[r], 2);   // "RIGHT CLICK" wraps inside its key chip
             }
-            _bank = MenuUi.Label(_kit, "Bank", CMTokens.Ui, UiScale.TypeMin, CMTokens.Biomass.Color, TextAnchor.MiddleLeft, 18f, 44f + 2f * RowH - 2f, KitW - 36f, 28f, "", 2f);
+            _bank = MenuUi.Fit(MenuUi.Label(_kit, "Bank", CMTokens.Ui, UiScale.TypeMin, CMTokens.Biomass.Color, TextAnchor.MiddleLeft, 18f, 44f + 2f * RowH - 2f, KitW - 36f, 28f, "", 2f), 11);
             _kit.gameObject.SetActive(false);
 
             // stun badge, dodge tick, jump hint: centre, below the player's head
@@ -299,12 +299,33 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             }
             bool bankOn = teamBank || a.Cls == ClassId.Builder;
             if (_bank.gameObject.activeSelf != bankOn) _bank.gameObject.SetActive(bankOn);
+            LayoutKit(Mathf.Min(rows, 2), bankOn);
             if (bankOn)
             {
                 int b = BuilderBank.Whole(w, a.Team);
                 HudText.Set(_bank, BankLine[Mathf.Clamp(b, 0, BankLine.Length - 1)]);
             }
             if (_glyphDirty) RefreshGlyphs();
+        }
+
+        int _kitRows = -1;
+        bool _kitBank;
+
+        /// <summary>hud-containment-1: the kit panel's height for its rows and bank line (no empty panel).</summary>
+        public static float KitHeight(int rows, bool bank) => 44f + rows * RowH + (bank ? 34f : 0f) + (rows > 0 && !bank ? 6f : 0f);
+
+        /// <summary>Sizes the kit to its content, its bottom on the bottom of its slot (work only when rows or bank change).</summary>
+        void LayoutKit(int rows, bool bank)
+        {
+            if (rows == _kitRows && bank == _kitBank) return;
+            _kitRows = rows;
+            _kitBank = bank;
+            float h = KitHeight(rows, bank);
+            Rect slot = HudZones.Kit;
+            MenuUi.Place(_kit, slot.x, slot.yMax - h, KitW, h);
+            MenuUi.Place(_kitPanel.rectTransform, 0f, 0f, KitW, h);
+            MenuUi.Place(_bank.rectTransform, 18f, 44f + rows * RowH - 2f, KitW - 36f, 28f);
+            // rows keep their place under the title: they are children of _kit, placed from its top
         }
 
         void SetRowActive(int r, bool on)

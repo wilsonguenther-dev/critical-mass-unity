@@ -1022,11 +1022,9 @@ namespace CriticalMass.Runtime.View.Moments
             _plateAccent.gameObject.SetActive(false);
             _title = CriticalMass.Runtime.Menu.MenuUi.Fit(HudText.Make(_titleRt, "Title Text", CMTokens.Display, UiScale.TypeHero, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 5f), 96);
             Centre(_title.rectTransform, new Vector2(0f, 14f), new Vector2(TitleW * 0.8f, 120f));
-            _title.resizeTextForBestFit = true;
             _title.resizeTextMinSize = 40;
             _title.resizeTextMaxSize = 96;
-            _title.horizontalOverflow = HorizontalWrapMode.Wrap;
-            _title.verticalOverflow = VerticalWrapMode.Truncate;
+            CriticalMass.Runtime.Menu.MenuUi.Contain(_title, 1);   // hud-containment-1: one rule (shrink, then ellipsis)
             _subtitle = CriticalMass.Runtime.Menu.MenuUi.Fit(HudText.Make(_titleRt, "Subtitle", CMTokens.Ui, UiScale.TypeLead, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 3f), 34);
             Centre(_subtitle.rectTransform, new Vector2(0f, -72f), new Vector2(TitleW * 0.8f, 44f));
 

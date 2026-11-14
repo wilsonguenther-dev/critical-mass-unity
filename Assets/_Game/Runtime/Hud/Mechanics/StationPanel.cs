@@ -102,9 +102,9 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             y += 2f * (TileH + 10f) + 6f;
             MenuUi.Label(_panel, "Upgrade Head", CMTokens.Ui, 17, CMTokens.WithAlpha(cream, 0.85f), TextAnchor.MiddleLeft, 22f, y, 200f, 30f, DepthWords.Upgrade, 2f);
             _who = MenuUi.Label(_panel, "Who", CMTokens.Ui, 14, CMTokens.WithAlpha(cream, 0.75f), TextAnchor.MiddleRight, 200f, y, PanelW - 222f, 30f, "", 1.5f);
-            _who.resizeTextForBestFit = true;
             _who.resizeTextMinSize = 10;
             _who.resizeTextMaxSize = 14;
+            MenuUi.Contain(_who, 1);
             y += 40f;
             for (int k = 0; k < 6; k++) BuildItem(6 + k, 22f, y + k * (RowH + 6f), PanelW - 44f, RowH, false);
             _panel.gameObject.SetActive(false);
@@ -127,9 +127,9 @@ namespace CriticalMass.Runtime.Hud.Mechanics
                 key.RimColor = cream;
                 MenuUi.Label(key.transform, "Digit", CMTokens.Mono, 15, cream, TextAnchor.MiddleCenter, 0f, 0f, 26f, 26f, Digits[cls], 1.5f);
                 _itemName[i] = MenuUi.Label(s.transform, "Name", CMTokens.Ui, 17, cream, TextAnchor.MiddleLeft, 40f, 6f, w - 46f, 28f, name, 2f);
-                _itemName[i].resizeTextForBestFit = true;
                 _itemName[i].resizeTextMinSize = 11;
                 _itemName[i].resizeTextMaxSize = 17;
+                MenuUi.Contain(_itemName[i], 1);
                 _itemNote[i] = MenuUi.Label(s.transform, "Note", CMTokens.Ui, 13, CMTokens.ToolBrass.Color, TextAnchor.MiddleLeft, 10f, 40f, w - 76f, 24f, "", 1.5f);
                 for (int p = 0; p < 3; p++) _pip[i, p] = Pip(s.transform, w - 62f + p * 18f, 44f);
             }

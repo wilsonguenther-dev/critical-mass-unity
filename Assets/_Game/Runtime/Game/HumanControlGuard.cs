@@ -286,14 +286,17 @@ namespace CriticalMass.Runtime.Game
             _warningText = MenuUi.Label(warn, "Text", CMTokens.Ui, UiScale.TypeSmall, cream, TextAnchor.MiddleCenter, 0f, 0f, WarningW, 48f, "", 2f);
             _warning.SetActive(false);
 
-            RectTransform plate = FeedUi.Anchored(_canvas.transform, "Automated Run Plate", new Vector2(0.5f, 0f), 0f, 24f, 1240f, 56f);
+            // hud-containment-1: the plate lives in the empty top-left corner (HudZones.AutomationPlate); as a 1240 px strip at
+            // the bottom it ran over the player card's health row, the subtitles and the minimap. Its words wrap inside it.
+            Rect pr = HudZones.AutomationPlate;
+            RectTransform plate = FeedUi.Anchored(_canvas.transform, "Automated Run Plate", new Vector2(0f, 1f), pr.x, -pr.y, pr.width, pr.height);
             _plate = plate.gameObject;
-            VectorShape pp = MenuUi.Shape(plate, "Plate", ShapeKind.RoundRect, 0f, 0f, 1240f, 56f, CMTokens.WithAlpha(CMTokens.VoidNavy.Color, 0.92f), 14f);
+            VectorShape pp = MenuUi.Shape(plate, "Plate", ShapeKind.RoundRect, 0f, 0f, pr.width, pr.height, CMTokens.WithAlpha(CMTokens.VoidNavy.Color, 0.92f), 14f);
             pp.OutlinePx = 3f;
             pp.RimPx = 3f;
             pp.RimColor = CMTokens.ToolBrass.Color;
-            MenuUi.Label(plate, "Text", CMTokens.Ui, UiScale.TypeBody, cream, TextAnchor.MiddleCenter, 0f, 0f, 1240f, 56f,
-                "AUTOMATED TEST RUN: THE COMPUTER IS PLAYING THIS WINDOW. YOUR KEYS DO NOTHING HERE. IT CLOSES BY ITSELF.", 2f);
+            MenuUi.Fit(MenuUi.Label(plate, "Text", CMTokens.Ui, UiScale.TypeSmall, cream, TextAnchor.MiddleCenter, 12f, 6f, pr.width - 24f, pr.height - 12f,
+                "AUTOMATED TEST RUN: THE COMPUTER IS PLAYING THIS WINDOW. YOUR KEYS DO NOTHING HERE. IT CLOSES BY ITSELF.", 2f), 13);
             _plate.SetActive(false);
         }
 

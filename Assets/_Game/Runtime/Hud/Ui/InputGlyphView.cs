@@ -158,7 +158,7 @@ namespace CriticalMass.Runtime.Hud.Ui
             float w = GlyphWidth;
             if (_showWords && !string.IsNullOrEmpty(s.Words))
             {
-                float ww = Mathf.Ceil(WordsText.preferredWidth) + 4f;
+                float ww = Mathf.Ceil(ContainedText.NaturalWidth(WordsText)) + 4f;
                 RectTransform t = WordsText.rectTransform;
                 t.sizeDelta = new Vector2(ww, h);
                 t.anchoredPosition = new Vector2(w + WordsGap, 0f);

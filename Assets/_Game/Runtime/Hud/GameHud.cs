@@ -829,14 +829,16 @@ namespace CriticalMass.Runtime.Hud
                 labels[i].horizontalOverflow = HorizontalWrapMode.Overflow;
                 labels[i].fontSize = HudLayout.AbilityNameMax;
                 labels[i].text = n;
-                widths[i] = n.Length == 0 ? 0f : labels[i].preferredWidth;
+                widths[i] = n.Length == 0 ? 0f : ContainedText.NaturalWidth(labels[i]);   // the full name, never a cut
             }
             int size = HudLayout.LayoutAbilityNames(widths, lefts, boxes);
             for (int i = 0; i < labels.Length; i++)
             {
                 labels[i].fontSize = size;
+                ContainedText.Of(labels[i])?.Configure(size, Mathf.Min(size, HudLayout.AbilityNameFloor), 1);   // the shared size is the rule's top
                 Place(labels[i].rectTransform, lefts[i], AbilityNameY, boxes[i], AbilityNameH);
                 HudText.FitWithEllipsis(labels[i], names[i], boxes[i]);
+                ContainedText.Of(labels[i])?.SetSource(names[i] ?? string.Empty);   // the one rule, at the shared size, in the final box
             }
             return size;
         }
