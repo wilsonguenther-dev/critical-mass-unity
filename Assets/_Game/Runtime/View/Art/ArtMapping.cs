@@ -324,7 +324,9 @@ namespace CriticalMass.Runtime.View.Art
             // voxel proxy (rig_body.py), clips
             // baked per class with foot IK (Builder_Clips.fbx, bake_clips.py; hip-height ratio = StrideScale). Empty hands:
             // the game hangs the mallet on handslot.r, held upright at idle. Face painted in the vertex colour. Pre-batch-b
-            // files: Builder/_fallback~.
+            // files: Builder/_fallback~. rig-builder-3: Attack is a hand-keyed overhead mallet strike (same length and hit
+            // time as the chop), the ladder rides the chest with the chest twist damped in locomotion, planted toes follow
+            // KayKit's toe yaw and the run stance is anchored at the ground speed (StrideScale unchanged).
             new ModelSpec { Key = Builder, AssetPath = "Assets/_Game/Art/Builder/Builder.fbx", Kind = ArtKind.Character, Rigged = true,
                 Bones = 41, ClipSource = "Assets/_Game/Art/Builder/Builder_Clips.fbx",
                 Meshes = new[] { "Builder_Hero", "Builder_LOD0", "Builder_LOD1", "Builder_Shadow" }, MaskCodes = new[] { 0, 8 },
