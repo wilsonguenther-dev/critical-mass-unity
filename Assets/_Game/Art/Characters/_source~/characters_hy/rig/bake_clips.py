@@ -796,6 +796,7 @@ for m in arm_mods:
 log("baked", len(baked), "of", len(acts))
 REP["mallet"] = dict(on=MALLET, contact_fraction=round(_CT, 4), wrist=MALLET_LOG[::2])
 REP["ground_speed"] = GROUND_SPEED
+REP["fps"] = fps
 REP["twist_damp"] = dict(keep_out=TWIST_DAMP, chest_from_hips_max_deg_before=TWIST_LOG)
 REP["planted_toe_yaw_kaykit_deg"] = {c: [min(v), max(v)] for c, v in TOE_LOG.items()}
 

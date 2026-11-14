@@ -306,10 +306,11 @@ try:
                 td = smp[i][s][0] - smp[i][s][1]
                 yaws.append(math.degrees(math.atan2(td.x, -td.y)))
         tz = {s: [round(r[s][0].z, 3) for r in smp[:2 * n_:2]] for s in ('l', 'r')}
+        dbg = [[round(k2 * 0.5, 1)] + [round(v, 3) for v in smp[k2]['l'][0]] for k2 in range(2 * n_)]
         loco[clip] = dict(slide=round(ft / bt, 3) if bt > 0 else None, planted_pairs=pairs, samples=len(smp),
                           stance_frac=round(pairs / (2 * len(smp)), 3), travel_deg=round(math.degrees(math.atan2(fwd.x, -fwd.y)), 1),
                           planted_toe_yaw_deg=[round(min(yaws), 1), round(sum(yaws) / len(yaws), 1), round(max(yaws), 1)] if yaws else None,
-                          toe_z_per_frame=tz, toe_min=[round(mins['l'], 3), round(mins['r'], 3)])
+                          toe_z_per_frame=tz, toe_l_xyz_half_frames=dbg, fps=fps_, v=round(v_, 3), toe_min=[round(mins['l'], 3), round(mins['r'], 3)])
     REP['loco_unity_way'] = loco
 except Exception as e_:
     REP['loco_unity_way'] = 'failed ' + repr(e_)
