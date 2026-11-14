@@ -328,5 +328,54 @@ namespace CriticalMass.Runtime.Tests
                     Assert.IsFalse(box.Overlaps(panels[i]), $"{sw}x{sh} ask {ask}: marker {box} overlaps the {HudEdgeMarkers.LayoutName(i)} {panels[i]}");
             }
         }
+
+        /// <summary>fix/hud-edge-markers-2 (candidate 7: an edge "Attack!" ping sat on the COINS box): the ping marker the
+        /// live HUD builds (PingMarkers.Build: ring, triangle, word, distance label) placed at the edge for each screen corner,
+        /// each panel's centre and the coins box's right end; every built child of the marker, measured from its real
+        /// RectTransform, ends up on screen and on no HUD panel, at 1280x720, 1920x1080 and 2560x1440.</summary>
+        [TestCase(1280, 720)]
+        [TestCase(1920, 1080)]
+        [TestCase(2560, 1440)]
+        public void ABuiltPingEdgeMarkerNeverSitsOnAPanel(int sw, int sh)
+        {
+            float k = HudLayout.Scale(sw, sh);
+            var go = new GameObject("Ping root", typeof(RectTransform));
+            try
+            {
+                var root = (RectTransform)go.transform;
+                root.anchorMin = root.anchorMax = root.pivot = new Vector2(0.5f, 0.5f);
+                root.sizeDelta = new Vector2(sw / k, sh / k);   // the HUD root in canvas units
+                var markers = new CriticalMass.Runtime.Hud.Interact.PingMarkers();
+                markers.Build(root);
+                Rect r = root.rect;
+                var panels = new Rect[HudEdgeMarkers.LayoutCount];
+                int n = HudEdgeMarkers.LayoutPanels(r.width, r.height, 1f, panels);   // root units, origin bottom-left
+                var asks = new List<Vector2> { r.min, new Vector2(r.xMax, r.yMin), new Vector2(r.xMin, r.yMax), r.max };
+                for (int i = 0; i < n; i++) asks.Add(panels[i].center + r.min);
+                asks.Add(new Vector2(panels[4].xMax - 10f, panels[4].center.y) + r.min);
+                RectTransform mk = markers.WorldMarker(0);
+                mk.gameObject.SetActive(true);
+                var corners = new Vector3[4];
+                foreach (Vector2 ask in asks)
+                {
+                    const float scale = 0.8f;   // an edge ping draws at 0.8
+                    Vector2 local = markers.PlaceEdge(0, ask, r, scale);
+                    mk.anchoredPosition = local;
+                    mk.localScale = new Vector3(scale, scale, 1f);
+                    for (int c = 0; c < mk.childCount; c++)
+                    {
+                        var ch = (RectTransform)mk.GetChild(c);
+                        ch.GetWorldCorners(corners);
+                        Vector2 a = (Vector2)root.InverseTransformPoint(corners[0]) - r.min, b = (Vector2)root.InverseTransformPoint(corners[2]) - r.min;
+                        Rect part = Rect.MinMaxRect(Mathf.Min(a.x, b.x), Mathf.Min(a.y, b.y), Mathf.Max(a.x, b.x), Mathf.Max(a.y, b.y));
+                        Assert.IsTrue(part.xMin >= -0.5f && part.yMin >= -0.5f && part.xMax <= r.width + 0.5f && part.yMax <= r.height + 0.5f,
+                            $"{sw}x{sh} ask {ask}: the marker's {ch.name} {part} leaves the screen");
+                        for (int i = 0; i < n; i++)
+                            Assert.IsFalse(part.Overlaps(panels[i]), $"{sw}x{sh} ask {ask}: the marker's {ch.name} {part} sits on the {HudEdgeMarkers.LayoutName(i)} {panels[i]}");
+                    }
+                }
+            }
+            finally { UnityEngine.Object.DestroyImmediate(go); }
+        }
     }
 }
