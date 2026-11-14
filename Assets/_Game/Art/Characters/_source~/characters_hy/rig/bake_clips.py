@@ -114,7 +114,7 @@ def plant_n(clip):
     return PLANT_N
 MAX_LOWER = 0.12       # hips never come down more than this to reach a target (DeathB-style clips keep FK reach)
 LOWER_PARTIAL = CLS == "Builder"
-MAX_LOWER_CLS = float(os.environ.get("BAKE_MAX_LOWER", "0.16")) if LOWER_PARTIAL else MAX_LOWER
+MAX_LOWER_CLS = float(os.environ.get("BAKE_MAX_LOWER", "0.12")) if LOWER_PARTIAL else MAX_LOWER
 LEG = lambda s: ("upperleg." + s, "lowerleg." + s, "foot." + s, "toes." + s)
 W = lambda arm, p: arm.matrix_world @ p
 
@@ -221,7 +221,8 @@ log("toe yaw at rest", REP["toe_yaw_rest_deg"])
 # in tall boots (ankle 0.17 u up), so the hip-height ratio (1.31) asked for a run stance his leg chain cannot reach: the
 # IK fell short and the planted toe moved back at 79% of the ground speed (the game read 0.23 u/u of slide). A shorter
 # stride at a higher cadence: feet and hips move horizontally by RATIO_H, and ModelSpec.StrideScale = RATIO_H.
-RATIO_H = float(os.environ.get("BAKE_RATIO_H", "1.0")) if CLS == "Builder" else RATIO
+RATIO_H = float(os.environ.get("BAKE_RATIO_H", str(RATIO))) if CLS == "Builder" else RATIO
+# (measured after the anchor fix below: Run planted-toe slide 0.134 at the hip-height ratio, 0.172 at 1.12; kept = RATIO)
 log("horizontal stride ratio", RATIO_H)
 REP.update(ratio=RATIO, stride_scale=RATIO_H, lift=LIFT, leg_class=leg_f, leg_kaykit=leg_k, thigh=Lt, shin=Ls,
            foot_vertices={s: int(len(FOOTV[s])) for s in SIDES})
@@ -722,7 +723,7 @@ def bake_action(clip, act):
             for s in SIDES:
                 U = W(fa, faP["upperleg." + s].head)
                 short = max(short, (targets[s] - U).length - 0.995 * (Lt[s] + Ls[s]))
-            if LOWER_PARTIAL and short > 1e-5 and lowered_frame + short > MAX_LOWER_CLS:
+            if LOWER_PARTIAL and clip in ORDER_CLIPS and short > 1e-5 and lowered_frame + short > MAX_LOWER_CLS:
                 # rig-builder-3: a target out of reach by more than the cap still takes the hips down to the cap (the
                 # old rule then did not lower them at all: the Builder's run toe-off fell 21% short of the anchored
                 # stance, and the game read that as skating)
