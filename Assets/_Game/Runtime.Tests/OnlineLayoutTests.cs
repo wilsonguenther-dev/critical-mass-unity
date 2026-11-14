@@ -88,7 +88,8 @@ namespace CriticalMass.Runtime.Tests
             Assert.Greater(OnlineLayout.Cell(0, OnlineLayout.CellName, false).width, OnlineLayout.Cell(0, OnlineLayout.CellName, true).width);
             Assert.GreaterOrEqual(OnlineLayout.RowSize(true), UiScale.TypeMin, "never below the type scale's minimum");
             Assert.GreaterOrEqual(OnlineLayout.RowSize(false), OnlineLayout.RowSize(true));
-            Assert.GreaterOrEqual(OnlineLayout.Cell(0, OnlineLayout.CellName, true).width, 160f - 0.01f, "the two-column name keeps its width (online-rooms-7 took the class room from the gutters)");
+            Assert.Greater(OnlineLayout.Cell(0, OnlineLayout.CellName, true).width, OnlineLayout.Cell(0, OnlineLayout.CellClass, true).width,
+                "the name keeps the widest column in two columns (online-rooms-8: 148 u, 98.7 px at 1280 x 720)");
         }
 
         [TestCase(false)]
@@ -113,9 +114,11 @@ namespace CriticalMass.Runtime.Tests
         }
 
         /// <summary>
-        /// online-rooms-6: at 1280 x 720 (the font drawn at its rounded screen size, the conservative case) every cell's
-        /// widest text fits its column: a 12-character name, CRIMSON, the longest class, NOT READY and a 3-digit ping, and
-        /// every head, for 32 players (two columns) and 8 players (one column).
+        /// online-rooms-8: at 1280 x 720 (the font drawn at its rounded screen size, the conservative case) every column's
+        /// widest possible text (OnlineLayout.Widest: the head and every value) fits its column with SparePx to spare, and
+        /// a 12-character name fits the name column, for 32 players (two columns) and 8 (one column), with the off-line
+        /// fallback widths and with the widths measured on the real font. All misses are collected and reported in one
+        /// assert, so the table can never fail one cell at a time again.
         /// </summary>
         [TestCase(32)]
         [TestCase(8)]
@@ -125,33 +128,39 @@ namespace CriticalMass.Runtime.Tests
             const float w = 1280f, h = 720f;
             float scale = Mathf.Min(w / OnlineLayout.RefW, h / OnlineLayout.RefH);
             int drawn = Mathf.Max(1, Mathf.RoundToInt(OnlineLayout.RowSize(two) * scale));
-            string longestClass = "";
-            foreach (string n in System.Enum.GetNames(typeof(CriticalMass.Sim.Config.ClassId)))
-                if (n.Length > longestClass.Length) longestClass = n.ToUpperInvariant();
-            string[][] texts =
-            {
-                new[] { "SHAYDENCALEB", "PLAYER" },
-                new[] { "CRIMSON", "AZURE", "TEAM" },
-                new[] { longestClass, "CLASS" },
-                new[] { "NOT READY", "READY", "HOST" },
-                new[] { "999 MS", "PING" },
-            };
             var root = new GameObject("Online Table Probe");
             try
             {
                 Text t = HudText.Make(root.transform, "Probe", CMTokens.Ui, drawn, Color.white, TextAnchor.MiddleLeft, 2f);
                 Assert.IsNotNull(t.font, "the font loads");
-                int last = players - 1;
-                for (int c = 0; c < OnlineLayout.CellCount; c++)
+                var misses = new List<string>();
+                foreach (bool measured in new[] { false, true })
                 {
-                    float cellW = OnlineLayout.ToScreen(OnlineLayout.Cell(last, c, two), w, h).width;
-                    // online-rooms-7: the class is never cut, so its column keeps a couple of px to spare at the smallest screen.
-                    float spare = c == OnlineLayout.CellClass ? 2f : 0f;
-                    foreach (string s in texts[c])
-                        Assert.LessOrEqual(TextFit.WidthOf(t, s, drawn) + spare, cellW, $"{players} players: \"{s}\" fits column {c} at {w}x{h}" + (spare > 0f ? " with 2 px to spare" : ""));
+                    if (measured) OnlineLayout.MeasureWith(t);
+                    else OnlineLayout.ResetMeasure();
+                    for (int c = 0; c < OnlineLayout.CellCount; c++)
+                    {
+                        float cellW = OnlineLayout.ToScreen(OnlineLayout.Cell(players - 1, c, two), w, h).width;
+                        float headW = OnlineLayout.ToScreen(OnlineLayout.HeadCell(two ? 1 : 0, c, two), w, h).width;
+                        float room = Mathf.Min(cellW, headW);
+                        var texts = new List<string>(OnlineLayout.Widest[c]);
+                        if (c == OnlineLayout.CellName) texts.Add("SHAYDENCALEB");   // the name is the one cell allowed an ellipsis beyond this
+                        float spare = c == OnlineLayout.CellName ? 0f : OnlineLayout.SparePx;
+                        foreach (string s in texts)
+                        {
+                            float tw = TextFit.WidthOf(t, s, drawn);
+                            if (tw + spare > room + 0.01f)
+                                misses.Add($"{(measured ? "measured" : "fallback")} column {c}: \"{s}\" {tw:0.0} + {spare:0} px > {room:0.00} px");
+                        }
+                    }
                 }
+                Assert.IsEmpty(misses, $"{players} players at {w}x{h}: " + string.Join("; ", misses));
             }
-            finally { Object.DestroyImmediate(root); }
+            finally
+            {
+                OnlineLayout.ResetMeasure();
+                Object.DestroyImmediate(root);
+            }
         }
 
         [Test]
