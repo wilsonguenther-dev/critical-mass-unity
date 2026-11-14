@@ -326,6 +326,16 @@ def clean(e):
         md.use_smooth_shade = False; sel_only([ob], ob); bpy.ops.object.modifier_apply(modifier=md.name)
         facts["voxel_rebuild_m"] = md.voxel_size if False else e["voxel"] * e["height"] / 2.0; facts["voxel_tris"] = tri_count(ob)
         print("GEN2 voxel", name, facts["voxel_tris"])
+    if e.get("octree"):   # rig-batch-b: interior sheets (edges on 3+ faces) stall the collapse and a level-set voxel rebuild
+        # loses open sheets. The octree remesh wraps every surface, open sheets included, in one closed manifold skin;
+        # enclosed interior pieces come out as separate shells and are dropped; colour still comes from the raw kd-tree.
+        md = ob.modifiers.new("oct", "REMESH"); md.mode = "SHARP"; md.octree_depth = int(e["octree"]); md.scale = 0.9
+        md.sharpness = 1.0; md.use_remove_disconnected = True; md.threshold = 0.02; md.use_smooth_shade = False
+        sel_only([ob], ob); bpy.ops.object.modifier_apply(modifier=md.name)
+        facts["octree_depth"] = int(e["octree"]); facts["octree_tris"] = tri_count(ob)
+        ob, facts["octree_floaters"] = drop_floaters(ob, 0.02)
+        facts["octree_tris_kept"] = tri_count(ob)
+        print("GEN2 octree", name, facts["octree_tris"], facts["octree_floaters"])
     lods = e.get("lods", {"Hero": 22000, "LOD0": 4000, "LOD1": 1400, "Shadow": 750})
     prefix = e.get("prefix", name)
     levels = {}; cols = {}

@@ -131,6 +131,26 @@ try:
             sc.render.filepath = os.path.join(OUT, f'measure_{CLS}_{tag}_{vn}.png')
             bpy.ops.render.render(write_still=True)
             bpy.data.objects.remove(g, do_unlink=True); made.remove(g)
+        # hand close-ups (positions from the joint override when there is one): are the fingers separate?
+        jf_ = os.path.join(HERE, f'rigb_joints_{CLS}.json')
+        if os.path.exists(jf_):
+            ov_ = json.load(open(jf_))
+            sc.render.resolution_x = sc.render.resolution_y = 600
+            cam_d.ortho_scale = 0.42
+            for s_ in ('l', 'r'):
+                if f'hand.{s_}' not in ov_:
+                    continue
+                hx, hy, hz = ov_[f'hand.{s_}']
+                sg = 1 if s_ == 'l' else -1
+                for vn, loc, rot in (('front', (hx, hy - 3, hz - 0.05), (math.pi / 2, 0, 0)),
+                                     ('out', (hx + sg * 3, hy, hz - 0.05), (math.pi / 2, 0, sg * math.pi / 2)),
+                                     ('in', (hx - sg * 3, hy, hz - 0.05), (math.pi / 2, 0, -sg * math.pi / 2)),
+                                     ('below', (hx, hy, hz - 3), (0, 0, 0))):
+                    cam.location, cam.rotation_euler = loc, rot
+                    cam_d.clip_start = 2.75 if vn != 'below' else 2.6
+                    sc.render.filepath = os.path.join(OUT, f'measure_{CLS}_{tag}_hand_{s_}_{vn}.png')
+                    bpy.ops.render.render(write_still=True)
+            cam_d.clip_start = 0.1
         for o in made:
             bpy.data.objects.remove(o, do_unlink=True)
 

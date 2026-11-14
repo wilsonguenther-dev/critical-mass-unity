@@ -267,6 +267,48 @@ if HOLD_ARM and "Idle" in acts:
     assign(kk, None)
 
 
+# rig-batch-b: the game hangs the light weapon on handslot.r with its handle along the slot's +Y. KayKit's slot points
+# forward at idle, so a new body's slot is held at a fixed turn relative to the hand (CREL) that stands the handle up
+# at the first Idle frame; the weapon then follows the hand through every clip.
+CREL = None
+
+
+def copy_pose_only(clip_act, frame):
+    assign(kk, clip_act); scene.frame_set(frame)
+    for pb in faP:
+        k = kkP.get(pb.name)
+        if k is None:
+            continue
+        l_, q_, s_ = k.matrix_basis.decompose()
+        if pb.name not in KEEP_LOC:
+            l_ = Vector((0, 0, 0))
+        pb.matrix_basis = Matrix.LocRotScale(l_, RESTFIX[pb.name] @ q_, s_)
+    upd()
+
+
+if NEW_BODY and "Idle" in acts and "handslot.r" in faP and "hand.r" in faP:
+    copy_pose_only(acts["Idle"], int(acts["Idle"].frame_range[0]))
+    Mh = (fa.matrix_world @ faP["hand.r"].matrix).to_3x3().normalized()
+    Ms = (fa.matrix_world @ faP["handslot.r"].matrix).to_3x3().normalized()
+    y0 = Ms.col[1]
+    Rd = y0.rotation_difference(Vector((0, 0, 1))).to_matrix() @ Ms
+    CREL = Mh.inverted() @ Rd
+    REP["handslot_idle_y_before"] = [round(v, 3) for v in y0]
+    log("handslot.r idle +Y before", REP["handslot_idle_y_before"], "-> stood up")
+    assign(kk, None); rest(fa)
+
+
+def hold_slot():
+    if CREL is None:
+        return
+    Mh = (fa.matrix_world @ faP["hand.r"].matrix)
+    Rs = Mh.to_3x3().normalized() @ CREL
+    p = (fa.matrix_world @ faP["handslot.r"].matrix).translation
+    S = faP["handslot.r"].matrix.to_scale()
+    set_world(fa, faP["handslot.r"], Matrix.LocRotScale(p, Rs.to_quaternion(), S))
+    upd()
+
+
 def kk_back_dir(act, f0, f1):
     """Direction the KayKit planted feet move in the clip (opposite to travel), or None."""
     acc, prev = Vector((0, 0, 0)), {s: None for s in SIDES}
@@ -408,6 +450,7 @@ def bake_action(clip, act):
             log("trace", f, "kk ankle z l %.3f r %.3f" % (K["Al"].z, K["Ar"].z), "target z l %.3f r %.3f" % (targets["l"].z, targets["r"].z),
                 "final z l %.3f r %.3f" % (W(fa, faP["foot.l"].head).z, W(fa, faP["foot.r"].head).z),
                 "planted", PL.get("l"), PL.get("r"), "hips z %.3f" % W(fa, faP["hips"].head).z, "upperleg z %.3f" % W(fa, faP["upperleg.l"].head).z)
+        hold_slot()
         for pb in faP:
             l, q, sc = pb.matrix_basis.decompose()
             if rec[pb.name] and Quaternion(rec[pb.name][-1][1]).dot(q) < 0:
