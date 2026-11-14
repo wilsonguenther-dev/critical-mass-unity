@@ -34,7 +34,7 @@ namespace CriticalMass.Editor.Art
         public const string ArtMaterialPath = "Assets/_Game/Resources/Toon/CMToonArt.mat";
 
         /// <summary>Bump when the contract changes: Unity re-imports every model this postprocessor touches.</summary>
-        public override uint GetVersion() => 9;
+        public override uint GetVersion() => 10;   // 10: wall-damage-1, the Miner barricade imports readable
 
         public static bool IsArt(string path) =>
             path.StartsWith(ArtRoot, StringComparison.Ordinal) && path.EndsWith(".fbx", StringComparison.OrdinalIgnoreCase);
@@ -76,6 +76,8 @@ namespace CriticalMass.Editor.Art
                 mi.materialName = ModelImporterMaterialName.BasedOnMaterialName;
                 mi.materialSearch = ModelImporterMaterialSearch.Local;
             }
+            // wall-damage-1: the barricade's damage look cuts its deployed mesh into planks and posts at load (BarricadeDamage).
+            if (spec != null && spec.Key == ArtMapping.MinerBarricade) mi.isReadable = true;
 
             mi.animationType = rigged ? ModelImporterAnimationType.Generic : ModelImporterAnimationType.None;
             mi.avatarSetup = rigged ? ModelImporterAvatarSetup.CreateFromThisModel : ModelImporterAvatarSetup.NoAvatar;

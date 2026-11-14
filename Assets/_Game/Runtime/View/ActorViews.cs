@@ -528,7 +528,7 @@ namespace CriticalMass.Runtime.View
                 ModelView m = _barricades[i];
                 if (m == null) continue;
                 m.SetActive(on);
-                if (!on) continue;
+                if (!on) { CriticalMass.Runtime.View.WallDamage.BarricadeDamage.Sync(i, m, b, cfg.Abilities.MinerBarricade.MaxHp, false); continue; }
                 count++;
                 double x = b.Cx + 0.5, z = b.Cz + 0.5;
                 m.Transform.localPosition = SimSpace.ToWorld(x, GroundHeight(map, x, z), z);
@@ -541,6 +541,8 @@ namespace CriticalMass.Runtime.View
                     if (r != null && r.enabled != show) r.enabled = show;
                 }
                 m.SetMaterial(ArtMaterials.ForTeam(m.Spec, b.Team));
+                // wall-damage-1: damage stages ON the barricade (pieces askew, cracks, lean), the per-hit shake, the break.
+                CriticalMass.Runtime.View.WallDamage.BarricadeDamage.Sync(i, m, b, cfg.Abilities.MinerBarricade.MaxHp, true);
             }
             return count;
         }

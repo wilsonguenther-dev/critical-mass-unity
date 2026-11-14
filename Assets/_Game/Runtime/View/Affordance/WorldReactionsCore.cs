@@ -66,6 +66,11 @@ namespace CriticalMass.Runtime.View.Affordance
 
         public int LocalActor = 0;
 
+        /// <summary>wall-damage-1: the reactions the game view reads (the damage looks shake from its pulses).</summary>
+        public static WorldReactions Current;
+        /// <summary>Most cells or barricades one Kaiju slam marks with an impact (the pulse ring is shared).</summary>
+        public const int KaijuContactCap = 8;
+
         public void Reset()
         {
             for (int i = 0; i < Pulses.Length; i++) Pulses[i].T0 = double.NegativeInfinity;
@@ -141,6 +146,7 @@ namespace CriticalMass.Runtime.View.Affordance
         public void Read(World w, double now)
         {
             if (w == null || w.Map == null) return;
+            Current = this;
             Ensure(w);
             GameConfig c = w.Config;
             if (_cursor < 0 || _cursor > w.EventHead) _cursor = Math.Max(0, w.EventHead - World.EventCapacity);
@@ -199,6 +205,9 @@ namespace CriticalMass.Runtime.View.Affordance
                     case SimEventType.BridgeCollapsed:
                         Push(ReactKind.Bridge, 1, e.X, e.Z, 0, 0, 1, now, 2);
                         break;
+                    case SimEventType.KaijuSlam:
+                        KaijuContact(w, e.X, e.Z, e.Radius > 0 ? e.Radius : e.Value, now);   // one slam path stores the radius in Value
+                        break;
                     case SimEventType.Gather:
                     case SimEventType.SourceGather:
                         Push(ReactKind.Node, 0, e.X, e.Z, 0, 0, 0.5, now);
@@ -222,6 +231,42 @@ namespace CriticalMass.Runtime.View.Affordance
                 }
                 _barricadeActive[i] = b.Active;
                 _barricadeHp[i] = b.Hp;
+            }
+        }
+
+        /// <summary>
+        /// wall-damage-1: the Kaiju's slam lands near walls and barricades. The rules do not let it damage them (no design doc
+        /// says it does; OD-4 says walls block it), so this is an impact only: a weak hit pulse (shake and dust, no health
+        /// change) on the wall cells (stone and breakable) and barricades inside the slam radius, at most KaijuContactCap of them.
+        /// </summary>
+        void KaijuContact(World w, double x, double z, double radius, double now)
+        {
+            MapDef m = w.Map;
+            if (radius <= 0) return;
+            int pushed = 0;
+            int x0 = Math.Max(0, (int)Math.Floor(x - radius)), x1 = Math.Min(m.Width - 1, (int)Math.Floor(x + radius));
+            int z0 = Math.Max(0, (int)Math.Floor(z - radius)), z1 = Math.Min(m.Height - 1, (int)Math.Floor(z + radius));
+            double r2 = radius * radius;
+            for (int cz = z0; cz <= z1 && pushed < KaijuContactCap; cz++)
+            for (int cx = x0; cx <= x1 && pushed < KaijuContactCap; cx++)
+            {
+                byte t = m.Cells[cz * m.Width + cx];
+                if (t != Cell.BreakableIntact && t != Cell.BreakableCracked && t != Cell.Wall) continue;
+                double dx = cx + 0.5 - x, dz = cz + 0.5 - z, d2 = dx * dx + dz * dz;
+                if (d2 > r2) continue;
+                double l = Math.Sqrt(d2);
+                Push(ReactKind.Wall, 0, cx + 0.5, cz + 0.5, l > 1e-6 ? dx / l : 0, l > 1e-6 ? dz / l : 0, 0.5, now);
+                pushed++;
+            }
+            for (int i = 0; w.Barricades != null && i < w.Barricades.Length && pushed < KaijuContactCap; i++)
+            {
+                Barricade b = w.Barricades[i];
+                if (!b.Active) continue;
+                double dx = b.Cx + 0.5 - x, dz = b.Cz + 0.5 - z, d2 = dx * dx + dz * dz;
+                if (d2 > r2) continue;
+                double l = Math.Sqrt(d2);
+                Push(ReactKind.Barricade, 0, b.Cx + 0.5, b.Cz + 0.5, l > 1e-6 ? dx / l : 0, l > 1e-6 ? dz / l : 0, 0.5, now);
+                pushed++;
             }
         }
 
