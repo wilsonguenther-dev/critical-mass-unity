@@ -4,6 +4,8 @@ using UnityEngine;
 using UnityEngine.Animations;
 using UnityEngine.Playables;
 
+namespace CriticalMass.Runtime.View.Art
+{
     /// <summary>
     /// rigs-2 (2026-11-13): per-class retarget of the shared KayKit clips onto a model whose BIND pose differs from its
     /// armature rest (the HY Farmer: the mesh is bound in its own A-pose while the armature rest carries the KayKit joints).
@@ -126,8 +128,6 @@ using UnityEngine.Playables;
         }
     }
 
-namespace CriticalMass.Runtime.View.Art
-{
     /// <summary>
     /// One instance of an imported model with a controller-free clip mixer (Playables, manual update): the caller sets each
     /// clip's time and weight every frame from sim state and calls Evaluate. No AnimatorController assets, no state machine
