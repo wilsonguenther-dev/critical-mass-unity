@@ -14,7 +14,8 @@
     "LOD1": 1400,
     "Shadow": 750
    },
-   "floater_frac": 0.002
+   "floater_frac": 0.002,
+   "voxel": 0.006
   },
   {
    "name": "Healer",
@@ -33,7 +34,8 @@
     "Shadow": 750
    },
    "floater_frac": 0.002,
-   "cloth_tol": 0.12
+   "cloth_tol": 0.12,
+   "voxel": 0.006
   },
   {
    "name": "Demolitions",
@@ -49,7 +51,8 @@
     "LOD1": 1400,
     "Shadow": 750
    },
-   "floater_frac": 0.002
+   "floater_frac": 0.002,
+   "voxel": 0.006
   },
   {
    "name": "Kaiju_Hatchling",
@@ -71,7 +74,8 @@
     "Shadow": 1200
    },
    "floater_frac": 0.002,
-   "glow_tol": 0.1
+   "glow_tol": 0.1,
+   "voxel": 0.006
   }
  ]
 }

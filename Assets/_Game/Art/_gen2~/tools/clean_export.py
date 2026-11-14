@@ -153,7 +153,7 @@ def decimated_copy(src, name, target):
     ob = src.copy(); ob.data = src.data.copy(); ob.name = ob.data.name = name
     bpy.context.scene.collection.objects.link(ob)
     t0 = t = tri_count(ob); how = []
-    for _ in range(4):
+    for _ in range(6):
         if t <= target:
             break
         md = ob.modifiers.new("dec", "DECIMATE"); md.decimate_type = "COLLAPSE"; md.ratio = max(1e-4, target / t * 0.98)
@@ -321,6 +321,11 @@ def clean(e):
         kd.insert(p, i)
     kd.balance()
     ob.name = name + "_RAW"
+    if e.get("voxel"):   # generated meshes with internal sheets: rebuild one closed surface first (colour comes from the kd-tree)
+        md = ob.modifiers.new("vox", "REMESH"); md.mode = "VOXEL"; md.voxel_size = e["voxel"] * e["height"] / 2.0
+        md.use_smooth_shade = False; sel_only([ob], ob); bpy.ops.object.modifier_apply(modifier=md.name)
+        facts["voxel_rebuild_m"] = md.voxel_size if False else e["voxel"] * e["height"] / 2.0; facts["voxel_tris"] = tri_count(ob)
+        print("GEN2 voxel", name, facts["voxel_tris"])
     lods = e.get("lods", {"Hero": 22000, "LOD0": 4000, "LOD1": 1400, "Shadow": 750})
     prefix = e.get("prefix", name)
     levels = {}; cols = {}
