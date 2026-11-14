@@ -2,7 +2,8 @@
 #   blender -b -P check_sheet.py -- <out> <Cls> [<Cls>.fbx] [<Cls>_Clips.fbx]
 # Rows, top to bottom: bind pose front | side | back | three-quarter; Idle first frame in the same four views;
 # Walk strip (side, 6 frames); Run strip (side, 6); attack strip (three-quarter, 6); skill strip (side, 6);
-# reactions (three-quarter): Hit mid, HitHeavy mid, KnockDown end, KO end, GetUp mid, Death end.
+# reactions (three-quarter): Hit mid, HitHeavy mid, KnockDown end, DeathB end (knockout), GetUp mid, Death end.
+# The clips play on the clip file's own skeleton and the model copies it in world space (what Unity does).
 # The game's light weapon is stood in by the same 0.62 u stick bake_clips.py uses, on handslot.r.
 # Writes <out>/check_<Cls>.png and <out>/check_<Cls>.json (idle sole heights, lean, weapon direction, height).
 import bpy, sys, os, json, math
@@ -49,8 +50,10 @@ scene = bpy.context.scene
 if not (os.path.exists(FBX) and os.path.exists(CLIPS)):
     REP['error'] = 'missing input'; save(); raise SystemExit(0)
 cobjs, cacts = imp(CLIPS, True)
+ca = next(o for o in cobjs if o.type == 'ARMATURE')   # the clip file's own skeleton plays the clips
 for o in cobjs:
-    bpy.data.objects.remove(o, do_unlink=True)
+    if o is not ca:
+        bpy.data.objects.remove(o, do_unlink=True)
 acts = {a.name.split('|')[-1]: a for a in cacts}
 fobjs, _ = imp(FBX, False)
 fa = next(o for o in fobjs if o.type == 'ARMATURE')
@@ -61,6 +64,22 @@ for o in fobjs:
 for a in acts.values():
     a.use_fake_user = True
 assign(fa, None)
+assign(ca, None)
+# Unity plays a clip file's curves as ABSOLUTE local transforms on the model's bones (matched by path), not as offsets from
+# the model's own rest. To see what the game sees, the model's bones copy the clip skeleton's bones in world space.
+ca.matrix_world = fa.matrix_world.copy()
+for pb in fa.pose.bones:
+    if pb.name in ca.pose.bones:
+        c_ = pb.constraints.new('COPY_TRANSFORMS'); c_.target = ca; c_.subtarget = pb.name
+        c_.target_space = c_.owner_space = 'WORLD'
+ca.hide_render = True
+REP['rest_diff_deg'] = {}
+for b_ in fa.data.bones:
+    if b_.name in ca.data.bones:
+        q1 = (fa.matrix_world @ b_.matrix_local).to_quaternion(); q2 = (ca.matrix_world @ ca.data.bones[b_.name].matrix_local).to_quaternion()
+        d_ = math.degrees(q1.rotation_difference(q2).angle)
+        if d_ > 1:
+            REP['rest_diff_deg'][b_.name] = round(d_, 1)
 for pb in fa.pose.bones:
     pb.location = (0, 0, 0); pb.rotation_quaternion = (1, 0, 0, 0); pb.rotation_euler = (0, 0, 0); pb.scale = (1, 1, 1)
 upd()
@@ -171,7 +190,7 @@ for vn, deg in VIEWS.items():
 rows.append(row)
 measure('bind')
 if 'Idle' in acts:
-    assign(fa, acts['Idle']); scene.frame_set(int(acts['Idle'].frame_range[0])); upd()
+    assign(ca, acts['Idle']); scene.frame_set(int(acts['Idle'].frame_range[0])); upd()
     measure('Idle')
     row = []
     for vn, deg in VIEWS.items():
@@ -180,7 +199,7 @@ if 'Idle' in acts:
 for clip, vn in (('Walk', 'side'), ('Run', 'side'), (ATTACK, 'q34'), (SKILL, 'side')):
     if clip not in acts:
         REP.setdefault('missing', []).append(clip); continue
-    assign(fa, acts[clip]); view(VIEWS[vn])
+    assign(ca, acts[clip]); view(VIEWS[vn])
     row = []
     for k, f in enumerate(frames(acts[clip], 6)):
         scene.frame_set(f); upd()
@@ -190,10 +209,10 @@ for clip, vn in (('Walk', 'side'), ('Run', 'side'), (ATTACK, 'q34'), (SKILL, 'si
     rows.append(row)
 row = []
 view(VIEWS['q34'])
-for clip, at in (('Hit', 0.5), ('HitHeavy', 0.5), ('KnockDown', 1.0), ('KO', 1.0), ('GetUp', 0.5), ('Death', 1.0)):
+for clip, at in (('Hit', 0.5), ('HitHeavy', 0.5), ('KnockDown', 1.0), ('DeathB', 1.0), ('GetUp', 0.5), ('Death', 1.0)):
     if clip not in acts:
         REP.setdefault('missing', []).append(clip); continue
-    assign(fa, acts[clip])
+    assign(ca, acts[clip])
     f0, f1 = acts[clip].frame_range
     scene.frame_set(int(f0 + (f1 - f0) * at)); upd()
     row.append(shot(f'react_{clip}'))
