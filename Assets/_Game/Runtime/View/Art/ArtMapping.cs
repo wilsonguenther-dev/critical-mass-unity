@@ -329,6 +329,8 @@ namespace CriticalMass.Runtime.View.Art
             // tris) on the shared 41 skeleton names, whole-hand weights, leaf wings rigid on the chest (rig_body.py), clips baked
             // per class with foot IK (Healer_Clips.fbx; hip-height ratio = StrideScale). Empty hands: the game hangs the
             // lantern on handslot.r. Face in the vertex colour; no glow code (6) in this body. Pre-batch-b: Healer/_fallback~.
+            // rig-healer-3: back strip deleted and capped in the dress colour, eyes and brows painted dark (code 0), buns rigid on
+            // the head, run stance anchored at the ground speed and run lean halved (hmw_run.py rig, GitHub run of bbe6e85).
             new ModelSpec { Key = Healer, AssetPath = "Assets/_Game/Art/Healer/Healer.fbx", Kind = ArtKind.Character, Rigged = true,
                 Bones = 41, ClipSource = "Assets/_Game/Art/Healer/Healer_Clips.fbx",
                 Meshes = new[] { "Healer_Hero", "Healer_LOD0", "Healer_LOD1", "Healer_Shadow" }, MaskCodes = new[] { 0, 8 },
