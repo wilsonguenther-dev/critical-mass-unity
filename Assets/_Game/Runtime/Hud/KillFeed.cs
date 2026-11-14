@@ -310,6 +310,7 @@ namespace CriticalMass.Runtime.Hud
                 var s = new Slot();
                 s.Rt = MenuUi.Rt(_box, "Line " + i);
                 MenuUi.Place(s.Rt, 0f, 0f, LineW, LineH);
+                HudZones.RegisterPanel(s.Rt);   // fix/hud-containment-5: world labels stay off the kill feed lines
                 s.Group = s.Rt.gameObject.AddComponent<CanvasGroup>();
                 s.Group.blocksRaycasts = false;
                 s.Group.interactable = false;

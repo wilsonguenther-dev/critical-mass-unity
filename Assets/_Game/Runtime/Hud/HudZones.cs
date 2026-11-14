@@ -132,9 +132,10 @@ namespace CriticalMass.Runtime.Hud
         // ---- panel mask (fix/hud-containment-4): HUD panels that world labels (name tags, call bubbles) must not draw
         // over. A panel registers its RectTransform once; OverPanel tests a label's screen rect against every active one.
         // Fixed arrays, no allocation; a destroyed panel's slot is reused.
-        const int MaxPanels = 16;
+        const int MaxPanels = 64;   // fix/hud-containment-5: every HUD panel, chip and line registers (was 16)
         static readonly RectTransform[] _panels = new RectTransform[MaxPanels];
         static readonly Canvas[] _panelCanvas = new Canvas[MaxPanels];
+        static readonly CanvasGroup[] _panelGroup = new CanvasGroup[MaxPanels];
         static int _panelCount;
         static readonly Vector3[] _corners = new Vector3[4];
 
@@ -151,6 +152,7 @@ namespace CriticalMass.Runtime.Hud
             if (free < 0) { if (_panelCount >= MaxPanels) return; free = _panelCount++; }
             _panels[free] = rt;
             _panelCanvas[free] = rt.GetComponentInParent<Canvas>();
+            _panelGroup[free] = rt.GetComponent<CanvasGroup>();   // a faded-out line masks nothing
         }
 
         /// <summary>rt's rect in screen pixels (bottom-left origin) on its canvas.</summary>
@@ -173,6 +175,8 @@ namespace CriticalMass.Runtime.Hud
                 if (p == null || !p.gameObject.activeInHierarchy) continue;
                 Canvas pc = _panelCanvas[i];
                 if (pc != null && !pc.enabled) continue;
+                CanvasGroup g = _panelGroup[i];
+                if (g != null && g.alpha <= 0.01f) continue;
                 if (me.Overlaps(ScreenRectOf(p, pc))) return true;
             }
             return false;

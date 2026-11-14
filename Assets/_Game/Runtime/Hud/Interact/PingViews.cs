@@ -348,6 +348,7 @@ namespace CriticalMass.Runtime.Hud.Interact
                 _text[i] = MenuUi.Label(rt, "Text", CMTokens.Ui, UiScale.TypeSmall, InteractUi.Cream, TextAnchor.MiddleLeft, 32f, 0f, 488f, LineH, "", 2.5f);
                 rt.gameObject.SetActive(false);
                 _rt[i] = rt;
+                HudZones.RegisterPanel(rt);   // fix/hud-containment-5: no name tag through a teammate call line ("FerGALElp!")
             }
         }
 

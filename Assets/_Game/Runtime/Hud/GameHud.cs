@@ -69,6 +69,8 @@ namespace CriticalMass.Runtime.Hud
             t0 = LoadTimer.Now();
             Clusters[(int)HudCluster.Match] = Cluster(HudCluster.Match);
             Clusters[(int)HudCluster.Kaiju] = Cluster(HudCluster.Kaiju);
+            HudZones.RegisterPanel(Clusters[(int)HudCluster.Match]);   // fix/hud-containment-5: the top band (clock, scores,
+            HudZones.RegisterPanel(Clusters[(int)HudCluster.Kaiju]);   // hill bar and its word) and the Kaiju panel mask world labels
             Clusters[(int)HudCluster.Player] = Cluster(HudCluster.Player);
             Clusters[(int)HudCluster.Minimap] = Cluster(HudCluster.Minimap);
             HudZones.RegisterPanel(Clusters[(int)HudCluster.Player]);    // fix/hud-containment-4: world labels stay off

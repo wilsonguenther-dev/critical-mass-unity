@@ -201,6 +201,8 @@ namespace CriticalMass.Runtime.Hud.Mechanics
 
             // team stock: three chips under the objective (own team only)
             _stock = MenuUi.Rt(_space, "Team Stock");
+            HudZones.RegisterPanel(_stock);   // fix/hud-containment-5: the top-centre stack masks world labels
+            HudZones.RegisterPanel(_obj);
             MenuUi.Place(_stock, (HudLayout.RefW - HudZones.StockW) * 0.5f, HudZones.StockY, HudZones.StockW, HudZones.StockH);
             ShapeKind[] icons = { ShapeKind.Hexagon, ShapeKind.Egg, ShapeKind.Circle };
             Color[] cols = { new Color32(160, 116, 72, 255), new Color32(96, 176, 232, 255), CMTokens.Biomass.Color };
@@ -229,6 +231,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
 
             // map-event bar
             _event = MenuUi.Rt(_space, "Map Event");
+            HudZones.RegisterPanel(_event);
             MenuUi.Place(_event, (HudLayout.RefW - EventW) * 0.5f, HudZones.EventY, EventW, EventH);
             Chip(_event, "Track", ShapeKind.RoundRect, 0f, 0f, EventW, EventH, CMTokens.WithAlpha(panel, 0.92f), 12f);
             _eventFill = Chip(_event, "Fill", ShapeKind.RoundRect, 3f, 3f, EventW - 6f, EventH - 6f, CMTokens.MeterOrange.Color, 10f);
