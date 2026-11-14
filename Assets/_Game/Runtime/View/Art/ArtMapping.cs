@@ -315,7 +315,7 @@ namespace CriticalMass.Runtime.View.Art
             // Art landing (2026-11-12): the three new classes, LOD files from art/fighter-lods d536d30 (weapons folded into
             // every level). Each body carries CM_Toon plus CM_FaceDecal on slot 1, the Miner's decal method (class READMEs).
             // rig-demolitions-1 (2026-11-14): the generated Demolitions body (octree shell + 4 mm voxel rebuild + collapse; Hero
-            // 21.6k, LOD0 3.9k, LOD1 1.4k, Shadow 0.8k tris) on the shared 41 skeleton names, whole-hand weights (fingerless
+            // 21,586, LOD0 3,946, LOD1 1,406, Shadow 820 tris incl. 26 for the eyes and brows, added geometry on the head bone) on the shared 41 skeleton names, whole-hand weights (fingerless
             // gloves; fingers merge at this budget), weights from a voxel proxy (rig_body.py; the barrel behind her back is a
             // separate piece held rigid on the chest, the hair buns ride the head), clips baked per class with foot IK
             // (Demolitions_Clips.fbx, bake_clips.py; hip-height ratio = StrideScale). Empty hands: the game hangs the pry bar on
