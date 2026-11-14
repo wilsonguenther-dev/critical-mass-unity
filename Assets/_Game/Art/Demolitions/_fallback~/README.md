@@ -1,0 +1,1 @@
+Pre-rig-batch-b Demolitions (KayKit joints, DemolitionsFace.png decal on slot 1). Replaced 2026-11-14 (rig-demolitions-1) by the generated body rigged with rig_body.py; rig_body.py reads this file for the KayKit skeleton.
