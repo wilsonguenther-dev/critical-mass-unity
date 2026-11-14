@@ -3,6 +3,8 @@ using CriticalMass.Runtime.Flow;
 using CriticalMass.Runtime.Game;
 using CriticalMass.Runtime.Hud;
 using CriticalMass.Runtime.Input;
+using CriticalMass.Runtime.Menu;
+using CriticalMass.Runtime.Menus;
 using CriticalMass.Sim.Config;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -154,7 +156,19 @@ namespace CriticalMass.Runtime.Onboarding
     public sealed class TrialBoot : MonoBehaviour
     {
         /// <summary>The offer is shown on boot (player builds, done flag not set).</summary>
-        public static bool OfferOnBoot => !Application.isEditor && !Application.isBatchMode && !GameFlow.Autoplay && !TrialProgress.Done;
+        public static bool OfferOnBoot => !Application.isEditor && !Application.isBatchMode && !GameFlow.Autoplay && !TrialProgress.Done && !TrialProgress.Offered;
+
+        /// <summary>fix/hud-containment-4 (by eye: the card came back on Home after a match, over CONFIRM QUIT): the card
+        /// waits while any other modal or full screen is up, and once shown (or once a match was played) never shows again.</summary>
+        public static bool OtherModalUp(MainMenu home) =>
+            (home != null && home.QuitConfirming) || ClassSelect.IsOpen || ControlsCard.IsOpen || Credits.IsOpen || LoadingScreen.IsOpen ||
+            ResultsHighlights.IsOpen || PauseMenuOpen();
+
+        static bool PauseMenuOpen()
+        {
+            PauseMenu p = UnityEngine.Object.FindAnyObjectByType<PauseMenu>();   // only while the card waits to show (menu idle)
+            return p != null && p.IsOpen;
+        }
 
         float _readyAt = -1f;
 
@@ -179,6 +193,7 @@ namespace CriticalMass.Runtime.Onboarding
             // first time the title is dismissed. Never over a match, setup or results.
             if (GameFlow.Enabled && GameFlow.State != FlowState.Title && GameFlow.State != FlowState.Menu)
             {
+                if (GameFlow.State == FlowState.Match && !Trial.PendingStart) TrialProgress.Offered = true;   // a match played: never offer after it
                 enabled = false;
                 return;
             }
@@ -195,7 +210,9 @@ namespace CriticalMass.Runtime.Onboarding
             // A short beat after the title goes, so the dismissing key does not land on the offer.
             if (_readyAt < 0f) _readyAt = Time.unscaledTime + 0.25f;
             if (Time.unscaledTime < _readyAt) return;
+            if (OtherModalUp(FlowDirector.Current != null ? FlowDirector.Current.MainMenu : null)) return;   // never over another modal
             enabled = false;
+            TrialProgress.Offered = true;   // its one showing
             // The card stands in for the main menu while it is up (its Skip brings the menu back), so the two never show at once.
             if (Trial.ShowOffer() != null && GameFlow.State == FlowState.Menu && FlowDirector.Current != null)
                 FlowDirector.Current.MainMenu.Hide();
