@@ -10,6 +10,7 @@
 import bpy, bmesh, json, math, os, sys
 import numpy as np
 from mathutils import Vector, kdtree
+from mathutils.bvhtree import BVHTree
 
 argv = sys.argv[sys.argv.index("--") + 1:]
 OUT, REPO, INP, MAN = argv[0], argv[1], argv[2], argv[3]
@@ -391,8 +392,25 @@ def clean(e):
                 S = np.array([srccol[kd.find(q)[1]][:3] for q in pts])
                 fi.append(i); lum.append(float(S.mean(1).min())); mlum.append(float(S.mean())); warm.append(float((S[:, 0] - S[:, 2]).min()))
             if fi:
-                fi = np.array(fi); lum = np.array(lum); warm = np.array(warm); ref = float(np.percentile(mlum, 75))
-                dark = fi[(lum < ff.get("rel", 0.65) * ref) | (warm < ff.get("cool", 0.06))]
+                fi = np.array(fi); mlum = np.array(mlum); ref = float(np.percentile(mlum, 75))
+                if lv == "Hero":
+                    # the face's MEAN colour (a feature has to cover most of the face, so shading seams do not blotch)
+                    S_ = [np.array([srccol[kd.find(q)[1]][:3] for q in [me.polygons[i].center] +
+                                    [me.polygons[i].center.lerp(me.vertices[v].co, 0.5) for v in me.polygons[i].vertices]]) for i in fi]
+                    mwarm = np.array([float((S[:, 0] - S[:, 2]).mean()) for S in S_])
+                    dark = fi[(mlum < ff.get("rel", 0.6) * ref) | (mwarm < ff.get("cool", 0.04))]
+                    hero_bvh = BVHTree.FromObject(o, bpy.context.evaluated_depsgraph_get())
+                    hero_dark = set(int(i) for i in dark)
+                else:
+                    # lower levels follow the Hero: a face is a feature when most of its sample points land on Hero features
+                    keep = []
+                    for i in fi:
+                        pg = me.polygons[i]; c = pg.center
+                        pts = [c] + [c.lerp(me.vertices[v].co, 0.5) for v in pg.vertices]
+                        hits = [hero_bvh.find_nearest(q)[2] for q in pts]
+                        if np.mean([h in hero_dark for h in hits]) >= ff.get("follow", 0.6):
+                            keep.append(i)
+                    dark = np.array(keep, int)
                 rgba[dark, :3] = hex2rgb(ff.get("colour", "#33241E")); rgba[dark, 3] = 0
                 facts.setdefault("face_features", {})[lv] = {"faces_in_box": int(len(fi)), "skin_ref": round(ref, 3),
                                                              "painted": int(len(dark))}
