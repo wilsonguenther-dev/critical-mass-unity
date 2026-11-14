@@ -248,9 +248,8 @@ def bake_action(clip, act):
         for s in SIDES:
             R = K["R" + s] @ K0["R" + s].inverted() @ TOEFIX[s] @ F0["R" + s]
             dk = K["A" + s] - K0["A" + s]
-            # Horizontal foot motion scales with the legs (stride); the lift of a swinging foot does not, so the swing
-            # ankle stays above the planted one (the game's facing tests take the lower ankle as the planted foot).
-            A = F0["A" + s] + Vector((dk.x * RATIO, dk.y * RATIO, dk.z)) + Vector((0, 0, LIFT))
+            # Foot motion scales with the legs (an unscaled swing lift was tried: Walk's lowest foot rose to 0.043).
+            A = F0["A" + s] + dk * RATIO + Vector((0, 0, LIFT))
             planted = (K["A" + s].z - K0["A" + s].z) < PLANT * leg_k
             if planted and bdir is not None:
                 if anchor[s] is None:
