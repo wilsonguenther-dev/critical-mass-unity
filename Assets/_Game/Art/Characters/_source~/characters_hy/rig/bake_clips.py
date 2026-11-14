@@ -152,6 +152,14 @@ wco = co @ mw[:3, :3].T + mw[:3, 3]
 FOOTV = {s: np.array([i for i in range(nv) if vg.get(dom[i], "") in ("foot." + s, "toes." + s)]) for s in SIDES}
 SOLEV = {s: np.array([i for i in range(nv) if vg.get(dom[i], "") == "foot." + s]) for s in SIDES}
 LIFT = -float(min(wco[FOOTV[s]][:, 2].min() for s in SIDES))
+# rig-warrior-1: the motion scale is the hip height above the soles against KayKit's (0.519 m, its bind), not the
+# hip-to-ankle chain: after the Warrior's shins were lengthened (ankles at KayKit's height inside his boots) the chain
+# ratio read 1.187 against a true size of 1.117, the hips rode too high, and in StrafeR his lower foot could not reach
+# down (both ankles level where KayKit's differ by 7-10 cm; the game read him turned around).
+KAYKIT_HIP = 0.519
+if CLS in ("Warrior",):
+    RATIO = ((fa.matrix_world @ fa.data.bones["upperleg.l"].head_local).z + LIFT) / KAYKIT_HIP
+    log("hip-height ratio", round(RATIO, 4))
 OFF = {}
 for s in SIDES:
     inv = np.array(F0["M" + s].inverted())
