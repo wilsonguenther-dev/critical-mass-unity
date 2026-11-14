@@ -1,5 +1,6 @@
 using System;
 using CriticalMass.Runtime.View.Affordance;
+using CriticalMass.Sim.Core;
 using CriticalMass.Sim.Grid;
 using UnityEngine;
 

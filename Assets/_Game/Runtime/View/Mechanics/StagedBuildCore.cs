@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using CriticalMass.Runtime.View.Art;
+using CriticalMass.Sim.Config;
 using CriticalMass.Sim.Core;
 using UnityEngine;
 

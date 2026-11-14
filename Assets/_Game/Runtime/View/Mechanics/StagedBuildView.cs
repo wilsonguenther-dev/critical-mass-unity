@@ -5,6 +5,7 @@ using CriticalMass.Runtime.Menu;
 using CriticalMass.Runtime.View.Anim;
 using CriticalMass.Runtime.View.Art;
 using CriticalMass.Runtime.View.Effects;
+using CriticalMass.Sim.Config;
 using CriticalMass.Sim.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
