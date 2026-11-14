@@ -167,8 +167,10 @@ namespace CriticalMass.Runtime.Hud.Mechanics
                 _rowChip[r].RimPx = 0f;
                 _rowPie[r] = MenuUi.Shape(_kit, "Pie " + r, ShapeKind.Pie, 20f, y + 5f, 38f, 38f, brass, 19f);
                 _rowPie[r].EmptyColor = CMTokens.MeterEmpty.Color;
+                _rowPie[r].RoundPie = true;   // fix/hud-containment-5: a round cooldown under the skill's icon (was a tan square)
                 _rowPie[r].OutlinePx = 3f;
                 _rowPie[r].RimPx = 0f;
+                _rowIcon[r] = HudIcon.Make(_kit, "Icon " + r, 23f, y + 8f, 32f, 32f);   // the skill's painted icon over its cooldown
                 _rowCd[r] = MenuUi.Fit(MenuUi.Label(_kit, "Cd " + r, CMTokens.Mono, UiScale.TypeMin, cream, TextAnchor.MiddleCenter, 16f, y + 5f, 46f, 38f, "", 2f), 15);
                 _rowName[r] = MenuUi.Fit(MenuUi.Label(_kit, "Name " + r, CMTokens.Ui, UiScale.TypeSmall, cream, TextAnchor.MiddleLeft, 70f, y + 2f, 154f, 26f, "", 2f), 12);
                 _rowNote[r] = MenuUi.Fit(MenuUi.Label(_kit, "Note " + r, CMTokens.Ui, UiScale.TypeMin, brass, TextAnchor.MiddleLeft, 70f, y + 26f, 154f, 20f, "", 2f), 11);
@@ -300,6 +302,12 @@ namespace CriticalMass.Runtime.Hud.Mechanics
                 HudText.Set(_rowNote[r], row.Note ?? string.Empty);
                 HudText.Set(_rowCd[r], CdLabel(row.CdSeconds));
                 _rowPie[r].Fill01 = 1f - row.Cd01;
+                // fix/hud-containment-5: the row's icon (the class's attack or ability art; none for other actions, the round
+                // cooldown then stands alone). The Healer has her own art since hud-art (UiIcons.Ability row 5).
+                string icon = RowIcon(row.Action, (int)a.Cls, (int)a.Team);
+                if (_rowIcon[r].Name != icon) _rowIcon[r].Set(icon, 2);
+                bool showIcon = icon != null && row.Cd01 <= 0f;
+                if (_rowIcon[r].Image.gameObject.activeSelf != showIcon) _rowIcon[r].Image.gameObject.SetActive(showIcon);
                 bool ready = row.Cd01 <= 0f && row.Usable && (row.MaxCharges == 0 || row.Charges > 0);
                 _rowChip[r].SetFill(ready ? CMTokens.PanelNavy.Color : CMTokens.MeterEmpty.Color);
                 _rowName[r].color = row.Usable ? CMTokens.WarmCream.Color : CMTokens.Stone.Color;
@@ -348,8 +356,20 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             // rows keep their place under the title: they are children of _kit, placed from its top
         }
 
+        readonly HudIcon[] _rowIcon = new HudIcon[2];
+
+        /// <summary>The painted icon for a kit row's action: the class's attack or ability art, else none.</summary>
+        public static string RowIcon(string action, int cls, int team)
+        {
+            int row = Mathf.Clamp(cls, 0, UiIcons.Ability.GetLength(0) - 1), t = Mathf.Clamp(team, 0, UiIcons.Ability.GetLength(1) - 1);
+            if (action == "Ability") return UiIcons.Ability[row, t];
+            if (action == "Attack") return UiIcons.Attack[Mathf.Clamp(cls, 0, UiIcons.Attack.GetLength(0) - 1), Mathf.Clamp(team, 0, UiIcons.Attack.GetLength(1) - 1)];
+            return null;
+        }
+
         void SetRowActive(int r, bool on)
         {
+            if (_rowIcon[r] != null && !on && _rowIcon[r].Image.gameObject.activeSelf) _rowIcon[r].Image.gameObject.SetActive(false);
             if (_rowChip[r].gameObject.activeSelf == on) return;
             _rowChip[r].gameObject.SetActive(on);
             _rowPie[r].gameObject.SetActive(on);
