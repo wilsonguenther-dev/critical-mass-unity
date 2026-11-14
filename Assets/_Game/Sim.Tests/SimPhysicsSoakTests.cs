@@ -218,7 +218,7 @@ namespace CriticalMass.Sim.Tests
         private static readonly ulong[,] Golden =
         {
             { 0x5C912AEED16BC302UL, 0x2980068FA0457CC2UL }, // Classic (DG-21, unchanged since the browser port)
-            { 0x2BE070768E23B442UL, 0x8BCA67D3B8845532UL }, // PhysicsOnly (re-pinned 2026-11-12: U-071; 5v5 re-pinned 2026-11-13: fix/kaiju-alive-1 Kaiju hits stagger, throw at KaijuKnockScale 0.5, topple)
+            { 0xBFA1133FB889F15FUL, 0x8809B67103F4E49CUL }, // PhysicsOnly (re-pinned 2026-11-14 integration batch 10 for fix/movement-shiver-1, from run 43625073919; before: 0x2BE070768E23B442 / 0x8BCA67D3B8845532; earlier: (re-pinned 2026-11-12: U-071; 5v5 re-pinned 2026-11-13: fix/kaiju-alive-1 Kaiju hits stagger, throw at KaijuKnockScale 0.5, topple)
             // feat/light-weapons-1 (2026-11-14): this Full row MUST be re-pinned ON PURPOSE in the one combined compile. The light
             // weapons (DepthConfig.LightWeapons) change every Full match: Demolitions and Healer bots now swing at close range and
             // every Builder / Demolitions / Healer hit shoves. Classic and PhysicsOnly do not move (depth rules are off there).
