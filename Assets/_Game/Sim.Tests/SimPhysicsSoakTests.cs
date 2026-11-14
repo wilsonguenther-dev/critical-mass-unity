@@ -221,7 +221,7 @@ namespace CriticalMass.Sim.Tests
         private static readonly ulong[,] Golden =
         {
             { 0x5C912AEED16BC302UL, 0x2980068FA0457CC2UL }, // Classic (DG-21, unchanged since the browser port)
-            { 0x233E437F9CFAECD7UL, 0x490A1BF7AA50C0A2UL }, // PhysicsOnly (re-pinned 2026-11-14 integration batch 10 for fix/movement-shiver-1 + -2, from run 43628367378; shiver-1 alone: 0xBFA1133FB889F15F / 0x8809B67103F4E49C; before: 0x2BE070768E23B442 / 0x8BCA67D3B8845532; earlier: (re-pinned 2026-11-12: U-071; 5v5 re-pinned 2026-11-13: fix/kaiju-alive-1 Kaiju hits stagger, throw at KaijuKnockScale 0.5, topple)
+            { 0x9109BE7ADFF569D0UL, 0xACD13B8995712D03UL }, // PhysicsOnly (re-pinned 2026-11-14 integration batch 10 for fix/movement-shiver-1..3, from run 43630865907; after -2: 0x233E437F9CFAECD7 / 0x490A1BF7AA50C0A2; shiver-1 alone: 0xBFA1133FB889F15F / 0x8809B67103F4E49C; before: 0x2BE070768E23B442 / 0x8BCA67D3B8845532; earlier: (re-pinned 2026-11-12: U-071; 5v5 re-pinned 2026-11-13: fix/kaiju-alive-1 Kaiju hits stagger, throw at KaijuKnockScale 0.5, topple)
             // feat/light-weapons-1 (2026-11-14): this Full row MUST be re-pinned ON PURPOSE in the one combined compile. The light
             // weapons (DepthConfig.LightWeapons) change every Full match: Demolitions and Healer bots now swing at close range and
             // every Builder / Demolitions / Healer hit shoves. Classic and PhysicsOnly do not move (depth rules are off there).
@@ -232,7 +232,7 @@ namespace CriticalMass.Sim.Tests
             // with a margin) and PhysicsConfig.BotWideLine (bots walk straight at a fight target only when the body fits along
             // the line; no swinging at a target behind a wall) change Kaiju and bot decisions. Classic does not move (Phys.On is
             // off there). Copy the PhysicsOnly and Full "rules-combined golden" lines this test prints into the rows.
-            { 0x214EE5D55012D0DBUL, 0x5D9F4BDCB5B33D08UL }, // Full (re-pinned 2026-11-14 integration batch 10 for fix/movement-shiver-1 + -2, from run 43628367378; before: 0xF20646D083F6DF6D / 0x12D502EBB7470305; earlier re-pinned 2026-11-14 integration batch 9 for feat/light-weapons-1, from run 43611800851; PRE-light-weapons: 0xAA728D5DAF5451F4 / 0xBF82793EEE8C78C8; re-pinned 2026-11-13 integration batch 7: fix/bridge-holes MapEventsConfig.BridgeCollapse default false (16v16 and 5v5) plus fix/kaiju-alive-1 Kaiju hits stagger, throw at KaijuKnockScale 0.5, topple (5v5); before: 0x70C7D9F992CAC3CC / 0x8F3F947AE72E7815, U-074..U-078)
+            { 0xA4D943F5D6D6F58EUL, 0x3196E0A5CF1F7B4DUL }, // Full (re-pinned 2026-11-14 integration batch 10 for fix/movement-shiver-1..3, from run 43630865907; after -2: 0x214EE5D55012D0DB / 0x5D9F4BDCB5B33D08; before: 0xF20646D083F6DF6D / 0x12D502EBB7470305; earlier re-pinned 2026-11-14 integration batch 9 for feat/light-weapons-1, from run 43611800851; PRE-light-weapons: 0xAA728D5DAF5451F4 / 0xBF82793EEE8C78C8; re-pinned 2026-11-13 integration batch 7: fix/bridge-holes MapEventsConfig.BridgeCollapse default false (16v16 and 5v5) plus fix/kaiju-alive-1 Kaiju hits stagger, throw at KaijuKnockScale 0.5, topple (5v5); before: 0x70C7D9F992CAC3CC / 0x8F3F947AE72E7815, U-074..U-078)
         };
     }
 }
