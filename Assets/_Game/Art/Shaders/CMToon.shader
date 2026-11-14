@@ -111,6 +111,7 @@ Shader "CM/Toon"
 
             half4 CMToonForwardFragment(CMToonForwardVaryings input) : SV_Target
             {
+                CMToonFadeClip(input.positionWS, input.positionCS);   // follow-camera-2: low-view see-through dither
                 // Handles cascades and screen-space shadows itself.
                 float4 shadowCoord = TransformWorldToShadowCoord(input.positionWS);
                 Light mainLight = GetMainLight(shadowCoord);
@@ -166,17 +167,20 @@ Shader "CM/Toon"
             struct CMToonOutlineVaryings
             {
                 float4 positionCS : SV_POSITION;
+                float3 positionWS : TEXCOORD0;
             };
 
             CMToonOutlineVaryings CMToonOutlineVertex(CMToonAttributes input)
             {
                 CMToonOutlineVaryings output;
                 output.positionCS = CMToonOutlinePositionCS(input);
+                output.positionWS = CMToonWorldPos(input);
                 return output;
             }
 
             half4 CMToonOutlineFragment(CMToonOutlineVaryings input) : SV_Target
             {
+                CMToonFadeClip(input.positionWS, input.positionCS);
                 return _OutlineColor;
             }
             ENDHLSL
@@ -252,17 +256,20 @@ Shader "CM/Toon"
             struct CMToonDepthVaryings
             {
                 float4 positionCS : SV_POSITION;
+                float3 positionWS : TEXCOORD0;
             };
 
             CMToonDepthVaryings CMToonDepthVertex(CMToonAttributes input)
             {
                 CMToonDepthVaryings output;
                 output.positionCS = CMToonPositionCS(input);
+                output.positionWS = CMToonWorldPos(input);
                 return output;
             }
 
             half CMToonDepthFragment(CMToonDepthVaryings input) : SV_Target
             {
+                CMToonFadeClip(input.positionWS, input.positionCS);   // the depth prepass must leave the same holes
                 return input.positionCS.z;
             }
             ENDHLSL
@@ -287,18 +294,21 @@ Shader "CM/Toon"
             {
                 float4 positionCS : SV_POSITION;
                 float3 normalWS   : TEXCOORD0;
+                float3 positionWS : TEXCOORD1;
             };
 
             CMToonDepthNormalsVaryings CMToonDepthNormalsVertex(CMToonAttributes input)
             {
                 CMToonDepthNormalsVaryings output;
                 output.positionCS = CMToonPositionCS(input);
+                output.positionWS = CMToonWorldPos(input);
                 output.normalWS = TransformObjectToWorldNormal(input.normalOS);
                 return output;
             }
 
             half4 CMToonDepthNormalsFragment(CMToonDepthNormalsVaryings input) : SV_Target
             {
+                CMToonFadeClip(input.positionWS, input.positionCS);
                 return half4(normalize(input.normalWS), 0.0);
             }
             ENDHLSL

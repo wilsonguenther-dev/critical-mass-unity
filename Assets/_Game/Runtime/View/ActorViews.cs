@@ -330,12 +330,12 @@ namespace CriticalMass.Runtime.View
             }
             if (CriticalMass.Runtime.Camera.GroundView.LodActive)
             {
-                // feat/follow-camera-1: first person hides your own body (the lens sits in its head); any other fighter
-                // standing on the line from the camera to you is not drawn, so you never lose your character behind one;
-                // fighters outside the view or beyond the draw distance are not posed or drawn (their effects skip too).
+                // feat/follow-camera-1: first person hides your own body (the lens sits in its head); fighters outside the
+                // view or beyond the draw distance are not posed or drawn (their effects skip too). follow-camera-2: a
+                // fighter on the line from the camera to you is no longer hidden here: the toon shader dithers it
+                // (CMToonFadeClip, set by GroundView), so it reads as a ghost instead of vanishing.
                 Vector3 at = SimSpace.ToWorld(x, h, z);
-                bool hide = (i == 0 && CriticalMass.Runtime.Camera.GroundView.HideSelf)
-                    || (i != _lodSelf && CriticalMass.Runtime.Camera.ViewCull.InCorridor(_camPos, _targetPos, at, CorridorMetres));
+                bool hide = i == 0 && CriticalMass.Runtime.Camera.GroundView.HideSelf;
                 bool culled = !hide && i != _lodSelf && !CriticalMass.Runtime.Camera.ViewCull.Visible(at, 1.5f, 2.6f);
                 if (hide || culled)
                 {

@@ -85,6 +85,28 @@ float _CMForceCount;
 float4 _CMWind;
 float4 _CMSwayParams;
 
+// follow-camera-2: the low views' see-through line. Globals (set by GroundView once a frame, outside the per-material
+// buffer so the SRP batcher is untouched): _CMFadeCam.xyz = camera position, w = 1 on / 0 off; _CMFadeTarget.xyz = the
+// followed fighter's chest, w = tube radius. Surfaces near the sight line lose up to 80 percent of their pixels in a
+// screen-space dither (clip, no blending, no extra pass); ViewCull.FadeAmount in C# is the same maths (tests).
+float4 _CMFadeCam;
+float4 _CMFadeTarget;
+
+void CMToonFadeClip(float3 positionWS, float4 positionCS)
+{
+    if (_CMFadeCam.w < 0.5) return;
+    float3 a = _CMFadeCam.xyz;
+    float3 s = _CMFadeTarget.xyz - a;
+    float t = dot(positionWS - a, s) / max(dot(s, s), 1e-4);
+    if (t <= 0.02 || t >= 0.85) return;
+    float d = length(a + s * t - positionWS);
+    float r = _CMFadeTarget.w;
+    float amount = saturate((r - d) / (r * 0.5)) * 0.8;
+    // Interleaved gradient noise on the pixel position: a stable, even dither with no texture.
+    float n = frac(52.9829189 * frac(dot(positionCS.xy, float2(0.06711056, 0.00583715))));
+    clip(n - amount);
+}
+
 // Shared vertex input. uv0 is read only when _DecalOn is set and outlineW (UV4.x, baked by ArtImportPostprocessor) only
 // when _OutlineWeightUV4 is set, for the same reason as UV3 below: meshes without the channel are never asked for it.
 // Shared vertex input. color.r is the team mask (vertex colour layer "TeamMask", U-043):
