@@ -84,7 +84,8 @@ namespace CriticalMass.Runtime.Tests
             {
                 CanvasGroup g = p.GetComponent<CanvasGroup>();
                 if (g != null && g.alpha <= 0.01f) return false;
-                if (p != root && p.GetComponent<Canvas>() is Canvas c && !c.enabled) return false;
+                Canvas c = p.GetComponent<Canvas>();   // == null, not "is": Unity's missing component is a fake null
+                if (p != root && c != null && !c.enabled) return false;
                 if (p == root) break;
             }
             return true;
@@ -196,7 +197,14 @@ namespace CriticalMass.Runtime.Tests
         public void EveryScreenKeepsItsLinesInsideTheirPanelsAndOffEachOtherAtEveryShape()
         {
             var bad = new List<string>();
-            Build("Title", go => TitleScreen.Show(go, null), bad);
+            try { Build("Title", go => TitleScreen.Show(go, null), bad); }
+            finally
+            {
+                // TitleScreen.Show hands over its egg, and edit-mode DestroyImmediate skips the egg's OnDestroy: clear the
+                // flag (as MotionComicTests does), or SecretsAndOptionsTests sees the title egg as active.
+                typeof(CriticalMass.Runtime.Secrets.SecretsBoard).GetField("TitleEggAttached",
+                    BindingFlags.Static | BindingFlags.NonPublic)?.SetValue(null, false);
+            }
             Build("Home", go => go.AddComponent<MainMenu>().EnsureBuilt(), bad);
             Build("Class and team select", go => go.AddComponent<ClassSelect>().Build(), bad);
             Build("Loading", go =>

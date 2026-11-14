@@ -112,7 +112,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
         static string[] BuildBankLines()
         {
             var a = new string[200];
-            for (int i = 0; i < a.Length; i++) a[i] = BuilderBank.WoodWord + " " + i.ToString(CultureInfo.InvariantCulture) + "  LADDER 1, BRIDGE 2";   // first-minutes-1 (was "TEAM BANK n")
+            for (int i = 0; i < a.Length; i++) a[i] = BuilderBank.WoodWord + " " + i.ToString(CultureInfo.InvariantCulture) + "  LADDER 1, BRIDGE 2";   // first-minutes-1 (was TEAM BANK n)
             return a;
         }
 
