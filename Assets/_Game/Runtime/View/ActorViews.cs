@@ -546,6 +546,7 @@ namespace CriticalMass.Runtime.View
                 KaijuExpression face = ArtMapping.KaijuExpressionFor(k.State, m == _hatchling ? simTime - _hatchTime : double.NegativeInfinity,
                     kaijuAttacking, kaijuHurt, false, simTime);
                 m.SetMaterial(ArtMaterials.ForGlow(m.Spec, glow, face));
+                _kaijuAnim.Face = face;   // rig-kaiju-2: the vertex-colour face shows it with the jaw and head
                 double speed = Math.Sqrt((k.X - k.PrevX) * (k.X - k.PrevX) + (k.Z - k.PrevZ) * (k.Z - k.PrevZ)) * cfg.SimHz;
                 if (m == _egg)
                 {

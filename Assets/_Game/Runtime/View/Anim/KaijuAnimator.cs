@@ -36,6 +36,28 @@ namespace CriticalMass.Runtime.View.Anim
         /// <summary>Procedural limits (degrees) and the yaw spring (1/s). The adult turns at most TurnRateDeg per second.</summary>
         public const float LookMaxDeg = 40f, LeanMaxDeg = 7f, TailMaxDeg = 28f, HitHeadDeg = 12f;
         public const double YawOmega = 18.0, TurnRateDeg = 360.0, HatchlingTurnRateDeg = 540.0, HeadLeadSeconds = 0.12;
+        /// <summary>
+        /// rig-kaiju-2: a model with a vertex-colour face (the green-crystal adult: no expression atlases) shows the same face
+        /// range through its jaw and head: FacePose gives (jaw open, head pitch + = chin down, head roll) in degrees per
+        /// expression, eased in and out. Neutral keeps the clips' goofy half-open mouth. ActorViews sets Face every frame.
+        /// </summary>
+        public KaijuExpression Face { get; set; }
+        public const double FaceRate = 8.0;
+        /// <summary>The eased jaw offset of the face, degrees (tests and captures).</summary>
+        public float FaceJawDeg => (float)_faceJaw;
+
+        public static void FacePose(KaijuExpression e, out double jaw, out double pitch, out double roll)
+        {
+            switch (e)
+            {
+                case KaijuExpression.Happy: jaw = 10; pitch = -4; roll = 7; break;      // a goofy grin with a head tilt
+                case KaijuExpression.Angry: jaw = 14; pitch = 6; roll = 0; break;       // snarl, head (brow plates) dipped
+                case KaijuExpression.Berserk: jaw = 18; pitch = 4; roll = 0; break;
+                case KaijuExpression.Hurt: jaw = 6; pitch = -10; roll = -5; break;      // head knocked back
+                case KaijuExpression.Sleepy: jaw = 3; pitch = 12; roll = 6; break;      // head droops
+                default: jaw = 0; pitch = 0; roll = 0; break;                          // Neutral and Blink
+            }
+        }
 
         sealed class Measured
         {
@@ -61,7 +83,7 @@ namespace CriticalMass.Runtime.View.Anim
         ModelView _lastModel;
         int _lastTick = -1;
         // procedural state
-        double _yaw = double.NaN, _yawRate, _lean, _tail, _look;
+        double _yaw = double.NaN, _yawRate, _lean, _tail, _look, _faceJaw, _facePitch, _faceRoll;
 
         /// <summary>Measured walk ground speed of a model (u/s at rate 1), for tests and the capture report.</summary>
         public double WalkSpeedOf(ModelView m) => m != null && _measured.TryGetValue(m, out Measured r) ? r.WalkSpeed : FallbackWalkSpeed;
@@ -431,6 +453,23 @@ namespace CriticalMass.Runtime.View.Anim
             Turn(m.Bone("Tail3"), up, _tail * 0.35);
             Turn(m.Bone("Neck"), up, _look * 0.4);
             Turn(m.Bone("Head"), up, _look * 0.6);
+            // rig-kaiju-2: no face atlases on the green-crystal adult, so its face is the jaw and the head (view only).
+            ModelSpec spec = m.Spec;
+            if (spec != null && spec.VertexColourFace)
+            {
+                FacePose(Face, out double fj, out double fp, out double fr);
+                if (dSim > 0)
+                {
+                    double a = 1 - Math.Exp(-FaceRate * dSim);
+                    _faceJaw += (fj - _faceJaw) * a; _facePitch += (fp - _facePitch) * a; _faceRoll += (fr - _faceRoll) * a;
+                }
+                Vector3 side = parent * (drawn * Vector3.right), fwd = parent * (drawn * Vector3.forward);
+                Transform jaw = m.Bone("Jaw"), head = m.Bone("Head");
+                if (head != null && (Math.Abs(_facePitch) > 1e-3 || Math.Abs(_faceRoll) > 1e-3))
+                    head.rotation = Quaternion.AngleAxis((float)_faceRoll, fwd) * Quaternion.AngleAxis((float)_facePitch, side) * head.rotation;
+                if (jaw != null && Math.Abs(_faceJaw) > 1e-3) jaw.rotation = Quaternion.AngleAxis((float)_faceJaw, side) * jaw.rotation;
+            }
+            else { _faceJaw = 0; _facePitch = 0; _faceRoll = 0; }
             if (flinch > 0f)
             {
                 Transform head = m.Bone("Head");

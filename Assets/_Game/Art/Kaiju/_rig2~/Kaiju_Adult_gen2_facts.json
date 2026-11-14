@@ -1,0 +1,134 @@
+{
+ "name": "Kaiju_Adult",
+ "source": "in:body-pro31-mv-7441c18c-d59e-4d40-ac41-5c1bdc2d4bc8_0.glb",
+ "kind": "kaiju",
+ "raw_tris": 500000,
+ "floaters": {
+  "parts_kept": 1,
+  "parts_dropped": 0,
+  "verts_dropped": 0
+ },
+ "colour_source": "texture 4096x4096",
+ "scale_applied": 7.120457946789568,
+ "palette": [
+  {
+   "hex": "#5E5A3E",
+   "code": 0
+  },
+  {
+   "hex": "#AE906C",
+   "code": 0
+  },
+  {
+   "hex": "#8D7854",
+   "code": 0
+  },
+  {
+   "hex": "#8AA120",
+   "code": 0
+  },
+  {
+   "hex": "#0E0E0F",
+   "code": 0
+  },
+  {
+   "hex": "#5E6925",
+   "code": 0
+  },
+  {
+   "hex": "#1D1F20",
+   "code": 0
+  },
+  {
+   "hex": "#C9F632",
+   "code": 6
+  },
+  {
+   "hex": "#282B2E",
+   "code": 0
+  },
+  {
+   "hex": "#2E333E",
+   "code": 0
+  },
+  {
+   "hex": "#373D47",
+   "code": 0
+  },
+  {
+   "hex": "#434923",
+   "code": 0
+  },
+  {
+   "hex": "#ABCD22",
+   "code": 6
+  },
+  {
+   "hex": "#72822A",
+   "code": 0
+  }
+ ],
+ "levels": {
+  "Hero": {
+   "how": "collapse 500000->23520",
+   "tris": 23520,
+   "verts": 11760,
+   "size_m": [
+    5.089,
+    5.584,
+    4.999
+   ],
+   "min_z": 0.0001,
+   "faces_per_code": {
+    "0": 20806,
+    "6": 2714
+   }
+  },
+  "LOD0": {
+   "how": "collapse 500000->10780",
+   "tris": 10780,
+   "verts": 5390,
+   "size_m": [
+    5.089,
+    5.582,
+    5.009
+   ],
+   "min_z": -0.0,
+   "faces_per_code": {
+    "0": 9582,
+    "6": 1198
+   }
+  },
+  "LOD1": {
+   "how": "collapse 500000->1470",
+   "tris": 1470,
+   "verts": 735,
+   "size_m": [
+    5.088,
+    5.565,
+    5.007
+   ],
+   "min_z": 0.0083,
+   "faces_per_code": {
+    "0": 1315,
+    "6": 155
+   }
+  },
+  "Shadow": {
+   "how": "collapse 500000->1372",
+   "tris": 1372,
+   "verts": 686,
+   "size_m": [
+    5.088,
+    5.565,
+    4.949
+   ],
+   "min_z": 0.0083,
+   "faces_per_code": {
+    "0": 1227,
+    "6": 145
+   }
+  }
+ },
+ "fbx": "Kaiju_Adult/Kaiju_Adult.fbx"
+}

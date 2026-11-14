@@ -84,10 +84,18 @@ namespace CriticalMass.Runtime.Tests
                 ModelSpec spec = ArtMapping.Spec(key);
                 CollectionAssert.Contains(spec.OwnClips, ArtMapping.Swipe, key + " Swipe (Kaiju v4)");
                 CollectionAssert.DoesNotContain(ArtMapping.LoopingClips, ArtMapping.Swipe, "Swipe is a one-shot");
+                Assert.AreEqual(180f, spec.ArtYawDeg, key);
+                // rig-kaiju-2: the green-crystal adult paints its face in the vertex colour (no decal UVs to swap atlases on);
+                // its anger reads through the jaw and head (KaijuAnimator). The hatchling keeps the seven atlases.
+                if (spec.VertexColourFace)
+                {
+                    Assert.IsNull(spec.FaceTexture, key + ": a vertex-colour face carries no decal");
+                    Assert.IsNull(spec.Expressions, key + ": no expression atlases on a vertex-colour face");
+                    continue;
+                }
                 Assert.AreEqual(ArtMapping.KaijuFace, spec.FaceTexture, key);
                 Assert.AreEqual(Enum.GetValues(typeof(KaijuExpression)).Length, spec.Expressions.Length, key + " expressions");
                 Assert.AreEqual(spec.FaceTexture, spec.Expressions[(int)KaijuExpression.Neutral], key + ": Neutral is the default face");
-                Assert.AreEqual(180f, spec.ArtYawDeg, key);
             }
         }
 
@@ -180,6 +188,12 @@ namespace CriticalMass.Runtime.Tests
                 ArtEntry e = Catalog().Find(key);
                 Assert.IsNotNull(e, key);
                 Assert.IsNotNull(e.Clip(ArtMapping.Swipe), key + " Swipe clip");
+                // rig-kaiju-2: the green-crystal adult has no face UVs; its expressions play through jaw, head and eye glow.
+                if (ArtMapping.Spec(key).VertexColourFace)
+                {
+                    Assert.AreEqual(0, e.Expressions?.Length ?? 0, key + ": no face atlases on a vertex-colour face");
+                    continue;
+                }
                 foreach (KaijuExpression x in Enum.GetValues(typeof(KaijuExpression)))
                 {
                     Texture2D tex = e.Expression((int)x);
