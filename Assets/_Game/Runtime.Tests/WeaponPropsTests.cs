@@ -18,10 +18,11 @@ namespace CriticalMass.Runtime.Tests
         [Test]
         public void EachClassModelGetsTheRightWeaponAndNothingIsDoubled()
         {
-            Assert.IsTrue(ArtMapping.Spec(ArtMapping.Builder).HeldWeaponInMesh, "today's Builder has his mallet in the mesh");
+            // rig-builder-1: the generated Builder body has empty hands; the game hangs the mallet on handslot.r.
+            Assert.IsFalse(ArtMapping.Spec(ArtMapping.Builder).HeldWeaponInMesh, "the new Builder body carries no mallet");
             Assert.IsTrue(ArtMapping.Spec(ArtMapping.Healer).HeldWeaponInMesh, "today's Healer has her lantern in the mesh");
             Assert.IsFalse(ArtMapping.Spec(ArtMapping.Demolitions).HeldWeaponInMesh, "the Demolitions Expert has no weapon modelled");
-            Assert.AreEqual(HeldWeapon.None, WeaponProps.Plan(ClassId.Builder, ArtMapping.Spec(ArtMapping.Builder)));
+            Assert.AreEqual(HeldWeapon.Mallet, WeaponProps.Plan(ClassId.Builder, ArtMapping.Spec(ArtMapping.Builder)));
             Assert.AreEqual(HeldWeapon.None, WeaponProps.Plan(ClassId.Healer, ArtMapping.Spec(ArtMapping.Healer)));
             Assert.AreEqual(HeldWeapon.PryBarStandIn, WeaponProps.Plan(ClassId.Demolitions, ArtMapping.Spec(ArtMapping.Demolitions)));
             // A new class model (no flag) gets the prop attached.
