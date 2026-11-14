@@ -329,6 +329,17 @@ namespace CriticalMass.Runtime.Tests
             finally { Object.DestroyImmediate(go); }
         }
 
+        [Test]
+        public void TheStartBannerStaysOutOfStagedShotsAndCoversTheActionAtMostFiveSeconds()
+        {
+            Assert.IsTrue(FirstMinutes.StagesCloseUps(new[] { "game", "-groundShots" }));
+            Assert.IsTrue(FirstMinutes.StagesCloseUps(new[] { "-followshots" }));
+            Assert.IsTrue(FirstMinutes.StagesCloseUps(new[] { "-skillShots" }));
+            Assert.IsFalse(FirstMinutes.StagesCloseUps(new[] { "-flowShots" }), "the flow walk shows the real HUD");
+            Assert.IsFalse(FirstMinutes.StagesCloseUps(null));
+            Assert.LessOrEqual(FirstMinutes.StartBannerOnScreenSeconds, 5.0 + 1e-9, "YOU ARE AZURE covers the action 5 s at most");
+        }
+
         // ---------------------------------------------------------------- 3. kill feed and toast lanes
 
         [Test]

@@ -48,6 +48,37 @@ namespace CriticalMass.Runtime.Hud
         /// <summary>The one-line goal. True to the rule: Match.DecideWinner compares hill seconds.</summary>
         public static string GoalLine(TeamId t) => "Hold the hill longer than " + TeamWord(t == TeamId.Azure ? TeamId.Crimson : TeamId.Azure) + " to win";
 
+        /// <summary>fix/hud-containment-4: capture runs that stage close-ups (their own camera shots of fighters, skills,
+        /// the horizon or a turntable). The start banner would sit over every staged shot, so these runs never show it.</summary>
+        public static readonly string[] CloseUpFlags = { "-groundshots", "-followshots", "-skillshots", "-horizonshots", "-turntable", "-shots", "-capture", "-shottick" };
+
+        /// <summary>True when the command line stages close-ups (pure; tests).</summary>
+        public static bool StagesCloseUps(string[] args)
+        {
+            if (args == null) return false;
+            foreach (string raw in args)
+            {
+                string a = (raw ?? string.Empty).Trim().ToLowerInvariant();
+                if (System.Array.IndexOf(CloseUpFlags, a) >= 0) return true;
+            }
+            return false;
+        }
+
+        static int _staged = -1;
+        /// <summary>This run stages close-ups (command line, read once) or is the editor capture tool.</summary>
+        public static bool StagedCapture
+        {
+            get
+            {
+                if (_staged < 0) _staged = StagesCloseUps(System.Environment.GetCommandLineArgs()) ? 1 : 0;
+                return _staged == 1 || CriticalMass.Runtime.Game.SimDriverBehaviour.CaptureMode;
+            }
+        }
+
+        /// <summary>Longest the start banner covers the action: in, hold, out (and the banner's own wall-time cap).</summary>
+        public static double StartBannerOnScreenSeconds =>
+            System.Math.Min(BannerQueue.InSeconds + BannerHoldSeconds + BannerQueue.OutSeconds, Banner.MaxWallSeconds + BannerQueue.OutSeconds);
+
         /// <summary>The match-start banner: your team in its colour, the goal under it.</summary>
         public static BannerSpec StartBanner(TeamId t) => new BannerSpec
         {
@@ -176,7 +207,7 @@ namespace CriticalMass.Runtime.Hud
             if (!_bannerShown)
             {
                 _bannerShown = true;
-                Banner.Show(FirstMinutes.StartBanner(a.Team));
+                if (!FirstMinutes.StagedCapture) Banner.Show(FirstMinutes.StartBanner(a.Team));   // fix/hud-containment-4
             }
             if (FirstMinutes.Respawned(_wasAlive, a.Alive)) { _since = w.Match.Time; _lastTick = -1; }
             _wasAlive = a.Alive;
