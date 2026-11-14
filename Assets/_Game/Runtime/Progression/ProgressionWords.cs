@@ -66,7 +66,7 @@ namespace CriticalMass.Runtime.Progression
             "Battle healer. Mends allies, heals in a burst and purifies the shrine. Never deals damage.",
         };
 
-        public static readonly string[] AbilityNames = { "SHIELD", "ROOTS", "WALL BREAK", "MINE", "BUILD", "HEALING WINGS" };
+        public static readonly string[] AbilityNames = { "SHIELD", "ROOTS", CriticalMass.Runtime.Hud.GameHud.MinerAbility, "MINE", "BUILD", "HEALING WINGS" };
 
         public static string ClassName(ClassId c) => ClassNames[(int)c];
 

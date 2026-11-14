@@ -356,16 +356,21 @@ namespace CriticalMass.Runtime.Hud
         }
 
         // Six classes (batch 3): names of the new ones come from the sim's name tables (DemolitionsNames, BuilderNames, HealerNames).
-        static readonly string[] ClassNames =
+        /// <summary>The six class names as the HUD shows them; the info cards and the full map read this list too
+        /// (skills-and-walls-audit-1: their own five-name copies clamped a Healer to BUILDER).</summary>
+        public static readonly string[] ClassNames =
         {
             "WARRIOR", "FARMER", "MINER", CriticalMass.Sim.Core.DemolitionsNames.ClassName, CriticalMass.Sim.Core.BuilderNames.ClassName,
             CriticalMass.Sim.Core.HealerNames.ClassName,
         };
         static readonly string[] AbilityNames =
         {
-            "SHIELD", "ROOTS", "WALL BREAK", CriticalMass.Sim.Core.DemolitionsNames.Mine, CriticalMass.Sim.Core.BuilderNames.Build,
+            "SHIELD", "ROOTS", MinerAbility, CriticalMass.Sim.Core.DemolitionsNames.Mine, CriticalMass.Sim.Core.BuilderNames.Build,
             CriticalMass.Sim.Core.HealerNames.Pulse,
         };
+        /// <summary>skills-and-walls-audit-1: the Miner's Space skill places a barricade (Barricades.cs); breaking walls is
+        /// his normal swing. The HUD said WALL BREAK.</summary>
+        public const string MinerAbility = "BARRICADE";
         static readonly string[] AttackNames =
         {
             "ATTACK", "ATTACK", "ATTACK", "NO SWORD", "ATTACK", CriticalMass.Sim.Core.HealerNames.Mend,   // Demolitions: TNT is on Dig / place

@@ -238,7 +238,7 @@ namespace CriticalMass.Runtime.Tests
                 var labels = new Text[3];
                 for (int i = 0; i < 3; i++)
                     labels[i] = Probe(root, CriticalMass.Runtime.Hud.Style.CMTokens.Ui, 16, TextAnchor.MiddleCenter, 0f, 76f, 22f);
-                labels[0].text = "WALL BREAK";
+                labels[0].text = "BARRICADE";
                 Assert.Greater(labels[0].preferredWidth, 40f, "the font measures text in this run");
                 string[][] slots = CriticalMass.Runtime.Hud.GameHud.AbilitySlotNames();
                 float[] widths = new float[3], lefts = new float[3], boxes = new float[3];
@@ -279,6 +279,19 @@ namespace CriticalMass.Runtime.Tests
                 Debug.Log("hud-overlaps-1: ability name rows checked " + sets.Count + ", cut with an ellipsis " + cut + " (stress rows only)");
             }
             finally { Object.DestroyImmediate(root); }
+        }
+
+        [Test]
+        public void EverySkillAndClassIsNamedForWhatItIs()
+        {
+            // skills-and-walls-audit-1: the Miner's Space skill places a barricade; a Healer was labelled BUILDER on the
+            // info cards and the full map because their class lists stopped at five.
+            string[][] slots = CriticalMass.Runtime.Hud.GameHud.AbilitySlotNames();
+            Assert.AreEqual("BARRICADE", slots[1][(int)ClassId.Miner]);
+            Assert.AreEqual("BARRICADE", CriticalMass.Runtime.Progression.ProgressionWords.AbilityNames[(int)ClassId.Miner]);
+            foreach (string[] slot in slots) CollectionAssert.DoesNotContain(slot, "WALL BREAK");
+            Assert.AreEqual(6, CriticalMass.Runtime.Hud.GameHud.ClassNames.Length, "one name per class");
+            Assert.AreEqual(CriticalMass.Sim.Core.HealerNames.ClassName, CriticalMass.Runtime.Hud.GameHud.ClassNames[(int)ClassId.Healer]);
         }
 
         static string Longest(string[] a)
