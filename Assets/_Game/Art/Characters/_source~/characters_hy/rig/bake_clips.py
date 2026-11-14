@@ -307,6 +307,66 @@ if False and NEW_BODY and "Idle" in acts:   # tried 2026-11-14 run 43637xxx: toe
     assign(kk, None); upd()
 
 
+# rig-miner-2: idle stands upright on flat feet. The full-local copy gave the Miner KayKit's idle lean and KayKit's
+# steeper foot pitch (heels up, toes down in the Unity stills). In the idle clips the planted feet keep the bind's flat
+# rotation, the toes stay as bound, and the hips turn once (constant per clip) so the head is straight above the hips.
+IDLE_FLAT = CLS in ("Miner",) or NEW_BODY
+IDLE_CLIPS = {"Idle", "IdleLook"}
+UPRIGHT = {}
+# rig-warrior-2: the held weapon's tip stays TIP_CLEAR above the ground in locomotion (the Warrior's sword tip dipped to
+# the floor in Walk frames 4-6): the hand turns up about the wrist until the lowest prop vertex clears it.
+TIP_CLEAR = {"Warrior": 0.18}.get(CLS)   # 0.15 u asked, 0.03 margin
+TIP_CLIPS = {"Walk", "WalkBack", "Run", "RunBack", "StrafeL", "StrafeR", "Idle", "IdleLook", "Carry"}
+TIP_LOCAL = None
+TIP_MIN = {}
+if TIP_CLEAR:
+    _hs = [i for i in range(nv) if vg.get(dom[i], "").startswith("handslot.r")]
+    if len(_hs) >= 20:
+        rest(fa)
+        _M = fa.matrix_world @ faP["handslot.r"].matrix
+        _p = wco[np.array(_hs)]
+        _far = _p[np.argmin(_p[:, 2])]          # the lowest prop vertex at rest = the tip that hangs down
+        TIP_LOCAL = _M.inverted() @ Vector(_far.tolist())
+        log("tip clearance on", len(_hs), "prop vertices, tip at rest", [round(v, 3) for v in _far])
+    else:
+        log("tip clearance: no prop on handslot.r (", len(_hs), "vertices)")
+
+
+def tip_world():
+    return (fa.matrix_world @ faP["handslot.r"].matrix) @ TIP_LOCAL
+
+
+def clear_tip(clip):
+    if TIP_LOCAL is None or clip not in TIP_CLIPS:
+        return
+    before = tip_world().z
+    for _ in range(16):
+        t = tip_world()
+        if t.z >= TIP_CLEAR:
+            break
+        piv = W(fa, faP["wrist.r"].head)
+        d = t - piv
+        ax = d.cross(Vector((0, 0, 1)))
+        if ax.length < 1e-6:
+            break
+        rotate_about(fa, faP["wrist.r"], piv, Quaternion(ax.normalized(), 0.08))
+        upd()
+    TIP_MIN[clip] = (min(TIP_MIN.get(clip, (9, 9))[0], before), min(TIP_MIN.get(clip, (9, 9))[1], tip_world().z))
+
+
+def upright_idle(clip, f0):
+    """Constant hips turn per idle clip that puts the head straight above the hips at its first frame."""
+    if not IDLE_FLAT or clip not in IDLE_CLIPS:
+        return
+    if clip not in UPRIGHT:
+        v = W(fa, faP["head"].head) - W(fa, faP["hips"].head)
+        UPRIGHT[clip] = v.rotation_difference(Vector((0, 0, v.length)).normalized() * 1.0 if False else Vector((0, 0, 1)))
+        REP.setdefault("idle_lean_deg", {})[clip] = round(math.degrees(v.angle(Vector((0, 0, 1)))), 1)
+    hp = faP["hips"]
+    rotate_about(fa, hp, W(fa, hp.head), UPRIGHT[clip])
+    upd()
+
+
 def hold_slot():
     if CREL is None:
         return
@@ -354,7 +414,7 @@ def bake_action(clip, act):
         scene.frame_set(f)
         for pb in faP:
             k = kkP.get(pb.name)
-            if NEW_BODY and pb.name.startswith("toes."):
+            if (NEW_BODY or (IDLE_FLAT and clip in IDLE_CLIPS)) and pb.name.startswith("toes."):
                 pb.matrix_basis.identity()   # rig-batch-b: toes stay as bound; KayKit's toe pitch sank the boot tips 2 cm
                 continue
             if k is None:
@@ -372,6 +432,7 @@ def bake_action(clip, act):
                 q_ = HOLD_REF[pb.name].slerp(q_, HOLD_KEEP)
             pb.matrix_basis = Matrix.LocRotScale(l_, q_, s_)
         upd()
+        upright_idle(clip, f0)
         K = snap(kk)
         Hd = F0["hips"] + (K["hips"] - K0["hips"]) * RATIO + Vector((0, 0, LIFT))
         targets, rots = {}, {}
@@ -380,7 +441,9 @@ def bake_action(clip, act):
             # delta from the pack's rest (+ TOEFIX) was measured against a pose, not the bind: the Warrior's planted
             # right foot in StrafeR pointed 112 degrees off and the game read him "turned around".
             R = (fa.matrix_world @ faP[LEG(s)[2]].matrix).to_3x3().normalized()
-            if FOOTREF:
+            if IDLE_FLAT and clip in IDLE_CLIPS:
+                R = F0["R" + s].copy()   # flat as bound (rest foot)
+            elif FOOTREF:
                 # rig-batch-b: KayKit's foot turn from its flat Idle foot, applied to this body's own flat rest foot (the
                 # full-local copy pitched the Builder's boots by KayKit's 20 degree steeper foot bone)
                 Rk_ = (kk.matrix_world @ kkP[LEG(s)[2]].matrix).to_3x3().normalized()
@@ -467,6 +530,7 @@ def bake_action(clip, act):
             log("trace", f, "kk ankle z l %.3f r %.3f" % (K["Al"].z, K["Ar"].z), "target z l %.3f r %.3f" % (targets["l"].z, targets["r"].z),
                 "final z l %.3f r %.3f" % (W(fa, faP["foot.l"].head).z, W(fa, faP["foot.r"].head).z),
                 "planted", PL.get("l"), PL.get("r"), "hips z %.3f" % W(fa, faP["hips"].head).z, "upperleg z %.3f" % W(fa, faP["upperleg.l"].head).z)
+        clear_tip(clip)
         hold_slot()
         for pb in faP:
             l, q, sc = pb.matrix_basis.decompose()
@@ -510,6 +574,8 @@ for m in arm_mods:
     m.show_viewport = True
 log("baked", len(baked), "of", len(acts))
 REP["hips_lowered_max"] = {c: round(v, 4) for c, v in lows.items() if v > 0}
+REP["tip_min_before_after"] = {c: [round(a, 3), round(b, 3)] for c, (a, b) in TIP_MIN.items()}
+log("tip min z before/after", REP["tip_min_before_after"], "idle lean before (deg)", REP.get("idle_lean_deg"))
 REP["flight_capped_max"] = {c: round(v, 4) for c, v in CAPPED.items()}
 log("flight capped at", FLIGHT_CAP, REP["flight_capped_max"])
 

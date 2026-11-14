@@ -25,6 +25,9 @@ import landmarks as LM
 importlib.reload(LM)
 OLD = {'Builder': 'Assets/_Game/Art/Builder/Builder.fbx', 'Healer': 'Assets/_Game/Art/Healer/Healer.fbx',
        'Demolitions': 'Assets/_Game/Art/Demolitions/Demolitions.fbx'}[CLS]
+_fb = OLD.replace(f'/{CLS}.fbx', f'/_fallback~/{CLS}.fbx')
+if os.path.exists(os.path.join(REPO, _fb)):
+    OLD = _fb   # the class's KayKit-joint model once the new body has replaced it
 os.makedirs(OUT, exist_ok=True)
 REP = {'class': CLS, 'src': SRC, 'old_rig': OLD, 'fingers': FINGERS, 'log': []}
 
