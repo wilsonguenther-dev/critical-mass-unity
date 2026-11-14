@@ -42,6 +42,8 @@ namespace CriticalMass.Runtime.View.Skills
         /// <summary>Times each skill fired since the last reset (index = (int)SkillId).</summary>
         public readonly int[] Fired = new int[SkillVisuals.Count];
         public int LastTerraformCode { get; private set; }
+        /// <summary>The Value of the last Ability event actor 0 raised (negative = a refusal code), int.MinValue = none.</summary>
+        public int LastAbilityCode0 { get; private set; } = int.MinValue;
         public int KaijuClawTick { get; private set; } = int.MinValue;
         public int KaijuSlamTelegraphTick { get; private set; } = int.MinValue;
         public int KaijuSlamTick { get; private set; } = int.MinValue;
@@ -74,6 +76,7 @@ namespace CriticalMass.Runtime.View.Skills
             for (int i = 0; i < MaxActors; i++) _healT0[i] = double.NegativeInfinity;
             for (int i = 0; i < Fired.Length; i++) Fired[i] = 0;
             KaijuClawTick = KaijuSlamTelegraphTick = KaijuSlamTick = int.MinValue;
+            LastAbilityCode0 = int.MinValue;
             SkillAnimCues.Clear();
         }
 
@@ -140,6 +143,7 @@ namespace CriticalMass.Runtime.View.Skills
             if (!Valid(w, e.A)) return;
             Actor a = w.Actors[e.A];
             int code = (int)e.Value;
+            if (e.A == 0) LastAbilityCode0 = code;
             switch (a.Cls)
             {
                 case ClassId.Warrior:
@@ -304,8 +308,8 @@ namespace CriticalMass.Runtime.View.Skills
                 {
                     float reach = c.Reach > 0 ? c.Reach : 2f;
                     float r = 0.4f + (reach - 0.4f) * (1f - (1f - k) * (1f - k));
-                    GroundRing(at, r - 0.16f, r, 0f, Mathf.PI * 2f, 40, A(HealGreen, 0.8f * (1f - k)));
-                    GroundRing(at, r - 0.22f, r - 0.16f, 0f, Mathf.PI * 2f, 40, A(team, 0.7f * (1f - k)));
+                    GroundRing(at, r - 0.09f, r, 0f, Mathf.PI * 2f, 40, A(HealGreen, 0.55f * (1f - k)));
+                    GroundRing(at, r - 0.13f, r - 0.09f, 0f, Mathf.PI * 2f, 40, A(team, 0.45f * (1f - k)));
                 }
                 CastsDrawn++;
             }
@@ -333,7 +337,7 @@ namespace CriticalMass.Runtime.View.Skills
                     Vector3 g = P(gx, gz, 0.03f);
                     _g.Blob(g, Vector3.right, Vector3.forward, 0.16f, null, 10, 0f, A(Navy, 0.4f));
                     Vector3 at = g + Vector3.up * h;
-                    _s.Chunk(at, Quaternion.Euler(p * 400f, p * 250f, 0f), new Vector3(0.08f, 0.08f, 0.1f), 0.022f, SeedLight, SeedMid, SeedDark, Navy);
+                    _s.Chunk(at, Quaternion.Euler(p * 400f, p * 250f, 0f), new Vector3(0.11f, 0.11f, 0.13f), 0.026f, SeedLight, SeedMid, SeedDark, Navy);
                     _a.Add = 255;
                     _a.Star(at, _camR, _camU, 0.14f, 0.45f, 5, p * 6f, A(team, 0.75f));
                     _a.Add = 0;
@@ -361,7 +365,7 @@ namespace CriticalMass.Runtime.View.Skills
                     }
                 }
                 // the patch: where the slow landed, team ring and soft fill, fading over the slow's length
-                _g.Blob(land, Vector3.right, Vector3.forward, s.Radius, null, 32, 0f, A(RootDark, 0.16f * fade));
+                _g.Blob(land, Vector3.right, Vector3.forward, s.Radius, null, 32, 0f, A(RootDark, 0.1f * fade));
                 Dashed(land, s.Radius - 0.08f, s.Radius, 16, 0.6f, 0f, A(team, 0.7f * fade));
                 // roots breaking out: spikes on a golden-angle spread, grow, hold, sink
                 float grow = Mathf.Clamp01(t / (float)RootsGrow);
@@ -374,11 +378,11 @@ namespace CriticalMass.Runtime.View.Skills
                         float ang = k * 2.39996f + i * 0.7f;
                         float rr = s.Radius * 0.85f * Mathf.Sqrt((k + 0.5f) / RootSpikes);
                         double rx = s.ToX + Math.Cos(ang) * rr, rz = s.ToZ + Math.Sin(ang) * rr;
-                        float hh = 0.42f * hk * (0.7f + 0.3f * ((k * 37) % 10) / 10f);
+                        float hh = 0.62f * hk * (0.7f + 0.3f * ((k * 37) % 10) / 10f);
                         Vector3 b = P(rx, rz, 0f);
                         Quaternion rot = Quaternion.Euler(18f * Mathf.Cos(ang * 3f), ang * Mathf.Rad2Deg, 18f * Mathf.Sin(ang * 2f));
-                        _s.Chunk(b + Vector3.up * (hh * 0.5f), rot, new Vector3(0.055f, hh * 0.5f, 0.055f), 0.018f, RootLight, RootMid, RootDark, Navy);
-                        _s.Chunk(b + rot * new Vector3(0f, hh, 0f), rot, new Vector3(0.07f, 0.03f, 0.04f), 0.012f, VineLight, VineMid, VineDark, Navy);
+                        _s.Chunk(b + Vector3.up * (hh * 0.5f), rot, new Vector3(0.085f, hh * 0.5f, 0.085f), 0.024f, RootLight, RootMid, RootDark, Navy);
+                        _s.Chunk(b + rot * new Vector3(0f, hh, 0f), rot, new Vector3(0.12f, 0.05f, 0.07f), 0.02f, VineLight, VineMid, VineDark, Navy);
                         RootsDrawn++;
                     }
                 }
@@ -400,26 +404,28 @@ namespace CriticalMass.Runtime.View.Skills
                 Color32 byTeam = TeamColor(a.Team == TeamId.Azure ? TeamId.Crimson : TeamId.Azure); // only an enemy roots you
                 Vector3 c = ActorAt(i, alpha, 0f);
                 float sway = Mathf.Sin((float)now * 5f + i) * 0.04f;
-                for (int k = 0; k < VineCoils; k++)
+                for (int k = 0; k < VineCoils * 2; k++)
                 {
-                    float ang = k * (Mathf.PI * 2f / VineCoils) + i * 0.9f;
+                    float ang = k * (Mathf.PI * 2f / VineCoils) + (k >= VineCoils ? 0.6f : 0f) + i * 0.9f;
                     Vector3 d = new Vector3(Mathf.Cos(ang), 0f, Mathf.Sin(ang));
-                    Vector3 tangent = new Vector3(-d.z, 0.45f, d.x);
-                    Vector3 p = c + d * (0.3f + sway) + Vector3.up * (0.07f + 0.09f * (k % 2));
-                    _s.Chunk(p, Quaternion.LookRotation(tangent), new Vector3(0.035f, 0.03f, 0.15f), 0.016f, VineLight, VineMid, VineDark, Navy);
+                    Vector3 tangent = new Vector3(-d.z, k >= VineCoils ? -0.5f : 0.5f, d.x);
+                    Vector3 p = c + d * (0.36f + sway) + Vector3.up * (k >= VineCoils ? 0.3f : 0.1f);
+                    _s.Chunk(p, Quaternion.LookRotation(tangent), new Vector3(0.06f, 0.05f, 0.22f), 0.02f, VineLight, VineMid, VineDark, Navy);
                 }
+                _g.Ring(c + Vector3.up * 0.05f, Vector3.right, Vector3.forward, 0.28f, 0.5f, 0f, Mathf.PI * 2f, 20, A(VineMid, 0.75f));
                 Vector3 ring = c + Vector3.up * 0.04f;
                 GroundRing(ring, 0.36f, 0.46f, 0f, Mathf.PI * 2f, 24, A(Navy, 0.55f));
                 GroundRing(ring, 0.38f, 0.44f, Mathf.PI * 0.5f - Mathf.PI * 2f * frac, Mathf.PI * 0.5f, Mathf.Max(3, (int)(24 * frac)), A(byTeam, 0.95f));
                 // slow icon: two down chevrons on a navy disc beside the shoulder (clear of the name label above the head)
-                Vector3 icon = c + Vector3.up * 1.45f + _camR * 0.5f;
-                _a.Blob(icon, _camR, _camU, 0.15f, null, 14, 0f, A(Navy, 0.8f));
+                Vector3 icon = c + Vector3.up * 1.5f + _camR * 0.6f;
+                _a.Blob(icon, _camR, _camU, 0.27f, null, 16, 0f, A(Navy, 0.85f));
+                _a.Ring(icon, _camR, _camU, 0.25f, 0.29f, 0f, Mathf.PI * 2f, 16, A(VineLight, 1f));
                 Vector3 d1 = (_camR + _camU).normalized, d2 = (_camR - _camU).normalized;
                 for (int j = 0; j < 2; j++)
                 {
-                    Vector3 m = icon + _camU * (0.05f - j * 0.075f);
-                    _a.Quad(m + (-_camR + _camU) * 0.035f, d2 * 0.05f, d1 * 0.016f, A(byTeam, 1f), A(byTeam, 1f));
-                    _a.Quad(m + (_camR + _camU) * 0.035f, d1 * 0.05f, d2 * 0.016f, A(byTeam, 1f), A(byTeam, 1f));
+                    Vector3 m = icon + _camU * (0.08f - j * 0.13f);
+                    _a.Quad(m + (-_camR + _camU) * 0.06f, d2 * 0.09f, d1 * 0.028f, A(byTeam, 1f), A(byTeam, 1f));
+                    _a.Quad(m + (_camR + _camU) * 0.06f, d1 * 0.09f, d2 * 0.028f, A(byTeam, 1f), A(byTeam, 1f));
                 }
             }
         }
@@ -439,7 +445,7 @@ namespace CriticalMass.Runtime.View.Skills
                 GroundRing(c, r - 0.1f, r, 0f, Mathf.PI * 2f, 24, A(HealGreen, 0.85f * (1f - k)));
                 GroundRing(c, r - 0.14f, r - 0.1f, 0f, Mathf.PI * 2f, 24, A(TeamColor(w.Actors[i].Team), 0.7f * (1f - k)));
                 _a.Add = 255;
-                _a.Blob(c + Vector3.up * (0.8f + 0.3f * k), _camR, _camU, 0.5f, null, 16, 0f, A(HealGreen, 0.3f * (1f - k)));
+                _a.Blob(c + Vector3.up * (0.8f + 0.3f * k), _camR, _camU, 0.42f, null, 16, 0f, A(HealGreen, 0.16f * (1f - k)));
                 _a.Add = 0;
             }
         }
