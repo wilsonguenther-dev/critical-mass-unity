@@ -602,12 +602,12 @@ namespace CriticalMass.Runtime.Camera
                 Shader.SetGlobalVector(FadeTargetId, new Vector4(_chest.x, _chest.y + 0.35f, _chest.z, ViewCull.FadeRadius));
                 _fadeSet = true;
             }
-            ViewCull.SetFollowLine(_chest + new Vector3(0f, 0.35f, 0f), on);
             else if (_fadeSet)
             {
                 Shader.SetGlobalVector(FadeCamId, Vector4.zero);
                 _fadeSet = false;
             }
+            ViewCull.SetFollowLine(_chest + new Vector3(0f, 0.35f, 0f), on);
         }
 
         void Leave()

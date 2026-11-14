@@ -2,6 +2,7 @@ using System;
 using CriticalMass.Runtime.Camera;
 using CriticalMass.Runtime.View;
 using CriticalMass.Runtime.View.Effects;
+using CriticalMass.Sim.Core;
 using CriticalMass.Sim.Grid;
 using NUnit.Framework;
 using UnityEngine;
