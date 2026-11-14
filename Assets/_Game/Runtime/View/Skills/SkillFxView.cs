@@ -18,7 +18,7 @@ namespace CriticalMass.Runtime.View.Skills
     /// </summary>
     public sealed class SkillFxView : MonoBehaviour
     {
-        public const int GroundVerts = 9000, SolidVerts = 24000, AirVerts = 6000;
+        public const int GroundVerts = 9000, SolidVerts = 32000, AirVerts = 6000;
 
         public static SkillFxView Active { get; private set; }
 
