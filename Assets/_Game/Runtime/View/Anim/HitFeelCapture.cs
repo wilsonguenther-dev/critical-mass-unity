@@ -28,6 +28,8 @@ namespace CriticalMass.Runtime.View.Anim
         public const int Frames = 10, FrameW = 480, FrameH = 360;
         public const float GameDistance = 7f, SideDistance = 5.5f, SideHeight = 0.35f;
         float _sideSign = 1f, _sideLift;   // fix/hit-feel-5: which side the side camera stands on (world z sign) and its lift
+        int _failed;   // fix/hit-feel-6: classes whose pair was not drawn where staged or whose tip gap was not measured
+        const double MaxGap = 2.0, MaxDrawnOff = 0.5;
         static readonly ClassId[] Classes = { ClassId.Warrior, ClassId.Farmer, ClassId.Miner, ClassId.Demolitions, ClassId.Builder, ClassId.Healer };
 
         SimDriverBehaviour _driver;
@@ -84,9 +86,9 @@ namespace CriticalMass.Runtime.View.Anim
             Log("Kaiju: not staged here; its claw is timed by KaijuAnimator (Swipe contact frame on the claw's damage tick)");
             SimDriverBehaviour.ScriptedHumanFrame = null;
             AutoplayArgs.ClockHeld = false;
-            Log("done");
+            Log(_failed > 0 ? "done with " + _failed + " FAILED class(es): see the FAILED lines" : "done: every class staged, framed and measured");
             yield return new WaitForSecondsRealtime(0.5f);
-            Application.Quit(0);
+            Application.Quit(_failed > 0 ? 1 : 0);
         }
 
         static bool Floor(World w, double x, double z)
@@ -187,6 +189,18 @@ namespace CriticalMass.Runtime.View.Anim
             double g0 = GroundHeight.At(w.Map, fx0, z);
             Vector3 focus = SimSpace.ToWorld(fx0, g0 + 0.9, z);
             PickSide(w, fx0, z, g0);
+            ActorViews views0 = _driver.GetComponent<ActorViews>();
+            // fix/hit-feel-6: one rendered frame so the views put the LIVE models on the staged pair, then check them
+            // there (the second and later classes measured a pooled model parked about 46 u away and framed empty sky).
+            // Up to 30 frames (sim clock held, no tick changes) for the views to swap in the class's model and draw it there.
+            for (int k = 0; k < 30; k++)
+            {
+                yield return null;
+                yield return new WaitForEndOfFrame();
+                if (DrawnAtPair(views0, w, n, out _, quiet: true)) break;
+            }
+            if (!DrawnAtPair(views0, w, n, out Vector3 drawnMid)) { _failed++; }
+            else focus = new Vector3(drawnMid.x, focus.y, drawnMid.z);
 
             double hp0 = w.Actors[_dummy].Hp, hz = w.Config.SimHz;
             _frame.Attack = true;
@@ -221,7 +235,13 @@ namespace CriticalMass.Runtime.View.Anim
                     double ddx = w.X[_dummy] - w.X[0], ddz = w.Z[_dummy] - w.Z[0];
                     surface = Math.Sqrt(ddx * ddx + ddz * ddz) - w.Config.Class(w.Actors[_dummy].Cls).Radius;
                     // fix/hit-feel-5: the weapon TIP's distance ahead of the SIM position along the line to the dummy
-                    tipAhead = TipAhead(views, w);
+                    tipAhead = TipAhead(views, w, out string liveSrc);
+                    if (double.IsNaN(tipAhead) || Math.Abs(surface - tipAhead) > MaxGap)
+                    {
+                        _failed++;
+                        Log(n + ": FAILED: tip gap " + (surface - tipAhead).ToString("0.00") + " u is not a measurement (over " + MaxGap +
+                            " u or no tip; tip from " + liveSrc + ")");
+                    }
                     stepAt = HitFeel.Lunge(w, 0, 0).magnitude;
                     if (HitFeel.StrikeLean(w, 0, 0, out double ld, out _, out _)) leanAt = ld;
                 }
@@ -270,17 +290,53 @@ namespace CriticalMass.Runtime.View.Anim
                 " ms; side camera on the " + (_sideSign > 0 ? "-z" : "+z") + " side, lift " + _sideLift.ToString("0.00") + " u");
         }
 
-        /// <summary>fix/hit-feel-5: the weapon tip's distance ahead of actor 0's SIM position along the line to the dummy (NaN: no tip).</summary>
-        double TipAhead(ActorViews views, World w)
+        /// <summary>
+        /// fix/hit-feel-6: the weapon tip's distance ahead of actor 0's SIM position along the line to the dummy, read from
+        /// the LIVE model (ActorViews.ModelOf(0) now, its own hand and tip: never the animator's cache, which kept the first
+        /// class's model after the views swapped actor 0 to the next class). NaN: no model or hand.
+        /// </summary>
+        double TipAhead(ActorViews views, World w, out string source)
         {
-            ActorAnimator anim = views != null ? views.AnimatorOf(0) : null;
-            if (anim == null || !anim.HasTip) return double.NaN;
+            source = "no model";
+            ModelView mv = views != null ? views.ModelOf(0) : null;
+            if (mv == null) return double.NaN;
+            Vector3 local = HitPose.TipLocal(mv, out Transform hand, out source);
+            if (hand == null) return double.NaN;
             Vector3 dir = SimSpace.ToWorld(w.X[_dummy] - w.X[0], 0, w.Z[_dummy] - w.Z[0]);
             dir.y = 0f;
             if (dir.sqrMagnitude < 1e-6f) return double.NaN;
-            Vector3 off = anim.TipWorld - SimSpace.ToWorld(w.X[0], 0, w.Z[0]);
+            Vector3 off = hand.TransformPoint(local) - SimSpace.ToWorld(w.X[0], 0, w.Z[0]);
             off.y = 0f;
             return Vector3.Dot(off, dir.normalized);
+        }
+
+        /// <summary>
+        /// fix/hit-feel-6: the attacker's and the dummy's LIVE models are drawn on their staged sim spots (within
+        /// MaxDrawnOff) and are the right class; logs them either way. drawnMid: the drawn pair's midpoint (camera focus).
+        /// </summary>
+        bool DrawnAtPair(ActorViews views, World w, string n, out Vector3 drawnMid, bool quiet = false)
+        {
+            drawnMid = Vector3.zero;
+            ModelView a = views != null ? views.ModelOf(0) : null, d = views != null ? views.ModelOf(_dummy) : null;
+            if (a == null || d == null)
+            {
+                if (!quiet) Log(n + ": FAILED: no live model for " + (a == null ? "the attacker" : "the dummy") + " after staging");
+                return false;
+            }
+            Vector3 sa = SimSpace.ToWorld(w.X[0], 0, w.Z[0]), sd = SimSpace.ToWorld(w.X[_dummy], 0, w.Z[_dummy]);
+            Vector3 pa = a.Transform.position, pd = d.Transform.position;
+            float oa = new Vector2(pa.x - sa.x, pa.z - sa.z).magnitude, od = new Vector2(pd.x - sd.x, pd.z - sd.z).magnitude;
+            string want = ArtMapping.ClassModel(w.Actors[0].Cls), key = a.Entry != null ? a.Entry.Key : "?";
+            bool active = a.Transform.gameObject.activeInHierarchy && d.Transform.gameObject.activeInHierarchy;
+            if (!quiet) Log(n + ": staged pair drawn: attacker model " + key + " " + oa.ToString("0.00") + " u from its sim spot, dummy " +
+                od.ToString("0.00") + " u, both active " + active);
+            drawnMid = (pa + pd) * 0.5f;
+            if (oa > MaxDrawnOff || od > MaxDrawnOff || !active || (want != null && key != want))
+            {
+                if (!quiet) Log(n + ": FAILED: the pair is not drawn where it was staged (or the wrong model is live): the strips and the measure would read elsewhere");
+                return false;
+            }
+            return true;
         }
 
         /// <summary>
@@ -329,6 +385,10 @@ namespace CriticalMass.Runtime.View.Anim
             Transform t = cam.transform;
             Vector3 p = t.position;
             Quaternion r = t.rotation;
+            // fix/hit-feel-6: the side shot sets its own lens (perspective, 40 degrees, near 0.1, far 200): the gameplay
+            // camera's clip planes and zoom follow its own height and the class, and could cull a pair 5.5 u away.
+            float near = cam.nearClipPlane, far = cam.farClipPlane, fov = cam.fieldOfView;
+            bool ortho = cam.orthographic;
             RenderTexture old = cam.targetTexture, prev = RenderTexture.active;
             RenderTexture rt = RenderTexture.GetTemporary(FrameW, FrameH, 24);
             Canvas[] canvases = FindObjectsByType<Canvas>(FindObjectsSortMode.None);   // capture only: hide every HUD canvas
@@ -341,6 +401,10 @@ namespace CriticalMass.Runtime.View.Anim
                     // Across the swing (the swing runs along world +x): a level camera on the -z side.
                     t.position = focus + new Vector3(0f, SideHeight + _sideLift, -SideDistance * _sideSign);
                     t.rotation = Quaternion.LookRotation(focus - t.position, Vector3.up);
+                    cam.orthographic = false;
+                    cam.fieldOfView = 40f;
+                    cam.nearClipPlane = 0.1f;
+                    cam.farClipPlane = 200f;
                 }
                 else t.position = focus - r * Vector3.forward * GameDistance;
                 cam.targetTexture = rt;
@@ -357,6 +421,10 @@ namespace CriticalMass.Runtime.View.Anim
                 for (int k = 0; k < canvases.Length; k++) if (canvases[k] != null) canvases[k].enabled = was[k];
                 cam.targetTexture = old;
                 RenderTexture.active = prev;
+                cam.orthographic = ortho;
+                cam.fieldOfView = fov;
+                cam.nearClipPlane = near;
+                cam.farClipPlane = far;
                 t.position = p;
                 t.rotation = r;
                 RenderTexture.ReleaseTemporary(rt);
