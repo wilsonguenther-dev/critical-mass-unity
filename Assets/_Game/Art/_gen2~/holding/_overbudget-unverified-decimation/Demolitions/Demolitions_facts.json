@@ -1,0 +1,130 @@
+{
+ "name": "Demolitions",
+ "source": "in:demolitions-body-three-quarter_200k.glb",
+ "kind": "fighter",
+ "raw_tris": 228199,
+ "floaters": {
+  "parts_kept": 2,
+  "parts_dropped": 1,
+  "verts_dropped": 5
+ },
+ "colour_source": "corner colour",
+ "scale_applied": 1.993446437614378,
+ "palette": [
+  {
+   "hex": "#5786A1",
+   "code": 0
+  },
+  {
+   "hex": "#496378",
+   "code": 8
+  },
+  {
+   "hex": "#836B58",
+   "code": 0
+  },
+  {
+   "hex": "#8F7B6D",
+   "code": 0
+  },
+  {
+   "hex": "#A48E78",
+   "code": 0
+  },
+  {
+   "hex": "#ECE9E5",
+   "code": 0
+  },
+  {
+   "hex": "#6E6E71",
+   "code": 0
+  },
+  {
+   "hex": "#5A3627",
+   "code": 0
+  },
+  {
+   "hex": "#788998",
+   "code": 0
+  },
+  {
+   "hex": "#929191",
+   "code": 0
+  },
+  {
+   "hex": "#715A47",
+   "code": 0
+  },
+  {
+   "hex": "#9E4437",
+   "code": 0
+  },
+  {
+   "hex": "#ADA499",
+   "code": 0
+  },
+  {
+   "hex": "#D1B99F",
+   "code": 0
+  }
+ ],
+ "levels": {
+  "Hero": {
+   "tris": 199770,
+   "verts": 66231,
+   "size_m": [
+    1.468,
+    1.278,
+    2.002
+   ],
+   "min_z": -0.0003,
+   "faces_per_code": {
+    "0": 189538,
+    "8": 10232
+   }
+  },
+  "LOD0": {
+   "tris": 199770,
+   "verts": 66231,
+   "size_m": [
+    1.468,
+    1.278,
+    2.002
+   ],
+   "min_z": -0.0003,
+   "faces_per_code": {
+    "0": 189538,
+    "8": 10232
+   }
+  },
+  "LOD1": {
+   "tris": 199770,
+   "verts": 66231,
+   "size_m": [
+    1.468,
+    1.278,
+    2.002
+   ],
+   "min_z": -0.0003,
+   "faces_per_code": {
+    "0": 189538,
+    "8": 10232
+   }
+  },
+  "Shadow": {
+   "tris": 199770,
+   "verts": 66231,
+   "size_m": [
+    1.468,
+    1.278,
+    2.002
+   ],
+   "min_z": -0.0003,
+   "faces_per_code": {
+    "0": 189538,
+    "8": 10232
+   }
+  }
+ },
+ "fbx": "Demolitions/Demolitions.fbx"
+}

@@ -1,0 +1,130 @@
+{
+ "name": "Healer",
+ "source": "in:healer-body-three-quarter_200k.glb",
+ "kind": "fighter",
+ "raw_tris": 190523,
+ "floaters": {
+  "parts_kept": 1,
+  "parts_dropped": 6,
+  "verts_dropped": 311
+ },
+ "colour_source": "corner colour",
+ "scale_applied": 1.999231752925449,
+ "palette": [
+  {
+   "hex": "#709BA5",
+   "code": 0
+  },
+  {
+   "hex": "#D1D7DD",
+   "code": 0
+  },
+  {
+   "hex": "#B5A58F",
+   "code": 0
+  },
+  {
+   "hex": "#8EA174",
+   "code": 0
+  },
+  {
+   "hex": "#9C968F",
+   "code": 0
+  },
+  {
+   "hex": "#C7AF92",
+   "code": 0
+  },
+  {
+   "hex": "#BAC0C1",
+   "code": 0
+  },
+  {
+   "hex": "#7A7C8C",
+   "code": 8
+  },
+  {
+   "hex": "#D7BDAC",
+   "code": 0
+  },
+  {
+   "hex": "#977F76",
+   "code": 0
+  },
+  {
+   "hex": "#75965B",
+   "code": 0
+  },
+  {
+   "hex": "#E2D0BF",
+   "code": 0
+  },
+  {
+   "hex": "#B9B3A9",
+   "code": 0
+  },
+  {
+   "hex": "#93B0B4",
+   "code": 0
+  }
+ ],
+ "levels": {
+  "Hero": {
+   "tris": 129270,
+   "verts": 45412,
+   "size_m": [
+    1.962,
+    0.638,
+    2.005
+   ],
+   "min_z": -0.0004,
+   "faces_per_code": {
+    "0": 122491,
+    "8": 6779
+   }
+  },
+  "LOD0": {
+   "tris": 129270,
+   "verts": 45412,
+   "size_m": [
+    1.962,
+    0.638,
+    2.005
+   ],
+   "min_z": -0.0004,
+   "faces_per_code": {
+    "0": 122491,
+    "8": 6779
+   }
+  },
+  "LOD1": {
+   "tris": 129270,
+   "verts": 45412,
+   "size_m": [
+    1.962,
+    0.638,
+    2.005
+   ],
+   "min_z": -0.0004,
+   "faces_per_code": {
+    "0": 122491,
+    "8": 6779
+   }
+  },
+  "Shadow": {
+   "tris": 129270,
+   "verts": 45412,
+   "size_m": [
+    1.962,
+    0.638,
+    2.005
+   ],
+   "min_z": -0.0004,
+   "faces_per_code": {
+    "0": 122491,
+    "8": 6779
+   }
+  }
+ },
+ "fbx": "Healer/Healer.fbx"
+}

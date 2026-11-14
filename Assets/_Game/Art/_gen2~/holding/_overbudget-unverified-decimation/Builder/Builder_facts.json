@@ -1,0 +1,130 @@
+{
+ "name": "Builder",
+ "source": "in:builder-body-three-quarter_200k.glb",
+ "kind": "fighter",
+ "raw_tris": 197784,
+ "floaters": {
+  "parts_kept": 1,
+  "parts_dropped": 2,
+  "verts_dropped": 8
+ },
+ "colour_source": "corner colour",
+ "scale_applied": 2.3309902795086623,
+ "palette": [
+  {
+   "hex": "#8D734B",
+   "code": 0
+  },
+  {
+   "hex": "#313B72",
+   "code": 0
+  },
+  {
+   "hex": "#A28F72",
+   "code": 0
+  },
+  {
+   "hex": "#617082",
+   "code": 0
+  },
+  {
+   "hex": "#5D87A7",
+   "code": 0
+  },
+  {
+   "hex": "#6B5236",
+   "code": 0
+  },
+  {
+   "hex": "#7D6340",
+   "code": 0
+  },
+  {
+   "hex": "#5C5962",
+   "code": 0
+  },
+  {
+   "hex": "#B7A187",
+   "code": 0
+  },
+  {
+   "hex": "#3A5991",
+   "code": 8
+  },
+  {
+   "hex": "#DBC1B4",
+   "code": 0
+  },
+  {
+   "hex": "#97815F",
+   "code": 0
+  },
+  {
+   "hex": "#828589",
+   "code": 0
+  },
+  {
+   "hex": "#7D7163",
+   "code": 0
+  }
+ ],
+ "levels": {
+  "Hero": {
+   "tris": 164046,
+   "verts": 58639,
+   "size_m": [
+    1.921,
+    1.315,
+    2.331
+   ],
+   "min_z": -0.0015,
+   "faces_per_code": {
+    "0": 157466,
+    "8": 6580
+   }
+  },
+  "LOD0": {
+   "tris": 164046,
+   "verts": 58639,
+   "size_m": [
+    1.921,
+    1.315,
+    2.331
+   ],
+   "min_z": -0.0015,
+   "faces_per_code": {
+    "0": 157466,
+    "8": 6580
+   }
+  },
+  "LOD1": {
+   "tris": 164046,
+   "verts": 58639,
+   "size_m": [
+    1.921,
+    1.315,
+    2.331
+   ],
+   "min_z": -0.0015,
+   "faces_per_code": {
+    "0": 157466,
+    "8": 6580
+   }
+  },
+  "Shadow": {
+   "tris": 164046,
+   "verts": 58639,
+   "size_m": [
+    1.921,
+    1.315,
+    2.331
+   ],
+   "min_z": -0.0015,
+   "faces_per_code": {
+    "0": 157466,
+    "8": 6580
+   }
+  }
+ },
+ "fbx": "Builder/Builder.fbx"
+}

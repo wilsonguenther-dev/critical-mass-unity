@@ -1,0 +1,118 @@
+{
+ "name": "Kaiju_Hatchling",
+ "source": "in:kaiju_hatchling-body-front_200k.glb",
+ "kind": "kaiju",
+ "raw_tris": 287296,
+ "floaters": {
+  "parts_kept": 1,
+  "parts_dropped": 3,
+  "verts_dropped": 15
+ },
+ "colour_source": "corner colour",
+ "scale_applied": 2.970564031675335,
+ "palette": [
+  {
+   "hex": "#A4A3A5",
+   "code": 0
+  },
+  {
+   "hex": "#0D2D12",
+   "code": 0
+  },
+  {
+   "hex": "#6A7D7B",
+   "code": 0
+  },
+  {
+   "hex": "#071408",
+   "code": 0
+  },
+  {
+   "hex": "#4D6761",
+   "code": 0
+  },
+  {
+   "hex": "#275E32",
+   "code": 0
+  },
+  {
+   "hex": "#13411A",
+   "code": 0
+  },
+  {
+   "hex": "#366143",
+   "code": 0
+  },
+  {
+   "hex": "#273B35",
+   "code": 0
+  },
+  {
+   "hex": "#195022",
+   "code": 0
+  },
+  {
+   "hex": "#3A5050",
+   "code": 0
+  },
+  {
+   "hex": "#1E5929",
+   "code": 0
+  }
+ ],
+ "levels": {
+  "Hero": {
+   "tris": 264471,
+   "verts": 57338,
+   "size_m": [
+    2.96,
+    2.735,
+    2.242
+   ],
+   "min_z": -0.0074,
+   "faces_per_code": {
+    "0": 264471
+   }
+  },
+  "LOD0": {
+   "tris": 264471,
+   "verts": 57338,
+   "size_m": [
+    2.96,
+    2.735,
+    2.242
+   ],
+   "min_z": -0.0074,
+   "faces_per_code": {
+    "0": 264471
+   }
+  },
+  "LOD1": {
+   "tris": 264471,
+   "verts": 57338,
+   "size_m": [
+    2.96,
+    2.735,
+    2.242
+   ],
+   "min_z": -0.0074,
+   "faces_per_code": {
+    "0": 264471
+   }
+  },
+  "Shadow": {
+   "tris": 264471,
+   "verts": 57338,
+   "size_m": [
+    2.96,
+    2.735,
+    2.242
+   ],
+   "min_z": -0.0074,
+   "faces_per_code": {
+    "0": 264471
+   }
+  }
+ },
+ "fbx": "Hatchling_A/Kaiju_Hatchling.fbx"
+}
