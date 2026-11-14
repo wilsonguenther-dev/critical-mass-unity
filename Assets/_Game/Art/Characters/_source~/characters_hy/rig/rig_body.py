@@ -371,8 +371,13 @@ try:
     rig_head = (P[:, 2] > J['head'].z + 0.06 * H) & np.isin(dom, [bi['head'], bi['chest'], bi['spine']])
     W[rig_head] = 0; W[rig_head, bi['head']] = 1; locked |= rig_head
     # back pack rigid on the chest: well behind the chest joint, between the hips and the head top, not an arm
-    back = (P[:, 1] > J['chest'].y + 0.10 * H) & (P[:, 2] > J['hips'].z) & (P[:, 2] < J['_headtop'].z)
-    back &= np.abs(P[:, 0]) < max(abs(J['upperarm.l'].x), abs(J['upperarm.r'].x)) + 0.05 * H
+    # rig-builder-2: everything carried behind the back (ladder, pack, wings) is ONE rigid piece on the chest: any vertex
+    # behind the back plane above the hips that is not on an arm (the ladder took shoulder weight and fanned out in Attack)
+    back = (P[:, 1] > J['chest'].y + 0.05 * H) & (P[:, 2] > J['hips'].z)
+    for s in SIDES:
+        pts_ = [J[f'upperarm.{s}'], J[f'lowerarm.{s}'], J[f'wrist.{s}'], J[f'hand.{s}']]
+        d_ = np.min([seg_dist(P, pts_[i], pts_[i + 1])[0] for i in range(3)], axis=0)
+        back &= d_ > 0.06 * H
     W[back] = 0; W[back, bi['chest']] = 1; locked |= back
     # arm weights only near the arm: an A-pose hand hangs beside the belt (the Builder's rope coil, pouches), and the
     # proxy heat let the arm carry them. Arm-chain weight on a vertex farther than ARM_R from its arm's bone chain goes to
