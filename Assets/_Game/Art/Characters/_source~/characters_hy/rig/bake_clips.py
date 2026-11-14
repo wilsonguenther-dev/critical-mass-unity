@@ -215,7 +215,13 @@ rest(fa); _yf = {s: _toe_yaw(fa, s) for s in SIDES}
 TOEFIX = {s: Matrix.Rotation(_yk[s] - _yf[s], 3, "Z") for s in SIDES}
 REP["toe_yaw_rest_deg"] = {s: dict(kaykit=round(math.degrees(_yk[s]), 1), cls=round(math.degrees(_yf[s]), 1)) for s in SIDES}
 log("toe yaw at rest", REP["toe_yaw_rest_deg"])
-REP.update(ratio=RATIO, lift=LIFT, leg_class=leg_f, leg_kaykit=leg_k, thigh=Lt, shin=Ls,
+# rig-builder-3: horizontal stride ratio (the game's StrideScale) apart from the hip-height ratio. The Builder's legs end
+# in tall boots (ankle 0.17 u up), so the hip-height ratio (1.31) asked for a run stance his leg chain cannot reach: the
+# IK fell short and the planted toe moved back at 79% of the ground speed (the game read 0.23 u/u of slide). A shorter
+# stride at a higher cadence: feet and hips move horizontally by RATIO_H, and ModelSpec.StrideScale = RATIO_H.
+RATIO_H = float(os.environ.get("BAKE_RATIO_H", "1.0")) if CLS == "Builder" else RATIO
+log("horizontal stride ratio", RATIO_H)
+REP.update(ratio=RATIO, stride_scale=RATIO_H, lift=LIFT, leg_class=leg_f, leg_kaykit=leg_k, thigh=Lt, shin=Ls,
            foot_vertices={s: int(len(FOOTV[s])) for s in SIDES})
 log("leg ratio", round(RATIO, 4), "ground lift", round(LIFT, 4), "thigh", Lt, "shin", Ls)
 
@@ -602,7 +608,7 @@ def bake_action(clip, act):
     MALLET_TGT[0] = None
     # Planted feet hold: while planted, a foot moves backward at exactly the class's ground speed (KayKit speed x leg
     # ratio, the speed the game moves it at), so it does not slide on the ground.
-    vg_ = GROUND_SPEED.get(clip, 0.0) * RATIO
+    vg_ = GROUND_SPEED.get(clip, 0.0) * RATIO_H
     bdir = kk_back_dir(act, f0, f1) if vg_ > 0 else None
     anchor = {s: None for s in SIDES}
     rec = {n: [] for n in names}
@@ -639,7 +645,8 @@ def bake_action(clip, act):
             arms_in(clip)
         m_drop, m_back = mallet_pose((f - f0) / max(1, f1 - f0)) if MAL else (0.0, 0.0)
         K = snap(kk)
-        Hd = F0["hips"] + (K["hips"] - K0["hips"]) * RATIO + Vector((0, m_back, LIFT - m_drop))
+        _dh = K["hips"] - K0["hips"]
+        Hd = F0["hips"] + Vector((_dh.x * RATIO_H, _dh.y * RATIO_H, _dh.z * RATIO)) + Vector((0, m_back, LIFT - m_drop))
         targets, rots = {}, {}
         for s in SIDES:
             # The foot keeps the world rotation the clip gives it through the full-local copy (as on KayKit). The old
@@ -670,7 +677,7 @@ def bake_action(clip, act):
                     R = Matrix.Rotation(yaw, 3, 'Z') @ F0["R" + s]
             dk = K["A" + s] - K0["A" + s]
             # Foot motion scales with the legs (an unscaled swing lift was tried: Walk's lowest foot rose to 0.043).
-            A = F0["A" + s] + dk * RATIO + Vector((0, 0, LIFT))
+            A = F0["A" + s] + Vector((dk.x * RATIO_H, dk.y * RATIO_H, dk.z * RATIO)) + Vector((0, 0, LIFT))
             planted = (K["A" + s].z - K0["A" + s].z) < (plant_n(clip) if NEW_BODY and clip in ORDER_CLIPS else PLANT) * leg_k
             if planted and bdir is not None:
                 if anchor[s] is None:
@@ -943,7 +950,7 @@ for clip in ("Idle", "Walk", "Run", "StrafeL", "StrafeR"):
                min_any=min(min(H["l"]), min(H["r"])), ankle_l=ANK["l"], ankle_r=ANK["r"], toe_yaw_l=YAW["l"],
                toe_yaw_r=YAW["r"])
     if clip in GROUND_SPEED:
-        v = GROUND_SPEED[clip] * RATIO
+        v = GROUND_SPEED[clip] * RATIO_H
         dt = 1.0 / fps
         back = Vector((0, 0))
         for s in SIDES:

@@ -265,7 +265,7 @@ for clip, vn, n in ((ATTACK, 'front', 8), (ATTACK, 'side', 8), (ATTACK, 'side_l'
 # unit of body travel (gate 0.2); the planted toe's yaw (0 = straight ahead, + toward his left).
 try:
     bk = json.load(open(os.path.join(OUT, f'bake_{CLS}.json')))
-    ratio_, gs_ = float(bk.get('ratio', 1.0)), bk.get('ground_speed', {})
+    ratio_, gs_ = float(bk.get('stride_scale', bk.get('ratio', 1.0))), bk.get('ground_speed', {})
     fps_ = scene.render.fps / scene.render.fps_base
     loco = {}
     for clip in ('Run', 'Walk', 'StrafeL', 'StrafeR', 'RunBack', 'WalkBack'):
