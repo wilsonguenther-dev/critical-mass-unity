@@ -79,6 +79,7 @@ namespace CriticalMass.Runtime.Camera
 
         void LateUpdate()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Late(this);
             if (_trauma <= 0f) return;
             if (FeelGate.ShakeScale <= 0f) { _trauma = 0f; return; }
             UnityEngine.Camera cam = UnityEngine.Camera.main;

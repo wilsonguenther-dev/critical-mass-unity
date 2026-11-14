@@ -188,6 +188,7 @@ namespace CriticalMass.Runtime.Menus
 
         void Update()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Upd(this);
             OverlayGuard.Tick();
             bool active = Enabled && (!Application.isBatchMode || AllowInBatchMode);
             bool titleOpen = active && IsTitleOpen() && !StoryIntro.IsPlaying && !Credits.IsOpen;

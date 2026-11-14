@@ -35,6 +35,7 @@ namespace CriticalMass.Runtime.View
 
         void LateUpdate()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Late(this);
             bool low = GroundView.PlayActive;
             if (!low)
             {

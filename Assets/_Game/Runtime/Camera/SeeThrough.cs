@@ -23,6 +23,7 @@ namespace CriticalMass.Runtime.Camera
     /// (Shaders/CMSeeThroughHook.hlsl; the CMToon owner adds one include and one call to use it).
     /// View only: reads the World, never writes it; aim is untouched (it stays the screen-to-world ray of HumanInputSource).
     /// </summary>
+    [DefaultExecutionOrder(160)]   // online-offline-cost-1: reads this frame's camera: after CinemachineBrain (100) and CameraShake (150), before GameHud's layout (200)
     public sealed class SeeThrough : MonoBehaviour
     {
         public const string ShaderResource = "CMCameraSeeThrough";
@@ -97,7 +98,7 @@ namespace CriticalMass.Runtime.Camera
             }
         }
 
-        private void LateUpdate() { var cost = CriticalMass.Runtime.Game.FrameCost.Enter(); LateUpdateCost(); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.Camera, cost); }
+        private void LateUpdate() { using var __ab = CriticalMass.Runtime.Game.AllocBy.Late(this); var cost = CriticalMass.Runtime.Game.FrameCost.Enter(); LateUpdateCost(); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.Camera, cost); }
 
         void LateUpdateCost()
         {

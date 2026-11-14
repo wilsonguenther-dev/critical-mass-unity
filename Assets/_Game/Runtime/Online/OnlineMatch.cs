@@ -144,6 +144,7 @@ namespace CriticalMass.Runtime.Online
         static void Begin(LockstepSession s)
         {
             Session = s;
+            LocalSeat.OnlineLive = true;
             s.Sampler = Sample;
             s.Ticked = w => Ticked?.Invoke(w);
             LocalSeat.Set(s.LocalActor);
@@ -187,6 +188,8 @@ namespace CriticalMass.Runtime.Online
             Code = null;
             LocalInput = null;
             LocalSeat.Reset();
+            LocalSeat.OnlineLive = OnlineHeadless.Active;
+            OnlineRunner.Drop();   // online-offline-cost-1: nothing online stays alive once the player leaves the room
         }
     }
 
@@ -204,8 +207,21 @@ namespace CriticalMass.Runtime.Online
             _one = go.AddComponent<OnlineRunner>();
         }
 
+        /// <summary>online-offline-cost-1: removes the runner and the chat HUD (Leave calls it; HostRoom and JoinRoom make them again).</summary>
+        public static void Drop()
+        {
+            if (_one != null)
+            {
+                if (Application.isPlaying) Destroy(_one.gameObject);
+                else DestroyImmediate(_one.gameObject);
+            }
+            _one = null;
+            OnlineChatHud.Drop();
+        }
+
         void Update()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Upd(this);
             if (!OnlineMatch.InRoom) return;
             OnlineMatch.Update();
         }

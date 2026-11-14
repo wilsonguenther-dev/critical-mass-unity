@@ -58,6 +58,7 @@ namespace CriticalMass.Runtime.View.Atmosphere
 
         void LateUpdate()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Late(this);
             if (!_wide) return;
             UnityEngine.Camera cam = UnityEngine.Camera.main;
             if (cam == null) return;

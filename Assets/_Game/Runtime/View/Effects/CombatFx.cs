@@ -398,7 +398,7 @@ namespace CriticalMass.Runtime.View.Effects
             return (w.Tick + _driver.Alpha) / _driver.Config.SimHz;
         }
 
-        private void LateUpdate() { var cost = CriticalMass.Runtime.Game.FrameCost.Enter(); LateUpdateCost(); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.Vfx, cost); }
+        private void LateUpdate() { using var __ab = CriticalMass.Runtime.Game.AllocBy.Late(this); var cost = CriticalMass.Runtime.Game.FrameCost.Enter(); LateUpdateCost(); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.Vfx, cost); }
 
         void LateUpdateCost()
         {

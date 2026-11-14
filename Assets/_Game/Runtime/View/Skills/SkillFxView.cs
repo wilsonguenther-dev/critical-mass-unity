@@ -16,6 +16,7 @@ namespace CriticalMass.Runtime.View.Skills
     /// animation cues keep running so no skill fires with the character standing still. Installs itself on the driver
     /// (SkillFxInstaller), so no shared file changes for wiring.
     /// </summary>
+    [DefaultExecutionOrder(160)]   // online-offline-cost-1: reads this frame's camera: after CinemachineBrain (100) and CameraShake (150), before GameHud's layout (200)
     public sealed class SkillFxView : MonoBehaviour
     {
         public const int GroundVerts = 9000, SolidVerts = 32000, AirVerts = 6000;
@@ -112,6 +113,7 @@ namespace CriticalMass.Runtime.View.Skills
 
         void LateUpdate()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Late(this);
             if (_driver == null || _ground == null) return;
             World w = _driver.World;
             if (w == null) return;
@@ -174,6 +176,7 @@ namespace CriticalMass.Runtime.View.Skills
 
         void Update()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Upd(this);
             if (_driver != null) return;
             if (--_wait > 0) return;
             _wait = SearchEveryFrames;

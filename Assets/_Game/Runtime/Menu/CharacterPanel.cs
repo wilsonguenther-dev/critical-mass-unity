@@ -734,6 +734,7 @@ namespace CriticalMass.Runtime.Menu
 
         void Update()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Upd(this);
             if (!_open) return;
             ProgressionUi.UpdateScale(_canvas);
             if (_previewArea.activeSelf) _preview.Tick(Time.unscaledDeltaTime);

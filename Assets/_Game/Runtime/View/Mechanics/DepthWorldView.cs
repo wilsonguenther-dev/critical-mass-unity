@@ -19,6 +19,7 @@ namespace CriticalMass.Runtime.View.Mechanics
     /// Builder's repair ring, and the line from a bot to the ping it answered. Reads the sim only. Reduced motion: no bob,
     /// no shake, no spin; reduce flashing: steady colours.
     /// </summary>
+    [DefaultExecutionOrder(160)]   // online-offline-cost-1: reads this frame's camera: after CinemachineBrain (100) and CameraShake (150), before GameHud's layout (200)
     public sealed class DepthWorldView : MonoBehaviour
     {
         public const int GroundVerts = 12000, SolidVerts = 22000, AirVerts = 6000;
@@ -118,7 +119,7 @@ namespace CriticalMass.Runtime.View.Mechanics
             Feed.Read(w);
         }
 
-        void LateUpdate() { var c = CriticalMass.Runtime.Game.FrameCost.Enter(); LateUpdateBody(); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.DepthView, c); }
+        void LateUpdate() { using var __ab = CriticalMass.Runtime.Game.AllocBy.Late(this); var c = CriticalMass.Runtime.Game.FrameCost.Enter(); LateUpdateBody(); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.DepthView, c); }
 
         void LateUpdateBody()
         {

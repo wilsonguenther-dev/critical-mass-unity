@@ -127,7 +127,7 @@ namespace CriticalMass.Runtime.Hud
 
         void OnDisable() => Live.Remove(this);
 
-        void LateUpdate() => Apply(false);
+        void LateUpdate() { using var __ab = CriticalMass.Runtime.Game.AllocBy.Late(this); Apply(false); }
 
         /// <summary>Re-reads the safe area (force: always) and re-homes new children.</summary>
         public void Apply(bool force)

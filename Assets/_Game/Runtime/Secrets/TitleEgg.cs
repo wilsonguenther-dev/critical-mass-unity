@@ -95,6 +95,7 @@ namespace CriticalMass.Runtime.Secrets
 
         void Update()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Upd(this);
             if (_punch >= 0f && _egg != null)
             {
                 _punch += Time.unscaledDeltaTime;

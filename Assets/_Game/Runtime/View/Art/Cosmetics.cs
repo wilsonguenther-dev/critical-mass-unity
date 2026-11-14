@@ -366,6 +366,7 @@ namespace CriticalMass.Runtime.View.Art
 
         void LateUpdate()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Late(this);
             if (_driver == null || _dresser == null) return;
             World w = _driver.World;
             if (w == null || w.ActorCount <= Local) return;

@@ -58,6 +58,18 @@ namespace CriticalMass.Runtime.Online
             _one = go.AddComponent<OnlineChatHud>();
         }
 
+        /// <summary>online-offline-cost-1: removes the chat HUD and its canvas (when the player leaves the room).</summary>
+        public static void Drop()
+        {
+            if (_one != null)
+            {
+                if (Application.isPlaying) Destroy(_one.gameObject);
+                else DestroyImmediate(_one.gameObject);
+            }
+            _one = null;
+            Typing = false;
+        }
+
         static ChatChannel Channel => OnlineMatch.Host != null ? OnlineMatch.Host.Chat : OnlineMatch.Client?.Chat;
 
         void Start()
@@ -111,6 +123,7 @@ namespace CriticalMass.Runtime.Online
 
         void Update()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Upd(this);
             ChatChannel ch = Channel;
             bool show = Visible && ch != null && OnlineMatch.InRoom;
             if (_canvas.enabled != show) _canvas.enabled = show;

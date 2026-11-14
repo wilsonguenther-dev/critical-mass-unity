@@ -39,6 +39,7 @@ namespace CriticalMass.Runtime.View.Affordance
     /// Read-only on the Sim. Every element obeys its WorldFeedbackSettings switch; shake obeys Reduce motion too.
     /// </summary>
     [CriticalMass.Runtime.Flow.GameOverlay(Order = 56, Scope = CriticalMass.Runtime.Flow.OverlayScope.MatchOnly)]
+    [DefaultExecutionOrder(160)]   // online-offline-cost-1: reads this frame's camera: after CinemachineBrain (100) and CameraShake (150), before GameHud's layout (200)
     public sealed class TerrainAffordanceView : MonoBehaviour
     {
         public const int MaxQuads = 320;
@@ -297,6 +298,7 @@ namespace CriticalMass.Runtime.View.Affordance
 
         void LateUpdate()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Late(this);
             World w = _driver != null ? _driver.World : null;
             _q = 0;
             MarkersDrawn = 0;

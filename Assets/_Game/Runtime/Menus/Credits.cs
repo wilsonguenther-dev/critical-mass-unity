@@ -264,6 +264,7 @@ namespace CriticalMass.Runtime.Menus
 
         void Update()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Upd(this);
             OverlayGuard.Tick();
             if (!_open) return;
             UpdateScale();

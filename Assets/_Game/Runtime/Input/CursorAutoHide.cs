@@ -25,6 +25,7 @@ namespace CriticalMass.Runtime.Input
 
         void Update()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Upd(this);
             ControlBindings.Sample();
             bool focused = Application.isFocused;
             // controls-1 round 2: the same per-frame focus read drives "Mute when in background" (GameSettings.Mix).

@@ -476,6 +476,7 @@ namespace CriticalMass.Runtime.Game
 
         void Update()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Upd(this);
             float dt = Time.unscaledDeltaTime;
             SessionKeeper.Tick(dt);
             if (SessionKeeper.ToolRun) return;

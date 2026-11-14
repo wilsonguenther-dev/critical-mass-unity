@@ -112,7 +112,7 @@ namespace CriticalMass.Runtime.Game
             Request = req;
             // online-rooms-2: in an online room the lockstep session owns the world and its clock; this driver only shows
             // it (the session ticks in OnlineRunner, inputs come from HumanInputSource through FillOnline).
-            CriticalMass.Net.LockstepSession online = Online.OnlineMatch.Session;
+            CriticalMass.Net.LockstepSession online = LocalSeat.OnlineLive ? Online.OnlineMatch.Session : null;   // online-offline-cost-1: offline never loads the online types
             if (online != null && (req == null || !req.Backdrop))
             {
                 _online = online;
@@ -202,9 +202,10 @@ namespace CriticalMass.Runtime.Game
 
         private void Update()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Upd(this);
             // online-rooms-3: while an online match runs (or the game is a hidden online test peer) no other world ticks:
             // the online session is the only thing stepping the Sim.
-            if (_online == null && (Online.OnlineMatch.Session != null || Online.OnlineHeadless.Active)) return;
+            if (_online == null && LocalSeat.OnlineLive) return;   // online-offline-cost-1: one plain bool; offline never touches the online types
             if (_online != null)
             {
                 float cd = Time.captureDeltaTime;

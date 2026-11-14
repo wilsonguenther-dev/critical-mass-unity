@@ -330,6 +330,7 @@ namespace CriticalMass.Runtime.Menu
 
         void Update()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Upd(this);
             if (_bar != null) _bar.Tick();
             if (!Animating || _r == null) return;
             float t = Time.unscaledTime - _start;
@@ -469,6 +470,7 @@ namespace CriticalMass.Runtime.Menu
 
         void Update()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Upd(this);
             if (!_open) return;
             ProgressionUi.UpdateScale(_canvas);
             if (CharacterPanel.IsOpen) return;

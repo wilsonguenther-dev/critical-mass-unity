@@ -51,6 +51,7 @@ namespace CriticalMass.Runtime.Game
 
         void LateUpdate()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Late(this);
             Scene scene = SceneManager.GetActiveScene();
             if (scene.handle != _sceneHandle || (_sun == null && Time.frameCount % 30 == 0))
             {

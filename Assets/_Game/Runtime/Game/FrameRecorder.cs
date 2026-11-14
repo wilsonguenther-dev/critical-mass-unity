@@ -142,6 +142,12 @@ namespace CriticalMass.Runtime.Game
             updateDelegate = () => Stamp(k),
         };
 
+        /// <summary>online-offline-cost-1: picks the allocation counter without installing the recorder (AllocBy uses it).</summary>
+        public static void EnsureAllocCounter()
+        {
+            if (AllocSource == "none") PickAllocCounter();
+        }
+
         static void PickAllocCounter()
         {
             try

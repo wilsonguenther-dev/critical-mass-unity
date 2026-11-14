@@ -502,6 +502,7 @@ namespace CriticalMass.Runtime.Menus
 
         void Update()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Upd(this);
             float target = _focus ? 1.04f : 1f;
             if (Mathf.Abs(_scale - target) < 1e-4f) return;
             _scale = Mathf.MoveTowards(_scale, target, Time.unscaledDeltaTime * (0.04f / 0.12f));

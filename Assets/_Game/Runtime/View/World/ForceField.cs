@@ -130,6 +130,7 @@ namespace CriticalMass.Runtime.View.Reactions
 
         private void LateUpdate()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Late(this);
             if (_driver == null) _driver = GetComponent<SimDriverBehaviour>();
             if (++_budgetCheck % 120 == 0)
             {

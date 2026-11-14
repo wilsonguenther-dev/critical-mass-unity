@@ -84,6 +84,7 @@ namespace CriticalMass.Runtime.Hud
 
         void Update()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Upd(this);
             float ms = Time.unscaledDeltaTime * 1000f;
             if (Time.frameCount > 1)
             {

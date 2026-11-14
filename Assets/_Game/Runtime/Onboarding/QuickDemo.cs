@@ -97,6 +97,7 @@ namespace CriticalMass.Runtime.Onboarding
 
         void Update()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Upd(this);
             if (_driver == null || _driver.World == null || Leaving) return;
             World w = _driver.World;
             if (w.Match.Phase == MatchPhase.Ended)

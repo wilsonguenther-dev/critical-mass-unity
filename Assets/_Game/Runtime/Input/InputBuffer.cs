@@ -103,6 +103,7 @@ namespace CriticalMass.Runtime.Input
 
         void Update()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Upd(this);
             if (_input == null) _input = GetComponent<HumanInputSource>();
             if (_driver == null) _driver = GetComponent<SimDriverBehaviour>();
             if (_input == null) return;

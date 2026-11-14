@@ -38,6 +38,7 @@ namespace CriticalMass.Runtime.Online
             }
             if (!wanted || !headless) return;
             Active = true;
+            LocalSeat.OnlineLive = true;
             Application.runInBackground = true;
             CriticalMass.Runtime.Game.FrameGovernor.SetHeadlessPeerFrameRate(200);   // the peer steps once a frame: keep frames short
             HeadlessPeer peer = HeadlessPeer.FromArgs(args, OnlineConfig.RelayUrl);
@@ -63,6 +64,7 @@ namespace CriticalMass.Runtime.Online
 
         void Update()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Upd(this);
             if (_quitting || _peer == null) return;
             int? done;
             try { done = _peer.Step(Clock.ElapsedMilliseconds); }

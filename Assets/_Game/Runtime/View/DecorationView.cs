@@ -78,6 +78,7 @@ namespace CriticalMass.Runtime.View
 
         private void LateUpdate()
         {
+            using var __ab = CriticalMass.Runtime.Game.AllocBy.Late(this);
             if (_driver == null) _driver = GetComponent<SimDriverBehaviour>();
             World w = _driver != null ? _driver.World : null;
             if (w == null) return;
