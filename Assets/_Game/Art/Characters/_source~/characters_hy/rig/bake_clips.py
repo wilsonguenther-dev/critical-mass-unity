@@ -164,6 +164,18 @@ REP["facing"] = dict(kk_world=[list(map(lambda v: round(v, 3), r)) for r in kk.m
                      class_world=[list(map(lambda v: round(v, 3), r)) for r in fa.matrix_world],
                      kk_toe_dir=_kf[0], class_toe_dir=_ff[0], kk_hips_z=_kf[1], class_hips_z=_ff[1])
 log("facing", REP["facing"])
+# The two rigs share bone frames but not joint offsets: KayKit's toes sit 19 degrees out from its ankle, the HY Farmer's
+# straight ahead, so the same foot rotation pointed the Farmer's toes 19 degrees further in than KayKit's (Run toe-off read
+# 36 to 48 degrees off forward in the game's facing tests). Turn each class foot at rest so its toes yaw as KayKit's do.
+def _toe_yaw(arm, s):
+    P = arm.pose.bones
+    t = W(arm, P["toes." + s].head) - W(arm, P["foot." + s].head)
+    return math.atan2(t.x, -t.y)
+rest(kk); _yk = {s: _toe_yaw(kk, s) for s in SIDES}
+rest(fa); _yf = {s: _toe_yaw(fa, s) for s in SIDES}
+TOEFIX = {s: Matrix.Rotation(_yk[s] - _yf[s], 3, "Z") for s in SIDES}
+REP["toe_yaw_rest_deg"] = {s: dict(kaykit=round(math.degrees(_yk[s]), 1), cls=round(math.degrees(_yf[s]), 1)) for s in SIDES}
+log("toe yaw at rest", REP["toe_yaw_rest_deg"])
 REP.update(ratio=RATIO, lift=LIFT, leg_class=leg_f, leg_kaykit=leg_k, thigh=Lt, shin=Ls,
            foot_vertices={s: int(len(FOOTV[s])) for s in SIDES})
 log("leg ratio", round(RATIO, 4), "ground lift", round(LIFT, 4), "thigh", Lt, "shin", Ls)
@@ -234,7 +246,7 @@ def bake_action(clip, act):
         Hd = F0["hips"] + (K["hips"] - K0["hips"]) * RATIO + Vector((0, 0, LIFT))
         targets, rots = {}, {}
         for s in SIDES:
-            R = K["R" + s] @ K0["R" + s].inverted() @ F0["R" + s]
+            R = K["R" + s] @ K0["R" + s].inverted() @ TOEFIX[s] @ F0["R" + s]
             dk = K["A" + s] - K0["A" + s]
             # Horizontal foot motion scales with the legs (stride); the lift of a swinging foot does not, so the swing
             # ankle stays above the planted one (the game's facing tests take the lower ankle as the planted foot).
