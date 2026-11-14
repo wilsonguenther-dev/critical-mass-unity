@@ -658,29 +658,41 @@ namespace CriticalMass.Net
             if (_t.Reliable)
             {
                 // One broadcast carries every new bundle to everyone (relay messages cost; acks are not needed on TCP).
-                int from = _sentBundle[0] + 1;
-                bool news = _producedThrough >= from || Status == LockstepStatus.Desynced;
-                if (now - _lastSendTo[0] < (news ? _sendEveryMs : _o.KeepAliveMs)) return;
-                int count = Math.Max(0, Math.Min(_producedThrough - from + 1, maxPer));
-                int len = BuildBundles(from, count, -1);
-                if (len <= 0) return;
-                _t.Send(Peers.Broadcast, _pkt, len);
-                BytesSent += len;
-                _lastSendTo[0] = now;
-                if (count > 0) _sentBundle[0] = from + count - 1;
+                // A 32-human bundle fits only two ticks in a packet, the same as a big room's send interval produces, so
+                // a backlog (after a stall) goes out in up to three packets at once instead of never draining.
+                for (int pkt = 0; pkt < 3; pkt++)
+                {
+                    int from = _sentBundle[0] + 1;
+                    bool news = _producedThrough >= from || Status == LockstepStatus.Desynced;
+                    if (pkt == 0 && now - _lastSendTo[0] < (news ? _sendEveryMs : _o.KeepAliveMs)) return;
+                    if (pkt > 0 && _producedThrough < from) return;
+                    int count = Math.Max(0, Math.Min(_producedThrough - from + 1, maxPer));
+                    int len = BuildBundles(from, count, -1);
+                    if (len <= 0) return;
+                    _t.Send(Peers.Broadcast, _pkt, len);
+                    BytesSent += len;
+                    _lastSendTo[0] = now;
+                    if (count > 0) _sentBundle[0] = from + count - 1;
+                }
                 return;
             }
             for (int k = 1; k < _h; k++)
             {
                 if (_gone[k]) continue;
-                int from = _ackedBundle[k] + 1;
-                bool news = _producedThrough >= from || Status == LockstepStatus.Desynced;
+                int first = _ackedBundle[k] + 1;
+                bool news = _producedThrough >= first || Status == LockstepStatus.Desynced;
                 if (now - _lastSendTo[k] < (news ? _sendEveryMs : _o.KeepAliveMs)) continue;
-                int count = Math.Max(0, Math.Min(_producedThrough - from + 1, maxPer));
-                int len = BuildBundles(from, count, _inThrough[k]);
-                if (len <= 0) continue;
-                _t.Send(Setup.Humans[k].Peer, _pkt, len);
-                BytesSent += len;
+                // Everything unacked, in up to three packets (a big room fits only two ticks in one).
+                for (int pkt = 0; pkt < 3; pkt++)
+                {
+                    int from = first + pkt * maxPer;
+                    if (pkt > 0 && _producedThrough < from) break;
+                    int count = Math.Max(0, Math.Min(_producedThrough - from + 1, maxPer));
+                    int len = BuildBundles(from, count, _inThrough[k]);
+                    if (len <= 0) break;
+                    _t.Send(Setup.Humans[k].Peer, _pkt, len);
+                    BytesSent += len;
+                }
                 _lastSendTo[k] = now;
             }
         }
