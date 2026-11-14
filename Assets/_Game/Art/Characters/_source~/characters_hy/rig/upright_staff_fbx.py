@@ -87,14 +87,21 @@ def rot_between(u, v):
 
 
 def main(src, clips, dst, take="Idle"):
-    rest = pack_points(clips, None, None)
     frames = [pack_points(clips, take, f) for f in (0, 10, 20)]
-    Q = kabsch(rest, np.mean(frames, axis=0))
     grip_idle_y = float(np.mean(frames, axis=0)[2][1])   # handslot.r height above the soles (pack ground is 0)
     data = open(src, "rb").read()
     head, top, foot_id, magic, ver = parse(data)
     objs, byid, up, down = graph(top)
     nm = lambda k: val(k.props[1]).split("\x00")[0]
+    # The bind (T-pose) positions of the hand joints come from the model's cluster links: the pack's default node values
+    # are not its bind (they are a pose), and fitting against them turned the staff sideways.
+    links = {}
+    for cl in [k for k in objs.kids if k.name == "Deformer" and val(k.props[2]) == "Cluster" and child(k, "TransformLink") is not None]:
+        for b, _ in down[val(cl.props[0])]:
+            if b in byid and byid[b].name == "Model":
+                links.setdefault(nm(byid[b]), val(child(cl, "TransformLink").props[0]).reshape(4, 4)[3, :3])
+    rest = np.array([links[n] for n in HAND])
+    Q = kabsch(rest, np.mean(frames, axis=0))
     rep = {"hand_idle_rotation_deg": round(math.degrees(math.acos(max(-1, min(1, (np.trace(Q) - 1) / 2)))), 1), "meshes": {}}
     for g in [k for k in objs.kids if k.name == "Geometry" and val(k.props[2]) == "Mesh"]:
         gid = val(g.props[0])
