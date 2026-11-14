@@ -46,6 +46,7 @@ namespace CriticalMass.Runtime.Game
             if (scene.path != BootScenePath) return null;
 
             long b0 = System.Diagnostics.Stopwatch.GetTimestamp();
+            LoadTimer.SceneLoaded(b0);   // perf/start-hitch-1: the scene-start report counts from here
             // Game root, components in this order.
             var game = new GameObject("Game");
             PlaceInScene(game, scene);

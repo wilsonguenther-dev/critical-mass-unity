@@ -178,7 +178,10 @@ namespace CriticalMass.Runtime.Menu
             CancelRebind();
         }
 
-        void Start()
+        // perf/start-hitch-1: timed for the scene-start report (LoadTimer).
+        void Start() { long t0 = CriticalMass.Runtime.Game.LoadTimer.Now(); StartBody(); CriticalMass.Runtime.Game.LoadTimer.Part("PauseMenu.Start", t0); }
+
+        void StartBody()
         {
             Build();
             AfterReload pending = PendingAfterReload;
@@ -511,6 +514,7 @@ namespace CriticalMass.Runtime.Menu
 
         static void ReloadBoot()
         {
+            CriticalMass.Runtime.Game.LoadTimer.LoadIssued();   // perf/start-hitch-1
             SceneManager.LoadScene(GameBootstrap.BootScenePath);
         }
 

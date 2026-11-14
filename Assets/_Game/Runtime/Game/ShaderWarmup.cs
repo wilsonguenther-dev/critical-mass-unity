@@ -46,7 +46,10 @@ namespace CriticalMass.Runtime.Game
         /// <summary>The file name for a graphics API (pure; tests).</summary>
         public static string FileFor(GraphicsDeviceType api) => api + ".graphicsstate";
 
-        void Start()
+        // perf/start-hitch-1: timed for the scene-start report (LoadTimer).
+        void Start() { long t0 = CriticalMass.Runtime.Game.LoadTimer.Now(); StartBody(); CriticalMass.Runtime.Game.LoadTimer.Part("ShaderWarmup.Start", t0); }
+
+        void StartBody()
         {
             try
             {

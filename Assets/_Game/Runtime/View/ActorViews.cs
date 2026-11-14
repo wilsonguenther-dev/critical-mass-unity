@@ -80,7 +80,10 @@ namespace CriticalMass.Runtime.View
         /// <summary>Models in use (for tests and the capture's frame report).</summary>
         public int ActiveModelCount { get; private set; }
 
-        private void Start()
+        // perf/start-hitch-1: timed for the scene-start report (LoadTimer).
+        private void Start() { long t0 = CriticalMass.Runtime.Game.LoadTimer.Now(); StartBody(); CriticalMass.Runtime.Game.LoadTimer.Part("ActorViews.Start", t0); }
+
+        private void StartBody()
         {
             _driver = GetComponent<SimDriverBehaviour>();
             if (_driver == null || _driver.World == null)
@@ -137,17 +140,33 @@ namespace CriticalMass.Runtime.View
             hill.GetComponent<Renderer>().sharedMaterial = ToonMaterials.Prop(Palette.Brass);
 
             // M9 (physics audit): prewarm spare models per class so a respawn as another class takes one from the pool.
-            if (_catalog != null)
-                foreach (ClassId cls in ClassIds.All)
-                {
-                    string key = ArtMapping.ClassModel(cls);
-                    if (key == null || _catalog.Find(key) == null) continue;
-                    for (int k = 0; k < PrewarmPerClass; k++)
-                    {
-                        ModelView m = Make(key, "Pool " + key);
-                        if (m != null) Give(m);
-                    }
-                }
+            // perf/start-hitch-1: built after Start, SparesPerFrame a frame (behind the loading screen), in the same order,
+            // so the scene's activation frame no longer instantiates them all at once.
+            _spareIndex = _catalog != null ? 0 : -1;
+        }
+
+        /// <summary>perf/start-hitch-1: M9 spare models built per frame after Start (PrewarmPerClass per class in all).</summary>
+        public const int SparesPerFrame = 2;
+        int _spareIndex = -1;   // next (class, copy) to build; -1 = all built
+
+        /// <summary>True while M9 spares are still to be built.</summary>
+        public bool SparesPending => _spareIndex >= 0;
+
+        void TrickleSpares()
+        {
+            if (_spareIndex < 0) return;
+            int total = ClassIds.All.Count * PrewarmPerClass, built = 0;
+            while (_spareIndex < total && built < SparesPerFrame)
+            {
+                ClassId cls = ClassIds.All[_spareIndex / PrewarmPerClass];
+                _spareIndex++;
+                string key = ArtMapping.ClassModel(cls);
+                if (key == null || _catalog == null || _catalog.Find(key) == null) continue;
+                ModelView m = Make(key, "Pool " + key);
+                if (m != null) Give(m);
+                built++;
+            }
+            if (_spareIndex >= total) _spareIndex = -1;
         }
 
         private void OnDestroy()
@@ -219,7 +238,7 @@ namespace CriticalMass.Runtime.View
             s.Push(m);
         }
 
-        private void LateUpdate() { if (CriticalMass.Runtime.Hud.TitleBackdrop.Frozen) return; var c = CriticalMass.Runtime.Game.FrameCost.Enter(); Sync(Time.deltaTime); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.ActorViews, c); }
+        private void LateUpdate() { if (CriticalMass.Runtime.Hud.TitleBackdrop.Frozen) return; var c = CriticalMass.Runtime.Game.FrameCost.Enter(); TrickleSpares(); Sync(Time.deltaTime); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.ActorViews, c); }
 
         /// <summary>
         /// Contract C3 (DG-71): called once per drawn actor (and the Kaiju, actor -2) after its pose is evaluated and before

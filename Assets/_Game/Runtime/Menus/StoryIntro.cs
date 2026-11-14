@@ -398,7 +398,10 @@ namespace CriticalMass.Runtime.Menus
             if (Instance == this) Instance = null;
         }
 
-        void Start()
+        // perf/start-hitch-1: timed for the scene-start report (LoadTimer).
+        void Start() { long t0 = CriticalMass.Runtime.Game.LoadTimer.Now(); StartBody(); CriticalMass.Runtime.Game.LoadTimer.Part("StoryIntro.Start", t0); }
+
+        void StartBody()
         {
             // Sequenced by the game flow (DG-01): on the boot's title (before the title, before the first-time card, which
             // waits for the title to go), never on a reload into a match, results or the menu, never in autoplay.

@@ -151,6 +151,7 @@ namespace CriticalMass.Editor
                           $"errors={summary.totalErrors} sizeBytes={summary.totalSize} seconds={summary.totalTime.TotalSeconds:F0} " +
                           $"development={development} output={summary.outputPath}");
 
+                if (summary.result == BuildResult.Succeeded) LogSizes(report);
                 if (summary.result != BuildResult.Succeeded)
                 {
                     Fail(1, $"build result {summary.result}");
@@ -160,6 +161,30 @@ namespace CriticalMass.Editor
             {
                 Debug.LogException(e);
                 Fail(1, "exception during build");
+            }
+        }
+
+        /// <summary>
+        /// perf/start-hitch-1: the Mac build carries 817 MB in resources.assets.resS (1.0 GB app), and the first launch of
+        /// a freshly copied app sat about 6 s at zero CPU before the engine started (the system checking the bundle).
+        /// One line per packed file and the 25 largest assets name what makes it big.
+        /// </summary>
+        static void LogSizes(BuildReport report)
+        {
+            try
+            {
+                var all = report.packedAssets.SelectMany(f => f.contents.Select(c => (file: Path.GetFileName(f.shortPath), c))).ToList();
+                foreach (var g in all.GroupBy(x => x.file).OrderByDescending(g => g.Sum(x => (long)x.c.packedSize)))
+                    Debug.Log($"[CriticalMass.Build] size {g.Key}: {g.Sum(x => (long)x.c.packedSize) / 1048576.0:F1} MB in {g.Count()} objects");
+                foreach (var t in all.GroupBy(x => x.c.type != null ? x.c.type.Name : "?").OrderByDescending(g => g.Sum(x => (long)x.c.packedSize)).Take(8))
+                    Debug.Log($"[CriticalMass.Build] size type {t.Key}: {t.Sum(x => (long)x.c.packedSize) / 1048576.0:F1} MB in {t.Count()} objects");
+                foreach (var a in all.GroupBy(x => x.c.sourceAssetPath).Select(g => (path: g.Key, size: g.Sum(x => (long)x.c.packedSize)))
+                             .OrderByDescending(a => a.size).Take(25))
+                    Debug.Log($"[CriticalMass.Build] size asset {a.size / 1048576.0:F1} MB {a.path}");
+            }
+            catch (Exception e)
+            {
+                Debug.Log($"[CriticalMass.Build] size breakdown skipped: {e.Message}");
             }
         }
 

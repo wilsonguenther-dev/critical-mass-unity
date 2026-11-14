@@ -128,7 +128,10 @@ namespace CriticalMass.Runtime.View.Affordance
 
         void OnBindings() => _bindingsVersion++;
 
-        void Start()
+        // perf/start-hitch-1: timed for the scene-start report (LoadTimer).
+        void Start() { long t0 = CriticalMass.Runtime.Game.LoadTimer.Now(); StartBody(); CriticalMass.Runtime.Game.LoadTimer.Part("TerrainAffordanceView.Start", t0); }
+
+        void StartBody()
         {
             _driver = GetComponent<SimDriverBehaviour>();
             if (_driver == null) _driver = FindAnyObjectByType<SimDriverBehaviour>();

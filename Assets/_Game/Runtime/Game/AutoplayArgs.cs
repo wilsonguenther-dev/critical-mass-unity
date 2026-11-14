@@ -699,6 +699,7 @@ namespace CriticalMass.Runtime.Game
                 _ended = false;
                 _recording = false;
                 _reloadFrame = Time.frameCount;
+                LoadTimer.LoadIssued();   // perf/start-hitch-1
                 SceneManager.LoadScene(GameBootstrap.BootScenePath);
                 return;
             }

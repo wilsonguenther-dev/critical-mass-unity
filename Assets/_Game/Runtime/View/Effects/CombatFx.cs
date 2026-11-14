@@ -119,7 +119,10 @@ namespace CriticalMass.Runtime.View.Effects
             _driver = GetComponent<SimDriverBehaviour>();
         }
 
-        private void Start()
+        // perf/start-hitch-1: timed for the scene-start report (LoadTimer).
+        private void Start() { long t0 = CriticalMass.Runtime.Game.LoadTimer.Now(); StartBody(); CriticalMass.Runtime.Game.LoadTimer.Part("CombatFx.Start", t0); }
+
+        private void StartBody()
         {
             if (_driver == null || _driver.World == null) { enabled = false; return; }
             World w = _driver.World;

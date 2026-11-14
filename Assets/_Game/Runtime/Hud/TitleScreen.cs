@@ -83,6 +83,10 @@ namespace CriticalMass.Runtime.Hud
             lr.anchorMin = lr.anchorMax = new Vector2(0.5f, 0.5f);
             lr.sizeDelta = LogoSize;
             lr.anchoredPosition = new Vector2(0f, LogoY);
+            // perf/start-hitch-1 (title idle CPU): the logo bob and the glow breathe change every frame; on their own nested
+            // canvas they re-batch only themselves, not the whole title canvas (its text, buttons and stickers). +1 draw.
+            _logo.gameObject.AddComponent<Canvas>();
+            _logo.gameObject.AddComponent<GraphicRaycaster>();   // the egg's hit area sits under the logo
             _glow = new GameObject("Egg Glow", typeof(RectTransform)).AddComponent<RawImage>();
             _glow.gameObject.layer = 5;
             _glow.transform.SetParent(lr, false);
@@ -141,6 +145,7 @@ namespace CriticalMass.Runtime.Hud
             if (EventSystem.current != null) EventSystem.current.SetSelectedGameObject(_playNow.gameObject);
 
             _prompt = HudText.Make(root, "Prompt", CMTokens.Ui, UiScale.TypeBody, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 2f);
+            _prompt.gameObject.AddComponent<Canvas>();   // perf/start-hitch-1: the breathing prompt re-batches alone (+1 draw)
             RectTransform pr = _prompt.rectTransform;
             pr.anchorMin = pr.anchorMax = new Vector2(0.5f, 0.5f);
             pr.sizeDelta = new Vector2(1100f, 40f);

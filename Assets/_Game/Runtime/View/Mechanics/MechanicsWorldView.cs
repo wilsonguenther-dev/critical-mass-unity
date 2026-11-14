@@ -47,7 +47,10 @@ namespace CriticalMass.Runtime.View.Mechanics
         static readonly Color32 Danger = CMTokens.MeterOrange.Color, Cream = CMTokens.WarmCream.Color, Spark = new Color32(255, 214, 72, 255);
         static readonly Color32 Heal = CMTokens.Biomass.Color, Seam = CMTokens.EggSeam.Color, Hurt = CMTokens.Crimson.Color;
 
-        void Start()
+        // perf/start-hitch-1: timed for the scene-start report (LoadTimer).
+        void Start() { long t0 = CriticalMass.Runtime.Game.LoadTimer.Now(); StartBody(); CriticalMass.Runtime.Game.LoadTimer.Part("MechanicsWorldView.Start", t0); }
+
+        void StartBody()
         {
             _driver = GetComponent<SimDriverBehaviour>();
             if (_driver == null || _driver.World == null) { enabled = false; return; }

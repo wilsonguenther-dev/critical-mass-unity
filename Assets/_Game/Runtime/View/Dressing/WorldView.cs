@@ -255,7 +255,10 @@ namespace CriticalMass.Runtime.View.Dressing
             mat != null && Enum.TryParse(mat.name.StartsWith("World", StringComparison.Ordinal) ? mat.name.Substring(5).Split(' ')[0] : "", out WorldLook look) &&
             WorldKit.CastsShadows(look) && (look != WorldLook.Prop || QualityTable.Current.PropShadows);
 
-        private void Start()
+        // perf/start-hitch-1: timed for the scene-start report (LoadTimer).
+        private void Start() { long t0 = CriticalMass.Runtime.Game.LoadTimer.Now(); StartBody(); CriticalMass.Runtime.Game.LoadTimer.Part("WorldView.Start", t0); }
+
+        private void StartBody()
         {
             _driver = GetComponent<SimDriverBehaviour>();
             if (_driver == null) _driver = FindAnyObjectByType<SimDriverBehaviour>();
@@ -719,6 +722,33 @@ namespace CriticalMass.Runtime.View.Dressing
                     if (mat != null) into.Add((pieceChunk, mat, d, s, m));
                 }
             }
+        }
+
+        /// <summary>
+        /// perf/start-hitch-1: tears down the world art one frame before a scene load (FlowDirector, under the full fade),
+        /// so the destroy of about 1262 renderers and their combined meshes is not part of the load frame. The view stops
+        /// (disabled); the scene load then destroys the component itself. One allocation per load (the find).
+        /// </summary>
+        public static void ReleaseAllForLoad()
+        {
+            long t0 = LoadTimer.Now();
+            WorldView[] views = FindObjectsByType<WorldView>(FindObjectsSortMode.None);
+            foreach (WorldView v in views) v.ReleaseForLoad();
+            if (!Application.isEditor && views.Length > 0)
+                Debug.Log($"[CM.Load] old world art released before the load in {(LoadTimer.Now() - t0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency:0.0} ms (destroys run at this frame's end)");
+        }
+
+        void ReleaseForLoad()
+        {
+            enabled = false;
+            _replanning = null;
+            if (_building != null)
+            {
+                _building = null;
+                Building = false;
+                BuildProgress = 1f;
+            }
+            Clear();
         }
 
         private void OnDestroy()
