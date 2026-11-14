@@ -236,6 +236,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             // "you were hit by": under the death recap card, in the centre column (integration batch 5: it sat at y 826,
             // over the player card and the spectate offer)
             _recap = MenuUi.Rt(_space, "Hit Recap");
+            HudZones.RegisterPanel(_recap);   // fix/hud-containment-4: world labels stay off YOU WERE HIT BY
             MenuUi.Place(_recap, RecapRect.x, RecapRect.y, RecapRect.width, RecapRect.height);
             MenuUi.Panel(_recap, "Panel", 0f, 0f, RecapRect.width, RecapRect.height);
             _recapHead = MenuUi.Label(_recap, "Head", CMTokens.Display, UiScale.TypeSmall, brass, TextAnchor.MiddleLeft, 22f, 8f, RecapRect.width - 44f, 28f, "YOU WERE HIT BY", 2f);
