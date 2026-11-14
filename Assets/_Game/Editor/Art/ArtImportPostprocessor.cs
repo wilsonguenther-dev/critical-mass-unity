@@ -34,7 +34,7 @@ namespace CriticalMass.Editor.Art
         public const string ArtMaterialPath = "Assets/_Game/Resources/Toon/CMToonArt.mat";
 
         /// <summary>Bump when the contract changes: Unity re-imports every model this postprocessor touches.</summary>
-        public override uint GetVersion() => 14;   // 14: deform-bone translations always dropped; 13: batch 8 merge of 10 (wall-damage-1, the Miner barricade imports readable) and 12 (KayKit deform-bone translations within 1% always dropped)
+        public override uint GetVersion() => 15;   // 15: bind-retarget models readable; 14: deform-bone translations always dropped; 13: batch 8 merge of 10 (wall-damage-1, the Miner barricade imports readable) and 12 (KayKit deform-bone translations within 1% always dropped)
 
         public static bool IsArt(string path) =>
             path.StartsWith(ArtRoot, StringComparison.Ordinal) && path.EndsWith(".fbx", StringComparison.OrdinalIgnoreCase);
@@ -82,6 +82,8 @@ namespace CriticalMass.Editor.Art
             }
             // wall-damage-1: the barricade's damage look cuts its deployed mesh into planks and posts at load (BarricadeDamage).
             if (spec != null && spec.Key == ArtMapping.MinerBarricade) mi.isReadable = true;
+            // batch 8: the bind retarget (ModelView.BindRetarget) finds the soles from the hero mesh's foot-weighted vertices.
+            if (spec != null && spec.RetargetToBind) mi.isReadable = true;
 
             mi.animationType = rigged ? ModelImporterAnimationType.Generic : ModelImporterAnimationType.None;
             mi.avatarSetup = rigged ? ModelImporterAvatarSetup.CreateFromThisModel : ModelImporterAvatarSetup.NoAvatar;
