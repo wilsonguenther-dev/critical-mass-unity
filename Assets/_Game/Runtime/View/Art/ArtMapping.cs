@@ -50,6 +50,8 @@ namespace CriticalMass.Runtime.View.Art
         public const float HeightTolerance = 0.12f;
         /// <summary>Leg length of this model's own joints over the KayKit skeleton's (hip to ankle): the locomotion stride
         /// scales by it so the planted foot holds. 1 for every model on the plain KayKit joints.</summary>
+        /// <summary>The face is painted in the vertex colour (HY exports): no decal texture, every vertex lined.</summary>
+        public bool VertexColourFace;
         public float StrideScale = 1f;
         /// <summary>Painted face decal (PNG next to the FBX, UV0 of Meshes[0]), or null.</summary>
         public string FaceTexture;
