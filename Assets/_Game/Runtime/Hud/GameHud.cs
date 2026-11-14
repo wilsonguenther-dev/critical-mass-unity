@@ -828,6 +828,7 @@ namespace CriticalMass.Runtime.Hud
             for (int i = 0; i < labels.Length; i++)
             {
                 labels[i].fontSize = size;
+                ContainedText.Of(labels[i])?.Configure(size, Mathf.Min(size, HudLayout.AbilityNameFloor), 1);   // the shared size is the rule's top
                 Place(labels[i].rectTransform, lefts[i], AbilityNameY, boxes[i], AbilityNameH);
                 HudText.FitWithEllipsis(labels[i], names[i], boxes[i]);
             }

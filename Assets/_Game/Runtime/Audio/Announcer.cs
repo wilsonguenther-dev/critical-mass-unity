@@ -590,9 +590,12 @@ namespace CriticalMass.Runtime.Audio
             if (_text != null)
             {
                 HudText.Set(_text, line.Text);
-                float w = Mathf.Clamp(_text.preferredWidth + 72f, 360f, MaxWidth);
+                // hud-containment-1: the box grows to the words up to the bottom band's width, then the line wraps to two,
+                // shrinks to 16 px and ends with an ellipsis (ContainedText); centred, it never reaches the player card.
+                _text.fontSize = UiScale.TypeButton;
+                float w = Mathf.Clamp(_text.preferredWidth + 72f, Mathf.Min(360f, MaxWidth), MaxWidth);
                 MenuUi.Place(_panel.rectTransform, (HudLayout.RefW - w) * 0.5f, SubtitleY, w, SubtitleH);
-                MenuUi.Place(_text.rectTransform, 0f, 0f, w, SubtitleH);
+                MenuUi.Place(_text.rectTransform, 16f, 0f, w - 32f, SubtitleH);
             }
             LineStarted?.Invoke(line);
         }
@@ -606,7 +609,7 @@ namespace CriticalMass.Runtime.Audio
 
         // ---- subtitles ----
 
-        const float MaxWidth = 920f;     // the free band between the player cluster and the minimap
+        static float MaxWidth => Mathf.Min(920f, HudZones.BottomBandW);     // the free band between the player cluster and the minimap
         const float SubtitleH = 60f;
         const float SubtitleY = HudLayout.RefH - HudLayout.Margin - SubtitleH - 4f;
 
@@ -636,6 +639,7 @@ namespace CriticalMass.Runtime.Audio
             _panel.RimPx = 2f;
             _text = MenuUi.Label(_panel.transform, "Line", CMTokens.Ui, UiScale.TypeButton, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter,
                 0f, 0f, 600f, SubtitleH, string.Empty, 2f);
+            MenuUi.Fit(_text, UiScale.TypeMin);
             _canvas.enabled = false;
         }
 

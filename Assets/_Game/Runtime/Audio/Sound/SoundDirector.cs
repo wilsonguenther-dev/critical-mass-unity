@@ -745,8 +745,10 @@ namespace CriticalMass.Runtime.Audio.Sound
     /// </summary>
     internal sealed class SoundCaptions
     {
-        public const int Lines = 3;
-        public const float Life = 2.4f, RepeatGap = 4f, Fade = 0.15f, LineH = 44f, LineW = 440f, Gap = 6f;
+        /// <summary>hud-containment-1: two caption lines at most (HudZones.CaptionLines); a third stacked onto the interact
+        /// prompt. A new caption replaces the oldest.</summary>
+        public const int Lines = HudZones.CaptionLines;
+        public const float Life = 2.4f, RepeatGap = 4f, Fade = 0.15f, LineH = HudZones.CaptionH, LineW = HudZones.CaptionW, Gap = HudZones.CaptionGap;
 
         [Serializable] private sealed class Row { public string id; public string text; }
         [Serializable] private sealed class Pack { public Row[] captions; }
@@ -787,17 +789,17 @@ namespace CriticalMass.Runtime.Audio.Sound
             _space.anchorMin = _space.anchorMax = new Vector2(0.5f, 0.5f);
             _space.pivot = new Vector2(0.5f, 0.5f);
             _space.sizeDelta = new Vector2(HudLayout.RefW, HudLayout.RefH);
-            float baseY = HudLayout.RefH - HudLayout.Margin - 60f - 4f - Gap - LineH;   // above the subtitle band
             for (int k = 0; k < Lines; k++)
             {
-                VectorShape panel = MenuUi.Panel(_space, "Caption " + k, (HudLayout.RefW - LineW) * 0.5f, baseY - k * (LineH + Gap), LineW, LineH);
+                Rect cr = HudZones.Caption(k);   // hud-containment-1: the centre-bottom lane, above the subtitles
+                VectorShape panel = MenuUi.Panel(_space, "Caption " + k, cr.x, cr.y, cr.width, cr.height);
                 panel.OutlinePx = 3f;
                 panel.RimPx = 2f;
                 _group[k] = panel.gameObject.AddComponent<CanvasGroup>();
                 _group[k].alpha = 0f;
                 _group[k].interactable = false;
                 _group[k].blocksRaycasts = false;
-                _text[k] = MenuUi.Label(panel.transform, "Text", CMTokens.Ui, 22, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 0f, 0f, LineW, LineH, string.Empty, 2f);
+                _text[k] = MenuUi.Fit(MenuUi.Label(panel.transform, "Text", CMTokens.Ui, 20, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 12f, 0f, LineW - 24f, LineH, string.Empty, 2f), 14);
             }
             _canvas.enabled = false;
         }

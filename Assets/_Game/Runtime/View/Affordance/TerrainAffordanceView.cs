@@ -78,7 +78,8 @@ namespace CriticalMass.Runtime.View.Affordance
         public int GhostCellsDrawn { get; private set; }
         public bool GhostValid { get; private set; }
         /// <summary>The prompt text now ("" = hidden), the hint now, and the bar's value (-1 = hidden).</summary>
-        public string PromptText => _promptShown ? _prompt : string.Empty;
+        public string PromptText => _promptShown ? (_promptDetail.Length > 0 ? _prompt + "\n" + _promptDetail : _prompt) : string.Empty;
+        string _promptDetail = string.Empty;
         public string HintText => _hintShown ? _hint : string.Empty;
         public float BarValue => _barShown ? (float)Focus.Value01 : -1f;
         public float BarNext => _barShown ? (float)Focus.Next01 : -1f;
@@ -102,7 +103,7 @@ namespace CriticalMass.Runtime.View.Affordance
 
         Canvas _canvas;
         RectTransform _root, _chip, _hintChip, _bar, _barFill, _barGhost;
-        Text _label, _hintLabel, _barLabel;
+        Text _label, _hintLabel, _barLabel, _detail;
         Image _fill, _ghost;
         readonly RectTransform[] _mini = new RectTransform[3];
         readonly Image[] _miniFill = new Image[3];
@@ -210,6 +211,15 @@ namespace CriticalMass.Runtime.View.Affordance
             _root = (RectTransform)go.transform;
 
             _chip = Chip(_root, "Target Prompt", 560f, 40f, out _label, UiScale.TypeBody);
+            // hud-containment-1: the reason ("bank empty", "too far 2.0 s") goes on a second, smaller line under the key and
+            // verb; the main lines stay key plus two or three words.
+            _detail = MenuUi.Fit(MenuUi.Label(_chip, "Detail", CMTokens.Ui, UiScale.TypeMin, CMTokens.ToolBrass.Color, TextAnchor.MiddleCenter, 14f, 0f, 532f, DetailH, "", 2f), 12);
+            RectTransform dr = _detail.rectTransform;
+            dr.anchorMin = new Vector2(0f, 0f);
+            dr.anchorMax = new Vector2(1f, 0f);
+            dr.pivot = new Vector2(0.5f, 0f);
+            dr.offsetMin = new Vector2(14f, 4f);
+            dr.offsetMax = new Vector2(-14f, 4f + DetailH);
             _hintChip = Chip(_root, "Class Hint", 980f, 44f, out _hintLabel, UiScale.TypeSmall);
             _hintChip.anchorMin = _hintChip.anchorMax = new Vector2(0.5f, 1f);
             _hintChip.pivot = new Vector2(0.5f, 1f);
@@ -720,6 +730,30 @@ namespace CriticalMass.Runtime.View.Affordance
             return string.IsNullOrEmpty(s) || s == "-" ? button.ToUpperInvariant() : s;
         }
 
+        /// <summary>hud-containment-1 prompt pill sizes: one main line, the detail line, the widest pill.</summary>
+        public const float LineH = 40f, DetailH = 22f, MaxPillW = 720f, MinPillW = 180f;
+
+        /// <summary>The main words of a prompt: key and verb ("HOLD E  GATHER", "F  PLACE BLOCK (3)").</summary>
+        public static string Main(AffTarget t, ControlDevice device) =>
+            t == null || !t.Has ? string.Empty : (t.Hold ? "HOLD " : "") + Glyph(t.Button, device) + "  " + t.Verb + (t.Count >= 0 ? " (" + t.Count + ")" : "");
+
+        /// <summary>The reason a prompt cannot act now ("bank empty", "too far 2.0 s"), or empty.</summary>
+        public static string Detail(AffTarget t) =>
+            t == null || !t.Has || t.Valid || string.IsNullOrEmpty(t.Why) ? string.Empty :
+            t.Why + (t.WaitSeconds > 0 ? " " + t.WaitSeconds.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " s" : "");
+
+        /// <summary>
+        /// The pill's size and where it may sit (hud-containment-1): inside the canvas's safe area with the HUD margin, so
+        /// a long pill never runs off a screen edge. Pivot bottom centre; returns the clamped anchored position.
+        /// </summary>
+        public static Vector2 ClampPill(Vector2 want, Vector2 size, Vector2 canvas)
+        {
+            float m = HudLayout.Margin;
+            float x = size.x + 2f * m >= canvas.x ? canvas.x * 0.5f : Mathf.Clamp(want.x, m + size.x * 0.5f, canvas.x - m - size.x * 0.5f);
+            float y = size.y + 2f * m >= canvas.y ? m : Mathf.Clamp(want.y, m, canvas.y - m - size.y);
+            return new Vector2(x, y);
+        }
+
         /// <summary>One prompt line: "F  PLACE BLOCK (3)", "HOLD E  GATHER", "SPACE  BUILD LADDER (12)   ·   bank empty".</summary>
         public static string Line(AffTarget t, ControlDevice device)
         {
@@ -744,12 +778,29 @@ namespace CriticalMass.Runtime.View.Affordance
             if (key != _promptKey)
             {
                 _promptKey = key;
-                string a = Line(Scan.Primary, ControlBindings.ActiveDevice), b = Line(Scan.Secondary, ControlBindings.ActiveDevice);
+                ControlDevice dev = ControlBindings.ActiveDevice;
+                string a = Main(Scan.Primary, dev), b = Main(Scan.Secondary, dev);
+                string da = Detail(Scan.Primary), db = Detail(Scan.Secondary);
+                string detail = da.Length > 0 && db.Length > 0 ? da + "  ·  " + db : da.Length > 0 ? da : db;
                 _prompt = b.Length > 0 ? a + "\n" + b : a;
-                HudText.Set(_label, _prompt);
-                // Fit the chip to the longer line (preferredWidth is the unwrapped width at the label's size).
+                // hud-containment-1: measure at full size, grow the pill to the words up to the safe width, then the
+                // label's rule (ContainedText) shrinks and ends with an ellipsis inside it.
+                _label.fontSize = UiScale.TypeBody;
+                _label.horizontalOverflow = HorizontalWrapMode.Overflow;
+                _label.text = _prompt;
                 float pw = _label.preferredWidth;
-                _chip.sizeDelta = new Vector2(Mathf.Clamp(pw + 40f, 180f, 720f), b.Length > 0 ? 70f : 42f);
+                _detail.text = detail;
+                _promptDetail = detail;
+                float dw = detail.Length > 0 ? _detail.preferredWidth : 0f;
+                float sc0 = _canvas.scaleFactor > 0 ? _canvas.scaleFactor : 1f;
+                float safeW = Mathf.Max(MinPillW, _canvas.pixelRect.width / sc0 - 2f * HudLayout.Margin);
+                float lines = b.Length > 0 ? 2f : 1f;
+                float h = 2f + lines * LineH + (detail.Length > 0 ? DetailH : 0f);
+                _chip.sizeDelta = new Vector2(Mathf.Clamp(Mathf.Max(pw, dw) + 40f, MinPillW, Mathf.Min(MaxPillW, safeW)), h);
+                RectTransform lr = _label.rectTransform;
+                lr.offsetMin = new Vector2(14f, 4f + (detail.Length > 0 ? DetailH : 0f));
+                lr.offsetMax = new Vector2(-14f, -4f);
+                if (_detail.gameObject.activeSelf != detail.Length > 0) _detail.gameObject.SetActive(detail.Length > 0);
             }
             AffTarget t = Scan.Primary;
             MapDef m = w.Map;
@@ -757,7 +808,8 @@ namespace CriticalMass.Runtime.View.Affordance
             if (OnScreen(cam, p, out Vector2 sp))
             {
                 float sc = _canvas.scaleFactor > 0 ? _canvas.scaleFactor : 1f;
-                _chip.anchoredPosition = new Vector2(sp.x / sc, sp.y / sc + 18f);
+                Vector2 cv = new Vector2(_canvas.pixelRect.width / sc, _canvas.pixelRect.height / sc);
+                _chip.anchoredPosition = ClampPill(new Vector2(sp.x / sc, sp.y / sc + 18f), _chip.sizeDelta, cv);
             }
             if (!_chip.gameObject.activeSelf) _chip.gameObject.SetActive(true);
             _promptShown = true;

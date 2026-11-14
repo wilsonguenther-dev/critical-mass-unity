@@ -65,11 +65,9 @@ namespace CriticalMass.Runtime.Hud
             _tip = MenuUi.Fit(MenuUi.Label(_card, "Tip", CMTokens.Ui, UiScale.TypeBody, CMTokens.WarmCream.Color, TextAnchor.UpperLeft, 220f, 78f, 580f, 64f, "", 2f), 21);
             _tip.horizontalOverflow = HorizontalWrapMode.Wrap;
             // best fit needs bounded overflow: a long name ("Demolitions Expert") shrinks to fit one line
-            _line.horizontalOverflow = HorizontalWrapMode.Wrap;
-            _line.verticalOverflow = VerticalWrapMode.Truncate;
-            _line.resizeTextForBestFit = true;
             _line.resizeTextMinSize = 22;
             _line.resizeTextMaxSize = 32;
+            MenuUi.Contain(_line, 1);   // hud-containment-1
             _card.gameObject.SetActive(false);
         }
 

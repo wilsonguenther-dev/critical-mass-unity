@@ -56,6 +56,7 @@ namespace CriticalMass.Runtime.Hud.Ui
             Text t = go.AddComponent<Text>();
             t.font = CMTokens.Font(face);
             t.fontSize = size;
+            // (hud-containment-1: ContainedText is attached at the end, once the label is set up)
             t.color = color;
             t.alignment = anchor;
             t.horizontalOverflow = HorizontalWrapMode.Overflow;
@@ -67,6 +68,10 @@ namespace CriticalMass.Runtime.Hud.Ui
                 TextOutline o = go.AddComponent<TextOutline>();
                 o.Radius = outline;
             }
+            // hud-containment-1: every HUD and menu label lives under the one text rule (TextFit): it shrinks to 60% of its
+            // size (never under 11 px) and then ends with an ellipsis, so no text draws outside its box. MenuUi.Fit,
+            // MenuUi.Contain and SetOneLine set other ranges. A label with no box (zero width) is left alone.
+            ContainedText.Attach(t, size, ContainedText.FloorFor(size));
             return t;
         }
 
@@ -78,6 +83,13 @@ namespace CriticalMass.Runtime.Hud.Ui
         {
             if (t == null) return;
             if (s == null) s = string.Empty;
+            ContainedText c = ContainedText.Of(t);
+            if (c != null)   // hud-containment-1: the one rule, one line, this size range
+            {
+                c.Configure(max, min, 1);
+                c.SetSource(s);
+                return;
+            }
             if (!t.resizeTextForBestFit && t.horizontalOverflow == HorizontalWrapMode.Overflow && t.text == s) return;
             t.resizeTextForBestFit = false;
             t.horizontalOverflow = HorizontalWrapMode.Overflow;
@@ -124,7 +136,11 @@ namespace CriticalMass.Runtime.Hud.Ui
         /// <summary>Sets text only when it changed (no mesh rebuild, no allocation on equal strings).</summary>
         public static void Set(Text t, string s)
         {
-            if (!ReferenceEquals(t.text, s) && t.text != s) t.text = s;
+            if (ReferenceEquals(t.text, s) || t.text == s) return;
+            // hud-containment-1: a contained label shows its words cut to fit; the same words again change nothing.
+            string src = ContainedText.SourceOf(t);
+            if (src != null && src == (s ?? string.Empty)) return;
+            t.text = s;
         }
     }
 

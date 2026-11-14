@@ -94,9 +94,17 @@ namespace CriticalMass.Runtime.Hud
         public static Rect Coins => new Rect(RefW - M - CoinsW, Minimap.y - ColumnGap - CoinsH, CoinsW, CoinsH);
         /// <summary>Power-up timer: left of the coin counter, bottoms aligned.</summary>
         public static Rect Power => new Rect(Coins.x - ColumnGap - PowerW, Minimap.y - ColumnGap - PowerH, PowerW, PowerH);
-        /// <summary>The coin chip of the match rewards: left column, 12 px above the player card.</summary>
+        // ---- left stack (hud-containment-1). Bottom up: player card, class kit, coin chip, ping feed. The kit, the coin chip
+        // and the ping feed used to share one spot above the player card, so teammate calls ("Vale: Help!") printed over
+        // the kit's skill rows and the coin chip sat on the kit. Each now has its own slot; the kit grows up from the
+        // bottom of its slot by its row count, so a short kit (TEAM BUILD BANK) leaves no empty panel.
+        /// <summary>The class kit's largest size (title, two skill rows, the bank line).</summary>
+        public const float KitW = 380f, KitMaxH = 44f + 2f * 54f + 34f;
+        /// <summary>The class kit / team build bank slot: left column, 12 px above the player card.</summary>
+        public static Rect Kit => new Rect(M, PlayerCard.y - ColumnGap - KitMaxH, KitW, KitMaxH);
+        /// <summary>The coin chip of the match rewards: left column, 12 px above the class kit slot.</summary>
         public const float CoinChipW = 168f, CoinChipH = 46f;
-        public static Rect CoinChip => new Rect(M, PlayerCard.y - ColumnGap - CoinChipH, CoinChipW, CoinChipH);
+        public static Rect CoinChip => new Rect(M, Kit.y - ColumnGap - CoinChipH, CoinChipW, CoinChipH);
         /// <summary>The ping / team line feed: left column, above the coin chip (four 30 px lines, newest at the bottom).</summary>
         public const float PingLineH = 30f, PingLineW = 520f;
         public static Rect PingFeed => new Rect(28f, CoinChip.y - ColumnGap - 4 * PingLineH, PingLineW, 4 * PingLineH);
@@ -105,7 +113,24 @@ namespace CriticalMass.Runtime.Hud
 
         /// <summary>The interact prompt ("B Base station"): 12 px under the lower lane (it sat inside it, under the intro line).</summary>
         public const float PromptW = 520f, PromptH = 50f;
-        public static Rect Prompt => new Rect((RefW - PromptW) * 0.5f, Lower.yMax + ColumnGap, PromptW, PromptH);
+        public static Rect Prompt => new Rect((RefW - PromptW) * 0.5f, Lower.yMax + PromptGap, PromptW, PromptH);
+        public const float PromptGap = 6f;
+
+        // ---- centre-bottom lane (hud-containment-1), bottom up: announcer subtitles, sound captions (two at most, a queue
+        // behind them), the interact prompt. All centred on the screen and no wider than the free band between the player
+        // card and the minimap on the narrower side (the 920 px subtitle ran over the player card and the captions sat
+        // on the prompt).
+        /// <summary>Widest a centred piece of the bottom lane may be (it clears the player card and the minimap by 12 px).</summary>
+        public static float BottomBandW => 2f * Mathf.Min(RefW * 0.5f - (PlayerCard.xMax + ColumnGap), (Minimap.x - ColumnGap) - RefW * 0.5f);
+        public const float SubtitleH = 60f, CaptionH = 40f, CaptionW = 440f, CaptionGap = 6f;
+        public const int CaptionLines = 2;
+        public static Rect Subtitles => new Rect((RefW - BottomBandW) * 0.5f, RefH - M - SubtitleH - 4f, BottomBandW, SubtitleH);
+        /// <summary>Caption line k (0 = lowest), just above the subtitles.</summary>
+        public static Rect Caption(int k) => new Rect((RefW - CaptionW) * 0.5f, Subtitles.y - (k + 1) * (CaptionH + CaptionGap), CaptionW, CaptionH);
+
+        /// <summary>The automated-run plate (test runs only): the empty top-left corner, clear of the top band and the
+        /// player card (it was a 1240 px strip over the player card, the subtitles and the minimap).</summary>
+        public static Rect AutomationPlate => new Rect(M, 8f, HudLayout.RefRect(HudCluster.Match).x - M - ColumnGap, 92f);
 
         /// <summary>A named HUD piece for the collision test: its rect (reference px, top-left origin) and its lane.</summary>
         public struct Piece
@@ -136,6 +161,11 @@ namespace CriticalMass.Runtime.Hud
                 new Piece("minimap", Minimap, HudZone.Minimap, false),
                 new Piece("player card", PlayerCard, HudZone.PlayerCard, false),
                 new Piece("coin chip", CoinChip, HudZone.PlayerCard, false),
+                new Piece("class kit / team build bank (largest)", Kit, HudZone.PlayerCard, false),
+                new Piece("automated-run plate", AutomationPlate, HudZone.TopBand, false),
+                new Piece("announcer subtitles (widest)", Subtitles, HudZone.Lower, false),
+                new Piece("sound caption 1", Caption(0), HudZone.Lower, false),
+                new Piece("sound caption 2", Caption(1), HudZone.Lower, false),
                 new Piece("ping feed", PingFeed, HudZone.Guide, false),
                 new Piece("intro line (you are the ...)", Lower, HudZone.Lower, false),
                 new Piece("death recap (centre lane, Recap priority)", new Rect((RefW - DeathRecap.CardW) * 0.5f, DeathRecap.TopY, DeathRecap.CardW, DeathRecap.CardH), HudZone.Callout, true),

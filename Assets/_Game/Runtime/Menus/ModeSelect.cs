@@ -85,9 +85,9 @@ namespace CriticalMass.Runtime.Menus
                 info.Watching ? "YOU" : "CHALLENGE", 2f);
             Text size = MenuUi.Label(t, "Teams", CMTokens.Display, UiScale.TypeBody, Cream, TextAnchor.MiddleLeft, 28f, 212f, 150f, 40f, "", 2f);
             Text length = MenuUi.Label(t, "Length", CMTokens.Display, UiScale.TypeBody, Cream, TextAnchor.MiddleLeft, 186f, 212f, 196f, 40f, "", 2f);
-            length.resizeTextForBestFit = true;
             length.resizeTextMinSize = 14;
             length.resizeTextMaxSize = 22;
+            MenuUi.Contain(length, 1);
             _sizeValues[m] = size;
             _lengthValues[m] = length;
             _texts[m] = new[] { title, line, size, length };

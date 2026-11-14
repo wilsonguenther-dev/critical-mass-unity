@@ -218,8 +218,8 @@ namespace CriticalMass.Runtime.Hud.Mechanics
                     MenuUi.Place(ri.rectTransform, 6f, 4f, 32f, 32f);
                 }
                 else Chip(chip, "Icon", icons[k], 10f, 9f, 22f, 22f, cols[k], 4f);
-                MenuUi.Label(chip, "Word", CMTokens.Ui, 13, CMTokens.WithAlpha(cream, 0.85f), TextAnchor.MiddleLeft, 38f, 1f, 40f, 38f,
-                    k == 0 ? DepthWords.Wood : k == 1 ? DepthWords.Water : DepthWords.Food, 1.5f).resizeTextForBestFit = true;
+                MenuUi.Fit(MenuUi.Label(chip, "Word", CMTokens.Ui, 13, CMTokens.WithAlpha(cream, 0.85f), TextAnchor.MiddleLeft, 38f, 1f, 40f, 38f,
+                    k == 0 ? DepthWords.Wood : k == 1 ? DepthWords.Water : DepthWords.Food, 1.5f), 9);   // hud-containment-1: "WATER" ran under its count
                 _stockNum[k] = MenuUi.Label(chip, "Count", CMTokens.Mono, 22, cream, TextAnchor.MiddleRight, 60f, 0f, 38f, 40f, "0", 2f);
                 _stockChip[k] = chip;
             }
@@ -249,13 +249,13 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             _promptKeyChip.RimPx = 2f;
             _promptKeyChip.RimColor = cream;
             _promptKey = MenuUi.Label(_promptKeyChip.transform, "Key", CMTokens.Ui, 15, cream, TextAnchor.MiddleCenter, 0f, 0f, 74f, 32f, "", 2f);
-            _promptKey.resizeTextForBestFit = true;
             _promptKey.resizeTextMinSize = 9;
             _promptKey.resizeTextMaxSize = 15;
+            MenuUi.Contain(_promptKey, 1);
             _promptText = MenuUi.Label(_prompt, "Words", CMTokens.Ui, 20, cream, TextAnchor.MiddleLeft, 96f, 0f, 370f, 50f, "", 2f);
-            _promptText.resizeTextForBestFit = true;
             _promptText.resizeTextMinSize = 12;
             _promptText.resizeTextMaxSize = 20;
+            MenuUi.Contain(_promptText, 2);   // key plus words; a long line wraps to a second, then shrinks, then ends with an ellipsis
             _promptPie = Chip(_prompt, "Progress", ShapeKind.Pie, 474f, 9f, 32f, 32f, brass, 16f);
             _promptPie.EmptyColor = CMTokens.MeterEmpty.Color;
             _prompt.gameObject.SetActive(false);
@@ -302,9 +302,9 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             _powerName = MenuUi.Label(_power, "Name", CMTokens.Display, 22, cream, TextAnchor.MiddleLeft, 68f, 4f, 170f, 32f, "", 2.5f);
             _powerTime = MenuUi.Label(_power, "Time", CMTokens.Mono, 22, cream, TextAnchor.MiddleRight, 240f, 4f, 76f, 32f, "", 2f);
             _powerHint = MenuUi.Label(_power, "Counter", CMTokens.Ui, 13, CMTokens.WithAlpha(cream, 0.8f), TextAnchor.MiddleLeft, 68f, 36f, 250f, 26f, "", 1.5f);
-            _powerHint.resizeTextForBestFit = true;
             _powerHint.resizeTextMinSize = 9;
             _powerHint.resizeTextMaxSize = 13;
+            MenuUi.Contain(_powerHint, 1);
             _power.gameObject.SetActive(false);
             HudKeepOut.Add(_power);
 

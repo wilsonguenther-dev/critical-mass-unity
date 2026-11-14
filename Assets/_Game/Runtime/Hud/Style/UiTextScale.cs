@@ -32,7 +32,9 @@ namespace CriticalMass.Runtime.Hud.Style
             {
                 Text t = s._texts[i];
                 s._base[i] = t.fontSize;
-                s._min[i] = t.resizeTextForBestFit ? Mathf.Min(t.resizeTextMinSize, t.fontSize) : Mathf.Min(UiScale.TypeMin, t.fontSize);
+                CriticalMass.Runtime.Hud.Ui.ContainedText c0 = t.GetComponent<CriticalMass.Runtime.Hud.Ui.ContainedText>();
+                if (c0 != null) s._base[i] = c0.MaxSize;
+                s._min[i] = c0 != null ? c0.MinSize : t.resizeTextForBestFit ? Mathf.Min(t.resizeTextMinSize, t.fontSize) : Mathf.Min(UiScale.TypeMin, t.fontSize);
             }
             return s;
         }
@@ -50,6 +52,15 @@ namespace CriticalMass.Runtime.Hud.Style
                 Text t = _texts[i];
                 if (t == null) continue;
                 int size = Mathf.Max(UiScale.TypeMin, Mathf.RoundToInt(_base[i] * scale));
+                // hud-containment-1: a contained label keeps the one rule; only its size range follows the setting.
+                CriticalMass.Runtime.Hud.Ui.ContainedText c = t.GetComponent<CriticalMass.Runtime.Hud.Ui.ContainedText>();
+                if (c != null)
+                {
+                    c.MaxSize = scale <= 1f ? Mathf.Min(_base[i], size) : size;
+                    c.MinSize = Mathf.Min(_min[i], c.MaxSize);
+                    c.Reapply();
+                    continue;
+                }
                 if (scale <= 1f && !t.resizeTextForBestFit)
                 {
                     t.fontSize = Mathf.Min(_base[i], size);

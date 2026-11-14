@@ -26,6 +26,8 @@ namespace CriticalMass.Runtime.Tests
         static readonly Vector2Int[] Shapes =
         {
             new Vector2Int(3024, 1964), new Vector2Int(1512, 982), new Vector2Int(1920, 1080), new Vector2Int(2560, 1080), new Vector2Int(1280, 800),
+            // hud-containment-1: 16:10, 4:3, the small 1280x720 and the smallest window the game allows (640x360)
+            new Vector2Int(1920, 1200), new Vector2Int(1024, 768), new Vector2Int(1280, 720), new Vector2Int(640, 360),
         };
 
         static Vector4 Notch(Vector2Int s) => HudSafeArea.NotchFor(s.x, s.y);
