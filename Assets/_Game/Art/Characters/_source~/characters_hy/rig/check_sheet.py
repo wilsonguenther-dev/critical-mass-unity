@@ -68,10 +68,12 @@ assign(ca, None)
 # Unity plays a clip file's curves as ABSOLUTE local transforms on the model's bones (matched by path), not as offsets from
 # the model's own rest. To see what the game sees, the model's bones copy the clip skeleton's bones in world space.
 ca.matrix_world = fa.matrix_world.copy()
+CONS = []
 for pb in fa.pose.bones:
     if pb.name in ca.pose.bones:
         c_ = pb.constraints.new('COPY_TRANSFORMS'); c_.target = ca; c_.subtarget = pb.name
         c_.target_space = c_.owner_space = 'WORLD'
+        c_.mute = True; CONS.append(c_)   # off for the bind row (the model's own bind pose)
 ca.hide_render = True
 REP['rest_diff_deg'] = {}
 for b_ in fa.data.bones:
@@ -189,6 +191,9 @@ for vn, deg in VIEWS.items():
     view(deg); row.append(shot('bind_' + vn))
 rows.append(row)
 measure('bind')
+for c_ in CONS:
+    c_.mute = False
+upd()
 if 'Idle' in acts:
     assign(ca, acts['Idle']); scene.frame_set(int(acts['Idle'].frame_range[0])); upd()
     measure('Idle')
