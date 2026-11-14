@@ -379,7 +379,7 @@ try:
     for s in SIDES:
         pts_ = [J[f'upperarm.{s}'], J[f'lowerarm.{s}'], J[f'wrist.{s}'], J[f'hand.{s}']]
         d_ = np.min([seg_dist(P, pts_[i], pts_[i + 1])[0] for i in range(3)], axis=0)
-        back &= d_ > 0.06 * H
+        back &= d_ > 0.05 * H
     W[back] = 0; W[back, bi['chest']] = 1; locked |= back
     # arm weights only near the arm: an A-pose hand hangs beside the belt (the Builder's rope coil, pouches), and the
     # proxy heat let the arm carry them. Arm-chain weight on a vertex farther than ARM_R from its arm's bone chain goes to
@@ -390,7 +390,8 @@ try:
         cols = [bi[n] for n in (f'upperarm.{s}', f'lowerarm.{s}', f'wrist.{s}', f'hand.{s}') if n in bi]
         cols += [bi[n] for n in DEF if n.endswith('.' + s) and n.split('_0')[0] in FING]
         pts = [J[f'upperarm.{s}'], J[f'lowerarm.{s}'], J[f'wrist.{s}'], J[f'hand.{s}'], handtip[s]]
-        d = np.min([seg_dist(P, pts[i], pts[i + 1])[0] for i in range(4)], axis=0)
+        # rig-builder-2: the hand reaches only its glove (0.055 H): a rope coil beside the A-pose hand stretched up with it
+        d = np.min([seg_dist(P, pts[i], pts[i + 1])[0] - (0.0 if i < 2 else 0.02 * H) for i in range(4)], axis=0)
         far = (d > ARM_R) & (W[:, cols].sum(1) > 0) & ~locked
         if far.any():
             W[np.ix_(far, cols)] = 0

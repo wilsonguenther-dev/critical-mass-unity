@@ -358,7 +358,7 @@ def clear_tip(clip):
 # axis) so that at the first Idle frame it is ARM_DOWN_DEG from straight down (KayKit's idle left the wide generated
 # torsos with arms out like a gorilla). The mallet swing reads stronger: in Attack the right arm's turn from its first
 # frame is scaled by ATTACK_GAIN.
-ARM_DOWN_DEG = 22.0
+ARM_DOWN_DEG = 28.0   # 22 put the Builder's gloves into his belly
 ARM_ADD = {}
 ATTACK_GAIN = {"Attack": 1.8}
 
