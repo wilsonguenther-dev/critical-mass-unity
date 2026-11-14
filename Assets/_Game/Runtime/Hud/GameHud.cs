@@ -440,7 +440,7 @@ namespace CriticalMass.Runtime.Hud
             _mapYou.gameObject.SetActive(false);
         }
 
-        static Texture2D MapTexture(int tier) => Resources.Load<Texture2D>("UI/Minimap/minimap@" + tier + "x");
+        static Texture2D MapTexture(int tier) => MinimapGeometry.Texture(tier);
 
         readonly HudIcon[] _mapBases = new HudIcon[2];
 

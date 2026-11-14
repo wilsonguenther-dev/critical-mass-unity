@@ -76,7 +76,9 @@ namespace CriticalMass.Runtime.Game
         private void Awake()
         {
             GameConfig cfg = GameConfig.CreateDefault();
+            cfg.Render.CameraYawDeg = CriticalMass.Runtime.Camera.CameraHeading.Chosen;   // creator's angle (135) or classic (45)
             AutoplayArgs.ApplyCameraYaw(cfg);   // -cameraYaw: automation runs only
+            CriticalMass.Runtime.Camera.CameraHeading.Active = cfg.Render.CameraYawDeg;   // controls and minimap match the screen
             Config = cfg;
             Flow.MatchRequest req = NextMatch;
             NextMatch = null;

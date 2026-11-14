@@ -79,7 +79,7 @@ namespace CriticalMass.Runtime.Camera
             {
                 _yawChecked = true;
                 double yaw = Driver.Config.Render.CameraYawDeg;
-                if (Math.Abs(yaw - 45) > 1e-9)
+                if (true)   // feat/camera-creator-angle: always the match heading (the basis object may predate it)
                 {
                     GroundCamera.Basis(360 - yaw, out double ux, out double uz, out _, out _);
                     _follow = new CameraFollow(ux, uz);

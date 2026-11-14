@@ -13,7 +13,8 @@ namespace CriticalMass.Runtime.Tests
     public sealed class CameraFollowTests
     {
         private const double Dt = 1.0 / 60;
-        private static readonly double UpX = HumanInputState.ScreenUpX, UpZ = HumanInputState.ScreenUpZ;
+        private static double UpX => HumanInputState.ScreenUpX;
+        private static double UpZ => HumanInputState.ScreenUpZ;
 
         private static CameraFollowInput Frame(double x, double z, double y = 0)
         {
