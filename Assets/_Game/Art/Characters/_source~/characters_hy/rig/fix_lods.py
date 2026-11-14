@@ -11,6 +11,9 @@ import bpy, sys, os, json, runpy
 
 argv = sys.argv[sys.argv.index('--') + 1:]
 OUT, CLS, MODEL, CLIPS = argv[0], argv[1], argv[2], argv[3]
+# mode: copy = every LOD is the Hero (stopgap, 21.6k tris per tier); voxel = voxel rebuild of the Hero, collapse, weights
+# and colours transferred from the Hero (the Hero itself does not collapse: Decimate on it stopped at 3,936 tris as shards)
+MODE = argv[4] if len(argv) > 4 else 'copy'
 os.makedirs(OUT, exist_ok=True)
 TARGET = {'LOD0': 3916, 'LOD1': 1315, 'Shadow': 1315}
 REP = {}
@@ -36,13 +39,39 @@ for lv, tgt in TARGET.items():
     arm_mods = [m for m in o.modifiers if m.type == 'ARMATURE']
     for m in arm_mods:
         m.show_viewport = False
-    d = o.modifiers.new('Dec', 'DECIMATE'); d.decimate_type = 'COLLAPSE'; d.use_collapse_triangulate = True
-    d.ratio = tgt / max(1, REP['hero_tris'])
     bpy.ops.object.select_all(action='DESELECT')
     o.select_set(True); bpy.context.view_layer.objects.active = o
-    with bpy.context.temp_override(object=o, active_object=o, selected_objects=[o], selected_editable_objects=[o]):
-        bpy.ops.object.modifier_move_to_index(modifier='Dec', index=0)
-        bpy.ops.object.modifier_apply(modifier='Dec')
+    ov = dict(object=o, active_object=o, selected_objects=[o], selected_editable_objects=[o])
+    if MODE == 'voxel':
+        cols = [(a.name, a.data_type, a.domain) for a in hero.data.color_attributes]
+        o.vertex_groups.clear()
+        o.data.remesh_voxel_size = 0.018
+        with bpy.context.temp_override(**ov):
+            bpy.ops.object.voxel_remesh()
+        d = o.modifiers.new('Dec', 'DECIMATE'); d.decimate_type = 'COLLAPSE'; d.use_collapse_triangulate = True
+        d.ratio = min(1.0, tgt / max(1, ntri(o)))
+        with bpy.context.temp_override(**ov):
+            bpy.ops.object.modifier_move_to_index(modifier='Dec', index=0)
+            bpy.ops.object.modifier_apply(modifier='Dec')
+        for n_, t_, dm_ in cols:
+            if n_ not in o.data.color_attributes:
+                o.data.color_attributes.new(n_, t_, dm_)
+        for g in hero.vertex_groups:
+            o.vertex_groups.new(name=g.name)
+        dt = o.modifiers.new('DT', 'DATA_TRANSFER'); dt.object = hero
+        dt.use_vert_data = True; dt.data_types_verts = {'VGROUP_WEIGHTS'}; dt.vert_mapping = 'POLYINTERP_NEAREST'
+        dt.layers_vgroup_select_src = 'ALL'; dt.layers_vgroup_select_dst = 'NAME'
+        dt.use_loop_data = True; dt.data_types_loops = {'COLOR_CORNER'}; dt.loop_mapping = 'NEAREST_POLY'
+        dt.use_vert_data = True
+        try:
+            dt.data_types_verts = {'VGROUP_WEIGHTS', 'COLOR_VERTEX'}
+        except Exception:
+            pass
+        with bpy.context.temp_override(**ov):
+            bpy.ops.object.modifier_move_to_index(modifier='DT', index=0)
+            bpy.ops.object.modifier_apply(modifier='DT')
+        REP.setdefault('colors', {})[lv] = cols
+    with bpy.context.temp_override(**ov):
         bpy.ops.object.vertex_group_limit_total(group_select_mode='ALL', limit=4)
         bpy.ops.object.vertex_group_normalize_all(group_select_mode='ALL', lock_active=False)
     for m in arm_mods:
@@ -67,6 +96,8 @@ r = bpy.ops.export_scene.fbx(filepath=path, use_selection=True, object_types={'A
 REP['export'] = dict(path=path, result=list(r), bytes=os.path.getsize(path))
 json.dump(REP, open(os.path.join(OUT, f'fix_lods_{CLS}.json'), 'w'), indent=1)
 print('[fix_lods]', json.dumps(REP), flush=True)
+REP['mode'] = MODE
+json.dump(REP, open(os.path.join(OUT, f'fix_lods_{CLS}.json'), 'w'), indent=1)
 sys.argv = ['blender', '--', OUT, CLS, path, CLIPS]
 try:
     HERE = os.path.dirname(os.path.abspath(__file__))
