@@ -496,11 +496,18 @@ namespace CriticalMass.Runtime.View
             z = hill.Z + dz / d * r;
         }
 
+        /// <summary>fix/movement-shiver-1: the drawn Kaiju position's reversal counter (view half of the "no shiver" detector).</summary>
+        private readonly Anim.ViewShiverProbe _kaijuMoveProbe = new Anim.ViewShiverProbe("Kaiju");
+        private double _kaijuDrawnX = double.NaN, _kaijuDrawnZ;
+
         private int SyncKaiju(World w, GameConfig cfg, MapDef map, double a, double simTime, double dSim)
         {
             Kaiju k = w.Kaiju;
             double x = Lerp(k.PrevX, k.X, a);
             double z = Lerp(k.PrevZ, k.Z, a);
+            if (k.State != KaijuState.Egg && dSim > 0 && !double.IsNaN(_kaijuDrawnX)) _kaijuMoveProbe.SampleMove(x - _kaijuDrawnX, z - _kaijuDrawnZ, simTime, x, z);
+            _kaijuDrawnX = x;
+            _kaijuDrawnZ = z;
             double h = GroundHeight(map, x, z);
             Quaternion facing = Quaternion.Euler(0f, SimSpace.YawDeg(k.Facing), 0f);
 

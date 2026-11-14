@@ -26,6 +26,19 @@ namespace CriticalMass.Sim.Core
         /// <summary>Hatch point (the neutral Kaiju idles here).</summary>
         public double HomeX;
         public double HomeZ;
+
+        // fix/movement-shiver-1 (PhysicsConfig.KaijuNavGuard)
+        /// <summary>Clearance-region label per cell (0 = not a clearance cell; same label = the body can walk between them),
+        /// rebuilt with the shadow grid.</summary>
+        public int[] Region;
+        /// <summary>Flood-fill scratch for Region (never allocated in a step).</summary>
+        public int[] RegionQueue;
+        /// <summary>Progress anchor and the seconds spent within KaijuProgressRadius of it while chasing without attacking.</summary>
+        public double ProgressX;
+        public double ProgressZ;
+        public double NoProgress;
+        /// <summary>Seconds each actor stays skipped by target choice after the Kaiju gave it up.</summary>
+        public double[] Ignore;
     }
 
     /// <summary>CM-30 miner dig / place state (browser TerraformState), per-actor arrays at ActorCapacity.</summary>
@@ -543,6 +556,10 @@ namespace CriticalMass.Sim.Core
             nav.RetargetIn = 0;
             nav.HomeX = map.Shrine.X;
             nav.HomeZ = map.Shrine.Z;
+            nav.ProgressX = 0;
+            nav.ProgressZ = 0;
+            nav.NoProgress = 0;
+            Array.Fill(nav.Ignore, 0.0);
 
             MatchState m = world.Match;
             m.Time = 0;
@@ -798,6 +815,9 @@ namespace CriticalMass.Sim.Core
                     RetargetIn = 0,
                     HomeX = map.Shrine.X,
                     HomeZ = map.Shrine.Z,
+                    Region = new int[map.Width * map.Height],
+                    RegionQueue = new int[map.Width * map.Height],
+                    Ignore = new double[cap],
                 },
                 Match = BlankMatch(),
                 Events = events,

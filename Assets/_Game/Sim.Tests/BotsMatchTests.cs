@@ -32,6 +32,8 @@ namespace CriticalMass.Sim.Tests
         private static double _dist;
         private static int _aliveSteps;
         private static double _worstStill;
+        /// <summary>fix/movement-shiver-3: who sat still longest, where, and what it wanted (the assert message).</summary>
+        private static string _worstStillWho = "";
         private static int _flapWorstB;
         private static HashSet<AiState> _seen;
 
@@ -175,6 +177,7 @@ namespace CriticalMass.Sim.Tests
             _dist = 0;
             _aliveSteps = 0;
             _worstStill = 0;
+            _worstStillWho = "";
             _seen = new HashSet<AiState>();
             _worldB = MakeWorld(2, 16);
             var flB = new FlapTracker(_worldB);
@@ -218,9 +221,14 @@ namespace CriticalMass.Sim.Tests
                         refZ[i] = w.Z[i];
                         stillSince[i] = t;
                     }
-                    else
+                    else if (t - stillSince[i] > _worstStill)
                     {
-                        _worstStill = Math.Max(_worstStill, t - stillSince[i]);
+                        _worstStill = t - stillSince[i];
+                        BotsState bs = BotBrain.GetBotsState(w);
+                        _worstStillWho = "actor " + i + " " + a.Cls + " " + a.Team + " " + a.AiState + " target " + bs.Target[i] +
+                                         " at (" + w.X[i].ToString("F1", CultureInfo.InvariantCulture) + ", " +
+                                         w.Z[i].ToString("F1", CultureInfo.InvariantCulture) + ") since " +
+                                         stillSince[i].ToString("F1", CultureInfo.InvariantCulture) + " s";
                     }
                 }
             });
@@ -260,7 +268,7 @@ namespace CriticalMass.Sim.Tests
         public void BMeanBotSpeedGt1USAndNoBotSitsStillPlusMinus005ForGt6SOutsideHoldHill()
         {
             Assert.Greater(_dist / (_aliveSteps * SimStep.Dt(_worldB.Config)), 1);
-            Assert.LessOrEqual(_worstStill, 6);
+            Assert.LessOrEqual(_worstStill, 6, "sat still longest: " + _worstStillWho);
         }
 
         [Test]

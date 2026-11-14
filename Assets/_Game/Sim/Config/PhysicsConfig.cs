@@ -105,6 +105,39 @@ namespace CriticalMass.Sim.Config
         /// <summary>The Kaiju's wall collider while SolidKaiju (KaijuConfig.GridRadius 0.7 otherwise): its body no longer sinks into walls.</summary>
         public double KaijuGridRadius = 1.1;
 
+        // ---- fix/movement-shiver-1 (owner 2026-11-14: "shaking and vibrating at the door")
+        /// <summary>The Kaiju never walks at a point its body cannot reach (it holds at the last cell it fits in), faces the way it
+        /// actually moved, claws and slams only what it can see, keeps its target unless a clearly better one appears, skips
+        /// targets on a part of the map its body cannot reach, and gives a target up after KaijuGiveUpSeconds without progress.</summary>
+        public bool KaijuNavGuard = true;
+        /// <summary>Seconds of no progress (net move under KaijuProgressRadius, not attacking) before the Kaiju gives its target up.</summary>
+        public double KaijuGiveUpSeconds = 1.5;
+        /// <summary>Seconds a given-up target is skipped by target choice.</summary>
+        public double KaijuIgnoreSeconds = 4;
+        public double KaijuProgressRadius = 1;
+        /// <summary>A new target must be this much closer (straight-line units) than the current one to take over.</summary>
+        public double KaijuRetargetMargin = 2;
+        /// <summary>Target choice adds this to the distance of a target behind a wall (prefer what it can see).</summary>
+        public double KaijuHiddenPenalty = 6;
+        /// <summary>Bots walk straight at a fight target only when their whole body fits along the line (not just its centre), so
+        /// the straight-line / route choice does not flip every tick at a wall end; and they do not strafe and swing at a target
+        /// inside reach but behind a wall.</summary>
+        public bool BotWideLine = true;
+        /// <summary>fix/movement-shiver-2: bot steering with hysteresis. Straight line or route is a choice held at least
+        /// BotModeHoldSeconds (straight needs the whole body to fit, it is left only when the centre line is blocked); the
+        /// circle-strafe band is entered at reach and left at reach + BotReachSlack; strafing steers from the target's real
+        /// position (the wind-up lead stays on the aim only); a bot settles on its hill post inside an arrival radius that grows
+        /// with the allies crowding it and only walks back when pushed BotPostRelease past it; a separation-only push keeps its
+        /// size (it is no longer blown up to a full-speed step) and one under BotMoveDeadzone is dropped.</summary>
+        public bool BotCalmSteer = true;
+        public double BotModeHoldSeconds = 0.5;
+        public double BotReachSlack = 0.4;
+        public double BotPostArrive = 0.5;
+        public double BotPostArrivePerAlly = 0.35;
+        public double BotPostArriveMax = 1.6;
+        public double BotPostRelease = 0.8;
+        public double BotMoveDeadzone = 0.15;
+
         // ---- DG-97 / OD-9 crowds
         /// <summary>Order-free relaxed separation: pushes accumulated, Iterations passes at Relax, capped per tick (mass split off:
         /// it cost the passive check 9 of 200 seeds).</summary>

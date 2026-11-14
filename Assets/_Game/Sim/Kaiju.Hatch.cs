@@ -42,6 +42,9 @@ namespace CriticalMass.Sim.Core
 
         internal const double MaxSubstep = 0.25;
 
+        /// <summary>fix/movement-shiver-1: holding on the goal cell when the body is this close to its centre.</summary>
+        internal const double HoldEps = 0.05;
+
         /// <summary>CM-26: a wound-up melee still lands on a target within meleeRange + this (it stepped back, not away).</summary>
         public const double MeleeLeash = 0.4;
 
@@ -162,6 +165,73 @@ namespace CriticalMass.Sim.Core
             nav.ClearGridVersion = w.GridVersion;
             // The field was built over the old shadow grid: force a rebuild.
             nav.FieldWallVersion = -1;
+            if (Phys.On(w, w.Config.Physics.KaijuNavGuard)) BuildRegions(w);
+        }
+
+        /// <summary>
+        /// fix/movement-shiver-1: label the clearance cells by region (8-connected with the flow field's no-corner-cutting
+        /// rule), so target choice can skip a fighter the body can never walk to (inside the shrine yard, on a diagonal bridge
+        /// far from its mouth). Breadth-first over the preallocated queue; no allocation.
+        /// </summary>
+        internal static void BuildRegions(World w)
+        {
+            KaijuNav nav = w.KaijuNav;
+            MapDef map = w.Map;
+            int W = map.Width;
+            int H = map.Height;
+            int[] reg = nav.Region;
+            int[] q = nav.RegionQueue;
+            Array.Fill(reg, 0);
+            int label = 0;
+            for (int start = 0; start < W * H; start++)
+            {
+                if (reg[start] != 0 || !IsClear(w, start % W, start / W)) continue;
+                label++;
+                int head = 0;
+                int tail = 0;
+                q[tail++] = start;
+                reg[start] = label;
+                while (head < tail)
+                {
+                    int c = q[head++];
+                    int cx = c % W;
+                    int cz = c / W;
+                    for (int i = 0; i < 8; i++)
+                    {
+                        int nx = cx + Ndx[i];
+                        int nz = cz + Ndz[i];
+                        if (!IsClear(w, nx, nz)) continue;
+                        int ni = nz * W + nx;
+                        if (reg[ni] != 0) continue;
+                        if (i >= 4 && (!IsClear(w, nx, cz) || !IsClear(w, cx, nz))) continue;
+                        reg[ni] = label;
+                        q[tail++] = ni;
+                    }
+                }
+            }
+        }
+
+        /// <summary>fix/movement-shiver-1: region label of the clearance cell nearest (x, z) within GoalSnapRings (0 = none).</summary>
+        internal static int RegionAt(World w, double x, double z, out int cx, out int cz)
+        {
+            if (!NearestClearCell(w, x, z, GoalSnapRings, out cx, out cz)) return 0;
+            return w.KaijuNav.Region[cz * w.Map.Width + cx];
+        }
+
+        /// <summary>
+        /// fix/movement-shiver-1: true when the body can get to a cell from which actor id is in claw reach: the clearance cell
+        /// nearest the actor is in the Kaiju's own region, its centre is within MeleeRange of the actor, and (with walls
+        /// blocking hits) nothing blocks the line from it. A fighter on a narrow bridge or behind a wall end fails this.
+        /// </summary>
+        internal static bool BodyCanReach(World w, int id, int kaijuRegion, bool current = false)
+        {
+            int r = RegionAt(w, w.X[id], w.Z[id], out int cx, out int cz);
+            if (r == 0 || (kaijuRegion != 0 && r != kaijuRegion)) return false;
+            double ex = cx + 0.5 - w.X[id];
+            double ez = cz + 0.5 - w.Z[id];
+            double reach = w.Config.Kaiju.MeleeRange + (current ? 1 : 0); // the current target keeps a 1 u margin (no flicker)
+            if (ex * ex + ez * ez > reach * reach) return false;
+            return !Phys.On(w, w.Config.Physics.WallsBlockHits) || SegmentClear.Clear(w.Map, cx + 0.5, cz + 0.5, w.X[id], w.Z[id]);
         }
 
         internal static bool IsClear(World w, int cx, int cz)
@@ -244,6 +314,10 @@ namespace CriticalMass.Sim.Core
             nav.RepathIn = 0;
             nav.GoalCx = -1;
             nav.GoalCz = -1;
+            nav.ProgressX = x;
+            nav.ProgressZ = z;
+            nav.NoProgress = 0;
+            Array.Fill(nav.Ignore, 0.0);
             World.PushEvent(w, SimEventType.Hatch, -1, -1, x, z, HatchCode(state));
         }
 
@@ -261,13 +335,27 @@ namespace CriticalMass.Sim.Core
             int best = -1;
             double bestScore = double.PositiveInfinity;
             int n = w.ActorCount;
+            // fix/movement-shiver-1: skip given-up targets and ones the body cannot get in claw reach of, prefer what it can
+            // see, and keep the current target unless another is KaijuRetargetMargin closer (no flip-flop between two fighters).
+            PhysicsConfig p = w.Config.Physics;
+            bool guard = Phys.On(w, p.KaijuNavGuard);
+            bool walls = guard && Phys.On(w, p.WallsBlockHits);
+            int kReg = 0;
+            if (guard)
+            {
+                RefreshClearance(w);
+                kReg = RegionAt(w, k.X, k.Z, out _, out _);
+            }
             for (int id = 0; id < n; id++)
             {
                 if (!KaijuCanTarget(w, id)) continue;
+                if (guard && (w.KaijuNav.Ignore[id] > 0 || !BodyCanReach(w, id, kReg, id == k.TargetId))) continue;
                 double dx = w.X[id] - k.X;
                 double dz = w.Z[id] - k.Z;
                 double score = Math.Sqrt(dx * dx + dz * dz);
                 if (bigFeeder >= 0 && (w.Actors[id].Team == TeamId.Azure ? 0 : 1) == bigFeeder) score -= BigFeederBias;
+                if (walls && !SegmentClear.Clear(w.Map, k.X, k.Z, w.X[id], w.Z[id])) score += p.KaijuHiddenPenalty;
+                if (guard && id == k.TargetId) score -= p.KaijuRetargetMargin;
                 if (score < bestScore)
                 {
                     bestScore = score;

@@ -51,6 +51,12 @@ namespace CriticalMass.Sim.Bots
         public double[] UnstickUntil;
         /// <summary>Fight target: actor id, TargetKaiju, or -1.</summary>
         public int[] Target;
+        /// <summary>fix/movement-shiver-2 (BotCalmSteer): fight steering mode (0 none, 1 straight at the target, 2 the route), the
+        /// match time before which it may not change again, 1 while inside the circle-strafe band, 1 while settled on the hill post.</summary>
+        public byte[] FightMode;
+        public double[] FightModeUntil;
+        public byte[] InReach;
+        public byte[] Settled;
         /// <summary>Gather / corrupt node id (-1 = none).</summary>
         public int[] TargetNode;
         /// <summary>Hill hold post (Float32 storage).</summary>
@@ -105,6 +111,10 @@ namespace CriticalMass.Sim.Bots
                 UnstickZ = new double[cap],
                 UnstickUntil = new double[cap],
                 Target = new int[cap],
+                FightMode = new byte[cap],
+                FightModeUntil = new double[cap],
+                InReach = new byte[cap],
+                Settled = new byte[cap],
                 TargetNode = new int[cap],
                 PostX = new double[cap],
                 PostZ = new double[cap],
@@ -153,6 +163,10 @@ namespace CriticalMass.Sim.Bots
                 st.UnstickZ[id] = JsMath.F32(0);
                 st.UnstickUntil[id] = 0;
                 st.Target[id] = -1;
+                st.FightMode[id] = 0;
+                st.FightModeUntil[id] = 0;
+                st.InReach[id] = 0;
+                st.Settled[id] = 0;
                 st.TargetNode[id] = -1;
                 st.PostX[id] = JsMath.F32(w.Map.Hill.X);
                 st.PostZ[id] = JsMath.F32(w.Map.Hill.Z);
