@@ -155,6 +155,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             // bottom-left safe frame as the ping feed and the player card; in the centred space it rose 60 px on a 16:10
             // screen and met the ping feed, which is anchored to the bottom.
             _kit = MenuUi.Rt(FeedUi.SafeRoot(_root), "Class Kit");
+            HudZones.RegisterPanel(_kit);   // fix/hud-containment-4: name tags stay off the kit and the build bank box
             MenuUi.Place(_kit, KitX, HudZones.Kit.y, KitW, kitH);
             _kitPanel = MenuUi.Panel(_kit, "Panel", 0f, 0f, KitW, kitH);
             _kitTitle = MenuUi.Fit(MenuUi.Label(_kit, "Title", CMTokens.Display, UiScale.TypeSmall, brass, TextAnchor.MiddleLeft, 18f, 8f, KitW - 36f, 28f, "", 2f), 13);

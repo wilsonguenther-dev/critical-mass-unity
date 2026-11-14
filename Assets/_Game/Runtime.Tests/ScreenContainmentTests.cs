@@ -301,6 +301,34 @@ namespace CriticalMass.Runtime.Tests
             finally { Object.DestroyImmediate(go); }
         }
 
+        [Test]
+        public void AWorldLabelOverARegisteredPanelIsCaught()
+        {
+            // fix/hud-containment-4: name tags and call bubbles test their screen rect against the HUD's panels
+            var go = new GameObject("Panel Mask", typeof(RectTransform));
+            try
+            {
+                Canvas c = go.AddComponent<Canvas>();
+                c.renderMode = RenderMode.ScreenSpaceOverlay;
+                var panel = MenuUi.Rt((RectTransform)go.transform, "Panel");
+                panel.anchorMin = panel.anchorMax = panel.pivot = Vector2.zero;
+                panel.anchoredPosition = Vector2.zero;
+                panel.sizeDelta = new Vector2(400f, 200f);
+                HudZones.RegisterPanel(panel);
+                var tag = MenuUi.Rt((RectTransform)go.transform, "Tag");
+                tag.anchorMin = tag.anchorMax = tag.pivot = Vector2.zero;
+                tag.sizeDelta = new Vector2(120f, 26f);
+                tag.anchoredPosition = new Vector2(300f, 150f);
+                Assert.IsTrue(HudZones.OverPanel(tag, c), "a tag on the panel is caught");
+                tag.anchoredPosition = new Vector2(700f, 600f);
+                Assert.IsFalse(HudZones.OverPanel(tag, c), "a tag in the open shows");
+                tag.anchoredPosition = new Vector2(300f, 150f);
+                panel.gameObject.SetActive(false);
+                Assert.IsFalse(HudZones.OverPanel(tag, c), "a hidden panel masks nothing");
+            }
+            finally { Object.DestroyImmediate(go); }
+        }
+
         // ---------------------------------------------------------------- 3. kill feed and toast lanes
 
         [Test]

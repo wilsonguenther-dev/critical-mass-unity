@@ -128,6 +128,55 @@ namespace CriticalMass.Runtime.Hud
         public static void HoldFullPanel() => _fullPanelFrame = Frame;
         /// <summary>A full panel held the screen this frame or the last.</summary>
         public static bool FullPanelHeld => _fullPanelFrame >= Frame - 1;
+
+        // ---- panel mask (fix/hud-containment-4): HUD panels that world labels (name tags, call bubbles) must not draw
+        // over. A panel registers its RectTransform once; OverPanel tests a label's screen rect against every active one.
+        // Fixed arrays, no allocation; a destroyed panel's slot is reused.
+        const int MaxPanels = 16;
+        static readonly RectTransform[] _panels = new RectTransform[MaxPanels];
+        static readonly Canvas[] _panelCanvas = new Canvas[MaxPanels];
+        static int _panelCount;
+        static readonly Vector3[] _corners = new Vector3[4];
+
+        /// <summary>Registers a HUD panel that world labels stay off (the player card, the minimap, the kit, the hit recap).</summary>
+        public static void RegisterPanel(RectTransform rt)
+        {
+            if (rt == null) return;
+            int free = -1;
+            for (int i = 0; i < _panelCount; i++)
+            {
+                if (_panels[i] == rt) return;
+                if (free < 0 && _panels[i] == null) free = i;
+            }
+            if (free < 0) { if (_panelCount >= MaxPanels) return; free = _panelCount++; }
+            _panels[free] = rt;
+            _panelCanvas[free] = rt.GetComponentInParent<Canvas>();
+        }
+
+        /// <summary>rt's rect in screen pixels (bottom-left origin) on its canvas.</summary>
+        public static Rect ScreenRectOf(RectTransform rt, Canvas c)
+        {
+            rt.GetWorldCorners(_corners);
+            UnityEngine.Camera cam = c != null && c.renderMode != RenderMode.ScreenSpaceOverlay ? c.worldCamera : null;
+            Vector2 a = RectTransformUtility.WorldToScreenPoint(cam, _corners[0]), b = RectTransformUtility.WorldToScreenPoint(cam, _corners[2]);
+            return Rect.MinMaxRect(Mathf.Min(a.x, b.x), Mathf.Min(a.y, b.y), Mathf.Max(a.x, b.x), Mathf.Max(a.y, b.y));
+        }
+
+        /// <summary>A world label (rt on canvas) would draw over an active registered panel.</summary>
+        public static bool OverPanel(RectTransform rt, Canvas canvas)
+        {
+            if (_panelCount == 0 || rt == null) return false;
+            Rect me = ScreenRectOf(rt, canvas);
+            for (int i = 0; i < _panelCount; i++)
+            {
+                RectTransform p = _panels[i];
+                if (p == null || !p.gameObject.activeInHierarchy) continue;
+                Canvas pc = _panelCanvas[i];
+                if (pc != null && !pc.enabled) continue;
+                if (me.Overlaps(ScreenRectOf(p, pc))) return true;
+            }
+            return false;
+        }
         /// <summary>The station prompt is up this frame: the terrain pill, which shares the prompt row, steps back.</summary>
         public static void HoldPromptRow() => _promptRowFrame = Frame;
         /// <summary>The station prompt held the prompt row this frame or the last.</summary>

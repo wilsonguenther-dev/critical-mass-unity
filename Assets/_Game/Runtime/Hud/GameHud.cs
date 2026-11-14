@@ -65,6 +65,8 @@ namespace CriticalMass.Runtime.Hud
             Clusters[(int)HudCluster.Kaiju] = Cluster(HudCluster.Kaiju);
             Clusters[(int)HudCluster.Player] = Cluster(HudCluster.Player);
             Clusters[(int)HudCluster.Minimap] = Cluster(HudCluster.Minimap);
+            HudZones.RegisterPanel(Clusters[(int)HudCluster.Player]);    // fix/hud-containment-4: world labels stay off
+            HudZones.RegisterPanel(Clusters[(int)HudCluster.Minimap]);   // the player card and the minimap
             // Owner walk 1: the four clusters sit in the safe area (the camera notch of a full-screen MacBook, overscan).
             RectTransform safe = FeedUi.SafeRoot(Root);
             for (int i = 0; i < Clusters.Length; i++)
