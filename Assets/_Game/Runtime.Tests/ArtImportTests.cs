@@ -233,7 +233,12 @@ namespace CriticalMass.Runtime.Tests
             Object.DestroyImmediate(decal);
         }
 
-        static IEnumerable<string> PaintedFaceKeys() => ArtMapping.Models.Where(m => m.VertexColourFace).Select(m => m.Key);
+        /// <summary>cand5-reds-1: fighters only. The rule below is the HY fighter face (human skin with dark eyes and brows,
+        /// never team-swapped or glowing). The Kaiju (art/rig-kaiju-2) also paints its face in vertex colour, but it is a
+        /// creature: its head bone is "Head", its face is scales, not skin, and its two eyes are glow code 6 ON PURPOSE so
+        /// they take the allegiance colour (kr2_build.py, "eyes: two small glow gems ... glow code 6 = allegiance colour").
+        /// Its mask codes ({0, 6}) are held by MeshesCarryVertexColourWithTheirMaskCodesOnTheArtMaterial.</summary>
+        static IEnumerable<string> PaintedFaceKeys() => ArtMapping.Models.Where(m => m.VertexColourFace && m.Kind == ArtKind.Character).Select(m => m.Key);
 
         /// <summary>
         /// HY classes paint the face in vertex colour (ModelSpec.VertexColourFace). On the Hero mesh's head (the vertices the
