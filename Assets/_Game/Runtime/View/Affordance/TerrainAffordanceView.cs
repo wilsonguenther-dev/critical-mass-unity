@@ -138,6 +138,10 @@ namespace CriticalMass.Runtime.View.Affordance
             BuildUi();
             if (Array.IndexOf(Environment.GetCommandLineArgs(), "-affordanceShots") >= 0 && GetComponent<AffordanceCapture>() == null)
                 gameObject.AddComponent<AffordanceCapture>();
+            // wall-damage-1: its own capture director (barricade and map wall stages), in its own file.
+            if (Array.IndexOf(Environment.GetCommandLineArgs(), CriticalMass.Runtime.View.WallDamage.WallDamageCapture.Flag) >= 0
+                && GetComponent<CriticalMass.Runtime.View.WallDamage.WallDamageCapture>() == null)
+                gameObject.AddComponent<CriticalMass.Runtime.View.WallDamage.WallDamageCapture>();
         }
 
         void OnDestroy()
@@ -588,7 +592,8 @@ namespace CriticalMass.Runtime.View.Affordance
                 Vector3 c = SimSpace.ToWorld(p.X, ObjectY(m, p.Kind, p.X, p.Z), p.Z) - fwd * 0.55f;
                 float s = (float)p.Strength;
                 // Shake and squash: a direction-aware jolt of the object's shell (decays in about a fifth of a second).
-                if (shake && p.Phase == 0)
+                // wall-damage-1: walls and barricades shake for real (BreakableCellSet, BarricadeDamage); no shell over them.
+                if (shake && p.Phase == 0 && p.Kind != ReactKind.Wall && p.Kind != ReactKind.Barricade)
                 {
                     float jolt = Mathf.Sin((float)age * 70f) * Mathf.Exp(-(float)age * 14f) * 0.14f * (0.5f + s);
                     Vector3 dir = SimSpace.ToWorld(p.DirX, 0, p.DirZ);
@@ -660,9 +665,11 @@ namespace CriticalMass.Runtime.View.Affordance
                     if (left < 0) continue;
                     int stage = WorldReactions.StageOf(left);
                     if (stage == 0) continue;
+                    // wall-damage-1: a cell drawn as its own piece carries crack strips on its faces; the flat decal stays only
+                    // for walls without one (the grey-box view).
+                    if (CriticalMass.Runtime.View.WallDamage.BreakableCellSet.Shown(i) != CriticalMass.Runtime.View.WallDamage.CellLook.None) { DecalsDrawn++; continue; }
                     float g = (float)GroundHeight.At(m, cx + 0.5, cz + 0.5);
                     GroundQuad(cx + 0.5, cz + 0.5, g + WallTop(m, cx, cz) + 0.012f, 0.5f, CellCrack1 + stage - 1, A(new Color32(255, 255, 255, 255), 0.9f));
-                    Billboard(SimSpace.ToWorld(cx + 0.5, g + WallTop(m, cx, cz) * 0.5f, cz + 0.5) - fwd * 0.52f, 0.5f, right, up, CellCrack1 + stage - 1, A(new Color32(255, 255, 255, 255), 0.85f));
                     DecalsDrawn++;
                 }
             }
@@ -673,12 +680,8 @@ namespace CriticalMass.Runtime.View.Affordance
                 if (left < 0) continue;
                 int stage = WorldReactions.StageOf(left);
                 if (stage == 0) continue;
-                Barricade b = bs[k];
-                float g = (float)GroundHeight.At(m, b.Cx + 0.5, b.Cz + 0.5);
-                Vector3 c = SimSpace.ToWorld(b.Cx + 0.5, g + 0.6f, b.Cz + 0.5) - fwd * 0.5f;
-                // Heavily damaged and breaking lean a little (loosened planks).
-                Vector3 lean = stage >= 2 ? right * (0.06f * (stage - 1)) : Vector3.zero;
-                Billboard(c + lean, 0.55f, right, up, CellCrack1 + stage - 1, A(new Color32(255, 255, 255, 255), 0.9f));
+                // wall-damage-1: the barricade itself shows the stage (BarricadeDamage: pieces askew, cracks, lean); the grey
+                // square with a crack scribble drawn over it is gone. Counted so the capture log still reports staged objects.
                 DecalsDrawn++;
             }
             DecorationDef[] ds = m.Decorations;

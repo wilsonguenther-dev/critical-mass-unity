@@ -153,7 +153,9 @@ namespace CriticalMass.Runtime.Audio.Sound
             C("barricade_place", F("impactWood_medium_000", "impactPlank_medium_000"), null, 0.5f, 1f, 0.06f, 2, 0.15f, 30, Mid),
             C("barricade_break", F("impactPlank_medium_001", "impactWood_heavy_000"), null, 0.6f, 0.85f, 0.06f, 2, 0.15f, 40, Mid, layer: "debris", layerGain: 0.35f),
             C("wall_crack", F("impactMining_002", "impactMining_003"), S("hit_stone"), 0.55f, 1f, 0.06f, 2, 0.12f, 40, Mid),
-            C("wall_break", F("impactWood_heavy_003"), null, 0.7f, 0.75f, 0.05f, 2, 0.2f, 55, Far, layer: "debris", layerGain: 0.5f),
+            // wall-damage-1: a breakable wall is stone, so its break is stone (it played a wood sample); the barricade gets a wood knock per hit.
+            C("wall_break", F("impactMining_002", "impactMining_003"), S("hit_stone"), 0.75f, 0.62f, 0.05f, 2, 0.2f, 55, Far, layer: "debris", layerGain: 0.6f),
+            C("barricade_hit", F("impactPlank_medium_000", "impactWood_medium_000"), null, 0.45f, 1.05f, 0.08f, 3, 0.06f, 30, Mid),
             C("debris", null, S("debris"), 0.45f, 1f, 0.08f, 3, 0.1f, 15, Mid),
             C("topple_creak", null, S("topple_creak"), 0.6f, 1f, 0.05f, 2, 0.3f, 50, Far, caption: "Pillar toppling"),
             C("topple_crash", null, S("topple_crash"), 0.85f, 1f, 0.05f, 2, 0.2f, 65, Far, layer: "slam_wood", layerGain: 0.45f),
