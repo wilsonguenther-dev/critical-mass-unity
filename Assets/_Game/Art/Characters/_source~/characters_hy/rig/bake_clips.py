@@ -102,6 +102,16 @@ FLIGHT_CAP = 0.32      # metres: lowest foot/toe joint never above this (game li
 CAPPED = {}
 PLANT_N = 0.04         # rig-builder-2: new bodies hold their locomotion stance a little longer (the game needs 0.3 u of planted run)
 PLANT = 0.025          # KayKit ankle within 2.5% of leg length of its rest height = planted
+# rig-builder-3: the Builder's run and strafe stance is held longer (the game read 0.23 u/u of planted-toe slide in Run:
+# KayKit's run stance is 2 frames, and the toe joint is within the game's 0.03 u stance band on the frames either side,
+# where the foot still swings). The anchored, flat stance covers those frames instead.
+PLANT_RUN = {"Builder": float(os.environ.get("BAKE_PLANT_RUN", "0.10"))}.get(CLS)
+
+
+def plant_n(clip):
+    if PLANT_RUN and clip in ("Run", "RunBack", "StrafeL", "StrafeR"):
+        return PLANT_RUN
+    return PLANT_N
 MAX_LOWER = 0.12       # hips never come down more than this to reach a target (DeathB-style clips keep FK reach)
 LEG = lambda s: ("upperleg." + s, "lowerleg." + s, "foot." + s, "toes." + s)
 W = lambda arm, p: arm.matrix_world @ p
@@ -389,7 +399,7 @@ def _k(t, ease, **kw):
 
 _WIND = dict(hips_p=-4, hips_y=-5, spine_p=-5, spine_y=-6, chest_p=-6, chest_y=-6, head_p=8, uar=-176, lar=-28,
              ual=-30, lal=-25, th=80, drop=0.02, back=0.0)
-_HIT = dict(hips_p=10, hips_y=3, spine_p=12, spine_y=3, chest_p=13, chest_y=2, head_p=-18, uar=-85, lar=-12,
+_HIT = dict(hips_p=10, hips_y=3, spine_p=12, spine_y=3, chest_p=13, chest_y=2, head_p=-18, uar=-58, lar=-12,
             ual=-40, lal=-30, th=-140, drop=0.07, back=0.03)
 MKEYS = [
     _k(0.0, "smooth"),
@@ -398,7 +408,7 @@ MKEYS = [
     _k(0.45, "in", hips_p=3, hips_y=0, spine_p=4, spine_y=1, chest_p=5, chest_y=1, head_p=-4, uar=-160, lar=-10,
        ual=-35, lal=-25, th=-15, drop=0.05, back=0.01),                             # mallet over the top
     _k(_CT, "lin", **_HIT),                                                         # contact (the clip's hit event)
-    _k(min(0.99, _CT + 0.09), "out", **dict(_HIT, drop=0.075, uar=-87, th=-135)),   # settle
+    _k(min(0.99, _CT + 0.09), "out", **dict(_HIT, drop=0.075, uar=-60, th=-135)),   # settle
     _k(1.0, "smooth"),
 ]
 MALLET_LOG = []
@@ -646,7 +656,7 @@ def bake_action(clip, act):
             # rig-builder-2: a new body's PLANTED locomotion foot lies flat as bound, turned only by KayKit's foot yaw. The
             # pack's heel-to-toe roll on the Builder's long boot lifted his toe joint more than 0.03 u through most of the
             # run stance (the game saw 2 planted frame pairs, 0.27 u, under its 0.3 u floor).
-            if NEW_BODY and clip in ORDER_CLIPS and (K["A" + s].z - K0["A" + s].z) < PLANT_N * leg_k:
+            if NEW_BODY and clip in ORDER_CLIPS and (K["A" + s].z - K0["A" + s].z) < plant_n(clip) * leg_k:
                 fd = (K["R" + s] @ K0["R" + s].inverted()) @ Vector((0, -1, 0))
                 if TOE_ABS:
                     # rig-builder-3: the planted toes point exactly where KayKit's toes point (its toe joint ahead of its
@@ -661,7 +671,7 @@ def bake_action(clip, act):
             dk = K["A" + s] - K0["A" + s]
             # Foot motion scales with the legs (an unscaled swing lift was tried: Walk's lowest foot rose to 0.043).
             A = F0["A" + s] + dk * RATIO + Vector((0, 0, LIFT))
-            planted = (K["A" + s].z - K0["A" + s].z) < (PLANT_N if NEW_BODY and clip in ORDER_CLIPS else PLANT) * leg_k
+            planted = (K["A" + s].z - K0["A" + s].z) < (plant_n(clip) if NEW_BODY and clip in ORDER_CLIPS else PLANT) * leg_k
             if planted and bdir is not None:
                 if anchor[s] is None:
                     anchor[s] = (A.copy(), f)
