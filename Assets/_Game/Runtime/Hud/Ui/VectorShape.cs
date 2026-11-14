@@ -28,6 +28,12 @@ namespace CriticalMass.Runtime.Hud.Ui
         public Color EmptyColor = new Color(0, 0, 0, 0);
         public float OutlinePx = CMTokens.OutlinePx;
         public float RimPx = CMTokens.RimPx;
+        /// <summary>fix/hud-containment-5: a Pie drawn as a disc (its rays stop at the inscribed circle) instead of a square
+        /// wipe. The class kit's cooldown is round: at full it was a blank tan square where the icon belongs.</summary>
+        public bool RoundPie;
+        /// <summary>fix/hud-containment-5: drop shadow under the shape (HudStyle.ShadowY px down, HudStyle.ShadowColor); 0 = none.</summary>
+        public float ShadowPx;
+        static readonly List<Vector2> Shadow = new List<Vector2>(256);
         public Color OutlineColor = CMTokens.VoidNavy.Color;
         public Color RimColor = CMTokens.WarmCream.Color;
         float _fill01 = 1f;
@@ -81,11 +87,17 @@ namespace CriticalMass.Runtime.Hud.Ui
 
             if (Kind == ShapeKind.Pie)
             {
-                BuildPie(vh, r, _fill01, FillColor * tint);
+                BuildPie(vh, RoundPie ? Square(r) : r, _fill01, FillColor * tint, RoundPie);
                 return;
             }
 
             Vector2 centre = BuildOutline(Kind, r, Radius, Outer);
+            if (ShadowPx > 0f)
+            {
+                Shadow.Clear();
+                for (int i = 0; i < Outer.Count; i++) Shadow.Add(Outer[i] + new Vector2(0f, -ShadowPx));
+                Fan(vh, Shadow, centre + new Vector2(0f, -ShadowPx), HudStyle.ShadowColor * new Color(1f, 1f, 1f, tint.a));
+            }
             float maxInset = Mathf.Min(r.width, r.height) * 0.32f;
             float o = Mathf.Min(OutlinePx, maxInset);
             float rim = Mathf.Min(RimPx, Mathf.Max(0, maxInset - o));
@@ -302,7 +314,13 @@ namespace CriticalMass.Runtime.Hud.Ui
             }
         }
 
-        static void BuildPie(VertexHelper vh, Rect r, float f, Color c)
+        static Rect Square(Rect r)
+        {
+            float d = Mathf.Min(r.width, r.height);
+            return new Rect(r.center.x - d * 0.5f, r.center.y - d * 0.5f, d, d);
+        }
+
+        static void BuildPie(VertexHelper vh, Rect r, float f, Color c, bool round = false)
         {
             if (f <= 0.0005f) return;
             int seg = Mathf.Max(2, Mathf.CeilToInt(64 * f));
@@ -313,9 +331,9 @@ namespace CriticalMass.Runtime.Hud.Ui
             {
                 float a = Mathf.PI * 0.5f - Mathf.PI * 2f * f * i / seg;  // clockwise from 12 o'clock
                 Vector2 dir = new Vector2(Mathf.Cos(a), Mathf.Sin(a));
-                float k = rad;
-                if (Mathf.Abs(dir.x) > 1e-4f) k = Mathf.Min(k, r.width * 0.5f / Mathf.Abs(dir.x));
-                if (Mathf.Abs(dir.y) > 1e-4f) k = Mathf.Min(k, r.height * 0.5f / Mathf.Abs(dir.y));
+                float k = round ? r.width * 0.5f : rad;
+                if (!round && Mathf.Abs(dir.x) > 1e-4f) k = Mathf.Min(k, r.width * 0.5f / Mathf.Abs(dir.x));
+                if (!round && Mathf.Abs(dir.y) > 1e-4f) k = Mathf.Min(k, r.height * 0.5f / Mathf.Abs(dir.y));
                 vh.AddVert(r.center + dir * k, c, Vector4.zero);
             }
             for (int i = 0; i < seg; i++) vh.AddTriangle(start, start + 2 + i, start + 1 + i);

@@ -155,6 +155,7 @@ namespace CriticalMass.Runtime.Hud.Interact
     /// </summary>
     public sealed class PingMarkers
     {
+        readonly bool[] _wordShown = new bool[PingBook.Capacity];
         /// <summary>
         /// fix/hud-containment-3: a world ping marker never sits on the bottom corners' panels. The left corner (player
         /// card, class kit, coin chip: the left stack up to the kit's top) and the right corner (minimap) push the marker up
@@ -262,6 +263,8 @@ namespace CriticalMass.Runtime.Hud.Interact
                     _worldShape[i].SetFill(c);
                     _worldShape[i].SetVerticesDirty();
                     HudText.Set(_worldWord[i], PingWords.Upper[(int)p.Kind]);
+                    _wordShown[i] = true;
+                    _worldWord[i].enabled = true;   // a new call in this slot shows its word until its line is up
                     if (_miniShape[i] != null)
                     {
                         _miniShape[i].Kind = PingWords.Shape[(int)p.Kind];
@@ -292,6 +295,10 @@ namespace CriticalMass.Runtime.Hud.Interact
                     scale *= 0.8f;
                 }
                 local = OffPanels(local, r);   // fix/hud-containment-3 (walk: ping markers on the class card)
+                // fix/hud-containment-5 (owner: "Fern: Help!" in the feed and "NEED HELP 10m" beside it said the same thing):
+                // while the call's line is in the feed the marker keeps its shape and distance and drops its word
+                bool word = !PingFeed.Showing(p.Serial);
+                if (_wordShown[i] != word) { _wordShown[i] = word; _worldWord[i].enabled = word; }
                 _world[i].anchoredPosition = local;
                 _world[i].localScale = new Vector3(scale, scale, 1f);
                 _worldGroup[i].alpha = a;
@@ -314,10 +321,25 @@ namespace CriticalMass.Runtime.Hud.Interact
     /// </summary>
     public sealed class PingFeed
     {
-        public const int Lines = 4;
+        /// <summary>fix/hud-containment-5: the one lane for teammate calls holds two lines (was 4), each in 0.2 s, held
+        /// LineLife, out 0.4 s; an older line steps out when a third arrives.</summary>
+        public const int Lines = 2;
+        public const float LineLife = 4f, FadeIn = 0.2f;
         // owner walk 1: the feed sits above the coin chip (Bottom was 196 and the bottom line ran under the chip)
         static float Bottom => HudZones.PingFeedBottom;
-        const float LineH = HudZones.PingLineH, Left = 28f, Life = (float)PingBook.Life, Fade = 0.4f;
+        const float LineH = HudZones.PingLineH, Left = 28f, Life = LineLife, Fade = 0.4f;
+        readonly int[] _serialAt = new int[Lines];
+        static PingFeed _live;
+
+        /// <summary>The call with this serial has its line in the feed now (the world marker then drops its word).</summary>
+        public static bool Showing(int serial)
+        {
+            PingFeed f = _live;
+            if (f == null || serial == 0) return false;
+            for (int i = 0; i < Lines; i++)
+                if (f._rt[i] != null && f._rt[i].gameObject.activeSelf && f._serialAt[i] == serial) return true;
+            return false;
+        }
         readonly RectTransform[] _rt = new RectTransform[Lines];
         readonly Text[] _text = new Text[Lines];
         readonly VectorShape[] _icon = new VectorShape[Lines];
@@ -348,24 +370,27 @@ namespace CriticalMass.Runtime.Hud.Interact
                 _text[i] = MenuUi.Label(rt, "Text", CMTokens.Ui, UiScale.TypeSmall, InteractUi.Cream, TextAnchor.MiddleLeft, 32f, 0f, 488f, LineH, "", 2.5f);
                 rt.gameObject.SetActive(false);
                 _rt[i] = rt;
+                HudZones.RegisterPanel(rt);   // fix/hud-containment-5: no name tag through a teammate call line ("FerGALElp!")
             }
         }
 
         public string LastLine => _count > 0 ? _text[(_count - 1) % Lines].text : null;
 
-        public void Add(Ping p, float realNow) => Push((PingWords.LineOverride != null ? PingWords.LineOverride(p) : null) ??
+        public void Add(Ping p, float realNow) => Push(p.Serial, (PingWords.LineOverride != null ? PingWords.LineOverride(p) : null) ??
             PingWords.FeedLine[(int)p.Kind, Mathf.Clamp(p.Place, 0, PingWords.Places.Length - 1)], PingWords.Shape[(int)p.Kind], PingWords.Colour(p.Kind), realNow);
 
         /// <summary>Mechanics depth: any team line (hand-offs, power-ups, bot answers) in the same column and style.</summary>
-        public void AddLine(string line, ShapeKind shape, Color c, float realNow) => Push(line, shape, c, realNow);
+        public void AddLine(string line, ShapeKind shape, Color c, float realNow) => Push(0, line, shape, c, realNow);
 
         public void AddRefused(double waitSeconds, float realNow) =>
-            Push(WaitLines[Mathf.Clamp(Mathf.CeilToInt((float)waitSeconds), 0, WaitLines.Length - 1)], ShapeKind.Diamond, CMTokens.Stone.Color, realNow);
+            Push(0, WaitLines[Mathf.Clamp(Mathf.CeilToInt((float)waitSeconds), 0, WaitLines.Length - 1)], ShapeKind.Diamond, CMTokens.Stone.Color, realNow);
 
-        void Push(string line, ShapeKind shape, Color c, float realNow)
+        void Push(int serial, string line, ShapeKind shape, Color c, float realNow)
         {
             if (_rt[0] == null) return;
+            _live = this;
             int slot = _count % Lines;
+            _serialAt[slot] = serial;
             _count++;
             HudText.Set(_text[slot], line);
             _icon[slot].Kind = shape;
@@ -386,7 +411,7 @@ namespace CriticalMass.Runtime.Hud.Interact
                 if (k >= _count || !_rt[slot].gameObject.activeSelf) continue;
                 float age = realNow - _at[slot];
                 if (age >= Life) { _rt[slot].gameObject.SetActive(false); continue; }
-                _group[slot].alpha = age > Life - Fade ? (Life - age) / Fade : 1f;
+                _group[slot].alpha = age < FadeIn ? age / FadeIn : age > Life - Fade ? (Life - age) / Fade : 1f;
                 _rt[slot].anchoredPosition = new Vector2(Left, Bottom + row * (LineH + 4f));
                 row++;
             }

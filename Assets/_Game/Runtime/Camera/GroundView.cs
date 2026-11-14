@@ -831,7 +831,7 @@ namespace CriticalMass.Runtime.Camera
             string toast = ToastLane.Current(Time.unscaledTime);
             if (toast != null)
             {
-                GUI.color = new Color(1f, 0.85f, 0.45f, 1f);
+                GUI.color = new Color(1f, 0.85f, 0.45f, ToastLane.Alpha(Time.unscaledTime));   // fix/hud-containment-5: fades in and out
                 _style.fontSize = Mathf.RoundToInt(26 * s);
                 GUI.Label(ToastLane.PixelRect(Screen.width, Screen.height, 40 * s), toast, _style);
             }

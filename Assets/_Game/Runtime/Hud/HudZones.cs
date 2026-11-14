@@ -82,9 +82,14 @@ namespace CriticalMass.Runtime.Hud
 
         // ---- owner walk 1: the named pieces that used to pick their own spots (every one is checked by the collision test) ----
         /// <summary>Top of the centre lane's residents: the job line, the team stock and the map-event bar sit here.</summary>
+        /// <remarks>fix/hud-containment-5 (owner: three things centre-top at once): one order, top down, with one gap
+        /// (StackGap 12): the top band (clock, scores, hill bar, its word, ends at 128), the job line, the stock chips, the
+        /// map-event bar. Each enters over StackIn, leaves over StackOut, and steps back at once for anything that holds
+        /// the centre lane.</remarks>
+        public const float StackGap = 12f, StackIn = 0.2f, StackOut = 0.25f;
         public const float JobY = 140f, JobW = 760f, JobH = 40f;
-        public const float StockY = 188f, StockH = 40f, StockChipW = 150f, StockChipGap = 10f, StockW = 3f * StockChipW + 2f * StockChipGap;   // fix/hud-containment-3: 470 (was 342; WATER clipped)
-        public const float EventY = 236f, EventW = 560f, EventH = 38f;
+        public const float StockY = JobY + JobH + StackGap, StockH = 40f, StockChipW = 150f, StockChipGap = 10f, StockW = 3f * StockChipW + 2f * StockChipGap;   // fix/hud-containment-3: 470 (was 342; WATER clipped)
+        public const float EventY = StockY + StockH + StackGap, EventW = 560f, EventH = 38f;
         /// <summary>
         /// The job line, stock and event bar live INSIDE the centre lane (the lane's lowest-priority residents): they show
         /// while nothing else holds the lane and step back for the banner, the Kaiju callout, the autopilot banner and the
@@ -132,9 +137,10 @@ namespace CriticalMass.Runtime.Hud
         // ---- panel mask (fix/hud-containment-4): HUD panels that world labels (name tags, call bubbles) must not draw
         // over. A panel registers its RectTransform once; OverPanel tests a label's screen rect against every active one.
         // Fixed arrays, no allocation; a destroyed panel's slot is reused.
-        const int MaxPanels = 16;
+        const int MaxPanels = 64;   // fix/hud-containment-5: every HUD panel, chip and line registers (was 16)
         static readonly RectTransform[] _panels = new RectTransform[MaxPanels];
         static readonly Canvas[] _panelCanvas = new Canvas[MaxPanels];
+        static readonly CanvasGroup[] _panelGroup = new CanvasGroup[MaxPanels];
         static int _panelCount;
         static readonly Vector3[] _corners = new Vector3[4];
 
@@ -151,6 +157,7 @@ namespace CriticalMass.Runtime.Hud
             if (free < 0) { if (_panelCount >= MaxPanels) return; free = _panelCount++; }
             _panels[free] = rt;
             _panelCanvas[free] = rt.GetComponentInParent<Canvas>();
+            _panelGroup[free] = rt.GetComponent<CanvasGroup>();   // a faded-out line masks nothing
         }
 
         /// <summary>rt's rect in screen pixels (bottom-left origin) on its canvas.</summary>
@@ -160,6 +167,20 @@ namespace CriticalMass.Runtime.Hud
             UnityEngine.Camera cam = c != null && c.renderMode != RenderMode.ScreenSpaceOverlay ? c.worldCamera : null;
             Vector2 a = RectTransformUtility.WorldToScreenPoint(cam, _corners[0]), b = RectTransformUtility.WorldToScreenPoint(cam, _corners[2]);
             return Rect.MinMaxRect(Mathf.Min(a.x, b.x), Mathf.Min(a.y, b.y), Mathf.Max(a.x, b.x), Mathf.Max(a.y, b.y));
+        }
+
+        /// <summary>fix/hud-containment-5: a world-anchored bar or label (the Kaiju health bar, the hill marker) slides down
+        /// off any HUD panel it would sit on (the top band, the job line, the stock chips), a step at a time. Returns true
+        /// when it had to move (callers dim it then). rt's anchoredPosition is y up.</summary>
+        public static bool SlideOffPanels(RectTransform rt, Canvas canvas, float step = 24f, int tries = 16)
+        {
+            bool moved = false;
+            for (int i = 0; i < tries && OverPanel(rt, canvas); i++)
+            {
+                rt.anchoredPosition -= new Vector2(0f, step);
+                moved = true;
+            }
+            return moved;
         }
 
         /// <summary>A world label (rt on canvas) would draw over an active registered panel.</summary>
@@ -173,6 +194,8 @@ namespace CriticalMass.Runtime.Hud
                 if (p == null || !p.gameObject.activeInHierarchy) continue;
                 Canvas pc = _panelCanvas[i];
                 if (pc != null && !pc.enabled) continue;
+                CanvasGroup g = _panelGroup[i];
+                if (g != null && g.alpha <= 0.01f) continue;
                 if (me.Overlaps(ScreenRectOf(p, pc))) return true;
             }
             return false;

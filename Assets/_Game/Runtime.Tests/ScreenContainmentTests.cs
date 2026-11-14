@@ -491,5 +491,139 @@ namespace CriticalMass.Runtime.Tests
             }
             finally { Object.DestroyImmediate(root); }
         }
+
+        // ---------------------------------------------------------------- fix/hud-containment-5 (owner screenshots)
+
+        [Test]
+        public void AWorldBarSlidesOffTheHudAndAFadedLineMasksNothing()
+        {
+            // (2) the Kaiju bar and the hill marker slide down off the top band and its stack; (1) a faded-out call line
+            // does not push tags away
+            var go = new GameObject("Slide Off", typeof(RectTransform));
+            try
+            {
+                Canvas c = go.AddComponent<Canvas>();
+                c.renderMode = RenderMode.ScreenSpaceOverlay;
+                var panel = MenuUi.Rt((RectTransform)go.transform, "Band");
+                panel.anchorMin = panel.anchorMax = panel.pivot = Vector2.zero;
+                panel.anchoredPosition = new Vector2(0f, 400f);
+                panel.sizeDelta = new Vector2(600f, 128f);
+                HudZones.RegisterPanel(panel);
+                var bar = MenuUi.Rt((RectTransform)go.transform, "Kaiju Bar");
+                bar.anchorMin = bar.anchorMax = bar.pivot = Vector2.zero;
+                bar.sizeDelta = new Vector2(300f, 56f);
+                bar.anchoredPosition = new Vector2(100f, 420f);
+                Assert.IsTrue(HudZones.OverPanel(bar, c), "the bar starts on the band");
+                Assert.IsTrue(HudZones.SlideOffPanels(bar, c), "it moves");
+                Assert.IsFalse(HudZones.OverPanel(bar, c), "and ends clear of it");
+                Assert.LessOrEqual(bar.anchoredPosition.y + 56f, 400.01f, "below the band, not on it");
+
+                var line = MenuUi.Rt((RectTransform)go.transform, "Ping Line");
+                line.anchorMin = line.anchorMax = line.pivot = Vector2.zero;
+                line.anchoredPosition = new Vector2(0f, 0f);
+                line.sizeDelta = new Vector2(520f, 30f);
+                CanvasGroup g = line.gameObject.AddComponent<CanvasGroup>();
+                HudZones.RegisterPanel(line);
+                var tag = MenuUi.Rt((RectTransform)go.transform, "Tag");
+                tag.anchorMin = tag.anchorMax = tag.pivot = Vector2.zero;
+                tag.sizeDelta = new Vector2(80f, 22f);
+                tag.anchoredPosition = new Vector2(100f, 4f);
+                Assert.IsTrue(HudZones.OverPanel(tag, c), "a tag through a shown call line is caught (no \"FerGALElp!\")");
+                g.alpha = 0f;
+                Assert.IsFalse(HudZones.OverPanel(tag, c), "a faded-out line masks nothing");
+            }
+            finally { Object.DestroyImmediate(go); }
+        }
+
+        [Test]
+        public void TheTopCentreStackHasOneOrderAndOneGap()
+        {
+            // (6) band, job line, stock chips, map-event bar, top down, StackGap apart, all above the guide column
+            float bandBottom = HudLayout.MatchSize.y;
+            Assert.AreEqual(HudZones.StackGap, HudZones.JobY - bandBottom, 0.01f, "job line under the band");
+            Assert.AreEqual(HudZones.StackGap, HudZones.StockY - (HudZones.JobY + HudZones.JobH), 0.01f, "stock under the job line");
+            Assert.AreEqual(HudZones.StackGap, HudZones.EventY - (HudZones.StockY + HudZones.StockH), 0.01f, "event bar under the stock");
+            Assert.LessOrEqual(HudZones.EventY + HudZones.EventH, HudZones.Callout.yMax + 0.01f, "inside the centre lane");
+            Assert.Less(HudZones.EventY + HudZones.EventH, HudZones.GuideUpperY, "above the guide column");
+            Assert.Greater(HudZones.StackIn, 0f);
+            Assert.Greater(HudZones.StackOut, 0f);
+        }
+
+        [Test]
+        public void TeamCallsHaveOneLaneOfTwoThatFades()
+        {
+            // (3) a cap of two lines, a few seconds each, inside the reserved feed zone
+            Assert.AreEqual(2, PingFeed.Lines);
+            Assert.LessOrEqual(PingFeed.LineLife, 5f, "fades after a few seconds");
+            Assert.Greater(PingFeed.FadeIn, 0f, "enters, not pops");
+            Assert.LessOrEqual(PingFeed.Lines * HudZones.PingLineH, HudZones.PingFeed.height + 0.01f, "inside its zone");
+            Assert.IsFalse(PingFeed.Showing(0), "a line that is not a call never hides a marker word");
+        }
+
+        [Test]
+        public void KeyPlatesNeverFlickerBetweenSchemes()
+        {
+            // (5) a scheme change redraws once it has settled, and at most once per SchemeHoldSeconds
+            Assert.IsFalse(HudPrompts.SchemeRedrawDue(10.1f, 10f, 0f), "not before it settles");
+            Assert.IsTrue(HudPrompts.SchemeRedrawDue(10f + HudPrompts.SchemeSettleSeconds + 0.01f, 10f, 0f), "once it has settled");
+            Assert.IsFalse(HudPrompts.SchemeRedrawDue(11f, 10f, 10f), "not twice inside the hold");
+            Assert.IsTrue(HudPrompts.SchemeRedrawDue(12.5f, 10f, 10f), "after the hold");
+        }
+
+        [Test]
+        public void LaneNoticesFadeInAndOut()
+        {
+            ToastLane.Clear();
+            try
+            {
+                ToastLane.Post("VIEW: THIRD PERSON", 0f);
+                Assert.IsNotNull(ToastLane.Current(0f));
+                Assert.AreEqual(0f, ToastLane.Alpha(0f), 0.01f, "enters from clear");
+                Assert.AreEqual(1f, ToastLane.Alpha(1f), 0.01f, "held");
+                Assert.Less(ToastLane.Alpha(ToastLane.Seconds - 0.05f), 0.5f, "leaving");
+                Assert.AreEqual(0f, ToastLane.Alpha(ToastLane.Seconds + 0.1f), 0.01f, "gone");
+            }
+            finally { ToastLane.Clear(); }
+        }
+
+        [Test]
+        public void EveryPanelPillAndChipTakesTheFinishTokens()
+        {
+            // (7) one radius per kind, one stroke, one rim, one shadow on the backing plate only
+            Assert.AreEqual(HudStyle.PanelRadius, HudStyle.RadiusFor(330f, 120f, 18f));
+            Assert.AreEqual(HudStyle.ChipRadius, HudStyle.RadiusFor(150f, 40f, 12f));
+            Assert.AreEqual(-1f, HudStyle.RadiusFor(760f, 40f, 14f), "a wide line is a pill");
+            Assert.AreEqual(-1f, HudStyle.RadiusFor(60f, 30f, -1f), "a built pill stays a pill");
+            var go = new GameObject("Finish", typeof(RectTransform));
+            try
+            {
+                VectorShape plate = MenuUi.Panel(go.transform, "Panel", 0f, 0f, 330f, 120f);
+                VectorShape row = MenuUi.Shape(go.transform, "Row", ShapeKind.RoundRect, 12f, 40f, 300f, 44f, Color.white, 12f);
+                row.OutlinePx = 4f;
+                row.RimPx = 0f;
+                VectorShape meter = MenuUi.Shape(go.transform, "Meter", ShapeKind.RoundRect, 12f, 90f, 300f, 22f, Color.white, 6f);
+                meter.EmptyColor = Color.black;
+                HudStyle.Sweep(go.transform);
+                Assert.AreEqual(HudStyle.PanelRadius, plate.Radius);
+                Assert.AreEqual(HudStyle.OutlinePx, plate.OutlinePx);
+                Assert.AreEqual(HudStyle.RimPx, plate.RimPx);
+                Assert.AreEqual(HudStyle.ShadowY, plate.ShadowPx, "the plate carries the shadow");
+                Assert.AreEqual(HudStyle.ChipRadius, row.Radius, 0.01f);
+                Assert.AreEqual(HudStyle.OutlinePx, row.OutlinePx);
+                Assert.AreEqual(0f, row.RimPx, "no rim stays no rim");
+                Assert.AreEqual(0f, row.ShadowPx, "rows inside it carry none");
+                Assert.AreEqual(6f, meter.Radius, "a meter keeps its own shape");
+            }
+            finally { Object.DestroyImmediate(go); }
+        }
+
+        [Test]
+        public void KitRowsShowTheSkillIcon()
+        {
+            // (4) the Healer's two rows (HEALING WINGS, PURIFY) name a painted icon, never a blank square
+            int healer = Array.IndexOf(UiIcons.Classes, "healer");
+            Assert.IsNotNull(CriticalMass.Runtime.Hud.Mechanics.MechanicsHud.RowIcon("Ability", healer, 0));
+            Assert.IsNotNull(CriticalMass.Runtime.Hud.Mechanics.MechanicsHud.RowIcon("DigPlace", healer, 1), "PURIFY");
+        }
     }
 }

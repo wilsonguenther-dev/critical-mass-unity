@@ -145,6 +145,7 @@ namespace CriticalMass.Runtime.Hud
             _title = MenuUi.Label(_toast, "Title", CMTokens.Display, UiScale.TypeButton, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft, 98f, 30f, 480f, 36f, "", 3f);
             _line = MenuUi.Label(_toast, "Rule", CMTokens.Ui, UiScale.TypeSmall, CMTokens.WithAlpha(CMTokens.WarmCream.Color, 0.88f), TextAnchor.MiddleLeft, 98f, 64f, 480f, 24f, "", 2f);
             _toast.gameObject.SetActive(false);
+            HudZones.RegisterPanel(_toast);   // fix/hud-containment-5: world labels stay off the achievement toast
 
             float lw = AchievementList.W, lh = AchievementList.Height;
             _listBox = FeedUi.Anchored(Canvas.transform, "Match End", new Vector2(0.5f, 0.5f), 0f, 0f, lw, lh);

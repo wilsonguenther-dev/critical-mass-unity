@@ -69,6 +69,8 @@ namespace CriticalMass.Runtime.Hud
             t0 = LoadTimer.Now();
             Clusters[(int)HudCluster.Match] = Cluster(HudCluster.Match);
             Clusters[(int)HudCluster.Kaiju] = Cluster(HudCluster.Kaiju);
+            HudZones.RegisterPanel(Clusters[(int)HudCluster.Match]);   // fix/hud-containment-5: the top band (clock, scores,
+            HudZones.RegisterPanel(Clusters[(int)HudCluster.Kaiju]);   // hill bar and its word) and the Kaiju panel mask world labels
             Clusters[(int)HudCluster.Player] = Cluster(HudCluster.Player);
             Clusters[(int)HudCluster.Minimap] = Cluster(HudCluster.Minimap);
             HudZones.RegisterPanel(Clusters[(int)HudCluster.Player]);    // fix/hud-containment-4: world labels stay off
@@ -224,7 +226,7 @@ namespace CriticalMass.Runtime.Hud
             _medallionHalf.Fill01 = 0.5f;
             _medallionHalf.gameObject.SetActive(false);
             Icon(_medallion.transform, "Crown", UiIcons.Crown, 13f, 11f, 34f, 34f);
-            _hillWord = Label(c, "Hill Word", CMTokens.Ui, UiScale.TypeSmall, Cream, TextAnchor.MiddleCenter, 250f, 106f, 300f, 24f, "NEUTRAL");
+            _hillWord = Label(c, "Hill Word", CMTokens.Ui, UiScale.TypeSmall, Cream, TextAnchor.MiddleCenter, 250f, 106f, 300f, 22f, "NEUTRAL");   // fix/hud-containment-5: ends at the band's 128 (was 130, under the job line's gap)
         }
 
         void BuildTeamPanel(RectTransform c, TeamId team, float x, out Text score, VectorShape[] pips, out Text onHill)
@@ -657,6 +659,8 @@ namespace CriticalMass.Runtime.Hud
         {
             if (Driver == null) Driver = GetComponent<SimDriverBehaviour>();
             if (Driver == null || Driver.World == null || Root == null) return;
+            // fix/hud-containment-5: one finish (HudStyle tokens) for every panel, pill and chip, built here or later
+            if (Time.frameCount % 60 == 2) HudStyle.Sweep(transform);   // the HUD object: its canvas and the feed, toast and ping canvases under it
             AttachCamera();
             UpdateScale();
             Refresh(Driver.World, Time.unscaledDeltaTime);
@@ -1021,7 +1025,10 @@ namespace CriticalMass.Runtime.Hud
             _hillMarker.transform.parent.gameObject.SetActive(hillOn);
             if (hillOn)
             {
-                ((RectTransform)_hillMarker.transform.parent).anchoredPosition = hp / scale;
+                var hm = (RectTransform)_hillMarker.transform.parent;
+                hm.anchoredPosition = hp / scale;
+                // fix/hud-containment-5 (owner: "CRIMSON" over the hill bar and CRIMSON HOLDS): off the top band and its stack
+                HudZones.SlideOffPanels(hm, Canvas);
                 _hillMarker.SetFill(HillColour(s.Hill));
                 HudText.Set(_hillMarkerWord, s.Hill == HillState.Contested ? "CONTESTED" : s.Hill == HillState.Neutral ? "NEUTRAL" :
                     s.Hill == HillState.Azure ? "AZURE" : "CRIMSON");

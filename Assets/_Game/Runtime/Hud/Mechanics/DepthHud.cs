@@ -201,6 +201,8 @@ namespace CriticalMass.Runtime.Hud.Mechanics
 
             // team stock: three chips under the objective (own team only)
             _stock = MenuUi.Rt(_space, "Team Stock");
+            HudZones.RegisterPanel(_stock);   // fix/hud-containment-5: the top-centre stack masks world labels
+            HudZones.RegisterPanel(_obj);
             MenuUi.Place(_stock, (HudLayout.RefW - HudZones.StockW) * 0.5f, HudZones.StockY, HudZones.StockW, HudZones.StockH);
             ShapeKind[] icons = { ShapeKind.Hexagon, ShapeKind.Egg, ShapeKind.Circle };
             Color[] cols = { new Color32(160, 116, 72, 255), new Color32(96, 176, 232, 255), CMTokens.Biomass.Color };
@@ -229,6 +231,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
 
             // map-event bar
             _event = MenuUi.Rt(_space, "Map Event");
+            HudZones.RegisterPanel(_event);
             MenuUi.Place(_event, (HudLayout.RefW - EventW) * 0.5f, HudZones.EventY, EventW, EventH);
             Chip(_event, "Track", ShapeKind.RoundRect, 0f, 0f, EventW, EventH, CMTokens.WithAlpha(panel, 0.92f), 12f);
             _eventFill = Chip(_event, "Fill", ShapeKind.RoundRect, 3f, 3f, EventW - 6f, EventH - 6f, CMTokens.MeterOrange.Color, 10f);
@@ -401,6 +404,29 @@ namespace CriticalMass.Runtime.Hud.Mechanics
 
         // ------------------------------------------------------------------ objective and prompt
 
+        /// <summary>
+        /// fix/hud-containment-5: a top-centre stack piece enters over HudZones.StackIn and leaves over StackOut instead of
+        /// popping; when the lane is taken (laneFree false) it leaves at once so it never sits under a banner. Returns true
+        /// while the piece is on screen (the caller keeps it current).
+        /// </summary>
+        static bool StackFade(RectTransform rt, bool want, bool laneFree)
+        {
+            CanvasGroup g = rt.GetComponent<CanvasGroup>();
+            if (g == null) { g = rt.gameObject.AddComponent<CanvasGroup>(); g.blocksRaycasts = false; g.alpha = 0f; }
+            bool on = rt.gameObject.activeSelf;
+            if (!laneFree || (!want && (!on || !Application.isPlaying)))
+            {
+                if (on) rt.gameObject.SetActive(false);
+                g.alpha = 0f;
+                return false;
+            }
+            if (want && !on) { rt.gameObject.SetActive(true); g.alpha = Application.isPlaying ? 0f : 1f; }
+            float dt = Time.unscaledDeltaTime;
+            g.alpha = want ? Mathf.Min(1f, g.alpha + dt / HudZones.StackIn) : Mathf.Max(0f, g.alpha - dt / HudZones.StackOut);
+            if (!want && g.alpha <= 0f) { rt.gameObject.SetActive(false); return false; }
+            return true;
+        }
+
         void TickObjective(World w, int me)
         {
             ObjectiveFacts f = View.Mechanics.Objective.Facts(w, me);
@@ -409,8 +435,9 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             // Integration batch 4: the job line sits on the top of the centre lane; it steps back while the autopilot banner or a
             // big-moment takeover holds the lane (HudZones), and comes back the frame after.
             bool show = id != ObjectiveId.None && w.Match.Phase != MatchPhase.Ended && !HudZones.Blocked(HudZone.Callout, HudPriority.Tip);   // owner walk 1: lane resident, steps back for any banner
-            if (_obj.gameObject.activeSelf != show) _obj.gameObject.SetActive(show);
-            if (show) HudText.Set(_objText, View.Mechanics.Objective.Words(id, f.Cls));
+            bool want = show;
+            show = StackFade(_obj, want, !HudZones.Blocked(HudZone.Callout, HudPriority.Tip));
+            if (show && want) HudText.Set(_objText, View.Mechanics.Objective.Words(id, f.Cls));
         }
 
         void TickPrompt(World w, int me, float real)
@@ -465,8 +492,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
         void TickStock(World w, int me, bool on, float real)
         {
             bool show = on && DepthRead.SourcesOn(w) && !HudZones.Blocked(HudZone.Callout, HudPriority.Tip);   // owner walk 1: lane resident, steps back for any banner
-            if (_stock.gameObject.activeSelf != show) _stock.gameObject.SetActive(show);
-            if (!show) return;
+            if (!StackFade(_stock, show, !HudZones.Blocked(HudZone.Callout, HudPriority.Tip))) return;
             TeamId t = w.Actors[me].Team;
             for (int k = 0; k < 3; k++)
             {
@@ -513,8 +539,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             // The map-event timer shares the centre lane at the bottom of the order: it waits while a Kaiju callout, a banner,
             // the lockout or autopilot line or a big-moment takeover holds the lane (integration batch 4).
             bool show = word != null && !HudZones.Blocked(HudZone.Callout, HudPriority.Tip);   // owner walk 1: lane resident
-            if (_event.gameObject.activeSelf != show) _event.gameObject.SetActive(show);
-            if (!show) return;
+            if (!StackFade(_event, show, !HudZones.Blocked(HudZone.Callout, HudPriority.Tip)) || word == null) return;
             HudText.SetOneLine(_eventWord, word, WordMax, WordFloor);
             int secs = StationRules.Seconds(ticksLeft, w.Config.SimHz);
             HudText.Set(_eventTime, Clock[Mathf.Clamp(secs, 0, Clock.Length - 1)]);

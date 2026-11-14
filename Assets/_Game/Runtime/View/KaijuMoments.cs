@@ -390,6 +390,11 @@ namespace CriticalMass.Runtime.View
             World w = Driver != null ? Driver.World : null;
             if (w == null) return;
             if (_worldCanvas == null) Build();
+            if (Time.frameCount % 60 == 3)   // fix/hud-containment-5: the HUD finish tokens on the bar and callout too
+            {
+                CriticalMass.Runtime.Hud.Ui.HudStyle.Sweep(_worldCanvas.transform);
+                if (_calloutCanvas != null) CriticalMass.Runtime.Hud.Ui.HudStyle.Sweep(_calloutCanvas.transform);
+            }
             UnityEngine.Camera cam = UnityEngine.Camera.main;
             if (cam == null) return;
             float scale = FitCanvas(_worldCanvas, cam);
@@ -558,6 +563,13 @@ namespace CriticalMass.Runtime.View
             else if (simNow >= _chipHoldUntil) _chip = Mathf.Max(shown, _chip - 0.6f * (float)dSim);
             if (!on) return;
             _bar.anchoredPosition = p / scale;
+            // fix/hud-containment-5 (owner: the bar and portrait sat under and touching the WOOD / WATER / FOOD chips):
+            // slide off the HUD's panels and dim while displaced
+            bool displaced = CriticalMass.Runtime.Hud.HudZones.SlideOffPanels(_bar, _worldCanvas);
+            CanvasGroup bg = _bar.GetComponent<CanvasGroup>();
+            if (bg == null) bg = _bar.gameObject.AddComponent<CanvasGroup>();
+            float ba = displaced ? 0.7f : 1f;
+            if (Mathf.Abs(bg.alpha - ba) > 1e-3f) bg.alpha = ba;
             Color c = ko ? CMTokens.Stone.Color : KaijuColour(k.State);
             _barFill.SetFill(c);
             _barFill.Fill01 = shown;
