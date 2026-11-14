@@ -223,7 +223,22 @@ namespace CriticalMass.Sim.Bots
             double dz = st.PostZ[id] - z;
             double d2 = dx * dx + dz * dz;
             double release = arrive + pc.BotPostRelease;
-            if (st.Settled[id] != 0 && d2 > release * release) st.Settled[id] = 0;
+            if (st.Settled[id] != 0 && d2 > release * release)
+            {
+                // fix/movement-shiver-3: pushed off the post by the crowd but still well inside the hill: the hold is about being
+                // on the hill, so the post moves to where it stands now instead of a walk back into the same crowd (out, back,
+                // out: the HoldHill Dither the gate still saw). Outside that it walks back as before.
+                HillDef hill = w.Map.Hill;
+                double hx = x - hill.X;
+                double hz = z - hill.Z;
+                double inner = hill.R - 1.5;
+                if (inner > 0 && hx * hx + hz * hz <= inner * inner)
+                {
+                    st.PostX[id] = JsMath.F32(x);
+                    st.PostZ[id] = JsMath.F32(z);
+                }
+                else st.Settled[id] = 0;
+            }
             else if (st.Settled[id] == 0 && d2 <= arrive * arrive) st.Settled[id] = 1;
             if (st.Settled[id] != 0)
             {
@@ -282,7 +297,14 @@ namespace CriticalMass.Sim.Bots
                 Mv.Z = (dx / d) * side * 0.6 + (dz / d) * pull;
             }
             else if (mode == 1) Toward(w, id, tx, tz, 0);
-            else Follow(w, st, id, st.Role[id] == BotsState.RoleKaiju ? BotFields.FieldShrine : BotFields.FieldHill);
+            else if (!Follow(w, st, id, st.Role[id] == BotsState.RoleKaiju ? BotFields.FieldShrine : BotFields.FieldHill))
+            {
+                // fix/movement-shiver-3: the route is the hill (or shrine) field; standing in its goal disc it gives no step.
+                // Round 2 left the bot standing there for good while its target stood behind a wall (34.9 s in BotsMatchTests).
+                // Go straight at the target instead: the wall slides it along, the stuck detector sees a bot that wants to move,
+                // and its unstick walk and the FSM's next think take it on.
+                Toward(w, id, tx, tz, 0);
+            }
         }
 
         private static bool Toward(World w, int id, double tx, double tz, double stopDist)
@@ -769,7 +791,9 @@ namespace CriticalMass.Sim.Bots
                 // code blew any push over 0.01 up to a full-speed step, so two allies nudging each other stepped back and forth
                 // at full speed every tick. Under BotMoveDeadzone it is dropped. Not a wish to move (WantMove stays 0), so the
                 // stuck detector does not send a jostled holder on an unstick walk.
-                double dzn = cfg.Physics.BotMoveDeadzone;
+                // fix/movement-shiver-3: the dead zone is for a settled hill holder only. Anywhere else a small push is kept: a bot
+                // with no step of its own must never be frozen in place by the dead zone (BotsMatchTests no-sit-still rule).
+                double dzn = a.AiState == AiState.HoldHill && st.Settled[id] != 0 ? cfg.Physics.BotMoveDeadzone : 0.01;
                 if (ml >= dzn * dzn)
                 {
                     double m = Math.Sqrt(ml);

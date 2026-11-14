@@ -222,6 +222,38 @@ namespace CriticalMass.Sim.Tests
             Assert.AreEqual(0, watch.Count, "no actor or Kaiju may shiver, dither or sit pressed while wanting to move (lines above)");
         }
 
+        /// <summary>
+        /// fix/movement-shiver-3 (BotsMatchTests: a bot sat still 34.9 s outside HoldHill on round 2): a fighting bot whose target
+        /// stands behind the ring wall takes the hill route, and standing in the hill's goal disc the route gives no step. It
+        /// must still move (straight at the target, which the wall slides along), never stand frozen.
+        /// </summary>
+        [Test]
+        public void AFightingBotStandingOnTheHillWithItsTargetBehindTheRingWallStillMoves()
+        {
+            World w = NewWorld(true, 5, 7);
+            InputFrame scratch = SimInput.EmptyInput();
+            MatchTick.Advance(w, null, scratch); // bot state and route fields exist
+            int bot = -1, target = -1;
+            for (int i = 1; i < w.ActorCount; i++)
+            {
+                if (bot < 0 && w.Actors[i].Team == TeamId.Azure) bot = i;
+                else if (target < 0 && w.Actors[i].Team == TeamId.Crimson) target = i;
+            }
+            for (int i = 0; i < w.ActorCount; i++) if (i != bot && i != target) Bench(w, i);
+            Pin(w, bot, 56.5, 40.5);      // the hill centre: inside the hill field's goal disc
+            Pin(w, target, 44.5, 36.5);   // outside the ring wall (x = 46) west of the hill
+            BotsState st = BotBrain.GetBotsState(w);
+            for (int k = 0; k < 3; k++)
+            {
+                w.Actors[bot].AiState = AiState.Fight;
+                st.Target[bot] = target;
+                InputFrame f = SimInput.EmptyInput();
+                BotSteer.SteerBot(w, st, bot, f);
+                Assert.Greater(f.MoveX * f.MoveX + f.MoveZ * f.MoveZ, 0.25, "steps toward the hidden target, call " + k);
+                Assert.AreEqual(1, st.WantMove[bot], "and counts as wanting to move (the stuck detector can act)");
+            }
+        }
+
         [Test]
         public void TheDetectorFlagsABackAndForthActorAndNotAWalker()
         {

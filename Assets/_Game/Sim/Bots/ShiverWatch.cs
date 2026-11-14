@@ -71,7 +71,17 @@ namespace CriticalMass.Sim.Bots
 
         private int _cap;
         private double[] _sx, _sz, _path, _ldx, _ldz, _pressT, _pressPath, _lastFacing;
-        private int[] _rev, _ticks;
+        private int[] _rev, _ticks, _lastRevTick;
+
+        /// <summary>
+        /// fix/movement-shiver-3, the melee-contact rule: while a bot fights a target within its attack reach + ContactSlack,
+        /// a direction reversal counts only when it comes at most RapidTicks after the previous one. Footwork against a target
+        /// that moves reverses by nature, at the pace of the opponent (several tenths of a second apart); a reversal every
+        /// RapidTicks ticks or faster is an oscillation of about 4 Hz or more, which reads as vibration, not as a dodge.
+        /// Outside contact every reversal counts, as before.
+        /// </summary>
+        public int RapidTicks = 4;
+        public double ContactSlack = 1.0;
 
         private void Ensure(int n)
         {
@@ -87,6 +97,7 @@ namespace CriticalMass.Sim.Bots
             _lastFacing = new double[n];
             _rev = new int[n];
             _ticks = new int[n];
+            _lastRevTick = new int[n];
             for (int i = 0; i < n; i++) _ticks[i] = -1;
         }
 
@@ -110,6 +121,7 @@ namespace CriticalMass.Sim.Bots
             _pressT[s] = 0;
             _pressPath[s] = 0;
             _lastFacing[s] = facing;
+            _lastRevTick[s] = int.MinValue / 2;
         }
 
         /// <summary>Measure one tick (call after SimStep.Step / MatchTick.Advance).</summary>
@@ -132,8 +144,10 @@ namespace CriticalMass.Sim.Bots
                 // Stunned or getting up it cannot move however much it wants to: not "pressed". Slowed, it walks slower.
                 bool wants = bot && st.WantMove[i] != 0 && a.AiState != AiState.HoldHill && a.StandUp <= 0 && a.HitStunTicks <= 0;
                 double speed = w.Config.Class(a.Cls).MoveSpeed * (a.SlowTimer > 0 ? 0.5 : 1);
+                _contact = bot && a.AiState == AiState.Fight && InContact(w, st, i);
                 Sample(w, i, w.X[i], w.Z[i], w.PrevX[i], w.PrevZ[i], a.Facing, false, wants, speed, dt,
                     a.Cls, a.Team, a.AiState, bot ? st.Target[i] : -1);
+                _contact = false;
             }
             Kaiju k = w.Kaiju;
             bool hatched = w.Match.Hatched && k.State != KaijuState.Egg;
@@ -145,6 +159,30 @@ namespace CriticalMass.Sim.Bots
             bool kWants = k.TargetId >= 0 && k.TelegraphIn <= 0 && k.MeleeWindupIn <= 0 && KaijuWantsToWalk(w);
             Sample(w, n, k.X, k.Z, k.PrevX, k.PrevZ, k.Facing, true, kWants, w.Config.Kaiju.MoveSpeed, dt,
                 ClassId.Warrior, TeamId.Azure, AiState.None, k.TargetId);
+        }
+
+        private bool _contact;
+
+        private bool InContact(World w, BotsState st, int i)
+        {
+            int t = st.Target[i];
+            double reach = w.Config.Class(w.Actors[i].Cls).AttackRange + ContactSlack;
+            double tx, tz;
+            if (t == BotsState.TargetKaiju)
+            {
+                tx = w.Kaiju.X;
+                tz = w.Kaiju.Z;
+                reach += w.Config.Kaiju.Radius;
+            }
+            else if (t >= 0 && t < w.ActorCount && w.Actors[t].Alive)
+            {
+                tx = w.X[t];
+                tz = w.Z[t];
+            }
+            else return false;
+            double dx = tx - w.X[i];
+            double dz = tz - w.Z[i];
+            return dx * dx + dz * dz <= reach * reach;
         }
 
         private static bool KaijuWantsToWalk(World w)
@@ -174,7 +212,11 @@ namespace CriticalMass.Sim.Bots
             {
                 double ux = dx / step;
                 double uz = dz / step;
-                if ((_ldx[s] != 0 || _ldz[s] != 0) && ux * _ldx[s] + uz * _ldz[s] < -0.5) _rev[s]++;
+                if ((_ldx[s] != 0 || _ldz[s] != 0) && ux * _ldx[s] + uz * _ldz[s] < -0.5)
+                {
+                    if (!_contact || w.Tick - _lastRevTick[s] <= RapidTicks) _rev[s]++;
+                    _lastRevTick[s] = w.Tick;
+                }
                 _ldx[s] = ux;
                 _ldz[s] = uz;
             }
