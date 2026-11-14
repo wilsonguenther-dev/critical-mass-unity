@@ -14,14 +14,14 @@ namespace CriticalMass.Editor.Art
     public static class TextureBudget
     {
         /// <summary>Bumped when a rule changes, so every covered texture re-imports (UiTexturePostprocessor.GetVersion).</summary>
-        public const uint RulesVersion = 1;
+        public const uint RulesVersion = 2;   // 2: no resize that leaves a side off a multiple of 4; mipped art made POT
 
         public const string UiRoot = "Assets/_Game/Resources/UI/";
         public const string StoryRoot = "Assets/_Game/Resources/Story/";
         public const string CardsRoot = "Assets/_Game/Art/Story/Resources/StoryCards/";
 
         /// <summary>Estimated in-build bytes of every covered texture together (the EditMode test's ceiling).</summary>
-        public const long TotalBudgetBytes = 130L * 1024 * 1024;
+        public const long TotalBudgetBytes = 180L * 1024 * 1024;
 
         public struct Rule
         {
@@ -30,6 +30,10 @@ namespace CriticalMass.Editor.Art
             public bool Mips;
             public bool Crunch;
             public int CrunchQuality;
+            /// <summary>Rules 2: mipped NPOT art (logos, icons) shipped uncompressed in build 1822b32, and so did every
+            /// texture whose resize left a side off a multiple of 4 (2560x1428 to 2048x1142). Mipped art is scaled to a
+            /// power of two; story art keeps its source size (every source side is a multiple of 4).</summary>
+            public TextureImporterNPOTScale Npot;
         }
 
         public static bool Covers(string path) =>
@@ -43,21 +47,27 @@ namespace CriticalMass.Editor.Art
             {
                 // Big-moment cut-ins draw in a match, up to the full width: native 1920, never crunched (no load hitch).
                 if (name.StartsWith("cutin_")) return R("story cut-in", 2048, false, false);
+                // Rules 2: never resized (StorySourceMax covers the largest source, 2560): a resize to 2048 gave 2048x1142,
+                // which the block compressor refuses, and the still shipped at 4 bytes a pixel. Crunch keeps the disk small.
                 // The motion comic is the intro's fallback when the film cannot play: 1920x1080 stage, drawn about 1:1.
                 // Glow and blur companions are soft by design: 1024 is enough.
                 bool soft = name.EndsWith("_glow") || name.EndsWith("_blur");
-                return R(soft ? "story soft layer" : "story layer", soft ? 1024 : 2048, false, true);
+                return R(soft ? "story soft layer" : "story layer", StorySourceMax, false, true);
             }
             if (path.StartsWith(CardsRoot)) return R("story card", 1024, false, true);   // the oldest fallback (placeholders)
-            if (path.Contains("/UI/Logo/")) return R("logo", 2048, true, false);         // drawn scaled down on the title
-            if (path.Contains("/UI/Mascot/")) return R("mascot", 512, true, false);      // 148 px portrait, 84 px chip
-            if (path.Contains("/UI/Icons/")) return R("icon", 512, true, false);         // the @4x icons draw smaller
+            // Mipped art is made a power of two: up for the logos (the title's sharpest art), to the nearest for icons.
+            if (path.Contains("/UI/Logo/")) return R("logo", 2048, true, false, TextureImporterNPOTScale.ToLarger);
+            if (path.Contains("/UI/Mascot/")) return R("mascot", 512, true, false, TextureImporterNPOTScale.ToNearest);
+            if (path.Contains("/UI/Icons/")) return R("icon", 512, true, false, TextureImporterNPOTScale.ToNearest);
             if (path.Contains("/UI/BigMoments/")) return R("big moment", 1024, false, false);
             return R("ui", 1024, false, false);                                          // minimap and the rest
         }
 
-        static Rule R(string c, int max, bool mips, bool crunch) =>
-            new Rule { Category = c, Max = max, Mips = mips, Crunch = crunch, CrunchQuality = 75 };
+        /// <summary>The largest story source side (2560): story art is never resized (rules 2).</summary>
+        public const int StorySourceMax = 4096;
+
+        static Rule R(string c, int max, bool mips, bool crunch, TextureImporterNPOTScale npot = TextureImporterNPOTScale.None) =>
+            new Rule { Category = c, Max = max, Mips = mips, Crunch = crunch, CrunchQuality = 75, Npot = npot };
 
         /// <summary>Bytes in the build for a source of w x h under a rule (block formats; pure; tests).</summary>
         public static long EstimateBytes(int w, int h, bool alpha, Rule r)
@@ -74,7 +84,7 @@ namespace CriticalMass.Editor.Art
         {
             Rule r = For(path);
             ti.textureType = TextureImporterType.Default;
-            ti.npotScale = TextureImporterNPOTScale.None;
+            ti.npotScale = r.Npot;
             ti.mipmapEnabled = r.Mips;
             ti.filterMode = r.Mips ? UnityEngine.FilterMode.Trilinear : UnityEngine.FilterMode.Bilinear;
             ti.wrapMode = UnityEngine.TextureWrapMode.Clamp;
