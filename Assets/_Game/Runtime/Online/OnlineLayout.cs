@@ -39,8 +39,10 @@ namespace CriticalMass.Runtime.Online
         // (the scale's minimum, never smaller) in two. The fixed widths are at TypeMin and grow with the size.
         public const int RowsPerColumn = 16, MaxRows = 2 * RowsPerColumn, CellCount = 5;
         public const int CellName = 0, CellTeam = 1, CellClass = 2, CellState = 3, CellPing = 4;
-        public const float RowH = 34f, TableHeadH = 30f, ColumnGap = 20f, CellPad = 6f, CellGap = 10f;
-        static readonly float[] FixedAtMin = { 0f, 80f, 116f, 96f, 62f };   // team, class, state, ping (the name takes the rest)
+        public const float RowH = 34f, TableHeadH = 30f, ColumnGap = 20f, CellPad = 6f, CellGap = 8f;
+        // online-rooms-7: class 116 -> 124 so DEMOLITIONS (78 px at TypeMin on 1280 x 720) fits with about 4.7 px to spare, never cut;
+        // the 8 u come from the gutters (CellGap 10 -> 8), so the name column keeps its 160 u in two columns.
+        static readonly float[] FixedAtMin = { 0f, 80f, 124f, 96f, 62f };   // team, class, state, ping (the name takes the rest)
 
         public static bool TwoColumns(int players) => players > RowsPerColumn;
 

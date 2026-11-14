@@ -88,6 +88,7 @@ namespace CriticalMass.Runtime.Tests
             Assert.Greater(OnlineLayout.Cell(0, OnlineLayout.CellName, false).width, OnlineLayout.Cell(0, OnlineLayout.CellName, true).width);
             Assert.GreaterOrEqual(OnlineLayout.RowSize(true), UiScale.TypeMin, "never below the type scale's minimum");
             Assert.GreaterOrEqual(OnlineLayout.RowSize(false), OnlineLayout.RowSize(true));
+            Assert.GreaterOrEqual(OnlineLayout.Cell(0, OnlineLayout.CellName, true).width, 160f - 0.01f, "the two-column name keeps its width (online-rooms-7 took the class room from the gutters)");
         }
 
         [TestCase(false)]
@@ -144,8 +145,10 @@ namespace CriticalMass.Runtime.Tests
                 for (int c = 0; c < OnlineLayout.CellCount; c++)
                 {
                     float cellW = OnlineLayout.ToScreen(OnlineLayout.Cell(last, c, two), w, h).width;
+                    // online-rooms-7: the class is never cut, so its column keeps a couple of px to spare at the smallest screen.
+                    float spare = c == OnlineLayout.CellClass ? 2f : 0f;
                     foreach (string s in texts[c])
-                        Assert.LessOrEqual(TextFit.WidthOf(t, s, drawn), cellW, $"{players} players: \"{s}\" fits column {c} at {w}x{h}");
+                        Assert.LessOrEqual(TextFit.WidthOf(t, s, drawn) + spare, cellW, $"{players} players: \"{s}\" fits column {c} at {w}x{h}" + (spare > 0f ? " with 2 px to spare" : ""));
                 }
             }
             finally { Object.DestroyImmediate(root); }
