@@ -657,7 +657,7 @@ namespace CriticalMass.Runtime.Game
                     _title.Hide();
                     _title = null;
                 }
-                if (!_recording && !_ended && _title == null)
+                if (!_recording && !_ended && _title == null && !FirstRunWarm.Running)   // first-run-warm-2: warm-up frames are not match frames
                 {
                     _recording = true;
                     _exceptionsAtStart = _exceptions;
