@@ -28,6 +28,9 @@ namespace CriticalMass.Sim.Config
         public int[] AttackWindup;
         /// <summary>DG-69: slowed follow-through after the contact tick per class (ticks).</summary>
         public int[] Recovery;
+        /// <summary>feat/light-weapons-1: light-weapon wind-up and follow-through per class (ticks; 0 for a class without one).</summary>
+        public int[] LightWindup;
+        public int[] LightRecovery;
         /// <summary>DG-70: hit-stun lengths (ticks).</summary>
         public int HeavyStun;
         public int KaijuStun;
@@ -63,7 +66,11 @@ namespace CriticalMass.Sim.Config
 
         public static Durations Create(GameConfig c)
         {
-            return new Durations { AttackWindup = new int[c.Classes.Length], Recovery = new int[c.Classes.Length] };
+            return new Durations
+            {
+                AttackWindup = new int[c.Classes.Length], Recovery = new int[c.Classes.Length],
+                LightWindup = new int[c.Classes.Length], LightRecovery = new int[c.Classes.Length],
+            };
         }
 
         /// <summary>Fill the table for config c at pace (no allocation).</summary>
@@ -79,6 +86,12 @@ namespace CriticalMass.Sim.Config
             {
                 AttackWindup[i] = windup ? RealSeconds(c, c.Classes[i].AttackWindupSeconds, pace) : 0;
                 Recovery[i] = windup ? RealSeconds(c, c.Classes[i].RecoverySeconds, pace) : 0;
+            }
+            for (int i = 0; i < LightWindup.Length; i++)
+            {
+                LightWeapon lw = LightWeapons.Row(c, (ClassId)i);
+                LightWindup[i] = windup && lw != null ? RealSeconds(c, lw.WindupSeconds, pace) : 0;
+                LightRecovery[i] = windup && lw != null ? RealSeconds(c, lw.RecoverySeconds, pace) : 0;
             }
             PhysicsConfig p = c.Physics;
             HeavyStun = RealSeconds(c, p.HeavyStunSeconds, pace);

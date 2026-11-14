@@ -68,26 +68,31 @@ namespace CriticalMass.Sim.Core
                 }
                 if (!a.Alive || a.StandUp > 0 || !w.Inputs[i].Attack || a.AttackCd > 0 || a.SwingPending) continue;
                 if (lane && a.HitStunTicks > 0) continue; // DG-70: a staggered actor cannot start a swing
-                if (a.Cls == ClassId.Demolitions) continue; // DG-22 (CM-38): no regular attack (Travis 2026-11-06)
+                // feat/light-weapons-1: with LightWeapons on, the Demolitions Expert swings her pry bar and the Healer her
+                // lantern; off (or Classic) it is DG-22 (CM-38: no regular attack, Travis 2026-11-06) and DG-40 exactly.
+                LightWeapon lw = LightWeapons.Of(w, a.Cls);
+                if (a.Cls == ClassId.Demolitions && lw == null) continue;
                 if (a.Cls == ClassId.Healer)
                 {
-                    Healer.TryMend(w, i); // DG-40 (U-061): no weapon; the attack press mends a hurt ally
-                    continue;
+                    // DG-40 (U-061): the attack press mends a hurt ally FIRST (support first); the lantern swings only when
+                    // nobody can be mended, so a Healer among her team heals and a Healer caught alone defends herself.
+                    if (Healer.TryMend(w, i) || lw == null) continue;
                 }
                 ClassConfig cc = cfg.Class(a.Cls);
-                a.AttackCd = cc.AttackCooldown;
+                double range = lw != null ? lw.Range : cc.AttackRange;
+                a.AttackCd = lw != null ? lw.CooldownSeconds : cc.AttackCooldown;
                 a.AnimAction = 0;
                 a.SpawnProtect = 0; // attacking drops protection
-                int windup = w.Dur.AttackWindup[(int)a.Cls];
+                int windup = lw != null ? w.Dur.LightWindup[(int)a.Cls] : w.Dur.AttackWindup[(int)a.Cls];
                 a.SwingTick = w.Tick;
                 a.SwingWindup = windup;
-                a.SwingRecovery = w.Dur.Recovery[(int)a.Cls];
+                a.SwingRecovery = lw != null ? w.Dur.LightRecovery[(int)a.Cls] : w.Dur.Recovery[(int)a.Cls];
                 a.SwingFacing = a.Facing;
                 double fx = JsMath.Cos(a.Facing);
                 double fz = JsMath.Sin(a.Facing);
                 // DG-16 (view request), DG-69: the swing starts on the press tick: reach point, locked facing, wind-up length.
-                if (lane) World.PushEvent(w, SimEventType.AttackStart, i, KindAttack, w.X[i] + fx * cc.AttackRange, w.Z[i] + fz * cc.AttackRange, a.Facing, null, DamageCause.None, 0, fx, fz, 0, 0, windup, a.SwingRecovery);
-                else World.PushEvent(w, SimEventType.AttackStart, i, -1, w.X[i] + fx * cc.AttackRange, w.Z[i] + fz * cc.AttackRange, a.Facing);
+                if (lane) World.PushEvent(w, SimEventType.AttackStart, i, KindAttack, w.X[i] + fx * range, w.Z[i] + fz * range, a.Facing, null, DamageCause.None, 0, fx, fz, 0, 0, windup, a.SwingRecovery);
+                else World.PushEvent(w, SimEventType.AttackStart, i, -1, w.X[i] + fx * range, w.Z[i] + fz * range, a.Facing);
                 if (windup > 0) a.SwingPending = true;
                 else ResolveSwing(w, i, a.Facing, fair, lane, maxTargetRadius, candidates);
             }
@@ -116,7 +121,8 @@ namespace CriticalMass.Sim.Core
         public static bool AttackReady(World w, int id)
         {
             Actor a = w.Actors[id];
-            if (!a.Alive || a.StandUp > 0 || a.Cls == ClassId.Demolitions) return false;
+            if (!a.Alive || a.StandUp > 0) return false;
+            if (a.Cls == ClassId.Demolitions && LightWeapons.Of(w, a.Cls) == null) return false; // feat/light-weapons-1
             if (TickDown(a.AttackCd, SimStep.Dt(w.Config)) > 0) return false;
             if (a.SwingPending && w.Tick + 1 < a.SwingTick + a.SwingWindup) return false;
             if (Phys.On(w, true) && a.HitStunTicks > 1) return false;
@@ -132,18 +138,23 @@ namespace CriticalMass.Sim.Core
             GameConfig cfg = w.Config;
             Actor a = w.Actors[i];
             ClassConfig cc = cfg.Class(a.Cls);
-            double dmg = cc.AttackDamage * Pickups.DamageScale(w, i); // U-066 Might (x 1 without it)
+            // feat/light-weapons-1: a light weapon's own damage, reach and arc (null: the class row, as before).
+            LightWeapon lw = LightWeapons.Of(w, a.Cls);
+            double baseDmg = lw != null ? lw.Damage : cc.AttackDamage;
+            double range = lw != null ? lw.Range : cc.AttackRange;
+            double arcDeg = lw != null ? lw.ArcDeg : cc.AttackArcDeg;
+            double dmg = baseDmg * Pickups.DamageScale(w, i); // U-066 Might (x 1 without it)
             double ax = w.X[i];
             double az = w.Z[i];
             double fx = JsMath.Cos(facing);
             double fz = JsMath.Sin(facing);
-            double cosHalf = JsMath.Cos(cc.AttackArcDeg / 2 * Math.PI / 180);
-            double halfRad = cc.AttackArcDeg / 2 * Math.PI / 180;
+            double cosHalf = JsMath.Cos(arcDeg / 2 * Math.PI / 180);
+            double halfRad = arcDeg / 2 * Math.PI / 180;
             bool body = Phys.On(w, cfg.Physics.ArcCoversBody); // DG-100 (S13): the arc reaches the target's body, not just its centre
             int cap = Phys.On(w, true) ? cfg.Physics.CleaveMaxTargets : 0; // OD-10: 0 = no cap
             int hits = 0;
             bool walls = Phys.On(w, cfg.Physics.WallsBlockHits); // DG-83: no hits through walls or barricades
-            int count = SpatialHash.QueryCircle(w.Hash, ax, az, cc.AttackRange + maxTargetRadius, candidates);
+            int count = SpatialHash.QueryCircle(w.Hash, ax, az, range + maxTargetRadius, candidates);
             for (int k = 0; k < count; k++)
             {
                 int j = candidates[k];
@@ -154,7 +165,7 @@ namespace CriticalMass.Sim.Core
                 if (!a.IsHuman && t.IsHuman && w.Match.Time < cfg.Bots.PassiveSeconds) continue;
                 double dx = w.X[j] - ax;
                 double dz = w.Z[j] - az;
-                double reach = cc.AttackRange + cfg.Class(t.Cls).Radius;
+                double reach = range + cfg.Class(t.Cls).Radius;
                 double d2 = dx * dx + dz * dz;
                 if (d2 > reach * reach) continue;
                 if (d2 > 1e-12)
@@ -166,13 +177,13 @@ namespace CriticalMass.Sim.Core
                 if (cap > 0 && hits >= cap) break;
                 hits++;
                 if (fair) w.Hits.Add(j, i, dmg, ax, az);
-                else Damage.ApplyMelee(w, j, dmg, i, ax, az);
+                else if (Damage.ApplyMelee(w, j, dmg, i, ax, az) > 0) LightWeapons.Shove(w, j, i, ax, az, dmg); // feat/light-weapons-1
             }
             // Structures (CM-05): the same swing chips enemy barricades in its arc; a Miner's pick also breaks breakables.
-            Barricades.DamageBarricadesInArc(w, i, ax, az, fx, fz, cc.AttackRange, cosHalf, cc.AttackDamage);
+            Barricades.DamageBarricadesInArc(w, i, ax, az, fx, fz, range, cosHalf, baseDmg);
             if (a.Cls == ClassId.Miner) Abilities.MinerWallBreak(w, i, ax, az, fx, fz);
             // CM-31: the same swing chips knock-down decorations in its arc (any class, bots included).
-            Topple.ToppleInArc(w, i, ax, az, fx, fz, cc.AttackRange, cosHalf);
+            Topple.ToppleInArc(w, i, ax, az, fx, fz, range, cosHalf);
 
             // CM-08: the same cleave hits the hatched Kaiju within attackRange + kaiju.radius, inside the arc.
             Kaiju kj = w.Kaiju;
@@ -180,7 +191,7 @@ namespace CriticalMass.Sim.Core
             {
                 double dx = kj.X - ax;
                 double dz = kj.Z - az;
-                double reach = cc.AttackRange + cfg.Kaiju.Radius;
+                double reach = range + cfg.Kaiju.Radius;
                 double d2 = dx * dx + dz * dz;
                 double kcos = body && d2 > 1e-12 ? WidenedCos(halfRad, cfg.Kaiju.Radius, Math.Sqrt(d2)) : cosHalf;
                 if (d2 <= reach * reach && (d2 <= 1e-12 || (dx * fx + dz * fz) / Math.Sqrt(d2) >= kcos - 1e-9)
@@ -190,7 +201,7 @@ namespace CriticalMass.Sim.Core
                 }
             }
             // DG-69: the contact tick, even on a whiff.
-            if (lane) World.PushEvent(w, SimEventType.AttackContact, i, -1, ax + fx * cc.AttackRange, az + fz * cc.AttackRange, hits, null, DamageCause.None, 0, fx, fz, 0, 0, 0, 0);
+            if (lane) World.PushEvent(w, SimEventType.AttackContact, i, -1, ax + fx * range, az + fz * range, hits, null, DamageCause.None, 0, fx, fz, 0, 0, 0, 0);
         }
 
         /// <summary>DG-100 (S13): cosine of the arc half-angle widened by asin(min(1, r / d)) for a target of radius r at distance d.</summary>
@@ -204,7 +215,12 @@ namespace CriticalMass.Sim.Core
         public static void ApplyPendingHits(World w)
         {
             PendingHits h = w.Hits;
-            for (int k = 0; k < h.Count; k++) Damage.ApplyMelee(w, h.Target[k], h.Amount[k], h.Source[k], h.SrcX[k], h.SrcZ[k]);
+            for (int k = 0; k < h.Count; k++)
+            {
+                // feat/light-weapons-1: a landed light-weapon hit also shoves (Shove is a no-op for every other swing).
+                if (Damage.ApplyMelee(w, h.Target[k], h.Amount[k], h.Source[k], h.SrcX[k], h.SrcZ[k]) > 0)
+                    LightWeapons.Shove(w, h.Target[k], h.Source[k], h.SrcX[k], h.SrcZ[k], h.Amount[k]);
+            }
             h.Count = 0;
         }
 
@@ -256,6 +272,88 @@ namespace CriticalMass.Sim.Core
                 int slot = World.SpawnLooseOrb(w, ox, oz, (int)res.MeatUnitsPerKill, Durations.T30(w.Config, res.MeatOrbLifetimeTicks), id);
                 if (pop) World.PushEvent(w, SimEventType.MeatPop, id, slot, ox, oz, 0, null, DamageCause.None, w.Config.Physics.MeatPopDistance, hx, hz, 0, 0, 0, 0);
             }
+        }
+    }
+
+    /// <summary>
+    /// feat/light-weapons-1 (art lead 2026-11-14, owner approved in principle): light self-defence weapons for the Builder
+    /// (MALLET), the Demolitions Expert (PRY BAR) and the Healer (LANTERN). Numbers: DepthConfig.LightWeapons, one block.
+    /// A light weapon is the normal melee swing (Combat.CombatSystem / ResolveSwing: wind-up, arc, walls, fair trades, the
+    /// usual Hit event, so the view's hit effects and the blood setting apply unchanged) with its own damage, reach, arc,
+    /// cooldown and timing, plus a small SHOVE on every landed hit through the DG-70 knock layer (Knock.Push, no stun),
+    /// which moves the target even while fighter knockback is off. Healer rules (support first): her press mends first and
+    /// swings only when no hurt ally is in mend range; the swing shares her mend cooldown. Off when DepthConfig.Classic is
+    /// true or LightWeapons.Enabled is false: then nothing here runs and the world hash is the game before. Deterministic:
+    /// plain config reads in id order, no RNG, no allocation; knock velocities go through JsMath.F32 like every other knock.
+    /// </summary>
+    public static class LightWeapons
+    {
+        /// <summary>On-screen names of the three light weapons, in ONE place for the owner to rename (HUD, hit recap).</summary>
+        public const string BuilderName = "MALLET", DemolitionsName = "PRY BAR", HealerName = "LANTERN";
+
+        /// <summary>Bots: the target body edge allowance on top of a light weapon's reach (the smallest class radius).</summary>
+        public const double BotBodyAllowance = 0.4;
+
+        /// <summary>The weapon row of a class in config c, or null for a class without one (rule switches not checked).</summary>
+        public static LightWeapon Row(GameConfig c, ClassId cls)
+        {
+            LightWeaponsConfig L = c.Depth.LightWeapons;
+            if (L == null) return null;
+            switch (cls)
+            {
+                case ClassId.Builder: return L.Builder;
+                case ClassId.Demolitions: return L.Demolitions;
+                case ClassId.Healer: return L.Healer;
+                default: return null;
+            }
+        }
+
+        /// <summary>True when the rule runs in config c (depth lane on and LightWeapons.Enabled).</summary>
+        public static bool On(GameConfig c) => c.Depth.LightWeapons != null && DepthRules.On(c, c.Depth.LightWeapons.Enabled);
+
+        public static bool On(World w) => On(w.Config);
+
+        /// <summary>The light weapon class cls swings in world w, or null (rule off, or a class without one).</summary>
+        public static LightWeapon Of(World w, ClassId cls) => On(w.Config) ? Row(w.Config, cls) : null;
+
+        /// <summary>
+        /// The shove of a landed hit of amount by source on living target, from (srcX, srcZ): Shove u at mass 1 (less the
+        /// damage knock already given when fighter knockback is on), through Knock.Effective (mass, a raised shield's front
+        /// share) and Knock.Push with no stun. No-op for a source without a light weapon, a dead target or a spent shove.
+        /// </summary>
+        public static void Shove(World w, int target, int source, double srcX, double srcZ, double amount)
+        {
+            if (source < 0 || source >= w.ActorCount || target < 0 || target >= w.ActorCount) return;
+            Actor s = w.Actors[source];
+            LightWeapon lw = Of(w, s.Cls);
+            if (lw == null || !(lw.Shove > 0)) return;
+            Actor t = w.Actors[target];
+            if (!t.Alive) return;
+            double dist = lw.Shove;
+            if (Phys.On(w, w.Config.Physics.Knockback)) dist -= amount * w.Config.Physics.MeleeKnockPerDamage;
+            if (!(dist > 0)) return;
+            Knock.Dir(w, target, srcX, srcZ, JsMath.Cos(s.SwingFacing), JsMath.Sin(s.SwingFacing), out double dx, out double dz);
+            double eff = Knock.Effective(w, target, dist, srcX, srcZ);
+            Knock.Push(w, target, source, dx, dz, eff, 0, Knock.Tier(w.Config, amount, false), DamageCause.Melee);
+        }
+
+        /// <summary>
+        /// Bots (BotSteer): keep this tick's attack press? Always for a class without a light weapon, and for the Builder
+        /// (his swing is the one he always had). A Healer keeps it when it would mend someone; otherwise, like a Demolitions
+        /// Expert, only when the aim point (the enemy it steered at) is inside the weapon's reach plus a body allowance, so a
+        /// bot swings at close range only and never at air from its stand-off distance.
+        /// </summary>
+        public static bool BotKeepsPress(World w, int id, double aimX, double aimZ)
+        {
+            Actor a = w.Actors[id];
+            LightWeapon lw = Of(w, a.Cls);
+            if (lw == null || a.Cls == ClassId.Builder) return true;
+            if (a.Cls == ClassId.Healer && Healer.MendTarget(w, id, aimX, aimZ) >= 0) return true;
+            if (!double.IsFinite(aimX) || !double.IsFinite(aimZ)) return false;
+            double dx = aimX - w.X[id];
+            double dz = aimZ - w.Z[id];
+            double reach = lw.Range + BotBodyAllowance;
+            return dx * dx + dz * dz <= reach * reach;
         }
     }
 }

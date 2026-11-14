@@ -377,8 +377,9 @@ namespace CriticalMass.Runtime.View.Mechanics
                 case ClassId.Warrior: return "SWORD";
                 case ClassId.Farmer: return "STAFF";
                 case ClassId.Miner: return "PICKAXE";
-                case ClassId.Builder: return "HAMMER";
-                case ClassId.Demolitions: return DemolitionsNames.Tnt;
+                case ClassId.Builder: return LightWeapons.BuilderName; // feat/light-weapons-1 (was HAMMER)
+                case ClassId.Demolitions: return LightWeapons.DemolitionsName; // a melee hit: blasts are named by the cause above
+                case ClassId.Healer: return LightWeapons.HealerName;
                 default: return "A HIT";
             }
         }
