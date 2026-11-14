@@ -10,6 +10,7 @@
 import bpy, bmesh, json, math, os, sys
 import numpy as np
 from mathutils import Vector, kdtree
+from mathutils.bvhtree import BVHTree
 
 argv = sys.argv[sys.argv.index("--") + 1:]
 OUT, REPO, INP, MAN = argv[0], argv[1], argv[2], argv[3]
@@ -373,22 +374,66 @@ def clean(e):
     for lv, o in levels.items():
         lab = ((cols[lv][:, None, :] - pal[None]) ** 2).sum(-1).argmin(1)
         rgba = np.concatenate([pal[lab], (codes[lab] / 8.0)[:, None]], axis=1)
-        if ff and lv != "Shadow":
+        if ff and lv != "Shadow" and ff.get("mode") == "skin":
+            # rig-demolitions-1 (final): painting whole triangles cannot draw an eye at these densities. Every face triangle
+            # in the face box goes to clean skin (the brightest warm palette colour): all of the inner band, and outside
+            # it the grey or dark smears (the hood's brown stays). The eyes and brows are added as geometry (rig_body.py).
+            x0, x1, y0, y1, z0, z1 = ff["box"]; xi = ff.get("inner_x", 0.12)
+            warm_pal = [j for j in range(len(pal)) if pal[j][0] - pal[j][2] > 0.1]
+            skin_c = pal[max(warm_pal, key=lambda j: pal[j].mean())]
+            n_ = 0
+            for i, pg in enumerate(o.data.polygons):
+                c = pg.center
+                if x0 < c.x < x1 and y0 < c.y < y1 and z0 < c.z < z1:
+                    r_ = rgba[i]
+                    if abs(c.x) < xi or r_[0] - r_[2] < ff.get("cool", 0.06) or r_[:3].mean() < 0.5 * skin_c.mean():
+                        rgba[i, :3] = skin_c; rgba[i, 3] = 0; n_ += 1
+            facts.setdefault("face_features", {})[lv] = {"to_skin": n_, "skin": "#%02X%02X%02X" % tuple(int(round(x * 255)) for x in skin_c)}
+        elif ff and lv != "Shadow":
             # rig-demolitions-1: thin painted features (eyes, brows, mouth) are lost twice: the face colour is the MEAN of 5
             # samples and the k-means palette has no slot for a few dark faces. Inside the face box (metres, after
             # normalise, facing -Y) a face whose DARKEST raw sample (centre, corners, edge midpoints) is darker than
             # rel x the face's median skin brightness is painted the feature colour (code 0, never team-swapped).
             x0, x1, y0, y1, z0, z1 = ff["box"]
-            me = o.data; fi, lum = [], []
+            # The generated faces paint the eyes grey-blue and the brows mid brown (no near-black): a feature is a face whose
+            # darkest sample is below rel x the skin brightness (75th percentile of the mean) OR whose coolest sample has
+            # red - blue under `cool` (skin is warm, red well above blue; the eye paint is grey-blue).
+            me = o.data; fi, lum, mlum, warm = [], [], [], []
             for i, pg in enumerate(me.polygons):
                 c = pg.center
                 if not (x0 < c.x < x1 and y0 < c.y < y1 and z0 < c.z < z1):
                     continue
                 pts = [c] + [me.vertices[v].co for v in pg.vertices] + [c.lerp(me.vertices[v].co, 0.5) for v in pg.vertices]
-                fi.append(i); lum.append(min(float(np.mean(srccol[kd.find(q)[1]][:3])) for q in pts))
+                S = np.array([srccol[kd.find(q)[1]][:3] for q in pts])
+                fi.append(i); lum.append(float(S.mean(1).min())); mlum.append(float(S.mean())); warm.append(float((S[:, 0] - S[:, 2]).min()))
             if fi:
-                fi = np.array(fi); lum = np.array(lum); ref = float(np.median(lum))
-                dark = fi[lum < ff.get("rel", 0.6) * ref]
+                fi = np.array(fi); mlum = np.array(mlum); ref = float(np.percentile(mlum, 75))
+                if lv == "Hero":
+                    # the face's MEAN colour (a feature has to cover most of the face, so shading seams do not blotch)
+                    S_ = [np.array([srccol[kd.find(q)[1]][:3] for q in [me.polygons[i].center] +
+                                    [me.polygons[i].center.lerp(me.vertices[v].co, 0.5) for v in me.polygons[i].vertices]]) for i in fi]
+                    mwarm = np.array([float((S[:, 0] - S[:, 2]).mean()) for S in S_])
+                    dark = fi[(mlum < ff.get("rel", 0.6) * ref) | (mwarm < ff.get("cool", 0.04))]
+                    hero_bvh = BVHTree.FromObject(o, bpy.context.evaluated_depsgraph_get())
+                    hero_dark = set(int(i) for i in dark)
+                else:
+                    # lower levels follow the Hero: a face is a feature when most of its sample points land on Hero features
+                    keep = []
+                    for i in fi:
+                        pg = me.polygons[i]; c = pg.center
+                        pts = [c] + [c.lerp(me.vertices[v].co, 0.5) for v in pg.vertices]
+                        hits = [hero_bvh.find_nearest(q)[2] for q in pts]
+                        if np.mean([h in hero_dark for h in hits]) >= ff.get("follow", 0.6):
+                            keep.append(i)
+                    dark = np.array(keep, int)
+                    # at this budget the grey-blue eye and soot paint smears over big triangles: grey faces in the box that
+                    # are not features go back to the skin colour (the brightest warm palette colour)
+                    warm_pal = [j for j in range(len(pal)) if pal[j][0] - pal[j][2] > 0.1]
+                    skin_c = pal[max(warm_pal, key=lambda j: pal[j].mean())] if warm_pal else None
+                    if skin_c is not None:
+                        grey = [i for i in fi if i not in set(keep) and rgba[i, 0] - rgba[i, 2] < 0.04]
+                        rgba[grey, :3] = skin_c; rgba[grey, 3] = 0
+                        facts.setdefault("face_features", {}).setdefault(lv + "_grey_to_skin", len(grey))
                 rgba[dark, :3] = hex2rgb(ff.get("colour", "#33241E")); rgba[dark, 3] = 0
                 facts.setdefault("face_features", {})[lv] = {"faces_in_box": int(len(fi)), "skin_ref": round(ref, 3),
                                                              "painted": int(len(dark))}
