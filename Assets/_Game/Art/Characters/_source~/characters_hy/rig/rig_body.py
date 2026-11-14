@@ -189,9 +189,16 @@ try:
     if '_flap_y' in J and '_flap_hem' in J:
         hx, hy, hz = J['_flap_hem'].x, max(J['_flap_hem'].y, J['_flap_y'].y), J['_flap_hem'].z
         fold = {}
+        legsegs = []
+        for sd in ('l', 'r'):
+            ch = [J[f'lowerleg.{sd}'], J[f'foot.{sd}'], J[f'toes.{sd}'], J[f'_toetip.{sd}']]
+            legsegs += [(ch[i], ch[i + 1]) for i in range(3)]
         for lv, o in LV.items():
             A = verts(o)
-            sel = (A[:, 1] > hy) & (np.abs(A[:, 0]) < hx) & (A[:, 2] < hz)
+            # healer-2 run 2: picked by distance, not a box: below the hem, behind the ankles and farther than the
+            # half width from every lower-leg, foot and toe bone is not a leg or a boot (the heel is 0.14 from its ankle)
+            dleg = np.min([seg_dist(A, a, b)[0] for a, b in legsegs], axis=0)
+            sel = (A[:, 2] < hz) & (A[:, 1] > min(J['foot.l'].y, J['foot.r'].y)) & (dleg > hx)
             A[sel, 2] = hz - (hz - A[sel, 2]) * 0.08
             o.data.vertices.foreach_set('co', A.reshape(-1)); o.data.update()
             fold[lv] = int(sel.sum())
