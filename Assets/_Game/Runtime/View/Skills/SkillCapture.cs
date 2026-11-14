@@ -575,7 +575,7 @@ namespace CriticalMass.Runtime.View.Skills
         }
 
         /// <summary>Keeps actor 0 and four living fighters 2.5 u from the Kaiju, so it has targets and the camera has it in frame.</summary>
-        static void Gather(World w)
+        internal static void Gather(World w)
         {
             Kaiju k = w.Kaiju;
             int moved = 0;
@@ -590,7 +590,7 @@ namespace CriticalMass.Runtime.View.Skills
             }
         }
 
-        static Vector3 KaijuFocus(World w)
+        internal static Vector3 KaijuFocus(World w)
         {
             Kaiju k = w.Kaiju;
             return SimSpace.ToWorld(k.X, GroundHeight.At(w.Map, k.X, k.Z) + 1.5, k.Z);

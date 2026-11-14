@@ -148,6 +148,7 @@ namespace CriticalMass.Runtime.View.Effects
             _solidGo = Layer("Fx Solid", _solid, _solidMat);
             BuildVignette();
             PrewarmFlash();
+            if (GoreShots.Requested && GetComponent<GoreShots>() == null) gameObject.AddComponent<GoreShots>();   // fix/gore-proof-1
             _shakeOn = false;   // integration batch 3: Camera.CameraShake (M11, FeelGate-scaled) is the one camera shake
             Effects.Active = this;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
@@ -219,10 +220,44 @@ namespace CriticalMass.Runtime.View.Effects
         private void OnTicked(World w)
         {
             if (!enabled) return;
+            if (w.Tick < _seenTick || w.EventHead < _seenHead) ResetForNewWorld();
+            _seenTick = w.Tick;
+            _seenHead = w.EventHead;
             _feed.OnTick(w, _scene, _audio, this);
             _scene.OnTickState(w);
             _bus.FootfallWorld = w;
             _bus.OnTick(w);
+        }
+
+        private int _seenTick = int.MinValue, _seenHead;
+
+        /// <summary>World resets seen (the sim clock went back: a rematch on the same scene, or a capture's restage).</summary>
+        public int WorldResets { get; private set; }
+
+        /// <summary>
+        /// fix/gore-proof-1: a world reset drops what the old world left in the view. Before this, CombatFeed only rewound its
+        /// event cursor: every fighter's last hit, hold and death tick survived the reset, so fighter i, hit at tick T in the
+        /// old world, flashed white (and leaned, and held its pose) again when the new world's clock passed T, whatever it
+        /// was doing then, for example swinging as an attacker. Capture tools restage with World.ResetWorld every shot, so the
+        /// ghost flash landed on whoever had that index in the next staging. The live effects had the same fault (FxScene.Clear).
+        /// </summary>
+        private void ResetForNewWorld()
+        {
+            WorldResets++;
+            _scene.Clear();
+            FillTicks(_feed.LastHitTick);
+            FillTicks(_feed.HoldTick);
+            FillTicks(_feed.DeathTick);
+            FillTicks(_feed.LastDealtTick);
+            System.Array.Clear(_feed.HoldTier, 0, _feed.HoldTier.Length);
+            _feed.KaijuDealtTick = int.MinValue / 2;
+            if (_launch != null) System.Array.Clear(_launch, 0, _launch.Length);
+            _vignetteAt = double.NegativeInfinity;
+        }
+
+        private static void FillTicks(int[] a)
+        {
+            for (int i = 0; i < a.Length; i++) a[i] = int.MinValue / 2;
         }
 
         private void OnKaijuFootfall(double x, double z)
@@ -698,6 +733,8 @@ namespace CriticalMass.Runtime.View.Effects
         }
 
         /// <summary>Current vignette alpha (tests and captures).</summary>
+        /// <summary>fix/gore-proof-1: true while the damage edge wears the navy texture (GORE Reduced or Off).</summary>
+        public bool VignetteNavy => _vignette != null && _vignetteNavy != null && _vignette.texture == _vignetteNavy;
         public float VignetteAlpha => _vignette != null && _vignette.enabled ? _vignette.color.a : 0f;
     }
 }

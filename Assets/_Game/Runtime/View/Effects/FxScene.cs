@@ -108,6 +108,17 @@ namespace CriticalMass.Runtime.View.Effects
         /// <summary>Gore pieces spawned by this scene so far, per registry entry (tests enumerate GoreGate.All with it).</summary>
         public int GoreSpawns(GorePiece p) => _goreSpawns[(int)p];
 
+        /// <summary>All gore pieces spawned so far, every registry entry together.</summary>
+        public int GoreSpawnsTotal()
+        {
+            int n = 0;
+            for (int i = 0; i < _goreSpawns.Length; i++) n += _goreSpawns[i];
+            return n;
+        }
+
+        /// <summary>Zero the gore counters (a capture counts each level on its own).</summary>
+        public void ResetGoreCounts() => System.Array.Clear(_goreSpawns, 0, _goreSpawns.Length);
+
         /// <summary>Gate and count one gore spawn: false = the level in force does not allow it, so do not spawn it.</summary>
         private bool Allow(GorePiece p)
         {
@@ -178,6 +189,18 @@ namespace CriticalMass.Runtime.View.Effects
             _speed = cfg.DefaultSpeed > 0 ? cfg.DefaultSpeed : 1;
             _hz = cfg.SimHz;
             _cap = World.ActorCapacity(cfg);
+            Clear();
+        }
+
+        /// <summary>
+        /// fix/gore-proof-1: every live effect gone (the state a new scene starts in). CombatFx calls it when the world is
+        /// reset (the sim clock goes back), because every effect is aged by sim time: an effect born at tick 900 of the old
+        /// world reads as "not born yet" in the new one (now - Born is negative, so it counts as alive and draws), so a blood
+        /// splat from the last match, or from a capture's FULL pass, came back in the next. The gore counters are kept
+        /// (ResetGoreCounts clears them).
+        /// </summary>
+        public void Clear()
+        {
             for (int i = 0; i < MaxBursts; i++) _bursts[i].Born = double.NegativeInfinity;
             for (int i = 0; i < MaxDroplets; i++) { _drops[i].Born = double.NegativeInfinity; _drops[i].Landed = true; }
             for (int i = 0; i < MaxDecals; i++) { _decals[i].Born = double.NegativeInfinity; _decals[i].Life = 0; _decalStamp[i] = -1; }
