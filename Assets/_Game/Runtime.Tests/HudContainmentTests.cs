@@ -288,6 +288,15 @@ namespace CriticalMass.Runtime.Tests
             Assert.AreEqual(0f, CriticalMass.Runtime.Audio.Sound.SoundCaptions.AlphaAt(start + 0.001f, start, until), "no ghost at the head");
         }
 
+        /// <summary>polish-3 (respawn capture: an empty "KNOCKED OUT" box under the knock-out card): no empty boxes.</summary>
+        [Test]
+        public void TheHitRecapBoxNeverShowsEmpty()
+        {
+            Assert.IsFalse(CriticalMass.Runtime.Hud.Mechanics.MechanicsHud.RecapShows(true, 0), "knocked out with no hits listed: hidden");
+            Assert.IsTrue(CriticalMass.Runtime.Hud.Mechanics.MechanicsHud.RecapShows(true, 1));
+            Assert.IsFalse(CriticalMass.Runtime.Hud.Mechanics.MechanicsHud.RecapShows(false, 3), "alive: hidden");
+        }
+
         [Test]
         public void TheStressCaptureFlagIsReadAndPadsByThirtyPercent()
         {

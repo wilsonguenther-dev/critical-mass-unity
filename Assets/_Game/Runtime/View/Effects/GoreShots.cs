@@ -32,7 +32,9 @@ namespace CriticalMass.Runtime.View.Effects
     {
         public const string Flag = "-goreShots";
         public const int TileW = 960, TileH = 540, Seed = 1337;
-        public const float CloseDistance = 9f;
+        /// <summary>polish-3: close enough that the blood or sparks fill a good part of the tile (was 9 u: the hit was a
+        /// speck). The focus is lifted to a fighter's chest so the hit sits in the middle of the frame.</summary>
+        public const float CloseDistance = 5.5f, FocusLift = 1.0f;
         public const double MinSat = 0.74, MinVal = 0.25, MaxHueDeg = 15;
 
         enum Scene { Hit, Knockout, KnockoutPop, KaijuHit, HillFight }
@@ -131,6 +133,32 @@ namespace CriticalMass.Runtime.View.Effects
             AutoplayArgs.ClockHeld = false;
         }
 
+        // polish-3 (the gore sheets proved nothing by eye: the "YOU ARE AZURE" start banner, a knock-out card and the
+        // OVERCHARGE / "IT HATCHED" cut-ins covered every close-up): as SkillCapture does, every enabled screen-space root
+        // canvas (HUD, cards, banners, moment plates) is hidden for the close-up only and put back after, any big moment in
+        // flight is stopped while it stages and shoots, and the first start banner plays out before any shot. Capture only.
+        static readonly System.Collections.Generic.List<Canvas> _hiddenHud = new System.Collections.Generic.List<Canvas>();
+
+        static void HideHud()
+        {
+            CriticalMass.Runtime.View.Moments.BigMoments.StopAll();
+            _hiddenHud.Clear();
+            foreach (Canvas c in FindObjectsByType<Canvas>(FindObjectsSortMode.None))
+                if (c != null && c.enabled && c.isRootCanvas && c.renderMode != RenderMode.WorldSpace) { c.enabled = false; _hiddenHud.Add(c); }
+        }
+
+        static void ShowHud()
+        {
+            foreach (Canvas c in _hiddenHud) if (c != null) c.enabled = true;
+            _hiddenHud.Clear();
+        }
+
+        /// <summary>polish-3: the camera rotation and focus of each scene's first level, reused for the other two so FULL,
+        /// REDUCED and OFF are framed identically and compare side by side.</summary>
+        Quaternion _sceneRot;
+        Vector3 _sceneFocus;
+        bool _sceneSet;
+
         static bool TitleShowing()
         {
             var t = FindAnyObjectByType<CriticalMass.Runtime.Hud.TitleScreen>();
@@ -148,6 +176,8 @@ namespace CriticalMass.Runtime.View.Effects
                 if (Time.realtimeSinceStartup - t0 > 120f) { Log("no match started; giving up"); Application.Quit(3); yield break; }
                 yield return new WaitForSecondsRealtime(0.5f);
             }
+            // polish-3: the match's start banner plays out once before any shot (hidden for close-ups in any case)
+            yield return new WaitForSecondsRealtime((float)CriticalMass.Runtime.Hud.FirstMinutes.BannerHoldSeconds + CriticalMass.Runtime.Hud.FirstMinutes.FadeSeconds);
             GoreLevel? pinned = GoreGate.Override;
             double scale = _driver.TimeScale;
             _driver.Ticked += OnTick;
@@ -241,6 +271,7 @@ namespace CriticalMass.Runtime.View.Effects
         IEnumerator Capture(Scene sc, GoreLevel level, Texture2D[] holder, int[,] perPiece, int lv)
         {
             string name = SceneNames[(int)sc], lvName = Name(level);
+            if (lv == 0) _sceneSet = false;
             World w = _driver.World;
             World.ResetWorld(w, new WorldOptions { Seed = Seed, TeamSize = 16, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = _driver.Config });
             AutoplayArgs.ClockHeld = true;
@@ -265,7 +296,7 @@ namespace CriticalMass.Runtime.View.Effects
                 if (kaiju && w.Kaiju.State != KaijuState.Egg) SkillCapture.Gather(w);
                 Step(1);
                 stepped++;
-                if (stepped % 300 == 0) yield return null;
+                if (stepped % 300 == 0) { CriticalMass.Runtime.View.Moments.BigMoments.StopAll(); yield return null; }
             }
             w.ForceHatch = false;
             if (!_found)
@@ -278,12 +309,22 @@ namespace CriticalMass.Runtime.View.Effects
                 ? (int)Math.Ceiling((_fx.Scene.CorpseSeconds + _fx.Scene.PopSeconds * 0.4) * w.Config.SimHz)
                 : sc == Scene.Knockout ? 4 : sc == Scene.HillFight ? 3 : 2;
             Step(after);
-            Vector3 focus = kaiju ? SkillCapture.KaijuFocus(w) : SimSpace.ToWorld(_fxX, 0, _fxZ);
+            Vector3 focus = kaiju ? SkillCapture.KaijuFocus(w) : SimSpace.ToWorld(_fxX, 0, _fxZ) + Vector3.up * FocusLift;
+            CriticalMass.Runtime.View.Moments.BigMoments.StopAll();   // polish-3: no cut-in over the shot
             yield return null;
             yield return null;             // the views and the effect meshes rebuild at the held clock
             yield return new WaitForEndOfFrame();
-            Texture2D full = ScreenCapture.CaptureScreenshotAsTexture();
-            Texture2D tile = Close(focus);
+            Texture2D full = ScreenCapture.CaptureScreenshotAsTexture();   // the full screen keeps the HUD and the damage edge
+            // polish-3: identical framing across the three levels (the sim is the same fight; this pins the camera too)
+            UnityEngine.Camera mc = UnityEngine.Camera.main;
+            if (!_sceneSet) { _sceneRot = mc != null ? mc.transform.rotation : Quaternion.identity; _sceneFocus = focus; _sceneSet = true; }
+            float drift = Vector3.Distance(focus, _sceneFocus);
+            HideHud();
+            yield return null;
+            yield return new WaitForEndOfFrame();
+            Texture2D tile = Close(_sceneFocus, _sceneRot);
+            int hidden = _hiddenHud.Count;
+            ShowHud();
             holder[0] = tile;
             File.WriteAllBytes(Path.Combine(_dir, "gore-" + lvName + "-" + name + "-full.png"), full.EncodeToPNG());
             if (tile != null) File.WriteAllBytes(Path.Combine(_dir, "gore-" + lvName + "-" + name + ".png"), tile.EncodeToPNG());
@@ -305,7 +346,8 @@ namespace CriticalMass.Runtime.View.Effects
                 .Append(" victim=").Append(_foundA).Append(" by=").Append(_foundB)
                 .Append(" goreSpawned=").Append(total).Append(" (").Append(pieces.Length > 0 ? pieces.ToString().Trim() : "none").Append(')')
                 .Append(" flash=").Append(flash).Append(" sparks=").Append(s.SparkCount(now)).Append(" blood=").Append(s.BloodCount(now))
-                .Append(" splats=").Append(s.DecalCount(now)).Append(" gibs=").Append(s.GibCount(now));
+                .Append(" splats=").Append(s.DecalCount(now)).Append(" gibs=").Append(s.GibCount(now))
+                .Append(" hudHidden=").Append(hidden).Append(" focusDrift=").Append(F(drift, "0.000"));
             if (tile != null)
             {
                 Color32[] px = tile.GetPixels32();
@@ -321,18 +363,19 @@ namespace CriticalMass.Runtime.View.Effects
             Destroy(full);
         }
 
-        Texture2D Close(Vector3 focus)
+        Texture2D Close(Vector3 focus, Quaternion r)
         {
             UnityEngine.Camera cam = UnityEngine.Camera.main;
             if (cam == null) return null;
             Transform t = cam.transform;
             Vector3 p = t.position;
-            Quaternion r = t.rotation;
+            Quaternion r0 = t.rotation;
             RenderTexture old = cam.targetTexture, prev = RenderTexture.active;
             RenderTexture rt = RenderTexture.GetTemporary(TileW, TileH, 24);
             Texture2D tex = null;
             try
             {
+                t.rotation = r;
                 t.position = focus - r * Vector3.forward * CloseDistance;
                 _fx.Rebuild(t.right, t.up);
                 cam.targetTexture = rt;
@@ -348,6 +391,7 @@ namespace CriticalMass.Runtime.View.Effects
                 cam.targetTexture = old;
                 RenderTexture.active = prev;
                 t.position = p;
+                t.rotation = r0;
                 RenderTexture.ReleaseTemporary(rt);
             }
             return tex;
