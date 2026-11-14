@@ -87,7 +87,9 @@ def footprint_of_imported():
         keep = np.array([not d.startswith('Tail') for d in dom])
         low = keep & (X[:, 2] < 1.2)
         feet = np.array([d.startswith('Foot') or d.startswith('Shin') or d.startswith('Toes') for d in dom])
+        ground = keep & (X[:, 2] < 0.4)
         res = {'all': round(float(np.ptp(X[keep, 0])), 3), 'low': round(float(np.ptp(X[low, 0])), 3),
+               'ground_z_lt_0.4': round(float(np.ptp(X[ground, 0])), 3) if ground.any() else None,
                'low_half_max': round(float(np.abs(X[low, 0] - np.median(X[keep, 0])).max()), 3),
                'feet': round(float(np.ptp(X[feet, 0])), 3) if feet.any() else None, 'height': round(float(np.ptp(X[:, 2])), 3)}
     return res
@@ -986,7 +988,7 @@ def walk(t, T):
     return p
 
 
-SQ_FOOT_X, SQ_FIST_X, SQ_FIST_Y = 0.42, 0.50, -1.30
+SQ_FOOT_X, SQ_FIST_X, SQ_FIST_Y = 0.30, 0.40, -1.30
 
 
 @clip('WalkSqueeze', WALK_N, loop=True)
@@ -1002,12 +1004,12 @@ def walk_squeeze(t, T):
         if ch.startswith('leg'):
             dy, dz, st = gait(u, 0.2)
             c = Vector((SQ_FOOT_X * sx, HEEL[s].y + dy - 0.05, HEEL[s].z + dz + 0.06))
-            p.ik[ch] = (c, c + Vector((0.4 * sx, -2.0, 0.6)))
+            p.ik[ch] = (c, c + Vector((0.0, -2.0, 0.6)))        # knees straight ahead, not out
             p.end[f'Foot_{s}'] = (16 if st else 16 + 14 * math.sin(math.pi * (u - DUTY) / (1 - DUTY)), 0, 0)   # on its toes
         else:
             dy, dz, st = gait(u, 0.3)
             c = Vector((SQ_FIST_X * sx, SQ_FIST_Y + dy, FIST_PLANT_Z + dz))
-            p.ik[ch] = (c + WRIST_OFF[s], c + WRIST_OFF[s] + Vector((0.25 * sx, 2.0, 0.6)))
+            p.ik[ch] = (c + WRIST_OFF[s], c + WRIST_OFF[s] + Vector((0.0, 2.0, 0.6)))   # elbows in, pointing back
             p.end[f'Fist_{s}'] = (-10 if st else -10 - 15 * math.sin(math.pi * (u - DUTY) / (1 - DUTY)), 0, 0)
     w2 = 2 * math.pi * ph
     side = math.sin(w2 + 0.4)
@@ -1020,7 +1022,10 @@ def walk_squeeze(t, T):
     p.q['Neck'] = arot('Neck', 6.0, 0, 6.0 * math.sin(w2 * 0.5))
     p.q['Head'] = arot('Head', 8.0, 4.0 * math.sin(w2 * 0.5), 0)       # peering down at the plank, a nervous wobble
     p.q['Jaw'] = arot('Jaw', 4.0)
-    tail_wave(p, t, 1.5, 1.0, T, lag=0.1, base_pitch=9.0)            # held up and straight behind
+    # tail held straight out behind (the art's tail curls to one side: aim each segment back along the plank)
+    for i, n in enumerate(TAILS):
+        dz = (-0.75, -0.45, -0.15, 0.0, 0.03, 0.05, 0.06)[min(i, 6)]
+        p.aim[n] = Vector((0.04 * math.sin(2 * math.pi * (ph - 0.1 * i)), 1.0, dz))
     return p
 
 
