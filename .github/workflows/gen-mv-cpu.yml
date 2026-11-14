@@ -1,0 +1,48 @@
+# gen-models-2 (2026-11-14): FREE image-to-3D trial on GitHub's standard CPU runners (public repo: no minute charge).
+# Open-weights multi-view shape model (Hunyuan3D-2mv turbo, Tencent Hunyuan 3D 2.0 Community Licence: the licence does
+# NOT cover the EU, the UK or South Korea; owner decision needed before anything made with it ships). Shape only.
+# Runs only on pushes to art/gen-models-2 that change the request file. One matrix job per character and seed.
+name: gen-mv-cpu
+on:
+  push:
+    branches: [art/gen-models-2]
+    paths: ['Assets/_Game/Art/_gen2~/mv/request.json']
+permissions:
+  contents: read
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.m.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { lfs: false, sparse-checkout: 'Assets/_Game/Art/_gen2~/mv', sparse-checkout-cone-mode: false }
+      - id: m
+        run: echo "matrix=$(python3 -c 'import json;print(json.dumps(json.load(open("Assets/_Game/Art/_gen2~/mv/request.json"))))')" >> "$GITHUB_OUTPUT"
+  gen:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      max-parallel: 12
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { lfs: false, sparse-checkout: 'Assets/_Game/Art/_gen2~/mv', sparse-checkout-cone-mode: false }
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - name: Install (CPU torch, model code pinned)
+        run: |
+          set -e; t0=$(date +%s)
+          pip -q install torch==2.5.1 torchvision==0.20.1 --index-url https://download.pytorch.org/whl/cpu
+          pip -q install "diffusers==0.31.0" "transformers==4.46.3" "huggingface_hub==0.26.5" einops omegaconf trimesh pygltflib \
+            opencv-python-headless accelerate safetensors scikit-image tqdm pymeshlab xatlas pillow
+          git clone -q https://github.com/Tencent-Hunyuan/Hunyuan3D-2 /tmp/hy && git -C /tmp/hy log -1 --format='%H %cs'
+          echo "install $(( $(date +%s) - t0 )) s"; nproc; free -g
+      - name: Generate
+        env: { PYTHONPATH: /tmp/hy, OMP_NUM_THREADS: '4' }
+        run: python Assets/_Game/Art/_gen2~/mv/hy_mv_cpu.py "${{ matrix.char }}" "${{ matrix.seed }}" "${{ matrix.octree }}" "${{ matrix.views }}" out
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: 'mv-${{ matrix.char }}-${{ matrix.seed }}', path: out, retention-days: 7 }

@@ -1,0 +1,70 @@
+{
+"include": [
+{
+"char": "builder",
+"seed": 1234,
+"octree": 320,
+"views": "front,left,back"
+},
+{
+"char": "healer",
+"seed": 1234,
+"octree": 320,
+"views": "front,left,back"
+},
+{
+"char": "demolitions",
+"seed": 1234,
+"octree": 320,
+"views": "front,left,back"
+},
+{
+"char": "kaiju_hatchling",
+"seed": 1234,
+"octree": 320,
+"views": "front,left,back"
+},
+{
+"char": "kaiju_adult",
+"seed": 1234,
+"octree": 320,
+"views": "front,left,back"
+},
+{
+"char": "farmer",
+"seed": 1234,
+"octree": 320,
+"views": "front,left,back"
+},
+{
+"char": "miner",
+"seed": 1234,
+"octree": 320,
+"views": "front,left,back"
+},
+{
+"char": "warrior",
+"seed": 1234,
+"octree": 320,
+"views": "front,left,back"
+},
+{
+"char": "builder",
+"seed": 77,
+"octree": 320,
+"views": "front,left,back"
+},
+{
+"char": "healer",
+"seed": 77,
+"octree": 320,
+"views": "front,left,back"
+},
+{
+"char": "demolitions",
+"seed": 77,
+"octree": 320,
+"views": "front,left,back"
+}
+]
+}
