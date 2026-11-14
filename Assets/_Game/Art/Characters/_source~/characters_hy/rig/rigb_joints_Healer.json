@@ -174,8 +174,8 @@
   "teal_b": 0.04
  },
  "_head_rigid": {
-  "_note": "rig-healer-3: hair buns rigid on the head",
+  "_note": "rig-healer-3: hair buns rigid on the head; r 0.34 (0.26 left the outer bun halves, centred about 0.22 out, on the chest: the buns capped and stretched in the run)",
   "dz": 0.29,
-  "r": 0.26
+  "r": 0.34
  }
 }
