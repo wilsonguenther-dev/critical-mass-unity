@@ -3,7 +3,8 @@
  "_opts": {
   "rigid_parts_on_chest": true,
   "back_skips_head": true,
-  "pull_rear_parts_flush": 0.015
+  "pull_rear_parts_flush": 0.015,
+  "rear_tilt_deg": 15
  },
  "hips": [
   0,
