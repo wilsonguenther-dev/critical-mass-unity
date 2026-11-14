@@ -27,7 +27,7 @@ namespace CriticalMass.Runtime.Game
 
         readonly SimDriverBehaviour _driver;
         readonly List<GameObject> _hidden = new List<GameObject>();
-        const int Moments = 2, MomentGap = 600;
+        const int Moments = 3;   // day, dusk, night on the same held tick
         int _moment, _momentStart = 1;
         Behaviour _brain;
         float _fov, _far;
@@ -47,8 +47,10 @@ namespace CriticalMass.Runtime.Game
             {
                 _sought = true;
                 int k = 0;
-                if (_moment > 0) { _driver.StepTicks(MomentGap); }
+                if (_moment > 0) k = SeekLimit;   // same tick for every time of day
+                Tod();
                 while (k < SeekLimit && !OnHill(w)) { _driver.StepTicks(1); k++; }
+                if (_moment > 0) k = 0;
                 Debug.Log($"[CM.Grab] tick {w.Tick} (stepped {k}{(k >= SeekLimit ? ", limit: player not on the hill" : "")}) yaw {_driver.Config.Render.CameraYawDeg}");
                 UnityEngine.Camera c0 = UnityEngine.Camera.main;
                 _brain = c0 != null ? (Behaviour)c0.GetComponent("CinemachineBrain") : null;
@@ -59,7 +61,12 @@ namespace CriticalMass.Runtime.Game
             if (phase >= Names.Length)
             {
                 Restore();
-                if (++_moment >= Moments) return true;
+                if (++_moment >= Moments)
+                {
+                    CriticalMass.Runtime.View.Atmosphere.TimeOfDayDirector.Override = null;
+                    CriticalMass.Runtime.View.Atmosphere.TimeOfDayDirector.Current?.SnapToTarget();
+                    return true;
+                }
                 _sought = false;
                 _momentStart += n;
                 return false;
@@ -68,17 +75,27 @@ namespace CriticalMass.Runtime.Game
             if (cam == null) return false;
             BigMoments.StopAll();
             Banner.Hide();
+            if (f == 0) Tod();
             if (f == 0) { foreach (GameObject g in _hidden) if (g != null) g.SetActive(true); _hidden.Clear(); }
             Canvases(phase % 2 == 1);
             if (_brain != null) _brain.enabled = false;
             Place(cam, w, phase >= 2);
             if (f == ShotAt)
             {
-                string path = Path.Combine(GamePaths.DataDir, "shot-grab-" + (_moment + 1) + "-" + Names[phase] + ".png");
+                string path = Path.Combine(GamePaths.DataDir, "shot-grab-" + TodName[_moment] + "-" + Names[phase] + ".png");
                 ScreenCapture.CaptureScreenshot(path);
                 Debug.Log($"[CM.Grab] {path} cam {cam.transform.position} fov {cam.fieldOfView:F1}");
             }
             return false;
+        }
+
+        static readonly string[] TodName = { "day", "dusk", "night" };
+
+        /// <summary>This moment's time of day, snapped (no blend: the clock is held).</summary>
+        void Tod()
+        {
+            CriticalMass.Runtime.View.Atmosphere.TimeOfDayDirector.Override = (CriticalMass.Runtime.View.Atmosphere.TimeOfDay)_moment;
+            CriticalMass.Runtime.View.Atmosphere.TimeOfDayDirector.Current?.SnapToTarget();
         }
 
         static bool OnHill(World w)
