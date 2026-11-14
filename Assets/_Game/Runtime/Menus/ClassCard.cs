@@ -686,8 +686,9 @@ namespace CriticalMass.Runtime.Menus
         /// "Demolitions Expert" in the wide display face.</summary>
         public static void Fit(Text t, int min)
         {
-            t.resizeTextMaxSize = t.fontSize;
-            t.resizeTextMinSize = Mathf.Min(min, t.fontSize);
+            int top = ContainedText.Of(t)?.MaxSize ?? t.fontSize;   // fix/hud-containment-3: the built size, not a shrunk one
+            t.resizeTextMaxSize = top;
+            t.resizeTextMinSize = Mathf.Min(min, top);
             MenuUi.Contain(t);   // hud-containment-1: the one text rule (wrap if the box allows, shrink, then ellipsis)
         }
 

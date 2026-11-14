@@ -156,6 +156,9 @@ namespace CriticalMass.Runtime.Tests
             {
                 Text t = HudText.Make(root.transform, "Probe", CMTokens.Ui, 20, Color.white, TextAnchor.MiddleLeft, 2f);
                 MenuUi.Place(t.rectTransform, 0f, 0f, 200f, 50f);
+                // fix/hud-containment-3: the rule measures without a graphics device (the runner gave no wrapped height)
+                Assert.Greater(TextFit.WidthOf(t, "SHORT", 20), 20f, "the rule measures words on the test runner");
+                Assert.Greater(TextFit.HeightOf(t, "BUILD A ROPE BRIDGE OVER THE GAP", 20, 200f, true), TextFit.LineHeightOf(t, 20) * 1.5f, "a long line wraps to more than one line at 200 px");
                 // fits: untouched
                 Assert.AreEqual("SHORT", TextFit.Apply(t, "SHORT", 20, 12, 2));
                 Assert.AreEqual(20, t.fontSize);

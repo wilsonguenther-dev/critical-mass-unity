@@ -783,7 +783,7 @@ namespace CriticalMass.Runtime.View.Affordance
 
         void UpdatePrompt(World w, UnityEngine.Camera cam, bool terrain)
         {
-            bool show = terrain && WorldFeedbackSettings.Prompts && Scan.Primary.Has;
+            bool show = terrain && WorldFeedbackSettings.Prompts && Scan.Primary.Has && !HudZones.PromptRowHeld;   // one resident on the prompt row
             if (!show)
             {
                 if (_chip != null && _chip.gameObject.activeSelf) _chip.gameObject.SetActive(false);

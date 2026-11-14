@@ -62,8 +62,11 @@ namespace CriticalMass.Runtime.Tests
             Rect box = In(root, rt);
             float lw = Mathf.Max(1e-3f, rt.rect.width), lh = Mathf.Max(1e-3f, rt.rect.height);
             float sx = box.width / lw, sy = box.height / lh;
-            float pw = t.horizontalOverflow == HorizontalWrapMode.Wrap ? Mathf.Min(lw, t.preferredWidth) : t.preferredWidth;
-            float ph = t.verticalOverflow == VerticalWrapMode.Truncate ? Mathf.Min(lh, t.preferredHeight) : t.preferredHeight;
+            bool wrap = t.horizontalOverflow == HorizontalWrapMode.Wrap;
+            float one = TextFit.WidthOf(t, t.text, t.fontSize);   // the rule's own measure: works on the headless runner
+            float pw = wrap ? Mathf.Min(lw, one) : one;
+            float tall = TextFit.HeightOf(t, t.text, t.fontSize, lw, wrap);
+            float ph = t.verticalOverflow == VerticalWrapMode.Truncate ? Mathf.Min(lh, tall) : tall;
             pw *= sx;
             ph *= sy;
             int a = (int)t.alignment;
