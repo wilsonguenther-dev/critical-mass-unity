@@ -5,6 +5,8 @@ Reports per clip the worst (highest) per-frame minimum and the frame, for each p
 Usage: blender -b --python measure_feet_bones.py -- <out> <repo> Warrior=Assets/..fbx:Assets/..fbx [more]
 """
 import bpy, sys, os, json
+from mathutils import Vector
+FACE = {}
 argv = sys.argv[sys.argv.index("--") + 1:]
 OUT, REPO, PACKS = argv[0], argv[1], argv[2:]
 os.makedirs(OUT, exist_ok=True)
@@ -35,6 +37,8 @@ for spec in PACKS:
     rest = {}
     ad.action = None
     bpy.context.view_layer.update()
+    FWD = sum((((arm.matrix_world @ arm.pose.bones["toes." + q].head) - (arm.matrix_world @ arm.pose.bones["foot." + q].head)).to_2d().normalized() for q in "lr"), Vector((0, 0))).normalized()
+    print("[facing]", cls, "rest forward", tuple(round(x, 3) for x in FWD), flush=True)
     rest = min((arm.matrix_world @ arm.pose.bones[b].head).z for b in BONES if b in arm.pose.bones)
     res = {"rest_min_joint_z": round(rest, 4), "clips": {}}
     for a in acts:
@@ -59,6 +63,37 @@ for spec in PACKS:
                 W = lambda b: round((arm.matrix_world @ pb[b].head).z, 3) if b in pb else None
                 tr.append((f, W("hips"), W("foot.l"), W("foot.r"), W("toes.l"), W("toes.r")))
             print("[feet]", cls, a.name.split("|")[-1], "frame, hips, foot.l, foot.r, toes.l, toes.r:", tr, flush=True)
+        # The game's facing read (SanityRig.TryFront): toes minus ankle of the foot with the LOWER ankle, flattened,
+        # against the model's forward (the rest ankle-to-toe heading). Frames more than 90 degrees off read "turned around".
+        cn = a.name.split("|")[-1]
+        if cn in ("Run", "RunBack", "Walk", "WalkBack", "StrafeL", "StrafeR"):
+            import math
+            ad.action = None; bpy.context.view_layer.update()
+            fw = sum(((arm.matrix_world @ arm.pose.bones["toes." + q].head) - (arm.matrix_world @ arm.pose.bones["foot." + q].head)).to_2d().normalized() for q in "lr").normalized() if False else None
+            ad.action = a
+            bad_f, gaps = [], []
+            for f in range(f0, f1 + 1):
+                bpy.context.scene.frame_set(f)
+                pb = arm.pose.bones
+                P = lambda b: arm.matrix_world @ pb[b].head
+                q = "l" if P("foot.l").z <= P("foot.r").z else "r"
+                d = (P("toes." + q) - P("foot." + q)).to_2d()
+                ang = math.degrees(math.atan2(d.x * FWD.y - d.y * FWD.x, d.dot(FWD))) if d.length > 1e-6 else 0.0
+                gaps.append(abs(P("foot.l").z - P("foot.r").z))
+                if abs(ang) > 90: bad_f.append((f, q, round(ang), round(gaps[-1], 3)))
+            FACE[cls + " " + cn] = (len(bad_f), f1 - f0 + 1)
+            print("[facing]", cls, cn, "turned-around frames", len(bad_f), "of", f1 - f0 + 1, bad_f[:6], flush=True)
+        # Arms as the game reads them (the pack's own armature, absolute local rotations): wrist drop below the
+        # shoulder and the spread between the two handslots, worst frame, per clip.
+        if a.name.split("|")[-1] in ("Idle", "Walk", "Run", "Attack"):
+            drops, spread = [], []
+            for f in range(f0, f1 + 1):
+                bpy.context.scene.frame_set(f)
+                pb = arm.pose.bones
+                P = lambda b: arm.matrix_world @ pb[b].head
+                drops.append(min(P("upperarm." + q).z - P("wrist." + q).z for q in "lr"))
+                spread.append(max(abs((P("handslot.l") - P("handslot.r")).x), abs((P("wrist.l") - P("wrist.r")).x)))
+            print("[arms]", cls, a.name.split("|")[-1], "wrist below shoulder min %.3f max %.3f, hand spread max %.3f" % (min(drops), max(drops), max(spread)), flush=True)
         res["clips"][a.name.split("|")[-1]] = dict(worst_float=round(worst, 3), at_frame=wf, lowest=round(low, 3), frames=f1 - f0 + 1)
     bad = {k: v for k, v in res["clips"].items() if v["worst_float"] > 0.35 or v["lowest"] < -0.2}
     res["fails_game_limits"] = bad
