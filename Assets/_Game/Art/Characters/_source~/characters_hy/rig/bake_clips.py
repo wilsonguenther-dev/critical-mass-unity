@@ -24,12 +24,12 @@ from mathutils import Vector, Matrix, Quaternion
 argv = sys.argv[sys.argv.index("--") + 1:]
 OUT, REPO = argv[0], argv[1]
 CLS = argv[2] if len(argv) > 2 else "Farmer"
-# Stance: the rest ankles' sideways offset from the hips centre is scaled by this (1 = the class's own hip width). The
-# Farmer's hip joints sit at +-0.194 m on 0.27 m legs (KayKit: +-0.171 on 0.37), so her feet read splayed; 0.85 brings
-# her ankles to +-0.165 (about KayKit's width), 6 degrees of inward leg tilt, boots 0.074 m apart at rest.
-STANCE = {"Farmer": 0.85}.get(CLS, 1.0)
-MIN_SEP = {}
-FBX = {"Farmer": "Assets/_Game/Art/Farmer/Farmer.fbx", "Miner": "Assets/_Game/Art/Miner/_hy~/Miner.fbx"}[CLS]
+FBX = {"Farmer": "Assets/_Game/Art/Farmer/Farmer.fbx", "Miner": "Assets/_Game/Art/Miner/Miner.fbx",
+       "Warrior": "Assets/_Game/Art/Characters/Warrior.fbx", "Builder": "Assets/_Game/Art/Builder/Builder.fbx",
+       "Healer": "Assets/_Game/Art/Healer/Healer.fbx", "Demolitions": "Assets/_Game/Art/Demolitions/Demolitions.fbx"}[CLS]
+if len(argv) > 3 and argv[3]:
+    FBX = argv[3]   # rig-batch-b: a freshly rigged model straight from rig_body.py (absolute path)
+NEW_BODY = CLS in ("Builder", "Healer", "Demolitions")   # rig-batch-b: generated bodies rigged by rig_body.py   # HY models (Miner lifted 0.10 m, lift_rig_fbx.py; Warrior art/characters-hy-rig ef9d2eb)
 CLIPS = "Assets/_Game/Art/Characters/KayKit_Clips.fbx"
 GROUND_SPEED = {}   # clip -> KayKit ground speed (m/s), from Resources/Anim/clip_facts.json
 os.makedirs(OUT, exist_ok=True)
@@ -94,6 +94,8 @@ acts = {a.name.split("|")[-1]: a for a in kacts}
 log("fps", fps, "kk", kk.name, "class rig", fa.name, "clips", len(acts), sorted(acts)[:8])
 
 SIDES = ("l", "r")
+FLIGHT_CAP = 0.32      # metres: lowest foot/toe joint never above this (game limit 0.35 u at scale 1)
+CAPPED = {}
 PLANT = 0.025          # KayKit ankle within 2.5% of leg length of its rest height = planted
 MAX_LOWER = 0.12       # hips never come down more than this to reach a target (DeathB-style clips keep FK reach)
 LEG = lambda s: ("upperleg." + s, "lowerleg." + s, "foot." + s, "toes." + s)
@@ -127,6 +129,13 @@ F0 = snap(fa)
 Lt = {s: (F0["K" + s] - F0["U" + s]).length for s in SIDES}
 Ls = {s: (F0["A" + s] - F0["K" + s]).length for s in SIDES}
 leg_k = sum((K0["A" + s] - K0["U" + s]).length for s in SIDES) / 2
+# rig-warrior-1: the hips and ankle motion is measured from KayKit's BIND (its model FBX: hips 0.406 m, ankles at
+# +-0.171 m side, 0.145 m up, 0.019 m back; Blender axes), not from the pack armature's rest, which is a pose: measured from
+# that pose the Warrior's StrafeR crossing step put his lower foot 0.54 m from the hip, out of reach, and it hung level
+# with the other foot (the game read him turned around).
+log("pack rest hips", tuple(round(x, 3) for x in K0["hips"]), "ankles", tuple(round(x, 3) for x in K0["Al"]), tuple(round(x, 3) for x in K0["Ar"]))
+K0["hips"] = Vector((0.0, 0.0, 0.406))
+K0["Al"], K0["Ar"] = Vector((0.171, 0.019, 0.145)), Vector((-0.171, 0.019, 0.145))
 leg_f = sum((F0["A" + s] - F0["U" + s]).length for s in SIDES) / 2
 RATIO = leg_f / leg_k
 
@@ -154,6 +163,14 @@ wco = co @ mw[:3, :3].T + mw[:3, 3]
 FOOTV = {s: np.array([i for i in range(nv) if vg.get(dom[i], "") in ("foot." + s, "toes." + s)]) for s in SIDES}
 SOLEV = {s: np.array([i for i in range(nv) if vg.get(dom[i], "") == "foot." + s]) for s in SIDES}
 LIFT = -float(min(wco[FOOTV[s]][:, 2].min() for s in SIDES))
+# rig-warrior-1: the motion scale is the hip height above the soles against KayKit's (0.519 m, its bind), not the
+# hip-to-ankle chain: after the Warrior's shins were lengthened (ankles at KayKit's height inside his boots) the chain
+# ratio read 1.187 against a true size of 1.117, the hips rode too high, and in StrafeR his lower foot could not reach
+# down (both ankles level where KayKit's differ by 7-10 cm; the game read him turned around).
+KAYKIT_HIP = 0.519
+if CLS in ("Warrior",) or NEW_BODY:
+    RATIO = ((fa.matrix_world @ fa.data.bones["upperleg.l"].head_local).z + LIFT) / KAYKIT_HIP
+    log("hip-height ratio", round(RATIO, 4))
 OFF = {}
 for s in SIDES:
     inv = np.array(F0["M" + s].inverted())
@@ -215,17 +232,30 @@ def rest_local(arm, name):
 
 
 # rig-farmer-3: copy each bone's FULL local rotation (its rest included), not its rotation relative to the rest. The
-# shared pack's armature rest is not the T-pose bind of the class rigs (KayKit's own model shares the bind), so copying
-# matrix_basis kept every class arm in the T-pose: Farmer_Clips.fbx read as the game reads it (absolute local rotations)
-# held her wrists at shoulder height, 0.38 m out, in Idle and Walk (KayKit's pack: 0.30 m below the shoulder). Legs hid
-# it (re-solved by IK). basis_class = rest_local_class^-1 @ rest_local_pack @ basis_pack, rotation only.
+# shared pack's armature rest is not the T-pose bind of the class rigs, so copying matrix_basis kept every class arm in
+# the T-pose (Farmer_Clips.fbx read as the game reads it held the wrists at shoulder height). Legs hid it (IK).
 RESTFIX = {pb.name: (rest_local(fa, pb.name).to_quaternion().inverted() @ rest_local(kk, pb.name).to_quaternion())
            for pb in fa.pose.bones if pb.name in kk.data.bones}
 
 # A class that carries a long prop in one hand swings that arm less in locomotion: its arm bones are pulled toward their
-# Idle (first frame) rotation, keeping HOLD_KEEP of the clip's swing. Farmer: the 2 m staff in her right hand swung out
-# to about 60 degrees in the walk with the full KayKit arm swing.
-HOLD_ARM = {"Farmer": "r"}.get(CLS)
+# Idle (first frame) rotation, keeping HOLD_KEEP of the clip's swing (as on art/rig-farmer-3 for her staff). Miner: the
+# pickaxe in his right hand rode sideways above his head in the walk with the full KayKit arm swing.
+HOLD_ARM = {"Farmer": "r", "Miner": "r", "Builder": "r", "Healer": "r", "Demolitions": "r"}.get(CLS)
+# rig-batch-b: finger bones (not in the pack) take one fixed pose per hand in every clip: the weapon hand closes round the
+# light weapon's handle (the game hangs it on handslot.r), the other hand rests half open. Curl = turn about the finger
+# bone's own X (its Z faces the palm, rig_body.py), so +angle closes the finger.
+FINGER_CURL = {"grip": {"thumb": (25, 30, 25), "f": (70, 75, 55)}, "relaxed": {"thumb": (8, 10, 8), "f": (18, 22, 16)}}
+GRIP_SIDE = "r"
+
+
+def finger_basis(name):
+    base, _, side = name.partition(".")
+    f, _, i = base.partition("_0")
+    if f not in ("thumb", "index", "middle", "ring", "pinky") or not i.isdigit():
+        return None
+    c = FINGER_CURL["grip" if side == GRIP_SIDE else "relaxed"]
+    a = (c["thumb"] if f == "thumb" else c["f"])[int(i) - 1]
+    return Matrix.Rotation(math.radians(a), 4, "X")
 HOLD_KEEP = 0.35
 HOLD_CLIPS = {"Walk", "WalkBack", "Run", "RunBack", "StrafeL", "StrafeR", "Carry"}
 HOLD_BONES = tuple(n + "." + HOLD_ARM for n in ("upperarm", "lowerarm", "wrist", "hand")) if HOLD_ARM else ()
@@ -253,6 +283,8 @@ def kk_back_dir(act, f0, f1):
 
 
 ZPRE, PL, KUP = {}, {}, {}
+ORDER_CLIPS = {"Walk", "WalkBack", "Run", "RunBack", "StrafeL", "StrafeR"}
+ORDER_GAP = 0.004
 
 
 def bake_action(clip, act):
@@ -272,7 +304,11 @@ def bake_action(clip, act):
         for pb in faP:
             k = kkP.get(pb.name)
             if k is None:
-                pb.matrix_basis.identity()
+                fb = finger_basis(pb.name)
+                if fb is not None:
+                    pb.matrix_basis = fb
+                else:
+                    pb.matrix_basis.identity()
                 continue
             l_, q_, s_ = k.matrix_basis.decompose()
             if pb.name not in KEEP_LOC:
@@ -286,11 +322,13 @@ def bake_action(clip, act):
         Hd = F0["hips"] + (K["hips"] - K0["hips"]) * RATIO + Vector((0, 0, LIFT))
         targets, rots = {}, {}
         for s in SIDES:
-            R = K["R" + s] @ K0["R" + s].inverted() @ TOEFIX[s] @ F0["R" + s]
+            # The foot keeps the world rotation the clip gives it through the full-local copy (as on KayKit). The old
+            # delta from the pack's rest (+ TOEFIX) was measured against a pose, not the bind: the Warrior's planted
+            # right foot in StrafeR pointed 112 degrees off and the game read him "turned around".
+            R = (fa.matrix_world @ faP[LEG(s)[2]].matrix).to_3x3().normalized()
             dk = K["A" + s] - K0["A" + s]
             # Foot motion scales with the legs (an unscaled swing lift was tried: Walk's lowest foot rose to 0.043).
             A = F0["A" + s] + dk * RATIO + Vector((0, 0, LIFT))
-            A.x -= (F0["A" + s].x - F0["hips"].x) * (1.0 - STANCE)
             planted = (K["A" + s].z - K0["A" + s].z) < PLANT * leg_k
             if planted and bdir is not None:
                 if anchor[s] is None:
@@ -307,16 +345,15 @@ def bake_action(clip, act):
                 A.z -= z
             contact[s].append(bool(planted))
             targets[s], rots[s] = A, R
-        # Double support: both planted soles pinned to z 0 tied the two ankles (gap 0.000), and the game's facing read
-        # (SanityRig.TryFront: the foot with the lower ankle) then took the trailing foot, toes 112 degrees off in
-        # StrafeR at the loop seam, "turned around" (Warrior, 2 of 20 frames; KayKit 0). The foot whose KayKit ankle is
-        # higher keeps its own sole height (never below ground), as on KayKit.
-        if PL["l"] and PL["r"]:
-            hi = max(SIDES, key=lambda q: KUP[q])
-            if ZPRE[hi] > 0:
-                targets[hi].z += ZPRE[hi]
-        sep = abs(targets["l"].x - targets["r"].x)
-        MIN_SEP[clip] = min(MIN_SEP.get(clip, 9.0), sep)
+        # The game's facing read (SanityRig.TryFront) takes the foot with the LOWER ankle. Pinning planted soles to z 0
+        # flipped KayKit's ankle order on a few locomotion frames (Warrior StrafeR frame 18: 3 mm the other way, the
+        # trailing foot read, toes 112 degrees off, "turned around"; KayKit itself: no such frame). In locomotion, when
+        # KayKit has a clear lower ankle, the other ankle stays at least ORDER_GAP above it.
+        if clip in ORDER_CLIPS:
+            lo = min(SIDES, key=lambda q: K["A" + q].z)
+            hi = "r" if lo == "l" else "l"
+            if K["A" + hi].z - K["A" + lo].z > 0.0005 and targets[hi].z < targets[lo].z + ORDER_GAP:
+                targets[hi].z = targets[lo].z + ORDER_GAP
         lowered_frame = 0.0
         for it in range(3):
             hp = faP["hips"]
@@ -357,6 +394,20 @@ def bake_action(clip, act):
             Ah = W(fa, faP[ft].head)
             set_world(fa, faP[ft], Matrix.LocRotScale(Ah, rots[s].to_quaternion(), F0["M" + s].to_scale()))
             upd()
+        # rig-warrior-1: the game's feet test fails a model whose LOWEST foot or toe joint is more than 0.35 u above the
+        # ground (GameplaySanityPlayTests). A run's flight frame scaled by a longer-legged class's ratio crossed it (HY
+        # Warrior Run frame 1: 0.392, the game saw 0.35-0.39). On such a frame the whole pose comes down rigidly (hips
+        # only) until that joint is at FLIGHT_CAP; frames under the cap are untouched.
+        lowj = min(W(fa, faP[b].head).z for b in ("foot.l", "foot.r", "toes.l", "toes.r") if b in faP)
+        if lowj > FLIGHT_CAP:
+            hp = faP["hips"]
+            set_world(fa, hp, Matrix.Translation((0, 0, FLIGHT_CAP - lowj)) @ (fa.matrix_world @ hp.matrix))
+            upd()
+            CAPPED[clip] = max(CAPPED.get(clip, 0.0), lowj - FLIGHT_CAP)
+        if clip == "StrafeR" and CLS == "Warrior" and f in (2, 10, 18):
+            log("trace", f, "kk ankle z l %.3f r %.3f" % (K["Al"].z, K["Ar"].z), "target z l %.3f r %.3f" % (targets["l"].z, targets["r"].z),
+                "final z l %.3f r %.3f" % (W(fa, faP["foot.l"].head).z, W(fa, faP["foot.r"].head).z),
+                "planted", PL.get("l"), PL.get("r"), "hips z %.3f" % W(fa, faP["hips"].head).z, "upperleg z %.3f" % W(fa, faP["upperleg.l"].head).z)
         for pb in faP:
             l, q, sc = pb.matrix_basis.decompose()
             if rec[pb.name] and Quaternion(rec[pb.name][-1][1]).dot(q) < 0:
@@ -399,9 +450,8 @@ for m in arm_mods:
     m.show_viewport = True
 log("baked", len(baked), "of", len(acts))
 REP["hips_lowered_max"] = {c: round(v, 4) for c, v in lows.items() if v > 0}
-REP["stance"] = STANCE
-REP["min_ankle_separation"] = {c: round(v, 4) for c, v in MIN_SEP.items()}
-log("stance", STANCE, "min ankle separation", {c: REP["min_ankle_separation"][c] for c in ("Idle", "Walk", "Run", "StrafeL", "StrafeR", "Attack") if c in MIN_SEP})
+REP["flight_capped_max"] = {c: round(v, 4) for c, v in CAPPED.items()}
+log("flight capped at", FLIGHT_CAP, REP["flight_capped_max"])
 
 # ---------------------------------------------------------------- measure
 dg = bpy.context.evaluated_depsgraph_get()
@@ -497,7 +547,26 @@ try:
     scene.display.shading.background_type = "VIEWPORT"
     scene.display.shading.background_color = (0.55, 0.6, 0.65)
     tiles = {}
-    for clip, picks in (("Walk", 6), ("Run", 6), ("Idle", 1)):
+    SKILL = {"Builder": ("Attack", "UseItem"), "Healer": ("Cast", "UseItem"), "Demolitions": ("Throw", "PickUp")}.get(CLS, ())
+    # the game's light weapon (WeaponProps: handle along handslot.r +Y, 0.62 u, held 0.12 u from its end): a stand-in stick
+    stick = None
+    if NEW_BODY and "handslot.r" in fa.pose.bones:
+        rest(fa)
+        bpy.ops.mesh.primitive_cylinder_add(vertices=8, radius=0.025, depth=0.62)
+        stick = bpy.context.active_object
+        bpy.ops.mesh.primitive_cube_add(size=0.14, location=(0, 0, 0.31))
+        hd_ = bpy.context.active_object
+        for o_ in scene.objects:
+            o_.select_set(o_ in (stick, hd_))
+        bpy.context.view_layer.objects.active = stick
+        bpy.ops.object.join()
+        stick.data.transform(Matrix.Rotation(-math.pi / 2, 4, "X"))   # cylinder axis Z -> +Y
+        stick.parent = fa; stick.parent_type = "BONE"; stick.parent_bone = "handslot.r"
+        upd()
+        Mhs = fa.matrix_world @ fa.pose.bones["handslot.r"].matrix
+        stick.matrix_world = Mhs @ Matrix.Translation((0, 0.31 - 0.12, 0))
+        upd()
+    for clip, picks in (("Walk", 6), ("Run", 6), ("Idle", 1)) + tuple((c, 6) for c in SKILL):
         if clip not in baked:
             continue
         assign(fa, baked[clip])
@@ -518,7 +587,21 @@ try:
                 os.remove(p)
                 row.append(px)
             tiles[(clip, vn)] = np.concatenate(row, axis=1)
-    for clip in ("Walk", "Run", "Idle"):
+    if NEW_BODY and "Idle" in baked:
+        assign(fa, baked["Idle"]); scene.frame_set(int(baked["Idle"].frame_range[0]))
+        extra = {"gameplay": (Vector((0, -4.2, 2.0 + 4.2 * math.tan(math.radians(55)))), Vector((math.radians(35), 0, 0)), 2.6),
+                 "gameplay34": (Vector((3.0, -3.0, 2.0 + 4.24 * math.tan(math.radians(55)))), Vector((math.radians(35), 0, math.radians(45))), 2.6)}
+        hr = fa.matrix_world @ fa.pose.bones["hand.r"].head
+        extra["hand_r"] = (Vector((hr.x - 0.15, hr.y - 2.0, hr.z)), Vector((math.radians(90), 0, math.radians(-4))), 0.5)
+        hl = fa.matrix_world @ fa.pose.bones["hand.l"].head
+        extra["hand_l"] = (Vector((hl.x + 0.15, hl.y - 2.0, hl.z)), Vector((math.radians(90), 0, math.radians(4))), 0.5)
+        for vn, (loc, rot, osc) in extra.items():
+            cam.location, cam.rotation_euler = loc, rot
+            cam_d.ortho_scale = osc
+            scene.render.filepath = os.path.join(OUT, f"{CLS}_Idle_{vn}.png")
+            bpy.ops.render.render(write_still=True)
+        cam_d.ortho_scale = 2.6
+    for clip in ("Walk", "Run", "Idle") + tuple(SKILL):
         rows = [tiles[(clip, vn)] for vn in ("side", "front") if (clip, vn) in tiles]
         if not rows:
             continue
@@ -530,6 +613,8 @@ try:
         img.file_format = "PNG"
         img.save()
     bpy.data.objects.remove(gp, do_unlink=True)
+    if stick is not None:
+        bpy.data.objects.remove(stick, do_unlink=True)
 except Exception as e:
     log("render failed", repr(e))
 
