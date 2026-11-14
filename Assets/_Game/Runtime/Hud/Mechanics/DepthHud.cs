@@ -616,8 +616,11 @@ namespace CriticalMass.Runtime.Hud.Mechanics
                     Vector3 hp = cam.WorldToScreenPoint(head);
                     if (HudKeepOut.Contains(new Vector2(hp.x, hp.y), 40f * _canvas.scaleFactor)) continue;
                     RectTransform rt = _tag[used];
-                    if (!rt.gameObject.activeSelf) rt.gameObject.SetActive(true);
                     rt.anchoredPosition = at;
+                    // fix/hud-containment-4 (by eye: JUNO over the build bank box): no tag over a HUD panel (tested before
+                    // it shows, so a hidden tag does not flick on and off every frame)
+                    if (HudZones.OverPanel(rt, _canvas)) { if (rt.gameObject.activeSelf) rt.gameObject.SetActive(false); _tagActor[used] = -1; continue; }
+                    if (!rt.gameObject.activeSelf) rt.gameObject.SetActive(true);
                     if (_tagActor[used] != id)
                     {
                         _tagActor[used] = id;
@@ -650,7 +653,12 @@ namespace CriticalMass.Runtime.Hud.Mechanics
                 float age = (float)f.Wall(view.SimNow - k.T);
                 if (age < 0f || age > 1.5f || k.Bot < 0 || k.Bot >= w.ActorCount || !w.Actors[k.Bot].Alive) continue;
                 if (!ToLocal(cam, Head(w, k.Bot, _driver.Alpha, 3.3f), out Vector2 at)) continue;
+                if (HudZones.FullPanelHeld) break;   // fix/hud-containment-4: no call bubble over the knock-out recap
                 RectTransform rt = _bubble[b];
+                rt.anchoredPosition = at;
+                rt.localScale = Vector3.one;
+                // fix/hud-containment-4 (by eye: "Help!" over YOU WERE HIT BY): no call bubble over a HUD panel
+                if (HudZones.OverPanel(rt, _canvas)) continue;
                 if (!rt.gameObject.activeSelf) rt.gameObject.SetActive(true);
                 float pop = age < 0.12f && !FeelGate.ReduceMotion ? Mathf.Lerp(0.6f, 1f, age / 0.12f) : 1f;
                 rt.localScale = new Vector3(pop, pop, 1f);

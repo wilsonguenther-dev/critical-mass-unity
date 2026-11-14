@@ -155,6 +155,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             // bottom-left safe frame as the ping feed and the player card; in the centred space it rose 60 px on a 16:10
             // screen and met the ping feed, which is anchored to the bottom.
             _kit = MenuUi.Rt(FeedUi.SafeRoot(_root), "Class Kit");
+            HudZones.RegisterPanel(_kit);   // fix/hud-containment-4: name tags stay off the kit and the build bank box
             MenuUi.Place(_kit, KitX, HudZones.Kit.y, KitW, kitH);
             _kitPanel = MenuUi.Panel(_kit, "Panel", 0f, 0f, KitW, kitH);
             _kitTitle = MenuUi.Fit(MenuUi.Label(_kit, "Title", CMTokens.Display, UiScale.TypeSmall, brass, TextAnchor.MiddleLeft, 18f, 8f, KitW - 36f, 28f, "", 2f), 13);
@@ -235,6 +236,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             // "you were hit by": under the death recap card, in the centre column (integration batch 5: it sat at y 826,
             // over the player card and the spectate offer)
             _recap = MenuUi.Rt(_space, "Hit Recap");
+            HudZones.RegisterPanel(_recap);   // fix/hud-containment-4: world labels stay off YOU WERE HIT BY
             MenuUi.Place(_recap, RecapRect.x, RecapRect.y, RecapRect.width, RecapRect.height);
             MenuUi.Panel(_recap, "Panel", 0f, 0f, RecapRect.width, RecapRect.height);
             _recapHead = MenuUi.Label(_recap, "Head", CMTokens.Display, UiScale.TypeSmall, brass, TextAnchor.MiddleLeft, 22f, 8f, RecapRect.width - 44f, 28f, "YOU WERE HIT BY", 2f);

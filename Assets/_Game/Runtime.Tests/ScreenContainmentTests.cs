@@ -276,6 +276,70 @@ namespace CriticalMass.Runtime.Tests
             finally { Object.DestroyImmediate(go); }
         }
 
+        [Test]
+        public void TheControlsTabIsReadableAndItsGridFitsThePanelWidth()
+        {
+            // fix/hud-containment-4: rows at the type scale, five binding columns inside the panel's content width
+            CollectionAssert.Contains(UiScale.TypeSteps, PauseMenu.GridType);
+            Assert.GreaterOrEqual(PauseMenu.GridType, UiScale.TypeSmall, "binding words at least the small type size");
+            Assert.GreaterOrEqual(PauseMenu.GridRowH, PauseMenu.GridGlyphH + 12f, "a row holds its glyph with room");
+            Assert.GreaterOrEqual(PauseMenu.GridRowH, 40f, "rows readable on the smallest window");
+            Assert.LessOrEqual(PauseMenu.GridColX(4) + PauseMenu.GridCellW, PauseMenu.PanelX + PauseMenu.PanelW - 40f + 0.01f, "the last column inside the panel");
+            var go = new GameObject("Controls Tab", typeof(RectTransform));
+            try
+            {
+                PauseMenu m = go.AddComponent<PauseMenu>();
+                m.Build();
+                m.ShowSettings(PauseMenu.Tab.Controls);
+                bool scrolls = false;
+                foreach (ScrollRect sr in go.GetComponentsInChildren<ScrollRect>(false)) scrolls = true;
+                float bottom = 0f;
+                foreach (MenuItem it in go.GetComponentsInChildren<MenuItem>(true))
+                    if (it.name.StartsWith("Cell ")) bottom = Mathf.Max(bottom, -it.GetComponent<RectTransform>().anchoredPosition.y + PauseMenu.GridRowH * 0.5f);
+                if (bottom > PauseMenu.PanelY + PauseMenu.PanelH - 78f) Assert.IsTrue(scrolls, "a grid taller than the panel scrolls inside it");
+            }
+            finally { Object.DestroyImmediate(go); }
+        }
+
+        [Test]
+        public void AWorldLabelOverARegisteredPanelIsCaught()
+        {
+            // fix/hud-containment-4: name tags and call bubbles test their screen rect against the HUD's panels
+            var go = new GameObject("Panel Mask", typeof(RectTransform));
+            try
+            {
+                Canvas c = go.AddComponent<Canvas>();
+                c.renderMode = RenderMode.ScreenSpaceOverlay;
+                var panel = MenuUi.Rt((RectTransform)go.transform, "Panel");
+                panel.anchorMin = panel.anchorMax = panel.pivot = Vector2.zero;
+                panel.anchoredPosition = Vector2.zero;
+                panel.sizeDelta = new Vector2(400f, 200f);
+                HudZones.RegisterPanel(panel);
+                var tag = MenuUi.Rt((RectTransform)go.transform, "Tag");
+                tag.anchorMin = tag.anchorMax = tag.pivot = Vector2.zero;
+                tag.sizeDelta = new Vector2(120f, 26f);
+                tag.anchoredPosition = new Vector2(300f, 150f);
+                Assert.IsTrue(HudZones.OverPanel(tag, c), "a tag on the panel is caught");
+                tag.anchoredPosition = new Vector2(700f, 600f);
+                Assert.IsFalse(HudZones.OverPanel(tag, c), "a tag in the open shows");
+                tag.anchoredPosition = new Vector2(300f, 150f);
+                panel.gameObject.SetActive(false);
+                Assert.IsFalse(HudZones.OverPanel(tag, c), "a hidden panel masks nothing");
+            }
+            finally { Object.DestroyImmediate(go); }
+        }
+
+        [Test]
+        public void TheStartBannerStaysOutOfStagedShotsAndCoversTheActionAtMostFiveSeconds()
+        {
+            Assert.IsTrue(FirstMinutes.StagesCloseUps(new[] { "game", "-groundShots" }));
+            Assert.IsTrue(FirstMinutes.StagesCloseUps(new[] { "-followshots" }));
+            Assert.IsTrue(FirstMinutes.StagesCloseUps(new[] { "-skillShots" }));
+            Assert.IsFalse(FirstMinutes.StagesCloseUps(new[] { "-flowShots" }), "the flow walk shows the real HUD");
+            Assert.IsFalse(FirstMinutes.StagesCloseUps(null));
+            Assert.LessOrEqual(FirstMinutes.StartBannerOnScreenSeconds, 5.0 + 1e-9, "YOU ARE AZURE covers the action 5 s at most");
+        }
+
         // ---------------------------------------------------------------- 3. kill feed and toast lanes
 
         [Test]

@@ -10,9 +10,22 @@ namespace CriticalMass.Runtime.Onboarding
     public static class TrialProgress
     {
         public const string DoneKey = "cm.trial.done";
+        /// <summary>fix/hud-containment-4: the FIRST TIME? card was shown (or a match was played): it never shows again.</summary>
+        public const string OfferedKey = "cm.trial.offered";
 
         /// <summary>Every key this class writes (tests back these up and restore them).</summary>
-        public static readonly string[] AllKeys = { DoneKey };
+        public static readonly string[] AllKeys = { DoneKey, OfferedKey };
+
+        /// <summary>The first-time card has had its one showing (persisted).</summary>
+        public static bool Offered
+        {
+            get => PlayerPrefs.GetInt(OfferedKey, 0) != 0;
+            set
+            {
+                PlayerPrefs.SetInt(OfferedKey, value ? 1 : 0);
+                PlayerPrefs.Save();
+            }
+        }
 
         public static bool Done
         {
