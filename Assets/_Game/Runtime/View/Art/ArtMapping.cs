@@ -314,17 +314,29 @@ namespace CriticalMass.Runtime.View.Art
                 VertexColourFace = true, StrideScale = 0.731f, ArtYawDeg = 180f },   // rigs-2 (leg ratio 0.731, bake_clips.py): clips baked per class with foot IK (Farmer_Clips.fbx, bake_clips.py). HY (2026-11-13; legs 0.267 vs KayKit 0.374 hip to ankle); pre-HY: OutlineWeights Farmer_OutlineW.json + FaceTexture Farmer_Face.png (Farmer/_fallback~)
             // Art landing (2026-11-12): the three new classes, LOD files from art/fighter-lods d536d30 (weapons folded into
             // every level). Each body carries CM_Toon plus CM_FaceDecal on slot 1, the Miner's decal method (class READMEs).
+            // rig-demolitions-1 (2026-11-14): the generated Demolitions body (octree shell + 4 mm voxel rebuild + collapse; Hero
+            // 21,586, LOD0 3,946, LOD1 1,406, Shadow 820 tris incl. 26 for the eyes and brows, added geometry on the head bone) on the shared 41 skeleton names, whole-hand weights (fingerless
+            // gloves; fingers merge at this budget), weights from a voxel proxy (rig_body.py; the barrel behind her back is a
+            // separate piece held rigid on the chest, the hair buns ride the head), clips baked per class with foot IK
+            // (Demolitions_Clips.fbx, bake_clips.py; hip-height ratio = StrideScale). Empty hands: the game hangs the pry bar on
+            // handslot.r, held upright at idle. Face painted in the vertex colour. Pre-batch-b files: Demolitions/_fallback~.
             new ModelSpec { Key = Demolitions, AssetPath = "Assets/_Game/Art/Demolitions/Demolitions.fbx", Kind = ArtKind.Character, Rigged = true,
-                Bones = 41, ClipSource = "Assets/_Game/Art/Characters/KayKit_Clips.fbx",
-                Meshes = new[] { "Demolitions_Hero", "Demolitions_LOD0", "Demolitions_LOD1", "Demolitions_Shadow" }, MaskCodes = new[] { 0, 6, 8 },
+                Bones = 41, ClipSource = "Assets/_Game/Art/Demolitions/Demolitions_Clips.fbx",
+                Meshes = new[] { "Demolitions_Hero", "Demolitions_LOD0", "Demolitions_LOD1", "Demolitions_Shadow" }, MaskCodes = new[] { 0, 8 },
                 OutlinePx = CharacterHullPx, Rim = 0.6f, Authored = MinerAzure, Crimson = MinerCrimson, Height = 2.0f,
-                FaceTexture = "Assets/_Game/Art/Demolitions/DemolitionsFace.png", FaceSlot = 1, ArtYawDeg = 180f },
+                VertexColourFace = true, StrideScale = 1.271f, ArtYawDeg = 180f },
+            // rig-builder-1 (2026-11-14): the generated Builder body (octree shell; Hero 21.6k, LOD0 3.9k, LOD1 and Shadow 1.3k
+            // tris) on the shared 41 skeleton names, whole-hand weights (his fingers merge at this budget), weights from a
+            // voxel proxy (rig_body.py), clips
+            // baked per class with foot IK (Builder_Clips.fbx, bake_clips.py; hip-height ratio = StrideScale). Empty hands:
+            // the game hangs the mallet on handslot.r, held upright at idle. Face painted in the vertex colour. Pre-batch-b
+            // files: Builder/_fallback~.
             new ModelSpec { Key = Builder, AssetPath = "Assets/_Game/Art/Builder/Builder.fbx", Kind = ArtKind.Character, Rigged = true,
-                Bones = 41, ClipSource = "Assets/_Game/Art/Characters/KayKit_Clips.fbx",
+                Bones = 41, ClipSource = "Assets/_Game/Art/Builder/Builder_Clips.fbx",
                 Meshes = new[] { "Builder_Hero", "Builder_LOD0", "Builder_LOD1", "Builder_Shadow" }, MaskCodes = new[] { 0, 8 },
-                // Height: the Hero mesh's bind-pose top is the ladder corner on his back (2.329 m in the FBX; cap crown 1.895).
+                // Height: the Hero mesh's bind-pose top is the ladder corner on his back (2.33 m; cap crown about 2.26).
                 OutlinePx = CharacterHullPx, Rim = 0.6f, Authored = BuilderAzure, Crimson = BuilderCrimson, Height = 2.33f,
-                FaceTexture = "Assets/_Game/Art/Builder/BuilderFace.png", FaceSlot = 1, ArtYawDeg = 180f, HeldWeaponInMesh = true },
+                VertexColourFace = true, StrideScale = 1.31f, ArtYawDeg = 180f },
             new ModelSpec { Key = Healer, AssetPath = "Assets/_Game/Art/Healer/Healer.fbx", Kind = ArtKind.Character, Rigged = true,
                 Bones = 41, ClipSource = "Assets/_Game/Art/Characters/KayKit_Clips.fbx",
                 Meshes = new[] { "Healer_Hero", "Healer_LOD0", "Healer_LOD1", "Healer_Shadow" }, MaskCodes = new[] { 0, 6, 8 },
