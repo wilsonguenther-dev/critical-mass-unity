@@ -155,7 +155,7 @@ namespace CriticalMass.Runtime.View.WallDamage
                 }
                 t.position = p;
                 // follow-camera-2: in the low views a piece beyond the effect draw distance or out of view is not drawn.
-                bool vis = CriticalMass.Runtime.Camera.ViewCull.FxVisible(p, _scale[i].magnitude);
+                bool vis = CriticalMass.Runtime.Camera.ViewCull.FxScale(p, _scale[i].magnitude, true) > 0f;   // follow-camera-3: not at the lens either
                 if (!vis) CriticalMass.Runtime.Camera.ViewCull.RubbleCulled++;
                 if (_mr[i].enabled != vis) _mr[i].enabled = vis;
             }

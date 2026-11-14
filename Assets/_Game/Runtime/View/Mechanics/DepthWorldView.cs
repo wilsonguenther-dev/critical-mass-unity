@@ -53,6 +53,7 @@ namespace CriticalMass.Runtime.View.Mechanics
             _ground = new FxMeshBuilder("Depth Ground", GroundVerts, GroundVerts * 3);
             _solid = new FxMeshBuilder("Depth Solid", SolidVerts, SolidVerts * 2);
             _air = new FxMeshBuilder("Depth Air", AirVerts, AirVerts * 3);
+            _air.ViewCulled = _air.NearFade = true;   // follow-camera-3: air sprites (sparks, puffs, crosses) never fill the lens
             _groundMat = Mat(sh, "Depth Ground", 0, 0, -2, 2986);
             _solidMat = Mat(sh, "Depth Solid", 2, 1, 0, 2456);
             _airMat = Mat(sh, "Depth Air", 0, 0, 0, 3096);

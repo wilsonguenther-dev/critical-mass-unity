@@ -137,6 +137,7 @@ namespace CriticalMass.Runtime.View.Effects
             _air = new FxMeshBuilder("Fx Air", AirVerts, AirVerts * 3);
             _solid = new FxMeshBuilder("Fx Solid", SolidVerts, SolidVerts * 2);
             _ground.ViewCulled = _air.ViewCulled = _solid.ViewCulled = true;   // follow-camera-2: low-view culling (gore after GoreGate too)
+            _air.NearFade = _solid.NearFade = true;   // follow-camera-3: bursts, smoke and debris never fill the lens
             Shader sh = Resources.Load<Shader>("CMFxUnlit");
             if (sh == null) sh = Shader.Find("CM/FxUnlit");
             _groundMat = Mat(sh, "Fx Ground", 0, 0, -2, 2990);

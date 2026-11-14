@@ -42,6 +42,10 @@ namespace CriticalMass.Runtime.View.Effects
         /// <summary>follow-camera-2: primitives outside the low camera's view or beyond ViewCull.FxDrawDistance are skipped
         /// (on for the combat and skill effect builders; off for ground paint stamps and gameplay markers).</summary>
         public bool ViewCulled;
+        /// <summary>follow-camera-3: with ViewCulled, also fade sprites out near the lens and off the sight line to the
+        /// player, and cap their size on screen (ViewCull.FxScale). On for air and solid effects; off for ground marks and
+        /// telegraphs, which must stay readable under the player.</summary>
+        public bool NearFade;
 
         public FxMeshBuilder(string name, int maxVerts, int maxIndices)
         {
@@ -109,7 +113,7 @@ namespace CriticalMass.Runtime.View.Effects
         /// <summary>A filled polygon (fan) of n points at radius r(k) given by radii[] (or r when radii is null).</summary>
         public void Blob(Vector3 c, Vector3 right, Vector3 up, float r, float[] radii, int n, float rot, Color32 col)
         {
-            if (ViewCulled && !CriticalMass.Runtime.Camera.ViewCull.FxVisible(c, r)) return;
+            if (ViewCulled) { float fk = CriticalMass.Runtime.Camera.ViewCull.FxScale(c, r, NearFade); if (fk <= 0f) return; r *= fk; }
             if (!Room(n + 1, n * 3)) return;
             int centre = V(c, col);
             for (int k = 0; k < n; k++)
@@ -124,7 +128,7 @@ namespace CriticalMass.Runtime.View.Effects
         /// <summary>A star with `points` spikes: outer radius r, inner radius r * inner.</summary>
         public void Star(Vector3 c, Vector3 right, Vector3 up, float r, float inner, int points, float rot, Color32 col)
         {
-            if (ViewCulled && !CriticalMass.Runtime.Camera.ViewCull.FxVisible(c, r)) return;
+            if (ViewCulled) { float fk = CriticalMass.Runtime.Camera.ViewCull.FxScale(c, r, NearFade); if (fk <= 0f) return; r *= fk; }
             int n = points * 2;
             if (!Room(n + 1, n * 3)) return;
             int centre = V(c, col);
@@ -146,7 +150,7 @@ namespace CriticalMass.Runtime.View.Effects
         /// <summary>Annulus with an inner and an outer colour (alpha ramps for trails).</summary>
         public void Ring(Vector3 c, Vector3 right, Vector3 up, float r0, float r1, float a0, float a1, int seg, Color32 inner, Color32 outer)
         {
-            if (ViewCulled && !CriticalMass.Runtime.Camera.ViewCull.FxVisible(c, r1)) return;
+            if (ViewCulled) { float fk = CriticalMass.Runtime.Camera.ViewCull.FxScale(c, r1, NearFade); if (fk <= 0f) return; r0 *= fk; r1 *= fk; }
             if (seg < 1 || r1 <= r0) return;
             if (!Room((seg + 1) * 2, seg * 6)) return;
             int start = VertCount;
@@ -168,7 +172,7 @@ namespace CriticalMass.Runtime.View.Effects
         /// <summary>A crescent (swing trail): the band's half-width tapers from 0 at a0 to `w` at a1 (the blade end).</summary>
         public void Crescent(Vector3 c, Vector3 right, Vector3 up, float r, float w, float a0, float a1, int seg, Color32 tail, Color32 head)
         {
-            if (ViewCulled && !CriticalMass.Runtime.Camera.ViewCull.FxVisible(c, r + w)) return;
+            if (ViewCulled) { float fk = CriticalMass.Runtime.Camera.ViewCull.FxScale(c, r + w, NearFade); if (fk <= 0f) return; r *= fk; w *= fk; }
             if (seg < 1) return;
             if (!Room((seg + 1) * 2, seg * 6)) return;
             int start = VertCount;
@@ -193,7 +197,7 @@ namespace CriticalMass.Runtime.View.Effects
         /// <summary>A quad from a centre, half extents along two axes.</summary>
         public void Quad(Vector3 c, Vector3 halfRight, Vector3 halfUp, Color32 bottom, Color32 top)
         {
-            if (ViewCulled && !CriticalMass.Runtime.Camera.ViewCull.FxVisible(c, Mathf.Max(halfRight.magnitude, halfUp.magnitude))) return;
+            if (ViewCulled) { float fk = CriticalMass.Runtime.Camera.ViewCull.FxScale(c, Mathf.Max(halfRight.magnitude, halfUp.magnitude), NearFade); if (fk <= 0f) return; halfRight *= fk; halfUp *= fk; }
             if (!Room(4, 6)) return;
             int s = V(c - halfRight - halfUp, bottom);
             V(c + halfRight - halfUp, bottom);
@@ -216,7 +220,7 @@ namespace CriticalMass.Runtime.View.Effects
         /// </summary>
         public void Chunk(Vector3 c, Quaternion rot, Vector3 half, float outline, Color32 light, Color32 mid, Color32 dark, Color32 navy)
         {
-            if (ViewCulled && !CriticalMass.Runtime.Camera.ViewCull.FxVisible(c, half.magnitude + outline)) return;
+            if (ViewCulled) { float fk = CriticalMass.Runtime.Camera.ViewCull.FxScale(c, half.magnitude + outline, NearFade); if (fk <= 0f) return; half *= fk; outline *= fk; }
             if (!Room(48, 72)) return;
             AddBox(c, rot, half + Vector3.one * outline, navy, navy, navy, true);
             AddBox(c, rot, half, light, mid, dark, false);
@@ -228,7 +232,7 @@ namespace CriticalMass.Runtime.View.Effects
         /// </summary>
         public void Bone(Vector3 c, Quaternion rot, float half, float thick, float outline, Color32 light, Color32 mid, Color32 dark, Color32 navy)
         {
-            if (ViewCulled && !CriticalMass.Runtime.Camera.ViewCull.FxVisible(c, half + thick + outline)) return;
+            if (ViewCulled) { float fk = CriticalMass.Runtime.Camera.ViewCull.FxScale(c, half + thick + outline, NearFade); if (fk <= 0f) return; half *= fk; thick *= fk; outline *= fk; }
             if (!Room(144, 216)) return;
             Vector3 ax = rot * Vector3.right;
             var shaft = new Vector3(half, thick, thick);
