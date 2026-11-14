@@ -287,6 +287,17 @@ namespace CriticalMass.Runtime.View
         /// <summary>feat/follow-camera-1: half-width of the camera-to-player line inside which other fighters are not drawn.</summary>
         public const float CorridorMetres = 0.7f;
 
+        /// <summary>follow-camera-4: in first person, allies (bodies with their wings, capes and held props, all under the
+        /// model) within this distance of the eyes are not drawn; they would fill the view. Enemies keep NearLensMetres.</summary>
+        public const float FirstAllyMetres = 2.4f;
+
+        private bool NearEyes(double x, double h, double z)
+        {
+            Vector3 p = SimSpace.ToWorld(x, h, z);
+            float dx = p.x - _camPos.x, dz = p.z - _camPos.z;
+            return dx * dx + dz * dz < FirstAllyMetres * FirstAllyMetres;
+        }
+
         private bool NearLens(double x, double h, double z)
         {
             Vector3 p = SimSpace.ToWorld(x, h, z);
@@ -354,7 +365,9 @@ namespace CriticalMass.Runtime.View
             ModelView m = slot.Model;
             // feat/ground-camera: from the low camera a fighter standing at the lens fills a third of the frame and hides the
             // shot; bodies within NearLensMetres of the camera (horizontally, other than the followed one) are not drawn.
-            if (CriticalMass.Runtime.Camera.GroundView.LodActive && i != _lodSelf && NearLens(x, h, z))
+            if (CriticalMass.Runtime.Camera.GroundView.LodActive && i != _lodSelf
+                && (NearLens(x, h, z) || (CriticalMass.Runtime.Camera.GroundView.HideSelf && actor != null && _lodSelf >= 0 && w.ActorCount > _lodSelf && w.Actors[_lodSelf] != null && actor.Team == w.Actors[_lodSelf].Team
+                    && NearEyes(x, h, z))))
             {
                 m.SetActive(false);
                 return false;
