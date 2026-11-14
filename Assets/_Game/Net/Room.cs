@@ -41,9 +41,6 @@ namespace CriticalMass.Net
         /// <summary>Display names follow the chat rules (letters, digits, space, '-' and '_'; filtered; at most 16).</summary>
         public static string CleanName(string s) => ChatFilter.CleanName(s);
     }
-            return cs.Length > 0 ? cs.ToString() : "Player";
-        }
-    }
 
     /// <summary>
     /// The host's side of a room: the authoritative member list (name, team, class, ready, ping), version checks, and the
