@@ -31,10 +31,14 @@ namespace CriticalMass.Runtime.Online
         public static Rect Lane = HudZones.Chat;
         /// <summary>Shown at all (the room screen and the online match turn it on).</summary>
         public static bool Visible;
+        /// <summary>true: Lane is in the menu's centred 1920 x 1080 space (the room screen); false: from the screen's top-left
+        /// corner like the HUD clusters (the match).</summary>
+        public static bool Centred;
 
         static OnlineChatHud _one;
         Canvas _canvas;
-        RectTransform _lane;
+        RectTransform _lane, _root, _space;
+        bool _placedCentred;
         readonly Text[] _lines = new Text[HudZones.ChatLines];
         readonly float[] _born = new float[HudZones.ChatLines];
         Text _input;
@@ -66,7 +70,12 @@ namespace CriticalMass.Runtime.Online
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(HudLayout.RefW, HudLayout.RefH);
             scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.Shrink;   // the HUD's uniform fit: the whole 1920 x 1080 space always fits
-            _lane = MenuUi.Rt(go.transform, "Lane");
+            _root = (RectTransform)go.transform;
+            _space = MenuUi.Rt(_root, "Centred Space");
+            _space.anchorMin = _space.anchorMax = new Vector2(0.5f, 0.5f);
+            _space.pivot = new Vector2(0.5f, 0.5f);
+            _space.sizeDelta = new Vector2(HudLayout.RefW, HudLayout.RefH);
+            _lane = MenuUi.Rt(_root, "Lane");
             _lane.anchorMin = _lane.anchorMax = new Vector2(0f, 1f);
             _lane.pivot = new Vector2(0f, 1f);
             for (int i = 0; i < _lines.Length; i++)
@@ -83,8 +92,12 @@ namespace CriticalMass.Runtime.Online
 
         void Place()
         {
-            if (_placed == Lane) return;
+            if (_placed == Lane && _placedCentred == Centred) return;
             _placed = Lane;
+            _placedCentred = Centred;
+            _lane.SetParent(Centred ? _space : _root, false);
+            _lane.anchorMin = _lane.anchorMax = new Vector2(0f, 1f);
+            _lane.pivot = new Vector2(0f, 1f);
             _lane.anchoredPosition = new Vector2(Lane.x, -Lane.y);
             _lane.sizeDelta = new Vector2(Lane.width, Lane.height);
             float w = Lane.width;

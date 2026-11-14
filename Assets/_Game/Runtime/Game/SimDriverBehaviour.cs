@@ -104,6 +104,7 @@ namespace CriticalMass.Runtime.Game
                 Online.OnlineMatch.LocalInput = FillOnline;
                 gameObject.AddComponent<Online.OnlineMatchOverlay>();
                 Online.OnlineChatHud.Lane = CriticalMass.Runtime.Hud.HudZones.Chat;   // the match HUD's own chat lane
+                Online.OnlineChatHud.Centred = false;
                 Online.OnlineChatHud.Visible = true;
                 return;
             }

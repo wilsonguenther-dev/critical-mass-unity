@@ -153,6 +153,7 @@ namespace CriticalMass.Runtime.Online
             // Chat lives in the room page's right column, under START / READY (its own box; the match moves it to its HUD lane).
             OnlineChatHud.Lane = new Rect(ColR, RowY + 356f, ColRW, HudZones.ChatLines * HudZones.ChatLineH + 6f + HudZones.ChatInputH);
             OnlineChatHud.Visible = p == Page.Room;
+            OnlineChatHud.Centred = true;
             HudText.Set(_sub, p == Page.Room ? "Y chats to everyone, Shift + Y to your team. Bots fill every empty seat."
                 : "Play one match with friends on other computers. Bots fill every empty seat.");
             if (p == Page.Home) SetStatus(OnlineConfig.Configured ? "" : "Online play is not switched on in this build yet.");

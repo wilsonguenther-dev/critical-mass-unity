@@ -74,6 +74,7 @@ namespace CriticalMass.Net
         public int LateInputs { get; private set; }
         /// <summary>Milliseconds this machine waited for the network (stalls).</summary>
         public long StallMs { get; private set; }
+        private long _stallSeen;
         public long BytesSent { get; private set; }
         /// <summary>The transport's reason when our own connection closed (plain words), else null.</summary>
         public string ClosedReason { get; private set; }
@@ -492,7 +493,8 @@ namespace CriticalMass.Net
                 StepOne();
                 if (IsHost) Produce(now);
             }
-            if (waited) { StallMs += (long)Math.Round(_tickMs); if (_waitingSince < 0) _waitingSince = now; }
+            // Wall time spent waiting for a bundle (counted per call, so it no longer depends on how often Update runs).
+            if (waited) { if (_waitingSince >= 0) StallMs += now - _stallSeen; else _waitingSince = now; _stallSeen = now; }
             else if (Stepped > 0) _waitingSince = -1;
         }
 
