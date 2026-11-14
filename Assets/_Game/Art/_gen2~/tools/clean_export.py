@@ -369,9 +369,29 @@ def clean(e):
         codes[np.where((np.linalg.norm(pal - hex2rgb(h), axis=1) < e.get("glow_tol", 0.2)) & (codes == 0))] = 6
     facts["palette"] = [{"hex": "#%02X%02X%02X" % tuple(int(round(x * 255)) for x in c), "code": int(k)} for c, k in zip(pal, codes)]
     mat = toon_material(); facts["levels"] = {}
+    ff = e.get("face_features")
     for lv, o in levels.items():
         lab = ((cols[lv][:, None, :] - pal[None]) ** 2).sum(-1).argmin(1)
         rgba = np.concatenate([pal[lab], (codes[lab] / 8.0)[:, None]], axis=1)
+        if ff and lv != "Shadow":
+            # rig-demolitions-1: thin painted features (eyes, brows, mouth) are lost twice: the face colour is the MEAN of 5
+            # samples and the k-means palette has no slot for a few dark faces. Inside the face box (metres, after
+            # normalise, facing -Y) a face whose DARKEST raw sample (centre, corners, edge midpoints) is darker than
+            # rel x the face's median skin brightness is painted the feature colour (code 0, never team-swapped).
+            x0, x1, y0, y1, z0, z1 = ff["box"]
+            me = o.data; fi, lum = [], []
+            for i, pg in enumerate(me.polygons):
+                c = pg.center
+                if not (x0 < c.x < x1 and y0 < c.y < y1 and z0 < c.z < z1):
+                    continue
+                pts = [c] + [me.vertices[v].co for v in pg.vertices] + [c.lerp(me.vertices[v].co, 0.5) for v in pg.vertices]
+                fi.append(i); lum.append(min(float(np.mean(srccol[kd.find(q)[1]][:3])) for q in pts))
+            if fi:
+                fi = np.array(fi); lum = np.array(lum); ref = float(np.median(lum))
+                dark = fi[lum < ff.get("rel", 0.6) * ref]
+                rgba[dark, :3] = hex2rgb(ff.get("colour", "#33241E")); rgba[dark, 3] = 0
+                facts.setdefault("face_features", {})[lv] = {"faces_in_box": int(len(fi)), "skin_ref": round(ref, 3),
+                                                             "painted": int(len(dark))}
         if lv == "Shadow":
             rgba[:, :3] = 0.2; rgba[:, 3] = 0
         write_colours(o, rgba)

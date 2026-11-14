@@ -58,9 +58,12 @@ acts = {a.name.split('|')[-1]: a for a in cacts}
 fobjs, _ = imp(FBX, False)
 fa = next(o for o in fobjs if o.type == 'ARMATURE')
 hero = next(o for o in fobjs if o.type == 'MESH' and o.name.startswith(CLS + '_Hero'))
+lod0 = next((o for o in fobjs if o.type == 'MESH' and o.name.startswith(CLS + '_LOD0')), None)
 for o in fobjs:
-    if o.type == 'MESH' and o is not hero:
+    if o.type == 'MESH' and o is not hero and o is not lod0:
         bpy.data.objects.remove(o, do_unlink=True)
+if lod0 is not None:
+    lod0.hide_render = True
 for a in acts.values():
     a.use_fake_user = True
 assign(fa, None)
@@ -248,3 +251,26 @@ img.save()
 REP['sheet'] = img.filepath_raw
 save()
 print('[check]', json.dumps(REP.get('measure', {}))[:3000], flush=True)
+
+# face close-ups at the bind pose, front, Hero then LOD0: <out>/face_<Cls>.png
+try:
+    for c_ in CONS:
+        c_.mute = True
+    assign(ca, None); scene.frame_set(1); upd()
+    stick.hide_render = True
+    cd.ortho_scale = 0.55; scene.render.resolution_x = scene.render.resolution_y = 400
+    cam.location = Vector((0, -6, 1.53)); cam.rotation_euler = (math.radians(90), 0, 0)
+    tiles = []
+    for ob in (hero, lod0):
+        if ob is None:
+            continue
+        hero.hide_render = ob is not hero
+        if lod0 is not None:
+            lod0.hide_render = ob is not lod0
+        tiles.append(shot('face_' + ob.name))
+    fs = np.concatenate(tiles, axis=1)
+    img = bpy.data.images.new(f'face_{CLS}', fs.shape[1], fs.shape[0]); img.pixels = fs.ravel()
+    img.filepath_raw = os.path.join(OUT, f'face_{CLS}.png'); img.file_format = 'PNG'; img.save()
+    REP['face_sheet'] = img.filepath_raw; save()
+except Exception as ex:
+    print('[check] face close-up failed', repr(ex), flush=True)
