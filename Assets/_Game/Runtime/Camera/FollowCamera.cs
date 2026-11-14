@@ -129,6 +129,43 @@ namespace CriticalMass.Runtime.Camera
     }
 
     /// <summary>
+    /// follow-camera-2: name tags and overhead health in the third- and first-person views. They are screen-space marks
+    /// placed at the head, so they always face the camera; this sets their size by distance from the camera (larger up
+    /// close, smaller far, within limits) and hides them too close to the lens or beyond a distance.
+    /// </summary>
+    public static class TagLens
+    {
+        public const float TagMaxDistance = 28f, BarMaxDistance = 32f, MinDistance = 0.9f;
+        /// <summary>Distance (u) at which a tag is its authored size.</summary>
+        public const float UnitDistance = 9f;
+        public const float MinScale = 0.6f, MaxScale = 1.2f;
+
+        public static float Scale(float d) => d <= 1e-3f ? MaxScale : Mathf.Clamp(UnitDistance / d, MinScale, MaxScale);
+        public static bool Show(float d, float max) => d >= MinDistance && d <= max;
+    }
+
+    /// <summary>
+    /// follow-camera-2: a sideways run does not turn the view. While the move is sideways with no forward or back input
+    /// (|up| under 0.2, |right| over 0.3), auto-follow holds its yaw; when forward input returns after a hold, it re-centres
+    /// behind the character at once. Back-only input keeps the turn-around swing (after YawFollow.BigTurnDelay).
+    /// </summary>
+    public sealed class StrafeGate
+    {
+        public const double UpDead = 0.2, SideMin = 0.3;
+        bool _holding;
+        public bool Holding => _holding;
+
+        /// <summary>One frame of input (screen right, up); recenter is true on the frame forward input returns after a hold.</summary>
+        public void Step(double right, double up, out bool hold, out bool recenter)
+        {
+            bool strafe = Math.Abs(up) < UpDead && Math.Abs(right) > SideMin;
+            recenter = _holding && !strafe && up >= UpDead;
+            _holding = strafe;
+            hold = strafe;
+        }
+    }
+
+    /// <summary>
     /// Camera-relative movement that does not chase its own tail (pure, testable): the yaw that maps the keys / stick to a
     /// world direction is the camera's yaw when the move began, held while any move input stays held, so a run toward the
     /// camera keeps going the same way while auto-follow swings the camera behind. Released, or the player looks
@@ -158,6 +195,59 @@ namespace CriticalMass.Runtime.Camera
         static Vector3 _cam;
         static bool _on, _lastWasSample;
 
+        /// <summary>follow-camera-2: cosmetic effects (FxMeshBuilder primitives from combat, gore that GoreGate let through
+        /// and skills; rubble pieces) beyond this distance from the low camera, or outside its view, are not drawn (u).</summary>
+        public const float FxDrawDistance = 70f;
+        /// <summary>Extra room past the frustum edge before an effect is dropped (u): no popping at the screen edge.</summary>
+        public const float FxMargin = 1.5f;
+        /// <summary>Effect primitives and rubble pieces drawn and culled this frame (all builders and the rubble pool), and
+        /// the same numbers last frame.</summary>
+        public static int FxDrawn, FxCulled, RubbleCulled, LastFxDrawn, LastFxCulled, LastRubbleCulled;
+
+        /// <summary>Recompute the planes from a camera now and switch the culling on or off (tests; Begin calls it once a frame).</summary>
+        public static void SetView(UnityEngine.Camera cam, bool on)
+        {
+            _on = on && cam != null;
+            if (!_on) return;
+            _cam = cam.transform.position;
+            GeometryUtility.CalculateFrustumPlanes(cam, Planes);
+        }
+
+        public static bool On => _on;
+
+        /// <summary>False when an effect centred at c with extent r is beyond FxDrawDistance or outside the view by more
+        /// than FxMargin. Always true when no low view is on. Counts what it decides.</summary>
+        public static bool FxVisible(Vector3 c, float r)
+        {
+            if (!_on) return true;
+            bool vis = (c - _cam).sqrMagnitude <= (FxDrawDistance + r) * (FxDrawDistance + r);
+            if (vis)
+                for (int i = 0; i < 6; i++)
+                    if (Planes[i].GetDistanceToPoint(c) < -(r + FxMargin)) { vis = false; break; }
+            if (vis) FxDrawn++; else FxCulled++;
+            return vis;
+        }
+
+        /// <summary>
+        /// The dithered fade the toon shader applies (CMToonFadeClip in CMToonCommon.hlsl, same maths): the share of a
+        /// surface's pixels removed at world point p, 0..MaxFade, by its distance to the line from the camera to the followed
+        /// fighter's chest. Nothing within the last 15 percent of the line (the fighter himself) or at the lens end.
+        /// </summary>
+        public static float FadeAmount(Vector3 cam, Vector3 target, Vector3 p, float radius)
+        {
+            Vector3 s = target - cam;
+            float l2 = Mathf.Max(s.sqrMagnitude, 1e-4f);
+            float t = Vector3.Dot(p - cam, s) / l2;
+            if (t <= 0.02f || t >= 0.85f) return 0f;
+            float d = (cam + s * t - p).magnitude;
+            return Mathf.Clamp01((radius - d) / (radius * 0.5f)) * MaxFade;
+        }
+
+        /// <summary>At most this share of pixels is removed (the body still reads as a ghost).</summary>
+        public const float MaxFade = 0.8f;
+        /// <summary>Radius of the faded tube around the sight line (u).</summary>
+        public const float FadeRadius = 1.0f;
+
         /// <summary>Fighters posed and drawn this frame, culled (outside the view or beyond the draw distance), and their
         /// rough triangle count (the active renderers' meshes; ActorViews fills it in every view).</summary>
         public static int FightersDrawn, FightersCulled, FighterTriangles;
@@ -168,14 +258,15 @@ namespace CriticalMass.Runtime.Camera
         public static void Begin(UnityEngine.Camera cam, bool on)
         {
             LastDrawn = FightersDrawn; LastCulled = FightersCulled; LastTriangles = FighterTriangles;
+            LastFxDrawn = FxDrawn; LastFxCulled = FxCulled; LastRubbleCulled = RubbleCulled;
+            FxDrawn = FxCulled = RubbleCulled = 0;
             if (_lastWasSample) SampledTriangles = FighterTriangles;
             _lastWasSample = SampleFrame;
             FightersDrawn = FightersCulled = FighterTriangles = 0;
             _on = on && cam != null;
             if (!_on || _frame == Time.frameCount) return;
             _frame = Time.frameCount;
-            _cam = cam.transform.position;
-            GeometryUtility.CalculateFrustumPlanes(cam, Planes);
+            SetView(cam, true);
         }
 
         /// <summary>Rough triangles a model submitted last frame: its renderers the camera saw (isVisible already drops

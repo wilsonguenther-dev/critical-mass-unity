@@ -136,6 +136,7 @@ namespace CriticalMass.Runtime.View.Effects
             _ground = new FxMeshBuilder("Fx Ground", GroundVerts, GroundVerts * 3);
             _air = new FxMeshBuilder("Fx Air", AirVerts, AirVerts * 3);
             _solid = new FxMeshBuilder("Fx Solid", SolidVerts, SolidVerts * 2);
+            _ground.ViewCulled = _air.ViewCulled = _solid.ViewCulled = true;   // follow-camera-2: low-view culling (gore after GoreGate too)
             Shader sh = Resources.Load<Shader>("CMFxUnlit");
             if (sh == null) sh = Shader.Find("CM/FxUnlit");
             _groundMat = Mat(sh, "Fx Ground", 0, 0, -2, 2990);
