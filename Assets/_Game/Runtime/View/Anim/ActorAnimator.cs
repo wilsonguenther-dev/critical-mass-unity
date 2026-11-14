@@ -184,7 +184,8 @@ namespace CriticalMass.Runtime.View.Anim
             double loopDt = holding ? 0 : dSim; // the fake hit-stop: loops do not advance during the hold
 
             // ---- facing (DG-89)
-            double target = SimSpace.YawDeg(actor.Facing);
+            // feat/hit-feel-1: through a swing the body turns to the enemy it swings at (HitFeel.Facing; the sim's Facing otherwise).
+            double target = SimSpace.YawDeg(HitFeel.Facing(w, i, alpha));
             if (corpse)
             {
                 if (!_wasCorpse) LatchDeath(m, actor, feed, i, target);

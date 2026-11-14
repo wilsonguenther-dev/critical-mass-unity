@@ -228,7 +228,8 @@ namespace CriticalMass.Runtime.View.Effects
                         // v2 tiers: every hit holds the victim's pose; heavy and critical hold the attacker too.
                         HoldTick[t] = w.Tick;
                         HoldTier[t] = _e.Tier;
-                        if (_e.Tier > 0 && ev.B >= 0 && ev.B < _capacity) { HoldTick[ev.B] = w.Tick; HoldTier[ev.B] = _e.Tier; }
+                        // feat/hit-feel-1: the attacker holds on every hit too (hit-stop on both fighters, HitFeel.HoldWallSeconds).
+                        if ((_e.Tier > 0 || ev.Cause == DamageCause.Melee) && ev.B >= 0 && ev.B < _capacity) { HoldTick[ev.B] = w.Tick; HoldTier[ev.B] = _e.Tier; }
                     }
                     return true;
                 }

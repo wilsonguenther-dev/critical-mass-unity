@@ -107,7 +107,8 @@ namespace CriticalMass.Runtime.View.Effects
         /// </summary>
         public double HoldFor(byte tier)
         {
-            double wall = tier == 0 ? 0.03 : tier == 1 ? 0.065 : 0.11;
+            // feat/hit-feel-1: 45 / 60 / 70 ms on both fighters (was 30 victim-only / 65 / 110), none with reduce motion.
+            double wall = Anim.HitFeel.HoldWallSeconds(tier, FeelGate.ReduceMotion);
             return _scene != null ? _scene.S(wall) : wall * 2;
         }
         /// <summary>White flash length, sim seconds: about 2.5 frames at 60 fps; at GORE Off the whole-silhouette flash is the
@@ -337,6 +338,13 @@ namespace CriticalMass.Runtime.View.Effects
         /// </summary>
         private static void ShakeFor(ref FxEvent e, World w)
         {
+            // feat/hit-feel-2: the hit nudge for the local player is on by default at a low strength (CameraShake.Nudge: the
+            // shake setting once the player has set it, off with reduce motion).
+            if (e.Kind == FxKind.Hit && w.ActorCount > 0)
+            {
+                float n = Anim.HitFeel.Nudge(e.A == 0, e.B == 0);
+                if (n > 0f) CriticalMass.Runtime.Camera.CameraShake.Nudge(n);
+            }
             if (w.ActorCount == 0 || FeelGate.ShakeScale <= 0f) return;
             float amount = ShakeAmount(e.Kind, e.A == 0, e.Value, DistanceToLocal(w, e.X, e.Z), w.Config.Kaiju.SlamRadius);
             if (amount > 0f) CriticalMass.Runtime.Camera.CameraShake.Impulse(amount);
@@ -565,11 +573,13 @@ namespace CriticalMass.Runtime.View.Effects
                 double env = hitT < up ? hitT / up : System.Math.Max(0, 1 - (hitT - up) / down);
                 if (env > 0)
                 {
-                    float k = (float)(env * (0.55 + 0.45 * System.Math.Min(1, _feed.LastHitDmg[i] / 30)));
+                    // feat/hit-feel-2: lean 8 to 24 degrees and shift 0.08 to 0.22 u by damage (was 7 to 13 and 0.06 to 0.11:
+                    // a few pixels at gameplay distance), plus a stagger step along the blow for mid and big hits.
+                    double dmg = _feed.LastHitDmg[i];
                     Vector3 d = SimSpace.ToWorld(_feed.HitDirX[i], 0, _feed.HitDirZ[i]);
                     Vector3 axis = Vector3.Cross(Vector3.up, d);
-                    if (axis.sqrMagnitude > 1e-6f) fx.Lean = Quaternion.AngleAxis(13f * k, axis.normalized);
-                    fx.Nudge = d * (0.11f * k);
+                    if (axis.sqrMagnitude > 1e-6f) fx.Lean = Quaternion.AngleAxis((float)(Anim.HitFeel.FlinchLeanDeg(dmg) * env), axis.normalized);
+                    fx.Nudge = d * (float)(Anim.HitFeel.FlinchShift(dmg) * env + Anim.HitFeel.StaggerStep(hitT / _scene.S(1.0), dmg));
                 }
                 any = true;
             }
