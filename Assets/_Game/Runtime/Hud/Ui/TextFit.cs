@@ -53,14 +53,15 @@ namespace CriticalMass.Runtime.Hud.Ui
             float w = 0f;
             if (t.font != null)
             {
+                float ppu = PixelsPerUnit(t);
                 TextGenerationSettings st = t.GetGenerationSettings(Vector2.zero);
                 st.fontSize = size;
-                st.scaleFactor = 1f;
+                st.scaleFactor = ppu;   // fix/hud-containment-3: the drawn size (small screens round glyphs up)
                 st.resizeTextForBestFit = false;
                 st.horizontalOverflow = HorizontalWrapMode.Overflow;
                 st.verticalOverflow = VerticalWrapMode.Overflow;
                 st.generateOutOfBounds = true;
-                w = Gen.GetPreferredWidth(s, st);
+                w = Gen.GetPreferredWidth(s, st) / ppu;
             }
             return w > 0f || !HasInk(s) ? w : Estimate(s, size);
         }
@@ -85,7 +86,29 @@ namespace CriticalMass.Runtime.Hud.Ui
                 lines += wrap ? WrappedLines(t, s.Substring(start, i - start), size, w) : 1;
                 start = i + 1;
             }
-            return lines * LineHeightOf(t, size);
+            float mine = lines * LineHeightOf(t, size);
+            // fix/hud-containment-3: never under Unity's own wrapped height (what it draws), when the font gives one
+            if (wrap && t != null && t.font != null && w > 1f)
+            {
+                float ppu = PixelsPerUnit(t);
+                TextGenerationSettings st = t.GetGenerationSettings(new Vector2(w, 0f));
+                st.fontSize = size;
+                st.scaleFactor = ppu;
+                st.resizeTextForBestFit = false;
+                st.horizontalOverflow = HorizontalWrapMode.Wrap;
+                st.verticalOverflow = VerticalWrapMode.Overflow;
+                st.generateOutOfBounds = true;
+                float unity = Gen.GetPreferredHeight(s, st) / ppu;
+                if (unity > mine) mine = unity;
+            }
+            return mine;
+        }
+
+        /// <summary>The label's canvas pixel scale (1 off a canvas or in a test).</summary>
+        public static float PixelsPerUnit(Text t)
+        {
+            float p = t != null ? t.pixelsPerUnit : 1f;
+            return p > 0.01f ? p : 1f;
         }
 
         static int WrappedLines(Text t, string para, int size, float w)
@@ -145,10 +168,20 @@ namespace CriticalMass.Runtime.Hud.Ui
         {
             if (t == null) return s;
             if (s == null) s = string.Empty;
+            // fix/hud-containment-3: a contained label is fitted through its component. Fitting it here directly set
+            // t.text, which re-ran the component's rule in the middle of this fit (edit mode applies at once) and left the
+            // cut on the label while this fit measured it, "fit" and returned the whole line uncut.
+            ContainedText owner = ContainedText.Of(t);
+            if (owner != null && !owner.Applying)
+            {
+                owner.Configure(max, min, maxLines);
+                owner.SetSource(s);
+                return t.text;
+            }
             if (Stress && s.Length > 0) s = Padded(s);
             if (min > max) min = max;
             Rect r = t.rectTransform.rect;
-            var key = (s, max, min, Mathf.RoundToInt(r.width), Mathf.RoundToInt(r.height), t.font != null ? t.font.GetInstanceID() : 0, maxLines);
+            var key = (s, max, min, Mathf.RoundToInt(r.width), Mathf.RoundToInt(r.height), (t.font != null ? t.font.GetInstanceID() : 0) * 31 + Mathf.RoundToInt(PixelsPerUnit(t) * 100f), maxLines);
             t.resizeTextForBestFit = false;
             t.verticalOverflow = VerticalWrapMode.Overflow;
             if (Cache.TryGetValue(key, out Fitted f))
@@ -289,6 +322,9 @@ namespace CriticalMass.Runtime.Hud.Ui
         static bool _hooked;
 
         public Text Label => _text;
+        /// <summary>The rule is running on this label now (TextFit.Apply then fits directly).</summary>
+        internal bool Applying => _applying;
+        float _ppu = -1f;
         /// <summary>What the rule last put on the label (the source, or its cut), null before the first run.</summary>
         public string Shown => _shown;
 
@@ -298,13 +334,16 @@ namespace CriticalMass.Runtime.Hud.Ui
             if (t == null) return null;
             ContainedText c = t.GetComponent<ContainedText>();
             if (c == null) c = t.gameObject.AddComponent<ContainedText>();
+            bool keepWords = c._text == t && c._shown != null && t.text == c._shown;   // t shows the rule's cut: keep its words
             c._text = t;
             c.MaxSize = Mathf.Max(max, min);
             c.MinSize = Mathf.Min(max, min);
             c._autoLines = lines <= 0;
             c.MaxLines = lines > 0 ? lines : TextFit.LinesFor(t.rectTransform.rect.height, c.MinSize);
             ByText[t] = c;
-            c.Source = t.text ?? string.Empty;
+            if (!keepWords) c.Source = t.text ?? string.Empty;
+            c._shown = null;   // fix/hud-containment-3: a new range refits (it returned early as "our own result")
+            if (keepWords) t.text = c.Source;
             c.Hook();
             c.ApplyNow();
             return c;
@@ -409,8 +448,25 @@ namespace CriticalMass.Runtime.Hud.Ui
             if (!Dirty.Contains(this)) Dirty.Add(this);
         }
 
+        static int _scaleCheck;
+
+        /// <summary>fix/hud-containment-3: a canvas whose scale changed (a resize, the first frame) refits its labels: the
+        /// rule measures at the drawn scale. Checked every 30 frames; no allocation (struct enumerator).</summary>
+        static void CheckScales()
+        {
+            if (++_scaleCheck < 30) return;
+            _scaleCheck = 0;
+            foreach (KeyValuePair<Text, ContainedText> kv in ByText)
+            {
+                ContainedText c = kv.Value;
+                if (c == null || c._text == null || c._ppu < 0f || !c.isActiveAndEnabled) continue;
+                if (Mathf.Abs(TextFit.PixelsPerUnit(c._text) - c._ppu) > 0.01f) { c._shown = null; if (!Dirty.Contains(c)) Dirty.Add(c); }
+            }
+        }
+
         static void Flush()
         {
+            CheckScales();
             for (int i = 0; i < Dirty.Count; i++)
             {
                 ContainedText c = Dirty[i];
@@ -443,7 +499,7 @@ namespace CriticalMass.Runtime.Hud.Ui
             if (_shown != null && now != _shown) Source = now;
             else if (_shown == null && now != Source && !(Source.Length > 0 && now.Length > 0 && IsCutOf(now, Source))) Source = now;
             _applying = true;
-            try { _shown = TextFit.Apply(_text, Source, MaxSize, MinSize, MaxLines); _size = _text.fontSize; }
+            try { _shown = TextFit.Apply(_text, Source, MaxSize, MinSize, MaxLines); _size = _text.fontSize; _ppu = TextFit.PixelsPerUnit(_text); }
             finally { _applying = false; }
         }
     }

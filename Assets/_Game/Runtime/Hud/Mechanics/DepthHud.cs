@@ -377,7 +377,8 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             TickGather(w, me, cam, on);
             TickCoins(w, view, me, cam, on, real);
             TickPower(w, me, on);
-            TickTags(w, view, me, cam, on);
+            // fix/hud-containment-3 (by eye: name tags over the knock-out recap): no world name tags under a full panel
+            TickTags(w, view, me, cam, on && !HudZones.Blocked(HudZone.Callout, HudPriority.Lockout));
             TickFloats(w, view, cam);
             TickPointer(w, cam, on);
             TickMaps(w, on, real);
