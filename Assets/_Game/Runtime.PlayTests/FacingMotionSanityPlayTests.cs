@@ -217,6 +217,7 @@ namespace CriticalMass.Runtime.PlayTests
             for (int s = 0; s < 40; s++)
             {
                 _w.Driver.StepTicks(15);
+                SanityWorld.AnimateAll();   // fix/builder-strafe-1: models built since Load are evaluated too
                 yield return null;
                 World w = _w.W;
                 for (int i = 0; i < w.ActorCount; i++)
