@@ -233,6 +233,20 @@ def rest_local(arm, name):
 RESTFIX = {pb.name: (rest_local(fa, pb.name).to_quaternion().inverted() @ rest_local(kk, pb.name).to_quaternion())
            for pb in fa.pose.bones if pb.name in kk.data.bones}
 
+# A class that carries a long prop in one hand swings that arm less in locomotion: its arm bones are pulled toward their
+# Idle (first frame) rotation, keeping HOLD_KEEP of the clip's swing (as on art/rig-farmer-3 for her staff). Miner: the
+# pickaxe in his right hand rode sideways above his head in the walk with the full KayKit arm swing.
+HOLD_ARM = {"Farmer": "r", "Miner": "r"}.get(CLS)
+HOLD_KEEP = 0.35
+HOLD_CLIPS = {"Walk", "WalkBack", "Run", "RunBack", "StrafeL", "StrafeR", "Carry"}
+HOLD_BONES = tuple(n + "." + HOLD_ARM for n in ("upperarm", "lowerarm", "wrist", "hand")) if HOLD_ARM else ()
+HOLD_REF = {}
+if HOLD_ARM and "Idle" in acts:
+    assign(kk, acts["Idle"])
+    scene.frame_set(int(acts["Idle"].frame_range[0]))
+    HOLD_REF = {n: RESTFIX[n] @ kkP[n].matrix_basis.to_quaternion() for n in HOLD_BONES if n in kkP}
+    assign(kk, None)
+
 
 def kk_back_dir(act, f0, f1):
     """Direction the KayKit planted feet move in the clip (opposite to travel), or None."""
@@ -276,7 +290,10 @@ def bake_action(clip, act):
             l_, q_, s_ = k.matrix_basis.decompose()
             if pb.name not in KEEP_LOC:
                 l_ = Vector((0, 0, 0))
-            pb.matrix_basis = Matrix.LocRotScale(l_, RESTFIX[pb.name] @ q_, s_)
+            q_ = RESTFIX[pb.name] @ q_
+            if clip in HOLD_CLIPS and pb.name in HOLD_REF:
+                q_ = HOLD_REF[pb.name].slerp(q_, HOLD_KEEP)
+            pb.matrix_basis = Matrix.LocRotScale(l_, q_, s_)
         upd()
         K = snap(kk)
         Hd = F0["hips"] + (K["hips"] - K0["hips"]) * RATIO + Vector((0, 0, LIFT))
