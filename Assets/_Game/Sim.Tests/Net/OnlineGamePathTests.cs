@@ -79,7 +79,7 @@ namespace CriticalMass.Sim.Tests.Net
         [Test]
         public void HostAndJoinerAgreeFor600TicksThroughTheLocalRelayWhileAnOfflineMatchTicks()
         {
-            var relay = new LocalRelay(40);
+            var relay = new LocalRelay(40) { HostExtraMs = 700 };
             Peer host = Make(relay, true, "Wilson", p => { p.ChatAt = 90; p.ChatText = "good luck"; });
             Begin(host);
             string code = host.P.Code;

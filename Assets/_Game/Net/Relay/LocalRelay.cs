@@ -14,6 +14,8 @@ namespace CriticalMass.Net.Relay
     public sealed class LocalRelay
     {
         public int DelayMs;
+        /// <summary>Extra time a host's connection takes to arrive (a slow host network: the joiner can get there first).</summary>
+        public int HostExtraMs;
         private long _now;
         private uint _rng = 0x9E3779B9u;
         private readonly Dictionary<string, Room> _rooms = new Dictionary<string, Room>();
@@ -56,7 +58,7 @@ namespace CriticalMass.Net.Relay
         public ITransport Connect(string code, string key)
         {
             var t = new LocalRelayTransport(this);
-            _joins.Add(new Join { At = _now + DelayMs, T = t, Code = code, Key = key });
+            _joins.Add(new Join { At = _now + DelayMs + (key != null ? HostExtraMs : 0), T = t, Code = code, Key = key });
             return t;
         }
 
