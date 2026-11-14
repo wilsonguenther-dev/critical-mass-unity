@@ -32,6 +32,7 @@ if len(argv) > 3 and argv[3]:
 NEW_BODY = CLS in ("Builder", "Healer", "Demolitions")   # rig-batch-b: generated bodies rigged by rig_body.py   # HY models (Miner lifted 0.10 m, lift_rig_fbx.py; Warrior art/characters-hy-rig ef9d2eb)
 CLIPS = "Assets/_Game/Art/Characters/KayKit_Clips.fbx"
 GROUND_SPEED = {}   # clip -> KayKit ground speed (m/s), from Resources/Anim/clip_facts.json
+CLIP_LEN, CLIP_CONTACT = {}, {}   # rig-builder-3: clip length and hit-event (contact) time, seconds
 os.makedirs(OUT, exist_ok=True)
 try:
     _cf = json.load(open(os.path.join(REPO, "Assets/_Game/Resources/Anim/clip_facts.json")))
@@ -39,6 +40,9 @@ try:
     for _e in _cf:
         if isinstance(_e, dict) and _e.get("groundSpeed", 0) > 0.05:
             GROUND_SPEED[_e["clip"]] = float(_e["groundSpeed"])
+        if isinstance(_e, dict) and _e.get("length", 0) > 0:
+            CLIP_LEN[_e["clip"]] = float(_e["length"])
+            CLIP_CONTACT[_e["clip"]] = float(_e.get("contact", -1))
 except Exception as _x:
     print("[bake] clip facts unreadable", _x)
 REP = {"class": CLS}
@@ -363,6 +367,92 @@ ARM_DOWN_DEG = 28.0   # 22 put the Builder's gloves into his belly
 ARM_ADD = {}
 ATTACK_GAIN = {"Attack": 1.8}
 
+# rig-builder-3: the Builder's Attack is a hand-keyed overhead mallet strike, not the scaled 1H chop. It keeps the chop's
+# frame range and its hit-event (contact) time, so the game's attack timing is unchanged: 0 to 30 % wind-up (right hand
+# up and behind the head, elbow bent, torso leans back and twists right), 30 % to contact strike (the arm comes down in
+# front to below the waist, torso folds forward, knees bend), contact to the end recover to Idle. The legs stand on the
+# Idle pose with flat planted feet (foot IK as Idle); only the hips come down. Angles in degrees, world space at each
+# bone's head: pitch + folds forward (about +X, the body faces -Y), yaw + turns left (about +Z); arm angles turn about
+# the shoulder line, - raises forward; th = mallet direction in the swing plane, 0 up, + toward the back.
+MALLET = CLS == "Builder" and os.environ.get("BAKE_MALLET", "1") == "1"
+MODE = {"mallet": MALLET}
+MALLET_TGT = [None]
+_CT = (CLIP_CONTACT.get("Attack", 0.5667) / CLIP_LEN.get("Attack", 1.0667)) if CLIP_LEN.get("Attack") else 0.531
+_Z = dict(hips_p=0, hips_y=0, spine_p=0, spine_y=0, chest_p=0, chest_y=0, head_p=0, uar=0, lar=0, ual=0, lal=0,
+          th=0, drop=0.0, back=0.0)
+
+
+def _k(t, ease, **kw):
+    d = dict(_Z); d.update(kw); d["t"] = t; d["ease"] = ease
+    return d
+
+
+_WIND = dict(hips_p=-4, hips_y=-5, spine_p=-5, spine_y=-6, chest_p=-6, chest_y=-6, head_p=8, uar=-165, lar=-50,
+             ual=-30, lal=-25, th=115, drop=0.02, back=0.0)
+_HIT = dict(hips_p=10, hips_y=3, spine_p=12, spine_y=3, chest_p=13, chest_y=2, head_p=-18, uar=-70, lar=-12,
+            ual=-40, lal=-30, th=-125, drop=0.10, back=0.03)
+MKEYS = [
+    _k(0.0, "smooth"),
+    _k(0.30, "smooth", **_WIND),                                                    # top of the wind-up
+    _k(0.34, "lin", **dict(_WIND, uar=-168, th=120)),                               # a short hold before the blow
+    _k(0.45, "in", hips_p=3, hips_y=0, spine_p=4, spine_y=1, chest_p=5, chest_y=1, head_p=-4, uar=-160, lar=-10,
+       ual=-35, lal=-25, th=-15, drop=0.05, back=0.01),                             # mallet over the top
+    _k(_CT, "lin", **_HIT),                                                         # contact (the clip's hit event)
+    _k(min(0.99, _CT + 0.09), "out", **dict(_HIT, drop=0.11, uar=-72, th=-120)),    # settle
+    _k(1.0, "smooth"),
+]
+MALLET_LOG = []
+
+
+def _ease(u, e):
+    if e == "smooth":
+        return u * u * (3 - 2 * u)
+    if e == "in":
+        return u * u
+    if e == "out":
+        return 1 - (1 - u) * (1 - u)
+    return u
+
+
+def mallet_keys(t):
+    t = max(0.0, min(1.0, t))
+    for a, b in zip(MKEYS, MKEYS[1:]):
+        if a["t"] <= t <= b["t"]:
+            u = _ease((t - a["t"]) / max(1e-6, b["t"] - a["t"]), b["ease"])
+            return {n: a[n] + (b[n] - a[n]) * u for n in _Z}
+    return dict(_Z)
+
+
+def mallet_pose(t):
+    """Pose the upper body for the mallet strike at clip fraction t (after the Idle copy, upright and arms_in)."""
+    k = mallet_keys(t)
+    for bn in ("hips", "spine", "chest"):
+        pb = faP[bn]
+        q = Quaternion((0, 0, 1), math.radians(k[bn + "_y"])) @ Quaternion((1, 0, 0), math.radians(k[bn + "_p"]))
+        rotate_about(fa, pb, W(fa, pb.head), q)
+        upd()
+    rotate_about(fa, faP["head"], W(fa, faP["head"].head), Quaternion((1, 0, 0), math.radians(k["head_p"])))
+    upd()
+    A = (W(fa, faP["upperarm.l"].head) - W(fa, faP["upperarm.r"].head)).normalized()
+    for bn, key in (("upperarm.r", "uar"), ("lowerarm.r", "lar"), ("upperarm.l", "ual"), ("lowerarm.l", "lal")):
+        pb = faP[bn]
+        rotate_about(fa, pb, W(fa, pb.head), Quaternion(A, math.radians(k[key])))
+        upd()
+    MALLET_TGT[0] = None
+    if CREL is not None:
+        th = math.radians(k["th"])
+        yaw = math.radians(k["hips_y"] + k["spine_y"] + k["chest_y"])
+        tgt = Quaternion((0, 0, 1), yaw) @ Vector((0.0, math.sin(th), math.cos(th)))
+        d = ((fa.matrix_world @ faP["hand.r"].matrix).to_3x3().normalized() @ CREL).col[1]
+        q = d.rotation_difference(tgt)
+        half = Quaternion().slerp(q, 0.5)        # the wrist takes half the turn, the handle turns in the fist for the rest
+        rotate_about(fa, faP["wrist.r"], W(fa, faP["wrist.r"].head), half)
+        upd()
+        MALLET_TGT[0] = tgt
+        MALLET_LOG.append(dict(t=round(t, 3), wrist_deg=round(math.degrees(half.angle), 1),
+                               full_deg=round(math.degrees(q.angle), 1)))
+    return k["drop"], k["back"]
+
 
 def _ua_angle(s):
     d = W(fa, faP["lowerarm." + s].head) - W(fa, faP["upperarm." + s].head)
@@ -405,7 +495,7 @@ if NEW_BODY and ARM_ADD and CREL is not None:
 
 
 def attack_gain(clip, q0s):
-    g = ATTACK_GAIN.get(clip) if NEW_BODY else None
+    g = ATTACK_GAIN.get(clip) if NEW_BODY and not (MODE["mallet"] and clip == "Attack") else None
     if not g:
         return
     for n in ("upperarm.r", "lowerarm.r"):
@@ -421,6 +511,8 @@ def attack_gain(clip, q0s):
 
 def upright_idle(clip, f0):
     """Constant hips turn per idle clip that puts the head straight above the hips at its first frame."""
+    if MODE["mallet"] and clip == "Attack":
+        clip = "Idle"   # rig-builder-3: the mallet strike starts and ends on the Idle pose, stood up the same way
     if not IDLE_FLAT or clip not in IDLE_CLIPS:
         return
     if clip not in UPRIGHT:
@@ -437,6 +529,10 @@ def hold_slot():
         return
     Mh = (fa.matrix_world @ faP["hand.r"].matrix)
     Rs = Mh.to_3x3().normalized() @ CREL
+    if MALLET_TGT[0] is not None:
+        # rig-builder-3: in the mallet strike the handle turns in the fist (about the grip, the slot origin) the rest of
+        # the way to the keyed direction (the wrist took half of it, mallet_pose)
+        Rs = Rs.col[1].rotation_difference(MALLET_TGT[0]).to_matrix() @ Rs
     p = (fa.matrix_world @ faP["handslot.r"].matrix).translation
     S = faP["handslot.r"].matrix.to_scale()
     set_world(fa, faP["handslot.r"], Matrix.LocRotScale(p, Rs.to_quaternion(), S))
@@ -464,8 +560,11 @@ ORDER_GAP = 0.004
 
 
 def bake_action(clip, act):
-    assign(kk, act)
+    MAL = MODE["mallet"] and clip == "Attack" and "Idle" in acts
+    assign(kk, acts["Idle"] if MAL else act)
     f0, f1 = int(act.frame_range[0]), int(act.frame_range[1])
+    fi0 = int(acts["Idle"].frame_range[0]) if MAL else 0
+    MALLET_TGT[0] = None
     # Planted feet hold: while planted, a foot moves backward at exactly the class's ground speed (KayKit speed x leg
     # ratio, the speed the game moves it at), so it does not slide on the ground.
     vg_ = GROUND_SPEED.get(clip, 0.0) * RATIO
@@ -477,7 +576,7 @@ def bake_action(clip, act):
     lowered = 0.0
     gain_q0 = {}
     for f in range(f0, f1 + 1):
-        scene.frame_set(f)
+        scene.frame_set(fi0 if MAL else f)
         for pb in faP:
             k = kkP.get(pb.name)
             if (NEW_BODY or (IDLE_FLAT and clip in IDLE_CLIPS)) and pb.name.startswith("toes."):
@@ -502,15 +601,16 @@ def bake_action(clip, act):
         upright_idle(clip, f0)
         if NEW_BODY:
             arms_in(clip)
+        m_drop, m_back = mallet_pose((f - f0) / max(1, f1 - f0)) if MAL else (0.0, 0.0)
         K = snap(kk)
-        Hd = F0["hips"] + (K["hips"] - K0["hips"]) * RATIO + Vector((0, 0, LIFT))
+        Hd = F0["hips"] + (K["hips"] - K0["hips"]) * RATIO + Vector((0, m_back, LIFT - m_drop))
         targets, rots = {}, {}
         for s in SIDES:
             # The foot keeps the world rotation the clip gives it through the full-local copy (as on KayKit). The old
             # delta from the pack's rest (+ TOEFIX) was measured against a pose, not the bind: the Warrior's planted
             # right foot in StrafeR pointed 112 degrees off and the game read him "turned around".
             R = (fa.matrix_world @ faP[LEG(s)[2]].matrix).to_3x3().normalized()
-            if IDLE_FLAT and clip in IDLE_CLIPS:
+            if (IDLE_FLAT and clip in IDLE_CLIPS) or MAL:
                 R = F0["R" + s].copy()   # flat as bound (rest foot)
             elif FOOTREF:
                 # rig-batch-b: KayKit's foot turn from its flat Idle foot, applied to this body's own flat rest foot (the
@@ -614,6 +714,7 @@ def bake_action(clip, act):
             if rec[pb.name] and Quaternion(rec[pb.name][-1][1]).dot(q) < 0:
                 q = -q
             rec[pb.name].append((tuple(l), tuple(q), tuple(sc)))
+    MALLET_TGT[0] = None
     new = bpy.data.actions.new(clip)
     new.use_fake_user = True
     assign(fa, new)   # fcurve_ensure_for_datablock needs the action on the datablock
@@ -650,6 +751,97 @@ assign(kk, None)
 for m in arm_mods:
     m.show_viewport = True
 log("baked", len(baked), "of", len(acts))
+REP["mallet"] = dict(on=MALLET, contact_fraction=round(_CT, 4), wrist=MALLET_LOG[::4])
+
+
+# rig-builder-3: ladder diagnosis. (1) the back piece's weights as exported (islands of the Hero, the back region);
+# (2) how far hips, spine and chest turn per frame in the new strike and in the old scaled chop (not exported).
+def bone_track(act, bones=("hips", "spine", "chest")):
+    assign(fa, act)
+    f0_, f1_ = int(act.frame_range[0]), int(act.frame_range[1])
+    res, q0 = {b: [] for b in bones}, {}
+    for f in range(f0_, f1_ + 1):
+        scene.frame_set(f)
+        for b in bones:
+            q = (fa.matrix_world @ faP[b].matrix).to_quaternion()
+            q0.setdefault(b, q)
+            d = q @ q0[b].inverted()
+            if d.w < 0:
+                d = -d
+            res[b].append([round(math.degrees(d.angle), 1), round(math.degrees(2 * math.atan2(d.z, d.w)), 1)])
+    assign(fa, None)
+    return res
+
+
+try:
+    BB = os.environ.get("RIG_BACK_BONE", "chest")
+    ng = len(hero.vertex_groups)
+    Wm = np.zeros((nv, ng))
+    for v in hero.data.vertices:
+        for g in v.groups:
+            Wm[v.index, g.group] = g.weight
+    me_ = hero.data
+    E_ = np.empty(len(me_.edges) * 2, np.int64); me_.edges.foreach_get("vertices", E_); E_ = E_.reshape(-1, 2)
+    lab = np.arange(nv)
+    for _ in range(5000):
+        m_ = np.minimum(lab[E_[:, 0]], lab[E_[:, 1]])
+        nl = lab.copy(); np.minimum.at(nl, E_[:, 0], m_); np.minimum.at(nl, E_[:, 1], m_)
+        nl = nl[nl]
+        if (nl == lab).all():
+            break
+        lab = nl
+    chest_y = (fa.matrix_world @ fa.data.bones["chest"].head_local).y
+    hips_z = (fa.matrix_world @ fa.data.bones["hips"].head_local).z
+    Hh = float(wco[:, 2].max())
+    backm = (wco[:, 1] > chest_y + 0.05 * Hh) & (wco[:, 2] > hips_z)
+    bbi = next((g.index for g in hero.vertex_groups if g.name == BB), None)
+
+    def wstats(sel):
+        idx = np.nonzero(sel)[0]
+        if len(idx) == 0 or bbi is None:
+            return {"n": 0}
+        rigid = Wm[idx, bbi] >= 0.999
+        other = {}
+        for gi_ in range(ng):
+            if gi_ == bbi:
+                continue
+            w_ = Wm[idx, gi_]
+            if (w_ > 1e-3).any():
+                other[vg[gi_]] = [int((w_ > 1e-3).sum()), round(float(w_.max()), 3)]
+        return {"n": int(len(idx)), "rigid_on_" + BB: int(rigid.sum()), "min_" + BB + "_weight": round(float(Wm[idx, bbi].min()), 3),
+                "other_bones_count_maxw": other}
+    isl = []
+    labs, cnt = np.unique(lab, return_counts=True)
+    for L_, c_ in sorted(zip(labs, cnt), key=lambda x: -x[1])[:12]:
+        sel = lab == L_
+        P_ = wco[sel]
+        isl.append(dict(verts=int(c_), behind_back_frac=round(float(backm[sel].mean()), 3),
+                        bbox_min=[round(float(x), 3) for x in P_.min(0)], bbox_max=[round(float(x), 3) for x in P_.max(0)],
+                        weights=wstats(sel) if backm[sel].mean() > 0.5 else None))
+    REP["ladder_diag"] = dict(back_bone=BB, islands_total=int(len(labs)), islands=isl, back_region=wstats(backm),
+                              back_plane_y=round(chest_y + 0.05 * Hh, 3), hips_z=round(hips_z, 3), height=round(Hh, 3))
+    log("ladder diag", json.dumps(REP["ladder_diag"])[:3000])
+    tracks = {}
+    for c_ in ("Attack", "UseItem", "Run", "Walk", "Hit", "HitHeavy"):
+        if c_ in baked:
+            tracks[c_] = bone_track(baked[c_])
+    if MALLET and "Attack" in acts:
+        for m in arm_mods:
+            m.show_viewport = False
+        MODE["mallet"] = False
+        chop, _, _ = bake_action("Attack", acts["Attack"])
+        MODE["mallet"] = MALLET
+        chop.name = "AttackChop_diag"
+        for m in arm_mods:
+            m.show_viewport = True
+        tracks["AttackChop_old"] = bone_track(chop)
+    REP["torso_turn_per_frame_deg_total_yaw"] = {c_: t_ for c_, t_ in tracks.items() if c_.startswith("Attack")}
+    REP["torso_turn_max_deg"] = {c_: {b: [max(x[0] for x in v), max(abs(x[1]) for x in v)] for b, v in t_.items()}
+                                 for c_, t_ in tracks.items()}
+    log("torso turn max (total, |yaw|) from each clip's first frame", json.dumps(REP["torso_turn_max_deg"]))
+except Exception:
+    import traceback as _tb
+    log("ladder diag failed", _tb.format_exc()[-1500:])
 REP["hips_lowered_max"] = {c: round(v, 4) for c, v in lows.items() if v > 0}
 REP["tip_min_before_after"] = {c: [round(a, 3), round(b, 3)] for c, (a, b) in TIP_MIN.items()}
 log("tip min z before/after", REP["tip_min_before_after"], "idle lean before (deg)", REP.get("idle_lean_deg"))

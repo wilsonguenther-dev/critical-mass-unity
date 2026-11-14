@@ -376,7 +376,11 @@ try:
     back &= np.linalg.norm(P - headc, axis=1) > 0.65 * (J['_headtop'].z - J['head'].z)   # hair buns stay on the head
     # rig-builder-2 (owner's look 2): NO arm exception, and the head-top rule runs after this and skips the pack: the
     # ladder's top rail above the head was taken by the head rule, so the ladder fanned between head and chest in Attack.
-    W[back] = 0; W[back, bi['chest']] = 1; locked |= back
+    # rig-builder-3: the bone that carries the back piece can be set per run (env RIG_BACK_BONE: chest, spine or hips)
+    BACK_BONE = os.environ.get('RIG_BACK_BONE', 'chest')
+    BACK_BONE = BACK_BONE if BACK_BONE in bi else 'chest'
+    REP['back_bone'] = BACK_BONE
+    W[back] = 0; W[back, bi[BACK_BONE]] = 1; locked |= back
     rig_head = (P[:, 2] > J['head'].z + 0.06 * H) & np.isin(dom, [bi['head'], bi['chest'], bi['spine']]) & ~back
     W[rig_head] = 0; W[rig_head, bi['head']] = 1; locked |= rig_head
     # rig-healer-1: a cloth panel hanging behind the legs to the floor rides the hips (joint file "_flap_y": metres behind)
