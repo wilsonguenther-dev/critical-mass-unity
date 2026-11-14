@@ -19,7 +19,9 @@ namespace CriticalMass.Runtime.Game
     /// also hands focus back to the app the owner was using. Fullscreen requests become a window (a hidden fullscreen
     /// window would still claim the display).</item>
     /// <item>Audio is muted (AudioListener.volume 0, enforced every frame, after GameSettings applies the saved volume);
-    /// the audio engine still runs, so smoke measurements of its cost stay valid.</item>
+    /// the audio engine still runs, so smoke measurements of its cost stay valid. feat/flow-capture-1: -soundVolume V
+    /// (0 to 1) keeps the sound on at V instead, enforced the same way, and logs every music and sound cue that starts and
+    /// stops, plus the silent gaps, as [CM.Audio] lines (AudioCueLog).</item>
     /// <item>The editor, batch mode and test runs are never touched. Other platforms: the flag parsing applies, the hiding
     /// is macOS only (Windows test runs go through tools/windows-run.ps1 on a separate machine).</item>
     /// </list>
@@ -28,13 +30,27 @@ namespace CriticalMass.Runtime.Game
     public static class AutomationWindow
     {
         public const string LogTag = "[CM.Window]";
+        /// <summary>feat/flow-capture-1: -soundVolume V keeps the sound on at V (0..1) in an automated run and logs the cues.</summary>
+        public const string SoundVolumeFlag = "-soundvolume";
+        static float _volume;
+
+        /// <summary>The -soundVolume value (clamped 0..1), or -1 when the flag is absent or has no number (pure; tests).</summary>
+        public static float SoundVolume(string[] args)
+        {
+            if (args == null) return -1f;
+            for (int i = 0; i < args.Length - 1; i++)
+                if ((args[i] ?? "").Trim().ToLowerInvariant() == SoundVolumeFlag
+                    && float.TryParse(args[i + 1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float v))
+                    return Mathf.Clamp01(v);
+            return -1f;
+        }
         public const string ShowWindowFlag = "-showwindow";
 
         /// <summary>Command-line flags that only automated runs use (lower case; matched case-insensitively).</summary>
         public static readonly string[] AutomationFlags =
         {
             "-autoplay", "-quitaftermatch", "-autoplaymatches", "-autoplayqualities", "-perflog", "-shots", "-simhashout",
-            "-capture", "-soak", "-tracestates", "-debughangseconds", "-automation", "-groundshots", "-followshots", "-shottick",
+            "-capture", "-soak", "-tracestates", "-debughangseconds", "-automation", "-groundshots", "-followshots", "-flowshots", "-shottick",
         };
 
         /// <summary>True when this run must stay hidden: an automation flag is present and -showWindow is not (pure; tests).</summary>
@@ -69,11 +85,16 @@ namespace CriticalMass.Runtime.Game
                 Screen.SetResolution(Mathf.Max(640, Screen.width), Mathf.Max(360, Screen.height), FullScreenMode.Windowed);
             Native.MakeAccessory();
             Native.HideNow();
-            AudioListener.volume = 0f;
+            float sound = SoundVolume(Environment.GetCommandLineArgs());
+            _volume = sound > 0f ? sound : 0f;
+            AudioListener.volume = _volume;
             var go = new GameObject("CriticalMass AutomationWindow") { hideFlags = HideFlags.HideAndDontSave };
             UnityEngine.Object.DontDestroyOnLoad(go);
             go.AddComponent<Keeper>();
-            Debug.Log($"{LogTag} automated run: window hidden, click-through and muted, no Dock icon (pass -showWindow to watch it)");
+            if (sound >= 0f) go.AddComponent<AudioCueLog>();
+            Debug.Log(sound >= 0f
+                ? $"{LogTag} automated run: window hidden and click-through, no Dock icon, sound ON at {_volume:F2} with the cue log (pass -showWindow to watch it)"
+                : $"{LogTag} automated run: window hidden, click-through and muted, no Dock icon (pass -showWindow to watch it)");
         }
 
         /// <summary>Re-hides every frame the app was shown or activated; keeps the audio muted.</summary>
@@ -81,7 +102,7 @@ namespace CriticalMass.Runtime.Game
         {
             void LateUpdate()
             {
-                if (AudioListener.volume != 0f) AudioListener.volume = 0f;
+                if (AudioListener.volume != _volume) AudioListener.volume = _volume;
                 if (Screen.fullScreenMode != FullScreenMode.Windowed)
                     Screen.SetResolution(Mathf.Max(640, Screen.width), Mathf.Max(360, Screen.height), FullScreenMode.Windowed);
                 if (Native.NeedsHide())
