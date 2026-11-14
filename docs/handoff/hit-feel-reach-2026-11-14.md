@@ -150,3 +150,21 @@ Every class reports drawn ground 1.50 u at the pair and 1.50 u at the camera, wi
 
 - **Line-of-sight test:** test the segment from the camera to the pair's chest against the bounds of every world renderer except the two fighters (Bounds.IntersectRay, capture-only cost). Try the 8 compass directions and two arm lengths (5.5 and 3.5 u), with a 20 to 30 degree downward angle. Use the first clear one; if none is clear, fail the class loudly.
 - **Simpler alternative:** stage every class on the Warrior's spot (x 58.1, z 3.5), which is known to frame well. Keep the line-of-sight test as the loud check.
+
+## Owner direction 2026-11-14
+
+The owner's words: "it should be based off how long the weapon is ... real logic and physics".
+
+So each class's attack range follows what its weapon really reaches. The art lead is being asked to confirm before any rule changes.
+
+Order of work for next session:
+
+1. **Fix the measure.**
+   - Read the tip on the frame where the strike is actually drawn (the capture frame), not one tick early.
+   - Pose the clip on the upper-body layer, as the game plays it, when picking the striking end and the view contact.
+   - Measure the Healer's lantern hand (hand.l), with the clip the animator actually plays.
+   - Give Demolitions her real weapon in place of the stand-in pry bar.
+2. **Re-read each class's reach** from the fixed capture: the tip gap at contact, the swing table and the furthest-forward point.
+3. **Set each class's range from its measured reach, in one data table.** The range IS the reach, never a hand-typed number, so a longer weapon automatically reaches further.
+4. **Re-pin the checksums** (the fixed-seed sim checksum changes with the ranges) and run a bot balance check.
+5. **Art lead sign-off.**
