@@ -417,7 +417,8 @@ namespace CriticalMass.Runtime.View
                 m.SetLod(AnimLod.PickLod(i == _lodSelf, Vector3.Distance(lodAt, _targetPos), _lodCut, row));
             if (i == _lodSelf) SelfRim(m, _lowView && CriticalMass.Runtime.Camera.GroundView.ActiveView == CriticalMass.Runtime.Camera.CameraView.ThirdPerson);
             Vector3 basePos = SimSpace.ToWorld(x, h, z);
-            m.Transform.localPosition = basePos + (hasFx ? fx.Nudge : Vector3.zero) + JumpLift.Offset(w, map, i, a, x, z); // DG-02 jump arc
+            m.Transform.localPosition = basePos + (hasFx ? fx.Nudge : Vector3.zero) + JumpLift.Offset(w, map, i, a, x, z) // DG-02 jump arc
+                + Anim.HitFeel.Lunge(w, i, a);   // feat/hit-feel-1: a short step into the swing, absorbed after contact (view only)
             Material teamMat = ArtMaterials.ForTeam(m.Spec, actor.Team);
             m.SetMaterial(hasFx && fx.Flash ? _fx.FlashMaterial(teamMat) : teamMat);
             // Animation pass: clips, timing, facing spring, squash and the level of detail live in Anim.ActorAnimator.
