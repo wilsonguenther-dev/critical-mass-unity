@@ -54,6 +54,7 @@ namespace CriticalMass.Runtime.View.Mechanics
             _ground = new FxMeshBuilder("Mechanics Ground", GroundVerts, GroundVerts * 3);
             _solid = new FxMeshBuilder("Mechanics Solid", SolidVerts, SolidVerts * 2);
             _air = new FxMeshBuilder("Mechanics Air", AirVerts, AirVerts * 3);
+            _air.ViewCulled = _air.NearFade = true;   // follow-camera-3: air sprites (sparks, puffs, crosses) never fill the lens
             Shader sh = UnityEngine.Resources.Load<Shader>("CMFxUnlit");
             if (sh == null) sh = Shader.Find("CM/FxUnlit");
             if (sh == null) { enabled = false; return; }

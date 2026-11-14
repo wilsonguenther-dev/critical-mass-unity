@@ -74,6 +74,9 @@ namespace CriticalMass.Runtime.Camera
         /// while the autopilot drives actor 0.</summary>
         public static CameraView? ViewOverride;
         public static bool ForcePlay;
+        /// <summary>follow-camera-3: a sim point (x, z) the auto-follow should face in the low play views (captures frame
+        /// the fight and the Kaiju with it). Null = behind the fighter as usual.</summary>
+        public static Vector2? AimAt;
 
         public SimDriverBehaviour Driver;
         public GroundViewMode Mode { get; private set; }
@@ -363,6 +366,12 @@ namespace CriticalMass.Runtime.Camera
             double behind = moving ? GroundCamera.YawToward(0, 0, vx, vz, GroundCamera.YawOfFacing(facing)) : GroundCamera.YawOfFacing(facing);
             bool reduce = CriticalMass.Runtime.View.Effects.FeelGate.ReduceMotion;
             double defPitch = rig.FirstPerson ? FollowCamera.FirstPitch : FollowCamera.ThirdPitch;
+            // follow-camera-3: a capture (or a later feature) may ask the auto-follow to frame a point of action.
+            if (AimAt.HasValue) behind = GroundCamera.YawToward(w.X[id], w.Z[id], AimAt.Value.x, AimAt.Value.y, behind);
+            // follow-camera-3: first person turns the view off a wall right in front of the eyes (view only; the controls
+            // stay latched while a move is held).
+            if (rig.FirstPerson && !_manual)
+                behind = FollowCamera.WallYaw(w.Map, w.X[id], GroundHeight.At(w.Map, w.X[id], w.Z[id]) + FollowCamera.EyeHeight, w.Z[id], behind, _cyl, _cylCount);
             if (snap)
             {
                 _yawFollow.Reset(GroundCamera.YawOfFacing(facing));
@@ -591,9 +600,11 @@ namespace CriticalMass.Runtime.Camera
             if (on)
             {
                 Shader.SetGlobalVector(FadeCamId, new Vector4(camPos.x, camPos.y, camPos.z, 1f));
-                Shader.SetGlobalVector(FadeTargetId, new Vector4(_chest.x, _chest.y, _chest.z, ViewCull.FadeRadius));
+                // follow-camera-3: aim the see-through at head and shoulders (chest + 0.35), not the belly.
+                Shader.SetGlobalVector(FadeTargetId, new Vector4(_chest.x, _chest.y + 0.35f, _chest.z, ViewCull.FadeRadius));
                 _fadeSet = true;
             }
+            ViewCull.SetFollowLine(_chest + new Vector3(0f, 0.35f, 0f), on);
             else if (_fadeSet)
             {
                 Shader.SetGlobalVector(FadeCamId, Vector4.zero);
