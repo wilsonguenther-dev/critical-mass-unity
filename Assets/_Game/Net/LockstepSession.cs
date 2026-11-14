@@ -26,7 +26,7 @@ namespace CriticalMass.Net
         /// <summary>A client that has not heard from the host for this long ends with HostLeft.</summary>
         public int HostLostMs = 8000;
         /// <summary>At most one packet per peer this often while there is news, and a keep-alive this often without.</summary>
-        public int SendEveryMs = 15;
+        public int SendEveryMs = 30;
         public int KeepAliveMs = 250;
         /// <summary>Largest per-client input lead the adaptive delay may reach (ticks).</summary>
         public int MaxLead = 20;
@@ -145,6 +145,8 @@ namespace CriticalMass.Net
         private readonly ulong[] _theirHash;
 
         private long _lastNow = -1;
+        private long _nowMs;
+        private long _leadUpMs = long.MinValue / 2;
         private double _acc;
         private long _startMs = -1;
 
@@ -221,6 +223,7 @@ namespace CriticalMass.Net
         {
             if (_lastNow < 0) { _lastNow = nowMs; _startMs = nowMs; _lastFromHost = nowMs; if (IsHost) for (int k = 0; k < _h; k++) _lastHeard[k] = nowMs; }
             long dt = Math.Max(0, nowMs - _lastNow);
+            _nowMs = nowMs;
             _lastNow = nowMs;
             while (_t.Poll(out TransportEvent ev)) Handle(ref ev, nowMs);
             if (Status == LockstepStatus.Running || Status == LockstepStatus.Ended)
@@ -485,7 +488,8 @@ namespace CriticalMass.Net
                     {
                         // The host had to replace our input (it came too late): lead one tick more.
                         LateInputs++;
-                        if (Lead < _o.MaxLead) Lead++;
+                        // One step up per half second: a burst of late ticks is one late episode, not ten.
+                        if (Lead < _o.MaxLead && _nowMs - _leadUpMs >= 500) { Lead++; _leadUpMs = _nowMs; }
                     }
                 }
             }
