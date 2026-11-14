@@ -16,9 +16,10 @@ namespace CriticalMass.Sim.Tests
     [TestFixture]
     public sealed class MovementShiverTests
     {
-        private static World NewWorld(bool guard, int teamSize = 5, int seed = 7)
+        private static World NewWorld(bool guard, int teamSize = 5, int seed = 7, bool? squeeze = null)
         {
             GameConfig cfg = GameConfig.CreateDefault();
+            cfg.Physics.KaijuBridgeSqueeze = squeeze ?? guard; // feat/kaiju-bridges-1
             cfg.Physics.KaijuNavGuard = guard;
             cfg.Physics.BotWideLine = guard;
             cfg.Physics.BotCalmSteer = guard;
@@ -121,7 +122,8 @@ namespace CriticalMass.Sim.Tests
         [Test]
         public void TheKaijuMakesAStableDecisionAtTheBridgeMouthFor600Ticks()
         {
-            World w = NewWorld(true);
+            // Without the bridge squeeze (feat/kaiju-bridges-1 makes this bridge reachable; see the bridge tests below).
+            World w = NewWorld(true, squeeze: false);
             int target = Setup(w, KaijuX, KaijuZ);
             var watch = new ShiverWatch();
             int flags = RunPinned(w, target, BridgeX, BridgeZ, 600, watch, out double closest);
@@ -163,6 +165,7 @@ namespace CriticalMass.Sim.Tests
                         cfg.Physics.KaijuNavGuard = guard;
                         cfg.Physics.BotWideLine = guard;
                         cfg.Physics.BotCalmSteer = guard;
+                        cfg.Physics.KaijuBridgeSqueeze = guard;
                         cfg.HatchSeconds = hatch;
                         World w = World.CreateWorld(new WorldOptions
                         {
@@ -383,6 +386,149 @@ namespace CriticalMass.Sim.Tests
                               ",\"at\":\"" + w.X[0].ToString("F1") + "," + w.Z[0].ToString("F1") + "\"}");
             Assert.IsTrue(gathered, "gathered within 120 s (stuck at " + w.X[0].ToString("F1") + ", " + w.Z[0].ToString("F1") + ")");
             Assert.IsTrue(delivered, "delivered within 120 s (stuck at " + w.X[0].ToString("F1") + ", " + w.Z[0].ToString("F1") + ")");
+        }
+
+
+        // ---- feat/kaiju-bridges-1 (art lead 2026-11-14: "the Kaiju tends to get stuck when trying to walk through the bridges")
+
+        /// <summary>The narrow bridges, (x0, z0) to (x1, z1), both halves of the map. The wide north-south ones (hill to shrine
+        /// island, hill to south island) always fit and are not listed.</summary>
+        private static readonly double[][] NarrowBridges =
+        {
+            new double[] { 18, 37, 40, 40 }, new double[] { 94, 37, 72, 40 },   // base to hill
+            new double[] { 13, 27, 23, 21 }, new double[] { 99, 27, 89, 21 },   // base to north island
+            new double[] { 35, 20, 44, 30 }, new double[] { 77, 20, 68, 30 },   // north island to the hill ring end
+            new double[] { 13, 45, 23, 52 }, new double[] { 99, 45, 89, 52 },   // base to south island
+            new double[] { 35, 55, 44, 50 }, new double[] { 77, 55, 68, 50 },   // south island to the hill
+            new double[] { 35, 15, 45, 11 }, new double[] { 77, 15, 67, 11 },   // north island to the shrine island
+            new double[] { 35, 59, 48, 64 }, new double[] { 77, 59, 64, 64 },   // south island to the far south island
+        };
+
+        /// <summary>A Kaiju clearance cell at or next to (x, z) (centre), or false.</summary>
+        private static bool KaijuCellNear(World w, double x, double z, out double cx, out double cz)
+        {
+            MapDef clear = w.KaijuNav.Clear;
+            int ox = (int)Math.Floor(x), oz = (int)Math.Floor(z);
+            for (int ring = 0; ring <= 2; ring++)
+                for (int dz = -ring; dz <= ring; dz++)
+                    for (int dx = -ring; dx <= ring; dx++)
+                    {
+                        if (Math.Max(Math.Abs(dx), Math.Abs(dz)) != ring || !MapGrid.IsWalkable(clear, ox + dx, oz + dz)) continue;
+                        cx = ox + dx + 0.5;
+                        cz = oz + dz + 0.5;
+                        return true;
+                    }
+            cx = cz = 0;
+            return false;
+        }
+
+        [TestCase(true)]
+        [TestCase(false)]
+        public void TheKaijuCanPathFromItsHatchSpotToEachBaseTheHillAndEveryIsland(bool squeeze)
+        {
+            World w = NewWorld(true, squeeze: squeeze);
+            SimResources.ApplyDelivery(w, TeamId.Azure, CarryKind.Biomass, 1);
+            w.ForceHatch = true;
+            SimStep.Step(w);
+            SimStep.Step(w); // the clearance grid is current
+            Kaiju k = w.Kaiju;
+            MapDef map = w.Map;
+            var names = new[] { "Azure base", "Crimson base", "hill", "north-west island", "north-east island", "south-west island", "south-east island", "south island" };
+            var spots = new[]
+            {
+                new PointXZ(map.Pads[0].X, map.Pads[0].Z), new PointXZ(map.Pads[1].X, map.Pads[1].Z), new PointXZ(map.Hill.X, map.Hill.Z),
+                new PointXZ(28.5, 18.5), new PointXZ(83.5, 18.5), new PointXZ(28.5, 56.5), new PointXZ(83.5, 56.5), new PointXZ(56.5, 65.5),
+            };
+            int unreached = 0;
+            var goal = new PointXZ[1];
+            FlowField f = null;
+            int kc = (int)Math.Floor(k.Z) * map.Width + (int)Math.Floor(k.X);
+            for (int i = 0; i < spots.Length; i++)
+            {
+                Assert.IsTrue(KaijuCellNear(w, spots[i].X, spots[i].Z, out double gx, out double gz) || !squeeze, names[i] + " has a cell the Kaiju fits in");
+                goal[0] = new PointXZ(gx, gz);
+                f = FlowField.ComputeFlowField(w.KaijuNav.Clear, goal, f);
+                bool ok = double.IsFinite(f.Dist[kc]);
+                if (!ok) unreached++;
+                Console.WriteLine("{\"item\":\"kaiju reach\",\"squeeze\":" + (squeeze ? "true" : "false") + ",\"to\":\"" + names[i] +
+                                  "\",\"reached\":" + (ok ? "true" : "false") + ",\"path\":" + (ok ? f.Dist[kc].ToString("F1") : "null") + "}");
+            }
+            if (squeeze) Assert.AreEqual(0, unreached, "from its hatch spot the Kaiju reaches both bases, the hill and every island");
+            else Assert.Greater(unreached, 0, "the old 1.1 m collider is cut off (the bug)");
+        }
+
+        /// <summary>
+        /// Each narrow bridge, from each end: a Crimson-owned Kaiju starts at the bridge end, the human fighter (actor 0, idle, not
+        /// pinned, so it can be shoved) stands mid-bridge. The Kaiju must reach claw range with no shiver flag; the fighter must
+        /// never be put on a cell it cannot stand on (pushed off the bridge), and never be held inside the Kaiju's body (trapped or
+        /// crushed) for more than half a second: the body gives way or shoves it along, as on wide ground.
+        /// </summary>
+        [Test]
+        public void TheKaijuCrossesEveryNarrowBridgeFromEachEndAndReachesAFighterMidBridgeWithoutCrushingIt()
+        {
+            int failures = 0;
+            for (int b = 0; b < NarrowBridges.Length; b++)
+            {
+                for (int end = 0; end < 2; end++)
+                {
+                    double[] br = NarrowBridges[b];
+                    World w = NewWorld(true);
+                    SimResources.ApplyDelivery(w, TeamId.Crimson, CarryKind.Biomass, 1);
+                    w.ForceHatch = true;
+                    SimStep.Step(w);
+                    SimStep.Step(w);
+                    for (int id = 1; id < w.ActorCount; id++) Bench(w, id);
+                    double sx = end == 0 ? br[0] : br[2], sz = end == 0 ? br[1] : br[3];
+                    Assert.IsTrue(KaijuCellNear(w, sx, sz, out double kx, out double kz), "bridge " + b + " end " + end + " has a Kaiju cell");
+                    Kaiju k = w.Kaiju;
+                    k.X = kx; k.Z = kz; k.PrevX = kx; k.PrevZ = kz;
+                    double mx = Math.Floor((br[0] + br[2]) / 2) + 0.5, mz = Math.Floor((br[1] + br[3]) / 2) + 0.5;
+                    if (!MapGrid.IsWalkable(w.Map, (int)Math.Floor(mx), (int)Math.Floor(mz))) mz += 1;
+                    Pin(w, 0, mx, mz);
+                    var watch = new ShiverWatch();
+                    InputFrame idle = SimInput.EmptyInput();
+                    InputFrame scratch = SimInput.EmptyInput();
+                    double closest = double.PositiveInfinity;
+                    int offBridge = 0, inside = 0, worstInside = 0;
+                    double bodyR = w.Config.Physics.KaijuBodyRadius + w.Config.Class(w.Actors[0].Cls).Radius;
+                    for (int t = 0; t < 900; t++)
+                    {
+                        w.Actors[0].Hp = w.Actors[0].MaxHp; // never knocked out: the scene holds
+                        MatchTick.Advance(w, idle, scratch);
+                        watch.Observe(w);
+                        double dx = w.X[0] - k.X, dz = w.Z[0] - k.Z, d = Math.Sqrt(dx * dx + dz * dz);
+                        closest = Math.Min(closest, d);
+                        // feat/kaiju-bridges-2: "off the bridge" is the sim's own stand rule (Collide.ActorFits: the box rule, or on a
+                        // diagonal deck, CM-33). Round 1 tested the raster cell under the centre, which is VOID on the stair-step
+                        // edges of a diagonal deck a fighter legally stands on: every "pushed off" of run 43636579754 was that.
+                        if (w.Actors[0].Alive && w.Actors[0].AirLen <= 0 && !Collide.ActorFits(w, w.X[0], w.Z[0], Collide.ActorRadius(w, 0))) offBridge++;
+                        inside = d < bodyR - 0.3 ? inside + 1 : 0;
+                        worstInside = Math.Max(worstInside, inside);
+                    }
+                    int kaijuFlags = 0;
+                    foreach (ShiverFlag f in watch.Flags) if (f.Actor == ShiverWatch.KaijuId) { kaijuFlags++; Console.WriteLine(ShiverWatch.Format(f)); }
+                    bool ok = closest <= w.Config.Kaiju.MeleeRange && kaijuFlags == 0 && offBridge == 0 && worstInside <= 15;
+                    if (!ok) failures++;
+                    Console.WriteLine("{\"item\":\"kaiju bridge crossing\",\"bridge\":" + b + ",\"from\":" + end + ",\"ok\":" + (ok ? "true" : "false") +
+                                      ",\"closest\":" + closest.ToString("F2") + ",\"kaijuFlags\":" + kaijuFlags + ",\"offBridgeTicks\":" + offBridge +
+                                      ",\"insideBodyTicks\":" + worstInside + ",\"squeeze\":" + Kaiju.SqueezeAmount(w).ToString("F2") + "}");
+                }
+            }
+            Assert.AreEqual(0, failures, "every narrow bridge, from each end: claw reach, no Kaiju shiver flag, the fighter never pushed off nor held inside the body (lines above)");
+        }
+
+        [Test]
+        public void TheKaijuWallColliderIsTheFullOneOnWideGround()
+        {
+            World w = NewWorld(true);
+            SimResources.ApplyDelivery(w, TeamId.Azure, CarryKind.Biomass, 1);
+            w.ForceHatch = true;
+            SimStep.Step(w);
+            Kaiju k = w.Kaiju;
+            k.X = w.Map.Hill.X + 0.5; k.Z = w.Map.Hill.Z + 0.5; k.PrevX = k.X; k.PrevZ = k.Z;
+            for (int t = 0; t < 60; t++) SimStep.Step(w);
+            Assert.AreEqual(w.Config.Physics.KaijuGridRadius, Kaiju.WallR(w), 1e-6, "full collider on the hill");
+            Assert.AreEqual(0, Kaiju.SqueezeAmount(w), 1e-6);
         }
 
         [Test]
