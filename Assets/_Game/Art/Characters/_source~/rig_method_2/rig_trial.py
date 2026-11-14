@@ -101,7 +101,21 @@ save_report()
 # ---------------------------------------------------------------- 1. the class's Hero meshes in bind shape
 bpy.ops.wm.read_factory_settings(use_empty=True)
 scene = bpy.context.scene
-objs, _ = imp(CLASS_FBX)
+if CLASS_FBX.lower().endswith('.glb'):
+    # a raw generated model (no rig): import, scale to the 2.0 m class height
+    bo = set(bpy.data.objects)
+    bpy.ops.import_scene.gltf(filepath=CLASS_FBX if os.path.isabs(CLASS_FBX) else os.path.join(REPO, CLASS_FBX))
+    objs = [o for o in bpy.data.objects if o not in bo]
+    for o in objs:
+        if o.type == 'MESH':
+            o.name = 'Generated_Hero_Body'
+            mw = o.matrix_world.copy(); o.parent = None; o.matrix_world = mw
+            o.data.transform(o.matrix_world); o.matrix_world = Matrix.Identity(4)
+            hgt = o.dimensions.z
+            o.data.transform(Matrix.Scale(2.0 / hgt, 4))
+            log('generated mesh', len(o.data.vertices), 'verts, scaled', round(2.0 / hgt, 3))
+else:
+    objs, _ = imp(CLASS_FBX)
 old_arm = next((o for o in objs if o.type == 'ARMATURE'), None)
 old_heads = {b.name: (old_arm.matrix_world @ b.head_local) for b in old_arm.data.bones} if old_arm else {}
 template_names = [b.name for b in old_arm.data.bones] if old_arm else []

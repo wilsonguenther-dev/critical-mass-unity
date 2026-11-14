@@ -90,6 +90,37 @@ def comps(nv, F):
         return components_np(nv, F)
 
 
+def track_up(V, F, hc, sg, H, z0, notes, side):
+    """Fallback for A-pose arms: follow the arm's horizontal section upward from just above the hand until it merges
+    with the torso. Returns the shoulder joint or None."""
+    Z = np.array([0, 0, 1.0])
+    prev = None; track = []
+    zz = hc[2] + 0.05 * H
+    while zz < z0 + 0.80 * H:
+        ls = [l for l in plane_loops(V, F, np.array([0, 0, zz]), Z) if l['c'][0] * sg > 0]
+        ref = prev['c'] if prev is not None else hc
+        ls = [l for l in ls if np.linalg.norm((l['c'] - ref)[:2]) < (0.06 if prev is not None else 0.14) * H]
+        if not ls:
+            break
+        l = min(ls, key=lambda q: np.linalg.norm((q['c'] - ref)[:2]))
+        inner = l['min'][0] if sg > 0 else -l['max'][0]
+        if prev is not None:
+            pin = prev['min'][0] if sg > 0 else -prev['max'][0]
+            if inner < pin - 0.04 * H or l['per'] > 2.2 * prev['per'] or inner < 0.02 * H:
+                break
+        track.append((zz, l)); prev = l
+        zz += 0.004 * H
+    if len(track) < 5:
+        return None
+    fr_t = (track[-1][0] - z0) / H
+    fr = min(max(fr_t, 0.45), 0.62)
+    l = min(track, key=lambda t: abs(t[0] - (z0 + fr * H)))[1]
+    inner = l['min'][0] if sg > 0 else l['max'][0]
+    outer = l['max'][0] if sg > 0 else l['min'][0]
+    notes.append(f'arm {side}: vertical march fallback, armpit {fr_t:.3f} H (used {fr:.3f} H), {len(track)} sections')
+    return np.array([inner + 0.35 * (outer - inner), l['c'][1], z0 + fr * H + 0.045 * H])
+
+
 def find(V0, F0, arm_seed=None, force_pose=None):
     notes = []
     V, F, _ = weld(V0, F0)
@@ -177,12 +208,18 @@ def find(V0, F0, arm_seed=None, force_pose=None):
                 p = l['c'] + d * 0.006 * H
                 if p[0] * sg < 0.05 * H:
                     break
-            if len(track) < 5:
-                notes.append(f'arm {side}: track failed ({len(track)} sections)'); continue
-            l = track[-1][1]
-            sh = l['c'] + d * 0.02 * H
+            sh = None
+            if len(track) >= 5:
+                sh = track[-1][1]['c'] + d * 0.02 * H
+            if sh is None or not (0.40 * H < sh[2] - z0 < 0.78 * H) or abs(sh[0]) > 0.35 * H:
+                notes.append(f'arm {side}: march along the arm gave {len(track)} sections; trying the vertical march')
+                if not tpose:
+                    sh = track_up(V, F, hc, sg, H, z0, notes, side)
+                if sh is None:
+                    notes.append(f'arm {side}: not found (needs seed joints)'); continue
+                d = (sh - hc) / np.linalg.norm(sh - hc); track = track or [(None, None)]
             fr = (sh[2] - z0) / H
-            notes.append(f'arm root {side} at x {sh[0]:.3f}, {fr:.3f} H (arm followed {len(track)} sections in from the hand)')
+            notes.append(f'arm root {side} at x {sh[0]:.3f}, {fr:.3f} H')
         L['upperarm.' + side] = sh
         ax_ = hc - sh; alen = np.linalg.norm(ax_); ax_ /= alen
         # wrist: thinnest arm section between 55% and 92% of shoulder->hand, cut perpendicular to the arm
