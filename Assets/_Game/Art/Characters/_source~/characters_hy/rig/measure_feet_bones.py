@@ -83,6 +83,17 @@ for spec in PACKS:
                 if abs(ang) > 90: bad_f.append((f, q, round(ang), round(gaps[-1], 3)))
             FACE[cls + " " + cn] = (len(bad_f), f1 - f0 + 1)
             print("[facing]", cls, cn, "turned-around frames", len(bad_f), "of", f1 - f0 + 1, bad_f[:6], flush=True)
+        # Arms as the game reads them (the pack's own armature, absolute local rotations): wrist drop below the
+        # shoulder and the spread between the two handslots, worst frame, per clip.
+        if a.name.split("|")[-1] in ("Idle", "Walk", "Run", "Attack"):
+            drops, spread = [], []
+            for f in range(f0, f1 + 1):
+                bpy.context.scene.frame_set(f)
+                pb = arm.pose.bones
+                P = lambda b: arm.matrix_world @ pb[b].head
+                drops.append(min(P("upperarm." + q).z - P("wrist." + q).z for q in "lr"))
+                spread.append(max(abs((P("handslot.l") - P("handslot.r")).x), abs((P("wrist.l") - P("wrist.r")).x)))
+            print("[arms]", cls, a.name.split("|")[-1], "wrist below shoulder min %.3f max %.3f, hand spread max %.3f" % (min(drops), max(drops), max(spread)), flush=True)
         res["clips"][a.name.split("|")[-1]] = dict(worst_float=round(worst, 3), at_frame=wf, lowest=round(low, 3), frames=f1 - f0 + 1)
     bad = {k: v for k, v in res["clips"].items() if v["worst_float"] > 0.35 or v["lowest"] < -0.2}
     res["fails_game_limits"] = bad
