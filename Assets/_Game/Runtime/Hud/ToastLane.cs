@@ -14,6 +14,16 @@ namespace CriticalMass.Runtime.Hud
     {
         public const int Cap = 3;
         public const float Seconds = 2f;
+        /// <summary>fix/hud-containment-5: a notice fades in and out inside its Seconds instead of popping.</summary>
+        public const float FadeIn = 0.15f, FadeOut = 0.2f;
+
+        /// <summary>The shown notice's opacity at now (0 when none).</summary>
+        public static float Alpha(float now)
+        {
+            if (_shown == null || now >= _until) return 0f;
+            float age = Seconds - (_until - now);
+            return Mathf.Clamp01(Mathf.Min(age / FadeIn, (_until - now) / FadeOut));
+        }
 
         static readonly string[] _queue = new string[Cap];
         static int _head, _count;

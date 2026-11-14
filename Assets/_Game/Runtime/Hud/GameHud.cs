@@ -226,7 +226,7 @@ namespace CriticalMass.Runtime.Hud
             _medallionHalf.Fill01 = 0.5f;
             _medallionHalf.gameObject.SetActive(false);
             Icon(_medallion.transform, "Crown", UiIcons.Crown, 13f, 11f, 34f, 34f);
-            _hillWord = Label(c, "Hill Word", CMTokens.Ui, UiScale.TypeSmall, Cream, TextAnchor.MiddleCenter, 250f, 106f, 300f, 24f, "NEUTRAL");
+            _hillWord = Label(c, "Hill Word", CMTokens.Ui, UiScale.TypeSmall, Cream, TextAnchor.MiddleCenter, 250f, 106f, 300f, 22f, "NEUTRAL");   // fix/hud-containment-5: ends at the band's 128 (was 130, under the job line's gap)
         }
 
         void BuildTeamPanel(RectTransform c, TeamId team, float x, out Text score, VectorShape[] pips, out Text onHill)

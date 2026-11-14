@@ -82,9 +82,14 @@ namespace CriticalMass.Runtime.Hud
 
         // ---- owner walk 1: the named pieces that used to pick their own spots (every one is checked by the collision test) ----
         /// <summary>Top of the centre lane's residents: the job line, the team stock and the map-event bar sit here.</summary>
+        /// <remarks>fix/hud-containment-5 (owner: three things centre-top at once): one order, top down, with one gap
+        /// (StackGap 12): the top band (clock, scores, hill bar, its word, ends at 128), the job line, the stock chips, the
+        /// map-event bar. Each enters over StackIn, leaves over StackOut, and steps back at once for anything that holds
+        /// the centre lane.</remarks>
+        public const float StackGap = 12f, StackIn = 0.2f, StackOut = 0.25f;
         public const float JobY = 140f, JobW = 760f, JobH = 40f;
-        public const float StockY = 188f, StockH = 40f, StockChipW = 150f, StockChipGap = 10f, StockW = 3f * StockChipW + 2f * StockChipGap;   // fix/hud-containment-3: 470 (was 342; WATER clipped)
-        public const float EventY = 236f, EventW = 560f, EventH = 38f;
+        public const float StockY = JobY + JobH + StackGap, StockH = 40f, StockChipW = 150f, StockChipGap = 10f, StockW = 3f * StockChipW + 2f * StockChipGap;   // fix/hud-containment-3: 470 (was 342; WATER clipped)
+        public const float EventY = StockY + StockH + StackGap, EventW = 560f, EventH = 38f;
         /// <summary>
         /// The job line, stock and event bar live INSIDE the centre lane (the lane's lowest-priority residents): they show
         /// while nothing else holds the lane and step back for the banner, the Kaiju callout, the autopilot banner and the
