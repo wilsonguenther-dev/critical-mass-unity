@@ -29,7 +29,12 @@ CLS = argv[2] if len(argv) > 2 else "Farmer"
 # her ankles to +-0.165 (about KayKit's width), 6 degrees of inward leg tilt, boots 0.074 m apart at rest.
 STANCE = {"Farmer": 0.85}.get(CLS, 1.0)
 MIN_SEP = {}
-FBX = {"Farmer": "Assets/_Game/Art/Farmer/Farmer.fbx", "Miner": "Assets/_Game/Art/Miner/_hy~/Miner.fbx"}[CLS]
+FBX = {"Farmer": "Assets/_Game/Art/Farmer/Farmer.fbx", "Miner": "Assets/_Game/Art/Miner/Miner.fbx",
+       "Warrior": "Assets/_Game/Art/Characters/Warrior.fbx", "Builder": "Assets/_Game/Art/Builder/Builder.fbx",
+       "Healer": "Assets/_Game/Art/Healer/Healer.fbx", "Demolitions": "Assets/_Game/Art/Demolitions/Demolitions.fbx"}[CLS]
+if len(argv) > 3 and argv[3]:
+    FBX = argv[3]   # rig-batch-b: a freshly rigged model straight from rig_body.py (absolute path)
+NEW_BODY = CLS in ("Builder", "Healer", "Demolitions")   # rig-batch-b: generated bodies rigged by rig_body.py   # HY models (Miner lifted 0.10 m, lift_rig_fbx.py; Warrior art/characters-hy-rig ef9d2eb)
 CLIPS = "Assets/_Game/Art/Characters/KayKit_Clips.fbx"
 GROUND_SPEED = {}   # clip -> KayKit ground speed (m/s), from Resources/Anim/clip_facts.json
 os.makedirs(OUT, exist_ok=True)
@@ -94,6 +99,8 @@ acts = {a.name.split("|")[-1]: a for a in kacts}
 log("fps", fps, "kk", kk.name, "class rig", fa.name, "clips", len(acts), sorted(acts)[:8])
 
 SIDES = ("l", "r")
+FLIGHT_CAP = 0.32      # metres: lowest foot/toe joint never above this (game limit 0.35 u at scale 1)
+CAPPED = {}   # rig-warrior-3: both restored (the cand4 merge dropped the definitions and kept the uses)
 PLANT = 0.025          # KayKit ankle within 2.5% of leg length of its rest height = planted
 MAX_LOWER = 0.12       # hips never come down more than this to reach a target (DeathB-style clips keep FK reach)
 LEG = lambda s: ("upperleg." + s, "lowerleg." + s, "foot." + s, "toes." + s)
@@ -153,7 +160,17 @@ mw = np.array(hero.matrix_world)
 wco = co @ mw[:3, :3].T + mw[:3, 3]
 FOOTV = {s: np.array([i for i in range(nv) if vg.get(dom[i], "") in ("foot." + s, "toes." + s)]) for s in SIDES}
 SOLEV = {s: np.array([i for i in range(nv) if vg.get(dom[i], "") == "foot." + s]) for s in SIDES}
+if NEW_BODY:   # rig-batch-b: the toes stay rigid on the foot (see the copy loop), so the boot tips count as sole
+    SOLEV = {s: np.array([i for i in range(nv) if vg.get(dom[i], "") in ("foot." + s, "toes." + s)]) for s in SIDES}
 LIFT = -float(min(wco[FOOTV[s]][:, 2].min() for s in SIDES))
+# rig-warrior-1: the motion scale is the hip height above the soles against KayKit's (0.519 m, its bind), not the
+# hip-to-ankle chain: after the Warrior's shins were lengthened (ankles at KayKit's height inside his boots) the chain
+# ratio read 1.187 against a true size of 1.117, the hips rode too high, and in StrafeR his lower foot could not reach
+# down (both ankles level where KayKit's differ by 7-10 cm; the game read him turned around).
+KAYKIT_HIP = 0.519
+if CLS in ("Warrior",) or NEW_BODY:
+    RATIO = ((fa.matrix_world @ fa.data.bones["upperleg.l"].head_local).z + LIFT) / KAYKIT_HIP
+    log("hip-height ratio", round(RATIO, 4))
 OFF = {}
 for s in SIDES:
     inv = np.array(F0["M" + s].inverted())
@@ -223,9 +240,24 @@ RESTFIX = {pb.name: (rest_local(fa, pb.name).to_quaternion().inverted() @ rest_l
            for pb in fa.pose.bones if pb.name in kk.data.bones}
 
 # A class that carries a long prop in one hand swings that arm less in locomotion: its arm bones are pulled toward their
-# Idle (first frame) rotation, keeping HOLD_KEEP of the clip's swing. Farmer: the 2 m staff in her right hand swung out
-# to about 60 degrees in the walk with the full KayKit arm swing.
-HOLD_ARM = {"Farmer": "r"}.get(CLS)
+# Idle (first frame) rotation, keeping HOLD_KEEP of the clip's swing (as on art/rig-farmer-3 for her staff). Miner: the
+# pickaxe in his right hand rode sideways above his head in the walk with the full KayKit arm swing.
+HOLD_ARM = {"Farmer": "r", "Miner": "r", "Builder": "r", "Healer": "r", "Demolitions": "r"}.get(CLS)
+# rig-batch-b: finger bones (not in the pack) take one fixed pose per hand in every clip: the weapon hand closes round the
+# light weapon's handle (the game hangs it on handslot.r), the other hand rests half open. Curl = turn about the finger
+# bone's own X (its Z faces the palm, rig_body.py), so +angle closes the finger.
+FINGER_CURL = {"grip": {"thumb": (25, 30, 25), "f": (70, 75, 55)}, "relaxed": {"thumb": (8, 10, 8), "f": (18, 22, 16)}}
+GRIP_SIDE = "r"
+
+
+def finger_basis(name):
+    base, _, side = name.partition(".")
+    f, _, i = base.partition("_0")
+    if f not in ("thumb", "index", "middle", "ring", "pinky") or not i.isdigit():
+        return None
+    c = FINGER_CURL["grip" if side == GRIP_SIDE else "relaxed"]
+    a = (c["thumb"] if f == "thumb" else c["f"])[int(i) - 1]
+    return Matrix.Rotation(math.radians(a), 4, "X")
 HOLD_KEEP = 0.35
 HOLD_CLIPS = {"Walk", "WalkBack", "Run", "RunBack", "StrafeL", "StrafeR", "Carry"}
 HOLD_BONES = tuple(n + "." + HOLD_ARM for n in ("upperarm", "lowerarm", "wrist", "hand")) if HOLD_ARM else ()
@@ -235,6 +267,125 @@ if HOLD_ARM and "Idle" in acts:
     scene.frame_set(int(acts["Idle"].frame_range[0]))
     HOLD_REF = {n: RESTFIX[n] @ kkP[n].matrix_basis.to_quaternion() for n in HOLD_BONES if n in kkP}
     assign(kk, None)
+
+
+# rig-batch-b: the game hangs the light weapon on handslot.r with its handle along the slot's +Y. KayKit's slot points
+# forward at idle, so a new body's slot is held at a fixed turn relative to the hand (CREL) that stands the handle up
+# at the first Idle frame; the weapon then follows the hand through every clip.
+CREL = None
+
+
+def copy_pose_only(clip_act, frame):
+    assign(kk, clip_act); scene.frame_set(frame)
+    for pb in faP:
+        k = kkP.get(pb.name)
+        if k is None:
+            continue
+        l_, q_, s_ = k.matrix_basis.decompose()
+        if pb.name not in KEEP_LOC:
+            l_ = Vector((0, 0, 0))
+        pb.matrix_basis = Matrix.LocRotScale(l_, RESTFIX[pb.name] @ q_, s_)
+    upd()
+
+
+if NEW_BODY and "Idle" in acts and "handslot.r" in faP and "hand.r" in faP:
+    copy_pose_only(acts["Idle"], int(acts["Idle"].frame_range[0]))
+    Mh = (fa.matrix_world @ faP["hand.r"].matrix).to_3x3().normalized()
+    Ms = (fa.matrix_world @ faP["handslot.r"].matrix).to_3x3().normalized()
+    y0 = Ms.col[1]
+    Rd = y0.rotation_difference(Vector((0, 0, 1))).to_matrix() @ Ms
+    CREL = Mh.inverted() @ Rd
+    REP["handslot_idle_y_before"] = [round(v, 3) for v in y0]
+    log("handslot.r idle +Y before", REP["handslot_idle_y_before"], "-> stood up")
+    assign(kk, None); rest(fa)
+
+
+FOOTREF = {}
+if False and NEW_BODY and "Idle" in acts:   # tried 2026-11-14 run 43637xxx: toe yaw read -137 degrees in Walk; off
+    assign(kk, acts["Idle"]); scene.frame_set(int(acts["Idle"].frame_range[0])); upd()
+    FOOTREF = {s: (kk.matrix_world @ kkP["foot." + s].matrix).to_3x3().normalized().inverted() for s in SIDES}
+    assign(kk, None); upd()
+
+
+# rig-miner-2: idle stands upright on flat feet. The full-local copy gave the Miner KayKit's idle lean and KayKit's
+# steeper foot pitch (heels up, toes down in the Unity stills). In the idle clips the planted feet keep the bind's flat
+# rotation, the toes stay as bound, and the hips turn once (constant per clip) so the head is straight above the hips.
+IDLE_FLAT = CLS in ("Miner",) or NEW_BODY
+IDLE_CLIPS = {"Idle", "IdleLook"}
+UPRIGHT = {}
+# rig-warrior-2: the held weapon's tip stays TIP_CLEAR above the ground in locomotion (the Warrior's sword tip dipped to
+# the floor in Walk frames 4-6): the hand turns up about the wrist until the lowest prop vertex clears it.
+TIP_CLEAR = {"Warrior": 0.18}.get(CLS)   # 0.15 u asked, 0.03 margin
+TIP_CLIPS = {"Walk", "WalkBack", "Run", "RunBack", "StrafeL", "StrafeR", "Idle", "IdleLook", "Carry"}
+TIP_LOCAL = None
+TIP_MIN = {}
+if TIP_CLEAR:
+    _hs = [i for i in range(nv) if vg.get(dom[i], "").startswith("handslot.r")]
+    if len(_hs) >= 20:
+        rest(fa)
+        _M = fa.matrix_world @ faP["handslot.r"].matrix
+        _p = wco[np.array(_hs)]
+        _Mi = np.array(_M.inverted())
+        TIP_LOCAL = _p @ _Mi[:3, :3].T + _Mi[:3, 3]   # every prop vertex in the slot's frame; the lowest one is checked
+        log("tip clearance on", len(_hs), "prop vertices")
+    else:
+        log("tip clearance: no prop on handslot.r (", len(_hs), "vertices)")
+    rest(fa)
+    # the character's forward along Blender Y, read from the left foot's toe joint against its ankle (rest pose)
+    TIP_FWD_Y = 1.0 if (W(fa, faP["toes.l"].head) - W(fa, faP["foot.l"].head)).y > 0 else -1.0
+    log("tip clearance: forward is", "+Y" if TIP_FWD_Y > 0 else "-Y")
+
+
+def tip_world():
+    M = np.array(fa.matrix_world @ faP["handslot.r"].matrix)
+    p = TIP_LOCAL @ M[:3, :3].T + M[:3, 3]
+    return Vector(p[np.argmin(p[:, 2])].tolist())
+
+
+def clear_tip(clip):
+    if TIP_LOCAL is None or clip not in TIP_CLIPS:
+        return
+    before = tip_world().z
+    for _ in range(16):
+        t = tip_world()
+        if t.z >= TIP_CLEAR:
+            break
+        piv = W(fa, faP["wrist.r"].head)
+        d = t - piv
+        ax = d.cross(Vector((0, 0, 1)))
+        if clip in IDLE_CLIPS:
+            # rig-warrior-3: in idle the tip comes up FORWARD (turn about the sideways axis), not outward along its own
+            # sideways lean: the outward lift made the idle front silhouette 1.0029 x his height (ArtPoseTests limit 1.0).
+            ax = Vector((TIP_FWD_Y, 0, 0))
+        if ax.length < 1e-6:
+            break
+        rotate_about(fa, faP["wrist.r"], piv, Quaternion(ax.normalized(), 0.08))
+        upd()
+    TIP_MIN[clip] = (min(TIP_MIN.get(clip, (9, 9))[0], before), min(TIP_MIN.get(clip, (9, 9))[1], tip_world().z))
+
+
+def upright_idle(clip, f0):
+    """Constant hips turn per idle clip that puts the head straight above the hips at its first frame."""
+    if not IDLE_FLAT or clip not in IDLE_CLIPS:
+        return
+    if clip not in UPRIGHT:
+        v = W(fa, faP["head"].head) - W(fa, faP["hips"].head)
+        UPRIGHT[clip] = v.rotation_difference(Vector((0, 0, v.length)).normalized() * 1.0 if False else Vector((0, 0, 1)))
+        REP.setdefault("idle_lean_deg", {})[clip] = round(math.degrees(v.angle(Vector((0, 0, 1)))), 1)
+    hp = faP["hips"]
+    rotate_about(fa, hp, W(fa, hp.head), UPRIGHT[clip])
+    upd()
+
+
+def hold_slot():
+    if CREL is None:
+        return
+    Mh = (fa.matrix_world @ faP["hand.r"].matrix)
+    Rs = Mh.to_3x3().normalized() @ CREL
+    p = (fa.matrix_world @ faP["handslot.r"].matrix).translation
+    S = faP["handslot.r"].matrix.to_scale()
+    set_world(fa, faP["handslot.r"], Matrix.LocRotScale(p, Rs.to_quaternion(), S))
+    upd()
 
 
 def kk_back_dir(act, f0, f1):
@@ -271,8 +422,15 @@ def bake_action(clip, act):
         scene.frame_set(f)
         for pb in faP:
             k = kkP.get(pb.name)
+            if (NEW_BODY or (IDLE_FLAT and clip in IDLE_CLIPS)) and pb.name.startswith("toes."):
+                pb.matrix_basis.identity()   # rig-batch-b: toes stay as bound; KayKit's toe pitch sank the boot tips 2 cm
+                continue
             if k is None:
-                pb.matrix_basis.identity()
+                fb = finger_basis(pb.name)
+                if fb is not None:
+                    pb.matrix_basis = fb
+                else:
+                    pb.matrix_basis.identity()
                 continue
             l_, q_, s_ = k.matrix_basis.decompose()
             if pb.name not in KEEP_LOC:
@@ -282,11 +440,22 @@ def bake_action(clip, act):
                 q_ = HOLD_REF[pb.name].slerp(q_, HOLD_KEEP)
             pb.matrix_basis = Matrix.LocRotScale(l_, q_, s_)
         upd()
+        upright_idle(clip, f0)
         K = snap(kk)
         Hd = F0["hips"] + (K["hips"] - K0["hips"]) * RATIO + Vector((0, 0, LIFT))
         targets, rots = {}, {}
         for s in SIDES:
-            R = K["R" + s] @ K0["R" + s].inverted() @ TOEFIX[s] @ F0["R" + s]
+            # The foot keeps the world rotation the clip gives it through the full-local copy (as on KayKit). The old
+            # delta from the pack's rest (+ TOEFIX) was measured against a pose, not the bind: the Warrior's planted
+            # right foot in StrafeR pointed 112 degrees off and the game read him "turned around".
+            R = (fa.matrix_world @ faP[LEG(s)[2]].matrix).to_3x3().normalized()
+            if IDLE_FLAT and clip in IDLE_CLIPS:
+                R = F0["R" + s].copy()   # flat as bound (rest foot)
+            elif FOOTREF:
+                # rig-batch-b: KayKit's foot turn from its flat Idle foot, applied to this body's own flat rest foot (the
+                # full-local copy pitched the Builder's boots by KayKit's 20 degree steeper foot bone)
+                Rk_ = (kk.matrix_world @ kkP[LEG(s)[2]].matrix).to_3x3().normalized()
+                R = Rk_ @ FOOTREF[s] @ F0["R" + s]
             dk = K["A" + s] - K0["A" + s]
             # Foot motion scales with the legs (an unscaled swing lift was tried: Walk's lowest foot rose to 0.043).
             A = F0["A" + s] + dk * RATIO + Vector((0, 0, LIFT))
@@ -357,6 +526,22 @@ def bake_action(clip, act):
             Ah = W(fa, faP[ft].head)
             set_world(fa, faP[ft], Matrix.LocRotScale(Ah, rots[s].to_quaternion(), F0["M" + s].to_scale()))
             upd()
+        # rig-warrior-1: the game's feet test fails a model whose LOWEST foot or toe joint is more than 0.35 u above the
+        # ground (GameplaySanityPlayTests). A run's flight frame scaled by a longer-legged class's ratio crossed it (HY
+        # Warrior Run frame 1: 0.392, the game saw 0.35-0.39). On such a frame the whole pose comes down rigidly (hips
+        # only) until that joint is at FLIGHT_CAP; frames under the cap are untouched.
+        lowj = min(W(fa, faP[b].head).z for b in ("foot.l", "foot.r", "toes.l", "toes.r") if b in faP)
+        if lowj > FLIGHT_CAP:
+            hp = faP["hips"]
+            set_world(fa, hp, Matrix.Translation((0, 0, FLIGHT_CAP - lowj)) @ (fa.matrix_world @ hp.matrix))
+            upd()
+            CAPPED[clip] = max(CAPPED.get(clip, 0.0), lowj - FLIGHT_CAP)
+        if clip == "StrafeR" and CLS == "Warrior" and f in (2, 10, 18):
+            log("trace", f, "kk ankle z l %.3f r %.3f" % (K["Al"].z, K["Ar"].z), "target z l %.3f r %.3f" % (targets["l"].z, targets["r"].z),
+                "final z l %.3f r %.3f" % (W(fa, faP["foot.l"].head).z, W(fa, faP["foot.r"].head).z),
+                "planted", PL.get("l"), PL.get("r"), "hips z %.3f" % W(fa, faP["hips"].head).z, "upperleg z %.3f" % W(fa, faP["upperleg.l"].head).z)
+        clear_tip(clip)
+        hold_slot()
         for pb in faP:
             l, q, sc = pb.matrix_basis.decompose()
             if rec[pb.name] and Quaternion(rec[pb.name][-1][1]).dot(q) < 0:
@@ -399,9 +584,10 @@ for m in arm_mods:
     m.show_viewport = True
 log("baked", len(baked), "of", len(acts))
 REP["hips_lowered_max"] = {c: round(v, 4) for c, v in lows.items() if v > 0}
-REP["stance"] = STANCE
-REP["min_ankle_separation"] = {c: round(v, 4) for c, v in MIN_SEP.items()}
-log("stance", STANCE, "min ankle separation", {c: REP["min_ankle_separation"][c] for c in ("Idle", "Walk", "Run", "StrafeL", "StrafeR", "Attack") if c in MIN_SEP})
+REP["tip_min_before_after"] = {c: [round(a, 3), round(b, 3)] for c, (a, b) in TIP_MIN.items()}
+log("tip min z before/after", REP["tip_min_before_after"], "idle lean before (deg)", REP.get("idle_lean_deg"))
+REP["flight_capped_max"] = {c: round(v, 4) for c, v in CAPPED.items()}
+log("flight capped at", FLIGHT_CAP, REP["flight_capped_max"])
 
 # ---------------------------------------------------------------- measure
 dg = bpy.context.evaluated_depsgraph_get()
@@ -497,7 +683,26 @@ try:
     scene.display.shading.background_type = "VIEWPORT"
     scene.display.shading.background_color = (0.55, 0.6, 0.65)
     tiles = {}
-    for clip, picks in (("Walk", 6), ("Run", 6), ("Idle", 1)):
+    SKILL = {"Builder": ("Attack", "UseItem"), "Healer": ("Cast", "UseItem"), "Demolitions": ("Throw", "PickUp")}.get(CLS, ())
+    # the game's light weapon (WeaponProps: handle along handslot.r +Y, 0.62 u, held 0.12 u from its end): a stand-in stick
+    stick = None
+    if NEW_BODY and "handslot.r" in fa.pose.bones:
+        rest(fa)
+        bpy.ops.mesh.primitive_cylinder_add(vertices=8, radius=0.025, depth=0.62)
+        stick = bpy.context.active_object
+        bpy.ops.mesh.primitive_cube_add(size=0.14, location=(0, 0, 0.31))
+        hd_ = bpy.context.active_object
+        for o_ in scene.objects:
+            o_.select_set(o_ in (stick, hd_))
+        bpy.context.view_layer.objects.active = stick
+        bpy.ops.object.join()
+        stick.data.transform(Matrix.Rotation(-math.pi / 2, 4, "X"))   # cylinder axis Z -> +Y
+        stick.parent = fa; stick.parent_type = "BONE"; stick.parent_bone = "handslot.r"
+        upd()
+        Mhs = fa.matrix_world @ fa.pose.bones["handslot.r"].matrix
+        stick.matrix_world = Mhs @ Matrix.Translation((0, 0.31 - 0.12, 0))
+        upd()
+    for clip, picks in (("Walk", 6), ("Run", 6), ("Idle", 1)) + tuple((c, 6) for c in SKILL):
         if clip not in baked:
             continue
         assign(fa, baked[clip])
@@ -518,7 +723,21 @@ try:
                 os.remove(p)
                 row.append(px)
             tiles[(clip, vn)] = np.concatenate(row, axis=1)
-    for clip in ("Walk", "Run", "Idle"):
+    if NEW_BODY and "Idle" in baked:
+        assign(fa, baked["Idle"]); scene.frame_set(int(baked["Idle"].frame_range[0]))
+        extra = {"gameplay": (Vector((0, -4.2, 2.0 + 4.2 * math.tan(math.radians(55)))), Vector((math.radians(35), 0, 0)), 2.6),
+                 "gameplay34": (Vector((3.0, -3.0, 2.0 + 4.24 * math.tan(math.radians(55)))), Vector((math.radians(35), 0, math.radians(45))), 2.6)}
+        hr = fa.matrix_world @ fa.pose.bones["hand.r"].head
+        extra["hand_r"] = (Vector((hr.x - 0.15, hr.y - 2.0, hr.z)), Vector((math.radians(90), 0, math.radians(-4))), 0.5)
+        hl = fa.matrix_world @ fa.pose.bones["hand.l"].head
+        extra["hand_l"] = (Vector((hl.x + 0.15, hl.y - 2.0, hl.z)), Vector((math.radians(90), 0, math.radians(4))), 0.5)
+        for vn, (loc, rot, osc) in extra.items():
+            cam.location, cam.rotation_euler = loc, rot
+            cam_d.ortho_scale = osc
+            scene.render.filepath = os.path.join(OUT, f"{CLS}_Idle_{vn}.png")
+            bpy.ops.render.render(write_still=True)
+        cam_d.ortho_scale = 2.6
+    for clip in ("Walk", "Run", "Idle") + tuple(SKILL):
         rows = [tiles[(clip, vn)] for vn in ("side", "front") if (clip, vn) in tiles]
         if not rows:
             continue
@@ -530,10 +749,22 @@ try:
         img.file_format = "PNG"
         img.save()
     bpy.data.objects.remove(gp, do_unlink=True)
+    if stick is not None:
+        bpy.data.objects.remove(stick, do_unlink=True)
 except Exception as e:
     log("render failed", repr(e))
 
 # ---------------------------------------------------------------- export <Cls>_Clips.fbx (armature + NLA takes)
+# rig-warrior-3: the game's ArtPoseTests idle read: Hero mesh at the first Idle frame, front width over height (limit 1.0)
+if "Idle" in baked:
+    assign(fa, baked["Idle"]); scene.frame_set(int(baked["Idle"].frame_range[0])); upd()
+    _eo = hero.evaluated_get(bpy.context.evaluated_depsgraph_get()); _me = _eo.to_mesh()
+    _c = np.empty(len(_me.vertices) * 3, np.float32); _me.vertices.foreach_get("co", _c); _eo.to_mesh_clear()
+    _c = _c.reshape(-1, 3) @ np.array(hero.matrix_world)[:3, :3].T + np.array(hero.matrix_world)[:3, 3]
+    _w, _h = float(np.ptp(_c[:, 0])), float(np.ptp(_c[:, 2]))
+    REP["idle_width_height"] = [round(_w, 4), round(_h, 4), round(_w / _h, 4)]
+    log("idle width / height (game limit 1.0)", REP["idle_width_height"])
+assign(fa, None)
 bpy.data.objects.remove(kk, do_unlink=True)
 bpy.data.objects.remove(hero, do_unlink=True)
 fa.name = "Rig"
