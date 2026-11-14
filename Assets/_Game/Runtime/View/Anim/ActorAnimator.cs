@@ -556,7 +556,7 @@ namespace CriticalMass.Runtime.View.Anim
                     windup = AttackTiming.SwingWindupSeconds(actor, hz);   // the sim's own swing: contact on SwingTick + SwingWindup
                     double age = AttackTiming.SwingAge(actor, w.Tick, alpha, hz);
                     if (combat != null && hasFx) age = combat.AttackTime(i, age, fx); // the attacker freezes on contact during the hold
-                    t = AttackTiming.ClipTime(age, ClipFacts.Contact(_actClip, (float)(len * 0.5)), len, windup, _actExtreme);
+                    t = AttackTiming.ClipTime(age, ViewContact(_actClip, ClipFacts.Contact(_actClip, (float)(len * 0.5))), len, windup, _actExtreme);
                     _actAge = age;
                 }
                 else
@@ -671,31 +671,76 @@ namespace CriticalMass.Runtime.View.Anim
         Transform _tipHand;
         ModelView _tipModel;
 
+        // fix/hit-feel-7: the view contact (clip seconds the damage tick shows) per model and clip.
+        string _vcClip;
+        double _vcTime = -1, _vcFact = -1;
+        string _endName = "a";
+
         /// <summary>
-        /// fix/hit-feel-5: once per fighter, before this frame's pose: pose the attack clip at its contact frame and measure
-        /// where the weapon TIP is (HitPose.TipLocal): its horizontal reach from the root and its height above the spine.
-        /// Feeds HitFeel.MeasuredReach (the step-in) and MeasuredLever (the strike lean).
+        /// fix/hit-feel-5/7: once per model and clip, before this frame's pose. Picks the weapon's STRIKING end (of the
+        /// two far ends, the one further forward along the fighter's facing at the clip's contact pose: a two-hand tool's
+        /// head, not its handle), then finds the clip time in [contact - 0.15, contact + 0.35] s where that end is furthest
+        /// forward: the view contact, which the wind-up craft lands on the damage tick (the sim's hit time is unchanged).
+        /// Its forward reach and its height above the spine feed HitFeel (step-in, strike lean).
         /// </summary>
-        void MeasureReach(ModelView m, ClassId cls, string clip)
+        void MeasureReach(ModelView m, Actor actor, string clip)
         {
             _reachMeasured = true;
             _tipModel = m;
-            _tipLocal = HitPose.TipLocal(m, out _tipHand, out _);
+            float len = m.ClipLength(clip);
+            _vcClip = clip;
+            _vcFact = ClipFacts.Contact(clip, len * 0.5f);
+            _vcTime = _vcFact;
+            Vector3 endA = HitPose.Ends(m, out _tipHand, out Vector3 endB, out _);
+            _tipLocal = endA;
+            _endName = "a";
             Transform spine = m.Bone("spine");
-            if (_tipHand == null || spine == null) return;
-            m.BeginPose();
-            m.Pose(clip, ClipFacts.Contact(clip, m.ClipLength(clip) * 0.5f), 1f, false);
-            if (!m.Evaluate(true)) return;
-            Vector3 tip = _tipHand.TransformPoint(_tipLocal), root = m.Transform.position;
-            Vector3 flat = tip - root;
-            flat.y = 0f;
-            HitFeel.SetMeasured(cls, flat.magnitude, tip.y - spine.position.y);
+            if (_tipHand == null || spine == null || len <= 0f) return;
+            Vector3 fwd = SimSpace.ToWorld(Math.Cos(actor.Facing), 0, Math.Sin(actor.Facing));
+            fwd.y = 0f;
+            fwd.Normalize();
+            if (endB.sqrMagnitude > 1e-6f && PoseAt(m, clip, _vcFact))
+            {
+                Vector3 root = m.Transform.position;
+                if (Vector3.Dot(_tipHand.TransformPoint(endB) - root, fwd) > Vector3.Dot(_tipHand.TransformPoint(endA) - root, fwd))
+                { _tipLocal = endB; _endName = "b (other end)"; }
+            }
+            double lo = Math.Max(0, _vcFact - 0.15), hi = Math.Max(_vcFact, Math.Min(len - AttackTiming.FadeOut - 0.03, _vcFact + 0.35)), best = double.NegativeInfinity;
+            const int n = 20;
+            for (int k = 0; k <= n; k++)
+            {
+                double t = lo + (hi - lo) * k / n;
+                if (!PoseAt(m, clip, t)) return;
+                double f = Vector3.Dot(_tipHand.TransformPoint(_tipLocal) - m.Transform.position, fwd);
+                if (f > best + 1e-4) { best = f; _vcTime = t; }
+            }
+            if (!PoseAt(m, clip, _vcTime)) return;
+            Vector3 tip = _tipHand.TransformPoint(_tipLocal);
+            HitFeel.SetMeasured(actor.Cls, Vector3.Dot(tip - m.Transform.position, fwd), tip.y - spine.position.y);
         }
+
+        static bool PoseAt(ModelView m, string clip, double t)
+        {
+            m.BeginPose();
+            m.Pose(clip, t, 1f, false);
+            return m.Evaluate(true);
+        }
+
+        /// <summary>The clip time this fighter's damage tick shows (the view contact; the fact table's until measured).</summary>
+        public double ViewContact(string clip, double fact) => clip != null && clip == _vcClip && _vcTime >= 0 ? _vcTime : fact;
+        public double FactContact => _vcFact;
+        public double ViewContactNow => _vcTime;
+        public string StrikingEnd => _endName;
+        public Vector3 TipLocalNow => _tipLocal;
+        public Transform TipHand => _tipHand;
 
         /// <summary>The weapon tip in world space now (capture; Vector3.zero before the first swing).</summary>
         public Vector3 TipWorld => _tipHand != null ? _tipHand.TransformPoint(_tipLocal) : Vector3.zero;
         public bool HasTip => _tipHand != null;
         double _actExtreme = -1;   // fix/hit-feel-3: the attack clip's measured wind-up extreme
+        ModelView _exModel;
+        string _exClip;
+        double _exTime = -1;
         int _lastCarried = -1;
         string _terraClip;
         double _terraAt;
@@ -730,10 +775,15 @@ namespace CriticalMass.Runtime.View.Anim
             _kind = kind;
             _actClip = clip;
             // fix/hit-feel-3: measured once per clip, here, before this frame's pose is built.
-            _actExtreme = kind == 1 && clip != null ? AttackTiming.MeasureExtreme(m, clip, ClipFacts.Contact(clip, m.ClipLength(clip) * 0.5f)) : -1;
-            // fix/hit-feel-6: measured again when the views gave this actor another model (a respawn into another class,
-            // the capture's next class); the cache kept the old, pooled model's hand.
-            if (kind == 1 && clip != null && (!_reachMeasured || _tipModel != m)) MeasureReach(m, actor.Cls, clip);
+            // fix/hit-feel-7: the view contact first (per model and clip), then the wind-up extreme before it (per model too).
+            if (kind == 1 && clip != null && (!_reachMeasured || _tipModel != m || _vcClip != clip)) MeasureReach(m, actor, clip);
+            if (kind == 1 && clip != null && (_exModel != m || _exClip != clip))
+            {
+                _exModel = m;
+                _exClip = clip;
+                _exTime = AttackTiming.ExtremeNow(m, clip, ViewContact(clip, ClipFacts.Contact(clip, m.ClipLength(clip) * 0.5f)));
+            }
+            _actExtreme = kind == 1 && clip != null ? _exTime : -1;
             _actStart = simTime - aa;
             _lastActW = 0f;
             _breakAt = -1;

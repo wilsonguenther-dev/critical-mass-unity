@@ -34,7 +34,7 @@ namespace CriticalMass.Editor.Art
         public const string ArtMaterialPath = "Assets/_Game/Resources/Toon/CMToonArt.mat";
 
         /// <summary>Bump when the contract changes: Unity re-imports every model this postprocessor touches.</summary>
-        public override uint GetVersion() => 18;   // 18: integration batch 10 merged both 17s: fix/hit-feel-5 weapon tip (WeaponTip) + perf/app-size-1 face decals DXT5 on desktop; 16: batch 8 reverted the HY Warrior rig (#86), importer back to the pre-#86 rules; 10: wall-damage-1, the Miner barricade imports readable
+        public override uint GetVersion() => 19;   // 19: fix/hit-feel-7 keeps both weapon ends (WeaponTip.OtherEnd); 18: integration batch 10 merged both 17s: fix/hit-feel-5 weapon tip (WeaponTip) + perf/app-size-1 face decals DXT5 on desktop; 16: batch 8 reverted the HY Warrior rig (#86), importer back to the pre-#86 rules; 10: wall-damage-1, the Miner barricade imports readable
 
         public static bool IsArt(string path) =>
             path.StartsWith(ArtRoot, StringComparison.Ordinal) && path.EndsWith(".fbx", StringComparison.OrdinalIgnoreCase);
@@ -311,6 +311,7 @@ namespace CriticalMass.Editor.Art
             Vector3 best = Vector3.zero;
             float bestD = 0f;
             int count = 0;
+            var pts = new List<Vector3>();
             foreach (SkinnedMeshRenderer smr in root.GetComponentsInChildren<SkinnedMeshRenderer>(true))
             {
                 Mesh mesh = smr.sharedMesh;
@@ -329,6 +330,7 @@ namespace CriticalMass.Editor.Art
                     if (!weaponBones.Contains(bw[k].boneIndex0) || bw[k].weight0 < 0.9f) continue;
                     Vector3 p = at.InverseTransformPoint(toWorld.MultiplyPoint3x4(v[k]));
                     count++;
+                    pts.Add(p);
                     float d = p.magnitude;
                     if (d > bestD) { bestD = d; best = p; }
                 }
@@ -340,6 +342,17 @@ namespace CriticalMass.Editor.Art
             tip.Distance = bestD > 0.2f ? bestD : 0f;
             tip.Local = bestD > 0.2f ? best : Vector3.zero;
             tip.Vertices = count;
+            // fix/hit-feel-7: the far point on the other side of the hand (a two-hand tool held mid-shaft has two ends)
+            Vector3 other = Vector3.zero;
+            float otherD = 0f;
+            if (bestD > 0.2f)
+            {
+                Vector3 axis = best / bestD;
+                foreach (Vector3 p in pts)
+                    if (Vector3.Dot(p, axis) < 0f && p.magnitude > otherD) { otherD = p.magnitude; other = p; }
+            }
+            tip.OtherDistance = otherD > 0.2f ? otherD : 0f;
+            tip.OtherEnd = otherD > 0.2f ? other : Vector3.zero;
         }
 
         private void OnPostprocessModel(GameObject root)

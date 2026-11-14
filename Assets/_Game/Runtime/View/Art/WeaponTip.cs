@@ -14,5 +14,11 @@ namespace CriticalMass.Runtime.View.Art
         public Vector3 Local;
         public float Distance;
         public int Vertices;
+        /// <summary>
+        /// fix/hit-feel-7: the far point on the OTHER side of the hand (a two-hand tool's handle end or head). The game
+        /// strikes with whichever end is further forward at the contact pose (ActorAnimator.MeasureReach). 0: none.
+        /// </summary>
+        public Vector3 OtherEnd;
+        public float OtherDistance;
     }
 }
