@@ -46,6 +46,9 @@ namespace CriticalMass.Runtime.Hud
         public double RespawnIn;
         public float PlayerX, PlayerZ;
         public int Kills, Deaths;
+        /// <summary>feat/light-weapons-2: a Healer whose attack press would swing the lantern now (nobody hurt to mend in
+        /// range); the attack slot then reads LANTERN instead of MEND.</summary>
+        public bool HealerLantern;
 
         public float Hp01 => MaxHp > 0 ? Math.Max(0f, Math.Min(1f, Hp / MaxHp)) : 0f;
 
@@ -68,10 +71,6 @@ namespace CriticalMass.Runtime.Hud
     public static class HudBinder
     {
         /// <summary>The local player's actor id (actor 0 is the human, SimDriverBehaviour / HumanInputSource).</summary>
-        /// <summary>feat/light-weapons-2: a Healer whose attack press would swing the lantern now (nobody hurt to mend in
-        /// range); the attack slot then reads LANTERN instead of MEND.</summary>
-        public bool HealerLantern;
-
         public const int LocalActor = 0;
 
         public static void Read(World w, int localId, HudState s)

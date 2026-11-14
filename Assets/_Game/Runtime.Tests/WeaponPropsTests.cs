@@ -93,7 +93,7 @@ namespace CriticalMass.Runtime.Tests
             World w = World.CreateWorld(new WorldOptions { Seed = 9, TeamSize = 5, HumanTeam = TeamId.Azure, HumanClass = ClassId.Healer, Config = GameConfig.CreateDefault() });
             for (int j = 1; j < w.ActorCount; j++) w.Actors[j].Alive = false;
             var s = new HudState();
-            HudState.Read(w, 0, s);
+            HudBinder.Read(w, 0, s);
             Assert.IsTrue(s.HealerLantern, "nobody hurt in range");
             int ally = 1;
             Assert.AreEqual(w.Actors[0].Team, w.Actors[ally].Team);
@@ -101,7 +101,7 @@ namespace CriticalMass.Runtime.Tests
             w.Actors[ally].Hp = w.Actors[ally].MaxHp * 0.5;
             w.X[ally] = w.X[0] + 1;
             w.Z[ally] = w.Z[0];
-            HudState.Read(w, 0, s);
+            HudBinder.Read(w, 0, s);
             Assert.IsFalse(s.HealerLantern, "a hurt ally in range: the press mends");
             var copy = new HudState();
             s.HealerLantern = true;
