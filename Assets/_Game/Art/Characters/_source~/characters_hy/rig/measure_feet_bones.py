@@ -48,6 +48,14 @@ for spec in PACKS:
             m = min((arm.matrix_world @ arm.pose.bones[b].head).z for b in BONES if b in arm.pose.bones)
             if m > worst: worst, wf = m, f
             low = min(low, m)
+        if a.name.split("|")[-1] in ("Run", "Idle"):
+            tr = []
+            for f in range(f0, f1 + 1, 2):
+                bpy.context.scene.frame_set(f)
+                pb = arm.pose.bones
+                W = lambda b: round((arm.matrix_world @ pb[b].head).z, 3) if b in pb else None
+                tr.append((f, W("hips"), W("foot.l"), W("foot.r"), W("toes.l"), W("toes.r")))
+            print("[feet]", cls, a.name.split("|")[-1], "frame, hips, foot.l, foot.r, toes.l, toes.r:", tr, flush=True)
         res["clips"][a.name.split("|")[-1]] = dict(worst_float=round(worst, 3), at_frame=wf, lowest=round(low, 3), frames=f1 - f0 + 1)
     bad = {k: v for k, v in res["clips"].items() if v["worst_float"] > 0.35 or v["lowest"] < -0.2}
     res["fails_game_limits"] = bad
