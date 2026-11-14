@@ -24,6 +24,11 @@ from mathutils import Vector, Matrix, Quaternion
 argv = sys.argv[sys.argv.index("--") + 1:]
 OUT, REPO = argv[0], argv[1]
 CLS = argv[2] if len(argv) > 2 else "Farmer"
+# Stance: the rest ankles' sideways offset from the hips centre is scaled by this (1 = the class's own hip width). The
+# Farmer's hip joints sit at +-0.194 m on 0.27 m legs (KayKit: +-0.171 on 0.37), so her feet read splayed; 0.85 brings
+# her ankles to +-0.165 (about KayKit's width), 6 degrees of inward leg tilt, boots 0.074 m apart at rest.
+STANCE = {"Farmer": 0.85}.get(CLS, 1.0)
+MIN_SEP = {}
 FBX = {"Farmer": "Assets/_Game/Art/Farmer/Farmer.fbx", "Miner": "Assets/_Game/Art/Miner/_hy~/Miner.fbx"}[CLS]
 CLIPS = "Assets/_Game/Art/Characters/KayKit_Clips.fbx"
 GROUND_SPEED = {}   # clip -> KayKit ground speed (m/s), from Resources/Anim/clip_facts.json
@@ -203,6 +208,35 @@ names = [pb.name for pb in fa.pose.bones]
 kkP, faP = kk.pose.bones, fa.pose.bones
 
 
+
+def rest_local(arm, name):
+    b = arm.data.bones[name]
+    return (b.parent.matrix_local.inverted() @ b.matrix_local) if b.parent else b.matrix_local.copy()
+
+
+# rig-farmer-3: copy each bone's FULL local rotation (its rest included), not its rotation relative to the rest. The
+# shared pack's armature rest is not the T-pose bind of the class rigs (KayKit's own model shares the bind), so copying
+# matrix_basis kept every class arm in the T-pose: Farmer_Clips.fbx read as the game reads it (absolute local rotations)
+# held her wrists at shoulder height, 0.38 m out, in Idle and Walk (KayKit's pack: 0.30 m below the shoulder). Legs hid
+# it (re-solved by IK). basis_class = rest_local_class^-1 @ rest_local_pack @ basis_pack, rotation only.
+RESTFIX = {pb.name: (rest_local(fa, pb.name).to_quaternion().inverted() @ rest_local(kk, pb.name).to_quaternion())
+           for pb in fa.pose.bones if pb.name in kk.data.bones}
+
+# A class that carries a long prop in one hand swings that arm less in locomotion: its arm bones are pulled toward their
+# Idle (first frame) rotation, keeping HOLD_KEEP of the clip's swing. Farmer: the 2 m staff in her right hand swung out
+# to about 60 degrees in the walk with the full KayKit arm swing.
+HOLD_ARM = {"Farmer": "r"}.get(CLS)
+HOLD_KEEP = 0.35
+HOLD_CLIPS = {"Walk", "WalkBack", "Run", "RunBack", "StrafeL", "StrafeR", "Carry"}
+HOLD_BONES = tuple(n + "." + HOLD_ARM for n in ("upperarm", "lowerarm", "wrist", "hand")) if HOLD_ARM else ()
+HOLD_REF = {}
+if HOLD_ARM and "Idle" in acts:
+    assign(kk, acts["Idle"])
+    scene.frame_set(int(acts["Idle"].frame_range[0]))
+    HOLD_REF = {n: RESTFIX[n] @ kkP[n].matrix_basis.to_quaternion() for n in HOLD_BONES if n in kkP}
+    assign(kk, None)
+
+
 def kk_back_dir(act, f0, f1):
     """Direction the KayKit planted feet move in the clip (opposite to travel), or None."""
     acc, prev = Vector((0, 0, 0)), {s: None for s in SIDES}
@@ -216,6 +250,9 @@ def kk_back_dir(act, f0, f1):
             prev[s] = a.copy() if planted else None
     acc.z = 0
     return acc.normalized() if acc.length > 1e-6 else None
+
+
+ZPRE, PL, KUP = {}, {}, {}
 
 
 def bake_action(clip, act):
@@ -237,10 +274,13 @@ def bake_action(clip, act):
             if k is None:
                 pb.matrix_basis.identity()
                 continue
-            mb = k.matrix_basis.copy()
+            l_, q_, s_ = k.matrix_basis.decompose()
             if pb.name not in KEEP_LOC:
-                mb.translation = Vector((0, 0, 0))
-            pb.matrix_basis = mb
+                l_ = Vector((0, 0, 0))
+            q_ = RESTFIX[pb.name] @ q_
+            if clip in HOLD_CLIPS and pb.name in HOLD_REF:
+                q_ = HOLD_REF[pb.name].slerp(q_, HOLD_KEEP)
+            pb.matrix_basis = Matrix.LocRotScale(l_, q_, s_)
         upd()
         K = snap(kk)
         Hd = F0["hips"] + (K["hips"] - K0["hips"]) * RATIO + Vector((0, 0, LIFT))
@@ -250,6 +290,7 @@ def bake_action(clip, act):
             dk = K["A" + s] - K0["A" + s]
             # Foot motion scales with the legs (an unscaled swing lift was tried: Walk's lowest foot rose to 0.043).
             A = F0["A" + s] + dk * RATIO + Vector((0, 0, LIFT))
+            A.x -= (F0["A" + s].x - F0["hips"].x) * (1.0 - STANCE)
             planted = (K["A" + s].z - K0["A" + s].z) < PLANT * leg_k
             if planted and bdir is not None:
                 if anchor[s] is None:
@@ -259,12 +300,23 @@ def bake_action(clip, act):
             elif not planted:
                 anchor[s] = None
             z = sole_z(s, A, R)
+            ZPRE[s], PL[s], KUP[s] = z, planted, K["A" + s].z - K0["A" + s].z
             if planted:
                 A.z -= z
             elif z < 0:
                 A.z -= z
             contact[s].append(bool(planted))
             targets[s], rots[s] = A, R
+        # Double support: both planted soles pinned to z 0 tied the two ankles (gap 0.000), and the game's facing read
+        # (SanityRig.TryFront: the foot with the lower ankle) then took the trailing foot, toes 112 degrees off in
+        # StrafeR at the loop seam, "turned around" (Warrior, 2 of 20 frames; KayKit 0). The foot whose KayKit ankle is
+        # higher keeps its own sole height (never below ground), as on KayKit.
+        if PL["l"] and PL["r"]:
+            hi = max(SIDES, key=lambda q: KUP[q])
+            if ZPRE[hi] > 0:
+                targets[hi].z += ZPRE[hi]
+        sep = abs(targets["l"].x - targets["r"].x)
+        MIN_SEP[clip] = min(MIN_SEP.get(clip, 9.0), sep)
         lowered_frame = 0.0
         for it in range(3):
             hp = faP["hips"]
@@ -347,6 +399,9 @@ for m in arm_mods:
     m.show_viewport = True
 log("baked", len(baked), "of", len(acts))
 REP["hips_lowered_max"] = {c: round(v, 4) for c, v in lows.items() if v > 0}
+REP["stance"] = STANCE
+REP["min_ankle_separation"] = {c: round(v, 4) for c, v in MIN_SEP.items()}
+log("stance", STANCE, "min ankle separation", {c: REP["min_ankle_separation"][c] for c in ("Idle", "Walk", "Run", "StrafeL", "StrafeR", "Attack") if c in MIN_SEP})
 
 # ---------------------------------------------------------------- measure
 dg = bpy.context.evaluated_depsgraph_get()
