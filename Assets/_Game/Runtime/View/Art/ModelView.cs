@@ -21,7 +21,7 @@ namespace CriticalMass.Runtime.View.Art
         readonly Quaternion[] _fix;
         readonly Transform _hips;
         readonly Vector3 _hipsBind, _hipsRest, _pelvisF, _pelvisKk, _lift;
-        readonly Quaternion _hipsRot0;
+        readonly Quaternion _hipsRot0, _hipsKkRot0;
         readonly float _ratio;
         /// <summary>Lift (model units) that puts the bind-pose soles on the root (the HY Farmer's sit 0.091 below it).</summary>
         public readonly float GroundLift;
@@ -29,8 +29,9 @@ namespace CriticalMass.Runtime.View.Art
         public readonly float MaxFixDeg;
 
         BindRetarget(Transform[] bones, Quaternion[] fix, Transform hips, Vector3 hipsBind, Vector3 hipsRest, float ratio, float maxDeg,
-            Vector3 pelvisF, Vector3 pelvisKk, Quaternion hipsRot0, Vector3 lift, float groundLift)
+            Vector3 pelvisF, Vector3 pelvisKk, Quaternion hipsRot0, Quaternion hipsKkRot0, Vector3 lift, float groundLift)
         {
+            _hipsKkRot0 = hipsKkRot0;
             _bones = bones; _fix = fix; _hips = hips; _hipsBind = hipsBind; _hipsRest = hipsRest; _ratio = ratio; MaxFixDeg = maxDeg;
             _pelvisF = pelvisF; _pelvisKk = pelvisKk; _hipsRot0 = hipsRot0; _lift = lift; GroundLift = groundLift;
         }
@@ -45,6 +46,10 @@ namespace CriticalMass.Runtime.View.Art
 
         static Vector3 _kkPelvis;
         static bool _kkPelvisKnown;
+        static readonly Dictionary<string, Quaternion> _kkRest = new Dictionary<string, Quaternion>();
+        /// <summary>The KayKit skeleton's rest local rotations by bone name (the clips' absolute rotations are relative to
+        /// these), from a model on the plain KayKit joints (Builder).</summary>
+        public static Dictionary<string, Quaternion> KaykitRest() { KaykitPelvis(); return _kkRest; }
         /// <summary>The KayKit skeleton's pelvis in its hips frame, from a model on the plain KayKit joints (Builder).</summary>
         public static Vector3 KaykitPelvis()
         {
@@ -53,13 +58,17 @@ namespace CriticalMass.Runtime.View.Art
             ArtEntry e = ArtCatalog.Load()?.Find(ArtMapping.Builder);
             if (e != null && e.Model != null)
                 foreach (Transform t in e.Model.GetComponentsInChildren<Transform>(true))
-                    if (t.name == "hips") { _kkPelvis = PelvisOf(t); break; }
+                {
+                    if (t.name == "hips") _kkPelvis = PelvisOf(t);
+                    _kkRest[t.name] = t.localRotation;
+                }
             return _kkPelvis;
         }
 
         /// <summary>Build from a model still in its armature rest pose (before any clip is applied). Null when the hero
         /// renderer has no bind poses.</summary>
-        public static BindRetarget Create(SkinnedMeshRenderer hero, float legRatio, ICollection<string> deformBones, Vector3 kkPelvis, Transform modelRoot)
+        public static BindRetarget Create(SkinnedMeshRenderer hero, float legRatio, ICollection<string> deformBones, Vector3 kkPelvis, Transform modelRoot,
+            IDictionary<string, Quaternion> kkRest)
         {
             if (hero == null || hero.sharedMesh == null) return null;
             Transform[] bones = hero.bones;
@@ -72,6 +81,7 @@ namespace CriticalMass.Runtime.View.Art
             var fix = new List<Quaternion>();
             Transform hips = null;
             Vector3 hipsBind = Vector3.zero, hipsRest = Vector3.zero;
+            Quaternion hipsKkRot0 = Quaternion.identity;
             float maxDeg = 0f;
             foreach (KeyValuePair<Transform, Matrix4x4> kv in world)
             {
@@ -83,7 +93,11 @@ namespace CriticalMass.Runtime.View.Art
                 Matrix4x4 pw = world.TryGetValue(p, out Matrix4x4 m) ? m : p.localToWorldMatrix;
                 Matrix4x4 local = pw.inverse * kv.Value;
                 Quaternion bindLocal = local.rotation;
-                Quaternion f = bindLocal * Quaternion.Inverse(b.localRotation);
+                // local = bind * kkRest^-1 * animated: the clip's motion away from the KayKit rest, applied in this bone's
+                // own bind frame (bone orientations differ per class where the joints were moved).
+                Quaternion kr = kkRest != null && kkRest.TryGetValue(b.name, out Quaternion k) ? k : b.localRotation;
+                if (isHips) hipsKkRot0 = kr;
+                Quaternion f = bindLocal * Quaternion.Inverse(kr);
                 maxDeg = Mathf.Max(maxDeg, Quaternion.Angle(Quaternion.identity, f));
                 list.Add(b);
                 fix.Add(f);
@@ -112,17 +126,18 @@ namespace CriticalMass.Runtime.View.Art
             if (hips != null && hips.parent != null && modelRoot != null)
                 lift = hips.parent.InverseTransformVector(modelRoot.TransformVector(Vector3.up * groundLift));
             return new BindRetarget(list.ToArray(), fix.ToArray(), hips, hipsBind, hipsRest, legRatio > 0f ? legRatio : 1f, maxDeg,
-                PelvisOf(hips), kkPelvis, hips != null ? hips.localRotation : Quaternion.identity, lift, groundLift);
+                PelvisOf(hips), kkPelvis, hips != null ? hips.localRotation : Quaternion.identity, hipsKkRot0, lift, groundLift);
         }
 
         public void Apply()
         {
+            Quaternion qkk = _hips != null ? _hips.localRotation : Quaternion.identity;   // the clip's KayKit hips rotation
             for (int i = 0; i < _bones.Length; i++) _bones[i].localRotation = _fix[i] * _bones[i].localRotation;
             if (_hips == null) return;
             // The clip moves KayKit's pelvis; this class's pelvis follows that motion scaled by its leg ratio, and the hips
             // turn about this class's own pelvis (its hips joint sits higher above the legs than KayKit's).
             Quaternion q = _hips.localRotation;
-            Vector3 kk = _hips.localPosition + q * _pelvisKk - (_hipsRest + _hipsRot0 * _pelvisKk);
+            Vector3 kk = _hips.localPosition + qkk * _pelvisKk - (_hipsRest + _hipsKkRot0 * _pelvisKk);
             Vector3 pelvis = _hipsBind + _hipsRot0 * _pelvisF + kk * _ratio + _lift;
             _hips.localPosition = pelvis - q * _pelvisF;
         }
@@ -296,7 +311,7 @@ namespace CriticalMass.Runtime.View.Art
             if (n == 0) return;
             if (Spec != null && Spec.RetargetToBind && Spec.Meshes != null && Spec.Meshes.Length > 0)
                 foreach (SkinnedMeshRenderer r in Root.GetComponentsInChildren<SkinnedMeshRenderer>(true))
-                    if (r.name == Spec.Meshes[0]) { Retarget = BindRetarget.Create(r, Spec.StrideScale, ArtMapping.KaykitDeformBoneNames, BindRetarget.KaykitPelvis(), Transform); break; }
+                    if (r.name == Spec.Meshes[0]) { Retarget = BindRetarget.Create(r, Spec.StrideScale, ArtMapping.KaykitDeformBoneNames, BindRetarget.KaykitPelvis(), Transform, BindRetarget.KaykitRest()); break; }
 
             _animator = Root.GetComponent<Animator>();
             if (_animator == null) _animator = Root.AddComponent<Animator>();
