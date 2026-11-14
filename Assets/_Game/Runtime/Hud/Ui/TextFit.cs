@@ -201,6 +201,8 @@ namespace CriticalMass.Runtime.Hud.Ui
         static bool _hooked;
 
         public Text Label => _text;
+        /// <summary>What the rule last put on the label (the source, or its cut), null before the first run.</summary>
+        public string Shown => _shown;
 
         /// <summary>Puts t under the rule with this size range (lines from the box height unless given).</summary>
         public static ContainedText Attach(Text t, int max, int min, int lines = 0)

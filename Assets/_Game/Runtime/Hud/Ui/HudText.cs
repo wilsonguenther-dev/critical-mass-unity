@@ -138,8 +138,8 @@ namespace CriticalMass.Runtime.Hud.Ui
         {
             if (ReferenceEquals(t.text, s) || t.text == s) return;
             // hud-containment-1: a contained label shows its words cut to fit; the same words again change nothing.
-            string src = ContainedText.SourceOf(t);
-            if (src != null && src == (s ?? string.Empty)) return;
+            ContainedText c = ContainedText.Of(t);
+            if (c != null && c.Source == (s ?? string.Empty) && c.Shown != null && t.text == c.Shown) return;
             t.text = s;
         }
     }
