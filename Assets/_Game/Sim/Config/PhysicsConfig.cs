@@ -123,6 +123,18 @@ namespace CriticalMass.Sim.Config
         /// the straight-line / route choice does not flip every tick at a wall end; and they do not strafe and swing at a target
         /// inside reach but behind a wall.</summary>
         public bool BotWideLine = true;
+
+        // ---- feat/kaiju-bridges-1 (art lead 2026-11-14: "the Kaiju tends to get stuck when trying to walk through the bridges")
+        /// <summary>The Kaiju squeezes across the narrow bridges: on a bridge cell, or within KaijuSqueezeHalo cells of one, a cell
+        /// counts as walkable for it when its wall collider fits at KaijuSqueezeRadius (the stair-stepped diagonal bridges only fit
+        /// 0.707 or less, so at KaijuGridRadius 1.1 it could reach neither base nor any side island). Its wall collider shrinks to
+        /// KaijuSqueezeRadius near such a cell and grows back at KaijuUnsqueezeRate only where the bigger circle fits (no pop).
+        /// Its body against fighters (KaijuBodyRadius) does not change. Needs SolidKaiju (without it the collider is 0.7 anyway).</summary>
+        public bool KaijuBridgeSqueeze = true;
+        public double KaijuSqueezeRadius = 0.7;
+        public int KaijuSqueezeHalo = 2;
+        /// <summary>Metres per second the wall collider grows back to KaijuGridRadius on wide ground.</summary>
+        public double KaijuUnsqueezeRate = 1.0;
         /// <summary>fix/movement-shiver-2: bot steering with hysteresis. Straight line or route is a choice held at least
         /// BotModeHoldSeconds (straight needs the whole body to fit, it is left only when the centre line is blocked); the
         /// circle-strafe band is entered at reach and left at reach + BotReachSlack; strafing steers from the target's real

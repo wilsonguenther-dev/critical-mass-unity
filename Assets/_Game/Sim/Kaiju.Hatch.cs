@@ -150,6 +150,22 @@ namespace CriticalMass.Sim.Core
             return amount;
         }
 
+        /// <summary>feat/kaiju-bridges-1: the bridge squeeze applies (it needs the DG-86 solid collider).</summary>
+        internal static bool SqueezeOn(World w) =>
+            Phys.On(w, w.Config.Physics.KaijuBridgeSqueeze) && Phys.On(w, w.Config.Physics.SolidKaiju);
+
+        /// <summary>feat/kaiju-bridges-1: a Bridge cell lies within `halo` cells (Chebyshev) of (cx, cz).</summary>
+        private static bool NearBridge(MapDef map, int cx, int cz, int halo)
+        {
+            for (int dz = -halo; dz <= halo; dz++)
+                for (int dx = -halo; dx <= halo; dx++)
+                {
+                    int x = cx + dx, z = cz + dz;
+                    if (MapGrid.InBounds(map, x, z) && map.Cells[z * map.Width + x] == Cell.Bridge) return true;
+                }
+            return false;
+        }
+
         /// <summary>Rebuild the shadow clearance grid when the real grid changed.</summary>
         internal static void RefreshClearance(World w)
         {
@@ -160,8 +176,20 @@ namespace CriticalMass.Sim.Core
             int width = map.Width;
             int height = map.Height;
             double r = GridR(w);
+            bool squeeze = SqueezeOn(w);
+            double sr = w.Config.Physics.KaijuSqueezeRadius;
+            int halo = w.Config.Physics.KaijuSqueezeHalo;
+            byte[] sq = nav.Squeeze;
             for (int cz = 0; cz < height; cz++)
-                for (int cx = 0; cx < width; cx++) cells[cz * width + cx] = MapGrid.ClearanceOk(map, cx, cz, r) ? Cell.Floor : Cell.Wall;
+                for (int cx = 0; cx < width; cx++)
+                {
+                    int i = cz * width + cx;
+                    bool ok = MapGrid.ClearanceOk(map, cx, cz, r);
+                    // feat/kaiju-bridges-1: near a bridge, a cell its squeezed collider fits in is walkable for it too.
+                    bool sqz = !ok && squeeze && NearBridge(map, cx, cz, halo) && MapGrid.ClearanceOk(map, cx, cz, sr);
+                    sq[i] = sqz ? (byte)1 : (byte)0;
+                    cells[i] = ok || sqz ? Cell.Floor : Cell.Wall;
+                }
             nav.ClearGridVersion = w.GridVersion;
             // The field was built over the old shadow grid: force a rebuild.
             nav.FieldWallVersion = -1;
