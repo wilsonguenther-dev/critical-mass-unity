@@ -12,6 +12,8 @@ imgs = {v: Image.open(os.path.join(here, "inputs", char, v + ".png")).convert("R
 pipe = Hunyuan3DDiTFlowMatchingPipeline.from_pretrained("tencent/Hunyuan3D-2mv", subfolder="hunyuan3d-dit-v2-mv-turbo",
                                                         variant="fp16", device="cpu", dtype=torch.float32)
 pipe.enable_flashvdm(mc_algo="mc")
+pipe.vae.to(device="cpu", dtype=torch.float32); pipe.model.to(dtype=torch.float32); pipe.conditioner.to(dtype=torch.float32)
+pipe.dtype = torch.float32
 log["t_load"] = round(time.time() - t0, 1); print(json.dumps(log), flush=True)
 mesh = pipe(image=imgs, num_inference_steps=5, octree_resolution=octree, num_chunks=20000,
             generator=torch.manual_seed(seed), output_type="trimesh")[0]
