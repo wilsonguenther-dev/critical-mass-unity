@@ -33,6 +33,46 @@ namespace CriticalMass.Runtime.View.WallDamage
 
         static void Log(string s) => Debug.Log("[CM.WallDmg] " + s);
 
+        /// <summary>
+        /// capture-gaps-1 (owner: "an unidentified dark pyramid shape and a white ring near the wall" in the b81 close-ups):
+        /// names everything drawn within 4.5 u of the wall cell, so the next capture says what they are instead of a guess.
+        /// Each renderer: object path, mesh, material, bounds centre and size. Then the sim things there: resource nodes
+        /// (kind, charges), actors (class, team, state) and the Miner's own aim targets. Capture only (allocates once).
+        /// Reading of the code so far: no view code builds a pyramid primitive; the candidates are the corruption node model
+        /// (prop_corruption_growth_s/l, a dark crystal; with no model the node falls back to a navy cube), a bot standing
+        /// there, and the cream ring of a pickup or supply drop (DepthWorldView) or a point target ring (TerrainAffordanceView,
+        /// which CaptureForce turns on). This log settles it.
+        /// </summary>
+        static void Census(World w, double x, double z)
+        {
+            Vector3 c = SimSpace.ToWorld(x, 0, z);
+            const float R = 4.5f;
+            var sb = new System.Text.StringBuilder("census around wall cell (" + x + ", " + z + "):\n");
+            foreach (Renderer r in Object.FindObjectsByType<Renderer>(FindObjectsSortMode.None))
+            {
+                if (!r.enabled || !r.gameObject.activeInHierarchy) continue;
+                Bounds b = r.bounds;
+                Vector3 d = b.center - c;
+                d.y = 0f;
+                if (d.magnitude - Mathf.Max(b.extents.x, b.extents.z) > R) continue;
+                if (b.extents.x > 12f || b.extents.z > 12f) continue;   // whole-map meshes (ground, effects) are listed by name only below
+                string path = r.name;
+                for (Transform t = r.transform.parent; t != null; t = t.parent) path = t.name + "/" + path;
+                MeshFilter mf = r.GetComponent<MeshFilter>();
+                sb.Append("  ").Append(path).Append(" mesh=").Append(mf != null && mf.sharedMesh != null ? mf.sharedMesh.name : "-")
+                  .Append(" mat=").Append(r.sharedMaterial != null ? r.sharedMaterial.name : "-")
+                  .Append(" at=").Append(b.center.ToString("0.0")).Append(" size=").Append(b.size.ToString("0.0")).Append('\n');
+            }
+            foreach (ResourceNode n in w.Nodes)
+                if (System.Math.Abs(n.X - x) <= R && System.Math.Abs(n.Z - z) <= R)
+                    sb.Append("  node ").Append(n.Kind).Append(" charges ").Append(n.Charges).Append(" at (").Append(n.X.ToString("0.0")).Append(", ").Append(n.Z.ToString("0.0")).Append(")\n");
+            for (int i = 0; i < w.Actors.Length; i++)
+                if (System.Math.Abs(w.X[i] - x) <= R && System.Math.Abs(w.Z[i] - z) <= R)
+                    sb.Append("  actor ").Append(i).Append(' ').Append(w.Actors[i].Cls).Append(' ').Append(w.Actors[i].Team)
+                      .Append(" alive ").Append(w.Actors[i].Alive).Append(" at (").Append(w.X[i].ToString("0.0")).Append(", ").Append(w.Z[i].ToString("0.0")).Append(")\n");
+            Log(sb.ToString());
+        }
+
         IEnumerator Shot(string name, float settle)
         {
             yield return new WaitForSecondsRealtime(settle);
@@ -225,6 +265,7 @@ namespace CriticalMass.Runtime.View.WallDamage
                 foreach (DecorationDef d in m.Decorations)
                     if (System.Math.Abs(d.Cx - cx) <= 4 && System.Math.Abs(d.Cz - cz) <= 4) Log("  in frame: decoration " + d.Kind + " at (" + d.Cx + ", " + d.Cz + ")");
             yield return Shot("wall-0-intact", 0.6f);
+            Census(w, cx + 0.5, cz + 0.5);
             int hits = 0;
             while (m.Cells[i] == Cell.BreakableIntact || m.Cells[i] == Cell.BreakableCracked)
             {

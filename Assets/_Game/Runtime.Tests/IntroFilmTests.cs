@@ -228,5 +228,19 @@ namespace CriticalMass.Runtime.Tests
             Audio.MusicDirector.ResumeTitleAt(IntroFilm.TitleMusicOffsetAtEnd);
             Assert.AreEqual(1f, Audio.MusicDirector.FilmBed, "the bed comes back even when no music director runs");
         }
-    }
+    
+        [Test]
+        public void TheHandoffCaptureShootsDenseAcrossTheDissolveIntoTheTitle()
+        {
+            // capture-gaps-1: -introHandoff goes to 10 shots a second from one second before the dissolve, never before.
+            Assert.IsFalse(IntroFilmCapture.InHandoffWindow(IntroFilm.HandoffStart - 1.5));
+            Assert.IsTrue(IntroFilmCapture.InHandoffWindow(IntroFilm.HandoffStart - 0.5));
+            Assert.IsTrue(IntroFilmCapture.InHandoffWindow(IntroFilm.Seconds));
+            Assert.AreEqual(2f, IntroFilmCapture.RateAt(10.0, true, 2f));
+            Assert.AreEqual(IntroFilmCapture.HandoffFps, IntroFilmCapture.RateAt(IntroFilm.HandoffStart, true, 2f));
+            Assert.AreEqual(2f, IntroFilmCapture.RateAt(IntroFilm.HandoffStart, false, 2f), "off without the flag");
+            Assert.GreaterOrEqual(IntroFilm.HandoffSeconds * IntroFilmCapture.HandoffFps, 8f, "at least 8 frames inside the dissolve");
+            CollectionAssert.AreEqual(new[] { 0f, 1f, 3f }, IntroFilmCapture.MatchShotSeconds);
+        }
+}
 }
