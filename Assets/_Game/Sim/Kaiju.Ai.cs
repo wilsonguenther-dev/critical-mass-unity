@@ -632,6 +632,7 @@ namespace CriticalMass.Sim.Core
             if (guard) for (int id = 0; id < n; id++) if (nav.Ignore[id] > 0) nav.Ignore[id] = Combat.TickDown(nav.Ignore[id], dt);
             if (SqueezeOn(w)) UpdateWallR(w, dt);
             nav.SiegeIn = Combat.TickDown(nav.SiegeIn, dt);
+            if (Phys.On(w, pc.KaijuHillSiege)) for (int id = 0; id < n; id++) if (nav.HitBy[id] > 0) nav.HitBy[id] = Combat.TickDown(nav.HitBy[id], dt);
 
             if (k.KoIn > 0)
             {

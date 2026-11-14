@@ -147,6 +147,13 @@ namespace CriticalMass.Sim.Config
         public double KaijuBarricadeDamage = 60;
         /// <summary>Barricades this far (metres) from the hill centre count as "in the way" (the ring is at 10.5).</summary>
         public double KaijuSiegeRadius = 13;
+        /// <summary>fix/kaiju-hill-1 round 2 (run 43648485298: 0.0 s on the hill with the ring open; every 30 s sample had a target
+        /// on the east approach): target choice had no range, so an owned Kaiju always chased the nearest enemy anywhere, and the
+        /// enemy stream from the base over the east bridge kept it at the east gap. An owned (not Berserk) Kaiju now adds
+        /// KaijuHillPull x (the target's distance beyond the hill radius) to a target's score: it guards the hill and fights what
+        /// comes onto it. A fighter that hit it in the last KaijuHitMemorySeconds is exempt, so it still punishes an attacker anywhere.</summary>
+        public double KaijuHillPull = 1.5;
+        public double KaijuHitMemorySeconds = 4;
         /// <summary>fix/movement-shiver-2: bot steering with hysteresis. Straight line or route is a choice held at least
         /// BotModeHoldSeconds (straight needs the whole body to fit, it is left only when the centre line is blocked); the
         /// circle-strafe band is entered at reach and left at reach + BotReachSlack; strafing steers from the target's real

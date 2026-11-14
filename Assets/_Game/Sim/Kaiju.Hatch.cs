@@ -128,6 +128,7 @@ namespace CriticalMass.Sim.Core
             if (k.State == KaijuState.Azure && src.Team != TeamId.Crimson) return 0;
             if (k.State == KaijuState.Crimson && src.Team != TeamId.Azure) return 0;
             if (k.State == KaijuState.Neutral) k.Threat[sourceId] = JsMath.F32(w.Config.Kaiju.NeutralThreatMemorySeconds);
+            else if (Phys.On(w, w.Config.Physics.KaijuHillSiege)) w.KaijuNav.HitBy[sourceId] = w.Config.Physics.KaijuHitMemorySeconds; // fix/kaiju-hill-1
             k.Hp -= amount;
             // DG-16 (view request): who hit the Kaiju and where, for effects: the point on its hit radius toward the attacker.
             double hx = w.X[sourceId] - k.X;
@@ -352,6 +353,7 @@ namespace CriticalMass.Sim.Core
             Array.Fill(nav.Ignore, 0.0);
             nav.SiegeCx = nav.SiegeCz = nav.StandCx = nav.StandCz = -1;
             nav.SiegeIn = 0;
+            Array.Fill(nav.HitBy, 0.0);
             World.PushEvent(w, SimEventType.Hatch, -1, -1, x, z, HatchCode(state));
         }
 
@@ -380,16 +382,27 @@ namespace CriticalMass.Sim.Core
                 RefreshClearance(w);
                 kReg = RegionAt(w, k.X, k.Z, out _, out _);
             }
+            bool hillPull = guard && Phys.On(w, p.KaijuHillSiege) && k.State != KaijuState.Berserk && k.State != KaijuState.Neutral;
+            HillDef hill = w.Map.Hill;
             for (int id = 0; id < n; id++)
             {
                 if (!KaijuCanTarget(w, id)) continue;
                 if (guard && (w.KaijuNav.Ignore[id] > 0 || !BodyCanReach(w, id, kReg, id == k.TargetId))) continue;
+                double pull = 0;
+                if (hillPull && !(w.KaijuNav.HitBy[id] > 0))
+                {
+                    double hx = w.X[id] - hill.X;
+                    double hz = w.Z[id] - hill.Z;
+                    double beyond = Math.Sqrt(hx * hx + hz * hz) - hill.R;
+                    if (beyond > 0) pull = p.KaijuHillPull * beyond;
+                }
                 double dx = w.X[id] - k.X;
                 double dz = w.Z[id] - k.Z;
                 double score = Math.Sqrt(dx * dx + dz * dz);
                 if (bigFeeder >= 0 && (w.Actors[id].Team == TeamId.Azure ? 0 : 1) == bigFeeder) score -= BigFeederBias;
                 if (walls && !SegmentClear.Clear(w.Map, k.X, k.Z, w.X[id], w.Z[id])) score += p.KaijuHiddenPenalty;
                 if (guard && id == k.TargetId) score -= p.KaijuRetargetMargin;
+                score += pull;
                 if (score < bestScore)
                 {
                     bestScore = score;
