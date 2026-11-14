@@ -96,6 +96,7 @@ log("fps", fps, "kk", kk.name, "class rig", fa.name, "clips", len(acts), sorted(
 SIDES = ("l", "r")
 FLIGHT_CAP = 0.32      # metres: lowest foot/toe joint never above this (game limit 0.35 u at scale 1)
 CAPPED = {}
+PLANT_N = 0.04         # rig-builder-2: new bodies hold their locomotion stance a little longer (the game needs 0.3 u of planted run)
 PLANT = 0.025          # KayKit ankle within 2.5% of leg length of its rest height = planted
 MAX_LOWER = 0.12       # hips never come down more than this to reach a target (DeathB-style clips keep FK reach)
 LEG = lambda s: ("upperleg." + s, "lowerleg." + s, "foot." + s, "toes." + s)
@@ -516,10 +517,18 @@ def bake_action(clip, act):
                 # full-local copy pitched the Builder's boots by KayKit's 20 degree steeper foot bone)
                 Rk_ = (kk.matrix_world @ kkP[LEG(s)[2]].matrix).to_3x3().normalized()
                 R = Rk_ @ FOOTREF[s] @ F0["R" + s]
+            # rig-builder-2: a new body's PLANTED locomotion foot lies flat as bound, turned only by KayKit's foot yaw. The
+            # pack's heel-to-toe roll on the Builder's long boot lifted his toe joint more than 0.03 u through most of the
+            # run stance (the game saw 2 planted frame pairs, 0.27 u, under its 0.3 u floor).
+            if NEW_BODY and clip in ORDER_CLIPS and (K["A" + s].z - K0["A" + s].z) < PLANT_N * leg_k:
+                fd = (K["R" + s] @ K0["R" + s].inverted()) @ Vector((0, -1, 0))
+                if fd.xy.length > 1e-4:
+                    yaw = math.atan2(fd.y, fd.x) - math.atan2(-1.0, 0.0)
+                    R = Matrix.Rotation(yaw, 3, 'Z') @ F0["R" + s]
             dk = K["A" + s] - K0["A" + s]
             # Foot motion scales with the legs (an unscaled swing lift was tried: Walk's lowest foot rose to 0.043).
             A = F0["A" + s] + dk * RATIO + Vector((0, 0, LIFT))
-            planted = (K["A" + s].z - K0["A" + s].z) < PLANT * leg_k
+            planted = (K["A" + s].z - K0["A" + s].z) < (PLANT_N if NEW_BODY and clip in ORDER_CLIPS else PLANT) * leg_k
             if planted and bdir is not None:
                 if anchor[s] is None:
                     anchor[s] = (A.copy(), f)
