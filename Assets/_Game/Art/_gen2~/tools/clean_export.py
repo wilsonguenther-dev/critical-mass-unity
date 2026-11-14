@@ -386,7 +386,7 @@ def clean(e):
                 c = pg.center
                 if x0 < c.x < x1 and y0 < c.y < y1 and z0 < c.z < z1:
                     r_ = rgba[i]
-                    if abs(c.x) < xi or r_[0] - r_[2] < 0.06 or r_[:3].mean() < 0.5 * skin_c.mean():
+                    if abs(c.x) < xi or r_[0] - r_[2] < ff.get("cool", 0.06) or r_[:3].mean() < 0.5 * skin_c.mean():
                         rgba[i, :3] = skin_c; rgba[i, 3] = 0; n_ += 1
             facts.setdefault("face_features", {})[lv] = {"to_skin": n_, "skin": "#%02X%02X%02X" % tuple(int(round(x * 255)) for x in skin_c)}
         elif ff and lv != "Shadow":

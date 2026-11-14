@@ -14,12 +14,13 @@
    "brow_x": 0.1,
    "brow_z": 1.611,
    "brow_w": 0.072,
-   "brow_t": 0.009,
+   "brow_t": 0.013,
    "arch": 0.005,
    "lift": 0.0025,
    "colour": "#33241E",
    "highlight": "#F4F1EA",
-   "_note": "eyes and brow positions read from the raw eye paint on the Hero close-up (face 0.33 m wide)"
+   "_note": "eyes and brow positions read from the raw eye paint on the Hero close-up (face 0.33 m wide)",
+   "brow_lift": 0.007
   }
  },
  "hips": [

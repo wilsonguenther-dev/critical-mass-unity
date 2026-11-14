@@ -63,15 +63,16 @@
    "face_features": {
     "mode": "skin",
     "box": [
-     -0.16,
-     0.16,
+     -0.17,
+     0.17,
      -0.4,
      -0.02,
      1.36,
-     1.67
+     1.7
     ],
     "inner_x": 0.12,
-    "_note": "rig-demolitions-1: clean skin on the face; eyes and brows are added geometry (rigb_joints_Demolitions.json _opts.face_features)"
+    "_note": "rig-demolitions-1: clean skin on the face; eyes and brows are added geometry (rigb_joints_Demolitions.json _opts.face_features)",
+    "cool": 0.1
    }
   }
  ]

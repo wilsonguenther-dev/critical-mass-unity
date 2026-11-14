@@ -666,7 +666,8 @@ try:
                 bx, bz, bw, bt, ar = sx * FF['brow_x'], FF['brow_z'], FF['brow_w'], FF['brow_t'], FF.get('arch', 0.005)
                 xs = [bx - bw / 2, bx, bx + bw / 2]
                 zb = [bz + ar * (1 - ((xx - bx) / (bw / 2)) ** 2) for xx in xs]
-                B_ = [on_skin(xs[i], zb[i], L) for i in range(3)]; T_ = [on_skin(xs[i], zb[i] + bt, L) for i in range(3)]
+                LB = FF.get('brow_lift', L)   # the brow ridge is steep: more lift so the skin between columns stays under
+                B_ = [on_skin(xs[i], zb[i], LB) for i in range(3)]; T_ = [on_skin(xs[i], zb[i] + bt, LB) for i in range(3)]
                 for i in range(2):
                     polys.append(([B_[i], B_[i + 1], T_[i + 1], T_[i]], dark_c))
             bm = bmesh.new(); bm.from_mesh(me)
