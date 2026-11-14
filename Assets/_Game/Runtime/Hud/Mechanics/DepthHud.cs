@@ -436,6 +436,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             }
             bool show = words != null;
             if (_prompt.gameObject.activeSelf != show) _prompt.gameObject.SetActive(show);
+            if (show) HudZones.HoldPromptRow();   // fix/hud-containment-3: the terrain pill yields the shared prompt row
             if (!show) return;
             HudText.Set(_promptText, words);
             _promptPanel.SetRim(refusal ? (Color)CMTokens.MeterOrange.Color : CMTokens.WarmCream.Color);
