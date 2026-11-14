@@ -1,6 +1,7 @@
 using System.Collections;
 using System.IO;
 using CriticalMass.Runtime.Game;
+using CriticalMass.Runtime.Menu;
 using CriticalMass.Runtime.View.Affordance;
 using CriticalMass.Sim.Config;
 using CriticalMass.Sim.Core;
@@ -50,12 +51,19 @@ namespace CriticalMass.Runtime.View.WallDamage
                 yield return new WaitForSecondsRealtime(0.5f);
             }
             TerrainAffordanceView.CaptureForce = true;
+            // wall-damage-2: the affordance markers and the target outline/ring drew over the wall in batch 8's stills; the
+            // capture turns them off (settings are restored at the end) so the damage itself is what is judged.
+            bool markers = WorldFeedbackSettings.Markers, outline = WorldFeedbackSettings.Outline;
+            WorldFeedbackSettings.Markers = false;
+            WorldFeedbackSettings.Outline = false;
             Stage();
             yield return new WaitForSecondsRealtime(3f);   // the world view rebuilds after a reset
             yield return BarricadeStrip();
             Stage();
             yield return new WaitForSecondsRealtime(3f);   // the world view rebuilds after a reset
             yield return WallStrip();
+            WorldFeedbackSettings.Markers = markers;
+            WorldFeedbackSettings.Outline = outline;
             TerrainAffordanceView.CaptureForce = false;
             Log("done");
             yield return new WaitForSecondsRealtime(0.5f);
@@ -78,41 +86,95 @@ namespace CriticalMass.Runtime.View.WallDamage
             w.Actors[id].Facing = facing;
         }
 
+        /// <summary>
+        /// wall-damage-2: a legal barricade tile in world terms. Batch 8's run placed none (the Miner stood in spawn ground,
+        /// and the hill refuses too). Walks rings outward from a point 4 u outside the hill edge, on the side away from the
+        /// Azure pad, stands the Miner 2 cells from the tile and asks the Sim's own refusal check before placing.
+        /// </summary>
+        bool PlaceLegal(World w, out int slot, out int tx, out int tz)
+        {
+            slot = -1; tx = tz = -1;
+            MapDef m = w.Map;
+            double hx = m.Hill.X, hz = m.Hill.Z, r = m.Hill.R + 4;
+            double ax = m.Pads[(int)TeamId.Azure].X - hx, az = m.Pads[(int)TeamId.Azure].Z - hz;
+            double al = System.Math.Sqrt(ax * ax + az * az);
+            if (al < 1e-6) { ax = 1; az = 0; al = 1; }
+            // Start on the hill's flank, a quarter turn from the Azure pad (not in either base).
+            int sx = (int)System.Math.Floor(hx - az / al * r), sz = (int)System.Math.Floor(hz + ax / al * r);
+            int[] ox = { 2, -2, 0, 0 }, oz = { 0, 0, 2, -2 };
+            for (int ring = 0; ring <= 10; ring++)
+            for (int dz = -ring; dz <= ring; dz++)
+            for (int dx = -ring; dx <= ring; dx++)
+            {
+                if (System.Math.Max(System.Math.Abs(dx), System.Math.Abs(dz)) != ring) continue;
+                int cx = sx + dx, cz = sz + dz;
+                if (!MapGrid.InBounds(m, cx, cz) || m.Cells[cz * m.Width + cx] != Cell.Floor) continue;
+                for (int k = 0; k < 4; k++)
+                {
+                    int mx = cx + ox[k], mz = cz + oz[k];
+                    if (!MapGrid.InBounds(m, mx, mz) || m.Cells[mz * m.Width + mx] != Cell.Floor) continue;
+                    Put(w, 0, mx + 0.5, mz + 0.5, System.Math.Atan2(cz - mz, cx - mx));
+                    int why = Barricades.BarricadeRefusal(w, 0, cx + 0.5, cz + 0.5);
+                    if (why != 0) continue;
+                    if (!Barricades.TryPlaceBarricade(w, 0, cx + 0.5, cz + 0.5)) { Log("barricade: tile (" + cx + ", " + cz + ") passed the check but TryPlace refused"); continue; }
+                    for (int i = 0; i < w.Barricades.Length; i++)
+                        if (w.Barricades[i].Active && w.Barricades[i].Cx == cx && w.Barricades[i].Cz == cz) slot = i;
+                    tx = cx; tz = cz;
+                    return slot >= 0;
+                }
+            }
+            return false;
+        }
+
         IEnumerator BarricadeStrip()
         {
             World w = _driver.World;
-            int slot = -1;
-            for (int f = 0; f < 4 && slot < 0; f++)
-            {
-                double face = w.Actors[0].Facing + f * System.Math.PI / 2;
-                if (Barricades.TryPlaceBarricade(w, 0, w.X[0] + System.Math.Cos(face) * 1.5, w.Z[0] + System.Math.Sin(face) * 1.5))
-                    for (int i = 0; i < w.Barricades.Length; i++) if (w.Barricades[i].Active) slot = i;
-            }
-            if (slot < 0) { Log("barricade: none could be placed here"); yield break; }
+            if (!PlaceLegal(w, out int slot, out int tx, out int tz)) { Log("barricade: PLACEMENT FAILED (no legal tile found near the hill flank)"); yield break; }
+            Log("barricade: ACCEPTED at tile (" + tx + ", " + tz + ") slot " + slot + "; miner at (" + w.X[0] + ", " + w.Z[0] + ")");
+            w.Actors[0].SpawnProtect = 30;
+            _driver.StepTicks(1);
+            yield return Shot("barricade-0-intact", 1.2f);
+            // Every hit to destruction, as an enemy Warrior's swing takes it (AttackDamage per hit).
             double max = w.Config.Abilities.MinerBarricade.MaxHp;
-            double[] left = { 1.0, 0.8, 0.5, 0.2 };
-            for (int k = 0; k < left.Length; k++)
+            double dmg = System.Math.Max(1, w.Config.Class(ClassId.Warrior).AttackDamage);
+            int hits = 0;
+            while (w.Barricades[slot].Active && w.Barricades[slot].Hp - dmg > 1e-9 && hits < 20)
             {
-                w.Barricades[slot].Hp = max * left[k];
-                yield return Shot("barricade-stage-" + k, 0.35f);
-                Log("barricade stage " + k + " shown=" + BarricadeDamage.StageShown(slot));
+                w.Barricades[slot].Hp -= dmg;
+                hits++;
+                if (hits == 1) yield return Shot("barricade-hit1-shake", 0.04f);
+                yield return Shot("barricade-hit" + hits, 0.35f);
+                Log("barricade hit " + hits + ": hp " + w.Barricades[slot].Hp.ToString("0") + "/" + max.ToString("0") + " stage shown " + BarricadeDamage.StageShown(slot));
             }
-            w.Barricades[slot].Hp = max * 0.1;
-            yield return Shot("barricade-hit-shake", 0.04f);
             w.Barricades[slot].Hp = 0;
             _driver.StepTicks(1);
+            Log("barricade: broken after " + (hits + 1) + " hits; active=" + w.Barricades[slot].Active);
             yield return Shot("barricade-break", 0.15f);
             yield return Shot("barricade-rubble-1s", 0.85f);
             yield return Shot("barricade-rubble-6s", 5f);
         }
 
         /// <summary>The breakable cell with breakable neighbours on both sides (so the per-cell look can be judged), or -1.</summary>
-        static int PickWallCell(MapDef m, out int n1, out int n2)
+        static bool Cluttered(World w, int cx, int cz)
         {
+            MapDef m = w.Map;
+            if (m.Decorations != null)
+                foreach (DecorationDef d in m.Decorations)
+                    if (System.Math.Abs(d.Cx - cx) <= 3 && System.Math.Abs(d.Cz - cz) <= 3) return true;
+            foreach (ResourceNode nd in w.Nodes)
+                if (System.Math.Abs(nd.X - (cx + 0.5)) <= 3.5 && System.Math.Abs(nd.Z - (cz + 0.5)) <= 3.5) return true;
+            return false;
+        }
+
+        static int PickWallCell(World w, out int n1, out int n2)
+        {
+            MapDef m = w.Map;
             n1 = n2 = -1;
+            for (int pass = 0; pass < 2; pass++)
             for (int i = 0; i < m.Cells.Length; i++)
             {
                 if (m.Cells[i] != Cell.BreakableIntact) continue;
+                if (pass == 0 && Cluttered(w, i % m.Width, i / m.Width)) continue;
                 int cx = i % m.Width, cz = i / m.Width;
                 if (cx > 0 && cx < m.Width - 1 && m.Cells[i - 1] == Cell.BreakableIntact && m.Cells[i + 1] == Cell.BreakableIntact) { n1 = i - 1; n2 = i + 1; return i; }
                 if (cz > 0 && cz < m.Height - 1 && m.Cells[i - m.Width] == Cell.BreakableIntact && m.Cells[i + m.Width] == Cell.BreakableIntact) { n1 = i - m.Width; n2 = i + m.Width; return i; }
@@ -142,7 +204,7 @@ namespace CriticalMass.Runtime.View.WallDamage
         {
             World w = _driver.World;
             MapDef m = w.Map;
-            int i = PickWallCell(m, out int n1, out int n2);
+            int i = PickWallCell(w, out int n1, out int n2);
             if (i < 0) { Log("wall: no breakable cell on this map"); yield break; }
             int cx = i % m.Width, cz = i / m.Width;
             // Stand the Miner on the nearest floor cell beside it, facing it (the camera follows him).
@@ -158,7 +220,10 @@ namespace CriticalMass.Runtime.View.WallDamage
             Put(w, 0, bx, bz, System.Math.Atan2(cz + 0.5 - bz, cx + 0.5 - bx));
             w.Actors[0].SpawnProtect = 30;
             _driver.StepTicks(1);
-            Log("wall cell " + i + " (" + cx + ", " + cz + ") neighbours " + n1 + ", " + n2 + "; miner at (" + bx + ", " + bz + ")");
+            Log("wall cell " + i + " (" + cx + ", " + cz + ") neighbours " + n1 + ", " + n2 + "; miner at (" + bx + ", " + bz + "); cluttered=" + Cluttered(w, cx, cz));
+            if (m.Decorations != null)
+                foreach (DecorationDef d in m.Decorations)
+                    if (System.Math.Abs(d.Cx - cx) <= 4 && System.Math.Abs(d.Cz - cz) <= 4) Log("  in frame: decoration " + d.Kind + " at (" + d.Cx + ", " + d.Cz + ")");
             yield return Shot("wall-0-intact", 0.6f);
             int hits = 0;
             while (m.Cells[i] == Cell.BreakableIntact || m.Cells[i] == Cell.BreakableCracked)
