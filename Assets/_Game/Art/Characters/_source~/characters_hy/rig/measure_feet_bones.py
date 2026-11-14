@@ -23,11 +23,14 @@ for spec in PACKS:
     cls, paths = spec.split("=", 1)
     model, clips = paths.split(":")
     bpy.ops.wm.read_factory_settings(use_empty=True)
-    mobjs, _ = imp(model, False)
-    arm = next(o for o in mobjs if o.type == "ARMATURE")
+    # The clips play on the clip pack's OWN armature: Unity applies a clip's local rotations as absolute values, while a
+    # Blender action is relative to the rest of the armature it is put on, so putting the pack's actions on the model's
+    # armature is only right when both rests match (they do not for a baked pack: the bake turns the feet at rest).
     cobjs, acts = imp(clips, True)
+    arm = next(o for o in cobjs if o.type == "ARMATURE")
     for o in cobjs:
-        bpy.data.objects.remove(o, do_unlink=True)
+        if o is not arm:
+            bpy.data.objects.remove(o, do_unlink=True)
     ad = arm.animation_data or arm.animation_data_create()
     rest = {}
     ad.action = None
