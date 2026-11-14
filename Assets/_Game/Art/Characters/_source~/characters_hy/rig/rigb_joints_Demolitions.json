@@ -2,7 +2,9 @@
  "_note": "rig-demolitions-1 2026-11-14: read by eye from measure_Demolitions_bind_front/side.png (0.1 m grid, 1000 px for 2.6 m, z = 1.25 + (500 - py)/384.6). Blender metres, faces -Y. Fingerless gloves: palm in the glove, wrist at the top of the palm.",
  "_opts": {
   "rigid_parts_on_chest": true,
-  "back_skips_head": true
+  "back_skips_head": true,
+  "pull_rear_parts_flush": 0.015,
+  "rear_tilt_deg": 15
  },
  "hips": [
   0,

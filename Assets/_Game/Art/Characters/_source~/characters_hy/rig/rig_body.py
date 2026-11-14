@@ -96,6 +96,88 @@ try:
         o.name = o.data.name = f'{CLS}_{lv}'
     hero = LV['Hero']
 
+    # rig-demolitions-1: '_opts': {'pull_rear_parts_flush': overlap_m}: a separate piece behind the body (the Demolitions
+    # barrel hung about 0.1 m behind her back in the generated model) moves forward (-Y) on every level until its nearest
+    # point sits overlap_m inside the body's back surface. The shift is measured on the Hero and applied to every level.
+    _jf0 = os.path.join(HERE, f'rigb_joints_{CLS}.json')
+    _pull = json.load(open(_jf0)).get('_opts', {}).get('pull_rear_parts_flush') if os.path.exists(_jf0) else None
+
+    def rear_parts(ob):
+        bm_ = bmesh.new(); bm_.from_mesh(ob.data); bm_.verts.ensure_lookup_table()
+        n_ = len(bm_.verts); comp = np.full(n_, -1); nc = 0
+        for v0 in bm_.verts:
+            if comp[v0.index] >= 0:
+                continue
+            comp[v0.index] = nc; st_ = [v0]
+            while st_:
+                v_ = st_.pop()
+                for e_ in v_.link_edges:
+                    o_ = e_.other_vert(v_)
+                    if comp[o_.index] < 0:
+                        comp[o_.index] = nc; st_.append(o_)
+            nc += 1
+        bm_.free()
+        P_ = verts(ob); main_ = np.bincount(comp).argmax()
+        rear = np.zeros(n_, bool)
+        for k_ in range(nc):
+            sel_ = comp == k_
+            if k_ != main_ and sel_.sum() > 50 and P_[sel_, 1].mean() > P_[comp == main_, 1].mean() + 0.15:
+                rear |= sel_
+        return P_, rear, comp == main_
+
+    if _pull:
+        # The piece is first centred behind the spine (x), then moved forward until its nearest point over the TORSO
+        # (|x| < 0.2 m, so a hanging arm in front of an off-centre piece does not stop it) sits _pull inside the back.
+        # A round piece centred this way curves away from the arms on both sides.
+        P_, rear, body_ = rear_parts(hero)
+        if rear.any():
+            R0 = P_[rear]
+            lo, hi = R0.min(0) - 0.01, R0.max(0) + 0.01
+            dx = -0.5 * (R0[:, 0].min() + R0[:, 0].max())
+            # tilt the top back (about x through the piece's front-bottom edge) so the top clears the big head's overhang,
+            # then measure the gap over the torso only (below the head joint)
+            _jj = json.load(open(_jf0))
+            tilt = math.radians(float(json.load(open(_jf0)).get('_opts', {}).get('rear_tilt_deg', 0)))
+            piv = np.array([0.0, R0[:, 1].min(), R0[:, 2].min()])
+            ct, st = math.cos(tilt), math.sin(tilt)
+
+            def place(Q, sy):
+                Q = Q.copy(); Q[:, 0] += dx
+                y_, z_ = Q[:, 1] - piv[1], Q[:, 2] - piv[2]
+                Q[:, 1] = piv[1] + y_ * ct + z_ * st - sy; Q[:, 2] = piv[2] - y_ * st + z_ * ct
+                return Q
+            cell = 0.02
+            zt = _jj['head'][2] - 0.02 if 'head' in _jj else 9
+            B = P_[body_ & (np.abs(P_[:, 0]) < 0.2) & (P_[:, 2] < zt)]; R_ = place(R0, 0.0)
+            kb = np.floor(B[:, [0, 2]] / cell).astype(int); kr = np.floor(R_[:, [0, 2]] / cell).astype(int)
+            back = {}
+            for (i_, j_), y_ in zip(map(tuple, kb), B[:, 1]):
+                if y_ > back.get((i_, j_), -9):
+                    back[(i_, j_)] = y_
+            gaps = [y_ - back[(i_, j_)] for (i_, j_), y_ in zip(map(tuple, kr), R_[:, 1]) if (i_, j_) in back]
+            gap = float(min(gaps)) if gaps else 0.0
+            shift = gap + float(_pull)
+            # clearance to the head (and hair) above the torso line after the move: positive = no contact
+            Hd = P_[body_ & (P_[:, 2] >= zt)]; Rf = place(R0, shift)
+            kh = np.floor(Hd[:, [0, 2]] / cell).astype(int); hb = {}
+            for (i_, j_), y_ in zip(map(tuple, kh), Hd[:, 1]):
+                if y_ > hb.get((i_, j_), -9):
+                    hb[(i_, j_)] = y_
+            hc = [y_ - hb[(i_, j_)] for (i_, j_), y_ in zip(map(tuple, np.floor(Rf[:, [0, 2]] / cell).astype(int)), Rf[:, 1]) if (i_, j_) in hb]
+            REP['rear_pull'] = {'gap_m': round(gap, 4), 'shift_y_m': round(shift, 4), 'shift_x_m': round(float(dx), 4),
+                                'tilt_deg': round(math.degrees(tilt), 1), 'head_clear_m': round(float(min(hc)), 4) if hc else None, 'levels': {}}
+            for lv, o in LV.items():
+                if o is hero:
+                    Pl, rl = P_, rear
+                else:
+                    Pl, rl, _ = rear_parts(o)
+                    if not rl.any():   # the piece merged into the body at this level (vertex clustering): take its box
+                        rl = np.all((Pl >= lo) & (Pl <= hi), axis=1)
+                co = Pl.copy(); co[rl] = place(Pl[rl], shift)
+                o.data.vertices.foreach_set('co', co.ravel()); o.data.update()
+                REP['rear_pull']['levels'][lv] = int(rl.sum())
+            log('rear piece pulled forward', REP['rear_pull'])
+
     def measure_sheet(tag):
         """Front and side orthographic renders of the Hero with a 0.1 m grid behind (red every 0.5 m) to read joints."""
         sc = bpy.context.scene
