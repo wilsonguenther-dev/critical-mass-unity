@@ -1341,8 +1341,8 @@ namespace CriticalMass.Runtime.Menu
                 Stepper(tab, 5, "TIME OF DAY", () => View.Atmosphere.TimeOfDaySettings.Label(View.Atmosphere.TimeOfDaySettings.Choice),
                     View.Atmosphere.TimeOfDaySettings.Step),
                 // feat/ground-camera: play from behind the fighter (experimental); F5 / double-tap View flips it in a match.
-                // feat/camera-creator-angle: the high camera's heading (creator's angle, red base bottom-left, the default; or the
-                // classic diamond, from the next match) and the experimental ground camera, in one cycle.
+                // feat/camera-creator-angle: the high camera's heading (creator's angle, red base bottom-left, or the classic
+                // diamond; applies from the next match) and the experimental ground camera, in one cycle.
                 Stepper(tab, 6, "CAMERA", CameraText, StepCamera),
             };
             MenuItem watch = MenuUi.Item(tab, "Watch Intro", ContentX, ContentY + GameTabLines * (LineH + LineGap) + 12f, 420f, 56f,
@@ -1384,7 +1384,7 @@ namespace CriticalMass.Runtime.Menu
         // ends at y 1000, inside the panel (PanelY 140 + PanelH 870 = 1010).
         const int GameTabLines = 7;
 
-        /// <summary>CAMERA line: HIGH: CREATOR ANGLE (default) / HIGH: CLASSIC DIAMOND / GROUND (EXPERIMENTAL).</summary>
+        /// <summary>CAMERA line: HIGH: CREATOR ANGLE / HIGH: CLASSIC DIAMOND (default until CameraHeading.CreatorAngleIsDefault) / GROUND (EXPERIMENTAL).</summary>
         static string CameraText() => GameSettings.GroundCamera ? "GROUND (EXPERIMENTAL)"
             : CriticalMass.Runtime.Camera.CameraHeading.ClassicChosen ? "HIGH: CLASSIC DIAMOND" : "HIGH: CREATOR ANGLE";
 

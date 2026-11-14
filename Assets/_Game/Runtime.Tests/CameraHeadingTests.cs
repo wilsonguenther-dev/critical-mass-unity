@@ -72,7 +72,7 @@ namespace CriticalMass.Runtime.Tests
         }
 
         [Test]
-        public void TheSettingDefaultsToTheCreatorAngle()
+        public void TheSettingDefaultFollowsTheFlipLineAndBothHeadingsStaySelectable()
         {
             CameraHeading.Pin = null;
             bool had = PlayerPrefs.HasKey(CameraHeading.Key);
@@ -80,9 +80,11 @@ namespace CriticalMass.Runtime.Tests
             try
             {
                 PlayerPrefs.DeleteKey(CameraHeading.Key);
-                Assert.AreEqual(CameraHeading.Creator, CameraHeading.Chosen);
+                Assert.AreEqual(CameraHeading.CreatorAngleIsDefault ? CameraHeading.Creator : CameraHeading.Classic, CameraHeading.Chosen);
                 CameraHeading.ClassicChosen = true;
                 Assert.AreEqual(CameraHeading.Classic, CameraHeading.Chosen);
+                CameraHeading.ClassicChosen = false;
+                Assert.AreEqual(CameraHeading.Creator, CameraHeading.Chosen);
                 Assert.Contains(CameraHeading.Key, CriticalMass.Runtime.Menu.GameSettings.AllKeys);
             }
             finally
