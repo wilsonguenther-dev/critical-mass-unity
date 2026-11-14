@@ -357,6 +357,10 @@ def bake_action(clip, act):
             set_world(fa, hp, Matrix.Translation((0, 0, FLIGHT_CAP - lowj)) @ (fa.matrix_world @ hp.matrix))
             upd()
             CAPPED[clip] = max(CAPPED.get(clip, 0.0), lowj - FLIGHT_CAP)
+        if clip == "StrafeR" and CLS == "Warrior":
+            log("trace", f, "kk ankle z l %.3f r %.3f" % (K["Al"].z, K["Ar"].z), "target z l %.3f r %.3f" % (targets["l"].z, targets["r"].z),
+                "final z l %.3f r %.3f" % (W(fa, faP["foot.l"].head).z, W(fa, faP["foot.r"].head).z),
+                "planted", PL.get("l"), PL.get("r"), "hips z %.3f" % W(fa, faP["hips"].head).z, "upperleg z %.3f" % W(fa, faP["upperleg.l"].head).z)
         for pb in faP:
             l, q, sc = pb.matrix_basis.decompose()
             if rec[pb.name] and Quaternion(rec[pb.name][-1][1]).dot(q) < 0:
