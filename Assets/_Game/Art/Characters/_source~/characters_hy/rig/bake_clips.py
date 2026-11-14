@@ -203,6 +203,19 @@ names = [pb.name for pb in fa.pose.bones]
 kkP, faP = kk.pose.bones, fa.pose.bones
 
 
+
+def rest_local(arm, name):
+    b = arm.data.bones[name]
+    return (b.parent.matrix_local.inverted() @ b.matrix_local) if b.parent else b.matrix_local.copy()
+
+
+# rig-farmer-3: copy each bone's FULL local rotation (its rest included), not its rotation relative to the rest. The
+# shared pack's armature rest is not the T-pose bind of the class rigs, so copying matrix_basis kept every class arm in
+# the T-pose (Farmer_Clips.fbx read as the game reads it held the wrists at shoulder height). Legs hid it (IK).
+RESTFIX = {pb.name: (rest_local(fa, pb.name).to_quaternion().inverted() @ rest_local(kk, pb.name).to_quaternion())
+           for pb in fa.pose.bones if pb.name in kk.data.bones}
+
+
 def kk_back_dir(act, f0, f1):
     """Direction the KayKit planted feet move in the clip (opposite to travel), or None."""
     acc, prev = Vector((0, 0, 0)), {s: None for s in SIDES}
@@ -237,10 +250,10 @@ def bake_action(clip, act):
             if k is None:
                 pb.matrix_basis.identity()
                 continue
-            mb = k.matrix_basis.copy()
+            l_, q_, s_ = k.matrix_basis.decompose()
             if pb.name not in KEEP_LOC:
-                mb.translation = Vector((0, 0, 0))
-            pb.matrix_basis = mb
+                l_ = Vector((0, 0, 0))
+            pb.matrix_basis = Matrix.LocRotScale(l_, RESTFIX[pb.name] @ q_, s_)
         upd()
         K = snap(kk)
         Hd = F0["hips"] + (K["hips"] - K0["hips"]) * RATIO + Vector((0, 0, LIFT))
