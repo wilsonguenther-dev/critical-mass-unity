@@ -743,7 +743,7 @@ namespace CriticalMass.Runtime.Audio.Sound
     /// comes from the words pack (Resources Lore/sound-captions.json: { "captions": [ { "id", "text" } ] }) when present,
     /// else the table's built-in caption. Every string is built at load: showing one never allocates.
     /// </summary>
-    internal sealed class SoundCaptions
+    public sealed class SoundCaptions
     {
         /// <summary>fix/hud-containment-3 (walk: stacked captions; "Hill captured" up with "contested"): ONE caption at a
         /// time on the lowest caption row. A caption of the same family (hill_captured / hill_contested / hill_lost) replaces
@@ -834,10 +834,32 @@ namespace CriticalMass.Runtime.Audio.Sound
             }
         }
 
+        /// <summary>polish-3: the hill-state caption family ("hill_captured", "hill_lost", "hill_contested").</summary>
+        public const string HillFamily = "hill";
+
+        /// <summary>polish-3 (owner: HUD items "not respecting each other's time on screen"; capture showed a "Hill lost"
+        /// pill above the banner "The hill is contested."): hill news is said ONCE. While the announcer's banner owns the
+        /// hill news (saying or about to say a hill line) a hill caption is not shown, a shown one is cut at once (no fade,
+        /// so no ghost outline is left behind) and a waiting one is dropped. Other captions are untouched.</summary>
+        public static bool YieldsToBanner(string family, bool bannerOwnsHillNews) =>
+            bannerOwnsHillNews && string.Equals(family, HillFamily, StringComparison.Ordinal);
+
+        /// <summary>Below this the fading pill is snapped to fully clear (no faint outline left on screen).</summary>
+        public const float GhostAlpha = 0.04f;
+
+        /// <summary>The pill's alpha at a moment of its life: fades in and out over Fade, and never a faint ghost.</summary>
+        public static float AlphaAt(float now, float start, float until)
+        {
+            if (now >= until || now < start) return 0f;
+            float a = Mathf.Min(Mathf.Clamp01((now - start) / Fade), Mathf.Clamp01((until - now) / Fade));
+            return a < GhostAlpha ? 0f : a;
+        }
+
         public void Show(int cue, float pan, float now, Action<string> raised)
         {
             if (cue < 0 || cue >= _words.Length || _words[cue] == null) return;
             if (!Announcer.SubtitlesEnabled) return;
+            if (YieldsToBanner(_family[cue], Announcer.OwnsHillNews)) return;
             bool up = _until[0] > now && _cue[0] >= 0;
             bool sameFamily = up && _cue[0] != cue && _family[_cue[0]] == _family[cue];
             if (!sameFamily && now - _last[cue] < RepeatGap) return;
@@ -866,6 +888,14 @@ namespace CriticalMass.Runtime.Audio.Sound
 
         public void Update(float now, bool hidden)
         {
+            // polish-3: the banner took the hill news (its line can start a frame after the caption): cut the hill pill at
+            // once and drop a waiting hill caption, so the same news never shows twice.
+            bool bannerHill = Announcer.OwnsHillNews;
+            if (bannerHill)
+            {
+                if (_pendCue >= 0 && YieldsToBanner(_family[_pendCue], true)) { _pendCue = -1; _pendRaised = null; }
+                if (_cue[0] >= 0 && _until[0] > now && YieldsToBanner(_family[_cue[0]], true)) { _until[0] = now; _cue[0] = -1; }
+            }
             if (_pendCue >= 0 && (_until[0] <= now || now - _start[0] >= MinShow))
             {
                 int c = _pendCue;
@@ -879,8 +909,8 @@ namespace CriticalMass.Runtime.Audio.Sound
                 float a = 0f;
                 if (!hidden && now < _until[k])
                 {
-                    a = Mathf.Min(Mathf.Clamp01((now - _start[k]) / Fade), Mathf.Clamp01((_until[k] - now) / Fade));
-                    any = true;
+                    a = AlphaAt(now, _start[k], _until[k]);
+                    if (a > 0f) any = true;
                 }
                 if (_group[k].alpha != a) _group[k].alpha = a;
             }

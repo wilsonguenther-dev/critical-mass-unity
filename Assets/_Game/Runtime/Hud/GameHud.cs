@@ -130,7 +130,12 @@ namespace CriticalMass.Runtime.Hud
             if (_mapImage != null && (mapTier != _mapTier || _mapImage.texture == null))
             {
                 _mapTier = mapTier;
-                _mapImage.texture = MapTexture(mapTier);
+                // polish-3: the image may still be baking on a worker (null): keep it hidden (a RawImage with no texture
+                // draws white) and ask again next frame; never blocks the main thread.
+                Texture2D tex = MapTexture(mapTier);
+                if (tex != null || _mapImage.texture == null) _mapImage.texture = tex;
+                bool show = _mapImage.texture != null;
+                if (_mapImage.enabled != show) _mapImage.enabled = show;
             }
         }
 
@@ -442,7 +447,8 @@ namespace CriticalMass.Runtime.Hud
             MinimapCanvas = NestedCanvas(_mapArea);   // M5: 40 moving dots and markers re-batch only the map
             _mapImage = _mapArea.gameObject.AddComponent<RawImage>();
             _mapImage.raycastTarget = false;
-            _mapImage.texture = MapTexture(_mapTier);
+            _mapImage.texture = MapTexture(_mapTier);   // polish-3: null while the worker bake runs (UpdateScale asks again)
+            _mapImage.enabled = _mapImage.texture != null;
             RectTransform g = Rt(_mapArea, "Ground Changes");
             g.anchorMin = Vector2.zero;
             g.anchorMax = Vector2.one;

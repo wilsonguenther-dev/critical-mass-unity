@@ -9,8 +9,8 @@ namespace CriticalMass.Runtime.View.Effects
     /// <list type="bullet">
     /// <item>0.000-0.034 white core flash (two frames; at most one flash per 0.34 s, WCAG 2.3.1: never three a second)</item>
     /// <item>0.000-0.300 view-only light pulse: an additive warm disc on the ground and a glow billboard (no real light)</item>
-    /// <item>0.012-0.320 the fireball: outlined, three stepped bands (yellow, orange, red), growing and rising</item>
-    /// <item>0.180-0.750 it breaks into seven lobes that fly out and step from fire to smoke grey</item>
+    /// <item>0.000-0.600 the fireball (polish-3): one soft core that scales up fast with three merged lobes, a shared ramp
+    /// from a yellow heart through orange to a dark-red edge and soft halo, fading out by 0.6</item>
     /// <item>0.150-2.800 a smoke column of six stepped-grey puffs (dust tones for walls and the slam)</item>
     /// <item>shock ring, debris chunks that bounce once, embers, ground dust, a scorch decal that lingers 14 s</item>
     /// <item>screen trauma by distance from the local player, applied only when cm.shake is on (CombatFx)</item>
@@ -300,6 +300,47 @@ namespace CriticalMass.Runtime.View.Effects
             }
         }
 
+        /// <summary>polish-3: the fireball is gone by this age (s at normal speed); the core reaches full size by
+        /// FireballGrow and fades out from FireballFadeFrom.</summary>
+        public const double FireballEnd = 0.6, FireballGrow = 0.12, FireballFadeFrom = 0.36;
+        /// <summary>polish-3: merged lobes around the core (3: each overlaps its neighbour by more than half its radius).</summary>
+        public const int FireballLobes = 3;
+        /// <summary>polish-3: lobe radius / core radius, lobe centre offset / lobe radius, the soft halo and the orange band
+        /// as shares of a shape's radius.</summary>
+        public const float FireballLobeK = 0.66f, FireballLobeOffset = 0.8f, FireballHaloK = 1.15f, FireballMidK = 0.78f;
+        /// <summary>polish-3: the widest the fireball ever draws from its centre to its halo edge (u). Fighters stand about
+        /// 2.1 u; the whole blast is about 2.2 u across, so it never swallows more than about one and a half fighters.</summary>
+        public const float FireballHalfMax = 1.1f;
+        /// <summary>polish-3: the dark-red edge of the fireball ramp.</summary>
+        public static readonly Color32 FireDeep = new Color32(168, 38, 30, 255);
+
+        /// <summary>Half-width of the whole drawn fireball as a share of the core radius (pure; tests).</summary>
+        public static float FireballHalfK => Mathf.Max(FireballHaloK, FireballLobeK * (FireballLobeOffset + FireballHaloK));
+        /// <summary>Overlap of two neighbouring lobes in lobe radii (pure; tests): 2 minus their centre distance.</summary>
+        public static float FireballLobeOverlap => 2f - 2f * FireballLobeOffset * Mathf.Sin(Mathf.PI / FireballLobes);
+
+        /// <summary>The fireball core radius at age t (s at normal speed) for a blast of radius R (pure; tests): 0 outside
+        /// its life; an ease-out from 35% to full by FireballGrow, then shrinking by a quarter while it fades.</summary>
+        public static float FireballCoreRadius(float R, float t)
+        {
+            if (t < 0f || t >= (float)FireballEnd) return 0f;
+            float max = Mathf.Min(0.7f * Mathf.Min(Mathf.Max(R, 0f), BoomVisualMax), FireballHalfMax / FireballHalfK);
+            float g = Mathf.Clamp01(t / (float)FireballGrow);
+            float e = 1f - (1f - g) * (1f - g) * (1f - g);
+            float f = Mathf.Clamp01((t - (float)FireballFadeFrom) / (float)(FireballEnd - FireballFadeFrom));
+            return max * (0.35f + 0.65f * e) * (1f - 0.25f * f);
+        }
+
+        /// <summary>The fireball alpha at age t (pure; tests): full, then fading to nothing by FireballEnd.</summary>
+        public static float FireballAlpha(float t)
+        {
+            if (t < 0f || t >= (float)FireballEnd) return 0f;
+            return 1f - Mathf.Clamp01((t - (float)FireballFadeFrom) / (float)(FireballEnd - FireballFadeFrom));
+        }
+
+        /// <summary>The yellow heart as a share of the core radius at age t (pure; tests): big at the flash, shrinking first.</summary>
+        public static float FireballYellowK(float t) => Mathf.Max(0f, 0.6f - 1.1f * Mathf.Max(0f, t - 0.08f));
+
         /// <summary>follow-camera-4: the smoke column in the low views lives this share of its time and rises this share
         /// of its height (a flatter, shorter column that clears the fight sooner).</summary>
         public const double LowSmokeLife = 0.6;
@@ -359,42 +400,37 @@ namespace CriticalMass.Runtime.View.Effects
                 if (ex.Flash && age < S(0.034))
                     air.Blob(c + Vector3.up * (0.6f * R), camRight, camUp, R * 0.62f, null, 14, 0, SparkWhite);
 
-                // Fireball: three stepped bands under a navy rim, growing and rising, the yellow heart shrinking first.
-                double f0 = S(0.012), f1 = S(0.32);
-                if (fire && age >= f0 && age < f1)
+                // polish-3 (owner: the TNT fireball read as "a bunch of orange balloons", about eight hard-edged spheres two
+                // fighters wide at 0.4 s): ONE soft toon blast. A single core that scales up fast and fades, FireballLobes
+                // lobes merged into it (each overlaps its neighbour by more than half its radius), drawn layer by layer
+                // across all shapes so they share one silhouette and one colour ramp: a soft dark-red halo, the dark-red
+                // edge, orange, and a bright yellow heart that shrinks first. No navy rim per ball, no lobes flying apart.
+                // Gone by FireballEnd; the small grey smoke puffs below carry on. Same builder, same draw call, fewer blobs.
+                if (fire)
                 {
-                    float u = (float)((age - f0) / (f1 - f0));
-                    float rf = R * (0.3f + 0.62f * (1f - (1f - u) * (1f - u) * (1f - u)));
-                    Vector3 p = c + Vector3.up * (0.55f * R + 0.4f * R * u);
-                    Lobes(ex.Seed, 600, 12, 0.86f, 1.12f);
-                    float a = 1f - Mathf.Clamp01((u - 0.75f) / 0.25f);
-                    air.Blob(p, camRight, camUp, rf * 1.12f + 0.05f, _radii, 12, ex.Seed * 0.001f, A(Navy, a));
-                    air.Blob(p, camRight, camUp, rf, _radii, 12, ex.Seed * 0.001f, A(FireRed, a));
-                    air.Blob(p, camRight, camUp, rf * (0.8f - 0.25f * u), _radii, 12, ex.Seed * 0.001f + 0.4f, A(FireOrange, a));
-                    float yr = rf * (0.56f - 0.5f * u);
-                    if (yr > 0.04f) air.Blob(p + camUp * (rf * 0.08f), camRight, camUp, yr, _radii, 12, ex.Seed * 0.001f + 0.8f, A(FireYellow, a));
-                }
-
-                // Lobes: the fireball breaks into seven puffs that fly out and cool from orange to red to smoke.
-                double l0 = S(0.18), l1 = S(0.75);
-                if (fire && age >= l0 && age < l1)
-                {
-                    float v = (float)((age - l0) / (l1 - l0));
-                    float e = 1f - (1f - v) * (1f - v);
-                    float rEnd = R * 0.92f;
-                    Vector3 centre = c + Vector3.up * (0.95f * R + 0.6f * R * v);
-                    Color32 fill = v < 0.35f ? FireOrange : v < 0.65f ? FireRed : SmokeDark;
-                    Color32 hi = v < 0.35f ? FireYellow : v < 0.65f ? FireOrange : SmokeMid;
-                    float al = 1f - v * v;
-                    for (int k = 0; k < 7; k++)
+                    float t = (float)(age / S(1.0));
+                    float rc = FireballCoreRadius(R, t);
+                    if (rc > 0f)
                     {
-                        float a = k * Mathf.PI * 2f / 7f + (R01(ex.Seed, (uint)k + 620) - 0.5f) * 0.5f;
-                        Vector3 dir = camRight * Mathf.Cos(a) + camUp * Mathf.Sin(a);
-                        Vector3 p = centre + dir * (rEnd * (0.45f + 0.75f * e));
-                        float sz = R * 0.42f * (1f - 0.55f * v) + 0.05f;
-                        air.Blob(p, camRight, camUp, sz + 0.05f, null, 9, 0, A(Navy, al));
-                        air.Blob(p, camRight, camUp, sz, null, 9, 0, A(fill, al));
-                        air.Blob(p + (camUp - camRight) * (sz * 0.25f), camRight, camUp, sz * 0.5f, null, 7, 0, A(hi, al));
+                        float a = FireballAlpha(t);
+                        float rise = Mathf.Clamp01(t / (float)FireballEnd);
+                        Vector3 p = c + Vector3.up * (0.55f * R + 0.35f * R * rise);
+                        float rl = rc * FireballLobeK, d = rl * FireballLobeOffset;
+                        float a0 = R01(ex.Seed, 600) * Mathf.PI * 2f;
+                        for (int layer = 0; layer < 3; layer++)
+                        {
+                            float k = layer == 0 ? FireballHaloK : layer == 1 ? 1f : FireballMidK;
+                            Color32 col = layer == 0 ? A(FireDeep, a * 0.45f) : layer == 1 ? A(FireDeep, a) : A(FireOrange, a);
+                            air.Blob(p, camRight, camUp, rc * k, null, 12, 0, col);
+                            for (int j = 0; j < FireballLobes; j++)
+                            {
+                                float ang = a0 + j * Mathf.PI * 2f / FireballLobes;
+                                Vector3 q = p + (camRight * Mathf.Cos(ang) + camUp * Mathf.Sin(ang)) * d;
+                                air.Blob(q, camRight, camUp, rl * k, null, 10, 0, col);
+                            }
+                        }
+                        float yr = rc * FireballYellowK(t);
+                        if (yr > 0.04f) air.Blob(p + camUp * (rc * 0.08f), camRight, camUp, yr, null, 12, 0, A(FireYellow, a));
                     }
                 }
 
