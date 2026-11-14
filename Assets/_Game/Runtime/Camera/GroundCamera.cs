@@ -305,9 +305,11 @@ namespace CriticalMass.Runtime.Camera
             if (rig && f.Rig.FirstPerson)
             {
                 // The eyes: the pivot a little ahead along the ground facing (the hidden body never fills the lens).
-                CamX = _px.X + ux * FollowCamera.EyeForward;
+                // follow-camera-3: the eyes never poke into a wall the fighter is pressed against.
+                double ef = FollowCamera.EyeOffset(f.Map, _px.X, _py.X, _pz.X, ux, uz, f.Cylinders, f.CylinderCount);
+                CamX = _px.X + ux * ef;
                 CamY = _py.X;
-                CamZ = _pz.X + uz * FollowCamera.EyeForward;
+                CamZ = _pz.X + uz * ef;
                 Dist = Allowed = 0;
                 OverHead = false;
                 return;

@@ -74,6 +74,9 @@ namespace CriticalMass.Runtime.Camera
         /// while the autopilot drives actor 0.</summary>
         public static CameraView? ViewOverride;
         public static bool ForcePlay;
+        /// <summary>follow-camera-3: a sim point (x, z) the auto-follow should face in the low play views (captures frame
+        /// the fight and the Kaiju with it). Null = behind the fighter as usual.</summary>
+        public static Vector2? AimAt;
 
         public SimDriverBehaviour Driver;
         public GroundViewMode Mode { get; private set; }
@@ -109,6 +112,10 @@ namespace CriticalMass.Runtime.Camera
         double _aimDistance = GroundCamera.AimDistance;
         readonly YawFollow _yawFollow = new YawFollow();
         readonly InputLatch _latch = new InputLatch();
+        readonly StrafeGate _strafe = new StrafeGate();
+        Vector3 _chest;
+        bool _fadeSet;
+        static readonly int FadeCamId = Shader.PropertyToID("_CMFadeCam"), FadeTargetId = Shader.PropertyToID("_CMFadeTarget");
         double _inputYaw = 315;
         float _sens = 1f;
         bool _invertY;
@@ -138,6 +145,7 @@ namespace CriticalMass.Runtime.Camera
                 gameObject.AddComponent<GroundViewShots>().View = this;
             if (AutoplayArgs.HasAutomationFlag(FollowCameraShots.Flag) && GetComponent<FollowCameraShots>() == null)
                 gameObject.AddComponent<FollowCameraShots>().View = this;
+            if (GetComponent<CriticalMass.Runtime.View.LowViewTags>() == null) gameObject.AddComponent<CriticalMass.Runtime.View.LowViewTags>();
         }
 
         void OnDestroy()
@@ -303,6 +311,7 @@ namespace CriticalMass.Runtime.Camera
             // Orbit / look input.
             ReadLook(paused, dt, out double orbitYaw, out double orbitPitch);
             GroundRig rig = default;
+            _chest = SimSpace.ToWorld(tx, gy + 1.2 + lift, tz);
             if (Mode == GroundViewMode.Play)
             {
                 CameraView v = ChosenView();
@@ -357,6 +366,12 @@ namespace CriticalMass.Runtime.Camera
             double behind = moving ? GroundCamera.YawToward(0, 0, vx, vz, GroundCamera.YawOfFacing(facing)) : GroundCamera.YawOfFacing(facing);
             bool reduce = CriticalMass.Runtime.View.Effects.FeelGate.ReduceMotion;
             double defPitch = rig.FirstPerson ? FollowCamera.FirstPitch : FollowCamera.ThirdPitch;
+            // follow-camera-3: a capture (or a later feature) may ask the auto-follow to frame a point of action.
+            if (AimAt.HasValue) behind = GroundCamera.YawToward(w.X[id], w.Z[id], AimAt.Value.x, AimAt.Value.y, behind);
+            // follow-camera-3: first person turns the view off a wall right in front of the eyes (view only; the controls
+            // stay latched while a move is held).
+            if (rig.FirstPerson && !_manual)
+                behind = FollowCamera.WallYaw(w.Map, w.X[id], GroundHeight.At(w.Map, w.X[id], w.Z[id]) + FollowCamera.EyeHeight, w.Z[id], behind, _cyl, _cylCount);
             if (snap)
             {
                 _yawFollow.Reset(GroundCamera.YawOfFacing(facing));
@@ -377,7 +392,12 @@ namespace CriticalMass.Runtime.Camera
                 _sinceLook += dt;
                 if (!_manual || _sinceLook >= FollowCamera.RecenterSeconds)
                 {
-                    _yawFollow.Step(dt, behind, reduce);
+                    // follow-camera-2: a sideways run with no forward input holds the yaw; forward input coming back
+                    // re-centres behind at once.
+                    bool hold = false, recenter = false;
+                    if (_input != null && !_manual) _strafe.Step(_input.State.MoveRight, _input.State.MoveUp, out hold, out recenter);
+                    if (recenter) _yawFollow.Recenter(behind);
+                    _yawFollow.Step(dt, hold ? _yawFollow.Target : behind, reduce);
                     if (dt > 0) _follow.SetPitch(_follow.Pitch + (defPitch - _follow.Pitch) * (1 - Math.Exp(-dt / 0.4)), rig.MinPitch, rig.MaxPitch);
                 }
             }
@@ -572,8 +592,29 @@ namespace CriticalMass.Runtime.Camera
             SetMinimalHud(true);
         }
 
+        /// <summary>follow-camera-2: the toon shader's see-through line (CMToonFadeClip) from the lens to the followed body's
+        /// chest; off in first person and when the low views are off. Two global vectors a frame, no allocation.</summary>
+        void SetFade(Vector3 camPos)
+        {
+            bool on = Mode != GroundViewMode.Off && !(Mode == GroundViewMode.Play && _view == CameraView.FirstPerson);
+            if (on)
+            {
+                Shader.SetGlobalVector(FadeCamId, new Vector4(camPos.x, camPos.y, camPos.z, 1f));
+                // follow-camera-3: aim the see-through at head and shoulders (chest + 0.35), not the belly.
+                Shader.SetGlobalVector(FadeTargetId, new Vector4(_chest.x, _chest.y + 0.35f, _chest.z, ViewCull.FadeRadius));
+                _fadeSet = true;
+            }
+            ViewCull.SetFollowLine(_chest + new Vector3(0f, 0.35f, 0f), on);
+            else if (_fadeSet)
+            {
+                Shader.SetGlobalVector(FadeCamId, Vector4.zero);
+                _fadeSet = false;
+            }
+        }
+
         void Leave()
         {
+            if (_fadeSet) { Shader.SetGlobalVector(FadeCamId, Vector4.zero); _fadeSet = false; }
             Mode = GroundViewMode.Off;
             _lodValid = false;
             if (_brain != null) _brain.enabled = true;
@@ -610,6 +651,7 @@ namespace CriticalMass.Runtime.Camera
             if (_cam.nearClipPlane != GroundCamera.NearClip) _cam.nearClipPlane = GroundCamera.NearClip;
             if (_cam.farClipPlane != GroundCamera.FarClip) _cam.farClipPlane = GroundCamera.FarClip;
             if (_backdrop != null) _backdrop.Place(pos);
+            SetFade(pos);
         }
 
         /// <summary>The HUD's minimap and Kaiju panels hide while watching from the ground (the clock and score stay).</summary>
