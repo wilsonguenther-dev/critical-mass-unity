@@ -374,6 +374,7 @@ namespace CriticalMass.Runtime.View.Anim
                 wsum += _eW[e];
             }
             if (wsum > 0) { stride /= wsum; len /= wsum; }
+            if (m.Spec != null && m.Spec.StrideScale > 0f) stride *= m.Spec.StrideScale;   // per-class legs (HY swaps)
             _warp = warp * move;
             double legs = 0;
             for (int e = 0; e < _eCount && wsum > 0; e++)

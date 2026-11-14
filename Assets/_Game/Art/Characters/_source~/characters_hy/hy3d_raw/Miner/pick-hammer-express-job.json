@@ -1,0 +1,12 @@
+{
+ "job": "1512823590666428416",
+ "action": "QueryHunyuanTo3DRapidJob",
+ "types": [
+  "GLB",
+  "GLB"
+ ],
+ "files": [
+  "pick-hammer-express-4279b25d-619a-492c-b3f2-5b8f2c8bb2dd_0.glb",
+  "pick-hammer-express-preview-preview_4279b25d-619a-492c-b3f2-5b8f2c8bb2dd_0.png"
+ ]
+}

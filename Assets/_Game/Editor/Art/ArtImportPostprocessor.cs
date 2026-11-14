@@ -34,7 +34,7 @@ namespace CriticalMass.Editor.Art
         public const string ArtMaterialPath = "Assets/_Game/Resources/Toon/CMToonArt.mat";
 
         /// <summary>Bump when the contract changes: Unity re-imports every model this postprocessor touches.</summary>
-        public override uint GetVersion() => 9;
+        public override uint GetVersion() => 12;   // 12: KayKit deform-bone translations within 1% always dropped
 
         public static bool IsArt(string path) =>
             path.StartsWith(ArtRoot, StringComparison.Ordinal) && path.EndsWith(".fbx", StringComparison.OrdinalIgnoreCase);
@@ -240,6 +240,75 @@ namespace CriticalMass.Editor.Art
                 c.lockRootPositionXZ = false;
             }
             mi.clipAnimations = clips.OrderBy(c => c.name, StringComparer.Ordinal).ToArray();
+        }
+
+        /// <summary>
+        /// HY characters (2026-11-13, art/characters-hy): the shared KayKit clips drop every bone translation curve that is
+        /// constant over the clip AND equal to the rest position. Measured on all 76 KayKit actions: only root, hips, the hand slots and the IK helpers move
+        /// in translation; every deform bone's translation is a constant equal to the KayKit rest. Without those constant
+        /// curves each class keeps its OWN joint positions from its FBX bind pose (the Farmer and Miner HY models place
+        /// knees, ankles, neck and arm lengths per class), while models on the plain KayKit skeleton look exactly as before
+        /// (their bind pose equals the constants that were removed). Rotations are untouched.
+        /// </summary>
+        public const string KaykitClipsPath = "Assets/_Game/Art/Characters/KayKit_Clips.fbx";
+
+        /// <summary>True when a translation curve set (x, y, z) of one bone is constant over the clip (pure; tests).</summary>
+        public static bool IsConstant(AnimationCurve c, float eps = 1e-5f)
+        {
+            if (c == null || c.length == 0) return true;
+            float v0 = c.keys[0].value;
+            foreach (Keyframe k in c.keys)
+                if (Math.Abs(k.value - v0) > eps) return false;
+            return true;
+        }
+
+        /// <summary>The KayKit skeleton's deform bones (they carry skin weight; KayKit animates them in rotation only).</summary>
+        public static readonly HashSet<string> KaykitDeformBones = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "spine", "chest", "head", "upperarm.l", "lowerarm.l", "wrist.l", "hand.l", "upperarm.r", "lowerarm.r", "wrist.r", "hand.r",
+            "upperleg.l", "lowerleg.l", "foot.l", "toes.l", "upperleg.r", "lowerleg.r", "foot.r", "toes.r",
+        };
+
+        private void OnPostprocessAnimation(GameObject root, AnimationClip clip)
+        {
+            if (assetPath != KaykitClipsPath || clip == null) return;
+            var byPath = new Dictionary<string, List<EditorCurveBinding>>();
+            foreach (EditorCurveBinding b in AnimationUtility.GetCurveBindings(clip))
+            {
+                if (b.type != typeof(Transform) || !b.propertyName.StartsWith("m_LocalPosition", StringComparison.Ordinal)) continue;
+                if (!byPath.TryGetValue(b.path, out List<EditorCurveBinding> l)) byPath[b.path] = l = new List<EditorCurveBinding>();
+                l.Add(b);
+            }
+            foreach (KeyValuePair<string, List<EditorCurveBinding>> kv in byPath)
+            {
+                Transform t = root != null ? root.transform.Find(kv.Key) : null;
+                if (t == null) continue;
+                bool same = true;
+                // A KayKit deform bone never moves in translation; some takes (Attack2HChop, ...) still carry a translation a
+                // hair off the rest value or jittering by round-off, which the strict test kept: a partly stripped clip then
+                // mixes KayKit and per-class joints (the HY Farmer's feet floated 0.35 u). For deform bones any translation
+                // that stays within 1% of its value is dropped.
+                bool deform = KaykitDeformBones.Contains(kv.Key.Substring(kv.Key.LastIndexOf('/') + 1));
+                float mag = 0f;   // the bone offset's size (largest axis), the scale of "1%"
+                foreach (EditorCurveBinding b in kv.Value)
+                {
+                    AnimationCurve c0 = AnimationUtility.GetEditorCurve(clip, b);
+                    if (c0 != null && c0.length > 0) mag = Math.Max(mag, Math.Abs(c0.keys[0].value));
+                }
+                foreach (EditorCurveBinding b in kv.Value)
+                {
+                    AnimationCurve c = AnimationUtility.GetEditorCurve(clip, b);
+                    if (c == null || c.length == 0) { same = false; break; }
+                    float tol = deform ? Math.Max(1e-4f, 0.01f * mag) : 1e-5f;   // deform: sub-1% jitter is round-off, not motion
+                    if (!IsConstant(c, tol)) { same = false; break; }
+                    if (deform) continue;
+                    char axis = b.propertyName[b.propertyName.Length - 1];
+                    float rest = axis == 'x' ? t.localPosition.x : axis == 'y' ? t.localPosition.y : t.localPosition.z;
+                    if (Math.Abs(c.keys[0].value - rest) > 1e-4f) { same = false; break; }   // a held offset is motion: keep
+                }
+                if (!same) continue;
+                foreach (EditorCurveBinding b in kv.Value) AnimationUtility.SetEditorCurve(clip, b, null);
+            }
         }
 
         /// <summary>World art: per-slot look materials, smoothed outline directions (UV3), foam extrusion (UV2).</summary>
