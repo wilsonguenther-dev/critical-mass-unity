@@ -60,6 +60,10 @@ namespace CriticalMass.Editor.Art
             mi.importConstraints = false;
             mi.addCollider = false;
             mi.isReadable = false;
+            // feat/staged-building-1: the staged build cuts the placed ladder, bridge and barricade meshes into their parts
+            // at match start (StagedBuildView.Cut), which needs their vertices on the CPU.
+            if (spec != null && CriticalMass.Runtime.View.Mechanics.StagedBuildCore.NeedsReadable(spec.Key))
+                mi.isReadable = true;
             mi.meshCompression = ModelImporterMeshCompression.Off;
             mi.importNormals = ModelImporterNormals.Import;
             mi.importTangents = ModelImporterTangents.None;
