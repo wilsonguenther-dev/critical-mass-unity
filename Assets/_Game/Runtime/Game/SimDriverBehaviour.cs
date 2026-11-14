@@ -65,6 +65,14 @@ namespace CriticalMass.Runtime.Game
         private HumanInputSource _input;
         private readonly InputFrame _humanFrame = SimInput.EmptyInput();
         private readonly InputFrame _scratch = SimInput.EmptyInput();
+
+        /// <summary>fix/movement-shiver-1: the "no shiver" detector over the live match (editor, development builds and automation
+        /// runs only; read-only on the World). Each flag is one `[CM.Shiver]` log line for the play-test logs.</summary>
+        private readonly ShiverWatch _shiver = new ShiverWatch();
+        private static int _shiverLogOn = -1;   // read on the first tick (Unity calls are not allowed in a static initializer)
+        private World _shiverWorld;
+        private int _shiverLogged;
+        private const int ShiverLogCap = 200;
         private readonly InputFrame _neutral = SimInput.EmptyInput();
 
         /// <summary>
@@ -149,6 +157,20 @@ namespace CriticalMass.Runtime.Game
             for (int i = 0; i < n; i++) Tick(input);
         }
 
+        private void WatchShiver()
+        {
+            if (!ReferenceEquals(_shiverWorld, World))
+            {
+                _shiverWorld = World;
+                _shiver.Clear();
+                _shiverLogged = 0;
+            }
+            int before = _shiver.Flags.Count;
+            _shiver.Observe(World);
+            for (int i = before; i < _shiver.Flags.Count && _shiverLogged < ShiverLogCap; i++, _shiverLogged++)
+                Debug.Log(ShiverWatch.Format(_shiver.Flags[i]));
+        }
+
         private void Tick(HumanInputSource input)
         {
             if (input != null) input.State.Fill(_humanFrame);
@@ -168,6 +190,8 @@ namespace CriticalMass.Runtime.Game
             long lt = CriticalMass.Runtime.Game.LoadTimer.WatchingTicks ? CriticalMass.Runtime.Game.LoadTimer.Now() : 0;   // perf/start-hitch-1: the first ticks after a load, timed
             MatchTick.Advance(World, HumanAutopilot ? null : _humanFrame, _scratch);
             if (lt != 0) CriticalMass.Runtime.Game.LoadTimer.TickDone(lt);
+            if (_shiverLogOn < 0) _shiverLogOn = Application.isEditor || Debug.isDebugBuild || AutoplayArgs.Current.Autoplay ? 1 : 0;
+            if (_shiverLogOn == 1) WatchShiver();
             FrameCost.Exit(FrameCost.Slot.Sim, c0);
             FrameCost.FrameTicks++;
             c0 = FrameCost.Enter();

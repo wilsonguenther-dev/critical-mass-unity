@@ -180,6 +180,25 @@ namespace CriticalMass.Sim.Bots
             return ok;
         }
 
+        /// <summary>
+        /// fix/movement-shiver-1: the centre line is clear and so are the two shoulder lines (offset by r either side), the
+        /// shoulders only up to `reach` short of the target (a target hugging a wall still counts). Allocation-free.
+        /// </summary>
+        internal static bool WideLineClear(MapDef map, double x0, double z0, double x1, double z1, double r, double reach)
+        {
+            if (FirstBlockedCell(map, x0, z0, x1, z1) >= 0) return false;
+            double dx = x1 - x0;
+            double dz = z1 - z0;
+            double len = Math.Sqrt(dx * dx + dz * dz);
+            if (len <= reach || len < 1e-9) return true;
+            double f = (len - reach) / len;
+            double ox = -dz / len * r;
+            double oz = dx / len * r;
+            double ex = x0 + dx * f;
+            double ez = z0 + dz * f;
+            return FirstBlockedCell(map, x0 + ox, z0 + oz, ex + ox, ez + oz) < 0 && FirstBlockedCell(map, x0 - ox, z0 - oz, ex - ox, ez - oz) < 0;
+        }
+
         private static bool Toward(World w, int id, double tx, double tz, double stopDist)
         {
             double dx = tx - w.X[id];
@@ -323,7 +342,11 @@ namespace CriticalMass.Sim.Bots
                     double dx = tx - x;
                     double dz = tz - z;
                     double d2 = dx * dx + dz * dz;
-                    if (d2 <= reach * reach)
+                    // fix/movement-shiver-1 (BotWideLine): no strafing and swinging at a target inside reach but behind a wall,
+                    // and the straight line counts only when the whole body fits along it (no route / line flip at a wall end).
+                    bool wide = Phys.On(w, cfg.Physics.BotWideLine);
+                    bool seen = !wide || !Phys.On(w, cfg.Physics.WallsBlockHits) || SegmentClear.Clear(map, x, z, tx, tz);
+                    if (d2 <= reach * reach && seen)
                     {
                         output.Attack = InArc(w, id, tx, tz);
                         // Inside reach: circle-strafe (side by id parity) with a small pull to keep the distance.
@@ -335,7 +358,7 @@ namespace CriticalMass.Sim.Bots
                         Mv.X = (-dz / d) * side * 0.6 + (dx / d) * pull;
                         Mv.Z = (dx / d) * side * 0.6 + (dz / d) * pull;
                     }
-                    else if (FirstBlockedCell(map, x, z, tx, tz) < 0)
+                    else if (wide ? WideLineClear(map, x, z, tx, tz, cc.Radius * 0.9, reach) : FirstBlockedCell(map, x, z, tx, tz) < 0)
                     {
                         Toward(w, id, tx, tz, 0);
                     }
@@ -417,7 +440,9 @@ namespace CriticalMass.Sim.Bots
                     if (!PingRules.HasOrder(w, id)) break;
                     PingRules.OrderGoal(w, id, out double gx, out double gz, out double stop);
                     FlowField route = PingRules.OrderRoute(w, id);
-                    if (FirstBlockedCell(map, x, z, gx, gz) < 0 || route == null) Toward(w, id, gx, gz, stop);
+                    // fix/movement-shiver-1 (BotWideLine): the straight line only when the whole body fits along it.
+                    bool lineOk = Phys.On(w, cfg.Physics.BotWideLine) ? WideLineClear(map, x, z, gx, gz, cc.Radius * 0.9, stop) : FirstBlockedCell(map, x, z, gx, gz) < 0;
+                    if (lineOk || route == null) Toward(w, id, gx, gz, stop);
                     else if (FlowField.SampleFlowDir(route, map, x, z, out double odx, out double odz))
                     {
                         Mv.X = odx;
@@ -469,7 +494,9 @@ namespace CriticalMass.Sim.Bots
                 {
                     // U-063: walk with the carrier (straight at it when the line is clear, else the shrine route it is on).
                     int t = st.EscortOf[id];
-                    if (t >= 0 && t < w.ActorCount && w.Actors[t].Alive && FirstBlockedCell(map, x, z, w.X[t], w.Z[t]) < 0)
+                    if (t >= 0 && t < w.ActorCount && w.Actors[t].Alive && (Phys.On(w, cfg.Physics.BotWideLine)
+                            ? WideLineClear(map, x, z, w.X[t], w.Z[t], cc.Radius * 0.9, cfg.Depth.Roles.EscortKeepDistance)
+                            : FirstBlockedCell(map, x, z, w.X[t], w.Z[t]) < 0))
                         Toward(w, id, w.X[t], w.Z[t], cfg.Depth.Roles.EscortKeepDistance);
                     else if (!Follow(w, st, id, BotFields.FieldShrine)) Toward(w, id, map.Shrine.X, map.Shrine.Z, 3);
                     break;

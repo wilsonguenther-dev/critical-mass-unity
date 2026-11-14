@@ -223,6 +223,12 @@ namespace CriticalMass.Sim.Tests
             // weapons (DepthConfig.LightWeapons) change every Full match: Demolitions and Healer bots now swing at close range and
             // every Builder / Demolitions / Healer hit shoves. Classic and PhysicsOnly do not move (depth rules are off there).
             // Re-pin: copy the "rules-combined golden" Full line this test prints into the two values below.
+            // fix/movement-shiver-1 (2026-11-14): the PhysicsOnly AND Full rows MUST be re-pinned ON PURPOSE again in the combined
+            // compile. PhysicsConfig.KaijuNavGuard (the Kaiju holds at the last cell its body fits in instead of shaking at a
+            // bridge mouth or wall end, gives up an unreachable target, claws and slams only what it can see, keeps its target
+            // with a margin) and PhysicsConfig.BotWideLine (bots walk straight at a fight target only when the body fits along
+            // the line; no swinging at a target behind a wall) change Kaiju and bot decisions. Classic does not move (Phys.On is
+            // off there). Copy the PhysicsOnly and Full "rules-combined golden" lines this test prints into the rows.
             { 0xF20646D083F6DF6DUL, 0x12D502EBB7470305UL }, // Full (re-pinned 2026-11-14 integration batch 9 for feat/light-weapons-1, from run 43611800851; PRE-light-weapons: 0xAA728D5DAF5451F4 / 0xBF82793EEE8C78C8; re-pinned 2026-11-13 integration batch 7: fix/bridge-holes MapEventsConfig.BridgeCollapse default false (16v16 and 5v5) plus fix/kaiju-alive-1 Kaiju hits stagger, throw at KaijuKnockScale 0.5, topple (5v5); before: 0x70C7D9F992CAC3CC / 0x8F3F947AE72E7815, U-074..U-078)
         };
     }

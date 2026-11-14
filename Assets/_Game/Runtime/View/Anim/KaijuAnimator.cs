@@ -37,6 +37,10 @@ namespace CriticalMass.Runtime.View.Anim
         public const float LookMaxDeg = 40f, LeanMaxDeg = 7f, TailMaxDeg = 28f, HitHeadDeg = 12f;
         public const double YawOmega = 18.0, TurnRateDeg = 360.0, HatchlingTurnRateDeg = 540.0, HeadLeadSeconds = 0.12;
 
+        /// <summary>fix/movement-shiver-1: the drawn yaw follows the actual motion above this speed (u/s), and ignores a heading
+        /// error under this many degrees.</summary>
+        public const double WalkYawMinSpeed = 0.6, YawDeadZoneDeg = 2.0;
+
         sealed class Measured
         {
             public double WalkSpeed = FallbackWalkSpeed;
@@ -62,6 +66,8 @@ namespace CriticalMass.Runtime.View.Anim
         int _lastTick = -1;
         // procedural state
         double _yaw = double.NaN, _yawRate, _lean, _tail, _look;
+        /// <summary>fix/movement-shiver-1: the drawn yaw's reversal counter (view half of the "no shiver" detector).</summary>
+        public readonly ViewShiverProbe YawProbe = new ViewShiverProbe("Kaiju");
 
         /// <summary>Measured walk ground speed of a model (u/s at rate 1), for tests and the capture report.</summary>
         public double WalkSpeedOf(ModelView m) => m != null && _measured.TryGetValue(m, out Measured r) ? r.WalkSpeed : FallbackWalkSpeed;
@@ -155,15 +161,26 @@ namespace CriticalMass.Runtime.View.Anim
 
             // Drawn yaw: a fast spring toward the sim facing, rate-limited (the sim snaps its facing toward a target).
             double target = facing.eulerAngles.y;
+            // fix/movement-shiver-1: walking (not winding up, slamming or knocked out), the drawn body faces the way the sim
+            // position actually went this tick, never a steering vector the walls refused; a heading error under
+            // YawDeadZoneDeg is not chased, so a small sideways shove does not twitch the body.
+            double velX = k.X - k.PrevX, velZ = k.Z - k.PrevZ;
+            // Only a forward-ish motion (within 100 degrees of the sim facing) steers it: a shove backwards by the crowd does not
+            // spin the body round to face where it was pushed.
+            if (!telegraph && k.MeleeWindupIn <= 0 && k.KoIn <= 0 && speed > WalkYawMinSpeed &&
+                (velX * Math.Cos(k.Facing) + velZ * Math.Sin(k.Facing)) > -0.17 * Math.Sqrt(velX * velX + velZ * velZ))
+                target = SimSpace.YawDeg(Math.Atan2(velZ, velX));
             if (double.IsNaN(_yaw)) { _yaw = target; _yawRate = 0; }
             double yawStep = 0;
             if (dSim > 0)
             {
                 double err = Locomotion.Wrap180(target - _yaw);
+                if (Math.Abs(err) < YawDeadZoneDeg) err = 0;
                 double maxStep = (isHatchling ? HatchlingTurnRateDeg : TurnRateDeg) * dSim;
                 yawStep = Math.Max(-maxStep, Math.Min(maxStep, err * (1 - Math.Exp(-YawOmega * dSim))));
                 if (Math.Abs(err) > 150 && k.KoIn > 0) yawStep = err;   // knocked out: no spin
                 _yaw = _yaw + yawStep;
+                YawProbe.SampleYaw(yawStep, simTime, k.X, k.Z);
                 double rate = yawStep / dSim;
                 _yawRate += (rate - _yawRate) * (1 - Math.Exp(-12 * dSim));
             }
