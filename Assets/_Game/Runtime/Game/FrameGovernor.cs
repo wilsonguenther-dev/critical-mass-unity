@@ -62,6 +62,10 @@ namespace CriticalMass.Runtime.Game
                 : "This session started with lighter video settings after an unexpected exit. Choose a quality level to change it.")
             : null;
 
+        /// <summary>The online headless peer (batch mode only, where this component never runs its own loop) asks here
+        /// for short frames, so this file stays the one writer of targetFrameRate (integration batch 10).</summary>
+        public static void SetHeadlessPeerFrameRate(int fps) { if (Application.isBatchMode) Application.targetFrameRate = fps; }
+
         public static int AppliedVSync { get; private set; }
         public static int AppliedTarget { get; private set; }
         public static int AppliedCap { get; private set; }
