@@ -1,4 +1,7 @@
-"""Farmer look fix (art/rig-farmer-2, 2026-11-14): three problems the batch-8.2 captures showed, fixed on the HY Farmer
+"""RENDER AND MEASURE ONLY: the FBX this script exports is NOT shipped (the Blender re-export turns every mesh node 90 X,
+runs 43611159728 and after). The shipped edit is patch_farmer_fbx.py, which applies the same rules to the FBX bytes.
+
+Farmer look fix (art/rig-farmer-2, 2026-11-14): three problems the batch-8.2 captures showed, fixed on the HY Farmer
 FBX itself. The skeleton is not touched, so Farmer_Clips.fbx (bake_clips.py) stays valid.
 
   1. TEAM COLOUR. The toon shader recolours only vertices whose alpha code is 8 (cloth). The old Farmer had 9.5% of
