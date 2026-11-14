@@ -325,6 +325,16 @@ namespace CriticalMass.Runtime.Hud.Ui
         /// <summary>The rule is running on this label now (TextFit.Apply then fits directly).</summary>
         internal bool Applying => _applying;
         float _ppu = -1f;
+        // fix/hud-containment-4: the box the last fit was made in. A fit is only "our own result, nothing new" while the
+        // box is the same: in edit mode Unity sends no OnRectTransformDimensionsChange to this script, so a cut made in
+        // an old narrow box (CORRUPTION in the CARRY box) survived the move into its new wide box.
+        float _fitW = -1f, _fitH = -1f;
+
+        bool BoxChanged()
+        {
+            Rect r = _text.rectTransform.rect;
+            return Mathf.Abs(r.width - _fitW) > 0.5f || Mathf.Abs(r.height - _fitH) > 0.5f;
+        }
         /// <summary>What the rule last put on the label (the source, or its cut), null before the first run.</summary>
         public string Shown => _shown;
 
@@ -372,7 +382,7 @@ namespace CriticalMass.Runtime.Hud.Ui
         public void SetSource(string s)
         {
             if (s == null) s = string.Empty;
-            if (_shown != null && s == Source) return;
+            if (_shown != null && s == Source && !BoxChanged()) return;
             _applying = true;
             try { _text.text = s; }
             finally { _applying = false; }
@@ -495,13 +505,26 @@ namespace CriticalMass.Runtime.Hud.Ui
         {
             if (_text == null) return;
             string now = _text.text ?? string.Empty;
+            if (_shown != null && BoxChanged())
+            {
+                if (_autoLines) MaxLines = TextFit.LinesFor(_text.rectTransform.rect.height, MinSize);
+                _shown = null;   // a new box: refit from the source words (the shown text may be the old box's cut)
+            }
             if (_shown != null && ReferenceEquals(now, _shown) && _text.fontSize == _size) return;   // our own result, nothing new
             // the game set a new size itself (a story caption, a scaled overlay): that size becomes the rule's top
             if (_size > 0 && _text.fontSize != _size) { MaxSize = _text.fontSize; if (MinSize > MaxSize) MinSize = MaxSize; }
             if (_shown != null && now != _shown) Source = now;
             else if (_shown == null && now != Source && !(Source.Length > 0 && now.Length > 0 && IsCutOf(now, Source))) Source = now;
             _applying = true;
-            try { _shown = TextFit.Apply(_text, Source, MaxSize, MinSize, MaxLines); _size = _text.fontSize; _ppu = TextFit.PixelsPerUnit(_text); }
+            try
+            {
+                _shown = TextFit.Apply(_text, Source, MaxSize, MinSize, MaxLines);
+                _size = _text.fontSize;
+                _ppu = TextFit.PixelsPerUnit(_text);
+                Rect fr = _text.rectTransform.rect;
+                _fitW = fr.width;
+                _fitH = fr.height;
+            }
             finally { _applying = false; }
         }
     }
