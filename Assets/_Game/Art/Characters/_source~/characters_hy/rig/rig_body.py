@@ -91,6 +91,53 @@ try:
         o.vertex_groups.clear()
         o.name = o.data.name = f'{CLS}_{lv}'
     hero = LV['Hero']
+
+    def measure_sheet(tag):
+        """Front and side orthographic renders of the Hero with a 0.1 m grid behind (red every 0.5 m) to read joints."""
+        sc = bpy.context.scene
+        sc.render.engine = 'BLENDER_WORKBENCH'; sc.display.shading.light = 'FLAT'
+        sc.display.shading.color_type = 'VERTEX'; sc.render.resolution_x = sc.render.resolution_y = 1000
+        sc.display.shading.background_type = 'VIEWPORT'; sc.display.shading.background_color = (1, 1, 1)
+        made = []
+        cam_d = bpy.data.cameras.new('mcam'); cam_d.type = 'ORTHO'; cam_d.ortho_scale = 2.6
+        cam = bpy.data.objects.new('mcam', cam_d); sc.collection.objects.link(cam); sc.camera = cam; made.append(cam)
+        for vn in ('front', 'side'):
+            bm = bmesh.new()
+            for k in range(-13, 14):
+                c = 0.1 * k
+                for horiz in (True, False):
+                    if horiz and not (0 <= k + 13 <= 26):
+                        continue
+                    w = 0.006 if k % 5 else 0.012
+                    if horiz:
+                        z = 0.1 * (k + 13); sz = (2.6, 0.002, w); ctr = (0, 0, z)
+                    else:
+                        sz = (w, 0.002, 2.7); ctr = (c, 0, 1.3)
+                    r = bmesh.ops.create_cube(bm, size=1.0)
+                    for v in r['verts']:
+                        v.co = Vector((v.co.x * sz[0] + ctr[0], v.co.y * sz[1] + ctr[1], v.co.z * sz[2] + ctr[2]))
+            me = bpy.data.meshes.new('grid'); bm.to_mesh(me); bm.free()
+            ca = me.color_attributes.new('Col', 'BYTE_COLOR', 'CORNER')
+            for d in ca.data:
+                d.color = (0.6, 0.6, 0.6, 1)
+            g = bpy.data.objects.new('grid', me); sc.collection.objects.link(g); made.append(g)
+            if vn == 'front':
+                g.location = (0, 1.5, 0); cam.location = (0, -8, 1.25); cam.rotation_euler = (math.pi / 2, 0, 0)
+            else:
+                g.rotation_euler = (0, 0, math.pi / 2); g.location = (-1.5, 0, 0)
+                cam.location = (8, 0, 1.25); cam.rotation_euler = (math.pi / 2, 0, math.pi / 2)
+            for o in LV.values():
+                o.hide_render = o is not hero
+            sc.render.filepath = os.path.join(OUT, f'measure_{CLS}_{tag}_{vn}.png')
+            bpy.ops.render.render(write_still=True)
+            bpy.data.objects.remove(g, do_unlink=True); made.remove(g)
+        for o in made:
+            bpy.data.objects.remove(o, do_unlink=True)
+
+    try:
+        measure_sheet('bind')
+    except Exception as e:
+        log('measure sheet failed', repr(e))
     V = verts(hero)
     log('levels', {k: (len(o.data.vertices), len(faces(o))) for k, o in LV.items()},
         'hero bbox', V.min(0).round(3).tolist(), V.max(0).round(3).tolist())

@@ -15,7 +15,7 @@
     "Shadow": 750
    },
    "floater_frac": 0.002,
-   "voxel": 0.006
+   "_note": "rig-batch-b: no voxel rebuild (it shredded the Builder at 0.006); collapse straight from the full-resolution raw"
   },
   {
    "name": "Healer",
@@ -35,7 +35,7 @@
    },
    "floater_frac": 0.002,
    "cloth_tol": 0.12,
-   "voxel": 0.006
+   "_note": "rig-batch-b: no voxel rebuild (it shredded the Builder at 0.006); collapse straight from the full-resolution raw"
   },
   {
    "name": "Demolitions",
@@ -52,7 +52,7 @@
     "Shadow": 750
    },
    "floater_frac": 0.002,
-   "voxel": 0.006
+   "_note": "rig-batch-b: no voxel rebuild (it shredded the Builder at 0.006); collapse straight from the full-resolution raw"
   }
  ]
 }
