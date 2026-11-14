@@ -86,7 +86,45 @@ namespace CriticalMass.Runtime.Online
             Code = code;
             Client = new RoomClient(t, GameConfig.CreateDefault(), name, OnlineConfig.Build);
             Client.Started = Begin;
+            _joinName = name;
+            _joinTries = 0;
+            _retryAt = -1;
             OnlineRunner.Ensure();
+        }
+
+        // online-rooms-3: a joiner who is quicker than the host's own connection hears "no room" / "still opening": ask
+        // again a few times before showing the error (the host's game may connect a second later).
+        const int JoinTries = 6, JoinRetryMs = 1500;
+        static string _joinName;
+        static int _joinTries;
+        static long _retryAt = -1;
+
+        /// <summary>true while a join is being asked again (the room screen shows "Connecting" instead of the error).</summary>
+        public static bool Retrying => _retryAt >= 0;
+        /// <summary>true when the closed join is still going to be asked again on the next update.</summary>
+        public static bool WillRetry => Client != null && Client.Session == null && Client.Phase == RoomPhase.Closed
+                                        && RelayTransport.IsRetryable(Client.Error) && _joinTries < JoinTries;
+
+        static void RetryJoin(long now)
+        {
+            if (Client == null || Client.Session != null || Client.Phase != RoomPhase.Closed) return;
+            if (_retryAt < 0)
+            {
+                if (!RelayTransport.IsRetryable(Client.Error) || _joinTries >= JoinTries) return;
+                _joinTries++;
+                _retryAt = now + JoinRetryMs;
+                return;
+            }
+            if (now < _retryAt) return;
+            _retryAt = -1;
+            try
+            {
+                Transport?.Close();
+                RelayTransport t = RelayTransport.Connect(OnlineConfig.RelayUrl, Code, null);
+                Transport = t;
+                Client = new RoomClient(t, GameConfig.CreateDefault(), _joinName, OnlineConfig.Build) { Started = Begin };
+            }
+            catch (RoomException) { /* keeps the closed client and its error */ }
         }
 
         /// <summary>Host: starts the match for everyone (null and a reason when it cannot yet).</summary>
@@ -132,7 +170,7 @@ namespace CriticalMass.Runtime.Online
         {
             long now = NowMs;
             if (Host != null) Host.Update(now);
-            else if (Client != null) Client.Update(now);
+            else if (Client != null) { Client.Update(now); RetryJoin(now); }
         }
 
         /// <summary>Leave the room (idempotent): the socket closes, the seat goes back to actor 0.</summary>

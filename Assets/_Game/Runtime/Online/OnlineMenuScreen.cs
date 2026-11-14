@@ -307,7 +307,7 @@ namespace CriticalMass.Runtime.Online
             }
             if (_page == Page.Room)
             {
-                if (OnlineMatch.Client != null && OnlineMatch.Client.Phase == RoomPhase.Closed)
+                if (OnlineMatch.Client != null && OnlineMatch.Client.Phase == RoomPhase.Closed && !OnlineMatch.Retrying && !OnlineMatch.WillRetry)
                 {
                     string why = OnlineMatch.Client.Error;
                     OnlineMatch.Leave();
