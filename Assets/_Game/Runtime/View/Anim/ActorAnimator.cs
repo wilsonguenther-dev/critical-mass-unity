@@ -185,7 +185,8 @@ namespace CriticalMass.Runtime.View.Anim
 
             // ---- facing (DG-89)
             // feat/hit-feel-1: through a swing the body turns to the enemy it swings at (HitFeel.Facing; the sim's Facing otherwise).
-            double target = SimSpace.YawDeg(HitFeel.Facing(w, i, alpha));
+            // fix/hit-feel-3: a fighter in a hit reaction (staggered) is never turned; it keeps the sim's facing.
+            double target = SimSpace.YawDeg(_hasReact ? actor.Facing : HitFeel.Facing(w, i, alpha));
             if (corpse)
             {
                 if (!_wasCorpse) LatchDeath(m, actor, feed, i, target);
@@ -516,7 +517,7 @@ namespace CriticalMass.Runtime.View.Anim
                     windup = AttackTiming.SwingWindupSeconds(actor, hz);   // the sim's own swing: contact on SwingTick + SwingWindup
                     double age = AttackTiming.SwingAge(actor, w.Tick, alpha, hz);
                     if (combat != null && hasFx) age = combat.AttackTime(i, age, fx); // the attacker freezes on contact during the hold
-                    t = AttackTiming.ClipTime(age, ClipFacts.Contact(_actClip, (float)(len * 0.5)), len, windup);
+                    t = AttackTiming.ClipTime(age, ClipFacts.Contact(_actClip, (float)(len * 0.5)), len, windup, _actExtreme);
                     _actAge = age;
                 }
                 else
@@ -612,6 +613,7 @@ namespace CriticalMass.Runtime.View.Anim
         }
 
         double _actAge;
+        double _actExtreme = -1;   // fix/hit-feel-3: the attack clip's measured wind-up extreme
         int _lastCarried = -1;
         string _terraClip;
         double _terraAt;
@@ -645,6 +647,8 @@ namespace CriticalMass.Runtime.View.Anim
             }
             _kind = kind;
             _actClip = clip;
+            // fix/hit-feel-3: measured once per clip, here, before this frame's pose is built.
+            _actExtreme = kind == 1 && clip != null ? AttackTiming.MeasureExtreme(m, clip, ClipFacts.Contact(clip, m.ClipLength(clip) * 0.5f)) : -1;
             _actStart = simTime - aa;
             _lastActW = 0f;
             _breakAt = -1;

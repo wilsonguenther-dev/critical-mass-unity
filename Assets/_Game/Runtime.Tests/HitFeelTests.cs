@@ -70,9 +70,9 @@ namespace CriticalMass.Runtime.Tests
         [Test]
         public void TheAttackerTurnsToTheEnemyItSwingsAt()
         {
-            World w = Swinging(ClassId.Warrior, 4, 2, 1.0, 0.4, out int e);
+            World w = Swinging(ClassId.Warrior, 4, 2, 1.0, 0.3, out int e);
             Assert.AreEqual(e, HitFeel.SwingTarget(w, 0));
-            Assert.AreEqual(Math.Atan2(0.4, 1.0), HitFeel.Facing(w, 0, 0), 1e-9, "faces the target, not just the press direction");
+            Assert.AreEqual(Math.Atan2(0.3, 1.0), HitFeel.Facing(w, 0, 0), 1e-9, "faces the target, not just the press direction");
 
             World behind = Swinging(ClassId.Warrior, 4, 2, -1.0, 0, out _);
             Assert.AreEqual(-1, HitFeel.SwingTarget(behind, 0), "an enemy behind is not the target");
@@ -81,6 +81,44 @@ namespace CriticalMass.Runtime.Tests
             World late = Swinging(ClassId.Warrior, 4, 4 + 30, 1.0, 0.4, out _);
             late.Actors[0].Facing = 1.0;
             Assert.AreEqual(1.0, HitFeel.Facing(late, 0, 0), 1e-9, "after the follow-through the sim's facing rules again");
+        }
+
+        /// <summary>fix/hit-feel-3: the swing turn never fights the movement facing (FacingSanityPlayTests allows 30 degrees).</summary>
+        [Test]
+        public void TheSwingTurnStaysInsideAConeOfTheSimFacing()
+        {
+            Assert.LessOrEqual(HitFeel.FaceConeDeg, 25, "inside the facing test's 30 degrees with room for the leg yaw");
+            World wide = Swinging(ClassId.Warrior, 4, 2, 1.0, 0.7, out int e);   // 35 degrees off the sim facing
+            Assert.AreEqual(e, HitFeel.SwingTarget(wide, 0), "still the swing target (inside the arc)");
+            Assert.AreEqual(0, HitFeel.Facing(wide, 0, 0), 1e-9, "outside the cone: keep the sim facing");
+
+            World moving = Swinging(ClassId.Warrior, 4, 2, 1.0, 0.0, out _);
+            moving.Actors[0].Facing = Math.PI;   // moving away from the swing (backing off): the movement facing rules
+            Assert.AreEqual(Math.PI, HitFeel.Facing(moving, 0, 0), 1e-9, "never turned around against the sim facing");
+            for (double ang = -Math.PI; ang <= Math.PI; ang += 0.1)
+            {
+                World s = Swinging(ClassId.Demolitions, 4, 2, Math.Cos(ang) * 1.0, Math.Sin(ang) * 1.0, out _);
+                s.Actors[0].Facing = 0.2;
+                double d = HitFeel.Facing(s, 0, 0) - 0.2;
+                d = Math.Atan2(Math.Sin(d), Math.Cos(d));
+                Assert.LessOrEqual(Math.Abs(d) * 180 / Math.PI, HitFeel.FaceConeDeg + 1e-6, $"target at {ang:0.0} rad");
+            }
+        }
+
+        /// <summary>fix/hit-feel-3: step-in, flinch and stagger never draw the body more than MaxViewOffset off its sim spot.</summary>
+        [Test]
+        public void TheDrawnBodyStaysNearItsSimPosition()
+        {
+            Assert.LessOrEqual(HitFeel.MaxViewOffset, 0.25f + 1e-6f, "the placement test allows 0.35 u; the ring sits on the sim spot");
+            Vector3 big = HitFeel.ClampOffset(new Vector3(0.4f, 0.3f, -0.3f));
+            Assert.AreEqual(HitFeel.MaxViewOffset, new Vector2(big.x, big.z).magnitude, 1e-5f, "clamped horizontally");
+            Assert.AreEqual(0.3f, big.y, 1e-6f, "vertical untouched");
+            Vector3 small = new Vector3(0.1f, 0, 0.05f);
+            Assert.AreEqual(small, HitFeel.ClampOffset(small), "a small offset is kept");
+            Assert.LessOrEqual(HitFeel.ReachStepMax, HitFeel.MaxViewOffset + 1e-9);
+            for (double dmg = 0; dmg <= 60; dmg += 2)
+                for (double t = 0; t < 0.6; t += 0.02)
+                    Assert.LessOrEqual(HitFeel.FlinchShift(dmg) + HitFeel.StaggerStep(t, dmg), 0.32, $"dmg {dmg} at {t:0.00} s (before the clamp)");
         }
 
         [Test]
@@ -165,23 +203,34 @@ namespace CriticalMass.Runtime.Tests
         }
             // ---------------------------------------------------------------- feat/hit-feel-2
 
+        /// <summary>
+        /// fix/hit-feel-3: ease into the extreme, hold it, and play the WHOLE strike (extreme to contact) in the last sim tick
+        /// before the damage tick, so the hand is fastest on that tick (hit-feel-2's 2-frame snap peaked it 4 to 5 ticks early).
+        /// </summary>
         [Test]
-        public void TheWindupSnapsToItsExtremeHoldsThenStrikesOnTheTick()
+        public void TheWindupHoldsItsExtremeThenStrikesInTheLastTick()
         {
             const double hz = 30;
             foreach (ClassId cls in All)
-                for (int windup = 2; windup <= 8; windup++)
-                {
-                    string clip = ArtMapping.ClassClips(cls).Attack ?? ArtMapping.Attack;
-                    double c = ClipFacts.Contact(clip, 0.567f), w = windup / hz, e = AttackTiming.Extreme(c);
-                    double snap = Math.Min(AttackTiming.AnticipationSeconds, w * 0.5), strike = Math.Min(AttackTiming.StrikeSeconds, w * 0.4);
-                    Assert.LessOrEqual(snap, 2.0 / 30 + 1e-9, "anticipation in 2 frames at most");
-                    Assert.AreEqual(e, AttackTiming.CraftTime(snap, c, w), 1e-9, $"{cls} W={windup}: at the wind-up extreme");
-                    Assert.AreEqual(e, AttackTiming.CraftTime(w - strike, c, w), 1e-9, $"{cls}: extreme held until the strike");
-                    Assert.AreEqual(c, AttackTiming.ClipTime(w, c, 2, w), 1e-9, $"{cls}: contact on the damage tick");
-                    Assert.AreEqual(c + 0.1, AttackTiming.ClipTime(w + 0.1, c, 2, w), 1e-9, $"{cls}: follow-through at normal speed");
-                    Assert.AreEqual(1f, AttackTiming.Envelope(snap, AttackTiming.CraftTime(snap, c, w), 2, w), 1e-6f, "the pose is fully in for the extreme");
-                }
+                for (int windup = 3; windup <= 8; windup++)
+                    foreach (double measured in new[] { -1.0, 0.05 })
+                    {
+                        string clip = ArtMapping.ClassClips(cls).Attack ?? ArtMapping.Attack;
+                        double c = ClipFacts.Contact(clip, 0.567f), w = windup / hz;
+                        double e = measured >= 0 && measured <= c ? measured : AttackTiming.Extreme(c);
+                        Assert.AreEqual(1.0 / hz, AttackTiming.StrikeSeconds, 1e-12, "the strike is one sim tick");
+                        double holdEnd = w - AttackTiming.StrikeSeconds, ease = Math.Min(AttackTiming.AnticipationSeconds, holdEnd);
+                        Assert.AreEqual(e, AttackTiming.CraftTime(ease, c, w, measured), 1e-9, $"{cls} W={windup}: at the extreme");
+                        Assert.AreEqual(e, AttackTiming.CraftTime(holdEnd, c, w, measured), 1e-9, $"{cls}: extreme held until the strike");
+                        Assert.AreEqual(c, AttackTiming.ClipTime(w, c, 2, w, measured), 1e-9, $"{cls}: contact on the damage tick");
+                        Assert.AreEqual(c + 0.1, AttackTiming.ClipTime(w + 0.1, c, 2, w, measured), 1e-9, $"{cls}: follow-through at normal speed");
+                        // per-tick clip advance: the last wind-up tick (the strike) must move at least as much clip as any
+                        // earlier tick's share of the ease, so the hand's fastest tick is the damage tick.
+                        double strikeStep = c - AttackTiming.ClipTime(w - 1 / hz, c, 2, w, measured);
+                        Assert.AreEqual(c - e, strikeStep, 1e-9, $"{cls}: the whole strike is the last tick");
+                        Assert.AreEqual(0f, AttackTiming.Envelope(0, 0, 2, w), 1e-6f, "fades in from nothing");
+                        Assert.Greater(AttackTiming.Envelope(holdEnd, e, 2, w), 0.7f, "mostly in for the strike");
+                    }
             Assert.AreEqual(4.0 / 30 - AttackTiming.StrikeSeconds, HitFeel.SmearDelay(4.0 / 30), 1e-9, "the smear starts with the strike");
             Assert.AreEqual(0, HitFeel.SmearDelay(0.01), 1e-9);
         }
@@ -207,13 +256,14 @@ namespace CriticalMass.Runtime.Tests
         [Test]
         public void FlinchesAreBigEnoughToSeeAndScaleWithDamage()
         {
-            Assert.AreEqual(8, HitFeel.FlinchLeanDeg(0), 1e-9);
-            Assert.AreEqual(24, HitFeel.FlinchLeanDeg(30), 1e-9);
+            Assert.AreEqual(6, HitFeel.FlinchLeanDeg(0), 1e-9);
+            // fix/hit-feel-3: at most 13 degrees (hit-feel-1's value): 24 tipped the body's bounds to 1.5x its height.
+            Assert.AreEqual(13, HitFeel.FlinchLeanDeg(30), 1e-9);
+            Assert.LessOrEqual(HitFeel.FlinchLeanDeg(100), 13 + 1e-9);
             Assert.Greater(HitFeel.FlinchLeanDeg(16), HitFeel.FlinchLeanDeg(8), "more damage, more lean");
-            Assert.GreaterOrEqual(HitFeel.FlinchLeanDeg(8), 12, "even the lantern's 8 leans 12 degrees");
             Assert.Greater(HitFeel.FlinchShift(22), HitFeel.FlinchShift(9));
             Assert.AreEqual(0, HitFeel.StaggerStep(0.1, 9), 1e-9, "a light tap does not stagger");
-            Assert.Greater(HitFeel.StaggerStep(0.1, 16), 0.15, "a mid hit staggers a visible step");
+            Assert.Greater(HitFeel.StaggerStep(0.1, 16), 0.1, "a mid hit staggers a visible step");
             Assert.Greater(HitFeel.StaggerStep(0.1, 30), HitFeel.StaggerStep(0.1, 16));
             Assert.AreEqual(0, HitFeel.StaggerStep(0.45, 30), 1e-9, "absorbed by 0.45 s");
         }
