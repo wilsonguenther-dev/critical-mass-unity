@@ -162,6 +162,26 @@ namespace CriticalMass.Runtime.Tests
             }
         }
 
+        [Test]
+        public void ABrokenBlockFallsApartIntoSeveralChunksAndACrackedOneIsTinted()
+        {
+            World w = NewWorld();
+            var cells = new List<int> { 0 };
+            Mesh box = Boxes(w.Map, cells);
+            MeshPiece[] chunks = MeshPieces.TryGrid(box, 2, 5);
+            Assert.IsNotNull(chunks);
+            Assert.Greater(chunks.Length, 1, "not one slab");
+            Assert.LessOrEqual(chunks.Length, 8);
+            Mesh tint = MeshPieces.TintShell(box, BreakableCellSet.CrackedTint, 0.012f);
+            Assert.IsNotNull(tint);
+            Assert.AreEqual(box.vertexCount, tint.vertexCount);
+            Assert.Greater(box.bounds.size.x, 0f);
+            Assert.Greater(tint.bounds.size.x, box.bounds.size.x, "the shell sits just outside the block");
+            foreach (MeshPiece c in chunks) { Object.DestroyImmediate(c.Mesh); if (c.Cracks != null) foreach (Mesh m in c.Cracks) if (m != null) Object.DestroyImmediate(m); }
+            Object.DestroyImmediate(tint);
+            Object.DestroyImmediate(box);
+        }
+
         // ------------------------------------------------------------------ rubble
 
         [Test]
