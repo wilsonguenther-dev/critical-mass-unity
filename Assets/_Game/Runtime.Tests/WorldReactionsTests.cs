@@ -242,14 +242,17 @@ namespace CriticalMass.Runtime.Tests
             var s = new FxMeshBuilder("s", CombatFx.SolidVerts, CombatFx.SolidVerts * 2);
             try
             {
+                // polish-5: the TNT scorch is a fading live mark (never stamped: a stamped scorch stayed for good and the bridge
+                // read as a hole); still marks that ARE stamped are the slam cracks, so the stamp-once rule is checked on a
+                // Kaiju slam, and the scorch is checked to be gone (not piling up as a live mesh) once its life is over.
                 int tick = 30;
-                var e = new FxEvent { Kind = FxKind.Explosion, Tick = tick, A = -1, B = (int)ExplosionKind.Tnt, X = pad.X, Z = pad.Z, Value = 2.0 };
+                var e = new FxEvent { Kind = FxKind.Explosion, Tick = tick, A = -1, B = (int)ExplosionKind.KaijuSlam, X = pad.X, Z = pad.Z, Value = 2.0 };
                 scene.OnFx(ref e, w);
-                double now = tick / cfg.SimHz + scene.S(1.0); // scorch has spread, long before its fade
+                double now = tick / cfg.SimHz + scene.S(1.0); // the crack has spread, long before its fade
                 scene.Advance(now);
                 scene.Build(now, w, Vector3.right, Vector3.up, g, a, s);
                 int stamped = paint.Builder.VertCount;
-                Assert.Greater(stamped, 0, "the scorch was stamped into the paint");
+                Assert.Greater(stamped, 0, "the slam crack was stamped into the paint");
                 Assert.Greater(scene.LastGroundMarks, 0, "and is still drawn this frame (no blank frame)");
                 scene.Build(now + 0.01, w, Vector3.right, Vector3.up, g, a, s);
                 Assert.AreEqual(stamped, paint.Builder.VertCount, "stamped once only");
@@ -257,6 +260,21 @@ namespace CriticalMass.Runtime.Tests
                 paint.Frame++;
                 scene.Build(now + 0.02, w, Vector3.right, Vector3.up, g, a, s);
                 Assert.AreEqual(0, scene.LastGroundMarks, "after the flush the mark lives only in the paint");
+                Assert.AreEqual(stamped, paint.Builder.VertCount);
+
+                // the TNT scorch: drawn live while it fades, never stamped, and gone from the ground mesh after its life
+                int tick2 = tick + (int)(20 * cfg.SimHz);
+                var tnt = new FxEvent { Kind = FxKind.Explosion, Tick = tick2, A = -1, B = (int)ExplosionKind.Tnt, X = pad.X, Z = pad.Z, Value = 2.0 };
+                scene.OnFx(ref tnt, w);
+                double t2 = tick2 / cfg.SimHz + scene.S(1.0);
+                scene.Advance(t2);
+                scene.Build(t2, w, Vector3.right, Vector3.up, g, a, s);
+                Assert.Greater(scene.LastGroundMarks, 0, "the scorch is drawn while it fades");
+                Assert.AreEqual(stamped, paint.Builder.VertCount, "the TNT scorch is never stamped into the paint");
+                double gone = tick2 / cfg.SimHz + scene.S(FxScene.ScorchLife + 0.1);
+                scene.Advance(gone);
+                scene.Build(gone, w, Vector3.right, Vector3.up, g, a, s);
+                Assert.AreEqual(0, scene.LastGroundMarks, "the scorch leaves the ground mesh when its life is over: still marks never pile up");
                 Assert.AreEqual(stamped, paint.Builder.VertCount);
             }
             finally
