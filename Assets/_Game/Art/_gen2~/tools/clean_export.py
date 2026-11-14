@@ -411,6 +411,14 @@ def clean(e):
                         if np.mean([h in hero_dark for h in hits]) >= ff.get("follow", 0.6):
                             keep.append(i)
                     dark = np.array(keep, int)
+                    # at this budget the grey-blue eye and soot paint smears over big triangles: grey faces in the box that
+                    # are not features go back to the skin colour (the brightest warm palette colour)
+                    warm_pal = [j for j in range(len(pal)) if pal[j][0] - pal[j][2] > 0.1]
+                    skin_c = pal[max(warm_pal, key=lambda j: pal[j].mean())] if warm_pal else None
+                    if skin_c is not None:
+                        grey = [i for i in fi if i not in set(keep) and rgba[i, 0] - rgba[i, 2] < 0.04]
+                        rgba[grey, :3] = skin_c; rgba[grey, 3] = 0
+                        facts.setdefault("face_features", {}).setdefault(lv + "_grey_to_skin", len(grey))
                 rgba[dark, :3] = hex2rgb(ff.get("colour", "#33241E")); rgba[dark, 3] = 0
                 facts.setdefault("face_features", {})[lv] = {"faces_in_box": int(len(fi)), "skin_ref": round(ref, 3),
                                                              "painted": int(len(dark))}
