@@ -15,6 +15,11 @@ python3 tools/online/compare-hashes.py host.txt join.txt
 
 ## The built game as a hidden peer
 
+Two copies of the game on one machine: each needs its own data folder or the second quits on the single-instance
+lock ("another copy of Critical Mass is already running"). Pass `-dataDir /tmp/cm-a` and `-dataDir /tmp/cm-b` to a
+normal windowed copy; the hidden modes below (`-onlineHost` / `-onlineJoin` with `-batchmode` or `-onlineHeadless`)
+pick `TEMP/cm-online-PID` by themselves when no `-dataDir` is given.
+
 The same flags work on the player with the `online` prefix, in `-batchmode -nographics` (or with `-onlineHeadless`):
 
 ```

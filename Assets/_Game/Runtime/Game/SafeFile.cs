@@ -264,7 +264,25 @@ namespace CriticalMass.Runtime.Game
                 if (string.Equals(args[i], "-dataDir", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrEmpty(args[i + 1]) &&
                     !args[i + 1].StartsWith("-", StringComparison.Ordinal))
                     return args[i + 1];
-            return null;
+            return HiddenOnlineDir(args);
+        }
+
+        /// <summary>
+        /// online-rooms-4: a hidden online test peer (-onlineHost or -onlineJoin with -batchmode or -onlineHeadless) and no
+        /// -dataDir gets its own folder, TEMP/cm-online-PID, so two copies on one machine never meet on the single-instance
+        /// lock (SessionKeeper) and never touch the player's own saves. Null for every other run.
+        /// </summary>
+        public static string HiddenOnlineDir(string[] args)
+        {
+            bool online = false, hidden = false;
+            foreach (string a in args)
+            {
+                string f = (a ?? "").TrimStart('-').ToLowerInvariant();
+                if (f == "onlinehost" || f == "onlinejoin") online = true;
+                if (f == "batchmode" || f == "onlineheadless") hidden = true;
+            }
+            if (!online || !hidden) return null;
+            return Path.Combine(Path.GetTempPath(), "cm-online-" + System.Diagnostics.Process.GetCurrentProcess().Id);
         }
 
         /// <summary>true for a -dataDir run without touching the engine (safe from any thread after boot; tests can set it).</summary>
