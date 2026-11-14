@@ -113,6 +113,9 @@ namespace CriticalMass.Editor
             bool development = Flag("-development");
             try
             {
+                // rigs-2 (2026-11-13): the player ships the art catalog as the ArtMapping specs say now (a class's
+                // ClipSource can point at its own baked clip pack); idempotent, an unchanged catalog is not re-saved.
+                Art.ArtCatalogBuilder.Build();
                 var scenes = EditorBuildSettings.scenes.Where(s => s.enabled).Select(s => s.path).ToArray();
                 if (scenes.Length == 0)
                 {
