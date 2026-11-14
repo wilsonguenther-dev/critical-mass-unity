@@ -186,7 +186,11 @@ namespace CriticalMass.Sim.Core
                     int i = cz * width + cx;
                     bool ok = MapGrid.ClearanceOk(map, cx, cz, r);
                     // feat/kaiju-bridges-1: near a bridge, a cell its squeezed collider fits in is walkable for it too.
-                    bool sqz = !ok && squeeze && NearBridge(map, cx, cz, halo) && MapGrid.ClearanceOk(map, cx, cz, sr);
+                    // feat/kaiju-bridges-2: or the cell centre is on a diagonal bridge's deck for the squeezed body (the CM-33
+                    // deck rule the actors use): the raster stair-steps of the shallow bridges (base to hill, south island to the
+                    // far islands) leave no cell the 0.7 m circle fits by the box rule.
+                    bool sqz = !ok && squeeze && NearBridge(map, cx, cz, halo) &&
+                               (MapGrid.ClearanceOk(map, cx, cz, sr) || Collide.DeckSpanAt(w, cx + 0.5, cz + 0.5, sr) != null);
                     sq[i] = sqz ? (byte)1 : (byte)0;
                     cells[i] = ok || sqz ? Cell.Floor : Cell.Wall;
                 }

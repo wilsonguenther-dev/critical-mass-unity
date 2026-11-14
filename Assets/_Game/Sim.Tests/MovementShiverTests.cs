@@ -498,7 +498,10 @@ namespace CriticalMass.Sim.Tests
                         watch.Observe(w);
                         double dx = w.X[0] - k.X, dz = w.Z[0] - k.Z, d = Math.Sqrt(dx * dx + dz * dz);
                         closest = Math.Min(closest, d);
-                        if (w.Actors[0].Alive && w.Actors[0].AirLen <= 0 && !MapGrid.IsWalkable(w.Map, (int)Math.Floor(w.X[0]), (int)Math.Floor(w.Z[0]))) offBridge++;
+                        // feat/kaiju-bridges-2: "off the bridge" is the sim's own stand rule (Collide.ActorFits: the box rule, or on a
+                        // diagonal deck, CM-33). Round 1 tested the raster cell under the centre, which is VOID on the stair-step
+                        // edges of a diagonal deck a fighter legally stands on: every "pushed off" of run 43636579754 was that.
+                        if (w.Actors[0].Alive && w.Actors[0].AirLen <= 0 && !Collide.ActorFits(w, w.X[0], w.Z[0], Collide.ActorRadius(w, 0))) offBridge++;
                         inside = d < bodyR - 0.3 ? inside + 1 : 0;
                         worstInside = Math.Max(worstInside, inside);
                     }

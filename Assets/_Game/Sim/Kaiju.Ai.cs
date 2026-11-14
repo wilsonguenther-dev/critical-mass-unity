@@ -237,10 +237,27 @@ namespace CriticalMass.Sim.Core
             double sx = dx / steps;
             double sz = dz / steps;
             bool guard = Phys.On(w, w.Config.Physics.SolidKaiju);
+            bool squeeze = SqueezeOn(w);
             for (int s = 0; s < steps; s++)
             {
                 double px = k.X;
                 double pz = k.Z;
+                if (squeeze)
+                {
+                    // feat/kaiju-bridges-2: on a diagonal deck the Kaiju moves by the actors' deck rule (CM-33), not the raster
+                    // push-out, which would shove it a cell sideways off the stair-steps. A step that lands on the deck is taken;
+                    // from the deck, it steps only to where it may stand (deck or clear circle), else the axis parts, else stays.
+                    double fx = JsMath.F32(px + sx);
+                    double fz = JsMath.F32(pz + sz);
+                    if (OnDeck(w, fx, fz)) { k.X = fx; k.Z = fz; continue; }
+                    if (OnDeck(w, px, pz))
+                    {
+                        if (KaijuFits(w, fx, fz)) { k.X = fx; k.Z = fz; }
+                        else if (KaijuFits(w, fx, pz)) k.X = fx;
+                        else if (KaijuFits(w, px, fz)) k.Z = fz;
+                        continue;
+                    }
+                }
                 k.X += sx;
                 k.Z += sz;
                 ResolveCircle(w);
@@ -275,7 +292,21 @@ namespace CriticalMass.Sim.Core
         }
 
         /// <summary>DG-86: true when the Kaiju's wall collider (WallR) overlaps no blocked cell.</summary>
-        public static bool CircleClear(World w) => CircleClearAt(w, WallR(w));
+        public static bool CircleClear(World w)
+        {
+            Kaiju k = w.Kaiju;
+            return CircleClearAt(w, k.X, k.Z, WallR(w)) || (SqueezeOn(w) && OnDeck(w, k.X, k.Z));
+        }
+
+        /// <summary>feat/kaiju-bridges-2: the squeezed Kaiju's centre at (x, z) is on a diagonal bridge's deck (Collide.DeckSpanAt).</summary>
+        private static bool OnDeck(World w, double x, double z)
+        {
+            double r = WallR(w);
+            return r <= w.Config.Physics.KaijuSqueezeRadius + 1e-9 && Collide.DeckSpanAt(w, x, z, r) != null;
+        }
+
+        /// <summary>feat/kaiju-bridges-2: the Kaiju may stand at (x, z): its wall circle is clear, or it is on a deck.</summary>
+        private static bool KaijuFits(World w, double x, double z) => CircleClearAt(w, x, z, WallR(w)) || OnDeck(w, x, z);
 
         /// <summary>feat/kaiju-bridges-1: the live wall collider radius: GridR, or the squeezed radius on and near a bridge.</summary>
         public static double WallR(World w)
@@ -317,7 +348,7 @@ namespace CriticalMass.Sim.Core
             }
             if (nav.WallR >= full) return;
             double grown = JsMath.F32(Math.Min(full, nav.WallR + pc.KaijuUnsqueezeRate * dt));
-            if (CircleClearAt(w, grown)) nav.WallR = grown;
+            if (CircleClearAt(w, k.X, k.Z, grown)) nav.WallR = grown;
         }
 
         /// <summary>
@@ -335,19 +366,18 @@ namespace CriticalMass.Sim.Core
         }
 
         /// <summary>True when a wall collider of radius `radius` at the Kaiju overlaps no blocked cell.</summary>
-        private static bool CircleClearAt(World w, double radius)
+        private static bool CircleClearAt(World w, double x, double z, double radius)
         {
-            Kaiju k = w.Kaiju;
             MapDef map = w.Map;
             double r = radius - 1e-3;
-            for (int gz = JsMath.FloorToInt(k.Z - r); gz <= JsMath.FloorToInt(k.Z + r); gz++)
+            for (int gz = JsMath.FloorToInt(z - r); gz <= JsMath.FloorToInt(z + r); gz++)
             {
-                for (int gx = JsMath.FloorToInt(k.X - r); gx <= JsMath.FloorToInt(k.X + r); gx++)
+                for (int gx = JsMath.FloorToInt(x - r); gx <= JsMath.FloorToInt(x + r); gx++)
                 {
                     if (MapGrid.IsWalkable(map, gx, gz)) continue;
-                    double nx = k.X < gx ? gx : (k.X > gx + 1 ? gx + 1.0 : k.X);
-                    double nz = k.Z < gz ? gz : (k.Z > gz + 1 ? gz + 1.0 : k.Z);
-                    if ((k.X - nx) * (k.X - nx) + (k.Z - nz) * (k.Z - nz) < r * r) return false;
+                    double nx = x < gx ? gx : (x > gx + 1 ? gx + 1.0 : x);
+                    double nz = z < gz ? gz : (z > gz + 1 ? gz + 1.0 : z);
+                    if ((x - nx) * (x - nx) + (z - nz) * (z - nz) < r * r) return false;
                 }
             }
             return true;
