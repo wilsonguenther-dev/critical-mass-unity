@@ -25,7 +25,9 @@ def main(src, dst, d):
     byid = {val(k.props[0]): k for k in objs.kids}
     parent = {}
     for c in conns.kids:
-        if val(c.props[0]) == "OO": parent[val(c.props[1])] = val(c.props[2])
+        # node parents only: a bone is also an OO child of each cluster that binds it
+        if val(c.props[0]) == "OO" and (val(c.props[2]) == 0 or (val(c.props[2]) in byid and byid[val(c.props[2])].name == "Model")):
+            parent[val(c.props[1])] = val(c.props[2])
     rep = collections.Counter()
     moved_nodes = set()
     for k in objs.kids:
