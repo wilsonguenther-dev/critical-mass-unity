@@ -1439,10 +1439,13 @@ namespace CriticalMass.Runtime.Menu
             }
         }
 
-        public void Note(RectTransform tab, int line, string text)
+        public void Note(RectTransform tab, int line, string text) => Note(tab, line, text, LineW);
+
+        /// <summary>A note of a given width (batch 8: the WORLD tab's note shares its row with the reset button).</summary>
+        public void Note(RectTransform tab, int line, string text, float width)
         {
             MenuUi.Label(tab, "Note", CMTokens.Ui, UiScale.TypeSmall, CMTokens.WithAlpha(Cream, 0.8f), TextAnchor.MiddleLeft, ContentX + 8f,
-                ContentY + line * (LineH + LineGap) + 10f, LineW, 36f, text, 2f);
+                ContentY + line * (LineH + LineGap) + 10f, width, 36f, text, 2f);
         }
 
         public MenuItem Slider(RectTransform tab, int line, string label, Func<float> get, Action<float> set)

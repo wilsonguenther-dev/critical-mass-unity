@@ -202,6 +202,8 @@ namespace CriticalMass.Runtime.Tests
                 // feat/terrain-affordances: the structure hit reactions decode their own events (WallBreak, ToppleHit,
                 // Terraform, pieces, barricades, bridge) that carry no WorldForce
                 "View/Affordance/WorldReactionsCore.cs",
+                // feat/skill-effects-1: the skill tells decode their own events (Ability, Purify, heals, Terraform, shield hits)
+                "View/Skills/SkillFxCore.cs",
             };
             var readers = Directory.GetFiles(root, "*.cs", SearchOption.AllDirectories)
                 .Where(f => Regex.IsMatch(File.ReadAllText(f), @"\.EventHead\b"))
