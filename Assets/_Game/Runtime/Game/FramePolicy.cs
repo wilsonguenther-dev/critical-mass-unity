@@ -117,6 +117,67 @@ namespace CriticalMass.Runtime.Game
             return (float)Math.Max(MinRenderScale, s);
         }
 
+        // ── perf/fullscreen-cost-1: dynamic render scale ──
+        // The playthrough walk (2026-11-14, 8 GB M1 Air, Medium, vsync 60): 6.7 % of match frames took 33 ms or more at
+        // 1920x1080 against 0.9 % at 1440x900, with the same game work: the cost is per pixel. During a match the governor
+        // trims the 3D render scale in small steps while frames miss the display and the GPU is the busy side, and gives
+        // the pixels back once frames have been on time for a while. Only between the level's floor and the scale the
+        // player (or the first-launch pick) chose; High keeps native pixels. Floors: Medium 0.8 (1080p then costs about
+        // what 1440x900 costs, where the walk was smooth), Low and below 0.7.
+
+        /// <summary>One step of the dynamic scale.</summary>
+        public const float DynamicStep = 0.05f;
+        /// <summary>The measurement window (seconds).</summary>
+        public const double DynamicWindowSeconds = 2.0;
+        /// <summary>Never two changes closer than this (seconds): a change re-sizes the camera targets once.</summary>
+        public const double DynamicHoldSeconds = 4.0;
+        /// <summary>On-time seconds before one step back up (doubles after a quick bounce, up to DynamicRecoverMaxSeconds).</summary>
+        public const double DynamicRecoverSeconds = 10.0, DynamicRecoverMaxSeconds = 80.0;
+        /// <summary>Step down when at least this share of the window's frames missed the display...</summary>
+        public const double DynamicMissShareDown = 0.03;
+        /// <summary>...and the GPU took at least this share of the frame budget on those frames (else it is the CPU's fault and
+        /// fewer pixels would not help). Step up only when the GPU's mean share is at or under DynamicGpuShareUp.</summary>
+        public const double DynamicGpuShareDown = 0.6, DynamicGpuShareUp = 0.5;
+        /// <summary>A frame counts as missed when it took longer than this many display intervals.</summary>
+        public const double DynamicMissFactor = 1.45;
+
+        /// <summary>The lowest dynamic scale of a quality level (High and above: 1 = off).</summary>
+        public static float DynamicFloor(int level) => level >= LevelHigh ? 1f : level == LevelMedium ? 0.8f : 0.7f;
+
+        /// <summary>
+        /// The next dynamic scale (pure; tests). missShare: share of the window's frames that missed the display. gpuShare:
+        /// GPU milliseconds over the frame budget (on the missed frames when there were any, else the window mean); 0 or less
+        /// = unknown (no frame timing on this machine): then down on misses alone, up after twice the calm time.
+        /// sinceChange: seconds since the last change. calmSeconds: seconds without a missed frame.
+        /// </summary>
+        public static float NextDynamicScale(float current, float floor, float ceiling, double missShare, double gpuShare,
+            double sinceChange, double calmSeconds, double recoverSeconds)
+        {
+            if (float.IsNaN(ceiling) || ceiling <= 0f) ceiling = 1f;
+            floor = Math.Min(floor, ceiling);
+            if (float.IsNaN(current)) current = ceiling;
+            current = Math.Max(floor, Math.Min(ceiling, current));
+            if (sinceChange < DynamicHoldSeconds) return current;
+            bool gpuKnown = gpuShare > 0;
+            if (missShare >= DynamicMissShareDown && (!gpuKnown || gpuShare >= DynamicGpuShareDown) && current > floor + 1e-4f)
+                return Math.Max(floor, StepRound(current - DynamicStep));
+            bool calm = gpuKnown ? calmSeconds >= recoverSeconds && gpuShare <= DynamicGpuShareUp : calmSeconds >= 2 * recoverSeconds;
+            if (calm && current < ceiling - 1e-4f) return Math.Min(ceiling, StepRound(current + DynamicStep));
+            return current;
+        }
+
+        /// <summary>Rounds to the step grid (0.05), so repeated steps never drift.</summary>
+        static float StepRound(float v) => (float)(Math.Round(v / DynamicStep) * DynamicStep);
+
+        /// <summary>The recover time after a step down: doubled when the scale had gone up less than two windows of calm
+        /// ago (a bounce), back to the base after a long stay; never above the maximum.</summary>
+        public static double NextRecoverSeconds(double recover, double secondsSinceStepUp)
+        {
+            if (secondsSinceStepUp < DynamicRecoverSeconds) return Math.Min(DynamicRecoverMaxSeconds, recover * 2);
+            if (secondsSinceStepUp > DynamicRecoverMaxSeconds) return DynamicRecoverSeconds;
+            return recover;
+        }
+
         /// <summary>true for integrated GPUs (Intel, AMD APUs, software renderers); Apple silicon counts as capable.</summary>
         public static bool IsIntegrated(string gpuName, int gpuMemoryMb)
         {

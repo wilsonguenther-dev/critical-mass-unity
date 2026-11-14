@@ -66,6 +66,11 @@ namespace CriticalMass.Runtime.Game
         public static int AppliedTarget { get; private set; }
         public static int AppliedCap { get; private set; }
         public static float AppliedRenderScale { get; private set; } = 1f;
+        /// <summary>perf/fullscreen-cost-1: the dynamic render scale in force (1 = none); the applied scale is the smaller of
+        /// this and the chosen scale. -noDynamicScale turns it off (old behaviour, for back-to-back comparisons).</summary>
+        public static float AppliedDynamicScale { get; private set; } = 1f;
+        public static int DynamicChanges { get; private set; }
+        public const string NoDynamicScaleFlag = "-noDynamicScale";
         public static int AppliedQueuedFrames { get; private set; }
         /// <summary>true while the title screen is up (read by SimDriverBehaviour's backdrop throttle).</summary>
         public static bool TitleUp { get; private set; }
@@ -131,6 +136,12 @@ namespace CriticalMass.Runtime.Game
         int _prefCap = DefaultCap, _prefBg, _prefVSync = 1, _baseLevel = -1, _seenW, _seenH, _seenDisplays;
         double _seenHz;
         float _chosenScale = 1f;
+        // perf/fullscreen-cost-1: dynamic render scale state (no allocation per frame).
+        float _dynScale = 1f;
+        double _dynWindow, _dynSinceChange = 100.0, _dynCalm, _dynSinceUp = 1000.0, _dynRecover = FramePolicy.DynamicRecoverSeconds, _dynGpuSum, _dynGpuMissSum;
+        int _dynFrames, _dynMisses, _dynGpuN, _dynGpuMissN;
+        int _dynOff = -1;
+        float _titleUpFor;
         int _argCap = -1;   // -fpsCap N (measurement runs: the floor profile uses 30); -1 = none
         readonly TimedCapGuard _guard = new TimedCapGuard();
         HumanInputSource _input;
@@ -284,10 +295,70 @@ namespace CriticalMass.Runtime.Game
             _guard.Reset();
         }
 
+        /// <summary>
+        /// perf/fullscreen-cost-1: measures the match frames (missed display intervals, GPU share from the frame timings
+        /// SessionKeeper already captures) over 2 s windows and steps the dynamic scale with FramePolicy.NextDynamicScale.
+        /// Matches only (not the title, menus, pause, loading or an unfocused window); a change re-applies the pixels once.
+        /// </summary>
+        void TickDynamicScale(float dt)
+        {
+            if (_dynOff < 0)
+            {
+                _dynOff = 0;
+                foreach (string a in Environment.GetCommandLineArgs())
+                    if (string.Equals(a, NoDynamicScaleFlag, StringComparison.OrdinalIgnoreCase)) _dynOff = 1;
+            }
+            int level = QualitySettings.GetQualityLevel();
+            bool active = _dynOff == 0 && !SafeMode && level < FramePolicy.LevelHigh && SessionKeeper.Phase == "match" &&
+                          !_title && !_inputPaused && !MenuOpen && !Menus.LoadingScreen.IsOpen;
+            if (!active || dt <= 0f || dt > 0.25f)
+            {
+                // A hitch (over 250 ms) is not a pixel problem; anything off-match starts a fresh window.
+                _dynWindow = 0; _dynFrames = _dynMisses = _dynGpuN = _dynGpuMissN = 0; _dynGpuSum = _dynGpuMissSum = 0;
+                return;
+            }
+            double hz = _seenHz > 20 ? _seenHz : 60.0;
+            double interval = AppliedVSync > 0 ? AppliedVSync / hz : AppliedTarget > 0 ? 1.0 / AppliedTarget : 1.0 / hz;
+            bool missed = dt > interval * FramePolicy.DynamicMissFactor;
+            float gpu = SessionKeeper.GpuFrameMs;
+            _dynFrames++;
+            if (missed) _dynMisses++;
+            if (gpu > 0f)
+            {
+                _dynGpuSum += gpu; _dynGpuN++;
+                if (missed) { _dynGpuMissSum += gpu; _dynGpuMissN++; }
+            }
+            _dynWindow += dt;
+            if (_dynWindow < FramePolicy.DynamicWindowSeconds) return;
+
+            double budgetMs = interval * 1000.0;
+            double missShare = _dynFrames > 0 ? (double)_dynMisses / _dynFrames : 0;
+            double gpuShare = _dynGpuMissN > 0 ? _dynGpuMissSum / _dynGpuMissN / budgetMs : _dynGpuN > 0 ? _dynGpuSum / _dynGpuN / budgetMs : 0;
+            _dynCalm = _dynMisses == 0 ? _dynCalm + _dynWindow : 0;
+            _dynSinceChange += _dynWindow;
+            _dynSinceUp += _dynWindow;
+            float floor = FramePolicy.DynamicFloor(level), ceiling = Mathf.Min(1f, _chosenScale);
+            float now = Mathf.Clamp(_dynScale, Mathf.Min(floor, ceiling), ceiling);
+            float next = FramePolicy.NextDynamicScale(now, floor, ceiling, missShare, gpuShare, _dynSinceChange, _dynCalm, _dynRecover);
+            if (Mathf.Abs(next - now) > 0.001f)
+            {
+                if (next < now) _dynRecover = FramePolicy.NextRecoverSeconds(_dynRecover, _dynSinceUp);
+                else { _dynSinceUp = 0; _dynCalm = 0; }
+                Debug.Log($"[CM.Governor] dynamic scale {now:0.00} -> {next:0.00} (missed {missShare * 100:0.0}%, gpu {gpuShare * 100:0}% of {budgetMs:0.0} ms, next recover {_dynRecover:0} s)");
+                _dynScale = next >= ceiling - 0.001f ? 1f : next;
+                _dynSinceChange = 0;
+                DynamicChanges++;
+                ApplyPixels();
+            }
+            _dynWindow = 0; _dynFrames = _dynMisses = _dynGpuN = _dynGpuMissN = 0; _dynGpuSum = _dynGpuMissSum = 0;
+        }
+
         void ApplyPixels()
         {
             int level = QualitySettings.GetQualityLevel();
-            float s = FramePolicy.RenderScaleFor(_chosenScale, FramePolicy.PixelBudget(level), Screen.width, Screen.height);
+            float dyn = Mathf.Max(_dynScale, FramePolicy.DynamicFloor(level));
+            AppliedDynamicScale = dyn < 1f ? dyn : 1f;
+            float s = FramePolicy.RenderScaleFor(Mathf.Min(_chosenScale, dyn), FramePolicy.PixelBudget(level), Screen.width, Screen.height);
             UniversalRenderPipelineAsset a = CurrentAsset();
             // Player only (Awake disables this component in the editor): the asset in a player is an in-memory object,
             // so the project's .asset file can never change.
@@ -417,6 +488,9 @@ namespace CriticalMass.Runtime.Game
                 _prefVSync = own ? PlayerPrefs.GetInt(PrefVSync, 1) : 1;
                 _title = FindAnyObjectByType<TitleScreen>() != null;
                 TitleUp = _title;
+                // perf/fullscreen-cost-1: once the title has been up 1.5 s, warm the HUD fonts while nobody plays.
+                _titleUpFor = _title ? _titleUpFor + 0.5f : 0f;
+                if (_titleUpFor >= 1.5f && !CriticalMass.Runtime.Hud.Style.GlyphWarmup.TitleDone) CriticalMass.Runtime.Hud.Style.GlyphWarmup.WarmScene(true);
                 if (_input == null) _input = FindAnyObjectByType<HumanInputSource>();
                 _inputPaused = _input != null && _input.State != null && _input.State.Paused;
                 _onBattery = SystemInfo.batteryStatus == BatteryStatus.Discharging;
@@ -452,6 +526,8 @@ namespace CriticalMass.Runtime.Game
                 UpdateThermal();
                 WatchExternalModeChange();
             }
+
+            TickDynamicScale(dt);
 
             if (_pendingWindow.HasValue && WindowDebounce.TryFire(Time.realtimeSinceStartupAsDouble))
             {
