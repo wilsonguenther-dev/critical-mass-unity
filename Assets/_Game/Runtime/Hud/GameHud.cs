@@ -1126,7 +1126,9 @@ namespace CriticalMass.Runtime.Hud
             float kx = Mathf.Abs(d.x) > 1e-4f ? (c.x - pad) / Mathf.Abs(d.x) : float.MaxValue;
             float ky = Mathf.Abs(d.y) > 1e-4f ? (c.y - pad) / Mathf.Abs(d.y) : float.MaxValue;
             Vector2 pos = c + d * Mathf.Min(kx, ky);
-            pos = HudKeepOut.PushOut(pos, c.y, 36f * scale);   // owner walk 1: never on a HUD panel (the clock band, Kaiju panel, feed)
+            // fix/hud-edge-markers-1: the whole marker (badge and distance label) slides along the free edge clear of every
+            // HUD panel (was: only its centre point pushed up or down, so the label could still sit on a panel).
+            pos = HudEdgeMarkers.PlaceLive(pos, HudEdgeMarkers.MarkerHalf, sw, sh, scale, 1f, pad);
             p.anchoredPosition = pos / scale;
             _ptrArrow[i].localRotation = Quaternion.Euler(0, 0, Mathf.Atan2(d.y, d.x) * Mathf.Rad2Deg);
             double dx = tx - s.PlayerX, dz = tz - s.PlayerZ;

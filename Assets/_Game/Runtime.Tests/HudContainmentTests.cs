@@ -304,5 +304,29 @@ namespace CriticalMass.Runtime.Tests
             Assert.IsFalse(HudStressFlag.In(new[] { "game", "-shots" }));
             Assert.AreEqual(13, TextFit.Padded("0123456789").Length);
         }
+
+        /// <summary>fix/hud-edge-markers-1: an off-screen edge marker (badge and distance label) asked to sit at each screen
+        /// corner, at each panel's centre and on the coins panel's right end (where the live match drew it) ends up on screen
+        /// and overlapping no HUD panel, at three 16:9 sizes.</summary>
+        [TestCase(1280, 720)]
+        [TestCase(1920, 1080)]
+        [TestCase(2560, 1440)]
+        public void EdgeMarkersSlideAlongTheFreeEdgeAndNeverSitOnAPanel(int sw, int sh)
+        {
+            float k = HudLayout.Scale(sw, sh);
+            var panels = new Rect[HudEdgeMarkers.LayoutCount];
+            int n = HudEdgeMarkers.LayoutPanels(sw, sh, k, panels);
+            var asks = new List<Vector2> { new Vector2(0, 0), new Vector2(sw, 0), new Vector2(0, sh), new Vector2(sw, sh) };
+            for (int i = 0; i < n; i++) asks.Add(panels[i].center);
+            asks.Add(new Vector2(panels[4].xMax - 10f * k, panels[4].center.y));
+            foreach (Vector2 ask in asks)
+            {
+                Vector2 p = HudEdgeMarkers.Place(ask, HudEdgeMarkers.MarkerHalf, sw, sh, k, 70f * k, panels, n);
+                Rect box = HudEdgeMarkers.Box(p, HudEdgeMarkers.MarkerHalf, k);
+                Assert.IsTrue(box.xMin >= 0f && box.yMin >= 0f && box.xMax <= sw && box.yMax <= sh, $"{sw}x{sh} ask {ask}: marker {box} on screen");
+                for (int i = 0; i < n; i++)
+                    Assert.IsFalse(box.Overlaps(panels[i]), $"{sw}x{sh} ask {ask}: marker {box} overlaps the {HudEdgeMarkers.LayoutName(i)} {panels[i]}");
+            }
+        }
     }
 }

@@ -727,7 +727,13 @@ namespace CriticalMass.Runtime.Hud.Mechanics
                 if (DamageDirection.OffScreen(vp))
                 {
                     Vector2 dir = DamageDirection.ScreenDir(vp);
-                    _pointer.anchoredPosition = DamageDirection.EdgePoint(dir, _space.rect.size * 0.5f, 60f);
+                    // fix/hud-edge-markers-1: the drop pointer sat on the COINS panel with its label on the minimap (it never
+                    // checked the panels). It now slides along the free edge clear of every HUD panel.
+                    Vector2 size = _space.rect.size;
+                    Vector2 edge = DamageDirection.EdgePoint(dir, size * 0.5f, 60f) + size * 0.5f;
+                    float sf = Mathf.Max(1e-4f, _canvas.scaleFactor);
+                    float k = HudLayout.Scale(size.x * sf, size.y * sf) / sf;
+                    _pointer.anchoredPosition = HudEdgeMarkers.PlaceLive(edge, HudEdgeMarkers.MarkerHalf, size.x, size.y, k, sf, 60f) - size * 0.5f;
                     _pointer.localEulerAngles = new Vector3(0f, 0f, DamageDirection.AngleDeg(dir) + 180f);
                     show = true;
                 }
