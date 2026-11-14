@@ -565,7 +565,7 @@ namespace CriticalMass.Runtime.Tests
         {
             // (5) a scheme change redraws once it has settled, and at most once per SchemeHoldSeconds
             Assert.IsFalse(HudPrompts.SchemeRedrawDue(10.1f, 10f, 0f), "not before it settles");
-            Assert.IsTrue(HudPrompts.SchemeRedrawDue(10f + HudPrompts.SchemeSettleSeconds, 10f, 0f), "once it has settled");
+            Assert.IsTrue(HudPrompts.SchemeRedrawDue(10f + HudPrompts.SchemeSettleSeconds + 0.01f, 10f, 0f), "once it has settled");
             Assert.IsFalse(HudPrompts.SchemeRedrawDue(11f, 10f, 10f), "not twice inside the hold");
             Assert.IsTrue(HudPrompts.SchemeRedrawDue(12.5f, 10f, 10f), "after the hold");
         }

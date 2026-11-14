@@ -264,6 +264,7 @@ namespace CriticalMass.Runtime.Hud.Interact
                     _worldShape[i].SetVerticesDirty();
                     HudText.Set(_worldWord[i], PingWords.Upper[(int)p.Kind]);
                     _wordShown[i] = true;
+                    _worldWord[i].enabled = true;   // a new call in this slot shows its word until its line is up
                     if (_miniShape[i] != null)
                     {
                         _miniShape[i].Kind = PingWords.Shape[(int)p.Kind];
