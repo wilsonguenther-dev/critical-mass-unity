@@ -154,6 +154,16 @@ for s in SIDES:
     inv = np.array(F0["M" + s].inverted())
     p = wco[SOLEV[s]]
     OFF[s] = p @ inv[:3, :3].T + inv[:3, 3]
+def _fwd(arm):
+    P = arm.pose.bones
+    t = W(arm, P["toes.l"].head) - W(arm, P["foot.l"].head)
+    h = (arm.matrix_world @ P["hips"].matrix).to_3x3() @ Vector((0, 0, 1))
+    return [round(x, 3) for x in t.normalized()], [round(x, 3) for x in h.normalized()]
+rest(kk); _kf = _fwd(kk); rest(fa); _ff = _fwd(fa)
+REP["facing"] = dict(kk_world=[list(map(lambda v: round(v, 3), r)) for r in kk.matrix_world],
+                     class_world=[list(map(lambda v: round(v, 3), r)) for r in fa.matrix_world],
+                     kk_toe_dir=_kf[0], class_toe_dir=_ff[0], kk_hips_z=_kf[1], class_hips_z=_ff[1])
+log("facing", REP["facing"])
 REP.update(ratio=RATIO, lift=LIFT, leg_class=leg_f, leg_kaykit=leg_k, thigh=Lt, shin=Ls,
            foot_vertices={s: int(len(FOOTV[s])) for s in SIDES})
 log("leg ratio", round(RATIO, 4), "ground lift", round(LIFT, 4), "thigh", Lt, "shin", Ls)
@@ -225,7 +235,10 @@ def bake_action(clip, act):
         targets, rots = {}, {}
         for s in SIDES:
             R = K["R" + s] @ K0["R" + s].inverted() @ F0["R" + s]
-            A = F0["A" + s] + (K["A" + s] - K0["A" + s]) * RATIO + Vector((0, 0, LIFT))
+            dk = K["A" + s] - K0["A" + s]
+            # Horizontal foot motion scales with the legs (stride); the lift of a swinging foot does not, so the swing
+            # ankle stays above the planted one (the game's facing tests take the lower ankle as the planted foot).
+            A = F0["A" + s] + Vector((dk.x * RATIO, dk.y * RATIO, dk.z)) + Vector((0, 0, LIFT))
             planted = (K["A" + s].z - K0["A" + s].z) < PLANT * leg_k
             if planted and bdir is not None:
                 if anchor[s] is None:
@@ -350,9 +363,14 @@ for clip in ("Idle", "Walk", "Run"):
     f0, f1 = int(a.frame_range[0]), int(a.frame_range[1])
     H = {s: [] for s in SIDES}
     XY = {s: [] for s in SIDES}
+    ANK = {s: [] for s in SIDES}
+    YAW = {s: [] for s in SIDES}
     for f in range(f0, f1 + 1):
         scene.frame_set(f)
         fh = foot_heights()
+        for s in SIDES:
+            a = W(fa, fa.pose.bones["foot." + s].head); t = W(fa, fa.pose.bones["toes." + s].head)
+            ANK[s].append(round(a.z, 3)); YAW[s].append(round(math.degrees(math.atan2(t.x - a.x, -(t.y - a.y))), 1))
         for s in SIDES:
             H[s].append(round(float(fh[s][:, 2].min()), 4))
             z = fh[s][:, 2]
@@ -364,7 +382,8 @@ for clip in ("Idle", "Walk", "Run"):
     planted_err = {s: max([abs(H[s][i]) for i in range(n) if con[s][i]] or [0.0]) for s in SIDES}
     res = dict(frames=n, foot_l=H["l"], foot_r=H["r"], contact_l=con["l"], contact_r=con["r"],
                lowest_per_frame=[min(lowest), max(lowest)], planted_err=planted_err,
-               min_any=min(min(H["l"]), min(H["r"])))
+               min_any=min(min(H["l"]), min(H["r"])), ankle_l=ANK["l"], ankle_r=ANK["r"], toe_yaw_l=YAW["l"],
+               toe_yaw_r=YAW["r"])
     if clip in GROUND_SPEED:
         v = GROUND_SPEED[clip] * RATIO
         dt = 1.0 / fps
