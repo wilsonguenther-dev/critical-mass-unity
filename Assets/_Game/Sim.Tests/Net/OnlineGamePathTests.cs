@@ -87,7 +87,7 @@ namespace CriticalMass.Sim.Tests.Net
             // The joiner asks before the host's connection is through: it must hear "not ready" and ask again, not fail.
             Peer join = Make(relay, false, "Jeisil", p => { p.Code = code; p.Team = TeamId.Crimson; p.Class = ClassId.Miner; });
             Begin(join);
-            World offline = World.CreateWorld(new WorldOptions { Seed = 5, TeamSize = 8 });
+            World offline = World.CreateWorld(new WorldOptions { Seed = 5, TeamSize = 8, Config = GameConfig.CreateDefault() });
             RunAll(relay, new List<Peer> { host, join }, offline);
             Assert.AreEqual(0, host.Exit, string.Join("\n", host.Log));
             Assert.AreEqual(0, join.Exit, string.Join("\n", join.Log));
