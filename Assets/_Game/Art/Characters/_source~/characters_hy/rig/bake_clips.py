@@ -600,6 +600,7 @@ def kk_back_dir(act, f0, f1, thr=None):
 ZPRE, PL, KUP = {}, {}, {}
 TOE_ABS = CLS == "Builder" and os.environ.get("BAKE_TOE_ABS", "1") == "1"
 TOE_LOG = {}
+IDLE_TOE = {}
 ORDER_CLIPS = {"Walk", "WalkBack", "Run", "RunBack", "StrafeL", "StrafeR"}
 ORDER_GAP = 0.004
 
@@ -664,6 +665,12 @@ def bake_action(clip, act):
             R = (fa.matrix_world @ faP[LEG(s)[2]].matrix).to_3x3().normalized()
             if (IDLE_FLAT and clip in IDLE_CLIPS) or MAL:
                 R = F0["R" + s].copy()   # flat as bound (rest foot)
+                if TOE_ABS:
+                    # rig-builder-3: the idle feet stay flat but splay as KayKit's idle toes do (about 19 degrees out).
+                    # FacingSanity read the Builder's straight idle toes (+-2 degrees) at the first frames of a move, when
+                    # the idle pose still shows: 42 degrees from the leg yaw against a 30 degree tolerance (6 of 42).
+                    R = Matrix.Rotation(_toe_yaw(kk, s) - _yf[s], 3, 'Z') @ R
+                    IDLE_TOE.setdefault(clip, {})[s] = round(math.degrees(_toe_yaw(kk, s)), 1)
             elif FOOTREF:
                 # rig-batch-b: KayKit's foot turn from its flat Idle foot, applied to this body's own flat rest foot (the
                 # full-local copy pitched the Builder's boots by KayKit's 20 degree steeper foot bone)
@@ -826,6 +833,7 @@ REP["mallet"] = dict(on=MALLET, contact_fraction=round(_CT, 4), wrist=MALLET_LOG
 REP["ground_speed"] = GROUND_SPEED
 REP["fps"] = fps
 REP["twist_damp"] = dict(keep_out=TWIST_DAMP, chest_from_hips_max_deg_before=TWIST_LOG)
+REP["idle_toe_yaw_deg"] = IDLE_TOE
 REP["planted_toe_yaw_kaykit_deg"] = {c: [min(v), max(v)] for c, v in TOE_LOG.items()}
 
 
