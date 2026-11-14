@@ -121,8 +121,6 @@ namespace CriticalMass.Runtime.Camera
         static readonly int[] HudPanels = { (int)HudCluster.Minimap, (int)HudCluster.Kaiju };
         readonly Vector3[] _corners = new Vector3[4];
         readonly bool[] _hidClusters = new bool[4];
-        float _toastUntil;
-        string _toast;
         bool _cursorLocked;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
@@ -714,8 +712,8 @@ namespace CriticalMass.Runtime.Camera
 
         void Toast(string s)
         {
-            _toast = s;
-            _toastUntil = Time.unscaledTime + 2f;
+            // hud-containment-2: the notice goes to the toast lane (a cap and a queue; it waits behind an achievement toast).
+            ToastLane.Post(s, Time.unscaledTime);
         }
 
         static Texture2D _tri, _dot;
@@ -786,11 +784,12 @@ namespace CriticalMass.Runtime.Camera
             GUI.color = new Color(1f, 0.97f, 0.88f, 0.75f);
             string line = Mode == GroundViewMode.Play ? PlayHint() : WatchLine;
             if (GetComponent<GroundViewShots>() == null && GetComponent<FollowCameraShots>() == null) GUI.Label(new Rect(0, Screen.height - 40 * s, Screen.width, 28 * s), line, _style);
-            if (_toast != null && Time.unscaledTime < _toastUntil)
+            string toast = ToastLane.Current(Time.unscaledTime);
+            if (toast != null)
             {
                 GUI.color = new Color(1f, 0.85f, 0.45f, 1f);
                 _style.fontSize = Mathf.RoundToInt(26 * s);
-                GUI.Label(new Rect(0, Screen.height * 0.22f, Screen.width, 40 * s), _toast, _style);
+                GUI.Label(ToastLane.PixelRect(Screen.width, Screen.height, 40 * s), toast, _style);
             }
             if (Mode == GroundViewMode.Play) { DrawAimTrail(s); DrawPlayAids(s); DrawViewCone(s); }
             GUI.color = old;
