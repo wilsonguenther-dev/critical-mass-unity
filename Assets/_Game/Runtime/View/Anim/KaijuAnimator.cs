@@ -165,7 +165,10 @@ namespace CriticalMass.Runtime.View.Anim
             // position actually went this tick, never a steering vector the walls refused; a heading error under
             // YawDeadZoneDeg is not chased, so a small sideways shove does not twitch the body.
             double velX = k.X - k.PrevX, velZ = k.Z - k.PrevZ;
-            if (!telegraph && k.MeleeWindupIn <= 0 && k.KoIn <= 0 && speed > WalkYawMinSpeed)
+            // Only a forward-ish motion (within 100 degrees of the sim facing) steers it: a shove backwards by the crowd does not
+            // spin the body round to face where it was pushed.
+            if (!telegraph && k.MeleeWindupIn <= 0 && k.KoIn <= 0 && speed > WalkYawMinSpeed &&
+                (velX * Math.Cos(k.Facing) + velZ * Math.Sin(k.Facing)) > -0.17 * Math.Sqrt(velX * velX + velZ * velZ))
                 target = SimSpace.YawDeg(Math.Atan2(velZ, velX));
             if (double.IsNaN(_yaw)) { _yaw = target; _yawRate = 0; }
             double yawStep = 0;
