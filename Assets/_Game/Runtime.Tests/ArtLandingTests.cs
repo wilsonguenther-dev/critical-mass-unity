@@ -188,6 +188,12 @@ namespace CriticalMass.Runtime.Tests
                 ArtEntry e = Catalog().Find(key);
                 Assert.IsNotNull(e, key);
                 Assert.IsNotNull(e.Clip(ArtMapping.Swipe), key + " Swipe clip");
+                // rig-kaiju-2: the green-crystal adult has no face UVs; its expressions play through jaw, head and eye glow.
+                if (ArtMapping.Spec(key).VertexColourFace)
+                {
+                    Assert.AreEqual(0, e.Expressions?.Length ?? 0, key + ": no face atlases on a vertex-colour face");
+                    continue;
+                }
                 foreach (KaijuExpression x in Enum.GetValues(typeof(KaijuExpression)))
                 {
                     Texture2D tex = e.Expression((int)x);
