@@ -1,0 +1,149 @@
+{
+ "name": "Healer",
+ "source": "in:healer-body-three-quarter.glb",
+ "kind": "fighter",
+ "raw_tris": 2341831,
+ "floaters": {
+  "parts_kept": 1,
+  "parts_dropped": 7,
+  "verts_dropped": 1471
+ },
+ "colour_source": "corner colour",
+ "scale_applied": 2.0001903357428916,
+ "octree_depth": 9,
+ "octree_tris": 1952600,
+ "octree_floaters": {
+  "parts_kept": 1,
+  "parts_dropped": 0,
+  "verts_dropped": 0
+ },
+ "octree_tris_kept": 1952600,
+ "voxel_after_floaters": {
+  "parts_kept": 1,
+  "parts_dropped": 19,
+  "verts_dropped": 160
+ },
+ "voxel_after_m": 0.004,
+ "voxel_after_tris": 2050364,
+ "palette": [
+  {
+   "hex": "#AFA492",
+   "code": 0
+  },
+  {
+   "hex": "#69A2A6",
+   "code": 0
+  },
+  {
+   "hex": "#787B8C",
+   "code": 8
+  },
+  {
+   "hex": "#EED9BF",
+   "code": 0
+  },
+  {
+   "hex": "#D1D7DD",
+   "code": 0
+  },
+  {
+   "hex": "#94AEAE",
+   "code": 0
+  },
+  {
+   "hex": "#DEC2AE",
+   "code": 0
+  },
+  {
+   "hex": "#798DA4",
+   "code": 8
+  },
+  {
+   "hex": "#C7AF94",
+   "code": 0
+  },
+  {
+   "hex": "#BFBCBB",
+   "code": 0
+  },
+  {
+   "hex": "#76985D",
+   "code": 0
+  },
+  {
+   "hex": "#9B8B80",
+   "code": 0
+  },
+  {
+   "hex": "#95796E",
+   "code": 0
+  },
+  {
+   "hex": "#F9F8F8",
+   "code": 0
+  }
+ ],
+ "levels": {
+  "Hero": {
+   "how": "collapse 2050364->21560",
+   "tris": 21560,
+   "verts": 10486,
+   "size_m": [
+    1.959,
+    0.643,
+    2.0
+   ],
+   "min_z": 0.0004,
+   "faces_per_code": {
+    "0": 17997,
+    "8": 3563
+   }
+  },
+  "LOD0": {
+   "how": "collapse 2050364->3920",
+   "tris": 3920,
+   "verts": 1666,
+   "size_m": [
+    1.957,
+    0.649,
+    2.0
+   ],
+   "min_z": -0.0049,
+   "faces_per_code": {
+    "0": 3180,
+    "8": 740
+   }
+  },
+  "LOD1": {
+   "how": "collapse 2050364->1554; collapse 1554->1514; split 0 non-manifold edges; collapse 1514->1514; split 0 non-manifold edges; collapse 1514->1514; split 0 non-manifold edges; collapse 1514->1514; split 0 non-manifold edges; collapse 1514->1514; split 0 non-manifold edges",
+   "tris": 1514,
+   "verts": 463,
+   "size_m": [
+    1.409,
+    0.522,
+    1.748
+   ],
+   "min_z": 0.1473,
+   "faces_per_code": {
+    "0": 1169,
+    "8": 345
+   }
+  },
+  "Shadow": {
+   "how": "collapse 2050364->1554; collapse 1554->1514; split 0 non-manifold edges; collapse 1514->1514; split 0 non-manifold edges; collapse 1514->1514; split 0 non-manifold edges; collapse 1514->1514; split 0 non-manifold edges; collapse 1514->1514; split 0 non-manifold edges; cluster 0.055 m -> 712",
+   "tris": 712,
+   "verts": 197,
+   "size_m": [
+    1.409,
+    0.522,
+    1.748
+   ],
+   "min_z": 0.1473,
+   "faces_per_code": {
+    "0": 544,
+    "8": 168
+   }
+  }
+ },
+ "fbx": "Healer/Healer.fbx"
+}

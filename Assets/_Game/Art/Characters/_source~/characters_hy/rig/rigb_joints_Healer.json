@@ -1,0 +1,181 @@
+{
+ "_note": "rig-batch-b 2026-11-14: read by eye from measure_Healer_bind_front/side.png (0.1 m grid). Blender metres, faces -Y.",
+ "hips": [
+  0,
+  0.02,
+  0.7
+ ],
+ "spine": [
+  0,
+  0.0,
+  0.9
+ ],
+ "chest": [
+  0,
+  -0.03,
+  1.12
+ ],
+ "head": [
+  0,
+  0.0,
+  1.39
+ ],
+ "_headtop": [
+  0,
+  0.0,
+  1.98
+ ],
+ "upperleg.l": [
+  0.12,
+  0.03,
+  0.62
+ ],
+ "lowerleg.l": [
+  0.19,
+  0.03,
+  0.37
+ ],
+ "foot.l": [
+  0.22,
+  0.08,
+  0.14
+ ],
+ "toes.l": [
+  0.22,
+  -0.18,
+  0.05
+ ],
+ "_toetip.l": [
+  0.22,
+  -0.29,
+  0.04
+ ],
+ "upperarm.l": [
+  0.21,
+  -0.03,
+  1.29
+ ],
+ "lowerarm.l": [
+  0.435,
+  -0.03,
+  1.0
+ ],
+ "wrist.l": [
+  0.535,
+  -0.08,
+  0.875
+ ],
+ "hand.l": [
+  0.565,
+  -0.12,
+  0.79
+ ],
+ "handslot.l": [
+  0.58,
+  -0.13,
+  0.76
+ ],
+ "upperleg.r": [
+  -0.12,
+  0.03,
+  0.62
+ ],
+ "lowerleg.r": [
+  -0.19,
+  0.03,
+  0.37
+ ],
+ "foot.r": [
+  -0.22,
+  0.08,
+  0.14
+ ],
+ "toes.r": [
+  -0.22,
+  -0.18,
+  0.05
+ ],
+ "_toetip.r": [
+  -0.22,
+  -0.29,
+  0.04
+ ],
+ "upperarm.r": [
+  -0.21,
+  -0.03,
+  1.29
+ ],
+ "lowerarm.r": [
+  -0.435,
+  -0.03,
+  1.0
+ ],
+ "wrist.r": [
+  -0.535,
+  -0.08,
+  0.875
+ ],
+ "hand.r": [
+  -0.565,
+  -0.12,
+  0.79
+ ],
+ "handslot.r": [
+  -0.58,
+  -0.13,
+  0.76
+ ],
+ "_flap_hem": [
+  0.2,
+  0.0,
+  0.38
+ ],
+ "_rigid_shins": [
+  0,
+  -0.15,
+  0.03
+ ],
+ "_flap_y": [
+  0,
+  0.23,
+  0
+ ],
+ "_strip_del": {
+  "_note": "rig-healer-3: the back strip deleted (side-view centre line top/bot [y, z], read from measure_Healer_bind_side.png)",
+  "top": [
+   0.155,
+   1.22
+  ],
+  "bot": [
+   0.3,
+   0.02
+  ],
+  "thick": 0.065,
+  "half_x": 0.26,
+  "hem": 0.37,
+  "leg_r": 0.17,
+  "dress_b": 0.05,
+  "grow_margin": 0.03,
+  "grow_z": 1.05
+ },
+ "_face_feat": {
+  "_note": "rig-healer-3: eyes (teal) and brows in the face box painted dark teal, code 0",
+  "box": [
+   -0.13,
+   0.13,
+   -0.32,
+   -0.04,
+   1.5,
+   1.7
+  ],
+  "colour": "#1C3A3D",
+  "rel": 0.65,
+  "teal_g": 0.06,
+  "teal_b": 0.04
+ },
+ "_head_rigid": {
+  "_note": "rig-healer-3: hair buns rigid on the head",
+  "dz": 0.29,
+  "r": 0.26
+ }
+}

@@ -9,6 +9,15 @@ OUT, REPO, INP, CLS, MODE = argv[:5]
 HERE = os.path.join(REPO, 'Assets/_Game/Art/Characters/_source~/characters_hy/rig')
 os.makedirs(OUT, exist_ok=True)
 RES = {'mode': MODE}
+# rig-healer-3: optional 6th arg "key.sub=value,..." patches rigb_joints_<Cls>.json in this checkout (parallel variants)
+if len(argv) > 5 and argv[5] not in ('', '-'):
+    _jp = os.path.join(HERE, f'rigb_joints_{CLS}.json'); _jj = json.load(open(_jp))
+    for _kv in argv[5].split(','):
+        _k, _v = _kv.split('=')
+        _k1, _k2 = _k.split('.')
+        _jj[_k1][_k2] = json.loads(_v)
+    json.dump(_jj, open(_jp, 'w'), indent=1)
+    RES['joint_overrides'] = argv[5]
 FBX = {'Miner': 'Assets/_Game/Art/Miner/Miner.fbx', 'Warrior': 'Assets/_Game/Art/Characters/Warrior.fbx',
        'Healer': 'Assets/_Game/Art/Healer/Healer.fbx'}[CLS]
 
