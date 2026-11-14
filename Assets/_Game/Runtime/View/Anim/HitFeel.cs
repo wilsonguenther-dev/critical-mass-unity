@@ -59,7 +59,29 @@ namespace CriticalMass.Runtime.View.Anim
         /// weapon), ESTIMATED from the rigs and props; HitFeelCapture logs the measured hand reach per class to replace
         /// these. Sim ranges: Warrior 1.7, Farmer 1.4, Miner 1.5, Builder 1.5, Demolitions 1.3, Healer 1.2.
         /// </summary>
+        /// <summary>
+        /// fix/hit-feel-5: the weapon TIP's horizontal reach from the root at the contact pose and the tip's height above
+        /// the spine (the lean's lever), measured on the rig per class by ActorAnimator on the first swing (0: not yet).
+        /// </summary>
+        public static readonly double[] MeasuredReach = new double[16], MeasuredLever = new double[16];
+
+        public static void SetMeasured(ClassId cls, double reach, double lever)
+        {
+            int k = (int)cls;
+            if (k < 0 || k >= MeasuredReach.Length || !(reach > 0.05)) return;
+            MeasuredReach[k] = reach;
+            MeasuredLever[k] = lever;
+        }
+
+        /// <summary>The tip reach used by the step-in: measured on the rig, else the estimate table.</summary>
         public static double ViewReach(ClassId cls)
+        {
+            int k = (int)cls;
+            return k >= 0 && k < MeasuredReach.Length && MeasuredReach[k] > 0 ? MeasuredReach[k] : EstimatedReach(cls);
+        }
+
+        /// <summary>hit-feel-2's estimate (u from the root to the tip), used until the rig is measured.</summary>
+        public static double EstimatedReach(ClassId cls)
         {
             switch (cls)
             {
@@ -232,6 +254,35 @@ namespace CriticalMass.Runtime.View.Anim
             }
             double m = peak * k;
             return SimSpace.ToWorld(dirX * m, 0, dirZ * m);
+        }
+
+        /// <summary>
+        /// fix/hit-feel-5: the upper-body lean toward the swing target that closes what the step-in leaves (gap = target
+        /// surface minus tip reach minus step-in), shaped like the lunge (peak on the damage tick, absorbed after).
+        /// False when there is no swing or no target. Pure on the world.
+        /// </summary>
+        public static bool StrikeLean(World w, int i, double alpha, out double deg, out double dirX, out double dirZ)
+        {
+            deg = 0; dirX = dirZ = 0;
+            if (w == null || i < 0 || i >= w.ActorCount || !w.Actors[i].Alive) return false;
+            Actor a = w.Actors[i];
+            double hz = w.Config.SimHz;
+            double age = SwingAge(a, w.Tick, alpha, hz);
+            if (age < 0) return false;
+            double windup = Math.Max(0, a.SwingWindup) / hz;
+            double k = Math.Max(0, LungeShape(age, windup));
+            if (k <= 0) return false;
+            int t = SwingTarget(w, i);
+            if (t < 0) return false;
+            double dx = w.X[t] - w.X[i], dz = w.Z[t] - w.Z[i], d = Math.Sqrt(dx * dx + dz * dz);
+            if (d < 1e-6) return false;
+            dirX = dx / d; dirZ = dz / d;
+            double rA = w.Config.Class(a.Cls).Radius, rT = w.Config.Class(w.Actors[t].Cls).Radius, reach = ViewReach(a.Cls);
+            double gap = d - rT - reach - StepPeak(d, reach, rA, rT);
+            int c = (int)a.Cls;
+            double lever = c >= 0 && c < MeasuredLever.Length && MeasuredLever[c] > 0 ? MeasuredLever[c] : 0.5;
+            deg = HitPose.StrikeLeanDeg(gap, lever) * k;
+            return deg > 0;
         }
     }
 }

@@ -164,8 +164,15 @@ namespace CriticalMass.Runtime.View.Anim
             // death launch moves the root fast, the lag spring read that as a huge tilt and swung the lying body's spine, chest
             // and head up. The Death clip owns the corpse; the lag resets when the fighter is posed alive again.
             if (s.Corpse && !s.IsKaiju) return;
-            if (mv != null) PostPoseRoot(actor, mv.Transform, mv.Entry != null ? mv.Entry.Key : null);
+            if (mv == null) return;
+            _state = s;   // fix/hit-feel-5: the strike lean and the hit recoil ride on the fighter springs (HitPose.Extra)
+            _hasState = true;
+            try { PostPoseRoot(actor, mv.Transform, mv.Entry != null ? mv.Entry.Key : null); }
+            finally { _hasState = false; }
         }
+
+        private ActorPoseState _state;
+        private bool _hasState;
 
         public void PostPoseRoot(int actor, Transform root, string modelKey)
         {
@@ -206,18 +213,16 @@ namespace CriticalMass.Runtime.View.Anim
             }
             Vector2 tilt = rig.Lag.Step(root.position, dt) * scale;
             float mag = tilt.magnitude;
-            if (mag < 1e-3f)
-            {
-                for (int i = 0; i < rig.Joints.Length; i++) if (rig.Joints[i] != null) rig.Written[i] = rig.Joints[i].localRotation;
-                return;
-            }
-            Vector3 axis = Vector3.Cross(Vector3.up, new Vector3(tilt.x / mag, 0f, tilt.y / mag));
+            Quaternion xs = Quaternion.identity, xc = Quaternion.identity, xh = Quaternion.identity;
+            if (_hasState) HitPose.Extra(in _state, scale, out xs, out xc, out xh);
+            Vector3 axis = mag >= 1e-3f ? Vector3.Cross(Vector3.up, new Vector3(tilt.x / mag, 0f, tilt.y / mag)) : Vector3.up;
             for (int i = 0; i < rig.Joints.Length; i++)
             {
                 Transform j = rig.Joints[i];
                 if (j == null) continue;
-                float a = Mathf.Min(mag * FighterShare[i], FighterMax[i]);
-                j.rotation = Quaternion.AngleAxis(a, axis) * j.rotation;
+                Quaternion extra = i == 0 ? xs : i == 1 ? xc : i == 2 ? xh : Quaternion.identity;
+                Quaternion lag = mag >= 1e-3f ? Quaternion.AngleAxis(Mathf.Min(mag * FighterShare[i], FighterMax[i]), axis) : Quaternion.identity;
+                j.rotation = lag * extra * j.rotation;
                 rig.Written[i] = j.localRotation;
             }
         }

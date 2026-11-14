@@ -27,6 +27,7 @@ namespace CriticalMass.Runtime.View.Anim
         public const string Flag = "-hitFeelShots", OnlyFlag = "-hitFeelShotsOnly", Prefix = "hitfeel-";
         public const int Frames = 10, FrameW = 480, FrameH = 360;
         public const float GameDistance = 7f, SideDistance = 5.5f, SideHeight = 0.35f;
+        float _sideSign = 1f, _sideLift;   // fix/hit-feel-5: which side the side camera stands on (world z sign) and its lift
         static readonly ClassId[] Classes = { ClassId.Warrior, ClassId.Farmer, ClassId.Miner, ClassId.Demolitions, ClassId.Builder, ClassId.Healer };
 
         SimDriverBehaviour _driver;
@@ -182,7 +183,10 @@ namespace CriticalMass.Runtime.View.Anim
             _frame.AimX = _dummyX;
             _frame.AimZ = _dummyZ;
             Step(4);
-            Vector3 focus = SimSpace.ToWorld(x + 0.5, GroundHeight.At(w.Map, x + 0.5, z) + 0.9, z);
+            double fx0 = x + 0.5 * DummyAhead(LightWeaponView.Range(w.Config, cls));
+            double g0 = GroundHeight.At(w.Map, fx0, z);
+            Vector3 focus = SimSpace.ToWorld(fx0, g0 + 0.9, z);
+            PickSide(w, fx0, z, g0);
 
             double hp0 = w.Actors[_dummy].Hp, hz = w.Config.SimHz;
             _frame.Attack = true;
@@ -191,7 +195,7 @@ namespace CriticalMass.Runtime.View.Anim
             int press = w.Actors[0].SwingTick > 0 ? w.Actors[0].SwingTick : w.Tick - 1;
             int windup = w.Actors[0].SwingWindup;
             int damageTick = -1;
-            double facingErr = 0, lungePeak = 0, handReach = double.NaN, surface = double.NaN;
+            double facingErr = 0, lungePeak = 0, handReach = double.NaN, surface = double.NaN, tipAhead = double.NaN, stepAt = 0, leanAt = 0;
             ActorViews views = _driver.GetComponent<ActorViews>();
             var side = new Texture2D(FrameW * Frames, FrameH, TextureFormat.RGB24, false);
             var game = new Texture2D(FrameW * Frames, FrameH, TextureFormat.RGB24, false);
@@ -216,6 +220,10 @@ namespace CriticalMass.Runtime.View.Anim
                     handReach = HandReach(views, w);
                     double ddx = w.X[_dummy] - w.X[0], ddz = w.Z[_dummy] - w.Z[0];
                     surface = Math.Sqrt(ddx * ddx + ddz * ddz) - w.Config.Class(w.Actors[_dummy].Cls).Radius;
+                    // fix/hit-feel-5: the weapon TIP's distance ahead of the SIM position along the line to the dummy
+                    tipAhead = TipAhead(views, w);
+                    stepAt = HitFeel.Lunge(w, 0, 0).magnitude;
+                    if (HitFeel.StrikeLean(w, 0, 0, out double ld, out _, out _)) leanAt = ld;
                 }
                 Step(1);
             }
@@ -240,6 +248,63 @@ namespace CriticalMass.Runtime.View.Anim
                 " u, target body surface " + surface.ToString("0.00") + " u; flinch " + HitFeel.FlinchLeanDeg(hp0 - w.Actors[_dummy].Hp).ToString("0") +
                 " deg, shift " + HitFeel.FlinchShift(hp0 - w.Actors[_dummy].Hp).ToString("0.00") + " u, stagger " +
                 HitFeel.StaggerStep(0.1, hp0 - w.Actors[_dummy].Hp).ToString("0.00") + " u");
+            // fix/hit-feel-5: the numbers to check reach by. "hand" above is the weapon HAND's distance ahead of the DRAWN
+            // root (step-in included) along the line to the dummy: neither the gap nor the hand's travel. "tip gap to
+            // surface" is the target body surface minus the weapon TIP's distance ahead of the SIM position: 0 or less is
+            // a touch (negative: the tip is that far into the body), positive is the gap left.
+            ModelView mv = views != null ? views.ModelOf(0) : null;
+            HitPose.TipLocal(mv, out _, out string tipSrc);
+            int ci = (int)cls;
+            double reach = HitFeel.ViewReach(cls), lever = HitFeel.MeasuredLever[ci];
+            double cover = reach + HitFeel.MaxViewOffset + HitPose.LeanGain(HitPose.MaxStrikeLeanDeg, lever > 0 ? lever : 0.5);
+            double range = LightWeaponView.Range(w.Config, cls);
+            HitTier tier = r.Tier;
+            Log(n + ": tip gap to surface " + (surface - tipAhead).ToString("0.00") + " u (tip " + tipAhead.ToString("0.00") +
+                " u ahead of the sim position, surface " + surface.ToString("0.00") + " u; tip from " + tipSrc + "); contact tip reach " +
+                reach.ToString("0.00") + (HitFeel.MeasuredReach[ci] > 0 ? " u measured" : " u ESTIMATE (not measured)") +
+                ", lever " + lever.ToString("0.00") + " u, step-in " + stepAt.ToString("0.00") + " u, strike lean " + leanAt.ToString("0") +
+                " deg; covers a body surface up to " + cover.ToString("0.00") + " u, sim range (to the surface) " + range.ToString("0.00") +
+                " u" + (range > cover + 1e-3 ? ": SHORT by " + (range - cover).ToString("0.00") + " u (rules question: shorten the range)" : ": covered") +
+                "; reaction recoil " + HitPose.RecoilDeg(tier).ToString("0") + " deg, head snap " + HitPose.HeadSnapDeg(tier).ToString("0") +
+                " deg, squash " + (HitPose.SquashMax * 100).ToString("0") + "% for " + (HitPose.SquashSeconds * 1000).ToString("0") +
+                " ms; side camera on the " + (_sideSign > 0 ? "-z" : "+z") + " side, lift " + _sideLift.ToString("0.00") + " u");
+        }
+
+        /// <summary>fix/hit-feel-5: the weapon tip's distance ahead of actor 0's SIM position along the line to the dummy (NaN: no tip).</summary>
+        double TipAhead(ActorViews views, World w)
+        {
+            ActorAnimator anim = views != null ? views.AnimatorOf(0) : null;
+            if (anim == null || !anim.HasTip) return double.NaN;
+            Vector3 dir = SimSpace.ToWorld(w.X[_dummy] - w.X[0], 0, w.Z[_dummy] - w.Z[0]);
+            dir.y = 0f;
+            if (dir.sqrMagnitude < 1e-6f) return double.NaN;
+            Vector3 off = anim.TipWorld - SimSpace.ToWorld(w.X[0], 0, w.Z[0]);
+            off.y = 0f;
+            return Vector3.Dot(off, dir.normalized);
+        }
+
+        /// <summary>
+        /// fix/hit-feel-5 (the empty dark side strips: the camera stood inside a wall or under higher ground on the -z
+        /// side): the side with more open floor at or below the pair's ground over the camera's 6 u, and a lift over any
+        /// higher ground left on that line.
+        /// </summary>
+        void PickSide(World w, double x, double z, double g0)
+        {
+            int bestClear = -1;
+            for (int s = 0; s < 2; s++)
+            {
+                double sign = s == 0 ? 1 : -1;   // world -z camera = sim +z
+                int clear = 0;
+                double top = g0;
+                for (int k = 1; k <= 6; k++)
+                {
+                    double cz = z + sign * k;
+                    double g = GroundHeight.At(w.Map, x, cz);
+                    if (Floor(w, x, cz) && g <= g0 + 0.3) clear++;
+                    if (g > top) top = g;
+                }
+                if (clear > bestClear) { bestClear = clear; _sideSign = (float)sign; _sideLift = (float)Math.Max(0, top - g0); }
+            }
         }
 
         /// <summary>Horizontal distance from actor 0's drawn root to its weapon hand along the line to the dummy (NaN: no rig).</summary>
@@ -274,7 +339,7 @@ namespace CriticalMass.Runtime.View.Anim
                 if (sideView)
                 {
                     // Across the swing (the swing runs along world +x): a level camera on the -z side.
-                    t.position = focus + new Vector3(0f, SideHeight, -SideDistance);
+                    t.position = focus + new Vector3(0f, SideHeight + _sideLift, -SideDistance * _sideSign);
                     t.rotation = Quaternion.LookRotation(focus - t.position, Vector3.up);
                 }
                 else t.position = focus - r * Vector3.forward * GameDistance;
