@@ -170,6 +170,17 @@ def decimated_copy(src, name, target):
             bmesh.ops.split_edges(bm, edges=nm)
             bm.to_mesh(ob.data); bm.free(); ob.data.update(); how.append(f"split {len(nm)} non-manifold edges")
         t = t1
+    if t > 1.15 * target:   # rig-batch-b: the collapse stops near 3.8k on these bodies; cluster vertices on a growing grid
+        for d in (0.008, 0.012, 0.016, 0.022, 0.03, 0.04, 0.055, 0.075):
+            bm = bmesh.new(); bm.from_mesh(ob.data)
+            bmesh.ops.remove_doubles(bm, verts=bm.verts[:], dist=d)
+            bmesh.ops.dissolve_degenerate(bm, dist=1e-6, edges=bm.edges[:])
+            me2 = ob.data.copy(); bm.to_mesh(me2); bm.free()
+            nt = sum(len(p_.vertices) - 2 for p_ in me2.polygons)
+            if nt <= 1.1 * target or d == 0.075:
+                ob.data = me2; how.append(f"cluster {d} m -> {nt}"); t = nt
+                break
+            bpy.data.meshes.remove(me2)
     print("GEN2 decimate", name, t0, "->", t, how)
     bm = bmesh.new(); bm.from_mesh(ob.data)
     bmesh.ops.dissolve_degenerate(bm, dist=1e-6, edges=bm.edges[:])

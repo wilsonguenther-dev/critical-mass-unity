@@ -298,6 +298,13 @@ if NEW_BODY and "Idle" in acts and "handslot.r" in faP and "hand.r" in faP:
     assign(kk, None); rest(fa)
 
 
+FOOTREF = {}
+if NEW_BODY and "Idle" in acts:
+    assign(kk, acts["Idle"]); scene.frame_set(int(acts["Idle"].frame_range[0])); upd()
+    FOOTREF = {s: (kk.matrix_world @ kkP["foot." + s].matrix).to_3x3().normalized().inverted() for s in SIDES}
+    assign(kk, None); upd()
+
+
 def hold_slot():
     if CREL is None:
         return
@@ -345,6 +352,9 @@ def bake_action(clip, act):
         scene.frame_set(f)
         for pb in faP:
             k = kkP.get(pb.name)
+            if NEW_BODY and pb.name.startswith("toes."):
+                pb.matrix_basis.identity()   # rig-batch-b: toes stay as bound; KayKit's toe pitch sank the boot tips 2 cm
+                continue
             if k is None:
                 fb = finger_basis(pb.name)
                 if fb is not None:
@@ -368,6 +378,11 @@ def bake_action(clip, act):
             # delta from the pack's rest (+ TOEFIX) was measured against a pose, not the bind: the Warrior's planted
             # right foot in StrafeR pointed 112 degrees off and the game read him "turned around".
             R = (fa.matrix_world @ faP[LEG(s)[2]].matrix).to_3x3().normalized()
+            if FOOTREF:
+                # rig-batch-b: KayKit's foot turn from its flat Idle foot, applied to this body's own flat rest foot (the
+                # full-local copy pitched the Builder's boots by KayKit's 20 degree steeper foot bone)
+                Rk_ = (kk.matrix_world @ kkP[LEG(s)[2]].matrix).to_3x3().normalized()
+                R = Rk_ @ FOOTREF[s] @ F0["R" + s]
             dk = K["A" + s] - K0["A" + s]
             # Foot motion scales with the legs (an unscaled swing lift was tried: Walk's lowest foot rose to 0.043).
             A = F0["A" + s] + dk * RATIO + Vector((0, 0, LIFT))
