@@ -89,8 +89,42 @@ namespace CriticalMass.Runtime.View.Skills
         }
 
         /// <summary>A close-up from the gameplay camera's own rotation, CloseDistance from focus, HUD-free (camera render only).</summary>
+        /// <summary>capture-gaps-2: keep the HUD in the shots (by default every screen-space canvas is hidden for each shot).</summary>
+        public const string HudFlag = "-skillShotsHud";
+        static readonly System.Collections.Generic.List<Canvas> _hiddenHud = new System.Collections.Generic.List<Canvas>();
+        bool _bannerWaited;
+
+        /// <summary>
+        /// capture-gaps-2 (batch e051f3c sheets: the OVERCHARGED and BLAST RADIUS moment cards, tutorial cards and the
+        /// "YOU ARE AZURE" start banner, which every restage brings back, covered the skill peaks): hides every enabled
+        /// screen-space root canvas (HUD, cards, banners, moment plates; world-space labels stay) and stops any moment in
+        /// flight, for the shot only; ShowHud puts back exactly the canvases it hid. Capture only, so no frame cost in play.
+        /// </summary>
+        static void HideHud()
+        {
+            if (Array.IndexOf(Environment.GetCommandLineArgs(), HudFlag) >= 0) return;
+            CriticalMass.Runtime.View.Moments.BigMoments.StopAll();
+            _hiddenHud.Clear();
+            foreach (Canvas c in FindObjectsByType<Canvas>(FindObjectsSortMode.None))
+                if (c != null && c.enabled && c.isRootCanvas && c.renderMode != RenderMode.WorldSpace) { c.enabled = false; _hiddenHud.Add(c); }
+        }
+
+        static void ShowHud()
+        {
+            foreach (Canvas c in _hiddenHud) if (c != null) c.enabled = true;
+            _hiddenHud.Clear();
+        }
+
         IEnumerator Shot(string name, Vector3 focus, bool wideToo)
         {
+            if (!_bannerWaited)
+            {
+                // the start banner of the first stage plays out once before any shot (it is hidden for shots in any case)
+                _bannerWaited = true;
+                yield return new WaitForSecondsRealtime((float)CriticalMass.Runtime.Hud.FirstMinutes.BannerHoldSeconds + CriticalMass.Runtime.Hud.FirstMinutes.FadeSeconds);
+            }
+            HideHud();
+            yield return null;
             yield return null;
             yield return new WaitForEndOfFrame();
             if (wideToo) ScreenCapture.CaptureScreenshot(Path.Combine(GamePaths.DataDir, Prefix + name + "-wide.png"));
@@ -124,8 +158,9 @@ namespace CriticalMass.Runtime.View.Skills
                     if (tex != null) Destroy(tex);
                 }
             }
-            Log("shot " + name + " " + Counts());
+            Log("shot " + name + " " + Counts() + " hudHidden=" + _hiddenHud.Count);
             yield return null;
+            ShowHud();
         }
 
         IEnumerator Run()
@@ -575,7 +610,7 @@ namespace CriticalMass.Runtime.View.Skills
         }
 
         /// <summary>Keeps actor 0 and four living fighters 2.5 u from the Kaiju, so it has targets and the camera has it in frame.</summary>
-        static void Gather(World w)
+        internal static void Gather(World w)
         {
             Kaiju k = w.Kaiju;
             int moved = 0;
@@ -586,11 +621,17 @@ namespace CriticalMass.Runtime.View.Skills
                 double x = k.X + Math.Cos(a) * 2.5, z = k.Z + Math.Sin(a) * 2.5;
                 if (!Floor(w, x, z)) continue;
                 if (Math.Abs(w.X[i] - x) + Math.Abs(w.Z[i] - z) > 6) Put(w, i, x, z);
+                // capture-gaps-2: why the claw and slam were NOT SEEN in 7200 ticks: a force-hatched Kaiju with nothing fed is
+                // Neutral, and a Neutral Kaiju only goes for fighters with Threat above 0 (KaijuHostileTo), i.e. who hit it;
+                // the bots never did, so it had no target, no claw, and never 2 hostiles in reach for a slam. Fixture: the
+                // gathered fighters count as having hit it, and lose their respawn cover (KaijuCanTarget skips it).
+                if (w.Kaiju.Threat != null && i < w.Kaiju.Threat.Length && w.Kaiju.Threat[i] < 5) w.Kaiju.Threat[i] = 5;
+                w.Actors[i].SpawnProtect = 0;
                 moved++;
             }
         }
 
-        static Vector3 KaijuFocus(World w)
+        internal static Vector3 KaijuFocus(World w)
         {
             Kaiju k = w.Kaiju;
             return SimSpace.ToWorld(k.X, GroundHeight.At(w.Map, k.X, k.Z) + 1.5, k.Z);
