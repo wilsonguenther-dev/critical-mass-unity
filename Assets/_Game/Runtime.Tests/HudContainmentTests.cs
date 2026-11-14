@@ -63,8 +63,8 @@ namespace CriticalMass.Runtime.Tests
             yield return new Spec("stock word", ui, 13, 9, 40f, 38f, "WATER");
             yield return new Spec("power-up counter", ui, 13, 9, 250f, 26f, "Counter: a Warrior's shield stops it");
             // menus (settings rows, tabs, class cards)
-            yield return new Spec("settings row label", ui, 24, 17, 560f, 60f, "COLOUR-BLIND TEAMS");
-            yield return new Spec("settings row value", ui, 24, 17, 300f, 60f, "BLUE / AMBER");
+            yield return new Spec("settings row label", disp, UiScale.TypeButton, 20, 600f, PauseMenu.LineH, "COLOUR-BLIND TEAMS");
+            yield return new Spec("settings row value", disp, UiScale.TypeButton, 20, 360f, PauseMenu.LineH, "THIRD PERSON, AUTO FOLLOW");
             yield return new Spec("settings tab (8 tabs)", disp, 22, 15, 1060f / 8f - 14f, 60f, "CONTROLS");
             yield return new Spec("class card name", disp, 36, 20, 300f, 48f, "DEMOLITIONS EXPERT");
         }
