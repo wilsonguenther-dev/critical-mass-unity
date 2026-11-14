@@ -131,10 +131,19 @@ namespace CriticalMass.Runtime.View.Effects
             AutoplayArgs.ClockHeld = false;
         }
 
+        static bool TitleShowing()
+        {
+            var t = FindAnyObjectByType<CriticalMass.Runtime.Hud.TitleScreen>();
+            return t != null && t.isActiveAndEnabled;
+        }
+
         IEnumerator Run()
         {
             float t0 = Time.realtimeSinceStartup;
-            while (_driver.World == null || _fx.Scene == null || _driver.World.Match.Phase != MatchPhase.Playing)
+            // integration batch 10: the title's live bot match is also Playing; wait for the real match (no title on screen),
+            // or every shot is the logo over the attract match
+            while (_driver.World == null || _fx.Scene == null || _driver.World.Match.Phase != MatchPhase.Playing
+                   || TitleShowing())
             {
                 if (Time.realtimeSinceStartup - t0 > 120f) { Log("no match started; giving up"); Application.Quit(3); yield break; }
                 yield return new WaitForSecondsRealtime(0.5f);
