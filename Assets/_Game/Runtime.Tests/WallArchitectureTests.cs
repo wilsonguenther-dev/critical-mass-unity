@@ -51,7 +51,12 @@ namespace CriticalMass.Runtime.Tests
             Assert.AreEqual(1, WallArchBudget.Draws);
             Assert.AreEqual(0, WallArchBudget.TextureBytes);
             WallArchReport hi = Build(map, FramePolicy.LevelHigh, out _);
-            Assert.Greater(hi.Merlons, 0); Assert.Greater(hi.Towers, 0); Assert.Greater(hi.Banners, 0); Assert.Greater(hi.Torches, 0);
+            // cand4-reds-1: banners go only on walls inside a team's territory; Skybreak's walls (hill ring, shrine yard) are
+            // all neutral ground, so this map has none (0 in candidate 4 at every level). Merlons, towers and torches must exist.
+            Assert.Greater(hi.Merlons, 0); Assert.Greater(hi.Towers, 0); Assert.Greater(hi.Torches, 0);
+            Assert.Greater(hi.Coping, 0, "Medium and High dress every wall cell");
+            WallArchReport med = Build(map, FramePolicy.LevelMedium, out _);
+            Assert.Greater(med.Merlons, 0, "Medium players get merlons too (Low and Very Low keep plain walls by budget)");
             Assert.LessOrEqual(hi.Towers, WallArchBudget.For(FramePolicy.LevelHigh).Towers);
             Assert.LessOrEqual(hi.Banners, WallArchBudget.For(FramePolicy.LevelHigh).Banners);
             Assert.LessOrEqual(hi.Torches, WallArchBudget.For(FramePolicy.LevelHigh).Torches);
@@ -101,6 +106,7 @@ namespace CriticalMass.Runtime.Tests
             double maxH = 0;
             for (int i = 0; i < map.Height01.Length; i++) maxH = System.Math.Max(maxH, map.Height01[i]);
             int over = 0, high = 0;
+            string firstHigh = null;
             for (int i = 0; i < m.V.Count; i++)
             {
                 Vector3 p = m.V[i];
@@ -111,7 +117,11 @@ namespace CriticalMass.Runtime.Tests
                 byte t = map.Cells[cz * W + cx];
                 if (t == Cell.BreakableIntact || t == Cell.BreakableCracked)
                     Assert.Fail($"dressing over a breakable cell ({cx}, {cz}): the #98 damage stages must read as before");
-                if (p.y > map.Height01[cz * W + cx] + WallArchitectureLayout.WallHeight + 0.5f) high++;
+                if (p.y > map.Height01[cz * W + cx] + WallArchitectureLayout.WallHeight + 0.5f)
+                {
+                    high++;
+                    if (firstHigh == null) firstHigh = $" (first at ({p.x:0.00}, {p.y:0.00}, {sz:0.00}) over cell ({cx}, {cz}), ground {map.Height01[cz * W + cx]:0.00})";
+                }
                 bool walk = t == Cell.Floor || t == Cell.BreakableDestroyed;
                 if (!walk) continue;
                 float fx = sx - cx, fz = sz - cz;
@@ -119,7 +129,7 @@ namespace CriticalMass.Runtime.Tests
                 if (edge > WallArchBudget.MaxIntrusion + 1e-3f && p.y > map.Height01[cz * W + cx] + 0.3f) over++;
             }
             Assert.AreEqual(0, over, "vertices standing inside a walkable cell, top-down");
-            Assert.AreEqual(0, high, "vertices more than 0.5 u over the wall top, top-down");
+            Assert.AreEqual(0, high, "vertices more than 0.5 u over the wall top, top-down" + firstHigh);
         }
 
         [Test]

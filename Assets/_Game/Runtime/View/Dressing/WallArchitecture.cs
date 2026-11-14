@@ -142,6 +142,10 @@ namespace CriticalMass.Runtime.View.Dressing
 
             int towers = 0, banners = 0, torches = 0;
             int bestRun = 0; (float x, float z, float yaw) runView = (0, 0, 0);
+            // cand4-reds-1: Skybreak's walls are the hill ring and the shrine yard, circles on the grid with their gaps at the
+            // cardinal points, so they have no straight cell and the eye-level "wall-run" shot never existed. Fallback: the
+            // first chained wall cell (two wall-like neighbours) with open ground beside it, seen from 3 u off that side.
+            bool fbFound = false; (float x, float z, float yaw) fbView = (0, 0, 0);
             for (int cz = 0; cz < H; cz++)
             for (int cx = 0; cx < W; cx++)
             {
@@ -163,7 +167,12 @@ namespace CriticalMass.Runtime.View.Dressing
                 }
                 if (tower)
                 {
-                    Tower(m, cx + 0.5, cz + 0.5, y0, top, tm, H01(cx, cz, 9));
+                    // cand4-reds-1: a tower's 0.62 u ring reaches into the neighbouring cells; next to a lower cell its roof
+                    // stood more than 0.5 u over THAT cell's wall top in the top-down view. Cap the roof to the lowest
+                    // neighbour (never below this wall's own top).
+                    double minN = y0;
+                    for (int j = -1; j <= 1; j++) for (int i = -1; i <= 1; i++) minN = Math.Min(minN, Y(cx + i, cz + j));
+                    Tower(m, cx + 0.5, cz + 0.5, y0, top, tm, H01(cx, cz, 9), minN + WallHeight + 0.5);
                     towers++;
                     rep.Towers++;
                 }
@@ -204,6 +213,14 @@ namespace CriticalMass.Runtime.View.Dressing
                         rep.Torches++;
                     }
                 }
+                if (!fbFound && nb == 2)
+                    for (int d = 0; d < 4 && !fbFound; d++)
+                    {
+                        if (!Walkable(T(cx + Dx[d], cz + Dz[d])) || !Walkable(T(cx + Dx[d] * 3, cz + Dz[d] * 3))) continue;
+                        float yawDeg = Mathf.Repeat(Mathf.Atan2(-Dx[d], Dz[d]) * Mathf.Rad2Deg, 360f);
+                        fbView = (cx + 0.5f + Dx[d] * 3f, cz + 0.5f + Dz[d] * 3f, yawDeg);
+                        fbFound = true;
+                    }
                 // A long straight run makes the eye-level wall shot: stand 3 u off its open side, look along it.
                 if (straight && rep.Views.Count == 0)
                 {
@@ -221,6 +238,7 @@ namespace CriticalMass.Runtime.View.Dressing
                 }
             }
             if (bestRun > 0) rep.Views.Add(("wall-run", runView.x, runView.z, runView.yaw, 4f));
+            else if (fbFound) rep.Views.Add(("wall-run", fbView.x, fbView.z, fbView.yaw, 4f));
 
             if (b.Gates) Gates(m, map, T, Y, rep);
             if (b.BridgeRopes) Ropes(m, map, T, Y, rep);
@@ -343,10 +361,10 @@ namespace CriticalMass.Runtime.View.Dressing
         }
 
         /// <summary>A round (octagonal) corner tower: 0.12 u proud of the wall, cone roof that grows in low views (24 tris).</summary>
-        static void Tower(ArchMesh m, double x, double z, double y0, double top, int team, float h)
+        static void Tower(ArchMesh m, double x, double z, double y0, double top, int team, float h, double cap = double.MaxValue)
         {
             const int n = 8;
-            double r = 0.62, yt = top + 0.25;
+            double r = 0.62, yt = Math.Max(top + 0.02, Math.Min(top + 0.25, cap - 0.14));   // apex = yt + 0.12 stays under cap
             Color body = Mul(Stone, 0.95f + 0.1f * h), roof = team == 1 ? Azure : team == 2 ? Crimson : Slate;
             for (int i = 0; i < n; i++)
             {

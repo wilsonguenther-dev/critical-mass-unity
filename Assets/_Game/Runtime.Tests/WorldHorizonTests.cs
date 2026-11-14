@@ -138,10 +138,14 @@ namespace CriticalMass.Runtime.Tests
         {
             string beyond = Src("_Game/Runtime/View/Atmosphere/WorldBeyond.cs");
             string horizon = Src("_Game/Runtime/View/Atmosphere/WorldHorizon.cs");
-            Assert.AreEqual(2, Regex.Matches(beyond, @"AddComponent<MeshRenderer>\(\)").Count, "two renderers: the world around the arena and the horizon");
-            Assert.AreEqual(2, Regex.Matches(beyond, @"new Material\(").Count, "two materials");
-            Assert.AreEqual(2, Regex.Matches(beyond, @"shadowCastingMode = ShadowCastingMode\.Off").Count, "neither casts a shadow");
-            Assert.AreEqual(2, Regex.Matches(beyond, @"receiveShadows = false").Count, "neither receives one");
+            // cand4-reds-1: world-horizon-2 (c061189) added the wall architecture's renderer here in the same commit as this
+            // test, which still counted two. Three renderers, three materials, none casts a shadow; the world and the horizon
+            // receive none, the wall dressing does (it sits on the walls and must shade like them).
+            Assert.AreEqual(3, Regex.Matches(beyond, @"AddComponent<MeshRenderer>\(\)").Count, "three renderers: the world around the arena, the horizon and the wall architecture");
+            Assert.AreEqual(3, Regex.Matches(beyond, @"new Material\(").Count, "three materials");
+            Assert.AreEqual(3, Regex.Matches(beyond, @"shadowCastingMode = ShadowCastingMode\.Off").Count, "none casts a shadow");
+            Assert.AreEqual(2, Regex.Matches(beyond, @"receiveShadows = false").Count, "the world and the horizon receive none");
+            Assert.AreEqual(1, Regex.Matches(beyond, @"receiveShadows = true").Count, "only the wall dressing receives shadows");
             foreach (string src in new[] { beyond, horizon }) StringAssert.DoesNotContain("Collider", src, "no colliders on scenery");
             StringAssert.DoesNotContain("Update(", horizon, "no per-frame script on the horizon");
             StringAssert.DoesNotContain("MonoBehaviour", horizon);
