@@ -154,6 +154,7 @@ namespace CriticalMass.Runtime.View.Effects
             PrewarmFlash();
             if (GoreShots.Requested && GetComponent<GoreShots>() == null) gameObject.AddComponent<GoreShots>();   // fix/gore-proof-1
             if (KaijuBridgeShots.Requested && GetComponent<KaijuBridgeShots>() == null) gameObject.AddComponent<KaijuBridgeShots>();   // integration batch 10
+            if (KaijuCampLog.Requested && GetComponent<KaijuCampLog>() == null) gameObject.AddComponent<KaijuCampLog>();   // integration batch 10
             _shakeOn = false;   // integration batch 3: Camera.CameraShake (M11, FeelGate-scaled) is the one camera shake
             Effects.Active = this;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
