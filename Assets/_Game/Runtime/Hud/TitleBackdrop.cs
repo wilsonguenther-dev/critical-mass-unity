@@ -19,7 +19,8 @@ namespace CriticalMass.Runtime.Hud
     /// </summary>
     public sealed class TitleBackdrop : MonoBehaviour
     {
-        /// <summary>Global switch (tests and captures that want the live backdrop turn it off).</summary>
+        /// <summary>Global switch (tests and captures that want the live backdrop turn it off). Players only: in the editor
+        /// (PlayMode tests, which also refuse unexpected log lines) the live backdrop always stays.</summary>
         public static bool Enabled = true;
         /// <summary>Title seconds before the still is taken: the backdrop's world builds over its first 1 to 2 s.</summary>
         public const float SettleSeconds = 3f;
@@ -59,7 +60,7 @@ namespace CriticalMass.Runtime.Hud
         {
             _age += Time.unscaledDeltaTime;
             bool hidden = Canvas == null || !Canvas.isActiveAndEnabled;
-            bool want = ShouldFreeze(Enabled, FrameGovernor.IdleTitle, hidden, _age, View.Dressing.WorldView.Building, _failed);
+            bool want = ShouldFreeze(Enabled && !Application.isEditor, FrameGovernor.IdleTitle, hidden, _age, View.Dressing.WorldView.Building, _failed);
             if (Frozen && _cam != null && _rt != null && (_cam.pixelWidth != _rt.width || _cam.pixelHeight != _rt.height)) Thaw();
             if (want && !Frozen) Freeze();
             else if (!want && Frozen) Thaw();

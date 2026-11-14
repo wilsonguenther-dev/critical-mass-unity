@@ -107,7 +107,7 @@ namespace CriticalMass.Runtime.Game
             // perf-title-start: the boot build runs inside the scene activation frame; name its parts in the log.
             long b4 = System.Diagnostics.Stopwatch.GetTimestamp();
             double f = 1000.0 / System.Diagnostics.Stopwatch.Frequency;
-            Debug.Log($"[CM.Load] boot build {(b4 - b0) * f:0} ms: world and views {(b1 - b0) * f:0}, hud {(b2 - b1) * f:0}, " +
+            if (!Application.isEditor) Debug.Log($"[CM.Load] boot build {(b4 - b0) * f:0} ms: world and views {(b1 - b0) * f:0}, hud {(b2 - b1) * f:0}, " +
                       $"flow {(b3 - b2) * f:0}, {overlays} overlays {OverlayRegistry.LastInstallMs:0} " +
                       $"(slowest {OverlayRegistry.Slowest} {OverlayRegistry.SlowestMs:0})");
             return game;
