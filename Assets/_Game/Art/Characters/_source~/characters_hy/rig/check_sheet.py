@@ -225,6 +225,112 @@ if row:
     rows.append(row)
 save()
 
+# rig-builder-3: separate strips played the Unity way (for the owner's sheets), and the mallet head's path in the attack
+VIEWS['side_l'] = 90   # from his left side (the bake's side view)
+CTF = 0.5667 / 1.0667  # the attack's hit event as a fraction of the clip (clip_facts.json)
+
+
+def save_row(name, tiles):
+    gap_ = np.zeros((tiles[0].shape[0], 4, 4), np.float32) + np.array([0.1, 0.1, 0.1, 1], np.float32)
+    parts = []
+    for t in tiles:
+        parts += [t, gap_]
+    row_ = np.concatenate(parts[:-1], axis=1)
+    im = bpy.data.images.new(name, row_.shape[1], row_.shape[0])
+    im.pixels = row_.ravel()
+    im.filepath_raw = os.path.join(OUT, name + '.png')
+    im.file_format = 'PNG'
+    im.save()
+    bpy.data.images.remove(im)
+
+
+for clip, vn, n in ((ATTACK, 'front', 8), (ATTACK, 'side', 8), (ATTACK, 'side_l', 8), ('Walk', 'side', 6),
+                    ('Walk', 'front', 6), ('Run', 'side', 6), (SKILL, 'side', 6)):
+    if clip not in acts:
+        continue
+    assign(ca, acts[clip]); view(VIEWS[vn])
+    f0_, f1_ = int(acts[clip].frame_range[0]), int(acts[clip].frame_range[1])
+    if clip == ATTACK:
+        fl = [f0_ + int(round((f1_ - f0_) * p_)) for p_ in (0.0, 0.15, 0.30, 0.38, 0.45, CTF, 0.70, 1.0)]
+    else:
+        fl = frames(acts[clip], n)
+    tiles = []
+    for k, f in enumerate(fl):
+        scene.frame_set(f); upd()
+        tiles.append(shot(f'x_{clip}_{vn}_{k}'))
+    save_row(f'{CLS}_U_{clip}_{vn}', tiles)
+    REP.setdefault('strips', {})[f'{CLS}_U_{clip}_{vn}'] = fl
+# rig-builder-3: the game's planted-foot checks, on the toe JOINTS as Unity plays the clip (FacingMotionSanityPlayTests):
+# a toe is planted while within 0.03 u of its own lowest height; slide = toe travel over consecutive planted samples per
+# unit of body travel (gate 0.2); the planted toe's yaw (0 = straight ahead, + toward his left).
+try:
+    bk = json.load(open(os.path.join(OUT, f'bake_{CLS}.json')))
+    ratio_, gs_ = float(bk.get('stride_scale', bk.get('ratio', 1.0))), bk.get('ground_speed', {})
+    fps_ = scene.render.fps / scene.render.fps_base
+    loco = {}
+    for clip in ('Run', 'Walk', 'StrafeL', 'StrafeR', 'RunBack', 'WalkBack'):
+        if clip not in acts or clip not in gs_:
+            continue
+        assign(ca, acts[clip])
+        f0_, f1_ = int(acts[clip].frame_range[0]), int(acts[clip].frame_range[1])
+        n_ = f1_ - f0_
+        smp = []
+        for cyc in range(3):
+            for k2 in range(2 * n_):
+                fr = f0_ + k2 * 0.5
+                scene.frame_set(int(fr), subframe=fr - int(fr)); upd()
+                rec_ = {}
+                for s in ('l', 'r'):
+                    t_ = fa.matrix_world @ fa.pose.bones['toes.' + s].head
+                    a_ = fa.matrix_world @ fa.pose.bones['foot.' + s].head
+                    rec_[s] = (t_.copy(), a_.copy())
+                smp.append(rec_)
+        dt_ = 0.5 / fps_
+        v_ = float(gs_[clip]) * ratio_
+        # travel direction: opposite to the planted toe's in-place motion
+        acc = Vector((0, 0, 0))
+        mins = {s: min(r[s][0].z for r in smp) for s in ('l', 'r')}
+        for i in range(1, len(smp)):
+            for s in ('l', 'r'):
+                if smp[i][s][0].z <= mins[s] + 0.03 and smp[i - 1][s][0].z <= mins[s] + 0.03:
+                    acc += smp[i][s][0] - smp[i - 1][s][0]
+        acc.z = 0
+        fwd = -acc.normalized() if acc.length > 1e-6 else Vector((0, -1, 0))
+        ft = bt = 0.0; pairs = 0; yaws = []
+        for s in ('l', 'r'):
+            for i in range(1, len(smp)):
+                if smp[i][s][0].z > mins[s] + 0.03 or smp[i - 1][s][0].z > mins[s] + 0.03:
+                    continue
+                d_ = (smp[i][s][0] - smp[i - 1][s][0]) + fwd * v_ * dt_
+                ft += math.hypot(d_.x, d_.y); bt += v_ * dt_; pairs += 1
+                td = smp[i][s][0] - smp[i][s][1]
+                yaws.append(math.degrees(math.atan2(td.x, -td.y)))
+        tz = {s: [round(r[s][0].z, 3) for r in smp[:2 * n_:2]] for s in ('l', 'r')}
+        dbg = [[round(k2 * 0.5, 1)] + [round(v, 3) for v in smp[k2]['l'][0]] for k2 in range(2 * n_)]
+        loco[clip] = dict(slide=round(ft / bt, 3) if bt > 0 else None, planted_pairs=pairs, samples=len(smp),
+                          stance_frac=round(pairs / (2 * len(smp)), 3), travel_deg=round(math.degrees(math.atan2(fwd.x, -fwd.y)), 1),
+                          planted_toe_yaw_deg=[round(min(yaws), 1), round(sum(yaws) / len(yaws), 1), round(max(yaws), 1)] if yaws else None,
+                          toe_z_per_frame=tz, toe_l_xyz_half_frames=dbg, fps=fps_, v=round(v_, 3), toe_min=[round(mins['l'], 3), round(mins['r'], 3)])
+    REP['loco_unity_way'] = loco
+except Exception as e_:
+    REP['loco_unity_way'] = 'failed ' + repr(e_)
+save()
+if ATTACK in acts:
+    assign(ca, acts[ATTACK])
+    f0_, f1_ = int(acts[ATTACK].frame_range[0]), int(acts[ATTACK].frame_range[1])
+    path_ = []
+    for f in range(f0_, f1_ + 1):
+        scene.frame_set(f); upd()
+        hd_ = stick.matrix_world @ Vector((0, 0.31, 0))
+        hr_ = fa.matrix_world @ fa.pose.bones['hand.r'].head
+        P = eval_verts()
+        fz = {s: round(float(P[np.isin(dom, [f'foot.{s}', f'toes.{s}'])][:, 2].min()), 3) for s in ('l', 'r')}
+        path_.append(dict(f=f, head_yz=[round(hd_.y, 3), round(hd_.z, 3)], head_x=round(hd_.x, 3),
+                          hand_yz=[round(hr_.y, 3), round(hr_.z, 3)], top_z=round(float(P[:, 2].max()), 3), foot_min_z=fz))
+    REP['attack_path'] = path_
+    REP['hips_z_rest'] = round((fa.matrix_world @ fa.data.bones['hips'].head_local).z, 3)
+save()
+
 # compose: rows top to bottom (Blender pixels are bottom-up), a dark gap between tiles
 gap = 6
 strips = []

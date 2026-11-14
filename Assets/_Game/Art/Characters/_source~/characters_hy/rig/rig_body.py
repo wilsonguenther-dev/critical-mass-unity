@@ -175,7 +175,7 @@ try:
         if seed:
             lmk = LM.find(Vw, Fw, arm_seed=seed)
         for k, v in ov.items():
-            if not k.startswith('_note'):
+            if not k.startswith('_note') and not isinstance(v, dict):   # rig-healer-3: dict keys are options
                 lmk['joints'][k] = v
         log('joint override', jf, sorted(ov))
     H = lmk['height']
@@ -186,7 +186,8 @@ try:
     # the ground (healer-5 put it on the hips and it still lay between and behind her feet). Joint-file "_flap_hem"
     # [half width x, -, hem z]: every vertex of the strip (behind "_flap_y", within the half width, below the hem) is
     # folded up to end just under the hem, on every level. A short closed fold, no hole.
-    if '_flap_y' in J and '_flap_hem' in J:
+    JS = json.load(open(jf)) if os.path.exists(jf) else {}   # rig-healer-3: option dicts
+    if '_flap_y' in J and '_flap_hem' in J and '_strip_del' not in JS:
         hx, hy, hz = J['_flap_hem'].x, max(J['_flap_hem'].y, J['_flap_y'].y), J['_flap_hem'].z
         fold = {}
         legsegs = []
@@ -206,6 +207,146 @@ try:
         REP['flap_folded_to_hem'] = {'hem_z': round(hz, 3), 'half_width': round(hx, 3), 'behind_y': round(hy, 3), 'vertices': fold,
                                      'lowest_z_behind': round(float(V[V[:, 1] > J['_flap_y'].y][:, 2].min()), 3)}
         log('flap folded', REP['flap_folded_to_hem'])
+
+    # ------------------------------------------------------------ rig-healer-3: colour helpers, painted face, strip removed
+    def face_rgba(o):
+        """Per-face sRGB colour + code alpha of the 'Col' attribute (faces are flat-coloured by clean_export)."""
+        me = o.data
+        a = me.color_attributes.get('Col') or (me.color_attributes[0] if len(me.color_attributes) else None)
+        if a is None:
+            return None, None
+        n = len(a.data); c = np.empty(n * 4, np.float32)
+        try:
+            a.data.foreach_get('color_srgb', c)
+        except Exception:
+            a.data.foreach_get('color', c)
+        c = c.reshape(-1, 4)
+        if a.domain == 'CORNER':
+            ls = np.empty(len(me.polygons), np.int32); me.polygons.foreach_get('loop_start', ls)
+            return c[ls], a
+        out = np.array([c[list(pg.vertices)].mean(0) for pg in me.polygons], np.float32)
+        return out, a
+
+    def set_face_rgba(o, a, fids, rgba):
+        me = o.data
+        n = len(a.data); c = np.empty(n * 4, np.float32)
+        key = 'color_srgb'
+        try:
+            a.data.foreach_get(key, c)
+        except Exception:
+            key = 'color'; a.data.foreach_get(key, c)
+        c = c.reshape(-1, 4)
+        for f in fids:
+            pg = me.polygons[int(f)]
+            idx = range(pg.loop_start, pg.loop_start + pg.loop_total) if a.domain == 'CORNER' else list(pg.vertices)
+            for li in idx:
+                c[li] = rgba
+        a.data.foreach_set(key, c.ravel()); me.update()
+
+    def hex_rgb(h):
+        h = h.lstrip('#'); return [int(h[i:i + 2], 16) / 255.0 for i in (0, 2, 4)]
+
+    # Painted face (ArtImportTests.HyFacesArePaintedInVertexColourAndNeverTeamSwapped). Same rule as rig-demolitions-1's
+    # clean_export face_features, applied to the holding model's colours: inside the face box a face that is DARK
+    # (luma under rel x the skin) or EYE-COLOURED (her eyes are painted teal: green and blue well above red; skin is warm,
+    # hair grey) is painted the dark feature colour, code 0 (never team-swapped). Dark teal keeps her teal eyes.
+    ffo = JS.get('_face_feat')
+    if ffo:
+        x0, x1, y0, y1, z0, z1 = ffo['box']
+        REP['face_features'] = {}
+        for lv, o in LV.items():
+            if lv == 'Shadow':
+                continue
+            C, a = face_rgba(o)
+            if C is None:
+                REP['face_features'][lv] = 'no colour attribute'; continue
+            ctr = np.empty(len(o.data.polygons) * 3, np.float32); o.data.polygons.foreach_get('center', ctr); ctr = ctr.reshape(-1, 3)
+            inb = (ctr[:, 0] > x0) & (ctr[:, 0] < x1) & (ctr[:, 1] > y0) & (ctr[:, 1] < y1) & (ctr[:, 2] > z0) & (ctr[:, 2] < z1)
+            r, g, b = C[:, 0], C[:, 1], C[:, 2]
+            luma = C[:, :3].mean(1)
+            skin = inb & (r > 0.45) & (r > g) & (g > b) & (r - b > 0.12)
+            ref = float(np.percentile(luma[skin], 75)) if skin.any() else 0.7
+            teal = (g - r > ffo.get('teal_g', 0.06)) & (b - r > ffo.get('teal_b', 0.04))
+            dark = inb & ((luma < ffo.get('rel', 0.65) * ref) | teal)
+            fids = np.nonzero(dark)[0]
+            if len(fids):
+                set_face_rgba(o, a, fids, hex_rgb(ffo.get('colour', '#1C3A3D')) + [0.0])
+            REP['face_features'][lv] = {'faces_in_box': int(inb.sum()), 'skin_faces': int(skin.sum()), 'skin_ref': round(ref, 3),
+                                        'teal': int((inb & teal).sum()), 'painted': int(len(fids))}
+        log('face features', REP['face_features'])
+
+    # The strip behind her back (neck to floor, a pale plank once folded) is DELETED on every level: faces near its
+    # centre line in the side view (yz, "_strip_del" top/bot [y, z], thickness, half width x), plus anything below the
+    # hem behind the ankles and away from the lower-leg/foot/toe bones; never the dress (blue) or a wing (green). The
+    # hole is capped and the cap takes the dress colour (copied from the dress beside it, code included).
+    sdo = JS.get('_strip_del')
+    if sdo:
+        (yt, zt), (yb, zb) = sdo['top'], sdo['bot']
+        legsegs = []
+        for sd in ('l', 'r'):
+            ch = [J[f'lowerleg.{sd}'], J[f'foot.{sd}'], J[f'toes.{sd}'], J[f'_toetip.{sd}']]
+            legsegs += [(ch[i], ch[i + 1]) for i in range(3)]
+        footy = min(J['foot.l'].y, J['foot.r'].y)
+        REP['strip_deleted'] = {}
+        for lv, o in LV.items():
+            C, a = face_rgba(o)
+            me = o.data
+            ctr = np.empty(len(me.polygons) * 3, np.float32); me.polygons.foreach_get('center', ctr); ctr = ctr.reshape(-1, 3)
+            # distance in the side view (y, z) to the strip's centre line
+            A2 = np.array([yt, zt]); B2 = np.array([yb, zb]); Q = ctr[:, 1:3]
+            t = np.clip(((Q - A2) @ (B2 - A2)) / float((B2 - A2) @ (B2 - A2)), 0, 1)
+            dl = np.linalg.norm(Q - (A2 + t[:, None] * (B2 - A2)), axis=1)
+            dleg = np.min([seg_dist(ctr, aa, bb)[0] for aa, bb in legsegs], axis=0)
+            low_ok = (ctr[:, 2] >= sdo['hem']) | (dleg > sdo['leg_r'])
+            band = (np.abs(ctr[:, 0]) < sdo['half_x']) & (dl < sdo['thick']) & (ctr[:, 2] < zt + 0.02) & low_ok
+            low = (ctr[:, 2] < sdo['hem']) & (ctr[:, 1] > footy) & (dleg > sdo['leg_r'])
+            if C is not None:
+                r, g, b = C[:, 0], C[:, 1], C[:, 2]
+                dress = (b - r > sdo.get('dress_b', 0.05))
+                wing = (g > np.maximum(r, b) + 0.05)
+            else:
+                dress = wing = np.zeros(len(ctr), bool)
+            sel = (band | low) & ~dress & ~wing
+            # the dress colour for the cap: the most common blue face behind her between hem and chest
+            behind = dress & (ctr[:, 1] > 0) & (ctr[:, 2] > sdo['hem']) & (ctr[:, 2] < 1.0)
+            ref_face = None
+            if behind.any():
+                key = np.round(C[behind, :4] * 50).astype(int)
+                u, inv, cnt = np.unique(key, axis=0, return_inverse=True, return_counts=True)
+                ref_face = int(np.nonzero(behind)[0][np.nonzero(inv.ravel() == cnt.argmax())[0][0]])
+            bm = bmesh.new(); bm.from_mesh(me); bm.faces.ensure_lookup_table()
+            lay = bm.loops.layers.color.get('Col') or bm.loops.layers.float_color.get('Col')
+            ref_col = None
+            if lay is not None and ref_face is not None:
+                ref_col = bm.faces[ref_face].loops[0][lay].copy() if hasattr(bm.faces[ref_face].loops[0][lay], 'copy') else tuple(bm.faces[ref_face].loops[0][lay])
+            kill = [bm.faces[i] for i in np.nonzero(sel)[0]]
+            edges = {e for f in kill for e in f.edges}
+            bmesh.ops.delete(bm, geom=kill, context='FACES')
+            bnd = [e for e in edges if e.is_valid and len(e.link_faces) == 1]
+            capped = 0
+            if bnd:
+                res = bmesh.ops.holes_fill(bm, edges=bnd, sides=0)
+                nf = res.get('faces', [])
+                if nf:
+                    tri = bmesh.ops.triangulate(bm, faces=nf)
+                    nf = tri.get('faces', nf)
+                    capped = len(nf)
+                    if lay is not None and ref_col is not None:
+                        for f in nf:
+                            for l in f.loops:
+                                l[lay] = ref_col
+            loose = [v for v in bm.verts if not v.link_faces]
+            if loose:
+                bmesh.ops.delete(bm, geom=loose, context='VERTS')
+            bm.to_mesh(me); bm.free(); me.update()
+            open_edges = 0
+            bm2 = bmesh.new(); bm2.from_mesh(me); open_edges = sum(1 for e in bm2.edges if len(e.link_faces) == 1); bm2.free()
+            REP['strip_deleted'][lv] = {'faces_deleted': len(kill), 'band': int((band & ~dress & ~wing).sum()),
+                                        'below_hem': int((low & ~dress & ~wing).sum()), 'cap_tris': capped,
+                                        'open_edges_after': open_edges, 'cap_colour': None if ref_face is None else
+                                        [round(float(x), 3) for x in C[ref_face]], 'faces_after': len(me.polygons)}
+        log('strip deleted', REP['strip_deleted'])
+    V = verts(hero)
     REP['joints'] = {k: [round(x, 4) for x in v] for k, v in J.items()}
     REP['hands'] ={s: {k: v for k, v in h.items() if k != 'finger_vids'} for s, h in lmk['hands'].items()}
     save()
@@ -403,6 +544,20 @@ try:
     W[back] = 0; W[back, bi['chest']] = 1; locked |= back
     rig_head = (P[:, 2] > J['head'].z + 0.06 * H) & np.isin(dom, [bi['head'], bi['chest'], bi['spine']]) & ~back
     W[rig_head] = 0; W[rig_head, bi['head']] = 1; locked |= rig_head
+    # rig-healer-3: the hair buns are ONE rigid piece on the head (their outer halves fell in the back-pack rule and rode
+    # the chest, so the buns smeared upward in the run). Above the head joint + dz, within r of the head axis, not green.
+    hro = JS.get('_head_rigid')
+    if hro:
+        Cf, _a = face_rgba(hero)
+        green = np.zeros(nv, bool)
+        if Cf is not None:
+            gf = Cf[:, 1] > np.maximum(Cf[:, 0], Cf[:, 2]) + 0.05
+            for pg in hero.data.polygons:
+                if gf[pg.index]:
+                    green[list(pg.vertices)] = True
+        buns = (P[:, 2] > J['head'].z + hro['dz']) & (np.hypot(P[:, 0], P[:, 1] - J['head'].y) < hro['r']) & ~green
+        W[buns] = 0; W[buns, bi['head']] = 1; locked |= buns
+        REP['buns_on_head'] = int(buns.sum())
     # rig-healer-1: a cloth panel hanging behind the legs to the floor rides the hips (joint file "_flap_y": metres behind)
     if '_flap_y' in J:
         flap = (P[:, 1] > J['_flap_y'].y) & (P[:, 2] < J['hips'].z) & ~locked

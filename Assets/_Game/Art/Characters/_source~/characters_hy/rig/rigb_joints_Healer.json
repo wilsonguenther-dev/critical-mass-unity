@@ -125,11 +125,55 @@
   -0.13,
   0.76
  ],
- "_flap_hem": [0.20, 0.0, 0.38],
-  "_rigid_shins": [0, -0.15, 0.03],
-  "_flap_y": [
+ "_flap_hem": [
+  0.2,
+  0.0,
+  0.38
+ ],
+ "_rigid_shins": [
+  0,
+  -0.15,
+  0.03
+ ],
+ "_flap_y": [
   0,
   0.23,
   0
- ]
+ ],
+ "_strip_del": {
+  "_note": "rig-healer-3: the back strip deleted (side-view centre line top/bot [y, z], read from measure_Healer_bind_side.png)",
+  "top": [
+   0.155,
+   1.22
+  ],
+  "bot": [
+   0.3,
+   0.02
+  ],
+  "thick": 0.045,
+  "half_x": 0.22,
+  "hem": 0.37,
+  "leg_r": 0.17,
+  "dress_b": 0.05
+ },
+ "_face_feat": {
+  "_note": "rig-healer-3: eyes (teal) and brows in the face box painted dark teal, code 0",
+  "box": [
+   -0.13,
+   0.13,
+   -0.32,
+   -0.04,
+   1.5,
+   1.7
+  ],
+  "colour": "#1C3A3D",
+  "rel": 0.65,
+  "teal_g": 0.06,
+  "teal_b": 0.04
+ },
+ "_head_rigid": {
+  "_note": "rig-healer-3: hair buns rigid on the head",
+  "dz": 0.29,
+  "r": 0.26
+ }
 }
