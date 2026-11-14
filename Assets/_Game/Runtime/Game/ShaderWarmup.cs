@@ -49,6 +49,9 @@ namespace CriticalMass.Runtime.Game
         /// <summary>The file name for a graphics API (pure; tests).</summary>
         public static string FileFor(GraphicsDeviceType api) => api + ".graphicsstate";
 
+        /// <summary>first-run-warm-2: a recording smaller than this holds no states (the Air's empty trace was 282 bytes).</summary>
+        public const long MinRecordingBytes = 1024;
+
         // perf/start-hitch-1: timed for the scene-start report (LoadTimer).
         void Start() { long t0 = CriticalMass.Runtime.Game.LoadTimer.Now(); StartBody(); CriticalMass.Runtime.Game.LoadTimer.Part("ShaderWarmup.Start", t0); }
 
@@ -56,7 +59,13 @@ namespace CriticalMass.Runtime.Game
         {
             try
             {
-                if (GamePaths.HasFlag("-traceStates"))
+                // first-run-warm-2: tracing and warming a recording need parallel PSO creation (Unity's BeginTrace docs); the
+                // Air's Metal player says no and wrote an empty 282-byte trace. Skip both cleanly there; FirstRunWarm's
+                // off-screen warm-up does not need them.
+                bool usable = FirstRunWarm.RecordingSupported;
+                if (GamePaths.HasFlag("-traceStates") && !usable)
+                    Debug.Log("[CM.Warmup] -traceStates skipped: supportsParallelPSOCreation=false on " + SystemInfo.graphicsDeviceType);
+                if (GamePaths.HasFlag("-traceStates") && usable)
                 {
                     _trace = new GraphicsStateCollection();
                     _trace.BeginTrace();
@@ -66,12 +75,22 @@ namespace CriticalMass.Runtime.Game
                     Debug.Log("[CM.Warmup] tracing shader variants and graphics states for " + SystemInfo.graphicsDeviceType);
                 }
                 string path = Path.Combine(Application.streamingAssetsPath, Folder, FileFor(SystemInfo.graphicsDeviceType));
-                if (File.Exists(path))
+                if (File.Exists(path) && usable && new FileInfo(path).Length >= MinRecordingBytes)
                 {
                     _warm = new GraphicsStateCollection(path);
-                    Debug.Log($"[CM.Warmup] warming {path} on the title and loading screens");
+                    if (_warm.totalGraphicsStateCount <= 0 && _warm.variantCount <= 0)
+                    {
+                        _warm = null;
+                        Done = true;
+                        Debug.Log($"[CM.Warmup] skipped: {path} holds no graphics states");
+                    }
+                    else Debug.Log($"[CM.Warmup] warming {path} on the title and loading screens");
                 }
-                else Done = true;
+                else
+                {
+                    Done = true;
+                    if (File.Exists(path)) Debug.Log($"[CM.Warmup] skipped: {path} " + (usable ? "is empty" : "needs parallel PSO creation, unsupported here"));
+                }
             }
             catch (Exception e)
             {

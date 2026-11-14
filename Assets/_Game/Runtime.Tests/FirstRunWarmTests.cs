@@ -17,6 +17,14 @@ namespace CriticalMass.Runtime.Tests
             Assert.IsTrue(FirstRunWarm.Done, "no warm-up in progress outside a match load (EditMode: none installed)");
             Assert.AreEqual(1f, FirstRunWarm.Progress, 1e-6f);
             Assert.AreEqual(-1, FirstRunWarm.StatesAfterStart, "counter off");
+            // first-run-warm-2: nothing runs, so nothing holds the sim or the frame governor; the hold has its own cap.
+            Assert.IsFalse(FirstRunWarm.Running, "no warm-up running outside a match load");
+            Assert.IsFalse(FirstRunWarm.HoldsSim, "the sim is never held without a warm-up");
+            Assert.LessOrEqual(FirstRunWarm.HoldCapSeconds, LoadingScreen.WarmUpWaitSeconds + 1f, "the sim hold is bounded");
+            Assert.Greater(FirstRunWarm.HoldCapSeconds, FirstRunWarm.BudgetSeconds, "the hold outlasts the warm-up's own cap");
+            bool rec = FirstRunWarm.RecordingSupported;   // never throws, whatever the device says
+            Assert.That(rec || !rec);
+            Assert.GreaterOrEqual(ShaderWarmup.MinRecordingBytes, 283L, "the Air's empty 282-byte trace counts as no recording");
         }
     }
 }

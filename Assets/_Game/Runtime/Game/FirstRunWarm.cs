@@ -32,6 +32,15 @@ namespace CriticalMass.Runtime.Game
     /// <para>Proof counter (with -warmCount or -automation): a GraphicsStateCollection trace from boot (or ShaderWarmup's own
     /// -traceStates trace); at match start its state count is the base, and "[CM.Warm] statesAfterStart=N" every 30 s and on
     /// quit is how many graphics states were first met after the match started (target: near zero).</para>
+    /// <para>first-run-warm-2 (the Air: a -traceStates match wrote a 282-byte file with every map empty, and the log had no
+    /// "[CM.Warm]" line at all): graphics-state tracing only records where SystemInfo.supportsParallelPSOCreation is true,
+    /// and that Mac's Metal player says false, so the recording route is now optional: "[CM.Warm] supportsParallelPSOCreation=X"
+    /// is logged once at start, the counter and ShaderWarmup's recording are skipped cleanly when it is false (or the file
+    /// is empty), and the warm-up above needs no recording. The automated match (-autoplay) never opens the loading
+    /// screen, so the same warm-up now also starts by itself there, once per match, as soon as the world is built and
+    /// before the first simulated tick (the sim is held while it runs: HoldsSim). Each run logs
+    /// "[CM.Warm] begin origin=..." and "[CM.Warm] end ms=N items=M"; the time cap (BudgetSeconds) logs when it is hit,
+    /// and HoldCapSeconds releases the sim whatever happens.</para>
     /// </summary>
     public sealed class FirstRunWarm : MonoBehaviour
     {
@@ -39,6 +48,8 @@ namespace CriticalMass.Runtime.Game
         public const int WideFrames = 3, FxFrames = 2;
         public const float WideLodBias = 50f, WideShadowDistance = 400f;
         public const string CountFlag = "-warmCount";
+        /// <summary>first-run-warm-2: the sim is never held longer than this (wall seconds), whatever a step costs.</summary>
+        public const float HoldCapSeconds = 3f;
         static readonly ExplosionKind[] Kinds = { ExplosionKind.Tnt, ExplosionKind.Mine, ExplosionKind.Barrel, ExplosionKind.WallBreak, ExplosionKind.KaijuSlam };
         static readonly double[] Ages = { 0.15, 1.0 };
 
@@ -46,8 +57,12 @@ namespace CriticalMass.Runtime.Game
 
         static FirstRunWarm _instance;
         Stage _stage = Stage.Idle;
-        int _frame;
+        int _frame, _items;
         long _stageStart, _allStart;
+        string _origin = "loading";
+        bool _auto;                 // automated run: begin by itself on each new match world
+        World _warmedWorld;         // the match world last warmed (once per match)
+        float _nextLook;
         SimDriverBehaviour _driver;
         CombatFx _fx;
 
@@ -59,6 +74,17 @@ namespace CriticalMass.Runtime.Game
 
         /// <summary>True when there is no warm-up in progress (finished, skipped or never begun): the loading screen may close.</summary>
         public static bool Done => _instance == null || _instance._stage == Stage.Idle || _instance._stage == Stage.Done;
+        /// <summary>first-run-warm-2: a warm-up is running now.</summary>
+        public static bool Running => _instance != null && _instance._stage != Stage.Idle && _instance._stage != Stage.Done;
+        /// <summary>first-run-warm-2: the sim waits while the warm-up runs (the match starts from the same state, later in
+        /// wall time), so no simulated frame is shown before it ends; released after HoldCapSeconds in any case.</summary>
+        public static bool HoldsSim => Running && Ms(_instance._allStart) < HoldCapSeconds * 1000f;
+        /// <summary>first-run-warm-2: graphics-state tracing records anything only where parallel PSO creation is supported
+        /// (Unity's BeginTrace docs); false on the Air's Metal player. Never throws.</summary>
+        public static bool RecordingSupported
+        {
+            get { try { return SystemInfo.supportsParallelPSOCreation; } catch (Exception) { return false; } }
+        }
         /// <summary>The warm-up's progress 0..1 for the loading bar.</summary>
         public static float Progress => _instance == null ? 1f : _instance.Fraction();
         /// <summary>States first met after the match started (counter on), else -1.</summary>
@@ -82,18 +108,24 @@ namespace CriticalMass.Runtime.Game
         {
             if (_instance == null) Install();
             if (_instance == null || (_instance._stage != Stage.Idle && _instance._stage != Stage.Done)) return;
-            _instance.StartWarm();
+            _instance.StartWarm("loading");
         }
 
         void OnEnable()
         {
             string[] args = Environment.GetCommandLineArgs();
             _counting = Array.IndexOf(args, CountFlag) >= 0 || Array.IndexOf(args, "-automation") >= 0;
+            _auto = Array.IndexOf(args, "-automation") >= 0;
+            try { _auto |= AutoplayArgs.Current.Autoplay; } catch (Exception) { }
+            _auto &= !Application.isEditor;   // players only: editor play tests keep their tick timing
         }
 
         void Start()
         {
+            Log("supportsParallelPSOCreation=" + RecordingSupported + " (" + SystemInfo.graphicsDeviceType + "; " +
+                (RecordingSupported ? "graphics-state recording usable" : "no graphics-state recording here: the off-screen warm-up runs without it") + ")");
             if (!_counting) return;
+            if (!RecordingSupported) { Log("counter off: graphics-state tracing records nothing without parallel PSO creation"); return; }
             try
             {
                 _trace = ShaderWarmup.ActiveTrace;
@@ -113,8 +145,10 @@ namespace CriticalMass.Runtime.Game
             }
         }
 
-        void StartWarm()
+        void StartWarm(string origin)
         {
+            _origin = origin;
+            _items = 0;
             _driver = FindAnyObjectByType<SimDriverBehaviour>();
             if (_driver == null || _driver.World == null || UnityEngine.Camera.main == null)
             {
@@ -123,7 +157,9 @@ namespace CriticalMass.Runtime.Game
                 return;
             }
             _fx = _driver.GetComponent<CombatFx>() ?? FindAnyObjectByType<CombatFx>();
+            _warmedWorld = _driver.World;
             _allStart = Now();
+            Log("begin origin=" + origin + " parallelPSO=" + RecordingSupported + " cap=" + (BudgetSeconds * 1000f).ToString("0") + "ms");
             _matchStarted = false;
             Enter(Stage.Wide);
         }
@@ -152,14 +188,28 @@ namespace CriticalMass.Runtime.Game
         void Update()
         {
             if (_stage != Stage.Idle && _stage != Stage.Done) Step();
+            else if (_auto) AutoBegin();
             UpdateCounter();
+        }
+
+        /// <summary>first-run-warm-2: the automated match never opens the loading screen; begin on each new match world once
+        /// its art is built (WorldView.Building off) and a camera exists, before the first tick (HoldsSim). Looks 4x a second.</summary>
+        void AutoBegin()
+        {
+            if (Time.unscaledTime < _nextLook) return;
+            _nextLook = Time.unscaledTime + 0.25f;
+            if (CriticalMass.Runtime.Menus.LoadingScreen.IsOpen || View.Dressing.WorldView.Building || UnityEngine.Camera.main == null) return;
+            SimDriverBehaviour d = FindAnyObjectByType<SimDriverBehaviour>();
+            if (d == null || d.World == null || ReferenceEquals(d.World, _warmedWorld)) return;
+            _nextLook = 0f;
+            StartWarm("automation");
         }
 
         void Step()
         {
             if (_stage != Stage.Done && _stage != Stage.Glyphs && OverBudget())
             {
-                Log("budget " + (BudgetSeconds * 1000f).ToString("0") + " ms reached at step " + _stage.ToString().ToLowerInvariant() + "; the rest is skipped");
+                Log("cap hit ms=" + Ms(_allStart).ToString("0") + " (cap " + (BudgetSeconds * 1000f).ToString("0") + ") at step " + _stage.ToString().ToLowerInvariant() + "; the rest is skipped");
                 ClearFx();
                 Finish();
                 return;
@@ -175,6 +225,7 @@ namespace CriticalMass.Runtime.Game
                     }
                     if (!RenderWide()) { Log("wide 0 (no camera)"); Enter(Stage.Fx); return; }
                     _frame++;
+                    _items++;
                     break;
                 case Stage.Fx:
                 {
@@ -193,6 +244,7 @@ namespace CriticalMass.Runtime.Game
                     try { _fx.PreviewExplosion(Ages[_frame % FxFrames], x, z, 2f, Kinds[_frame / FxFrames]); }
                     catch (Exception e) { Log("fx preview failed: " + e.Message); _frame = total; return; }
                     _frame++;
+                    _items++;
                     break;
                 }
                 case Stage.Audio:
@@ -200,6 +252,7 @@ namespace CriticalMass.Runtime.Game
                     int n = 0;
                     foreach (AudioClip c in Resources.FindObjectsOfTypeAll<AudioClip>())
                         if (c != null && c.loadState == AudioDataLoadState.Unloaded && c.LoadAudioData()) n++;
+                    _items += n;
                     Log("audio " + Ms(_stageStart).ToString("0") + " (" + n + " clips loaded)");
                     Enter(Stage.Glyphs);
                     break;
@@ -207,6 +260,7 @@ namespace CriticalMass.Runtime.Game
                 case Stage.Glyphs:
                 {
                     int n = CriticalMass.Runtime.Hud.Style.GlyphWarmup.WarmScene();
+                    _items += n;
                     Log("glyphs " + Ms(_stageStart).ToString("0") + " (" + n + " font sizes)");
                     Finish();
                     break;
@@ -217,7 +271,7 @@ namespace CriticalMass.Runtime.Game
         void Finish()
         {
             _stage = Stage.Done;
-            Log("total " + Ms(_allStart).ToString("0"));
+            Log("end ms=" + Ms(_allStart).ToString("0") + " items=" + _items + " origin=" + _origin);
         }
 
         void ClearFx()
