@@ -766,6 +766,11 @@ def bake_action(clip, act):
             log("trace", f, "kk ankle z l %.3f r %.3f" % (K["Al"].z, K["Ar"].z), "target z l %.3f r %.3f" % (targets["l"].z, targets["r"].z),
                 "final z l %.3f r %.3f" % (W(fa, faP["foot.l"].head).z, W(fa, faP["foot.r"].head).z),
                 "planted", PL.get("l"), PL.get("r"), "hips z %.3f" % W(fa, faP["hips"].head).z, "upperleg z %.3f" % W(fa, faP["upperleg.l"].head).z)
+        if clip in ("Run", "StrafeR"):
+            _a = W(fa, faP["foot.l"].head); _t = W(fa, faP["toes.l"].head)
+            REP.setdefault("dbg_" + clip, []).append([f, bool(PL.get("l")), [round(targets["l"].x, 3), round(targets["l"].y, 3), round(targets["l"].z, 3)],
+                                                     [round(_a.x, 3), round(_a.y, 3), round(_a.z, 3)], [round(_t.x, 3), round(_t.y, 3), round(_t.z, 3)],
+                                                     None if anchor["l"] is None else anchor["l"][1]])
         clear_tip(clip)
         hold_slot()
         for pb in faP:
