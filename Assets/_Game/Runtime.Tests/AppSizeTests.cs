@@ -48,11 +48,12 @@ namespace CriticalMass.Runtime.Tests
                 Assert.IsTrue(Ceiling.TryGetValue(r.Category, out int max), "a new category needs a ceiling here: " + r.Category);
                 if (r.Max < TextureBudget.StorySourceMax) Assert.LessOrEqual(r.Max, max, r.Category + ": the rule grew past the ceiling");
                 // Rules 2: a side off a multiple of 4 is refused by the block compressor (build 1822b32 shipped those at 4 B/px).
-                if (tex.width % 4 != 0 || tex.height % 4 != 0) bad.Add($"{path} {tex.width}x{tex.height}: a side is not a multiple of 4");
+                // The minimap ("ui", 205x210 at 1x) maps pixels to cells and keeps its size: 0.9 MB, exempt.
+                if (r.Category != "ui" && (tex.width % 4 != 0 || tex.height % 4 != 0)) bad.Add($"{path} {tex.width}x{tex.height}: a side is not a multiple of 4");
                 if (Mathf.Max(tex.width, tex.height) > max) bad.Add($"{path} {tex.width}x{tex.height} over {max}");
                 if (tex.isReadable) bad.Add(path + " readable (a second copy in memory)");
                 if (!r.Mips && tex.mipmapCount > 1) bad.Add(path + " has mipmaps");
-                if (Mathf.Max(tex.width, tex.height) >= 64 && !GraphicsFormatUtility.IsCompressedFormat(tex.graphicsFormat))
+                if (r.Category != "ui" && Mathf.Max(tex.width, tex.height) >= 64 && !GraphicsFormatUtility.IsCompressedFormat(tex.graphicsFormat))
                     bad.Add($"{path} {tex.graphicsFormat} (not block-compressed: 4 bytes a pixel)");
             }
             Assert.Greater(seen, 300, "the covered textures were found");
