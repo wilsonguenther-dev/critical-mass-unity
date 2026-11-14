@@ -41,6 +41,13 @@ namespace CriticalMass.Runtime.View.Effects
         // ---- palette (sRGB; three flat tone steps per material, Void Navy outline) ----
         public static readonly Color32 Navy = new Color32(24, 35, 59, 255);
         public static readonly Color32 BloodLight = new Color32(214, 52, 60, 255), BloodMid = new Color32(150, 18, 34, 255), BloodDark = new Color32(88, 8, 20, 255);
+        // World around arena 1 (2026-11-13): marks left ON THE GROUND by hits and knock-outs (splats, drips, the stamped
+        // paint) are a neutral dark ink, not red. Red ground paint read as "Crimson team" under every fight, which breaks
+        // the bible's reserved-hue rule (art direction 2026-11-12: ground decals for hits and knock-outs are neutral marks
+        // in Void Navy, never red, never Azure or Crimson). Low chroma (under 0.03 OKLab), hue of Void Navy, drawn at
+        // GroundInkAlpha so the ground shows through and the marks stay quieter than the fighters.
+        public static readonly Color32 GroundInkLight = new Color32(104, 104, 118, 255), GroundInkMid = new Color32(64, 66, 82, 255), GroundInkDark = new Color32(38, 42, 58, 255);
+        public const float GroundInkAlpha = 0.72f;
         public static readonly Color32 SparkWhite = new Color32(255, 251, 236, 255), SparkYellow = new Color32(255, 214, 72, 255), SparkOrange = new Color32(255, 150, 40, 255);
         public static readonly Color32 Steel = new Color32(196, 210, 226, 255);
         public static readonly Color32 DustLight = new Color32(247, 240, 229, 255), DustMid = new Color32(214, 202, 184, 255), DustDark = new Color32(158, 146, 132, 255);

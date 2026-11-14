@@ -4,7 +4,9 @@
 // UV2 (path centre x, z, radius x, radius z, world units), UV3 (height y, angular speed rad/s, phase rad, scale). The
 // mesh is authored in the creature's own frame (+z forward, +x right). UV1.zw: a formation offset (x right, z forward,
 // world units) added after the flap, so a bird's place in its flock never scales its wing beat. Kinds: 0 skyray (wing beat), 1 cloud-loafer
-// (slow body wave), 2 bird (fast flap). Vertex alpha 1 marks a glow spot (self-lit, scaled by _CMAmbient.w: 0 in Day).
+// (slow body wave), 2 bird (fast flap), 3 lantern glider (world around arena 1: a slow soaring flap). Birds fly by day and
+// dusk and gliders at night: each kind's scale follows the night amount (_CMAmbient.w) and a hidden one is moved far
+// out of view, so the swap costs nothing. Vertex alpha 1 marks a glow spot (self-lit, scaled by _CMAmbient.w: 0 in Day).
 // Toon: two hard bands on the main light, the time-of-day grade and the height fog of the world (CMTimeOfDay.hlsl), so
 // they sink into the void like the sky rocks. Motion time: _CMAmbientTime (AmbientLife.Clock: seconds x 0.35 under reduce motion). Visual only.
 // No shadow caster (they never shadow the islands) and no depth passes (nothing reads them).
@@ -76,10 +78,15 @@ Shader "CM/AmbientCreature"
             float3 lp = i.positionOS.xyz;
             if (kind < 0.5)        lp.y += sin(t * 1.3 + i.uv3.z * 5.0) * 0.30 * pow(abs(lp.x), 1.3);               // skyray wing beat
             else if (kind < 1.5)   lp.x += sin(lp.z * 0.55 - t * 0.9 + i.uv3.z) * 0.10 * saturate(abs(lp.z) * 0.35); // loafer body wave
-            else                   lp.y += sin(t * 8.5 + i.uv1.x * 40.0) * 0.55 * abs(lp.x);                         // bird flap
+            else if (kind < 2.5)   lp.y += sin(t * 8.5 + i.uv1.x * 40.0) * 0.55 * abs(lp.x);                         // bird flap
+            else                   lp.y += sin(t * 2.1 + i.uv1.x * 40.0) * 0.28 * abs(lp.x);                         // glider soar
+            float night = smoothstep(0.6, 0.9, _CMAmbient.w);
+            float vis = kind > 2.5 ? night : (kind > 1.5 ? 1.0 - night : 1.0);
+            s *= vis;
             lp *= s;
             lp += float3(i.uv1.z, 0.0, i.uv1.w);
             positionWS = P + R * lp.x + U * lp.y + F * lp.z;
+            if (vis < 0.001) positionWS.y -= 10000.0;   // hidden: far out of view (no ink speck from a collapsed hull)
             float3 n = i.normalOS;
             normalWS = normalize(R * n.x + U * n.y + F * n.z);
         }
