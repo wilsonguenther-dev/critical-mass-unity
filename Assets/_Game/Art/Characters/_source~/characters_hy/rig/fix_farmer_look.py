@@ -347,6 +347,17 @@ except Exception as x:
 arm.data.pose_position = "REST"
 
 # ------------------------------------------------------------------ export (the class recipe: cm_art/export.py)
+# The importer turns each root mesh by the axis conversion (object rotation 90 X) and leaves the data in FBX axes; with
+# bake_space_transform the exporter would then write that turn as the mesh node's Lcl Rotation and rotated geometry
+# (run 43611159728: Farmer_Hero Lcl Rotation 90 X, height along -Z). Bake the object transform into the data first so
+# the meshes go out as the class FBX has them: identity nodes, Y-up geometry. The armature keeps its own node.
+for name, ob in meshes.items():
+    if ob.parent is None:
+        M = ob.matrix_basis.copy()
+        ob.data.transform(M)
+        ob.matrix_basis = Matrix.Identity(4)
+        ob.data.update()
+bpy.context.view_layer.update()
 for o in scene.objects:
     o.select_set(o is arm or o.name in meshes)
 bpy.context.view_layer.objects.active = arm
