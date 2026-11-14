@@ -463,7 +463,9 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             TeamId t = w.Actors[me].Team;
             for (int k = 0; k < 3; k++)
             {
-                int n = DepthRead.Stock(w, t, k);
+                // first-minutes-1 (walk 1 #6): the WOOD chip shows the one team wood number (BuilderBank.Whole), the same as the
+                // class card, kit footer and build prompt. It read the banked stock alone (WOOD 0 beside TEAM WOOD 2).
+                int n = k == DepthRead.StockWood ? BuilderBank.Whole(w, t) : DepthRead.Stock(w, t, k);
                 if (n != _stockSeen[k])
                 {
                     if (_stockSeen[k] >= 0) _stockPopAt[k] = real;
