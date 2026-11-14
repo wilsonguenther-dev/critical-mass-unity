@@ -11,6 +11,8 @@ namespace CriticalMass.Runtime.View.WallDamage
         public Vector3 Pivot;
         /// <summary>Crack overlays for stages 1..3 (index 0..2), in the piece's own space; null when none.</summary>
         public Mesh[] Cracks;
+        /// <summary>wall-damage-2: a dark see-through shell just outside the piece (the cracked stage's darker tint); null when none.</summary>
+        public Mesh Tint;
         public float Size;
     }
 
@@ -128,6 +130,66 @@ namespace CriticalMass.Runtime.View.WallDamage
             return pieces;
         }
 
+        /// <summary>
+        /// wall-damage-2: cuts a mesh into up to n x n x n chunky pieces by where each triangle's centre falls in its bounds
+        /// (a wall block is one welded island, so islands alone would throw it as one slab). Pieces are recentred.
+        /// </summary>
+        public static MeshPiece[] TryGrid(Mesh src, int n, int seed)
+        {
+            if (src == null || !src.isReadable || src.vertexCount == 0 || n < 1) return null;
+            Vector3[] v = src.vertices;
+            Bounds bb = src.bounds;
+            Vector3 lo = bb.min, sz = Vector3.Max(bb.size, Vector3.one * 1e-4f);
+            int subs = src.subMeshCount;
+            var tris = new int[subs][];
+            var cellOf = new int[subs][];
+            for (int s = 0; s < subs; s++)
+            {
+                tris[s] = src.GetTriangles(s);
+                int[] t = tris[s];
+                cellOf[s] = new int[t.Length / 3];
+                for (int k = 0; k + 2 < t.Length; k += 3)
+                {
+                    Vector3 c = (v[t[k]] + v[t[k + 1]] + v[t[k + 2]]) / 3f - lo;
+                    int gx = Mathf.Clamp((int)(c.x / sz.x * n), 0, n - 1), gy = Mathf.Clamp((int)(c.y / sz.y * n), 0, n - 1), gz = Mathf.Clamp((int)(c.z / sz.z * n), 0, n - 1);
+                    cellOf[s][k / 3] = (gx * n + gy) * n + gz;
+                }
+            }
+            var pieces = new MeshPiece[n * n * n];
+            for (int g = 0; g < pieces.Length; g++)
+            {
+                int gg = g;
+                pieces[g] = Build(src, v, tris, (s, k) => cellOf[s][k / 3] == gg, seed + g * 11);
+            }
+            return Compact(pieces);
+        }
+
+        /// <summary>wall-damage-2: a copy of a piece pushed out along its normals, every vertex one colour (drawn with the crack material).</summary>
+        public static Mesh TintShell(Mesh piece, Color32 colour, float push)
+        {
+            if (piece == null || !piece.isReadable || piece.vertexCount == 0) return null;
+            Vector3[] v = piece.vertices;
+            Vector3[] nrm = piece.normals;
+            bool hasN = nrm != null && nrm.Length == v.Length;
+            var cols = new Color32[v.Length];
+            var uvs = new Vector2[v.Length];
+            for (int i = 0; i < v.Length; i++)
+            {
+                if (hasN) v[i] += nrm[i] * push;
+                cols[i] = colour;
+                uvs[i] = new Vector2(0.5f, 0.5f);
+            }
+            var m = new Mesh { name = piece.name + " tint" };
+            if (v.Length > 65000) m.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
+            m.vertices = v;
+            m.colors32 = cols;
+            m.uv = uvs;
+            var all = new List<int>();
+            for (int s = 0; s < piece.subMeshCount; s++) all.AddRange(piece.GetTriangles(s));
+            m.SetTriangles(all, 0, true);
+            return m;
+        }
+
         static MeshPiece[] Compact(MeshPiece[] p)
         {
             int n = 0;
@@ -215,18 +277,28 @@ namespace CriticalMass.Runtime.View.WallDamage
             int triCount = t.Length / 3;
             if (triCount == 0) return null;
             // The larger faces first (cracks on slivers would not read).
+            // wall-damage-2: the cracks must read from the high gameplay camera, so they sit mostly on the faces that look up
+            // (the camera sees tops first), and they are wide dark strokes, not hairlines.
             var big = new List<int>();
+            var up = new List<int>();
             float maxArea = 0f;
             for (int k = 0; k < triCount; k++) maxArea = Mathf.Max(maxArea, Area(v, t, k));
-            for (int k = 0; k < triCount; k++) if (Area(v, t, k) >= maxArea * 0.25f) big.Add(k);
+            for (int k = 0; k < triCount; k++)
+            {
+                if (Area(v, t, k) < maxArea * 0.12f) continue;
+                big.Add(k);
+                Vector3 fn = Vector3.Cross(v[t[k * 3 + 1]] - v[t[k * 3]], v[t[k * 3 + 2]] - v[t[k * 3]]);
+                if (fn.sqrMagnitude > 1e-12f && fn.normalized.y > 0.45f) up.Add(k);
+            }
             if (big.Count == 0 || maxArea <= 0f) return null;
             float size = piece.bounds.size.magnitude;
-            float seg = Mathf.Clamp(size * 0.09f, 0.03f, 0.22f), width = Mathf.Clamp(seg * 0.16f, 0.006f, 0.03f), lift = Mathf.Clamp(size * 0.004f, 0.003f, 0.012f);
+            float seg = Mathf.Clamp(size * 0.16f, 0.12f, 0.42f), width = Mathf.Clamp(seg * 0.3f, 0.04f, 0.075f), lift = Mathf.Clamp(size * 0.005f, 0.006f, 0.015f);
             V.Clear(); N.Clear(); UV.Clear(); C.Clear();
             var idx = new List<int>();
             for (int l = 0; l < lines; l++)
             {
-                int k = big[(int)(DamageLook.Hash01(seed + l * 41) * big.Count) % big.Count];
+                List<int> from = up.Count > 0 && l % 3 != 2 ? up : big;
+                int k = from[(int)(DamageLook.Hash01(seed + l * 41) * from.Count) % from.Count];
                 Vector3 a = v[t[k * 3]], b = v[t[k * 3 + 1]], c = v[t[k * 3 + 2]];
                 Vector3 n = Vector3.Cross(b - a, c - a);
                 if (n.sqrMagnitude < 1e-12f) continue;
@@ -234,12 +306,18 @@ namespace CriticalMass.Runtime.View.WallDamage
                 float r1 = 0.2f + 0.6f * DamageLook.Hash01(seed + l * 53 + 1), r2 = (1f - r1) * DamageLook.Hash01(seed + l * 59 + 2);
                 Vector3 p = a + (b - a) * r1 + (c - a) * r2;
                 Vector3 dir = Vector3.ProjectOnPlane(Quaternion.AngleAxis(DamageLook.Hash01(seed + l * 67 + 3) * 360f, n) * (b - a), n).normalized;
-                for (int sgi = 0; sgi < 3; sgi++)
+                for (int sgi = 0; sgi < 4; sgi++)
                 {
                     float turn = (DamageLook.Hash01(seed + l * 71 + sgi * 5) - 0.5f) * 80f;
                     dir = Quaternion.AngleAxis(turn, n) * dir;
                     Vector3 q = p + dir * seg * (0.6f + 0.6f * DamageLook.Hash01(seed + l * 73 + sgi));
-                    if (!Inside(a, b, c, n, q)) break;
+                    if (!Inside(a, b, c, n, q))
+                    {
+                        // Clip the stroke to the face instead of dropping it (short faces still get a visible crack).
+                        Vector3 mid = p + (q - p) * 0.5f;
+                        if (!Inside(a, b, c, n, mid)) break;
+                        q = mid;
+                    }
                     Vector3 side = Vector3.Cross(n, dir).normalized * width * (sgi == 0 ? 1f : 0.7f);
                     int bi = V.Count;
                     V.Add(p - side + n * lift); V.Add(p + side + n * lift); V.Add(q + side * 0.5f + n * lift); V.Add(q - side * 0.5f + n * lift);

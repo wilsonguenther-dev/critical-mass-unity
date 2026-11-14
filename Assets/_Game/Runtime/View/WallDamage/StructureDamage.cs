@@ -359,6 +359,12 @@ namespace CriticalMass.Runtime.View.WallDamage
         Material[] _mats;
         readonly Transform _section;
         readonly bool[] _shaking;
+        /// <summary>wall-damage-2: the cracked stage's darker tint, and each cell's resting pose (a cracked block sits askew).</summary>
+        readonly MeshFilter[] _tint;
+        readonly Vector3[] _basePos;
+        readonly Quaternion[] _baseRot;
+        /// <summary>Darker tint over a cracked cell (drawn with the crack material: unlit, see-through).</summary>
+        public static readonly Color32 CrackedTint = new Color32(0x16, 0x12, 0x1A, 0x6A);
 
         static BreakableCellSet[] _byCell = new BreakableCellSet[0];
         static int[] _localByCell = new int[0];
@@ -388,6 +394,7 @@ namespace CriticalMass.Runtime.View.WallDamage
             {
                 if (p == null) continue;
                 FreeMesh(p.Mesh);
+                FreeMesh(p.Tint);
                 if (p.Cracks != null) foreach (Mesh m in p.Cracks) FreeMesh(m);
             }
         }
@@ -412,6 +419,9 @@ namespace CriticalMass.Runtime.View.WallDamage
             _look = new byte[n];
             _crackStage = new int[n];
             _shaking = new bool[n];
+            _tint = new MeshFilter[n];
+            _basePos = new Vector3[n];
+            _baseRot = new Quaternion[n];
             Material crack = MeshPieces.CrackMaterial();
             for (int c = 0; c < n; c++)
             {
@@ -427,6 +437,13 @@ namespace CriticalMass.Runtime.View.WallDamage
                 cr.sharedMaterial = crack;
                 cr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
                 _crackStage[c] = -1;
+                var tg = new GameObject("Tint");
+                tg.transform.SetParent(g.transform, false);
+                _tint[c] = tg.AddComponent<MeshFilter>();
+                var tr = tg.AddComponent<MeshRenderer>();
+                tr.sharedMaterial = crack;
+                tr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                _baseRot[c] = Quaternion.identity;
             }
         }
 
@@ -446,9 +463,15 @@ namespace CriticalMass.Runtime.View.WallDamage
             byLook[1] = cracked != null && cracked.isReadable ? MeshPieces.TryCells(cracked, toSim, cells, width, seed + 1) : null;
             byLook[2] = destroyed != null && destroyed.isReadable ? MeshPieces.TryCells(destroyed, toSim, cells, width, seed + 2) : null;
             if (byLook[0] == null) return null;
+            // wall-damage-2: the break throws several chunky pieces (a 2 x 2 x 2 cut of the cell's slice, in the wall's own
+            // materials), not the whole block as one slab; the cracked stage gets a darker tint shell.
             var chunks = new MeshPiece[cells.Count][];
             for (int c = 0; c < cells.Count; c++)
-                chunks[c] = byLook[0][c] != null ? MeshPieces.TryIslands(byLook[0][c].Mesh, 5, seed + c * 3) : null;
+                chunks[c] = byLook[0][c] != null ? MeshPieces.TryGrid(byLook[0][c].Mesh, 2, seed + c * 3) : null;
+            for (int k = 0; k < 2; k++)
+                if (byLook[k] != null)
+                    foreach (MeshPiece pc in byLook[k])
+                        if (pc != null) pc.Tint = MeshPieces.TintShell(pc.Mesh, CrackedTint, 0.012f);
             var set = new BreakableCellSet(cells.ToArray(), byLook, chunks, section);
             if (_byCell.Length != mapCells) { _byCell = new BreakableCellSet[mapCells]; _localByCell = new int[mapCells]; }
             for (int c = 0; c < cells.Count; c++)
@@ -474,17 +497,64 @@ namespace CriticalMass.Runtime.View.WallDamage
                     _mf[c].sharedMesh = piece != null ? piece.Mesh : null;
                     _mr[c].sharedMaterials = mats;
                     if (!first && look == CellLook.Rubble && was != CellLook.Rubble && was != CellLook.None) BreakCell(w, c);
+                    if (!first && look == CellLook.Cracked && was == CellLook.Intact) Chip(w, c);
                     _look[c] = (byte)look;
                 }
-                // Crack strips: from the hit points left (a chipped intact cell when HitsPerState > 1, every cracked cell).
+                // Crack strips: from the hit points left. wall-damage-2: a cracked cell (one hit from breaking with the usual 2
+                // hits) shows the heaviest stage at once: the widest strokes, the dark tint and the block knocked askew.
                 double left = WorldReactions.WallLeft01(w, i);
-                int stage = look == CellLook.Rubble ? 0 : System.Math.Max(DamageLook.Stage(left), look == CellLook.Cracked ? 2 : 0);
+                int stage = look == CellLook.Rubble ? 0 : System.Math.Max(DamageLook.Stage(left), look == CellLook.Cracked ? 3 : 0);
                 if (stage != _crackStage[c])
                 {
                     MeshPiece piece = Piece(look, c);
                     _crack[c].sharedMesh = stage > 0 && piece != null && piece.Cracks != null ? piece.Cracks[Mathf.Clamp(stage, 1, 3) - 1] : null;
+                    _tint[c].sharedMesh = stage >= 2 && piece != null ? piece.Tint : null;
+                    Pose(w, c, stage >= 2 ? stage : 0, piece);
                     _crackStage[c] = stage;
                 }
+            }
+        }
+
+        /// <summary>Rests a damaged cell's block askew: tipped about its base away from the last blow, sunk and slid a little.</summary>
+        void Pose(World w, int c, int stage, MeshPiece piece)
+        {
+            _basePos[c] = Vector3.zero;
+            _baseRot[c] = Quaternion.identity;
+            if (stage >= 2 && piece != null && piece.Mesh != null)
+            {
+                int i = Cells[c];
+                double x = i % w.Map.Width + 0.5, z = i / w.Map.Width + 0.5;
+                Vector3 d = DamageHits.Latest(ReactKind.Wall, 0, x, z, 0.75, Time.unscaledTimeAsDouble, 3.0, out ReactPulse p) ? DamageHits.WorldDir(p, i) : DamageHits.WorldDir(new ReactPulse(), i);
+                Vector3 dl = _section.InverseTransformDirection(d).normalized, ul = _section.InverseTransformDirection(Vector3.up).normalized;
+                Bounds b = piece.Mesh.bounds;   // cell slices keep the section's space
+                Vector3 pivot = new Vector3(b.center.x, b.min.y, b.center.z);
+                float deg = stage >= 3 ? 7f : 4f;
+                Quaternion r = Quaternion.AngleAxis(deg, Vector3.Cross(ul, dl));
+                _baseRot[c] = r;
+                _basePos[c] = pivot - r * pivot + dl * 0.06f - ul * 0.05f;
+            }
+            _t[c].localPosition = _basePos[c];
+            _t[c].localRotation = _baseRot[c];
+        }
+
+        /// <summary>The first hit knocks two small chips off the block (thrown as rubble), so the hit cell visibly loses stone.</summary>
+        void Chip(World w, int c)
+        {
+            MeshPiece[] chunks = _chunks[c];
+            if (chunks == null || chunks.Length == 0 || _mats == null) return;
+            int i = Cells[c];
+            double x = i % w.Map.Width + 0.5, z = i / w.Map.Width + 0.5;
+            double now = Time.unscaledTimeAsDouble;
+            Vector3 dir = DamageHits.Latest(ReactKind.Wall, 0, x, z, 0.75, now, 1.0, out ReactPulse p) ? DamageHits.WorldDir(p, i) : DamageHits.WorldDir(new ReactPulse(), i);
+            float groundY = (float)GroundHeight.At(w.Map, x, z) + 0.04f;
+            Matrix4x4 m = _section.localToWorldMatrix;
+            for (int k = 0; k < 2; k++)
+            {
+                MeshPiece ch = chunks[(int)(DamageLook.Hash01(i * 29 + k) * chunks.Length) % chunks.Length];
+                Vector3 pos = m.MultiplyPoint3x4(ch.Pivot);
+                float a = DamageLook.Hash01(i * 31 + k);
+                Vector3 v = dir * (1.2f + a) + Vector3.up * (2.4f + a);
+                RubblePool.Spawn(ch.Mesh, _mats, pos, _section.rotation, _section.lossyScale * 0.45f, v, new Vector3(400f * a, 200f, -300f * a), groundY);
             }
         }
 
@@ -530,7 +600,7 @@ namespace CriticalMass.Runtime.View.WallDamage
             {
                 BreakableCellSet set = _all[s];
                 for (int c = 0; c < set._shaking.Length; c++)
-                    if (set._shaking[c]) { set._t[c].localPosition = Vector3.zero; set._shaking[c] = false; }
+                    if (set._shaking[c]) { set._t[c].localPosition = set._basePos[c]; set._shaking[c] = false; }
             }
             if (rx == null) return;
             ReactPulse[] ps = rx.Pulses;
@@ -550,7 +620,7 @@ namespace CriticalMass.Runtime.View.WallDamage
                 Vector3 d = DamageHits.WorldDir(p, i);
                 // The section may be rotated: push along the blow in the section's own space.
                 Vector3 local = set._section.InverseTransformDirection(d);
-                set._t[c].localPosition = local * DamageLook.Shake(age, (float)p.Strength);
+                set._t[c].localPosition = set._basePos[c] + local * DamageLook.Shake(age, (float)p.Strength);
                 set._shaking[c] = true;
             }
         }
