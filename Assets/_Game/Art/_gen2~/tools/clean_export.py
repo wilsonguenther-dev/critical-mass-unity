@@ -152,6 +152,8 @@ def tri_count(ob):
 def decimated_copy(src, name, target):
     ob = src.copy(); ob.data = src.data.copy(); ob.name = ob.data.name = name
     bpy.context.scene.collection.objects.link(ob)
+    if target < 2000:
+        drop_floaters(ob, 0.01)
     t0 = t = tri_count(ob); how = []
     for _ in range(6):
         if t <= target:
@@ -321,11 +323,14 @@ def clean(e):
         kd.insert(p, i)
     kd.balance()
     ob.name = name + "_RAW"
+    if e.get("voxel"):
+        bm = bmesh.new(); bm.from_mesh(ob.data); bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:]); bm.to_mesh(ob.data); bm.free()
     if e.get("voxel"):   # generated meshes with internal sheets: rebuild one closed surface first (colour comes from the kd-tree)
         md = ob.modifiers.new("vox", "REMESH"); md.mode = "VOXEL"; md.voxel_size = e["voxel"] * e["height"] / 2.0
         md.use_smooth_shade = False; sel_only([ob], ob); bpy.ops.object.modifier_apply(modifier=md.name)
         facts["voxel_rebuild_m"] = md.voxel_size if False else e["voxel"] * e["height"] / 2.0; facts["voxel_tris"] = tri_count(ob)
-        print("GEN2 voxel", name, facts["voxel_tris"])
+        ob, facts["floaters_after_voxel"] = drop_floaters(ob, 0.002)
+        print("GEN2 voxel", name, facts["voxel_tris"], facts["floaters_after_voxel"])
     lods = e.get("lods", {"Hero": 22000, "LOD0": 4000, "LOD1": 1400, "Shadow": 750})
     prefix = e.get("prefix", name)
     levels = {}; cols = {}

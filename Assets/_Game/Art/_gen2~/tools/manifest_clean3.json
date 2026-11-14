@@ -1,0 +1,275 @@
+{
+ "clean": [
+  {
+   "name": "Builder",
+   "src": "in:builder-body-three-quarter.glb",
+   "height": 2.33,
+   "cloth": [
+    "#3D4F95"
+   ],
+   "k": 14,
+   "lods": {
+    "Hero": 22000,
+    "LOD0": 4000,
+    "LOD1": 1400,
+    "Shadow": 750
+   },
+   "floater_frac": 0.002,
+   "voxel": 0.006
+  },
+  {
+   "name": "Healer",
+   "src": "in:healer-body-three-quarter.glb",
+   "height": 2.0,
+   "cloth": [
+    "#6E7894",
+    "#5B6790",
+    "#7A7C8C"
+   ],
+   "k": 14,
+   "lods": {
+    "Hero": 22000,
+    "LOD0": 4000,
+    "LOD1": 1400,
+    "Shadow": 750
+   },
+   "floater_frac": 0.002,
+   "cloth_tol": 0.12,
+   "voxel": 0.006
+  },
+  {
+   "name": "Demolitions",
+   "src": "in:demolitions-body-three-quarter.glb",
+   "height": 2.0,
+   "cloth": [
+    "#3C5B83"
+   ],
+   "k": 14,
+   "lods": {
+    "Hero": 22000,
+    "LOD0": 4000,
+    "LOD1": 1400,
+    "Shadow": 750
+   },
+   "floater_frac": 0.002,
+   "voxel": 0.006
+  },
+  {
+   "name": "Kaiju_Hatchling",
+   "dir": "Hatchling_A",
+   "prefix": "Kaiju",
+   "kind": "kaiju",
+   "src": "in:kaiju_hatchling-body-front.glb",
+   "height": 2.235,
+   "glow": [
+    "#1E5929",
+    "#275E32",
+    "#195022"
+   ],
+   "k": 12,
+   "lods": {
+    "Hero": 20000,
+    "LOD0": 6000,
+    "LOD1": 1500,
+    "Shadow": 1200
+   },
+   "floater_frac": 0.002,
+   "glow_tol": 0.1,
+   "voxel": 0.006
+  },
+  {
+   "name": "Demolitions",
+   "dir": "Demolitions_mv1234",
+   "prefix": "Demolitions",
+   "kind": "fighter",
+   "src": "in:demolitions_s1234_raw.glb",
+   "height": 2.0,
+   "cloth": [
+    "#3C5B83"
+   ],
+   "glow": [],
+   "k": 14,
+   "lods": {
+    "Hero": 22000,
+    "LOD0": 4000,
+    "LOD1": 1400,
+    "Shadow": 750
+   },
+   "project": {
+    "front": "repo:Assets/_Game/Art/_gen2~/mv/inputs/demolitions/front.png",
+    "left": "repo:Assets/_Game/Art/_gen2~/mv/inputs/demolitions/left.png",
+    "back": "repo:Assets/_Game/Art/_gen2~/mv/inputs/demolitions/back.png"
+   }
+  },
+  {
+   "name": "Demolitions",
+   "dir": "Demolitions_mv77",
+   "prefix": "Demolitions",
+   "kind": "fighter",
+   "src": "in:demolitions_s77_raw.glb",
+   "height": 2.0,
+   "cloth": [
+    "#3C5B83"
+   ],
+   "glow": [],
+   "k": 14,
+   "lods": {
+    "Hero": 22000,
+    "LOD0": 4000,
+    "LOD1": 1400,
+    "Shadow": 750
+   },
+   "project": {
+    "front": "repo:Assets/_Game/Art/_gen2~/mv/inputs/demolitions/front.png",
+    "left": "repo:Assets/_Game/Art/_gen2~/mv/inputs/demolitions/left.png",
+    "back": "repo:Assets/_Game/Art/_gen2~/mv/inputs/demolitions/back.png"
+   }
+  },
+  {
+   "name": "Farmer",
+   "dir": "Farmer_mv1234",
+   "prefix": "Farmer",
+   "kind": "fighter",
+   "src": "in:farmer_s1234_raw.glb",
+   "height": 2.0,
+   "cloth": [
+    "#2F3F66"
+   ],
+   "glow": [],
+   "k": 14,
+   "lods": {
+    "Hero": 22000,
+    "LOD0": 4000,
+    "LOD1": 1400,
+    "Shadow": 750
+   },
+   "project": {
+    "front": "repo:Assets/_Game/Art/_gen2~/mv/inputs/farmer/front.png",
+    "left": "repo:Assets/_Game/Art/_gen2~/mv/inputs/farmer/left.png",
+    "back": "repo:Assets/_Game/Art/_gen2~/mv/inputs/farmer/back.png"
+   }
+  },
+  {
+   "name": "Healer",
+   "dir": "Healer_mv1234",
+   "prefix": "Healer",
+   "kind": "fighter",
+   "src": "in:healer_s1234_raw.glb",
+   "height": 2.0,
+   "cloth": [
+    "#5B6790"
+   ],
+   "glow": [],
+   "k": 14,
+   "lods": {
+    "Hero": 22000,
+    "LOD0": 4000,
+    "LOD1": 1400,
+    "Shadow": 750
+   },
+   "project": {
+    "front": "repo:Assets/_Game/Art/_gen2~/mv/inputs/healer/front.png",
+    "left": "repo:Assets/_Game/Art/_gen2~/mv/inputs/healer/left.png",
+    "back": "repo:Assets/_Game/Art/_gen2~/mv/inputs/healer/back.png"
+   }
+  },
+  {
+   "name": "Healer",
+   "dir": "Healer_mv77",
+   "prefix": "Healer",
+   "kind": "fighter",
+   "src": "in:healer_s77_raw.glb",
+   "height": 2.0,
+   "cloth": [
+    "#5B6790"
+   ],
+   "glow": [],
+   "k": 14,
+   "lods": {
+    "Hero": 22000,
+    "LOD0": 4000,
+    "LOD1": 1400,
+    "Shadow": 750
+   },
+   "project": {
+    "front": "repo:Assets/_Game/Art/_gen2~/mv/inputs/healer/front.png",
+    "left": "repo:Assets/_Game/Art/_gen2~/mv/inputs/healer/left.png",
+    "back": "repo:Assets/_Game/Art/_gen2~/mv/inputs/healer/back.png"
+   }
+  },
+  {
+   "name": "Kaiju_Adult",
+   "dir": "Kaiju_mv1234",
+   "prefix": "Kaiju",
+   "kind": "kaiju",
+   "src": "in:kaiju_adult_s1234_raw.glb",
+   "height": 5.0,
+   "cloth": [],
+   "glow": [
+    "#9BE03C",
+    "#C8F050"
+   ],
+   "k": 14,
+   "lods": {
+    "Hero": 24000,
+    "LOD0": 11000,
+    "LOD1": 1500,
+    "Shadow": 1400
+   },
+   "project": {
+    "front": "repo:Assets/_Game/Art/_gen2~/mv/inputs/kaiju_adult/front.png",
+    "left": "repo:Assets/_Game/Art/_gen2~/mv/inputs/kaiju_adult/left.png",
+    "back": "repo:Assets/_Game/Art/_gen2~/mv/inputs/kaiju_adult/back.png"
+   }
+  },
+  {
+   "name": "Kaiju_Hatchling",
+   "dir": "Hatchling_mv1234",
+   "prefix": "Kaiju",
+   "kind": "kaiju",
+   "src": "in:kaiju_hatchling_s1234_raw.glb",
+   "height": 2.235,
+   "cloth": [],
+   "glow": [
+    "#7FD03A",
+    "#A6E04A"
+   ],
+   "k": 14,
+   "lods": {
+    "Hero": 20000,
+    "LOD0": 6000,
+    "LOD1": 1500,
+    "Shadow": 1200
+   },
+   "project": {
+    "front": "repo:Assets/_Game/Art/_gen2~/mv/inputs/kaiju_hatchling/front.png",
+    "left": "repo:Assets/_Game/Art/_gen2~/mv/inputs/kaiju_hatchling/left.png",
+    "back": "repo:Assets/_Game/Art/_gen2~/mv/inputs/kaiju_hatchling/back.png"
+   }
+  },
+  {
+   "name": "Warrior",
+   "dir": "Warrior_mv1234",
+   "prefix": "Warrior",
+   "kind": "fighter",
+   "src": "in:warrior_s1234_raw.glb",
+   "height": 2.0,
+   "cloth": [
+    "#2E8C9A"
+   ],
+   "glow": [],
+   "k": 14,
+   "lods": {
+    "Hero": 22000,
+    "LOD0": 4000,
+    "LOD1": 1400,
+    "Shadow": 750
+   },
+   "project": {
+    "front": "repo:Assets/_Game/Art/_gen2~/mv/inputs/warrior/front.png",
+    "left": "repo:Assets/_Game/Art/_gen2~/mv/inputs/warrior/left.png",
+    "back": "repo:Assets/_Game/Art/_gen2~/mv/inputs/warrior/back.png"
+   }
+  }
+ ]
+}
