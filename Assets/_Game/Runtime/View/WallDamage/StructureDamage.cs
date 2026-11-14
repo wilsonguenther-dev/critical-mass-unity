@@ -364,7 +364,8 @@ namespace CriticalMass.Runtime.View.WallDamage
         readonly Vector3[] _basePos;
         readonly Quaternion[] _baseRot;
         /// <summary>Darker tint over a cracked cell (drawn with the crack material: unlit, see-through).</summary>
-        public static readonly Color32 CrackedTint = new Color32(0x16, 0x12, 0x1A, 0x6A);
+        // capture-gaps-1: alpha 0x6A to 0x9C, so a cracked block is clearly darker than its intact neighbours from the gameplay camera.
+        public static readonly Color32 CrackedTint = new Color32(0x16, 0x12, 0x1A, 0x9C);
 
         static BreakableCellSet[] _byCell = new BreakableCellSet[0];
         static int[] _localByCell = new int[0];
@@ -528,10 +529,10 @@ namespace CriticalMass.Runtime.View.WallDamage
                 Vector3 dl = _section.InverseTransformDirection(d).normalized, ul = _section.InverseTransformDirection(Vector3.up).normalized;
                 Bounds b = piece.Mesh.bounds;   // cell slices keep the section's space
                 Vector3 pivot = new Vector3(b.center.x, b.min.y, b.center.z);
-                float deg = stage >= 3 ? 7f : 4f;
+                float deg = stage >= 3 ? DamageLook.CrackedLeanDeg : DamageLook.DamagedLeanDeg;
                 Quaternion r = Quaternion.AngleAxis(deg, Vector3.Cross(ul, dl));
                 _baseRot[c] = r;
-                _basePos[c] = pivot - r * pivot + dl * 0.06f - ul * 0.05f;
+                _basePos[c] = pivot - r * pivot + dl * 0.08f - ul * 0.08f;   // capture-gaps-1: knocked further back and down (was 0.06, 0.05)
             }
             _t[c].localPosition = _basePos[c];
             _t[c].localRotation = _baseRot[c];

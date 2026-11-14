@@ -111,8 +111,24 @@ namespace CriticalMass.Runtime.View.WallDamage
 
         public static bool RubbleAlive(float age) => age >= 0f && age < RubbleSeconds;
 
-        /// <summary>Crack lines drawn at a stage (cumulative): 0, 3, 7, 12 per piece share.</summary>
-        public static int CrackLines(int stage) => stage <= 0 ? 0 : stage == 1 ? 3 : stage == 2 ? 7 : 12;
+        /// <summary>Crack lines drawn at a stage (cumulative): 0, 4, 9, 16 per piece share (capture-gaps-1: was 0, 3, 7, 12).</summary>
+        public static int CrackLines(int stage) => stage <= 0 ? 0 : stage == 1 ? 4 : stage == 2 ? 9 : 16;
+
+        /// <summary>
+        /// <summary>
+        /// capture-gaps-1 (owner: the crack stage before a wall breaks was too weak to see at gameplay distance): crack stroke
+        /// segment length and HALF-width bounds, in world units (a stroke is twice the half-width across: 0.17 to 0.30 u, about
+        /// 12 px or more at 1080p square-on from the default gameplay camera, GameplayCamera.Distance 23.4 u; it was 0.08 to
+        /// 0.15 u, about 6 px, and was lost in the stone's own shading). A test holds the pixel size.
+        /// </summary>
+        public const float CrackSegMin = 0.16f, CrackSegMax = 0.5f, CrackWidthMin = 0.085f, CrackWidthMax = 0.15f;
+
+        /// <summary>Resting lean of a cracked wall block (degrees) at the heaviest stage, and at stage 2 (was 7 and 4).</summary>
+        public const float CrackedLeanDeg = 10f, DamagedLeanDeg = 5f;
+
+        /// <summary>On-screen size in pixels of a world size seen square-on at a distance with a vertical field of view.</summary>
+        public static float PixelsAt(float worldSize, float distance, float fovDeg, int screenH) =>
+            worldSize / (2f * distance * Mathf.Tan(fovDeg * 0.5f * Mathf.Deg2Rad)) * screenH;
     }
 
     /// <summary>Slot picker for a fixed ring of pooled pieces: the free slot, else the oldest (so the cap is never passed).</summary>
