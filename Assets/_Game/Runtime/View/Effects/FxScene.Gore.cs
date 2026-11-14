@@ -359,6 +359,14 @@ namespace CriticalMass.Runtime.View.Effects
             uint sd = d.Seed;
             // Neutral ground ink (world around arena 1), never a team hue.
             Color32 navy = A(Navy, fade * 0.55f), mid = A(GroundInkMid, fade * GroundInkAlpha), dark = A(GroundInkDark, fade * GroundInkAlpha), light = A(GroundInkLight, fade * GroundInkAlpha);
+            if (d.Shape == 6)
+            {
+                // polish-5: the knock-out pool is dark blood red (see PoolMid); its rim a darker red, not navy.
+                navy = A(PoolDark, fade * 0.6f);
+                mid = A(PoolMid, fade * PoolAlpha);
+                dark = A(PoolDark, fade * PoolAlpha);
+                light = A(PoolLight, fade * PoolAlpha);
+            }
             switch (d.Shape)
             {
                 case 1:
