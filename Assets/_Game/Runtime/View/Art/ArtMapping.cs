@@ -155,6 +155,10 @@ namespace CriticalMass.Runtime.View.Art
         /// <summary>Kaiju clips the Kaiju art branch adds (art/kaiju-blender, DG-91); used when present, else the old poses.</summary>
         public const string Swipe = "Swipe", SwipeWindup = "SwipeWindup", Flinch = "Flinch";
 
+        /// <summary>rig-kaiju-2: the green-crystal adult's bridge walk (same cycle and stride as Walk, fists tucked, stance
+        /// narrowed to about 1.6 m): blended over Walk by KaijuAnimator.Squeeze (feat/kaiju-bridges-1) once that lands.</summary>
+        public const string WalkSqueeze = "WalkSqueeze";
+
         /// <summary>The 24 clips beyond the original 8 that KayKit_Clips.fbx carries once build_kaykit_clips.py is re-run.</summary>
         public static readonly string[] KaykitExtraClips =
         {
@@ -165,7 +169,7 @@ namespace CriticalMass.Runtime.View.Art
         /// <summary>Clips that loop (Loop Time on import).</summary>
         public static readonly string[] LoopingClips =
         {
-            Idle, Walk, Run, Gather, Shake, Berserk, StrafeL, StrafeR, WalkBack, JumpAir, Blocking, Carry, IdleLook, SitIdle,
+            Idle, Walk, Run, Gather, Shake, Berserk, WalkSqueeze, StrafeL, StrafeR, WalkBack, JumpAir, Blocking, Carry, IdleLook, SitIdle,
         };
 
         /// <summary>
@@ -258,6 +262,9 @@ namespace CriticalMass.Runtime.View.Art
             "Assets/_Game/Art/Kaiju/Kaiju_Face_Berserk.png", "Assets/_Game/Art/Kaiju/Kaiju_Face_Hurt.png",
             "Assets/_Game/Art/Kaiju/Kaiju_Face_Sleepy.png", "Assets/_Game/Art/Kaiju/Kaiju_Face_Blink.png",
         };
+
+        /// <summary>Bones of the green-crystal adult rig (rig-kaiju-2; the FBX exports every bone, Root included).</summary>
+        public const int KaijuAdultBones = 46;
 
         /// <summary>The first seconds of the hatchling stage show the sleepy face (egg-fresh).</summary>
         public const double HatchlingSleepySeconds = 3.0;
@@ -359,11 +366,18 @@ namespace CriticalMass.Runtime.View.Art
                 Bones = 20, OwnClips = new[] { Idle, Walk, Roar, SlamWindup, Slam, Swipe, Berserk, KO }, Meshes = new[] { "Kaiju_Hero", "Kaiju_LOD0", "Kaiju_LOD1", "Kaiju_Shadow" },
                 MaskCodes = new[] { 0, 6 }, OutlinePx = CharacterHullPx, Authored = KaijuDefault(GlowNeutral), Height = 2.235f, FaceTexture = KaijuFace,
                 Expressions = KaijuExpressionTextures, ArtYawDeg = 180f },
+            // rig-kaiju-2 (2026-11-14, owner: "Switch, I love it"): the green-crystal adult from art/gen-models-2, rigged by
+            // script (Kaiju/_rig2~/kr2_build.py): KAIJU_ADULT_BONES bones (the old names kept: Root, Hips, Spine, Chest, Neck,
+            // Head, Jaw, Tail1.., Arm/Forearm/Fist, Thigh/Shin/Foot, plus Spine2/3, Shoulder, 3 knuckles a fist, Toes, Tail4..7
+            // and one bone per back crystal cluster). Its face is painted in the vertex colour (no decal, no expression
+            // atlases): anger reads through the jaw and a head dip (KaijuAnimator) and the glow eyes take the allegiance colour.
+            // Fallback: Kaiju/_fallback~/Kaiju_Adult.fbx (the pre-switch file; same .meta) with Bones = 22,
+            // Authored = KaijuDefault(GlowAzure), FaceTexture = KaijuFace, Expressions = KaijuExpressionTextures, no VertexColourFace.
             new ModelSpec { Key = KaijuAdult, AssetPath = "Assets/_Game/Art/Kaiju/Kaiju_Adult.fbx", Kind = ArtKind.Kaiju, Rigged = true,
-                Bones = 22,   // kaiju-walk-1: each hind leg Thigh > Shin > Foot (Foot_L/Foot_R = the planted foot at the sole)
+                Bones = KaijuAdultBones,
                 OwnClips = new[] { Idle, Walk, Roar, SlamWindup, Slam, Swipe, Berserk, KO }, Meshes = new[] { "Kaiju_Hero", "Kaiju_LOD0", "Kaiju_LOD1", "Kaiju_Shadow" },
-                MaskCodes = new[] { 0, 6 }, OutlinePx = CharacterHullPx, Authored = KaijuDefault(GlowAzure), Height = 5.0f, FaceTexture = KaijuFace,
-                Expressions = KaijuExpressionTextures, ArtYawDeg = 180f },
+                MaskCodes = new[] { 0, 6 }, OutlinePx = CharacterHullPx, Authored = KaijuDefault(GlowNeutral), Height = 5.0f,
+                VertexColourFace = true, ArtYawDeg = 180f },
             new ModelSpec { Key = KaijuShards, AssetPath = "Assets/_Game/Art/Kaiju/Kaiju_BerserkShards.fbx", Kind = ArtKind.Kaiju,
                 Meshes = new[] { "Kaiju_BerserkShards" }, MaskCodes = new[] { 6 }, OutlinePx = 0f, Authored = KaijuDefault(GlowAzure) },
             new ModelSpec { Key = KaijuSpikes, AssetPath = "Assets/_Game/Art/Kaiju/Kaiju_TelegraphSpikes.fbx", Kind = ArtKind.Kaiju,

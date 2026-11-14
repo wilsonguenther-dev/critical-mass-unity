@@ -1,0 +1,616 @@
+{
+ "log": [
+  "    0.4 old adult footprint {'rest': {'all': 5.094, 'low': 5.094, 'ground_z_lt_0.4': 5.046, 'low_half_max': 2.565, 'feet': 2.46, 'height': 5.0}, 'idle': {'all': 5.094, 'low': 5.094, 'ground_z_lt_0.4': 5.046, 'low_half_max': 2.562, 'feet': 2.46, 'height': 5.0}}",
+  "    0.5 footprint {'new_rest_low_half': 2.381, 'old_idle_low_half': 2.562, 'fist_in': 0.0}",
+  "    0.5 imported {'Hero': 23520, 'LOD0': 10780, 'LOD1': 1470, 'Shadow': 1372} bbox [[-2.448, -1.99, 0.0], [2.641, 3.594, 5.0]]",
+  "    0.5 crystal clusters [('Crystal1', [-0.06, -1.52, 3.43], [-0.06, -1.43, 3.99], 46), ('Crystal2', [-0.06, -1.14, 3.73], [-0.06, -1.01, 4.89], 89), ('Crystal3', [-0.06, -0.95, 4.16], [-0.06, -0.96, 5.0], 62), ('Crystal4', [-0.06, -0.47, 4.22], [-0.06, -0.47, 4.52], 19), ('Crystal5', [-0.06, -0.1, 4.16], [-0.06, 0.1, 4.59], 21), ('Crystal6', [-0.06, 0.32, 4.01], [-0.06, 0.3, 5.0], 92), ('Crystal7', [-0.06, 0.64, 3.84], [-0.05, 0.63, 4.57], 78), ('Crystal8', [-0.06, 0.93, 3.22], [-0.05, 0.9, 4.26], 64)]",
+  "    0.5 bones 46",
+  "    0.6 mouth Hero rip edges 20 jaw faces 116 rim up/lo 19 19",
+  "    0.6 mouth LOD0 rip edges 17 jaw faces 50 rim up/lo 16 16",
+  "    0.8 proxy verts 28114",
+  "    2.6 proxy weights {'verts': 28114, 'heat_ok': True, 'unweighted': 0}",
+  "    3.5 weights Hero {'verts': 11779, 'rigid_head': 940, 'jaw': 70, 'crystal_verts': 478, 'tail_crystal_verts': 598, 'rigid_plates': 21, 'plate_verts': 175, 'max_infl': 4, 'unweighted': 0}",
+  "    3.8 weights LOD0 {'verts': 5406, 'rigid_head': 446, 'jaw': 34, 'crystal_verts': 202, 'tail_crystal_verts': 287, 'rigid_plates': 12, 'plate_verts': 46, 'max_infl': 4, 'unweighted': 0}",
+  "    3.9 weights LOD1 {'verts': 735, 'rigid_head': 53, 'jaw': 4, 'crystal_verts': 48, 'tail_crystal_verts': 43, 'rigid_plates': 0, 'plate_verts': 0, 'max_infl': 4, 'unweighted': 0}",
+  "    3.9 weights Shadow {'verts': 686, 'rigid_head': 50, 'jaw': 3, 'crystal_verts': 0, 'tail_crystal_verts': 0, 'rigid_plates': 0, 'plate_verts': 0, 'max_infl': 4, 'unweighted': 0}",
+  "    4.0 extras Hero 5 tris now 23789",
+  "    4.0 extras LOD0 4 tris now 11048",
+  "    4.0 clip Idle {'frames': 90, 'loop': True, 'foot_lift_L': 0.0, 'foot_lift_R': 0.0, 'fist_R_peak_frame': 10, 'fist_R_peak_mps': 0.0, 'hips_min_z': 1.65}",
+  "    4.1 clip Walk {'frames': 30, 'loop': True, 'foot_lift_L': 0.318, 'foot_lift_R': 0.318, 'fist_R_peak_frame': 16, 'fist_R_peak_mps': 6.13, 'hips_min_z': 1.581, 'planted_speed': 2.505, 'stride_m': 1.56}",
+  "    4.1 clip WalkSqueeze {'frames': 30, 'loop': True, 'foot_lift_L': 0.199, 'foot_lift_R': 0.199, 'fist_R_peak_frame': 16, 'fist_R_peak_mps': 6.12, 'hips_min_z': 1.41}",
+  "    4.1 clip SlamWindup {'frames': 30, 'loop': False, 'foot_lift_L': 0.0, 'foot_lift_R': 0.0, 'fist_R_peak_frame': 13, 'fist_R_peak_mps': 7.97, 'hips_min_z': 1.7}",
+  "    4.2 clip Slam {'frames': 36, 'loop': False, 'foot_lift_L': 0.0, 'foot_lift_R': 0.0, 'fist_R_peak_frame': 4, 'fist_R_peak_mps': 31.07, 'hips_min_z': 1.342}",
+  "    4.2 clip Swipe {'frames': 36, 'loop': False, 'foot_lift_L': 0.0, 'foot_lift_R': 0.0, 'fist_R_peak_frame': 12, 'fist_R_peak_mps': 35.97, 'hips_min_z': 1.7}",
+  "    4.2 clip Roar {'frames': 60, 'loop': False, 'foot_lift_L': 0.0, 'foot_lift_R': 0.0, 'fist_R_peak_frame': 13, 'fist_R_peak_mps': 1.96, 'hips_min_z': 1.626}",
+  "    4.3 clip Berserk {'frames': 60, 'loop': True, 'foot_lift_L': 0.0, 'foot_lift_R': 0.0, 'fist_R_peak_frame': 21, 'fist_R_peak_mps': 15.23, 'hips_min_z': 1.851}",
+  "    4.3 clip KO {'frames': 60, 'loop': False, 'foot_lift_L': 0.0, 'foot_lift_R': 0.0, 'fist_R_peak_frame': 12, 'fist_R_peak_mps': 2.76, 'hips_min_z': 0.98}",
+  "    4.4 clip Flinch {'frames': 15, 'loop': False, 'foot_lift_L': 0.0, 'foot_lift_R': 0.0, 'fist_R_peak_frame': 6, 'fist_R_peak_mps': 0.0, 'hips_min_z': 1.7}",
+  "    6.1 stress arm_raised {'p99': 3.034, 'max': 24.41, 'torn_edges': 2116, 'worst_at': [-0.79, -0.3, 2.04], 'lowest_z': 0.001}",
+  "    6.4 stress slam {'p99': 1.875, 'max': 10.51, 'torn_edges': 458, 'worst_at': [0.74, -0.36, 2.02], 'lowest_z': -0.192}",
+  "    6.7 stress swipe {'p99': 1.778, 'max': 25.02, 'torn_edges': 419, 'worst_at': [-0.79, -0.3, 2.04], 'lowest_z': 0.001}",
+  "    7.0 stress tail_curl {'p99': 1.389, 'max': 6.85, 'torn_edges': 119, 'worst_at': [1.61, 2.99, 0.04], 'lowest_z': -0.67}",
+  "    7.7 stress jaw_open {'p99': 1.343, 'max': 12.28, 'torn_edges': 125, 'worst_at': [0.02, -1.33, 4.15], 'lowest_z': 0.0}",
+  "    8.0 stress crouch {'p99': 1.502, 'max': 8.21, 'torn_edges': 165, 'worst_at': [0.02, -1.33, 4.15], 'lowest_z': -0.42}",
+  "   12.7 strip Idle [0, 18, 36, 54, 72, 90]",
+  "   15.3 strip Walk [0, 5, 10, 15, 20, 25]",
+  "   17.7 strip WalkSqueeze [0, 5, 10, 15, 20, 25]",
+  "   19.9 strip SlamWindup [0, 6, 12, 18, 24, 30]",
+  "   22.1 strip Slam [0, 3, 6, 10, 20, 36]",
+  "   24.3 strip Swipe [0, 8, 12, 15, 20, 30]",
+  "   26.5 strip Roar [0, 12, 24, 36, 48, 60]",
+  "   28.6 strip Berserk [0, 12, 24, 36, 48, 60]",
+  "   30.8 strip KO [0, 12, 24, 36, 48, 60]",
+  "   33.0 strip Flinch [0, 3, 6, 9, 12, 15]",
+  "   34.6 export {'result': ['FINISHED'], 'bytes': 4273068}",
+  "   35.5 new adult footprint {'rest': {'all': 4.847, 'low': 4.729, 'ground_z_lt_0.4': 4.605, 'low_half_max': 2.405, 'feet': 2.544, 'height': 4.999}, 'idle': {'all': 4.817, 'low': 4.742, 'ground_z_lt_0.4': 4.664, 'low_half_max': 2.404, 'feet': 2.543, 'height': 4.999}, 'squeeze': {'all': 3.32, 'low': 1.961, 'ground_z_lt_0.4': 1.538, 'low_half_max': 1.04, 'feet': 1.594, 'height': 4.699}}",
+  "   35.5 verify {\"objects\": {\"Kaiju_Shadow\": {\"tris\": 1372, \"colors\": [\"Col\"], \"groups\": 37, \"max_infl\": 4, \"zmax\": 4.957}, \"Kaiju_LOD0\": {\"tris\": 11048, \"colors\": [\"Col\"], \"groups\": 45, \"max_infl\": 4, \"zmax\": 5.009}, \"Kaiju_Hero\": {\"tris\": 23789, \"colors\": [\"Col\"], \"groups\": 46, \"max_infl\": 4, \"zmax\": 5.0}, \"Kaiju_LOD1\": {\"tris\": 1470, \"colors\": [\"Col\"], \"groups\": 45, \"max_infl\": 4, \"zmax\": 5.015}}, \"actions\": {\"KaijuRig|Berserk\": [1.0, 61.0], \"KaijuRig|Flinch\": [1.0, 16.0], \"KaijuRig|Idle\": [1.0, 91.0], \"KaijuRig|KO\": [1.0, 61.0], \"KaijuRig|Roar\": [1.0, 61.0], \"KaijuRig|Slam\": [1.0, 37.0], \"KaijuRig|SlamWindup\": [1.0, 31.0], \"KaijuRig|Swipe\": [1.0, 37.0], \"KaijuRig|Walk\": [1.0, 31.0], \"KaijuRig|WalkSqueeze\": [1.0, 31.0]}, \"bones\": 46}"
+ ],
+ "started": "2026-11-14T20:26:06Z",
+ "old_footprint": {
+  "rest": {
+   "all": 5.094,
+   "low": 5.094,
+   "ground_z_lt_0.4": 5.046,
+   "low_half_max": 2.565,
+   "feet": 2.46,
+   "height": 5.0
+  },
+  "idle": {
+   "all": 5.094,
+   "low": 5.094,
+   "ground_z_lt_0.4": 5.046,
+   "low_half_max": 2.562,
+   "feet": 2.46,
+   "height": 5.0
+  }
+ },
+ "input_tris": {
+  "Hero": 23520,
+  "LOD0": 10780,
+  "LOD1": 1470,
+  "Shadow": 1372
+ },
+ "recentred_bbox": [
+  [
+   -2.448,
+   -1.99,
+   0.0
+  ],
+  [
+   2.641,
+   3.594,
+   5.0
+  ]
+ ],
+ "footprint": {
+  "new_rest_low_half": 2.381,
+  "old_idle_low_half": 2.562,
+  "fist_in": 0.0
+ },
+ "crystals": [
+  [
+   "Crystal1",
+   [
+    -0.06,
+    -1.52,
+    3.43
+   ],
+   [
+    -0.06,
+    -1.43,
+    3.99
+   ],
+   46
+  ],
+  [
+   "Crystal2",
+   [
+    -0.06,
+    -1.14,
+    3.73
+   ],
+   [
+    -0.06,
+    -1.01,
+    4.89
+   ],
+   89
+  ],
+  [
+   "Crystal3",
+   [
+    -0.06,
+    -0.95,
+    4.16
+   ],
+   [
+    -0.06,
+    -0.96,
+    5.0
+   ],
+   62
+  ],
+  [
+   "Crystal4",
+   [
+    -0.06,
+    -0.47,
+    4.22
+   ],
+   [
+    -0.06,
+    -0.47,
+    4.52
+   ],
+   19
+  ],
+  [
+   "Crystal5",
+   [
+    -0.06,
+    -0.1,
+    4.16
+   ],
+   [
+    -0.06,
+    0.1,
+    4.59
+   ],
+   21
+  ],
+  [
+   "Crystal6",
+   [
+    -0.06,
+    0.32,
+    4.01
+   ],
+   [
+    -0.06,
+    0.3,
+    5.0
+   ],
+   92
+  ],
+  [
+   "Crystal7",
+   [
+    -0.06,
+    0.64,
+    3.84
+   ],
+   [
+    -0.05,
+    0.63,
+    4.57
+   ],
+   78
+  ],
+  [
+   "Crystal8",
+   [
+    -0.06,
+    0.93,
+    3.22
+   ],
+   [
+    -0.05,
+    0.9,
+    4.26
+   ],
+   64
+  ]
+ ],
+ "bones": [
+  "Root",
+  "Hips",
+  "Spine",
+  "Spine2",
+  "Spine3",
+  "Chest",
+  "Neck",
+  "Head",
+  "Jaw",
+  "Crystal1",
+  "Shoulder_L",
+  "Arm_L",
+  "Forearm_L",
+  "Fist_L",
+  "Knuckle1_L",
+  "Knuckle2_L",
+  "Knuckle3_L",
+  "Shoulder_R",
+  "Arm_R",
+  "Forearm_R",
+  "Fist_R",
+  "Knuckle1_R",
+  "Knuckle2_R",
+  "Knuckle3_R",
+  "Crystal2",
+  "Crystal3",
+  "Crystal4",
+  "Crystal5",
+  "Crystal6",
+  "Crystal7",
+  "Crystal8",
+  "Tail1",
+  "Tail2",
+  "Tail3",
+  "Tail4",
+  "Tail5",
+  "Tail6",
+  "Tail7",
+  "Thigh_L",
+  "Shin_L",
+  "Foot_L",
+  "Toes_L",
+  "Thigh_R",
+  "Shin_R",
+  "Foot_R",
+  "Toes_R"
+ ],
+ "bone_count": 46,
+ "mouth": {
+  "Hero": {
+   "rip_edges": 20,
+   "jaw_faces": 116,
+   "rim_up": 19,
+   "rim_lo": 19
+  },
+  "LOD0": {
+   "rip_edges": 17,
+   "jaw_faces": 50,
+   "rim_up": 16,
+   "rim_lo": 16
+  }
+ },
+ "proxy": {
+  "verts": 28114,
+  "heat_ok": true,
+  "unweighted": 0
+ },
+ "weights": {
+  "Hero": {
+   "verts": 11779,
+   "rigid_head": 940,
+   "jaw": 70,
+   "crystal_verts": 478,
+   "tail_crystal_verts": 598,
+   "rigid_plates": 21,
+   "plate_verts": 175,
+   "max_infl": 4,
+   "unweighted": 0
+  },
+  "LOD0": {
+   "verts": 5406,
+   "rigid_head": 446,
+   "jaw": 34,
+   "crystal_verts": 202,
+   "tail_crystal_verts": 287,
+   "rigid_plates": 12,
+   "plate_verts": 46,
+   "max_infl": 4,
+   "unweighted": 0
+  },
+  "LOD1": {
+   "verts": 735,
+   "rigid_head": 53,
+   "jaw": 4,
+   "crystal_verts": 48,
+   "tail_crystal_verts": 43,
+   "rigid_plates": 0,
+   "plate_verts": 0,
+   "max_infl": 4,
+   "unweighted": 0
+  },
+  "Shadow": {
+   "verts": 686,
+   "rigid_head": 50,
+   "jaw": 3,
+   "crystal_verts": 0,
+   "tail_crystal_verts": 0,
+   "rigid_plates": 0,
+   "plate_verts": 0,
+   "max_infl": 4,
+   "unweighted": 0
+  }
+ },
+ "tris": {
+  "Hero": 23789,
+  "LOD0": 11048,
+  "LOD1": 1470,
+  "Shadow": 1372
+ },
+ "clips": {
+  "Idle": {
+   "frames": 90,
+   "loop": true,
+   "foot_lift_L": 0.0,
+   "foot_lift_R": 0.0,
+   "fist_R_peak_frame": 10,
+   "fist_R_peak_mps": 0.0,
+   "hips_min_z": 1.65
+  },
+  "Walk": {
+   "frames": 30,
+   "loop": true,
+   "foot_lift_L": 0.318,
+   "foot_lift_R": 0.318,
+   "fist_R_peak_frame": 16,
+   "fist_R_peak_mps": 6.13,
+   "hips_min_z": 1.581,
+   "planted_speed": 2.505,
+   "stride_m": 1.56
+  },
+  "WalkSqueeze": {
+   "frames": 30,
+   "loop": true,
+   "foot_lift_L": 0.199,
+   "foot_lift_R": 0.199,
+   "fist_R_peak_frame": 16,
+   "fist_R_peak_mps": 6.12,
+   "hips_min_z": 1.41
+  },
+  "SlamWindup": {
+   "frames": 30,
+   "loop": false,
+   "foot_lift_L": 0.0,
+   "foot_lift_R": 0.0,
+   "fist_R_peak_frame": 13,
+   "fist_R_peak_mps": 7.97,
+   "hips_min_z": 1.7
+  },
+  "Slam": {
+   "frames": 36,
+   "loop": false,
+   "foot_lift_L": 0.0,
+   "foot_lift_R": 0.0,
+   "fist_R_peak_frame": 4,
+   "fist_R_peak_mps": 31.07,
+   "hips_min_z": 1.342
+  },
+  "Swipe": {
+   "frames": 36,
+   "loop": false,
+   "foot_lift_L": 0.0,
+   "foot_lift_R": 0.0,
+   "fist_R_peak_frame": 12,
+   "fist_R_peak_mps": 35.97,
+   "hips_min_z": 1.7
+  },
+  "Roar": {
+   "frames": 60,
+   "loop": false,
+   "foot_lift_L": 0.0,
+   "foot_lift_R": 0.0,
+   "fist_R_peak_frame": 13,
+   "fist_R_peak_mps": 1.96,
+   "hips_min_z": 1.626
+  },
+  "Berserk": {
+   "frames": 60,
+   "loop": true,
+   "foot_lift_L": 0.0,
+   "foot_lift_R": 0.0,
+   "fist_R_peak_frame": 21,
+   "fist_R_peak_mps": 15.23,
+   "hips_min_z": 1.851
+  },
+  "KO": {
+   "frames": 60,
+   "loop": false,
+   "foot_lift_L": 0.0,
+   "foot_lift_R": 0.0,
+   "fist_R_peak_frame": 12,
+   "fist_R_peak_mps": 2.76,
+   "hips_min_z": 0.98
+  },
+  "Flinch": {
+   "frames": 15,
+   "loop": false,
+   "foot_lift_L": 0.0,
+   "foot_lift_R": 0.0,
+   "fist_R_peak_frame": 6,
+   "fist_R_peak_mps": 0.0,
+   "hips_min_z": 1.7
+  }
+ },
+ "new_fists_x": {
+  "Idle": [
+   1.93,
+   -1.93
+  ],
+  "Walk": [
+   1.93,
+   -1.93
+  ],
+  "WalkSqueeze": [
+   0.48,
+   -0.48
+  ]
+ },
+ "stress": {
+  "arm_raised": {
+   "p99": 3.034,
+   "max": 24.41,
+   "torn_edges": 2116,
+   "worst_at": [
+    -0.79,
+    -0.3,
+    2.04
+   ],
+   "lowest_z": 0.001
+  },
+  "slam": {
+   "p99": 1.875,
+   "max": 10.51,
+   "torn_edges": 458,
+   "worst_at": [
+    0.74,
+    -0.36,
+    2.02
+   ],
+   "lowest_z": -0.192
+  },
+  "swipe": {
+   "p99": 1.778,
+   "max": 25.02,
+   "torn_edges": 419,
+   "worst_at": [
+    -0.79,
+    -0.3,
+    2.04
+   ],
+   "lowest_z": 0.001
+  },
+  "tail_curl": {
+   "p99": 1.389,
+   "max": 6.85,
+   "torn_edges": 119,
+   "worst_at": [
+    1.61,
+    2.99,
+    0.04
+   ],
+   "lowest_z": -0.67
+  },
+  "jaw_open": {
+   "p99": 1.343,
+   "max": 12.28,
+   "torn_edges": 125,
+   "worst_at": [
+    0.02,
+    -1.33,
+    4.15
+   ],
+   "lowest_z": 0.0
+  },
+  "crouch": {
+   "p99": 1.502,
+   "max": 8.21,
+   "torn_edges": 165,
+   "worst_at": [
+    0.02,
+    -1.33,
+    4.15
+   ],
+   "lowest_z": -0.42
+  }
+ },
+ "export": {
+  "result": [
+   "FINISHED"
+  ],
+  "bytes": 4273068
+ },
+ "verify": {
+  "objects": {
+   "Kaiju_Shadow": {
+    "tris": 1372,
+    "colors": [
+     "Col"
+    ],
+    "groups": 37,
+    "max_infl": 4,
+    "zmax": 4.957
+   },
+   "Kaiju_LOD0": {
+    "tris": 11048,
+    "colors": [
+     "Col"
+    ],
+    "groups": 45,
+    "max_infl": 4,
+    "zmax": 5.009
+   },
+   "Kaiju_Hero": {
+    "tris": 23789,
+    "colors": [
+     "Col"
+    ],
+    "groups": 46,
+    "max_infl": 4,
+    "zmax": 5.0
+   },
+   "Kaiju_LOD1": {
+    "tris": 1470,
+    "colors": [
+     "Col"
+    ],
+    "groups": 45,
+    "max_infl": 4,
+    "zmax": 5.015
+   }
+  },
+  "actions": {
+   "KaijuRig|Berserk": [
+    1.0,
+    61.0
+   ],
+   "KaijuRig|Flinch": [
+    1.0,
+    16.0
+   ],
+   "KaijuRig|Idle": [
+    1.0,
+    91.0
+   ],
+   "KaijuRig|KO": [
+    1.0,
+    61.0
+   ],
+   "KaijuRig|Roar": [
+    1.0,
+    61.0
+   ],
+   "KaijuRig|Slam": [
+    1.0,
+    37.0
+   ],
+   "KaijuRig|SlamWindup": [
+    1.0,
+    31.0
+   ],
+   "KaijuRig|Swipe": [
+    1.0,
+    37.0
+   ],
+   "KaijuRig|Walk": [
+    1.0,
+    31.0
+   ],
+   "KaijuRig|WalkSqueeze": [
+    1.0,
+    31.0
+   ]
+  },
+  "bones": 46
+ },
+ "new_footprint": {
+  "rest": {
+   "all": 4.847,
+   "low": 4.729,
+   "ground_z_lt_0.4": 4.605,
+   "low_half_max": 2.405,
+   "feet": 2.544,
+   "height": 4.999
+  },
+  "idle": {
+   "all": 4.817,
+   "low": 4.742,
+   "ground_z_lt_0.4": 4.664,
+   "low_half_max": 2.404,
+   "feet": 2.543,
+   "height": 4.999
+  },
+  "squeeze": {
+   "all": 3.32,
+   "low": 1.961,
+   "ground_z_lt_0.4": 1.538,
+   "low_half_max": 1.04,
+   "feet": 1.594,
+   "height": 4.699
+  }
+ },
+ "seconds": 35.5
+}

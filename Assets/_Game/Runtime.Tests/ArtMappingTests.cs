@@ -146,7 +146,7 @@ namespace CriticalMass.Runtime.Tests
             Assert.AreEqual(1f, ArtMaterials.ForGlow(adult, ArtMapping.GlowBerserk).GetFloat("_Berserk"), "berserk darkens the plates");
             Material calm = ArtMaterials.ForGlow(adult, ArtMapping.GlowAzure);
             Assert.AreEqual(0f, calm.GetFloat("_Berserk"));
-            Assert.AreEqual(1f, calm.GetFloat("_DecalOn"), "Kaiju face atlas");
+            Assert.AreEqual(adult.FaceTexture != null ? 1f : 0f, calm.GetFloat("_DecalOn"), "Kaiju face atlas (rig-kaiju-2: none on the vertex-colour face)");
             Assert.AreEqual(0f, ArtMaterials.ForGlow(ArtMapping.Spec(ArtMapping.KaijuShards), ArtMapping.GlowBerserk).GetFloat("_Berserk"),
                 "shards are all glow: nothing to darken, and only Kaiju creature stages are switched");
         }
