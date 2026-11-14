@@ -472,7 +472,8 @@ namespace CriticalMass.Runtime.View.Effects
             if (e.B == Damage.KaijuSource) AddBurst(t, contact + Vector3.up * 0.2f, 1.05f, 5, seed + 1, tan, S(0.24));
 
             // Knock-back dust at the feet, blown along the hit.
-            if (tier >= 1)
+            // feat/light-weapons-2: a light-weapon hit shoves, so it gets the same dust (two puffs) to read as a push-back.
+            if (tier >= 1 || CriticalMass.Runtime.View.Anim.LightWeaponView.Shoves(_cfg, e.HasAttacker, e.AttCls))
             {
                 Vector3 feet = W(e.X, h + 0.12, e.Z);
                 for (int k = 0; k < 2 + tier; k++) AddPuff(t, feet, seed, (uint)(k + 60), 0.3f + 0.06f * tier, DustMid, 2, e.DirX, e.DirZ);
@@ -562,13 +563,13 @@ namespace CriticalMass.Runtime.View.Effects
         private void AddTrail(double t, FxEvent e, World w)
         {
             ref Trail tr = ref _trails[_nt++ % MaxTrails];
-            ClassConfig cc = _cfg.Class(e.Cls);
             double h = Ground(e.X, e.Z);
             tr.Born = t;
             tr.P = W(e.X, h, e.Z);
             tr.Facing = (float)Math.Atan2(e.DirZ, e.DirX);
-            tr.Arc = (float)(cc.AttackArcDeg * Math.PI / 180);
-            tr.Radius = (float)cc.AttackRange * 0.82f;
+            // feat/light-weapons-2: a light weapon draws its own short arc (its reach and width, not the class row's).
+            tr.Arc = (float)(CriticalMass.Runtime.View.Anim.LightWeaponView.ArcDeg(_cfg, e.Cls) * Math.PI / 180);
+            tr.Radius = (float)CriticalMass.Runtime.View.Anim.LightWeaponView.Range(_cfg, e.Cls) * 0.82f;
             tr.Team = e.Team == TeamId.Azure ? AzureC : CrimsonC;
             tr.Kind = (byte)e.Cls;
         }

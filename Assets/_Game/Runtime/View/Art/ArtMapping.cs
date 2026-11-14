@@ -24,6 +24,12 @@ namespace CriticalMass.Runtime.View.Art
     public sealed class ModelSpec
     {
         public string Key;
+        /// <summary>
+        /// feat/light-weapons-2: the class's light weapon is modelled into this character mesh already (the Builder's mallet
+        /// rigid on handslot.r, the Healer's lantern in her left hand: art/fighter-lods d536d30 folded them into every LOD).
+        /// False (every new model unless it says so): Anim.WeaponProps attaches the prop to the hand slot at run time.
+        /// </summary>
+        public bool HeldWeaponInMesh;
         /// <summary>Project path of the FBX (Assets/_Game/Art/**).</summary>
         public string AssetPath;
         public ArtKind Kind;
@@ -318,12 +324,12 @@ namespace CriticalMass.Runtime.View.Art
                 Meshes = new[] { "Builder_Hero", "Builder_LOD0", "Builder_LOD1", "Builder_Shadow" }, MaskCodes = new[] { 0, 8 },
                 // Height: the Hero mesh's bind-pose top is the ladder corner on his back (2.329 m in the FBX; cap crown 1.895).
                 OutlinePx = CharacterHullPx, Rim = 0.6f, Authored = BuilderAzure, Crimson = BuilderCrimson, Height = 2.33f,
-                FaceTexture = "Assets/_Game/Art/Builder/BuilderFace.png", FaceSlot = 1, ArtYawDeg = 180f },
+                FaceTexture = "Assets/_Game/Art/Builder/BuilderFace.png", FaceSlot = 1, ArtYawDeg = 180f, HeldWeaponInMesh = true },
             new ModelSpec { Key = Healer, AssetPath = "Assets/_Game/Art/Healer/Healer.fbx", Kind = ArtKind.Character, Rigged = true,
                 Bones = 41, ClipSource = "Assets/_Game/Art/Characters/KayKit_Clips.fbx",
                 Meshes = new[] { "Healer_Hero", "Healer_LOD0", "Healer_LOD1", "Healer_Shadow" }, MaskCodes = new[] { 0, 6, 8 },
                 OutlinePx = CharacterHullPx, Rim = 0.6f, Authored = MinerAzure, Crimson = MinerCrimson, Height = 2.0f,
-                FaceTexture = "Assets/_Game/Art/Healer/HealerFace.png", FaceSlot = 1, ArtYawDeg = 180f },
+                FaceTexture = "Assets/_Game/Art/Healer/HealerFace.png", FaceSlot = 1, ArtYawDeg = 180f, HeldWeaponInMesh = true },
             new ModelSpec { Key = DemolitionsProps, AssetPath = "Assets/_Game/Art/Demolitions/DemolitionsProps.fbx", Kind = ArtKind.Prop,
                 Meshes = new[] { MineBuried, MineArmed, MineOwnerRing, MineTriggered, TntFlight, CraterRim, Explosion },
                 OutlinePx = 2.5f, Authored = MinerAzure, Crimson = MinerCrimson },

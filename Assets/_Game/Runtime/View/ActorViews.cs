@@ -62,6 +62,9 @@ namespace CriticalMass.Runtime.View
         private double _eggIdleT;
         private readonly Anim.KaijuAnimator _kaijuAnim = new Anim.KaijuAnimator();
         private Anim.CarryProp _carryProp;
+        /// <summary>feat/light-weapons-2: the light weapons in the hand (its own listener file).</summary>
+        private Anim.WeaponProps _weaponProps;
+        public Anim.WeaponProps WeaponProps => _weaponProps;
         private Anim.ActorPoseState _poseState;
 
         private Transform[] _nodes;
@@ -95,6 +98,8 @@ namespace CriticalMass.Runtime.View
             for (int i = 0; i < capacity; i++) _actors[i] = new CharSlot { Anim = new Anim.ActorAnimator(i) };
             _carryProp = new Anim.CarryProp(_catalog);
             Anim.PostPoseHooks.Register(_carryProp);
+            _weaponProps = new Anim.WeaponProps(_catalog);
+            Anim.PostPoseHooks.Register(_weaponProps);
             // DG-108: one model per class built before the first tick, so the match never instantiates mid-fight.
             foreach (ClassId c in ClassIds.All)
             {
@@ -148,6 +153,7 @@ namespace CriticalMass.Runtime.View
         private void OnDestroy()
         {
             if (_carryProp != null) Anim.PostPoseHooks.Unregister(_carryProp);
+            if (_weaponProps != null) Anim.PostPoseHooks.Unregister(_weaponProps);
             foreach (Stack<ModelView> s in _pool.Values) foreach (ModelView m in s) m.Dispose();
         }
 
