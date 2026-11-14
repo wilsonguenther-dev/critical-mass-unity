@@ -495,6 +495,13 @@ namespace CriticalMass.Runtime.View.Effects
             _scene.SetFoliage(FxScene.FoliageMask(view.Plan, _driver.World.Map));
         }
 
+        /// <summary>smoke-look-1 capture: one view-only explosion ageSeconds old at sim (x, z), every other effect cleared.</summary>
+        public void PreviewExplosion(double ageSeconds, double x, double z, float R, ExplosionKind kind)
+        {
+            if (_scene == null || _driver == null || _driver.World == null) return;
+            _scene.PreviewExplosion(SimNow(), ageSeconds, x, z, R, kind, _driver.World);
+        }
+
         /// <summary>Advance and rebuild the effect meshes for a camera basis (also called by tests and the capture tool).</summary>
         public void Rebuild(Vector3 camRight, Vector3 camUp)
         {

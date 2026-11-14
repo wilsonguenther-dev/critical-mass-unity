@@ -143,6 +143,8 @@ namespace CriticalMass.Runtime.Camera
                 gameObject.AddComponent<GroundViewShots>().View = this;
             if (AutoplayArgs.HasAutomationFlag(FollowCameraShots.Flag) && GetComponent<FollowCameraShots>() == null)
                 gameObject.AddComponent<FollowCameraShots>().View = this;
+            if (AutoplayArgs.HasAutomationFlag(SmokeShots.Flag) && GetComponent<SmokeShots>() == null)
+                gameObject.AddComponent<SmokeShots>().View = this;
             if (GetComponent<CriticalMass.Runtime.View.LowViewTags>() == null) gameObject.AddComponent<CriticalMass.Runtime.View.LowViewTags>();
         }
 
