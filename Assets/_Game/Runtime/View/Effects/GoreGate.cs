@@ -63,7 +63,29 @@ namespace CriticalMass.Runtime.View.Effects
         public static GoreLevel? Override;
 
         /// <summary>The level in force: the override, else GameSettings.Gore (PlayerPrefs; read it once per frame at most).</summary>
-        public static GoreLevel Current => Override ?? CriticalMass.Runtime.Menu.GameSettings.Gore;
+        public static GoreLevel Current => Override ?? FlagLevel() ?? CriticalMass.Runtime.Menu.GameSettings.Gore;
+
+        static bool _flagRead;
+        static GoreLevel? _flag;
+
+        /// <summary>Integration batch 9: "-goreLevel full|reduced|off" pins the level for a player run, so the gore levels can be
+        /// looked at in the BUILT game (GoreCapture is editor only). Honoured only with -autoplay (an automation run), so a
+        /// person's launch never changes it. Read once per process; never writes the setting.</summary>
+        static GoreLevel? FlagLevel()
+        {
+            if (_flagRead) return _flag;
+            _flagRead = true;
+            string[] args;
+            try { args = Environment.GetCommandLineArgs(); } catch { return null; }
+            if (Array.FindIndex(args, a => string.Equals(a, "-autoplay", StringComparison.OrdinalIgnoreCase)) < 0) return null;
+            for (int i = 0; i + 1 < args.Length; i++)
+            {
+                if (!string.Equals(args[i], "-goreLevel", StringComparison.OrdinalIgnoreCase)) continue;
+                string v = args[i + 1].ToLowerInvariant();
+                _flag = v == "off" ? GoreLevel.Off : v == "reduced" ? GoreLevel.Reduced : v == "full" ? GoreLevel.Full : (GoreLevel?)null;
+            }
+            return _flag;
+        }
 
         /// <summary>True for a piece that is a body part or bone (never shown below Full).</summary>
         public static bool IsBodyPart(GorePiece p) =>
