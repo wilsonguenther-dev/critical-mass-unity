@@ -276,6 +276,31 @@ namespace CriticalMass.Runtime.Tests
             finally { Object.DestroyImmediate(go); }
         }
 
+        [Test]
+        public void TheControlsTabIsReadableAndItsGridFitsThePanelWidth()
+        {
+            // fix/hud-containment-4: rows at the type scale, five binding columns inside the panel's content width
+            CollectionAssert.Contains(UiScale.TypeSteps, PauseMenu.GridType);
+            Assert.GreaterOrEqual(PauseMenu.GridType, UiScale.TypeSmall, "binding words at least the small type size");
+            Assert.GreaterOrEqual(PauseMenu.GridRowH, PauseMenu.GridGlyphH + 12f, "a row holds its glyph with room");
+            Assert.GreaterOrEqual(PauseMenu.GridRowH, 40f, "rows readable on the smallest window");
+            Assert.LessOrEqual(PauseMenu.GridColX(4) + PauseMenu.GridCellW, PauseMenu.PanelX + PauseMenu.PanelW - 40f + 0.01f, "the last column inside the panel");
+            var go = new GameObject("Controls Tab", typeof(RectTransform));
+            try
+            {
+                PauseMenu m = go.AddComponent<PauseMenu>();
+                m.Build();
+                m.ShowSettings(PauseMenu.Tab.Controls);
+                bool scrolls = false;
+                foreach (ScrollRect sr in go.GetComponentsInChildren<ScrollRect>(false)) scrolls = true;
+                float bottom = 0f;
+                foreach (MenuItem it in go.GetComponentsInChildren<MenuItem>(true))
+                    if (it.name.StartsWith("Cell ")) bottom = Mathf.Max(bottom, -it.GetComponent<RectTransform>().anchoredPosition.y + PauseMenu.GridRowH * 0.5f);
+                if (bottom > PauseMenu.PanelY + PauseMenu.PanelH - 78f) Assert.IsTrue(scrolls, "a grid taller than the panel scrolls inside it");
+            }
+            finally { Object.DestroyImmediate(go); }
+        }
+
         // ---------------------------------------------------------------- 3. kill feed and toast lanes
 
         [Test]

@@ -1035,21 +1035,32 @@ namespace CriticalMass.Runtime.Menu
         // 26 + 2 px, so the list still ends above the toggles and Reset. feat/ground-camera: 25 rows (Camera view) at
         // 25 + 2 px take the height the 24 rows took (675 px against 672).
         const int GridCols = 5, KeyCols = 3;
-        const float GridRowH = 25f, GridRowGap = 2f, GridCellW = 172f, GridCellGap = 8f;
+        // fix/hud-containment-4 (by eye: "a tiny cramped grid with unreadable text in a big panel"): rows at the type scale
+        // (TypeSmall words, 28 px glyphs, 46 px rows), the five binding columns grouped under KEYBOARD AND MOUSE and
+        // CONTROLLER, the action column on the left; the tab scrolls inside the panel (ContainedScroll) when it is taller.
+        public const float GridRowH = 46f, GridRowGap = 6f, GridCellW = 180f, GridCellGap = 10f, GridGlyphH = 28f, GridHeadH = 32f;
+        public const int GridType = UiScale.TypeSmall;
+        public static float GridColX(int c) => ContentX + LabelW + c * (GridCellW + GridCellGap);
 
         GameObject BuildControls(RectTransform parent)
         {
             RectTransform tab = MenuUi.Rt(parent, "Controls Tab");
             MenuUi.Stretch(tab);
             float y = ContentY;
+            // column groups, then the column heads, all on the type scale
+            MenuUi.Fit(MenuUi.Label(tab, "Group Keyboard", CMTokens.Display, GridType, Brass, TextAnchor.MiddleCenter, GridColX(0), y,
+                KeyCols * GridCellW + (KeyCols - 1) * GridCellGap, GridHeadH, "KEYBOARD AND MOUSE", 2f), UiScale.TypeMin);
+            MenuUi.Fit(MenuUi.Label(tab, "Group Controller", CMTokens.Display, GridType, Brass, TextAnchor.MiddleCenter, GridColX(KeyCols), y,
+                (GridCols - KeyCols) * GridCellW + (GridCols - KeyCols - 1) * GridCellGap, GridHeadH, "CONTROLLER", 2f), UiScale.TypeMin);
+            y += GridHeadH + 2f;
             string[] heads = { "KEYS: W A S D", "KEYS: ARROWS", "MOUSE", "CONTROLLER", "CONTROLLER 2" };
             for (int c = 0; c < GridCols; c++)
-                MenuUi.Label(tab, "Head " + c, CMTokens.Ui, UiScale.TypeMin, Brass, TextAnchor.MiddleCenter, ContentX + LabelW + c * (GridCellW + GridCellGap), y,
-                    GridCellW, 28f, heads[c], 2f);
-            y += 32f;
+                MenuUi.Fit(MenuUi.Label(tab, "Head " + c, CMTokens.Ui, GridType, Brass, TextAnchor.MiddleCenter, GridColX(c), y,
+                    GridCellW, GridHeadH, heads[c], 2f), UiScale.TypeMin);
+            y += GridHeadH + 8f;
 
             // DG-14: VIEW CONTROLS at the top of the tab, in the empty corner above the action labels.
-            MenuItem view = MenuUi.Item(tab, "View Controls", ContentX, ContentY - 4f, LabelW - 20f, 34f, "VIEW CONTROLS",
+            MenuItem view = MenuUi.Item(tab, "View Controls", ContentX, ContentY, LabelW - 20f, 2f * GridHeadH + 2f, "VIEW CONTROLS",
                 MenuItem.Kind.Button, UiScale.TypeSmall, true, CMTokens.Display);
             view.Submitted = ShowControls;
 
@@ -1058,8 +1069,8 @@ namespace CriticalMass.Runtime.Menu
             for (int r = 0; r < ControlBindings.Rows.Length; r++)
             {
                 ControlRow row = ControlBindings.Rows[r];
-                MenuUi.Label(tab, "Row " + row.Label, CMTokens.Ui, UiScale.TypeMin, Cream, TextAnchor.MiddleLeft, ContentX + 8f, y, LabelW - 8f, GridRowH,
-                    row.Label.ToUpperInvariant(), 2f);
+                MenuUi.Fit(MenuUi.Label(tab, "Row " + row.Label, CMTokens.Ui, GridType, Cream, TextAnchor.MiddleLeft, ContentX + 8f, y, LabelW - 20f, GridRowH,
+                    row.Label.ToUpperInvariant(), 2f), UiScale.TypeMin);
                 var line = new MenuItem[GridCols];
                 var slots = new List<RebindSlot>(row.Keyboard);
                 slots.AddRange(row.Gamepad);
@@ -1068,11 +1079,11 @@ namespace CriticalMass.Runtime.Menu
                     RebindSlot slot = slots[si];
                     int c = Mathf.Clamp((int)slot.Column, 0, GridCols - 1);
                     if (line[c] != null) continue;
-                    MenuItem cell = MenuUi.Item(tab, $"Cell {row.Label} {c}", ContentX + LabelW + c * (GridCellW + GridCellGap), y, GridCellW, GridRowH, "-",
-                        MenuItem.Kind.Button, UiScale.TypeMin, true, CMTokens.Mono);
+                    MenuItem cell = MenuUi.Item(tab, $"Cell {row.Label} {c}", GridColX(c), y, GridCellW, GridRowH, "-",
+                        MenuItem.Kind.Button, GridType, true, CMTokens.Mono);
                     var cref = new CellRef { Item = cell, Slot = slot, Row = row };
                     // The binding's glyph beside its name (a mouse with the button lit, a keycap, a controller button).
-                    cref.Glyph = InputGlyphView.Make(cell.transform, "Glyph", 22f);
+                    cref.Glyph = InputGlyphView.Make(cell.transform, "Glyph", GridGlyphH);
                     cref.Glyph.Rect.anchoredPosition = new Vector2(8f, 0f);
                     cell.Submitted = () => StartRebind(cref);
                     if (!slot.Rebindable) cell.interactable = false;
@@ -1082,7 +1093,9 @@ namespace CriticalMass.Runtime.Menu
                 grid.Add(line);
                 y += GridRowH + GridRowGap;
             }
-            MenuItem reset = MenuUi.Item(tab, "Reset Controls", PanelX + PanelW - 40f - 340f, PanelY + PanelH - 78f, 340f, 56f,
+            // The toggles and Reset follow the grid (inside the scroll when the grid is taller than the panel), never under it.
+            float after = Mathf.Max(y + 14f, PanelY + PanelH - 78f);
+            MenuItem reset = MenuUi.Item(tab, "Reset Controls", PanelX + PanelW - 40f - 340f, after, 340f, 56f,
                 "RESET TO DEFAULTS", MenuItem.Kind.Button, UiScale.TypeBody, true, CMTokens.Display);
             reset.Submitted = () =>
             {
@@ -1091,7 +1104,7 @@ namespace CriticalMass.Runtime.Menu
             };
 
             // Easy movement toggles (GameSettings, kept between launches; HumanInputSource applies them at once).
-            y = PanelY + PanelH - 78f + 5f;
+            y = after + 5f;
             MenuItem assist = MoveToggle(tab, "Movement Assist", ContentX, y, () => GameSettings.MovementAssist,
                 v => GameSettings.MovementAssist = v, "MOVEMENT ASSIST",
                 "Movement assist on: one key follows a bridge it points along, and you slide past corners.",
