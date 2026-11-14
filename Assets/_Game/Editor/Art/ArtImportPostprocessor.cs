@@ -34,7 +34,7 @@ namespace CriticalMass.Editor.Art
         public const string ArtMaterialPath = "Assets/_Game/Resources/Toon/CMToonArt.mat";
 
         /// <summary>Bump when the contract changes: Unity re-imports every model this postprocessor touches.</summary>
-        public override uint GetVersion() => 16;   // 16: batch 8 reverted the HY Warrior rig (#86), importer back to the pre-#86 rules; 10: wall-damage-1, the Miner barricade imports readable
+        public override uint GetVersion() => 17;   // 17: perf/app-size-1, face decals DXT5 on desktop (were uncompressed); 16: batch 8 reverted the HY Warrior rig (#86), importer back to the pre-#86 rules; 10: wall-damage-1, the Miner barricade imports readable
 
         public static bool IsArt(string path) =>
             path.StartsWith(ArtRoot, StringComparison.Ordinal) && path.EndsWith(".fbx", StringComparison.OrdinalIgnoreCase);
@@ -109,7 +109,15 @@ namespace CriticalMass.Editor.Art
             ti.wrapMode = TextureWrapMode.Clamp;
             ti.filterMode = FilterMode.Bilinear;
             ti.mipmapEnabled = true;
-            ti.textureCompression = TextureImporterCompression.Uncompressed;
+            // perf/app-size-1 (rules 17): DXT5 on desktop, 1 byte a pixel (was uncompressed RGBA32, 4): the seven 512 px
+            // kaiju faces were 9.1 MB of the build. The face is drawn at well under 512 px from the game camera.
+            ti.textureCompression = TextureImporterCompression.Compressed;
+            TextureImporterPlatformSettings s = ti.GetPlatformTextureSettings("Standalone");
+            s.overridden = true;
+            s.format = TextureImporterFormat.DXT5;
+            s.textureCompression = TextureImporterCompression.Compressed;
+            s.maxTextureSize = 512;
+            ti.SetPlatformTextureSettings(s);
             ti.isReadable = false;
         }
 

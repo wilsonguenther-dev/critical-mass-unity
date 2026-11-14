@@ -11,7 +11,7 @@ namespace CriticalMass.Runtime.Menus.Story
 {
     /// <summary>
     /// Story intro 3 (plan intro-film-1): the intro is one pre-rendered film, picture and sound locked in a single file
-    /// (StreamingAssets/Story/intro-film-1.mp4, 2560x1440, 30 fps, a fixed black 2.0:1 frame baked in), played by Unity's
+    /// (StreamingAssets/Story/intro-film-1.mp4, 1920x1080 since perf/app-size-1 (was 2560x1440), 30 fps, a fixed black 2.0:1 frame baked in), played by Unity's
     /// VideoPlayer. The engine draws only what must follow the player's screen and settings: the subtitles (in the black
     /// under the picture, keyed to the video clock), the title logo (pixel-locked to the title screen's logo) and the skip
     /// prompt. The shot table the film was rendered from ships as Resources/Story/intro-film.json; tests read it.
@@ -214,7 +214,7 @@ namespace CriticalMass.Runtime.Menus.Story
             _vp.waitForFirstFrame = true;
             _vp.renderMode = VideoRenderMode.RenderTexture;
             _vp.aspectRatio = VideoAspectRatio.FitInside;
-            _rt = new RenderTexture(2560, 1440, 0, RenderTextureFormat.ARGB32) { name = "Intro Film" };
+            _rt = new RenderTexture(1920, 1080, 0, RenderTextureFormat.ARGB32) { name = "Intro Film" };   // perf/app-size-1: the film is 1920x1080 now (8 MB of GPU memory, was 14.7)
             _vp.targetTexture = _rt;
             _video.texture = _rt;
             _audio = gameObject.AddComponent<AudioSource>();
