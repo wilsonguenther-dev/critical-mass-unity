@@ -165,5 +165,54 @@ namespace CriticalMass.Runtime.Tests
             for (int i = 0; i < 1200; i++) t.Feed(1.0 / 60, 0, true, 60);
             Assert.IsFalse(t.ForceTimed);
         }
+
+        /// <summary>fix/pacing-guard-1: a timed fallback, then the return to vsync, leaves exactly the vsync state: vsync on,
+        /// no target, no limiter, interval 1. Vsync and a timed target can never be set together.</summary>
+        [Test]
+        public void TimedFallbackThenVsyncLeavesExactlyTheVsyncState()
+        {
+            var t = new TimedCapGuard();
+            for (int i = 0; i < 300; i++) t.Feed(1.0 / 60, 60, true, 60);   // 60 fps against vsync 1 at 60: holding
+            Assert.IsFalse(t.ForceTimed);
+            PacingState vsyncState = PacingState.For(t.Settings(60, 60));
+            for (int i = 0; i < 600; i++) t.Feed(1.0 / 200, 60, true, 60);  // 200 fps against 60 for 3 s: vsync not holding
+            Assert.IsTrue(t.ForceTimed);
+            PacingState timed = PacingState.For(t.Settings(60, 60));
+            Assert.AreEqual(0, timed.VSync);
+            Assert.AreEqual(60, timed.Target);
+            Assert.IsTrue(timed.Timed);
+            t.Reset();   // a scene load, a display change or a new cap
+            PacingState back = PacingState.For(t.Settings(60, 60));
+            Assert.AreEqual(vsyncState, back, "back to exactly the vsync state");
+            Assert.AreEqual(1, back.VSync);
+            Assert.AreEqual(-1, back.Target, "no timed target left with vsync on");
+            Assert.IsFalse(back.Limiter);
+            Assert.AreEqual(1, back.Interval);
+            Assert.AreEqual(-1, PacingState.For(1, 60).Target, "vsync and a timed target never mix");
+            Assert.AreEqual("vsync=1 target=-1 limiter=none interval=1", back.ToString());
+        }
+
+        /// <summary>fix/pacing-guard-1: a new cap's very first settings are judged afresh (no frame of the old cap's timer).</summary>
+        [Test]
+        public void ANewCapsFirstFrameIsNeverPacedByTheOldTrip()
+        {
+            var t = new TimedCapGuard();
+            for (int i = 0; i < 300; i++) t.Feed(1.0 / 60, FramePolicy.TitleCap, true, 60);
+            Assert.IsTrue(t.ForceTimed);
+            Assert.AreEqual((1, -1), t.Settings(60, 60), "the first frame at the new cap is vsync already");
+        }
+
+        /// <summary>fix/pacing-guard-1: running fast while the window is hidden or unfocused is "not presenting", not
+        /// "vsync broken": the overrun trip stays off; 1 s stalled presents still switch to the timer.</summary>
+        [Test]
+        public void AHiddenWindowNeverTripsTheOverrunGuardButStallsStillDo()
+        {
+            var t = new TimedCapGuard();
+            for (int i = 0; i < 600; i++) t.Feed(1.0 / 60, FramePolicy.TitleCap, true, 60, presenting: false);
+            Assert.IsFalse(t.ForceTimed, "60 fps against 20 in a hidden window: the window is not presenting, pacing stays");
+            Assert.AreEqual(FramePolicy.FrameSettings(FramePolicy.TitleCap, 60), t.Settings(FramePolicy.TitleCap, 60));
+            for (int i = 0; i < TimedCapGuard.StallFrames; i++) t.Feed(1.0, FramePolicy.TitleCap, true, 60, presenting: false);
+            Assert.IsTrue(t.ForceTimed, "stalled presents still switch to the timer");
+        }
     }
 }
