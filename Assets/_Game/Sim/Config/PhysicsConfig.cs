@@ -153,8 +153,11 @@ namespace CriticalMass.Sim.Config
         /// of the hill centre. With no such target it walks to the hill and stands on it (contesting). Round 2's soft score pull
         /// (1.5 x distance beyond the hill) only re-ranked fighters it could reach, and the stream off the east bridge always had
         /// one nearer, so it never left the east approach.</summary>
-        public double KaijuHillFightRadius = 12;
-        public double KaijuHillLeash = 18;
+        /// <summary>Round 4 (candidate 8 run 43711681801): 12 left out a fighter standing just outside a ring gap (the west gap
+        /// fighter at (44.5, 36.5) is 12.02 m out), so 13 = ring 10.5 + 2.5; the leash 18 let attacker chases pull it to 16 m and
+        /// cost on-or-near time (0.50 of owned time), so 15.</summary>
+        public double KaijuHillFightRadius = 13;
+        public double KaijuHillLeash = 15;
         /// <summary>Its body crushes a barricade it presses against (barricade HP per second; 120 HP = half a second), and its
         /// path planning treats barricade cells as passable: a fort of crates round the hill holders no longer cuts the hill off.</summary>
         public double KaijuBarricadeCrushPerSecond = 240;
