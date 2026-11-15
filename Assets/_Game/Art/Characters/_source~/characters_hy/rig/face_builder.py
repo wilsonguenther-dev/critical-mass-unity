@@ -143,16 +143,56 @@ dark_c, hi_c = hexc(FF['colour']), hexc(FF['highlight'])
 xb = FF['eye_x'] + 0.6 * FF['eye_w'] + 0.025
 z0b, z1b = FF['eye_z'] - 0.9 * FF['eye_h'], FF['brow_z'] + FF['brow_t'] + 0.02
 REP['skin_box'] = [round(-xb, 3), round(xb, 3), round(z0b, 3), round(z1b, 3)]
+def drop_loose(o, nmax=3):
+    # LOD voxel remnants: islands of 1-3 faces (vertices welded by position at 0.1 mm) are deleted before the face goes on
+    me = o.data
+    co = np.empty(len(me.vertices) * 3); me.vertices.foreach_get('co', co)
+    _, key = np.unique(np.round(co.reshape(-1, 3) / 1e-4).astype(np.int64), axis=0, return_inverse=True)
+    key = key.ravel(); par = list(range(int(key.max()) + 1))
+
+    def fnd(a):
+        while par[a] != a:
+            par[a] = par[par[a]]; a = par[a]
+        return a
+    for p in me.polygons:
+        r0 = fnd(int(key[p.vertices[0]]))
+        for v in p.vertices[1:]:
+            r1 = fnd(int(key[v]))
+            if r1 != r0:
+                par[r1] = r0
+    grp = {}
+    for p in me.polygons:
+        grp.setdefault(fnd(int(key[p.vertices[0]])), []).append(p.index)
+    kill = sorted(i for g in grp.values() if len(g) <= nmax for i in g)
+    if kill:
+        bm = bmesh.new(); bm.from_mesh(me); bm.faces.ensure_lookup_table()
+        bmesh.ops.delete(bm, geom=[bm.faces[i] for i in kill], context='FACES')
+        bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context='VERTS')
+        bm.to_mesh(me); bm.free(); me.update()
+    return len(kill)
+
+
+# Team colour: the blue trims (cuffs, collar, cap brim, straps) were authored code 0, so a Crimson Builder kept Azure
+# trims and the voxel LODs got blue smears on a red shirt. Every saturated blue code-0 corner becomes code 8 (team cloth):
+# CMToonSwap scales the target by the corner's brightness, so a darker trim stays a darker band of the team colour.
+TEAM_BLUE = os.environ.get('FACE_TEAM_BLUE', '1') == '1'
 for lv, o in LV.items():
+    if lv != 'Hero':
+        REP.setdefault('loose_faces_dropped', {})[lv] = drop_loose(o)
     me = o.data; M = o.matrix_world; Mi = M.inverted()
     ca, C = corner_cols(me)
+    if TEAM_BLUE:
+        mx, mn = C[:, :3].max(1), C[:, :3].min(1)
+        blue = (np.round(C[:, 3] * 8) == 0) & (C[:, 2] - C[:, 0] > 0.12) & (C[:, 2] >= C[:, 1] - 0.02) & (mx - mn > 0.15)
+        C[blue, 3] = 1.0
+        REP.setdefault('blue_corners_to_code8', {})[lv] = int(blue.sum())
     nsk = 0
     for p in me.polygons:
         c = M @ p.center; n = (M.to_3x3() @ p.normal).normalized()
         if abs(c.x) < xb and z0b < c.z < z1b and n.y * F > 0.2:
             s, k = p.loop_start, p.loop_total
             cc = C[s:s + k]
-            m = (np.round(cc[:, 3] * 8) == 0) & ((lum(cc[:, :3]) < 0.8 * lum(skin)) | (cc[:, 0] - cc[:, 2] < 0.05))
+            m = (np.round(cc[:, 3] * 8) == 0) & ((lum(cc[:, :3]) < 0.62 * lum(skin)) | (cc[:, 0] - cc[:, 2] < 0.05))
             if m.any():
                 cc[m, :3] = skin; cc[m, 3] = 0.0; C[s:s + k] = cc; nsk += int(m.sum())
     lb = world_bvh(o); miss = [0]
