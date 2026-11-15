@@ -56,11 +56,13 @@ def measure(o):
     # file normals vs winding
     me.calc_normals_split() if hasattr(me, 'calc_normals_split') else None
     try:
-        cn = np.array([list(l.normal) for l in me.corner_normals]) if hasattr(me, 'corner_normals') else np.array([list(l.normal) for l in me.loops])
-    except Exception:
-        cn = None
+        cn = np.array([list(l.vector) for l in me.corner_normals]) if hasattr(me, 'corner_normals') else np.array([list(l.normal) for l in me.loops])
+    except Exception as ex:
+        print('[cull] corner normals', ex, flush=True); cn = None
     fn = np.repeat(np.array([list(p.normal) for p in me.polygons]), [p.loop_total for p in me.polygons], axis=0)
     against = int(((cn * fn).sum(1) < 0).sum()) if cn is not None and len(cn) == len(fn) else None
+    against_hi = int(((cn * fn).sum(1) < -0.5).sum()) if cn is not None and len(cn) == len(fn) else None
+    smooth = float(np.mean((cn * fn).sum(1))) if cn is not None and len(cn) == len(fn) else None
     # outline direction: per position, the sum of the corner normals there (Unity splits per corner normal)
     vi = np.empty(len(me.loops), np.int64); me.loops.foreach_get('vertex_index', vi)
     V = np.array([list(v.co) for v in me.vertices])
@@ -77,7 +79,7 @@ def measure(o):
     bm.free()
     return dict(tris=sum(len(p.vertices) - 2 for p in me.polygons), faces=len(me.polygons), winding_inconsistent_edges=incons,
                 nonmanifold_edges=nonman, open_edges=openE, faces_facing_inward=inward, inward_at=inward_at,
-                file_normals_against_winding=against, outline_dirs_weak=weak, positions=int(len(cnt)), alpha_codes=codes,
+                file_normals_against_winding=against, file_normals_against_over60deg=against_hi, file_normal_dot_face_mean=smooth, corners=len(fn), outline_dirs_weak=weak, positions=int(len(cnt)), alpha_codes=codes,
                 material_slots=[m.name if m else None for m in me.materials], color_layers=[c.name for c in me.color_attributes],
                 has_custom_normals=bool(getattr(me, 'has_custom_normals', False)))
 
