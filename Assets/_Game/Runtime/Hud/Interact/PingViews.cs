@@ -296,9 +296,9 @@ namespace CriticalMass.Runtime.Hud.Interact
             {
                 Ping p = Pings.Book.Get(i);
                 float a = w != null ? PingBook.Alpha(p, now) : 0f;
-                bool on = a > 0f && cam != null;
+                bool on = a > 0f && cam != null && w.Match.Phase != MatchPhase.Ended;   // fix/results-hide-pings-1: never over the results
                 if (_world[i].gameObject.activeSelf != on) _world[i].gameObject.SetActive(on);
-                bool miniOn = a > 0f && _mini[i] != null;
+                bool miniOn = a > 0f && _mini[i] != null && w.Match.Phase != MatchPhase.Ended;
                 if (_mini[i] != null && _mini[i].gameObject.activeSelf != miniOn) _mini[i].gameObject.SetActive(miniOn);
                 if (a <= 0f) continue;
                 if (_serial[i] != p.Serial)
