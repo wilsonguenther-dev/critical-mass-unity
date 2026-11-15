@@ -174,6 +174,35 @@ def drop_loose(o, nmax=3):
     return len(kill)
 
 
+def despike(o, max_angle=float(os.environ.get('DESPIKE_DEG', '200')), passes=8):
+    # rig-builder-4 (coordinator 06:10): LOD1 and Shadow showed pale spikes across the belly (the belt tools) and at the
+    # hands in the game camera: the edge collapse left needle cones. A cone tip is a vertex whose corner angles add up to
+    # far less than 360 degrees; each pass moves every such vertex to the mean of its neighbours (bind pose, before the
+    # face goes on; weights and colours stay with the vertex), then pulls any vertex more than 15 mm outside the Hero
+    # surface back to 15 mm.
+    me = o.data; bm = bmesh.new(); bm.from_mesh(me); moved = set(); Mw = o.matrix_world; Mi = Mw.inverted()
+    for _ in range(passes):
+        tips = [v for v in bm.verts if v.link_loops and math.degrees(sum(l.calc_angle() for l in v.link_loops)) < max_angle]
+        if not tips:
+            break
+        new = {v: sum((e.other_vert(v).co for e in v.link_edges), Vector()) / len(v.link_edges) for v in tips}
+        for v, c in new.items():
+            v.co = c; moved.add(v.index)
+    out = 0; worst = 0.0
+    for v in bm.verts:
+        w = Mw @ v.co; hit = bvh.find_nearest(w)
+        if hit[0] is None:
+            continue
+        d = w - hit[0]; nrm = hit[1]
+        if d.dot(nrm) > 0:
+            worst = max(worst, d.length)
+            if d.length > 0.015:
+                v.co = Mi @ (hit[0] + nrm * 0.015); out += 1
+    left = sum(1 for v in bm.verts if v.link_loops and math.degrees(sum(l.calc_angle() for l in v.link_loops)) < max_angle)
+    bm.to_mesh(me); bm.free(); me.update()
+    return dict(vertices_smoothed=len(moved), clamped_to_hero=out, worst_outside_mm=round(worst * 1000, 1), tips_left=left)
+
+
 # Team colour: the blue trims (cuffs, collar, cap brim, straps) were authored code 0, so a Crimson Builder kept Azure
 # trims and the voxel LODs got blue smears on a red shirt. Every saturated blue code-0 corner becomes code 8 (team cloth):
 # CMToonSwap scales the target by the corner's brightness, so a darker trim stays a darker band of the team colour.
@@ -181,6 +210,8 @@ TEAM_BLUE = os.environ.get('FACE_TEAM_BLUE', '1') == '1'
 for lv, o in LV.items():
     if lv != 'Hero':
         REP.setdefault('loose_faces_dropped', {})[lv] = drop_loose(o)
+    if lv in ('LOD1', 'Shadow') and os.environ.get('FACE_DESPIKE', '1') == '1':
+        REP.setdefault('despike', {})[lv] = despike(o)
     me = o.data; M = o.matrix_world; Mi = M.inverted()
     ca, C = corner_cols(me)
     if TEAM_BLUE:
@@ -209,32 +240,46 @@ for lv, o in LV.items():
                 cc[m, :3] = skin; cc[m, 3] = 0.0; C[s:s + k] = cc; nsk += int(m.sum())
     if lv == 'Hero':
         HPC = np.array([C[p.loop_start] for p in me.polygons])   # the Hero is painted one colour per face
-    lb = world_bvh(o); miss = [0]
+    lb = world_bvh(o); miss = [0]; planes = {}
 
-    def on_skin(x, z, lift):
-        hit = lb.ray_cast(Vector((x, F * 3.0, z)), Vector((0, -F, 0)))
-        if hit[0] is None:
-            miss[0] += 1; return Vector((x, F * 0.2, z))
-        nn = hit[1] if hit[1].y * F > 0 else -hit[1]
-        return hit[0] + nn * lift
+    def plane_under(tag, x0, x1, z0, z1, lift, pad=0.005, n=11):
+        # rig-builder-4 (coordinator 06:10): one shared depth sank his left eye into the cheek (the face is not
+        # symmetric). Per piece and per level: sample the skin under the piece's footprint (front rays, n x n), fit a
+        # plane depth = a + b x + c z, then push the plane forward until every sample is behind it by `lift`. Every vertex
+        # of the piece sits on that plane, so the piece is flat, fully clear of the skin, and the same size from the front.
+        S = []
+        for x in np.linspace(x0 - pad, x1 + pad, n):
+            for z in np.linspace(z0 - pad, z1 + pad, n):
+                hit = lb.ray_cast(Vector((x, F * 3.0, z)), Vector((0, -F, 0)))
+                if hit[0] is None:
+                    miss[0] += 1; continue
+                S.append((x, z, F * hit[0].y))
+        S = np.array(S); A_ = np.c_[np.ones(len(S)), S[:, 0], S[:, 1]]
+        cf = np.linalg.lstsq(A_, S[:, 2], rcond=None)[0]
+        res = S[:, 2] - A_ @ cf
+        a0 = cf[0] + res.max() + lift
+        planes[tag] = dict(samples=len(S), skin_relief_mm=round(float(np.ptp(res)) * 1000, 1),
+                           depth_m=round(float(a0 + cf[1] * (x0 + x1) / 2 + cf[2] * (z0 + z1) / 2), 4))
+        return lambda x, z, extra=0.0: Vector((x, F * (a0 + extra + cf[1] * x + cf[2] * z), z))
     polys = []
     L = FF['lift']; ns = int(FF['sides'])
     for sx in (-1, 1):
+        sd = 'l' if sx * F > 0 else 'r'   # his side
         ex, ez, ew, eh = sx * FF['eye_x'], FF['eye_z'], FF['eye_w'], FF['eye_h']
-        c0 = on_skin(ex, ez, L)
-        ring = [on_skin(ex + 0.5 * ew * math.cos(2 * math.pi * k / ns), ez + 0.5 * eh * math.sin(2 * math.pi * k / ns), L)
+        P = plane_under('eye.' + sd, ex - ew / 2, ex + ew / 2, ez - eh / 2, ez + eh / 2, L)
+        c0 = P(ex, ez)
+        ring = [P(ex + 0.5 * ew * math.cos(2 * math.pi * k / ns), ez + 0.5 * eh * math.sin(2 * math.pi * k / ns))
                 for k in range(ns)]
         for k in range(ns):
             polys.append(([c0, ring[k], ring[(k + 1) % ns]], dark_c))
         hx, hz, hs = ex + F * 0.25 * ew, ez + 0.22 * eh, 0.3 * ew
-        polys.append(([on_skin(hx - hs / 2, hz - hs / 3, L + 0.001), on_skin(hx + hs / 2, hz - hs / 3, L + 0.001),
-                       on_skin(hx, hz + hs * 0.6, L + 0.001)], hi_c))
+        polys.append(([P(hx - hs / 2, hz - hs / 3, 0.001), P(hx + hs / 2, hz - hs / 3, 0.001), P(hx, hz + hs * 0.6, 0.001)], hi_c))
         bx, bz, bw, bt, ar = sx * FF['brow_x'], FF['brow_z'], FF['brow_w'], FF['brow_t'], FF['arch']
-        nc = int(FF.get('brow_cols', 3))   # more columns follow the brow ridge (the 3-column brow broke up on his left)
+        nc = int(FF.get('brow_cols', 3))
         xs3 = [bx - bw / 2 + bw * i / (nc - 1) for i in range(nc)]
         zb = [bz + ar * (1 - ((xx - bx) / (bw / 2)) ** 2) for xx in xs3]
-        LB = FF['brow_lift']
-        B_ = [on_skin(xs3[i], zb[i], LB) for i in range(nc)]; T_ = [on_skin(xs3[i], zb[i] + bt, LB) for i in range(nc)]
+        PB = plane_under('brow.' + sd, bx - bw / 2, bx + bw / 2, bz, bz + ar + bt, FF.get('brow_clear', 0.003))
+        B_ = [PB(xs3[i], zb[i]) for i in range(nc)]; T_ = [PB(xs3[i], zb[i] + bt) for i in range(nc)]
         for i in range(nc - 1):
             polys.append(([B_[i], B_[i + 1], T_[i + 1], T_[i]], dark_c))
     if F > 0:   # wind toward the viewer (Unity culls back faces)
@@ -260,7 +305,7 @@ for lv, o in LV.items():
         g.remove(new_v)
     o.vertex_groups['head'].add(new_v, 1.0, 'REPLACE')
     REP.setdefault('face_features', {})[lv] = dict(tris_added=sum(len(p_) - 2 for p_, _ in polys), verts_added=len(new_v),
-                                                   ray_misses=miss[0], corners_to_skin=nsk)
+                                                   ray_misses=miss[0], corners_to_skin=nsk, planes=planes)
 REP['tris_after'] = {lv: ntri(o) for lv, o in LV.items()}
 for ob in scene.objects:
     ob.select_set(ob.type in ('ARMATURE', 'MESH'))
