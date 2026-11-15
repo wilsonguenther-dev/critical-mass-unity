@@ -95,6 +95,7 @@ namespace CriticalMass.Sim.Core
             World.PushEvent(w, SimEventType.KaijuSlam, -1, hits, k.TelegraphX, k.TelegraphZ, R, null, DamageCause.None, R, 0, 0, knock ? p.SlamKnockCentre : 0, 2, 0, 0);
             // fix/kaiju-alive-1: the slam ring knocks structures down (after the KaijuSlam event, so the view lands both).
             if (Phys.On(w, p.KaijuTopples)) Topple.ToppleInArc(w, -1, k.TelegraphX, k.TelegraphZ, 1, 0, Math.Max(0, R * p.KaijuSlamToppleShare - w.Config.Abilities.Topple.Reach), -1);
+            if (Phys.On(w, p.KaijuHillSiege)) SmashBarricades(w, k.TelegraphX, k.TelegraphZ, 1, 0, R * p.KaijuSlamToppleShare, -1);
         }
 
         /// <summary>
@@ -155,6 +156,8 @@ namespace CriticalMass.Sim.Core
             if (Phys.On(w, p.KaijuTopples))
                 Topple.ToppleInArc(w, -1, k.ClawX, k.ClawZ, fx, fz, Math.Max(0, kc.MeleeRange + MeleeLeash - w.Config.Abilities.Topple.Reach),
                     JsMath.Cos(p.KaijuClawConeDeg / 2 * Math.PI / 180));
+            if (Phys.On(w, p.KaijuHillSiege))
+                SmashBarricades(w, k.ClawX, k.ClawZ, fx, fz, kc.MeleeRange + MeleeLeash, JsMath.Cos(p.KaijuClawConeDeg / 2 * Math.PI / 180));
             for (int id = 0; id < w.ActorCount; id++)
             {
                 if (!w.Actors[id].Alive || !KaijuHostileTo(w, id) || !InClawCone(w, id)) continue;
@@ -307,6 +310,117 @@ namespace CriticalMass.Sim.Core
 
         /// <summary>feat/kaiju-bridges-2: the Kaiju may stand at (x, z): its wall circle is clear, or it is on a deck.</summary>
         private static bool KaijuFits(World w, double x, double z) => CircleClearAt(w, x, z, WallR(w)) || OnDeck(w, x, z);
+
+        /// <summary>
+        /// fix/kaiju-hill-1: KaijuBarricadeDamage off every barricade (any team) whose cell centre is within `range` of (ax, az)
+        /// inside the cone (cosHalf -1 = all round), not through another wall (the DG-83 rule the fighters' chip uses).
+        /// </summary>
+        private static void SmashBarricades(World w, double ax, double az, double fx, double fz, double range, double cosHalf)
+        {
+            Barricade[] list = w.Barricades;
+            if (list == null) return;
+            double r2 = range * range;
+            double dmg = w.Config.Physics.KaijuBarricadeDamage;
+            bool walls = Phys.On(w, w.Config.Physics.WallsBlockHits);
+            for (int s = 0; s < list.Length; s++)
+            {
+                Barricade b = list[s];
+                if (!b.Active || b.Hp <= 0) continue;
+                double dx = b.Cx + 0.5 - ax;
+                double dz = b.Cz + 0.5 - az;
+                double d2 = dx * dx + dz * dz;
+                if (d2 > r2) continue;
+                if (d2 > 1e-12 && (dx * fx + dz * fz) / Math.Sqrt(d2) < cosHalf - 1e-9) continue;
+                if (walls && !SegmentClear.Clear(w.Map, ax, az, b.Cx + 0.5, b.Cz + 0.5, b.Cx, b.Cz)) continue;
+                b.Hp -= dmg;
+            }
+        }
+
+        /// <summary>fix/kaiju-hill-1 round 3: KaijuBarricadeCrushPerSecond x dt off every barricade whose cell is within its wall
+        /// collider + 0.25 m (pressing on it), any team.</summary>
+        private static void CrushBarricades(World w, double dt)
+        {
+            Barricade[] list = w.Barricades;
+            if (list == null) return;
+            Kaiju k = w.Kaiju;
+            double r = WallR(w) + 0.25;
+            double dmg = w.Config.Physics.KaijuBarricadeCrushPerSecond * dt;
+            for (int s = 0; s < list.Length; s++)
+            {
+                Barricade b = list[s];
+                if (!b.Active || b.Hp <= 0) continue;
+                double nx = k.X < b.Cx ? b.Cx : (k.X > b.Cx + 1 ? b.Cx + 1.0 : k.X);
+                double nz = k.Z < b.Cz ? b.Cz : (k.Z > b.Cz + 1 ? b.Cz + 1.0 : k.Z);
+                if ((k.X - nx) * (k.X - nx) + (k.Z - nz) * (k.Z - nz) > r * r) continue;
+                b.Hp -= dmg;
+            }
+        }
+
+        /// <summary>
+        /// fix/kaiju-hill-1: with no target and the hill cut off from its clearance region, pick (every 1 s) the active barricade
+        /// within KaijuSiegeRadius of the hill nearest to it that has a cell of its own region within claw reach, and the clear cell
+        /// of its region nearest that barricade to claw from. None in the way: the cell of its region nearest the hill (it walks
+        /// as close as it can instead of standing still). Returns false when the hill is reachable (walk there as before).
+        /// </summary>
+        private static bool PickSiege(World w)
+        {
+            Kaiju k = w.Kaiju;
+            KaijuNav nav = w.KaijuNav;
+            MapDef map = w.Map;
+            HillDef hill = map.Hill;
+            RefreshClearance(w);
+            int mine = RegionAt(w, k.X, k.Z, out _, out _);
+            if (mine == 0 || RegionAt(w, hill.X, hill.Z, out _, out _) == mine)
+            {
+                nav.SiegeCx = nav.SiegeCz = nav.StandCx = nav.StandCz = -1;
+                return false;
+            }
+            if (nav.SiegeIn > 0 && nav.StandCx >= 0) return true;
+            nav.SiegeIn = 1;
+            int W = map.Width;
+            double reach = w.Config.Kaiju.MeleeRange;
+            int rc = (int)Math.Ceiling(reach);
+            double sr2 = w.Config.Physics.KaijuSiegeRadius * w.Config.Physics.KaijuSiegeRadius;
+            double best = double.PositiveInfinity;
+            nav.SiegeCx = nav.SiegeCz = nav.StandCx = nav.StandCz = -1;
+            Barricade[] list = w.Barricades;
+            for (int s = 0; list != null && s < list.Length; s++)
+            {
+                Barricade b = list[s];
+                if (!b.Active || b.Hp <= 0) continue;
+                double bx = b.Cx + 0.5, bz = b.Cz + 0.5;
+                if ((bx - hill.X) * (bx - hill.X) + (bz - hill.Z) * (bz - hill.Z) > sr2) continue;
+                // The clear cell of its own region nearest the barricade, within claw reach of it.
+                int sx = -1, sz = -1;
+                double sd = double.PositiveInfinity;
+                for (int dz = -rc; dz <= rc; dz++)
+                    for (int dx = -rc; dx <= rc; dx++)
+                    {
+                        int cx = b.Cx + dx, cz = b.Cz + dz;
+                        if (!MapGrid.InBounds(map, cx, cz) || nav.Region[cz * W + cx] != mine) continue;
+                        double d = (cx + 0.5 - bx) * (cx + 0.5 - bx) + (cz + 0.5 - bz) * (cz + 0.5 - bz);
+                        if (d > reach * reach || d >= sd) continue;
+                        sd = d; sx = cx; sz = cz;
+                    }
+                if (sx < 0) continue;
+                double dk = (bx - k.X) * (bx - k.X) + (bz - k.Z) * (bz - k.Z);
+                if (dk >= best) continue;
+                best = dk;
+                nav.SiegeCx = b.Cx; nav.SiegeCz = b.Cz; nav.StandCx = sx; nav.StandCz = sz;
+            }
+            if (nav.StandCx >= 0) return true;
+            // Nothing to break: the cell of its own region closest to the hill centre.
+            double bh = double.PositiveInfinity;
+            for (int i = 0; i < W * map.Height; i++)
+            {
+                if (nav.Region[i] != mine) continue;
+                double cx = i % W + 0.5, cz = i / W + 0.5;
+                double d = (cx - hill.X) * (cx - hill.X) + (cz - hill.Z) * (cz - hill.Z);
+                if (d >= bh) continue;
+                bh = d; nav.StandCx = i % W; nav.StandCz = i / W;
+            }
+            return nav.StandCx >= 0;
+        }
 
         /// <summary>feat/kaiju-bridges-1: the live wall collider radius: GridR, or the squeezed radius on and near a bridge.</summary>
         public static double WallR(World w)
@@ -537,6 +651,8 @@ namespace CriticalMass.Sim.Core
             bool seen = guard && Phys.On(w, pc.WallsBlockHits);
             if (guard) for (int id = 0; id < n; id++) if (nav.Ignore[id] > 0) nav.Ignore[id] = Combat.TickDown(nav.Ignore[id], dt);
             if (SqueezeOn(w)) UpdateWallR(w, dt);
+            nav.SiegeIn = Combat.TickDown(nav.SiegeIn, dt);
+            if (Phys.On(w, pc.KaijuHillSiege)) for (int id = 0; id < n; id++) if (nav.HitBy[id] > 0) nav.HitBy[id] = Combat.TickDown(nav.HitBy[id], dt);
 
             if (k.KoIn > 0)
             {
@@ -616,6 +732,32 @@ namespace CriticalMass.Sim.Core
                 gx = w.Map.Hill.X;
                 gz = w.Map.Hill.Z;
                 stop = HillStop;
+                // fix/kaiju-hill-1: the hill is cut off (barricades in the ring's gaps): break through, or get as close as it can.
+                if (guard && Phys.On(w, pc.KaijuHillSiege) && PickSiege(w))
+                {
+                    gx = nav.StandCx + 0.5;
+                    gz = nav.StandCz + 0.5;
+                    stop = HoldEps;
+                    if (nav.SiegeCx >= 0 && k.MeleeCd <= 0 && k.MeleeWindupIn <= 0)
+                    {
+                        double bx = nav.SiegeCx + 0.5 - k.X;
+                        double bz = nav.SiegeCz + 0.5 - k.Z;
+                        if (bx * bx + bz * bz <= kc.MeleeRange * kc.MeleeRange)
+                        {
+                            // Claw the barricade (no actor target): ResolveClawCone smashes it and hits any fighter in the cone.
+                            k.Facing = JsMath.Atan2(bz, bx);
+                            k.MeleeWindupIn = w.Dur.KaijuClawWindup;
+                            k.MeleeWindupLen = w.Dur.KaijuClawWindup;
+                            k.MeleeTargetId = -1;
+                            k.MeleeCd = kc.MeleeCooldown;
+                            k.ClawX = k.X;
+                            k.ClawZ = k.Z;
+                            k.ClawFacing = k.Facing;
+                            World.PushEvent(w, SimEventType.KaijuMeleeWindup, -1, -1, nav.SiegeCx + 0.5, nav.SiegeCz + 0.5, w.Dur.KaijuClawWindup, null,
+                                DamageCause.None, kc.MeleeRange + MeleeLeash, JsMath.Cos(k.Facing), JsMath.Sin(k.Facing), 0, 0, w.Dur.KaijuClawWindup, 0);
+                        }
+                    }
+                }
             }
             double ex = gx - k.X;
             double ez = gz - k.Z;
@@ -625,6 +767,9 @@ namespace CriticalMass.Sim.Core
             // circling at the chase stop made it walk one tick (facing its path cell) and stand the next (facing the fighter):
             // the facing swung between the two every tick on the hill.
             if (guard && t >= 0 && ex * ex + ez * ez <= (kc.MeleeRange + 1.5) * (kc.MeleeRange + 1.5)) k.Facing = JsMath.Atan2(ez, ex);
+
+            // fix/kaiju-hill-1 round 3: its body crushes the barricades it presses against (its plan goes through them).
+            if (guard && Phys.On(w, pc.KaijuHillSiege)) CrushBarricades(w, dt);
 
             // fix/movement-shiver-1: give a target up after KaijuGiveUpSeconds without progress (net move under
             // KaijuProgressRadius while not in claw reach of it with a clear line); it is skipped for KaijuIgnoreSeconds.
