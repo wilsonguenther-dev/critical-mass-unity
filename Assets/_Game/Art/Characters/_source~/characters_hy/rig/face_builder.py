@@ -226,12 +226,22 @@ def despike(o, max_angle=float(os.environ.get('DESPIKE_DEG', '200')), passes=8):
 # trims and the voxel LODs got blue smears on a red shirt. Every saturated blue code-0 corner becomes code 8 (team cloth):
 # CMToonSwap scales the target by the corner's brightness, so a darker trim stays a darker band of the team colour.
 TEAM_BLUE = os.environ.get('FACE_TEAM_BLUE', '1') == '1'
+SHADOW_BODY = int(os.environ.get('SHADOW_BODY', '760'))
 for lv, o in LV.items():
     if lv != 'Hero':
         REP.setdefault('loose_faces_dropped', {})[lv] = drop_loose(o)
     REP.setdefault('back_head_to_chest', {})[lv] = back_to_chest(o)
     if lv in ('LOD1', 'Shadow') and os.environ.get('FACE_DESPIKE', '1') == '1':
         REP.setdefault('despike', {})[lv] = despike(o)
+    if lv == 'Shadow' and ntri(o) > SHADOW_BODY:
+        # FighterLod contract: _Shadow at most 800 triangles (shadow only). Edge collapse of the despiked LOD1 copy to
+        # SHADOW_BODY, so with the 34 face triangles it stays under 800; weights and colours ride the collapse.
+        d = o.modifiers.new('Dec', 'DECIMATE'); d.decimate_type = 'COLLAPSE'; d.use_collapse_triangulate = True
+        d.ratio = SHADOW_BODY / ntri(o)
+        with bpy.context.temp_override(object=o, active_object=o, selected_objects=[o]):
+            bpy.ops.object.modifier_move_to_index(modifier='Dec', index=0)
+            bpy.ops.object.modifier_apply(modifier='Dec')
+        REP['shadow_body_tris'] = ntri(o); REP.setdefault('loose_faces_dropped_after_shadow_collapse', drop_loose(o))
     me = o.data; M = o.matrix_world; Mi = M.inverted()
     ca, C = corner_cols(me)
     if TEAM_BLUE:
@@ -327,6 +337,21 @@ for lv, o in LV.items():
     REP.setdefault('face_features', {})[lv] = dict(tris_added=sum(len(p_) - 2 for p_, _ in polys), verts_added=len(new_v),
                                                    ray_misses=miss[0], corners_to_skin=nsk, planes=planes)
 REP['tris_after'] = {lv: ntri(o) for lv, o in LV.items()}
+# rig-builder-4 (coordinator 07:19, teal slivers and wash at the gameplay camera): the rebuilt LODs were shaded SMOOTH, so
+# the FBX carried averaged vertex normals; on the thin slabs (apron, ladder rails, boot soles, knee pads) the average of
+# the two sides points sideways or backwards (LOD1: 348 of 4,016 corner normals against their face, 121 by more than 60
+# degrees), which lights those faces from behind and fills them with the team rim. LOD0, LOD1 and Shadow export flat
+# (one normal per face, the CM look: VertexColourFace, mesh_smooth_type FACE), custom normals cleared. Hero unchanged.
+for lv in ('LOD0', 'LOD1', 'Shadow'):
+    o = LV[lv]; me = o.data
+    me.polygons.foreach_set('use_smooth', [False] * len(me.polygons))
+    with bpy.context.temp_override(object=o, active_object=o, selected_objects=[o], selected_editable_objects=[o]):
+        try:
+            bpy.ops.mesh.customdata_custom_splitnormals_clear()
+        except Exception as ex:
+            REP.setdefault('normals_clear_error', {})[lv] = str(ex)
+    me.update()
+REP['flat_levels'] = ['LOD0', 'LOD1', 'Shadow']
 for ob in scene.objects:
     ob.select_set(ob.type in ('ARMATURE', 'MESH'))
 bpy.context.view_layer.objects.active = rig
@@ -353,3 +378,5 @@ sys.argv = ['blender', '--', OUT, path, f'{CLS}_Hero']
 runpy.run_path(os.path.join(HERE, 'face_rule_check.py'), run_name='__main__')   # the cand9 painted-face test, replayed
 sys.argv = _sv
 runpy.run_path(os.path.join(HERE, 'fbx_pair_check.py'), run_name='__main__')
+sys.argv = ['blender', '--', OUT, path, CLS, CLIPS]
+runpy.run_path(os.path.join(HERE, 'cull_check.py'), run_name='__main__')   # back faces culled + inverted hull, high camera
