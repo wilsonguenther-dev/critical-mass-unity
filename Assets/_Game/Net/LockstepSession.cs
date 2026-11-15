@@ -494,7 +494,7 @@ namespace CriticalMass.Net
             int hostStepped = r.I32();
             int na = r.U8();
             int myMargin = int.MinValue;
-            for (int i = 0; i < na; i++) { int d = (sbyte)r.U8(); if (i == LocalSlot && d != -128) myMargin = d; }   // -128: none of ours in yet
+            for (int i = 0; i < na; i++) { int md = (sbyte)r.U8(); if (i == LocalSlot && md != -128) myMargin = md; }   // -128: none of ours in yet
             if (!ReadHashes(ref r, 0)) return;
             int first = r.I32();
             int count = r.U8();
