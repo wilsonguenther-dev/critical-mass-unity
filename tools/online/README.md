@@ -35,7 +35,7 @@ All flags: `-onlineHost`, `-onlineJoin CODE`, `-onlineCode`, `-onlineKey`, `-onl
 `-onlineCodeOut FILE` (written once the host is connected, "ROOM READY"), `-onlineTimeout SECONDS`,
 `-onlineLobby SECONDS` (host gives up if the room is not full and ready, default 180, exit 4), `-onlineJoinTries N`
 (joiner asks again 1.5 s apart while the room is not there yet, default 8), `-onlineChatAt TICK` and
-`-onlineChatText TEXT` (send a chat line; every received line is logged as ONLINE CHAT), `-onlineDropAt TICK` (drop off
+`-onlineChatTeam` (the scripted chat line goes to the team only), `-onlineChatText TEXT` (send a chat line; every received line is logged as ONLINE CHAT), `-onlineDropAt TICK` (drop off
 with no goodbye; the others log ONLINE TOBOT with the seat and tick), `-onlineBuild`, `-onlineHeadless`.
 The hash log starts with tick 0 (the world as built) and tick 1, then every 30th tick: a mismatch at 0 is a setup
 difference, at 1 the first inputs, later a simulation drift. The summary line ends with every peer's round trip.
@@ -52,3 +52,13 @@ Exit codes: 0 ok, 2 desync, 3 room closed or host left, 4 timed out, 5 could not
    Air instance against a GitHub runner console peer: Mono player against .NET 8, different networks.
 4. People: owner hosts, Jeisil and Travis join by code from their homes; per-tick hashes are not needed, the
    in-game "MATCH STOPPED" panel reports any desync with its tick.
+
+## Real-relay stills (online-rooms-9)
+
+A rendered game (not batch mode, not `-onlineHeadless`) with `-onlineRelayShots` plays one real match through the relay
+and saves `shot-online-relay-NN-NAME-1920x1080.png` stills of the lobby, the match (start, a chat line, one minute in)
+and the results into the data folder, one `[CM.OnlineRelayShots] NN-NAME REACHED / NOT REACHED` line each. It takes the
+hidden peer's flags: `-onlineHost -onlineCodeOut PATH -onlineHumans N` (make the room, start when N are in) or
+`-onlineJoin CODE`, plus `-onlineRelay URL`, `-onlineName`, `-onlineTimeout`, `-onlineChatAt`, `-onlineChatText`,
+`-onlineChatTeam`. The other players are hidden peers on the same code. The window stays hidden unless `-showWindow`.
+Every hidden peer's ONLINE SUMMARY now also prints `leadmin`, `leadmax` and `waits` (stall milliseconds by the slot waited for).

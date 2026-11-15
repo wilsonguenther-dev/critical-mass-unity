@@ -365,7 +365,10 @@ namespace CriticalMass.Runtime.View
             double z = hasFx && fx.Corpse ? fx.CorpseZ : Lerp(w.PrevZ[i], w.Z[i], a);
             if (_stressHill) StressPlace(map.Hill, i, ref x, ref z);
             double h = GroundHeight(map, x, z);
-            Quaternion facing = Quaternion.Euler(0f, SimSpace.YawDeg(actor.Facing), 0f);
+            double faceYaw = actor.Facing;
+            // online-rooms-9: online, the local fighter turns to its own fresh aim at once (view only; the sim applies it Lead ticks later).
+            if (i == LocalSeat.Actor && OnlineFeel.Active && OnlineFeel.TryFacing(x, z, out double aimYaw)) faceYaw = aimYaw;
+            Quaternion facing = Quaternion.Euler(0f, SimSpace.YawDeg(faceYaw), 0f);
             if (hasFx) facing = fx.Lean * facing;
             if (hasFx && fx.Holding) dSim = 0; // the fake hit-stop: loops do not advance during the hold
             if (capsule)

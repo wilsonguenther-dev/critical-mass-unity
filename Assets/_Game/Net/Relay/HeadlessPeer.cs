@@ -48,6 +48,8 @@ namespace CriticalMass.Net.Relay
         /// <summary>Send ChatText to everyone when the match reaches this tick (-1 = never).</summary>
         public int ChatAt = -1;
         public string ChatText = "hello from the headless peer";
+        /// <summary>online-rooms-9 (-onlineChatTeam): the scripted chat line goes to the peer's team only.</summary>
+        public bool ChatTeam;
         /// <summary>Drop off the network with no goodbye at this tick (-1 = never), to test the bot handover.</summary>
         public int DropAt = -1;
         public string Build = "headless";
@@ -197,8 +199,8 @@ namespace CriticalMass.Net.Relay
             if (ChatAt >= 0 && !_chatSent && _session.Stepped >= ChatAt)
             {
                 _chatSent = true;
-                string why = Chat?.Say(ChatText, ChatScope.All, now);
-                Log("ONLINE CHAT SENT at tick " + _session.Stepped + (why != null ? " refused: " + why : ""));
+                string why = Chat?.Say(ChatText, ChatTeam ? ChatScope.Team : ChatScope.All, now);
+                Log("ONLINE CHAT SENT" + (ChatTeam ? " TEAM" : "") + " at tick " + _session.Stepped + (why != null ? " refused: " + why : ""));
             }
             if (DropAt >= 0 && _session.Stepped >= DropAt)
             {
@@ -236,9 +238,19 @@ namespace CriticalMass.Net.Relay
             s.Sampler = _pilot.Fill;
             _hashes.Add(new KeyValuePair<int, ulong>(0, s.MyWorldHash0));
             s.HashRecorded = (tick, h) => _hashes.Add(new KeyValuePair<int, ulong>(tick, h));
-            s.HumanToBot = (slot, actor, tick) => Log($"ONLINE TOBOT slot {slot} actor {actor} at tick {tick}");
+            s.HumanToBot += (slot, actor, tick) => Log($"ONLINE TOBOT slot {slot} actor {actor} at tick {tick}");   // += : the room posts its notice too
             Log($"ONLINE SETUP peer {_t.LocalPeer} actor {s.LocalActor} humans {s.Setup.Humans.Length} seed {s.Setup.Seed} " +
                 $"config 0x{s.MyConfigHash:X16} world0 0x{s.MyWorldHash0:X16} host config 0x{s.Setup.ConfigHash:X16} host world0 0x{s.Setup.WorldHash0:X16}");
+        }
+
+        /// <summary>online-rooms-9: stall milliseconds by the slot waited for ("1=840ms,2=12ms"; a client waits on slot 0, the host).</summary>
+        private string Waits()
+        {
+            long[] w = _session?.StallBySlotMs;
+            if (w == null) return "";
+            var sb = new StringBuilder();
+            for (int k = 0; k < w.Length; k++) { if (sb.Length > 0) sb.Append(','); sb.Append(k).Append('=').Append(w[k]).Append("ms"); }
+            return sb.ToString();
         }
 
         private bool Fail(int code, string why)
@@ -252,7 +264,8 @@ namespace CriticalMass.Net.Relay
         {
             if (_session != null)
                 Log($"ONLINE SUMMARY peer {(_t != null ? _t.LocalPeer : -1)} actor {_session.LocalActor} ticks {_session.Stepped} final 0x{StateHash.Of(_session.World):X16} " +
-                    $"lead {_session.Lead} late {_session.LateInputs} stall {_session.StallMs} ms sent {_session.BytesSent} B status {_session.Status} pings {Pings()}");
+                    $"lead {_session.Lead} late {_session.LateInputs} stall {_session.StallMs} ms sent {_session.BytesSent} B status {_session.Status} pings {Pings()} " +
+                    $"leadmin {_session.LeadMin} leadmax {_session.LeadMax} waits {Waits()}");   // online-rooms-9: lead range and stall by slot
             if (!string.IsNullOrEmpty(HashLogPath))
             {
                 var sb = new StringBuilder();
@@ -307,6 +320,7 @@ namespace CriticalMass.Net.Relay
                     case "onlinejointries": case "join-tries": int.TryParse(next, out p.JoinTries); i++; break;
                     case "onlinechatat": case "chat-at": int.TryParse(next, out p.ChatAt); i++; break;
                     case "onlinechattext": case "chat-text": p.ChatText = next; i++; break;
+                    case "onlinechatteam": case "chat-team": p.ChatTeam = true; break;
                     case "onlinedropat": case "drop-at": int.TryParse(next, out p.DropAt); i++; break;
                     case "onlinebuild": case "build": p.Build = next; i++; break;
                 }

@@ -9,7 +9,7 @@ namespace CriticalMass.Net
     public static class NetVersion
     {
         /// <summary>Bumps whenever any packet layout or the lockstep rules change.</summary>
-        public const int Protocol = 2;   // 2: the start message carries the config and tick 0 fingerprints
+        public const int Protocol = 3;   // 3 (online-rooms-9): bundles carry the host's tick and every slot's margin   // 2: the start message carries the config and tick 0 fingerprints
     }
 
     /// <summary>A transport that can close its room to newcomers (the relay does; the loopback does not need to).</summary>
@@ -46,6 +46,51 @@ namespace CriticalMass.Net
     /// The host's side of a room: the authoritative member list (name, team, class, ready, ping), version checks, and the
     /// START that turns the room into a lockstep match. Everything a client sends is a request the host validates.
     /// </summary>
+    /// <summary>
+    /// online-rooms-9: the room's join and leave notices, the same words on every machine. In the lobby the host posts
+    /// them as it sees peers come and go and each joiner posts them from the roster; in a match every machine posts
+    /// "NAME left: a bot took over." when the lockstep hands that human's fighter to a bot (the same tick everywhere).
+    /// </summary>
+    public static class RoomNotices
+    {
+        public static string Joined(string name) => name + " joined.";
+        public static string LeftRoom(string name) => name + " left the room.";
+        public static string LeftMatch(string name) => name + " left: a bot took over.";
+
+        /// <summary>Posts the in-match leave notice on this machine when a human becomes a bot.</summary>
+        public static void Hook(LockstepSession s, ChatChannel chat)
+        {
+            if (s == null || chat == null) return;
+            s.HumanToBot += (slot, actor, tick) =>
+            {
+                string name = slot >= 0 && slot < s.Setup.Humans.Length ? s.Setup.Humans[slot].Name : null;
+                chat.Notice(LeftMatch(string.IsNullOrEmpty(name) ? "A player" : name), s.NowMs);
+            };
+        }
+
+        /// <summary>A joiner's roster update: notices for who came and went since the last one (none when !announce).
+        /// known: peer to name, as of the previous roster (kept by the caller).</summary>
+        public static void Roster(Dictionary<int, string> known, List<RoomMember> now, ChatChannel chat, long at, int self, bool announce)
+        {
+            var seen = new HashSet<int>();
+            foreach (RoomMember m in now)
+            {
+                seen.Add(m.Peer);
+                bool isNew = !known.ContainsKey(m.Peer);
+                known[m.Peer] = m.Name;
+                if (isNew && announce && m.Peer != self && chat != null) chat.Notice(Joined(m.Name), at);
+            }
+            var left = new List<int>();
+            foreach (KeyValuePair<int, string> kv in known) if (!seen.Contains(kv.Key)) left.Add(kv.Key);
+            foreach (int p in left)
+            {
+                string name = known[p];
+                known.Remove(p);
+                if (announce && p != self && chat != null) chat.Notice(LeftRoom(name), at);
+            }
+        }
+    }
+
     public sealed class RoomHost
     {
         public readonly List<RoomMember> Members = new List<RoomMember>();
@@ -162,7 +207,7 @@ namespace CriticalMass.Net
                     {
                         Members.Remove(gone);
                         Changed(gone.Confirmed ? gone.Name + " left the room." : "");
-                        if (gone.Confirmed) Chat.Notice(gone.Name + " left.", now);
+                        if (gone.Confirmed) Chat.Notice(RoomNotices.LeftRoom(gone.Name), now);
                     }
                     return;
                 case TransportEventKind.Data:
@@ -192,7 +237,7 @@ namespace CriticalMass.Net
                     m.Name = RoomMsg.CleanName(name);
                     m.Confirmed = true;
                     Changed(m.Name + " joined.");
-                    Chat.Notice(m.Name + " joined.", now);
+                    Chat.Notice(RoomNotices.Joined(m.Name), now);
                     return;
                 }
                 case RoomMsg.Pick:
@@ -219,7 +264,7 @@ namespace CriticalMass.Net
                     int sent = r.I32();
                     if (r.Bad) return;
                     long rtt = unchecked((int)now - sent);   // both sides of the subtraction wrap the same way
-                    if (rtt >= 0 && rtt < 10000) { m.PingMs = (int)rtt; }
+                    if (rtt >= 0 && rtt < 10000) { m.PingMs = m.PingMs <= 0 ? (int)rtt : (3 * m.PingMs + (int)rtt) / 4; }   // online-rooms-9: smoothed, so one hitch (260 ms) does not set the whole match's delay
                     return;
                 }
             }
@@ -267,6 +312,15 @@ namespace CriticalMass.Net
         /// Starts the match: picks the seed, sets the starting input delay from the worst measured ping, seats every human,
         /// sends START (resent by the session until each client answers) and locks the room. Null if it cannot start yet.
         /// </summary>
+        /// <summary>
+        /// online-rooms-9: the room's starting input delay in ticks: half the worst smoothed round trip plus 60 ms, at
+        /// least 100 ms and at most 250 ms. It is the host's own felt delay for the whole match (the host's input never
+        /// travels; the delay is the joiners' buffer against jitter on the bundles) and every joiner's starting lead, which
+        /// then adapts both ways (LeadPolicy). Before: a whole round trip plus 60 ms up to 400 ms, set by one 260 ms ping.
+        /// </summary>
+        public static int StartDelay(int worstPingMs, double tickMs) =>
+            Math.Max((int)Math.Ceiling(100 / tickMs - 1e-6), Math.Min((int)Math.Ceiling(250 / tickMs - 1e-6), (int)Math.Ceiling((Math.Max(0, worstPingMs) / 2.0 + 60) / tickMs - 1e-6)));
+
         public LockstepSession Start(long now, LockstepOptions options = null, int seed = 0)
         {
             if (!CanStart(out _)) return null;
@@ -284,8 +338,7 @@ namespace CriticalMass.Net
                 TeamSize = TeamSize,
                 HostTeam = Members[0].Team,
                 Pace = Pace,
-                // A round trip plus 60 ms of slack, at least 100 ms and at most 400 ms; each client adapts after.
-                InputDelay = Math.Max((int)Math.Ceiling(100 / tickMs), Math.Min((int)Math.Ceiling(400 / tickMs), (int)Math.Ceiling((worst + 60) / tickMs))),
+                InputDelay = StartDelay(worst, tickMs),
                 HashEvery = 30,
                 Humans = new HumanSlot[n],
             };
@@ -295,6 +348,7 @@ namespace CriticalMass.Net
             // earlier match or the offline game touched). The host builds first, then sends what it built from: the config
             // fingerprint and its tick 0 world fingerprint ride in the start message, and a client that differs refuses.
             Session = new LockstepSession(_t, setup, GameConfig.CreateDefault(), options) { Other = Chat.Handle };
+            RoomNotices.Hook(Session, Chat);
             setup.ConfigHash = Session.MyConfigHash;
             setup.WorldHash0 = Session.MyWorldHash0;
             var w = new WireWriter(new byte[Peers.MaxPacket]);
@@ -313,6 +367,8 @@ namespace CriticalMass.Net
     /// <summary>A joiner's side of a room: says hello, mirrors the host's member list, sends picks, and enters the match on START.</summary>
     public sealed class RoomClient
     {
+        private readonly Dictionary<int, string> _announced = new Dictionary<int, string>();   // online-rooms-9: roster notices
+
         public RoomPhase Phase { get; private set; } = RoomPhase.Connecting;
         public readonly List<RoomMember> Members = new List<RoomMember>();
         public int TeamSize { get; private set; } = 16;
@@ -441,6 +497,8 @@ namespace CriticalMass.Net
                         m.Confirmed = true;
                         list.Add(m);
                     }
+                    // online-rooms-9: joiners see joins and leaves too (only the host used to); the first roster is not news.
+                    RoomNotices.Roster(_announced, list, Chat, now, _t.LocalPeer, Phase == RoomPhase.Lobby);
                     Members.Clear();
                     Members.AddRange(list);
                     TeamSize = teamSize;
@@ -475,6 +533,7 @@ namespace CriticalMass.Net
                     if (setup == null) { Fail("The host sent a match this game cannot play."); return; }
                     if (setup.SlotOfPeer(_t.LocalPeer) < 0) { Fail("The match started without you."); return; }
                     Session = new LockstepSession(_t, setup, GameConfig.CreateDefault(), Options) { Other = Chat.Handle };
+                    RoomNotices.Hook(Session, Chat);
                     Phase = RoomPhase.InMatch;
                     Version++;
                     Started?.Invoke(Session);

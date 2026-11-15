@@ -20,7 +20,13 @@ namespace CriticalMass.Net
     public sealed class LockstepOptions
     {
         /// <summary>The host waits this long for a late human input before it repeats that human's last input.</summary>
-        public int LateMs = 250;
+        public int LateMs = 100;
+        /// <summary>
+        /// online-rooms-9: a human the host had to repeat stays "lagging" this long: its inputs are used when they are in
+        /// time and repeated when not, and nobody waits for it. Before, an on-time input cleared lagging at once, so a peer
+        /// hovering at the edge cost everyone a LateMs wait again and again (77 s of waits in an 8 minute match).
+        /// </summary>
+        public int LagHoldMs = 2000;
         /// <summary>A human the host has not heard from for this long becomes a bot (at one announced tick).</summary>
         public int DropAfterMs = 6000;
         /// <summary>A client that has not heard from the host for this long ends with HostLeft.</summary>
@@ -29,7 +35,7 @@ namespace CriticalMass.Net
         public int SendEveryMs = 30;
         public int KeepAliveMs = 250;
         /// <summary>Largest per-client input lead the adaptive delay may reach, in milliseconds (converted to ticks at the match pace).</summary>
-        public int MaxLeadMs = 700;
+        public int MaxLeadMs = 700;   // online-rooms-9: the adaptive lead's ceiling (LeadPolicy: floor 100 ms)
         /// <summary>Ticks of wall-clock backlog the stepping clock keeps after a stall (catch-up burst cap).</summary>
         public int BacklogTicks = 6;
     }
@@ -74,6 +80,16 @@ namespace CriticalMass.Net
         public int LateInputs { get; private set; }
         /// <summary>Milliseconds this machine waited for the network (stalls).</summary>
         public long StallMs { get; private set; }
+        /// <summary>online-rooms-9: stall time by the slot it waited for (the host: the human whose input was missing; a client: slot 0).</summary>
+        public long[] StallBySlotMs { get; private set; }
+        /// <summary>online-rooms-9: the smallest and largest lead this machine used (a client's adapts; the host's is fixed).</summary>
+        public int LeadMin => _lead != null ? _lead.Min : Lead;
+        public int LeadMax => _lead != null ? _lead.Max : Lead;
+        /// <summary>The clock of the last Update (milliseconds).</summary>
+        public long NowMs => _nowMs;
+        private LeadPolicy _lead;
+        private long[] _lagUntil;
+        private int _blame = -1;
         /// <summary>online-rooms-3: ConfigHash.Of the config this machine built the world from.</summary>
         public ulong MyConfigHash { get; }
         /// <summary>online-rooms-3: StateHash.Of the world right after it was built (tick 0).</summary>
@@ -110,7 +126,6 @@ namespace CriticalMass.Net
         private readonly ITransport _t;
         private readonly LockstepOptions _o;
         private readonly double _tickMs;
-        private readonly int _maxLead;
         private readonly int _h;
         private readonly int _bundleSize;
         private readonly InputFrame _scratch = SimInput.EmptyInput();
@@ -155,8 +170,6 @@ namespace CriticalMass.Net
         private int _sentInput = -1;
         private long _lastFromHost;
         private long _lastSendHost;
-        private int _hostMargin;
-        private long _marginSince;
 
         // Hashes.
         private readonly int[] _hashTick = new int[HashKeep];
@@ -168,7 +181,6 @@ namespace CriticalMass.Net
         private long _lastNow = -1;
         private long _nowMs;
         private long _waitingSince = -1;
-        private long _leadUpMs = long.MinValue / 2;
         private double _acc;
         private long _startMs = -1;
 
@@ -206,7 +218,6 @@ namespace CriticalMass.Net
             if (SetupMismatch != null) { Status = LockstepStatus.Desynced; DesyncTick = 0; }
             // Wall milliseconds per tick: the match pace (sim ticks per wall second / SimHz) speeds the clock, never the rules.
             _tickMs = 1000.0 / (cfg.SimHz * WallPace(setup, cfg));
-            _maxLead = Math.Max(2, (int)Math.Ceiling(_o.MaxLeadMs / _tickMs));
             // A big room sends half as often (two ticks per packet): the relay's room object sees one message per human per
             // send, and 32 humans x 33 a second would sit at its 1,000 a second soft limit. 17+ humans: 66 ms, 32 x 15 = 480/s.
             _sendEveryMs = setup.Humans.Length > BigRoomHumans ? Math.Max(_o.SendEveryMs, 2 * _o.SendEveryMs) : _o.SendEveryMs;
@@ -223,6 +234,10 @@ namespace CriticalMass.Net
             _theirHash = new ulong[_h * 2];
             for (int i = 0; i < _theirTick.Length; i++) _theirTick[i] = -1;
             Lead = Math.Max(1, setup.InputDelay);
+            StallBySlotMs = new long[_h];
+            // online-rooms-9: a client's lead adapts both ways (LeadPolicy); the host's own input never travels, so its lead
+            // stays the room's start delay (it is also the joiners' buffer against jitter on the bundles).
+            if (!IsHost) { _lead = LeadPolicy.For(Lead, _tickMs, _o.MaxLeadMs); Lead = _lead.Lead; }
             if (IsHost)
             {
                 _in = new byte[_h][];
@@ -231,6 +246,7 @@ namespace CriticalMass.Net
                 _lastHeard = new long[_h];
                 _heardInput = new bool[_h];
                 _lagging = new bool[_h];
+                _lagUntil = new long[_h];
                 _dropPending = new bool[_h];
                 _gone = new bool[_h];
                 _ackedBundle = new int[_h];
@@ -392,11 +408,13 @@ namespace CriticalMass.Net
                     if (!needNow) return;
                     if (_lagging[k]) continue;
                     if (_waitSince < 0) _waitSince = now;
-                    if (_heardInput[k] && now - _waitSince >= _o.LateMs) { _lagging[k] = true; continue; }
+                    if (_heardInput[k] && now - _waitSince >= _o.LateMs) { _lagging[k] = true; _lagUntil[k] = now + _o.LagHoldMs; continue; }
+                    _blame = k;
                     ready = false;
                 }
                 if (!ready) return;
                 _waitSince = -1;
+                _blame = -1;
                 int off = idx * _bundleSize;
                 for (int k = 0; k < _h; k++)
                 {
@@ -414,10 +432,11 @@ namespace CriticalMass.Net
                     {
                         Buffer.BlockCopy(_in[k], idx * InputCodec.Size, _bundles, o + 1, InputCodec.Size);
                         Buffer.BlockCopy(_in[k], idx * InputCodec.Size, _lastInput[k], 0, InputCodec.Size);
-                        _lagging[k] = false;
+                        if (now >= _lagUntil[k]) _lagging[k] = false;   // online-rooms-9: on time again for LagHoldMs first
                     }
                     else
                     {
+                        if (_lagging[k]) _lagUntil[k] = now + _o.LagHoldMs;   // online-rooms-9: still late: stay lagging
                         // Late: keep this human moving as they last did, without repeating a one-shot press.
                         ClearOneShots(_lastInput[k], 0);
                         Buffer.BlockCopy(_lastInput[k], 0, _bundles, o + 1, InputCodec.Size);
@@ -470,6 +489,12 @@ namespace CriticalMass.Net
             var r = new WireReader(d, 1, len);
             int theirDesync = r.I32();
             int ack = r.I32();
+            // online-rooms-9: the host's stepping tick and every slot's input horizon relative to it (the margin), in
+            // broadcasts too: the relay path used to carry no acknowledgement at all, so a client's lead could only grow.
+            int hostStepped = r.I32();
+            int na = r.U8();
+            int myMargin = int.MinValue;
+            for (int i = 0; i < na; i++) { int d = (sbyte)r.U8(); if (i == LocalSlot && d != -128) myMargin = d; }   // -128: none of ours in yet
             if (!ReadHashes(ref r, 0)) return;
             int first = r.I32();
             int count = r.U8();
@@ -487,12 +512,11 @@ namespace CriticalMass.Net
                 _bundleTick[idx] = t;
             }
             while (_bundleTick[(_bundlesThrough + 1) & (Window - 1)] == _bundlesThrough + 1) _bundlesThrough++;
-            // Adaptive lead: how far ahead of the host's sequencing our inputs arrive.
-            if (ack >= 0)
+            // Adaptive lead (LeadPolicy): how many ticks ahead of the host's stepping our inputs were when it sent this.
+            if (myMargin != int.MinValue && _lead != null && hostStepped >= 0)
             {
-                int margin = ack - _bundlesThrough;
-                if (margin != _hostMargin) { _hostMargin = margin; _marginSince = now; }
-                if (margin > 3 && now - _marginSince > 3000 && Lead > 1) { Lead--; _marginSince = now; }
+                _lead.OnMargin(myMargin, now);
+                Lead = _lead.Lead;
             }
             if (theirDesync >= 0) Desync(theirDesync);
             CheckHashes();
@@ -518,7 +542,18 @@ namespace CriticalMass.Net
                 if (IsHost) Produce(now);
             }
             // Wall time spent waiting for a bundle (counted per call, so it no longer depends on how often Update runs).
-            if (waited) { if (_waitingSince >= 0) StallMs += now - _stallSeen; else _waitingSince = now; _stallSeen = now; }
+            if (waited)
+            {
+                if (_waitingSince >= 0)
+                {
+                    long add = now - _stallSeen;
+                    StallMs += add;
+                    int slot = IsHost ? _blame : 0;
+                    if (slot >= 0 && slot < _h) StallBySlotMs[slot] += add;
+                }
+                else _waitingSince = now;
+                _stallSeen = now;
+            }
             else if (Stepped > 0) _waitingSince = -1;
         }
 
@@ -548,7 +583,7 @@ namespace CriticalMass.Net
                         // The host had to replace our input (it came too late): lead one tick more.
                         LateInputs++;
                         // One step up per half second: a burst of late ticks is one late episode, not ten.
-                        if (Lead < _maxLead && _nowMs - _leadUpMs >= 500) { Lead++; _leadUpMs = _nowMs; }
+                        if (_lead != null) { _lead.OnLate(_nowMs); Lead = _lead.Lead; }
                     }
                 }
             }
@@ -684,7 +719,7 @@ namespace CriticalMass.Net
                         _t.Send(Setup.Humans[k].Peer, StartPacket, StartPacketLength);
                         _lastStartSend[k] = now;
                     }
-            int maxPer = Math.Max(1, (Peers.MaxPacket - 32) / _bundleSize);
+            int maxPer = Math.Max(1, (Peers.MaxPacket - 48 - _h) / _bundleSize);   // online-rooms-9: + the margins
             if (_t.Reliable)
             {
                 // One broadcast carries every new bundle to everyone (relay messages cost; acks are not needed on TCP).
@@ -733,6 +768,13 @@ namespace CriticalMass.Net
             w.U8(MsgBundles);
             w.I32(DesyncTick);
             w.I32(ackInput);
+            w.I32(Stepped);
+            w.U8(_h);
+            for (int k = 0; k < _h; k++)
+            {
+                int d = _gone[k] || _inThrough[k] < 0 ? -128 : _inThrough[k] - Stepped;
+                w.U8(unchecked((byte)(sbyte)Math.Max(-128, Math.Min(127, d))));
+            }
             WriteHashes(ref w);
             w.I32(from);
             w.U8(count);

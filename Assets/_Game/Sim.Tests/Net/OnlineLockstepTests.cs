@@ -21,11 +21,12 @@ namespace CriticalMass.Sim.Tests.Net
             public LoopbackNetwork Net;
             public List<LockstepSession> Sessions = new List<LockstepSession>();
             public List<Dictionary<int, ulong>> Hashes = new List<Dictionary<int, ulong>>();
+            public List<LoopbackTransport> Links = new List<LoopbackTransport>();
             public long Now;
         }
 
         /// <summary>A room of `humans` people: the host on Azure, the second on the other team, any third on the host's team.</summary>
-        private static Rig Make(int humans, int teamSize, int delayMs, int jitterMs, double loss, LockstepOptions o = null, uint netSeed = 7)
+        private static Rig Make(int humans, int teamSize, int delayMs, int jitterMs, double loss, LockstepOptions o = null, uint netSeed = 7, int inputDelay = 6)
         {
             var rig = new Rig { Net = new LoopbackNetwork(netSeed, delayMs, jitterMs, loss) };
             var teams = new TeamId[humans];
@@ -34,12 +35,13 @@ namespace CriticalMass.Sim.Tests.Net
             var actors = new int[humans];
             Assert.IsTrue(MatchSetup.AssignActors(teamSize, TeamId.Azure, teams, actors));
             // Pace 1: 30 ticks per wall second, so the millisecond numbers in these tests read as 33 ms ticks.
-            var setup = new MatchSetup { Seed = 4242, TeamSize = teamSize, HostTeam = TeamId.Azure, InputDelay = 6, HashEvery = 30, Pace = 1 };
+            var setup = new MatchSetup { Seed = 4242, TeamSize = teamSize, HostTeam = TeamId.Azure, InputDelay = inputDelay, HashEvery = 30, Pace = 1 };
             setup.Humans = new HumanSlot[humans];
             var transports = new LoopbackTransport[humans];
             for (int i = 0; i < humans; i++)
             {
                 transports[i] = rig.Net.CreatePeer();
+                rig.Links.Add(transports[i]);
                 setup.Humans[i] = new HumanSlot { Peer = transports[i].LocalPeer, Actor = actors[i], Class = teams[i] == TeamId.Crimson ? ClassId.Miner : ClassId.Warrior, Name = "P" + i };
             }
             for (int i = 0; i < humans; i++)
@@ -334,6 +336,74 @@ namespace CriticalMass.Sim.Tests.Net
             Assert.AreEqual(LockstepStatus.Running, rig.Sessions[0].Status);
             Assert.Greater(rig.Sessions[1].Lead, 6, "the client's lead grew to cover the round trip");
             AssertSameHashes(rig, 0, 1, 50);
+        }
+
+        // ------------------------------------------------------------------ online-rooms-9
+
+        [Test]
+        public void AGoodLinkBringsTheClientLeadDownToTheFloorAndTheWorldsStillMatch()
+        {
+            // The 2026-11-15 relay run left a joiner at a 19-tick lead (633 ms) on a link that needed far less. Start there
+            // on a 30 ms each-way link: the lead must come down, never under the floor, and nothing may diverge.
+            Rig rig = Make(2, 6, 30, 5, 0, null, 7, 19);
+            Run(rig, 1200, 400_000);
+            LockstepSession c = rig.Sessions[1];
+            Assert.AreEqual(19, c.LeadMax, "starts at the room's delay");
+            Assert.LessOrEqual(c.Lead, 9, "a 60 ms round trip needs a few ticks, not 19");
+            Assert.GreaterOrEqual(c.LeadMin, LeadPolicy.For(19, 1000.0 / 30, new LockstepOptions().MaxLeadMs).Floor, "never under the floor");
+            Assert.AreEqual(19, rig.Sessions[0].Lead, "the host's lead is the room's start delay");
+            Assert.AreEqual(LockstepStatus.Running, rig.Sessions[0].Status);
+            AssertSameHashes(rig, 0, 1, 30);
+        }
+
+        [Test]
+        public void APeerThatKeepsMissingTicksIsRepeatedAndTheRoomDoesNotWaitForItEachTime()
+        {
+            // Peer 2 goes quiet for 250 ms of every 500 ms (a link that hovers at the edge), with a ceiling too low for
+            // its lead to cover the gaps. Before online-rooms-9 every gap cost the whole room a LateMs wait again (an
+            // on-time input cleared "lagging" at once): 40 gaps, about 10 s of waits. Now it stays lagging and is repeated.
+            var o = new LockstepOptions { MaxLeadMs = 150 };
+            Rig rig = Make(3, 8, 40, 10, 0, o);
+            Run(rig, 300, 60_000);
+            long before = rig.Sessions[0].StallMs;
+            var skip = new[] { false, false, true };
+            for (int n = 0; n < 40; n++)
+            {
+                Run(rig, 1_000_000, rig.Now + 250, null, skip);
+                Run(rig, 1_000_000, rig.Now + 250);
+            }
+            LockstepSession host = rig.Sessions[0];
+            long waited = host.StallMs - before;
+            Assert.Less(waited, 1500, $"the room waited {waited} ms in 20 s for one edge-of-time peer");
+            Assert.Greater(host.LateInputs, 30, "the missing inputs were repeated");
+            Assert.IsTrue(host.World.Actors[rig.Sessions[2].LocalActor].IsHuman, "not dropped: it is still sending");
+            Assert.AreEqual(LockstepStatus.Running, host.Status);
+            Assert.AreEqual(LockstepStatus.Running, rig.Sessions[1].Status);
+            AssertSameHashes(rig, 0, 1, 20);
+            AssertSameHashes(rig, 0, 2, 10);
+        }
+
+        [Test]
+        public void EveryoneLeftInTheMatchSeesWhoLeftAndThatABotTookOver()
+        {
+            Rig rig = Make(3, 8, 50, 10, 0);
+            var chats = new ChatChannel[3];
+            for (int i = 0; i < 3; i++)
+            {
+                chats[i] = new ChatChannel(rig.Links[i]);
+                RoomNotices.Hook(rig.Sessions[i], chats[i]);
+            }
+            Run(rig, 300, 60_000);
+            rig.Net.Cut(2, true);
+            Run(rig, 600, 120_000, null, new[] { false, false, true });
+            string want = RoomNotices.LeftMatch("P2");
+            Assert.AreEqual("P2 left: a bot took over.", want);
+            for (int i = 0; i < 2; i++)
+            {
+                int found = 0;
+                foreach (ChatLine l in chats[i].Lines) if (l.Scope == ChatScope.System && l.Text == want) found++;
+                Assert.AreEqual(1, found, (i == 0 ? "the host" : "the joiner") + " shows the leave notice once");
+            }
         }
     }
 }
