@@ -473,6 +473,9 @@ namespace CriticalMass.Sim.Tests
                 {
                     double[] br = NarrowBridges[b];
                     World w = NewWorld(true);
+                    // The mover is under test, not target choice: under "fight on the hill" (KaijuHillSiege) an owned Kaiju does
+                    // not chase a fighter standing mid-bridge far from the hill, so that rule is off here.
+                    w.Config.Physics.KaijuHillSiege = false;
                     SimResources.ApplyDelivery(w, TeamId.Crimson, CarryKind.Biomass, 1);
                     w.ForceHatch = true;
                     SimStep.Step(w);
@@ -532,11 +535,16 @@ namespace CriticalMass.Sim.Tests
         }
 
         /// <summary>
-        /// fix/kaiju-hill-1 (two Air matches on b4310e9, seeds 1337 and 4242: 0.0 s inside the hill radius, parked 9 to 16 m east of
-        /// the hill, idle with no target 330 s to 390 s): over a whole seeded 16v16 match on the game's rules, the hatched Kaiju is
-        /// inside the hill radius for more than 20 s, and it never stands still with no target for more than 5 s while off the hill
-        /// (on the hill with no enemy near is holding it; Neutral at home and knocked out are excluded). Its position is printed
-        /// every 30 s, as the Air run logged it.
+        /// fix/kaiju-hill-1 (art lead 2026-11-15: "Fighting on the hill"). A whole seeded 16v16 match on the game's rules. Counted
+        /// only while the Kaiju is owned (Azure or Crimson: Berserk hunts everyone, Neutral idles at the egg) and not knocked out:
+        ///   on-or-near share, within KaijuHillFightRadius (12 m: the hill disc plus the ring band), at least 60%: it may leave
+        ///   only to answer an attacker inside the 18 m leash and must come back;
+        ///   on-hill share, inside the 6 m hill radius, at least 20% and more than 20 s: fights at the ring gaps and on the band
+        ///   count as near, not on, so a fifth on the disc itself is the floor, not the target;
+        ///   never standing still off the hill with no target for more than 5 s (clawing excluded).
+        /// The floors are first guesses from the rule, not measured: rounds 1 and 2 measured 0.0 s on the hill. The printout
+        /// (every 30 s: position, target, active barricades within 13 m of the hill, fighters touching its body) is what to read if
+        /// it fails.
         /// </summary>
         [TestCase(1337)]
         [TestCase(4242, Category = "Slow")]
@@ -547,21 +555,37 @@ namespace CriticalMass.Sim.Tests
             InputFrame scratch = SimInput.EmptyInput();
             HillDef hill = w.Map.Hill;
             double hz = cfg.SimHz, dt = 1.0 / hz;
-            double onHill = 0, still = 0, worstStill = 0, worstAt = 0, ax = double.NaN, az = 0;
+            double owned = 0, onHill = 0, near = 0, still = 0, worstStill = 0, worstAt = 0, ax = double.NaN, az = 0;
+            double nearR = cfg.Physics.KaijuHillFightRadius;
             int maxTicks = (int)(hz * 60 * 30);
             for (int t = 0; t < maxTicks && w.Match.Phase != MatchPhase.Ended; t++)
             {
                 MatchTick.Advance(w, null, scratch);
                 Kaiju k = w.Kaiju;
                 if (!w.Match.Hatched || k.State == KaijuState.Egg) continue;
-                double hx = k.X - hill.X, hzz = k.Z - hill.Z;
-                bool inHill = hx * hx + hzz * hzz <= hill.R * hill.R;
-                if (inHill) onHill += dt;
+                double hx = k.X - hill.X, hzz = k.Z - hill.Z, hd2 = hx * hx + hzz * hzz;
+                bool inHill = hd2 <= hill.R * hill.R;
+                bool isOwned = (k.State == KaijuState.Azure || k.State == KaijuState.Crimson) && k.KoIn <= 0;
+                if (isOwned)
+                {
+                    owned += dt;
+                    if (inHill) onHill += dt;
+                    if (hd2 <= nearR * nearR) near += dt;
+                }
                 if (w.Tick % (int)(hz * 30) == 0)
+                {
+                    int forts = 0, touching = 0;
+                    foreach (Barricade b in w.Barricades)
+                        if (b.Active && (b.Cx + 0.5 - hill.X) * (b.Cx + 0.5 - hill.X) + (b.Cz + 0.5 - hill.Z) * (b.Cz + 0.5 - hill.Z) <= 13 * 13) forts++;
+                    for (int i = 0; i < w.ActorCount; i++)
+                        if (w.Actors[i].Alive && (w.X[i] - k.X) * (w.X[i] - k.X) + (w.Z[i] - k.Z) * (w.Z[i] - k.Z) <= 2.2 * 2.2) touching++;
                     Console.WriteLine("{\"item\":\"kaiju 30s\",\"seed\":" + seed + ",\"t\":" + w.Match.Time.ToString("F0") + ",\"at\":\"" +
-                                      k.X.ToString("F1") + "," + k.Z.ToString("F1") + "\",\"target\":" + k.TargetId + ",\"state\":\"" + k.State +
+                                      k.X.ToString("F1") + "," + k.Z.ToString("F1") + "\",\"fromHill\":" + Math.Sqrt(hd2).ToString("F1") +
+                                      ",\"target\":" + k.TargetId + ",\"state\":\"" + k.State + "\",\"hillBarricades\":" + forts +
+                                      ",\"touching\":" + touching + ",\"siegeStand\":\"" + w.KaijuNav.StandCx + "," + w.KaijuNav.StandCz +
                                       "\",\"onHillS\":" + onHill.ToString("F1") + "}");
-                bool idleCase = k.TargetId < 0 && k.State != KaijuState.Neutral && k.KoIn <= 0 && !inHill && k.MeleeCd <= 0; // clawing a barricade is not idle
+                }
+                bool idleCase = k.TargetId < 0 && isOwned && !inHill && k.MeleeCd <= 0; // clawing is not idle
                 if (idleCase && !double.IsNaN(ax) && (k.X - ax) * (k.X - ax) + (k.Z - az) * (k.Z - az) <= 0.3 * 0.3)
                 {
                     still += dt;
@@ -574,9 +598,14 @@ namespace CriticalMass.Sim.Tests
                     az = k.Z;
                 }
             }
-            Console.WriteLine("{\"item\":\"kaiju hill\",\"seed\":" + seed + ",\"onHillS\":" + onHill.ToString("F1") + ",\"worstIdleOffHillS\":" +
+            double onShare = owned > 0 ? onHill / owned : 0, nearShare = owned > 0 ? near / owned : 0;
+            Console.WriteLine("{\"item\":\"kaiju hill\",\"seed\":" + seed + ",\"ownedS\":" + owned.ToString("F1") + ",\"onHillS\":" + onHill.ToString("F1") +
+                              ",\"onShare\":" + onShare.ToString("F2") + ",\"nearShare\":" + nearShare.ToString("F2") + ",\"worstIdleOffHillS\":" +
                               worstStill.ToString("F1") + ",\"worstIdleEndsAt\":" + worstAt.ToString("F0") + "}");
-            Assert.Greater(onHill, 20.0, "the Kaiju spends more than 20 s inside the hill radius over the match");
+            Assert.Greater(owned, 60.0, "the match gives an owned Kaiju at least a minute (else the test proves nothing)");
+            Assert.GreaterOrEqual(nearShare, 0.60, "an owned Kaiju is on or near the hill (within 12 m) at least 60% of its owned time");
+            Assert.GreaterOrEqual(onShare, 0.20, "and inside the 6 m hill radius at least 20% of it");
+            Assert.Greater(onHill, 20.0, "and more than 20 s inside the hill radius");
             Assert.LessOrEqual(worstStill, 5.0, "it never stands still off the hill with no target for more than 5 s");
         }
 

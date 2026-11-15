@@ -336,6 +336,26 @@ namespace CriticalMass.Sim.Core
             }
         }
 
+        /// <summary>fix/kaiju-hill-1 round 3: KaijuBarricadeCrushPerSecond x dt off every barricade whose cell is within its wall
+        /// collider + 0.25 m (pressing on it), any team.</summary>
+        private static void CrushBarricades(World w, double dt)
+        {
+            Barricade[] list = w.Barricades;
+            if (list == null) return;
+            Kaiju k = w.Kaiju;
+            double r = WallR(w) + 0.25;
+            double dmg = w.Config.Physics.KaijuBarricadeCrushPerSecond * dt;
+            for (int s = 0; s < list.Length; s++)
+            {
+                Barricade b = list[s];
+                if (!b.Active || b.Hp <= 0) continue;
+                double nx = k.X < b.Cx ? b.Cx : (k.X > b.Cx + 1 ? b.Cx + 1.0 : k.X);
+                double nz = k.Z < b.Cz ? b.Cz : (k.Z > b.Cz + 1 ? b.Cz + 1.0 : k.Z);
+                if ((k.X - nx) * (k.X - nx) + (k.Z - nz) * (k.Z - nz) > r * r) continue;
+                b.Hp -= dmg;
+            }
+        }
+
         /// <summary>
         /// fix/kaiju-hill-1: with no target and the hill cut off from its clearance region, pick (every 1 s) the active barricade
         /// within KaijuSiegeRadius of the hill nearest to it that has a cell of its own region within claw reach, and the clear cell
@@ -747,6 +767,9 @@ namespace CriticalMass.Sim.Core
             // circling at the chase stop made it walk one tick (facing its path cell) and stand the next (facing the fighter):
             // the facing swung between the two every tick on the hill.
             if (guard && t >= 0 && ex * ex + ez * ez <= (kc.MeleeRange + 1.5) * (kc.MeleeRange + 1.5)) k.Facing = JsMath.Atan2(ez, ex);
+
+            // fix/kaiju-hill-1 round 3: its body crushes the barricades it presses against (its plan goes through them).
+            if (guard && Phys.On(w, pc.KaijuHillSiege)) CrushBarricades(w, dt);
 
             // fix/movement-shiver-1: give a target up after KaijuGiveUpSeconds without progress (net move under
             // KaijuProgressRadius while not in claw reach of it with a clear line); it is skipped for KaijuIgnoreSeconds.

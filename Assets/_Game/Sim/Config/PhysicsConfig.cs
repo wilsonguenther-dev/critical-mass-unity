@@ -147,12 +147,17 @@ namespace CriticalMass.Sim.Config
         public double KaijuBarricadeDamage = 60;
         /// <summary>Barricades this far (metres) from the hill centre count as "in the way" (the ring is at 10.5).</summary>
         public double KaijuSiegeRadius = 13;
-        /// <summary>fix/kaiju-hill-1 round 2 (run 43648485298: 0.0 s on the hill with the ring open; every 30 s sample had a target
-        /// on the east approach): target choice had no range, so an owned Kaiju always chased the nearest enemy anywhere, and the
-        /// enemy stream from the base over the east bridge kept it at the east gap. An owned (not Berserk) Kaiju now adds
-        /// KaijuHillPull x (the target's distance beyond the hill radius) to a target's score: it guards the hill and fights what
-        /// comes onto it. A fighter that hit it in the last KaijuHitMemorySeconds is exempt, so it still punishes an attacker anywhere.</summary>
-        public double KaijuHillPull = 1.5;
+        /// <summary>fix/kaiju-hill-1 round 3 (art lead 2026-11-15: "Fighting on the hill"): an owned (not Berserk, not Neutral)
+        /// Kaiju picks only hostile fighters within KaijuHillFightRadius of the hill centre (the hill disc and the ring band; the
+        /// ring is at 10.5), plus a fighter that hit it in the last KaijuHitMemorySeconds while that fighter is within KaijuHillLeash
+        /// of the hill centre. With no such target it walks to the hill and stands on it (contesting). Round 2's soft score pull
+        /// (1.5 x distance beyond the hill) only re-ranked fighters it could reach, and the stream off the east bridge always had
+        /// one nearer, so it never left the east approach.</summary>
+        public double KaijuHillFightRadius = 12;
+        public double KaijuHillLeash = 18;
+        /// <summary>Its body crushes a barricade it presses against (barricade HP per second; 120 HP = half a second), and its
+        /// path planning treats barricade cells as passable: a fort of crates round the hill holders no longer cuts the hill off.</summary>
+        public double KaijuBarricadeCrushPerSecond = 240;
         public double KaijuHitMemorySeconds = 4;
         /// <summary>fix/movement-shiver-2: bot steering with hysteresis. Straight line or route is a choice held at least
         /// BotModeHoldSeconds (straight needs the whole body to fit, it is left only when the centre line is blocked); the
