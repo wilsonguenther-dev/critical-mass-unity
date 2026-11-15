@@ -94,7 +94,7 @@ namespace CriticalMass.Runtime.View.Effects
                 if (ax * ax + az * az <= 2.2 * 2.2) touching++;
             }
             string name = "shot-kaiju-watch-" + n.ToString("00", CultureInfo.InvariantCulture) + ".png";
-            Log("t=" + F(w.Match.Time) + " kaiju " + F(k.X) + "," + F(k.Z) + " state " + k.State + " target " + k.TargetId +
+            Log("t=" + F(w.Match.Time) + " kaiju " + F(k.X) + "," + F(k.Z) + " state " + k.State + " koLeft " + F(k.KoIn) + " target " + k.TargetId +
                 " distToHill " + F(dist) + " onHill " + (dist <= hill.R ? "yes" : "no") + " barricades13m " + barricades +
                 " touching " + touching + " shot " + name);
 
