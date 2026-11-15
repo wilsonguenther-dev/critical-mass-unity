@@ -191,13 +191,12 @@ for lv, o in LV.items():
     if lv != 'Hero' and os.environ.get('FACE_FLAT', '1') == '1':
         # one colour per face on the rebuilt LODs (VertexColourFace, as the Hero is painted): the nearest-face transfer
         # gave a big LOD triangle corners from different parts, which the GPU blends into smears (blue-grey on a red shirt)
+        # each LOD face takes the colour (and code) of the Hero face nearest its centre, after the Hero's own fixes
         nfl = 0
         for p_ in me.polygons:
-            s_, k_ = p_.loop_start, p_.loop_total
-            q_ = [tuple(np.round(C[s_ + i] * 255).astype(int)) for i in range(k_)]
-            best = max(set(q_), key=lambda t: (q_.count(t), t[3]))
-            if q_.count(best) < k_:
-                C[s_:s_ + k_] = np.array(best, np.float32) / 255.0; nfl += 1
+            hit = bvh.find_nearest(M @ p_.center)
+            if hit[2] is not None:
+                C[p_.loop_start:p_.loop_start + p_.loop_total] = HPC[hit[2]]; nfl += 1
         REP.setdefault('faces_flattened', {})[lv] = nfl
     nsk = 0
     for p in me.polygons:
@@ -208,6 +207,8 @@ for lv, o in LV.items():
             m = (np.round(cc[:, 3] * 8) == 0) & ((lum(cc[:, :3]) < 0.62 * lum(skin)) | (cc[:, 0] - cc[:, 2] < 0.05))
             if m.any():
                 cc[m, :3] = skin; cc[m, 3] = 0.0; C[s:s + k] = cc; nsk += int(m.sum())
+    if lv == 'Hero':
+        HPC = np.array([C[p.loop_start] for p in me.polygons])   # the Hero is painted one colour per face
     lb = world_bvh(o); miss = [0]
 
     def on_skin(x, z, lift):
