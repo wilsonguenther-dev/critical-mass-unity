@@ -42,7 +42,9 @@ namespace CriticalMass.Sim.Core
             SimResources.ResourcesSystem(w, dt);
             Roles.HandoffSystem(w); // U-063: a carrier that may not feed hands its biomass to a feeder beside it
             Sources.SourcesSystem(w, dt); // U-064: groves and springs, the bank at the base
+            SimProfile.Begin?.Invoke(SimProfile.KaijuHill);   // fix/frame-cost-1: "CM.KaijuHill" in the player (timing only)
             Kaiju.KaijuSystem(w, dt);
+            SimProfile.End?.Invoke(SimProfile.KaijuHill);
             Stations.StationSystem(w); // U-065: upgrade purchases at the base station
             PingRules.PingSystem(w); // U-067: pings in, orders out, the bots' own calls
             Respawn.RespawnSystem(w, dt);

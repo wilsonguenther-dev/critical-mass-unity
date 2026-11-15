@@ -621,6 +621,7 @@ namespace CriticalMass.Runtime.Game
         /// </summary>
         void ApplyPacing(PacingState p)
         {
+            using var scope = FrameCostMarkers.Pace.Auto();   // fix/frame-cost-1
             if (QualitySettings.vSyncCount != p.VSync) QualitySettings.vSyncCount = p.VSync;
             if (Application.targetFrameRate != p.Target) Application.targetFrameRate = p.Target;
             if (OnDemandRendering.renderFrameInterval != p.Interval) OnDemandRendering.renderFrameInterval = p.Interval;
