@@ -174,6 +174,25 @@ def drop_loose(o, nmax=3):
     return len(kill)
 
 
+def back_to_chest(o, behind=float(os.environ.get('BACK_HEAD_Y', '0.17'))):
+    # rig-builder-4 (cand9 red, HyFacesArePaintedInVertexColourAndNeverTeamSwapped): the test takes the half of the
+    # head-bone vertices with the most skin-coloured vertices as the face. The ladder's top rungs behind his head were
+    # weighted to the head bone (146 vertices, seen in rig-builder-3's ladder diagnosis), and their tan wood counts as
+    # skin, so the BACK half won (596 to 558) and the placed eyes were never looked at. Every vertex more than `behind`
+    # metres behind the head bone (in the bind pose) that the head carries goes 100 % to the chest, where the rest of
+    # the ladder rides: the bind pose and every sheet look the same; in motion the ladder no longer turns with the head.
+    Mw = o.matrix_world; hd = o.vertex_groups['head'].index; ch = o.vertex_groups['chest']
+    y0 = F * H0.y; idx = []
+    for v in o.data.vertices:
+        if any(g.group == hd and g.weight > 0 for g in v.groups) and F * (Mw @ v.co).y < y0 - behind:
+            idx.append(v.index)
+    if idx:
+        for g in list(o.vertex_groups):
+            g.remove(idx)
+        ch.add(idx, 1.0, 'REPLACE')
+    return len(idx)
+
+
 def despike(o, max_angle=float(os.environ.get('DESPIKE_DEG', '200')), passes=8):
     # rig-builder-4 (coordinator 06:10): LOD1 and Shadow showed pale spikes across the belly (the belt tools) and at the
     # hands in the game camera: the edge collapse left needle cones. A cone tip is a vertex whose corner angles add up to
@@ -210,6 +229,7 @@ TEAM_BLUE = os.environ.get('FACE_TEAM_BLUE', '1') == '1'
 for lv, o in LV.items():
     if lv != 'Hero':
         REP.setdefault('loose_faces_dropped', {})[lv] = drop_loose(o)
+    REP.setdefault('back_head_to_chest', {})[lv] = back_to_chest(o)
     if lv in ('LOD1', 'Shadow') and os.environ.get('FACE_DESPIKE', '1') == '1':
         REP.setdefault('despike', {})[lv] = despike(o)
     me = o.data; M = o.matrix_world; Mi = M.inverted()
@@ -323,8 +343,13 @@ json.dump(REP, open(os.path.join(OUT, f'face_{CLS}.json'), 'w'), indent=1)
 print('[face]', json.dumps({k: v for k, v in REP.items() if k != 'face_map'}), flush=True)
 sys.argv = ['blender', '--', OUT, CLS, path, CLIPS]
 os.environ['PAIR_TEAMS'] = '1'
+_rule = os.path.join(os.path.dirname(os.path.abspath(path)), 'rule')
+_sv = list(sys.argv)
 try:
     HERE = os.path.dirname(os.path.abspath(__file__))
 except NameError:
     HERE = os.path.join(os.environ.get('GITHUB_WORKSPACE', '.'), 'Assets/_Game/Art/Characters/_source~/characters_hy/rig')
+sys.argv = ['blender', '--', OUT, path, f'{CLS}_Hero']
+runpy.run_path(os.path.join(HERE, 'face_rule_check.py'), run_name='__main__')   # the cand9 painted-face test, replayed
+sys.argv = _sv
 runpy.run_path(os.path.join(HERE, 'fbx_pair_check.py'), run_name='__main__')
