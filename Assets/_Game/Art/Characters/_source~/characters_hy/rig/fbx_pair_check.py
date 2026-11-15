@@ -215,3 +215,131 @@ img.filepath_raw = os.path.join(OUT, f'pair_{CLS}.png'); img.file_format = 'PNG'
 REP['sheet'] = dict(path=img.filepath_raw, rows=[s[0] for s in states], columns=[o.name for o in meshes])
 save()
 print('[pair]', json.dumps({k: REP[k] for k in ('bones', 'clips', 'meshes')})[:4000], flush=True)
+
+# ---- rig-builder-4 (2026-11-15): loose pieces, team colours, Attack, face close-ups (env PAIR_TEAMS=1)
+# Islands: faces joined through shared vertex POSITIONS (welded at 0.1 mm, the FBX splits vertices at colour seams);
+# a loose triangle is an island of 1-3 faces. The face features (dark #33241E or highlight, all on the head bone) are
+# islands by design and are counted apart.
+isl = {}
+for o in meshes:
+    me = o.data
+    co = np.empty(len(me.vertices) * 3); me.vertices.foreach_get('co', co); co = co.reshape(-1, 3)
+    _, key = np.unique(np.round(co / 1e-4).astype(np.int64), axis=0, return_inverse=True)
+    key = key.ravel(); par = list(range(int(key.max()) + 1))
+
+    def fnd(a):
+        while par[a] != a:
+            par[a] = par[par[a]]; a = par[a]
+        return a
+    for p in me.polygons:
+        vs = [int(key[v]) for v in p.vertices]
+        r0 = fnd(vs[0])
+        for v in vs[1:]:
+            r1 = fnd(v)
+            if r1 != r0:
+                par[r1] = r0
+    roots = {}
+    for p in me.polygons:
+        roots.setdefault(fnd(int(key[p.vertices[0]])), []).append(p.index)
+    cav = me.color_attributes.active_color or (me.color_attributes[0] if len(me.color_attributes) else None)
+    def is_feat(fs):
+        if cav is None or cav.domain != 'CORNER':
+            return False
+        for fi in fs:
+            for li in me.polygons[fi].loop_indices:
+                c = cav.data[li].color_srgb
+                if not ((abs(c[0] - 0.2) < 0.03 and abs(c[1] - 0.141) < 0.03) or min(c[:3]) > 0.9):
+                    return False
+        return True
+    sizes = sorted((len(v) for v in roots.values()), reverse=True)
+    small = [v for v in roots.values() if len(v) <= 3]
+    feat = [v for v in roots.values() if is_feat(v)]
+    loose = [v for v in small if not is_feat(v)]
+    isl[o.name] = dict(tris=sum(len(p.vertices) - 2 for p in me.polygons), verts=len(me.vertices), islands=len(roots),
+                       largest=sizes[:6], face_feature_islands=len(feat), face_feature_faces=sum(len(v) for v in feat),
+                       loose_1_to_3_faces_not_features=len(loose),
+                       loose_at=[[round(x, 3) for x in (o.matrix_world @ me.polygons[v[0]].center)] for v in loose[:12]],
+                       islands_4_to_20_faces=sum(1 for v in roots.values() if 3 < len(v) <= 20 and not is_feat(v)))
+REP['islands'] = isl
+save()
+print('[islands]', json.dumps(isl), flush=True)
+
+if os.environ.get('PAIR_TEAMS') == '1':
+    hx = lambda h: np.array([int(h.lstrip('#')[i:i + 2], 16) / 255.0 for i in (0, 2, 4)])
+    TEAMS = {'Azure': hx('#2A9DBA'), 'Crimson': hx('#E46753')}   # ArtMapping BuilderAzure / BuilderCrimson cloth
+    AUTH = hx('#2A9DBA')                                          # authored allegiance (Authored = BuilderAzure)
+    base = {}
+    for o in meshes:
+        c_ = o.data.color_attributes.active_color or o.data.color_attributes[0]
+        a = np.empty(len(c_.data) * 4, np.float32); c_.data.foreach_get('color_srgb', a)
+        base[o.name] = (c_, a.reshape(-1, 4).copy())
+    REP['codes_per_level'] = {o.name: {str(int(k)): int(n) for k, n in zip(*np.unique(np.round(base[o.name][1][:, 3] * 8), return_counts=True))}
+                              for o in meshes}
+
+    def set_team(t):
+        # CMToonSwap: out = target * max(rgb) / max(authored), in sRGB, on code 8 only
+        for o in meshes:
+            c_, a = base[o.name]; b = a.copy(); m = np.round(a[:, 3] * 8) == 8
+            k = a[m, :3].max(1) / AUTH.max(); b[m, :3] = np.clip(TEAMS[t][None] * k[:, None], 0, 1)
+            c_.data.foreach_set('color_srgb', b.ravel()); o.data.update()
+    FY = -1.0
+    tb = next((b for b in ma.data.bones if 'toe' in b.name.lower()), None)
+    if tb is not None and tb.parent is not None:
+        FY = 1.0 if tb.head_local.y > tb.parent.head_local.y else -1.0
+
+    def look(loc, tgt):
+        cam.location = Vector(loc); cam.rotation_euler = (Vector(tgt) - Vector(loc)).to_track_quat('-Z', 'Y').to_euler()
+    st2 = []
+    for c_ in ('Idle', 'Walk', 'Run'):
+        if c_ in acts:
+            a = acts[c_]; f0, f1 = int(a.frame_range[0]), int(a.frame_range[1]); st2.append((c_, a, f0 + (f1 - f0) // 3))
+    if 'Attack' in acts:
+        a = acts['Attack']; f0, f1 = int(a.frame_range[0]), int(a.frame_range[1])
+        st2 += [('Attack_windup', a, f0 + round(0.30 * (f1 - f0))), ('Attack_hit', a, f0 + round(0.531 * (f1 - f0)))]
+    REP['team_sheets'] = {}
+    views = {'front': ((0, FY * 6, 1.15), (0, 0, 1.15)), 'side': ((-6, 0, 1.15), (0, 0, 1.15)),
+             'high': ((4.2, FY * 4.2, 5.2), (0, 0, 1.0))}
+    for t in TEAMS:
+        set_team(t)
+        for vw in ('front', 'side', 'high'):
+            rows = []
+            for tag, act, f in st2:
+                pose_from_clip(act, f)
+                row = []
+                for o in meshes:
+                    for o2 in meshes:
+                        o2.hide_render = o2 is not o
+                    cd.ortho_scale = 2.8 if vw != 'high' else 3.2
+                    look(*views[vw])
+                    row.append(shot(os.path.join(OUT, f'_t_{t}_{vw}_{tag}_{o.name}.png')))
+                rows.append(np.concatenate(row, axis=1))
+            sh = np.concatenate(rows[::-1], axis=0)
+            im = bpy.data.images.new('t', sh.shape[1], sh.shape[0]); im.pixels = sh.ravel()
+            im.filepath_raw = os.path.join(OUT, f'{CLS}_team_{t}_{vw}.png'); im.file_format = 'PNG'; im.save()
+            REP['team_sheets'][f'{t}_{vw}'] = dict(path=im.filepath_raw, rows_top_down=[s[0] for s in st2],
+                                                   columns=[o.name for o in meshes])
+        save()
+    # face close-ups: Idle frame, front ortho on the head; rows Azure close, Crimson close, Azure three-quarter
+    a = acts.get('Idle'); pose_from_clip(a, int(a.frame_range[0]))
+    hp = ma.matrix_world @ ma.pose.bones['head'].head
+    rows = []
+    scene.render.resolution_x, scene.render.resolution_y = 320, 320
+    for t, vw in (('Azure', 'f'), ('Crimson', 'f'), ('Azure', 'q')):
+        set_team(t); row = []
+        for o in meshes:
+            for o2 in meshes:
+                o2.hide_render = o2 is not o
+            c = hp + Vector((0, 0, 0.17))
+            if vw == 'f':
+                cd.ortho_scale = 0.5; look((c.x, c.y + FY * 4, c.z), c)
+            else:
+                cd.ortho_scale = 0.6; look((c.x + 2.6, c.y + FY * 2.6, c.z + 2.2), c)
+            row.append(shot(os.path.join(OUT, f'_f_{t}_{vw}_{o.name}.png')))
+        rows.append(np.concatenate(row, axis=1))
+    sh = np.concatenate(rows[::-1], axis=0)
+    im = bpy.data.images.new('f', sh.shape[1], sh.shape[0]); im.pixels = sh.ravel()
+    im.filepath_raw = os.path.join(OUT, f'{CLS}_face_levels.png'); im.file_format = 'PNG'; im.save()
+    REP['face_sheet'] = dict(path=im.filepath_raw, rows_top_down=['Azure front', 'Crimson front', 'Azure three-quarter'],
+                             columns=[o.name for o in meshes], head=[round(x, 3) for x in hp])
+    save()
+    print('[teams]', json.dumps({k: REP[k] for k in ('codes_per_level', 'team_sheets', 'face_sheet')}), flush=True)
