@@ -45,7 +45,8 @@ for lv, tgt in TARGET.items():
     if MODE == 'voxel':
         cols = [(a.name, a.data_type, a.domain) for a in hero.data.color_attributes]
         o.vertex_groups.clear()
-        o.data.remesh_voxel_size = 0.018
+        o.data.remesh_voxel_size = 0.018 if lv == 'LOD0' else float(os.environ.get('LOD1_VOX', '0.018'))
+        REP.setdefault('voxel', {})[lv] = o.data.remesh_voxel_size
         with bpy.context.temp_override(**ov):
             bpy.ops.object.voxel_remesh()
         d = o.modifiers.new('Dec', 'DECIMATE'); d.decimate_type = 'COLLAPSE'; d.use_collapse_triangulate = True
@@ -105,4 +106,7 @@ except NameError:
     HERE = os.path.join(os.environ.get('GITHUB_WORKSPACE', '.'), 'Assets/_Game/Art/Characters/_source~/characters_hy/rig')
 if not os.path.exists(os.path.join(HERE, 'fbx_pair_check.py')):
     HERE = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(MODEL)))) + '/Art/Characters/_source~/characters_hy/rig'
-runpy.run_path(os.path.join(HERE, 'fbx_pair_check.py'), run_name='__main__')
+if os.environ.get('FIX_THEN_FACE') == '1':   # rig-builder-4: the face goes on after the rebuild (face_builder runs the pair check)
+    runpy.run_path(os.path.join(HERE, 'face_builder.py'), run_name='__main__')
+else:
+    runpy.run_path(os.path.join(HERE, 'fbx_pair_check.py'), run_name='__main__')

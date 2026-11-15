@@ -108,7 +108,7 @@ for i in range(dark.shape[0]):
             blobs.append(dict(n=len(pts), cx=float(P[:, 0].mean()), cz=float(P[:, 1].mean()), w=float(np.ptp(P[:, 0]) + 0.004),
                               h=float(np.ptp(P[:, 1]) + 0.004)))
 REP['dark_blobs'] = [{k: round(v, 3) if isinstance(v, float) else v for k, v in b.items()} for b in blobs if b['n'] >= 2]
-FF = dict(eye_w=0.034, eye_h=0.044, sides=8, brow_w=0.08, brow_t=0.014, arch=0.006, lift=0.0025, brow_lift=0.007,
+FF = dict(eye_w=0.034, eye_h=0.044, sides=8, brow_w=0.08, brow_t=0.014, arch=0.006, lift=0.0025, brow_lift=0.012, brow_cols=5,
           colour='#33241E', highlight='#F4F1EA')
 side = [b for b in blobs if b['n'] >= 3 and 0.02 < abs(b['cx']) < 0.15]
 pairs = []
@@ -134,6 +134,8 @@ if feat:
     if above:
         FF.update(brow_x=above[0][0], brow_z=above[0][1] - FF['brow_t'] / 2)
 FF.setdefault('eye_x', 0.075); FF.setdefault('eye_z', float(H0.z + 0.16))
+if CLS == 'Builder':   # read on face-1's close-up: the detected dark pair at z 1.926 is his nostrils, the eyes sit 5 cm higher
+    FF.update(eye_x=0.08, eye_z=1.978, brow_x=0.085, brow_z=2.028)
 FF.setdefault('brow_x', FF['eye_x'] + 0.004); FF.setdefault('brow_z', FF['eye_z'] + 0.052)
 FF.update(json.loads(os.environ.get('FACE_JSON', '{}') or '{}'))
 REP['face_features_params'] = FF
@@ -186,6 +188,17 @@ for lv, o in LV.items():
         blue = (np.round(C[:, 3] * 8) == 0) & (C[:, 2] - C[:, 0] > 0.12) & (C[:, 2] >= C[:, 1] - 0.02) & (mx - mn > 0.15)
         C[blue, 3] = 1.0
         REP.setdefault('blue_corners_to_code8', {})[lv] = int(blue.sum())
+    if lv != 'Hero' and os.environ.get('FACE_FLAT', '1') == '1':
+        # one colour per face on the rebuilt LODs (VertexColourFace, as the Hero is painted): the nearest-face transfer
+        # gave a big LOD triangle corners from different parts, which the GPU blends into smears (blue-grey on a red shirt)
+        nfl = 0
+        for p_ in me.polygons:
+            s_, k_ = p_.loop_start, p_.loop_total
+            q_ = [tuple(np.round(C[s_ + i] * 255).astype(int)) for i in range(k_)]
+            best = max(set(q_), key=lambda t: (q_.count(t), t[3]))
+            if q_.count(best) < k_:
+                C[s_:s_ + k_] = np.array(best, np.float32) / 255.0; nfl += 1
+        REP.setdefault('faces_flattened', {})[lv] = nfl
     nsk = 0
     for p in me.polygons:
         c = M @ p.center; n = (M.to_3x3() @ p.normal).normalized()
@@ -216,11 +229,12 @@ for lv, o in LV.items():
         polys.append(([on_skin(hx - hs / 2, hz - hs / 3, L + 0.001), on_skin(hx + hs / 2, hz - hs / 3, L + 0.001),
                        on_skin(hx, hz + hs * 0.6, L + 0.001)], hi_c))
         bx, bz, bw, bt, ar = sx * FF['brow_x'], FF['brow_z'], FF['brow_w'], FF['brow_t'], FF['arch']
-        xs3 = [bx - bw / 2, bx, bx + bw / 2]
+        nc = int(FF.get('brow_cols', 3))   # more columns follow the brow ridge (the 3-column brow broke up on his left)
+        xs3 = [bx - bw / 2 + bw * i / (nc - 1) for i in range(nc)]
         zb = [bz + ar * (1 - ((xx - bx) / (bw / 2)) ** 2) for xx in xs3]
         LB = FF['brow_lift']
-        B_ = [on_skin(xs3[i], zb[i], LB) for i in range(3)]; T_ = [on_skin(xs3[i], zb[i] + bt, LB) for i in range(3)]
-        for i in range(2):
+        B_ = [on_skin(xs3[i], zb[i], LB) for i in range(nc)]; T_ = [on_skin(xs3[i], zb[i] + bt, LB) for i in range(nc)]
+        for i in range(nc - 1):
             polys.append(([B_[i], B_[i + 1], T_[i + 1], T_[i]], dark_c))
     if F > 0:   # wind toward the viewer (Unity culls back faces)
         polys = [(pts[::-1], col) for pts, col in polys]
