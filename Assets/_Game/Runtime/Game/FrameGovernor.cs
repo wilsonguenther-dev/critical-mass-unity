@@ -573,7 +573,10 @@ namespace CriticalMass.Runtime.Game
                     vsync = 0;   // vsync off by choice (or the save-power cap): still capped, never unbounded
                     target = cap > 0 ? cap : (double.IsNaN(hz) || hz < 20 ? 60 : (int)Math.Round(hz));
                 }
-                _guard.Feed(dt, cap, vsync > 0, hz);
+                // fix/pacing-guard-1: a hidden or unfocused window is "not presenting" (macOS gives it no vsync): never a
+                // reason to put the session on a timer.
+                bool presenting = !AutomationWindow.Active && _focused;
+                _guard.Feed(dt, cap, vsync > 0, hz, presenting);
                 if (_guard.ForceTimed && cap >= 0 && vsync == 0 && target > 0 && _prefVSync != 0) reasonGuard = _guard.Why;
             }
             string reason = vsync > 0 ? "vsync " + vsync : target > 0 ? "timed " + target : "unlimited";
@@ -583,8 +586,10 @@ namespace CriticalMass.Runtime.Game
             // perf-60hz-32p: hidden automation windows keep vsync too. Measured on the Air in one session (build a81efe4,
             // Medium): vsync 1 = 0.67% of frames at 33 ms or more, p95 16.8 ms; a timed 60 (vsync off, targetFrameRate 60) =
             // 7.59%, p95 24.2 ms. A timer is the worse pacer on macOS, hidden or not.
-            if (QualitySettings.vSyncCount != vsync) QualitySettings.vSyncCount = vsync;
-            if (Application.targetFrameRate != target) Application.targetFrameRate = target;
+            PacingState pace = PacingState.For(vsync, target);
+            ApplyPacing(pace);
+            vsync = pace.VSync;
+            target = pace.Target;
             AppliedVSync = vsync;
             AppliedTarget = target;
             AppliedCap = cap;
@@ -602,6 +607,31 @@ namespace CriticalMass.Runtime.Game
             if (SystemEvents.Notice != null) notice = (notice != null ? notice + "\n" : "") + SystemEvents.Notice;
             _gui.Notice = notice;
             _gui.enabled = notice != null;
+        }
+
+        PacingState _paceLogged;
+        bool _paceEverLogged;
+        string _paceSeenPhase = "";
+
+        /// <summary>
+        /// fix/pacing-guard-1: the one writer of every pacing setting. All of them are written from one PacingState every
+        /// frame (only when they differ), so a return to vsync clears the timed target and nothing of a timed mode can
+        /// linger: vSyncCount, targetFrameRate, and OnDemandRendering.renderFrameInterval (never used by the game; forced
+        /// to 1 so nothing else can leave a frame-skip behind). Logs "[CM.Pace] state ..." on every change and at match start.
+        /// </summary>
+        void ApplyPacing(PacingState p)
+        {
+            if (QualitySettings.vSyncCount != p.VSync) QualitySettings.vSyncCount = p.VSync;
+            if (Application.targetFrameRate != p.Target) Application.targetFrameRate = p.Target;
+            if (OnDemandRendering.renderFrameInterval != p.Interval) OnDemandRendering.renderFrameInterval = p.Interval;
+            string phase = SessionKeeper.Phase ?? "";
+            bool matchStart = phase == "match" && _paceSeenPhase != "match";
+            _paceSeenPhase = phase;
+            if (_paceEverLogged && p.Equals(_paceLogged) && !matchStart) return;
+            _paceEverLogged = true;
+            _paceLogged = p;
+            Debug.Log("[CM.Pace] state " + p + " (applied vSyncCount " + QualitySettings.vSyncCount + ", targetFrameRate " +
+                      Application.targetFrameRate + (matchStart ? ", match start" : "") + (AutomationWindow.Active ? ", hidden window" : "") + ")");
         }
 
         int EffectiveCapFor(bool menuLike)
