@@ -128,6 +128,7 @@ namespace CriticalMass.Sim.Core
             if (k.State == KaijuState.Azure && src.Team != TeamId.Crimson) return 0;
             if (k.State == KaijuState.Crimson && src.Team != TeamId.Azure) return 0;
             if (k.State == KaijuState.Neutral) k.Threat[sourceId] = JsMath.F32(w.Config.Kaiju.NeutralThreatMemorySeconds);
+            else if (Phys.On(w, w.Config.Physics.KaijuHillSiege)) w.KaijuNav.HitBy[sourceId] = w.Config.Physics.KaijuHitMemorySeconds; // fix/kaiju-hill-1
             k.Hp -= amount;
             // DG-16 (view request): who hit the Kaiju and where, for effects: the point on its hit radius toward the attacker.
             double hx = w.X[sourceId] - k.X;
@@ -166,6 +167,30 @@ namespace CriticalMass.Sim.Core
             return false;
         }
 
+        /// <summary>
+        /// fix/kaiju-hill-1 round 3: MapGrid.ClearanceOk with barricade cells counted as walkable (the Kaiju crushes them; see
+        /// Kaiju.CrushBarricades), so its plan goes through a barricade instead of treating the far side as another region.
+        /// </summary>
+        private static bool ClearanceThroughBarricades(MapDef map, int cx, int cz, double radius)
+        {
+            if (!PassableForKaiju(map, cx, cz)) return false;
+            double x = cx + 0.5;
+            double z = cz + 0.5;
+            double r2 = radius * radius;
+            for (int gz = JsMath.FloorToInt(z - radius); gz <= JsMath.FloorToInt(z + radius); gz++)
+                for (int gx = JsMath.FloorToInt(x - radius); gx <= JsMath.FloorToInt(x + radius); gx++)
+                {
+                    if (PassableForKaiju(map, gx, gz)) continue;
+                    double nx = x < gx ? gx : x > gx + 1 ? gx + 1 : x;
+                    double nz = z < gz ? gz : z > gz + 1 ? gz + 1 : z;
+                    if ((x - nx) * (x - nx) + (z - nz) * (z - nz) < r2) return false;
+                }
+            return true;
+        }
+
+        private static bool PassableForKaiju(MapDef map, int cx, int cz) =>
+            MapGrid.IsWalkable(map, cx, cz) || (MapGrid.InBounds(map, cx, cz) && map.Cells[cz * map.Width + cx] == Cell.Barricade);
+
         /// <summary>Rebuild the shadow clearance grid when the real grid changed.</summary>
         internal static void RefreshClearance(World w)
         {
@@ -177,6 +202,7 @@ namespace CriticalMass.Sim.Core
             int height = map.Height;
             double r = GridR(w);
             bool squeeze = SqueezeOn(w);
+            bool crush = Phys.On(w, w.Config.Physics.KaijuNavGuard) && Phys.On(w, w.Config.Physics.KaijuHillSiege);
             double sr = w.Config.Physics.KaijuSqueezeRadius;
             int halo = w.Config.Physics.KaijuSqueezeHalo;
             byte[] sq = nav.Squeeze;
@@ -184,7 +210,7 @@ namespace CriticalMass.Sim.Core
                 for (int cx = 0; cx < width; cx++)
                 {
                     int i = cz * width + cx;
-                    bool ok = MapGrid.ClearanceOk(map, cx, cz, r);
+                    bool ok = crush ? ClearanceThroughBarricades(map, cx, cz, r) : MapGrid.ClearanceOk(map, cx, cz, r);
                     // feat/kaiju-bridges-1: near a bridge, a cell its squeezed collider fits in is walkable for it too.
                     // feat/kaiju-bridges-2: or the cell centre is on a diagonal bridge's deck for the squeezed body (the CM-33
                     // deck rule the actors use): the raster stair-steps of the shallow bridges (base to hill, south island to the
@@ -350,6 +376,9 @@ namespace CriticalMass.Sim.Core
             nav.ProgressZ = z;
             nav.NoProgress = 0;
             Array.Fill(nav.Ignore, 0.0);
+            nav.SiegeCx = nav.SiegeCz = nav.StandCx = nav.StandCz = -1;
+            nav.SiegeIn = 0;
+            Array.Fill(nav.HitBy, 0.0);
             World.PushEvent(w, SimEventType.Hatch, -1, -1, x, z, HatchCode(state));
         }
 
@@ -378,10 +407,22 @@ namespace CriticalMass.Sim.Core
                 RefreshClearance(w);
                 kReg = RegionAt(w, k.X, k.Z, out _, out _);
             }
+            bool hillRule = guard && Phys.On(w, p.KaijuHillSiege) && k.State != KaijuState.Berserk && k.State != KaijuState.Neutral;
+            HillDef hill = w.Map.Hill;
             for (int id = 0; id < n; id++)
             {
                 if (!KaijuCanTarget(w, id)) continue;
                 if (guard && (w.KaijuNav.Ignore[id] > 0 || !BodyCanReach(w, id, kReg, id == k.TargetId))) continue;
+                if (hillRule)
+                {
+                    // fix/kaiju-hill-1 round 3: fight on the hill; an attacker only within the leash.
+                    double hx = w.X[id] - hill.X;
+                    double hz = w.Z[id] - hill.Z;
+                    double hd2 = hx * hx + hz * hz;
+                    bool onHill = hd2 <= p.KaijuHillFightRadius * p.KaijuHillFightRadius;
+                    bool attacker = w.KaijuNav.HitBy[id] > 0 && hd2 <= p.KaijuHillLeash * p.KaijuHillLeash;
+                    if (!onHill && !attacker) continue;
+                }
                 double dx = w.X[id] - k.X;
                 double dz = w.Z[id] - k.Z;
                 double score = Math.Sqrt(dx * dx + dz * dz);
