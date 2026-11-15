@@ -282,6 +282,35 @@ namespace CriticalMass.Runtime.Game
     }
 
     /// <summary>
+    /// fix/pacing-guard-1: the whole frame-pacing state, owned in one place so modes cannot mix. Vsync mode (VSync &gt; 0) always
+    /// has no target (-1); timed mode (VSync 0) has its target; no frame limiter is ever used; the render-frame interval is
+    /// always 1. FrameGovernor writes every field of it at once (QualitySettings.vSyncCount, Application.targetFrameRate,
+    /// OnDemandRendering.renderFrameInterval) and logs "[CM.Pace] state ..." whenever it changes and at match start.
+    /// </summary>
+    public readonly struct PacingState : IEquatable<PacingState>
+    {
+        public readonly int VSync, Target, Interval;
+        public readonly bool Limiter;
+
+        PacingState(int vSync, int target)
+        {
+            VSync = Math.Max(0, Math.Min(4, vSync));
+            Target = VSync > 0 ? -1 : target;   // vsync mode never keeps a timed target: the two never run together
+            Interval = 1;
+            Limiter = false;
+        }
+
+        /// <summary>The one constructor: vsync and target as the cap rules gave them; a target with vsync on is dropped.</summary>
+        public static PacingState For(int vSync, int target) => new PacingState(vSync, target);
+        public static PacingState For((int vSync, int target) s) => new PacingState(s.vSync, s.target);
+        public bool Timed => VSync == 0 && Target > 0;
+        public bool Equals(PacingState o) => VSync == o.VSync && Target == o.Target && Interval == o.Interval && Limiter == o.Limiter;
+        public override bool Equals(object o) => o is PacingState p && Equals(p);
+        public override int GetHashCode() => (VSync * 397) ^ (Target * 31) ^ Interval;
+        public override string ToString() => "vsync=" + VSync + " target=" + Target + " limiter=" + (Limiter ? "on" : "none") + " interval=" + Interval;
+    }
+
+    /// <summary>
     /// DG-49 safety net: when the measured frame rate stays above 1.5 times the cap for 2 s while vsync is meant to hold it
     /// (display asleep, window hidden, a panel that ignores vSyncCount 2), switch to a timed cap (vsync off, target = cap).
     /// perf-60hz-32p: the display-rate default (cap 0) is covered too (its cap is the refresh rate; batch 6 left it
@@ -318,22 +347,16 @@ namespace CriticalMass.Runtime.Game
             _stalls = 0;
         }
 
-        /// <summary>One frame of dt seconds at this cap; vsyncActive: vsync is what holds the cap now; refreshHz: the display.</summary>
-        public void Feed(double dt, int cap, bool vsyncActive, double refreshHz = 60)
+        /// <summary>
+        /// One frame of dt seconds at this cap; vsyncActive: vsync is what holds the cap now; refreshHz: the display.
+        /// fix/pacing-guard-1: presenting = the window is on screen and in front (not the hidden automation window, not
+        /// unfocused). macOS gives a hidden or occluded window no vsync, so running faster than the cap there means "window
+        /// not presenting", not "vsync broken": the overrun trip is off while not presenting (the Air: the hidden 20 fps
+        /// title tripped it, and every match after that paced badly). The stall trip (1 s presents) still works.
+        /// </summary>
+        public void Feed(double dt, int cap, bool vsyncActive, double refreshHz = 60, bool presenting = true)
         {
-            if (cap != _cap)
-            {
-                // perf-60hz-32p: a new cap is judged afresh. The timed cap used to stick across caps: on the Air the 20 fps
-                // title (vsync 3, hidden window) tripped it and the whole match then ran on a 60 timer (5.6% of frames at
-                // 33 ms or more against 0.16% on vsync 1).
-                _cap = cap;
-                ForceTimed = false;
-                Why = "";
-                _age = 0;
-                _frames = 0;
-                _stallAge = 0;
-                _stalls = 0;
-            }
+            Rearm(cap);
             if (cap < 0 || ForceTimed) return;
             if (double.IsNaN(refreshHz) || refreshHz < 20) refreshHz = 60;
             double rate = cap > 0 ? cap : refreshHz;
@@ -353,6 +376,36 @@ namespace CriticalMass.Runtime.Game
                     _stalls = 0;
                 }
             }
+            if (!presenting)
+            {
+                _age = 0;
+                _frames = 0;
+                return;
+            }
+            FeedRate(dt, rate, vsyncActive);
+        }
+
+        /// <summary>fix/pacing-guard-1: a new cap is judged afresh, before its first frame's settings are read (Settings calls
+        /// it too, so the first frame of a new cap is never paced by the old cap's trip).</summary>
+        void Rearm(int cap)
+        {
+            if (cap != _cap)
+            {
+                // perf-60hz-32p: a new cap is judged afresh. The timed cap used to stick across caps: on the Air the 20 fps
+                // title (vsync 3, hidden window) tripped it and the whole match then ran on a 60 timer (5.6% of frames at
+                // 33 ms or more against 0.16% on vsync 1).
+                _cap = cap;
+                ForceTimed = false;
+                Why = "";
+                _age = 0;
+                _frames = 0;
+                _stallAge = 0;
+                _stalls = 0;
+            }
+        }
+
+        void FeedRate(double dt, double rate, bool vsyncActive)
+        {
             _age += Math.Max(0, dt);
             _frames++;
             if (_age < FramePolicy.TimedCapWindowSeconds) return;
@@ -369,6 +422,7 @@ namespace CriticalMass.Runtime.Game
         /// <summary>The frame settings for a cap with the guard applied (cap 0 timed at the display rate).</summary>
         public (int vSync, int target) Settings(int cap, double refreshHz)
         {
+            Rearm(cap);
             (int v, int t) = FramePolicy.FrameSettings(cap, refreshHz);
             if (!ForceTimed || cap < 0) return (v, t);
             if (cap > 0) return (0, cap);
