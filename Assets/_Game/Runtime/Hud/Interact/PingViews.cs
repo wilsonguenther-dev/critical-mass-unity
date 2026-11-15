@@ -187,6 +187,52 @@ namespace CriticalMass.Runtime.Hud.Interact
         RectTransform _root;
         RectTransform _mapArea;
         static readonly string[] Metres = BuildMetres();
+        // fix/hud-edge-markers-2: the marker's real box (ring, shape, word and distance label) measured from the built objects.
+        readonly Rect[] _box = new Rect[N];
+        Canvas _canvas;
+        static readonly Vector3[] Corners4 = new Vector3[4];
+
+        /// <summary>The world marker for slot i (tests read its built children).</summary>
+        public RectTransform WorldMarker(int i) => _world[i];
+
+        /// <summary>fix/hud-edge-markers-2: the bounds of every child of a built marker in the marker's own units around its
+        /// pivot (its ring, its shape, its word and its distance label, enabled or not). Allocation-free.</summary>
+        public static Rect MeasureBox(RectTransform marker)
+        {
+            float x0 = float.MaxValue, y0 = float.MaxValue, x1 = float.MinValue, y1 = float.MinValue;
+            for (int c = 0; c < marker.childCount; c++)
+            {
+                if (!(marker.GetChild(c) is RectTransform ch)) continue;
+                ch.GetLocalCorners(Corners4);
+                for (int k = 0; k < 4; k++)
+                {
+                    Vector3 q = marker.InverseTransformPoint(ch.TransformPoint(Corners4[k]));
+                    x0 = Mathf.Min(x0, q.x); y0 = Mathf.Min(y0, q.y); x1 = Mathf.Max(x1, q.x); y1 = Mathf.Max(y1, q.y);
+                }
+            }
+            Rect own = marker.rect;
+            if (x0 > x1) return own;
+            return Rect.MinMaxRect(Mathf.Min(x0, own.xMin), Mathf.Min(y0, own.yMin), Mathf.Max(x1, own.xMax), Mathf.Max(y1, own.yMax));
+        }
+
+        /// <summary>
+        /// fix/hud-edge-markers-2 (candidate 7: an off-screen "Attack!" ping, triangle and "33m", sat on the COINS box over
+        /// its count): an edge ping slides along the free screen edge with its whole measured box clear of every HUD panel
+        /// (HudEdgeMarkers: layout panels, the coins box included, plus the live keep-out panels). It used to clamp to the
+        /// edge and then only hop to just above the minimap, which is where the coins box sits. local and r: the marker
+        /// root's units (r = the root's rect, local relative to its pivot); scale = the marker's local scale.
+        /// </summary>
+        public Vector2 PlaceEdge(int i, Vector2 local, Rect r, float scale)
+        {
+            if (_canvas == null && _root != null) _canvas = _root.GetComponentInParent<Canvas>();
+            float sf = _canvas != null ? Mathf.Max(1e-4f, _canvas.scaleFactor) : 1f;
+            float k = HudLayout.Scale(r.width * sf, r.height * sf) / sf;
+            Rect box = _box[i];
+            Vector2 off = box.center * scale;
+            Vector2 half = box.size * (0.5f * scale / Mathf.Max(1e-4f, k));
+            Vector2 got = HudEdgeMarkers.PlaceLive(local + off - r.min, half, r.width, r.height, k, sf, EdgePad);
+            return got + r.min - off;
+        }
 
         static string[] BuildMetres()
         {
@@ -211,6 +257,7 @@ namespace CriticalMass.Runtime.Hud.Interact
                 _worldDist[i] = MenuUi.Label(rt, "Distance", CMTokens.Mono, UiScale.TypeMin, InteractUi.Cream, TextAnchor.MiddleCenter, -10f, 60f, 80f, 20f, "", 2.5f);
                 rt.gameObject.SetActive(false);
                 _world[i] = rt;
+                _box[i] = MeasureBox(rt);
             }
         }
 
@@ -293,8 +340,9 @@ namespace CriticalMass.Runtime.Hud.Interact
                     local.x = Mathf.Clamp(local.x, r.xMin + EdgePad, r.xMax - EdgePad);
                     local.y = Mathf.Clamp(local.y, r.yMin + EdgePad, r.yMax - EdgePad);
                     scale *= 0.8f;
+                    local = PlaceEdge(i, local, r, scale);   // fix/hud-edge-markers-2: clear of every panel, the coins box too
                 }
-                local = OffPanels(local, r);   // fix/hud-containment-3 (walk: ping markers on the class card)
+                else local = OffPanels(local, r);   // fix/hud-containment-3 (walk: ping markers on the class card)
                 // fix/hud-containment-5 (owner: "Fern: Help!" in the feed and "NEED HELP 10m" beside it said the same thing):
                 // while the call's line is in the feed the marker keeps its shape and distance and drops its word
                 bool word = !PingFeed.Showing(p.Serial);
