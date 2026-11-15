@@ -537,8 +537,9 @@ namespace CriticalMass.Sim.Tests
         /// <summary>
         /// fix/kaiju-hill-1 (art lead 2026-11-15: "Fighting on the hill"). A whole seeded 16v16 match on the game's rules. Counted
         /// only while the Kaiju is owned (Azure or Crimson: Berserk hunts everyone, Neutral idles at the egg) and not knocked out:
-        ///   on-or-near share, within KaijuHillFightRadius (12 m: the hill disc plus the ring band), at least 60%: it may leave
-        ///   only to answer an attacker inside the 18 m leash and must come back;
+        ///   on-or-near share, within KaijuHillFightRadius (13 m: the hill disc, the ring band and the mouths of its gaps), at least
+        ///   60%: it may leave only to answer an attacker inside the 15 m leash and must come back (candidate 8, radius 12 and leash
+        ///   18: 0.50, on-hill 0.22 / 39.5 s);
         ///   on-hill share, inside the 6 m hill radius, at least 20% and more than 20 s: fights at the ring gaps and on the band
         ///   count as near, not on, so a fifth on the disc itself is the floor, not the target;
         ///   never standing still off the hill with no target for more than 5 s (clawing excluded).
