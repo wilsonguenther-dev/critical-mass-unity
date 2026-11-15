@@ -126,6 +126,7 @@ namespace CriticalMass.Runtime.Game
                 RuntimeCounters.Reset();
                 Online.OnlineMatch.Ticked += ForwardTicked;
                 Online.OnlineMatch.LocalInput = FillOnline;
+                OnlineFeel.Active = true;
                 gameObject.AddComponent<Online.OnlineMatchOverlay>();
                 Online.OnlineChatHud.Lane = CriticalMass.Runtime.Hud.HudZones.Chat;   // the match HUD's own chat lane
                 Online.OnlineChatHud.Centred = false;
@@ -188,12 +189,14 @@ namespace CriticalMass.Runtime.Game
                 into.AimX = double.NaN;
                 into.AimZ = double.NaN;
             }
+            OnlineFeel.Note(into.AimX, into.AimZ);   // online-rooms-9: view-only immediate turn (ActorViews)
         }
 
         private void OnDestroy()
         {
             if (_online == null) return;
             Online.OnlineChatHud.Visible = false;
+            OnlineFeel.Reset();
             Online.OnlineMatch.Ticked -= ForwardTicked;
             if (Online.OnlineMatch.LocalInput == (Action<InputFrame>)FillOnline) Online.OnlineMatch.LocalInput = null;
             // Leaving the match scene (results, menu, quit) leaves the room.
