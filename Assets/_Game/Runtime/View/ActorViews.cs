@@ -367,7 +367,12 @@ namespace CriticalMass.Runtime.View
             double h = GroundHeight(map, x, z);
             double faceYaw = actor.Facing;
             // online-rooms-9: online, the local fighter turns to its own fresh aim at once (view only; the sim applies it Lead ticks later).
-            if (i == LocalSeat.Actor && OnlineFeel.Active && OnlineFeel.TryFacing(x, z, out double aimYaw)) faceYaw = aimYaw;
+            if (i == LocalSeat.Actor && OnlineFeel.Active)
+            {
+                FrameCostMarkers.OnlineView.Begin();   // fix/frame-cost-1: online only; offline never enters
+                if (OnlineFeel.TryFacing(x, z, out double aimYaw)) faceYaw = aimYaw;
+                FrameCostMarkers.OnlineView.End();
+            }
             Quaternion facing = Quaternion.Euler(0f, SimSpace.YawDeg(faceYaw), 0f);
             if (hasFx) facing = fx.Lean * facing;
             if (hasFx && fx.Holding) dSim = 0; // the fake hit-stop: loops do not advance during the hold

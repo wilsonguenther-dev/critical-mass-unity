@@ -64,13 +64,24 @@ namespace CriticalMass.Runtime.Hud
             new Rect(p.x - halfRef.x * k, p.y - halfRef.y * k, 2f * halfRef.x * k, 2f * halfRef.y * k);
 
         /// <summary>Live placement: layout panels plus the live HudKeepOut panels (screen px / pxPerUnit).</summary>
+        // fix/frame-cost-1: up to 8 edge pings, the hill pointer and the drop pointer each gathered the panel list (8 layout
+        // rects plus up to 16 live RectTransform corner projections) every frame. Gathered once per frame per space now.
+        static int _cacheFrame = -1, _cacheN;
+        static float _cw, _ch, _ck, _cp;
+
         public static Vector2 PlaceLive(Vector2 want, Vector2 halfRef, float w, float h, float k, float pxPerUnit, float inset)
         {
-            int n = LayoutPanels(w, h, k, Buf);
-            float inv = pxPerUnit > 1e-4f ? 1f / pxPerUnit : 1f;
-            for (int i = 0; i < HudKeepOut.Count && n < MaxPanels; i++)
-                if (HudKeepOut.ScreenRect(i, out Rect r)) Buf[n++] = new Rect(r.x * inv, r.y * inv, r.width * inv, r.height * inv);
-            return Place(want, halfRef, w, h, k, inset, Buf, n);
+            using var scope = Game.FrameCostMarkers.HudEdge.Auto();
+            int frame = Time.frameCount;
+            if (frame != _cacheFrame || w != _cw || h != _ch || k != _ck || pxPerUnit != _cp)
+            {
+                int n = LayoutPanels(w, h, k, Buf);
+                float inv = pxPerUnit > 1e-4f ? 1f / pxPerUnit : 1f;
+                for (int i = 0; i < HudKeepOut.Count && n < MaxPanels; i++)
+                    if (HudKeepOut.ScreenRect(i, out Rect r)) Buf[n++] = new Rect(r.x * inv, r.y * inv, r.width * inv, r.height * inv);
+                _cacheFrame = frame; _cw = w; _ch = h; _ck = k; _cp = pxPerUnit; _cacheN = n;
+            }
+            return Place(want, halfRef, w, h, k, inset, Buf, _cacheN);
         }
 
         /// <summary>
