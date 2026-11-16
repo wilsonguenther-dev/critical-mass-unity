@@ -33,6 +33,27 @@ How the two runners meet: the host job makes the room itself (POST /rooms) just 
 gives a host 2 minutes to connect), uploads the code as artifact `room-<mode>`, and the joiner waits for that artifact
 (`tools/online/wait-room.sh`, one check every 10 s) and then joins with retries (`-onlineJoinTries 80`).
 
+## Proof runs (2026-11-16, branch fix/b12-w, players from unity-ci run 43949762033 = v1.0.898, commit c1f3bff)
+
+| Run | Mode | Result |
+|---|---|---|
+| 43956860150 | players: Windows player (Windows Server 2025 x64, Mono) hosts, macOS player (macOS 26.7 arm64; the app is universal x86_64 + arm64, so it ran native arm64) joins | CROSSPLAY CHECK OK (config 0x26FB05D9D92F7436, world0 0xDE06D86E16465232, build c1f3bff on both); MATCH 63 fingerprints agree, ticks 0..1830; both exit 0; the match took 62 s |
+| 43956860150 | package-windows | CriticalMass-1.0.898-windows.zip, 128 MB zipped, 297 MB installed, 0 do-not-ship entries, SHA-256 264cb01f31e024d6f503af604ae83378157dfea6a5331ee4dbefd05412fd356a (workflow artifact) |
+| 43955924786 | console: .NET 8 peer on Windows x64 hosts, .NET 8 peer on macOS arm64 joins | MATCH 63 fingerprints agree, ticks 0..1830; same config and world0 (the compare job itself was red on a script bug, fixed since; verdict re-run from its artifacts) |
+| 43955943884 | sim-tests (no Unity, .NET 8, Linux) | the culture, config and LF/CRLF tests passed with every row printed; the Sim text guard was red on a false match (`config.Resources.` is a field), fixed since and re-checked against the same sources |
+| 43955919705 | players, first try | failed: the macOS job picked the .app inside the Burst debug folder (fixed), and the lone Windows host lost its connection (below) |
+
+## Found: a Windows player host that waits ALONE loses the room after about 30 seconds
+
+In run 43955919705 the Windows player hosted, printed ROOM READY, and with nobody else in the room printed
+"The connection to the room was lost." (exit 3) about 30 s later; the whole player run lasted 38 s. The .NET console
+host alone in a room did not (it waited 15 minutes in run 43627866241, and about a minute in 43955924786). The proof
+runs avoid it by making the host's room only once the joiner is ready. Not yet known: whether a Mac player host alone
+does the same, and the cause (RelayTransport.cs swallows the receive exception; 30 s is the default WebSocket
+keep-alive interval of the runtime's ClientWebSocket, so the keep-alive frame of Unity's Mono is the first suspect).
+Why it matters: a real Windows player who makes a room and waits for friends may lose it. First check on a real
+PC or on the Air: host a room and wait two minutes before anyone joins. Diagnostic patch below.
+
 ## Why the cross-OS run of 2026-11-14 failed (run 43627866241)
 
 A separate job made the room, and both runners started at once. The macOS joiner built faster and connected at
@@ -115,6 +136,19 @@ already refuses a Windows folder whose stamp differs from the Mac app's).
    (title screen label).
 
 ## Patches outside b12-w's files (for the integrator to route; none moves a checksum)
+
+RelayTransport.cs (forbidden here), say why a connection was lost (today the exception is swallowed), for the lone-host finding:
+
+```diff
+-            catch (Exception)
++            catch (Exception e)
+             {
+                 // Socket errors, cancellation: reported once below.
++                if (!_closed && _closingReason == null) _closingReason = "The connection to the room was lost (" + e.GetType().Name + ": " + e.Message + ").";
+             }
+```
+and, if the keep-alive is confirmed as the cause, set it explicitly where the socket is made
+(`_ws.Options.KeepAliveInterval = TimeSpan.FromSeconds(20);` or `TimeSpan.Zero`, whichever the Air test shows survives).
 
 RelayTransport.cs (forbidden here), accept a pasted code with a trailing line end or tab:
 
