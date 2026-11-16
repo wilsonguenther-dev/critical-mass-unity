@@ -79,7 +79,7 @@ namespace CriticalMass.Sim.Core
                     if (Healer.TryMend(w, i) || lw == null) continue;
                 }
                 ClassConfig cc = cfg.Class(a.Cls);
-                double range = lw != null ? lw.Range : cc.AttackRange;
+                double range = ReachOf(w, a.Cls); // b11-c: the weapon-reach table (Full), else the light weapon / class row
                 a.AttackCd = lw != null ? lw.CooldownSeconds : cc.AttackCooldown;
                 a.AnimAction = 0;
                 a.SpawnProtect = 0; // attacking drops protection
@@ -102,6 +102,40 @@ namespace CriticalMass.Sim.Core
             // CM-35: the last thing combat does: every body killed this step (or since last step's combat) drops its meat once.
             DropCorpseMeat(w);
         }
+
+        /// <summary>b11-c: true when the weapon-reach rule runs in config c (depth lane on and WeaponReach.Enabled: Full only).</summary>
+        public static bool WeaponReachOn(GameConfig c) => c.Depth.WeaponReach != null && c.Depth.WeaponReach.Reach != null
+            && DepthRules.On(c, c.Depth.WeaponReach.Enabled);
+
+        /// <summary>
+        /// b11-c (RULE CHANGE): the ONE reach of a swing of class cls (u, from the attacker's centre to the target's body
+        /// surface). Rule on: the DepthConfig.WeaponReach row (what the weapon really reaches at the drawn strike). Off: the
+        /// light weapon's Range when that rule is on, else the class row's AttackRange (the game before). Combat's swing,
+        /// its AttackStart / AttackContact points, barricades, decorations, the Kaiju, LightWeapons.BotKeepsPress and the
+        /// view (LightWeaponView.Range) all read this. Pure config reads, no allocation.
+        /// </summary>
+        public static double ReachOf(GameConfig c, ClassId cls)
+        {
+            if (WeaponReachOn(c))
+            {
+                double[] t = c.Depth.WeaponReach.Reach;
+                int k = (int)cls;
+                if (k >= 0 && k < t.Length) return t[k];
+            }
+            LightWeapon lw = LightWeapons.On(c) ? LightWeapons.Row(c, cls) : null;
+            return lw != null ? lw.Range : c.Class(cls).AttackRange;
+        }
+
+        public static double ReachOf(World w, ClassId cls) => ReachOf(w.Config, cls);
+
+        /// <summary>
+        /// b11-c: the reach the bots chase and press at (BotSteer, ShiverWatch; the bots then add their own slack). Rule on:
+        /// the same table row as the swing, so a bot closes to where its weapon really lands. The Healer keeps her class
+        /// row (4.5 u: her mend stand-off; her lantern press is still filtered by LightWeapons.BotKeepsPress). Rule off: the
+        /// class row's AttackRange, exactly as the bots read it before.
+        /// </summary>
+        public static double BotReachOf(World w, ClassId cls) =>
+            cls != ClassId.Healer && WeaponReachOn(w.Config) ? ReachOf(w.Config, cls) : w.Config.Class(cls).AttackRange;
 
         /// <summary>Melee kind on AttackStart B (the PR #33 value); abilities use the Kind* codes below.</summary>
         public const int KindAttack = -1;
@@ -141,7 +175,7 @@ namespace CriticalMass.Sim.Core
             // feat/light-weapons-1: a light weapon's own damage, reach and arc (null: the class row, as before).
             LightWeapon lw = LightWeapons.Of(w, a.Cls);
             double baseDmg = lw != null ? lw.Damage : cc.AttackDamage;
-            double range = lw != null ? lw.Range : cc.AttackRange;
+            double range = ReachOf(w, a.Cls); // b11-c: one reach for actors, barricades, decorations and the Kaiju
             double arcDeg = lw != null ? lw.ArcDeg : cc.AttackArcDeg;
             double dmg = baseDmg * Pickups.DamageScale(w, i); // U-066 Might (x 1 without it)
             double ax = w.X[i];
@@ -185,7 +219,7 @@ namespace CriticalMass.Sim.Core
             // CM-31: the same swing chips knock-down decorations in its arc (any class, bots included).
             Topple.ToppleInArc(w, i, ax, az, fx, fz, range, cosHalf);
 
-            // CM-08: the same cleave hits the hatched Kaiju within attackRange + kaiju.radius, inside the arc.
+            // CM-08: the same cleave hits the hatched Kaiju within the swing's reach (ReachOf) + kaiju.radius, inside the arc.
             Kaiju kj = w.Kaiju;
             if (kj.State != KaijuState.Egg && kj.KoIn <= 0)
             {
@@ -352,7 +386,7 @@ namespace CriticalMass.Sim.Core
             if (!double.IsFinite(aimX) || !double.IsFinite(aimZ)) return false;
             double dx = aimX - w.X[id];
             double dz = aimZ - w.Z[id];
-            double reach = lw.Range + BotBodyAllowance;
+            double reach = Combat.ReachOf(w, a.Cls) + BotBodyAllowance; // b11-c: the swing's own reach
             return dx * dx + dz * dz <= reach * reach;
         }
     }

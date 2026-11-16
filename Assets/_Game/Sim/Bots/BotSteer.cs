@@ -431,14 +431,14 @@ namespace CriticalMass.Sim.Bots
                         valid = k.State != KaijuState.Egg && k.KoIn <= 0;
                         tx = k.X;
                         tz = k.Z;
-                        reach = cc.AttackRange + cfg.Kaiju.Radius + AttackSlack;
+                        reach = Combat.BotReachOf(w, a.Cls) + cfg.Kaiju.Radius + AttackSlack; // b11-c
                     }
                     else if (t >= 0 && t < w.ActorCount && w.Actors[t].Alive && !BotFsm.PassiveTarget(w, t))
                     {
                         valid = true;
                         tx = w.X[t];
                         tz = w.Z[t];
-                        reach = cc.AttackRange + AttackSlack;
+                        reach = Combat.BotReachOf(w, a.Cls) + AttackSlack; // b11-c: the weapon-reach table
                         // DG-69: with a wind-up the bot swings at where the target will be on the contact tick.
                         int windup = w.Dur.AttackWindup[(int)a.Cls];
                         if (windup > 0)
@@ -657,7 +657,7 @@ namespace CriticalMass.Sim.Bots
             // hold, walk or gather; the FSM only decides whether to CHASE).
             if (!output.Attack && a.AiState != AiState.Fight)
             {
-                double reach = cc.AttackRange + AttackSlack;
+                double reach = Combat.BotReachOf(w, a.Cls) + AttackSlack; // b11-c: the weapon-reach table
                 int cnt = SpatialHash.QueryCircle(w.Hash, x, z, reach, mates);
                 int best = -1;
                 double bestD2 = double.PositiveInfinity;
@@ -691,7 +691,7 @@ namespace CriticalMass.Sim.Bots
                         || (k.State != KaijuState.Neutral && k.State != KaijuState.Egg && k.State != SimEnumMap.ToKaijuState(a.Team));
                     if (hostile && k.KoIn <= 0)
                     {
-                        double kr = cc.AttackRange + cfg.Kaiju.Radius + AttackSlack;
+                        double kr = Combat.BotReachOf(w, a.Cls) + cfg.Kaiju.Radius + AttackSlack; // b11-c
                         double dx = k.X - x;
                         double dz = k.Z - z;
                         if (dx * dx + dz * dz <= kr * kr)
@@ -716,7 +716,7 @@ namespace CriticalMass.Sim.Bots
                     double bz = JsMath.FloorToInt((double)hit / W) + 0.5;
                     double bdx = bx - x;
                     double bdz = bz - z;
-                    double reach = cc.AttackRange + 0.5;
+                    double reach = Combat.BotReachOf(w, a.Cls) + 0.5; // b11-c
                     if (bdx * bdx + bdz * bdz <= reach * reach && !output.Attack)
                     {
                         Barricade[] list = w.Barricades;

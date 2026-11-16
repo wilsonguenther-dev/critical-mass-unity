@@ -20,5 +20,15 @@ namespace CriticalMass.Runtime.View.Art
         /// </summary>
         public Vector3 OtherEnd;
         public float OtherDistance;
+        /// <summary>
+        /// b11-c: the same measure on the LEFT hand ("handslot.l" or "hand.l"): the Healer carries her lantern there, so her
+        /// reach is read from it (HitPose.StrikeEnds). LeftDistance 0: nothing held in the left hand.
+        /// </summary>
+        public string LeftBone = "handslot.l";
+        public Vector3 LeftLocal;
+        public float LeftDistance;
+        public int LeftVertices;
+        public Vector3 LeftOtherEnd;
+        public float LeftOtherDistance;
     }
 }
