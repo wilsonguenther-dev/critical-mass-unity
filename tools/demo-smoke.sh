@@ -169,9 +169,15 @@ s = {'pass': code == 0 and ends == matches and not exc and not over and not not_
      'phases': phases, 'triangles_run_max': mk.get('Triangles Count', {}).get('max'),
      'assets': p1.get('assets'), 'screen': p1.get('screen'), 'frame_cap': p1.get('frame_cap'), 'vsync': p1.get('vsync'),
      'winner': [p.get('winner') for p in perfs], 'version': p1.get('version'), 'commit': p1.get('commit'),
-     'other_unity_pids': others.split(), 'out': out}
+     'other_unity_pids': others.split(), 'out': out,
+     # b12-t: CM frame-cost scopes (mean/p95/max ms per frame; null = not recorded, release players), the Kaiju clearance
+     # counters and the Kaiju ownership split, per match from perf*.json, and the match-end log lines. Reported, not gated.
+     'cm_scopes': [p.get('cm_scopes') for p in perfs], 'clearance': [p.get('clearance') for p in perfs],
+     'kaiju_own': [p.get('kaiju_own') for p in perfs],
+     'cm_perf_lines': re.findall(r'\[CM\.Perf\][^\n]*', txt)[:60], 'kaiju_own_lines': re.findall(r'\[CM\.KaijuOwn\][^\n]*', txt)[:10]}
 open(os.path.join(out, 'summary.json'), 'w').write(json.dumps(s, indent=1) + '\n')
-print(json.dumps({k: s[k] for k in ('pass', 'profile', 'exit', 'match_end_logged', 'exception_lines', 'over_budget', 'not_measured', 'problems', 'measured')}))
+print(json.dumps({k: s[k] for k in ('pass', 'profile', 'exit', 'match_end_logged', 'exception_lines', 'over_budget', 'not_measured', 'problems', 'measured',
+                                    'cm_scopes', 'clearance', 'kaiju_own')}))
 sys.exit(0 if s['pass'] else 1)
 PY
 }

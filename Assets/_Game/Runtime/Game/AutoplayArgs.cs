@@ -40,6 +40,11 @@ namespace CriticalMass.Runtime.Game
     ///   -groundView / -groundShots  ground view while watching (feat/ground-camera); -groundShots adds the capture tour
     ///   -shots                   screenshots shot-title.png, shot-start.png (3 s of match time), shot-mid.png, shot-farmer-1..4.png (Farmer walk strip at 30 s) and shot-kaiju-1..6.png (Kaiju walk strip after the hatch) into the data folder (Windows graphics run)
     ///   -traceStates             record shader states for warm-up (ShaderWarmup); -exportReport, -diag: SupportReport
+    ///   -kaijuKoShots [DIR]      b12-t staged run: force-hatch, knock the Kaiju out through Kaiju.DamageKaiju, stills at 0.5 s,
+    ///                            2 s and after it recovers (KaijuKoShots; installed here on the match's driver), then quit
+    /// b12-t match-end lines (every recorded match): "[CM.Perf] scope=CM.KaijuHill mean=.. p95=.. max=.. frames=.." per CM
+    /// frame-cost scope, "[CM.Perf] clearance full=.. patches=.. regions=.. perMin=.." and "[CM.KaijuOwn] egg=..s ..."
+    /// (KaijuOwnershipLog); perf.json carries the same as cm_scopes, clearance and kaiju_own.
     /// DG-63: the crash log is written by CrashLog (bounded queue, one background writer, 20 lines per second, repeat keys
     /// with digits and hex as "#"); Exceptions and Errors both count. A stack in the sim or the match driver ends the match
     /// to the menu with a notice instead of freezing it.
@@ -633,6 +638,9 @@ namespace CriticalMass.Runtime.Game
             }
             if (_driver == null || _driver.World == null || _quitting) return;
             SessionKeeper.MatchTick = _driver.World.Tick;
+            // b12-t: the staged Kaiju knock-out capture lives on the match's driver object (as GoreShots on CombatFx's)
+            if (CriticalMass.Runtime.View.Effects.KaijuKoShots.Requested && _driver.GetComponent<CriticalMass.Runtime.View.Effects.KaijuKoShots>() == null)
+                _driver.gameObject.AddComponent<CriticalMass.Runtime.View.Effects.KaijuKoShots>();
 
             if (o.Autoplay)
             {
@@ -665,7 +673,8 @@ namespace CriticalMass.Runtime.Game
                     PerfOverlay.ClearPhase(PerfOverlay.PhaseResults);
                     PerfOverlay.SetPhase(PerfOverlay.PhaseMatch);
                     if (_match == 1 && o.Pacing != null && o.Pacing.Length > 0) FrameGovernor.PacingOverride = o.Pacing[0];
-                    PerfOverlay.BeginRecording();
+                    PerfOverlay.BeginRecording();   // b12-t: also zeroes the SimProfile clearance counters
+                    KaijuOwnershipLog.Begin(_driver);   // b12-t: Kaiju state once per sim tick until Finish
                     FrameRecorder.Begin();
                 }
             }
@@ -717,6 +726,14 @@ namespace CriticalMass.Runtime.Game
             World w = _driver.World;
             PerfOverlay.Report r = _recording ? PerfOverlay.EndRecording() : null;
             _recording = false;
+            // b12-t: CM scope times, clearance counters and Kaiju ownership, as log lines and in perf.json
+            string kaijuOwn = KaijuOwnershipLog.Tally.Samples > 0 ? KaijuOwnershipLog.Json(KaijuOwnershipLog.Tally, w.Config.SimHz) : "null";
+            KaijuOwnershipLog.End(w.Config.SimHz);
+            if (r != null)
+            {
+                r.SimSeconds = w.Match.Time;
+                foreach (string line in r.PerfLines()) Debug.Log(line);
+            }
             PerfOverlay.SetPhase(PerfOverlay.PhaseResults);
             double wall = Time.realtimeSinceStartupAsDouble - _matchStart;
             const double Mb = 1024.0 * 1024.0;
@@ -771,6 +788,7 @@ namespace CriticalMass.Runtime.Game
                 ("screen", Q($"{Screen.width}x{Screen.height}")),
                 ("assets", assets),
                 ("phases", PerfOverlay.PhasesJson()),
+                ("kaiju_own", kaijuOwn),
             };
             {
                 string perfBase = string.IsNullOrEmpty(Current.PerfLog) ? Path.Combine(Application.persistentDataPath, "perf-last.json") : Current.PerfLog;

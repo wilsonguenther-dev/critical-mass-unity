@@ -47,7 +47,18 @@ namespace CriticalMass.Runtime.Hud
             "Batches Count", "SetPass Calls Count", "Draw Calls Count", "Triangles Count", "Vertices Count",
             "Shadow Casters Count", "GC Allocated In Frame", "System Used Memory", "GC Reserved Memory",
             "Visible Skinned Meshes Count", "Canvas.SendWillRenderCanvases", "Canvas.BuildBatch",
+            // b12-t: the frame-cost scopes (FrameCostMarkers, Scripts category; they record in development builds only).
+            "CM.KaijuHill", "CM.KaijuClear", "CM.HudEdge", "CM.Pace", "CM.OnlineView",
         };
+
+        /// <summary>b12-t: the named frame-cost scopes (FrameCostMarkers) whose per-frame time is kept for mean, p95 and max.</summary>
+        public static readonly string[] CmScopes = { "CM.KaijuHill", "CM.KaijuClear", "CM.HudEdge", "CM.Pace", "CM.OnlineView" };
+
+        /// <summary>b12-t: every marker and counter name the recorder asks for (tests).</summary>
+        public static System.Collections.ObjectModel.ReadOnlyCollection<string> RecordedMarkers => Array.AsReadOnly(Markers);
+
+        /// <summary>b12-t: per-frame samples kept per CM scope (about 18 minutes at 60 fps; allocated once, never per frame).</summary>
+        public const int MaxScopeFrames = 65536;
 
         sealed class Rec
         {
@@ -56,6 +67,9 @@ namespace CriticalMass.Runtime.Hud
             public ProfilerMarkerDataUnit Unit;
             public double Sum, Max;
             public long Samples;
+            /// <summary>b12-t: per-frame values of a CM scope (null for every other marker) and how many are held.</summary>
+            public float[] Frames;
+            public int FrameCount;
         }
 
         static readonly List<Rec> Recs = new List<Rec>();
@@ -176,6 +190,10 @@ namespace CriticalMass.Runtime.Hud
                     ProfilerRecorderDescription d = ProfilerRecorderHandle.GetDescription(h);
                     if (wanted.Contains(d.Name)) Add(d);
                 }
+                // b12-t: a CM scope that has not run yet may be missing from the available list; ask for it by name
+                // (ProfilerMarker(string) markers are in the Scripts category).
+                foreach (string name in CmScopes)
+                    if (!RecNames.Contains(name)) AddByName(ProfilerCategory.Scripts, name);
             }
             if (withScripts)
             {
@@ -200,7 +218,26 @@ namespace CriticalMass.Runtime.Hud
                 return false;
             }
             RecNames.Add(d.Name);
-            Recs.Add(new Rec { Name = d.Name, R = r, Unit = d.UnitType });
+            Recs.Add(new Rec { Name = d.Name, R = r, Unit = d.UnitType, Frames = IsCmScope(d.Name) ? new float[MaxScopeFrames] : null });
+            return true;
+        }
+
+        static bool IsCmScope(string name) => Array.IndexOf(CmScopes, name) >= 0;
+
+        /// <summary>b12-t: start a recorder by category and name (a marker not listed as available yet); time unit assumed.</summary>
+        static bool AddByName(ProfilerCategory category, string name)
+        {
+            if (RecNames.Contains(name)) return false;
+            ProfilerRecorder r;
+            try { r = ProfilerRecorder.StartNew(category, name, 1); }
+            catch (Exception) { return false; }
+            if (!r.Valid)
+            {
+                r.Dispose();
+                return false;
+            }
+            RecNames.Add(name);
+            Recs.Add(new Rec { Name = name, R = r, Unit = ProfilerMarkerDataUnit.TimeNanoseconds, Frames = IsCmScope(name) ? new float[MaxScopeFrames] : null });
             return true;
         }
 
@@ -223,6 +260,7 @@ namespace CriticalMass.Runtime.Hud
                 r.Sum += v;
                 if (v > r.Max) r.Max = v;
                 r.Samples++;
+                if (r.Frames != null && r.FrameCount < r.Frames.Length) r.Frames[r.FrameCount++] = (float)v;
             }
         }
 
@@ -361,7 +399,9 @@ namespace CriticalMass.Runtime.Hud
                 r.Sum = 0;
                 r.Max = 0;
                 r.Samples = 0;
+                r.FrameCount = 0;
             }
+            CriticalMass.Sim.Core.SimProfile.ResetCounters();   // b12-t: clearance counters count this match only
             MatchFrames.Clear();
             MatchGpu.Clear();
             MatchCpuMain.Clear();
@@ -378,10 +418,62 @@ namespace CriticalMass.Runtime.Hud
             /// <summary>FrameTimingManager GPU and main-thread CPU frame times (ms); NaN when the platform reported none.</summary>
             public double GpuP50 = double.NaN, GpuP95 = double.NaN, CpuMainP50 = double.NaN, CpuMainP95 = double.NaN;
             public List<(string name, string unit, double mean, double max)> MarkerMeans = new List<(string, string, double, double)>();
+            /// <summary>b12-t: one entry per CM scope (CmScopes order); Recorded false when the player gave no timing for it
+            /// (release players: ProfilerMarker records in development builds only).</summary>
+            public List<ScopeStat> Scopes = new List<ScopeStat>();
+            /// <summary>b12-t: SimProfile clearance counters over the match (reset at BeginRecording).</summary>
+            public int ClearanceFull, ClearancePatches, ClearanceRegions;
+            /// <summary>b12-t: sim seconds of the match (AutoplayArgs sets it at the end; NaN = unknown, per_min is null).</summary>
+            public double SimSeconds = double.NaN;
+
+            /// <summary>b12-t: clearance refreshes (full rebuilds plus patches) per sim minute; NaN without SimSeconds.</summary>
+            public double ClearancePerMin => SimSeconds > 0 ? (ClearanceFull + ClearancePatches) / (SimSeconds / 60.0) : double.NaN;
+
+            /// <summary>b12-t: the match-end log lines: one "[CM.Perf] scope=..." per CM scope and one "[CM.Perf] clearance ...".</summary>
+            public List<string> PerfLines()
+            {
+                CultureInfo c = CultureInfo.InvariantCulture;
+                var lines = new List<string>(Scopes.Count + 1);
+                foreach (ScopeStat s in Scopes)
+                    lines.Add(s.Recorded
+                        ? string.Format(c, "[CM.Perf] scope={0} mean={1:0.0000} p95={2:0.0000} max={3:0.0000} frames={4}", s.Name, s.Mean, s.P95, s.Max, s.Frames)
+                        : "[CM.Perf] scope=" + s.Name + " not recorded (scopes time only in development builds)");
+                lines.Add(string.Format(c, "[CM.Perf] clearance full={0} patches={1} regions={2} perMin={3}", ClearanceFull, ClearancePatches,
+                    ClearanceRegions, double.IsNaN(ClearancePerMin) ? "n/a" : ClearancePerMin.ToString("0.00", c)));
+                return lines;
+            }
 
             public string Summary() => string.Format(CultureInfo.InvariantCulture,
                 "frames={0} p50={1:F2}ms p95={2:F2}ms p99={3:F2}ms worst={4:F1}ms at {5:F1}s hitches>50ms={6} >33ms={7}",
                 Frames, P50, P95, P99, Worst, WorstAtSecond, Over50, Over33);
+        }
+
+        /// <summary>b12-t: one CM scope over a recorded match: per-frame mean, p95 and max in ms, and the frames counted.</summary>
+        public struct ScopeStat
+        {
+            public string Name;
+            public bool Recorded;
+            public double Mean, P95, Max;
+            public int Frames;
+        }
+
+        /// <summary>b12-t: a scope's stats from its per-frame values (pure; tests). count 0 = not recorded.</summary>
+        public static ScopeStat ScopeOf(string name, float[] frames, int count)
+        {
+            var s = new ScopeStat { Name = name, Recorded = frames != null && count > 0, Frames = Math.Max(0, count) };
+            if (!s.Recorded) return s;
+            var a = new float[count];
+            Array.Copy(frames, a, count);
+            double sum = 0;
+            foreach (float v in a)
+            {
+                sum += v;
+                if (v > s.Max) s.Max = v;
+            }
+            s.Mean = sum / count;
+            Array.Sort(a);
+            s.P95 = PercentileSorted(a, 95);
+            return s;
         }
 
         /// <summary>Stops recording and returns the report.</summary>
@@ -413,6 +505,15 @@ namespace CriticalMass.Runtime.Hud
                 int byUnit = (a.unit == "ms" ? 0 : 1).CompareTo(b.unit == "ms" ? 0 : 1);   // times first, then counts
                 return byUnit != 0 ? byUnit : b.mean.CompareTo(a.mean);
             });
+            foreach (string name in CmScopes)
+            {
+                Rec sr = Find(name);
+                // ProfilerMarker.Begin/End are compiled out of release players (ENABLE_PROFILER): their zeros are "not recorded"
+                rep.Scopes.Add(sr != null && sr.R.Valid && Debug.isDebugBuild ? ScopeOf(name, sr.Frames, sr.FrameCount) : new ScopeStat { Name = name });
+            }
+            rep.ClearanceFull = CriticalMass.Sim.Core.SimProfile.ClearanceFullRebuilds;
+            rep.ClearancePatches = CriticalMass.Sim.Core.SimProfile.ClearancePatches;
+            rep.ClearanceRegions = CriticalMass.Sim.Core.SimProfile.ClearanceRegionBuilds;
             return rep;
         }
 
@@ -575,6 +676,18 @@ namespace CriticalMass.Runtime.Hud
             // null (never 0) when the platform reported no timing: the perf gate fails closed on a missing number.
             sb.Append("  \"gpu_ms\": ").Append(double.IsNaN(r.GpuP95) ? "null" : string.Format(c, "{{\"p50\": {0:0.###}, \"p95\": {1:0.###}}}", r.GpuP50, r.GpuP95)).Append(",\n");
             sb.Append("  \"cpu_main_ms\": ").Append(double.IsNaN(r.CpuMainP95) ? "null" : string.Format(c, "{{\"p50\": {0:0.###}, \"p95\": {1:0.###}}}", r.CpuMainP50, r.CpuMainP95)).Append(",\n");
+            // b12-t: the CM frame-cost scopes (null = not recorded) and the clearance counters.
+            sb.Append("  \"cm_scopes\": {");
+            for (int i = 0; i < r.Scopes.Count; i++)
+            {
+                ScopeStat s = r.Scopes[i];
+                sb.Append(i == 0 ? "" : ", ").Append('"').Append(s.Name).Append("\": ");
+                if (s.Recorded) sb.AppendFormat(c, "{{\"mean\": {0:0.#####}, \"p95\": {1:0.#####}, \"max\": {2:0.#####}, \"frames\": {3}}}", s.Mean, s.P95, s.Max, s.Frames);
+                else sb.Append("null");
+            }
+            sb.Append("},\n");
+            sb.AppendFormat(c, "  \"clearance\": {{\"full\": {0}, \"patches\": {1}, \"regions\": {2}, \"per_min\": {3}}},\n",
+                r.ClearanceFull, r.ClearancePatches, r.ClearanceRegions, double.IsNaN(r.ClearancePerMin) ? "null" : r.ClearancePerMin.ToString("0.###", c));
             sb.Append("  \"markers\": [\n");
             for (int i = 0; i < r.MarkerMeans.Count; i++)
             {
