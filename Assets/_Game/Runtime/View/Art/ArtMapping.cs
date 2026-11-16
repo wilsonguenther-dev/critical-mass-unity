@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using CriticalMass.Sim.Config;
 using CriticalMass.Sim.Core;
@@ -100,6 +101,37 @@ namespace CriticalMass.Runtime.View.Art
     public static class ArtMapping
     {
         public const string Warrior = "Warrior";
+        /// <summary>
+        /// Batch 12 AB textured Warrior pilot: the Warrior rebuilt from the generator's original 4K download with UVs and a
+        /// 1024 base colour (team mask in its alpha), on the Warrior's own 41-bone rig and clips. Selected by
+        /// <c>-warriorTex 1</c>; the old Warrior stays the default until the owner sees the side by side.
+        /// </summary>
+        public const string WarriorTex = "WarriorTex";
+        public const string WarriorTexFlag = "-warriorTex";
+        /// <summary>Resources path of the pilot's base map (Art/Characters/WarriorTex/Resources/WarriorTex/WarriorTex_Base.png).</summary>
+        public const string WarriorTexBaseMap = "WarriorTex/WarriorTex_Base";
+        static int _warriorTex = -1;
+
+        /// <summary>True when the command line says <c>-warriorTex 1</c> (read once).</summary>
+        public static bool WarriorTexOn
+        {
+            get
+            {
+                if (_warriorTex < 0) _warriorTex = WarriorTexArg(Environment.GetCommandLineArgs()) ? 1 : 0;
+                return _warriorTex == 1;
+            }
+        }
+
+        /// <summary><c>-warriorTex 1</c> anywhere in the arguments (pure; tests). Anything else, or no flag: the old Warrior.</summary>
+        public static bool WarriorTexArg(string[] args)
+        {
+            if (args == null) return false;
+            int i = Array.IndexOf(args, WarriorTexFlag);
+            return i >= 0 && i + 1 < args.Length && args[i + 1].Trim() == "1";
+        }
+
+        /// <summary>Tests only: force the pilot on or off (null reads the command line again).</summary>
+        public static void SetWarriorTexForTests(bool? on) => _warriorTex = on == null ? -1 : on.Value ? 1 : 0;
         public const string Miner = "Miner";
         public const string Farmer = "Farmer";
         public const string Demolitions = "Demolitions";
@@ -309,6 +341,13 @@ namespace CriticalMass.Runtime.View.Art
                 Meshes = new[] { "Warrior_Hero", "Warrior_LOD0", "Warrior_LOD1", "Warrior_Shadow" }, MaskCodes = new[] { 0, 6, 8 },
                 OutlinePx = CharacterHullPx, Rim = 0.6f, Authored = WarriorAzure, Crimson = WarriorCrimson, Height = 2.0f,
                 VertexColourFace = true, StrideScale = 1.118f, ArtYawDeg = 180f },   // rig-warrior-1: HY Warrior (art/characters-hy-rig ef9d2eb, shins +0.06 m so the ankles sit at KayKit height above his soles; StrideScale = the bake motion scale, hip height over KayKit 0.519 m) on its own clips baked with foot IK (Warrior_Clips.fbx, bake_clips.py); pre-HY: FaceTexture Warrior_Face.png, KayKit_Clips.fbx (Characters/_fallback~)
+            // Batch 12 AB textured Warrior pilot (-warriorTex 1): UV-mapped LOD0 (~6,000 tris) and LOD1 with a 1024 base colour, the
+            // old Warrior_Shadow proxy, the Warrior's skeleton, clips, swatches, stride and facing (build_warrior_tex.py).
+            new ModelSpec { Key = WarriorTex, AssetPath = "Assets/_Game/Art/Characters/WarriorTex/WarriorTex.fbx", Kind = ArtKind.Character, Rigged = true,
+                Bones = 41, ClipSource = "Assets/_Game/Art/Characters/Warrior_Clips.fbx",
+                Meshes = new[] { "WarriorTex_LOD0", "WarriorTex_LOD1", "WarriorTex_Shadow" }, MaskCodes = new[] { 0 },
+                OutlinePx = CharacterHullPx, Rim = 0.6f, Authored = WarriorAzure, Crimson = WarriorCrimson, Height = 2.0f,
+                StrideScale = 1.118f, ArtYawDeg = 180f },
             new ModelSpec { Key = Miner, AssetPath = "Assets/_Game/Art/Miner/Miner.fbx", Kind = ArtKind.Character, Rigged = true,
                 Bones = 41, ClipSource = "Assets/_Game/Art/Miner/Miner_Clips.fbx",
                 Meshes = new[] { "Miner_Hero", "Miner_LOD0", "Miner_LOD1", "Miner_Shadow" }, MaskCodes = new[] { 0, 6, 8 },
@@ -419,7 +458,7 @@ namespace CriticalMass.Runtime.View.Art
         {
             switch (cls)
             {
-                case ClassId.Warrior: return Warrior;
+                case ClassId.Warrior: return WarriorTexOn ? WarriorTex : Warrior;
                 case ClassId.Miner: return Miner;
                 case ClassId.Farmer: return Farmer;
                 case ClassId.Demolitions: return Demolitions;

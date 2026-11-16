@@ -211,6 +211,34 @@ half3 CMToonDecal(half3 albedo, float2 uv)
     return lerp(albedo, d.rgb, d.a);
 }
 
+// Textured Warrior pilot (batch 12 AB, part B): keyword _CMTOON_BASEMAP, enabled only on the materials of a model with a
+// base map (ArtMaterials), so every untextured model compiles and draws exactly as before. _BaseMap: sRGB rgb = the lit
+// colour (baked from the generator's original 4K texture), alpha = the team mask: 0 fixed, 0.5 team cloth (banded),
+// 1 team glow (self-lit); in between (bilinear, mips, compression) lerps. Team channels swap as the vertex-colour codes
+// do (CMToonSwap, in sRGB). Replaces the vertex-colour albedo; the bands, rim, time of day and fog that follow are shared.
+TEXTURE2D(_BaseMap);
+SAMPLER(sampler_BaseMap);
+
+void CMToonBaseMapColour(float2 uv, out half3 albedo, out half selfLit)
+{
+    half4 t = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, uv);
+#if defined(UNITY_COLORSPACE_GAMMA)
+    half3 srgb = t.rgb;
+#else
+    half3 srgb = LinearToSRGB(t.rgb);
+#endif
+    half cloth = saturate(t.a * 2.0h);
+    half glow = saturate(t.a * 2.0h - 1.0h);
+    half3 c = lerp(srgb, CMToonSwap(srgb, _TeamCloth.rgb, _DefaultCloth.rgb), cloth);
+    c = lerp(c, CMToonSwap(srgb, _TeamGlow.rgb, _DefaultGlow.rgb), glow);
+    selfLit = glow > 0.5h ? 1.0h : 0.0h;
+#if defined(UNITY_COLORSPACE_GAMMA)
+    albedo = c;
+#else
+    albedo = SRGBToLinear(c);
+#endif
+}
+
 // Pushes a clip-space position px pixels (at 1080p, scaled with the target height) along the screen projection of an
 // object-space direction: the same constant-pixel rule as the hull, used for the waterfall foam band.
 float4 CMToonPushPx(float4 positionCS, float3 dirOS, float px)

@@ -1,0 +1,335 @@
+{
+ "inputs": {
+  "warrior": "/home/runner/work/critical-mass-unity/critical-mass-unity/Assets/_Game/Art/Characters/Warrior.fbx",
+  "clips": "/home/runner/work/critical-mass-unity/critical-mass-unity/Assets/_Game/Art/Characters/Warrior_Clips.fbx",
+  "raw": "/home/runner/work/critical-mass-unity/critical-mass-unity/Assets/_Game/Art/Characters/_source~/characters_hy/tex_pilot/raw/body-1-pro31-mv.glb"
+ },
+ "old": {
+  "Warrior_LOD0": {
+   "tris": 4446,
+   "verts": 2217
+  },
+  "Warrior_LOD1": {
+   "tris": 1480,
+   "verts": 734
+  },
+  "Warrior_Hero": {
+   "tris": 21500,
+   "verts": 10744
+  },
+  "Warrior_Shadow": {
+   "tris": 780,
+   "verts": 430
+  }
+ },
+ "bones": 41,
+ "raw": {
+  "tris": 500000,
+  "verts": 310827,
+  "uv_layers": 1,
+  "texture": [
+   4096,
+   4096
+  ],
+  "texture_name": "texture_20250901"
+ },
+ "align": {
+  "reference": "Warrior_Hero",
+  "height_m": 2.0007,
+  "fit_scale_vs_glb": 1.8689,
+  "median_m_before": 0.00807,
+  "p90_m_before": 0.11949,
+  "refine_translate": [
+   -0.0003,
+   0.0035,
+   -0.0001
+  ],
+  "median_m_after": 0.00761,
+  "p90_m_after": 0.11974,
+  "refinement_kept": true,
+  "chosen_yaw": 0.0
+ },
+ "weld": {
+  "tris_after_weld": 499950,
+  "specks_dropped": 0
+ },
+ "uv_pack": "concave repack",
+ "lod0": {
+  "tris": 6000,
+  "verts": 2990,
+  "uv_coverage": 0.272,
+  "uv_flipped_tris": 0,
+  "uv_min": [
+   0.0039,
+   0.0039
+  ],
+  "uv_max": [
+   0.9937,
+   0.9961
+  ]
+ },
+ "reference_mask_codes_per_corner": {
+  "0": 60939,
+  "6": 495,
+  "8": 3066
+ },
+ "texture": {
+  "size": [
+   1024,
+   1024
+  ],
+  "path": "/home/runner/work/_temp/out/WarriorTex_Base.png",
+  "alpha_team_cloth_fraction": 0.0662,
+  "alpha_team_glow_fraction": 0.0044,
+  "rgb_mean": [
+   0.328,
+   0.292,
+   0.279
+  ]
+ },
+ "weight_source": {
+  "object": "Warrior_Hero",
+  "prop_vertices_removed": 1254,
+  "tris": 19000
+ },
+ "skin": {
+  "WarriorTex_LOD0": {
+   "max_influences": 4,
+   "unweighted_verts": 0,
+   "groups": 22
+  },
+  "WarriorTex_LOD1": {
+   "max_influences": 4,
+   "unweighted_verts": 0,
+   "groups": 22
+  }
+ },
+ "tris": {
+  "WarriorTex_LOD0": 6000,
+  "WarriorTex_LOD1": 1500,
+  "WarriorTex_Shadow": 780
+ },
+ "clip_stretch": {
+  "Rig.001|Attack": {
+   "max": 8.238,
+   "min": 0.442,
+   "control_today_lod0_max": 1.423,
+   "frames": 13
+  },
+  "Rig.001|Attack2HChop": {
+   "max": 12.633,
+   "min": 0.367,
+   "control_today_lod0_max": 1.534,
+   "frames": 14
+  },
+  "Rig.001|Attack2HSlice": {
+   "max": 14.18,
+   "min": 0.291,
+   "control_today_lod0_max": 1.709,
+   "frames": 14
+  },
+  "Rig.001|AttackSlice": {
+   "max": 12.391,
+   "min": 0.36,
+   "control_today_lod0_max": 1.444,
+   "frames": 13
+  },
+  "Rig.001|Block": {
+   "max": 16.078,
+   "min": 0.463,
+   "control_today_lod0_max": 1.372,
+   "frames": 13
+  },
+  "Rig.001|BlockHit": {
+   "max": 16.09,
+   "min": 0.478,
+   "control_today_lod0_max": 1.372,
+   "frames": 13
+  },
+  "Rig.001|Blocking": {
+   "max": 16.083,
+   "min": 0.463,
+   "control_today_lod0_max": 1.372,
+   "frames": 13
+  },
+  "Rig.001|Carry": {
+   "max": 9.391,
+   "min": 0.436,
+   "control_today_lod0_max": 1.42,
+   "frames": 13
+  },
+  "Rig.001|Cast": {
+   "max": 8.659,
+   "min": 0.493,
+   "control_today_lod0_max": 1.356,
+   "frames": 23
+  },
+  "Rig.001|Cheer": {
+   "max": 14.546,
+   "min": 0.397,
+   "control_today_lod0_max": 1.407,
+   "frames": 14
+  },
+  "Rig.001|Death": {
+   "max": 12.357,
+   "min": 0.33,
+   "control_today_lod0_max": 1.499,
+   "frames": 20
+  },
+  "Rig.001|DeathB": {
+   "max": 12.083,
+   "min": 0.178,
+   "control_today_lod0_max": 1.737,
+   "frames": 13
+  },
+  "Rig.001|Gather": {
+   "max": 8.238,
+   "min": 0.462,
+   "control_today_lod0_max": 1.292,
+   "frames": 16
+  },
+  "Rig.001|GetUp": {
+   "max": 19.448,
+   "min": 0.34,
+   "control_today_lod0_max": 1.709,
+   "frames": 15
+  },
+  "Rig.001|Hit": {
+   "max": 8.968,
+   "min": 0.496,
+   "control_today_lod0_max": 1.308,
+   "frames": 17
+  },
+  "Rig.001|HitHeavy": {
+   "max": 12.052,
+   "min": 0.422,
+   "control_today_lod0_max": 1.499,
+   "frames": 21
+  },
+  "Rig.001|Idle": {
+   "max": 7.276,
+   "min": 0.552,
+   "control_today_lod0_max": 1.273,
+   "frames": 13
+  },
+  "Rig.001|IdleLook": {
+   "max": 13.836,
+   "min": 0.413,
+   "control_today_lod0_max": 1.436,
+   "frames": 13
+  },
+  "Rig.001|JumpAir": {
+   "max": 13.17,
+   "min": 0.477,
+   "control_today_lod0_max": 1.255,
+   "frames": 13
+  },
+  "Rig.001|JumpLand": {
+   "max": 10.88,
+   "min": 0.405,
+   "control_today_lod0_max": 1.285,
+   "frames": 17
+  },
+  "Rig.001|JumpStart": {
+   "max": 11.589,
+   "min": 0.412,
+   "control_today_lod0_max": 1.277,
+   "frames": 15
+  },
+  "Rig.001|KnockDown": {
+   "max": 19.448,
+   "min": 0.338,
+   "control_today_lod0_max": 1.709,
+   "frames": 13
+  },
+  "Rig.001|PickUp": {
+   "max": 8.324,
+   "min": 0.351,
+   "control_today_lod0_max": 1.287,
+   "frames": 16
+  },
+  "Rig.001|Run": {
+   "max": 8.949,
+   "min": 0.355,
+   "control_today_lod0_max": 1.51,
+   "frames": 20
+  },
+  "Rig.001|SitDown": {
+   "max": 13.003,
+   "min": 0.311,
+   "control_today_lod0_max": 1.469,
+   "frames": 13
+  },
+  "Rig.001|SitIdle": {
+   "max": 10.879,
+   "min": 0.366,
+   "control_today_lod0_max": 1.425,
+   "frames": 13
+  },
+  "Rig.001|StrafeL": {
+   "max": 15.27,
+   "min": 0.368,
+   "control_today_lod0_max": 1.593,
+   "frames": 20
+  },
+  "Rig.001|StrafeR": {
+   "max": 6.128,
+   "min": 0.391,
+   "control_today_lod0_max": 1.409,
+   "frames": 20
+  },
+  "Rig.001|Throw": {
+   "max": 13.906,
+   "min": 0.422,
+   "control_today_lod0_max": 1.368,
+   "frames": 17
+  },
+  "Rig.001|UseItem": {
+   "max": 8.238,
+   "min": 0.449,
+   "control_today_lod0_max": 1.311,
+   "frames": 13
+  },
+  "Rig.001|Walk": {
+   "max": 12.608,
+   "min": 0.355,
+   "control_today_lod0_max": 1.368,
+   "frames": 13
+  },
+  "Rig.001|WalkBack": {
+   "max": 5.834,
+   "min": 0.466,
+   "control_today_lod0_max": 1.29,
+   "frames": 13
+  }
+ },
+ "export": {
+  "path": "/home/runner/work/_temp/out/WarriorTex.fbx",
+  "result": [
+   "FINISHED"
+  ],
+  "bytes": 595532
+ },
+ "round_trip": {
+  "bones": 41,
+  "bones_missing": [],
+  "max_bind_matrix_diff": 2e-06,
+  "meshes": {
+   "WarriorTex_LOD0": {
+    "tris": 6000,
+    "uv": 1,
+    "colours": 1
+   },
+   "WarriorTex_LOD1": {
+    "tris": 1500,
+    "uv": 1,
+    "colours": 1
+   },
+   "WarriorTex_Shadow": {
+    "tris": 780,
+    "uv": 1,
+    "colours": 1
+   }
+  }
+ }
+}

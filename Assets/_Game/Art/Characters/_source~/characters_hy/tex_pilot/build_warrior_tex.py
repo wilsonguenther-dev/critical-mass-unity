@@ -200,6 +200,19 @@ for v0 in list(bm.verts):
 bm.to_mesh(low.data)
 bm.free()
 REP["weld"] = dict(tris_after_weld=ntri(low), specks_dropped=dropped)
+# Run 3 showed the raw keeps surfaces today's Hero does not have (p90 distance 0.12 m: the arm and leg membranes the
+# HY build cleaned up), and their edges stretched 7x to 19x in the clips while today's LOD0 stays under 1.8x. Drop every
+# raw vertex farther than WT_CULL_M (0.03 m) from today's Hero before the decimation.
+CULL = float(os.environ.get("WT_CULL_M", "0.03"))
+if CULL > 0:
+    bm = bmesh.new()
+    bm.from_mesh(low.data)
+    far = [v for v in bm.verts if bvh_old.find_nearest(v.co)[3] > CULL]
+    bmesh.ops.delete(bm, geom=far, context="VERTS")
+    bm.to_mesh(low.data)
+    bm.free()
+    REP["cull"] = dict(metres=CULL, vertices_removed=len(far), tris_after=ntri(low))
+    log("membrane cull", REP["cull"])
 ratio = LOD0_TRIS / max(1, ntri(low))
 for attempt in range(3):
     work = low.data.copy()
