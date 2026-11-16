@@ -1097,7 +1097,8 @@ namespace CriticalMass.Runtime.Hud
             for (int i = 0; i < w.ActorCount && row < HeartRows; i++)
             {
                 Actor a = w.Actors[i];
-                if (i == HudBinder.LocalActor || !a.Alive || a.Hp >= a.MaxHp || w.Match.Time - _lastHit[i] > 3.0 || _lastHit[i] <= 0) continue;
+                // Batch 12 item P: an enemy the fog hides shows no hearts either
+                if (i == HudBinder.LocalActor || !a.Alive || global::CriticalMass.Runtime.View.Fog.FogOfWar.Hides(i) || a.Hp >= a.MaxHp || w.Match.Time - _lastHit[i] > 3.0 || _lastHit[i] <= 0) continue;
                 Vector3 head = SimSpace.ToWorld(w.X[i], GroundHeight.At(w.Map, w.X[i], w.Z[i]) + 2.8, w.Z[i]);
                 if (!Project(cam, head, out Vector2 p)) continue;
                 RectTransform r = _heartRows[row];
