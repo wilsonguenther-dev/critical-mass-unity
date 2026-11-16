@@ -26,12 +26,70 @@ namespace CriticalMass.Sim.Core
         /// </summary>
         public static bool ForceFullClearance;
 
-        /// <summary>Zero the counters (tests).</summary>
+        /// <summary>Zero the counters (tests; b12-t: also the player at every recorded match start).</summary>
         public static void ResetCounters()
         {
             ClearanceFullRebuilds = 0;
             ClearancePatches = 0;
             ClearanceRegionBuilds = 0;
+        }
+
+        /// <summary>
+        /// b12-t: Kaiju ownership tally, plain integer counters fed one KaijuState per sim tick by the player's
+        /// KaijuOwnershipLog (Runtime) and by the Sim tests. Nothing in the Sim reads or writes it, so no checksum can move.
+        /// The owner is Azure or Crimson; Egg, Neutral and Berserk have none. A switch is a change of owner between two
+        /// samples (none to Azure, Azure to none, ...), so egg to neutral is not one. Ticks only; seconds = ticks / SimHz.
+        /// </summary>
+        public struct KaijuOwnTally
+        {
+            public int EggTicks, NeutralTicks, AzureTicks, CrimsonTicks, BerserkTicks;
+            /// <summary>Owner changes between consecutive samples.</summary>
+            public int Switches;
+            /// <summary>Samples taken (one per tick).</summary>
+            public int Samples;
+            /// <summary>True once an Azure or Crimson sample was seen; FirstOwnedTick = samples before it.</summary>
+            public bool EverOwned;
+            public int FirstOwnedTick;
+            /// <summary>The longest unbroken run of one owner, in ticks, and that owner's state (Azure or Crimson).</summary>
+            public int LongestHoldTicks;
+            public KaijuState LongestHoldState;
+            int _owner, _run;
+
+            /// <summary>Back to an empty tally.</summary>
+            public void Reset() => this = default;
+
+            /// <summary>Count one tick in state s. Allocates nothing.</summary>
+            public void Sample(KaijuState s)
+            {
+                switch (s)
+                {
+                    case KaijuState.Egg: EggTicks++; break;
+                    case KaijuState.Neutral: NeutralTicks++; break;
+                    case KaijuState.Azure: AzureTicks++; break;
+                    case KaijuState.Crimson: CrimsonTicks++; break;
+                    default: BerserkTicks++; break;
+                }
+                int owner = s == KaijuState.Azure ? 1 : s == KaijuState.Crimson ? 2 : 0;
+                if (owner != 0 && !EverOwned)
+                {
+                    EverOwned = true;
+                    FirstOwnedTick = Samples;
+                }
+                if (Samples > 0 && owner != _owner) Switches++;
+                _run = Samples > 0 && owner == _owner ? _run + 1 : 1;
+                _owner = owner;
+                if (owner != 0 && _run > LongestHoldTicks)
+                {
+                    LongestHoldTicks = _run;
+                    LongestHoldState = s;
+                }
+                Samples++;
+            }
+
+            /// <summary>Ticks spent in one state.</summary>
+            public int TicksIn(KaijuState s) =>
+                s == KaijuState.Egg ? EggTicks : s == KaijuState.Neutral ? NeutralTicks : s == KaijuState.Azure ? AzureTicks
+                : s == KaijuState.Crimson ? CrimsonTicks : BerserkTicks;
         }
     }
 }

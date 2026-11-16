@@ -4,7 +4,7 @@
 #   tools/remote-playtest.sh [--host HOST] [--app PATH.app] [--mode smoke|captures] [--quality High|Medium|Low]
 #                            [--matches N] [--out DIR] [--speed X] [--novsync] [--profile default|floor]
 #                            [--width W --height H] [--title-seconds S] [--timeout S] [--lock-wait S] [--keep N] [--affordance-shots]
-#                            [--extra "PLAYER FLAGS"]  (e.g. "-showWindow -autoplayPacing rule,timed60")
+#                            [--kaiju-ko-shots] [--gore-shots] [--extra "PLAYER FLAGS"]  (e.g. "-autoplayPacing rule,timed60")
 # What it does: copies the .app (rsync, only changed files) to ~/cm-remote/builds/<build commit>/ on the box, starts
 # ~/cm-remote/bin/air-run.sh there detached (queue lock, mute for the run, caffeinate, settings isolation, the same
 # automation flags as tools/demo-smoke.sh: -autoplay -quitAfterMatch -autoplayMatches -autoplayTitleSeconds
@@ -14,6 +14,10 @@
 # --mode captures adds -shots: the player writes shot-title.png (title, 2 s in), shot-start.png (3 s of match time) and shot-mid.png (60 s),
 # copied to OUT/shots/. --affordance-shots adds -affordanceShots: shot-afford-*.png, the terrain-affordance and world-feedback
 # frames (TerrainAffordanceView's AffordanceCapture). (Screen grabs from outside the game are not possible over ssh: macOS refuses screen recording.)
+# b12-t: --kaiju-ko-shots adds -kaijuKoShots (OUT/data/kaiju-ko-shots/: the knocked-out Kaiju at 0.5 s, 2 s and recovered,
+# gameplay and low side camera) and --gore-shots adds -goreShots (OUT/data/gore-shots/, with the aftermath scene). Both are
+# staged runs that quit before a match end, so the smoke verdict below reads FAIL for them by design; judge the pictures
+# and the [CM.KaijuKoShots] / [CM.Gore] lines instead (the script prints how many pictures each folder holds).
 # Defaults: host wilsons-macbook-air.local (or CM_REMOTE_HOST), app Builds/current or Builds/macOS of this checkout,
 # smoke, Medium, 1 match, 1920x1080 window, 12 s on the title, OUT Logs/remote/<utc>-<mode>-<quality>.
 # Exit: 0 pass, 1 fail (exceptions, budget over or not measured), 4 match timeout, 124 overall timeout, 75 queue wait
@@ -50,6 +54,8 @@ while [[ $# -gt 0 ]]; do
     --lock-wait) LOCK_WAIT="${2:?}"; shift 2 ;;
     --keep) KEEP="${2:?}"; shift 2 ;;
     --affordance-shots) AFF=1; shift ;;
+    --kaiju-ko-shots) PLAYERARGS="${PLAYERARGS:+$PLAYERARGS }-kaijuKoShots"; shift ;;   # b12-t
+    --gore-shots) PLAYERARGS="${PLAYERARGS:+$PLAYERARGS }-goreShots"; shift ;;           # b12-t
     -h|--help) usage ;;
     *) echo "remote-playtest: unknown flag $1" >&2; usage ;;
   esac
@@ -96,6 +102,11 @@ CM_PROFILE="$PROFILE" CM_SMOKE_EXIT="$code" CM_SMOKE_LAUNCH_MS="${launch_ms:-0}"
 rc=$?
 set -e
 n_shots="$( (ls "$OUT"/shots/*.png 2>/dev/null || true) | wc -l | tr -d ' ')"
+for d in "$OUT"/data/*/; do   # b12-t: capture folders (kaiju-ko-shots, gore-shots, ...) and how many pictures each holds
+  [[ -d "$d" ]] || continue
+  n="$( (ls "$d"*.png 2>/dev/null || true) | wc -l | tr -d ' ')"
+  if (( n > 0 )); then echo "remote-playtest: $n picture(s) in ${d%/}"; fi
+done
 echo "remote-playtest: $( ((rc == 0)) && echo PASS || echo FAIL ) player exit $code, $n_shots shot(s), out $OUT"
 (( code == 4 )) && exit 4
 exit "$rc"

@@ -18,7 +18,10 @@ namespace CriticalMass.Runtime.View.Effects
     /// same fight on the same ticks, and only the view differs. Scenes: hit (a fighter hits YOUR fighter, so the damage edge
     /// shows), knockout (4 ticks after a knock-out), knockout-pop (the body's pop: the sparkle poof at Off), kaiju-hit (the
     /// Kaiju hits a fighter; the egg is force-hatched as in -skillShots), hill-fight (a hit with 10 or more fighters within
-    /// 4 u). Per scene: gore-sheet-SCENE.png (FULL | REDUCED | OFF close-ups, 960x540 each) and, per level, the close tile
+    /// 4 u), aftermath (b12-t: the hill-fight staging, then the same ground at +20 s and +60 s after the hit with every
+    /// fighter benched on its spawn spot so no new fight adds marks; the clock runs at the match pace so the ground paint
+    /// fades as in play; sheets gore-sheet-aftermath-20.png and -60.png and one line per still:
+    /// "scene=aftermath t=20 level=full marks=.. decals=.. pings=.."). Per scene: gore-sheet-SCENE.png (FULL | REDUCED | OFF close-ups, 960x540 each) and, per level, the close tile
     /// and the full screen (with the HUD and the damage edge). Log lines ("[CM.Gore]"):
     ///   level=off scene=hit goreSpawned=0 (...per piece...) bloodRedShare=0.00000 crimsonLikeShare=... flash=True sparks=N
     ///   edge=navy alpha=0.62 edgeNavyShare=... edgeRedShare=...
@@ -37,8 +40,14 @@ namespace CriticalMass.Runtime.View.Effects
         public const float CloseDistance = 5.5f, FocusLift = 1.0f;
         public const double MinSat = 0.74, MinVal = 0.25, MaxHueDeg = 15;
 
-        enum Scene { Hit, Knockout, KnockoutPop, KaijuHit, HillFight }
-        static readonly string[] SceneNames = { "hit", "knockout", "knockout-pop", "kaiju-hit", "hill-fight" };
+        enum Scene { Hit, Knockout, KnockoutPop, KaijuHit, HillFight, Aftermath }
+        static readonly string[] SceneNames = { "hit", "knockout", "knockout-pop", "kaiju-hit", "hill-fight", "aftermath" };
+
+        /// <summary>b12-t: every scene a run stages, in order (tests).</summary>
+        public static System.Collections.ObjectModel.ReadOnlyCollection<string> SceneList => Array.AsReadOnly(SceneNames);
+
+        /// <summary>b12-t: the aftermath stills, seconds of match time after the hill-fight hit (one config place).</summary>
+        public static readonly double[] AftermathSeconds = { 20, 60 };
         static readonly GoreLevel[] Levels = { GoreLevel.Full, GoreLevel.Reduced, GoreLevel.Off };
 
         SimDriverBehaviour _driver;
@@ -183,18 +192,25 @@ namespace CriticalMass.Runtime.View.Effects
             _driver.Ticked += OnTick;
             var totals = new int[Levels.Length];
             var perPiece = new int[Levels.Length, GoreGate.All.Length];
+            _scale = scale > 0 ? scale : 1.0;
             for (int sc = 0; sc < SceneNames.Length; sc++)
             {
-                var tiles = new Texture2D[Levels.Length];
+                // b12-t: aftermath has one tile per level at the hit and one per AftermathSeconds offset
+                int stills = (Scene)sc == Scene.Aftermath ? 1 + AftermathSeconds.Length : 1;
+                var tiles = new Texture2D[stills][];
+                for (int k = 0; k < stills; k++) tiles[k] = new Texture2D[Levels.Length];
                 for (int lv = 0; lv < Levels.Length; lv++)
                 {
-                    var holder = new Texture2D[1];
+                    var holder = new Texture2D[stills];
                     IEnumerator e = Capture((Scene)sc, Levels[lv], holder, perPiece, lv);
                     while (e.MoveNext()) yield return e.Current;
-                    tiles[lv] = holder[0];
+                    for (int k = 0; k < stills; k++) tiles[k][lv] = holder[k];
                 }
-                Sheet(SceneNames[sc], tiles);
-                foreach (Texture2D t in tiles) if (t != null) Destroy(t);
+                for (int k = 0; k < stills; k++)
+                {
+                    Sheet(k == 0 ? SceneNames[sc] : SceneNames[sc] + "-" + AftermathSeconds[k - 1].ToString("0", CultureInfo.InvariantCulture), tiles[k]);
+                    foreach (Texture2D t in tiles[k]) if (t != null) Destroy(t);
+                }
             }
             for (int lv = 0; lv < Levels.Length; lv++)
             {
@@ -365,6 +381,12 @@ namespace CriticalMass.Runtime.View.Effects
             _frame.AimZ = double.NaN;
             SimDriverBehaviour.ScriptedHumanFrame = _staged ? _frame : null;
             Step(1);                       // CombatFx sees the clock go back here and drops the old world's effects
+            if (sc == Scene.Aftermath)
+            {
+                _spawnX = new double[w.ActorCount];
+                _spawnZ = new double[w.ActorCount];
+                for (int i = 0; i < w.ActorCount; i++) { _spawnX[i] = w.X[i]; _spawnZ[i] = w.Z[i]; }
+            }
             _fx.Scene.Clear();
             _fx.Scene.ResetGoreCounts();
             bool kaiju = sc == Scene.KaijuHit;
@@ -422,7 +444,8 @@ namespace CriticalMass.Runtime.View.Effects
             else
             {
                 _head = w.EventHead;
-                _minTick = sc == Scene.HillFight ? (int)(30 * w.Config.SimHz) : (int)(10 * w.Config.SimHz);
+                bool hill = sc == Scene.HillFight || sc == Scene.Aftermath;
+                _minTick = hill ? (int)(30 * w.Config.SimHz) : (int)(10 * w.Config.SimHz);
                 int limit = (int)(240 * w.Config.SimHz);
                 while (!_found && stepped < limit && w.Match.Phase == MatchPhase.Playing)
                 {
@@ -433,7 +456,7 @@ namespace CriticalMass.Runtime.View.Effects
                 }
                 UnityEngine.Camera c0 = UnityEngine.Camera.main;
                 rot = c0 != null ? c0.transform.rotation : Quaternion.identity;
-                dist = sc == Scene.HillFight ? WideDistance : 8f;
+                dist = hill ? WideDistance : 8f;
                 focus = kaiju ? SkillCapture.KaijuFocus(w) : SimSpace.ToWorld(_fxX, 0, _fxZ) + Vector3.up * FocusLift;
             }
             w.ForceHatch = false;
@@ -499,6 +522,87 @@ namespace CriticalMass.Runtime.View.Effects
             Destroy(full);
             _target = -1;
             _benchX = null;
+            if (sc == Scene.Aftermath)
+            {
+                Log(GroundLine(0, lvName, w, now));
+                IEnumerator a = Aftermath(lvName, foundTick, holder);
+                while (a.MoveNext()) yield return a.Current;
+            }
+        }
+
+        // ---- b12-t aftermath: the same ground long after the fight ----
+        double _scale = 1.0;
+        double[] _spawnX, _spawnZ;
+
+        /// <summary>Live ground marks of each kind at sim time now: marks = decals and marks drawn in the ground mesh at the
+        /// last build (FxScene.LastGroundMarks), decals = live blood splats and pools, pings = live ping orders on the map,
+        /// blood = every live blood piece.</summary>
+        string GroundLine(double t, string lvName, World w, double now)
+        {
+            FxScene s = _fx.Scene;
+            int pings = 0;
+            if (w.Depth != null && w.Depth.OrderKind != null && w.Depth.OrderEnd != null)
+                for (int i = 0; i < w.ActorCount && i < w.Depth.OrderKind.Length; i++)
+                    if (w.Depth.OrderKind[i] != 0 && w.Depth.OrderEnd[i] > w.Tick) pings++;
+            return "scene=aftermath t=" + t.ToString("0", CultureInfo.InvariantCulture) + " level=" + lvName + " marks=" + s.LastGroundMarks
+                + " decals=" + s.DecalCount(now) + " pings=" + pings + " blood=" + s.BloodCount(now) + " tick=" + w.Tick;
+        }
+
+        /// <summary>Benches every living fighter on the spot it had at the match start (no new fight on the shot ground).</summary>
+        void Bench(World w)
+        {
+            if (_spawnX == null) return;
+            for (int i = 0; i < w.ActorCount && i < _spawnX.Length; i++)
+                if (w.Actors[i].Alive) Put(w, i, _spawnX[i], _spawnZ[i]);
+        }
+
+        /// <summary>
+        /// From the hill-fight hit, steps the clock at the match pace (ticks per frame from the real frame time and the
+        /// driver's own pace, so the ground paint's wall-clock fade runs as in play) with every fighter benched, and at each
+        /// AftermathSeconds offset writes the full screen (camera held on the fight spot) and the close tile framed as the
+        /// hill-fight shot, and logs the ground line.
+        /// </summary>
+        IEnumerator Aftermath(string lvName, int foundTick, Texture2D[] holder)
+        {
+            World w = _driver.World;
+            var cam = FindAnyObjectByType<CriticalMass.Runtime.Camera.CameraFollowTarget>();
+            double hz = w.Config.SimHz;
+            for (int k = 0; k < AftermathSeconds.Length; k++)
+            {
+                int target = foundTick + (int)Math.Round(AftermathSeconds[k] * hz);
+                while (w.Tick < target && w.Match.Phase == MatchPhase.Playing)
+                {
+                    int n = Math.Max(1, (int)Math.Round(_scale * Time.unscaledDeltaTime * hz));
+                    n = Math.Min(n, target - w.Tick);
+                    for (int t = 0; t < n; t++)
+                    {
+                        Step(1);
+                        Bench(w);
+                    }
+                    if (cam != null) cam.SetOverride(_fxX, _fxZ);
+                    CriticalMass.Runtime.View.Moments.BigMoments.StopAll();
+                    yield return null;
+                }
+                CriticalMass.Runtime.Hud.Banner.ClearAll();
+                for (int f = 0; f < 6; f++)
+                {
+                    if (cam != null) cam.SetOverride(_fxX, _fxZ);
+                    yield return null;
+                }
+                yield return new WaitForEndOfFrame();
+                string tag = AftermathSeconds[k].ToString("0", CultureInfo.InvariantCulture);
+                Texture2D full = ScreenCapture.CaptureScreenshotAsTexture();
+                File.WriteAllBytes(Path.Combine(_dir, "gore-" + lvName + "-aftermath-" + tag + "s-full.png"), full.EncodeToPNG());
+                Destroy(full);
+                Texture2D tile = Close(_sceneFocus, _sceneRot, _sceneDist, out int _, out int stillOn);
+                if (tile != null) File.WriteAllBytes(Path.Combine(_dir, "gore-" + lvName + "-aftermath-" + tag + "s.png"), tile.EncodeToPNG());
+                if (k + 1 < holder.Length) holder[k + 1] = tile;
+                else if (tile != null) Destroy(tile);
+                double now = w.Tick / hz;
+                Log(GroundLine((w.Tick - foundTick) / hz, lvName, w, now) + " uiStillOn=" + stillOn
+                    + (w.Match.Phase == MatchPhase.Playing ? "" : " (match ended early: " + w.Match.Phase + ")"));
+            }
+            if (cam != null) cam.ClearOverride();
         }
 
         float _sceneDist;
