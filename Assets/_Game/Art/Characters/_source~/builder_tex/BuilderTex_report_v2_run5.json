@@ -1,0 +1,2780 @@
+{
+ "config": {
+  "key": "BuilderTex",
+  "raw_glb": "~/cm-art-trial/builder/builder-512-tex2048-official.glb",
+  "rig_fbx": "~/cm-art-trial/builder/ref_rig4/Builder.fbx",
+  "rig_fbx_note": "rig-builder-4 Builder.fbx (fix/b12-i, git show origin/fix/b12-i:Assets/_Game/Art/Builder/Builder.fbx | git lfs smudge): the 41-bone rig the Builder clips were baked on, plus Builder_LOD0 as the stretch control and the old look in the side by side",
+  "rig_prefix": "Builder_",
+  "clips_fbx": "Assets/_Game/Art/Builder/Builder_Clips.fbx",
+  "out_dir": "~/cm-art-trial/builder/game-ready-v2",
+  "repo_fbx": "Assets/_Game/Art/Characters/BuilderTex/BuilderTex.fbx",
+  "repo_tex": "Assets/_Game/Art/Characters/BuilderTex/Resources/BuilderTex/BuilderTex_Base.png",
+  "crown_m": null,
+  "crown_front_fraction": 0.5,
+  "raw_yaw_deg": 0,
+  "lod_tris": [
+   7000,
+   1800,
+   760
+  ],
+  "head_decimate_weight": 0.85,
+  "tex": 1024,
+  "head_uv_scale": 1.7,
+  "team": {
+   "cloth_authored": "#2A9DBA",
+   "azure": "#2A9DBA",
+   "crimson": "#E46753",
+   "hue_deg": [
+    168,
+    205
+   ],
+   "sat_min": 0.33,
+   "val_min": 0.16
+  },
+  "joint_cut": {
+   "shoulder_r": 0.17,
+   "hip_r": 0.22
+  },
+  "pack": {
+   "seed_behind_m": 0.36,
+   "grow_behind_m": 0.17,
+   "z_min": 0.75
+  },
+  "fill_holes_sides": 0,
+  "speck_diag_m": 0.012,
+  "weights": {
+   "power": 5.0,
+   "smooth_iters": 3,
+   "apron_leg_factor": 0.35,
+   "pack_feather_rings": 4
+  },
+  "clips": {
+   "idle": "Idle",
+   "run": "Run",
+   "attack": "Attack",
+   "hit": "Hit"
+  },
+  "render_px": 300,
+  "remesh": {
+   "voxel_max": 0.012,
+   "voxel_min": 0.004,
+   "slab_m": 0.012,
+   "pack_voxel": 0.008,
+   "body_lod0_tris": 6100,
+   "pack_lod0_tris": 900,
+   "lod1_tris": 1800,
+   "shadow_tris": 700,
+   "head_decimate_weight": 0.3,
+   "uv_margin": 0.004,
+   "cage_extrusion": 0.02,
+   "max_ray_m": 0.05,
+   "bake_margin_px": 8,
+   "bake_samples": 4,
+   "shirt_regions": [
+    "torso",
+    "arm.l",
+    "arm.r",
+    "zarm.l",
+    "zarm.r"
+   ],
+   "lighten_clip": [
+    0.6,
+    1.25
+   ],
+   "mallet": {
+    "length": 0.62,
+    "grip_from_end": 0.12,
+    "wood": "#8A5E3B"
+   },
+   "close_r": 0.012,
+   "region_smooth_iters": 6,
+   "pack_close_r": 0.006,
+   "smooth_iters": 24,
+   "shadow_voxel": 0.05,
+   "apron_leg_factor": 1.0,
+   "allowed_rings": 2
+  },
+  "out_dir_remesh": "~/cm-art-trial/builder/game-ready-v2"
+ },
+ "rig": {
+  "bones": 41,
+  "old": {
+   "Builder_Hero": 21592,
+   "Builder_LOD0": 3946,
+   "Builder_LOD1": 1344,
+   "Builder_Shadow": 794
+  }
+ },
+ "clips": {
+  "Rig.001|Attack": [
+   1.0,
+   26.0
+  ],
+  "Rig.001|Attack2HChop": [
+   1.0,
+   40.0
+  ],
+  "Rig.001|Attack2HSlice": [
+   1.0,
+   27.0
+  ],
+  "Rig.001|AttackSlice": [
+   1.0,
+   26.0
+  ],
+  "Rig.001|Block": [
+   1.0,
+   26.0
+  ],
+  "Rig.001|BlockHit": [
+   1.0,
+   26.0
+  ],
+  "Rig.001|Blocking": [
+   1.0,
+   26.0
+  ],
+  "Rig.001|Carry": [
+   1.0,
+   26.0
+  ],
+  "Rig.001|Cast": [
+   1.0,
+   23.0
+  ],
+  "Rig.001|Cheer": [
+   1.0,
+   41.0
+  ],
+  "Rig.001|Death": [
+   1.0,
+   20.0
+  ],
+  "Rig.001|DeathB": [
+   1.0,
+   64.0
+  ],
+  "Rig.001|Gather": [
+   1.0,
+   32.0
+  ],
+  "Rig.001|GetUp": [
+   1.0,
+   57.0
+  ],
+  "Rig.001|Hit": [
+   1.0,
+   17.0
+  ],
+  "Rig.001|HitHeavy": [
+   1.0,
+   21.0
+  ],
+  "Rig.001|Idle": [
+   1.0,
+   26.0
+  ],
+  "Rig.001|IdleLook": [
+   1.0,
+   26.0
+  ],
+  "Rig.001|JumpAir": [
+   1.0,
+   26.0
+  ],
+  "Rig.001|JumpLand": [
+   1.0,
+   17.0
+  ],
+  "Rig.001|JumpStart": [
+   1.0,
+   15.0
+  ],
+  "Rig.001|KnockDown": [
+   1.0,
+   73.0
+  ],
+  "Rig.001|PickUp": [
+   1.0,
+   32.0
+  ],
+  "Rig.001|Run": [
+   1.0,
+   20.0
+  ],
+  "Rig.001|SitDown": [
+   1.0,
+   25.0
+  ],
+  "Rig.001|SitIdle": [
+   1.0,
+   97.0
+  ],
+  "Rig.001|StrafeL": [
+   1.0,
+   20.0
+  ],
+  "Rig.001|StrafeR": [
+   1.0,
+   20.0
+  ],
+  "Rig.001|Throw": [
+   1.0,
+   33.0
+  ],
+  "Rig.001|UseItem": [
+   1.0,
+   39.0
+  ],
+  "Rig.001|Walk": [
+   1.0,
+   26.0
+  ],
+  "Rig.001|WalkBack": [
+   1.0,
+   26.0
+  ]
+ },
+ "winding": {
+  "components": 120,
+  "flipped_inside_out": 102,
+  "main_volume_before": 0.0171
+ },
+ "align": {
+  "crown_target_m": 2.2651,
+  "scale": 2.30834,
+  "shin_centre_y": [
+   -0.1625,
+   -0.164
+  ],
+  "shin_bone_y": 0.116,
+  "shift_y": 0.2793000042438507,
+  "bounds": [
+   [
+    -0.929,
+    -0.365,
+    0.0
+   ],
+   [
+    0.988,
+    0.947,
+    2.316
+   ]
+  ]
+ },
+ "pose_fit_deg": {
+  "upperarm.l": {
+   "deg": 3.2,
+   "target": [
+    0.767,
+    -0.042,
+    0.918
+   ]
+  },
+  "upperleg.l": {
+   "deg": 10.4,
+   "target": [
+    0.253,
+    0.053,
+    0.22
+   ]
+  },
+  "upperarm.r": {
+   "deg": 4.9,
+   "target": [
+    -0.746,
+    -0.041,
+    0.919
+   ]
+  },
+  "upperleg.r": {
+   "deg": 10.7,
+   "target": [
+    -0.253,
+    0.051,
+    0.22
+   ]
+  }
+ },
+ "pack_threshold": {
+  "shirt_back_surface_behind_spine_m": 0.2915,
+  "grow_behind_m": 0.3215
+ },
+ "parts_raw": {
+  "components": 120,
+  "main_verts": 141014,
+  "speck_components": 17,
+  "item_components": 72,
+  "pack_verts": 53235,
+  "raw_tris": 290527
+ },
+ "joint_cut_raw_apose_trials": [
+  {
+   "tag": "raw (A-pose) x1.00",
+   "radii_m": {
+    "shoulder": 0.17,
+    "hip": 0.22
+   },
+   "verts": 145760,
+   "cut_verts": 3610,
+   "components_after_cut": 17,
+   "arm.l": {
+    "probe_verts": 2575,
+    "components": 1,
+    "torso_verts_in_its_component": 17854,
+    "other_limb_verts_in_its_component": {
+     "leg.l": 5219,
+     "leg.r": 5375
+    },
+    "welded": true,
+    "nearest_torso_m": 0.2005
+   },
+   "leg.l": {
+    "probe_verts": 5219,
+    "components": 1,
+    "torso_verts_in_its_component": 17854,
+    "other_limb_verts_in_its_component": {
+     "arm.l": 2575,
+     "arm.r": 2583
+    },
+    "welded": true,
+    "nearest_torso_m": 0.2362
+   },
+   "arm.r": {
+    "probe_verts": 2583,
+    "components": 1,
+    "torso_verts_in_its_component": 17854,
+    "other_limb_verts_in_its_component": {
+     "leg.l": 5219,
+     "leg.r": 5375
+    },
+    "welded": true,
+    "nearest_torso_m": 0.1906
+   },
+   "leg.r": {
+    "probe_verts": 5375,
+    "components": 1,
+    "torso_verts_in_its_component": 17854,
+    "other_limb_verts_in_its_component": {
+     "arm.l": 2575,
+     "arm.r": 2583
+    },
+    "welded": true,
+    "nearest_torso_m": 0.2359
+   },
+   "any_welded": true
+  },
+  {
+   "tag": "raw (A-pose) x1.25",
+   "radii_m": {
+    "shoulder": 0.2125,
+    "hip": 0.275
+   },
+   "verts": 145760,
+   "cut_verts": 8564,
+   "components_after_cut": 27,
+   "arm.l": {
+    "probe_verts": 2575,
+    "components": 1,
+    "torso_verts_in_its_component": 17808,
+    "other_limb_verts_in_its_component": {
+     "leg.l": 0,
+     "leg.r": 13
+    },
+    "welded": true,
+    "nearest_torso_m": 0.2005
+   },
+   "leg.l": {
+    "probe_verts": 5119,
+    "components": 3,
+    "torso_verts_in_its_component": 0,
+    "other_limb_verts_in_its_component": {
+     "arm.l": 0,
+     "arm.r": 0
+    },
+    "welded": false,
+    "nearest_torso_m": 0.2919
+   },
+   "arm.r": {
+    "probe_verts": 2583,
+    "components": 1,
+    "torso_verts_in_its_component": 17808,
+    "other_limb_verts_in_its_component": {
+     "leg.l": 0,
+     "leg.r": 13
+    },
+    "welded": true,
+    "nearest_torso_m": 0.1906
+   },
+   "leg.r": {
+    "probe_verts": 5284,
+    "components": 3,
+    "torso_verts_in_its_component": 17808,
+    "other_limb_verts_in_its_component": {
+     "arm.l": 2575,
+     "arm.r": 2583
+    },
+    "welded": true,
+    "nearest_torso_m": 0.2831
+   },
+   "any_welded": true
+  },
+  {
+   "tag": "raw (A-pose) x1.50",
+   "radii_m": {
+    "shoulder": 0.255,
+    "hip": 0.33
+   },
+   "verts": 145760,
+   "cut_verts": 15219,
+   "components_after_cut": 24,
+   "arm.l": {
+    "probe_verts": 2575,
+    "components": 1,
+    "torso_verts_in_its_component": 0,
+    "other_limb_verts_in_its_component": {
+     "leg.l": 0,
+     "leg.r": 0
+    },
+    "welded": false,
+    "nearest_torso_m": 0.2005
+   },
+   "leg.l": {
+    "probe_verts": 4448,
+    "components": 2,
+    "torso_verts_in_its_component": 0,
+    "other_limb_verts_in_its_component": {
+     "arm.l": 0,
+     "arm.r": 0
+    },
+    "welded": false,
+    "nearest_torso_m": 0.3076
+   },
+   "arm.r": {
+    "probe_verts": 2583,
+    "components": 1,
+    "torso_verts_in_its_component": 0,
+    "other_limb_verts_in_its_component": {
+     "leg.l": 0,
+     "leg.r": 0
+    },
+    "welded": false,
+    "nearest_torso_m": 0.1906
+   },
+   "leg.r": {
+    "probe_verts": 4803,
+    "components": 2,
+    "torso_verts_in_its_component": 17611,
+    "other_limb_verts_in_its_component": {
+     "arm.l": 0,
+     "arm.r": 0
+    },
+    "welded": true,
+    "nearest_torso_m": 0.3151
+   },
+   "any_welded": true
+  },
+  {
+   "tag": "raw (A-pose) x1.75",
+   "radii_m": {
+    "shoulder": 0.2975,
+    "hip": 0.385
+   },
+   "verts": 145760,
+   "cut_verts": 23486,
+   "components_after_cut": 45,
+   "arm.l": {
+    "probe_verts": 2575,
+    "components": 1,
+    "torso_verts_in_its_component": 0,
+    "other_limb_verts_in_its_component": {
+     "leg.l": 0,
+     "leg.r": 0
+    },
+    "welded": false,
+    "nearest_torso_m": 0.2005
+   },
+   "leg.l": {
+    "probe_verts": 3755,
+    "components": 1,
+    "torso_verts_in_its_component": 0,
+    "other_limb_verts_in_its_component": {
+     "arm.l": 0,
+     "arm.r": 0
+    },
+    "welded": false,
+    "nearest_torso_m": 0.4799
+   },
+   "arm.r": {
+    "probe_verts": 2583,
+    "components": 2,
+    "torso_verts_in_its_component": 0,
+    "other_limb_verts_in_its_component": {
+     "leg.l": 0,
+     "leg.r": 0
+    },
+    "welded": false,
+    "nearest_torso_m": 0.1906
+   },
+   "leg.r": {
+    "probe_verts": 4156,
+    "components": 2,
+    "torso_verts_in_its_component": 16584,
+    "other_limb_verts_in_its_component": {
+     "arm.l": 0,
+     "arm.r": 0
+    },
+    "welded": true,
+    "nearest_torso_m": 0.4764
+   },
+   "any_welded": true
+  }
+ ],
+ "joint_cut_raw_apose": {
+  "tag": "raw (A-pose) x1.75",
+  "radii_m": {
+   "shoulder": 0.2975,
+   "hip": 0.385
+  },
+  "verts": 145760,
+  "cut_verts": 23486,
+  "components_after_cut": 45,
+  "arm.l": {
+   "probe_verts": 2575,
+   "components": 1,
+   "torso_verts_in_its_component": 0,
+   "other_limb_verts_in_its_component": {
+    "leg.l": 0,
+    "leg.r": 0
+   },
+   "welded": false,
+   "nearest_torso_m": 0.2005
+  },
+  "leg.l": {
+   "probe_verts": 3755,
+   "components": 1,
+   "torso_verts_in_its_component": 0,
+   "other_limb_verts_in_its_component": {
+    "arm.l": 0,
+    "arm.r": 0
+   },
+   "welded": false,
+   "nearest_torso_m": 0.4799
+  },
+  "arm.r": {
+   "probe_verts": 2583,
+   "components": 2,
+   "torso_verts_in_its_component": 0,
+   "other_limb_verts_in_its_component": {
+    "leg.l": 0,
+    "leg.r": 0
+   },
+   "welded": false,
+   "nearest_torso_m": 0.1906
+  },
+  "leg.r": {
+   "probe_verts": 4156,
+   "components": 2,
+   "torso_verts_in_its_component": 16584,
+   "other_limb_verts_in_its_component": {
+    "arm.l": 0,
+    "arm.r": 0
+   },
+   "welded": true,
+   "nearest_torso_m": 0.4764
+  },
+  "any_welded": true
+ },
+ "joint_cut_scale": 1.75,
+ "v2_raw_gaps": {
+  "arm.l": {
+   "min_m": 0.0434,
+   "p01_m": 0.0825,
+   "at": [
+    0.439,
+    0.078,
+    1.151
+   ],
+   "other": "torso"
+  },
+  "arm.r": {
+   "min_m": 0.0435,
+   "p01_m": 0.081,
+   "at": [
+    -0.447,
+    0.075,
+    1.15
+   ],
+   "other": "torso"
+  },
+  "leg.l": {
+   "min_m": 0.1626,
+   "p01_m": 0.1819,
+   "at": [
+    0.083,
+    0.17,
+    0.298
+   ],
+   "other": "leg.r"
+  },
+  "leg.r": {
+   "min_m": 0.1626,
+   "p01_m": 0.1848,
+   "at": [
+    -0.079,
+    0.184,
+    0.296
+   ],
+   "other": "leg.l"
+  }
+ },
+ "v2_slab_vertices_moved": {},
+ "v2_raw_gaps_after_slab": {
+  "arm.l": {
+   "min_m": 0.0434,
+   "p01_m": 0.0825,
+   "at": [
+    0.439,
+    0.078,
+    1.151
+   ],
+   "other": "torso"
+  },
+  "arm.r": {
+   "min_m": 0.0435,
+   "p01_m": 0.081,
+   "at": [
+    -0.447,
+    0.075,
+    1.15
+   ],
+   "other": "torso"
+  },
+  "leg.l": {
+   "min_m": 0.1626,
+   "p01_m": 0.1819,
+   "at": [
+    0.083,
+    0.17,
+    0.298
+   ],
+   "other": "leg.r"
+  },
+  "leg.r": {
+   "min_m": 0.1626,
+   "p01_m": 0.1848,
+   "at": [
+    -0.079,
+    0.184,
+    0.296
+   ],
+   "other": "leg.l"
+  }
+ },
+ "v2_voxel_m": 0.012,
+ "v2_close": {
+  "close_r": 0.012,
+  "voxel_m": 0.008083333333333335
+ },
+ "v2_remesh": {
+  "body": {
+   "cavity_shells_removed": 0,
+   "genus_total": 17,
+   "tris": 718772,
+   "verts": 359372,
+   "open_edges": 0,
+   "nonmanifold_edges": 0,
+   "nonmanifold_verts": 0,
+   "winding_flips": 0,
+   "signed_volume_m3": 0.2156,
+   "components": 10
+  },
+  "pack": {
+   "cavity_shells_removed": 0,
+   "genus_total": 30,
+   "tris": 383564,
+   "verts": 191746,
+   "open_edges": 0,
+   "nonmanifold_edges": 0,
+   "nonmanifold_verts": 0,
+   "winding_flips": 0,
+   "signed_volume_m3": 0.1252,
+   "components": 12
+  }
+ },
+ "v2_remesh_gaps": {
+  "arm.l": {
+   "min_m": 0.045,
+   "p01_m": 0.0703,
+   "at": [
+    0.436,
+    0.085,
+    1.161
+   ],
+   "other": "torso",
+   "edges_to_others": 0
+  },
+  "arm.r": {
+   "min_m": 0.0446,
+   "p01_m": 0.0694,
+   "at": [
+    -0.439,
+    0.109,
+    1.168
+   ],
+   "other": "torso",
+   "edges_to_others": 0
+  },
+  "leg.l": {
+   "min_m": 0.1637,
+   "p01_m": 0.1827,
+   "at": [
+    0.084,
+    0.174,
+    0.303
+   ],
+   "other": "leg.r",
+   "edges_to_others": 0
+  },
+  "leg.r": {
+   "min_m": 0.1637,
+   "p01_m": 0.1826,
+   "at": [
+    -0.079,
+    0.174,
+    0.303
+   ],
+   "other": "leg.l",
+   "edges_to_others": 0
+  }
+ },
+ "v2_decimate": {
+  "body": [
+   5916
+  ],
+  "pack": [
+   1916,
+   900
+  ],
+  "lod1": [
+   1800
+  ],
+  "shadow": [
+   700
+  ]
+ },
+ "v2_lod0_parts": {
+  "body": {
+   "genus_total": 17,
+   "tris": 5916,
+   "verts": 2944,
+   "open_edges": 0,
+   "nonmanifold_edges": 0,
+   "nonmanifold_verts": 0,
+   "winding_flips": 0,
+   "signed_volume_m3": 0.2159,
+   "components": 10
+  },
+  "pack": {
+   "genus_total": 30,
+   "tris": 900,
+   "verts": 414,
+   "open_edges": 0,
+   "nonmanifold_edges": 0,
+   "nonmanifold_verts": 0,
+   "winding_flips": 0,
+   "signed_volume_m3": 0.1206,
+   "components": 12
+  }
+ },
+ "v2_lod0_head_tris": 1756,
+ "uv": {
+  "coverage": 0.5245,
+  "islands": 440,
+  "seams": 457,
+  "head_texel_density_vs_body": 2.958,
+  "uv_min": [
+   0.004,
+   0.004
+  ],
+  "uv_max": [
+   0.9788,
+   0.9952
+  ]
+ },
+ "bake": {
+  "result": [
+   "FINISHED"
+  ],
+  "engine": "CYCLES selected-to-active",
+  "cage_extrusion_m": 0.02,
+  "max_ray_m": 0.05,
+  "margin_px": 8
+ },
+ "team_mask": {
+  "method": "region (navy shirt in torso/sleeves) + teal trim",
+  "team_fraction_of_covered": 0.144,
+  "shirt_median_value_srgb": 0.255,
+  "texels_covered": 0.5199,
+  "by_region": {
+   "torso": 0.318,
+   "head": 0.008,
+   "arm.l": 0.429,
+   "arm.r": 0.33,
+   "leg.l": 0.0,
+   "leg.r": 0.0,
+   "pack": 0.018
+  }
+ },
+ "v2_heat": {
+  "verts": 2898,
+  "weighted": 2898
+ },
+ "weights": {
+  "bone_heat_result": [
+   "FINISHED"
+  ],
+  "LOD0": {
+   "max_influences": 4,
+   "mean_influences": 2.8,
+   "unweighted": 0,
+   "heat_unweighted": 460,
+   "fallback_verts": 467,
+   "sum_err": 2.220446049250313e-16,
+   "regions": {
+    "torso": 738,
+    "head": 881,
+    "arm.l": 132,
+    "arm.r": 122,
+    "leg.l": 138,
+    "leg.r": 140,
+    "pack": 417,
+    "zarm.l": 171,
+    "zarm.r": 160,
+    "zleg.l": 170,
+    "zleg.r": 289
+   }
+  },
+  "LOD1": {
+   "max_influences": 4,
+   "mean_influences": 2.83,
+   "unweighted": 0,
+   "heat_unweighted": 0,
+   "fallback_verts": 0,
+   "sum_err": 2.220446049250313e-16,
+   "regions": {
+    "torso": 178,
+    "head": 119,
+    "arm.l": 33,
+    "arm.r": 35,
+    "leg.l": 32,
+    "leg.r": 36,
+    "pack": 233,
+    "zarm.l": 39,
+    "zarm.r": 39,
+    "zleg.l": 44,
+    "zleg.r": 62
+   }
+  },
+  "Shadow": {
+   "max_influences": 4,
+   "mean_influences": 2.91,
+   "unweighted": 0,
+   "heat_unweighted": 0,
+   "fallback_verts": 0,
+   "sum_err": 2.220446049250313e-16,
+   "regions": {
+    "torso": 57,
+    "head": 54,
+    "arm.l": 17,
+    "arm.r": 15,
+    "leg.l": 26,
+    "leg.r": 23,
+    "pack": 56,
+    "zarm.l": 23,
+    "zarm.r": 27,
+    "zleg.l": 14,
+    "zleg.r": 38
+   }
+  }
+ },
+ "tris": {
+  "BuilderTex_LOD0": 6816,
+  "BuilderTex_LOD1": 1800,
+  "BuilderTex_Shadow": 700
+ },
+ "v2_lod_surfaces": {
+  "BuilderTex_LOD0": {
+   "genus_total": 47,
+   "tris": 6816,
+   "verts": 3358,
+   "open_edges": 0,
+   "nonmanifold_edges": 0,
+   "nonmanifold_verts": 0,
+   "winding_flips": 0,
+   "signed_volume_m3": 0.3365,
+   "components": 22
+  },
+  "BuilderTex_LOD1": {
+   "genus_total": 47,
+   "tris": 1800,
+   "verts": 850,
+   "open_edges": 0,
+   "nonmanifold_edges": 0,
+   "nonmanifold_verts": 0,
+   "winding_flips": 0,
+   "signed_volume_m3": 0.3266,
+   "components": 22
+  },
+  "BuilderTex_Shadow": {
+   "genus_total": 34,
+   "tris": 700,
+   "verts": 350,
+   "open_edges": 0,
+   "nonmanifold_edges": 0,
+   "nonmanifold_verts": 0,
+   "winding_flips": 0,
+   "signed_volume_m3": 0.3794,
+   "components": 34
+  }
+ },
+ "v2_gaps_apose": {
+  "BuilderTex_LOD0": {
+   "arm.l": {
+    "min_m": 0.0743,
+    "p01_m": 0.0781,
+    "at": [
+     0.447,
+     0.138,
+     1.123
+    ],
+    "other": "torso",
+    "edges_to_others": 0
+   },
+   "arm.r": {
+    "min_m": 0.0713,
+    "p01_m": 0.0749,
+    "at": [
+     -0.467,
+     0.055,
+     1.154
+    ],
+    "other": "torso",
+    "edges_to_others": 0
+   },
+   "leg.l": {
+    "min_m": 0.1838,
+    "p01_m": 0.1878,
+    "at": [
+     0.095,
+     0.19,
+     0.012
+    ],
+    "other": "leg.r",
+    "edges_to_others": 0
+   },
+   "leg.r": {
+    "min_m": 0.1838,
+    "p01_m": 0.1891,
+    "at": [
+     -0.088,
+     0.172,
+     0.014
+    ],
+    "other": "leg.l",
+    "edges_to_others": 0
+   }
+  },
+  "BuilderTex_LOD1": {
+   "arm.l": {
+    "min_m": 0.1161,
+    "p01_m": 0.1196,
+    "at": [
+     0.452,
+     0.107,
+     1.13
+    ],
+    "other": "torso",
+    "edges_to_others": 0
+   },
+   "arm.r": {
+    "min_m": 0.0871,
+    "p01_m": 0.0904,
+    "at": [
+     -0.547,
+     0.092,
+     1.028
+    ],
+    "other": "torso",
+    "edges_to_others": 0
+   },
+   "leg.l": {
+    "min_m": 0.185,
+    "p01_m": 0.1885,
+    "at": [
+     0.094,
+     0.242,
+     0.011
+    ],
+    "other": "leg.r",
+    "edges_to_others": 0
+   },
+   "leg.r": {
+    "min_m": 0.185,
+    "p01_m": 0.189,
+    "at": [
+     -0.083,
+     0.188,
+     0.011
+    ],
+    "other": "leg.l",
+    "edges_to_others": 0
+   }
+  },
+  "BuilderTex_Shadow": {
+   "arm.l": {
+    "min_m": 0.1274,
+    "p01_m": 0.1353,
+    "at": [
+     0.534,
+     0.022,
+     1.141
+    ],
+    "other": "torso",
+    "edges_to_others": 3
+   },
+   "arm.r": {
+    "min_m": 0.1522,
+    "p01_m": 0.1608,
+    "at": [
+     -0.534,
+     0.125,
+     1.064
+    ],
+    "other": "zleg.r",
+    "edges_to_others": 0
+   },
+   "leg.l": {
+    "min_m": 0.207,
+    "p01_m": 0.2071,
+    "at": [
+     0.1,
+     0.198,
+     0.241
+    ],
+    "other": "leg.r",
+    "edges_to_others": 0
+   },
+   "leg.r": {
+    "min_m": 0.207,
+    "p01_m": 0.2078,
+    "at": [
+     -0.1,
+     0.165,
+     0.201
+    ],
+    "other": "leg.l",
+    "edges_to_others": 0
+   }
+  }
+ },
+ "lod0_head_tris": 1756,
+ "unskin_max_move_m": {
+  "BuilderTex_LOD0": 0.1431,
+  "BuilderTex_LOD1": 0.1435,
+  "BuilderTex_Shadow": 0.1351
+ },
+ "joint_cut_rest": {
+  "BuilderTex_LOD0": {
+   "tag": "BuilderTex_LOD0 rest",
+   "radii_m": {
+    "shoulder": 0.2975,
+    "hip": 0.385
+   },
+   "verts": 3358,
+   "cut_verts": 786,
+   "components_after_cut": 29,
+   "arm.l": {
+    "probe_verts": 50,
+    "components": 2,
+    "torso_verts_in_its_component": 0,
+    "other_limb_verts_in_its_component": {
+     "leg.l": 0,
+     "leg.r": 0
+    },
+    "welded": false,
+    "nearest_torso_m": 0.2714
+   },
+   "leg.l": {
+    "probe_verts": 137,
+    "components": 1,
+    "torso_verts_in_its_component": 0,
+    "other_limb_verts_in_its_component": {
+     "arm.l": 0,
+     "arm.r": 0
+    },
+    "welded": false,
+    "nearest_torso_m": 0.5344
+   },
+   "arm.r": {
+    "probe_verts": 53,
+    "components": 2,
+    "torso_verts_in_its_component": 0,
+    "other_limb_verts_in_its_component": {
+     "leg.l": 0,
+     "leg.r": 0
+    },
+    "welded": false,
+    "nearest_torso_m": 0.2389
+   },
+   "leg.r": {
+    "probe_verts": 135,
+    "components": 3,
+    "torso_verts_in_its_component": 0,
+    "other_limb_verts_in_its_component": {
+     "arm.l": 0,
+     "arm.r": 0
+    },
+    "welded": false,
+    "nearest_torso_m": 0.5267
+   },
+   "any_welded": false
+  },
+  "BuilderTex_LOD1": {
+   "tag": "BuilderTex_LOD1 rest",
+   "radii_m": {
+    "shoulder": 0.2975,
+    "hip": 0.385
+   },
+   "verts": 850,
+   "cut_verts": 183,
+   "components_after_cut": 30,
+   "arm.l": {
+    "probe_verts": 11,
+    "components": 2,
+    "torso_verts_in_its_component": 0,
+    "other_limb_verts_in_its_component": {
+     "leg.l": 0,
+     "leg.r": 0
+    },
+    "welded": false,
+    "nearest_torso_m": 0.3687
+   },
+   "leg.l": {
+    "probe_verts": 33,
+    "components": 1,
+    "torso_verts_in_its_component": 0,
+    "other_limb_verts_in_its_component": {
+     "arm.l": 0,
+     "arm.r": 0
+    },
+    "welded": false,
+    "nearest_torso_m": 0.6933
+   },
+   "arm.r": {
+    "probe_verts": 10,
+    "components": 2,
+    "torso_verts_in_its_component": 0,
+    "other_limb_verts_in_its_component": {
+     "leg.l": 0,
+     "leg.r": 0
+    },
+    "welded": false,
+    "nearest_torso_m": 0.3674
+   },
+   "leg.r": {
+    "probe_verts": 34,
+    "components": 3,
+    "torso_verts_in_its_component": 0,
+    "other_limb_verts_in_its_component": {
+     "arm.l": 0,
+     "arm.r": 0
+    },
+    "welded": false,
+    "nearest_torso_m": 0.6762
+   },
+   "any_welded": false
+  },
+  "BuilderTex_Shadow": {
+   "tag": "BuilderTex_Shadow rest",
+   "radii_m": {
+    "shoulder": 0.2975,
+    "hip": 0.385
+   },
+   "verts": 350,
+   "cut_verts": 101,
+   "components_after_cut": 27,
+   "arm.l": {
+    "probe_verts": 7,
+    "components": 1,
+    "torso_verts_in_its_component": 41,
+    "other_limb_verts_in_its_component": {
+     "leg.l": 0,
+     "leg.r": 0
+    },
+    "welded": true,
+    "nearest_torso_m": 0.3824,
+    "bridge_path_m": [
+     [
+      0.254,
+      -0.151,
+      1.353
+     ],
+     [
+      0.349,
+      0.067,
+      1.125
+     ],
+     [
+      0.417,
+      0.038,
+      1.114
+     ],
+     [
+      0.547,
+      0.011,
+      1.148
+     ]
+    ]
+   },
+   "leg.l": {
+    "probe_verts": 28,
+    "components": 5,
+    "torso_verts_in_its_component": 0,
+    "other_limb_verts_in_its_component": {
+     "arm.l": 0,
+     "arm.r": 0
+    },
+    "welded": false,
+    "nearest_torso_m": 0.7027
+   },
+   "arm.r": {
+    "probe_verts": 5,
+    "components": 1,
+    "torso_verts_in_its_component": 0,
+    "other_limb_verts_in_its_component": {
+     "leg.l": 0,
+     "leg.r": 0
+    },
+    "welded": false,
+    "nearest_torso_m": 0.4424
+   },
+   "leg.r": {
+    "probe_verts": 23,
+    "components": 5,
+    "torso_verts_in_its_component": 0,
+    "other_limb_verts_in_its_component": {
+     "arm.l": 0,
+     "arm.r": 0
+    },
+    "welded": false,
+    "nearest_torso_m": 0.7052
+   },
+   "any_welded": true
+  }
+ },
+ "v2_gaps_rest": {
+  "BuilderTex_LOD0": {
+   "arm.l": {
+    "min_m": 0.0804,
+    "p01_m": 0.0923,
+    "at": [
+     0.462,
+     0.128,
+     1.122
+    ],
+    "other": "torso",
+    "edges_to_others": 0
+   },
+   "arm.r": {
+    "min_m": 0.09,
+    "p01_m": 0.0931,
+    "at": [
+     -0.479,
+     0.126,
+     1.121
+    ],
+    "other": "torso",
+    "edges_to_others": 0
+   },
+   "leg.l": {
+    "min_m": 0.1718,
+    "p01_m": 0.1777,
+    "at": [
+     0.089,
+     0.305,
+     0.035
+    ],
+    "other": "leg.r",
+    "edges_to_others": 0
+   },
+   "leg.r": {
+    "min_m": 0.1718,
+    "p01_m": 0.1788,
+    "at": [
+     -0.082,
+     0.289,
+     0.035
+    ],
+    "other": "leg.l",
+    "edges_to_others": 0
+   }
+  },
+  "BuilderTex_LOD1": {
+   "arm.l": {
+    "min_m": 0.1294,
+    "p01_m": 0.1305,
+    "at": [
+     0.463,
+     0.099,
+     1.13
+    ],
+    "other": "torso",
+    "edges_to_others": 0
+   },
+   "arm.r": {
+    "min_m": 0.1083,
+    "p01_m": 0.111,
+    "at": [
+     -0.488,
+     0.027,
+     1.172
+    ],
+    "other": "torso",
+    "edges_to_others": 0
+   },
+   "leg.l": {
+    "min_m": 0.171,
+    "p01_m": 0.1765,
+    "at": [
+     0.086,
+     0.356,
+     0.044
+    ],
+    "other": "leg.r",
+    "edges_to_others": 0
+   },
+   "leg.r": {
+    "min_m": 0.171,
+    "p01_m": 0.1772,
+    "at": [
+     -0.077,
+     0.306,
+     0.035
+    ],
+    "other": "leg.l",
+    "edges_to_others": 0
+   }
+  },
+  "BuilderTex_Shadow": {
+   "arm.l": {
+    "min_m": 0.1373,
+    "p01_m": 0.1446,
+    "at": [
+     0.547,
+     0.011,
+     1.148
+    ],
+    "other": "torso",
+    "edges_to_others": 3
+   },
+   "arm.r": {
+    "min_m": 0.1644,
+    "p01_m": 0.1727,
+    "at": [
+     -0.551,
+     0.115,
+     1.067
+    ],
+    "other": "zleg.r",
+    "edges_to_others": 0
+   },
+   "leg.l": {
+    "min_m": 0.1977,
+    "p01_m": 0.1977,
+    "at": [
+     0.095,
+     0.273,
+     0.262
+    ],
+    "other": "leg.r",
+    "edges_to_others": 0
+   },
+   "leg.r": {
+    "min_m": 0.1977,
+    "p01_m": 0.1986,
+    "at": [
+     -0.096,
+     0.249,
+     0.217
+    ],
+    "other": "leg.l",
+    "edges_to_others": 0
+   }
+  }
+ },
+ "height_lod0_rest_m": 2.3179,
+ "joint_cut_rest_spheres": {
+  "l": {
+   "shoulder": [
+    0.44999998807907104,
+    0.10000000149011612,
+    1.4600000381469727
+   ],
+   "hip": [
+    0.17000000178813934,
+    0.11999999731779099,
+    0.6800000071525574
+   ]
+  },
+  "r": {
+   "shoulder": [
+    -0.44999998807907104,
+    0.10000000149011612,
+    1.4600000381469727
+   ],
+   "hip": [
+    -0.17000000178813934,
+    0.11999999731779099,
+    0.6800000071525574
+   ]
+  }
+ },
+ "v2_clip_offset_check": {
+  "hips": {
+   "rig_m": 0.75,
+   "clip_idle_m": 0.723,
+   "diff_m": -0.027
+  },
+  "spine": {
+   "rig_m": 0.211,
+   "clip_idle_m": 0.211,
+   "diff_m": -0.0
+  },
+  "chest": {
+   "rig_m": 0.272,
+   "clip_idle_m": 0.272,
+   "diff_m": 0.0
+  },
+  "head": {
+   "rig_m": 0.502,
+   "clip_idle_m": 0.502,
+   "diff_m": -0.0
+  },
+  "upperarm.l": {
+   "rig_m": 0.511,
+   "clip_idle_m": 0.511,
+   "diff_m": -0.0
+  },
+  "lowerarm.l": {
+   "rig_m": 0.284,
+   "clip_idle_m": 0.284,
+   "diff_m": -0.0
+  },
+  "wrist.l": {
+   "rig_m": 0.145,
+   "clip_idle_m": 0.145,
+   "diff_m": 0.0
+  },
+  "hand.l": {
+   "rig_m": 0.135,
+   "clip_idle_m": 0.135,
+   "diff_m": -0.0
+  },
+  "upperarm.r": {
+   "rig_m": 0.511,
+   "clip_idle_m": 0.511,
+   "diff_m": -0.0
+  },
+  "lowerarm.r": {
+   "rig_m": 0.284,
+   "clip_idle_m": 0.284,
+   "diff_m": -0.0
+  },
+  "wrist.r": {
+   "rig_m": 0.145,
+   "clip_idle_m": 0.145,
+   "diff_m": 0.0
+  },
+  "hand.r": {
+   "rig_m": 0.135,
+   "clip_idle_m": 0.135,
+   "diff_m": -0.0
+  },
+  "upperleg.l": {
+   "rig_m": 0.18,
+   "clip_idle_m": 0.18,
+   "diff_m": 0.0
+  },
+  "lowerleg.l": {
+   "rig_m": 0.238,
+   "clip_idle_m": 0.238,
+   "diff_m": -0.0
+  },
+  "foot.l": {
+   "rig_m": 0.284,
+   "clip_idle_m": 0.284,
+   "diff_m": -0.0
+  },
+  "toes.l": {
+   "rig_m": 0.269,
+   "clip_idle_m": 0.269,
+   "diff_m": -0.0
+  },
+  "upperleg.r": {
+   "rig_m": 0.18,
+   "clip_idle_m": 0.18,
+   "diff_m": -0.0
+  },
+  "lowerleg.r": {
+   "rig_m": 0.238,
+   "clip_idle_m": 0.238,
+   "diff_m": -0.0
+  },
+  "foot.r": {
+   "rig_m": 0.284,
+   "clip_idle_m": 0.284,
+   "diff_m": -0.0
+  },
+  "toes.r": {
+   "rig_m": 0.269,
+   "clip_idle_m": 0.269,
+   "diff_m": 0.0
+  }
+ },
+ "clip_stretch": {
+  "Attack": {
+   "new_LOD0": {
+    "max": 3.88,
+    "p999": 2.572,
+    "worst_frame": 11,
+    "worst_bone": "upperarm.r",
+    "worst_at": [
+     -0.429,
+     0.233,
+     1.222
+    ]
+   },
+   "new_LOD1": {
+    "max": 3.198,
+    "p999": 1.863,
+    "worst_frame": 12,
+    "worst_bone": "upperarm.r",
+    "worst_at": [
+     -0.407,
+     0.099,
+     1.199
+    ]
+   },
+   "current_LOD0": {
+    "max": 13.933,
+    "p999": 7.353,
+    "worst_frame": 10,
+    "worst_bone": "toes.r",
+    "worst_at": [
+     -0.637,
+     -1.077,
+     0.169
+    ]
+   }
+  },
+  "Attack2HChop": {
+   "new_LOD0": {
+    "max": 5.407,
+    "p999": 2.073,
+    "worst_frame": 18,
+    "worst_bone": "lowerleg.l",
+    "worst_at": [
+     0.15,
+     0.332,
+     0.383
+    ]
+   },
+   "new_LOD1": {
+    "max": 2.189,
+    "p999": 1.786,
+    "worst_frame": 25,
+    "worst_bone": "upperarm.r",
+    "worst_at": [
+     -0.403,
+     0.055,
+     1.14
+    ]
+   },
+   "current_LOD0": {
+    "max": 8.381,
+    "p999": 4.841,
+    "worst_frame": 22,
+    "worst_bone": "toes.l",
+    "worst_at": [
+     0.84,
+     -0.768,
+     0.062
+    ]
+   }
+  },
+  "Attack2HSlice": {
+   "new_LOD0": {
+    "max": 3.656,
+    "p999": 2.485,
+    "worst_frame": 19,
+    "worst_bone": "lowerleg.l",
+    "worst_at": [
+     0.15,
+     0.332,
+     0.383
+    ]
+   },
+   "new_LOD1": {
+    "max": 2.455,
+    "p999": 2.144,
+    "worst_frame": 11,
+    "worst_bone": "upperarm.r",
+    "worst_at": [
+     -0.407,
+     0.099,
+     1.199
+    ]
+   },
+   "current_LOD0": {
+    "max": 7.715,
+    "p999": 5.035,
+    "worst_frame": 20,
+    "worst_bone": "toes.l",
+    "worst_at": [
+     0.84,
+     -0.768,
+     0.062
+    ]
+   }
+  },
+  "AttackSlice": {
+   "new_LOD0": {
+    "max": 3.143,
+    "p999": 2.028,
+    "worst_frame": 5,
+    "worst_bone": "chest",
+    "worst_at": [
+     0.231,
+     -0.107,
+     1.51
+    ]
+   },
+   "new_LOD1": {
+    "max": 1.804,
+    "p999": 1.546,
+    "worst_frame": 24,
+    "worst_bone": "upperarm.r",
+    "worst_at": [
+     -0.407,
+     0.099,
+     1.199
+    ]
+   },
+   "current_LOD0": {
+    "max": 6.791,
+    "p999": 4.289,
+    "worst_frame": 13,
+    "worst_bone": "toes.l",
+    "worst_at": [
+     0.84,
+     -0.768,
+     0.062
+    ]
+   }
+  },
+  "Block": {
+   "new_LOD0": {
+    "max": 3.633,
+    "p999": 1.836,
+    "worst_frame": 18,
+    "worst_bone": "lowerleg.l",
+    "worst_at": [
+     0.15,
+     0.332,
+     0.383
+    ]
+   },
+   "new_LOD1": {
+    "max": 2.025,
+    "p999": 1.569,
+    "worst_frame": 9,
+    "worst_bone": "upperarm.r",
+    "worst_at": [
+     -0.403,
+     0.055,
+     1.14
+    ]
+   },
+   "current_LOD0": {
+    "max": 7.024,
+    "p999": 3.938,
+    "worst_frame": 10,
+    "worst_bone": "toes.l",
+    "worst_at": [
+     0.84,
+     -0.768,
+     0.062
+    ]
+   }
+  },
+  "BlockHit": {
+   "new_LOD0": {
+    "max": 4.098,
+    "p999": 1.945,
+    "worst_frame": 8,
+    "worst_bone": "lowerleg.l",
+    "worst_at": [
+     0.15,
+     0.332,
+     0.383
+    ]
+   },
+   "new_LOD1": {
+    "max": 2.025,
+    "p999": 1.565,
+    "worst_frame": 1,
+    "worst_bone": "upperarm.r",
+    "worst_at": [
+     -0.403,
+     0.055,
+     1.14
+    ]
+   },
+   "current_LOD0": {
+    "max": 7.021,
+    "p999": 4.092,
+    "worst_frame": 1,
+    "worst_bone": "toes.l",
+    "worst_at": [
+     0.84,
+     -0.768,
+     0.062
+    ]
+   }
+  },
+  "Blocking": {
+   "new_LOD0": {
+    "max": 3.658,
+    "p999": 1.893,
+    "worst_frame": 14,
+    "worst_bone": "lowerleg.l",
+    "worst_at": [
+     0.15,
+     0.332,
+     0.383
+    ]
+   },
+   "new_LOD1": {
+    "max": 2.025,
+    "p999": 1.617,
+    "worst_frame": 1,
+    "worst_bone": "upperarm.r",
+    "worst_at": [
+     -0.403,
+     0.055,
+     1.14
+    ]
+   },
+   "current_LOD0": {
+    "max": 7.022,
+    "p999": 3.977,
+    "worst_frame": 2,
+    "worst_bone": "toes.l",
+    "worst_at": [
+     0.84,
+     -0.768,
+     0.062
+    ]
+   }
+  },
+  "Carry": {
+   "new_LOD0": {
+    "max": 3.495,
+    "p999": 1.644,
+    "worst_frame": 14,
+    "worst_bone": "lowerleg.l",
+    "worst_at": [
+     0.15,
+     0.332,
+     0.383
+    ]
+   },
+   "new_LOD1": {
+    "max": 1.609,
+    "p999": 1.489,
+    "worst_frame": 14,
+    "worst_bone": "upperarm.r",
+    "worst_at": [
+     -0.407,
+     0.099,
+     1.199
+    ]
+   },
+   "current_LOD0": {
+    "max": 5.79,
+    "p999": 2.811,
+    "worst_frame": 1,
+    "worst_bone": "toes.l",
+    "worst_at": [
+     0.84,
+     -0.768,
+     0.062
+    ]
+   }
+  },
+  "Cast": {
+   "new_LOD0": {
+    "max": 3.155,
+    "p999": 1.897,
+    "worst_frame": 9,
+    "worst_bone": "lowerleg.l",
+    "worst_at": [
+     0.15,
+     0.332,
+     0.383
+    ]
+   },
+   "new_LOD1": {
+    "max": 1.695,
+    "p999": 1.431,
+    "worst_frame": 4,
+    "worst_bone": "upperarm.r",
+    "worst_at": [
+     -0.407,
+     0.099,
+     1.199
+    ]
+   },
+   "current_LOD0": {
+    "max": 5.547,
+    "p999": 2.916,
+    "worst_frame": 6,
+    "worst_bone": "toes.r",
+    "worst_at": [
+     -0.637,
+     -1.077,
+     0.169
+    ]
+   }
+  },
+  "Cheer": {
+   "new_LOD0": {
+    "max": 3.964,
+    "p999": 1.826,
+    "worst_frame": 29,
+    "worst_bone": "lowerleg.l",
+    "worst_at": [
+     0.15,
+     0.332,
+     0.383
+    ]
+   },
+   "new_LOD1": {
+    "max": 1.864,
+    "p999": 1.545,
+    "worst_frame": 29,
+    "worst_bone": "upperarm.r",
+    "worst_at": [
+     -0.407,
+     0.099,
+     1.199
+    ]
+   },
+   "current_LOD0": {
+    "max": 7.324,
+    "p999": 4.624,
+    "worst_frame": 32,
+    "worst_bone": "toes.l",
+    "worst_at": [
+     0.84,
+     -0.768,
+     0.062
+    ]
+   }
+  },
+  "Death": {
+   "new_LOD0": {
+    "max": 4.709,
+    "p999": 2.434,
+    "worst_frame": 13,
+    "worst_bone": "lowerleg.l",
+    "worst_at": [
+     0.15,
+     0.332,
+     0.383
+    ]
+   },
+   "new_LOD1": {
+    "max": 2.588,
+    "p999": 1.655,
+    "worst_frame": 20,
+    "worst_bone": "upperarm.r",
+    "worst_at": [
+     -0.407,
+     0.099,
+     1.199
+    ]
+   },
+   "current_LOD0": {
+    "max": 7.377,
+    "p999": 5.203,
+    "worst_frame": 14,
+    "worst_bone": "toes.r",
+    "worst_at": [
+     -0.497,
+     -1.167,
+     0.022
+    ]
+   }
+  },
+  "DeathB": {
+   "new_LOD0": {
+    "max": 11.562,
+    "p999": 4.111,
+    "worst_frame": 63,
+    "worst_bone": "lowerleg.l",
+    "worst_at": [
+     0.15,
+     0.332,
+     0.383
+    ]
+   },
+   "new_LOD1": {
+    "max": 3.777,
+    "p999": 2.425,
+    "worst_frame": 63,
+    "worst_bone": "lowerleg.l",
+    "worst_at": [
+     0.383,
+     0.195,
+     0.349
+    ]
+   },
+   "current_LOD0": {
+    "max": 5.407,
+    "p999": 3.718,
+    "worst_frame": 39,
+    "worst_bone": "toes.r",
+    "worst_at": [
+     -0.325,
+     -0.78,
+     -0.126
+    ]
+   }
+  },
+  "Gather": {
+   "new_LOD0": {
+    "max": 2.84,
+    "p999": 2.111,
+    "worst_frame": 15,
+    "worst_bone": "chest",
+    "worst_at": [
+     0.231,
+     -0.107,
+     1.51
+    ]
+   },
+   "new_LOD1": {
+    "max": 1.698,
+    "p999": 1.517,
+    "worst_frame": 14,
+    "worst_bone": "upperarm.l",
+    "worst_at": [
+     0.403,
+     0.039,
+     1.151
+    ]
+   },
+   "current_LOD0": {
+    "max": 5.895,
+    "p999": 3.959,
+    "worst_frame": 13,
+    "worst_bone": "toes.r",
+    "worst_at": [
+     -0.895,
+     -0.809,
+     0.02
+    ]
+   }
+  },
+  "GetUp": {
+   "new_LOD0": {
+    "max": 6.358,
+    "p999": 2.699,
+    "worst_frame": 41,
+    "worst_bone": "lowerleg.l",
+    "worst_at": [
+     0.15,
+     0.332,
+     0.383
+    ]
+   },
+   "new_LOD1": {
+    "max": 2.263,
+    "p999": 1.898,
+    "worst_frame": 35,
+    "worst_bone": "lowerleg.l",
+    "worst_at": [
+     0.383,
+     0.195,
+     0.349
+    ]
+   },
+   "current_LOD0": {
+    "max": 7.192,
+    "p999": 4.494,
+    "worst_frame": 1,
+    "worst_bone": "toes.l",
+    "worst_at": [
+     0.75,
+     -1.153,
+     0.176
+    ]
+   }
+  },
+  "Hit": {
+   "new_LOD0": {
+    "max": 3.162,
+    "p999": 1.675,
+    "worst_frame": 3,
+    "worst_bone": "chest",
+    "worst_at": [
+     0.231,
+     -0.107,
+     1.51
+    ]
+   },
+   "new_LOD1": {
+    "max": 1.844,
+    "p999": 1.477,
+    "worst_frame": 5,
+    "worst_bone": "upperleg.r",
+    "worst_at": [
+     -0.334,
+     0.257,
+     0.496
+    ]
+   },
+   "current_LOD0": {
+    "max": 3.974,
+    "p999": 2.775,
+    "worst_frame": 17,
+    "worst_bone": "toes.l",
+    "worst_at": [
+     0.84,
+     -0.768,
+     0.062
+    ]
+   }
+  },
+  "HitHeavy": {
+   "new_LOD0": {
+    "max": 5.318,
+    "p999": 2.478,
+    "worst_frame": 5,
+    "worst_bone": "spine",
+    "worst_at": [
+     0.329,
+     -0.106,
+     0.956
+    ]
+   },
+   "new_LOD1": {
+    "max": 1.734,
+    "p999": 1.617,
+    "worst_frame": 6,
+    "worst_bone": "upperleg.r",
+    "worst_at": [
+     -0.257,
+     0.293,
+     0.526
+    ]
+   },
+   "current_LOD0": {
+    "max": 5.702,
+    "p999": 3.025,
+    "worst_frame": 5,
+    "worst_bone": "toes.r",
+    "worst_at": [
+     -0.637,
+     -1.077,
+     0.169
+    ]
+   }
+  },
+  "Idle": {
+   "new_LOD0": {
+    "max": 1.903,
+    "p999": 1.574,
+    "worst_frame": 13,
+    "worst_bone": "upperarm.l",
+    "worst_at": [
+     0.393,
+     0.054,
+     1.234
+    ]
+   },
+   "new_LOD1": {
+    "max": 1.488,
+    "p999": 1.361,
+    "worst_frame": 12,
+    "worst_bone": "upperarm.r",
+    "worst_at": [
+     -0.407,
+     0.099,
+     1.199
+    ]
+   },
+   "current_LOD0": {
+    "max": 3.986,
+    "p999": 2.795,
+    "worst_frame": 21,
+    "worst_bone": "toes.l",
+    "worst_at": [
+     0.84,
+     -0.768,
+     0.062
+    ]
+   }
+  },
+  "IdleLook": {
+   "new_LOD0": {
+    "max": 2.509,
+    "p999": 1.613,
+    "worst_frame": 11,
+    "worst_bone": "upperarm.l",
+    "worst_at": [
+     0.521,
+     0.3,
+     1.241
+    ]
+   },
+   "new_LOD1": {
+    "max": 1.745,
+    "p999": 1.466,
+    "worst_frame": 26,
+    "worst_bone": "upperarm.l",
+    "worst_at": [
+     0.643,
+     0.298,
+     1.29
+    ]
+   },
+   "current_LOD0": {
+    "max": 5.486,
+    "p999": 3.428,
+    "worst_frame": 10,
+    "worst_bone": "toes.l",
+    "worst_at": [
+     0.84,
+     -0.768,
+     0.062
+    ]
+   }
+  },
+  "JumpAir": {
+   "new_LOD0": {
+    "max": 4.354,
+    "p999": 1.717,
+    "worst_frame": 12,
+    "worst_bone": "lowerleg.l",
+    "worst_at": [
+     0.15,
+     0.332,
+     0.383
+    ]
+   },
+   "new_LOD1": {
+    "max": 1.764,
+    "p999": 1.342,
+    "worst_frame": 14,
+    "worst_bone": "lowerleg.l",
+    "worst_at": [
+     0.383,
+     0.195,
+     0.349
+    ]
+   },
+   "current_LOD0": {
+    "max": 4.513,
+    "p999": 2.807,
+    "worst_frame": 14,
+    "worst_bone": "toes.r",
+    "worst_at": [
+     -0.497,
+     -1.167,
+     0.022
+    ]
+   }
+  },
+  "JumpLand": {
+   "new_LOD0": {
+    "max": 6.929,
+    "p999": 1.903,
+    "worst_frame": 5,
+    "worst_bone": "lowerleg.l",
+    "worst_at": [
+     0.15,
+     0.332,
+     0.383
+    ]
+   },
+   "new_LOD1": {
+    "max": 1.826,
+    "p999": 1.57,
+    "worst_frame": 6,
+    "worst_bone": "upperarm.r",
+    "worst_at": [
+     -0.407,
+     0.099,
+     1.199
+    ]
+   },
+   "current_LOD0": {
+    "max": 4.041,
+    "p999": 3.402,
+    "worst_frame": 6,
+    "worst_bone": "toes.l",
+    "worst_at": [
+     0.84,
+     -0.768,
+     0.062
+    ]
+   }
+  },
+  "JumpStart": {
+   "new_LOD0": {
+    "max": 5.523,
+    "p999": 1.766,
+    "worst_frame": 7,
+    "worst_bone": "lowerleg.l",
+    "worst_at": [
+     0.15,
+     0.332,
+     0.383
+    ]
+   },
+   "new_LOD1": {
+    "max": 1.742,
+    "p999": 1.455,
+    "worst_frame": 7,
+    "worst_bone": "upperleg.r",
+    "worst_at": [
+     -0.334,
+     0.257,
+     0.496
+    ]
+   },
+   "current_LOD0": {
+    "max": 3.877,
+    "p999": 2.7,
+    "worst_frame": 7,
+    "worst_bone": "toes.l",
+    "worst_at": [
+     0.84,
+     -0.768,
+     0.062
+    ]
+   }
+  },
+  "KnockDown": {
+   "new_LOD0": {
+    "max": 6.91,
+    "p999": 2.699,
+    "worst_frame": 11,
+    "worst_bone": "lowerleg.l",
+    "worst_at": [
+     0.15,
+     0.332,
+     0.383
+    ]
+   },
+   "new_LOD1": {
+    "max": 2.317,
+    "p999": 1.963,
+    "worst_frame": 17,
+    "worst_bone": "lowerleg.l",
+    "worst_at": [
+     0.383,
+     0.195,
+     0.349
+    ]
+   },
+   "current_LOD0": {
+    "max": 7.192,
+    "p999": 4.494,
+    "worst_frame": 73,
+    "worst_bone": "toes.l",
+    "worst_at": [
+     0.75,
+     -1.153,
+     0.176
+    ]
+   }
+  },
+  "PickUp": {
+   "new_LOD0": {
+    "max": 4.481,
+    "p999": 1.783,
+    "worst_frame": 9,
+    "worst_bone": "lowerleg.l",
+    "worst_at": [
+     0.15,
+     0.332,
+     0.383
+    ]
+   },
+   "new_LOD1": {
+    "max": 1.774,
+    "p999": 1.5,
+    "worst_frame": 11,
+    "worst_bone": "upperleg.r",
+    "worst_at": [
+     -0.334,
+     0.257,
+     0.496
+    ]
+   },
+   "current_LOD0": {
+    "max": 4.459,
+    "p999": 3.202,
+    "worst_frame": 23,
+    "worst_bone": "toes.r",
+    "worst_at": [
+     -0.637,
+     -1.077,
+     0.169
+    ]
+   }
+  },
+  "Run": {
+   "new_LOD0": {
+    "max": 7.714,
+    "p999": 2.246,
+    "worst_frame": 15,
+    "worst_bone": "lowerleg.l",
+    "worst_at": [
+     0.15,
+     0.332,
+     0.383
+    ]
+   },
+   "new_LOD1": {
+    "max": 2.34,
+    "p999": 1.687,
+    "worst_frame": 17,
+    "worst_bone": "lowerleg.l",
+    "worst_at": [
+     0.383,
+     0.195,
+     0.349
+    ]
+   },
+   "current_LOD0": {
+    "max": 3.831,
+    "p999": 2.638,
+    "worst_frame": 18,
+    "worst_bone": "toes.l",
+    "worst_at": [
+     0.84,
+     -0.768,
+     0.062
+    ]
+   }
+  },
+  "SitDown": {
+   "new_LOD0": {
+    "max": 5.957,
+    "p999": 2.441,
+    "worst_frame": 25,
+    "worst_bone": "lowerleg.l",
+    "worst_at": [
+     0.15,
+     0.332,
+     0.383
+    ]
+   },
+   "new_LOD1": {
+    "max": 2.25,
+    "p999": 1.715,
+    "worst_frame": 25,
+    "worst_bone": "lowerleg.l",
+    "worst_at": [
+     0.383,
+     0.195,
+     0.349
+    ]
+   },
+   "current_LOD0": {
+    "max": 6.486,
+    "p999": 3.659,
+    "worst_frame": 8,
+    "worst_bone": "toes.r",
+    "worst_at": [
+     -0.325,
+     -0.78,
+     -0.126
+    ]
+   }
+  },
+  "SitIdle": {
+   "new_LOD0": {
+    "max": 5.985,
+    "p999": 2.574,
+    "worst_frame": 43,
+    "worst_bone": "lowerleg.l",
+    "worst_at": [
+     0.15,
+     0.332,
+     0.383
+    ]
+   },
+   "new_LOD1": {
+    "max": 2.268,
+    "p999": 1.675,
+    "worst_frame": 43,
+    "worst_bone": "lowerleg.l",
+    "worst_at": [
+     0.383,
+     0.195,
+     0.349
+    ]
+   },
+   "current_LOD0": {
+    "max": 5.703,
+    "p999": 3.663,
+    "worst_frame": 69,
+    "worst_bone": "toes.r",
+    "worst_at": [
+     -0.325,
+     -0.78,
+     -0.126
+    ]
+   }
+  },
+  "StrafeL": {
+   "new_LOD0": {
+    "max": 9.06,
+    "p999": 2.412,
+    "worst_frame": 15,
+    "worst_bone": "lowerleg.l",
+    "worst_at": [
+     0.15,
+     0.332,
+     0.383
+    ]
+   },
+   "new_LOD1": {
+    "max": 2.448,
+    "p999": 1.73,
+    "worst_frame": 17,
+    "worst_bone": "lowerleg.l",
+    "worst_at": [
+     0.383,
+     0.195,
+     0.349
+    ]
+   },
+   "current_LOD0": {
+    "max": 4.525,
+    "p999": 2.769,
+    "worst_frame": 10,
+    "worst_bone": "toes.l",
+    "worst_at": [
+     0.75,
+     -1.153,
+     0.176
+    ]
+   }
+  },
+  "StrafeR": {
+   "new_LOD0": {
+    "max": 6.273,
+    "p999": 2.091,
+    "worst_frame": 15,
+    "worst_bone": "lowerleg.l",
+    "worst_at": [
+     0.15,
+     0.332,
+     0.383
+    ]
+   },
+   "new_LOD1": {
+    "max": 2.3,
+    "p999": 1.81,
+    "worst_frame": 17,
+    "worst_bone": "lowerleg.l",
+    "worst_at": [
+     0.383,
+     0.195,
+     0.349
+    ]
+   },
+   "current_LOD0": {
+    "max": 5.932,
+    "p999": 3.909,
+    "worst_frame": 11,
+    "worst_bone": "toes.l",
+    "worst_at": [
+     0.75,
+     -1.153,
+     0.176
+    ]
+   }
+  },
+  "Throw": {
+   "new_LOD0": {
+    "max": 5.768,
+    "p999": 1.915,
+    "worst_frame": 17,
+    "worst_bone": "lowerleg.l",
+    "worst_at": [
+     0.15,
+     0.332,
+     0.383
+    ]
+   },
+   "new_LOD1": {
+    "max": 2.371,
+    "p999": 1.679,
+    "worst_frame": 12,
+    "worst_bone": "upperarm.r",
+    "worst_at": [
+     -0.407,
+     0.099,
+     1.199
+    ]
+   },
+   "current_LOD0": {
+    "max": 7.02,
+    "p999": 4.332,
+    "worst_frame": 12,
+    "worst_bone": "toes.r",
+    "worst_at": [
+     -0.497,
+     -1.167,
+     0.022
+    ]
+   }
+  },
+  "UseItem": {
+   "new_LOD0": {
+    "max": 2.608,
+    "p999": 1.844,
+    "worst_frame": 13,
+    "worst_bone": "lowerleg.l",
+    "worst_at": [
+     0.15,
+     0.332,
+     0.383
+    ]
+   },
+   "new_LOD1": {
+    "max": 1.79,
+    "p999": 1.466,
+    "worst_frame": 7,
+    "worst_bone": "upperarm.r",
+    "worst_at": [
+     -0.407,
+     0.099,
+     1.199
+    ]
+   },
+   "current_LOD0": {
+    "max": 4.637,
+    "p999": 3.167,
+    "worst_frame": 17,
+    "worst_bone": "toes.l",
+    "worst_at": [
+     0.48,
+     -1.163,
+     0.029
+    ]
+   }
+  },
+  "Walk": {
+   "new_LOD0": {
+    "max": 6.297,
+    "p999": 1.942,
+    "worst_frame": 19,
+    "worst_bone": "lowerleg.l",
+    "worst_at": [
+     0.15,
+     0.332,
+     0.383
+    ]
+   },
+   "new_LOD1": {
+    "max": 2.074,
+    "p999": 1.537,
+    "worst_frame": 23,
+    "worst_bone": "lowerleg.l",
+    "worst_at": [
+     0.383,
+     0.195,
+     0.349
+    ]
+   },
+   "current_LOD0": {
+    "max": 5.418,
+    "p999": 3.087,
+    "worst_frame": 1,
+    "worst_bone": "toes.l",
+    "worst_at": [
+     0.75,
+     -1.153,
+     0.176
+    ]
+   }
+  },
+  "WalkBack": {
+   "new_LOD0": {
+    "max": 6.208,
+    "p999": 1.967,
+    "worst_frame": 9,
+    "worst_bone": "lowerleg.l",
+    "worst_at": [
+     0.15,
+     0.332,
+     0.383
+    ]
+   },
+   "new_LOD1": {
+    "max": 2.092,
+    "p999": 1.544,
+    "worst_frame": 5,
+    "worst_bone": "lowerleg.l",
+    "worst_at": [
+     0.383,
+     0.195,
+     0.349
+    ]
+   },
+   "current_LOD0": {
+    "max": 5.151,
+    "p999": 3.137,
+    "worst_frame": 18,
+    "worst_bone": "toes.r",
+    "worst_at": [
+     -0.325,
+     -0.78,
+     -0.126
+    ]
+   }
+  }
+ },
+ "stretch_summary": {
+  "new_LOD0": {
+   "worst_max": 11.562,
+   "worst_clip": "DeathB",
+   "worst_p999": 4.111
+  },
+  "new_LOD1": {
+   "worst_max": 3.777,
+   "worst_clip": "DeathB",
+   "worst_p999": 2.425
+  },
+  "current_LOD0": {
+   "worst_max": 13.933,
+   "worst_clip": "Attack",
+   "worst_p999": 7.353
+  }
+ },
+ "render_poses": [
+  [
+   "idle",
+   "Idle",
+   1
+  ],
+  [
+   "run",
+   "Run",
+   1
+  ],
+  [
+   "attack_raise",
+   "Attack",
+   11
+  ],
+  [
+   "attack_contact",
+   "Attack",
+   18
+  ],
+  [
+   "hit",
+   "Hit",
+   7
+  ]
+ ],
+ "renders": {
+  "grid_cols": "game55 azure, game55 crimson, front10 azure, front10 crimson, side10 azure, side10 crimson",
+  "grid_rows": [
+   "idle",
+   "run",
+   "attack_raise",
+   "attack_contact",
+   "hit"
+  ],
+  "files": [
+   "BuilderTex_Base.png",
+   "BuilderTex_bake_raw.png",
+   "BuilderTex_mask.png",
+   "BuilderTex_preview_azure.png",
+   "BuilderTex_preview_crimson.png",
+   "face_new.png",
+   "face_old.png",
+   "grid_new.png",
+   "grid_old.png",
+   "parts_back.png",
+   "parts_front.png",
+   "parts_raw.png",
+   "parts_side.png",
+   "side_by_side_front_side10.png",
+   "side_by_side_game55.png"
+  ]
+ },
+ "export": {
+  "path": "/Users/wilsonguenther/cm-art-trial/builder/game-ready-v2/BuilderTex.fbx",
+  "result": [
+   "FINISHED"
+  ],
+  "bytes": 650380
+ },
+ "round_trip": {
+  "armature": "Rig",
+  "bones": 41,
+  "bones_missing": [],
+  "max_bind_matrix_diff": 1.5e-05,
+  "meshes": {
+   "BuilderTex_LOD0": {
+    "tris": 6797,
+    "uv": 1,
+    "colours": [
+     "Col"
+    ],
+    "groups": 20,
+    "parent": "Rig"
+   },
+   "BuilderTex_LOD1": {
+    "tris": 1781,
+    "uv": 1,
+    "colours": [
+     "Col"
+    ],
+    "groups": 20,
+    "parent": "Rig"
+   },
+   "BuilderTex_Shadow": {
+    "tris": 667,
+    "uv": 1,
+    "colours": [
+     "Col"
+    ],
+    "groups": 17,
+    "parent": "Rig"
+   }
+  }
+ }
+}

@@ -1,0 +1,131 @@
+{
+ "key": "BuilderTex",
+ "raw_glb": "~/cm-art-trial/builder/builder-512-tex2048-official.glb",
+ "rig_fbx": "~/cm-art-trial/builder/ref_rig4/Builder.fbx",
+ "rig_fbx_note": "rig-builder-4 Builder.fbx (fix/b12-i, git show origin/fix/b12-i:Assets/_Game/Art/Builder/Builder.fbx | git lfs smudge): the 41-bone rig the Builder clips were baked on, plus Builder_LOD0 as the stretch control and the old look in the side by side",
+ "rig_prefix": "Builder_",
+ "clips_fbx": "Assets/_Game/Art/Builder/Builder_Clips.fbx",
+ "out_dir": "~/cm-art-trial/builder/game-ready",
+ "repo_fbx": "Assets/_Game/Art/Characters/BuilderTex/BuilderTex.fbx",
+ "repo_tex": "Assets/_Game/Art/Characters/BuilderTex/Resources/BuilderTex/BuilderTex_Base.png",
+ "crown_m": null,
+ "crown_front_fraction": 0.5,
+ "raw_yaw_deg": 0,
+ "lod_tris": [
+  7000,
+  1800,
+  760
+ ],
+ "head_decimate_weight": 0.85,
+ "tex": 1024,
+ "head_uv_scale": 1.7,
+ "team": {
+  "cloth_authored": "#2A9DBA",
+  "azure": "#2A9DBA",
+  "crimson": "#E46753",
+  "hue_deg": [
+   168,
+   205
+  ],
+  "sat_min": 0.33,
+  "val_min": 0.16
+ },
+ "joint_cut": {
+  "shoulder_r": 0.17,
+  "hip_r": 0.22
+ },
+ "pack": {
+  "seed_behind_m": 0.36,
+  "grow_behind_m": 0.17,
+  "z_min": 0.75
+ },
+ "fill_holes_sides": 0,
+ "speck_diag_m": 0.012,
+ "weights": {
+  "power": 5.0,
+  "smooth_iters": 3,
+  "apron_leg_factor": 0.35,
+  "pack_feather_rings": 4
+ },
+ "clips": {
+  "idle": "Idle",
+  "run": "Run",
+  "attack": "Attack",
+  "hit": "Hit"
+ },
+ "render_px": 300,
+ "remesh": {
+  "voxel_max": 0.012,
+  "voxel_min": 0.004,
+  "slab_m": 0.012,
+  "pack_voxel": 0.008,
+  "body_lod0_tris": 5500,
+  "pack_lod0_tris": 900,
+  "lod1_tris": 1800,
+  "shadow_tris": 700,
+  "head_decimate_weight": 0.3,
+  "uv_margin": 0.0025,
+  "cage_extrusion": 0.02,
+  "max_ray_m": 0.05,
+  "bake_margin_px": 8,
+  "bake_samples": 4,
+  "shirt_regions": [
+   "torso",
+   "arm.l",
+   "arm.r"
+  ],
+  "lighten_clip": [
+   0.6,
+   1.25
+  ],
+  "mallet": {
+   "length": 0.62,
+   "grip_from_end": 0.12,
+   "wood": "#8A5E3B"
+  },
+  "close_r": 0.012,
+  "region_smooth_iters": 6,
+  "pack_close_r": 0.006,
+  "smooth_iters": 24,
+  "shadow_voxel": 0.05,
+  "apron_leg_factor": 1.0,
+  "allowed_rings": 2,
+  "items_lod0_tris": 600,
+  "item_voxel": 0.006,
+  "item_close_r": 0.004,
+  "neck_band_m": 0.12,
+  "head_smooth_iters": 2,
+  "rigid_uv_angle": 89,
+  "cap_band_depth_m": 0.32,
+  "mask_open_px": 3,
+  "mask_min_blob_px": 40,
+  "dangle_below_hips_m": 0.25,
+  "zone_leg_below_m": 99.0,
+  "head_bone_reach_m": 99.0,
+  "_note_run8": "zone_leg_below_m 0.22 relabelled 3,070 hip-zone verts as leg: the crotch shells then sat 'between legs', the voxel fell to its minimum and decimation stalled (LOD0 10k). Both run-8 rules are disabled (99) = run-7 behaviour."
+ },
+ "out_dir_remesh": "~/cm-art-trial/builder/game-ready-v2",
+ "weights_rules": {
+  "hip_margin_frac": 0.15,
+  "joint_band_frac": 0.25,
+  "crotch_band_m": 0.06,
+  "hip_band_up_frac": 0.15,
+  "apron_front_m": 0.05,
+  "apron_leg_max": 0.6,
+  "shoulder_band_frac": 0.2,
+  "neck_band_m": 0.04,
+  "smooth_iters": 4,
+  "arm_side_ramp_m": 0.06,
+  "segment_softmin_m": 0.02,
+  "enabled": false,
+  "_note_run12": "Explicit region rules (runs 10-12) scored worse than run 9's heat + zone-hop blend + ring smoothing: clips under 2.5x LOD0 1/32, LOD1 15/32 (run 9: 3/32, 27/32). Kept for the record, off by default. Remaining edges: hip band seam (hips|upperleg vs upperleg|lowerleg at z 0.57-0.67), crotch/apron centre, arm zone edge at the shoulder band."
+ },
+ "weights_overrides": {
+  "knee_margin_m": 0.03,
+  "smooth_iters": 3,
+  "grow_rings": 8,
+  "grow_up_m": 0.12,
+  "grow_min_w": 0.02,
+  "enabled": false
+ }
+}
