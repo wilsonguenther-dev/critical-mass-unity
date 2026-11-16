@@ -538,6 +538,14 @@ namespace CriticalMass.Sim.Config
         public double CooldownTicks = 150;
         /// <summary>DG-22 (not in the browser, U-059): ticks from the throw until the bundle touches down (the TntLanded event; the fuse still counts from the throw) [guess: 0.4 s].</summary>
         public double FlightTicks = 12;
+        /// <summary>b12-jz RULE (Full rules only, off while Depth.Classic): the ATTACK press throws TNT whenever it is ready
+        /// (her default attack: aim point, or the nearest enemy within ThrowRange + BlastRadius when there is no aim, else
+        /// ahead); between throws the attack press is her pry bar (LightWeapons). The DigPlace press still throws too. Same
+        /// Damage and CooldownTicks as before, so her damage-per-second ceiling does not rise (see Demolitions.cs).</summary>
+        public bool ThrowOnAttack = true;
+        /// <summary>b12-jz: an attack throw lands at least this far from her (the crater never opens at her feet; her blast
+        /// never hurts her or her team either way, Demolitions.BlastActors skips her team).</summary>
+        public double MinThrowRange = 2;
 
         public DemolitionsTntConfig Clone() => (DemolitionsTntConfig)MemberwiseClone();
     }

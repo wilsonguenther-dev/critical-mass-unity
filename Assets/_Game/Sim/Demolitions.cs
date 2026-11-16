@@ -599,10 +599,91 @@ namespace CriticalMass.Sim.Core
                 byte pressed = w.Inputs[i].Terraform ? (byte)1 : (byte)0;
                 bool rising = pressed == 1 && s.PrevPressed[i] == 0;
                 s.PrevPressed[i] = pressed;
-                if (!rising || !a.Alive || a.Cls != ClassId.Demolitions || a.StandUp > 0) continue;
-                bool hasAim = w.HasAim[i] == 1;
-                ThrowTnt(w, i, hasAim ? w.Inputs[i].AimX : double.NaN, hasAim ? w.Inputs[i].AimZ : double.NaN);
+                if (!a.Alive || a.Cls != ClassId.Demolitions || a.StandUp > 0) continue;
+                if (rising)
+                {
+                    bool hasAim = w.HasAim[i] == 1;
+                    ThrowTnt(w, i, hasAim ? w.Inputs[i].AimX : double.NaN, hasAim ? w.Inputs[i].AimZ : double.NaN);
+                    continue;
+                }
+                if (AttackThrowsNow(w, i)) ThrowFromAttack(w, i);
             }
+        }
+
+        /// <summary>
+        /// b12-jz RULE: true when Demolitions actor id's ATTACK press throws TNT this step: DemolitionsTnt.ThrowOnAttack on,
+        /// Full rules (not Depth.Classic), attack held, TNT ready, no pry-bar swing cooling down or winding up, not staggered.
+        /// Otherwise the attack press is her pry bar as before (Combat, LightWeapons).
+        /// </summary>
+        public static bool AttackThrowsNow(World w, int id)
+        {
+            Actor a = w.Actors[id];
+            if (a == null || !a.Alive || a.Cls != ClassId.Demolitions || a.StandUp > 0) return false;
+            if (!w.Config.Abilities.DemolitionsTnt.ThrowOnAttack || w.Config.Depth.Classic) return false;
+            if (!w.Inputs[id].Attack || w.Tick < w.Demolitions.TntReadyTick[id]) return false;
+            if (a.AttackCd > 0 || a.SwingPending) return false;
+            if (a.HitStunTicks > 0 && Phys.On(w, true)) return false;
+            return true;
+        }
+
+        /// <summary>
+        /// b12-jz: where an attack throw goes: the aim point, else the nearest living enemy within ThrowRange + BlastRadius
+        /// (index order breaks ties), else NaN (ThrowTnt then throws straight ahead at ThrowRange). A point nearer than
+        /// MinThrowRange is pushed out to it along the same line (along the facing when it is on her). Pure on the world.
+        /// </summary>
+        public static void AttackThrowPoint(World w, int id, out double x, out double z)
+        {
+            DemolitionsTntConfig cfg = w.Config.Abilities.DemolitionsTnt;
+            double px = w.X[id], pz = w.Z[id];
+            x = double.NaN;
+            z = double.NaN;
+            if (w.HasAim[id] == 1)
+            {
+                x = w.Inputs[id].AimX;
+                z = w.Inputs[id].AimZ;
+            }
+            else
+            {
+                double reach = cfg.ThrowRange + cfg.BlastRadius, best = reach * reach;
+                TeamId team = w.Actors[id].Team;
+                for (int j = 0; j < w.ActorCount; j++)
+                {
+                    Actor t = w.Actors[j];
+                    if (t == null || !t.Alive || t.Team == team) continue;
+                    double dx = w.X[j] - px, dz = w.Z[j] - pz, d2 = dx * dx + dz * dz;
+                    if (d2 < best || (d2 == best && double.IsNaN(x)))
+                    {
+                        best = d2;
+                        x = w.X[j];
+                        z = w.Z[j];
+                    }
+                }
+            }
+            if (double.IsNaN(x)) return;
+            double vx = x - px, vz = z - pz, d = Math.Sqrt(vx * vx + vz * vz), min = cfg.MinThrowRange;
+            if (d >= min) return;
+            if (d < 1e-9)
+            {
+                vx = JsMath.Cos(w.Actors[id].Facing);
+                vz = JsMath.Sin(w.Actors[id].Facing);
+                d = 1;
+            }
+            x = JsMath.F32(px + vx / d * min);
+            z = JsMath.F32(pz + vz / d * min);
+        }
+
+        /// <summary>
+        /// b12-jz: the attack-press throw. On success it also spends one attack cooldown (the class AttackCooldown), so this
+        /// step's Combat does not also start a pry-bar swing. Balance: TNT stays 55 per throw every CooldownTicks (150 = 5 s);
+        /// 1.0.868's ceiling was TNT 55 / 5 s + pry bar 9 / 0.75 s = 11 + 12 = 23 per second; now each 5 s holds one throw and
+        /// (5 - 0.65) / 0.75 = 5.8 swings: (55 + 52.2) / 5 = 21.4 per second, not higher.
+        /// </summary>
+        public static int ThrowFromAttack(World w, int id)
+        {
+            AttackThrowPoint(w, id, out double x, out double z);
+            int code = ThrowTnt(w, id, x, z);
+            if (code == TntThrownCode) w.Actors[id].AttackCd = w.Config.Class(ClassId.Demolitions).AttackCooldown;
+            return code;
         }
 
         /// <summary>
