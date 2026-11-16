@@ -165,6 +165,39 @@ raw.data.vertices.foreach_set("co", np.ascontiguousarray(best[2], np.float32).ra
 raw.data.update()
 log("aligned", REP["align"])
 
+# ------------------------------------------------------------------------------------------------ 2b. A-pose
+# Run 4 showed the real mismatch: today's Hero is the raw UNSKINNED to the rig's rest (build_hy3d.py posed the rig into
+# the raw's A-pose, upper arms 32.1 and upper legs 15.2 degrees, then took the mesh back to the rest), so the raw's arms
+# and legs sit away from the skeleton. Pose the rig into the raw's A-pose the same way (fit_pose), work in that pose
+# (cull, bake, weight transfer), then unskin the new mesh to the rest with the same bones, as the Hero was.
+rig.data.pose_position = "POSE"
+A_ = rig.matrix_world.copy()
+J = {b.name: A_ @ b.head_local for b in rig.data.bones}
+PR = best[2]
+REP["pose_fit_deg"] = {}
+for side in ("l", "r"):
+    sg = 1.0 if J["hand." + side].x > 0 else -1.0
+    ext = float(np.max(sg * PR[:, 0]))
+    hand = PR[sg * PR[:, 0] > 0.8 * ext].mean(0)
+    ank = PR[(PR[:, 2] > 0.10) & (PR[:, 2] < 0.20) & (sg * PR[:, 0] > 0.03)].mean(0)
+    for bone, tip, tgt in (("upperarm." + side, "hand." + side, hand), ("upperleg." + side, "foot." + side, ank)):
+        q = (J[tip] - J[bone]).normalized().rotation_difference((Vector(tuple(tgt)) - J[bone]).normalized())
+        pb = rig.pose.bones[bone]
+        Mw = Matrix.Translation(J[bone]) @ q.to_matrix().to_4x4() @ Matrix.Translation(-J[bone]) @ (A_ @ pb.matrix)
+        pb.matrix = A_.inverted() @ Mw
+        bpy.context.view_layer.update()
+        REP["pose_fit_deg"][bone] = round(math.degrees(q.angle), 1)
+dg0 = bpy.context.evaluated_depsgraph_get()
+evr = REF.evaluated_get(dg0)
+mer = evr.to_mesh()
+WP = np.array([tuple(REF.matrix_world @ v.co) for v in mer.vertices])
+evr.to_mesh_clear()
+bvh_old = BVHTree.FromPolygons([tuple(v) for v in WP], [tuple(p.vertices) for p in REF.data.polygons])
+dp, _ = dists(PR[sample_i])
+REP["pose_fit"] = dict(median_m=round(float(np.median(dp)), 5), p90_m=round(float(np.percentile(dp, 90)), 5),
+                       p99_m=round(float(np.percentile(dp, 99)), 5), build_hy3d_reported_deg={"upperarm": 32.1, "upperleg": 15.2})
+log("A-pose", REP["pose_fit_deg"], REP["pose_fit"])
+
 # ------------------------------------------------------------------------------------------------ 3. LOD0 geometry
 low = raw.copy()
 low.data = raw.data.copy()
@@ -466,6 +499,31 @@ dt.layers_vgroup_select_dst = "NAME"
 apply_mod(newo, "DT")
 limit4(newo)
 bpy.data.objects.remove(REFB, do_unlink=True)
+# Unskin to the rest (linear blend, as the armature modifier deforms): rest = (sum w S_b)^-1 posed.
+Mo = newo.matrix_world.copy()
+Moi = Mo.inverted()
+SK = {pb.name: A_ @ pb.matrix @ pb.bone.matrix_local.inverted() @ A_.inverted() for pb in rig.pose.bones}
+gname2 = {g.index: g.name for g in newo.vertex_groups}
+unsk = 0.0
+for v in newo.data.vertices:
+    M = Matrix.Diagonal((0.0, 0.0, 0.0, 0.0))
+    tot = 0.0
+    for g in v.groups:
+        nm = gname2.get(g.group)
+        if nm in SK and g.weight > 0:
+            M = M + SK[nm] * g.weight
+            tot += g.weight
+    if tot <= 0:
+        continue
+    wp = Mo @ v.co
+    rp = (M * (1.0 / tot)).inverted_safe() @ wp
+    unsk = max(unsk, (rp - wp).length)
+    v.co = Moi @ rp
+newo.data.update()
+for pb in rig.pose.bones:
+    pb.matrix_basis = Matrix.Identity(4)
+bpy.context.view_layer.update()
+REP["unskin_max_move_m"] = round(unsk, 4)
 col = newo.data.color_attributes.new("Col", "BYTE_COLOR", "CORNER")   # code 0 (fixed, lined): the outline mask path
 col.data.foreach_set("color", np.tile([1.0, 1.0, 1.0, 0.0], len(col.data)).astype(np.float32))
 newo.data.color_attributes.active_color_name = "Col"
