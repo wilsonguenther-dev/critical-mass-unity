@@ -17,7 +17,7 @@ Measures (Idle, Walk, Run): per frame and per foot, the lowest foot vertex of th
 flag, and planted-foot slide over the cycle at the class's ground speed. Renders: front and side Walk strips with a
 ground line. Usage: blender -b --python bake_clips.py -- <out> <repo> <Class>
 """
-import bpy, sys, os, json, math
+import bpy, sys, os, json, math, re
 import numpy as np
 from mathutils import Vector, Matrix, Quaternion
 
@@ -106,6 +106,28 @@ PLANT = 0.025          # KayKit ankle within 2.5% of leg length of its rest heig
 # KayKit's run stance is 2 frames, and the toe joint is within the game's 0.03 u stance band on the frames either side,
 # where the foot still swings). The anchored, flat stance covers those frames instead.
 PLANT_RUN = {"Builder": float(os.environ.get("BAKE_PLANT_RUN", "0.10")), "Healer": 0.14}.get(CLS)   # rig-healer-3: Healer too (0.36 u/u run slide in the game; 0.205 at 0.10 by check_sheet)
+
+
+# b12-x2: the Healer's run read ragged. Two bake options, OFF for every class unless its env var says otherwise (today's
+# behaviour), with a per-class default dict so a class can be switched on in ONE place:
+#   LOOP_ANCHOR (BAKE_LOOP_ANCHOR=1): locomotion loops are baked over two cycles and the second is kept, so a stance that
+#     runs across the clip's end and start keeps ONE anchored track (before, the anchor restarted at the first frame from
+#     KayKit's scaled foot and the planted foot jumped at the loop seam).
+#   RELEASE_BLEND (BAKE_RELEASE_BLEND=N): for N frames after a stance ends, the anchored-minus-free foot offset fades out
+#     (before, the swing foot snapped from the anchored track back onto KayKit's scaled track in one frame).
+LOOP_ANCHOR = os.environ.get("BAKE_LOOP_ANCHOR", {}.get(CLS, "0")) == "1"
+RELEASE_BLEND = int(os.environ.get("BAKE_RELEASE_BLEND", {}.get(CLS, "0")))
+#   SMOOTH_LOWER (BAKE_SMOOTH_LOWER=1; the Healer's default): in the run-stance clips the hips come down by a SMOOTH,
+#     cyclic version of the per-frame shortfall lowering (a +-2-frame running maximum, then a 1-4-6-4-1 blur, so every
+#     frame is still lowered at least as much as its own targets need). The per-frame lowering gave the Healer's Run a
+#     ragged hips track (clip_measure, b12-x2: bob jerk 0.185 u at frame 15 against 0.08 to 0.10 for KayKit, the Warrior
+#     and Demolitions; extra bumps at frames 3 and 12 where KayKit's hips go down).
+SMOOTH_LOWER = os.environ.get("BAKE_SMOOTH_LOWER", {"Healer": "1"}.get(CLS, "0")) == "1"
+SMOOTH_CLIPS = ("Run", "RunBack", "StrafeL", "StrafeR")
+# b12-x2: bake only some takes (BAKE_TAKES=Attack,...) and export them on top of every other take of an existing clips
+# file (BAKE_SPLICE_INTO=<repo path>), so a class whose other clips came from an older bake keeps them as they are.
+ONLY_TAKES = [c for c in os.environ.get("BAKE_TAKES", "").split(",") if c]
+SPLICE_INTO = os.environ.get("BAKE_SPLICE_INTO", "")
 
 
 def plant_n(clip):
@@ -393,7 +415,12 @@ ATTACK_GAIN = {"Attack": 1.8}
 # Idle pose with flat planted feet (foot IK as Idle); only the hips come down. Angles in degrees, world space at each
 # bone's head: pitch + folds forward (about +X, the body faces -Y), yaw + turns left (about +Z); arm angles turn about
 # the shoulder line, - raises forward; th = mallet direction in the swing plane, 0 up, + toward the back.
-MALLET = CLS == "Builder" and os.environ.get("BAKE_MALLET", "1") == "1"
+# b12-x2: the Demolitions Attack takes the same hand-keyed strike (BAKE_DEMO_STRIKE, on by default for her only): her
+# scaled 1H chop held the pry bar's handle pointing back over her shoulder at contact (clip_measure: handle -0.68 forward,
+# tip proxy 0.13 u BEHIND where it started, weapon hand 0.19 u forward at contact, 0.6 u out to her right), so its tip
+# never came forward through the contact window (C2, batch 12). The strike keeps the clip's frames and contact time.
+MALLET = (CLS == "Builder" and os.environ.get("BAKE_MALLET", "1") == "1") or \
+         (CLS == "Demolitions" and os.environ.get("BAKE_DEMO_STRIKE", "1") == "1")
 MODE = {"mallet": MALLET}
 MALLET_TGT = [None]
 _CT = (CLIP_CONTACT.get("Attack", 0.5667) / CLIP_LEN.get("Attack", 1.0667)) if CLIP_LEN.get("Attack") else 0.531
@@ -627,7 +654,42 @@ def bake_action(clip, act):
     prev_v = {s: None for s in SIDES}
     lowered = 0.0
     gain_q0 = {}
-    for f in range(f0, f1 + 1):
+    # b12-x2 LOOP_ANCHOR: a locomotion loop is walked twice and only the second cycle is recorded, so the anchor and the
+    # release fade carry over the seam. The first cycle leaves out the end frame when it repeats the first (one period).
+    seq = list(range(f0, f1 + 1))
+    loop2 = LOOP_ANCHOR and NEW_BODY and clip in ORDER_CLIPS and bdir is not None and f1 > f0
+    smooth = SMOOTH_LOWER and NEW_BODY and clip in SMOOTH_CLIPS and f1 > f0   # b12-x2: warm-up, measure, record
+    n_c = 0
+    if loop2 or smooth:
+        scene.frame_set(f0)
+        _a0 = snap(kk)
+        scene.frame_set(f1)
+        _a1 = snap(kk)
+        dup = all((_a0["A" + s] - _a1["A" + s]).length < 1e-4 for s in SIDES) and (_a0["hips"] - _a1["hips"]).length < 1e-4
+        cyc_ = list(range(f0, f1 if dup else f1 + 1))
+        n_c = len(cyc_)
+        seq = cyc_ * (2 if smooth else 1) + seq
+        REP.setdefault("loop_anchor" if loop2 else "smooth_lower", {})[clip] = dict(end_repeats_start=bool(dup), cycle_frames=n_c)
+    skip = len(seq) - (f1 - f0 + 1)
+    low_req, low_s = {}, {}
+    rel_off = {s: Vector((0, 0, 0)) for s in SIDES}
+    rel_left = {s: 0 for s in SIDES}
+    for tick, f in enumerate(seq):
+        recording = tick >= skip
+        measuring = smooth and n_c <= tick < 2 * n_c
+        if (smooth or loop2) and not LOOP_ANCHOR and tick in (n_c, skip):
+            anchor = {s: None for s in SIDES}   # without LOOP_ANCHOR every pass bakes the cycle exactly as one pass did
+            rel_left = {s: 0 for s in SIDES}
+        if smooth and tick == skip:
+            cy = sorted(low_req)
+            L_ = [low_req[x] for x in cy]
+            n_ = len(L_)
+            mx = [max(L_[(i + k) % n_] for k in range(-2, 3)) for i in range(n_)]
+            low_s = {cy[i]: sum(w_ * mx[(i + k) % n_] for k, w_ in zip(range(-2, 3), (1, 4, 6, 4, 1))) / 16.0 for i in range(n_)}
+            if f1 not in low_s:
+                low_s[f1] = low_s[f0]
+            REP.setdefault("smooth_lower", {}).setdefault(clip, {}).update(
+                per_frame_before=[round(low_req[x], 4) for x in cy], per_frame_after=[round(low_s[x], 4) for x in cy])
         scene.frame_set(fi0 if MAL else f)
         for pb in faP:
             k = kkP.get(pb.name)
@@ -702,18 +764,26 @@ def bake_action(clip, act):
             planted = (K["A" + s].z - K0["A" + s].z) < (plant_n(clip) if NEW_BODY and clip in ORDER_CLIPS else PLANT) * leg_k
             if planted and bdir is not None:
                 if anchor[s] is None:
-                    anchor[s] = (A.copy(), f)
+                    anchor[s] = (A.copy(), tick)   # tick = f - f0 (+ one period in LOOP_ANCHOR's recorded cycle)
                 a0, fa0 = anchor[s]
-                A.x, A.y = (a0 + bdir * vg_ * (f - fa0) / fps).x, (a0 + bdir * vg_ * (f - fa0) / fps).y
+                _free = A.copy()
+                A.x, A.y = (a0 + bdir * vg_ * (tick - fa0) / fps).x, (a0 + bdir * vg_ * (tick - fa0) / fps).y
+                if RELEASE_BLEND > 0:
+                    rel_off[s] = Vector((A.x - _free.x, A.y - _free.y, 0.0))
+                    rel_left[s] = RELEASE_BLEND
             elif not planted:
                 anchor[s] = None
+                if RELEASE_BLEND > 0 and rel_left[s] > 0:
+                    A += rel_off[s] * (rel_left[s] / (RELEASE_BLEND + 1.0))   # b12-x2: fade the anchored offset out
+                    rel_left[s] -= 1
             z = sole_z(s, A, R)
             ZPRE[s], PL[s], KUP[s] = z, planted, K["A" + s].z - K0["A" + s].z
             if planted:
                 A.z -= z
             elif z < 0:
                 A.z -= z
-            contact[s].append(bool(planted))
+            if recording:
+                contact[s].append(bool(planted))
             targets[s], rots[s] = A, R
         # The game's facing read (SanityRig.TryFront) takes the foot with the LOWER ankle. Pinning planted soles to z 0
         # flipped KayKit's ankle order on a few locomotion frames (Warrior StrafeR frame 18: 3 mm the other way, the
@@ -725,28 +795,41 @@ def bake_action(clip, act):
             if K["A" + hi].z - K["A" + lo].z > 0.0005 and targets[hi].z < targets[lo].z + ORDER_GAP:
                 targets[hi].z = targets[lo].z + ORDER_GAP
         lowered_frame = 0.0
-        for it in range(3):
+        if smooth and recording:
+            # b12-x2 SMOOTH_LOWER: the smoothed lowering, never less than this frame's own need (see SMOOTH_LOWER)
+            lowered_frame = low_s.get(f, 0.0)
+            Hd = Hd - Vector((0, 0, lowered_frame + (1e-4 if lowered_frame > 0 else 0.0)))
             hp = faP["hips"]
             Mw = fa.matrix_world @ hp.matrix
             Mw.translation = Hd
             set_world(fa, hp, Mw)
             upd()
-            short = 0.0
-            for s in SIDES:
-                U = W(fa, faP["upperleg." + s].head)
-                short = max(short, (targets[s] - U).length - 0.995 * (Lt[s] + Ls[s]))
-            if LOWER_PARTIAL and clip in ORDER_CLIPS and short > 1e-5 and lowered_frame + short > MAX_LOWER_CLS:
-                # rig-builder-3: a target out of reach by more than the cap still takes the hips down to the cap (the
-                # old rule then did not lower them at all: the Builder's run toe-off fell 21% short of the anchored
-                # stance, and the game read that as skating)
-                short = MAX_LOWER_CLS - lowered_frame
-                if short <= 1e-5:
+            lowered = max(lowered, lowered_frame)
+        else:
+            for it in range(3):
+                hp = faP["hips"]
+                Mw = fa.matrix_world @ hp.matrix
+                Mw.translation = Hd
+                set_world(fa, hp, Mw)
+                upd()
+                short = 0.0
+                for s in SIDES:
+                    U = W(fa, faP["upperleg." + s].head)
+                    short = max(short, (targets[s] - U).length - 0.995 * (Lt[s] + Ls[s]))
+                if LOWER_PARTIAL and clip in ORDER_CLIPS and short > 1e-5 and lowered_frame + short > MAX_LOWER_CLS:
+                    # rig-builder-3: a target out of reach by more than the cap still takes the hips down to the cap (the
+                    # old rule then did not lower them at all: the Builder's run toe-off fell 21% short of the anchored
+                    # stance, and the game read that as skating)
+                    short = MAX_LOWER_CLS - lowered_frame
+                    if short <= 1e-5:
+                        break
+                elif short <= 1e-5 or lowered_frame + short > MAX_LOWER:
                     break
-            elif short <= 1e-5 or lowered_frame + short > MAX_LOWER:
-                break
-            lowered_frame += short
-            Hd = Hd - Vector((0, 0, short + 1e-4))
-            lowered = max(lowered, short)
+                lowered_frame += short
+                Hd = Hd - Vector((0, 0, short + 1e-4))
+                lowered = max(lowered, short)
+        if measuring:
+            low_req[f] = lowered_frame
         for s in SIDES:
             up, lo, ft, _ = LEG(s)
             H = W(fa, faP[up].head)
@@ -785,14 +868,14 @@ def bake_action(clip, act):
             log("trace", f, "kk ankle z l %.3f r %.3f" % (K["Al"].z, K["Ar"].z), "target z l %.3f r %.3f" % (targets["l"].z, targets["r"].z),
                 "final z l %.3f r %.3f" % (W(fa, faP["foot.l"].head).z, W(fa, faP["foot.r"].head).z),
                 "planted", PL.get("l"), PL.get("r"), "hips z %.3f" % W(fa, faP["hips"].head).z, "upperleg z %.3f" % W(fa, faP["upperleg.l"].head).z)
-        if clip in ("Run", "StrafeR"):
+        if clip in ("Run", "StrafeR") and recording:
             _a = W(fa, faP["foot.l"].head); _t = W(fa, faP["toes.l"].head)
             REP.setdefault("dbg_" + clip, []).append([f, bool(PL.get("l")), [round(targets["l"].x, 3), round(targets["l"].y, 3), round(targets["l"].z, 3)],
                                                      [round(_a.x, 3), round(_a.y, 3), round(_a.z, 3)], [round(_t.x, 3), round(_t.y, 3), round(_t.z, 3)],
                                                      None if anchor["l"] is None else anchor["l"][1]])
         clear_tip(clip)
         hold_slot()
-        for pb in faP:
+        for pb in (faP if recording else ()):   # b12-x2: LOOP_ANCHOR's first cycle is not recorded
             l, q, sc = pb.matrix_basis.decompose()
             if rec[pb.name] and Quaternion(rec[pb.name][-1][1]).dot(q) < 0:
                 q = -q
@@ -825,6 +908,8 @@ for m in arm_mods:
     m.show_viewport = False   # no skinning while baking (speed); back on for the measures
 baked, contacts, lows = {}, {}, {}
 for clip in sorted(acts):
+    if ONLY_TAKES and clip not in ONLY_TAKES:
+        continue
     try:
         new, contact, lowered = bake_action(clip, acts[clip])
         baked[clip], contacts[clip], lows[clip] = new, contact, lowered
@@ -1084,6 +1169,41 @@ try:
             scene.render.filepath = os.path.join(OUT, f"{CLS}_Idle_{vn}.png")
             bpy.ops.render.render(write_still=True)
         cam_d.ortho_scale = 2.6
+    if "Attack" in ONLY_TAKES and "Attack" in baked:
+        # b12-x2: the re-baked Attack from the two gameplay cameras at wind-up (30 %), contact (the clip's hit event) and
+        # follow-through (contact + 15 %), with the stand-in bar; one sheet, rows = cameras, columns = those three moments.
+        a = baked["Attack"]
+        assign(fa, a)
+        f0, f1 = int(a.frame_range[0]), int(a.frame_range[1])
+        moments = [("windup", 0.30), ("contact", _CT), ("follow", min(1.0, _CT + 0.15))]
+        cams = {"gameplay": (Vector((0, -4.2, 2.0 + 4.2 * math.tan(math.radians(55)))), Vector((math.radians(35), 0, 0))),
+                "gameplay34": (Vector((3.0, -3.0, 2.0 + 4.24 * math.tan(math.radians(55)))), Vector((math.radians(35), 0, math.radians(45))))}
+        rx, ry = scene.render.resolution_x, scene.render.resolution_y
+        scene.render.resolution_x = scene.render.resolution_y = 420
+        rows_ = []
+        for vn, (loc, rot) in cams.items():
+            cam.location, cam.rotation_euler = loc, rot
+            cam_d.ortho_scale = 2.8
+            row = []
+            for mn, fr_ in moments:
+                f = f0 + int(round((f1 - f0) * fr_))
+                scene.frame_set(f)
+                p = os.path.join(OUT, f"{CLS}_Attack_{vn}_{mn}_f{f}.png")
+                scene.render.filepath = p
+                bpy.ops.render.render(write_still=True)
+                img = bpy.data.images.load(p)
+                row.append(np.array(img.pixels[:], np.float32).reshape(img.size[1], img.size[0], 4))
+                bpy.data.images.remove(img)
+            rows_.append(np.concatenate(row, axis=1))
+        sheet = np.concatenate(rows_[::-1], axis=0)   # image rows run bottom-up: first camera on top
+        img = bpy.data.images.new(f"{CLS}_Attack_gameplay_sheet", sheet.shape[1], sheet.shape[0])
+        img.pixels = sheet.ravel()
+        img.filepath_raw = os.path.join(OUT, f"{CLS}_Attack_gameplay_sheet.png")
+        img.file_format = "PNG"
+        img.save()
+        REP["attack_render"] = dict(moments={mn: f0 + int(round((f1 - f0) * fr_)) for mn, fr_ in moments}, cameras=list(cams))
+        scene.render.resolution_x, scene.render.resolution_y = rx, ry
+        cam_d.ortho_scale = 2.6
     for clip in ("Walk", "Run", "Idle") + tuple(SKILL):
         rows = [tiles[(clip, vn)] for vn in ("side", "front") if (clip, vn) in tiles]
         if not rows:
@@ -1104,37 +1224,116 @@ except Exception as e:
 # ---------------------------------------------------------------- export <Cls>_Clips.fbx (armature + NLA takes)
 bpy.data.objects.remove(kk, do_unlink=True)
 bpy.data.objects.remove(hero, do_unlink=True)
-fa.name = "Rig"
-ad = fa.animation_data or fa.animation_data_create()
-ad.action = None
-for t in list(ad.nla_tracks):
-    ad.nla_tracks.remove(t)
-for clip, a in sorted(baked.items()):
-    tr = ad.nla_tracks.new()
-    tr.name = clip
-    st = tr.strips.new(clip, int(a.frame_range[0]), a)
-    st.name = clip
-    try:
-        if st.action_slot is None and len(a.slots):
-            st.action_slot = a.slots[0]
-    except Exception:
-        pass
-for ob in list(scene.objects):
-    if ob is not None:
-        ob.select_set(ob is fa)
-bpy.context.view_layer.objects.active = fa
-rest(fa)
-assign(fa, None)
+def export_rig(arm, takes_, path_):
+    """Export arm with one NLA take per clip (the exporter settings every <Cls>_Clips.fbx is written with)."""
+    sc_ = bpy.context.scene
+    arm.name = "Rig"
+    ad = arm.animation_data or arm.animation_data_create()
+    ad.action = None
+    for t in list(ad.nla_tracks):
+        ad.nla_tracks.remove(t)
+    for clip, a in sorted(takes_.items()):
+        tr = ad.nla_tracks.new()
+        tr.name = clip
+        st = tr.strips.new(clip, int(a.frame_range[0]), a)
+        st.name = clip
+        try:
+            if st.action_slot is None and len(a.slots):
+                st.action_slot = a.slots[0]
+        except Exception:
+            pass
+    for ob in list(sc_.objects):
+        if ob is not None:
+            ob.select_set(ob is arm)
+    bpy.context.view_layer.objects.active = arm
+    rest(arm)
+    assign(arm, None)
+    return bpy.ops.export_scene.fbx(filepath=path_, use_selection=True, object_types={"ARMATURE"}, apply_unit_scale=True,
+                                    apply_scale_options="FBX_SCALE_ALL", global_scale=1.0, axis_forward="-Z", axis_up="Y",
+                                    bake_space_transform=True, add_leaf_bones=False, primary_bone_axis="Y",
+                                    secondary_bone_axis="X", use_armature_deform_only=False, armature_nodetype="NULL",
+                                    bake_anim=True, bake_anim_use_all_bones=True, bake_anim_use_nla_strips=True,
+                                    bake_anim_use_all_actions=False, bake_anim_force_startend_keying=True, bake_anim_step=1.0,
+                                    bake_anim_simplify_factor=0.0, use_custom_props=False, path_mode="STRIP")
+
+
+def _rest_local(arm, n):
+    b = arm.data.bones[n]
+    return b.matrix_local if b.parent is None else b.parent.matrix_local.inverted() @ b.matrix_local
+
+
+def retake(src, act, dst, name):
+    """b12-x2: re-key a take of src onto dst keeping every bone's transform relative to its parent (what the FBX take
+    stores and Unity plays), not its matrix_basis (which is relative to a rest that differs between the two rigs)."""
+    assign(src, act)
+    f0, f1 = int(round(act.frame_range[0])), int(round(act.frame_range[1]))
+    nm = [pb.name for pb in dst.pose.bones if pb.name in src.pose.bones]
+    inv = {n: _rest_local(dst, n).inverted() for n in nm}
+    rec_ = {n: [] for n in nm}
+    for f in range(f0, f1 + 1):
+        bpy.context.scene.frame_set(f)
+        upd()
+        for n in nm:
+            pb = src.pose.bones[n]
+            L = pb.matrix if pb.parent is None else pb.parent.matrix.inverted() @ pb.matrix
+            l, q, sc = (inv[n] @ L).decompose()
+            if rec_[n] and Quaternion(rec_[n][-1][1]).dot(q) < 0:
+                q = -q
+            rec_[n].append((tuple(l), tuple(q), tuple(sc)))
+    new = bpy.data.actions.new(name)
+    new.use_fake_user = True
+    assign(dst, new)
+    frames = list(range(f0, f1 + 1))
+    for n in nm:
+        dst.pose.bones[n].rotation_mode = "QUATERNION"
+        for path_, idx, n_ch in (("location", 0, 3), ("rotation_quaternion", 1, 4), ("scale", 2, 3)):
+            for c in range(n_ch):
+                fc = new.fcurve_ensure_for_datablock(dst, f'pose.bones["{n}"].{path_}', index=c)
+                fc.keyframe_points.add(len(frames))
+                kv = np.empty(len(frames) * 2, np.float32)
+                kv[0::2] = frames
+                kv[1::2] = [r[idx][c] for r in rec_[n]]
+                fc.keyframe_points.foreach_set("co", kv)
+                for kp in fc.keyframe_points:
+                    kp.interpolation = "LINEAR"
+                fc.update()
+    assign(dst, None)
+    assign(src, None)
+    return new
+
+
 path = os.path.join(OUT, f"{CLS}_Clips.fbx")
-r = bpy.ops.export_scene.fbx(filepath=path, use_selection=True, object_types={"ARMATURE"}, apply_unit_scale=True,
-                             apply_scale_options="FBX_SCALE_ALL", global_scale=1.0, axis_forward="-Z", axis_up="Y",
-                             bake_space_transform=True, add_leaf_bones=False, primary_bone_axis="Y",
-                             secondary_bone_axis="X", use_armature_deform_only=False, armature_nodetype="NULL",
-                             bake_anim=True, bake_anim_use_all_bones=True, bake_anim_use_nla_strips=True,
-                             bake_anim_use_all_actions=False, bake_anim_force_startend_keying=True, bake_anim_step=1.0,
-                             bake_anim_simplify_factor=0.0, use_custom_props=False, path_mode="STRIP")
+takes = dict(baked)
+if SPLICE_INTO:
+    # b12-x2: the new takes go into the EXISTING clips file in that file's own armature space. A take is the pose bones'
+    # matrix_basis against their rest, and the rest a clips file imports with is not the model's (run 43956735923:
+    # handing the file's takes to the model rig moved every joint up to 0.48 u). So: write the baked takes alone, start
+    # an empty scene, import the existing file (its armature and takes) and the baked-only file (same exporter, same
+    # importer, so the same rest), give the new takes to the existing armature, drop the other one, export.
+    tmp = os.path.join(OUT, "_baked_takes_only.fbx")
+    export_rig(fa, baked, tmp)
+    bpy.ops.wm.read_factory_settings(use_empty=True)
+    base_objs, base_acts = imp(SPLICE_INTO, True)
+    new_objs, new_acts = imp(tmp, True)
+    A_ = next(o for o in base_objs if o.type == "ARMATURE")
+    B_ = next(o for o in new_objs if o.type == "ARMATURE")
+    clip_of = lambda a: re.sub(r"\.\d{3}$", "", a.name.split("|")[-1])
+    takes = {clip_of(a): a for a in base_acts}
+    kept = sorted(c for c in takes if c not in baked)
+    for a in new_acts:
+        if clip_of(a) in baked:
+            takes[clip_of(a)] = retake(B_, a, A_, clip_of(a) + "_spliced")
+    for a in list(takes.values()):
+        a.use_fake_user = True
+    for o in new_objs + [o for o in base_objs if o is not A_]:
+        bpy.data.objects.remove(o, do_unlink=True)
+    REP["splice"] = dict(into=SPLICE_INTO, baked=sorted(baked), kept=kept, tmp=tmp)
+    log("splice into", SPLICE_INTO, "baked", sorted(baked), "kept", len(kept))
+    r = export_rig(A_, takes, path)
+else:
+    r = export_rig(fa, takes, path)
 REP["export"] = dict(path=path, result=list(r), bytes=os.path.getsize(path) if os.path.exists(path) else 0,
-                     takes=len(baked))
+                     takes=len(takes))
 REP["log"] = LOG
 with open(os.path.join(OUT, f"bake_{CLS}.json"), "w") as fh:
     json.dump(REP, fh, indent=1, default=lambda o: list(o) if hasattr(o, "__iter__") else str(o))
