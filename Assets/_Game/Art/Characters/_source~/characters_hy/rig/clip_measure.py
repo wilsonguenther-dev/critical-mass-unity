@@ -39,11 +39,13 @@ BAKES = {
             dict(label="healer_seam_rel3", cls="Healer", env={"BAKE_LOOP_ANCHOR": "1", "BAKE_RELEASE_BLEND": "3"}),
             dict(label="demo_today", cls="Demolitions", env={}),
             dict(label="demo_strike", cls="Demolitions", env={"BAKE_DEMO_STRIKE": "1"})],
-    "final": [dict(label="healer_final", cls="Healer", env={}), dict(label="demo_final", cls="Demolitions", env={})],
+    "final": [dict(label="healer_final", cls="Healer", env={}),
+              dict(label="demo_final", cls="Demolitions",
+                   env={"BAKE_TAKES": "Attack", "BAKE_SPLICE_INTO": "Assets/_Game/Art/Demolitions/Demolitions_Clips.fbx"})],
     "none": [],
 }
 COMMITTED = [  # label, path, clips
-    ("healer_committed", "Assets/_Game/Art/Healer/Healer_Clips.fbx", ("Run", "Walk", "RunBack")),
+    ("healer_committed", "Assets/_Game/Art/Healer/Healer_Clips.fbx", ("Run", "Walk", "StrafeL", "StrafeR")),
     ("demo_committed", "Assets/_Game/Art/Demolitions/Demolitions_Clips.fbx", ("Attack", "Run")),
     ("warrior_ref", "Assets/_Game/Art/Characters/Warrior_Clips.fbx", ("Attack", "Run")),
     ("kaykit_ref", "Assets/_Game/Art/Characters/KayKit_Clips.fbx", ("Attack", "Run")),
@@ -125,6 +127,9 @@ def rest_frame(arm):
 
 
 def sample(arm, act, bones):
+    assign(arm, None)
+    for pb in arm.pose.bones:   # a bone with no curve in this take must not keep the previous take's pose
+        pb.matrix_basis.identity()
     assign(arm, act)
     f0, f1 = int(round(act.frame_range[0])), int(round(act.frame_range[1]))
     sc = bpy.context.scene
@@ -198,7 +203,8 @@ def loco(tag, arm, act, clip, frame0, kk_leg):
     res["hips_z"] = dict(min=r3(min(hz)), max=r3(max(hz)), range=r3(max(hz) - min(hz)), max_step=r3(max(abs(x) for x in d1)),
                          max_jerk=r3(abs(d2[i2])), jerk_frame=cyc[i2]["f"], per_frame=[r3(x) for x in hz])
     say(f"{tag} {clip} hips height range {res['hips_z']['range']} u, largest frame step {res['hips_z']['max_step']} u, "
-        f"largest bob jerk {res['hips_z']['max_jerk']} u at frame {res['hips_z']['jerk_frame']} (smooth bob: jerk well under the step)")
+        f"largest bob jerk {res['hips_z']['max_jerk']} u at frame {res['hips_z']['jerk_frame']} (references 0.08 to 0.10 u)")
+    say(f"{tag} {clip} hips height per frame {res['hips_z']['per_frame']}")
     if "root" in cyc[0]["p"]:
         rz = [c["p"]["root"].z for c in cyc]
         res["root_z_range"] = r3(max(rz) - min(rz))
@@ -410,7 +416,7 @@ for b, od, p, lf in procs:
     say(f"bake {b['label']} exit {rc}, {REP['bakes'][b['label']]['fbx_bytes']} bytes")
     if not os.path.exists(fbx):
         continue
-    clips = ("Run", "Walk", "RunBack") if b["cls"] == "Healer" else ("Attack", "Run")
+    clips = ("Run", "Walk", "StrafeL", "StrafeR") if b["cls"] == "Healer" else ("Attack", "Run")
     REP["files"][b["label"]] = measure(b["label"], fbx, clips, kk_leg)
     committed = {"Healer": "Assets/_Game/Art/Healer/Healer_Clips.fbx", "Demolitions": "Assets/_Game/Art/Demolitions/Demolitions_Clips.fbx"}[b["cls"]]
     try:
