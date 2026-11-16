@@ -218,7 +218,10 @@ namespace CriticalMass.Net.Relay
             return null;
         }
 
-        private ChatChannel Chat => _room != null ? _room.Chat : _client?.Chat;
+        /// <summary>This peer's chat (the host's routing channel, or a joiner's), null before Begin. b11-b: public for the relay tests.</summary>
+        public ChatChannel Chat => _room != null ? _room.Chat : _client?.Chat;
+        /// <summary>b11-b: the peer number the relay gave this connection (-1 before it connects).</summary>
+        public int LocalPeer => _t != null ? _t.LocalPeer : -1;
 
         private void ChatLog()
         {

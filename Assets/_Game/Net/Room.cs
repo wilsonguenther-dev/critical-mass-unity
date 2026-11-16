@@ -123,7 +123,9 @@ namespace CriticalMass.Net
             Chat = new ChatChannel(transport)
             {
                 NameOf = p => Find(p)?.Name ?? "PLAYER",
-                TeamOf = p => (int)(Find(p)?.Team ?? TeamId.Azure),
+                // b11-b: an unknown peer has no team (-1 matches nobody); it used to count as Azure.
+                TeamOf = p => { RoomMember m = Find(p); return m != null ? (int)m.Team : -1; },
+                Knows = p => { RoomMember m = Find(p); return m != null && m.Confirmed; },
                 PeersInRoom = ConfirmedPeers,
             };
         }

@@ -190,6 +190,10 @@ namespace CriticalMass.Net
         /// <summary>Host side: who is called what and on which team (the room or the match fills it).</summary>
         public Func<int, string> NameOf = p => "PLAYER";
         public Func<int, int> TeamOf = p => 0;
+        /// <summary>b11-b: host side: true for a peer whose lines the host may route (a confirmed member of the room). A
+        /// connection the room never confirmed, or refused, is dropped here in the lobby AND in the match (the match
+        /// forwards every chat packet it hears; before this a stranger's line was routed as if it sat on Azure).</summary>
+        public Func<int, bool> Knows = p => true;
         /// <summary>Host side: every human peer currently in the room.</summary>
         public Func<IEnumerable<int>> PeersInRoom = () => Array.Empty<int>();
         /// <summary>Bumps on every new line (the screen redraws when it changes).</summary>
@@ -244,6 +248,7 @@ namespace CriticalMass.Net
             if (_host)
             {
                 // A client asks the host to send; the host never trusts the sender's own name or peer number.
+                if (!Knows(ev.From)) return;
                 if (!TakeToken(ev.From, now)) return;
                 string clean = ChatFilter.CleanLine(text);
                 if (clean.Length > 0) Route(ev.From, scope, clean, now);
@@ -263,6 +268,7 @@ namespace CriticalMass.Net
             w.Str(name, ChatFilter.NameMax);
             w.Str(clean, ChatFilter.MaxLength);
             int team = TeamOf(from);
+            if (scope == ChatScope.Team && team < 0) return;   // b11-b: no known team, so no team to send to
             foreach (int p in PeersInRoom())
             {
                 if (p == Peers.Host) continue;
