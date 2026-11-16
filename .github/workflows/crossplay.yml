@@ -1,0 +1,381 @@
+# b12-w (2026-11-16): Windows-with-Mac cross-play, proven with no human. One match through the deployed room relay
+# (repository variable CM_RELAY_URL) between two GitHub runners, each writing the per-tick fingerprints (tick 0, tick 1,
+# then every 30th tick); compare-hashes.py must print MATCH on every row, and crossplay-check.py must find the same
+# ConfigHash, the same tick-0 world and the same build on both sides. Modes:
+#   players            the BUILT GAME on both sides: the Windows player (StandaloneWindows64, Mono) hosts on windows-latest,
+#                      the macOS player joins on macos-latest (Apple Silicon, like the owner's Mac); both -batchmode
+#                      -nographics, autopilot humans. Players come from a unity-ci run (input unity_ci_run_id, which must
+#                      have the artifacts player-StandaloneWindows64 and player-StandaloneOSX: unity-ci.yml jobs=builds).
+#   console            the .NET 8 console peers (tools/online/HeadlessPeer): Windows hosts, macOS joins (the old
+#                      online-smoke cross-os pair, fixed: see tools/online/wait-room.sh for why it failed on 2026-11-14).
+#   mixed              the Windows player hosts, a Linux .NET 8 console peer joins. Diagnostic only: Mono against .NET 8 is
+#                      not the shipping pair.
+#   mac_host_external  a Windows-runner player joins a room code given as input room_code (the owner's Mac or the Air
+#                      hosts); its fingerprints are uploaded for compare-hashes.py against the host's log.
+# A packaging job (any mode with a unity_ci_run_id) zips the Windows player with tools/package.sh --windows as
+# CriticalMass-<version>-windows.zip + .sha256 and uploads it as a WORKFLOW ARTIFACT (never a release).
+# Rendezvous: the host job makes the room itself just before its game starts (the relay gives a host 2 minutes to
+# connect) and uploads the code as artifact room-<mode>; the joiner waits for that artifact, then joins with retries.
+name: crossplay
+on:
+  workflow_dispatch:
+    inputs:
+      unity_ci_run_id:
+        description: "unity-ci run id whose players to use (needs player-StandaloneWindows64 and player-StandaloneOSX; not needed for console)"
+        default: ''
+      ticks:
+        description: "ticks to play (30 per second; fingerprints every 30th)"
+        default: '1800'
+      mode:
+        description: "players | console | mixed | mac_host_external"
+        type: choice
+        options: [players, console, mixed, mac_host_external]
+        default: players
+      room_code:
+        description: "mac_host_external only: the room code the external host shows"
+        default: ''
+  # Until this file is on main, GitHub cannot dispatch it by name; online-smoke.yml (on main) calls it with its input
+  # crossplay_mode: gh workflow run online-smoke.yml --ref BRANCH -f crossplay_mode=players -f unity_ci_run_id=ID
+  workflow_call:
+    inputs:
+      unity_ci_run_id: { type: string, default: '' }
+      ticks: { type: string, default: '1800' }
+      mode: { type: string, default: players }
+      room_code: { type: string, default: '' }
+permissions:
+  contents: read
+  actions: read
+env:
+  RELAY: ${{ vars.CM_RELAY_URL }}
+  T: ${{ inputs.ticks || '1800' }}
+  DOTNET_CLI_TELEMETRY_OPTOUT: 1
+  DOTNET_NOLOGO: 1
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Relay health and inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          [ -n "$RELAY" ] || { echo "repository variable CM_RELAY_URL is not set"; exit 1; }
+          echo "relay /health: $(curl -sf --max-time 20 "$RELAY/health" || echo FAILED)"
+          curl -sf --max-time 20 "$RELAY/health" > /dev/null
+          M="${{ inputs.mode }}"; R="${{ inputs.unity_ci_run_id }}"
+          if [ "$M" != console ] && [ -z "$R" ]; then echo "mode $M needs unity_ci_run_id (a unity-ci run with both players)"; exit 1; fi
+          if [ "$M" = mac_host_external ] && [ -z "${{ inputs.room_code }}" ]; then echo "mac_host_external needs room_code"; exit 1; fi
+          echo "### crossplay mode=$M ticks=$T unity_ci_run_id=${R:-none}" >> "$GITHUB_STEP_SUMMARY"
+
+  # ---------------------------------------------------------------- Windows PLAYER host (players, mixed)
+  host-player-windows:
+    needs: preflight
+    if: inputs.mode == 'players' || inputs.mode == 'mixed'
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with: { sparse-checkout: tools/online, lfs: false }
+      - uses: actions/download-artifact@v4
+        with:
+          name: player-StandaloneWindows64
+          run-id: ${{ inputs.unity_ci_run_id }}
+          github-token: ${{ github.token }}
+      - name: Unpack and stamp
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path player, out, room | Out-Null
+          tar -xzf player-StandaloneWindows64.tgz -C player
+          if (-not (Test-Path player\CriticalMass.exe)) { Get-ChildItem player; throw "no CriticalMass.exe in the player artifact" }
+          python tools/online/player-stamp.py player | Tee-Object -FilePath out\stamp.txt
+          "runner: $([Environment]::OSVersion.VersionString) $env:PROCESSOR_ARCHITECTURE" | Tee-Object -FilePath out\runner.txt
+      # The host makes its room only once the joiner's game is unpacked and waiting (artifact joiner-ready-<mode>), so the
+      # host never sits alone in the room: in run 43955919705 a lone Windows player host lost its relay connection about
+      # 30 s after ROOM READY (see docs/windows-crossplay.md).
+      - name: Wait until the joiner is ready
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash tools/online/wait-room.sh "joiner-ready-${{ inputs.mode }}" ready 1500 5
+      - name: Make the room (POST /rooms) and publish its code
+        shell: pwsh
+        run: |
+          $r = Invoke-RestMethod -Method Post -Uri "$env:RELAY/rooms"
+          $nb = (python tools/online/player-stamp.py player --field netbuild).Trim()
+          $ver = (python tools/online/player-stamp.py player --field version).Trim()
+          [IO.File]::WriteAllText("$PWD\room\room.txt", "code=$($r.code)`nnetbuild=$nb`nversion=$ver`n")
+          [IO.File]::WriteAllText("$env:RUNNER_TEMP\room-key.txt", $r.key)
+          "code=$($r.code)" | Out-File -Append -Encoding utf8 $env:GITHUB_OUTPUT
+          Write-Host "ROOM $($r.code) for build $nb ($ver)"
+        id: room
+      - uses: actions/upload-artifact@v4
+        with: { name: 'room-${{ inputs.mode }}', path: room/room.txt, retention-days: 1 }
+      - name: Host the match (Windows player, -batchmode -nographics)
+        shell: pwsh
+        timeout-minutes: 35
+        run: |
+          $key = Get-Content "$env:RUNNER_TEMP\room-key.txt" -Raw
+          $a = @('-batchmode','-nographics','-logFile',"$PWD\out\peer.log",'-onlineHost','-onlineCode','${{ steps.room.outputs.code }}','-onlineKey',$key.Trim(),
+                 '-onlineRelay',$env:RELAY,'-onlineHumans','2','-onlineTicks',$env:T,'-onlineHashLog',"$PWD\out\hashes.txt",
+                 '-onlineLobby','540','-onlineTimeout','1800','-onlineName','WindowsHost')
+          $t0 = Get-Date
+          "player start $($t0.ToUniversalTime().ToString('o'))" | Tee-Object -FilePath out\timing.txt
+          $p = Start-Process player\CriticalMass.exe -ArgumentList ($a + @('-timestamps')) -Wait -PassThru
+          "player end $((Get-Date).ToUniversalTime().ToString('o')) after $([int]((Get-Date) - $t0).TotalSeconds) s" | Tee-Object -Append -FilePath out\timing.txt
+          Get-Content out\peer.log -ErrorAction SilentlyContinue | Select-String -Pattern '\[online\]|\[CM\.Online\]|Exception' | Select-Object -Last 60 | ForEach-Object { $_.Line }
+          "exit $($p.ExitCode)" | Tee-Object -FilePath out\exit.txt
+          exit $p.ExitCode
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: side-host, path: out/, retention-days: 7 }
+
+  # ---------------------------------------------------------------- macOS PLAYER join (players)
+  join-player-mac:
+    needs: preflight
+    if: inputs.mode == 'players'
+    runs-on: macos-latest
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { sparse-checkout: tools/online, lfs: false }
+      - uses: actions/download-artifact@v4
+        with:
+          name: player-StandaloneOSX
+          run-id: ${{ inputs.unity_ci_run_id }}
+          github-token: ${{ github.token }}
+      - name: Unpack, sign ad hoc if needed, stamp
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p player out
+          tar -xzf player-StandaloneOSX.tgz -C player
+          APP=$(find player -maxdepth 1 -name '*.app' -type d | head -1)   # not the *_DoNotShip Burst debug folder's copy
+          EXE=$(find "$APP/Contents/MacOS" -type f -perm -u+x | head -1)
+          echo "APP=$APP" >> "$GITHUB_ENV"; echo "EXE=$EXE" >> "$GITHUB_ENV"
+          xattr -cr "$APP" || true
+          codesign --verify "$APP" 2>/dev/null && echo "signature: valid" || { echo "signature: none or broken, signing ad hoc (Apple Silicon will not run unsigned code)"; codesign --force --deep --sign - "$APP"; }
+          { echo "runner: $(sw_vers -productVersion) $(uname -m)"; echo "player slices: $(lipo -archs "$EXE")"; } | tee out/runner.txt
+          python3 tools/online/player-stamp.py "$APP" | tee out/stamp.txt
+          mkdir -p ready && echo "ready=1" > ready/room.txt
+      - uses: actions/upload-artifact@v4
+        with: { name: 'joiner-ready-${{ inputs.mode }}', path: ready/room.txt, retention-days: 1 }
+      - name: Wait for the host's room
+        shell: bash
+        run: bash tools/online/wait-room.sh "room-${{ inputs.mode }}" room 1500 3
+      - name: Join the match (macOS player, -batchmode -nographics)
+        shell: bash
+        timeout-minutes: 35
+        run: |
+          set +e -uo pipefail
+          CODE=$(sed -n 's/^code=//p' room/room.txt)
+          echo "player start $(date -u +%FT%TZ)" | tee out/timing.txt
+          "$EXE" -batchmode -timestamps -nographics -logFile "$PWD/out/peer.log" -onlineJoin "$CODE" -onlineRelay "$RELAY" -onlineTicks "$T" \
+            -onlineTeam crimson -onlineClass Miner -onlineHashLog "$PWD/out/hashes.txt" -onlineJoinTries 80 -onlineTimeout 1800 -onlineName MacJoiner
+          rc=$?
+          echo "player end $(date -u +%FT%TZ)" | tee -a out/timing.txt
+          grep -E '\[online\]|\[CM\.Online\]|Exception' out/peer.log | tail -60 || true
+          echo "exit $rc" | tee out/exit.txt
+          exit $rc
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: side-join, path: out/, retention-days: 7 }
+
+  # ---------------------------------------------------------------- Linux .NET 8 console join (mixed)
+  join-console-linux:
+    needs: preflight
+    if: inputs.mode == 'mixed'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { lfs: false }
+      - uses: actions/setup-dotnet@v4
+        with: { dotnet-version: '8.0.x' }
+      - run: dotnet build tools/online/HeadlessPeer -c Release -nologo -clp:ErrorsOnly
+      - run: mkdir -p ready && echo "ready=1" > ready/room.txt
+      - uses: actions/upload-artifact@v4
+        with: { name: 'joiner-ready-${{ inputs.mode }}', path: ready/room.txt, retention-days: 1 }
+      - name: Wait for the host's room
+        run: bash tools/online/wait-room.sh "room-${{ inputs.mode }}" room 1500 3
+      - name: Join the match (console peer, sends the player's build so the host admits it)
+        shell: bash
+        timeout-minutes: 35
+        run: |
+          set +e -uo pipefail
+          mkdir -p out
+          CODE=$(sed -n 's/^code=//p' room/room.txt); NB=$(sed -n 's/^netbuild=//p' room/room.txt)
+          echo "runner: $(uname -sm)" | tee out/runner.txt
+          dotnet tools/online/HeadlessPeer/bin/Release/net8.0/cm-online-peer.dll -join "$CODE" -relay "$RELAY" -ticks "$T" -team crimson \
+            -class Miner -build "$NB" -hash-log out/hashes.txt -join-tries 80 -timeout 1800 -name LinuxConsole 2>&1 | tee out/peer.log
+          rc=${PIPESTATUS[0]}
+          echo "exit $rc" | tee out/exit.txt
+          exit $rc
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: side-join, path: out/, retention-days: 7 }
+
+  # ---------------------------------------------------------------- .NET 8 console pair (console): Windows hosts, macOS joins
+  console:
+    needs: preflight
+    if: inputs.mode == 'console'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-latest, role: host }
+          - { os: macos-latest, role: join }
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { lfs: false }
+      - uses: actions/setup-dotnet@v4
+        with: { dotnet-version: '8.0.x' }
+      - run: dotnet build tools/online/HeadlessPeer -c Release -nologo -clp:ErrorsOnly
+      - name: Make the room (host) and publish its code
+        if: matrix.role == 'host'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p room
+          J=$(curl -sf -X POST "$RELAY/rooms")
+          echo "$J" | python -c 'import sys,json;d=json.load(sys.stdin);open("room/room.txt","w",newline="\n").write("code="+d["code"]+"\nnetbuild=headless\nversion=console\n");open(sys.argv[1],"w").write(d["key"])' "$RUNNER_TEMP/room-key.txt"
+          cat room/room.txt
+      - uses: actions/upload-artifact@v4
+        if: matrix.role == 'host'
+        with: { name: 'room-${{ inputs.mode }}', path: room/room.txt, retention-days: 1 }
+      - name: Wait for the host's room (joiner)
+        if: matrix.role == 'join'
+        shell: bash
+        run: bash tools/online/wait-room.sh "room-${{ inputs.mode }}" room 1500
+      - name: Play
+        shell: bash
+        timeout-minutes: 35
+        run: |
+          set +e -uo pipefail
+          mkdir -p out
+          echo "runner: $(uname -sm)" | tee out/runner.txt
+          P=tools/online/HeadlessPeer/bin/Release/net8.0/cm-online-peer.dll
+          CODE=$(sed -n 's/^code=//p' room/room.txt)
+          if [ "${{ matrix.role }}" = host ]; then
+            dotnet $P -host -code "$CODE" -key "$(cat "$RUNNER_TEMP/room-key.txt")" -relay "$RELAY" -humans 2 -ticks "$T" \
+              -hash-log out/hashes.txt -lobby 540 -timeout 1800 -name WindowsConsole 2>&1 | tee out/peer.log
+          else
+            dotnet $P -join "$CODE" -relay "$RELAY" -ticks "$T" -team crimson -class Miner -hash-log out/hashes.txt \
+              -join-tries 80 -timeout 1800 -name MacConsole 2>&1 | tee out/peer.log
+          fi
+          rc=${PIPESTATUS[0]}
+          echo "exit $rc" | tee out/exit.txt
+          exit $rc
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: 'side-${{ matrix.role }}', path: out/, retention-days: 7 }
+
+  # ---------------------------------------------------------------- Windows player joins an external host (mac_host_external)
+  join-external-windows:
+    needs: preflight
+    if: inputs.mode == 'mac_host_external'
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with: { sparse-checkout: tools/online, lfs: false }
+      - uses: actions/download-artifact@v4
+        with:
+          name: player-StandaloneWindows64
+          run-id: ${{ inputs.unity_ci_run_id }}
+          github-token: ${{ github.token }}
+      - name: Join the external room (Windows player, -batchmode -nographics)
+        shell: pwsh
+        timeout-minutes: 35
+        run: |
+          New-Item -ItemType Directory -Force -Path player, out | Out-Null
+          tar -xzf player-StandaloneWindows64.tgz -C player
+          python tools/online/player-stamp.py player | Tee-Object -FilePath out\stamp.txt
+          Write-Host "The host's game must be this same build (netbuild above), or the host refuses this joiner."
+          $a = @('-batchmode','-nographics','-logFile',"$PWD\out\peer.log",'-onlineJoin','${{ inputs.room_code }}','-onlineRelay',$env:RELAY,
+                 '-onlineTicks',$env:T,'-onlineTeam','crimson','-onlineHashLog',"$PWD\out\hashes.txt",'-onlineJoinTries','200',
+                 '-onlineTimeout','1800','-onlineName','WindowsRunner')
+          $p = Start-Process player\CriticalMass.exe -ArgumentList $a -Wait -PassThru
+          Get-Content out\peer.log -ErrorAction SilentlyContinue | Select-String -Pattern '\[online\]|\[CM\.Online\]|Exception' | Select-Object -Last 60 | ForEach-Object { $_.Line }
+          "exit $($p.ExitCode)" | Tee-Object -FilePath out\exit.txt
+          Write-Host "Compare with the host's log: python3 tools/online/compare-hashes.py host.txt hashes.txt --min $([int]$env:T / 30 - 2)"
+          exit $p.ExitCode
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: side-join-external, path: out/, retention-days: 7 }
+
+  # ---------------------------------------------------------------- the verdict
+  compare:
+    needs: [preflight, host-player-windows, join-player-mac, join-console-linux, console]
+    if: always() && inputs.mode != 'mac_host_external' && needs.preflight.result != 'failure'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with: { sparse-checkout: tools/online, lfs: false }
+      - uses: actions/download-artifact@v4
+        with: { name: side-host, path: side-host }
+      - uses: actions/download-artifact@v4
+        with: { name: side-join, path: side-join }
+      - name: Same build, same rules, same fingerprints
+        shell: bash
+        run: |
+          set +e -uo pipefail
+          for s in side-host side-join; do echo "== $s"; cat $s/runner.txt $s/stamp.txt $s/exit.txt 2>/dev/null; done
+          SA=; SB=; [ -f side-host/stamp.txt ] && SA="--stamp-a side-host/stamp.txt"; [ -f side-join/stamp.txt ] && SB="--stamp-b side-join/stamp.txt"
+          python3 tools/online/crossplay-check.py side-host/peer.log side-join/peer.log $SA $SB --names host,join | tee check.txt
+          c1=${PIPESTATUS[0]}
+          python3 tools/online/compare-hashes.py side-host/hashes.txt side-join/hashes.txt --min $(( T / 30 - 2 )) | tee hashes.txt
+          c2=${PIPESTATUS[0]}
+          { echo "### crossplay ${{ inputs.mode }}: $(tail -1 hashes.txt)"; echo '```'; cat check.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          [ $c1 -eq 0 ] && [ $c2 -eq 0 ]
+    # preflight is listed through the play jobs; this keeps the expression above valid
+
+  # ---------------------------------------------------------------- the Windows zip (workflow artifact, never a release)
+  package-windows:
+    needs: preflight
+    if: inputs.unity_ci_run_id != '' && inputs.mode != 'console'
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+          sparse-checkout: |
+            tools/package.sh
+            tools/windows-run.ps1
+            tools/online/player-stamp.py
+          sparse-checkout-cone-mode: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: player-StandaloneWindows64
+          run-id: ${{ inputs.unity_ci_run_id }}
+          github-token: ${{ github.token }}
+      - name: Zip the Windows player (tools/package.sh --windows)
+        id: zip
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/win/CriticalMass"
+          tar -xzf player-StandaloneWindows64.tgz -C "$RUNNER_TEMP/win/CriticalMass"
+          V=$(python3 tools/online/player-stamp.py "$RUNNER_TEMP/win/CriticalMass" --field version)
+          python3 tools/online/player-stamp.py "$RUNNER_TEMP/win/CriticalMass"
+          bash tools/package.sh --windows "$RUNNER_TEMP/win/CriticalMass" --version "$V" --out "$PWD/pkg"
+          ls -la pkg; cat pkg/*.sha256
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "### Windows zip: CriticalMass-$V-windows.zip ($(cut -d' ' -f1 pkg/CriticalMass-$V-windows.zip.sha256))" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CriticalMass-${{ steps.zip.outputs.version }}-windows
+          path: |
+            pkg/CriticalMass-${{ steps.zip.outputs.version }}-windows.zip
+            pkg/CriticalMass-${{ steps.zip.outputs.version }}-windows.zip.sha256
+            pkg/FIRST-RUN.txt
+          retention-days: 14

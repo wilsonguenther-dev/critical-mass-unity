@@ -2,16 +2,19 @@
 # DG-57: package a release for testers. Zips the .app only (ditto -c -k --keepParent; Windows: the player files only),
 # leaving out every *DoNotShip* / *ButDontShip* folder, adds FIRST-RUN.txt (with the streamer note and where the game
 # keeps its files) and writes a SHA-256 checksum. Records the Gatekeeper assessment of a quarantined copy.
-#   tools/package.sh [--mac PATH.app] [--windows DIR] [--out DIR]
+#   tools/package.sh [--mac PATH.app] [--windows DIR] [--version V] [--out DIR]
+# b12-w: with --version the zips are named CriticalMass-<V>-windows.zip / CriticalMass-<V>-mac.zip (else CriticalMass-windows.zip /
+# CriticalMass-mac.zip, as before), each with a <zip>.sha256 next to it. Without ditto (not macOS) the Windows zip is made with zip -r -X;
+# .github/workflows/crossplay.yml (job package-windows) runs this on macos-latest on a downloaded Windows player.
 # Defaults: --mac Builds/current/CriticalMass.app, out Builds/packages/<stamp>. Exit 1 when a do-not-ship folder slipped in
 # or the installed size is over 500 MB.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-MAC="$ROOT/Builds/current/CriticalMass.app"; WIN=""; OUT="$ROOT/Builds/packages/$(date -u +%Y%m%dT%H%M%SZ)"
+MAC="$ROOT/Builds/current/CriticalMass.app"; WIN=""; VER=""; OUT="$ROOT/Builds/packages/$(date -u +%Y%m%dT%H%M%SZ)"
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --mac) MAC="${2:?}"; shift 2 ;; --windows) WIN="${2:?}"; shift 2 ;; --out) OUT="${2:?}"; shift 2 ;;
-    *) echo "usage: package.sh [--mac PATH.app] [--windows DIR] [--out DIR]" >&2; exit 64 ;;
+    --mac) MAC="${2:?}"; shift 2 ;; --windows) WIN="${2:?}"; shift 2 ;; --version) VER="${2:?}"; shift 2 ;; --out) OUT="${2:?}"; shift 2 ;;
+    *) echo "usage: package.sh [--mac PATH.app] [--windows DIR] [--version V] [--out DIR]" >&2; exit 64 ;;
   esac
 done
 mkdir -p "$OUT"
@@ -38,7 +41,11 @@ pack() {  # $1 source dir parent, $2 item, $3 zip
   rsync -a --exclude '*DoNotShip*' --exclude '*ButDontShip*' "$1/$2" "$stage/"
   cp "$OUT/FIRST-RUN.txt" "$stage/"
   [[ "$3" == *windows* ]] && cp "$ROOT/tools/windows-run.ps1" "$stage/$2/"
-  (cd "$stage" && ditto -c -k --keepParent "$2" "$3.tmp.zip" && zip -q "$3.tmp.zip" FIRST-RUN.txt && mv "$3.tmp.zip" "$3")
+  if command -v ditto >/dev/null 2>&1; then
+    (cd "$stage" && ditto -c -k --keepParent "$2" "$3.tmp.zip" && zip -q "$3.tmp.zip" FIRST-RUN.txt && mv "$3.tmp.zip" "$3")
+  else
+    (cd "$stage" && zip -q -r -X "$3.tmp.zip" "$2" FIRST-RUN.txt && mv "$3.tmp.zip" "$3")
+  fi
   local mb; mb="$(du -sm "$stage/$2" | awk '{print $1}')"
   rm -rf "$stage"
   (cd "$(dirname "$3")" && shasum -a 256 "$(basename "$3")" > "$(basename "$3").sha256")
@@ -48,14 +55,14 @@ pack() {  # $1 source dir parent, $2 item, $3 zip
   (( mb <= 500 )) || { echo "package: over the 500 MB installed-size budget" >&2; fail=1; }
 }
 if [[ -d "$MAC" ]]; then
-  pack "$(dirname "$MAC")" "$(basename "$MAC")" "$OUT/CriticalMass-mac.zip"
+  pack "$(dirname "$MAC")" "$(basename "$MAC")" "$OUT/CriticalMass${VER:+-$VER}-mac.zip"
   echo "codesign: $(codesign --verify --strict "$MAC" 2>&1 && echo ok)" | tee "$OUT/gatekeeper.txt"
   q="$(mktemp -d)"; ditto "$MAC" "$q/CriticalMass.app"; xattr -w com.apple.quarantine "0081;$(printf %x "$(date +%s)");package.sh;" "$q/CriticalMass.app" || true
   echo "spctl (quarantined copy): $(spctl -a -vv "$q/CriticalMass.app" 2>&1 | tr '\n' ' ')" | tee -a "$OUT/gatekeeper.txt"
   rm -rf "$q"
 fi
 if [[ -n "$WIN" && -d "$WIN" ]]; then
-  pack "$(dirname "$WIN")" "$(basename "$WIN")" "$OUT/CriticalMass-windows.zip"
+  pack "$(dirname "$WIN")" "$(basename "$WIN")" "$OUT/CriticalMass${VER:+-$VER}-windows.zip"
 fi
 echo "$OUT"
 exit $fail

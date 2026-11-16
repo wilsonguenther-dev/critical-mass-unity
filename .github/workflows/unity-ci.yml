@@ -274,9 +274,14 @@ jobs:
   # 1280x720, screenshots) is best effort on WARP and never fails the run; its log and screenshots are uploaded either way.
   # Pass B also traces the Direct3D 11 shader warm-up states (-Trace): the game ships no warm-up file for any API yet
   # (Assets/StreamingAssets/ShaderWarmup is absent), and this is the one D3D11 device we have.
+  # b12-w: runs for jobs=build-windows, builds and all. It ran and passed on jobs=builds (run 43949762033); the "skipped" run
+  # 43933598094 was jobs=build-mac (plan: build-windows=false), so it was right to skip. The old `if:` also carried an
+  # implicit success(): a failed macOS leg of the build matrix skipped the Windows smoke even when the Windows player
+  # built. !cancelled() keeps it running then (a failed Windows leg makes the download below fail, plainly).
+  # Pass A stays required; Pass B stays best effort; Pass B's screenshots and logs (player/test-*/data-b/*.png) upload.
   smoke-windows:
     needs: [plan, build]
-    if: needs.plan.outputs.build-windows == 'true'
+    if: ${{ !cancelled() && needs.plan.outputs.build-windows == 'true' }}
     runs-on: windows-latest
     timeout-minutes: 60
     steps:
