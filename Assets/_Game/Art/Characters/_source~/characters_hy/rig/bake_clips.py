@@ -1287,26 +1287,16 @@ def retake(src, act, dst, name, only=None):
     nm = [pb.name for pb in dst.pose.bones if pb.name in src.pose.bones and (not only or pb.name in only)]
     inv = {n: _rest_local(dst, n).inverted() for n in nm}
     rec_ = {n: [] for n in nm}
-    at_rest = {n: True for n in nm}
     for f in range(f0, f1 + 1):
         bpy.context.scene.frame_set(f)
         upd()
         for n in nm:
             pb = src.pose.bones[n]
-            lb, qb, sb = pb.matrix_basis.decompose()
-            if lb.length > 1e-6 or abs(qb.angle) > 1e-6 or (sb - Vector((1, 1, 1))).length > 1e-6:
-                at_rest[n] = False
             L = pb.matrix if pb.parent is None else pb.parent.matrix.inverted() @ pb.matrix
             l, q, sc = (inv[n] @ L).decompose()
             if rec_[n] and Quaternion(rec_[n][-1][1]).dot(q) < 0:
                 q = -q
             rec_[n].append((tuple(l), tuple(q), tuple(sc)))
-    # b12-x2 (run 43959812574): a bone the new take leaves at its rest (control-toe-roll.r) stays at the existing rig's
-    # rest too. Converted, it carried the 4.2 deg rest difference, and the export wrote that onto all 31 other takes.
-    rest_kept = sorted(n for n in nm if at_rest[n])
-    for n in rest_kept:
-        rec_[n] = [((0.0, 0.0, 0.0), (1.0, 0.0, 0.0, 0.0), (1.0, 1.0, 1.0))] * len(rec_[n])
-    REP.setdefault("retake_rest_kept", {})[name] = rest_kept
     new = bpy.data.actions.new(name)
     new.use_fake_user = True
     assign(dst, new)
