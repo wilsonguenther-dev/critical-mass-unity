@@ -120,12 +120,16 @@ namespace CriticalMass.Runtime.Tests
             Assert.AreSame(m, WeaponProps.MalletMesh(), "built once, shared by every holder");
             Assert.Less(m.triangles.Length / 3, 200, "a few dozen triangles, not a model");
             Assert.AreEqual(WeaponProps.MalletLength, m.bounds.max.y, 0.05f, "handle along +Y up to the head");
-            foreach (string hex in new[] { WeaponProps.MalletWoodHex, WeaponProps.PryBarIronHex })
+            Assert.AreEqual(2, m.subMeshCount, "b12-c2 view: handle and head are their own submeshes");
+            Debug.Log("[WeaponProps] mallet head " + WeaponProps.MalletHeadHex + ", handle " + WeaponProps.MalletHandleHex + ", " + (m.triangles.Length / 3) +
+                " triangles (limit < 200), submeshes " + m.subMeshCount + " (limit 2)");
+            foreach (string hex in new[] { WeaponProps.MalletHeadHex, WeaponProps.MalletHandleHex, WeaponProps.PryBarIronHex })
             {
                 Assert.AreNotEqual(Palette.Azure.ToLowerInvariant(), hex.ToLowerInvariant());
                 Assert.AreNotEqual(Palette.Crimson.ToLowerInvariant(), hex.ToLowerInvariant());
             }
-            Assert.AreNotEqual(WeaponProps.MalletWoodHex, WeaponProps.PryBarIronHex, "the stand-in reads as iron, not the mallet");
+            Assert.AreNotEqual(WeaponProps.MalletHeadHex, WeaponProps.PryBarIronHex, "the stand-in reads as iron, not the mallet");
+            Assert.AreNotEqual(WeaponProps.MalletHeadHex, WeaponProps.MalletHandleHex, "head and handle read apart");
         }
 
         [Test]
