@@ -142,6 +142,52 @@ namespace CriticalMass.Runtime.Tests
             Assert.AreEqual(0, unbound, "clip curves that bind to nothing on BuilderTex");
         }
 
+        // ------------------------------------------------------------------------------------ watertight + stretch table
+
+        [Test]
+        public void EveryLodIsWatertightOnceSeamSplitsAreWelded()
+        {
+            ModelSpec spec = ArtMapping.Spec(ArtMapping.BuilderTex);
+            GameObject root = LoadOrIgnore(spec);
+            foreach (SkinnedMeshRenderer r in root.GetComponentsInChildren<SkinnedMeshRenderer>(true).Where(s => s.name.StartsWith("BuilderTex_", StringComparison.Ordinal)))
+            {
+                Vector3[] v = r.sharedMesh.vertices;
+                int[] tri = r.sharedMesh.triangles;
+                var key = new Dictionary<Vector3, int>();
+                int[] node = new int[v.Length];
+                for (int i = 0; i < v.Length; i++)
+                {
+                    if (!key.TryGetValue(v[i], out int k)) { k = key.Count; key[v[i]] = k; }
+                    node[i] = k;
+                }
+                var edges = new Dictionary<long, int>();
+                for (int t = 0; t < tri.Length; t += 3)
+                    for (int e = 0; e < 3; e++)
+                    {
+                        int a = node[tri[t + e]], b = node[tri[t + (e + 1) % 3]];
+                        long id = (long)Math.Min(a, b) * 1000003L + Math.Max(a, b);
+                        edges[id] = edges.TryGetValue(id, out int c) ? c + 1 : 1;
+                    }
+                int open = edges.Values.Count(c => c == 1), over = edges.Values.Count(c => c > 2);
+                Debug.Log($"[BuilderTexTests] {r.name}: {key.Count} welded vertices, {edges.Count} edges, open {open} (expected 0), shared by more than two faces {over}");
+                Assert.AreEqual(0, open, r.name + " has open edges");
+            }
+        }
+
+        /// <summary>Prints the clip stretch table from the final Blender build (_source~/builder_tex/BuilderTex_stretch.csv):
+        /// longest-edge stretch over every frame of every clip, LOD0/LOD1 vs the current Builder LOD0. Deliberately NOT
+        /// asserted: the single worst edge is stricter than the eye at gameplay size, and the known-imperfect spots (inner
+        /// thigh above the knee, front of the shin, right armpit) are documented as a limitation of this experimental model.</summary>
+        [Test]
+        public void PrintsTheClipStretchTable()
+        {
+            string path = System.IO.Path.Combine(Application.dataPath, "_Game/Art/Characters/_source~/builder_tex/BuilderTex_stretch.csv");
+            if (!System.IO.File.Exists(path)) { Debug.Log("[BuilderTexTests] stretch table absent: " + path); Assert.Ignore("stretch table absent"); }
+            string[] lines = System.IO.File.ReadAllLines(path);
+            Debug.Log("[BuilderTexTests] clip stretch (x rest edge length; max = single worst edge, p999 = 99.9th percentile; not asserted)\n" + string.Join("\n", lines));
+            Assert.Greater(lines.Length, 1);
+        }
+
         // ------------------------------------------------------------------------------------ rest-pose joint cut
 
         static readonly string[] Deform =

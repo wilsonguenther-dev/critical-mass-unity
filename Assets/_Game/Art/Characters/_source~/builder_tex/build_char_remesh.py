@@ -571,6 +571,78 @@ def chain_weights(P, bones, band):
     return Wc / Wc.sum(1, keepdims=True), u
 
 
+def data_overrides(W, Vx, Ex, rigid):
+    """Only provably mis-weighted vertices: (a) below a knee (minus a margin) on that leg's side, weight on hips, spine,
+    chest, head, arms, the other leg or the own upper leg moves to the own lower leg/foot/toes in the proportion the
+    neighbours carry; (b) below the neck, head weight moves to the neighbours' spine/chest/hips. Then ordinary neighbour
+    smoothing on a 2-ring around the changed vertices, the bad bones re-cleared, max 4, normalised."""
+    ov = C["weights_overrides"]; n = len(Vx); W = W.copy(); a_, b_ = Ex[:, 0], Ex[:, 1]
+    if not ov.get("enabled", True): return W, {"enabled": False}       # run 9 weighting
+
+    def nb_avg(M):
+        acc = np.zeros_like(M); np.add.at(acc, a_, M[b_]); np.add.at(acc, b_, M[a_]); return acc
+    changed = np.zeros(n, bool); bad_mask = np.zeros_like(W, dtype=bool); st = {}
+    for s, o_ in (("l", "r"), ("r", "l")):
+        kz = JA["lowerleg." + s][0][2] - ov["knee_margin_m"]
+        side = Vx[:, 0] * np.sign(JA["upperleg." + s][0][0]) > 0
+        good = [BI[b + "." + s] for b in ("lowerleg", "foot", "toes")]
+        badb = [i for i in range(len(DEFORM)) if i not in good]
+        sel = ~rigid & side & (Vx[:, 2] < kz) & (W[:, badb].sum(1) > 1e-3)
+        if not sel.any(): st["calf." + s] = 0; continue
+        G = np.zeros_like(W); G[:, good] = W[:, good]; nbG = nb_avg(G)[sel][:, good]
+        fb = nbG.sum(1) <= 1e-9
+        if fb.any():
+            Dg = np.stack([segdist(Vx[sel][fb], *JA[DEFORM[g]]) for g in good], 1); nbG[fb] = np.eye(len(good))[Dg.argmin(1)]
+        prop = nbG / nbG.sum(1, keepdims=True); moved = W[sel][:, badb].sum(1)
+        Wn = W[sel].copy(); Wn[:, badb] = 0; Wn[:, good] += prop * moved[:, None]; W[sel] = Wn
+        changed |= sel; bm_ = np.zeros(len(DEFORM), bool); bm_[badb] = True; bad_mask[sel] = bm_
+        st["calf." + s] = int(sel.sum())
+        # the same shell continues above the cut: grow edge by edge from fixed vertices while a neighbour still carries
+        # torso / other-leg weight, up to grow_up_m above the knee (there the own upper leg is legitimate and kept)
+        good2 = [BI[b + "." + s] for b in ("upperleg", "lowerleg", "foot", "toes")]
+        bad2 = [i for i in range(len(DEFORM)) if i not in good2]
+        grown = 0; front = sel.copy()
+        for _ in range(ov["grow_rings"]):
+            nb = np.zeros(n, bool); nb[a_[front[b_]]] = True; nb[b_[front[a_]]] = True
+            cand = nb & ~changed & ~rigid & side & (Vx[:, 2] < JA["lowerleg." + s][0][2] + ov["grow_up_m"]) & (W[:, bad2].sum(1) > ov["grow_min_w"])
+            if not cand.any(): break
+            G = np.zeros_like(W); G[:, good2] = W[:, good2]; nbG = nb_avg(G)[cand][:, good2]
+            nbG[nbG.sum(1) <= 1e-9] = np.eye(len(good2))[1]
+            prop = nbG / nbG.sum(1, keepdims=True); moved = W[cand][:, bad2].sum(1)
+            Wn = W[cand].copy(); Wn[:, bad2] = 0; Wn[:, good2] += prop * moved[:, None]; W[cand] = Wn
+            changed |= cand; bm2 = np.zeros(len(DEFORM), bool); bm2[bad2] = True; bad_mask[cand] = bm2
+            grown += int(cand.sum()); front = cand
+        st["calf_grown." + s] = grown
+    nz = JA["head"][0][2]; hb = BI["head"]; tb = [BI["spine"], BI["chest"], BI["hips"]]
+    sel = ~rigid & (Vx[:, 2] < nz) & (W[:, hb] > 1e-3)
+    if sel.any():
+        T = np.zeros_like(W); T[:, tb] = W[:, tb]; nbT = nb_avg(T)[sel][:, tb]
+        nbT[nbT.sum(1) <= 1e-9] = [0, 1, 0]
+        prop = nbT / nbT.sum(1, keepdims=True); moved = W[sel, hb]
+        Wn = W[sel].copy(); Wn[:, hb] = 0; Wn[:, tb] += prop * moved[:, None]; W[sel] = Wn
+        changed |= sel; bad_mask[sel, hb] = True
+    st["head_below_neck"] = int(sel.sum())
+    # (c) hips weight above the chest joint (the armpit/side of the chest) moves to the neighbours' spine/chest
+    cz = JA["chest"][0][2]; hi = BI["hips"]; tb2 = [BI["spine"], BI["chest"]]
+    sel = ~rigid & (Vx[:, 2] > cz) & (W[:, hi] > 1e-3)
+    if sel.any():
+        T = np.zeros_like(W); T[:, tb2] = W[:, tb2]; nbT = nb_avg(T)[sel][:, tb2]; nbT[nbT.sum(1) <= 1e-9] = [0, 1]
+        prop = nbT / nbT.sum(1, keepdims=True); moved = W[sel, hi]
+        Wn = W[sel].copy(); Wn[:, hi] = 0; Wn[:, tb2] += prop * moved[:, None]; W[sel] = Wn
+        changed |= sel; bad_mask[sel, hi] = True
+    st["hips_above_chest"] = int(sel.sum())
+    ring = changed.copy()
+    for _ in range(2):
+        r2 = ring.copy(); r2[a_[ring[b_]]] = True; r2[b_[ring[a_]]] = True; ring = r2
+    ring &= ~rigid
+    deg = np.zeros(n); np.add.at(deg, a_, 1); np.add.at(deg, b_, 1)
+    for _ in range(ov["smooth_iters"]):
+        avg = nb_avg(W) / np.maximum(deg, 1)[:, None]
+        W[ring] = 0.5 * W[ring] + 0.5 * avg[ring]; W[bad_mask] = 0; W = top4(W)
+    st["ring_verts"] = int(ring.sum())
+    return W, st
+
+
 def region_rules(W, Vx, Ex, Lx, rigid, al_s):
     """Explicit regions (A-pose, fitted skeleton) over the heat/zone weights: legs by height and side, the apron,
     the neck line, arms by projection beyond a short shoulder band. Then smoothing that never crosses a class border."""
@@ -684,6 +756,8 @@ def finalize(o, W, tag):
         acc = np.zeros_like(W); np.add.at(acc, Ex[:, 0], W[Ex[:, 1]]); np.add.at(acc, Ex[:, 1], W[Ex[:, 0]])
         W = np.where(al_s, 0.5 * W + 0.5 * acc / np.maximum(deg, 1)[:, None], 0); W = top4(W)
     W, rules = region_rules(W, Vx, Ex, Lx, rigid, al_s)
+    W, fixes = data_overrides(W, Vx, Ex, rigid)
+    rules = dict(rules, overrides=fixes)
     W[W < 1e-3] = 0; W = W / np.maximum(W.sum(1, keepdims=True), 1e-12)
     o.vertex_groups.clear(); vgs = [o.vertex_groups.new(name=b) for b in DEFORM]
     for vi, bi in zip(*np.nonzero(W > 0)): vgs[bi].add([int(vi)], float(W[vi, bi]), "REPLACE")
@@ -716,13 +790,7 @@ while shd.data.uv_layers: shd.data.uv_layers.remove(shd.data.uv_layers[0])
 mr = shd.modifiers.new("R", "REMESH"); mr.mode = "VOXEL"; mr.voxel_size = RM["shadow_voxel"]; mr.adaptivity = 0.0; apply_mod(shd, "R")
 REP["v2_decimate"]["shadow"] = decimate_to(shd, RM["shadow_tris"])
 shd.data.uv_layers.new(name="UVMap")
-W0_ = read_groups(low); V0_, _ = arrays(low); F0_ = faces_of(low)
-bvh0 = BVHTree.FromPolygons(V0_.tolist(), F0_.tolist()); V1_, _ = arrays(lod1); W1in = np.zeros((len(V1_), len(DEFORM)))
-for i, p_ in enumerate(V1_):
-    co_, _, fi, _ = bvh0.find_nearest(Vector(p_)); tri = V0_[F0_[fi]]
-    bc = np.linalg.lstsq(np.vstack([tri.T, np.ones(3)]), np.append(np.array(co_), 1.0), rcond=None)[0].clip(0, 1); bc /= bc.sum()
-    W1in[i] = bc @ W0_[F0_[fi]]
-REP["weights"]["LOD1"] = finalize(lod1, W1in, lod1.name)
+REP["weights"]["LOD1"] = finalize(lod1, read_groups(lod1), lod1.name)
 V1, _ = arrays(lod1); W1 = read_groups(lod1); kd1 = KDTree(len(V1))
 for i, p in enumerate(V1): kd1.insert(p, i)
 kd1.balance()

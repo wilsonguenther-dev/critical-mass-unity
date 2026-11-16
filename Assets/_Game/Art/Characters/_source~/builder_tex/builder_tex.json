@@ -119,5 +119,13 @@
   "segment_softmin_m": 0.02,
   "enabled": false,
   "_note_run12": "Explicit region rules (runs 10-12) scored worse than run 9's heat + zone-hop blend + ring smoothing: clips under 2.5x LOD0 1/32, LOD1 15/32 (run 9: 3/32, 27/32). Kept for the record, off by default. Remaining edges: hip band seam (hips|upperleg vs upperleg|lowerleg at z 0.57-0.67), crotch/apron centre, arm zone edge at the shoulder band."
+ },
+ "weights_overrides": {
+  "knee_margin_m": 0.03,
+  "smooth_iters": 3,
+  "grow_rings": 8,
+  "grow_up_m": 0.12,
+  "grow_min_w": 0.02,
+  "enabled": false
  }
 }

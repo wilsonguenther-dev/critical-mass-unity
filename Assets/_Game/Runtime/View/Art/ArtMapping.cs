@@ -416,11 +416,13 @@ namespace CriticalMass.Runtime.View.Art
             // Batch 12 textured Builder pilot (-builderTex 1, build_char_tex.py): UV-mapped LOD0 (~7,000 tris), LOD1 (~1,800) and Shadow
             // (<800) with a 1024 base colour (team cloth in its alpha), on the rig-builder-4 skeleton and its Builder_Clips (baked per
             // class with foot IK, hip-height ratio 1.31 = StrideScale). Empty hands: the game hangs the mallet on handslot.r
-            // (HeldWeaponInMesh false). Height: the bind-pose LOD0 top, the chair on his back (2.3042 m).
+            // (HeldWeaponInMesh false). Height: the bind-pose LOD0 top, the chair on his back (2.3143 m).
+            // EXPERIMENTAL: weights at the inner thigh above the knee, the front of the shin and the right armpit are imperfect
+            // (see _source~/builder_tex/README.md); selected only by -builderTex 1.
             new ModelSpec { Key = BuilderTex, AssetPath = "Assets/_Game/Art/Characters/BuilderTex/BuilderTex.fbx", Kind = ArtKind.Character, Rigged = true,
                 Bones = 41, ClipSource = "Assets/_Game/Art/Builder/Builder_Clips.fbx",
                 Meshes = new[] { "BuilderTex_LOD0", "BuilderTex_LOD1", "BuilderTex_Shadow" }, MaskCodes = new[] { 0 },
-                OutlinePx = CharacterHullPx, Rim = 0.6f, Authored = BuilderAzure, Crimson = BuilderCrimson, Height = 2.3042f,
+                OutlinePx = CharacterHullPx, Rim = 0.6f, Authored = BuilderAzure, Crimson = BuilderCrimson, Height = 2.3143f,
                 StrideScale = 1.31f, ArtYawDeg = 180f },
             // rig-healer-1 (2026-11-14): the generated Healer body (octree shell; Hero 21.6k, LOD0 3.9k, LOD1 1.5k, Shadow 0.7k
             // tris) on the shared 41 skeleton names, whole-hand weights, leaf wings rigid on the chest (rig_body.py), clips baked
