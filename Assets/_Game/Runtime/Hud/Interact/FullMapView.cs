@@ -49,6 +49,8 @@ namespace CriticalMass.Runtime.Hud.Interact
         RectTransform _root, _space, _panel, _viewport, _mapLayer, _markers;
         RawImage _image;
         MinimapGround _ground;
+        /// <summary>Batch 12 item P: the fog-of-war grey over the map image (shown only while the fog is drawn).</summary>
+        global::CriticalMass.Runtime.View.Fog.FogMapLayer _fog;
         Texture2D _tex;
         int _tier = 2;
 
@@ -192,6 +194,11 @@ namespace CriticalMass.Runtime.Hud.Interact
             _ground = g.gameObject.AddComponent<MinimapGround>();
             _ground.raycastTarget = false;
             _ground.Bind(_proj, MinimapGeometry.BakedMap);
+            // Batch 12 item P: the fog-of-war grey over the image and ground changes, under every marker (pans and zooms with the map)
+            RectTransform fg = MenuUi.Rt(_mapLayer, "Fog Of War");
+            MenuUi.Stretch(fg);
+            _fog = fg.gameObject.AddComponent<global::CriticalMass.Runtime.View.Fog.FogMapLayer>();
+            _fog.Bind(_proj);
             _markers = MenuUi.Rt(_viewport, "Markers");
             MenuUi.Stretch(_markers);
             _fit = Mathf.Min(ViewW / _proj.Width, ViewH / _proj.Height);
@@ -516,6 +523,7 @@ namespace CriticalMass.Runtime.Hud.Interact
             HudState s = _state;
             MapDef map = w.Map;
             _ground.Watch(map, w.GridVersion);
+            if (_fog != null) _fog.Sync();
             TeamId mine = s.HasPlayer ? s.Team : TeamId.Azure;
 
             // side column
@@ -578,7 +586,9 @@ namespace CriticalMass.Runtime.Hud.Interact
                     bool ally = a.Team == mine;
                     m.Enemy = !ally;
                     m.Respawning = !a.Alive && ally;
-                    on = a.Alive ? (ally || MapRules.Seen(w, i, mine, w.ActorCount)) : m.Respawning;
+                    // Batch 12 item P: with the fog drawn an enemy marker follows the fog; without it, the older MapRules.Seen
+                    bool seen = global::CriticalMass.Runtime.View.Fog.FogOfWar.Active ? !global::CriticalMass.Runtime.View.Fog.FogOfWar.Hides(i) : MapRules.Seen(w, i, mine, w.ActorCount);
+                    on = a.Alive ? (ally || seen) : m.Respawning;
                     if (on) Fill(m, w, i, a, ally, respawnCount);
                 }
                 m.Shown = on;
