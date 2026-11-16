@@ -138,5 +138,26 @@ namespace CriticalMass.Runtime.Game
         static void LogOnce() => Debug.Log("[CM.Sharp] " + Describe(Off) + " (" + Flag + " <list> turns them off)");
 
         // ---------------------------------------------------------------------------------------- consumers
+
+        /// <summary>
+        /// Sharpness switch "msaa": 2x MSAA on the URP asset the High level uses (Very High and Ultra share it), set once at
+        /// start in a player. Players only, like FrameGovernor's render scale: in a player the asset is an in-memory object,
+        /// so the project's .asset file never changes (in the editor nothing is touched). Off: nothing is touched (authored 1).
+        /// </summary>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        static void ApplyMsaa()
+        {
+            if (Application.isEditor || !Msaa) return;
+            int levels = QualitySettings.names.Length;
+            for (int i = 0; i < levels; i++)
+            {
+                if (QualitySettings.GetRenderPipelineAssetAt(i) is UnityEngine.Rendering.Universal.UniversalRenderPipelineAsset a)
+                {
+                    int want = MsaaFor(i, true);
+                    if (i >= FramePolicy.LevelHigh || a.msaaSampleCount != want) a.msaaSampleCount = Mathf.Max(a.msaaSampleCount, want);
+                }
+            }
+            Debug.Log("[CM.Sharp] msaa: High URP asset " + MsaaFor(FramePolicy.LevelHigh, true) + "x, Medium and Low unchanged");
+        }
     }
 }
