@@ -154,7 +154,10 @@ def sample(arm, act, bones):
 
 
 def qang(a, b):
-    return math.degrees(a.rotation_difference(b).angle) if a is not None and b is not None else 0.0
+    if a is None or b is None:
+        return 0.0
+    d = math.degrees(a.rotation_difference(b).angle)
+    return min(d, 360.0 - d)   # q and -q are the same turn
 
 
 def keyed(act):
@@ -507,6 +510,7 @@ def deep_check(spliced, committed, model):
                 dp = (x[n].translation - y[n].translation).length
                 dr = math.degrees(x[n].to_3x3().normalized().to_quaternion().rotation_difference(
                     y[n].to_3x3().normalized().to_quaternion()).angle)
+                dr = min(dr, 360.0 - dr)   # q and -q are the same turn (run 43961106736 printed toes.r 360.0000 deg)
                 if n == ctr and n not in watch:
                     ctr_max = [max(ctr_max[0], dp), max(ctr_max[1], dr)]
                     continue
