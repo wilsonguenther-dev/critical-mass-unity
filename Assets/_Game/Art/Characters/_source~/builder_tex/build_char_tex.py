@@ -845,7 +845,9 @@ for act in sorted(bpy.data.actions, key=lambda a: a.name):
                 wi = np.nonzero(ok)[0][r.argmax()]
                 mid = (R0[E[wi, 0]] + R0[E[wi, 1]]) / 2
                 bd = {b: float(segdist(mid[None], *JR[b])[0]) for b in DEFORM}
-                row[k].update(max=round(mx_, 3), worst_frame=f, worst_bone=min(bd, key=bd.get), worst_at=np.round(mid, 3).tolist())
+                gn_ = {g.index: g.name for g in o.vertex_groups}
+                vb_ = [sorted(((gn_[g.group], round(g.weight, 2)) for g in o.data.vertices[int(E[wi, j])].groups if g.weight > 0.01), key=lambda t: -t[1]) for j in (0, 1)]
+                row[k].update(max=round(mx_, 3), worst_frame=f, worst_bone=min(bd, key=bd.get), worst_at=np.round(mid, 3).tolist(), worst_edge_weights=vb_)
             row[k]["p999"] = round(max(row[k]["p999"], float(np.percentile(r, 99.9))), 3)
     stretch[act.name.split("|")[-1]] = row
     log("stretch %-14s" % act.name.split("|")[-1], " | ".join("%s max %.2f p99.9 %.2f (%s f%d)" % (k, v["max"], v["p999"], v["worst_bone"], v["worst_frame"]) for k, v in row.items()))

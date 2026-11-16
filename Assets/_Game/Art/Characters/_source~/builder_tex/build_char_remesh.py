@@ -45,7 +45,7 @@ _m_proof = "# " + "=" * 96 + " clip proof\n"
 assert _m_lod0 in _src and _m_proof in _src
 exec(compile(_src[:_src.index(_m_lod0)], P1, "exec"), globals())          # rig, raw, align, A-pose, parts
 RM = C["remesh"]
-REG = ["torso", "head", "arm.l", "arm.r", "leg.l", "leg.r", "pack", "zarm.l", "zarm.r", "zleg.l", "zleg.r"]
+REG = ["torso", "head", "arm.l", "arm.r", "leg.l", "leg.r", "pack", "zarm.l", "zarm.r", "zleg.l", "zleg.r", "item"]
 RI = {r: i for i, r in enumerate(REG)}
 UVREG = {"torso": "torso", "zarm.l": "torso", "zarm.r": "torso", "zleg.l": "torso", "zleg.r": "torso"}
 
@@ -72,6 +72,12 @@ for s in ("l", "r"):
         reg &= Vr[:, 0] * np.sign(JA[chain[0] + "." + s][0][0]) > 0
         if rep_c[kind + "." + s]["welded"]: reg &= np.isin(near_r, ch)
         L[reg & ~item & ~pack] = RI[kind + "." + s]
+# the hip spheres are wide (x1.75): shell that falls inside one but hangs well below the hip joint (the piece behind
+# the left calf) belongs to that leg, not to the hip blend zone
+for s in ("l", "r"):
+    low_zone = (L == RI["zleg." + s]) & (Vr[:, 2] < JA["upperleg." + s][0][2] - RM["zone_leg_below_m"])
+    L[low_zone] = RI["leg." + s]
+    REP.setdefault("v2_zone_to_leg", {})[s] = int(low_zone.sum())
 hz_ = JA["head"][0][2] - 0.04
 L[(near_r == BI["head"]) & (Vr[:, 2] > hz_) & (L == RI["torso"])] = RI["head"]
 for u in np.unique(lab[item]):                    # loose items: region of the part they hang on
@@ -82,6 +88,25 @@ for u in np.unique(lab[item]):                    # loose items: region of the p
     elif bb == "head": L[m] = RI["head"]
     else: L[m] = RI["torso"]
 L[pack] = RI["pack"]
+IB = -np.ones(len(Vr), int)
+rigid_item = np.zeros(len(Vr), bool)
+REP["v2_rigid_items"] = []
+for u in np.unique(lab[item]):
+    m = (lab == u) & item & ~pack
+    if not m.any() or L[m][0] in (RI["arm.l"], RI["arm.r"]): continue        # held / glove pieces stay with the hand
+    c = Vr[m].mean(0); top = Vr[m, 2].max()
+    if top > JA["hips"][0][2] - 0.25 and c[2] < JA["spine"][1][2]: bname = "hips"     # hangs from the belt
+    else:
+        dd = {b: float(segdist(c[None], *JA[b])[0]) for b in DEFORM}; bname = min(dd, key=dd.get)
+    IB[m] = BI[bname]; rigid_item |= m; L[m] = RI["item"]
+    REP["v2_rigid_items"].append(dict(verts=int(m.sum()), centroid=np.round(c, 3).tolist(), bone=bname))
+# dangling body geometry: torso-labelled pieces of the main shell below the knee line (tools hung from the belt, the
+# piece behind the left calf) are cut off too, rigid on the hips, so the leg never drags them
+dang = (L == RI["torso"]) & ~pack & ~speck & (Vr[:, 2] < JA["hips"][0][2] - RM["dangle_below_hips_m"])
+IB[dang] = BI["hips"]; rigid_item |= dang; L[dang] = RI["item"]
+REP["v2_dangling_cut"] = dict(verts=int(dang.sum()), bbox=[Vr[dang].min(0).round(3).tolist(), Vr[dang].max(0).round(3).tolist()] if dang.any() else None)
+log("v2 dangling cut", REP["v2_dangling_cut"])
+log("v2 rigid items", len(REP["v2_rigid_items"]), json.dumps(REP["v2_rigid_items"])[:1500])
 LIMB_OTHERS = {"arm.l": ["torso", "head", "leg.l", "leg.r", "arm.r", "zleg.l", "zleg.r"],
                "arm.r": ["torso", "head", "leg.l", "leg.r", "arm.l", "zleg.l", "zleg.r"],
                "leg.l": ["leg.r", "arm.l", "arm.r"], "leg.r": ["leg.l", "arm.l", "arm.r"]}
@@ -107,7 +132,7 @@ def gaps(V, Lx, E=None):
     return out
 
 
-body_raw = ~speck & ~pack
+body_raw = ~speck & ~pack & ~rigid_item
 G0 = gaps(Vr[body_raw], L[body_raw])
 gmin = min(v["min_m"] for v in G0.values() if v)
 REP["v2_raw_gaps"] = G0
@@ -136,9 +161,27 @@ for i, p in enumerate(Vr): kdr.insert(p, i)
 kdr.balance()
 
 
+bodyonly = ~pack & ~rigid_item & ~speck
+kdb = KDTree(int(bodyonly.sum())); _bi = np.nonzero(bodyonly)[0]
+for i, p in enumerate(Vr[bodyonly]): kdb.insert(p, i)
+kdb.balance()
+
+
 def labels_of(o):
-    Vx, _ = arrays(o)
-    return np.array([L[kdr.find(p)[1]] for p in Vx])
+    """Nearest raw vertex's region, decided per connected piece: a piece that is mostly pack/item (it came from the pack
+    or items object) is all pack/item; in any other piece a vertex that merely lies near a pack strap or a belt item
+    takes the nearest BODY region instead."""
+    Vx, Ex = arrays(o)
+    Lx = np.array([L[kdr.find(p)[1]] for p in Vx])
+    lc = components(len(Vx), Ex)
+    for u in np.unique(lc):
+        m = lc == u; rg = np.isin(Lx[m], [RI["pack"], RI["item"]])
+        if rg.mean() >= 0.5:
+            Lx[m] = RI["pack"] if (Lx[m] == RI["pack"]).sum() >= (Lx[m] == RI["item"]).sum() else RI["item"]
+        else:
+            for i in np.nonzero(m)[0]:
+                if Lx[i] in (RI["pack"], RI["item"]): Lx[i] = L[_bi[kdb.find(Vx[i])[1]]]
+    return Lx
 
 
 # ================================================================================================ 2. remesh
@@ -209,6 +252,8 @@ CR = RM["close_r"]; VOXC = float(np.clip((gmin - 2 * CR) / 2.4, RM["voxel_min"],
 REP["v2_close"] = dict(close_r=CR, voxel_m=VOXC)
 REP["v2_remesh"] = {"body": remesh(body, VOXC, CR), "pack": remesh(pk, RM["pack_voxel"], RM["pack_close_r"])}
 REP["v2_remesh"]["body"].update(surface_check(body)); REP["v2_remesh"]["pack"].update(surface_check(pk))
+itm = part_copy("Items", rigid_item)
+REP["v2_remesh"]["items"] = remesh(itm, RM["item_voxel"], RM["item_close_r"]); REP["v2_remesh"]["items"].update(surface_check(itm))
 Vb, Eb = arrays(body); Lb = labels_of(body)
 REP["v2_remesh_gaps"] = gaps(Vb, Lb, Eb)
 log("v2 remesh", json.dumps(REP["v2_remesh"]), "gaps", json.dumps(REP["v2_remesh_gaps"]))
@@ -233,9 +278,21 @@ Lb = labels_of(body)
 dg_ = body.vertex_groups.new(name="dense")
 dg_.add(list(range(len(Lb))), 1.0, "REPLACE")
 dg_.add(np.nonzero(Lb == RI["head"])[0].tolist(), RM["head_decimate_weight"], "REPLACE")
-REP["v2_decimate"] = {"body": decimate_to(body, RM["body_lod0_tris"], "dense"), "pack": decimate_to(pk, RM["pack_lod0_tris"])}
+REP["v2_decimate"] = {"body": decimate_to(body, RM["body_lod0_tris"], "dense"), "pack": decimate_to(pk, RM["pack_lod0_tris"]),
+                     "items": decimate_to(itm, RM["items_lod0_tris"])}
 body.vertex_groups.clear()
-REP["v2_lod0_parts"] = {"body": surface_check(body), "pack": surface_check(pk)}
+Lb = labels_of(body); Vb_, _ = arrays(body)
+headish = (Lb == RI["head"]) | (np.linalg.norm(Vb_ - JA["head"][0], axis=1) < RM["neck_band_m"])
+bm = bmesh.new(); bm.from_mesh(body.data); bm.verts.ensure_lookup_table(); bm.faces.ensure_lookup_table()
+hv_ = [bm.verts[i] for i in np.nonzero(headish)[0]]
+for _ in range(RM["head_smooth_iters"]):
+    bmesh.ops.smooth_vert(bm, verts=hv_, factor=0.5, use_axis_x=True, use_axis_y=True, use_axis_z=True)
+hf_ = [f for f in bm.faces if all(headish[v.index] for v in f.verts)]
+he_ = list({e for f in hf_ for e in f.edges if all(headish[v.index] for v in e.verts)})
+bmesh.ops.beautify_fill(bm, faces=hf_, edges=he_)
+bm.to_mesh(body.data); bm.free()
+REP["v2_head_cleanup"] = dict(verts=int(headish.sum()), faces=len(hf_), smooth_iters=RM["head_smooth_iters"])
+REP["v2_lod0_parts"] = {"body": surface_check(body), "pack": surface_check(pk), "items": surface_check(itm)}
 Lb = labels_of(body); Fb = faces_of(body)
 REP["v2_lod0_head_tris"] = int((np.array([np.bincount(Lb[f], minlength=len(REG)).argmax() for f in Fb]) == RI["head"]).sum())
 log("v2 LOD0 parts", json.dumps(REP["v2_lod0_parts"]), "head tris", REP["v2_lod0_head_tris"])
@@ -292,14 +349,17 @@ def unwrap_regions(o):
 
 
 fr_body, nseam = unwrap_regions(body)
-pk.data.uv_layers.new(name="UVMap"); sel_only([pk], pk)
-bpy.ops.object.mode_set(mode="EDIT"); bpy.ops.mesh.select_all(action="SELECT")
-bpy.ops.uv.smart_project(angle_limit=math.radians(66), island_margin=RM["uv_margin"], area_weight=0.0, correct_aspect=True, scale_to_bounds=False)
-bpy.ops.object.mode_set(mode="OBJECT")
-fr_all = np.concatenate([fr_body, np.array(["pack"] * len(pk.data.polygons))])
-with bpy.context.temp_override(active_object=body, object=body, selected_objects=[body, pk], selected_editable_objects=[body, pk]):
+for o_ in (pk, itm):                   # rigid pieces: few big islands (the chair's slats merged by the wide angle)
+    o_.data.uv_layers.new(name="UVMap"); sel_only([o_], o_)
+    bpy.ops.object.mode_set(mode="EDIT"); bpy.ops.mesh.select_all(action="SELECT")
+    bpy.ops.uv.smart_project(angle_limit=math.radians(RM["rigid_uv_angle"]), island_margin=RM["uv_margin"], area_weight=0.0, correct_aspect=True, scale_to_bounds=False)
+    bpy.ops.object.mode_set(mode="OBJECT")
+with bpy.context.temp_override(active_object=body, object=body, selected_objects=[body, pk, itm], selected_editable_objects=[body, pk, itm]):
     bpy.ops.object.join()
 low = body; low.name = low.data.name = KEY + "_LOD0"
+_Ll = labels_of(low)
+fr_all = np.array([UVREG.get(REG[np.bincount(_Ll[list(p_.vertices)], minlength=len(REG)).argmax()], REG[np.bincount(_Ll[list(p_.vertices)], minlength=len(REG)).argmax()]) for p_ in low.data.polygons])
+fr_all = np.where(fr_all == "item", "pack", fr_all)     # rigid pieces share the pack's UV/mask class (fixed colour)
 sel_only([low], low)
 bpy.ops.object.mode_set(mode="EDIT"); bpy.ops.mesh.select_all(action="SELECT"); bpy.ops.uv.select_all(action="SELECT")
 bpy.ops.uv.average_islands_scale()
@@ -311,7 +371,10 @@ if hm.any():
     cen = uvl[hm].reshape(-1, 2).mean(0); uvl[hm] = cen + (uvl[hm] - cen) * C["head_uv_scale"]
 low.data.uv_layers[0].data.foreach_set("uv", uvl.ravel())
 bpy.ops.object.mode_set(mode="EDIT"); bpy.ops.mesh.select_all(action="SELECT"); bpy.ops.uv.select_all(action="SELECT")
-bpy.ops.uv.pack_islands(rotate=True, margin=RM["uv_margin"], margin_method="FRACTION", shape_method="CONCAVE")
+try:
+    bpy.ops.uv.pack_islands(rotate=True, rotate_method="ANY", margin=RM["uv_margin"], margin_method="FRACTION", shape_method="CONCAVE")
+except TypeError:
+    bpy.ops.uv.pack_islands(rotate=True, margin=RM["uv_margin"], margin_method="FRACTION", shape_method="CONCAVE")
 bpy.ops.object.mode_set(mode="OBJECT")
 uvl = np.zeros(len(low.data.loops) * 2); low.data.uv_layers[0].data.foreach_get("uv", uvl); uvl = uvl.reshape(-1, 3, 2)
 F0 = faces_of(low); V0, E0 = arrays(low)
@@ -356,7 +419,7 @@ REP["bake"] = dict(result=list(r), engine="CYCLES selected-to-active", cage_extr
 
 # region raster (UV space), dilated into the bake margin
 def raster_regions(o, fr):
-    reg = -np.ones((TEX, TEX), int)
+    reg = -np.ones((TEX, TEX), int); zm = np.zeros((TEX, TEX)); Vq, _ = arrays(o); Fq = faces_of(o)
     u = np.zeros(len(o.data.loops) * 2); o.data.uv_layers[0].data.foreach_get("uv", u); u = u.reshape(-1, 3, 2)
     for t in range(len(u)):
         P = u[t] * TEX - 0.5
@@ -370,11 +433,12 @@ def raster_regions(o, fr):
         w1 = ((c[1] - a[1]) * (gx - c[0]) + (a[0] - c[0]) * (gy - c[1])) / den
         ins = (w0 >= -0.01) & (w1 >= -0.01) & (1 - w0 - w1 >= -0.01)
         reg[gy[ins], gx[ins]] = fr[t]
-    return reg
+        zz = Vq[Fq[t], 2]; zm[gy[ins], gx[ins]] = w0[ins] * zz[0] + w1[ins] * zz[1] + (1 - w0[ins] - w1[ins]) * zz[2]
+    return reg, zm
 
 
 RN = ["torso", "head", "arm.l", "arm.r", "leg.l", "leg.r", "pack"]
-regmap = raster_regions(low, np.array([RN.index(x) for x in fr_all]))
+regmap, zmap = raster_regions(low, np.array([RN.index(x) for x in fr_all]))
 covered = regmap >= 0
 
 
@@ -394,20 +458,33 @@ mx = BAKE.max(2); mn = BAKE.min(2); sat = (mx - mn) / np.maximum(mx, 1e-6); dd =
 hue = np.where(mx == rr, (gg - bb_) / dd % 6, np.where(mx == gg, (bb_ - rr) / dd + 2, (rr - gg) / dd + 4)) * 60
 tc = C["team"]
 navy = (bb_ > rr + 0.04) & (bb_ >= gg) & (mx < 0.55) & (mx > 0.04)
-shirt_reg = np.isin(rm2, [RN.index(UVREG.get(x, x)) for x in RM["shirt_regions"]])
-teal = (hue >= tc["hue_deg"][0]) & (hue <= tc["hue_deg"][1]) & (sat >= tc["sat_min"]) & (mx >= tc["val_min"]) & (rm2 >= 0)
-team = (navy & shirt_reg) | teal
-team = erode(dilate(dilate(erode(team)))) & (rm2 >= 0)
+SH = [RN.index(UVREG.get(x, x)) for x in RM["shirt_regions"]]
+shirt_reg = np.isin(regmap, SH)
+teal = (hue >= tc["hue_deg"][0]) & (hue <= tc["hue_deg"][1]) & (sat >= tc["sat_min"]) & (mx >= tc["val_min"])
+Vh_, _ = arrays(low); head_top = float(Vh_[labels_of(low) == RI["head"], 2].max())
+capband = (regmap == RN.index("head")) & teal & (zmap > head_top - RM["cap_band_depth_m"])
+team = ((navy | teal) & shirt_reg) | capband
+for _ in range(RM["mask_open_px"]): team = erode(team)
+for _ in range(RM["mask_open_px"]): team = dilate(team) & covered & (shirt_reg | capband | (team & (regmap == RN.index("head"))))
+team = erode(dilate(team)) & covered
 pix = np.argwhere(team); idx = -np.ones(team.shape, int); idx[team] = np.arange(len(pix))
 Ep = []
 for dy, dx in ((0, 1), (1, 0)):
     nb = team & shift(team, -dy, -dx); Ep.append(np.stack([idx[nb], shift(idx, -dy, -dx)[nb]], 1))
 Ep = np.concatenate(Ep) if len(pix) else np.zeros((0, 2), int)
 pl_ = components(len(pix), Ep); u_, cn_ = np.unique(pl_, return_counts=True)
-team[tuple(pix[np.isin(pl_, u_[cn_ < 20])].T)] = False
+team[tuple(pix[np.isin(pl_, u_[cn_ < RM["mask_min_blob_px"]])].T)] = False
+core = team.copy()
+for _ in range(RM["bake_margin_px"]):         # into this island's own bake margin only (uncovered texels)
+    team = team | (dilate(team) & ~covered & np.isin(rm2, SH + [RN.index("head")]))
+# value of the current Builder's team cloth (its code-8 vertex colours): CMToonSwap keeps hue/saturation of the target
+# and scales by max(rgb)/max(authored), so matching that ratio matches the colour
+oc = old0.data.color_attributes.get("Col"); ocs = np.zeros(len(oc.data) * 4); oc.data.foreach_get("color_srgb", ocs); ocs = ocs.reshape(-1, 4)
+ok8 = np.round(ocs[:, 3] * 8).astype(int) == 8
+k_old = float(np.median(ocs[ok8, :3].max(1) / hexrgb(tc["cloth_authored"]).max())) if ok8.any() else 1.0
 auth = hexrgb(tc["cloth_authored"])
-v = mx; vmed = float(np.median(v[team])) if team.any() else 1.0
-kk = np.clip(v / max(vmed, 1e-4), *RM["lighten_clip"])
+v = mx; vmed = float(np.median(v[core])) if core.any() else 1.0
+kk = np.clip(v / max(vmed, 1e-4), *RM["lighten_clip"]) * k_old
 base = BAKE.copy(); base[team] = auth[None, :] * kk[team][:, None]
 alpha = np.where(team, 0.5, 0.0).astype(np.float32)
 img4 = np.concatenate([base, alpha[:, :, None]], 2)
@@ -418,7 +495,11 @@ write_png(os.path.join(OUT, KEY + "_mask.png"), np.concatenate([np.repeat(alpha[
 for t_ in ("azure", "crimson"):
     pv = base.copy(); pv[team] = np.clip(hexrgb(tc[t_])[None, :] * (base[team].max(1, keepdims=True) / auth.max()), 0, 1)
     write_png(os.path.join(OUT, KEY + "_preview_%s.png" % t_), pv)
-REP["team_mask"] = dict(method="region (navy shirt in torso/sleeves) + teal trim", team_fraction_of_covered=round(float(team[covered].mean()), 4),
+def to_hex(c): return "#%02X%02X%02X" % tuple(int(round(x * 255)) for x in np.clip(c, 0, 1))
+REP["team_colour_match"] = {t_: dict(current_builder=to_hex(hexrgb(tc[t_]) * k_old), new_median=to_hex(hexrgb(tc[t_]) * float(np.median(kk[core]))),
+                                     k_current=round(k_old, 3), k_new_median=round(float(np.median(kk[core])), 3)) for t_ in ("azure", "crimson")}
+log("v2 team colour", REP["team_colour_match"], "cap band texels", int(capband.sum()), "head_top", round(head_top, 3))
+REP["team_mask"] = dict(method="region: navy/teal in shirt+sleeves, teal cap band; opened, no pack", team_fraction_of_covered=round(float(team[covered].mean()), 4),
                         shirt_median_value_srgb=round(vmed, 3), texels_covered=round(float(covered.mean()), 4),
                         by_region={RN[i]: round(float(team[regmap == i].mean()), 3) for i in range(len(RN)) if (regmap == i).any()})
 log("v2 mask", REP["team_mask"])
@@ -435,6 +516,7 @@ TORSO4 = [BI[b] for b in ("hips", "spine", "chest", "head")]
 def allowed_for(Lx, Vx):
     n = len(Lx); al = np.zeros((n, len(DEFORM)), bool); fac = np.ones((n, len(DEFORM)))
     t = Lx == RI["torso"]; al[np.ix_(np.nonzero(t)[0], TORSO4)] = True
+    al[t & (Vx[:, 2] < JA["head"][0][2] - RM["head_bone_reach_m"]), BI["head"]] = False   # heat leaks the head bone down the belly
     below = t & (Vx[:, 2] < JA["hips"][0][2])
     for s in ("l", "r"):
         al[below, BI["upperleg." + s]] = True; fac[below, BI["upperleg." + s]] = RM["apron_leg_factor"]
@@ -445,6 +527,12 @@ def allowed_for(Lx, Vx):
         ii = np.nonzero(Lx == RI["zarm." + s])[0]; al[np.ix_(ii, [BI["chest"], BI["spine"], BI["upperarm." + s]])] = True
         ii = np.nonzero(Lx == RI["zleg." + s])[0]; al[np.ix_(ii, [BI["hips"], BI["upperleg." + s]])] = True
     p = np.nonzero(Lx == RI["pack"])[0]; al[p] = False; al[p, BI["chest"]] = True
+    it = Lx == RI["item"]
+    if it.any():
+        ib = IBx_[0]; lc_ = components(len(Vx), Ex_[0])
+        for u in np.unique(lc_[it]):
+            m = it & (lc_ == u); bb = np.bincount(ib[m][ib[m] >= 0], minlength=len(DEFORM)).argmax() if (ib[m] >= 0).any() else BI["hips"]
+            al[m] = False; al[m, bb] = True
     return al, fac
 
 
@@ -462,11 +550,17 @@ def read_groups(o):
     return W
 
 
+IBx_, Ex_ = [None], [None]
+
+
 def finalize(o, W, tag):
     Vx, Ex = arrays(o); Lx = labels_of(o); n = len(Vx)
+    IBx_[0] = np.array([IB[kdr.find(p_)[1]] for p_ in Vx]); Ex_[0] = Ex
     al, fac = allowed_for(Lx, Vx)
+    rigid = (Lx == RI["item"]) | (Lx == RI["pack"])
     heat_unweighted = int((W.sum(1) <= 1e-6).sum())
     W = W * al * fac
+    W[rigid] = al[rigid].astype(float)
     D = bone_dists(Vx, JA)
     fb = W.sum(1) <= 1e-6
     W[fb] = (al * fac / np.maximum(D, 0.01) ** C["weights"]["power"])[fb]
@@ -483,7 +577,7 @@ def finalize(o, W, tag):
         for zone, limb, roots, lb in (("zarm." + s, "arm." + s, ["chest", "spine"], "upperarm." + s), ("zleg." + s, "leg." + s, ["hips"], "upperleg." + s)):
             z = Lx == RI[zone]
             if not z.any(): continue
-            lm = Lx == RI[limb]; tor = ~z & ~lm & (Lx != RI["pack"])
+            lm = Lx == RI[limb]; tor = ~z & ~lm & (Lx != RI["pack"]) & (Lx != RI["item"])
             da = hop(lm, z | lm)[z]; dt = hop(tor, z | tor)[z]
             t = np.where(np.isinf(da), 0.0, np.where(np.isinf(dt), 1.0, dt / np.maximum(da + dt, 1e-9)))
             t = t * t * (3 - 2 * t)
@@ -499,7 +593,7 @@ def finalize(o, W, tag):
     al_s = al.copy()
     for _ in range(RM["allowed_rings"]):
         g_ = al_s.copy(); g_[Ex[:, 0]] |= al_s[Ex[:, 1]]; g_[Ex[:, 1]] |= al_s[Ex[:, 0]]
-        g_[Lx == RI["pack"]] = al[Lx == RI["pack"]]; al_s = g_
+        g_[rigid] = al[rigid]; al_s = g_
     for _ in range(RM["smooth_iters"]):
         acc = np.zeros_like(W); np.add.at(acc, Ex[:, 0], W[Ex[:, 1]]); np.add.at(acc, Ex[:, 1], W[Ex[:, 0]])
         W = np.where(al_s, 0.5 * W + 0.5 * acc / np.maximum(deg, 1)[:, None], 0); W = top4(W)
@@ -570,6 +664,10 @@ for o in LODS:
     am = o.modifiers.new("Armature", "ARMATURE"); am.object = rig
     for p in o.data.polygons: p.use_smooth = True
     o.data.set_sharp_from_angle(angle=math.radians(60.0))
+    lh = LAB_REST[o.name] == RI["head"]; ev = np.zeros(len(o.data.edges) * 2, int); o.data.edges.foreach_get("vertices", ev); ev = ev.reshape(-1, 2)
+    sa = o.data.attributes.get("sharp_edge")
+    if sa is not None:
+        sv = np.zeros(len(o.data.edges), bool); sa.data.foreach_get("value", sv); sv[lh[ev[:, 0]] & lh[ev[:, 1]]] = False; sa.data.foreach_set("value", sv)
     for a in [a.name for a in o.data.color_attributes]: o.data.color_attributes.remove(o.data.color_attributes[a])
     ca = o.data.color_attributes.new("Col", "BYTE_COLOR", "CORNER")
     ca.data.foreach_set("color", np.tile([1.0, 1.0, 1.0, 0.0], len(ca.data)).astype(np.float32))

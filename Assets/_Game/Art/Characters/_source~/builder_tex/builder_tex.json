@@ -59,12 +59,12 @@
   "voxel_min": 0.004,
   "slab_m": 0.012,
   "pack_voxel": 0.008,
-  "body_lod0_tris": 6100,
+  "body_lod0_tris": 5500,
   "pack_lod0_tris": 900,
   "lod1_tris": 1800,
   "shadow_tris": 700,
   "head_decimate_weight": 0.3,
-  "uv_margin": 0.004,
+  "uv_margin": 0.0025,
   "cage_extrusion": 0.02,
   "max_ray_m": 0.05,
   "bake_margin_px": 8,
@@ -72,9 +72,7 @@
   "shirt_regions": [
    "torso",
    "arm.l",
-   "arm.r",
-   "zarm.l",
-   "zarm.r"
+   "arm.r"
   ],
   "lighten_clip": [
    0.6,
@@ -91,7 +89,20 @@
   "smooth_iters": 24,
   "shadow_voxel": 0.05,
   "apron_leg_factor": 1.0,
-  "allowed_rings": 2
+  "allowed_rings": 2,
+  "items_lod0_tris": 600,
+  "item_voxel": 0.006,
+  "item_close_r": 0.004,
+  "neck_band_m": 0.12,
+  "head_smooth_iters": 4,
+  "rigid_uv_angle": 89,
+  "cap_band_depth_m": 0.32,
+  "mask_open_px": 3,
+  "mask_min_blob_px": 40,
+  "dangle_below_hips_m": 0.25,
+  "zone_leg_below_m": 99.0,
+  "head_bone_reach_m": 99.0,
+  "_note_run8": "zone_leg_below_m 0.22 relabelled 3,070 hip-zone verts as leg: the crotch shells then sat 'between legs', the voxel fell to its minimum and decimation stalled (LOD0 10k). Both run-8 rules are disabled (99) = run-7 behaviour."
  },
  "out_dir_remesh": "~/cm-art-trial/builder/game-ready-v2"
 }
