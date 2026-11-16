@@ -27,9 +27,10 @@ os.makedirs(OUT, exist_ok=True)
 RATIO = float(os.environ.get('SEAM_RATIO', '2.2'))
 MINLEN = float(os.environ.get('SEAM_MIN_M', '0.05'))
 SMOOTH_DEG = float(os.environ.get('SMOOTH_DEG', '50'))
+JOINT_RATIO = float(os.environ.get('SEAM_JOINT_RATIO', '3.5'))   # armpit webbing on the shoulder / hip pairs
 SHADOW_MAX, LOD1_MAX, LOD0_MAX = 800, 1500, 4500
 LEVELS = ('Hero', 'LOD0', 'LOD1', 'Shadow')
-REP = {'params': dict(ratio=RATIO, min_m=MINLEN, smooth_deg=SMOOTH_DEG)}
+REP = {'params': dict(ratio=RATIO, joint_ratio=JOINT_RATIO, min_m=MINLEN, smooth_deg=SMOOTH_DEG)}
 
 
 def save():
@@ -164,6 +165,15 @@ def fused(a, b):
     return True
 
 
+def joint_pair(a, b):
+    # the shoulder (chest / upperarm) and the hip joint (hips or spine / upperleg): real skin stretches there, so only an
+    # edge past JOINT_RATIO counts as a fused bridge (the inner arm glued to the torso side, the webbing under a raised arm)
+    if not a or not b:
+        return False
+    x = {a.partition('.')[0], b.partition('.')[0]}
+    return x == {'chest', 'upperarm'} or x == {'hips', 'upperleg'} or x == {'spine', 'upperleg'}
+
+
 def dominant(o):
     names = {g.index: g.name for g in o.vertex_groups}
     dom = []
@@ -199,12 +209,13 @@ def stretch(objs):
     for o in objs:
         k = o.name; dom = dominant(o); e = E[k]
         far = np.array([fused(dom[a], dom[b]) for a, b in e], bool) if len(e) else np.zeros(0, bool)
-        flag = (best[k] > RATIO) & far
+        jpair = np.array([joint_pair(dom[a], dom[b]) for a, b in e], bool) if len(e) else np.zeros(0, bool)
+        flag = ((best[k] > RATIO) & far) | ((best[k] > JOINT_RATIO) & jpair)
         pairs, clips = {}, {}
         for i in np.nonzero(flag)[0]:
             a, b = e[i]; pk = ' / '.join(sorted((dom[a] or '-', dom[b] or '-'))); pairs[pk] = pairs.get(pk, 0) + 1
             cl = FR[where[k][i]][0]; clips[cl] = clips.get(cl, 0) + 1
-        joint = (best[k] > RATIO) & ~far
+        joint = (best[k] > RATIO) & ~flag
         jp = {}
         for i in np.nonzero(joint)[0]:
             a, b = e[i]; pk = ' / '.join(sorted((dom[a] or '-', dom[b] or '-'))); jp[pk] = jp.get(pk, 0) + 1
@@ -325,7 +336,7 @@ print('[seams] before', json.dumps(REP['stretch_before']), flush=True)
 
 # ---- FIX: cut the fused bridges and cap, twice, then normals
 REP['cut'] = {lv: [] for lv in LEVELS}
-for rnd in range(2):
+for rnd in range(3):
     for lv, o in LV.items():
         fl = st[o.name]['flag']
         if len(fl) == 0:
@@ -337,6 +348,42 @@ for rnd in range(2):
     st = stretch(list(LV.values()))
     REP[f'stretch_after_{rnd + 1}'] = {lv: st[o.name]['summary'] for lv, o in LV.items()}
     save()
+REP['stretch_after'] = REP['stretch_after_3']
+
+
+def despeckle(o, passes=2):
+    # team-cloth specks: a code-8 face whose neighbours are at least two thirds fixed colour (code 0) takes the colour of
+    # its largest fixed-colour neighbour (the one-colour-per-face LOD transfer dropped shirt triangles onto the apron,
+    # the ladder, the boots and the thighs; at the gameplay camera they read as team lines inside the body)
+    me = o.data; bm = bmesh.new(); bm.from_mesh(me)
+    lay = bm.loops.layers.float_color.get(COLN) or bm.loops.layers.color.get(COLN)
+    if lay is None:
+        bm.free(); return 'no corner colour layer ' + COLN
+    changed = 0
+    for _ in range(passes):
+        mean = {f: [sum(l[lay][i] for l in f.loops) / len(f.loops) for i in range(4)] for f in bm.faces}
+        code = {f: int(round(mean[f][3] * 8)) for f in bm.faces}
+        todo = []
+        for f in bm.faces:
+            if code[f] != 8:
+                continue
+            nb = [g for e in f.edges for g in e.link_faces if g is not f]
+            other = [g for g in nb if code[g] == 0]
+            if len(nb) >= 2 and len(other) * 3 >= len(nb) * 2:
+                todo.append((f, max(other, key=lambda x: x.calc_area())))
+        for f, g in todo:
+            for l in f.loops:
+                l[lay] = mean[g]
+        changed += len(todo)
+        if not todo:
+            break
+    bm.to_mesh(me); me.update(); bm.free()
+    return changed
+
+
+COLN = (LV['LOD0'].data.color_attributes.active_color or LV['LOD0'].data.color_attributes[0]).name
+REP['colour_domain'] = LV['LOD0'].data.color_attributes[COLN].domain
+REP['despeckled_faces'] = {lv: despeckle(o) for lv, o in LV.items()}
 for lv, o in LV.items():
     smooth_by_angle(o, SMOOTH_DEG)
 REP['normals_after'] = {lv: normal_stats(o) for lv, o in LV.items()}
@@ -344,7 +391,7 @@ REP['tris_after'] = {lv: ntri(o) for lv, o in LV.items()}
 REP['contracts'] = dict(LOD0=REP['tris_after']['LOD0'] <= LOD0_MAX, LOD1=REP['tris_after']['LOD1'] <= LOD1_MAX,
                         Shadow=REP['tris_after']['Shadow'] <= SHADOW_MAX)
 save()
-print('[seams] after', json.dumps({k: REP[k] for k in ('stretch_after_2', 'normals_after', 'tris_after', 'contracts')}), flush=True)
+print('[seams] after', json.dumps({k: REP[k] for k in ('stretch_after', 'despeckled_faces', 'normals_after', 'tris_after', 'contracts')}), flush=True)
 
 # ---- export (rest pose, model only)
 rest(); assign(ca, None)
@@ -379,7 +426,7 @@ def sock(coll, ident):
     return next(s for s in coll if s.identifier == ident)
 
 
-def toon_mat(name, team):
+def toon_mat(name, team, rim=0.6):
     m = bpy.data.materials.new(name); m.use_nodes = True; nt = m.node_tree; N = nt.nodes; K = nt.links.new; N.clear()
     out = N.new('ShaderNodeOutputMaterial'); vc = N.new('ShaderNodeVertexColor'); vc.layer_name = COL
     sep = N.new('ShaderNodeSeparateColor'); K(vc.outputs['Color'], sep.inputs[0])
@@ -397,7 +444,7 @@ def toon_mat(name, team):
     lit = N.new('ShaderNodeVectorMath'); lit.operation = 'SCALE'; K(sock(mx.outputs, 'Result_Color'), lit.inputs[0]); K(bv.outputs[0], sock(lit.inputs, 'Scale'))
     lw = N.new('ShaderNodeLayerWeight'); lw.inputs['Blend'].default_value = 0.5
     rm = N.new('ShaderNodeMath'); rm.operation = 'GREATER_THAN'; K(lw.outputs['Facing'], rm.inputs[0]); rm.inputs[1].default_value = 0.75
-    rs = N.new('ShaderNodeMath'); rs.operation = 'MULTIPLY'; K(rm.outputs[0], rs.inputs[0]); rs.inputs[1].default_value = 0.6
+    rs = N.new('ShaderNodeMath'); rs.operation = 'MULTIPLY'; K(rm.outputs[0], rs.inputs[0]); rs.inputs[1].default_value = rim
     m3 = N.new('ShaderNodeMix'); m3.data_type = 'RGBA'
     K(rs.outputs[0], sock(m3.inputs, 'Factor_Float')); K(lit.outputs[0], sock(m3.inputs, 'A_Color')); sock(m3.inputs, 'B_Color').default_value = (*TEAMS[team], 1.0)
     em = N.new('ShaderNodeEmission'); K(sock(m3.outputs, 'Result_Color'), em.inputs['Color'])
@@ -416,6 +463,7 @@ def hull_mat():
 
 try:
     MATS = {t: toon_mat('toon_' + t, t) for t in TEAMS}; HULL = hull_mat()
+    MATS['crimson_norim'] = toon_mat('toon_crimson_norim', 'crimson', 0.0)
     sc.render.engine = 'CYCLES'; sc.cycles.device = 'CPU'; sc.cycles.samples = 8; sc.cycles.use_denoising = False
     sc.cycles.max_bounces = 2; sc.cycles.transparent_max_bounces = 32; sc.cycles.diffuse_bounces = 0; sc.cycles.glossy_bounces = 0
     sc.view_settings.view_transform = 'Standard'
@@ -428,7 +476,8 @@ try:
     sc.render.resolution_x, sc.render.resolution_y = 260, 330; sc.render.resolution_percentage = 100
     cd = bpy.data.cameras.new('cam'); cd.type = 'ORTHO'; cd.ortho_scale = 3.3
     cam = bpy.data.objects.new('cam', cd); sc.collection.objects.link(cam); sc.camera = cam
-    VIEWS = {'game55': (30.0, 55.0), 'side10': (90.0, 10.0)}   # (azimuth from the front, pitch); the body faces -Y
+    VIEWS = {'game55': (30.0, 55.0), 'front10': (-20.0, 10.0), 'side10': (90.0, 10.0)}   # (azimuth from the front, pitch); faces -Y
+    LEVEL_VIEWS = {'LOD0': ('game55', 'front10', 'side10'), 'LOD1': ('game55',), 'Hero': ('game55', 'front10', 'side10')}
     AFTER = {lv: copy_obj(LV[lv], f'{LV[lv].name}_after') for lv in ('Hero', 'LOD0', 'LOD1')}
     RO = {}
     for tag, objs in (('before', BEFORE), ('after', AFTER)):
@@ -471,14 +520,16 @@ try:
         bpy.data.images.remove(img); os.remove(p); return px
 
     tgt = Vector((0, 0, 1.05)); REP['renders'] = []
+    ROWS = [('azure', 'before'), ('azure', 'after'), ('crimson', 'before'), ('crimson', 'after'), ('crimson_norim', 'after')]
     for lv in ('LOD0', 'LOD1', 'Hero'):
-        for vname, (az, pitch) in VIEWS.items():
+        for vname in LEVEL_VIEWS[lv]:
+            az, pitch = VIEWS[vname]
             a_, p_ = math.radians(az), math.radians(pitch)
             loc = tgt + 8.0 * Vector((math.sin(a_) * math.cos(p_), -math.cos(a_) * math.cos(p_), math.sin(p_)))
             cam.location = loc; cam.rotation_euler = (tgt - loc).to_track_quat('-Z', 'Y').to_euler()
             rows = []
-            for team in ('azure', 'crimson'):
-                for tag in ('before', 'after'):
+            for team, tag in ROWS:
+                if True:
                     o, h = RO[(tag, lv)]
                     o.data.materials.clear(); o.data.materials.append(MATS[team])
                     for (t2, l2), (o2, h2) in RO.items():
@@ -495,7 +546,7 @@ try:
             im = bpy.data.images.new('g', g.shape[1], g.shape[0]); im.pixels = g.ravel()
             p = os.path.join(OUT, f'{CLS}_{lv}_{vname}.png'); im.filepath_raw = p; im.file_format = 'PNG'; im.save()
             REP['renders'].append(p); save()
-    REP['render_layout'] = 'rows top to bottom: azure before, azure after, crimson before, crimson after; columns: ' + ', '.join(n for n, a, f in POSES)
+    REP['render_layout'] = 'rows top to bottom: azure before, azure after, crimson before, crimson after, crimson after with the rim off; columns: ' + ', '.join(n for n, a, f in POSES)
 except Exception:
     REP['render_error'] = traceback.format_exc()
 save()
