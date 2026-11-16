@@ -2,6 +2,7 @@ using System;
 using CriticalMass.Sim.Bots;
 using CriticalMass.Sim.Config;
 using CriticalMass.Sim.Core;
+using CriticalMass.Sim.Grid;
 using NUnit.Framework;
 
 namespace CriticalMass.Sim.Tests
