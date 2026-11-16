@@ -68,72 +68,6 @@ namespace CriticalMass.Sim.Core
             return KaijuState.Neutral;
         }
 
-        /// <summary>b12-r: the Kaiju-type rule is live (KaijuTypesConfig.On in the Full profile: both rule lanes on).</summary>
-        public static bool TypesOn(GameConfig c) => c.Kaiju.Types.On && !c.Physics.Classic && !c.Depth.Classic;
-
-        /// <summary>
-        /// b12-r (pure): the type a feed of plant and meat units picks. MixShare or more of (plant + meat) as plant = GROVE, as
-        /// meat = BRUTE, else (or nothing fed) STANDARD. Negative or non-finite tallies count as 0.
-        /// </summary>
-        public static KaijuType PickType(double plant, double meat, KaijuTypesConfig t)
-        {
-            if (!(plant > 0) || !double.IsFinite(plant)) plant = 0;
-            if (!(meat > 0) || !double.IsFinite(meat)) meat = 0;
-            double total = plant + meat;
-            if (!(total > 0)) return KaijuType.Standard;
-            if (plant / total >= t.MixShare) return KaijuType.Grove;
-            if (meat / total >= t.MixShare) return KaijuType.Brute;
-            return KaijuType.Standard;
-        }
-
-        /// <summary>b12-r: the plant share of a feed (0 when nothing was fed); for logs and the view.</summary>
-        public static double PlantShare(double plant, double meat) => plant + meat > 0 ? plant / (plant + meat) : 0;
-
-        /// <summary>b12-r: the Kaiju's move speed for its type (KaijuConfig.MoveSpeed itself for STANDARD: no multiply, bit for bit).</summary>
-        public static double TypeMoveSpeed(World w)
-        {
-            KaijuConfig kc = w.Config.Kaiju;
-            switch (w.Kaiju.Type)
-            {
-                case KaijuType.Grove: return kc.MoveSpeed * kc.Types.GroveSpeedScale;
-                case KaijuType.Brute: return kc.MoveSpeed * kc.Types.BruteSpeedScale;
-                default: return kc.MoveSpeed;
-            }
-        }
-
-        /// <summary>b12-r: an attack's damage (claw or slam) for the Kaiju's type (the base itself unless BRUTE).</summary>
-        public static double TypeDamage(World w, double baseDamage) =>
-            w.Kaiju.Type == KaijuType.Brute ? baseDamage * w.Config.Kaiju.Types.BruteDamageScale : baseDamage;
-
-        /// <summary>b12-r: the type's max-HP scale (1 for STANDARD).</summary>
-        public static double TypeHpScale(KaijuType type, KaijuTypesConfig t) =>
-            type == KaijuType.Grove ? t.GroveHpScale : type == KaijuType.Brute ? t.BruteHpScale : 1;
-
-        /// <summary>b12-r: before the hatch the Kaiju carries no type (a reset world may still hold the last match's).</summary>
-        internal static void ClearType(Kaiju k)
-        {
-            k.Type = KaijuType.Standard;
-            k.RegenIn = 0;
-            k.MixPlant = 0;
-            k.MixMeat = 0;
-        }
-
-        /// <summary>
-        /// b12-r: GROVE regeneration, once per Kaiju step while it is up (not knocked out): GroveRegenSharePerSecond of max HP per
-        /// second, clamped to max HP, once no hit landed for GroveRegenDelaySeconds. No-op for every other type.
-        /// </summary>
-        internal static void TypeRegen(World w, double dt)
-        {
-            Kaiju k = w.Kaiju;
-            if (k.Type != KaijuType.Grove) return;
-            if (k.RegenIn > 0)
-            {
-                k.RegenIn = Combat.TickDown(k.RegenIn, dt);
-                return;
-            }
-            if (k.Hp < k.MaxHp) k.Hp = Math.Min(k.MaxHp, k.Hp + k.MaxHp * w.Config.Kaiju.Types.GroveRegenSharePerSecond * dt);
-        }
-
         /// <summary>'hatch' event value: 0 neutral, 1 azure, 2 crimson, 3 berserk.</summary>
         public static int HatchCode(KaijuState s)
         {
@@ -196,7 +130,6 @@ namespace CriticalMass.Sim.Core
             if (k.State == KaijuState.Neutral) k.Threat[sourceId] = JsMath.F32(w.Config.Kaiju.NeutralThreatMemorySeconds);
             else if (Phys.On(w, w.Config.Physics.KaijuHillSiege)) w.KaijuNav.HitBy[sourceId] = w.Config.Physics.KaijuHitMemorySeconds; // fix/kaiju-hill-1
             k.Hp -= amount;
-            if (k.Type == KaijuType.Grove) k.RegenIn = w.Config.Kaiju.Types.GroveRegenDelaySeconds; // b12-r: a hit pauses the regrowth
             // DG-16 (view request): who hit the Kaiju and where, for effects: the point on its hit radius toward the attacker.
             double hx = w.X[sourceId] - k.X;
             double hz = w.Z[sourceId] - k.Z;
@@ -550,16 +483,6 @@ namespace CriticalMass.Sim.Core
             k.State = state;
             m.Hatched = true;
             w.ForceHatch = false;
-            // b12-r (RULE CHANGE): the mix fed before this hatch picks the type. The tallies are snapshotted here, before anything
-            // can reset them (World.InitWorld zeroes Delivered with the next match; ApplyDelivery stops at the hatch). The egg
-            // never comes back within a match, so "the deliveries since the last hatch" are exactly these tallies. MaxHp here is
-            // the reset value (HpPerTeamMember x team size): scaled once.
-            KaijuTypesConfig tc = w.Config.Kaiju.Types;
-            k.MixPlant = m.Delivered[(int)TeamId.Azure].Plant + m.Delivered[(int)TeamId.Crimson].Plant;
-            k.MixMeat = m.Delivered[(int)TeamId.Azure].Meat + m.Delivered[(int)TeamId.Crimson].Meat;
-            k.Type = TypesOn(w.Config) ? PickType(k.MixPlant, k.MixMeat, tc) : KaijuType.Standard;
-            k.RegenIn = 0;
-            if (k.Type != KaijuType.Standard) k.MaxHp *= TypeHpScale(k.Type, tc);
             k.Hp = k.MaxHp;
             k.KoIn = 0;
             k.MeleeCd = 0;

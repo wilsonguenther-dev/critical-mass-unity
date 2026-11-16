@@ -1,8 +1,5 @@
 namespace CriticalMass.Sim.Core
 {
-    /// <summary>b12-r (RULE CHANGE): the Kaiju's type, picked once at the hatch from the plant / meat mix fed before it (KaijuTypesConfig).</summary>
-    public enum KaijuType { Standard, Grove, Brute }
-
     /// <summary>The Kaiju (browser Kaiju). The static functions of kaiju.ts live in other files of this partial class.</summary>
     public sealed partial class Kaiju
     {
@@ -36,13 +33,5 @@ namespace CriticalMass.Sim.Core
         public double ClawX;
         public double ClawZ;
         public double ClawFacing;
-        // ---- b12-r Kaiju types (appended; KaijuConfig.Types, Full profile only)
-        /// <summary>The type the hatch picked (Standard before the hatch, with the rule off, or for a mixed or empty feed).</summary>
-        public KaijuType Type;
-        /// <summary>GROVE: seconds left before the regeneration resumes (set to GroveRegenDelaySeconds by every hit).</summary>
-        public double RegenIn;
-        /// <summary>The plant and meat units both teams had fed when the hatch ran (the snapshot the type was picked from).</summary>
-        public double MixPlant;
-        public double MixMeat;
     }
 }

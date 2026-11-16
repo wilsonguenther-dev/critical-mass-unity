@@ -52,7 +52,7 @@ namespace CriticalMass.Sim.Core
                 double dx = w.X[id] - k.TelegraphX;
                 double dz = w.Z[id] - k.TelegraphZ;
                 if (dx * dx + dz * dz > r2) continue;
-                if (Damage.ApplyDamage(w, id, TypeDamage(w, kc.SlamDamage), Damage.KaijuSlamSource, k.TelegraphX, k.TelegraphZ) > 0) hits++;
+                if (Damage.ApplyDamage(w, id, kc.SlamDamage, Damage.KaijuSlamSource, k.TelegraphX, k.TelegraphZ) > 0) hits++;
             }
             k.SlamCd = kc.SlamCooldown;
             World.PushEvent(w, SimEventType.KaijuSlam, -1, hits, k.TelegraphX, k.TelegraphZ, kc.SlamRadius);
@@ -88,7 +88,7 @@ namespace CriticalMass.Sim.Core
                 double ux = d > 1e-6 ? dx / d : JsMath.Cos(id * 2.39996);
                 double uz = d > 1e-6 ? dz / d : JsMath.Sin(id * 2.39996);
                 double kd = p.SlamKnockCentre + (p.SlamKnockEdge - p.SlamKnockCentre) * (d / R);
-                if (Damage.ApplyHit(w, id, TypeDamage(w, kc.SlamDamage) * share, Damage.KaijuSlamSource, k.TelegraphX, k.TelegraphZ, DamageCause.KaijuSlam,
+                if (Damage.ApplyHit(w, id, kc.SlamDamage * share, Damage.KaijuSlamSource, k.TelegraphX, k.TelegraphZ, DamageCause.KaijuSlam,
                     ux, uz, knock ? kd * Damage.KaijuThrow(w) : 0, knock ? w.Dur.SlamStun : 0) > 0) hits++;
             }
             k.SlamCd = kc.SlamCooldown;
@@ -123,9 +123,9 @@ namespace CriticalMass.Sim.Core
             if (Damage.Knocks(w, DamageCause.KaijuMelee))
             {
                 Knock.Dir(w, t, k.X, k.Z, JsMath.Cos(k.Facing), JsMath.Sin(k.Facing), out double kx, out double kz);
-                Damage.ApplyHit(w, t, TypeDamage(w, kc.MeleeDamage), Damage.KaijuSource, k.X, k.Z, DamageCause.KaijuMelee, kx, kz, w.Config.Physics.KaijuClawKnock, w.Dur.KaijuStun);
+                Damage.ApplyHit(w, t, kc.MeleeDamage, Damage.KaijuSource, k.X, k.Z, DamageCause.KaijuMelee, kx, kz, w.Config.Physics.KaijuClawKnock, w.Dur.KaijuStun);
             }
-            else Damage.ApplyDamage(w, t, TypeDamage(w, kc.MeleeDamage), Damage.KaijuSource, k.X, k.Z);
+            else Damage.ApplyDamage(w, t, kc.MeleeDamage, Damage.KaijuSource, k.X, k.Z);
             if (!w.Actors[t].Alive && k.TargetId == t) k.TargetId = -1;
         }
 
@@ -163,7 +163,7 @@ namespace CriticalMass.Sim.Core
                 if (!w.Actors[id].Alive || !KaijuHostileTo(w, id) || !InClawCone(w, id)) continue;
                 if (walls && !SegmentClear.Clear(w.Map, k.ClawX, k.ClawZ, w.X[id], w.Z[id])) continue;
                 Knock.Dir(w, id, k.ClawX, k.ClawZ, fx, fz, out double dx, out double dz);
-                Damage.ApplyHit(w, id, TypeDamage(w, kc.MeleeDamage), Damage.KaijuSource, k.ClawX, k.ClawZ, DamageCause.KaijuMelee, dx, dz,
+                Damage.ApplyHit(w, id, kc.MeleeDamage, Damage.KaijuSource, k.ClawX, k.ClawZ, DamageCause.KaijuMelee, dx, dz,
                     knock ? p.KaijuClawKnock * Damage.KaijuThrow(w) : 0, knock ? w.Dur.KaijuStun : 0);
             }
         }
@@ -597,7 +597,7 @@ namespace CriticalMass.Sim.Core
             double ddz = az - k.Z;
             double len = Math.Sqrt(ddx * ddx + ddz * ddz);
             if (len < 1e-6) return;
-            double stepLen = TypeMoveSpeed(w) * dt; // b12-r: KaijuConfig.MoveSpeed for STANDARD
+            double stepLen = w.Config.Kaiju.MoveSpeed * dt;
             if (guard && len < stepLen) stepLen = len; // arrive on the point, do not overshoot and come back
             double x0 = k.X;
             double z0 = k.Z;
@@ -627,7 +627,6 @@ namespace CriticalMass.Sim.Core
             Cleanse.CleanseSystem(w);
             if (!m.Hatched)
             {
-                ClearType(k); // b12-r: no type on an egg (the hatch below picks one)
                 if (m.Instability >= SimResources.BerserkLine(w)) SimResources.LockBerserk(w); // DG-41
                 if (w.ForceHatch || m.Time + HatchTimeEps >= cfg.HatchSeconds)
                 {
@@ -665,7 +664,6 @@ namespace CriticalMass.Sim.Core
                 }
                 return;
             }
-            TypeRegen(w, dt); // b12-r: GROVE regrows out of combat (no-op for every other type)
 
             if (k.TargetId >= 0 && !KaijuCanTarget(w, k.TargetId)) k.TargetId = -1;
 

@@ -49,8 +49,6 @@ namespace CriticalMass.Net
                 Mix(ref h, Bits(w.Kaiju.X));
                 Mix(ref h, Bits(w.Kaiju.Z));
                 Mix(ref h, Bits(w.Kaiju.Hp));
-                // b12-r: the hatch-picked type (mixed only when it is not STANDARD, so every hash without the rule is unchanged)
-                if (w.Match.Hatched && w.Kaiju.Type != KaijuType.Standard) Mix(ref h, (long)w.Kaiju.Type);
             }
             return h;
         }

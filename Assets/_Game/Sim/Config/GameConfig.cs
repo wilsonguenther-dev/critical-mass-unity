@@ -119,7 +119,6 @@ namespace CriticalMass.Sim.Config
         {
             Physics.Classic = profile == RulesProfile.Classic;
             Depth.Classic = profile != RulesProfile.Full;
-            Kaiju.Types.On = profile == RulesProfile.Full;   // b12-r: Kaiju types are a Full-only rule
             if (profile == RulesProfile.Classic) DefaultSpeed = 2;
             return this;
         }
@@ -354,40 +353,8 @@ namespace CriticalMass.Sim.Config
         public double NeutralThreatMemorySeconds = 8;
         /// <summary>At 0 HP the Kaiju is knocked out for this long, then recovers to full HP.</summary>
         public double KoSeconds = 60;
-        /// <summary>b12-r (Travis's request, RULE CHANGE): the Kaiju type the biomass mix picks at the hatch (Full profile only).</summary>
-        public KaijuTypesConfig Types = new KaijuTypesConfig();
 
-        public KaijuConfig Clone()
-        {
-            var c = (KaijuConfig)MemberwiseClone();
-            c.Types = Types.Clone();
-            return c;
-        }
-    }
-
-    /// <summary>
-    /// b12-r (RULE CHANGE, owner rule numbers, the ONE table): at the hatch the plant / meat mix BOTH teams fed the egg picks
-    /// the Kaiju's type. MixShare or more plant = GROVE (tougher, slower, regenerates out of combat); MixShare or more meat =
-    /// BRUTE (hits harder, faster, frailer); anything else, or nothing fed, = STANDARD (today's Kaiju, every number unchanged).
-    /// Wood and water are not plant or meat and do not count. Live only in the Full profile (Kaiju.TypesOn: this flag and both
-    /// rule lanes on; ApplyRules sets it); Classic and PhysicsOnly always hatch STANDARD.
-    /// </summary>
-    public sealed class KaijuTypesConfig
-    {
-        public bool On = true;
-        /// <summary>Share of (plant + meat) at or above which the mix picks GROVE (plant) or BRUTE (meat).</summary>
-        public double MixShare = 0.65;
-        /// <summary>GROVE: max HP +25 %, move speed -10 %, 1 % of max HP per second once not hit for 5 s.</summary>
-        public double GroveHpScale = 1.25;
-        public double GroveSpeedScale = 0.90;
-        public double GroveRegenSharePerSecond = 0.01;
-        public double GroveRegenDelaySeconds = 5;
-        /// <summary>BRUTE: attack damage (claw and slam) +20 %, move speed +10 %, max HP -10 %.</summary>
-        public double BruteDamageScale = 1.20;
-        public double BruteSpeedScale = 1.10;
-        public double BruteHpScale = 0.90;
-
-        public KaijuTypesConfig Clone() => (KaijuTypesConfig)MemberwiseClone();
+        public KaijuConfig Clone() => (KaijuConfig)MemberwiseClone();
     }
 
     /// <summary>One class's stat row (browser ClassConfig).</summary>
