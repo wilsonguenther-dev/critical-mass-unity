@@ -196,7 +196,29 @@ namespace CriticalMass.Runtime.Onboarding
             }
             _wasAlive = me.Alive;
 
+            // b11-af (results chevron): the green chevron and the edge pointer never outlive the match. A guided match that
+            // ends before its steps do went to the results screen with the chevron still bobbing over the last target.
+            if (!GateArrow(CriticalMass.Runtime.Flow.GameFlow.State, w.Match.Phase, me.Alive))
+            {
+                if (_mascot != null) _mascot.StopPointing();   // nothing to point at (as before when down; now also after the end)
+                return;
+            }
             UpdateArrow(w, me.Alive);
+        }
+
+        /// <summary>
+        /// b11-af: the world arrow (chevron, ring, edge pointer) may show only in a live match: never once the match has
+        /// ended, never on the results screen, never while the player is down. Pure; tests.
+        /// </summary>
+        public static bool ArrowAllowed(CriticalMass.Runtime.Flow.FlowState state, MatchPhase phase, bool alive) =>
+            alive && phase != MatchPhase.Ended && state != CriticalMass.Runtime.Flow.FlowState.Results;
+
+        /// <summary>b11-af: hides the world arrow when ArrowAllowed says no; true when it may show (tests call it too).</summary>
+        public bool GateArrow(CriticalMass.Runtime.Flow.FlowState state, MatchPhase phase, bool alive)
+        {
+            if (ArrowAllowed(state, phase, alive)) return true;
+            HideArrow();
+            return false;
         }
 
         /// <summary>A long wait on one step: thinking (with a nudge) after ThinkingAfterSeconds, sleepy after SleepyAfterSeconds.
@@ -257,7 +279,8 @@ namespace CriticalMass.Runtime.Onboarding
 
         // ---------------------------------------------------------------- world arrow
 
-        void BuildArrow()
+        /// <summary>Builds the world arrow's canvas once (Begin calls it; public for ResultsChevronTests).</summary>
+        public void BuildArrow()
         {
             if (Canvas != null) return;
             var go = new GameObject("Trial Arrow Canvas", typeof(RectTransform));

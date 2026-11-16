@@ -252,16 +252,22 @@ namespace CriticalMass.Runtime.Hud.Mechanics
 
         void LateUpdateCost()
         {
-            if (CriticalMass.Runtime.Flow.GameFlow.MenuIdle) return;   // batch 4: hidden behind a menu over a backdrop match
+            if (CriticalMass.Runtime.Flow.GameFlow.MenuIdle)   // batch 4: hidden behind a menu over a backdrop match
+            {
+                // b11-af: and drawn nowhere then (it returned with the canvas still on, so the last frame's damage
+                // chevrons stayed on screen over the menu)
+                if (_canvas != null && _canvas.enabled) { _canvas.enabled = false; HideChevrons(); }
+                return;
+            }
             if (_driver == null) _driver = GetComponent<SimDriverBehaviour>();
             if (_log == null && --_logSearch <= 0) { _logSearch = 30; _log = FindAnyObjectByType<CombatLog>(); }
             World w = _driver != null ? _driver.World : null;
             MechanicsWorldView view = MechanicsWorldView.Active;
             InteractUi.UpdateScale(_canvas);
             if (_canvas.worldCamera == null) _canvas.worldCamera = UnityEngine.Camera.main;
-            bool hide = w == null || view == null || (_log != null && _log.Suppressed) || w.Match.Phase == MatchPhase.Ended;
+            bool hide = w == null || view == null || (_log != null && _log.Suppressed) || HiddenOver(CriticalMass.Runtime.Flow.GameFlow.State, w.Match.Phase);
             if (_canvas.enabled == hide) _canvas.enabled = !hide;
-            if (hide) { _recapOpen = false; return; }
+            if (hide) { _recapOpen = false; HideChevrons(); return; }
             int me = view.Feed.LocalActor;
             if (me < 0 || me >= w.ActorCount) return;
             float realNow = Time.unscaledTime;
@@ -443,6 +449,21 @@ namespace CriticalMass.Runtime.Hud.Mechanics
         }
 
         // ------------------------------------------------------------------ off-screen damage chevrons (DG-101)
+
+        /// <summary>
+        /// b11-af (results chevron): the mechanics HUD (damage chevrons, kit, recap) is hidden once the match has ended
+        /// and on the results screen, whatever world is loaded behind it. Pure; tests.
+        /// </summary>
+        public static bool HiddenOver(CriticalMass.Runtime.Flow.FlowState state, MatchPhase phase) =>
+            phase == MatchPhase.Ended || state == CriticalMass.Runtime.Flow.FlowState.Results;
+
+        /// <summary>b11-af: every damage chevron off (a hidden HUD keeps none active, so none can show when it comes back).</summary>
+        void HideChevrons()
+        {
+            for (int i = 0; i < _chev.Length; i++)
+                if (_chev[i] != null && _chev[i].gameObject.activeSelf) _chev[i].gameObject.SetActive(false);
+            ChevronsShown = 0;
+        }
 
         void TickChevrons(World w, MechanicsWorldView view, int me)
         {
