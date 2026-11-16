@@ -17,7 +17,7 @@ Measures (Idle, Walk, Run): per frame and per foot, the lowest foot vertex of th
 flag, and planted-foot slide over the cycle at the class's ground speed. Renders: front and side Walk strips with a
 ground line. Usage: blender -b --python bake_clips.py -- <out> <repo> <Class>
 """
-import bpy, sys, os, json, math
+import bpy, sys, os, json, math, re
 import numpy as np
 from mathutils import Vector, Matrix, Quaternion
 
@@ -1189,53 +1189,68 @@ except Exception as e:
 # ---------------------------------------------------------------- export <Cls>_Clips.fbx (armature + NLA takes)
 bpy.data.objects.remove(kk, do_unlink=True)
 bpy.data.objects.remove(hero, do_unlink=True)
+def export_rig(arm, takes_, path_):
+    """Export arm with one NLA take per clip (the exporter settings every <Cls>_Clips.fbx is written with)."""
+    sc_ = bpy.context.scene
+    arm.name = "Rig"
+    ad = arm.animation_data or arm.animation_data_create()
+    ad.action = None
+    for t in list(ad.nla_tracks):
+        ad.nla_tracks.remove(t)
+    for clip, a in sorted(takes_.items()):
+        tr = ad.nla_tracks.new()
+        tr.name = clip
+        st = tr.strips.new(clip, int(a.frame_range[0]), a)
+        st.name = clip
+        try:
+            if st.action_slot is None and len(a.slots):
+                st.action_slot = a.slots[0]
+        except Exception:
+            pass
+    for ob in list(sc_.objects):
+        if ob is not None:
+            ob.select_set(ob is arm)
+    bpy.context.view_layer.objects.active = arm
+    rest(arm)
+    assign(arm, None)
+    return bpy.ops.export_scene.fbx(filepath=path_, use_selection=True, object_types={"ARMATURE"}, apply_unit_scale=True,
+                                    apply_scale_options="FBX_SCALE_ALL", global_scale=1.0, axis_forward="-Z", axis_up="Y",
+                                    bake_space_transform=True, add_leaf_bones=False, primary_bone_axis="Y",
+                                    secondary_bone_axis="X", use_armature_deform_only=False, armature_nodetype="NULL",
+                                    bake_anim=True, bake_anim_use_all_bones=True, bake_anim_use_nla_strips=True,
+                                    bake_anim_use_all_actions=False, bake_anim_force_startend_keying=True, bake_anim_step=1.0,
+                                    bake_anim_simplify_factor=0.0, use_custom_props=False, path_mode="STRIP")
+
+
+path = os.path.join(OUT, f"{CLS}_Clips.fbx")
 takes = dict(baked)
 if SPLICE_INTO:
-    # b12-x2: every take of the existing clips file that was not baked now goes out unchanged next to the new ones
-    sobjs, sacts = imp(SPLICE_INTO, True)
-    kept = []
-    for a in sacts:
-        c = a.name.split("|")[-1]
+    # b12-x2: the new takes go into the EXISTING clips file in that file's own armature space. A take is the pose bones'
+    # matrix_basis against their rest, and the rest a clips file imports with is not the model's (run 43956735923:
+    # handing the file's takes to the model rig moved every joint up to 0.48 u). So: write the baked takes alone, start
+    # an empty scene, import the existing file (its armature and takes) and the baked-only file (same exporter, same
+    # importer, so the same rest), give the new takes to the existing armature, drop the other one, export.
+    tmp = os.path.join(OUT, "_baked_takes_only.fbx")
+    export_rig(fa, baked, tmp)
+    bpy.ops.wm.read_factory_settings(use_empty=True)
+    base_objs, base_acts = imp(SPLICE_INTO, True)
+    new_objs, new_acts = imp(tmp, True)
+    A_ = next(o for o in base_objs if o.type == "ARMATURE")
+    clip_of = lambda a: re.sub(r"\.\d{3}$", "", a.name.split("|")[-1])
+    takes = {clip_of(a): a for a in base_acts}
+    kept = sorted(c for c in takes if c not in baked)
+    for a in new_acts:
+        if clip_of(a) in baked:
+            takes[clip_of(a)] = a
+    for a in list(takes.values()):
         a.use_fake_user = True
-        if c not in takes:
-            takes[c] = a
-            kept.append(c)
-    for o in sobjs:
-        dat = o.data if o.type == "ARMATURE" else None
+    for o in new_objs + [o for o in base_objs if o is not A_]:
         bpy.data.objects.remove(o, do_unlink=True)
-        if dat is not None and dat.users == 0:
-            bpy.data.armatures.remove(dat)
-    REP["splice"] = dict(into=SPLICE_INTO, baked=sorted(baked), kept=sorted(kept))
+    REP["splice"] = dict(into=SPLICE_INTO, baked=sorted(baked), kept=kept, tmp=tmp)
     log("splice into", SPLICE_INTO, "baked", sorted(baked), "kept", len(kept))
-fa.name = "Rig"
-ad = fa.animation_data or fa.animation_data_create()
-ad.action = None
-for t in list(ad.nla_tracks):
-    ad.nla_tracks.remove(t)
-for clip, a in sorted(takes.items()):
-    tr = ad.nla_tracks.new()
-    tr.name = clip
-    st = tr.strips.new(clip, int(a.frame_range[0]), a)
-    st.name = clip
-    try:
-        if st.action_slot is None and len(a.slots):
-            st.action_slot = a.slots[0]
-    except Exception:
-        pass
-for ob in list(scene.objects):
-    if ob is not None:
-        ob.select_set(ob is fa)
-bpy.context.view_layer.objects.active = fa
-rest(fa)
-assign(fa, None)
-path = os.path.join(OUT, f"{CLS}_Clips.fbx")
-r = bpy.ops.export_scene.fbx(filepath=path, use_selection=True, object_types={"ARMATURE"}, apply_unit_scale=True,
-                             apply_scale_options="FBX_SCALE_ALL", global_scale=1.0, axis_forward="-Z", axis_up="Y",
-                             bake_space_transform=True, add_leaf_bones=False, primary_bone_axis="Y",
-                             secondary_bone_axis="X", use_armature_deform_only=False, armature_nodetype="NULL",
-                             bake_anim=True, bake_anim_use_all_bones=True, bake_anim_use_nla_strips=True,
-                             bake_anim_use_all_actions=False, bake_anim_force_startend_keying=True, bake_anim_step=1.0,
-                             bake_anim_simplify_factor=0.0, use_custom_props=False, path_mode="STRIP")
+    r = export_rig(A_, takes, path)
+else:
+    r = export_rig(fa, takes, path)
 REP["export"] = dict(path=path, result=list(r), bytes=os.path.getsize(path) if os.path.exists(path) else 0,
                      takes=len(takes))
 REP["log"] = LOG

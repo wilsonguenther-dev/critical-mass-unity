@@ -42,6 +42,8 @@ BAKES = {
     "final": [dict(label="healer_final", cls="Healer", env={}),
               dict(label="demo_final", cls="Demolitions",
                    env={"BAKE_TAKES": "Attack", "BAKE_SPLICE_INTO": "Assets/_Game/Art/Demolitions/Demolitions_Clips.fbx"})],
+    "splice": [dict(label="demo_splice", cls="Demolitions",
+                    env={"BAKE_TAKES": "Attack", "BAKE_SPLICE_INTO": "Assets/_Game/Art/Demolitions/Demolitions_Clips.fbx"})],
     "none": [],
 }
 COMMITTED = [  # label, path, clips
