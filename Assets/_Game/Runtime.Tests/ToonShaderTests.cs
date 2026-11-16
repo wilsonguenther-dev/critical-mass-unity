@@ -215,7 +215,8 @@ namespace CriticalMass.Runtime.Tests
                 bool on = m.IsKeywordEnabled(CriticalMass.Runtime.View.Art.ArtMaterials.BaseMapKeyword);
                 Debug.Log($"[ToonShaderTests] {spec.Key}: base map {(textured ? "yes" : "no")}, keyword {(on ? "on" : "off")} (expected {(textured ? "on" : "off")})");
                 Assert.AreEqual(textured, on, spec.Key);
-                if (spec.Key != CriticalMass.Runtime.View.Art.ArtMapping.WarriorTex) Assert.IsFalse(textured, spec.Key + " has a base map");
+                if (spec.Key != CriticalMass.Runtime.View.Art.ArtMapping.WarriorTex && spec.Key != CriticalMass.Runtime.View.Art.ArtMapping.BuilderTex)
+                    Assert.IsFalse(textured, spec.Key + " has a base map");
                 n++;
             }
             Assert.Greater(n, 5, "art materials checked");

@@ -71,9 +71,17 @@ namespace CriticalMass.Runtime.View.Art
         /// <summary>CM/Toon's base-map keyword (shader_feature_local in the lit pass).</summary>
         public const string BaseMapKeyword = "_CMTOON_BASEMAP";
 
-        /// <summary>The model's base colour texture (only the textured Warrior pilot has one), or null.</summary>
-        public static Texture2D BaseMapOf(ModelSpec spec) =>
-            spec != null && spec.Key == ArtMapping.WarriorTex ? Resources.Load<Texture2D>(ArtMapping.WarriorTexBaseMap) : null;
+        /// <summary>The model's base colour texture (the textured Warrior and Builder pilots have one), or null.</summary>
+        public static Texture2D BaseMapOf(ModelSpec spec)
+        {
+            string path = BaseMapPathOf(spec);
+            return path == null ? null : Resources.Load<Texture2D>(path);
+        }
+
+        /// <summary>Resources path of a textured pilot's base map, or null for every vertex-colour model.</summary>
+        public static string BaseMapPathOf(ModelSpec spec) =>
+            spec == null ? null : spec.Key == ArtMapping.WarriorTex ? ArtMapping.WarriorTexBaseMap
+                : spec.Key == ArtMapping.BuilderTex ? ArtMapping.BuilderTexBaseMap : null;
 
         static Texture2D FaceOf(ModelSpec spec) => spec.FaceTexture == null ? null : ArtCatalog.Load()?.Find(spec.Key)?.Face;
 

@@ -132,6 +132,39 @@ namespace CriticalMass.Runtime.View.Art
 
         /// <summary>Tests only: force the pilot on or off (null reads the command line again).</summary>
         public static void SetWarriorTexForTests(bool? on) => _warriorTex = on == null ? -1 : on.Value ? 1 : 0;
+        /// <summary>
+        /// Batch 12 textured Builder pilot (art/builder-tex-1): the Builder rebuilt from the generator's textured download
+        /// (290k triangles, 2048 base colour) by _source~/builder_tex/build_char_tex.py: collapse-decimated LODs that keep the
+        /// arm, glove and leg shells off the torso, a 1024 base colour baked from the original texture (team mask in its
+        /// alpha), weights limited per limb, the back pack rigid on the chest, on the Builder's 41-bone rig and
+        /// Builder_Clips. Selected by <c>-builderTex 1</c>; the old Builder stays the default until the owner sees it in game.
+        /// </summary>
+        public const string BuilderTex = "BuilderTex";
+        public const string BuilderTexFlag = "-builderTex";
+        /// <summary>Resources path of the pilot's base map (Art/Characters/BuilderTex/Resources/BuilderTex/BuilderTex_Base.png).</summary>
+        public const string BuilderTexBaseMap = "BuilderTex/BuilderTex_Base";
+        static int _builderTex = -1;
+
+        /// <summary>True when the command line says <c>-builderTex 1</c> (read once).</summary>
+        public static bool BuilderTexOn
+        {
+            get
+            {
+                if (_builderTex < 0) _builderTex = BuilderTexArg(Environment.GetCommandLineArgs()) ? 1 : 0;
+                return _builderTex == 1;
+            }
+        }
+
+        /// <summary><c>-builderTex 1</c> anywhere in the arguments (pure; tests). Anything else, or no flag: the old Builder.</summary>
+        public static bool BuilderTexArg(string[] args)
+        {
+            if (args == null) return false;
+            int i = Array.IndexOf(args, BuilderTexFlag);
+            return i >= 0 && i + 1 < args.Length && args[i + 1].Trim() == "1";
+        }
+
+        /// <summary>Tests only: force the pilot on or off (null reads the command line again).</summary>
+        public static void SetBuilderTexForTests(bool? on) => _builderTex = on == null ? -1 : on.Value ? 1 : 0;
         public const string Miner = "Miner";
         public const string Farmer = "Farmer";
         public const string Demolitions = "Demolitions";
@@ -380,6 +413,15 @@ namespace CriticalMass.Runtime.View.Art
                 // Height: the Hero mesh's bind-pose top is the ladder corner on his back (2.329 m in the FBX; cap crown 1.895).
                 OutlinePx = CharacterHullPx, Rim = 0.6f, Authored = BuilderAzure, Crimson = BuilderCrimson, Height = 2.33f,
                 FaceTexture = "Assets/_Game/Art/Builder/BuilderFace.png", FaceSlot = 1, ArtYawDeg = 180f, HeldWeaponInMesh = true },
+            // Batch 12 textured Builder pilot (-builderTex 1, build_char_tex.py): UV-mapped LOD0 (~7,000 tris), LOD1 (~1,800) and Shadow
+            // (<800) with a 1024 base colour (team cloth in its alpha), on the rig-builder-4 skeleton and its Builder_Clips (baked per
+            // class with foot IK, hip-height ratio 1.31 = StrideScale). Empty hands: the game hangs the mallet on handslot.r
+            // (HeldWeaponInMesh false). Height: the bind-pose LOD0 top, the chair on his back (2.3042 m).
+            new ModelSpec { Key = BuilderTex, AssetPath = "Assets/_Game/Art/Characters/BuilderTex/BuilderTex.fbx", Kind = ArtKind.Character, Rigged = true,
+                Bones = 41, ClipSource = "Assets/_Game/Art/Builder/Builder_Clips.fbx",
+                Meshes = new[] { "BuilderTex_LOD0", "BuilderTex_LOD1", "BuilderTex_Shadow" }, MaskCodes = new[] { 0 },
+                OutlinePx = CharacterHullPx, Rim = 0.6f, Authored = BuilderAzure, Crimson = BuilderCrimson, Height = 2.3042f,
+                StrideScale = 1.31f, ArtYawDeg = 180f },
             // rig-healer-1 (2026-11-14): the generated Healer body (octree shell; Hero 21.6k, LOD0 3.9k, LOD1 1.5k, Shadow 0.7k
             // tris) on the shared 41 skeleton names, whole-hand weights, leaf wings rigid on the chest (rig_body.py), clips baked
             // per class with foot IK (Healer_Clips.fbx; hip-height ratio = StrideScale). Empty hands: the game hangs the
@@ -462,7 +504,7 @@ namespace CriticalMass.Runtime.View.Art
                 case ClassId.Miner: return Miner;
                 case ClassId.Farmer: return Farmer;
                 case ClassId.Demolitions: return Demolitions;
-                case ClassId.Builder: return Builder;
+                case ClassId.Builder: return BuilderTexOn ? BuilderTex : Builder;
                 case ClassId.Healer: return Healer;
                 default: return null;
             }
