@@ -131,7 +131,7 @@ namespace CriticalMass.Sim.Core
     /// </summary>
     public static class DemolitionsNames
     {
-        public const string ClassName = "DEMOLITIONS";
+        public const string ClassName = "DEMOLITIONIST";
         /// <summary>The class ability (Space / the ability button): the land mine.</summary>
         public const string Mine = "MINE";
         /// <summary>The second ability (the DigPlace binding: F, Y on a controller): the TNT throw.</summary>

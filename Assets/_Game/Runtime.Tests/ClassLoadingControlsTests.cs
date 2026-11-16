@@ -259,7 +259,7 @@ namespace CriticalMass.Runtime.Tests
                     StringAssert.DoesNotContain("{", a.Cooldown, c + " " + a.Name);
                 }
             }
-            Assert.AreEqual("Demolitions Expert", LoreWords.Class(ClassId.Demolitions).Name);
+            Assert.AreEqual("Demolitionist", LoreWords.Class(ClassId.Demolitions).Name);
             StringAssert.Contains("he hands you", LoreWords.Class(ClassId.Builder).Bio, "the Builder is a man");
             StringAssert.Contains(cfgNumber(GameConfig.CreateDefault().Class(ClassId.Warrior).MaxHp), LoreWords.Class(ClassId.Warrior).Abilities[2].Text,
                 "numbers come from GameConfig");
