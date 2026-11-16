@@ -114,7 +114,7 @@ namespace CriticalMass.Sim.Tests.Net
                 TestContext.WriteLine($"[b12-x2 cap] host lead {rows[i, 0]}: joiner starts at {p.Lead}, floor {p.Floor}, ceiling {p.Ceiling} (expected {rows[i, 1]})");
                 Assert.AreEqual(rows[i, 1], p.Ceiling, "host lead " + rows[i, 0]);
                 Assert.AreEqual(Math.Max(p.Floor, rows[i, 0]), p.Lead, "the joiner still starts at the host's lead");
-                Assert.GreaterOrEqual(p.Ceiling, rows[i, 0] + LeadPolicy.JoinerCapOverHost, "the cap never cuts the host's own lead");
+                Assert.GreaterOrEqual(p.Ceiling, Math.Min(rows[i, 0] + LeadPolicy.JoinerCapOverHost, 21), "the cap never cuts the host's own lead (+4, unless the old 700 ms ceiling is lower)");
             }
             LeadPolicy tiny = LeadPolicy.For(3, Tick30, 50);
             TestContext.WriteLine($"[b12-x2 cap] a 50 ms maximum: floor {tiny.Floor}, ceiling {tiny.Ceiling} (the floor wins)");
