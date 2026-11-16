@@ -1007,6 +1007,7 @@ REP["round_trip"] = dict(armature=rig2.name, bones=len(rig2.data.bones), bones_m
 log("round trip", REP["round_trip"])
 import shutil
 for src, dst in ((path, X(C["repo_fbx"])), (os.path.join(OUT, KEY + "_Base.png"), X(C["repo_tex"]))):
+    if os.environ.get("BT_NO_REPO_COPY"): break           # method 2 copies by hand, only after the renders are clean
     os.makedirs(os.path.dirname(dst), exist_ok=True); shutil.copyfile(src, dst)
 REP.pop("REST", None)
 save()

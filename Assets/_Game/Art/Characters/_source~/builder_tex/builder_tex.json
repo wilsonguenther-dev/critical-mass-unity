@@ -11,16 +11,87 @@
  "crown_m": null,
  "crown_front_fraction": 0.5,
  "raw_yaw_deg": 0,
- "lod_tris": [7000, 1800, 760],
+ "lod_tris": [
+  7000,
+  1800,
+  760
+ ],
  "head_decimate_weight": 0.85,
  "tex": 1024,
  "head_uv_scale": 1.7,
- "team": {"cloth_authored": "#2A9DBA", "azure": "#2A9DBA", "crimson": "#E46753", "hue_deg": [168, 205], "sat_min": 0.33, "val_min": 0.16},
- "joint_cut": {"shoulder_r": 0.17, "hip_r": 0.22},
- "pack": {"seed_behind_m": 0.36, "grow_behind_m": 0.17, "z_min": 0.75},
+ "team": {
+  "cloth_authored": "#2A9DBA",
+  "azure": "#2A9DBA",
+  "crimson": "#E46753",
+  "hue_deg": [
+   168,
+   205
+  ],
+  "sat_min": 0.33,
+  "val_min": 0.16
+ },
+ "joint_cut": {
+  "shoulder_r": 0.17,
+  "hip_r": 0.22
+ },
+ "pack": {
+  "seed_behind_m": 0.36,
+  "grow_behind_m": 0.17,
+  "z_min": 0.75
+ },
  "fill_holes_sides": 0,
  "speck_diag_m": 0.012,
- "weights": {"power": 5.0, "smooth_iters": 3, "apron_leg_factor": 0.35, "pack_feather_rings": 4},
- "clips": {"idle": "Idle", "run": "Run", "attack": "Attack", "hit": "Hit"},
- "render_px": 300
+ "weights": {
+  "power": 5.0,
+  "smooth_iters": 3,
+  "apron_leg_factor": 0.35,
+  "pack_feather_rings": 4
+ },
+ "clips": {
+  "idle": "Idle",
+  "run": "Run",
+  "attack": "Attack",
+  "hit": "Hit"
+ },
+ "render_px": 300,
+ "remesh": {
+  "voxel_max": 0.012,
+  "voxel_min": 0.004,
+  "slab_m": 0.012,
+  "pack_voxel": 0.008,
+  "body_lod0_tris": 6100,
+  "pack_lod0_tris": 900,
+  "lod1_tris": 1800,
+  "shadow_tris": 700,
+  "head_decimate_weight": 0.3,
+  "uv_margin": 0.004,
+  "cage_extrusion": 0.02,
+  "max_ray_m": 0.05,
+  "bake_margin_px": 8,
+  "bake_samples": 4,
+  "shirt_regions": [
+   "torso",
+   "arm.l",
+   "arm.r",
+   "zarm.l",
+   "zarm.r"
+  ],
+  "lighten_clip": [
+   0.6,
+   1.25
+  ],
+  "mallet": {
+   "length": 0.62,
+   "grip_from_end": 0.12,
+   "wood": "#8A5E3B"
+  },
+  "close_r": 0.012,
+  "region_smooth_iters": 6,
+  "pack_close_r": 0.006,
+  "smooth_iters": 24,
+  "shadow_voxel": 0.05,
+  "apron_leg_factor": 1.0,
+  "allowed_rings": 2
+ },
+ "out_dir_remesh": "~/cm-art-trial/builder/game-ready-v2"
 }
