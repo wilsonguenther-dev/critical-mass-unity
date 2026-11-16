@@ -178,7 +178,9 @@ namespace CriticalMass.Sim.Tests
             Assert.AreEqual(BuiltPieces.RefusedTarget, BuiltPieces.Build(w, Bld, 7.5, 0));
             Assert.AreEqual(B.RefuseLockSeconds, w.Actors[Bld].AbilityCd, 1e-9);
             w.Actors[Bld].AbilityCd = 0;
-            // A 7-cell gap is longer than BridgeMaxCells (6).
+            // A 7-cell gap is longer than BridgeMaxCells when the cap is 6 (b12-jz: the shipped cap is 12, which the strip
+            // cannot exceed without reaching its cliff, so the refusal is checked against a 6 cap set here).
+            w.Config.Abilities.BuilderPieces.BridgeMaxCells = 6;
             Paint(w, 13, 8, 15, 18, Cell.Void);
             before = (byte[])w.Map.Cells.Clone();
             Assert.AreEqual(BuiltPieces.RefusedLength, BuiltPieces.Build(w, Bld, 20, 13.5));
