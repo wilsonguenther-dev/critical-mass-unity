@@ -155,24 +155,92 @@ namespace CriticalMass.Runtime.Online
         {
             _seenVersion = ch.Version;
             var lines = ch.Lines;
-            int size = UiScale.TypeSmall;
             float width = Mathf.Max(40f, _placed.width);
-            float lineH = Mathf.Max(1f, TextFit.LineHeightOf(_body, size));
             float bodyH = _placed.height - HudZones.ChatInputH - 6f;
-            int room = Mathf.Min(MaxLines, Mathf.Max(1, Mathf.FloorToInt(bodyH / lineH)));
-            var picked = new System.Collections.Generic.List<string>();
-            int used = 0;
-            for (int k = lines.Count - 1; k >= 0; k--)
+            _texts.Clear();
+            for (int k = 0; k < lines.Count; k++)
             {
                 ChatLine l = lines[k];
-                string text = l.Scope == ChatScope.System ? "· " + l.Text : (l.Scope == ChatScope.Team ? "[TEAM] " : "") + l.From + ": " + l.Text;
-                int need = Mathf.Max(1, Mathf.RoundToInt(TextFit.HeightOf(_body, text, size, width, true) / lineH));
-                if (used + need > room) break;
-                used += need;
-                picked.Insert(0, text);
+                _texts.Add(l.Scope == ChatScope.System ? "· " + l.Text : (l.Scope == ChatScope.Team ? "[TEAM] " : "") + l.From + ": " + l.Text);
             }
-            HudText.Set(_body, string.Join("\n", picked));
+            ShowWholeLines(_body, _texts, UiScale.TypeSmall, width, bodyH, MaxLines, _picked);
             _born = Time.unscaledTime;
+        }
+
+        // b11-af: reused on every redraw (a redraw runs only when a chat line arrives, never per frame).
+        readonly System.Collections.Generic.List<string> _texts = new System.Collections.Generic.List<string>(32);
+        readonly System.Collections.Generic.List<string> _picked = new System.Collections.Generic.List<string>(MaxLines);
+        static readonly System.Collections.Generic.List<UILineInfo> GenLines = new System.Collections.Generic.List<UILineInfo>(16);
+        static readonly TextGenerator Gen = new TextGenerator(512);
+
+        /// <summary>
+        /// b11-af (lobby notice box cut its top line in half when it scrolled): puts on body the newest of texts (oldest
+        /// first in the list) that fit a width x height box as WHOLE lines, at most maxLines drawn lines, and returns what it
+        /// set. Each candidate block is measured as one block (TextFit's wrapped height of the joined lines, which is never
+        /// under Unity's own) instead of summing per-line estimates that were rounded to whole lines; then the text the rule
+        /// actually put on the label is checked against Unity's own line layout (TopLineInside) and the oldest line goes
+        /// until the first drawn line's top edge is inside the box. picked receives the shown lines, oldest first.
+        /// Allocation only when a line arrives (the joined strings), never per frame.
+        /// </summary>
+        public static string ShowWholeLines(Text body, System.Collections.Generic.IList<string> texts, int size, float width, float height,
+            int maxLines, System.Collections.Generic.List<string> picked)
+        {
+            picked.Clear();
+            if (body == null) return string.Empty;
+            float lineH = Mathf.Max(1f, TextFit.LineHeightOf(body, size));
+            int cap = Mathf.Max(1, maxLines), used = 0;
+            string shown = string.Empty;
+            for (int k = texts.Count - 1; k >= 0; k--)
+            {
+                // the line cap counts wrapped lines (as before); the fit is the whole block's measured height against the box
+                int need = Mathf.Max(1, Mathf.RoundToInt(TextFit.HeightOf(body, texts[k], size, width, true) / lineH));
+                if (used + need > cap) break;
+                string cand = picked.Count == 0 ? texts[k] : texts[k] + "\n" + shown;
+                if (TextFit.HeightOf(body, cand, size, width, true) > height + 0.5f) break;
+                used += need;
+                picked.Insert(0, texts[k]);
+                shown = cand;
+            }
+            if (picked.Count == 0 && texts.Count > 0)
+            {
+                picked.Add(texts[texts.Count - 1]);   // the newest line alone always shows (the text rule shrinks or cuts it to fit)
+                shown = picked[0];
+            }
+            HudText.Set(body, shown);
+            // The final word: Unity's own layout of what the rule set. Drop the oldest line while the top one pokes out.
+            while (picked.Count > 1 && !TopLineInside(body))
+            {
+                picked.RemoveAt(0);
+                shown = string.Join("\n", picked);
+                HudText.Set(body, shown);
+            }
+            return shown;
+        }
+
+        /// <summary>
+        /// b11-af: true when the first drawn line of t sits wholly inside t's rect (its top edge at or under the rect's top),
+        /// from Unity's own line layout at t's current settings and canvas scale; where the font gives no metrics (headless
+        /// runner) from TextFit's measured height of the drawn text. Tests and ShowWholeLines.
+        /// </summary>
+        public static bool TopLineInside(Text t)
+        {
+            if (t == null || string.IsNullOrEmpty(t.text)) return true;
+            Rect r = t.rectTransform.rect;
+            bool wrap = t.horizontalOverflow == HorizontalWrapMode.Wrap;
+            if (t.font != null)
+            {
+                float ppu = TextFit.PixelsPerUnit(t);
+                TextGenerationSettings st = t.GetGenerationSettings(r.size);
+                st.generateOutOfBounds = true;
+                if (Gen.Populate(t.text, st))
+                {
+                    GenLines.Clear();
+                    Gen.GetLines(GenLines);
+                    if (GenLines.Count > 0 && GenLines[0].height > 0)
+                        return GenLines[0].topY / ppu <= r.yMax + 0.5f;   // generator space is the rect's pivot space x ppu
+                }
+            }
+            return TextFit.HeightOf(t, t.text, t.fontSize, r.width, wrap) <= r.height + 0.5f;
         }
 
         void StartTyping()
