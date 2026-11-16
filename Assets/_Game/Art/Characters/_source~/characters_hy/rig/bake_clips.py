@@ -1257,6 +1257,51 @@ def export_rig(arm, takes_, path_):
                                     bake_anim_simplify_factor=0.0, use_custom_props=False, path_mode="STRIP")
 
 
+def _rest_local(arm, n):
+    b = arm.data.bones[n]
+    return b.matrix_local if b.parent is None else b.parent.matrix_local.inverted() @ b.matrix_local
+
+
+def retake(src, act, dst, name):
+    """b12-x2: re-key a take of src onto dst keeping every bone's transform relative to its parent (what the FBX take
+    stores and Unity plays), not its matrix_basis (which is relative to a rest that differs between the two rigs)."""
+    assign(src, act)
+    f0, f1 = int(round(act.frame_range[0])), int(round(act.frame_range[1]))
+    nm = [pb.name for pb in dst.pose.bones if pb.name in src.pose.bones]
+    inv = {n: _rest_local(dst, n).inverted() for n in nm}
+    rec_ = {n: [] for n in nm}
+    for f in range(f0, f1 + 1):
+        bpy.context.scene.frame_set(f)
+        upd()
+        for n in nm:
+            pb = src.pose.bones[n]
+            L = pb.matrix if pb.parent is None else pb.parent.matrix.inverted() @ pb.matrix
+            l, q, sc = (inv[n] @ L).decompose()
+            if rec_[n] and Quaternion(rec_[n][-1][1]).dot(q) < 0:
+                q = -q
+            rec_[n].append((tuple(l), tuple(q), tuple(sc)))
+    new = bpy.data.actions.new(name)
+    new.use_fake_user = True
+    assign(dst, new)
+    frames = list(range(f0, f1 + 1))
+    for n in nm:
+        dst.pose.bones[n].rotation_mode = "QUATERNION"
+        for path_, idx, n_ch in (("location", 0, 3), ("rotation_quaternion", 1, 4), ("scale", 2, 3)):
+            for c in range(n_ch):
+                fc = new.fcurve_ensure_for_datablock(dst, f'pose.bones["{n}"].{path_}', index=c)
+                fc.keyframe_points.add(len(frames))
+                kv = np.empty(len(frames) * 2, np.float32)
+                kv[0::2] = frames
+                kv[1::2] = [r[idx][c] for r in rec_[n]]
+                fc.keyframe_points.foreach_set("co", kv)
+                for kp in fc.keyframe_points:
+                    kp.interpolation = "LINEAR"
+                fc.update()
+    assign(dst, None)
+    assign(src, None)
+    return new
+
+
 path = os.path.join(OUT, f"{CLS}_Clips.fbx")
 takes = dict(baked)
 if SPLICE_INTO:
@@ -1271,12 +1316,13 @@ if SPLICE_INTO:
     base_objs, base_acts = imp(SPLICE_INTO, True)
     new_objs, new_acts = imp(tmp, True)
     A_ = next(o for o in base_objs if o.type == "ARMATURE")
+    B_ = next(o for o in new_objs if o.type == "ARMATURE")
     clip_of = lambda a: re.sub(r"\.\d{3}$", "", a.name.split("|")[-1])
     takes = {clip_of(a): a for a in base_acts}
     kept = sorted(c for c in takes if c not in baked)
     for a in new_acts:
         if clip_of(a) in baked:
-            takes[clip_of(a)] = a
+            takes[clip_of(a)] = retake(B_, a, A_, clip_of(a) + "_spliced")
     for a in list(takes.values()):
         a.use_fake_user = True
     for o in new_objs + [o for o in base_objs if o is not A_]:

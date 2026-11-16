@@ -420,6 +420,9 @@ for b, od, p, lf in procs:
         continue
     clips = ("Run", "Walk", "StrafeL", "StrafeR") if b["cls"] == "Healer" else ("Attack", "Run")
     REP["files"][b["label"]] = measure(b["label"], fbx, clips, kk_leg)
+    tmp = os.path.join(od, "_baked_takes_only.fbx")
+    if os.path.exists(tmp):   # the spliced take must play like the take as baked (same parent-relative transforms)
+        REP["files"][b["label"] + "_baked_only"] = measure(b["label"] + "_baked_only", tmp, ("Attack",), kk_leg)
     committed = {"Healer": "Assets/_Game/Art/Healer/Healer_Clips.fbx", "Demolitions": "Assets/_Game/Art/Demolitions/Demolitions_Clips.fbx"}[b["cls"]]
     try:
         REP["compare"][b["label"] + "_vs_committed"] = compare(b["label"] + " vs committed", fbx, os.path.join(REPO, committed))
