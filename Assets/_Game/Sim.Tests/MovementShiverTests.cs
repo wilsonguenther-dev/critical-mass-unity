@@ -552,15 +552,10 @@ namespace CriticalMass.Sim.Tests
         public void InAWholeMatchTheKaijuGetsOntoTheHillAndNeverIdlesOffItWithNoTarget(int seed)
         {
             GameConfig cfg = GameConfig.CreateDefault();
-            // b11-c (batch 11 fix-up): this test measures an OWNED Kaiju on the hill, so the egg must not lock Berserk. Which
-            // seeds lock Berserk (instability at or over KaijuFeed.BerserkThreshold, 100, before the hatch) moves with every
-            // rule change: with the weapon-reach rule (shorter swings for every class but the Warrior) seed 1337 hatched
-            // Berserk at 4:30 and the Kaiju was never owned (ownedS 0.0, run 43926111894). Every other rule stays the
-            // game's; the berserk share itself is gated by RulesDg16bSoakTests.CM64TheBerserkShareStaysInTheCM34Band (Slow).
-            // The diag line below prints the instability at the hatch and the bots' whiff share per class, so a real
-            // regression (bots swinging at air) shows in the log instead of hiding behind this switch.
+            // b12-c: on the game's own rules (the batch 11 fix-up's Berserk-cannot-lock override is gone). The diag line below
+            // prints the hatch time, the instability at the hatch against the Berserk line, and the bots' whiffs per swings by
+            // class, so a shorter-reach regression shows in the log (control numbers: WeaponReachRuleTests' "b12-c whiffs").
             double defaultBerserkLine = cfg.KaijuFeed.BerserkThreshold;
-            cfg.KaijuFeed.BerserkThreshold = 1e9;
             Assert.IsFalse(cfg.KaijuFeed.RandomBerserk, "the fixed threshold decides (DG-41 random line off)");
             double hatchAt = -1, instabilityAtHatch = double.NaN;
             var swings = new int[6];

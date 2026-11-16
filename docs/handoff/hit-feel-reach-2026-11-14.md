@@ -186,3 +186,19 @@ Order of work for next session:
 - **Re-pin loop.** The EditMode test `WeaponReachTests` prints `[CM.WeaponReach] <class>: measured reach X u, table Y u`
   (measured = tip reach at the drawn view contact + 0.25 u step-in cap + 18 degree lean gain). The rows are replaced by
   those numbers in the fix-up round, then the Full golden is re-pinned from the "rules-combined golden" Full line.
+
+## Batch 12 item C (2026-11-16): round 2 findings and fixes
+
+- Round 2 measured Warrior 1.47, Farmer 0.96, Miner 1.37 and Builder 1.24 u (sane). Healer 0.21: the authored lantern prop
+  mesh has no CPU copy, so no tip point was found on it; `HitPose.PropPoints` now uses the mesh bounds' corners for such a
+  prop. Demolitions 0.38: the stand-in pry bar's tip stays level with her root through the whole window (out at her right
+  side, 1.1 to 1.3 u high). The test now prints the whole clip (tip and hand forward per sample), the clip's asset and how
+  many of its curve paths bind to her rig. If the clip binds and her hand never comes forward, that is an art finding
+  about her Attack clip and the stand-in, not a measure bug.
+- Bots pressed from the old distances (whiffs per swing at seed 1337: Farmer 427/700, Builder 81/156, Warrior 435/1755).
+  With the rule on they now press only when the predicted contact lands (`BotSteer.PressLands`: attacker and target
+  positions after the wind-up, within ReachOf + target radius - 0.05 u), and walk straight in when they are inside the
+  chase band but would land short. With the rule off, nothing changes.
+- `WeaponReachRuleTests.BotsDoNotWhiffMoreWithTheReachRuleThanTheControlOnTheSameSeeds` prints whiffs per class and per
+  team, and instability at the hatch, rule on against the pre-b11-c control, on the same seeds (16v16 1337 and 4242,
+  5v5 1 to 4). It fails if any class's whiff share rises more than 0.10 over the control.

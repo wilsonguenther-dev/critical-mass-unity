@@ -1,6 +1,7 @@
 using System;
 using CriticalMass.Sim.Config;
 using CriticalMass.Sim.Core;
+using CriticalMass.Sim.Bots;
 using CriticalMass.Sim.Grid;
 using NUnit.Framework;
 
@@ -162,6 +163,122 @@ namespace CriticalMass.Sim.Tests
             copy.Depth.WeaponReach.Reach[0] = 9;
             Assert.AreNotEqual(9, c.Depth.WeaponReach.Reach[0], "Clone copies the table");
             Assert.AreEqual(6, c.Depth.WeaponReach.Reach.Length, "one row per class");
+        }
+
+        // ---------------------------------------------------------------- b12-c: bot whiffs, rule on against the control
+
+        private sealed class WhiffRun
+        {
+            public readonly int[] Swings = new int[6], Whiffs = new int[6], TeamSwings = new int[2], TeamWhiffs = new int[2];
+            public double HatchAt = -1, Instability = double.NaN;
+            public bool Berserk;
+            public MatchResult Winner = MatchResult.Draw;
+        }
+
+        /// <summary>
+        /// The match config: 16v16 = the game's default (Full, as MovementShiverTests); 5v5 = CreateBrowser5v5 with the depth
+        /// lane on (as DepthSoakTests). Rule off = the CONTROL, the game before b11-c: WeaponReach off and the light weapons'
+        /// pre-b11-c Range (1.5 / 1.3 / 1.2 u), so the bots' whiffs are compared like with like.
+        /// </summary>
+        private static GameConfig MatchConfig(int teamSize, bool ruleOn)
+        {
+            GameConfig c = teamSize >= 16 ? GameConfig.CreateDefault() : GameConfig.CreateBrowser5v5();
+            c.Depth.Classic = false;
+            if (!ruleOn)
+            {
+                c.Depth.WeaponReach.Enabled = false;
+                c.Depth.LightWeapons.Builder.Range = 1.5;
+                c.Depth.LightWeapons.Demolitions.Range = 1.3;
+                c.Depth.LightWeapons.Healer.Range = 1.2;
+            }
+            return c;
+        }
+
+        /// <summary>One bot match (every slot bot-driven) for at least minTicks and until the hatch, at most maxTicks.</summary>
+        private static WhiffRun Play(int seed, int teamSize, bool ruleOn, int minTicks, int maxTicks)
+        {
+            GameConfig cfg = MatchConfig(teamSize, ruleOn);
+            World w = World.CreateWorld(new WorldOptions { Seed = seed, TeamSize = teamSize, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = cfg });
+            InputFrame scratch = SimInput.EmptyInput();
+            var r = new WhiffRun();
+            int lastHead = 0;
+            for (int t = 0; t < maxTicks && w.Match.Phase != MatchPhase.Ended; t++)
+            {
+                if (t >= minTicks && w.Match.Hatched) break;
+                MatchTick.Advance(w, null, scratch);
+                int from = Math.Max(w.EventHead >= lastHead ? lastHead : 0, w.EventHead - World.EventCapacity);
+                for (int q = from; q < w.EventHead; q++)
+                {
+                    SimEvent ev = w.Events[q % World.EventCapacity];
+                    if (ev.Type != SimEventType.AttackContact || ev.A < 0 || ev.A >= w.ActorCount) continue;
+                    Actor a = w.Actors[ev.A];
+                    int c = (int)a.Cls, team = a.Team == TeamId.Azure ? 0 : 1;
+                    if (c < 0 || c >= r.Swings.Length) continue;
+                    r.Swings[c]++;
+                    r.TeamSwings[team]++;
+                    if (ev.Value <= 0) { r.Whiffs[c]++; r.TeamWhiffs[team]++; }
+                }
+                lastHead = w.EventHead;
+                if (w.Match.Hatched && r.HatchAt < 0)
+                {
+                    r.HatchAt = w.Match.Time;
+                    r.Instability = w.Match.Instability;
+                    r.Berserk = w.Match.BerserkLocked;
+                }
+            }
+            r.Winner = w.Match.Winner;
+            return r;
+        }
+
+        private static string Shares(int[] whiffs, int[] swings)
+        {
+            var sb = new System.Text.StringBuilder();
+            for (int c = 0; c < swings.Length; c++)
+                sb.Append(c == 0 ? "" : ",").Append('"').Append(((ClassId)c).ToString()).Append("\":\"").Append(whiffs[c]).Append('/').Append(swings[c]).Append('"');
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// b12-c: bots close to inside the table reach before they swing (BotSteer.PressLands), so the shorter reach must not
+        /// raise any class's whiff share (contacts with no actor hit / swings) more than WhiffCeilingOverControl over the
+        /// control (the same seeds, rule off, pre-b11-c light-weapon ranges). Prints, per size and arm, the whiffs per swings
+        /// by class and by team, and for 16v16 the hatch time, the instability at the hatch and whether Berserk locked, so the
+        /// shorter reach's effect on the Berserk line is read like with like.
+        /// </summary>
+        [Test]
+        public void BotsDoNotWhiffMoreWithTheReachRuleThanTheControlOnTheSameSeeds()
+        {
+            const double WhiffCeilingOverControl = 0.10;
+            const int MinSwings = 40;
+            var failures = new System.Collections.Generic.List<string>();
+            foreach (int size in new[] { 16, 5 })
+            {
+                int[] seeds = size == 16 ? new[] { 1337, 4242 } : new[] { 1, 2, 3, 4 };
+                var on = new WhiffRun();
+                var off = new WhiffRun();
+                foreach (int seed in seeds)
+                    foreach (bool rule in new[] { true, false })
+                    {
+                        WhiffRun r = Play(seed, size, rule, 7200, 10800);
+                        WhiffRun sum = rule ? on : off;
+                        for (int c = 0; c < 6; c++) { sum.Swings[c] += r.Swings[c]; sum.Whiffs[c] += r.Whiffs[c]; }
+                        for (int k = 0; k < 2; k++) { sum.TeamSwings[k] += r.TeamSwings[k]; sum.TeamWhiffs[k] += r.TeamWhiffs[k]; }
+                        Console.WriteLine("{\"item\":\"b12-c whiffs\",\"size\":" + size + ",\"seed\":" + seed + ",\"rule\":\"" + (rule ? "on" : "off (control)") +
+                                          "\",\"hatchAt\":" + r.HatchAt.ToString("F0") + ",\"instabilityAtHatch\":" + r.Instability.ToString("F1") +
+                                          ",\"berserkLocked\":" + (r.Berserk ? "true" : "false") + ",\"winnerSoFar\":\"" + r.Winner + "\",\"byClass\":{" + Shares(r.Whiffs, r.Swings) +
+                                          "},\"azure\":\"" + r.TeamWhiffs[0] + "/" + r.TeamSwings[0] + "\",\"crimson\":\"" + r.TeamWhiffs[1] + "/" + r.TeamSwings[1] + "\"}");
+                    }
+                for (int c = 0; c < 6; c++)
+                {
+                    if (on.Swings[c] < MinSwings || off.Swings[c] < MinSwings) continue;
+                    double so = (double)on.Whiffs[c] / on.Swings[c], sc = (double)off.Whiffs[c] / off.Swings[c];
+                    Console.WriteLine("{\"item\":\"b12-c whiff share\",\"size\":" + size + ",\"class\":\"" + (ClassId)c + "\",\"on\":" + so.ToString("F3") +
+                                      ",\"control\":" + sc.ToString("F3") + ",\"ceiling\":" + (sc + WhiffCeilingOverControl).ToString("F3") + "}");
+                    if (so > sc + WhiffCeilingOverControl)
+                        failures.Add(size + "v" + size + " " + (ClassId)c + ": whiff share " + so.ToString("F3") + " with the rule against " + sc.ToString("F3") + " in the control");
+                }
+            }
+            Assert.IsEmpty(failures, string.Join("\n", failures));
         }
     }
 }
