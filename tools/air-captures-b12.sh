@@ -10,7 +10,7 @@
 #                     one run per AB switch off only when the candidate is over budget. Writes OUT/1-frame-control/compare.txt:
 #                     the [CM.Perf] scope and clearance lines, idle CPU, worst hitch, frames over 33 ms (counter AND recorder).
 #    2 ab-stills      -characterShots with and without -sharpOff all; Warrior -warriorTex 0 and 1
-#    3 fog            fog captures on and off (P's flags; see --fog-args)
+#    3 fog            -fogShots (P stages fog on and off stills itself), then one smoke with -fog off
 #    4 kaiju-types    -kaijuTypeShots (GROVE, BRUTE, standard at hatch)
 #    5 grenade        --affordance-shots (-affordanceShots) and -grenadeShots
 #    6 t-shots        -kaijuKoShots and -goreShots (aftermath scene), and the [CM.KaijuOwn] line (from step 1, else one smoke)
@@ -22,8 +22,9 @@
 # Player flags and who adds them in batch 12 (existing = already in c1f3bff):
 #   existing: -seed -characterShots -characterShotsOnly -affordanceShots -goreShots -hitFeelShots -flowShots
 #   added by T: -kaijuKoShots, the goreShots aftermath scene, the [CM.Perf] / [CM.KaijuOwn] lines
-#   added by AB: -sharpOff all|<switch>, -warriorTex 0|1    added by P: the fog capture flags (defaults below are guesses
-#   until P's PR names them: pass --fog-args / --fog-off-args)    added by R: -kaijuTypeShots    added by JK: -grenadeShots
+#   added by AB: -sharpOff <normals,rim,upscale,msaa,lod0|all>, -warriorTex 1 (anything else = old Warrior)
+#   added by P: -fogShots [dir] (stills with fog on and off), -fog on|off (pin)    added by R: -kaijuTypeShots [dir]
+#   added by JK: -grenadeShots, -affordanceShots (existing, extended)    T: -kaijuKoShots [dir], -goreShots
 #   added by C2: the hitFeelShots fixes (dummy at sim reach, Builder side strip)    added by X1: the results / idle / load lines
 #   added by W: the crossplay workflow's mac_host_external mode and the online host flags (--online-args)
 # Output: everything under OUT/<n>-<name>/<run>/ (Player.log, perf*.json, summary.json, data/ with pictures); each step
@@ -34,8 +35,8 @@ set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 HOST="${CM_REMOTE_HOST:-wilsons-macbook-air.local}"
 APP=""; CONTROL=""; OUT=""; ONLY=""; QUALITY=Medium; SEED=4242; DRY=0; YES=0
-AB_SWITCHES="normals,rim,upscaler,msaa,lod0"   # AB's switch names (added by AB; confirm against AB's PR)
-FOG_ARGS="-fogShots"; FOG_OFF_ARGS="-fogShots -fogOff"   # added by P; confirm against P's PR
+AB_SWITCHES="normals,rim,upscale,msaa,lod0"   # AB's switch names (SharpSwitches.cs: -sharpOff normals|rim|upscale|msaa|lod0|all)
+FOG_ARGS="-fogShots"; FOG_OFF_ARGS="-fog off"   # P (FogConfig.cs): -fogShots [dir] stages the stills with the fog on AND off; -fog on|off pins it (here: a fog-off smoke)
 ONLINE_ARGS=""
 KEEP_BUILDS="c2af29b 79b8afb"
 usage() { sed -n '2,8p' "${BASH_SOURCE[0]}" | sed 's/^# *//' >&2; exit 64; }
