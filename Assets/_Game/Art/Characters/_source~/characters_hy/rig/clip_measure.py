@@ -365,15 +365,19 @@ def compare(tag, pa, pb):
             diff[c] = dict(frames=[len(A[c]), len(B[c])])
             continue
         rot = pos = 0.0
+        worst_b = None
         for x, y in zip(A[c], B[c]):
             for b in x["q"]:
                 if b in y["q"]:
-                    rot = max(rot, qang(x["q"][b], y["q"][b]))
+                    a_ = qang(x["q"][b], y["q"][b])
+                    if a_ > rot:
+                        rot, worst_b = a_, b
             for b in x["p"]:
                 if b in y["p"]:
                     pos = max(pos, (x["p"][b] - y["p"][b]).length)
-        diff[c] = dict(max_bone_turn_deg=round(rot, 2), max_joint_move=r3(pos))
+        diff[c] = dict(max_bone_turn_deg=round(rot, 2), worst_bone=worst_b, max_joint_move=r3(pos))
     changed = {c: v for c, v in diff.items() if v.get("max_bone_turn_deg", 99) > 0.5 or (v.get("max_joint_move") or 0) > 0.005}
+    say(f"{tag}: worst bone per changed clip {[(c, diff[c].get('worst_bone'), diff[c].get('max_bone_turn_deg')) for c in sorted(changed)][:8]}")
     say(f"{tag}: clips that differ (> 0.5 deg or > 5 mm): {len(changed)} of {len(diff)} {sorted(changed)}; "
         f"only in one file: {sorted(set(A) ^ set(B))}")
     return dict(per_clip=diff, changed=sorted(changed), only_in_one=sorted(set(A) ^ set(B)))

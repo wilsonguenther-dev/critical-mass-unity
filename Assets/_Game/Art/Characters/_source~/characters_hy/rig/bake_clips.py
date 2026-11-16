@@ -1285,8 +1285,15 @@ def retake(src, act, dst, name):
     assign(dst, new)
     frames = list(range(f0, f1 + 1))
     for n in nm:
-        dst.pose.bones[n].rotation_mode = "QUATERNION"
-        for path_, idx, n_ch in (("location", 0, 3), ("rotation_quaternion", 1, 4), ("scale", 2, 3)):
+        mode = dst.pose.bones[n].rotation_mode   # keep the rig's own rotation mode: the other takes are keyed in it
+        if mode not in ("QUATERNION", "AXIS_ANGLE"):
+            prev = None
+            for i, r in enumerate(rec_[n]):
+                e = Quaternion(r[1]).to_euler(mode, prev) if prev is not None else Quaternion(r[1]).to_euler(mode)
+                prev = e
+                rec_[n][i] = (r[0], tuple(e), r[2])
+        rot_path, rot_n = ("rotation_quaternion", 4) if mode in ("QUATERNION", "AXIS_ANGLE") else ("rotation_euler", 3)
+        for path_, idx, n_ch in (("location", 0, 3), (rot_path, 1, rot_n), ("scale", 2, 3)):
             for c in range(n_ch):
                 fc = new.fcurve_ensure_for_datablock(dst, f'pose.bones["{n}"].{path_}', index=c)
                 fc.keyframe_points.add(len(frames))
