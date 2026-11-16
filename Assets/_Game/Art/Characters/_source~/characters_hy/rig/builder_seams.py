@@ -452,7 +452,7 @@ def split_by_limb(o, extra):
             dup[key] = nv; lim[nv] = S; domb[nv] = domb[src]
         return dup[key]
 
-    made = 0
+    made = 0; rebuilt_side = {}
     for S, data, mi, sm in recs:
         fv = [d[0] for d in data]
         nvs = [vert_for(v, S, fv) for v in fv]
@@ -462,7 +462,7 @@ def split_by_limb(o, extra):
             nf = bm.faces.new(nvs)
         except ValueError:
             continue
-        nf.material_index = mi; nf.smooth = sm; made += 1
+        nf.material_index = mi; nf.smooth = sm; made += 1; rebuilt_side[nf] = S
         for l, (v, cols, uvv) in zip(nf.loops, data):
             for x, c in zip(lays, cols):
                 l[x] = c
@@ -475,41 +475,92 @@ def split_by_limb(o, extra):
     if loose:
         bmesh.ops.delete(bm, geom=loose, context='VERTS')
     newb = [e for e in bm.edges if len(e.link_faces) == 1 and frozenset(e.verts) not in old_bnd]
-    caps = []
-    if newb:
-        caps = [f for f in bmesh.ops.holes_fill(bm, edges=newb, sides=0).get('faces', []) if f.is_valid]
-        cs = set(caps)
-        for f in caps:
-            for e in f.edges:
-                g = next((x for x in e.link_faces if x not in cs), None)
-                if g is None:
+    # caps: run 5 showed the rims are not closed loops (they end where the weld meets the shoulder or hip skin, which
+    # stays joined), so the generic hole fill closed almost nothing. Each limb's rim edges are walked into chains; a closed
+    # chain is fan-filled, an open chain is fan-filled together with its closing edge (its two ends), which the other
+    # side's cap shares, so the surface stays closed.
+    def face_side(f):
+        if f in rebuilt_side:
+            return rebuilt_side[f]
+        cnt = {}
+        for l in f.loops:
+            k = lim.get(l.vert, 'core'); cnt[k] = cnt.get(k, 0) + 1
+        return max(sorted(cnt), key=lambda k: (cnt[k], k == 'core'))
+
+    bys = {}
+    for e in newb:
+        bys.setdefault(face_side(e.link_faces[0]), []).append(e)
+    caps, open_chains, mixed = [], 0, 0
+    for S, es in sorted(bys.items()):
+        adj = {}
+        for e in es:
+            v0, v1 = e.verts
+            adj.setdefault(v0, []).append((v1, e)); adj.setdefault(v1, []).append((v0, e))
+        used = set()
+        starts = [v for v, n in adj.items() if len(n) % 2 == 1] + list(adj)
+        for st0 in starts:
+            while any(e not in used for _, e in adj[st0]):
+                chain, cur = [st0], st0
+                while True:
+                    step = next(((w, e) for w, e in adj[cur] if e not in used), None)
+                    if step is None:
+                        break
+                    w, e = step; used.add(e); chain.append(w); cur = w
+                    if w is st0:
+                        break
+                if chain[-1] is chain[0]:
+                    chain = chain[:-1]
+                else:
+                    open_chains += 1
+                if len(chain) < 3:
                     continue
-                d = lambda face: next(((l.vert, l.link_loop_next.vert) for l in face.loops if l.edge == e), None)
-                if d(f) == d(g):
-                    f.normal_flip()
-                break
-        if caps:
-            caps = bmesh.ops.triangulate(bm, faces=caps, quad_method='BEAUTY', ngon_method='BEAUTY')['faces']
-        cs = set(caps); mixed = []
-        for f in caps:
-            vs = [l.vert for l in f.loops]
-            if any(fused(domb.get(a, ''), domb.get(b, '')) for a in vs for b in vs if a is not b):
-                mixed.append(f); continue
-            src = None
-            for l in f.loops:
-                l2 = next((x for x in l.vert.link_loops if x.face not in cs), None)
-                if l2 is None:
-                    continue
-                src = src or l2.face
-                for x in lays:
-                    l[x] = l2[x]
-                for u in uvs:
-                    l[u].uv = l2[u].uv
-            if src is not None:
-                f.material_index = src.material_index; f.smooth = src.smooth
-        if mixed:
-            bmesh.ops.delete(bm, geom=mixed, context='FACES_ONLY')
-        rep_['cap_tris_mixed_dropped'] = len(mixed)
+                p0 = chain[0]
+                for i in range(1, len(chain) - 1):
+                    tri = (p0, chain[i], chain[i + 1])
+                    if len(set(tri)) < 3:
+                        continue
+                    try:
+                        caps.append(bm.faces.new(tri))
+                    except ValueError:
+                        pass
+    # second chance for whatever rim the chains left open (ends that did not meet the other side's closing edge)
+    rem = [e for e in bm.edges if e.is_valid and len(e.link_faces) == 1 and frozenset(e.verts) not in old_bnd]
+    if rem:
+        try:
+            extra = [f for f in bmesh.ops.holes_fill(bm, edges=rem, sides=0).get('faces', []) if f.is_valid]
+            if extra:
+                extra = bmesh.ops.triangulate(bm, faces=extra, quad_method='BEAUTY', ngon_method='BEAUTY')['faces']
+            caps += extra; rep_['second_fill_tris'] = len(extra)
+        except Exception as ex:
+            rep_['second_fill_error'] = str(ex)
+    cs = set(caps)
+    for f in caps:   # wind each cap like the face across its rim edge
+        for e in f.edges:
+            g = next((x for x in e.link_faces if x not in cs), None)
+            if g is None:
+                continue
+            d = lambda face: next(((l.vert, l.link_loop_next.vert) for l in face.loops if l.edge == e), None)
+            if d(f) == d(g):
+                f.normal_flip()
+            break
+    for f in caps:
+        vs = [l.vert for l in f.loops]
+        if any(fused(domb.get(x, ''), domb.get(y, '')) for x in vs for y in vs if x is not y):
+            mixed += 1
+        src = None
+        for l in f.loops:
+            l2 = next((x for x in l.vert.link_loops if x.face not in cs), None)
+            if l2 is None:
+                continue
+            src = src or l2.face
+            for x in lays:
+                l[x] = l2[x]
+            for u in uvs:
+                l[u].uv = l2[u].uv
+        if src is not None:
+            f.material_index = src.material_index; f.smooth = src.smooth
+    rep_['cap_tris_across_limbs'] = mixed
+    rep_['open_rim_chains'] = open_chains
     rep_.update(faces_rebuilt=made, vertices_duplicated=len(dup), new_rim_edges=len(newb), cap_tris=len(caps))
     rep_['open_edges_after'] = sum(1 for e in bm.edges if len(e.link_faces) == 1)
     rep_['open_edges_before'] = len(old_bnd)
