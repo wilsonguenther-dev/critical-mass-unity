@@ -207,6 +207,8 @@ namespace CriticalMass.Runtime.Online
         static Text L(Transform parent, string name, Rect r, Typeface face, int size, Color c, TextAnchor anchor, string text, int lines)
         {
             Text t = MenuUi.Label(parent, name, face, size, c, anchor, r.x, r.y, r.width, r.height, text, 2f);
+            t.resizeTextMaxSize = size; // b11-af-2 follow-up: shrink-only, never past the designed size
+            t.resizeTextMinSize = ContainedText.FloorFor(size);
             MenuUi.Contain(t, lines);
             return t;
         }
