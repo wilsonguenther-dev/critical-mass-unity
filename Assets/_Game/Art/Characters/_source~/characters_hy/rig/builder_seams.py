@@ -436,7 +436,7 @@ def split_by_limb(o, extra):
         recs.append((S, [(l.vert, [tuple(l[x]) for x in lays], [tuple(l[u].uv) for u in uvs]) for l in f.loops],
                      f.material_index, f.smooth))
     bmesh.ops.delete(bm, geom=list(faces), context='FACES_ONLY')
-    dup, lim, domb = {}, {}, {}
+    dup, lim, domb, orig_of = {}, {}, {}, {}
     for v, i in vidx.items():
         lim[v] = vl[i]; domb[v] = dom[i]
 
@@ -449,7 +449,7 @@ def split_by_limb(o, extra):
             nv = bm.verts.new(v.co)
             for kk, w in src[dl].items():
                 nv[dl][kk] = w
-            dup[key] = nv; lim[nv] = S; domb[nv] = domb[src]
+            dup[key] = nv; lim[nv] = S; domb[nv] = domb[src]; orig_of[nv] = v
         return dup[key]
 
     made = 0; rebuilt_side = {}
@@ -514,9 +514,14 @@ def split_by_limb(o, extra):
                     open_chains += 1
                 if len(chain) < 3:
                     continue
-                p0 = chain[0]
-                for i in range(1, len(chain) - 1):
-                    tri = (p0, chain[i], chain[i + 1])
+                # fan from the rim vertex of this limb furthest along the chain from its ends (run 6: fans from a shared
+                # end vertex made a third of the cap triangles span two limbs)
+                own = [i for i, v in enumerate(chain) if lim.get(v) == S]
+                k = min(own, key=lambda i: abs(i - (len(chain) - 1) / 2.0)) if own else 0
+                poly = chain[k:] + chain[:k]
+                p0 = poly[0]
+                for i in range(1, len(poly) - 1):
+                    tri = (p0, poly[i], poly[i + 1])
                     if len(set(tri)) < 3:
                         continue
                     try:
@@ -560,6 +565,13 @@ def split_by_limb(o, extra):
         if src is not None:
             f.material_index = src.material_index; f.smooth = src.smooth
     rep_['cap_tris_across_limbs'] = mixed
+    # last resort for rims still open: weld those duplicates back onto their originals (a little of the weld returns there,
+    # the surface stays closed)
+    rem = [e for e in bm.edges if e.is_valid and len(e.link_faces) == 1 and frozenset(e.verts) not in old_bnd]
+    tm = {v: orig_of[v] for e in rem for v in e.verts if v in orig_of and orig_of[v].is_valid}
+    if tm:
+        bmesh.ops.weld_verts(bm, targetmap=tm)
+    rep_['rewelded_vertices'] = len(tm)
     rep_['open_rim_chains'] = open_chains
     rep_.update(faces_rebuilt=made, vertices_duplicated=len(dup), new_rim_edges=len(newb), cap_tris=len(caps))
     rep_['open_edges_after'] = sum(1 for e in bm.edges if len(e.link_faces) == 1)
