@@ -16,6 +16,8 @@ namespace CriticalMass.Runtime.Game
         public static readonly ProfilerMarker KaijuHill = new ProfilerMarker("CM.KaijuHill");
         public static readonly ProfilerMarker Pace = new ProfilerMarker("CM.Pace");
         public static readonly ProfilerMarker HudEdge = new ProfilerMarker("CM.HudEdge");
+        /// <summary>b11-dg: the Kaiju shadow-grid refresh after a grid change (inside CM.KaijuHill or CM.Sim's other Kaiju calls).</summary>
+        public static readonly ProfilerMarker KaijuClear = new ProfilerMarker("CM.KaijuClear");
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         static void Install()
@@ -24,7 +26,16 @@ namespace CriticalMass.Runtime.Game
             SimProfile.End = EndSim;
         }
 
-        static void BeginSim(int id) { if (id == SimProfile.KaijuHill) KaijuHill.Begin(); }
-        static void EndSim(int id) { if (id == SimProfile.KaijuHill) KaijuHill.End(); }
+        static void BeginSim(int id)
+        {
+            if (id == SimProfile.KaijuHill) KaijuHill.Begin();
+            else if (id == SimProfile.KaijuClearance) KaijuClear.Begin();
+        }
+
+        static void EndSim(int id)
+        {
+            if (id == SimProfile.KaijuHill) KaijuHill.End();
+            else if (id == SimProfile.KaijuClearance) KaijuClear.End();
+        }
     }
 }

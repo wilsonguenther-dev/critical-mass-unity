@@ -191,39 +191,178 @@ namespace CriticalMass.Sim.Core
         private static bool PassableForKaiju(MapDef map, int cx, int cz) =>
             MapGrid.IsWalkable(map, cx, cz) || (MapGrid.InBounds(map, cx, cz) && map.Cells[cz * map.Width + cx] == Cell.Barricade);
 
-        /// <summary>Rebuild the shadow clearance grid when the real grid changed.</summary>
+        /// <summary>
+        /// b11-dg: what the shadow grid was last built from (per World, allocated once, like Barricades' memo). Built = the real
+        /// cells at that build; the rest are the inputs of ClearCellAt. Never part of the Sim state: it only lets a grid change
+        /// recompute the cells near the changed ones instead of every cell.
+        /// </summary>
+        private sealed class ClearBuild
+        {
+            public byte[] Built;
+            public int[] Changed;
+            public int[] Mark;
+            public int Stamp;
+            public MapDef Map;
+            public double R, Sr;
+            public int Halo;
+            public bool Squeeze, Crush, Guard, Valid;
+        }
+
+        private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<World, ClearBuild> ClearBuilds =
+            new System.Runtime.CompilerServices.ConditionalWeakTable<World, ClearBuild>();
+
+        /// <summary>b11-dg: more changed cells than this since the last build = one full rebuild (cheaper than many windows).</summary>
+        internal const int ClearPatchMaxCells = 48;
+
+        private static ClearBuild ClearBuildFor(World w)
+        {
+            int n = w.Map.Width * w.Map.Height;
+            if (!ClearBuilds.TryGetValue(w, out ClearBuild b) || b.Built.Length != n)
+            {
+                if (b != null) ClearBuilds.Remove(w);
+                b = new ClearBuild { Built = new byte[n], Changed = new int[ClearPatchMaxCells], Mark = new int[n] };
+                ClearBuilds.Add(w, b);
+            }
+            return b;
+        }
+
+        /// <summary>
+        /// One shadow cell (and its squeeze flag) from the real grid: the whole rule, shared by the full build and the patch so
+        /// both give the same bytes. Returns true when the shadow cell's walkable value changed.
+        /// </summary>
+        private static bool ClearCellAt(World w, MapDef map, int cx, int cz, double r, bool crush, bool squeeze, double sr, int halo,
+                                        byte[] cells, byte[] sq)
+        {
+            int i = cz * map.Width + cx;
+            bool ok = crush ? ClearanceThroughBarricades(map, cx, cz, r) : MapGrid.ClearanceOk(map, cx, cz, r);
+            // feat/kaiju-bridges-1: near a bridge, a cell its squeezed collider fits in is walkable for it too.
+            // feat/kaiju-bridges-2: or the cell centre is on a diagonal bridge's deck for the squeezed body (the CM-33
+            // deck rule the actors use): the raster stair-steps of the shallow bridges (base to hill, south island to the
+            // far islands) leave no cell the 0.7 m circle fits by the box rule.
+            bool sqz = !ok && squeeze && NearBridge(map, cx, cz, halo) &&
+                       (MapGrid.ClearanceOk(map, cx, cz, sr) || Collide.DeckSpanAt(w, cx + 0.5, cz + 0.5, sr) != null);
+            sq[i] = sqz ? (byte)1 : (byte)0;
+            byte v = ok || sqz ? Cell.Floor : Cell.Wall;
+            if (cells[i] == v) return false;
+            cells[i] = v;
+            return true;
+        }
+
+        /// <summary>
+        /// b11-dg: how far (Chebyshev cells) a real-cell change can reach into ClearCellAt: the collider box (r), the bridge halo,
+        /// the squeezed box (sr) and the diagonal-deck test (axis cells within BridgeHalfWidth + DeckPad + sr of the centre), each
+        /// plus the half cell from the centre, plus 1 spare. A cell farther than this from every changed cell keeps its value.
+        /// </summary>
+        internal static int ClearReach(double r, double sr, int halo)
+        {
+            int box = (int)Math.Ceiling(Math.Max(r, sr) + 0.5);
+            int deck = (int)Math.Ceiling(CriticalMass.Sim.Maps.SkybreakBasinMap.BridgeHalfWidth + Collide.DeckPad + sr + 0.5);
+            return Math.Max(Math.Max(box, deck), halo) + 1;
+        }
+
+        /// <summary>
+        /// Rebuild the shadow clearance grid when the real grid changed. b11-dg (frame cost): a change of a few cells (a barricade
+        /// placed, crushed or expired) recomputes only the cells within ClearReach of them, and the regions only when a shadow
+        /// cell actually changed (under the crush rule a barricade swap never changes one away from a bridge). Every shadow
+        /// cell, squeeze flag and region label comes out byte-identical to a full rebuild (each is a pure function of the real
+        /// grid within that reach, and BuildRegions a pure function of the shadow cells); the flow field is still invalidated on
+        /// every grid change exactly as before, so no Sim decision or timer moves. SimProfile.ForceFullClearance = the old path.
+        /// </summary>
         internal static void RefreshClearance(World w)
         {
             KaijuNav nav = w.KaijuNav;
             if (nav.ClearGridVersion == w.GridVersion) return;
+            SimProfile.Begin?.Invoke(SimProfile.KaijuClearance);
             MapDef map = w.Map;
             byte[] cells = nav.Clear.Cells;
+            byte[] real = map.Cells;
             int width = map.Width;
             int height = map.Height;
             double r = GridR(w);
             bool squeeze = SqueezeOn(w);
-            bool crush = Phys.On(w, w.Config.Physics.KaijuNavGuard) && Phys.On(w, w.Config.Physics.KaijuHillSiege);
+            bool guard = Phys.On(w, w.Config.Physics.KaijuNavGuard);
+            bool crush = guard && Phys.On(w, w.Config.Physics.KaijuHillSiege);
             double sr = w.Config.Physics.KaijuSqueezeRadius;
             int halo = w.Config.Physics.KaijuSqueezeHalo;
             byte[] sq = nav.Squeeze;
-            for (int cz = 0; cz < height; cz++)
-                for (int cx = 0; cx < width; cx++)
+            ClearBuild b = ClearBuildFor(w);
+            bool same = b.Valid && nav.ClearGridVersion >= 0 && !SimProfile.ForceFullClearance && ReferenceEquals(b.Map, map) &&
+                        b.R == r && b.Sr == sr && b.Halo == halo && b.Squeeze == squeeze && b.Crush == crush && b.Guard == guard;
+            int changed = 0;
+            if (same)
+            {
+                int n = width * height;
+                byte[] built = b.Built;
+                for (int i = 0; i < n; i++)
                 {
-                    int i = cz * width + cx;
-                    bool ok = crush ? ClearanceThroughBarricades(map, cx, cz, r) : MapGrid.ClearanceOk(map, cx, cz, r);
-                    // feat/kaiju-bridges-1: near a bridge, a cell its squeezed collider fits in is walkable for it too.
-                    // feat/kaiju-bridges-2: or the cell centre is on a diagonal bridge's deck for the squeezed body (the CM-33
-                    // deck rule the actors use): the raster stair-steps of the shallow bridges (base to hill, south island to the
-                    // far islands) leave no cell the 0.7 m circle fits by the box rule.
-                    bool sqz = !ok && squeeze && NearBridge(map, cx, cz, halo) &&
-                               (MapGrid.ClearanceOk(map, cx, cz, sr) || Collide.DeckSpanAt(w, cx + 0.5, cz + 0.5, sr) != null);
-                    sq[i] = sqz ? (byte)1 : (byte)0;
-                    cells[i] = ok || sqz ? Cell.Floor : Cell.Wall;
+                    if (built[i] == real[i]) continue;
+                    if (changed == ClearPatchMaxCells)
+                    {
+                        same = false;
+                        break;
+                    }
+                    b.Changed[changed++] = i;
                 }
+            }
+            bool regions;
+            if (same)
+            {
+                SimProfile.ClearancePatches++;
+                if (b.Stamp == int.MaxValue)
+                {
+                    Array.Fill(b.Mark, 0);
+                    b.Stamp = 0;
+                }
+                int stamp = ++b.Stamp;
+                int[] mark = b.Mark;
+                int reach = ClearReach(r, sr, halo);
+                bool any = false;
+                for (int c = 0; c < changed; c++)
+                {
+                    int ci = b.Changed[c];
+                    int ccx = ci % width;
+                    int ccz = ci / width;
+                    int z0 = Math.Max(0, ccz - reach), z1 = Math.Min(height - 1, ccz + reach);
+                    int x0 = Math.Max(0, ccx - reach), x1 = Math.Min(width - 1, ccx + reach);
+                    for (int cz = z0; cz <= z1; cz++)
+                        for (int cx = x0; cx <= x1; cx++)
+                        {
+                            int i = cz * width + cx;
+                            if (mark[i] == stamp) continue;
+                            mark[i] = stamp;
+                            if (ClearCellAt(w, map, cx, cz, r, crush, squeeze, sr, halo, cells, sq)) any = true;
+                        }
+                    b.Built[ci] = real[ci];
+                }
+                regions = any;
+            }
+            else
+            {
+                SimProfile.ClearanceFullRebuilds++;
+                for (int cz = 0; cz < height; cz++)
+                    for (int cx = 0; cx < width; cx++)
+                        ClearCellAt(w, map, cx, cz, r, crush, squeeze, sr, halo, cells, sq);
+                Array.Copy(real, b.Built, real.Length);
+                b.Map = map;
+                b.R = r;
+                b.Sr = sr;
+                b.Halo = halo;
+                b.Squeeze = squeeze;
+                b.Crush = crush;
+                b.Guard = guard;
+                b.Valid = true;
+                regions = true;
+            }
             nav.ClearGridVersion = w.GridVersion;
-            // The field was built over the old shadow grid: force a rebuild.
+            // The field was built over the old shadow grid: force a rebuild (on every grid change, as before b11-dg: the
+            // rebuild resets RepathIn, so skipping it would move the Sim).
             nav.FieldWallVersion = -1;
-            if (Phys.On(w, w.Config.Physics.KaijuNavGuard)) BuildRegions(w);
+            if (guard && regions)
+            {
+                SimProfile.ClearanceRegionBuilds++;
+                BuildRegions(w);
+            }
+            SimProfile.End?.Invoke(SimProfile.KaijuClearance);
         }
 
         /// <summary>
