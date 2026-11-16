@@ -108,6 +108,17 @@ PLANT = 0.025          # KayKit ankle within 2.5% of leg length of its rest heig
 PLANT_RUN = {"Builder": float(os.environ.get("BAKE_PLANT_RUN", "0.10")), "Healer": 0.14}.get(CLS)   # rig-healer-3: Healer too (0.36 u/u run slide in the game; 0.205 at 0.10 by check_sheet)
 
 
+# b12-x2: the Healer's run read ragged. Two bake options, OFF for every class unless its env var says otherwise (today's
+# behaviour), with a per-class default dict so a class can be switched on in ONE place:
+#   LOOP_ANCHOR (BAKE_LOOP_ANCHOR=1): locomotion loops are baked over two cycles and the second is kept, so a stance that
+#     runs across the clip's end and start keeps ONE anchored track (before, the anchor restarted at the first frame from
+#     KayKit's scaled foot and the planted foot jumped at the loop seam).
+#   RELEASE_BLEND (BAKE_RELEASE_BLEND=N): for N frames after a stance ends, the anchored-minus-free foot offset fades out
+#     (before, the swing foot snapped from the anchored track back onto KayKit's scaled track in one frame).
+LOOP_ANCHOR = os.environ.get("BAKE_LOOP_ANCHOR", {}.get(CLS, "0")) == "1"
+RELEASE_BLEND = int(os.environ.get("BAKE_RELEASE_BLEND", {}.get(CLS, "0")))
+
+
 def plant_n(clip):
     if PLANT_RUN and clip in ("Run", "RunBack", "StrafeL", "StrafeR"):
         return PLANT_RUN
@@ -393,7 +404,10 @@ ATTACK_GAIN = {"Attack": 1.8}
 # Idle pose with flat planted feet (foot IK as Idle); only the hips come down. Angles in degrees, world space at each
 # bone's head: pitch + folds forward (about +X, the body faces -Y), yaw + turns left (about +Z); arm angles turn about
 # the shoulder line, - raises forward; th = mallet direction in the swing plane, 0 up, + toward the back.
-MALLET = CLS == "Builder" and os.environ.get("BAKE_MALLET", "1") == "1"
+# b12-x2: the Demolitions Attack can take the same hand-keyed strike (BAKE_DEMO_STRIKE=1): her scaled 1H chop left the
+# pry bar tip level with her root, out at her right side, never forward through the contact window (C2, batch 12).
+MALLET = (CLS == "Builder" and os.environ.get("BAKE_MALLET", "1") == "1") or \
+         (CLS == "Demolitions" and os.environ.get("BAKE_DEMO_STRIKE", "0") == "1")
 MODE = {"mallet": MALLET}
 MALLET_TGT = [None]
 _CT = (CLIP_CONTACT.get("Attack", 0.5667) / CLIP_LEN.get("Attack", 1.0667)) if CLIP_LEN.get("Attack") else 0.531
@@ -627,7 +641,22 @@ def bake_action(clip, act):
     prev_v = {s: None for s in SIDES}
     lowered = 0.0
     gain_q0 = {}
-    for f in range(f0, f1 + 1):
+    # b12-x2 LOOP_ANCHOR: a locomotion loop is walked twice and only the second cycle is recorded, so the anchor and the
+    # release fade carry over the seam. The first cycle leaves out the end frame when it repeats the first (one period).
+    seq = list(range(f0, f1 + 1))
+    if LOOP_ANCHOR and NEW_BODY and clip in ORDER_CLIPS and bdir is not None and f1 > f0:
+        scene.frame_set(f0)
+        _a0 = snap(kk)
+        scene.frame_set(f1)
+        _a1 = snap(kk)
+        dup = all((_a0["A" + s] - _a1["A" + s]).length < 1e-4 for s in SIDES) and (_a0["hips"] - _a1["hips"]).length < 1e-4
+        seq = list(range(f0, f1 if dup else f1 + 1)) + seq
+        REP.setdefault("loop_anchor", {})[clip] = dict(end_repeats_start=bool(dup), cycle_frames=len(seq) - (f1 - f0 + 1))
+    skip = len(seq) - (f1 - f0 + 1)
+    rel_off = {s: Vector((0, 0, 0)) for s in SIDES}
+    rel_left = {s: 0 for s in SIDES}
+    for tick, f in enumerate(seq):
+        recording = tick >= skip
         scene.frame_set(fi0 if MAL else f)
         for pb in faP:
             k = kkP.get(pb.name)
@@ -702,18 +731,26 @@ def bake_action(clip, act):
             planted = (K["A" + s].z - K0["A" + s].z) < (plant_n(clip) if NEW_BODY and clip in ORDER_CLIPS else PLANT) * leg_k
             if planted and bdir is not None:
                 if anchor[s] is None:
-                    anchor[s] = (A.copy(), f)
+                    anchor[s] = (A.copy(), tick)   # tick = f - f0 (+ one period in LOOP_ANCHOR's recorded cycle)
                 a0, fa0 = anchor[s]
-                A.x, A.y = (a0 + bdir * vg_ * (f - fa0) / fps).x, (a0 + bdir * vg_ * (f - fa0) / fps).y
+                _free = A.copy()
+                A.x, A.y = (a0 + bdir * vg_ * (tick - fa0) / fps).x, (a0 + bdir * vg_ * (tick - fa0) / fps).y
+                if RELEASE_BLEND > 0:
+                    rel_off[s] = Vector((A.x - _free.x, A.y - _free.y, 0.0))
+                    rel_left[s] = RELEASE_BLEND
             elif not planted:
                 anchor[s] = None
+                if RELEASE_BLEND > 0 and rel_left[s] > 0:
+                    A += rel_off[s] * (rel_left[s] / (RELEASE_BLEND + 1.0))   # b12-x2: fade the anchored offset out
+                    rel_left[s] -= 1
             z = sole_z(s, A, R)
             ZPRE[s], PL[s], KUP[s] = z, planted, K["A" + s].z - K0["A" + s].z
             if planted:
                 A.z -= z
             elif z < 0:
                 A.z -= z
-            contact[s].append(bool(planted))
+            if recording:
+                contact[s].append(bool(planted))
             targets[s], rots[s] = A, R
         # The game's facing read (SanityRig.TryFront) takes the foot with the LOWER ankle. Pinning planted soles to z 0
         # flipped KayKit's ankle order on a few locomotion frames (Warrior StrafeR frame 18: 3 mm the other way, the
@@ -785,14 +822,14 @@ def bake_action(clip, act):
             log("trace", f, "kk ankle z l %.3f r %.3f" % (K["Al"].z, K["Ar"].z), "target z l %.3f r %.3f" % (targets["l"].z, targets["r"].z),
                 "final z l %.3f r %.3f" % (W(fa, faP["foot.l"].head).z, W(fa, faP["foot.r"].head).z),
                 "planted", PL.get("l"), PL.get("r"), "hips z %.3f" % W(fa, faP["hips"].head).z, "upperleg z %.3f" % W(fa, faP["upperleg.l"].head).z)
-        if clip in ("Run", "StrafeR"):
+        if clip in ("Run", "StrafeR") and recording:
             _a = W(fa, faP["foot.l"].head); _t = W(fa, faP["toes.l"].head)
             REP.setdefault("dbg_" + clip, []).append([f, bool(PL.get("l")), [round(targets["l"].x, 3), round(targets["l"].y, 3), round(targets["l"].z, 3)],
                                                      [round(_a.x, 3), round(_a.y, 3), round(_a.z, 3)], [round(_t.x, 3), round(_t.y, 3), round(_t.z, 3)],
                                                      None if anchor["l"] is None else anchor["l"][1]])
         clear_tip(clip)
         hold_slot()
-        for pb in faP:
+        for pb in (faP if recording else ()):   # b12-x2: LOOP_ANCHOR's first cycle is not recorded
             l, q, sc = pb.matrix_basis.decompose()
             if rec[pb.name] and Quaternion(rec[pb.name][-1][1]).dot(q) < 0:
                 q = -q

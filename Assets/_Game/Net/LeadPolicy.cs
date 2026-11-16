@@ -19,10 +19,23 @@ namespace CriticalMass.Net
     /// </list>
     /// Pure and deterministic in its inputs; the lead only decides which future tick a local input is sent for, so it never
     /// touches what the worlds compute.
+    /// <para>
+    /// b12-x2: a joiner's lead is also capped at <see cref="JoinerCap"/> (the host's lead + <see cref="JoinerCapOverHost"/>,
+    /// at least <see cref="JoinerCapMinTicks"/>), under the old ceiling: Room A (batch 11, relay) peaked at 17 to 18 ticks
+    /// for a joiner whose host sat at 10. Same grow and shrink rules; never below the floor. A link whose round trip needs
+    /// more than the cap gets its late inputs repeated by the host (as today past the ceiling) rather than a longer delay.
+    /// The cap needs nothing on the wire: the joiner's starting lead IS the host's lead (the room's start delay).
+    /// </para>
     /// </summary>
     public sealed class LeadPolicy
     {
         public const int SafetyTicks = 2;
+
+        /// <summary>b12-x2, the joiner cap's numbers (the one place they live): max(host lead + 4, 12) ticks.</summary>
+        public const int JoinerCapOverHost = 4, JoinerCapMinTicks = 12;
+
+        /// <summary>The most ticks a joiner's lead may reach in a room whose host lead (start delay) is hostLead.</summary>
+        public static int JoinerCap(int hostLead) => Math.Max(hostLead + JoinerCapOverHost, JoinerCapMinTicks);
         public const long WindowMs = 1500, ShrinkEveryMs = 1000, QuietMs = 3000, GrowGapMs = 500;
 
         public readonly int Floor, Ceiling;
@@ -45,9 +58,14 @@ namespace CriticalMass.Net
             Min = Max = Lead;
         }
 
-        /// <summary>The floor and ceiling at a tick length: 100 ms (at least 2 ticks) to maxLeadMs.</summary>
+        /// <summary>
+        /// A joiner's policy. start is the room's start delay, which is the host's lead for the whole match. The floor is
+        /// 100 ms (at least 2 ticks); the ceiling is maxLeadMs or <see cref="JoinerCap"/>(start), whichever is lower, and
+        /// never under the floor.
+        /// </summary>
         public static LeadPolicy For(int start, double tickMs, int maxLeadMs) =>
-            new LeadPolicy(start, Math.Max(2, (int)Math.Ceiling(FloorMs / tickMs - 1e-6)), Math.Max(2, (int)Math.Ceiling(maxLeadMs / tickMs - 1e-6)));
+            new LeadPolicy(start, Math.Max(2, (int)Math.Ceiling(FloorMs / tickMs - 1e-6)),
+                Math.Min(Math.Max(2, (int)Math.Ceiling(maxLeadMs / tickMs - 1e-6)), JoinerCap(Math.Max(1, start))));
 
         /// <summary>The lead never goes below this many milliseconds (frame and send pacing alone take about this).</summary>
         public const int FloorMs = 100;

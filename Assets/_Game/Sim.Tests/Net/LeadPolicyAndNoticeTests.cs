@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using CriticalMass.Net;
 using NUnit.Framework;
@@ -98,6 +99,67 @@ namespace CriticalMass.Sim.Tests.Net
             CollectionAssert.AreEquivalent(new[] { "AIDAN joined.", "JEISIL left the room." }, texts);
             RoomNotices.Roster(known, new List<RoomMember> { M(0, "WILSON"), M(2, "ME"), M(3, "AIDAN") }, chat, 20, 2, true);
             Assert.AreEqual(2, chat.Lines.Count, "an unchanged roster posts nothing");
+        }
+
+        // ------------------------------------------------------------------ b12-x2: the joiner cap
+
+        [Test]
+        public void TheJoinerCapIsHostLeadPlus4OrAtLeast12AndNeverUnderTheFloor()
+        {
+            // host lead -> expected ceiling at 30 Hz with the 700 ms maximum (21 ticks)
+            int[,] rows = { { 3, 12 }, { 6, 12 }, { 8, 12 }, { 10, 14 }, { 12, 16 }, { 19, 21 } };
+            for (int i = 0; i < rows.GetLength(0); i++)
+            {
+                LeadPolicy p = LeadPolicy.For(rows[i, 0], Tick30, 700);
+                TestContext.WriteLine($"[b12-x2 cap] host lead {rows[i, 0]}: joiner starts at {p.Lead}, floor {p.Floor}, ceiling {p.Ceiling} (expected {rows[i, 1]})");
+                Assert.AreEqual(rows[i, 1], p.Ceiling, "host lead " + rows[i, 0]);
+                Assert.AreEqual(Math.Max(p.Floor, rows[i, 0]), p.Lead, "the joiner still starts at the host's lead");
+                Assert.GreaterOrEqual(p.Ceiling, rows[i, 0] + LeadPolicy.JoinerCapOverHost, "the cap never cuts the host's own lead");
+            }
+            LeadPolicy tiny = LeadPolicy.For(3, Tick30, 50);
+            TestContext.WriteLine($"[b12-x2 cap] a 50 ms maximum: floor {tiny.Floor}, ceiling {tiny.Ceiling} (the floor wins)");
+            Assert.AreEqual(tiny.Floor, tiny.Ceiling, "the ceiling is never under the floor");
+            Assert.AreEqual(3, tiny.Floor, "today's floor (100 ms at 30 Hz) is unchanged");
+        }
+
+        [Test]
+        public void AJitteryJoinerWithHostLead10NeverGoesOverTheCapAndRecovers()
+        {
+            const int hostLead = 10, cap = 14, recoverWithinMs = 12_000, spikeFrom = 10_000, spikeTo = 14_000, settleBound = 6 + LeadPolicy.SafetyTicks + 1;
+            Assert.AreEqual(cap, LeadPolicy.JoinerCap(hostLead));
+            LeadPolicy p = LeadPolicy.For(hostLead, Tick30, 700);
+            LeadPolicy old = new LeadPolicy(hostLead, p.Floor, 21);   // the same script under the old ceiling only
+            Assert.AreEqual(hostLead, p.Lead, "starts at the host's lead");
+            Assert.AreEqual(cap, p.Ceiling);
+            uint rng = 12345;
+            long recoveredAt = -1;
+            int worstBeforeSpike = 0;
+            for (long t = 0; t <= 30_000; t += 30)
+            {
+                rng = rng * 1664525u + 1013904223u;
+                int need = 4 + (int)((rng >> 16) % 3);                                  // a round trip needing 4 to 6 ticks
+                if (t < spikeFrom && (rng >> 8) % 300 == 0) need = 12;                    // a rare one-packet spike
+                if (t >= spikeFrom && t < spikeTo) need = 20;                             // a 4 s spike far over the cap
+                foreach (LeadPolicy q in new[] { p, old })
+                {
+                    int margin = q.Lead - need;
+                    if (margin < 0) q.OnLate(t);
+                    q.OnMargin(margin, t);
+                }
+                if (t < spikeFrom) worstBeforeSpike = Math.Max(worstBeforeSpike, p.Lead);
+                if (t >= spikeTo && recoveredAt < 0 && p.Lead <= settleBound) recoveredAt = t;
+                if (t % 250 == 0)
+                    TestContext.WriteLine($"[b12-x2 lead] t {t} ms need {need} lead {p.Lead} (old ceiling 21: {old.Lead}) cap {cap} floor {p.Floor}");
+                Assert.LessOrEqual(p.Lead, cap, "over the cap at " + t + " ms");
+                Assert.GreaterOrEqual(p.Lead, p.Floor, "under the floor at " + t + " ms");
+            }
+            TestContext.WriteLine($"[b12-x2 lead] leadmin {p.Min} leadmax {p.Max} (limit {cap}); old ceiling's leadmax {old.Max}; " +
+                                  $"worst before the spike {worstBeforeSpike}; back to {settleBound} or less {(recoveredAt < 0 ? "never" : (recoveredAt - spikeTo) + " ms")} after the spike (limit {recoverWithinMs} ms); grown {p.Grown} shrunk {p.Shrunk}");
+            Assert.AreEqual(cap, p.Max, "the spike drove it to the cap and no further");
+            Assert.Greater(old.Max, cap, "the script really pushes past the cap (the old ceiling let it)");
+            Assert.GreaterOrEqual(recoveredAt, spikeTo, "it came back down after the spike");
+            Assert.LessOrEqual(recoveredAt - spikeTo, recoverWithinMs, "recovers within the limit");
+            Assert.AreEqual(10, RoomHost.StartDelay(2 * (10 * 25 - 60), 25.0), "the host's lead (the room's start delay) is computed as before");
         }
 
         static RoomMember M(int peer, string name) => new RoomMember { Peer = peer, Name = name, Confirmed = true };
