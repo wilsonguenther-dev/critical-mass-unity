@@ -488,5 +488,22 @@ namespace CriticalMass.Runtime.Tests
             Assert.IsTrue(CriticalMass.Runtime.Menus.LoadingScreen.Settled(0, CriticalMass.Runtime.Menus.LoadingScreen.SettleWaitSeconds),
                 "a throttled window never holds the screen up");
         }
+
+        [Test]
+        public void MediumRenderScaleFollowsTheUpscaleSwitch()
+        {
+            // Batch 12 AB, sharpness switch "upscale": the 8 GB first-launch pick renders Medium at 0.85 (0.75 when off).
+            try
+            {
+                SharpSwitches.SetForTests(SharpSwitches.Switch.None);
+                float on = FramePolicy.PickQuality("Apple M1", 0, 8192, 6, FramePolicy.LevelHigh).scale;
+                SharpSwitches.SetForTests(SharpSwitches.Switch.Upscale);
+                float off = FramePolicy.PickQuality("Apple M1", 0, 8192, 6, FramePolicy.LevelHigh).scale;
+                Debug.Log($"[PerfAndFeelTests] Medium render scale on an 8 GB M1: switch on {on:0.00} (expected 0.85), -sharpOff upscale {off:0.00} (expected 0.75)");
+                Assert.AreEqual(0.85f, on, 1e-6f);
+                Assert.AreEqual(0.75f, off, 1e-6f);
+            }
+            finally { SharpSwitches.ResetForTests(); }
+        }
     }
 }

@@ -34,7 +34,9 @@ namespace CriticalMass.Runtime.Game
         /// <summary>The pixel budget at default settings (1080p-equivalent) and at High and above.</summary>
         public const double DefaultPixelBudget = 2_100_000;
         public const double HighPixelBudget = 3_700_000;
-        public const float MidRenderScale = 0.75f;
+        /// <summary>Medium's first-launch render scale: 0.85 with the sharpness switch "upscale" on (batch 12 AB), 0.75 with
+        /// -sharpOff upscale. URP keeps upscaling bilinear here (FSR needs camera post-processing: SharpSwitches).</summary>
+        public static float MidRenderScale => SharpSwitches.MidRenderScaleFor(SharpSwitches.Upscale);
         public const float LowRenderScale = 0.75f;
         public const float SafeRenderScale = 0.7f;
         public const float MinRenderScale = 0.4f;
