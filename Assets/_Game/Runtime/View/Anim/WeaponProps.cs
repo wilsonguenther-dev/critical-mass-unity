@@ -21,8 +21,12 @@ namespace CriticalMass.Runtime.View.Anim
             return lw != null ? lw.ArcDeg : c.Class(cls).AttackArcDeg;
         }
 
-        /// <summary>The reach a swing of cls draws (u): the sim's own (b11-c: Combat.ReachOf, the weapon-reach table in Full).</summary>
-        public static double Range(GameConfig c, ClassId cls) => Combat.ReachOf(c, cls);
+        /// <summary>The reach a swing of cls draws (u).</summary>
+        public static double Range(GameConfig c, ClassId cls)
+        {
+            LightWeapon lw = On(c, cls);
+            return lw != null ? lw.Range : c.Class(cls).AttackRange;
+        }
 
         /// <summary>True when a hit by an attacker of attCls shoves (so the hit shows the push-back dust).</summary>
         public static bool Shoves(GameConfig c, bool hasAttacker, ClassId attCls)
@@ -58,12 +62,8 @@ namespace CriticalMass.Runtime.View.Anim
         /// <summary>Grip: the handle runs along the socket's +Y (the KayKit weapon convention), held this far from its end.</summary>
         public static readonly Vector3 GripEuler = Vector3.zero;
         public const float GripFromEnd = 0.12f;
-        /// <summary>
-        /// b12-c2 view: the mallet read badly against brown gloves (the old #8A5E3B wood). Light steel head and pale ash
-        /// handle, team-safe neutrals (never a team hue); the stand-in pry bar stays dark iron.
-        /// </summary>
-        public const string MalletHeadHex = "#A9B3BC", MalletHandleHex = "#C9A77C";
-        public const string PryBarIronHex = "#3B4048";
+        /// <summary>Team-safe neutrals: weathered wood (mallet) and dark iron (stand-in pry bar).</summary>
+        public const string MalletWoodHex = "#8A5E3B", PryBarIronHex = "#3B4048";
         public const string PropName = "Light Weapon";
 
         readonly ArtCatalog _catalog;
@@ -126,7 +126,7 @@ namespace CriticalMass.Runtime.View.Anim
             // The head: a 0.26 x 0.14 x 0.14 block across the handle's top.
             parts[1] = new CombineInstance { mesh = cube, transform = Matrix4x4.TRS(new Vector3(0f, L * 0.88f, 0f), Quaternion.identity, new Vector3(0.14f, 0.14f, 0.26f)) };
             var m = new Mesh { name = "LightWeapon_MalletShape" };
-            m.CombineMeshes(parts, false, true);   // b12-c2 view: two submeshes, 0 = handle, 1 = head (one colour each)
+            m.CombineMeshes(parts, true, true);
             m.RecalculateBounds();
             _malletMesh = m;
             return m;
@@ -150,20 +150,7 @@ namespace CriticalMass.Runtime.View.Anim
             return go;
         }
 
-        /// <summary>
-        /// b12-c2 view: handle and head in their own colours (submesh 0 and 1: one more draw call per mallet than before),
-        /// each with the characters' outline width (ToonMaterials.CharacterOutlinePx, 3 px, in place of the props' 2.5 px)
-        /// so the mallet keeps a line against the glove. Same CM/Toon material path, cached per colour.
-        /// </summary>
-        static GameObject MakeMallet()
-        {
-            GameObject go = MeshObject(PropName + " (Mallet)", MalletMesh(), MalletMaterial(MalletHandleHex));
-            go.GetComponent<MeshRenderer>().sharedMaterials = new[] { MalletMaterial(MalletHandleHex), MalletMaterial(MalletHeadHex) };
-            return go;
-        }
-
-        static Material MalletMaterial(string hex) =>
-            ToonMaterials.Toon("prop", hex, hex, ToonMaterials.CharacterOutlinePx, 0f, ToonMaterials.OutlineFromNormal);
+        static GameObject MakeMallet() => MeshObject(PropName + " (Mallet)", MalletMesh(), ToonMaterials.Prop(MalletWoodHex, false));
 
         /// <summary>STAND-IN until a pry-bar model exists: a dark-iron bar built from boxes (PryBarMesh).</summary>
         static GameObject MakeStandInPryBar() => MeshObject(PropName + " (Pry Bar STAND-IN)", PryBarMesh(), ToonMaterials.Prop(PryBarIronHex, false));

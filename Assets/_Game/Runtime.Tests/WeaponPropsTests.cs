@@ -60,59 +60,6 @@ namespace CriticalMass.Runtime.Tests
             Assert.IsNull(WeaponProps.Attach(null, HeldWeapon.Mallet, TeamId.Azure, null));
         }
 
-        /// <summary>
-        /// b12-i (carried by b12-c2; Air look of build 36a581c: "no mallet in either hand"). The character shots hang the
-        /// class's hand prop exactly as the game does (CharacterShotsCapture spawns ModelView directly, outside ActorViews,
-        /// and used to shoot the Builder, Healer and Demolitions Expert empty-handed). b12-c2: the base has the OLD KayKit
-        /// Builder, whose spec says HeldWeaponInMesh (his mallet is part of his mesh, rigid on handslot.r), so for that spec
-        /// the truth is "no prop is hung, the mesh shows it"; for a Builder spec without the flag the prop hangs from the real
-        /// weapon slot (handslot.r, not the hand.r fallback), is drawn, about one mallet long and points out of the fist.
-        /// Prints which branch it checked.
-        /// </summary>
-        [Test]
-        public void TheBuilderRigShowsHisMalletOnTheHandSlot()
-        {
-            ModelSpec spec = ArtMapping.Spec(ArtMapping.Builder);
-            var asset = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>(spec.AssetPath);
-            Assert.IsNotNull(asset, spec.AssetPath + " is not imported");
-            string src = System.IO.File.ReadAllText(System.IO.Path.Combine(Application.dataPath, "_Game/Runtime/View/Art/CharacterShotsCapture.cs"));
-            StringAssert.Contains("HangHandProp(m, cls, team, _catalog);", src, "the character shots hang the hand prop as the game does");
-            GameObject go = Object.Instantiate(asset);
-            try
-            {
-                Transform hand = null;
-                foreach (Transform t in go.GetComponentsInChildren<Transform>(true))
-                    if (t.name == WeaponProps.HandBone) { hand = t; break; }
-                Assert.IsNotNull(hand, "the Builder rig has the weapon slot " + WeaponProps.HandBone + " (not only the fallback)");
-                if (spec.HeldWeaponInMesh)
-                {
-                    Debug.Log("[WeaponProps] Builder spec " + spec.AssetPath + ": HeldWeaponInMesh = true (the mallet is part of his mesh); "
-                        + "Plan = " + WeaponProps.Plan(ClassId.Builder, spec) + " (limit None), so the shots and the game hang no prop on him");
-                    Assert.AreEqual(HeldWeapon.None, WeaponProps.Plan(ClassId.Builder, spec), "the mesh carries the mallet; no second one is hung");
-                    Assert.IsNull(CharacterShotsCapture.HangHandProp(null, ClassId.Builder, TeamId.Azure, null), "nothing hung without a model");
-                    return;
-                }
-                Assert.AreEqual(HeldWeapon.Mallet, WeaponProps.Plan(ClassId.Builder, spec));
-                Transform prop = WeaponProps.Attach(hand, HeldWeapon.Mallet, TeamId.Azure, null);
-                Assert.IsNotNull(prop);
-                Assert.AreSame(hand, prop.parent, "parented to the hand slot");
-                Assert.IsTrue(prop.gameObject.activeInHierarchy, "active");
-                Renderer r = prop.GetComponentInChildren<Renderer>();
-                Assert.IsNotNull(r, "drawn");
-                Assert.IsTrue(r.enabled, "renderer enabled");
-                float len = r.bounds.size.magnitude;
-                Transform fore = hand.parent != null ? hand.parent.parent : null;
-                float dot = fore != null && (hand.position - fore.position).sqrMagnitude > 1e-6f
-                    ? Vector3.Dot(prop.up, (hand.position - fore.position).normalized) : 1f;
-                Debug.Log("[WeaponProps] Builder spec " + spec.AssetPath + ": HeldWeaponInMesh = false; mallet hung on " + hand.name
-                    + ", bounds " + len.ToString("F2") + " u (limit > " + (WeaponProps.MalletLength * 0.8f).ToString("F2")
-                    + "), handle-out dot " + dot.ToString("F2") + " (limit > -0.50)");
-                Assert.Greater(len, WeaponProps.MalletLength * 0.8f, "about one mallet long in the world, not scaled away");
-                Assert.Greater(dot, -0.5f, "the handle leaves the fist; it does not point back up the forearm into the sleeve");
-            }
-            finally { Object.DestroyImmediate(go); }
-        }
-
         [Test]
         public void TheMalletShapeIsOneSmallSharedMeshInTeamSafeColours()
         {
@@ -120,16 +67,12 @@ namespace CriticalMass.Runtime.Tests
             Assert.AreSame(m, WeaponProps.MalletMesh(), "built once, shared by every holder");
             Assert.Less(m.triangles.Length / 3, 200, "a few dozen triangles, not a model");
             Assert.AreEqual(WeaponProps.MalletLength, m.bounds.max.y, 0.05f, "handle along +Y up to the head");
-            Assert.AreEqual(2, m.subMeshCount, "b12-c2 view: handle and head are their own submeshes");
-            Debug.Log("[WeaponProps] mallet head " + WeaponProps.MalletHeadHex + ", handle " + WeaponProps.MalletHandleHex + ", " + (m.triangles.Length / 3) +
-                " triangles (limit < 200), submeshes " + m.subMeshCount + " (limit 2)");
-            foreach (string hex in new[] { WeaponProps.MalletHeadHex, WeaponProps.MalletHandleHex, WeaponProps.PryBarIronHex })
+            foreach (string hex in new[] { WeaponProps.MalletWoodHex, WeaponProps.PryBarIronHex })
             {
                 Assert.AreNotEqual(Palette.Azure.ToLowerInvariant(), hex.ToLowerInvariant());
                 Assert.AreNotEqual(Palette.Crimson.ToLowerInvariant(), hex.ToLowerInvariant());
             }
-            Assert.AreNotEqual(WeaponProps.MalletHeadHex, WeaponProps.PryBarIronHex, "the stand-in reads as iron, not the mallet");
-            Assert.AreNotEqual(WeaponProps.MalletHeadHex, WeaponProps.MalletHandleHex, "head and handle read apart");
+            Assert.AreNotEqual(WeaponProps.MalletWoodHex, WeaponProps.PryBarIronHex, "the stand-in reads as iron, not the mallet");
         }
 
         [Test]

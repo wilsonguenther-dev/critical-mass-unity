@@ -178,7 +178,7 @@ namespace CriticalMass.Sim.Tests
             ClassConfig b = c.Class(ClassId.Builder);
             LightWeapon m = c.Depth.LightWeapons.Builder;
             Assert.AreEqual(b.AttackDamage, m.Damage, "the mallet is the Builder's swing as it was");
-            Assert.AreEqual(c.Depth.WeaponReach.Reach[(int)ClassId.Builder], m.Range, "b11-c: the mallet's Range is the weapon-reach table's Builder row");
+            Assert.AreEqual(b.AttackRange, m.Range);
             Assert.AreEqual(b.AttackArcDeg, m.ArcDeg);
             Assert.AreEqual(b.AttackCooldown, m.CooldownSeconds);
             ClassConfig war = c.Class(ClassId.Warrior);
