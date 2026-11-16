@@ -209,7 +209,7 @@ namespace CriticalMass.Runtime.Tests
             int n = 0;
             foreach (CriticalMass.Runtime.View.Art.ModelSpec spec in CriticalMass.Runtime.View.Art.ArtMapping.Models)
             {
-                if (spec.Authored == null) continue;
+                if (spec.Authored.Cloth == null) continue;   // TeamSwatch is a struct: no authored swatch = no Cloth hex
                 Material m = CriticalMass.Runtime.View.Art.ArtMaterials.ForTeam(spec, CriticalMass.Sim.Config.TeamId.Azure);
                 bool textured = CriticalMass.Runtime.View.Art.ArtMaterials.BaseMapOf(spec) != null;
                 bool on = m.IsKeywordEnabled(CriticalMass.Runtime.View.Art.ArtMaterials.BaseMapKeyword);
