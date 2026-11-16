@@ -169,7 +169,7 @@ log("aligned", REP["align"])
 low = raw.copy()
 low.data = raw.data.copy()
 scene.collection.objects.link(low)
-low.name = low.data.name = "WarriorTex_LOD0"
+low.name = low.data.name = "WT_build"
 while low.data.uv_layers:
     low.data.uv_layers.remove(low.data.uv_layers[0])
 for a in list(low.data.color_attributes):
@@ -220,10 +220,10 @@ for o in scene.objects:
     o.select_set(o is low)
 bpy.ops.object.mode_set(mode="EDIT")
 bpy.ops.mesh.select_all(action="SELECT")
-bpy.ops.uv.smart_project(angle_limit=math.radians(66.0), island_margin=0.004, area_weight=0.0, correct_aspect=True,
+bpy.ops.uv.smart_project(angle_limit=math.radians(80.0), island_margin=0.002, area_weight=0.0, correct_aspect=True,
                          scale_to_bounds=False)
 try:
-    bpy.ops.uv.pack_islands(rotate=True, margin=0.003, shape_method="CONCAVE")
+    bpy.ops.uv.pack_islands(rotate=True, margin=0.002, shape_method="CONCAVE")
     REP["uv_pack"] = "concave repack"
 except Exception as x:
     REP["uv_pack"] = "smart project packing only: " + repr(x)
@@ -342,7 +342,36 @@ log("texture", REP["texture"])
 save()
 
 # ------------------------------------------------------------------------------------------------ 5. skin, LOD1, shadow
-newo = old0.copy()                                  # same parent, armature modifier and vertex group names as LOD0
+# Weight source: the Hero without its props (shield and cleaver are rigid on the hand slots; a body vertex near the hand
+# must not take a hand-slot weight from them).
+REFB = REF.copy()
+REFB.data = REF.data.copy()
+scene.collection.objects.link(REFB)
+gname = {g.index: g.name for g in REFB.vertex_groups}
+bm = bmesh.new()
+bm.from_mesh(REFB.data)
+dl = bm.verts.layers.deform.active
+kill = [v for v in bm.verts if dl is not None and len(v[dl]) and "slot" in gname.get(max(v[dl].items(), key=lambda kv: kv[1])[0], "").lower()]
+bmesh.ops.delete(bm, geom=kill, context="VERTS")
+bm.to_mesh(REFB.data)
+bm.free()
+REP["weight_source"] = dict(object=REF.name, prop_vertices_removed=len(kill), tris=ntri(REFB))
+
+
+def limit4(o):
+    vg = o.vertex_groups
+    for v in o.data.vertices:
+        ws = sorted(((g.weight, g.group) for g in v.groups), reverse=True)
+        keep = [x for x in ws[:4] if x[0] > 1e-4]
+        for w_, gi in ws:
+            if (w_, gi) not in keep:
+                vg[gi].remove([v.index])
+        tot = sum(w_ for w_, _ in keep)
+        for w_, gi in keep:
+            vg[gi].add([v.index], w_ / tot, "REPLACE")
+
+
+newo = old0.copy()                                  # same parent and armature modifier as LOD0
 newo.data = low.data.copy()
 scene.collection.objects.link(newo)
 Minv = old0.matrix_world.inverted()
@@ -358,20 +387,20 @@ for g in REF.vertex_groups:                         # Blender keeps group names 
     if newo.vertex_groups.get(g.name) is None:
         newo.vertex_groups.new(name=g.name)
 dt = newo.modifiers.new("DT", "DATA_TRANSFER")
-dt.object = REF
+dt.object = REFB
 dt.use_vert_data = True
 dt.data_types_verts = {"VGROUP_WEIGHTS"}
 dt.vert_mapping = "POLYINTERP_NEAREST"
 dt.layers_vgroup_select_src = "ALL"
 dt.layers_vgroup_select_dst = "NAME"
 apply_mod(newo, "DT")
-with bpy.context.temp_override(**override(newo)):
-    bpy.ops.object.vertex_group_limit_total(group_select_mode="ALL", limit=4)
-    bpy.ops.object.vertex_group_normalize_all(group_select_mode="ALL", lock_active=False)
+limit4(newo)
+bpy.data.objects.remove(REFB, do_unlink=True)
 col = newo.data.color_attributes.new("Col", "BYTE_COLOR", "CORNER")   # code 0 (fixed, lined): the outline mask path
 col.data.foreach_set("color", np.tile([1.0, 1.0, 1.0, 0.0], len(col.data)).astype(np.float32))
 newo.data.color_attributes.active_color_name = "Col"
 bpy.data.objects.remove(low, do_unlink=True)
+newo.name = newo.data.name = "WarriorTex_LOD0"
 
 lod1 = newo.copy()
 lod1.data = newo.data.copy()
@@ -380,9 +409,7 @@ lod1.name = lod1.data.name = "WarriorTex_LOD1"
 d = lod1.modifiers.new("Dec", "DECIMATE")
 d.decimate_type, d.use_collapse_triangulate, d.ratio = "COLLAPSE", True, LOD1_TRIS / max(1, ntri(newo))
 apply_mod(lod1, "Dec")
-with bpy.context.temp_override(**override(lod1)):
-    bpy.ops.object.vertex_group_limit_total(group_select_mode="ALL", limit=4)
-    bpy.ops.object.vertex_group_normalize_all(group_select_mode="ALL", lock_active=False)
+limit4(lod1)
 for m in arms:
     m.show_viewport = True
 for m in lod1.modifiers:
@@ -407,6 +434,7 @@ log("skin", REP["skin"], "tris", REP["tris"])
 save()
 
 # ------------------------------------------------------------------------------------------------ renders (evidence)
+base.alpha_mode = "NONE"                            # display only: the saved PNG keeps its alpha mask
 try:
     scene.render.engine = "BLENDER_WORKBENCH"
     scene.display.shading.light = "FLAT"
@@ -442,7 +470,7 @@ except Exception as x:
     log("render skipped", x)
 
 # ------------------------------------------------------------------------------------------------ 6. clip stretch
-for o in (old0, old1, oldH):
+for o in (old1, oldH):
     if o:
         bpy.data.objects.remove(o, do_unlink=True)
 rig.data.pose_position = "POSE"
@@ -461,9 +489,12 @@ def deformed(o):
     return co.reshape(-1, 3)
 
 
-rest = deformed(newo)
-L0 = np.linalg.norm(rest[edges[:, 0]] - rest[edges[:, 1]], axis=1)
-ok = L0 > 1e-5
+ARMS = {"new": (newo, edges), "control_today_lod0": (old0, np.array([tuple(e.vertices) for e in old0.data.edges]))}
+REST0 = {}
+for k_, (o_, e_) in ARMS.items():
+    r_ = deformed(o_)
+    l_ = np.linalg.norm(r_[e_[:, 0]] - r_[e_[:, 1]], axis=1)
+    REST0[k_] = (l_, l_ > 0.002)
 stretch = {}
 if carm is not None:
     if carm.animation_data is None:
@@ -475,7 +506,7 @@ if carm is not None:
             carm.animation_data.action_slot = act.slots[0]
         f0, f1 = int(act.frame_range[0]), int(act.frame_range[1])
         step = max(1, (f1 - f0) // 12)
-        hi, lo = 1.0, 1.0
+        hi, lo, chi = 1.0, 1.0, 1.0
         for f in range(f0, f1 + 1, step):
             scene.frame_set(f)
             for pb in rig.pose.bones:
@@ -484,12 +515,18 @@ if carm is not None:
                     pb.matrix_basis = cb.matrix_basis.copy()
             bpy.context.view_layer.update()
             dg = bpy.context.evaluated_depsgraph_get()
-            D = deformed(newo)
-            r = np.linalg.norm(D[edges[:, 0]] - D[edges[:, 1]], axis=1)[ok] / L0[ok]
-            hi, lo = max(hi, float(np.percentile(r, 99.9))), min(lo, float(np.percentile(r, 0.1)))
-        stretch[act.name] = dict(max=round(hi, 3), min=round(lo, 3), frames=len(range(f0, f1 + 1, step)))
-        print("[warrior_tex] clip %-28s edge stretch max %.3f min %.3f (99.9th / 0.1th percentile over sampled frames)"
-              % (act.name, hi, lo), flush=True)
+            for k_, (o_, e_) in ARMS.items():
+                D = deformed(o_)
+                l_, ok_ = REST0[k_]
+                r = np.linalg.norm(D[e_[:, 0]] - D[e_[:, 1]], axis=1)[ok_] / l_[ok_]
+                if k_ == "new":
+                    hi, lo = max(hi, float(np.percentile(r, 99.9))), min(lo, float(np.percentile(r, 0.1)))
+                else:
+                    chi = max(chi, float(np.percentile(r, 99.9)))
+        stretch[act.name] = dict(max=round(hi, 3), min=round(lo, 3), control_today_lod0_max=round(chi, 3),
+                                 frames=len(range(f0, f1 + 1, step)))
+        print("[warrior_tex] clip %-28s edge stretch new max %.3f min %.3f | today's LOD0 max %.3f (99.9th / 0.1th pct, edges > 2 mm)"
+              % (act.name, hi, lo, chi), flush=True)
 REP["clip_stretch"] = stretch
 for pb in rig.pose.bones:
     pb.matrix_basis = Matrix.Identity(4)
@@ -498,6 +535,7 @@ if carm is not None:
     for o in clip_objs:
         bpy.data.objects.remove(o, do_unlink=True)
 bpy.data.objects.remove(raw, do_unlink=True)
+bpy.data.objects.remove(old0, do_unlink=True)
 save()
 
 # ------------------------------------------------------------------------------------------------ export + round trip
