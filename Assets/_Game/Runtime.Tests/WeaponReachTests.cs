@@ -124,6 +124,38 @@ namespace CriticalMass.Runtime.Tests
                 var trace = new StringBuilder();
                 bool ok = ActorAnimator.MeasureStrike(m, cls, clip, fwd, out Transform hand, out Vector3 tipLocal, out string end,
                     out double fact, out double view, out double tip, out double lever, rig.Pose, trace);
+                // b12-c: the whole clip, not only the contact window: does the striking end ever come forward, and does the
+                // clip bind to this rig at all (curve paths that resolve under the model root)?
+                var whole = new StringBuilder();
+                double bestWhole = double.NegativeInfinity, bestWholeT = 0, handFwdMax = double.NegativeInfinity;
+                float clipLen = m.ClipLength(clip);
+                for (int k = 0; k <= 24 && hand != null; k++)
+                {
+                    double tt = clipLen * k / 24.0;
+                    if (!rig.Pose(clip, tt)) break;
+                    double fw = Vector3.Dot(hand.TransformPoint(tipLocal) - m.Transform.position, fwd);
+                    double hf = Vector3.Dot(hand.position - m.Transform.position, fwd);
+                    if (fw > bestWhole) { bestWhole = fw; bestWholeT = tt; }
+                    if (hf > handFwdMax) handFwdMax = hf;
+                    whole.Append(' ').Append(tt.ToString("0.00")).Append('=').Append(fw.ToString("0.00")).Append("/h").Append(hf.ToString("0.00"));
+                }
+                AnimationClip ac = entry.Clip(clip);
+                EditorCurveBinding[] binds = ac != null ? AnimationUtility.GetCurveBindings(ac) : new EditorCurveBinding[0];
+                var paths = new HashSet<string>();
+                int resolved = 0, spineCurves = 0;
+                Transform spineBone = m.Bone(ModelView.UpperBodyRootBone);
+                foreach (EditorCurveBinding bnd in binds)
+                {
+                    if (!paths.Add(bnd.path)) continue;
+                    Transform bt = bnd.path.Length == 0 ? m.Root.transform : m.Root.transform.Find(bnd.path);
+                    if (bt == null) continue;
+                    resolved++;
+                    if (spineBone != null && (bt == spineBone || bt.IsChildOf(spineBone))) spineCurves++;
+                }
+                Debug.Log("[CM.WeaponReach] " + cls.ToString().ToLowerInvariant() + " whole clip: asset " + (ac != null ? AssetDatabase.GetAssetPath(ac) : "none") +
+                    ", bound paths " + resolved + " of " + paths.Count + " (" + spineCurves + " under spine), striking end furthest forward " +
+                    bestWhole.ToString("0.00") + " u at " + bestWholeT.ToString("0.000") + " s, hand furthest forward " + handFwdMax.ToString("0.00") +
+                    " u; tip/hand forward per sample:" + whole);
                 var r = new Result
                 {
                     Ok = ok,

@@ -114,6 +114,23 @@ namespace CriticalMass.Runtime.View.Anim
         }
 
         /// <summary>
+        /// b12-c: the points of a prop mesh to measure a tip from: its vertices when the mesh is readable (the built mallet
+        /// and stand-in pry bar), else the 8 corners of its bounds. The authored Healer_Lantern_Prop imports without a CPU copy,
+        /// so round 2 found no point on it ("no lantern measured", tip (0, 0, 0)); its bounds still give its far end. Null: no mesh.
+        /// </summary>
+        public static Vector3[] PropPoints(Mesh mesh)
+        {
+            if (mesh == null) return null;
+            if (mesh.isReadable) return mesh.vertices;
+            Bounds b = mesh.bounds;
+            Vector3 c = b.center, e = b.extents;
+            var pts = new Vector3[8];
+            for (int k = 0; k < 8; k++)
+                pts[k] = c + new Vector3((k & 1) == 0 ? -e.x : e.x, (k & 2) == 0 ? -e.y : e.y, (k & 4) == 0 ? -e.z : e.z);
+            return pts;
+        }
+
+        /// <summary>
         /// fix/hit-feel-7: both far ends of the held weapon in the hand's local space: the return value is the farthest
         /// point from the hand, `other` the farthest on the opposite side of the hand (Vector3.zero: none). Which one
         /// strikes is decided on the contact pose (the one further forward: ActorAnimator.MeasureReach).
@@ -132,9 +149,8 @@ namespace CriticalMass.Runtime.View.Anim
                 if (!prop.gameObject.activeInHierarchy || !prop.name.StartsWith(WeaponProps.PropName, StringComparison.Ordinal)) continue;
                 foreach (MeshFilter mf in prop.GetComponentsInChildren<MeshFilter>())
                 {
-                    Mesh mesh = mf.sharedMesh;
-                    if (mesh == null || !mesh.isReadable) continue;
-                    Vector3[] v = mesh.vertices;
+                    Vector3[] v = PropPoints(mf.sharedMesh);
+                    if (v == null) continue;
                     for (int k = 0; k < v.Length; k++)
                     {
                         Vector3 p = hand.InverseTransformPoint(mf.transform.TransformPoint(v[k]));
@@ -149,9 +165,8 @@ namespace CriticalMass.Runtime.View.Anim
                     Vector3 ax = best.normalized;
                     foreach (MeshFilter mf in prop.GetComponentsInChildren<MeshFilter>())
                     {
-                        Mesh mesh = mf.sharedMesh;
-                        if (mesh == null || !mesh.isReadable) continue;
-                        Vector3[] v = mesh.vertices;
+                        Vector3[] v = PropPoints(mf.sharedMesh);
+                        if (v == null) continue;
                         for (int k = 0; k < v.Length; k++)
                         {
                             Vector3 p = hand.InverseTransformPoint(mf.transform.TransformPoint(v[k]));

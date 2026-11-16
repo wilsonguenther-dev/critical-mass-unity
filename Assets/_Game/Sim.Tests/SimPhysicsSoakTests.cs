@@ -43,6 +43,33 @@ namespace CriticalMass.Sim.Tests
             public readonly int[] Count = new int[6];
         }
 
+        /// <summary>
+        /// b12-c: what holds a stationary bot (printed with its failure line): its own swing, stagger, health, velocity and
+        /// the walkable cells around it, and every actor within 2.5 u (id, class, team, state, distance, swing pending).
+        /// </summary>
+        internal static string StuckContext(World w, int id)
+        {
+            Actor a = w.Actors[id];
+            var sb = new System.Text.StringBuilder();
+            sb.Append(" [hp ").Append(a.Hp.ToString("F0")).Append('/').Append(a.MaxHp.ToString("F0")).Append(", swingPending ").Append(a.SwingPending)
+              .Append(", attackCd ").Append(a.AttackCd.ToString("F2")).Append(", hitStun ").Append(a.HitStunTicks).Append(", v (")
+              .Append(w.Vx[id].ToString("F2")).Append(", ").Append(w.Vz[id].ToString("F2")).Append("), knock (").Append(a.KVx.ToString("F2")).Append(", ")
+              .Append(a.KVz.ToString("F2")).Append("), walkable N/E/S/W ");
+            int cx = JsMath.FloorToInt(w.X[id]), cz = JsMath.FloorToInt(w.Z[id]);
+            sb.Append(MapGrid.IsWalkable(w.Map, cx, cz + 1) ? 1 : 0).Append(MapGrid.IsWalkable(w.Map, cx + 1, cz) ? 1 : 0)
+              .Append(MapGrid.IsWalkable(w.Map, cx, cz - 1) ? 1 : 0).Append(MapGrid.IsWalkable(w.Map, cx - 1, cz) ? 1 : 0).Append("; near:");
+            for (int j = 0; j < w.ActorCount; j++)
+            {
+                if (j == id || !w.Actors[j].Alive) continue;
+                double dx = w.X[j] - w.X[id], dz = w.Z[j] - w.Z[id], d = Math.Sqrt(dx * dx + dz * dz);
+                if (d > 2.5) continue;
+                Actor o = w.Actors[j];
+                sb.Append(' ').Append(j).Append(' ').Append(o.Cls).Append(' ').Append(o.Team).Append(' ').Append(o.AiState).Append(" d=").Append(d.ToString("F2"))
+                  .Append(o.SwingPending ? " swinging" : "");
+            }
+            return sb.Append(']').ToString();
+        }
+
         internal static Run Soak(int seed, BotDifficulty d, bool classic, List<string> failures)
         {
             GameConfig cfg = SixClassMix(classic);
@@ -111,7 +138,7 @@ namespace CriticalMass.Sim.Tests
                     }
                     int still = tick - anchorTick[id];
                     if (still > run.WorstStill) run.WorstStill = still;
-                    if (still == StuckTicks + 1) failures.Add($"{tag} tick {tick}: bot {id} ({a.Cls}, {a.AiState}) stationary > {StuckTicks} ticks at ({x:F2}, {z:F2})");
+                    if (still == StuckTicks + 1) failures.Add($"{tag} tick {tick}: bot {id} ({a.Cls}, {a.AiState}) stationary > {StuckTicks} ticks at ({x:F2}, {z:F2})" + StuckContext(w, id));
                 }
                 if (failures.Count > 30) break;
                 if (tick % 300 == 0 && !Terraform.PadsReachHill(w.Map)) failures.Add($"{tag} tick {tick}: a pad cannot reach the hill");
