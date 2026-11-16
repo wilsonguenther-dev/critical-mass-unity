@@ -113,7 +113,7 @@ namespace CriticalMass.Runtime.Game
             // online-rooms-2: in an online room the lockstep session owns the world and its clock; this driver only shows
             // it (the session ticks in OnlineRunner, inputs come from HumanInputSource through FillOnline).
             CriticalMass.Net.LockstepSession online = Online.OnlineMatch.Session;
-            if (online != null && (req == null || !req.Backdrop))
+            if (ShowsOnlineWorld(online != null, req))
             {
                 _online = online;
                 World = _online.World;
@@ -229,7 +229,8 @@ namespace CriticalMass.Runtime.Game
             // perf-smooth-1: no tick while the world art is still building over frames (a player's match start, behind the
             // loading screen): the match starts from the same state, only later in wall time.
             // first-run-warm-2: nor while the first-run warm-up runs (FirstRunWarm.HoldsSim, capped), the automated match included.
-            bool paused = (input != null && input.State.Paused) || View.Dressing.WorldView.Building || FirstRunWarm.HoldsSim;
+            bool paused = (input != null && input.State.Paused) || View.Dressing.WorldView.Building || FirstRunWarm.HoldsSim ||
+                          BackdropHeld(Request != null && Request.Backdrop, CriticalMass.Runtime.Hud.TitleBackdrop.Frozen);
             // DG-60: after a hitch at most SimClock.TickCap ticks run this frame and the rest of the backlog is dropped
             // (counted), so one slow frame never makes the next one slow too. Same inputs per tick: determinism holds.
             int ticks = _clock.Advance(unscaled, TimeScale, _dt, paused);
@@ -238,6 +239,20 @@ namespace CriticalMass.Runtime.Game
             RuntimeCounters.SimDroppedTicks = _clock.DroppedTicks;
             Alpha = _clock.Alpha(_dt);
         }
+
+        /// <summary>
+        /// b12-x1 (title idle CPU): a backdrop world (the bot match behind the title and the menus, its own world, never a
+        /// real match) takes no tick while the title shows its still (TitleBackdrop.Frozen). TitleBackdrop also sets
+        /// TimeScale 0, but an automation run's -autoplaySpeed rewrites TimeScale every frame, so the hold lives here too.
+        /// Wall time only: the backdrop resumes from the same state; no rule, no checksum (pure; tests).
+        /// </summary>
+        public static bool BackdropHeld(bool backdropWorld, bool titleFrozen) => backdropWorld && titleFrozen;
+
+        /// <summary>b12-x1 (pure; tests): a backdrop request never takes the online session's world (the Awake rule).</summary>
+        public static bool ShowsOnlineWorld(bool sessionActive, Flow.MatchRequest req) => sessionActive && (req == null || !req.Backdrop);
+
+        /// <summary>b12-x1 (pure; tests): simulated ticks per wall second at a time scale (0 while held).</summary>
+        public static double TicksPerWallSecond(double timeScale, double simHz, bool held) => held ? 0.0 : Math.Max(0.0, timeScale) * simHz;
 
         /// <summary>Runs n ticks immediately (smoke test); the accumulator and Alpha are left as they are.</summary>
         public void StepTicks(int n)

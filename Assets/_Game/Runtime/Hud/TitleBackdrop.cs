@@ -22,8 +22,21 @@ namespace CriticalMass.Runtime.Hud
         /// <summary>Global switch (tests and captures that want the live backdrop turn it off). Players only: in the editor
         /// (PlayMode tests, which also refuse unexpected log lines) the live backdrop always stays.</summary>
         public static bool Enabled = true;
-        /// <summary>Title seconds before the still is taken: the backdrop's world builds over its first 1 to 2 s.</summary>
-        public const float SettleSeconds = 3f;
+        /// <summary>Title seconds before the still is taken: the backdrop's world builds over its first 1 to 2 s (the still
+        /// also waits for WorldView.Building to end). b12-x1: 3 -> 2 s, so the smoke's idle window (title + 2 s onward) is
+        /// all still: the live backdrop costs about 50% of a core on the Air, the still a fraction of it.</summary>
+        public const float SettleSeconds = 2f;
+        /// <summary>b12-x1: the idle limits TitleIdleCostTests holds the still to: no backdrop tick, no fighter view synced,
+        /// the world camera draws the UI layer only (one camera render of the world in all, the still itself).</summary>
+        public const double FrozenTicksPerSecondLimit = 0.0;
+        public const int FrozenSyncedViewsLimit = 0;
+
+        /// <summary>b12-x1 (pure; tests): fighter views ActorViews syncs per frame on the title (it skips its LateUpdate while
+        /// the still is up).</summary>
+        public static int SyncedViews(bool frozen, int actors) => frozen ? 0 : Mathf.Max(0, actors);
+
+        /// <summary>b12-x1 (pure; tests): the culling mask the world camera keeps while the still is up: the canvas layer only.</summary>
+        public static int FrozenCullingMask(int canvasLayer) => 1 << canvasLayer;
         /// <summary>Drift: the still is drawn this much larger than the screen and pans within the margin.</summary>
         public const float DriftScale = 1.06f;
         public const float DriftPeriodSeconds = 48f;
@@ -128,7 +141,7 @@ namespace CriticalMass.Runtime.Hud
             _still.gameObject.SetActive(true);
             _driftT = 0f;
             _savedMask = _cam.cullingMask;
-            _cam.cullingMask = 1 << Canvas.gameObject.layer;   // the camera draws only the UI from now on
+            _cam.cullingMask = FrozenCullingMask(Canvas.gameObject.layer);   // the camera draws only the UI from now on
             _driver = FindAnyObjectByType<SimDriverBehaviour>();
             if (_driver != null)
             {

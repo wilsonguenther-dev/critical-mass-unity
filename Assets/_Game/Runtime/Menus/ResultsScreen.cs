@@ -398,6 +398,23 @@ namespace CriticalMass.Runtime.Menus
 
         static Text Wrap(Text t) => MenuUi.Fit(t, UiScale.TypeMin);
 
+        /// <summary>
+        /// b12-x1 (owner shot: a "Kaiju ... to th" strip behind the middle card). It was not one of this screen's labels: it
+        /// was the match's CaptionBar (Codex/OverlayUi.cs, sorting order 28, a 980 px plate centred at y 700) still showing
+        /// a caption that fired late in the match, such as the exact-tie egg line from Secrets/SecretWatcher.cs:98 ("The Kaiju
+        /// chose no one, and sat down on the hill to think about it.", 6 s). The results canvas (order 30) drew over it, the
+        /// three cards hid its middle, and the gaps between the cards showed "...Kaiju" and "to th...". The results own the
+        /// screen: any caption still up is closed when they show and while they are up. Returns true when one was closed.
+        /// </summary>
+        public static bool HideStrayOverlays()
+        {
+            if (!CriticalMass.Runtime.Codex.CaptionBar.IsShowing) return false;
+            CriticalMass.Runtime.Codex.CaptionBar.Hide();
+            return true;
+        }
+
+        protected override void OnShow() => HideStrayOverlays();
+
         static float Top => ResultsLayout.CardsTop;
 
         static void Card(RectTransform parent, string name, float x, string heading)
@@ -557,6 +574,7 @@ namespace CriticalMass.Runtime.Menus
 
         protected override void Tick()
         {
+            HideStrayOverlays();   // b12-x1: a caption fired after the results opened stays behind them; close it
             // LB / RB (Q / E on the keyboard) step through the pages; F12 on the highlights page saves the photo card.
             UnityEngine.InputSystem.Gamepad pad = UnityEngine.InputSystem.Gamepad.current;
             UnityEngine.InputSystem.Keyboard kb = UnityEngine.InputSystem.Keyboard.current;
