@@ -220,7 +220,12 @@ namespace CriticalMass.Runtime.Tests
             int w = Words(p.text);
             Assert.That(w, Is.InRange(120, 160), "premise words");
             foreach (ClassId c in Enum.GetValues(typeof(ClassId)))
-                Assert.IsTrue(p.text.Contains(c.ToString()), $"premise names every class: {c}");
+            {
+                // b12-jz rename: the Demolitions class reads "Demolitionist" to players (ClassId stays Demolitions).
+                string name = c == ClassId.Demolitions ? "Demolitionist" : c.ToString();
+                UnityEngine.Debug.Log($"[LoreContentTests] premise names {c} as \"{name}\": {p.text.Contains(name)}");
+                Assert.IsTrue(p.text.Contains(name), $"premise names every class: {c} (as {name})");
+            }
             Assert.That(p.loreLines.Length, Is.InRange(6, 12));
             foreach (Line l in p.loreLines) Assert.LessOrEqual(Words(l.text), 20, l.id);
         }
