@@ -314,7 +314,7 @@ namespace CriticalMass.Runtime.Game
             }
             int level = QualitySettings.GetQualityLevel();
             bool active = _dynOff == 0 && !SafeMode && level < FramePolicy.LevelHigh && SessionKeeper.Phase == "match" &&
-                          !_title && !_inputPaused && !MenuOpen && !Menus.LoadingScreen.IsOpen;
+                          !_title && !_inputPaused && !MenuOpen && !Menus.LoadingScreen.IsOpen && !FirstRunWarm.Running;   // first-run-warm-2: warm-up frames never move the render scale
             if (!active || dt <= 0f || dt > 0.25f)
             {
                 // A hitch (over 250 ms) is not a pixel problem; anything off-match starts a fresh window.
@@ -621,6 +621,7 @@ namespace CriticalMass.Runtime.Game
         /// </summary>
         void ApplyPacing(PacingState p)
         {
+            using var scope = FrameCostMarkers.Pace.Auto();   // fix/frame-cost-1
             if (QualitySettings.vSyncCount != p.VSync) QualitySettings.vSyncCount = p.VSync;
             if (Application.targetFrameRate != p.Target) Application.targetFrameRate = p.Target;
             if (OnDemandRendering.renderFrameInterval != p.Interval) OnDemandRendering.renderFrameInterval = p.Interval;

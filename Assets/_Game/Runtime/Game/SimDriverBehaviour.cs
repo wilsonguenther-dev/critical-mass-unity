@@ -228,7 +228,8 @@ namespace CriticalMass.Runtime.Game
             HumanInputSource input = InputSource;
             // perf-smooth-1: no tick while the world art is still building over frames (a player's match start, behind the
             // loading screen): the match starts from the same state, only later in wall time.
-            bool paused = (input != null && input.State.Paused) || View.Dressing.WorldView.Building;
+            // first-run-warm-2: nor while the first-run warm-up runs (FirstRunWarm.HoldsSim, capped), the automated match included.
+            bool paused = (input != null && input.State.Paused) || View.Dressing.WorldView.Building || FirstRunWarm.HoldsSim;
             // DG-60: after a hitch at most SimClock.TickCap ticks run this frame and the rest of the backlog is dropped
             // (counted), so one slow frame never makes the next one slow too. Same inputs per tick: determinism holds.
             int ticks = _clock.Advance(unscaled, TimeScale, _dt, paused);
