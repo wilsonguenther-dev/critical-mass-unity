@@ -1169,6 +1169,41 @@ try:
             scene.render.filepath = os.path.join(OUT, f"{CLS}_Idle_{vn}.png")
             bpy.ops.render.render(write_still=True)
         cam_d.ortho_scale = 2.6
+    if "Attack" in ONLY_TAKES and "Attack" in baked:
+        # b12-x2: the re-baked Attack from the two gameplay cameras at wind-up (30 %), contact (the clip's hit event) and
+        # follow-through (contact + 15 %), with the stand-in bar; one sheet, rows = cameras, columns = those three moments.
+        a = baked["Attack"]
+        assign(fa, a)
+        f0, f1 = int(a.frame_range[0]), int(a.frame_range[1])
+        moments = [("windup", 0.30), ("contact", _CT), ("follow", min(1.0, _CT + 0.15))]
+        cams = {"gameplay": (Vector((0, -4.2, 2.0 + 4.2 * math.tan(math.radians(55)))), Vector((math.radians(35), 0, 0))),
+                "gameplay34": (Vector((3.0, -3.0, 2.0 + 4.24 * math.tan(math.radians(55)))), Vector((math.radians(35), 0, math.radians(45))))}
+        rx, ry = scene.render.resolution_x, scene.render.resolution_y
+        scene.render.resolution_x = scene.render.resolution_y = 420
+        rows_ = []
+        for vn, (loc, rot) in cams.items():
+            cam.location, cam.rotation_euler = loc, rot
+            cam_d.ortho_scale = 2.8
+            row = []
+            for mn, fr_ in moments:
+                f = f0 + int(round((f1 - f0) * fr_))
+                scene.frame_set(f)
+                p = os.path.join(OUT, f"{CLS}_Attack_{vn}_{mn}_f{f}.png")
+                scene.render.filepath = p
+                bpy.ops.render.render(write_still=True)
+                img = bpy.data.images.load(p)
+                row.append(np.array(img.pixels[:], np.float32).reshape(img.size[1], img.size[0], 4))
+                bpy.data.images.remove(img)
+            rows_.append(np.concatenate(row, axis=1))
+        sheet = np.concatenate(rows_[::-1], axis=0)   # image rows run bottom-up: first camera on top
+        img = bpy.data.images.new(f"{CLS}_Attack_gameplay_sheet", sheet.shape[1], sheet.shape[0])
+        img.pixels = sheet.ravel()
+        img.filepath_raw = os.path.join(OUT, f"{CLS}_Attack_gameplay_sheet.png")
+        img.file_format = "PNG"
+        img.save()
+        REP["attack_render"] = dict(moments={mn: f0 + int(round((f1 - f0) * fr_)) for mn, fr_ in moments}, cameras=list(cams))
+        scene.render.resolution_x, scene.render.resolution_y = rx, ry
+        cam_d.ortho_scale = 2.6
     for clip in ("Walk", "Run", "Idle") + tuple(SKILL):
         rows = [tiles[(clip, vn)] for vn in ("side", "front") if (clip, vn) in tiles]
         if not rows:
