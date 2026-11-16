@@ -44,6 +44,8 @@ BAKES = {
                    env={"BAKE_TAKES": "Attack", "BAKE_SPLICE_INTO": "Assets/_Game/Art/Demolitions/Demolitions_Clips.fbx"})],
     "splice": [dict(label="demo_splice", cls="Demolitions",
                     env={"BAKE_TAKES": "Attack", "BAKE_SPLICE_INTO": "Assets/_Game/Art/Demolitions/Demolitions_Clips.fbx"})],
+    "splice_check": [dict(label="demo_splice", cls="Demolitions",
+                          env={"BAKE_TAKES": "Attack", "BAKE_SPLICE_INTO": "Assets/_Game/Art/Demolitions/Demolitions_Clips.fbx"})],
     "none": [],
 }
 COMMITTED = [  # label, path, clips
@@ -152,7 +154,10 @@ def sample(arm, act, bones):
 
 
 def qang(a, b):
-    return math.degrees(a.rotation_difference(b).angle) if a is not None and b is not None else 0.0
+    if a is None or b is None:
+        return 0.0
+    d = math.degrees(a.rotation_difference(b).angle)
+    return min(d, 360.0 - d)   # q and -q are the same turn
 
 
 def keyed(act):
@@ -365,15 +370,19 @@ def compare(tag, pa, pb):
             diff[c] = dict(frames=[len(A[c]), len(B[c])])
             continue
         rot = pos = 0.0
+        worst_b = None
         for x, y in zip(A[c], B[c]):
             for b in x["q"]:
                 if b in y["q"]:
-                    rot = max(rot, qang(x["q"][b], y["q"][b]))
+                    a_ = qang(x["q"][b], y["q"][b])
+                    if a_ > rot:
+                        rot, worst_b = a_, b
             for b in x["p"]:
                 if b in y["p"]:
                     pos = max(pos, (x["p"][b] - y["p"][b]).length)
-        diff[c] = dict(max_bone_turn_deg=round(rot, 2), max_joint_move=r3(pos))
+        diff[c] = dict(max_bone_turn_deg=round(rot, 2), worst_bone=worst_b, max_joint_move=r3(pos))
     changed = {c: v for c, v in diff.items() if v.get("max_bone_turn_deg", 99) > 0.5 or (v.get("max_joint_move") or 0) > 0.005}
+    say(f"{tag}: worst bone per changed clip {[(c, diff[c].get('worst_bone'), diff[c].get('max_bone_turn_deg')) for c in sorted(changed)][:8]}")
     say(f"{tag}: clips that differ (> 0.5 deg or > 5 mm): {len(changed)} of {len(diff)} {sorted(changed)}; "
         f"only in one file: {sorted(set(A) ^ set(B))}")
     return dict(per_clip=diff, changed=sorted(changed), only_in_one=sorted(set(A) ^ set(B)))
@@ -428,6 +437,113 @@ for b, od, p, lf in procs:
         REP["compare"][b["label"] + "_vs_committed"] = compare(b["label"] + " vs committed", fbx, os.path.join(REPO, committed))
     except Exception as e:
         say(f"compare {b['label']} failed {e!r}")
+
+
+def deep_check(spliced, committed, model):
+    """b12-x2: do the bones the game draws or hangs props on match, in world space, in every non-Attack take?"""
+    POS_TOL, ROT_TOL = 0.0005, 0.05
+    bpy.ops.wm.read_factory_settings(use_empty=True)
+    bpy.ops.import_scene.fbx(filepath=model, use_anim=False, use_custom_normals=False, ignore_leaf_bones=False,
+                             automatic_bone_orientation=False, primary_bone_axis="Y", secondary_bone_axis="X")
+    marm = next(o for o in bpy.data.objects if o.type == "ARMATURE")
+    model_bones = [b.name for b in marm.data.bones]
+    weighted, lods = set(), []
+    for o in bpy.data.objects:
+        if o.type != "MESH":
+            continue
+        lods.append(o.name)
+        gi = {g.index: g.name for g in o.vertex_groups}
+        for v in o.data.vertices:
+            for g in v.groups:
+                if g.weight > 1e-6 and g.group in gi:
+                    weighted.add(gi[g.group])
+    slots = sorted(b for b in model_bones if any(k in b.lower() for k in ("slot", "attach", "prop", "socket")))
+    roots = [b for b in ("root", "hips") if b in model_bones]
+    watch = sorted((weighted & set(model_bones)) | set(slots) | set(roots))
+    ctr = "control-toe-roll.r"
+    res = dict(model_bone_count=len(model_bones), lods=lods, weighted=sorted(weighted), slots=slots, roots=roots,
+               control_in_model=ctr in model_bones, control_weighted=ctr in weighted)
+    say(f"deep check: model {len(model_bones)} bones, meshes {lods}; weighted bones {len(weighted)}; slot bones {slots}; root {roots}")
+    say(f"deep check: {ctr} in the model's skeleton: {ctr in model_bones}; has vertex weights on any mesh: {ctr in weighted}")
+
+    def worlds(path):
+        arm, acts = load(path)
+        P = arm.pose.bones
+        desc = sorted(b.name for b in arm.data.bones[ctr].children_recursive) if ctr in arm.data.bones else None
+        par = arm.data.bones[ctr].parent.name if ctr in arm.data.bones and arm.data.bones[ctr].parent else None
+        out = {}
+        for c, a in acts.items():
+            if c == "Attack":
+                continue
+            assign(arm, None)
+            for pb in P:
+                pb.matrix_basis.identity()
+            assign(arm, a)
+            f0, f1 = int(round(a.frame_range[0])), int(round(a.frame_range[1]))
+            fr = []
+            for f in range(f0, f1 + 1):
+                bpy.context.scene.frame_set(f)
+                upd()
+                fr.append({n: (arm.matrix_world @ P[n].matrix) for n in watch + [ctr] if n in P})
+            out[c] = fr
+        return out, desc, par, len(arm.data.bones)
+
+    A, descA, parA, nA = worlds(committed)
+    B, descB, parB, nB = worlds(spliced)
+    res.update(control_descendants_committed=descA, control_descendants_spliced=descB, control_parent=parA,
+               clip_file_bones=[nA, nB])
+    hit = sorted(set(descB or []) & set(watch))
+    say(f"deep check: {ctr} parent {parA}; its descendants in the clips file {descB}; weighted or slot bones among them: {hit}; "
+        f"clips-file skeleton {nA}/{nB} bones vs model {len(model_bones)}")
+    worst = dict(pos=0.0, rot=0.0, pos_at=None, rot_at=None)
+    ctr_max = [0.0, 0.0]   # the control bone itself, as a check that the method sees the 4.2 deg (not in the verdict)
+    per_clip, missing = {}, sorted(set(A) ^ set(B))
+    for c in sorted(set(A) & set(B)):
+        cp = cr = 0.0
+        if len(A[c]) != len(B[c]):
+            per_clip[c] = "frame count %d vs %d" % (len(A[c]), len(B[c]))
+            continue
+        for i, (x, y) in enumerate(zip(A[c], B[c])):
+            for n in x:
+                if n not in y:
+                    continue
+                dp = (x[n].translation - y[n].translation).length
+                dr = math.degrees(x[n].to_3x3().normalized().to_quaternion().rotation_difference(
+                    y[n].to_3x3().normalized().to_quaternion()).angle)
+                dr = min(dr, 360.0 - dr)   # q and -q are the same turn (run 43961106736 printed toes.r 360.0000 deg)
+                if n == ctr and n not in watch:
+                    ctr_max = [max(ctr_max[0], dp), max(ctr_max[1], dr)]
+                    continue
+                if dp > cp:
+                    cp = dp
+                if dr > cr:
+                    cr = dr
+                if dp > worst["pos"]:
+                    worst.update(pos=dp, pos_at=[c, i, n])
+                if dr > worst["rot"]:
+                    worst.update(rot=dr, rot_at=[c, i, n])
+        per_clip[c] = [round(cp, 6), round(cr, 4)]
+    over = {c: v for c, v in per_clip.items() if not isinstance(v, list) or v[0] >= POS_TOL or v[1] >= ROT_TOL}
+    res.update(per_clip_max_pos_rot=per_clip, worst=worst, over_tolerance=over, clips_compared=len(per_clip),
+               clips_only_in_one=missing, watched_bones=len(watch), tol=dict(pos=POS_TOL, rot=ROT_TOL))
+    res["control_bone_max_pos_rot"] = [round(ctr_max[0], 6), round(ctr_max[1], 4)]
+    say(f"deep check: {ctr} itself (method check, not in the verdict): max {ctr_max[0]:.6f} u, {ctr_max[1]:.4f} deg")
+    res["pass"] = bool(per_clip) and not over and not missing and len(per_clip) == 31
+    say(f"deep check: {len(per_clip)} non-Attack clips x every frame x {len(watch)} weighted/slot/root bones: worst position "
+        f"{worst['pos']:.6f} u at {worst['pos_at']}, worst rotation {worst['rot']:.4f} deg at {worst['rot_at']} "
+        f"(limits {POS_TOL} u, {ROT_TOL} deg); clips over: {sorted(over)}; only in one file: {missing}; PASS={res['pass']}")
+    return res
+
+
+if PLAN == "splice_check":
+    sp = os.path.join(OUT, "bake_demo_splice", "Demolitions_Clips.fbx")
+    try:
+        REP["deep_check"] = deep_check(sp, os.path.join(REPO, "Assets/_Game/Art/Demolitions/Demolitions_Clips.fbx"),
+                                       os.path.join(REPO, "Assets/_Game/Art/Demolitions/Demolitions.fbx"))
+    except Exception:
+        import traceback
+        REP["deep_check"] = "failed " + traceback.format_exc()[-1500:]
+        say("deep check failed " + traceback.format_exc()[-600:])
 REP["lines"] = LINES
 with open(os.path.join(OUT, "clip_measure.json"), "w") as fh:
     json.dump(REP, fh, indent=1, default=str)
