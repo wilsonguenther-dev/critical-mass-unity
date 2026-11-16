@@ -196,26 +196,26 @@ namespace CriticalMass.Runtime.View.Anim
             return result;
         }
 
-        /// <summary>fix/hit-feel-7: MeasureExtreme without the per-clip cache (the animator keeps one per model and clip).</summary>
-        public static double ExtremeNow(ModelView m, string clip, double contact)
+        /// <summary>
+        /// fix/hit-feel-7: MeasureExtreme without the per-clip cache (the animator keeps one per model and clip). b11-c: on
+        /// the pose the game draws (PoseDrawn), and on the hand that strikes (the animator passes its measured tip hand:
+        /// the Healer's left); null = the weapon hand.
+        /// </summary>
+        public static double ExtremeNow(ModelView m, string clip, double contact, Transform strikeHand = null)
         {
             if (clip == null) return -1;
             double result = -1;
-            Transform hand = m != null ? (m.Bone("handslot.r") ?? m.Bone("hand.r")) : null;
+            Transform hand = strikeHand != null ? strikeHand : m != null ? (m.Bone("handslot.r") ?? m.Bone("hand.r")) : null;
             if (hand != null && contact > 1e-3)
             {
-                m.BeginPose();
-                m.Pose(clip, contact, 1f, false);
-                if (m.Evaluate(true))
+                if (PoseDrawn(m, clip, contact))
                 {
                     Vector3 hc = m.Transform.InverseTransformPoint(hand.position);
                     double best = -1;
                     for (int k = 0; k < ExtremeSamples; k++)
                     {
                         double t = contact * k / ExtremeSamples;
-                        m.BeginPose();
-                        m.Pose(clip, t, 1f, false);
-                        if (!m.Evaluate(true)) { best = -1; break; }
+                        if (!PoseDrawn(m, clip, t)) { best = -1; break; }
                         double d = (m.Transform.InverseTransformPoint(hand.position) - hc).sqrMagnitude;
                         if (d > best) { best = d; result = t; }
                     }
@@ -223,6 +223,32 @@ namespace CriticalMass.Runtime.View.Anim
                 }
             }
             return result;
+        }
+
+        /// <summary>
+        /// b11-c: poses clip at t the way the game DRAWS a swing (ActorAnimator.PoseUpper on a standing fighter): idle on the
+        /// full body (the legs), the clip on the upper-body layer at envelope weight 1, layer strength 1. A clip that is not
+        /// on the upper layer goes to the full body over idle exactly as ModelView.PoseUpper sends it in the game. Evaluates;
+        /// false when the graph did not run. Measure-time only (once per model and clip), never per frame.
+        /// </summary>
+        public static bool PoseDrawn(ModelView m, string clip, double t)
+        {
+            if (m == null || clip == null) return false;
+            m.BeginPose();
+            m.Pose(ArtMapping.Idle, 0, 1f, true);
+            if (!m.PoseUpper(clip, t, 1f, false, 0)) return false;
+            m.UpperWeight = 1f;
+            return m.Evaluate(true);
+        }
+
+        /// <summary>
+        /// b11-c: the clip the animator plays for a melee press of cls (ActorAnimator.BeginAction): the class's attack clip,
+        /// except the Healer's lantern swing (light weapons on), which plays the shared one-hand Attack instead of Cast.
+        /// </summary>
+        public static string SwingClip(ModelView m, ClassId cls, GameConfig cfg)
+        {
+            if (cls == ClassId.Healer && cfg != null && LightWeapons.On(cfg) && m != null && m.HasClip(ArtMapping.Attack)) return ArtMapping.Attack;
+            return AttackClip(m, cls);
         }
 
         /// <summary>Tests: forget the measured extremes.</summary>
