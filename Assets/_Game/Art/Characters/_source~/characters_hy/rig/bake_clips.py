@@ -1262,12 +1262,29 @@ def _rest_local(arm, n):
     return b.matrix_local if b.parent is None else b.parent.matrix_local.inverted() @ b.matrix_local
 
 
-def retake(src, act, dst, name):
+def keyed_bones(act):
+    """Bone names with at least one curve in act (Blender 5 layered actions, or the legacy list)."""
+    out = set()
+    fcs = list(getattr(act, "fcurves", []) or [])
+    try:
+        for ly in act.layers:
+            for st in ly.strips:
+                for cb in st.channelbags:
+                    fcs.extend(cb.fcurves)
+    except Exception:
+        pass
+    for fc in fcs:
+        if fc.data_path.startswith('pose.bones["'):
+            out.add(fc.data_path.split('"')[1])
+    return out
+
+
+def retake(src, act, dst, name, only=None):
     """b12-x2: re-key a take of src onto dst keeping every bone's transform relative to its parent (what the FBX take
     stores and Unity plays), not its matrix_basis (which is relative to a rest that differs between the two rigs)."""
     assign(src, act)
     f0, f1 = int(round(act.frame_range[0])), int(round(act.frame_range[1]))
-    nm = [pb.name for pb in dst.pose.bones if pb.name in src.pose.bones]
+    nm = [pb.name for pb in dst.pose.bones if pb.name in src.pose.bones and (not only or pb.name in only)]
     inv = {n: _rest_local(dst, n).inverted() for n in nm}
     rec_ = {n: [] for n in nm}
     for f in range(f0, f1 + 1):
@@ -1327,9 +1344,16 @@ if SPLICE_INTO:
     clip_of = lambda a: re.sub(r"\.\d{3}$", "", a.name.split("|")[-1])
     takes = {clip_of(a): a for a in base_acts}
     kept = sorted(c for c in takes if c not in baked)
+    # b12-x2 (run 43959239625): key only the bones the existing file keys. control-toe-roll.r has no curve in her
+    # takes; keying it in the new Attack left its Attack value on every later take in the export (4.2 deg, all 31).
+    base_keyed = set()
+    for a in base_acts:
+        base_keyed |= keyed_bones(a)
+    REP["splice_base_keyed_bones"] = sorted(base_keyed)
+    log("splice: bones keyed in the existing file", len(base_keyed), "of", len(A_.pose.bones))
     for a in new_acts:
         if clip_of(a) in baked:
-            takes[clip_of(a)] = retake(B_, a, A_, clip_of(a) + "_spliced")
+            takes[clip_of(a)] = retake(B_, a, A_, clip_of(a) + "_spliced", base_keyed)
     for a in list(takes.values()):
         a.use_fake_user = True
     for o in new_objs + [o for o in base_objs if o is not A_]:
