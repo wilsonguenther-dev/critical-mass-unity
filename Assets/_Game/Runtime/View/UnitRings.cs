@@ -211,7 +211,7 @@ namespace CriticalMass.Runtime.View
                 int v = i * 4;
                 Style s = Style.Hidden;
                 Actor a = i < w.ActorCount ? w.Actors[i] : null;
-                if (a != null && a.Alive) s = i == SelfId ? Style.Self : a.Team == selfTeam ? Style.Ally : Style.Enemy;
+                if (a != null && a.Alive && !global::CriticalMass.Runtime.View.Fog.FogOfWar.Hides(i)) s = i == SelfId ? Style.Self : a.Team == selfTeam ? Style.Ally : Style.Enemy;
                 _styles[i] = s;
                 if (s == Style.Hidden)
                 {

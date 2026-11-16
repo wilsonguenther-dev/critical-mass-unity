@@ -633,6 +633,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
                     if (id == me) continue;
                     Actor a = w.Actors[id];
                     if (!a.Alive) continue;
+                    if (global::CriticalMass.Runtime.View.Fog.FogOfWar.Hides(id)) continue;
                     double dx = w.X[id] - mx, dz = w.Z[id] - mz;
                     if (dx * dx + dz * dz > TagRange * TagRange) continue;
                     Vector3 head = Head(w, id, _driver.Alpha, 2.65f);
