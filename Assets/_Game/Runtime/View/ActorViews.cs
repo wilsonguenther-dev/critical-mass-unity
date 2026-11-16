@@ -360,6 +360,15 @@ namespace CriticalMass.Runtime.View
             }
             if (slot.Capsule != null && slot.Capsule.gameObject.activeSelf != capsule) slot.Capsule.gameObject.SetActive(capsule);
             if (!alive) return false;
+            // Batch 12 item P (fog of war, view only): an enemy the local team does not see is not drawn (its model or
+            // capsule goes inactive, as a culled fighter's does, so its props, trails and overhead marks skip too). The
+            // slot keeps its pooled model; LOD and pooling are untouched. The Kaiju, nodes and the hill are never hidden.
+            if (Fog.FogOfWar.Hides(i))
+            {
+                if (slot.Capsule != null && slot.Capsule.gameObject.activeSelf) slot.Capsule.gameObject.SetActive(false);
+                if (slot.Model != null) slot.Model.SetActive(false);
+                return false;
+            }
 
             double x = hasFx && fx.Corpse ? fx.CorpseX : Lerp(w.PrevX[i], w.X[i], a);
             double z = hasFx && fx.Corpse ? fx.CorpseZ : Lerp(w.PrevZ[i], w.Z[i], a);

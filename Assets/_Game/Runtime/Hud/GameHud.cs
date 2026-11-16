@@ -419,6 +419,8 @@ namespace CriticalMass.Runtime.Hud
         public const double SightRadius = 16.0;
         RawImage _mapImage;
         MinimapGround _ground;
+        /// <summary>Batch 12 item P: the fog-of-war grey over the minimap (shown only while the fog is drawn).</summary>
+        global::CriticalMass.Runtime.View.Fog.FogMapLayer _mapFog;
         RectTransform _mapArea;
         readonly VectorShape[] _dots = new VectorShape[MaxDots];
         VectorShape _mapHill;
@@ -456,6 +458,13 @@ namespace CriticalMass.Runtime.Hud
             _ground = g.gameObject.AddComponent<MinimapGround>();
             _ground.raycastTarget = false;
             _ground.Bind(_proj, MinimapGeometry.BakedMap);
+            // Batch 12 item P: the fog-of-war grey, over the ground changes and under every dot and marker
+            RectTransform fg = Rt(_mapArea, "Fog Of War");
+            fg.anchorMin = Vector2.zero;
+            fg.anchorMax = Vector2.one;
+            fg.sizeDelta = Vector2.zero;
+            _mapFog = fg.gameObject.AddComponent<global::CriticalMass.Runtime.View.Fog.FogMapLayer>();
+            _mapFog.Bind(_proj);
             for (int i = 0; i < MaxDots; i++)
             {
                 VectorShape d = Shape(_mapArea, "Dot " + i, ShapeKind.Circle, 0f, 0f, 7f, 7f, CMTokens.Azure.Color);
@@ -961,6 +970,7 @@ namespace CriticalMass.Runtime.Hud
                 for (int t = 0; t < 2 && t < w.Map.Pads.Length; t++) PlaceOnMap(_mapBases[t].Rt, w.Map.Pads[t].X, w.Map.Pads[t].Z);
             }
             _ground.Watch(w.Map, w.GridVersion);
+            if (_mapFog != null) _mapFog.Sync();
             _mapHill.SetFill(s.Hill == HillState.Neutral ? Navy : HillColour(s.Hill));
             bool eggOnMap = !s.Hatched || s.Kaiju == KaijuState.Egg;
             _mapEgg.Set(eggOnMap ? UiIcons.MapEgg : KaijuIcon(s, false), _tier);
@@ -984,7 +994,10 @@ namespace CriticalMass.Runtime.Hud
                     }
                     on = false;
                 }
-                if (on && w.Actors[i].Team != mine) on = Seen(w, i, mine, n);
+                // Batch 12 item P: with the fog drawn an enemy dot follows the fog (12 u of a teammate, 10 u of a held hill,
+                // the base, faded); without it, the older SightRadius rule
+                if (on && w.Actors[i].Team != mine)
+                    on = global::CriticalMass.Runtime.View.Fog.FogOfWar.Active ? !global::CriticalMass.Runtime.View.Fog.FogOfWar.Hides(i) : Seen(w, i, mine, n);
                 VectorShape d = _dots[i];
                 if (d.gameObject.activeSelf != on) d.gameObject.SetActive(on);
                 if (!on) continue;

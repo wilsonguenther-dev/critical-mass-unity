@@ -28,8 +28,10 @@ namespace CriticalMass.Runtime.Menu
         public const string ShakeAmountKey = GameSettings.ShakeScaleKey;
         /// <summary>Reduce motion: one key for every reader (StoryIntro, AttractMode, FeelGate, big moments, world reactions).</summary>
         public const string ReduceMotionKey = GameSettings.ReduceMotionKey;
+        /// <summary>Batch 12 item P (Travis): fog of war on / off (default on; drawn only in the Full profile, never Classic).</summary>
+        public const string FogOfWarKey = "cm.access.fogOfWar";
 
-        public static readonly string[] AllKeys = { HideNamesKey, CleanHudKey, SubtitlesKey, UiScaleKey, ReduceFlashingKey, ShakeAmountKey, ReduceMotionKey, View.Moments.BigMomentsSettings.ModeKey };
+        public static readonly string[] AllKeys = { HideNamesKey, CleanHudKey, SubtitlesKey, UiScaleKey, ReduceFlashingKey, ShakeAmountKey, ReduceMotionKey, View.Moments.BigMomentsSettings.ModeKey, FogOfWarKey };
 
         /// <summary>UI scale choices in percent, screen order.</summary>
         public static readonly int[] UiScaleOptions = { 80, 90, 100, 110, 120, 130 };
@@ -51,6 +53,10 @@ namespace CriticalMass.Runtime.Menu
         public static bool ReduceFlashing { get => GameSettings.ReduceFlashing; set { GameSettings.ReduceFlashing = value; Changed?.Invoke(); } }
         /// <summary>Reduce motion (default off): fades instead of slides, a quarter of the world sway, no shake.</summary>
         public static bool ReduceMotion { get => GameSettings.ReduceMotion; set { GameSettings.ReduceMotion = value; Changed?.Invoke(); } }
+
+        /// <summary>Fog of war (default on): outside what your team sees, a haze hides ground detail and enemy fighters, and
+        /// the maps grey out. View only (Runtime/View/Fog); the Classic profile, spectators and the results never show it.</summary>
+        public static bool FogOfWar { get => GetB(FogOfWarKey, true); set => SetB(FogOfWarKey, value); }
 
         /// <summary>Flashes allowed per second: 3 with Reduce flashing on, otherwise no limit.</summary>
         public static int MaxFlashesPerSecond => ReduceFlashing ? ReducedFlashesPerSecond : int.MaxValue;
@@ -131,6 +137,8 @@ namespace CriticalMass.Runtime.Menu
                     d => View.Moments.BigMomentsSettings.Mode = View.Moments.BigMomentsSettings.Step(View.Moments.BigMomentsSettings.Mode, d)),
                 // Owner, 2026-11-14: GORE intensity (the Game tab's row, same setting): FULL default, REDUCED, OFF.
                 menu.Stepper(tab, 8, "GORE", () => global::CriticalMass.Runtime.View.Effects.GoreGate.Label(GameSettings.Gore), d => GameSettings.Gore = global::CriticalMass.Runtime.View.Effects.GoreGate.Step(GameSettings.Gore, d)),
+                // Batch 12 item P (Travis): fog of war, ON default (Full profile only; Classic never shows it).
+                menu.Stepper(tab, 9, "FOG OF WAR", () => OnOff(FogOfWar), d => FogOfWar = !FogOfWar),
             };
             float y = PauseMenu.ContentY + items.Count * (PauseMenu.LineH + PauseMenu.LineGap) + 10f;
             MenuItem reset = MenuUi.Item(tab, "Reset Access", PauseMenu.ContentX, y, 460f, 56f, "RESET THESE OPTIONS",
