@@ -202,3 +202,24 @@ Order of work for next session:
 - `WeaponReachRuleTests.BotsDoNotWhiffMoreWithTheReachRuleThanTheControlOnTheSameSeeds` prints whiffs per class and per
   team, and instability at the hatch, rule on against the pre-b11-c control, on the same seeds (16v16 1337 and 4242,
   5v5 1 to 4). It fails if any class's whiff share rises more than 0.10 over the control.
+
+## Batch 12 item C2 (Mon 16 Nov 2026, 14:59 CST): continuing PR #177 on the batch 12 base
+
+- Base: integration/batch-12-cand1 plus the four reverted reach commits re-applied and PR #177 merged; the
+  SimPhysicsSoakTests.Golden rows are the base's values (the integrator pastes the Full row once, after R and C2).
+- Demolitions bar: no combined run of PR #177's prints existed when this was written, so the cause is not read yet.
+  `WeaponReachTests.TheDemolitionsBarComesForwardOrTheCauseIsNamed` now prints one verdict line
+  ("[CM.WeaponReach] demolitions verdict: ..."): CODE (upper layer not applied, wrong clip by name, bar not on
+  handslot.r: asserted), ATTACH (hand comes forward, bar does not), or ART (her own Attack clip moves the hand forward
+  under 0.25 u while the shared KayKit Attack sampled onto her rig moves it 0.40 u or more; the clip asset and frames are
+  printed for X2's re-bake). Her table row stays the measured value of what the game draws.
+- Healer seed 101: no StuckContext line was available. Default applied: her bot decides a lantern press at the old 1.6 u
+  (DepthConfig.WeaponReach.HealerBotPressDistance, rule on only); her table row still decides the hit.
+  `WeaponReachRuleTests.TheHealerBotIsNotStuckInRetreatOnSeed101` prints her StuckContext lines if she stalls again.
+- 5v5 balance: `WeaponReachRuleTests.TheReachRuleKeepsTheControlsBalanceOnTheSameSeeds` plays whole matches, rule on
+  against the same-seed control, 5v5 seeds 1 to 20 and 16v16 seeds 1337 and 4242, and prints wins, whiffs per team and
+  class, hatch time and Berserk locks. Limits: whiff share +0.10 over control (classes with 40+ swings), 5v5 win share
+  within 0.15 of the control's.
+- Hit-feel capture: the dummy's body surface now stands at the class's sim reach minus 0.02 u (the hit lands at the edge
+  of the range). The side camera picks its side by a clear line of sight over the map grid (centre and both shoulder
+  lines, both sides, lifts 0 to 3 u, the lift now applied), then one ray against the drawn dressing; every choice is logged.
