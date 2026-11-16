@@ -176,7 +176,10 @@ namespace CriticalMass.Runtime.Tests
         {
             if (Ui == null || Display == null) Assert.Ignore("fonts not loadable in this run");
             // The HUD card's class name plate (112 px, best-fit 16..12, 2 px outline): the closer's capture walk cut DEMOLITIONS.
-            Assert.IsTrue(UiScale.FitsOneLine(Ui, "DEMOLITIONS", UiScale.TypeMin, 12, 112f, 2f), "DEMOLITIONS fits the HUD name plate");
+            // b12-jz: the class reads DEMOLITIONIST now (13 letters, two more than DEMOLITIONS).
+            bool fits = UiScale.FitsOneLine(Ui, "DEMOLITIONIST", UiScale.TypeMin, 12, 112f, 2f);
+            UnityEngine.Debug.Log($"[b12-jz rename] DEMOLITIONIST on the 112 px HUD name plate (best-fit 16..12, 2 px outline): fits {fits}");
+            Assert.IsTrue(fits, "DEMOLITIONIST fits the HUD name plate");
             // The hatch banner headline (plate width - 300, best-fit 48..30, 4 px outline).
             foreach (string team in new[] { "AZURE", "CRIMSON", "NOBODY" })
                 Assert.IsTrue(UiScale.FitsOneLine(Display, CriticalMass.Runtime.View.KaijuMomentTracker.WordSidesWith + team, UiScale.TypeDisplay,

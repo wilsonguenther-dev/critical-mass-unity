@@ -161,7 +161,7 @@ namespace CriticalMass.Runtime.Codex
             new[] { "relic-08", "Tide Shell", "Hold it to your ear and you hear the sea.", "There is no sea. That is the strange part." },
             new[] { "relic-09", "Hatchling Tooth", "Lost by a very young Kaiju.", "Found by a very brave Miner." },
             new[] { "relic-10", "Bridge Knot", "Builders tie this knot first and trust it most.", "Nobody else has ever untied one." },
-            new[] { "relic-11", "Burnt Fuse", "Left by the Basin's first Demolitions Expert.", "Found a long way from where it was lit." },
+            new[] { "relic-11", "Burnt Fuse", "Left by the Basin's first Demolitionist.", "Found a long way from where it was lit." },
             new[] { "relic-12", "Crown of the Hill", "Whoever wore it held the hill from dawn to dusk.", "Then they came down for supper." },
         };
 
