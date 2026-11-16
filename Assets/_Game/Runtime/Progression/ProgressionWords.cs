@@ -78,7 +78,7 @@ namespace CriticalMass.Runtime.Progression
         {
             if (c == ClassId.Demolitions) return "No regular attack: the Demolitions Expert fights with mines and TNT.";
             ClassConfig k = cfg.Class(c);
-            return N(k.AttackDamage) + " damage in a " + N(k.AttackArcDeg) + "° arc, reach " + N(k.AttackRange) + " m.";
+            return N(k.AttackDamage) + " damage in a " + N(k.AttackArcDeg) + "° arc, reach " + N(CriticalMass.Sim.Core.Combat.ReachOf(cfg, c)) + " m.";
         }
 
         /// <summary>What the class's ability does, with the numbers from the sim config.</summary>
