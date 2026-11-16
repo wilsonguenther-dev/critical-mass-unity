@@ -81,13 +81,10 @@ namespace CriticalMass.Runtime.Online
             _lane.anchorMin = _lane.anchorMax = new Vector2(0f, 1f);
             _lane.pivot = new Vector2(0f, 1f);
             // online-rooms-5: one wrapped box (newest line at the bottom), so a long line wraps instead of running off.
-            _body = MenuUi.Label(_lane, "Lines", CMTokens.Ui, UiScale.TypeSmall, CMTokens.WarmCream.Color, TextAnchor.LowerLeft,
-                0f, 0f, 100f, 100f, "", 2f);
-            _body.horizontalOverflow = HorizontalWrapMode.Wrap;
-            _body.supportRichText = false;   // typed text is shown as typed; TextFit measures plain text
-            MenuUi.Contain(_body, MaxLines);
+            _body = MakeBody(_lane, UiScale.TypeSmall, 100f, 100f);
             _input = MenuUi.Label(_lane, "Typing", CMTokens.Ui, UiScale.TypeSmall, CMTokens.ToolBrass.Color, TextAnchor.MiddleLeft,
                 0f, HudZones.ChatLines * HudZones.ChatLineH + 6f, 100f, HudZones.ChatInputH, "", 2f);
+            ShrinkOnly(_input, UiScale.TypeSmall);
             MenuUi.Contain(_input, 1);
             _placed = new Rect(-1, -1, 0, 0);
             _lane.gameObject.AddComponent<RectMask2D>();   // online-rooms-6: nothing draws past the box's edges
@@ -208,13 +205,93 @@ namespace CriticalMass.Runtime.Online
             }
             HudText.Set(body, shown);
             // The final word: Unity's own layout of what the rule set. Drop the oldest line while the top one pokes out.
-            while (picked.Count > 1 && !TopLineInside(body))
+            while (picked.Count > 1 && (!TopLineInside(body) || DrawnLines(body) > cap))
             {
                 picked.RemoveAt(0);
                 shown = string.Join("\n", picked);
                 HudText.Set(body, shown);
             }
             return shown;
+        }
+
+        /// <summary>
+        /// b11-af-2: the chat lines label, built exactly as the lane uses it (tests build it with this too): small type,
+        /// bottom-aligned, wrapped, plain text, under the text rule with a SHRINK-ONLY range (size down to its floor).
+        /// Root cause of the cut top line: MenuUi.Contain takes its range from the label's resizeTextMin/MaxSize, which a
+        /// fresh Text leaves at Unity's defaults 10 and 40, so the rule GREW the chat text from 18 px towards 40 px until
+        /// the block filled the box, and its one-line tolerance (box height + half the size) let the top line stand out of
+        /// the box, where the lane's mask cut it in half.
+        /// </summary>
+        public static Text MakeBody(Transform parent, int size, float w, float h)
+        {
+            Text t = MenuUi.Label(parent, "Lines", CMTokens.Ui, size, CMTokens.WarmCream.Color, TextAnchor.LowerLeft, 0f, 0f, w, h, "", 2f);
+            t.horizontalOverflow = HorizontalWrapMode.Wrap;
+            t.supportRichText = false;   // typed text is shown as typed; TextFit measures plain text
+            ShrinkOnly(t, size);
+            MenuUi.Contain(t, MaxLines);
+            return t;
+        }
+
+        /// <summary>b11-af-2: the range MenuUi.Contain reads, set to the label's own size down to its floor (never larger).</summary>
+        static void ShrinkOnly(Text t, int size)
+        {
+            t.resizeTextMaxSize = size;
+            t.resizeTextMinSize = ContainedText.FloorFor(size);
+        }
+
+        /// <summary>b11-af-2: lines Unity draws for t at its current settings (generator), else TextFit's greedy count.</summary>
+        public static int DrawnLines(Text t)
+        {
+            if (t == null || string.IsNullOrEmpty(t.text)) return 0;
+            Rect r = t.rectTransform.rect;
+            if (Populated(t, r) && GenLines.Count > 0 && GenLines[0].height > 0) return GenLines.Count;
+            float lh = Mathf.Max(1f, TextFit.LineHeightOf(t, t.fontSize));
+            return Mathf.Max(1, Mathf.RoundToInt(TextFit.HeightOf(t, t.text, t.fontSize, r.width, t.horizontalOverflow == HorizontalWrapMode.Wrap) / lh));
+        }
+
+        /// <summary>
+        /// b11-af-2, tests: the label's box (rect, pivot space), size range and settings, and every drawn line's top and
+        /// bottom in the same space (Unity's generator / ppu), so one failed run shows where each line sits.
+        /// </summary>
+        public static string Describe(Text t)
+        {
+            if (t == null) return "(no label)";
+            Rect r = t.rectTransform.rect;
+            float ppu = TextFit.PixelsPerUnit(t);
+            var sb = new System.Text.StringBuilder(256);
+            sb.Append("box x ").Append(r.xMin.ToString("0.0")).Append("..").Append(r.xMax.ToString("0.0"))
+              .Append(" y ").Append(r.yMin.ToString("0.0")).Append("..").Append(r.yMax.ToString("0.0"))
+              .Append(" (").Append(r.width.ToString("0.0")).Append(" x ").Append(r.height.ToString("0.0")).Append(")")
+              .Append(" ppu ").Append(ppu.ToString("0.000")).Append(" size ").Append(t.fontSize)
+              .Append(" range ").Append(t.resizeTextMinSize).Append("..").Append(t.resizeTextMaxSize)
+              .Append(" wrap ").Append(t.horizontalOverflow).Append(" v ").Append(t.verticalOverflow).Append(" align ").Append(t.alignment)
+              .Append(" lineH(TextFit) ").Append(TextFit.LineHeightOf(t, t.fontSize).ToString("0.00"))
+              .Append(" height(TextFit) ").Append(TextFit.HeightOf(t, t.text, t.fontSize, r.width, t.horizontalOverflow == HorizontalWrapMode.Wrap).ToString("0.0"));
+            if (Populated(t, r))
+            {
+                sb.Append(" generator lines ").Append(GenLines.Count).Append(':');
+                for (int i = 0; i < GenLines.Count; i++)
+                {
+                    UILineInfo l = GenLines[i];
+                    sb.Append(" [").Append(i).Append(" top ").Append((l.topY / ppu).ToString("0.0"))
+                      .Append(" bottom ").Append(((l.topY - l.height) / ppu).ToString("0.0")).Append(" h ").Append((l.height / ppu).ToString("0.0")).Append(']');
+                }
+            }
+            else sb.Append(" generator: no layout");
+            sb.Append(" text \"").Append(t.text.Replace("\n", " | ")).Append('"');
+            return sb.ToString();
+        }
+
+        /// <summary>Unity's generator run on t's text and settings (as Text draws it); its lines land in GenLines.</summary>
+        static bool Populated(Text t, Rect r)
+        {
+            GenLines.Clear();
+            if (t.font == null) return false;
+            TextGenerationSettings st = t.GetGenerationSettings(r.size);
+            st.generateOutOfBounds = true;
+            if (!Gen.Populate(t.text, st)) return false;
+            Gen.GetLines(GenLines);
+            return true;
         }
 
         /// <summary>
@@ -227,19 +304,8 @@ namespace CriticalMass.Runtime.Online
             if (t == null || string.IsNullOrEmpty(t.text)) return true;
             Rect r = t.rectTransform.rect;
             bool wrap = t.horizontalOverflow == HorizontalWrapMode.Wrap;
-            if (t.font != null)
-            {
-                float ppu = TextFit.PixelsPerUnit(t);
-                TextGenerationSettings st = t.GetGenerationSettings(r.size);
-                st.generateOutOfBounds = true;
-                if (Gen.Populate(t.text, st))
-                {
-                    GenLines.Clear();
-                    Gen.GetLines(GenLines);
-                    if (GenLines.Count > 0 && GenLines[0].height > 0)
-                        return GenLines[0].topY / ppu <= r.yMax + 0.5f;   // generator space is the rect's pivot space x ppu
-                }
-            }
+            if (Populated(t, r) && GenLines.Count > 0 && GenLines[0].height > 0)
+                return GenLines[0].topY / TextFit.PixelsPerUnit(t) <= r.yMax + 0.5f;   // generator space is the rect's pivot space x ppu
             return TextFit.HeightOf(t, t.text, t.fontSize, r.width, wrap) <= r.height + 0.5f;
         }
 
