@@ -32,10 +32,16 @@ JOINT_RATIO = float(os.environ.get('SEAM_JOINT_RATIO', '3.5'))
 # Hero and LOD0 (open edges 86 -> 144 / 104): a see-through regression, so the cut is OFF by default. ON by default: the
 # limb weight clean-up (not yet run), the team-speck clean-up and the normals (both proven better in the run-3 renders).
 CUT = os.environ.get('SEAM_CUT', '0') == '1'
+# b12-i run 4 (43947773193): the weight clean-up alone made the welded bridges stretch further (LOD0 worst 15.3x -> 17.9x):
+# the sheet is geometry welded across limbs, not only weights. SPLIT (default on): every face on a welded edge goes wholly
+# to one limb; the vertices it shares with another limb are duplicated with that limb's weights, so no face spans two
+# limbs; each new rim is one limb's loop and is capped (closed: no see-through). A level that would break its triangle
+# contract or keep an uncapped rim is restored unsplit and reported.
+SPLIT = os.environ.get('SEAM_SPLIT', '1') == '1'
 WEIGHTS = os.environ.get('SEAM_WEIGHTS', '1') == '1'   # armpit webbing on the shoulder / hip pairs
 SHADOW_MAX, LOD1_MAX, LOD0_MAX = 800, 1500, 4500
 LEVELS = ('Hero', 'LOD0', 'LOD1', 'Shadow')
-REP = {'params': dict(ratio=RATIO, joint_ratio=JOINT_RATIO, min_m=MINLEN, smooth_deg=SMOOTH_DEG, cut=CUT, weights=WEIGHTS)}
+REP = {'params': dict(ratio=RATIO, joint_ratio=JOINT_RATIO, min_m=MINLEN, smooth_deg=SMOOTH_DEG, cut=CUT, weights=WEIGHTS, split=SPLIT)}
 
 
 def save():
@@ -388,7 +394,150 @@ if WEIGHTS:
     REP['stretch_after'] = REP['stretch_after_weights']
     save()
 
-# ---- FIX 2 (SEAM_CUT=1 only): cut the fused bridges and cap, three rounds
+# ---- FIX 2: split the welded faces by limb and cap each side
+def vertex_limbs(o):
+    names = {g.index: g.name for g in o.vertex_groups}
+    out = []
+    for v in o.data.vertices:
+        tot = {}
+        for g in v.groups:
+            n = names.get(g.group)
+            if n in ANC:
+                tot[limb(n)] = tot.get(limb(n), 0.0) + g.weight
+        out.append(max(tot, key=tot.get) if tot else 'core')
+    return out
+
+
+def static_fused_edges(o):
+    dom = dominant(o)
+    return [i for i, (a, b) in enumerate(edges_of(o)) if fused(dom[a], dom[b])], dom
+
+
+def split_by_limb(o, extra):
+    me = o.data
+    fe, dom = static_fused_edges(o)
+    vl = vertex_limbs(o)
+    bridge = set(fe) | {int(i) for i in extra}
+    bm = bmesh.new(); bm.from_mesh(me); bm.verts.ensure_lookup_table(); bm.edges.ensure_lookup_table()
+    dl = bm.verts.layers.deform.active
+    vidx = {v: v.index for v in bm.verts}
+    old_bnd = {frozenset(e.verts) for e in bm.edges if len(e.link_faces) == 1}
+    faces = {f for i in bridge for f in bm.edges[i].link_faces}
+    rep_ = dict(welded_edges=len(fe), bridge_edges=len(bridge), faces_split=len(faces))
+    if not faces:
+        bm.free(); return rep_
+    lays = list(bm.loops.layers.color) + list(bm.loops.layers.float_color); uvs = list(bm.loops.layers.uv)
+    recs = []
+    for f in faces:
+        cnt = {}
+        for l in f.loops:
+            k = vl[vidx[l.vert]]; cnt[k] = cnt.get(k, 0) + 1
+        S = max(sorted(cnt), key=lambda k: (cnt[k], k == 'core'))
+        recs.append((S, [(l.vert, [tuple(l[x]) for x in lays], [tuple(l[u].uv) for u in uvs]) for l in f.loops],
+                     f.material_index, f.smooth))
+    bmesh.ops.delete(bm, geom=list(faces), context='FACES_ONLY')
+    dup, lim, domb = {}, {}, {}
+    for v, i in vidx.items():
+        lim[v] = vl[i]; domb[v] = dom[i]
+
+    def vert_for(v, S, fv):
+        if lim[v] == S:
+            return v
+        key = (vidx[v], S)
+        if key not in dup:
+            src = min((u for u in fv if lim[u] == S), key=lambda u: (u.co - v.co).length_squared)
+            nv = bm.verts.new(v.co)
+            for kk, w in src[dl].items():
+                nv[dl][kk] = w
+            dup[key] = nv; lim[nv] = S; domb[nv] = domb[src]
+        return dup[key]
+
+    made = 0
+    for S, data, mi, sm in recs:
+        fv = [d[0] for d in data]
+        nvs = [vert_for(v, S, fv) for v in fv]
+        if len(set(nvs)) < 3:
+            continue
+        try:
+            nf = bm.faces.new(nvs)
+        except ValueError:
+            continue
+        nf.material_index = mi; nf.smooth = sm; made += 1
+        for l, (v, cols, uvv) in zip(nf.loops, data):
+            for x, c in zip(lays, cols):
+                l[x] = c
+            for u, t in zip(uvs, uvv):
+                l[u].uv = t
+    wire = [e for e in bm.edges if not e.link_faces]
+    if wire:
+        bmesh.ops.delete(bm, geom=wire, context='EDGES')
+    loose = [v for v in bm.verts if not v.link_edges]
+    if loose:
+        bmesh.ops.delete(bm, geom=loose, context='VERTS')
+    newb = [e for e in bm.edges if len(e.link_faces) == 1 and frozenset(e.verts) not in old_bnd]
+    caps = []
+    if newb:
+        caps = [f for f in bmesh.ops.holes_fill(bm, edges=newb, sides=0).get('faces', []) if f.is_valid]
+        cs = set(caps)
+        for f in caps:
+            for e in f.edges:
+                g = next((x for x in e.link_faces if x not in cs), None)
+                if g is None:
+                    continue
+                d = lambda face: next(((l.vert, l.link_loop_next.vert) for l in face.loops if l.edge == e), None)
+                if d(f) == d(g):
+                    f.normal_flip()
+                break
+        if caps:
+            caps = bmesh.ops.triangulate(bm, faces=caps, quad_method='BEAUTY', ngon_method='BEAUTY')['faces']
+        cs = set(caps); mixed = []
+        for f in caps:
+            vs = [l.vert for l in f.loops]
+            if any(fused(domb.get(a, ''), domb.get(b, '')) for a in vs for b in vs if a is not b):
+                mixed.append(f); continue
+            src = None
+            for l in f.loops:
+                l2 = next((x for x in l.vert.link_loops if x.face not in cs), None)
+                if l2 is None:
+                    continue
+                src = src or l2.face
+                for x in lays:
+                    l[x] = l2[x]
+                for u in uvs:
+                    l[u].uv = l2[u].uv
+            if src is not None:
+                f.material_index = src.material_index; f.smooth = src.smooth
+        if mixed:
+            bmesh.ops.delete(bm, geom=mixed, context='FACES_ONLY')
+        rep_['cap_tris_mixed_dropped'] = len(mixed)
+    rep_.update(faces_rebuilt=made, vertices_duplicated=len(dup), new_rim_edges=len(newb), cap_tris=len(caps))
+    rep_['open_edges_after'] = sum(1 for e in bm.edges if len(e.link_faces) == 1)
+    rep_['open_edges_before'] = len(old_bnd)
+    bm.to_mesh(me); me.update(); bm.free()
+    return rep_
+
+
+if SPLIT:
+    REP['split'] = {}
+    LIMIT = {'LOD0': LOD0_MAX, 'LOD1': LOD1_MAX, 'Shadow': SHADOW_MAX, 'Hero': 10 ** 9}
+    for lv, o in LV.items():
+        keep = o.data.copy()
+        r_ = split_by_limb(o, st[o.name]['flag'])
+        r_['tris'] = ntri(o)
+        if r_.get('open_edges_after', 0) > r_.get('open_edges_before', 0) or r_['tris'] > LIMIT[lv]:
+            old = o.data; o.data = keep; bpy.data.meshes.remove(old); r_['restored_unsplit'] = True
+        else:
+            bpy.data.meshes.remove(keep)
+        r_['welded_edges_left'] = len(static_fused_edges(o)[0])
+        REP['split'][lv] = r_
+    save()
+    print('[seams] split', json.dumps(REP['split']), flush=True)
+    st = stretch(list(LV.values()))
+    REP['stretch_after_split'] = {lv: st[o.name]['summary'] for lv, o in LV.items()}
+    REP['stretch_after'] = REP['stretch_after_split']
+    save()
+
+# ---- FIX 3 (SEAM_CUT=1 only): cut the fused bridges and cap, three rounds
 REP['cut'] = {lv: [] for lv in LEVELS}
 for rnd in range(3 if CUT else 0):
     for lv, o in LV.items():
