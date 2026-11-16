@@ -145,7 +145,7 @@ jobs:
         shell: bash
         timeout-minutes: 35
         run: |
-          set -uo pipefail
+          set +e -uo pipefail
           P=tools/online/HeadlessPeer/bin/Release/net8.0/cm-online-peer.dll
           T="${{ inputs.ticks || '1800' }}"
           CODE=$(sed -n 's/^code=//p' room/room.txt)
@@ -171,8 +171,9 @@ jobs:
         with: { lfs: false, sparse-checkout: tools/online }
       - uses: actions/download-artifact@v4
       - run: |
+          set +e
           python3 tools/online/crossplay-check.py hashes-host/peer.log hashes-join/peer.log --names host,join
-          python3 tools/online/compare-hashes.py hashes-host/hashes.txt hashes-join/hashes.txt --min $(( ${{ inputs.ticks || '1800' }} / 30 - 2 ))
+          python3 tools/online/compare-hashes.py hashes-host/hashes.txt hashes-join/hashes.txt --min $(( ${{ inputs.ticks || '1800' }} / 30 - 2 )) || exit 1
 
   # b12-w: Windows player against Mac player (and the other cross-play modes), see crossplay.yml.
   crossplay:

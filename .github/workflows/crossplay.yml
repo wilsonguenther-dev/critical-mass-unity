@@ -89,6 +89,14 @@ jobs:
           if (-not (Test-Path player\CriticalMass.exe)) { Get-ChildItem player; throw "no CriticalMass.exe in the player artifact" }
           python tools/online/player-stamp.py player | Tee-Object -FilePath out\stamp.txt
           "runner: $([Environment]::OSVersion.VersionString) $env:PROCESSOR_ARCHITECTURE" | Tee-Object -FilePath out\runner.txt
+      # The host makes its room only once the joiner's game is unpacked and waiting (artifact joiner-ready-<mode>), so the
+      # host never sits alone in the room: in run 43955919705 a lone Windows player host lost its relay connection about
+      # 30 s after ROOM READY (see docs/windows-crossplay.md).
+      - name: Wait until the joiner is ready
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash tools/online/wait-room.sh "joiner-ready-${{ inputs.mode }}" ready 1500 5
       - name: Make the room (POST /rooms) and publish its code
         shell: pwsh
         run: |
@@ -110,7 +118,10 @@ jobs:
           $a = @('-batchmode','-nographics','-logFile',"$PWD\out\peer.log",'-onlineHost','-onlineCode','${{ steps.room.outputs.code }}','-onlineKey',$key.Trim(),
                  '-onlineRelay',$env:RELAY,'-onlineHumans','2','-onlineTicks',$env:T,'-onlineHashLog',"$PWD\out\hashes.txt",
                  '-onlineLobby','540','-onlineTimeout','1800','-onlineName','WindowsHost')
-          $p = Start-Process player\CriticalMass.exe -ArgumentList $a -Wait -PassThru
+          $t0 = Get-Date
+          "player start $($t0.ToUniversalTime().ToString('o'))" | Tee-Object -FilePath out\timing.txt
+          $p = Start-Process player\CriticalMass.exe -ArgumentList ($a + @('-timestamps')) -Wait -PassThru
+          "player end $((Get-Date).ToUniversalTime().ToString('o')) after $([int]((Get-Date) - $t0).TotalSeconds) s" | Tee-Object -Append -FilePath out\timing.txt
           Get-Content out\peer.log -ErrorAction SilentlyContinue | Select-String -Pattern '\[online\]|\[CM\.Online\]|Exception' | Select-Object -Last 60 | ForEach-Object { $_.Line }
           "exit $($p.ExitCode)" | Tee-Object -FilePath out\exit.txt
           exit $p.ExitCode
@@ -140,25 +151,30 @@ jobs:
           set -euo pipefail
           mkdir -p player out
           tar -xzf player-StandaloneOSX.tgz -C player
-          APP=$(find player -maxdepth 2 -name '*.app' -type d | head -1)
+          APP=$(find player -maxdepth 1 -name '*.app' -type d | head -1)   # not the *_DoNotShip Burst debug folder's copy
           EXE=$(find "$APP/Contents/MacOS" -type f -perm -u+x | head -1)
           echo "APP=$APP" >> "$GITHUB_ENV"; echo "EXE=$EXE" >> "$GITHUB_ENV"
           xattr -cr "$APP" || true
           codesign --verify "$APP" 2>/dev/null && echo "signature: valid" || { echo "signature: none or broken, signing ad hoc (Apple Silicon will not run unsigned code)"; codesign --force --deep --sign - "$APP"; }
           { echo "runner: $(sw_vers -productVersion) $(uname -m)"; echo "player slices: $(lipo -archs "$EXE")"; } | tee out/runner.txt
           python3 tools/online/player-stamp.py "$APP" | tee out/stamp.txt
+          mkdir -p ready && echo "ready=1" > ready/room.txt
+      - uses: actions/upload-artifact@v4
+        with: { name: 'joiner-ready-${{ inputs.mode }}', path: ready/room.txt, retention-days: 1 }
       - name: Wait for the host's room
         shell: bash
-        run: bash tools/online/wait-room.sh "room-${{ inputs.mode }}" room 1500
+        run: bash tools/online/wait-room.sh "room-${{ inputs.mode }}" room 1500 3
       - name: Join the match (macOS player, -batchmode -nographics)
         shell: bash
         timeout-minutes: 35
         run: |
-          set -uo pipefail
+          set +e -uo pipefail
           CODE=$(sed -n 's/^code=//p' room/room.txt)
-          "$EXE" -batchmode -nographics -logFile "$PWD/out/peer.log" -onlineJoin "$CODE" -onlineRelay "$RELAY" -onlineTicks "$T" \
+          echo "player start $(date -u +%FT%TZ)" | tee out/timing.txt
+          "$EXE" -batchmode -timestamps -nographics -logFile "$PWD/out/peer.log" -onlineJoin "$CODE" -onlineRelay "$RELAY" -onlineTicks "$T" \
             -onlineTeam crimson -onlineClass Miner -onlineHashLog "$PWD/out/hashes.txt" -onlineJoinTries 80 -onlineTimeout 1800 -onlineName MacJoiner
           rc=$?
+          echo "player end $(date -u +%FT%TZ)" | tee -a out/timing.txt
           grep -E '\[online\]|\[CM\.Online\]|Exception' out/peer.log | tail -60 || true
           echo "exit $rc" | tee out/exit.txt
           exit $rc
@@ -180,13 +196,16 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with: { dotnet-version: '8.0.x' }
       - run: dotnet build tools/online/HeadlessPeer -c Release -nologo -clp:ErrorsOnly
+      - run: mkdir -p ready && echo "ready=1" > ready/room.txt
+      - uses: actions/upload-artifact@v4
+        with: { name: 'joiner-ready-${{ inputs.mode }}', path: ready/room.txt, retention-days: 1 }
       - name: Wait for the host's room
-        run: bash tools/online/wait-room.sh "room-${{ inputs.mode }}" room 1500
+        run: bash tools/online/wait-room.sh "room-${{ inputs.mode }}" room 1500 3
       - name: Join the match (console peer, sends the player's build so the host admits it)
         shell: bash
         timeout-minutes: 35
         run: |
-          set -uo pipefail
+          set +e -uo pipefail
           mkdir -p out
           CODE=$(sed -n 's/^code=//p' room/room.txt); NB=$(sed -n 's/^netbuild=//p' room/room.txt)
           echo "runner: $(uname -sm)" | tee out/runner.txt
@@ -239,7 +258,7 @@ jobs:
         shell: bash
         timeout-minutes: 35
         run: |
-          set -uo pipefail
+          set +e -uo pipefail
           mkdir -p out
           echo "runner: $(uname -sm)" | tee out/runner.txt
           P=tools/online/HeadlessPeer/bin/Release/net8.0/cm-online-peer.dll
@@ -308,7 +327,7 @@ jobs:
       - name: Same build, same rules, same fingerprints
         shell: bash
         run: |
-          set -uo pipefail
+          set +e -uo pipefail
           for s in side-host side-join; do echo "== $s"; cat $s/runner.txt $s/stamp.txt $s/exit.txt 2>/dev/null; done
           SA=; SB=; [ -f side-host/stamp.txt ] && SA="--stamp-a side-host/stamp.txt"; [ -f side-join/stamp.txt ] && SB="--stamp-b side-join/stamp.txt"
           python3 tools/online/crossplay-check.py side-host/peer.log side-join/peer.log $SA $SB --names host,join | tee check.txt

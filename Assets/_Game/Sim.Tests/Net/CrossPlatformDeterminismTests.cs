@@ -202,7 +202,8 @@ namespace CriticalMass.Sim.Tests.Net
             // checkout (git autocrlf) leaves C# sources LF, so no multi-line string literal changes between checkouts.
             string sim = Path.Combine("Assets", "_Game", "Sim");
             if (!Directory.Exists(sim)) { Assert.Inconclusive("run from the repository root (the Sim sources are not at " + sim + ")"); return; }
-            var textApi = new Regex(@"\b(File|Directory|StreamReader|TextReader|Resources)\.|ReadAllText|ReadAllLines|TextAsset|\.Split\(|\b(int|long|double|float|decimal|ulong)\.(Try)?Parse\(|Convert\.ToDouble|Environment\.|DateTime\.|System\.Random\b|new Random\(", RegexOptions.CultureInvariant);
+            // (?<![\w.]) : the type itself, not a member called that (GameConfig has a field named Resources).
+            var textApi = new Regex(@"(?<![\w.])(File|Directory|StreamReader|TextReader|Environment|DateTime)\.|Resources\.Load|ReadAllText|ReadAllLines|TextAsset|\.Split\(|(?<![\w.])(int|long|double|float|decimal|ulong)\.(Try)?Parse\(|Convert\.ToDouble|System\.Random\b|new Random\(", RegexOptions.CultureInvariant);
             var verbatimMultiLine = new Regex("@\"[^\"]*\n", RegexOptions.CultureInvariant);
             var hits = new List<string>();
             int files = 0, multiLine = 0;
