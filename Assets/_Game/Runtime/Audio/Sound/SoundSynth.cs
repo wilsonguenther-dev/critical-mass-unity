@@ -390,8 +390,14 @@ namespace CriticalMass.Runtime.Audio.Sound
             R("sub_small", 0.35f, 0f, L(Si, 0, 0.35f, 70, 45, 0.003f, 0.1f, 1f)),
 
             // ---- ambience
-            Loop("amb_wind", 6f, L(Nz, 0, 0, 1, 1, 0, 0, 0.7f, 500, 0, 80, 0, 0, 0.5f, 1f / 6f), L(Nz, 0, 0, 1, 1, 0, 0, 0.2f, 1400, 0, 600, 0, 0, 0.7f, 2f / 6f)),
-            Loop("amb_water", 4f, L(Nz, 0, 0, 1, 1, 0, 0, 0.5f, 2500, 0, 300), L(Cr, 0, 0, 600, 0, 0, 0, 0.4f, 6000, 0, 1500), L(Br, 0, 0, 1, 1, 0, 0, 0.4f, 300)),
+            // b12-jz: the wind used to be WHITE noise through one gentle (6 dB per octave) 500 Hz low-pass plus a 600 to 1400 Hz
+            // white-noise band, peak-normalised: a steady full-band hiss that laptop speakers (no bass) play as pure white
+            // noise. It is now brown noise (already falling 6 dB per octave above ~75 Hz) through a 300 Hz low-pass, so it
+            // falls 12 dB per octave: a soft low gust, nothing above ~1 kHz. AM rates stay whole cycles per 6 s (seamless).
+            Loop("amb_wind", 6f, L(Br, 0, 0, 1, 1, 0, 0, 1f, 300, 0, 50, 0, 0, 0.6f, 1f / 6f), L(Br, 0, 0, 1, 1, 0, 0, 0.3f, 650, 0, 180, 0, 0, 0.7f, 2f / 6f)),
+            // b12-jz: water keeps its splash but loses the open hiss (the white 300 to 2500 Hz band is now brown noise
+            // 250 to 1500 Hz; the crackle is low-passed at 2.4 kHz instead of 6 kHz).
+            Loop("amb_water", 4f, L(Br, 0, 0, 1, 1, 0, 0, 0.5f, 1500, 0, 250), L(Cr, 0, 0, 600, 0, 0, 0, 0.35f, 2400, 0, 900), L(Br, 0, 0, 1, 1, 0, 0, 0.6f, 300)),
             R("amb_bird", 0.36f, 0f, L(Si, 0, 0.08f, 2800, 3600, 0.005f, 0.03f, 0.5f, 0, 0, 0, 0.05f, 30f), L(Si, 0.12f, 0.08f, 3000, 4000, 0.005f, 0.03f, 0.5f, 0, 0, 0, 0.05f, 30f),
                 L(Si, 0.22f, 0.1f, 2600, 3400, 0.005f, 0.03f, 0.45f, 0, 0, 0, 0.05f, 30f)),
             R("amb_bird_trill", 0.42f, 0f, L(Si, 0, 0.4f, 3400, 3300, 0.02f, 0.15f, 0.45f, 0, 0, 0, 0.08f, 25f)),
