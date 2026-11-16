@@ -55,17 +55,17 @@ namespace CriticalMass.Runtime.Tests
 
         static Text Body(Transform root, int size, Vector2 box)
         {
-            // built as OnlineChatHud.Start builds it, at the drawn size (off a canvas: one unit = one screen px)
-            Text t = MenuUi.Label(root, "Lines", CMTokens.Ui, size, CMTokens.WarmCream.Color, TextAnchor.LowerLeft, 0f, 0f, box.x, box.y, "", 2f);
-            t.horizontalOverflow = HorizontalWrapMode.Wrap;
-            t.supportRichText = false;
-            MenuUi.Contain(t, OnlineChatHud.MaxLines);
+            // b11-af-2: the lane's own builder, at the drawn size (off a canvas: one unit = one screen px)
+            Text t = OnlineChatHud.MakeBody(root, size, box.x, box.y);
             MenuUi.Place(t.rectTransform, 0f, 0f, box.x, box.y);
             return t;
         }
 
-        static void AssertWholeLines(Text t, List<string> texts, List<string> picked, string shown, Vector2 box, string where)
+        static void AssertWholeLines(Text t, List<string> texts, List<string> picked, string shown, Vector2 box, int size, string where)
         {
+            string d = OnlineChatHud.Describe(t);
+            TestContext.WriteLine(where + ": " + d);   // every run prints the box, the size and each drawn line's top and bottom
+            where = where + " [" + d + "]";
             Assert.IsNotNull(t.font, "the font loads");
             Assert.GreaterOrEqual(picked.Count, 1, where + ": the newest notice always shows");
             Assert.AreEqual(texts[texts.Count - 1], picked[picked.Count - 1], where + ": the newest notice is the bottom line");
@@ -74,11 +74,11 @@ namespace CriticalMass.Runtime.Tests
                 Assert.AreEqual(texts[first + i], picked[i], where + ": the shown lines are the newest ones, in order");
             Assert.AreEqual(string.Join("\n", picked), shown, where + ": the box shows exactly the picked lines");
             Assert.AreEqual(shown, t.text, where + ": the text rule did not cut a shown line (no ellipsis)");
+            Assert.LessOrEqual(t.fontSize, size, where + ": the text rule never grows the chat text past its size (b11-af-2 root cause)");
             Assert.IsTrue(OnlineChatHud.TopLineInside(t), where + ": the top edge of the first shown line is inside the box");
             float drawn = TextFit.HeightOf(t, t.text, t.fontSize, box.x, true);
             Assert.LessOrEqual(drawn, box.y + 0.5f, where + $": the shown block ({drawn:0.0} px) fits the box ({box.y:0.0} px)");
-            float lineH = TextFit.LineHeightOf(t, t.fontSize);
-            Assert.LessOrEqual(Mathf.RoundToInt(drawn / lineH), OnlineChatHud.MaxLines, where + ": at most MaxLines drawn lines");
+            Assert.LessOrEqual(OnlineChatHud.DrawnLines(t), OnlineChatHud.MaxLines, where + ": at most MaxLines drawn lines (Unity's own line count)");
         }
 
         [TestCase(1280, 720)]
@@ -94,7 +94,7 @@ namespace CriticalMass.Runtime.Tests
                 List<string> texts = Texts();
                 var picked = new List<string>();
                 string shown = OnlineChatHud.ShowWholeLines(t, texts, size, box.x, box.y, OnlineChatHud.MaxLines, picked);
-                AssertWholeLines(t, texts, picked, shown, box, $"{w}x{h}");
+                AssertWholeLines(t, texts, picked, shown, box, size, $"{w}x{h}");
             }
             finally { Object.DestroyImmediate(root); }
         }
@@ -114,10 +114,10 @@ namespace CriticalMass.Runtime.Tests
                 List<string> texts = Texts();
                 var picked = new List<string>();
                 string shown = OnlineChatHud.ShowWholeLines(t, texts, size, box.x, box.y, OnlineChatHud.MaxLines, picked);
-                AssertWholeLines(t, texts, picked, shown, box, $"{w}x{h} tight");
+                AssertWholeLines(t, texts, picked, shown, box, size, $"{w}x{h} tight");
                 Assert.Less(picked.Count, texts.Count, "the tight box cannot hold every notice");
                 string next = texts[texts.Count - picked.Count - 1] + "\n" + shown;
-                Assert.Greater(TextFit.HeightOf(t, next, size, box.x, true), box.y + 0.5f, "the next older line would not fit whole (none dropped early)");
+                Assert.Greater(TextFit.HeightOf(t, next, size, box.x, true), box.y + 0.5f, "the next older line would not fit whole (none dropped early) [" + OnlineChatHud.Describe(t) + "]");
             }
             finally { Object.DestroyImmediate(root); }
         }
@@ -141,7 +141,7 @@ namespace CriticalMass.Runtime.Tests
                 Vector2 box = new Vector2(Box(w, h).x, TextFit.LineHeightOf(t, size) * 2.6f);
                 MenuUi.Place(t.rectTransform, 0f, 0f, box.x, box.y);
                 t.text = string.Join("\n", Texts());
-                Assert.IsFalse(OnlineChatHud.TopLineInside(t), "twelve notices in a box under three lines tall cut the top line");
+                Assert.IsFalse(OnlineChatHud.TopLineInside(t), "twelve notices in a box under three lines tall cut the top line [" + OnlineChatHud.Describe(t) + "]");
             }
             finally { Object.DestroyImmediate(go); }
         }
