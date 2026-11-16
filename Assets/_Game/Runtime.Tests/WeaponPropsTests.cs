@@ -61,6 +61,45 @@ namespace CriticalMass.Runtime.Tests
             Assert.IsNull(WeaponProps.Attach(null, HeldWeapon.Mallet, TeamId.Azure, null));
         }
 
+        /// <summary>
+        /// b12-i (Air look of build 36a581c: "no mallet in either hand"): on the imported Builder rig the mallet hangs from
+        /// the real weapon slot (handslot.r, not the hand.r fallback), is drawn (active, renderer enabled, non-empty bounds
+        /// about one mallet long) and points out of the fist, not back up the forearm into the sleeve. The character shots
+        /// hang it too (CharacterShotsCapture spawns ModelView directly, outside ActorViews, and used to shoot him
+        /// empty-handed).
+        /// </summary>
+        [Test]
+        public void TheBuilderRigShowsHisMalletOnTheHandSlot()
+        {
+            ModelSpec spec = ArtMapping.Spec(ArtMapping.Builder);
+            Assert.AreEqual(HeldWeapon.Mallet, WeaponProps.Plan(ClassId.Builder, spec));
+            var asset = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>(spec.AssetPath);
+            Assert.IsNotNull(asset, spec.AssetPath + " is not imported");
+            GameObject go = Object.Instantiate(asset);
+            try
+            {
+                Transform hand = null;
+                foreach (Transform t in go.GetComponentsInChildren<Transform>(true))
+                    if (t.name == WeaponProps.HandBone) { hand = t; break; }
+                Assert.IsNotNull(hand, "the Builder rig has the weapon slot " + WeaponProps.HandBone + " (not only the fallback)");
+                Transform prop = WeaponProps.Attach(hand, HeldWeapon.Mallet, TeamId.Azure, null);
+                Assert.IsNotNull(prop);
+                Assert.AreSame(hand, prop.parent, "parented to the hand slot");
+                Assert.IsTrue(prop.gameObject.activeInHierarchy, "active");
+                Renderer r = prop.GetComponentInChildren<Renderer>();
+                Assert.IsNotNull(r, "drawn");
+                Assert.IsTrue(r.enabled, "renderer enabled");
+                Assert.Greater(r.bounds.size.magnitude, WeaponProps.MalletLength * 0.8f, "about one mallet long in the world, not scaled away");
+                Transform fore = hand.parent != null ? hand.parent.parent : null;
+                if (fore != null && (hand.position - fore.position).sqrMagnitude > 1e-6f)
+                    Assert.Greater(Vector3.Dot(prop.up, (hand.position - fore.position).normalized), -0.5f,
+                        "the handle leaves the fist; it does not point back up the forearm into the sleeve");
+            }
+            finally { Object.DestroyImmediate(go); }
+            string src = System.IO.File.ReadAllText(System.IO.Path.Combine(Application.dataPath, "_Game/Runtime/View/Art/CharacterShotsCapture.cs"));
+            StringAssert.Contains("HangHandProp(m, cls, team, _catalog);", src, "the character shots hang the hand prop as the game does");
+        }
+
         [Test]
         public void TheMalletShapeIsOneSmallSharedMeshInTeamSafeColours()
         {
