@@ -200,6 +200,9 @@ namespace CriticalMass.Runtime.Audio.Sound
             for (int i = 0; i < FuseVoices; i++) _fuse[i] = Source("Fuse " + i, true, out _fuseLpf[i]);
             _wind = Source("Wind", true, out _);
             _water = Source("Water", true, out _);
+            // b12-jz: the ambience beds follow the MUSIC slider and its mute (there is no separate ambience slider).
+            UnityEngine.Audio.AudioMixerGroup bed = GameSettings.MusicGroup;
+            if (bed != null) { _wind.outputAudioMixerGroup = bed; _water.outputAudioMixerGroup = bed; }
             _berserk = Source("Berserk", true, out _berserkLpf);
             for (int i = 0; i < SubVoices; i++) _sub[i] = Source("Sub " + i, false, out _);
         }
@@ -474,7 +477,8 @@ namespace CriticalMass.Runtime.Audio.Sound
             _cursor[cue] = idx;
             AudioClip clip = clips[idx];
             double now = Time.unscaledTimeAsDouble;
-            float worldGain = (_title && !uiBus ? TitleGain : 1f) * (uiBus ? 1f : FilmWorldGain);
+            float worldGain = uiBus ? 1f : TitleWorldGain(_title, MusicDirector.CurrentState, CriticalMass.Runtime.Menus.StoryIntro.IsPlaying) * FilmWorldGain;
+            if (worldGain <= 0f) { Refused++; return false; }
             float gain = Mathf.Clamp01(c.Gain * gainScale * g * (1f + vj) * worldGain * (own ? 1.1f : 1f));
 
             _plan.BeginFrame(Time.frameCount);
@@ -648,11 +652,12 @@ namespace CriticalMass.Runtime.Audio.Sound
         {
             bool world = w != null && !_paused;
             int windCue = SoundTable.EdgeCue(SoundEdge.Wind), waterCue = SoundTable.EdgeCue(SoundEdge.Water);
-            // Wind: always under the world.
-            Loop(_wind, windCue, world, SoundTable.Cue(windCue).Gain * _duckAmb * (_title ? 0.7f : 1f) * FilmWorldGain, 0f);
+            // Wind: under the match only (never on the title or under the film; b12-jz).
+            float windGain = WindGain(_title, SoundTable.Cue(windCue).Gain, _duckAmb, FilmWorldGain);
+            Loop(_wind, windCue, world && windGain > 0f, windGain, 0f);
             // Water: the nearest waterfall.
             float wg = 0f, wp = 0f;
-            if (world && _fallCount > 0)
+            if (world && _fallCount > 0 && !_title)
             {
                 int best = -1;
                 float bd = float.MaxValue;
@@ -665,7 +670,7 @@ namespace CriticalMass.Runtime.Audio.Sound
                 wg = SoundSpace.Gain(dist, 4f, 26f) * SoundTable.Cue(waterCue).Gain * _duckAmb;
                 wp = SoundSpace.Pan(_fallX[best] - _lx, -(_fallZ[best] - _lz), _rx, _rz);
             }
-            Loop(_water, waterCue, world && _fallCount > 0, wg, wp);
+            Loop(_water, waterCue, world && _fallCount > 0 && !_title, wg * FilmWorldGain, wp);
             // Berserk: at the Kaiju.
             if (_berserkCue >= 0 && world)
             {
@@ -687,6 +692,22 @@ namespace CriticalMass.Runtime.Audio.Sound
                 if (!_fuse[i].isPlaying && world) _fuse[i].Play();
             }
         }
+
+        /// <summary>
+        /// b12-jz (pure; tests): the wind bed's volume. Zero on the title screen (it was the steady hiss heard at boot,
+        /// under the attract match, before the title's own music) and zero under the film; in a match it is the cue gain
+        /// times the ambience duck and the film ramp.
+        /// </summary>
+        public static float WindGain(bool title, float cueGain, float duckAmb, float filmWorldGain) =>
+            title ? 0f : Mathf.Max(0f, cueGain * duckAmb * filmWorldGain);
+
+        /// <summary>
+        /// b12-jz (pure; tests): the gain of world (non-UI) one-shots. In a match 1. On the title they wait for the title's
+        /// own audio: silent until the title music is playing or the story intro owns the screen, then TitleGain. So no
+        /// world sound plays at boot before the title's music or film.
+        /// </summary>
+        public static float TitleWorldGain(bool title, MusicState music, bool storyPlaying) =>
+            !title ? 1f : music != MusicState.Silent || storyPlaying ? TitleGain : 0f;
 
         private void Loop(AudioSource s, int cue, bool on, float volume, float pan)
         {

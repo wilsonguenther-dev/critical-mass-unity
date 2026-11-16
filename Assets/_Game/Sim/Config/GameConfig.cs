@@ -538,6 +538,14 @@ namespace CriticalMass.Sim.Config
         public double CooldownTicks = 150;
         /// <summary>DG-22 (not in the browser, U-059): ticks from the throw until the bundle touches down (the TntLanded event; the fuse still counts from the throw) [guess: 0.4 s].</summary>
         public double FlightTicks = 12;
+        /// <summary>b12-jz RULE (Full rules only, off while Depth.Classic): the ATTACK press throws TNT whenever it is ready
+        /// (her default attack: aim point, or the nearest enemy within ThrowRange + BlastRadius when there is no aim, else
+        /// ahead); between throws the attack press is her pry bar (LightWeapons). The DigPlace press still throws too. Same
+        /// Damage and CooldownTicks as before, so her damage-per-second ceiling does not rise (see Demolitions.cs).</summary>
+        public bool ThrowOnAttack = true;
+        /// <summary>b12-jz: an attack throw lands at least this far from her (the crater never opens at her feet; her blast
+        /// never hurts her or her team either way, Demolitions.BlastActors skips her team).</summary>
+        public double MinThrowRange = 2;
 
         public DemolitionsTntConfig Clone() => (DemolitionsTntConfig)MemberwiseClone();
     }
@@ -694,7 +702,11 @@ namespace CriticalMass.Sim.Config
         /// <summary>Spendable biomass each team starts a match with (so a Builder can act before the first delivery).</summary>
         public double StartBiomass = 2;
         public double LadderMaxCells = 2;
-        public double BridgeMaxCells = 6;
+        /// <summary>b12-jz RULE (was 6): longest void / water run a rope bridge spans. On Skybreak Basin 6 reached only the
+        /// overlook gap and one hill / south-island spot, so a Builder at any other island edge was refused and "only
+        /// built stairs"; 12 spans the hill / shrine-island (9 to 12), hill / south-island (7 to 11) and courtyard /
+        /// overlook (9) gaps. The base / courtyard gaps (13 and up) stay out of reach.</summary>
+        public double BridgeMaxCells = 12;
         /// <summary>Lanes across the span, centred on the line the builder looks along (Topple.WidthCells: wide enough for bots).</summary>
         public double WidthCells = 3;
         /// <summary>The gap or wall must start within this many cells ahead of the builder's cell.</summary>

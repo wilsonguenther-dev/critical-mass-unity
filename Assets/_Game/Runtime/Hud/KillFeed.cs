@@ -85,11 +85,11 @@ namespace CriticalMass.Runtime.Hud
     {
         public static readonly string[] Team = { "Azure", "Crimson" };
         /// <summary>Feed names (short, upper case).</summary>
-        public static readonly string[] ClassUpper = { "WARRIOR", "FARMER", "MINER", "DEMOLITIONS", "BUILDER", "HEALER" };
+        public static readonly string[] ClassUpper = { "WARRIOR", "FARMER", "MINER", "DEMOLITIONIST", "BUILDER", "HEALER" };
         public const string You = "YOU", Kaiju = "KAIJU";
         public const string KnockedOut = "Knocked out";
 
-        static readonly string[] ClassNameBuiltIn = { "Warrior", "Farmer", "Miner", "Demolitions Expert", "Builder", "Healer" };
+        static readonly string[] ClassNameBuiltIn = { "Warrior", "Farmer", "Miner", "Demolitionist", "Builder", "Healer" };
         /// <summary>Attack-input names; empty while the class's attack waits on a rule (Demolitions DG-22, Builder DG-24).</summary>
         static readonly string[] AttackBuiltIn = { "Cleave", "Staff Hook", "Pick-Hammer", "TNT", "Hammer", "" };
 

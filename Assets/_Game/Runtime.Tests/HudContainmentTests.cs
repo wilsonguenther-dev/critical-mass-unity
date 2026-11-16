@@ -46,7 +46,7 @@ namespace CriticalMass.Runtime.Tests
             Rect plate = HudZones.AutomationPlate;
             // match HUD: left stack
             yield return new Spec("kit title", disp, UiScale.TypeSmall, 13, HudZones.KitW - 36f, 28f, "TEAM BUILD BANK");
-            yield return new Spec("kit title (class)", disp, UiScale.TypeSmall, 13, HudZones.KitW - 36f, 28f, "DEMOLITIONS");
+            yield return new Spec("kit title (class)", disp, UiScale.TypeSmall, 13, HudZones.KitW - 36f, 28f, "DEMOLITIONIST");
             yield return new Spec("kit skill name", ui, UiScale.TypeSmall, 12, 154f, 26f, "HEALING WINGS");
             yield return new Spec("kit skill note", ui, UiScale.TypeMin, 11, 154f, 20f, "GO TO THE EGG");
             yield return new Spec("kit key chip", ui, 14, 9, 68f, 30f, "RIGHT CLICK", 2);
@@ -100,7 +100,7 @@ namespace CriticalMass.Runtime.Tests
             yield return new Spec("prompt pill, two actions", disp, UiScale.TypeBody, 14, HudZones.BottomBandW - 28f, CriticalMass.Runtime.View.Affordance.TerrainAffordanceView.LineH,
                 "HOLD RIGHT CLICK  BUILD BRIDGE (12)" + CriticalMass.Runtime.View.Affordance.TerrainAffordanceView.ActionJoin + "SPACE  BUILD LADDER (12)", 1);
             yield return new Spec("settings tab (8 tabs)", disp, 22, 15, 1060f / 8f - 14f, 60f, "CONTROLS");
-            yield return new Spec("class card name", disp, 36, 20, 300f, 48f, "DEMOLITIONS EXPERT");
+            yield return new Spec("class card name", disp, 36, 20, 300f, 48f, "DEMOLITIONIST");
         }
 
         static Text Make(GameObject root, Spec s)
