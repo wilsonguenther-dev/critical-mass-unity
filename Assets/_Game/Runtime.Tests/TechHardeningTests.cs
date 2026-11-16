@@ -96,7 +96,8 @@ namespace CriticalMass.Runtime.Tests
         {
             var m1 = FramePolicy.PickQuality("Apple M1", 0, 8192, 6, 3);
             Assert.LessOrEqual(m1.level, FramePolicy.LevelMedium);
-            Assert.LessOrEqual(m1.scale, 0.75f);
+            // batch 12 AB sharpness switch "upscale": Medium renders at 0.85 (0.75 with -sharpOff upscale); frame cost checked on the Air.
+            Assert.LessOrEqual(m1.scale, CriticalMass.Runtime.Game.SharpSwitches.Upscale ? CriticalMass.Runtime.Game.SharpSwitches.MidRenderScaleSharp : CriticalMass.Runtime.Game.SharpSwitches.MidRenderScaleOld);
             var m2 = FramePolicy.PickQuality("Apple M2", 0, 16384, 6, 3);
             Assert.AreEqual(FramePolicy.LevelMedium, m2.level, "base M2 is mid tier even with 16 GB");
             Assert.AreEqual(FramePolicy.LevelLow, FramePolicy.PickQuality("Intel(R) UHD Graphics 620", 1536, 7987, 6, 3).level);

@@ -223,10 +223,10 @@ namespace CriticalMass.Runtime.Tests
             }
             Vector3[] flat = CriticalMass.Editor.Art.SharpNormalsPostprocessor.EncodeInFrame(new[] { Vector3.up }, new[] { new Vector4(0f, 1f, 0f, 1f) },
                 new[] { Vector3.right }, out int parallel);
-            Line("frame: largest error of the decoded normal after a bone turn (deg)", worst.ToString("0.0000"), "< 0.01");
+            Line("frame: largest error of the decoded normal after a bone turn (deg)", worst.ToString("0.0000"), "< 0.05 (float Vector3.Angle cannot read under ~0.028 deg: acos(1 - 1 ulp))");
             Line("frame: T parallel to N stores", flat[0] + " degenerate=" + parallel, "(0, 0, 1) degenerate=1 (keeps the imported normal)");
             Assert.AreEqual(0, degenerate);
-            Assert.Less(worst, 0.01f);
+            Assert.Less(worst, 0.05f);
             Assert.AreEqual(1, parallel);
             Assert.AreEqual(new Vector3(0f, 0f, 1f), flat[0]);
         }
