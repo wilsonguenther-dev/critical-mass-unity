@@ -5,27 +5,45 @@
 #   Pass B (graphics): a 1280x720 Direct3D 11 window on the runner's software renderer (WARP), 60 s+, screenshots at
 #   the title and mid-match; both must have mean brightness > 0.08 and > 1% of pixels off the most common colour.
 # Never builds Unity here (no licence on runners). Manual trigger only.
+# b12-w: or give unity_ci_run_id instead of a tag: the player then comes straight from that unity-ci run's artifact
+# player-StandaloneWindows64 (jobs=builds or build-windows), so every test build can be checked without publishing a zip.
+# The release asset may be named CriticalMass-windows.zip (old), CriticalMass-Windows-<v>.zip or CriticalMass-<v>-windows.zip.
 name: windows-player
 on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: "Release tag holding CriticalMass-windows.zip"
-        required: true
+        description: "Release tag holding the Windows zip (or leave empty and give unity_ci_run_id)"
+        default: ''
+      unity_ci_run_id:
+        description: "unity-ci run id with the artifact player-StandaloneWindows64 (used when release_tag is empty)"
+        default: ''
 permissions:
   contents: read
+  actions: read
 jobs:
   windows-player:
     runs-on: windows-latest
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        if: inputs.release_tag == ''
+        with:
+          name: player-StandaloneWindows64
+          run-id: ${{ inputs.unity_ci_run_id }}
+          github-token: ${{ github.token }}
       - name: Download the player
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release download "${{ inputs.release_tag }}" --pattern "CriticalMass-windows.zip" --dir player
-          Expand-Archive player\CriticalMass-windows.zip -DestinationPath player
+          New-Item -ItemType Directory -Force -Path player | Out-Null
+          if ("${{ inputs.release_tag }}" -ne "") {
+            gh release download "${{ inputs.release_tag }}" --pattern "*indows*.zip" --dir player
+            Get-ChildItem player -Filter *.zip | ForEach-Object { Expand-Archive $_.FullName -DestinationPath player }
+          } elseif ("${{ inputs.unity_ci_run_id }}" -ne "") {
+            tar -xzf player-StandaloneWindows64.tgz -C player
+          } else { Write-Host "give release_tag or unity_ci_run_id"; exit 1 }
           Get-ChildItem -Recurse player -Filter CriticalMass.exe | Select-Object -First 1 | ForEach-Object { "PLAYER_DIR=$($_.DirectoryName)" | Out-File -Append $env:GITHUB_ENV }
       - name: Pass A (logic, no graphics device)
         shell: pwsh

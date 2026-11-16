@@ -24,10 +24,21 @@ on:
       ticks:
         description: "ticks to play"
         default: '1800'
+      crossplay_mode:
+        description: "b12-w: run .github/workflows/crossplay.yml instead of the local pair (none | players | console | mixed | mac_host_external)"
+        type: choice
+        options: [none, players, console, mixed, mac_host_external]
+        default: none
+      unity_ci_run_id:
+        description: "crossplay: the unity-ci run whose players to use"
+        default: ''
+      room_code:
+        description: "crossplay mac_host_external: the room code the external host shows"
+        default: ''
 permissions:
   contents: read
 concurrency:
-  group: online-smoke-${{ github.ref }}
+  group: online-smoke-${{ github.ref }}-${{ inputs.crossplay_mode || 'none' }}
   cancel-in-progress: true
 env:
   DOTNET_CLI_TELEMETRY_OPTOUT: 1
@@ -35,6 +46,7 @@ env:
   WRANGLER_SEND_METRICS: 'false'
 jobs:
   local-relay:
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.crossplay_mode == 'none' || inputs.crossplay_mode == '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -85,20 +97,14 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-  cross-os-room:
-    if: ${{ inputs.cross_os && vars.CM_RELAY_URL != '' }}
-    runs-on: ubuntu-latest
-    outputs:
-      code: ${{ steps.make.outputs.code }}
-      key: ${{ steps.make.outputs.key }}
-    steps:
-      - id: make
-        run: |
-          J=$(curl -sf -X POST "${{ vars.CM_RELAY_URL }}/rooms")
-          echo "code=$(echo "$J" | python3 -c 'import sys,json;print(json.load(sys.stdin)["code"])')" >> "$GITHUB_OUTPUT"
-          echo "key=$(echo "$J" | python3 -c 'import sys,json;print(json.load(sys.stdin)["key"])')" >> "$GITHUB_OUTPUT"
+  # b12-w: the cross-OS pair, fixed. Its only run (43627866241, 2026-11-14) failed because a separate job made the room
+  # and the two runners raced: the macOS joiner connected 9 s before the Windows host and heard "no room with that
+  # code" (that build did not retry), then the host waited 15 minutes for nobody (exit 4). Now the Windows host makes
+  # the room itself right before it connects and uploads the code as an artifact; the macOS joiner waits for that
+  # artifact (tools/online/wait-room.sh) and joins with retries. The same pair, plus the built players, is
+  # .github/workflows/crossplay.yml (mode console / players).
   cross-os:
-    needs: cross-os-room
+    if: ${{ inputs.cross_os && vars.CM_RELAY_URL != '' }}
     strategy:
       fail-fast: false
       matrix:
@@ -106,32 +112,77 @@ jobs:
           - { os: windows-latest, role: host }
           - { os: macos-latest, role: join }
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 25
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELAY: ${{ vars.CM_RELAY_URL }}
     steps:
       - uses: actions/checkout@v4
         with: { lfs: false }
       - uses: actions/setup-dotnet@v4
         with: { dotnet-version: '8.0.x' }
-      - name: Play
+      - run: dotnet build tools/online/HeadlessPeer -c Release -nologo -clp:ErrorsOnly
+      - name: Make the room (host) and publish its code
+        if: matrix.role == 'host'
         shell: bash
         run: |
-          dotnet build tools/online/HeadlessPeer -c Release -nologo -clp:ErrorsOnly
+          set -euo pipefail
+          mkdir -p room
+          J=$(curl -sf -X POST "$RELAY/rooms")
+          echo "$J" | python -c 'import sys,json;d=json.load(sys.stdin);open("room/room.txt","w",newline="\n").write("code="+d["code"]+"\nnetbuild=headless\n");open(sys.argv[1],"w").write(d["key"])' "$RUNNER_TEMP/room-key.txt"
+          cat room/room.txt
+      - uses: actions/upload-artifact@v4
+        if: matrix.role == 'host'
+        with: { name: cross-os-room, path: room/room.txt, retention-days: 1 }
+      - name: Wait for the host's room (joiner)
+        if: matrix.role == 'join'
+        shell: bash
+        run: bash tools/online/wait-room.sh cross-os-room room 1500
+      - name: Play
+        shell: bash
+        timeout-minutes: 35
+        run: |
+          set -uo pipefail
           P=tools/online/HeadlessPeer/bin/Release/net8.0/cm-online-peer.dll
           T="${{ inputs.ticks || '1800' }}"
+          CODE=$(sed -n 's/^code=//p' room/room.txt)
           if [ "${{ matrix.role }}" = host ]; then
-            dotnet $P -host -code "${{ needs.cross-os-room.outputs.code }}" -key "${{ needs.cross-os-room.outputs.key }}" -relay "${{ vars.CM_RELAY_URL }}" -humans 2 -ticks $T -hash-log hashes.txt -lobby 300 -timeout 900 -timeout 900
+            dotnet $P -host -code "$CODE" -key "$(cat "$RUNNER_TEMP/room-key.txt")" -relay "$RELAY" -humans 2 -ticks $T -hash-log hashes.txt -lobby 540 -timeout 1800 2>&1 | tee peer.log
           else
-            sleep 20
-            dotnet $P -join "${{ needs.cross-os-room.outputs.code }}" -relay "${{ vars.CM_RELAY_URL }}" -ticks $T -team crimson -hash-log hashes.txt -timeout 900 -join-tries 40
+            dotnet $P -join "$CODE" -relay "$RELAY" -ticks $T -team crimson -hash-log hashes.txt -timeout 1800 -join-tries 80 2>&1 | tee peer.log
           fi
+          exit ${PIPESTATUS[0]}
       - uses: actions/upload-artifact@v4
         if: always()
-        with: { name: 'hashes-${{ matrix.role }}', path: hashes.txt }
+        with:
+          name: 'hashes-${{ matrix.role }}'
+          path: |
+            hashes.txt
+            peer.log
   cross-os-compare:
     needs: cross-os
+    if: ${{ always() && inputs.cross_os }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with: { lfs: false, sparse-checkout: tools/online }
       - uses: actions/download-artifact@v4
-      - run: python3 tools/online/compare-hashes.py hashes-host/hashes.txt hashes-join/hashes.txt --min 50
+      - run: |
+          python3 tools/online/crossplay-check.py hashes-host/peer.log hashes-join/peer.log --names host,join
+          python3 tools/online/compare-hashes.py hashes-host/hashes.txt hashes-join/hashes.txt --min $(( ${{ inputs.ticks || '1800' }} / 30 - 2 ))
+
+  # b12-w: Windows player against Mac player (and the other cross-play modes), see crossplay.yml.
+  crossplay:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.crossplay_mode != 'none' && inputs.crossplay_mode != '' }}
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/crossplay.yml
+    with:
+      mode: ${{ inputs.crossplay_mode }}
+      unity_ci_run_id: ${{ inputs.unity_ci_run_id }}
+      ticks: ${{ inputs.ticks || '1800' }}
+      room_code: ${{ inputs.room_code }}

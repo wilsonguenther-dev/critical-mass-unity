@@ -41,8 +41,12 @@ namespace CriticalMass.Runtime.Online
             Application.runInBackground = true;
             CriticalMass.Runtime.Game.FrameGovernor.SetHeadlessPeerFrameRate(200);   // the peer steps once a frame: keep frames short
             HeadlessPeer peer = HeadlessPeer.FromArgs(args, OnlineConfig.RelayUrl);
-            peer.Build = OnlineConfig.Build;
-            peer.Log = s => Debug.Log("[online] " + s);
+            peer.Build = OnlineConfig.Build;   // b12-w: -onlineBuild is read by FromArgs but the player always sends its own commit
+            peer.Log = s =>
+            {
+                Debug.Log("[online] " + s);
+                if (s.StartsWith("ONLINE SETUP", StringComparison.Ordinal)) Debug.Log(VersionLine("start"));   // match start
+            };
             if (string.IsNullOrEmpty(peer.RelayUrl))
             {
                 Debug.LogError("[online] ONLINE ERROR no relay address (pass -onlineRelay URL or set CM_RELAY_URL)");
@@ -55,9 +59,33 @@ namespace CriticalMass.Runtime.Online
             go.AddComponent<OnlineHeadless>();
         }
 
+        /// <summary>
+        /// b12-w: one line at room join and one at match start, the same format as the console peer
+        /// (tools/online/HeadlessPeer), so a Windows and a Mac log can be compared by eye or by
+        /// tools/online/crossplay-check.py: "[CM.Online] build=1.0.900 config=0123456789ABCDEF protocol=3
+        /// platform=windows/x64 runtime=mono netbuild=a1b2c3d phase=join". build is the stamped version, netbuild what the
+        /// host compares (the commit: a host refuses a joiner whose netbuild differs, Room.cs Hello), config the
+        /// ConfigHash the match start compares (a client whose rules differ refuses with a plain reason).
+        /// Reflection over the config: called twice per process, never per frame.
+        /// </summary>
+        public static string VersionLine(string phase)
+        {
+            var inv = System.Globalization.CultureInfo.InvariantCulture;
+            string config = CriticalMass.Net.ConfigHash.Of(CriticalMass.Sim.Config.GameConfig.CreateDefault()).ToString("X16", inv);
+            string os = System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows) ? "windows"
+                : System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.OSX) ? "macos"
+                : System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Linux) ? "linux" : "other";
+            string arch = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture.ToString().ToLowerInvariant();
+            string runtime = Type.GetType("Mono.Runtime") != null ? "mono" : "dotnet" + Environment.Version.Major.ToString(inv);
+            return "[CM.Online] build=" + CriticalMass.Runtime.Game.BuildInfo.Version + " config=" + config +
+                   " protocol=" + CriticalMass.Net.NetVersion.Protocol.ToString(inv) + " platform=" + os + "/" + arch +
+                   " runtime=" + runtime + " netbuild=" + OnlineConfig.Build + " phase=" + phase;
+        }
+
         void Start()
         {
             Clock.Restart();
+            Debug.Log(VersionLine("join"));   // b12-w: before the peer creates or joins the room
             if (!_peer.Begin(0)) Quit(_peer.ExitCode);
         }
 
