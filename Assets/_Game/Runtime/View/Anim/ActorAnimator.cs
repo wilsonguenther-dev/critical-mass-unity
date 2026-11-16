@@ -741,7 +741,8 @@ namespace CriticalMass.Runtime.View.Anim
                 Vector3 tw = hand.TransformPoint(tipLocal);
                 double f = Vector3.Dot(tw - m.Transform.position, fwd);
                 if (f > best + 1e-4) { best = f; view = t; }
-                trace?.Append(' ').Append(t.ToString("0.000")).Append(" tip ").Append(tw.ToString("F2")).Append(" f=").Append(f.ToString("0.00"));
+                trace?.Append(' ').Append(t.ToString("0.000")).Append(" tip ").Append(tw.ToString("F2")).Append(" hand ").Append(hand.position.ToString("F2"))
+                    .Append(" f=").Append(f.ToString("0.00"));
             }
             if (!(pose != null ? pose(clip, view) : AttackTiming.PoseDrawn(m, clip, view))) return false;
             Vector3 tip = hand.TransformPoint(tipLocal);
