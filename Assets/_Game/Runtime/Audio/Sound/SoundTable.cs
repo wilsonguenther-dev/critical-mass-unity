@@ -245,9 +245,10 @@ namespace CriticalMass.Runtime.Audio.Sound
             C("sub_step", null, S("sub_step"), 0.7f, 1f, 0.05f, 1, 0.2f, 60, Ui, SoundBus.Sub, variants: 1),
             C("sub_small", null, S("sub_small"), 0.6f, 1f, 0.05f, 1, 0.12f, 50, Ui, SoundBus.Sub, variants: 1),
 
-            // ---- ambience (with the world)
-            C("amb_wind", null, S("amb_wind"), 0.22f, 1f, 0f, 1, 0f, 5, Ui, SoundBus.Ambience, loop: true),
-            C("amb_water", null, S("amb_water"), 0.5f, 1f, 0f, 1, 0f, 5, Mid, SoundBus.Ambience, loop: true),
+            // ---- ambience (with the world). b12-jz: wind 0.22 -> 0.08 (-8.8 dB) and water 0.5 -> 0.3 (-4.4 dB); both beds
+            // play on the Music mixer group, so the MUSIC slider and its mute control them (SoundDirector.BuildVoices).
+            C("amb_wind", null, S("amb_wind"), 0.08f, 1f, 0f, 1, 0f, 5, Ui, SoundBus.Ambience, loop: true),
+            C("amb_water", null, S("amb_water"), 0.3f, 1f, 0f, 1, 0f, 5, Mid, SoundBus.Ambience, loop: true),
             C("amb_bird", null, S("amb_bird"), 0.22f, 1f, 0.1f, 1, 2f, 2, Mid, SoundBus.Ambience),
             C("amb_bird_trill", null, S("amb_bird_trill"), 0.2f, 1f, 0.1f, 1, 2f, 2, Mid, SoundBus.Ambience),
         };
