@@ -204,14 +204,48 @@ REP["weld"] = dict(tris_after_weld=ntri(low), specks_dropped=dropped)
 # HY build cleaned up), and their edges stretched 7x to 19x in the clips while today's LOD0 stays under 1.8x. Drop every
 # raw vertex farther than WT_CULL_M (0.03 m) from today's Hero before the decimation.
 CULL = float(os.environ.get("WT_CULL_M", "0.03"))
+
+
+def open_edges(me_):
+    b_ = bmesh.new(); b_.from_mesh(me_)
+    n_ = sum(1 for e in b_.edges if len(e.link_faces) == 1); b_.free()
+    return n_
+
+
+def region_of(name):
+    n_ = name.lower()
+    if "head" in n_ or "neck" in n_: return "head"
+    if any(k in n_ for k in ("arm", "hand", "shoulder", "wrist", "finger", "thumb", "slot", "elbow")): return "arms"
+    if any(k in n_ for k in ("leg", "foot", "toe", "knee", "shin", "thigh", "ankle")): return "legs"
+    return "torso"
+
+
+gn = {g.index: g.name for g in REF.vertex_groups}
+vreg = []
+for v in REF.data.vertices:
+    gs = sorted(((g.weight, g.group) for g in v.groups), reverse=True)
+    vreg.append(region_of(gn.get(gs[0][1], "")) if gs else "torso")
+preg = [vreg[p.vertices[0]] for p in REF.data.polygons]
+REP["open_edges"] = {"raw_welded": open_edges(low.data)}
 if CULL > 0:
     bm = bmesh.new()
     bm.from_mesh(low.data)
-    far = [v for v in bm.verts if bvh_old.find_nearest(v.co)[3] > CULL]
+    far, by_region, all_region = [], {}, {}
+    for v in bm.verts:
+        loc, nrm, idx, dist = bvh_old.find_nearest(v.co)
+        rg = preg[idx] if idx is not None else "torso"
+        all_region[rg] = all_region.get(rg, 0) + 1
+        if dist > CULL:
+            far.append(v)
+            by_region[rg] = by_region.get(rg, 0) + 1
     bmesh.ops.delete(bm, geom=far, context="VERTS")
+    bnd = [e for e in bm.edges if len(e.link_faces) == 1]
+    before_fill = len(bnd)
+    bmesh.ops.holes_fill(bm, edges=bnd, sides=16)        # pinholes only; a long membrane cut stays open and is counted
     bm.to_mesh(low.data)
     bm.free()
-    REP["cull"] = dict(metres=CULL, vertices_removed=len(far), tris_after=ntri(low))
+    REP["cull"] = dict(metres=CULL, vertices_removed=len(far), removed_by_region=by_region, raw_vertices_by_region=all_region,
+                       open_edges_after_cut=before_fill, open_edges_after_pinhole_fill=open_edges(low.data), tris_after=ntri(low))
     log("membrane cull", REP["cull"])
 ratio = LOD0_TRIS / max(1, ntri(low))
 for attempt in range(3):
@@ -231,16 +265,39 @@ low.data.set_sharp_from_angle(angle=math.radians(60.0))
 bpy.context.view_layer.objects.active = low
 for o in scene.objects:
     o.select_set(o is low)
-bpy.ops.object.mode_set(mode="EDIT")
-bpy.ops.mesh.select_all(action="SELECT")
-bpy.ops.uv.smart_project(angle_limit=math.radians(80.0), island_margin=0.002, area_weight=0.0, correct_aspect=True,
-                         scale_to_bounds=False)
-try:
-    bpy.ops.uv.pack_islands(rotate=True, margin=0.002, shape_method="CONCAVE")
-    REP["uv_pack"] = "concave repack"
-except Exception as x:
-    REP["uv_pack"] = "smart project packing only: " + repr(x)
-bpy.ops.object.mode_set(mode="OBJECT")
+scene.tool_settings.use_uv_select_sync = True
+
+
+def uv_cov(me_):
+    a_ = np.zeros(len(me_.loops) * 2); me_.uv_layers.active.data.foreach_get("uv", a_); a_ = a_.reshape(-1, 2)
+    t_ = 0.0
+    for p_ in me_.polygons:
+        x_, y_, z_ = a_[p_.loop_start], a_[p_.loop_start + 1], a_[p_.loop_start + 2]
+        t_ += abs((y_[0] - x_[0]) * (z_[1] - x_[1]) - (y_[1] - x_[1]) * (z_[0] - x_[0])) / 2
+    return t_
+
+
+def unwrap(ang, mg):
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_all(action="SELECT")
+    bpy.ops.uv.smart_project(angle_limit=math.radians(ang), island_margin=mg, area_weight=0.0, correct_aspect=True,
+                             scale_to_bounds=False)
+    try:
+        bpy.ops.uv.select_all(action="SELECT")
+        bpy.ops.uv.average_islands_scale()
+        bpy.ops.uv.pack_islands(rotate=True, margin=mg, shape_method="CONCAVE")
+    except Exception as x:
+        log("pack failed", x)
+    bpy.ops.object.mode_set(mode="OBJECT")
+    return uv_cov(low.data)
+
+
+trials = [(unwrap(a_, m_), a_, m_) for a_, m_ in ((80.0, 0.002), (66.0, 0.0015), (50.0, 0.0015))]
+REP["uv_trials"] = [dict(angle=a_, margin=m_, coverage=round(c_, 4)) for c_, a_, m_ in trials]
+bestuv = max(trials)
+if bestuv is not trials[-1]:
+    unwrap(bestuv[1], bestuv[2])
+log("uv trials", REP["uv_trials"], "kept", bestuv[1:])
 me = low.data
 me.uv_layers[0].name = "UVMap"
 uv = np.zeros(len(me.loops) * 2)
@@ -476,7 +533,10 @@ try:
     for y_ in (yaw, yaw + 180.0):
         shot("old_lod0_%d" % y_, [old0], "VERTEX", y_, zc, 2.3)
         shot("new_lod0_%d" % y_, [newo], "TEXTURE", y_, zc, 2.3)
-    shot("new_face", [newo], "TEXTURE", yaw, float(W[:, 2].max()) - 0.25, 0.7)
+    for y_ in (0.0, 180.0):
+        shot("new_face_%d" % y_, [newo], "TEXTURE", y_, float(W[:, 2].max()) - 0.25, 0.7)
+        shot("old_face_%d" % y_, [old0], "VERTEX", y_, float(W[:, 2].max()) - 0.25, 0.7)
+        shot("new_threequarter_%d" % (y_ + 45), [newo], "TEXTURE", y_ + 45.0, zc, 2.3)
     shot("new_lod1", [lod1], "TEXTURE", yaw, zc, 2.3)
 except Exception as x:
     REP["render_error"] = repr(x)
@@ -540,7 +600,26 @@ if carm is not None:
                                  frames=len(range(f0, f1 + 1, step)))
         print("[warrior_tex] clip %-28s edge stretch new max %.3f min %.3f | today's LOD0 max %.3f (99.9th / 0.1th pct, edges > 2 mm)"
               % (act.name, hi, lo, chi), flush=True)
+        if "shot" in globals() and act.name.split("|")[-1] in ("AttackSlice", "Run"):
+            fm = int(f0 + (0.5 if act.name.endswith("Run") else 0.45) * (f1 - f0))
+            scene.frame_set(fm)
+            for pb in rig.pose.bones:
+                cb = carm.pose.bones.get(pb.name)
+                if cb is not None:
+                    pb.matrix_basis = cb.matrix_basis.copy()
+            bpy.context.view_layer.update()
+            tag = act.name.split("|")[-1].lower()
+            for y_ in (0.0, 180.0, 135.0):
+                shot("new_%s_%d" % (tag, y_), [newo], "TEXTURE", y_, zc, 2.6)
+            shot("old_%s_0" % tag, [old0], "VERTEX", 0.0, zc, 2.6)
 REP["clip_stretch"] = stretch
+if stretch:
+    REP["stretch_summary"] = dict(new_max=max(v["max"] for v in stretch.values()),
+                                  today_lod0_max=max(v["control_today_lod0_max"] for v in stretch.values()),
+                                  new_min=min(v["min"] for v in stretch.values()),
+                                  verdict="pass" if max(v["max"] for v in stretch.values()) <= 2.5 else "FAIL (over 2.5x)")
+REP["open_edges"].update({"new_lod0": open_edges(newo.data), "new_lod1": open_edges(lod1.data), "today_lod0": open_edges(old0.data)})
+log("stretch", REP.get("stretch_summary"), "open edges", REP["open_edges"])
 for pb in rig.pose.bones:
     pb.matrix_basis = Matrix.Identity(4)
 rig.data.pose_position = "REST"
@@ -580,3 +659,28 @@ save()
 print("[warrior_tex] SUMMARY " + json.dumps(dict(raw=REP["raw"], align=REP["align"], lod0=REP["lod0"], texture=REP["texture"],
                                                  tris=REP["tris"], bones=REP["round_trip"]["bones"],
                                                  bind_diff=REP["round_trip"]["max_bind_matrix_diff"], skin=REP["skin"])), flush=True)
+try:
+    names = sorted(f for f in os.listdir(OUT) if f.endswith(".png") and (f.startswith("new_") or f.startswith("old_")))
+    tiles = []
+    for f in names:
+        im = bpy.data.images.load(os.path.join(OUT, f))
+        w_, h_ = im.size
+        tiles.append(np.array(im.pixels[:], np.float32).reshape(h_, w_, 4)[::2, ::2])
+    cols = 4
+    th, tw = tiles[0].shape[:2]
+    rows = (len(tiles) + cols - 1) // cols
+    sheet = np.zeros((rows * th, cols * tw, 4), np.float32)
+    sheet[..., 3] = 1.0
+    for k, a_ in enumerate(tiles):
+        r_, c_ = divmod(k, cols)
+        sheet[(rows - 1 - r_) * th:(rows - r_) * th, c_ * tw:(c_ + 1) * tw] = a_
+    sh = bpy.data.images.new("sheet", cols * tw, rows * th)
+    sh.pixels.foreach_set(sheet.ravel())
+    sh.filepath_raw = os.path.join(OUT, "sheet.png")
+    sh.file_format = "PNG"
+    sh.save()
+    REP["sheet_order_left_to_right_top_down"] = names
+except Exception as x:
+    REP["sheet_error"] = repr(x)
+save()
+print("[warrior_tex] SHEET " + json.dumps(REP.get("sheet_order_left_to_right_top_down")), flush=True)
