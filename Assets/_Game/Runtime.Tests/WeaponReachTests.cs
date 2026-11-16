@@ -61,9 +61,11 @@ namespace CriticalMass.Runtime.Tests
                 _scale = new Vector3[_lower.Length];
             }
 
-            public bool Pose(string clip, double t)
+            public bool Pose(string clip, double t) => PoseClip(_e.Clip(clip), t, _m.OnUpperLayer(clip));
+
+            /// <summary>b12-c2: any clip (another rig's clip pack too) on this rig, upper-body layered when upper.</summary>
+            public bool PoseClip(AnimationClip a, double t, bool upper)
             {
-                AnimationClip a = _e.Clip(clip);
                 if (a == null) return false;
                 AnimationClip idle = _e.Clip(ArtMapping.Idle);
                 if (idle != null) idle.SampleAnimation(_m.Root, 0f);
@@ -74,7 +76,7 @@ namespace CriticalMass.Runtime.Tests
                     _scale[i] = _lower[i].localScale;
                 }
                 a.SampleAnimation(_m.Root, (float)Math.Min(Math.Max(t, 0), a.length));
-                if (HasSpine && _m.OnUpperLayer(clip))
+                if (HasSpine && upper)
                     for (int i = 0; i < _lower.Length; i++)
                     {
                         _lower[i].localPosition = _pos[i];
@@ -209,6 +211,138 @@ namespace CriticalMass.Runtime.Tests
             foreach (ClassId cls in Classes)
                 if (cls != ClassId.Warrior)
                     Assert.Greater(got[ClassId.Warrior], got[cls], "the Warrior's sword reaches further than the " + cls + "'s weapon");
+        }
+
+        /// <summary>
+        /// b12-c2 (PR #177 point 1, the Demolitions pry bar that never comes forward): separates the code-side causes from
+        /// an art one and prints a verdict line "[CM.WeaponReach] demolitions verdict: ...". Code causes, asserted: the
+        /// attack clip not on the upper-body layer, the wrong clip picked by name (not her own Demolitions_Clips pack), the
+        /// bar not on the weapon slot handslot.r. Printed: the bar's angle to her forearm and its sideways share at the
+        /// strike (an attach turned sideways), her hand's forward travel over her own Attack clip, and the same for the
+        /// shared KayKit Attack (the Builder's pack) sampled onto HER rig. Her own clip barely moving the hand forward while
+        /// the KayKit clip does on the same rig = ART: her baked Attack clip (X2 measures and re-bakes); the frames are printed.
+        /// </summary>
+        [Test]
+        public void TheDemolitionsBarComesForwardOrTheCauseIsNamed()
+        {
+            const double TravelArt = 0.25, TravelRef = 0.40;
+            GameConfig cfg = GameConfig.CreateDefault();
+            var cat = AssetDatabase.LoadAssetAtPath<ArtCatalog>(ArtCatalog.AssetPath);
+            Assert.IsNotNull(cat, ArtCatalog.AssetPath + " (run ProjectSetup.Apply)");
+            ArtEntry entry = cat.Find(ArtMapping.Demolitions), kay = cat.Find(ArtMapping.Builder);
+            Assert.IsNotNull(entry, "Demolitions not in the catalog");
+            var holder = new GameObject("WeaponReachTests demolitions verdict");
+            ModelView m = null;
+            try
+            {
+                m = new ModelView(entry, holder.transform, "verdict demolitions");
+                Quaternion facing = Quaternion.Euler(0f, SimSpace.YawDeg(0), 0f);
+                Vector3 fwd = SimSpace.ToWorld(1, 0, 0);
+                m.Transform.position = Vector3.zero;
+                m.SetFacing(facing);
+                Transform slot = m.Bone(WeaponProps.HandBone), hand = m.Bone(WeaponProps.HandBoneFallback);
+                Transform bar = WeaponProps.Attach(slot ?? hand, WeaponProps.Plan(ClassId.Demolitions, m.Spec), TeamId.Azure, cat);
+                string clip = AttackTiming.SwingClip(m, ClassId.Demolitions, cfg);
+                AnimationClip own = entry.Clip(clip);
+                AnimationClip kayAttack = kay != null ? kay.Clip(ArtMapping.Attack) : null;
+                string ownPath = own != null ? AssetDatabase.GetAssetPath(own) : "none";
+                bool upper = m.OnUpperLayer(clip);
+                var rig = new RigPose(m, entry, facing);
+                Transform arm = hand != null ? hand.parent : null;
+                Vector3 right = Vector3.Cross(Vector3.up, fwd).normalized;
+                double ownMin, ownMax, ownTipMax, ownMinT, ownMaxT, kayMin, kayMax, kayTipMax, kayMinT, kayMaxT;
+                var ownTrace = new StringBuilder();
+                var kayTrace = new StringBuilder();
+                Travel(rig, own, upper, hand, bar, fwd, m, ownTrace, out ownMin, out ownMinT, out ownMax, out ownMaxT, out ownTipMax);
+                Travel(rig, kayAttack, upper, hand, bar, fwd, m, kayTrace, out kayMin, out kayMinT, out kayMax, out kayMaxT, out kayTipMax);
+                // the bar at the fact contact of her own clip: angle to the forearm, sideways share of its axis
+                double contact = ClipFacts.Contact(clip, own != null ? own.length * 0.55f : 0.5f);
+                rig.PoseClip(own, contact, upper);
+                double armAngle = bar != null && arm != null ? Vector3.Angle(bar.up, (hand.position - arm.position).normalized) : double.NaN;
+                double sideways = bar != null ? Math.Abs(Vector3.Dot(bar.up, right)) : double.NaN;
+                double fps = own != null && own.frameRate > 0 ? own.frameRate : 30;
+                double kfps = kayAttack != null && kayAttack.frameRate > 0 ? kayAttack.frameRate : 30;
+                double ownTravel = ownMax - ownMin, kayTravel = kayMax - kayMin;
+                string verdict;
+                if (!upper) verdict = "CODE: her attack clip is not on the upper-body layer";
+                else if (own == null || !ownPath.Contains("Demolitions_Clips")) verdict = "CODE: the clip picked by name is not her own pack (" + ownPath + ")";
+                else if (slot == null || bar == null || bar.parent != slot) verdict = "CODE: the bar is not on " + WeaponProps.HandBone;
+                else if (ownTravel < TravelArt && kayTravel >= TravelRef)
+                    verdict = "ART (X2): her Attack clip " + ownPath + " moves her hand forward only " + ownTravel.ToString("0.00") + " u (" +
+                        ownMin.ToString("0.00") + " at frame " + (ownMinT * fps).ToString("0") + " to " + ownMax.ToString("0.00") + " at frame " +
+                        (ownMaxT * fps).ToString("0") + ", " + fps.ToString("0") + " fps); the shared KayKit Attack on HER rig moves it " +
+                        kayTravel.ToString("0.00") + " u (frames " + (kayMinT * kfps).ToString("0") + " to " + (kayMaxT * kfps).ToString("0") + "): re-bake her Attack";
+                else if (ownTravel < TravelArt) verdict = "ART or RIG: neither her clip (" + ownTravel.ToString("0.00") + " u) nor the KayKit Attack (" + kayTravel.ToString("0.00") + " u) moves her hand forward on her rig";
+                else if (ownTipMax < ownMax + 0.1) verdict = "ATTACH: her hand comes forward " + ownTravel.ToString("0.00") + " u but the bar tip only to " + ownTipMax.ToString("0.00") + " u (bar to forearm " + armAngle.ToString("0") + " deg, sideways share " + sideways.ToString("0.00") + ")";
+                else verdict = "OK: the bar comes forward, tip furthest " + ownTipMax.ToString("0.00") + " u, hand travel " + ownTravel.ToString("0.00") + " u";
+                Debug.Log("[CM.WeaponReach] demolitions verdict: " + verdict);
+                Debug.Log("[CM.WeaponReach] demolitions verdict detail: clip " + clip + " from " + ownPath + ", upper layer " + upper + ", slot " +
+                    (slot != null ? slot.name : "MISSING") + ", bar parent " + (bar != null && bar.parent != null ? bar.parent.name : "none") +
+                    ", bar to forearm at contact " + armAngle.ToString("0") + " deg, sideways share " + sideways.ToString("0.00") + " (limit 0.70)" +
+                    ", own hand forward " + ownMin.ToString("0.00") + ".." + ownMax.ToString("0.00") + " (limit travel " + TravelArt + "), tip max " + ownTipMax.ToString("0.00") +
+                    "; KayKit Attack on her rig " + (kayAttack != null ? "hand " + kayMin.ToString("0.00") + ".." + kayMax.ToString("0.00") + ", tip max " + kayTipMax.ToString("0.00") : "not found") +
+                    "; own t=hand/tip:" + ownTrace + "; kaykit t=hand/tip:" + kayTrace);
+                Assert.IsTrue(upper, "her attack clip plays on the upper-body layer");
+                Assert.That(ownPath, Does.Contain("Demolitions_Clips"), "her own baked clip pack is the one picked by name");
+                Assert.IsNotNull(slot, "her rig has the weapon slot " + WeaponProps.HandBone);
+                Assert.AreSame(slot, bar != null ? bar.parent : null, "the bar hangs from " + WeaponProps.HandBone);
+            }
+            finally
+            {
+                m?.Dispose();
+                Object.DestroyImmediate(holder);
+            }
+        }
+
+        static void Travel(RigPose rig, AnimationClip a, bool upper, Transform hand, Transform bar, Vector3 fwd, ModelView m, StringBuilder trace,
+            out double min, out double minT, out double max, out double maxT, out double tipMax)
+        {
+            min = double.PositiveInfinity; max = double.NegativeInfinity; tipMax = double.NegativeInfinity; minT = maxT = 0;
+            if (a == null || hand == null) { min = max = tipMax = double.NaN; return; }
+            for (int k = 0; k <= 24; k++)
+            {
+                double t = a.length * k / 24.0;
+                if (!rig.PoseClip(a, t, upper)) break;
+                double h = Vector3.Dot(hand.position - m.Transform.position, fwd);
+                double tip = double.NaN;
+                if (bar != null)
+                {
+                    MeshFilter mf = bar.GetComponentInChildren<MeshFilter>();
+                    Bounds b = mf != null && mf.sharedMesh != null ? mf.sharedMesh.bounds : new Bounds(Vector3.up * WeaponProps.PryBarLength, Vector3.zero);
+                    tip = Vector3.Dot(mf != null ? mf.transform.TransformPoint(new Vector3(b.center.x, b.max.y, b.center.z)) - m.Transform.position : Vector3.zero, fwd);
+                    if (tip > tipMax) tipMax = tip;
+                }
+                if (h < min) { min = h; minT = t; }
+                if (h > max) { max = h; maxT = t; }
+                trace.Append(' ').Append(t.ToString("0.00")).Append('=').Append(h.ToString("0.00")).Append('/').Append(tip.ToString("0.00"));
+            }
+        }
+
+        /// <summary>
+        /// b12-c2 (hit-feel capture): HitFeelCapture.DummyAhead puts the dummy's body SURFACE at the class's sim reach
+        /// (Combat.ReachOf, Full) minus HitFeelCapture.SurfaceInset (0.02 u) for every class row and every class's body
+        /// radius as the dummy: inside the reach (the hit lands) and at its edge. Prints one line per attacker class.
+        /// </summary>
+        [Test]
+        public void TheHitFeelDummySurfaceStandsAtTheSimReachMinusTwoHundredths()
+        {
+            GameConfig cfg = GameConfig.CreateDefault();
+            foreach (ClassId cls in Classes)
+            {
+                double reach = Combat.ReachOf(cfg, cls), worst = 0;
+                foreach (ClassId dummy in Classes)
+                {
+                    double radius = cfg.Class(dummy).Radius;
+                    double ahead = HitFeelCapture.DummyAhead(reach, radius);
+                    double surface = HitFeelCapture.DummySurface(ahead, radius);
+                    worst = Math.Max(worst, Math.Abs(surface - (reach - 0.02)));
+                    Assert.AreEqual(reach - 0.02, surface, 1e-9, cls + " vs a " + dummy + " dummy: surface at reach - 0.02 u");
+                    Assert.Less(surface, reach, cls + ": inside the reach, the hit lands");
+                    Assert.AreEqual(ahead, surface + radius, 1e-9, "the centre is the surface plus the dummy's radius");
+                }
+                Debug.Log("[CM.HitFeel] " + cls.ToString().ToLowerInvariant() + ": sim reach " + reach.ToString("0.00") + " u, dummy surface placed at " +
+                    (reach - HitFeelCapture.SurfaceInset).ToString("0.00") + " u (limit reach - 0.02), worst error over the six dummy radii " + worst.ToString("E1"));
+            }
         }
     }
 }
