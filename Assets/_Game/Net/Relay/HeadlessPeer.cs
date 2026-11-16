@@ -308,23 +308,24 @@ namespace CriticalMass.Net.Relay
                     case "onlinename": case "name": p.Name = next; i++; break;
                     case "onlineteam": case "team": p.Team = (next ?? "").ToLowerInvariant().StartsWith("c") ? TeamId.Crimson : TeamId.Azure; i++; break;
                     case "onlineclass": case "class":
-                        if (Enum.TryParse(next, true, out ClassId c)) p.Class = c;
+                        foreach (string cn in Enum.GetNames(typeof(ClassId)))
+                            if (string.Equals(cn, next, StringComparison.OrdinalIgnoreCase)) { p.Class = (ClassId)Enum.Parse(typeof(ClassId), cn); break; }
                         i++;
                         break;
-                    case "onlinehumans": case "humans": int.TryParse(next, out p.Humans); i++; break;
-                    case "onlineticks": case "ticks": int.TryParse(next, out p.Ticks); i++; break;
-                    case "onlineteamsize": case "teamsize": int.TryParse(next, out p.TeamSize); i++; break;
-                    case "onlineseed": case "seed": int.TryParse(next, out p.Seed); i++; break;
+                    case "onlinehumans": case "humans": int.TryParse(next, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out p.Humans); i++; break;
+                    case "onlineticks": case "ticks": int.TryParse(next, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out p.Ticks); i++; break;
+                    case "onlineteamsize": case "teamsize": int.TryParse(next, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out p.TeamSize); i++; break;
+                    case "onlineseed": case "seed": int.TryParse(next, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out p.Seed); i++; break;
                     case "onlinepace": case "pace": double.TryParse(next, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out p.Pace); i++; break;
                     case "onlinehashlog": case "hash-log": p.HashLogPath = next; i++; break;
                     case "onlinecodeout": case "code-out": p.CodeOutPath = next; i++; break;
-                    case "onlinetimeout": case "timeout": int.TryParse(next, out p.TimeoutSeconds); i++; break;
-                    case "onlinelobby": case "lobby": int.TryParse(next, out p.LobbySeconds); i++; break;
-                    case "onlinejointries": case "join-tries": int.TryParse(next, out p.JoinTries); i++; break;
-                    case "onlinechatat": case "chat-at": int.TryParse(next, out p.ChatAt); i++; break;
+                    case "onlinetimeout": case "timeout": int.TryParse(next, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out p.TimeoutSeconds); i++; break;
+                    case "onlinelobby": case "lobby": int.TryParse(next, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out p.LobbySeconds); i++; break;
+                    case "onlinejointries": case "join-tries": int.TryParse(next, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out p.JoinTries); i++; break;
+                    case "onlinechatat": case "chat-at": int.TryParse(next, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out p.ChatAt); i++; break;
                     case "onlinechattext": case "chat-text": p.ChatText = next; i++; break;
                     case "onlinechatteam": case "chat-team": p.ChatTeam = true; break;
-                    case "onlinedropat": case "drop-at": int.TryParse(next, out p.DropAt); i++; break;
+                    case "onlinedropat": case "drop-at": int.TryParse(next, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out p.DropAt); i++; break;
                     case "onlinebuild": case "build": p.Build = next; i++; break;
                 }
             }

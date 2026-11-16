@@ -44,7 +44,7 @@ namespace CriticalMass.Net.Relay
             foreach (char ch in typed)
             {
                 char c = char.ToUpperInvariant(ch);
-                if (c == ' ' || c == '-') continue;
+                if (c == ' ' || c == '-' || c == '\r' || c == '\n' || c == '\t') continue;
                 if (RoomCodes.Alphabet.IndexOf(c) < 0) return null;
                 sb.Append(c);
             }
@@ -163,9 +163,10 @@ namespace CriticalMass.Net.Relay
                     if (r.MessageType == WebSocketMessageType.Binary) OnFrame(buf, n);
                 }
             }
-            catch (Exception)
+            catch (Exception e)
             {
-                // Socket errors, cancellation: reported once below.
+                // Socket errors, cancellation: reported once below, naming the exception so a lost room says why.
+                if (!_closed && _closingReason == null) _closingReason = "The connection to the room was lost (" + e.GetType().Name + ": " + e.Message + ").";
             }
             Finish(_closingReason ?? (_closed ? "You left the room." : "The connection to the room was lost."));
             await sender.ConfigureAwait(false);
