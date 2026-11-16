@@ -27,10 +27,15 @@ os.makedirs(OUT, exist_ok=True)
 RATIO = float(os.environ.get('SEAM_RATIO', '2.2'))
 MINLEN = float(os.environ.get('SEAM_MIN_M', '0.05'))
 SMOOTH_DEG = float(os.environ.get('SMOOTH_DEG', '50'))
-JOINT_RATIO = float(os.environ.get('SEAM_JOINT_RATIO', '3.5'))   # armpit webbing on the shoulder / hip pairs
+JOINT_RATIO = float(os.environ.get('SEAM_JOINT_RATIO', '3.5'))
+# b12-i run 3 (GitHub run 43946784954): cutting and capping the bridges left a dark hole at the raised right arm on the
+# Hero and LOD0 (open edges 86 -> 144 / 104): a see-through regression, so the cut is OFF by default. ON by default: the
+# limb weight clean-up (not yet run), the team-speck clean-up and the normals (both proven better in the run-3 renders).
+CUT = os.environ.get('SEAM_CUT', '0') == '1'
+WEIGHTS = os.environ.get('SEAM_WEIGHTS', '1') == '1'   # armpit webbing on the shoulder / hip pairs
 SHADOW_MAX, LOD1_MAX, LOD0_MAX = 800, 1500, 4500
 LEVELS = ('Hero', 'LOD0', 'LOD1', 'Shadow')
-REP = {'params': dict(ratio=RATIO, joint_ratio=JOINT_RATIO, min_m=MINLEN, smooth_deg=SMOOTH_DEG)}
+REP = {'params': dict(ratio=RATIO, joint_ratio=JOINT_RATIO, min_m=MINLEN, smooth_deg=SMOOTH_DEG, cut=CUT, weights=WEIGHTS)}
 
 
 def save():
@@ -334,9 +339,58 @@ REP['stretch_before'] = {lv: st[o.name]['summary'] for lv, o in LV.items()}
 save()
 print('[seams] before', json.dumps(REP['stretch_before']), flush=True)
 
-# ---- FIX: cut the fused bridges and cap, twice, then normals
+# ---- FIX 1: limb-exclusive weights. Run 2/3 measured stretched edges between vertices of the SAME dominant bone
+# (LOD0: hand.r / hand.r 7, chest / chest 10): partial weights bled across limbs by the voxel proxy (a glove vertex partly on
+# the chest or hips stays behind when the hand rises; a belly vertex partly on the forearm is dragged up with it). Each
+# vertex keeps only the bones of its dominant limb, plus the joint it sits at: an arm vertex keeps the chest only when its
+# top arm bone is upperarm (the shoulder), a leg vertex keeps hips/spine only at upperleg (the hip), a body vertex keeps
+# upperarm and upperleg (shoulder and hip) and drops forearm, wrist, hand, shin, foot and toes. Then renormalised.
+def limb_weights(o):
+    names = {g.index: g.name for g in o.vertex_groups}
+    changed = 0
+    for v in o.data.vertices:
+        ws = [(names.get(g.group), g.weight, g.group) for g in v.groups if names.get(g.group) in ANC and g.weight > 0]
+        if len(ws) < 2:
+            continue
+        tot = {}
+        for n, w, _ in ws:
+            tot[limb(n)] = tot.get(limb(n), 0.0) + w
+        L = max(tot, key=tot.get)
+        own = [x for x in ws if limb(x[0]) == L]
+        top = max(own, key=lambda x: x[1])[0].partition('.')[0]
+        keep = []
+        for n, w, gi in ws:
+            base = n.partition('.')[0]
+            ok = limb(n) == L
+            if not ok and L == 'core':
+                ok = base in ('upperarm', 'upperleg')
+            elif not ok and L.startswith('arm'):
+                ok = n == 'chest' and top == 'upperarm'
+            elif not ok and L.startswith('leg'):
+                ok = n in ('hips', 'spine') and top == 'upperleg'
+            keep.append(ok)
+        if all(keep):
+            continue
+        tw = sum(w for (n, w, gi), k in zip(ws, keep) if k)
+        for (n, w, gi), k in zip(ws, keep):
+            if k:
+                o.vertex_groups[gi].add([v.index], w / tw, 'REPLACE')
+            else:
+                o.vertex_groups[gi].remove([v.index])
+        changed += 1
+    return changed
+
+
+if WEIGHTS:
+    REP['weights_cleaned_vertices'] = {lv: limb_weights(o) for lv, o in LV.items()}
+    st = stretch(list(LV.values()))
+    REP['stretch_after_weights'] = {lv: st[o.name]['summary'] for lv, o in LV.items()}
+    REP['stretch_after'] = REP['stretch_after_weights']
+    save()
+
+# ---- FIX 2 (SEAM_CUT=1 only): cut the fused bridges and cap, three rounds
 REP['cut'] = {lv: [] for lv in LEVELS}
-for rnd in range(3):
+for rnd in range(3 if CUT else 0):
     for lv, o in LV.items():
         fl = st[o.name]['flag']
         if len(fl) == 0:
@@ -348,7 +402,8 @@ for rnd in range(3):
     st = stretch(list(LV.values()))
     REP[f'stretch_after_{rnd + 1}'] = {lv: st[o.name]['summary'] for lv, o in LV.items()}
     save()
-REP['stretch_after'] = REP['stretch_after_3']
+if CUT:
+    REP['stretch_after'] = REP['stretch_after_3']
 
 
 def despeckle(o, passes=2):
@@ -391,7 +446,7 @@ REP['tris_after'] = {lv: ntri(o) for lv, o in LV.items()}
 REP['contracts'] = dict(LOD0=REP['tris_after']['LOD0'] <= LOD0_MAX, LOD1=REP['tris_after']['LOD1'] <= LOD1_MAX,
                         Shadow=REP['tris_after']['Shadow'] <= SHADOW_MAX)
 save()
-print('[seams] after', json.dumps({k: REP[k] for k in ('stretch_after', 'despeckled_faces', 'normals_after', 'tris_after', 'contracts')}), flush=True)
+print('[seams] after', json.dumps({k: REP.get(k) for k in ('stretch_after', 'weights_cleaned_vertices', 'despeckled_faces', 'normals_after', 'tris_after', 'contracts')}), flush=True)
 
 # ---- export (rest pose, model only)
 rest(); assign(ca, None)
