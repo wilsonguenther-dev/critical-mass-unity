@@ -123,46 +123,44 @@ if img is None or not raw.data.uv_layers:
     raise SystemExit(REP["stop"])
 
 V = world_verts(raw)
-H_T = float(W[:, 2].max() - W[:, 2].min())
+# The reference is today's Warrior_Hero (21.5k: body 19k + shield + cleaver; LOD0 is its decimation): its props sit in
+# the same mesh, so the fit is build_hy3d.py's own (body height = the Hero's head top, soles on z = 0, x centred on the
+# bounds, y on the torso median), never a bounds or ICP fit that the shield and cleaver would drag. Then a translation-only
+# refinement on the closest pairs (props excluded by the distance trim), kept only if it lowers the median distance.
+REF = oldH or old0
+WR = world_verts(REF)
+H_T = float(WR[:, 2].max())
 s = H_T / float(V[:, 2].max() - V[:, 2].min())
-V = (V - [0, 0, V[:, 2].min()]) * s          # build_hy3d.py: height fit, feet on z = 0
+V = (V - [0, 0, V[:, 2].min()]) * s
 torso = V[(V[:, 2] > 0.5 * H_T) & (V[:, 2] < 0.6 * H_T)]
 V -= [(V[:, 0].max() + V[:, 0].min()) / 2, float(np.median(torso[:, 1])), 0]
-V += [0, 0, float(W[:, 2].min())]
-bvh_old = BVHTree.FromPolygons([tuple(v) for v in W], [tuple(p.vertices) for p in old0.data.polygons])
+bvh_old = BVHTree.FromPolygons([tuple(v) for v in WR], [tuple(p.vertices) for p in REF.data.polygons])
 rng = np.random.default_rng(12)
+sample_i = rng.choice(len(V), min(5000, len(V)), replace=False)
 
 
-def residual(P):
-    d = []
-    for p in P:
+def dists(P):
+    out = np.zeros(len(P))
+    near = np.zeros((len(P), 3))
+    for k, p in enumerate(P):
         r = bvh_old.find_nearest(Vector(p))
-        d.append(r[3] if r[0] is not None else 1.0)
-    return float(np.sqrt(np.mean(np.square(d))))
+        out[k], near[k] = r[3], tuple(r[0])
+    return out, near
 
 
-def icp(P, iters=12):
-    sc, tr = 1.0, np.zeros(3)
-    sample = P[rng.choice(len(P), min(4000, len(P)), replace=False)]
-    for _ in range(iters):
-        Q = sc * sample + tr
-        N = np.array([tuple(bvh_old.find_nearest(Vector(q))[0]) for q in Q])
-        pm, nm_ = Q.mean(0), N.mean(0)
-        k = float(np.sum((Q - pm) * (N - nm_)) / max(1e-9, np.sum((Q - pm) ** 2)))
-        sc, tr = sc * k, k * tr + (nm_ - k * pm)
-    return sc, tr, residual(sc * sample + tr)
-
-
-best = None
-for yaw in (0.0, 180.0):
-    R = np.array(Matrix.Rotation(math.radians(yaw), 3, "Z"))
-    P = V @ R.T
-    sc, tr, res = icp(P)
-    REP.setdefault("align", {})["yaw_%d" % yaw] = dict(scale=round(sc, 5), translate=np.round(tr, 4).tolist(), rms_m=round(res, 5))
-    if best is None or res < best[0]:
-        best = (res, yaw, sc * P + tr)
-REP["align"]["chosen_yaw"] = best[1]
-REP["align"]["fit_scale_vs_glb"] = round(s, 4)
+d0, _ = dists(V[sample_i])
+tr = np.zeros(3)
+for _ in range(8):
+    d, near = dists(V[sample_i] + tr)
+    keep = d < max(0.004, 3.0 * float(np.median(d)))
+    tr = tr + (near[keep] - (V[sample_i] + tr)[keep]).mean(0)
+d1, _ = dists(V[sample_i] + tr)
+use = float(np.median(d1)) < float(np.median(d0))
+REP["align"] = dict(reference=REF.name, height_m=round(H_T, 4), fit_scale_vs_glb=round(s, 4),
+                    median_m_before=round(float(np.median(d0)), 5), p90_m_before=round(float(np.percentile(d0, 90)), 5),
+                    refine_translate=np.round(tr, 4).tolist(), median_m_after=round(float(np.median(d1)), 5),
+                    p90_m_after=round(float(np.percentile(d1, 90)), 5), refinement_kept=use, chosen_yaw=0.0)
+best = (0, 0.0, V + (tr if use else 0))
 raw.data.vertices.foreach_set("co", np.ascontiguousarray(best[2], np.float32).ravel())
 raw.data.update()
 log("aligned", REP["align"])
@@ -224,6 +222,11 @@ bpy.ops.object.mode_set(mode="EDIT")
 bpy.ops.mesh.select_all(action="SELECT")
 bpy.ops.uv.smart_project(angle_limit=math.radians(66.0), island_margin=0.004, area_weight=0.0, correct_aspect=True,
                          scale_to_bounds=False)
+try:
+    bpy.ops.uv.pack_islands(rotate=True, margin=0.003, shape_method="CONCAVE")
+    REP["uv_pack"] = "concave repack"
+except Exception as x:
+    REP["uv_pack"] = "smart project packing only: " + repr(x)
 bpy.ops.object.mode_set(mode="OBJECT")
 me = low.data
 me.uv_layers[0].name = "UVMap"
@@ -308,19 +311,20 @@ mt.links.new(tot.outputs[0], em.inputs["Color"])
 outn = mt.nodes.new("ShaderNodeOutputMaterial")
 mt.links.new(em.outputs[0], outn.inputs["Surface"])
 codes = {}
-ca = old0.data.color_attributes.get("Col") or (old0.data.color_attributes[0] if old0.data.color_attributes else None)
+ca = REF.data.color_attributes.get("Col") or (REF.data.color_attributes[0] if REF.data.color_attributes else None)
 if ca is not None:
     al = np.zeros(len(ca.data) * 4)
     ca.data.foreach_get("color", al)
     for k, n in zip(*np.unique(np.round(al.reshape(-1, 4)[:, 3] * 8).astype(int), return_counts=True)):
         codes[int(k)] = int(n)
     att.attribute_name = ca.name
-REP["old_lod0_mask_codes_per_corner"] = codes
-old0.data.materials.clear()
-old0.data.materials.append(mm)
-for p_ in old0.data.polygons:
+REP["reference_mask_codes_per_corner"] = codes
+REF_MATS = list(REF.data.materials)
+REF.data.materials.clear()
+REF.data.materials.append(mm)
+for p_ in REF.data.polygons:
     p_.material_index = 0
-bake("EMIT", old0, maskimg)
+bake("EMIT", REF, maskimg)
 tex.image = base
 
 px = np.array(base.pixels[:]).reshape(TEX, TEX, 4)
@@ -350,8 +354,11 @@ for m in list(newo.modifiers):
 arms = [m for m in newo.modifiers if m.type == "ARMATURE"]
 for m in arms:
     m.show_viewport = False
+for g in REF.vertex_groups:                         # Blender keeps group names on the mesh data: recreate them
+    if newo.vertex_groups.get(g.name) is None:
+        newo.vertex_groups.new(name=g.name)
 dt = newo.modifiers.new("DT", "DATA_TRANSFER")
-dt.object = old0
+dt.object = REF
 dt.use_vert_data = True
 dt.data_types_verts = {"VGROUP_WEIGHTS"}
 dt.vert_mapping = "POLYINTERP_NEAREST"
