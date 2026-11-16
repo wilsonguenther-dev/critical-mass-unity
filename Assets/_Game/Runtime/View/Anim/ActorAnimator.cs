@@ -687,59 +687,43 @@ namespace CriticalMass.Runtime.View.Anim
         {
             _reachMeasured = true;
             _tipModel = m;
+            float len = m.ClipLength(clip);
             _vcClip = clip;
-            Vector3 fwd = SimSpace.ToWorld(Math.Cos(actor.Facing), 0, Math.Sin(actor.Facing));
-            if (MeasureStrike(m, actor.Cls, clip, fwd, out _tipHand, out _tipLocal, out _endName, out _vcFact, out _vcTime, out double reach, out double lever))
-                HitFeel.SetMeasured(actor.Cls, reach, lever);
-        }
-
-        /// <summary>
-        /// b11-c: the measure behind MeasureReach, static so the EditMode reach test (WeaponReachTests) runs the game's own
-        /// code on the imported model. On the pose the game DRAWS (AttackTiming.PoseDrawn: idle legs, the clip on the
-        /// upper-body layer; hit-feel-7 posed the clip on the full body, which is not what the damage tick shows):
-        /// the striking end (of the two far ends of the weapon class cls strikes with, HitPose.StrikeEnds: the Healer's
-        /// lantern hand, hand.l), picked at the fact-table contact; the view contact (the clip time in [contact - 0.15,
-        /// contact + 0.35] s where that end is furthest forward along fwd); that end's forward reach from the model root
-        /// and its height above the spine (the lean lever). False (outputs partly filled) when it cannot be measured.
-        /// </summary>
-        public static bool MeasureStrike(ModelView m, ClassId cls, string clip, Vector3 fwd, out Transform hand, out Vector3 tipLocal,
-            out string endName, out double fact, out double view, out double reach, out double lever)
-        {
-            hand = null;
-            tipLocal = Vector3.zero;
-            endName = "a";
-            reach = 0;
-            lever = 0;
-            float len = m != null && clip != null ? m.ClipLength(clip) : 0f;
-            fact = ClipFacts.Contact(clip, len * 0.5f);
-            view = fact;
-            if (m == null) return false;
-            Vector3 endA = HitPose.StrikeEnds(m, cls, out hand, out Vector3 endB, out _);
-            tipLocal = endA;
+            _vcFact = ClipFacts.Contact(clip, len * 0.5f);
+            _vcTime = _vcFact;
+            Vector3 endA = HitPose.Ends(m, out _tipHand, out Vector3 endB, out _);
+            _tipLocal = endA;
+            _endName = "a";
             Transform spine = m.Bone("spine");
+            if (_tipHand == null || spine == null || len <= 0f) return;
+            Vector3 fwd = SimSpace.ToWorld(Math.Cos(actor.Facing), 0, Math.Sin(actor.Facing));
             fwd.y = 0f;
-            if (hand == null || spine == null || len <= 0f || fwd.sqrMagnitude < 1e-8f) return false;
             fwd.Normalize();
-            if (endB.sqrMagnitude > 1e-6f && AttackTiming.PoseDrawn(m, clip, fact))
+            if (endB.sqrMagnitude > 1e-6f && PoseAt(m, clip, _vcFact))
             {
                 Vector3 root = m.Transform.position;
-                if (Vector3.Dot(hand.TransformPoint(endB) - root, fwd) > Vector3.Dot(hand.TransformPoint(endA) - root, fwd))
-                { tipLocal = endB; endName = "b (other end)"; }
+                if (Vector3.Dot(_tipHand.TransformPoint(endB) - root, fwd) > Vector3.Dot(_tipHand.TransformPoint(endA) - root, fwd))
+                { _tipLocal = endB; _endName = "b (other end)"; }
             }
-            double lo = Math.Max(0, fact - 0.15), hi = Math.Max(fact, Math.Min(len - AttackTiming.FadeOut - 0.03, fact + 0.35)), best = double.NegativeInfinity;
+            double lo = Math.Max(0, _vcFact - 0.15), hi = Math.Max(_vcFact, Math.Min(len - AttackTiming.FadeOut - 0.03, _vcFact + 0.35)), best = double.NegativeInfinity;
             const int n = 20;
             for (int k = 0; k <= n; k++)
             {
                 double t = lo + (hi - lo) * k / n;
-                if (!AttackTiming.PoseDrawn(m, clip, t)) return false;
-                double f = Vector3.Dot(hand.TransformPoint(tipLocal) - m.Transform.position, fwd);
-                if (f > best + 1e-4) { best = f; view = t; }
+                if (!PoseAt(m, clip, t)) return;
+                double f = Vector3.Dot(_tipHand.TransformPoint(_tipLocal) - m.Transform.position, fwd);
+                if (f > best + 1e-4) { best = f; _vcTime = t; }
             }
-            if (!AttackTiming.PoseDrawn(m, clip, view)) return false;
-            Vector3 tip = hand.TransformPoint(tipLocal);
-            reach = Vector3.Dot(tip - m.Transform.position, fwd);
-            lever = tip.y - spine.position.y;
-            return true;
+            if (!PoseAt(m, clip, _vcTime)) return;
+            Vector3 tip = _tipHand.TransformPoint(_tipLocal);
+            HitFeel.SetMeasured(actor.Cls, Vector3.Dot(tip - m.Transform.position, fwd), tip.y - spine.position.y);
+        }
+
+        static bool PoseAt(ModelView m, string clip, double t)
+        {
+            m.BeginPose();
+            m.Pose(clip, t, 1f, false);
+            return m.Evaluate(true);
         }
 
         /// <summary>The clip time this fighter's damage tick shows (the view contact; the fact table's until measured).</summary>
@@ -749,9 +733,6 @@ namespace CriticalMass.Runtime.View.Anim
         public string StrikingEnd => _endName;
         public Vector3 TipLocalNow => _tipLocal;
         public Transform TipHand => _tipHand;
-        /// <summary>b11-c: the model and clip the tip was last measured on (capture: the live model's own measure only).</summary>
-        public ModelView TipModel => _tipModel;
-        public string MeasuredClip => _vcClip;
 
         /// <summary>The weapon tip in world space now (capture; Vector3.zero before the first swing).</summary>
         public Vector3 TipWorld => _tipHand != null ? _tipHand.TransformPoint(_tipLocal) : Vector3.zero;
@@ -800,7 +781,7 @@ namespace CriticalMass.Runtime.View.Anim
             {
                 _exModel = m;
                 _exClip = clip;
-                _exTime = AttackTiming.ExtremeNow(m, clip, ViewContact(clip, ClipFacts.Contact(clip, m.ClipLength(clip) * 0.5f)), _tipModel == m ? _tipHand : null);
+                _exTime = AttackTiming.ExtremeNow(m, clip, ViewContact(clip, ClipFacts.Contact(clip, m.ClipLength(clip) * 0.5f)));
             }
             _actExtreme = kind == 1 && clip != null ? _exTime : -1;
             _actStart = simTime - aa;

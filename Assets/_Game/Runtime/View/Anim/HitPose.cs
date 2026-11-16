@@ -1,7 +1,6 @@
 using System;
 using CriticalMass.Runtime.View.Art;
 using CriticalMass.Runtime.View.Effects;
-using CriticalMass.Sim.Config;
 using UnityEngine;
 
 namespace CriticalMass.Runtime.View.Anim
@@ -83,35 +82,6 @@ namespace CriticalMass.Runtime.View.Anim
         /// the WeaponTip measured at import, else the hand itself (no weapon). Allocates (vertex read): once per fighter.
         /// </summary>
         public static Vector3 TipLocal(ModelView m, out Transform hand, out string source) => Ends(m, out hand, out _, out source);
-
-        /// <summary>
-        /// b11-c: the ends of the weapon class cls really strikes with. Every class: Ends (the weapon hand, handslot.r). The
-        /// Healer: a lantern PROP on the weapon hand when one is attached (a new Healer model); otherwise her own lantern in
-        /// the LEFT hand (handslot.l / hand.l, measured at import: WeaponTip.Left*), else that bare left hand. Allocates
-        /// (vertex read, strings): once per fighter and clip, like Ends.
-        /// </summary>
-        public static Vector3 StrikeEnds(ModelView m, ClassId cls, out Transform hand, out Vector3 other, out string source)
-        {
-            Vector3 r = Ends(m, out hand, out other, out source);
-            if (cls != ClassId.Healer || m == null || source.StartsWith("prop", StringComparison.Ordinal)) return r;
-            Transform left = m.Bone("handslot.l") ?? m.Bone("hand.l");
-            if (left == null) return r;
-            hand = left;
-            other = Vector3.zero;
-            source = "left hand " + left.name + " (no lantern measured)";
-            WeaponTip tip = m.Root != null ? m.Root.GetComponentInChildren<WeaponTip>(true) : null;
-            if (tip != null && tip.LeftDistance > 0f && !string.IsNullOrEmpty(tip.LeftBone))
-            {
-                Transform b = m.Bone(tip.LeftBone);
-                if (b != null)
-                {
-                    source = "import (" + tip.LeftVertices + " lantern vertices on " + tip.LeftBone + ")";
-                    if (tip.LeftOtherDistance > 0f) other = left.InverseTransformPoint(b.TransformPoint(tip.LeftOtherEnd));
-                    return left.InverseTransformPoint(b.TransformPoint(tip.LeftLocal));
-                }
-            }
-            return Vector3.zero;
-        }
 
         /// <summary>
         /// fix/hit-feel-7: both far ends of the held weapon in the hand's local space: the return value is the farthest

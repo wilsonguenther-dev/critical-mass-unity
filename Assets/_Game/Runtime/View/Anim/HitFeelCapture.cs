@@ -218,12 +218,6 @@ namespace CriticalMass.Runtime.View.Anim
             int windup = w.Actors[0].SwingWindup;
             int damageTick = -1;
             double facingErr = 0, lungePeak = 0, handReach = double.NaN, surface = double.NaN, tipAhead = double.NaN, stepAt = 0, leanAt = 0;
-            // b11-c: the tip is also read on the frame AFTER the damage tick, with each frame's render alpha, and the gap is
-            // judged on the frame where the strike is drawn (the one with the tip further forward): the wind-up craft makes
-            // the whole strike inside the last tick, so a frame drawn at alpha 0 still shows the drawn-back extreme.
-            double tipContact = double.NaN, tipNext = double.NaN, alphaContact = double.NaN, alphaNext = double.NaN;
-            bool readNext = false;
-            string liveSrc = "no model";
             ActorViews views = _driver.GetComponent<ActorViews>();
             var side = new Texture2D(FrameW * Frames, FrameH, TextureFormat.RGB24, false);
             var game = new Texture2D(FrameW * Frames, FrameH, TextureFormat.RGB24, false);
@@ -242,12 +236,6 @@ namespace CriticalMass.Runtime.View.Anim
                 bool contact = damageTick == w.Tick;
                 RenderInto(side, f, focus, true, contact);
                 RenderInto(game, f, focus, false, contact);
-                if (readNext)
-                {
-                    readNext = false;
-                    alphaNext = _driver.Alpha;
-                    tipNext = TipAhead(views, w, cls, out _);
-                }
                 if (contact)
                 {
                     // feat/hit-feel-2: weapon-hand reach at the contact frame, along the line to the dummy, from the drawn body.
@@ -255,24 +243,17 @@ namespace CriticalMass.Runtime.View.Anim
                     double ddx = w.X[_dummy] - w.X[0], ddz = w.Z[_dummy] - w.Z[0];
                     surface = Math.Sqrt(ddx * ddx + ddz * ddz) - w.Config.Class(w.Actors[_dummy].Cls).Radius;
                     // fix/hit-feel-5: the weapon TIP's distance ahead of the SIM position along the line to the dummy
-                    tipContact = TipAhead(views, w, cls, out liveSrc);
-                    alphaContact = _driver.Alpha;
-                    readNext = true;
+                    tipAhead = TipAhead(views, w, out string liveSrc);
+                    if (double.IsNaN(tipAhead) || Math.Abs(surface - tipAhead) > MaxGap)
+                    {
+                        _failed++;
+                        Log(n + ": FAILED: tip gap " + (surface - tipAhead).ToString("0.00") + " u is not a measurement (over " + MaxGap +
+                            " u or no tip; tip from " + liveSrc + ")");
+                    }
                     stepAt = HitFeel.Lunge(w, 0, 0).magnitude;
                     if (HitFeel.StrikeLean(w, 0, 0, out double ld, out _, out _)) leanAt = ld;
                 }
                 Step(1);
-            }
-            // b11-c: the strike frame: the contact frame or the one after it, whichever draws the tip further forward.
-            tipAhead = double.IsNaN(tipNext) || (!double.IsNaN(tipContact) && tipContact >= tipNext) ? tipContact : tipNext;
-            Log(n + ": strike frame: tip " + tipContact.ToString("0.00") + " u at the damage-tick frame (render alpha " +
-                alphaContact.ToString("0.00") + "), " + tipNext.ToString("0.00") + " u on the frame after (alpha " + alphaNext.ToString("0.00") +
-                "); judged on " + (tipAhead.Equals(tipContact) ? "the damage-tick frame" : "the frame after"));
-            if (damageTick >= 0 && (double.IsNaN(tipAhead) || Math.Abs(surface - tipAhead) > MaxGap))
-            {
-                _failed++;
-                Log(n + ": FAILED: tip gap " + (surface - tipAhead).ToString("0.00") + " u is not a measurement (over " + MaxGap +
-                    " u or no tip; tip from " + liveSrc + ")");
             }
             SwingTable(views, w, n, cls);
             Write(side, Prefix + n + "-side.png");
@@ -280,9 +261,7 @@ namespace CriticalMass.Runtime.View.Anim
             Destroy(side);
             Destroy(game);
 
-            // b11-c: the clip the animator really played (the Healer's lantern swing plays Attack, not Cast)
-            ActorAnimator played = views != null ? views.AnimatorOf(0) : null;
-            string clip = played != null && played.MeasuredClip != null ? played.MeasuredClip : ArtMapping.ClassClips(cls).Attack;
+            string clip = ArtMapping.ClassClips(cls).Attack;
             double c = ClipFacts.Contact(clip, 0.567f);
             double viewOffMs = (AttackTiming.ContactAge(c, windup / hz) - windup / hz) * 1000;
             int expect = press + windup;
@@ -303,7 +282,7 @@ namespace CriticalMass.Runtime.View.Anim
             // surface" is the target body surface minus the weapon TIP's distance ahead of the SIM position: 0 or less is
             // a touch (negative: the tip is that far into the body), positive is the gap left.
             ModelView mv = views != null ? views.ModelOf(0) : null;
-            HitPose.StrikeEnds(mv, cls, out _, out _, out string tipSrc);
+            HitPose.TipLocal(mv, out _, out string tipSrc);
             int ci = (int)cls;
             double reach = HitFeel.ViewReach(cls), lever = HitFeel.MeasuredLever[ci];
             double cover = reach + HitFeel.MaxViewOffset + HitPose.LeanGain(HitPose.MaxStrikeLeanDeg, lever > 0 ? lever : 0.5);
@@ -318,8 +297,7 @@ namespace CriticalMass.Runtime.View.Anim
                 reach.ToString("0.00") + (HitFeel.MeasuredReach[ci] > 0 ? " u measured" : " u ESTIMATE (not measured)") +
                 ", lever " + lever.ToString("0.00") + " u, step-in " + stepAt.ToString("0.00") + " u, strike lean " + leanAt.ToString("0") +
                 " deg; covers a body surface up to " + cover.ToString("0.00") + " u, sim range (to the surface) " + range.ToString("0.00") +
-                " u" + (range > cover + 1e-3 ? ": SHORT by " + (range - cover).ToString("0.00") + " u (weapon-reach table row to re-measure)" : ": covered") +
-                " (weapon-reach rule " + (Combat.WeaponReachOn(w.Config) ? "on" : "off") + ")" +
+                " u" + (range > cover + 1e-3 ? ": SHORT by " + (range - cover).ToString("0.00") + " u (rules question: shorten the range)" : ": covered") +
                 "; reaction recoil " + HitPose.RecoilDeg(tier).ToString("0") + " deg, head snap " + HitPose.HeadSnapDeg(tier).ToString("0") +
                 " deg, squash " + (HitPose.SquashMax * 100).ToString("0") + "% for " + (HitPose.SquashSeconds * 1000).ToString("0") +
                 " ms; side camera on the " + (_sideSign > 0 ? "-z" : "+z") + " side, lift " + _sideLift.ToString("0.00") + " u");
@@ -392,8 +370,7 @@ namespace CriticalMass.Runtime.View.Anim
             ModelView mv = views != null ? views.ModelOf(0) : null;
             ActorAnimator anim = views != null ? views.AnimatorOf(0) : null;
             if (mv == null || anim == null || anim.TipHand == null) { Log(n + ": swing table: no measured tip"); return; }
-            // b11-c: the clip the animator measured and plays (Healer: the lantern swing's Attack), on the drawn pose
-            string clip = anim.MeasuredClip != null && anim.TipModel == mv ? anim.MeasuredClip : AttackTiming.SwingClip(mv, cls, w.Config);
+            string clip = AttackTiming.AttackClip(mv, cls);
             float len = clip != null ? mv.ClipLength(clip) : 0f;
             if (len <= 0f) { Log(n + ": swing table: no attack clip"); return; }
             double fact = ClipFacts.Contact(clip, len * 0.5f), view = anim.ViewContact(clip, fact);
@@ -401,14 +378,16 @@ namespace CriticalMass.Runtime.View.Anim
             dir.y = 0f;
             dir.Normalize();
             var sb = new System.Text.StringBuilder();
-            sb.Append(n).Append(": swing table (drawn pose: idle legs, clip on the upper layer; clip ").Append(clip).Append(", striking end ").Append(anim.StrikingEnd)
+            sb.Append(n).Append(": swing table (clip ").Append(clip).Append(", striking end ").Append(anim.StrikingEnd)
               .Append(", C contact ").Append(fact.ToString("0.000")).Append(" s, V view contact ").Append(view.ToString("0.000")).Append(" s):");
             double bestF = double.NegativeInfinity, bestT = 0;
             const int samples = 24;
             for (int k = 0; k <= samples; k++)
             {
                 double t = len * k / samples;
-                if (!AttackTiming.PoseDrawn(mv, clip, t)) break;
+                mv.BeginPose();
+                mv.Pose(clip, t, 1f, false);
+                if (!mv.Evaluate(true)) break;
                 double f = Vector3.Dot(anim.TipHand.TransformPoint(anim.TipLocalNow) - mv.Transform.position, dir);
                 if (f > bestF) { bestF = f; bestT = t; }
                 bool atC = Math.Abs(t - fact) <= len / samples * 0.5, atV = Math.Abs(t - view) <= len / samples * 0.5;
@@ -423,23 +402,12 @@ namespace CriticalMass.Runtime.View.Anim
         /// the LIVE model (ActorViews.ModelOf(0) now, its own hand and tip: never the animator's cache, which kept the first
         /// class's model after the views swapped actor 0 to the next class). NaN: no model or hand.
         /// </summary>
-        double TipAhead(ActorViews views, World w, ClassId cls, out string source)
+        double TipAhead(ActorViews views, World w, out string source)
         {
             source = "no model";
             ModelView mv = views != null ? views.ModelOf(0) : null;
             if (mv == null) return double.NaN;
-            // b11-c: the STRIKING end the animator measured on this live model (hit-feel-7 read end "a" here even when the
-            // swing strikes with the other end), else the class's strike ends (the Healer's lantern hand).
-            ActorAnimator anim = views.AnimatorOf(0);
-            Vector3 local;
-            Transform hand;
-            if (anim != null && anim.TipModel == mv && anim.TipHand != null)
-            {
-                local = anim.TipLocalNow;
-                hand = anim.TipHand;
-                source = "striking end " + anim.StrikingEnd + " on " + hand.name;
-            }
-            else local = HitPose.StrikeEnds(mv, cls, out hand, out _, out source);
+            Vector3 local = HitPose.TipLocal(mv, out Transform hand, out source);
             if (hand == null) return double.NaN;
             Vector3 dir = SimSpace.ToWorld(w.X[_dummy] - w.X[0], 0, w.Z[_dummy] - w.Z[0]);
             dir.y = 0f;
