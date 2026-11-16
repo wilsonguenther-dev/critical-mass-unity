@@ -701,13 +701,9 @@ namespace CriticalMass.Runtime.View.Anim
         /// lantern hand, hand.l), picked at the fact-table contact; the view contact (the clip time in [contact - 0.15,
         /// contact + 0.35] s where that end is furthest forward along fwd); that end's forward reach from the model root
         /// and its height above the spine (the lean lever). False (outputs partly filled) when it cannot be measured.
-        /// <para>b11-c fix-up: <paramref name="pose"/> replaces AttackTiming.PoseDrawn (the EditMode test samples the clips
-        /// straight onto the rig: its playable graph does not move the bones outside play mode); <paramref name="trace"/>
-        /// (tests, capture) gets one entry per sample: clip time, tip world position, forward distance.</para>
         /// </summary>
         public static bool MeasureStrike(ModelView m, ClassId cls, string clip, Vector3 fwd, out Transform hand, out Vector3 tipLocal,
-            out string endName, out double fact, out double view, out double reach, out double lever,
-            Func<string, double, bool> pose = null, System.Text.StringBuilder trace = null)
+            out string endName, out double fact, out double view, out double reach, out double lever)
         {
             hand = null;
             tipLocal = Vector3.zero;
@@ -724,11 +720,9 @@ namespace CriticalMass.Runtime.View.Anim
             fwd.y = 0f;
             if (hand == null || spine == null || len <= 0f || fwd.sqrMagnitude < 1e-8f) return false;
             fwd.Normalize();
-            if (endB.sqrMagnitude > 1e-6f && (pose != null ? pose(clip, fact) : AttackTiming.PoseDrawn(m, clip, fact)))
+            if (endB.sqrMagnitude > 1e-6f && AttackTiming.PoseDrawn(m, clip, fact))
             {
                 Vector3 root = m.Transform.position;
-                trace?.Append(" pick at ").Append(fact.ToString("0.000")).Append(": end a ").Append(Vector3.Dot(hand.TransformPoint(endA) - root, fwd).ToString("0.00"))
-                    .Append(" u, end b ").Append(Vector3.Dot(hand.TransformPoint(endB) - root, fwd).ToString("0.00")).Append(" u;");
                 if (Vector3.Dot(hand.TransformPoint(endB) - root, fwd) > Vector3.Dot(hand.TransformPoint(endA) - root, fwd))
                 { tipLocal = endB; endName = "b (other end)"; }
             }
@@ -737,16 +731,12 @@ namespace CriticalMass.Runtime.View.Anim
             for (int k = 0; k <= n; k++)
             {
                 double t = lo + (hi - lo) * k / n;
-                if (!(pose != null ? pose(clip, t) : AttackTiming.PoseDrawn(m, clip, t))) return false;
-                Vector3 tw = hand.TransformPoint(tipLocal);
-                double f = Vector3.Dot(tw - m.Transform.position, fwd);
+                if (!AttackTiming.PoseDrawn(m, clip, t)) return false;
+                double f = Vector3.Dot(hand.TransformPoint(tipLocal) - m.Transform.position, fwd);
                 if (f > best + 1e-4) { best = f; view = t; }
-                trace?.Append(' ').Append(t.ToString("0.000")).Append(" tip ").Append(tw.ToString("F2")).Append(" f=").Append(f.ToString("0.00"));
             }
-            if (!(pose != null ? pose(clip, view) : AttackTiming.PoseDrawn(m, clip, view))) return false;
+            if (!AttackTiming.PoseDrawn(m, clip, view)) return false;
             Vector3 tip = hand.TransformPoint(tipLocal);
-            trace?.Append("; strike at ").Append(view.ToString("0.000")).Append(" s: tip ").Append(tip.ToString("F2")).Append(", root ")
-                .Append(m.Transform.position.ToString("F2")).Append(", spine ").Append(spine.position.ToString("F2"));
             reach = Vector3.Dot(tip - m.Transform.position, fwd);
             lever = tip.y - spine.position.y;
             return true;
