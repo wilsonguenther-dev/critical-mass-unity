@@ -340,6 +340,35 @@ namespace CriticalMass.Runtime.View.Effects
             }
         }
 
+        /// <summary>b11-eh: round blobs along the smear stroke (shape 4), replacing its two straight-edged quads.</summary>
+        public const int SmearStrokeBlobs = 4;
+
+        /// <summary>Number of splat shapes DrawSplat knows (0..6; 6 is the knock-out pool).</summary>
+        public const int SplatShapes = 7;
+
+        /// <summary>
+        /// b11-eh (tests): draw one splat of the given shape at c into g exactly as the ground mesh and the paint stamp do,
+        /// at full size and full opacity. View only, allocation-free.
+        /// </summary>
+        public void DrawSplatShape(FxMeshBuilder g, Vector3 c, float size, byte shape, uint seed, double dirX, double dirZ, byte kind = 0)
+        {
+            var d = new Decal
+            {
+                P = c, Size = size, Shape = shape, Seed = seed, Kind = kind, Rot = R01(seed, 11) * Mathf.PI * 2f,
+                DirA = Mathf.Atan2((float)-dirZ, (float)dirX), Life = 1, Grow = 0,
+            };
+            DrawSplat(g, c, size, d, 1f);
+        }
+
+        /// <summary>b11-eh (tests): the latest birth time plus life of any decal ever spawned (NegativeInfinity if none).</summary>
+        public double LastDecalEnd()
+        {
+            double end = double.NegativeInfinity;
+            for (int i = 0; i < MaxDecals; i++)
+                if (!double.IsNegativeInfinity(_decals[i].Born)) end = Math.Max(end, _decals[i].Born + _decals[i].Life);
+            return end;
+        }
+
         private bool _splatRed;   // set by DrawSplat for its Dot calls (cand5-reds-1)
 
         private void Dot(FxMeshBuilder g, Vector3 p, Vector3 gr, Vector3 gu, float r, float fade)
@@ -417,14 +446,24 @@ namespace CriticalMass.Runtime.View.Effects
                 }
                 case 4:
                 {
-                    // Smear: a dragged stroke along the flight with round ends. 65 verts.
-                    Vector3 mc = c + dv * s * 0.75f;
-                    g.Quad(mc, dv * s * 0.75f, pv * (s * 0.42f + 0.03f), navy, navy);
-                    g.Blob(c, gr, gu, s * 0.42f + 0.03f, null, 9, 0, navy);
-                    g.Blob(c + dv * s * 1.5f, gr, gu, s * 0.5f + 0.03f, null, 9, 0, navy);
-                    g.Quad(mc, dv * s * 0.75f, pv * (s * 0.42f), mid, mid);
-                    g.Blob(c, gr, gu, s * 0.42f, null, 9, 0, mid);
-                    g.Blob(c + dv * s * 1.5f, gr, gu, s * 0.5f, null, 9, 0, mid);
+                    // Smear: a dragged stroke along the flight with round ends, built from overlapping lobed blobs only.
+                    // b11-eh: it used to be a straight-edged navy quad under a grey ink quad between two round caps: the
+                    // only straight-edged, square-cornered ground mark left after a fight (see SmearStrokeBlobs). Now no
+                    // splat shape has a straight edge. 4 x (10 + 1) x 2 + 10 + 7 = 105 verts (under CostDecal 130).
+                    for (int k = 0; k < SmearStrokeBlobs; k++)
+                    {
+                        float u = k / (float)(SmearStrokeBlobs - 1);
+                        float r = s * Mathf.Lerp(0.42f, 0.5f, u);
+                        Lobes(sd, (uint)(90 + k * 10), 10, 0.88f, 1.1f);
+                        g.Blob(c + dv * (s * 1.5f * u), gr, gu, r + 0.03f, _radii, 10, d.Rot + k, navy);
+                    }
+                    for (int k = 0; k < SmearStrokeBlobs; k++)
+                    {
+                        float u = k / (float)(SmearStrokeBlobs - 1);
+                        float r = s * Mathf.Lerp(0.42f, 0.5f, u);
+                        Lobes(sd, (uint)(90 + k * 10), 10, 0.88f, 1.1f);
+                        g.Blob(c + dv * (s * 1.5f * u), gr, gu, r, _radii, 10, d.Rot + k, mid);
+                    }
                     g.Blob(c + dv * s * 1.45f, gr, gu, s * 0.26f, null, 9, 0, dark);
                     g.Blob(c + dv * s * 0.6f + pv * s * 0.15f, gr, gu, s * 0.12f, null, 6, 0, light);
                     break;

@@ -217,7 +217,17 @@ namespace CriticalMass.Runtime.View.Anim
             double moving = Math.Min(1.0, speed / Math.Max(0.3, me.WalkSpeed));
             double leanTarget = k.KoIn > 0 ? 0 : -Math.Max(-LeanMaxDeg, Math.Min(LeanMaxDeg, _yawRate * 0.035 * (0.35 + 0.65 * moving)));
             if (dSim > 0) _lean += (leanTarget - _lean) * (1 - Math.Exp(-8 * dSim));
-            m.SetFacing(drawn * Quaternion.Euler((float)(-FlinchDeg * flinch), 0f, (float)_lean));
+            // b11-eh: knocked out = down on its belly. The root tips forward (KaijuDownPose) and slides back so the lying body
+            // stays over the sim position; DownPose below rests the belly and chin on the ground and splays the limbs.
+            float down = KaijuDownPose.Weight(k.KoIn, cfg.Kaiju.KoSeconds, simTime - _getUpAt, GetUpSeconds);
+            DownWeight = down;
+            DownRootPitchDeg = KaijuDownPose.RootPitchDeg * down;
+            m.SetFacing(drawn * Quaternion.Euler((float)(-FlinchDeg * flinch) + DownRootPitchDeg, 0f, (float)_lean));
+            if (down > 0f)
+            {
+                float bodyH = (m.Spec != null && m.Spec.Height > 0 ? m.Spec.Height : 5f) * s;
+                m.Transform.localPosition += (drawn * Vector3.back) * (KaijuDownPose.BackShare * bodyH * down);
+            }
 
             // Stride: turning in place steps too (a 1 u stance swings at |yaw rate| x 1 u).
             double turnSpeed = Math.Abs(_yawRate) * Math.PI / 180.0 * (isHatchling ? 0.5 : 1.0);
@@ -342,6 +352,8 @@ namespace CriticalMass.Runtime.View.Anim
 
             if (wrote) Procedural(m, w, k, dSim, flinch, isHatchling, drawn);
             if (wrote) LockFeet(m, dSim);
+            if (wrote && down > 0f) DownPose(m, down, drawn, s);
+            else DownChinHeight = float.NaN;
 
             // Footfalls on the measured contacts of the Walk clip (the force bus makes the shake, dust and thud).
             float walkLen = m.ClipLength(ArtMapping.Walk);
@@ -497,6 +509,52 @@ namespace CriticalMass.Runtime.View.Anim
             }
         }
 
+        /// <summary>b11-eh: the down pose's weight this frame (0 standing, 1 fully down), its root pitch and the head height
+        /// above the ground it left (NaN when not down). Tests and captures read them.</summary>
+        public float DownWeight { get; private set; }
+        public float DownRootPitchDeg { get; private set; }
+        public float DownChinHeight { get; private set; } = float.NaN;
+
+        static readonly string[] DownTorso = { "Hips", "Spine2", "Chest" };
+
+        /// <summary>
+        /// b11-eh: on the evaluated KO pose (root already tipped by KaijuDownPose.RootPitchDeg): lift the root until the
+        /// torso rests on the ground instead of sinking into it, swing the neck so the head (chin) rests at
+        /// KaijuDownPose.HeadRestShare of the height, and splay the legs and arms outward. Every step scales with the weight.
+        /// </summary>
+        void DownPose(ModelView m, float wgt, Quaternion drawn, float scale)
+        {
+            Quaternion parent = m.Transform.parent != null ? m.Transform.parent.rotation : Quaternion.identity;
+            Vector3 up = parent * Vector3.up, fwd = parent * (drawn * Vector3.forward), side = parent * (drawn * Vector3.right);
+            float h = (m.Spec != null && m.Spec.Height > 0 ? m.Spec.Height : 5f) * scale;
+            float ground = m.Transform.position.y;   // ActorViews stands the root on the ground before the pose
+            float low = float.PositiveInfinity;
+            for (int i = 0; i < DownTorso.Length; i++)
+            {
+                Transform b = m.Bone(DownTorso[i]);
+                if (b != null) low = Mathf.Min(low, b.position.y);
+            }
+            if (!float.IsInfinity(low))
+            {
+                float lift = Mathf.Max(0f, ground + KaijuDownPose.BellyRestShare * h - low) * wgt;
+                if (lift > 0f) m.Transform.position += up * lift;
+            }
+            Transform hips = m.Bone("Hips");
+            Vector3 centre = hips != null ? hips.position : m.Transform.position;
+            KaijuDownPose.Splay(m.Bone("Thigh_L"), m.Bone("Shin_L"), centre, side, KaijuDownPose.ThighSplayDeg * wgt);
+            KaijuDownPose.Splay(m.Bone("Thigh_R"), m.Bone("Shin_R"), centre, side, KaijuDownPose.ThighSplayDeg * wgt);
+            KaijuDownPose.Splay(m.Bone("Arm_L"), m.Bone("Forearm_L"), centre, side, KaijuDownPose.ArmSplayDeg * wgt);
+            KaijuDownPose.Splay(m.Bone("Arm_R"), m.Bone("Forearm_R"), centre, side, KaijuDownPose.ArmSplayDeg * wgt);
+            Transform neck = m.Bone("Neck"), head = m.Bone("Head");
+            if (neck != null && head != null)
+            {
+                float deg = KaijuDownPose.NeckCorrectionDeg(neck.position, head.position, fwd, ground + KaijuDownPose.HeadRestShare * h) * wgt;
+                if (Mathf.Abs(deg) > 1e-3f) neck.rotation = Quaternion.AngleAxis(deg, side) * neck.rotation;
+                DownChinHeight = head.position.y - ground;
+            }
+            else DownChinHeight = float.NaN;
+        }
+
         static void Turn(Transform bone, Vector3 axis, double deg)
         {
             if (bone == null || Math.Abs(deg) < 1e-3) return;
@@ -613,5 +671,71 @@ namespace CriticalMass.Runtime.View.Anim
             }
             return best > 1e-4 ? bestT : -1;
         }
+    }
+
+    /// <summary>
+    /// b11-eh: the knocked-out Kaiju's down pose, every number in one place. Default (Jeisil was asked and may change it):
+    /// slumped on its belly, chin on the ground, limbs splayed. The KO clip alone only crouched it (hips down 0.72, a 10
+    /// degree hip tip and a 24 degree spine bend on a 5 u body), so on top of the clip the root tips forward RootPitchDeg
+    /// (torso about level with the clip's own bend), slides back BackShare of the height so the lying body stays over its
+    /// sim position, rests the torso BellyRestShare of the height above the ground, swings the neck until the head sits
+    /// HeadRestShare above it, and turns thighs and arms outward. Ramps in with the clip's collapse (frames 10 to 34 of 60
+    /// at 30 fps) and out over the get-up. View only.
+    /// </summary>
+    public static class KaijuDownPose
+    {
+        public const double FallDelay = 0.33, FallSeconds = 0.8;
+        public const float RootPitchDeg = 60f, BackShare = 0.25f;
+        public const float BellyRestShare = 0.1f, HeadRestShare = 0.1f;
+        public const float ThighSplayDeg = 25f, ArmSplayDeg = 35f, MaxNeckDeg = 75f;
+        /// <summary>The bands a capture or test holds the down pose to: root pitch, and the head height as a share of height.</summary>
+        public const float RootPitchMinDeg = 45f, RootPitchMaxDeg = 95f, HeadBandShare = 0.06f;
+
+        /// <summary>
+        /// Down weight 0..1: koIn = the sim's knock-out time left (seconds, 0 when up), koSeconds its full length,
+        /// sinceGetUp = seconds since it recovered (NegativeInfinity or less than 0: never), getUpSeconds the get-up length.
+        /// </summary>
+        public static float Weight(double koIn, double koSeconds, double sinceGetUp, double getUpSeconds)
+        {
+            if (koIn > 0) return Smooth01((koSeconds - koIn - FallDelay) / FallSeconds);
+            if (sinceGetUp >= 0 && sinceGetUp < getUpSeconds) return 1f - Smooth01(sinceGetUp / getUpSeconds);
+            return 0f;
+        }
+
+        static float Smooth01(double u)
+        {
+            float t = Mathf.Clamp01((float)u);
+            return t * t * (3f - 2f * t);
+        }
+
+        /// <summary>
+        /// Degrees to turn a joint at pivot about the body's side axis (positive tips forward-pointing bones down) so that
+        /// tip ends at height targetY; fwd is the body's facing. Clamped to MaxNeckDeg. Pure.
+        /// </summary>
+        public static float NeckCorrectionDeg(Vector3 pivot, Vector3 tip, Vector3 fwd, float targetY)
+        {
+            Vector3 v = tip - pivot;
+            float len = v.magnitude;
+            if (len < 1e-4f) return 0f;
+            float e = Mathf.Asin(Mathf.Clamp(v.y / len, -1f, 1f));
+            float e2 = Mathf.Asin(Mathf.Clamp((targetY - pivot.y) / len, -1f, 1f));
+            float sign = Vector3.Dot(v, fwd) >= 0f ? 1f : -1f;
+            return Mathf.Clamp((e - e2) * Mathf.Rad2Deg * sign, -MaxNeckDeg, MaxNeckDeg);
+        }
+
+        /// <summary>Turn limb (towards its child) outward from the body centre along side by deg. Allocation-free.</summary>
+        public static void Splay(Transform limb, Transform child, Vector3 centre, Vector3 side, float deg)
+        {
+            if (limb == null || child == null || Mathf.Abs(deg) < 1e-3f) return;
+            Vector3 outward = side * (Vector3.Dot(limb.position - centre, side) >= 0f ? 1f : -1f);
+            Vector3 axis = Vector3.Cross(child.position - limb.position, outward);
+            if (axis.sqrMagnitude < 1e-8f) return;
+            limb.rotation = Quaternion.AngleAxis(deg, axis.normalized) * limb.rotation;
+        }
+
+        /// <summary>Is a pose inside the down band: root pitch, and head height above the ground for a body of height h.</summary>
+        public static bool InBand(float rootPitchDeg, float headHeight, float h) =>
+            rootPitchDeg >= RootPitchMinDeg && rootPitchDeg <= RootPitchMaxDeg &&
+            Mathf.Abs(headHeight - HeadRestShare * h) <= HeadBandShare * h;
     }
 }

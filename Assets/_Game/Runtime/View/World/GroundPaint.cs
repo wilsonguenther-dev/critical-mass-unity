@@ -133,8 +133,21 @@ namespace CriticalMass.Runtime.View.Reactions
                 bus?.Subscribe(this);
             }
             if (_rt == null) return;
+            // b11-eh: stamped blood stains are GORE Full only, but nothing ever wiped them when the setting dropped, so a
+            // Full fight's stains stayed on the ground at Reduced and Off for the paint's whole life (up to 40 s at High).
+            if (_fx != null && _fx.Scene != null)
+            {
+                GoreLevel g = _fx.Scene.Gore;
+                if (ShouldWipe(_lastGore, g)) ClearAll();
+                _lastGore = g;
+            }
             Flush();
         }
+
+        private GoreLevel _lastGore = GoreLevel.Full;
+
+        /// <summary>b11-eh: true when the GORE level just dropped from Full (the only level that stamps stains).</summary>
+        public static bool ShouldWipe(GoreLevel was, GoreLevel now) => was == GoreLevel.Full && now != GoreLevel.Full;
 
         /// <summary>Draw what the builder holds into the texture and run the quarter-second fade; Frame moves on.</summary>
         /// <summary>Wipe everything painted so far (GORE dropping below Full clears the stamped blood stains at once).</summary>
