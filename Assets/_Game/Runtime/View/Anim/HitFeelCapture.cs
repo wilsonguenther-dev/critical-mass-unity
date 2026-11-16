@@ -69,6 +69,12 @@ namespace CriticalMass.Runtime.View.Anim
         /// </summary>
         public static double DummyAhead(double reach, double dummyRadius) => reach - SurfaceInset + dummyRadius;
 
+        /// <summary>
+        /// b12-c2: the one-argument form is the dummy's body SURFACE ahead for a reach (reach - SurfaceInset), kept for
+        /// HitFeelTests.TheCaptureDummyStandsInsideTheReach (not this item's file); the placement uses the centre form above.
+        /// </summary>
+        public static double DummyAhead(double reach) => reach - SurfaceInset;
+
         /// <summary>The dummy's body surface ahead of the attacker's centre for a centre distance ahead (pure; tests).</summary>
         public static double DummySurface(double ahead, double dummyRadius) => ahead - dummyRadius;
 
