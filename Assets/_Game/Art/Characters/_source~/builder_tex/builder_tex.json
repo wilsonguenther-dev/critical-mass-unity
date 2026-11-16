@@ -94,7 +94,7 @@
   "item_voxel": 0.006,
   "item_close_r": 0.004,
   "neck_band_m": 0.12,
-  "head_smooth_iters": 4,
+  "head_smooth_iters": 2,
   "rigid_uv_angle": 89,
   "cap_band_depth_m": 0.32,
   "mask_open_px": 3,
@@ -104,5 +104,20 @@
   "head_bone_reach_m": 99.0,
   "_note_run8": "zone_leg_below_m 0.22 relabelled 3,070 hip-zone verts as leg: the crotch shells then sat 'between legs', the voxel fell to its minimum and decimation stalled (LOD0 10k). Both run-8 rules are disabled (99) = run-7 behaviour."
  },
- "out_dir_remesh": "~/cm-art-trial/builder/game-ready-v2"
+ "out_dir_remesh": "~/cm-art-trial/builder/game-ready-v2",
+ "weights_rules": {
+  "hip_margin_frac": 0.15,
+  "joint_band_frac": 0.25,
+  "crotch_band_m": 0.06,
+  "hip_band_up_frac": 0.15,
+  "apron_front_m": 0.05,
+  "apron_leg_max": 0.6,
+  "shoulder_band_frac": 0.2,
+  "neck_band_m": 0.04,
+  "smooth_iters": 4,
+  "arm_side_ramp_m": 0.06,
+  "segment_softmin_m": 0.02,
+  "enabled": false,
+  "_note_run12": "Explicit region rules (runs 10-12) scored worse than run 9's heat + zone-hop blend + ring smoothing: clips under 2.5x LOD0 1/32, LOD1 15/32 (run 9: 3/32, 27/32). Kept for the record, off by default. Remaining edges: hip band seam (hips|upperleg vs upperleg|lowerleg at z 0.57-0.67), crotch/apron centre, arm zone edge at the shoulder band."
+ }
 }

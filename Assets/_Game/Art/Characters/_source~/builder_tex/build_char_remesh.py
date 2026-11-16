@@ -553,6 +553,92 @@ def read_groups(o):
 IBx_, Ex_ = [None], [None]
 
 
+def sstep(x):
+    x = np.clip(x, 0.0, 1.0); return x * x * (3 - 2 * x)
+
+
+def chain_weights(P, bones, band):
+    """Weights along a bone chain by projection onto its segments; a blend band of band x the shorter segment at
+    each joint (knee, ankle, ball / elbow, wrist, hand)."""
+    A = np.array([JA[b][0] for b in bones]); B = np.array([JA[b][1] for b in bones]); ln = np.linalg.norm(B - A, axis=1)
+    T = np.stack([np.clip(((P - A[k]) @ (B[k] - A[k])) / max(ln[k] ** 2, 1e-12), 0, 1) for k in range(len(bones))], 1)
+    D = np.stack([np.linalg.norm(P - (A[k] + T[:, k:k + 1] * (B[k] - A[k])), axis=1) for k in range(len(bones))], 1)
+    k = D.argmin(1); cum = np.concatenate([[0], np.cumsum(ln)]); u = cum[k] + T[np.arange(len(P)), k] * ln[k]
+    # soft nearest segment: one-hot along a segment, a smooth blend where two segments are about equally near (the
+    # joint band); never a flip between neighbours far from the axis (the shell behind the knee)
+    sig = C["weights_rules"]["segment_softmin_m"] + band * 0.0
+    Wc = np.exp(-(D - D.min(1, keepdims=True)) / sig); Wc[Wc < 1e-3] = 0
+    return Wc / Wc.sum(1, keepdims=True), u
+
+
+def region_rules(W, Vx, Ex, Lx, rigid, al_s):
+    """Explicit regions (A-pose, fitted skeleton) over the heat/zone weights: legs by height and side, the apron,
+    the neck line, arms by projection beyond a short shoulder band. Then smoothing that never crosses a class border."""
+    rr = C["weights_rules"]; n = len(Vx); W = W.copy()
+    if not rr.get("enabled", True): return W, {"enabled": False}     # run 9 weighting (better: see _note_run12)
+    cls = np.zeros(n, int)                       # 0 torso/other, 1 leg.l, 2 leg.r, 3 apron, 4 arm.l, 5 arm.r, 6 rigid
+    cls[rigid] = 6
+    hipz = np.mean([JA["upperleg." + s][0][2] for s in ("l", "r")]); hipy = np.mean([JA["upperleg." + s][0][1] for s in ("l", "r")])
+    body = ~rigid & ~np.isin(Lx, [RI["arm.l"], RI["arm.r"], RI["head"]])
+    apron = body & (Lx == RI["torso"]) & (Vx[:, 2] < hipz) & (Vx[:, 1] < hipy - rr["apron_front_m"])
+    stats = {}
+    for si, s in ((1, "l"), (2, "r")):
+        H = JA["upperleg." + s][0]; lt = np.linalg.norm(JA["upperleg." + s][1] - H); cut = H[2] - rr["hip_margin_frac"] * lt
+        side = Vx[:, 0] * np.sign(H[0]) > 0
+        leg = body & side & ~apron & (Vx[:, 2] < cut)
+        bones = [BI[b + "." + s] for b in ("upperleg", "lowerleg", "foot", "toes")]
+        Wc, _ = chain_weights(Vx[leg], [b + "." + s for b in ("upperleg", "lowerleg", "foot", "toes")], rr["joint_band_frac"])
+        Wn = np.zeros((int(leg.sum()), len(DEFORM))); Wn[:, bones] = Wc
+        cx = np.abs(Vx[leg, 0]) < rr["crotch_band_m"]          # the crotch strip joins the legs: hips at the centre line
+        if cx.any():
+            a_ = 1 - np.abs(Vx[leg][cx, 0]) / rr["crotch_band_m"]; Wn[cx] *= (1 - a_)[:, None]; Wn[cx, BI["hips"]] += a_
+        W[leg] = Wn; cls[leg] = si
+        band = body & side & ~apron & ~leg & (Vx[:, 2] < H[2] + rr["hip_band_up_frac"] * lt)   # hip band: blend into the leg
+        f = sstep((H[2] + rr["hip_band_up_frac"] * lt - Vx[band, 2]) / ((rr["hip_band_up_frac"] + rr["hip_margin_frac"]) * lt))
+        e = np.zeros(len(DEFORM)); e[BI["upperleg." + s]] = 1
+        W[band] = W[band] * (1 - f)[:, None] + e * f[:, None]
+        stats["leg." + s] = int(leg.sum()); stats["hipband." + s] = int(band.sum())
+    if apron.any():
+        bot = Vx[apron, 2].min(); f = sstep((hipz - Vx[apron, 2]) / max(hipz - bot, 1e-6)) * rr["apron_leg_max"]
+        wl = sstep((Vx[apron, 0] + rr["crotch_band_m"]) / (2 * rr["crotch_band_m"]))
+        if JA["upperleg.l"][0][0] < 0: wl = 1 - wl
+        Wa = np.zeros((int(apron.sum()), len(DEFORM))); Wa[:, BI["hips"]] = 1 - f
+        Wa[:, BI["upperleg.l"]] = f * wl; Wa[:, BI["upperleg.r"]] = f * (1 - wl)
+        W[apron] = Wa; cls[apron] = 3
+    stats["apron"] = int(apron.sum())
+    for ci, s in ((4, "l"), (5, "r")):
+        names = [b + "." + s for b in ("upperarm", "lowerarm", "wrist", "hand")]
+        cand = ~rigid & np.isin(Lx, [RI["arm." + s], RI["zarm." + s]])
+        Wc, u = chain_weights(Vx[cand], names, rr["joint_band_frac"])
+        dch = np.minimum(segdist(Vx[cand], *JA["chest"]), segdist(Vx[cand], *JA["spine"]))
+        dua = segdist(Vx[cand], *JA["upperarm." + s])
+        ul = np.linalg.norm(JA["upperarm." + s][1] - JA["upperarm." + s][0]); ush = rr["shoulder_band_frac"] * ul
+        # zone vertices count as arm by how much the zone blend (edge hops from the arm shell) already gave the upper
+        # arm, never by distance (the side of the chest is nearer the upper arm's axis than the spine's)
+        armish = np.where(Lx[cand] == RI["arm." + s], 1.0, sstep((W[cand, BI["upperarm." + s]] - 0.5) / 0.4))
+        g = sstep(u / max(ush, 1e-6)) * armish                     # 0 at the joint .. 1 past the shoulder band
+        ci_ = np.nonzero(cand)[0]
+        Wn = np.zeros((len(ci_), len(DEFORM))); Wn[:, [BI[b] for b in names]] = Wc
+        W[ci_] = W[ci_] * (1 - g)[:, None] + Wn * g[:, None]
+        cls[ci_[g > 0.999]] = ci
+        stats["arm." + s] = int((g > 0.999).sum())
+    nz = JA["head"][0][2]; hb = rr["neck_band_m"]           # head weight only above the neck joint
+    fh = sstep((Vx[:, 2] - (nz - hb)) / (2 * hb)); keep = ~rigid
+    hw = W[keep, BI["head"]] * fh[keep]
+    rest = W[keep, BI["head"]] - hw; W[keep, BI["head"]] = hw; W[keep, BI["chest"]] += rest
+    stats["head_cleared_below_neck"] = int(((rest > 1e-3)).sum())
+    W = top4(W)
+    same = cls[Ex[:, 0]] == cls[Ex[:, 1]]; Es = Ex[same]
+    dg = np.zeros(n); np.add.at(dg, Es[:, 0], 1); np.add.at(dg, Es[:, 1], 1)
+    alw = W > 1e-4
+    alw[cls == 0] |= al_s[cls == 0]
+    for _ in range(rr["smooth_iters"]):
+        acc = np.zeros_like(W); np.add.at(acc, Es[:, 0], W[Es[:, 1]]); np.add.at(acc, Es[:, 1], W[Es[:, 0]])
+        Wn_ = np.where(alw, 0.5 * W + 0.5 * acc / np.maximum(dg, 1)[:, None], 0)
+        Wn_[cls == 6] = W[cls == 6]; Wn_[dg == 0] = W[dg == 0]; W = top4(Wn_)
+    return W, stats
+
+
 def finalize(o, W, tag):
     Vx, Ex = arrays(o); Lx = labels_of(o); n = len(Vx)
     IBx_[0] = np.array([IB[kdr.find(p_)[1]] for p_ in Vx]); Ex_[0] = Ex
@@ -597,12 +683,13 @@ def finalize(o, W, tag):
     for _ in range(RM["smooth_iters"]):
         acc = np.zeros_like(W); np.add.at(acc, Ex[:, 0], W[Ex[:, 1]]); np.add.at(acc, Ex[:, 1], W[Ex[:, 0]])
         W = np.where(al_s, 0.5 * W + 0.5 * acc / np.maximum(deg, 1)[:, None], 0); W = top4(W)
+    W, rules = region_rules(W, Vx, Ex, Lx, rigid, al_s)
     W[W < 1e-3] = 0; W = W / np.maximum(W.sum(1, keepdims=True), 1e-12)
     o.vertex_groups.clear(); vgs = [o.vertex_groups.new(name=b) for b in DEFORM]
     for vi, bi in zip(*np.nonzero(W > 0)): vgs[bi].add([int(vi)], float(W[vi, bi]), "REPLACE")
     ninf = (W > 0).sum(1)
     wr = dict(max_influences=int(ninf.max()), mean_influences=round(float(ninf.mean()), 2), unweighted=int((ninf == 0).sum()),
-              heat_unweighted=heat_unweighted, fallback_verts=int(fb.sum()), sum_err=float(np.abs(W.sum(1) - 1).max()),
+              heat_unweighted=heat_unweighted, fallback_verts=int(fb.sum()), rules=rules, sum_err=float(np.abs(W.sum(1) - 1).max()),
               regions={REG[i]: int((Lx == i).sum()) for i in range(len(REG))})
     log("v2 weights", tag, wr)
     return wr
@@ -629,7 +716,13 @@ while shd.data.uv_layers: shd.data.uv_layers.remove(shd.data.uv_layers[0])
 mr = shd.modifiers.new("R", "REMESH"); mr.mode = "VOXEL"; mr.voxel_size = RM["shadow_voxel"]; mr.adaptivity = 0.0; apply_mod(shd, "R")
 REP["v2_decimate"]["shadow"] = decimate_to(shd, RM["shadow_tris"])
 shd.data.uv_layers.new(name="UVMap")
-REP["weights"]["LOD1"] = finalize(lod1, read_groups(lod1), lod1.name)
+W0_ = read_groups(low); V0_, _ = arrays(low); F0_ = faces_of(low)
+bvh0 = BVHTree.FromPolygons(V0_.tolist(), F0_.tolist()); V1_, _ = arrays(lod1); W1in = np.zeros((len(V1_), len(DEFORM)))
+for i, p_ in enumerate(V1_):
+    co_, _, fi, _ = bvh0.find_nearest(Vector(p_)); tri = V0_[F0_[fi]]
+    bc = np.linalg.lstsq(np.vstack([tri.T, np.ones(3)]), np.append(np.array(co_), 1.0), rcond=None)[0].clip(0, 1); bc /= bc.sum()
+    W1in[i] = bc @ W0_[F0_[fi]]
+REP["weights"]["LOD1"] = finalize(lod1, W1in, lod1.name)
 V1, _ = arrays(lod1); W1 = read_groups(lod1); kd1 = KDTree(len(V1))
 for i, p in enumerate(V1): kd1.insert(p, i)
 kd1.balance()
