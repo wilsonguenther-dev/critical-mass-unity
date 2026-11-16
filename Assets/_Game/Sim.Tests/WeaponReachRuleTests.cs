@@ -280,5 +280,118 @@ namespace CriticalMass.Sim.Tests
             }
             Assert.IsEmpty(failures, string.Join("\n", failures));
         }
+
+        // ---------------------------------------------------------------- b12-c2: balance arm and the Healer on seed 101
+
+        /// <summary>One whole bot match (until it ends, at most the match length plus a second), every slot bot-driven.</summary>
+        private static WhiffRun PlayFull(int seed, int teamSize, bool ruleOn)
+        {
+            GameConfig cfg = MatchConfig(teamSize, ruleOn);
+            int max = (int)Math.Ceiling(cfg.MatchSeconds * cfg.SimHz) + (int)cfg.SimHz;
+            return Play(seed, teamSize, ruleOn, int.MaxValue, max);
+        }
+
+        /// <summary>
+        /// b12-c2 (RULE CHANGE balance arm): whole bot matches, rule on against the same-seed CONTROL (rule off, pre-b11-c
+        /// light-weapon ranges): 5v5 with the depth lane on (DepthSoakTests.DepthA5v5's config) on seeds 1 to 20, and 16v16
+        /// (the game's default) on seeds 1337 and 4242. Prints one line per match and arm (winner, hatch time, instability
+        /// at the hatch, Berserk locked, whiffs per team and per class) and one summary per size and arm (wins per team,
+        /// win share, mean hatch time, Berserk locks, team whiff shares). Fails when a class with MinSwings or more swings in
+        /// both arms whiffs more than WhiffCeilingOverControl over the control, or (5v5, 20 seeds) when either team's win
+        /// share is more than WinShareLimit off the control's. The 16v16 win shares are printed only: two matches cannot
+        /// carry a share limit.
+        /// </summary>
+        [Test]
+        public void TheReachRuleKeepsTheControlsBalanceOnTheSameSeeds()
+        {
+            const double WinShareLimit = 0.15, WhiffCeilingOverControl = 0.10;
+            const int MinSwings = 40;
+            var failures = new System.Collections.Generic.List<string>();
+            foreach (int size in new[] { 5, 16 })
+            {
+                int[] seeds = size == 16 ? new[] { 1337, 4242 } : new[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 };
+                var arms = new[] { new WhiffRun(), new WhiffRun() };   // 0 = rule on, 1 = control
+                var wins = new int[2, 3];                               // azure, crimson, draw
+                var hatchSum = new double[2];
+                var hatchN = new int[2];
+                var berserk = new int[2];
+                foreach (int seed in seeds)
+                    for (int arm = 0; arm < 2; arm++)
+                    {
+                        bool rule = arm == 0;
+                        WhiffRun r = PlayFull(seed, size, rule);
+                        WhiffRun sum = arms[arm];
+                        for (int c = 0; c < 6; c++) { sum.Swings[c] += r.Swings[c]; sum.Whiffs[c] += r.Whiffs[c]; }
+                        for (int k = 0; k < 2; k++) { sum.TeamSwings[k] += r.TeamSwings[k]; sum.TeamWhiffs[k] += r.TeamWhiffs[k]; }
+                        wins[arm, r.Winner == MatchResult.Azure ? 0 : r.Winner == MatchResult.Crimson ? 1 : 2]++;
+                        if (r.HatchAt >= 0) { hatchSum[arm] += r.HatchAt; hatchN[arm]++; }
+                        if (r.Berserk) berserk[arm]++;
+                        Console.WriteLine("{\"item\":\"b12-c2 balance match\",\"size\":" + size + ",\"seed\":" + seed + ",\"rule\":\"" + (rule ? "on" : "off (control)") +
+                                          "\",\"winner\":\"" + r.Winner + "\",\"hatchAt\":" + r.HatchAt.ToString("F0") + ",\"instabilityAtHatch\":" + r.Instability.ToString("F1") +
+                                          ",\"berserkLocked\":" + (r.Berserk ? "true" : "false") + ",\"azureWhiffs\":\"" + r.TeamWhiffs[0] + "/" + r.TeamSwings[0] +
+                                          "\",\"crimsonWhiffs\":\"" + r.TeamWhiffs[1] + "/" + r.TeamSwings[1] + "\",\"byClass\":{" + Shares(r.Whiffs, r.Swings) + "}}");
+                    }
+                int n = seeds.Length;
+                for (int arm = 0; arm < 2; arm++)
+                    Console.WriteLine("{\"item\":\"b12-c2 balance\",\"size\":" + size + ",\"rule\":\"" + (arm == 0 ? "on" : "off (control)") + "\",\"matches\":" + n +
+                                      ",\"azureWins\":" + wins[arm, 0] + ",\"crimsonWins\":" + wins[arm, 1] + ",\"draws\":" + wins[arm, 2] +
+                                      ",\"azureShare\":" + ((double)wins[arm, 0] / n).ToString("F2") + ",\"crimsonShare\":" + ((double)wins[arm, 1] / n).ToString("F2") +
+                                      ",\"hatchMean\":" + (hatchN[arm] > 0 ? hatchSum[arm] / hatchN[arm] : -1).ToString("F0") + ",\"hatched\":" + hatchN[arm] +
+                                      ",\"berserkLocks\":" + berserk[arm] + ",\"azureWhiffShare\":" + Share(arms[arm].TeamWhiffs[0], arms[arm].TeamSwings[0]).ToString("F3") +
+                                      ",\"crimsonWhiffShare\":" + Share(arms[arm].TeamWhiffs[1], arms[arm].TeamSwings[1]).ToString("F3") + "}");
+                for (int c = 0; c < 6; c++)
+                {
+                    WhiffRun on = arms[0], off = arms[1];
+                    double so = Share(on.Whiffs[c], on.Swings[c]), sc = Share(off.Whiffs[c], off.Swings[c]);
+                    bool judged = on.Swings[c] >= MinSwings && off.Swings[c] >= MinSwings;
+                    Console.WriteLine("{\"item\":\"b12-c2 balance whiff share\",\"size\":" + size + ",\"class\":\"" + (ClassId)c + "\",\"on\":\"" + on.Whiffs[c] + "/" + on.Swings[c] +
+                                      "\",\"onShare\":" + so.ToString("F3") + ",\"control\":\"" + off.Whiffs[c] + "/" + off.Swings[c] + "\",\"controlShare\":" + sc.ToString("F3") +
+                                      ",\"ceiling\":" + (sc + WhiffCeilingOverControl).ToString("F3") + ",\"judged\":" + (judged ? "true" : "false (under " + MinSwings + " swings)") + "}");
+                    if (judged && so > sc + WhiffCeilingOverControl)
+                        failures.Add(size + "v" + size + " " + (ClassId)c + ": whiff share " + so.ToString("F3") + " with the rule against " + sc.ToString("F3") + " in the control (ceiling +" + WhiffCeilingOverControl + ")");
+                }
+                if (size == 5)
+                    for (int team = 0; team < 2; team++)
+                    {
+                        double on = (double)wins[0, team] / n, off = (double)wins[1, team] / n;
+                        string name = team == 0 ? "Azure" : "Crimson";
+                        Console.WriteLine("{\"item\":\"b12-c2 balance win share\",\"size\":5,\"team\":\"" + name + "\",\"on\":" + on.ToString("F2") + ",\"control\":" + off.ToString("F2") +
+                                          ",\"limit\":" + WinShareLimit.ToString("F2") + ",\"gap\":" + Math.Abs(on - off).ToString("F2") + "}");
+                        if (Math.Abs(on - off) > WinShareLimit + 1e-9)
+                            failures.Add("5v5 " + name + " win share " + on.ToString("F2") + " with the rule against " + off.ToString("F2") + " in the control (limit " + WinShareLimit + ")");
+                    }
+            }
+            Assert.IsEmpty(failures, string.Join("\n", failures));
+        }
+
+        private static double Share(int part, int whole) => whole > 0 ? (double)part / whole : 0;
+
+        /// <summary>
+        /// b12-c2 (PR #177 point 4): the Healer bot stalled in Retreat on seed 101 (SimPhysicsSoakTests' 16v16 six-class
+        /// soak). Runs that soak at every difficulty and fails on any Healer stationary line; each failure line carries
+        /// SimPhysicsSoakTests.StuckContext (her health, swing, cooldown, stagger, velocity, knock, walkable cells, every
+        /// actor within 2.5 u). Prints per difficulty how many Healer lines and other failure lines there were.
+        /// </summary>
+        [Test]
+        public void TheHealerBotIsNotStuckInRetreatOnSeed101()
+        {
+            var healer = new System.Collections.Generic.List<string>();
+            foreach (BotDifficulty d in new[] { BotDifficulty.Easy, BotDifficulty.Normal, BotDifficulty.Hard })
+            {
+                var lines = new System.Collections.Generic.List<string>();
+                SimPhysicsSoakTests.Soak(101, d, false, lines);
+                int mine = 0;
+                foreach (string l in lines)
+                    if (l.Contains("(Healer, ") && l.Contains(" stationary "))
+                    {
+                        healer.Add(l);
+                        mine++;
+                        Console.WriteLine("{\"item\":\"b12-c2 healer seed 101 stuck\",\"line\":\"" + l.Replace("\"", "'") + "\"}");
+                    }
+                Console.WriteLine("{\"item\":\"b12-c2 healer seed 101\",\"difficulty\":\"" + d + "\",\"rule\":\"" + (Combat.WeaponReachOn(SimPhysicsSoakTests.SixClassMix(false)) ? "on" : "off") +
+                                  "\",\"healerStationaryLines\":" + mine + ",\"otherFailureLines\":" + (lines.Count - mine) + ",\"limit\":0}");
+            }
+            Assert.IsEmpty(healer, "the Healer bot stalls (StuckContext on each line):\n" + string.Join("\n", healer));
+        }
     }
 }

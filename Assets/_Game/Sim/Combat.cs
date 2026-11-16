@@ -387,6 +387,9 @@ namespace CriticalMass.Sim.Core
             double dx = aimX - w.X[id];
             double dz = aimZ - w.Z[id];
             double reach = Combat.ReachOf(w, a.Cls) + BotBodyAllowance; // b11-c: the swing's own reach
+            // b12-c2 (rule on): the Healer decides at her old press distance (DepthConfig.WeaponReach.HealerBotPressDistance);
+            // whether the swing lands is still her table row. Rule off: unchanged.
+            if (a.Cls == ClassId.Healer && Combat.WeaponReachOn(w.Config)) reach = w.Config.Depth.WeaponReach.HealerBotPressDistance;
             return dx * dx + dz * dz <= reach * reach;
         }
     }

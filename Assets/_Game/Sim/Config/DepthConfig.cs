@@ -444,6 +444,13 @@ namespace CriticalMass.Sim.Config
         public static readonly double[] Start = { 1.70, 1.06, 1.38, 0.73, 1.23, 0.94 };
         /// <summary>The live table (a copy of Start): reach of each class's swing in u.</summary>
         public double[] Reach = (double[])Start.Clone();
+        /// <summary>
+        /// b12-c2 (DECISION only, rule on): how close an enemy must be (centre to centre, u) for a Healer bot to keep a
+        /// lantern press that would not mend (LightWeapons.BotKeepsPress). 1.6 = the old 1.2 u light-weapon range plus the
+        /// 0.4 u body allowance, the distance her bot decided at before b11-c (with her 0.94 row it became 1.34). Her table
+        /// row still governs whether the swing lands. Default chosen for the seed 101 Retreat stall (PR #177 point 4).
+        /// </summary>
+        public double HealerBotPressDistance = 1.6;
 
         public WeaponReachConfig Clone()
         {
