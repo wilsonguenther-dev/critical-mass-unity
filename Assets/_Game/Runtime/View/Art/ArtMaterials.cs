@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using CriticalMass.Runtime.Game;
 using CriticalMass.Sim.Config;
 using UnityEngine;
 
@@ -48,9 +49,16 @@ namespace CriticalMass.Runtime.View.Art
             if (face != null) m.SetTexture("_FaceTex", face);
             m.SetFloat("_OutlineWeightUV4", spec.BakesOutlineWeights ? 1f : 0f);
             m.SetFloat("_Berserk", 0f);
+            // Sharpness switch "normals" (batch 12 AB): the by-position smoothed normals SharpNormalsPostprocessor bakes into UV3.
+            m.SetFloat("_SmoothNormals", BakesSmoothNormals(spec) ? SharpSwitches.SmoothNormalsFor(SharpSwitches.Normals) : 0f);
             Cache[key] = m;
             return m;
         }
+
+        /// <summary>Models whose meshes carry the smoothed normals in UV3 (the rigged characters with a hull, whose TANGENT
+        /// carries the smoothed outline directions the UV3 frame is built on). The importer and the material both ask this.</summary>
+        public static bool BakesSmoothNormals(ModelSpec spec) =>
+            spec != null && spec.Kind == ArtKind.Character && spec.Rigged && spec.OutlinePx > 0f;
 
         static Texture2D FaceOf(ModelSpec spec) => spec.FaceTexture == null ? null : ArtCatalog.Load()?.Find(spec.Key)?.Face;
 

@@ -64,6 +64,7 @@ Shader "CM/Toon"
         [Toggle] _SwayOn ("World Sway From UV5 (pivot xz, weight, kind)", Float) = 0
         _WaterFlow ("Water Flow (stripes and ripple rings; 0 off)", Range(0, 2)) = 0
         [Toggle] _WobbleUV4Y ("Wobble Weight From UV4.y (hair, scarf, tabard)", Float) = 0
+        _SmoothNormals ("Smoothed Normals From UV3 (characters, 0 imported)", Range(0, 1)) = 0
     }
 
     SubShader
@@ -103,7 +104,7 @@ Shader "CM/Toon"
                 CMToonForwardVaryings output;
                 output.positionCS = CMToonPositionCS(input);
                 output.positionWS = CMToonWorldPos(input);
-                output.normalWS = TransformObjectToWorldNormal(input.normalOS);
+                output.normalWS = TransformObjectToWorldNormal(CMToonSmoothNormalOS(input));
                 output.color = input.color;
                 output.uv0 = _DecalOn > 0.5 ? input.uv0 : float2(0, 0);
                 return output;
@@ -218,7 +219,7 @@ Shader "CM/Toon"
             {
                 CMToonShadowVaryings output;
                 float3 positionWS = CMToonWorldPos(input);
-                float3 normalWS = TransformObjectToWorldNormal(input.normalOS);
+                float3 normalWS = TransformObjectToWorldNormal(CMToonSmoothNormalOS(input));
             #if _CASTING_PUNCTUAL_LIGHT_SHADOW
                 float3 lightDirectionWS = normalize(_LightPosition - positionWS);
             #else
@@ -302,7 +303,7 @@ Shader "CM/Toon"
                 CMToonDepthNormalsVaryings output;
                 output.positionCS = CMToonPositionCS(input);
                 output.positionWS = CMToonWorldPos(input);
-                output.normalWS = TransformObjectToWorldNormal(input.normalOS);
+                output.normalWS = TransformObjectToWorldNormal(CMToonSmoothNormalOS(input));
                 return output;
             }
 
