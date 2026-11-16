@@ -186,6 +186,17 @@ namespace CriticalMass.Runtime.View.Affordance
             return ok ? 0 : Terraform.RefusedRoute;
         }
 
+        /// <summary>b12-jk signs: n more route proofs for this frame (on top of what the marker scan left).</summary>
+        public void GrantRouteBudget(int n) { if (n > 0) _budgetLeft += n; }
+
+        /// <summary>b12-jk signs: cell (cx, cz) is diggable now by the Sim's rule AND its route proof is known (within the budget).</summary>
+        public bool DigProven(World w, int cx, int cz)
+        {
+            if (w == null || w.Map == null || !MapGrid.InBounds(w.Map, cx, cz)) return false;
+            EnsureCache(w);
+            return DigOk(w, cx, cz, out _);
+        }
+
         /// <summary>Is cell (cx, cz) diggable now by the Sim's rule, proven within the budget? (known = false: not proven yet).</summary>
         bool DigOk(World w, int cx, int cz, out bool known)
         {
@@ -706,8 +717,9 @@ namespace CriticalMass.Runtime.View.Affordance
             p.Has = true;
             p.Button = "DigPlace";
             p.Action = AffAction.Tnt;
-            p.Verb = "THROW TNT";
-            Abilities.ClampToRange(ox, oz, ax, az, a.Facing, throwR, out double tx, out double tz);
+            p.Verb = "THROW " + GrenadeTuning.Name;
+            // b12-jk: the one landing rule the arc preview shares (GrenadeRead.Landing = Demolitions.ThrowTnt's clamp).
+            GrenadeRead.Landing(ox, oz, ax, az, a.Facing, c.Abilities.DemolitionsTnt, out double tx, out double tz);
             p.X = tx;
             p.Z = tz;
             p.Cx = JsMath.FloorToInt(tx);

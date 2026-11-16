@@ -729,7 +729,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             Row(p, y, ShapeKind.RoundRect, CMTokens.Azure.Color, "Ladder or rope bridge, team colour", cream, false); y += LegendStep;
             Row(p, y, ShapeKind.Diamond, CMTokens.Azure.Color, "Your team's mine (enemies see the mound)", cream, false); y += LegendStep;
             Row(p, y, ShapeKind.Circle, CMTokens.Biomass.Color, "Drop to pick up: biomass or meat", cream, false); y += LegendStep;
-            Row(p, y, ShapeKind.Circle, CMTokens.MeterOrange.Color, "TNT about to land", cream, true);
+            Row(p, y, ShapeKind.Circle, CMTokens.MeterOrange.Color, CriticalMass.Runtime.View.Affordance.GrenadeTuning.Name + " about to land", cream, true);
         }
 
         static void Row(Transform p, float y, ShapeKind kind, Color c, string word, Color cream, bool ring)

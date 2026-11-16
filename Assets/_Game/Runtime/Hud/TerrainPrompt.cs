@@ -181,7 +181,7 @@ namespace CriticalMass.Runtime.Hud
                 int v = (key >> 19) & 63, v12 = (key >> 19) & 4095;
                 if ((key & (1 << 16)) != 0) return CriticalMass.Runtime.View.Mechanics.BuilderBank.WoodWord + " " + v12 + "   ·   " + TrialText.Fill("{Ability}", device) + ": BUILD";
                 if ((key & (1 << 17)) != 0) return "CARRYING " + v + "/" + ((key >> 25) & 63) + "   ·   HOLD " + TrialText.Fill("{Interact}", device) + ": GATHER";
-                return (v12 == 0 ? "TNT READY" : "TNT IN " + v12 + " S") + "   ·   " + TrialText.Fill("{DigPlace}", device) + ": THROW";
+                return (v12 == 0 ? CriticalMass.Runtime.View.Affordance.GrenadeTuning.Name + " READY" : CriticalMass.Runtime.View.Affordance.GrenadeTuning.Name + " IN " + v12 + " S") + "   ·   " + TrialText.Fill("{DigPlace}", device) + ": THROW";
             }
             int pillar = key & 3;
             if (pillar != 0)

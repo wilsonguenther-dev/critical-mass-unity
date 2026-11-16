@@ -41,7 +41,8 @@ namespace CriticalMass.Runtime.View.Affordance
     [CriticalMass.Runtime.Flow.GameOverlay(Order = 56, Scope = CriticalMass.Runtime.Flow.OverlayScope.MatchOnly)]
     public sealed class TerrainAffordanceView : MonoBehaviour
     {
-        public const int MaxQuads = 320;
+        /// <summary>b12-jk: 320 + 120 for the grenade read (arc 15, fuse rings with the "!" 8 x 5, mine rings 16) and the signs (24 x 2).</summary>
+        public const int MaxQuads = 440;
         /// <summary>Markers drawn at most in normal play (a 32-player fight stays readable) and while the show key is held.</summary>
         public const int MarkerCapCrowd = 40, MarkerCapAll = AffordanceScan.MaxMarkers;
         public const string ShaderResource = "Affordance/CMAffordance";
@@ -67,6 +68,14 @@ namespace CriticalMass.Runtime.View.Affordance
         public readonly AffordanceScan Scan = new AffordanceScan();
         public readonly WorldReactions Reactions = new WorldReactions();
         public readonly ProgressFocus Focus = new ProgressFocus();
+        /// <summary>b12-jk: the can-dig / can-build / can-take-down signs (every class) and the grenade read (arc, rings, "!").</summary>
+        public readonly SignScan Signs = new SignScan();
+        public readonly GrenadeArcView Grenade = new GrenadeArcView();
+        /// <summary>b12-jk captures (-grenadeShots) and tests: the aim the view uses instead of the mouse.</summary>
+        public static bool AimForced;
+        public static double AimForcedX, AimForcedZ;
+        /// <summary>Signs drawn last frame, per kind (SignKind order).</summary>
+        public readonly int[] SignsDrawn = new int[SignScan.Kinds];
 
         /// <summary>The affordances (markers, target, prompt) are on for the local player this frame.</summary>
         public bool Showing { get; private set; }
@@ -146,6 +155,9 @@ namespace CriticalMass.Runtime.View.Affordance
             if (Array.IndexOf(Environment.GetCommandLineArgs(), CriticalMass.Runtime.View.WallDamage.WallDamageCapture.Flag) >= 0
                 && GetComponent<CriticalMass.Runtime.View.WallDamage.WallDamageCapture>() == null)
                 gameObject.AddComponent<CriticalMass.Runtime.View.WallDamage.WallDamageCapture>();
+            // b12-jk: the grenade-read capture director, in its own file.
+            if (Array.IndexOf(Environment.GetCommandLineArgs(), GrenadeShots.Flag) >= 0 && GetComponent<GrenadeShots>() == null)
+                gameObject.AddComponent<GrenadeShots>();
         }
 
         void OnDestroy()
@@ -339,16 +351,28 @@ namespace CriticalMass.Runtime.View.Affordance
             Vector3 camUp = cam != null ? cam.transform.up : Vector3.up;
             Vector3 camFwd = cam != null ? cam.transform.forward : Vector3.forward;
 
-            // Order = priority under the quad cap: the target and ghost, the reactions, the damage stages, the markers.
+            // Order = priority under the quad cap: the target and ghost, the grenade read, the reactions, the damage stages,
+            // the markers, the signs.
             if (terrain)
             {
                 AimOf(w, out bool hasAim, out double ax, out double az);
                 Scan.Scan(w, LocalActor, hasAim, ax, az, ShowAllHeld);
                 if (WorldFeedbackSettings.Outline) { DrawTarget(w, Scan.Primary, true); DrawTarget(w, Scan.Secondary, false); }
             }
+            // b12-jk: the aim arc (Demolitions, with the target outline switch), then the live fuse rings, the "!" and the
+            // owner team's mine rings (Signs switch). Everyone in a match sees the rings; enemies never see a mine ring.
+            Grenade.Draw(this, w, local, terrain && me.Cls == ClassId.Demolitions && WorldFeedbackSettings.Outline ? Scan.Primary : null,
+                WorldFeedbackSettings.Signs, camRight, camUp, camFwd);
             DrawReactions(w, now, camRight, camUp, camFwd);
             DrawStages(w, camRight, camUp, camFwd);
             if (terrain && (WorldFeedbackSettings.Markers || ShowAllHeld)) DrawMarkers(w);
+            for (int k = 0; k < SignsDrawn.Length; k++) SignsDrawn[k] = 0;
+            if (local && WorldFeedbackSettings.Signs)
+            {
+                Signs.Scan(w, LocalActor, terrain ? Scan : null);
+                DrawSigns(w, camRight, camUp, camFwd);
+            }
+            else Signs.Clear();
             Upload();
 
             if (local) Focus.Update(w, LocalActor, Reactions, now);
@@ -360,6 +384,13 @@ namespace CriticalMass.Runtime.View.Affordance
 
         void AimOf(World w, out bool hasAim, out double ax, out double az)
         {
+            if (AimForced)
+            {
+                hasAim = true;
+                ax = AimForcedX;
+                az = AimForcedZ;
+                return;
+            }
             if (_human != null && !_driver.HumanAutopilot)
             {
                 HumanInputState s = _human.State;
@@ -420,7 +451,7 @@ namespace CriticalMass.Runtime.View.Affordance
 
         static Vector2 UvMin(int cell) => new Vector2((cell % 4) / 4f, (cell / 4) / 3f);
 
-        void Quad(Vector3 a, Vector3 b, Vector3 c, Vector3 d, int cell, Color32 col)
+        internal void Quad(Vector3 a, Vector3 b, Vector3 c, Vector3 d, int cell, Color32 col)
         {
             if (_q >= MaxQuads) return;
             int v = _q * 4;
@@ -437,21 +468,41 @@ namespace CriticalMass.Runtime.View.Affordance
             _q++;
         }
 
+        /// <summary>b12-jk: a solid quad (the flat centre of the disc cell): ribbons and the "!" bar.</summary>
+        internal void SolidQuad(Vector3 a, Vector3 b, Vector3 c, Vector3 d, Color32 col)
+        {
+            if (_q >= MaxQuads) return;
+            int v = _q * 4;
+            _v[v] = a; _v[v + 1] = b; _v[v + 2] = c; _v[v + 3] = d;
+            // CellDisc is fully covered (and two-tone red = 1) within 22 px of its centre: sample a 6 px square there.
+            Vector2 m = UvMin(CellDisc);
+            float u0 = m.x + 29f / 256f, u1 = m.x + 35f / 256f, v0 = m.y + 29f / 192f, v1 = m.y + 35f / 192f;
+            _uv[v] = new Vector2(u0, v0);
+            _uv[v + 1] = new Vector2(u0, v1);
+            _uv[v + 2] = new Vector2(u1, v1);
+            _uv[v + 3] = new Vector2(u1, v0);
+            _c[v] = _c[v + 1] = _c[v + 2] = _c[v + 3] = col;
+            _q++;
+        }
+
+        /// <summary>Quads still free under MaxQuads this frame.</summary>
+        internal int QuadsLeft => MaxQuads - _q;
+
         /// <summary>A flat quad on the ground centred at sim (x, z), half size h (u), at height y.</summary>
-        void GroundQuad(double x, double z, float y, float h, int cell, Color32 col)
+        internal void GroundQuad(double x, double z, float y, float h, int cell, Color32 col)
         {
             Vector3 c = SimSpace.ToWorld(x, y, z);
             Quad(new Vector3(c.x - h, c.y, c.z - h), new Vector3(c.x - h, c.y, c.z + h), new Vector3(c.x + h, c.y, c.z + h), new Vector3(c.x + h, c.y, c.z - h), cell, col);
         }
 
         /// <summary>A camera-facing quad centred at p, half size h.</summary>
-        void Billboard(Vector3 p, float h, Vector3 right, Vector3 up, int cell, Color32 col)
+        internal void Billboard(Vector3 p, float h, Vector3 right, Vector3 up, int cell, Color32 col)
         {
             Vector3 r = right * h, u = up * h;
             Quad(p - r - u, p - r + u, p + r + u, p + r - u, cell, col);
         }
 
-        static Color32 A(Color32 c, float alpha) { c.a = (byte)Mathf.Clamp(Mathf.RoundToInt(alpha * 255f), 0, 255); return c; }
+        internal static Color32 A(Color32 c, float alpha) { c.a = (byte)Mathf.Clamp(Mathf.RoundToInt(alpha * 255f), 0, 255); return c; }
 
         void Upload()
         {
@@ -466,7 +517,7 @@ namespace CriticalMass.Runtime.View.Affordance
             _mesh.SetColors(_c, 0, _c.Length, f);
         }
 
-        float CellY(MapDef m, double x, double z) => (float)GroundHeight.At(m, x, z) + GroundLift;
+        internal float CellY(MapDef m, double x, double z) => (float)GroundHeight.At(m, x, z) + GroundLift;
 
         // ------------------------------------------------------------------ markers and target
 
@@ -536,7 +587,8 @@ namespace CriticalMass.Runtime.View.Affordance
             if (t.Ghost == 5)
             {
                 float y = CellY(m, t.X, t.Z) + 0.02f;
-                GroundQuad(t.X, t.Z, y, (float)t.GhostRadius, CellRing, A(t.Valid ? ActionColour(AffAction.Tnt) : RefusedRed, 0.85f));
+                // b12-jk: the landing ring sits exactly on the blast radius (the atlas ring is drawn at 28 of 32 px).
+                GroundQuad(t.X, t.Z, y, GrenadeRead.RingQuadHalf((float)t.GhostRadius), CellRing, A(t.Valid ? ActionColour(AffAction.Tnt) : RefusedRed, 0.85f));
                 GroundQuad(t.X, t.Z, y, (float)t.GhostRadius, CellDisc, A(t.Valid ? ActionColour(AffAction.Tnt) : RefusedRed, 0.14f));
                 for (int k = 0; k < t.GhostCount; k++)
                 {
@@ -655,6 +707,40 @@ namespace CriticalMass.Runtime.View.Affordance
                 {
                     float ring = 0.5f + (float)p.Size * u * 2f;
                     GroundQuad(p.X, p.Z, CellY(m, p.X, p.Z) + 0.03f, ring, CellDisc, A(mat, 0.35f * (1f - u)));
+                }
+            }
+        }
+
+        // ------------------------------------------------------------------ signs (b12-jk)
+
+        /// <summary>Sign colours: pick sun yellow, hammer lilac (the marker colours), crack blast orange.</summary>
+        public static Color32 SignColour(SignKind k) =>
+            k == SignKind.Pick ? ActionColour(AffAction.Dig) : k == SignKind.Hammer ? ActionColour(AffAction.Build) : ActionColour(AffAction.Tnt);
+
+        /// <summary>The atlas cell a sign wears: the pick (shovel), the hammer, the middle crack.</summary>
+        public static int SignCell(SignKind k) => k == SignKind.Pick ? CellPick : k == SignKind.Hammer ? CellHammer : CellCrack2;
+
+        static readonly Color32 SignInk = new Color32(0xF5, 0xEB, 0xDC, 0xFF);
+
+        /// <summary>The signs: an upright disc in the kind's colour with its icon, over the object, fading with distance.</summary>
+        void DrawSigns(World w, Vector3 right, Vector3 up, Vector3 fwd)
+        {
+            MapDef m = w.Map;
+            for (int k = 0; k < SignScan.Kinds; k++)
+            {
+                SignKind kind = (SignKind)k;
+                Color32 col = SignColour(kind);
+                int cell = SignCell(kind);
+                for (int i = 0; i < Signs.Count[k] && QuadsLeft >= 2; i++)
+                {
+                    AffSign s = Signs.Get(kind, i);
+                    float a = GrenadeTuning.SignAlpha * SignScan.Fade(s.Dist);
+                    if (a < 0.03f) continue;
+                    float g = (float)GroundHeight.At(m, s.X, s.Z);
+                    Vector3 p = SimSpace.ToWorld(s.X, g + s.Top + GrenadeTuning.SignLift, s.Z) - fwd * 0.3f;
+                    Billboard(p, GrenadeTuning.SignSize, right, up, CellDisc, A(col, a));
+                    Billboard(p - fwd * 0.01f, GrenadeTuning.SignSize * 0.78f, right, up, cell, A(kind == SignKind.Crack ? new Color32(255, 255, 255, 255) : SignInk, a));
+                    SignsDrawn[k]++;
                 }
             }
         }
@@ -842,7 +928,7 @@ namespace CriticalMass.Runtime.View.Affordance
                 case ClassId.Miner: return TrialText.Fill("MINER: {DigPlace} digs the marked ground and places it back, {Ability} drops a barricade. Hold " + show + " to see everything you can use.", d);
                 case ClassId.Builder: return TrialText.Fill("BUILDER: face a cliff or a gap; {Ability} builds the ladder or bridge shown, {Interact} carries one. Hold " + show + " to see everything you can use.", d);
                 case ClassId.Farmer: return TrialText.Fill("FARMER: hold {Interact} at the green markers to gather, then feed the egg at the shrine. Hold " + show + " to see everything you can use.", d);
-                case ClassId.Demolitions: return TrialText.Fill("DEMOLITIONS: {DigPlace} throws TNT at the marked circle, {Ability} lays a mine. Hold " + show + " to see what a blast can break.", d);
+                case ClassId.Demolitions: return TrialText.Fill("DEMOLITIONS: {DigPlace} throws " + GrenadeTuning.Name + " at the marked circle, {Ability} lays a mine. Hold " + show + " to see what a blast can break.", d);
                 default: return string.Empty;
             }
         }

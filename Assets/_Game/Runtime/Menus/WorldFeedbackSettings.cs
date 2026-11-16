@@ -24,11 +24,13 @@ namespace CriticalMass.Runtime.Menu
         public const string BuildAnimKey = "cm.world.buildAnim";
         /// <summary>feat/skill-effects-1: the class skill tells (SkillFxView), on by default.</summary>
         public const string SkillFxKey = "cm.world.skillfx";
+        /// <summary>b12-jk: the can-dig / can-build / can-take-down signs and the grenade fuse and mine rings, on by default.</summary>
+        public const string SignsKey = "cm.world.signs";
         /// <summary>Per class: matches started with the first-minute hint shown (cm.world.hintSeen.&lt;class index&gt;).</summary>
         public const string HintSeenPrefix = "cm.world.hintSeen.";
         public const string TabName = "WORLD";
 
-        public static readonly string[] AllKeys = { PromptsKey, OutlineKey, MarkersKey, ProgressKey, ShakeKey, ParticlesKey, HintsKey, BuildAnimKey, SkillFxKey };
+        public static readonly string[] AllKeys = { PromptsKey, OutlineKey, MarkersKey, ProgressKey, ShakeKey, ParticlesKey, HintsKey, BuildAnimKey, SkillFxKey, SignsKey };
 
         /// <summary>Hint levels (HintsKey).</summary>
         public const int HintsOff = 0, HintsFirstMatches = 1, HintsAlways = 2;
@@ -53,6 +55,8 @@ namespace CriticalMass.Runtime.Menu
         public static bool BuildAnimations { get => GetB(BuildAnimKey, true); set => SetB(BuildAnimKey, value); }
         /// <summary>Skill wind-ups, effects and marks (Root Seeds, Shield Up, heals, Purify, dig and place, TNT bundle).</summary>
         public static bool SkillEffects { get => GetB(SkillFxKey, true); set => SetB(SkillFxKey, value); }
+        /// <summary>b12-jk: pick, hammer and crack signs over what your class can dig, build or take down; TNT fuse rings, the "!" when you stand in an enemy blast, your team's mine rings.</summary>
+        public static bool Signs { get => GetB(SignsKey, true); set => SetB(SignsKey, value); }
         /// <summary>HintsOff, HintsFirstMatches (default) or HintsAlways.</summary>
         public static int Hints
         {
@@ -86,7 +90,7 @@ namespace CriticalMass.Runtime.Menu
 
         static string OnOff(bool b) => b ? "ON" : "OFF";
 
-        /// <summary>The WORLD tab: eight lines, a reset button and a note.</summary>
+        /// <summary>The WORLD tab: ten lines, a reset button and a note.</summary>
         public static List<MenuItem> BuildTab(PauseMenu menu, RectTransform tab)
         {
             var items = new List<MenuItem>
@@ -100,9 +104,10 @@ namespace CriticalMass.Runtime.Menu
                 menu.Stepper(tab, 6, "CLASS HINTS", () => HintsLabel(Hints), d => Hints = (Hints + (d >= 0 ? 1 : 2)) % 3),
                 menu.Stepper(tab, 7, "BUILD ANIMATIONS", () => OnOff(BuildAnimations), d => BuildAnimations = !BuildAnimations),
                 menu.Stepper(tab, 8, "SKILL EFFECTS", () => OnOff(SkillEffects), d => SkillEffects = !SkillEffects),
+                menu.Stepper(tab, 9, "SIGNS AND BLAST RINGS", () => OnOff(Signs), d => Signs = !Signs),
             };
-            // batch 8: nine switches (build animations and skill effects both kept), so the reset button shares the note's row,
-            // right-aligned, and both stay inside the panel (row 9 ends at y 1004; the panel ends at 1010).
+            // batch 8: the reset button shares the note's row, right-aligned. b12-jk: ten switches, so that row is row 10; the
+            // tab scrolls inside its clipped view (hud-containment-1, ContainedScroll) when it is taller than the panel.
             int row = items.Count;
             float y = PauseMenu.ContentY + row * (PauseMenu.LineH + PauseMenu.LineGap) + 4f;
             MenuItem reset = MenuUi.Item(tab, "Reset World Feedback", PauseMenu.ContentX + PauseMenu.LineW - 460f, y, 460f, 52f, "RESET THESE OPTIONS",

@@ -45,7 +45,11 @@ namespace CriticalMass.Runtime.View.Affordance
             ScreenCapture.CaptureScreenshot(path);
             Log("shot " + name + " markers=" + _view.MarkersDrawn + " quads=" + _view.QuadsDrawn + " outline=" + _view.OutlineDrawn
                 + " ghost=" + _view.GhostCellsDrawn + (_view.GhostValid ? " valid" : " refused") + " prompt=\"" + _view.PromptText.Replace("\n", " | ")
-                + "\" bar=" + _view.BarValue.ToString("0.00") + " " + _view.BarLabel + " decals=" + _view.DecalsDrawn);
+                + "\" bar=" + _view.BarValue.ToString("0.00") + " " + _view.BarLabel + " decals=" + _view.DecalsDrawn
+                + " signs=pick:" + _view.SignsDrawn[(int)SignKind.Pick] + "/" + _view.Signs.Candidates[(int)SignKind.Pick]
+                + " hammer:" + _view.SignsDrawn[(int)SignKind.Hammer] + "/" + _view.Signs.Candidates[(int)SignKind.Hammer]
+                + " crack:" + _view.SignsDrawn[(int)SignKind.Crack] + "/" + _view.Signs.Candidates[(int)SignKind.Crack]
+                + " arc=" + _view.Grenade.ArcPointsDrawn + " aimRing=" + _view.Grenade.AimRingRadius.ToString("0.00"));
             yield return null;
         }
 
