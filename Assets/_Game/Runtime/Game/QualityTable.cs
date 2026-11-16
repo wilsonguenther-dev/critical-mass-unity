@@ -71,7 +71,10 @@ namespace CriticalMass.Runtime.Game
         public const float AnimFarMetres = 15f;
         /// <summary>perf-60hz-32p crowd budgets (fighters besides your own at LOD0): with all 32 on screen at the hill, Medium
         /// skins 1 + 10 LOD0 bodies (at most 4,500 triangles each) and 21 LOD1 bodies (1,500) instead of 32 LOD0 ones.</summary>
-        public const int MediumLod0Budget = 10, HighLod0Budget = 16;
+        public const int HighLod0Budget = 16;
+        /// <summary>Medium's budget: 16 with the sharpness switch "lod0" on (batch 12 AB), 10 with -sharpOff lod0. Read by the
+        /// Medium row below, so the row and this value never differ.</summary>
+        public static int MediumLod0Budget => SharpSwitches.MediumLod0BudgetFor(SharpSwitches.Lod0);
 
         /// <summary>The row for a quality level (0 Very Low, 1 Low, 2 Medium, 3 High, 4 Very High, 5 Ultra).</summary>
         public static QualityRow For(int level)

@@ -56,6 +56,7 @@ Shader "CM/Toon"
         _ExtrudePx ("UV2 Extrusion (px at 1080p, foam)", Range(0, 32)) = 0
         [Toggle] _DecalOn ("Face Decal (UV0, alpha mix)", Float) = 0
         [NoScaleOffset] _FaceTex ("Face Decal", 2D) = "black" {}
+        [NoScaleOffset] _BaseMap ("Base Colour (textured pilot: rgb colour, alpha team mask 0 / 0.5 cloth / 1 glow)", 2D) = "white" {}
         _Berserk ("Berserk (fixed colours darken)", Range(0, 1)) = 0
         _BerserkMul ("Berserk Multiplier (sRGB)", Vector) = (0.82, 0.56, 0.78, 1)
         _BerserkTint ("Berserk Tint (Corruption)", Color) = (0.556863, 0.247059, 0.819608, 1)
@@ -64,6 +65,7 @@ Shader "CM/Toon"
         [Toggle] _SwayOn ("World Sway From UV5 (pivot xz, weight, kind)", Float) = 0
         _WaterFlow ("Water Flow (stripes and ripple rings; 0 off)", Range(0, 2)) = 0
         [Toggle] _WobbleUV4Y ("Wobble Weight From UV4.y (hair, scarf, tabard)", Float) = 0
+        _SmoothNormals ("Smoothed Normals From UV3 (characters, 0 imported)", Range(0, 1)) = 0
     }
 
     SubShader
@@ -85,6 +87,9 @@ Shader "CM/Toon"
 
             // Main light shadow attenuation feeds the ramp test.
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
+            // Textured pilot (batch 12 AB): only materials with a base map enable it; the variant is kept in players by
+            // Art/Characters/WarriorTex/Resources/WarriorTex/CMToonArtTex.mat.
+            #pragma shader_feature_local _CMTOON_BASEMAP
 
             #include "CMToonCommon.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
@@ -103,9 +108,13 @@ Shader "CM/Toon"
                 CMToonForwardVaryings output;
                 output.positionCS = CMToonPositionCS(input);
                 output.positionWS = CMToonWorldPos(input);
-                output.normalWS = TransformObjectToWorldNormal(input.normalOS);
+                output.normalWS = TransformObjectToWorldNormal(CMToonSmoothNormalOS(input));
                 output.color = input.color;
+            #if defined(_CMTOON_BASEMAP)
+                output.uv0 = input.uv0;
+            #else
                 output.uv0 = _DecalOn > 0.5 ? input.uv0 : float2(0, 0);
+            #endif
                 return output;
             }
 
@@ -123,6 +132,9 @@ Shader "CM/Toon"
                 half selfLit = 0.0h;
                 if (_ColorMode > 0.5) CMToonVertexColour(input.color, albedo, selfLit);
                 else albedo = lerp(_BaseColor.rgb, _TeamColor.rgb, input.color.r);
+            #if defined(_CMTOON_BASEMAP)
+                CMToonBaseMapColour(input.uv0, albedo, selfLit);
+            #endif
                 albedo = CMToonDecal(albedo, input.uv0);
 
                 // Three bands from N.L; a cast shadow drops the pixel to the shadow band; a top-facing surface is one
@@ -218,7 +230,7 @@ Shader "CM/Toon"
             {
                 CMToonShadowVaryings output;
                 float3 positionWS = CMToonWorldPos(input);
-                float3 normalWS = TransformObjectToWorldNormal(input.normalOS);
+                float3 normalWS = TransformObjectToWorldNormal(CMToonSmoothNormalOS(input));
             #if _CASTING_PUNCTUAL_LIGHT_SHADOW
                 float3 lightDirectionWS = normalize(_LightPosition - positionWS);
             #else
@@ -302,7 +314,7 @@ Shader "CM/Toon"
                 CMToonDepthNormalsVaryings output;
                 output.positionCS = CMToonPositionCS(input);
                 output.positionWS = CMToonWorldPos(input);
-                output.normalWS = TransformObjectToWorldNormal(input.normalOS);
+                output.normalWS = TransformObjectToWorldNormal(CMToonSmoothNormalOS(input));
                 return output;
             }
 

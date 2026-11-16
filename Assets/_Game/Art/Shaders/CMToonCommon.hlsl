@@ -63,6 +63,9 @@ CBUFFER_START(UnityPerMaterial)
     float _SwayOn;
     float _WaterFlow;
     float _WobbleUV4Y;
+    // Sharpness switch "normals" (batch 12 AB): 0 the imported normals, 1 the by-position smoothed ones in UV3
+    // (Editor/Art/SharpNormalsPostprocessor; characters only, ArtMaterials sets it). Default 0: no other mesh reads UV3 here.
+    float _SmoothNormals;
 CBUFFER_END
 
 // Outside the per-material block (textures are not CBUFFER members; SRP Batcher compatible).
@@ -127,6 +130,24 @@ struct CMToonAttributes
     float4 sway       : TEXCOORD5;
 };
 
+// Sharpness switch "normals" (batch 12 AB): the lighting normal of a vertex. With _SmoothNormals 0 exactly the imported
+// normal. Else UV3 (the outlineOS slot; characters draw their hull from TANGENT, _OutlineSource 3, so UV3 is free on them)
+// holds the 60 degree by-position smoothed normal in the vertex's own frame: x along the tangent made orthogonal to N,
+// y along N x T, z along N. UV3 is not skinned but N and T are, so the frame rebuilt here turns with the bones
+// (SharpNormalsPostprocessor.DecodeInFrame is the C# twin). T nearly parallel to N: the imported normal.
+float3 CMToonSmoothNormalOS(CMToonAttributes input)
+{
+    if (_SmoothNormals <= 0.0) return input.normalOS;
+    float3 n = normalize(input.normalOS);
+    float3 t = input.tangentOS.xyz - n * dot(n, input.tangentOS.xyz);
+    float tl = length(t);
+    if (tl < 0.05) return input.normalOS;
+    t /= tl;
+    float3 e = input.outlineOS;
+    float3 s = e.x * t + e.y * cross(n, t) + e.z * n;
+    return normalize(lerp(n, s, _SmoothNormals));
+}
+
 // Vertex-colour mode (_ColorMode 1; Blender art import 2026-11-12). The art's colour set "Col" carries the lit colour
 // in RGB (sRGB hex from the bible) and a mask code in A, read here in eighths:
 //   0 fixed (banded)        1 fixed glow, lined (self-lit)   2 fixed glow (self-lit, no hull; alpha 0.25: the Farmer's
@@ -188,6 +209,34 @@ half3 CMToonDecal(half3 albedo, float2 uv)
     if (_DecalOn < 0.5) return albedo;
     half4 d = SAMPLE_TEXTURE2D(_FaceTex, sampler_FaceTex, uv);
     return lerp(albedo, d.rgb, d.a);
+}
+
+// Textured Warrior pilot (batch 12 AB, part B): keyword _CMTOON_BASEMAP, enabled only on the materials of a model with a
+// base map (ArtMaterials), so every untextured model compiles and draws exactly as before. _BaseMap: sRGB rgb = the lit
+// colour (baked from the generator's original 4K texture), alpha = the team mask: 0 fixed, 0.5 team cloth (banded),
+// 1 team glow (self-lit); in between (bilinear, mips, compression) lerps. Team channels swap as the vertex-colour codes
+// do (CMToonSwap, in sRGB). Replaces the vertex-colour albedo; the bands, rim, time of day and fog that follow are shared.
+TEXTURE2D(_BaseMap);
+SAMPLER(sampler_BaseMap);
+
+void CMToonBaseMapColour(float2 uv, out half3 albedo, out half selfLit)
+{
+    half4 t = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, uv);
+#if defined(UNITY_COLORSPACE_GAMMA)
+    half3 srgb = t.rgb;
+#else
+    half3 srgb = LinearToSRGB(t.rgb);
+#endif
+    half cloth = saturate(t.a * 2.0h);
+    half glow = saturate(t.a * 2.0h - 1.0h);
+    half3 c = lerp(srgb, CMToonSwap(srgb, _TeamCloth.rgb, _DefaultCloth.rgb), cloth);
+    c = lerp(c, CMToonSwap(srgb, _TeamGlow.rgb, _DefaultGlow.rgb), glow);
+    selfLit = glow > 0.5h ? 1.0h : 0.0h;
+#if defined(UNITY_COLORSPACE_GAMMA)
+    albedo = c;
+#else
+    albedo = SRGBToLinear(c);
+#endif
 }
 
 // Pushes a clip-space position px pixels (at 1080p, scaled with the target height) along the screen projection of an

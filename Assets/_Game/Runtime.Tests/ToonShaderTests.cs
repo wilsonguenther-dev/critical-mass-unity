@@ -180,6 +180,99 @@ namespace CriticalMass.Runtime.Tests
             Assert.AreEqual(2.5f, shader.GetPropertyDefaultFloatValue(cell), FloatTolerance, "mean cell size 2.5 u");
         }
 
+        // ------------------------------------------------------------------------- batch 12 AB: sharpness + textured pilot
+
+        [Test]
+        public void HasTheSmoothNormalsAndBaseMapPropertiesAndTheBaseMapKeyword()
+        {
+            Shader shader = FindToon();
+            int sn = shader.FindPropertyIndex("_SmoothNormals");
+            if (sn < 0) Debug.Log("[ToonShaderTests] _SmoothNormals absent (the normals switch commit is reverted)");
+            else
+            {
+                float d = shader.GetPropertyDefaultFloatValue(sn);
+                Debug.Log($"[ToonShaderTests] _SmoothNormals default {d} (expected 0: only character materials turn it on)");
+                Assert.AreEqual(0f, d, FloatTolerance);
+            }
+            int bm = shader.FindPropertyIndex("_BaseMap");
+            Debug.Log($"[ToonShaderTests] _BaseMap property index {bm}, type {(bm >= 0 ? shader.GetPropertyType(bm).ToString() : "missing")} (expected a Texture)");
+            Assert.GreaterOrEqual(bm, 0, "_BaseMap missing");
+            Assert.AreEqual(ShaderPropertyType.Texture, shader.GetPropertyType(bm));
+            LocalKeyword kw = shader.keywordSpace.FindKeyword(CriticalMass.Runtime.View.Art.ArtMaterials.BaseMapKeyword);
+            Debug.Log($"[ToonShaderTests] keyword {CriticalMass.Runtime.View.Art.ArtMaterials.BaseMapKeyword} declared: {kw.isValid} (expected True)");
+            Assert.IsTrue(kw.isValid, "the base map keyword is not declared");
+        }
+
+        [Test]
+        public void UntexturedArtMaterialsNeverEnableTheBaseMapKeyword()
+        {
+            int n = 0;
+            foreach (CriticalMass.Runtime.View.Art.ModelSpec spec in CriticalMass.Runtime.View.Art.ArtMapping.Models)
+            {
+                if (spec.Authored == null) continue;
+                Material m = CriticalMass.Runtime.View.Art.ArtMaterials.ForTeam(spec, CriticalMass.Sim.Config.TeamId.Azure);
+                bool textured = CriticalMass.Runtime.View.Art.ArtMaterials.BaseMapOf(spec) != null;
+                bool on = m.IsKeywordEnabled(CriticalMass.Runtime.View.Art.ArtMaterials.BaseMapKeyword);
+                Debug.Log($"[ToonShaderTests] {spec.Key}: base map {(textured ? "yes" : "no")}, keyword {(on ? "on" : "off")} (expected {(textured ? "on" : "off")})");
+                Assert.AreEqual(textured, on, spec.Key);
+                if (spec.Key != CriticalMass.Runtime.View.Art.ArtMapping.WarriorTex) Assert.IsFalse(textured, spec.Key + " has a base map");
+                n++;
+            }
+            Assert.Greater(n, 5, "art materials checked");
+        }
+
+        [Test]
+        public void TheTexturedWarriorImportsWithUvsItsTextureBonesAndBoundClips()
+        {
+            var spec = CriticalMass.Runtime.View.Art.ArtMapping.Spec(CriticalMass.Runtime.View.Art.ArtMapping.WarriorTex);
+            var root = AssetDatabase.LoadAssetAtPath<GameObject>(spec.AssetPath);
+            if (root == null)
+            {
+                Debug.Log("[ToonShaderTests] WarriorTex import: skipped, " + spec.AssetPath + " is absent");
+                Assert.Ignore(spec.AssetPath + " absent");
+            }
+            SkinnedMeshRenderer[] smrs = root.GetComponentsInChildren<SkinnedMeshRenderer>(true);
+            SkinnedMeshRenderer lod0 = System.Linq.Enumerable.FirstOrDefault(smrs, r => r.name == spec.Meshes[0]);
+            Assert.IsNotNull(lod0, spec.Meshes[0] + " renderer");
+            Mesh mesh = lod0.sharedMesh;
+            long idx = 0;
+            for (int i = 0; i < mesh.subMeshCount; i++) idx += mesh.GetIndexCount(i);
+            int tris = (int)(idx / 3);
+            bool uv0 = mesh.HasVertexAttribute(VertexAttribute.TexCoord0), uv3 = mesh.HasVertexAttribute(VertexAttribute.TexCoord3);
+            int bones = System.Linq.Enumerable.Count(System.Linq.Enumerable.Distinct(System.Linq.Enumerable.Where(
+                System.Linq.Enumerable.SelectMany(smrs, s => s.bones), b => b != null)));
+            Debug.Log($"[ToonShaderTests] WarriorTex LOD0: {tris} triangles (expected 5,000 to 7,000), UV0 {uv0} (expected True), " +
+                      $"UV3 smoothed normals {uv3}, {bones} bones (expected 41), {mesh.vertexCount} vertices");
+            Assert.That(tris, Is.InRange(5000, 7000));
+            Assert.IsTrue(uv0, "no UV0");
+            Assert.AreEqual(41, bones);
+
+            Texture2D tex = Resources.Load<Texture2D>(CriticalMass.Runtime.View.Art.ArtMapping.WarriorTexBaseMap);
+            Assert.IsNotNull(tex, "Resources/" + CriticalMass.Runtime.View.Art.ArtMapping.WarriorTexBaseMap);
+            var ti = (TextureImporter)AssetImporter.GetAtPath(AssetDatabase.GetAssetPath(tex));
+            bool alpha = ti != null && ti.DoesSourceTextureHaveAlpha();
+            Debug.Log($"[ToonShaderTests] WarriorTex_Base: {tex.width} x {tex.height} (expected 1024 x 1024), source alpha {alpha} (expected True: the team mask), " +
+                      $"sRGB {ti?.sRGBTexture}, mipmaps {tex.mipmapCount}, format {tex.format}");
+            Assert.AreEqual(1024, tex.width);
+            Assert.AreEqual(1024, tex.height);
+            Assert.IsTrue(alpha, "the base map has no alpha (team mask)");
+
+            int clips = 0, unbound = 0;
+            foreach (UnityEngine.Object o in AssetDatabase.LoadAllAssetsAtPath(spec.ClipSource))
+            {
+                if (!(o is AnimationClip c) || c.name.StartsWith("__preview__", StringComparison.Ordinal)) continue;
+                int miss = 0;
+                foreach (EditorCurveBinding b in AnimationUtility.GetCurveBindings(c))
+                    if (!string.IsNullOrEmpty(b.path) && root.transform.Find(b.path) == null) miss++;
+                clips++;
+                unbound += miss;
+                if (miss > 0) Debug.Log($"[ToonShaderTests] WarriorTex clip {c.name}: {miss} curve paths not found on the model");
+            }
+            Debug.Log($"[ToonShaderTests] WarriorTex: {clips} clips from {spec.ClipSource}, {unbound} unbound curve paths (expected 0)");
+            Assert.Greater(clips, 0, "no clips");
+            Assert.AreEqual(0, unbound, "clip curves that bind to nothing on WarriorTex");
+        }
+
         private static void AssertColor(Shader shader, string name, string hex)
         {
             int i = shader.FindPropertyIndex(name);

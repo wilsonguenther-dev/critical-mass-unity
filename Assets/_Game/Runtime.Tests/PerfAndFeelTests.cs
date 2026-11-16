@@ -69,7 +69,7 @@ namespace CriticalMass.Runtime.Tests
         [Test]
         public void CrowdBudgetKeepsOnlyTheNearestFightersAtLod0()
         {
-            // perf-60hz-32p: 31 others on screen at the hill; Medium keeps 10 at LOD0, High 16, Low none.
+            // perf-60hz-32p: 31 others on screen at the hill; Medium keeps its budget at LOD0 (16; 10 with -sharpOff lod0), High 16, Low none.
             QualityRow low = QualityTable.For(FramePolicy.LevelLow), med = QualityTable.For(FramePolicy.LevelMedium),
                 high = QualityTable.For(FramePolicy.LevelHigh);
             Assert.AreEqual(QualityTable.MediumLod0Budget, med.Lod0Budget);
@@ -87,6 +87,25 @@ namespace CriticalMass.Runtime.Tests
             Assert.AreEqual(0, AnimLod.PickLod(true, 40f, float.NegativeInfinity, med), "your own fighter is always LOD0");
             Assert.AreEqual(float.PositiveInfinity, AnimLod.CrowdCut(new float[4], 4, 10), "a small crowd is not cut");
             Assert.AreEqual(1, AnimLod.PickLod(false, 2f, AnimLod.CrowdCut(new float[4], 4, 0), low));
+        }
+
+        [Test]
+        public void MediumLod0BudgetFollowsTheLod0Switch()
+        {
+            // Batch 12 AB, sharpness switch "lod0": Medium keeps 16 fighters at LOD0 (10 when off); High stays 16.
+            try
+            {
+                SharpSwitches.SetForTests(SharpSwitches.Switch.None);
+                int on = QualityTable.For(FramePolicy.LevelMedium).Lod0Budget;
+                SharpSwitches.SetForTests(SharpSwitches.Switch.Lod0);
+                int off = QualityTable.For(FramePolicy.LevelMedium).Lod0Budget;
+                int high = QualityTable.For(FramePolicy.LevelHigh).Lod0Budget;
+                Debug.Log($"[PerfAndFeelTests] Medium LOD0 budget: switch on {on} (expected 16), -sharpOff lod0 {off} (expected 10), High {high} (expected 16)");
+                Assert.AreEqual(16, on);
+                Assert.AreEqual(10, off);
+                Assert.AreEqual(16, high);
+            }
+            finally { SharpSwitches.ResetForTests(); }
         }
 
         [Test]
@@ -487,6 +506,23 @@ namespace CriticalMass.Runtime.Tests
             Assert.IsTrue(CriticalMass.Runtime.Menus.LoadingScreen.Settled(calm, 0.2f));
             Assert.IsTrue(CriticalMass.Runtime.Menus.LoadingScreen.Settled(0, CriticalMass.Runtime.Menus.LoadingScreen.SettleWaitSeconds),
                 "a throttled window never holds the screen up");
+        }
+
+        [Test]
+        public void MediumRenderScaleFollowsTheUpscaleSwitch()
+        {
+            // Batch 12 AB, sharpness switch "upscale": the 8 GB first-launch pick renders Medium at 0.85 (0.75 when off).
+            try
+            {
+                SharpSwitches.SetForTests(SharpSwitches.Switch.None);
+                float on = FramePolicy.PickQuality("Apple M1", 0, 8192, 6, FramePolicy.LevelHigh).scale;
+                SharpSwitches.SetForTests(SharpSwitches.Switch.Upscale);
+                float off = FramePolicy.PickQuality("Apple M1", 0, 8192, 6, FramePolicy.LevelHigh).scale;
+                Debug.Log($"[PerfAndFeelTests] Medium render scale on an 8 GB M1: switch on {on:0.00} (expected 0.85), -sharpOff upscale {off:0.00} (expected 0.75)");
+                Assert.AreEqual(0.85f, on, 1e-6f);
+                Assert.AreEqual(0.75f, off, 1e-6f);
+            }
+            finally { SharpSwitches.ResetForTests(); }
         }
     }
 }
