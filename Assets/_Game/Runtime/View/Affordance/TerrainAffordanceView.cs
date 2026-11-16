@@ -928,7 +928,7 @@ namespace CriticalMass.Runtime.View.Affordance
                 case ClassId.Miner: return TrialText.Fill("MINER: {DigPlace} digs the marked ground and places it back, {Ability} drops a barricade. Hold " + show + " to see everything you can use.", d);
                 case ClassId.Builder: return TrialText.Fill("BUILDER: face a cliff or a gap; {Ability} builds the ladder or bridge shown, {Interact} carries one. Hold " + show + " to see everything you can use.", d);
                 case ClassId.Farmer: return TrialText.Fill("FARMER: hold {Interact} at the green markers to gather, then feed the egg at the shrine. Hold " + show + " to see everything you can use.", d);
-                case ClassId.Demolitions: return TrialText.Fill("DEMOLITIONS: {DigPlace} throws " + GrenadeTuning.Name + " at the marked circle, {Ability} lays a mine. Hold " + show + " to see what a blast can break.", d);
+                case ClassId.Demolitions: return TrialText.Fill("DEMOLITIONIST: {Attack} throws " + GrenadeTuning.Name + " at the marked circle, {Ability} lays a mine. Hold " + show + " to see what a blast can break.", d);
                 default: return string.Empty;
             }
         }

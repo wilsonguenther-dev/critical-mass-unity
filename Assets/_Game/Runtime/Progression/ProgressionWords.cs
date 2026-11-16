@@ -54,14 +54,14 @@ namespace CriticalMass.Runtime.Progression
             return l.Source == RewardSource.HillTime ? n + " S" : "x" + n;
         }
 
-        public static readonly string[] ClassNames = { "WARRIOR", "FARMER", "MINER", "DEMOLITIONS", "BUILDER", "HEALER" };
+        public static readonly string[] ClassNames = { "WARRIOR", "FARMER", "MINER", "DEMOLITIONIST", "BUILDER", "HEALER" };
 
         public static readonly string[] RoleLines =
         {
             "Front line. Holds the hill and turns blows aside with a shield.",
             "Harvester. Carries the most biomass and roots anyone who chases.",
             "Sapper. Breaks walls open and throws up barricades.",
-            "Blast expert. Mines and TNT, no regular swing.",
+            "Blast expert. TNT on attack, mines on Space.",
             "Ladders and rope bridges for the whole team; anyone can carry them.",
             "Battle healer. Mends allies, heals in a burst and purifies the shrine. Never deals damage.",
         };
@@ -76,7 +76,7 @@ namespace CriticalMass.Runtime.Progression
         /// <summary>What the class's attack does, with the numbers from the sim config.</summary>
         public static string AttackText(GameConfig cfg, ClassId c)
         {
-            if (c == ClassId.Demolitions) return "No regular attack: the Demolitions Expert fights with mines and TNT.";
+            if (c == ClassId.Demolitions) return "Her attack lobs TNT; the pry bar swings while it reloads.";
             ClassConfig k = cfg.Class(c);
             return N(k.AttackDamage) + " damage in a " + N(k.AttackArcDeg) + "° arc, reach " + N(k.AttackRange) + " m.";
         }
