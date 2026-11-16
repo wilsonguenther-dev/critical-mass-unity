@@ -26,11 +26,14 @@ namespace CriticalMass.Sim.Config
         public MapEventsConfig Events = new MapEventsConfig();
         /// <summary>feat/light-weapons-1: the Builder's, Demolitions Expert's and Healer's light self-defence weapons.</summary>
         public LightWeaponsConfig LightWeapons = new LightWeaponsConfig();
+        /// <summary>b11-c: every class's swing reach from its weapon's measured length (one table; Combat.ReachOf).</summary>
+        public WeaponReachConfig WeaponReach = new WeaponReachConfig();
 
         public DepthConfig Clone()
         {
             var c = (DepthConfig)MemberwiseClone();
             c.LightWeapons = LightWeapons.Clone();
+            c.WeaponReach = WeaponReach.Clone();
             c.Roles = Roles.Clone();
             c.Sources = Sources.Clone();
             c.Stations = Stations.Clone();
@@ -388,21 +391,23 @@ namespace CriticalMass.Sim.Config
     public sealed class LightWeaponsConfig
     {
         public bool Enabled = true;
-        /// <summary>Builder MALLET: today's swing unchanged (16 every 0.65 s, 1.5 u, 90 degrees), plus the shove.</summary>
+        /// <summary>Builder MALLET: today's swing (16 every 0.65 s, 90 degrees), plus the shove. b11-c: every light weapon's
+        /// Range is the WeaponReach table's row (it was 1.5 / 1.3 / 1.2 u before the reach rule); while WeaponReach is on,
+        /// Combat.ReachOf reads the live table, so a tuned table row is the reach.</summary>
         public LightWeapon Builder = new LightWeapon
         {
-            Damage = 16, Range = 1.5, ArcDeg = 90, CooldownSeconds = 0.65, WindupSeconds = 0.10, RecoverySeconds = 0.08, Shove = 0.5,
+            Damage = 16, Range = WeaponReachConfig.Start[(int)ClassId.Builder], ArcDeg = 90, CooldownSeconds = 0.65, WindupSeconds = 0.10, RecoverySeconds = 0.08, Shove = 0.5,
         };
-        /// <summary>Demolitions PRY BAR (she had no attack): 9 every 0.75 s, 1.3 u, 90 degrees, a slightly slower wind-up.</summary>
+        /// <summary>Demolitions PRY BAR (she had no attack): 9 every 0.75 s, 90 degrees, a slightly slower wind-up.</summary>
         public LightWeapon Demolitions = new LightWeapon
         {
-            Damage = 9, Range = 1.3, ArcDeg = 90, CooldownSeconds = 0.75, WindupSeconds = 0.12, RecoverySeconds = 0.10, Shove = 0.5,
+            Damage = 9, Range = WeaponReachConfig.Start[(int)ClassId.Demolitions], ArcDeg = 90, CooldownSeconds = 0.75, WindupSeconds = 0.12, RecoverySeconds = 0.10, Shove = 0.5,
         };
-        /// <summary>Healer LANTERN: 8 every 0.8 s, 1.2 u, 90 degrees, the biggest shove. Her attack press MENDS first; the
+        /// <summary>Healer LANTERN: 8 every 0.8 s, 90 degrees, the biggest shove. Her attack press MENDS first; the
         /// lantern swings only when no hurt ally is in mend range, and it shares her mend cooldown (every swing costs a mend).</summary>
         public LightWeapon Healer = new LightWeapon
         {
-            Damage = 8, Range = 1.2, ArcDeg = 90, CooldownSeconds = 0.8, WindupSeconds = 0.12, RecoverySeconds = 0.10, Shove = 0.6,
+            Damage = 8, Range = WeaponReachConfig.Start[(int)ClassId.Healer], ArcDeg = 90, CooldownSeconds = 0.8, WindupSeconds = 0.12, RecoverySeconds = 0.10, Shove = 0.6,
         };
 
         public LightWeaponsConfig Clone()
@@ -411,6 +416,46 @@ namespace CriticalMass.Sim.Config
             c.Builder = Builder.Clone();
             c.Demolitions = Demolitions.Clone();
             c.Healer = Healer.Clone();
+            return c;
+        }
+    }
+
+    // =====================================================================================================================
+    // WEAPON REACH (b11-c, 2026-11-16, RULE CHANGE). Owner: "it should be based off how long the weapon is ... real logic
+    // and physics". Every class's sim swing reach (to the target's body surface, from the attacker's centre) is what its
+    // weapon really reaches at the drawn strike, from this ONE table: a longer weapon reaches further. Plan and numbers:
+    // docs/handoff/hit-feel-reach-2026-11-14.md. Starting values = the doc's "best cover" column (furthest-forward weapon
+    // point of the swing + the 0.25 u view step-in cap + the 18 degree strike-lean gain); the EditMode test
+    // WeaponReachTests prints the measured reach of every imported model ("<class>: measured reach X u, table Y u") and
+    // the rows are replaced by those measured numbers. On in the Full profile only (a depth-lane rule, like LightWeapons).
+    // DepthConfig.Classic (the Classic and PhysicsOnly profiles) = the class rows' AttackRange, exactly as before; Enabled
+    // false with the depth lane on = the class rows plus the light weapons' own Range (the table's starting rows).
+    // =====================================================================================================================
+
+    /// <summary>b11-c: per-class swing reach (u) from the weapon's measured length. Indexed by (int)ClassId.</summary>
+    public sealed class WeaponReachConfig
+    {
+        public bool Enabled = true;
+        /// <summary>
+        /// The starting rows, Warrior, Farmer, Miner, Demolitions, Builder, Healer: Warrior 1.70 (unchanged, his sword
+        /// covers it), Farmer 1.06 (was 1.40), Miner 1.38 (was 1.50), Demolitions 0.73 (STAND-IN pry bar; was 1.30; her real
+        /// weapon is art, not this rule), Builder 1.23 (was 1.50), Healer 0.94 (lantern hand; was 1.20).
+        /// </summary>
+        public static readonly double[] Start = { 1.70, 1.06, 1.38, 0.73, 1.23, 0.94 };
+        /// <summary>The live table (a copy of Start): reach of each class's swing in u.</summary>
+        public double[] Reach = (double[])Start.Clone();
+        /// <summary>
+        /// b12-c2 (DECISION only, rule on): how close an enemy must be (centre to centre, u) for a Healer bot to keep a
+        /// lantern press that would not mend (LightWeapons.BotKeepsPress). 1.6 = the old 1.2 u light-weapon range plus the
+        /// 0.4 u body allowance, the distance her bot decided at before b11-c (with her 0.94 row it became 1.34). Her table
+        /// row still governs whether the swing lands. Default chosen for the seed 101 Retreat stall (PR #177 point 4).
+        /// </summary>
+        public double HealerBotPressDistance = 1.6;
+
+        public WeaponReachConfig Clone()
+        {
+            var c = (WeaponReachConfig)MemberwiseClone();
+            c.Reach = (double[])Reach.Clone();
             return c;
         }
     }

@@ -43,6 +43,33 @@ namespace CriticalMass.Sim.Tests
             public readonly int[] Count = new int[6];
         }
 
+        /// <summary>
+        /// b12-c: what holds a stationary bot (printed with its failure line): its own swing, stagger, health, velocity and
+        /// the walkable cells around it, and every actor within 2.5 u (id, class, team, state, distance, swing pending).
+        /// </summary>
+        internal static string StuckContext(World w, int id)
+        {
+            Actor a = w.Actors[id];
+            var sb = new System.Text.StringBuilder();
+            sb.Append(" [hp ").Append(a.Hp.ToString("F0")).Append('/').Append(a.MaxHp.ToString("F0")).Append(", swingPending ").Append(a.SwingPending)
+              .Append(", attackCd ").Append(a.AttackCd.ToString("F2")).Append(", hitStun ").Append(a.HitStunTicks).Append(", v (")
+              .Append(w.Vx[id].ToString("F2")).Append(", ").Append(w.Vz[id].ToString("F2")).Append("), knock (").Append(a.KVx.ToString("F2")).Append(", ")
+              .Append(a.KVz.ToString("F2")).Append("), walkable N/E/S/W ");
+            int cx = JsMath.FloorToInt(w.X[id]), cz = JsMath.FloorToInt(w.Z[id]);
+            sb.Append(MapGrid.IsWalkable(w.Map, cx, cz + 1) ? 1 : 0).Append(MapGrid.IsWalkable(w.Map, cx + 1, cz) ? 1 : 0)
+              .Append(MapGrid.IsWalkable(w.Map, cx, cz - 1) ? 1 : 0).Append(MapGrid.IsWalkable(w.Map, cx - 1, cz) ? 1 : 0).Append("; near:");
+            for (int j = 0; j < w.ActorCount; j++)
+            {
+                if (j == id || !w.Actors[j].Alive) continue;
+                double dx = w.X[j] - w.X[id], dz = w.Z[j] - w.Z[id], d = Math.Sqrt(dx * dx + dz * dz);
+                if (d > 2.5) continue;
+                Actor o = w.Actors[j];
+                sb.Append(' ').Append(j).Append(' ').Append(o.Cls).Append(' ').Append(o.Team).Append(' ').Append(o.AiState).Append(" d=").Append(d.ToString("F2"))
+                  .Append(o.SwingPending ? " swinging" : "");
+            }
+            return sb.Append(']').ToString();
+        }
+
         internal static Run Soak(int seed, BotDifficulty d, bool classic, List<string> failures)
         {
             GameConfig cfg = SixClassMix(classic);
@@ -111,7 +138,7 @@ namespace CriticalMass.Sim.Tests
                     }
                     int still = tick - anchorTick[id];
                     if (still > run.WorstStill) run.WorstStill = still;
-                    if (still == StuckTicks + 1) failures.Add($"{tag} tick {tick}: bot {id} ({a.Cls}, {a.AiState}) stationary > {StuckTicks} ticks at ({x:F2}, {z:F2})");
+                    if (still == StuckTicks + 1) failures.Add($"{tag} tick {tick}: bot {id} ({a.Cls}, {a.AiState}) stationary > {StuckTicks} ticks at ({x:F2}, {z:F2})" + StuckContext(w, id));
                 }
                 if (failures.Count > 30) break;
                 if (tick % 300 == 0 && !Terraform.PadsReachHill(w.Map)) failures.Add($"{tag} tick {tick}: a pad cannot reach the hill");
@@ -232,6 +259,8 @@ namespace CriticalMass.Sim.Tests
             // with a margin) and PhysicsConfig.BotWideLine (bots walk straight at a fight target only when the body fits along
             // the line; no swinging at a target behind a wall) change Kaiju and bot decisions. Classic does not move (Phys.On is
             // off there). Copy the PhysicsOnly and Full "rules-combined golden" lines this test prints into the rows.
+            // b12-c2 (RULE CHANGE, merged last): this Full row is EXPECTED to move (both values) with DepthConfig.WeaponReach on; the
+            // integrator pastes the final printed Full "rules-combined golden" line once. Classic and PhysicsOnly must not move.
             { 0xC8739A69D4C704AAUL, 0x4CF5DD7DE4AB3BA1UL }, // Full (re-pinned 2026-11-14 integration batch 10 for fix/movement-shiver-1..4 + feat/kaiju-bridges-1+2 (5v5 only; run 43639049337), shiver-4 from run 43633158753 (after -3: run 43630865907); after -2: 0x214EE5D55012D0DB / 0x5D9F4BDCB5B33D08; before: 0xF20646D083F6DF6D / 0x12D502EBB7470305; earlier re-pinned 2026-11-14 integration batch 9 for feat/light-weapons-1, from run 43611800851; PRE-light-weapons: 0xAA728D5DAF5451F4 / 0xBF82793EEE8C78C8; re-pinned 2026-11-13 integration batch 7: fix/bridge-holes MapEventsConfig.BridgeCollapse default false (16v16 and 5v5) plus fix/kaiju-alive-1 Kaiju hits stagger, throw at KaijuKnockScale 0.5, topple (5v5); before: 0x70C7D9F992CAC3CC / 0x8F3F947AE72E7815, U-074..U-078)
         };
     }

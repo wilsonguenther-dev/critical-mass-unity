@@ -51,7 +51,7 @@ namespace CriticalMass.Runtime.Onboarding
                 case TrialGoal.UseAbility:
                 {
                     if (!has) return;
-                    double reach = cc.AttackRange + 0.3;
+                    double reach = Combat.ReachOf(w, a.Cls) + 0.3; // b11-c: the swing's own reach
                     // Whoever is already in reach gets hit first (a hurt target may run home); else chase the arrow's.
                     int near = TrialChecks.PickEnemy(w, false);
                     if (near >= 0 && TrialChecks.Dist2(px, pz, w.X[near], w.Z[near]) <= reach * reach)
@@ -98,7 +98,7 @@ namespace CriticalMass.Runtime.Onboarding
                     if (TrialChecks.Dist2(px, pz, tx, tz) > hold * hold) WalkTo(w, tx, tz, 0, frame);
                     // On the hill: hit whoever comes close, so the count stays ours.
                     int e = TrialChecks.PickEnemy(w, false);
-                    if (e >= 0 && TrialChecks.Dist2(px, pz, w.X[e], w.Z[e]) <= (cc.AttackRange + 0.3) * (cc.AttackRange + 0.3))
+                    if (e >= 0 && TrialChecks.Dist2(px, pz, w.X[e], w.Z[e]) <= (Combat.ReachOf(w, a.Cls) + 0.3) * (Combat.ReachOf(w, a.Cls) + 0.3))
                     {
                         frame.AimX = w.X[e];
                         frame.AimZ = w.Z[e];

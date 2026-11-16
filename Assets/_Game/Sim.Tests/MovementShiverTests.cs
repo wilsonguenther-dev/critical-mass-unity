@@ -552,6 +552,15 @@ namespace CriticalMass.Sim.Tests
         public void InAWholeMatchTheKaijuGetsOntoTheHillAndNeverIdlesOffItWithNoTarget(int seed)
         {
             GameConfig cfg = GameConfig.CreateDefault();
+            // b12-c: on the game's own rules (the batch 11 fix-up's Berserk-cannot-lock override is gone). The diag line below
+            // prints the hatch time, the instability at the hatch against the Berserk line, and the bots' whiffs per swings by
+            // class, so a shorter-reach regression shows in the log (control numbers: WeaponReachRuleTests' "b12-c whiffs").
+            double defaultBerserkLine = cfg.KaijuFeed.BerserkThreshold;
+            Assert.IsFalse(cfg.KaijuFeed.RandomBerserk, "the fixed threshold decides (DG-41 random line off)");
+            double hatchAt = -1, instabilityAtHatch = double.NaN;
+            var swings = new int[6];
+            var whiffs = new int[6];
+            int lastHead = 0;
             World w = World.CreateWorld(new WorldOptions { Seed = seed, TeamSize = 16, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = cfg });
             InputFrame scratch = SimInput.EmptyInput();
             HillDef hill = w.Map.Hill;
@@ -562,7 +571,19 @@ namespace CriticalMass.Sim.Tests
             for (int t = 0; t < maxTicks && w.Match.Phase != MatchPhase.Ended; t++)
             {
                 MatchTick.Advance(w, null, scratch);
+                int from = Math.Max(w.EventHead >= lastHead ? lastHead : 0, w.EventHead - World.EventCapacity);
+                for (int q = from; q < w.EventHead; q++)
+                {
+                    SimEvent ev = w.Events[q % World.EventCapacity];
+                    if (ev.Type != SimEventType.AttackContact || ev.A < 0 || ev.A >= w.ActorCount || w.Actors[ev.A].IsHuman) continue;
+                    int c = (int)w.Actors[ev.A].Cls;
+                    if (c < 0 || c >= swings.Length) continue;
+                    swings[c]++;
+                    if (ev.Value <= 0) whiffs[c]++;
+                }
+                lastHead = w.EventHead;
                 Kaiju k = w.Kaiju;
+                if (w.Match.Hatched && hatchAt < 0) { hatchAt = w.Match.Time; instabilityAtHatch = w.Match.Instability; }
                 if (!w.Match.Hatched || k.State == KaijuState.Egg) continue;
                 double hx = k.X - hill.X, hzz = k.Z - hill.Z, hd2 = hx * hx + hzz * hzz;
                 bool inHill = hd2 <= hill.R * hill.R;
@@ -603,6 +624,12 @@ namespace CriticalMass.Sim.Tests
             Console.WriteLine("{\"item\":\"kaiju hill\",\"seed\":" + seed + ",\"ownedS\":" + owned.ToString("F1") + ",\"onHillS\":" + onHill.ToString("F1") +
                               ",\"onShare\":" + onShare.ToString("F2") + ",\"nearShare\":" + nearShare.ToString("F2") + ",\"worstIdleOffHillS\":" +
                               worstStill.ToString("F1") + ",\"worstIdleEndsAt\":" + worstAt.ToString("F0") + "}");
+            var diag = new System.Text.StringBuilder();
+            for (int q = 0; q < swings.Length; q++)
+                diag.Append(q == 0 ? "" : ",").Append('"').Append(((ClassId)q).ToString()).Append("\":\"").Append(whiffs[q]).Append('/').Append(swings[q]).Append('"');
+            Console.WriteLine("{\"item\":\"kaiju hill diag\",\"seed\":" + seed + ",\"hatchAt\":" + hatchAt.ToString("F0") + ",\"instabilityAtHatch\":" +
+                              instabilityAtHatch.ToString("F1") + ",\"wouldLockBerserkOnGameRules\":" + (instabilityAtHatch >= defaultBerserkLine ? "true" : "false") +
+                              ",\"botWhiffsPerSwingsByClass\":{" + diag + "}}");
             Assert.Greater(owned, 60.0, "the match gives an owned Kaiju at least a minute (else the test proves nothing)");
             Assert.GreaterOrEqual(nearShare, 0.60, "an owned Kaiju is on or near the hill (within 12 m) at least 60% of its owned time");
             Assert.GreaterOrEqual(onShare, 0.20, "and inside the 6 m hill radius at least 20% of it");

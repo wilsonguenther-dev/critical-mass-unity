@@ -119,6 +119,7 @@ namespace CriticalMass.Runtime.View.Art
                 yield return new WaitForSecondsRealtime(0.5f);
             }
             ArtCatalog catalog = ArtCatalog.Load();
+            _catalog = catalog;
             if (catalog == null) { Log("no art catalog in Resources; nothing to shoot"); yield return Finish(); yield break; }
             if (_driver != null) { _savedScale = _driver.TimeScale; _driver.TimeScale = 0; }
             ReadGameplayCamera();
@@ -226,7 +227,24 @@ namespace CriticalMass.Runtime.View.Art
             r.SetPropertyBlock(block);
         }
 
-        ModelView Spawn(ArtEntry e, TeamId team, string name, Vector3 at)
+        /// <summary>The loaded catalog (the Healer's lantern prop comes from it when the hand prop is hung).</summary>
+        ArtCatalog _catalog;
+
+        /// <summary>
+        /// b12-i: the shots hang the class's hand prop exactly as the game does (Anim.WeaponProps: Plan, then Attach to the
+        /// hand slot, "handslot.r" or "hand.r"). The capture spawns ModelView directly, not through ActorViews, so before
+        /// this the Builder (mallet), the Healer (lantern) and the Demolitions Expert (pry bar) were shot empty-handed.
+        /// </summary>
+        public static Transform HangHandProp(ModelView m, ClassId? cls, TeamId team, ArtCatalog catalog)
+        {
+            if (m == null || !cls.HasValue) return null;
+            Anim.HeldWeapon kind = Anim.WeaponProps.Plan(cls.Value, m.Spec);
+            if (kind == Anim.HeldWeapon.None) return null;
+            Transform hand = m.Bone(Anim.WeaponProps.HandBone) ?? m.Bone(Anim.WeaponProps.HandBoneFallback);
+            return Anim.WeaponProps.Attach(hand, kind, team, catalog);
+        }
+
+        ModelView Spawn(ArtEntry e, TeamId team, string name, Vector3 at, ClassId? cls)
         {
             var m = new ModelView(e, transform, name);
             ModelSpec spec = m.Spec;
@@ -241,6 +259,7 @@ namespace CriticalMass.Runtime.View.Art
             Animator a = m.Root.GetComponent<Animator>();
             if (a != null) a.cullingMode = AnimatorCullingMode.AlwaysAnimate;
             foreach (Renderer r in m.Renderers) if (r is SkinnedMeshRenderer smr) smr.updateWhenOffscreen = true;
+            HangHandProp(m, cls, team, _catalog);
             return m;
         }
 
@@ -304,7 +323,7 @@ namespace CriticalMass.Runtime.View.Art
         {
             string teamName = team == TeamId.Azure ? "azure" : "crimson";
             string baseName = Prefix + s.Name.ToLowerInvariant() + "-" + teamName;
-            ModelView m = Spawn(e, team, "CharacterShots " + s.Name, Stage);
+            ModelView m = Spawn(e, team, "CharacterShots " + s.Name, Stage, s.Cls);
             ModelSpec spec = m.Spec;
             PoseAt(m, ArtMapping.Idle, 0f, true);
             yield return null;
@@ -387,7 +406,7 @@ namespace CriticalMass.Runtime.View.Art
             {
                 ArtEntry e = catalog.Find(s.Key);
                 if (e == null || e.Model == null || ArtMapping.Spec(s.Key) == null) continue;
-                ModelView m = Spawn(e, team, "CharacterShots Lineup " + s.Name, Stage);
+                ModelView m = Spawn(e, team, "CharacterShots Lineup " + s.Name, Stage, s.Cls);
                 PoseAt(m, ArtMapping.Idle, 0f, true);
                 m.SetHero(false);
                 m.SetLod(0);
