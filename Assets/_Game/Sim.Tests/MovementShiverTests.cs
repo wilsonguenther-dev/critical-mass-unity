@@ -552,6 +552,20 @@ namespace CriticalMass.Sim.Tests
         public void InAWholeMatchTheKaijuGetsOntoTheHillAndNeverIdlesOffItWithNoTarget(int seed)
         {
             GameConfig cfg = GameConfig.CreateDefault();
+            // b11-c (batch 11 fix-up): this test measures an OWNED Kaiju on the hill, so the egg must not lock Berserk. Which
+            // seeds lock Berserk (instability at or over KaijuFeed.BerserkThreshold, 100, before the hatch) moves with every
+            // rule change: with the weapon-reach rule (shorter swings for every class but the Warrior) seed 1337 hatched
+            // Berserk at 4:30 and the Kaiju was never owned (ownedS 0.0, run 43926111894). Every other rule stays the
+            // game's; the berserk share itself is gated by RulesDg16bSoakTests.CM64TheBerserkShareStaysInTheCM34Band (Slow).
+            // The diag line below prints the instability at the hatch and the bots' whiff share per class, so a real
+            // regression (bots swinging at air) shows in the log instead of hiding behind this switch.
+            double defaultBerserkLine = cfg.KaijuFeed.BerserkThreshold;
+            cfg.KaijuFeed.BerserkThreshold = 1e9;
+            Assert.IsFalse(cfg.KaijuFeed.RandomBerserk, "the fixed threshold decides (DG-41 random line off)");
+            double hatchAt = -1, instabilityAtHatch = double.NaN;
+            var swings = new int[6];
+            var whiffs = new int[6];
+            int lastHead = 0;
             World w = World.CreateWorld(new WorldOptions { Seed = seed, TeamSize = 16, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = cfg });
             InputFrame scratch = SimInput.EmptyInput();
             HillDef hill = w.Map.Hill;
@@ -562,7 +576,19 @@ namespace CriticalMass.Sim.Tests
             for (int t = 0; t < maxTicks && w.Match.Phase != MatchPhase.Ended; t++)
             {
                 MatchTick.Advance(w, null, scratch);
+                int from = Math.Max(w.EventHead >= lastHead ? lastHead : 0, w.EventHead - World.EventCapacity);
+                for (int q = from; q < w.EventHead; q++)
+                {
+                    SimEvent ev = w.Events[q % World.EventCapacity];
+                    if (ev.Type != SimEventType.AttackContact || ev.A < 0 || ev.A >= w.ActorCount || w.Actors[ev.A].IsHuman) continue;
+                    int c = (int)w.Actors[ev.A].Cls;
+                    if (c < 0 || c >= swings.Length) continue;
+                    swings[c]++;
+                    if (ev.Value <= 0) whiffs[c]++;
+                }
+                lastHead = w.EventHead;
                 Kaiju k = w.Kaiju;
+                if (w.Match.Hatched && hatchAt < 0) { hatchAt = w.Match.Time; instabilityAtHatch = w.Match.Instability; }
                 if (!w.Match.Hatched || k.State == KaijuState.Egg) continue;
                 double hx = k.X - hill.X, hzz = k.Z - hill.Z, hd2 = hx * hx + hzz * hzz;
                 bool inHill = hd2 <= hill.R * hill.R;
@@ -603,6 +629,12 @@ namespace CriticalMass.Sim.Tests
             Console.WriteLine("{\"item\":\"kaiju hill\",\"seed\":" + seed + ",\"ownedS\":" + owned.ToString("F1") + ",\"onHillS\":" + onHill.ToString("F1") +
                               ",\"onShare\":" + onShare.ToString("F2") + ",\"nearShare\":" + nearShare.ToString("F2") + ",\"worstIdleOffHillS\":" +
                               worstStill.ToString("F1") + ",\"worstIdleEndsAt\":" + worstAt.ToString("F0") + "}");
+            var diag = new System.Text.StringBuilder();
+            for (int q = 0; q < swings.Length; q++)
+                diag.Append(q == 0 ? "" : ",").Append('"').Append(((ClassId)q).ToString()).Append("\":\"").Append(whiffs[q]).Append('/').Append(swings[q]).Append('"');
+            Console.WriteLine("{\"item\":\"kaiju hill diag\",\"seed\":" + seed + ",\"hatchAt\":" + hatchAt.ToString("F0") + ",\"instabilityAtHatch\":" +
+                              instabilityAtHatch.ToString("F1") + ",\"wouldLockBerserkOnGameRules\":" + (instabilityAtHatch >= defaultBerserkLine ? "true" : "false") +
+                              ",\"botWhiffsPerSwingsByClass\":{" + diag + "}}");
             Assert.Greater(owned, 60.0, "the match gives an owned Kaiju at least a minute (else the test proves nothing)");
             Assert.GreaterOrEqual(nearShare, 0.60, "an owned Kaiju is on or near the hill (within 12 m) at least 60% of its owned time");
             Assert.GreaterOrEqual(onShare, 0.20, "and inside the 6 m hill radius at least 20% of it");
