@@ -52,6 +52,8 @@ namespace CriticalMass.Runtime.View
         /// <summary>Allegiance at the hatch (the sim freezes it from the hatch on).</summary>
         public double HatchAzure { get; private set; }
         public double HatchCrimson { get; private set; }
+        /// <summary>b12-r: the type the hatch picked (read from the Kaiju when the hatch is seen).</summary>
+        public KaijuType HatchType { get; private set; }
         public bool BerserkLocked { get; private set; }
 
         public void Reset()
@@ -61,6 +63,7 @@ namespace CriticalMass.Runtime.View
             _pendingCount = 0;
             HatchSeen = false;
             HatchTick = -1;
+            HatchType = KaijuType.Standard;
             BerserkLocked = false;
         }
 
@@ -111,6 +114,7 @@ namespace CriticalMass.Runtime.View
             HatchZ = z;
             HatchAzure = w.Match.Allegiance.Azure;
             HatchCrimson = w.Match.Allegiance.Crimson;
+            HatchType = w.Match.Hatched ? w.Kaiju.Type : KaijuType.Standard;
             // Several ticks can run between two frames: a natural hatch ran on the tick that started at HatchSeconds, so
             // count back from the clock; a forced one is placed on the oldest tick it could have been.
             int ran = Math.Max(0, w.Tick - _lastTick - 1);
@@ -191,6 +195,25 @@ namespace CriticalMass.Runtime.View
             }
         }
 
+        /// <summary>
+        /// b12-r: the hatch banner with the type's name first in the reason line ("GROVE KAIJU, fed 64 to 41"); STANDARD is the
+        /// banner above unchanged.
+        /// </summary>
+        public static void BannerParts(KaijuState s, double azure, double crimson, KaijuType type, out string headline, out string reason)
+        {
+            BannerParts(s, azure, crimson, out headline, out reason);
+            string name = Anim.KaijuTypeLook.Name(type);
+            if (name != null) reason = name + WordTypeJoin + reason;
+        }
+
+        public const string WordTypeJoin = ", ";
+
+        public static string BannerText(KaijuState s, double azure, double crimson, KaijuType type)
+        {
+            BannerParts(s, azure, crimson, type, out string h, out string r);
+            return h + ": " + r;
+        }
+
         /// <summary>The banner as one line, "HEADLINE: reason" (the acceptance check compares this).</summary>
         public static string BannerText(KaijuState s, double azure, double crimson)
         {
@@ -202,9 +225,12 @@ namespace CriticalMass.Runtime.View
             oneDecimal ? v.ToString("0.0", CultureInfo.InvariantCulture) : Math.Round(v).ToString("0", CultureInfo.InvariantCulture);
 
         /// <summary>The banner spec for a hatch outcome (icon and badge as well as colour).</summary>
-        public static BannerSpec HatchBanner(KaijuState s, double azure, double crimson)
+        public static BannerSpec HatchBanner(KaijuState s, double azure, double crimson) => HatchBanner(s, azure, crimson, KaijuType.Standard);
+
+        /// <summary>b12-r: the banner spec with the type's name in the reason line (GROVE / BRUTE).</summary>
+        public static BannerSpec HatchBanner(KaijuState s, double azure, double crimson, KaijuType type)
         {
-            BannerParts(s, azure, crimson, out string h, out string r);
+            BannerParts(s, azure, crimson, type, out string h, out string r);
             var b = new BannerSpec { Headline = h, Reason = r, Priority = 3 };
             switch (s)
             {
@@ -432,7 +458,7 @@ namespace CriticalMass.Runtime.View
                     Banner.Show(KaijuMomentTracker.BerserkLockBanner());
                     break;
                 case KaijuMomentKind.Hatch:
-                    Banner.Show(KaijuMomentTracker.HatchBanner(Tracker.HatchState, Tracker.HatchAzure, Tracker.HatchCrimson));
+                    Banner.Show(KaijuMomentTracker.HatchBanner(Tracker.HatchState, Tracker.HatchAzure, Tracker.HatchCrimson, Tracker.HatchType));
                     if (_calloutKind == KaijuMomentKind.HatchSoon) _calloutAt = double.NegativeInfinity;
                     break;
             }
