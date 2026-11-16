@@ -69,6 +69,10 @@ namespace CriticalMass.Net.Relay
         private readonly List<KeyValuePair<int, ulong>> _hashes = new List<KeyValuePair<int, ulong>>();
         private AutoplayPilot _pilot;
         private bool _picked, _readyLogged, _chatSent, _dropped;
+        // b12 (X2 follow-up): one "ONLINE LEAD" line per second of match (30 ticks at the shipped 30 Hz) so a log shows how the
+        // adaptive lead moved, not only the SUMMARY's range. LeadPolicy/LockstepSession already expose these; no wire change.
+        private const int LeadLineEveryTicks = 30;
+        private int _nextLeadLine;
         private int _tries, _chatSeen;
         private long _start, _deadline, _retryAt = -1, _lingerUntil = -1;
 
@@ -201,6 +205,11 @@ namespace CriticalMass.Net.Relay
                 _chatSent = true;
                 string why = Chat?.Say(ChatText, ChatTeam ? ChatScope.Team : ChatScope.All, now);
                 Log("ONLINE CHAT SENT" + (ChatTeam ? " TEAM" : "") + " at tick " + _session.Stepped + (why != null ? " refused: " + why : ""));
+            }
+            if (_session.Stepped >= _nextLeadLine)
+            {
+                _nextLeadLine = _session.Stepped + LeadLineEveryTicks;
+                Log($"ONLINE LEAD tick {_session.Stepped} lead {_session.Lead} leadmin {_session.LeadMin} leadmax {_session.LeadMax} late {_session.LateInputs}");
             }
             if (DropAt >= 0 && _session.Stepped >= DropAt)
             {
