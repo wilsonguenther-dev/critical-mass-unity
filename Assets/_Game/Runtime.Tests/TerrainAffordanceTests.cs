@@ -583,6 +583,208 @@ namespace CriticalMass.Runtime.Tests
             Assert.AreEqual(0, alive, "every burst completes");
         }
 
+        // ------------------------------------------------------------------ b12-jk signs (Jeisil's k)
+
+        static void SignLog(string s) => Debug.Log("[CM.Signs] " + s);
+
+        static string Fd(double v) => v.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
+
+        /// <summary>The marker scan and the sign pass together, run until the dig route proofs are all cached.</summary>
+        static void SignWarm(World w, AffordanceScan scan, SignScan signs)
+        {
+            for (int k = 0; k < 600; k++)
+            {
+                bool terrain = AffordanceScan.IsTerrainClass(w.Actors[Me].Cls);
+                if (terrain) scan.Scan(w, Me, false, double.NaN, double.NaN, false);
+                signs.Scan(w, Me, terrain ? scan : null);
+            }
+        }
+
+        /// <summary>Paints every breakable wall within r of actor 0 back to floor (a clean scene for the sign counts).</summary>
+        static void ClearBreakables(World w, double r)
+        {
+            MapDef m = w.Map;
+            for (int cz = 0; cz < m.Height; cz++)
+            for (int cx = 0; cx < m.Width; cx++)
+            {
+                int i = cz * m.Width + cx;
+                byte t = m.Cells[i];
+                if (t != Cell.BreakableIntact && t != Cell.BreakableCracked) continue;
+                double dx = cx + 0.5 - w.X[Me], dz = cz + 0.5 - w.Z[Me];
+                if (dx * dx + dz * dz <= r * r) m.Cells[i] = Cell.Floor;
+            }
+        }
+
+        /// <summary>Floor cells around actor 0 between rMin and rMax u, nearest first (ring order), none twice.</summary>
+        static List<int> FloorNear(World w, double rMin, double rMax, int want)
+        {
+            MapDef m = w.Map;
+            var list = new List<int>();
+            int sx = JsMath.FloorToInt(w.X[Me]), sz = JsMath.FloorToInt(w.Z[Me]);
+            for (int ring = 1; ring <= (int)Math.Ceiling(rMax) + 1 && list.Count < want; ring++)
+            for (int cz = sz - ring; cz <= sz + ring && list.Count < want; cz++)
+            for (int cx = sx - ring; cx <= sx + ring && list.Count < want; cx++)
+            {
+                if (Math.Abs(cx - sx) != ring && Math.Abs(cz - sz) != ring) continue;
+                if (!MapGrid.InBounds(m, cx, cz) || m.Cells[cz * m.Width + cx] != Cell.Floor) continue;
+                double dx = cx + 0.5 - w.X[Me], dz = cz + 0.5 - w.Z[Me], d = Math.Sqrt(dx * dx + dz * dz);
+                if (d < rMin || d > rMax) continue;
+                list.Add(cz * m.Width + cx);
+            }
+            return list;
+        }
+
+        [Test]
+        public void MinerGetsPickSignsOnlyOnDiggableCells()
+        {
+            World w = Field(ClassId.Miner);
+            var scan = new AffordanceScan();
+            var signs = new SignScan();
+            Assert.IsTrue(FindSpot(w, scan, s => s.Primary.Valid), "a diggable spot");
+            SignWarm(w, scan, signs);
+            MapDef m = w.Map;
+            int barricadeCell = scan.Secondary.Has && scan.Secondary.Valid ? scan.Secondary.Cz * m.Width + scan.Secondary.Cx : -1;
+            int picks = signs.Count[(int)SignKind.Pick];
+            SignLog("miner: " + picks + " pick signs of " + signs.Candidates[(int)SignKind.Pick] + " candidates (limit 1.." + GrenadeTuning.SignsPerKind
+                    + "), hammer " + signs.Count[(int)SignKind.Hammer] + " (limit 0)");
+            Assert.Greater(picks, 0, "the Miner sees pick signs");
+            Assert.LessOrEqual(picks, GrenadeTuning.SignsPerKind);
+            Assert.AreEqual(0, signs.Count[(int)SignKind.Hammer], "no hammer signs for the Miner (own-class build signs only)");
+            for (int i = 0; i < picks; i++)
+            {
+                AffSign s = signs.Get(SignKind.Pick, i);
+                int cx = s.Cell % m.Width, cz = s.Cell / m.Width;
+                int dig = Terraform.DigRefusal(w, cx, cz);
+                int bar = s.Cell == barricadeCell ? Barricades.BarricadeRefusal(w, Me, s.X, s.Z) : -99;
+                SignLog("  pick at (" + cx + ", " + cz + ") " + Fd(s.Dist) + " u: dig refusal " + dig + ", barricade refusal " + (bar == -99 ? "-" : bar.ToString()) + " (limit one of them 0)");
+                Assert.IsTrue(dig == 0 || bar == 0, "a pick sign marks a cell the Sim lets him dig or barricade");
+            }
+        }
+
+        [Test]
+        public void BuilderGetsHammerSignsOnlyOnBuildableSpots()
+        {
+            World w = Field(ClassId.Builder);
+            var scan = new AffordanceScan();
+            var signs = new SignScan();
+            Assert.IsTrue(FindSpot(w, scan, s => s.Primary.Has && s.Primary.Action == AffAction.Build && s.Primary.Valid), "a spot with a valid build");
+            signs.Scan(w, Me, scan);
+            var buildable = new HashSet<int>();
+            int dirs = 0;
+            for (int k = 0; k < 4; k++)
+            {
+                int dx = k == 0 ? 1 : k == 1 ? -1 : 0, dz = k == 2 ? 1 : k == 3 ? -1 : 0;
+                if (BuiltPieces.BuildRefusal(w, Me, dx, dz) != 0) continue;
+                dirs++;
+                for (int q = 0; q < BuiltPieces.LastPlanCount; q++) buildable.Add(BuiltPieces.LastPlanCell(q));
+            }
+            int hammers = signs.Count[(int)SignKind.Hammer];
+            SignLog("builder: " + hammers + " hammer signs for " + dirs + " buildable directions (limit 1.." + dirs + "), pick " + signs.Count[(int)SignKind.Pick] + " (limit 0)");
+            Assert.Greater(hammers, 0, "the Builder sees a hammer sign");
+            Assert.LessOrEqual(hammers, dirs, "one hammer per buildable ladder or bridge");
+            Assert.AreEqual(0, signs.Count[(int)SignKind.Pick], "no pick signs for the Builder");
+            for (int i = 0; i < hammers; i++)
+            {
+                AffSign s = signs.Get(SignKind.Hammer, i);
+                SignLog("  hammer at cell " + s.Cell + " " + Fd(s.Dist) + " u: in a plan the Sim accepts -> " + buildable.Contains(s.Cell) + " (limit true)");
+                Assert.IsTrue(buildable.Contains(s.Cell), "a hammer sign sits on a ladder or bridge the Sim would build");
+            }
+        }
+
+        [Test]
+        public void EveryClassGetsCrackSignsOnWhatItCanTakeDown()
+        {
+            foreach (ClassId cls in ClassIds.All)
+            {
+                World w = Field(cls);
+                MapDef m = w.Map;
+                ClearBreakables(w, 16);
+                List<int> cells = FloorNear(w, 2.5, 7, 3);
+                Assert.AreEqual(3, cells.Count, "three floor cells near " + cls);
+                Assert.GreaterOrEqual(w.Barricades.Length, 2);
+                TeamId mine = w.Actors[Me].Team, theirs = mine == TeamId.Azure ? TeamId.Crimson : TeamId.Azure;
+                Barricade enemy = w.Barricades[0], own = w.Barricades[1];
+                enemy.Active = true; enemy.Team = theirs; enemy.Cx = cells[0] % m.Width; enemy.Cz = cells[0] / m.Width; enemy.Hp = 50;
+                own.Active = true; own.Team = mine; own.Cx = cells[1] % m.Width; own.Cz = cells[1] / m.Width; own.Hp = 50;
+                m.Cells[cells[0]] = Cell.Barricade;
+                m.Cells[cells[1]] = Cell.Barricade;
+                m.Cells[cells[2]] = Cell.BreakableIntact;
+                var scan = new AffordanceScan();
+                var signs = new SignScan();
+                SignWarm(w, scan, signs);
+                bool atEnemy = false, atOwn = false, atWall = false;
+                for (int i = 0; i < signs.Count[(int)SignKind.Crack]; i++)
+                {
+                    int c = signs.Get(SignKind.Crack, i).Cell;
+                    atEnemy |= c == cells[0];
+                    atOwn |= c == cells[1];
+                    atWall |= c == cells[2];
+                }
+                bool wallRule = SignScan.TakesDownWall(cls);
+                SignLog(cls + ": crack on enemy barricade " + atEnemy + " (limit true), on own barricade " + atOwn + " (limit false), on breakable wall "
+                        + atWall + " (limit " + wallRule + "); crack signs " + signs.Count[(int)SignKind.Crack]);
+                Assert.IsTrue(atEnemy, cls + " can chip an enemy barricade: crack sign");
+                Assert.IsFalse(atOwn, cls + " never gets a take-down sign on its own team's barricade");
+                Assert.AreEqual(wallRule, atWall, cls + ": crack on a breakable wall exactly when the class can break one");
+                if (cls != ClassId.Miner) Assert.AreEqual(0, signs.Count[(int)SignKind.Pick], cls + ": pick signs are the Miner's only");
+                if (cls != ClassId.Builder) Assert.AreEqual(0, signs.Count[(int)SignKind.Hammer], cls + ": hammer signs are the Builder's only");
+            }
+        }
+
+        [Test]
+        public void SignsKeepTheNearestEightAndNothingPast14Units()
+        {
+            World w = Field(ClassId.Demolitions);
+            MapDef m = w.Map;
+            ClearBreakables(w, 21);
+            List<int> cells = FloorNear(w, 1.5, 19, 400);
+            var painted = new List<int>();
+            for (int k = 0; k < cells.Count; k += 3) { m.Cells[cells[k]] = Cell.BreakableIntact; painted.Add(cells[k]); }
+            var signs = new SignScan();
+            signs.Scan(w, Me, null);
+            int n = signs.Count[(int)SignKind.Crack];
+            double maxKept = 0;
+            var kept = new HashSet<int>();
+            for (int i = 0; i < n; i++) { AffSign s = signs.Get(SignKind.Crack, i); kept.Add(s.Cell); maxKept = Math.Max(maxKept, s.Dist); }
+            int within = 0, beyond = 0;
+            double minLeftOut = double.MaxValue;
+            foreach (int c in painted)
+            {
+                double dx = c % m.Width + 0.5 - w.X[Me], dz = c / m.Width + 0.5 - w.Z[Me], d = Math.Sqrt(dx * dx + dz * dz);
+                if (d <= GrenadeTuning.SignRadius) within++; else beyond++;
+                if (d > GrenadeTuning.SignRadius) Assert.IsFalse(kept.Contains(c), "no sign past " + GrenadeTuning.SignRadius + " u");
+                else if (!kept.Contains(c)) minLeftOut = Math.Min(minLeftOut, d);
+            }
+            SignLog("crowd: " + painted.Count + " breakable walls (" + within + " within 14 u, " + beyond + " beyond), signs kept " + n + " (limit "
+                    + GrenadeTuning.SignsPerKind + "), farthest kept " + Fd(maxKept) + " u (limit <= nearest left out " + (minLeftOut == double.MaxValue ? "-" : Fd(minLeftOut)) + " u and <= 14)");
+            Assert.Greater(within, GrenadeTuning.SignsPerKind, "the scene has more walls in range than the cap");
+            Assert.Greater(beyond, 0, "the scene has walls past the sign radius");
+            Assert.AreEqual(GrenadeTuning.SignsPerKind, n, "only the nearest " + GrenadeTuning.SignsPerKind + " show");
+            Assert.LessOrEqual(maxKept, GrenadeTuning.SignRadius);
+            Assert.LessOrEqual(maxKept, minLeftOut + 1e-9, "the kept signs are the nearest ones");
+            for (int i = 1; i < n; i++) Assert.LessOrEqual(signs.Get(SignKind.Crack, i - 1).Dist, signs.Get(SignKind.Crack, i).Dist, "nearest first");
+            float f0 = SignScan.Fade(GrenadeTuning.SignFadeStart), f1 = SignScan.Fade(GrenadeTuning.SignRadius - 0.5), f2 = SignScan.Fade(GrenadeTuning.SignRadius);
+            SignLog("fade: at " + Fd(GrenadeTuning.SignFadeStart) + " u " + Fd(f0) + " (limit 1), at " + Fd(GrenadeTuning.SignRadius - 0.5) + " u " + Fd(f1)
+                    + " (limit 0..1), at 14 u " + Fd(f2) + " (limit 0)");
+            Assert.AreEqual(1f, f0, 1e-6f);
+            Assert.That(f1, Is.GreaterThan(0f).And.LessThan(1f));
+            Assert.AreEqual(0f, f2, 1e-6f, "gone at 14 u");
+        }
+
+        [Test]
+        public void SignsSwitchDefaultsOnAndTurnsOff()
+        {
+            WorldFeedbackSettings.ResetAll();
+            bool def = WorldFeedbackSettings.Signs;
+            WorldFeedbackSettings.Signs = false;
+            bool off = WorldFeedbackSettings.Signs;
+            SignLog("signs switch: default " + def + " (limit true), after turning off " + off + " (limit false), in reset keys "
+                    + Array.IndexOf(WorldFeedbackSettings.AllKeys, WorldFeedbackSettings.SignsKey) + " (limit >= 0)");
+            Assert.IsTrue(def);
+            Assert.IsFalse(off);
+            Assert.Contains(WorldFeedbackSettings.SignsKey, WorldFeedbackSettings.AllKeys, "RESET THESE OPTIONS clears it");
+        }
+
         [Test]
         public void AtlasBakesAllCells()
         {
