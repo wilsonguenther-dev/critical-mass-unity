@@ -5,10 +5,11 @@
 #       already uses smoothed per-position directions (WorldMeshBake.SmoothOutlineTangents): it is not the cause.
 #   (2) a stretched teal sheet from the raised right glove to the hip on the attack: the octree shell fused surfaces that
 #       touch in the bind pose (glove at the hip, inner arm at the torso side, thighs under the apron); when the limbs move
-#       apart, the bridge faces between vertices of distant bones (bone-tree distance >= 2) stretch into a sheet.
+#       apart, the bridge faces between vertices of different limbs (fused(): forearm/glove to belly or hip, inner arm to
+#       hips, thigh to apron, thigh to thigh) stretch into a sheet.
 # What this does, per level (Hero, LOD0, LOD1, Shadow), measured over every frame of Attack, Run and Walk (Idle every 4th):
 #   stretch: edges whose posed length > SEAM_RATIO x rest and > SEAM_MIN_M metres, between vertices whose dominant bones are
-#   >= 2 apart in the bone tree (a fused bridge, not a joint) -> the faces on them are cut, each new hole is capped from its
+#   on different limbs away from that limb's own joint (fused(): a bridge, not a joint) -> the faces on them are cut, each new hole is capped from its
 #   own rim (weights, colours and UVs from the neighbouring corners), twice; then normals are rebuilt from the winding,
 #   smooth inside SMOOTH_DEG and split at sharper edges (no corner normal can point against its face; thin slabs keep a
 #   side each). Exports <out>/<Cls>.fbx with face_builder.py's settings, then renders BEFORE (the file as given) and AFTER
@@ -130,6 +131,39 @@ def tdist(a, b):
     return 9
 
 
+ARM = ('upperarm', 'lowerarm', 'wrist', 'hand', 'handslot')
+LEG = ('upperleg', 'lowerleg', 'foot', 'toes')
+
+
+def limb(n):
+    base, _, side = n.partition('.')
+    if base in ARM:
+        return 'arm.' + side
+    if base in LEG:
+        return 'leg.' + side
+    return 'core'
+
+
+def fused(a, b):
+    # A fused bridge joins two different limbs, or a limb and the body away from that limb's own joint: the forearm or the
+    # glove glued to the belly or the hip, the inner arm to the hips, a thigh to the apron (chest), thigh to thigh. Not
+    # fused: same limb (elbow, knee, wrist folds), body to body (chest / hips across the spine: torso skin), the shoulder
+    # (chest / upperarm) and the hip joint (hips or spine / upperleg).
+    if not a or not b:
+        return False
+    la, lb = limb(a), limb(b)
+    if la == lb:
+        return False
+    if 'core' in (la, lb):
+        c, l = (a, b) if la == 'core' else (b, a)
+        lbase = l.partition('.')[0]
+        if c == 'chest' and lbase == 'upperarm':
+            return False
+        if c in ('hips', 'spine') and lbase == 'upperleg':
+            return False
+    return True
+
+
 def dominant(o):
     names = {g.index: g.name for g in o.vertex_groups}
     dom = []
@@ -164,17 +198,21 @@ def stretch(objs):
     out = {}
     for o in objs:
         k = o.name; dom = dominant(o); e = E[k]
-        far = np.array([tdist(dom[a], dom[b]) >= 2 for a, b in e], bool) if len(e) else np.zeros(0, bool)
+        far = np.array([fused(dom[a], dom[b]) for a, b in e], bool) if len(e) else np.zeros(0, bool)
         flag = (best[k] > RATIO) & far
         pairs, clips = {}, {}
         for i in np.nonzero(flag)[0]:
             a, b = e[i]; pk = ' / '.join(sorted((dom[a] or '-', dom[b] or '-'))); pairs[pk] = pairs.get(pk, 0) + 1
             cl = FR[where[k][i]][0]; clips[cl] = clips.get(cl, 0) + 1
         joint = (best[k] > RATIO) & ~far
+        jp = {}
+        for i in np.nonzero(joint)[0]:
+            a, b = e[i]; pk = ' / '.join(sorted((dom[a] or '-', dom[b] or '-'))); jp[pk] = jp.get(pk, 0) + 1
         out[k] = dict(flag=np.nonzero(flag)[0], summary=dict(
             fused_edges_over=int(flag.sum()), worst_ratio=round(float(best[k][flag].max()) if flag.any() else 0.0, 2),
             joint_edges_over=int(joint.sum()), worst_joint_ratio=round(float(best[k][joint].max()) if joint.any() else 0.0, 2),
-            by_clip=clips, bone_pairs=dict(sorted(pairs.items(), key=lambda t: -t[1])[:12])))
+            by_clip=clips, bone_pairs=dict(sorted(pairs.items(), key=lambda t: -t[1])[:12]),
+            joint_pairs=dict(sorted(jp.items(), key=lambda t: -t[1])[:8])))
     return out
 
 
@@ -395,9 +433,13 @@ try:
     RO = {}
     for tag, objs in (('before', BEFORE), ('after', AFTER)):
         for lv, o in objs.items():
-            h = copy_obj(o, o.name + '_hull'); h.data.materials.clear(); h.data.materials.append(HULL)
-            so = h.modifiers.new('Hull', 'SOLIDIFY'); so.thickness = 0.015; so.offset = 1.0; so.use_flip_normals = True
-            so.use_rim = False; so.use_even_offset = False; so.use_quality_normals = True
+            # the inverted hull: the same skinned surface, winding reversed, pushed 2 cm out along the averaged vertex
+            # normals (the game's _OutlineSource 3 direction); its near side is back-facing (transparent), the far side
+            # shows as the Void Navy line round the body
+            h = copy_obj(o, o.name + '_hull'); hb_ = bmesh.new(); hb_.from_mesh(h.data)
+            bmesh.ops.reverse_faces(hb_, faces=hb_.faces[:]); hb_.to_mesh(h.data); hb_.free()
+            h.data.materials.clear(); h.data.materials.append(HULL)
+            dm = h.modifiers.new('Hull', 'DISPLACE'); dm.direction = 'NORMAL'; dm.mid_level = 0.0; dm.strength = -0.02
             RO[(tag, lv)] = (o, h)
     for o in LV.values():
         o.hide_render = True
