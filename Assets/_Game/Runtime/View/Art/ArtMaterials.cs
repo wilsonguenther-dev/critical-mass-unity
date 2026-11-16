@@ -37,7 +37,7 @@ namespace CriticalMass.Runtime.View.Art
             m.SetColor("_DefaultMarker", Hex(MarkerAzure));
             m.SetColor("_DefaultMarkerDark", Hex(MarkerDarkAzure));
             m.SetColor("_TeamColor", Hex(rimHex));
-            m.SetFloat("_RimStrength", spec.Rim);
+            m.SetFloat("_RimStrength", SharpSwitches.RimFor(spec.Rim, SharpSwitches.Rim));   // sharpness switch "rim" (batch 12 AB): 0.6 -> 0.3
             m.SetFloat("_OutlinePx", spec.OutlinePx);
             // Rigged models carry smoothed hull directions in TANGENT (ArtImportPostprocessor): no torn hull, no crease lines.
             m.SetFloat("_OutlineSource", spec.Rigged ? 3f : 0f);
