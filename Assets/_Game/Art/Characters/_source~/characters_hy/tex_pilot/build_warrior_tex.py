@@ -25,6 +25,7 @@ import bpy, bmesh, sys, os, json, math, time
 import numpy as np
 from mathutils import Vector, Matrix
 from mathutils.bvhtree import BVHTree
+from mathutils.kdtree import KDTree
 
 argv = sys.argv[sys.argv.index("--") + 1:]
 OUT, REPO = argv[0], argv[1]
@@ -165,6 +166,39 @@ raw.data.vertices.foreach_set("co", np.ascontiguousarray(best[2], np.float32).ra
 raw.data.update()
 log("aligned", REP["align"])
 
+# ------------------------------------------------------------------------------------------------ 2b. A-pose
+# Run 4 showed the real mismatch: today's Hero is the raw UNSKINNED to the rig's rest (build_hy3d.py posed the rig into
+# the raw's A-pose, upper arms 32.1 and upper legs 15.2 degrees, then took the mesh back to the rest), so the raw's arms
+# and legs sit away from the skeleton. Pose the rig into the raw's A-pose the same way (fit_pose), work in that pose
+# (cull, bake, weight transfer), then unskin the new mesh to the rest with the same bones, as the Hero was.
+rig.data.pose_position = "POSE"
+A_ = rig.matrix_world.copy()
+J = {b.name: A_ @ b.head_local for b in rig.data.bones}
+PR = best[2]
+REP["pose_fit_deg"] = {}
+for side in ("l", "r"):
+    sg = 1.0 if J["hand." + side].x > 0 else -1.0
+    ext = float(np.max(sg * PR[:, 0]))
+    hand = PR[sg * PR[:, 0] > 0.8 * ext].mean(0)
+    ank = PR[(PR[:, 2] > 0.10) & (PR[:, 2] < 0.20) & (sg * PR[:, 0] > 0.03)].mean(0)
+    for bone, tip, tgt in (("upperarm." + side, "hand." + side, hand), ("upperleg." + side, "foot." + side, ank)):
+        q = (J[tip] - J[bone]).normalized().rotation_difference((Vector(tuple(tgt)) - J[bone]).normalized())
+        pb = rig.pose.bones[bone]
+        Mw = Matrix.Translation(J[bone]) @ q.to_matrix().to_4x4() @ Matrix.Translation(-J[bone]) @ (A_ @ pb.matrix)
+        pb.matrix = A_.inverted() @ Mw
+        bpy.context.view_layer.update()
+        REP["pose_fit_deg"][bone] = round(math.degrees(q.angle), 1)
+dg0 = bpy.context.evaluated_depsgraph_get()
+evr = REF.evaluated_get(dg0)
+mer = evr.to_mesh()
+WP = np.array([tuple(REF.matrix_world @ v.co) for v in mer.vertices])
+evr.to_mesh_clear()
+bvh_old = BVHTree.FromPolygons([tuple(v) for v in WP], [tuple(p.vertices) for p in REF.data.polygons])
+dp, _ = dists(PR[sample_i])
+REP["pose_fit"] = dict(median_m=round(float(np.median(dp)), 5), p90_m=round(float(np.percentile(dp, 90)), 5),
+                       p99_m=round(float(np.percentile(dp, 99)), 5), build_hy3d_reported_deg={"upperarm": 32.1, "upperleg": 15.2})
+log("A-pose", REP["pose_fit_deg"], REP["pose_fit"])
+
 # ------------------------------------------------------------------------------------------------ 3. LOD0 geometry
 low = raw.copy()
 low.data = raw.data.copy()
@@ -204,14 +238,48 @@ REP["weld"] = dict(tris_after_weld=ntri(low), specks_dropped=dropped)
 # HY build cleaned up), and their edges stretched 7x to 19x in the clips while today's LOD0 stays under 1.8x. Drop every
 # raw vertex farther than WT_CULL_M (0.03 m) from today's Hero before the decimation.
 CULL = float(os.environ.get("WT_CULL_M", "0.03"))
+
+
+def open_edges(me_):
+    b_ = bmesh.new(); b_.from_mesh(me_)
+    n_ = sum(1 for e in b_.edges if len(e.link_faces) == 1); b_.free()
+    return n_
+
+
+def region_of(name):
+    n_ = name.lower()
+    if "head" in n_ or "neck" in n_: return "head"
+    if any(k in n_ for k in ("arm", "hand", "shoulder", "wrist", "finger", "thumb", "slot", "elbow")): return "arms"
+    if any(k in n_ for k in ("leg", "foot", "toe", "knee", "shin", "thigh", "ankle")): return "legs"
+    return "torso"
+
+
+gn = {g.index: g.name for g in REF.vertex_groups}
+vreg = []
+for v in REF.data.vertices:
+    gs = sorted(((g.weight, g.group) for g in v.groups), reverse=True)
+    vreg.append(region_of(gn.get(gs[0][1], "")) if gs else "torso")
+preg = [vreg[p.vertices[0]] for p in REF.data.polygons]
+REP["open_edges"] = {"raw_welded": open_edges(low.data)}
 if CULL > 0:
     bm = bmesh.new()
     bm.from_mesh(low.data)
-    far = [v for v in bm.verts if bvh_old.find_nearest(v.co)[3] > CULL]
+    far, by_region, all_region = [], {}, {}
+    for v in bm.verts:
+        loc, nrm, idx, dist = bvh_old.find_nearest(v.co)
+        rg = preg[idx] if idx is not None else "torso"
+        all_region[rg] = all_region.get(rg, 0) + 1
+        if dist > CULL:
+            far.append(v)
+            by_region[rg] = by_region.get(rg, 0) + 1
     bmesh.ops.delete(bm, geom=far, context="VERTS")
+    bnd = [e for e in bm.edges if len(e.link_faces) == 1]
+    before_fill = len(bnd)
+    bmesh.ops.holes_fill(bm, edges=bnd, sides=16)        # pinholes only; a long membrane cut stays open and is counted
     bm.to_mesh(low.data)
     bm.free()
-    REP["cull"] = dict(metres=CULL, vertices_removed=len(far), tris_after=ntri(low))
+    REP["cull"] = dict(metres=CULL, vertices_removed=len(far), removed_by_region=by_region, raw_vertices_by_region=all_region,
+                       open_edges_after_cut=before_fill, open_edges_after_pinhole_fill=open_edges(low.data), tris_after=ntri(low))
     log("membrane cull", REP["cull"])
 ratio = LOD0_TRIS / max(1, ntri(low))
 for attempt in range(3):
@@ -225,22 +293,109 @@ for attempt in range(3):
         break
     low.data = work
     ratio *= LOD0_TRIS / max(1, t)
+
+# ------------------------------------------------------------------------------------------------ 2c. shield and cleaver
+# Taken from today's LOD0 unchanged: same vertices, same rigid hand-slot weights. Posed into the A-pose with those
+# weights, joined as separate islands of the LOD0 (as today's LOD0 carries them, so ActorViews needs nothing new), baked
+# into their own region of the 1024 texture from their own vertex colours and team mask codes, and given their original
+# weights back after the body weight transfer, so the unskin returns them exactly to today's rest position.
+BN = [b.name for b in rig.data.bones]
+SKA = {pb.name: A_ @ pb.matrix @ pb.bone.matrix_local.inverted() @ A_.inverted() for pb in rig.pose.bones}
+g0 = {g.index: g.name for g in old0.vertex_groups}
+POLD = [v.index for v in old0.data.vertices
+        if len(v.groups) and "slot" in g0.get(max(v.groups, key=lambda g: g.weight).group, "").lower()]
+pset_old = set(POLD)
+Pme = old0.data.copy()
+Pob = bpy.data.objects.new("WT_props", Pme)
+scene.collection.objects.link(Pob)
+bm = bmesh.new()
+bm.from_mesh(Pme)
+bmesh.ops.delete(bm, geom=[v for v in bm.verts if v.index not in pset_old], context="VERTS")
+bm.to_mesh(Pme)
+bm.free()
+Pob.vertex_groups.clear()
+while len(Pme.uv_layers):
+    Pme.uv_layers.remove(Pme.uv_layers[0])
+Pme.materials.clear()
+pca = Pme.color_attributes.get("Col") or (Pme.color_attributes[0] if len(Pme.color_attributes) else None)
+pca.name = "PropCol"
+for c_ in [c_ for c_ in Pme.color_attributes if c_.name != "PropCol"]:
+    Pme.color_attributes.remove(c_)
+Pme.attributes.new("is_prop", "INT", "POINT").data.foreach_set("value", np.ones(len(Pme.vertices), np.int32))
+pbk = np.full((len(Pme.vertices), 4), -1, np.int32)
+pwk = np.zeros((len(Pme.vertices), 4), np.float32)
+per_bone, second_w = {}, 0.0
+Mw0 = old0.matrix_world.copy()
+for i_, oi in enumerate(POLD):
+    ov = old0.data.vertices[oi]
+    ws = sorted(((g.weight, g0[g.group]) for g in ov.groups if g.weight > 1e-4), reverse=True)[:4]
+    tot_ = sum(w_ for w_, _ in ws)
+    if len(ws) > 1:
+        second_w = max(second_w, ws[1][0] / tot_)
+    M_ = Matrix.Diagonal((0.0, 0.0, 0.0, 0.0))
+    for k_, (w_, nm) in enumerate(ws):
+        pbk[i_, k_], pwk[i_, k_] = BN.index(nm), w_ / tot_
+        M_ = M_ + SKA[nm] * (w_ / tot_)
+    Pme.vertices[i_].co = M_ @ (Mw0 @ ov.co)
+    per_bone[ws[0][1]] = per_bone.get(ws[0][1], 0) + 1
+for k_ in range(4):
+    Pme.attributes.new("pb%d" % k_, "INT", "POINT").data.foreach_set("value", pbk[:, k_].copy())
+    Pme.attributes.new("pw%d" % k_, "FLOAT", "POINT").data.foreach_set("value", pwk[:, k_].copy())
+REP["props"] = dict(source="today's Warrior_LOD0 (vertices whose strongest weight is a hand-slot bone)",
+                    vertices=len(POLD), tris=ntri(Pob), max_second_weight=round(second_w, 4),
+                    by_bone={nm: dict(vertices=n_, parent=rig.data.bones[nm].parent.name if rig.data.bones[nm].parent else None,
+                                      side_x=round(float(np.mean([(Mw0 @ old0.data.vertices[oi].co).x for oi in POLD
+                                                                   if g0[max(old0.data.vertices[oi].groups, key=lambda g: g.weight).group] == nm])), 3))
+                             for nm, n_ in per_bone.items()},
+                    colour_path="baked into the 1024 base texture (the _CMTOON_BASEMAP path replaces vertex colour; it does not mix)")
+for o in scene.objects:
+    o.select_set(o is low or o is Pob)
+bpy.context.view_layer.objects.active = low
+bpy.ops.object.join()
+fl_ = np.zeros(len(low.data.vertices), np.int32)
+low.data.attributes["is_prop"].data.foreach_get("value", fl_)
+REP["props"]["joined_prop_vertices"] = int(fl_.sum())
+REP["props"]["body_tris"], REP["props"]["lod0_tris_total"] = ntri(low) - REP["props"]["tris"], ntri(low)
+log("props", REP["props"])
 for p in low.data.polygons:
     p.use_smooth = True
 low.data.set_sharp_from_angle(angle=math.radians(60.0))
 bpy.context.view_layer.objects.active = low
 for o in scene.objects:
     o.select_set(o is low)
-bpy.ops.object.mode_set(mode="EDIT")
-bpy.ops.mesh.select_all(action="SELECT")
-bpy.ops.uv.smart_project(angle_limit=math.radians(80.0), island_margin=0.002, area_weight=0.0, correct_aspect=True,
-                         scale_to_bounds=False)
-try:
-    bpy.ops.uv.pack_islands(rotate=True, margin=0.002, shape_method="CONCAVE")
-    REP["uv_pack"] = "concave repack"
-except Exception as x:
-    REP["uv_pack"] = "smart project packing only: " + repr(x)
-bpy.ops.object.mode_set(mode="OBJECT")
+scene.tool_settings.use_uv_select_sync = True
+
+
+def uv_cov(me_):
+    a_ = np.zeros(len(me_.loops) * 2); me_.uv_layers.active.data.foreach_get("uv", a_); a_ = a_.reshape(-1, 2)
+    t_ = 0.0
+    for p_ in me_.polygons:
+        x_, y_, z_ = a_[p_.loop_start], a_[p_.loop_start + 1], a_[p_.loop_start + 2]
+        t_ += abs((y_[0] - x_[0]) * (z_[1] - x_[1]) - (y_[1] - x_[1]) * (z_[0] - x_[0])) / 2
+    return t_
+
+
+def unwrap(ang, mg):
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_all(action="SELECT")
+    bpy.ops.uv.smart_project(angle_limit=math.radians(ang), island_margin=mg, area_weight=0.0, correct_aspect=True,
+                             scale_to_bounds=False)
+    try:
+        bpy.ops.uv.select_all(action="SELECT")
+        bpy.ops.uv.average_islands_scale()
+        bpy.ops.uv.pack_islands(rotate=True, margin=mg, shape_method="CONCAVE")
+    except Exception as x:
+        log("pack failed", x)
+    bpy.ops.object.mode_set(mode="OBJECT")
+    return uv_cov(low.data)
+
+
+trials = [(unwrap(a_, m_), a_, m_) for a_, m_ in ((80.0, 0.002), (66.0, 0.0015), (50.0, 0.0015))]
+REP["uv_trials"] = [dict(angle=a_, margin=m_, coverage=round(c_, 4)) for c_, a_, m_ in trials]
+bestuv = max(trials)
+if bestuv is not trials[-1]:
+    unwrap(bestuv[1], bestuv[2])
+log("uv trials", REP["uv_trials"], "kept", bestuv[1:])
 me = low.data
 me.uv_layers[0].name = "UVMap"
 uv = np.zeros(len(me.loops) * 2)
@@ -340,8 +495,68 @@ for p_ in REF.data.polygons:
 bake("EMIT", REF, maskimg)
 tex.image = base
 
+
+def lin2srgb(c):
+    c = np.clip(c, 0.0, 1.0)
+    return np.where(c <= 0.0031308, 12.92 * c, 1.055 * np.power(c, 1 / 2.4) - 0.055)
+
+
+PT = low.copy()
+PT.data = low.data.copy()
+scene.collection.objects.link(PT)
+flp = np.zeros(len(PT.data.vertices), np.int32)
+PT.data.attributes["is_prop"].data.foreach_get("value", flp)
+bm = bmesh.new()
+bm.from_mesh(PT.data)
+bmesh.ops.delete(bm, geom=[f for f in bm.faces if not all(flp[v.index] for v in f.verts)], context="FACES")
+bm.to_mesh(PT.data)
+bm.free()
+pcm = bpy.data.materials.new("PropColour")
+pcm.use_nodes = True
+for n in list(pcm.node_tree.nodes):
+    pcm.node_tree.nodes.remove(n)
+pa_ = pcm.node_tree.nodes.new("ShaderNodeAttribute"); pa_.attribute_name = "PropCol"
+pe_ = pcm.node_tree.nodes.new("ShaderNodeEmission")
+po_ = pcm.node_tree.nodes.new("ShaderNodeOutputMaterial")
+pcm.node_tree.links.new(pa_.outputs["Color"], pe_.inputs["Color"])
+pcm.node_tree.links.new(pe_.outputs[0], po_.inputs["Surface"])
+pmm = mm.copy()
+for n in pmm.node_tree.nodes:
+    if n.type == "ATTRIBUTE":
+        n.attribute_name = "PropCol"
+
+
+def prop_bake(name, m_):
+    im_ = bpy.data.images.new(name, TEX, TEX, alpha=True, float_buffer=True)
+    im_.pixels.foreach_set(np.full(TEX * TEX * 4, -1.0, np.float32))     # sentinel: pixels the bake did not write
+    tn = m_.node_tree.nodes.new("ShaderNodeTexImage")
+    tn.image = im_
+    m_.node_tree.nodes.active = tn
+    PT.data.materials.clear()
+    PT.data.materials.append(m_)
+    for p_ in PT.data.polygons:
+        p_.material_index = 0
+    for o in scene.objects:
+        o.select_set(o is PT)
+    bpy.context.view_layer.objects.active = PT
+    bpy.ops.object.bake(type="EMIT", use_selected_to_active=False, margin=1, target="IMAGE_TEXTURES", use_clear=False)
+    return np.array(im_.pixels[:], np.float32).reshape(TEX, TEX, 4)
+
+
+PCv = prop_bake("PropC", pcm)
+PMv = prop_bake("PropM", pmm)
+bpy.data.objects.remove(PT, do_unlink=True)
+
 px = np.array(base.pixels[:]).reshape(TEX, TEX, 4)
 mk = np.array(maskimg.pixels[:]).reshape(TEX, TEX, 4)[:, :, 0]
+covp = PCv[:, :, 0] > -0.5
+px[covp, :3] = lin2srgb(PCv[covp, :3])
+mk[covp] = PMv[covp, 0]
+REP["props"]["texture"] = dict(pixels=int(covp.sum()), fraction=round(float(covp.mean()), 4),
+                               team_cloth_pixels=int(((mk > 0.25) & (mk < 0.75) & covp).sum()),
+                               team_glow_pixels=int(((mk >= 0.75) & covp).sum()),
+                               rgb_mean_srgb=px[covp, :3].mean(0).round(3).tolist() if covp.any() else None)
+log("prop texture", REP["props"]["texture"])
 px[:, :, 3] = mk
 base.pixels.foreach_set(px.ravel().astype(np.float32))
 base.filepath_raw = os.path.join(OUT, "WarriorTex_Base.png")
@@ -409,6 +624,53 @@ dt.layers_vgroup_select_dst = "NAME"
 apply_mod(newo, "DT")
 limit4(newo)
 bpy.data.objects.remove(REFB, do_unlink=True)
+nmv = len(newo.data.vertices)
+fl_ = np.zeros(nmv, np.int32)
+newo.data.attributes["is_prop"].data.foreach_get("value", fl_)
+PNEW = np.nonzero(fl_)[0]
+pbk = np.zeros((nmv, 4), np.int32)
+pwk = np.zeros((nmv, 4), np.float32)
+for k_ in range(4):
+    a_ = np.zeros(nmv, np.int32); newo.data.attributes["pb%d" % k_].data.foreach_get("value", a_); pbk[:, k_] = a_
+    b_ = np.zeros(nmv, np.float32); newo.data.attributes["pw%d" % k_].data.foreach_get("value", b_); pwk[:, k_] = b_
+vg = newo.vertex_groups
+for i_ in PNEW:
+    i_ = int(i_)
+    for gi in [g.group for g in newo.data.vertices[i_].groups]:
+        vg[gi].remove([i_])
+    for k_ in range(4):
+        if pbk[i_, k_] >= 0 and pwk[i_, k_] > 0:
+            nm = BN[pbk[i_, k_]]
+            (vg.get(nm) or vg.new(name=nm)).add([i_], float(pwk[i_, k_]), "REPLACE")
+for nm in ["is_prop"] + ["pb%d" % k_ for k_ in range(4)] + ["pw%d" % k_ for k_ in range(4)]:
+    newo.data.attributes.remove(newo.data.attributes[nm])
+newo.data.color_attributes.remove(newo.data.color_attributes["PropCol"])
+REP["props"]["weights_restored_vertices"] = len(PNEW)
+# Unskin to the rest (linear blend, as the armature modifier deforms): rest = (sum w S_b)^-1 posed.
+Mo = newo.matrix_world.copy()
+Moi = Mo.inverted()
+SK = {pb.name: A_ @ pb.matrix @ pb.bone.matrix_local.inverted() @ A_.inverted() for pb in rig.pose.bones}
+gname2 = {g.index: g.name for g in newo.vertex_groups}
+unsk = 0.0
+for v in newo.data.vertices:
+    M = Matrix.Diagonal((0.0, 0.0, 0.0, 0.0))
+    tot = 0.0
+    for g in v.groups:
+        nm = gname2.get(g.group)
+        if nm in SK and g.weight > 0:
+            M = M + SK[nm] * g.weight
+            tot += g.weight
+    if tot <= 0:
+        continue
+    wp = Mo @ v.co
+    rp = (M * (1.0 / tot)).inverted_safe() @ wp
+    unsk = max(unsk, (rp - wp).length)
+    v.co = Moi @ rp
+newo.data.update()
+for pb in rig.pose.bones:
+    pb.matrix_basis = Matrix.Identity(4)
+bpy.context.view_layer.update()
+REP["unskin_max_move_m"] = round(unsk, 4)
 col = newo.data.color_attributes.new("Col", "BYTE_COLOR", "CORNER")   # code 0 (fixed, lined): the outline mask path
 col.data.foreach_set("color", np.tile([1.0, 1.0, 1.0, 0.0], len(col.data)).astype(np.float32))
 newo.data.color_attributes.active_color_name = "Col"
@@ -476,7 +738,10 @@ try:
     for y_ in (yaw, yaw + 180.0):
         shot("old_lod0_%d" % y_, [old0], "VERTEX", y_, zc, 2.3)
         shot("new_lod0_%d" % y_, [newo], "TEXTURE", y_, zc, 2.3)
-    shot("new_face", [newo], "TEXTURE", yaw, float(W[:, 2].max()) - 0.25, 0.7)
+    for y_ in (0.0, 180.0):
+        shot("new_face_%d" % y_, [newo], "TEXTURE", y_, float(W[:, 2].max()) - 0.25, 0.7)
+        shot("old_face_%d" % y_, [old0], "VERTEX", y_, float(W[:, 2].max()) - 0.25, 0.7)
+        shot("new_threequarter_%d" % (y_ + 45), [newo], "TEXTURE", y_ + 45.0, zc, 2.3)
     shot("new_lod1", [lod1], "TEXTURE", yaw, zc, 2.3)
 except Exception as x:
     REP["render_error"] = repr(x)
@@ -500,6 +765,31 @@ def deformed(o):
     m.vertices.foreach_get("co", co)
     ev.to_mesh_clear()
     return co.reshape(-1, 3)
+
+
+PSET_NEW = set(int(i_) for i_ in PNEW)
+NB_POLYS = [tuple(p.vertices) for p in newo.data.polygons if not any(v in PSET_NEW for v in p.vertices)]
+OB_POLYS = [tuple(p.vertices) for p in old0.data.polygons if not any(v in pset_old for v in p.vertices)]
+POLD_A = np.array(POLD)
+props_check = {}
+
+
+def prop_frame(Dn, Do, rec):
+    kd = KDTree(len(POLD_A))
+    for j_, q_ in enumerate(Do[POLD_A]):
+        kd.insert(Vector(tuple(q_)), j_)
+    kd.balance()
+    rec["attach_max_m"] = max(rec.get("attach_max_m", 0.0), max(kd.find(Vector(tuple(q_)))[2] for q_ in Dn[PNEW]))
+    for key, Dx, pidx, polys in (("new", Dn, PNEW, NB_POLYS), ("today", Do, POLD_A, OB_POLYS)):
+        bv = BVHTree.FromPolygons([tuple(q_) for q_ in Dx], polys)
+        dep = []
+        for q_ in Dx[pidx]:
+            q_ = Vector(tuple(q_))
+            loc, nrm, _, dd = bv.find_nearest(q_)
+            if loc is not None and dd < 0.05 and (q_ - loc).dot(nrm) < 0:
+                dep.append(dd)
+        rec[key + "_inside_max"] = max(rec.get(key + "_inside_max", 0), len(dep))
+        rec[key + "_depth_max_m"] = max(rec.get(key + "_depth_max_m", 0.0), max(dep) if dep else 0.0)
 
 
 ARMS = {"new": (newo, edges), "control_today_lod0": (old0, np.array([tuple(e.vertices) for e in old0.data.edges]))}
@@ -528,19 +818,45 @@ if carm is not None:
                     pb.matrix_basis = cb.matrix_basis.copy()
             bpy.context.view_layer.update()
             dg = bpy.context.evaluated_depsgraph_get()
+            Ds = {}
             for k_, (o_, e_) in ARMS.items():
                 D = deformed(o_)
+                Ds[k_] = D
                 l_, ok_ = REST0[k_]
                 r = np.linalg.norm(D[e_[:, 0]] - D[e_[:, 1]], axis=1)[ok_] / l_[ok_]
                 if k_ == "new":
                     hi, lo = max(hi, float(np.percentile(r, 99.9))), min(lo, float(np.percentile(r, 0.1)))
                 else:
                     chi = max(chi, float(np.percentile(r, 99.9)))
+            if any(t_ in act.name for t_ in ("Attack", "Block")):
+                prop_frame(Ds["new"], Ds["control_today_lod0"], props_check.setdefault(act.name.split("|")[-1], {}))
         stretch[act.name] = dict(max=round(hi, 3), min=round(lo, 3), control_today_lod0_max=round(chi, 3),
                                  frames=len(range(f0, f1 + 1, step)))
         print("[warrior_tex] clip %-28s edge stretch new max %.3f min %.3f | today's LOD0 max %.3f (99.9th / 0.1th pct, edges > 2 mm)"
               % (act.name, hi, lo, chi), flush=True)
+        if act.name.split("|")[-1] in props_check:
+            print("[warrior_tex] props %-22s %s" % (act.name.split("|")[-1], json.dumps({k: round(v, 4) for k, v in props_check[act.name.split("|")[-1]].items()})), flush=True)
+        if "shot" in globals() and act.name.split("|")[-1] in ("AttackSlice", "Run", "Block"):
+            fm = int(f0 + (0.5 if act.name.endswith("Run") else 0.45) * (f1 - f0))
+            scene.frame_set(fm)
+            for pb in rig.pose.bones:
+                cb = carm.pose.bones.get(pb.name)
+                if cb is not None:
+                    pb.matrix_basis = cb.matrix_basis.copy()
+            bpy.context.view_layer.update()
+            tag = act.name.split("|")[-1].lower()
+            for y_ in (0.0, 180.0, 135.0):
+                shot("new_%s_%d" % (tag, y_), [newo], "TEXTURE", y_, zc, 2.6)
+            shot("old_%s_0" % tag, [old0], "VERTEX", 0.0, zc, 2.6)
 REP["clip_stretch"] = stretch
+REP["props_check"] = {k: {a: round(b, 4) for a, b in v.items()} for k, v in props_check.items()}
+if stretch:
+    REP["stretch_summary"] = dict(new_max=max(v["max"] for v in stretch.values()),
+                                  today_lod0_max=max(v["control_today_lod0_max"] for v in stretch.values()),
+                                  new_min=min(v["min"] for v in stretch.values()),
+                                  verdict="pass" if max(v["max"] for v in stretch.values()) <= 2.5 else "FAIL (over 2.5x)")
+REP["open_edges"].update({"new_lod0": open_edges(newo.data), "new_lod1": open_edges(lod1.data), "today_lod0": open_edges(old0.data)})
+log("stretch", REP.get("stretch_summary"), "open edges", REP["open_edges"])
 for pb in rig.pose.bones:
     pb.matrix_basis = Matrix.Identity(4)
 rig.data.pose_position = "REST"
@@ -580,3 +896,28 @@ save()
 print("[warrior_tex] SUMMARY " + json.dumps(dict(raw=REP["raw"], align=REP["align"], lod0=REP["lod0"], texture=REP["texture"],
                                                  tris=REP["tris"], bones=REP["round_trip"]["bones"],
                                                  bind_diff=REP["round_trip"]["max_bind_matrix_diff"], skin=REP["skin"])), flush=True)
+try:
+    names = sorted(f for f in os.listdir(OUT) if f.endswith(".png") and (f.startswith("new_") or f.startswith("old_")))
+    tiles = []
+    for f in names:
+        im = bpy.data.images.load(os.path.join(OUT, f))
+        w_, h_ = im.size
+        tiles.append(np.array(im.pixels[:], np.float32).reshape(h_, w_, 4)[::2, ::2])
+    cols = 4
+    th, tw = tiles[0].shape[:2]
+    rows = (len(tiles) + cols - 1) // cols
+    sheet = np.zeros((rows * th, cols * tw, 4), np.float32)
+    sheet[..., 3] = 1.0
+    for k, a_ in enumerate(tiles):
+        r_, c_ = divmod(k, cols)
+        sheet[(rows - 1 - r_) * th:(rows - r_) * th, c_ * tw:(c_ + 1) * tw] = a_
+    sh = bpy.data.images.new("sheet", cols * tw, rows * th)
+    sh.pixels.foreach_set(sheet.ravel())
+    sh.filepath_raw = os.path.join(OUT, "sheet.png")
+    sh.file_format = "PNG"
+    sh.save()
+    REP["sheet_order_left_to_right_top_down"] = names
+except Exception as x:
+    REP["sheet_error"] = repr(x)
+save()
+print("[warrior_tex] SHEET " + json.dumps(REP.get("sheet_order_left_to_right_top_down")), flush=True)
