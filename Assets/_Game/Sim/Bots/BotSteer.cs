@@ -604,7 +604,7 @@ namespace CriticalMass.Sim.Bots
                     // craters (Cell.Void) cut the floor pocket she stood on off the pad field (her cell and every neighbour
                     // Infinity but one diagonal past a void corner, which FlowStepAt refuses), so Follow found no step, she wanted
                     // no move (WantMove 0: the stuck and progress detectors never fire) and stood there for good. Now she hops out.
-                    if (!Follow(w, st, id, TeamPadField(w, id))) HopOut(w, st, id, TeamPadField(w, id), output);
+                    if (!Follow(w, st, id, TeamPadField(w, id)) && DepthRules.On(w, true)) HopOut(w, st, id, TeamPadField(w, id), output);   // Full only: Classic / PhysicsOnly rows unchanged
                     break;
                 case AiState.Order:
                 {
