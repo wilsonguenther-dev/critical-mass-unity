@@ -75,6 +75,54 @@ namespace CriticalMass.Sim.Bots
         /// direction away from the threat, is not below -0.05). None fits: false (the bot holds the hill and takes the hit)
         /// unless dmg would knock it out, then the threat direction (off the hill). Off the hill: the direction unchanged.
         /// </summary>
+        /// <summary>
+        /// b13 r3 integrator (sim cost): called by MatchTick once per tick before the bot fills. Lists the actors that swung in the
+        /// last MaxCycleSeconds (or are winding up) and the landed bombs inside the dodge fuse window, in id / slot order, so Scan
+        /// walks those instead of every actor and the whole bomb pool for every bot. Nothing between BeginFills and EndFills
+        /// changes a swing, a bomb or who is alive (input fills and ApplyInput only copy inputs), so the candidates are the same.
+        /// </summary>
+        public static void BeginFills(World w)
+        {
+            if (!Dodge.On(w)) return;
+            DodgeState s = w.Dodges;
+            s.Ensure(w);
+            DodgeConfig dc = w.Config.Depth.Dodge;
+            if (s.ScanSwing.Length < w.ActorCount) s.ScanSwing = new int[w.Actors.Length > w.ActorCount ? w.Actors.Length : w.ActorCount];
+            int maxCycle = (int)(MaxCycleSeconds * w.Config.SimHz + 0.5);
+            int n = 0;
+            for (int e = 0; e < w.ActorCount; e++)
+            {
+                Actor en = w.Actors[e];
+                if (!en.Alive) continue;
+                if (!en.SwingPending && (en.SwingTick <= w.Tick - maxCycle || en.SwingTick > w.Tick)) continue;
+                s.ScanSwing[n++] = e;
+            }
+            s.ScanSwingN = n;
+            Bomb[] bombs = w.Demolitions != null ? w.Demolitions.Bombs : null;
+            n = 0;
+            if (bombs != null)
+            {
+                if (s.ScanBomb.Length < bombs.Length) s.ScanBomb = new int[bombs.Length];
+                for (int b = 0; b < bombs.Length; b++)
+                {
+                    Bomb bomb = bombs[b];
+                    if (bomb == null || !bomb.Active || !bomb.Landed) continue;
+                    int fuse = bomb.BlastTick - w.Tick;
+                    if (fuse < 0 || fuse > dc.TntFuseTicksLeft) continue;
+                    s.ScanBomb[n++] = b;
+                }
+            }
+            s.ScanBombN = n;
+            s.ScanTick = w.Tick;
+            s.ScanCached = true;
+        }
+
+        /// <summary>b13 r3 integrator: the end of MatchTick's fill phase (the lists go stale once the step runs).</summary>
+        public static void EndFills(World w)
+        {
+            if (w.Dodges != null) w.Dodges.ScanCached = false;
+        }
+
         public static bool HillAware(World w, DodgeState s, DodgeConfig dc, int id, double ax, double az, double dmg, ref double dx, ref double dz)
         {
             HillDef hill = w.Map != null ? w.Map.Hill : null;
@@ -171,11 +219,15 @@ namespace CriticalMass.Sim.Bots
             }
             // (2) enemy TNT, landed, short fuse
             Bomb[] bombs = w.Demolitions != null ? w.Demolitions.Bombs : null;
+            DodgeState cache = w.Dodges;
+            bool cached = cache != null && cache.ScanCached && cache.ScanTick == w.Tick;
             if (bombs != null)
             {
                 double br = cfg.Abilities.DemolitionsTnt.BlastRadius + dc.TntSlack;
-                for (int b = 0; b < bombs.Length; b++)
+                int nb = cached ? cache.ScanBombN : bombs.Length;
+                for (int bi = 0; bi < nb; bi++)
                 {
+                    int b = cached ? cache.ScanBomb[bi] : bi;
                     Bomb bomb = bombs[b];
                     if (bomb == null || !bomb.Active || !bomb.Landed || bomb.Team == me.Team) continue;
                     int fuse = bomb.BlastTick - w.Tick;
@@ -200,8 +252,10 @@ namespace CriticalMass.Sim.Bots
             }
             // (4) enemy melee wind-up aimed at this bot: sideways, the side with more room
             int maxCycle = (int)(MaxCycleSeconds * cfg.SimHz + 0.5);
-            for (int e = 0; e < w.ActorCount; e++)
+            int ne = cached ? cache.ScanSwingN : w.ActorCount;
+            for (int ei = 0; ei < ne; ei++)
             {
+                int e = cached ? cache.ScanSwing[ei] : ei;
                 Actor en = w.Actors[e];
                 if (e == id || !en.Alive || en.Team == me.Team) continue;
                 if (!en.SwingPending && (en.SwingTick <= w.Tick - maxCycle || en.SwingTick > w.Tick)) continue;   // cheap: no recent swing
