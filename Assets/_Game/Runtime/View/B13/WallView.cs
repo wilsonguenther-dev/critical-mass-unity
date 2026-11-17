@@ -24,6 +24,8 @@ namespace CriticalMass.Runtime.View.B13
     public sealed class WallView : MonoBehaviour
     {
         public const float ShortTop = 0.6f, TallTop = 1.6f;
+        /// <summary>Inset of a short wall's team-colour inlay from the cell edge (b14 review: was 0.08, a lid over the whole block).</summary>
+        public const float CapInset = 0.2f;
         const int MaxVerts = 4096, MaxIdx = 8192;
 
         static readonly Color32 GhostOk = Pm(72, 220, 120, 110), GhostBad = Pm(240, 64, 56, 110), GhostEdge = Pm(255, 255, 255, 160);
@@ -124,7 +126,9 @@ namespace CriticalMass.Runtime.View.B13
                 {
                     if (!_mesh.Room(4, 6)) return;
                     Color32 tc = b.Team == TeamId.Azure ? AzureTop : CrimsonTop;
-                    Quad(b.Cx + 0.08f, b.Cz + 0.08f, b.Cx + 0.92f, b.Cz + 0.92f, h + top + 0.015f, tc);
+                    // b14 review: the cap is an inlay on the stone top (CapInset), not a lid over the whole block: the bevelled
+                    // stone shows round it, so a row of blocks reads as stones carrying team colour instead of a blue brick.
+                    Quad(b.Cx + CapInset, b.Cz + CapInset, b.Cx + 1f - CapInset, b.Cz + 1f - CapInset, h + top + 0.015f, tc);
                     CapsDrawn++;
                     double max = BuilderWalls.SlotMaxHp(w, s);
                     double share = max > 0 ? b.Hp / max : 1;
