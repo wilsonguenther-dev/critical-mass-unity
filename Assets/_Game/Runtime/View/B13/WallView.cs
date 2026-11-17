@@ -14,7 +14,8 @@ namespace CriticalMass.Runtime.View.B13
     /// <item>the GHOST while the local player is a living Builder and the rule is on: translucent cells (green = will build,
     /// red = refused; the reason word is TerrainPrompt's), knee high for short pieces, 1.6 u for tall ones, a flat pad for a
     /// crater fill;</item>
-    /// <item>short walls (Cell.LowWall, the 0.6 u stone box is GridChunkMeshView's): a team-coloured top, cracks by HP;</item>
+    /// <item>short walls (Cell.LowWall; b14: the bevelled stone block under it is TerrainEditMesh's, top exactly ShortTop
+    /// above the ground, so the cap sits on its flat top inside the 0.07 u bevel): a team-coloured top, cracks by HP;</item>
     /// <item>every wall cell in its last WarnTicks (BuilderPieces' crumble warning, 3 s): a flickering outline box.</item>
     /// </list>
     /// Tall walls are Cell.Barricade cells in barricade slots, so ActorViews' palisade model (team material, damage stages)

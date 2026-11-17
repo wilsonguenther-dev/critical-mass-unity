@@ -56,6 +56,22 @@ namespace CriticalMass.Runtime.View
 
         private int _seenDressVersion;
 
+        // b14 terrain look: changed terrain (pits, filled and placed blocks, short wall blocks) is TerrainEditMesh's, one
+        // extra mesh per chunk that has any, created on first need (a match with no digs makes none).
+        private readonly TerrainEditMesh _edit = new TerrainEditMesh();
+        private GameObject[] _editObjects;
+        private Mesh[] _editMeshes;
+        private int[] _editPits, _editBlocks, _editWalls;
+        private int _seenEditCaptures = -1;
+
+        /// <summary>Pit cells, earth block cells and short wall cells drawn now over all chunks (WallShots prints them).</summary>
+        public static int EditPits { get; private set; }
+        public static int EditBlocks { get; private set; }
+        public static int EditShortWalls { get; private set; }
+        /// <summary>Wall time of the last chunk rebuild, ms (the hitch budget's proof).</summary>
+        public static double LastRebuildMs { get; private set; }
+        private static readonly System.Diagnostics.Stopwatch RebuildWatch = new System.Diagnostics.Stopwatch();
+
         private void Start()
         {
             // World art (2026-11-12): the dressed world draws ground, bridges and the walls the bases kit covers; this
@@ -83,6 +99,12 @@ namespace CriticalMass.Runtime.View
                 var r = go != null ? go.GetComponent<MeshRenderer>() : null;
                 if (r != null && r.shadowCastingMode != mode) r.shadowCastingMode = mode;
             }
+            if (_editObjects != null)
+                foreach (GameObject go in _editObjects)
+                {
+                    var r = go != null ? go.GetComponent<MeshRenderer>() : null;
+                    if (r != null && r.shadowCastingMode != mode) r.shadowCastingMode = mode;
+                }
         }
 
         private void LateUpdate() { var cost = CriticalMass.Runtime.Game.FrameCost.Enter(); LateUpdateCost(); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.Ground, cost); }
@@ -102,6 +124,16 @@ namespace CriticalMass.Runtime.View
                 _seenDressVersion = Dressing.WorldView.DressVersion;
                 if (_dirty != null) for (int c = 0; c < _dirty.Length; c++) RebuildChunk(c);
             }
+            TerrainEdits.Sync(w);
+            if (TerrainEdits.Captures != _seenEditCaptures)
+            {
+                // A new map or a repaint (World.Epoch): every chunk again, so filled blocks of the last match go away.
+                _seenEditCaptures = TerrainEdits.Captures;
+                System.Array.Copy(w.Map.Cells, _cellsCopy, _cellsCopy.Length);
+                _seenGridVersion = w.GridVersion;
+                for (int c = 0; c < _dirty.Length; c++) { _dirty[c] = false; RebuildChunk(c); }
+                return;
+            }
             if (w.GridVersion == _seenGridVersion) return;
             _seenGridVersion = w.GridVersion;
 
@@ -112,9 +144,9 @@ namespace CriticalMass.Runtime.View
             {
                 if (cells[i] == _cellsCopy[i]) continue;
                 _cellsCopy[i] = cells[i];
-                int cx = i % width;
-                int cz = i / width;
-                _dirty[(cz / ChunkSize) * _chunksX + cx / ChunkSize] = true;
+                // b14: a pit's depth and walls read cells up to two away, and a spoil lump sits on the neighbour, so every
+                // chunk within two cells rebuilds (still only the chunks around the edit, never the whole map).
+                MarkDirtyAround(i % width, i / width);
                 any = true;
             }
             if (!any) return;
@@ -131,6 +163,15 @@ namespace CriticalMass.Runtime.View
             DestroyChunks();
         }
 
+        private void MarkDirtyAround(int cx, int cz)
+        {
+            int ax = Mathf.Max(0, cx - 2) / ChunkSize, bx = Mathf.Min(_map.Width - 1, cx + 2) / ChunkSize;
+            int az = Mathf.Max(0, cz - 2) / ChunkSize, bz = Mathf.Min(_map.Height - 1, cz + 2) / ChunkSize;
+            for (int z = az; z <= bz; z++)
+            for (int x = ax; x <= bx; x++)
+                _dirty[z * _chunksX + x] = true;
+        }
+
         private void BuildAll(World w)
         {
             DestroyChunks();
@@ -138,6 +179,8 @@ namespace CriticalMass.Runtime.View
             _map = w.Map;
             _cellsCopy = (byte[])_map.Cells.Clone();
             _seenGridVersion = w.GridVersion;
+            TerrainEdits.Sync(w);
+            _seenEditCaptures = TerrainEdits.Captures;
             _seenDressVersion = Dressing.WorldView.DressVersion;
             _chunksX = (_map.Width + ChunkSize - 1) / ChunkSize;
             _chunksZ = (_map.Height + ChunkSize - 1) / ChunkSize;
@@ -157,6 +200,12 @@ namespace CriticalMass.Runtime.View
             _chunkObjects = new GameObject[count];
             _meshes = new Mesh[count];
             _dirty = new bool[count];
+            _editObjects = new GameObject[count];
+            _editMeshes = new Mesh[count];
+            _editPits = new int[count];
+            _editBlocks = new int[count];
+            _editWalls = new int[count];
+            EditPits = EditBlocks = EditShortWalls = 0;
             for (int c = 0; c < count; c++)
             {
                 int chx = c % _chunksX;
@@ -193,10 +242,17 @@ namespace CriticalMass.Runtime.View
             }
             _chunkObjects = null;
             _meshes = null;
+            if (_editObjects != null)
+                for (int c = 0; c < _editObjects.Length; c++) if (_editObjects[c] != null) Destroy(_editObjects[c]);
+            if (_editMeshes != null)
+                for (int c = 0; c < _editMeshes.Length; c++) if (_editMeshes[c] != null) Destroy(_editMeshes[c]);
+            _editObjects = null;
+            _editMeshes = null;
         }
 
         private void RebuildChunk(int c)
         {
+            RebuildWatch.Restart();
             int chx = c % _chunksX;
             int chz = c / _chunksX;
             int x0 = chx * ChunkSize;
@@ -209,11 +265,17 @@ namespace CriticalMass.Runtime.View
             _outline.Clear();
             for (int k = 0; k < _tris.Length; k++) _tris[k].Clear();
 
+            TerrainEdits.Arrays(_map, out byte[] pristine, out bool[] touched);
             for (int cz = z0; cz < z1; cz++)
             {
                 for (int cx = x0; cx < x1; cx++)
                 {
                     int i = cz * _map.Width + cx;
+                    // b14: changed terrain and short walls are TerrainEditMesh's (a barricade on an edited cell keeps its
+                    // grey-box body when the barricade model is not imported).
+                    byte cur = _cellsCopy[i];
+                    TerrainEdits.Kind kind = pristine != null ? TerrainEdits.Classify(pristine[i], cur, touched[i]) : TerrainEdits.Kind.None;
+                    if (TerrainEditMesh.Owns(cur, kind) && !(cur == Cell.Barricade && !BarricadeModelShown)) continue;
                     if (Dressing.WorldView.Draws(i, _cellsCopy[i])) continue;
                     if (!CellBox(_cellsCopy[i], _map.Height01[i], out double top, out double bottom, out int look)) continue;
                     AddBox(cx, cx + 1, cz, cz + 1, bottom, top, _tris[look]);
@@ -229,6 +291,34 @@ namespace CriticalMass.Runtime.View
             mesh.SetUVs(3, _outline);
             for (int k = 0; k < _tris.Length; k++) mesh.SetTriangles(_tris[k], k, false);
             mesh.RecalculateBounds();
+
+            _edit.Build(_map.Width, _map.Height, _cellsCopy, _map.Height01, pristine, touched, x0, z0, x1, z1);
+            if (_edit.Tris.Count > 0 || _editMeshes[c] != null)
+            {
+                if (_editMeshes[c] == null)
+                {
+                    var go = new GameObject("Terrain Edits " + chx + "," + chz);
+                    go.transform.SetParent(transform, false);
+                    var em = new Mesh { name = "TerrainEdits " + chx + "," + chz };
+                    em.MarkDynamic();
+                    go.AddComponent<MeshFilter>().sharedMesh = em;
+                    var er = go.AddComponent<MeshRenderer>();
+                    er.sharedMaterial = TerrainEditMesh.Material();
+                    er.shadowCastingMode = ChunkShadows();
+                    _editObjects[c] = go;
+                    _editMeshes[c] = em;
+                }
+                bool has = _edit.Upload(_editMeshes[c]);
+                var r = _editObjects[c].GetComponent<MeshRenderer>();
+                if (r.enabled != has) r.enabled = has;
+            }
+            EditPits += _edit.PitCells - _editPits[c];
+            EditBlocks += _edit.BlockCells - _editBlocks[c];
+            EditShortWalls += _edit.ShortWallCells - _editWalls[c];
+            _editPits[c] = _edit.PitCells;
+            _editBlocks[c] = _edit.BlockCells;
+            _editWalls[c] = _edit.ShortWallCells;
+            LastRebuildMs = RebuildWatch.Elapsed.TotalMilliseconds;
         }
 
         /// <summary>True when the art catalog carries the Miner barricade model (art import 2026-11-12).</summary>
@@ -256,8 +346,9 @@ namespace CriticalMass.Runtime.View
                     if (BarricadeModelShown) { top = h; bottom = h - 0.5; look = LookCream; return true; }
                     top = h + 1.0; bottom = h - 0.5; look = LookMeat; return true;
                 case Cell.LowWall:   // b13-hook: a short wall (item B restyles it)
-                    // CM b13 B: a knee-high stone block (WallView.ShortTop 0.6 u; WallView adds the team-coloured top and cracks).
-                    top = h + 0.6; bottom = h - 0.5; look = LookStone; return true;
+                    // b14: not reached in RebuildChunk (TerrainEditMesh draws the bevelled stone block, top WallView.ShortTop);
+                    // kept for any other caller of CellBox.
+                    top = h + 0.6; bottom = h - 0.02; look = LookStone; return true;
                 case Cell.Water:
                     top = WaterTop; bottom = WaterTop - 0.2; look = LookWater; return true;
                 default:
