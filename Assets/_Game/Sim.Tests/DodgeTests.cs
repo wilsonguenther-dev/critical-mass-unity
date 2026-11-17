@@ -225,14 +225,18 @@ namespace CriticalMass.Sim.Tests
             InputFrame scratch = SimInput.EmptyInput();
             int max = (int)Math.Ceiling(cfg.MatchSeconds * cfg.SimHz) + (int)cfg.SimHz, lastHead = 0, lastLeader = 0;
             double firstKo = -1;
+            var teamDodges = new int[2];
+            int kaijuAzure = 0, kaijuCrimson = 0;
             for (int t = 0; t < max && w.Match.Phase != MatchPhase.Ended; t++)
             {
                 MatchTick.Advance(w, null, scratch);
+                if (w.Kaiju.State == KaijuState.Azure) kaijuAzure++;
+                else if (w.Kaiju.State == KaijuState.Crimson) kaijuCrimson++;
                 int from = Math.Max(w.EventHead >= lastHead ? lastHead : 0, w.EventHead - World.EventCapacity);
                 for (int q = from; q < w.EventHead; q++)
                 {
                     SimEvent ev = w.Events[q % World.EventCapacity];
-                    if (ev.Type == SimEventType.Dodge && ev.A >= 0 && ev.A < w.ActorCount && !w.Actors[ev.A].IsHuman) arm.Dodges++;
+                    if (ev.Type == SimEventType.Dodge && ev.A >= 0 && ev.A < w.ActorCount && !w.Actors[ev.A].IsHuman) { arm.Dodges++; teamDodges[w.Actors[ev.A].Team == TeamId.Azure ? 0 : 1]++; }
                     if ((ev.Type == SimEventType.Hit || ev.Type == SimEventType.Death) && ev.A >= 0 && ev.A < w.ActorCount && ev.Value > 0)
                     {
                         arm.AllDamage += ev.Value;
@@ -263,7 +267,9 @@ namespace CriticalMass.Sim.Tests
             if (firstKo >= 0) arm.FirstKo.Add(firstKo);
             arm.Wins[w.Match.Winner == MatchResult.Azure ? 0 : w.Match.Winner == MatchResult.Crimson ? 1 : 2]++;
             Console.WriteLine("{\"item\":\"b13-jd balance match\",\"size\":" + size + ",\"seed\":" + seed + ",\"dodge\":\"" + (on ? "on" : "off (control)") + "\",\"winner\":\"" + w.Match.Winner +
-                              "\",\"firstKoAt\":" + firstKo.ToString("F1") + ",\"seconds\":" + w.Match.Time.ToString("F0") + "}");
+                              "\",\"firstKoAt\":" + firstKo.ToString("F1") + ",\"seconds\":" + w.Match.Time.ToString("F0") +
+                              ",\"kaijuMostlyWith\":\"" + (kaijuAzure > kaijuCrimson ? "Azure" : kaijuCrimson > kaijuAzure ? "Crimson" : "none") + "\",\"kaijuAzureS\":" + (kaijuAzure / cfg.SimHz).ToString("F0") + ",\"kaijuCrimsonS\":" + (kaijuCrimson / cfg.SimHz).ToString("F0") +
+                              ",\"botDodgesAzure\":" + teamDodges[0] + ",\"botDodgesCrimson\":" + teamDodges[1] + ",\"hillAzureS\":" + w.Match.HillSeconds.Azure.ToString("F0") + ",\"hillCrimsonS\":" + w.Match.HillSeconds.Crimson.ToString("F0") + "}");
         }
 
         private static double Median(List<double> v)
@@ -365,24 +371,36 @@ namespace CriticalMass.Sim.Tests
             var clock = new long[2];
             long own = 0;
             int dodgesSeen = 0;
+            // b13 r3: both arms are built and warmed first, then measured tick by tick in turn (on, control, on, ...), so
+            // JIT tiering and runner clock drift fall on both arms alike (round 1 printed on 41.0 vs control 74.1 us, round 3's
+            // first run 58.4 vs 40.1 us, with the arm measured first always the odd one)
+            var worlds = new World[2];
+            var scratches = new InputFrame[2];
             for (int arm = 0; arm < 2; arm++)
             {
-                World w = World.CreateWorld(new WorldOptions { Seed = 4242, TeamSize = 16, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = MatchConfig(16, arm == 0) });
-                InputFrame scratch = SimInput.EmptyInput();
-                for (int t = 0; t < Warm; t++) MatchTick.Advance(w, null, scratch);
-                // b13 r3: the rule's own calls run once in the warm-up too, so a first call's one-time type set-up (static
-                // tables, JIT) is not counted as a per-tick allocation (round 1 printed 74416 B with no dodge in the window)
+                worlds[arm] = World.CreateWorld(new WorldOptions { Seed = 4242, TeamSize = 16, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = MatchConfig(16, arm == 0) });
+                scratches[arm] = SimInput.EmptyInput();
+                for (int t = 0; t < Warm; t++) MatchTick.Advance(worlds[arm], null, scratches[arm]);
+            }
+            {
+                World w = worlds[0];
+                // the rule's own calls run once in the warm-up too, so a first call's one-time set-up (static tables, JIT) is
+                // not counted as a per-tick allocation (round 1 printed 74416 B with no dodge in the window)
                 for (int id = 0; id < w.ActorCount; id++)
                 {
                     Dodge.Active(w, id); Dodge.Immune(w, id, DamageCause.Melee); Dodge.Phase(w, id, 0.5); Dodge.CooldownTicks(w, id);
                     BotReflex.FindThreat(w, null, w.Config.Depth.Dodge, id, out int _, out int _, out double _, out double _);
                 }
-                int d0 = w.Dodges.Count;
-                for (int t = 0; t < Ticks; t++)
+            }
+            int d0 = worlds[0].Dodges.Count;
+            for (int t = 0; t < Ticks; t++)
+            {
+                for (int arm = 0; arm < 2; arm++)
                 {
+                    World w = worlds[arm];
                     long a0 = GC.GetAllocatedBytesForCurrentThread();
                     long c0 = System.Diagnostics.Stopwatch.GetTimestamp();
-                    MatchTick.Advance(w, null, scratch);
+                    MatchTick.Advance(w, null, scratches[arm]);
                     clock[arm] += System.Diagnostics.Stopwatch.GetTimestamp() - c0;
                     alloc[arm] += GC.GetAllocatedBytesForCurrentThread() - a0;
                     if (arm != 0) continue;
@@ -394,8 +412,8 @@ namespace CriticalMass.Sim.Tests
                     }
                     own += GC.GetAllocatedBytesForCurrentThread() - o0;
                 }
-                if (arm == 0) dodgesSeen = w.Dodges.Count - d0;
             }
+            dodgesSeen = worlds[0].Dodges.Count - d0;
             double usOn = clock[0] * 1e6 / System.Diagnostics.Stopwatch.Frequency / Ticks, usOff = clock[1] * 1e6 / System.Diagnostics.Stopwatch.Frequency / Ticks;
             Console.WriteLine("{\"item\":\"b13-jd allocation\",\"ruleOwnCallsBytes\":" + own + ",\"wholeTickBytesOn\":" + alloc[0] + ",\"wholeTickBytesControl\":" + alloc[1] + ",\"dodgesInWindow\":" + dodgesSeen + "}");
             Console.WriteLine("{\"item\":\"b13-jd sim cost\",\"usPerTickOn\":" + usOn.ToString("F1") + ",\"usPerTickControl\":" + usOff.ToString("F1") + ",\"limit\":1.10,\"verdict\":\"" + (usOn <= usOff * 1.10 ? "PASS" : "FAIL") + "\"}");
