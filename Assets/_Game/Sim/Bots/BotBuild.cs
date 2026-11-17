@@ -21,6 +21,8 @@ namespace CriticalMass.Sim.Bots
         public const int GuardEveryTicks = 90;
         /// <summary>Ticks before a refused rule 1 try may run again.</summary>
         public const int HillRetryTicks = 30;
+        /// <summary>Rule 1 waits while the walking Kaiju is within this many units of the hill centre (it must reach the hill).</summary>
+        public const double KaijuNearHill = 16;
 
         /// <summary>The Builder's decision; true = a build press was queued (BotFsm.DecideBuilder skips the rest).</summary>
         public static bool DecideBuilder(World w, BotsState st, int id, AiState s)
@@ -67,7 +69,8 @@ namespace CriticalMass.Sim.Bots
             // Never while the Kaiju is up and walking: a ring of hill-edge walls fenced it off the hill (MovementShiverTests 1337 /
             // 4242: on-hill share 0.0), so the hill walls go up before the hatch and while it is knocked out.
             Kaiju kj = w.Kaiju;
-            bool kaijuWalking = kj.State != KaijuState.Egg && !(kj.KoIn > 0);
+            bool kaijuWalking = kj.State != KaijuState.Egg && !(kj.KoIn > 0)
+                && (kj.X - w.Map.Hill.X) * (kj.X - w.Map.Hill.X) + (kj.Z - w.Map.Hill.Z) * (kj.Z - w.Map.Hill.Z) < KaijuNearHill * KaijuNearHill;
             if (!kaijuWalking && w.Match.HillState == own && w.Tick - ws.BotHillTick[id] >= Durations.T30(w.Config, b.BotHillEveryTicks))
             {
                 HillDef h = w.Map.Hill;

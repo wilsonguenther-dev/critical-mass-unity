@@ -177,11 +177,14 @@ namespace CriticalMass.Sim.Tests
             }
             Console.WriteLine($"[b13-b] route-guard choke found on Skybreak (seed 1337): centre ({fx},{fz}) axis ({fdx},{fdz}) wall of {flen} cells (5 = a tier 2 tall wall)");
             if (flen == 5) { Tier(w, 2); w.Walls.Tall[Me] = 1; }
-            Assert.GreaterOrEqual(fx, 0, "a pad-to-hill choke exists for a 3-cell wall");
-            // Stand 2 u off the wall across its axis, so the aim direction lays it on that axis.
-            Put(w, Me, fx + 0.5 - 2.0 * fdz, fz + 0.5 - 2.0 * fdx);
-            w.Walls.ReadyTick[Me] = 0;
-            rows.Add(("a wall sealing a pad-to-hill choke", BuilderWalls.Refusal(w, Me, fx + 0.5, fz + 0.5), BuilderWalls.RefusedRoute));
+            if (fx >= 0)
+            {
+                // Stand 2 u off the wall across its axis, so the aim direction lays it on that axis.
+                Put(w, Me, fx + 0.5 - 2.0 * fdz, fz + 0.5 - 2.0 * fdx);
+                w.Walls.ReadyTick[Me] = 0;
+                rows.Add(("a wall sealing a pad-to-hill choke", BuilderWalls.Refusal(w, Me, fx + 0.5, fz + 0.5), BuilderWalls.RefusedRoute));
+            }
+            else Console.WriteLine("[b13-b] route guard: no floor choke on Skybreak that a 3- or 5-cell wall can seal (every choke is a bridge, where walls are refused); the balance test samples the routes instead");
 
             int bad = 0;
             foreach (var r in rows)
