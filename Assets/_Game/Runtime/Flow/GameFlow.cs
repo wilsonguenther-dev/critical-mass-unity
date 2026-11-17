@@ -65,6 +65,11 @@ namespace CriticalMass.Runtime.Flow
         public MatchMode Mode;
         /// <summary>Home lobby: the mode's match settings, applied to this world's own fresh config (default: none).</summary>
         public MatchRules Rules;
+        /// <summary>
+        /// b13-replay: this "match" is a saved replay played back (Replay.ReplayPlayback.Pending holds it): the driver builds
+        /// the world from the replay's own starting conditions and feeds its recorded inputs; it is never recorded again.
+        /// </summary>
+        public bool Replay;
 
         /// <summary>
         /// The sim's options for this request. cfg is the new world's own config (SimDriverBehaviour makes one per world):
@@ -317,6 +322,24 @@ namespace CriticalMass.Runtime.Flow
             // match clock until it hides). Never in autoplay or batch runs. It names the speed the match runs at.
             if (!Autoplay && Menus.LoadingScreen.UseInFlow)
                 Menus.LoadingScreen.ShowForMatch(_pending.Seed, MatchSpeed.LoadingLine(_pending.Pace), quick);
+            Reload();
+        }
+
+        /// <summary>
+        /// b13-replay: plays a saved replay (Replay.ReplayPlayback.Pending is set by the caller): the Boot reload builds a
+        /// match scene around the replay's world. The player's last setup, seed and match count are left alone, so Play
+        /// again after a replay plays the player's own setup. quick: no loading screen (a rewind re-simulates behind the
+        /// replay bar's own cover instead).
+        /// </summary>
+        public static void BeginReplay(MatchRequest shown, bool quick)
+        {
+            if (shown == null) return;
+            shown.Replay = true;
+            shown.Backdrop = false;
+            _pending = shown;
+            State = FlowState.Match;
+            if (!quick && !Autoplay && Menus.LoadingScreen.UseInFlow)
+                Menus.LoadingScreen.ShowForMatch(shown.Seed, MatchSpeed.LoadingLine(shown.Pace), true);
             Reload();
         }
 
