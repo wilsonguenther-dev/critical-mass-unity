@@ -18,10 +18,13 @@ namespace CriticalMass.Sim.Tests
     [TestFixture]
     public sealed class CorruptionRollTests
     {
-        static World Make(int seed, int size, Action<GameConfig> tweak = null, GameConfig baseCfg = null)
+        /// <summary>b13 r3 integrator: mechanics tests run the crystal rule in small worlds too (SmallMatchesCrystals); the balance
+        /// run passes mechanics false and plays the shipped default (small matches keep the old rule only).</summary>
+        static World Make(int seed, int size, Action<GameConfig> tweak = null, GameConfig baseCfg = null, bool mechanics = true)
         {
             GameConfig cfg = baseCfg ?? GameConfig.CreateDefault();
             cfg.TeamSize = size;
+            if (mechanics) cfg.Depth.Corruption.SmallMatchesCrystals = true;
             tweak?.Invoke(cfg);
             return World.CreateWorld(new WorldOptions { Seed = seed, TeamSize = size, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = cfg });
         }
@@ -581,7 +584,7 @@ namespace CriticalMass.Sim.Tests
 
         static void RunMatch(Arm arm, int seed, int size, bool on, out bool success)
         {
-            World w = Make(seed, size, c => c.Depth.Corruption.On = on);
+            World w = Make(seed, size, c => c.Depth.Corruption.On = on, null, false);
             InputFrame scratch = SimInput.EmptyInput();
             int head = w.EventHead;
             int maxSteps = (int)Math.Ceiling(w.Config.MatchSeconds * w.Config.SimHz) + (int)w.Config.SimHz;

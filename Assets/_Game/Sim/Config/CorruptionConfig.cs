@@ -17,10 +17,12 @@ namespace CriticalMass.Sim.Config
         /// </summary>
         public int OldBerserkMaxTeamSize = 8;
         /// <summary>
-        /// In those small matches the crystal rule runs too (both wild rules). Set false if both together fail the limits: then
-        /// small matches use the old rule only (crystals, the pool and the roll are off there, as with On false).
+        /// In those small matches the crystal rule runs too (both wild rules) when true. OWNER DEFAULT fallback taken: with both
+        /// together the 5v5 idle-player floor stayed at 0.065 (limit 0.15; the old rule's equaliser is the director's pre-hatch
+        /// corruption run, which the crystal rule turns off), so small matches use the OLD rule only (crystals, the pool and the
+        /// roll are off there, exactly as with On false).
         /// </summary>
-        public bool SmallMatchesCrystals = true;
+        public bool SmallMatchesCrystals = false;
 
         // --- crystal veins (the existing corruption nodes on the south island) ---
         /// <summary>Charges per crystal vein while the rule is on.</summary>
