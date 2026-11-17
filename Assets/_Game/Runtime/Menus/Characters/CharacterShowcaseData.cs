@@ -112,7 +112,7 @@ namespace CriticalMass.Runtime.Menus.Characters
             },
             new ShowcaseClass
             {
-                Id = ClassId.Builder, FileId = "builder", Name = "BUILDER", Role = "Shapes the ground and builds the way.",
+                Id = ClassId.Builder, FileId = "builder", Name = "BUILDER", Role = "Digs, fills and builds ways.",
                 Summary = "Digs and fills the ground, builds stairs onto high ground and bridges over gaps.",
                 FAction = "DIG / PLACE", Ability = "STAIRS / BRIDGE",
                 Slides = new[]
