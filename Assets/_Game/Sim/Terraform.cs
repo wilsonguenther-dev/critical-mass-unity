@@ -298,7 +298,7 @@ namespace CriticalMass.Sim.Core
             double ax = double.IsFinite(aimX) ? aimX : w.X[id];
             double az = double.IsFinite(aimZ) ? aimZ : w.Z[id];
             TerraformState t = w.Terraform;
-            if (!a.Alive || a.Cls != ClassId.Miner || t.Carried[id] >= CarryMax(w.Config)) return Refuse(w, id, -1, ax, az, RefusedTarget);
+            if (!a.Alive || a.Cls != OwnerClass(w) || t.Carried[id] >= CarryMax(w.Config)) return Refuse(w, id, -1, ax, az, RefusedTarget);
             if (!TargetCell(w, id, aimX, aimZ, out int cx, out int cz)) return Refuse(w, id, -1, ax, az, RefusedOutside);
             int i = cz * w.Map.Width + cx;
             if (WaitTicks(w, a.Team) > 0) return Refuse(w, id, i, cx + 0.5, cz + 0.5, RefusedRate);
@@ -321,7 +321,7 @@ namespace CriticalMass.Sim.Core
             double ax = double.IsFinite(aimX) ? aimX : w.X[id];
             double az = double.IsFinite(aimZ) ? aimZ : w.Z[id];
             TerraformState t = w.Terraform;
-            if (!a.Alive || a.Cls != ClassId.Miner || t.Carried[id] == 0) return Refuse(w, id, -1, ax, az, RefusedTarget);
+            if (!a.Alive || a.Cls != OwnerClass(w) || t.Carried[id] == 0) return Refuse(w, id, -1, ax, az, RefusedTarget);
             if (!TargetCell(w, id, aimX, aimZ, out int cx, out int cz)) return Refuse(w, id, -1, ax, az, RefusedOutside);
             int i = cz * w.Map.Width + cx;
             if (WaitTicks(w, a.Team) > 0) return Refuse(w, id, i, cx + 0.5, cz + 0.5, RefusedRate);
@@ -332,6 +332,16 @@ namespace CriticalMass.Sim.Core
             if (t.Carried[id] == 0) t.Mode[id] = (byte)TerraformMode.Dig; // DG-09: an empty carry switches back to Dig
             World.PushEvent(w, SimEventType.Terraform, id, i, cx + 0.5, cz + 0.5, Placed);
             return Placed;
+        }
+
+        /// <summary>
+        /// b13 r2 (owner decision: terrain play belongs to the Builder and the Demolitionist, never the Miner): the class whose F
+        /// digs and places. The BUILDER while the hut rule is on (Full profile, HutConfig.BuilderTerraform), else the Miner
+        /// (Classic and PhysicsOnly unchanged). Same costs, reach, carry and team rate cap for whoever owns it.
+        /// </summary>
+        public static ClassId OwnerClass(World w)
+        {
+            return Blacksmith.On(w) && w.Config.Depth.Hut.BuilderTerraform ? ClassId.Builder : ClassId.Miner;
         }
 
         /// <summary>DG-09: actor id's current dig / place mode.</summary>
@@ -369,7 +379,7 @@ namespace CriticalMass.Sim.Core
                 bool b13Switch = flip && B13Hooks.TakeTerraformSwitch(w, i);   // b13-hook
                 bool b13Press = rising && B13Hooks.TakeTerraformPress(w, i);   // b13-hook
                 if (b13Switch || b13Press) continue;   // b13-hook
-                if (a.Cls != ClassId.Miner) continue;
+                if (a.Cls != OwnerClass(w)) continue;   // b13 r2: the Builder while the hut rule is on, else the Miner
                 if (flip) t.Mode[i] = t.Mode[i] == (byte)TerraformMode.Place ? (byte)TerraformMode.Dig : (byte)TerraformMode.Place;
                 if (!rising || a.StandUp > 0) continue;
                 bool hasAim = w.HasAim[i] == 1;

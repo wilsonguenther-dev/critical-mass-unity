@@ -35,6 +35,12 @@ namespace CriticalMass.Sim.Config
         /// <summary>More trees for the Builder (Jeisil): added to the groves, mirrored, so 10 groves instead of 6.</summary>
         public double[] ExtraWoodAnchors = { 40, 27, 40, 53 };
 
+        // ---- Terrain (owner decision, b13 r2: terrain play belongs to the Builder and the Demolitionist, never the Miner)
+        /// <summary>While the hut rule is on, the dig / place terraform (F, Terraform.cs: same costs, reach, carry and rate cap)
+        /// belongs to the BUILDER instead of the Miner (the Miner's F is MINE). False = nobody digs or places (round 1).
+        /// Bots never dig or place (BotBrain clears the press, CM-30), so bot matches are unchanged either way.</summary>
+        public bool BuilderTerraform = true;
+
         // ---- Miner bots (Sim/Bots/BotMine.cs)
         /// <summary>Task MineOre utility (supply is 0.8, corrupt 0.85 x greed).</summary>
         public double BotMineUtility = 0.82;
