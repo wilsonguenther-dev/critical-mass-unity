@@ -86,6 +86,10 @@ namespace CriticalMass.Runtime.View.B13
         {
             int me = CriticalMass.Runtime.View.Affordance.TerrainAffordanceView.LocalActor;
             if (me < 0 || me >= w.ActorCount || w.Match.Phase != MatchPhase.Playing) return;
+            // b14 (#209 routed): while the wheel holds LADDER or BRIDGE the sim still has a wall piece selected; the
+            // terrain view draws the climb ghost then, so the wall ghost stays hidden.
+            var belt = CriticalMass.Runtime.Input.BuilderToolbelt.Local;
+            if (belt != null && (belt.Actor < 0 || belt.Actor == me) && CriticalMass.Runtime.Input.BuilderToolbelt.IsClimb(belt.Selected)) return;
             if (!BuilderWalls.Ghost(w, me, out int cx, out int cz, out int dx, out int dz, out int len, out bool tall, out bool ok)) return;
             bool fill = BuilderWalls.GhostFill(w, me);
             GhostOkShown = ok;
