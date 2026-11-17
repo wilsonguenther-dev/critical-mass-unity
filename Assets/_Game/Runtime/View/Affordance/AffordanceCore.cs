@@ -608,7 +608,7 @@ namespace CriticalMass.Runtime.View.Affordance
                 p.Verb = t == BuilderTool.Ladder ? "BUILD LADDER" : "BUILD BRIDGE";
                 p.Ghost = 3;
                 int plan = BuiltPieces.Plan(w, id, dx, dz, kind);
-                if (plan == 0)
+                if (plan == 0 && BuiltPieces.LastPlanCount > 0)
                 {
                     int n = BuiltPieces.LastPlanCount;
                     for (int q = 0; q < n; q++)
