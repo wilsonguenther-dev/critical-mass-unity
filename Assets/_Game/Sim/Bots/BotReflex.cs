@@ -19,6 +19,8 @@ namespace CriticalMass.Sim.Bots
     public static class BotReflex
     {
         public const int KindSlam = 1, KindTnt = 2, KindClaw = 3, KindMelee = 4;
+        /// <summary>b13 r3: no attack cooldown is longer than this (seconds), so an older swing is skipped before any lookup.</summary>
+        private const double MaxCycleSeconds = 1.5;
 
         /// <summary>Writes bot id's jump and dodge presses into o after SteerBot (nothing with the rule off).</summary>
         public static void Fill(World w, BotsState st, int id, InputFrame o)
@@ -197,10 +199,12 @@ namespace CriticalMass.Sim.Bots
                 return true;
             }
             // (4) enemy melee wind-up aimed at this bot: sideways, the side with more room
+            int maxCycle = (int)(MaxCycleSeconds * cfg.SimHz + 0.5);
             for (int e = 0; e < w.ActorCount; e++)
             {
                 Actor en = w.Actors[e];
                 if (e == id || !en.Alive || en.Team == me.Team) continue;
+                if (!en.SwingPending && (en.SwingTick <= w.Tick - maxCycle || en.SwingTick > w.Tick)) continue;   // cheap: no recent swing
                 LightWeapon lw = LightWeapons.Of(w, en.Cls); // the swing's own reach on this base (b13-reach's Combat.ReachOf is a separate merge)
                 if (!en.SwingPending)
                 {
