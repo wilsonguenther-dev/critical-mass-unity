@@ -190,12 +190,20 @@ namespace CriticalMass.Sim.Tests
             Assert.Greater(banks, 0);
         }
 
+        static bool AnyChanneling(World w)
+        {
+            for (int i = 0; i < w.ActorCount; i++) if (Blacksmith.ChannelVein(w, i) >= 0) return true;
+            return false;
+        }
+
         static long Measure(bool hutOn, out int channelTicks, out long ruleBytes, out double usPerTick)
         {
             GameConfig cfg = DepthKit.Cfg(d => d.Hut.On = hutOn);
             World w = DepthKit.Make(cfg, ClassId.Warrior, 4242, 16);
             InputFrame scratch = SimInput.EmptyInput(), probe = SimInput.EmptyInput();
             for (int t = 0; t < 600; t++) MatchTick.Advance(w, null, scratch);
+            // b13 integrator: the window must hold a Miner mining, so warm-up runs on (at most 2400 more ticks) until one channels.
+            for (int t = 0; hutOn && t < 2400 && !AnyChanneling(w); t++) MatchTick.Advance(w, null, scratch);
             BotsState st = BotBrain.GetBotsState(w);
             channelTicks = 0;
             ruleBytes = 0;

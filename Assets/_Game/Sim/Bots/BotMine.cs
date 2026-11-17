@@ -86,6 +86,8 @@ namespace CriticalMass.Sim.Bots
             }
             // Empty-handed with an enemy close: fight as today (the Miner still holds his share of the fights).
             if (ore <= 0 && EnemyWithin(w, id, H.BotFightRange)) return;
+            // b13 integrator tuning: with ore in hand he still fights back at close range (a pure miner, not a pure target).
+            if (ore > 0 && EnemyWithin(w, id, H.BotFightWithOreRange)) return;
             byte kind;
             double gx, gz;
             FlowField route;
@@ -181,8 +183,13 @@ namespace CriticalMass.Sim.Bots
                 if (v >= 0)
                 {
                     SourceNode s = w.Depth.Sources[v];
-                    st.TaskX[id] = s.X;
-                    st.TaskZ[id] = s.Z;
+                    // b13 integrator (NoShiver fix): the steering point stays 0.3 u from the bot toward the vein, so BotSteer keeps
+                    // calling Act (within its 1.2 u) instead of walking him into the vein's body from up to 1.6 u away (Pressed flags).
+                    double vx = s.X - x, vz = s.Z - z, vl = Math.Sqrt(vx * vx + vz * vz);
+                    st.TaskX[id] = vl > 1e-9 ? x + vx / vl * 0.3 : x;
+                    st.TaskZ[id] = vl > 1e-9 ? z + vz / vl * 0.3 : z;
+                    o.MoveX = 0;
+                    o.MoveZ = 0;
                     o.AimX = s.X;
                     o.AimZ = s.Z;
                     // Hold F while a channel runs; release one tick to press again when it ended (full, empty, refused).
@@ -202,6 +209,10 @@ namespace CriticalMass.Sim.Bots
                 {
                     // The bank press on its edge (Sources' interact edge).
                     o.Interact = w.Depth.PrevInteract[id] == 0;
+                    st.TaskX[id] = x;   // b13 integrator: stand and bank (no push into the pad edge)
+                    st.TaskZ[id] = z;
+                    o.MoveX = 0;
+                    o.MoveZ = 0;
                     return true;
                 }
                 PadDef pad = w.Map.Pads[(int)a.Team];
