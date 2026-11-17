@@ -4,7 +4,9 @@
 # audio mix), then encoded with ffmpeg. The window never shows (AutomationWindow) and nothing reaches the speakers
 # (AudioRenderer takes the mix). Actor 0 is the Azure Warrior on autopilot; the camera is the default gameplay camera.
 #   tools/match-video.sh --app PATH.app [--seed N | --scout A-B] [--out DIR] [--final-dir DIR] [--fps 30]
-#                        [--quality High] [--results-seconds 10] [--timeout S] [--keep-frames] [--scout-only]
+#                        [--quality High] [--results-seconds 10] [--timeout S] [--keep-frames] [--scout-only] [--camera default|saved]
+# --camera default (the default): the game's own default camera (top-down, default heading) for the film, whatever this
+#   Mac's saved settings say (the cm.camera.* keys are removed for the run, then every saved setting is restored); saved: as saved.
 # --scout A-B: sim-only matches on seeds A..B first (-batchmode -nographics -simScout, seconds each, no window) and
 #   records the best one: the Kaiju hatched, both teams hold the hill, the closest final score (ties: more knock-outs).
 # Output: FINAL_DIR/CriticalMass-match-<version>-1080p.mp4 (H.264 CRF 19 capped at 14 Mb/s + AAC 192k) and -720p-text.mp4 (two-pass,
@@ -13,7 +15,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP=""; SEED=""; SCOUT=""; OUT=""; FINAL="$HOME/Movies/CriticalMass"; FPS=30; QUALITY=High; RESULTS=10; TIMEOUT=1500
-KEEP=0; SCOUT_ONLY=0; VFLIP=0
+KEEP=0; SCOUT_ONLY=0; VFLIP=0; CAMERA=default
 usage() { sed -n '6,7p' "${BASH_SOURCE[0]}" | sed 's/^# *//' >&2; exit 64; }
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -21,7 +23,7 @@ while [[ $# -gt 0 ]]; do
     --out) OUT="${2:?}"; shift 2 ;; --final-dir) FINAL="${2:?}"; shift 2 ;; --fps) FPS="${2:?}"; shift 2 ;;
     --quality) QUALITY="${2:?}"; shift 2 ;; --results-seconds) RESULTS="${2:?}"; shift 2 ;;
     --timeout) TIMEOUT="${2:?}"; shift 2 ;; --keep-frames) KEEP=1; shift ;; --scout-only) SCOUT_ONLY=1; shift ;;
-    --vflip) VFLIP=1; shift ;;
+    --vflip) VFLIP=1; shift ;; --camera) CAMERA="${2:?}"; shift 2 ;;
     -h|--help) usage ;; *) echo "match-video: unknown flag $1" >&2; usage ;;
   esac
 done
@@ -66,7 +68,7 @@ if [[ -z "${CM_HEAVY_HELD:-}" && -x "$HOME/bin/cm-heavy" ]]; then
   set +e
   CM_HEAVY_TIMEOUT=$((TIMEOUT + 120)) CM_HEAVY_HELD=1 "$HOME/bin/cm-heavy" unity env CM_HEAVY_HELD=1 bash "${BASH_SOURCE[0]}" \
     --app "$APP" --seed "$SEED" --out "$OUT" --final-dir "$FINAL" --fps "$FPS" --quality "$QUALITY" \
-    --results-seconds "$RESULTS" --timeout "$TIMEOUT" $( ((KEEP)) && echo --keep-frames ) $( ((VFLIP)) && echo --vflip )
+    --results-seconds "$RESULTS" --timeout "$TIMEOUT" --camera "$CAMERA" $( ((KEEP)) && echo --keep-frames ) $( ((VFLIP)) && echo --vflip )
   rc=$?
   set -e
   # cm-heavy can exit 1 from its own cleanup after a good job: judge by the outputs.
@@ -81,6 +83,7 @@ if defaults export "$DOMAIN" "$OUT/prefs-before.plist" 2>/dev/null; then HAD_PRE
 restore_prefs() { if (( HAD_PREFS )); then defaults import "$DOMAIN" "$OUT/prefs-before.plist" 2>/dev/null || true
                   else defaults delete "$DOMAIN" 2>/dev/null || true; fi; }
 trap restore_prefs EXIT
+if [[ "$CAMERA" == default ]]; then for k in cm.camera.ground cm.camera.view cm.camera.heading cm.camera.manual; do defaults delete "$DOMAIN" "$k" 2>/dev/null || true; done; fi
 open -g -j -n "$APP" --args -autoplay -autoplayTitleSeconds 3 -autoplayTimeout "$TIMEOUT" -seed "$SEED" \
   -matchVideo "$CAP" -matchVideoFps "$FPS" -matchVideoResultsSeconds "$RESULTS" -soundVolume 1 -quality "$QUALITY" \
   -screen-fullscreen 0 -screen-width 1920 -screen-height 1080 -dataDir "$OUT/data" -logFile "$LOG"
