@@ -110,6 +110,22 @@ namespace CriticalMass.Runtime.Game
             Flow.MatchRequest req = NextMatch;
             NextMatch = null;
             Request = req;
+            // b13-replay: a saved replay builds its own world from the recorded starting conditions; this driver only shows
+            // it (Replay.ReplayPlayback ticks it with the recorded inputs, as OnlineRunner does for a room).
+            if (req != null && req.Replay && Replay.ReplayPlayback.Pending != null)
+            {
+                _replay = Replay.ReplayPlayback.TakePending();
+                World = _replay.World;
+                World.Config.Render.CameraYawDeg = cfg.Render.CameraYawDeg;   // view-only setting; the Sim never reads Render
+                Config = World.Config;
+                TimeScale = req.Pace > 0 ? req.Pace : cfg.DefaultSpeed;
+                HumanAutopilot = false;
+                _dt = SimStep.Dt(Config);
+                Alpha = 0;
+                RuntimeCounters.Reset();
+                gameObject.AddComponent<Replay.ReplayPlayback>();
+                return;
+            }
             // online-rooms-2: in an online room the lockstep session owns the world and its clock; this driver only shows
             // it (the session ticks in OnlineRunner, inputs come from HumanInputSource through FillOnline).
             CriticalMass.Net.LockstepSession online = Online.OnlineMatch.Session;
@@ -170,6 +186,26 @@ namespace CriticalMass.Runtime.Game
         /// <summary>online-rooms-2: true while this driver shows an online match (pace, pause and speed are the room's).</summary>
         public bool IsOnline => _online != null;
 
+        /// <summary>b13-replay: the replay this driver shows (null in a played match); Replay.ReplayPlayback ticks it.</summary>
+        private CriticalMass.Net.Replay.ReplayPlayer _replay;
+
+        /// <summary>b13-replay: true while this driver shows a saved replay.</summary>
+        public bool IsReplay => _replay != null;
+
+        /// <summary>b13-replay: the replay's player (null in a played match).</summary>
+        public CriticalMass.Net.Replay.ReplayPlayer ReplayPlayer => _replay;
+
+        /// <summary>b13-replay: ReplayPlayback ran one replay tick: the same per-tick notification a played tick raises.</summary>
+        internal void ReplayTicked(World w)
+        {
+            if (w != World) return;
+            FrameCost.FrameTicks++;
+            Ticked?.Invoke(w);
+        }
+
+        /// <summary>b13-replay: ReplayPlayback's interpolation fraction for this frame.</summary>
+        internal void ReplayAlpha(double alpha) => Alpha = alpha;
+
         private void ForwardTicked(World w)
         {
             if (w != World) return;
@@ -208,6 +244,12 @@ namespace CriticalMass.Runtime.Game
             // online-rooms-3: while an online match runs (or the game is a hidden online test peer) no other world ticks:
             // the online session is the only thing stepping the Sim.
             if (_online == null && (Online.OnlineMatch.Session != null || Online.OnlineHeadless.Active)) return;
+            if (_replay != null)
+            {
+                float rc = Time.captureDeltaTime;
+                FrameDt = Math.Min(rc > 0f ? rc : Time.unscaledDeltaTime, MaxFrameDt);
+                return;   // b13-replay: ReplayPlayback ticks the replay world and sets Alpha
+            }
             if (_online != null)
             {
                 float cd = Time.captureDeltaTime;
@@ -257,7 +299,7 @@ namespace CriticalMass.Runtime.Game
         /// <summary>Runs n ticks immediately (smoke test); the accumulator and Alpha are left as they are.</summary>
         public void StepTicks(int n)
         {
-            if (_online != null) return;   // online-rooms-2: only the lockstep session steps an online world
+            if (_online != null || _replay != null) return;   // online-rooms-2: only the lockstep session steps an online world (b13: only ReplayPlayback a replay)
             HumanInputSource input = InputSource;
             for (int i = 0; i < n; i++) Tick(input);
         }

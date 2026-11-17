@@ -4,6 +4,7 @@
     "references": [
         "CriticalMass.Sim",
         "CriticalMass.Runtime",
+        "CriticalMass.Net",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner",
         "UnityEngine.UI",
