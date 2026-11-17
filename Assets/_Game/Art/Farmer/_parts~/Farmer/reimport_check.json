@@ -1,10 +1,10 @@
 {
  "file": "out/Farmer/Farmer.fbx",
- "bytes": 688524,
+ "bytes": 690332,
  "bones": 41,
  "bone_names_equal_game": true,
  "parents_equal_game": true,
- "rest_maxdiff_vs_game_m": 2e-06,
+ "rest_maxdiff_vs_game_m": 0.0,
  "game_rig": "Art/Farmer/Farmer.fbx",
  "meshes": {
   "Farmer_Hero": {
@@ -31,8 +31,8 @@
    "armature_mod": true
   },
   "Farmer_LOD0": {
-   "tris": 4248,
-   "verts": 2500,
+   "tris": 4278,
+   "verts": 2520,
    "colour_layers": [
     "Col"
    ],
@@ -48,14 +48,14 @@
    "materials": [
     "CM_Toon"
    ],
-   "height_m": 2.1837,
-   "min_z": -0.025,
+   "height_m": 2.1833,
+   "min_z": -0.0083,
    "parent": "Rig",
    "armature_mod": true
   },
   "Farmer_LOD1": {
-   "tris": 1456,
-   "verts": 1015,
+   "tris": 1460,
+   "verts": 1021,
    "colour_layers": [
     "Col"
    ],
@@ -77,8 +77,8 @@
    "armature_mod": true
   },
   "Farmer_Shadow": {
-   "tris": 656,
-   "verts": 368,
+   "tris": 602,
+   "verts": 341,
    "colour_layers": [
     "Col"
    ],
@@ -92,8 +92,8 @@
    "materials": [
     "CM_Toon"
    ],
-   "height_m": 2.1774,
-   "min_z": -0.0083,
+   "height_m": 1.666,
+   "min_z": -0.0056,
    "parent": "Rig",
    "armature_mod": true
   }

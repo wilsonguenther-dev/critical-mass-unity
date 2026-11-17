@@ -1,10 +1,10 @@
 {
  "file": "out/Warrior/Warrior.fbx",
- "bytes": 713964,
+ "bytes": 721852,
  "bones": 41,
  "bone_names_equal_game": true,
  "parents_equal_game": true,
- "rest_maxdiff_vs_game_m": 2e-06,
+ "rest_maxdiff_vs_game_m": 0.0,
  "game_rig": "Art/Characters/Warrior.fbx",
  "meshes": {
   "Warrior_Hero": {
@@ -31,8 +31,8 @@
    "armature_mod": true
   },
   "Warrior_LOD0": {
-   "tris": 4198,
-   "verts": 2531,
+   "tris": 4266,
+   "verts": 2566,
    "colour_layers": [
     "Col"
    ],
@@ -54,8 +54,8 @@
    "armature_mod": true
   },
   "Warrior_LOD1": {
-   "tris": 1433,
-   "verts": 1092,
+   "tris": 1448,
+   "verts": 1109,
    "colour_layers": [
     "Col"
    ],
@@ -71,14 +71,14 @@
    "materials": [
     "CM_Toon"
    ],
-   "height_m": 2.1507,
-   "min_z": -0.056,
+   "height_m": 2.1592,
+   "min_z": -0.0535,
    "parent": "Rig",
    "armature_mod": true
   },
   "Warrior_Shadow": {
-   "tris": 742,
-   "verts": 411,
+   "tris": 666,
+   "verts": 373,
    "colour_layers": [
     "Col"
    ],
@@ -92,17 +92,17 @@
    "materials": [
     "CM_Toon"
    ],
-   "height_m": 2.1507,
-   "min_z": -0.056,
+   "height_m": 2.1454,
+   "min_z": -0.0445,
    "parent": "Rig",
    "armature_mod": true
   }
  },
  "face_proxy": {
   "head_verts": 1424,
-  "skin_front_verts": 295,
-  "dark_in_skin_bbox": 310,
-  "contrast": 0.406,
+  "skin_front_verts": 401,
+  "dark_in_skin_bbox": 100,
+  "contrast": 0.369,
   "face_codes": [
    0
   ]

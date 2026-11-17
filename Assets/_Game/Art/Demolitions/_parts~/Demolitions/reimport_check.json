@@ -1,10 +1,10 @@
 {
  "file": "out/Demolitions/Demolitions.fbx",
- "bytes": 706764,
+ "bytes": 704588,
  "bones": 41,
  "bone_names_equal_game": true,
  "parents_equal_game": true,
- "rest_maxdiff_vs_game_m": 4e-06,
+ "rest_maxdiff_vs_game_m": 0.0,
  "game_rig": "Art/Demolitions/Demolitions.fbx",
  "meshes": {
   "Demolitions_Hero": {
@@ -52,8 +52,8 @@
    "armature_mod": true
   },
   "Demolitions_LOD1": {
-   "tris": 1447,
-   "verts": 980,
+   "tris": 1465,
+   "verts": 985,
    "colour_layers": [
     "Col"
    ],
@@ -74,8 +74,8 @@
    "armature_mod": true
   },
   "Demolitions_Shadow": {
-   "tris": 752,
-   "verts": 418,
+   "tris": 724,
+   "verts": 404,
    "colour_layers": [
     "Col"
    ],
@@ -89,8 +89,8 @@
    "materials": [
     "CM_Toon"
    ],
-   "height_m": 2.055,
-   "min_z": 0.0025,
+   "height_m": 2.0447,
+   "min_z": 0.0068,
    "parent": "Rig",
    "armature_mod": true
   }

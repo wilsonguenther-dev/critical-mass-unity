@@ -1,6 +1,6 @@
 {
  "file": "out/Builder/Builder.fbx",
- "bytes": 693372,
+ "bytes": 693772,
  "bones": 41,
  "bone_names_equal_game": true,
  "parents_equal_game": true,
@@ -52,8 +52,8 @@
    "armature_mod": true
   },
   "Builder_LOD1": {
-   "tris": 1445,
-   "verts": 1013,
+   "tris": 1451,
+   "verts": 1016,
    "colour_layers": [
     "Col"
    ],
@@ -74,8 +74,8 @@
    "armature_mod": true
   },
   "Builder_Shadow": {
-   "tris": 760,
-   "verts": 422,
+   "tris": 752,
+   "verts": 418,
    "colour_layers": [
     "Col"
    ],
@@ -89,17 +89,17 @@
    "materials": [
     "CM_Toon"
    ],
-   "height_m": 2.3659,
-   "min_z": 0.015,
+   "height_m": 2.3523,
+   "min_z": 0.019,
    "parent": "Rig",
    "armature_mod": true
   }
  },
  "face_proxy": {
   "head_verts": 1218,
-  "skin_front_verts": 349,
-  "dark_in_skin_bbox": 54,
-  "contrast": 0.379,
+  "skin_front_verts": 319,
+  "dark_in_skin_bbox": 88,
+  "contrast": 0.364,
   "face_codes": [
    0
   ]

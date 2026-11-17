@@ -398,7 +398,7 @@ namespace CriticalMass.Runtime.View.Art
                 StrideScale = 1.118f, ArtYawDeg = 180f },
             new ModelSpec { Key = Miner, AssetPath = "Assets/_Game/Art/Miner/Miner.fbx", Kind = ArtKind.Character, Rigged = true,
                 Bones = 41, ClipSource = "Assets/_Game/Art/Miner/Miner_Clips.fbx",
-                Meshes = new[] { "Miner_Hero", "Miner_LOD0", "Miner_LOD1", "Miner_Shadow" }, MaskCodes = new[] { 0, 6, 8 },
+                Meshes = new[] { "Miner_Hero", "Miner_LOD0", "Miner_LOD1", "Miner_Shadow" }, MaskCodes = new[] { 0, 2, 8 },   // parts r2: the helmet lamp is a fixed glow (2), never team glow (6) inside the face
                 // Height: the Hero mesh's bind-pose bounds, 2.127 m: the pick head raised in his right hand (2.115) above the
                 // helmet. rig-miner-3 scaled the whole rig by 0.9831 so his BODY (soles to helmet top, crest and pick left out)
                 // is 2.0 m; the crest tops out at 2.07.

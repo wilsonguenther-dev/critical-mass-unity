@@ -1,10 +1,10 @@
 {
  "file": "out/Miner/Miner.fbx",
- "bytes": 694044,
+ "bytes": 695740,
  "bones": 41,
  "bone_names_equal_game": true,
  "parents_equal_game": true,
- "rest_maxdiff_vs_game_m": 1e-06,
+ "rest_maxdiff_vs_game_m": 0.0,
  "game_rig": "Art/Miner/Miner.fbx",
  "meshes": {
   "Miner_Hero": {
@@ -15,7 +15,7 @@
    ],
    "codes": [
     0,
-    6,
+    2,
     8
    ],
    "max_influences": 1,
@@ -31,14 +31,14 @@
    "armature_mod": true
   },
   "Miner_LOD0": {
-   "tris": 4214,
-   "verts": 2450,
+   "tris": 4228,
+   "verts": 2457,
    "colour_layers": [
     "Col"
    ],
    "codes": [
     0,
-    6,
+    2,
     8
    ],
    "max_influences": 1,
@@ -54,14 +54,14 @@
    "armature_mod": true
   },
   "Miner_LOD1": {
-   "tris": 1441,
-   "verts": 1026,
+   "tris": 1465,
+   "verts": 1033,
    "colour_layers": [
     "Col"
    ],
    "codes": [
     0,
-    6,
+    2,
     8
    ],
    "max_influences": 1,
@@ -72,13 +72,13 @@
     "CM_Toon"
    ],
    "height_m": 2.2039,
-   "min_z": 0.015,
+   "min_z": 0.0167,
    "parent": "Rig",
    "armature_mod": true
   },
   "Miner_Shadow": {
-   "tris": 760,
-   "verts": 420,
+   "tris": 706,
+   "verts": 393,
    "colour_layers": [
     "Col"
    ],
@@ -92,8 +92,8 @@
    "materials": [
     "CM_Toon"
    ],
-   "height_m": 2.2039,
-   "min_z": 0.015,
+   "height_m": 2.1903,
+   "min_z": 0.0204,
    "parent": "Rig",
    "armature_mod": true
   }
@@ -105,7 +105,7 @@
   "contrast": 0.523,
   "face_codes": [
    0,
-   6
+   2
   ]
  },
  "approved_tris": 9870,
