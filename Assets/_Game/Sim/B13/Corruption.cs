@@ -508,6 +508,9 @@ namespace CriticalMass.Sim.Core
                 s.Successes++;
                 s.WildTick = w.Tick;
                 s.WildLeader = LeadingTeam(w);
+                // b13 r3: one wild rule. The match is now locked berserk (MatchState.BerserkLocked, which the bands and the
+                // director read), set directly: no BerserkLocked event, the CorruptionRoll event is the announcement.
+                w.Match.BerserkLocked = true;
             }
             World.PushEvent(w, SimEventType.CorruptionRoll, idx, ok ? 1 : 0, x, z, p);
             return ok;

@@ -71,6 +71,9 @@ namespace CriticalMass.Sim.Config
         /// round 1 a short-handed 5v5 team emptied its egg crew onto the island and the idle-player floor fell to 0.025).</summary>
         public int SmallTeamSize = 8;
         public int SmallTeamRunners = 1;
+        /// <summary>b13 r3: a small team behind on allegiance before the hatch by DeepTrailFactor x Bots.CorruptWhenBehindBy or more
+        /// (an idle player's team) sends MaxRunners: the crystal roll is its only comeback now the instability line is off.</summary>
+        public double DeepTrailFactor = 2;
         /// <summary>b13 r3: escorts (task 24): the trailing team sends up to this many fighters with its runners (teams of
         /// EscortMinTeam or more); an escort walks with the runner and fights an enemy within EscortGuardRadius of it.</summary>
         public int MaxEscorts = 2;

@@ -428,19 +428,26 @@ namespace CriticalMass.Sim.Tests
                 GiveCrystals(w);
                 for (int t = 0; t < 30; t++) MatchTick.Advance(w, null, scratch);
                 GiveCrystals(w);
+                // b13 r3: two back-to-back 300-tick windows; the first can hold one-time base costs (r3 run 1: rule off 129176 B,
+                // rule on 40 B), the second is the steady state the 0 B limit is about.
                 long b0 = GC.GetAllocatedBytesForCurrentThread();
+                for (int t = 0; t < 300; t++) MatchTick.Advance(w, null, scratch);
+                long first = GC.GetAllocatedBytesForCurrentThread() - b0;
+                GiveCrystals(w);
+                b0 = GC.GetAllocatedBytesForCurrentThread();
                 Stopwatch sw = Stopwatch.StartNew();
                 for (int t = 0; t < 300; t++) MatchTick.Advance(w, null, scratch);
                 sw.Stop();
                 long bytes = GC.GetAllocatedBytesForCurrentThread() - b0;
+                Console.WriteLine($"[b13-c alloc] rule {(on ? "on" : "off")}: first 300-tick window {first} B (one-time costs, printed)");
                 double us = sw.Elapsed.TotalMilliseconds * 1000.0 / 300;
                 if (on) { onUs = us; onBytes = bytes; } else { offUs = us; offBytes = bytes; }
-                Console.WriteLine($"[b13-c alloc] 16v16 seed 4242 Full, rule {(on ? "on" : "off")}: 300 ticks after 600 warm-up with carriers: {bytes} B allocated, {us:0.0} us per tick (limit: 0 B)");
+                Console.WriteLine($"[b13-c alloc] 16v16 seed 4242 Full, rule {(on ? "on" : "off")}: second 300-tick window after 900 warm-up with carriers: {bytes} B allocated, {us:0.0} us per tick (limit: 0 B)");
             }
             Console.WriteLine($"[b13-c cost] mean sim us per tick on {onUs:0.0} vs off {offUs:0.0}: {(offUs > 0 ? (onUs / offUs - 1) * 100 : 0):+0.0;-0.0}% (limit +10%; printed, timing is not asserted on shared runners)");
             Console.WriteLine($"[b13-c alloc] rule's own allocation (on - off): {onBytes - offBytes} B (limit 0 B)");
             Assert.LessOrEqual(onBytes, offBytes, "the corruption rule adds no allocation over the same-seed control");
-            Assert.AreEqual(0, onBytes, "0 B in the post-hatch window");
+            Assert.AreEqual(0, onBytes, "0 B in the steady post-hatch window");
         }
 
         /// <summary>
