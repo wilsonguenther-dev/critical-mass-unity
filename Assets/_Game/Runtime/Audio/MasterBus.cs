@@ -141,6 +141,7 @@ namespace CriticalMass.Runtime.Audio
     {
         AudioListener _listener;
         int _next;
+        bool _warned;
 
         public static MasterBusFilter Active { get; private set; }
 
@@ -151,6 +152,14 @@ namespace CriticalMass.Runtime.Audio
             if (_listener != null && _listener.isActiveAndEnabled && Active != null && Active.gameObject == _listener.gameObject) return;
             _listener = FindAnyObjectByType<AudioListener>();
             if (_listener == null) return;
+            // A filter beside AudioSources would bind to them, not to the listener (Unity logs an error): skip such a listener.
+            if (_listener.GetComponent<AudioSource>() != null)
+            {
+                if (!_warned) Debug.LogWarning("[CM.Audio] master bus skipped: the AudioListener shares its GameObject with an AudioSource");
+                _warned = true;
+                Active = null;
+                return;
+            }
             MasterBusFilter f = _listener.GetComponent<MasterBusFilter>();
             if (f == null) f = _listener.gameObject.AddComponent<MasterBusFilter>();
             Active = f;

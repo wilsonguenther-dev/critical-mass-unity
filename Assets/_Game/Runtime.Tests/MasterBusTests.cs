@@ -92,7 +92,7 @@ namespace CriticalMass.Runtime.Tests
         {
             var mix = new float[(int)(6.0 * Rate) * Ch];
             AddMusic(mix, t => MusicDirector.BaseGain);
-            string[] cues = { "whoosh_mid", "hit_wood", "step_dirt" };
+            string[] cues = { "swing_mid", "hit_wood", "step_dirt" };
             // A fight at a few metres: a swing, a hit and footsteps every 0.4 s, at half their table gain (distance and crowd).
             for (int k = 0; k < 14; k++) AddCue(mix, cues[k % cues.Length], 0.2 + 0.4 * k, 0.5f);
             float[] after = Run(mix);

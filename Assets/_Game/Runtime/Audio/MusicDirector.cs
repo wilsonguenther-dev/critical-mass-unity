@@ -29,7 +29,15 @@ namespace CriticalMass.Runtime.Audio
             if (_root != null) return;
             _root = new GameObject("CM Audio");
             UnityEngine.Object.DontDestroyOnLoad(_root);
-            if (UnityEngine.Object.FindAnyObjectByType<AudioListener>() == null) _root.AddComponent<AudioListener>();
+            // CM b13 S0: the listener sits on its own child (no AudioSource beside it), so the master bus filter on it
+            // (MasterBusFilter, OnAudioFilterRead) processes the whole mix; Unity refuses a filter on a GameObject that holds
+            // both a listener and sources.
+            if (UnityEngine.Object.FindAnyObjectByType<AudioListener>() == null)
+            {
+                var ear = new GameObject("CM Listener");
+                ear.transform.SetParent(_root.transform, false);
+                ear.AddComponent<AudioListener>();
+            }
             _root.AddComponent<MusicDirector>();
             _root.AddComponent<Announcer>();
             _root.AddComponent<UiSoundBinder>();
