@@ -17,6 +17,11 @@ namespace CriticalMass.Runtime.View.Affordance
         /// <summary>The on-screen name of the Demolitions throwable. TNT IS the grenade; to call it GRENADE change this one line.</summary>
         public const string Name = DemolitionsNames.Tnt;
 
+        /// <summary>b12 r3: true when the Demolitionist's ATTACK press throws TNT under these rules (the b12-jz rule:
+        /// DemolitionsTnt.ThrowOnAttack, Full rules only, as Demolitions.AttackThrowsNow). Every HUD word reads this.</summary>
+        public static bool AttackThrows(CriticalMass.Sim.Config.GameConfig c) =>
+            c != null && c.Abilities.DemolitionsTnt.ThrowOnAttack && !c.Depth.Classic;
+
         // ------------------------------------------------------------------ aim arc
         /// <summary>Points on the aim arc (hand to landing), pooled once.</summary>
         public const int ArcPoints = 16;

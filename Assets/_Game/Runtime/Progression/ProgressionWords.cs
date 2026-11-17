@@ -61,7 +61,7 @@ namespace CriticalMass.Runtime.Progression
             "Front line. Holds the hill and turns blows aside with a shield.",
             "Harvester. Carries the most biomass and roots anyone who chases.",
             "Sapper. Breaks walls open and throws up barricades.",
-            "Blast expert. TNT on attack, mines on Space.",
+            "Blast expert. Her attack throws TNT; her ability lays mines.",
             "Ladders and rope bridges for the whole team; anyone can carry them.",
             "Battle healer. Mends allies, heals in a burst and purifies the shrine. Never deals damage.",
         };

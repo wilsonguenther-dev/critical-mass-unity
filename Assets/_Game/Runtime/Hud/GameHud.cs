@@ -400,7 +400,8 @@ namespace CriticalMass.Runtime.Hud
         static readonly string[] AttackNames =
         {
             // feat/light-weapons-1: the Demolitions slot names her pry bar (was NO SWORD), the Builder's his mallet; the
-            // Healer's press still MENDS first (the lantern swings only when nobody can be mended). TNT is on Dig / place.
+            // Healer's press still MENDS first (the lantern swings only when nobody can be mended). b12 r3: under the b12-jz
+            // rule her attack throws TNT when ready, so the slot reads TNT then (DemolitionsTntWord) and PRY BAR while it reloads.
             "ATTACK", "ATTACK", "ATTACK", CriticalMass.Sim.Core.LightWeapons.DemolitionsName, CriticalMass.Sim.Core.LightWeapons.BuilderName,
             CriticalMass.Sim.Core.HealerNames.Mend,
         };
@@ -411,6 +412,13 @@ namespace CriticalMass.Runtime.Hud
         /// <summary>feat/light-weapons-1 placeholder: the Demolitions attack slot borrows the Builder's hammer icon (existing
         /// art) until a pry-bar icon is drawn; every other class keeps its own row.</summary>
         static int AttackIconRow(int cls) => cls == (int)ClassId.Demolitions && (int)ClassId.Builder < UiIcons.Classes.Length ? (int)ClassId.Builder : IconRow(cls);
+
+        /// <summary>b12 r3: the attack slot word when the Demolitionist's attack press throws TNT now.</summary>
+        public const string DemolitionsTntWord = CriticalMass.Sim.Core.DemolitionsNames.Tnt;
+
+        /// <summary>b12 r3: the attack slot's icon row: the Demolitionist's own (the TNT bundle) while her attack throws TNT,
+        /// else the pry-bar stand-in (AttackIconRow).</summary>
+        static int SlotIconRow(int cls, bool demoTntReady) => cls == (int)ClassId.Demolitions && demoTntReady ? IconRow(cls) : AttackIconRow(cls);
 
         // ---------------------------------------------------------------- minimap
 
@@ -819,8 +827,12 @@ namespace CriticalMass.Runtime.Hud
             }
 
             // buttons: attack (LMB), class ability (RMB), carry (E)
-            string attackName = AttackName(cls, s.HealerLantern);
-            ApplyButton(_buttons[0], s.AttackCd01, 0f, UiIcons.Attack[AttackIconRow(cls), team], attackName, dt);
+            // b12 r3: a Demolitionist under the b12-jz rule: TNT (its icon, its own reload) when ready, else PRY BAR with the
+            // TNT reload sweeping over the slot and its seconds, so the slot always says what the attack press does now.
+            bool demoTnt = cls == (int)ClassId.Demolitions && s.DemoTntOnAttack;
+            string attackName = AttackName(cls, s.HealerLantern, demoTnt && s.DemoTntReady);
+            float slotCd = demoTnt && !s.DemoTntReady ? s.DemoTntCd01 : s.AttackCd01, slotSec = demoTnt && !s.DemoTntReady ? s.DemoTntSeconds : 0f;
+            ApplyButton(_buttons[0], slotCd, slotSec, UiIcons.Attack[SlotIconRow(cls, demoTnt && s.DemoTntReady), team], attackName, dt);
             ApplyButton(_buttons[1], s.AbilityCd01, s.AbilityCdSeconds, UiIcons.Ability[iconRow, team], AbilityNames[cls], dt);
             ApplyDenied(_buttons[1], dt);
             AbilityButton carry = _buttons[2];
@@ -832,9 +844,14 @@ namespace CriticalMass.Runtime.Hud
 
         /// <summary>feat/light-weapons-2: the attack slot's word. The Healer's reads LANTERN while her press would swing the
         /// lantern (nobody hurt in mend range) and MEND otherwise; every other class has one fixed word.</summary>
-        public static string AttackName(int cls, bool healerLantern)
+        public static string AttackName(int cls, bool healerLantern) => AttackName(cls, healerLantern, false);
+
+        /// <summary>b12 r3: as above; demoTntReady = a Demolitionist whose attack press throws TNT right now (the b12-jz rule
+        /// and TNT ready): her slot reads TNT. While it reloads (or without the rule) it reads PRY BAR.</summary>
+        public static string AttackName(int cls, bool healerLantern, bool demoTntReady)
         {
             if (cls < 0 || cls >= AttackNames.Length) return "ATTACK";
+            if (cls == (int)ClassId.Demolitions && demoTntReady) return DemolitionsTntWord;
             return cls == (int)ClassId.Healer && healerLantern ? CriticalMass.Sim.Core.LightWeapons.HealerName : AttackNames[cls];
         }
 
@@ -844,9 +861,10 @@ namespace CriticalMass.Runtime.Hud
         /// <summary>Every word the attack slot can show: the class words plus the Healer's LANTERN (feat/light-weapons-2).</summary>
         static string[] AttackSlotNames()
         {
-            var a = new string[AttackNames.Length + 1];
+            var a = new string[AttackNames.Length + 2];
             Array.Copy(AttackNames, a, AttackNames.Length);
             a[AttackNames.Length] = CriticalMass.Sim.Core.LightWeapons.HealerName;
+            a[AttackNames.Length + 1] = DemolitionsTntWord;
             return a;
         }
 

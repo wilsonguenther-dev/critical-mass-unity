@@ -510,7 +510,9 @@ namespace CriticalMass.Runtime.View.Mechanics
                     else
                     {
                         row.Name = DemolitionsNames.Tnt;
-                        row.Action = "DigPlace";
+                        // b12 r3: under the b12-jz rule her ATTACK press throws it (Dig / place still works too): the key
+                        // chip shows the attack binding and the row wears her TNT art (MechanicsHud.RowIcon "Attack").
+                        row.Action = CriticalMass.Runtime.View.Affordance.GrenadeTuning.AttackThrows(c) ? "Attack" : "DigPlace";
                         row.MaxCharges = 0;
                         row.Charges = 0;
                         int wait = Demolitions.TntWaitTicks(w, id);

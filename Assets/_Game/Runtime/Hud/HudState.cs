@@ -49,6 +49,11 @@ namespace CriticalMass.Runtime.Hud
         /// <summary>feat/light-weapons-2: a Healer whose attack press would swing the lantern now (nobody hurt to mend in
         /// range); the attack slot then reads LANTERN instead of MEND.</summary>
         public bool HealerLantern;
+        /// <summary>b12 r3: a Demolitionist whose attack press throws TNT under these rules (b12-jz), whether it is ready now,
+        /// and its reload (0..1 of the cooldown, seconds left). The attack slot then reads TNT when ready, else PRY BAR with the
+        /// TNT reload sweeping over it.</summary>
+        public bool DemoTntOnAttack, DemoTntReady;
+        public float DemoTntCd01, DemoTntSeconds;
 
         public float Hp01 => MaxHp > 0 ? Math.Max(0f, Math.Min(1f, Hp / MaxHp)) : 0f;
 
@@ -64,6 +69,7 @@ namespace CriticalMass.Runtime.Hud
             Carry = o.Carry; CarryAmount = o.CarryAmount; RespawnIn = o.RespawnIn; PlayerX = o.PlayerX; PlayerZ = o.PlayerZ;
             Kills = o.Kills; Deaths = o.Deaths;
             HealerLantern = o.HealerLantern;
+            DemoTntOnAttack = o.DemoTntOnAttack; DemoTntReady = o.DemoTntReady; DemoTntCd01 = o.DemoTntCd01; DemoTntSeconds = o.DemoTntSeconds;
         }
     }
 
@@ -119,6 +125,12 @@ namespace CriticalMass.Runtime.Hud
             bool aim = localId < w.HasAim.Length && w.HasAim[localId] == 1;
             s.HealerLantern = a.Cls == ClassId.Healer && lw != null && a.Alive
                 && Healer.MendTarget(w, localId, aim ? w.Inputs[localId].AimX : double.NaN, aim ? w.Inputs[localId].AimZ : double.NaN) < 0;
+            DemolitionsTntConfig tnt = c.Abilities.DemolitionsTnt;
+            s.DemoTntOnAttack = a.Cls == ClassId.Demolitions && tnt.ThrowOnAttack && !c.Depth.Classic;
+            int tntWait = s.DemoTntOnAttack && w.Demolitions != null ? Demolitions.TntWaitTicks(w, localId) : 0;
+            s.DemoTntReady = s.DemoTntOnAttack && tntWait <= 0;
+            s.DemoTntCd01 = s.DemoTntOnAttack && tnt.CooldownTicks > 0 ? Clamp01((float)(tntWait / tnt.CooldownTicks)) : 0f;
+            s.DemoTntSeconds = s.DemoTntOnAttack ? (float)(tntWait / c.SimHz) : 0f;
             s.AbilityCd01 = cc.AbilityCooldown > 0 ? Clamp01((float)(a.AbilityCd / cc.AbilityCooldown)) : 0f;
             s.AbilityCdSeconds = (float)Math.Max(0, a.AbilityCd);
             s.Carry = a.Carry;

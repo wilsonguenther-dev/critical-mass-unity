@@ -30,6 +30,9 @@ namespace CriticalMass.Runtime.Hud
         /// <summary>World units from a pillar's base cell centre inside which the knock-down line shows.</summary>
         public const double PillarRange = 4.5;
         const float ChipW = 620f, ChipH = 46f, LiftY = 214f, ShiftX = 190f;
+        /// <summary>b12 r3: canvas units kept clear between the top of the prompt-pill lane and this chip when the pill is up
+        /// (the two nearly touched, and overlapped once the pill grew its reason line).</summary>
+        public const float PillGap = 10f;
 
         public static TerrainPrompt Instance { get; private set; }
         /// <summary>What the chip says now ("" = hidden). Tests and captures read it.</summary>
@@ -101,6 +104,14 @@ namespace CriticalMass.Runtime.Hud
             if (Mathf.Abs(_canvas.scaleFactor - s) > 1e-4f) _canvas.scaleFactor = s;
         }
 
+        void PlaceChip()
+        {
+            UnityEngine.Camera cam = _canvas.worldCamera;
+            float w = cam != null ? cam.pixelWidth : Screen.width, h = cam != null ? cam.pixelHeight : Screen.height;
+            float y = ChipBottom(w, h, _canvas.scaleFactor, CriticalMass.Runtime.View.Affordance.TerrainAffordanceView.PromptPillShown);
+            if (Mathf.Abs(_chip.anchoredPosition.y - y) > 0.5f) _chip.anchoredPosition = new Vector2(ShiftX, y);
+        }
+
         void LateUpdate()
         {
             if (_canvas == null) return;
@@ -108,6 +119,7 @@ namespace CriticalMass.Runtime.Hud
             if (_canvas.enabled != hudOn) _canvas.enabled = hudOn;
             if (!hudOn) return;
             UpdateScale();
+            PlaceChip();
             World w = _driver != null ? _driver.World : null;
             int key = w != null ? StateKey(w) : -1;
             if (key == _key) return;
@@ -141,6 +153,8 @@ namespace CriticalMass.Runtime.Hud
                     case ClassId.Farmer:
                         return (1 << 17) | (Math.Min(63, a.CarryAmount + a.CarryMeat) << 19) | (Math.Min(63, (int)w.Config.Class(a.Cls).CarryCapacity) << 25) | (dev << 15);
                     case ClassId.Demolitions:
+                        // b12 r3: merged into the prompt pill while it is up (it says the same thing on one line there).
+                        if (CriticalMass.Runtime.View.Affordance.TerrainAffordanceView.PromptPillShown) return -1;
                         return (1 << 18) | (Math.Min(4095, (int)Math.Ceiling(Demolitions.TntWaitTicks(w, me) / w.Config.SimHz)) << 19) | (dev << 15);
                     default:
                         return -1;
@@ -173,6 +187,30 @@ namespace CriticalMass.Runtime.Hud
             return best < 0 ? 0 : Topple.ModeFor(ds[best], px, pz);
         }
 
+        /// <summary>
+        /// b12 r3: the Demolitionist's strip. Under the b12-jz rule her attack press throws TNT when ready and swings the pry
+        /// bar while it reloads, so the line names the attack binding: "TNT READY · LEFT CLICK: THROW" or "TNT IN 3 S · LEFT
+        /// CLICK: PRY BAR" (the pad's glyph on a controller). Without the rule: the Dig / place key throws, as before.
+        /// </summary>
+        public static string DemolitionsLine(bool attackThrows, int waitSeconds, ControlDevice device)
+        {
+            string tnt = CriticalMass.Runtime.View.Affordance.GrenadeTuning.Name;
+            string state = waitSeconds <= 0 ? tnt + " READY" : tnt + " IN " + waitSeconds + " S";
+            if (!attackThrows) return state + "   ·   " + TrialText.Fill("{DigPlace}", device) + ": THROW";
+            return state + "   ·   " + TrialText.Fill("{Attack}", device) + (waitSeconds <= 0 ? ": THROW" : ": " + CriticalMass.Sim.Core.LightWeapons.DemolitionsName);
+        }
+
+        /// <summary>
+        /// b12 r3: the chip's bottom (canvas units, from the screen bottom) on a w x h screen at HUD scale s: its old LiftY, or,
+        /// while the prompt pill is up, PillGap above the top of the pill's reserved lane (the pill never leaves that lane).
+        /// </summary>
+        public static float ChipBottom(float w, float h, float s, bool pillShown)
+        {
+            if (!pillShown || w < 1 || h < 1 || s <= 0f) return LiftY;
+            Rect lane = HudZones.PromptLanePixels(w, h);   // device px, top-left origin
+            return Mathf.Max(LiftY, (h - lane.y) / s + PillGap);
+        }
+
         static string Compose(World w, int key)
         {
             ControlDevice device = ControlBindings.ActiveDevice;
@@ -181,7 +219,7 @@ namespace CriticalMass.Runtime.Hud
                 int v = (key >> 19) & 63, v12 = (key >> 19) & 4095;
                 if ((key & (1 << 16)) != 0) return CriticalMass.Runtime.View.Mechanics.BuilderBank.WoodWord + " " + v12 + "   ·   " + TrialText.Fill("{Ability}", device) + ": BUILD";
                 if ((key & (1 << 17)) != 0) return "CARRYING " + v + "/" + ((key >> 25) & 63) + "   ·   HOLD " + TrialText.Fill("{Interact}", device) + ": GATHER";
-                return (v12 == 0 ? CriticalMass.Runtime.View.Affordance.GrenadeTuning.Name + " READY" : CriticalMass.Runtime.View.Affordance.GrenadeTuning.Name + " IN " + v12 + " S") + "   ·   " + TrialText.Fill("{DigPlace}", device) + ": THROW";
+                return DemolitionsLine(CriticalMass.Runtime.View.Affordance.GrenadeTuning.AttackThrows(w.Config), v12, device);
             }
             int pillar = key & 3;
             if (pillar != 0)

@@ -59,7 +59,7 @@ namespace CriticalMass.Runtime.View.Art
         private readonly Material[][] _slots;
         private readonly FighterLod.Role[] _roles;
         private readonly bool[] _isBody;
-        private readonly bool _hasProxy, _hasLod0, _hasLod1;
+        private readonly bool _hasProxy, _hasLod0, _hasLod1, _hasHero;
         private int _tierApplied = int.MinValue;
         private bool _justActivated = true;
         private int _lod = -1;
@@ -71,6 +71,8 @@ namespace CriticalMass.Runtime.View.Art
         /// <summary>The LOD drawn now (0 or 1; -1 before the first pick) and whether the close-camera Hero mesh is shown.</summary>
         public int CurrentLod => _lod;
         public bool HeroShown => _hero;
+        /// <summary>The model has a close-camera _Hero mesh (the textured pilots do not; they show LOD0 up close).</summary>
+        public bool HasHero => _hasHero;
         /// <summary>The model follows the art LOD contract (has a _LOD1 mesh).</summary>
         public bool HasLodChain => _hasLod1;
 
@@ -148,6 +150,7 @@ namespace CriticalMass.Runtime.View.Art
                 _hasProxy |= role == FighterLod.Role.Shadow;
                 _hasLod0 |= role == FighterLod.Role.Lod0;
                 _hasLod1 |= role == FighterLod.Role.Lod1;
+                _hasHero |= role == FighterLod.Role.Hero;
                 r.receiveShadows = role != FighterLod.Role.Shadow;
                 if (r is SkinnedMeshRenderer smr) smr.updateWhenOffscreen = false;
             }
@@ -363,7 +366,7 @@ namespace CriticalMass.Runtime.View.Art
 
         /// <summary>
         /// Close cameras only (class select, story, results, Barracks, photo mode): shows the _Hero mesh and hides the
-        /// in-match LODs and the shadow proxy. Never on in a match (C4 point 2). No-op visually for a model without a Hero.
+        /// in-match LODs and the shadow proxy. Never on in a match (C4 point 2). A model without a Hero shows its LOD0 (b12 r3).
         /// </summary>
         public void SetHero(bool on)
         {
@@ -382,7 +385,7 @@ namespace CriticalMass.Runtime.View.Art
                 Renderer r = Renderers[i];
                 if (r == null || _roles[i] == FighterLod.Role.Shadow) continue;
                 if (_roles[i] == FighterLod.Role.Shared && Spec != null && Spec.Kind == ArtKind.Prop) continue;   // barricade states
-                bool on = FighterLod.Draws(_roles[i], _hero, _lod < 0 ? 0 : _lod, _hasLod0, _hasLod1);
+                bool on = FighterLod.Draws(_roles[i], _hero, _lod < 0 ? 0 : _lod, _hasLod0, _hasLod1, _hasHero);
                 if (r.enabled != on) r.enabled = on;
             }
         }

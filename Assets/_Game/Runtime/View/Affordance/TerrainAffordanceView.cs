@@ -87,6 +87,8 @@ namespace CriticalMass.Runtime.View.Affordance
         public int GhostCellsDrawn { get; private set; }
         public bool GhostValid { get; private set; }
         /// <summary>The prompt text now ("" = hidden), the hint now, and the bar's value (-1 = hidden).</summary>
+        /// <summary>b12 r3: the prompt pill is up this frame (TerrainPrompt merges into it or steps above it).</summary>
+        public static bool PromptPillShown { get; private set; }
         public string PromptText => _promptShown ? (_promptDetail.Length > 0 ? _prompt + "\n" + _promptDetail : _prompt) : string.Empty;
         string _promptDetail = string.Empty;
         public string HintText => _hintShown ? _hint : string.Empty;
@@ -411,6 +413,7 @@ namespace CriticalMass.Runtime.View.Affordance
             if (_bar != null && _bar.gameObject.activeSelf) _bar.gameObject.SetActive(false);
             for (int k = 0; k < _mini.Length; k++) if (_mini[k] != null && _mini[k].gameObject.activeSelf) _mini[k].gameObject.SetActive(false);
             _promptShown = _hintShown = _barShown = false;
+            PromptPillShown = false;
         }
 
         // ------------------------------------------------------------------ colours
@@ -876,7 +879,7 @@ namespace CriticalMass.Runtime.View.Affordance
             if (!show)
             {
                 if (_chip != null && _chip.gameObject.activeSelf) _chip.gameObject.SetActive(false);
-                _promptShown = false;
+                _promptShown = PromptPillShown = false;
                 return;
             }
             int key = Scan.Primary.TextKey() * 31 + Scan.Secondary.TextKey();
@@ -917,7 +920,7 @@ namespace CriticalMass.Runtime.View.Affordance
                 _chip.anchoredPosition = LanePill(sp.x / sc, _chip.sizeDelta, _canvas.pixelRect.size, sc);
             }
             if (!_chip.gameObject.activeSelf) _chip.gameObject.SetActive(true);
-            _promptShown = true;
+            _promptShown = PromptPillShown = true;
         }
 
         static string HintFor(ClassId c, ControlDevice d)

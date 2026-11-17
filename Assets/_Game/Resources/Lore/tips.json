@@ -118,7 +118,7 @@
     },
     {
       "id": "tip-24",
-      "text": "The Demolitionist's mines are visible to everyone. The trick is where you put them, not hiding them.",
+      "text": "The Demolitionist's attack throws TNT when ready; her pry bar swings while it reloads. Mines are visible to everyone.",
       "needsRule": "DG-22"
     },
     {

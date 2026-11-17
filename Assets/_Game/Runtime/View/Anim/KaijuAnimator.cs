@@ -80,7 +80,7 @@ namespace CriticalMass.Runtime.View.Anim
         double _roarAt = double.NegativeInfinity, _getUpAt = double.NegativeInfinity, _hatchAt = double.NegativeInfinity;
         double _teleTotal, _lastTeleIn;
         int _lastWindup, _windupLen;
-        double _lastHp = double.NaN, _lastKo;
+        double _lastHp = double.NaN, _lastKo, _lastKoAt;
         KaijuState _lastState = KaijuState.Egg;
         bool _roarPending, _roarSoundPending;
         float _roarPitch = 1f, _roarGain = 1f;
@@ -158,8 +158,12 @@ namespace CriticalMass.Runtime.View.Anim
                 // The slam telegraph's real length (the sim floors it to KaijuSlamMinRealSeconds at the match pace).
                 if (k.TelegraphIn > 0 && (_lastTeleIn <= 0 || k.TelegraphIn > _lastTeleIn)) _teleTotal = k.TelegraphIn;
                 _lastTeleIn = k.TelegraphIn;
-                if (_lastKo > 0 && k.KoIn <= 0) _getUpAt = simTime;
+                // b12 r3: the get-up starts when the sim recovered (last seen KO time left added to when it was seen), not
+                // when a view frame first notices it: a capture that steps many ticks between frames (KaijuKoShots) or a
+                // catch-up frame saw it late, so the "recovered" still showed it still flat on its belly (weight 1.0).
+                if (_lastKo > 0 && k.KoIn <= 0) _getUpAt = Math.Min(simTime, _lastKoAt + _lastKo);
                 _lastKo = k.KoIn;
+                _lastKoAt = simTime;
                 // Roars: the hatch, a side chosen (or switched), berserk.
                 if (k.State != _lastState)
                 {
@@ -385,7 +389,7 @@ namespace CriticalMass.Runtime.View.Anim
             _pinned[0] = _pinned[1] = false;
             _pinW[0] = _pinW[1] = 0f;
             _lockModel = null;
-            _lastKo = 0;
+            _lastKo = _lastKoAt = 0;
             _lastState = KaijuState.Egg;
             _roarPending = _roarSoundPending = false;
             _yaw = double.NaN;

@@ -165,12 +165,13 @@ namespace CriticalMass.Runtime.Tests
         public void TheAttackSlotNamesTheWeapon()
         {
             Assert.AreEqual("MALLET", GameHud.AttackName((int)ClassId.Builder, false));
-            Assert.AreEqual("PRY BAR", GameHud.AttackName((int)ClassId.Demolitions, false));
+            Assert.AreEqual("PRY BAR", GameHud.AttackName((int)ClassId.Demolitions, false), "TNT reloading: the pry bar swings");
+            Assert.AreEqual("TNT", GameHud.AttackName((int)ClassId.Demolitions, false, true), "b12 r3: TNT ready, her attack throws it");
             Assert.AreEqual(HealerNames.Mend, GameHud.AttackName((int)ClassId.Healer, false), "someone to mend: MEND");
             Assert.AreEqual("LANTERN", GameHud.AttackName((int)ClassId.Healer, true), "nobody to mend: LANTERN");
             Assert.AreEqual("ATTACK", GameHud.AttackName((int)ClassId.Warrior, true));
             string[] slot = GameHud.AbilitySlotNames()[0];
-            foreach (string word in new[] { "MALLET", "PRY BAR", "LANTERN" }) CollectionAssert.Contains(slot, word);
+            foreach (string word in new[] { "MALLET", "PRY BAR", "LANTERN", "TNT" }) CollectionAssert.Contains(slot, word);
             CollectionAssert.DoesNotContain(slot, "NO SWORD");
         }
 

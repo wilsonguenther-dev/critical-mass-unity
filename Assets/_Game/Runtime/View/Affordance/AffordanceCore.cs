@@ -104,6 +104,10 @@ namespace CriticalMass.Runtime.View.Affordance
             NothingToCross = "nothing to cross", GettingUp = "getting up", NoWood = "no wood", EnemyGround = "enemy ground",
             Occupied = "occupied", Hill = "hill ground", Water = "no ground", NoRoom = "hands full", Busy = "busy here",
             NotFeeder = "cannot feed";
+        /// <summary>b12 r3: the Demolitionist's detail line while her TNT reloads (her attack is the pry bar meanwhile).</summary>
+        public const string TntIn = GrenadeTuning.Name + " in";
+        /// <summary>b12 r3: her prompt verbs on the attack binding: TNT ready, and the pry bar while it reloads.</summary>
+        public const string ThrowTnt = "THROW " + GrenadeTuning.Name, PryBar = CriticalMass.Sim.Core.LightWeapons.DemolitionsName;
     }
 
     /// <summary>
@@ -712,12 +716,15 @@ namespace CriticalMass.Runtime.View.Affordance
                 Add(AffAction.Tnt, b.Cx, b.Cz, b.Cx + 0.5, b.Cz + 0.5, d2 <= (throwR + blast) * (throwR + blast));
             }
 
-            // Primary: the TNT throw on the dig / place key (Demolitions.ThrowTnt: aim pulled back to ThrowRange).
+            // Primary: the TNT throw (Demolitions.ThrowTnt: aim pulled back to ThrowRange). b12 r3: under the b12-jz rule her
+            // ATTACK press throws it when ready (Dig / place still does too), so the prompt names the attack binding, and while
+            // it reloads says what that press does now: the pry bar, with the TNT wait as the reason line.
+            bool onAttack = GrenadeTuning.AttackThrows(c);
             AffTarget p = Primary;
             p.Has = true;
-            p.Button = "DigPlace";
+            p.Button = onAttack ? "Attack" : "DigPlace";
             p.Action = AffAction.Tnt;
-            p.Verb = "THROW " + GrenadeTuning.Name;
+            p.Verb = AffWords.ThrowTnt;
             // b12-jk: the one landing rule the arc preview shares (GrenadeRead.Landing = Demolitions.ThrowTnt's clamp).
             GrenadeRead.Landing(ox, oz, ax, az, a.Facing, c.Abilities.DemolitionsTnt, out double tx, out double tz);
             p.X = tx;
@@ -743,6 +750,7 @@ namespace CriticalMass.Runtime.View.Affordance
             }
             int tw = Demolitions.TntWaitTicks(w, id);
             if (a.StandUp > 0) Refuse(p, AffWords.GettingUp);
+            else if (tw > 0 && onAttack) { p.Verb = AffWords.PryBar; Refuse(p, AffWords.TntIn); p.WaitSeconds = WaitS(w, tw); }
             else if (tw > 0) { Refuse(p, AffWords.Wait); p.WaitSeconds = WaitS(w, tw); }
             else p.Valid = true;
 

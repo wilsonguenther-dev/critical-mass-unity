@@ -257,7 +257,7 @@ namespace CriticalMass.Runtime.Tests
             Assert.AreEqual(row.MaxCharges, row.Charges);
             Assert.IsTrue(ClassKit.Read(d, 0, 1, ref row, numbers));
             Assert.AreEqual(DemolitionsNames.Tnt, row.Name);
-            Assert.AreEqual("DigPlace", row.Action);
+            Assert.AreEqual("Attack", row.Action, "b12 r3: her attack press throws TNT under the default (Full) rules");
 
             World b = NewWorld(ClassId.Builder);
             Assert.IsTrue(ClassKit.Read(b, 0, 0, ref row, numbers));

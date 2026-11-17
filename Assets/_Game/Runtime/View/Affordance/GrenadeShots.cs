@@ -16,13 +16,16 @@ namespace CriticalMass.Runtime.View.Affordance
     /// "[CM.GrenadeShots] NN-name REACHED ringRadius=.. fuseLeft=.. ...":
     /// 01-aim (a Demolitions player aiming: the arc and the landing ring), 02-midfuse (his own bomb half way through the
     /// fuse), 03-lastthird (the fast blink near the blast), 04-enemy-inside (an enemy bomb with him inside the ring: the
-    /// warning colour and the "!"), then quits. A capture fixture: it resets the world, stops the clock (TimeScale 0) and
+    /// warning colour and the "!"), 05-throw-release and 06-blast (b12 r3: her own real throw, at the release and at the
+    /// blast), then quits. A capture fixture: it resets the world, stops the clock (TimeScale 0) and
     /// stages Bomb slots and the aim exactly as the tests stage their scenes. It never runs without the flag.
     /// </summary>
     public sealed class GrenadeShots : MonoBehaviour
     {
         public const string Flag = "-grenadeShots";
         public const string Prefix = "shot-grenade-";
+        /// <summary>Ticks after the throw for the release still (the bundle just leaving her hand).</summary>
+        public const int ReleaseTicks = 2;
 
         SimDriverBehaviour _driver;
         TerrainAffordanceView _view;
@@ -90,6 +93,26 @@ namespace CriticalMass.Runtime.View.Affordance
             for (int i = 1; i < w.ActorCount && enemy < 0; i++) if (w.Actors[i].Team != me.Team) enemy = i;
             Stage(w, 1, enemy >= 0 ? enemy : 1, me.Team == TeamId.Azure ? TeamId.Crimson : TeamId.Azure, w.X[0] + 0.8, w.Z[0] + 0.5, 0.6);
             yield return Shot("04-enemy-inside", 0.4f);
+
+            // b12 r3: her own throw for real (the Sim's ThrowTnt, the call her attack press makes when TNT is ready), one
+            // still at the release (bundle just out of her hand, the slot now on the pry bar with the TNT cooldown), one at
+            // the blast (first frame of the explosion). The clock stays stopped between them; only these ticks are stepped.
+            Clear(w);
+            w.Demolitions.TntReadyTick[0] = 0;
+            me.AttackCd = 0;
+            int code = Demolitions.ThrowTnt(w, 0, ax, az);
+            Bomb thrown = null;
+            foreach (Bomb b in w.Demolitions.Bombs) if (b.Active && b.Owner == 0) thrown = b;
+            Log("throw code " + code + (thrown != null ? " thrown tick " + thrown.ThrownTick + " land tick " + thrown.LandTick + " blast tick " + thrown.BlastTick : " (no bomb)"));
+            if (thrown != null)
+            {
+                _driver.StepTicks(ReleaseTicks);
+                yield return Shot("05-throw-release", 0.15f);
+                int blastTick = thrown.BlastTick;
+                if (w.Tick < blastTick) _driver.StepTicks(blastTick - w.Tick);
+                _driver.StepTicks(1);
+                yield return Shot("06-blast", 0.12f);
+            }
 
             Clear(w);
             TerrainAffordanceView.AimForced = false;

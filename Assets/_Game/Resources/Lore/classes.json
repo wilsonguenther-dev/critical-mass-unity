@@ -100,10 +100,10 @@
       "abilities": [
         {
           "input": "attack",
-          "name": "Pry Bar",
-          "text": "A short, light swing that shoves an enemy back a step. The mine and the TNT are your real weapons.",
-          "cooldown": "",
-          "needsRule": ""
+          "name": "TNT",
+          "text": "Your attack throws TNT up to {cfg:tntRange} m. It blows {cfg:tntFuse} s after it lands for {cfg:tntDamage} damage, breaks walls and craters the ground.",
+          "cooldown": "{cfg:tntCooldown}",
+          "needsRule": "DG-22"
         },
         {
           "input": "ability",
@@ -113,10 +113,10 @@
           "needsRule": ""
         },
         {
-          "input": "throw",
-          "name": "TNT",
-          "text": "Throw TNT up to {cfg:tntRange} m. It blows {cfg:tntFuse} s after it lands for {cfg:tntDamage} damage, breaks walls and craters the ground.",
-          "cooldown": "{cfg:tntCooldown}",
+          "input": "attack",
+          "name": "Pry Bar",
+          "text": "While the TNT reloads, your attack is a short, light swing that shoves an enemy back a step.",
+          "cooldown": "",
           "needsRule": ""
         }
       ]

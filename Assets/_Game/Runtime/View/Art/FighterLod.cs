@@ -67,9 +67,17 @@ namespace CriticalMass.Runtime.View.Art
         /// Whether a renderer draws (pure; tests). hero: a close camera asked for the Hero mesh. lod: 0 or 1 from PickLod.
         /// hasLod1: the model has a _LOD1 mesh (without one LOD0 stays). hasLod0: the model has a _LOD0 mesh.
         /// </summary>
-        public static bool Draws(Role role, bool hero, int lod, bool hasLod0, bool hasLod1)
+        public static bool Draws(Role role, bool hero, int lod, bool hasLod0, bool hasLod1) => Draws(role, hero, lod, hasLod0, hasLod1, true);
+
+        /// <summary>
+        /// b12 r3: as above, with hasHero = the model has a _Hero mesh. A close camera on a model WITHOUT one (the textured
+        /// Warrior and Builder pilots ship LOD0, LOD1 and Shadow only) draws its LOD0 instead: it drew NOTHING before (every
+        /// renderer off), and the close-up capture then measured a 0.5 u, zero-width model and framed the strips on the shins.
+        /// </summary>
+        public static bool Draws(Role role, bool hero, int lod, bool hasLod0, bool hasLod1, bool hasHero)
         {
-            if (hero) return role == Role.Hero || role == Role.Shared;
+            if (hero && hasHero) return role == Role.Hero || role == Role.Shared;
+            if (hero) lod = 0;   // close camera, no Hero mesh: the best mesh the model has
             switch (role)
             {
                 case Role.Hero: return !hasLod0 && !hasLod1;   // a Hero-only export still shows something in a match
