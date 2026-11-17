@@ -54,6 +54,14 @@ namespace CriticalMass.Sim.Core
                 m.Instability += units * feed.BiomassInstabilityPerUnit;
                 World.PushEvent(w, SimEventType.DeliverBiomass, actorId, teamIdx, sh.X, sh.Z, units, meat ? BiomassType.Meat : BiomassType.Plant, DamageCause.None);
             }
+            else if (Corruption.On(w))
+            {
+                // CM b13 [C]: a crystal gives NO allegiance and NO instability; it goes into the corruption pool (rolled at the
+                // hatch). Delivered.Corruption still tallies it, so Cleanse.NetCorruptionUnits and Healer purify stay consistent.
+                m.Delivered[(int)team].Corruption += units;
+                Corruption.OnEggFeed(w, team, units);
+                World.PushEvent(w, SimEventType.DeliverCorruption, actorId, teamIdx, sh.X, sh.Z, units);
+            }
             else
             {
                 m.Allegiance[team] += units * feed.CorruptionAllegiancePerUnit * MapEvents.FeedScale(w);
@@ -68,9 +76,11 @@ namespace CriticalMass.Sim.Core
         /// DG-41: the instability that locks berserk this match. KaijuFeed.BerserkThreshold unless KaijuFeed.RandomBerserk; then
         /// u^2 x BerserkCurveMax with u = SeedUniform(seed) in [0, 1), fixed for the whole match and never drawn from the shared
         /// RNG (P(line &lt;= I) = sqrt(I / BerserkCurveMax)). Pure function of the seed and config.
+        /// CM b13 [C]: +infinity while Corruption.On (instability never locks berserk; the crystal roll is the wild rule).
         /// </summary>
         public static double BerserkLine(World w)
         {
+            if (Corruption.On(w) && !Corruption.KeepsOldBerserk(w)) return double.PositiveInfinity; // CM b13 [C]: one wild rule (the crystal roll), not two; b13 r3 integrator: small matches keep the old line (owner default)
             KaijuFeedConfig feed = w.Config.KaijuFeed;
             if (!feed.RandomBerserk) return feed.BerserkThreshold;
             double u = SeedUniform(w.Opts.Seed);
@@ -104,15 +114,17 @@ namespace CriticalMass.Sim.Core
         }
 
         /// <summary>Regrow one charge of a node per regrow period while it is below its max charges.</summary>
-        private static void Regrow(GameConfig config, ResourceNode node, double dt)
+        private static void Regrow(World w, ResourceNode node, double dt)
         {
             if (node.Charges >= node.MaxCharges)
             {
                 node.RegrowIn = 0;
                 return;
             }
+            GameConfig config = w.Config;
             double period =
-                node.Kind == NodeKind.Biomass ? config.Resources.BiomassRegrowSeconds : config.Resources.CorruptionRegrowSeconds;
+                node.Kind == NodeKind.Biomass ? config.Resources.BiomassRegrowSeconds
+                : Corruption.On(w) ? Corruption.VeinRegrowSeconds(w) : config.Resources.CorruptionRegrowSeconds; // CM b13 [C]: crystal veins
             if (node.RegrowIn <= 0) node.RegrowIn = period;
             node.RegrowIn = Combat.TickDown(node.RegrowIn, dt);
             if (node.RegrowIn <= 0)
@@ -138,7 +150,8 @@ namespace CriticalMass.Sim.Core
         {
             Actor a = w.Actors[id];
             double cap = w.Config.Class(a.Cls).CarryCapacity;
-            if (a.CarryAmount >= cap) return -1;
+            bool crystals = Corruption.On(w); // CM b13 [C]: a crystal vein has its own carry cap (1, the Miner 2)
+            if (!crystals && a.CarryAmount >= cap) return -1;
             double reach = w.Config.Resources.NodeInteractRange + Collide.ActorRadius(w, id);
             double r2 = reach * reach;
             double x = w.X[id];
@@ -150,6 +163,7 @@ namespace CriticalMass.Sim.Core
             {
                 ResourceNode n = nodes[i];
                 if (!NodeTakes(w, a, n)) continue;
+                if (crystals && a.CarryAmount >= (n.Kind == NodeKind.Corruption ? Corruption.CrystalCap(w, a.Cls) : cap)) continue;
                 double dx = n.X - x;
                 double dz = n.Z - z;
                 double d2 = dx * dx + dz * dz;
@@ -240,7 +254,9 @@ namespace CriticalMass.Sim.Core
         public static void ResourcesSystem(World w, double dt)
         {
             ResourceNode[] nodes = w.Nodes;
-            for (int i = 0; i < nodes.Length; i++) Regrow(w.Config, nodes[i], dt);
+            bool crystals = Corruption.On(w); // CM b13 [C]
+            if (crystals) Corruption.EnsureVeins(w);
+            for (int i = 0; i < nodes.Length; i++) Regrow(w, nodes[i], dt);
             int liveOrbs = AgeOrbs(w);
 
             int n = w.ActorCount;
@@ -302,6 +318,15 @@ namespace CriticalMass.Sim.Core
                         continue;
                     }
                 }
+                // CM b13 [C]: after the hatch a crystal carrier holding E within feed reach of the Kaiju feeds it (only a
+                // knocked-out Kaiju, only a team that does not own it); the wind-up is DeliverTicks, so a hit interrupts it.
+                if (!egg && a.Carry == CarryKind.Corruption && a.CarryAmount > 0 && Corruption.On(w) && w.Match.Hatched && Corruption.InFeedReach(w, id))
+                {
+                    a.GatherProgress = 0;
+                    a.GatherNodeId = -1;
+                    Corruption.StepFeed(w, id);
+                    continue;
+                }
                 Delivery.CancelDelivery(a);
 
                 int ni = GatherNode(w, id);
@@ -317,7 +342,8 @@ namespace CriticalMass.Sim.Core
                     a.GatherNodeId = ni;
                 }
                 a.GatherProgress += dt;
-                double need = w.Config.Class(a.Cls).GatherSeconds;
+                bool vein = nodes[ni].Kind == NodeKind.Corruption && Corruption.On(w); // CM b13 [C]: 3.0 s per crystal, the Miner 1.0 s
+                double need = vein ? Corruption.GatherSeconds(w, a.Cls) : w.Config.Class(a.Cls).GatherSeconds;
                 if (a.GatherProgress >= need - Combat.TimerEps)
                 {
                     ResourceNode node = nodes[ni];
@@ -326,6 +352,7 @@ namespace CriticalMass.Sim.Core
                     a.CarryAmount += 1;
                     a.GatherProgress = 0;
                     World.PushEvent(w, SimEventType.Gather, id, ni, node.X, node.Z, a.CarryAmount);
+                    if (vein) Corruption.OnMined(w, id, ni);
                 }
             }
         }

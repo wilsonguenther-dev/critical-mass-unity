@@ -573,7 +573,7 @@ namespace CriticalMass.Sim.Core
                 double dx = w.X[id] - k.X;
                 double dz = w.Z[id] - k.Z;
                 double score = Math.Sqrt(dx * dx + dz * dz);
-                if (bigFeeder >= 0 && (w.Actors[id].Team == TeamId.Azure ? 0 : 1) == bigFeeder) score -= BigFeederBias;
+                if (bigFeeder >= 0 && (w.Actors[id].Team == TeamId.Azure ? 0 : 1) == bigFeeder) score -= Corruption.TargetBias(w, BigFeederBias);   // b13 r3 [C] routed: wild bias WildLeaderBias (6)
                 if (walls && !SegmentClear.Clear(w.Map, k.X, k.Z, w.X[id], w.Z[id])) score += p.KaijuHiddenPenalty;
                 if (guard && id == k.TargetId) score -= p.KaijuRetargetMargin;
                 if (score < bestScore)
