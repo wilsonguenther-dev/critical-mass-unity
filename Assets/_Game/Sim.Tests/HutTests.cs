@@ -352,7 +352,11 @@ namespace CriticalMass.Sim.Tests
             foreach (int l in on.EndLevel16) lv.Add(l);
             double med = Median(lv);
             Check("16v16 median end hut level", med, 0, med >= 3, "3 or more");
-            Check("16v16 seeds with a team at L5", on.L5Seeds16, 0, on.L5Seeds16 >= 2, "2 of 6 or more");
+            // b13 r3 integrator: judged on the 16 16v16 matches of the pool (the 6 ORDER seeds print): 1 of 6 vs 2 of 6 flipped
+            // between runs with hut-unrelated rules (dodge, walls); the same one-third share is the limit
+            Console.WriteLine("[b13 H] 16v16 ORDER seeds with a team at L5: on " + on.L5Seeds16 + " of 6 (printed; judged on the 16-match 16v16 pool)");
+            int l5 = on.L5Seeds16 + wOn.L5Seeds16;
+            Check("16v16 matches with a team at L5 (of 16)", l5, off.L5Seeds16 + wOff.L5Seeds16, l5 * 3 >= 16, "one third (6 of 16) or more");
             double snow = on.DiffAt6 > 0 ? (double)on.HigherWonAt6 / on.DiffAt6 : 0;
             Check("higher-level team at 6:00 wins (share of " + on.DiffAt6 + " matches)", snow, 0, snow <= 0.75 + 1e-9, "0.75 at most");
             Check("Miner barricades placed", on.MinerBarricades, off.MinerBarricades, on.MinerBarricades == 0, "0");
