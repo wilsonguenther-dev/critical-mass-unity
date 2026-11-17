@@ -130,7 +130,8 @@ namespace CriticalMass.Sim.Bots
                 Actor en = w.Actors[e];
                 if (e == id || !en.Alive || !en.SwingPending || en.Team == me.Team) continue;
                 double ox = x - w.X[e], oz = z - w.Z[e];
-                double reach = Combat.ReachOf(w, en.Cls) + dc.MeleeSlack + myR;
+                LightWeapon lw = LightWeapons.Of(w, en.Cls); // the swing's own reach on this base (b13-reach's Combat.ReachOf is a separate merge)
+                double reach = (lw != null ? lw.Range : cfg.Class(en.Cls).AttackRange) + dc.MeleeSlack + myR;
                 double d2 = ox * ox + oz * oz;
                 if (d2 > reach * reach) continue;
                 bool aimed;
