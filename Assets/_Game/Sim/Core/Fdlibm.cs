@@ -440,7 +440,7 @@ namespace CriticalMass.Sim.Core
             unchecked
             {
                 double z, w, t, r, fn;
-                double[] tx = new double[3];
+                double[] tx = _tx3 ?? (_tx3 = new double[3]);   // b13 integrator: reused; all three slots are written before use
                 int e0, i, j, nx, n, ix, hx;
                 uint low;
 
@@ -1120,9 +1120,14 @@ namespace CriticalMass.Sim.Core
          *      __kernel_cos            ... cosine function on [-pi/4,pi/4]
          *      __ieee754_rem_pio2      ... argument reduction routine
          */
+        // b13 integrator: per-thread scratch for the argument reduction (bit-identical results; no per-call allocation, which
+        // made every rule item's 0 B allocation test see 248 B a tick from Cos/Sin of angles past pi/4).
+        [System.ThreadStatic] private static double[] _y2;
+        [System.ThreadStatic] private static double[] _tx3;
+
         public static double Cos(double x)
         {
-            double[] y = new double[2];
+            double[] y = _y2 ?? (_y2 = new double[2]);   // b13 integrator: reused (was a 40 B allocation per call past pi/4)
             double z = 0.0;
             int n, ix;
 
@@ -1276,7 +1281,7 @@ namespace CriticalMass.Sim.Core
          */
         public static double Sin(double x)
         {
-            double[] y = new double[2];
+            double[] y = _y2 ?? (_y2 = new double[2]);   // b13 integrator: reused (was a 40 B allocation per call past pi/4)
             double z = 0.0;
             int n, ix;
 
