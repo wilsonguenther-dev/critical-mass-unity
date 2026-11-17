@@ -1,0 +1,274 @@
+{
+ "file": "out/Farmer/Farmer.fbx",
+ "bytes": 688524,
+ "bones": 41,
+ "bone_names_equal_game": true,
+ "parents_equal_game": true,
+ "rest_maxdiff_vs_game_m": 2e-06,
+ "game_rig": "Art/Farmer/Farmer.fbx",
+ "meshes": {
+  "Farmer_Hero": {
+   "tris": 9618,
+   "verts": 5219,
+   "colour_layers": [
+    "Col"
+   ],
+   "codes": [
+    0,
+    2,
+    8
+   ],
+   "max_influences": 1,
+   "uv": [
+    "UVMap"
+   ],
+   "materials": [
+    "CM_Toon"
+   ],
+   "height_m": 2.1857,
+   "min_z": -0.025,
+   "parent": "Rig",
+   "armature_mod": true
+  },
+  "Farmer_LOD0": {
+   "tris": 4248,
+   "verts": 2500,
+   "colour_layers": [
+    "Col"
+   ],
+   "codes": [
+    0,
+    2,
+    8
+   ],
+   "max_influences": 1,
+   "uv": [
+    "UVMap"
+   ],
+   "materials": [
+    "CM_Toon"
+   ],
+   "height_m": 2.1837,
+   "min_z": -0.025,
+   "parent": "Rig",
+   "armature_mod": true
+  },
+  "Farmer_LOD1": {
+   "tris": 1456,
+   "verts": 1015,
+   "colour_layers": [
+    "Col"
+   ],
+   "codes": [
+    0,
+    2,
+    8
+   ],
+   "max_influences": 1,
+   "uv": [
+    "UVMap"
+   ],
+   "materials": [
+    "CM_Toon"
+   ],
+   "height_m": 2.1774,
+   "min_z": -0.0083,
+   "parent": "Rig",
+   "armature_mod": true
+  },
+  "Farmer_Shadow": {
+   "tris": 656,
+   "verts": 368,
+   "colour_layers": [
+    "Col"
+   ],
+   "codes": [
+    0
+   ],
+   "max_influences": 1,
+   "uv": [
+    "UVMap"
+   ],
+   "materials": [
+    "CM_Toon"
+   ],
+   "height_m": 2.1774,
+   "min_z": -0.0083,
+   "parent": "Rig",
+   "armature_mod": true
+  }
+ },
+ "face_proxy": {
+  "head_verts": 1699,
+  "skin_front_verts": 232,
+  "dark_in_skin_bbox": 247,
+  "contrast": 0.429,
+  "face_codes": [
+   0
+  ]
+ },
+ "approved_tris": 9236,
+ "poses": [
+  [
+   "idle",
+   "Idle",
+   13
+  ],
+  [
+   "walk",
+   "Walk",
+   6
+  ],
+  [
+   "attack",
+   "Attack2HSlice",
+   16
+  ],
+  [
+   "action",
+   "Cast",
+   11
+  ]
+ ],
+ "grip": {
+  "farmer_left_fist_gap_m_per_frame[frame,hero,lod0]": [
+   [
+    1,
+    -0.026,
+    -0.026
+   ],
+   [
+    2,
+    -0.0306,
+    -0.0306
+   ],
+   [
+    3,
+    -0.014,
+    -0.014
+   ],
+   [
+    4,
+    -0.0401,
+    -0.0401
+   ],
+   [
+    5,
+    -0.0389,
+    -0.0389
+   ],
+   [
+    6,
+    -0.0463,
+    -0.0463
+   ],
+   [
+    7,
+    -0.0364,
+    -0.0364
+   ],
+   [
+    8,
+    -0.032,
+    -0.032
+   ],
+   [
+    9,
+    -0.0282,
+    -0.0282
+   ],
+   [
+    10,
+    -0.0517,
+    -0.0517
+   ],
+   [
+    11,
+    -0.0407,
+    -0.0407
+   ],
+   [
+    12,
+    -0.034,
+    -0.034
+   ],
+   [
+    13,
+    -0.0261,
+    -0.0261
+   ],
+   [
+    14,
+    -0.0192,
+    -0.0192
+   ],
+   [
+    15,
+    -0.0152,
+    -0.0152
+   ],
+   [
+    16,
+    -0.0159,
+    -0.0159
+   ],
+   [
+    17,
+    -0.0187,
+    -0.0187
+   ],
+   [
+    18,
+    -0.0245,
+    -0.0245
+   ],
+   [
+    19,
+    -0.0266,
+    -0.0266
+   ],
+   [
+    20,
+    -0.0124,
+    -0.0124
+   ],
+   [
+    21,
+    -0.0254,
+    -0.0254
+   ],
+   [
+    22,
+    -0.0297,
+    -0.0297
+   ],
+   [
+    23,
+    -0.0174,
+    -0.0174
+   ],
+   [
+    24,
+    -0.0302,
+    -0.0302
+   ],
+   [
+    25,
+    -0.0552,
+    -0.0552
+   ],
+   [
+    26,
+    -0.0379,
+    -0.0379
+   ],
+   [
+    27,
+    -0.0229,
+    -0.0229
+   ]
+  ],
+  "farmer_gap_max_hero_m": -0.0124,
+  "farmer_gap_max_lod0_m": -0.0124
+ }
+}

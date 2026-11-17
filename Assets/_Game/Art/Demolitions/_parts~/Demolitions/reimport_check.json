@@ -1,0 +1,131 @@
+{
+ "file": "out/Demolitions/Demolitions.fbx",
+ "bytes": 706764,
+ "bones": 41,
+ "bone_names_equal_game": true,
+ "parents_equal_game": true,
+ "rest_maxdiff_vs_game_m": 4e-06,
+ "game_rig": "Art/Demolitions/Demolitions.fbx",
+ "meshes": {
+  "Demolitions_Hero": {
+   "tris": 10152,
+   "verts": 5456,
+   "colour_layers": [
+    "Col"
+   ],
+   "codes": [
+    0,
+    8
+   ],
+   "max_influences": 1,
+   "uv": [
+    "UVMap"
+   ],
+   "materials": [
+    "CM_Toon"
+   ],
+   "height_m": 2.055,
+   "min_z": 0.0,
+   "parent": "Rig",
+   "armature_mod": true
+  },
+  "Demolitions_LOD0": {
+   "tris": 4277,
+   "verts": 2514,
+   "colour_layers": [
+    "Col"
+   ],
+   "codes": [
+    0,
+    8
+   ],
+   "max_influences": 1,
+   "uv": [
+    "UVMap"
+   ],
+   "materials": [
+    "CM_Toon"
+   ],
+   "height_m": 2.055,
+   "min_z": 0.0,
+   "parent": "Rig",
+   "armature_mod": true
+  },
+  "Demolitions_LOD1": {
+   "tris": 1447,
+   "verts": 980,
+   "colour_layers": [
+    "Col"
+   ],
+   "codes": [
+    0,
+    8
+   ],
+   "max_influences": 1,
+   "uv": [
+    "UVMap"
+   ],
+   "materials": [
+    "CM_Toon"
+   ],
+   "height_m": 2.055,
+   "min_z": 0.0025,
+   "parent": "Rig",
+   "armature_mod": true
+  },
+  "Demolitions_Shadow": {
+   "tris": 752,
+   "verts": 418,
+   "colour_layers": [
+    "Col"
+   ],
+   "codes": [
+    0
+   ],
+   "max_influences": 1,
+   "uv": [
+    "UVMap"
+   ],
+   "materials": [
+    "CM_Toon"
+   ],
+   "height_m": 2.055,
+   "min_z": 0.0025,
+   "parent": "Rig",
+   "armature_mod": true
+  }
+ },
+ "face_proxy": {
+  "head_verts": 1511,
+  "skin_front_verts": 367,
+  "dark_in_skin_bbox": 232,
+  "contrast": 0.419,
+  "face_codes": [
+   0
+  ]
+ },
+ "approved_tris": 9968,
+ "poses": [
+  [
+   "idle",
+   "Idle",
+   13
+  ],
+  [
+   "walk",
+   "Walk",
+   6
+  ],
+  [
+   "attack",
+   "Attack",
+   15
+  ],
+  [
+   "action",
+   "PickUp",
+   16
+  ]
+ ],
+ "grip": {}
+}
