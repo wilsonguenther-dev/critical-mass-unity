@@ -43,7 +43,7 @@ namespace CriticalMass.Sim.Core
             KaijuConfig kc = w.Config.Kaiju;
             Kaiju k = w.Kaiju;
             int n = w.ActorCount;
-            double r2 = kc.SlamRadius * kc.SlamRadius;
+            double r2 = KaijuTypes.SlamRadius(w) * KaijuTypes.SlamRadius(w);
             int hits = 0;
             for (int id = 0; id < n; id++)
             {
@@ -54,8 +54,8 @@ namespace CriticalMass.Sim.Core
                 if (dx * dx + dz * dz > r2) continue;
                 if (Damage.ApplyDamage(w, id, kc.SlamDamage, Damage.KaijuSlamSource, k.TelegraphX, k.TelegraphZ) > 0) hits++;
             }
-            k.SlamCd = kc.SlamCooldown;
-            World.PushEvent(w, SimEventType.KaijuSlam, -1, hits, k.TelegraphX, k.TelegraphZ, kc.SlamRadius);
+            k.SlamCd = KaijuTypes.SlamCooldown(w);
+            World.PushEvent(w, SimEventType.KaijuSlam, -1, hits, k.TelegraphX, k.TelegraphZ, KaijuTypes.SlamRadius(w));
         }
 
         /// <summary>
@@ -69,7 +69,7 @@ namespace CriticalMass.Sim.Core
             KaijuConfig kc = w.Config.Kaiju;
             PhysicsConfig p = w.Config.Physics;
             Kaiju k = w.Kaiju;
-            double R = kc.SlamRadius;
+            double R = KaijuTypes.SlamRadius(w);
             double full = p.SlamFullRadiusShare * R;
             bool walls = Phys.On(w, p.WallsBlockHits);
             bool knock = Damage.Knocks(w, DamageCause.KaijuSlam);
@@ -91,7 +91,7 @@ namespace CriticalMass.Sim.Core
                 if (Damage.ApplyHit(w, id, kc.SlamDamage * share, Damage.KaijuSlamSource, k.TelegraphX, k.TelegraphZ, DamageCause.KaijuSlam,
                     ux, uz, knock ? kd * Damage.KaijuThrow(w) : 0, knock ? w.Dur.SlamStun : 0) > 0) hits++;
             }
-            k.SlamCd = kc.SlamCooldown;
+            k.SlamCd = KaijuTypes.SlamCooldown(w);
             World.PushEvent(w, SimEventType.KaijuSlam, -1, hits, k.TelegraphX, k.TelegraphZ, R, null, DamageCause.None, R, 0, 0, knock ? p.SlamKnockCentre : 0, 2, 0, 0);
             // fix/kaiju-alive-1: the slam ring knocks structures down (after the KaijuSlam event, so the view lands both).
             if (Phys.On(w, p.KaijuTopples)) Topple.ToppleInArc(w, -1, k.TelegraphX, k.TelegraphZ, 1, 0, Math.Max(0, R * p.KaijuSlamToppleShare - w.Config.Abilities.Topple.Reach), -1);
@@ -123,9 +123,9 @@ namespace CriticalMass.Sim.Core
             if (Damage.Knocks(w, DamageCause.KaijuMelee))
             {
                 Knock.Dir(w, t, k.X, k.Z, JsMath.Cos(k.Facing), JsMath.Sin(k.Facing), out double kx, out double kz);
-                Damage.ApplyHit(w, t, kc.MeleeDamage, Damage.KaijuSource, k.X, k.Z, DamageCause.KaijuMelee, kx, kz, w.Config.Physics.KaijuClawKnock, w.Dur.KaijuStun);
+                Damage.ApplyHit(w, t, KaijuTypes.MeleeDamage(w, kc.MeleeDamage), Damage.KaijuSource, k.X, k.Z, DamageCause.KaijuMelee, kx, kz, w.Config.Physics.KaijuClawKnock, w.Dur.KaijuStun);
             }
-            else Damage.ApplyDamage(w, t, kc.MeleeDamage, Damage.KaijuSource, k.X, k.Z);
+            else Damage.ApplyDamage(w, t, KaijuTypes.MeleeDamage(w, kc.MeleeDamage), Damage.KaijuSource, k.X, k.Z);
             if (!w.Actors[t].Alive && k.TargetId == t) k.TargetId = -1;
         }
 
@@ -163,7 +163,7 @@ namespace CriticalMass.Sim.Core
                 if (!w.Actors[id].Alive || !KaijuHostileTo(w, id) || !InClawCone(w, id)) continue;
                 if (walls && !SegmentClear.Clear(w.Map, k.ClawX, k.ClawZ, w.X[id], w.Z[id])) continue;
                 Knock.Dir(w, id, k.ClawX, k.ClawZ, fx, fz, out double dx, out double dz);
-                Damage.ApplyHit(w, id, kc.MeleeDamage, Damage.KaijuSource, k.ClawX, k.ClawZ, DamageCause.KaijuMelee, dx, dz,
+                Damage.ApplyHit(w, id, KaijuTypes.MeleeDamage(w, kc.MeleeDamage), Damage.KaijuSource, k.ClawX, k.ClawZ, DamageCause.KaijuMelee, dx, dz,
                     knock ? p.KaijuClawKnock * Damage.KaijuThrow(w) : 0, knock ? w.Dur.KaijuStun : 0);
             }
         }
@@ -597,7 +597,7 @@ namespace CriticalMass.Sim.Core
             double ddz = az - k.Z;
             double len = Math.Sqrt(ddx * ddx + ddz * ddz);
             if (len < 1e-6) return;
-            double stepLen = w.Config.Kaiju.MoveSpeed * dt;
+            double stepLen = KaijuTypes.MoveSpeed(w) * dt; // b13-k: KaijuConfig.MoveSpeed itself for ELDER
             if (guard && len < stepLen) stepLen = len; // arrive on the point, do not overshoot and come back
             double x0 = k.X;
             double z0 = k.Z;
@@ -638,6 +638,7 @@ namespace CriticalMass.Sim.Core
                 return;
             }
             if (k.State == KaijuState.Egg) return;
+            KaijuTypes.Step(w, dt); // b13-k: REGROWTH and SHROUD (no-op for ELDER)
 
             KaijuNav nav = w.KaijuNav;
             int n = w.ActorCount;
@@ -693,7 +694,7 @@ namespace CriticalMass.Sim.Core
                 if (nav.RetargetIn <= 0) nav.RetargetIn = KaijuRetargetSeconds;
             }
 
-            if (k.SlamCd <= 0 && CountHostilesWithin(w, k.X, k.Z, kc.SlamRadius, seen) >= 2)
+            if (k.SlamCd <= 0 && CountHostilesWithin(w, k.X, k.Z, KaijuTypes.SlamRadius(w), seen) >= 2)
             {
                 k.TelegraphX = k.X;
                 k.TelegraphZ = k.Z;
@@ -701,12 +702,12 @@ namespace CriticalMass.Sim.Core
                 {
                     // DG-85 / OD-7: at least KaijuSlamMinRealSeconds on screen at the match pace (48 ticks at pace 2).
                     k.TelegraphIn = w.Dur.SlamTelegraph / cfg.SimHz;
-                    World.PushEvent(w, SimEventType.KaijuTelegraph, -1, -1, k.X, k.Z, kc.SlamRadius, null, DamageCause.None, kc.SlamRadius, 0, 0, 0, 0, w.Dur.SlamTelegraph, 0);
+                    World.PushEvent(w, SimEventType.KaijuTelegraph, -1, -1, k.X, k.Z, KaijuTypes.SlamRadius(w), null, DamageCause.None, KaijuTypes.SlamRadius(w), 0, 0, 0, 0, w.Dur.SlamTelegraph, 0);
                 }
                 else
                 {
                     k.TelegraphIn = kc.SlamTelegraphSeconds;
-                    World.PushEvent(w, SimEventType.KaijuTelegraph, -1, -1, k.X, k.Z, kc.SlamRadius);
+                    World.PushEvent(w, SimEventType.KaijuTelegraph, -1, -1, k.X, k.Z, KaijuTypes.SlamRadius(w));
                 }
                 return;
             }
@@ -750,7 +751,7 @@ namespace CriticalMass.Sim.Core
                             k.MeleeWindupIn = w.Dur.KaijuClawWindup;
                             k.MeleeWindupLen = w.Dur.KaijuClawWindup;
                             k.MeleeTargetId = -1;
-                            k.MeleeCd = kc.MeleeCooldown;
+                            k.MeleeCd = KaijuTypes.MeleeCooldown(w);
                             k.ClawX = k.X;
                             k.ClawZ = k.Z;
                             k.ClawFacing = k.Facing;
@@ -819,7 +820,7 @@ namespace CriticalMass.Sim.Core
                     k.MeleeWindupIn = w.Dur.KaijuClawWindup;
                     k.MeleeWindupLen = w.Dur.KaijuClawWindup;
                     k.MeleeTargetId = t;
-                    k.MeleeCd = kc.MeleeCooldown;
+                    k.MeleeCd = KaijuTypes.MeleeCooldown(w);
                     k.ClawX = k.X;
                     k.ClawZ = k.Z;
                     k.ClawFacing = k.Facing;

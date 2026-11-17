@@ -49,13 +49,33 @@ namespace CriticalMass.Runtime.View.Fog
             {
                 Actor a = w.Actors[i];
                 if (a == null || !a.Alive || a.Team != team) continue;
-                buf[n++] = new FogSource(w.X[i], w.Z[i], FogConfig.SightTeammate);
+                buf[n++] = new FogSource(w.X[i], w.Z[i], KaijuTypes.SightRadiusFor(w, i, FogConfig.SightTeammate));   // b13-k: SHROUD shrinks an affected teammate inside
             }
             if (n < buf.Length && w.Map.Hill != null && w.Match.HillState == HeldBy(team))
                 buf[n++] = new FogSource(w.Map.Hill.X, w.Map.Hill.Z, FogConfig.SightHeldHill);
             PadDef pad = w.Map.Pads != null && (int)team < w.Map.Pads.Length ? w.Map.Pads[(int)team] : null;
             if (n < buf.Length && pad != null) buf[n++] = new FogSource(pad.X, pad.Z, BaseRadius(w, team));
             return n;
+        }
+
+        /// <summary>
+        /// b13-k: true when MIRE's SHROUD hides actor target from team: the team is affected, the target stands inside the
+        /// cloud, and no teammate standing inside the cloud is within its (shrunk) sight of it. Viewers outside never see in.
+        /// </summary>
+        public static bool CloudHides(World w, TeamId team, FogSource[] src, int n, int target)
+        {
+            if (!KaijuTypes.CloudActive(w, out double cx, out double cz, out double cr)) return false;
+            if (!(target >= 0 && target < w.ActorCount) || !KaijuTypes.AffectsTeam(w, team)) return false;
+            double tx = w.X[target] - cx, tz = w.Z[target] - cz;
+            if (tx * tx + tz * tz > cr * cr) return false;
+            for (int i = 0; i < n; i++)
+            {
+                double sx = src[i].X - cx, sz = src[i].Z - cz;
+                if (sx * sx + sz * sz > cr * cr) continue;
+                double dx = w.X[target] - src[i].X, dz = w.Z[target] - src[i].Z;
+                if (dx * dx + dz * dz <= src[i].R * src[i].R) return false;
+            }
+            return true;
         }
 
         /// <summary>True when (x, z) is within any disc's exact radius (the enemy test; no grid rounding).</summary>
@@ -180,7 +200,7 @@ namespace CriticalMass.Runtime.View.Fog
             {
                 Actor a = i < w.ActorCount ? w.Actors[i] : null;
                 // a body (alive, or a corpse still drawn) is seen where it lies; teammates always
-                _seen[i] = a != null && (a.Team == team || FogSight.SeenAt(_src, SourceCount, w.X[i], w.Z[i]));
+                _seen[i] = a != null && (a.Team == team || (FogSight.SeenAt(_src, SourceCount, w.X[i], w.Z[i]) && !FogSight.CloudHides(w, team, _src, SourceCount, i)));   // b13-k: SHROUD
             }
         }
 
