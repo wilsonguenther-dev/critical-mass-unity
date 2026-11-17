@@ -397,10 +397,10 @@ namespace CriticalMass.Sim.Tests
         {
             GameConfig a = Full();
             GameConfig b = a.Clone();
-            b.Depth.KaijuTypes.RefShare[0] = 0.9;
+            b.Depth.KaijuTypes.RefShare[0] = 0.5;
             b.Depth.KaijuTypes.ShroudTicks[0] = 1;
             Print("clone edit leaves the original RefShare[0] / ShroudTicks[0]", F(a.Depth.KaijuTypes.RefShare[0]) + " / " + a.Depth.KaijuTypes.ShroudTicks[0], "unchanged");
-            Assert.AreNotEqual(0.9, a.Depth.KaijuTypes.RefShare[0]);
+            Assert.AreEqual(0.90, a.Depth.KaijuTypes.RefShare[0]);
             Assert.AreEqual(120, a.Depth.KaijuTypes.ShroudTicks[0]);
         }
 
