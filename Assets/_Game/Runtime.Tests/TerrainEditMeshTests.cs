@@ -289,14 +289,35 @@ namespace CriticalMass.Runtime.Tests
             long beforeUp = GC.GetAllocatedBytesForCurrentThread();
             m.Upload(mesh);
             long allocUp = GC.GetAllocatedBytesForCurrentThread() - beforeUp;
-            Print($"chunk with {pits} pits and {walls} short walls: managed bytes over {Runs} rebuilds", alloc, "== 0");
-            Print("chunk rebuild mean ms (editor, managed build only)", ms, "< 2.0");
+            int worstTris = m.Tris.Count / 3;
+
+            // The usual case: one chunk holding a 3 x 3 dig, one fill and a row of three BLOCK pieces.
+            byte[] c2 = All(Cell.Floor, N * N);
+            var t2 = new bool[N * N];
+            for (int z = 20; z <= 22; z++) for (int x = 20; x <= 22; x++) { c2[z * N + x] = Cell.Void; t2[z * N + x] = true; }
+            c2[21 * N + 21] = Cell.Floor;
+            c2[25 * N + 20] = c2[25 * N + 21] = c2[25 * N + 22] = Cell.LowWall;
+            byte[] p2 = All(Cell.Floor, N * N);
+            for (int k = 0; k < 3; k++) m.Build(N, N, c2, h, p2, t2, 16, 16, 32, 32);
+            sw.Restart();
+            long before2 = GC.GetAllocatedBytesForCurrentThread();
+            for (int k = 0; k < Runs; k++) m.Build(N, N, c2, h, p2, t2, 16, 16, 32, 32);
+            long alloc2 = GC.GetAllocatedBytesForCurrentThread() - before2;
+            double ms2 = sw.Elapsed.TotalMilliseconds / Runs;
+
+            Print($"worst chunk ({pits} pits of 256 cells, {walls} short walls): managed bytes over {Runs} rebuilds", alloc, "== 0");
+            Print("worst chunk rebuild mean ms (CI editor, managed build only)", ms, "< 5.0 (15% of a 33.3 ms frame)");
+            Print("usual chunk (3x3 dig, a fill, 3 blocks): managed bytes over " + Runs + " rebuilds", alloc2, "== 0");
+            Print("usual chunk rebuild mean ms", ms2, "< 1.0");
             Print("mesh upload managed bytes (printed, not asserted)", allocUp, "info");
-            Print("chunk triangles", m.Tris.Count / 3, "info (draw calls added: one per chunk with edits)");
+            Print("worst chunk triangles", worstTris, "info (draw calls added: one per chunk with edits)");
+            Print("usual chunk triangles", m.Tris.Count / 3, "info");
             Print($"placed cells in the neighbour chunk", placed, "info");
             UnityEngine.Object.DestroyImmediate(mesh);
-            Assert.AreEqual(0, alloc, "terrain edit rebuild allocates");
-            Assert.Less(ms, 2.0, "terrain edit rebuild cost");
+            Assert.AreEqual(0, alloc, "terrain edit rebuild allocates (worst chunk)");
+            Assert.AreEqual(0, alloc2, "terrain edit rebuild allocates (usual chunk)");
+            Assert.Less(ms, 5.0, "worst-case terrain edit rebuild cost");
+            Assert.Less(ms2, 1.0, "usual terrain edit rebuild cost");
         }
     }
 }

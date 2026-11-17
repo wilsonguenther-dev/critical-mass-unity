@@ -65,6 +65,11 @@ namespace CriticalMass.Runtime.View
         byte[] _cells, _pr;
         bool[] _tc;
         double[] _h01;
+        // Per-build caches (grown, never shrunk, so a warm rebuild allocates nothing): the kind of every cell within 3 of the
+        // chunk (a depth reads 2 rings around a neighbour) and the pit depth of every cell within 1.
+        byte[] _kind = new byte[0];
+        double[] _depth = new double[0];
+        int _kx0, _kz0, _kw, _kh, _dx0, _dz0, _dw, _dh;
         readonly bool[] _rim = new bool[4];
         readonly double[] _step = new double[4];
         static readonly int[] DX = { -1, 1, 0, 0 }, DZ = { 0, 0, -1, 1 };
@@ -87,6 +92,17 @@ namespace CriticalMass.Runtime.View
         {
             Clear();
             _w = width; _h = height; _cells = cells; _h01 = h01; _pr = pristine; _tc = touched;
+            _kw = _kh = _dw = _dh = 0;   // caches off while they fill
+            int kx0 = x0 - 3, kz0 = z0 - 3, kw = x1 - x0 + 6, kh = z1 - z0 + 6;
+            if (_kind.Length < kw * kh) _kind = new byte[kw * kh];
+            for (int z = 0; z < kh; z++)
+            for (int x = 0; x < kw; x++)
+                _kind[z * kw + x] = (byte)KindAt(kx0 + x, kz0 + z);
+            _kx0 = kx0; _kz0 = kz0; _kw = kw; _kh = kh;
+            int dx0 = x0 - 1, dz0 = z0 - 1, dw = x1 - x0 + 2, dh = z1 - z0 + 2;
+            if (_depth.Length < dw * dh) _depth = new double[dw * dh];
+            for (int k = 0; k < dw * dh; k++) _depth[k] = -1;
+            _dx0 = dx0; _dz0 = dz0; _dw = dw; _dh = dh;
             for (int cz = z0; cz < z1; cz++)
             for (int cx = x0; cx < x1; cx++)
             {
@@ -137,6 +153,8 @@ namespace CriticalMass.Runtime.View
 
         TerrainEdits.Kind KindAt(int cx, int cz)
         {
+            int kx = cx - _kx0, kz = cz - _kz0;
+            if (kx >= 0 && kz >= 0 && kx < _kw && kz < _kh) return (TerrainEdits.Kind)_kind[kz * _kw + kx];
             if (!In(cx, cz)) return TerrainEdits.Kind.None;
             int i = cz * _w + cx;
             byte p = _pr != null ? _pr[i] : _cells[i];
@@ -147,6 +165,16 @@ namespace CriticalMass.Runtime.View
         {
             if (!In(cx, cz)) return 0;
             return _h01 != null ? _h01[cz * _w + cx] : 0;
+        }
+
+        /// <summary>PitDepth through the per-build cache.</summary>
+        double Depth(int cx, int cz)
+        {
+            int dx = cx - _dx0, dz = cz - _dz0;
+            if (dx < 0 || dz < 0 || dx >= _dw || dz >= _dh) return PitDepth(cx, cz);
+            int k = dz * _dw + dx;
+            if (_depth[k] < 0) _depth[k] = PitDepth(cx, cz);
+            return _depth[k];
         }
 
         /// <summary>Pit depth of cell (cx, cz): by the Chebyshev ring to the nearest cell that is not a pit.</summary>
@@ -178,7 +206,7 @@ namespace CriticalMass.Runtime.View
         {
             PitCells++;
             double h = H(cx, cz);
-            double yf = h - PitDepth(cx, cz);
+            double yf = h - Depth(cx, cz);
             for (int s = 0; s < 4; s++)
             {
                 int nx = cx + DX[s], nz = cz + DZ[s];
@@ -186,7 +214,7 @@ namespace CriticalMass.Runtime.View
                 if (KindAt(nx, nz) == TerrainEdits.Kind.Pit)
                 {
                     _rim[s] = false;
-                    double yfn = H(nx, nz) - PitDepth(nx, nz);
+                    double yfn = H(nx, nz) - Depth(nx, nz);
                     if (yfn > yf + 0.01) _step[s] = yfn;
                 }
                 else _rim[s] = true;
