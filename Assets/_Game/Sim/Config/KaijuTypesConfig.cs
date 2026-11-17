@@ -30,9 +30,10 @@ namespace CriticalMass.Sim.Config
         /// 3 % over its reference share) the mix is "today's mix" and today's Kaiju hatches. Before r3 ELDER needed an exact
         /// tie or nothing fed, which real play never gives (0 of 24 balance seeds). Measured on the 24 balance seeds (sim run
         /// printed by KaijuTypeTests): 1.03 gives ELDER on the plant-led mixes 0.902 / 0.098 and 0.915 / 0.085 and the meat-led
-        /// 0.898 / 0.102 (3 of 24). 0 = the old rule (ties only).
+        /// 0.898 / 0.102 (3 of 24), and 4 of 24 once the other r3 items moved the matches (full sim gate run 44106440444);
+        /// 1.02 drops the meat-led 0.102 mix (score 1.02). 0 = the old rule (ties only).
         /// </summary>
-        public double ElderBelowScore = 1.03;
+        public double ElderBelowScore = 1.02;
         /// <summary>Units of the type's own kind fed (both teams) for power level 1, 2, 3 (below the first: level 0, trait only).</summary>
         public double[] LevelUnits = { 8, 16, 24 };
 

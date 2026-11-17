@@ -49,8 +49,8 @@ namespace CriticalMass.Sim.Tests
                 ("meat and wood tied over the reference", r[0], 2 * r[1], 2 * r[2], 0, KaijuType.Elder),
                 ("nothing delivered", 0, 0, 0, 0, KaijuType.Elder),
                 // b13 r3: a balanced feed (best score under ElderBelowScore 1.03) hatches ELDER; just over it, the type.
-                ("balanced, plant a little over its reference (92 / 8)", 92, 8, 0, 0, KaijuType.Elder),
-                ("balanced, meat a little over its reference (89.8 / 10.2)", 89.8, 10.2, 0, 0, KaijuType.Elder),
+                ("balanced, plant a little over its reference (91.5 / 8.5)", 91.5, 8.5, 0, 0, KaijuType.Elder),
+                ("balanced, meat a little over its reference (89.9 / 10.1)", 89.9, 10.1, 0, 0, KaijuType.Elder),
                 ("plant just past the ELDER line (93.5 / 6.5)", 93.5, 6.5, 0, 0, KaijuType.Grove),
                 ("meat just past the ELDER line (89 / 11)", 89, 11, 0, 0, KaijuType.Brute),
                 ("bad tallies", double.NaN, -4, double.PositiveInfinity, 0, KaijuType.Elder),
