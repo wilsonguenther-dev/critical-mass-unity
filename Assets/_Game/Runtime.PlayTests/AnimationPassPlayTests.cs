@@ -182,8 +182,17 @@ namespace CriticalMass.Runtime.PlayTests
             Assert.IsNotNull(tl);
             HumanInputState inp = _w.HumanInput;
             SanityWorld.FromScreenIntent(0, 1, out double ax, out double az);
+            // b13 r3: every direction starts from the same spawn spot at rest. Before, each row started where the last one
+            // ended, so after right and up-right (60 ticks each) the up and up-left rows ran into the map (seed 4242: up-left
+            // body travel under 0.3 u, up 0.23 u/u over 7 pairs while bumping) and which rows bumped depended on the match.
+            double x0 = _w.W.X[0], z0 = _w.W.Z[0];
             for (int k = 0; k < 8; k++)
             {
+                _w.W.X[0] = x0;
+                _w.W.Z[0] = z0;
+                _w.W.Vx[0] = 0;
+                _w.W.Vz[0] = 0;
+                _w.Tick(2);
                 double ang = k * Math.PI / 4;
                 inp.SetMove(Math.Cos(ang), Math.Sin(ang));
                 const int n = 60;
