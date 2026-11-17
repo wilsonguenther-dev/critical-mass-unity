@@ -69,8 +69,6 @@ namespace CriticalMass.Sim.Bots
             bool trailing = Trailing(w, a.Team);
             if (!trailing)
             {
-                // Before the hatch BotFsm's shrine intercept (CM-64) already contests a carrier at the egg wind-up.
-                if (!m.Hatched) return;
                 // b13 r3: the team that is not behind intercepts an enemy crystal carrier near it (never its hill squad, never
                 // the Healer), at most MaxInterceptors at a time.
                 if (a.Cls == ClassId.Healer || st.HillSquad[id] != 0) return;
@@ -84,7 +82,7 @@ namespace CriticalMass.Sim.Bots
 
             // Runners: the trailing team's runner classes fetch crystals (before the hatch: behind on allegiance).
             bool runner = Roles.IsRunner(w, a.Cls) && Roles.MayCorrupt(w, a.Cls) && a.CarryAmount <= 0 && a.CarryMeat <= 0 && st.Corrupt[id] == 0;
-            int maxRunners = w.Opts.TeamSize < c.SmallTeamSize && !DeepTrailing(w, a.Team) ? c.SmallTeamRunners : c.MaxRunners;
+            int maxRunners = w.Opts.TeamSize < c.SmallTeamSize ? c.SmallTeamRunners : c.MaxRunners;
             if (runner && (IsOnTask(w, st, id, TaskVein) || CountTask(w, st, a.Team, id, TaskVein, TaskFeed) < maxRunners))
             {
                 int vein = NearestVein(w, id);
@@ -116,15 +114,6 @@ namespace CriticalMass.Sim.Bots
                 return m.Allegiance[other] - m.Allegiance[team] >= w.Config.Bots.CorruptWhenBehindBy;
             }
             return Corruption.TrailingTeam(w) == (team == TeamId.Azure ? 0 : 1);
-        }
-
-        /// <summary>Before the hatch, behind on allegiance by DeepTrailFactor x Bots.CorruptWhenBehindBy or more.</summary>
-        private static bool DeepTrailing(World w, TeamId team)
-        {
-            MatchState m = w.Match;
-            if (m.Hatched) return false;
-            TeamId other = team == TeamId.Azure ? TeamId.Crimson : TeamId.Azure;
-            return m.Allegiance[other] - m.Allegiance[team] >= w.Config.Depth.Corruption.DeepTrailFactor * w.Config.Bots.CorruptWhenBehindBy;
         }
 
         /// <summary>Acts at the task point (TaskKind 20-29); true = the frame was written.</summary>
