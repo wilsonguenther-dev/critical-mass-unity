@@ -626,6 +626,7 @@ namespace CriticalMass.Runtime.View.Mechanics
             if (driver.GetComponent<CriticalMass.Runtime.Hud.Mechanics.EmoteWheel>() == null) driver.gameObject.AddComponent<CriticalMass.Runtime.Hud.Mechanics.EmoteWheel>();
             // feat/mechanics-depth-view: jobs, sources, stations, pickups, pings, named bots, map events (U-063 to U-068).
             if (driver.GetComponent<DepthWorldView>() == null) driver.gameObject.AddComponent<DepthWorldView>();
+            CriticalMass.Runtime.View.B13.B13Views.EnsureOn(driver);   // b13-hook: the batch 13 item views (H, B, J, K, C)
             if (driver.GetComponent<CriticalMass.Runtime.Hud.Mechanics.DepthHud>() == null) driver.gameObject.AddComponent<CriticalMass.Runtime.Hud.Mechanics.DepthHud>();
             if (driver.GetComponent<CriticalMass.Runtime.Hud.Mechanics.StationPanel>() == null) driver.gameObject.AddComponent<CriticalMass.Runtime.Hud.Mechanics.StationPanel>();
             return v;
