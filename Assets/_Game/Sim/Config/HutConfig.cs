@@ -47,6 +47,10 @@ namespace CriticalMass.Sim.Config
         public double BotHaulEnemyRange = 8;
         /// <summary>HAUL on the way to the hut with this much ore.</summary>
         public double BotHaulHomeOre = 2;
+        /// <summary>An empty-handed Miner bot with an enemy this close fights (today's logic) instead of walking to a vein (u).</summary>
+        public double BotFightRange = 8;
+        /// <summary>A Miner bot that ended up in Deliver with ore (the shrine would refuse it) is pulled back to the hut at this utility.</summary>
+        public double BotEscapeUtility = 2;
         /// <summary>A task lasts this long without a fresh think (s).</summary>
         public double BotTaskSeconds = 20;
 

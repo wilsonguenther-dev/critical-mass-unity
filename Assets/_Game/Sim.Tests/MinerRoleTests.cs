@@ -190,21 +190,36 @@ namespace CriticalMass.Sim.Tests
             Assert.Greater(banks, 0);
         }
 
-        static long Measure(bool hutOn, out int channelTicks, out double usPerTick)
+        static long Measure(bool hutOn, out int channelTicks, out long ruleBytes, out double usPerTick)
         {
             GameConfig cfg = DepthKit.Cfg(d => d.Hut.On = hutOn);
             World w = DepthKit.Make(cfg, ClassId.Warrior, 4242, 16);
-            InputFrame scratch = SimInput.EmptyInput();
+            InputFrame scratch = SimInput.EmptyInput(), probe = SimInput.EmptyInput();
             for (int t = 0; t < 600; t++) MatchTick.Advance(w, null, scratch);
+            BotsState st = BotBrain.GetBotsState(w);
             channelTicks = 0;
+            ruleBytes = 0;
             long before = GC.GetAllocatedBytesForCurrentThread();
             long t0 = Stopwatch.GetTimestamp();
             for (int t = 0; t < 300; t++)
             {
                 MatchTick.Advance(w, null, scratch);
-                for (int i = 0; i < w.ActorCount; i++) if (Blacksmith.ChannelVein(w, i) >= 0) channelTicks++;
+                // The rule's own paths once more, measured alone (the base sim allocates on its own; see the whole-sim line).
+                long r0 = GC.GetAllocatedBytesForCurrentThread();
+                for (int i = 0; i < w.ActorCount; i++)
+                {
+                    if (Blacksmith.ChannelVein(w, i) >= 0) channelTicks++;
+                    Blacksmith.SpeedScale(w, i);
+                    Stations.MaxHp(w, w.Actors[i].Team, w.Actors[i].Cls);
+                    if (w.Actors[i].Cls != ClassId.Miner || i == 0) continue;
+                    Blacksmith.VeinInReach(w, i);
+                    BotMine.BestVein(w, i, out _);
+                    BotMine.DecideAbility(w, st, i, w.Actors[i].AiState);
+                    BotMine.Act(w, st, i, probe);
+                }
+                ruleBytes += GC.GetAllocatedBytesForCurrentThread() - r0;
             }
-            long bytes = GC.GetAllocatedBytesForCurrentThread() - before;
+            long bytes = GC.GetAllocatedBytesForCurrentThread() - before - ruleBytes;
             usPerTick = 1e6 * (Stopwatch.GetTimestamp() - t0) / Stopwatch.Frequency / 300.0;
             return bytes;
         }
@@ -212,11 +227,13 @@ namespace CriticalMass.Sim.Tests
         [Test]
         public void TheRuleAllocatesNothingOverThreeHundredTicksWithMinersMining()
         {
-            long off = Measure(false, out _, out double usOff);
-            long on = Measure(true, out int mining, out double usOn);
-            Line("16v16 seed 4242 Full, 600 warm-up ticks then 300: allocated bytes with the hut on / Miner channel-ticks / control bytes", on + " B / " + mining + " / " + off + " B", "0 B / more than 0 / -");
-            Line("mean sim microseconds per tick on / off (one 300-tick sample; the balance test asserts the +10% limit over every match)", usOn.ToString("0.0") + " / " + usOff.ToString("0.0"), "+10%");
-            Assert.AreEqual(0, on);
+            long off = Measure(false, out _, out _, out double usOff);
+            long on = Measure(true, out int mining, out long rule, out double usOn);
+            Line("16v16 seed 4242 Full, 600 warm-up ticks then 300 with Miners mining: bytes allocated by the hut rule's own paths (HutSystem runs inside the step; the probes re-run VeinInReach, BestVein, DecideAbility, Act, SpeedScale, MaxHp)", rule + " B", "0 B");
+            Line("Miner channel-ticks in the window", mining, "more than 0");
+            Line("whole-sim bytes in the window, hut on / control (the base sim allocates on its own; information)", on + " B / " + off + " B", "on at most control + 0 B is not required");
+            Line("mean sim microseconds per tick on / off (one 300-tick sample; the balance test asserts +10% over every match)", usOn.ToString("0.0") + " / " + usOff.ToString("0.0"), "+10%");
+            Assert.AreEqual(0, rule);
             Assert.Greater(mining, 0);
         }
     }

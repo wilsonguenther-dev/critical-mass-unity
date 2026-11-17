@@ -76,6 +76,16 @@ namespace CriticalMass.Sim.Bots
             int ore = Blacksmith.OreOf(a);
             bool top = Blacksmith.Level(w, a.Team) >= Blacksmith.MaxLevel(w.Config);
             if (top && ore <= 0) return; // at L5 today's behaviour returns
+            // Ore never goes to the egg: a Miner that walked into Deliver with ore is sent to the hut at once.
+            if (ore > 0 && a.AiState == AiState.Deliver)
+            {
+                PadDef hp = w.Map.Pads[(int)a.Team];
+                Aim(w, id, Blacksmith.PadField(w, a.Team), hp.X, hp.Z, out double ex, out double ez);
+                Offer(w, st, id, TaskHut, ex, ez, H.BotEscapeUtility);
+                return;
+            }
+            // Empty-handed with an enemy close: fight as today (the Miner still holds his share of the fights).
+            if (ore <= 0 && EnemyWithin(w, id, H.BotFightRange)) return;
             byte kind;
             double gx, gz;
             FlowField route;
@@ -101,6 +111,20 @@ namespace CriticalMass.Sim.Bots
             route = Blacksmith.PadField(w, a.Team);
             Aim(w, id, route, pad.X, pad.Z, out gx, out gz);
             Offer(w, st, id, kind, gx, gz, H.BotCarryUtility);
+        }
+
+        static bool EnemyWithin(World w, int id, double r)
+        {
+            double r2 = r * r;
+            TeamId team = w.Actors[id].Team;
+            for (int j = 0; j < w.ActorCount; j++)
+            {
+                Actor e = w.Actors[j];
+                if (!e.Alive || e.Team == team) continue;
+                double dx = w.X[j] - w.X[id], dz = w.Z[j] - w.Z[id];
+                if (dx * dx + dz * dz <= r2) return true;
+            }
+            return false;
         }
 
         static void Offer(World w, BotsState st, int id, byte kind, double gx, double gz, double u)
