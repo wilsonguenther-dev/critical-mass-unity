@@ -354,6 +354,11 @@ namespace CriticalMass.Sim.Bots
         {
             if (!Combat.WeaponReachOn(w.Config)) return true;
             Actor a = w.Actors[id];
+            // b13-reach (C2 point a): the Healer's MEND is not a weapon swing. Her press lands when Healer.MendTarget finds a
+            // hurt ally within HealerConfig.MendRange of her (never the reach table), and she keeps her 4.5 u stand-off
+            // (Combat.BotReachOf), so she is never walked in to swing. Her LANTERN press (no ally to mend) is decided by
+            // LightWeapons.BotKeepsPress at WeaponReach.HealerBotPressDistance (1.6 u), inside her measured 1.34 u row plus
+            // any body radius; only that swing reads her reach row.
             if (a.Cls == ClassId.Healer) return true;
             if (!double.IsFinite(tx) || !double.IsFinite(tz)) return false;
             double lead = SwingLeadSeconds(w, a.Cls);
@@ -438,6 +443,7 @@ namespace CriticalMass.Sim.Bots
             double aimZ = double.NaN;
             bool separate = true;
             bool minerField = false;
+            bool trapped = false; // b13-reach: a retreat whose pad field has no step (see AiState.Retreat)
             int capacity = World.ActorCapacity(cfg);
             if (Mates.Length < capacity) Mates = new int[capacity];
             int[] mates = Mates;
@@ -600,7 +606,17 @@ namespace CriticalMass.Sim.Bots
                     break;
                 }
                 case AiState.Retreat:
-                    Follow(w, st, id, TeamPadField(w, id));
+                    // b13-reach (C2 point c): seed 101 Easy, tick 14010, the Healer (11/126 HP) stood in Retreat 6 u from her pad
+                    // with no actor within 2.5 u and none of her four neighbour cells walkable (StuckContext): the pad field has no
+                    // step from a pocket closed by built cells, so Follow left her move at zero. Rule on: walk straight at the pad
+                    // instead, so the barricade probe below sidesteps or chips the cell that closes the pocket (her own team's
+                    // too, see Trapped). Rule off: unchanged.
+                    if (!Follow(w, st, id, TeamPadField(w, id)) && Combat.WeaponReachOn(cfg))
+                    {
+                        PadDef home = map.Pads[(int)a.Team];
+                        Toward(w, id, home.X, home.Z, 0);
+                        trapped = true;
+                    }
                     break;
                 case AiState.Order:
                 {
@@ -800,7 +816,7 @@ namespace CriticalMass.Sim.Bots
                         for (int s = 0; s < list.Length; s++)
                         {
                             Barricade b = list[s];
-                            if (b.Active && b.Cx + 0.5 == bx && b.Cz + 0.5 == bz && b.Team != a.Team)
+                            if (b.Active && b.Cx + 0.5 == bx && b.Cz + 0.5 == bz && (b.Team != a.Team || trapped))   // b13-reach: a trapped retreat chips its own team's cell too
                             {
                                 aimX = bx;
                                 aimZ = bz;

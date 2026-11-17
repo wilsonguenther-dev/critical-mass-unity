@@ -223,3 +223,19 @@ Order of work for next session:
 - Hit-feel capture: the dummy's body surface now stands at the class's sim reach minus 0.02 u (the hit lands at the edge
   of the range). The side camera picks its side by a clear line of sight over the map grid (centre and both shoulder
   lines, both sides, lifts 0 to 3 u, the lift now applied), then one ray against the drawn dressing; every choice is logged.
+
+## Batch 13 item J, branch fix/b13-reach (Mon 16 Nov 2026): the C2 rework
+
+- Restored C2 (revert of the cut 1a171fd8) on b13-s0. ProgressionWords.cs stays V's (its ReachOf line is routed as a patch).
+- Healer MEND is not a weapon swing: a bot press at a hurt ally inside HealerConfig.MendRange is kept and never judged by
+  the reach table (Healer.MendTarget; BotSteer.PressLands exempts her and documents why; she keeps her 4.5 u stand-off).
+  Only her LANTERN swing reads a reach row, now the measured 1.34 u; her lantern press is still decided at 1.6 u, which lands
+  on every body radius (1.34 + 0.40 - 0.05 = 1.69). Cause of the batch 12 whiffs: 1.6 u press against a 0.94 + body reach.
+- Rows re-pinned from unity-ci run 43968649842 (EditMode WeaponReachTests): Warrior 1.47, Farmer 0.96, Miner 1.37,
+  Demolitions 1.19, Builder 1.20, Healer 1.34.
+- Healer seed 101 Easy, tick 14010: StuckContext showed her alone, 11/126 HP, in Retreat, with no walkable 4-neighbour
+  cell (a pocket closed by built cells), so the pad flow field had no step and her move stayed zero. Rule on: when Follow
+  has no step in Retreat she walks straight at her pad, and the barricade probe sidesteps or chips the closing cell (her own
+  team's too while trapped).
+- Tests: WeaponReachRuleTests balance arm (5v5 1-20, 16v16 1337/4242/7/99/2024/31337) prints and judges every common limit
+  plus the whiff ceiling; mend/lantern, re-pinned rows, allocation and sim-cost tests added.
