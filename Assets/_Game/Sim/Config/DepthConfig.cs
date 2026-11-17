@@ -26,6 +26,16 @@ namespace CriticalMass.Sim.Config
         public MapEventsConfig Events = new MapEventsConfig();
         /// <summary>feat/light-weapons-1: the Builder's, Demolitions Expert's and Healer's light self-defence weapons.</summary>
         public LightWeaponsConfig LightWeapons = new LightWeaponsConfig();
+        /// <summary>CM b13 [H]: the Miner mines; the team's Blacksmith hut levels 1 to 5.</summary>
+        public HutConfig Hut = new HutConfig();
+        /// <summary>CM b13 [B]: the Builder's walls and blocks.</summary>
+        public BuildConfig Build = new BuildConfig();
+        /// <summary>CM b13 [J]: dodge for every class (and jump over short walls).</summary>
+        public DodgeConfig Dodge = new DodgeConfig();
+        /// <summary>CM b13 [K]: Kaiju types from the biomass mix, inherent traits and fed powers.</summary>
+        public KaijuTypesConfig KaijuTypes = new KaijuTypesConfig();
+        /// <summary>CM b13 [C]: the corruption crystal, the roll and the wild Kaiju.</summary>
+        public CorruptionConfig Corruption = new CorruptionConfig();
 
         public DepthConfig Clone()
         {
@@ -37,6 +47,11 @@ namespace CriticalMass.Sim.Config
             c.Pickups = Pickups.Clone();
             c.Pings = Pings.Clone();
             c.Events = Events.Clone();
+            c.Hut = Hut.Clone();
+            c.Build = Build.Clone();
+            c.Dodge = Dodge.Clone();
+            c.KaijuTypes = KaijuTypes.Clone();
+            c.Corruption = Corruption.Clone();
             return c;
         }
     }
