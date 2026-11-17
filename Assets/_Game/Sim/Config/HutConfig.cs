@@ -57,6 +57,14 @@ namespace CriticalMass.Sim.Config
         public double BotFightRange = 8;   // b13 r2: back from 14 (round 1 tuning pass): 14 u cost a fifth of the ore and moved no kill share
         /// <summary>b13 integrator tuning pass: a Miner bot carrying ore still fights back when an enemy is this close (u).</summary>
         public double BotFightWithOreRange = 4;
+        /// <summary>
+        /// b13 r3 (Miner bots fight): the Fight utility BotMine offers when an empty-handed Miner bot sees an enemy within
+        /// BotFightRange (with ore: BotFightWithOreRange), and at the top level when he stands on the hill (radius plus
+        /// BotTopFightHillMargin). 1.0 beats holding the hill (0.7 + 0.25 inertia) and loses to nothing a hurt bot needs (he
+        /// offers it only above BotFsm.LowHp, where Retreat does not apply). 0 = round 2 (he walked to the hill instead).
+        /// </summary>
+        public double BotDefendUtility = 1.0;
+        public double BotTopFightHillMargin = 2;
         /// <summary>A Miner bot that ended up in Deliver with ore (the shrine would refuse it) is pulled back to the hut at this utility.</summary>
         public double BotEscapeUtility = 2;
         /// <summary>A task lasts this long without a fresh think (s).</summary>

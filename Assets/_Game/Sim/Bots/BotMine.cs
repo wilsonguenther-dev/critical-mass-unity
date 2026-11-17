@@ -110,7 +110,17 @@ namespace CriticalMass.Sim.Bots
             if (a.CarryAmount > 0 && a.Carry != CarryKind.None && a.Carry != CarryKind.Ore) return; // other cargo: today's logic
             int ore = Blacksmith.OreOf(a);
             bool top = Blacksmith.Level(w, a.Team) >= Blacksmith.MaxLevel(w.Config);
-            if (top && ore <= 0) return; // at L5 today's behaviour returns
+            // b13 r3: the defend rule. Round 2's Miner bot dropped his vein when an enemy came within 8 u but, as a non-hill
+            // role (fight utility 0.6 x hp x aggression under the hill's 0.7), walked to the hill instead of fighting: kill
+            // share 0.022 against the control's 0.124. Now a visible enemy within range (BotFsm's Perceive pick) is fought.
+            int foe = BotFsm.PerceivedEnemy(out double foeD2);
+            bool able = a.MaxHp > 0 && a.Hp / a.MaxHp >= BotFsm.LowHp(w.Config);   // hurt: Retreat (0.9) stays the answer
+            if (top && ore <= 0)
+            {
+                // at L5 today's behaviour returns, and he fights on the hill like a hill holder (not as a 0.6 bystander)
+                if (able && foe >= 0 && OnHill(w, id, H.BotTopFightHillMargin)) BotFsm.ConsiderExternal(w, AiState.Fight, H.BotDefendUtility);
+                return;
+            }
             // Ore never goes to the egg: a Miner that walked into Deliver with ore is sent to the hut at once.
             if (ore > 0 && a.AiState == AiState.Deliver)
             {
@@ -119,10 +129,19 @@ namespace CriticalMass.Sim.Bots
                 Offer(w, st, id, TaskHut, ex, ez, H.BotEscapeUtility);
                 return;
             }
-            // Empty-handed with an enemy close: fight as today (the Miner still holds his share of the fights).
-            if (ore <= 0 && EnemyWithin(w, id, H.BotFightRange)) return;
+            // Empty-handed with an enemy close: he defends himself and joins the fight (b13 r3: Fight is offered, not left to
+            // the hill-biased default).
+            if (ore <= 0 && EnemyWithin(w, id, H.BotFightRange))
+            {
+                if (able && foe >= 0 && foeD2 <= H.BotFightRange * H.BotFightRange) BotFsm.ConsiderExternal(w, AiState.Fight, H.BotDefendUtility);
+                return;
+            }
             // b13 integrator tuning: with ore in hand he still fights back at close range (a pure miner, not a pure target).
-            if (ore > 0 && EnemyWithin(w, id, H.BotFightWithOreRange)) return;
+            if (ore > 0 && EnemyWithin(w, id, H.BotFightWithOreRange))
+            {
+                if (able && foe >= 0 && foeD2 <= H.BotFightWithOreRange * H.BotFightWithOreRange) BotFsm.ConsiderExternal(w, AiState.Fight, H.BotDefendUtility);
+                return;
+            }
             byte kind;
             double gx, gz;
             FlowField route;
@@ -148,6 +167,18 @@ namespace CriticalMass.Sim.Bots
             route = Blacksmith.PadField(w, a.Team);
             Aim(w, id, route, pad.X, pad.Z, out gx, out gz);
             Offer(w, st, id, kind, gx, gz, H.BotCarryUtility);
+        }
+
+        /// <summary>b13 r3: BotFsm perceives out to FightKeepRange for a Miner bot under the hut rule (his defend range).</summary>
+        public static bool WidePerception(World w, BotsState st, int id) =>
+            Mining(w, st, id) && w.Config.Depth.Hut.BotDefendUtility > 0 && w.Config.Depth.Hut.BotFightRange > BotFsm.FightRange;
+
+        /// <summary>Bot id stands within the hill radius plus margin (u) of the hill centre.</summary>
+        static bool OnHill(World w, int id, double margin)
+        {
+            HillDef h = w.Map.Hill;
+            double dx = w.X[id] - h.X, dz = w.Z[id] - h.Z, r = h.R + margin;
+            return dx * dx + dz * dz <= r * r;
         }
 
         static bool EnemyWithin(World w, int id, double r)
