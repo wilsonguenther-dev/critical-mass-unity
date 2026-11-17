@@ -602,21 +602,21 @@ namespace CriticalMass.Sim.Tests
                     {
                         walls++;
                         if (!on || e.A < 0 || e.A >= w.ActorCount) continue;
-                        int t = (int)w.Actors[e.A].Team;
-                        wallsTeam[t]++;
-                        arm.WallsTeam[t]++;
+                        int tm = (int)w.Actors[e.A].Team;
+                        wallsTeam[tm]++;
+                        arm.WallsTeam[tm]++;
                         List<int> slots = NewestPieceSlots(w, e.A);
                         PieceDelta(w, slots, out double da, out double dc);
-                        double own = t == 0 ? da : dc, enemy = t == 0 ? dc : da;
-                        arm.OwnDelta[t] += own; arm.EnemyDelta[t] += enemy;
-                        if (own > 0.01) arm.OwnLonger[t]++;
-                        if (enemy > 0.01) arm.EnemyLonger[t]++;
-                        double toEnemy = t == 0 ? e.X - w.Map.Hill.X : w.Map.Hill.X - e.X;   // + = on the enemy's half of the mirror line
-                        arm.ToEnemy[t] += toEnemy;
-                        if (toEnemy < 0) arm.OwnHalf[t]++;
+                        double own = tm == 0 ? da : dc, enemy = tm == 0 ? dc : da;
+                        arm.OwnDelta[tm] += own; arm.EnemyDelta[tm] += enemy;
+                        if (own > 0.01) arm.OwnLonger[tm]++;
+                        if (enemy > 0.01) arm.EnemyLonger[tm]++;
+                        double toEnemy = tm == 0 ? e.X - w.Map.Hill.X : w.Map.Hill.X - e.X;   // + = on the enemy's half of the mirror line
+                        arm.ToEnemy[tm] += toEnemy;
+                        if (toEnemy < 0) arm.OwnHalf[tm]++;
                         double hd = Math.Sqrt((e.X - w.Map.Hill.X) * (e.X - w.Map.Hill.X) + (e.Z - w.Map.Hill.Z) * (e.Z - w.Map.Hill.Z));
-                        arm.HillDist[t] += hd;
-                        if (wallLog.Count < 6) wallLog.Add($"{(TeamId)t} t{w.Tick} ({e.X - 0.5:F0},{e.Z - 0.5:F0}) mirror-x {(t == 0 ? e.X : 2 * w.Map.Hill.X - e.X) - 0.5:F0} len {e.Value} hill {hd:F1} dOwn {own:F0} dEnemy {enemy:F0}");
+                        arm.HillDist[tm] += hd;
+                        if (wallLog.Count < 6) wallLog.Add($"{(TeamId)tm} t{w.Tick} ({e.X - 0.5:F0},{e.Z - 0.5:F0}) mirror-x {(tm == 0 ? e.X : 2 * w.Map.Hill.X - e.X) - 0.5:F0} len {e.Value} hill {hd:F1} dOwn {own:F0} dEnemy {enemy:F0}");
                     }
                 }
                 if (on && w.Tick % sampleEvery == 0)
@@ -627,10 +627,10 @@ namespace CriticalMass.Sim.Tests
                         if (!w.Actors[j].Alive) continue;
                         int tj = (int)w.Actors[j].Team;
                         bool[] seen = { false, false };
-                        for (int k = w.Walls.BaseSlots; k < w.Barricades.Length; k++)
+                        for (int ks = w.Walls.BaseSlots; ks < w.Barricades.Length; ks++)
                         {
-                            if (!BuilderWalls.IsWallSlot(w, k)) continue;
-                            Barricade b = w.Barricades[k];
+                            if (!BuilderWalls.IsWallSlot(w, ks)) continue;
+                            Barricade b = w.Barricades[ks];
                             double dx = b.Cx + 0.5 - w.X[j], dz = b.Cz + 0.5 - w.Z[j];
                             if (dx * dx + dz * dz < 1.44) seen[(int)b.Team] = true;
                         }
