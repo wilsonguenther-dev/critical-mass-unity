@@ -101,7 +101,7 @@ namespace CriticalMass.Sim.Core
 
         /// <summary>
         /// Pure: the type a feed of (plant, meat, wood, water) units picks. score_k = share_k / RefShare_k; the largest wins;
-        /// the two best within TieEps, nothing fed, or a bad tally = ELDER. Writes the four scores into <paramref name="score"/>
+        /// the two best within TieEps, a best score under ElderBelowScore (a balanced feed), nothing fed, or a bad tally = ELDER. Writes the four scores into <paramref name="score"/>
         /// when given (length 4). Negative or non-finite units count as 0.
         /// </summary>
         public static KaijuType Pick(double plant, double meat, double wood, double water, KaijuTypesConfig c, double[] score = null)
@@ -122,6 +122,8 @@ namespace CriticalMass.Sim.Core
                 else if (s > second) second = s;
             }
             if (best < 0 || bestS - second <= c.TieEps) return KaijuType.Elder;
+            // b13 r3: a balanced feed (no kind clearly over its reference share) hatches ELDER, today's Kaiju.
+            if (bestS < c.ElderBelowScore) return KaijuType.Elder;
             return TypeOfKind(best);
         }
 

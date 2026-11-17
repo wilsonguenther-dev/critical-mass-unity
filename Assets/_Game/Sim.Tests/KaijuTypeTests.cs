@@ -48,6 +48,11 @@ namespace CriticalMass.Sim.Tests
                 ("exactly the reference mix (a four-way tie)", 100 * r[0], 100 * r[1], 100 * r[2], 100 * r[3], KaijuType.Elder),
                 ("meat and wood tied over the reference", r[0], 2 * r[1], 2 * r[2], 0, KaijuType.Elder),
                 ("nothing delivered", 0, 0, 0, 0, KaijuType.Elder),
+                // b13 r3: a balanced feed (best score under ElderBelowScore 1.03) hatches ELDER; just over it, the type.
+                ("balanced, plant a little over its reference (92 / 8)", 92, 8, 0, 0, KaijuType.Elder),
+                ("balanced, meat a little over its reference (89.8 / 10.2)", 89.8, 10.2, 0, 0, KaijuType.Elder),
+                ("plant just past the ELDER line (93.5 / 6.5)", 93.5, 6.5, 0, 0, KaijuType.Grove),
+                ("meat just past the ELDER line (89 / 11)", 89, 11, 0, 0, KaijuType.Brute),
                 ("bad tallies", double.NaN, -4, double.PositiveInfinity, 0, KaijuType.Elder),
             };
             var wrong = new List<string>();
@@ -639,6 +644,8 @@ namespace CriticalMass.Sim.Tests
             var count = new Dictionary<KaijuType, int> { { KaijuType.Elder, 0 }, { KaijuType.Grove, 0 }, { KaijuType.Brute, 0 }, { KaijuType.Timber, 0 }, { KaijuType.Mire, 0 } };
             var levels = new Dictionary<KaijuType, string> { { KaijuType.Elder, "" }, { KaijuType.Grove, "" }, { KaijuType.Brute, "" }, { KaijuType.Timber, "" }, { KaijuType.Mire, "" } };
             for (int i = 0; i < 24; i++) { count[on[i].Type]++; levels[on[i].Type] += "L" + on[i].Level + " "; }
+            // b13 r3: ELDER is reachable by real play (a balanced feed), rare: 1 to 3 of the 24 seeds.
+            Limit("ELDER hatches over the 24 seeds", count[KaijuType.Elder].ToString(), "1 to 3 (rare, reachable)", count[KaijuType.Elder] >= 1 && count[KaijuType.Elder] <= 3);
             Print("type count over the 24 seeds (5v5 1-20, 16v16 1337 4242 7 99)", "ELDER " + count[KaijuType.Elder] + ", GROVE " + count[KaijuType.Grove] + ", BRUTE " + count[KaijuType.Brute] +
                 ", TIMBER " + count[KaijuType.Timber] + ", MIRE " + count[KaijuType.Mire], "each of the four at least 2, none over 12");
             foreach (KaijuType t in Typed)

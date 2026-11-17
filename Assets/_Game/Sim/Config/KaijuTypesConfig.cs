@@ -25,6 +25,14 @@ namespace CriticalMass.Sim.Config
         public double RefFloor = 0.02;
         /// <summary>Two best scores within this of each other = a tie = ELDER.</summary>
         public double TieEps = 1e-9;
+        /// <summary>
+        /// b13 r3 (ELDER reachable): a BALANCED feed hatches ELDER. When the best score is below this (no kind fed more than
+        /// 3 % over its reference share) the mix is "today's mix" and today's Kaiju hatches. Before r3 ELDER needed an exact
+        /// tie or nothing fed, which real play never gives (0 of 24 balance seeds). Measured on the 24 balance seeds (sim run
+        /// printed by KaijuTypeTests): 1.03 gives ELDER on the plant-led mixes 0.902 / 0.098 and 0.915 / 0.085 and the meat-led
+        /// 0.898 / 0.102 (3 of 24). 0 = the old rule (ties only).
+        /// </summary>
+        public double ElderBelowScore = 1.03;
         /// <summary>Units of the type's own kind fed (both teams) for power level 1, 2, 3 (below the first: level 0, trait only).</summary>
         public double[] LevelUnits = { 8, 16, 24 };
 
