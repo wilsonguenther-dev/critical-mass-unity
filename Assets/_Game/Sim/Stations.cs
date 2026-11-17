@@ -49,7 +49,7 @@ namespace CriticalMass.Sim.Core
         /// <summary>The team's level of a class (1 with the rule off).</summary>
         public static int Level(World w, TeamId team, ClassId cls)
         {
-            if (!On(w)) return 1;
+            if (!On(w) || Blacksmith.On(w)) return 1; // CM b13 [H]: the hut replaces the class ladder (nothing reads a stale level)
             int l = w.Depth.ClassLevel[(int)team * ClassIds.All.Count + (int)cls];
             return l < 1 ? 1 : l;
         }
@@ -67,6 +67,8 @@ namespace CriticalMass.Sim.Core
         /// <summary>Max HP a member of team's class has right now (the class row with the rule off).</summary>
         public static double MaxHp(World w, TeamId team, ClassId cls)
         {
+            // CM b13 [H]: with the Blacksmith hut on, round(class row x StatScale) at the team's hut level (Respawn calls this at every spawn).
+            if (Blacksmith.On(w)) return Blacksmith.MaxHpAt(w.Config, cls, Blacksmith.Level(w, team));
             return On(w) ? MaxHpAt(w.Config, cls, Level(w, team, cls)) : w.Config.Class(cls).MaxHp;
         }
 
@@ -139,6 +141,7 @@ namespace CriticalMass.Sim.Core
                 int buy = inp.StationBuy;
                 if (buy == 0) continue;
                 inp.StationBuy = 0; // one-shot
+                if (Blacksmith.On(w)) continue; // CM b13 [H]: no class ladder while the hut is on (class switching is unchanged)
                 if (on && w.Actors[i].Alive && w.Actors[i].StandUp <= 0) TryUpgrade(w, i, buy - 1);
             }
         }
@@ -165,7 +168,8 @@ namespace CriticalMass.Sim.Core
                 World.PushEvent(w, SimEventType.ClassSwitch, id, Respawn.ClassSwitchCooldown, x, z, ci);
                 return false;
             }
-            // The load: banked when the stock exists, else dropped. Corruption is always dropped.
+            // The load: banked when the stock exists, else dropped. Corruption is always dropped. CM b13 [H]: ore goes to the hut.
+            if (Blacksmith.On(w) && a.Carry == CarryKind.Ore && a.CarryAmount > 0) Blacksmith.BankOre(w, id);
             if (Sources.On(w) && (a.CarryMeat > 0 || (a.CarryAmount > 0 && a.Carry != CarryKind.Corruption))) Sources.Bank(w, id);
             a.Carry = CarryKind.None;
             a.CarryAmount = 0;
@@ -196,7 +200,7 @@ namespace CriticalMass.Sim.Core
         public static void TakeBotBuy(World w, int id, InputFrame output)
         {
             output.StationBuy = 0;
-            if (!On(w)) return;
+            if (!On(w) || Blacksmith.On(w)) return; // CM b13 [H]: no ladder to buy while the hut is on
             Actor a = w.Actors[id];
             if (!a.Alive || a.Cls != ClassId.Builder) return;
             int period = Durations.T30(w.Config, w.Config.Depth.Stations.BotBuyPeriodTicks);
