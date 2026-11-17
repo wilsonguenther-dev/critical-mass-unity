@@ -78,6 +78,10 @@ namespace CriticalMass.Sim.Config
         /// <summary>False: an owned Kaiju's cloud blinds only the other team (a wild or neutral one blinds everyone).</summary>
         public const bool KaijuBlindHitsOwnTeam = false;
 
+        /// <summary>b13 r3: bots the SHROUD would blind leave the cloud and skirt its rim unless contesting the hill
+        /// (BotKaijuFeed.AvoidCloud).</summary>
+        public bool BotsAvoidCloud = true;
+
         // ---- bot feed plans (Sim/Bots/BotKaijuFeed.cs): plan = floor(SeedUniform(seed x 3 + teamIndex) x 4), pre-hatch only
         /// <summary>Per plan (0 plant, 1 meat, 2 wood, 3 water): multiplier on the bots' plant-gather utility (plan 0 = today).</summary>
         public double[] FeedPlanGatherScale = { 1.0, 0.6, 0.8, 0.8 };

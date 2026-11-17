@@ -72,7 +72,7 @@ namespace CriticalMass.Sim.Bots
         /// </summary>
         public static bool AvoidCloud(World w, int id, InputFrame o)
         {
-            if (!KaijuTypes.On(w) || !(id >= 0 && id < w.ActorCount)) return false;
+            if (!KaijuTypes.On(w) || !w.Config.Depth.KaijuTypes.BotsAvoidCloud || !(id >= 0 && id < w.ActorCount)) return false;
             if (!KaijuTypes.CloudActive(w, out double cx, out double cz, out double r)) return false;
             if (!w.Actors[id].Alive || !KaijuTypes.Affected(w, id)) return false;
             double x = w.X[id], z = w.Z[id];
