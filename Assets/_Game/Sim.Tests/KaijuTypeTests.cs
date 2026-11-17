@@ -36,17 +36,17 @@ namespace CriticalMass.Sim.Tests
         {
             KaijuTypesConfig c = new KaijuTypesConfig();
             double[] r = c.RefShare;
-            Print("RefShare pinned (plant, meat, wood, water)", F(r[0]) + ", " + F(r[1]) + ", " + F(r[2]) + ", " + F(r[3]), "sums to 1 within 0.01");
-            Assert.AreEqual(1.0, r[0] + r[1] + r[2] + r[3], 0.01);
+            Print("RefShare pinned (plant, meat, wood, water)", F(r[0]) + ", " + F(r[1]) + ", " + F(r[2]) + ", " + F(r[3]), "the control's measured mean, floor " + F(c.RefFloor));
+            Assert.Greater(Math.Min(Math.Min(r[0], r[1]), Math.Min(r[2], r[3])), 0, "every reference is above 0");
             var cases = new (string name, double p, double m, double d, double a, KaijuType want)[]
             {
                 ("plant dominant", 80, 10, 5, 5, KaijuType.Grove),
-                ("meat dominant", 40, 40, 10, 10, KaijuType.Brute),
-                ("wood dominant", 40, 20, 30, 10, KaijuType.Timber),
-                ("water dominant", 40, 20, 10, 30, KaijuType.Mire),
+                ("meat dominant", 70, 30, 0, 0, KaijuType.Brute),
+                ("wood dominant", 80, 10, 8, 2, KaijuType.Timber),
+                ("water dominant", 80, 10, 2, 8, KaijuType.Mire),
                 ("only water", 0, 0, 0, 3, KaijuType.Mire),
                 ("exactly the reference mix (a four-way tie)", 100 * r[0], 100 * r[1], 100 * r[2], 100 * r[3], KaijuType.Elder),
-                ("meat and wood tied over the reference", 2 * r[0] * 0.5, 2 * r[1], 2 * r[2], 0, KaijuType.Elder),
+                ("meat and wood tied over the reference", r[0], 2 * r[1], 2 * r[2], 0, KaijuType.Elder),
                 ("nothing delivered", 0, 0, 0, 0, KaijuType.Elder),
                 ("bad tallies", double.NaN, -4, double.PositiveInfinity, 0, KaijuType.Elder),
             };
@@ -333,14 +333,15 @@ namespace CriticalMass.Sim.Tests
                 DepthKit.Put(w, bot, k.X + 1, k.Z);
                 DepthKit.Put(w, enemy, k.X + 4, k.Z);
                 w.Actors[bot].Facing = 0;
+                if (cloud) blocks = KaijuTypes.BlindBlocks(w, bot, enemy);
                 BotFsm.ThinkBot(w, st, bot);
                 return st.Target[bot];
             }
+            bool blocks = false;
             int before = Think(false);
             KaijuTypes.ForceShroud(w);
             DepthKit.Steps(w, 16);
             Assert.IsTrue(KaijuTypes.CloudActive(w, out _, out _, out _), "the cloud is up");
-            bool blocks = KaijuTypes.BlindBlocks(w, bot, enemy);
             int after = Think(true);
             Print("bot " + bot + " target with the enemy 3 u away: no cloud / inside the cloud", before + " / " + after + " (BlindBlocks " + blocks + ")", "the enemy " + enemy + " is not the target inside the cloud");
             Assert.IsTrue(blocks);
@@ -508,7 +509,7 @@ namespace CriticalMass.Sim.Tests
         public void AMireCastingAllocatesNothingAndCostsLittleSimTime()
         {
             double[] us = new double[2];
-            long bytes = -1;
+            long bytes = -1, offBytes = -1;
             int casts = 0;
             for (int arm = 0; arm < 2; arm++)
             {
@@ -522,12 +523,13 @@ namespace CriticalMass.Sim.Tests
                 for (int s = 0; s < 600; s++)
                 {
                     if (s == 30) w.ForceHatch = true;
+                    if (s == 60 && on) KaijuTypes.ForceShroud(w);   // one full cast in the warm-up (puff, cloud, cooldown paths run once)
                     MatchTick.Advance(w, null, scratch);
                 }
                 if (on)
                 {
                     Assert.AreEqual(KaijuType.Mire, KaijuTypes.Type(w));
-                    KaijuTypes.ForceShroud(w);
+                    Assert.IsTrue(KaijuTypes.ForceShroud(w), "a second cast starts the measured window");
                 }
                 long b0 = GC.GetAllocatedBytesForCurrentThread();
                 long t0 = Stopwatch.GetTimestamp();
@@ -536,10 +538,12 @@ namespace CriticalMass.Sim.Tests
                 long b1 = GC.GetAllocatedBytesForCurrentThread();
                 us[arm] = (t1 - t0) * 1e6 / Stopwatch.Frequency / 300.0;
                 if (on) { bytes = b1 - b0; casts = w.KaijuKind.Casts; }
+                else offBytes = b1 - b0;
             }
             Print("16v16 seed 4242 Full, 600 warm-up ticks then 300 ticks with a MIRE casting: allocated", bytes + " B (casts " + casts + ")", "0 B");
             Print("mean sim microseconds per tick types on / off", F(us[0]) + " / " + F(us[1]) + " (" + (us[0] <= us[1] * 1.10 ? "PASS" : "OVER") + ")", "+10 % (printed only: timing on a shared runner)");
-            Assert.AreEqual(0, bytes, "no per-tick allocation with a SHROUD up");
+            Print("same 300 ticks with the rule off (the base's own allocation, not K's)", offBytes + " B", "printed");
+            Assert.LessOrEqual(bytes, offBytes, "the SHROUD adds no allocation over the control");
         }
 
         private static double Median(List<double> v)

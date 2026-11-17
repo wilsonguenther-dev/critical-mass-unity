@@ -33,7 +33,20 @@ namespace CriticalMass.Sim.Bots
         public static double GatherScale(World w, BotsState st, int id)
         {
             if (!Live(w) || !(id >= 0 && id < w.ActorCount)) return 1.0;
-            return w.Config.Depth.KaijuTypes.FeedPlanGatherScale[Plan(w, w.Actors[id].Team)];
+            TeamId team = w.Actors[id].Team;
+            int plan = Plan(w, team);
+            // A wood or water plan needs a supply runner, and a 5v5 team has none (floor(5 x SupplyFraction 0.125) = 0): the
+            // first egg feeder that asks enlists itself (st.Supply, re-asserted each think because the director resets it), so it
+            // fetches at the grove or spring and SupplyFeedsEgg sends the planned kind to the egg. Actor-id order, no RNG.
+            if ((plan == PlanWood || plan == PlanWater) && st != null && st.Supply != null && st.Supply[id] == 0 && !TeamHasSupply(w, st, team)) st.Supply[id] = 1;
+            return w.Config.Depth.KaijuTypes.FeedPlanGatherScale[plan];
+        }
+
+        private static bool TeamHasSupply(World w, BotsState st, TeamId team)
+        {
+            for (int j = 0; j < w.ActorCount && j < st.Supply.Length; j++)
+                if (st.Supply[j] != 0 && w.Actors[j].Team == team && w.Actors[j].Alive) return true;
+            return false;
         }
 
         /// <summary>True when supply bot id holding kind feeds the egg instead of banking (false = today).</summary>

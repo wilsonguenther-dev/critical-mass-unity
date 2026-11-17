@@ -15,11 +15,14 @@ namespace CriticalMass.Sim.Config
 
         // ---- the picker
         /// <summary>
-        /// Reference share per kind (plant, meat, wood, water): a kind's share of the feed divided by this is its score. Start
-        /// {0.55, 0.20, 0.15, 0.10}; pinned to the control arm's measured mean mix over the balance seeds (KaijuTypeTests prints
-        /// both). A mix equal to the control's average scores 1.0 on every kind.
+        /// Reference share per kind (plant, meat, wood, water): a kind's share of the feed divided by this is its score. Started
+        /// at {0.55, 0.20, 0.15, 0.10}; PINNED to the control arm's measured mean mix over the 26 balance seeds (sim run
+        /// 44012448675: plant 0.900, meat 0.100, wood 0.000, water 0.000), with a floor of RefFloor on wood and water (a
+        /// reference of 0 would let a single unit win). KaijuTypeTests prints the measured mean beside this.
         /// </summary>
-        public double[] RefShare = { 0.55, 0.20, 0.15, 0.10 };
+        public double[] RefShare = { 0.90, 0.10, 0.02, 0.02 };
+        /// <summary>The floor applied when pinning RefShare to a kind the control never feeds (wood, water).</summary>
+        public double RefFloor = 0.02;
         /// <summary>Two best scores within this of each other = a tie = ELDER.</summary>
         public double TieEps = 1e-9;
         /// <summary>Units of the type's own kind fed (both teams) for power level 1, 2, 3 (below the first: level 0, trait only).</summary>
