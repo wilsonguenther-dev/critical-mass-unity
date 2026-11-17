@@ -192,5 +192,70 @@ namespace CriticalMass.Sim.Tests
             int all = built[1] + built[2], ok2 = walked[1] + walked[2];
             Assert.GreaterOrEqual(ok2, all * 0.8, "at least 80% of built pieces are crossed by just holding the build direction");
         }
-    }
+    
+        /// <summary>
+        /// CM b13 B (Jeisil: "his stairs must actually work"): the first ladder the Builder can build on Skybreak Basin (seed 3,
+        /// scan order) is walked UP and back DOWN by a fighter of each team by just holding the direction, and a jump started on
+        /// the ladder lands on walkable ground with no fall. Prints every walk and the jump landing.
+        /// </summary>
+        [Test]
+        public void SkybreakLadderIsWalkedBothWaysAndAJumpFromItLandsClear()
+        {
+            World w = World.CreateWorld(new WorldOptions { Seed = 3, TeamSize = 5, HumanTeam = TeamId.Azure, HumanClass = ClassId.Builder, Config = GameConfig.CreateBrowser5v5() });
+            for (int j = 1; j < w.ActorCount; j++) { w.Actors[j].Alive = false; w.Actors[j].RespawnIn = 1e9; }
+            MapDef map = w.Map;
+            int[] dxs = { 1, -1, 0, 0 }, dzs = { 0, 0, 1, -1 };
+            int fx = -1, fz = -1, fdx = 0, fdz = 0;
+            double lx = 0, lz = 0;
+            for (int cz = 1; cz < map.Height - 1 && fx < 0; cz++)
+            for (int cx = 1; cx < map.Width - 1 && fx < 0; cx++)
+            {
+                if (!MapGrid.IsWalkable(map, cx, cz)) continue;
+                for (int d = 0; d < 4 && fx < 0; d++)
+                {
+                    int dx = dxs[d], dz = dzs[d];
+                    if (MapGrid.InBounds(map, cx + dx, cz + dz) && map.Cells[(cz + dz) * map.Width + cx + dx] != Cell.Wall) continue;
+                    double bx = cx + 0.5, bz = cz + 0.5;
+                    if (!Collide.ActorFits(w, bx, bz, Collide.ActorRadius(w, Bld))) continue;
+                    w.Builder.Spent[0] = -100;
+                    if (BuildAt(w, bx, bz, bx + dx * 5, bz + dz * 5) != BuiltPieces.BuiltLadderCode) continue;
+                    BuiltPieces.LastPlanLanding(w, Bld, dx, dz, out lx, out lz, out _);
+                    fx = cx; fz = cz; fdx = dx; fdz = dz;
+                }
+            }
+            Console.WriteLine($"[b13-b stairs] ladder on Skybreak from ({fx},{fz}) dir ({fdx},{fdz}) landing ({lx:F1},{lz:F1})");
+            Assert.GreaterOrEqual(fx, 0, "a ladder can be built on Skybreak");
+            double sx = fx + 0.5, sz = fz + 0.5;
+            var bad = new List<string>();
+            int ally = FirstOf(w, TeamId.Azure), enemy = FirstOf(w, TeamId.Crimson);
+            foreach (int j in new[] { Bld, ally, enemy })
+            {
+                Put(w, j, sx, sz);
+                bool up = Walk(w, j, fdx, fdz, ww => (ww.X[j] - lx) * fdx + (ww.Z[j] - lz) * fdz >= -0.1, 150, out int tUp);
+                bool down = Walk(w, j, -fdx, -fdz, ww => (ww.X[j] - sx) * fdx + (ww.Z[j] - sz) * fdz <= 0.1, 150, out int tDown);
+                Console.WriteLine($"[b13-b stairs] actor {j} {w.Actors[j].Team}: up {(up ? "reached" : "STUCK")} in {tUp} ticks, back down {(down ? "reached" : "STUCK")} in {tDown} ticks, ends ({w.X[j]:F2},{w.Z[j]:F2}) (limit 150 each)");
+                if (!up || !down) bad.Add($"actor {j} up {up} down {down}");
+                w.Actors[j].Alive = j == Bld;
+                if (j != Bld) w.X[j] = -50;
+            }
+            // A jump started on the ladder (on its wall cell), along the build direction.
+            Put(w, Bld, sx + fdx * 1.0, sz + fdz * 1.0);
+            double dt = SimStep.Dt(w.Config);
+            int head = w.EventHead;
+            for (int t = 0; t < 45; t++)
+            {
+                w.Inputs[Bld].MoveX = fdx;
+                w.Inputs[Bld].MoveZ = fdz;
+                w.Inputs[Bld].Jump = t == 0;
+                Movement.MovementSystem(w, dt);
+            }
+            w.Inputs[Bld].MoveX = 0; w.Inputs[Bld].MoveZ = 0; w.Inputs[Bld].Jump = false;
+            int falls = 0;
+            for (int i = head; i < w.EventHead; i++) if (w.Events[i % World.EventCapacity].Type == SimEventType.Fall) falls++;
+            bool landed = MapGrid.IsWalkable(map, JsMath.FloorToInt(w.X[Bld]), JsMath.FloorToInt(w.Z[Bld])) || BuiltPieces.InteractBusy(w, w.X[Bld], w.Z[Bld]);
+            Console.WriteLine($"[b13-b stairs] jump from the ladder: ends ({w.X[Bld]:F2},{w.Z[Bld]:F2}) airLen {w.Actors[Bld].AirLen}, on walkable ground or a piece {landed}, falls {falls} (want 0), stand-up {w.Actors[Bld].StandUp:F2}");
+            if (falls != 0) bad.Add("the jump from the ladder fell");
+            Assert.IsEmpty(bad, string.Join("\n", bad));
+        }
+}
 }
