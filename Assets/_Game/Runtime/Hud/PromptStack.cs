@@ -24,7 +24,8 @@ namespace CriticalMass.Runtime.Hud
         public const float SlotH = HudZones.PromptLaneH;
         /// <summary>Nominal size and centre offset (canvas units) of each source, for the layout test and the placement.</summary>
         public static readonly Vector2[] Size = { new Vector2(HudZones.PromptW, HudZones.PromptH), new Vector2(720f, SlotH), new Vector2(620f, 46f) };
-        public static readonly float[] CentreX = { 0f, 0f, 190f };
+        /// <remarks>All centred: the tool strip used to sit 190 right of centre, and one row up it ran into the power-up timer at 1280x720.</remarks>
+        public static readonly float[] CentreX = { 0f, 0f, 0f };
 
         static readonly int[] _wantFrame = { int.MinValue, int.MinValue, int.MinValue };
         static readonly bool[] _wanted = new bool[Sources];

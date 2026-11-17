@@ -108,8 +108,8 @@ namespace CriticalMass.Runtime.Hud
         /// the terrain pill; hidden while two of those are up).</summary>
         void PlaceChip(int slot)
         {
-            float y = PromptStack.Bottom(slot, ChipH);
-            if (Mathf.Abs(_chip.anchoredPosition.y - y) > 0.5f) _chip.anchoredPosition = new Vector2(ShiftX, y);
+            var p = new Vector2(PromptStack.CentreX[(int)PromptStack.Source.Strip], PromptStack.Bottom(slot, ChipH));
+            if ((_chip.anchoredPosition - p).sqrMagnitude > 0.25f) _chip.anchoredPosition = p;
         }
 
         /// <summary>The chip is on screen now (it has words and a slot in the prompt stack).</summary>
