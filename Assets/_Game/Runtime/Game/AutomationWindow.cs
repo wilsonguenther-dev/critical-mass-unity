@@ -52,6 +52,8 @@ namespace CriticalMass.Runtime.Game
             "-autoplay", "-quitaftermatch", "-autoplaymatches", "-autoplayqualities", "-perflog", "-shots", "-simhashout",
             "-capture", "-soak", "-tracestates", "-debughangseconds", "-automation", "-groundshots", "-followshots", "-smokeshots", "-flowshots", "-onlineshots", "-onlinerelayshots", "-shottick", "-matchvideo", "-simscout",
             "-replayshots", "-replaylast",
+            // CM b13 S0: every batch 13 capture flag (lower case: ShouldHide compares the lower-cased argument).
+            "-hutshots", "-wallshots", "-dodgeshots", "-kaijutypeshots", "-corruptionshots", "-charactershowcaseshots",
         };
 
         /// <summary>True when this run must stay hidden: an automation flag is present and -showWindow is not (pure; tests).</summary>
