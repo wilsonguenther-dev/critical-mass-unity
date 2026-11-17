@@ -9,6 +9,19 @@ namespace CriticalMass.Sim.Config
         /// <summary>The rule's own switch (Full profile only: systems read it through DepthRules.On).</summary>
         public bool On = true;   // b13 r3: item C back in (rule change, Full profile only; the meter, roll banner and crystal view show behind it)
 
+        // --- small matches (b13 r3 integrator, OWNER DEFAULT) ---
+        /// <summary>
+        /// Matches with a team size at or under this keep the OLD berserk rule (the biomass instability line, SimResources.BerserkLine:
+        /// either team's feeding can make the Kaiju berserk). It was the short-handed team's equaliser: with the crystal roll alone
+        /// the 5v5 idle-player floor fell to 0.07 (limit 0.15). Larger matches use the crystal roll only (one wild rule).
+        /// </summary>
+        public int OldBerserkMaxTeamSize = 8;
+        /// <summary>
+        /// In those small matches the crystal rule runs too (both wild rules). Set false if both together fail the limits: then
+        /// small matches use the old rule only (crystals, the pool and the roll are off there, as with On false).
+        /// </summary>
+        public bool SmallMatchesCrystals = true;
+
         // --- crystal veins (the existing corruption nodes on the south island) ---
         /// <summary>Charges per crystal vein while the rule is on.</summary>
         public int VeinCharges = 2;

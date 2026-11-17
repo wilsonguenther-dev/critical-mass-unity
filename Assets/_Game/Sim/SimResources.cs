@@ -80,7 +80,7 @@ namespace CriticalMass.Sim.Core
         /// </summary>
         public static double BerserkLine(World w)
         {
-            if (Corruption.On(w)) return double.PositiveInfinity; // CM b13 [C]: one wild rule (the crystal roll), not two
+            if (Corruption.On(w) && !Corruption.KeepsOldBerserk(w)) return double.PositiveInfinity; // CM b13 [C]: one wild rule (the crystal roll), not two; b13 r3 integrator: small matches keep the old line (owner default)
             KaijuFeedConfig feed = w.Config.KaijuFeed;
             if (!feed.RandomBerserk) return feed.BerserkThreshold;
             double u = SeedUniform(w.Opts.Seed);

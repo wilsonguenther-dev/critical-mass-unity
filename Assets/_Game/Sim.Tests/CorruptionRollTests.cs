@@ -119,14 +119,20 @@ namespace CriticalMass.Sim.Tests
             double afterAzure = Corruption.Pool(w);
             SimResources.ApplyDelivery(w, TeamId.Crimson, CarryKind.Corruption, 1, -1);
             double afterBoth = Corruption.Pool(w);
-            Console.WriteLine($"[b13-c trailing] azure behind 20 s feeds 1: pool {afterAzure} (expect 1.5); crimson feeds 1: pool {afterBoth} (expect 2.5); allegiance {w.Match.Allegiance.Azure}/{w.Match.Allegiance.Crimson} instability {w.Match.Instability} (expect 0) berserkLine {SimResources.BerserkLine(w)} (expect infinity)");
+            Console.WriteLine($"[b13-c trailing] azure behind 20 s feeds 1: pool {afterAzure} (expect 1.5); crimson feeds 1: pool {afterBoth} (expect 2.5); allegiance {w.Match.Allegiance.Azure}/{w.Match.Allegiance.Crimson} instability {w.Match.Instability} (expect 0) berserkLine {SimResources.BerserkLine(w)} (expect finite: 5v5 keeps the old line)");
             Assert.AreEqual(1.5, afterAzure, 1e-12);
             Assert.AreEqual(2.5, afterBoth, 1e-12);
             Assert.AreEqual(0, w.Match.Allegiance.Azure);
             Assert.AreEqual(0, w.Match.Allegiance.Crimson);
             Assert.AreEqual(0, w.Match.Instability);
             Assert.AreEqual(2, w.Match.Delivered[0].Corruption + w.Match.Delivered[1].Corruption);
-            Assert.IsTrue(double.IsPositiveInfinity(SimResources.BerserkLine(w)));
+            // b13 r3 integrator (owner default): a 5v5 match keeps the old instability line; a 16v16 match has only the roll
+            Assert.IsTrue(Corruption.KeepsOldBerserk(w));
+            Assert.IsFalse(double.IsPositiveInfinity(SimResources.BerserkLine(w)), "5v5 keeps the old berserk line");
+            World big = Make(7, 16);
+            Console.WriteLine($"[b13-c small matches] 5v5 berserk line {SimResources.BerserkLine(w)} (expect finite), 16v16 {SimResources.BerserkLine(big)} (expect infinity), rule on in both {Corruption.On(w)}/{Corruption.On(big)}");
+            Assert.IsTrue(Corruption.On(big));
+            Assert.IsTrue(double.IsPositiveInfinity(SimResources.BerserkLine(big)), "16v16: one wild rule");
             Assert.AreEqual(Corruption.ChanceOf(2.5, w.Config.Depth.Corruption), Corruption.Chance(w), 1e-12);
         }
 

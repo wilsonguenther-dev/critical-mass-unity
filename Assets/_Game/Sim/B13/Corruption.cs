@@ -102,7 +102,16 @@ namespace CriticalMass.Sim.Core
     public static class Corruption
     {
         /// <summary>The rule is on (Full profile only).</summary>
-        public static bool On(World w) => DepthRules.On(w, w.Config.Depth.Corruption.On);
+        public static bool On(World w) => DepthRules.On(w, w.Config.Depth.Corruption.On) && (w.Config.Depth.Corruption.SmallMatchesCrystals || !SmallMatch(w));
+
+        /// <summary>b13 r3 integrator (owner default): a match whose team size is at or under OldBerserkMaxTeamSize.</summary>
+        public static bool SmallMatch(World w) => w.Opts.TeamSize <= w.Config.Depth.Corruption.OldBerserkMaxTeamSize;
+
+        /// <summary>
+        /// b13 r3 integrator: the old instability berserk line still locks berserk in this match: always with the rule off, and in
+        /// small matches with it on (owner default: the old rule was the short-handed team's equaliser).
+        /// </summary>
+        public static bool KeepsOldBerserk(World w) => !DepthRules.On(w, w.Config.Depth.Corruption.On) || SmallMatch(w);
 
         private const double TicksPerSecondRef = 30.0;
 
