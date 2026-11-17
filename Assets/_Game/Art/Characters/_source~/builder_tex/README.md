@@ -16,7 +16,7 @@ Headless Blender 5.2.3 through the machine lock:
 - collapses it to LOD0 6,834 / LOD1 1,800 / Shadow 700 triangles
 - unwraps by region (58% UV coverage)
 - Cycles-bakes a 1024 base colour with the team mask in alpha
-- weights: with `weights_transfer.enabled` (the default since build v3), by robust skin weight transfer from the
+- weights: with `weights_transfer.enabled` (OFF, see "Build v3 attempt" below), by robust skin weight transfer from the
   Warrior (below); otherwise by bone heat with region masks, edge-hop zone blends and ring smoothing (4 influences)
 - exports the FBX and renders the proofs
 
