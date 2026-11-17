@@ -318,7 +318,7 @@ namespace CriticalMass.Runtime.Game
 
         void UpdatePlate()
         {
-            bool on = AutomatedRun && !SimDriverBehaviour.CaptureMode;
+            bool on = AutomatedRun && !SimDriverBehaviour.CaptureMode && !MatchVideo.Active;   // b13: a match film for people has no plate
             if (!on && _plate == null) return;
             Build();
             if (_plate.activeSelf != on) _plate.SetActive(on);
