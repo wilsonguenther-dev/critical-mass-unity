@@ -255,6 +255,8 @@ namespace CriticalMass.Runtime.View
                     // With the Miner barricade model imported (ActorViews draws it), the cell is plain floor under it.
                     if (BarricadeModelShown) { top = h; bottom = h - 0.5; look = LookCream; return true; }
                     top = h + 1.0; bottom = h - 0.5; look = LookMeat; return true;
+                case Cell.LowWall:   // b13-hook: a short wall (item B restyles it)
+                    top = h + 0.6; bottom = h - 0.5; look = LookMeat; return true;
                 case Cell.Water:
                     top = WaterTop; bottom = WaterTop - 0.2; look = LookWater; return true;
                 default:

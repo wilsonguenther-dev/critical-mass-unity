@@ -285,7 +285,7 @@ namespace CriticalMass.Runtime.View.Effects
         public bool IsGround(double x, double z)
         {
             byte c = CellAt(x, z);
-            return c == Cell.Floor || c == Cell.Bridge || c == Cell.BreakableDestroyed || c == Cell.Barricade;
+            return c == Cell.Floor || c == Cell.Bridge || c == Cell.BreakableDestroyed || c == Cell.Barricade || c == Cell.LowWall;   // b13-hook
         }
 
         /// <summary>
@@ -301,7 +301,8 @@ namespace CriticalMass.Runtime.View.Effects
                 case Cell.Floor:
                 case Cell.Bridge:
                 case Cell.BreakableDestroyed:
-                case Cell.Barricade: y = h; return true;
+                case Cell.Barricade:
+                case Cell.LowWall: y = h; return true;   // b13-hook
                 case Cell.Wall:
                 case Cell.BreakableIntact: y = h + 1.5; return true;
                 case Cell.BreakableCracked: y = h + 0.75; return true;

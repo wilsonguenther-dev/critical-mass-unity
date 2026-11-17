@@ -14,7 +14,7 @@ namespace CriticalMass.Sim.Grid
         /// <summary>True when cell type t stops a hit.</summary>
         public static bool Blocks(byte t)
         {
-            return t == Cell.Wall || t == Cell.Barricade || t == Cell.BreakableIntact || t == Cell.BreakableCracked;
+            return t == Cell.Wall || t == Cell.Barricade || t == Cell.LowWall || t == Cell.BreakableIntact || t == Cell.BreakableCracked;   // b13-hook
         }
 
         /// <summary>True when nothing blocks the segment (x0, z0) to (x1, z1), the cell (ignoreCx, ignoreCz) excepted.</summary>

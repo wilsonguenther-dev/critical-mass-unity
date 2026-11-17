@@ -57,8 +57,8 @@ namespace CriticalMass.Sim.Core
         {
             MapDef map = w.Map;
             if (MapGrid.IsWalkable(map, cx, cz)) return false;
-            // CM-32: airborne actors pass over in-map VOID.
-            return !(air && MapGrid.InBounds(map, cx, cz) && map.Cells[cz * map.Width + cx] == Cell.Void);
+            // CM-32: airborne actors pass over in-map VOID. CM b13: and over a short wall (Cell.LowWall); walking does not.
+            return !(air && MapGrid.InBounds(map, cx, cz) && (map.Cells[cz * map.Width + cx] == Cell.Void || map.Cells[cz * map.Width + cx] == Cell.LowWall));   // b13-hook
         }
 
         private static bool RowBlocked(World w, int cx, double z, double r, bool air)

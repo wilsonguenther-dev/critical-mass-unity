@@ -125,7 +125,7 @@ namespace CriticalMass.Runtime.Hud.Ui
             _breakD = Skeleton(c => c == Cell.BreakableIntact);
             _crackD = Skeleton(c => c == Cell.BreakableCracked);
             _rubbleD = Skeleton(c => c == Cell.BreakableDestroyed);
-            _barD = Skeleton(c => c == Cell.Barricade);
+            _barD = Skeleton(c => c == Cell.Barricade || c == Cell.LowWall);   // b13-hook
 
             // 4) bridges (plank axis per connected bridge) and the paved lanes from each bridge end to its island's hub
             _pathD = Fill(float.MaxValue);

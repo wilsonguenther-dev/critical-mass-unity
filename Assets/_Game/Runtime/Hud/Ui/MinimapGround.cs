@@ -169,7 +169,7 @@ namespace CriticalMass.Runtime.Hud.Ui
                 if (was == now) continue;
                 Color c;
                 if (now == Cell.Void) c = Hole;
-                else if (now == Cell.Barricade) c = Brass;
+                else if (now == Cell.Barricade || now == Cell.LowWall) c = Brass;   // b13-hook
                 else if (now == Cell.BreakableDestroyed) c = Rubble;
                 else if (now == Cell.BreakableCracked) c = Cracked;
                 else if (now == Cell.Bridge) c = Bridge;

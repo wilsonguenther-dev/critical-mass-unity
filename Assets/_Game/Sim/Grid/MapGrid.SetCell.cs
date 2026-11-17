@@ -14,7 +14,7 @@ namespace CriticalMass.Sim.Grid
             if (old == type) return;
             map.Cells[i] = type;
             w.GridVersion++;
-            if (old != Cell.Barricade && type != Cell.Barricade)
+            if (old != Cell.Barricade && type != Cell.Barricade && old != Cell.LowWall && type != Cell.LowWall)   // b13-hook: a LowWall swap is a barricade swap (fields path through both)
             {
                 w.WallVersion++;
                 w.WallChangeTick = w.Tick; // CM-30: terraform's rate cap keys on the last field-invalidating change

@@ -33,7 +33,7 @@ namespace CriticalMass.Runtime.View.Anim
         public const float Restitution = 0.3f, Slide = 0.2f, Gravity = 30f, WallGap = 0.35f, SlideSeconds = 0.15f;
 
         public static bool Blocks(byte cell) =>
-            cell == Cell.Wall || cell == Cell.BreakableIntact || cell == Cell.BreakableCracked || cell == Cell.Barricade;
+            cell == Cell.Wall || cell == Cell.BreakableIntact || cell == Cell.BreakableCracked || cell == Cell.Barricade || cell == Cell.LowWall;   // b13-hook
 
         public static LaunchPlan Plan(MapDef map, double x, double z, double dirX, double dirZ, byte tier, int other, float motionScale = 1f)
         {

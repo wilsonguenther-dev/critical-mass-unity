@@ -710,7 +710,7 @@ namespace CriticalMass.Sim.Bots
                 // Barricade avoidance: probe ahead; sidestep around a BARRICADE, chip an enemy one in reach.
                 int W = map.Width;
                 int hit = FirstBlockedCell(map, x, z, x + Mv.X * BarricadeProbe, z + Mv.Z * BarricadeProbe);
-                if (hit >= 0 && hit < map.Cells.Length && map.Cells[hit] == Cell.Barricade)
+                if (hit >= 0 && hit < map.Cells.Length && (map.Cells[hit] == Cell.Barricade || map.Cells[hit] == Cell.LowWall))   // b13-hook
                 {
                     double bx = (hit % W) + 0.5;
                     double bz = JsMath.FloorToInt((double)hit / W) + 0.5;

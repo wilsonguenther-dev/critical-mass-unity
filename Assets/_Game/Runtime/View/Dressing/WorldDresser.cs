@@ -192,7 +192,7 @@ namespace CriticalMass.Runtime.View.Dressing
 
         /// <summary>Cells that draw island ground (layout.py solid_ground).</summary>
         public static bool Solid(byte t) =>
-            t == Cell.Floor || t == Cell.Wall || t == Cell.BreakableIntact || t == Cell.BreakableCracked || t == Cell.BreakableDestroyed || t == Cell.Barricade;
+            t == Cell.Floor || t == Cell.Wall || t == Cell.BreakableIntact || t == Cell.BreakableCracked || t == Cell.BreakableDestroyed || t == Cell.Barricade || t == Cell.LowWall;   // b13-hook
 
         static double YawOf(double dx, double dz) => Math.Atan2(dz, dx) * 180.0 / Math.PI;
 

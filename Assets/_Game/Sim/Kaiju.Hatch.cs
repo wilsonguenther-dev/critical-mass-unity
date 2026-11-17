@@ -189,7 +189,7 @@ namespace CriticalMass.Sim.Core
         }
 
         private static bool PassableForKaiju(MapDef map, int cx, int cz) =>
-            MapGrid.IsWalkable(map, cx, cz) || (MapGrid.InBounds(map, cx, cz) && map.Cells[cz * map.Width + cx] == Cell.Barricade);
+            MapGrid.IsWalkable(map, cx, cz) || (MapGrid.InBounds(map, cx, cz) && (map.Cells[cz * map.Width + cx] == Cell.Barricade || map.Cells[cz * map.Width + cx] == Cell.LowWall));   // b13-hook
 
         /// <summary>
         /// b11-dg: what the shadow grid was last built from (per World, allocated once, like Barricades' memo). Built = the real

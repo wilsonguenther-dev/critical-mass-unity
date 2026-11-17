@@ -408,7 +408,8 @@ namespace CriticalMass.Runtime.View.Effects
                 case Cell.Wall:
                 case Cell.BreakableIntact:
                 case Cell.BreakableCracked:
-                case Cell.Barricade: return Surface.Stone;
+                case Cell.Barricade:
+                case Cell.LowWall: return Surface.Stone;   // b13-hook
                 case Cell.BreakableDestroyed: return Surface.Dirt;
                 case Cell.Water: return Surface.Water;
                 case Cell.Void: return Surface.Void;

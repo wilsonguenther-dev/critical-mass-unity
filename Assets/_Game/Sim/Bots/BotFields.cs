@@ -160,6 +160,7 @@ namespace CriticalMass.Sim.Bots
                 || t == Cell.BreakableDestroyed
                 || t == Cell.Bridge
                 || t == Cell.Barricade
+                || t == Cell.LowWall   // b13-hook
                 || (miner && (t == Cell.BreakableIntact || t == Cell.BreakableCracked));
         }
 
