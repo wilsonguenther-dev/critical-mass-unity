@@ -231,10 +231,10 @@ namespace CriticalMass.Runtime.Hud
                 int sel = v & 3, why = (v >> 2) & 15, wood = (v >> 7) & 31;
                 bool fill = ((v >> 6) & 1) == 1;
                 string piece = fill ? "FILL HOLE" : sel == 2 ? "BLOCK" : sel == 1 ? "TALL WALL" : "SHORT WALL";
-                string line = TrialText.Fill("{DigPlace}", device) + "  BUILD " + piece + "   ·   " + TrialText.Fill("{Switch}", device) + ": SWITCH   ·   "
+                string wallLine = TrialText.Fill("{DigPlace}", device) + "  BUILD " + piece + "   ·   " + TrialText.Fill("{Switch}", device) + ": SWITCH   ·   "
                     + CriticalMass.Runtime.View.Mechanics.BuilderBank.WoodWord + " " + wood;
-                if (why != 0) line += "   ·   " + BuilderWalls.Word(-why);
-                return line;
+                if (why != 0) wallLine += "   ·   " + BuilderWalls.Word(-why);
+                return wallLine;
             }
             if ((key & (7 << 16)) != 0)
             {
