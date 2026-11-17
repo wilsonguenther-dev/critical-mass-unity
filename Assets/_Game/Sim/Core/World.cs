@@ -624,6 +624,12 @@ namespace CriticalMass.Sim.Core
             world.Builder.Reset();
             world.Healer.Reset(); // DG-40
             world.Depth.Reset(world); // U-063 onward
+            // CM b13: every item state resets with the world (InitWorld runs for CreateWorld and ResetWorld).
+            world.Hut.Reset(world);   // b13-hook
+            world.Walls.Reset(world);   // b13-hook
+            world.Dodges.Reset(world);   // b13-hook
+            world.KaijuKind.Reset(world);   // b13-hook
+            world.Corrupt.Reset(world);   // b13-hook
 
             SpatialHash.Rebuild(world.Hash, world.X, world.Z, world.Actors, world.ActorCount);
         }
@@ -851,7 +857,18 @@ namespace CriticalMass.Sim.Core
                 Hits = PendingHits.Create(cap),
                 Dur = Durations.Create(cfg),
                 Depth = DepthState.Create(cfg, map),
+                Hut = new HutState(),   // b13-hook
+                Walls = new WallsState(),   // b13-hook
+                Dodges = new DodgeState(),   // b13-hook
+                KaijuKind = new KaijuTypeState(),   // b13-hook
+                Corrupt = new CorruptionState(),   // b13-hook
             };
+            // CM b13: the item states allocate once here, after the actor arrays exist (no per-tick allocation).
+            world.Hut.Init(world);   // b13-hook
+            world.Walls.Init(world);   // b13-hook
+            world.Dodges.Init(world);   // b13-hook
+            world.KaijuKind.Init(world);   // b13-hook
+            world.Corrupt.Init(world);   // b13-hook
             InitWorld(world, opts);
             return world;
         }
@@ -973,6 +990,18 @@ namespace CriticalMass.Sim.Core
         public PendingHits Hits;
         /// <summary>DG-68: every duration of this world in ticks, derived once per CreateWorld / ResetWorld for the match pace.</summary>
         public Durations Dur;
+
+        // CM b13 (S0 scaffold): one state object per batch 13 item; each class lives in its item's stub file (Sim/B13/).
+        /// <summary>CM b13 [H]: the Blacksmith huts (Sim/B13/Blacksmith.cs).</summary>
+        public HutState Hut;   // b13-hook
+        /// <summary>CM b13 [B]: the Builder walls (Sim/B13/BuilderWalls.cs).</summary>
+        public WallsState Walls;   // b13-hook
+        /// <summary>CM b13 [J]: the dodges (Sim/B13/Dodge.cs).</summary>
+        public DodgeState Dodges;   // b13-hook
+        /// <summary>CM b13 [K]: the Kaiju type (Sim/B13/KaijuTypes.cs).</summary>
+        public KaijuTypeState KaijuKind;   // b13-hook
+        /// <summary>CM b13 [C]: the corruption pool and rolls (Sim/B13/Corruption.cs).</summary>
+        public CorruptionState Corrupt;   // b13-hook
         /// <summary>Mechanics depth (U-063 onward): roles, sources, stations, pickups, pings and map events (DepthState.cs).</summary>
         public DepthState Depth;
     }

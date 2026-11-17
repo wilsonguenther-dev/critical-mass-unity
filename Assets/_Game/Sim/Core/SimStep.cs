@@ -39,9 +39,12 @@ namespace CriticalMass.Sim.Core
             Topple.ToppleSystem(w); // DG-09: ToppleDown events when a fall animation time has passed
             BuiltPieces.PiecesSystem(w); // DG-24: broken / expired ladders and bridges, after this step's digs and craters
             Barricades.BarricadesSystem(w, dt);
+            BuilderWalls.WallsSystem(w);   // b13-hook: CM b13 [B]
             SimResources.ResourcesSystem(w, dt);
+            Corruption.CorruptionSystem(w, dt);   // b13-hook: CM b13 [C]
             Roles.HandoffSystem(w); // U-063: a carrier that may not feed hands its biomass to a feeder beside it
             Sources.SourcesSystem(w, dt); // U-064: groves and springs, the bank at the base
+            Blacksmith.HutSystem(w);   // b13-hook: CM b13 [H]
             SimProfile.Begin?.Invoke(SimProfile.KaijuHill);   // fix/frame-cost-1: "CM.KaijuHill" in the player (timing only)
             Kaiju.KaijuSystem(w, dt);
             SimProfile.End?.Invoke(SimProfile.KaijuHill);
