@@ -480,11 +480,15 @@ namespace CriticalMass.Sim.Core
                 if (len > ProofIdx.Length) len = ProofIdx.Length;
             }
             int half = len / 2;
+            // b13 r3: every cell is checked and the most basic refusal wins (outside, ground, keep-out, then occupied), so a
+            // mirrored piece gets the same word for both teams (first-found depended on which end the scan started from).
+            int worst = 0;
             for (int k = -half; k < len - half; k++)
             {
                 int why = CellRefusal(w, cx + k * dx, cz + k * dz);
-                if (why != 0) return why;
+                if (why != 0 && (worst == 0 || why > worst)) worst = why;
             }
+            if (worst != 0) return worst;
             if (Wood(w, a.Team) < Cost(b, piece, tall, false)) return RefusedWood;
             if (w.Tick < s.ReadyTick[id]) return RefusedLock;
             if (!RouteOk(w, cx, cz, dx, dz, len)) return RefusedRoute;

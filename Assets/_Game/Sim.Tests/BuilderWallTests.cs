@@ -212,7 +212,7 @@ namespace CriticalMass.Sim.Tests
             Open(w, 4, out int ox, out int oz);
             var rows = new List<(string what, int got, int want)>();
             Put(w, Me, ox + 0.5, oz + 0.5);
-            double ax = ox + 3.0, az = oz + 0.5;
+            double ax = ox + 3.25, az = oz + 0.5;   // b13 r3: off the cell boundary (a boundary aim now goes to the Builder's side)
 
             MapGrid.SetCell(w, ox + 3, oz + 1, Cell.Void);
             rows.Add(("a cell is Void (wall piece)", BuilderWalls.Refusal(w, Me, ax, az), BuilderWalls.RefusedGround));
