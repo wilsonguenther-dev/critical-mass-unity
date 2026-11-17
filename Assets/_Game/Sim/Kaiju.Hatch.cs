@@ -115,7 +115,10 @@ namespace CriticalMass.Sim.Core
         }
 
         /// <summary>Damage the Kaiju from actor <paramref name="sourceId"/>; at 0 hp a KO for koSeconds ('kaijuKO'). Returns damage dealt.</summary>
-        public static double DamageKaiju(World w, int sourceId, double amount)
+        public static double DamageKaiju(World w, int sourceId, double amount) => DamageKaiju(w, sourceId, amount, DamageCause.None);
+
+        /// <summary>b13-k: as above with the damage cause (DamageCause.Explosion for TNT: TIMBER's BARKSKIN reads it).</summary>
+        public static double DamageKaiju(World w, int sourceId, double amount, DamageCause cause)
         {
             MatchState m = w.Match;
             Kaiju k = w.Kaiju;
@@ -126,11 +129,13 @@ namespace CriticalMass.Sim.Core
             Actor src = w.Actors[sourceId];
             if (!src.Alive) return 0;
             amount *= B13Hooks.DamageScale(w, sourceId, -1, DamageCause.None);   // b13-hook: target -1 = the Kaiju
+            amount = KaijuTypes.TakenScale(w, amount, cause); // b13-k: BARKSKIN (the amount itself unless a fed TIMBER takes an explosion)
             if (k.State == KaijuState.Azure && src.Team != TeamId.Crimson) return 0;
             if (k.State == KaijuState.Crimson && src.Team != TeamId.Azure) return 0;
             if (k.State == KaijuState.Neutral) k.Threat[sourceId] = JsMath.F32(w.Config.Kaiju.NeutralThreatMemorySeconds);
             else if (Phys.On(w, w.Config.Physics.KaijuHillSiege)) w.KaijuNav.HitBy[sourceId] = w.Config.Physics.KaijuHitMemorySeconds; // fix/kaiju-hill-1
             k.Hp -= amount;
+            KaijuTypes.OnDamaged(w); // b13-k: a hit restarts the REGROWTH wait
             // DG-16 (view request): who hit the Kaiju and where, for effects: the point on its hit radius toward the attacker.
             double hx = w.X[sourceId] - k.X;
             double hz = w.Z[sourceId] - k.Z;

@@ -351,7 +351,7 @@ namespace CriticalMass.Sim.Bots
                 oz = k.TelegraphZ;
                 double ddx = w.X[id] - ox;
                 double ddz = w.Z[id] - oz;
-                if (ddx * ddx + ddz * ddz > (cfg.Kaiju.SlamRadius + 0.5) * (cfg.Kaiju.SlamRadius + 0.5)) return false;
+                if (ddx * ddx + ddz * ddz > (KaijuTypes.SlamRadius(w) + 0.5) * (KaijuTypes.SlamRadius(w) + 0.5)) return false;
                 int left = (int)Math.Ceiling(k.TelegraphIn * cfg.SimHz - 1e-9);
                 if (Phys.On(w, cfg.Physics.AirDodgesSlam) && w.Actors[id].AirLen == 0 && left >= 1 && left <= Jump.AirTicks(cfg) - 2) output.Jump = true;
             }

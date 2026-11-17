@@ -190,6 +190,11 @@ namespace CriticalMass.Runtime.View.Anim
                 float from = hs != null && asp != null && asp.Height > 0 ? hs.Height / asp.Height : 0.45f;
                 s = Mathf.Lerp(from, 1f, Locomotion.Smooth(0, 1, g / GrowSeconds));
             }
+            // b13-k (from b12-r): the hatch-picked type draws the same model within 10 % of its size, and tints it.
+            KaijuType type = w.Match.Hatched ? KaijuTypes.Type(w) : KaijuType.Elder;
+            s *= KaijuTypeLook.Scale(type);
+            DrawnType = type;
+            ApplyTypeLook(m, type, k.State);
             Scale = s;
             m.Transform.localScale = m.BaseScale * s;   // fix/model-scale: set from the stored base, the Kaiju's own models only
 
@@ -379,9 +384,56 @@ namespace CriticalMass.Runtime.View.Anim
             }
         }
 
+        // b12-r: the type look (one property block, reused; written only when the type or the neutral flag changes).
+        MaterialPropertyBlock _typeBlock;   // created on the first typed pose (never in a MonoBehaviour field initializer)
+        ModelView _lookModelA, _lookModelB;
+        int _lookKeyA = -1, _lookKeyB = -1;
+
+        /// <summary>The type the last pose drew (STANDARD before the hatch).</summary>
+        public KaijuType DrawnType { get; private set; }
+
+        /// <summary>
+        /// b12-r: the type tint on the Kaiju's own renderers. STANDARD clears it (today's look exactly). GROVE / BRUTE shift the
+        /// mid and shadow bands of the body (_MidRatio / _ShadowRatio, per channel), and while the Kaiju is NEUTRAL its crystals
+        /// (team-glow code 6) take the type colour; an owned or berserk Kaiju keeps its allegiance glow on the crystals.
+        /// No allocation: one block, applied only on a change. The renderers leave the SRP Batcher while tinted (same draw calls).
+        /// </summary>
+        void ApplyTypeLook(ModelView m, KaijuType type, KaijuState state)
+        {
+            if (m == null) return;
+            int key = type == KaijuType.Elder ? 0 : (int)type * 2 + (state == KaijuState.Neutral ? 1 : 0);
+            // Two models take the look (hatchling and adult): remember the last key per model.
+            if (m != _lookModelA && m != _lookModelB)
+            {
+                if (_lookModelA == null) { _lookModelA = m; _lookKeyA = -1; }
+                else { _lookModelB = m; _lookKeyB = -1; }
+            }
+            bool isA = m == _lookModelA;
+            if ((isA ? _lookKeyA : _lookKeyB) == key) return;
+            if (isA) _lookKeyA = key;
+            else _lookKeyB = key;
+            if (_typeBlock == null) _typeBlock = new MaterialPropertyBlock();
+            _typeBlock.Clear();
+            if (key != 0)
+            {
+                Vector4 body = KaijuTypeLook.BodyRatio(type);
+                _typeBlock.SetVector("_MidRatio", body);
+                _typeBlock.SetVector("_ShadowRatio", body);
+                if (state == KaijuState.Neutral) _typeBlock.SetColor("_TeamGlow", ArtMaterials.Hex(KaijuTypeLook.CrystalHex(type)));
+            }
+            Renderer[] rs = m.Renderers;
+            for (int i = 0; i < rs.Length; i++)
+            {
+                if (rs[i] == null) continue;
+                if (key == 0) rs[i].SetPropertyBlock(null);
+                else rs[i].SetPropertyBlock(_typeBlock);
+            }
+        }
+
         /// <summary>Forget every edge and spring (a new match): the next hatch roars again.</summary>
         public void Reset()
         {
+            _lookKeyA = _lookKeyB = -1;   // b12-r: rewrite the type look on the next pose
             _strikeAt = _flinchAt = _growAt = _roarAt = _getUpAt = _hatchAt = double.NegativeInfinity;
             _teleTotal = _lastTeleIn = 0;
             _lastWindup = _windupLen = 0;
@@ -674,6 +726,41 @@ namespace CriticalMass.Runtime.View.Anim
                 prev = q;
             }
             return best > 1e-4 ? bestT : -1;
+        }
+    }
+
+    /// <summary>
+    /// b13-k (from b12-r): how each Kaiju type is drawn (view only, the one table): same model, a size within 10 %, a body band
+    /// tint and the crystal colour a NEUTRAL Kaiju shows. ELDER = today's look. GROVE moss green, BRUTE ember red-orange (kept
+    /// clear of the Crimson glow #F2563F), TIMBER bark brown, MIRE slate teal (kept clear of the Azure glow).
+    /// </summary>
+    public static class KaijuTypeLook
+    {
+        public const float GroveScale = 1.06f, BruteScale = 0.97f, TimberScale = 1.04f, MireScale = 1.0f;
+        public const string GroveCrystal = "#5FAE3C", BruteCrystal = "#FF8A1F", TimberCrystal = "#9A6A3A", MireCrystal = "#4E9A94";
+        /// <summary>Linear per-channel multipliers of the body's mid and shadow bands.</summary>
+        public static readonly Vector4 GroveBody = new Vector4(0.80f, 1.00f, 0.72f, 1f), BruteBody = new Vector4(1.00f, 0.76f, 0.62f, 1f),
+            TimberBody = new Vector4(0.94f, 0.80f, 0.64f, 1f), MireBody = new Vector4(0.70f, 0.88f, 0.90f, 1f);
+        public const string GroveName = "GROVE KAIJU", BruteName = "BRUTE KAIJU", TimberName = "TIMBER KAIJU", MireName = "MIRE KAIJU";
+        /// <summary>Between the type name and its power word in the hatch callout ("GROVE KAIJU - REGROWTH").</summary>
+        public const string PowerJoin = " - ";
+
+        public static float Scale(KaijuType t) =>
+            t == KaijuType.Grove ? GroveScale : t == KaijuType.Brute ? BruteScale : t == KaijuType.Timber ? TimberScale : t == KaijuType.Mire ? MireScale : 1f;
+        public static Vector4 BodyRatio(KaijuType t) =>
+            t == KaijuType.Grove ? GroveBody : t == KaijuType.Brute ? BruteBody : t == KaijuType.Timber ? TimberBody : t == KaijuType.Mire ? MireBody : Vector4.one;
+        /// <summary>The crystal colour of a NEUTRAL Kaiju of this type (ELDER: the neutral glow, as today).</summary>
+        public static string CrystalHex(KaijuType t) =>
+            t == KaijuType.Grove ? GroveCrystal : t == KaijuType.Brute ? BruteCrystal : t == KaijuType.Timber ? TimberCrystal : t == KaijuType.Mire ? MireCrystal : ArtMapping.GlowNeutral;
+        /// <summary>"GROVE KAIJU" ... "MIRE KAIJU", null for ELDER.</summary>
+        public static string Name(KaijuType t) =>
+            t == KaijuType.Grove ? GroveName : t == KaijuType.Brute ? BruteName : t == KaijuType.Timber ? TimberName : t == KaijuType.Mire ? MireName : null;
+        /// <summary>The hatch callout: the name, plus " - POWER" once the fed power is level 1 or more; null for ELDER.</summary>
+        public static string Callout(KaijuType t, int level)
+        {
+            string n = Name(t);
+            if (n == null) return null;
+            return level >= 1 ? n + PowerJoin + KaijuTypes.PowerWord(t) : n;
         }
     }
 
