@@ -61,7 +61,7 @@ namespace CriticalMass.Runtime.Menus
         }
 
         /// <summary>Card lines in screen order (labels of ControlBindings.Rows; Move merges the four move rows).</summary>
-        /// <para>b13-v: "Build / mine" and "Switch piece" (the Builder builds, the Miner mines with the F action; the rows
+        /// <para>b13-v: "Build / mine" and "Next tool" (b14; was "Switch piece") (the Builder builds, the Miner mines with the F action; the rows
         /// are found under their old names too), and a Dodge line once the Dodge binding row exists.</para>
         public static readonly string[] LineLabels = BuildLineLabels();
 
@@ -69,7 +69,7 @@ namespace CriticalMass.Runtime.Menus
         {
             var l = new List<string> { "Move", "Aim", "Lock facing (hold)", "Attack", "Class ability", "Jump" };
             if (RowIndex("Dodge") >= 0) l.Add("Dodge");
-            l.AddRange(new[] { "Interact / carry", "Build / mine", "Switch piece", "Ping wheel", "Scoreboard", "Full map", "Base station", "Pause menu" });
+            l.AddRange(new[] { "Interact / carry", "Build / mine", "Next tool", "Ping wheel", "Scoreboard", "Full map", "Base station", "Pause menu" });
             return l.ToArray();
         }
 
@@ -84,7 +84,7 @@ namespace CriticalMass.Runtime.Menus
             int i = FindRow(label);
             if (i >= 0) return i;
             if (label == "Build / mine") return FindRow("Dig / place");
-            if (label == "Switch piece") return FindRow("Switch dig / place");
+            if (label == "Next tool") { int r = FindRow("Switch piece"); return r >= 0 ? r : FindRow("Switch dig / place"); }
             return -1;
         }
 
@@ -675,7 +675,7 @@ namespace CriticalMass.Runtime.Menus
             switch (action)
             {
                 case "DigPlace": return "Build / mine";
-                case "SwitchDigPlace": return "Switch piece";
+                case "SwitchDigPlace": return "Next tool";
                 case "OpenStation": return "Base station";
                 case "HudCursor": return "HUD cursor";
                 case "MinimapZoom": return "Minimap zoom";

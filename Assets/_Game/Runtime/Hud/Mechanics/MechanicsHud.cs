@@ -31,7 +31,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
     public static class B13Kit
     {
         public const float DodgeW = 150f;
-        public const string Mine = "MINE", Haul = "HAUL", Build = "BUILD", Stairs = "STAIRS / BRIDGE";
+        public const string Mine = "MINE", Haul = "HAUL", Build = "BUILD", Stairs = "STAIRS / BRIDGE", NextTool = "NEXT TOOL";
         public const string ShortWall = "SHORT WALL", TallWall = "TALL WALL", LongWall = "TALL WALL x5", Block = "BLOCK";
         public static readonly string[] OreNotes = { "ORE 0/3", "ORE 1/3", "ORE 2/3", "ORE 3/3" };
 
@@ -41,7 +41,33 @@ namespace CriticalMass.Runtime.Hud.Mechanics
 
         /// <summary>The two row names of a class with the batch 13 rule on (row 0 = F, row 1 = Space); null = today's rows.</summary>
         public static string[] SlotNames(ClassId c) =>
-            c == ClassId.Miner ? new[] { Mine, Haul } : c == ClassId.Builder ? new[] { Build, Stairs } : null;
+            c == ClassId.Miner ? new[] { Mine, Haul } : c == ClassId.Builder ? new[] { Build, NextTool } : null;
+
+        static string[] _toolNotes;
+
+        /// <summary>b14: the Builder's BUILD row note for a tool: "LADDER  2 WOOD", "SHORT WALL  1 WOOD", "DIG" (cached, no
+        /// allocation after the first call; tier 2 names the five-cell tall wall).</summary>
+        public static string ToolNote(BuilderTool t, int tier, int cost)
+        {
+            const int Costs = 10;
+            if (_toolNotes == null) _toolNotes = new string[BuilderToolbelt.Count * 3 * Costs];
+            int ti = Mathf.Clamp((int)t, 0, BuilderToolbelt.Count - 1), tr = Mathf.Clamp(tier, 0, 2), c = Mathf.Clamp(cost, 0, Costs - 1);
+            int k = (ti * 3 + tr) * Costs + c;
+            if (_toolNotes[k] == null)
+            {
+                string word = BuilderToolbelt.Word((BuilderTool)ti, tr);
+                _toolNotes[k] = c > 0 ? word + "  " + c.ToString(CultureInfo.InvariantCulture) + " WOOD" : word;
+            }
+            return _toolNotes[k];
+        }
+
+        /// <summary>b14: the Builder's selected tool: the local wheel's choice, else the sim's own selection.</summary>
+        public static BuilderTool ToolOf(World w, int id)
+        {
+            BuilderToolbelt belt = BuilderToolbelt.Local;
+            if (belt != null && (belt.Actor < 0 || belt.Actor == id)) return belt.Selected;
+            return BuilderToolbelt.SimTool(w, id, out BuilderTool t) ? t : BuilderTool.Ladder;
+        }
 
         /// <summary>The Builder's piece word: BLOCK, SHORT WALL, TALL WALL (tier 1) or TALL WALL x5 (tier 2).</summary>
         public static string PieceWord(BuildPiece p, bool tall, int tier) => p == BuildPiece.Block ? Block : !tall ? ShortWall : tier >= 2 ? LongWall : TallWall;
@@ -68,15 +94,29 @@ namespace CriticalMass.Runtime.Hud.Mechanics
                 }
                 else
                 {
+                    // b14: the BUILD row names the selected tool of the one wheel and what it costs (the wood itself is on
+                    // the TEAM WOOD line only, once).
                     row.Name = Build;
                     int tier = BuilderWalls.Tier(w, a.Team);
-                    bool tall = tier >= 1;   // the default selection is the tallest he has
-                    if (BuilderWalls.Ghost(w, id, out _, out _, out _, out _, out _, out bool gt, out bool ok)) { tall = gt; row.Usable = a.Alive && ok; }
-                    row.Note = PieceWord(BuilderWalls.Piece(w, id), tall, tier);
+                    BuilderTool tool = ToolOf(w, id);
+                    if (BuilderToolbelt.IsWallPiece(tool) && BuilderWalls.Ghost(w, id, out _, out _, out _, out _, out _, out _, out bool ok)) row.Usable = a.Alive && ok;
+                    row.Note = ToolNote(tool, tier, BuilderToolbelt.Cost(w, tool));
                 }
                 return true;
             }
             if (r != 1) return false;
+            if (a.Cls == ClassId.Builder)
+            {
+                // b14: the second row is the wheel's next tool on the switch key (the ability buttons use the tool too).
+                BuilderToolbelt.Rules(w, id, out bool walls, out bool terrain, out bool tall2);
+                BuilderTool next = BuilderToolbelt.Next(ToolOf(w, id), 1, walls, terrain, tall2);
+                row.Action = "SwitchDigPlace";
+                row.Name = NextTool;
+                row.Note = ToolNote(next, BuilderWalls.Tier(w, a.Team), 0);
+                row.Cd01 = 0f;
+                row.CdSeconds = 0f;
+                return true;
+            }
             row.Action = "Ability";
             row.Name = a.Cls == ClassId.Miner ? Haul : Stairs;
             row.Cd01 = cc.AbilityCooldown > 0 ? Mathf.Clamp01((float)(a.AbilityCd / cc.AbilityCooldown)) : 0f;
@@ -436,7 +476,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
                     {
                         _bankWood = b;
                         _bankSwitch = _switchKey;
-                        _bankLine = B13Kit.BankLine(WoodNote(b), _switchKey);
+                        _bankLine = BuilderBank.WoodWord + " " + b.ToString(CultureInfo.InvariantCulture);   // b14: "TEAM WOOD 4" (the switch key is on the NEXT TOOL row)
                     }
                     HudText.Set(_bank, _bankLine);
                 }
@@ -528,8 +568,8 @@ namespace CriticalMass.Runtime.Hud.Mechanics
                 if (Mathf.Abs(kc.sizeDelta.x - cw) > 0.5f) MenuUi.Place(kc, KitW - 24f - cw, 42f + r * RowH + 9f, cw, 30f);
             }
             // b13-v: the dodge and switch keys from the current bindings (J's defaults while no Dodge binding exists)
-            HudText.Set(_dodgeKey, B13Kit.DodgeLabel(B13Kit.KeyOr("Dodge", ControlBindings.ActiveDevice == ControlDevice.Gamepad ? "B" : "SHIFT")));
-            _switchKey = B13Kit.KeyOr("SwitchDigPlace", ControlBindings.ActiveDevice == ControlDevice.Gamepad ? "LB / RB" : "WHEEL");
+            HudText.Set(_dodgeKey, B13Kit.DodgeLabel(B13Kit.KeyOr("Dodge", ControlBindings.ActiveDevice == ControlDevice.Gamepad ? "RB" : "SHIFT")));
+            _switchKey = B13Kit.KeyOr("SwitchDigPlace", ControlBindings.ActiveDevice == ControlDevice.Gamepad ? "LB" : "WHEEL");
             string jump = InputGlyphs.Words("Jump");
             HudText.Set(_jumpText, "JUMP IT  " + (string.IsNullOrEmpty(jump) ? "SPACE" : jump.ToUpperInvariant()));
         }

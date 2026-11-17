@@ -1,6 +1,7 @@
 using System;
 using CriticalMass.Runtime.Hud;
 using CriticalMass.Runtime.Hud.Mechanics;
+using CriticalMass.Runtime.Input;
 using CriticalMass.Sim.Config;
 using CriticalMass.Sim.Core;
 using NUnit.Framework;
@@ -22,7 +23,11 @@ namespace CriticalMass.Runtime.Tests
                 P(c + " slots " + (names == null ? "today's kit (no batch 13 rows)" : "F " + names[0] + ", Space " + names[1]));
             }
             CollectionAssert.AreEqual(new[] { "MINE", "HAUL" }, B13Kit.SlotNames(ClassId.Miner));
-            CollectionAssert.AreEqual(new[] { "BUILD", "STAIRS / BRIDGE" }, B13Kit.SlotNames(ClassId.Builder));
+            CollectionAssert.AreEqual(new[] { "BUILD", "NEXT TOOL" }, B13Kit.SlotNames(ClassId.Builder));   // b14: one tool wheel
+            Assert.AreEqual("LADDER  2 WOOD", B13Kit.ToolNote(BuilderTool.Ladder, 0, 2));
+            Assert.AreEqual("TALL WALL x5  2 WOOD", B13Kit.ToolNote(BuilderTool.TallWall, 2, 2));
+            Assert.AreEqual("DIG", B13Kit.ToolNote(BuilderTool.Dig, 0, 0));
+            Assert.AreSame(B13Kit.ToolNote(BuilderTool.Block, 1, 1), B13Kit.ToolNote(BuilderTool.Block, 1, 1), "cached: no allocation per frame");
             Assert.IsNull(B13Kit.SlotNames(ClassId.Warrior));
             for (int n = 0; n <= 3; n++) { P("ore note " + n + ": " + B13Kit.OreNote(n)); Assert.AreEqual("ORE " + n + "/3", B13Kit.OreNote(n)); }
             Assert.AreEqual("ORE 3/3", B13Kit.OreNote(7), "clamped");

@@ -104,30 +104,43 @@ namespace CriticalMass.Runtime.Hud
             if (Mathf.Abs(_canvas.scaleFactor - s) > 1e-4f) _canvas.scaleFactor = s;
         }
 
-        void PlaceChip()
+        /// <summary>b14: the chip's slot in the one prompt stack (PromptStack: lowest priority, behind the station prompt and
+        /// the terrain pill; hidden while two of those are up).</summary>
+        void PlaceChip(int slot)
         {
-            UnityEngine.Camera cam = _canvas.worldCamera;
-            float w = cam != null ? cam.pixelWidth : Screen.width, h = cam != null ? cam.pixelHeight : Screen.height;
-            float y = ChipBottom(w, h, _canvas.scaleFactor, CriticalMass.Runtime.View.Affordance.TerrainAffordanceView.PromptPillShown);
-            if (Mathf.Abs(_chip.anchoredPosition.y - y) > 0.5f) _chip.anchoredPosition = new Vector2(ShiftX, y);
+            var p = new Vector2(PromptStack.CentreX[(int)PromptStack.Source.Strip], PromptStack.Bottom(slot, ChipH));
+            if ((_chip.anchoredPosition - p).sqrMagnitude > 0.25f) _chip.anchoredPosition = p;
         }
+
+        /// <summary>The chip is on screen now (it has words and a slot in the prompt stack).</summary>
+        public static bool Visible => Instance != null && Instance._chip != null && Instance._chip.gameObject.activeSelf;
 
         void LateUpdate()
         {
             if (_canvas == null) return;
             bool hudOn = _hud != null && _hud.Canvas != null && _hud.Canvas.enabled;
             if (_canvas.enabled != hudOn) _canvas.enabled = hudOn;
-            if (!hudOn) return;
+            if (!hudOn)
+            {
+                PromptStack.Release(PromptStack.Source.Strip);
+                return;
+            }
             UpdateScale();
-            PlaceChip();
             World w = _driver != null ? _driver.World : null;
             int key = w != null ? StateKey(w) : -1;
-            if (key == _key) return;
-            _key = key;
-            _text = key < 0 ? string.Empty : Compose(w, key);
-            _shown = _text.Length > 0;
-            if (_chip.gameObject.activeSelf != _shown) _chip.gameObject.SetActive(_shown);
-            if (_shown) HudText.Set(_label, _text);
+            if (key != _key)
+            {
+                _key = key;
+                _text = key < 0 ? string.Empty : Compose(w, key);
+                _shown = _text.Length > 0;
+                if (_shown) HudText.Set(_label, _text);
+            }
+            int slot = -1;
+            if (_shown) { PromptStack.Want(PromptStack.Source.Strip); slot = PromptStack.SlotOf(PromptStack.Source.Strip); }
+            else PromptStack.Release(PromptStack.Source.Strip);
+            bool vis = slot >= 0;
+            if (_chip.gameObject.activeSelf != vis) _chip.gameObject.SetActive(vis);
+            if (vis) PlaceChip(slot);
         }
 
         /// <summary>
@@ -141,8 +154,7 @@ namespace CriticalMass.Runtime.Hud
             Actor a = w.Actors[me];
             if (!a.Alive) return -1;
             int pillar = PillarModeHere(w, me);
-            bool miner = a.Cls == Terraform.OwnerClass(w);   // b13 r2: the dig / place strip follows the class that owns terrain (the Builder with the hut rule)
-            if (miner && a.Cls == ClassId.Builder && BuilderWalls.On(w) && !BuilderWalls.TerrainTool(w, me)) miner = false;   // b13 r3: a piece is selected: the walls strip
+            bool miner = a.Cls == Terraform.OwnerClass(w) && a.Cls != ClassId.Builder;   // b13 r2: the dig / place strip follows the class that owns terrain; b14: the Builder always has his tool strip
             // feat/terrain-affordances (e): the other terrain classes keep their resource in the same strip.
             if (pillar == 0 && !miner)
             {
@@ -150,16 +162,18 @@ namespace CriticalMass.Runtime.Hud
                 switch (a.Cls)
                 {
                     case ClassId.Builder:
-                        // CM b13 B: with the walls rule on, the strip names the selected piece, the ghost's verdict and the wood.
-                        if (BuilderWalls.On(w))
-                        {
-                            int sel = BuilderWalls.Piece(w, me) == BuildPiece.Block ? 2 : BuilderWalls.TallSelected(w, me) ? 1 : 0;
-                            int why = Math.Min(15, Math.Max(0, -BuilderWalls.GhostWhy(w, me)));
-                            int fill = BuilderWalls.GhostFill(w, me) ? 1 : 0;
-                            int wood = Math.Min(31, Math.Max(0, BuilderWalls.Wood(w, a.Team)));
-                            return (3 << 16) | ((sel | (why << 2) | (fill << 6) | (wood << 7)) << 19) | (dev << 15);
-                        }
-                        return (1 << 16) | (Math.Min(4095, (int)Math.Floor(Math.Max(0, BuiltPieces.Bank(w, a.Team)))) << 19) | (dev << 15);
+                    {
+                        // b14: the one tool wheel: the selected tool, its cost (or the blocks carried on dig / place) and the
+                        // next-tool key. The aimed spot's verdict is the terrain pill's; the wood is on the kit's TEAM WOOD line.
+                        BuilderTool tool = CriticalMass.Runtime.Hud.Mechanics.B13Kit.ToolOf(w, me);
+                        int tier = Math.Min(2, Math.Max(0, BuilderWalls.Tier(w, a.Team)));
+                        bool blocks = tool == BuilderTool.Dig || tool == BuilderTool.Place;
+                        int n = Math.Min(15, blocks ? w.Terraform.Carried[me] : BuilderToolbelt.Cost(w, tool));
+                        int bcap = blocks ? Math.Min(7, Terraform.CarryMax(w.Config)) : 0;
+                        BuilderToolbelt.Rules(w, me, out bool walls, out bool terrain, out bool tall);
+                        int next = (int)BuilderToolbelt.Next(tool, 1, walls, terrain, tall);
+                        return (3 << 16) | next | ((int)tool << 19) | (tier << 22) | (n << 24) | (bcap << 28) | (dev << 15);
+                    }
                     case ClassId.Farmer:
                         return (1 << 17) | (Math.Min(63, a.CarryAmount + a.CarryMeat) << 19) | (Math.Min(63, (int)w.Config.Class(a.Cls).CarryCapacity) << 25) | (dev << 15);
                     case ClassId.Demolitions:
@@ -221,21 +235,24 @@ namespace CriticalMass.Runtime.Hud
             return Mathf.Max(LiftY, (h - lane.y) / s + PillGap);
         }
 
+        /// <summary>b14: the Builder's tool strip for a packed key: "LADDER   ·   2 WOOD   ·   WHEEL: BRIDGE   ·   1-7: PICK",
+        /// "DIG   ·   BLOCKS 1/3   ·   LB: PLACE" (the switch key names the tool it moves to).</summary>
+        public static string BuilderLine(int key, ControlDevice device)
+        {
+            BuilderTool tool = (BuilderTool)((key >> 19) & 7);
+            int tier = (key >> 22) & 3, n = (key >> 24) & 15, max = (key >> 28) & 7;
+            string line = BuilderToolbelt.Word(tool, tier);
+            if (tool == BuilderTool.Dig || tool == BuilderTool.Place) line += "   ·   BLOCKS " + n + "/" + max;
+            else if (n > 0) line += "   ·   " + n + " WOOD";
+            line += "   ·   " + TrialText.Fill("{Switch}", device) + ": " + BuilderToolbelt.Word((BuilderTool)(key & 7), tier);
+            if (device != ControlDevice.Gamepad) line += "   ·   1-7: PICK";
+            return line;
+        }
+
         static string Compose(World w, int key)
         {
             ControlDevice device = ControlBindings.ActiveDevice;
-            if ((key & (7 << 16)) == (3 << 16))
-            {
-                // CM b13 B: "F  BUILD SHORT WALL   ·   WHEEL: SWITCH   ·   WOOD 4" (+ the refusal word while the ghost is red).
-                int v = (key >> 19) & 4095;
-                int sel = v & 3, why = (v >> 2) & 15, wood = (v >> 7) & 31;
-                bool fill = ((v >> 6) & 1) == 1;
-                string piece = fill ? "FILL HOLE" : sel == 2 ? "BLOCK" : sel == 1 ? "TALL WALL" : "SHORT WALL";
-                string wallLine = TrialText.Fill("{DigPlace}", device) + "  BUILD " + piece + "   ·   " + TrialText.Fill("{Switch}", device) + ": SWITCH   ·   "
-                    + CriticalMass.Runtime.View.Mechanics.BuilderBank.WoodWord + " " + wood;
-                if (why != 0) wallLine += "   ·   " + BuilderWalls.Word(-why);
-                return wallLine;
-            }
+            if ((key & (7 << 16)) == (3 << 16)) return BuilderLine(key, device);
             if ((key & (7 << 16)) != 0)
             {
                 int v = (key >> 19) & 63, v12 = (key >> 19) & 4095;

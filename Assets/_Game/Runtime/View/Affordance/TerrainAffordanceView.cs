@@ -85,6 +85,13 @@ namespace CriticalMass.Runtime.View.Affordance
         public int DecalsDrawn { get; private set; }
         public bool OutlineDrawn { get; private set; }
         public int GhostCellsDrawn { get; private set; }
+        /// <summary>b14: the faint reach outline's strength, 1 when a tool (or the class, or a new life) was just picked, fading
+        /// to 0 over ReachFadeSeconds of match time. Outside it only the aimed cell is drawn (or everything while the show
+        /// key is held).</summary>
+        public float ReachWindow01 { get; private set; }
+        public bool ReachWindowActive => ReachWindow01 > 0f;
+        public const double ReachFadeSeconds = 1.5;
+        int _reachKey = int.MinValue, _reachTick;
         public bool GhostValid { get; private set; }
         /// <summary>The prompt text now ("" = hidden), the hint now, and the bar's value (-1 = hidden).</summary>
         /// <summary>b12 r3: the prompt pill is up this frame (TerrainPrompt merges into it or steps above it).</summary>
@@ -358,6 +365,25 @@ namespace CriticalMass.Runtime.View.Affordance
             if (terrain)
             {
                 AimOf(w, out bool hasAim, out double ax, out double az);
+                // b14: the local Builder's scan follows the one tool wheel (BuilderToolbelt): only the selected tool, and the
+                // ladder / bridge along the wheel's axis (with its hysteresis), so the ghost is exactly what F will build.
+                BuilderToolbelt belt = BuilderToolbelt.Local;
+                Scan.Belt = me.Cls == ClassId.Builder && belt != null && (!_driver.HumanAutopilot || CaptureForce);
+                if (Scan.Belt)
+                {
+                    belt.UpdateAxis(w, LocalActor, hasAim, ax, az);
+                    Scan.Tool = belt.Selected;
+                    Scan.ToolDx = belt.Dx;
+                    Scan.ToolDz = belt.Dz;
+                }
+                int rk = ((int)me.Cls * 397 + (Scan.Belt ? belt.Serial : 0)) * 31 + w.Epoch;
+                if (rk != _reachKey || w.Tick < _reachTick)
+                {
+                    _reachKey = rk;
+                    _reachTick = w.Tick;
+                }
+                double fadeTicks = Math.Max(1.0, ReachFadeSeconds * w.Config.SimHz);
+                ReachWindow01 = Mathf.Clamp01(1f - (float)((w.Tick - _reachTick) / fadeTicks));
                 Scan.Scan(w, LocalActor, hasAim, ax, az, ShowAllHeld);
                 if (WorldFeedbackSettings.Outline) { DrawTarget(w, Scan.Primary, true); DrawTarget(w, Scan.Secondary, false); }
             }
@@ -526,6 +552,10 @@ namespace CriticalMass.Runtime.View.Affordance
 
         void DrawMarkers(World w)
         {
+            // b14 (owner: "hint tiles plastered everywhere"): outside the reach window only the aimed cell is drawn (DrawTarget);
+            // inside it, a faint outline of the cells in reach, fading out. Holding the show key shows everything, as before.
+            float window = ShowAllHeld ? 1f : ReachWindow01;
+            if (window <= 0f) return;
             MapDef m = w.Map;
             int cap = ShowAllHeld ? MarkerCapAll : MarkerCapCrowd;
             double r = ShowAllHeld ? AffordanceScan.RadiusAll : AffordanceScan.Radius;
@@ -534,9 +564,10 @@ namespace CriticalMass.Runtime.View.Affordance
             for (int k = 0; k < Scan.MarkerCount && MarkersDrawn < cap; k++)
             {
                 AffMarker mk = Scan.Markers[k];
+                if (!ShowAllHeld && !mk.InReach) continue;
                 double d = Math.Sqrt((mk.X - ox) * (mk.X - ox) + (mk.Z - oz) * (mk.Z - oz));
                 float fade = 1f - Mathf.Clamp01((float)((d - r * 0.6) / (r * 0.4 + 1e-6)));
-                float alpha = (mk.InReach ? ReachAlpha : QuietAlpha) * (ShowAllHeld ? Mathf.Max(fade, 0.6f) : fade);
+                float alpha = ShowAllHeld ? (mk.InReach ? ReachAlpha : QuietAlpha) * Mathf.Max(fade, 0.6f) : QuietAlpha * window;
                 if (alpha < 0.03f) continue;
                 Color32 col = ActionColour(mk.Action);
                 bool cell = mk.Cx >= 0;
@@ -567,6 +598,13 @@ namespace CriticalMass.Runtime.View.Affordance
         void DrawTarget(World w, AffTarget t, bool primary)
         {
             if (!t.Has) return;
+            if (!t.Mark)
+            {
+                // b14: nothing real to point at (open sky, a pit just dug, a block just placed) or WallView's own ghost:
+                // the prompt carries the words; no tile.
+                if (primary) GhostValid = t.Valid;
+                return;
+            }
             MapDef m = w.Map;
             float meY = CellY(m, w.X[LocalActor], w.Z[LocalActor]);
             Color32 tint = t.Valid ? ActionColour(t.Action) : RefusedRed;
@@ -863,7 +901,7 @@ namespace CriticalMass.Runtime.View.Affordance
             return new Vector2(x, y);
         }
 
-        /// <summary>One prompt line: "F  PLACE BLOCK (3)", "HOLD E  GATHER", "SPACE  BUILD LADDER (12)   ·   bank empty".</summary>
+        /// <summary>One prompt line: "F  PLACE BLOCK (3)", "HOLD E  GATHER", "F  BUILD LADDER   ·   bank empty".</summary>
         public static string Line(AffTarget t, ControlDevice device)
         {
             if (t == null || !t.Has) return string.Empty;
@@ -875,7 +913,12 @@ namespace CriticalMass.Runtime.View.Affordance
 
         void UpdatePrompt(World w, UnityEngine.Camera cam, bool terrain)
         {
-            bool show = terrain && WorldFeedbackSettings.Prompts && Scan.Primary.Has && !HudZones.PromptRowHeld;   // one resident on the prompt row
+            // b14: the pill takes its slot in the one prompt stack (PromptStack: after the station prompt, before the tool strip).
+            bool want = terrain && WorldFeedbackSettings.Prompts && Scan.Primary.Has;
+            int slot = -1;
+            if (want) { PromptStack.Want(PromptStack.Source.Pill); slot = PromptStack.SlotOf(PromptStack.Source.Pill); }
+            else PromptStack.Release(PromptStack.Source.Pill);
+            bool show = slot >= 0;
             if (!show)
             {
                 if (_chip != null && _chip.gameObject.activeSelf) _chip.gameObject.SetActive(false);
@@ -914,11 +957,14 @@ namespace CriticalMass.Runtime.View.Affordance
             AffTarget t = Scan.Primary;
             MapDef m = w.Map;
             Vector3 p = SimSpace.ToWorld(t.X, GroundHeight.At(m, t.X, t.Z) + 1.6, t.Z);
+            Vector2 pos = _chip.anchoredPosition;
             if (OnScreen(cam, p, out Vector2 sp))
             {
                 float sc = _canvas.scaleFactor > 0 ? _canvas.scaleFactor : 1f;
-                _chip.anchoredPosition = LanePill(sp.x / sc, _chip.sizeDelta, _canvas.pixelRect.size, sc);
+                pos = LanePill(sp.x / sc, _chip.sizeDelta, _canvas.pixelRect.size, sc);
             }
+            pos.y = PromptStack.Bottom(slot, _chip.sizeDelta.y);
+            _chip.anchoredPosition = pos;
             if (!_chip.gameObject.activeSelf) _chip.gameObject.SetActive(true);
             _promptShown = PromptPillShown = true;
         }
@@ -929,9 +975,9 @@ namespace CriticalMass.Runtime.View.Affordance
             switch (c)
             {
                 case ClassId.Miner when builderDigs: return TrialText.Fill("MINER: {DigPlace} mines ore at a vein, {Interact} banks it at your hut, {Ability} hauls it home fast. Hold " + show + " to see everything you can use.", d);
-                case ClassId.Builder when builderDigs: return TrialText.Fill("BUILDER: {DigPlace} digs the marked ground and places it back, {Ability} builds the ladder or bridge shown. Hold " + show + " to see everything you can use.", d);
+                case ClassId.Builder when builderDigs: return TrialText.Fill("BUILDER: {DigPlace} uses the tool on your wheel where the outline shows. {Switch} or 1-7 picks dig, place, ladder, bridge, walls or block. Hold " + show + " to see everything you can use.", d);
                 case ClassId.Miner: return TrialText.Fill("MINER: {DigPlace} digs the marked ground and places it back, {Ability} drops a barricade. Hold " + show + " to see everything you can use.", d);
-                case ClassId.Builder: return TrialText.Fill("BUILDER: face a cliff or a gap; {Ability} builds the ladder or bridge shown, {Interact} carries one. Hold " + show + " to see everything you can use.", d);
+                case ClassId.Builder: return TrialText.Fill("BUILDER: {DigPlace} uses the tool on your wheel: a ladder flat against the cliff you face, a bridge straight over a gap. {Switch} picks the tool. Hold " + show + " to see everything you can use.", d);
                 case ClassId.Farmer: return TrialText.Fill("FARMER: hold {Interact} at the green markers to gather, then feed the egg at the shrine. Hold " + show + " to see everything you can use.", d);
                 case ClassId.Demolitions: return TrialText.Fill("DEMOLITIONIST: {Attack} throws " + GrenadeTuning.Name + " at the marked circle, {Ability} lays a mine. Hold " + show + " to see what a blast can break.", d);
                 default: return string.Empty;

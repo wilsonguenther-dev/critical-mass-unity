@@ -200,21 +200,28 @@ namespace CriticalMass.Runtime.PlayTests
         }
 
         [UnityTest]
-        public IEnumerator LeftShiftLocksFacingOnTheKeysAndWalksToThePointerOnlyWithTheMouse()
+        public IEnumerator LeftCtrlLocksFacingOnTheKeysAndYWalksToThePointerOnlyWithTheMouse()
         {
+            // b14 (owner: Left Shift was bound to two actions): L SHIFT is the dodge alone; lock facing is L CTRL (arrows
+            // hand), walk to pointer's key is Y.
             TakeControl();
             yield return Tap(Key.X);
             Assert.AreEqual(AimResolver.Mode.Keys, _input.Aim.Current);
-            yield return Send(_kb, new KeyboardState(Key.LeftShift));
+            yield return Send(_kb, new KeyboardState(Key.LeftCtrl));
             yield return null;
-            Assert.IsTrue(_input.FacingLocked, "keys aim: L SHIFT locks the facing");
-            Assert.IsFalse(_input.State.PointerWalkHeld, "keys aim: L SHIFT never walks to a resting cursor");
+            Assert.IsTrue(_input.FacingLocked, "keys aim: L CTRL locks the facing");
+            yield return Send(_kb, new KeyboardState());
+            yield return Send(_kb, new KeyboardState(Key.Y));
+            yield return null;
+            Assert.IsFalse(_input.State.PointerWalkHeld, "keys aim: Y never walks to a resting cursor");
             yield return Send(_kb, new KeyboardState());
             yield return Send(_mouse, new MouseState { delta = new Vector2(20f, 0f), position = new Vector2(400f, 300f) });
-            yield return Send(_kb, new KeyboardState(Key.LeftShift));
+            yield return Send(_kb, new KeyboardState(Key.LeftCtrl));
             yield return null;
             Assert.IsFalse(_input.FacingLocked, "mouse aim: no lock");
-            Assert.IsTrue(_input.State.PointerWalkHeld, "mouse aim: L SHIFT walks to the pointer");
+            yield return Send(_kb, new KeyboardState(Key.Y));
+            yield return null;
+            Assert.IsTrue(_input.State.PointerWalkHeld, "mouse aim: Y walks to the pointer");
             yield return Send(_kb, new KeyboardState());
         }
 

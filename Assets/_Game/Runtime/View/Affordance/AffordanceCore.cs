@@ -1,4 +1,5 @@
 using System;
+using CriticalMass.Runtime.Input;
 using CriticalMass.Sim.Config;
 using CriticalMass.Sim.Core;
 using CriticalMass.Sim.Grid;
@@ -56,9 +57,13 @@ namespace CriticalMass.Runtime.View.Affordance
         public int GhostCount;
         public readonly int[] GhostCells = new int[GhostMax];
         public double GhostRadius;
+        /// <summary>b14: draw the target in the world. False = the prompt only (a refusal with nothing real to point at, or a
+        /// wall piece whose ghost WallView draws): never a tile over open sky or on a cell the tool cannot use.</summary>
+        public bool Mark = true;
 
         public void Clear()
         {
+            Mark = true;
             Has = false;
             Action = AffAction.None;
             Button = "";
@@ -104,6 +109,8 @@ namespace CriticalMass.Runtime.View.Affordance
             NothingToCross = "nothing to cross", GettingUp = "getting up", NoWood = "no wood", EnemyGround = "enemy ground",
             Occupied = "occupied", Hill = "hill ground", Water = "no ground", NoRoom = "hands full", Busy = "busy here",
             NotFeeder = "cannot feed";
+        /// <summary>b14: the Builder's ladder / bridge tools facing nothing they can span.</summary>
+        public const string NoCliff = "face a cliff", NoGap = "face a gap";
         /// <summary>b12 r3: the Demolitionist's detail line while her TNT reloads (her attack is the pry bar meanwhile).</summary>
         public const string TntIn = GrenadeTuning.Name + " in";
         /// <summary>b12 r3: her prompt verbs on the attack binding: TNT ready, and the pry bar while it reloads.</summary>
@@ -134,6 +141,12 @@ namespace CriticalMass.Runtime.View.Affordance
         public readonly AffTarget Secondary = new AffTarget();
         /// <summary>The scan stopped adding markers at MaxMarkers.</summary>
         public bool Capped;
+
+        /// <summary>b14: the view sets these for the local Builder: scan only the tool selected on his wheel (BuilderToolbelt),
+        /// with the ladder / bridge along (ToolDx, ToolDz). False (tests, captures): the batch 13 scan.</summary>
+        public bool Belt;
+        public BuilderTool Tool = BuilderTool.Ladder;
+        public int ToolDx = 1, ToolDz;
 
         int[] _routeStamp = new int[0];
         byte[] _routeOk = new byte[0];
@@ -236,6 +249,11 @@ namespace CriticalMass.Runtime.View.Affordance
                     ScanMiner(w, id, a, ax, az, r);
                     return true;
                 case ClassId.Builder:
+                    if (Belt)
+                    {
+                        ScanBuilderTool(w, id, a, ax, az, r);
+                        return true;
+                    }
                     ScanBuilder(w, id, a, ax, az, r);
                     // b13 r2: the Builder owns dig / place with the hut rule: F on the second line unless E has a piece to carry or a bridge to mend
                     if (Terraform.OwnerClass(w) == ClassId.Builder && !Secondary.Has) DigPlace(w, id, a, ax, az, r, Secondary, false);
@@ -550,6 +568,113 @@ namespace CriticalMass.Runtime.View.Affordance
                     else if (Sources.Stock(w, a.Team, Sources.StockWood) < (int)E.BridgeRepairWood) Refuse(s, AffWords.NoWood);
                     else s.Valid = a.StandUp <= 0;
                 }
+            }
+        }
+
+        /// <summary>
+        /// b14: the Builder's primary for the tool on his wheel. DIG / PLACE: the Sim's dig / place target (Terraform's checks).
+        /// LADDER / BRIDGE: BuiltPieces.Plan of exactly that kind along the wheel's axis; the ghost is the cells it will lay,
+        /// drawn only when the plan exists (a refusal is words, never a red tile over open sky). Walls and block: the verdict
+        /// of BuilderWalls.Ghost (WallView draws that ghost, so nothing here). E keeps carry / repair on the second line.
+        /// </summary>
+        void ScanBuilderTool(World w, int id, Actor a, double ax, double az, double r)
+        {
+            GameConfig c = w.Config;
+            BuiltPiece[] ps = w.Builder.Pieces;
+            int carrySlot = w.Builder.CarryPiece[id];
+            AffTarget p = Primary;
+            if (carrySlot >= 0)
+            {
+                // A carried piece goes down with E along the same axis (the batch 13 rule), whatever the tool.
+                ScanBuilder(w, id, a, ax, az, r);
+                if (Primary.Action == AffAction.PutDown && !Primary.Valid) Primary.Mark = false;
+                return;
+            }
+            BuilderTool t = Tool;
+            if (t == BuilderTool.Dig || t == BuilderTool.Place)
+            {
+                DigPlace(w, id, a, ax, az, r, p, false);
+                // the aimed cell is drawn only when the tool can use it, or red on solid ground it may not dig (never on a pit
+                // just dug, a block just placed, open sky, or for a short wait)
+                if (!p.Valid) p.Mark = t == BuilderTool.Dig && p.Why != AffWords.Wait && MapGrid.InBounds(w.Map, p.Cx, p.Cz) && MapGrid.IsWalkable(w.Map, p.Cx, p.Cz);
+            }
+            else if (BuilderToolbelt.IsClimb(t))
+            {
+                int kind = t == BuilderTool.Ladder ? BuiltPieces.Ladder : BuiltPieces.Bridge;
+                int dx = ToolDx, dz = ToolDz;
+                p.Has = true;
+                p.Button = "DigPlace";
+                p.Action = AffAction.Build;
+                p.Verb = t == BuilderTool.Ladder ? "BUILD LADDER" : "BUILD BRIDGE";
+                p.Ghost = 3;
+                int plan = BuiltPieces.Plan(w, id, dx, dz, kind);
+                if (plan == 0 && BuiltPieces.LastPlanCount > 0)
+                {
+                    int n = BuiltPieces.LastPlanCount;
+                    for (int q = 0; q < n; q++)
+                    {
+                        int i = BuiltPieces.LastPlanCell(q);
+                        p.AddGhostCell(i);
+                        Add(AffAction.Build, i % w.Map.Width, i / w.Map.Width, i % w.Map.Width + 0.5, i / w.Map.Width + 0.5, true);
+                    }
+                    int first = p.GhostCells[0];
+                    p.Cx = first % w.Map.Width;
+                    p.Cz = first / w.Map.Width;
+                    p.X = p.Cx + 0.5;
+                    p.Z = p.Cz + 0.5;
+                }
+                else
+                {
+                    p.Mark = false;
+                    p.X = w.X[id] + dx;
+                    p.Z = w.Z[id] + dz;
+                }
+                int why = plan;
+                if (why == 0 && BuiltPieces.OwnedCount(w, id) >= c.Abilities.BuilderPieces.MaxActivePerBuilder) why = BuiltPieces.RefusedLimit;
+                if (why == 0 && !(BuiltPieces.Bank(w, a.Team) >= BuiltPieces.Cost(c, kind))) why = BuiltPieces.RefusedBiomass;
+                if (why == 0 && w.Tick - w.WallChangeTick < Durations.T30(c, c.Abilities.MinerTerraform.MinGapTicks)) why = BuiltPieces.RefusedRate;
+                p.Count = -1;
+                if (a.StandUp > 0) Refuse(p, AffWords.GettingUp);
+                else if (plan != 0 && plan != BuiltPieces.RefusedLength && plan != BuiltPieces.RefusedOccupied) Refuse(p, t == BuilderTool.Ladder ? AffWords.NoCliff : AffWords.NoGap);
+                else if (why != 0) Refuse(p, BuilderWhy(why));
+                else if (a.AbilityCd > 0) { Refuse(p, AffWords.Wait); p.WaitSeconds = a.AbilityCd; }
+                else p.Valid = true;
+            }
+            else
+            {
+                // SHORT WALL / TALL WALL / BLOCK: WallView draws the ghost; the pill names the piece and the Sim's verdict.
+                p.Has = true;
+                p.Button = "DigPlace";
+                p.Action = AffAction.Build;
+                p.Mark = false;
+                bool has = BuilderWalls.Ghost(w, id, out int gx, out int gz, out _, out _, out _, out _, out bool ok);
+                p.Verb = has && BuilderWalls.GhostFill(w, id) ? "FILL HOLE" : "BUILD " + BuilderToolbelt.Word(t, BuilderWalls.Tier(w, a.Team));
+                if (has)
+                {
+                    p.Cx = gx;
+                    p.Cz = gz;
+                    p.X = gx + 0.5;
+                    p.Z = gz + 0.5;
+                    if (ok) p.Valid = true;
+                    else Refuse(p, BuilderWalls.Word(BuilderWalls.GhostWhy(w, id)).ToLowerInvariant());
+                }
+                else Refuse(p, AffWords.Wait);
+            }
+
+            // Secondary: interact (carry the piece in reach, or hold to repair the broken bridge), as in ScanBuilder.
+            int slot = a.CarryAmount > 0 || a.CarryMeat > 0 || BuiltPieces.InteractBusy(w, w.X[id], w.Z[id]) ? -1 : BuiltPieces.PieceInReach(w, id);
+            if (slot >= 0)
+            {
+                BuiltPiece pc = ps[slot];
+                AffTarget s = Secondary;
+                s.Has = true;
+                s.Button = "Interact";
+                s.Action = AffAction.Carry;
+                s.Verb = pc.Kind == BuiltPieces.Ladder ? "CARRY LADDER" : "CARRY BRIDGE";
+                s.X = pc.X;
+                s.Z = pc.Z;
+                s.Valid = a.StandUp <= 0;
+                if (!s.Valid) s.Why = AffWords.GettingUp;
             }
         }
 

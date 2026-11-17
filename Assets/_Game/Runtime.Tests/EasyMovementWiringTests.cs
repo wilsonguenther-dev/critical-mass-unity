@@ -26,10 +26,11 @@ namespace CriticalMass.Runtime.Tests
             InputAction a = asset.FindActionMap(ControlBindings.MapName, true).FindAction("MoveToPointer", false);
             Assert.IsNotNull(a, "MoveToPointer action");
             Assert.AreEqual(InputActionType.Button, a.type);
-            // Integration batch 2: two defaults, the mouse side button and L SHIFT (for trackpads and two-button mice).
+            // Integration batch 2: two defaults, the mouse side button and a key (for trackpads and two-button mice); b14: the
+            // key is Y (L SHIFT is the dodge alone).
             Assert.AreEqual(2, a.bindings.Count);
             Assert.AreEqual("<Mouse>/backButton", a.bindings[0].path);
-            Assert.AreEqual("<Keyboard>/leftShift", a.bindings[1].path);
+            Assert.AreEqual("<Keyboard>/y", a.bindings[1].path);
             Assert.AreEqual(2, ControlBindings.Rows.Single(r => r.Label == "Walk to pointer").Keyboard.Length);
             ControlRow row = ControlBindings.Rows.Single(r => r.Label == "Walk to pointer");
             Assert.AreEqual("MoveToPointer", row.Keyboard[0].Action);

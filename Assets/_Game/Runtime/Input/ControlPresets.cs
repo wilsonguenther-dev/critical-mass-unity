@@ -72,9 +72,9 @@ namespace CriticalMass.Runtime.Input
         {
             switch (p)
             {
-                case ControlPreset.ArrowsZxc: return "Arrows move (right hand). Z attack, X ability, C jump, V interact, F dig, R switch, L SHIFT lock facing (left hand).";
-                case ControlPreset.WasdJkl: return "WASD move (left hand). J attack, K ability, SPACE jump, H interact, U dig, I switch, L lock facing (right hand).";
-                case ControlPreset.WasdMouse: return "WASD move, SPACE jump, E interact, F dig (left hand). The mouse aims, clicks attack and ability, the wheel switches.";
+                case ControlPreset.ArrowsZxc: return "Arrows move (right hand). Z attack, X ability, C jump, V interact, F use tool, R next tool, L CTRL lock facing, L SHIFT dodge (left hand).";
+                case ControlPreset.WasdJkl: return "WASD move (left hand). J attack, K ability, SPACE jump, H interact, U use tool, I next tool, L lock facing (right hand). L SHIFT dodge.";
+                case ControlPreset.WasdMouse: return "WASD move, SPACE jump, L SHIFT dodge, E interact, F use tool (left hand). The mouse aims, clicks attack and ability, the wheel picks the tool.";
                 default: return "Mouse in the left hand aims and attacks. Arrows move; R SHIFT jump, / interact, . dig, , switch, ; ping (right hand).";
             }
         }

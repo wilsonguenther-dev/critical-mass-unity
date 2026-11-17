@@ -26,7 +26,7 @@ namespace CriticalMass.Runtime.Onboarding
         {
             "{Dodge} to dodge. A quick dash; you cannot be hit for a moment.",
             "Hold {DigPlace} near an ore vein to MINE, then bank the ore at your hut.",
-            "{DigPlace} BUILDS where the outline shows. {Switch} picks the piece.",
+            "{DigPlace} uses your tool on the outlined spot. {Switch} or 1-7 picks the tool: dig, place, ladder, bridge, walls, block.",
         };
 
         public static string Line(int i, ControlDevice device) => TrialText.Fill(Lines[Mathf.Clamp(i, 0, Count - 1)], device);
@@ -154,8 +154,8 @@ namespace CriticalMass.Runtime.Onboarding
                 case "Jump": return Action("Jump", device, pad ? "A" : "SPACE");
                 case "DigPlace": return Action("DigPlace", device, pad ? "Y" : "F");
                 case "Map": return Action("Map", device, pad ? "D-PAD UP" : "M");
-                case "Switch": return pad ? "LB / RB" : "WHEEL";   // creator acceptance: the dig / place mode switch
-                case "Dodge": return Action("Dodge", device, pad ? "B" : "SHIFT");   // b13-v: J's default dodge keys
+                case "Switch": return pad ? Action("SwitchDigPlace", device, "LB") : "WHEEL";   // b14: the Builder's next-tool button (left bumper)
+                case "Dodge": return Action("Dodge", device, pad ? "RB" : "SHIFT");   // b14: Left Shift / right bumper
                 default: return null;
             }
         }

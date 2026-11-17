@@ -105,7 +105,7 @@ namespace CriticalMass.Runtime.Tests
                 { "Interact", new[] { "<Keyboard>/e", "<Keyboard>/h", "<Keyboard>/v" } },
                 { "DigPlace", new[] { "<Keyboard>/f", "<Keyboard>/u" } },
                 { "SwitchDigPlace", new[] { "<Keyboard>/i", "<Keyboard>/r" } },
-                { "LockFacing", new[] { "<Keyboard>/l", "<Keyboard>/leftShift" } },
+                { "LockFacing", new[] { "<Keyboard>/l", "<Keyboard>/leftCtrl" } },   // b14: Left Shift is the dodge
             };
             foreach (var kv in expect)
             {
@@ -131,12 +131,28 @@ namespace CriticalMass.Runtime.Tests
         }
 
         [Test]
-        public void LockFacingAndWalkToPointerMayShareLeftShiftOnly()
+        public void LeftShiftIsTheDodgeAloneAndLockFacingMovedToLeftCtrl()
         {
+            // b14 (owner: Left Shift was bound to two actions): dodge keeps it; lock facing (Arrows hand) is Left Ctrl, walk to
+            // pointer's second key is Y. No key of the keyboard group belongs to two actions.
             InputAction lockF = A("LockFacing");
             int i = ControlBindings.FindBindingIndex(lockF, new RebindSlot("LockFacing", ControlDevice.KeyboardMouse, 1));
-            Assert.AreEqual("<Keyboard>/leftShift", lockF.bindings[i].effectivePath);
-            CollectionAssert.IsEmpty(ControlBindings.Conflicts(lockF, i), "scheme-exclusive pair");
+            Assert.AreEqual("<Keyboard>/leftCtrl", lockF.bindings[i].effectivePath);
+            CollectionAssert.IsEmpty(ControlBindings.Conflicts(lockF, i), "Left Ctrl is lock facing's alone");
+            var owners = new Dictionary<string, HashSet<string>>();
+            foreach (InputAction a in ControlBindings.Map(_asset).actions)
+                foreach (InputBinding b in a.bindings)
+                {
+                    if (b.isComposite || string.IsNullOrEmpty(b.effectivePath) || !b.effectivePath.StartsWith("<Keyboard>/")) continue;
+                    if (!owners.TryGetValue(b.effectivePath, out HashSet<string> set)) owners[b.effectivePath] = set = new HashSet<string>();
+                    set.Add(a.name);
+                }
+            foreach (var kv in owners)
+            {
+                Debug.Log("[CM.Keys] " + kv.Key + ": " + string.Join(", ", kv.Value));
+                Assert.AreEqual(1, kv.Value.Count, kv.Key + " is bound to " + string.Join(", ", kv.Value));
+            }
+            CollectionAssert.AreEqual(new[] { "Dodge" }, owners["<Keyboard>/leftShift"].ToArray(), "Left Shift = dodge");
             Assert.IsTrue(ControlSchemes.SchemeExclusive("MoveToPointer", "LockFacing"));
             Assert.IsFalse(ControlSchemes.SchemeExclusive("Attack", "Jump"));
         }

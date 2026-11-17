@@ -449,7 +449,7 @@
                 {
                     "name": "",
                     "id": "5b7e2c19-3a4d-4c8e-9f61-2d0b8a7c41e6",
-                    "path": "<Keyboard>/leftShift",
+                    "path": "<Keyboard>/y",
                     "interactions": "",
                     "processors": "",
                     "groups": "KeyboardMouse",
@@ -470,8 +470,19 @@
                 },
                 {
                     "name": "",
-                    "id": "0ab50077-06df-435c-8690-cf179bd43b62",
+                    "id": "b14e0a5e-7c3d-4b21-9f0e-5a1c2d3e4f60",
                     "path": "<Gamepad>/buttonEast",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "Gamepad",
+                    "action": "Ability",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "0ab50077-06df-435c-8690-cf179bd43b62",
+                    "path": "<Gamepad>/rightShoulder",
                     "interactions": "",
                     "processors": "",
                     "groups": "Gamepad",
@@ -482,7 +493,7 @@
                 {
                     "name": "",
                     "id": "2676f6e1-63bd-491b-967e-001210fcc3f8",
-                    "path": "<Keyboard>/leftCtrl",
+                    "path": "<Keyboard>/leftShift",
                     "interactions": "",
                     "processors": "",
                     "groups": "KeyboardMouse",
@@ -612,37 +623,15 @@
                     "isPartOfComposite": false
                 },
                 {
-                    "name": "Shoulders",
-                    "id": "18a5efeb-ac5e-4978-b826-d9e92b33e801",
-                    "path": "1DAxis",
-                    "interactions": "",
-                    "processors": "",
-                    "groups": "",
-                    "action": "SwitchDigPlace",
-                    "isComposite": true,
-                    "isPartOfComposite": false
-                },
-                {
-                    "name": "negative",
-                    "id": "36e5be2a-e1fd-4049-abe0-f7f34378a17f",
+                    "name": "",
+                    "id": "b14c1b0e-2d4f-4a6b-8c9d-0e1f2a3b4c5d",
                     "path": "<Gamepad>/leftShoulder",
                     "interactions": "",
                     "processors": "",
                     "groups": "Gamepad",
                     "action": "SwitchDigPlace",
                     "isComposite": false,
-                    "isPartOfComposite": true
-                },
-                {
-                    "name": "positive",
-                    "id": "577d3aaa-5bb1-48b6-a29d-3f7ca3af69c8",
-                    "path": "<Gamepad>/rightShoulder",
-                    "interactions": "",
-                    "processors": "",
-                    "groups": "Gamepad",
-                    "action": "SwitchDigPlace",
-                    "isComposite": false,
-                    "isPartOfComposite": true
+                    "isPartOfComposite": false
                 },
                 {
                     "name": "WASD",
@@ -889,7 +878,7 @@
                 {
                     "name": "Arrows",
                     "id": "ef894edf-6f13-5e90-aeb7-8e4fc9a97854",
-                    "path": "<Keyboard>/leftShift",
+                    "path": "<Keyboard>/leftCtrl",
                     "interactions": "",
                     "processors": "",
                     "groups": "KeyboardMouse",

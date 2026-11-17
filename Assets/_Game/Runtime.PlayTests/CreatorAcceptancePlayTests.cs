@@ -270,14 +270,14 @@ namespace CriticalMass.Runtime.PlayTests
             double stopX = W.X[0];
             Assert.LessOrEqual(onHole, Jump.CoyoteTicks(C) + 1, "never left standing over the hole");
 
-            // PLACE: to the edge of the island, switch mode with the bumper, aim at the void, press F.
+            // PLACE: to the edge of the island, switch to PLACE with the left bumper, aim at the void, press F.
             Assert.IsTrue(EdgeSpot(W.X[0], W.Z[0], out int fx, out int fz, out int vx, out int vz), "an island edge to build on");
             // Stand at the back of the edge cell so the aim point, pulled back to Reach (1.6 u), lands on the first void cell.
             double ex0 = fx + 0.5 - (vx - fx) * 0.25, ez0 = fz + 0.5 - (vz - fz) * 0.25;
             if (!Collide.ActorFits(W, ex0, ez0, C.Class(ClassId.Builder).Radius)) { ex0 = fx + 0.5; ez0 = fz + 0.5; }
             Teleport(ex0, ez0);
             _driver.StepTicks((int)Math.Ceiling(1.5 * C.SimHz));   // the team's terraform cooldown
-            yield return Pad(Vector2.zero, Vector2.zero, 0f, GamepadButton.RightShoulder);
+            yield return Pad(Vector2.zero, Vector2.zero, 0f, GamepadButton.LeftShoulder);   // b14: LB = next tool (RB is the dodge)
             _driver.StepTicks(1);
             yield return Pad(Vector2.zero, Vector2.zero);
             Assert.AreEqual(TerraformMode.Place, Terraform.ModeOf(W, 0), "the bumper switched the miner to Place");

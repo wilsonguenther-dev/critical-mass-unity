@@ -83,6 +83,13 @@ namespace CriticalMass.Runtime.Input
         bool _abilityLatch;
         bool _terraformLatch;
         bool _switchLatch;
+        /// <summary>b14: +1 forward / -1 back for the latched switch press (wheel up / down; keys and the bumper go forward).</summary>
+        int _switchDir = 1;
+        /// <summary>b14: a Builder tool picked with a number key this tick (0..6), -1 none.</summary>
+        int _pick = -1;
+
+        /// <summary>b14: the Builder's one tool wheel (Fill routes his use and switch presses through it).</summary>
+        public readonly BuilderToolbelt Toolbelt = new BuilderToolbelt();
         bool _jumpLatch;
         // CM b13 J: dodge, latched like Jump (one InputFrame.Dodge per press, dropped while paused).
         bool _dodgeLatch;
@@ -201,6 +208,9 @@ namespace CriticalMass.Runtime.Input
             _abilityLatch = false;
             _terraformLatch = false;
             _switchLatch = false;
+            _switchDir = 1;
+            _pick = -1;
+            Toolbelt.Reset();
             _jumpLatch = false;
             _dodgeLatch = false;
             _classPick = -1;
@@ -260,9 +270,17 @@ namespace CriticalMass.Runtime.Input
         /// DG-09 (U-053): the dig / place mode switch was pressed (mouse wheel notch, LB or RB; HumanInputSource edge-detects
         /// the SwitchDigPlace axis). Latched like a button: one InputFrame.TerraformSwitch per press, dropped while paused.
         /// </summary>
-        public void SwitchDigPlace()
+        public void SwitchDigPlace(int dir = 1)
         {
-            if (!_paused) _switchLatch = true;
+            if (_paused) return;
+            _switchLatch = true;
+            _switchDir = dir < 0 ? -1 : 1;
+        }
+
+        /// <summary>b14: a number key picked Builder tool k (0..6, BuilderTool order); used by the next Fill on a living Builder.</summary>
+        public void PickBuilderTool(int k)
+        {
+            if (!_paused && k >= 0 && k < BuilderToolbelt.Count) _pick = k;
         }
 
         /// <summary>A button went up. Latches stay set until Fill consumes them.</summary>
@@ -403,6 +421,7 @@ namespace CriticalMass.Runtime.Input
                 _abilityLatch = false;
                 _terraformLatch = false;
                 _switchLatch = false;
+                _pick = -1;
                 _jumpLatch = false;
                 _dodgeLatch = false;
                 _classPick = -1;
@@ -440,13 +459,29 @@ namespace CriticalMass.Runtime.Input
             bool attackNow = _attackBuffer.Step(_attackLatch, canBuffer, canBuffer && InputReadiness.Attack(bw, BufferActor), early);
             output.Attack = _attackHeld || attackNow;
             _attackLatch = false;
-            output.Ability = _abilityBuffer.Step(_abilityLatch, canBuffer, canBuffer && InputReadiness.Ability(bw, BufferActor), early);
+            World tw = _world ?? bw;
+            int tid = Toolbelt.Actor >= 0 ? Toolbelt.Actor : BufferActor;
+            if (BuilderToolbelt.Applies(tw, tid))
+            {
+                // b14: the Builder's one tool wheel. F (DigPlace) and the class-ability buttons both USE the selected tool;
+                // the belt turns the press into the sim's Terraform or Ability press and walks the sim's selection with
+                // TerraformSwitch presses (BuilderToolbelt).
+                bool use = _terraformLatch || _abilityLatch;
+                _abilityBuffer.Clear();
+                Toolbelt.Step(tw, tid, _switchLatch, _switchDir, _pick, use, _hasAim, _aimX, _aimZ, output);
+            }
+            else
+            {
+                output.Ability = _abilityBuffer.Step(_abilityLatch, canBuffer, canBuffer && InputReadiness.Ability(bw, BufferActor), early);
+                output.Terraform = _terraformLatch;
+                output.TerraformSwitch = _switchLatch;
+            }
             _abilityLatch = false;
-            output.Interact = _interactHeld;
-            output.Terraform = _terraformLatch;
             _terraformLatch = false;
-            output.TerraformSwitch = _switchLatch;
             _switchLatch = false;
+            _switchDir = 1;
+            _pick = -1;
+            output.Interact = _interactHeld;
             output.Jump = _jumpLatch;
             _jumpLatch = false;
             output.Dodge = _dodgeLatch; // CM b13 J: one dodge per press

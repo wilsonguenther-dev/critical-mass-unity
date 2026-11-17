@@ -66,7 +66,7 @@ namespace CriticalMass.Runtime.Menus.Characters
                 Slides = new[]
                 {
                     S("CLEAVE", "Your attack is a wide swing across the front."),
-                    S("SHIELD UP", "Space raises the shield and takes most of the sting out of hits from the front."),
+                    S("SHIELD UP", "Your ability raises the shield and takes most of the sting out of hits from the front."),
                     S("HOLD THE HILL", "Stand on the hill with more friends than they have and the clock is yours."),
                     S("JUMP AND DODGE", "Jump clears gaps and short walls; a dodge dashes you out of a hit."),
                 },
@@ -80,7 +80,7 @@ namespace CriticalMass.Runtime.Menus.Characters
                 {
                     S("GATHER", "Hold E on plants. The Farmer gathers fastest and carries three."),
                     S("FEED THE EGG", "Take biomass to the egg and hold E. It remembers who feeds it."),
-                    S("ROOT SEEDS", "Space lobs seeds that slow every enemy near the landing."),
+                    S("ROOT SEEDS", "Your ability lobs seeds that slow every enemy near the landing."),
                     S("JUMP AND DODGE", "Jump clears gaps and short walls; a dodge dashes you out of a hit."),
                 },
             },
@@ -106,20 +106,20 @@ namespace CriticalMass.Runtime.Menus.Characters
                 {
                     S("TNT", "Your attack lobs TNT at your aim. After a short fuse it blows."),
                     S("CRATER", "The blast opens a crater. Nobody walks across a hole."),
-                    S("LAND MINE", "Space lays a mine that arms in a moment and hits whoever steps on it."),
+                    S("LAND MINE", "Your ability lays a mine that arms in a moment and hits whoever steps on it."),
                     S("JUMP AND DODGE", "Jump clears gaps and short walls; a dodge dashes you out of a hit."),
                 },
             },
             new ShowcaseClass
             {
-                Id = ClassId.Builder, FileId = "builder", Name = "BUILDER", Role = "Builds walls and stairs.",
-                Summary = "Builds walls and blocks for cover and traps, digs and fills the ground, stairs over walls and bridges over gaps.",
-                FAction = "BUILD", Ability = "STAIRS / BRIDGE",
+                Id = ClassId.Builder, FileId = "builder", Name = "BUILDER", Role = "Builds walls, ladders and bridges.",
+                Summary = "One tool wheel: dig, place, ladder, bridge, short wall, tall wall, block. F uses the tool on the outlined spot.",
+                FAction = "USE TOOL", Ability = "USE TOOL",
                 Slides = new[]
                 {
-                    S("BUILD", "BUILD the selected piece where the outline shows."),
-                    S("SWITCH PIECE", "Dig, place, short wall, tall wall (hut level 2), block. A block dropped in a hole fills it."),
-                    S("STAIRS AND BRIDGES", "STAIRS over a wall, BRIDGE over a gap."),
+                    S("USE TOOL", "F uses the selected tool where the outline shows. Right click does the same."),
+                    S("TOOL WHEEL", "Dig, place, ladder, bridge, short wall, tall wall (hut level 2), block. The wheel or 1-7 picks one."),
+                    S("LADDERS AND BRIDGES", "A ladder lies flat against the cliff you face; a bridge spans straight out from your edge."),
                     S("JUMP AND DODGE", "Jump clears gaps and short walls; a dodge dashes you out of a hit."),
                 },
             },
@@ -131,7 +131,7 @@ namespace CriticalMass.Runtime.Menus.Characters
                 Slides = new[]
                 {
                     S("MEND", "Your attack mends an ally in front of you."),
-                    S("HEALING PULSE", "Space heals everyone close to you in one burst."),
+                    S("HEALING PULSE", "Your ability heals everyone close to you in one burst."),
                     S("PURIFY", "Hold E at the egg to clear corruption out of it."),
                     S("JUMP AND DODGE", "Jump clears gaps and short walls; a dodge dashes you out of a hit."),
                 },
@@ -184,7 +184,7 @@ namespace CriticalMass.Runtime.Menus.Characters
 
         // ---------------------------------------------------------------- controls
 
-        /// <summary>The CONTROLS rows of a class, in screen order (Switch piece for the Builder only).</summary>
+        /// <summary>The CONTROLS rows of a class, in screen order (Next tool for the Builder only).</summary>
         public static ShowcaseControl[] ControlsFor(ClassId c)
         {
             ShowcaseClass k = Of(c);
@@ -197,7 +197,7 @@ namespace CriticalMass.Runtime.Menus.Characters
             rows[4] = new ShowcaseControl { Label = "Interact", Action = "Interact", What = c == ClassId.Miner ? "Gather, carry, bank ore" : "Gather, carry, feed" };
             rows[5] = new ShowcaseControl { Label = "Jump", Action = "Jump", What = "Clears gaps and short walls" };
             rows[6] = new ShowcaseControl { Label = "Dodge", Action = "Dodge", What = "Quick dash, 3 s to recharge" };
-            if (builder) rows[7] = new ShowcaseControl { Label = "Switch piece", Action = "SwitchDigPlace", What = "Dig, place, short wall, tall wall, block" };
+            if (builder) rows[7] = new ShowcaseControl { Label = "Next tool", Action = "SwitchDigPlace", What = "Dig, place, ladder, bridge, short wall, tall wall, block (or 1-7)" };
             return rows;
         }
 
