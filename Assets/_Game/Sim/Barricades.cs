@@ -215,11 +215,8 @@ namespace CriticalMass.Sim.Core
             if (!b.Active) return;
             b.Active = false;
             MapDef map = w.Map;
-            byte cur = map.Cells[b.Cz * map.Width + b.Cx];
-            // CM b13 B: a Builder wall cell is a barricade slot too (short = Cell.LowWall); it restores its stored ground
-            // (Floor or BreakableDestroyed; a Miner barricade only ever stored Floor or Bridge, so its path is unchanged).
-            if (cur == Cell.Barricade || cur == Cell.LowWall)
-                MapGrid.SetCell(w, b.Cx, b.Cz, b.PrevCell == Cell.Bridge ? Cell.Bridge : b.PrevCell == Cell.BreakableDestroyed ? Cell.BreakableDestroyed : Cell.Floor);
+            if (map.Cells[b.Cz * map.Width + b.Cx] == Cell.Barricade)
+                MapGrid.SetCell(w, b.Cx, b.Cz, b.PrevCell == Cell.Bridge ? Cell.Bridge : Cell.Floor);
             World.PushEvent(w, SimEventType.BarricadeBroken, b.Owner, slot, b.Cx + 0.5, b.Cz + 0.5, reason);
         }
 
@@ -284,7 +281,7 @@ namespace CriticalMass.Sim.Core
         }
 
         /// <summary>Cleave damage to ENEMY barricades (called by CombatSystem after a swing's actor hits): every active barricade of another team whose cell centre is within range and inside the arc loses damage hp.</summary>
-        public static void DamageBarricadesInArc(World w, int attackerId, double ax, double az, double fx, double fz, double range, double cosHalf, double damage, bool skipWalls = false)
+        public static void DamageBarricadesInArc(World w, int attackerId, double ax, double az, double fx, double fz, double range, double cosHalf, double damage)
         {
             TeamId team = w.Actors[attackerId].Team;
             double r2 = range * range;
@@ -293,7 +290,6 @@ namespace CriticalMass.Sim.Core
             {
                 Barricade b = list[s];
                 if (!b.Active || b.Team == team || b.Hp <= 0) continue;
-                if (skipWalls && BuilderWalls.IsWallSlot(w, s)) continue; // CM b13 B: TNT takes BuildConfig.TntDamage off wall cells (BuilderWalls.BlastWalls)
                 double dx = b.Cx + 0.5 - ax;
                 double dz = b.Cz + 0.5 - az;
                 double d2 = dx * dx + dz * dz;

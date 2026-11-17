@@ -671,7 +671,7 @@ namespace CriticalMass.Runtime.View
             for (int i = 0; i < _barricades.Length; i++)
             {
                 Barricade b = w.Barricades[i];
-                bool on = b != null && b.Active && CriticalMass.Sim.Core.BuilderWalls.SlotKind(w, i) != CriticalMass.Sim.Core.BuilderWalls.KindShort;   // b13-b (routed): short walls are drawn by WallView
+                bool on = b != null && b.Active;
                 if (on && _barricades[i] == null) _barricades[i] = Make(ArtMapping.MinerBarricade, "Barricade " + i);
                 ModelView m = _barricades[i];
                 if (m == null) continue;

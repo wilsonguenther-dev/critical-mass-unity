@@ -281,16 +281,6 @@ namespace CriticalMass.Sim.Core
             w.Terraform.TeamReadyTick[(int)team] = w.Tick + Durations.T30(w.Config, w.Config.Abilities.MinerTerraform.TeamCooldownTicks);
         }
 
-        /// <summary>
-        /// CM b13 B: a Builder's BLOCK into a hole fills it to Floor (the old Miner place: permanent, PlaceRefusal and WaitTicks
-        /// already checked by BuilderWalls). Same commit as a place (team cooldown, wall change tick) and one Terraform Placed event.
-        /// </summary>
-        public static void CommitFill(World w, int id, int cx, int cz)
-        {
-            Commit(w, id, cx, cz, Cell.Floor);
-            World.PushEvent(w, SimEventType.Terraform, id, cz * w.Map.Width + cx, cx + 0.5, cz + 0.5, Placed);
-        }
-
         /// <summary>DG-09: blocks a miner may carry (MinerTerraform.CarryMax, at least 1, at most 255).</summary>
         public static int CarryMax(GameConfig c)
         {
