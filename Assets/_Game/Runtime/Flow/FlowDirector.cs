@@ -442,7 +442,7 @@ namespace CriticalMass.Runtime.Flow
                         GameFlow.RenewBackdrop();
                     break;
                 case FlowState.Results:
-                    if (GameFlow.Autoplay && Time.unscaledTime - _resultsAt >= GameFlow.AutoplayResultsSeconds) PlayAgain();
+                    if (GameFlow.Autoplay && !CriticalMass.Runtime.Game.MatchVideo.Active && Time.unscaledTime - _resultsAt >= GameFlow.AutoplayResultsSeconds) PlayAgain();   // b13: the match video holds the results
                     else if (!Results.IsVisible && _external == null) Results.Show();   // never left without a screen
                     break;
             }
