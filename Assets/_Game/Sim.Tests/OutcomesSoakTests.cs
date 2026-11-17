@@ -180,9 +180,12 @@ namespace CriticalMass.Sim.Tests
             int n = OutcomeBatches.C.Count;
             Console.WriteLine("{\"item\":\"AFK first " + n + "\",\"bot\":" + Wins(AfkBot, MatchResult.Azure, n) + ",\"passive\":" + Wins(AfkPassive, MatchResult.Azure, n) +
                               ",\"wander\":" + Wins(AfkWander, MatchResult.Azure, n) + "} (printed)");
-            const int first = 201, seeds = 100;
-            int bot = 0, passive = 0, wander = 0;
-            for (int seed = first; seed < first + seeds; seed++)
+            // 201-250 are the AFK batch the 50-seed test already plays (SoakCache); 251-300 run here (run time: the sim job's 30 min).
+            OutcomeBatch afk = OutcomeBatches.Get("AFK");
+            Assert.AreEqual(201, afk.FirstSeed);
+            Assert.AreEqual(50, afk.Count);
+            int bot = Wins(AfkBot, MatchResult.Azure), passive = Wins(AfkPassive, MatchResult.Azure), wander = Wins(AfkWander, MatchResult.Azure);
+            for (int seed = 251; seed <= 300; seed++)
             {
                 if (OutcomeRunner.RunOutcomeMatch(seed, 5, HumanMode.Bot).Winner == MatchResult.Azure) bot++;
                 if (OutcomeRunner.RunOutcomeMatch(seed, 5, HumanMode.Passive).Winner == MatchResult.Azure) passive++;
