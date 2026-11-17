@@ -72,6 +72,7 @@ namespace CriticalMass.Sim.Bots
             output.Terraform = false;
             output.Jump = false;
             output.TerraformSwitch = false; // DG-09: bots never switch the dig / place mode (they never dig: oracle CM-30)
+            output.Dodge = false;   // b13-hook: the shared scratch frame never carries a human dodge to a bot (BotReflex sets it)
             BotSteer.SteerBot(w, st, id, output);
             // DG-22 (CM-38): a Demolitions bot's queued TNT throw (BotFsm.DecideDemolitions) is its one press, aimed at the throw point.
             Demolitions.TakeBotTnt(w, id, output);

@@ -11,7 +11,7 @@ namespace CriticalMass.Net.Replay
     /// then, for every actor whose bit is set in the presence mask (id order): u8 change bits, then each changed field.
     /// </code>
     /// Change bits: 0 MoveX, 1 MoveZ, 2 AimX, 3 AimZ, 4 buttons (u8: Attack, Ability, Interact, Terraform, Jump,
-    /// TerraformSwitch), 5 picks (i8 ClassPick, u8 StationBuy, u8 PingKind), 6 PingX, 7 PingZ.
+    /// TerraformSwitch, Dodge = bit 64 since CM b13), 5 picks (i8 ClassPick, u8 StationBuy, u8 PingKind), 6 PingX, 7 PingZ.
     /// A double is written as a varint: even = zig-zag delta of its quantum index (move 1/127, points 1/100, which is
     /// exactly what online frames hold and what keyboards, sticks at rest and ping points mostly hold), odd (1) = the raw
     /// 8 bytes follow. Either way the decoded double has the recorded bits exactly, so playback consumes the same frames.
@@ -28,7 +28,8 @@ namespace CriticalMass.Net.Replay
         const double QuantLimit = 1e7;
 
         public static int Buttons(InputFrame f) =>
-            (f.Attack ? 1 : 0) | (f.Ability ? 2 : 0) | (f.Interact ? 4 : 0) | (f.Terraform ? 8 : 0) | (f.Jump ? 16 : 0) | (f.TerraformSwitch ? 32 : 0);
+            (f.Attack ? 1 : 0) | (f.Ability ? 2 : 0) | (f.Interact ? 4 : 0) | (f.Terraform ? 8 : 0) | (f.Jump ? 16 : 0) | (f.TerraformSwitch ? 32 : 0)
+            | (f.Dodge ? 64 : 0);   // b13-hook
 
         public static void SetButtons(InputFrame f, int b)
         {
@@ -38,6 +39,7 @@ namespace CriticalMass.Net.Replay
             f.Terraform = (b & 8) != 0;
             f.Jump = (b & 16) != 0;
             f.TerraformSwitch = (b & 32) != 0;
+            f.Dodge = (b & 64) != 0;   // b13-hook
         }
 
         static bool Same(double a, double b) => BitConverter.DoubleToInt64Bits(a) == BitConverter.DoubleToInt64Bits(b);

@@ -15,7 +15,8 @@ namespace CriticalMass.Net
         /// <summary>Aim and ping points are clamped to this many sim units from the origin (the arena is about 112 x 72).</summary>
         public const double CoordLimit = 320;
 
-        private const int BAttack = 1, BAbility = 2, BInteract = 4, BTerraform = 8, BJump = 16, BSwitch = 32, BHasAim = 64;
+        private const int BAttack = 1, BAbility = 2, BInteract = 4, BTerraform = 8, BJump = 16, BSwitch = 32, BHasAim = 64,
+            BDodge = 128;   // b13-hook: CM b13 dodge, same byte as BJump (Size stays 14)
 
         public static void Encode(InputFrame f, byte[] buf, int off)
         {
@@ -32,6 +33,7 @@ namespace CriticalMass.Net
             if (f.Jump) b |= BJump;
             if (f.TerraformSwitch) b |= BSwitch;
             if (aim) b |= BHasAim;
+            if (f.Dodge) b |= BDodge;   // b13-hook
             buf[off + 6] = (byte)b;
             buf[off + 7] = (byte)(sbyte)(f.ClassPick >= 0 && f.ClassPick < ClassIds.All.Count ? f.ClassPick : -1);
             buf[off + 8] = (byte)(f.StationBuy >= 1 && f.StationBuy <= ClassIds.All.Count ? f.StationBuy : 0);
@@ -64,6 +66,7 @@ namespace CriticalMass.Net
             f.Terraform = (b & BTerraform) != 0;
             f.Jump = (b & BJump) != 0;
             f.TerraformSwitch = (b & BSwitch) != 0;
+            f.Dodge = (b & BDodge) != 0;   // b13-hook
             int cp = (sbyte)buf[off + 7];
             f.ClassPick = cp >= 0 && cp < ClassIds.All.Count ? cp : -1;
             int sb = buf[off + 8];

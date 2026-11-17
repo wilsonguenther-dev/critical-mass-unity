@@ -21,6 +21,7 @@ namespace CriticalMass.Sim.Core
                 Terraform = false,
                 Jump = false,
                 TerraformSwitch = false,
+                Dodge = false,   // b13-hook
                 StationBuy = 0,
                 PingKind = 0,
             };
@@ -53,6 +54,7 @@ namespace CriticalMass.Sim.Core
             dst.Terraform = frame.Terraform == true;
             dst.Jump = frame.Jump == true;
             dst.TerraformSwitch = frame.TerraformSwitch == true;
+            dst.Dodge = frame.Dodge == true;   // b13-hook
             dst.StationBuy = frame.StationBuy >= 1 && frame.StationBuy <= ClassIds.All.Count ? frame.StationBuy : 0;
             dst.PingKind = frame.PingKind >= 1 && frame.PingKind <= 4 && !double.IsNaN(frame.PingX) && !double.IsNaN(frame.PingZ) ? frame.PingKind : 0;
             dst.PingX = frame.PingX;

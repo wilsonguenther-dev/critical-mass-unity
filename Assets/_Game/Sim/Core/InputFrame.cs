@@ -35,6 +35,11 @@ namespace CriticalMass.Sim.Core
         public int PingKind;
         public double PingX;
         public double PingZ;
+        /// <summary>
+        /// CM b13 [J]: dodge this step. One-shot: edge-latched by the human input layer, read and cleared by the dodge system
+        /// (Sim/B13/Dodge.cs); bots set it through BotReflex. Wire bit 128 (InputCodec), replay button bit 64.
+        /// </summary>
+        public bool Dodge;   // b13-hook
 
         public void CopyFrom(InputFrame other)
         {
@@ -53,6 +58,7 @@ namespace CriticalMass.Sim.Core
             PingKind = other.PingKind;
             PingX = other.PingX;
             PingZ = other.PingZ;
+            Dodge = other.Dodge;   // b13-hook
         }
     }
 }

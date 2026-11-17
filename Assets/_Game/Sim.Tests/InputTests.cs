@@ -150,5 +150,31 @@ namespace CriticalMass.Sim.Tests
             World.ResetWorld(w, Opts(2, 4, TeamId.Crimson, ClassId.Miner));
             for (int i = 0; i < w.HasAim.Length; i++) Assert.AreEqual(0, w.HasAim[i]);
         }
+
+        [Test]
+        public void B13DodgeSurvivesTheWireCodecRoundTripAndApplyInput()
+        {
+            var f = SimInput.EmptyInput();
+            f.Dodge = true;
+            f.Jump = true;
+            var b = new byte[CriticalMass.Net.InputCodec.Size];
+            CriticalMass.Net.InputCodec.Encode(f, b, 0);
+            var g = SimInput.EmptyInput();
+            CriticalMass.Net.InputCodec.Decode(b, 0, g);
+            Console.WriteLine($"[b13 input] codec Size {CriticalMass.Net.InputCodec.Size} B, buttons byte 0x{b[6]:X2}, decoded Dodge={g.Dodge} Jump={g.Jump} (limit: Size 14, both true)");
+            Assert.AreEqual(14, CriticalMass.Net.InputCodec.Size);
+            Assert.IsTrue(g.Dodge && g.Jump);
+            f.Dodge = false;
+            CriticalMass.Net.InputCodec.Encode(f, b, 0);
+            CriticalMass.Net.InputCodec.Decode(b, 0, g);
+            Assert.IsFalse(g.Dodge, "a frame without dodge decodes without dodge");
+            var w = World.CreateWorld(Opts(2, 4, TeamId.Azure, ClassId.Miner));
+            f.Dodge = true;
+            SimInput.ApplyInput(w, 0, f);
+            var c = SimInput.EmptyInput();
+            c.CopyFrom(w.Inputs[0]);
+            Console.WriteLine($"[b13 input] ApplyInput then CopyFrom: Dodge={c.Dodge} (limit: true)");
+            Assert.IsTrue(c.Dodge);
+        }
     }
 }

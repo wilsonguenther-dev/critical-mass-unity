@@ -63,6 +63,7 @@ namespace CriticalMass.Sim.Tests.Net
             f.Terraform = false;
             f.Jump = (t + actor) % 97 == 0;
             f.TerraformSwitch = false;
+            f.Dodge = (t + actor * 3) % 89 == 0;   // CM b13: dodge presses travel through the record and playback paths
             f.ClassPick = -1;
             f.StationBuy = 0;
             f.PingKind = (t + actor * 11) % 400 == 0 ? 1 : 0;
@@ -358,6 +359,22 @@ namespace CriticalMass.Sim.Tests.Net
                               $"(limit 50 us); {fpTicks} fingerprint ticks; buffer {rec.InputBytes} B");
             Assert.AreEqual(0, allocated, "the per-tick recording path allocated");
             Assert.Less(usPerTick, 50.0);
+        }
+
+        [Test]
+        public void B13DodgeButtonSurvivesTheReplayButtonsByte()
+        {
+            var f = SimInput.EmptyInput();
+            f.Dodge = true;
+            f.Attack = true;
+            int b = ReplayInputStream.Buttons(f);
+            var g = SimInput.EmptyInput();
+            ReplayInputStream.SetButtons(g, b);
+            Console.WriteLine($"[b13 replay] buttons byte 0x{b:X2}, decoded Dodge={g.Dodge} Attack={g.Attack} (limit: bit 64 set, both true)");
+            Assert.AreEqual(64, b & 64);
+            Assert.IsTrue(g.Dodge && g.Attack);
+            ReplayInputStream.SetButtons(g, 0);
+            Assert.IsFalse(g.Dodge);
         }
     }
 }
